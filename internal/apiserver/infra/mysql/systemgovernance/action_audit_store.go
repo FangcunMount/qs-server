@@ -91,6 +91,13 @@ func (s *ActionAuditStore) Complete(ctx context.Context, record app.ActionAuditR
 		return result.Error
 	}
 	if result.RowsAffected != 1 {
+		var existing actionRunPO
+		if err := s.db.WithContext(ctx).Where("org_id = ? AND request_id = ?", record.OrgID, record.RequestID).Take(&existing).Error; err != nil {
+			return err
+		}
+		if existing.ActionID == record.ActionID && existing.Status == record.Status && existing.ResultJSON == resultJSON {
+			return nil
+		}
 		return gorm.ErrRecordNotFound
 	}
 	return nil

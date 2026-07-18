@@ -268,3 +268,6 @@ log:
 jwt:
   secret_key: "qs-collection-server-jwt-secret-key-2024"
   token_duration: 168  # 7 天 (24*7小时)
+resilience:
+  control:
+    enabled: true

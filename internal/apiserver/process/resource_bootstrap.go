@@ -28,7 +28,7 @@ type resourceStageDeps struct {
 	mqPublisher           mqPublisherStageDeps
 	eventSubsystem        eventSubsystemResourceDeps
 	loadEventCatalog      func() (*eventcatalog.Catalog, error)
-	buildResilience       func(*cacheplanebootstrap.RuntimeBundle) *resiliencesubsystem.Subsystem
+	buildResilience       func(*cacheplanebootstrap.RuntimeBundle) (*resiliencesubsystem.Subsystem, error)
 	buildContainerOptions func(containerOptionsInput) container.ContainerOptions
 }
 
@@ -78,7 +78,7 @@ func (s *server) buildResourceStageDeps() resourceStageDeps {
 	return deps
 }
 
-func (s *server) buildResilienceDeps() func(*cacheplanebootstrap.RuntimeBundle) *resiliencesubsystem.Subsystem {
+func (s *server) buildResilienceDeps() func(*cacheplanebootstrap.RuntimeBundle) (*resiliencesubsystem.Subsystem, error) {
 	if s == nil || s.config == nil {
 		return nil
 	}
@@ -175,8 +175,12 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 	redisCache, redisRuntime, cacheSubsystem := initializeRedisRuntime(deps.redisRuntime)
 	var resilience *resiliencesubsystem.Subsystem
 	if deps.buildResilience != nil {
-		resilience = deps.buildResilience(redisRuntime)
+		resilience, err = deps.buildResilience(redisRuntime)
+		if err != nil {
+			return resourceOutput{}, err
+		}
 	}
+	actionAuditStore, actionAuditRunner := buildActionAuditRuntime(mysqlDB, redisRuntime)
 	mqPublisher, publishMode := createMQPublisher(deps.mqPublisher)
 	eventCatalog, err := loadEventCatalog(deps.loadEventCatalog)
 	if err != nil {
@@ -205,9 +209,11 @@ func prepareResources(deps resourceStageDeps) (resourceOutput, error) {
 	}
 	if deps.buildContainerOptions != nil {
 		containerOptions := deps.buildContainerOptions(containerOptionsInput{
-			cacheSubsystem: cacheSubsystem,
-			resilience:     resilience,
-			eventSubsystem: events,
+			cacheSubsystem:    cacheSubsystem,
+			resilience:        resilience,
+			eventSubsystem:    events,
+			actionAuditStore:  actionAuditStore,
+			actionAuditRunner: actionAuditRunner,
 		})
 		output.containerInput = containerBootstrapInput{containerOptions: containerOptions}
 	}

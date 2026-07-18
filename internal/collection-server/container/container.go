@@ -116,7 +116,7 @@ func (c *Container) TesteeService() *testee.Service {
 }
 
 // NewContainer 创建新的容器
-func NewContainer(opts *options.Options, opsHandle *redisruntime.Handle, locks *locksubsystem.Subsystem, familyStatus *observability.FamilyStatusRegistry) *Container {
+func NewContainer(opts *options.Options, opsHandle *redisruntime.Handle, locks *locksubsystem.Subsystem, familyStatus *observability.FamilyStatusRegistry) (*Container, error) {
 	var backend ratelimit.Backend
 	if opsHandle != nil && opsHandle.Client != nil {
 		backend = ratelimitredis.NewBackend(opsHandle.Client, opsHandle.Builder)
@@ -129,8 +129,20 @@ func NewContainer(opts *options.Options, opsHandle *redisruntime.Handle, locks *
 	var concurrencyCfg *options.ConcurrencyOptions
 	var waitCfg *options.WaitReportOptions
 	var grpcCfg *options.GRPCClientOptions
+	var controlEnabled *bool
 	if opts != nil {
 		rateCfg, concurrencyCfg, waitCfg, grpcCfg = opts.RateLimit, opts.Concurrency, opts.WaitReport, opts.GRPCClient
+		if opts.Resilience != nil && opts.Resilience.Control != nil {
+			controlEnabled = &opts.Resilience.Control.Enabled
+		}
+	}
+	resilienceSubsystem, err := resiliencesubsystem.New(resiliencesubsystem.Options{
+		RateLimit: rateCfg, Concurrency: concurrencyCfg, WaitReport: waitCfg, GRPCClient: grpcCfg,
+		Backend: backend, Locks: locks, OpsAvailable: opsHandle != nil && opsHandle.Client != nil, StateStore: stateStore,
+		ControlEnabled: controlEnabled,
+	})
+	if err != nil {
+		return nil, err
 	}
 	c := &Container{
 		opts:           opts,
@@ -139,13 +151,10 @@ func NewContainer(opts *options.Options, opsHandle *redisruntime.Handle, locks *
 		familyStatus:   familyStatus,
 		initialized:    false,
 		cacheSubsystem: collectioncache.NewSubsystem(collectionCacheConfig(opts), opsHandle),
-		resilience: resiliencesubsystem.New(resiliencesubsystem.Options{
-			RateLimit: rateCfg, Concurrency: concurrencyCfg, WaitReport: waitCfg, GRPCClient: grpcCfg,
-			Backend: backend, Locks: locks, OpsAvailable: opsHandle != nil && opsHandle.Client != nil, StateStore: stateStore,
-		}),
+		resilience:     resilienceSubsystem,
 	}
 	c.initConcurrencyGates()
-	return c
+	return c, nil
 }
 
 func collectionCacheConfig(opts *options.Options) collectioncache.Config {

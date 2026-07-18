@@ -116,3 +116,41 @@ func TestPerfProfilesMatchSOPCapacityContract(t *testing.T) {
 		t.Fatal("SOP still describes perf-mixed300 as unqualified full-pass")
 	}
 }
+
+func TestPerfPathsMatchCurrentRuntimeContract(t *testing.T) {
+	root := repoRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "scripts/perf/qs-perf.config.example.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, retired := range []string{
+		"/api/v1/statistics/system",
+		"/api/v1/statistics/questionnaires/",
+	} {
+		if strings.Contains(string(raw), retired) {
+			t.Fatalf("perf config still references retired statistics route %q", retired)
+		}
+	}
+
+	var config struct {
+		Paths struct {
+			StatisticsContentBatch string `json:"statisticsContentBatch"`
+			BehaviorReportStatus   string `json:"behaviorReportStatus"`
+			BehaviorReport         string `json:"behaviorReport"`
+		} `json:"paths"`
+	}
+	if err := json.Unmarshal(raw, &config); err != nil {
+		t.Fatal(err)
+	}
+
+	if config.Paths.StatisticsContentBatch != "/api/v1/statistics/contents/batch" {
+		t.Fatalf("statisticsContentBatch = %q, want current batch endpoint", config.Paths.StatisticsContentBatch)
+	}
+	if config.Paths.BehaviorReportStatus != "/api/v1/behavior-assessments/{assessment_id}/report-status?testee_id={testee_id}" {
+		t.Fatalf("behaviorReportStatus = %q, want current behavior report-status endpoint", config.Paths.BehaviorReportStatus)
+	}
+	if config.Paths.BehaviorReport != "/api/v1/behavior-assessments/{assessment_id}/report?testee_id={testee_id}" {
+		t.Fatalf("behaviorReport = %q, want current behavior report endpoint", config.Paths.BehaviorReport)
+	}
+}

@@ -520,7 +520,12 @@ export const QUERY_PATHS = applySmokeQueryPathOverride(
 export const STATS_PATHS = envOrConfigList(
   'STATISTICS_PATHS',
   ['statisticsPaths', 'statistics_paths', 'paths.statistics'],
-  '/api/v1/statistics/overview?preset=7d,/api/v1/statistics/system,/api/v1/statistics/questionnaires/{questionnaire_code}?preset=7d'
+  '/api/v1/statistics/overview?preset=7d'
+);
+export const STATS_CONTENT_BATCH_PATH = envOrConfigString(
+  'STATISTICS_CONTENT_BATCH_PATH',
+  ['statisticsContentBatchPath', 'statistics_content_batch_path', 'paths.statisticsContentBatch', 'paths.statistics_content_batch'],
+  '/api/v1/statistics/contents/batch'
 );
 
 export const SUBMIT_PATH = envOrConfigString('SUBMIT_PATH', ['submitPath', 'submit_path', 'paths.submit'], '/api/v1/answersheets');
@@ -552,6 +557,11 @@ export const PERSONALITY_REPORT_STATUS_PATH = envOrConfigString(
   ['personalityReportStatusPath', 'personality_report_status_path', 'paths.personalityReportStatus', 'paths.personality_report_status'],
   defaultReportStatusPath(REPORT_MODE, 'personality')
 );
+export const BEHAVIOR_REPORT_STATUS_PATH = envOrConfigString(
+  'BEHAVIOR_REPORT_STATUS_PATH',
+  ['behaviorReportStatusPath', 'behavior_report_status_path', 'paths.behaviorReportStatus', 'paths.behavior_report_status'],
+  defaultReportStatusPath(REPORT_MODE, 'behavior')
+);
 export const REPORT_EVENTS_PATH = envOrConfigString(
   'REPORT_EVENTS_PATH',
   ['reportEventsPath', 'report_events_path', 'paths.reportEvents', 'paths.report_events'],
@@ -561,6 +571,11 @@ export const PERSONALITY_REPORT_PATH = envOrConfigString(
   'PERSONALITY_REPORT_PATH',
   ['personalityReportPath', 'personality_report_path', 'paths.personalityReport', 'paths.personality_report'],
   '/api/v1/typology-assessments/{assessment_id}/report?testee_id={testee_id}'
+);
+export const BEHAVIOR_REPORT_PATH = envOrConfigString(
+  'BEHAVIOR_REPORT_PATH',
+  ['behaviorReportPath', 'behavior_report_path', 'paths.behaviorReport', 'paths.behavior_report'],
+  '/api/v1/behavior-assessments/{assessment_id}/report?testee_id={testee_id}'
 );
 export const PERSONALITY_SESSION_PATH = envOrConfigString(
   'PERSONALITY_SESSION_PATH',

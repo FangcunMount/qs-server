@@ -6,7 +6,11 @@ import (
 )
 
 func TestSnapshotDoesNotInventWorkerRateOrBackpressureCapabilities(t *testing.T) {
-	snapshot := New(Options{}).Snapshot(time.Now())
+	s, err := New(Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := s.Snapshot(time.Now())
 	if snapshot.InstanceID == "" || len(snapshot.RateLimits) != 0 || len(snapshot.Backpressure) != 0 {
 		t.Fatalf("Snapshot() = %+v", snapshot)
 	}

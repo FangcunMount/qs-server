@@ -39,13 +39,17 @@ type Subsystem struct {
 	stateStore   control.StateStore
 }
 
-func New(opts Options) *Subsystem {
+func New(opts Options) (*Subsystem, error) {
 	cfg := opts.RateLimit
 	if cfg == nil {
 		cfg = options.NewRateLimitOptions()
 	}
+	identity, err := control.ResolveInstanceIdentity("apiserver", opts.InstanceID)
+	if err != nil {
+		return nil, err
+	}
 	s := &Subsystem{
-		identity:     control.ResolveInstanceIdentity("apiserver", opts.InstanceID),
+		identity:     identity,
 		rateEnabled:  cfg.Enabled,
 		budgets:      make(map[ratelimit.BudgetID]*ratelimit.Budget),
 		backpressure: buildBackpressure(opts.Backpressure),
@@ -56,7 +60,7 @@ func New(opts Options) *Subsystem {
 	s.budgets[BudgetSubmit] = newLocalBudget(BudgetSubmit, cfg.SubmitGlobalQPS, cfg.SubmitGlobalBurst, cfg.SubmitUserQPS, cfg.SubmitUserBurst)
 	s.budgets[BudgetAdminSubmit] = newLocalBudget(BudgetAdminSubmit, cfg.AdminSubmitGlobalQPS, cfg.AdminSubmitGlobalBurst, cfg.AdminSubmitUserQPS, cfg.AdminSubmitUserBurst)
 	s.budgets[BudgetWaitReport] = newLocalBudget(BudgetWaitReport, cfg.WaitReportGlobalQPS, cfg.WaitReportGlobalBurst, cfg.WaitReportUserQPS, cfg.WaitReportUserBurst)
-	return s
+	return s, nil
 }
 
 // Start runs control-state reconciliation and instance heartbeats. Data-plane

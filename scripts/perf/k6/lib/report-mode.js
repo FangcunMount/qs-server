@@ -6,9 +6,13 @@ export const LONG_POLL_MEDICAL_REPORT_PATH =
   '/api/v1/assessments/{assessment_id}/wait-report?testee_id={testee_id}&timeout={report_timeout}';
 export const LONG_POLL_PERSONALITY_REPORT_PATH =
   '/api/v1/typology-assessments/{assessment_id}/wait-report?testee_id={testee_id}&timeout={report_timeout}';
+export const LONG_POLL_BEHAVIOR_REPORT_PATH =
+  '/api/v1/behavior-assessments/{assessment_id}/wait-report?testee_id={testee_id}&timeout={report_timeout}';
 export const SHORT_POLL_MEDICAL_REPORT_PATH = '/api/v1/assessments/{assessment_id}/report-status?testee_id={testee_id}';
 export const SHORT_POLL_PERSONALITY_REPORT_PATH =
   '/api/v1/typology-assessments/{assessment_id}/report-status?testee_id={testee_id}';
+export const SHORT_POLL_BEHAVIOR_REPORT_PATH =
+  '/api/v1/behavior-assessments/{assessment_id}/report-status?testee_id={testee_id}';
 
 export function normalizeReportMode(raw) {
   const value = String(raw || '')
@@ -54,6 +58,9 @@ export function isShortPollReportMode(mode) {
 }
 
 export function defaultReportStatusPath(mode, kind) {
+  if (kind === 'behavior') {
+    return isShortPollReportMode(mode) ? SHORT_POLL_BEHAVIOR_REPORT_PATH : LONG_POLL_BEHAVIOR_REPORT_PATH;
+  }
   if (isShortPollReportMode(mode)) {
     return kind === 'personality' ? SHORT_POLL_PERSONALITY_REPORT_PATH : SHORT_POLL_MEDICAL_REPORT_PATH;
   }

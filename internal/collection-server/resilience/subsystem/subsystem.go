@@ -32,15 +32,16 @@ const (
 )
 
 type Options struct {
-	InstanceID   string
-	RateLimit    *options.RateLimitOptions
-	Concurrency  *options.ConcurrencyOptions
-	WaitReport   *options.WaitReportOptions
-	GRPCClient   *options.GRPCClientOptions
-	Backend      ratelimit.Backend
-	Locks        *locksubsystem.Subsystem
-	OpsAvailable bool
-	StateStore   control.StateStore
+	InstanceID     string
+	RateLimit      *options.RateLimitOptions
+	Concurrency    *options.ConcurrencyOptions
+	WaitReport     *options.WaitReportOptions
+	GRPCClient     *options.GRPCClientOptions
+	Backend        ratelimit.Backend
+	Locks          *locksubsystem.Subsystem
+	OpsAvailable   bool
+	StateStore     control.StateStore
+	ControlEnabled *bool
 }
 
 type queueRegistration struct {
@@ -63,20 +64,30 @@ type Subsystem struct {
 	activeCommands   map[string]struct{}
 	controlReady     atomic.Bool
 	grpcInflightWait time.Duration
+	controlEnabled   bool
 }
 
-func New(opts Options) *Subsystem {
+func New(opts Options) (*Subsystem, error) {
 	rateCfg := opts.RateLimit
 	if rateCfg == nil {
 		rateCfg = options.NewRateLimitOptions()
 	}
+	controlEnabled := true
+	if opts.ControlEnabled != nil {
+		controlEnabled = *opts.ControlEnabled
+	}
+	identity, err := control.ResolveInstanceIdentity("collection-server", opts.InstanceID)
+	if err != nil {
+		return nil, err
+	}
 	s := &Subsystem{
-		identity:    control.ResolveInstanceIdentity("collection-server", opts.InstanceID),
+		identity:    identity,
 		rateEnabled: rateCfg.Enabled, budgets: make(map[ratelimit.BudgetID]*ratelimit.Budget),
 		gates: make(map[string]*concurrency.Gate), locks: opts.Locks, opsAvailable: opts.OpsAvailable, stateStore: opts.StateStore,
 		appliedRate:    make(map[ratelimit.BudgetID]uint64),
 		queues:         make(map[string]queueRegistration),
 		activeCommands: make(map[string]struct{}),
+		controlEnabled: controlEnabled,
 	}
 	s.budgets[BudgetQuery] = newBudget(BudgetQuery, opts.Backend, rateCfg.QueryGlobalQPS, rateCfg.QueryGlobalBurst, rateCfg.QueryUserQPS, rateCfg.QueryUserBurst)
 	s.budgets[BudgetSubmit] = newBudget(BudgetSubmit, opts.Backend, rateCfg.SubmitGlobalQPS, rateCfg.SubmitGlobalBurst, rateCfg.SubmitUserQPS, rateCfg.SubmitUserBurst)
@@ -86,20 +97,24 @@ func New(opts Options) *Subsystem {
 	grpcOptions := opts.GRPCClient
 	s.gates[GateGRPCDownstream] = concurrency.NewGate(grpcOptions.ResolvedMaxInflight())
 	s.grpcInflightWait = grpcOptions.ResolvedInflightWait()
-	if opts.StateStore == nil || !opts.OpsAvailable {
+	if !controlEnabled {
 		s.controlReady.Store(true)
 	}
-	return s
+	return s, nil
 }
 
 // Sync performs the cold-start control-state read before the process may
 // report ready. Reconciliation continues asynchronously after this succeeds.
 func (s *Subsystem) Sync(ctx context.Context) error {
-	if s == nil || s.stateStore == nil || !s.opsAvailable {
-		if s != nil {
-			s.controlReady.Store(true)
-		}
+	if s == nil {
 		return nil
+	}
+	if !s.controlEnabled {
+		s.controlReady.Store(true)
+		return nil
+	}
+	if s.stateStore == nil || !s.opsAvailable {
+		return control.ErrUnavailable
 	}
 	state, exists, err := s.stateStore.Load(ctx, "queue:collection-server:answersheet_submit")
 	if err != nil {
@@ -118,7 +133,7 @@ func (s *Subsystem) ControlSynchronized() bool {
 
 func (s *Subsystem) Start(ctx context.Context) context.CancelFunc {
 	ctx, cancel := context.WithCancel(ctx)
-	if s == nil || s.stateStore == nil {
+	if s == nil || !s.controlEnabled {
 		return cancel
 	}
 	go func() {
@@ -149,6 +164,9 @@ func (s *Subsystem) Start(ctx context.Context) context.CancelFunc {
 }
 
 func (s *Subsystem) reconcile(ctx context.Context) {
+	if s == nil || s.stateStore == nil || !s.controlEnabled {
+		return
+	}
 	if heartbeater, ok := s.stateStore.(control.InstanceHeartbeater); ok {
 		_ = heartbeater.Heartbeat(ctx, s.identity, 5*time.Second)
 	}

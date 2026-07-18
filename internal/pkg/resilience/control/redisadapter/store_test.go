@@ -50,7 +50,10 @@ func TestStoreCommandClaimAndPerInstanceResults(t *testing.T) {
 	t.Cleanup(func() { _ = client.Close() })
 	store := NewStore(client, keyspace.NewBuilderWithNamespace("ops:runtime"))
 	ctx := context.Background()
-	identity := control.ResolveInstanceIdentity("collection-server", "collection-0")
+	identity, err := control.ResolveInstanceIdentity("collection-server", "collection-0")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := store.Heartbeat(ctx, identity, time.Minute); err != nil {
 		t.Fatal(err)
 	}

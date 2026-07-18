@@ -3,6 +3,7 @@ import { scenarioData, pickReportSample, flattenReportSamples, renderPath } from
 import { timedRequest, authHeaders, collectionToken, recordHTTPStatus, responseData } from '../lib/http.js';
 import {
   COLLECTION_BASE_URL, REPORT_STATUS_PATH, PERSONALITY_REPORT_STATUS_PATH, REPORT_TIMEOUT, REPORT_SHORT_POLL,
+  BEHAVIOR_REPORT_STATUS_PATH,
 } from '../lib/config.js';
 import {
   reportStatusDuration, reportStatusFailed, medicalReportStatusDuration, medicalReportStatusFailed,
@@ -14,8 +15,18 @@ import {
 export function reportStatusQuery(data) {
   const ctx = scenarioData(data);
   const sample = pickReportSample(flattenReportSamples(ctx.reportSamples));
-  const pathTemplate = sample && sample.model_type === 'personality' ? PERSONALITY_REPORT_STATUS_PATH : REPORT_STATUS_PATH;
+  const pathTemplate = reportStatusPathForSample(sample);
   runReportStatusQuery(ctx, sample, pathTemplate, 'report_status_query', reportStatusDuration, reportStatusFailed);
+}
+
+export function reportStatusPathForSample(sample) {
+  if (sample && sample.model_type === 'personality') {
+    return PERSONALITY_REPORT_STATUS_PATH;
+  }
+  if (sample && sample.model_type === 'behavior') {
+    return BEHAVIOR_REPORT_STATUS_PATH;
+  }
+  return REPORT_STATUS_PATH;
 }
 
 export function medicalReportStatusQuery(data) {
@@ -73,4 +84,3 @@ export function runReportStatusQuery(ctx, sample, pathTemplate, endpoint, durati
     'report status query status is 200': (r) => r.status === 200,
   });
 }
-

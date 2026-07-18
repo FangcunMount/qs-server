@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/gin-gonic/gin"
@@ -203,7 +202,7 @@ func TestCollectionOpenAPIHasNoLegacyPersonalitySessionSchemas(t *testing.T) {
 func TestCollectionRESTRegistersMedicalAssessmentListRoute(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	c := container.NewContainer(
+	c := mustNewCollectionContainer(t,
 		options.NewOptions(),
 		nil,
 		nil,
@@ -230,7 +229,7 @@ func TestCollectionRESTRegistersMedicalAssessmentListRoute(t *testing.T) {
 func TestCollectionRESTDoesNotRegisterLegacyV2AssessmentOutcomeRoutes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	c := container.NewContainer(
+	c := mustNewCollectionContainer(t,
 		options.NewOptions(),
 		nil,
 		nil,
@@ -264,7 +263,7 @@ func TestCollectionRESTDoesNotDocumentLegacyTypologyAssessmentCompatibility(t *t
 func TestCollectionPublicBusinessRoutesAreCoveredByOpenAPI(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	c := container.NewContainer(
+	c := mustNewCollectionContainer(t,
 		options.NewOptions(),
 		nil,
 		nil,

@@ -64,6 +64,10 @@ func (c *Container) Cleanup() error {
 		c.resilienceCancel()
 		c.resilienceCancel = nil
 	}
+	if c.actionAuditCancel != nil {
+		c.actionAuditCancel()
+		c.actionAuditCancel = nil
+	}
 	if c.eventSubsystem != nil {
 		if err := c.eventSubsystem.Close(); err != nil {
 			return fmt.Errorf("failed to close event subsystem: %w", err)

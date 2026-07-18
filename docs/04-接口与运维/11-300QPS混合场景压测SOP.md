@@ -91,6 +91,8 @@ smoke_4
 - HTTP 429 是限流或提交保护信号，不等价于 outbox 堆积。
 - catalog 503 是 query semaphore Try reject，不是 rate limit 429。
 - k6 5xx 但应用日志无 5xx 时，优先查 Nginx。
+- report 自动发现会按模型身份拆分 `medical`、`personality`、`behavior`；behavior 报告走 `/behavior-assessments`，WebSocket 订阅使用 `kind=behavior`。
+- `qps.stats` 在机构总览 `GET /statistics/overview` 与内容批量统计 `POST /statistics/contents/batch` 之间分配；后者按 `questionnaire/scale + code` 构造请求。
 
 ---
 
@@ -113,7 +115,7 @@ make perf-smoke
 
 - token count 足够，`expired=0`。
 - `min_ttl_seconds` 大于本轮压测时长。
-- collection catalog、personality、questionnaire、apiserver testees preflight 均为 200。
+- collection catalog、personality、questionnaire，以及 apiserver testees/statistics preflight 均为 200。
 - `report_events.enabled=true`。
 
 
@@ -125,6 +127,8 @@ make perf-sync-profiles
 make perf-sync-vusers
 make perf-verify
 ```
+
+`perf-sync-profiles` 会保留本地 token/URL，并移除已经退休的 `/statistics/system`、`/statistics/questionnaires/:code` 配置。
 
 使用规则：
 
@@ -499,4 +503,3 @@ Nginx 判断：
 - apiserver / collection / worker 关键错误日志
 
 ---
-

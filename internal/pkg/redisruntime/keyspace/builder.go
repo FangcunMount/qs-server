@@ -172,6 +172,10 @@ func (b *Builder) BuildResilienceCommandResultKey(requestID, instanceID string) 
 	return NewOpsKeyspace(b.namespace()).ResilienceCommandResult(requestID, instanceID)
 }
 
+func (b *Builder) BuildGovernanceAuditReplayKey(orgID, requestID string) string {
+	return NewOpsKeyspace(b.namespace()).GovernanceAuditReplay(orgID, requestID)
+}
+
 // func (b *Builder) prefix(key string) string {
 // 	if b == nil {
 // 		return AddNamespace(key)

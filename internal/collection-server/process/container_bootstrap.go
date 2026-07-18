@@ -7,8 +7,12 @@ import (
 )
 
 func (s *server) initializeContainer(resources resourceOutput) (containerOutput, error) {
+	collectionContainer, err := container.NewContainer(s.config.Options, resources.redisRuntime.opsHandle, resources.redisRuntime.locks, resources.redisRuntime.familyStatus)
+	if err != nil {
+		return containerOutput{}, err
+	}
 	output := containerOutput{
-		container: container.NewContainer(s.config.Options, resources.redisRuntime.opsHandle, resources.redisRuntime.locks, resources.redisRuntime.familyStatus),
+		container: collectionContainer,
 	}
 	if output.container == nil {
 		return output, nil

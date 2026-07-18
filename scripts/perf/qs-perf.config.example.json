@@ -955,7 +955,7 @@
     },
     "stats_isolate_29": {
       "duration": "10m",
-      "description": "线 A 隔离：仅 apiserver statistics 29/s（overview+system）；量化 stats 独立容量",
+      "description": "线 A 隔离：仅 apiserver statistics 29/s（overview+contents/batch）；量化 stats 独立容量",
       "qps": {
         "query": 0,
         "submit": 0,
@@ -965,8 +965,7 @@
       },
       "paths": {
         "statistics": [
-          "/api/v1/statistics/overview?preset=7d",
-          "/api/v1/statistics/system"
+          "/api/v1/statistics/overview?preset=7d"
         ]
       },
       "vusers": {
@@ -978,7 +977,7 @@
     },
     "stats_warmup_1m": {
       "duration": "1m",
-      "description": "线 A 可选：Step2 前 1min stats 预热（overview+system @29/s），降低缓存击穿尖刺",
+      "description": "线 A 可选：Step2 前 1min stats 预热（overview+contents/batch @29/s），降低缓存击穿尖刺",
       "qps": {
         "query": 0,
         "submit": 0,
@@ -988,8 +987,7 @@
       },
       "paths": {
         "statistics": [
-          "/api/v1/statistics/overview?preset=7d",
-          "/api/v1/statistics/system"
+          "/api/v1/statistics/overview?preset=7d"
         ]
       },
       "vusers": {
@@ -1214,16 +1212,17 @@
       "/api/v1/questionnaires/{questionnaire_code}"
     ],
     "statistics": [
-      "/api/v1/statistics/overview?preset=7d",
-      "/api/v1/statistics/system",
-      "/api/v1/statistics/questionnaires/{questionnaire_code}?preset=7d"
+      "/api/v1/statistics/overview?preset=7d"
     ],
+    "statisticsContentBatch": "/api/v1/statistics/contents/batch",
     "submit": "/api/v1/answersheets",
     "submitStatus": "/api/v1/answersheets/submit-status?request_id={request_id}",
     "reportStatus": "/api/v1/assessments/{assessment_id}/report-status?testee_id={testee_id}",
     "reportEvents": "/api/v1/report-events",
     "typologySession": "/api/v1/typology-assessment-sessions",
     "typologyReportStatus": "/api/v1/typology-assessments/{assessment_id}/report-status?testee_id={testee_id}",
-    "typologyReport": "/api/v1/typology-assessments/{assessment_id}/report?testee_id={testee_id}"
+    "typologyReport": "/api/v1/typology-assessments/{assessment_id}/report?testee_id={testee_id}",
+    "behaviorReportStatus": "/api/v1/behavior-assessments/{assessment_id}/report-status?testee_id={testee_id}",
+    "behaviorReport": "/api/v1/behavior-assessments/{assessment_id}/report?testee_id={testee_id}"
   }
 }

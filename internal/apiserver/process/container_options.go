@@ -4,12 +4,15 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	cachebootstrap "github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
+	mysqlsystemgov "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/systemgovernance"
+	redissystemgov "github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/systemgovernance"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/apiserver/resilience/subsystem"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
@@ -20,12 +23,15 @@ import (
 	controlredis "github.com/FangcunMount/qs-server/internal/pkg/resilience/control/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
+	"gorm.io/gorm"
 )
 
 type containerOptionsInput struct {
-	cacheSubsystem *cachebootstrap.Subsystem
-	resilience     *resiliencesubsystem.Subsystem
-	eventSubsystem *eventsubsystem.Subsystem
+	cacheSubsystem    *cachebootstrap.Subsystem
+	resilience        *resiliencesubsystem.Subsystem
+	eventSubsystem    *eventsubsystem.Subsystem
+	actionAuditStore  systemgov.ActionAuditStore
+	actionAuditRunner *systemgov.ActionAuditRecoveryRunner
 }
 
 func (s *server) buildContainerOptions(input containerOptionsInput) container.ContainerOptions {
@@ -45,10 +51,27 @@ func (s *server) buildContainerOptions(input containerOptionsInput) container.Co
 		ReportStatus:               s.config.Cache.Capabilities.ReportStatus,
 		Signaling:                  s.config.Signaling,
 		SystemGovernance:           s.config.SystemGovernance,
+		ActionAuditStore:           input.actionAuditStore,
+		ActionAuditRunner:          input.actionAuditRunner,
 	}
 }
 
-func (s *server) buildResilienceSubsystem(runtime *cacheplanebootstrap.RuntimeBundle) *resiliencesubsystem.Subsystem {
+func buildActionAuditRuntime(db *gorm.DB, runtime *cacheplanebootstrap.RuntimeBundle) (systemgov.ActionAuditStore, *systemgov.ActionAuditRecoveryRunner) {
+	primary := mysqlsystemgov.NewActionAuditStore(db)
+	var fallback systemgov.ActionAuditFallbackStore
+	if runtime != nil {
+		if ops := runtime.Handle(redisruntime.FamilyOps); ops != nil && ops.Client != nil {
+			fallback = redissystemgov.NewActionAuditFallbackStore(ops.Client, ops.Builder)
+		}
+	}
+	recoverable := systemgov.NewRecoverableActionAuditStore(primary, fallback)
+	runner := systemgov.NewActionAuditRecoveryRunner(recoverable, func(err error) {
+		log.Warnf("governance audit recovery failed: %v", err)
+	})
+	return recoverable, runner
+}
+
+func (s *server) buildResilienceSubsystem(runtime *cacheplanebootstrap.RuntimeBundle) (*resiliencesubsystem.Subsystem, error) {
 	renewalEnabled := s.config.LockLease != nil && s.config.LockLease.RenewalEnabled
 	var lockHandle *redisruntime.Handle
 	var lockStatus *redisobserve.FamilyStatusRegistry

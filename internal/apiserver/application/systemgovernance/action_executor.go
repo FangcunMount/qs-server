@@ -96,11 +96,11 @@ func (e *ActionExecutor) Run(
 					FinishedAt: audit.FinishedAt, Status: audit.Status,
 				}
 			}
-			auditCtx, cancelAudit := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
+			auditCtx, cancelAudit := context.WithTimeout(context.WithoutCancel(ctx), 6*time.Second)
 			defer cancelAudit()
-			if err := e.audit.Complete(auditCtx, audit); err != nil && runErr == nil {
+			if err := e.audit.Complete(auditCtx, audit); err != nil {
 				runResult = nil
-				runErr = errors.WithCode(code.ErrInternalServerError, "complete governance audit: %s", err.Error())
+				runErr = errors.WithCode(code.ErrInternalServerError, "governance action outcome could not be persisted")
 			}
 		}()
 	}

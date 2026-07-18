@@ -1,5 +1,5 @@
 import { check } from 'k6';
-import { scenarioData, weightedPickModelType, buildMedicalSubmitPayload, buildPersonalitySubmitPayload } from '../lib/data.js';
+import { scenarioData, weightedPickModelType, buildMedicalSubmitRequest, buildPersonalitySubmitPayload } from '../lib/data.js';
 import { timedRequest, jsonHeaders, collectionToken, recordHTTPStatus } from '../lib/http.js';
 import { COLLECTION_BASE_URL, SUBMIT_PATH, SUBMIT_MIX, IDEMPOTENCY_PREFIX } from '../lib/config.js';
 import { answerSubmitDuration, answerSubmitAccepted, answerSubmitFailed, answerSubmitSuccessRate } from '../lib/metrics.js';
@@ -20,7 +20,14 @@ export function personalityAnswerSubmit(data) {
 }
 
 export function submitAnswerSheet(ctx, modelType) {
-  const payload = modelType === 'personality' ? buildPersonalitySubmitPayload(ctx) : buildMedicalSubmitPayload(ctx);
+  let payload;
+  if (modelType === 'personality') {
+    payload = buildPersonalitySubmitPayload(ctx);
+  } else {
+    const request = buildMedicalSubmitRequest(ctx);
+    payload = request.payload;
+    modelType = request.modelType;
+  }
   if (!payload) {
     answerSubmitFailed.add(1, { reason: 'missing_submit_payload', model_type: modelType });
     answerSubmitSuccessRate.add(false, { model_type: modelType });
@@ -46,4 +53,3 @@ export function submitAnswerSheet(ctx, modelType) {
     'answersheet submit status is 202': (r) => r.status === 202,
   });
 }
-

@@ -130,6 +130,7 @@ func (c *Container) buildRESTSystemGovernanceFacade(statisticsDeps resttransport
 		MySQLDB:                 c.mysqlDB,
 		ResilienceGovernor:      c.resilience,
 		LocalResilienceSnapshot: c.localResilienceSnapshot(),
+		ActionAuditStore:        c.actionAuditStore,
 	})
 }
 

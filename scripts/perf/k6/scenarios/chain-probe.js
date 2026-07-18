@@ -1,10 +1,11 @@
 import { sleep, check } from 'k6';
 import { responseItems } from '../lib/util.js';
-import { scenarioData, buildMedicalSubmitPayload, buildSubmitPayloadFromCase, buildPersonalityCaseFromSession, renderPath } from '../lib/data.js';
+import { scenarioData, buildMedicalSubmitRequest, buildSubmitPayloadFromCase, buildPersonalityCaseFromSession, renderPath } from '../lib/data.js';
 import { timedRequest, authHeaders, jsonHeaders, collectionToken, apiserverToken, responseData, recordHTTPStatus } from '../lib/http.js';
 import {
   APISERVER_BASE_URL, COLLECTION_BASE_URL, SUBMIT_PATH, SUBMIT_STATUS_PATH,
   REPORT_STATUS_PATH, PERSONALITY_REPORT_STATUS_PATH, PERSONALITY_REPORT_PATH,
+  BEHAVIOR_REPORT_STATUS_PATH,
   IDEMPOTENCY_PREFIX, CHAIN_PROBE_TIMEOUT_SECONDS, CHAIN_PROBE_POLL_SECONDS, REPORT_TIMEOUT,
   CHAIN_PROBE_MODEL_TYPE,
 } from '../lib/config.js';
@@ -38,7 +39,9 @@ export function runAsyncChainProbe(ctx, modelType) {
     }
     payload = buildSubmitPayloadFromCase(personalityCase);
   } else {
-    payload = buildMedicalSubmitPayload(ctx);
+    const request = buildMedicalSubmitRequest(ctx);
+    payload = request.payload;
+    modelType = request.modelType;
   }
   if (!payload) {
     chainProbeFailed.add(1, { reason: 'missing_submit_payload', model_type: modelType });
@@ -70,7 +73,9 @@ export function runAsyncChainProbe(ctx, modelType) {
   }
   submitToAssessmentLatency.add(Date.now() - start, { model_type: modelType });
 
-  const reportPathTemplate = modelType === 'personality' ? PERSONALITY_REPORT_STATUS_PATH : REPORT_STATUS_PATH;
+  const reportPathTemplate = modelType === 'personality'
+    ? PERSONALITY_REPORT_STATUS_PATH
+    : (modelType === 'behavior' ? BEHAVIOR_REPORT_STATUS_PATH : REPORT_STATUS_PATH);
   const assessmentStart = Date.now();
   const terminalStatus = waitReportTerminal(assessmentID, payload.testee_id, ctx, reportPathTemplate, modelType === 'personality' ? 'chain_probe_personality_report_status' : 'chain_probe_report_status');
   if (!terminalStatus) {
@@ -108,7 +113,7 @@ export function runAsyncChainProbe(ctx, modelType) {
         return;
       }
     }
-  } else {
+  } else if (modelType === 'medical') {
     medicalReportGeneratedLatency.add(totalLatency, latencyTags);
   }
   chainProbeTerminal.add(1, { assessment_status: terminalStatus, model_type: modelType });
@@ -159,19 +164,22 @@ export function findAssessmentIDByAnswerSheet(data, answerSheetID) {
 export function waitAssessmentID(answerSheetID, testeeID, modelType) {
   const deadline = Date.now() + CHAIN_PROBE_TIMEOUT_SECONDS * 1000;
   const personality = modelType === 'personality';
+  const behavior = modelType === 'behavior';
   while (Date.now() < deadline) {
     const path = personality
       ? `/api/v1/typology-assessments?testee_id=${encodeURIComponent(testeeID)}&page=1&page_size=20`
-      : `/api/v1/evaluations/assessments?testee_id=${encodeURIComponent(testeeID)}&page=1&page_size=20`;
+      : (behavior
+        ? `/api/v1/behavior-assessments?testee_id=${encodeURIComponent(testeeID)}&page=1&page_size=20`
+        : `/api/v1/evaluations/assessments?testee_id=${encodeURIComponent(testeeID)}&page=1&page_size=20`);
     const res = timedRequest(
       'GET',
-      personality ? COLLECTION_BASE_URL : APISERVER_BASE_URL,
+      personality || behavior ? COLLECTION_BASE_URL : APISERVER_BASE_URL,
       path,
       null,
-      authHeaders(personality ? collectionToken() : apiserverToken()),
+      authHeaders(personality || behavior ? collectionToken() : apiserverToken()),
       {
-        endpoint: personality ? 'chain_probe_typology_assessment_lookup' : 'chain_probe_evaluation_assessment_lookup',
-        service: personality ? 'collection-server' : 'qs-apiserver',
+        endpoint: personality ? 'chain_probe_typology_assessment_lookup' : (behavior ? 'chain_probe_behavior_assessment_lookup' : 'chain_probe_evaluation_assessment_lookup'),
+        service: personality || behavior ? 'collection-server' : 'qs-apiserver',
         model_type: modelType,
       }
     );

@@ -493,7 +493,7 @@ collection 的保护层包括：
 
 这些能力都应该归入 `03-基础设施/concurrency` 或 `03-基础设施/runtime` 深讲。collection runtime 文档只说明它们在哪里挂载、如何影响进程行为。
 
-治理控制面启用时，collection 必须先读取并应用 SubmitQueue 的持久化期望状态，才允许 `/readyz` 返回成功。冷同步读取失败、非法状态或初始 drain 未完成只影响 Ready，不影响存活检查；首次同步成功后的短暂控制面故障不撤销 Ready，进程继续使用最后有效状态。
+治理控制面通过 `resilience.control.enabled` 配置，默认启用。collection 必须先读取并应用 SubmitQueue 的持久化期望状态，才允许 `/readyz` 返回成功。冷同步缺少 Store、读取失败、非法状态或初始 drain 未完成只影响 Ready，不影响存活检查；后台每秒重试。首次同步成功后的短暂控制面故障不撤销 Ready，进程继续使用最后有效状态。显式关闭时不会启动控制心跳、命令消费或动态状态对账。
 
 ---
 

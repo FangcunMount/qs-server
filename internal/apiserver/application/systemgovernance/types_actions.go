@@ -78,3 +78,17 @@ type ActionAuditStore interface {
 	Claim(context.Context, ActionAuditRecord) (existing *ActionAuditReplay, claimed bool, err error)
 	Complete(context.Context, ActionAuditRecord) error
 }
+
+// ActionAuditFallbackStore persists only terminal replay data when the primary
+// audit store cannot finish a record. Implementations must not persist Input or
+// actor credentials.
+type ActionAuditFallbackStore interface {
+	Load(context.Context, int64, string) (ActionAuditRecord, bool, error)
+	Put(context.Context, ActionAuditRecord) error
+	Delete(context.Context, int64, string) error
+	List(context.Context, int) ([]ActionAuditRecord, error)
+}
+
+type ActionAuditRecoverer interface {
+	Recover(context.Context, int) (int, error)
+}

@@ -712,6 +712,16 @@ func TestRelinquishLeaderRejectsNonLeaderKinds(t *testing.T) {
 	}
 }
 
+func TestNilSubsystemLeaderOperationsReturnErrors(t *testing.T) {
+	var s *Subsystem
+	if _, err := s.RelinquishLeader(context.Background(), locklease.WorkloadPlanSchedulerLeader, locklease.RelinquishOptions{}); err == nil {
+		t.Fatal("RelinquishLeader() error=nil, want unavailable error")
+	}
+	if err := s.ApplyLeaderCooldown(locklease.WorkloadPlanSchedulerLeader, time.Now().Add(time.Minute)); err == nil {
+		t.Fatal("ApplyLeaderCooldown() error=nil, want unavailable error")
+	}
+}
+
 func TestSnapshotsDeriveCatalogBindingsAndFamilyHealth(t *testing.T) {
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})

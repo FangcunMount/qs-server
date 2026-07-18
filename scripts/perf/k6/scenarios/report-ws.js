@@ -72,7 +72,7 @@ function runReportWsQuery(ctx, sample, kind, endpoint) {
 export function reportWsQuery(data) {
   const ctx = scenarioData(data);
   const sample = pickReportSample(flattenReportSamples(ctx.reportSamples));
-  const kind = sample && sample.model_type === 'personality' ? 'personality' : 'medical';
+  const kind = sample && (sample.model_type === 'personality' || sample.model_type === 'behavior') ? sample.model_type : 'medical';
   runReportWsQuery(ctx, sample, kind, 'report_ws_query');
 }
 

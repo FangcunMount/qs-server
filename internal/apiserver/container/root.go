@@ -9,6 +9,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/FangcunMount/component-base/pkg/event"
+	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
@@ -42,6 +43,9 @@ type Container struct {
 	statisticsRepairWindowDays int
 	reportStatusConfig         reportstatus.Config
 	systemGovernanceOptions    *apiserveroptions.SystemGovernanceOptions
+	actionAuditStore           systemgov.ActionAuditStore
+	actionAuditRunner          *systemgov.ActionAuditRecoveryRunner
+	actionAuditCancel          context.CancelFunc
 
 	// 事件发布器（统一管理）
 	eventPublisher event.EventPublisher
@@ -85,12 +89,21 @@ type Container struct {
 
 // NewContainer 创建容器
 func NewContainer(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCache redis.UniversalClient) *Container {
+	c := newBaseContainer(mysqlDB, mongoDB, redisCache)
+	resilienceSubsystem, err := resiliencesubsystem.New(resiliencesubsystem.Options{})
+	if err != nil {
+		panic(err)
+	}
+	c.resilience = resilienceSubsystem
+	return c
+}
+
+func newBaseContainer(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCache redis.UniversalClient) *Container {
 	return &Container{
 		mysqlDB:      mysqlDB,
 		mongoDB:      mongoDB,
 		redisCache:   redisCache,
 		cacheOptions: ContainerCacheOptions{},
-		resilience:   resiliencesubsystem.New(resiliencesubsystem.Options{}),
 		initialized:  false,
 		modules:      make(map[string]Module),
 	}
@@ -124,18 +137,26 @@ func (c *Container) loadedModules() []Module {
 
 // NewContainerWithOptions 创建带配置的容器
 func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCache redis.UniversalClient, opts ContainerOptions) *Container {
-	c := NewContainer(mysqlDB, mongoDB, redisCache)
+	c := newBaseContainer(mysqlDB, mongoDB, redisCache)
 	c.eventSubsystem = opts.EventSubsystem
 	c.cacheOptions = opts.Cache
 	c.cache = opts.CacheSubsystem
 	c.locks = opts.LockSubsystem
 	if opts.Resilience != nil {
 		c.resilience = opts.Resilience
+	} else {
+		resilienceSubsystem, err := resiliencesubsystem.New(resiliencesubsystem.Options{})
+		if err != nil {
+			panic(err)
+		}
+		c.resilience = resilienceSubsystem
 	}
 	c.planEntryURL = opts.PlanEntryBaseURL
 	c.statisticsRepairWindowDays = opts.StatisticsRepairWindowDays
 	c.reportStatusConfig = reportstatus.ConfigFromOptions(opts.ReportStatus, opts.Signaling, "apiserver")
 	c.systemGovernanceOptions = opts.SystemGovernance
+	c.actionAuditStore = opts.ActionAuditStore
+	c.actionAuditRunner = opts.ActionAuditRunner
 	c.silent = opts.Silent
 
 	return c
@@ -201,6 +222,9 @@ func (c *Container) Initialize() error {
 	c.initPlatformModule()
 	if c.resilience != nil {
 		c.resilienceCancel = c.resilience.Start(context.Background())
+	}
+	if c.actionAuditRunner != nil {
+		c.actionAuditCancel = c.actionAuditRunner.Start(context.Background())
 	}
 
 	c.initialized = true

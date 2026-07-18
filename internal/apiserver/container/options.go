@@ -1,6 +1,7 @@
 package container
 
 import (
+	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
@@ -31,7 +32,9 @@ type ContainerOptions struct {
 	// Silent suppresses container stdout bootstrap/cleanup prints.
 	Silent bool
 	// SystemGovernance unified governance facade configuration.
-	SystemGovernance *apiserveroptions.SystemGovernanceOptions
+	SystemGovernance  *apiserveroptions.SystemGovernanceOptions
+	ActionAuditStore  systemgov.ActionAuditStore
+	ActionAuditRunner *systemgov.ActionAuditRecoveryRunner
 }
 
 type ContainerCacheOptions = cachebootstrap.CacheOptions

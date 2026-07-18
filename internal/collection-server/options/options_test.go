@@ -5,6 +5,13 @@ import (
 	"testing"
 )
 
+func TestResilienceControlDefaultsEnabled(t *testing.T) {
+	opts := NewOptions()
+	if opts.Resilience == nil || opts.Resilience.Control == nil || !opts.Resilience.Control.Enabled {
+		t.Fatalf("resilience control defaults=%+v, want enabled", opts.Resilience)
+	}
+}
+
 func TestValidateAllowsMissingProfileWhenRuntimeFamilyFallsBackToDefault(t *testing.T) {
 	opts := NewOptions()
 	opts.RedisRuntime.Families["ops_runtime"].RedisProfile = "missing_profile"

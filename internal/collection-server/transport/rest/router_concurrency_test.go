@@ -24,7 +24,7 @@ func TestCatalogConcurrencyHandlersBypassGateOnL1Hit(t *testing.T) {
 	opts := options.NewOptions()
 	opts.Concurrency.MaxCatalogConcurrency = 1
 	opts.Concurrency.CatalogMaxWaitMs = 100
-	c := container.NewContainer(opts, nil, nil, nil)
+	c := mustNewCollectionContainer(t, opts, nil, nil, nil)
 	c.InitializeRuntimeClients(container.ClientBundle{})
 
 	// Generic catalogue has no local projection cache; verify the admission
@@ -232,7 +232,7 @@ func TestRouterConcurrencyMaxWaitFromOptions(t *testing.T) {
 	opts := options.NewOptions()
 	opts.Concurrency.MaxWaitMs = 2500
 	opts.Concurrency.CatalogMaxWaitMs = 800
-	router := &Router{container: container.NewContainer(opts, nil, nil, nil)}
+	router := &Router{container: mustNewCollectionContainer(t, opts, nil, nil, nil)}
 	if got := router.concurrencyMaxWait().Milliseconds(); got != 2500 {
 		t.Fatalf("concurrencyMaxWait = %dms, want 2500ms", got)
 	}

@@ -14,6 +14,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func mustNewResilience(opts resiliencesubsystem.Options) *resiliencesubsystem.Subsystem {
+	s, err := resiliencesubsystem.New(opts)
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
+
 func TestDecodeSubscribeFrame(t *testing.T) {
 	frame, err := decodeFrame([]byte(`{"op":"subscribe","assessment_id":"123","kind":"personality","testee_id":"456"}`))
 	if err != nil {
@@ -78,7 +86,7 @@ func TestSubscribeLimiterUsesSharedGlobalAndPerUserBudgets(t *testing.T) {
 		ReportEventsUserQPS:     2,
 		ReportEventsUserBurst:   4,
 	}
-	limiter := newSubscribeLimiter(backend, cfg, resiliencesubsystem.New(resiliencesubsystem.Options{RateLimit: cfg, Backend: backend}))
+	limiter := newSubscribeLimiter(backend, cfg, mustNewResilience(resiliencesubsystem.Options{RateLimit: cfg, Backend: backend}))
 	if limiter == nil {
 		t.Fatal("enabled report-events rate limit should install a limiter")
 	}
@@ -107,7 +115,7 @@ func TestLocalSubscribeLimiterSharesGlobalBudgetAcrossUsers(t *testing.T) {
 		ReportEventsUserQPS:     100,
 		ReportEventsUserBurst:   100,
 	}
-	limiter := newSubscribeLimiter(nil, cfg, resiliencesubsystem.New(resiliencesubsystem.Options{RateLimit: cfg}))
+	limiter := newSubscribeLimiter(nil, cfg, mustNewResilience(resiliencesubsystem.Options{RateLimit: cfg}))
 
 	if decision := limiter.Decide(context.Background(), "user:1"); !decision.Allowed {
 		t.Fatalf("first user decision = %+v, want allowed", decision)
@@ -125,7 +133,7 @@ func TestLocalSubscribeLimiterKeepsIndependentPerUserBudgets(t *testing.T) {
 		ReportEventsUserQPS:     1,
 		ReportEventsUserBurst:   1,
 	}
-	limiter := newSubscribeLimiter(nil, cfg, resiliencesubsystem.New(resiliencesubsystem.Options{RateLimit: cfg}))
+	limiter := newSubscribeLimiter(nil, cfg, mustNewResilience(resiliencesubsystem.Options{RateLimit: cfg}))
 
 	if decision := limiter.Decide(context.Background(), "user:1"); !decision.Allowed {
 		t.Fatalf("first user decision = %+v, want allowed", decision)

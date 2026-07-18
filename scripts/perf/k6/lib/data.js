@@ -60,7 +60,7 @@ import {
   REPORT_VUSER_DEFAULTS,
 } from './config.js';
 
-let staticReportSamples = { medical: [], personality: [] };
+let staticReportSamples = { medical: [], behavior: [], personality: [] };
 let staticAnswerTemplates = [];
 let staticPersonalityCases = [];
 
@@ -143,7 +143,7 @@ export function normalizeMedicalCase(item) {
     return null;
   }
   return {
-    model_type: 'medical_scale',
+    model_type: normalizeExecutionModelType(item.model_type || item.modelType || item.kind || 'medical'),
     scale_code: String(item.scale_code || item.scaleCode || ''),
     questionnaire_code: questionnaireCode,
     questionnaire_version: String(item.questionnaire_version || item.questionnaireVersion || QUESTIONNAIRE_VERSION || ''),
@@ -151,6 +151,17 @@ export function normalizeMedicalCase(item) {
     testee_id: String(item.testee_id || item.testeeId || ''),
     answers: item.answers || [],
   };
+}
+
+export function normalizeExecutionModelType(raw) {
+  const value = String(raw || '').trim().toLowerCase();
+  if (value === 'behavior' || value === 'behavior_ability' || value === 'behavioral_rating' || value === 'cognitive') {
+    return 'behavior';
+  }
+  if (value === 'personality' || value === 'typology') {
+    return 'personality';
+  }
+  return 'medical';
 }
 
 export function normalizePersonalityCase(item) {
@@ -176,10 +187,11 @@ export function normalizePersonalityCase(item) {
 
 export function normalizeReportSamples(raw, fallback) {
   if (!raw) {
-    return fallback || { medical: [], personality: [] };
+    return fallback || { medical: [], behavior: [], personality: [] };
   }
   if (Array.isArray(raw)) {
     const medical = [];
+    const behavior = [];
     const personality = [];
     raw.forEach((item) => {
       const sample = normalizeReportSample(item);
@@ -188,19 +200,22 @@ export function normalizeReportSamples(raw, fallback) {
       }
       if (sample.model_type === 'personality') {
         personality.push(sample);
+      } else if (sample.model_type === 'behavior') {
+        behavior.push(sample);
       } else {
         medical.push(sample);
       }
     });
-    return { medical, personality };
+    return { medical, behavior, personality };
   }
-  if (raw.medical || raw.personality) {
+  if (raw.medical || raw.behavior || raw.personality) {
     return {
       medical: (raw.medical || []).map((item) => normalizeReportSample(item, 'medical')).filter(Boolean),
+      behavior: (raw.behavior || []).map((item) => normalizeReportSample(item, 'behavior')).filter(Boolean),
       personality: (raw.personality || []).map((item) => normalizeReportSample(item, 'personality')).filter(Boolean),
     };
   }
-  return fallback || { medical: [], personality: [] };
+  return fallback || { medical: [], behavior: [], personality: [] };
 }
 
 export function normalizeReportSample(item, defaultModelType) {
@@ -213,7 +228,7 @@ export function normalizeReportSample(item, defaultModelType) {
     return null;
   }
   return {
-    model_type: String(item.model_type || item.modelType || defaultModelType || 'medical'),
+    model_type: normalizeExecutionModelType(item.model_type || item.modelType || defaultModelType || 'medical'),
     assessment_id: assessmentID,
     testee_id: testeeID,
   };
@@ -228,11 +243,17 @@ export function pickReportSample(samples) {
 
 export function flattenReportSamples(reportSamples) {
   const normalized = normalizeReportSamples(reportSamples);
-  return normalized.medical.concat(normalized.personality);
+  return normalized.medical.concat(normalized.behavior).concat(normalized.personality);
+}
+export function buildMedicalSubmitRequest(data) {
+  const template = clone(pick(data.medicalCases.length > 0 ? data.medicalCases : data.answerTemplates));
+  return {
+    modelType: normalizeExecutionModelType(template && template.model_type),
+    payload: buildSubmitPayloadFromCase(template),
+  };
 }
 export function buildMedicalSubmitPayload(data) {
-  const template = clone(pick(data.medicalCases.length > 0 ? data.medicalCases : data.answerTemplates));
-  return buildSubmitPayloadFromCase(template);
+  return buildMedicalSubmitRequest(data).payload;
 }
 
 export function buildPersonalitySubmitPayload(data) {
@@ -528,7 +549,7 @@ export function loadReportSamples() {
     return normalizeReportSamples(reportSamples);
   }
   if (ASSESSMENT_IDS.length === 0) {
-    return { medical: [], personality: [] };
+    return { medical: [], behavior: [], personality: [] };
   }
   return {
     medical: ASSESSMENT_IDS.map((assessmentID, index) => ({
@@ -536,6 +557,7 @@ export function loadReportSamples() {
       assessment_id: String(assessmentID),
       testee_id: String(TESTEE_IDS[index % TESTEE_IDS.length]),
     })).filter((item) => item.assessment_id && item.testee_id),
+    behavior: [],
     personality: [],
   };
 }
@@ -561,6 +583,7 @@ export function discoverMedicalCases(testeeIDs) {
 
   const discovered = [];
   const scaleQuestionnaireCodes = [];
+  const questionnaireModelTypes = {};
   SCALE_CODES.forEach((scaleCode) => {
     const scale = getCollectionData(`/api/v1/assessment-models/${encodeURIComponent(scaleCode)}`, 'discover_assessment_model');
     if (!scale) {
@@ -569,6 +592,7 @@ export function discoverMedicalCases(testeeIDs) {
     const qCode = String(scale.questionnaire_code || scale.questionnaireCode || '');
     if (qCode) {
       scaleQuestionnaireCodes.push(qCode);
+      questionnaireModelTypes[qCode] = normalizeExecutionModelType(scale.kind || scale.model_kind || scale.modelKind);
     }
   });
 
@@ -582,7 +606,7 @@ export function discoverMedicalCases(testeeIDs) {
       return;
     }
     discovered.push(normalizeMedicalCase({
-      model_type: 'medical_scale',
+      model_type: questionnaireModelTypes[qCode] || 'medical',
       scale_code: '',
       questionnaire_code: detail.code || qCode,
       questionnaire_version: detail.version || QUESTIONNAIRE_VERSION || '',
@@ -730,11 +754,12 @@ export function discoverTesteeIDs() {
 }
 
 export function discoverReportSamples(testeeIDs) {
-  if (staticReportSamples.medical.length > 0 || staticReportSamples.personality.length > 0 || !AUTO_DISCOVER_SEEDDATA || APISERVER_TOKENS.length === 0) {
+  if (staticReportSamples.medical.length > 0 || staticReportSamples.behavior.length > 0 || staticReportSamples.personality.length > 0 || !AUTO_DISCOVER_SEEDDATA || APISERVER_TOKENS.length === 0) {
     return staticReportSamples;
   }
   return {
     medical: discoverMedicalReportSamples(testeeIDs),
+    behavior: discoverBehaviorReportSamples(testeeIDs),
     personality: discoverPersonalityReportSamples(testeeIDs),
   };
 }
@@ -747,10 +772,35 @@ export function discoverMedicalReportSamples(testeeIDs) {
     }
     const data = getApiserverData(`/api/v1/evaluations/assessments?testee_id=${encodeURIComponent(testeeID)}&page=1&page_size=20`, 'discover_assessments');
     responseItems(data).forEach((item) => {
+      const model = item.model || {};
+      if (normalizeExecutionModelType(model.kind || item.model_kind || item.modelKind) === 'behavior') {
+        return;
+      }
       const assessmentID = String(item.id || item.assessment_id || item.assessmentId || '');
       const sampleTesteeID = String(item.testee_id || item.testeeId || testeeID);
       if (assessmentID && sampleTesteeID) {
         out.push({ model_type: 'medical', assessment_id: assessmentID, testee_id: sampleTesteeID });
+      }
+    });
+  });
+  return uniqueReportSamples(out).slice(0, DISCOVER_ASSESSMENT_LIMIT);
+}
+
+export function discoverBehaviorReportSamples(testeeIDs) {
+  const out = [];
+  if (COLLECTION_TOKENS.length === 0) {
+    return out;
+  }
+  testeeIDs.slice(0, Math.min(testeeIDs.length, DISCOVER_TESTEE_LIMIT)).forEach((testeeID) => {
+    if (out.length >= DISCOVER_ASSESSMENT_LIMIT) {
+      return;
+    }
+    const data = getCollectionData(`/api/v1/behavior-assessments?testee_id=${encodeURIComponent(testeeID)}&page=1&page_size=20`, 'discover_behavior_assessments');
+    responseItems(data).forEach((item) => {
+      const assessmentID = String(item.id || item.assessment_id || item.assessmentId || '');
+      const sampleTesteeID = String(item.testee_id || item.testeeId || testeeID);
+      if (assessmentID && sampleTesteeID) {
+        out.push({ model_type: 'behavior', assessment_id: assessmentID, testee_id: sampleTesteeID });
       }
     });
   });

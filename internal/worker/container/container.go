@@ -61,7 +61,7 @@ type ClientBundle struct {
 }
 
 // NewContainer 创建新的容器
-func NewContainer(opts *options.Options, logger *slog.Logger, opsHandle *redisruntime.Handle, locks *locksubsystem.Subsystem, eventCatalog *eventcatalog.Catalog) *Container {
+func NewContainer(opts *options.Options, logger *slog.Logger, opsHandle *redisruntime.Handle, locks *locksubsystem.Subsystem, eventCatalog *eventcatalog.Catalog) (*Container, error) {
 	lockBuilder := keyspace.NewBuilder()
 	if locks != nil && locks.Builder() != nil {
 		lockBuilder = locks.Builder()
@@ -69,6 +69,10 @@ func NewContainer(opts *options.Options, logger *slog.Logger, opsHandle *redisru
 	var stateStore *controlredis.Store
 	if opsHandle != nil {
 		stateStore = controlredis.NewStore(opsHandle.Client, opsHandle.Builder)
+	}
+	resilienceSubsystem, err := resiliencesubsystem.New(resiliencesubsystem.Options{Locks: locks, StateStore: stateStore})
+	if err != nil {
+		return nil, err
 	}
 	c := &Container{
 		opts:         opts,
@@ -78,10 +82,10 @@ func NewContainer(opts *options.Options, logger *slog.Logger, opsHandle *redisru
 		lockBuilder:  lockBuilder,
 		eventCatalog: eventCatalog,
 		initialized:  false,
-		resilience:   resiliencesubsystem.New(resiliencesubsystem.Options{Locks: locks, StateStore: stateStore}),
+		resilience:   resilienceSubsystem,
 	}
 	c.reportStatus = c.buildReportStatusReporter()
-	return c
+	return c, nil
 }
 
 func (c *Container) buildReportStatusReporter() *reportstatus.Reporter {

@@ -33,6 +33,15 @@ type Options struct {
 	JWT                     *JWTOptions                             `json:"jwt" mapstructure:"jwt"`
 	IAMOptions              *genericoptions.IAMOptions              `json:"iam" mapstructure:"iam"`
 	Runtime                 *RuntimeOptions                         `json:"runtime" mapstructure:"runtime"`
+	Resilience              *ResilienceOptions                      `json:"resilience" mapstructure:"resilience"`
+}
+
+type ResilienceOptions struct {
+	Control *ResilienceControlOptions `json:"control" mapstructure:"control"`
+}
+
+type ResilienceControlOptions struct {
+	Enabled bool `json:"enabled" mapstructure:"enabled"`
 }
 
 // GRPCClientOptions GRPC 客户端配置
@@ -254,6 +263,7 @@ func NewOptions() *Options {
 		},
 		IAMOptions: genericoptions.NewIAMOptions(),
 		Runtime:    NewRuntimeOptions(),
+		Resilience: &ResilienceOptions{Control: &ResilienceControlOptions{Enabled: true}},
 	}
 }
 
@@ -360,8 +370,13 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.Cache.Capabilities.Catalog.Typology.AddFlags(fss.FlagSet("cache.capabilities.catalog.typology"))
 	o.Runtime.AddFlags(fss.FlagSet("runtime"))
 	o.JWT.AddFlags(fss.FlagSet("jwt"))
+	o.Resilience.Control.AddFlags(fss.FlagSet("resilience.control"))
 
 	return fss
+}
+
+func (o *ResilienceControlOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.BoolVar(&o.Enabled, "resilience.control.enabled", o.Enabled, "Require and run resilience control-state synchronization.")
 }
 
 // AddFlags 添加 GRPC 客户端相关的命令行参数
@@ -487,6 +502,9 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateWaitReportOptions(o.WaitReport)...)
 	errs = append(errs, validateReportEventsOptions(o.ReportEvents)...)
 	errs = append(errs, validateCollectionJWT(o.JWT)...)
+	if o.Resilience == nil || o.Resilience.Control == nil {
+		errs = append(errs, fmt.Errorf("resilience.control cannot be nil"))
+	}
 
 	return errs
 }

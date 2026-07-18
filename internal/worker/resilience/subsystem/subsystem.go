@@ -22,8 +22,12 @@ type Subsystem struct {
 	store    control.StateStore
 }
 
-func New(opts Options) *Subsystem {
-	return &Subsystem{identity: control.ResolveInstanceIdentity("worker", opts.InstanceID), locks: opts.Locks, store: opts.StateStore}
+func New(opts Options) (*Subsystem, error) {
+	identity, err := control.ResolveInstanceIdentity("worker", opts.InstanceID)
+	if err != nil {
+		return nil, err
+	}
+	return &Subsystem{identity: identity, locks: opts.Locks, store: opts.StateStore}, nil
 }
 
 func (s *Subsystem) Start(parent context.Context) context.CancelFunc {

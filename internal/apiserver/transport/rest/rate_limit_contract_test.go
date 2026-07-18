@@ -195,6 +195,9 @@ func TestWaitReportBudgetUsesDedicatedConfig(t *testing.T) {
 }
 
 func newRateContractRouter(cfg *options.RateLimitOptions) *Router {
-	provider := resiliencesubsystem.New(resiliencesubsystem.Options{RateLimit: cfg})
+	provider, err := resiliencesubsystem.New(resiliencesubsystem.Options{RateLimit: cfg})
+	if err != nil {
+		panic(err)
+	}
 	return NewRouter(Deps{RateLimit: cfg, RateBudgets: provider})
 }

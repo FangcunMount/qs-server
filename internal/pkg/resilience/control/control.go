@@ -154,7 +154,8 @@ type RateLimitChangeResult struct {
 }
 
 type QueueChange struct {
-	RequestID      string     `json:"-"`
+	RequestID      string     `json:"request_id,omitempty"`
+	StateVersion   uint64     `json:"state_version,omitempty"`
 	Component      string     `json:"component"`
 	Queue          string     `json:"queue"`
 	Target         string     `json:"target"`

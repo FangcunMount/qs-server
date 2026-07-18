@@ -25,6 +25,7 @@ type RESTSystemGovernanceInput struct {
 	LocalResilienceSnapshot func() resilience.RuntimeSnapshot
 	MySQLDB                 *gorm.DB
 	ResilienceGovernor      control.Governor
+	ActionAuditStore        systemgov.ActionAuditStore
 }
 
 // BuildRESTSystemGovernanceFacade assembles the unified governance facade.
@@ -36,6 +37,10 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 		components = govcomponent.NewAdapter(in.Options.Components)
 	}
 	registry := systemgov.NewActionRegistry(resilienceActionFlags(in.Options))
+	auditStore := in.ActionAuditStore
+	if auditStore == nil {
+		auditStore = governanceinfra.NewActionAuditStore(in.MySQLDB)
+	}
 	return systemgov.NewFacade(systemgov.FacadeDeps{
 		EventStatusService:      in.EventStatusService,
 		EventTypeSources:        buildEventTypeSources(in.EventOutboxes),
@@ -46,7 +51,7 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 		Metrics:                 metrics,
 		Components:              components,
 		Registry:                registry,
-		Actions:                 systemgov.NewActionExecutorWithResilience(registry, in.CacheGovernance, in.CachePolicyReloader, in.ResilienceGovernor, governanceinfra.NewActionAuditStore(in.MySQLDB)),
+		Actions:                 systemgov.NewActionExecutorWithResilience(registry, in.CacheGovernance, in.CachePolicyReloader, in.ResilienceGovernor, auditStore),
 	})
 }
 

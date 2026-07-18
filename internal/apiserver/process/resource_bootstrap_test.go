@@ -45,7 +45,10 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 	var buildOptionsInput containerOptionsInput
 	var eventOptions eventsubsystem.Options
 	wantOptions := container.ContainerOptions{PlanEntryBaseURL: "https://entry.example", EventSubsystem: events}
-	resilience := resiliencesubsystem.New(resiliencesubsystem.Options{Backpressure: apiserveroptions.NewBackpressureOptions()})
+	resilience, err := resiliencesubsystem.New(resiliencesubsystem.Options{Backpressure: apiserveroptions.NewBackpressureOptions()})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	got, err := prepareResources(resourceStageDeps{
 		database: databaseResourceDeps{
@@ -76,12 +79,12 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 			},
 		},
 		loadEventCatalog: func() (*eventcatalog.Catalog, error) { return catalog, nil },
-		buildResilience: func(got *cacheplanebootstrap.RuntimeBundle) *resiliencesubsystem.Subsystem {
+		buildResilience: func(got *cacheplanebootstrap.RuntimeBundle) (*resiliencesubsystem.Subsystem, error) {
 			if got != runtimeBundle {
 				t.Fatalf("resilience runtime = %#v, want %#v", got, runtimeBundle)
 			}
 			resilienceConfigured = true
-			return resilience
+			return resilience, nil
 		},
 		buildContainerOptions: func(output containerOptionsInput) container.ContainerOptions {
 			buildOptionsInput = output

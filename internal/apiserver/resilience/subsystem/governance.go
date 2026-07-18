@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
@@ -177,15 +178,19 @@ func (s *Subsystem) SetQueueState(ctx context.Context, actor control.ActionActor
 	if exists {
 		expected = current.Version
 	}
+	expectedInstances, err := commandTargetInstances(ctx, commands, change.Component, change.Target)
+	if err != nil {
+		return result, err
+	}
+	if exists && queueChangeMatches(current.Payload, change) {
+		result.Status, result.Version = control.CommandStatusNoop, current.Version
+		return result, nil
+	}
+	change.StateVersion = expected + 1
 	payload, err := json.Marshal(change)
 	if err != nil {
 		return result, err
 	}
-	published, err := s.stateStore.CompareAndSwap(ctx, name, expected, control.VersionedState{Payload: payload, Actor: actor}, 0)
-	if err != nil {
-		return result, err
-	}
-	result.Version = published.Version
 	command := control.Command{
 		RequestID: change.RequestID, ActionID: queueActionID(change.DesiredState),
 		Target:  control.Target{Component: change.Component, InstanceID: change.Target},
@@ -196,28 +201,57 @@ func (s *Subsystem) SetQueueState(ctx context.Context, actor control.ActionActor
 		timeout = time.Minute
 	}
 	command.ExpiresAt = time.Now().Add(timeout + time.Minute)
-	expectedInstances, err := commandTargetInstances(ctx, commands, change.Component, change.Target)
-	if err != nil {
-		return result, err
-	}
 	if len(expectedInstances) == 0 {
+		published, publishErr := s.stateStore.CompareAndSwap(ctx, name, expected, control.VersionedState{Payload: payload, Actor: actor}, 0)
+		if publishErr != nil {
+			resilience.ObserveControlOperation("apiserver", "queue_state_commit", "failed")
+			return result, publishErr
+		}
+		resilience.ObserveControlOperation("apiserver", "queue_state_commit", "ok")
+		result.Version = published.Version
 		result.Status = control.CommandStatusNoop
 		return result, nil
 	}
 	if err := commands.PublishCommand(ctx, command, timeout+time.Minute); err != nil {
+		resilience.ObserveControlOperation("apiserver", "queue_command_publish", "failed")
 		return result, err
 	}
+	resilience.ObserveControlOperation("apiserver", "queue_command_publish", "ok")
+	published, err := s.stateStore.CompareAndSwap(ctx, name, expected, control.VersionedState{Payload: payload, Actor: actor}, 0)
+	if err != nil {
+		resilience.ObserveControlOperation("apiserver", "queue_state_commit", "failed")
+		return result, err
+	}
+	resilience.ObserveControlOperation("apiserver", "queue_state_commit", "ok")
+	result.Version = published.Version
 	results, status, err := waitCommandResults(ctx, commands, actor.OrgID, change.RequestID, expectedInstances, timeout)
 	result.Instances, result.Status = results, status
 	if change.DesiredState == control.QueueStateActive && status != control.CommandStatusOK && status != control.CommandStatusNoop {
 		rollback := change
 		rollback.DesiredState = control.QueueStatePaused
+		rollback.StateVersion = published.Version + 1
 		rollbackPayload, _ := json.Marshal(rollback)
 		if restored, restoreErr := s.stateStore.CompareAndSwap(ctx, name, published.Version, control.VersionedState{Payload: rollbackPayload, Actor: actor}, 0); restoreErr == nil {
 			result.Version = restored.Version
 		}
 	}
 	return result, err
+}
+
+func queueChangeMatches(payload []byte, expected control.QueueChange) bool {
+	var current control.QueueChange
+	if json.Unmarshal(payload, &current) != nil {
+		return false
+	}
+	currentTarget, expectedTarget := current.Target, expected.Target
+	if currentTarget == "" {
+		currentTarget = "all"
+	}
+	if expectedTarget == "" {
+		expectedTarget = "all"
+	}
+	return current.Component == expected.Component && current.Queue == expected.Queue &&
+		currentTarget == expectedTarget && current.DesiredState == expected.DesiredState
 }
 
 func queueActionID(state control.QueueState) string {

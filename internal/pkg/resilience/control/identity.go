@@ -3,6 +3,7 @@ package control
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"strings"
 )
@@ -13,25 +14,35 @@ type InstanceIdentity struct {
 	Generation string `json:"generation"`
 }
 
-func ResolveInstanceIdentity(component, configured string) InstanceIdentity {
+var readRandom = rand.Read
+
+func ResolveInstanceIdentity(component, configured string) (InstanceIdentity, error) {
 	instanceID := strings.TrimSpace(configured)
 	if instanceID == "" {
 		instanceID, _ = os.Hostname()
 	}
 	if instanceID == "" {
-		instanceID = "instance-" + randomToken()
+		token, err := randomToken()
+		if err != nil {
+			return InstanceIdentity{}, fmt.Errorf("generate resilience instance id: %w", err)
+		}
+		instanceID = "instance-" + token
+	}
+	generation, err := randomToken()
+	if err != nil {
+		return InstanceIdentity{}, fmt.Errorf("generate resilience instance generation: %w", err)
 	}
 	return InstanceIdentity{
 		Component:  component,
 		InstanceID: instanceID,
-		Generation: randomToken(),
-	}
+		Generation: generation,
+	}, nil
 }
 
-func randomToken() string {
+func randomToken() (string, error) {
 	var raw [8]byte
-	if _, err := rand.Read(raw[:]); err != nil {
-		return "unknown"
+	if _, err := readRandom(raw[:]); err != nil {
+		return "", err
 	}
-	return hex.EncodeToString(raw[:])
+	return hex.EncodeToString(raw[:]), nil
 }

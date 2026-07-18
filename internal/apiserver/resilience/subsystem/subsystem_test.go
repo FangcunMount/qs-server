@@ -2,6 +2,8 @@ package subsystem
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -19,7 +21,7 @@ import (
 )
 
 func TestSubsystemOwnsStableSharedBudgetsAndSnapshot(t *testing.T) {
-	s := New(Options{RateLimit: options.NewRateLimitOptions(), Backpressure: options.NewBackpressureOptions()})
+	s := mustNewSubsystem(t, Options{RateLimit: options.NewRateLimitOptions(), Backpressure: options.NewBackpressureOptions()})
 	left, ok := s.Budget(BudgetQuery)
 	if !ok {
 		t.Fatal("query budget unavailable")
@@ -47,18 +49,21 @@ func TestQueueCommandWaitsForTargetInstanceResult(t *testing.T) {
 	t.Cleanup(func() { _ = client.Close() })
 	store := controlredis.NewStore(client, keyspace.NewBuilderWithNamespace("ops:runtime"))
 	collectionOpts := collectionoptions.NewOptions()
-	collection := collectionresilience.New(collectionresilience.Options{
+	collection, err := collectionresilience.New(collectionresilience.Options{
 		InstanceID: "collection-0", RateLimit: collectionOpts.RateLimit,
 		Concurrency: collectionOpts.Concurrency, WaitReport: collectionOpts.WaitReport,
 		OpsAvailable: true, StateStore: store,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	queue := &fakeQueueController{state: control.QueueStateActive}
 	collection.RegisterQueue("answersheet_submit", queue, queue.snapshot)
 	cancel := collection.Start(context.Background())
 	t.Cleanup(cancel)
 	waitForInstance(t, store, "collection-server")
 
-	governor := New(Options{InstanceID: "api-0", RateLimit: options.NewRateLimitOptions(), StateStore: store})
+	governor := mustNewSubsystem(t, Options{InstanceID: "api-0", RateLimit: options.NewRateLimitOptions(), StateStore: store})
 	drained, err := governor.SetQueueState(context.Background(), control.ActionActor{OrgID: 9}, control.QueueChange{
 		RequestID: "drain-1", Component: "collection-server", Queue: "answersheet_submit", Target: "all",
 		DesiredState: control.QueueStatePaused, TimeoutSeconds: 2,
@@ -120,14 +125,23 @@ func waitForInstance(t *testing.T, store control.CommandStore, component string)
 	t.Fatal("instance heartbeat did not appear")
 }
 
+func mustNewSubsystem(t *testing.T, opts Options) *Subsystem {
+	t.Helper()
+	s, err := New(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
 func TestRateOverrideReconcilesAcrossInstancesAndResetRestoresConfig(t *testing.T) {
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() { _ = client.Close() })
 	store := controlredis.NewStore(client, keyspace.NewBuilderWithNamespace("ops:runtime"))
 	cfg := options.NewRateLimitOptions()
-	left := New(Options{InstanceID: "api-0", RateLimit: cfg, StateStore: store})
-	right := New(Options{InstanceID: "api-1", RateLimit: cfg, StateStore: store})
+	left := mustNewSubsystem(t, Options{InstanceID: "api-0", RateLimit: cfg, StateStore: store})
+	right := mustNewSubsystem(t, Options{InstanceID: "api-1", RateLimit: cfg, StateStore: store})
 	cancel := right.Start(context.Background())
 	t.Cleanup(cancel)
 
@@ -165,7 +179,10 @@ func TestCommandTargetInstancesDeduplicatesGenerations(t *testing.T) {
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() { _ = client.Close() })
 	store := controlredis.NewStore(client, keyspace.NewBuilderWithNamespace("ops:runtime"))
-	identity := control.ResolveInstanceIdentity("collection-server", "collection-0")
+	identity, err := control.ResolveInstanceIdentity("collection-server", "collection-0")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := store.Heartbeat(context.Background(), identity, time.Minute); err != nil {
 		t.Fatal(err)
 	}
@@ -178,6 +195,112 @@ func TestCommandTargetInstancesDeduplicatesGenerations(t *testing.T) {
 	if err != nil || len(instances) != 1 || instances[0] != identity.InstanceID {
 		t.Fatalf("commandTargetInstances() = %v, %v", instances, err)
 	}
+}
+
+func TestQueuePublisherWritesCommandBeforeCommittingDesiredState(t *testing.T) {
+	current := control.QueueChange{RequestID: "old", StateVersion: 1, Component: "collection-server", Queue: "answersheet_submit", Target: "all", DesiredState: control.QueueStatePaused}
+	payload, _ := json.Marshal(current)
+	store := &queuePublisherStore{
+		state: control.VersionedState{Version: 1, Payload: payload}, exists: true,
+		instances: []control.InstanceIdentity{{Component: "collection-server", InstanceID: "collection-0", Generation: "g1"}},
+		casErr:    errors.New("state CAS failed"),
+	}
+	governor := mustNewSubsystem(t, Options{InstanceID: "api-0", StateStore: store})
+	_, err := governor.SetQueueState(context.Background(), control.ActionActor{OrgID: 9}, control.QueueChange{
+		RequestID: "resume-commit", Component: "collection-server", Queue: "answersheet_submit", Target: "all", DesiredState: control.QueueStateActive,
+	})
+	if !errors.Is(err, store.casErr) {
+		t.Fatalf("SetQueueState() error=%v, want CAS error", err)
+	}
+	if len(store.calls) != 2 || store.calls[0] != "publish" || store.calls[1] != "cas" {
+		t.Fatalf("calls=%v, want publish before cas", store.calls)
+	}
+	var commandChange control.QueueChange
+	if err := json.Unmarshal(store.command.Payload, &commandChange); err != nil {
+		t.Fatal(err)
+	}
+	if commandChange.RequestID != "resume-commit" || commandChange.StateVersion != 2 {
+		t.Fatalf("command change=%+v, want request/version handshake", commandChange)
+	}
+	if store.state.Version != 1 {
+		t.Fatalf("state version=%d after failed CAS, want unchanged", store.state.Version)
+	}
+}
+
+func TestQueuePublisherDoesNotCommitStateWhenCommandPublishFails(t *testing.T) {
+	payload, _ := json.Marshal(control.QueueChange{Component: "collection-server", Queue: "answersheet_submit", Target: "all", DesiredState: control.QueueStatePaused})
+	store := &queuePublisherStore{
+		state: control.VersionedState{Version: 1, Payload: payload}, exists: true,
+		instances:  []control.InstanceIdentity{{Component: "collection-server", InstanceID: "collection-0", Generation: "g1"}},
+		publishErr: errors.New("command publish failed"),
+	}
+	governor := mustNewSubsystem(t, Options{InstanceID: "api-0", StateStore: store})
+	_, err := governor.SetQueueState(context.Background(), control.ActionActor{OrgID: 9}, control.QueueChange{
+		RequestID: "resume-publish", Component: "collection-server", Queue: "answersheet_submit", Target: "all", DesiredState: control.QueueStateActive,
+	})
+	if !errors.Is(err, store.publishErr) || len(store.calls) != 1 || store.calls[0] != "publish" || store.state.Version != 1 {
+		t.Fatalf("error=%v calls=%v state=%+v", err, store.calls, store.state)
+	}
+}
+
+func TestQueuePublisherPersistsDesiredStateWithoutLiveInstances(t *testing.T) {
+	payload, _ := json.Marshal(control.QueueChange{Component: "collection-server", Queue: "answersheet_submit", Target: "all", DesiredState: control.QueueStatePaused})
+	store := &queuePublisherStore{state: control.VersionedState{Version: 1, Payload: payload}, exists: true}
+	governor := mustNewSubsystem(t, Options{InstanceID: "api-0", StateStore: store})
+	result, err := governor.SetQueueState(context.Background(), control.ActionActor{OrgID: 9}, control.QueueChange{
+		RequestID: "resume-future", Component: "collection-server", Queue: "answersheet_submit", Target: "all", DesiredState: control.QueueStateActive,
+	})
+	if err != nil || result.Status != control.CommandStatusNoop || result.Version != 2 || len(store.calls) != 1 || store.calls[0] != "cas" {
+		t.Fatalf("result=%+v error=%v calls=%v", result, err, store.calls)
+	}
+	var committed control.QueueChange
+	if err := json.Unmarshal(store.state.Payload, &committed); err != nil || committed.DesiredState != control.QueueStateActive || committed.StateVersion != 2 {
+		t.Fatalf("committed=%+v error=%v", committed, err)
+	}
+}
+
+type queuePublisherStore struct {
+	state      control.VersionedState
+	exists     bool
+	instances  []control.InstanceIdentity
+	command    control.Command
+	calls      []string
+	publishErr error
+	casErr     error
+}
+
+func (s *queuePublisherStore) Load(context.Context, string) (control.VersionedState, bool, error) {
+	return s.state, s.exists, nil
+}
+func (s *queuePublisherStore) CompareAndSwap(_ context.Context, _ string, expected uint64, candidate control.VersionedState, _ time.Duration) (control.VersionedState, error) {
+	s.calls = append(s.calls, "cas")
+	if s.casErr != nil {
+		return control.VersionedState{}, s.casErr
+	}
+	candidate.Version = expected + 1
+	s.state, s.exists = candidate, true
+	return candidate, nil
+}
+func (*queuePublisherStore) Delete(context.Context, string, uint64) error { return nil }
+func (s *queuePublisherStore) PublishCommand(_ context.Context, command control.Command, _ time.Duration) error {
+	s.calls = append(s.calls, "publish")
+	s.command = command
+	return s.publishErr
+}
+func (*queuePublisherStore) ListCommands(context.Context, string, string) ([]control.Command, error) {
+	return nil, nil
+}
+func (*queuePublisherStore) Claim(context.Context, string, string, time.Duration) (bool, error) {
+	return false, nil
+}
+func (*queuePublisherStore) PutCommandResult(context.Context, control.CommandResult, time.Duration) error {
+	return nil
+}
+func (*queuePublisherStore) ListCommandResults(context.Context, int64, string) ([]control.CommandResult, error) {
+	return nil, nil
+}
+func (s *queuePublisherStore) ListInstances(context.Context, string) ([]control.InstanceIdentity, error) {
+	return s.instances, nil
 }
 
 func waitForBudget(t *testing.T, subsystem *Subsystem, version uint64, source string) {

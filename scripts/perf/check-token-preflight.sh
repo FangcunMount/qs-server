@@ -111,6 +111,25 @@ http_status() {
   echo "$label: $status"
 }
 
+http_json_status() {
+  local label="$1"
+  local url="$2"
+  local token="$3"
+  local body="$4"
+  if [[ -z "$token" ]]; then
+    echo "$label: no token"
+    return
+  fi
+  local status
+  status="$(curl -sS -o /dev/null -w '%{http_code}' \
+    -X POST \
+    -H "Authorization: Bearer $token" \
+    -H 'Content-Type: application/json' \
+    --data "$body" \
+    "$url")"
+  echo "$label: $status"
+}
+
 tokens_file="$(resolve_path "$(json_value '.tokensFile')")"
 collection_tokens_file="$(resolve_path "$(json_value '.collectionTokensFile')")"
 apiserver_tokens_file="$(resolve_path "$(json_value '.apiserverTokensFile')")"
@@ -168,3 +187,6 @@ else
   echo "collection questionnaire: skipped (no questionnaire_code)"
 fi
 http_status "apiserver testees" "${apiserver_base_url%/}/api/v1/testees?org_id=${org_id}&page=1&page_size=1" "$apiserver_token"
+http_status "apiserver statistics overview" "${apiserver_base_url%/}/api/v1/statistics/overview?preset=7d" "$apiserver_token"
+http_json_status "apiserver statistics content batch" "${apiserver_base_url%/}/api/v1/statistics/contents/batch" "$apiserver_token" \
+  "{\"items\":[{\"type\":\"scale\",\"code\":\"${scale_code}\"}]}"

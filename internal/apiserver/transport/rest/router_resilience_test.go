@@ -12,7 +12,11 @@ func newRouterWithBudgets(deps Deps) *Router {
 		deps.RateLimit = cfg
 	}
 	if deps.RateBudgets == nil {
-		deps.RateBudgets = resiliencesubsystem.New(resiliencesubsystem.Options{RateLimit: cfg})
+		provider, err := resiliencesubsystem.New(resiliencesubsystem.Options{RateLimit: cfg})
+		if err != nil {
+			panic(err)
+		}
+		deps.RateBudgets = provider
 	}
 	return NewRouter(deps)
 }

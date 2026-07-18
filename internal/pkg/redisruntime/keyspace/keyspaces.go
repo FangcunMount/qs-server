@@ -208,3 +208,7 @@ func (k OpsKeyspace) ResilienceCommand(component, requestID string) string {
 func (k OpsKeyspace) ResilienceCommandResult(requestID, instanceID string) string {
 	return k.keyspace.Prefix("resilience:result:" + requestID + ":" + instanceID)
 }
+
+func (k OpsKeyspace) GovernanceAuditReplay(orgID, requestID string) string {
+	return k.keyspace.Prefix("governance:audit-replay:" + orgID + ":" + requestID)
+}

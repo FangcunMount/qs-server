@@ -18,13 +18,26 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
-migrate_legacy_typology_paths() {
-  jq '
+migrate_runtime_paths() {
+  jq --slurpfile ex "$EXAMPLE" '
     def migrate_path:
       gsub("/api/v1/personality-models"; "/api/v1/typology-models")
       | gsub("/api/v1/personality-assessment-sessions"; "/api/v1/typology-assessment-sessions")
       | gsub("/api/v1/personality-assessments"; "/api/v1/typology-assessments");
+    def retired_statistics_path:
+      startswith("/api/v1/statistics/system")
+      or startswith("/api/v1/statistics/questionnaires/");
+    def current_statistics_paths:
+      map(select(retired_statistics_path | not))
+      | if length > 0 then . else ($ex[0].paths.statistics // []) end;
     walk(if type == "string" then migrate_path else . end)
+    | .paths.statistics = ((.paths.statistics // []) | current_statistics_paths)
+    | .qpsProfiles |= with_entries(
+        if (.value.paths.statistics? | type) == "array"
+        then .value.paths.statistics |= current_statistics_paths
+        else .
+        end
+      )
   '
 }
 
@@ -34,7 +47,7 @@ before_path_keys="$(jq -c '.paths // {} | keys' "$LOCAL")"
 next="$(jq -c --slurpfile ex "$EXAMPLE" '
   .qpsProfiles = (($ex[0].qpsProfiles // {}) + (.qpsProfiles // {}))
   | .paths = (($ex[0].paths // {}) + (.paths // {}))
-' "$LOCAL" | migrate_legacy_typology_paths)"
+' "$LOCAL" | migrate_runtime_paths)"
 
 if [[ "$next" == "$before" ]]; then
   echo "qs-perf.config.json already up to date: $LOCAL"
@@ -42,9 +55,13 @@ if [[ "$next" == "$before" ]]; then
 fi
 
 migrated_paths="$(jq -n --argjson before "$before" --argjson after "$next" '
-  [ $before, $after ]
-  | map([.. | strings | select(test("/api/v1/personality-"))] | unique | sort)
-  | if (.[0] | length) > 0 and (.[0] != .[1]) then "typology path migration applied" else empty end
+  ([ $before, $after ]
+    | map([.. | strings | select(test("/api/v1/personality-"))] | unique | sort)
+    | if (.[0] | length) > 0 and (.[0] != .[1]) then ["typology path migration applied"] else [] end)
+  + ([ $before, $after ]
+    | map([.. | strings | select(test("/api/v1/statistics/(system|questionnaires/)"))] | unique | sort)
+    | if (.[0] | length) > 0 and (.[0] != .[1]) then ["retired statistics paths removed"] else [] end)
+  | join(", ")
 ')"
 
 added_profiles="$(jq -n --argjson before "$before_profile_keys" --argjson after "$(jq -c '.qpsProfiles // {} | keys' <<<"$next")" '

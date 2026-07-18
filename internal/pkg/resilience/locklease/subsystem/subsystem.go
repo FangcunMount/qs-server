@@ -354,11 +354,14 @@ func (s *Subsystem) Run(
 
 func (s *Subsystem) RelinquishLeader(ctx context.Context, workload locklease.WorkloadID, opts locklease.RelinquishOptions) (locklease.RelinquishResult, error) {
 	result := locklease.RelinquishResult{Workload: workload}
+	if s == nil {
+		return result, fmt.Errorf("lock lease subsystem is unavailable")
+	}
 	capability, ok := locklease.Lookup(workload)
 	if !ok {
 		return result, fmt.Errorf("unknown lock lease workload %q", workload)
 	}
-	if s == nil || capability.Component != s.component || capability.Kind != locklease.KindLeader {
+	if capability.Component != s.component || capability.Kind != locklease.KindLeader {
 		return result, fmt.Errorf("workload %q is not a releasable leader lease for component %q", workload, s.component)
 	}
 	if ctx == nil {
@@ -405,8 +408,11 @@ func (s *Subsystem) RelinquishLeader(ctx context.Context, workload locklease.Wor
 // ApplyLeaderCooldown restores a control-plane cooldown after process restart.
 // It never acquires or releases a lease.
 func (s *Subsystem) ApplyLeaderCooldown(workload locklease.WorkloadID, until time.Time) error {
+	if s == nil {
+		return fmt.Errorf("lock lease subsystem is unavailable")
+	}
 	capability, ok := locklease.Lookup(workload)
-	if !ok || s == nil || capability.Component != s.component || capability.Kind != locklease.KindLeader {
+	if !ok || capability.Component != s.component || capability.Kind != locklease.KindLeader {
 		return fmt.Errorf("workload %q is not a leader lease for component %q", workload, s.component)
 	}
 	if until.IsZero() || !until.After(s.now()) {

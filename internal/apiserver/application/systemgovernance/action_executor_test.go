@@ -2,6 +2,8 @@ package systemgovernance
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -96,12 +98,168 @@ func TestActionExecutorReplaysApplicationErrorsWithoutExecutingAgain(t *testing.
 	}
 }
 
+func TestActionExecutorReplaysTerminalOutcomeFromFallbackWhenPrimaryCompleteFails(t *testing.T) {
+	for _, errorCode := range []int{0, internalcode.ErrInvalidArgument, internalcode.ErrConflict, internalcode.ErrInternalServerError} {
+		t.Run(baseerrors.ParseCoder(baseerrors.WithCode(errorCode, "outcome")).String(), func(t *testing.T) {
+			governance := &fakeStatisticsGovernance{}
+			if errorCode != 0 {
+				governance.manualErr = baseerrors.WithCode(errorCode, "governance failure")
+			}
+			primary := &failingActionAudit{memoryActionAudit: memoryActionAudit{results: map[string]*ActionAuditReplay{}}, failComplete: true}
+			fallback := &memoryActionAuditFallback{records: map[string]ActionAuditRecord{}}
+			audit := NewRecoverableActionAuditStore(primary, fallback)
+			audit.primaryRetryWindow = 10 * time.Millisecond
+			audit.fallbackTimeout = time.Second
+			executor := NewActionExecutorWithResilience(NewActionRegistry(), governance, nil, nil, audit)
+			req := ActionRunRequest{RequestID: "fallback-request", Confirm: true, Input: map[string]interface{}{"targets": []interface{}{}}}
+
+			firstResult, firstErr := executor.Run(context.Background(), 9, "cache.manual_warmup", req)
+			secondResult, secondErr := executor.Run(context.Background(), 9, "cache.manual_warmup", req)
+			if errorCode == 0 {
+				if firstErr != nil || secondErr != nil || firstResult == nil || secondResult == nil || firstResult.Status != secondResult.Status {
+					t.Fatalf("results=(%+v,%+v) errors=(%v,%v)", firstResult, secondResult, firstErr, secondErr)
+				}
+			} else if firstErr == nil || secondErr == nil || baseerrors.ParseCoder(firstErr).Code() != errorCode ||
+				baseerrors.ParseCoder(secondErr).Code() != errorCode || firstErr.Error() != secondErr.Error() {
+				t.Fatalf("first=%v second=%v, want replayed code=%d", firstErr, secondErr, errorCode)
+			}
+			if governance.manualCalls != 1 || primary.completeCalls < 1 {
+				t.Fatalf("manualCalls=%d completeCalls=%d, want one execution and attempted completion", governance.manualCalls, primary.completeCalls)
+			}
+		})
+	}
+}
+
+func TestActionAuditFallbackRejectsRequestIDForAnotherAction(t *testing.T) {
+	fallback := &memoryActionAuditFallback{records: map[string]ActionAuditRecord{
+		"9:shared-request": {OrgID: 9, RequestID: "shared-request", ActionID: "cache.repair_complete", Status: "ok", FinishedAt: time.Now()},
+	}}
+	audit := NewRecoverableActionAuditStore(&memoryActionAudit{results: map[string]*ActionAuditReplay{}}, fallback)
+	executor := NewActionExecutorWithResilience(NewActionRegistry(), &fakeStatisticsGovernance{}, nil, nil, audit)
+	_, err := executor.Run(context.Background(), 9, "cache.manual_warmup", ActionRunRequest{RequestID: "shared-request", Confirm: true})
+	if err == nil || baseerrors.ParseCoder(err).Code() != internalcode.ErrConflict {
+		t.Fatalf("Run() error=%v, want conflict", err)
+	}
+}
+
+func TestActionAuditRecoveryBackfillsPrimaryAndDeletesFallback(t *testing.T) {
+	primary := &failingActionAudit{memoryActionAudit: memoryActionAudit{results: map[string]*ActionAuditReplay{}}, failComplete: true}
+	fallback := &memoryActionAuditFallback{records: map[string]ActionAuditRecord{}}
+	audit := NewRecoverableActionAuditStore(primary, fallback)
+	audit.primaryRetryWindow = 10 * time.Millisecond
+	audit.fallbackTimeout = time.Second
+	record := ActionAuditRecord{OrgID: 9, RequestID: "recover-request", ActionID: "cache.manual_warmup", Status: "ok", FinishedAt: time.Now(), Result: &ActionRunResult{ActionID: "cache.manual_warmup", Status: "ok"}}
+	if _, claimed, err := audit.Claim(context.Background(), record); err != nil || !claimed {
+		t.Fatalf("Claim() claimed=%v err=%v", claimed, err)
+	}
+	if err := audit.Complete(context.Background(), record); err != nil {
+		t.Fatalf("Complete() error=%v", err)
+	}
+	primary.failComplete = false
+	if recovered, err := audit.Recover(context.Background(), 100); err != nil || recovered != 1 {
+		t.Fatalf("Recover() recovered=%d err=%v", recovered, err)
+	}
+	if _, exists, _ := fallback.Load(context.Background(), 9, record.RequestID); exists {
+		t.Fatal("fallback was not deleted after recovery")
+	}
+	if replay := primary.results[record.RequestID]; replay == nil || replay.Result == nil {
+		t.Fatalf("primary replay=%+v, want recovered result", replay)
+	}
+}
+
+func TestActionExecutorReturnsFixedInternalErrorWhenBothAuditStoresFail(t *testing.T) {
+	governance := &fakeStatisticsGovernance{}
+	primary := &failingActionAudit{memoryActionAudit: memoryActionAudit{results: map[string]*ActionAuditReplay{}}, failComplete: true}
+	audit := NewRecoverableActionAuditStore(primary, failingActionAuditFallback{})
+	audit.primaryRetryWindow = 10 * time.Millisecond
+	audit.fallbackTimeout = 10 * time.Millisecond
+	executor := NewActionExecutorWithResilience(NewActionRegistry(), governance, nil, nil, audit)
+	_, err := executor.Run(context.Background(), 9, "cache.manual_warmup", ActionRunRequest{RequestID: "dual-failure", Confirm: true, Input: map[string]interface{}{"targets": []interface{}{}}})
+	if err == nil || baseerrors.ParseCoder(err).Code() != internalcode.ErrInternalServerError {
+		t.Fatalf("Run() error=%v, want fixed internal error", err)
+	}
+	_, _ = executor.Run(context.Background(), 9, "cache.manual_warmup", ActionRunRequest{RequestID: "dual-failure", Confirm: true})
+	if governance.manualCalls != 1 {
+		t.Fatalf("manualCalls=%d, want no re-execution", governance.manualCalls)
+	}
+}
+
 type memoryActionAudit struct {
 	mu        sync.Mutex
 	claims    int
 	completes int
 	running   bool
 	results   map[string]*ActionAuditReplay
+}
+
+type failingActionAudit struct {
+	memoryActionAudit
+	failComplete  bool
+	completeCalls int
+}
+
+func (a *failingActionAudit) Complete(ctx context.Context, record ActionAuditRecord) error {
+	a.completeCalls++
+	if a.failComplete {
+		return errors.New("mysql complete failed")
+	}
+	return a.memoryActionAudit.Complete(ctx, record)
+}
+
+type memoryActionAuditFallback struct {
+	mu      sync.Mutex
+	records map[string]ActionAuditRecord
+}
+
+func (s *memoryActionAuditFallback) Load(_ context.Context, orgID int64, requestID string) (ActionAuditRecord, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	record, ok := s.records[controlAuditKey(orgID, requestID)]
+	return record, ok, nil
+}
+
+func (s *memoryActionAuditFallback) Put(_ context.Context, record ActionAuditRecord) error {
+	s.mu.Lock()
+	s.records[controlAuditKey(record.OrgID, record.RequestID)] = record
+	s.mu.Unlock()
+	return nil
+}
+
+func (s *memoryActionAuditFallback) Delete(_ context.Context, orgID int64, requestID string) error {
+	s.mu.Lock()
+	delete(s.records, controlAuditKey(orgID, requestID))
+	s.mu.Unlock()
+	return nil
+}
+
+func (s *memoryActionAuditFallback) List(_ context.Context, limit int) ([]ActionAuditRecord, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result := make([]ActionAuditRecord, 0, len(s.records))
+	for _, record := range s.records {
+		if len(result) == limit {
+			break
+		}
+		result = append(result, record)
+	}
+	return result, nil
+}
+
+type failingActionAuditFallback struct{}
+
+func (failingActionAuditFallback) Load(context.Context, int64, string) (ActionAuditRecord, bool, error) {
+	return ActionAuditRecord{}, false, nil
+}
+func (failingActionAuditFallback) Put(context.Context, ActionAuditRecord) error {
+	return errors.New("redis fallback failed")
+}
+func (failingActionAuditFallback) Delete(context.Context, int64, string) error { return nil }
+func (failingActionAuditFallback) List(context.Context, int) ([]ActionAuditRecord, error) {
+	return nil, nil
+}
+
+func controlAuditKey(orgID int64, requestID string) string {
+	return fmt.Sprintf("%d:%s", orgID, requestID)
 }
 
 func (a *memoryActionAudit) Claim(_ context.Context, record ActionAuditRecord) (*ActionAuditReplay, bool, error) {
