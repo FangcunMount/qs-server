@@ -6,11 +6,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	reportqueryjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
 	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
+	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
+	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -22,6 +25,7 @@ type operatorQueryStub struct {
 	lastLimit  int
 	runList    *evaluationoperator.RunList
 	failedRuns *evaluationoperator.RetryableFailedRunList
+	latestRun  *evaluationoperator.Run
 }
 
 func (s *operatorQueryStub) GetAssessment(_ context.Context, actor evaluationoperator.Actor, id uint64) (*evaluationoperator.Assessment, error) {
@@ -56,8 +60,71 @@ func (s *operatorQueryStub) ListAssessmentRuns(_ context.Context, actor evaluati
 	s.lastActor, s.lastID, s.lastLimit = actor, id, limit
 	return s.runList, nil
 }
-func (*operatorQueryStub) GetLatestAssessmentRun(context.Context, evaluationoperator.Actor, uint64) (*evaluationoperator.Run, error) {
-	return nil, nil
+func (s *operatorQueryStub) GetLatestAssessmentRun(context.Context, evaluationoperator.Actor, uint64) (*evaluationoperator.Run, error) {
+	return s.latestRun, s.err
+}
+
+type governanceActionRunnerStub struct {
+	orgID    int64
+	actionID string
+	request  systemgov.ActionRunRequest
+	calls    int
+}
+
+func (s *governanceActionRunnerStub) RunAction(_ context.Context, orgID int64, actionID string, request systemgov.ActionRunRequest) (*systemgov.ActionRunResult, error) {
+	s.orgID, s.actionID, s.request = orgID, actionID, request
+	s.calls++
+	return &systemgov.ActionRunResult{RequestID: request.RequestID, ActionID: actionID, Status: "succeeded", StartedAt: time.Now(), FinishedAt: time.Now()}, nil
+}
+
+func TestLegacyEvaluationRetryUsesGovernanceAction(t *testing.T) {
+	query := &operatorQueryStub{
+		result:    &evaluationoperator.Assessment{ID: 301, OrgID: 12, Status: "failed"},
+		latestRun: &evaluationoperator.Run{AssessmentID: 301, AttemptNo: 3, Status: "failed", RetryDisposition: "manual_required"},
+	}
+	actions := &governanceActionRunnerStub{}
+	h := NewEvaluationOperatorHandler(nil, nil, query, actions)
+	c, rec := protectedContext(http.MethodPost, "/api/v1/evaluations/assessments/301/retry")
+	c.Params = gin.Params{{Key: "id", Value: "301"}}
+	c.Request = c.Request.WithContext(pkgmiddleware.WithRequestID(c.Request.Context(), "request-legacy-retry"))
+	h.RetryFailed(c)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("response=%d %s", rec.Code, rec.Body.String())
+	}
+	if actions.calls != 1 || actions.orgID != 12 || actions.actionID != "evaluation.retry" || !actions.request.Confirm || actions.request.RequestID != "request-legacy-retry" {
+		t.Fatalf("governance action=%#v", actions)
+	}
+	if actions.request.Input["reason"] != "legacy evaluation retry endpoint" || actions.request.Input["expected_attempt"] != 3 {
+		t.Fatalf("governance input=%#v", actions.request.Input)
+	}
+}
+
+func TestLegacyEvaluationRetryRejectsNonManualLatestRun(t *testing.T) {
+	query := &operatorQueryStub{latestRun: &evaluationoperator.Run{AssessmentID: 301, AttemptNo: 2, Status: "failed", RetryDisposition: "automatic"}}
+	actions := &governanceActionRunnerStub{}
+	h := NewEvaluationOperatorHandler(nil, nil, query, actions)
+	c, rec := protectedContext(http.MethodPost, "/api/v1/evaluations/assessments/301/retry")
+	c.Params = gin.Params{{Key: "id", Value: "301"}}
+	h.RetryFailed(c)
+	if rec.Code != http.StatusConflict || actions.calls != 0 {
+		t.Fatalf("response=%d actions=%d body=%s", rec.Code, actions.calls, rec.Body.String())
+	}
+}
+
+func TestLegacyEvaluationRetryReplaysAuditedRequestAfterDispositionChanged(t *testing.T) {
+	query := &operatorQueryStub{
+		result:    &evaluationoperator.Assessment{ID: 301, OrgID: 12, Status: "failed"},
+		latestRun: &evaluationoperator.Run{AssessmentID: 301, AttemptNo: 3, Status: "failed", RetryDisposition: "automatic", ActionRequestID: "request-legacy-retry"},
+	}
+	actions := &governanceActionRunnerStub{}
+	h := NewEvaluationOperatorHandler(nil, nil, query, actions)
+	c, rec := protectedContext(http.MethodPost, "/api/v1/evaluations/assessments/301/retry")
+	c.Params = gin.Params{{Key: "id", Value: "301"}}
+	c.Request = c.Request.WithContext(pkgmiddleware.WithRequestID(c.Request.Context(), "request-legacy-retry"))
+	h.RetryFailed(c)
+	if rec.Code != http.StatusOK || actions.calls != 1 || actions.request.RequestID != "request-legacy-retry" {
+		t.Fatalf("response=%d actions=%#v body=%s", rec.Code, actions, rec.Body.String())
+	}
 }
 func (s *operatorQueryStub) ListRetryableFailedRuns(_ context.Context, actor evaluationoperator.Actor, limit int, _ uint64) (*evaluationoperator.RetryableFailedRunList, error) {
 	s.lastActor, s.lastLimit = actor, limit

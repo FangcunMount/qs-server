@@ -11,9 +11,11 @@ import (
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	reportqueryjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
 	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
+	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 )
 
 // EvaluationOperatorHandler exposes backend-operator Evaluation use cases.
@@ -22,6 +24,11 @@ type EvaluationOperatorHandler struct {
 	operatorRecoveryService  evaluationoperator.RecoveryService
 	operatorExecutionService evaluationoperator.BatchExecutionService
 	protectedQueryService    evaluationoperator.QueryService
+	systemGovernance         GovernanceActionRunner
+}
+
+type GovernanceActionRunner interface {
+	RunAction(context.Context, int64, string, systemgov.ActionRunRequest) (*systemgov.ActionRunResult, error)
 }
 
 // AssessmentReportJourneyHandler exposes cross-module Assessment and Report journeys.
@@ -35,8 +42,13 @@ func NewEvaluationOperatorHandler(
 	operatorRecoveryService evaluationoperator.RecoveryService,
 	operatorExecutionService evaluationoperator.BatchExecutionService,
 	protectedQueryService evaluationoperator.QueryService,
+	governance ...GovernanceActionRunner,
 ) *EvaluationOperatorHandler {
-	return &EvaluationOperatorHandler{BaseHandler: &BaseHandler{}, operatorRecoveryService: operatorRecoveryService, operatorExecutionService: operatorExecutionService, protectedQueryService: protectedQueryService}
+	handler := &EvaluationOperatorHandler{BaseHandler: &BaseHandler{}, operatorRecoveryService: operatorRecoveryService, operatorExecutionService: operatorExecutionService, protectedQueryService: protectedQueryService}
+	if len(governance) > 0 {
+		handler.systemGovernance = governance[0]
+	}
+	return handler
 }
 
 func NewAssessmentReportJourneyHandler(
@@ -408,7 +420,36 @@ func (h *EvaluationOperatorHandler) RetryFailed(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	result, err := h.operatorRecoveryService.Retry(ctx, evaluationoperator.Actor{OrgID: orgID, OperatorUserID: operatorUserID}, id)
+	if h.systemGovernance == nil || h.protectedQueryService == nil {
+		h.Error(c, errors.WithCode(code.ErrModuleInitializationFailed, "evaluation retry governance is not configured"))
+		return
+	}
+	actor := evaluationoperator.Actor{OrgID: orgID, OperatorUserID: operatorUserID}
+	latest, err := h.protectedQueryService.GetLatestAssessmentRun(ctx, actor, id)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	requestID := pkgmiddleware.RequestIDFromStandardContext(ctx)
+	isAuditReplay := latest != nil && requestID != "" && latest.ActionRequestID == requestID
+	if latest == nil || (!isAuditReplay && (latest.Status != "failed" || latest.RetryDisposition != "manual_required")) {
+		h.Error(c, errors.WithCode(code.ErrConflict, "最新失败尝试不需要人工重试"))
+		return
+	}
+	_, err = h.systemGovernance.RunAction(ctx, orgID, "evaluation.retry", systemgov.ActionRunRequest{
+		RequestID: requestID,
+		Confirm:   true,
+		Input: map[string]interface{}{
+			"resource_id":      strconv.FormatUint(id, 10),
+			"expected_attempt": latest.AttemptNo,
+			"reason":           "legacy evaluation retry endpoint",
+		},
+	})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.protectedQueryService.GetAssessment(ctx, actor, id)
 	if err != nil {
 		h.Error(c, err)
 		return

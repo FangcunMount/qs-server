@@ -3,7 +3,8 @@ module github.com/FangcunMount/qs-server
 go 1.25.12
 
 require (
-	github.com/FangcunMount/component-base v0.6.5
+	github.com/DATA-DOG/go-sqlmock v1.5.2
+	github.com/FangcunMount/component-base v0.6.6
 	github.com/FangcunMount/iam/v2 v2.0.8
 	github.com/alicebob/miniredis/v2 v2.30.0
 	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.4.1
@@ -100,7 +101,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/prometheus/client_golang v1.22.0
-	github.com/prometheus/client_model v0.6.2 // indirect
+	github.com/prometheus/client_model v0.6.2
 	github.com/prometheus/common v0.63.0 // indirect
 	github.com/prometheus/procfs v0.16.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect

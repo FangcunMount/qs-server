@@ -38,3 +38,25 @@ func TestOptionsValidateMetricsConfig(t *testing.T) {
 		t.Fatalf("expected metrics.bind_port validation error, got %v", errs)
 	}
 }
+
+func TestOptionsValidateDeliveryHardCap(t *testing.T) {
+	opts := NewOptions()
+	opts.Messaging.Delivery.MaxAttempts = 9
+	for _, err := range opts.Validate() {
+		if strings.Contains(err.Error(), "messaging.delivery.max_attempts must be between 1 and 8") {
+			return
+		}
+	}
+	t.Fatal("expected delivery hard-cap validation error")
+}
+
+func TestOptionsValidateHoldReplayHardCap(t *testing.T) {
+	opts := NewOptions()
+	opts.RetryGovernance.HoldReplay.MaxAttempts = 31
+	for _, err := range opts.Validate() {
+		if strings.Contains(err.Error(), "retry_governance.hold_replay.max_attempts must be between 1 and 30") {
+			return
+		}
+	}
+	t.Fatal("expected hold replay hard-cap validation error")
+}

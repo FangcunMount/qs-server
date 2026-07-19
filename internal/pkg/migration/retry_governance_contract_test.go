@@ -72,6 +72,24 @@ func TestMongoRetryGovernanceMigrationContract(t *testing.T) {
 	}
 }
 
+func TestMySQLRetryEventHoldMigrationContract(t *testing.T) {
+	up := readMySQLMigration(t, "000050_add_retry_event_hold.up.sql")
+	down := readMySQLMigration(t, "000050_add_retry_event_hold.down.sql")
+	for _, token := range []string{
+		"CREATE TABLE `retry_event_hold`",
+		"`original_delivery_attempt`",
+		"`replay_attempt_count`",
+		"`claim_token`",
+		"`manual_replay_request_id`",
+		"uk_retry_event_hold_delivery",
+		"idx_retry_event_hold_due",
+		"idx_retry_event_hold_org_governance",
+	} {
+		requireSQLContains(t, up, token)
+	}
+	requireSQLContains(t, down, "DROP TABLE IF EXISTS `retry_event_hold`")
+}
+
 func readJSONMigration(t *testing.T, name string) string {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join("migrations", "mongodb", name))

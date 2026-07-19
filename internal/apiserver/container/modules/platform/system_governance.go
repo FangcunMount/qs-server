@@ -48,11 +48,11 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 	if auditStore == nil {
 		auditStore = governanceinfra.NewActionAuditStore(in.MySQLDB)
 	}
+	retryReader := retrygovinfra.NewReader(in.MySQLDB, in.MongoDB)
 	actions := systemgov.NewActionExecutorWithResilience(registry, in.CacheGovernance, in.CachePolicyReloader, in.ResilienceGovernor, auditStore).
-		BindEventReplayStores(buildEventReplayStores(in.EventOutboxes)).
+		BindEventReplayStores(buildEventReplayStores(in.EventOutboxes, retryReader)).
 		BindDeliveryReplay(eventdelivery.NewStore(in.MySQLDB), in.EventPublisher).
 		BindActionHandlers(in.ActionHandlers)
-	retryReader := retrygovinfra.NewReader(in.MySQLDB, in.MongoDB)
 	return systemgov.NewFacade(systemgov.FacadeDeps{
 		EventStatusService:      in.EventStatusService,
 		EventTypeSources:        buildEventTypeSources(in.EventOutboxes),
@@ -69,12 +69,15 @@ func BuildRESTSystemGovernanceFacade(in RESTSystemGovernanceInput) systemgov.Fac
 	})
 }
 
-func buildEventReplayStores(outboxes []appEventing.NamedOutboxStatusReader) map[string]outboxport.ManualReplayAuthorizer {
+func buildEventReplayStores(outboxes []appEventing.NamedOutboxStatusReader, retryHold outboxport.ManualReplayAuthorizer) map[string]outboxport.ManualReplayAuthorizer {
 	stores := map[string]outboxport.ManualReplayAuthorizer{}
 	for _, outbox := range outboxes {
 		if replay, ok := outbox.Reader.(outboxport.ManualReplayAuthorizer); ok && outbox.Name != "" {
 			stores[outbox.Name] = replay
 		}
+	}
+	if retryHold != nil {
+		stores["retry_hold"] = retryHold
 	}
 	return stores
 }

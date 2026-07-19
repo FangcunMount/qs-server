@@ -30,10 +30,12 @@ type RetryGovernanceSummary struct {
 	OutboxManual         int64 `json:"outbox_manual_required"`
 	BlockedRetryEvents   int64 `json:"blocked_retry_events"`
 	TransportDeadLetters int64 `json:"transport_dead_letters"`
+	HeldAutomatic        int64 `json:"held_automatic"`
+	HeldManualRequired   int64 `json:"held_manual_required"`
 }
 
 type RetryGovernanceReader interface {
-	ReadRetryGovernance(context.Context) (RetryGovernanceSummary, error)
+	ReadRetryGovernance(context.Context, int64) (RetryGovernanceSummary, error)
 }
 
 type RetryCandidate struct {

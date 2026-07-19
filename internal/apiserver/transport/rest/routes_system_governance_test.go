@@ -26,7 +26,7 @@ func (s stubSystemGovernanceFacade) GetOverview(context.Context, string) (*syste
 	return s.overview, nil
 }
 
-func (s stubSystemGovernanceFacade) GetEvents(context.Context, string) (*systemgov.EventsView, error) {
+func (s stubSystemGovernanceFacade) GetEvents(context.Context, int64, string) (*systemgov.EventsView, error) {
 	if s.events != nil {
 		return s.events, nil
 	}
@@ -120,6 +120,10 @@ func TestSystemGovernanceOverviewRouteReturnsSnapshot(t *testing.T) {
 	})
 	engine := gin.New()
 	engine.Use(orgAdminSnapshotMiddleware())
+	engine.Use(func(c *gin.Context) {
+		c.Set(restmiddleware.OrgIDKey, uint64(88))
+		c.Next()
+	})
 	group := engine.Group("/internal/v1")
 	router.registerSystemGovernanceInternalRoutes(group)
 
@@ -179,6 +183,10 @@ func TestSystemGovernanceEventsRouteReturnsAdditiveDrainFields(t *testing.T) {
 	})
 	engine := gin.New()
 	engine.Use(orgAdminSnapshotMiddleware())
+	engine.Use(func(c *gin.Context) {
+		c.Set(restmiddleware.OrgIDKey, uint64(88))
+		c.Next()
+	})
 	group := engine.Group("/internal/v1")
 	router.registerSystemGovernanceInternalRoutes(group)
 

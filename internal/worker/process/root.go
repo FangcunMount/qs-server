@@ -14,6 +14,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/worker/config"
 	"github.com/FangcunMount/qs-server/internal/worker/container"
 	grpcclientinfra "github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
+	messagingintegration "github.com/FangcunMount/qs-server/internal/worker/integration/messaging"
 	observability "github.com/FangcunMount/qs-server/internal/worker/observability"
 )
 
@@ -61,7 +62,9 @@ type observabilityOutput struct {
 }
 
 type messagingRuntimeOutput struct {
-	subscriber messaging.Subscriber
+	subscriber   messaging.Subscriber
+	publisher    messaging.Publisher
+	holdReplayer *messagingintegration.RetryEventHoldReplayer
 }
 
 type runtimeOutput struct {

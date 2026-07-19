@@ -96,7 +96,12 @@ func (h *SystemGovernanceHandler) Events(c *gin.Context) {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"message": "system governance unavailable"})
 		return
 	}
-	result, err := h.facade.GetEvents(c.Request.Context(), c.Query("window"))
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.facade.GetEvents(c.Request.Context(), orgID, c.Query("window"))
 	if err != nil {
 		h.Error(c, err)
 		return

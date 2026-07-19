@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	drivermysql "github.com/go-sql-driver/mysql"
 
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
@@ -27,6 +28,22 @@ type DeadLetterRecord struct {
 
 type DeadLetterRecorder interface {
 	RecordDeadLetter(context.Context, DeadLetterRecord) error
+}
+
+func failedMessageHandler(recorder DeadLetterRecorder) basemessaging.FailedMessageHandler {
+	return func(ctx context.Context, failed basemessaging.FailedMessage) error {
+		if recorder == nil || failed.Message == nil {
+			return fmt.Errorf("dead-letter audit store is not configured")
+		}
+		lastError := "transport delivery exhausted"
+		if failed.Cause != nil {
+			lastError = failed.Cause.Error()
+		}
+		return recorder.RecordDeadLetter(ctx, deadLetterRecord(
+			failed.Provider, failed.Topic, failed.Channel, failed.Attempts,
+			failed.Message.UUID, failed.Message.Payload, lastError,
+		))
+	}
 }
 
 type mysqlDeadLetterRecorder struct{ db *sql.DB }

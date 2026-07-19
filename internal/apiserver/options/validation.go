@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 // Validate 验证命令行参数
@@ -61,6 +62,13 @@ func validateRetryGovernance(opts *SystemGovernanceOptions) []error {
 		}
 		if policy.MaxAutomaticAttempts < 1 {
 			errs = append(errs, fmt.Errorf("system_governance.retry.%s.max_automatic_attempts must be greater than 0", name))
+		}
+		hardMax := retrygovernance.HardMaxBusinessAttempts
+		if name == "outbox" {
+			hardMax = retrygovernance.HardMaxOutboxAttempts
+		}
+		if policy.MaxAutomaticAttempts > hardMax {
+			errs = append(errs, fmt.Errorf("system_governance.retry.%s.max_automatic_attempts cannot exceed %d", name, hardMax))
 		}
 		if policy.BaseDelay <= 0 || policy.MaxDelay < policy.BaseDelay {
 			errs = append(errs, fmt.Errorf("system_governance.retry.%s delays are invalid", name))

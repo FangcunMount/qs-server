@@ -412,3 +412,26 @@ func TestOptionsValidateCacheRoutes(t *testing.T) {
 		})
 	}
 }
+
+func TestOptionsValidateRetryHardCaps(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*Options)
+		want   string
+	}{
+		{name: "business", mutate: func(opts *Options) { opts.SystemGovernance.Retry.Business.MaxAutomaticAttempts = 4 }, want: "business.max_automatic_attempts cannot exceed 3"},
+		{name: "outbox", mutate: func(opts *Options) { opts.SystemGovernance.Retry.Outbox.MaxAutomaticAttempts = 31 }, want: "outbox.max_automatic_attempts cannot exceed 30"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := NewOptions()
+			tt.mutate(opts)
+			for _, err := range opts.Validate() {
+				if strings.Contains(err.Error(), tt.want) {
+					return
+				}
+			}
+			t.Fatalf("expected validation error containing %q", tt.want)
+		})
+	}
+}

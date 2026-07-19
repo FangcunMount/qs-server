@@ -19,6 +19,12 @@ const (
 	DispositionTerminal       Disposition = "terminal"
 )
 
+const (
+	HardMaxBusinessAttempts = 3
+	HardMaxOutboxAttempts   = 30
+	HardMaxDeliveryAttempts = 8
+)
+
 func (d Disposition) IsValid() bool {
 	switch d {
 	case DispositionAutomatic, DispositionManualRequired, DispositionTerminal:
@@ -111,6 +117,12 @@ func ConfigurePolicies(business, outbox Policy) error {
 	}
 	if err := outbox.Validate(); err != nil {
 		return fmt.Errorf("outbox retry policy: %w", err)
+	}
+	if business.MaxAutomaticAttempts > HardMaxBusinessAttempts {
+		return fmt.Errorf("business retry policy: max automatic attempts cannot exceed %d", HardMaxBusinessAttempts)
+	}
+	if outbox.MaxAutomaticAttempts > HardMaxOutboxAttempts {
+		return fmt.Errorf("outbox retry policy: max automatic attempts cannot exceed %d", HardMaxOutboxAttempts)
 	}
 	setPolicy(&businessPolicy, business)
 	setPolicy(&outboxPolicy, outbox)

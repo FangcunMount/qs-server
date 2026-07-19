@@ -53,6 +53,12 @@ const (
 	ConsumeOutcomeAckFailed        ConsumeOutcome = "ack_failed"
 	ConsumeOutcomeNacked           ConsumeOutcome = "nacked"
 	ConsumeOutcomeNackFailed       ConsumeOutcome = "nack_failed"
+	ConsumeOutcomeDecodeNacked     ConsumeOutcome = "decode_nacked"
+	ConsumeOutcomeDecodeNackFailed ConsumeOutcome = "decode_nack_failed"
+	ConsumeOutcomeHeld             ConsumeOutcome = "held"
+	ConsumeOutcomeHoldFailed       ConsumeOutcome = "hold_failed"
+	ConsumeOutcomeHoldReplayed     ConsumeOutcome = "hold_replayed"
+	ConsumeOutcomeHoldReplayFailed ConsumeOutcome = "hold_replay_failed"
 )
 
 func (o ConsumeOutcome) String() string { return string(o) }

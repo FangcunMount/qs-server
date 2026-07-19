@@ -2,10 +2,12 @@ package options
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"github.com/FangcunMount/qs-server/pkg/configmask"
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
 )
@@ -37,7 +39,8 @@ type Options struct {
 	LockLease    *genericoptions.LockLeaseOptions    `json:"lock_lease" mapstructure:"lock_lease"`
 	Cache        *CacheOptions                       `json:"cache" mapstructure:"cache"`
 	// report_status 与 signaling
-	Signaling *genericoptions.SignalingOptions `json:"signaling" mapstructure:"signaling"`
+	Signaling          *genericoptions.SignalingOptions `json:"signaling" mapstructure:"signaling"`
+	deliveryConfigured bool
 }
 
 type CacheOptions struct {
@@ -73,7 +76,15 @@ type DeliveryOptions struct {
 }
 
 type RetryGovernanceOptions struct {
-	AutomaticRetryEnabled bool `json:"automatic_retry_enabled" mapstructure:"automatic-retry-enabled"`
+	AutomaticRetryEnabled bool                `json:"automatic_retry_enabled" mapstructure:"automatic-retry-enabled"`
+	HoldReplay            *RetryPolicyOptions `json:"hold_replay" mapstructure:"hold-replay"`
+}
+
+type RetryPolicyOptions struct {
+	MaxAttempts    int           `json:"max_attempts" mapstructure:"max-attempts"`
+	BaseDelay      time.Duration `json:"base_delay" mapstructure:"base-delay"`
+	MaxDelay       time.Duration `json:"max_delay" mapstructure:"max-delay"`
+	JitterFraction float64       `json:"jitter_fraction" mapstructure:"jitter-fraction"`
 }
 
 // WorkerOptions Worker 运行配置
@@ -128,14 +139,14 @@ func NewOptions() *Options {
 			NSQLookupdAddr: "localhost:4161",
 			Delivery:       &DeliveryOptions{Enable: true, MaxAttempts: 8},
 		},
-		RetryGovernance: &RetryGovernanceOptions{AutomaticRetryEnabled: true},
+		RetryGovernance: &RetryGovernanceOptions{AutomaticRetryEnabled: true, HoldReplay: &RetryPolicyOptions{MaxAttempts: 30, BaseDelay: 10 * time.Second, MaxDelay: time.Hour, JitterFraction: .2}},
 		GRPC: &GRPCOptions{
 			ApiserverAddr: "localhost:9090",
 			Insecure:      true,
 		},
 		Worker: &WorkerOptions{
 			Concurrency: 10,
-			MaxRetries:  3,
+			MaxRetries:  0,
 			ServiceName: "qs-worker",
 		},
 		Notification: &NotificationOptions{
@@ -151,6 +162,8 @@ func NewOptions() *Options {
 		Signaling: genericoptions.NewSignalingOptions(),
 	}
 }
+
+func (o *Options) DeliveryConfigured() bool { return o != nil && o.deliveryConfigured }
 
 func defaultRedisRuntimeOptions() *genericoptions.RedisRuntimeOptions {
 	opts := genericoptions.NewRedisRuntimeOptions()
@@ -203,10 +216,17 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	messagingFS.IntVar(&o.Messaging.Delivery.MaxAttempts, "messaging.delivery.max-attempts", o.Messaging.Delivery.MaxAttempts,
 		"Maximum transport delivery attempts before dead letter")
 	if o.RetryGovernance == nil {
-		o.RetryGovernance = &RetryGovernanceOptions{AutomaticRetryEnabled: true}
+		o.RetryGovernance = &RetryGovernanceOptions{AutomaticRetryEnabled: true, HoldReplay: &RetryPolicyOptions{MaxAttempts: 30, BaseDelay: 10 * time.Second, MaxDelay: time.Hour, JitterFraction: .2}}
 	}
 	messagingFS.BoolVar(&o.RetryGovernance.AutomaticRetryEnabled, "retry-governance.automatic-retry-enabled", o.RetryGovernance.AutomaticRetryEnabled,
 		"Emergency switch for automatic business retry events; manual and force events remain enabled")
+	if o.RetryGovernance.HoldReplay == nil {
+		o.RetryGovernance.HoldReplay = &RetryPolicyOptions{MaxAttempts: 30, BaseDelay: 10 * time.Second, MaxDelay: time.Hour, JitterFraction: .2}
+	}
+	messagingFS.IntVar(&o.RetryGovernance.HoldReplay.MaxAttempts, "retry-governance.hold-replay.max-attempts", o.RetryGovernance.HoldReplay.MaxAttempts, "Maximum retry hold publish attempts")
+	messagingFS.DurationVar(&o.RetryGovernance.HoldReplay.BaseDelay, "retry-governance.hold-replay.base-delay", o.RetryGovernance.HoldReplay.BaseDelay, "Base retry hold publish delay")
+	messagingFS.DurationVar(&o.RetryGovernance.HoldReplay.MaxDelay, "retry-governance.hold-replay.max-delay", o.RetryGovernance.HoldReplay.MaxDelay, "Maximum retry hold publish delay")
+	messagingFS.Float64Var(&o.RetryGovernance.HoldReplay.JitterFraction, "retry-governance.hold-replay.jitter-fraction", o.RetryGovernance.HoldReplay.JitterFraction, "Retry hold publish jitter fraction")
 
 	// gRPC flags
 	grpcFS := fss.FlagSet("grpc")
@@ -281,8 +301,20 @@ func (o *Options) Validate() []error {
 		}
 	}
 	if o.Messaging != nil && o.Messaging.Delivery != nil && o.Messaging.Delivery.Enable {
-		if o.Messaging.Delivery.MaxAttempts < 1 || o.Messaging.Delivery.MaxAttempts > 65535 {
-			errs = append(errs, fmt.Errorf("messaging.delivery.max_attempts must be between 1 and 65535"))
+		if o.Messaging.Delivery.MaxAttempts < 1 || o.Messaging.Delivery.MaxAttempts > retrygovernance.HardMaxDeliveryAttempts {
+			errs = append(errs, fmt.Errorf("messaging.delivery.max_attempts must be between 1 and %d", retrygovernance.HardMaxDeliveryAttempts))
+		}
+	}
+	if o.RetryGovernance != nil && o.RetryGovernance.HoldReplay != nil {
+		policy := o.RetryGovernance.HoldReplay
+		if policy.MaxAttempts < 1 || policy.MaxAttempts > retrygovernance.HardMaxOutboxAttempts {
+			errs = append(errs, fmt.Errorf("retry_governance.hold_replay.max_attempts must be between 1 and %d", retrygovernance.HardMaxOutboxAttempts))
+		}
+		if policy.BaseDelay <= 0 || policy.MaxDelay < policy.BaseDelay {
+			errs = append(errs, fmt.Errorf("retry_governance.hold_replay delays are invalid"))
+		}
+		if policy.JitterFraction < 0 || policy.JitterFraction > 1 {
+			errs = append(errs, fmt.Errorf("retry_governance.hold_replay.jitter_fraction must be between 0 and 1"))
 		}
 	}
 	if len(o.Redis.Addrs) == 0 && o.Redis.Port <= 0 {

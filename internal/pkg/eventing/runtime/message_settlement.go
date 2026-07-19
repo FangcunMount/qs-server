@@ -2,12 +2,17 @@ package eventruntime
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"github.com/FangcunMount/component-base/pkg/eventcodec"
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 )
+
+// ErrAutomaticRetryPaused marks a business retry event that must be durably
+// held instead of consuming transport retry budget.
+var ErrAutomaticRetryPaused = errors.New("automatic business retry paused by emergency switch")
 
 // MessageEventExtractor resolves event type from metadata first and falls back
 // to the canonical envelope.
@@ -57,6 +62,31 @@ func (p MessageSettlementPolicy) AckInvalid(msg *messaging.Message, parseErr err
 		return
 	}
 	p.observe(msg, "", eventobservability.ConsumeOutcomePoisonAcked)
+}
+
+func (p MessageSettlementPolicy) NackInvalid(msg *messaging.Message, parseErr error) (eventobservability.ConsumeOutcome, error) {
+	p.logger.Warn("message missing event_type and payload parse failed",
+		slog.String("channel", p.service), slog.String("topic", p.topic), slog.String("msg_id", msg.UUID),
+		slog.Int("payload_bytes", len(msg.Payload)), slog.String("error", parseErr.Error()))
+	if nackErr := msg.Nack(); nackErr != nil {
+		p.observe(msg, "", eventobservability.ConsumeOutcomeDecodeNackFailed)
+		return eventobservability.ConsumeOutcomeDecodeNackFailed, nackErr
+	}
+	p.observe(msg, "", eventobservability.ConsumeOutcomeDecodeNacked)
+	return eventobservability.ConsumeOutcomeDecodeNacked, parseErr
+}
+
+func (p MessageSettlementPolicy) AckHeld(msg *messaging.Message) (eventobservability.ConsumeOutcome, error) {
+	return p.ack(msg, eventobservability.ConsumeOutcomeHeld, eventobservability.ConsumeOutcomeHoldFailed)
+}
+
+func (p MessageSettlementPolicy) NackHoldFailed(msg *messaging.Message, eventType string, holdErr error) eventobservability.ConsumeOutcome {
+	p.logger.Error("failed to persist paused retry event hold",
+		slog.String("channel", p.service), slog.String("topic", p.topic), slog.String("event_type", eventType),
+		slog.String("msg_id", msg.UUID), slog.String("error", holdErr.Error()))
+	_ = msg.Nack()
+	p.observe(msg, eventType, eventobservability.ConsumeOutcomeHoldFailed)
+	return eventobservability.ConsumeOutcomeHoldFailed
 }
 
 func (p MessageSettlementPolicy) NackFailed(msg *messaging.Message, eventType string, dispatchErr error) eventobservability.ConsumeOutcome {

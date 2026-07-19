@@ -45,6 +45,9 @@ func (r *Reader) ListRetryCandidates(ctx context.Context, orgID int64, cursor st
 	if err := r.appendDeliveryCandidates(ctx, orgID, fetch, &items); err != nil {
 		return app.RetryCandidatePage{}, err
 	}
+	if err := r.appendHoldCandidates(ctx, orgID, fetch, &items); err != nil {
+		return app.RetryCandidatePage{}, err
+	}
 
 	sort.Slice(items, func(i, j int) bool {
 		if !items[i].UpdatedAt.Equal(items[j].UpdatedAt) {
@@ -207,6 +210,32 @@ ORDER BY updated_at DESC LIMIT ?`, orgID, limit).Scan(&rows).Error; err != nil {
 	for _, row := range rows {
 		last := valueOrEmpty(row.LastError)
 		*dst = append(*dst, app.RetryCandidate{Kind: "transport_delivery", Store: "mysql", ResourceID: strconv.FormatUint(row.ID, 10), Attempt: row.DeliveryAttempts, Disposition: "manual_required", LastErrorKind: last, UpdatedAt: row.UpdatedAt})
+	}
+	return nil
+}
+
+func (r *Reader) appendHoldCandidates(ctx context.Context, orgID int64, limit int, dst *[]app.RetryCandidate) error {
+	var rows []struct {
+		EventID            string
+		ReplayAttemptCount int
+		RetryDisposition   string
+		NextAttemptAt      *time.Time
+		LastError          *string
+		UpdatedAt          time.Time
+	}
+	if err := r.mysql.WithContext(ctx).Raw(`SELECT event_id, replay_attempt_count, retry_disposition,
+next_attempt_at, last_error, updated_at FROM retry_event_hold
+WHERE org_id=? AND status IN ('blocked','failed','replaying')
+  AND retry_disposition IN ('automatic','manual_required')
+ORDER BY updated_at DESC LIMIT ?`, orgID, limit).Scan(&rows).Error; err != nil {
+		return err
+	}
+	for _, row := range rows {
+		*dst = append(*dst, app.RetryCandidate{
+			Kind: "retry_hold", Store: "retry_hold", ResourceID: row.EventID,
+			Attempt: row.ReplayAttemptCount, Disposition: row.RetryDisposition,
+			NextAttemptAt: row.NextAttemptAt, LastErrorKind: valueOrEmpty(row.LastError), UpdatedAt: row.UpdatedAt,
+		})
 	}
 	return nil
 }

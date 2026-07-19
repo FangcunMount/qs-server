@@ -2,11 +2,13 @@ package messaging
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
+	cbrabbit "github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
@@ -30,38 +32,41 @@ type SubscriptionRuntime interface {
 type MessageEventExtractor = eventruntime.MessageEventExtractor
 type MessageSettlementPolicy = eventruntime.MessageSettlementPolicy
 
-type SubscriberOptions struct {
-	MaxInFlight int
-	MaxAttempts int
-	DeadLetters DeadLetterRecorder
-}
-
 func CreateSubscriber(cfg *config.MessagingConfig, logger *slog.Logger, maxInFlight int) (basemessaging.Subscriber, error) {
-	return CreateSubscriberWithOptions(cfg, logger, SubscriberOptions{MaxInFlight: maxInFlight, MaxAttempts: 8})
+	return CreateSubscriberWithOptions(cfg, logger, NewSubscriberOptions(maxInFlight, 8, nil))
 }
 
-func CreateSubscriberWithOptions(cfg *config.MessagingConfig, logger *slog.Logger, opts SubscriberOptions) (basemessaging.Subscriber, error) {
+func NewSubscriberOptions(maxInFlight, maxAttempts int, recorder DeadLetterRecorder) basemessaging.SubscriberOptions {
+	return basemessaging.SubscriberOptions{
+		MaxInFlight:          maxInFlight,
+		MaxAttempts:          maxAttempts,
+		RetryBackoff:         basemessaging.RetryBackoffOptions{BaseDelay: 30 * time.Second, MaxDelay: 5 * time.Minute, JitterFraction: .2},
+		FailedMessageHandler: failedMessageHandler(recorder),
+	}
+}
+
+func CreateSubscriberWithOptions(cfg *config.MessagingConfig, logger *slog.Logger, opts basemessaging.SubscriberOptions) (basemessaging.Subscriber, error) {
 	switch cfg.Provider {
 	case "nsq":
 		nsqCfg := nsq.NewConfig()
-		if opts.MaxInFlight > 0 {
-			nsqCfg.MaxInFlight = opts.MaxInFlight
-		}
-		if opts.MaxAttempts > 0 {
-			nsqCfg.MaxAttempts = uint16(opts.MaxAttempts)
-		}
-		return newGovernedNSQSubscriber([]string{cfg.NSQLookupdAddr}, nsqCfg, opts.DeadLetters)
+		return cbnsq.NewSubscriberWithOptions([]string{cfg.NSQLookupdAddr}, nsqCfg, opts)
 	case "rabbitmq":
-		return newGovernedRabbitSubscriber(cfg.RabbitMQURL, opts)
+		return cbrabbit.NewSubscriberWithOptions(cfg.RabbitMQURL, opts)
 	default:
 		logger.Warn("unknown messaging provider, using NSQ as default",
 			slog.String("provider", cfg.Provider),
 		)
 		nsqCfg := nsq.NewConfig()
-		if opts.MaxAttempts > 0 {
-			nsqCfg.MaxAttempts = uint16(opts.MaxAttempts)
-		}
-		return newGovernedNSQSubscriber([]string{cfg.NSQLookupdAddr}, nsqCfg, opts.DeadLetters)
+		return cbnsq.NewSubscriberWithOptions([]string{cfg.NSQLookupdAddr}, nsqCfg, opts)
+	}
+}
+
+func CreatePublisher(cfg *config.MessagingConfig) (basemessaging.Publisher, error) {
+	switch cfg.Provider {
+	case "rabbitmq":
+		return cbrabbit.NewPublisher(cfg.RabbitMQURL)
+	default:
+		return cbnsq.NewPublisher(cfg.NSQAddr, nsq.NewConfig())
 	}
 }
 
@@ -94,11 +99,12 @@ func SubscribeHandlers(serviceName string, logger *slog.Logger, runtime Subscrip
 }
 
 type SubscribeHandlersOptions struct {
-	ServiceName string
-	Logger      *slog.Logger
-	Runtime     SubscriptionRuntime
-	Subscriber  basemessaging.Subscriber
-	Observer    eventobservability.Observer
+	ServiceName  string
+	Logger       *slog.Logger
+	Runtime      SubscriptionRuntime
+	Subscriber   basemessaging.Subscriber
+	Observer     eventobservability.Observer
+	HoldRecorder RetryEventHoldRecorder
 }
 
 func SubscribeHandlersWithOptions(opts SubscribeHandlersOptions) error {
@@ -116,7 +122,7 @@ func SubscribeHandlersWithOptions(opts SubscribeHandlersOptions) error {
 	subscriptions := runtime.GetTopicSubscriptions()
 	for _, sub := range subscriptions {
 		topicName := sub.TopicName
-		msgHandler := createDispatchHandlerWithObserver(logger, runtime, topicName, serviceName, opts.Observer)
+		msgHandler := createDispatchHandlerWithObserverAndHold(logger, runtime, topicName, serviceName, opts.Observer, opts.HoldRecorder)
 		if err := subscriber.Subscribe(topicName, serviceName, msgHandler); err != nil {
 			logger.Error("failed to subscribe",
 				slog.String("topic", topicName),
@@ -138,6 +144,10 @@ func createDispatchHandler(logger *slog.Logger, dispatcher EventDispatcher, topi
 }
 
 func createDispatchHandlerWithObserver(logger *slog.Logger, dispatcher EventDispatcher, topicName, serviceName string, observer eventobservability.Observer) basemessaging.Handler {
+	return createDispatchHandlerWithObserverAndHold(logger, dispatcher, topicName, serviceName, observer, nil)
+}
+
+func createDispatchHandlerWithObserverAndHold(logger *slog.Logger, dispatcher EventDispatcher, topicName, serviceName string, observer eventobservability.Observer, holdRecorder RetryEventHoldRecorder) basemessaging.Handler {
 	extractor := MessageEventExtractor{}
 	if logger == nil {
 		logger = slog.Default()
@@ -149,8 +159,11 @@ func createDispatchHandlerWithObserver(logger *slog.Logger, dispatcher EventDisp
 	return func(ctx context.Context, msg *basemessaging.Message) error {
 		eventType, err := extractor.Extract(msg)
 		if err != nil {
-			settlement.AckInvalid(msg, err)
-			return nil
+			_, settleErr := settlement.NackInvalid(msg, err)
+			if settleErr != nil && !errors.Is(settleErr, err) {
+				return errors.Join(err, settleErr)
+			}
+			return err
 		}
 
 		logLevel := dispatchLogLevel(topicName)
@@ -159,6 +172,19 @@ func createDispatchHandlerWithObserver(logger *slog.Logger, dispatcher EventDisp
 		startedAt := time.Now()
 		result, err := dispatcher.DispatchEvent(ctx, eventType, msg.Payload)
 		if err != nil {
+			if errors.Is(err, eventruntime.ErrAutomaticRetryPaused) {
+				if holdRecorder == nil {
+					settlement.NackHoldFailed(msg, eventType, errors.New("retry event hold recorder is not configured"))
+					return err
+				}
+				if holdErr := holdRecorder.Hold(ctx, msg, eventType, err); holdErr != nil {
+					settlement.NackHoldFailed(msg, eventType, holdErr)
+					return errors.Join(err, holdErr)
+				}
+				outcome, ackErr := settlement.AckHeld(msg)
+				eventobservability.ObserveConsumeDuration(ctx, observer, eventobservability.ConsumeDurationEvent{Service: serviceName, Topic: topicName, EventType: eventType, Outcome: outcome, Duration: time.Since(startedAt)})
+				return ackErr
+			}
 			outcome := settlement.NackFailed(msg, eventType, err)
 			elapsed := time.Since(startedAt)
 			eventobservability.ObserveConsumeDuration(ctx, observer, eventobservability.ConsumeDurationEvent{

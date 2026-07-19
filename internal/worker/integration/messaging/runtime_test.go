@@ -70,6 +70,16 @@ type consumeObserver struct {
 	durations []eventobservability.ConsumeDurationEvent
 }
 
+type fakeHoldRecorder struct {
+	calls int
+	err   error
+}
+
+func (r *fakeHoldRecorder) Hold(context.Context, *basemessaging.Message, string, error) error {
+	r.calls++
+	return r.err
+}
+
 func (o *consumeObserver) ObservePublish(context.Context, eventobservability.PublishEvent) {}
 func (o *consumeObserver) ObserveOutbox(context.Context, eventobservability.OutboxEvent)   {}
 
@@ -178,55 +188,55 @@ func TestSubscribeHandlersUsesNarrowSubscriptionRuntime(t *testing.T) {
 	}
 }
 
-func TestDispatchHandlerAcksInvalidPayloadWithoutDispatch(t *testing.T) {
+func TestDispatchHandlerNacksInvalidPayloadWithoutDispatch(t *testing.T) {
 	dispatcher := &fakeDispatcher{}
 	msg := basemessaging.NewMessage("msg-1", []byte("not-json"))
-	ackCount := 0
-	msg.SetAckFunc(func() error {
-		ackCount++
+	nackCount := 0
+	msg.SetNackFunc(func() error {
+		nackCount++
 		return nil
 	})
 
 	handler := createDispatchHandler(testLogger(), dispatcher, "topic")
-	if err := handler(context.Background(), msg); err != nil {
-		t.Fatalf("handler: %v", err)
+	if err := handler(context.Background(), msg); err == nil {
+		t.Fatal("expected decode error")
 	}
 
 	if dispatcher.calls != 0 {
 		t.Fatalf("dispatch calls = %d, want 0", dispatcher.calls)
 	}
-	if ackCount != 1 {
-		t.Fatalf("ackCount = %d, want 1", ackCount)
+	if nackCount != 1 {
+		t.Fatalf("nackCount = %d, want 1", nackCount)
 	}
 }
 
-func TestDispatchHandlerObservesPoisonAcked(t *testing.T) {
+func TestDispatchHandlerObservesDecodeNacked(t *testing.T) {
 	observer := &consumeObserver{}
 	dispatcher := &fakeDispatcher{}
 	msg := basemessaging.NewMessage("msg-1", []byte("not-json"))
-	msg.SetAckFunc(func() error { return nil })
+	msg.SetNackFunc(func() error { return nil })
 
 	handler := createDispatchHandlerWithObserver(testLogger(), dispatcher, "topic", "worker", observer)
-	if err := handler(context.Background(), msg); err != nil {
-		t.Fatalf("handler: %v", err)
+	if err := handler(context.Background(), msg); err == nil {
+		t.Fatal("expected decode error")
 	}
 
-	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomePoisonAcked)
+	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeDecodeNacked)
 	assertNoConsumeDuration(t, observer)
 }
 
-func TestDispatchHandlerObservesPoisonAckFailed(t *testing.T) {
+func TestDispatchHandlerObservesDecodeNackFailed(t *testing.T) {
 	observer := &consumeObserver{}
 	dispatcher := &fakeDispatcher{}
 	msg := basemessaging.NewMessage("msg-1", []byte("not-json"))
-	msg.SetAckFunc(func() error { return errors.New("ack failed") })
+	msg.SetNackFunc(func() error { return errors.New("nack failed") })
 
 	handler := createDispatchHandlerWithObserver(testLogger(), dispatcher, "topic", "worker", observer)
-	if err := handler(context.Background(), msg); err != nil {
-		t.Fatalf("handler: %v", err)
+	if err := handler(context.Background(), msg); err == nil {
+		t.Fatal("expected decode/nack error")
 	}
 
-	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomePoisonAckFailed)
+	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeDecodeNackFailed)
 	assertNoConsumeDuration(t, observer)
 }
 
@@ -265,6 +275,46 @@ func TestDispatchHandlerObservesNacked(t *testing.T) {
 
 	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeNacked)
 	assertConsumeDuration(t, observer, eventobservability.ConsumeOutcomeNacked)
+}
+
+func TestDispatchHandlerAcksPausedEventOnlyAfterDurableHold(t *testing.T) {
+	observer := &consumeObserver{}
+	dispatcher := &fakeDispatcher{err: eventruntime.ErrAutomaticRetryPaused}
+	recorder := &fakeHoldRecorder{}
+	msg := basemessaging.NewMessage("msg-1", []byte(`{}`))
+	msg.Metadata["event_type"] = "metadata.event"
+	ackCount := 0
+	msg.SetAckFunc(func() error { ackCount++; return nil })
+
+	handler := createDispatchHandlerWithObserverAndHold(testLogger(), dispatcher, "topic", "worker", observer, recorder)
+	if err := handler(t.Context(), msg); err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	if recorder.calls != 1 || ackCount != 1 {
+		t.Fatalf("hold calls=%d ack calls=%d, want 1/1", recorder.calls, ackCount)
+	}
+	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeHeld)
+	assertConsumeDuration(t, observer, eventobservability.ConsumeOutcomeHeld)
+}
+
+func TestDispatchHandlerNacksPausedEventWhenHoldFails(t *testing.T) {
+	observer := &consumeObserver{}
+	dispatcher := &fakeDispatcher{err: eventruntime.ErrAutomaticRetryPaused}
+	recorder := &fakeHoldRecorder{err: errors.New("mysql unavailable")}
+	msg := basemessaging.NewMessage("msg-1", []byte(`{}`))
+	msg.Metadata["event_type"] = "metadata.event"
+	nackCount := 0
+	msg.SetNackFunc(func() error { nackCount++; return nil })
+
+	handler := createDispatchHandlerWithObserverAndHold(testLogger(), dispatcher, "topic", "worker", observer, recorder)
+	if err := handler(t.Context(), msg); err == nil {
+		t.Fatal("expected hold error")
+	}
+	if recorder.calls != 1 || nackCount != 1 {
+		t.Fatalf("hold calls=%d nack calls=%d, want 1/1", recorder.calls, nackCount)
+	}
+	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeHoldFailed)
+	assertNoConsumeDuration(t, observer)
 }
 
 func TestDispatchHandlerObservesNackFailed(t *testing.T) {

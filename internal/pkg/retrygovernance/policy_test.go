@@ -101,15 +101,28 @@ func TestConfigurePoliciesPublishesAtomicSnapshots(t *testing.T) {
 			t.Fatalf("restore policies: %v", err)
 		}
 	})
-	business := Policy{Version: "business-test/v2", MaxAutomaticAttempts: 4, BaseDelay: time.Second, MaxDelay: time.Minute}
+	business := Policy{Version: "business-test/v2", MaxAutomaticAttempts: 2, BaseDelay: time.Second, MaxDelay: time.Minute}
 	outbox := Policy{Version: "outbox-test/v2", MaxAutomaticAttempts: 12, BaseDelay: 2 * time.Second, MaxDelay: time.Hour, JitterFraction: .1}
 	if err := ConfigurePolicies(business, outbox); err != nil {
 		t.Fatal(err)
 	}
-	if got := BusinessPolicy(); got.Version != business.Version || got.MaxAutomaticAttempts != 4 {
+	if got := BusinessPolicy(); got.Version != business.Version || got.MaxAutomaticAttempts != 2 {
 		t.Fatalf("business policy = %#v", got)
 	}
 	if got := OutboxPolicy(); got.Version != outbox.Version || got.MaxAutomaticAttempts != 12 {
 		t.Fatalf("outbox policy = %#v", got)
+	}
+}
+
+func TestConfigurePoliciesRejectsHardCapViolation(t *testing.T) {
+	business := DefaultBusinessPolicy
+	business.MaxAutomaticAttempts = HardMaxBusinessAttempts + 1
+	if err := ConfigurePolicies(business, DefaultOutboxPolicy); err == nil {
+		t.Fatal("expected business hard-cap validation error")
+	}
+	outbox := DefaultOutboxPolicy
+	outbox.MaxAutomaticAttempts = HardMaxOutboxAttempts + 1
+	if err := ConfigurePolicies(DefaultBusinessPolicy, outbox); err == nil {
+		t.Fatal("expected outbox hard-cap validation error")
 	}
 }

@@ -32,8 +32,17 @@ func buildLifecycleDeps(resources resourceOutput, containerOutput containerOutpu
 	var deps lifecycleDeps
 	if runtimeOutput.messaging.subscriber != nil {
 		deps.stopSubscriber = func() error {
+			if runtimeOutput.messaging.holdReplayer != nil {
+				runtimeOutput.messaging.holdReplayer.Stop()
+			}
 			runtimeOutput.messaging.subscriber.Stop()
-			return runtimeOutput.messaging.subscriber.Close()
+			err := runtimeOutput.messaging.subscriber.Close()
+			if runtimeOutput.messaging.publisher != nil {
+				if closeErr := runtimeOutput.messaging.publisher.Close(); err == nil {
+					err = closeErr
+				}
+			}
+			return err
 		}
 	}
 	if integrationOutput.grpcClients.grpcManager != nil {

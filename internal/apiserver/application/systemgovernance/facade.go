@@ -14,7 +14,7 @@ import (
 // Facade 是unified system governance entry point。
 type Facade interface {
 	GetOverview(ctx context.Context, window string) (*OverviewResponse, error)
-	GetEvents(ctx context.Context, window string) (*EventsView, error)
+	GetEvents(ctx context.Context, orgID int64, window string) (*EventsView, error)
 	ListRetryCandidates(ctx context.Context, orgID int64, cursor string, limit int) (*RetryCandidatePage, error)
 	GetCache(ctx context.Context, window string) (*CacheView, error)
 	GetResilience(ctx context.Context, window string) (*ResilienceView, error)
@@ -81,7 +81,7 @@ func (f *facade) GetOverview(ctx context.Context, window string) (*OverviewRespo
 	if err != nil {
 		return nil, err
 	}
-	events, err := f.eventCollector().Collect(ctx, evalCtx)
+	events, err := f.eventCollector().Collect(ctx, evalCtx, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -109,12 +109,12 @@ func (f *facade) GetOverview(ctx context.Context, window string) (*OverviewRespo
 	}, nil
 }
 
-func (f *facade) GetEvents(ctx context.Context, window string) (*EventsView, error) {
+func (f *facade) GetEvents(ctx context.Context, orgID int64, window string) (*EventsView, error) {
 	evalCtx, err := f.newEvaluationContext(ctx, window)
 	if err != nil {
 		return nil, err
 	}
-	return f.eventCollector().Collect(ctx, evalCtx)
+	return f.eventCollector().Collect(ctx, evalCtx, orgID)
 }
 
 func (f *facade) ListRetryCandidates(ctx context.Context, orgID int64, cursor string, limit int) (*RetryCandidatePage, error) {

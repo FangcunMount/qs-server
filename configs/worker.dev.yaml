@@ -51,6 +51,11 @@ messaging:
 
 retry_governance:
   automatic-retry-enabled: true  # emergency switch; manual/force authorization is unaffected
+  hold-replay:
+    max-attempts: 30
+    base-delay: 10s
+    max-delay: 1h
+    jitter-fraction: 0.2
 
 # ============================================================
 # 3. gRPC 客户端配置

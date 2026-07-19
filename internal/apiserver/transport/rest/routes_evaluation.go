@@ -19,6 +19,7 @@ func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
 		r.deps.Evaluation.OperatorRecoveryService,
 		r.deps.Evaluation.OperatorExecutionService,
 		r.deps.Evaluation.ProtectedQueryService,
+		r.deps.SystemGovernanceFacade,
 	)
 	journeyHandler := handler.NewAssessmentReportJourneyHandler(
 		r.deps.Interpretation.ReportQueryJourney,

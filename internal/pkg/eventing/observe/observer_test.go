@@ -58,6 +58,12 @@ func TestOutcomeStringValuesAreStable(t *testing.T) {
 		ConsumeOutcomeAckFailed.String():          "ack_failed",
 		ConsumeOutcomeNacked.String():             "nacked",
 		ConsumeOutcomeNackFailed.String():         "nack_failed",
+		ConsumeOutcomeDecodeNacked.String():       "decode_nacked",
+		ConsumeOutcomeDecodeNackFailed.String():   "decode_nack_failed",
+		ConsumeOutcomeHeld.String():               "held",
+		ConsumeOutcomeHoldFailed.String():         "hold_failed",
+		ConsumeOutcomeHoldReplayed.String():       "hold_replayed",
+		ConsumeOutcomeHoldReplayFailed.String():   "hold_replay_failed",
 	}
 	for got, want := range cases {
 		if got == "" {
