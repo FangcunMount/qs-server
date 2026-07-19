@@ -122,9 +122,10 @@ func addOutboxCounts(summary *app.RetryGovernanceSummary, rows []countRow) {
 	}
 }
 func addOutbox(summary *app.RetryGovernanceSummary, disposition string, count int64) {
-	if disposition == "automatic" {
+	switch disposition {
+	case "automatic":
 		summary.OutboxAutomatic += count
-	} else if disposition == "manual_required" {
+	case "manual_required":
 		summary.OutboxManual += count
 	}
 }

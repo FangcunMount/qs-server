@@ -16,7 +16,7 @@ func TestRetryHoldManualReplayIsOrgScopedAndDoesNotResetAttemptCount(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer sqlDB.Close()
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	db, err := gorm.Open(mysql.New(mysql.Config{Conn: sqlDB, SkipInitializeWithVersion: true}), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)
@@ -51,7 +51,7 @@ func TestRetryHoldManualReplayRejectsOtherOrganization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer sqlDB.Close()
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	db, err := gorm.Open(mysql.New(mysql.Config{Conn: sqlDB, SkipInitializeWithVersion: true}), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)

@@ -79,11 +79,12 @@ func (s *service) Generate(ctx context.Context, command GenerateCommand) (*Resul
 		return nil, err
 	}
 	result := &Result{}
-	if executed.Status == interpretationexecution.ExecuteStatusProcessing {
+	switch executed.Status {
+	case interpretationexecution.ExecuteStatusProcessing:
 		result.Status = StatusProcessing
-	} else if executed.Status == interpretationexecution.ExecuteStatusBlocked {
+	case interpretationexecution.ExecuteStatusBlocked:
 		result.Status = StatusBlocked
-	} else {
+	default:
 		result.Status = StatusGenerated
 	}
 	if executed.Generation != nil {

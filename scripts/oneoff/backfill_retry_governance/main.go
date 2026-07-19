@@ -77,7 +77,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer mysqlDB.Close()
+	defer func() { _ = mysqlDB.Close() }()
 	if err := mysqlDB.PingContext(ctx); err != nil {
 		log.Fatalf("ping mysql: %v", err)
 	}
@@ -85,7 +85,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer mongoClient.Disconnect(context.Background())
+	defer func() { _ = mongoClient.Disconnect(context.Background()) }()
 	if err := mongoClient.Ping(ctx, nil); err != nil {
 		log.Fatalf("ping mongo: %v", err)
 	}
@@ -136,7 +136,7 @@ ORDER BY rc.id LIMIT ?`, cfg.limit)
 	if err != nil {
 		return 0, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	candidates := []evaluationCandidate{}
 	for rows.Next() {
 		var item evaluationCandidate
@@ -164,7 +164,7 @@ func applyEvaluation(ctx context.Context, db *sql.DB, item evaluationCandidate) 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	if disposition != retrygovernance.DispositionAutomatic {
 		_, err = tx.ExecContext(ctx, `UPDATE runtime_checkpoint SET attempt_origin=COALESCE(attempt_origin,'initial'), retry_disposition=?,
 policy_max_attempts=3, retry_policy_version='business-retry/v1', next_attempt_at=NULL, updated_at=NOW(3)
@@ -212,7 +212,7 @@ func backfillInterpretation(ctx context.Context, mysqlDB *sql.DB, db *mongo.Data
 	if err != nil {
 		return 0, err
 	}
-	defer cur.Close(ctx)
+	defer func() { _ = cur.Close(ctx) }()
 	count := 0
 	for cur.Next(ctx) {
 		var generation generationCandidate
