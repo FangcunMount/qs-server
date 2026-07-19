@@ -17,7 +17,7 @@ func TestRetryEventHoldDuplicateIsStatePreservingNoop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	store := &mysqlRetryEventHoldStore{db: db, provider: "nsq", policy: retrygovernance.DefaultOutboxPolicy}
 	message := basemessaging.NewMessage("message-1", []byte(`{"id":"event-1","data":{"org_id":7}}`))
 	message.Topic = "evaluation"
@@ -40,7 +40,7 @@ func TestRetryEventHoldClaimUsesDispositionScheduleAndLeaseCAS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	store := &mysqlRetryEventHoldStore{db: db, provider: "nsq", policy: retrygovernance.DefaultOutboxPolicy}
 	now := time.Date(2026, 7, 19, 2, 0, 0, 0, time.UTC)
 	mock.ExpectBegin()

@@ -14,7 +14,7 @@ func TestBackfillEvaluationDryRunAndRepeatedApplyAreIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	columns := []string{"id", "assessment_id", "attempt_no", "retryable", "org_id", "testee_id", "questionnaire_code", "questionnaire_version", "answer_sheet_id", "evaluation_model_kind", "evaluation_model_sub_kind", "evaluation_model_algorithm", "evaluation_model_code", "evaluation_model_version"}
 	row := []driver.Value{uint64(11), uint64(22), 3, true, int64(7), uint64(8), "Q", "v1", uint64(9), nil, nil, nil, nil, nil}
 	query := regexp.QuoteMeta("FROM runtime_checkpoint rc")

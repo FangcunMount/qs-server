@@ -29,7 +29,7 @@ func TestMySQLOutboxCandidatesExplainAutomaticAndManualSummary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	gormDB, err := gorm.Open(mysql.New(mysql.Config{Conn: db, SkipInitializeWithVersion: true}), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)
