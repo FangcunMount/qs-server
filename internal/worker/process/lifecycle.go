@@ -42,6 +42,16 @@ func buildLifecycleDeps(resources resourceOutput, containerOutput containerOutpu
 					err = closeErr
 				}
 			}
+			if runtimeOutput.messaging.deadLetterRecorder != nil {
+				if closeErr := runtimeOutput.messaging.deadLetterRecorder.Close(); err == nil {
+					err = closeErr
+				}
+			}
+			if runtimeOutput.messaging.holdStore != nil {
+				if closeErr := runtimeOutput.messaging.holdStore.Close(); err == nil {
+					err = closeErr
+				}
+			}
 			return err
 		}
 	}

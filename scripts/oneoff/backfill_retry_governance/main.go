@@ -69,6 +69,29 @@ type outcomeCorrelation struct {
 	TesteeID            uint64
 }
 
+type runner struct {
+	mysqlDB *sql.DB
+	mongoDB *mongo.Database
+	cfg     config
+	now     func() time.Time
+}
+
+func newRunner(mysqlDB *sql.DB, mongoDB *mongo.Database, cfg config) *runner {
+	return &runner{mysqlDB: mysqlDB, mongoDB: mongoDB, cfg: cfg, now: time.Now}
+}
+
+func (r *runner) run(ctx context.Context) (int, int, error) {
+	evaluationCount, err := backfillEvaluation(ctx, r.mysqlDB, r.cfg, r.now)
+	if err != nil {
+		return 0, 0, fmt.Errorf("backfill evaluation: %w", err)
+	}
+	interpretationCount, err := backfillInterpretation(ctx, r.mysqlDB, r.mongoDB, r.cfg, r.now)
+	if err != nil {
+		return evaluationCount, 0, fmt.Errorf("backfill interpretation: %w", err)
+	}
+	return evaluationCount, interpretationCount, nil
+}
+
 func main() {
 	cfg := parseFlags()
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
@@ -90,13 +113,9 @@ func main() {
 		log.Fatalf("ping mongo: %v", err)
 	}
 
-	evaluationCount, err := backfillEvaluation(ctx, mysqlDB, cfg)
+	evaluationCount, interpretationCount, err := newRunner(mysqlDB, mongoClient.Database(cfg.mongoDB), cfg).run(ctx)
 	if err != nil {
-		log.Fatalf("backfill evaluation: %v", err)
-	}
-	interpretationCount, err := backfillInterpretation(ctx, mysqlDB, mongoClient.Database(cfg.mongoDB), cfg)
-	if err != nil {
-		log.Fatalf("backfill interpretation: %v", err)
+		log.Fatal(err)
 	}
 	log.Printf("retry governance backfill complete apply=%v evaluation=%d interpretation=%d", cfg.apply, evaluationCount, interpretationCount)
 }
@@ -119,7 +138,7 @@ func parseFlags() config {
 	return cfg
 }
 
-func backfillEvaluation(ctx context.Context, db *sql.DB, cfg config) (int, error) {
+func backfillEvaluation(ctx context.Context, db *sql.DB, cfg config, now func() time.Time) (int, error) {
 	rows, err := db.QueryContext(ctx, `
 SELECT rc.id, rc.assessment_id, rc.attempt_no, rc.retryable,
        a.org_id, a.testee_id, a.questionnaire_code, a.questionnaire_version, a.answer_sheet_id,
@@ -151,15 +170,15 @@ ORDER BY rc.id LIMIT ?`, cfg.limit)
 		return len(candidates), rows.Err()
 	}
 	for _, item := range candidates {
-		if err := applyEvaluation(ctx, db, item); err != nil {
+		if err := applyEvaluation(ctx, db, item, now()); err != nil {
 			return 0, err
 		}
 	}
 	return len(candidates), nil
 }
 
-func applyEvaluation(ctx context.Context, db *sql.DB, item evaluationCandidate) error {
-	disposition := retrygovernance.BusinessPolicy().DecideFailure(item.Retryable, item.Attempt, time.Now()).Disposition
+func applyEvaluation(ctx context.Context, db *sql.DB, item evaluationCandidate, now time.Time) error {
+	disposition := retrygovernance.BusinessPolicy().DecideFailure(item.Retryable, item.Attempt, now).Disposition
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -174,8 +193,7 @@ WHERE id=? AND status='failed'`, disposition, item.CheckpointID)
 		}
 		return tx.Commit()
 	}
-	now := time.Now()
-	eventID := fmt.Sprintf("eval-retry:%d:%d:automatic", item.AssessmentID, item.Attempt)
+	eventID := evaluationRetryEventID(item.AssessmentID, item.Attempt)
 	evt := event.NewRetryRequestedEvent(event.RequestedInput{
 		EventID: eventID, OrgID: item.OrgID, AssessmentID: int64(item.AssessmentID), TesteeID: item.TesteeID,
 		QuestionnaireCode: item.QuestionnaireCode, QuestionnaireVer: item.QuestionnaireVersion,
@@ -207,7 +225,11 @@ VALUES (?,?,?,?,?,?,?,'pending',0,NULL,?,?,?) ON DUPLICATE KEY UPDATE event_id=V
 	return tx.Commit()
 }
 
-func backfillInterpretation(ctx context.Context, mysqlDB *sql.DB, db *mongo.Database, cfg config) (int, error) {
+func evaluationRetryEventID(assessmentID uint64, attempt int) string {
+	return fmt.Sprintf("eval-retry:%d:%d:automatic", assessmentID, attempt)
+}
+
+func backfillInterpretation(ctx context.Context, mysqlDB *sql.DB, db *mongo.Database, cfg config, now func() time.Time) (int, error) {
 	cur, err := db.Collection("report_generations").Find(ctx, bson.M{"status": "failed", "deleted_at": nil}, options.Find().SetLimit(int64(cfg.limit)))
 	if err != nil {
 		return 0, err
@@ -230,20 +252,20 @@ func backfillInterpretation(ctx context.Context, mysqlDB *sql.DB, db *mongo.Data
 		if run.RetryDisposition != "" && (run.RetryDisposition != string(retrygovernance.DispositionAutomatic) || run.RetryEventID != "") {
 			continue
 		}
-		disposition := retrygovernance.BusinessPolicy().DecideFailure(run.Failure != nil && run.Failure.Retryable, run.Attempt, time.Now()).Disposition
+		decisionTime := now()
+		disposition := retrygovernance.BusinessPolicy().DecideFailure(run.Failure != nil && run.Failure.Retryable, run.Attempt, decisionTime).Disposition
 		count++
 		if !cfg.apply {
 			continue
 		}
-		if err := applyInterpretation(ctx, mysqlDB, db, generation, run, disposition); err != nil {
+		if err := applyInterpretation(ctx, mysqlDB, db, generation, run, disposition, decisionTime); err != nil {
 			return count - 1, err
 		}
 	}
 	return count, cur.Err()
 }
 
-func applyInterpretation(ctx context.Context, mysqlDB *sql.DB, db *mongo.Database, generation generationCandidate, run runCandidate, disposition retrygovernance.Disposition) error {
-	now := time.Now()
+func applyInterpretation(ctx context.Context, mysqlDB *sql.DB, db *mongo.Database, generation generationCandidate, run runCandidate, disposition retrygovernance.Disposition, now time.Time) error {
 	set := bson.M{"attempt_origin": "initial", "retry_disposition": disposition, "policy_max_attempts": 3,
 		"retry_policy_version": "business-retry/v1", "updated_at": now}
 	if disposition != retrygovernance.DispositionAutomatic {

@@ -3,6 +3,7 @@ package eventruntime
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 
 	"github.com/FangcunMount/component-base/pkg/eventcodec"
@@ -22,12 +23,15 @@ func (MessageEventExtractor) Extract(msg *messaging.Message) (string, error) {
 	if msg.Metadata == nil {
 		msg.Metadata = map[string]string{}
 	}
-	if eventType, ok := msg.Metadata["event_type"]; ok {
+	if eventType := msg.Metadata["event_type"]; eventType != "" {
 		return eventType, nil
 	}
 	env, err := eventcodec.DecodeEnvelope(msg.Payload)
 	if err != nil {
 		return "", err
+	}
+	if env.EventType == "" {
+		return "", fmt.Errorf("event envelope has no event_type")
 	}
 	msg.Metadata["event_type"] = env.EventType
 	return env.EventType, nil
@@ -50,18 +54,6 @@ func NewMessageSettlementPolicy(logger *slog.Logger, service, topic string, obse
 		observer = eventobservability.DefaultObserver()
 	}
 	return MessageSettlementPolicy{logger: logger, service: service, topic: topic, observer: observer}
-}
-
-func (p MessageSettlementPolicy) AckInvalid(msg *messaging.Message, parseErr error) {
-	p.logger.Warn("message missing event_type and payload parse failed",
-		slog.String("channel", p.service), slog.String("topic", p.topic), slog.String("msg_id", msg.UUID),
-		slog.Int("payload_bytes", len(msg.Payload)), slog.String("error", parseErr.Error()))
-	if ackErr := msg.Ack(); ackErr != nil {
-		p.observe(msg, "", eventobservability.ConsumeOutcomePoisonAckFailed)
-		p.logger.Warn("failed to ack invalid message", slog.String("channel", p.service), slog.String("topic", p.topic), slog.String("msg_id", msg.UUID), slog.String("error", ackErr.Error()))
-		return
-	}
-	p.observe(msg, "", eventobservability.ConsumeOutcomePoisonAcked)
 }
 
 func (p MessageSettlementPolicy) NackInvalid(msg *messaging.Message, parseErr error) (eventobservability.ConsumeOutcome, error) {

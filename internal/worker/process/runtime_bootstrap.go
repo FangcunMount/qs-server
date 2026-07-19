@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	messagingintegration "github.com/FangcunMount/qs-server/internal/worker/integration/messaging"
 	observability "github.com/FangcunMount/qs-server/internal/worker/observability"
@@ -36,21 +36,35 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 		}
 	}
 
-	subscriber, err := messagingintegration.CreateSubscriberWithOptions(s.config.Messaging, s.logger,
-		messagingintegration.NewSubscriberOptions(s.workerMaxInFlight(), s.workerMaxDeliveryAttempts(), mustDeadLetterRecorder(s.config.MySQL)))
+	deadLetterRecorder, err := eventtransport.OpenMySQLDeadLetterRecorder(s.config.MySQL)
 	if err != nil {
+		return runtimeOutput{}, err
+	}
+	subscriberOptions, err := eventtransport.NewSubscriberOptions(s.workerMaxInFlight(), s.workerMaxDeliveryAttempts(), eventtransport.FailedMessageHandler(deadLetterRecorder))
+	if err != nil {
+		_ = deadLetterRecorder.Close()
+		return runtimeOutput{}, err
+	}
+	subscriber, err := eventtransport.NewSubscriber(eventtransport.SubscriberConfig{
+		Provider: s.config.Messaging.Provider, NSQLookupdAddr: s.config.Messaging.NSQLookupdAddr, RabbitMQURL: s.config.Messaging.RabbitMQURL,
+	}, subscriberOptions)
+	if err != nil {
+		_ = deadLetterRecorder.Close()
 		if output.observability.metricsServer != nil {
 			_ = output.observability.metricsServer.Shutdown(context.Background())
 		}
 		return runtimeOutput{}, err
 	}
 	output.messaging.subscriber = subscriber
+	output.messaging.deadLetterRecorder = deadLetterRecorder
 	holdStore, err := messagingintegration.NewMySQLRetryEventHoldStore(s.config.MySQL, s.config.Messaging.Provider, s.holdReplayPolicy())
 	if err != nil {
 		subscriber.Stop()
 		_ = subscriber.Close()
+		_ = deadLetterRecorder.Close()
 		return runtimeOutput{}, err
 	}
+	output.messaging.holdStore = holdStore
 
 	if err := messagingintegration.SubscribeHandlersWithOptions(messagingintegration.SubscribeHandlersOptions{
 		ServiceName:  s.config.Worker.ServiceName,
@@ -61,6 +75,8 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 	}); err != nil {
 		subscriber.Stop()
 		_ = subscriber.Close()
+		_ = holdStore.Close()
+		_ = deadLetterRecorder.Close()
 		if output.observability.metricsServer != nil {
 			_ = output.observability.metricsServer.Shutdown(context.Background())
 		}
@@ -71,6 +87,8 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 		if publishErr != nil {
 			subscriber.Stop()
 			_ = subscriber.Close()
+			_ = holdStore.Close()
+			_ = deadLetterRecorder.Close()
 			return runtimeOutput{}, publishErr
 		}
 		output.messaging.publisher = publisher
@@ -93,14 +111,6 @@ func (s *server) holdReplayPolicy() retrygovernance.Policy {
 	policy.MaxDelay = configured.MaxDelay
 	policy.JitterFraction = configured.JitterFraction
 	return policy
-}
-
-func mustDeadLetterRecorder(options *genericoptions.MySQLOptions) messagingintegration.DeadLetterRecorder {
-	recorder, err := messagingintegration.NewMySQLDeadLetterRecorder(options)
-	if err != nil {
-		panic(err)
-	}
-	return recorder
 }
 
 func (s *server) workerMaxDeliveryAttempts() int {

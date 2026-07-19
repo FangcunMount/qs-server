@@ -79,7 +79,7 @@ type integrationStage struct {
 func (integrationStage) Name() string { return "initialize integrations" }
 
 func (s integrationStage) Run(state *prepareState) error {
-	output, err := s.server.initializeIntegrations(state.container)
+	output, err := s.server.initializeIntegrations(state.resources, state.container)
 	if err != nil {
 		return err
 	}

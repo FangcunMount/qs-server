@@ -40,14 +40,19 @@ func TestOptionsValidateMetricsConfig(t *testing.T) {
 }
 
 func TestOptionsValidateDeliveryHardCap(t *testing.T) {
-	opts := NewOptions()
-	opts.Messaging.Delivery.MaxAttempts = 9
-	for _, err := range opts.Validate() {
-		if strings.Contains(err.Error(), "messaging.delivery.max_attempts must be between 1 and 8") {
-			return
-		}
+	for _, enabled := range []bool{true, false} {
+		t.Run(map[bool]string{true: "enabled", false: "disabled"}[enabled], func(t *testing.T) {
+			opts := NewOptions()
+			opts.Messaging.Delivery.Enable = enabled
+			opts.Messaging.Delivery.MaxAttempts = 9
+			for _, err := range opts.Validate() {
+				if strings.Contains(err.Error(), "messaging.delivery.max_attempts must be between 1 and 8") {
+					return
+				}
+			}
+			t.Fatal("expected delivery hard-cap validation error")
+		})
 	}
-	t.Fatal("expected delivery hard-cap validation error")
 }
 
 func TestOptionsValidateHoldReplayHardCap(t *testing.T) {

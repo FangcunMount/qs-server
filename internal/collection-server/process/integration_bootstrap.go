@@ -2,11 +2,13 @@ package process
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	grpcclientintegration "github.com/FangcunMount/qs-server/internal/collection-server/integration/grpcclient"
+	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
 	iamauth "github.com/FangcunMount/qs-server/internal/pkg/iamauth"
 	"google.golang.org/grpc/credentials"
 )
@@ -58,7 +60,14 @@ func (s *server) startAuthzVersionSync(c *container.Container) messaging.Subscri
 		return nil
 	}
 
-	subscriber, err := authzSync.NewSubscriber()
+	options, err := eventtransport.NewSubscriberOptions(0, authzSync.Delivery.EffectiveMaxAttempts(), eventtransport.TerminalFailedMessageHandler(slog.Default(), "collection-server-iam-authz-sync"))
+	if err != nil {
+		log.Warnf("Failed to configure collection authz version subscriber: %v", err)
+		return nil
+	}
+	subscriber, err := eventtransport.NewSubscriber(eventtransport.SubscriberConfig{
+		Provider: authzSync.Provider, NSQLookupdAddr: authzSync.NSQLookupdAddr, RabbitMQURL: authzSync.RabbitMQURL,
+	}, options)
 	if err != nil {
 		log.Warnf("Failed to create collection authz version subscriber: %v", err)
 		return nil

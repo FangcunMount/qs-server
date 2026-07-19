@@ -1,12 +1,14 @@
 package process
 
 import (
+	"io"
 	"log/slog"
 
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	cachegovobs "github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
@@ -62,9 +64,11 @@ type observabilityOutput struct {
 }
 
 type messagingRuntimeOutput struct {
-	subscriber   messaging.Subscriber
-	publisher    messaging.Publisher
-	holdReplayer *messagingintegration.RetryEventHoldReplayer
+	subscriber         messaging.Subscriber
+	publisher          messaging.Publisher
+	holdReplayer       *messagingintegration.RetryEventHoldReplayer
+	deadLetterRecorder *eventtransport.SQLDeadLetterRecorder
+	holdStore          io.Closer
 }
 
 type runtimeOutput struct {

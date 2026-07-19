@@ -45,20 +45,21 @@ func (o OutboxStatusScrapeOutcome) String() string { return string(o) }
 type ConsumeOutcome string
 
 const (
-	ConsumeOutcomePoisonAcked      ConsumeOutcome = "poison_acked"
-	ConsumeOutcomePoisonAckFailed  ConsumeOutcome = "poison_ack_failed"
-	ConsumeOutcomeUnknownAcked     ConsumeOutcome = "unknown_acked"
-	ConsumeOutcomeUnknownAckFailed ConsumeOutcome = "unknown_ack_failed"
-	ConsumeOutcomeAcked            ConsumeOutcome = "acked"
-	ConsumeOutcomeAckFailed        ConsumeOutcome = "ack_failed"
-	ConsumeOutcomeNacked           ConsumeOutcome = "nacked"
-	ConsumeOutcomeNackFailed       ConsumeOutcome = "nack_failed"
-	ConsumeOutcomeDecodeNacked     ConsumeOutcome = "decode_nacked"
-	ConsumeOutcomeDecodeNackFailed ConsumeOutcome = "decode_nack_failed"
-	ConsumeOutcomeHeld             ConsumeOutcome = "held"
-	ConsumeOutcomeHoldFailed       ConsumeOutcome = "hold_failed"
-	ConsumeOutcomeHoldReplayed     ConsumeOutcome = "hold_replayed"
-	ConsumeOutcomeHoldReplayFailed ConsumeOutcome = "hold_replay_failed"
+	ConsumeOutcomePoisonAcked       ConsumeOutcome = "poison_acked"
+	ConsumeOutcomePoisonAckFailed   ConsumeOutcome = "poison_ack_failed"
+	ConsumeOutcomeUnknownAcked      ConsumeOutcome = "unknown_acked"
+	ConsumeOutcomeUnknownAckFailed  ConsumeOutcome = "unknown_ack_failed"
+	ConsumeOutcomeAcked             ConsumeOutcome = "acked"
+	ConsumeOutcomeAckFailed         ConsumeOutcome = "ack_failed"
+	ConsumeOutcomeNacked            ConsumeOutcome = "nacked"
+	ConsumeOutcomeNackFailed        ConsumeOutcome = "nack_failed"
+	ConsumeOutcomeDecodeNacked      ConsumeOutcome = "decode_nacked"
+	ConsumeOutcomeDecodeNackFailed  ConsumeOutcome = "decode_nack_failed"
+	ConsumeOutcomeHeld              ConsumeOutcome = "held"
+	ConsumeOutcomeHoldFailed        ConsumeOutcome = "hold_failed"
+	ConsumeOutcomeHoldReplayed      ConsumeOutcome = "hold_replayed"
+	ConsumeOutcomeHoldReplayFailed  ConsumeOutcome = "hold_replay_failed"
+	ConsumeOutcomeTransportTerminal ConsumeOutcome = "transport_terminal"
 )
 
 func (o ConsumeOutcome) String() string { return string(o) }

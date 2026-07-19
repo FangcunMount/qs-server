@@ -332,8 +332,8 @@ func (s *Subsystem) consumerMessageHandler(consumer *consumerRuntime) messaging.
 	return func(ctx context.Context, msg *messaging.Message) error {
 		eventType, err := extractor.Extract(msg)
 		if err != nil {
-			settlement.AckInvalid(msg, err)
-			return nil
+			_, nackErr := settlement.NackInvalid(msg, err)
+			return nackErr
 		}
 		if eventType != consumer.eventType {
 			_, err := settlement.AckUnknown(msg)

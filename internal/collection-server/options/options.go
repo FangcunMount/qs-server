@@ -497,6 +497,9 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateWaitReportOptions(o.WaitReport)...)
 	errs = append(errs, validateReportEventsOptions(o.ReportEvents)...)
 	errs = append(errs, validateCollectionJWT(o.JWT)...)
+	if o.IAMOptions != nil && o.IAMOptions.AuthzSync != nil {
+		errs = append(errs, o.IAMOptions.AuthzSync.Delivery.Validate("iam.authz-sync.delivery")...)
+	}
 	if o.Resilience == nil || o.Resilience.Control == nil {
 		errs = append(errs, fmt.Errorf("resilience.control cannot be nil"))
 	}

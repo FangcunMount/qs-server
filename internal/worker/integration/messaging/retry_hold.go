@@ -29,6 +29,13 @@ type mysqlRetryEventHoldStore struct {
 	policy   retrygovernance.Policy
 }
 
+func (s *mysqlRetryEventHoldStore) Close() error {
+	if s == nil || s.db == nil {
+		return nil
+	}
+	return s.db.Close()
+}
+
 func NewMySQLRetryEventHoldStore(options *genericoptions.MySQLOptions, provider string, policies ...retrygovernance.Policy) (*mysqlRetryEventHoldStore, error) {
 	if options == nil || options.Host == "" || options.Database == "" || provider == "" {
 		return nil, fmt.Errorf("retry event hold store is not configured")
@@ -81,11 +88,7 @@ INSERT INTO retry_event_hold
    replay_attempt_count, next_attempt_at, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'blocked', 'automatic', 0, ?, ?, ?)
 ON DUPLICATE KEY UPDATE
-  event_id=VALUES(event_id), org_id=VALUES(org_id), payload_json=VALUES(payload_json),
-  original_delivery_attempt=LEAST(original_delivery_attempt, VALUES(original_delivery_attempt)),
-  blocked_reason=VALUES(blocked_reason), blocked_at=VALUES(blocked_at), status='blocked',
-  retry_disposition='automatic', next_attempt_at=VALUES(next_attempt_at), claim_token=NULL,
-  claim_expires_at=NULL, last_error=NULL, replayed_at=NULL, updated_at=VALUES(updated_at)`,
+  id=LAST_INSERT_ID(id)`,
 		eventID, message.UUID, orgID, s.provider, message.Topic, message.Channel, string(message.Payload),
 		max(int(message.Attempts), 1), reason, now, now, now, now,
 	)
@@ -136,7 +139,12 @@ LIMIT 1 FOR UPDATE SKIP LOCKED`, now, now, now).Scan(&item.ID, &item.EventID, &i
 	item.ClaimToken = uuid.NewString()
 	result, err := tx.ExecContext(ctx, `UPDATE retry_event_hold
 SET status='replaying', claim_token=?, claim_expires_at=?, updated_at=?
-WHERE id=? AND (status IN ('blocked','failed') OR (status='replaying' AND claim_expires_at<=?))`, item.ClaimToken, now.Add(lease), now, item.ID, now)
+WHERE id=?
+  AND retry_disposition='automatic'
+  AND (status IN ('blocked','failed') OR (status='replaying' AND claim_expires_at<=?))
+  AND (next_attempt_at IS NULL OR next_attempt_at<=?)
+  AND (claim_expires_at IS NULL OR claim_expires_at<=?)`, item.ClaimToken, now.Add(lease), now, item.ID, now, now, now)
+
 	if err != nil {
 		return nil, err
 	}

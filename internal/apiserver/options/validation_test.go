@@ -421,6 +421,14 @@ func TestOptionsValidateRetryHardCaps(t *testing.T) {
 	}{
 		{name: "business", mutate: func(opts *Options) { opts.SystemGovernance.Retry.Business.MaxAutomaticAttempts = 4 }, want: "business.max_automatic_attempts cannot exceed 3"},
 		{name: "outbox", mutate: func(opts *Options) { opts.SystemGovernance.Retry.Outbox.MaxAutomaticAttempts = 31 }, want: "outbox.max_automatic_attempts cannot exceed 30"},
+		{name: "transport disabled", mutate: func(opts *Options) {
+			opts.MessagingOptions.Delivery.Enable = false
+			opts.MessagingOptions.Delivery.MaxAttempts = 9
+		}, want: "messaging.delivery.max_attempts must be between 1 and 8"},
+		{name: "iam transport disabled", mutate: func(opts *Options) {
+			opts.IAMOptions.AuthzSync.Delivery.Enable = false
+			opts.IAMOptions.AuthzSync.Delivery.MaxAttempts = 9
+		}, want: "iam.authz-sync.delivery.max_attempts must be between 1 and 8"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

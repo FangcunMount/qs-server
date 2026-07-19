@@ -3,11 +3,66 @@ package messaging
 import (
 	"context"
 	"errors"
+	"regexp"
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
+
+func TestRetryEventHoldDuplicateIsStatePreservingNoop(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	store := &mysqlRetryEventHoldStore{db: db, provider: "nsq", policy: retrygovernance.DefaultOutboxPolicy}
+	message := basemessaging.NewMessage("message-1", []byte(`{"id":"event-1","data":{"org_id":7}}`))
+	message.Topic = "evaluation"
+	message.Channel = "qs-worker"
+	message.Attempts = 3
+
+	mock.ExpectExec(regexp.QuoteMeta("ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)")).
+		WithArgs("event-1", "message-1", int64(7), "nsq", "evaluation", "qs-worker", string(message.Payload), 3, "automatic retry paused", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(42, 0))
+	if err := store.Hold(t.Context(), message, "evaluation.retry.requested", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRetryEventHoldClaimUsesDispositionScheduleAndLeaseCAS(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	store := &mysqlRetryEventHoldStore{db: db, provider: "nsq", policy: retrygovernance.DefaultOutboxPolicy}
+	now := time.Date(2026, 7, 19, 2, 0, 0, 0, time.UTC)
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT id, event_id, message_id, topic_name, channel_name, payload_json, replay_attempt_count").
+		WithArgs(now, now, now).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "event_id", "message_id", "topic_name", "channel_name", "payload_json", "replay_attempt_count"}).
+			AddRow(uint64(1), "event-1", "message-1", "topic", "channel", `{}`, 4))
+	mock.ExpectExec("UPDATE retry_event_hold.*retry_disposition='automatic'.*next_attempt_at.*claim_expires_at").
+		WithArgs(sqlmock.AnyArg(), now.Add(time.Minute), now, uint64(1), now, now, now).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+	item, err := store.claim(t.Context(), now, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item == nil || item.ID != 1 || item.ClaimToken == "" || item.ReplayAttemptCount != 4 {
+		t.Fatalf("claim = %#v", item)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
 
 type holdStoreStub struct {
 	items          []*heldEvent

@@ -12,6 +12,18 @@ func TestResilienceControlDefaultsEnabled(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsIAMTransportHardCapWhileDisabled(t *testing.T) {
+	opts := NewOptions()
+	opts.IAMOptions.AuthzSync.Delivery.Enable = false
+	opts.IAMOptions.AuthzSync.Delivery.MaxAttempts = 9
+	for _, err := range opts.Validate() {
+		if strings.Contains(err.Error(), "iam.authz-sync.delivery.max_attempts must be between 1 and 8") {
+			return
+		}
+	}
+	t.Fatalf("expected IAM transport hard-cap error, got %v", opts.Validate())
+}
+
 func TestValidateAllowsMissingProfileWhenRuntimeFamilyFallsBackToDefault(t *testing.T) {
 	opts := NewOptions()
 	opts.RedisRuntime.Families["ops_runtime"].RedisProfile = "missing_profile"

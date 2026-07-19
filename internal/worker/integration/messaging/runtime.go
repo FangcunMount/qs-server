@@ -32,35 +32,6 @@ type SubscriptionRuntime interface {
 type MessageEventExtractor = eventruntime.MessageEventExtractor
 type MessageSettlementPolicy = eventruntime.MessageSettlementPolicy
 
-func CreateSubscriber(cfg *config.MessagingConfig, logger *slog.Logger, maxInFlight int) (basemessaging.Subscriber, error) {
-	return CreateSubscriberWithOptions(cfg, logger, NewSubscriberOptions(maxInFlight, 8, nil))
-}
-
-func NewSubscriberOptions(maxInFlight, maxAttempts int, recorder DeadLetterRecorder) basemessaging.SubscriberOptions {
-	return basemessaging.SubscriberOptions{
-		MaxInFlight:          maxInFlight,
-		MaxAttempts:          maxAttempts,
-		RetryBackoff:         basemessaging.RetryBackoffOptions{BaseDelay: 30 * time.Second, MaxDelay: 5 * time.Minute, JitterFraction: .2},
-		FailedMessageHandler: failedMessageHandler(recorder),
-	}
-}
-
-func CreateSubscriberWithOptions(cfg *config.MessagingConfig, logger *slog.Logger, opts basemessaging.SubscriberOptions) (basemessaging.Subscriber, error) {
-	switch cfg.Provider {
-	case "nsq":
-		nsqCfg := nsq.NewConfig()
-		return cbnsq.NewSubscriberWithOptions([]string{cfg.NSQLookupdAddr}, nsqCfg, opts)
-	case "rabbitmq":
-		return cbrabbit.NewSubscriberWithOptions(cfg.RabbitMQURL, opts)
-	default:
-		logger.Warn("unknown messaging provider, using NSQ as default",
-			slog.String("provider", cfg.Provider),
-		)
-		nsqCfg := nsq.NewConfig()
-		return cbnsq.NewSubscriberWithOptions([]string{cfg.NSQLookupdAddr}, nsqCfg, opts)
-	}
-}
-
 func CreatePublisher(cfg *config.MessagingConfig) (basemessaging.Publisher, error) {
 	switch cfg.Provider {
 	case "rabbitmq":

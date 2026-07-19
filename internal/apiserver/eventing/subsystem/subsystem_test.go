@@ -185,6 +185,63 @@ func TestProjectionHandlerFailureNacksOnlyItsMessage(t *testing.T) {
 	}
 }
 
+func TestProjectionDecodeFailureNacksMessage(t *testing.T) {
+	subscriber := &fakeSubscriber{}
+	s, err := New(Options{
+		Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeMQ, MQPublisher: fakePublisher{},
+		SubscriberFactory: func() (messaging.Subscriber, error) { return subscriber, nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.RegisterConsumer(hotRankConsumerID, func(context.Context, string, []byte) error {
+		t.Fatal("projection handler must not run for an invalid envelope")
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Start(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+
+	var acked, nacked bool
+	msg := messaging.NewMessage("invalid-event", []byte(`{"not":"an-envelope"}`))
+	msg.SetAckFunc(func() error { acked = true; return nil })
+	msg.SetNackFunc(func() error { nacked = true; return nil })
+	if err := subscriber.handler(t.Context(), msg); err == nil {
+		t.Fatal("invalid envelope error = nil")
+	}
+	if acked || !nacked {
+		t.Fatalf("settlement acked=%v nacked=%v, want false/true", acked, nacked)
+	}
+}
+
+func TestProjectionDecodeFailureReturnsNackError(t *testing.T) {
+	subscriber := &fakeSubscriber{}
+	s, err := New(Options{
+		Catalog: loadCatalog(t), PublisherMode: eventruntime.PublishModeMQ, MQPublisher: fakePublisher{},
+		SubscriberFactory: func() (messaging.Subscriber, error) { return subscriber, nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.RegisterConsumer(hotRankConsumerID, func(context.Context, string, []byte) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Start(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+
+	wantErr := errors.New("nack unavailable")
+	msg := messaging.NewMessage("invalid-event", []byte(`{}`))
+	msg.SetNackFunc(func() error { return wantErr })
+	if err := subscriber.handler(t.Context(), msg); !errors.Is(err, wantErr) {
+		t.Fatalf("handler error = %v, want %v", err, wantErr)
+	}
+}
+
 func TestLoggingModeReportsProjectionConsumerDisabled(t *testing.T) {
 	recorder := &lifecycleRecorder{}
 	relay := &fakeRelay{name: "mongo", recorder: recorder, started: make(chan struct{})}

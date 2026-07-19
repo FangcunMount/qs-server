@@ -287,4 +287,11 @@ func (o *IAMOptions) AddFlags(fs *pflag.FlagSet) {
 		"Topic name used for IAM authz version notifications")
 	fs.StringVar(&o.AuthzSync.ChannelPrefix, "iam.authz-sync.channel-prefix", o.AuthzSync.ChannelPrefix,
 		"Channel prefix used to build per-instance IAM authz version sync subscriptions")
+	if o.AuthzSync.Delivery == nil {
+		o.AuthzSync.Delivery = NewTransportDeliveryOptions()
+	}
+	fs.BoolVar(&o.AuthzSync.Delivery.Enable, "iam.authz-sync.delivery.enable", o.AuthzSync.Delivery.Enable,
+		"Enable bounded IAM authorization version delivery retry")
+	fs.IntVar(&o.AuthzSync.Delivery.MaxAttempts, "iam.authz-sync.delivery.max-attempts", o.AuthzSync.Delivery.MaxAttempts,
+		"Maximum IAM authorization version delivery attempts")
 }

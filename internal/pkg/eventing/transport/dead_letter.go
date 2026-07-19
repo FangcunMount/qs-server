@@ -1,4 +1,4 @@
-package messaging
+package transport
 
 import (
 	"context"
@@ -8,9 +8,8 @@ import (
 	"time"
 
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
-	drivermysql "github.com/go-sql-driver/mysql"
-
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	drivermysql "github.com/go-sql-driver/mysql"
 )
 
 type DeadLetterRecord struct {
@@ -30,27 +29,21 @@ type DeadLetterRecorder interface {
 	RecordDeadLetter(context.Context, DeadLetterRecord) error
 }
 
-func failedMessageHandler(recorder DeadLetterRecorder) basemessaging.FailedMessageHandler {
-	return func(ctx context.Context, failed basemessaging.FailedMessage) error {
-		if recorder == nil || failed.Message == nil {
-			return fmt.Errorf("dead-letter audit store is not configured")
-		}
-		lastError := "transport delivery exhausted"
-		if failed.Cause != nil {
-			lastError = failed.Cause.Error()
-		}
-		return recorder.RecordDeadLetter(ctx, deadLetterRecord(
-			failed.Provider, failed.Topic, failed.Channel, failed.Attempts,
-			failed.Message.UUID, failed.Message.Payload, lastError,
-		))
-	}
+type SQLDeadLetterRecorder struct {
+	db    *sql.DB
+	owned bool
 }
 
-type mysqlDeadLetterRecorder struct{ db *sql.DB }
+func NewSQLDeadLetterRecorder(db *sql.DB) (*SQLDeadLetterRecorder, error) {
+	if db == nil {
+		return nil, fmt.Errorf("dead-letter audit store is not configured")
+	}
+	return &SQLDeadLetterRecorder{db: db}, nil
+}
 
-func NewMySQLDeadLetterRecorder(options *genericoptions.MySQLOptions) (DeadLetterRecorder, error) {
+func OpenMySQLDeadLetterRecorder(options *genericoptions.MySQLOptions) (*SQLDeadLetterRecorder, error) {
 	if options == nil || options.Host == "" || options.Database == "" {
-		return nil, nil
+		return nil, fmt.Errorf("dead-letter audit store is not configured")
 	}
 	cfg := drivermysql.NewConfig()
 	cfg.Net = "tcp"
@@ -66,10 +59,33 @@ func NewMySQLDeadLetterRecorder(options *genericoptions.MySQLOptions) (DeadLette
 	db.SetMaxOpenConns(2)
 	db.SetMaxIdleConns(1)
 	db.SetConnMaxLifetime(options.MaxConnectionLifeTime)
-	return &mysqlDeadLetterRecorder{db: db}, nil
+	return &SQLDeadLetterRecorder{db: db, owned: true}, nil
 }
 
-func (r *mysqlDeadLetterRecorder) RecordDeadLetter(ctx context.Context, record DeadLetterRecord) error {
+func (r *SQLDeadLetterRecorder) Close() error {
+	if r == nil || r.db == nil || !r.owned {
+		return nil
+	}
+	return r.db.Close()
+}
+
+func FailedMessageHandler(recorder DeadLetterRecorder) basemessaging.FailedMessageHandler {
+	return func(ctx context.Context, failed basemessaging.FailedMessage) error {
+		if recorder == nil || failed.Message == nil {
+			return fmt.Errorf("dead-letter audit store is not configured")
+		}
+		lastError := "transport delivery exhausted"
+		if failed.Cause != nil {
+			lastError = failed.Cause.Error()
+		}
+		return recorder.RecordDeadLetter(ctx, deadLetterRecord(
+			failed.Provider, failed.Topic, failed.Channel, failed.Attempts,
+			failed.Message.UUID, failed.Message.Payload, lastError,
+		))
+	}
+}
+
+func (r *SQLDeadLetterRecorder) RecordDeadLetter(ctx context.Context, record DeadLetterRecord) error {
 	if r == nil || r.db == nil {
 		return fmt.Errorf("dead-letter audit store is not configured")
 	}

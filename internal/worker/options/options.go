@@ -70,10 +70,7 @@ type MessagingOptions struct {
 	Delivery    *DeliveryOptions `json:"delivery" mapstructure:"delivery"`
 }
 
-type DeliveryOptions struct {
-	Enable      bool `json:"enable" mapstructure:"enable"`
-	MaxAttempts int  `json:"max_attempts" mapstructure:"max-attempts"`
-}
+type DeliveryOptions = genericoptions.TransportDeliveryOptions
 
 type RetryGovernanceOptions struct {
 	AutomaticRetryEnabled bool                `json:"automatic_retry_enabled" mapstructure:"automatic-retry-enabled"`
@@ -137,7 +134,7 @@ func NewOptions() *Options {
 			Provider:       "nsq",
 			NSQAddr:        "localhost:4150",
 			NSQLookupdAddr: "localhost:4161",
-			Delivery:       &DeliveryOptions{Enable: true, MaxAttempts: 8},
+			Delivery:       genericoptions.NewTransportDeliveryOptions(),
 		},
 		RetryGovernance: &RetryGovernanceOptions{AutomaticRetryEnabled: true, HoldReplay: &RetryPolicyOptions{MaxAttempts: 30, BaseDelay: 10 * time.Second, MaxDelay: time.Hour, JitterFraction: .2}},
 		GRPC: &GRPCOptions{
@@ -209,7 +206,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	messagingFS.StringVar(&o.Messaging.RabbitMQURL, "messaging.rabbitmq-url", o.Messaging.RabbitMQURL,
 		"RabbitMQ connection URL")
 	if o.Messaging.Delivery == nil {
-		o.Messaging.Delivery = &DeliveryOptions{Enable: true, MaxAttempts: 8}
+		o.Messaging.Delivery = genericoptions.NewTransportDeliveryOptions()
 	}
 	messagingFS.BoolVar(&o.Messaging.Delivery.Enable, "messaging.delivery.enable", o.Messaging.Delivery.Enable,
 		"Enable bounded transport retry")
@@ -300,7 +297,7 @@ func (o *Options) Validate() []error {
 			errs = append(errs, fmt.Errorf("metrics.bind_port must be greater than 0 when metrics are enabled"))
 		}
 	}
-	if o.Messaging != nil && o.Messaging.Delivery != nil && o.Messaging.Delivery.Enable {
+	if o.Messaging != nil && o.Messaging.Delivery != nil {
 		if o.Messaging.Delivery.MaxAttempts < 1 || o.Messaging.Delivery.MaxAttempts > retrygovernance.HardMaxDeliveryAttempts {
 			errs = append(errs, fmt.Errorf("messaging.delivery.max_attempts must be between 1 and %d", retrygovernance.HardMaxDeliveryAttempts))
 		}

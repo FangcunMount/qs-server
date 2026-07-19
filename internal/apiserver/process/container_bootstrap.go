@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
 	iamauth "github.com/FangcunMount/qs-server/internal/pkg/iamauth"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 )
@@ -19,7 +20,8 @@ type containerStageDeps struct {
 type integrationStageDeps struct {
 	container             *container.Container
 	initializeWeChat      func(*container.Container) error
-	startAuthzVersionSync func(*container.Container) messaging.Subscriber
+	deadLetterRecorder    eventtransport.DeadLetterRecorder
+	startAuthzVersionSync func(*container.Container, eventtransport.DeadLetterRecorder) messaging.Subscriber
 }
 
 func (s *server) initializeContainer(resources resourceOutput) (containerOutput, error) {
@@ -87,20 +89,26 @@ func bootstrapContainerStage(deps containerStageDeps) (containerOutput, error) {
 	return output, nil
 }
 
-func (s *server) initializeIntegrations(containerOutput containerOutput) (integrationOutput, error) {
-	return bootstrapIntegrationStage(s.buildIntegrationStageDeps(containerOutput))
+func (s *server) initializeIntegrations(resources resourceOutput, containerOutput containerOutput) (integrationOutput, error) {
+	return bootstrapIntegrationStage(s.buildIntegrationStageDeps(resources, containerOutput))
 }
 
-func (s *server) buildIntegrationStageDeps(containerOutput containerOutput) integrationStageDeps {
+func (s *server) buildIntegrationStageDeps(resources resourceOutput, containerOutput containerOutput) integrationStageDeps {
 	if s == nil || containerOutput.container == nil {
 		return integrationStageDeps{}
 	}
 
-	return integrationStageDeps{
+	deps := integrationStageDeps{
 		container:             containerOutput.container,
 		initializeWeChat:      s.initializeWeChatServices,
 		startAuthzVersionSync: s.startAuthzVersionSync,
 	}
+	if resources.handles.mysqlDB != nil {
+		if sqlDB, err := resources.handles.mysqlDB.DB(); err == nil {
+			deps.deadLetterRecorder, _ = eventtransport.NewSQLDeadLetterRecorder(sqlDB)
+		}
+	}
+	return deps
 }
 
 func bootstrapIntegrationStage(deps integrationStageDeps) (integrationOutput, error) {
@@ -114,7 +122,7 @@ func bootstrapIntegrationStage(deps integrationStageDeps) (integrationOutput, er
 	}
 	output := integrationOutput{}
 	if deps.startAuthzVersionSync != nil {
-		output.authzVersionSubscriber = deps.startAuthzVersionSync(deps.container)
+		output.authzVersionSubscriber = deps.startAuthzVersionSync(deps.container, deps.deadLetterRecorder)
 	}
 	return output, nil
 }
@@ -136,7 +144,7 @@ func (s *server) initializeWeChatServices(c *container.Container) error {
 	return nil
 }
 
-func (s *server) startAuthzVersionSync(c *container.Container) messaging.Subscriber {
+func (s *server) startAuthzVersionSync(c *container.Container, recorder eventtransport.DeadLetterRecorder) messaging.Subscriber {
 	if s == nil || s.config == nil || c == nil || c.IAMModule == nil {
 		return nil
 	}
@@ -146,7 +154,18 @@ func (s *server) startAuthzVersionSync(c *container.Container) messaging.Subscri
 		return nil
 	}
 
-	subscriber, err := authzSync.NewSubscriber()
+	if recorder == nil {
+		logger.L(context.Background()).Warnw("IAM authz version subscriber requires durable dead-letter audit", "component", "apiserver")
+		return nil
+	}
+	options, err := eventtransport.NewSubscriberOptions(0, authzSync.Delivery.EffectiveMaxAttempts(), eventtransport.FailedMessageHandler(recorder))
+	if err != nil {
+		logger.L(context.Background()).Warnw("Failed to configure authz version subscriber", "component", "apiserver", "error", err.Error())
+		return nil
+	}
+	subscriber, err := eventtransport.NewSubscriber(eventtransport.SubscriberConfig{
+		Provider: authzSync.Provider, NSQLookupdAddr: authzSync.NSQLookupdAddr, RabbitMQURL: authzSync.RabbitMQURL,
+	}, options)
 	if err != nil {
 		logger.L(context.Background()).Warnw("Failed to create authz version subscriber",
 			"component", "apiserver",

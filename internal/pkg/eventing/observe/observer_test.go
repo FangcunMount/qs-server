@@ -64,6 +64,7 @@ func TestOutcomeStringValuesAreStable(t *testing.T) {
 		ConsumeOutcomeHoldFailed.String():         "hold_failed",
 		ConsumeOutcomeHoldReplayed.String():       "hold_replayed",
 		ConsumeOutcomeHoldReplayFailed.String():   "hold_replay_failed",
+		ConsumeOutcomeTransportTerminal.String():  "transport_terminal",
 	}
 	for got, want := range cases {
 		if got == "" {

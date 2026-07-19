@@ -2,10 +2,6 @@ package options
 
 import (
 	"fmt"
-
-	"github.com/FangcunMount/component-base/pkg/messaging"
-	"github.com/FangcunMount/component-base/pkg/messaging/nsq"
-	"github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
 )
 
 const (
@@ -14,12 +10,13 @@ const (
 
 // IAMAuthzSyncOptions IAM 授权版本同步订阅配置。
 type IAMAuthzSyncOptions struct {
-	Enabled        bool   `json:"enabled" mapstructure:"enabled"`
-	Provider       string `json:"provider" mapstructure:"provider"`
-	NSQLookupdAddr string `json:"nsq_lookupd_addr" mapstructure:"nsq-lookupd-addr"`
-	RabbitMQURL    string `json:"rabbitmq_url" mapstructure:"rabbitmq-url"`
-	Topic          string `json:"topic" mapstructure:"topic"`
-	ChannelPrefix  string `json:"channel_prefix" mapstructure:"channel-prefix"`
+	Enabled        bool                      `json:"enabled" mapstructure:"enabled"`
+	Provider       string                    `json:"provider" mapstructure:"provider"`
+	NSQLookupdAddr string                    `json:"nsq_lookupd_addr" mapstructure:"nsq-lookupd-addr"`
+	RabbitMQURL    string                    `json:"rabbitmq_url" mapstructure:"rabbitmq-url"`
+	Topic          string                    `json:"topic" mapstructure:"topic"`
+	ChannelPrefix  string                    `json:"channel_prefix" mapstructure:"channel-prefix"`
+	Delivery       *TransportDeliveryOptions `json:"delivery" mapstructure:"delivery"`
 }
 
 // NewIAMAuthzSyncOptions 创建默认授权版本同步配置。
@@ -30,16 +27,20 @@ func NewIAMAuthzSyncOptions() *IAMAuthzSyncOptions {
 		NSQLookupdAddr: "",
 		Topic:          DefaultIAMAuthzSyncTopic,
 		ChannelPrefix:  "qs-authz-sync",
+		Delivery:       NewTransportDeliveryOptions(),
 	}
 }
 
 // Validate 验证 authz-sync 配置。
 func (o *IAMAuthzSyncOptions) Validate() []error {
-	if o == nil || !o.Enabled {
+	if o == nil {
 		return nil
 	}
 
-	var errs []error
+	errs := o.Delivery.Validate("iam.authz-sync.delivery")
+	if !o.Enabled {
+		return errs
+	}
 	switch o.Provider {
 	case "nsq":
 		if o.NSQLookupdAddr == "" {
@@ -58,20 +59,4 @@ func (o *IAMAuthzSyncOptions) Validate() []error {
 	}
 
 	return errs
-}
-
-// NewSubscriber 创建授权版本同步订阅者。
-func (o *IAMAuthzSyncOptions) NewSubscriber() (messaging.Subscriber, error) {
-	if o == nil || !o.Enabled {
-		return nil, fmt.Errorf("iam authz-sync is not enabled")
-	}
-
-	switch o.Provider {
-	case "nsq":
-		return nsq.NewSubscriber([]string{o.NSQLookupdAddr}, nil)
-	case "rabbitmq":
-		return rabbitmq.NewSubscriber(o.RabbitMQURL)
-	default:
-		return nil, fmt.Errorf("unsupported iam authz-sync provider: %s", o.Provider)
-	}
 }

@@ -17,6 +17,14 @@ func (o *Options) Validate() []error {
 	errs = append(errs, o.Log.Validate()...)
 	errs = append(errs, o.OSSOptions.Validate()...)
 	errs = append(errs, o.AssessmentAssets.Validate()...)
+	if o.MessagingOptions == nil {
+		errs = append(errs, fmt.Errorf("messaging is required"))
+	} else {
+		errs = append(errs, o.MessagingOptions.Validate()...)
+	}
+	if o.IAMOptions != nil && o.IAMOptions.AuthzSync != nil {
+		errs = append(errs, o.IAMOptions.AuthzSync.Delivery.Validate("iam.authz-sync.delivery")...)
+	}
 	if o.AssessmentAssets != nil && o.AssessmentAssets.Enabled && (o.OSSOptions == nil || !o.OSSOptions.Enabled) {
 		errs = append(errs, fmt.Errorf("oss.enabled must be true when assessment_assets.enabled is true"))
 	}

@@ -13,6 +13,7 @@ import (
 	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/apiserver/resilience/subsystem"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/bootstrap"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
@@ -33,11 +34,12 @@ type resourceStageDeps struct {
 }
 
 type eventSubsystemResourceDeps struct {
-	newSubsystem      func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error)
-	subscriberFactory eventsubsystem.SubscriberFactory
-	consumers         map[string]eventsubsystem.ConsumerOptions
-	mongo             eventsubsystem.ProfileOptions
-	assessment        eventsubsystem.ProfileOptions
+	newSubsystem           func(eventsubsystem.Options) (*eventsubsystem.Subsystem, error)
+	subscriberFactory      eventsubsystem.SubscriberFactory
+	buildSubscriberFactory func(*gorm.DB) (eventsubsystem.SubscriberFactory, error)
+	consumers              map[string]eventsubsystem.ConsumerOptions
+	mongo                  eventsubsystem.ProfileOptions
+	assessment             eventsubsystem.ProfileOptions
 }
 
 type databaseResourceDeps struct {
@@ -89,17 +91,37 @@ func (s *server) buildEventSubsystemResourceDeps() eventSubsystemResourceDeps {
 	if s == nil || s.config == nil {
 		return eventSubsystemResourceDeps{}
 	}
-	var subscriberFactory eventsubsystem.SubscriberFactory
+	var buildSubscriberFactory func(*gorm.DB) (eventsubsystem.SubscriberFactory, error)
 	if s.config.MessagingOptions != nil && s.config.MessagingOptions.Enabled {
-		subscriberFactory = s.config.MessagingOptions.NewSubscriber
+		buildSubscriberFactory = func(mysqlDB *gorm.DB) (eventsubsystem.SubscriberFactory, error) {
+			if mysqlDB == nil {
+				return nil, fmt.Errorf("event delivery dead-letter database is not configured")
+			}
+			sqlDB, err := mysqlDB.DB()
+			if err != nil {
+				return nil, fmt.Errorf("resolve event delivery dead-letter database: %w", err)
+			}
+			recorder, err := eventtransport.NewSQLDeadLetterRecorder(sqlDB)
+			if err != nil {
+				return nil, err
+			}
+			options, err := eventtransport.NewSubscriberOptions(0, s.config.MessagingOptions.Delivery.EffectiveMaxAttempts(), eventtransport.FailedMessageHandler(recorder))
+			if err != nil {
+				return nil, err
+			}
+			config := eventtransport.SubscriberConfig{
+				Provider: s.config.MessagingOptions.Provider, NSQLookupdAddr: s.config.MessagingOptions.NSQLookupdAddr, RabbitMQURL: s.config.MessagingOptions.RabbitMQURL,
+			}
+			return func() (messaging.Subscriber, error) { return eventtransport.NewSubscriber(config, options) }, nil
+		}
 	}
 	mongoProfile, assessmentProfile := buildEventProfileOptions(s.config)
 	return eventSubsystemResourceDeps{
-		newSubsystem:      eventsubsystem.New,
-		subscriberFactory: subscriberFactory,
-		consumers:         buildEventConsumerOptions(s.config),
-		mongo:             mongoProfile,
-		assessment:        assessmentProfile,
+		newSubsystem:           eventsubsystem.New,
+		buildSubscriberFactory: buildSubscriberFactory,
+		consumers:              buildEventConsumerOptions(s.config),
+		mongo:                  mongoProfile,
+		assessment:             assessmentProfile,
 	}
 }
 
@@ -242,12 +264,20 @@ func buildResourceEventSubsystem(
 		mysqlLimiter = resilience.Backpressure("mysql")
 		mongoLimiter = resilience.Backpressure("mongo")
 	}
+	subscriberFactory := deps.subscriberFactory
+	if deps.buildSubscriberFactory != nil {
+		var err error
+		subscriberFactory, err = deps.buildSubscriberFactory(mysqlDB)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return deps.newSubsystem(eventsubsystem.Options{
 		MySQLDB: mysqlDB, MongoDB: mongoDB, OpsRedis: opsRedis,
 		Catalog: catalog, MQPublisher: mqPublisher, PublisherMode: publishMode,
 		MySQLLimiter: mysqlLimiter, MongoLimiter: mongoLimiter,
 		Mongo: deps.mongo, Assessment: deps.assessment,
-		SubscriberFactory: deps.subscriberFactory, Consumers: deps.consumers,
+		SubscriberFactory: subscriberFactory, Consumers: deps.consumers,
 	})
 }
 

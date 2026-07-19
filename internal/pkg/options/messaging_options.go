@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	"github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"github.com/spf13/pflag"
 )
 
@@ -22,9 +23,39 @@ type MessagingOptions struct {
 	NSQLookupdAddr string `json:"nsq_lookupd_addr" mapstructure:"nsq-lookupd-addr"`
 
 	// RabbitMQ 配置
-	RabbitMQURL          string `json:"rabbitmq_url" mapstructure:"rabbitmq-url"`
-	RabbitMQExchange     string `json:"rabbitmq_exchange" mapstructure:"rabbitmq-exchange"`
-	RabbitMQExchangeType string `json:"rabbitmq_exchange_type" mapstructure:"rabbitmq-exchange-type"`
+	RabbitMQURL          string                    `json:"rabbitmq_url" mapstructure:"rabbitmq-url"`
+	RabbitMQExchange     string                    `json:"rabbitmq_exchange" mapstructure:"rabbitmq-exchange"`
+	RabbitMQExchangeType string                    `json:"rabbitmq_exchange_type" mapstructure:"rabbitmq-exchange-type"`
+	Delivery             *TransportDeliveryOptions `json:"delivery" mapstructure:"delivery"`
+}
+
+type TransportDeliveryOptions struct {
+	Enable      bool `json:"enable" mapstructure:"enable"`
+	MaxAttempts int  `json:"max_attempts" mapstructure:"max-attempts"`
+}
+
+func NewTransportDeliveryOptions() *TransportDeliveryOptions {
+	return &TransportDeliveryOptions{Enable: true, MaxAttempts: retrygovernance.HardMaxDeliveryAttempts}
+}
+
+func (o *TransportDeliveryOptions) EffectiveMaxAttempts() int {
+	if o == nil {
+		return retrygovernance.HardMaxDeliveryAttempts
+	}
+	if !o.Enable {
+		return 1
+	}
+	return o.MaxAttempts
+}
+
+func (o *TransportDeliveryOptions) Validate(path string) []error {
+	if o == nil {
+		return []error{fmt.Errorf("%s is required", path)}
+	}
+	if o.MaxAttempts < 1 || o.MaxAttempts > retrygovernance.HardMaxDeliveryAttempts {
+		return []error{fmt.Errorf("%s.max_attempts must be between 1 and %d", path, retrygovernance.HardMaxDeliveryAttempts)}
+	}
+	return nil
 }
 
 // NewMessagingOptions 创建默认的消息队列配置
@@ -36,6 +67,7 @@ func NewMessagingOptions() *MessagingOptions {
 		NSQLookupdAddr:       "127.0.0.1:4161",
 		RabbitMQExchange:     "qs.events",
 		RabbitMQExchangeType: "topic",
+		Delivery:             NewTransportDeliveryOptions(),
 	}
 }
 
@@ -55,14 +87,21 @@ func (o *MessagingOptions) AddFlags(fs *pflag.FlagSet) {
 		"RabbitMQ exchange name")
 	fs.StringVar(&o.RabbitMQExchangeType, "messaging.rabbitmq-exchange-type", o.RabbitMQExchangeType,
 		"RabbitMQ exchange type (direct, topic, fanout)")
+	if o.Delivery == nil {
+		o.Delivery = NewTransportDeliveryOptions()
+	}
+	fs.BoolVar(&o.Delivery.Enable, "messaging.delivery.enable", o.Delivery.Enable,
+		"Enable bounded transport retry")
+	fs.IntVar(&o.Delivery.MaxAttempts, "messaging.delivery.max-attempts", o.Delivery.MaxAttempts,
+		"Maximum transport delivery attempts before dead letter")
 }
 
 // Validate 验证配置
 func (o *MessagingOptions) Validate() []error {
-	var errs []error
+	errs := o.Delivery.Validate("messaging.delivery")
 
 	if !o.Enabled {
-		return nil // 未启用时不需要验证
+		return errs
 	}
 
 	switch o.Provider {
@@ -94,22 +133,6 @@ func (o *MessagingOptions) NewPublisher() (messaging.Publisher, error) {
 	case "rabbitmq":
 		// 创建 RabbitMQ Publisher
 		return rabbitmq.NewPublisher(o.RabbitMQURL)
-	default:
-		return nil, fmt.Errorf("unsupported messaging provider: %s", o.Provider)
-	}
-}
-
-// NewSubscriber 创建消息队列订阅者。
-func (o *MessagingOptions) NewSubscriber() (messaging.Subscriber, error) {
-	if !o.Enabled {
-		return nil, fmt.Errorf("messaging is not enabled")
-	}
-
-	switch o.Provider {
-	case "nsq":
-		return nsq.NewSubscriber([]string{o.NSQLookupdAddr}, nil)
-	case "rabbitmq":
-		return rabbitmq.NewSubscriber(o.RabbitMQURL)
 	default:
 		return nil, fmt.Errorf("unsupported messaging provider: %s", o.Provider)
 	}
