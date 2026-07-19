@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/component-base/pkg/event"
-	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
@@ -335,7 +334,6 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	c.CodesService = &codesServiceStub{}
 	c.QRCodeObjectKeyPrefix = "rest-prefix"
 
-	evaluationRecovery := evaluationoperator.NewRecoveryService(nil, nil, nil, nil)
 	planCommand := planApp.NewCommandService(nil, nil, nil, nil, nil, nil)
 	planQuery := planApp.NewQueryService(nil, nil, nil)
 	questionnaireQuery := appQuestionnaire.NewQueryService(nil, nil, nil, nil)
@@ -344,7 +342,7 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 		AnswerSheet:   &AnswerSheetSubModule{},
 	}
 	c.ActorModule = &ActorModule{}
-	c.EvaluationModule = &EvaluationModule{OperatorRecovery: evaluationRecovery}
+	c.EvaluationModule = &EvaluationModule{}
 	c.PlanModule = &PlanModule{CommandService: planCommand, QueryService: planQuery}
 	c.StatisticsModule = &StatisticsModule{}
 
@@ -355,8 +353,8 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	if deps.Survey.QuestionnaireQueryService != questionnaireQuery {
 		t.Fatalf("survey query service not extracted correctly: %#v", deps.Survey)
 	}
-	if deps.Evaluation.OperatorRecoveryService == nil || deps.Plan.CommandService != planCommand || deps.Plan.QueryService != planQuery || !deps.Statistics.Enabled {
-		t.Fatalf("evaluation/plan/statistics dependencies not extracted correctly")
+	if deps.Plan.CommandService != planCommand || deps.Plan.QueryService != planQuery || !deps.Statistics.Enabled {
+		t.Fatalf("plan/statistics dependencies not extracted correctly")
 	}
 	if deps.CodesService != c.CodesService {
 		t.Fatalf("CodesService = %#v, want %#v", deps.CodesService, c.CodesService)

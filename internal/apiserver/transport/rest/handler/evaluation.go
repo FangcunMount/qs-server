@@ -21,7 +21,6 @@ import (
 // EvaluationOperatorHandler exposes backend-operator Evaluation use cases.
 type EvaluationOperatorHandler struct {
 	*BaseHandler
-	operatorRecoveryService  evaluationoperator.RecoveryService
 	operatorExecutionService evaluationoperator.BatchExecutionService
 	protectedQueryService    evaluationoperator.QueryService
 	systemGovernance         GovernanceActionRunner
@@ -39,12 +38,11 @@ type AssessmentReportJourneyHandler struct {
 }
 
 func NewEvaluationOperatorHandler(
-	operatorRecoveryService evaluationoperator.RecoveryService,
 	operatorExecutionService evaluationoperator.BatchExecutionService,
 	protectedQueryService evaluationoperator.QueryService,
 	governance ...GovernanceActionRunner,
 ) *EvaluationOperatorHandler {
-	handler := &EvaluationOperatorHandler{BaseHandler: &BaseHandler{}, operatorRecoveryService: operatorRecoveryService, operatorExecutionService: operatorExecutionService, protectedQueryService: protectedQueryService}
+	handler := &EvaluationOperatorHandler{BaseHandler: &BaseHandler{}, operatorExecutionService: operatorExecutionService, protectedQueryService: protectedQueryService}
 	if len(governance) > 0 {
 		handler.systemGovernance = governance[0]
 	}

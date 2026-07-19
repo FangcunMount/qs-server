@@ -317,6 +317,25 @@ func TestDispatchHandlerNacksPausedEventWhenHoldFails(t *testing.T) {
 	assertNoConsumeDuration(t, observer)
 }
 
+func TestDispatchHandlerPropagatesNackErrorWhenHoldFails(t *testing.T) {
+	observer := &consumeObserver{}
+	dispatcher := &fakeDispatcher{err: eventruntime.ErrAutomaticRetryPaused}
+	holdErr := errors.New("mysql unavailable")
+	nackErr := errors.New("nack unavailable")
+	recorder := &fakeHoldRecorder{err: holdErr}
+	msg := basemessaging.NewMessage("msg-1", []byte(`{}`))
+	msg.Metadata["event_type"] = "metadata.event"
+	msg.SetNackFunc(func() error { return nackErr })
+
+	handler := createDispatchHandlerWithObserverAndHold(testLogger(), dispatcher, "topic", "worker", observer, recorder)
+	err := handler(t.Context(), msg)
+	if !errors.Is(err, eventruntime.ErrAutomaticRetryPaused) || !errors.Is(err, holdErr) || !errors.Is(err, nackErr) {
+		t.Fatalf("handler error = %v, want paused, hold, and nack errors", err)
+	}
+	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeHoldFailed)
+	assertNoConsumeDuration(t, observer)
+}
+
 func TestDispatchHandlerObservesNackFailed(t *testing.T) {
 	observer := &consumeObserver{}
 	dispatcher := &fakeDispatcher{err: errors.New("dispatch failed")}

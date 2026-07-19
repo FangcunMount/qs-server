@@ -15,7 +15,7 @@ import (
 func TestEvaluationHandlerListAssessmentRunsSuccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	query := &operatorQueryStub{runList: &evaluationoperator.RunList{Items: []*evaluationoperator.Run{{RunID: "301:1", AssessmentID: 301, AttemptNo: 1, Status: "succeeded", StartedAt: time.Now()}}}}
-	h := NewEvaluationOperatorHandler(nil, nil, query)
+	h := NewEvaluationOperatorHandler(nil, query)
 	c, rec := protectedContext(http.MethodGet, "/api/v1/evaluations/assessments/301/runs?limit=5")
 	c.Params = gin.Params{{Key: "id", Value: "301"}}
 	h.ListAssessmentRuns(c)

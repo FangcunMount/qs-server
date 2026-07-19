@@ -80,12 +80,6 @@ func (*routerEvaluationQueryStub) ListRetryableFailedRuns(context.Context, evalu
 	return &evaluationoperator.RetryableFailedRunList{}, nil
 }
 
-type routerEvaluationRecoveryStub struct{}
-
-func (*routerEvaluationRecoveryStub) Retry(context.Context, evaluationoperator.Actor, uint64) (*evaluationoperator.Assessment, error) {
-	return &evaluationoperator.Assessment{}, nil
-}
-
 func (*routerClinicianQueryStub) GetByID(context.Context, uint64) (*clinicianApp.ClinicianResult, error) {
 	return nil, nil
 }
@@ -373,7 +367,6 @@ func newRouterTestContainer() *container.Container {
 	}
 	evaluationModule := &evalmod.Module{
 		OperatorExecutionService: &routerOperatorExecutionStub{},
-		OperatorRecovery:         &routerEvaluationRecoveryStub{},
 		OperatorQuery:            &routerEvaluationQueryStub{},
 	}
 	c := container.NewContainerWithOptions(nil, nil, nil, container.ContainerOptions{

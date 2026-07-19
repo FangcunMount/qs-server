@@ -83,7 +83,7 @@ func TestLegacyEvaluationRetryUsesGovernanceAction(t *testing.T) {
 		latestRun: &evaluationoperator.Run{AssessmentID: 301, AttemptNo: 3, Status: "failed", RetryDisposition: "manual_required"},
 	}
 	actions := &governanceActionRunnerStub{}
-	h := NewEvaluationOperatorHandler(nil, nil, query, actions)
+	h := NewEvaluationOperatorHandler(nil, query, actions)
 	c, rec := protectedContext(http.MethodPost, "/api/v1/evaluations/assessments/301/retry")
 	c.Params = gin.Params{{Key: "id", Value: "301"}}
 	c.Request = c.Request.WithContext(pkgmiddleware.WithRequestID(c.Request.Context(), "request-legacy-retry"))
@@ -102,7 +102,7 @@ func TestLegacyEvaluationRetryUsesGovernanceAction(t *testing.T) {
 func TestLegacyEvaluationRetryRejectsNonManualLatestRun(t *testing.T) {
 	query := &operatorQueryStub{latestRun: &evaluationoperator.Run{AssessmentID: 301, AttemptNo: 2, Status: "failed", RetryDisposition: "automatic"}}
 	actions := &governanceActionRunnerStub{}
-	h := NewEvaluationOperatorHandler(nil, nil, query, actions)
+	h := NewEvaluationOperatorHandler(nil, query, actions)
 	c, rec := protectedContext(http.MethodPost, "/api/v1/evaluations/assessments/301/retry")
 	c.Params = gin.Params{{Key: "id", Value: "301"}}
 	h.RetryFailed(c)
@@ -117,7 +117,7 @@ func TestLegacyEvaluationRetryReplaysAuditedRequestAfterDispositionChanged(t *te
 		latestRun: &evaluationoperator.Run{AssessmentID: 301, AttemptNo: 3, Status: "failed", RetryDisposition: "automatic", ActionRequestID: "request-legacy-retry"},
 	}
 	actions := &governanceActionRunnerStub{}
-	h := NewEvaluationOperatorHandler(nil, nil, query, actions)
+	h := NewEvaluationOperatorHandler(nil, query, actions)
 	c, rec := protectedContext(http.MethodPost, "/api/v1/evaluations/assessments/301/retry")
 	c.Params = gin.Params{{Key: "id", Value: "301"}}
 	c.Request = c.Request.WithContext(pkgmiddleware.WithRequestID(c.Request.Context(), "request-legacy-retry"))

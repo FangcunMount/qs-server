@@ -140,9 +140,17 @@ func execMongoMigration(t *testing.T, db *mongo.Database, name string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var commands []bson.M
-	if err := json.Unmarshal(payload, &commands); err != nil {
+	var rawCommands []json.RawMessage
+	if err := json.Unmarshal(payload, &rawCommands); err != nil {
 		t.Fatal(err)
+	}
+	commands := make([]bson.D, 0, len(rawCommands))
+	for _, raw := range rawCommands {
+		var command bson.D
+		if err := bson.UnmarshalExtJSON(raw, true, &command); err != nil {
+			t.Fatal(err)
+		}
+		commands = append(commands, command)
 	}
 	for _, command := range commands {
 		if err := db.RunCommand(t.Context(), command).Err(); err != nil {

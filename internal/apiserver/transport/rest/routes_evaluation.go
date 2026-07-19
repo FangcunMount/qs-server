@@ -8,15 +8,13 @@ import (
 
 // registerEvaluationProtectedRoutes 注册评估模块相关的受保护路由。
 func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
-	if r.deps.Evaluation.OperatorRecoveryService == nil ||
-		r.deps.Evaluation.OperatorExecutionService == nil ||
+	if r.deps.Evaluation.OperatorExecutionService == nil ||
 		r.deps.Evaluation.ProtectedQueryService == nil ||
 		r.deps.Interpretation.ReportQueryJourney == nil ||
 		r.deps.Interpretation.ReportWaitJourney == nil {
 		return
 	}
 	evalHandler := handler.NewEvaluationOperatorHandler(
-		r.deps.Evaluation.OperatorRecoveryService,
 		r.deps.Evaluation.OperatorExecutionService,
 		r.deps.Evaluation.ProtectedQueryService,
 		r.deps.SystemGovernanceFacade,

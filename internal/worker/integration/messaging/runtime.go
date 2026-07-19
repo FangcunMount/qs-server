@@ -145,12 +145,13 @@ func createDispatchHandlerWithObserverAndHold(logger *slog.Logger, dispatcher Ev
 		if err != nil {
 			if errors.Is(err, eventruntime.ErrAutomaticRetryPaused) {
 				if holdRecorder == nil {
-					settlement.NackHoldFailed(msg, eventType, errors.New("retry event hold recorder is not configured"))
-					return err
+					holdErr := errors.New("retry event hold recorder is not configured")
+					_, nackErr := settlement.NackHoldFailed(msg, eventType, holdErr)
+					return errors.Join(err, holdErr, nackErr)
 				}
 				if holdErr := holdRecorder.Hold(ctx, msg, eventType, err); holdErr != nil {
-					settlement.NackHoldFailed(msg, eventType, holdErr)
-					return errors.Join(err, holdErr)
+					_, nackErr := settlement.NackHoldFailed(msg, eventType, holdErr)
+					return errors.Join(err, holdErr, nackErr)
 				}
 				outcome, ackErr := settlement.AckHeld(msg)
 				eventobservability.ObserveConsumeDuration(ctx, observer, eventobservability.ConsumeDurationEvent{Service: serviceName, Topic: topicName, EventType: eventType, Outcome: outcome, Duration: time.Since(startedAt)})

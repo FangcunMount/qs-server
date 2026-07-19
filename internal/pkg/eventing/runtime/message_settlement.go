@@ -72,13 +72,20 @@ func (p MessageSettlementPolicy) AckHeld(msg *messaging.Message) (eventobservabi
 	return p.ack(msg, eventobservability.ConsumeOutcomeHeld, eventobservability.ConsumeOutcomeHoldFailed)
 }
 
-func (p MessageSettlementPolicy) NackHoldFailed(msg *messaging.Message, eventType string, holdErr error) eventobservability.ConsumeOutcome {
+func (p MessageSettlementPolicy) NackHoldFailed(msg *messaging.Message, eventType string, holdErr error) (eventobservability.ConsumeOutcome, error) {
 	p.logger.Error("failed to persist paused retry event hold",
 		slog.String("channel", p.service), slog.String("topic", p.topic), slog.String("event_type", eventType),
 		slog.String("msg_id", msg.UUID), slog.String("error", holdErr.Error()))
-	_ = msg.Nack()
-	p.observe(msg, eventType, eventobservability.ConsumeOutcomeHoldFailed)
-	return eventobservability.ConsumeOutcomeHoldFailed
+	outcome := eventobservability.ConsumeOutcomeHoldFailed
+	if nackErr := msg.Nack(); nackErr != nil {
+		p.observe(msg, eventType, outcome)
+		p.logger.Warn("failed to nack paused retry event",
+			slog.String("channel", p.service), slog.String("topic", p.topic), slog.String("event_type", eventType),
+			slog.String("msg_id", msg.UUID), slog.String("error", nackErr.Error()))
+		return outcome, nackErr
+	}
+	p.observe(msg, eventType, outcome)
+	return outcome, nil
 }
 
 func (p MessageSettlementPolicy) NackFailed(msg *messaging.Message, eventType string, dispatchErr error) eventobservability.ConsumeOutcome {

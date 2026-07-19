@@ -22,6 +22,10 @@ type GovernedRetryCommand struct {
 	Reason          string
 }
 
+type EventStager interface {
+	Stage(context.Context, ...event.DomainEvent) error
+}
+
 type GovernedRetryService interface {
 	Authorize(context.Context, Actor, GovernedRetryCommand) (*evalrun.EvaluationRun, error)
 	Latest(context.Context, uint64) (*evalrun.EvaluationRun, error)

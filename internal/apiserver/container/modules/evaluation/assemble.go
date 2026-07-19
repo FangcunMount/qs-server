@@ -48,7 +48,6 @@ type Module struct {
 	IntakeService            evaluationintake.Service
 	TesteeService            evaluationtestee.Service
 	OperatorQuery            evaluationoperator.QueryService
-	OperatorRecovery         evaluationoperator.RecoveryService
 	GovernedRetry            evaluationoperator.GovernedRetryService
 	ScaleAnalysis            evaluationoperator.ScaleAnalysisService
 	WorkerService            evaluationworker.Service
@@ -223,7 +222,6 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 	m.TesteeService = evaluationtestee.NewService(infra.assessmentRepo, infra.assessmentReader, scoreFacts)
 	m.OperatorQuery = evaluationoperator.NewQueryService(infra.assessmentRepo, infra.assessmentReader, normalized.TesteeAccessChecker, scoreFacts, infra.runRepo)
 	m.GovernedRetry = evaluationoperator.NewGovernedRetryService(infra.assessmentRepo, infra.runRepo, infra.txRunner, infra.assessmentOutboxStore, normalized.TesteeAccessChecker)
-	m.OperatorRecovery = evaluationoperator.NewRecoveryService(infra.assessmentRepo, infra.txRunner, infra.assessmentOutboxStore, normalized.TesteeAccessChecker, m.GovernedRetry)
 	m.ScaleAnalysis = evaluationoperator.NewScaleAnalysisService(m.OperatorQuery)
 	m.workbenchLatestRiskReader = infra.latestRiskReader
 }

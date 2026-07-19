@@ -51,6 +51,7 @@ GROUP BY rc.retry_disposition`, orgID).Scan(&evaluation).Error; err != nil {
 		{{Key: "$match", Value: bson.D{{Key: "status", Value: "failed"}, {Key: "deleted_at", Value: nil}, {Key: "outcome_id", Value: bson.D{{Key: "$in", Value: outcomeIDs}}}}}},
 		{{Key: "$lookup", Value: bson.D{{Key: "from", Value: "interpretation_runs"}, {Key: "localField", Value: "latest_run_id"}, {Key: "foreignField", Value: "domain_id"}, {Key: "as", Value: "run"}}}},
 		{{Key: "$unwind", Value: "$run"}},
+		{{Key: "$match", Value: bson.D{{Key: "run.status", Value: "failed"}, {Key: "run.retry_disposition", Value: bson.D{{Key: "$in", Value: bson.A{"automatic", "manual_required", "terminal"}}}}}}},
 		{{Key: "$group", Value: bson.D{{Key: "_id", Value: "$run.retry_disposition"}, {Key: "count", Value: bson.D{{Key: "$sum", Value: 1}}}}}},
 	}
 	cursor, err := r.mongo.Collection("report_generations").Aggregate(ctx, pipeline)

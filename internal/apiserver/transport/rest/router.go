@@ -126,7 +126,6 @@ type ActorDeps struct {
 }
 
 type EvaluationDeps struct {
-	OperatorRecoveryService  evaluationoperator.RecoveryService
 	OperatorExecutionService evaluationoperator.BatchExecutionService
 	ProtectedQueryService    evaluationoperator.QueryService
 }
