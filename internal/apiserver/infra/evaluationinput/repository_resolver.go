@@ -169,11 +169,6 @@ func (r *ModelInputProviderRegistry) Resolve(key evaldomain.ExecutionIdentity) (
 			return provider, nil
 		}
 	}
-	if key.Kind == modelcatalog.KindBehavioralRating {
-		if provider, ok := r.items[evaldomain.ExecutionIdentityBehavioralRatingDefault]; ok {
-			return provider, nil
-		}
-	}
 	return nil, fmt.Errorf("unsupported evaluation model key: %s", key)
 }
 

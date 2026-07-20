@@ -23,55 +23,64 @@ func MaterializeInputProviders(paths []modelcatalog.ExecutionPath, deps InputPro
 	if deps.ScaleCatalog == nil || deps.TypologyCatalog == nil || deps.AnswerSheets == nil || deps.Questionnaires == nil {
 		return nil, fmt.Errorf("evaluation input provider dependencies are incomplete")
 	}
-	providers := make([]ModelInputProvider, 0, len(paths))
+	providers := make([]ModelInputProvider, 0, len(paths)+1)
 	for _, path := range paths {
-		provider, err := materializeInputProvider(path, deps)
+		batch, err := materializeInputProvidersForPath(path, deps)
 		if err != nil {
 			return nil, err
 		}
-		providers = append(providers, provider)
+		providers = append(providers, batch...)
 	}
 	return providers, nil
 }
 
-func materializeInputProvider(path modelcatalog.ExecutionPath, deps InputProviderDeps) (ModelInputProvider, error) {
+func materializeInputProvidersForPath(path modelcatalog.ExecutionPath, deps InputProviderDeps) ([]ModelInputProvider, error) {
 	switch path {
 	case modelcatalog.ExecutionPathScaleDescriptor:
-		return NewScaleModelInputProvider(
+		return []ModelInputProvider{NewScaleModelInputProvider(
 			deps.ScaleCatalog,
 			deps.PublishedModels,
 			deps.AnswerSheets,
 			deps.Questionnaires,
-		), nil
+		)}, nil
 	case modelcatalog.ExecutionPathTypologyDescriptor:
-		return NewConfiguredTypologyModelInputProvider(
+		return []ModelInputProvider{NewConfiguredTypologyModelInputProvider(
 			deps.TypologyCatalog,
 			deps.PublishedModels,
 			deps.AnswerSheets,
 			deps.Questionnaires,
-		), nil
+		)}, nil
 	case modelcatalog.ExecutionPathBehavioralRatingDescriptor:
 		if deps.BehavioralRatingCatalog == nil {
 			return nil, fmt.Errorf("behavioral_rating catalog is required")
 		}
-		return NewBehavioralRatingModelInputProvider(
-			deps.BehavioralRatingCatalog,
-			deps.PublishedModels,
-			deps.AnswerSheets,
-			deps.Questionnaires,
-			deps.NormSubjectReader,
-		), nil
+		out := make([]ModelInputProvider, 0, 2)
+		for _, algorithm := range []modelcatalog.Algorithm{
+			modelcatalog.AlgorithmBrief2,
+			modelcatalog.AlgorithmSPMSensory,
+		} {
+			out = append(out, NewBehavioralRatingModelInputProvider(
+				algorithm,
+				deps.BehavioralRatingCatalog,
+				deps.PublishedModels,
+				deps.AnswerSheets,
+				deps.Questionnaires,
+				deps.NormSubjectReader,
+			))
+		}
+		return out, nil
 	case modelcatalog.ExecutionPathCognitiveDescriptor:
 		if deps.CognitiveCatalog == nil {
 			return nil, fmt.Errorf("cognitive catalog is required")
 		}
-		return NewCognitiveModelInputProvider(
+		return []ModelInputProvider{NewCognitiveModelInputProvider(
+			modelcatalog.AlgorithmSPM,
 			deps.CognitiveCatalog,
 			deps.PublishedModels,
 			deps.AnswerSheets,
 			deps.Questionnaires,
 			deps.NormSubjectReader,
-		), nil
+		)}, nil
 	default:
 		return nil, fmt.Errorf("unsupported evaluation execution path: %s", path)
 	}

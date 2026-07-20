@@ -11,6 +11,7 @@ import (
 )
 
 type CognitiveModelInputProvider struct {
+	algorithm           modelcatalog.Algorithm
 	catalog             port.CognitiveModelCatalog
 	publishedModels     rulesetport.PublishedModelReader
 	answerSheetReader   port.AnswerSheetReader
@@ -19,6 +20,7 @@ type CognitiveModelInputProvider struct {
 }
 
 func NewCognitiveModelInputProvider(
+	algorithm modelcatalog.Algorithm,
 	catalog port.CognitiveModelCatalog,
 	publishedModels rulesetport.PublishedModelReader,
 	answerSheetReader port.AnswerSheetReader,
@@ -26,6 +28,7 @@ func NewCognitiveModelInputProvider(
 	normSubjectReader port.NormSubjectReader,
 ) CognitiveModelInputProvider {
 	return CognitiveModelInputProvider{
+		algorithm:           algorithm,
 		catalog:             catalog,
 		publishedModels:     publishedModels,
 		answerSheetReader:   answerSheetReader,
@@ -34,8 +37,8 @@ func NewCognitiveModelInputProvider(
 	}
 }
 
-func (CognitiveModelInputProvider) ExecutionIdentity() evaldomain.ExecutionIdentity {
-	return evaldomain.ExecutionIdentityCognitiveDefault
+func (p CognitiveModelInputProvider) ExecutionIdentity() evaldomain.ExecutionIdentity {
+	return evaldomain.CognitiveIdentity(p.algorithm)
 }
 
 func (CognitiveModelInputProvider) ExecutionPath() modelcatalog.ExecutionPath {
@@ -45,6 +48,12 @@ func (CognitiveModelInputProvider) ExecutionPath() modelcatalog.ExecutionPath {
 func (p CognitiveModelInputProvider) ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {
 	if p.catalog == nil {
 		return nil, port.NewResolveError(port.FailureKindModelNotFound, fmt.Errorf("cognitive catalog is not configured"), "解释模型不存在", "加载解释模型失败")
+	}
+	if ref.ModelRef.Algorithm == "" {
+		ref.ModelRef.Algorithm = string(p.algorithm)
+	} else if modelcatalog.Algorithm(ref.ModelRef.Algorithm) != p.algorithm {
+		err := fmt.Errorf("cognitive algorithm %s does not match provider %s", ref.ModelRef.Algorithm, p.algorithm)
+		return nil, port.NewResolveError(port.FailureKindUnsupportedModel, err, "不支持的解释模型", "加载解释模型失败")
 	}
 	model, err := p.catalog.GetCognitiveByRef(ctx, ref.ModelRef)
 	if err != nil {

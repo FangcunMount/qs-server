@@ -68,9 +68,6 @@ func (r *RuntimeResolver) ResolveExecution(a *assessment.Assessment, input *eval
 	}
 	resolved.DescriptorKey = key
 	resolved.Descriptor = desc
-	if canonicalIdentity, ok := canonicalExecutionIdentityForFamily(desc.AlgorithmFamily); ok {
-		resolved.ExecutionIdentity = canonicalIdentity
-	}
 	return resolved, nil
 }
 

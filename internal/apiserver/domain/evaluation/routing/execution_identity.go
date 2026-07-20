@@ -20,16 +20,11 @@ var (
 		SubKind:   modelcatalog.SubKindTypology,
 		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
 	}
-	ExecutionIdentityBehavioralRatingDefault = ExecutionIdentity{
-		Kind:      modelcatalog.KindBehavioralRating,
-		SubKind:   modelcatalog.SubKindEmpty,
-		Algorithm: modelcatalog.AlgorithmBehavioralRatingDefault,
-	}
-	ExecutionIdentityCognitiveDefault = ExecutionIdentity{
-		Kind:      modelcatalog.KindCognitive,
-		SubKind:   modelcatalog.SubKindEmpty,
-		Algorithm: modelcatalog.AlgorithmSPM,
-	}
+	// ExecutionIdentityBehavioralRatingDefault is the retired family-route key.
+	// Input providers register under canonical algorithms (brief2 / spm_sensory).
+	ExecutionIdentityBehavioralRatingDefault = BehavioralRatingIdentity(modelcatalog.AlgorithmBehavioralRatingDefault)
+	// ExecutionIdentityCognitiveDefault is the SPM cognitive route identity.
+	ExecutionIdentityCognitiveDefault = CognitiveIdentity(modelcatalog.AlgorithmSPM)
 )
 
 // PersonalityTypologyIdentity 构建执行路由身份 用于 类型学算法。
@@ -37,6 +32,24 @@ func PersonalityTypologyIdentity(algorithm modelcatalog.Algorithm) ExecutionIden
 	return ExecutionIdentity{
 		Kind:      modelcatalog.KindTypology,
 		SubKind:   modelcatalog.SubKindTypology,
+		Algorithm: algorithm,
+	}
+}
+
+// BehavioralRatingIdentity builds the exact execution route key for a behavioral algorithm.
+func BehavioralRatingIdentity(algorithm modelcatalog.Algorithm) ExecutionIdentity {
+	return ExecutionIdentity{
+		Kind:      modelcatalog.KindBehavioralRating,
+		SubKind:   modelcatalog.SubKindEmpty,
+		Algorithm: algorithm,
+	}
+}
+
+// CognitiveIdentity builds the exact execution route key for a cognitive algorithm.
+func CognitiveIdentity(algorithm modelcatalog.Algorithm) ExecutionIdentity {
+	return ExecutionIdentity{
+		Kind:      modelcatalog.KindCognitive,
+		SubKind:   modelcatalog.SubKindEmpty,
 		Algorithm: algorithm,
 	}
 }

@@ -373,11 +373,40 @@ func brief2InputSnapshot() *evaluationinput.InputSnapshot {
 
 func draftBehavioralRatingAssessment(t *testing.T) *assessment.Assessment {
 	t.Helper()
-	modelRef := assessment.NewEvaluationModelRefByCode(
+	modelRef := assessment.NewEvaluationModelRefWithIdentity(
 		modelcatalog.KindBehavioralRating,
+		modelcatalog.SubKindEmpty,
+		modelcatalog.AlgorithmBehavioralRatingDefault,
+		meta.ZeroID,
 		meta.NewCode("BR-001"),
 		"1.0.0",
 		"行为评分",
+	)
+	a, err := assessment.NewAssessment(
+		1,
+		testee.NewID(8005),
+		assessment.NewQuestionnaireRefByCode(meta.NewCode("Q-001"), "1.0.0"),
+		assessment.NewAnswerSheetRef(meta.FromUint64(6005)),
+		assessment.NewAdhocOrigin(),
+		assessment.WithID(assessment.NewID(7005)),
+		assessment.WithEvaluationModel(modelRef),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment: %v", err)
+	}
+	return a
+}
+
+func draftBrief2Assessment(t *testing.T) *assessment.Assessment {
+	t.Helper()
+	modelRef := assessment.NewEvaluationModelRefWithIdentity(
+		modelcatalog.KindBehavioralRating,
+		modelcatalog.SubKindEmpty,
+		modelcatalog.AlgorithmBrief2,
+		meta.ZeroID,
+		meta.NewCode("BR-BRIEF2"),
+		"1.0.0",
+		"BRIEF-2",
 	)
 	a, err := assessment.NewAssessment(
 		1,

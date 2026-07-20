@@ -29,8 +29,8 @@ func TestBehavioralRatingModelIdentitySurvivesExecutionProjectionRoundTrip(t *te
 				"v1",
 				"Behavioral Model",
 			)
-			if routeAlgorithm := modelRef.ExecutionIdentity().Algorithm; routeAlgorithm != modelcatalog.AlgorithmBehavioralRatingDefault {
-				t.Fatalf("route algorithm = %s, want %s", routeAlgorithm, modelcatalog.AlgorithmBehavioralRatingDefault)
+			if routeAlgorithm := modelRef.ExecutionIdentity().Algorithm; routeAlgorithm != algorithm {
+				t.Fatalf("route algorithm = %s, want %s", routeAlgorithm, algorithm)
 			}
 
 			executionRef := ModelRefFromAssessment(modelRef)

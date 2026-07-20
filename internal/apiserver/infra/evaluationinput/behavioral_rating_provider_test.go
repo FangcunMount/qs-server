@@ -45,6 +45,7 @@ func TestBehavioralRatingProviderAttachesNormSubject(t *testing.T) {
 	birthday := time.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC)
 	asOf := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	provider := evaluationinputInfra.NewBehavioralRatingModelInputProvider(
+		"brief2",
 		stubBehavioralCatalog{},
 		nil,
 		stubAnswerSheetReader{},
@@ -56,7 +57,7 @@ func TestBehavioralRatingProviderAttachesNormSubject(t *testing.T) {
 		AnswerSheetID: 3,
 		TesteeID:      7,
 		AsOf:          asOf,
-		ModelRef:      port.ModelRef{Code: "BRIEF2", Version: "1.0.0"},
+		ModelRef:      port.ModelRef{Algorithm: "brief2", Code: "BRIEF2", Version: "1.0.0"},
 	})
 	if err != nil {
 		t.Fatal(err)

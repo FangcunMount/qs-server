@@ -7,24 +7,18 @@ import (
 )
 
 func (r ModelRef) ExecutionIdentity() evaldomain.ExecutionIdentity {
+	kind := modelcatalog.Kind(r.Kind)
 	if r.Algorithm != "" {
-		id := evaldomain.ExecutionIdentity{
-			Kind:      modelcatalog.Kind(r.Kind),
+		return evaldomain.ExecutionIdentity{
+			Kind:      kind,
 			SubKind:   modelcatalog.SubKind(r.SubKind),
 			Algorithm: modelcatalog.Algorithm(r.Algorithm),
 		}
-		if id.Kind == modelcatalog.KindBehavioralRating {
-			return evaldomain.ExecutionIdentityBehavioralRatingDefault
-		}
+	}
+	if id, ok := evaldomain.ExecutionIdentityFromLegacyKind(kind); ok {
 		return id
 	}
-	if id, ok := evaldomain.ExecutionIdentityFromLegacyKind(modelcatalog.Kind(r.Kind)); ok {
-		return id
-	}
-	if modelcatalog.Kind(r.Kind) == modelcatalog.KindBehavioralRating && r.Algorithm == "" {
-		return evaldomain.ExecutionIdentityBehavioralRatingDefault
-	}
-	return evaldomain.ExecutionIdentity{Kind: modelcatalog.Kind(r.Kind)}
+	return evaldomain.ExecutionIdentity{Kind: kind, SubKind: modelcatalog.SubKind(r.SubKind)}
 }
 
 func TypologyPayload(input *InputSnapshot) (*typology.Payload, bool) {

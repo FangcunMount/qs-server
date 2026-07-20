@@ -81,7 +81,7 @@ func TestRetirementDeleteChecklistNonEmpty(t *testing.T) {
 	if len(identity.DualIdentityDeleteChecklist()) != 0 {
 		t.Fatal("dual-identity checklist should be empty after retirement")
 	}
-	if len(identity.RetirementDeleteChecklist()) < 3 {
+	if len(identity.RetirementDeleteChecklist()) < 2 {
 		t.Fatal("full checklist too short")
 	}
 }

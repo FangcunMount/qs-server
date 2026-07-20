@@ -10,7 +10,7 @@ import (
 func TestV1Brief2ExecuteAppliesNormTScore(t *testing.T) {
 	t.Parallel()
 
-	a := draftBehavioralRatingAssessment(t)
+	a := draftBrief2Assessment(t)
 	if err := a.Submit(); err != nil {
 		t.Fatalf("Submit: %v", err)
 	}

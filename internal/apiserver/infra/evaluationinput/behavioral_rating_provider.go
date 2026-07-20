@@ -11,6 +11,7 @@ import (
 )
 
 type BehavioralRatingModelInputProvider struct {
+	algorithm           modelcatalog.Algorithm
 	catalog             port.BehavioralRatingModelCatalog
 	publishedModels     rulesetport.PublishedModelReader
 	answerSheetReader   port.AnswerSheetReader
@@ -19,6 +20,7 @@ type BehavioralRatingModelInputProvider struct {
 }
 
 func NewBehavioralRatingModelInputProvider(
+	algorithm modelcatalog.Algorithm,
 	catalog port.BehavioralRatingModelCatalog,
 	publishedModels rulesetport.PublishedModelReader,
 	answerSheetReader port.AnswerSheetReader,
@@ -26,6 +28,7 @@ func NewBehavioralRatingModelInputProvider(
 	normSubjectReader port.NormSubjectReader,
 ) BehavioralRatingModelInputProvider {
 	return BehavioralRatingModelInputProvider{
+		algorithm:           algorithm,
 		catalog:             catalog,
 		publishedModels:     publishedModels,
 		answerSheetReader:   answerSheetReader,
@@ -34,8 +37,8 @@ func NewBehavioralRatingModelInputProvider(
 	}
 }
 
-func (BehavioralRatingModelInputProvider) ExecutionIdentity() evaldomain.ExecutionIdentity {
-	return evaldomain.ExecutionIdentityBehavioralRatingDefault
+func (p BehavioralRatingModelInputProvider) ExecutionIdentity() evaldomain.ExecutionIdentity {
+	return evaldomain.BehavioralRatingIdentity(p.algorithm)
 }
 
 func (BehavioralRatingModelInputProvider) ExecutionPath() modelcatalog.ExecutionPath {
@@ -45,6 +48,12 @@ func (BehavioralRatingModelInputProvider) ExecutionPath() modelcatalog.Execution
 func (p BehavioralRatingModelInputProvider) ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {
 	if p.catalog == nil {
 		return nil, port.NewResolveError(port.FailureKindModelNotFound, fmt.Errorf("behavioral_rating catalog is not configured"), "解释模型不存在", "加载解释模型失败")
+	}
+	if ref.ModelRef.Algorithm == "" {
+		ref.ModelRef.Algorithm = string(p.algorithm)
+	} else if modelcatalog.Algorithm(ref.ModelRef.Algorithm) != p.algorithm {
+		err := fmt.Errorf("behavioral_rating algorithm %s does not match provider %s", ref.ModelRef.Algorithm, p.algorithm)
+		return nil, port.NewResolveError(port.FailureKindUnsupportedModel, err, "不支持的解释模型", "加载解释模型失败")
 	}
 	model, err := p.catalog.GetBehavioralRatingByRef(ctx, ref.ModelRef)
 	if err != nil {
@@ -64,7 +73,7 @@ func (p BehavioralRatingModelInputProvider) ResolveInput(ctx context.Context, re
 	}
 	payload := port.BehavioralRatingModelPayload{Snapshot: model}
 	snapshot := &port.InputSnapshot{
-		Model:         port.NewBehavioralRatingModelSnapshot(model, modelcatalog.Algorithm(ref.ModelRef.Algorithm)),
+		Model:         port.NewBehavioralRatingModelSnapshot(model, p.algorithm),
 		ModelPayload:  payload,
 		AnswerSheet:   answerSheet,
 		Questionnaire: qnr,
