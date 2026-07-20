@@ -14,3 +14,5 @@ go run ./scripts/oneoff/migrate_personality_kind_values --mongo-uri "$MONGO_URI"
 ```
 
 应用完成后，重启 collection-server 或发布对应的 `TypologyModelCacheChangedSignal`，再验证 `POST /api/v1/typology-assessment-sessions`。
+
+MySQL Assessment/Outcome 上的 `evaluation_model_kind=personality` 见 [`normalize_assessment_personality_kind`](../normalize_assessment_personality_kind/)。
