@@ -438,7 +438,7 @@ func listIndexNames(ctx context.Context, collection *mongo.Collection) (map[stri
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+	defer func() { _ = cursor.Close(ctx) }()
 	out := make(map[string]bool)
 	for cursor.Next(ctx) {
 		var item struct {
