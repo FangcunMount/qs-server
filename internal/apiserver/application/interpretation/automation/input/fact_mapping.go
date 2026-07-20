@@ -9,6 +9,7 @@ import (
 	reportscore "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scoring"
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology/patterns"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	evaluationfactcodec "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact/codec"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -58,7 +59,57 @@ func factorModel(snapshot *evaluationinput.InputSnapshot, family modelcatalog.Al
 			InterpretRules: factorRules(factor.InterpretRules),
 		})
 	}
-	return &reportscore.ReportModel{Code: scale.Code, Title: scale.Title, Factors: factors}
+	assets := factorModelAssets(snapshot, scale)
+	return &reportscore.ReportModel{Code: scale.Code, Title: scale.Title, Factors: factors, Assets: assets}
+}
+
+func factorModelAssets(snapshot *evaluationinput.InputSnapshot, scale *scalesnapshot.ScaleSnapshot) *interpretationassets.Assets {
+	if snapshot != nil {
+		if frozen, ok := evaluationinput.InterpretationAssetsFromSnapshot(snapshot); ok {
+			assets := frozen
+			return &assets
+		}
+	}
+	if scale != nil && scale.InterpretationAssets != nil && scale.InterpretationAssets.IsMaterialized() {
+		return scale.InterpretationAssets
+	}
+	legacy := presentationAssetsFromScale(scale)
+	if !legacy.IsMaterialized() {
+		return nil
+	}
+	return &legacy
+}
+
+func presentationAssetsFromScale(scale *scalesnapshot.ScaleSnapshot) interpretationassets.Assets {
+	if scale == nil {
+		return interpretationassets.Assets{}
+	}
+	if scale.InterpretationAssets != nil && scale.InterpretationAssets.IsMaterialized() {
+		return *scale.InterpretationAssets
+	}
+	seen := make(map[string]struct{})
+	outcomes := make([]interpretationassets.OutcomePresentation, 0)
+	for _, factor := range scale.Factors {
+		for _, rule := range factor.InterpretRules {
+			code := rule.RiskLevel
+			if code == "" {
+				continue
+			}
+			if _, ok := seen[code]; ok {
+				continue
+			}
+			if rule.Conclusion == "" && rule.Suggestion == "" {
+				continue
+			}
+			outcomes = append(outcomes, interpretationassets.OutcomePresentation{
+				OutcomeCode: code,
+				Summary:     rule.Conclusion,
+				Description: rule.Suggestion,
+			})
+			seen[code] = struct{}{}
+		}
+	}
+	return interpretationassets.Assets{Outcomes: outcomes}
 }
 
 func factorRules(rules []scalesnapshot.InterpretRuleSnapshot) []reportscore.FactorInterpretRule {

@@ -42,17 +42,11 @@ func ApplyAbilityConclusions(outcome *domainoutcome.Execution, rules []conclusio
 			if code == "" {
 				code = matched.Level
 			}
-			label := matched.Title
-			if label == "" {
-				label = matched.Level
-			}
-			level := &domainoutcome.ResultLevel{Code: code, Label: label}
+			// Decision path keeps OutcomeCode only; presentation is resolved at Interpretation (MC-R016).
+			level := &domainoutcome.ResultLevel{Code: code}
 			dimension.Level = level
 			if rule.Primary || dimension.Role == "total" {
 				outcome.Level = level
-				if outcome.Summary.PrimaryLabel == "" {
-					outcome.Summary.PrimaryLabel = label
-				}
 				if outcome.Summary.Level == nil && code != "" {
 					levelCode := code
 					outcome.Summary.Level = &levelCode

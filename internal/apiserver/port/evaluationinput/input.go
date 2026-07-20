@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
@@ -73,11 +74,12 @@ type InputRef struct {
 }
 
 type InputSnapshot struct {
-	Model         *ModelSnapshot
-	ModelPayload  ModelPayload
-	AnswerSheet   *AnswerSheetSnapshot
-	Questionnaire *QuestionnaireSnapshot
-	NormSubject   *NormSubjectSnapshot
+	Model                *ModelSnapshot
+	ModelPayload         ModelPayload
+	AnswerSheet          *AnswerSheetSnapshot
+	Questionnaire        *QuestionnaireSnapshot
+	NormSubject          *NormSubjectSnapshot
+	InterpretationAssets *interpretationassets.Assets
 }
 
 // NormSubjectSnapshot carries demographics for norm-based scoring such as Brief-2 T-scores.

@@ -30,10 +30,7 @@ func ExecutionFromScoringInterpretation(
 		Value: result.TotalScore,
 	}
 	if result.RiskLevel != "" {
-		execution.Level = &domainoutcome.ResultLevel{
-			Code:  string(result.RiskLevel),
-			Label: string(result.RiskLevel),
-		}
+		execution.Level = &domainoutcome.ResultLevel{Code: string(result.RiskLevel)}
 	}
 	execution.Dimensions = dimensionResultsFromScoring(result)
 	return execution

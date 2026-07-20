@@ -15,15 +15,18 @@ func TestApplyAbilityConclusionsProjectsMatchingRawScoreRange(t *testing.T) {
 		FactorCode: "total", ScoreBasis: conclusion.ScoreBasisRaw, Primary: true,
 		Rules: []conclusion.ScoreRangeOutcome{{MinScore: 40, MaxScore: 50, Level: "high", OutcomeCode: "ability_high", Title: "优秀", Summary: "能力较强", Description: "继续保持", MaxInclusive: true}},
 	}})
-	if got.Dimensions[0].Level == nil || got.Dimensions[0].Level.Code != "ability_high" || got.Dimensions[0].Level.Label != "优秀" {
+	if got.Dimensions[0].Level == nil || got.Dimensions[0].Level.Code != "ability_high" || got.Dimensions[0].Level.Label != "" {
 		t.Fatalf("level = %#v", got.Dimensions[0].Level)
 	}
 	if got.Level == nil || got.Level.Code != "ability_high" {
 		t.Fatalf("execution level = %#v", got.Level)
 	}
 	decision := domainoutcome.DecisionResultFromExecution(got)
-	if decision.OutcomeCode != "ability_high" || decision.LevelLabel != "优秀" {
+	if decision.OutcomeCode != "ability_high" || decision.LevelCode != "ability_high" {
 		t.Fatalf("decision = %#v", decision)
+	}
+	if decision.LevelLabel != "" {
+		t.Fatalf("LevelLabel must not carry presentation copy, got %q", decision.LevelLabel)
 	}
 }
 

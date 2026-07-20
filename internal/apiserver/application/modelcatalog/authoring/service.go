@@ -10,6 +10,7 @@ import (
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -44,6 +45,7 @@ func (s Service) SaveDefinition(ctx context.Context, actor modelcatalog.ActorCon
 	if issues := appdefinition.ValidateDefinitionV2(value); len(issues) > 0 {
 		return nil, appdefinition.NewValidationError(issues)
 	}
+	modeldefinition.MaterializeLayers(value)
 	if err := model.ForkDraftFromPublished(s.now()); err != nil {
 		return nil, err
 	}

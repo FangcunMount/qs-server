@@ -9,6 +9,7 @@ import (
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -75,6 +76,9 @@ func (p Publisher) Publish(ctx context.Context, model *domain.AssessmentModel, o
 	}
 	if issues := handler.ValidateForPublish(ctx, model); domain.HasValidationErrors(issues) {
 		return nil, definition.NewValidationError(issues)
+	}
+	if model.DefinitionV2 != nil {
+		modeldefinition.MaterializeLayers(model.DefinitionV2)
 	}
 	now := p.now()
 	if model.IsPublished() {

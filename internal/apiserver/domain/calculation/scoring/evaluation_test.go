@@ -39,6 +39,23 @@ func TestEvaluatorSumsFactorsWhenNoTotalScoreFactor(t *testing.T) {
 	}
 }
 
+func TestEvaluatorRiskMatchingIgnoresInterpretCopyFields(t *testing.T) {
+	input := scaleInputForTest()
+	// Rewrite presentation copy; RiskLevel (OutcomeCode) must stay the decision fact.
+	input.Model.Factors[0].InterpretRules[0].Conclusion = "改写结论"
+	input.Model.Factors[0].InterpretRules[0].Suggestion = "改写建议"
+	input.AnswerSheet.Answers[0].Score = 3
+	input.AnswerSheet.Answers[1].Score = 5
+
+	result, err := NewDefaultEvaluator().Score(context.Background(), input)
+	if err != nil {
+		t.Fatalf("Score returned error: %v", err)
+	}
+	if result.RiskLevel != RiskLevelLow {
+		t.Fatalf("overall risk = %s, want low (copy rewrite must not change decision)", result.RiskLevel)
+	}
+}
+
 func TestEvaluatorRiskMatchingAndOverallFallback(t *testing.T) {
 	input := scaleInputForTest()
 	input.AnswerSheet.Answers[0].Score = 40

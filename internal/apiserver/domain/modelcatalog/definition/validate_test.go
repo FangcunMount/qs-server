@@ -192,6 +192,39 @@ func TestValidateRequiresOutcomeCodeAndRejectsOverlapOrGap(t *testing.T) {
 	})
 }
 
+func TestValidateRejectsReportAdapterIncompatibleWithDecisionKind(t *testing.T) {
+	t.Parallel()
+
+	def := definition.Definition{
+		Measure:  definition.MeasureSpec{Factors: []factor.Factor{{Code: "E", Role: factor.FactorRoleDimension}}},
+		Outcomes: []conclusion.Outcome{{Code: "ENTJ"}},
+		Conclusions: []conclusion.Conclusion{conclusion.TypeConclusion{
+			FactorCodes: []string{"E"},
+			Decision:    conclusion.TypeDecision{Kind: binding.DecisionKindPoleComposition},
+			Profiles:    []conclusion.TypeOutcomeProfile{{OutcomeCode: "ENTJ"}},
+		}},
+		ReportMap: definition.ReportMap{Sections: []definition.ReportSection{{
+			Code: "main", AdapterKey: "trait_profile",
+		}}},
+	}
+	issues := definition.Validate(def)
+	if !hasValidationCode(issues, "report_section.adapter.decision_mismatch") {
+		t.Fatalf("issues = %#v, want report_section.adapter.decision_mismatch", issues)
+	}
+
+	def.ReportMap.Sections[0].AdapterKey = "mbti"
+	issues = definition.Validate(def)
+	if !hasValidationCode(issues, "report_section.adapter.legacy") {
+		t.Fatalf("issues = %#v, want report_section.adapter.legacy", issues)
+	}
+
+	def.ReportMap.Sections[0].AdapterKey = "personality_type"
+	issues = definition.Validate(def)
+	if hasValidationCode(issues, "report_section.adapter.decision_mismatch") || hasValidationCode(issues, "report_section.adapter.legacy") {
+		t.Fatalf("issues = %#v, want no adapter issues for compatible adapter", issues)
+	}
+}
+
 func hasValidationCode(issues []definition.ValidationIssue, code string) bool {
 	for _, issue := range issues {
 		if issue.Code == code {

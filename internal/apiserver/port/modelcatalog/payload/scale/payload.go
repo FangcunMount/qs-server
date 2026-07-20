@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scorerange"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
 	portmodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -34,6 +35,8 @@ type ScaleSnapshot struct {
 	Factors              []FactorSnapshot
 	// Measure is omitted on historical flat payloads (json omitempty).
 	Measure *definition.MeasureSpec `json:"Measure,omitempty"`
+	// InterpretationAssets is omitted on historical payloads (MC-R016 batch 4).
+	InterpretationAssets *interpretationassets.Assets `json:"InterpretationAssets,omitempty"`
 
 	// PublishedRuntime is evaluation-only metadata from AssessmentSnapshot; not JSON payload.
 	PublishedRuntime *portmodelcatalog.PublishedRuntimeMeta `json:"-"`

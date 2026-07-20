@@ -17,6 +17,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -95,7 +96,12 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 	}
 	var reportInput json.RawMessage
 	if request.Input != nil && request.Input.ModelPayload != nil {
-		reportInput, err = json.Marshal(request.Input.ModelPayload)
+		var assets *interpretationassets.Assets
+		if frozen, ok := evaluationinput.InterpretationAssetsFromSnapshot(request.Input); ok {
+			copy := frozen
+			assets = &copy
+		}
+		reportInput, err = evaluationinput.MarshalReportInput(request.Input.ModelPayload, assets)
 		if err != nil {
 			return nil, fmt.Errorf("marshal evaluation report input: %w", err)
 		}

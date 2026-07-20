@@ -2,18 +2,22 @@ package definition
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/decision"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 )
 
 // Definition 是测评模型定义主体，组合测量、校准、结论和报告映射。
 type Definition struct {
-	Measure     MeasureSpec
-	Calibration Calibration
-	Execution   ExecutionSpec
-	Conclusions []conclusion.Conclusion
-	Outcomes    []conclusion.Outcome
-	ReportMap   ReportMap
+	Measure              MeasureSpec
+	Calibration          Calibration
+	Execution            ExecutionSpec
+	Conclusions          []conclusion.Conclusion
+	Outcomes             []conclusion.Outcome
+	ReportMap            ReportMap
+	DecisionSpec         decision.Spec                 `json:"DecisionSpec,omitempty"`
+	InterpretationAssets interpretationassets.Assets     `json:"InterpretationAssets,omitempty"`
 }
 
 // ExecutionSpec carries algorithm-specific semantics that cannot be expressed

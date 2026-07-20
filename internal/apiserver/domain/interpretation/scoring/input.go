@@ -3,6 +3,7 @@ package scoring
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scorerange"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
 )
 
 type FactorReportScore struct {
@@ -36,6 +37,7 @@ type ReportModel struct {
 	Code    string
 	Title   string
 	Factors []FactorReportModel
+	Assets  *interpretationassets.Assets
 }
 
 type FactorReportModel struct {

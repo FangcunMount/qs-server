@@ -8,12 +8,14 @@ import (
 
 // DefinitionPO is the BSON shape for the target ModelCatalog definition.
 type DefinitionPO struct {
-	Measure     MeasureSpecPO   `bson:"measure,omitempty"`
-	Calibration CalibrationPO   `bson:"calibration,omitempty"`
-	Execution   ExecutionSpecPO `bson:"execution,omitempty"`
-	Conclusions []ConclusionPO  `bson:"conclusions,omitempty"`
-	Outcomes    []OutcomePO     `bson:"outcomes,omitempty"`
-	ReportMap   ReportMapPO     `bson:"report_map,omitempty"`
+	Measure              MeasureSpecPO          `bson:"measure,omitempty"`
+	Calibration          CalibrationPO          `bson:"calibration,omitempty"`
+	Execution            ExecutionSpecPO        `bson:"execution,omitempty"`
+	Conclusions          []ConclusionPO         `bson:"conclusions,omitempty"`
+	Outcomes             []OutcomePO            `bson:"outcomes,omitempty"`
+	ReportMap            ReportMapPO            `bson:"report_map,omitempty"`
+	DecisionSpec         DecisionSpecPO         `bson:"decision_spec,omitempty"`
+	InterpretationAssets InterpretationAssetsPO `bson:"interpretation_assets,omitempty"`
 }
 
 type ExecutionSpecPO struct {
@@ -210,12 +212,14 @@ func definitionToPO(def *domain.Definition) *DefinitionPO {
 		return nil
 	}
 	return &DefinitionPO{
-		Measure:     measureSpecToPO(def.Measure),
-		Calibration: calibrationToPO(def.Calibration),
-		Execution:   executionSpecToPO(def.Execution),
-		Conclusions: conclusionsToPO(def.Conclusions),
-		Outcomes:    outcomesToPO(def.Outcomes),
-		ReportMap:   reportMapToPO(def.ReportMap),
+		Measure:              measureSpecToPO(def.Measure),
+		Calibration:          calibrationToPO(def.Calibration),
+		Execution:            executionSpecToPO(def.Execution),
+		Conclusions:          conclusionsToPO(def.Conclusions),
+		Outcomes:             outcomesToPO(def.Outcomes),
+		ReportMap:            reportMapToPO(def.ReportMap),
+		DecisionSpec:         decisionSpecToPO(def.DecisionSpec),
+		InterpretationAssets: interpretationAssetsToPO(def.InterpretationAssets),
 	}
 }
 
@@ -231,12 +235,14 @@ func definitionFromPO(po *DefinitionPO) *domain.Definition {
 		return nil
 	}
 	return &domain.Definition{
-		Measure:     measureSpecFromPO(po.Measure),
-		Calibration: calibrationFromPO(po.Calibration),
-		Execution:   executionSpecFromPO(po.Execution),
-		Conclusions: conclusionsFromPO(po.Conclusions),
-		Outcomes:    outcomesFromPO(po.Outcomes),
-		ReportMap:   reportMapFromPO(po.ReportMap),
+		Measure:              measureSpecFromPO(po.Measure),
+		Calibration:          calibrationFromPO(po.Calibration),
+		Execution:            executionSpecFromPO(po.Execution),
+		Conclusions:          conclusionsFromPO(po.Conclusions),
+		Outcomes:             outcomesFromPO(po.Outcomes),
+		ReportMap:            reportMapFromPO(po.ReportMap),
+		DecisionSpec:         decisionSpecFromPO(po.DecisionSpec),
+		InterpretationAssets: interpretationAssetsFromPO(po.InterpretationAssets),
 	}
 }
 

@@ -33,6 +33,7 @@ func Validate(def Definition) []ValidationIssue {
 	issues = append(issues, outcomeIssues...)
 	issues = append(issues, validateConclusions(def.Conclusions, factorCodes, outcomeCodes)...)
 	issues = append(issues, validateReportMap(def.ReportMap)...)
+	issues = append(issues, validateReportMapAgainstDecision(def)...)
 	return issues
 }
 
@@ -294,6 +295,68 @@ func validateReportMap(reportMap ReportMap) []ValidationIssue {
 		seen[section.Code] = struct{}{}
 	}
 	return issues
+}
+
+// validateReportMapAgainstDecision checks ReportMap adapter/template compatibility
+// with TypeConclusion DecisionKind (MC-R016).
+func validateReportMapAgainstDecision(def Definition) []ValidationIssue {
+	var decisionKind binding.DecisionKind
+	hasType := false
+	for _, item := range def.Conclusions {
+		typeConclusion, ok := item.(conclusion.TypeConclusion)
+		if !ok {
+			continue
+		}
+		hasType = true
+		decisionKind = typeConclusion.Decision.Kind
+		break
+	}
+	if !hasType || decisionKind == "" || len(def.ReportMap.Sections) == 0 {
+		return nil
+	}
+	issues := make([]ValidationIssue, 0)
+	for _, section := range def.ReportMap.Sections {
+		if section.AdapterKey == "" {
+			continue
+		}
+		if isLegacyReportAdapter(section.AdapterKey) {
+			issues = append(issues, ValidationIssue{
+				Field:   "report_map.sections." + section.Code + ".adapter_key",
+				Code:    "report_section.adapter.legacy",
+				Message: fmt.Sprintf("report adapter %q is legacy; use personality_type or trait_profile", section.AdapterKey),
+			})
+			continue
+		}
+		if !reportAdapterCompatibleWithDecision(decisionKind, section.AdapterKey) {
+			issues = append(issues, ValidationIssue{
+				Field:   "report_map.sections." + section.Code + ".adapter_key",
+				Code:    "report_section.adapter.decision_mismatch",
+				Message: fmt.Sprintf("report adapter %q is incompatible with decision kind %q", section.AdapterKey, decisionKind),
+			})
+		}
+	}
+	return issues
+}
+
+func isLegacyReportAdapter(adapter string) bool {
+	switch adapter {
+	case "mbti", "sbti", "bigfive":
+		return true
+	default:
+		return false
+	}
+}
+
+func reportAdapterCompatibleWithDecision(kind binding.DecisionKind, adapter string) bool {
+	switch kind {
+	case binding.DecisionKindTraitProfile:
+		return adapter == "trait_profile"
+	case binding.DecisionKindPoleComposition, binding.DecisionKindNearestPattern, binding.DecisionKindDominantFactor:
+		return adapter == "personality_type"
+	default:
+		// NormLookup / AbilityLevel / ScoreRange do not use typology report adapters.
+		return true
+	}
 }
 
 func validScoreBasis(value conclusion.ScoreBasis) bool {

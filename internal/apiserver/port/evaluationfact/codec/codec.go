@@ -117,38 +117,15 @@ func DecodeReportInput(record *evaluationfact.Record) (*evaluationinput.InputSna
 	if len(record.ReportInput()) == 0 {
 		return nil, nil
 	}
-	var payload evaluationinput.ModelPayload
-	switch record.Model().Kind {
-	case modelcatalog.KindScale:
-		var typed evaluationinput.ScaleModelPayload
-		if err := json.Unmarshal(record.ReportInput(), &typed); err != nil {
-			return nil, decodeReportInputError(record, err)
-		}
-		payload = typed
-	case modelcatalog.KindTypology:
-		var typed evaluationinput.TypologyModelPayload
-		if err := json.Unmarshal(record.ReportInput(), &typed); err != nil {
-			return nil, decodeReportInputError(record, err)
-		}
-		payload = typed
-	case modelcatalog.KindBehavioralRating:
-		var typed evaluationinput.BehavioralRatingModelPayload
-		if err := json.Unmarshal(record.ReportInput(), &typed); err != nil {
-			return nil, decodeReportInputError(record, err)
-		}
-		payload = typed
-	case modelcatalog.KindCognitive:
-		var typed evaluationinput.CognitiveModelPayload
-		if err := json.Unmarshal(record.ReportInput(), &typed); err != nil {
-			return nil, decodeReportInputError(record, err)
-		}
-		payload = typed
-	default:
-		return nil, fmt.Errorf("unsupported report input model kind %s", record.Model().Kind)
-	}
 	model := record.Model()
-	snapshot := &evaluationinput.ModelSnapshot{Kind: evaluationinput.EvaluationModelKind(model.Kind), SubKind: string(model.SubKind), Algorithm: string(model.Algorithm), Code: model.Code, Version: model.Version, Title: model.Title, Payload: payload}
-	return &evaluationinput.InputSnapshot{Model: snapshot, ModelPayload: payload}, nil
+	snapshot, err := evaluationinput.SnapshotFromReportInput(record.ReportInput(), evaluationinput.ModelRef{
+		Kind: evaluationinput.EvaluationModelKind(model.Kind), SubKind: string(model.SubKind),
+		Algorithm: string(model.Algorithm), Code: model.Code, Version: model.Version, Title: model.Title,
+	})
+	if err != nil {
+		return nil, decodeReportInputError(record, err)
+	}
+	return snapshot, nil
 }
 
 func decodeReportInputError(record *evaluationfact.Record, err error) error {

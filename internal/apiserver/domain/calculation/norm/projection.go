@@ -39,14 +39,9 @@ func (p Projection) Apply(result *calculation.Result) *calculation.Result {
 					MinAgeMonths: normScore.Reference.MinAgeMonths, MaxAgeMonths: normScore.Reference.MaxAgeMonths,
 					Gender: normScore.Reference.Gender,
 				}
-				if level, conclusion, suggestion, interpreted := InterpretTScore(p.Tables, dim.Code, normScore.TScore); interpreted {
-					enriched.Level = &calculation.ResultLevel{Code: level, Label: conclusion}
-					if conclusion != "" {
-						enriched.Description = conclusion
-					}
-					if suggestion != "" {
-						enriched.Suggestion = suggestion
-					}
+				if level, _, _, interpreted := InterpretTScore(p.Tables, dim.Code, normScore.TScore); interpreted {
+					// Decision path keeps OutcomeCode only; presentation is restored at Interpretation (MC-R016).
+					enriched.Level = &calculation.ResultLevel{Code: level}
 				}
 			}
 			dimensions = append(dimensions, enriched)
@@ -55,9 +50,6 @@ func (p Projection) Apply(result *calculation.Result) *calculation.Result {
 	}
 	if primary := primaryDimension(result.Dimensions, p.PrimaryDimensionCode); primary != nil && primary.Level != nil {
 		result.Level = primary.Level
-		if primary.Description != "" {
-			result.PrimaryLabel = primary.Description
-		}
 	}
 	return result
 }

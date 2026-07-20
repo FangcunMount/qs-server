@@ -5,15 +5,59 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scorerange"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
 )
 
-// interpretScaleFactor 生成单个因子的结论/建议文案：优先命中解读规则，否则按已判定风险等级回退默认文案。
-// 未命中规则时不再取末段规则（与 calculation 判定契约对齐，MC-R004）。
+// interpretScaleFactor resolves factor presentation. Primary path: frozen OutcomeCode
+// → InterpretationAssets; legacy fallback: score-range rematch on InterpretRules (MC-R016).
 func interpretScaleFactor(model *ReportModel, fs FactorReportScore) (string, string) {
+	if model != nil && model.Assets != nil {
+		if conclusion, suggestion, ok := presentationFromOutcomeCode(*model.Assets, outcomeCodeFromFactorScore(fs)); ok {
+			return conclusion, suggestion
+		}
+	}
 	if rule := findFactorInterpretRule(model, fs.FactorCode, fs.RawScore); rule != nil && rule.Conclusion != "" {
 		return rule.Conclusion, rule.Suggestion
 	}
 	return defaultScaleFactorInterpretation(fs.FactorName, fs.RiskLevel, fs.RawScore)
+}
+
+func outcomeCodeFromFactorScore(fs FactorReportScore) string {
+	if fs.Level != nil && fs.Level.Code != "" {
+		return fs.Level.Code
+	}
+	if fs.RiskLevel != "" && fs.RiskLevel != report.RiskLevelNone {
+		return string(fs.RiskLevel)
+	}
+	return ""
+}
+
+func presentationFromOutcomeCode(assets interpretationassets.Assets, code string) (conclusion, suggestion string, ok bool) {
+	if code == "" {
+		return "", "", false
+	}
+	pres, found := assets.FindOutcome(code)
+	if !found {
+		return "", "", false
+	}
+	conclusion = firstNonEmpty(pres.Summary, pres.Title, pres.Description)
+	suggestion = pres.Description
+	if pres.Summary != "" && pres.Description != "" && pres.Summary != pres.Description {
+		conclusion = pres.Summary
+	}
+	if conclusion == "" {
+		return "", "", false
+	}
+	return conclusion, suggestion, true
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func findFactorInterpretRule(model *ReportModel, factorCode string, score float64) *FactorInterpretRule {
