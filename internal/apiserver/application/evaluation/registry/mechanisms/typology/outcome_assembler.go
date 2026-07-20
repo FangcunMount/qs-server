@@ -3,15 +3,13 @@ package typology
 import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
+	calcclassification "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 )
 
 func executionFromPersonalityType(modelRef assessment.EvaluationModelRef, detail outcometypology.PersonalityTypeDetail) *domainoutcome.Execution {
-	score := detail.MatchPercent
-	if score == 0 && detail.Similarity > 0 {
-		score = detail.Similarity * 100
-	}
+	score := calcclassification.MatchPercentPrefer(detail.MatchPercent, detail.Similarity)
 	execution := domainoutcome.NewExecution(evaloutcome.ModelRefFromAssessment(modelRef), domainoutcome.Summary{PrimaryLabel: detail.TypeCode, Score: scorePointer(score), Tags: []string{detail.TypeName, detail.OneLiner}}, domainoutcome.Detail{Kind: modelRef.Kind(), Payload: detail})
 	execution.Primary = &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindMatchPercent, Value: score, Label: detail.TypeCode}
 	execution.Level = &domainoutcome.ResultLevel{Code: detail.TypeCode, Label: detail.TypeName, Severity: "none"}

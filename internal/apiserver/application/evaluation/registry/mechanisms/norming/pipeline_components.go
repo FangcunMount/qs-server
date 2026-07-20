@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
@@ -37,8 +38,12 @@ func NewPipelineComponentsWithScoring(scoring *factorscoring.Executor) PipelineC
 
 type factorNormInputAssembler struct{}
 
-func (factorNormInputAssembler) Assemble(route evalpipeline.ModelRoute) (evalpipeline.CalculationInput, error) {
-	return evalpipeline.CalculationInput{Route: route}, nil
+func (factorNormInputAssembler) Assemble(input evalpipeline.ExecutionInput) (evalpipeline.CalculationInput, error) {
+	route, ok := evaloutcome.ModelRouteFromInput(input.Input)
+	if !ok {
+		return evalpipeline.CalculationInput{}, fmt.Errorf("descriptor pipeline requires model route")
+	}
+	return evalpipeline.CalculationInput{Route: route, Execution: input}, nil
 }
 
 type factorNormCalculator struct {
@@ -50,14 +55,11 @@ type factorNormPipelineResult struct {
 	input   *portevaluationinput.InputSnapshot
 }
 
-func (c factorNormCalculator) Calculate(ctx context.Context, _ evalpipeline.CalculationInput) (any, error) {
+func (c factorNormCalculator) Calculate(ctx context.Context, calcInput evalpipeline.CalculationInput) (any, error) {
 	if c.scoring == nil {
 		return nil, fmt.Errorf("factor_norm evaluation calculator is not configured")
 	}
-	execInput, ok := evalpipeline.ExecutionInputFromContext(ctx)
-	if !ok {
-		return nil, evalpipeline.ErrExecutionContextMissing
-	}
+	execInput := calcInput.Execution
 	scaleSnapshot, ok := portevaluationinput.BehavioralRatingScaleSnapshot(execInput.Input)
 	if !ok || scaleSnapshot == nil {
 		return nil, fmt.Errorf("behavioral_rating model payload is required")

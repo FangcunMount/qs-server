@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/inputinvariant"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
@@ -33,19 +34,20 @@ func NewPipelineComponentsWithRuntime(runtime PersonalityRuntime) PipelineCompon
 
 type typologyInputAssembler struct{}
 
-func (typologyInputAssembler) Assemble(route evalpipeline.ModelRoute) (evalpipeline.CalculationInput, error) {
-	return evalpipeline.CalculationInput{Route: route}, nil
+func (typologyInputAssembler) Assemble(input evalpipeline.ExecutionInput) (evalpipeline.CalculationInput, error) {
+	route, ok := evaloutcome.ModelRouteFromInput(input.Input)
+	if !ok {
+		return evalpipeline.CalculationInput{}, fmt.Errorf("descriptor pipeline requires model route")
+	}
+	return evalpipeline.CalculationInput{Route: route, Execution: input}, nil
 }
 
 type typologyCalculator struct {
 	runtime PersonalityRuntime
 }
 
-func (c typologyCalculator) Calculate(ctx context.Context, _ evalpipeline.CalculationInput) (any, error) {
-	execInput, ok := evalpipeline.ExecutionInputFromContext(ctx)
-	if !ok {
-		return nil, evalpipeline.ErrExecutionContextMissing
-	}
+func (c typologyCalculator) Calculate(_ context.Context, calcInput evalpipeline.CalculationInput) (any, error) {
+	execInput := calcInput.Execution
 	if err := inputinvariant.Validate(inputinvariant.Input{
 		Assessment:    execInput.Assessment,
 		Snapshot:      execInput.Input,

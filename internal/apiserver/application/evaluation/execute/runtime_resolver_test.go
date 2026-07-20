@@ -82,8 +82,8 @@ func TestRuntimeResolverReturnsDescriptorErrorWhenRegistryCannotResolveSnapshot(
 
 type runtimeStubInputAssembler struct{}
 
-func (runtimeStubInputAssembler) Assemble(route evalpipeline.ModelRoute) (evalpipeline.CalculationInput, error) {
-	return evalpipeline.CalculationInput{Route: route}, nil
+func (runtimeStubInputAssembler) Assemble(input evalpipeline.ExecutionInput) (evalpipeline.CalculationInput, error) {
+	return evalpipeline.CalculationInput{Execution: input}, nil
 }
 
 type runtimeStubCalculator struct{}

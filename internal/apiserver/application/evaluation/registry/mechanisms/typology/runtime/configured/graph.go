@@ -229,7 +229,7 @@ func buildPoleDecision(fg modeltypology.FactorGraphSpec) (calcclassification.Dec
 			LeftPole:     meta.LeftPole,
 			RightPole:    meta.RightPole,
 			Threshold:    meta.Threshold,
-			MaxDeviation: dimensionMaxDeviation(meta, mappings),
+			MaxDeviation: calcclassification.PoleMaxDeviation(meta.Constant, meta.Threshold, contributionsFromMappings(mappings)),
 		})
 	}
 	return calcclassification.DecisionSpec{Kind: calcclassification.DecisionKindPoleComposition, Poles: poles}, nil
@@ -344,51 +344,16 @@ func cloneOptionScores(source map[string]float64) map[string]float64 {
 	return cloned
 }
 
-func dimensionMaxDeviation(meta modeltypology.Dimension, mappings []modeltypology.QuestionMapping) float64 {
-	minScore := meta.Constant
-	maxScore := meta.Constant
+func contributionsFromMappings(mappings []modeltypology.QuestionMapping) []calcclassification.AnswerContribution {
+	out := make([]calcclassification.AnswerContribution, 0, len(mappings))
 	for _, mapping := range mappings {
-		if mapping.Dimension != meta.Code && mapping.Dimension != "" {
-			continue
-		}
-		if len(mapping.OptionScores) > 0 {
-			var localMin, localMax float64
-			first := true
-			for _, score := range mapping.OptionScores {
-				if first {
-					localMin, localMax = score, score
-					first = false
-					continue
-				}
-				if score < localMin {
-					localMin = score
-				}
-				if score > localMax {
-					localMax = score
-				}
-			}
-			minScore += localMin
-			maxScore += localMax
-			continue
-		}
-		if mapping.Sign > 0 {
-			minScore += mapping.Sign * 1
-			maxScore += mapping.Sign * 5
-		} else {
-			minScore += mapping.Sign * 5
-			maxScore += mapping.Sign * 1
-		}
+		out = append(out, calcclassification.AnswerContribution{
+			QuestionCode: mapping.QuestionCode,
+			Sign:         mapping.Sign,
+			OptionScores: cloneOptionScores(mapping.OptionScores),
+		})
 	}
-	threshold := meta.Threshold
-	if threshold == 0 {
-		threshold = 24
-	}
-	left := threshold - minScore
-	right := maxScore - threshold
-	if left > right {
-		return left
-	}
-	return right
+	return out
 }
 
 func firstNonEmpty(values ...string) string {

@@ -106,6 +106,7 @@ func TestMechanismOrientedEvaluationPackagesExist(t *testing.T) {
 		"internal/apiserver/domain/evaluation/event",
 		"internal/apiserver/domain/calculation/scoring",
 		"internal/apiserver/domain/calculation/classification",
+		"internal/apiserver/domain/calculation/task_performance",
 		"internal/apiserver/application/evaluation/registry",
 		"internal/apiserver/application/evaluation/registry/mechanisms/scoring",
 		"internal/apiserver/application/evaluation/registry/mechanisms/typology",

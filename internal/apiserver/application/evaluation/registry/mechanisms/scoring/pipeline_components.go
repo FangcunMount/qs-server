@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	calcscoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -43,8 +44,12 @@ func NewPipelineComponentsWithDeps(validator InputValidator, evaluator *calcscor
 
 type factorScoringInputAssembler struct{}
 
-func (factorScoringInputAssembler) Assemble(route evalpipeline.ModelRoute) (evalpipeline.CalculationInput, error) {
-	return evalpipeline.CalculationInput{Route: route}, nil
+func (factorScoringInputAssembler) Assemble(input evalpipeline.ExecutionInput) (evalpipeline.CalculationInput, error) {
+	route, ok := evaloutcome.ModelRouteFromInput(input.Input)
+	if !ok {
+		return evalpipeline.CalculationInput{}, fmt.Errorf("descriptor pipeline requires model route")
+	}
+	return evalpipeline.CalculationInput{Route: route, Execution: input}, nil
 }
 
 type factorScoringCalculator struct {
@@ -62,10 +67,7 @@ func (c factorScoringCalculator) Calculate(ctx context.Context, calcInput evalpi
 	if c.evaluator == nil {
 		return nil, fmt.Errorf("factor_scoring evaluation calculator is not configured")
 	}
-	execInput, ok := evalpipeline.ExecutionInputFromContext(ctx)
-	if !ok {
-		return nil, evalpipeline.ErrExecutionContextMissing
-	}
+	execInput := calcInput.Execution
 	scoringInput := ExecutionInput{
 		Assessment: execInput.Assessment,
 		Input:      execInput.Input,

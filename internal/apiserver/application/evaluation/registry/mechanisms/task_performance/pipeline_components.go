@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/inputinvariant"
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
@@ -38,8 +39,12 @@ func NewPipelineComponentsWithScoring(scoring *factorscoring.Executor) PipelineC
 
 type taskPerformanceInputAssembler struct{}
 
-func (taskPerformanceInputAssembler) Assemble(route evalpipeline.ModelRoute) (evalpipeline.CalculationInput, error) {
-	return evalpipeline.CalculationInput{Route: route}, nil
+func (taskPerformanceInputAssembler) Assemble(input evalpipeline.ExecutionInput) (evalpipeline.CalculationInput, error) {
+	route, ok := evaloutcome.ModelRouteFromInput(input.Input)
+	if !ok {
+		return evalpipeline.CalculationInput{}, fmt.Errorf("descriptor pipeline requires model route")
+	}
+	return evalpipeline.CalculationInput{Route: route, Execution: input}, nil
 }
 
 type taskPerformanceCalculator struct {
@@ -50,14 +55,11 @@ type taskPerformancePipelineResult struct {
 	outcome *domainoutcome.Execution
 }
 
-func (c taskPerformanceCalculator) Calculate(ctx context.Context, _ evalpipeline.CalculationInput) (any, error) {
+func (c taskPerformanceCalculator) Calculate(ctx context.Context, calcInput evalpipeline.CalculationInput) (any, error) {
 	if c.scoring == nil {
 		return nil, fmt.Errorf("task_performance evaluation calculator is not configured")
 	}
-	execInput, ok := evalpipeline.ExecutionInputFromContext(ctx)
-	if !ok {
-		return nil, evalpipeline.ErrExecutionContextMissing
-	}
+	execInput := calcInput.Execution
 	if err := inputinvariant.Validate(inputinvariant.Input{
 		Assessment:    execInput.Assessment,
 		Snapshot:      execInput.Input,

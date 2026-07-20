@@ -18,13 +18,7 @@ func assemblePersonalityTypeDetail(input DetailInput) (any, error) {
 	if score == 0 {
 		score = input.Candidate.MatchScore
 	}
-	matchPercent := score
-	similarity := score
-	if score > 0 && score <= 1 {
-		matchPercent = score * 100
-	} else if score > 1 {
-		similarity = score / 100
-	}
+	matchPercent, similarity := calcclassification.DualScaleFromScore(score)
 	dimensions, err := buildPersonalityDimensions(input)
 	if err != nil {
 		return nil, err

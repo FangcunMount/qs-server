@@ -5,7 +5,6 @@ package descriptor
 
 import (
 	"context"
-	"errors"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
@@ -36,7 +35,8 @@ func ExecutionFamilyFromRoute(route ModelRoute) (modelcatalog.AlgorithmFamily, b
 }
 
 type CalculationInput struct {
-	Route ModelRoute
+	Route     ModelRoute
+	Execution ExecutionInput
 }
 
 type ExecutionInput struct {
@@ -48,25 +48,12 @@ type DescriptorExecutor interface {
 	Execute(context.Context, RuntimeDescriptor, ExecutionInput) (*domainoutcome.Execution, error)
 }
 
-var ErrExecutionContextMissing = errors.New("descriptor execution context is missing")
-
-type executionInputContextKey struct{}
-
-func ContextWithExecutionInput(ctx context.Context, input ExecutionInput) context.Context {
-	return context.WithValue(ctx, executionInputContextKey{}, input)
-}
-
-func ExecutionInputFromContext(ctx context.Context) (ExecutionInput, bool) {
-	input, ok := ctx.Value(executionInputContextKey{}).(ExecutionInput)
-	return input, ok
-}
-
 type Calculator interface {
 	Calculate(context.Context, CalculationInput) (any, error)
 }
 
 type InputAssembler interface {
-	Assemble(ModelRoute) (CalculationInput, error)
+	Assemble(ExecutionInput) (CalculationInput, error)
 }
 
 type OutcomeAssembler interface {
