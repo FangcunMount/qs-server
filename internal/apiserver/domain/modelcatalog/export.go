@@ -220,7 +220,9 @@ var (
 	BehavioralAlgorithmLookupAlternates = identitypkg.BehavioralAlgorithmLookupAlternates
 	BehavioralAlgorithmBackfillTarget   = identitypkg.BehavioralAlgorithmBackfillTarget
 	EvaluateRetirementGate              = identitypkg.EvaluateRetirementGate
+	EvaluateDualIdentityRetirementGate  = identitypkg.EvaluateDualIdentityRetirementGate
 	RetirementDeleteChecklist           = identitypkg.RetirementDeleteChecklist
+	DualIdentityDeleteChecklist         = identitypkg.DualIdentityDeleteChecklist
 	IsRetainedReadAliasAlgorithm        = identitypkg.IsRetainedReadAliasAlgorithm
 	AlgorithmWriteCanonical           = identitypkg.AlgorithmWriteCanonical
 	AlgorithmWriteDraftOK             = identitypkg.AlgorithmWriteDraftOK

@@ -43,14 +43,16 @@ type config struct {
 }
 
 type report struct {
-	PublishedCount            int                     `json:"published_count"`
-	PublishedRetainedRead     int                     `json:"published_retained_read"`
-	AssessmentRetainedAlias   int                     `json:"assessment_retained_alias"`
-	AssessmentEmptyAlgorithm  int                     `json:"assessment_empty_algorithm"`
-	AssessmentBuckets         map[string]int          `json:"assessment_buckets,omitempty"`
-	MetricsAttested           bool                    `json:"metrics_attested"`
-	Gate                      identity.RetirementGate `json:"gate"`
-	DeleteChecklist           []string                `json:"delete_checklist"`
+	PublishedCount           int                     `json:"published_count"`
+	PublishedRetainedRead    int                     `json:"published_retained_read"`
+	AssessmentRetainedAlias  int                     `json:"assessment_retained_alias"`
+	AssessmentEmptyAlgorithm int                     `json:"assessment_empty_algorithm"`
+	AssessmentBuckets        map[string]int          `json:"assessment_buckets,omitempty"`
+	MetricsAttested          bool                    `json:"metrics_attested"`
+	DualIdentityGate         identity.RetirementGate `json:"dual_identity_gate"`
+	FullGate                 identity.RetirementGate `json:"full_gate"`
+	DualIdentityChecklist    []string                `json:"dual_identity_checklist"`
+	FullDeleteChecklist      []string                `json:"full_delete_checklist"`
 }
 
 func main() {
@@ -70,8 +72,9 @@ func main() {
 	defer func() { _ = client.Disconnect(context.Background()) }()
 
 	out := &report{
-		MetricsAttested: cfg.metricsOK,
-		DeleteChecklist: identity.RetirementDeleteChecklist(),
+		MetricsAttested:       cfg.metricsOK,
+		DualIdentityChecklist: identity.DualIdentityDeleteChecklist(),
+		FullDeleteChecklist:   identity.RetirementDeleteChecklist(),
 	}
 	if err := fillPublished(ctx, client.Database(cfg.mongoDB), out); err != nil {
 		fmt.Fprintln(os.Stderr, "audit published:", err)
@@ -86,17 +89,27 @@ func main() {
 		fmt.Fprintln(os.Stderr, "note: --mysql-dsn omitted; assessment inventory treated as 0 for gate math (incomplete)")
 	}
 
-	out.Gate = identity.EvaluateRetirementGate(identity.RetirementGateInputs{
+	inputs := identity.RetirementGateInputs{
 		PublishedRetainedRead:    out.PublishedRetainedRead,
 		AssessmentRetainedAlias:  out.AssessmentRetainedAlias,
 		AssessmentEmptyAlgorithm: out.AssessmentEmptyAlgorithm,
 		MetricsRetainedReadOK:    cfg.metricsOK,
 		MetricsFallbackOK:        cfg.metricsOK,
-	})
-	if cfg.mysqlDSN == "" && out.Gate.Status != "FAIL" {
-		out.Gate = identity.RetirementGate{
-			Status:  "WARN",
-			Reasons: append([]string{"mysql_dsn_omitted"}, out.Gate.Reasons...),
+	}
+	out.DualIdentityGate = identity.EvaluateDualIdentityRetirementGate(inputs)
+	out.FullGate = identity.EvaluateRetirementGate(inputs)
+	if cfg.mysqlDSN == "" {
+		if out.DualIdentityGate.Status != "FAIL" {
+			out.DualIdentityGate = identity.RetirementGate{
+				Status:  "WARN",
+				Reasons: append([]string{"mysql_dsn_omitted"}, out.DualIdentityGate.Reasons...),
+			}
+		}
+		if out.FullGate.Status != "FAIL" {
+			out.FullGate = identity.RetirementGate{
+				Status:  "WARN",
+				Reasons: append([]string{"mysql_dsn_omitted"}, out.FullGate.Reasons...),
+			}
 		}
 	}
 
@@ -105,7 +118,7 @@ func main() {
 	} else {
 		printReport(out)
 	}
-	if cfg.failOnGate && out.Gate.Status != "PASS" {
+	if cfg.failOnGate && out.DualIdentityGate.Status != "PASS" {
 		os.Exit(1)
 	}
 }
@@ -205,10 +218,9 @@ func scanBuckets(ctx context.Context, db *sql.DB, query, source string, out *rep
 		if err := rows.Scan(&kind, &algorithm, &cnt); err != nil {
 			return err
 		}
-		alg := modelcatalog.Algorithm(algorithm.String)
 		key := source + "|" + kind.String + "|" + algorithm.String
 		out.AssessmentBuckets[key] = cnt
-		if identity.IsRetainedReadAliasAlgorithm(alg) {
+		if identity.IsRetainedReadAliasAlgorithm(identity.Algorithm(algorithm.String)) {
 			out.AssessmentRetainedAlias += cnt
 			continue
 		}
@@ -222,11 +234,8 @@ func scanBuckets(ctx context.Context, db *sql.DB, query, source string, out *rep
 func printReport(out *report) {
 	fmt.Printf("published=%d published_retained_read=%d assessment_retained_alias=%d assessment_empty_algorithm=%d metrics_attested=%v\n",
 		out.PublishedCount, out.PublishedRetainedRead, out.AssessmentRetainedAlias, out.AssessmentEmptyAlgorithm, out.MetricsAttested)
-	fmt.Printf("gate=%s", out.Gate.Status)
-	if len(out.Gate.Reasons) > 0 {
-		fmt.Printf(" reasons=%s", strings.Join(out.Gate.Reasons, ","))
-	}
-	fmt.Println()
+	printGate("dual_identity_gate", out.DualIdentityGate)
+	printGate("full_gate", out.FullGate)
 	if len(out.AssessmentBuckets) > 0 {
 		keys := make([]string, 0, len(out.AssessmentBuckets))
 		for k := range out.AssessmentBuckets {
@@ -238,8 +247,20 @@ func printReport(out *report) {
 			fmt.Printf("  %s count=%d\n", k, out.AssessmentBuckets[k])
 		}
 	}
-	fmt.Println("delete checklist (only after gate=PASS):")
-	for _, item := range out.DeleteChecklist {
+	fmt.Println("dual-identity checklist (after dual_identity_gate=PASS):")
+	for _, item := range out.DualIdentityChecklist {
 		fmt.Printf("  - %s\n", item)
 	}
+	fmt.Println("full checklist (after full_gate=PASS):")
+	for _, item := range out.FullDeleteChecklist {
+		fmt.Printf("  - %s\n", item)
+	}
+}
+
+func printGate(name string, gate identity.RetirementGate) {
+	fmt.Printf("%s=%s", name, gate.Status)
+	if len(gate.Reasons) > 0 {
+		fmt.Printf(" reasons=%s", strings.Join(gate.Reasons, ","))
+	}
+	fmt.Println()
 }

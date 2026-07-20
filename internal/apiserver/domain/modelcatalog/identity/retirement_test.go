@@ -29,6 +29,22 @@ func TestEvaluateRetirementGateFailOnInventory(t *testing.T) {
 	}
 }
 
+func TestEvaluateDualIdentityRetirementGateIgnoresEmptyAlgorithm(t *testing.T) {
+	t.Parallel()
+	got := identity.EvaluateDualIdentityRetirementGate(identity.RetirementGateInputs{
+		AssessmentEmptyAlgorithm: 99, MetricsRetainedReadOK: true, MetricsFallbackOK: true,
+	})
+	if got.Status != "PASS" {
+		t.Fatalf("got = %#v", got)
+	}
+	got = identity.EvaluateDualIdentityRetirementGate(identity.RetirementGateInputs{
+		AssessmentRetainedAlias: 1, MetricsRetainedReadOK: true, MetricsFallbackOK: true,
+	})
+	if got.Status != "FAIL" {
+		t.Fatalf("got = %#v", got)
+	}
+}
+
 func TestEvaluateRetirementGateWarnWithoutMetrics(t *testing.T) {
 	t.Parallel()
 	got := identity.EvaluateRetirementGate(identity.RetirementGateInputs{})
@@ -62,7 +78,10 @@ func TestIsRetainedReadAliasAlgorithm(t *testing.T) {
 
 func TestRetirementDeleteChecklistNonEmpty(t *testing.T) {
 	t.Parallel()
+	if len(identity.DualIdentityDeleteChecklist()) < 2 {
+		t.Fatal("dual checklist too short")
+	}
 	if len(identity.RetirementDeleteChecklist()) < 5 {
-		t.Fatal("checklist too short")
+		t.Fatal("full checklist too short")
 	}
 }
