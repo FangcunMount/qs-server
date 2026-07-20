@@ -23,12 +23,18 @@ func TestBuildPublishedModelUsesDefinitionV2Decision(t *testing.T) {
 		Version:    1,
 		Title:      "Brief-2 V2",
 		Definition: domain.DefinitionPayload{Data: []byte(`{"dimensions":[]}`)},
-		DefinitionV2: &domain.Definition{Conclusions: []domain.Conclusion{
-			domain.NormConclusion{FactorCode: "bri", Primary: true},
-		}},
+		DefinitionV2: &domain.Definition{
+			Calibration: modeldefinition.Calibration{NormRefs: []norm.Ref{{FactorCode: "bri", NormTableVersion: "brief2-cn-2024"}}},
+			Conclusions: []domain.Conclusion{
+				domain.NormConclusion{FactorCode: "bri", Primary: true},
+			},
+		},
 	}
 
-	snapshot, err := (appdefinition.BehavioralRatingDefinitionHandler{}).BuildSnapshotPayload(context.Background(), model)
+	snapshot, err := (appdefinition.BehavioralRatingDefinitionHandler{NormRepo: normRepositoryStub{table: &norm.Norm{
+		TableVersion: "brief2-cn-2024",
+		Factors:      []norm.FactorTable{{FactorCode: "bri"}},
+	}}}).BuildSnapshotPayload(context.Background(), model)
 	if err != nil {
 		t.Fatalf("BuildSnapshotPayload: %v", err)
 	}
@@ -49,12 +55,21 @@ func TestBuildPublishedModelPreservesConfiguredBrief2PrimaryDimension(t *testing
 		Definition: domain.DefinitionPayload{
 			Data: []byte(`{"dimensions":[],"brief2":{"primary_dimension_code":"bri"}}`),
 		},
-		DefinitionV2: &domain.Definition{Conclusions: []domain.Conclusion{
-			domain.NormConclusion{FactorCode: "bri", Primary: true},
-		}},
+		DefinitionV2: &domain.Definition{
+			Calibration: modeldefinition.Calibration{NormRefs: []norm.Ref{{FactorCode: "bri", NormTableVersion: "brief2-cn-2024"}}},
+			Conclusions: []domain.Conclusion{
+				domain.NormConclusion{FactorCode: "bri", Primary: true},
+			},
+			Execution: modeldefinition.ExecutionSpec{Brief2: &modeldefinition.Brief2Spec{
+				PrimaryFactorCode: "bri",
+			}},
+		},
 	}
 
-	snapshot, err := (appdefinition.BehavioralRatingDefinitionHandler{}).BuildSnapshotPayload(context.Background(), model)
+	snapshot, err := (appdefinition.BehavioralRatingDefinitionHandler{NormRepo: normRepositoryStub{table: &norm.Norm{
+		TableVersion: "brief2-cn-2024",
+		Factors:      []norm.FactorTable{{FactorCode: "bri"}},
+	}}}).BuildSnapshotPayload(context.Background(), model)
 	if err != nil {
 		t.Fatalf("Build published model: %v", err)
 	}

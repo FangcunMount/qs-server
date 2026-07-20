@@ -30,24 +30,34 @@ func (m *AssessmentModel) DecisionKindForDefinition() (binding.DecisionKind, err
 	}
 }
 
+// behavioralDecisionKind enforces the domain rule that behavioral_rating always
+// publishes as norm_lookup. Raw score-range models must use KindScale instead.
 func behavioralDecisionKind(items []conclusion.Conclusion, hasNormRefs bool) (binding.DecisionKind, error) {
+	if !hasNormRefs {
+		return "", fmt.Errorf("behavioral_rating requires at least one calibration.norm_refs entry")
+	}
+	primaryCount := 0
 	hasNormConclusion := false
-	hasPrimary := false
 	for _, item := range items {
 		normConclusion, ok := item.(conclusion.NormConclusion)
 		if !ok {
 			continue
 		}
 		hasNormConclusion = true
-		hasPrimary = hasPrimary || normConclusion.Primary
-	}
-	if hasNormRefs || hasNormConclusion {
-		if !hasPrimary {
-			return "", fmt.Errorf("behavioral norm conclusion requires a primary factor")
+		if normConclusion.Primary {
+			primaryCount++
 		}
-		return binding.DecisionKindNormLookup, nil
 	}
-	return binding.DecisionKindScoreRange, nil
+	if !hasNormConclusion {
+		return "", fmt.Errorf("behavioral_rating requires at least one norm conclusion")
+	}
+	if primaryCount == 0 {
+		return "", fmt.Errorf("behavioral_rating requires exactly one primary norm conclusion")
+	}
+	if primaryCount > 1 {
+		return "", fmt.Errorf("behavioral_rating allows only one primary norm conclusion")
+	}
+	return binding.DecisionKindNormLookup, nil
 }
 
 func typologyDecisionKind(items []conclusion.Conclusion) (binding.DecisionKind, error) {

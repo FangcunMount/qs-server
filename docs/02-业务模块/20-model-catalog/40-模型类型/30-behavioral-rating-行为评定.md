@@ -1,6 +1,6 @@
 # behavioral_rating：行为评定
 
-> 状态：`behavioral_rating + factor_norm` 已支持 BRIEF-2 和感觉统合 SPM 的因子、复合指数、精确常模、T 分/百分位和等级投影。本文正式将 Norm 定义为该模型类型的必需组成；当前发布校验尚未强制这一规则，生产输入也尚未填充 NormSubject，属于优先治理项。
+> 状态：`behavioral_rating + factor_norm` 已支持 BRIEF-2 和感觉统合 SPM 的因子、复合指数、精确常模、T 分/百分位和等级投影。正式发布已强制 NormRef、Primary NormConclusion 与 `norm_lookup`（见 `MC-R003`）。历史 default/`score_range` snapshot 的兼容读取与下线仍属后续治理。
 
 ## 1. 本文回答
 

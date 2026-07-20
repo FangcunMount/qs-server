@@ -30,14 +30,6 @@ func TestDecisionKindForDefinitionUsesDomainSemantics(t *testing.T) {
 			want: binding.DecisionKindNormLookup,
 		},
 		{
-			name: "behavioral score range",
-			model: assessmentmodel.AssessmentModel{
-				Kind:         binding.KindBehavioralRating,
-				DefinitionV2: &definition.Definition{Conclusions: []conclusion.Conclusion{conclusion.RiskConclusion{FactorCode: "total"}}},
-			},
-			want: binding.DecisionKindScoreRange,
-		},
-		{
 			name:  "cognitive without ability rules",
 			model: assessmentmodel.AssessmentModel{Kind: binding.KindCognitive, DefinitionV2: &definition.Definition{}},
 			want:  binding.DecisionKindAbilityLevel,
@@ -69,16 +61,62 @@ func TestDecisionKindForDefinitionUsesDomainSemantics(t *testing.T) {
 	}
 }
 
-func TestDecisionKindForDefinitionRejectsBehavioralNormWithoutPrimary(t *testing.T) {
+func TestDecisionKindForDefinitionRejectsBehavioralWithoutNormSemantics(t *testing.T) {
 	t.Parallel()
 
-	model := assessmentmodel.AssessmentModel{
-		Kind: binding.KindBehavioralRating,
-		DefinitionV2: &definition.Definition{
-			Calibration: definition.Calibration{NormRefs: []norm.Ref{{FactorCode: "gec", NormTableVersion: "2026"}}},
+	cases := []struct {
+		name  string
+		model assessmentmodel.AssessmentModel
+	}{
+		{
+			name: "score range only",
+			model: assessmentmodel.AssessmentModel{
+				Kind:         binding.KindBehavioralRating,
+				DefinitionV2: &definition.Definition{Conclusions: []conclusion.Conclusion{conclusion.RiskConclusion{FactorCode: "total"}}},
+			},
+		},
+		{
+			name: "norm refs without primary",
+			model: assessmentmodel.AssessmentModel{
+				Kind: binding.KindBehavioralRating,
+				DefinitionV2: &definition.Definition{
+					Calibration: definition.Calibration{NormRefs: []norm.Ref{{FactorCode: "gec", NormTableVersion: "2026"}}},
+				},
+			},
+		},
+		{
+			name: "norm conclusions without refs",
+			model: assessmentmodel.AssessmentModel{
+				Kind: binding.KindBehavioralRating,
+				DefinitionV2: &definition.Definition{
+					Conclusions: []conclusion.Conclusion{conclusion.NormConclusion{FactorCode: "gec", Primary: true}},
+				},
+			},
+		},
+		{
+			name: "multiple primary",
+			model: assessmentmodel.AssessmentModel{
+				Kind: binding.KindBehavioralRating,
+				DefinitionV2: &definition.Definition{
+					Calibration: definition.Calibration{NormRefs: []norm.Ref{
+						{FactorCode: "gec", NormTableVersion: "2026"},
+						{FactorCode: "bri", NormTableVersion: "2026"},
+					}},
+					Conclusions: []conclusion.Conclusion{
+						conclusion.NormConclusion{FactorCode: "gec", Primary: true},
+						conclusion.NormConclusion{FactorCode: "bri", Primary: true},
+					},
+				},
+			},
 		},
 	}
-	if _, err := model.DecisionKindForDefinition(); err == nil {
-		t.Fatal("expected behavioral norm definition without primary conclusion to fail")
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if _, err := tc.model.DecisionKindForDefinition(); err == nil {
+				t.Fatal("expected behavioral_rating without complete norm semantics to fail")
+			}
+		})
 	}
 }
