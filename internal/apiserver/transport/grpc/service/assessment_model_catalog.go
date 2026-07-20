@@ -92,6 +92,18 @@ func catalogListInput(kind, subKind, algorithm, category, keyword, questionnaire
 	return modelcatalog.ListModelsDTO{Kind: kind, SubKind: subKind, Algorithm: algorithm, Category: category, Keyword: keyword, QuestionnaireCode: questionnaireCode, QuestionnaireVersion: questionnaireVersion, Page: int(page), PageSize: int(pageSize)}
 }
 
+func toProtoSummary(summary modelcatalog.ModelSummary) *pb.CatalogModelSummary {
+	return &pb.CatalogModelSummary{
+		Code: summary.Code, Kind: summary.Kind, SubKind: summary.SubKind, Algorithm: summary.Algorithm,
+		ProductChannel: summary.ProductChannel, Title: summary.Title, Description: summary.Description,
+		Status: summary.Status, Category: summary.Category,
+		Stages: append([]string(nil), summary.Stages...), ApplicableAges: append([]string(nil), summary.ApplicableAges...),
+		Reporters: append([]string(nil), summary.Reporters...), Tags: append([]string(nil), summary.Tags...),
+		QuestionnaireCode: summary.QuestionnaireCode, QuestionnaireVersion: summary.QuestionnaireVersion,
+		AlgorithmFamily: summary.AlgorithmFamily, DecisionKind: summary.DecisionKind, PayloadFormat: summary.PayloadFormat,
+	}
+}
+
 func toProtoPublishedModel(model *modelcatalog.PublishedModelDetail) (*pb.PublishedAssessmentModel, error) {
 	if model == nil || model.Definition == nil {
 		return nil, status.Error(codes.FailedPrecondition, "published model definition_v2 is required")
@@ -100,11 +112,16 @@ func toProtoPublishedModel(model *modelcatalog.PublishedModelDetail) (*pb.Publis
 	if err != nil {
 		return nil, err
 	}
-	return &pb.PublishedAssessmentModel{Summary: toProtoSummary(model.ModelSummary), Version: model.Version, DefinitionJson: definition}, nil
-}
-
-func toProtoSummary(summary modelcatalog.ModelSummary) *pb.CatalogModelSummary {
-	return &pb.CatalogModelSummary{Code: summary.Code, Kind: summary.Kind, SubKind: summary.SubKind, Algorithm: summary.Algorithm, ProductChannel: summary.ProductChannel, Title: summary.Title, Description: summary.Description, Status: summary.Status, Category: summary.Category, Stages: append([]string(nil), summary.Stages...), ApplicableAges: append([]string(nil), summary.ApplicableAges...), Reporters: append([]string(nil), summary.Reporters...), Tags: append([]string(nil), summary.Tags...), QuestionnaireCode: summary.QuestionnaireCode, QuestionnaireVersion: summary.QuestionnaireVersion}
+	summary := toProtoSummary(model.ModelSummary)
+	if summary != nil {
+		if summary.DecisionKind == "" {
+			summary.DecisionKind = model.DecisionKind
+		}
+		if summary.PayloadFormat == "" {
+			summary.PayloadFormat = model.PayloadFormat
+		}
+	}
+	return &pb.PublishedAssessmentModel{Summary: summary, Version: model.Version, DefinitionJson: definition}, nil
 }
 
 func optionValues(items []modelcatalog.Option) []*pb.CatalogOption {

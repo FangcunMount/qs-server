@@ -183,6 +183,8 @@ type ModelIdentityOutput struct {
 	Title           string
 	ProductChannel  string
 	AlgorithmFamily string
+	DecisionKind    string
+	PayloadFormat   string
 }
 
 type ScoreValueOutput struct {
@@ -497,6 +499,8 @@ func convertModelIdentity(model *pb.ModelIdentity) ModelIdentityOutput {
 		Title:           model.GetTitle(),
 		ProductChannel:  model.GetProductChannel(),
 		AlgorithmFamily: model.GetAlgorithmFamily(),
+		DecisionKind:    model.GetDecisionKind(),
+		PayloadFormat:   model.GetPayloadFormat(),
 	}
 }
 

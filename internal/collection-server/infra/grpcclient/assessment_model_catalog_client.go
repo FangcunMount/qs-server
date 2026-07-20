@@ -20,6 +20,9 @@ type CatalogModelOutput struct {
 	SubKind              string
 	Algorithm            string
 	ProductChannel       string
+	AlgorithmFamily      string
+	DecisionKind         string
+	PayloadFormat        string
 	Version              string
 	Title                string
 	Description          string
@@ -129,7 +132,15 @@ func catalogSummaryFromProto(value *pb.CatalogModelSummary) *CatalogModelOutput 
 	if value == nil {
 		return &CatalogModelOutput{}
 	}
-	return &CatalogModelOutput{Code: value.GetCode(), Kind: value.GetKind(), SubKind: value.GetSubKind(), Algorithm: value.GetAlgorithm(), ProductChannel: value.GetProductChannel(), Title: value.GetTitle(), Description: value.GetDescription(), Status: value.GetStatus(), Category: value.GetCategory(), Stages: append([]string(nil), value.GetStages()...), ApplicableAges: append([]string(nil), value.GetApplicableAges()...), Reporters: append([]string(nil), value.GetReporters()...), Tags: append([]string(nil), value.GetTags()...), QuestionnaireCode: value.GetQuestionnaireCode(), QuestionnaireVersion: value.GetQuestionnaireVersion()}
+	return &CatalogModelOutput{
+		Code: value.GetCode(), Kind: value.GetKind(), SubKind: value.GetSubKind(), Algorithm: value.GetAlgorithm(),
+		ProductChannel: value.GetProductChannel(), AlgorithmFamily: value.GetAlgorithmFamily(),
+		DecisionKind: value.GetDecisionKind(), PayloadFormat: value.GetPayloadFormat(),
+		Title: value.GetTitle(), Description: value.GetDescription(), Status: value.GetStatus(), Category: value.GetCategory(),
+		Stages: append([]string(nil), value.GetStages()...), ApplicableAges: append([]string(nil), value.GetApplicableAges()...),
+		Reporters: append([]string(nil), value.GetReporters()...), Tags: append([]string(nil), value.GetTags()...),
+		QuestionnaireCode: value.GetQuestionnaireCode(), QuestionnaireVersion: value.GetQuestionnaireVersion(),
+	}
 }
 
 func catalogOptionsFromProto(values []*pb.CatalogOption) []CatalogOptionOutput {

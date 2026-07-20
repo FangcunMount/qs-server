@@ -11,6 +11,8 @@ type ModelIdentityResponse struct {
 	Title           string `json:"title,omitempty"`
 	ProductChannel  string `json:"product_channel,omitempty"`
 	AlgorithmFamily string `json:"algorithm_family,omitempty"`
+	DecisionKind    string `json:"decision_kind,omitempty"`
+	PayloadFormat   string `json:"payload_format,omitempty"`
 }
 
 // ScoreValueResponse 主分投影。

@@ -32,17 +32,22 @@ func ModelRouteFromInput(input *evaluationinput.InputSnapshot) (evalpipeline.Mod
 		}
 	}
 	payloadFormat := model.PayloadFormat
-	if payloadFormat == "" {
-		payloadFormat = modelcatalog.DraftPayloadFormatForModel(kind, algorithm)
-	}
 	family := modelcatalog.AlgorithmFamily(model.AlgorithmFamily)
 
-	return evalpipeline.ModelRoute{
+	route := evalpipeline.ModelRoute{
 		Kind:            kind,
 		SubKind:         subKind,
 		Algorithm:       algorithm,
 		AlgorithmFamily: family,
 		DecisionKind:    decisionKind,
 		PayloadFormat:   payloadFormat,
-	}, true
+	}
+	if route.HasFrozenRuntime() {
+		return route, true
+	}
+	// Legacy incomplete inputs may still draft payload format; counted in DescriptorKeyFromRoute.
+	if route.PayloadFormat == "" {
+		route.PayloadFormat = modelcatalog.DraftPayloadFormatForModel(kind, algorithm)
+	}
+	return route, true
 }

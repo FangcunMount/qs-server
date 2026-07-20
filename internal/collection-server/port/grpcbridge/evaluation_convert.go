@@ -166,6 +166,8 @@ func toModelIdentityResponse(model ModelIdentityOutput) evaluation.ModelIdentity
 		Title:           model.Title,
 		ProductChannel:  model.ProductChannel,
 		AlgorithmFamily: model.AlgorithmFamily,
+		DecisionKind:    model.DecisionKind,
+		PayloadFormat:   model.PayloadFormat,
 	}
 }
 

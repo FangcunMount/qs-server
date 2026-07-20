@@ -328,6 +328,8 @@ func publishedDetailFromModel(model *modelcatalogport.PublishedModel) (*modelcat
 	} else {
 		modelcatalog.PopulateModelSummaryIdentity(&summary, model.Kind, model.SubKind, model.Algorithm, model.ProductChannel)
 	}
+	summary.DecisionKind = string(model.DecisionKind)
+	summary.PayloadFormat = model.PayloadFormat
 	return &modelcatalog.PublishedModelDetail{
 		ModelSummary:  summary,
 		Version:       model.Version,

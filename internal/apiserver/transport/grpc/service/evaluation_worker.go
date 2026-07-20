@@ -49,7 +49,13 @@ func (s *EvaluationWorkerService) ExecuteEvaluation(ctx context.Context, req *pb
 	}
 	if result.Outcome != nil {
 		resp.OutcomeId = result.Outcome.ID
-		resp.Model = &pb.ModelIdentity{Kind: result.Outcome.ModelKind, SubKind: result.Outcome.SubKind, Algorithm: result.Outcome.Algorithm, Code: result.Outcome.ModelCode, Version: result.Outcome.Version, Title: result.Outcome.Title}
+		resp.Model = &pb.ModelIdentity{
+			Kind: result.Outcome.ModelKind, SubKind: result.Outcome.SubKind, Algorithm: result.Outcome.Algorithm,
+			Code: result.Outcome.ModelCode, Version: result.Outcome.Version, Title: result.Outcome.Title,
+			AlgorithmFamily: result.Outcome.AlgorithmFamily,
+			DecisionKind:    result.Outcome.DecisionKind,
+			PayloadFormat:   result.Outcome.PayloadFormat,
+		}
 		if result.Outcome.TotalScore != nil {
 			resp.PrimaryScore = &pb.ScoreValue{Kind: "raw_total", Value: *result.Outcome.TotalScore}
 		}

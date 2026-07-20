@@ -18,15 +18,18 @@ import (
 type Command struct{ AssessmentID uint64 }
 
 type Outcome struct {
-	ID         string
-	ModelKind  string
-	SubKind    string
-	Algorithm  string
-	ModelCode  string
-	Version    string
-	Title      string
-	TotalScore *float64
-	RiskLevel  string
+	ID              string
+	ModelKind       string
+	SubKind         string
+	Algorithm       string
+	AlgorithmFamily string
+	DecisionKind    string
+	PayloadFormat   string
+	ModelCode       string
+	Version         string
+	Title           string
+	TotalScore      *float64
+	RiskLevel       string
 }
 
 type Result struct {
@@ -140,8 +143,10 @@ func (s *service) readReceipt(ctx context.Context, assessmentID uint64) (*Result
 		return nil, err
 	}
 	model := record.Model()
+	runtime := record.Runtime()
 	out := &Outcome{
 		ID: record.ID().String(), ModelKind: string(model.Kind), SubKind: string(model.SubKind), Algorithm: string(model.Algorithm),
+		AlgorithmFamily: string(runtime.AlgorithmFamily), DecisionKind: string(runtime.DecisionKind), PayloadFormat: runtime.PayloadFormat,
 		ModelCode: model.Code, Version: model.Version, Title: model.Title,
 	}
 	if execution.Primary != nil {

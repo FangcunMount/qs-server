@@ -26,6 +26,9 @@ type CatalogModel struct {
 	SubKind              string
 	Algorithm            string
 	ProductChannel       string
+	AlgorithmFamily      string
+	DecisionKind         string
+	PayloadFormat        string
 	Version              string
 	Title                string
 	Description          string
@@ -85,6 +88,9 @@ type ModelResponse struct {
 	SubKind              string          `json:"sub_kind,omitempty"`
 	Algorithm            string          `json:"algorithm,omitempty"`
 	ProductChannel       string          `json:"product_channel,omitempty"`
+	AlgorithmFamily      string          `json:"algorithm_family,omitempty"`
+	DecisionKind         string          `json:"decision_kind,omitempty"`
+	PayloadFormat        string          `json:"payload_format,omitempty"`
 	Version              string          `json:"version,omitempty"`
 	Title                string          `json:"title"`
 	Description          string          `json:"description,omitempty"`
@@ -236,7 +242,15 @@ func modelResponse(value *CatalogModel) *ModelResponse {
 	if value == nil {
 		return nil
 	}
-	return &ModelResponse{Code: value.Code, Kind: value.Kind, SubKind: value.SubKind, Algorithm: value.Algorithm, ProductChannel: value.ProductChannel, Version: value.Version, Title: value.Title, Description: value.Description, Status: value.Status, Category: value.Category, Stages: append([]string(nil), value.Stages...), ApplicableAges: append([]string(nil), value.ApplicableAges...), Reporters: append([]string(nil), value.Reporters...), Tags: append([]string(nil), value.Tags...), QuestionnaireCode: value.QuestionnaireCode, QuestionnaireVersion: value.QuestionnaireVersion, Definition: append(json.RawMessage(nil), value.Definition...)}
+	return &ModelResponse{
+		Code: value.Code, Kind: value.Kind, SubKind: value.SubKind, Algorithm: value.Algorithm, ProductChannel: value.ProductChannel,
+		AlgorithmFamily: value.AlgorithmFamily, DecisionKind: value.DecisionKind, PayloadFormat: value.PayloadFormat,
+		Version: value.Version, Title: value.Title, Description: value.Description, Status: value.Status, Category: value.Category,
+		Stages: append([]string(nil), value.Stages...), ApplicableAges: append([]string(nil), value.ApplicableAges...),
+		Reporters: append([]string(nil), value.Reporters...), Tags: append([]string(nil), value.Tags...),
+		QuestionnaireCode: value.QuestionnaireCode, QuestionnaireVersion: value.QuestionnaireVersion,
+		Definition: append(json.RawMessage(nil), value.Definition...),
+	}
 }
 func options(values []CatalogOption) []OptionResponse {
 	result := make([]OptionResponse, 0, len(values))

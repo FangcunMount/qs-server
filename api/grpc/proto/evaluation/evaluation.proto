@@ -40,6 +40,9 @@ message ModelIdentity {
   string title = 6;
   string product_channel = 7;
   string algorithm_family = 8;
+  // Publish-time frozen RuntimeIdentity fields (MC-R006).
+  string decision_kind = 9;
+  string payload_format = 10;
 }
 
 message ScoreValue {

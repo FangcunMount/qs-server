@@ -30,6 +30,10 @@ message CatalogModelSummary {
   repeated string tags = 13;
   string questionnaire_code = 14;
   string questionnaire_version = 15;
+  // Publish-time frozen RuntimeIdentity (MC-R006).
+  string algorithm_family = 16;
+  string decision_kind = 17;
+  string payload_format = 18;
 }
 
 message PublishedAssessmentModel {

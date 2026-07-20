@@ -16,6 +16,7 @@ const (
 	CompatibilitySourceDecisionKind   CompatibilitySource = "decision_kind"
 	CompatibilitySourceLegacyTypology CompatibilitySource = "legacy_typology"
 	CompatibilitySourceFamilyDefault  CompatibilitySource = "family_default_decision"
+	CompatibilitySourceDraftFormat    CompatibilitySource = "draft_payload_format"
 )
 
 // CompatibilityHit records whether evaluation used a migration fallback.
@@ -26,19 +27,38 @@ type CompatibilityHit struct {
 
 // DescriptorKeyFromRoute derives the single runtime routing key from a model route.
 func DescriptorKeyFromRoute(route ModelRoute) (DescriptorKey, error) {
+	if route.HasFrozenRuntime() {
+		family, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(route.DecisionKind)
+		if !ok || family != route.AlgorithmFamily {
+			return DescriptorKey{}, fmt.Errorf(
+				"frozen runtime identity conflict: family=%s decision=%s",
+				route.AlgorithmFamily, route.DecisionKind,
+			)
+		}
+		observeRuntimeCompat(CompatibilityHit{Source: CompatibilitySourceFrozen}, "runtime")
+		return DescriptorKey{
+			AlgorithmFamily: route.AlgorithmFamily,
+			DecisionKind:    route.DecisionKind,
+			PayloadFormat:   route.PayloadFormat,
+		}, nil
+	}
+
 	family, hit, ok := ExecutionFamilyFromRouteWithCompat(route)
 	if !ok {
 		return DescriptorKey{}, fmt.Errorf("unsupported model route for runtime descriptor: %s/%s", route.Kind, route.Algorithm)
 	}
+	observeRuntimeCompat(hit, "family")
+
 	decision, decisionHit := ExecutionDecisionFromRouteWithCompat(route, family)
 	if decision == "" {
 		return DescriptorKey{}, fmt.Errorf("unable to resolve decision kind for route %s/%s", route.Kind, route.Algorithm)
 	}
-	_ = hit
-	_ = decisionHit
+	observeRuntimeCompat(decisionHit, "decision")
+
 	format := route.PayloadFormat
 	if format == "" {
 		format = modelcatalog.DraftPayloadFormatForModel(route.Kind, route.Algorithm)
+		observeRuntimeCompat(CompatibilityHit{Used: true, Source: CompatibilitySourceDraftFormat}, "payload_format")
 	}
 	return DescriptorKey{
 		AlgorithmFamily: family,

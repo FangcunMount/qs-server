@@ -84,9 +84,22 @@ func typologyResponseFromCatalog(model *modelcatalog.ModelResponse, incoming err
 	if err != nil {
 		return nil, fmt.Errorf("project typology presentation: %w", err)
 	}
-	response := &typologymodel.TypologyModelResponse{Code: model.Code, Version: model.Version, Title: model.Title, Algorithm: model.Algorithm, Description: model.Description, QuestionnaireCode: model.QuestionnaireCode, QuestionnaireVersion: model.QuestionnaireVersion, Status: model.Status, Kind: string(modeldomain.KindTypology), SubKind: model.SubKind, ProductChannel: model.ProductChannel, PayloadFormat: modeldomain.PayloadFormatPersonalityTypologyV1, DecisionKind: string(runtime.Decision.Kind)}
-	if family, ok := modeldomain.AlgorithmFamilyFromIdentity(modeldomain.KindTypology, modeldomain.SubKind(model.SubKind), modeldomain.Algorithm(model.Algorithm)); ok {
-		response.AlgorithmFamily = string(family)
+	response := &typologymodel.TypologyModelResponse{
+		Code: model.Code, Version: model.Version, Title: model.Title, Algorithm: model.Algorithm, Description: model.Description,
+		QuestionnaireCode: model.QuestionnaireCode, QuestionnaireVersion: model.QuestionnaireVersion, Status: model.Status,
+		Kind: string(modeldomain.KindTypology), SubKind: model.SubKind, ProductChannel: model.ProductChannel,
+		PayloadFormat: model.PayloadFormat, DecisionKind: model.DecisionKind, AlgorithmFamily: model.AlgorithmFamily,
+	}
+	if response.PayloadFormat == "" {
+		response.PayloadFormat = modeldomain.PayloadFormatPersonalityTypologyV1
+	}
+	if response.DecisionKind == "" {
+		response.DecisionKind = string(runtime.Decision.Kind)
+	}
+	if response.AlgorithmFamily == "" {
+		if family, ok := modeldomain.AlgorithmFamilyFromIdentity(modeldomain.KindTypology, modeldomain.SubKind(model.SubKind), modeldomain.Algorithm(model.Algorithm)); ok {
+			response.AlgorithmFamily = string(family)
+		}
 	}
 	response.QuestionCount = int32(countRuntimeQuestions(runtime))
 	response.DimensionOrder = append([]string(nil), runtime.FactorGraph.DecisionFactorOrder()...)

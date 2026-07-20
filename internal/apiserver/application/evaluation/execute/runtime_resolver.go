@@ -47,7 +47,12 @@ func (r *RuntimeResolver) ResolveExecution(a *assessment.Assessment, input *eval
 	if ok {
 		_, ok = evalpipeline.ExecutionFamilyFromRoute(route)
 	}
+	// New published models carry frozen RuntimeIdentity on InputSnapshot; do not
+	// silently fall back to Assessment ModelRef (identity-only, no family/decision/format).
 	if !ok {
+		if input != nil && input.Model != nil && input.Model.HasFrozenRuntime() {
+			return resolved, fmt.Errorf("evaluation runtime cannot resolve frozen model route")
+		}
 		route, ok = modelRouteFromAssessment(a)
 	}
 	if !ok {

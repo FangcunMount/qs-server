@@ -101,6 +101,8 @@ type ModelSummary struct {
 	Algorithm            string       `json:"algorithm,omitempty"`
 	ProductChannel       string       `json:"product_channel,omitempty" example:"typology"`
 	AlgorithmFamily      string       `json:"algorithm_family,omitempty"`
+	DecisionKind         string       `json:"decision_kind,omitempty"`
+	PayloadFormat        string       `json:"payload_format,omitempty"`
 	Title                string       `json:"title"`
 	Description          string       `json:"description,omitempty"`
 	Status               string       `json:"status"`

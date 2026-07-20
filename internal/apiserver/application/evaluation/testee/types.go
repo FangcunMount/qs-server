@@ -18,7 +18,9 @@ type TrendQuery struct {
 	Limit      int
 }
 
-type ModelIdentity struct{ Kind, SubKind, Algorithm, Code, Version, Title, ProductChannel, AlgorithmFamily string }
+type ModelIdentity struct {
+	Kind, SubKind, Algorithm, Code, Version, Title, ProductChannel, AlgorithmFamily, DecisionKind, PayloadFormat string
+}
 type ScoreValue struct {
 	Kind  string
 	Value float64
