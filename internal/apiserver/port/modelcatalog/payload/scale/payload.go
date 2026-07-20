@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scorerange"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	portmodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -18,6 +19,10 @@ func ParsePublishedPayload(payload []byte) (*ScaleSnapshot, error) {
 }
 
 // ScaleSnapshot 已发布量表规则集 载荷（ruleset.scale.v1）。
+//
+// Flat Factors remain the historical compat surface for factor_scoring.
+// Measure (when present) is the canonical MeasureSpec used by new publishes
+// so FactorGraph / factor sources / source metadata are not lost (MC-R015).
 type ScaleSnapshot struct {
 	ID                   uint64
 	Code                 string
@@ -27,6 +32,8 @@ type ScaleSnapshot struct {
 	QuestionnaireVersion string
 	Status               string
 	Factors              []FactorSnapshot
+	// Measure is omitted on historical flat payloads (json omitempty).
+	Measure *definition.MeasureSpec `json:"Measure,omitempty"`
 
 	// PublishedRuntime is evaluation-only metadata from AssessmentSnapshot; not JSON payload.
 	PublishedRuntime *portmodelcatalog.PublishedRuntimeMeta `json:"-"`
@@ -46,6 +53,13 @@ type ExecutionEnvelope struct {
 
 func (s *ScaleSnapshot) IsPublished() bool {
 	return s != nil && s.Status == "published"
+}
+
+// HasCanonicalMeasure reports whether the snapshot carries a MeasureSpec that
+// should be preferred over reconstructing from flat Factors.
+func (s *ScaleSnapshot) HasCanonicalMeasure() bool {
+	return s != nil && s.Measure != nil && (len(s.Measure.Factors) > 0 || len(s.Measure.Scoring) > 0 ||
+		len(s.Measure.FactorGraph.Roots) > 0 || len(s.Measure.FactorGraph.Edges) > 0)
 }
 
 func (s *ScaleSnapshot) FindFactor(code string) (*FactorSnapshot, bool) {

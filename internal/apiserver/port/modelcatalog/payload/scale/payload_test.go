@@ -56,7 +56,16 @@ func TestDefinitionRoundTripPreservesScaleRiskRules(t *testing.T) {
 		Status:               original.Status,
 	}, definition)
 
-	if !reflect.DeepEqual(got, original) {
-		t.Fatalf("scale definition round trip mismatch\n got: %#v\nwant: %#v", got, original)
+	if !reflect.DeepEqual(got.Factors, original.Factors) {
+		t.Fatalf("scale factors round trip mismatch\n got: %#v\nwant: %#v", got.Factors, original.Factors)
+	}
+	if got.Code != original.Code || got.ScaleVersion != original.ScaleVersion || got.Status != original.Status {
+		t.Fatalf("envelope mismatch got=%#v want=%#v", got, original)
+	}
+	if !got.HasCanonicalMeasure() {
+		t.Fatal("FromDefinition should attach canonical Measure")
+	}
+	if !reflect.DeepEqual(got.Measure, &definition.Measure) {
+		t.Fatalf("Measure =\n%#v\nwant %#v", got.Measure, definition.Measure)
 	}
 }

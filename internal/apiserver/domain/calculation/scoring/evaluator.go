@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/capability"
 )
 
 // Evaluator executes scale factor scoring and risk classification.
@@ -50,22 +51,37 @@ func (e *Evaluator) Score(ctx context.Context, input Input) (*Result, error) {
 // DefaultStrategyRegistry is the default scale factor aggregation registry.
 type DefaultStrategyRegistry struct{}
 
-// ScoreFactor executes scale factor aggregation strategies.
+// ScoreFactor executes scale factor aggregation strategies against the capability catalog.
 func (DefaultStrategyRegistry) ScoreFactor(_ context.Context, factor Factor, values []float64) (float64, error) {
-	score, err := calculation.DefaultStrategyRegistry{}.Score(context.Background(), calculation.Dimension{
-		Code:         factor.Code,
-		StrategyCode: factor.ScoringStrategy,
-	}, values)
-	if err != nil {
-		return 0, err
-	}
-	strategy := Strategy(factor.ScoringStrategy)
-	if strategy != StrategySum &&
-		strategy != StrategyAvg &&
-		strategy != StrategyCnt {
+	usage := usageForFactor(factor)
+	code, ok := capability.Canonical(capability.PathScaleDescriptor, usage, factor.ScoringStrategy)
+	if !ok {
 		return 0, fmt.Errorf("unknown factor scoring strategy for %s: %s", factor.Code, factor.ScoringStrategy)
 	}
-	return score, nil
+	switch code {
+	case "sum", "weighted_sum":
+		// weighted_sum values are pre-multiplied by child weights in collectChildValues.
+		return sumValues(values), nil
+	case "avg":
+		if len(values) == 0 {
+			return 0, nil
+		}
+		return sumValues(values) / float64(len(values)), nil
+	case "cnt":
+		return float64(len(values)), nil
+	case "none", "lookup", "custom":
+		return 0, nil
+	default:
+		return 0, fmt.Errorf("unknown factor scoring strategy for %s: %s", factor.Code, factor.ScoringStrategy)
+	}
+}
+
+func sumValues(values []float64) float64 {
+	var total float64
+	for _, value := range values {
+		total += value
+	}
+	return total
 }
 
 type scaleCalculationRegistry struct {
@@ -76,8 +92,10 @@ func (r scaleCalculationRegistry) Score(ctx context.Context, dimension calculati
 	if r.registry == nil {
 		return 0, nil
 	}
-	return r.registry.ScoreFactor(ctx, Factor{
-		Code:            dimension.Code,
-		ScoringStrategy: dimension.StrategyCode,
-	}, values)
+	factor := Factor{Code: dimension.Code, ScoringStrategy: dimension.StrategyCode}
+	if capability.Supports(capability.PathScaleDescriptor, capability.UsageCompositeProjection, dimension.StrategyCode) &&
+		!capability.Supports(capability.PathScaleDescriptor, capability.UsageQuestionAggregation, dimension.StrategyCode) {
+		factor.ChildCodes = []string{"_"}
+	}
+	return r.registry.ScoreFactor(ctx, factor, values)
 }

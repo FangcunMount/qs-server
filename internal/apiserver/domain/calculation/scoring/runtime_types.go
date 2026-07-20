@@ -19,9 +19,10 @@ func (r RiskLevel) String() string {
 type Strategy string
 
 const (
-	StrategySum Strategy = "sum"
-	StrategyAvg Strategy = "avg"
-	StrategyCnt Strategy = "cnt"
+	StrategySum         Strategy = "sum"
+	StrategyAvg         Strategy = "avg"
+	StrategyCnt         Strategy = "cnt"
+	StrategyWeightedSum Strategy = "weighted_sum"
 )
 
 func (s Strategy) String() string {
@@ -29,5 +30,6 @@ func (s Strategy) String() string {
 }
 
 func (s Strategy) IsValid() bool {
-	return capability.Supports(capability.PathScaleDescriptor, capability.UsageQuestionAggregation, string(s))
+	return capability.Supports(capability.PathScaleDescriptor, capability.UsageQuestionAggregation, string(s)) ||
+		capability.Supports(capability.PathScaleDescriptor, capability.UsageCompositeProjection, string(s))
 }

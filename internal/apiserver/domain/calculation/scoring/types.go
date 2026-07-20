@@ -22,15 +22,29 @@ type Model struct {
 	Factors              []Factor
 }
 
+// QuestionContribution is one question input with optional sign/weight/override.
+// When Contributions is non-empty it is preferred over QuestionCodes for leaf scoring.
+type QuestionContribution struct {
+	Code         string
+	Sign         float64
+	Weight       float64
+	ScoringMode  string
+	OptionScores map[string]float64
+}
+
 type Factor struct {
 	Code            string
 	Title           string
 	ScoringStrategy string
 	ScoringParams   CntParams
 	QuestionCodes   []string
-	MaxScore        *float64
-	IsTotalScore    bool
-	InterpretRules  []InterpretRule
+	Contributions   []QuestionContribution
+	// ChildCodes marks a composite factor whose inputs are other factor raw scores.
+	ChildCodes   []string
+	ChildWeights map[string]float64
+	MaxScore     *float64
+	IsTotalScore bool
+	InterpretRules []InterpretRule
 }
 
 type CntParams struct {

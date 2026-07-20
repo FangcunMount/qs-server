@@ -58,8 +58,9 @@ func outcomesFromRiskConclusions(items []conclusion.Conclusion) []conclusion.Out
 	return out
 }
 
-// ScaleSnapshotFromDefinition projects target definition layers back to the
-// scale runtime DTO while keeping the published payload schema unchanged.
+// ScaleSnapshotFromDefinition projects DefinitionV2 into the scale runtime DTO.
+// Flat Factors stay as the factor_scoring compat surface; Measure carries the
+// canonical MeasureSpec so graph/source metadata are not lost (MC-R015).
 func ScaleSnapshotFromDefinition(env ExecutionEnvelope, def *definition.Definition) *ScaleSnapshot {
 	if def == nil {
 		return nil
@@ -70,6 +71,16 @@ func ScaleSnapshotFromDefinition(env ExecutionEnvelope, def *definition.Definiti
 }
 
 func measureSpecFromScaleSnapshot(snapshot *ScaleSnapshot) definition.MeasureSpec {
+	if snapshot == nil {
+		return definition.MeasureSpec{}
+	}
+	if snapshot.HasCanonicalMeasure() {
+		return cloneMeasureSpec(*snapshot.Measure)
+	}
+	return measureSpecFromFlatFactors(snapshot)
+}
+
+func measureSpecFromFlatFactors(snapshot *ScaleSnapshot) definition.MeasureSpec {
 	if snapshot == nil || snapshot.Factors == nil {
 		return definition.MeasureSpec{}
 	}
@@ -126,6 +137,7 @@ func buildFromMeasureSpec(env ExecutionEnvelope, measure definition.MeasureSpec)
 		}
 		factors = append(factors, projected)
 	}
+	canonical := cloneMeasureSpec(measure)
 	return &ScaleSnapshot{
 		ID:                   env.ID,
 		Code:                 env.Code,
@@ -135,7 +147,75 @@ func buildFromMeasureSpec(env ExecutionEnvelope, measure definition.MeasureSpec)
 		QuestionnaireVersion: env.QuestionnaireVersion,
 		Status:               env.Status,
 		Factors:              factors,
+		Measure:              &canonical,
 	}
+}
+
+// cloneMeasureSpec deep-copies MeasureSpec so snapshot storage cannot mutate Definition.
+func cloneMeasureSpec(measure definition.MeasureSpec) definition.MeasureSpec {
+	out := definition.MeasureSpec{
+		Factors: append([]factor.Factor(nil), measure.Factors...),
+		FactorGraph: factor.FactorGraph{
+			Roots: append([]string(nil), measure.FactorGraph.Roots...),
+			Edges: append([]factor.FactorEdge(nil), measure.FactorGraph.Edges...),
+		},
+	}
+	if len(measure.FactorGraph.SortOrders) > 0 {
+		out.FactorGraph.SortOrders = make(map[string]int, len(measure.FactorGraph.SortOrders))
+		for k, v := range measure.FactorGraph.SortOrders {
+			out.FactorGraph.SortOrders[k] = v
+		}
+	}
+	if len(measure.Scoring) == 0 {
+		return out
+	}
+	out.Scoring = make([]factor.Scoring, 0, len(measure.Scoring))
+	for _, rule := range measure.Scoring {
+		cloned := factor.Scoring{
+			FactorCode:    rule.FactorCode,
+			Strategy:      rule.Strategy,
+			MaxScore:      cloneFloat64(rule.MaxScore),
+			Constant:      rule.Constant,
+			OptionScoring: rule.OptionScoring,
+			Params:        cloneScoringParams(rule.Params),
+			Sources:       cloneScoringSources(rule.Sources),
+		}
+		if len(rule.Weights) > 0 {
+			cloned.Weights = make(map[string]float64, len(rule.Weights))
+			for k, v := range rule.Weights {
+				cloned.Weights[k] = v
+			}
+		}
+		out.Scoring = append(out.Scoring, cloned)
+	}
+	return out
+}
+
+func cloneScoringParams(params *factor.ScoringParams) *factor.ScoringParams {
+	if params == nil {
+		return nil
+	}
+	return &factor.ScoringParams{
+		CntOptionContents: append([]string(nil), params.CntOptionContents...),
+	}
+}
+
+func cloneScoringSources(sources []factor.ScoringSource) []factor.ScoringSource {
+	if len(sources) == 0 {
+		return nil
+	}
+	out := make([]factor.ScoringSource, 0, len(sources))
+	for _, source := range sources {
+		cloned := source
+		if len(source.OptionScores) > 0 {
+			cloned.OptionScores = make(map[string]float64, len(source.OptionScores))
+			for k, v := range source.OptionScores {
+				cloned.OptionScores[k] = v
+			}
+		}
+		out = append(out, cloned)
+	}
+	return out
 }
 
 func questionSources(codes []string) []factor.ScoringSource {

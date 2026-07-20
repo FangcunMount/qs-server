@@ -9,6 +9,9 @@ import (
 )
 
 func collectFactorValues(factor Factor, sheet *AnswerSheet, qnr *Questionnaire) ([]float64, error) {
+	if len(factor.ChildCodes) > 0 {
+		return nil, fmt.Errorf("composite factor %s must be scored from child factor scores", factor.Code)
+	}
 	code, ok := capability.Canonical(capability.PathScaleDescriptor, capability.UsageQuestionAggregation, factor.ScoringStrategy)
 	if !ok {
 		return nil, fmt.Errorf("unsupported factor scoring strategy for %s: %s", factor.Code, factor.ScoringStrategy)
@@ -29,6 +32,17 @@ func collectFactorValues(factor Factor, sheet *AnswerSheet, qnr *Questionnaire) 
 func collectQuestionScores(factor Factor, sheet *AnswerSheet) []float64 {
 	// MissingAnswerPolicyFor(scale, question_aggregation) == skip.
 	answerMap := factorScoreAnswerMap(sheet)
+	if len(factor.Contributions) > 0 {
+		scores := make([]float64, 0, len(factor.Contributions))
+		for _, contrib := range factor.Contributions {
+			answer, found := answerMap[contrib.Code]
+			if !found {
+				continue
+			}
+			scores = append(scores, applyQuestionContribution(contrib, answer))
+		}
+		return scores
+	}
 	scores := make([]float64, 0, len(factor.QuestionCodes))
 	for _, qCode := range factor.QuestionCodes {
 		if answer, found := answerMap[qCode]; found {
@@ -38,6 +52,49 @@ func collectQuestionScores(factor Factor, sheet *AnswerSheet) []float64 {
 	return scores
 }
 
+func applyQuestionContribution(contrib QuestionContribution, answer Answer) float64 {
+	base := answer.Score
+	if contrib.ScoringMode == "option_override" {
+		if optionID := factorScoreOptionID(answer); optionID != "" {
+			if score, ok := contrib.OptionScores[optionID]; ok {
+				base = score
+			}
+		}
+	}
+	sign := contrib.Sign
+	if sign == 0 {
+		sign = 1
+	}
+	weight := contrib.Weight
+	if weight == 0 {
+		weight = 1
+	}
+	return base * sign * weight
+}
+
+func collectChildValues(factor Factor, rawByCode map[string]float64) []float64 {
+	code, _ := capability.Canonical(capability.PathScaleDescriptor, capability.UsageCompositeProjection, factor.ScoringStrategy)
+	values := make([]float64, 0, len(factor.ChildCodes))
+	for _, child := range factor.ChildCodes {
+		score, ok := rawByCode[child]
+		if !ok {
+			continue
+		}
+		if code == "weighted_sum" {
+			weight := 1.0
+			if factor.ChildWeights != nil {
+				if w, ok := factor.ChildWeights[child]; ok {
+					weight = w
+				}
+			}
+			values = append(values, score*weight)
+			continue
+		}
+		values = append(values, score)
+	}
+	return values
+}
+
 func collectCntMatches(factor Factor, sheet *AnswerSheet, qnr *Questionnaire) []float64 {
 	targetContents := factor.ScoringParams.CntOptionContents
 	if len(targetContents) == 0 {
@@ -45,8 +102,15 @@ func collectCntMatches(factor Factor, sheet *AnswerSheet, qnr *Questionnaire) []
 	}
 	optionContentMap := factorScoreOptionContentMap(qnr)
 	answerMap := factorScoreAnswerMap(sheet)
-	matchValues := make([]float64, 0, len(factor.QuestionCodes))
-	for _, qCode := range factor.QuestionCodes {
+	codes := factor.QuestionCodes
+	if len(factor.Contributions) > 0 {
+		codes = make([]string, 0, len(factor.Contributions))
+		for _, contrib := range factor.Contributions {
+			codes = append(codes, contrib.Code)
+		}
+	}
+	matchValues := make([]float64, 0, len(codes))
+	for _, qCode := range codes {
 		answer, found := answerMap[qCode]
 		if !found {
 			continue
