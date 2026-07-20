@@ -5,7 +5,9 @@ import (
 	"fmt"
 
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/capability"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	domainfactor "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -158,3 +160,25 @@ func requireBehavioralPublishAlgorithm(algorithm domain.Algorithm) error {
 		return fmt.Errorf("behavioral_rating algorithm %q 不受支持；请使用 brief2 或 spm_sensory", algorithm)
 	}
 }
+
+// ValidateStrategyCapability checks Measure Scoring strategies and executable
+// Scoring requirements against the Calculation capability catalog (MC-R014).
+func ValidateStrategyCapability(model *domain.AssessmentModel, path capability.Path) []domain.DomainValidationIssue {
+	if model == nil || model.DefinitionV2 == nil || path == "" {
+		return nil
+	}
+	measure := model.DefinitionV2.Measure
+	hierarchy := domainfactor.ValidateScoringStrategyCapability(path, measure.Scoring)
+	hierarchy = append(hierarchy, domainfactor.ValidateExecutableScoringCapability(path, measure.Factors, measure.Scoring)...)
+	if len(hierarchy) == 0 {
+		return nil
+	}
+	out := make([]domain.DomainValidationIssue, 0, len(hierarchy))
+	for _, issue := range hierarchy {
+		out = append(out, domain.DomainValidationIssue{
+			Field: issue.Field, Code: issue.Code, Message: issue.Message, Level: domain.ValidationLevelError,
+		})
+	}
+	return out
+}
+

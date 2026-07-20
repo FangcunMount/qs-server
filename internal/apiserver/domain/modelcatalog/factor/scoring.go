@@ -1,6 +1,9 @@
 package factor
 
-// ScoringStrategy 命名如何 question 分数 aggregate 为 因子 原始分。
+// ScoringStrategy names how source scores aggregate into a factor raw score.
+// The declared set must match capability.DeclaredAuthoringStrategyCodes()
+// (OpenAPI enums / ops options / publish catalog). Path-specific subsets are
+// enforced by ValidateScoringStrategyCapability — presence here is not global support.
 type ScoringStrategy string
 
 const (
@@ -8,9 +11,10 @@ const (
 	ScoringStrategyAvg         ScoringStrategy = "avg"
 	ScoringStrategyWeightedSum ScoringStrategy = "weighted_sum"
 	ScoringStrategyWeightedAvg ScoringStrategy = "weighted_avg"
-	ScoringStrategyMax         ScoringStrategy = "max"
-	ScoringStrategyMin         ScoringStrategy = "min"
 	ScoringStrategyCnt         ScoringStrategy = "cnt"
+	ScoringStrategyNone        ScoringStrategy = "none"
+	ScoringStrategyLookup      ScoringStrategy = "lookup"
+	ScoringStrategyCustom      ScoringStrategy = "custom"
 )
 
 func (s ScoringStrategy) String() string { return string(s) }

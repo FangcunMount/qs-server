@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/capability"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
@@ -30,6 +31,7 @@ func (h BehavioralRatingDefinitionHandler) ValidateForPublish(ctx context.Contex
 		LegacyDefinitionMessage:   "行为评定模型定义不能为空",
 		IncludeBehavioralSemantic: true,
 		IncludeAlgorithmBinding:   true,
+		StrategyCapabilityPath:    capability.PathBehavioralRatingDescriptor,
 	})
 }
 

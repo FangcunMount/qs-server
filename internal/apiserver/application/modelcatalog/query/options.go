@@ -2,6 +2,7 @@ package query
 
 import (
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/capability"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -32,6 +33,7 @@ func catalogOptionsForKind(kind string) modelcatalog.OptionsResult {
 		AlgorithmFamilies: modelcatalog.AlgorithmFamilyOptions(),
 		Algorithms:        algorithmOptions(kind),
 		SubKinds:          subKindOptions(kind),
+		ScoringStrategies: scoringStrategyOptions(kind),
 		Categories:        []modelcatalog.Option{},
 	}
 	if kind == modelcatalog.KindScale {
@@ -42,6 +44,38 @@ func catalogOptionsForKind(kind string) modelcatalog.OptionsResult {
 		result.Tags = []modelcatalog.Option{}
 	}
 	return result
+}
+
+func scoringStrategyOptions(kind string) []modelcatalog.Option {
+	if kind == "" {
+		// Union across all paths when kind is omitted.
+		seen := make(map[string]struct{})
+		out := make([]modelcatalog.Option, 0)
+		for _, path := range capability.AllPaths() {
+			for _, code := range capability.AuthoringStrategyCodes(path) {
+				if _, ok := seen[code]; ok {
+					continue
+				}
+				seen[code] = struct{}{}
+				out = append(out, modelcatalog.Option{Label: code, Value: code})
+			}
+		}
+		return out
+	}
+	domainKind, ok := modelcatalog.APIKindToDomainKind(kind)
+	if !ok {
+		return []modelcatalog.Option{}
+	}
+	path, ok := capability.PathForKind(string(domainKind))
+	if !ok {
+		return []modelcatalog.Option{}
+	}
+	codes := capability.AuthoringStrategyCodes(path)
+	out := make([]modelcatalog.Option, 0, len(codes))
+	for _, code := range codes {
+		out = append(out, modelcatalog.Option{Label: code, Value: code})
+	}
+	return out
 }
 
 func algorithmOptions(kind string) []modelcatalog.Option {

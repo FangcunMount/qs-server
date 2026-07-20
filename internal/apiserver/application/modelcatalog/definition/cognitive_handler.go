@@ -4,6 +4,7 @@ import (
 	"context"
 
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/capability"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
@@ -22,11 +23,12 @@ func (CognitiveDefinitionHandler) Supports(identity domain.Identity) bool {
 // ValidateForPublish 验证发布
 func (h CognitiveDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	return ComposePublishValidation(ctx, model, PublicationComposerOptions{
-		NormRepo:                  h.NormRepo,
-		QuestionnaireQuery:        h.QuestionnaireQuery,
-		RequireLegacyDefinition:   true,
-		LegacyDefinitionMessage:   "认知模型定义不能为空",
-		IncludeAlgorithmBinding:   true,
+		NormRepo:                h.NormRepo,
+		QuestionnaireQuery:      h.QuestionnaireQuery,
+		RequireLegacyDefinition: true,
+		LegacyDefinitionMessage: "认知模型定义不能为空",
+		IncludeAlgorithmBinding: true,
+		StrategyCapabilityPath:  capability.PathCognitiveDescriptor,
 	})
 }
 

@@ -2735,6 +2735,9 @@ const docTemplate = `{
                 "code": {
                     "type": "string"
                 },
+                "decision_kind": {
+                    "type": "string"
+                },
                 "kind": {
                     "description": "测评层 Kind；类型学规范值为 typology，读兼容历史 personality。",
                     "type": "string",
@@ -2743,6 +2746,9 @@ const docTemplate = `{
                         "personality"
                     ],
                     "example": "typology"
+                },
+                "payload_format": {
+                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string"
@@ -3206,6 +3212,9 @@ const docTemplate = `{
                 "code": {
                     "type": "string"
                 },
+                "decision_kind": {
+                    "type": "string"
+                },
                 "kind": {
                     "description": "测评层 Kind；类型学规范值为 typology，读兼容历史 personality。",
                     "type": "string",
@@ -3214,6 +3223,9 @@ const docTemplate = `{
                         "personality"
                     ],
                     "example": "typology"
+                },
+                "payload_format": {
+                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string"
@@ -3386,6 +3398,9 @@ const docTemplate = `{
                 "algorithm": {
                     "type": "string"
                 },
+                "algorithm_family": {
+                    "type": "string"
+                },
                 "applicable_ages": {
                     "type": "array",
                     "items": {
@@ -3396,6 +3411,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "code": {
+                    "type": "string"
+                },
+                "decision_kind": {
                     "type": "string"
                 },
                 "definition": {
@@ -3411,6 +3429,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "kind": {
+                    "type": "string"
+                },
+                "payload_format": {
                     "type": "string"
                 },
                 "product_channel": {
@@ -3506,6 +3527,9 @@ const docTemplate = `{
                 "algorithm": {
                     "type": "string"
                 },
+                "algorithm_family": {
+                    "type": "string"
+                },
                 "applicable_ages": {
                     "type": "array",
                     "items": {
@@ -3518,6 +3542,9 @@ const docTemplate = `{
                 "code": {
                     "type": "string"
                 },
+                "decision_kind": {
+                    "type": "string"
+                },
                 "definition": {
                     "type": "array",
                     "items": {
@@ -3528,6 +3555,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
+                    "type": "string"
+                },
+                "payload_format": {
                     "type": "string"
                 },
                 "product_channel": {
@@ -4169,6 +4199,9 @@ const docTemplate = `{
                 "code": {
                     "type": "string"
                 },
+                "decision_kind": {
+                    "type": "string"
+                },
                 "kind": {
                     "description": "测评层 Kind；类型学规范值为 typology，读兼容历史 personality。",
                     "type": "string",
@@ -4177,6 +4210,9 @@ const docTemplate = `{
                         "personality"
                     ],
                     "example": "typology"
+                },
+                "payload_format": {
+                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string"

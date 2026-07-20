@@ -9918,18 +9918,20 @@ const docTemplate = `{
                 "avg",
                 "weighted_sum",
                 "weighted_avg",
-                "max",
-                "min",
-                "cnt"
+                "cnt",
+                "none",
+                "lookup",
+                "custom"
             ],
             "x-enum-varnames": [
                 "ScoringStrategySum",
                 "ScoringStrategyAvg",
                 "ScoringStrategyWeightedSum",
                 "ScoringStrategyWeightedAvg",
-                "ScoringStrategyMax",
-                "ScoringStrategyMin",
-                "ScoringStrategyCnt"
+                "ScoringStrategyCnt",
+                "ScoringStrategyNone",
+                "ScoringStrategyLookup",
+                "ScoringStrategyCustom"
             ]
         },
         "github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormBand": {
@@ -10135,6 +10137,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "decision_kind": {
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
                 },
@@ -10144,6 +10149,9 @@ const docTemplate = `{
                 "kind": {
                     "type": "string",
                     "example": "typology"
+                },
+                "payload_format": {
+                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string",
@@ -10221,12 +10229,18 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "decision_kind": {
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
                 },
                 "kind": {
                     "type": "string",
                     "example": "typology"
+                },
+                "payload_format": {
+                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string",
@@ -10332,6 +10346,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "decision_kind": {
+                    "type": "string"
+                },
                 "definition": {
                     "$ref": "#/definitions/modelcatalog.Definition"
                 },
@@ -10341,6 +10358,9 @@ const docTemplate = `{
                 "kind": {
                     "type": "string",
                     "example": "typology"
+                },
+                "payload_format": {
+                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string",
@@ -11685,6 +11705,12 @@ const docTemplate = `{
                         "$ref": "#/definitions/modelcatalog.Option"
                     }
                 },
+                "scoring_strategies": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/modelcatalog.Option"
+                    }
+                },
                 "stages": {
                     "type": "array",
                     "items": {
@@ -11746,12 +11772,18 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "decision_kind": {
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
                 },
                 "kind": {
                     "type": "string",
                     "example": "typology"
+                },
+                "payload_format": {
+                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string",
@@ -12426,6 +12458,9 @@ const docTemplate = `{
                 "Level": {
                     "type": "string"
                 },
+                "MaxInclusive": {
+                    "type": "boolean"
+                },
                 "MaxScore": {
                     "type": "number"
                 },
@@ -12440,6 +12475,9 @@ const docTemplate = `{
                 },
                 "Title": {
                     "type": "string"
+                },
+                "UnboundedMax": {
+                    "type": "boolean"
                 }
             }
         },
@@ -12523,9 +12561,10 @@ const docTemplate = `{
                         "avg",
                         "weighted_sum",
                         "weighted_avg",
-                        "max",
-                        "min",
-                        "cnt"
+                        "cnt",
+                        "none",
+                        "lookup",
+                        "custom"
                     ]
                 },
                 "Weights": {
@@ -13572,6 +13611,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "decision_kind": {
+                    "type": "string"
+                },
                 "definition": {
                     "$ref": "#/definitions/modelcatalog.Definition"
                 },
@@ -13581,6 +13623,9 @@ const docTemplate = `{
                 "kind": {
                     "type": "string",
                     "example": "typology"
+                },
+                "payload_format": {
+                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string",

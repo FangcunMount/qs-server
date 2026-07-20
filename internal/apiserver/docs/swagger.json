@@ -9915,18 +9915,20 @@
                 "avg",
                 "weighted_sum",
                 "weighted_avg",
-                "max",
-                "min",
-                "cnt"
+                "cnt",
+                "none",
+                "lookup",
+                "custom"
             ],
             "x-enum-varnames": [
                 "ScoringStrategySum",
                 "ScoringStrategyAvg",
                 "ScoringStrategyWeightedSum",
                 "ScoringStrategyWeightedAvg",
-                "ScoringStrategyMax",
-                "ScoringStrategyMin",
-                "ScoringStrategyCnt"
+                "ScoringStrategyCnt",
+                "ScoringStrategyNone",
+                "ScoringStrategyLookup",
+                "ScoringStrategyCustom"
             ]
         },
         "github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormBand": {
@@ -10132,6 +10134,9 @@
                 "created_at": {
                     "type": "string"
                 },
+                "decision_kind": {
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
                 },
@@ -10141,6 +10146,9 @@
                 "kind": {
                     "type": "string",
                     "example": "typology"
+                },
+                "payload_format": {
+                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string",
@@ -10218,12 +10226,18 @@
                 "created_at": {
                     "type": "string"
                 },
+                "decision_kind": {
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
                 },
                 "kind": {
                     "type": "string",
                     "example": "typology"
+                },
+                "payload_format": {
+                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string",
@@ -10329,6 +10343,9 @@
                 "created_at": {
                     "type": "string"
                 },
+                "decision_kind": {
+                    "type": "string"
+                },
                 "definition": {
                     "$ref": "#/definitions/modelcatalog.Definition"
                 },
@@ -10338,6 +10355,9 @@
                 "kind": {
                     "type": "string",
                     "example": "typology"
+                },
+                "payload_format": {
+                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string",
@@ -11682,6 +11702,12 @@
                         "$ref": "#/definitions/modelcatalog.Option"
                     }
                 },
+                "scoring_strategies": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/modelcatalog.Option"
+                    }
+                },
                 "stages": {
                     "type": "array",
                     "items": {
@@ -11743,12 +11769,18 @@
                 "created_at": {
                     "type": "string"
                 },
+                "decision_kind": {
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
                 },
                 "kind": {
                     "type": "string",
                     "example": "typology"
+                },
+                "payload_format": {
+                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string",
@@ -12423,6 +12455,9 @@
                 "Level": {
                     "type": "string"
                 },
+                "MaxInclusive": {
+                    "type": "boolean"
+                },
                 "MaxScore": {
                     "type": "number"
                 },
@@ -12437,6 +12472,9 @@
                 },
                 "Title": {
                     "type": "string"
+                },
+                "UnboundedMax": {
+                    "type": "boolean"
                 }
             }
         },
@@ -12520,9 +12558,10 @@
                         "avg",
                         "weighted_sum",
                         "weighted_avg",
-                        "max",
-                        "min",
-                        "cnt"
+                        "cnt",
+                        "none",
+                        "lookup",
+                        "custom"
                     ]
                 },
                 "Weights": {
@@ -13569,6 +13608,9 @@
                 "created_at": {
                     "type": "string"
                 },
+                "decision_kind": {
+                    "type": "string"
+                },
                 "definition": {
                     "$ref": "#/definitions/modelcatalog.Definition"
                 },
@@ -13578,6 +13620,9 @@
                 "kind": {
                     "type": "string",
                     "example": "typology"
+                },
+                "payload_format": {
+                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string",

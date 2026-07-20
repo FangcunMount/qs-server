@@ -401,18 +401,20 @@ definitions:
     - avg
     - weighted_sum
     - weighted_avg
-    - max
-    - min
     - cnt
+    - none
+    - lookup
+    - custom
     type: string
     x-enum-varnames:
     - ScoringStrategySum
     - ScoringStrategyAvg
     - ScoringStrategyWeightedSum
     - ScoringStrategyWeightedAvg
-    - ScoringStrategyMax
-    - ScoringStrategyMin
     - ScoringStrategyCnt
+    - ScoringStrategyNone
+    - ScoringStrategyLookup
+    - ScoringStrategyCustom
   github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormBand:
     properties:
       gender:
@@ -546,12 +548,16 @@ definitions:
         type: string
       created_at:
         type: string
+      decision_kind:
+        type: string
       description:
         type: string
       heat_score:
         type: integer
       kind:
         example: typology
+        type: string
+      payload_format:
         type: string
       product_channel:
         example: typology
@@ -604,10 +610,14 @@ definitions:
         type: string
       created_at:
         type: string
+      decision_kind:
+        type: string
       description:
         type: string
       kind:
         example: typology
+        type: string
+      payload_format:
         type: string
       product_channel:
         example: typology
@@ -678,12 +688,16 @@ definitions:
         type: string
       created_at:
         type: string
+      decision_kind:
+        type: string
       definition:
         $ref: '#/definitions/modelcatalog.Definition'
       description:
         type: string
       kind:
         example: typology
+        type: string
+      payload_format:
         type: string
       product_channel:
         example: typology
@@ -1583,6 +1597,10 @@ definitions:
         items:
           $ref: '#/definitions/modelcatalog.Option'
         type: array
+      scoring_strategies:
+        items:
+          $ref: '#/definitions/modelcatalog.Option'
+        type: array
       stages:
         items:
           $ref: '#/definitions/modelcatalog.Option'
@@ -1623,10 +1641,14 @@ definitions:
         type: string
       created_at:
         type: string
+      decision_kind:
+        type: string
       description:
         type: string
       kind:
         example: typology
+        type: string
+      payload_format:
         type: string
       product_channel:
         example: typology
@@ -2084,6 +2106,8 @@ definitions:
         type: string
       Level:
         type: string
+      MaxInclusive:
+        type: boolean
       MaxScore:
         type: number
       MinScore:
@@ -2094,6 +2118,8 @@ definitions:
         type: string
       Title:
         type: string
+      UnboundedMax:
+        type: boolean
     type: object
   response.DefinitionScoringParamsWire:
     properties:
@@ -2150,9 +2176,10 @@ definitions:
         - avg
         - weighted_sum
         - weighted_avg
-        - max
-        - min
         - cnt
+        - none
+        - lookup
+        - custom
         type: string
       Weights:
         additionalProperties:
@@ -2859,12 +2886,16 @@ definitions:
         type: string
       created_at:
         type: string
+      decision_kind:
+        type: string
       definition:
         $ref: '#/definitions/modelcatalog.Definition'
       description:
         type: string
       kind:
         example: typology
+        type: string
+      payload_format:
         type: string
       product_channel:
         example: typology

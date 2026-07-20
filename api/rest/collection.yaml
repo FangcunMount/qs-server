@@ -2418,6 +2418,8 @@ components:
           type: string
         code:
           type: string
+        decision_kind:
+          type: string
         kind:
           description: 测评层 Kind；类型学规范值为 typology，读兼容历史 personality。
           type: string
@@ -2425,6 +2427,8 @@ components:
           - typology
           - personality
           example: typology
+        payload_format:
+          type: string
         product_channel:
           type: string
         sub_kind:
@@ -2733,6 +2737,8 @@ components:
           type: string
         code:
           type: string
+        decision_kind:
+          type: string
         kind:
           description: 测评层 Kind；类型学规范值为 typology，读兼容历史 personality。
           type: string
@@ -2740,6 +2746,8 @@ components:
           - typology
           - personality
           example: typology
+        payload_format:
+          type: string
         product_channel:
           type: string
         sub_kind:
@@ -2853,6 +2861,8 @@ components:
       properties:
         algorithm:
           type: string
+        algorithm_family:
+          type: string
         applicable_ages:
           type: array
           items:
@@ -2860,6 +2870,8 @@ components:
         category:
           type: string
         code:
+          type: string
+        decision_kind:
           type: string
         definition:
           type: array
@@ -2870,6 +2882,8 @@ components:
         heat_score:
           type: integer
         kind:
+          type: string
+        payload_format:
           type: string
         product_channel:
           type: string
@@ -2932,6 +2946,8 @@ components:
       properties:
         algorithm:
           type: string
+        algorithm_family:
+          type: string
         applicable_ages:
           type: array
           items:
@@ -2940,6 +2956,8 @@ components:
           type: string
         code:
           type: string
+        decision_kind:
+          type: string
         definition:
           type: array
           items:
@@ -2947,6 +2965,8 @@ components:
         description:
           type: string
         kind:
+          type: string
+        payload_format:
           type: string
         product_channel:
           type: string
@@ -3375,6 +3395,8 @@ components:
           type: string
         code:
           type: string
+        decision_kind:
+          type: string
         kind:
           description: 测评层 Kind；类型学规范值为 typology，读兼容历史 personality。
           type: string
@@ -3382,6 +3404,8 @@ components:
           - typology
           - personality
           example: typology
+        payload_format:
+          type: string
         product_channel:
           type: string
         sub_kind:

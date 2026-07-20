@@ -2732,6 +2732,9 @@
                 "code": {
                     "type": "string"
                 },
+                "decision_kind": {
+                    "type": "string"
+                },
                 "kind": {
                     "description": "测评层 Kind；类型学规范值为 typology，读兼容历史 personality。",
                     "type": "string",
@@ -2740,6 +2743,9 @@
                         "personality"
                     ],
                     "example": "typology"
+                },
+                "payload_format": {
+                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string"
@@ -3203,6 +3209,9 @@
                 "code": {
                     "type": "string"
                 },
+                "decision_kind": {
+                    "type": "string"
+                },
                 "kind": {
                     "description": "测评层 Kind；类型学规范值为 typology，读兼容历史 personality。",
                     "type": "string",
@@ -3211,6 +3220,9 @@
                         "personality"
                     ],
                     "example": "typology"
+                },
+                "payload_format": {
+                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string"
@@ -3383,6 +3395,9 @@
                 "algorithm": {
                     "type": "string"
                 },
+                "algorithm_family": {
+                    "type": "string"
+                },
                 "applicable_ages": {
                     "type": "array",
                     "items": {
@@ -3393,6 +3408,9 @@
                     "type": "string"
                 },
                 "code": {
+                    "type": "string"
+                },
+                "decision_kind": {
                     "type": "string"
                 },
                 "definition": {
@@ -3408,6 +3426,9 @@
                     "type": "integer"
                 },
                 "kind": {
+                    "type": "string"
+                },
+                "payload_format": {
                     "type": "string"
                 },
                 "product_channel": {
@@ -3503,6 +3524,9 @@
                 "algorithm": {
                     "type": "string"
                 },
+                "algorithm_family": {
+                    "type": "string"
+                },
                 "applicable_ages": {
                     "type": "array",
                     "items": {
@@ -3515,6 +3539,9 @@
                 "code": {
                     "type": "string"
                 },
+                "decision_kind": {
+                    "type": "string"
+                },
                 "definition": {
                     "type": "array",
                     "items": {
@@ -3525,6 +3552,9 @@
                     "type": "string"
                 },
                 "kind": {
+                    "type": "string"
+                },
+                "payload_format": {
                     "type": "string"
                 },
                 "product_channel": {
@@ -4166,6 +4196,9 @@
                 "code": {
                     "type": "string"
                 },
+                "decision_kind": {
+                    "type": "string"
+                },
                 "kind": {
                     "description": "测评层 Kind；类型学规范值为 typology，读兼容历史 personality。",
                     "type": "string",
@@ -4174,6 +4207,9 @@
                         "personality"
                     ],
                     "example": "typology"
+                },
+                "payload_format": {
+                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string"

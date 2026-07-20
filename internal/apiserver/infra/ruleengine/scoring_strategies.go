@@ -15,14 +15,24 @@ type scoringStrategy interface {
 
 type scoringStrategies map[calculation.StrategyType]scoringStrategy
 
-func newDefaultScoringStrategies() scoringStrategies {
+func newQuestionAggregationStrategies() scoringStrategies {
+	// Public ScaleFactorScorer registry matches capability question_aggregation:
+	// sum / avg(average) / cnt(count). Extra StrategyType helpers stay constructible
+	// for unit tests but are not registered on the public path.
 	strategies := scoringStrategies{}
 	strategies.Register(&sumStrategy{})
 	strategies.Register(&averageStrategy{})
+	strategies.Register(&countStrategy{})
+	return strategies
+}
+
+// newLegacyScoringStrategies keeps historical strategy implementations available
+// for characterization tests. Prefer newQuestionAggregationStrategies for runtime.
+func newLegacyScoringStrategies() scoringStrategies {
+	strategies := newQuestionAggregationStrategies()
 	strategies.Register(&weightedSumStrategy{})
 	strategies.Register(&maxStrategy{})
 	strategies.Register(&minStrategy{})
-	strategies.Register(&countStrategy{})
 	strategies.Register(&firstStrategy{})
 	strategies.Register(&lastStrategy{})
 	return strategies

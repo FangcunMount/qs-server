@@ -4,11 +4,16 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/capability"
 	"github.com/FangcunMount/qs-server/internal/pkg/answervalue"
 )
 
 func collectFactorValues(factor Factor, sheet *AnswerSheet, qnr *Questionnaire) ([]float64, error) {
-	switch Strategy(factor.ScoringStrategy) {
+	code, ok := capability.Canonical(capability.PathScaleDescriptor, capability.UsageQuestionAggregation, factor.ScoringStrategy)
+	if !ok {
+		return nil, fmt.Errorf("unsupported factor scoring strategy for %s: %s", factor.Code, factor.ScoringStrategy)
+	}
+	switch Strategy(code) {
 	case StrategySum, StrategyAvg:
 		return collectQuestionScores(factor, sheet), nil
 	case StrategyCnt:
@@ -22,6 +27,7 @@ func collectFactorValues(factor Factor, sheet *AnswerSheet, qnr *Questionnaire) 
 }
 
 func collectQuestionScores(factor Factor, sheet *AnswerSheet) []float64 {
+	// MissingAnswerPolicyFor(scale, question_aggregation) == skip.
 	answerMap := factorScoreAnswerMap(sheet)
 	scores := make([]float64, 0, len(factor.QuestionCodes))
 	for _, qCode := range factor.QuestionCodes {

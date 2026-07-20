@@ -41,7 +41,7 @@ func TestAnswerScorerMapsScoreResultsToPortDTO(t *testing.T) {
 func TestScoringStrategiesCalculateCurrentBehavior(t *testing.T) {
 	t.Parallel()
 
-	strategies := newDefaultScoringStrategies()
+	strategies := newLegacyScoringStrategies()
 	cases := []struct {
 		name     string
 		strategy calculation.StrategyType
@@ -83,7 +83,7 @@ func TestScoringStrategiesCalculateCurrentBehavior(t *testing.T) {
 func TestWeightedSumRejectsInvalidWeights(t *testing.T) {
 	t.Parallel()
 
-	_, err := newDefaultScoringStrategies().Get(calculation.StrategyTypeWeightedSum).Calculate(
+	_, err := newLegacyScoringStrategies().Get(calculation.StrategyTypeWeightedSum).Calculate(
 		[]float64{1, 2},
 		map[string]string{calculation.ParamKeyWeights: "[1]"},
 	)
@@ -127,7 +127,9 @@ func TestScaleFactorScorerScoresConfiguredStrategies(t *testing.T) {
 	}{
 		{name: "sum", strategy: "sum", values: []float64{1, 2, 3}, want: 6},
 		{name: "avg", strategy: "avg", values: []float64{2, 4}, want: 3},
+		{name: "average alias", strategy: "average", values: []float64{2, 4}, want: 3},
 		{name: "cnt", strategy: "cnt", values: []float64{1, 1, 1}, want: 3},
+		{name: "count alias", strategy: "count", values: []float64{1, 1, 1}, want: 3},
 	}
 
 	for _, tc := range cases {
@@ -148,6 +150,15 @@ func TestScaleFactorScorerRejectsUnknownStrategy(t *testing.T) {
 
 	if _, err := NewScaleFactorScorer().ScoreFactor(context.Background(), "factor", []float64{1}, "unknown", nil); err == nil {
 		t.Fatal("ScoreFactor() error = nil, want unknown strategy error")
+	}
+}
+
+func TestScaleFactorScorerRejectsStrategiesOutsideQuestionAggregationCatalog(t *testing.T) {
+	t.Parallel()
+	for _, strategy := range []string{"max", "min", "weighted_sum", "first", "last"} {
+		if _, err := NewScaleFactorScorer().ScoreFactor(context.Background(), "factor", []float64{1, 2}, strategy, nil); err == nil {
+			t.Fatalf("ScoreFactor(%s) error = nil, want catalog rejection", strategy)
+		}
 	}
 }
 

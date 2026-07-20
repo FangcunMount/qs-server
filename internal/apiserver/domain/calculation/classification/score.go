@@ -77,6 +77,7 @@ func indexAnswers(sheet *AnswerSheet) map[string]Answer {
 }
 
 func scoreLeaf(spec LeafScoringSpec, answers map[string]Answer) (float64, error) {
+	// MissingAnswerPolicyFor(typology, typology_leaf) == fail.
 	total := spec.Constant
 	for _, contribution := range spec.Contributions {
 		answer, ok := answers[contribution.QuestionCode]

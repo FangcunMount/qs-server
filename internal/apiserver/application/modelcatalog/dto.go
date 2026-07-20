@@ -197,17 +197,18 @@ type AssessmentRelease struct {
 }
 
 type OptionsResult struct {
-	Kinds             []Option `json:"kinds"`
-	ModelFamilies     []Option `json:"model_families,omitempty"`
-	ProductChannels   []Option `json:"product_channels,omitempty"`
-	AlgorithmFamilies []Option `json:"algorithm_families,omitempty"`
-	Categories        []Option `json:"categories"`
-	Algorithms        []Option `json:"algorithms"`
-	SubKinds          []Option `json:"sub_kinds"`
-	Tags              []Option `json:"tags,omitempty"`
-	Stages            []Option `json:"stages,omitempty"`
-	ApplicableAges    []Option `json:"applicable_ages,omitempty"`
-	Reporters         []Option `json:"reporters,omitempty"`
+	Kinds              []Option `json:"kinds"`
+	ModelFamilies      []Option `json:"model_families,omitempty"`
+	ProductChannels    []Option `json:"product_channels,omitempty"`
+	AlgorithmFamilies  []Option `json:"algorithm_families,omitempty"`
+	Categories         []Option `json:"categories"`
+	Algorithms         []Option `json:"algorithms"`
+	SubKinds           []Option `json:"sub_kinds"`
+	ScoringStrategies  []Option `json:"scoring_strategies,omitempty"`
+	Tags               []Option `json:"tags,omitempty"`
+	Stages             []Option `json:"stages,omitempty"`
+	ApplicableAges     []Option `json:"applicable_ages,omitempty"`
+	Reporters          []Option `json:"reporters,omitempty"`
 }
 
 type ValidationIssue struct {

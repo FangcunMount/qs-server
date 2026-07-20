@@ -1,5 +1,7 @@
 package scoring
 
+import "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/capability"
+
 type RiskLevel string
 
 const (
@@ -27,5 +29,5 @@ func (s Strategy) String() string {
 }
 
 func (s Strategy) IsValid() bool {
-	return s == StrategySum || s == StrategyAvg || s == StrategyCnt
+	return capability.Supports(capability.PathScaleDescriptor, capability.UsageQuestionAggregation, string(s))
 }

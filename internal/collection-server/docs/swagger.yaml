@@ -188,12 +188,16 @@ definitions:
         type: string
       code:
         type: string
+      decision_kind:
+        type: string
       kind:
         description: 测评层 Kind；类型学规范值为 typology，读兼容历史 personality。
         enum:
         - typology
         - personality
         example: typology
+        type: string
+      payload_format:
         type: string
       product_channel:
         type: string
@@ -503,12 +507,16 @@ definitions:
         type: string
       code:
         type: string
+      decision_kind:
+        type: string
       kind:
         description: 测评层 Kind；类型学规范值为 typology，读兼容历史 personality。
         enum:
         - typology
         - personality
         example: typology
+        type: string
+      payload_format:
         type: string
       product_channel:
         type: string
@@ -623,6 +631,8 @@ definitions:
     properties:
       algorithm:
         type: string
+      algorithm_family:
+        type: string
       applicable_ages:
         items:
           type: string
@@ -630,6 +640,8 @@ definitions:
       category:
         type: string
       code:
+        type: string
+      decision_kind:
         type: string
       definition:
         items:
@@ -640,6 +652,8 @@ definitions:
       heat_score:
         type: integer
       kind:
+        type: string
+      payload_format:
         type: string
       product_channel:
         type: string
@@ -702,6 +716,8 @@ definitions:
     properties:
       algorithm:
         type: string
+      algorithm_family:
+        type: string
       applicable_ages:
         items:
           type: string
@@ -710,6 +726,8 @@ definitions:
         type: string
       code:
         type: string
+      decision_kind:
+        type: string
       definition:
         items:
           type: integer
@@ -717,6 +735,8 @@ definitions:
       description:
         type: string
       kind:
+        type: string
+      payload_format:
         type: string
       product_channel:
         type: string
@@ -1145,12 +1165,16 @@ definitions:
         type: string
       code:
         type: string
+      decision_kind:
+        type: string
       kind:
         description: 测评层 Kind；类型学规范值为 typology，读兼容历史 personality。
         enum:
         - typology
         - personality
         example: typology
+        type: string
+      payload_format:
         type: string
       product_channel:
         type: string

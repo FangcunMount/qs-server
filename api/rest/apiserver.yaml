@@ -10112,17 +10112,19 @@ components:
       - avg
       - weighted_sum
       - weighted_avg
-      - max
-      - min
       - cnt
+      - none
+      - lookup
+      - custom
       x-enum-varnames:
       - ScoringStrategySum
       - ScoringStrategyAvg
       - ScoringStrategyWeightedSum
       - ScoringStrategyWeightedAvg
-      - ScoringStrategyMax
-      - ScoringStrategyMin
       - ScoringStrategyCnt
+      - ScoringStrategyNone
+      - ScoringStrategyLookup
+      - ScoringStrategyCustom
     github_com_FangcunMount_qs-server_internal_apiserver_application_modelcatalog.NormBand:
       type: object
       properties:
@@ -10257,6 +10259,8 @@ components:
           type: string
         created_at:
           type: string
+        decision_kind:
+          type: string
         description:
           type: string
         heat_score:
@@ -10264,6 +10268,8 @@ components:
         kind:
           type: string
           example: typology
+        payload_format:
+          type: string
         product_channel:
           type: string
           example: typology
@@ -10315,11 +10321,15 @@ components:
           type: string
         created_at:
           type: string
+        decision_kind:
+          type: string
         description:
           type: string
         kind:
           type: string
           example: typology
+        payload_format:
+          type: string
         product_channel:
           type: string
           example: typology
@@ -10389,6 +10399,8 @@ components:
           type: string
         created_at:
           type: string
+        decision_kind:
+          type: string
         definition:
           $ref: '#/components/schemas/modelcatalog.Definition'
         description:
@@ -10396,6 +10408,8 @@ components:
         kind:
           type: string
           example: typology
+        payload_format:
+          type: string
         product_channel:
           type: string
           example: typology
@@ -11294,6 +11308,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/modelcatalog.Option'
+        scoring_strategies:
+          type: array
+          items:
+            $ref: '#/components/schemas/modelcatalog.Option'
         stages:
           type: array
           items:
@@ -11334,11 +11352,15 @@ components:
           type: string
         created_at:
           type: string
+        decision_kind:
+          type: string
         description:
           type: string
         kind:
           type: string
           example: typology
+        payload_format:
+          type: string
         product_channel:
           type: string
           example: typology
@@ -11795,6 +11817,8 @@ components:
           type: string
         Level:
           type: string
+        MaxInclusive:
+          type: boolean
         MaxScore:
           type: number
         MinScore:
@@ -11805,6 +11829,8 @@ components:
           type: string
         Title:
           type: string
+        UnboundedMax:
+          type: boolean
     response.DefinitionScoringParamsWire:
       type: object
       properties:
@@ -11862,9 +11888,10 @@ components:
           - avg
           - weighted_sum
           - weighted_avg
-          - max
-          - min
           - cnt
+          - none
+          - lookup
+          - custom
         Weights:
           type: object
           additionalProperties:
@@ -12570,6 +12597,8 @@ components:
           type: string
         created_at:
           type: string
+        decision_kind:
+          type: string
         definition:
           $ref: '#/components/schemas/modelcatalog.Definition'
         description:
@@ -12577,6 +12606,8 @@ components:
         kind:
           type: string
           example: typology
+        payload_format:
+          type: string
         product_channel:
           type: string
           example: typology

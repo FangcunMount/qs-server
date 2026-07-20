@@ -26,3 +26,29 @@ func TestCatalogOptionsFilterAlgorithmsByCanonicalKind(t *testing.T) {
 		t.Fatalf("behavioral_rating algorithms = %#v", behavioral.Algorithms)
 	}
 }
+
+func TestCatalogOptionsExposeScoringStrategiesFromCapability(t *testing.T) {
+	t.Parallel()
+	scale := catalogOptionsForKind(modelcatalog.KindScale)
+	if len(scale.ScoringStrategies) == 0 {
+		t.Fatal("scale scoring_strategies empty")
+	}
+	for _, item := range scale.ScoringStrategies {
+		if item.Value == "weighted_avg" || item.Value == "max" {
+			t.Fatalf("scale scoring_strategies should not include %q: %#v", item.Value, scale.ScoringStrategies)
+		}
+	}
+	typology := catalogOptionsForKind(modelcatalog.KindTypology)
+	found := false
+	for _, item := range typology.ScoringStrategies {
+		if item.Value == "weighted_avg" {
+			found = true
+		}
+		if item.Value == "cnt" {
+			t.Fatalf("typology scoring_strategies should not include cnt: %#v", typology.ScoringStrategies)
+		}
+	}
+	if !found {
+		t.Fatalf("typology scoring_strategies missing weighted_avg: %#v", typology.ScoringStrategies)
+	}
+}

@@ -116,6 +116,22 @@ func TestBehavioralValidateForPublishAcceptsBrief2(t *testing.T) {
 	}
 }
 
+func TestBehavioralValidateForPublishRejectsUnsupportedStrategy(t *testing.T) {
+	t.Parallel()
+
+	handler := behavioralPublishHandler(&norm.Norm{
+		TableVersion: "brief2-cn-2024",
+		FormVariant:  "teacher",
+		Factors:      []norm.FactorTable{{FactorCode: "bri", Lookup: []norm.LookupEntry{{RawScoreMin: 1, RawScoreMax: 3, TScore: 50, Percentile: 50}}}},
+	})
+	model := validBehavioralDraft()
+	model.DefinitionV2.Measure.Scoring[0].Strategy = factor.ScoringStrategy("max")
+	issues := handler.ValidateForPublish(context.Background(), model)
+	if !hasIssueCode(issues, "strategy.unsupported_for_path") {
+		t.Fatalf("issues = %#v, want strategy.unsupported_for_path", issues)
+	}
+}
+
 func TestBehavioralBuildSnapshotRejectsDefaultAlgorithm(t *testing.T) {
 	t.Parallel()
 

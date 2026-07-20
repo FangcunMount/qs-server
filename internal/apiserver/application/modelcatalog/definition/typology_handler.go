@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/capability"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelpreview"
@@ -27,6 +28,7 @@ func (TypologyDefinitionHandler) Supports(identity domain.Identity) bool {
 func (h TypologyDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	return ComposePublishValidation(ctx, model, PublicationComposerOptions{
 		QuestionnaireQuery:          h.QuestionnaireQuery,
+		StrategyCapabilityPath:      capability.PathTypologyDescriptor,
 		SkipQuestionnaireOnDefError: true,
 		OmitSharedTail:              true,
 		AfterDefinition:             h.validateTypologyRuntime,

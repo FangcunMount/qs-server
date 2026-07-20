@@ -55,6 +55,34 @@ func TestScaleValidateForPublishAcceptsRiskDecision(t *testing.T) {
 	}
 }
 
+func TestScaleValidateForPublishRejectsUnsupportedStrategy(t *testing.T) {
+	t.Parallel()
+	model := publishableScaleShell()
+	model.DefinitionV2 = completeScaleDefinition()
+	model.DefinitionV2.Measure.Scoring[0].Strategy = factor.ScoringStrategyWeightedSum
+	handler := ScaleDefinitionHandler{QuestionnaireQuery: publishedQuestionnaireStub("Q", "1",
+		questionnaireapp.QuestionResult{Code: "Q1", Type: "single_choice", Options: []questionnaireapp.OptionResult{{Value: "A"}, {Value: "B"}}},
+	)}
+	issues := handler.ValidateForPublish(context.Background(), model)
+	if !hasIssueCode(issues, "strategy.unsupported_for_path") {
+		t.Fatalf("issues = %#v, want strategy.unsupported_for_path", issues)
+	}
+}
+
+func TestScaleValidateForPublishRejectsMissingExecutableScoring(t *testing.T) {
+	t.Parallel()
+	model := publishableScaleShell()
+	model.DefinitionV2 = completeScaleDefinition()
+	model.DefinitionV2.Measure.Scoring = nil
+	handler := ScaleDefinitionHandler{QuestionnaireQuery: publishedQuestionnaireStub("Q", "1",
+		questionnaireapp.QuestionResult{Code: "Q1", Type: "single_choice", Options: []questionnaireapp.OptionResult{{Value: "A"}, {Value: "B"}}},
+	)}
+	issues := handler.ValidateForPublish(context.Background(), model)
+	if !hasIssueCode(issues, "factor.scoring.executable_required") {
+		t.Fatalf("issues = %#v, want factor.scoring.executable_required", issues)
+	}
+}
+
 func TestScaleValidateForPublishRejectsUnknownQuestionRef(t *testing.T) {
 	t.Parallel()
 	model := publishableScaleShell()

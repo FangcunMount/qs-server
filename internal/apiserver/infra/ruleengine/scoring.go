@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/capability"
 	ruleengineport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 	"github.com/FangcunMount/qs-server/internal/pkg/answervalue"
 )
@@ -91,28 +92,34 @@ func maxOptionScore(optionScores map[string]float64) float64 {
 }
 
 // ScaleFactorScorer executes scale factor scoring through infrastructure strategies.
+// The public surface is capability.PathScaleDescriptor × UsageQuestionAggregation
+// (sum/avg/cnt + aliases) — not the historical full StrategyType registry.
 type ScaleFactorScorer struct {
 	strategies scoringStrategies
 }
 
 // NewScaleFactorScorer creates a factor scoring engine adapter.
 func NewScaleFactorScorer() *ScaleFactorScorer {
-	return &ScaleFactorScorer{strategies: newDefaultScoringStrategies()}
+	return &ScaleFactorScorer{strategies: newQuestionAggregationStrategies()}
 }
 
 // ScoreFactor executes a factor aggregation strategy over prepared numeric values.
 func (s *ScaleFactorScorer) ScoreFactor(_ context.Context, factorCode string, values []float64, strategy string, params map[string]string) (float64, error) {
-	switch strategy {
+	code, ok := capability.Canonical(capability.PathScaleDescriptor, capability.UsageQuestionAggregation, strategy)
+	if !ok {
+		return 0, fmt.Errorf("unknown factor scoring strategy for %s: %s", factorCode, strategy)
+	}
+	switch code {
 	case "sum":
 		return s.calculateWithFallback(calculation.StrategyTypeSum, values, params, sumValues), nil
-	case "avg", "average":
+	case "avg":
 		if len(values) == 0 {
 			return 0, nil
 		}
 		return s.calculateWithFallback(calculation.StrategyTypeAverage, values, params, func(values []float64) float64 {
 			return sumValues(values) / float64(len(values))
 		}), nil
-	case "cnt", "count":
+	case "cnt":
 		return s.calculateWithFallback(calculation.StrategyTypeCount, values, params, func(values []float64) float64 {
 			return float64(len(values))
 		}), nil

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/capability"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -20,7 +21,8 @@ func (ScaleDefinitionHandler) Supports(identity domain.Identity) bool {
 // ValidateForPublish 验证发布
 func (h ScaleDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	return ComposePublishValidation(ctx, model, PublicationComposerOptions{
-		QuestionnaireQuery: h.QuestionnaireQuery,
+		QuestionnaireQuery:     h.QuestionnaireQuery,
+		StrategyCapabilityPath: capability.PathScaleDescriptor,
 	})
 }
 

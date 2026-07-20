@@ -34,9 +34,20 @@ func ValidateMeasureSpecParts(factors []Factor, graph FactorGraph, scoring []Sco
 		}
 		seenCodes[item.Code] = struct{}{}
 	}
-	issues = append(issues, validateFactorGraph(graph, byCode)...)
+	issues = append(issues, validateFactorGraph(graph, byCode, scoring)...)
 	scoringByFactor := make(map[string]Scoring, len(scoring))
+	seenScoringFactor := make(map[string]struct{}, len(scoring))
 	for _, rule := range scoring {
+		if rule.FactorCode != "" {
+			if _, dup := seenScoringFactor[rule.FactorCode]; dup {
+				issues = append(issues, HierarchyIssue{
+					Field:   fmt.Sprintf("scoring[%s]", rule.FactorCode),
+					Code:    "scoring.factor.duplicate",
+					Message: fmt.Sprintf("factor %s 只能有一条 scoring", rule.FactorCode),
+				})
+			}
+			seenScoringFactor[rule.FactorCode] = struct{}{}
+		}
 		scoringByFactor[rule.FactorCode] = rule
 		issues = append(issues, validateScoring(rule, byCode)...)
 	}
@@ -81,10 +92,45 @@ func ValidateMeasureSpecParts(factors []Factor, graph FactorGraph, scoring []Sco
 	return issues
 }
 
-func validateFactorGraph(graph FactorGraph, byCode map[string]Factor) []HierarchyIssue {
+func validateFactorGraph(graph FactorGraph, byCode map[string]Factor, scoring []Scoring) []HierarchyIssue {
 	issues := make([]HierarchyIssue, 0)
+	seenEdge := make(map[string]struct{}, len(graph.Edges))
+	parentByChild := make(map[string]string, len(graph.Edges))
+	nodesInEdges := make(map[string]struct{}, len(graph.Edges)*2)
+
 	for _, edge := range graph.Edges {
 		prefix := fmt.Sprintf("factors[%s]", edge.ChildCode)
+		if edge.ParentCode == "" || edge.ChildCode == "" {
+			issues = append(issues, HierarchyIssue{
+				Field: "factor_graph.edges", Code: "factor_graph.edge.invalid",
+				Message: "factor graph edge parent_code 和 child_code 不能为空",
+			})
+			continue
+		}
+		if edge.ParentCode == edge.ChildCode {
+			issues = append(issues, HierarchyIssue{
+				Field: prefix + ".parent_code", Code: "factor.parent_code.self",
+				Message: fmt.Sprintf("factor %s 不能以自身为 parent", edge.ChildCode),
+			})
+		}
+		edgeKey := edge.ParentCode + "\x00" + edge.ChildCode
+		if _, dup := seenEdge[edgeKey]; dup {
+			issues = append(issues, HierarchyIssue{
+				Field: "factor_graph.edges", Code: "factor_graph.edge.duplicate",
+				Message: fmt.Sprintf("factor graph edge %s -> %s 重复", edge.ParentCode, edge.ChildCode),
+			})
+		}
+		seenEdge[edgeKey] = struct{}{}
+		if prev, exists := parentByChild[edge.ChildCode]; exists && prev != edge.ParentCode {
+			issues = append(issues, HierarchyIssue{
+				Field: prefix + ".parent_code", Code: "factor.parent_code.multiple",
+				Message: fmt.Sprintf("factor %s 只能有一个 parent（已有 %s，又出现 %s）", edge.ChildCode, prev, edge.ParentCode),
+			})
+		}
+		parentByChild[edge.ChildCode] = edge.ParentCode
+		nodesInEdges[edge.ParentCode] = struct{}{}
+		nodesInEdges[edge.ChildCode] = struct{}{}
+
 		if _, ok := byCode[edge.ParentCode]; !ok {
 			issues = append(issues, HierarchyIssue{
 				Field:   prefix + ".parent_code",
@@ -105,8 +151,158 @@ func validateFactorGraph(graph FactorGraph, byCode map[string]Factor) []Hierarch
 			Field: "factor_graph.edges", Code: "factor.parent_code.cycle", Message: "factor graph 存在循环 parent 引用",
 		})
 	}
+
+	issues = append(issues, validateFactorGraphRoots(graph, byCode, parentByChild)...)
+	if len(graph.Edges) > 0 {
+		issues = append(issues, validateFactorGraphReachability(graph, nodesInEdges)...)
+	}
+	issues = append(issues, validateFactorGraphScoringConsistency(graph, scoring)...)
 	return issues
 }
+
+func validateFactorGraphRoots(graph FactorGraph, byCode map[string]Factor, parentByChild map[string]string) []HierarchyIssue {
+	if len(graph.Roots) == 0 {
+		if len(graph.Edges) == 0 {
+			return nil
+		}
+		return []HierarchyIssue{{
+			Field: "factor_graph.roots", Code: "factor_graph.roots.required",
+			Message: "factor graph 存在 edges 时必须声明 roots",
+		}}
+	}
+	issues := make([]HierarchyIssue, 0)
+	seenRoot := make(map[string]struct{}, len(graph.Roots))
+	for _, root := range graph.Roots {
+		if root == "" {
+			issues = append(issues, HierarchyIssue{
+				Field: "factor_graph.roots", Code: "factor_graph.root.invalid",
+				Message: "factor graph root 不能为空",
+			})
+			continue
+		}
+		if _, dup := seenRoot[root]; dup {
+			issues = append(issues, HierarchyIssue{
+				Field: "factor_graph.roots", Code: "factor_graph.root.duplicate",
+				Message: fmt.Sprintf("factor graph root %s 重复", root),
+			})
+			continue
+		}
+		seenRoot[root] = struct{}{}
+		if _, ok := byCode[root]; !ok {
+			issues = append(issues, HierarchyIssue{
+				Field: "factor_graph.roots", Code: "factor_graph.root.not_found",
+				Message: fmt.Sprintf("factor graph root %s 不存在", root),
+			})
+		}
+		if parent, isChild := parentByChild[root]; isChild {
+			issues = append(issues, HierarchyIssue{
+				Field: "factor_graph.roots", Code: "factor_graph.root.is_child",
+				Message: fmt.Sprintf("factor graph root %s 不能同时是 %s 的 child", root, parent),
+			})
+		}
+	}
+	return issues
+}
+
+func validateFactorGraphReachability(graph FactorGraph, nodesInEdges map[string]struct{}) []HierarchyIssue {
+	reachable := make(map[string]struct{}, len(nodesInEdges))
+	childrenByParent := make(map[string][]string, len(graph.Edges))
+	for _, edge := range graph.Edges {
+		childrenByParent[edge.ParentCode] = append(childrenByParent[edge.ParentCode], edge.ChildCode)
+	}
+	var walk func(code string)
+	walk = func(code string) {
+		if _, ok := reachable[code]; ok {
+			return
+		}
+		reachable[code] = struct{}{}
+		for _, child := range childrenByParent[code] {
+			walk(child)
+		}
+	}
+	for _, root := range graph.Roots {
+		walk(root)
+	}
+	issues := make([]HierarchyIssue, 0)
+	for code := range nodesInEdges {
+		if _, ok := reachable[code]; ok {
+			continue
+		}
+		issues = append(issues, HierarchyIssue{
+			Field: fmt.Sprintf("factors[%s]", code), Code: "factor_graph.node.unreachable",
+			Message: fmt.Sprintf("factor %s 无法从 factor graph roots 到达", code),
+		})
+	}
+	return issues
+}
+
+func validateFactorGraphScoringConsistency(graph FactorGraph, scoring []Scoring) []HierarchyIssue {
+	if len(scoring) == 0 {
+		return nil
+	}
+	issues := make([]HierarchyIssue, 0)
+	parentsWithEdges := make(map[string]map[string]struct{})
+	for _, edge := range graph.Edges {
+		children, ok := parentsWithEdges[edge.ParentCode]
+		if !ok {
+			children = make(map[string]struct{})
+			parentsWithEdges[edge.ParentCode] = children
+		}
+		children[edge.ChildCode] = struct{}{}
+	}
+	seenParents := make(map[string]struct{})
+	for _, rule := range scoring {
+		if !scoringHasSourceKind(rule, ScoringSourceFactor) {
+			continue
+		}
+		seenParents[rule.FactorCode] = struct{}{}
+		want := make(map[string]struct{})
+		for _, source := range rule.Sources {
+			if source.Kind == ScoringSourceFactor && source.Code != "" {
+				want[source.Code] = struct{}{}
+			}
+		}
+		got := parentsWithEdges[rule.FactorCode]
+		if sameStringSet(want, got) {
+			continue
+		}
+		issues = append(issues, HierarchyIssue{
+			Field: fmt.Sprintf("scoring[%s].sources", rule.FactorCode),
+			Code:  "factor_graph.children.mismatch",
+			Message: fmt.Sprintf(
+				"factor %s 的 factor-source children 与 factor graph edges 不一致",
+				rule.FactorCode,
+			),
+		})
+	}
+	for parent := range parentsWithEdges {
+		if _, ok := seenParents[parent]; ok {
+			continue
+		}
+		issues = append(issues, HierarchyIssue{
+			Field: fmt.Sprintf("factors[%s].children_policy", parent),
+			Code:  "factor_graph.children.mismatch",
+			Message: fmt.Sprintf(
+				"factor graph 声明了 %s 的 children，但 scoring 未配置对应 factor sources",
+				parent,
+			),
+		})
+	}
+	return issues
+}
+
+func sameStringSet(left, right map[string]struct{}) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for key := range left {
+		if _, ok := right[key]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 
 func validateScoring(rule Scoring, byCode map[string]Factor) []HierarchyIssue {
 	issues := make([]HierarchyIssue, 0)

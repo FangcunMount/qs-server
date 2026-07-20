@@ -77,6 +77,23 @@ func TestCognitiveValidateForPublishRejectsMissingSPMExecution(t *testing.T) {
 	}
 }
 
+func TestCognitiveValidateForPublishRejectsUnsupportedStrategy(t *testing.T) {
+	t.Parallel()
+	model := publishableCognitiveShell()
+	model.DefinitionV2 = cognitiveDefinitionWithAbility()
+	model.DefinitionV2.Measure.Scoring = []factor.Scoring{{
+		FactorCode: "TOTAL",
+		Strategy:   factor.ScoringStrategy("max"),
+		Sources:    []factor.ScoringSource{{Kind: factor.ScoringSourceQuestion, Code: "Q1"}},
+	}}
+	issues := (CognitiveDefinitionHandler{QuestionnaireQuery: publishedQuestionnaireStub("Q", "1",
+		questionnaireapp.QuestionResult{Code: "Q1", Options: []questionnaireapp.OptionResult{{Value: "A"}}},
+	)}).ValidateForPublish(context.Background(), model)
+	if !hasIssueCode(issues, "strategy.unsupported_for_path") {
+		t.Fatalf("issues = %#v, want strategy.unsupported_for_path", issues)
+	}
+}
+
 func publishableCognitiveShell() *domain.AssessmentModel {
 	return &domain.AssessmentModel{
 		Kind:       domain.KindCognitive,

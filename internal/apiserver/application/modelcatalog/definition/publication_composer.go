@@ -4,6 +4,7 @@ import (
 	"context"
 
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/capability"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
@@ -17,6 +18,9 @@ type PublicationComposerOptions struct {
 	LegacyDefinitionMessage     string
 	IncludeBehavioralSemantic   bool
 	IncludeAlgorithmBinding     bool
+	// StrategyCapabilityPath enables MC-R014 Scoring.Strategy checks against the
+	// Calculation capability catalog for this execution path.
+	StrategyCapabilityPath      capability.Path
 	SkipQuestionnaireOnDefError bool
 	// OmitSharedTail skips AppendDecisionKindIssues + ValidateQuestionnaireMeasure.
 	// Typology owns questionnaire checks inside AfterDefinition / runtime validator.
@@ -52,6 +56,9 @@ func ComposePublishValidation(
 	}
 	if opts.IncludeAlgorithmBinding {
 		issues = append(issues, ValidateAlgorithmBinding(model)...)
+	}
+	if opts.StrategyCapabilityPath != "" {
+		issues = append(issues, ValidateStrategyCapability(model, opts.StrategyCapabilityPath)...)
 	}
 	if opts.SkipQuestionnaireOnDefError && domain.HasValidationErrors(issues) {
 		return issues

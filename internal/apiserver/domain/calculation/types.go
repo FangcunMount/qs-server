@@ -2,32 +2,35 @@ package calculation
 
 // ==================== 计分策略类型 ====================
 
-// StrategyType 计分策略类型
+// StrategyType 计分策略类型（infra/ruleengine 内部实现名）。
+// 声明空间 / OpenAPI / Definition 使用 capability catalog 的 canonical 码
+//（avg、cnt）；本类型保留 average、count 作为内部名，由 ScaleFactorScorer
+// 经 capability.Canonical 映射。公开 ScaleFactorScorer 仅注册 question_aggregation 子集。
 type StrategyType string
 
 const (
 	// StrategyTypeSum 求和计分：将所有值相加
 	StrategyTypeSum StrategyType = "sum"
 
-	// StrategyTypeAverage 平均分计分：所有值的平均值
+	// StrategyTypeAverage 平均分计分：内部名 average；声明空间 canonical 为 avg
 	StrategyTypeAverage StrategyType = "average"
 
-	// StrategyTypeWeightedSum 加权求和：按权重加权求和
+	// StrategyTypeWeightedSum 加权求和：按权重加权求和（composite projection；非 ScaleFactorScorer 公开面）
 	StrategyTypeWeightedSum StrategyType = "weighted_sum"
 
-	// StrategyTypeMax 最大值：取所有值的最大值
+	// StrategyTypeMax 最大值（legacy helper；不在声明空间 / 公开 ScaleFactorScorer）
 	StrategyTypeMax StrategyType = "max"
 
-	// StrategyTypeMin 最小值：取所有值的最小值
+	// StrategyTypeMin 最小值（legacy helper；不在声明空间 / 公开 ScaleFactorScorer）
 	StrategyTypeMin StrategyType = "min"
 
-	// StrategyTypeCount 计数：统计值的数量
+	// StrategyTypeCount 计数：内部名 count；声明空间 canonical 为 cnt
 	StrategyTypeCount StrategyType = "count"
 
-	// StrategyTypeFirst 取第一个值
+	// StrategyTypeFirst 取第一个值（legacy helper；不在声明空间）
 	StrategyTypeFirst StrategyType = "first"
 
-	// StrategyTypeLast 取最后一个值
+	// StrategyTypeLast 取最后一个值（legacy helper；不在声明空间）
 	StrategyTypeLast StrategyType = "last"
 )
 
