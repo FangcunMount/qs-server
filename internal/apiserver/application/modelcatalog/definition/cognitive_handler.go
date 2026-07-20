@@ -2,12 +2,10 @@ package definition
 
 import (
 	"context"
-	"fmt"
 
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
-	cognitivepayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
 )
 
 // CognitiveDefinitionHandler composes shared validators with cognitive payload projection.
@@ -42,20 +40,5 @@ func (h CognitiveDefinitionHandler) ValidateForPublish(ctx context.Context, mode
 
 // BuildSnapshotPayload 构建评估模型快照负载
 func (CognitiveDefinitionHandler) BuildSnapshotPayload(_ context.Context, model *domain.AssessmentModel) (SnapshotBuildResult, error) {
-	if model == nil || model.DefinitionV2 == nil {
-		return SnapshotBuildResult{}, fmt.Errorf("cognitive definition_v2 is required")
-	}
-	encoded, err := cognitivepayload.PayloadFromDefinition(model.DefinitionV2)
-	if err != nil {
-		return SnapshotBuildResult{}, fmt.Errorf("project cognitive payload: %w", err)
-	}
-	algorithm := model.Algorithm
-	if algorithm == "" {
-		algorithm = domain.AlgorithmSPM
-	}
-	decisionKind, err := model.DecisionKindForDefinition()
-	if err != nil {
-		return SnapshotBuildResult{}, err
-	}
-	return SnapshotBuildResult{Kind: domain.KindCognitive, Algorithm: algorithm, PayloadFormat: domain.PayloadFormatForCognitive(algorithm), DecisionKind: decisionKind, Payload: encoded}, nil
+	return (CompatibilityPayloadProjector{}).ProjectCognitive(model)
 }

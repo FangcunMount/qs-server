@@ -7,7 +7,6 @@ import (
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
-	behavioralpayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 )
 
 // BehavioralRatingDefinitionHandler composes shared validators with behavioral
@@ -47,31 +46,11 @@ func (h BehavioralRatingDefinitionHandler) BuildSnapshotPayload(ctx context.Cont
 	if model == nil || model.DefinitionV2 == nil {
 		return SnapshotBuildResult{}, fmt.Errorf("behavioral_rating definition_v2 is required")
 	}
-	if err := requireBehavioralPublishAlgorithm(model.Algorithm); err != nil {
-		return SnapshotBuildResult{}, err
-	}
 	table, err := h.loadNormTable(ctx, model.DefinitionV2)
 	if err != nil {
 		return SnapshotBuildResult{}, err
 	}
-	encoded, err := behavioralpayload.PayloadFromDefinitionWithNorm(model.DefinitionV2, table)
-	if err != nil {
-		return SnapshotBuildResult{}, fmt.Errorf("project behavioral_rating payload: %w", err)
-	}
-	decisionKind, err := model.DecisionKindForDefinition()
-	if err != nil {
-		return SnapshotBuildResult{}, err
-	}
-	if decisionKind != domain.DecisionKindNormLookup {
-		return SnapshotBuildResult{}, fmt.Errorf("behavioral_rating decision kind must be norm_lookup, got %s", decisionKind)
-	}
-	return SnapshotBuildResult{
-		Kind:          domain.KindBehavioralRating,
-		Algorithm:     model.Algorithm,
-		PayloadFormat: domain.PayloadFormatForBehavioralRating(model.Algorithm),
-		DecisionKind:  decisionKind,
-		Payload:       encoded,
-	}, nil
+	return (CompatibilityPayloadProjector{}).ProjectBehavioral(model, table)
 }
 
 func (h BehavioralRatingDefinitionHandler) loadNormTable(ctx context.Context, value *domain.Definition) (*domain.Norm, error) {
