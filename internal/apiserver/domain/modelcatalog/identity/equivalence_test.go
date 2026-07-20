@@ -40,3 +40,43 @@ func TestTypologyAlgorithmLookupAlternates(t *testing.T) {
 		t.Fatalf("canonical alts = %#v", alts)
 	}
 }
+
+func TestBehavioralAlgorithmsEquivalent(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		left, right binding.Algorithm
+		want        bool
+	}{
+		{binding.AlgorithmBehavioralRatingDefault, binding.AlgorithmBrief2, true},
+		{binding.AlgorithmBrief2, binding.AlgorithmBehavioralRatingDefault, true},
+		{binding.AlgorithmBehavioralRatingDefault, binding.AlgorithmSPMSensory, true},
+		{binding.AlgorithmBrief2, binding.AlgorithmSPMSensory, false},
+		{binding.AlgorithmBrief2, binding.AlgorithmBrief2, true},
+	}
+	for _, tc := range cases {
+		got := identity.BehavioralAlgorithmsEquivalent(tc.left, tc.right)
+		if got != tc.want {
+			t.Fatalf("%s ~ %s = %v, want %v", tc.left, tc.right, got, tc.want)
+		}
+	}
+}
+
+func TestBehavioralAlgorithmBackfillTarget(t *testing.T) {
+	t.Parallel()
+	got, reason, ok := identity.BehavioralAlgorithmBackfillTarget(binding.AlgorithmBehavioralRatingDefault, true, false, "")
+	if !ok || got != binding.AlgorithmBrief2 || reason != "" {
+		t.Fatalf("brief2 spec: got=%s reason=%s ok=%v", got, reason, ok)
+	}
+	_, reason, ok = identity.BehavioralAlgorithmBackfillTarget(binding.AlgorithmBehavioralRatingDefault, false, true, "")
+	if ok || reason != "ambiguous_brief2_or_spm_sensory" {
+		t.Fatalf("ambiguous: reason=%s ok=%v", reason, ok)
+	}
+	got, reason, ok = identity.BehavioralAlgorithmBackfillTarget(binding.AlgorithmBehavioralRatingDefault, false, true, binding.AlgorithmSPMSensory)
+	if !ok || got != binding.AlgorithmSPMSensory {
+		t.Fatalf("explicit spm: got=%s reason=%s ok=%v", got, reason, ok)
+	}
+	_, reason, ok = identity.BehavioralAlgorithmBackfillTarget(binding.AlgorithmBehavioralRatingDefault, false, false, "")
+	if ok || reason != "requires_brief2_execution_or_norm_refs" {
+		t.Fatalf("ineligible: reason=%s ok=%v", reason, ok)
+	}
+}

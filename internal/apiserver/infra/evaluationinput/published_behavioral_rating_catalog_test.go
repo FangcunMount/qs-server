@@ -106,6 +106,62 @@ func TestPublishedBehavioralRatingCatalogDecodesBrief2Snapshot(t *testing.T) {
 	}
 }
 
+func TestBehavioralRatingLookupRefsIncludesAlternates(t *testing.T) {
+	t.Parallel()
+	refs := behavioralRatingLookupRefs(port.ModelRef{
+		Kind: port.EvaluationModelKindBehavioralRating, Code: "BR", Version: "1",
+		Algorithm: string(domain.AlgorithmBehavioralRatingDefault),
+	})
+	if len(refs) < 3 || refs[0].Algorithm != domain.AlgorithmBehavioralRatingDefault {
+		t.Fatalf("refs = %#v", refs)
+	}
+	seen := map[domain.Algorithm]bool{}
+	for _, ref := range refs {
+		seen[ref.Algorithm] = true
+	}
+	if !seen[domain.AlgorithmBrief2] || !seen[domain.AlgorithmSPMSensory] {
+		t.Fatalf("missing alternates: %#v", refs)
+	}
+}
+
+func TestPublishedBehavioralRatingCatalogAcceptsEquivalentAlias(t *testing.T) {
+	t.Parallel()
+	raw := []byte(`{
+		"dimensions": [{"code": "total", "title": "总分", "question_codes": ["q1"], "scoring_strategy": "sum", "is_total_score": true}],
+		"interpret_rules": [{"dimension_code": "total", "ranges": [{"min_score": 0, "max_score": 10, "conclusion": "low"}]}]
+	}`)
+	materialized, err := behavioral.ImportLegacyDefinition(raw)
+	if err != nil {
+		t.Fatalf("ImportLegacyDefinition: %v", err)
+	}
+	canonical := &rulesetport.PublishedModel{
+		SchemaVersion: domain.SchemaVersionV2,
+		PayloadFormat: domain.PayloadFormatBehavioralRatingDefaultV1,
+		Kind:          domain.KindBehavioralRating,
+		Algorithm:     domain.AlgorithmBrief2,
+		Code:          "BR-ALIAS",
+		Version:       "1.0.0",
+		Status:        "published",
+		DefinitionV2:  materialized.Definition,
+	}
+	reader := stubPublishedBehavioralRatingReader{byAlgorithm: map[domain.Algorithm]*rulesetport.PublishedModel{
+		domain.AlgorithmBrief2: canonical,
+	}}
+	catalog := NewPublishedBehavioralRatingCatalog(reader)
+	got, err := catalog.GetBehavioralRatingByRef(context.Background(), port.ModelRef{
+		Kind:      port.EvaluationModelKindBehavioralRating,
+		Algorithm: string(domain.AlgorithmBehavioralRatingDefault),
+		Code:      "BR-ALIAS",
+		Version:   "1.0.0",
+	})
+	if err != nil {
+		t.Fatalf("GetBehavioralRatingByRef via retained alias: %v", err)
+	}
+	if got.Code != "BR-ALIAS" {
+		t.Fatalf("snapshot = %#v", got)
+	}
+}
+
 type stubNormRepository struct {
 	tables []*norm.Norm
 }
@@ -126,13 +182,20 @@ func (s stubNormRepository) FindNorm(_ context.Context, version string) (*norm.N
 }
 
 type stubPublishedBehavioralRatingReader struct {
-	snapshot *rulesetport.PublishedModel
-	err      error
+	snapshot    *rulesetport.PublishedModel
+	byAlgorithm map[domain.Algorithm]*rulesetport.PublishedModel
+	err         error
 }
 
-func (s stubPublishedBehavioralRatingReader) GetPublishedModelByRef(context.Context, rulesetport.Ref) (*rulesetport.PublishedModel, error) {
+func (s stubPublishedBehavioralRatingReader) GetPublishedModelByRef(_ context.Context, ref rulesetport.Ref) (*rulesetport.PublishedModel, error) {
 	if s.err != nil {
 		return nil, s.err
+	}
+	if s.byAlgorithm != nil {
+		if snap, ok := s.byAlgorithm[ref.Algorithm]; ok {
+			return snap, nil
+		}
+		return nil, domain.ErrNotFound
 	}
 	return s.snapshot, nil
 }

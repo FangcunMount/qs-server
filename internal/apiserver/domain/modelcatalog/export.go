@@ -216,6 +216,9 @@ var (
 	TypologyAlgorithmLookupAlternates = identitypkg.TypologyAlgorithmLookupAlternates
 	TypologyAlgorithmBackfillTarget   = identitypkg.TypologyAlgorithmBackfillTarget
 	CanonicalTypologyPublishAlgorithm = identitypkg.CanonicalTypologyPublishAlgorithm
+	BehavioralAlgorithmsEquivalent      = identitypkg.BehavioralAlgorithmsEquivalent
+	BehavioralAlgorithmLookupAlternates = identitypkg.BehavioralAlgorithmLookupAlternates
+	BehavioralAlgorithmBackfillTarget   = identitypkg.BehavioralAlgorithmBackfillTarget
 	AlgorithmWriteCanonical           = identitypkg.AlgorithmWriteCanonical
 	AlgorithmWriteDraftOK             = identitypkg.AlgorithmWriteDraftOK
 	AlgorithmWriteRetainedRead        = identitypkg.AlgorithmWriteRetainedRead

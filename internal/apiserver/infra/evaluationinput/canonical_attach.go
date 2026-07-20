@@ -39,7 +39,21 @@ func attachTypologyCanonical(ctx context.Context, reader rulesetport.PublishedMo
 }
 
 func attachBehavioralCanonical(ctx context.Context, reader rulesetport.PublishedModelReader, ref port.InputRef, snapshot *port.InputSnapshot) {
-	attachPublishedCanonical(ctx, reader, behavioralRatingLookupRef(ref.ModelRef), snapshot)
+	if reader == nil || snapshot == nil {
+		return
+	}
+	for _, lookup := range behavioralRatingLookupRefs(ref.ModelRef) {
+		published, err := reader.GetPublishedModelByRef(ctx, lookup)
+		if err != nil || published == nil || published.DefinitionV2 == nil {
+			continue
+		}
+		requested := domain.Algorithm(ref.ModelRef.Algorithm)
+		if requested != "" && !domain.BehavioralAlgorithmsEquivalent(published.Algorithm, requested) {
+			continue
+		}
+		port.AttachCanonicalDefinition(snapshot, published.DefinitionV2)
+		return
+	}
 }
 
 func attachCognitiveCanonical(ctx context.Context, reader rulesetport.PublishedModelReader, ref port.InputRef, snapshot *port.InputSnapshot) {
