@@ -30,6 +30,7 @@ func NewRepositoryResolver(
 	questionnaireRepo questionnaire.Repository,
 	modelCatalog rulesetport.Catalog,
 	paths []modelcatalog.ExecutionPath,
+	normSubjectReader port.NormSubjectReader,
 	normRepos ...rulesetport.NormRepository,
 ) (*RepositoryResolver, error) {
 	if len(paths) == 0 {
@@ -64,6 +65,7 @@ func NewRepositoryResolver(
 		CognitiveCatalog:        cognitiveCatalog,
 		AnswerSheets:            answerSheetReader,
 		Questionnaires:          questionnaireReader,
+		NormSubjectReader:       normSubjectReader,
 	})
 	if err != nil {
 		return nil, err

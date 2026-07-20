@@ -169,21 +169,36 @@ func cloneFloat64(value *float64) *float64 {
 }
 
 func lookupParametric(table FactorNormTable, rawScore float64, subject Subject) (NormScore, bool) {
+	var generic *NormBand
 	for _, band := range table.Bands {
-		if !bandMatchesSubject(band, subject) {
-			continue
-		}
 		if band.Mean == nil || band.StdDev == nil || *band.StdDev == 0 {
 			continue
 		}
-		tScore := 50 + 10*((rawScore-*band.Mean) / *band.StdDev)
-		return NormScore{
-			TScore:     roundScore(tScore),
-			Percentile: percentileFromTScore(tScore),
-			Reference:  referenceFromBand(band),
-		}, true
+		if isGenericBand(band) {
+			if generic == nil {
+				copy := band
+				generic = &copy
+			}
+			continue
+		}
+		if !bandMatchesSubject(band, subject) {
+			continue
+		}
+		return scoreFromBand(band, rawScore), true
+	}
+	if generic != nil {
+		return scoreFromBand(*generic, rawScore), true
 	}
 	return NormScore{}, false
+}
+
+func scoreFromBand(band NormBand, rawScore float64) NormScore {
+	tScore := 50 + 10*((rawScore-*band.Mean) / *band.StdDev)
+	return NormScore{
+		TScore:     roundScore(tScore),
+		Percentile: percentileFromTScore(tScore),
+		Reference:  referenceFromBand(band),
+	}
 }
 
 func referenceFromLookup(entry NormLookupEntry) NormReference {
@@ -194,11 +209,25 @@ func referenceFromBand(band NormBand) NormReference {
 	return NormReference{MinAgeMonths: band.MinAgeMonths, MaxAgeMonths: band.MaxAgeMonths, Gender: band.Gender}
 }
 
+func isGenericBand(band NormBand) bool {
+	return band.MinAgeMonths == 0 && band.MaxAgeMonths == 0 && band.Gender == ""
+}
+
+// bandMatchesSubject applies the same strict demographic rule as entryMatchesSubject:
+// a cohort-scoped band cannot match when the required subject fields are missing.
 func bandMatchesSubject(band NormBand, subject Subject) bool {
-	if band.Gender != "" && subject.Gender != "" && band.Gender != subject.Gender {
-		return false
+	if isGenericBand(band) {
+		return true
 	}
-	if subject.AgeMonths > 0 {
+	if band.Gender != "" {
+		if subject.Gender == "" || band.Gender != subject.Gender {
+			return false
+		}
+	}
+	if band.MinAgeMonths > 0 || band.MaxAgeMonths > 0 {
+		if subject.AgeMonths <= 0 {
+			return false
+		}
 		if band.MinAgeMonths > 0 && subject.AgeMonths < band.MinAgeMonths {
 			return false
 		}

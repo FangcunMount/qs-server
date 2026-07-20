@@ -41,6 +41,7 @@ type WireInput struct {
 	MySQLLimiter              backpressure.Acquirer
 	MongoLimiter              backpressure.Acquirer
 	TesteeAccessChecker       evaluationoperator.AccessChecker
+	NormSubjectReader         evaluationinput.NormSubjectReader
 	SurveyRuntimeInfra        *surveymod.SurveyRuntimeInfra
 	PublishedModelCatalog     rulesetport.Catalog
 	RuntimeDescriptorRegistry *evalpipeline.RuntimeDescriptorRegistry
@@ -73,6 +74,7 @@ func Wire(in WireInput) (WireResult, error) {
 			infra.QuestionnaireRepo,
 			catalog,
 			executionPaths,
+			in.NormSubjectReader,
 			mongomodelcatalog.NewNormRepository(in.MongoDB, mongoBase.BaseRepositoryOptions{Limiter: in.MongoLimiter}),
 		)
 		if err != nil {

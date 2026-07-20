@@ -14,6 +14,7 @@ type InputProviderDeps struct {
 	CognitiveCatalog        port.CognitiveModelCatalog
 	AnswerSheets            port.AnswerSheetReader
 	Questionnaires          port.QuestionnaireReader
+	NormSubjectReader       port.NormSubjectReader
 }
 
 func MaterializeInputProviders(paths []modelcatalog.ExecutionPath, deps InputProviderDeps) ([]ModelInputProvider, error) {
@@ -53,6 +54,7 @@ func materializeInputProvider(path modelcatalog.ExecutionPath, deps InputProvide
 			deps.BehavioralRatingCatalog,
 			deps.AnswerSheets,
 			deps.Questionnaires,
+			deps.NormSubjectReader,
 		), nil
 	case modelcatalog.ExecutionPathCognitiveDescriptor:
 		if deps.CognitiveCatalog == nil {
@@ -62,6 +64,7 @@ func materializeInputProvider(path modelcatalog.ExecutionPath, deps InputProvide
 			deps.CognitiveCatalog,
 			deps.AnswerSheets,
 			deps.Questionnaires,
+			deps.NormSubjectReader,
 		), nil
 	default:
 		return nil, fmt.Errorf("unsupported evaluation execution path: %s", path)

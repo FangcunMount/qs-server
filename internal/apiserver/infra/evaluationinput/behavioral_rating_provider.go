@@ -13,17 +13,20 @@ type BehavioralRatingModelInputProvider struct {
 	catalog             port.BehavioralRatingModelCatalog
 	answerSheetReader   port.AnswerSheetReader
 	questionnaireReader port.QuestionnaireReader
+	normSubjectReader   port.NormSubjectReader
 }
 
 func NewBehavioralRatingModelInputProvider(
 	catalog port.BehavioralRatingModelCatalog,
 	answerSheetReader port.AnswerSheetReader,
 	questionnaireReader port.QuestionnaireReader,
+	normSubjectReader port.NormSubjectReader,
 ) BehavioralRatingModelInputProvider {
 	return BehavioralRatingModelInputProvider{
 		catalog:             catalog,
 		answerSheetReader:   answerSheetReader,
 		questionnaireReader: questionnaireReader,
+		normSubjectReader:   normSubjectReader,
 	}
 }
 
@@ -51,11 +54,16 @@ func (p BehavioralRatingModelInputProvider) ResolveInput(ctx context.Context, re
 	if err != nil {
 		return nil, err
 	}
+	normSubject, err := resolveNormSubject(ctx, p.normSubjectReader, ref)
+	if err != nil {
+		return nil, err
+	}
 	payload := port.BehavioralRatingModelPayload{Snapshot: model}
 	return &port.InputSnapshot{
 		Model:         port.NewBehavioralRatingModelSnapshot(model, modelcatalog.Algorithm(ref.ModelRef.Algorithm)),
 		ModelPayload:  payload,
 		AnswerSheet:   answerSheet,
 		Questionnaire: qnr,
+		NormSubject:   normSubject,
 	}, nil
 }

@@ -76,6 +76,81 @@ func TestLookupNormScoreParametricBand(t *testing.T) {
 	}
 }
 
+func TestLookupNormScoreParametricRejectsMissingDemographics(t *testing.T) {
+	t.Parallel()
+
+	mean := 10.0
+	std := 2.0
+	tables := &calcnorm.NormTables{
+		Factors: []calcnorm.FactorNormTable{{
+			FactorCode: "bri",
+			Bands: []calcnorm.NormBand{{
+				MinAgeMonths: 60,
+				MaxAgeMonths: 120,
+				Gender:       "female",
+				Mean:         &mean,
+				StdDev:       &std,
+			}},
+		}},
+	}
+
+	if _, ok := calcnorm.LookupNormScore(tables, "bri", 12, calcnorm.Subject{}); ok {
+		t.Fatal("empty subject must not match demographic band")
+	}
+	if _, ok := calcnorm.LookupNormScore(tables, "bri", 12, calcnorm.Subject{AgeMonths: 72}); ok {
+		t.Fatal("missing gender must not match gender-scoped band")
+	}
+	if _, ok := calcnorm.LookupNormScore(tables, "bri", 12, calcnorm.Subject{Gender: "female"}); ok {
+		t.Fatal("missing age must not match age-scoped band")
+	}
+	if _, ok := calcnorm.LookupNormScore(tables, "bri", 12, calcnorm.Subject{AgeMonths: 40, Gender: "female"}); ok {
+		t.Fatal("below age lower bound must not match")
+	}
+	if _, ok := calcnorm.LookupNormScore(tables, "bri", 12, calcnorm.Subject{AgeMonths: 130, Gender: "female"}); ok {
+		t.Fatal("above age upper bound must not match")
+	}
+	if _, ok := calcnorm.LookupNormScore(tables, "bri", 12, calcnorm.Subject{AgeMonths: 72, Gender: "male"}); ok {
+		t.Fatal("gender mismatch must not match")
+	}
+
+	score, ok := calcnorm.LookupNormScore(tables, "bri", 12, calcnorm.Subject{AgeMonths: 72, Gender: "female"})
+	if !ok || score.TScore != 60 {
+		t.Fatalf("matching subject = %#v, ok = %v", score, ok)
+	}
+	if score.Reference.MinAgeMonths != 60 || score.Reference.MaxAgeMonths != 120 || score.Reference.Gender != "female" {
+		t.Fatalf("selected band reference = %#v", score.Reference)
+	}
+}
+
+func TestLookupNormScoreParametricFallsBackToGenericBand(t *testing.T) {
+	t.Parallel()
+
+	specificMean, specificStd := 8.0, 2.0
+	genericMean, genericStd := 10.0, 2.0
+	tables := &calcnorm.NormTables{
+		Factors: []calcnorm.FactorNormTable{{
+			FactorCode: "bri",
+			Bands: []calcnorm.NormBand{
+				{MinAgeMonths: 60, MaxAgeMonths: 120, Gender: "female", Mean: &specificMean, StdDev: &specificStd},
+				{Mean: &genericMean, StdDev: &genericStd},
+			},
+		}},
+	}
+
+	score, ok := calcnorm.LookupNormScore(tables, "bri", 12, calcnorm.Subject{})
+	if !ok || score.TScore != 60 {
+		t.Fatalf("generic fallback = %#v, ok = %v", score, ok)
+	}
+	if score.Reference != (calcnorm.NormReference{}) {
+		t.Fatalf("generic band reference = %#v, want empty cohort", score.Reference)
+	}
+
+	score, ok = calcnorm.LookupNormScore(tables, "bri", 12, calcnorm.Subject{AgeMonths: 72, Gender: "female"})
+	if !ok || score.TScore != 70 {
+		t.Fatalf("demographic band preferred = %#v, ok = %v", score, ok)
+	}
+}
+
 func TestInterpretTScore(t *testing.T) {
 	t.Parallel()
 

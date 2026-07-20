@@ -3,6 +3,7 @@ package evaluationinput
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
@@ -63,6 +64,11 @@ type InputRef struct {
 	AnswerSheetID        uint64
 	QuestionnaireCode    string
 	QuestionnaireVersion string
+	// TesteeID identifies the subject whose demographics feed NormSubject.
+	TesteeID uint64
+	// AsOf is the assessment occurrence time used to compute AgeMonths.
+	// Prefer Assessment.SubmittedAt; zero means AgeMonths cannot be derived.
+	AsOf time.Time
 }
 
 type InputSnapshot struct {
@@ -77,6 +83,17 @@ type InputSnapshot struct {
 type NormSubjectSnapshot struct {
 	AgeMonths int
 	Gender    string
+}
+
+// NormSubjectFacts is the Actor-side demographic authority used to build NormSubjectSnapshot.
+type NormSubjectFacts struct {
+	Gender   string // "male" / "female" / "" (unknown or missing)
+	Birthday *time.Time
+}
+
+// NormSubjectReader loads Testee demographics for evaluation input materialization.
+type NormSubjectReader interface {
+	ReadNormSubjectFacts(ctx context.Context, testeeID uint64) (*NormSubjectFacts, error)
 }
 
 type ModelSnapshot struct {

@@ -13,17 +13,20 @@ type CognitiveModelInputProvider struct {
 	catalog             port.CognitiveModelCatalog
 	answerSheetReader   port.AnswerSheetReader
 	questionnaireReader port.QuestionnaireReader
+	normSubjectReader   port.NormSubjectReader
 }
 
 func NewCognitiveModelInputProvider(
 	catalog port.CognitiveModelCatalog,
 	answerSheetReader port.AnswerSheetReader,
 	questionnaireReader port.QuestionnaireReader,
+	normSubjectReader port.NormSubjectReader,
 ) CognitiveModelInputProvider {
 	return CognitiveModelInputProvider{
 		catalog:             catalog,
 		answerSheetReader:   answerSheetReader,
 		questionnaireReader: questionnaireReader,
+		normSubjectReader:   normSubjectReader,
 	}
 }
 
@@ -51,11 +54,16 @@ func (p CognitiveModelInputProvider) ResolveInput(ctx context.Context, ref port.
 	if err != nil {
 		return nil, err
 	}
+	normSubject, err := resolveNormSubject(ctx, p.normSubjectReader, ref)
+	if err != nil {
+		return nil, err
+	}
 	payload := port.CognitiveModelPayload{Snapshot: model}
 	return &port.InputSnapshot{
 		Model:         port.NewCognitiveModelSnapshot(model),
 		ModelPayload:  payload,
 		AnswerSheet:   answerSheet,
 		Questionnaire: qnr,
+		NormSubject:   normSubject,
 	}, nil
 }

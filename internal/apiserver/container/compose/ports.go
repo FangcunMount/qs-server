@@ -2,6 +2,7 @@ package compose
 
 import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
+	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
@@ -31,4 +32,5 @@ type SurveyPorts struct {
 // ActorPorts exposes actor-side outputs needed by downstream modules.
 type ActorPorts struct {
 	TesteeAccess actorAccessApp.TesteeAccessService
+	TesteeQuery  testeeApp.TesteeQueryService
 }

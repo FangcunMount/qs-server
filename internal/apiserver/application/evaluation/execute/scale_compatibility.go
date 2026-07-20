@@ -1,6 +1,8 @@
 package execute
 
 import (
+	"time"
+
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -9,13 +11,21 @@ import (
 // inputRefFromAssessment 从评估数据中获取评估输入引用
 func inputRefFromAssessment(a *assessment.Assessment, assessmentID uint64) evaluationinput.InputRef {
 	modelRef := modelRefFromAssessment(a)
-	return evaluationinput.InputRef{
+	ref := evaluationinput.InputRef{
 		AssessmentID:         assessmentID,
 		ModelRef:             modelRef,
 		AnswerSheetID:        a.AnswerSheetRef().ID().Uint64(),
 		QuestionnaireCode:    a.QuestionnaireRef().Code().String(),
 		QuestionnaireVersion: a.QuestionnaireRef().Version(),
+		TesteeID:             a.TesteeID().Uint64(),
 	}
+	if submittedAt := a.SubmittedAt(); submittedAt != nil {
+		ref.AsOf = submittedAt.UTC()
+	} else {
+		// Evaluation should only run after submit; keep a stable clock for AgeMonths.
+		ref.AsOf = time.Now().UTC()
+	}
+	return ref
 }
 
 // modelRefFromAssessment 从评估数据中获取评估模型引用
