@@ -11,13 +11,14 @@ import (
 
 // SnapshotBuildResult 只包含评估模型快照所需的家庭特定部分
 type SnapshotBuildResult struct {
-	Kind          domain.Kind
-	SubKind       domain.SubKind
-	Algorithm     domain.Algorithm
-	PayloadFormat string
-	DecisionKind  domain.DecisionKind
-	Payload       []byte
-	Version       string
+	Kind            domain.Kind
+	SubKind         domain.SubKind
+	Algorithm       domain.Algorithm
+	AlgorithmFamily domain.AlgorithmFamily // optional; publisher freezes via ResolveRuntimeIdentity when empty
+	PayloadFormat   string
+	DecisionKind    domain.DecisionKind
+	Payload         []byte
+	Version         string
 }
 
 // Handler 拥有家庭特定的定义验证和发布塑造

@@ -32,6 +32,7 @@ type PublishedAssessmentModelPO struct {
 	Kind                    string        `bson:"kind"`
 	SubKind                 string        `bson:"sub_kind,omitempty"`
 	Algorithm               string        `bson:"algorithm,omitempty"`
+	AlgorithmFamily         string        `bson:"algorithm_family,omitempty"`
 	Code                    string        `bson:"code"`
 	ReleaseVersion          string        `bson:"release_version"`
 	Title                   string        `bson:"title"`

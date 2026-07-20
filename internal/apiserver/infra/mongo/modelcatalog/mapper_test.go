@@ -14,6 +14,7 @@ func TestMapperRoundTripPublishedModel(t *testing.T) {
 		Kind:                 domain.KindTypology,
 		SubKind:              domain.SubKindTypology,
 		Algorithm:            domain.AlgorithmMBTI,
+		AlgorithmFamily:      domain.AlgorithmFamilyFactorClassification,
 		Code:                 "MBTI_OEJTS",
 		Version:              "1.0.0",
 		Title:                "MBTI",
@@ -34,6 +35,9 @@ func TestMapperRoundTripPublishedModel(t *testing.T) {
 
 	mapper := NewMapper()
 	po := mapper.ToPO(original)
+	if po.AlgorithmFamily != string(domain.AlgorithmFamilyFactorClassification) {
+		t.Fatalf("po algorithm_family = %q", po.AlgorithmFamily)
+	}
 	if po.DefinitionSchemaVersion != domain.SchemaVersionV2 {
 		t.Fatalf("definition schema version = %q", po.DefinitionSchemaVersion)
 	}

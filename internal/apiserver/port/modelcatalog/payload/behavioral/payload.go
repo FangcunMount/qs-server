@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	catalognorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
+	portmodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 	sharedpayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/shared"
 )
@@ -23,6 +24,9 @@ type Snapshot struct {
 	Status               string
 	Factors              []FactorSnapshot
 	Norming              *NormingProfile
+
+	// PublishedRuntime is evaluation-only metadata from AssessmentSnapshot; not JSON payload.
+	PublishedRuntime *portmodelcatalog.PublishedRuntimeMeta
 }
 
 // NormingProfile 携带常模化配置 beyond score_range 计分（机制中性，解析自 brief2 等扩展）。

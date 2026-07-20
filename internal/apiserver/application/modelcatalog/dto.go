@@ -139,8 +139,10 @@ type AssessmentReleaseVersion struct {
 // legacy payload.
 type PublishedModelDetail struct {
 	ModelSummary
-	Version    string             `json:"version"`
-	Definition *domain.Definition `json:"definition"`
+	Version       string             `json:"version"`
+	DecisionKind  string             `json:"decision_kind,omitempty"`
+	PayloadFormat string             `json:"payload_format,omitempty"`
+	Definition    *domain.Definition `json:"definition"`
 }
 
 type PublishedModelListResult struct {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scorerange"
+	portmodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 // ParsePublishedPayload decodes a published scale payload envelope.
@@ -26,6 +27,9 @@ type ScaleSnapshot struct {
 	QuestionnaireVersion string
 	Status               string
 	Factors              []FactorSnapshot
+
+	// PublishedRuntime is evaluation-only metadata from AssessmentSnapshot; not JSON payload.
+	PublishedRuntime *portmodelcatalog.PublishedRuntimeMeta `json:"-"`
 }
 
 // ExecutionEnvelope carries non-factor metadata when projecting DefinitionV2

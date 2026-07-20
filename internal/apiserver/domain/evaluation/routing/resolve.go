@@ -6,41 +6,96 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
+// CompatibilitySource identifies how a missing frozen RuntimeIdentity field was filled.
+type CompatibilitySource string
+
+const (
+	CompatibilitySourceNone           CompatibilitySource = ""
+	CompatibilitySourceFrozen         CompatibilitySource = "frozen"
+	CompatibilitySourceIdentity       CompatibilitySource = "identity"
+	CompatibilitySourceDecisionKind   CompatibilitySource = "decision_kind"
+	CompatibilitySourceLegacyTypology CompatibilitySource = "legacy_typology"
+	CompatibilitySourceFamilyDefault  CompatibilitySource = "family_default_decision"
+)
+
+// CompatibilityHit records whether evaluation used a migration fallback.
+type CompatibilityHit struct {
+	Used   bool
+	Source CompatibilitySource
+}
+
 // DescriptorKeyFromRoute derives the single runtime routing key from a model route.
 func DescriptorKeyFromRoute(route ModelRoute) (DescriptorKey, error) {
-	family, ok := ExecutionFamilyFromRoute(route)
+	family, hit, ok := ExecutionFamilyFromRouteWithCompat(route)
 	if !ok {
 		return DescriptorKey{}, fmt.Errorf("unsupported model route for runtime descriptor: %s/%s", route.Kind, route.Algorithm)
 	}
+	decision, decisionHit := ExecutionDecisionFromRouteWithCompat(route, family)
+	if decision == "" {
+		return DescriptorKey{}, fmt.Errorf("unable to resolve decision kind for route %s/%s", route.Kind, route.Algorithm)
+	}
+	_ = hit
+	_ = decisionHit
+	format := route.PayloadFormat
+	if format == "" {
+		format = modelcatalog.DraftPayloadFormatForModel(route.Kind, route.Algorithm)
+	}
 	return DescriptorKey{
 		AlgorithmFamily: family,
-		DecisionKind:    ExecutionDecisionFromRoute(route, family),
-		PayloadFormat:   route.PayloadFormat,
+		DecisionKind:    decision,
+		PayloadFormat:   format,
 	}, nil
 }
 
-// ExecutionFamilyFromRoute 解析执行家族 using modelcatalog identity as the primary route.
+// ExecutionFamilyFromRoute 解析执行家族 using frozen RuntimeIdentity first.
 func ExecutionFamilyFromRoute(route ModelRoute) (modelcatalog.AlgorithmFamily, bool) {
+	family, _, ok := ExecutionFamilyFromRouteWithCompat(route)
+	return family, ok
+}
+
+// ExecutionFamilyFromRouteWithCompat prefers frozen AlgorithmFamily; otherwise uses
+// explicit compatibility derivation for legacy snapshots.
+func ExecutionFamilyFromRouteWithCompat(route ModelRoute) (modelcatalog.AlgorithmFamily, CompatibilityHit, bool) {
+	if route.AlgorithmFamily != "" {
+		return route.AlgorithmFamily, CompatibilityHit{Source: CompatibilitySourceFrozen}, true
+	}
 	if family, ok := modelcatalog.AlgorithmFamilyFromIdentity(route.Kind, route.SubKind, route.Algorithm); ok {
-		return family, true
+		return family, CompatibilityHit{Used: true, Source: CompatibilitySourceIdentity}, true
 	}
 	if family, ok := legacyTypologyFamilyFromRoute(route); ok {
-		return family, true
+		return family, CompatibilityHit{Used: true, Source: CompatibilitySourceLegacyTypology}, true
 	}
 	if route.DecisionKind != "" {
-		return modelcatalog.AlgorithmFamilyFromDecisionKind(route.DecisionKind)
+		if family, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(route.DecisionKind); ok {
+			return family, CompatibilityHit{Used: true, Source: CompatibilitySourceDecisionKind}, true
+		}
 	}
-	return modelcatalog.AlgorithmFamilyFromIdentity(route.Kind, route.SubKind, route.Algorithm)
+	return "", CompatibilityHit{}, false
 }
 
 // ExecutionDecisionFromRoute 解析判定类型 aligned 使用 执行家族。
 func ExecutionDecisionFromRoute(route ModelRoute, family modelcatalog.AlgorithmFamily) modelcatalog.DecisionKind {
+	decision, _ := ExecutionDecisionFromRouteWithCompat(route, family)
+	return decision
+}
+
+// ExecutionDecisionFromRouteWithCompat prefers frozen DecisionKind when compatible with family.
+// Incomplete legacy routes may fall back to the family default decision.
+func ExecutionDecisionFromRouteWithCompat(route ModelRoute, family modelcatalog.AlgorithmFamily) (modelcatalog.DecisionKind, CompatibilityHit) {
 	if route.DecisionKind != "" {
 		if decisionFamily, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(route.DecisionKind); ok && decisionFamily == family {
-			return route.DecisionKind
+			source := CompatibilitySourceFrozen
+			if route.AlgorithmFamily == "" {
+				source = CompatibilitySourceDecisionKind
+			}
+			return route.DecisionKind, CompatibilityHit{Used: source != CompatibilitySourceFrozen, Source: source}
+		}
+		// Frozen complete routes must not silently replace an incompatible decision.
+		if route.HasFrozenRuntime() {
+			return "", CompatibilityHit{}
 		}
 	}
-	return DecisionKindForFamily(family)
+	return DecisionKindForFamily(family), CompatibilityHit{Used: true, Source: CompatibilitySourceFamilyDefault}
 }
 
 func legacyTypologyFamilyFromRoute(route ModelRoute) (modelcatalog.AlgorithmFamily, bool) {

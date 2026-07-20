@@ -40,6 +40,7 @@ func (Mapper) ToPO(model *port.PublishedModel) *PublishedAssessmentModelPO {
 		Kind:                    string(kind),
 		SubKind:                 string(model.SubKind),
 		Algorithm:               string(model.Algorithm),
+		AlgorithmFamily:         string(model.AlgorithmFamily),
 		Code:                    model.Code,
 		ReleaseVersion:          model.Version,
 		Title:                   model.Title,
@@ -75,13 +76,14 @@ func (Mapper) ToPublished(po *PublishedAssessmentModelPO) *port.PublishedModel {
 	if productChannel == "" {
 		productChannel = domain.DefaultProductChannelFor(kind)
 	}
-	return &port.PublishedModel{
+	model := &port.PublishedModel{
 		SchemaVersion:        po.SchemaVersion,
 		PayloadFormat:        po.PayloadFormat,
 		ProductChannel:       productChannel,
 		Kind:                 kind,
 		SubKind:              domain.SubKind(po.SubKind),
 		Algorithm:            domain.Algorithm(po.Algorithm),
+		AlgorithmFamily:      domain.AlgorithmFamily(po.AlgorithmFamily),
 		Code:                 po.Code,
 		Version:              po.ReleaseVersion,
 		Title:                po.Title,
@@ -101,5 +103,20 @@ func (Mapper) ToPublished(po *PublishedAssessmentModelPO) *port.PublishedModel {
 		Source:               source,
 		Payload:              append([]byte(nil), po.Payload...),
 		DefinitionV2:         definitionFromPO(po.DefinitionV2),
+	}
+	backfillAlgorithmFamily(model)
+	return model
+}
+
+func backfillAlgorithmFamily(model *port.PublishedModel) {
+	if model == nil || model.AlgorithmFamily != "" {
+		return
+	}
+	if f, ok := domain.AlgorithmFamilyFromDecisionKind(model.DecisionKind); ok {
+		model.AlgorithmFamily = f
+		return
+	}
+	if f, ok := domain.AlgorithmFamilyFromIdentity(model.Kind, model.SubKind, model.Algorithm); ok {
+		model.AlgorithmFamily = f
 	}
 }

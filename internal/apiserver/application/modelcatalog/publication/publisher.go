@@ -40,6 +40,11 @@ func (p Publisher) BuildSnapshot(ctx context.Context, model *domain.AssessmentMo
 	if err != nil {
 		return nil, err
 	}
+	runtime, err := domain.ResolveRuntimeIdentity(result.Kind, result.SubKind, result.Algorithm, result.DecisionKind, result.PayloadFormat)
+	if err != nil {
+		return nil, fmt.Errorf("freeze runtime identity: %w", err)
+	}
+	result.AlgorithmFamily = runtime.AlgorithmFamily
 	// 创建评估模型快照
 	return snapshotFromModel(model, result), nil
 }
@@ -121,6 +126,7 @@ func snapshotFromModel(model *domain.AssessmentModel, result definition.Snapshot
 		Kind:                 result.Kind,
 		SubKind:              result.SubKind,
 		Algorithm:            result.Algorithm,
+		AlgorithmFamily:      result.AlgorithmFamily,
 		Code:                 model.Code,
 		Version:              version,
 		Title:                model.Title,

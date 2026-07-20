@@ -47,6 +47,7 @@ type AssessmentSnapshot struct {
 	Kind                 domain.Kind
 	SubKind              domain.SubKind
 	Algorithm            domain.Algorithm
+	AlgorithmFamily      domain.AlgorithmFamily
 	Code                 string
 	Version              string
 	Title                string

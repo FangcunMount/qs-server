@@ -26,6 +26,7 @@ func TestPublisherBuildSnapshotUsesDefinitionHandler(t *testing.T) {
 	}
 	if snapshot.Kind != domain.KindCognitive ||
 		snapshot.Algorithm != domain.AlgorithmSPM ||
+		snapshot.AlgorithmFamily != domain.AlgorithmFamilyTaskPerformance ||
 		snapshot.PayloadFormat != domain.PayloadFormatCognitiveDefaultV1 ||
 		snapshot.DecisionKind != domain.DecisionKindAbilityLevel ||
 		snapshot.Version != "v3" ||

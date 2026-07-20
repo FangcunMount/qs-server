@@ -15,11 +15,17 @@ type DescriptorKey struct {
 
 // ModelRoute 是运行时路由需要的最小模型身份。
 type ModelRoute struct {
-	Kind          modelcatalog.Kind
-	SubKind       modelcatalog.SubKind
-	Algorithm     modelcatalog.Algorithm
-	DecisionKind  modelcatalog.DecisionKind
-	PayloadFormat string
+	Kind            modelcatalog.Kind
+	SubKind         modelcatalog.SubKind
+	Algorithm       modelcatalog.Algorithm
+	AlgorithmFamily modelcatalog.AlgorithmFamily
+	DecisionKind    modelcatalog.DecisionKind
+	PayloadFormat   string
+}
+
+// HasFrozenRuntime reports publish-time complete RuntimeIdentity on the route.
+func (r ModelRoute) HasFrozenRuntime() bool {
+	return r.AlgorithmFamily != "" && r.DecisionKind != "" && r.PayloadFormat != ""
 }
 
 func (k DescriptorKey) IsZero() bool {

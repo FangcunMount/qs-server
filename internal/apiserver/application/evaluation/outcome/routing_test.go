@@ -7,6 +7,32 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
+func TestModelRouteFromInputPreservesFrozenRuntimeIdentity(t *testing.T) {
+	t.Parallel()
+
+	route, ok := ModelRouteFromInput(&evaluationinput.InputSnapshot{
+		Model: &evaluationinput.ModelSnapshot{
+			Kind:            evaluationinput.EvaluationModelKindBehavioralRating,
+			Algorithm:       string(modelcatalog.AlgorithmBehavioralRatingDefault),
+			AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorNorm),
+			DecisionKind:    string(modelcatalog.DecisionKindNormLookup),
+			PayloadFormat:   modelcatalog.PayloadFormatBehavioralRatingDefaultV1,
+			ProductChannel:  string(modelcatalog.ProductChannel("screening")),
+			Code:            "BR-001",
+			Version:         "1.0.0",
+			Title:           "筛查行为评分",
+		},
+	})
+	if !ok {
+		t.Fatal("ModelRouteFromInput returned false")
+	}
+	if route.AlgorithmFamily != modelcatalog.AlgorithmFamilyFactorNorm ||
+		route.DecisionKind != modelcatalog.DecisionKindNormLookup ||
+		route.PayloadFormat != modelcatalog.PayloadFormatBehavioralRatingDefaultV1 {
+		t.Fatalf("frozen runtime not preserved: %#v", route)
+	}
+}
+
 func TestModelRouteFromInputPreservesRuntimeIdentity(t *testing.T) {
 	t.Parallel()
 

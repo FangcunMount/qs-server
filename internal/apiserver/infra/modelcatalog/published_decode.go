@@ -31,6 +31,7 @@ func DecodeBehavioralRatingFromDefinition(model *port.PublishedModel, tables map
 	if !payload.IsPublished() {
 		return nil, fmt.Errorf("behavioral_rating model is not published: %s", payload.Code)
 	}
+	payload.PublishedRuntime = port.RuntimeMetaFromPublished(model)
 	return payload, nil
 }
 
@@ -63,5 +64,6 @@ func DecodeScaleFromPublished(model *port.PublishedModel) (*scalesnapshot.ScaleS
 	if snapshot == nil {
 		return nil, fmt.Errorf("scale definition_v2 cannot produce runtime snapshot: %s", model.Code)
 	}
+	snapshot.PublishedRuntime = port.RuntimeMetaFromPublished(model)
 	return snapshot, nil
 }

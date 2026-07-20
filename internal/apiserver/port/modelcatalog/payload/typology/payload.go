@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
+	portmodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 // Payload 是unified personality 类型学 model 载荷。
@@ -23,6 +24,9 @@ type Payload struct {
 	MatchingSpec         MatchingSpec         `json:"matching_spec"`
 	SpecialTriggers      []SpecialTrigger     `json:"special_triggers"`
 	Runtime              *RuntimeSpec         `json:"runtime,omitempty"`
+
+	// PublishedRuntime is evaluation-only metadata from AssessmentSnapshot; not JSON payload.
+	PublishedRuntime *portmodelcatalog.PublishedRuntimeMeta `json:"-"`
 }
 
 // HasExplicitRuntime 报告是否 载荷 携带 作者定义 运行时规格。

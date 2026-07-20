@@ -26,6 +26,7 @@ type (
 	Family         = identitypkg.Family
 
 	AlgorithmFamily = identitypkg.AlgorithmFamily
+	RuntimeIdentity = identitypkg.RuntimeIdentity
 	ExecutionPath   = binding.ExecutionPath
 
 	KindCapability        = binding.KindCapability
@@ -199,8 +200,10 @@ var (
 	DecisionKindForIdentity         = binding.DecisionKindForIdentity
 	AlgorithmFamilyFromIdentity     = binding.AlgorithmFamilyFromIdentity
 	AllAlgorithmFamilies            = identitypkg.AllAlgorithmFamilies
+	ResolveRuntimeIdentity          = identitypkg.ResolveRuntimeIdentity
 
 	IsScalePayloadFormat               = payloadformatpkg.IsScalePayloadFormat
+	IsLegacyDecodeOnlyPayloadFormat    = payloadformatpkg.IsLegacyDecodeOnlyPayloadFormat
 	IsMBTIPayloadFormat                = payloadformatpkg.IsMBTIPayloadFormat
 	IsSBTIPayloadFormat                = payloadformatpkg.IsSBTIPayloadFormat
 	IsPersonalityTypologyPayloadFormat = payloadformatpkg.IsPersonalityTypologyPayloadFormat

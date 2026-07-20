@@ -7,6 +7,7 @@ import (
 )
 
 // ModelRouteFromInput 构建运行时路由 从 resolved 评估输入。
+// Prefer frozen RuntimeIdentity on ModelSnapshot; only fall back for incomplete legacy inputs.
 func ModelRouteFromInput(input *evaluationinput.InputSnapshot) (evalpipeline.ModelRoute, bool) {
 	if input == nil {
 		return evalpipeline.ModelRoute{}, false
@@ -24,16 +25,24 @@ func ModelRouteFromInput(input *evaluationinput.InputSnapshot) (evalpipeline.Mod
 	subKind := modelcatalog.SubKind(model.SubKind)
 	algorithm := modelcatalog.Algorithm(model.Algorithm)
 
-	var decisionKind modelcatalog.DecisionKind
-	if payload, ok := evaluationinput.TypologyPayload(input); ok && payload.HasExplicitRuntime() && payload.Runtime.Decision.Kind != "" {
-		decisionKind = payload.Runtime.Decision.Kind
+	decisionKind := modelcatalog.DecisionKind(model.DecisionKind)
+	if decisionKind == "" {
+		if payload, ok := evaluationinput.TypologyPayload(input); ok && payload.HasExplicitRuntime() && payload.Runtime.Decision.Kind != "" {
+			decisionKind = payload.Runtime.Decision.Kind
+		}
 	}
-	payloadFormat := modelcatalog.DraftPayloadFormatForModel(kind, algorithm)
+	payloadFormat := model.PayloadFormat
+	if payloadFormat == "" {
+		payloadFormat = modelcatalog.DraftPayloadFormatForModel(kind, algorithm)
+	}
+	family := modelcatalog.AlgorithmFamily(model.AlgorithmFamily)
+
 	return evalpipeline.ModelRoute{
-		Kind:          kind,
-		SubKind:       subKind,
-		Algorithm:     algorithm,
-		DecisionKind:  decisionKind,
-		PayloadFormat: payloadFormat,
+		Kind:            kind,
+		SubKind:         subKind,
+		Algorithm:       algorithm,
+		AlgorithmFamily: family,
+		DecisionKind:    decisionKind,
+		PayloadFormat:   payloadFormat,
 	}, true
 }

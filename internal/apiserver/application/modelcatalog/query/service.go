@@ -322,8 +322,19 @@ func publishedDetailFromModel(model *modelcatalogport.PublishedModel) (*modelcat
 		activeVersion = model.Version
 	}
 	summary := modelcatalog.ModelSummary{Code: model.Code, Kind: modelcatalog.DomainKindToAPIKind(model.Kind), SubKind: string(model.SubKind), Algorithm: string(model.Algorithm), Title: model.Title, Description: model.Description, Status: model.Status, Category: model.Category, Stages: append([]string(nil), model.Stages...), ApplicableAges: append([]string(nil), model.ApplicableAges...), Reporters: append([]string(nil), model.Reporters...), Tags: append([]string(nil), model.Tags...), QuestionnaireCode: model.QuestionnaireCode, QuestionnaireVersion: model.QuestionnaireVersion, ReleaseState: modelcatalog.ReleaseState{WorkingStatus: model.Status, WorkingVersion: model.Version, OnlineStatus: onlineStatus, ActiveVersion: activeVersion}}
-	modelcatalog.PopulateModelSummaryIdentity(&summary, model.Kind, model.SubKind, model.Algorithm, model.ProductChannel)
-	return &modelcatalog.PublishedModelDetail{ModelSummary: summary, Version: model.Version, Definition: model.DefinitionV2}, nil
+	if model.AlgorithmFamily != "" {
+		summary.AlgorithmFamily = string(model.AlgorithmFamily)
+		summary.ProductChannel = string(domain.ResolveProductChannel(model.Kind, model.ProductChannel))
+	} else {
+		modelcatalog.PopulateModelSummaryIdentity(&summary, model.Kind, model.SubKind, model.Algorithm, model.ProductChannel)
+	}
+	return &modelcatalog.PublishedModelDetail{
+		ModelSummary:  summary,
+		Version:       model.Version,
+		Definition:    model.DefinitionV2,
+		DecisionKind:  string(model.DecisionKind),
+		PayloadFormat: model.PayloadFormat,
+	}, nil
 }
 
 func normalizePage(value int) int {

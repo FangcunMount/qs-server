@@ -110,5 +110,6 @@ func decodePublishedCognitiveModel(model *rulesetport.PublishedModel) (*taskperf
 	if !payload.IsPublished() {
 		return nil, fmt.Errorf("cognitive model is not published: %s", payload.Code)
 	}
+	payload.PublishedRuntime = rulesetport.RuntimeMetaFromPublished(model)
 	return payload, nil
 }

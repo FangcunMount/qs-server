@@ -29,7 +29,7 @@ func NewBehavioralRatingModelSnapshot(snapshot *behavioralsnapshot.Snapshot, alg
 			algorithm = modelcatalog.AlgorithmBrief2
 		}
 	}
-	return &ModelSnapshot{
+	ms := &ModelSnapshot{
 		Kind:           EvaluationModelKindBehavioralRating,
 		Algorithm:      string(algorithm),
 		ProductChannel: string(modelcatalog.ProductChannelBehaviorAbility),
@@ -38,6 +38,7 @@ func NewBehavioralRatingModelSnapshot(snapshot *behavioralsnapshot.Snapshot, alg
 		Title:          snapshot.Title,
 		Payload:        BehavioralRatingModelPayload{Snapshot: snapshot},
 	}
+	return applyPublishedRuntime(ms, snapshot.PublishedRuntime)
 }
 
 func BehavioralRatingPayload(input *InputSnapshot) (BehavioralRatingModelPayload, bool) {

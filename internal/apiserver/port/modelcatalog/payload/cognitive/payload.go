@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	catalognorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 	taskperf "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance"
+	portmodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 	sharedpayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/shared"
 )
@@ -25,6 +26,9 @@ type Snapshot struct {
 	Factors              []FactorSnapshot
 	AbilityConclusions   []conclusion.AbilityConclusion
 	SPM                  *SPMSpec
+
+	// PublishedRuntime is evaluation-only metadata from AssessmentSnapshot; not JSON payload.
+	PublishedRuntime *portmodelcatalog.PublishedRuntimeMeta
 }
 
 type FactorSnapshot struct {

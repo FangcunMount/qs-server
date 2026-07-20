@@ -22,7 +22,7 @@ func NewCognitiveModelSnapshot(snapshot *taskperfsnapshot.Snapshot) *ModelSnapsh
 	if snapshot == nil {
 		return nil
 	}
-	return &ModelSnapshot{
+	ms := &ModelSnapshot{
 		Kind:           EvaluationModelKindCognitive,
 		Algorithm:      string(modelcatalog.AlgorithmSPM),
 		ProductChannel: string(modelcatalog.ProductChannelBehaviorAbility),
@@ -31,6 +31,7 @@ func NewCognitiveModelSnapshot(snapshot *taskperfsnapshot.Snapshot) *ModelSnapsh
 		Title:          snapshot.Title,
 		Payload:        CognitiveModelPayload{Snapshot: snapshot},
 	}
+	return applyPublishedRuntime(ms, snapshot.PublishedRuntime)
 }
 
 func CognitivePayload(input *InputSnapshot) (CognitiveModelPayload, bool) {

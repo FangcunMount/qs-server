@@ -78,7 +78,12 @@ func decodePublishedTypologyModel(model *rulesetport.PublishedModel) (*modeltypo
 	if err != nil {
 		return nil, err
 	}
-	return ensurePublishedTypologyPayload(payload)
+	payload, err = ensurePublishedTypologyPayload(payload)
+	if err != nil {
+		return nil, err
+	}
+	payload.PublishedRuntime = rulesetport.RuntimeMetaFromPublished(model)
+	return payload, nil
 }
 
 func ensurePublishedTypologyPayload(payload *modeltypology.Payload) (*modeltypology.Payload, error) {
