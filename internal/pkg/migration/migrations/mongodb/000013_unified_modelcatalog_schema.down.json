@@ -1,0 +1,67 @@
+[
+  {
+    "dropIndexes": "assessment_models",
+    "index": "idx_assessment_models_head_code"
+  },
+  {
+    "dropIndexes": "assessment_models",
+    "index": "idx_assessment_models_snapshot_identity_version"
+  },
+  {
+    "dropIndexes": "assessment_models",
+    "index": "idx_assessment_models_active_code"
+  },
+  {
+    "dropIndexes": "assessment_models",
+    "index": "idx_assessment_models_active_questionnaire"
+  },
+  {
+    "dropIndexes": "assessment_models",
+    "index": "idx_assessment_models_active_catalog"
+  },
+  {
+    "dropIndexes": "assessment_models",
+    "index": "idx_assessment_models_release_history"
+  },
+  {
+    "dropIndexes": "questionnaires",
+    "index": "idx_questionnaires_head_code"
+  },
+  {
+    "dropIndexes": "questionnaires",
+    "index": "idx_questionnaires_snapshot_version"
+  },
+  {
+    "dropIndexes": "questionnaires",
+    "index": "idx_questionnaires_active_code"
+  },
+  {
+    "dropIndexes": "questionnaires",
+    "index": "idx_questionnaires_release_history"
+  },
+  {
+    "dropIndexes": "assessment_norms",
+    "index": "idx_assessment_norms_table_version"
+  },
+  {
+    "createIndexes": "assessment_models",
+    "indexes": [
+      {
+        "key": { "code": 1 },
+        "name": "idx_assessment_models_code",
+        "unique": true,
+        "partialFilterExpression": { "deleted_at": null }
+      }
+    ]
+  },
+  {
+    "createIndexes": "questionnaires",
+    "indexes": [
+      {
+        "key": { "code": 1, "version": 1 },
+        "name": "idx_code_version",
+        "unique": true
+      }
+    ]
+  }
+]

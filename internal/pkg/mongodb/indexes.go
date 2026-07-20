@@ -20,9 +20,9 @@ func NewQuestionnairesIndexes(collection *mongo.Collection) *QuestionnairesIndex
 	return &QuestionnairesIndexes{collection: collection}
 }
 
-// EnsureIndexes 确保所有推荐索引已创建
+// EnsureIndexes 确保所有推荐索引已创建（含 unified head/snapshot partial unique）。
 func (q *QuestionnairesIndexes) EnsureIndexes(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	indexModels := []mongo.IndexModel{
@@ -60,6 +60,7 @@ func (q *QuestionnairesIndexes) EnsureIndexes(ctx context.Context) error {
 			Options: options.Index().SetName("idx_status_deleted_updated"),
 		},
 	}
+	indexModels = append(indexModels, unifiedQuestionnaireIndexModels()...)
 
 	if _, err := q.collection.Indexes().CreateMany(ctx, indexModels); err != nil {
 		return fmt.Errorf("create questionnaires indexes: %w", err)
@@ -174,6 +175,151 @@ func (s *ScalesIndexes) EnsureIndexes(ctx context.Context) error {
 	return nil
 }
 
+// AssessmentModelsIndexes manages unified assessment_models indexes.
+type AssessmentModelsIndexes struct {
+	collection *mongo.Collection
+}
+
+// NewAssessmentModelsIndexes creates an assessment_models index manager.
+func NewAssessmentModelsIndexes(collection *mongo.Collection) *AssessmentModelsIndexes {
+	return &AssessmentModelsIndexes{collection: collection}
+}
+
+// EnsureIndexes creates the canonical role-based partial unique indexes.
+func (a *AssessmentModelsIndexes) EnsureIndexes(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	if _, err := a.collection.Indexes().CreateMany(ctx, unifiedAssessmentModelIndexModels()); err != nil {
+		return fmt.Errorf("create assessment_models indexes: %w", err)
+	}
+	return nil
+}
+
+// AssessmentNormsIndexes manages assessment_norms indexes.
+type AssessmentNormsIndexes struct {
+	collection *mongo.Collection
+}
+
+// NewAssessmentNormsIndexes creates an assessment_norms index manager.
+func NewAssessmentNormsIndexes(collection *mongo.Collection) *AssessmentNormsIndexes {
+	return &AssessmentNormsIndexes{collection: collection}
+}
+
+// EnsureIndexes creates the canonical Norm table_version unique index.
+func (a *AssessmentNormsIndexes) EnsureIndexes(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if _, err := a.collection.Indexes().CreateMany(ctx, unifiedAssessmentNormIndexModels()); err != nil {
+		return fmt.Errorf("create assessment_norms indexes: %w", err)
+	}
+	return nil
+}
+
+func unifiedAssessmentModelIndexModels() []mongo.IndexModel {
+	return []mongo.IndexModel{
+		{
+			Keys: bson.D{{Key: "code", Value: 1}, {Key: "record_role", Value: 1}},
+			Options: options.Index().SetName("idx_assessment_models_head_code").SetUnique(true).
+				SetPartialFilterExpression(bson.M{"record_role": "head", "deleted_at": nil}),
+		},
+		{
+			Keys: bson.D{
+				{Key: "kind", Value: 1}, {Key: "sub_kind", Value: 1}, {Key: "algorithm", Value: 1},
+				{Key: "code", Value: 1}, {Key: "release_version", Value: 1}, {Key: "record_role", Value: 1},
+			},
+			Options: options.Index().SetName("idx_assessment_models_snapshot_identity_version").SetUnique(true).
+				SetPartialFilterExpression(bson.M{"record_role": "published_snapshot", "deleted_at": nil}),
+		},
+		{
+			Keys: bson.D{{Key: "code", Value: 1}, {Key: "record_role", Value: 1}, {Key: "release_status", Value: 1}},
+			Options: options.Index().SetName("idx_assessment_models_active_code").SetUnique(true).
+				SetPartialFilterExpression(bson.M{"record_role": "published_snapshot", "release_status": "active", "deleted_at": nil}),
+		},
+		{
+			Keys: bson.D{
+				{Key: "questionnaire_code", Value: 1}, {Key: "questionnaire_version", Value: 1},
+				{Key: "record_role", Value: 1}, {Key: "release_status", Value: 1},
+			},
+			Options: options.Index().SetName("idx_assessment_models_active_questionnaire").SetUnique(true).
+				SetPartialFilterExpression(bson.M{"record_role": "published_snapshot", "release_status": "active", "deleted_at": nil}),
+		},
+		{
+			Keys: bson.D{
+				{Key: "record_role", Value: 1}, {Key: "release_status", Value: 1}, {Key: "status", Value: 1},
+				{Key: "kind", Value: 1}, {Key: "category", Value: 1}, {Key: "algorithm", Value: 1}, {Key: "code", Value: 1},
+			},
+			Options: options.Index().SetName("idx_assessment_models_active_catalog"),
+		},
+		{
+			Keys:    bson.D{{Key: "code", Value: 1}, {Key: "record_role", Value: 1}, {Key: "published_at", Value: -1}},
+			Options: options.Index().SetName("idx_assessment_models_release_history"),
+		},
+	}
+}
+
+func unifiedQuestionnaireIndexModels() []mongo.IndexModel {
+	return []mongo.IndexModel{
+		{
+			Keys: bson.D{{Key: "code", Value: 1}, {Key: "record_role", Value: 1}},
+			Options: options.Index().SetName("idx_questionnaires_head_code").SetUnique(true).
+				SetPartialFilterExpression(bson.M{"record_role": "head", "deleted_at": nil}),
+		},
+		{
+			Keys: bson.D{{Key: "code", Value: 1}, {Key: "version", Value: 1}, {Key: "record_role", Value: 1}},
+			Options: options.Index().SetName("idx_questionnaires_snapshot_version").SetUnique(true).
+				SetPartialFilterExpression(bson.M{"record_role": "published_snapshot", "deleted_at": nil}),
+		},
+		{
+			Keys: bson.D{{Key: "code", Value: 1}, {Key: "record_role", Value: 1}, {Key: "release_status", Value: 1}},
+			Options: options.Index().SetName("idx_questionnaires_active_code").SetUnique(true).
+				SetPartialFilterExpression(bson.M{"record_role": "published_snapshot", "release_status": "active", "deleted_at": nil}),
+		},
+		{
+			Keys:    bson.D{{Key: "code", Value: 1}, {Key: "record_role", Value: 1}, {Key: "published_at", Value: -1}},
+			Options: options.Index().SetName("idx_questionnaires_release_history"),
+		},
+	}
+}
+
+func unifiedAssessmentNormIndexModels() []mongo.IndexModel {
+	return []mongo.IndexModel{{
+		Keys: bson.D{{Key: "table_version", Value: 1}},
+		Options: options.Index().SetName("idx_assessment_norms_table_version").SetUnique(true).
+			SetPartialFilterExpression(bson.M{"deleted_at": nil}),
+	}}
+}
+
+// RequiredUnifiedIndexNames lists canonical indexes that must exist after migration 000013.
+func RequiredUnifiedIndexNames() map[string][]string {
+	return map[string][]string{
+		"assessment_models": {
+			"idx_assessment_models_head_code",
+			"idx_assessment_models_snapshot_identity_version",
+			"idx_assessment_models_active_code",
+			"idx_assessment_models_active_questionnaire",
+			"idx_assessment_models_active_catalog",
+			"idx_assessment_models_release_history",
+		},
+		"questionnaires": {
+			"idx_questionnaires_head_code",
+			"idx_questionnaires_snapshot_version",
+			"idx_questionnaires_active_code",
+			"idx_questionnaires_release_history",
+		},
+		"assessment_norms": {
+			"idx_assessment_norms_table_version",
+		},
+	}
+}
+
+// ForbiddenLegacyIndexNames lists indexes that conflict with unified head/snapshot coexistence.
+func ForbiddenLegacyIndexNames() map[string][]string {
+	return map[string][]string{
+		"assessment_models": {"idx_assessment_models_code"},
+		"questionnaires":    {"idx_code_version"},
+	}
+}
+
 // IndexManager 集中管理所有集合的索引创建
 type IndexManager struct {
 	db *mongo.Database
@@ -186,22 +332,72 @@ func NewIndexManager(db *mongo.Database) *IndexManager {
 
 // EnsureAllIndexes 确保所有集合的索引都已创建
 func (m *IndexManager) EnsureAllIndexes(ctx context.Context) error {
-	// 问卷集合
 	if err := NewQuestionnairesIndexes(m.db.Collection("questionnaires")).EnsureIndexes(ctx); err != nil {
 		return err
 	}
-
-	// 答卷集合
 	if err := NewAnswerSheetsIndexes(m.db.Collection("answersheets")).EnsureIndexes(ctx); err != nil {
 		return err
 	}
-
-	// 量表集合
 	if err := NewScalesIndexes(m.db.Collection("scales")).EnsureIndexes(ctx); err != nil {
 		return err
 	}
-
+	if err := NewAssessmentModelsIndexes(m.db.Collection("assessment_models")).EnsureIndexes(ctx); err != nil {
+		return err
+	}
+	if err := NewAssessmentNormsIndexes(m.db.Collection("assessment_norms")).EnsureIndexes(ctx); err != nil {
+		return err
+	}
 	return nil
+}
+
+// VerifyUnifiedModelCatalogIndexes checks that required unified indexes exist and
+// conflicting legacy unique indexes are absent. Missing required indexes fail closed.
+func (m *IndexManager) VerifyUnifiedModelCatalogIndexes(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	for collection, names := range RequiredUnifiedIndexNames() {
+		present, err := listIndexNames(ctx, m.db.Collection(collection))
+		if err != nil {
+			return fmt.Errorf("list indexes for %s: %w", collection, err)
+		}
+		for _, name := range names {
+			if !present[name] {
+				return fmt.Errorf("required unified index %s.%s is missing; run Mongo migration 000013", collection, name)
+			}
+		}
+	}
+	for collection, names := range ForbiddenLegacyIndexNames() {
+		present, err := listIndexNames(ctx, m.db.Collection(collection))
+		if err != nil {
+			return fmt.Errorf("list indexes for %s: %w", collection, err)
+		}
+		for _, name := range names {
+			if present[name] {
+				return fmt.Errorf("legacy conflicting index %s.%s still exists; drop it before serving write traffic", collection, name)
+			}
+		}
+	}
+	return nil
+}
+
+func listIndexNames(ctx context.Context, collection *mongo.Collection) (map[string]bool, error) {
+	cursor, err := collection.Indexes().List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	out := make(map[string]bool)
+	for cursor.Next(ctx) {
+		var item struct {
+			Name string `bson:"name"`
+		}
+		if err := cursor.Decode(&item); err != nil {
+			return nil, err
+		}
+		out[item.Name] = true
+	}
+	return out, cursor.Err()
 }
 
 // MongoDB Shell 脚本版本 (用于手动创建)
@@ -225,6 +421,21 @@ db.questionnaires.createIndex(
 db.questionnaires.createIndex(
     { status: 1, deleted_at: 1, updated_at: -1 },
     { name: "idx_status_deleted_updated" }
+);
+
+db.questionnaires.createIndex(
+    { code: 1, record_role: 1 },
+    { name: "idx_questionnaires_head_code", unique: true, partialFilterExpression: { record_role: "head", deleted_at: null } }
+);
+
+db.questionnaires.createIndex(
+    { code: 1, version: 1, record_role: 1 },
+    { name: "idx_questionnaires_snapshot_version", unique: true, partialFilterExpression: { record_role: "published_snapshot", deleted_at: null } }
+);
+
+db.questionnaires.createIndex(
+    { code: 1, record_role: 1, release_status: 1 },
+    { name: "idx_questionnaires_active_code", unique: true, partialFilterExpression: { record_role: "published_snapshot", release_status: "active", deleted_at: null } }
 );
 
 // ========== AnswerSheets 集合 ==========
@@ -267,12 +478,20 @@ db.scales.createIndex(
     }
 );
 
+// ========== Assessment Models / Norms（unified schema，与 migration 000013 同源）==========
+db.assessment_models.createIndex(
+    { code: 1, record_role: 1 },
+    { name: "idx_assessment_models_head_code", unique: true, partialFilterExpression: { record_role: "head", deleted_at: null } }
+);
+db.assessment_norms.createIndex(
+    { table_version: 1 },
+    { name: "idx_assessment_norms_table_version", unique: true, partialFilterExpression: { deleted_at: null } }
+);
+
 // ========== 验证索引 ==========
-// 查看所有索引
 db.questionnaires.getIndexes();
 db.answersheets.getIndexes();
 db.scales.getIndexes();
-
-// 删除索引（如需要）
-// db.questionnaires.dropIndex("idx_code_record_role_deleted");
+db.assessment_models.getIndexes();
+db.assessment_norms.getIndexes();
 `

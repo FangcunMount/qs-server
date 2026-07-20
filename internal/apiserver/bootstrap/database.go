@@ -14,6 +14,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/pkg/migration"
+	mongo_indexes "github.com/FangcunMount/qs-server/internal/pkg/mongodb"
 	options "github.com/FangcunMount/qs-server/internal/pkg/options"
 )
 
@@ -590,6 +591,14 @@ func (dm *DatabaseManager) runMigrations(ctx context.Context) error {
 				"version", mongoVersion,
 			)
 		}
+		if err := mongo_indexes.NewIndexManager(mongoClient.Database(mongoDatabase)).VerifyUnifiedModelCatalogIndexes(ctx); err != nil {
+			return fmt.Errorf("mongodb unified schema index verification failed: %w", err)
+		}
+		logger.L(ctx).Infow("✅ MongoDB unified model-catalog indexes verified",
+			"component", "MongoDBMigration",
+			"action", "verify_indexes",
+			"result", "success",
+		)
 		ran = true
 	}
 
