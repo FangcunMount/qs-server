@@ -6,9 +6,14 @@ import (
 )
 
 // ValidateMeasureSpecParts checks measure-layer invariants after Factor is split from graph and scoring.
+// AssessmentModel publish/save baseline (MC-R007): Factors are required; empty measure is not a valid model.
 func ValidateMeasureSpecParts(factors []Factor, graph FactorGraph, scoring []Scoring) []HierarchyIssue {
 	if len(factors) == 0 {
-		return nil
+		return []HierarchyIssue{{
+			Field:   "factors",
+			Code:    "measure.factors.required",
+			Message: "assessment model requires at least one factor",
+		}}
 	}
 	byCode := IndexByFactorCode(factors)
 	issues := make([]HierarchyIssue, 0)

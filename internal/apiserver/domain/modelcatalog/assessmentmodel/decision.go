@@ -18,16 +18,36 @@ func (m *AssessmentModel) DecisionKindForDefinition() (binding.DecisionKind, err
 	}
 	switch m.Kind {
 	case binding.KindScale:
-		return binding.DecisionKindScoreRange, nil
+		return scaleDecisionKind(m.DefinitionV2.Conclusions)
 	case binding.KindBehavioralRating:
 		return behavioralDecisionKind(m.DefinitionV2.Conclusions, len(m.DefinitionV2.Calibration.NormRefs) > 0)
 	case binding.KindCognitive:
-		return binding.DecisionKindAbilityLevel, nil
+		return cognitiveDecisionKind(m.DefinitionV2.Conclusions)
 	case binding.KindTypology:
 		return typologyDecisionKind(m.DefinitionV2.Conclusions)
 	default:
 		return "", fmt.Errorf("model kind %s does not define a publish decision", m.Kind)
 	}
+}
+
+// scaleDecisionKind requires an explicit RiskConclusion; Kind alone must not invent Decision.
+func scaleDecisionKind(items []conclusion.Conclusion) (binding.DecisionKind, error) {
+	for _, item := range items {
+		if _, ok := item.(conclusion.RiskConclusion); ok {
+			return binding.DecisionKindScoreRange, nil
+		}
+	}
+	return "", fmt.Errorf("scale definition requires a risk conclusion")
+}
+
+// cognitiveDecisionKind requires an explicit AbilityConclusion; Kind alone must not invent Decision.
+func cognitiveDecisionKind(items []conclusion.Conclusion) (binding.DecisionKind, error) {
+	for _, item := range items {
+		if _, ok := item.(conclusion.AbilityConclusion); ok {
+			return binding.DecisionKindAbilityLevel, nil
+		}
+	}
+	return "", fmt.Errorf("cognitive definition requires an ability conclusion")
 }
 
 // behavioralDecisionKind enforces the domain rule that behavioral_rating always

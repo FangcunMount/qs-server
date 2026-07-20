@@ -49,11 +49,11 @@ func (h TypologyDefinitionHandler) ValidateForPublish(ctx context.Context, model
 		}
 		return append(issues, domain.DomainValidationIssue{Field: "definition_v2", Code: "definition_v2.runtime.invalid", Message: err.Error(), Level: domain.ValidationLevelError})
 	}
-	questionnaire, questionnaireIssues := h.questionnaireSnapshotForPublish(ctx, model.Binding.QuestionnaireCode, model.Binding.QuestionnaireVersion)
+	questionnaire, questionnaireIssues := loadPublishedQuestionnaire(ctx, h.QuestionnaireQuery, model.Binding.QuestionnaireCode, model.Binding.QuestionnaireVersion)
 	if len(questionnaireIssues) > 0 {
 		return append(issues, questionnaireIssues...)
 	}
-	return append(issues, modeltypology.ValidateRuntimeSpecForPublishWithContext(payload.Runtime, questionnaire, modeltypology.RuntimeSpecValidationContext{Algorithm: payload.Algorithm, Outcomes: payload.Outcomes})...)
+	return append(issues, modeltypology.ValidateRuntimeSpecForPublishWithContext(payload.Runtime, questionnaireSnapshotFromResult(questionnaire), modeltypology.RuntimeSpecValidationContext{Algorithm: payload.Algorithm, Outcomes: payload.Outcomes})...)
 }
 
 // BuildSnapshotPayload 构建评估模型快照负载
@@ -125,24 +125,6 @@ func (h TypologyDefinitionHandler) PreviewReport(ctx context.Context, model *dom
 		return nil, err
 	}
 	return previewResultFromReport(result), nil
-}
-
-// questionnaireSnapshotForPublish 获取问卷快照
-func (h TypologyDefinitionHandler) questionnaireSnapshotForPublish(ctx context.Context, codeValue, version string) (modeltypology.QuestionnaireSnapshot, []domain.DomainValidationIssue) {
-	if codeValue == "" || version == "" {
-		return modeltypology.QuestionnaireSnapshot{}, nil
-	}
-	if h.QuestionnaireQuery == nil {
-		return modeltypology.QuestionnaireSnapshot{}, []domain.DomainValidationIssue{{Field: "binding.questionnaire", Message: "问卷查询服务未配置", Code: "binding.questionnaire_query.unavailable", Level: domain.ValidationLevelError}}
-	}
-	questionnaire, err := h.QuestionnaireQuery.GetPublishedByCodeVersion(ctx, codeValue, version)
-	if err != nil || questionnaire == nil {
-		return modeltypology.QuestionnaireSnapshot{}, []domain.DomainValidationIssue{{Field: "binding.questionnaire", Message: "绑定问卷不存在或未发布", Code: "binding.questionnaire.not_found", Level: domain.ValidationLevelError}}
-	}
-	if len(questionnaire.Questions) == 0 {
-		return modeltypology.QuestionnaireSnapshot{}, []domain.DomainValidationIssue{{Field: "binding.questionnaire", Message: "绑定问卷题目不能为空", Code: "binding.questionnaire.questions.required", Level: domain.ValidationLevelError}}
-	}
-	return questionnaireSnapshotFromResult(questionnaire), nil
 }
 
 // previewQuestionnaire 预览问卷

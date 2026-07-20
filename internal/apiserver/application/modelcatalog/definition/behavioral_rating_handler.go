@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	behavioralpayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
@@ -11,7 +12,8 @@ import (
 
 // BehavioralRatingDefinitionHandler 行为评定模型定义处理程序
 type BehavioralRatingDefinitionHandler struct {
-	NormRepo port.NormRepository
+	NormRepo           port.NormRepository
+	QuestionnaireQuery questionnaireapp.QuestionnaireQueryService
 }
 
 // Supports 支持
@@ -36,6 +38,7 @@ func (h BehavioralRatingDefinitionHandler) ValidateForPublish(ctx context.Contex
 	if _, err := model.DecisionKindForDefinition(); err != nil {
 		issues = append(issues, domain.DomainValidationIssue{Field: "definition_v2.conclusions", Code: "definition_v2.decision.invalid", Message: err.Error(), Level: domain.ValidationLevelError})
 	}
+	issues = append(issues, validateDefinitionQuestionnaireRefs(ctx, h.QuestionnaireQuery, model)...)
 	return issues
 }
 

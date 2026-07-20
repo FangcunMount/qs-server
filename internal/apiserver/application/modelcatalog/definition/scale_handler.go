@@ -5,13 +5,16 @@ import (
 	"encoding/json"
 	"fmt"
 
+	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	scalepayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
 // ScaleDefinitionHandler 拥有规模特定的线缆投影和发布验证
 // DefinitionV2 是其唯一的创作输入。
-type ScaleDefinitionHandler struct{}
+type ScaleDefinitionHandler struct {
+	QuestionnaireQuery questionnaireapp.QuestionnaireQueryService
+}
 
 // Supports 支持特定评估模型身份
 func (ScaleDefinitionHandler) Supports(identity domain.Identity) bool {
@@ -19,14 +22,21 @@ func (ScaleDefinitionHandler) Supports(identity domain.Identity) bool {
 }
 
 // ValidateForPublish 验证发布
-func (ScaleDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
+func (h ScaleDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	if model == nil {
 		return []domain.DomainValidationIssue{{
 			Field: "model", Message: "模型不能为空", Code: "model.required", Level: domain.ValidationLevelError,
 		}}
 	}
 	issues := model.ValidateForPublish().Issues
-	return append(issues, ValidateDefinitionV2ForPublish(ctx, model.DefinitionV2, nil)...)
+	issues = append(issues, ValidateDefinitionV2ForPublish(ctx, model.DefinitionV2, nil)...)
+	if _, err := model.DecisionKindForDefinition(); err != nil {
+		issues = append(issues, domain.DomainValidationIssue{
+			Field: "definition_v2.conclusions", Code: "definition_v2.decision.invalid", Message: err.Error(), Level: domain.ValidationLevelError,
+		})
+	}
+	issues = append(issues, validateDefinitionQuestionnaireRefs(ctx, h.QuestionnaireQuery, model)...)
+	return issues
 }
 
 // BuildSnapshotPayload 构建评估模型快照负载

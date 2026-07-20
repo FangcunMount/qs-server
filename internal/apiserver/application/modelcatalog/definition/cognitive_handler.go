@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	cognitivepayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
@@ -11,7 +12,8 @@ import (
 
 // CognitiveDefinitionHandler 拥有认知 DefinitionV2 验证及其发布的负载投影
 type CognitiveDefinitionHandler struct {
-	NormRepo port.NormRepository // 规范存储库
+	NormRepo           port.NormRepository
+	QuestionnaireQuery questionnaireapp.QuestionnaireQueryService
 }
 
 // Supports 支持特定评估模型身份
@@ -35,6 +37,7 @@ func (h CognitiveDefinitionHandler) ValidateForPublish(ctx context.Context, mode
 	if _, err := model.DecisionKindForDefinition(); err != nil {
 		issues = append(issues, domain.DomainValidationIssue{Field: "definition_v2.conclusions", Code: "definition_v2.decision.invalid", Message: err.Error(), Level: domain.ValidationLevelError})
 	}
+	issues = append(issues, validateDefinitionQuestionnaireRefs(ctx, h.QuestionnaireQuery, model)...)
 	return issues
 }
 

@@ -241,7 +241,7 @@ Decision 是测评模型的必需层。它把 Factor 或校准结果转换为稳
 
 Decision 不负责生成面向用户的标题、长描述、建议或报告 section。当前这些内容仍混合在 Conclusion、Outcome 和 TypeOutcomeProfile 中，是已经识别的物理结构问题。
 
-目标发布规则是：Factor 必需、Norm 可选、Decision 必需。当前 `ValidateMeasureSpecParts` 在 Factors 为空时直接返回，部分 Kind 的 `DecisionKindForDefinition` 也仍从 Kind 提供默认结果，因此代码尚未形成所有模型类型统一执行的完整性守卫。这是规划改造，不应写成已经实现。
+目标发布规则是：Factor 必需、Norm 可选、Decision 必需。`ValidateMeasureSpecParts` 已对空 Factors 返回 `measure.factors.required`；scale/cognitive 的 `DecisionKindForDefinition` 已要求对应 Conclusion；scale/behavioral/cognitive 发布时已对照已发布问卷版本校验 question/option（及 SPM CorrectOption）存在性。问卷 type 策略与 Bind/Publish 分策仍属 MC-R009。
 
 ## 6. AlgorithmBinding 与 ExecutionSpec
 

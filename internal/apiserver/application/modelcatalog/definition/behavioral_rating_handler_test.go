@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
+	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
@@ -13,13 +14,26 @@ import (
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
+func behavioralPublishHandler(table *norm.Norm) appdefinition.BehavioralRatingDefinitionHandler {
+	return appdefinition.BehavioralRatingDefinitionHandler{
+		NormRepo: behavioralNormRepoStub{table: table},
+		QuestionnaireQuery: behavioralQuestionnaireStub{result: &questionnaireapp.QuestionnaireResult{
+			Code: "Q", Version: "1", Status: "published",
+			Questions: []questionnaireapp.QuestionResult{
+				{Code: "q1", Options: []questionnaireapp.OptionResult{{Value: "A"}}},
+				{Code: "q2", Options: []questionnaireapp.OptionResult{{Value: "A"}}},
+			},
+		}},
+	}
+}
+
 func TestBehavioralValidateForPublishRejectsMissingNormSemantics(t *testing.T) {
 	t.Parallel()
 
-	handler := appdefinition.BehavioralRatingDefinitionHandler{NormRepo: behavioralNormRepoStub{table: &norm.Norm{
+	handler := behavioralPublishHandler(&norm.Norm{
 		TableVersion: "brief2-cn-2024",
 		Factors:      []norm.FactorTable{{FactorCode: "bri", Lookup: []norm.LookupEntry{{RawScoreMin: 1, RawScoreMax: 3, TScore: 50, Percentile: 50}}}},
-	}}}
+	})
 
 	model := validBehavioralDraft()
 	model.DefinitionV2.Calibration.NormRefs = nil
@@ -32,10 +46,10 @@ func TestBehavioralValidateForPublishRejectsMissingNormSemantics(t *testing.T) {
 func TestBehavioralValidateForPublishRejectsDefaultAlgorithm(t *testing.T) {
 	t.Parallel()
 
-	handler := appdefinition.BehavioralRatingDefinitionHandler{NormRepo: behavioralNormRepoStub{table: &norm.Norm{
+	handler := behavioralPublishHandler(&norm.Norm{
 		TableVersion: "brief2-cn-2024",
 		Factors:      []norm.FactorTable{{FactorCode: "bri", Lookup: []norm.LookupEntry{{RawScoreMin: 1, RawScoreMax: 3, TScore: 50, Percentile: 50}}}},
-	}}}
+	})
 	model := validBehavioralDraft()
 	model.Algorithm = domain.AlgorithmBehavioralRatingDefault
 	issues := handler.ValidateForPublish(context.Background(), model)
@@ -47,10 +61,10 @@ func TestBehavioralValidateForPublishRejectsDefaultAlgorithm(t *testing.T) {
 func TestBehavioralValidateForPublishRejectsNormRefMissingInTable(t *testing.T) {
 	t.Parallel()
 
-	handler := appdefinition.BehavioralRatingDefinitionHandler{NormRepo: behavioralNormRepoStub{table: &norm.Norm{
+	handler := behavioralPublishHandler(&norm.Norm{
 		TableVersion: "brief2-cn-2024",
 		Factors:      []norm.FactorTable{{FactorCode: "other", Lookup: []norm.LookupEntry{{RawScoreMin: 1, RawScoreMax: 3, TScore: 50, Percentile: 50}}}},
-	}}}
+	})
 	model := validBehavioralDraft()
 	issues := handler.ValidateForPublish(context.Background(), model)
 	if !hasIssueCode(issues, "behavioral_rating.norm_ref.factor.missing_in_table") {
@@ -61,13 +75,13 @@ func TestBehavioralValidateForPublishRejectsNormRefMissingInTable(t *testing.T) 
 func TestBehavioralValidateForPublishRejectsConclusionWithoutNormRef(t *testing.T) {
 	t.Parallel()
 
-	handler := appdefinition.BehavioralRatingDefinitionHandler{NormRepo: behavioralNormRepoStub{table: &norm.Norm{
+	handler := behavioralPublishHandler(&norm.Norm{
 		TableVersion: "brief2-cn-2024",
 		Factors: []norm.FactorTable{
 			{FactorCode: "bri", Lookup: []norm.LookupEntry{{RawScoreMin: 1, RawScoreMax: 3, TScore: 50, Percentile: 50}}},
 			{FactorCode: "gec", Lookup: []norm.LookupEntry{{RawScoreMin: 1, RawScoreMax: 3, TScore: 50, Percentile: 50}}},
 		},
-	}}}
+	})
 	model := validBehavioralDraft()
 	model.DefinitionV2.Measure.Factors = append(model.DefinitionV2.Measure.Factors, factor.Factor{Code: "gec", Title: "GEC", Role: factor.FactorRoleDimension})
 	model.DefinitionV2.Measure.Scoring = append(model.DefinitionV2.Measure.Scoring, factor.Scoring{
@@ -89,11 +103,11 @@ func TestBehavioralValidateForPublishRejectsConclusionWithoutNormRef(t *testing.
 func TestBehavioralValidateForPublishAcceptsBrief2(t *testing.T) {
 	t.Parallel()
 
-	handler := appdefinition.BehavioralRatingDefinitionHandler{NormRepo: behavioralNormRepoStub{table: &norm.Norm{
+	handler := behavioralPublishHandler(&norm.Norm{
 		TableVersion: "brief2-cn-2024",
 		FormVariant:  "teacher",
 		Factors:      []norm.FactorTable{{FactorCode: "bri", Lookup: []norm.LookupEntry{{RawScoreMin: 1, RawScoreMax: 3, TScore: 50, Percentile: 50}}}},
-	}}}
+	})
 	issues := handler.ValidateForPublish(context.Background(), validBehavioralDraft())
 	for _, issue := range issues {
 		if issue.Level == domain.ValidationLevelError {
@@ -165,6 +179,33 @@ func hasIssueCode(issues []domain.DomainValidationIssue, code string) bool {
 		}
 	}
 	return false
+}
+
+type behavioralQuestionnaireStub struct {
+	result *questionnaireapp.QuestionnaireResult
+	err    error
+}
+
+func (s behavioralQuestionnaireStub) GetByCode(context.Context, string) (*questionnaireapp.QuestionnaireResult, error) {
+	return s.result, s.err
+}
+func (s behavioralQuestionnaireStub) List(context.Context, questionnaireapp.ListQuestionnairesDTO) (*questionnaireapp.QuestionnaireSummaryListResult, error) {
+	return nil, nil
+}
+func (s behavioralQuestionnaireStub) GetPublishedByCode(context.Context, string) (*questionnaireapp.QuestionnaireResult, error) {
+	return s.result, s.err
+}
+func (s behavioralQuestionnaireStub) GetPublishedByCodeVersion(context.Context, string, string) (*questionnaireapp.QuestionnaireResult, error) {
+	return s.result, s.err
+}
+func (s behavioralQuestionnaireStub) GetQuestionCount(context.Context, string) (int32, error) {
+	if s.result == nil {
+		return 0, s.err
+	}
+	return int32(len(s.result.Questions)), s.err
+}
+func (s behavioralQuestionnaireStub) ListPublished(context.Context, questionnaireapp.ListQuestionnairesDTO) (*questionnaireapp.QuestionnaireSummaryListResult, error) {
+	return nil, nil
 }
 
 type behavioralNormRepoStub struct {

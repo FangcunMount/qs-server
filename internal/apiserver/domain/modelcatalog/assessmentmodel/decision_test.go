@@ -19,6 +19,16 @@ func TestDecisionKindForDefinitionUsesDomainSemantics(t *testing.T) {
 		want  binding.DecisionKind
 	}{
 		{
+			name: "scale risk conclusion",
+			model: assessmentmodel.AssessmentModel{
+				Kind: binding.KindScale,
+				DefinitionV2: &definition.Definition{Conclusions: []conclusion.Conclusion{
+					conclusion.RiskConclusion{FactorCode: "total"},
+				}},
+			},
+			want: binding.DecisionKindScoreRange,
+		},
+		{
 			name: "behavioral norm",
 			model: assessmentmodel.AssessmentModel{
 				Kind: binding.KindBehavioralRating,
@@ -30,9 +40,14 @@ func TestDecisionKindForDefinitionUsesDomainSemantics(t *testing.T) {
 			want: binding.DecisionKindNormLookup,
 		},
 		{
-			name:  "cognitive without ability rules",
-			model: assessmentmodel.AssessmentModel{Kind: binding.KindCognitive, DefinitionV2: &definition.Definition{}},
-			want:  binding.DecisionKindAbilityLevel,
+			name: "cognitive ability conclusion",
+			model: assessmentmodel.AssessmentModel{
+				Kind: binding.KindCognitive,
+				DefinitionV2: &definition.Definition{Conclusions: []conclusion.Conclusion{
+					conclusion.AbilityConclusion{FactorCode: "total", ScoreBasis: conclusion.ScoreBasisRaw},
+				}},
+			},
+			want: binding.DecisionKindAbilityLevel,
 		},
 		{
 			name: "typology type conclusion",
@@ -56,6 +71,33 @@ func TestDecisionKindForDefinitionUsesDomainSemantics(t *testing.T) {
 			}
 			if got != tc.want {
 				t.Fatalf("decision kind = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestDecisionKindForDefinitionRejectsIncompleteDecision(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		model assessmentmodel.AssessmentModel
+	}{
+		{
+			name:  "scale without risk conclusion",
+			model: assessmentmodel.AssessmentModel{Kind: binding.KindScale, DefinitionV2: &definition.Definition{}},
+		},
+		{
+			name:  "cognitive without ability conclusion",
+			model: assessmentmodel.AssessmentModel{Kind: binding.KindCognitive, DefinitionV2: &definition.Definition{}},
+		},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if _, err := tc.model.DecisionKindForDefinition(); err == nil {
+				t.Fatal("expected incomplete decision to fail")
 			}
 		})
 	}
