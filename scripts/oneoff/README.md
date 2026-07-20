@@ -47,6 +47,7 @@ export MONGO_URI='mongodb://app_user:***@127.0.0.1:27017/qs?directConnection=tru
 | `seed_brief2/` | 从历史 BRIEF-2 常模 PHP 和经过核验的题目-因子映射，初始化 BRIEF-2 家长版行为能力模型 | Mongo `assessment_norms` + `assessment_models` head/snapshot |
 | `seed_spm_sensory/` | 从历史 SPM 感觉统合常模 PHP 和经过核验的题目-因子映射，初始化 `spm_sensory` 行为能力模型 | Mongo `assessment_norms` + `assessment_models` head/snapshot |
 | `audit_scale_models/` | 只读审计所有 canonical Scale 草稿、发布快照、绑定问卷、DefinitionV2 与 payload 投影一致性 | 无写入 |
+| `audit_norm_usage/` | 只读 Norm 反向引用审计：published snapshot NormRef → usage / dangling / unreferenced（MC-R020 A） | 无写入 |
 | `observe_outbox_by_event_type/` | 只读观测 outbox 按 `event_type` 积压与近期写入，输出 legacy 退役 Gate | 无写入 |
 
 `__pycache__/` 是 Python 运行产物，不是脚本入口。
