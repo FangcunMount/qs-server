@@ -10,7 +10,8 @@ import (
 	behavioralpayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 )
 
-// BehavioralRatingDefinitionHandler 行为评定模型定义处理程序
+// BehavioralRatingDefinitionHandler composes shared validators with behavioral
+// Norm loading and payload projection.
 type BehavioralRatingDefinitionHandler struct {
 	NormRepo           port.NormRepository
 	QuestionnaireQuery questionnaireapp.QuestionnaireQueryService
@@ -24,21 +25,20 @@ func (BehavioralRatingDefinitionHandler) Supports(identity domain.Identity) bool
 // ValidateForPublish 验证发布
 func (h BehavioralRatingDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	if model == nil {
-		return []domain.DomainValidationIssue{{Field: "model", Message: "模型不能为空", Code: "model.required", Level: domain.ValidationLevelError}}
+		return []domain.DomainValidationIssue{modelRequiredIssue()}
 	}
 	if model.Definition.IsEmpty() {
-		return []domain.DomainValidationIssue{{Field: "definition", Message: "行为评定模型定义不能为空", Code: "definition.required", Level: domain.ValidationLevelError}}
+		return []domain.DomainValidationIssue{{
+			Field: "definition", Message: "行为评定模型定义不能为空",
+			Code: "definition.required", Level: domain.ValidationLevelError,
+		}}
 	}
 	issues := model.ValidateForPublish().Issues
-	issues = append(issues, ValidateDefinitionV2ForPublishWithModel(ctx, model, model.DefinitionV2, h.NormRepo)...)
-	issues = append(issues, h.validateBehavioralPublishContract(ctx, model)...)
-	if model.Algorithm == domain.AlgorithmBrief2 && model.DefinitionV2 != nil && model.DefinitionV2.Execution.Brief2 == nil {
-		issues = append(issues, domain.DomainValidationIssue{Field: "execution.brief2", Code: "brief2.execution.required", Message: "BRIEF-2 execution spec is required", Level: domain.ValidationLevelError})
-	}
-	if _, err := model.DecisionKindForDefinition(); err != nil {
-		issues = append(issues, domain.DomainValidationIssue{Field: "definition_v2.conclusions", Code: "definition_v2.decision.invalid", Message: err.Error(), Level: domain.ValidationLevelError})
-	}
-	issues = append(issues, validateDefinitionQuestionnaireRefs(ctx, h.QuestionnaireQuery, model)...)
+	issues = append(issues, ValidateDefinitionForPublish(ctx, model, h.NormRepo)...)
+	issues = append(issues, ValidateBehavioralSemantic(model)...)
+	issues = append(issues, ValidateAlgorithmBinding(model)...)
+	issues = AppendDecisionKindIssues(model, issues)
+	issues = append(issues, ValidateQuestionnaireMeasure(ctx, h.QuestionnaireQuery, model)...)
 	return issues
 }
 
@@ -72,59 +72,6 @@ func (h BehavioralRatingDefinitionHandler) BuildSnapshotPayload(ctx context.Cont
 		DecisionKind:  decisionKind,
 		Payload:       encoded,
 	}, nil
-}
-
-func (h BehavioralRatingDefinitionHandler) validateBehavioralPublishContract(_ context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
-	issues := make([]domain.DomainValidationIssue, 0)
-	if err := requireBehavioralPublishAlgorithm(model.Algorithm); err != nil {
-		issues = append(issues, domain.DomainValidationIssue{
-			Field: "algorithm", Code: "behavioral_rating.algorithm.required", Message: err.Error(), Level: domain.ValidationLevelError,
-		})
-	}
-	if model.DefinitionV2 == nil {
-		return issues
-	}
-	def := model.DefinitionV2
-	if len(def.Calibration.NormRefs) == 0 {
-		issues = append(issues, domain.DomainValidationIssue{
-			Field: "calibration.norm_refs", Code: "behavioral_rating.norm_refs.required",
-			Message: "behavioral_rating 必须配置至少一条 NormRef；原始分区间模型应使用 scale", Level: domain.ValidationLevelError,
-		})
-	}
-
-	normRefFactors := map[string]struct{}{}
-	for _, ref := range def.Calibration.NormRefs {
-		if ref.FactorCode != "" {
-			normRefFactors[ref.FactorCode] = struct{}{}
-		}
-	}
-	for _, item := range def.Conclusions {
-		normConclusion, ok := item.(domain.NormConclusion)
-		if !ok {
-			continue
-		}
-		if _, ok := normRefFactors[normConclusion.FactorCode]; normConclusion.FactorCode != "" && !ok {
-			issues = append(issues, domain.DomainValidationIssue{
-				Field: "definition_v2.conclusions", Code: "behavioral_rating.conclusion.norm_ref.missing",
-				Message: fmt.Sprintf("NormConclusion factor %s 缺少对应 NormRef", normConclusion.FactorCode),
-				Level:   domain.ValidationLevelError,
-			})
-		}
-	}
-	return issues
-}
-
-func requireBehavioralPublishAlgorithm(algorithm domain.Algorithm) error {
-	switch algorithm {
-	case domain.AlgorithmBrief2, domain.AlgorithmSPMSensory:
-		return nil
-	case "":
-		return fmt.Errorf("behavioral_rating 发布必须指定真实 Algorithm（brief2 或 spm_sensory）")
-	case domain.AlgorithmBehavioralRatingDefault:
-		return fmt.Errorf("新发布不允许 behavioral_rating_default；请使用 brief2 或 spm_sensory")
-	default:
-		return fmt.Errorf("behavioral_rating algorithm %q 不受支持；请使用 brief2 或 spm_sensory", algorithm)
-	}
 }
 
 func (h BehavioralRatingDefinitionHandler) loadNormTable(ctx context.Context, value *domain.Definition) (*domain.Norm, error) {

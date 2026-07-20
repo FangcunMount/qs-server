@@ -50,6 +50,33 @@ func TestCognitiveValidateForPublishRejectsUnknownSPMOption(t *testing.T) {
 	}
 }
 
+func TestCognitiveBuildSnapshotPayloadDefaultsAlgorithmAndDecision(t *testing.T) {
+	t.Parallel()
+	model := publishableCognitiveShell()
+	model.Algorithm = ""
+	model.DefinitionV2 = cognitiveDefinitionWithAbility()
+	result, err := (CognitiveDefinitionHandler{}).BuildSnapshotPayload(context.Background(), model)
+	if err != nil {
+		t.Fatalf("BuildSnapshotPayload: %v", err)
+	}
+	if result.Algorithm != domain.AlgorithmSPM || result.DecisionKind != domain.DecisionKindAbilityLevel || len(result.Payload) == 0 {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestCognitiveValidateForPublishRejectsMissingSPMExecution(t *testing.T) {
+	t.Parallel()
+	model := publishableCognitiveShell()
+	model.DefinitionV2 = cognitiveDefinitionWithAbility()
+	model.DefinitionV2.Execution.SPM = nil
+	issues := (CognitiveDefinitionHandler{QuestionnaireQuery: publishedQuestionnaireStub("Q", "1",
+		questionnaireapp.QuestionResult{Code: "Q1", Options: []questionnaireapp.OptionResult{{Value: "A"}}},
+	)}).ValidateForPublish(context.Background(), model)
+	if !hasIssueCode(issues, "spm.execution.required") {
+		t.Fatalf("issues = %#v, want spm.execution.required", issues)
+	}
+}
+
 func publishableCognitiveShell() *domain.AssessmentModel {
 	return &domain.AssessmentModel{
 		Kind:       domain.KindCognitive,

@@ -10,8 +10,7 @@ import (
 	scalepayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
-// ScaleDefinitionHandler 拥有规模特定的线缆投影和发布验证
-// DefinitionV2 是其唯一的创作输入。
+// ScaleDefinitionHandler composes shared validators with scale payload projection.
 type ScaleDefinitionHandler struct {
 	QuestionnaireQuery questionnaireapp.QuestionnaireQueryService
 }
@@ -24,18 +23,12 @@ func (ScaleDefinitionHandler) Supports(identity domain.Identity) bool {
 // ValidateForPublish 验证发布
 func (h ScaleDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	if model == nil {
-		return []domain.DomainValidationIssue{{
-			Field: "model", Message: "模型不能为空", Code: "model.required", Level: domain.ValidationLevelError,
-		}}
+		return []domain.DomainValidationIssue{modelRequiredIssue()}
 	}
 	issues := model.ValidateForPublish().Issues
-	issues = append(issues, ValidateDefinitionV2ForPublish(ctx, model.DefinitionV2, nil)...)
-	if _, err := model.DecisionKindForDefinition(); err != nil {
-		issues = append(issues, domain.DomainValidationIssue{
-			Field: "definition_v2.conclusions", Code: "definition_v2.decision.invalid", Message: err.Error(), Level: domain.ValidationLevelError,
-		})
-	}
-	issues = append(issues, validateDefinitionQuestionnaireRefs(ctx, h.QuestionnaireQuery, model)...)
+	issues = append(issues, ValidateDefinitionForPublish(ctx, model, nil)...)
+	issues = AppendDecisionKindIssues(model, issues)
+	issues = append(issues, ValidateQuestionnaireMeasure(ctx, h.QuestionnaireQuery, model)...)
 	return issues
 }
 

@@ -31,10 +31,10 @@ func (TypologyDefinitionHandler) Supports(identity domain.Identity) bool {
 // ValidateForPublish 验证发布
 func (h TypologyDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	if model == nil {
-		return []domain.DomainValidationIssue{{Field: "model", Message: "模型不能为空", Code: "model.required", Level: domain.ValidationLevelError}}
+		return []domain.DomainValidationIssue{modelRequiredIssue()}
 	}
 	issues := model.ValidateForPublish().Issues
-	issues = append(issues, ValidateDefinitionV2ForPublish(ctx, model.DefinitionV2, nil)...)
+	issues = append(issues, ValidateDefinitionForPublish(ctx, model, nil)...)
 	if domain.HasValidationErrors(issues) {
 		return issues
 	}

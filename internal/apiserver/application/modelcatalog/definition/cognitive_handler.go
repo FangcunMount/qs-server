@@ -10,7 +10,7 @@ import (
 	cognitivepayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
 )
 
-// CognitiveDefinitionHandler 拥有认知 DefinitionV2 验证及其发布的负载投影
+// CognitiveDefinitionHandler composes shared validators with cognitive payload projection.
 type CognitiveDefinitionHandler struct {
 	NormRepo           port.NormRepository
 	QuestionnaireQuery questionnaireapp.QuestionnaireQueryService
@@ -24,20 +24,19 @@ func (CognitiveDefinitionHandler) Supports(identity domain.Identity) bool {
 // ValidateForPublish 验证发布
 func (h CognitiveDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	if model == nil {
-		return []domain.DomainValidationIssue{{Field: "model", Message: "模型不能为空", Code: "model.required", Level: domain.ValidationLevelError}}
+		return []domain.DomainValidationIssue{modelRequiredIssue()}
 	}
 	if model.Definition.IsEmpty() {
-		return []domain.DomainValidationIssue{{Field: "definition", Message: "认知模型定义不能为空", Code: "definition.required", Level: domain.ValidationLevelError}}
+		return []domain.DomainValidationIssue{{
+			Field: "definition", Message: "认知模型定义不能为空",
+			Code: "definition.required", Level: domain.ValidationLevelError,
+		}}
 	}
 	issues := model.ValidateForPublish().Issues
-	issues = append(issues, ValidateDefinitionV2ForPublishWithModel(ctx, model, model.DefinitionV2, h.NormRepo)...)
-	if model.Algorithm == domain.AlgorithmSPM && model.DefinitionV2 != nil && model.DefinitionV2.Execution.SPM == nil {
-		issues = append(issues, domain.DomainValidationIssue{Field: "execution.spm", Code: "spm.execution.required", Message: "SPM execution spec is required", Level: domain.ValidationLevelError})
-	}
-	if _, err := model.DecisionKindForDefinition(); err != nil {
-		issues = append(issues, domain.DomainValidationIssue{Field: "definition_v2.conclusions", Code: "definition_v2.decision.invalid", Message: err.Error(), Level: domain.ValidationLevelError})
-	}
-	issues = append(issues, validateDefinitionQuestionnaireRefs(ctx, h.QuestionnaireQuery, model)...)
+	issues = append(issues, ValidateDefinitionForPublish(ctx, model, h.NormRepo)...)
+	issues = append(issues, ValidateAlgorithmBinding(model)...)
+	issues = AppendDecisionKindIssues(model, issues)
+	issues = append(issues, ValidateQuestionnaireMeasure(ctx, h.QuestionnaireQuery, model)...)
 	return issues
 }
 
