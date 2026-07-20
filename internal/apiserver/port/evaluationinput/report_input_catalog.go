@@ -133,7 +133,7 @@ func typologyOutcomesFromAssets(assets *interpretationassets.Assets) []typology.
 		byCode[profile.OutcomeCode] = typology.Outcome{
 			Code: profile.OutcomeCode, Name: existing.Name, OneLiner: existing.OneLiner,
 			Summary: firstNonEmpty(profile.Commentary, existing.Summary),
-			Traits: profile.Traits, Strengths: profile.Strengths, Weaknesses: profile.Weaknesses,
+			Traits:  profile.Traits, Strengths: profile.Strengths, Weaknesses: profile.Weaknesses,
 			Suggestions: profile.Suggestions, ImageURL: profile.ImageURL, Pattern: profile.Pattern,
 			Image: profile.Image, IsSpecial: profile.IsSpecial, Trigger: profile.Trigger,
 			Commentary: profile.Commentary,

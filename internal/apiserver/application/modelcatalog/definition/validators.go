@@ -206,4 +206,3 @@ func ValidateStrategyCapability(model *domain.AssessmentModel, path capability.P
 	}
 	return out
 }
-

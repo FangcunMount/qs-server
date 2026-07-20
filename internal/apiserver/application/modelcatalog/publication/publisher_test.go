@@ -78,7 +78,7 @@ func TestPublisherPublishAttachesProjectionHashes(t *testing.T) {
 	model.DefinitionV2 = completeScaleDefinitionForPublishTest()
 	repo := &publishedRepo{}
 	publisher := publication.Publisher{
-		Registry: definition.NewRegistry(warningSnapshotHandler{}),
+		Registry:  definition.NewRegistry(warningSnapshotHandler{}),
 		ModelRepo: &publishedModelRepo{}, Repo: repo,
 	}
 	if _, err := publisher.Publish(context.Background(), model, publication.PublishOptions{}); err != nil {

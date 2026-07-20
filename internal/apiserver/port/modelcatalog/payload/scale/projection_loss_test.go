@@ -16,7 +16,7 @@ func TestScaleSnapshotFromDefinitionPreservesQuestionOnlyBaseline(t *testing.T) 
 	maxScore := 10.0
 	def := &definition.Definition{
 		Measure: definition.MeasureSpec{
-			Factors: []factor.Factor{{Code: "total", Title: "总分", Role: factor.FactorRoleTotal}},
+			Factors:     []factor.Factor{{Code: "total", Title: "总分", Role: factor.FactorRoleTotal}},
 			FactorGraph: factor.FactorGraph{Roots: []string{"total"}},
 			Scoring: []factor.Scoring{{
 				FactorCode: "total",
@@ -95,7 +95,7 @@ func TestScaleSnapshotFromDefinitionPreservesQuestionSourceMetadata(t *testing.T
 	t.Parallel()
 	def := &definition.Definition{
 		Measure: definition.MeasureSpec{
-			Factors: []factor.Factor{{Code: "dim", Title: "维度", Role: factor.FactorRoleDimension}},
+			Factors:     []factor.Factor{{Code: "dim", Title: "维度", Role: factor.FactorRoleDimension}},
 			FactorGraph: factor.FactorGraph{Roots: []string{"dim"}},
 			Scoring: []factor.Scoring{{
 				FactorCode:    "dim",

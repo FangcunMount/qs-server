@@ -12,12 +12,12 @@ import (
 // PublicationComposerOptions configures the shared publish-validation pipeline.
 // Family handlers compose options instead of owning Kind-switched validation trees.
 type PublicationComposerOptions struct {
-	NormRepo                    port.NormRepository
-	QuestionnaireQuery          questionnaireapp.QuestionnaireQueryService
-	RequireLegacyDefinition     bool
-	LegacyDefinitionMessage     string
-	IncludeBehavioralSemantic   bool
-	IncludeAlgorithmBinding     bool
+	NormRepo                  port.NormRepository
+	QuestionnaireQuery        questionnaireapp.QuestionnaireQueryService
+	RequireLegacyDefinition   bool
+	LegacyDefinitionMessage   string
+	IncludeBehavioralSemantic bool
+	IncludeAlgorithmBinding   bool
 	// StrategyCapabilityPath enables MC-R014 Scoring.Strategy checks against the
 	// Calculation capability catalog for this execution path.
 	StrategyCapabilityPath      capability.Path

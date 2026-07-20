@@ -37,11 +37,11 @@ type bucket struct {
 }
 
 type report struct {
-	Scanned   int      `json:"scanned"`
-	Eligible  int      `json:"eligible"`
-	Skipped   int      `json:"skipped"`
-	Applied   int      `json:"applied"`
-	Buckets   []bucket `json:"buckets"`
+	Scanned  int      `json:"scanned"`
+	Eligible int      `json:"eligible"`
+	Skipped  int      `json:"skipped"`
+	Applied  int      `json:"applied"`
+	Buckets  []bucket `json:"buckets"`
 }
 
 func main() {

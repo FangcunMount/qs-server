@@ -16,8 +16,8 @@ type Definition struct {
 	Conclusions          []conclusion.Conclusion
 	Outcomes             []conclusion.Outcome
 	ReportMap            ReportMap
-	DecisionSpec         decision.Spec                 `json:"DecisionSpec,omitempty"`
-	InterpretationAssets interpretationassets.Assets     `json:"InterpretationAssets,omitempty"`
+	DecisionSpec         decision.Spec               `json:"DecisionSpec,omitempty"`
+	InterpretationAssets interpretationassets.Assets `json:"InterpretationAssets,omitempty"`
 }
 
 // ExecutionSpec carries algorithm-specific semantics that cannot be expressed

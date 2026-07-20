@@ -41,9 +41,9 @@ type OutcomeRefPO struct {
 }
 
 type InterpretationAssetsPO struct {
-	Outcomes   []OutcomePresentationPO   `bson:"outcomes,omitempty"`
-	Profiles   []TypeProfilePO           `bson:"profiles,omitempty"`
-	ReportSpec InterpretationReportPO    `bson:"report_spec,omitempty"`
+	Outcomes   []OutcomePresentationPO `bson:"outcomes,omitempty"`
+	Profiles   []TypeProfilePO         `bson:"profiles,omitempty"`
+	ReportSpec InterpretationReportPO  `bson:"report_spec,omitempty"`
 }
 
 type OutcomePresentationPO struct {

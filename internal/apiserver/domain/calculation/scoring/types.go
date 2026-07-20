@@ -40,10 +40,10 @@ type Factor struct {
 	QuestionCodes   []string
 	Contributions   []QuestionContribution
 	// ChildCodes marks a composite factor whose inputs are other factor raw scores.
-	ChildCodes   []string
-	ChildWeights map[string]float64
-	MaxScore     *float64
-	IsTotalScore bool
+	ChildCodes     []string
+	ChildWeights   map[string]float64
+	MaxScore       *float64
+	IsTotalScore   bool
 	InterpretRules []InterpretRule
 }
 

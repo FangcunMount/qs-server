@@ -4,8 +4,8 @@
 // Checks:
 //  1. published Mongo snapshots retained_read count
 //  2. optional MySQL Assessment/Outcome:
-//       - retained aliases (mbti|sbti|bigfive|behavioral_rating_default)
-//       - empty algorithm rows (separate bucket)
+//     - retained aliases (mbti|sbti|bigfive|behavioral_rating_default)
+//     - empty algorithm rows (separate bucket)
 //  3. optional --metrics-ok attestation for Prometheus 14d rates
 //
 // Default exit 0; use --fail-on-gate to exit 1 when status != PASS.

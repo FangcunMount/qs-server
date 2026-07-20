@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 )
 
 // ReportInputAuditIssue records a report-input integrity finding (MC-R017 batch 3).
@@ -39,13 +39,13 @@ func ReportInputSchema(data []byte) uint {
 // BuildFreezeOptionsFromSnapshot derives v3 freeze options from a decoded input snapshot.
 func BuildFreezeOptionsFromSnapshot(input *InputSnapshot, modelRef ModelRef, family modelcatalog.AlgorithmFamily) ReportInputFreezeOptions {
 	opts := ReportInputFreezeOptions{
-		Payload:         input.ModelPayload,
 		ModelRef:        modelRef,
 		AlgorithmFamily: family,
 	}
 	if input == nil {
 		return opts
 	}
+	opts.Payload = input.ModelPayload
 	if frozen, ok := InterpretationAssetsFromSnapshot(input); ok {
 		copy := frozen
 		opts.Assets = &copy

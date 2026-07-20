@@ -55,14 +55,14 @@ func (d *Definition) UnmarshalJSON(data []byte) error {
 }
 
 type definitionJSON struct {
-	Measure              MeasureSpec                    `json:"Measure"`
-	Calibration          Calibration                    `json:"Calibration"`
-	Execution            ExecutionSpec                  `json:"Execution"`
-	Conclusions          []conclusionJSON               `json:"Conclusions"`
-	Outcomes             []conclusion.Outcome           `json:"Outcomes"`
-	ReportMap            ReportMap                      `json:"ReportMap"`
-	DecisionSpec         decision.Spec                  `json:"DecisionSpec,omitempty"`
-	InterpretationAssets interpretationassets.Assets    `json:"InterpretationAssets,omitempty"`
+	Measure              MeasureSpec                 `json:"Measure"`
+	Calibration          Calibration                 `json:"Calibration"`
+	Execution            ExecutionSpec               `json:"Execution"`
+	Conclusions          []conclusionJSON            `json:"Conclusions"`
+	Outcomes             []conclusion.Outcome        `json:"Outcomes"`
+	ReportMap            ReportMap                   `json:"ReportMap"`
+	DecisionSpec         decision.Spec               `json:"DecisionSpec,omitempty"`
+	InterpretationAssets interpretationassets.Assets `json:"InterpretationAssets,omitempty"`
 }
 
 type conclusionJSON struct {

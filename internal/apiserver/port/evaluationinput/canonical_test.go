@@ -13,7 +13,7 @@ import (
 func TestAttachCanonicalDefinitionMaterializesAssets(t *testing.T) {
 	t.Parallel()
 	def := &modeldefinition.Definition{
-		Measure: modeldefinition.MeasureSpec{Factors: []factor.Factor{{Code: "total", Title: "总分"}}},
+		Measure:  modeldefinition.MeasureSpec{Factors: []factor.Factor{{Code: "total", Title: "总分"}}},
 		Outcomes: []conclusion.Outcome{{Code: "low", Title: "低", Summary: "摘要"}},
 	}
 	modeldefinition.MaterializeLayers(def)

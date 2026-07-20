@@ -138,7 +138,7 @@ func TestValidateMeasureSpecPartsRejectsGraphScoringChildrenMismatch(t *testing.
 		[]factor.Factor{{Code: "parent", Role: factor.FactorRoleIndex}, {Code: "child"}, {Code: "other"}},
 		factor.FactorGraph{
 			Roots: []string{"parent"},
-			Edges:  []factor.FactorEdge{{ParentCode: "parent", ChildCode: "child"}},
+			Edges: []factor.FactorEdge{{ParentCode: "parent", ChildCode: "child"}},
 		},
 		[]factor.Scoring{{
 			FactorCode: "parent", Strategy: factor.ScoringStrategySum,
@@ -156,7 +156,7 @@ func TestValidateMeasureSpecPartsAcceptsConsistentHierarchy(t *testing.T) {
 		[]factor.Factor{{Code: "parent", Role: factor.FactorRoleIndex}, {Code: "child"}},
 		factor.FactorGraph{
 			Roots: []string{"parent"},
-			Edges:  []factor.FactorEdge{{ParentCode: "parent", ChildCode: "child"}},
+			Edges: []factor.FactorEdge{{ParentCode: "parent", ChildCode: "child"}},
 		},
 		[]factor.Scoring{{
 			FactorCode: "parent", Strategy: factor.ScoringStrategySum,

@@ -10,10 +10,10 @@ import (
 func TestClassifyAlgorithmWritePolicy(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name                string
-		kind                binding.Kind
-		algorithm           binding.Algorithm
-		want                identity.AlgorithmWritePolicy
+		name      string
+		kind      binding.Kind
+		algorithm binding.Algorithm
+		want      identity.AlgorithmWritePolicy
 	}{
 		{name: "scale_default", kind: binding.KindScale, algorithm: binding.AlgorithmScaleDefault, want: identity.AlgorithmWriteCanonical},
 		{name: "scale_empty", kind: binding.KindScale, want: identity.AlgorithmWriteDraftOK},

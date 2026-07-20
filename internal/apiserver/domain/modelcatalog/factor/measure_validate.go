@@ -303,7 +303,6 @@ func sameStringSet(left, right map[string]struct{}) bool {
 	return true
 }
 
-
 func validateScoring(rule Scoring, byCode map[string]Factor) []HierarchyIssue {
 	issues := make([]HierarchyIssue, 0)
 	if _, ok := byCode[rule.FactorCode]; !ok {

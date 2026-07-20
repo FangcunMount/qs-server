@@ -31,8 +31,8 @@ type config struct {
 }
 
 type report struct {
-	PublishedCount int                           `json:"published_count"`
-	ErrorCount     int                           `json:"error_count"`
+	PublishedCount int                               `json:"published_count"`
+	ErrorCount     int                               `json:"error_count"`
 	Issues         []publication.InventoryAuditIssue `json:"issues"`
 }
 

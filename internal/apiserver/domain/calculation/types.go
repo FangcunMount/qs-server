@@ -4,7 +4,7 @@ package calculation
 
 // StrategyType 计分策略类型（infra/ruleengine 内部实现名）。
 // 声明空间 / OpenAPI / Definition 使用 capability catalog 的 canonical 码
-//（avg、cnt）；本类型保留 average、count 作为内部名，由 ScaleFactorScorer
+// （avg、cnt）；本类型保留 average、count 作为内部名，由 ScaleFactorScorer
 // 经 capability.Canonical 映射。公开 ScaleFactorScorer 仅注册 question_aggregation 子集。
 type StrategyType string
 

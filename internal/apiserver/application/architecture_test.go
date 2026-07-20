@@ -600,13 +600,14 @@ func isEvaluationRootPackageGoFile(root, path string) bool {
 }
 
 func isEvaluationRulesetPayloadImport(importPath string) bool {
-	if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog" {
-		return true
-	}
 	if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing" {
 		return true
 	}
+	// MC-R017: evaluationinput may carry canonical DefinitionV2 / InterpretationAssets,
+	// measure helpers, and frozen calculation NormTables for ReportInput replay.
 	for _, allowed := range []string{
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm",
 		"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology",
 		"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale",
 		"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral",

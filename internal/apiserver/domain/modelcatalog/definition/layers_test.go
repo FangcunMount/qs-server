@@ -61,7 +61,7 @@ func TestInterpretationAssetsFromKeepsPresentationAndProfiles(t *testing.T) {
 				Decision: conclusion.TypeDecision{Kind: binding.DecisionKindPoleComposition},
 				Profiles: []conclusion.TypeOutcomeProfile{{
 					OutcomeCode: "ENTJ", Pattern: "E-N-T-J", Suggestions: []string{"行动"},
-					Rarity:      conclusion.Rarity{Percent: 1.8, Label: "稀少", OneInX: 56},
+					Rarity: conclusion.Rarity{Percent: 1.8, Label: "稀少", OneInX: 56},
 				}},
 			},
 		},

@@ -6,10 +6,11 @@ import (
 )
 
 // Offline condition (ops / MC-R018):
-// 1) inventory: audit_legacy_identities retained_read == 0
-// 2) runtime: qs_modelcatalog_identity_write_policy_total{policy="retained_read"}
-//    and qs_modelcatalog_identity_algorithm_fallback_total stay flat (rate≈0) for a
-//    sustained window (e.g. 14d) across environments
+//  1. inventory: audit_legacy_identities retained_read == 0
+//  2. runtime: qs_modelcatalog_identity_write_policy_total{policy="retained_read"}
+//     and qs_modelcatalog_identity_algorithm_fallback_total stay flat (rate≈0) for a
+//     sustained window (e.g. 14d) across environments
+//
 // → then remove the corresponding retained-read / empty-algorithm fallback branch.
 var (
 	identityWritePolicyTotal = promauto.NewCounterVec(prometheus.CounterOpts{

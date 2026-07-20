@@ -63,9 +63,9 @@ func TestMarshalReportInputV3OmitsPayloadForScale(t *testing.T) {
 		OutcomeCode: "low", Summary: "偏低",
 	}}}
 	raw, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
-		Payload: evaluationinput.ScaleModelPayload{Scale: &scalesnapshot.ScaleSnapshot{Code: "PHQ9"}},
-		Assets:  assets,
-		ModelRef: evaluationinput.ModelRef{Kind: evaluationinput.EvaluationModelKindScale, Code: "PHQ9", Version: "v1"},
+		Payload:         evaluationinput.ScaleModelPayload{Scale: &scalesnapshot.ScaleSnapshot{Code: "PHQ9"}},
+		Assets:          assets,
+		ModelRef:        evaluationinput.ModelRef{Kind: evaluationinput.EvaluationModelKindScale, Code: "PHQ9", Version: "v1"},
 		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
 		FactorCatalog:   []evaluationinput.FactorCatalogEntry{{Code: "TOTAL", Title: "总分", MaxScore: &max, IsTotalScore: true}},
 	})
@@ -102,9 +102,9 @@ func TestMarshalReportInputV3OmitsPayloadForTypology(t *testing.T) {
 	}}}
 	src := typology.Source{Attribution: "test", License: "CC"}
 	raw, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
-		Payload: evaluationinput.TypologyModelPayload{Payload: &typology.Payload{Code: "MBTI", Outcomes: []typology.Outcome{{Code: "INTJ"}}}},
-		Assets:  assets,
-		ModelRef: evaluationinput.ModelRef{Kind: evaluationinput.EvaluationModelKindTypology, Code: "MBTI", Version: "v1", Algorithm: "mbti"},
+		Payload:         evaluationinput.TypologyModelPayload{Payload: &typology.Payload{Code: "MBTI", Outcomes: []typology.Outcome{{Code: "INTJ"}}}},
+		Assets:          assets,
+		ModelRef:        evaluationinput.ModelRef{Kind: evaluationinput.EvaluationModelKindTypology, Code: "MBTI", Version: "v1", Algorithm: "mbti"},
 		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
 		TypologySource:  &src,
 	})
@@ -146,9 +146,9 @@ func TestMarshalReportInputV3OmitsPayloadForBehavioralNorm(t *testing.T) {
 	}}}
 	assets := &interpretationassets.Assets{Outcomes: []interpretationassets.OutcomePresentation{{OutcomeCode: "elevated", Summary: "偏高"}}}
 	raw, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
-		Payload: evaluationinput.BehavioralRatingModelPayload{Snapshot: &behavioralsnapshot.Snapshot{Code: "BRIEF2"}},
-		Assets:  assets,
-		ModelRef: evaluationinput.ModelRef{Kind: evaluationinput.EvaluationModelKindBehavioralRating, Code: "BRIEF2", Version: "v1"},
+		Payload:         evaluationinput.BehavioralRatingModelPayload{Snapshot: &behavioralsnapshot.Snapshot{Code: "BRIEF2"}},
+		Assets:          assets,
+		ModelRef:        evaluationinput.ModelRef{Kind: evaluationinput.EvaluationModelKindBehavioralRating, Code: "BRIEF2", Version: "v1"},
 		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorNorm,
 		FactorCatalog:   []evaluationinput.FactorCatalogEntry{{Code: "gec", Title: "GEC", MaxScore: &max}},
 		Norming:         &evaluationinput.NormingFreeze{NormTables: tables},

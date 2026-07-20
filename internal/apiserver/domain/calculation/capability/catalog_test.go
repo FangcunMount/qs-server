@@ -10,44 +10,44 @@ func TestCatalogFreezesExecutionPathStrategyMatrix(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		path    capability.Path
-		usage   capability.Usage
-		want    []string
-		accept  []string
-		reject  []string
+		path   capability.Path
+		usage  capability.Usage
+		want   []string
+		accept []string
+		reject []string
 	}{
 		{
 			path: capability.PathScaleDescriptor, usage: capability.UsageQuestionAggregation,
-			want: []string{"sum", "avg", "cnt"},
+			want:   []string{"sum", "avg", "cnt"},
 			accept: []string{"sum", "avg", "average", "cnt", "count"},
 			reject: []string{"weighted_sum", "max", "min", "weighted_avg"},
 		},
 		{
 			path: capability.PathScaleDescriptor, usage: capability.UsageCompositeProjection,
-			want: []string{"sum", "avg", "weighted_sum", "none", "lookup", "custom"},
+			want:   []string{"sum", "avg", "weighted_sum", "none", "lookup", "custom"},
 			accept: []string{"sum", "average", "weighted_sum", "none"},
 			reject: []string{"cnt", "weighted_avg", "max"},
 		},
 		{
 			path: capability.PathTypologyDescriptor, usage: capability.UsageTypologyLeaf,
-			want: []string{"sum"},
+			want:   []string{"sum"},
 			accept: []string{"sum"},
 			reject: []string{"avg", "weighted_avg", "cnt"},
 		},
 		{
 			path: capability.PathTypologyDescriptor, usage: capability.UsageTypologyComposite,
-			want: []string{"sum", "avg", "weighted_avg"},
+			want:   []string{"sum", "avg", "weighted_avg"},
 			accept: []string{"sum", "avg", "average", "weighted_avg"},
 			reject: []string{"cnt", "weighted_sum", "max"},
 		},
 		{
 			path: capability.PathBehavioralRatingDescriptor, usage: capability.UsageQuestionAggregation,
-			want: []string{"sum", "avg", "cnt"},
+			want:   []string{"sum", "avg", "cnt"},
 			reject: []string{"weighted_sum"},
 		},
 		{
 			path: capability.PathCognitiveDescriptor, usage: capability.UsageQuestionAggregation,
-			want: []string{"sum", "avg", "cnt"},
+			want:   []string{"sum", "avg", "cnt"},
 			reject: []string{"max"},
 		},
 	}
