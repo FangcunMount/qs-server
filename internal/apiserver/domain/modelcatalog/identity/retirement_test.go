@@ -3,6 +3,7 @@ package identity_test
 import (
 	"testing"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
 )
 
@@ -15,9 +16,15 @@ func TestEvaluateRetirementGateFailOnInventory(t *testing.T) {
 		t.Fatalf("got = %#v", got)
 	}
 	got = identity.EvaluateRetirementGate(identity.RetirementGateInputs{
-		AssessmentRetainedRead: 2, MetricsRetainedReadOK: true, MetricsFallbackOK: true,
+		AssessmentRetainedAlias: 2, MetricsRetainedReadOK: true, MetricsFallbackOK: true,
 	})
-	if got.Status != "FAIL" {
+	if got.Status != "FAIL" || got.Reasons[0] != "assessment_retained_alias>0" {
+		t.Fatalf("got = %#v", got)
+	}
+	got = identity.EvaluateRetirementGate(identity.RetirementGateInputs{
+		AssessmentEmptyAlgorithm: 3, MetricsRetainedReadOK: true, MetricsFallbackOK: true,
+	})
+	if got.Status != "FAIL" || got.Reasons[0] != "assessment_empty_algorithm>0" {
 		t.Fatalf("got = %#v", got)
 	}
 }
@@ -37,6 +44,19 @@ func TestEvaluateRetirementGatePass(t *testing.T) {
 	})
 	if got.Status != "PASS" {
 		t.Fatalf("got = %#v", got)
+	}
+}
+
+func TestIsRetainedReadAliasAlgorithm(t *testing.T) {
+	t.Parallel()
+	if !identity.IsRetainedReadAliasAlgorithm(binding.AlgorithmMBTI) {
+		t.Fatal("mbti")
+	}
+	if identity.IsRetainedReadAliasAlgorithm(binding.AlgorithmBrief2) {
+		t.Fatal("brief2 is canonical")
+	}
+	if identity.IsRetainedReadAliasAlgorithm("") {
+		t.Fatal("empty is not retained alias")
 	}
 }
 

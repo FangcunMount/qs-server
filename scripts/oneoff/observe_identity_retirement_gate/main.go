@@ -3,7 +3,9 @@
 //
 // Checks:
 //  1. published Mongo snapshots retained_read count
-//  2. optional MySQL Assessment/Outcome retained algorithm counts
+//  2. optional MySQL Assessment/Outcome:
+//       - retained aliases (mbti|sbti|bigfive|behavioral_rating_default)
+//       - empty algorithm rows (separate bucket)
 //  3. optional --metrics-ok attestation for Prometheus 14d rates
 //
 // Default exit 0; use --fail-on-gate to exit 1 when status != PASS.
@@ -16,6 +18,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -40,13 +43,14 @@ type config struct {
 }
 
 type report struct {
-	PublishedCount         int                      `json:"published_count"`
-	PublishedRetainedRead  int                      `json:"published_retained_read"`
-	AssessmentRetainedRead int                      `json:"assessment_retained_read"`
-	AssessmentBuckets      map[string]int           `json:"assessment_buckets,omitempty"`
-	MetricsAttested        bool                     `json:"metrics_attested"`
-	Gate                   identity.RetirementGate  `json:"gate"`
-	DeleteChecklist        []string                 `json:"delete_checklist"`
+	PublishedCount            int                     `json:"published_count"`
+	PublishedRetainedRead     int                     `json:"published_retained_read"`
+	AssessmentRetainedAlias   int                     `json:"assessment_retained_alias"`
+	AssessmentEmptyAlgorithm  int                     `json:"assessment_empty_algorithm"`
+	AssessmentBuckets         map[string]int          `json:"assessment_buckets,omitempty"`
+	MetricsAttested           bool                    `json:"metrics_attested"`
+	Gate                      identity.RetirementGate `json:"gate"`
+	DeleteChecklist           []string                `json:"delete_checklist"`
 }
 
 func main() {
@@ -79,14 +83,15 @@ func main() {
 			os.Exit(1)
 		}
 	} else {
-		fmt.Fprintln(os.Stderr, "note: --mysql-dsn omitted; assessment_retained_read treated as 0 for gate math (inventory incomplete)")
+		fmt.Fprintln(os.Stderr, "note: --mysql-dsn omitted; assessment inventory treated as 0 for gate math (incomplete)")
 	}
 
 	out.Gate = identity.EvaluateRetirementGate(identity.RetirementGateInputs{
-		PublishedRetainedRead:  out.PublishedRetainedRead,
-		AssessmentRetainedRead: out.AssessmentRetainedRead,
-		MetricsRetainedReadOK:  cfg.metricsOK,
-		MetricsFallbackOK:      cfg.metricsOK,
+		PublishedRetainedRead:    out.PublishedRetainedRead,
+		AssessmentRetainedAlias:  out.AssessmentRetainedAlias,
+		AssessmentEmptyAlgorithm: out.AssessmentEmptyAlgorithm,
+		MetricsRetainedReadOK:    cfg.metricsOK,
+		MetricsFallbackOK:        cfg.metricsOK,
 	})
 	if cfg.mysqlDSN == "" && out.Gate.Status != "FAIL" {
 		out.Gate = identity.RetirementGate{
@@ -200,27 +205,37 @@ func scanBuckets(ctx context.Context, db *sql.DB, query, source string, out *rep
 		if err := rows.Scan(&kind, &algorithm, &cnt); err != nil {
 			return err
 		}
+		alg := modelcatalog.Algorithm(algorithm.String)
 		key := source + "|" + kind.String + "|" + algorithm.String
 		out.AssessmentBuckets[key] = cnt
-		// Empty algorithm on Assessment is draft_ok / historical incompleteness;
-		// count it toward retirement inventory so deletes stay blocked until reviewed.
-		out.AssessmentRetainedRead += cnt
+		if identity.IsRetainedReadAliasAlgorithm(alg) {
+			out.AssessmentRetainedAlias += cnt
+			continue
+		}
+		if algorithm.String == "" {
+			out.AssessmentEmptyAlgorithm += cnt
+		}
 	}
 	return rows.Err()
 }
 
 func printReport(out *report) {
-	fmt.Printf("published=%d published_retained_read=%d assessment_retained_read=%d metrics_attested=%v\n",
-		out.PublishedCount, out.PublishedRetainedRead, out.AssessmentRetainedRead, out.MetricsAttested)
+	fmt.Printf("published=%d published_retained_read=%d assessment_retained_alias=%d assessment_empty_algorithm=%d metrics_attested=%v\n",
+		out.PublishedCount, out.PublishedRetainedRead, out.AssessmentRetainedAlias, out.AssessmentEmptyAlgorithm, out.MetricsAttested)
 	fmt.Printf("gate=%s", out.Gate.Status)
 	if len(out.Gate.Reasons) > 0 {
 		fmt.Printf(" reasons=%s", strings.Join(out.Gate.Reasons, ","))
 	}
 	fmt.Println()
 	if len(out.AssessmentBuckets) > 0 {
+		keys := make([]string, 0, len(out.AssessmentBuckets))
+		for k := range out.AssessmentBuckets {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
 		fmt.Println("assessment buckets:")
-		for k, v := range out.AssessmentBuckets {
-			fmt.Printf("  %s count=%d\n", k, v)
+		for _, k := range keys {
+			fmt.Printf("  %s count=%d\n", k, out.AssessmentBuckets[k])
 		}
 	}
 	fmt.Println("delete checklist (only after gate=PASS):")
