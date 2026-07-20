@@ -1,8 +1,8 @@
 package scoring
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scorerange"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 )
 
 type FactorReportScore struct {
