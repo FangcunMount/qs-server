@@ -53,6 +53,12 @@ func TestUnifiedModelCatalogSchemaMigrationFreshInstall(t *testing.T) {
 
 	execMongoMigration(t, db, "000013_unified_modelcatalog_schema.up.json")
 
+	mgr := mongo_indexes.NewIndexManager(db)
+	// JSON up only createIndexes; legacy drop is Go-side (idempotent IndexNotFound).
+	if err := mgr.ReconcileUnifiedModelCatalogIndexes(ctx); err != nil {
+		t.Fatalf("ReconcileUnifiedModelCatalogIndexes: %v", err)
+	}
+
 	assertMongoIndex(t, db.Collection("assessment_models"), "idx_assessment_models_code", false)
 	assertMongoIndex(t, db.Collection("questionnaires"), "idx_code_version", false)
 	for collection, names := range mongo_indexes.RequiredUnifiedIndexNames() {
@@ -61,7 +67,7 @@ func TestUnifiedModelCatalogSchemaMigrationFreshInstall(t *testing.T) {
 		}
 	}
 
-	if err := mongo_indexes.NewIndexManager(db).VerifyUnifiedModelCatalogIndexes(ctx); err != nil {
+	if err := mgr.VerifyUnifiedModelCatalogIndexes(ctx); err != nil {
 		t.Fatalf("VerifyUnifiedModelCatalogIndexes: %v", err)
 	}
 

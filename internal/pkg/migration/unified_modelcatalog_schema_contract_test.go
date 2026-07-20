@@ -12,11 +12,22 @@ func TestMongoUnifiedModelCatalogSchemaMigrationContract(t *testing.T) {
 	up := readJSONMigration(t, "000013_unified_modelcatalog_schema.up.json")
 	down := readJSONMigration(t, "000013_unified_modelcatalog_schema.down.json")
 
+	// dropIndexes must NOT live in JSON up: already-cutover envs hit IndexNotFound → dirty@13.
+	// Legacy cleanup is Go-side DropForbiddenLegacyIndexes (idempotent).
 	for _, token := range []string{
-		`"dropIndexes": "assessment_models"`,
+		`"dropIndexes"`,
 		`"index": "idx_assessment_models_code"`,
-		`"dropIndexes": "questionnaires"`,
 		`"index": "idx_code_version"`,
+	} {
+		if strings.Contains(up, token) {
+			t.Fatalf("mongo up migration 000013 must not contain non-idempotent drop %q", token)
+		}
+	}
+
+	for _, token := range []string{
+		`"createIndexes": "assessment_models"`,
+		`"createIndexes": "questionnaires"`,
+		`"createIndexes": "assessment_norms"`,
 		"idx_assessment_models_head_code",
 		"idx_assessment_models_snapshot_identity_version",
 		"idx_assessment_models_active_code",
@@ -77,7 +88,7 @@ func TestMongoUnifiedModelCatalogSchemaMigrationContract(t *testing.T) {
 	if err := json.Unmarshal([]byte(up), &commands); err != nil {
 		t.Fatalf("up migration is not a JSON array: %v", err)
 	}
-	if len(commands) < 4 {
-		t.Fatalf("up migration command count = %d, want drop/create/index steps", len(commands))
+	if len(commands) != 3 {
+		t.Fatalf("up migration command count = %d, want 3 createIndexes steps", len(commands))
 	}
 }

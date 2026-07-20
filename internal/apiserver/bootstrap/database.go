@@ -591,7 +591,11 @@ func (dm *DatabaseManager) runMigrations(ctx context.Context) error {
 				"version", mongoVersion,
 			)
 		}
-		if err := mongo_indexes.NewIndexManager(mongoClient.Database(mongoDatabase)).VerifyUnifiedModelCatalogIndexes(ctx); err != nil {
+		indexManager := mongo_indexes.NewIndexManager(mongoClient.Database(mongoDatabase))
+		if err := indexManager.ReconcileUnifiedModelCatalogIndexes(ctx); err != nil {
+			return fmt.Errorf("mongodb unified schema index reconcile failed: %w", err)
+		}
+		if err := indexManager.VerifyUnifiedModelCatalogIndexes(ctx); err != nil {
 			return fmt.Errorf("mongodb unified schema index verification failed: %w", err)
 		}
 		logger.L(ctx).Infow("✅ MongoDB unified model-catalog indexes verified",

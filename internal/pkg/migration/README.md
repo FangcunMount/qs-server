@@ -374,11 +374,35 @@ A: Dirty 状态表示迁移中途失败。需要：
 
 1. 检查日志确定失败原因
 2. 手动修复数据库到一致状态
-3. 更新 `schema_migrations` 表的 dirty 字段为 0
+3. 更新 `schema_migrations` 的 dirty 字段为 false
 
 ```sql
+-- MySQL
 UPDATE schema_migrations SET dirty = 0 WHERE version = X;
 ```
+
+```javascript
+// MongoDB
+db.schema_migrations.find()
+// 确认索引与数据已一致后：
+db.schema_migrations.updateOne({}, { $set: { version: NumberLong(X), dirty: false } })
+```
+
+#### Mongo 000013（unified model-catalog）dirty@13
+
+常见原因：已 cutover 环境对不存在的 legacy 索引执行 `dropIndexes` → IndexNotFound → dirty。
+
+修复原则：**先核验索引，再清 dirty**。
+
+1. `db.schema_migrations.find()` 确认 `version: 13, dirty: true`
+2. 检查 `assessment_models` / `questionnaires` / `assessment_norms` 的 `getIndexes()`：
+   - required：见 `RequiredUnifiedIndexNames()`（如 `idx_assessment_models_head_code` 等）
+   - 不应存在：`idx_assessment_models_code`、`idx_code_version`
+3. 若 required 齐全且无 legacy → 执行上面的 `updateOne` 清 dirty，再重启 apiserver
+4. 若缺 required → 手工 `createIndexes` 补齐，或将 version 回退到 `12, dirty:false` 后部署含「create-only 000013 + Go reconcile」的版本再启
+5. 不要在未核验前盲目 force
+
+当前代码：JSON up 只做 `createIndexes`；legacy 删除在 `ReconcileUnifiedModelCatalogIndexes`（忽略 IndexNotFound）。
 
 ### Q: 生产环境如何禁用自动迁移？
 

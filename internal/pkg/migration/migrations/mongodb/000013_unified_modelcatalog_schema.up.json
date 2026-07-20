@@ -1,13 +1,5 @@
 [
   {
-    "dropIndexes": "assessment_models",
-    "index": "idx_assessment_models_code"
-  },
-  {
-    "dropIndexes": "questionnaires",
-    "index": "idx_code_version"
-  },
-  {
     "createIndexes": "assessment_models",
     "indexes": [
       {

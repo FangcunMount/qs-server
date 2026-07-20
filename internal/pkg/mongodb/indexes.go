@@ -2,7 +2,9 @@ package mongo_indexes
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -332,7 +334,8 @@ func NewIndexManager(db *mongo.Database) *IndexManager {
 
 // EnsureAllIndexes 确保所有集合的索引都已创建
 func (m *IndexManager) EnsureAllIndexes(ctx context.Context) error {
-	if err := NewQuestionnairesIndexes(m.db.Collection("questionnaires")).EnsureIndexes(ctx); err != nil {
+	// Reconcile covers assessment_models / assessment_norms / questionnaires (incl. unified).
+	if err := m.ReconcileUnifiedModelCatalogIndexes(ctx); err != nil {
 		return err
 	}
 	if err := NewAnswerSheetsIndexes(m.db.Collection("answersheets")).EnsureIndexes(ctx); err != nil {
@@ -341,13 +344,62 @@ func (m *IndexManager) EnsureAllIndexes(ctx context.Context) error {
 	if err := NewScalesIndexes(m.db.Collection("scales")).EnsureIndexes(ctx); err != nil {
 		return err
 	}
+	return nil
+}
+
+// ReconcileUnifiedModelCatalogIndexes drops conflicting legacy unique indexes
+// (ignoring IndexNotFound) then ensures the canonical unified indexes exist.
+// Legacy dropIndexes inside JSON migrations are intentionally avoided: already-
+// cutover environments fail with IndexNotFound and leave golang-migrate dirty.
+func (m *IndexManager) ReconcileUnifiedModelCatalogIndexes(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	if err := m.DropForbiddenLegacyIndexes(ctx); err != nil {
+		return err
+	}
 	if err := NewAssessmentModelsIndexes(m.db.Collection("assessment_models")).EnsureIndexes(ctx); err != nil {
 		return err
 	}
 	if err := NewAssessmentNormsIndexes(m.db.Collection("assessment_norms")).EnsureIndexes(ctx); err != nil {
 		return err
 	}
+	// Unified questionnaire indexes are included in QuestionnairesIndexes.EnsureIndexes.
+	if err := NewQuestionnairesIndexes(m.db.Collection("questionnaires")).EnsureIndexes(ctx); err != nil {
+		return err
+	}
 	return nil
+}
+
+// DropForbiddenLegacyIndexes removes indexes that conflict with head/snapshot coexistence.
+// Missing indexes are ignored so cutover environments remain idempotent.
+func (m *IndexManager) DropForbiddenLegacyIndexes(ctx context.Context) error {
+	for collection, names := range ForbiddenLegacyIndexNames() {
+		coll := m.db.Collection(collection)
+		for _, name := range names {
+			_, err := coll.Indexes().DropOne(ctx, name)
+			if err == nil {
+				continue
+			}
+			if isIndexNotFound(err) {
+				continue
+			}
+			return fmt.Errorf("drop legacy index %s.%s: %w", collection, name, err)
+		}
+	}
+	return nil
+}
+
+func isIndexNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	var cmdErr mongo.CommandError
+	if errors.As(err, &cmdErr) {
+		// MongoDB IndexNotFound = 27
+		return cmdErr.Code == 27 || cmdErr.Name == "IndexNotFound"
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "IndexNotFound") || strings.Contains(msg, "index not found")
 }
 
 // VerifyUnifiedModelCatalogIndexes checks that required unified indexes exist and
@@ -363,7 +415,7 @@ func (m *IndexManager) VerifyUnifiedModelCatalogIndexes(ctx context.Context) err
 		}
 		for _, name := range names {
 			if !present[name] {
-				return fmt.Errorf("required unified index %s.%s is missing; run Mongo migration 000013", collection, name)
+				return fmt.Errorf("required unified index %s.%s is missing; run Mongo migration 000013 / ReconcileUnifiedModelCatalogIndexes", collection, name)
 			}
 		}
 	}
