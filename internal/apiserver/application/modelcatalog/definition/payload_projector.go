@@ -111,8 +111,13 @@ func (CompatibilityPayloadProjector) ProjectCognitive(model *domain.AssessmentMo
 		return SnapshotBuildResult{}, fmt.Errorf("project cognitive payload: %w", err)
 	}
 	algorithm := model.Algorithm
-	if algorithm == "" {
-		algorithm = domain.AlgorithmSPM
+	if !domain.IsCanonicalPublishAlgorithm(model.Kind, algorithm) {
+		switch domain.ClassifyAlgorithmWritePolicy(model.Kind, algorithm) {
+		case domain.AlgorithmWriteDraftOK:
+			return SnapshotBuildResult{}, fmt.Errorf("%s", publishAlgorithmRequiredMessage(model.Kind))
+		default:
+			return SnapshotBuildResult{}, fmt.Errorf("%s", publishLegacyAlgorithmMessage(model.Kind, algorithm))
+		}
 	}
 	decisionKind, err := model.DecisionKindForDefinition()
 	if err != nil {
@@ -132,8 +137,12 @@ func (CompatibilityPayloadProjector) ProjectBehavioral(model *domain.AssessmentM
 	if model == nil || model.DefinitionV2 == nil {
 		return SnapshotBuildResult{}, fmt.Errorf("behavioral_rating definition_v2 is required")
 	}
-	if err := requireBehavioralPublishAlgorithm(model.Algorithm); err != nil {
-		return SnapshotBuildResult{}, err
+	switch domain.ClassifyAlgorithmWritePolicy(model.Kind, model.Algorithm) {
+	case domain.AlgorithmWriteCanonical:
+	case domain.AlgorithmWriteDraftOK:
+		return SnapshotBuildResult{}, fmt.Errorf("%s", publishAlgorithmRequiredMessage(model.Kind))
+	default:
+		return SnapshotBuildResult{}, fmt.Errorf("%s", publishLegacyAlgorithmMessage(model.Kind, model.Algorithm))
 	}
 	encoded, err := behavioralpayload.PayloadFromDefinitionWithNorm(model.DefinitionV2, table)
 	if err != nil {

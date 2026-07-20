@@ -42,6 +42,62 @@ func (c PublishedTypologyCatalog) GetTypologyModelByRef(ctx context.Context, ref
 	return nil, domain.ErrNotFound
 }
 
+func typologyLookupRefs(ref port.ModelRef, algorithm domain.Algorithm) []rulesetport.Ref {
+	if algorithm == "" {
+		refs := make([]rulesetport.Ref, 0, 3)
+		if ref.SubKind != "" {
+			refs = append(refs, rulesetport.Ref{
+				Kind:    domain.KindTypology,
+				SubKind: domain.SubKind(ref.SubKind),
+				Code:    ref.Code,
+				Version: ref.Version,
+			})
+		}
+		refs = append(refs,
+			rulesetport.Ref{
+				Kind:    domain.KindTypology,
+				Code:    ref.Code,
+				Version: ref.Version,
+			},
+			rulesetport.Ref{
+				Kind:    domain.KindTypology,
+				SubKind: domain.SubKindTypology,
+				Code:    ref.Code,
+				Version: ref.Version,
+			},
+		)
+		return refs
+	}
+	algorithms := []domain.Algorithm{algorithm}
+	algorithms = append(algorithms, domain.TypologyAlgorithmLookupAlternates(algorithm)...)
+	seen := make(map[domain.Algorithm]struct{}, len(algorithms))
+	refs := make([]rulesetport.Ref, 0, len(algorithms))
+	for _, alg := range algorithms {
+		if _, ok := seen[alg]; ok {
+			continue
+		}
+		seen[alg] = struct{}{}
+		refs = append(refs, rulesetport.Ref{
+			Kind:      domain.KindTypology,
+			SubKind:   domain.SubKindTypology,
+			Algorithm: alg,
+			Code:      ref.Code,
+			Version:   ref.Version,
+		})
+	}
+	return refs
+}
+
+func assertTypologyAlgorithm(payload *modeltypology.Payload, algorithm domain.Algorithm) (*modeltypology.Payload, error) {
+	if payload == nil {
+		return nil, fmt.Errorf("typology payload is nil")
+	}
+	if domain.TypologyAlgorithmsEquivalent(payload.Algorithm, algorithm) {
+		return payload, nil
+	}
+	return nil, fmt.Errorf("typology algorithm %s does not match ref %s", payload.Algorithm, algorithm)
+}
+
 func (c PublishedTypologyCatalog) FindTypologyModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*modeltypology.Payload, error) {
 	if c.reader == nil {
 		return nil, fmt.Errorf("published typology catalog is not configured")
@@ -101,49 +157,4 @@ func resolveTypologyAlgorithm(ref port.ModelRef) domain.Algorithm {
 		return domain.Algorithm(ref.Algorithm)
 	}
 	return ""
-}
-
-func typologyLookupRefs(ref port.ModelRef, algorithm domain.Algorithm) []rulesetport.Ref {
-	if algorithm != "" {
-		return []rulesetport.Ref{{
-			Kind:      domain.KindTypology,
-			SubKind:   domain.SubKindTypology,
-			Algorithm: algorithm,
-			Code:      ref.Code,
-			Version:   ref.Version,
-		}}
-	}
-	refs := make([]rulesetport.Ref, 0, 3)
-	if ref.SubKind != "" {
-		refs = append(refs, rulesetport.Ref{
-			Kind:    domain.KindTypology,
-			SubKind: domain.SubKind(ref.SubKind),
-			Code:    ref.Code,
-			Version: ref.Version,
-		})
-	}
-	refs = append(refs,
-		rulesetport.Ref{
-			Kind:    domain.KindTypology,
-			Code:    ref.Code,
-			Version: ref.Version,
-		},
-		rulesetport.Ref{
-			Kind:    domain.KindTypology,
-			SubKind: domain.SubKindTypology,
-			Code:    ref.Code,
-			Version: ref.Version,
-		},
-	)
-	return refs
-}
-
-func assertTypologyAlgorithm(payload *modeltypology.Payload, algorithm domain.Algorithm) (*modeltypology.Payload, error) {
-	if payload == nil {
-		return nil, fmt.Errorf("typology payload is nil")
-	}
-	if payload.Algorithm != algorithm {
-		return nil, fmt.Errorf("typology algorithm %s does not match ref %s", payload.Algorithm, algorithm)
-	}
-	return payload, nil
 }

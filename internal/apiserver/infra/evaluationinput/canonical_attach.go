@@ -46,6 +46,9 @@ func attachCognitiveCanonical(ctx context.Context, reader rulesetport.PublishedM
 	algorithm := domain.Algorithm(ref.ModelRef.Algorithm)
 	if algorithm == "" {
 		algorithm = domain.AlgorithmSPM
+		domain.ObserveAlgorithmFallback(
+			domain.KindCognitive, "", algorithm, "infra.cognitive_canonical_attach",
+		)
 	}
 	attachPublishedCanonical(ctx, reader, rulesetport.Ref{
 		Kind: domain.KindCognitive, Algorithm: algorithm, Code: ref.ModelRef.Code, Version: ref.ModelRef.Version,

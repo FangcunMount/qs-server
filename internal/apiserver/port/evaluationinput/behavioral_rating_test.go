@@ -34,3 +34,17 @@ func TestNewBehavioralRatingModelSnapshotKeepsLegacyNormingFallback(t *testing.T
 		t.Fatalf("algorithm = %s, want %s", model.Algorithm, modelcatalog.AlgorithmBrief2)
 	}
 }
+
+func TestNewBehavioralRatingModelSnapshotFallsBackToDefaultWithoutNorming(t *testing.T) {
+	t.Parallel()
+	model := NewBehavioralRatingModelSnapshot(&behavioralsnapshot.Snapshot{Code: "LEGACY"}, "")
+	if model == nil {
+		t.Fatal("model snapshot is nil")
+	}
+	if model.Algorithm != string(modelcatalog.AlgorithmBehavioralRatingDefault) {
+		t.Fatalf("algorithm = %s, want %s", model.Algorithm, modelcatalog.AlgorithmBehavioralRatingDefault)
+	}
+	if !modelcatalog.IsRetainedReadAlgorithm(modelcatalog.KindBehavioralRating, modelcatalog.Algorithm(model.Algorithm)) {
+		t.Fatal("fallback algorithm should be retained_read")
+	}
+}

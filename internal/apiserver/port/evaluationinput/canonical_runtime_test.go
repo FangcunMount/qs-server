@@ -66,5 +66,17 @@ func TestAuditRuntimeInputSourceDetectsCompatFallback(t *testing.T) {
 	if len(issues) == 0 || issues[0].Code != "runtime.compat_payload_only" {
 		t.Fatalf("issues = %#v", issues)
 	}
+}
+
+func TestAuditLegacyIdentityFlagsRetainedAlgorithm(t *testing.T) {
+	t.Parallel()
+	issues := evaluationinput.AuditLegacyIdentity(&evaluationinput.InputSnapshot{
+		Model: &evaluationinput.ModelSnapshot{
+			Kind: evaluationinput.EvaluationModelKindTypology, Algorithm: string(modelcatalog.AlgorithmMBTI),
+		},
+	})
+	if len(issues) == 0 || issues[0].Code != "identity.algorithm.retained_read" {
+		t.Fatalf("issues = %#v", issues)
+	}
 	_ = interpretationassets.Assets{}
 }

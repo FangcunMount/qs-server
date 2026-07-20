@@ -27,6 +27,7 @@ type CompatibilityHit struct {
 
 // DescriptorKeyFromRoute derives the single runtime routing key from a model route.
 func DescriptorKeyFromRoute(route ModelRoute) (DescriptorKey, error) {
+	modelcatalog.ObserveWritePolicy(route.Kind, route.Algorithm)
 	if route.HasFrozenRuntime() {
 		family, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(route.DecisionKind)
 		if !ok || family != route.AlgorithmFamily {

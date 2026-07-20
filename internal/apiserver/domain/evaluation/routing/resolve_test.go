@@ -27,6 +27,27 @@ func TestDescriptorKeyFromRouteUsesDecisionKind(t *testing.T) {
 	}
 }
 
+func TestDescriptorKeyFromRouteClassifiesRetainedTypologyAlias(t *testing.T) {
+	t.Parallel()
+	route := ModelRoute{
+		Kind:          modelcatalog.KindTypology,
+		SubKind:       modelcatalog.SubKindTypology,
+		Algorithm:     modelcatalog.AlgorithmMBTI,
+		DecisionKind:  modelcatalog.DecisionKindPoleComposition,
+		PayloadFormat: modelcatalog.PayloadFormatPersonalityTypologyV1,
+	}
+	if !modelcatalog.IsRetainedReadAlgorithm(route.Kind, route.Algorithm) {
+		t.Fatalf("algorithm %s should be retained_read", route.Algorithm)
+	}
+	key, err := DescriptorKeyFromRoute(route)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if key.AlgorithmFamily != modelcatalog.AlgorithmFamilyFactorClassification {
+		t.Fatalf("family=%s", key.AlgorithmFamily)
+	}
+}
+
 func TestDescriptorKeyFromRouteDifferentiatesDecisionKindWithinFamily(t *testing.T) {
 	t.Parallel()
 

@@ -34,11 +34,16 @@ func AppendDecisionKindIssues(model *domain.AssessmentModel, issues []domain.Dom
 
 // ValidateAlgorithmBinding checks Algorithm / ExecutionSpec publish rules by
 // AlgorithmBinding (Algorithm + derived Family), not by Kind switch.
+// MC-R018: new publishes must use canonical algorithms; retained-read aliases fail here.
 func ValidateAlgorithmBinding(model *domain.AssessmentModel) []domain.DomainValidationIssue {
-	if model == nil || model.DefinitionV2 == nil {
+	if model == nil {
 		return nil
 	}
 	issues := make([]domain.DomainValidationIssue, 0)
+	issues = append(issues, validatePublishAlgorithmPolicy(model)...)
+	if model.DefinitionV2 == nil {
+		return issues
+	}
 	switch model.Algorithm {
 	case domain.AlgorithmBrief2:
 		if model.DefinitionV2.Execution.Brief2 == nil {
@@ -56,38 +61,70 @@ func ValidateAlgorithmBinding(model *domain.AssessmentModel) []domain.DomainVali
 		}
 	case domain.AlgorithmSPMSensory:
 		// publishable factor_norm algorithm; no extra ExecutionSpec gate here
-	case domain.AlgorithmBehavioralRatingDefault, "":
-		if isFactorNormFamily(model) {
-			if err := requireBehavioralPublishAlgorithm(model.Algorithm); err != nil {
-				issues = append(issues, domain.DomainValidationIssue{
-					Field: "algorithm", Code: "behavioral_rating.algorithm.required",
-					Message: err.Error(), Level: domain.ValidationLevelError,
-				})
-			}
-		}
-	default:
-		if isFactorNormFamily(model) {
-			if err := requireBehavioralPublishAlgorithm(model.Algorithm); err != nil {
-				issues = append(issues, domain.DomainValidationIssue{
-					Field: "algorithm", Code: "behavioral_rating.algorithm.required",
-					Message: err.Error(), Level: domain.ValidationLevelError,
-				})
-			}
-		}
 	}
 	return issues
 }
 
-func isFactorNormFamily(model *domain.AssessmentModel) bool {
+func validatePublishAlgorithmPolicy(model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	if model == nil {
-		return false
+		return nil
 	}
-	family, ok := domain.AlgorithmFamilyFromIdentity(model.Kind, model.SubKind, model.Algorithm)
-	return ok && family == domain.AlgorithmFamilyFactorNorm
+	policy := domain.ClassifyAlgorithmWritePolicy(model.Kind, model.Algorithm)
+	switch policy {
+	case domain.AlgorithmWriteCanonical:
+		return nil
+	case domain.AlgorithmWriteDraftOK:
+		return []domain.DomainValidationIssue{{
+			Field: "algorithm", Code: "algorithm.publish.required",
+			Message: publishAlgorithmRequiredMessage(model.Kind), Level: domain.ValidationLevelError,
+		}}
+	case domain.AlgorithmWriteRetainedRead:
+		code := "algorithm.publish.legacy_alias"
+		if model.Kind == domain.KindBehavioralRating {
+			code = "behavioral_rating.algorithm.required"
+		}
+		return []domain.DomainValidationIssue{{
+			Field: "algorithm", Code: code,
+			Message: publishLegacyAlgorithmMessage(model.Kind, model.Algorithm), Level: domain.ValidationLevelError,
+		}}
+	default:
+		return []domain.DomainValidationIssue{{
+			Field: "algorithm", Code: "algorithm.publish.unsupported",
+			Message: fmt.Sprintf("algorithm %q is not supported for publish on kind %s", model.Algorithm, model.Kind),
+			Level:   domain.ValidationLevelError,
+		}}
+	}
 }
 
-// ValidateBehavioralSemantic checks behavioral NormRef / conclusion contracts
-// without loading Norm tables (existence is handled by NormCompatibility).
+func publishAlgorithmRequiredMessage(kind domain.Kind) string {
+	switch kind {
+	case domain.KindTypology:
+		return "typology 发布必须使用 personality_typology"
+	case domain.KindBehavioralRating:
+		return "behavioral_rating 发布必须指定真实 Algorithm（brief2 或 spm_sensory）"
+	case domain.KindCognitive:
+		return "cognitive 发布必须指定真实 Algorithm（spm）"
+	case domain.KindScale:
+		return "scale 发布必须指定 Algorithm（scale_default）"
+	default:
+		return "algorithm is required for publish"
+	}
+}
+
+func publishLegacyAlgorithmMessage(kind domain.Kind, algorithm domain.Algorithm) string {
+	switch kind {
+	case domain.KindTypology:
+		return fmt.Sprintf("新发布不允许 legacy typology algorithm %q；请使用 personality_typology", algorithm)
+	case domain.KindBehavioralRating:
+		if algorithm == domain.AlgorithmBehavioralRatingDefault {
+			return "新发布不允许 behavioral_rating_default；请使用 brief2 或 spm_sensory"
+		}
+		return fmt.Sprintf("behavioral_rating algorithm %q 不受支持；请使用 brief2 或 spm_sensory", algorithm)
+	default:
+		return fmt.Sprintf("新发布不允许 retained-read algorithm %q", algorithm)
+	}
+}
+
 func ValidateBehavioralSemantic(model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	if model == nil || model.DefinitionV2 == nil {
 		return nil
@@ -146,19 +183,6 @@ func ValidateDefinitionForPublish(
 		return ValidateDefinitionV2ForPublish(ctx, model.DefinitionV2, nil)
 	}
 	return ValidateDefinitionV2ForPublishWithModel(ctx, model, model.DefinitionV2, norms)
-}
-
-func requireBehavioralPublishAlgorithm(algorithm domain.Algorithm) error {
-	switch algorithm {
-	case domain.AlgorithmBrief2, domain.AlgorithmSPMSensory:
-		return nil
-	case "":
-		return fmt.Errorf("behavioral_rating 发布必须指定真实 Algorithm（brief2 或 spm_sensory）")
-	case domain.AlgorithmBehavioralRatingDefault:
-		return fmt.Errorf("新发布不允许 behavioral_rating_default；请使用 brief2 或 spm_sensory")
-	default:
-		return fmt.Errorf("behavioral_rating algorithm %q 不受支持；请使用 brief2 或 spm_sensory", algorithm)
-	}
 }
 
 // ValidateStrategyCapability checks Measure Scoring strategies and executable

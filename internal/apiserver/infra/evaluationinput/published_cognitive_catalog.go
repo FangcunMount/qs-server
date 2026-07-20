@@ -77,6 +77,9 @@ func cognitiveLookupRef(ref port.ModelRef) rulesetport.Ref {
 	algorithm := domain.Algorithm(ref.Algorithm)
 	if algorithm == "" {
 		algorithm = domain.AlgorithmSPM
+		domain.ObserveAlgorithmFallback(
+			domain.KindCognitive, "", algorithm, "infra.cognitive_lookup_ref",
+		)
 	}
 	return rulesetport.Ref{
 		Kind:      domain.KindCognitive,

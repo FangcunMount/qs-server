@@ -29,6 +29,9 @@ type (
 	RuntimeIdentity = identitypkg.RuntimeIdentity
 	ExecutionPath   = binding.ExecutionPath
 
+	AlgorithmWritePolicy     = identitypkg.AlgorithmWritePolicy
+	LegacyIdentityAuditIssue = identitypkg.LegacyIdentityAuditIssue
+
 	KindCapability        = binding.KindCapability
 	ModelFamilyCapability = binding.ModelFamilyCapability
 	CapabilityRole        = binding.CapabilityRole
@@ -203,6 +206,20 @@ var (
 	CompatibleIdentity              = identitypkg.CompatibleIdentity
 	AllAlgorithmFamilies            = identitypkg.AllAlgorithmFamilies
 	ResolveRuntimeIdentity          = identitypkg.ResolveRuntimeIdentity
+	ClassifyAlgorithmWritePolicy    = identitypkg.ClassifyAlgorithmWritePolicy
+	IsCanonicalPublishAlgorithm     = identitypkg.IsCanonicalPublishAlgorithm
+	IsRetainedReadAlgorithm         = identitypkg.IsRetainedReadAlgorithm
+	AuditIdentityWritePolicy          = identitypkg.AuditIdentityWritePolicy
+	ObserveWritePolicy                = identitypkg.ObserveWritePolicy
+	ObserveAlgorithmFallback          = identitypkg.ObserveAlgorithmFallback
+	TypologyAlgorithmsEquivalent      = identitypkg.TypologyAlgorithmsEquivalent
+	TypologyAlgorithmLookupAlternates = identitypkg.TypologyAlgorithmLookupAlternates
+	TypologyAlgorithmBackfillTarget   = identitypkg.TypologyAlgorithmBackfillTarget
+	CanonicalTypologyPublishAlgorithm = identitypkg.CanonicalTypologyPublishAlgorithm
+	AlgorithmWriteCanonical           = identitypkg.AlgorithmWriteCanonical
+	AlgorithmWriteDraftOK             = identitypkg.AlgorithmWriteDraftOK
+	AlgorithmWriteRetainedRead        = identitypkg.AlgorithmWriteRetainedRead
+	AlgorithmWriteUnknown             = identitypkg.AlgorithmWriteUnknown
 
 	IsScalePayloadFormat               = payloadformatpkg.IsScalePayloadFormat
 	IsLegacyDecodeOnlyPayloadFormat    = payloadformatpkg.IsLegacyDecodeOnlyPayloadFormat

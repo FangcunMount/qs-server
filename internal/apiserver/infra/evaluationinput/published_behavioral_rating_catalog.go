@@ -79,6 +79,9 @@ func behavioralRatingLookupRef(ref port.ModelRef) rulesetport.Ref {
 	algorithm := domain.Algorithm(ref.Algorithm)
 	if algorithm == "" {
 		algorithm = domain.AlgorithmBrief2
+		domain.ObserveAlgorithmFallback(
+			domain.KindBehavioralRating, "", algorithm, "infra.behavioral_lookup_ref",
+		)
 	}
 	return rulesetport.Ref{
 		Kind:      domain.KindBehavioralRating,

@@ -1,6 +1,7 @@
 package evaluationinput
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 	cognitivepayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
@@ -81,16 +82,35 @@ func AuditRuntimeInputSource(input *InputSnapshot) []ReportInputAuditIssue {
 	if input == nil {
 		return nil
 	}
+	issues := AuditLegacyIdentity(input)
 	if _, ok := DefinitionV2FromSnapshot(input); ok {
-		return nil
+		return issues
 	}
 	if input.ModelPayload != nil {
-		return []ReportInputAuditIssue{{
+		issues = append(issues, ReportInputAuditIssue{
 			Code:    "runtime.compat_payload_only",
 			Message: "evaluation input lacks DefinitionV2; runtime falls back to compat payload projection",
-		}}
+		})
 	}
-	return nil
+	return issues
+}
+
+// AuditLegacyIdentity flags retained-read / empty algorithm identities (MC-R018).
+func AuditLegacyIdentity(input *InputSnapshot) []ReportInputAuditIssue {
+	if input == nil || input.Model == nil {
+		return nil
+	}
+	kind := modelcatalog.Kind(input.Model.Kind)
+	algorithm := modelcatalog.Algorithm(input.Model.Algorithm)
+	raw := modelcatalog.AuditIdentityWritePolicy(kind, algorithm)
+	if len(raw) == 0 {
+		return nil
+	}
+	out := make([]ReportInputAuditIssue, 0, len(raw))
+	for _, issue := range raw {
+		out = append(out, ReportInputAuditIssue{Code: issue.Code, Message: issue.Message})
+	}
+	return out
 }
 
 // HasReportInputFreezeMaterial reports whether commit can freeze report input without legacy payload-only shape.

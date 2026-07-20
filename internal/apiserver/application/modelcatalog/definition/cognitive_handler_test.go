@@ -50,10 +50,21 @@ func TestCognitiveValidateForPublishRejectsUnknownSPMOption(t *testing.T) {
 	}
 }
 
-func TestCognitiveBuildSnapshotPayloadDefaultsAlgorithmAndDecision(t *testing.T) {
+func TestCognitiveBuildSnapshotPayloadRejectsEmptyAlgorithm(t *testing.T) {
 	t.Parallel()
 	model := publishableCognitiveShell()
 	model.Algorithm = ""
+	model.DefinitionV2 = cognitiveDefinitionWithAbility()
+	_, err := (CognitiveDefinitionHandler{}).BuildSnapshotPayload(context.Background(), model)
+	if err == nil {
+		t.Fatal("BuildSnapshotPayload error = nil, want empty algorithm rejection")
+	}
+}
+
+func TestCognitiveBuildSnapshotPayloadUsesExplicitSPM(t *testing.T) {
+	t.Parallel()
+	model := publishableCognitiveShell()
+	model.Algorithm = domain.AlgorithmSPM
 	model.DefinitionV2 = cognitiveDefinitionWithAbility()
 	result, err := (CognitiveDefinitionHandler{}).BuildSnapshotPayload(context.Background(), model)
 	if err != nil {

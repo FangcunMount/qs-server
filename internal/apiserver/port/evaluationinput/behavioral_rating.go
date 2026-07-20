@@ -23,11 +23,17 @@ func NewBehavioralRatingModelSnapshot(snapshot *behavioralsnapshot.Snapshot, alg
 		return nil
 	}
 	version := snapshot.Version
+	// Retained-read fallback (MC-R018): empty Algorithm still maps for historical
+	// payloads; new publishes must persist brief2/spm_sensory explicitly.
 	if algorithm == "" {
-		algorithm = modelcatalog.AlgorithmBehavioralRatingDefault
+		filled := modelcatalog.AlgorithmBehavioralRatingDefault
 		if snapshot.Norming != nil {
-			algorithm = modelcatalog.AlgorithmBrief2
+			filled = modelcatalog.AlgorithmBrief2
 		}
+		modelcatalog.ObserveAlgorithmFallback(
+			modelcatalog.KindBehavioralRating, "", filled, "evaluationinput.behavioral_snapshot",
+		)
+		algorithm = filled
 	}
 	ms := &ModelSnapshot{
 		Kind:           EvaluationModelKindBehavioralRating,
