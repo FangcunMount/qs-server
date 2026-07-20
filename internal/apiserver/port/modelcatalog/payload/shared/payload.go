@@ -1,6 +1,10 @@
 package shared
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scorerange"
+)
 
 // DefinitionBody is the shared behavioral/cognitive wire payload.
 type DefinitionBody struct {
@@ -40,15 +44,19 @@ type InterpretRule struct {
 }
 
 type ScoreRangeRule struct {
-	MinScore   float64 `json:"min_score"`
-	MaxScore   float64 `json:"max_score"`
-	Level      string  `json:"level,omitempty"`
-	Conclusion string  `json:"conclusion"`
-	Suggestion string  `json:"suggestion,omitempty"`
+	MinScore     float64 `json:"min_score"`
+	MaxScore     float64 `json:"max_score"`
+	MaxInclusive bool    `json:"max_inclusive,omitempty"`
+	UnboundedMax bool    `json:"unbounded_max,omitempty"`
+	Level        string  `json:"level,omitempty"`
+	Conclusion   string  `json:"conclusion"`
+	Suggestion   string  `json:"suggestion,omitempty"`
 }
 
 func (r ScoreRangeRule) Matches(score float64) bool {
-	return score >= r.MinScore && score < r.MaxScore
+	return scorerange.Bound{
+		Min: r.MinScore, Max: r.MaxScore, MaxInclusive: r.MaxInclusive, UnboundedMax: r.UnboundedMax,
+	}.Contains(score)
 }
 
 func ParseDefinitionBodyJSON(payload []byte) (DefinitionBody, error) {

@@ -3,11 +3,12 @@ package scoring
 import (
 	"fmt"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scorerange"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 )
 
-// interpretScaleFactor 生成单个因子的结论/建议文案：优先命中解读规则，否则回退默认文案。
-// 该逻辑由 evaluation 领域下沉至此，evaluation 只负责产出分数/等级等事实。
+// interpretScaleFactor 生成单个因子的结论/建议文案：优先命中解读规则，否则按已判定风险等级回退默认文案。
+// 未命中规则时不再取末段规则（与 calculation 判定契约对齐，MC-R004）。
 func interpretScaleFactor(model *ReportModel, fs FactorReportScore) (string, string) {
 	if rule := findFactorInterpretRule(model, fs.FactorCode, fs.RawScore); rule != nil && rule.Conclusion != "" {
 		return rule.Conclusion, rule.Suggestion
@@ -23,22 +24,23 @@ func findFactorInterpretRule(model *ReportModel, factorCode string, score float6
 		if model.Factors[i].Code != factorCode {
 			continue
 		}
-		return findInterpretRuleWithRangeFallback(model.Factors[i].InterpretRules, score)
+		rules := model.Factors[i].InterpretRules
+		if len(rules) == 0 {
+			return nil
+		}
+		bounds := make([]scorerange.Bound, len(rules))
+		for j, rule := range rules {
+			bounds[j] = scorerange.Bound{
+				Min: rule.Min, Max: rule.Max, MaxInclusive: rule.MaxInclusive, UnboundedMax: rule.UnboundedMax,
+			}
+		}
+		index, ok := scorerange.MatchBounds(score, bounds)
+		if !ok {
+			return nil
+		}
+		return &rules[index]
 	}
 	return nil
-}
-
-func findInterpretRuleWithRangeFallback(rules []FactorInterpretRule, score float64) *FactorInterpretRule {
-	for i := range rules {
-		if rules[i].Matches(score) {
-			return &rules[i]
-		}
-	}
-	if len(rules) == 0 {
-		return nil
-	}
-	last := rules[len(rules)-1]
-	return &last
 }
 
 func defaultScaleFactorInterpretation(factorName string, riskLevel report.RiskLevel, score float64) (string, string) {

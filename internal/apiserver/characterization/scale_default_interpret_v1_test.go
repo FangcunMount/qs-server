@@ -71,7 +71,7 @@ func scaleDefaultInterpretInputSnapshot() *evaluationinput.InputSnapshot {
 					ScoringStrategy: "sum",
 					InterpretRules: []scalesnapshot.InterpretRuleSnapshot{
 						{Min: 0, Max: 20, RiskLevel: "none", Conclusion: "总分得分5.0分，处于正常水平", Suggestion: "状态良好，继续保持"},
-						{Min: 20, Max: 100, RiskLevel: "medium", Conclusion: "总分偏高", Suggestion: "建议复查"},
+						{Min: 20, Max: 100, RiskLevel: "medium", Conclusion: "总分偏高", Suggestion: "建议复查", MaxInclusive: true},
 					},
 				},
 				{
@@ -82,7 +82,7 @@ func scaleDefaultInterpretInputSnapshot() *evaluationinput.InputSnapshot {
 					InterpretRules: []scalesnapshot.InterpretRuleSnapshot{
 						{Min: 0, Max: 40, RiskLevel: "low", Conclusion: "情绪得分较低", Suggestion: "保持"},
 						{Min: 40, Max: 60, RiskLevel: "medium", Conclusion: "情绪得分45.0分，处于中等水平", Suggestion: "建议关注相关方面，适当调整生活方式"},
-						{Min: 60, Max: 100, RiskLevel: "high", Conclusion: "情绪得分偏高", Suggestion: "及时干预"},
+						{Min: 60, Max: 100, RiskLevel: "high", Conclusion: "情绪得分偏高", Suggestion: "及时干预", MaxInclusive: true},
 					},
 				},
 			},

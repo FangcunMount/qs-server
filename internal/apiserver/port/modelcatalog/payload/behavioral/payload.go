@@ -125,11 +125,13 @@ type brief2TScoreRule struct {
 }
 
 type brief2TScoreRange struct {
-	MinT       float64 `json:"min_t"`
-	MaxT       float64 `json:"max_t"`
-	Level      string  `json:"level,omitempty"`
-	Conclusion string  `json:"conclusion,omitempty"`
-	Suggestion string  `json:"suggestion,omitempty"`
+	MinT         float64 `json:"min_t"`
+	MaxT         float64 `json:"max_t,omitempty"`
+	MaxInclusive bool    `json:"max_inclusive,omitempty"`
+	UnboundedMax bool    `json:"unbounded_max,omitempty"`
+	Level        string  `json:"level,omitempty"`
+	Conclusion   string  `json:"conclusion,omitempty"`
+	Suggestion   string  `json:"suggestion,omitempty"`
 }
 
 // ParseDefinitionPayload de编码 behavioral_rating 载荷 body 为 运行时 快照。
@@ -265,9 +267,14 @@ func normConclusionsFromPayload(body *brief2Extension) []conclusion.Conclusion {
 		}
 		ranges := make([]conclusion.ScoreRangeOutcome, 0, len(rule.Ranges))
 		for _, item := range rule.Ranges {
+			outcomeCode := item.Level
 			ranges = append(ranges, conclusion.ScoreRangeOutcome{
-				MinScore: item.MinT, MaxScore: item.MaxT, Level: item.Level, Summary: item.Conclusion, Description: item.Suggestion,
+				MinScore: item.MinT, MaxScore: item.MaxT, MaxInclusive: item.MaxInclusive, UnboundedMax: item.UnboundedMax,
+				Level: item.Level, OutcomeCode: outcomeCode, Summary: item.Conclusion, Description: item.Suggestion,
 			})
+		}
+		if n := len(ranges); n > 0 && !ranges[n-1].MaxInclusive && !ranges[n-1].UnboundedMax {
+			ranges[n-1].MaxInclusive = true
 		}
 		items = append(items, conclusion.NormConclusion{
 			FactorCode: rule.FactorCode, ScoreBasis: conclusion.ScoreBasisTScore,
@@ -701,11 +708,13 @@ func scaleFactorSnapshotFromBehavioral(item FactorSnapshot) scalesnapshot.Factor
 	rules := make([]scalesnapshot.InterpretRuleSnapshot, 0, len(item.InterpretRules))
 	for _, rule := range item.InterpretRules {
 		rules = append(rules, scalesnapshot.InterpretRuleSnapshot{
-			Min:        rule.MinScore,
-			Max:        rule.MaxScore,
-			RiskLevel:  rule.Level,
-			Conclusion: rule.Conclusion,
-			Suggestion: rule.Suggestion,
+			Min:          rule.MinScore,
+			Max:          rule.MaxScore,
+			MaxInclusive: rule.MaxInclusive,
+			UnboundedMax: rule.UnboundedMax,
+			RiskLevel:    rule.Level,
+			Conclusion:   rule.Conclusion,
+			Suggestion:   rule.Suggestion,
 		})
 	}
 	var params scalesnapshot.ScoringParamsSnapshot

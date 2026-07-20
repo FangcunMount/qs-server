@@ -140,8 +140,18 @@ func validBehavioralDraft() *domain.AssessmentModel {
 				OptionScoring: factor.OptionScoringCompat,
 			}}},
 			Calibration: modeldefinition.Calibration{NormRefs: []norm.Ref{{FactorCode: "bri", NormTableVersion: "brief2-cn-2024"}}},
+			Outcomes: []domain.Outcome{
+				{Code: "normal", Title: "正常"},
+				{Code: "elevated", Title: "升高"},
+			},
 			Conclusions: []domain.Conclusion{
-				domain.NormConclusion{FactorCode: "bri", ScoreBasis: domain.ScoreBasisTScore, Primary: true},
+				domain.NormConclusion{
+					FactorCode: "bri", ScoreBasis: domain.ScoreBasisTScore, Primary: true,
+					Rules: []domain.ScoreRangeOutcome{
+						{MinScore: 0, MaxScore: 60, OutcomeCode: "normal", Level: "normal"},
+						{MinScore: 60, MaxScore: 100, OutcomeCode: "elevated", Level: "elevated", MaxInclusive: true},
+					},
+				},
 			},
 			Execution: modeldefinition.ExecutionSpec{Brief2: &modeldefinition.Brief2Spec{PrimaryFactorCode: "bri"}},
 		},

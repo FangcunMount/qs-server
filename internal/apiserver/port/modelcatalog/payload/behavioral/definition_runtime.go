@@ -125,7 +125,10 @@ func calcNormTables(table *catalognorm.Norm, conclusions []conclusion.NormConclu
 		}
 		rule := calcnorm.TScoreInterpretRule{FactorCode: item.FactorCode, Ranges: make([]calcnorm.TScoreRange, 0, len(item.Rules))}
 		for _, item := range item.Rules {
-			rule.Ranges = append(rule.Ranges, calcnorm.TScoreRange{MinT: item.MinScore, MaxT: item.MaxScore, Level: item.Level, Conclusion: item.Summary, Suggestion: item.Description})
+			rule.Ranges = append(rule.Ranges, calcnorm.TScoreRange{
+				MinT: item.MinScore, MaxT: item.MaxScore, MaxInclusive: item.MaxInclusive, UnboundedMax: item.UnboundedMax,
+				Level: item.Level, Conclusion: item.Summary, Suggestion: item.Description,
+			})
 		}
 		out.TScoreRules = append(out.TScoreRules, rule)
 	}

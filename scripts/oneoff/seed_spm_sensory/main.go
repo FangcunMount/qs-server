@@ -528,6 +528,11 @@ func buildDefinition(questionnaire *surveyquestionnaire.Questionnaire, factorMap
 	}
 	definition.Measure.FactorGraph.SortOrders[tasteSmellFactorCode] = len(catalog.order) + 1
 	definition.ReportMap = modeldefinition.ReportMap{Sections: []modeldefinition.ReportSection{{Code: "spm_sensory_scores", Title: "SPM 感觉处理维度", Kind: modeldefinition.ReportSectionKindFactorScores, SourceRefs: append([]string(nil), catalog.order...)}}}
+	definition.Outcomes = []conclusion.Outcome{
+		{Code: "normal", Title: "与同龄儿童相似"},
+		{Code: "mild_moderate", Title: "轻度到中度困难"},
+		{Code: "severe", Title: "严重困难"},
+	}
 	if issues := modeldefinition.Validate(*definition); len(issues) > 0 {
 		return nil, fmt.Errorf("generated DefinitionV2 is invalid: %s", issues[0].Message)
 	}
@@ -561,9 +566,9 @@ func validateSPMOptionScores(questionCode string, options []surveyquestionnaire.
 
 func spmConclusion(factorCode string, primary bool) conclusion.NormConclusion {
 	return conclusion.NormConclusion{FactorCode: factorCode, ScoreBasis: conclusion.ScoreBasisTScore, Primary: primary, Rules: []conclusion.ScoreRangeOutcome{
-		{MinScore: 0, MaxScore: 59, Level: "normal", Title: "与同龄儿童相似"},
-		{MinScore: 60, MaxScore: 69, Level: "mild_moderate", Title: "轻度到中度困难"},
-		{MinScore: 70, MaxScore: 200, Level: "severe", Title: "严重困难"},
+		{MinScore: 0, MaxScore: 60, Level: "normal", OutcomeCode: "normal", Title: "与同龄儿童相似"},
+		{MinScore: 60, MaxScore: 70, Level: "mild_moderate", OutcomeCode: "mild_moderate", Title: "轻度到中度困难"},
+		{MinScore: 70, MaxScore: 200, Level: "severe", OutcomeCode: "severe", Title: "严重困难", MaxInclusive: true},
 	}}
 }
 

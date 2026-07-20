@@ -83,13 +83,15 @@ type DefinitionConclusionWire struct {
 }
 
 type DefinitionScoreRangeWire struct {
-	MinScore    float64 `json:"MinScore"`
-	MaxScore    float64 `json:"MaxScore"`
-	Level       string  `json:"Level,omitempty"`
-	OutcomeCode string  `json:"OutcomeCode,omitempty"`
-	Title       string  `json:"Title,omitempty"`
-	Summary     string  `json:"Summary,omitempty"`
-	Description string  `json:"Description,omitempty"`
+	MinScore     float64 `json:"MinScore"`
+	MaxScore     float64 `json:"MaxScore,omitempty"`
+	MaxInclusive bool    `json:"MaxInclusive,omitempty"`
+	UnboundedMax bool    `json:"UnboundedMax,omitempty"`
+	Level        string  `json:"Level,omitempty"`
+	OutcomeCode  string  `json:"OutcomeCode,omitempty"`
+	Title        string  `json:"Title,omitempty"`
+	Summary      string  `json:"Summary,omitempty"`
+	Description  string  `json:"Description,omitempty"`
 }
 
 type DefinitionOutcomeWire struct {

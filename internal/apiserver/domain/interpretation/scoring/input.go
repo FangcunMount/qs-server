@@ -2,6 +2,7 @@ package scoring
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scorerange"
 )
 
 type FactorReportScore struct {
@@ -47,14 +48,18 @@ type FactorReportModel struct {
 
 // FactorInterpretRule 是量表因子解读规则的中立表示，用于在解读侧生成结论/建议文案。
 type FactorInterpretRule struct {
-	Min        float64
-	Max        float64
-	RiskLevel  string
-	Conclusion string
-	Suggestion string
+	Min          float64
+	Max          float64
+	MaxInclusive bool
+	UnboundedMax bool
+	RiskLevel    string
+	Conclusion   string
+	Suggestion   string
 }
 
-// Matches 采用左闭右开区间语义：score ∈ [Min, Max)。
+// Matches 使用与 Decision ScoreRange 相同的端点契约（默认半开区间）。
 func (r FactorInterpretRule) Matches(score float64) bool {
-	return score >= r.Min && score < r.Max
+	return scorerange.Bound{
+		Min: r.Min, Max: r.Max, MaxInclusive: r.MaxInclusive, UnboundedMax: r.UnboundedMax,
+	}.Contains(score)
 }

@@ -1,6 +1,9 @@
 package scoring
 
-import "github.com/FangcunMount/qs-server/internal/pkg/meta"
+import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scorerange"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+)
 
 // Input is the neutral scale scoring input.
 type Input struct {
@@ -35,15 +38,19 @@ type CntParams struct {
 }
 
 type InterpretRule struct {
-	Min        float64
-	Max        float64
-	RiskLevel  string
-	Conclusion string
-	Suggestion string
+	Min          float64
+	Max          float64
+	MaxInclusive bool
+	UnboundedMax bool
+	RiskLevel    string
+	Conclusion   string
+	Suggestion   string
 }
 
 func (r InterpretRule) Matches(score float64) bool {
-	return score >= r.Min && score < r.Max
+	return scorerange.Bound{
+		Min: r.Min, Max: r.Max, MaxInclusive: r.MaxInclusive, UnboundedMax: r.UnboundedMax,
+	}.Contains(score)
 }
 
 type AnswerSheet struct {

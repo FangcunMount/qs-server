@@ -122,13 +122,15 @@ type OutcomePO struct {
 }
 
 type ScoreRangeOutcomePO struct {
-	MinScore    float64 `bson:"min_score"`
-	MaxScore    float64 `bson:"max_score"`
-	Level       string  `bson:"level,omitempty"`
-	OutcomeCode string  `bson:"outcome_code,omitempty"`
-	Title       string  `bson:"title,omitempty"`
-	Summary     string  `bson:"summary,omitempty"`
-	Description string  `bson:"description,omitempty"`
+	MinScore     float64 `bson:"min_score"`
+	MaxScore     float64 `bson:"max_score,omitempty"`
+	MaxInclusive bool    `bson:"max_inclusive,omitempty"`
+	UnboundedMax bool    `bson:"unbounded_max,omitempty"`
+	Level        string  `bson:"level,omitempty"`
+	OutcomeCode  string  `bson:"outcome_code,omitempty"`
+	Title        string  `bson:"title,omitempty"`
+	Summary      string  `bson:"summary,omitempty"`
+	Description  string  `bson:"description,omitempty"`
 }
 
 type TypeDecisionPO struct {
@@ -461,7 +463,7 @@ func conclusionsToPO(conclusions []domain.Conclusion) []ConclusionPO {
 			})
 		case domain.AbilityConclusion:
 			out = append(out, ConclusionPO{
-				Kind: string(conclusion.KindAbility), FactorCode: typed.FactorCode, ScoreBasis: string(typed.ScoreBasis),
+				Kind: string(conclusion.KindAbility), FactorCode: typed.FactorCode, ScoreBasis: string(typed.ScoreBasis), Primary: typed.Primary,
 				Rules: scoreRangeOutcomesToPO(typed.Rules), Outcomes: outcomesToPO(typed.Outcomes),
 			})
 		}
@@ -494,7 +496,7 @@ func conclusionsFromPO(items []ConclusionPO) []domain.Conclusion {
 		case conclusion.KindNorm:
 			out = append(out, domain.NormConclusion{FactorCode: item.FactorCode, ScoreBasis: conclusion.ScoreBasis(item.ScoreBasis), Primary: item.Primary, Rules: scoreRangeOutcomesFromPO(item.Rules), Outcomes: outcomesFromPO(item.Outcomes)})
 		case conclusion.KindAbility:
-			out = append(out, domain.AbilityConclusion{FactorCode: item.FactorCode, ScoreBasis: conclusion.ScoreBasis(item.ScoreBasis), Rules: scoreRangeOutcomesFromPO(item.Rules), Outcomes: outcomesFromPO(item.Outcomes)})
+			out = append(out, domain.AbilityConclusion{FactorCode: item.FactorCode, ScoreBasis: conclusion.ScoreBasis(item.ScoreBasis), Primary: item.Primary, Rules: scoreRangeOutcomesFromPO(item.Rules), Outcomes: outcomesFromPO(item.Outcomes)})
 		}
 	}
 	return out
@@ -539,13 +541,15 @@ func scoreRangeOutcomesToPO(rules []conclusion.ScoreRangeOutcome) []ScoreRangeOu
 	out := make([]ScoreRangeOutcomePO, 0, len(rules))
 	for _, item := range rules {
 		out = append(out, ScoreRangeOutcomePO{
-			MinScore:    item.MinScore,
-			MaxScore:    item.MaxScore,
-			Level:       item.Level,
-			OutcomeCode: item.OutcomeCode,
-			Title:       item.Title,
-			Summary:     item.Summary,
-			Description: item.Description,
+			MinScore:     item.MinScore,
+			MaxScore:     item.MaxScore,
+			MaxInclusive: item.MaxInclusive,
+			UnboundedMax: item.UnboundedMax,
+			Level:        item.Level,
+			OutcomeCode:  item.OutcomeCode,
+			Title:        item.Title,
+			Summary:      item.Summary,
+			Description:  item.Description,
 		})
 	}
 	return out
@@ -558,13 +562,15 @@ func scoreRangeOutcomesFromPO(items []ScoreRangeOutcomePO) []conclusion.ScoreRan
 	out := make([]conclusion.ScoreRangeOutcome, 0, len(items))
 	for _, item := range items {
 		out = append(out, conclusion.ScoreRangeOutcome{
-			MinScore:    item.MinScore,
-			MaxScore:    item.MaxScore,
-			Level:       item.Level,
-			OutcomeCode: item.OutcomeCode,
-			Title:       item.Title,
-			Summary:     item.Summary,
-			Description: item.Description,
+			MinScore:     item.MinScore,
+			MaxScore:     item.MaxScore,
+			MaxInclusive: item.MaxInclusive,
+			UnboundedMax: item.UnboundedMax,
+			Level:        item.Level,
+			OutcomeCode:  item.OutcomeCode,
+			Title:        item.Title,
+			Summary:      item.Summary,
+			Description:  item.Description,
 		})
 	}
 	return out

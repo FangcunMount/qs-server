@@ -41,7 +41,7 @@ func TestDefinitionRoundTripPreservesScaleRiskRules(t *testing.T) {
 			ScoringStrategy: "sum",
 			MaxScore:        &maxScore,
 			InterpretRules: []InterpretRuleSnapshot{{
-				Min: 0, Max: 10, RiskLevel: "low", Conclusion: "低风险", Suggestion: "观察",
+				Min: 0, Max: 10, MaxInclusive: true, RiskLevel: "low", Conclusion: "低风险", Suggestion: "观察",
 			}},
 		}},
 	}

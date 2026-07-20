@@ -598,6 +598,12 @@ func buildDefinition(questionnaire *surveyquestionnaire.Questionnaire, mapping f
 		Kind:       modeldefinition.ReportSectionKindFactorScores,
 		SourceRefs: append([]string(nil), catalog.order...),
 	}}}
+	definition.Outcomes = []conclusion.Outcome{
+		{Code: "normal", Title: "与同龄儿童相似"},
+		{Code: "mild", Title: "轻微执行功能障碍"},
+		{Code: "moderate", Title: "中度执行功能障碍"},
+		{Code: "severe", Title: "严重执行功能障碍"},
+	}
 	if issues := modeldefinition.Validate(*definition); len(issues) > 0 {
 		return nil, fmt.Errorf("generated DefinitionV2 is invalid: %s", issues[0].Message)
 	}
@@ -711,22 +717,22 @@ func brief2Conclusion(factorCode, title string, primary bool) conclusion.NormCon
 		Primary:    primary,
 		Rules: []conclusion.ScoreRangeOutcome{
 			{
-				MinScore: 0, MaxScore: 59, Level: "normal", Title: "与同龄儿童相似",
+				MinScore: 0, MaxScore: 60, Level: "normal", OutcomeCode: "normal", Title: "与同龄儿童相似",
 				Summary:     fmt.Sprintf("在%s方面的表现与同龄儿童相近；本次问卷未提示明显困难。", profile.aspect),
 				Description: fmt.Sprintf("可继续提供清晰、稳定的日常规则和作息，并在%s等压力较大的情境中留意表现变化。若困难只偶尔出现，宜结合睡眠、任务难度和环境变化综合观察。", profile.context),
 			},
 			{
-				MinScore: 60, MaxScore: 64, Level: "mild", Title: "轻微执行功能障碍",
+				MinScore: 60, MaxScore: 65, Level: "mild", OutcomeCode: "mild", Title: "轻微执行功能障碍",
 				Summary:     fmt.Sprintf("在%s方面可能偶有困难，通常在%s时更容易表现出来。", profile.aspect, profile.context),
 				Description: fmt.Sprintf("建议先从一个高频场景开始：%s。连续观察一段时间，记录哪些提示有效，并避免把偶发困难直接等同于能力不足。", profile.strategy),
 			},
 			{
-				MinScore: 65, MaxScore: 69, Level: "moderate", Title: "中度执行功能障碍",
+				MinScore: 65, MaxScore: 70, Level: "moderate", OutcomeCode: "moderate", Title: "中度执行功能障碍",
 				Summary:     fmt.Sprintf("问卷提示%s方面的困难较为明显，可能已影响%s。", profile.aspect, profile.impact),
 				Description: fmt.Sprintf("建议家长与教师共同确定一至两个可观察的目标，并在多个场景使用一致支持：%s。定期根据实际完成情况调整目标和支持强度。", profile.strategy),
 			},
 			{
-				MinScore: 70, MaxScore: 200, Level: "severe", Title: "严重执行功能障碍",
+				MinScore: 70, MaxScore: 200, Level: "severe", OutcomeCode: "severe", Title: "严重执行功能障碍", MaxInclusive: true,
 				Summary:     fmt.Sprintf("问卷提示%s方面存在显著困难，可能持续影响%s。", profile.aspect, profile.impact),
 				Description: fmt.Sprintf("除实施日常支持外，建议尽快与学校或照护团队沟通，形成具体支持计划：%s。若困难已持续影响学习、家庭互动、同伴关系或生活自理，可携带本报告向儿童发育行为、心理或康复等专业人员咨询；本结果用于筛查和支持规划，不能单独作为诊断依据。", profile.strategy),
 			},

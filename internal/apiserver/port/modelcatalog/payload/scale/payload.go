@@ -3,6 +3,8 @@ package scale
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scorerange"
 )
 
 // ParsePublishedPayload decodes a published scale payload envelope.
@@ -70,12 +72,20 @@ func (f FactorSnapshot) QuestionCount() int {
 }
 
 func (f FactorSnapshot) FindInterpretRule(score float64) *InterpretRuleSnapshot {
-	for i := range f.InterpretRules {
-		if f.InterpretRules[i].Matches(score) {
-			return &f.InterpretRules[i]
+	if len(f.InterpretRules) == 0 {
+		return nil
+	}
+	bounds := make([]scorerange.Bound, len(f.InterpretRules))
+	for i, rule := range f.InterpretRules {
+		bounds[i] = scorerange.Bound{
+			Min: rule.Min, Max: rule.Max, MaxInclusive: rule.MaxInclusive, UnboundedMax: rule.UnboundedMax,
 		}
 	}
-	return nil
+	index, ok := scorerange.MatchBounds(score, bounds)
+	if !ok {
+		return nil
+	}
+	return &f.InterpretRules[index]
 }
 
 type ScoringParamsSnapshot struct {
@@ -83,13 +93,17 @@ type ScoringParamsSnapshot struct {
 }
 
 type InterpretRuleSnapshot struct {
-	Min        float64
-	Max        float64
-	RiskLevel  string
-	Conclusion string
-	Suggestion string
+	Min          float64 `json:"Min"`
+	Max          float64 `json:"Max"`
+	MaxInclusive bool    `json:"MaxInclusive,omitempty"`
+	UnboundedMax bool    `json:"UnboundedMax,omitempty"`
+	RiskLevel    string  `json:"RiskLevel"`
+	Conclusion   string  `json:"Conclusion"`
+	Suggestion   string  `json:"Suggestion"`
 }
 
 func (r InterpretRuleSnapshot) Matches(score float64) bool {
-	return score >= r.Min && score < r.Max
+	return scorerange.Bound{
+		Min: r.Min, Max: r.Max, MaxInclusive: r.MaxInclusive, UnboundedMax: r.UnboundedMax,
+	}.Contains(score)
 }

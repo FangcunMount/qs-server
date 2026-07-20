@@ -39,11 +39,11 @@ func TestValidateAcceptsCompleteDefinition(t *testing.T) {
 		Conclusions: []conclusion.Conclusion{
 			conclusion.NormConclusion{
 				FactorCode: "total", ScoreBasis: conclusion.ScoreBasisTScore, Primary: true,
-				Rules: []conclusion.ScoreRangeOutcome{{MinScore: 40, MaxScore: 60, Level: "average", OutcomeCode: "average"}},
+				Rules: []conclusion.ScoreRangeOutcome{{MinScore: 40, MaxScore: 60, Level: "average", OutcomeCode: "average", MaxInclusive: true}},
 			},
 			conclusion.AbilityConclusion{
-				FactorCode: "total", ScoreBasis: conclusion.ScoreBasisRaw,
-				Rules: []conclusion.ScoreRangeOutcome{{MinScore: 0, MaxScore: 10, OutcomeCode: "type_a"}},
+				FactorCode: "total", ScoreBasis: conclusion.ScoreBasisRaw, Primary: true,
+				Rules: []conclusion.ScoreRangeOutcome{{MinScore: 0, MaxScore: 10, OutcomeCode: "type_a", MaxInclusive: true}},
 			},
 			conclusion.TypeConclusion{
 				FactorCodes: []string{"trait"},
@@ -109,7 +109,7 @@ func TestValidateRequiresOutcomeCodeAndRejectsOverlapOrGap(t *testing.T) {
 			FactorCode: "total",
 			Rules: []conclusion.ScoreRangeOutcome{
 				{MinScore: 0, MaxScore: 60, OutcomeCode: "low"},
-				{MinScore: 50, MaxScore: 100, OutcomeCode: "high"},
+				{MinScore: 50, MaxScore: 100, OutcomeCode: "high", MaxInclusive: true},
 			},
 		}}
 		issues := definition.Validate(def)
@@ -124,7 +124,7 @@ func TestValidateRequiresOutcomeCodeAndRejectsOverlapOrGap(t *testing.T) {
 			FactorCode: "total",
 			Rules: []conclusion.ScoreRangeOutcome{
 				{MinScore: 0, MaxScore: 40, OutcomeCode: "low"},
-				{MinScore: 50, MaxScore: 100, OutcomeCode: "high"},
+				{MinScore: 50, MaxScore: 100, OutcomeCode: "high", MaxInclusive: true},
 			},
 		}}
 		issues := definition.Validate(def)
@@ -139,10 +139,54 @@ func TestValidateRequiresOutcomeCodeAndRejectsOverlapOrGap(t *testing.T) {
 			FactorCode: "total",
 			Rules: []conclusion.ScoreRangeOutcome{
 				{MinScore: 0, MaxScore: 60, OutcomeCode: "low"},
-				{MinScore: 60, MaxScore: 100, OutcomeCode: "high"},
+				{MinScore: 60, MaxScore: 100, OutcomeCode: "high", MaxInclusive: true},
 			},
 		}}
 		if issues := definition.Validate(def); len(issues) != 0 {
+			t.Fatalf("issues = %#v", issues)
+		}
+	})
+
+	t.Run("unbounded max accepted", func(t *testing.T) {
+		def := base
+		def.Conclusions = []conclusion.Conclusion{conclusion.RiskConclusion{
+			FactorCode: "total",
+			Rules: []conclusion.ScoreRangeOutcome{
+				{MinScore: 0, MaxScore: 60, OutcomeCode: "low"},
+				{MinScore: 60, OutcomeCode: "high", UnboundedMax: true},
+			},
+		}}
+		if issues := definition.Validate(def); len(issues) != 0 {
+			t.Fatalf("issues = %#v", issues)
+		}
+	})
+
+	t.Run("last endpoint required", func(t *testing.T) {
+		def := base
+		def.Conclusions = []conclusion.Conclusion{conclusion.RiskConclusion{
+			FactorCode: "total",
+			Rules: []conclusion.ScoreRangeOutcome{
+				{MinScore: 0, MaxScore: 60, OutcomeCode: "low"},
+				{MinScore: 60, MaxScore: 100, OutcomeCode: "high"},
+			},
+		}}
+		issues := definition.Validate(def)
+		if !hasValidationCode(issues, "conclusion.range.endpoint.required") {
+			t.Fatalf("issues = %#v", issues)
+		}
+	})
+
+	t.Run("non-last max inclusive rejected", func(t *testing.T) {
+		def := base
+		def.Conclusions = []conclusion.Conclusion{conclusion.RiskConclusion{
+			FactorCode: "total",
+			Rules: []conclusion.ScoreRangeOutcome{
+				{MinScore: 0, MaxScore: 60, OutcomeCode: "low", MaxInclusive: true},
+				{MinScore: 61, MaxScore: 100, OutcomeCode: "high", MaxInclusive: true},
+			},
+		}}
+		issues := definition.Validate(def)
+		if !hasValidationCode(issues, "conclusion.range.endpoint.non_last") {
 			t.Fatalf("issues = %#v", issues)
 		}
 	})

@@ -223,15 +223,22 @@ func riskRulesFromInterpretRules(rules []InterpretRuleSnapshot) []conclusion.Sco
 		return nil
 	}
 	out := make([]conclusion.ScoreRangeOutcome, 0, len(rules))
-	for _, rule := range rules {
-		out = append(out, conclusion.ScoreRangeOutcome{
-			MinScore:    rule.Min,
-			MaxScore:    rule.Max,
-			OutcomeCode: rule.RiskLevel,
-			Title:       rule.RiskLevel,
-			Summary:     rule.Conclusion,
-			Description: rule.Suggestion,
-		})
+	for i, rule := range rules {
+		item := conclusion.ScoreRangeOutcome{
+			MinScore:     rule.Min,
+			MaxScore:     rule.Max,
+			MaxInclusive: rule.MaxInclusive,
+			UnboundedMax: rule.UnboundedMax,
+			OutcomeCode:  rule.RiskLevel,
+			Title:        rule.RiskLevel,
+			Summary:      rule.Conclusion,
+			Description:  rule.Suggestion,
+		}
+		// Publish contract: last range must declare an upper-bound endpoint.
+		if i == len(rules)-1 && !item.MaxInclusive && !item.UnboundedMax {
+			item.MaxInclusive = true
+		}
+		out = append(out, item)
 	}
 	return out
 }
@@ -282,11 +289,13 @@ func interpretRulesFromRisk(rules []conclusion.ScoreRangeOutcome) []InterpretRul
 			level = rule.Title
 		}
 		out = append(out, InterpretRuleSnapshot{
-			Min:        rule.MinScore,
-			Max:        rule.MaxScore,
-			RiskLevel:  level,
-			Conclusion: rule.Summary,
-			Suggestion: rule.Description,
+			Min:          rule.MinScore,
+			Max:          rule.MaxScore,
+			MaxInclusive: rule.MaxInclusive,
+			UnboundedMax: rule.UnboundedMax,
+			RiskLevel:    level,
+			Conclusion:   rule.Summary,
+			Suggestion:   rule.Description,
 		})
 	}
 	return out

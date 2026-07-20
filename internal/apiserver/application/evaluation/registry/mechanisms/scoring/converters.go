@@ -122,11 +122,13 @@ func interpretRulesFromSnapshot(rules []scalesnapshot.InterpretRuleSnapshot) []c
 	out := make([]calcscoring.InterpretRule, 0, len(rules))
 	for _, rule := range rules {
 		out = append(out, calcscoring.InterpretRule{
-			Min:        rule.Min,
-			Max:        rule.Max,
-			RiskLevel:  rule.RiskLevel,
-			Conclusion: rule.Conclusion,
-			Suggestion: rule.Suggestion,
+			Min:          rule.Min,
+			Max:          rule.Max,
+			MaxInclusive: rule.MaxInclusive,
+			UnboundedMax: rule.UnboundedMax,
+			RiskLevel:    rule.RiskLevel,
+			Conclusion:   rule.Conclusion,
+			Suggestion:   rule.Suggestion,
 		})
 	}
 	return out

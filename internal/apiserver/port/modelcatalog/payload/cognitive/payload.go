@@ -121,17 +121,20 @@ type spmItemPayload struct {
 type abilityConclusionPayload struct {
 	FactorCode string                   `json:"factor_code"`
 	ScoreBasis string                   `json:"score_basis"`
+	Primary    bool                     `json:"primary,omitempty"`
 	Ranges     []abilityConclusionRange `json:"ranges"`
 }
 
 type abilityConclusionRange struct {
-	MinScore    float64 `json:"min_score"`
-	MaxScore    float64 `json:"max_score"`
-	Level       string  `json:"level,omitempty"`
-	OutcomeCode string  `json:"outcome_code,omitempty"`
-	Title       string  `json:"title,omitempty"`
-	Summary     string  `json:"summary,omitempty"`
-	Description string  `json:"description,omitempty"`
+	MinScore     float64 `json:"min_score"`
+	MaxScore     float64 `json:"max_score,omitempty"`
+	MaxInclusive bool    `json:"max_inclusive,omitempty"`
+	UnboundedMax bool    `json:"unbounded_max,omitempty"`
+	Level        string  `json:"level,omitempty"`
+	OutcomeCode  string  `json:"outcome_code,omitempty"`
+	Title        string  `json:"title,omitempty"`
+	Summary      string  `json:"summary,omitempty"`
+	Description  string  `json:"description,omitempty"`
 }
 
 // ParseDefinitionPayload de编码 cognitive 载荷 body 为 运行时 快照。
@@ -211,9 +214,12 @@ func spmExtensionFromDefinition(def *definition.Definition) *spmExtension {
 		if !ok {
 			continue
 		}
-		entry := abilityConclusionPayload{FactorCode: ability.FactorCode, ScoreBasis: string(ability.ScoreBasis), Ranges: make([]abilityConclusionRange, 0, len(ability.Rules))}
+		entry := abilityConclusionPayload{FactorCode: ability.FactorCode, ScoreBasis: string(ability.ScoreBasis), Primary: ability.Primary, Ranges: make([]abilityConclusionRange, 0, len(ability.Rules))}
 		for _, value := range ability.Rules {
-			entry.Ranges = append(entry.Ranges, abilityConclusionRange{MinScore: value.MinScore, MaxScore: value.MaxScore, Level: value.Level, OutcomeCode: value.OutcomeCode, Title: value.Title, Summary: value.Summary, Description: value.Description})
+			entry.Ranges = append(entry.Ranges, abilityConclusionRange{
+				MinScore: value.MinScore, MaxScore: value.MaxScore, MaxInclusive: value.MaxInclusive, UnboundedMax: value.UnboundedMax,
+				Level: value.Level, OutcomeCode: value.OutcomeCode, Title: value.Title, Summary: value.Summary, Description: value.Description,
+			})
 		}
 		ext.AbilityConclusions = append(ext.AbilityConclusions, entry)
 	}
@@ -270,12 +276,13 @@ func abilityConclusionsFromPayload(spm *spmExtension) []conclusion.Conclusion {
 		ranges := make([]conclusion.ScoreRangeOutcome, 0, len(item.Ranges))
 		for _, value := range item.Ranges {
 			ranges = append(ranges, conclusion.ScoreRangeOutcome{
-				MinScore: value.MinScore, MaxScore: value.MaxScore, Level: value.Level, OutcomeCode: value.OutcomeCode,
+				MinScore: value.MinScore, MaxScore: value.MaxScore, MaxInclusive: value.MaxInclusive, UnboundedMax: value.UnboundedMax,
+				Level: value.Level, OutcomeCode: value.OutcomeCode,
 				Title: value.Title, Summary: value.Summary, Description: value.Description,
 			})
 		}
 		out = append(out, conclusion.AbilityConclusion{
-			FactorCode: item.FactorCode, ScoreBasis: conclusion.ScoreBasis(item.ScoreBasis), Rules: ranges,
+			FactorCode: item.FactorCode, ScoreBasis: conclusion.ScoreBasis(item.ScoreBasis), Primary: item.Primary, Rules: ranges,
 		})
 	}
 	return out
@@ -624,11 +631,13 @@ func scaleFactorSnapshotFromCognitive(item FactorSnapshot) scalesnapshot.FactorS
 	rules := make([]scalesnapshot.InterpretRuleSnapshot, 0, len(item.InterpretRules))
 	for _, rule := range item.InterpretRules {
 		rules = append(rules, scalesnapshot.InterpretRuleSnapshot{
-			Min:        rule.MinScore,
-			Max:        rule.MaxScore,
-			RiskLevel:  rule.Level,
-			Conclusion: rule.Conclusion,
-			Suggestion: rule.Suggestion,
+			Min:          rule.MinScore,
+			Max:          rule.MaxScore,
+			MaxInclusive: rule.MaxInclusive,
+			UnboundedMax: rule.UnboundedMax,
+			RiskLevel:    rule.Level,
+			Conclusion:   rule.Conclusion,
+			Suggestion:   rule.Suggestion,
 		})
 	}
 	var params scalesnapshot.ScoringParamsSnapshot

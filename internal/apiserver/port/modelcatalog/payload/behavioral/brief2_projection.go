@@ -85,7 +85,10 @@ func brief2ExtensionFromDefinition(def *definition.Definition, table *catalognor
 		}
 		rule := brief2TScoreRule{FactorCode: normConclusion.FactorCode, Ranges: make([]brief2TScoreRange, 0, len(normConclusion.Rules))}
 		for _, value := range normConclusion.Rules {
-			rule.Ranges = append(rule.Ranges, brief2TScoreRange{MinT: value.MinScore, MaxT: value.MaxScore, Level: value.Level, Conclusion: value.Summary, Suggestion: value.Description})
+			rule.Ranges = append(rule.Ranges, brief2TScoreRange{
+				MinT: value.MinScore, MaxT: value.MaxScore, MaxInclusive: value.MaxInclusive, UnboundedMax: value.UnboundedMax,
+				Level: value.Level, Conclusion: value.Summary, Suggestion: value.Description,
+			})
 		}
 		ext.TScoreRules = append(ext.TScoreRules, rule)
 	}

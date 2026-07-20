@@ -64,7 +64,10 @@ func factorModel(snapshot *evaluationinput.InputSnapshot, family modelcatalog.Al
 func factorRules(rules []scalesnapshot.InterpretRuleSnapshot) []reportscore.FactorInterpretRule {
 	converted := make([]reportscore.FactorInterpretRule, 0, len(rules))
 	for _, rule := range rules {
-		converted = append(converted, reportscore.FactorInterpretRule{Min: rule.Min, Max: rule.Max, RiskLevel: rule.RiskLevel, Conclusion: rule.Conclusion, Suggestion: rule.Suggestion})
+		converted = append(converted, reportscore.FactorInterpretRule{
+			Min: rule.Min, Max: rule.Max, MaxInclusive: rule.MaxInclusive, UnboundedMax: rule.UnboundedMax,
+			RiskLevel: rule.RiskLevel, Conclusion: rule.Conclusion, Suggestion: rule.Suggestion,
+		})
 	}
 	return converted
 }

@@ -28,11 +28,12 @@ func TestScalePayloadJSONShapeMatchesLegacySnapshot(t *testing.T) {
 			ScoringParams:   newscale.ScoringParamsSnapshot{CntOptionContents: []string{"yes"}},
 			MaxScore:        &maxScore,
 			InterpretRules: []newscale.InterpretRuleSnapshot{{
-				Min:        0,
-				Max:        10,
-				RiskLevel:  "low",
-				Conclusion: "low",
-				Suggestion: "watch",
+				Min:          0,
+				Max:          10,
+				MaxInclusive: true,
+				RiskLevel:    "low",
+				Conclusion:   "low",
+				Suggestion:   "watch",
 			}},
 		}},
 	}
@@ -41,7 +42,7 @@ func TestScalePayloadJSONShapeMatchesLegacySnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal new scale payload: %v", err)
 	}
-	wantBytes := []byte(`{"ID":42,"Code":"SCL_CONTRACT","ScaleVersion":"1.0.0","Title":"Contract Scale","QuestionnaireCode":"Q_CONTRACT","QuestionnaireVersion":"2.0.0","Status":"published","Factors":[{"Code":"total","Title":"Total","IsTotalScore":true,"QuestionCodes":["Q1","Q2"],"ScoringStrategy":"sum","ScoringParams":{"CntOptionContents":["yes"]},"MaxScore":10,"InterpretRules":[{"Min":0,"Max":10,"RiskLevel":"low","Conclusion":"low","Suggestion":"watch"}]}]}`)
+	wantBytes := []byte(`{"ID":42,"Code":"SCL_CONTRACT","ScaleVersion":"1.0.0","Title":"Contract Scale","QuestionnaireCode":"Q_CONTRACT","QuestionnaireVersion":"2.0.0","Status":"published","Factors":[{"Code":"total","Title":"Total","IsTotalScore":true,"QuestionCodes":["Q1","Q2"],"ScoringStrategy":"sum","ScoringParams":{"CntOptionContents":["yes"]},"MaxScore":10,"InterpretRules":[{"Min":0,"Max":10,"MaxInclusive":true,"RiskLevel":"low","Conclusion":"low","Suggestion":"watch"}]}]}`)
 	if !bytes.Equal(gotBytes, wantBytes) {
 		t.Fatalf("payload JSON = %s\nwant JSON = %s", gotBytes, wantBytes)
 	}
@@ -70,11 +71,12 @@ func TestScalePayloadDefinitionRoundTripMatchesLegacySnapshot(t *testing.T) {
 			ScoringStrategy: "sum",
 			MaxScore:        &maxScore,
 			InterpretRules: []newscale.InterpretRuleSnapshot{{
-				Min:        0,
-				Max:        10,
-				RiskLevel:  "low",
-				Conclusion: "low",
-				Suggestion: "watch",
+				Min:          0,
+				Max:          10,
+				MaxInclusive: true,
+				RiskLevel:    "low",
+				Conclusion:   "low",
+				Suggestion:   "watch",
 			}},
 		}},
 	}

@@ -32,13 +32,15 @@ type RiskConclusion struct {
 func (RiskConclusion) conclusionKind() Kind { return KindRisk }
 
 type ScoreRangeOutcome struct {
-	MinScore    float64
-	MaxScore    float64
-	Level       string
-	OutcomeCode string
-	Title       string
-	Summary     string
-	Description string
+	MinScore     float64
+	MaxScore     float64
+	MaxInclusive bool // [min,max] when true; otherwise half-open [min,max)
+	UnboundedMax bool // ignore MaxScore; match any score >= MinScore
+	Level        string
+	OutcomeCode  string
+	Title        string
+	Summary      string
+	Description  string
 }
 
 type TypeConclusion struct {
@@ -65,6 +67,7 @@ func (NormConclusion) conclusionKind() Kind { return KindNorm }
 type AbilityConclusion struct {
 	FactorCode string
 	ScoreBasis ScoreBasis
+	Primary    bool // when true, matched Level becomes Execution.Level / DecisionResult
 	Rules      []ScoreRangeOutcome
 	Outcomes   []Outcome
 }

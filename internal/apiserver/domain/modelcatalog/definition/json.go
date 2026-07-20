@@ -83,7 +83,7 @@ func marshalConclusions(items []conclusion.Conclusion) ([]conclusionJSON, error)
 		case conclusion.NormConclusion:
 			out = append(out, conclusionJSON{Kind: conclusion.KindNorm, FactorCode: value.FactorCode, ScoreBasis: value.ScoreBasis, Primary: value.Primary, Rules: value.Rules, Outcomes: value.Outcomes})
 		case conclusion.AbilityConclusion:
-			out = append(out, conclusionJSON{Kind: conclusion.KindAbility, FactorCode: value.FactorCode, ScoreBasis: value.ScoreBasis, Rules: value.Rules, Outcomes: value.Outcomes})
+			out = append(out, conclusionJSON{Kind: conclusion.KindAbility, FactorCode: value.FactorCode, ScoreBasis: value.ScoreBasis, Primary: value.Primary, Rules: value.Rules, Outcomes: value.Outcomes})
 		case conclusion.TypeConclusion:
 			out = append(out, conclusionJSON{Kind: conclusion.KindType, FactorCodes: value.FactorCodes, Decision: value.Decision, SpecialRules: value.SpecialRules, OutcomeMapping: value.OutcomeMapping, Profiles: value.Profiles, Outcomes: value.Outcomes})
 		default:
@@ -105,7 +105,7 @@ func unmarshalConclusions(items []conclusionJSON) ([]conclusion.Conclusion, erro
 		case conclusion.KindNorm:
 			out = append(out, conclusion.NormConclusion{FactorCode: item.FactorCode, ScoreBasis: item.ScoreBasis, Primary: item.Primary, Rules: item.Rules, Outcomes: item.Outcomes})
 		case conclusion.KindAbility:
-			out = append(out, conclusion.AbilityConclusion{FactorCode: item.FactorCode, ScoreBasis: item.ScoreBasis, Rules: item.Rules, Outcomes: item.Outcomes})
+			out = append(out, conclusion.AbilityConclusion{FactorCode: item.FactorCode, ScoreBasis: item.ScoreBasis, Primary: item.Primary, Rules: item.Rules, Outcomes: item.Outcomes})
 		case conclusion.KindType:
 			out = append(out, conclusion.TypeConclusion{FactorCodes: item.FactorCodes, Decision: item.Decision, SpecialRules: item.SpecialRules, OutcomeMapping: item.OutcomeMapping, Profiles: item.Profiles, Outcomes: item.Outcomes})
 		default:

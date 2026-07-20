@@ -16,8 +16,10 @@ func NormalizeOutcome(outcome *domainoutcome.Execution) *domainoutcome.Execution
 
 // ApplyAbilityConclusions projects optional DefinitionV2 ability ranges onto
 // calculated cognitive factor results. No configured rule means no change.
-// Ranges use half-open [min, max) with the last rule max-inclusive.
+// Matching uses the shared ScoreRange endpoint contract (half-open by default;
+// explicit max_inclusive / unbounded_max; legacy last-inclusive when unset).
 // Level.Code prefers OutcomeCode when present so code and display stay separated.
+// Primary ability conclusions (or total-role dimensions) promote to Execution.Level.
 func ApplyAbilityConclusions(outcome *domainoutcome.Execution, rules []conclusion.AbilityConclusion) *domainoutcome.Execution {
 	if outcome == nil || len(rules) == 0 {
 		return outcome
@@ -32,35 +34,34 @@ func ApplyAbilityConclusions(outcome *domainoutcome.Execution, rules []conclusio
 			if !ok || rule.FactorCode != dimension.Code {
 				continue
 			}
-			for index, item := range rule.Rules {
-				last := index == len(rule.Rules)-1
-				if !scoreInHalfOpenRange(value, item.MinScore, item.MaxScore, last) {
-					continue
-				}
-				code := item.OutcomeCode
-				if code == "" {
-					code = item.Level
-				}
-				label := item.Title
-				if label == "" {
-					label = item.Level
-				}
-				dimension.Level = &domainoutcome.ResultLevel{Code: code, Label: label}
-				break
+			matched, ok := conclusion.MatchScoreRangeOutcomes(value, rule.Rules)
+			if !ok {
+				continue
 			}
+			code := matched.OutcomeCode
+			if code == "" {
+				code = matched.Level
+			}
+			label := matched.Title
+			if label == "" {
+				label = matched.Level
+			}
+			level := &domainoutcome.ResultLevel{Code: code, Label: label}
+			dimension.Level = level
+			if rule.Primary || dimension.Role == "total" {
+				outcome.Level = level
+				if outcome.Summary.PrimaryLabel == "" {
+					outcome.Summary.PrimaryLabel = label
+				}
+				if outcome.Summary.Level == nil && code != "" {
+					levelCode := code
+					outcome.Summary.Level = &levelCode
+				}
+			}
+			break
 		}
 	}
 	return outcome
-}
-
-func scoreInHalfOpenRange(score, min, max float64, lastInclusive bool) bool {
-	if score < min {
-		return false
-	}
-	if lastInclusive {
-		return score <= max
-	}
-	return score < max
 }
 
 func scoreForBasis(dimension domainoutcome.DimensionResult, basis conclusion.ScoreBasis) (float64, bool) {

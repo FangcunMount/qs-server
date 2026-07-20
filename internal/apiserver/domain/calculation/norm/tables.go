@@ -3,6 +3,8 @@ package norm
 import (
 	"fmt"
 	"math"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scorerange"
 )
 
 // Subject 携带人口学信息 用于 常模区间选择。
@@ -50,11 +52,13 @@ type TScoreInterpretRule struct {
 }
 
 type TScoreRange struct {
-	MinT       float64
-	MaxT       float64
-	Level      string
-	Conclusion string
-	Suggestion string
+	MinT         float64
+	MaxT         float64
+	MaxInclusive bool
+	UnboundedMax bool
+	Level        string
+	Conclusion   string
+	Suggestion   string
 }
 
 type NormScore struct {
@@ -90,10 +94,10 @@ func LookupNormScore(tables *NormTables, factorCode string, rawScore float64, su
 	return NormScore{}, false
 }
 
-// InterpretTScore 映射T 分 到 临床解释 用于 因子。
-// Ranges use half-open [min, max) semantics; the last range is max-inclusive
-// so an upper bound such as 100 remains reachable without an open-ended sentinel.
-func InterpretTScore(tables *NormTables, factorCode string, tScore float64) (level, conclusion, suggestion string, ok bool) {
+// InterpretTScore 映射 T 分到临床解释。
+// Matching uses the shared ScoreRange endpoint contract (half-open by default;
+// explicit max_inclusive / unbounded_max; legacy last-inclusive when unset).
+func InterpretTScore(tables *NormTables, factorCode string, tScore float64) (level, text, suggestion string, ok bool) {
 	if tables == nil {
 		return "", "", "", false
 	}
@@ -101,25 +105,20 @@ func InterpretTScore(tables *NormTables, factorCode string, tScore float64) (lev
 		if rule.FactorCode != factorCode {
 			continue
 		}
-		for index, item := range rule.Ranges {
-			last := index == len(rule.Ranges)-1
-			if !scoreInHalfOpenRange(tScore, item.MinT, item.MaxT, last) {
-				continue
+		bounds := make([]scorerange.Bound, len(rule.Ranges))
+		for i, item := range rule.Ranges {
+			bounds[i] = scorerange.Bound{
+				Min: item.MinT, Max: item.MaxT, MaxInclusive: item.MaxInclusive, UnboundedMax: item.UnboundedMax,
 			}
-			return item.Level, item.Conclusion, item.Suggestion, true
 		}
+		index, matched := scorerange.MatchBounds(tScore, bounds)
+		if !matched {
+			continue
+		}
+		item := rule.Ranges[index]
+		return item.Level, item.Conclusion, item.Suggestion, true
 	}
 	return "", "", "", false
-}
-
-func scoreInHalfOpenRange(score, min, max float64, lastInclusive bool) bool {
-	if score < min {
-		return false
-	}
-	if lastInclusive {
-		return score <= max
-	}
-	return score < max
 }
 
 func factorTable(tables *NormTables, factorCode string) (FactorNormTable, bool) {

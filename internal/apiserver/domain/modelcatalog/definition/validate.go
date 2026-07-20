@@ -159,7 +159,11 @@ func validateFactorConclusion(kind, factorCode string, basis conclusion.ScoreBas
 		return issues
 	}
 	for _, rule := range rules {
-		if rule.MinScore > rule.MaxScore {
+		if rule.UnboundedMax {
+			if rule.MaxInclusive {
+				issues = append(issues, ValidationIssue{Field: prefix + ".rules", Code: "conclusion.range.endpoint.conflict", Message: "score range cannot set both max_inclusive and unbounded_max"})
+			}
+		} else if rule.MinScore > rule.MaxScore {
 			issues = append(issues, ValidationIssue{Field: prefix + ".rules", Code: "conclusion.range.invalid", Message: "conclusion range min_score must not exceed max_score"})
 		}
 		if rule.OutcomeCode == "" {
@@ -174,52 +178,69 @@ func validateFactorConclusion(kind, factorCode string, basis conclusion.ScoreBas
 	return issues
 }
 
-// validateScoreRangeCoverage enforces the publish contract for half-open ranges
-// [min, max), with the last range treated as max-inclusive for upper bound coverage.
-// Adjacent ranges must meet exactly at endpoints; overlaps and gaps are rejected.
+// validateScoreRangeCoverage enforces the publish contract for score ranges:
+// half-open [min,max) by default; only the last range may use max_inclusive or unbounded_max.
+// Adjacent ranges must meet exactly; overlaps and gaps are rejected.
 func validateScoreRangeCoverage(field string, rules []conclusion.ScoreRangeOutcome) []ValidationIssue {
 	type scoredRange struct {
-		min, max float64
-		index    int
+		bound conclusion.ScoreRangeBound
+		index int
 	}
 	ordered := make([]scoredRange, 0, len(rules))
 	for i, rule := range rules {
-		if rule.MinScore > rule.MaxScore {
+		if !rule.UnboundedMax && rule.MinScore > rule.MaxScore {
 			continue
 		}
-		ordered = append(ordered, scoredRange{min: rule.MinScore, max: rule.MaxScore, index: i})
+		ordered = append(ordered, scoredRange{bound: rule.Bound(), index: i})
 	}
-	if len(ordered) < 2 {
+	if len(ordered) == 0 {
 		return nil
 	}
 	sort.SliceStable(ordered, func(i, j int) bool {
-		if ordered[i].min == ordered[j].min {
-			return ordered[i].max < ordered[j].max
+		if ordered[i].bound.Min == ordered[j].bound.Min {
+			return ordered[i].bound.Max < ordered[j].bound.Max
 		}
-		return ordered[i].min < ordered[j].min
+		return ordered[i].bound.Min < ordered[j].bound.Min
 	})
 
 	issues := make([]ValidationIssue, 0)
+	last := len(ordered) - 1
+	for i, item := range ordered {
+		if i != last && (item.bound.MaxInclusive || item.bound.UnboundedMax) {
+			issues = append(issues, ValidationIssue{
+				Field:   field,
+				Code:    "conclusion.range.endpoint.non_last",
+				Message: fmt.Sprintf("only the last score range may set max_inclusive or unbounded_max (rule %d)", item.index),
+			})
+		}
+	}
+	lastBound := ordered[last].bound
+	if !lastBound.MaxInclusive && !lastBound.UnboundedMax {
+		issues = append(issues, ValidationIssue{
+			Field:   field,
+			Code:    "conclusion.range.endpoint.required",
+			Message: "last score range must set max_inclusive=true or unbounded_max=true so the upper bound is reachable",
+		})
+	}
+
 	for i := 0; i < len(ordered); i++ {
 		for j := i + 1; j < len(ordered); j++ {
-			left, right := ordered[i], ordered[j]
-			// Half-open overlap: [a,b) and [c,d) overlap iff a < d && c < b.
-			if left.min < right.max && right.min < left.max {
+			if conclusion.RangesOverlap(ordered[i].bound, ordered[j].bound) {
 				issues = append(issues, ValidationIssue{
 					Field:   field,
 					Code:    "conclusion.range.overlap",
-					Message: fmt.Sprintf("score ranges overlap between rules %d and %d; use adjacent [min,max) boundaries", left.index, right.index),
+					Message: fmt.Sprintf("score ranges overlap between rules %d and %d; use adjacent [min,max) boundaries", ordered[i].index, ordered[j].index),
 				})
 			}
 		}
 	}
 	for i := 0; i+1 < len(ordered); i++ {
-		left, right := ordered[i], ordered[i+1]
-		if left.max < right.min {
+		left, right := ordered[i].bound, ordered[i+1].bound
+		if conclusion.HasCoverageGap(left, right) {
 			issues = append(issues, ValidationIssue{
 				Field:   field,
 				Code:    "conclusion.range.gap",
-				Message: fmt.Sprintf("score ranges leave a gap between %.4g and %.4g", left.max, right.min),
+				Message: fmt.Sprintf("score ranges leave a gap between %.4g and %.4g", left.Max, right.Min),
 			})
 		}
 	}
