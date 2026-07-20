@@ -111,6 +111,41 @@ func (r *Repository) BackfillPublishedDefinitionV2(ctx context.Context, model *p
 	return nil
 }
 
+// BackfillPublishedProjectionHashes writes missing projection hashes when absent.
+func (r *Repository) BackfillPublishedProjectionHashes(ctx context.Context, model *port.PublishedModel, defHash, payloadHash string) error {
+	if model == nil || model.Code == "" || model.Version == "" {
+		return fmt.Errorf("%w: published model is required", domain.ErrInvalidArgument)
+	}
+	if defHash == "" && payloadHash == "" {
+		return fmt.Errorf("%w: at least one projection hash is required", domain.ErrInvalidArgument)
+	}
+	existingDef, existingPayload := port.ProjectionHashesFromSource(model.Source)
+	if existingDef != "" && existingPayload != "" {
+		return nil
+	}
+	filter := publishedFilter(bson.M{
+		"code": model.Code, "release_version": model.Version, "payload": model.Payload,
+	})
+	set := bson.M{"updated_at": time.Now()}
+	if existingDef == "" && defHash != "" {
+		set["source.definition_content_hash"] = defHash
+	}
+	if existingPayload == "" && payloadHash != "" {
+		set["source.payload_projection_hash"] = payloadHash
+	}
+	if _, ok := model.Source[port.SourceProjectionHashSchema]; !ok {
+		set["source.projection_hash_schema"] = modeldefinition.ProjectionHashSchemaV1
+	}
+	result, err := r.Collection().UpdateOne(ctx, filter, bson.M{"$set": set})
+	if err != nil {
+		return err
+	}
+	if result.MatchedCount != 1 {
+		return fmt.Errorf("%w: published model %s@%s", domain.ErrNotFound, model.Code, model.Version)
+	}
+	return nil
+}
+
 func (r *Repository) upsertPublishedModel(ctx context.Context, model *port.PublishedModel) error {
 	po := r.mapper.ToPO(model)
 	now := time.Now()

@@ -73,7 +73,7 @@ func (a OutcomeAssembler) AssembleFromPayload(
 	if payload == nil {
 		return nil, fmt.Errorf("typology payload is required")
 	}
-	spec, err := payload.ToRuntimeSpec()
+	spec, err := modeltypology.ResolveRuntimeSpec(nil, payload)
 	if err != nil {
 		return nil, err
 	}

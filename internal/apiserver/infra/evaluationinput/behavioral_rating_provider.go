@@ -7,10 +7,12 @@ import (
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 type BehavioralRatingModelInputProvider struct {
 	catalog             port.BehavioralRatingModelCatalog
+	publishedModels     rulesetport.PublishedModelReader
 	answerSheetReader   port.AnswerSheetReader
 	questionnaireReader port.QuestionnaireReader
 	normSubjectReader   port.NormSubjectReader
@@ -18,12 +20,14 @@ type BehavioralRatingModelInputProvider struct {
 
 func NewBehavioralRatingModelInputProvider(
 	catalog port.BehavioralRatingModelCatalog,
+	publishedModels rulesetport.PublishedModelReader,
 	answerSheetReader port.AnswerSheetReader,
 	questionnaireReader port.QuestionnaireReader,
 	normSubjectReader port.NormSubjectReader,
 ) BehavioralRatingModelInputProvider {
 	return BehavioralRatingModelInputProvider{
 		catalog:             catalog,
+		publishedModels:     publishedModels,
 		answerSheetReader:   answerSheetReader,
 		questionnaireReader: questionnaireReader,
 		normSubjectReader:   normSubjectReader,
@@ -59,11 +63,13 @@ func (p BehavioralRatingModelInputProvider) ResolveInput(ctx context.Context, re
 		return nil, err
 	}
 	payload := port.BehavioralRatingModelPayload{Snapshot: model}
-	return &port.InputSnapshot{
+	snapshot := &port.InputSnapshot{
 		Model:         port.NewBehavioralRatingModelSnapshot(model, modelcatalog.Algorithm(ref.ModelRef.Algorithm)),
 		ModelPayload:  payload,
 		AnswerSheet:   answerSheet,
 		Questionnaire: qnr,
 		NormSubject:   normSubject,
-	}, nil
+	}
+	attachBehavioralCanonical(ctx, p.publishedModels, ref, snapshot)
+	return snapshot, nil
 }

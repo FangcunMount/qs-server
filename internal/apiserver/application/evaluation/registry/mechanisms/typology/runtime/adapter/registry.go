@@ -6,6 +6,7 @@ import (
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
@@ -14,6 +15,16 @@ type ModelAdapter interface {
 	Algorithm() modelcatalog.Algorithm
 	Score(
 		payload *modeltypology.Payload,
+		sheet *evalinput.AnswerSheet,
+	) (outcometypology.ScoringResult, error)
+}
+
+// CanonicalScorer scores typology using canonical Definition when available (MC-R017 batch 5).
+type CanonicalScorer interface {
+	ModelAdapter
+	ScoreWithDefinition(
+		payload *modeltypology.Payload,
+		def *modeldefinition.Definition,
 		sheet *evalinput.AnswerSheet,
 	) (outcometypology.ScoringResult, error)
 }

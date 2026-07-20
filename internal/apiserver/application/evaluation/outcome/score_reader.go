@@ -2,7 +2,6 @@ package outcome
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/log"
@@ -174,11 +173,19 @@ func scoreMetadataFromRecord(record *domainoutcome.Record, execution *domainoutc
 	if record == nil || len(record.ReportInput()) == 0 {
 		return names, maxScores, false
 	}
-	var frozen evaluationinput.ScaleModelPayload
-	if err := json.Unmarshal(record.ReportInput(), &frozen); err != nil || frozen.Scale == nil {
+	model := record.Model()
+	snapshot, err := evaluationinput.SnapshotFromReportInput(record.ReportInput(), evaluationinput.ModelRef{
+		Kind: evaluationinput.EvaluationModelKind(model.Kind), SubKind: string(model.SubKind),
+		Algorithm: string(model.Algorithm), Code: model.Code, Version: model.Version, Title: model.Title,
+	})
+	if err != nil || snapshot == nil {
 		return names, maxScores, false
 	}
-	for _, factor := range frozen.Scale.Factors {
+	scale, ok := evaluationinput.ScalePayload(snapshot)
+	if !ok || scale == nil {
+		return names, maxScores, false
+	}
+	for _, factor := range scale.Factors {
 		if names[factor.Code] == "" {
 			names[factor.Code] = factor.Title
 		}

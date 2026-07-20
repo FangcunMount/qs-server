@@ -17,7 +17,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -95,13 +94,20 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 		return nil, fmt.Errorf("marshal canonical evaluation outcome: %w", err)
 	}
 	var reportInput json.RawMessage
-	if request.Input != nil && request.Input.ModelPayload != nil {
-		var assets *interpretationassets.Assets
-		if frozen, ok := evaluationinput.InterpretationAssetsFromSnapshot(request.Input); ok {
-			copy := frozen
-			assets = &copy
+	if request.Input != nil && evaluationinput.HasReportInputFreezeMaterial(request.Input) {
+		modelRef := evaluationinput.ModelRef{}
+		if request.Execution != nil {
+			modelRef = evaluationinput.ModelRef{
+				Kind:      evaluationinput.EvaluationModelKind(request.Execution.ModelRef.Kind()),
+				SubKind:   string(request.Execution.ModelRef.SubKind()),
+				Algorithm: string(request.Execution.ModelRef.Algorithm()),
+				Code:      request.Execution.ModelRef.Code().String(),
+				Version:   request.Execution.ModelRef.Version(),
+				Title:     request.Execution.ModelRef.Title(),
+			}
 		}
-		reportInput, err = evaluationinput.MarshalReportInput(request.Input.ModelPayload, assets)
+		opts := evaluationinput.BuildFreezeOptionsFromSnapshot(request.Input, modelRef, request.DescriptorKey.AlgorithmFamily)
+		reportInput, err = evaluationinput.MarshalReportInput(opts)
 		if err != nil {
 			return nil, fmt.Errorf("marshal evaluation report input: %w", err)
 		}

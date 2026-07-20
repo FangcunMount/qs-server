@@ -109,9 +109,14 @@ func InterpretationAssetsFrom(def *Definition) interpretationassets.Assets {
 					Suggestions: append([]string(nil), profile.Suggestions...),
 					ImageURL:    profile.ImageURL,
 					Image:       profile.Image,
-					IsSpecial:   profile.IsSpecial,
-					Trigger:     profile.Trigger,
-					Commentary:  profile.Commentary,
+					Rarity: interpretationassets.RarityPresentation{
+						Percent: profile.Rarity.Percent,
+						Label:   profile.Rarity.Label,
+						OneInX:  profile.Rarity.OneInX,
+					},
+					IsSpecial:  profile.IsSpecial,
+					Trigger:    profile.Trigger,
+					Commentary: profile.Commentary,
 				})
 			}
 			for _, outcome := range c.Outcomes {

@@ -61,5 +61,5 @@ func (e *Executor) Execute(_ context.Context, input evaluationexecute.ExecutionI
 		return nil, fmt.Errorf("personality typology payload is required")
 	}
 	modelRef := modelRefFromExecutionInput(input, payload)
-	return e.runner.buildOutcome(modelRef, payload, input.Input.AnswerSheet)
+	return e.runner.buildOutcome(modelRef, input.Input, payload, input.Input.AnswerSheet)
 }

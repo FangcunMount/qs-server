@@ -46,6 +46,7 @@ func TestBehavioralRatingProviderAttachesNormSubject(t *testing.T) {
 	asOf := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	provider := evaluationinputInfra.NewBehavioralRatingModelInputProvider(
 		stubBehavioralCatalog{},
+		nil,
 		stubAnswerSheetReader{},
 		stubQuestionnaireReader{},
 		stubNormSubjectReader{facts: &port.NormSubjectFacts{Gender: "male", Birthday: &birthday}},

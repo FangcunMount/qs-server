@@ -269,6 +269,17 @@ func typeOutcomeProfilesFromPayload(payload *Payload) []conclusion.TypeOutcomePr
 	return out
 }
 
+// ResolveRuntimeSpec prefers canonical Definition over compat payload projection (MC-R017 batch 5).
+func ResolveRuntimeSpec(def *definition.Definition, payload *Payload) (*RuntimeSpec, error) {
+	if def != nil {
+		return RuntimeSpecFromDefinition(def)
+	}
+	if payload == nil {
+		return nil, fmt.Errorf("typology payload is required")
+	}
+	return payload.ToRuntimeSpec()
+}
+
 // RuntimeSpecFromDefinition reconstructs the typology execution DTO solely from Definition semantics.
 func RuntimeSpecFromDefinition(def *definition.Definition) (*RuntimeSpec, error) {
 	if def == nil {

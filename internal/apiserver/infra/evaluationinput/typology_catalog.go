@@ -7,11 +7,13 @@ import (
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 type TypologyModelInputProvider struct {
 	algorithm           modelcatalog.Algorithm
 	catalog             port.TypologyModelCatalog
+	publishedModels     rulesetport.PublishedModelReader
 	answerSheetReader   port.AnswerSheetReader
 	questionnaireReader port.QuestionnaireReader
 }
@@ -19,12 +21,14 @@ type TypologyModelInputProvider struct {
 func NewTypologyModelInputProvider(
 	algorithm modelcatalog.Algorithm,
 	catalog port.TypologyModelCatalog,
+	publishedModels rulesetport.PublishedModelReader,
 	answerSheetReader port.AnswerSheetReader,
 	questionnaireReader port.QuestionnaireReader,
 ) TypologyModelInputProvider {
 	return TypologyModelInputProvider{
 		algorithm:           algorithm,
 		catalog:             catalog,
+		publishedModels:     publishedModels,
 		answerSheetReader:   answerSheetReader,
 		questionnaireReader: questionnaireReader,
 	}
@@ -37,17 +41,20 @@ func (p TypologyModelInputProvider) ExecutionIdentity() evaldomain.ExecutionIden
 // ConfiguredTypologyModelInputProvider resolves typology payloads without algorithm-alias guards.
 type ConfiguredTypologyModelInputProvider struct {
 	catalog             port.TypologyModelCatalog
+	publishedModels     rulesetport.PublishedModelReader
 	answerSheetReader   port.AnswerSheetReader
 	questionnaireReader port.QuestionnaireReader
 }
 
 func NewConfiguredTypologyModelInputProvider(
 	catalog port.TypologyModelCatalog,
+	publishedModels rulesetport.PublishedModelReader,
 	answerSheetReader port.AnswerSheetReader,
 	questionnaireReader port.QuestionnaireReader,
 ) ConfiguredTypologyModelInputProvider {
 	return ConfiguredTypologyModelInputProvider{
 		catalog:             catalog,
+		publishedModels:     publishedModels,
 		answerSheetReader:   answerSheetReader,
 		questionnaireReader: questionnaireReader,
 	}
@@ -65,6 +72,7 @@ func (p ConfiguredTypologyModelInputProvider) ResolveInput(ctx context.Context, 
 	provider := TypologyModelInputProvider{
 		algorithm:           modelcatalog.AlgorithmPersonalityTypology,
 		catalog:             p.catalog,
+		publishedModels:     p.publishedModels,
 		answerSheetReader:   p.answerSheetReader,
 		questionnaireReader: p.questionnaireReader,
 	}
@@ -115,12 +123,14 @@ func (p TypologyModelInputProvider) resolveConfiguredInput(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	return &port.InputSnapshot{
+	snapshot := &port.InputSnapshot{
 		Model:         port.NewTypologyModelSnapshot(payload),
 		ModelPayload:  port.TypologyModelPayload{Payload: payload},
 		AnswerSheet:   answerSheet,
 		Questionnaire: qnr,
-	}, nil
+	}
+	attachTypologyCanonical(ctx, p.publishedModels, ref, p.algorithm, snapshot)
+	return snapshot, nil
 }
 
 func typologyModelNotFoundMessage(algorithm modelcatalog.Algorithm) string {

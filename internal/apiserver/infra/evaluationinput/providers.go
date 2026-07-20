@@ -5,6 +5,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 type InputProviderDeps struct {
@@ -12,6 +13,7 @@ type InputProviderDeps struct {
 	TypologyCatalog         port.TypologyModelCatalog
 	BehavioralRatingCatalog port.BehavioralRatingModelCatalog
 	CognitiveCatalog        port.CognitiveModelCatalog
+	PublishedModels         rulesetport.PublishedModelReader
 	AnswerSheets            port.AnswerSheetReader
 	Questionnaires          port.QuestionnaireReader
 	NormSubjectReader       port.NormSubjectReader
@@ -37,12 +39,14 @@ func materializeInputProvider(path modelcatalog.ExecutionPath, deps InputProvide
 	case modelcatalog.ExecutionPathScaleDescriptor:
 		return NewScaleModelInputProvider(
 			deps.ScaleCatalog,
+			deps.PublishedModels,
 			deps.AnswerSheets,
 			deps.Questionnaires,
 		), nil
 	case modelcatalog.ExecutionPathTypologyDescriptor:
 		return NewConfiguredTypologyModelInputProvider(
 			deps.TypologyCatalog,
+			deps.PublishedModels,
 			deps.AnswerSheets,
 			deps.Questionnaires,
 		), nil
@@ -52,6 +56,7 @@ func materializeInputProvider(path modelcatalog.ExecutionPath, deps InputProvide
 		}
 		return NewBehavioralRatingModelInputProvider(
 			deps.BehavioralRatingCatalog,
+			deps.PublishedModels,
 			deps.AnswerSheets,
 			deps.Questionnaires,
 			deps.NormSubjectReader,
@@ -62,6 +67,7 @@ func materializeInputProvider(path modelcatalog.ExecutionPath, deps InputProvide
 		}
 		return NewCognitiveModelInputProvider(
 			deps.CognitiveCatalog,
+			deps.PublishedModels,
 			deps.AnswerSheets,
 			deps.Questionnaires,
 			deps.NormSubjectReader,

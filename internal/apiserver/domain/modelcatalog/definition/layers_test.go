@@ -61,6 +61,7 @@ func TestInterpretationAssetsFromKeepsPresentationAndProfiles(t *testing.T) {
 				Decision: conclusion.TypeDecision{Kind: binding.DecisionKindPoleComposition},
 				Profiles: []conclusion.TypeOutcomeProfile{{
 					OutcomeCode: "ENTJ", Pattern: "E-N-T-J", Suggestions: []string{"行动"},
+					Rarity:      conclusion.Rarity{Percent: 1.8, Label: "稀少", OneInX: 56},
 				}},
 			},
 		},
@@ -76,6 +77,9 @@ func TestInterpretationAssetsFromKeepsPresentationAndProfiles(t *testing.T) {
 	profile, ok := assets.FindProfile("ENTJ")
 	if !ok || profile.Pattern != "E-N-T-J" || len(profile.Suggestions) != 1 {
 		t.Fatalf("profile = %#v", profile)
+	}
+	if profile.Rarity.Label != "稀少" || profile.Rarity.OneInX != 56 {
+		t.Fatalf("rarity = %#v", profile.Rarity)
 	}
 	if len(assets.ReportSpec.Sections) != 1 || assets.ReportSpec.Sections[0].AdapterKey != "personality_type" {
 		t.Fatalf("report = %#v", assets.ReportSpec)

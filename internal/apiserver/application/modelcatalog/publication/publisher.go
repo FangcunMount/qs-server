@@ -90,6 +90,16 @@ func (p Publisher) Publish(ctx context.Context, model *domain.AssessmentModel, o
 	if err != nil {
 		return nil, err
 	}
+	if model.DefinitionV2 != nil {
+		if issues := AuditSnapshotProjection(ctx, model, handler, snapshot); domain.HasValidationErrors(issues) {
+			return nil, definition.NewValidationError(issues)
+		}
+		defHash, hashErr := modeldefinition.CanonicalContentHash(model.DefinitionV2)
+		if hashErr != nil {
+			return nil, fmt.Errorf("compute definition content hash: %w", hashErr)
+		}
+		port.AttachProjectionHashes(snapshot, defHash, modeldefinition.PayloadProjectionHash(snapshot.Payload))
+	}
 	if err := p.Repo.Save(ctx, snapshot); err != nil {
 		return nil, err
 	}

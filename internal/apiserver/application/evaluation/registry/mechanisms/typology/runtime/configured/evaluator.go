@@ -7,6 +7,7 @@ import (
 	calcclassification "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification"
 	calcspecialrule "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification/specialrule"
 	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
+	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
@@ -31,13 +32,22 @@ func NewEvaluatorWithDetails(details DetailAssemblerRegistry) Evaluator {
 
 // Score 评估类型学载荷 和 returns 计分结果。
 func (e Evaluator) Score(payload *modeltypology.Payload, sheet *evalinput.AnswerSheet) (outcometypology.ScoringResult, error) {
+	return e.ScoreWithDefinition(payload, nil, sheet)
+}
+
+// ScoreWithDefinition prefers canonical Definition runtime spec over compat payload (MC-R017 batch 5).
+func (e Evaluator) ScoreWithDefinition(
+	payload *modeltypology.Payload,
+	def *modeldefinition.Definition,
+	sheet *evalinput.AnswerSheet,
+) (outcometypology.ScoringResult, error) {
 	if payload == nil {
 		return outcometypology.ScoringResult{}, fmt.Errorf("typology payload is required")
 	}
 	if sheet == nil {
 		return outcometypology.ScoringResult{}, fmt.Errorf("answer sheet is required")
 	}
-	spec, err := payload.ToRuntimeSpec()
+	spec, err := modeltypology.ResolveRuntimeSpec(def, payload)
 	if err != nil {
 		return outcometypology.ScoringResult{}, err
 	}

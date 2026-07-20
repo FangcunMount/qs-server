@@ -7,6 +7,7 @@ import (
 	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
 	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
@@ -47,6 +48,14 @@ func (a Adapter) Score(
 	payload *modeltypology.Payload,
 	sheet *evalinput.AnswerSheet,
 ) (outcometypology.ScoringResult, error) {
+	return a.ScoreWithDefinition(payload, nil, sheet)
+}
+
+func (a Adapter) ScoreWithDefinition(
+	payload *modeltypology.Payload,
+	def *modeldefinition.Definition,
+	sheet *evalinput.AnswerSheet,
+) (outcometypology.ScoringResult, error) {
 	if payload == nil {
 		return outcometypology.ScoringResult{}, fmt.Errorf("typology payload is required")
 	}
@@ -57,5 +66,5 @@ func (a Adapter) Score(
 			a.algorithm,
 		)
 	}
-	return a.evaluator.Score(payload, sheet)
+	return a.evaluator.ScoreWithDefinition(payload, def, sheet)
 }

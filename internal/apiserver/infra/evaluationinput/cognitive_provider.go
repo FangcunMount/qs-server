@@ -7,10 +7,12 @@ import (
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 type CognitiveModelInputProvider struct {
 	catalog             port.CognitiveModelCatalog
+	publishedModels     rulesetport.PublishedModelReader
 	answerSheetReader   port.AnswerSheetReader
 	questionnaireReader port.QuestionnaireReader
 	normSubjectReader   port.NormSubjectReader
@@ -18,12 +20,14 @@ type CognitiveModelInputProvider struct {
 
 func NewCognitiveModelInputProvider(
 	catalog port.CognitiveModelCatalog,
+	publishedModels rulesetport.PublishedModelReader,
 	answerSheetReader port.AnswerSheetReader,
 	questionnaireReader port.QuestionnaireReader,
 	normSubjectReader port.NormSubjectReader,
 ) CognitiveModelInputProvider {
 	return CognitiveModelInputProvider{
 		catalog:             catalog,
+		publishedModels:     publishedModels,
 		answerSheetReader:   answerSheetReader,
 		questionnaireReader: questionnaireReader,
 		normSubjectReader:   normSubjectReader,
@@ -59,11 +63,13 @@ func (p CognitiveModelInputProvider) ResolveInput(ctx context.Context, ref port.
 		return nil, err
 	}
 	payload := port.CognitiveModelPayload{Snapshot: model}
-	return &port.InputSnapshot{
+	snapshot := &port.InputSnapshot{
 		Model:         port.NewCognitiveModelSnapshot(model),
 		ModelPayload:  payload,
 		AnswerSheet:   answerSheet,
 		Questionnaire: qnr,
 		NormSubject:   normSubject,
-	}, nil
+	}
+	attachCognitiveCanonical(ctx, p.publishedModels, ref, snapshot)
+	return snapshot, nil
 }

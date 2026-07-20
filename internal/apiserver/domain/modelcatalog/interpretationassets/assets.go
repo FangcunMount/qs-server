@@ -20,9 +20,17 @@ type TypeProfilePresentation struct {
 	Suggestions []string
 	ImageURL    string
 	Image       string
+	Rarity      RarityPresentation
 	IsSpecial   bool
 	Trigger     string
 	Commentary  string
+}
+
+// RarityPresentation is typology rarity display copy (MC-R017 batch 3).
+type RarityPresentation struct {
+	Percent float64
+	Label   string
+	OneInX  int
 }
 
 // ReportSection is one report assembly instruction.

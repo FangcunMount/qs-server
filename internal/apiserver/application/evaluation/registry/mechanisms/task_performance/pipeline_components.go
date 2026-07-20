@@ -65,18 +65,19 @@ func (c taskPerformanceCalculator) Calculate(ctx context.Context, _ evalpipeline
 	}); err != nil {
 		return nil, err
 	}
-	cognitivePayload, ok := portevaluationinput.CognitivePayload(execInput.Input)
-	if !ok || cognitivePayload.Snapshot == nil {
+	cognitiveSnapshot, ok := portevaluationinput.CognitiveExecutionSnapshot(execInput.Input)
+	if !ok || cognitiveSnapshot == nil {
 		return nil, fmt.Errorf("cognitive model payload is required")
 	}
-	if cognitivePayload.Snapshot.SPM != nil {
-		outcome, err := CalculateSPM(execInput.Input, cognitivePayload.Snapshot)
+	abilityRules := portevaluationinput.AbilityConclusionsFromSnapshot(execInput.Input)
+	if cognitiveSnapshot.SPM != nil {
+		outcome, err := CalculateSPM(execInput.Input, cognitiveSnapshot)
 		if err != nil {
 			return nil, err
 		}
-		return taskPerformancePipelineResult{outcome: ApplyAbilityConclusions(outcome, cognitivePayload.Snapshot.AbilityConclusions)}, nil
+		return taskPerformancePipelineResult{outcome: ApplyAbilityConclusions(outcome, abilityRules)}, nil
 	}
-	scaleSnapshot := cognitivePayload.Snapshot.ToScaleSnapshot()
+	scaleSnapshot := cognitiveSnapshot.ToScaleSnapshot()
 	outcome, err := c.scoring.Execute(ctx, evalpipeline.ExecutionInput{
 		Assessment: execInput.Assessment,
 		Input:      factorscoring.CloneInputWithScaleSnapshot(execInput.Input, scaleSnapshot),
@@ -84,7 +85,7 @@ func (c taskPerformanceCalculator) Calculate(ctx context.Context, _ evalpipeline
 	if err != nil {
 		return nil, err
 	}
-	return taskPerformancePipelineResult{outcome: ApplyAbilityConclusions(NormalizeOutcome(outcome), cognitivePayload.Snapshot.AbilityConclusions)}, nil
+	return taskPerformancePipelineResult{outcome: ApplyAbilityConclusions(NormalizeOutcome(outcome), abilityRules)}, nil
 }
 
 type taskPerformanceOutcomeAssembler struct{}

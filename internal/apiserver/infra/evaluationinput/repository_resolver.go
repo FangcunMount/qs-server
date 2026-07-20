@@ -63,6 +63,7 @@ func NewRepositoryResolver(
 		TypologyCatalog:         typologyCatalog,
 		BehavioralRatingCatalog: behavioralRatingCatalog,
 		CognitiveCatalog:        cognitiveCatalog,
+		PublishedModels:         modelCatalog,
 		AnswerSheets:            answerSheetReader,
 		Questionnaires:          questionnaireReader,
 		NormSubjectReader:       normSubjectReader,
@@ -178,17 +179,20 @@ func (r *ModelInputProviderRegistry) Resolve(key evaldomain.ExecutionIdentity) (
 
 type ScaleModelInputProvider struct {
 	scaleCatalog        port.ScaleModelCatalog
+	publishedModels     rulesetport.PublishedModelReader
 	answerSheetReader   port.AnswerSheetReader
 	questionnaireReader port.QuestionnaireReader
 }
 
 func NewScaleModelInputProvider(
 	scaleCatalog port.ScaleModelCatalog,
+	publishedModels rulesetport.PublishedModelReader,
 	answerSheetReader port.AnswerSheetReader,
 	questionnaireReader port.QuestionnaireReader,
 ) ScaleModelInputProvider {
 	return ScaleModelInputProvider{
 		scaleCatalog:        scaleCatalog,
+		publishedModels:     publishedModels,
 		answerSheetReader:   answerSheetReader,
 		questionnaireReader: questionnaireReader,
 	}
@@ -217,12 +221,14 @@ func (p ScaleModelInputProvider) ResolveInput(ctx context.Context, ref port.Inpu
 	}
 
 	payload := port.ScaleModelPayload{Scale: scale}
-	return &port.InputSnapshot{
+	snapshot := &port.InputSnapshot{
 		Model:         port.NewScaleModelSnapshot(scale),
 		ModelPayload:  payload,
 		AnswerSheet:   answerSheet,
 		Questionnaire: qnr,
-	}, nil
+	}
+	attachScaleCanonical(ctx, p.publishedModels, ref, snapshot)
+	return snapshot, nil
 }
 
 type RepositoryAnswerSheetSnapshotReader struct {

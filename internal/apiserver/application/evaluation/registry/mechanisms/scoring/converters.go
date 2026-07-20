@@ -3,6 +3,7 @@ package scoring
 import (
 	calcscoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scoring"
 	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
+	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
@@ -10,6 +11,15 @@ import (
 )
 
 func calcInputFromSnapshot(snapshot *evaluationinput.InputSnapshot) calcscoring.Input {
+	if def, ok := evaluationinput.DefinitionV2FromSnapshot(snapshot); ok {
+		if scale := scaleSnapshotFromDefinition(snapshot, def); scale != nil {
+			return calcscoring.Input{
+				Model:         modelFromSnapshot(scale),
+				AnswerSheet:   scaleAnswerSheetFromDomain(answerSheetFromPort(snapshot.AnswerSheet)),
+				Questionnaire: scaleQuestionnaireFromDomain(questionnaireFromPort(snapshot.Questionnaire)),
+			}
+		}
+	}
 	scaleSnapshot, _ := evaluationinput.ScalePayload(snapshot)
 	return calcscoring.Input{
 		Model:         modelFromSnapshot(scaleSnapshot),
@@ -80,6 +90,23 @@ func questionnaireFromPort(snapshot *evaluationinput.QuestionnaireSnapshot) *eva
 		Title:     snapshot.Title,
 		Questions: questions,
 	}
+}
+
+func scaleSnapshotFromDefinition(input *evaluationinput.InputSnapshot, def *modeldefinition.Definition) *scalesnapshot.ScaleSnapshot {
+	if input == nil || def == nil || len(def.Measure.Factors) == 0 {
+		return nil
+	}
+	env := scalesnapshot.ExecutionEnvelope{Status: "published"}
+	if input.Model != nil {
+		env.Code = input.Model.Code
+		env.ScaleVersion = input.Model.Version
+		env.Title = input.Model.Title
+	}
+	if input.AnswerSheet != nil {
+		env.QuestionnaireCode = input.AnswerSheet.QuestionnaireCode
+		env.QuestionnaireVersion = input.AnswerSheet.QuestionnaireVersion
+	}
+	return scalesnapshot.ScaleSnapshotFromDefinition(env, def)
 }
 
 func modelFromSnapshot(snapshot *scalesnapshot.ScaleSnapshot) calcscoring.Model {

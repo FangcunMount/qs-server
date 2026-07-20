@@ -102,7 +102,7 @@ func TestResolverComposesSnapshotReadersUsingAnswerSheetExactVersion(t *testing.
 	scaleCatalog := &scaleCatalogStub{snapshot: scaleSnapshot}
 	resolver, err := NewResolver(
 		scaleCatalog,
-		NewScaleModelInputProvider(scaleCatalog, answerSheetReaderStub{snapshot: answerSnapshot}, qReader),
+		NewScaleModelInputProvider(scaleCatalog, nil, answerSheetReaderStub{snapshot: answerSnapshot}, qReader),
 	)
 	if err != nil {
 		t.Fatalf("NewResolver returned error: %v", err)

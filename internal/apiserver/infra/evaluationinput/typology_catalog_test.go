@@ -48,6 +48,7 @@ func TestTypologyModelInputProviderReturnsTypologyPayload(t *testing.T) {
 	provider := NewTypologyModelInputProvider(
 		modelcatalog.AlgorithmMBTI,
 		fakeTypologyCatalog{payload: payload},
+		nil,
 		fakeAnswerSheetReader{sheet: &port.AnswerSheetSnapshot{
 			QuestionnaireCode:    "MBTI_TEST",
 			QuestionnaireVersion: "1.0.0",
@@ -78,6 +79,7 @@ func TestTypologyModelInputProviderRejectsAlgorithmMismatch(t *testing.T) {
 	provider := NewTypologyModelInputProvider(
 		modelcatalog.AlgorithmMBTI,
 		fakeTypologyCatalog{payload: payload},
+		nil,
 		fakeAnswerSheetReader{sheet: &port.AnswerSheetSnapshot{
 			QuestionnaireCode:    "SBTI_FUN",
 			QuestionnaireVersion: "1.0.0",
@@ -100,6 +102,7 @@ func TestTypologyProviderResolvesBigFivePayload(t *testing.T) {
 	provider := NewTypologyModelInputProvider(
 		modelcatalog.AlgorithmBigFive,
 		fakeTypologyCatalog{payload: payload},
+		nil,
 		fakeAnswerSheetReader{sheet: &port.AnswerSheetSnapshot{}},
 		fakeQuestionnaireReader{},
 	)

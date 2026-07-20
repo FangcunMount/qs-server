@@ -10,6 +10,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
+	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -67,6 +69,30 @@ func TestPublisherAllowsNonBlockingValidationWarnings(t *testing.T) {
 	}
 	if _, err := publisher.Publish(context.Background(), model, publication.PublishOptions{}); err != nil {
 		t.Fatalf("Publish() with warning: %v", err)
+	}
+}
+
+func TestPublisherPublishAttachesProjectionHashes(t *testing.T) {
+	t.Parallel()
+	model := newPublishedTestModel(t)
+	model.DefinitionV2 = completeScaleDefinitionForPublishTest()
+	repo := &publishedRepo{}
+	publisher := publication.Publisher{
+		Registry: definition.NewRegistry(warningSnapshotHandler{}),
+		ModelRepo: &publishedModelRepo{}, Repo: repo,
+	}
+	if _, err := publisher.Publish(context.Background(), model, publication.PublishOptions{}); err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+	snapshot := repo.snapshots[model.Code]
+	if snapshot == nil || snapshot.Source[port.SourceDefinitionContentHash] == "" || snapshot.Source[port.SourcePayloadProjectionHash] == "" {
+		t.Fatalf("projection hashes = %#v", snapshot.Source)
+	}
+}
+
+func completeScaleDefinitionForPublishTest() *modeldefinition.Definition {
+	return &modeldefinition.Definition{
+		Conclusions: []conclusion.Conclusion{conclusion.RiskConclusion{FactorCode: "total"}},
 	}
 }
 

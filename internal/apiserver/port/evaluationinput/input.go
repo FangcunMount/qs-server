@@ -7,6 +7,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
+	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
@@ -80,6 +81,8 @@ type InputSnapshot struct {
 	Questionnaire        *QuestionnaireSnapshot
 	NormSubject          *NormSubjectSnapshot
 	InterpretationAssets *interpretationassets.Assets
+	// DefinitionV2 is canonical model semantics for runtime replay (MC-R017 batch 4).
+	DefinitionV2 *modeldefinition.Definition
 }
 
 // NormSubjectSnapshot carries demographics for norm-based scoring such as Brief-2 T-scores.

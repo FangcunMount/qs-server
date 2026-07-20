@@ -62,7 +62,7 @@ func (c typologyCalculator) Calculate(ctx context.Context, _ evalpipeline.Calcul
 		return nil, err
 	}
 	modelRef := modelRefFromExecutionInput(execInput, payload)
-	return runner.buildOutcome(modelRef, payload, execInput.Input.AnswerSheet)
+	return runner.buildOutcome(modelRef, execInput.Input, payload, execInput.Input.AnswerSheet)
 }
 
 type typologyPipelineOutcomeAssembler struct{}

@@ -1,6 +1,7 @@
 package typology
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
@@ -34,6 +35,35 @@ func TestToRuntimeSpecFromMBTIPayload(t *testing.T) {
 	}
 	if len(spec.SpecialRules) != 0 {
 		t.Fatalf("SpecialRules = %#v, want empty", spec.SpecialRules)
+	}
+}
+
+func TestResolveRuntimeSpecPrefersDefinition(t *testing.T) {
+	payload := FromMBTI(&MBTILegacyModel{
+		Code:           "MBTI_TEST",
+		Version:        "1.0.0",
+		DimensionOrder: []string{"EI"},
+		Dimensions: map[string]MBTILegacyDimension{
+			"EI": {Code: "EI", Name: "外向-内向", LeftPole: "I", RightPole: "E"},
+		},
+		TypeProfiles: []MBTILegacyTypeProfile{
+			{TypeCode: "INTJ", TypeName: "建筑师"},
+		},
+	})
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	mat, err := ImportLegacyDefinition(raw, binding.AlgorithmMBTI)
+	if err != nil {
+		t.Fatalf("ImportLegacyDefinition: %v", err)
+	}
+	spec, err := ResolveRuntimeSpec(mat.Definition, payload)
+	if err != nil {
+		t.Fatalf("ResolveRuntimeSpec: %v", err)
+	}
+	if spec.Decision.Kind != binding.DecisionKindPoleComposition {
+		t.Fatalf("Decision.Kind = %s", spec.Decision.Kind)
 	}
 }
 
