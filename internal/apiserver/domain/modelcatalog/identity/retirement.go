@@ -89,6 +89,5 @@ func RetirementDeleteChecklist() []string {
 		"compat ModelPayload decoder retained-read paths (MC-R017 overlap)",
 		"ExecutionIdentityBehavioralRatingDefault / CognitiveDefault family route key remap",
 		"oneoff audit_assessment_retained_algorithms.sql",
-		"oneoff soft_delete_assessment_empty_algorithms (full_gate inventory)",
 	}
 }
