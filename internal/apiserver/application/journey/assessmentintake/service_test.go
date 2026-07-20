@@ -74,7 +74,7 @@ func boundScaleBinding() bindingStub {
 	}
 }
 
-func TestEnsureUnboundAnswerSheetCreatesWithoutAutoSubmit(t *testing.T) {
+func TestEnsureUnboundAnswerSheetEndsWithoutCreatingAssessment(t *testing.T) {
 	calls := []string{}
 	intake := &intakeStub{calls: &calls, created: &evaluationintake.Assessment{ID: 91}}
 	svc := NewService(scoringStub{calls: &calls}, nil, nil, nil, intake, nil)
@@ -82,10 +82,50 @@ func TestEnsureUnboundAnswerSheetCreatesWithoutAutoSubmit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.AssessmentID != 91 || !result.Created || result.AutoSubmitted || intake.submitted {
-		t.Fatalf("result = %#v", result)
+	if result.AssessmentID != 0 || result.Created || result.AutoSubmitted || intake.submitted {
+		t.Fatalf("result = %#v, submitted = %v", result, intake.submitted)
 	}
-	if !reflect.DeepEqual(calls, []string{"score", "find", "create"}) {
+	if !reflect.DeepEqual(calls, []string{"score", "find"}) {
+		t.Fatalf("calls = %v", calls)
+	}
+}
+
+func TestEnsureUnboundReplayReusesLegacyAssessmentWithoutSubmit(t *testing.T) {
+	calls := []string{}
+	intake := &intakeStub{
+		calls:    &calls,
+		existing: &evaluationintake.Assessment{ID: 91, Status: "pending"},
+	}
+	svc := NewService(scoringStub{calls: &calls}, nil, nil, nil, intake, nil)
+
+	result, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.AssessmentID != 91 || result.Created || result.AutoSubmitted || intake.submitted {
+		t.Fatalf("result = %#v, submitted = %v", result, intake.submitted)
+	}
+	if !reflect.DeepEqual(calls, []string{"score", "find"}) {
+		t.Fatalf("calls = %v", calls)
+	}
+}
+
+func TestEnsureBoundAnswerSheetCreatesAndAutoSubmits(t *testing.T) {
+	calls := []string{}
+	intake := &intakeStub{
+		calls:   &calls,
+		created: &evaluationintake.Assessment{ID: 91, Status: "pending"},
+	}
+	svc := NewService(scoringStub{calls: &calls}, boundScaleBinding(), nil, nil, intake, nil)
+
+	result, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.AssessmentID != 91 || !result.Created || !result.AutoSubmitted || !intake.submitted {
+		t.Fatalf("result = %#v, submitted = %v", result, intake.submitted)
+	}
+	if !reflect.DeepEqual(calls, []string{"score", "find", "create", "submit"}) {
 		t.Fatalf("calls = %v", calls)
 	}
 }

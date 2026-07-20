@@ -35,9 +35,10 @@ type Command struct {
 	OriginID             string // 来源ID
 }
 
-// Result 评估入库结果
+// Result 评估入库结果。
+// AssessmentID 为 0 且 Created/AutoSubmitted 均为 false 时，表示独立问卷无需创建 Assessment。
 type Result struct {
-	AssessmentID  uint64 // 评估ID
+	AssessmentID  uint64 // 评估ID；独立问卷无绑定时为 0
 	Created       bool   // 是否创建
 	AutoSubmitted bool   // 是否自动提交
 }
@@ -117,29 +118,46 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 		"model_version", valueOrEmpty(dto.ModelVersion),
 	)
 
-	// 匹配计划
-	matched := s.matchPlan(ctx, command, dto.ModelCode)
-	if matched != nil {
-		dto.OriginType = "plan"
-		dto.OriginID = &matched.PlanID
+	// 仅已绑定测评模型时匹配计划；独立问卷不得完成 Plan Task。
+	var matched *planapp.TaskAssessmentContext
+	if bound {
+		matched = s.matchPlan(ctx, command, dto.ModelCode)
+		if matched != nil {
+			dto.OriginType = "plan"
+			dto.OriginID = &matched.PlanID
+		}
 	}
 
-	// 查找已存在的评估
+	// 查找已存在的评估（含历史空壳 Assessment 的幂等复用）
 	if existing, findErr := s.intake.FindByAnswerSheetID(ctx, command.AnswerSheetID); findErr == nil && existing != nil {
 		autoSubmitted, submitErr := s.submitPendingBoundAssessment(ctx, command, existing, bound)
 		if submitErr != nil {
 			return nil, submitErr
 		}
-		s.completePlanBestEffort(ctx, command.OrgID, matched, existing.ID)
+		if bound {
+			s.completePlanBestEffort(ctx, command.OrgID, matched, existing.ID)
+		}
 		l.Infow("答卷已有关联测评，复用已有测评",
 			"action", "ensure_assessment",
 			"answersheet_id", command.AnswerSheetID,
 			"assessment_id", existing.ID,
 			"assessment_status", existing.Status,
+			"bound", bound,
 			"auto_submitted", autoSubmitted,
 			"result", "idempotent_hit",
 		)
 		return &Result{AssessmentID: existing.ID, AutoSubmitted: autoSubmitted}, nil
+	}
+
+	// 独立 Questionnaire：保留 AnswerSheet 与基础题分后结束，不创建 Assessment。
+	if !bound {
+		l.Infow("答卷未绑定测评模型，入库链路在基础分后结束",
+			"action", "ensure_assessment",
+			"answersheet_id", command.AnswerSheetID,
+			"duration_ms", time.Since(startedAt).Milliseconds(),
+			"result", "no_assessment_required",
+		)
+		return &Result{}, nil
 	}
 
 	// 创建评估
