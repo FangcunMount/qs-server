@@ -47,7 +47,7 @@ func (s Service) SaveDefinition(ctx context.Context, actor modelcatalog.ActorCon
 	if err := model.ForkDraftFromPublished(s.now()); err != nil {
 		return nil, err
 	}
-	handler, err := s.Registry.MustResolve(domain.Identity{Kind: model.Kind, SubKind: model.SubKind, Algorithm: model.Algorithm})
+	handler, err := s.Registry.MustResolveBinding(appdefinition.AlgorithmBindingFromModel(model))
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func (s Service) ValidateDefinition(ctx context.Context, actor modelcatalog.Acto
 	if err != nil {
 		return nil, err
 	}
-	handler, err := s.Registry.MustResolve(domain.Identity{Kind: model.Kind, SubKind: model.SubKind, Algorithm: model.Algorithm})
+	handler, err := s.Registry.MustResolveBinding(appdefinition.AlgorithmBindingFromModel(model))
 	if err != nil {
 		return nil, err
 	}

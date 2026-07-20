@@ -24,7 +24,8 @@ type SnapshotBuildResult struct {
 // Handler 拥有家庭特定的定义验证和发布塑造
 // Family handlers 验证规范的 DefinitionV2 时提供；遗留的导入属于所属的 API 适配器边界。
 type Handler interface {
-	// Supports 支持特定评估模型身份
+	// Supports reports whether this handler owns the AlgorithmBinding
+	// represented by identity (Kind + SubKind + Algorithm matrix).
 	Supports(identity domain.Identity) bool
 	// ValidateForPublish 验证发布
 	ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue
@@ -53,7 +54,7 @@ type PreviewHandler interface {
 	PreviewReport(context.Context, *domain.AssessmentModel, json.RawMessage) (*PreviewResult, error)
 }
 
-// Registry 通过模型身份解析家庭处理程序
+// Registry resolves family handlers by AlgorithmBinding (compatibility matrix).
 type Registry struct {
 	handlers []Handler
 }
@@ -69,8 +70,13 @@ func NewRegistry(handlers ...Handler) Registry {
 	return Registry{handlers: copied}
 }
 
-// Resolve 解析家庭处理程序
-func (r Registry) Resolve(identity domain.Identity) (Handler, bool) {
+// ResolveBinding resolves a handler by full AlgorithmBinding.
+func (r Registry) ResolveBinding(binding AlgorithmBinding) (Handler, bool) {
+	binding = binding.WithDerivedFamily()
+	if !binding.Compatible() {
+		return nil, false
+	}
+	identity := binding.Identity()
 	for _, handler := range r.handlers {
 		if handler.Supports(identity) {
 			return handler, true
@@ -79,13 +85,26 @@ func (r Registry) Resolve(identity domain.Identity) (Handler, bool) {
 	return nil, false
 }
 
-// MustResolve 必须解析家庭处理程序
-func (r Registry) MustResolve(identity domain.Identity) (Handler, error) {
-	handler, ok := r.Resolve(identity)
+// MustResolveBinding must resolve a handler by AlgorithmBinding.
+func (r Registry) MustResolveBinding(binding AlgorithmBinding) (Handler, error) {
+	handler, ok := r.ResolveBinding(binding)
 	if ok {
 		return handler, nil
 	}
-	return nil, fmt.Errorf("unsupported assessment model identity %s/%s/%s", identity.Kind, identity.SubKind, identity.Algorithm)
+	return nil, fmt.Errorf(
+		"unsupported assessment model algorithm binding %s/%s/%s",
+		binding.Kind, binding.SubKind, binding.Algorithm,
+	)
+}
+
+// Resolve resolves by Identity fields (delegates to ResolveBinding).
+func (r Registry) Resolve(identity domain.Identity) (Handler, bool) {
+	return r.ResolveBinding(AlgorithmBindingFromIdentity(identity))
+}
+
+// MustResolve must resolve by Identity fields (delegates to MustResolveBinding).
+func (r Registry) MustResolve(identity domain.Identity) (Handler, error) {
+	return r.MustResolveBinding(AlgorithmBindingFromIdentity(identity))
 }
 
 // PreviewReport 预览报告
@@ -93,7 +112,7 @@ func (r Registry) PreviewReport(ctx context.Context, model *domain.AssessmentMod
 	if model == nil {
 		return nil, fmt.Errorf("assessment model is nil")
 	}
-	handler, err := r.MustResolve(domain.Identity{Kind: model.Kind, SubKind: model.SubKind, Algorithm: model.Algorithm})
+	handler, err := r.MustResolveBinding(AlgorithmBindingFromModel(model))
 	if err != nil {
 		return nil, err
 	}

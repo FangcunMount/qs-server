@@ -31,6 +31,29 @@ func TestValidateAlgorithmBindingRequiresSPMExecution(t *testing.T) {
 	}
 }
 
+func TestValidateAlgorithmBindingRejectsEmptyFactorNormAlgorithm(t *testing.T) {
+	t.Parallel()
+	model := &domain.AssessmentModel{
+		Kind: domain.KindBehavioralRating, Algorithm: "",
+		DefinitionV2: &modeldefinition.Definition{},
+	}
+	issues := ValidateAlgorithmBinding(model)
+	if !hasIssueCode(issues, "behavioral_rating.algorithm.required") {
+		t.Fatalf("issues = %#v, want behavioral_rating.algorithm.required", issues)
+	}
+}
+
+func TestValidateAlgorithmBindingIgnoresEmptyCognitiveAlgorithm(t *testing.T) {
+	t.Parallel()
+	model := &domain.AssessmentModel{
+		Kind: domain.KindCognitive, Algorithm: "",
+		DefinitionV2: &modeldefinition.Definition{},
+	}
+	if issues := ValidateAlgorithmBinding(model); len(issues) != 0 {
+		t.Fatalf("issues = %#v, want none for empty cognitive algorithm", issues)
+	}
+}
+
 func TestValidateBehavioralSemanticRequiresNormRefs(t *testing.T) {
 	t.Parallel()
 	model := &domain.AssessmentModel{

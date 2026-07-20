@@ -113,6 +113,42 @@ func AlgorithmFamilyFromIdentity(kind Kind, subKind SubKind, algorithm Algorithm
 	return AlgorithmFamilyFromDecisionKind(decision)
 }
 
+// CompatibleAlgorithmBinding reports whether Kind/SubKind/Algorithm form a
+// known ModelIdentity ↔ AlgorithmBinding matrix entry. Empty Algorithm is
+// allowed for draft authoring; publish validators still enforce concrete values.
+func CompatibleAlgorithmBinding(kind Kind, subKind SubKind, algorithm Algorithm) bool {
+	switch kind {
+	case KindScale:
+		return algorithm == "" || algorithm == AlgorithmScaleDefault
+	case KindTypology:
+		if subKind != SubKindEmpty && subKind != SubKindTypology {
+			return false
+		}
+		switch algorithm {
+		case "", AlgorithmMBTI, AlgorithmSBTI, AlgorithmBigFive, AlgorithmPersonalityTypology:
+			return true
+		default:
+			return false
+		}
+	case KindBehavioralRating:
+		switch algorithm {
+		case "", AlgorithmBrief2, AlgorithmSPMSensory, AlgorithmBehavioralRatingDefault:
+			return true
+		default:
+			return false
+		}
+	case KindCognitive:
+		return algorithm == "" || algorithm == AlgorithmSPM
+	default:
+		return false
+	}
+}
+
+// CompatibleIdentity is CompatibleAlgorithmBinding for an Identity value.
+func CompatibleIdentity(identity Identity) bool {
+	return CompatibleAlgorithmBinding(identity.Kind, identity.SubKind, identity.Algorithm)
+}
+
 // AllAlgorithmFamilies 返回 supported 算法家族 values 用于 API 选项。
 func AllAlgorithmFamilies() []AlgorithmFamily {
 	return []AlgorithmFamily{

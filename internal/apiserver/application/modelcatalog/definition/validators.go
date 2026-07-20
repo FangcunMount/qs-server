@@ -30,36 +30,58 @@ func AppendDecisionKindIssues(model *domain.AssessmentModel, issues []domain.Dom
 	return issues
 }
 
-// ValidateAlgorithmBinding checks family Algorithm/ExecutionSpec publish rules
-// without Mongo/HTTP dependencies.
+// ValidateAlgorithmBinding checks Algorithm / ExecutionSpec publish rules by
+// AlgorithmBinding (Algorithm + derived Family), not by Kind switch.
 func ValidateAlgorithmBinding(model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	if model == nil || model.DefinitionV2 == nil {
 		return nil
 	}
 	issues := make([]domain.DomainValidationIssue, 0)
-	switch model.Kind {
-	case domain.KindBehavioralRating:
-		if err := requireBehavioralPublishAlgorithm(model.Algorithm); err != nil {
-			issues = append(issues, domain.DomainValidationIssue{
-				Field: "algorithm", Code: "behavioral_rating.algorithm.required",
-				Message: err.Error(), Level: domain.ValidationLevelError,
-			})
-		}
-		if model.Algorithm == domain.AlgorithmBrief2 && model.DefinitionV2.Execution.Brief2 == nil {
+	switch model.Algorithm {
+	case domain.AlgorithmBrief2:
+		if model.DefinitionV2.Execution.Brief2 == nil {
 			issues = append(issues, domain.DomainValidationIssue{
 				Field: "execution.brief2", Code: "brief2.execution.required",
 				Message: "BRIEF-2 execution spec is required", Level: domain.ValidationLevelError,
 			})
 		}
-	case domain.KindCognitive:
-		if model.Algorithm == domain.AlgorithmSPM && model.DefinitionV2.Execution.SPM == nil {
+	case domain.AlgorithmSPM:
+		if model.DefinitionV2.Execution.SPM == nil {
 			issues = append(issues, domain.DomainValidationIssue{
 				Field: "execution.spm", Code: "spm.execution.required",
 				Message: "SPM execution spec is required", Level: domain.ValidationLevelError,
 			})
 		}
+	case domain.AlgorithmSPMSensory:
+		// publishable factor_norm algorithm; no extra ExecutionSpec gate here
+	case domain.AlgorithmBehavioralRatingDefault, "":
+		if isFactorNormFamily(model) {
+			if err := requireBehavioralPublishAlgorithm(model.Algorithm); err != nil {
+				issues = append(issues, domain.DomainValidationIssue{
+					Field: "algorithm", Code: "behavioral_rating.algorithm.required",
+					Message: err.Error(), Level: domain.ValidationLevelError,
+				})
+			}
+		}
+	default:
+		if isFactorNormFamily(model) {
+			if err := requireBehavioralPublishAlgorithm(model.Algorithm); err != nil {
+				issues = append(issues, domain.DomainValidationIssue{
+					Field: "algorithm", Code: "behavioral_rating.algorithm.required",
+					Message: err.Error(), Level: domain.ValidationLevelError,
+				})
+			}
+		}
 	}
 	return issues
+}
+
+func isFactorNormFamily(model *domain.AssessmentModel) bool {
+	if model == nil {
+		return false
+	}
+	family, ok := domain.AlgorithmFamilyFromIdentity(model.Kind, model.SubKind, model.Algorithm)
+	return ok && family == domain.AlgorithmFamilyFactorNorm
 }
 
 // ValidateBehavioralSemantic checks behavioral NormRef / conclusion contracts

@@ -14,19 +14,14 @@ type ScaleDefinitionHandler struct {
 
 // Supports 支持特定评估模型身份
 func (ScaleDefinitionHandler) Supports(identity domain.Identity) bool {
-	return identity.Kind == domain.KindScale
+	return supportsBinding(domain.KindScale, identity)
 }
 
 // ValidateForPublish 验证发布
 func (h ScaleDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
-	if model == nil {
-		return []domain.DomainValidationIssue{modelRequiredIssue()}
-	}
-	issues := model.ValidateForPublish().Issues
-	issues = append(issues, ValidateDefinitionForPublish(ctx, model, nil)...)
-	issues = AppendDecisionKindIssues(model, issues)
-	issues = append(issues, ValidateQuestionnaireMeasure(ctx, h.QuestionnaireQuery, model)...)
-	return issues
+	return ComposePublishValidation(ctx, model, PublicationComposerOptions{
+		QuestionnaireQuery: h.QuestionnaireQuery,
+	})
 }
 
 // BuildSnapshotPayload 构建评估模型快照负载

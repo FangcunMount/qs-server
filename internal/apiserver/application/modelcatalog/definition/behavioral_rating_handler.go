@@ -18,27 +18,19 @@ type BehavioralRatingDefinitionHandler struct {
 
 // Supports 支持
 func (BehavioralRatingDefinitionHandler) Supports(identity domain.Identity) bool {
-	return identity.Kind == domain.KindBehavioralRating
+	return supportsBinding(domain.KindBehavioralRating, identity)
 }
 
 // ValidateForPublish 验证发布
 func (h BehavioralRatingDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
-	if model == nil {
-		return []domain.DomainValidationIssue{modelRequiredIssue()}
-	}
-	if model.Definition.IsEmpty() {
-		return []domain.DomainValidationIssue{{
-			Field: "definition", Message: "行为评定模型定义不能为空",
-			Code: "definition.required", Level: domain.ValidationLevelError,
-		}}
-	}
-	issues := model.ValidateForPublish().Issues
-	issues = append(issues, ValidateDefinitionForPublish(ctx, model, h.NormRepo)...)
-	issues = append(issues, ValidateBehavioralSemantic(model)...)
-	issues = append(issues, ValidateAlgorithmBinding(model)...)
-	issues = AppendDecisionKindIssues(model, issues)
-	issues = append(issues, ValidateQuestionnaireMeasure(ctx, h.QuestionnaireQuery, model)...)
-	return issues
+	return ComposePublishValidation(ctx, model, PublicationComposerOptions{
+		NormRepo:                  h.NormRepo,
+		QuestionnaireQuery:        h.QuestionnaireQuery,
+		RequireLegacyDefinition:   true,
+		LegacyDefinitionMessage:   "行为评定模型定义不能为空",
+		IncludeBehavioralSemantic: true,
+		IncludeAlgorithmBinding:   true,
+	})
 }
 
 // BuildSnapshotPayload 构建快照负载

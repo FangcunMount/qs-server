@@ -85,7 +85,7 @@ func conclusionScoreBasis(item conclusion.Conclusion) (conclusion.ScoreBasis, st
 }
 
 func scoreBasisUnsupported(model *domain.AssessmentModel, factorTable norm.FactorTable, basis conclusion.ScoreBasis) string {
-	spmRuntime := model != nil && model.Kind == domain.KindCognitive && effectiveNormAlgorithm(model) == domain.AlgorithmSPM
+	spmRuntime := effectiveNormAlgorithm(model) == domain.AlgorithmSPM
 	switch basis {
 	case conclusion.ScoreBasisTScore:
 		if spmRuntime {
@@ -126,12 +126,11 @@ func effectiveNormAlgorithm(model *domain.AssessmentModel) domain.Algorithm {
 	if model.Algorithm != "" {
 		return model.Algorithm
 	}
-	switch model.Kind {
-	case domain.KindCognitive:
+	family, ok := domain.AlgorithmFamilyFromIdentity(model.Kind, model.SubKind, model.Algorithm)
+	if ok && family == domain.AlgorithmFamilyTaskPerformance {
 		return domain.AlgorithmSPM
-	default:
-		return ""
 	}
+	return ""
 }
 
 func definitionFormVariant(model *domain.AssessmentModel) string {

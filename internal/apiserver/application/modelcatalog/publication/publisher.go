@@ -32,7 +32,7 @@ func (p Publisher) BuildSnapshot(ctx context.Context, model *domain.AssessmentMo
 		return nil, fmt.Errorf("assessment model is nil")
 	}
 	// 解析模型身份
-	handler, err := p.Registry.MustResolve(identityFromModel(model))
+	handler, err := p.Registry.MustResolveBinding(definition.AlgorithmBindingFromModel(model))
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func (p Publisher) Publish(ctx context.Context, model *domain.AssessmentModel, o
 	if p.Repo == nil {
 		return nil, fmt.Errorf("已发布模型存储库为空")
 	}
-	handler, err := p.Registry.MustResolve(identityFromModel(model))
+	handler, err := p.Registry.MustResolveBinding(definition.AlgorithmBindingFromModel(model))
 	if err != nil {
 		return nil, err
 	}
@@ -104,14 +104,6 @@ func (p Publisher) now() time.Time {
 		return p.Now().UTC()
 	}
 	return time.Now().UTC()
-}
-
-// identityFromModel 从模型创建身份
-func identityFromModel(model *domain.AssessmentModel) domain.Identity {
-	if model == nil {
-		return domain.Identity{}
-	}
-	return domain.Identity{Kind: model.Kind, SubKind: model.SubKind, Algorithm: model.Algorithm}
 }
 
 // snapshotFromModel 从模型和结果创建评估模型快照

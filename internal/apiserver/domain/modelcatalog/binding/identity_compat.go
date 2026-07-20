@@ -20,3 +20,9 @@ func AlgorithmFamilyStringFromIdentity(kind Kind, subKind SubKind, algorithm Alg
 	}
 	return string(family)
 }
+
+// CompatibleAlgorithmBinding reports whether Kind/SubKind/Algorithm form a
+// known ModelIdentity ↔ AlgorithmBinding matrix entry.
+func CompatibleAlgorithmBinding(kind Kind, subKind SubKind, algorithm Algorithm) bool {
+	return identitypkg.CompatibleAlgorithmBinding(kind, subKind, algorithm)
+}

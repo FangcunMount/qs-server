@@ -20,31 +20,43 @@ type TypologyDefinitionHandler struct {
 
 // Supports 支持特定评估模型身份
 func (TypologyDefinitionHandler) Supports(identity domain.Identity) bool {
-	return identity.Kind == domain.KindTypology
+	return supportsBinding(domain.KindTypology, identity)
 }
 
 // ValidateForPublish 验证发布
 func (h TypologyDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
-	if model == nil {
-		return []domain.DomainValidationIssue{modelRequiredIssue()}
-	}
-	issues := model.ValidateForPublish().Issues
-	issues = append(issues, ValidateDefinitionForPublish(ctx, model, nil)...)
-	if domain.HasValidationErrors(issues) {
-		return issues
-	}
+	return ComposePublishValidation(ctx, model, PublicationComposerOptions{
+		QuestionnaireQuery:          h.QuestionnaireQuery,
+		SkipQuestionnaireOnDefError: true,
+		OmitSharedTail:              true,
+		AfterDefinition:             h.validateTypologyRuntime,
+	})
+}
+
+func (h TypologyDefinitionHandler) validateTypologyRuntime(
+	ctx context.Context,
+	model *domain.AssessmentModel,
+	issues []domain.DomainValidationIssue,
+) []domain.DomainValidationIssue {
 	payload, err := (CompatibilityPayloadProjector{}).ProjectTypologyPayload(model, "")
 	if err != nil || payload == nil || payload.Runtime == nil {
 		if err == nil {
 			err = fmt.Errorf("typology runtime specification is empty")
 		}
-		return append(issues, domain.DomainValidationIssue{Field: "definition_v2", Code: "definition_v2.runtime.invalid", Message: err.Error(), Level: domain.ValidationLevelError})
+		return append(issues, domain.DomainValidationIssue{
+			Field: "definition_v2", Code: "definition_v2.runtime.invalid",
+			Message: err.Error(), Level: domain.ValidationLevelError,
+		})
 	}
 	questionnaire, questionnaireIssues := loadPublishedQuestionnaire(ctx, h.QuestionnaireQuery, model.Binding.QuestionnaireCode, model.Binding.QuestionnaireVersion)
 	if len(questionnaireIssues) > 0 {
 		return append(issues, questionnaireIssues...)
 	}
-	return append(issues, modeltypology.ValidateRuntimeSpecForPublishWithContext(payload.Runtime, questionnaireSnapshotFromResult(questionnaire), modeltypology.RuntimeSpecValidationContext{Algorithm: payload.Algorithm, Outcomes: payload.Outcomes})...)
+	return append(issues, modeltypology.ValidateRuntimeSpecForPublishWithContext(
+		payload.Runtime,
+		questionnaireSnapshotFromResult(questionnaire),
+		modeltypology.RuntimeSpecValidationContext{Algorithm: payload.Algorithm, Outcomes: payload.Outcomes},
+	)...)
 }
 
 // BuildSnapshotPayload 构建评估模型快照负载

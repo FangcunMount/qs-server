@@ -36,6 +36,28 @@ func TestRegistryResolveByIdentity(t *testing.T) {
 	}
 }
 
+func TestRegistryResolveBindingRejectsCrossKindAlgorithm(t *testing.T) {
+	t.Parallel()
+
+	registry := NewRegistry(
+		ScaleDefinitionHandler{},
+		BehavioralRatingDefinitionHandler{},
+		CognitiveDefinitionHandler{},
+		TypologyDefinitionHandler{},
+	)
+	cases := []domain.Identity{
+		{Kind: domain.KindScale, Algorithm: domain.AlgorithmBrief2},
+		{Kind: domain.KindBehavioralRating, Algorithm: domain.AlgorithmSPM},
+		{Kind: domain.KindCognitive, Algorithm: domain.AlgorithmBrief2},
+		{Kind: domain.KindTypology, SubKind: domain.SubKindTypology, Algorithm: domain.AlgorithmSPM},
+	}
+	for _, identity := range cases {
+		if _, ok := registry.ResolveBinding(AlgorithmBindingFromIdentity(identity)); ok {
+			t.Fatalf("ResolveBinding(%s/%s/%s) should reject incompatible binding", identity.Kind, identity.SubKind, identity.Algorithm)
+		}
+	}
+}
+
 func TestRegistryResolvesAllCanonicalDefinitionStrategies(t *testing.T) {
 	t.Parallel()
 
@@ -51,8 +73,13 @@ func TestRegistryResolvesAllCanonicalDefinitionStrategies(t *testing.T) {
 		{Kind: domain.KindCognitive, Algorithm: domain.AlgorithmSPM},
 		{Kind: domain.KindTypology, SubKind: domain.SubKindTypology, Algorithm: domain.AlgorithmMBTI},
 	} {
-		if _, ok := registry.Resolve(identity); !ok {
-			t.Fatalf("Resolve(%s/%s/%s) = no handler", identity.Kind, identity.SubKind, identity.Algorithm)
+		binding := AlgorithmBindingFromIdentity(identity)
+		handler, ok := registry.ResolveBinding(binding)
+		if !ok || handler == nil {
+			t.Fatalf("ResolveBinding(%s/%s/%s) = no handler", identity.Kind, identity.SubKind, identity.Algorithm)
+		}
+		if binding.Family == "" {
+			t.Fatalf("ResolveBinding should derive AlgorithmFamily for %s/%s/%s", identity.Kind, identity.SubKind, identity.Algorithm)
 		}
 	}
 }

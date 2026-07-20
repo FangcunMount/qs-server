@@ -16,26 +16,18 @@ type CognitiveDefinitionHandler struct {
 
 // Supports 支持特定评估模型身份
 func (CognitiveDefinitionHandler) Supports(identity domain.Identity) bool {
-	return identity.Kind == domain.KindCognitive
+	return supportsBinding(domain.KindCognitive, identity)
 }
 
 // ValidateForPublish 验证发布
 func (h CognitiveDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
-	if model == nil {
-		return []domain.DomainValidationIssue{modelRequiredIssue()}
-	}
-	if model.Definition.IsEmpty() {
-		return []domain.DomainValidationIssue{{
-			Field: "definition", Message: "认知模型定义不能为空",
-			Code: "definition.required", Level: domain.ValidationLevelError,
-		}}
-	}
-	issues := model.ValidateForPublish().Issues
-	issues = append(issues, ValidateDefinitionForPublish(ctx, model, h.NormRepo)...)
-	issues = append(issues, ValidateAlgorithmBinding(model)...)
-	issues = AppendDecisionKindIssues(model, issues)
-	issues = append(issues, ValidateQuestionnaireMeasure(ctx, h.QuestionnaireQuery, model)...)
-	return issues
+	return ComposePublishValidation(ctx, model, PublicationComposerOptions{
+		NormRepo:                  h.NormRepo,
+		QuestionnaireQuery:        h.QuestionnaireQuery,
+		RequireLegacyDefinition:   true,
+		LegacyDefinitionMessage:   "认知模型定义不能为空",
+		IncludeAlgorithmBinding:   true,
+	})
 }
 
 // BuildSnapshotPayload 构建评估模型快照负载
