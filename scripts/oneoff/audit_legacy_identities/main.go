@@ -19,6 +19,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
+	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 )
 
 type config struct {
@@ -99,8 +100,12 @@ func envOr(key, fallback string) string {
 }
 
 func audit(ctx context.Context, db *mongo.Database) (*report, error) {
-	cur, err := db.Collection("assessment_model_snapshots").Find(ctx, bson.M{}, options.Find().SetProjection(bson.M{
-		"kind": 1, "algorithm": 1, "code": 1, "version": 1,
+	collName := (&mongomodelcatalog.PublishedAssessmentModelPO{}).CollectionName()
+	cur, err := db.Collection(collName).Find(ctx, bson.M{
+		"deleted_at":  nil,
+		"record_role": "published_snapshot",
+	}, options.Find().SetProjection(bson.M{
+		"kind": 1, "algorithm": 1, "code": 1, "version": 1, "release_version": 1,
 	}))
 	if err != nil {
 		return nil, err
