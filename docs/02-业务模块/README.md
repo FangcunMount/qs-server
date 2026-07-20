@@ -20,7 +20,7 @@
 
 ## 3. 现行深度
 
-Survey、ModelCatalog、Evaluation、Interpretation 已保留独立的领域模型、核心设计和关键路径文档。Actor、Plan、Statistics 本轮先收敛为可维护的 canonical README，后续深拆必须以当前代码复核为前提，不能把归档模板直接搬回。
+Survey、ModelCatalog、Evaluation、Interpretation、Actor 已保留独立的领域模型、核心设计、关键路径和设计问题文档。Plan 正按“领域模型—核心设计—关键链路—重构清单”拆分，README 与领域模型已经完成；Statistics 仍先保留可维护的模块入口。后续深拆必须以当前代码复核为前提，不能把归档模板直接搬回。
 
 ## 4. 跨模块原则
 

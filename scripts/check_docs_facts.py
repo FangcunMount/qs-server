@@ -42,6 +42,13 @@ BUSINESS_DOC_DIRS = {
     "statistics": "70-statistics",
 }
 
+# These are safety budgets, not target sizes. The old 120-file global limit
+# forced evidence-rich modules into oversized README files. Keep a wider
+# repository guardrail and a per-module guardrail so docs can be split by
+# responsibility without allowing one module to grow without review.
+MAX_ACTIVE_MARKDOWN = 150
+MAX_BUSINESS_MODULE_MARKDOWN = 18
+
 REQUIRED_EVENTS = {
     "answersheet.submitted",
     "evaluation.requested",
@@ -135,9 +142,18 @@ def main() -> int:
             )
         )
     for package, directory in BUSINESS_DOC_DIRS.items():
-        readme = DOCS / "02-业务模块" / directory / "README.md"
+        module_dir = DOCS / "02-业务模块" / directory
+        readme = module_dir / "README.md"
         if not readme.exists():
             issues.append(Issue("missing-module-readme", f"{package}: {readme.relative_to(ROOT)}"))
+        module_files = list(module_dir.rglob("*.md")) if module_dir.exists() else []
+        if len(module_files) > MAX_BUSINESS_MODULE_MARKDOWN:
+            issues.append(
+                Issue(
+                    "business-module-doc-tree-too-large",
+                    f"{package}: {len(module_files)} files; limit is {MAX_BUSINESS_MODULE_MARKDOWN}",
+                )
+            )
 
     event_text = EVENTS.read_text(encoding="utf-8")
     configured_events = set(re.findall(r"^  ([a-z0-9_.]+):\s*$", event_text, flags=re.MULTILINE))
@@ -150,8 +166,13 @@ def main() -> int:
         issues.append(Issue("missing-signal-contract", signal_name))
 
     files = list(active_markdown())
-    if len(files) > 120:
-        issues.append(Issue("active-doc-tree-too-large", f"{len(files)} files; limit is 120"))
+    if len(files) > MAX_ACTIVE_MARKDOWN:
+        issues.append(
+            Issue(
+                "active-doc-tree-too-large",
+                f"{len(files)} files; limit is {MAX_ACTIVE_MARKDOWN}",
+            )
+        )
 
     for path in files:
         text = path.read_text(encoding="utf-8")
