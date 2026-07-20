@@ -138,6 +138,9 @@ func (s *contentService) persistQuestionnaire(ctx context.Context, q *questionna
 			"result", "failed",
 			"error", err.Error(),
 		)
+		if questionnaire.IsRevisionConflict(err) {
+			return errors.WithCode(errorCode.ErrConflict, "questionnaire revision conflict; refresh and retry")
+		}
 		return errors.WrapC(err, errorCode.ErrDatabase, "保存问卷失败")
 	}
 	return nil

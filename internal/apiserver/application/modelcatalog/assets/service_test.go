@@ -54,7 +54,7 @@ func TestUploadOutcomeImageRejectsInvalidOrOversizedContent(t *testing.T) {
 	}
 }
 
-func TestUploadOutcomeImageRequiresPermissionAndForksPublishedModelToDraft(t *testing.T) {
+func TestUploadOutcomeImageRequiresPermissionAndKeepsPublishedHead(t *testing.T) {
 	config := Config{ObjectKeyPrefix: "assets", PublicURLPrefix: "https://qs.example/assets", MaxUploadBytes: 1024}
 	denied := Service{Models: modelRepoStub{model: mbtiDraft()}, Authorizer: denyAuthorizer{}, Store: &memoryStore{}, Config: config}
 	if _, err := denied.UploadOutcomeImage(context.Background(), modelcatalog.ActorContext{}, UploadInput{ModelCode: "MBTI_DEMO", OutcomeCode: "INTJ", Content: onePixelPNG}); err == nil {
@@ -62,12 +62,12 @@ func TestUploadOutcomeImageRequiresPermissionAndForksPublishedModelToDraft(t *te
 	}
 	published := mbtiDraft()
 	published.Status = domain.ModelStatusPublished
-	notDraft := Service{Models: modelRepoStub{model: published}, Authorizer: allowAuthorizer{}, Store: &memoryStore{}, Config: config}
-	if _, err := notDraft.UploadOutcomeImage(context.Background(), modelcatalog.ActorContext{}, UploadInput{ModelCode: "MBTI_DEMO", OutcomeCode: "INTJ", Content: onePixelPNG}); err != nil {
+	svc := Service{Models: modelRepoStub{model: published}, Authorizer: allowAuthorizer{}, Store: &memoryStore{}, Config: config}
+	if _, err := svc.UploadOutcomeImage(context.Background(), modelcatalog.ActorContext{}, UploadInput{ModelCode: "MBTI_DEMO", OutcomeCode: "INTJ", Content: onePixelPNG}); err != nil {
 		t.Fatalf("UploadOutcomeImage published model: %v", err)
 	}
-	if !published.IsDraft() {
-		t.Fatalf("published model status = %q, want draft", published.Status)
+	if !published.IsPublished() {
+		t.Fatalf("published model status = %q, want published (upload must not fork draft)", published.Status)
 	}
 }
 

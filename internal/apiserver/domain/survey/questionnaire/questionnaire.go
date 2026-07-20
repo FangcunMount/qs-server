@@ -20,8 +20,9 @@ type Questionnaire struct {
 	imgUrl string            // 问卷封面图片URL
 
 	// —— 通用状态
-	version Version // 问卷版本号
-	status  Status  // 问卷状态： 草稿/已发布/已归档
+	version  Version // 问卷版本号
+	revision int64   // head 乐观锁修订号（与业务 Version 独立）
+	status   Status  // 问卷状态： 草稿/已发布/已归档
 
 	// —— 版本记录角色
 	recordRole        RecordRole
@@ -86,7 +87,10 @@ func WithTitle(title string) QuestionnaireOption { return func(q *Questionnaire)
 func WithDesc(d string) QuestionnaireOption      { return func(q *Questionnaire) { q.desc = d } }
 func WithImgUrl(url string) QuestionnaireOption  { return func(q *Questionnaire) { q.imgUrl = url } }
 func WithVersion(v Version) QuestionnaireOption  { return func(q *Questionnaire) { q.version = v } }
-func WithStatus(s Status) QuestionnaireOption    { return func(q *Questionnaire) { q.status = s } }
+func WithRevision(revision int64) QuestionnaireOption {
+	return func(q *Questionnaire) { q.revision = revision }
+}
+func WithStatus(s Status) QuestionnaireOption { return func(q *Questionnaire) { q.status = s } }
 func WithType(t QuestionnaireType) QuestionnaireOption {
 	return func(q *Questionnaire) { q.typ = t }
 }
@@ -144,7 +148,12 @@ func (q *Questionnaire) GetTitle() string       { return q.title }
 func (q *Questionnaire) GetDescription() string { return q.desc }
 func (q *Questionnaire) GetImgUrl() string      { return q.imgUrl }
 func (q *Questionnaire) GetVersion() Version    { return q.version }
-func (q *Questionnaire) GetStatus() Status      { return q.status }
+func (q *Questionnaire) GetRevision() int64     { return q.revision }
+func (q *Questionnaire) BumpRevision() {
+	q.revision++
+}
+func (q *Questionnaire) SetRevision(revision int64) { q.revision = revision }
+func (q *Questionnaire) GetStatus() Status          { return q.status }
 func (q *Questionnaire) GetRecordRole() RecordRole {
 	if q.recordRole == "" {
 		return RecordRoleHead

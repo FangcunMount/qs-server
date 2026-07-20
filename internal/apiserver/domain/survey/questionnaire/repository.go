@@ -8,12 +8,18 @@ import (
 // ErrNotFound 表示问卷仓储未找到目标记录。
 var (
 	ErrNotFound               = stderrors.New("questionnaire not found")
+	ErrRevisionConflict       = stderrors.New("questionnaire revision conflict")
 	ErrReleaseVersionConflict = stderrors.New("questionnaire release version conflicts with existing content")
 )
 
 // IsNotFound 判断错误是否为问卷仓储未找到。
 func IsNotFound(err error) bool {
 	return stderrors.Is(err, ErrNotFound)
+}
+
+// IsRevisionConflict 判断错误是否为 head 乐观锁冲突。
+func IsRevisionConflict(err error) bool {
+	return stderrors.Is(err, ErrRevisionConflict)
 }
 
 // Repository 问卷存储库接口（出站端口）

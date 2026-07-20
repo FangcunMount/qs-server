@@ -34,6 +34,9 @@ func NewRepository(db *mongo.Database, opts ...mongoBase.BaseRepositoryOptions) 
 func (r *Repository) Create(ctx context.Context, qDomain *domainQuestionnaire.Questionnaire) error {
 	qDomain.SetRecordRole(domainQuestionnaire.RecordRoleHead)
 	qDomain.SetActivePublished(false)
+	if qDomain.GetRevision() == 0 {
+		qDomain.SetRevision(1)
+	}
 
 	po := r.mapper.ToPO(qDomain)
 	mongoBase.ApplyAuditCreate(ctx, po)
@@ -272,10 +275,13 @@ func (r *Repository) LoadQuestions(ctx context.Context, qDomain *domainQuestionn
 	return nil
 }
 
-// Update 更新或恢复 head 记录
+// Update 更新 head 记录（revision CAS，不 upsert）
 func (r *Repository) Update(ctx context.Context, qDomain *domainQuestionnaire.Questionnaire) error {
 	qDomain.SetRecordRole(domainQuestionnaire.RecordRoleHead)
 	qDomain.SetActivePublished(false)
+
+	expectedRevision := qDomain.GetRevision()
+	qDomain.BumpRevision()
 
 	po := r.mapper.ToPO(qDomain)
 	mongoBase.ApplyAuditUpdate(ctx, po)
@@ -288,14 +294,28 @@ func (r *Repository) Update(ctx context.Context, qDomain *domainQuestionnaire.Qu
 
 	updateData, err := po.ToBsonM()
 	if err != nil {
+		qDomain.SetRevision(expectedRevision)
 		return err
 	}
+	delete(updateData, "_id")
+	delete(updateData, "created_at")
+	delete(updateData, "created_by")
 
-	filter := headFilter(qDomain.GetCode().Value())
-	update := bson.M{"$set": updateData}
-
-	_, err = r.Collection().UpdateOne(ctx, filter, update, options.Update().SetUpsert(true))
-	return err
+	filter := headRevisionFilter(qDomain.GetCode().Value(), expectedRevision)
+	result, err := r.Collection().UpdateOne(ctx, filter, bson.M{"$set": updateData})
+	if err != nil {
+		qDomain.SetRevision(expectedRevision)
+		return err
+	}
+	if result.MatchedCount == 0 {
+		qDomain.SetRevision(expectedRevision)
+		existing, findErr := r.FindByCode(ctx, qDomain.GetCode().Value())
+		if findErr == nil && existing != nil {
+			return domainQuestionnaire.ErrRevisionConflict
+		}
+		return domainQuestionnaire.ErrNotFound
+	}
+	return nil
 }
 
 // SetActivePublishedVersion 切换当前对外生效的已发布快照

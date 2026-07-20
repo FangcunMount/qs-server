@@ -17,7 +17,6 @@ import (
 	"path"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
@@ -79,18 +78,9 @@ func (s Service) UploadOutcomeImage(ctx context.Context, actor modelcatalog.Acto
 	if err := s.Store.Put(ctx, objectKey, contentType, input.Content); err != nil {
 		return nil, fmt.Errorf("store outcome image: %w", err)
 	}
-	// Definition edits already fork a published head into a mutable draft. An
-	// uploaded portrait is the first step of that same edit flow, so preserve
-	// the active published snapshot and make the following definition save use
-	// a draft head as well.
-	if model.IsPublished() {
-		if err := model.ForkDraftFromPublished(time.Now()); err != nil {
-			return nil, err
-		}
-		if err := s.Models.Update(ctx, model); err != nil {
-			return nil, fmt.Errorf("fork draft for outcome image: %w", modelcatalog.MapDraftWriteError(err))
-		}
-	}
+	// Upload only stores an immutable object and returns its URL. Mutating the
+	// model head (including forking published → draft) happens when the URL is
+	// saved into DefinitionV2 through the normal authoring workflow.
 	return &modelcatalog.OutcomeImageUploadResult{
 		ImageURL:    strings.TrimRight(s.Config.PublicURLPrefix, "/") + "/" + path.Join(input.ModelCode, input.OutcomeCode, filename),
 		ContentType: contentType,

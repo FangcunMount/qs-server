@@ -70,7 +70,7 @@ func (s *lifecycleService) deleteDraftAndRestoreLatestPublished(ctx context.Cont
 	if err != nil {
 		return errors.WrapC(err, errorCode.ErrQuestionnaireInvalidInput, "恢复工作版本失败")
 	}
-	if err := s.repo.Update(ctx, restored); err != nil {
+	if err := s.repo.Create(ctx, restored); err != nil {
 		return errors.WrapC(err, errorCode.ErrDatabase, "恢复工作版本失败")
 	}
 	return nil

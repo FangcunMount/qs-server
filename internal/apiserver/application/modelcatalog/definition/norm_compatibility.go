@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 )
 
@@ -43,7 +44,79 @@ func CheckNormCompatibility(model *domain.AssessmentModel, table *norm.Norm, ref
 			Level:   domain.ValidationLevelError,
 		})
 	}
+	issues = append(issues, checkScoreBasisProducible(model, table, ref)...)
 	return issues
+}
+
+func checkScoreBasisProducible(model *domain.AssessmentModel, table *norm.Norm, ref norm.Ref) []domain.DomainValidationIssue {
+	if model == nil || model.DefinitionV2 == nil || table == nil || ref.FactorCode == "" {
+		return nil
+	}
+	factorTable, ok := normFactorTable(table, ref.FactorCode)
+	if !ok {
+		return nil
+	}
+	issues := make([]domain.DomainValidationIssue, 0)
+	for _, item := range model.DefinitionV2.Conclusions {
+		basis, factorCode, kind := conclusionScoreBasis(item)
+		if factorCode == "" || factorCode != ref.FactorCode || basis == "" || basis == conclusion.ScoreBasisRaw {
+			continue
+		}
+		if errMsg := scoreBasisUnsupported(model, factorTable, basis); errMsg != "" {
+			issues = append(issues, domain.DomainValidationIssue{
+				Field: "definition_v2.conclusions", Code: "norm.score_basis.unsupported",
+				Message: fmt.Sprintf("%s conclusion factor %s: %s", kind, factorCode, errMsg),
+				Level:   domain.ValidationLevelError,
+			})
+		}
+	}
+	return issues
+}
+
+func conclusionScoreBasis(item conclusion.Conclusion) (conclusion.ScoreBasis, string, string) {
+	switch typed := item.(type) {
+	case conclusion.NormConclusion:
+		return typed.ScoreBasis, typed.FactorCode, "norm"
+	case conclusion.AbilityConclusion:
+		return typed.ScoreBasis, typed.FactorCode, "ability"
+	default:
+		return "", "", ""
+	}
+}
+
+func scoreBasisUnsupported(model *domain.AssessmentModel, factorTable norm.FactorTable, basis conclusion.ScoreBasis) string {
+	spmRuntime := model != nil && model.Kind == domain.KindCognitive && effectiveNormAlgorithm(model) == domain.AlgorithmSPM
+	switch basis {
+	case conclusion.ScoreBasisTScore:
+		if spmRuntime {
+			return "cognitive+spm 运行时不产生 T 分，不能使用 score_basis=t_score"
+		}
+		if len(factorTable.Lookup) == 0 && len(factorTable.Bands) == 0 {
+			return "常模表无法产生 T 分"
+		}
+		return ""
+	case conclusion.ScoreBasisPercentile:
+		if len(factorTable.Lookup) == 0 && len(factorTable.Bands) == 0 {
+			return "常模表无法产生百分位"
+		}
+		return ""
+	case conclusion.ScoreBasisStandardScore:
+		if factorHasStandardScore(factorTable) {
+			return ""
+		}
+		return "常模表未提供 standard_score，不能使用 score_basis=standard_score"
+	default:
+		return ""
+	}
+}
+
+func factorHasStandardScore(factorTable norm.FactorTable) bool {
+	for _, row := range factorTable.Lookup {
+		if row.StandardScore != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func effectiveNormAlgorithm(model *domain.AssessmentModel) domain.Algorithm {
@@ -69,13 +142,18 @@ func definitionFormVariant(model *domain.AssessmentModel) string {
 }
 
 func normTableHasFactor(table *norm.Norm, factorCode string) bool {
+	_, ok := normFactorTable(table, factorCode)
+	return ok
+}
+
+func normFactorTable(table *norm.Norm, factorCode string) (norm.FactorTable, bool) {
 	if table == nil || factorCode == "" {
-		return false
+		return norm.FactorTable{}, false
 	}
 	for _, factor := range table.Factors {
 		if factor.FactorCode == factorCode {
-			return true
+			return factor, true
 		}
 	}
-	return false
+	return norm.FactorTable{}, false
 }

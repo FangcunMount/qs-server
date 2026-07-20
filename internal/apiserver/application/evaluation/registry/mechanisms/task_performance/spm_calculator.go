@@ -63,8 +63,20 @@ func CalculateSPM(input *portevaluationinput.InputSnapshot, snapshot *taskperfsn
 		if norm, ok := calcnorm.LookupNormScore(snapshot.SPM.NormTables, snapshot.SPM.TotalFactorCode, total, subject); ok {
 			totalDimension := &execution.Dimensions[len(execution.Dimensions)-1]
 			totalDimension.DerivedScores = append(totalDimension.DerivedScores, domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindPercentile, Value: norm.Percentile})
+			scoreKind := domainoutcome.ScoreKindPercentile
+			benchmark := 0.0
 			if norm.StandardScore != nil {
 				totalDimension.DerivedScores = append(totalDimension.DerivedScores, domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindStandardScore, Value: *norm.StandardScore})
+				scoreKind = domainoutcome.ScoreKindStandardScore
+			}
+			totalDimension.NormReference = &domainoutcome.NormReference{
+				ScoreKind:    scoreKind,
+				Benchmark:    benchmark,
+				TableVersion: snapshot.SPM.NormTables.NormTableVersion,
+				FormVariant:  snapshot.SPM.NormTables.FormVariant,
+				MinAgeMonths: norm.Reference.MinAgeMonths,
+				MaxAgeMonths: norm.Reference.MaxAgeMonths,
+				Gender:       norm.Reference.Gender,
 			}
 		}
 	}

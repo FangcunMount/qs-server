@@ -40,6 +40,7 @@ func cloneQuestionnaireAsHead(q *domainQuestionnaire.Questionnaire) (*domainQues
 		domainQuestionnaire.WithCreatedAt(q.GetCreatedAt()),
 		domainQuestionnaire.WithUpdatedBy(q.GetUpdatedBy()),
 		domainQuestionnaire.WithUpdatedAt(q.GetUpdatedAt()),
+		domainQuestionnaire.WithRevision(0),
 		domainQuestionnaire.WithRecordRole(domainQuestionnaire.RecordRoleHead),
 		domainQuestionnaire.WithActivePublished(false),
 	)

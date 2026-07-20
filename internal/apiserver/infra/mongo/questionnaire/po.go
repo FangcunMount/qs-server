@@ -17,6 +17,7 @@ type QuestionnairePO struct {
 	Description       string       `bson:"description,omitempty" json:"description,omitempty"`
 	ImgUrl            string       `bson:"img_url,omitempty" json:"img_url,omitempty"`
 	Version           string       `bson:"version" json:"version"`
+	Revision          int64        `bson:"revision" json:"revision"`
 	Status            string       `bson:"status" json:"status"`
 	Type              string       `bson:"type" json:"type"`
 	RecordRole        string       `bson:"record_role,omitempty" json:"record_role,omitempty"`

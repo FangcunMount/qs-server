@@ -21,6 +21,23 @@ func headFilter(code string) bson.M {
 	}
 }
 
+func headRevisionFilter(code string, expectedRevision int64) bson.M {
+	filter := headFilter(code)
+	if expectedRevision == 0 {
+		filter["$and"] = bson.A{
+			bson.M{"$or": headRoleCandidates()},
+			bson.M{"$or": bson.A{
+				bson.M{"revision": 0},
+				bson.M{"revision": bson.M{"$exists": false}},
+			}},
+		}
+		delete(filter, "$or")
+		return filter
+	}
+	filter["revision"] = expectedRevision
+	return filter
+}
+
 func headVersionFilter(code, version string) bson.M {
 	filter := headFilter(code)
 	filter["version"] = version

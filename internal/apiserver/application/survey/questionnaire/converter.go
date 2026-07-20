@@ -17,6 +17,7 @@ import (
 type QuestionnaireResult struct {
 	Code         string           // 问卷编码
 	Version      string           // 版本号
+	Revision     int64            // head 乐观锁修订号
 	Title        string           // 问卷标题
 	Description  string           // 问卷描述
 	ImgUrl       string           // 封面图URL
@@ -120,6 +121,7 @@ func toQuestionnaireResult(q *domainQuestionnaire.Questionnaire) *QuestionnaireR
 	result := &QuestionnaireResult{
 		Code:         q.GetCode().String(),
 		Version:      q.GetVersion().String(),
+		Revision:     q.GetRevision(),
 		Title:        q.GetTitle(),
 		Description:  q.GetDescription(),
 		ImgUrl:       q.GetImgUrl(),
