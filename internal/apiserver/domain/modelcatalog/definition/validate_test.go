@@ -32,11 +32,14 @@ func TestValidateAcceptsCompleteDefinition(t *testing.T) {
 			}},
 		},
 		Calibration: definition.Calibration{NormRefs: []norm.Ref{{FactorCode: "total", NormTableVersion: "2026"}}},
-		Outcomes:    []conclusion.Outcome{{Code: "type_a", Title: "Type A"}},
+		Outcomes: []conclusion.Outcome{
+			{Code: "type_a", Title: "Type A"},
+			{Code: "average", Title: "Average"},
+		},
 		Conclusions: []conclusion.Conclusion{
 			conclusion.NormConclusion{
 				FactorCode: "total", ScoreBasis: conclusion.ScoreBasisTScore, Primary: true,
-				Rules: []conclusion.ScoreRangeOutcome{{MinScore: 40, MaxScore: 60, Level: "average"}},
+				Rules: []conclusion.ScoreRangeOutcome{{MinScore: 40, MaxScore: 60, Level: "average", OutcomeCode: "average"}},
 			},
 			conclusion.AbilityConclusion{
 				FactorCode: "total", ScoreBasis: conclusion.ScoreBasisRaw,
@@ -78,4 +81,78 @@ func TestValidateReportsCrossLayerReferenceErrors(t *testing.T) {
 	if len(issues) < 7 {
 		t.Fatalf("Validate() issue count = %d, want cross-layer violations: %#v", len(issues), issues)
 	}
+}
+
+func TestValidateRequiresOutcomeCodeAndRejectsOverlapOrGap(t *testing.T) {
+	t.Parallel()
+
+	base := definition.Definition{
+		Measure:  definition.MeasureSpec{Factors: []factor.Factor{{Code: "total", Role: factor.FactorRoleTotal}}},
+		Outcomes: []conclusion.Outcome{{Code: "low"}, {Code: "high"}},
+	}
+
+	t.Run("missing outcome code", func(t *testing.T) {
+		def := base
+		def.Conclusions = []conclusion.Conclusion{conclusion.RiskConclusion{
+			FactorCode: "total",
+			Rules:      []conclusion.ScoreRangeOutcome{{MinScore: 0, MaxScore: 10, Level: "low"}},
+		}}
+		issues := definition.Validate(def)
+		if !hasValidationCode(issues, "conclusion.outcome_code.required") {
+			t.Fatalf("issues = %#v", issues)
+		}
+	})
+
+	t.Run("overlap", func(t *testing.T) {
+		def := base
+		def.Conclusions = []conclusion.Conclusion{conclusion.RiskConclusion{
+			FactorCode: "total",
+			Rules: []conclusion.ScoreRangeOutcome{
+				{MinScore: 0, MaxScore: 60, OutcomeCode: "low"},
+				{MinScore: 50, MaxScore: 100, OutcomeCode: "high"},
+			},
+		}}
+		issues := definition.Validate(def)
+		if !hasValidationCode(issues, "conclusion.range.overlap") {
+			t.Fatalf("issues = %#v", issues)
+		}
+	})
+
+	t.Run("gap", func(t *testing.T) {
+		def := base
+		def.Conclusions = []conclusion.Conclusion{conclusion.RiskConclusion{
+			FactorCode: "total",
+			Rules: []conclusion.ScoreRangeOutcome{
+				{MinScore: 0, MaxScore: 40, OutcomeCode: "low"},
+				{MinScore: 50, MaxScore: 100, OutcomeCode: "high"},
+			},
+		}}
+		issues := definition.Validate(def)
+		if !hasValidationCode(issues, "conclusion.range.gap") {
+			t.Fatalf("issues = %#v", issues)
+		}
+	})
+
+	t.Run("adjacent half-open accepted", func(t *testing.T) {
+		def := base
+		def.Conclusions = []conclusion.Conclusion{conclusion.RiskConclusion{
+			FactorCode: "total",
+			Rules: []conclusion.ScoreRangeOutcome{
+				{MinScore: 0, MaxScore: 60, OutcomeCode: "low"},
+				{MinScore: 60, MaxScore: 100, OutcomeCode: "high"},
+			},
+		}}
+		if issues := definition.Validate(def); len(issues) != 0 {
+			t.Fatalf("issues = %#v", issues)
+		}
+	})
+}
+
+func hasValidationCode(issues []definition.ValidationIssue, code string) bool {
+	for _, issue := range issues {
+		if issue.Code == code {
+			return true
+		}
+	}
+	return false
 }

@@ -14,10 +14,9 @@ import (
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
 
-// V1 contract (default interpretation path): when factors have no matching
-// interpret rule, the report falls back to the default conclusion/suggestion
-// text. This locks the exact wording so it survives moving the text generation
-// from evaluation to interpretation.
+// V1 contract: scale risk/conclusion text comes from configured interpret rules.
+// Hardcoded absolute-score risk fallback was removed (MC-R004); fixtures must
+// encode the ranges that produce stable report wording.
 func TestV1ScaleDefaultInterpretationTextIsStable(t *testing.T) {
 	a := submittedScaleAssessment(t)
 	snapshot := scaleDefaultInterpretInputSnapshot()
@@ -70,12 +69,21 @@ func scaleDefaultInterpretInputSnapshot() *evaluationinput.InputSnapshot {
 					IsTotalScore:    true,
 					QuestionCodes:   []string{"q1"},
 					ScoringStrategy: "sum",
+					InterpretRules: []scalesnapshot.InterpretRuleSnapshot{
+						{Min: 0, Max: 20, RiskLevel: "none", Conclusion: "总分得分5.0分，处于正常水平", Suggestion: "状态良好，继续保持"},
+						{Min: 20, Max: 100, RiskLevel: "medium", Conclusion: "总分偏高", Suggestion: "建议复查"},
+					},
 				},
 				{
 					Code:            "mood",
 					Title:           "情绪",
 					QuestionCodes:   []string{"q2"},
 					ScoringStrategy: "sum",
+					InterpretRules: []scalesnapshot.InterpretRuleSnapshot{
+						{Min: 0, Max: 40, RiskLevel: "low", Conclusion: "情绪得分较低", Suggestion: "保持"},
+						{Min: 40, Max: 60, RiskLevel: "medium", Conclusion: "情绪得分45.0分，处于中等水平", Suggestion: "建议关注相关方面，适当调整生活方式"},
+						{Min: 60, Max: 100, RiskLevel: "high", Conclusion: "情绪得分偏高", Suggestion: "及时干预"},
+					},
 				},
 			},
 		}},

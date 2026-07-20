@@ -16,6 +16,8 @@ func NormalizeOutcome(outcome *domainoutcome.Execution) *domainoutcome.Execution
 
 // ApplyAbilityConclusions projects optional DefinitionV2 ability ranges onto
 // calculated cognitive factor results. No configured rule means no change.
+// Ranges use half-open [min, max) with the last rule max-inclusive.
+// Level.Code prefers OutcomeCode when present so code and display stay separated.
 func ApplyAbilityConclusions(outcome *domainoutcome.Execution, rules []conclusion.AbilityConclusion) *domainoutcome.Execution {
 	if outcome == nil || len(rules) == 0 {
 		return outcome
@@ -30,16 +32,35 @@ func ApplyAbilityConclusions(outcome *domainoutcome.Execution, rules []conclusio
 			if !ok || rule.FactorCode != dimension.Code {
 				continue
 			}
-			for _, item := range rule.Rules {
-				if value < item.MinScore || value > item.MaxScore {
+			for index, item := range rule.Rules {
+				last := index == len(rule.Rules)-1
+				if !scoreInHalfOpenRange(value, item.MinScore, item.MaxScore, last) {
 					continue
 				}
-				dimension.Level = &domainoutcome.ResultLevel{Code: item.Level, Label: item.Title}
+				code := item.OutcomeCode
+				if code == "" {
+					code = item.Level
+				}
+				label := item.Title
+				if label == "" {
+					label = item.Level
+				}
+				dimension.Level = &domainoutcome.ResultLevel{Code: code, Label: label}
 				break
 			}
 		}
 	}
 	return outcome
+}
+
+func scoreInHalfOpenRange(score, min, max float64, lastInclusive bool) bool {
+	if score < min {
+		return false
+	}
+	if lastInclusive {
+		return score <= max
+	}
+	return score < max
 }
 
 func scoreForBasis(dimension domainoutcome.DimensionResult, basis conclusion.ScoreBasis) (float64, bool) {

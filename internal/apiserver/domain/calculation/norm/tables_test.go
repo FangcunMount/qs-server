@@ -158,7 +158,7 @@ func TestInterpretTScore(t *testing.T) {
 		TScoreRules: []calcnorm.TScoreInterpretRule{{
 			FactorCode: "gec",
 			Ranges: []calcnorm.TScoreRange{
-				{MinT: 0, MaxT: 59, Level: "low", Conclusion: "正常"},
+				{MinT: 0, MaxT: 60, Level: "low", Conclusion: "正常"},
 				{MinT: 60, MaxT: 100, Level: "elevated", Conclusion: "升高"},
 			},
 		}},
@@ -166,5 +166,13 @@ func TestInterpretTScore(t *testing.T) {
 	level, conclusion, _, ok := calcnorm.InterpretTScore(tables, "gec", 65)
 	if !ok || level != "elevated" || conclusion != "升高" {
 		t.Fatalf("interpret = %q %q ok=%v", level, conclusion, ok)
+	}
+	level, conclusion, _, ok = calcnorm.InterpretTScore(tables, "gec", 60)
+	if !ok || level != "elevated" {
+		t.Fatalf("boundary 60 = %q %q ok=%v, want elevated via half-open adjacency", level, conclusion, ok)
+	}
+	level, conclusion, _, ok = calcnorm.InterpretTScore(tables, "gec", 100)
+	if !ok || level != "elevated" {
+		t.Fatalf("upper bound 100 = %q %q ok=%v, want elevated via last-range inclusive max", level, conclusion, ok)
 	}
 }

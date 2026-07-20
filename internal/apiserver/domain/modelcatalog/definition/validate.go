@@ -2,6 +2,7 @@ package definition
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
@@ -153,14 +154,73 @@ func validateFactorConclusion(kind, factorCode string, basis conclusion.ScoreBas
 	if kind != "risk" && !validScoreBasis(basis) {
 		issues = append(issues, ValidationIssue{Field: prefix + ".score_basis", Code: "conclusion.score_basis.invalid", Message: "conclusion score basis is invalid"})
 	}
+	if len(rules) == 0 {
+		issues = append(issues, ValidationIssue{Field: prefix + ".rules", Code: "conclusion.rules.required", Message: "conclusion requires at least one score range rule"})
+		return issues
+	}
 	for _, rule := range rules {
 		if rule.MinScore > rule.MaxScore {
 			issues = append(issues, ValidationIssue{Field: prefix + ".rules", Code: "conclusion.range.invalid", Message: "conclusion range min_score must not exceed max_score"})
 		}
-		if rule.OutcomeCode != "" {
-			if _, ok := outcomeCodes[rule.OutcomeCode]; !ok {
-				issues = append(issues, ValidationIssue{Field: prefix + ".rules", Code: "conclusion.outcome.not_found", Message: fmt.Sprintf("outcome %s is not defined", rule.OutcomeCode)})
+		if rule.OutcomeCode == "" {
+			issues = append(issues, ValidationIssue{Field: prefix + ".rules", Code: "conclusion.outcome_code.required", Message: "score range rule requires outcome_code; display text belongs in outcomes registry"})
+			continue
+		}
+		if _, ok := outcomeCodes[rule.OutcomeCode]; !ok {
+			issues = append(issues, ValidationIssue{Field: prefix + ".rules", Code: "conclusion.outcome.not_found", Message: fmt.Sprintf("outcome %s is not defined", rule.OutcomeCode)})
+		}
+	}
+	issues = append(issues, validateScoreRangeCoverage(prefix+".rules", rules)...)
+	return issues
+}
+
+// validateScoreRangeCoverage enforces the publish contract for half-open ranges
+// [min, max), with the last range treated as max-inclusive for upper bound coverage.
+// Adjacent ranges must meet exactly at endpoints; overlaps and gaps are rejected.
+func validateScoreRangeCoverage(field string, rules []conclusion.ScoreRangeOutcome) []ValidationIssue {
+	type scoredRange struct {
+		min, max float64
+		index    int
+	}
+	ordered := make([]scoredRange, 0, len(rules))
+	for i, rule := range rules {
+		if rule.MinScore > rule.MaxScore {
+			continue
+		}
+		ordered = append(ordered, scoredRange{min: rule.MinScore, max: rule.MaxScore, index: i})
+	}
+	if len(ordered) < 2 {
+		return nil
+	}
+	sort.SliceStable(ordered, func(i, j int) bool {
+		if ordered[i].min == ordered[j].min {
+			return ordered[i].max < ordered[j].max
+		}
+		return ordered[i].min < ordered[j].min
+	})
+
+	issues := make([]ValidationIssue, 0)
+	for i := 0; i < len(ordered); i++ {
+		for j := i + 1; j < len(ordered); j++ {
+			left, right := ordered[i], ordered[j]
+			// Half-open overlap: [a,b) and [c,d) overlap iff a < d && c < b.
+			if left.min < right.max && right.min < left.max {
+				issues = append(issues, ValidationIssue{
+					Field:   field,
+					Code:    "conclusion.range.overlap",
+					Message: fmt.Sprintf("score ranges overlap between rules %d and %d; use adjacent [min,max) boundaries", left.index, right.index),
+				})
 			}
+		}
+	}
+	for i := 0; i+1 < len(ordered); i++ {
+		left, right := ordered[i], ordered[i+1]
+		if left.max < right.min {
+			issues = append(issues, ValidationIssue{
+				Field:   field,
+				Code:    "conclusion.range.gap",
+				Message: fmt.Sprintf("score ranges leave a gap between %.4g and %.4g", left.max, right.min),
+			})
 		}
 	}
 	return issues

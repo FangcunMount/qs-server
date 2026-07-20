@@ -91,6 +91,8 @@ func LookupNormScore(tables *NormTables, factorCode string, rawScore float64, su
 }
 
 // InterpretTScore 映射T 分 到 临床解释 用于 因子。
+// Ranges use half-open [min, max) semantics; the last range is max-inclusive
+// so an upper bound such as 100 remains reachable without an open-ended sentinel.
 func InterpretTScore(tables *NormTables, factorCode string, tScore float64) (level, conclusion, suggestion string, ok bool) {
 	if tables == nil {
 		return "", "", "", false
@@ -99,13 +101,25 @@ func InterpretTScore(tables *NormTables, factorCode string, tScore float64) (lev
 		if rule.FactorCode != factorCode {
 			continue
 		}
-		for _, item := range rule.Ranges {
-			if tScore >= item.MinT && tScore <= item.MaxT {
-				return item.Level, item.Conclusion, item.Suggestion, true
+		for index, item := range rule.Ranges {
+			last := index == len(rule.Ranges)-1
+			if !scoreInHalfOpenRange(tScore, item.MinT, item.MaxT, last) {
+				continue
 			}
+			return item.Level, item.Conclusion, item.Suggestion, true
 		}
 	}
 	return "", "", "", false
+}
+
+func scoreInHalfOpenRange(score, min, max float64, lastInclusive bool) bool {
+	if score < min {
+		return false
+	}
+	if lastInclusive {
+		return score <= max
+	}
+	return score < max
 }
 
 func factorTable(tables *NormTables, factorCode string) (FactorNormTable, bool) {

@@ -15,7 +15,9 @@ func calculateFactorRiskLevel(model Model, factorCode string, score float64) Ris
 			return RiskLevel(rule.RiskLevel)
 		}
 	}
-	return defaultRiskLevelByScore(score)
+	// MC-R004: published scale models must encode risk via InterpretRules.
+	// Hardcoded absolute-score fallback is no longer applied at runtime.
+	return RiskLevelNone
 }
 
 func calculateOverallRiskLevel(model Model, factorScores []FactorScore) RiskLevel {
@@ -36,21 +38,6 @@ func calculateOverallRiskLevel(model Model, factorScores []FactorScore) RiskLeve
 		}
 	}
 	return maxRisk
-}
-
-func defaultRiskLevelByScore(score float64) RiskLevel {
-	switch {
-	case score >= 80:
-		return RiskLevelSevere
-	case score >= 60:
-		return RiskLevelHigh
-	case score >= 40:
-		return RiskLevelMedium
-	case score >= 20:
-		return RiskLevelLow
-	default:
-		return RiskLevelNone
-	}
 }
 
 func riskLevelOrder(level RiskLevel) int {

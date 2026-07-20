@@ -13,9 +13,9 @@ func TestApplyAbilityConclusionsProjectsMatchingRawScoreRange(t *testing.T) {
 	}}}
 	got := ApplyAbilityConclusions(outcome, []conclusion.AbilityConclusion{{
 		FactorCode: "total", ScoreBasis: conclusion.ScoreBasisRaw,
-		Rules: []conclusion.ScoreRangeOutcome{{MinScore: 40, MaxScore: 50, Level: "high", Title: "优秀", Summary: "能力较强", Description: "继续保持"}},
+		Rules: []conclusion.ScoreRangeOutcome{{MinScore: 40, MaxScore: 50, Level: "high", OutcomeCode: "ability_high", Title: "优秀", Summary: "能力较强", Description: "继续保持"}},
 	}})
-	if got.Dimensions[0].Level == nil || got.Dimensions[0].Level.Code != "high" {
+	if got.Dimensions[0].Level == nil || got.Dimensions[0].Level.Code != "ability_high" || got.Dimensions[0].Level.Label != "优秀" {
 		t.Fatalf("level = %#v", got.Dimensions[0].Level)
 	}
 }

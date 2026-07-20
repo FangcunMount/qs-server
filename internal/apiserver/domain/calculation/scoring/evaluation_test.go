@@ -53,13 +53,15 @@ func TestEvaluatorRiskMatchingAndOverallFallback(t *testing.T) {
 	}
 
 	input.Model.Factors[0].IsTotalScore = false
-	input.Model.Factors[0].InterpretRules = nil
+	for i := range input.Model.Factors {
+		input.Model.Factors[i].InterpretRules = nil
+	}
 	result, err = NewDefaultEvaluator().Score(context.Background(), input)
 	if err != nil {
 		t.Fatalf("Score returned error: %v", err)
 	}
-	if result.RiskLevel != RiskLevelSevere {
-		t.Fatalf("overall risk = %s, want severe from highest factor default risk", result.RiskLevel)
+	if result.RiskLevel != RiskLevelNone {
+		t.Fatalf("overall risk = %s, want none without interpret rules or hardcoded fallback", result.RiskLevel)
 	}
 }
 
