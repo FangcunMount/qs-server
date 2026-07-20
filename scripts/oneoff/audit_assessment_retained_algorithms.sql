@@ -7,8 +7,8 @@
 
 -- Assessment: typology retained aliases + behavioral_rating_default + empty algorithm
 SELECT 'assessment' AS source,
-       evaluation_model_kind AS kind,
-       evaluation_model_algorithm AS algorithm,
+       COALESCE(evaluation_model_kind, '') AS kind,
+       COALESCE(evaluation_model_algorithm, '') AS algorithm,
        COUNT(*) AS cnt
 FROM assessment
 WHERE deleted_at IS NULL
@@ -22,8 +22,8 @@ ORDER BY cnt DESC;
 
 -- Evaluation outcome: same retained aliases (no soft-delete column on this table)
 SELECT 'evaluation_outcome' AS source,
-       model_kind AS kind,
-       model_algorithm AS algorithm,
+       COALESCE(model_kind, '') AS kind,
+       COALESCE(model_algorithm, '') AS algorithm,
        COUNT(*) AS cnt
 FROM evaluation_outcome
 WHERE model_algorithm IN ('mbti', 'sbti', 'bigfive', 'behavioral_rating_default')

@@ -162,7 +162,7 @@ func fillAssessment(ctx context.Context, dsn string, out *report) error {
 	out.AssessmentBuckets = map[string]int{}
 
 	q1 := `
-SELECT evaluation_model_kind, COALESCE(evaluation_model_algorithm, ''), COUNT(*)
+SELECT COALESCE(evaluation_model_kind, ''), COALESCE(evaluation_model_algorithm, ''), COUNT(*)
 FROM assessment
 WHERE deleted_at IS NULL
   AND (
@@ -176,7 +176,7 @@ GROUP BY evaluation_model_kind, evaluation_model_algorithm`
 	}
 
 	q2 := `
-SELECT model_kind, COALESCE(model_algorithm, ''), COUNT(*)
+SELECT COALESCE(model_kind, ''), COALESCE(model_algorithm, ''), COUNT(*)
 FROM evaluation_outcome
 WHERE model_algorithm IN ('mbti','sbti','bigfive','behavioral_rating_default')
    OR model_algorithm IS NULL
@@ -195,12 +195,12 @@ func scanBuckets(ctx context.Context, db *sql.DB, query, source string, out *rep
 	}
 	defer func() { _ = rows.Close() }()
 	for rows.Next() {
-		var kind, algorithm string
+		var kind, algorithm sql.NullString
 		var cnt int
 		if err := rows.Scan(&kind, &algorithm, &cnt); err != nil {
 			return err
 		}
-		key := source + "|" + kind + "|" + algorithm
+		key := source + "|" + kind.String + "|" + algorithm.String
 		out.AssessmentBuckets[key] = cnt
 		// Empty algorithm on Assessment is draft_ok / historical incompleteness;
 		// count it toward retirement inventory so deletes stay blocked until reviewed.
