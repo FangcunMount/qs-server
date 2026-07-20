@@ -9,6 +9,7 @@ import (
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	appbinding "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/binding"
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
+	appevolution "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/evolution"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/lifecycle"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -23,6 +24,7 @@ type Service struct {
 	Published         modelcatalogport.PublishedSnapshotRepository
 	Authorizer        modelcatalog.Authorizer
 	BindingPolicies   appbinding.Policies
+	Evolution         appevolution.Policy
 	Effects           lifecycle.EffectsRegistry
 	Now               func() time.Time
 	GenerateScaleCode func() (string, error)
@@ -89,6 +91,9 @@ func (s Service) UpdateBasicInfo(ctx context.Context, actor modelcatalog.ActorCo
 	if err != nil {
 		return nil, err
 	}
+	if err := s.Evolution.GuardAlgorithmChange(ctx, model.Code, domain.Algorithm(input.Algorithm)); err != nil {
+		return nil, err
+	}
 	if err := model.ForkDraftFromPublished(s.now()); err != nil {
 		return nil, err
 	}
@@ -103,7 +108,7 @@ func (s Service) UpdateBasicInfo(ctx context.Context, actor modelcatalog.ActorCo
 		return nil, err
 	}
 	if err := s.ModelRepo.Update(ctx, model); err != nil {
-		return nil, err
+		return nil, modelcatalog.MapDraftWriteError(err)
 	}
 	return modelcatalog.ModelSummaryFromAssessmentModel(model), nil
 }
@@ -111,6 +116,9 @@ func (s Service) UpdateBasicInfo(ctx context.Context, actor modelcatalog.ActorCo
 func (s Service) BindQuestionnaire(ctx context.Context, actor modelcatalog.ActorContext, input modelcatalog.BindQuestionnaireDTO) (*modelcatalog.QuestionnaireBindingResult, error) {
 	model, err := s.loadAndAuthorize(ctx, actor, input.Code)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.Evolution.GuardQuestionnaireCodeChange(ctx, model.Code, input.QuestionnaireCode); err != nil {
 		return nil, err
 	}
 	binding, err := s.BindingPolicies.Validate(ctx, model, domain.QuestionnaireBinding{QuestionnaireCode: input.QuestionnaireCode, QuestionnaireVersion: input.QuestionnaireVersion})
@@ -129,7 +137,7 @@ func (s Service) BindQuestionnaire(ctx context.Context, actor modelcatalog.Actor
 		}
 	}
 	if err := s.ModelRepo.Update(ctx, model); err != nil {
-		return nil, err
+		return nil, modelcatalog.MapDraftWriteError(err)
 	}
 	return &modelcatalog.QuestionnaireBindingResult{QuestionnaireCode: binding.QuestionnaireCode, QuestionnaireVersion: binding.QuestionnaireVersion}, nil
 }
@@ -148,7 +156,7 @@ func (s Service) Archive(ctx context.Context, actor modelcatalog.ActorContext, m
 		return nil, err
 	}
 	if err := s.ModelRepo.Update(ctx, model); err != nil {
-		return nil, err
+		return nil, modelcatalog.MapDraftWriteError(err)
 	}
 	s.Effects.AfterTransition(ctx, model, lifecycle.ActionArchived)
 	return modelcatalog.ModelSummaryFromAssessmentModel(model), nil
@@ -212,7 +220,7 @@ func (s Service) SynchronizeQuestionnaireVersion(ctx context.Context, actor mode
 			}
 		}
 		if err := s.ModelRepo.Update(ctx, model); err != nil {
-			return err
+			return modelcatalog.MapDraftWriteError(err)
 		}
 	}
 	return nil

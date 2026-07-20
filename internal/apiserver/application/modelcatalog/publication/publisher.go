@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -89,7 +90,7 @@ func (p Publisher) Publish(ctx context.Context, model *domain.AssessmentModel, o
 		return nil, err
 	}
 	if err := p.ModelRepo.Update(ctx, model); err != nil {
-		return nil, err
+		return nil, modelcatalog.MapDraftWriteError(err)
 	}
 	if options.AfterPublished != nil {
 		options.AfterPublished(ctx, model.Code, "publish")

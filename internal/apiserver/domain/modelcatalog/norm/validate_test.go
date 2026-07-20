@@ -30,12 +30,21 @@ func TestValidateImportRejectsIncompatibleIdentity(t *testing.T) {
 	}
 }
 
-func TestValidateImportRejectsRavenSPMNorms(t *testing.T) {
+func TestValidateImportAcceptsRavenSPMNorms(t *testing.T) {
 	table := validTable()
 	table.Kind = identity.KindCognitive
 	table.Algorithm = identity.AlgorithmSPM
+	if err := norm.ValidateImport(table); err != nil {
+		t.Fatalf("ValidateImport() error = %v", err)
+	}
+}
+
+func TestValidateImportRejectsCognitiveWithUnsupportedAlgorithm(t *testing.T) {
+	table := validTable()
+	table.Kind = identity.KindCognitive
+	table.Algorithm = identity.AlgorithmBrief2
 	if err := norm.ValidateImport(table); err == nil {
-		t.Fatal("ValidateImport() error = nil, want Raven SPM identity error")
+		t.Fatal("ValidateImport() error = nil, want identity error")
 	}
 }
 

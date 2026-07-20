@@ -64,7 +64,7 @@ func (s Service) SaveDefinition(ctx context.Context, actor modelcatalog.ActorCon
 		return nil, err
 	}
 	if err := s.ModelRepo.Update(ctx, model); err != nil {
-		return nil, err
+		return nil, modelcatalog.MapDraftWriteError(err)
 	}
 	return model.DefinitionV2, nil
 }

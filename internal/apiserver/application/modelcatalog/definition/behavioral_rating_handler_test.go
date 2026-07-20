@@ -67,7 +67,7 @@ func TestBehavioralValidateForPublishRejectsNormRefMissingInTable(t *testing.T) 
 	})
 	model := validBehavioralDraft()
 	issues := handler.ValidateForPublish(context.Background(), model)
-	if !hasIssueCode(issues, "behavioral_rating.norm_ref.factor.missing_in_table") {
+	if !hasIssueCode(issues, "norm.factor.missing") {
 		t.Fatalf("issues = %#v, want missing-in-table rejection", issues)
 	}
 }

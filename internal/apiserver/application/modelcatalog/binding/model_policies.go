@@ -12,7 +12,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// TypologyPolicy 保持类型合同，即绑定的问卷必须已经发布并包含问题
+// TypologyPolicy keeps the typology contract: bound questionnaire must already
+// be published and contain questions.
 type TypologyPolicy struct {
 	Questionnaires questionnaireapp.QuestionnaireQueryService
 }
@@ -23,34 +24,13 @@ func (p TypologyPolicy) Supports(identity domain.Identity) bool {
 }
 
 // Validate 验证
-func (p TypologyPolicy) Validate(ctx context.Context, _ *domain.AssessmentModel, binding domain.QuestionnaireBinding) (domain.QuestionnaireBinding, error) {
-	if binding.QuestionnaireCode == "" {
-		return domain.QuestionnaireBinding{}, errors.WithCode(code.ErrInvalidArgument, "questionnaire code is required")
-	}
-	if p.Questionnaires == nil {
-		return domain.QuestionnaireBinding{}, errors.WithCode(code.ErrInternalServerError, "questionnaire query service is not configured")
-	}
-	var (
-		result *questionnaireapp.QuestionnaireResult
-		err    error
-	)
-	if binding.QuestionnaireVersion != "" {
-		result, err = p.Questionnaires.GetPublishedByCodeVersion(ctx, binding.QuestionnaireCode, binding.QuestionnaireVersion)
-	} else {
-		result, err = p.Questionnaires.GetPublishedByCode(ctx, binding.QuestionnaireCode)
-	}
-	if err != nil || result == nil || result.Version == "" {
-		return domain.QuestionnaireBinding{}, errors.WithCode(code.ErrInvalidArgument, "binding questionnaire is invalid")
-	}
-	if len(result.Questions) == 0 {
-		return domain.QuestionnaireBinding{}, errors.WithCode(code.ErrInvalidArgument, "binding questionnaire must contain questions")
-	}
-	return domain.QuestionnaireBinding{QuestionnaireCode: result.Code, QuestionnaireVersion: result.Version}, nil
+func (p TypologyPolicy) Validate(ctx context.Context, model *domain.AssessmentModel, binding domain.QuestionnaireBinding) (domain.QuestionnaireBinding, error) {
+	return PublishedQuestionnairePolicy{Kind: domain.KindTypology, Questionnaires: p.Questionnaires}.Validate(ctx, model, binding)
 }
 
 // BeforePublish 发布前
-func (TypologyPolicy) BeforePublish(context.Context, *domain.AssessmentModel) error {
-	return nil
+func (p TypologyPolicy) BeforePublish(ctx context.Context, model *domain.AssessmentModel) error {
+	return PublishedQuestionnairePolicy{Kind: domain.KindTypology, Questionnaires: p.Questionnaires}.BeforePublish(ctx, model)
 }
 
 // ScalePolicy 保持量表特定的问卷类型、唯一性和发布版本同步规则

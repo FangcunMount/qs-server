@@ -34,9 +34,12 @@ func TestPublishReleaseIsIdempotentForPublishedModel(t *testing.T) {
 	service := Service{
 		Transactions:   directTransactionRunner{},
 		Models:         repo,
-		Published:      noopPublishedModelRepo{},
+		Published:      &idempotentPublishedRepo{model: model},
 		Authorizer:     allowReleaseAuthorizer{},
 		Questionnaires: noopQuestionnaireLifecycle{},
+		QuestionnaireQuery: &idempotentQuestionnaireQuery{
+			code: "MEDICAL-QUESTIONNAIRE", version: "v1", status: "published",
+		},
 	}
 
 	result, err := service.PublishRelease(context.Background(), modelcatalog.ActorContext{}, model.Code)
@@ -48,6 +51,35 @@ func TestPublishReleaseIsIdempotentForPublishedModel(t *testing.T) {
 	}
 	if repo.findCalls != 1 {
 		t.Fatalf("FindByCode calls = %d, want 1; an idempotent publish must not emit post-commit effects", repo.findCalls)
+	}
+}
+
+func TestPublishReleaseRejectsIncompletePublishedPair(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 7, 13, 10, 0, 0, 0, time.UTC)
+	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
+		Code: "MEDICAL-SCALE", Kind: domain.KindScale, Algorithm: domain.AlgorithmScaleDefault, Title: "Medical scale", Now: now,
+	})
+	if err != nil {
+		t.Fatalf("NewAssessmentModel() error = %v", err)
+	}
+	if err := model.BindQuestionnaire(domain.QuestionnaireBinding{QuestionnaireCode: "MEDICAL-QUESTIONNAIRE", QuestionnaireVersion: "v1"}, now); err != nil {
+		t.Fatalf("BindQuestionnaire() error = %v", err)
+	}
+	if err := model.MarkPublished(now.Add(time.Minute)); err != nil {
+		t.Fatalf("MarkPublished() error = %v", err)
+	}
+	service := Service{
+		Transactions:       directTransactionRunner{},
+		Models:             &publishedReleaseModelRepo{model: model},
+		Published:          noopPublishedModelRepo{},
+		Authorizer:         allowReleaseAuthorizer{},
+		Questionnaires:     noopQuestionnaireLifecycle{},
+		QuestionnaireQuery: &idempotentQuestionnaireQuery{},
+	}
+	if _, err := service.PublishRelease(context.Background(), modelcatalog.ActorContext{}, model.Code); err == nil {
+		t.Fatal("PublishRelease() error = nil, want incomplete pair conflict")
 	}
 }
 
@@ -181,6 +213,38 @@ func (r *publishedReleaseModelRepo) FindByCode(context.Context, string) (*domain
 
 type noopPublishedModelRepo struct {
 	modelcatalogport.PublishedModelRepository
+}
+
+func (noopPublishedModelRepo) FindPublishedByModelCode(context.Context, domain.Kind, string) (*modelcatalogport.PublishedModel, error) {
+	return nil, domain.ErrNotFound
+}
+
+type idempotentPublishedRepo struct {
+	modelcatalogport.PublishedModelRepository
+	model *domain.AssessmentModel
+}
+
+func (r *idempotentPublishedRepo) FindPublishedByModelCode(_ context.Context, kind domain.Kind, code string) (*modelcatalogport.PublishedModel, error) {
+	if r.model == nil || r.model.Code != code || r.model.Kind != kind {
+		return nil, domain.ErrNotFound
+	}
+	return &modelcatalogport.PublishedModel{
+		Kind: r.model.Kind, Code: r.model.Code, Version: "1",
+		QuestionnaireCode: r.model.Binding.QuestionnaireCode, QuestionnaireVersion: r.model.Binding.QuestionnaireVersion,
+		ReleaseStatus: domain.ReleaseStatusActive, Status: "published",
+	}, nil
+}
+
+type idempotentQuestionnaireQuery struct {
+	questionnaire.QuestionnaireQueryService
+	code, version, status string
+}
+
+func (q *idempotentQuestionnaireQuery) GetPublishedByCodeVersion(_ context.Context, code, version string) (*questionnaire.QuestionnaireResult, error) {
+	if q.code == "" || code != q.code || version != q.version {
+		return nil, stderrors.New("questionnaire not published")
+	}
+	return &questionnaire.QuestionnaireResult{Code: code, Version: version, Status: q.status}, nil
 }
 
 type noopQuestionnaireLifecycle struct {

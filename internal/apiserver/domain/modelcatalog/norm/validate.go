@@ -59,6 +59,11 @@ func validateIdentity(kind identity.Kind, algorithm identity.Algorithm) error {
 		case identity.AlgorithmBrief2, identity.AlgorithmSPMSensory, identity.AlgorithmBehavioralRatingDefault:
 			return nil
 		}
+	case identity.KindCognitive:
+		switch algorithm {
+		case identity.AlgorithmSPM:
+			return nil
+		}
 	}
 	return invalid("norm algorithm %q is incompatible with kind %q", algorithm, kind)
 }

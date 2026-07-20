@@ -30,7 +30,7 @@ func (h CognitiveDefinitionHandler) ValidateForPublish(ctx context.Context, mode
 		return []domain.DomainValidationIssue{{Field: "definition", Message: "认知模型定义不能为空", Code: "definition.required", Level: domain.ValidationLevelError}}
 	}
 	issues := model.ValidateForPublish().Issues
-	issues = append(issues, ValidateDefinitionV2ForPublish(ctx, model.DefinitionV2, h.NormRepo)...)
+	issues = append(issues, ValidateDefinitionV2ForPublishWithModel(ctx, model, model.DefinitionV2, h.NormRepo)...)
 	if model.Algorithm == domain.AlgorithmSPM && model.DefinitionV2 != nil && model.DefinitionV2.Execution.SPM == nil {
 		issues = append(issues, domain.DomainValidationIssue{Field: "execution.spm", Code: "spm.execution.required", Message: "SPM execution spec is required", Level: domain.ValidationLevelError})
 	}

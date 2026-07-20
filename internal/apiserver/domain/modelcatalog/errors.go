@@ -9,6 +9,7 @@ import (
 
 var (
 	ErrNotFound               = stderrors.New("assessment model not found")
+	ErrRevisionConflict       = stderrors.New("assessment model revision conflict")
 	ErrVersionRequired        = stderrors.New("assessment model version is required")
 	ErrAmbiguousVersion       = stderrors.New("multiple published assessment models matched")
 	ErrInvalidArgument        = binding.ErrInvalidArgument
@@ -19,6 +20,10 @@ var (
 
 func IsNotFound(err error) bool {
 	return stderrors.Is(err, ErrNotFound)
+}
+
+func IsRevisionConflict(err error) bool {
+	return stderrors.Is(err, ErrRevisionConflict)
 }
 
 func IsVersionRequired(err error) bool {

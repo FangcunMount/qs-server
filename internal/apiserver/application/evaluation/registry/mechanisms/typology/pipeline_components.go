@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/inputinvariant"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
@@ -45,11 +46,12 @@ func (c typologyCalculator) Calculate(ctx context.Context, _ evalpipeline.Calcul
 	if !ok {
 		return nil, evalpipeline.ErrExecutionContextMissing
 	}
-	if execInput.Assessment == nil {
-		return nil, fmt.Errorf("assessment is required")
-	}
-	if execInput.Input == nil {
-		return nil, fmt.Errorf("evaluation input is required")
+	if err := inputinvariant.Validate(inputinvariant.Input{
+		Assessment:    execInput.Assessment,
+		Snapshot:      execInput.Input,
+		DescriptorKey: "factor_classification",
+	}); err != nil {
+		return nil, err
 	}
 	payload, ok := port.TypologyPayload(execInput.Input)
 	if !ok {

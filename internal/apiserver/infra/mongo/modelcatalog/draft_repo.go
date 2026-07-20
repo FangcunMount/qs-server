@@ -72,6 +72,10 @@ func (r *DraftRepository) Update(ctx context.Context, model *domain.AssessmentMo
 		return err
 	}
 	if result.MatchedCount == 0 {
+		existing, findErr := r.FindByCode(ctx, model.Code)
+		if findErr == nil && existing != nil {
+			return domain.ErrRevisionConflict
+		}
 		return domain.ErrNotFound
 	}
 	return nil

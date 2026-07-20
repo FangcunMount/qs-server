@@ -8,6 +8,7 @@ import (
 	"time"
 
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/evolution"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
@@ -88,6 +89,41 @@ func TestUpdateBasicInfoForksPublishedModelToDraftWithOneRevision(t *testing.T) 
 	if got, want := model.Revision(), publishedRevision+1; got != want {
 		t.Fatalf("revision = %d, want %d", got, want)
 	}
+}
+
+func TestUpdateBasicInfoRejectsFrozenAlgorithmChange(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 7, 14, 10, 0, 0, 0, time.UTC)
+	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
+		Code: "MBTI-1", Kind: domain.KindTypology, SubKind: domain.SubKindTypology,
+		Algorithm: domain.AlgorithmMBTI, Title: "MBTI", Now: now,
+	})
+	if err != nil {
+		t.Fatalf("NewAssessmentModel: %v", err)
+	}
+	service := Service{
+		ModelRepo:  &revisionCheckingModelRepo{model: model, persistedRevision: model.Revision()},
+		Authorizer: allowManagementAuthorizer{},
+		Evolution: evolution.Policy{History: managementHistoryStub{items: []*modelcatalogport.PublishedModel{
+			{Code: "MBTI-1", Algorithm: domain.AlgorithmMBTI, QuestionnaireCode: "Q-MBTI"},
+		}}},
+		Now: func() time.Time { return now.Add(time.Minute) },
+	}
+	_, err = service.UpdateBasicInfo(context.Background(), modelcatalog.ActorContext{}, modelcatalog.UpdateBasicInfoDTO{
+		Code: "MBTI-1", Title: "MBTI", Algorithm: string(domain.AlgorithmBigFive),
+	})
+	if err == nil {
+		t.Fatal("expected frozen algorithm rejection")
+	}
+}
+
+type managementHistoryStub struct {
+	items []*modelcatalogport.PublishedModel
+}
+
+func (s managementHistoryStub) ListPublishedReleaseHistory(context.Context, string) ([]*modelcatalogport.PublishedModel, error) {
+	return s.items, nil
 }
 
 type allowManagementAuthorizer struct{}

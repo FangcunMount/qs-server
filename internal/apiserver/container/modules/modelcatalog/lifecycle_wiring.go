@@ -33,6 +33,7 @@ type LifecycleDeps struct {
 
 // questionnaireBindingPolicies 问卷绑定策略
 func questionnaireBindingPolicies(deps Deps) appbinding.Policies {
+	published := deps.Catalog.QuestionnaireQuery
 	return appbinding.NewPolicies(
 		appbinding.ScalePolicy{
 			Models:         deps.Catalog.ModelRepo,
@@ -48,7 +49,9 @@ func questionnaireBindingPolicies(deps Deps) appbinding.Policies {
 				return result.Version, nil
 			},
 		},
-		appbinding.TypologyPolicy{Questionnaires: deps.Catalog.QuestionnaireQuery},
+		appbinding.TypologyPolicy{Questionnaires: published},
+		appbinding.PublishedQuestionnairePolicy{Kind: domain.KindBehavioralRating, Questionnaires: published},
+		appbinding.PublishedQuestionnairePolicy{Kind: domain.KindCognitive, Questionnaires: published},
 	)
 }
 

@@ -10,6 +10,7 @@ import (
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	appbinding "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/binding"
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
+	appevolution "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/evolution"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/lifecycle"
 	publication "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
 	questionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
@@ -23,15 +24,17 @@ import (
 // It is deliberately the only caller allowed to publish a questionnaire for a
 // model, so the questionnaire version cannot be supplied by a client.
 type Service struct {
-	Transactions   apptransaction.Runner
-	Models         modelcatalogport.ModelRepository
-	Published      modelcatalogport.PublishedSnapshotRepository
-	Authorizer     modelcatalog.Authorizer
-	Registry       appdefinition.Registry
-	Bindings       appbinding.Policies
-	Questionnaires questionnaire.QuestionnaireLifecycleService
-	Effects        lifecycle.EffectsRegistry
-	Now            func() time.Time
+	Transactions       apptransaction.Runner
+	Models             modelcatalogport.ModelRepository
+	Published          modelcatalogport.PublishedSnapshotRepository
+	Authorizer         modelcatalog.Authorizer
+	Registry           appdefinition.Registry
+	Bindings           appbinding.Policies
+	Evolution          appevolution.Policy
+	Questionnaires     questionnaire.QuestionnaireLifecycleService
+	QuestionnaireQuery questionnaire.QuestionnaireQueryService
+	Effects            lifecycle.EffectsRegistry
+	Now                func() time.Time
 }
 
 var _ modelcatalog.AssessmentReleaseService = Service{}
@@ -47,6 +50,9 @@ func (s Service) PublishRelease(ctx context.Context, actor modelcatalog.ActorCon
 			return err
 		}
 		if model.IsPublished() {
+			if err := s.ensurePublishedPair(txCtx, model); err != nil {
+				return err
+			}
 			alreadyPublished = true
 			result = releaseFrom(model, "published", "")
 			return nil
@@ -75,8 +81,14 @@ func (s Service) PublishRelease(ctx context.Context, actor modelcatalog.ActorCon
 				}
 			}
 			if err := s.Models.Update(txCtx, model); err != nil {
-				return err
+				return modelcatalog.MapDraftWriteError(err)
 			}
+		}
+		if err := s.Evolution.GuardPublishIdentity(txCtx, model); err != nil {
+			return err
+		}
+		if err := s.Bindings.BeforePublish(txCtx, model); err != nil {
+			return err
 		}
 		publisher := publication.Publisher{Registry: s.Registry, ModelRepo: s.Models, Repo: s.Published, Now: s.Now}
 		if _, err := publisher.Publish(txCtx, model, publication.PublishOptions{ReplaceKind: model.Kind}); err != nil {
@@ -129,7 +141,7 @@ func (s Service) UnpublishRelease(ctx context.Context, actor modelcatalog.ActorC
 				return err
 			}
 			if err := s.Models.Update(txCtx, model); err != nil {
-				return err
+				return modelcatalog.MapDraftWriteError(err)
 			}
 		}
 		transitionedModel = model
@@ -173,7 +185,7 @@ func (s Service) ArchiveRelease(ctx context.Context, actor modelcatalog.ActorCon
 				return err
 			}
 			if err := s.Models.Update(txCtx, model); err != nil {
-				return err
+				return modelcatalog.MapDraftWriteError(err)
 			}
 		}
 		transitionedModel = model
@@ -188,6 +200,42 @@ func (s Service) ArchiveRelease(ctx context.Context, actor modelcatalog.ActorCon
 	s.Effects.AfterTransition(ctx, transitionedModel, lifecycle.ActionArchived)
 	logger.L(ctx).Infow("测评归档成功", "release_action", "archive", "model_code", result.ModelCode, "questionnaire_code", result.QuestionnaireCode, "questionnaire_version", result.QuestionnaireVersion, "transaction_result", "committed", "duration_ms", time.Since(start).Milliseconds())
 	return result, nil
+}
+
+func (s Service) ensurePublishedPair(ctx context.Context, model *domain.AssessmentModel) error {
+	if model == nil {
+		return errors.WithCode(code.ErrInvalidArgument, "assessment model is required")
+	}
+	if model.Binding.QuestionnaireCode == "" || model.Binding.QuestionnaireVersion == "" {
+		return errors.WithCode(code.ErrConflict, "release.pair.incomplete: published model is missing questionnaire binding")
+	}
+	active, err := s.Published.FindPublishedByModelCode(ctx, model.Kind, model.Code)
+	if err != nil {
+		if domain.IsNotFound(err) {
+			return errors.WithCode(code.ErrConflict, "release.pair.incomplete: active assessment snapshot is missing")
+		}
+		return err
+	}
+	if active == nil {
+		return errors.WithCode(code.ErrConflict, "release.pair.incomplete: active assessment snapshot is missing")
+	}
+	if status := domain.NormalizeReleaseStatus(active.ReleaseStatus, active.Status == "published"); status != "" && !status.IsActive() {
+		return errors.WithCode(code.ErrConflict, "release.pair.incomplete: active assessment snapshot is missing")
+	}
+	if active.QuestionnaireCode != model.Binding.QuestionnaireCode || active.QuestionnaireVersion != model.Binding.QuestionnaireVersion {
+		return errors.WithCode(code.ErrConflict, "release.pair.incomplete: active snapshot questionnaire binding does not match model head")
+	}
+	if s.QuestionnaireQuery == nil {
+		return errors.WithCode(code.ErrInternalServerError, "assessment release questionnaire query is not configured")
+	}
+	publishedQ, err := s.QuestionnaireQuery.GetPublishedByCodeVersion(ctx, model.Binding.QuestionnaireCode, model.Binding.QuestionnaireVersion)
+	if err != nil {
+		return errors.WithCode(code.ErrConflict, "release.questionnaire.not_active: %v", err)
+	}
+	if publishedQ == nil || publishedQ.Status != "published" {
+		return errors.WithCode(code.ErrConflict, "release.questionnaire.not_active: questionnaire side is not published")
+	}
+	return nil
 }
 
 func (s Service) withTransaction(ctx context.Context, fn func(context.Context) error) error {

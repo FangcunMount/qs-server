@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
+	questionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/hotrank"
@@ -19,11 +20,12 @@ import (
 // service deliberately receives model repositories rather than legacy scale
 // read models or payload decoders.
 type Dependencies struct {
-	Models     modelcatalogport.ModelRepository
-	Published  modelcatalogport.PublishedModelLister
-	Authorizer modelcatalog.Authorizer
-	QRCode     qrcode.QRCodeService
-	HotRank    hotrank.ReadModel
+	Models             modelcatalogport.ModelRepository
+	Published          modelcatalogport.PublishedModelLister
+	Authorizer         modelcatalog.Authorizer
+	QRCode             qrcode.QRCodeService
+	HotRank            hotrank.ReadModel
+	QuestionnaireQuery questionnaire.QuestionnaireQueryService
 }
 
 type catalogQueryService struct {
@@ -132,6 +134,44 @@ func (s *catalogQueryService) populateReleaseState(ctx context.Context, model *d
 	summary.ReleaseState.OnlineStatus = "online"
 	summary.ReleaseState.ActiveVersion = active.Version
 	summary.ReleaseState.HasUnpublishedChanges = model.IsDraft() || summary.ReleaseState.WorkingVersion != active.Version
+	if err := s.enrichQuestionnaireDirty(ctx, model, active, summary); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *catalogQueryService) enrichQuestionnaireDirty(ctx context.Context, model *domain.AssessmentModel, active *modelcatalogport.PublishedModel, summary *modelcatalog.ModelSummary) error {
+	if summary.ReleaseState.HasUnpublishedChanges || model == nil || active == nil {
+		return nil
+	}
+	codeValue := model.Binding.QuestionnaireCode
+	if codeValue == "" {
+		codeValue = active.QuestionnaireCode
+	}
+	if codeValue == "" || s.deps.QuestionnaireQuery == nil {
+		return nil
+	}
+	head, err := s.deps.QuestionnaireQuery.GetByCode(ctx, codeValue)
+	if err != nil {
+		// Missing questionnaire head means the active pair is incomplete / dirty.
+		summary.ReleaseState.HasUnpublishedChanges = true
+		return nil
+	}
+	if head == nil {
+		summary.ReleaseState.HasUnpublishedChanges = true
+		return nil
+	}
+	if head.ReleaseState.HasUnpublishedChanges {
+		summary.ReleaseState.HasUnpublishedChanges = true
+		return nil
+	}
+	activeQVersion := active.QuestionnaireVersion
+	if activeQVersion == "" {
+		activeQVersion = model.Binding.QuestionnaireVersion
+	}
+	if activeQVersion != "" && head.Version != "" && head.Version != activeQVersion {
+		summary.ReleaseState.HasUnpublishedChanges = true
+	}
 	return nil
 }
 

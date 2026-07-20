@@ -26,6 +26,11 @@ func ValidateDefinitionV2(value *modeldefinition.Definition) []domain.DomainVali
 
 // ValidateDefinitionV2ForPublish 验证 DefinitionV2 并验证外部常模引用
 func ValidateDefinitionV2ForPublish(ctx context.Context, value *modeldefinition.Definition, norms port.NormRepository) []domain.DomainValidationIssue {
+	return ValidateDefinitionV2ForPublishWithModel(ctx, nil, value, norms)
+}
+
+// ValidateDefinitionV2ForPublishWithModel 在发布时校验常模存在性及 Model/Norm 兼容性。
+func ValidateDefinitionV2ForPublishWithModel(ctx context.Context, model *domain.AssessmentModel, value *modeldefinition.Definition, norms port.NormRepository) []domain.DomainValidationIssue {
 	issues := ValidateDefinitionV2(value)
 	if value == nil {
 		return issues
@@ -40,10 +45,15 @@ func ValidateDefinitionV2ForPublish(ctx context.Context, value *modeldefinition.
 			})
 			break
 		}
-		if _, err := norms.FindNorm(ctx, ref.NormTableVersion); err != nil {
+		table, err := norms.FindNorm(ctx, ref.NormTableVersion)
+		if err != nil {
 			issues = append(issues, domain.DomainValidationIssue{
 				Field: "calibration.norm_refs", Code: "norm.not_found", Message: "常模表不存在: " + ref.NormTableVersion, Level: domain.ValidationLevelError,
 			})
+			continue
+		}
+		if model != nil {
+			issues = append(issues, CheckNormCompatibility(model, table, ref)...)
 		}
 	}
 	return issues

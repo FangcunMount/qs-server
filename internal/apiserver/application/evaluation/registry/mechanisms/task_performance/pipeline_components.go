@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/inputinvariant"
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
@@ -56,6 +57,13 @@ func (c taskPerformanceCalculator) Calculate(ctx context.Context, _ evalpipeline
 	execInput, ok := evalpipeline.ExecutionInputFromContext(ctx)
 	if !ok {
 		return nil, evalpipeline.ErrExecutionContextMissing
+	}
+	if err := inputinvariant.Validate(inputinvariant.Input{
+		Assessment:    execInput.Assessment,
+		Snapshot:      execInput.Input,
+		DescriptorKey: "task_performance",
+	}); err != nil {
+		return nil, err
 	}
 	cognitivePayload, ok := portevaluationinput.CognitivePayload(execInput.Input)
 	if !ok || cognitivePayload.Snapshot == nil {

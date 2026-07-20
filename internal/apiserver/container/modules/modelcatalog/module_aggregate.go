@@ -3,6 +3,7 @@ package modelcatalog
 import (
 	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	appauthoring "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/authoring"
+	appevolution "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/evolution"
 	appmanagement "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/management"
 	appnormtable "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/normtable"
 	apppublication "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
@@ -49,11 +50,13 @@ func New(deps Deps) (*Module, error) {
 	hotRank := NewHotRank(deps.HotRank)
 
 	// 管理服务
+	evolutionPolicy := appevolution.Policy{History: publishedReleaseHistory(deps.Catalog.PublishedLister)}
 	management := &appmanagement.Service{
 		ModelRepo:       deps.Catalog.ModelRepo,
 		Published:       deps.Catalog.PublishedRepo,
 		Authorizer:      assessmentModelApp.SnapshotAuthorizer{},
 		BindingPolicies: bindings,
+		Evolution:       evolutionPolicy,
 		Effects:         effects,
 	}
 	// 定义服务
@@ -70,21 +73,25 @@ func New(deps Deps) (*Module, error) {
 		Authorizer:   assessmentModelApp.SnapshotAuthorizer{},
 		Registry:     registry,
 		Bindings:     bindings,
+		Evolution:    evolutionPolicy,
 		Effects:      effects,
 	}
 	release := apprelease.Service{
 		Transactions: deps.Catalog.Transactions,
 		Models:       deps.Catalog.ModelRepo, Published: deps.Catalog.PublishedRepo,
 		Authorizer: assessmentModelApp.SnapshotAuthorizer{}, Registry: registry,
-		Bindings: bindings, Questionnaires: deps.Lifecycle.QuestionnairePublisher,
-		Effects: effects,
+		Bindings: bindings, Evolution: evolutionPolicy,
+		Questionnaires:     deps.Lifecycle.QuestionnairePublisher,
+		QuestionnaireQuery: deps.Catalog.QuestionnaireQuery,
+		Effects:            effects,
 	}
 	// 查询服务
 	query := appquery.NewService(appquery.Dependencies{
-		Models:     deps.Catalog.ModelRepo,
-		Published:  deps.Catalog.PublishedLister,
-		Authorizer: assessmentModelApp.SnapshotAuthorizer{},
-		HotRank:    hotRank.ReadModel,
+		Models:             deps.Catalog.ModelRepo,
+		Published:          deps.Catalog.PublishedLister,
+		Authorizer:         assessmentModelApp.SnapshotAuthorizer{},
+		HotRank:            hotRank.ReadModel,
+		QuestionnaireQuery: deps.Catalog.QuestionnaireQuery,
 	})
 	normTables := appnormtable.Service{Repository: deps.Catalog.NormRepo, Authorizer: assessmentModelApp.SnapshotAuthorizer{}}
 	// 组合模块
@@ -137,4 +144,11 @@ func (m *Module) ModuleInfo() modules.ModuleInfo {
 		Version:     "1.0.0",
 		Description: "测评解释模型资产模块（量表 + 类型学模型目录）",
 	}
+}
+
+func publishedReleaseHistory(lister modelcatalogport.PublishedModelLister) modelcatalogport.PublishedReleaseHistoryReader {
+	if reader, ok := lister.(modelcatalogport.PublishedReleaseHistoryReader); ok {
+		return reader
+	}
+	return nil
 }

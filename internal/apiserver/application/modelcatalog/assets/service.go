@@ -88,7 +88,7 @@ func (s Service) UploadOutcomeImage(ctx context.Context, actor modelcatalog.Acto
 			return nil, err
 		}
 		if err := s.Models.Update(ctx, model); err != nil {
-			return nil, fmt.Errorf("fork draft for outcome image: %w", err)
+			return nil, fmt.Errorf("fork draft for outcome image: %w", modelcatalog.MapDraftWriteError(err))
 		}
 	}
 	return &modelcatalog.OutcomeImageUploadResult{

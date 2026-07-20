@@ -17,7 +17,7 @@ type RESTDeps struct {
 func (m *Module) ExportRESTDeps(
 	qrCodeService qrcodeApp.QRCodeService,
 	codesService codesApp.CodesService,
-	_ questionnaireApp.QuestionnaireQueryService,
+	questionnaireQuery questionnaireApp.QuestionnaireQueryService,
 ) RESTDeps {
 	deps := RESTDeps{}
 	if m == nil {
@@ -32,7 +32,8 @@ func (m *Module) ExportRESTDeps(
 	deps.AssessmentModel.Release = m.Release
 	deps.AssessmentModel.NormTables = m.NormTables
 	deps.AssessmentModel.Query = appquery.NewService(appquery.Dependencies{
-		Models: m.ModelRepo, Published: m.PublishedLister, Authorizer: assessmentModelApp.SnapshotAuthorizer{}, QRCode: qrCodeService, HotRank: m.HotRank.ReadModel,
+		Models: m.ModelRepo, Published: m.PublishedLister, Authorizer: assessmentModelApp.SnapshotAuthorizer{},
+		QRCode: qrCodeService, HotRank: m.HotRank.ReadModel, QuestionnaireQuery: questionnaireQuery,
 	})
 	return deps
 }

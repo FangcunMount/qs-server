@@ -2,6 +2,7 @@ package binding
 
 import (
 	"context"
+	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
@@ -36,7 +37,10 @@ func NewPolicies(policies ...Policy) Policies {
 func (r Policies) Validate(ctx context.Context, model *domain.AssessmentModel, binding domain.QuestionnaireBinding) (domain.QuestionnaireBinding, error) {
 	policy := r.resolve(model)
 	if policy == nil {
-		return binding, nil
+		if model == nil {
+			return binding, nil
+		}
+		return domain.QuestionnaireBinding{}, fmt.Errorf("questionnaire binding policy is not registered for kind %s", model.Kind)
 	}
 	return policy.Validate(ctx, model, binding)
 }
@@ -45,7 +49,10 @@ func (r Policies) Validate(ctx context.Context, model *domain.AssessmentModel, b
 func (r Policies) BeforePublish(ctx context.Context, model *domain.AssessmentModel) error {
 	policy := r.resolve(model)
 	if policy == nil {
-		return nil
+		if model == nil {
+			return nil
+		}
+		return fmt.Errorf("questionnaire binding policy is not registered for kind %s", model.Kind)
 	}
 	return policy.BeforePublish(ctx, model)
 }

@@ -8,6 +8,7 @@ import (
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	appbinding "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/binding"
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
+	appevolution "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/evolution"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/lifecycle"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -24,6 +25,7 @@ type Service struct {
 	Authorizer   modelcatalog.Authorizer
 	Registry     appdefinition.Registry
 	Bindings     appbinding.Policies
+	Evolution    appevolution.Policy
 	Effects      lifecycle.EffectsRegistry
 	Now          func() time.Time
 }
@@ -37,6 +39,9 @@ func (s Service) Publish(ctx context.Context, actor modelcatalog.ActorContext, m
 		return nil, errors.WithCode(code.ErrInternalServerError, "publication transaction runner is not configured")
 	}
 	if err := s.Transactions.WithinTransaction(ctx, func(txCtx context.Context) error {
+		if err := s.Evolution.GuardPublishIdentity(txCtx, model); err != nil {
+			return err
+		}
 		if err := s.Bindings.BeforePublish(txCtx, model); err != nil {
 			return err
 		}
@@ -67,7 +72,7 @@ func (s Service) Unpublish(ctx context.Context, actor modelcatalog.ActorContext,
 		return nil, err
 	}
 	if err := s.ModelRepo.Update(ctx, model); err != nil {
-		return nil, err
+		return nil, modelcatalog.MapDraftWriteError(err)
 	}
 	s.Effects.AfterTransition(ctx, model, lifecycle.ActionUnpublished)
 	return modelcatalog.ModelSummaryFromAssessmentModel(model), nil

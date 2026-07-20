@@ -30,7 +30,7 @@ func (h BehavioralRatingDefinitionHandler) ValidateForPublish(ctx context.Contex
 		return []domain.DomainValidationIssue{{Field: "definition", Message: "行为评定模型定义不能为空", Code: "definition.required", Level: domain.ValidationLevelError}}
 	}
 	issues := model.ValidateForPublish().Issues
-	issues = append(issues, ValidateDefinitionV2ForPublish(ctx, model.DefinitionV2, h.NormRepo)...)
+	issues = append(issues, ValidateDefinitionV2ForPublishWithModel(ctx, model, model.DefinitionV2, h.NormRepo)...)
 	issues = append(issues, h.validateBehavioralPublishContract(ctx, model)...)
 	if model.Algorithm == domain.AlgorithmBrief2 && model.DefinitionV2 != nil && model.DefinitionV2.Execution.Brief2 == nil {
 		issues = append(issues, domain.DomainValidationIssue{Field: "execution.brief2", Code: "brief2.execution.required", Message: "BRIEF-2 execution spec is required", Level: domain.ValidationLevelError})
@@ -74,7 +74,7 @@ func (h BehavioralRatingDefinitionHandler) BuildSnapshotPayload(ctx context.Cont
 	}, nil
 }
 
-func (h BehavioralRatingDefinitionHandler) validateBehavioralPublishContract(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
+func (h BehavioralRatingDefinitionHandler) validateBehavioralPublishContract(_ context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	issues := make([]domain.DomainValidationIssue, 0)
 	if err := requireBehavioralPublishAlgorithm(model.Algorithm); err != nil {
 		issues = append(issues, domain.DomainValidationIssue{
@@ -90,30 +90,6 @@ func (h BehavioralRatingDefinitionHandler) validateBehavioralPublishContract(ctx
 			Field: "calibration.norm_refs", Code: "behavioral_rating.norm_refs.required",
 			Message: "behavioral_rating 必须配置至少一条 NormRef；原始分区间模型应使用 scale", Level: domain.ValidationLevelError,
 		})
-	}
-
-	normFactorsByVersion := map[string]map[string]struct{}{}
-	for _, ref := range def.Calibration.NormRefs {
-		if ref.NormTableVersion == "" {
-			continue
-		}
-		factorSet, ok := normFactorsByVersion[ref.NormTableVersion]
-		if !ok {
-			table, err := h.loadNormTableByVersion(ctx, ref.NormTableVersion)
-			if err != nil {
-				// FindNorm failures are already reported by ValidateDefinitionV2ForPublish.
-				continue
-			}
-			factorSet = normTableFactorSet(table)
-			normFactorsByVersion[ref.NormTableVersion] = factorSet
-		}
-		if _, exists := factorSet[ref.FactorCode]; ref.FactorCode != "" && !exists {
-			issues = append(issues, domain.DomainValidationIssue{
-				Field: "calibration.norm_refs", Code: "behavioral_rating.norm_ref.factor.missing_in_table",
-				Message: fmt.Sprintf("NormRef factor %s 不在常模表 %s 中", ref.FactorCode, ref.NormTableVersion),
-				Level:   domain.ValidationLevelError,
-			})
-		}
 	}
 
 	normRefFactors := map[string]struct{}{}
@@ -183,17 +159,4 @@ func (h BehavioralRatingDefinitionHandler) loadNormTableByVersion(ctx context.Co
 		return nil, fmt.Errorf("behavioral_rating norm table %s is not available", version)
 	}
 	return table, nil
-}
-
-func normTableFactorSet(table *domain.Norm) map[string]struct{} {
-	out := make(map[string]struct{})
-	if table == nil {
-		return out
-	}
-	for _, factor := range table.Factors {
-		if factor.FactorCode != "" {
-			out[factor.FactorCode] = struct{}{}
-		}
-	}
-	return out
 }
