@@ -94,9 +94,7 @@ func (p TypologyModelInputProvider) resolveConfiguredInput(ctx context.Context, 
 	if payload == nil {
 		return nil, port.NewResolveError(port.FailureKindModelNotFound, fmt.Errorf("typology model payload is nil"), typologyModelNotFoundMessage(p.algorithm), "加载解释模型失败")
 	}
-	if p.algorithm != "" &&
-		p.algorithm != modelcatalog.AlgorithmPersonalityTypology &&
-		!modelcatalog.TypologyAlgorithmsEquivalent(payload.Algorithm, p.algorithm) {
+	if p.algorithm != "" && payload.Algorithm != p.algorithm {
 		err := fmt.Errorf("typology algorithm %s does not match provider %s", payload.Algorithm, p.algorithm)
 		return nil, port.NewResolveError(port.FailureKindUnsupportedModel, err, "不支持的解释模型", "加载解释模型失败")
 	}

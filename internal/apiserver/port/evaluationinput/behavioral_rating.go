@@ -22,23 +22,12 @@ func NewBehavioralRatingModelSnapshot(snapshot *behavioralsnapshot.Snapshot, alg
 	if snapshot == nil {
 		return nil
 	}
-	version := snapshot.Version
-	// MC-R018 batch 5: empty Algorithm fills canonical brief2 (not retained-read
-	// behavioral_rating_default). Dual-identity lookup still resolves historical
-	// Assessment rows that store behavioral_rating_default.
-	if algorithm == "" {
-		filled := modelcatalog.AlgorithmBrief2
-		modelcatalog.ObserveAlgorithmFallback(
-			modelcatalog.KindBehavioralRating, "", filled, "evaluationinput.behavioral_snapshot",
-		)
-		algorithm = filled
-	}
 	ms := &ModelSnapshot{
 		Kind:           EvaluationModelKindBehavioralRating,
 		Algorithm:      string(algorithm),
 		ProductChannel: string(modelcatalog.ProductChannelBehaviorAbility),
 		Code:           snapshot.Code,
-		Version:        version,
+		Version:        snapshot.Version,
 		Title:          snapshot.Title,
 		Payload:        BehavioralRatingModelPayload{Snapshot: snapshot},
 	}

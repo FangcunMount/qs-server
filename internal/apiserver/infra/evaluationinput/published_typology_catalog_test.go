@@ -45,28 +45,24 @@ func TestDecodePublishedTypologyModelRequiresDefinitionV2(t *testing.T) {
 	}
 }
 
-func TestAssertTypologyAlgorithmAcceptsEquivalentAlias(t *testing.T) {
+func TestAssertTypologyAlgorithmRequiresExactMatch(t *testing.T) {
 	t.Parallel()
 	payload := &typology.Payload{Algorithm: domain.AlgorithmPersonalityTypology}
-	got, err := assertTypologyAlgorithm(payload, domain.AlgorithmMBTI)
+	if _, err := assertTypologyAlgorithm(payload, domain.AlgorithmMBTI); err == nil {
+		t.Fatal("mbti ref must not match personality_typology payload after dual-identity retirement")
+	}
+	got, err := assertTypologyAlgorithm(payload, domain.AlgorithmPersonalityTypology)
 	if err != nil || got != payload {
-		t.Fatalf("assert = %#v err=%v", got, err)
-	}
-	if _, err := assertTypologyAlgorithm(payload, domain.AlgorithmSBTI); err != nil {
-		t.Fatalf("sbti should also be equivalent to personality_typology payload: %v", err)
-	}
-	payload.Algorithm = domain.AlgorithmMBTI
-	if _, err := assertTypologyAlgorithm(payload, domain.AlgorithmSBTI); err == nil {
-		t.Fatal("mbti payload must not match sbti ref")
+		t.Fatalf("exact match = %#v err=%v", got, err)
 	}
 }
 
-func TestTypologyLookupRefsIncludesCanonicalAlternate(t *testing.T) {
+func TestTypologyLookupRefsExactAlgorithmOnly(t *testing.T) {
 	t.Parallel()
 	refs := typologyLookupRefs(evaluationinput.ModelRef{
 		Kind: evaluationinput.EvaluationModelKindTypology, Code: "M", Version: "1", Algorithm: string(domain.AlgorithmMBTI),
 	}, domain.AlgorithmMBTI)
-	if len(refs) < 2 || refs[0].Algorithm != domain.AlgorithmMBTI || refs[1].Algorithm != domain.AlgorithmPersonalityTypology {
+	if len(refs) != 1 || refs[0].Algorithm != domain.AlgorithmMBTI {
 		t.Fatalf("refs = %#v", refs)
 	}
 }

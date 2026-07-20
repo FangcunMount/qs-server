@@ -42,13 +42,17 @@ func attachBehavioralCanonical(ctx context.Context, reader rulesetport.Published
 	if reader == nil || snapshot == nil {
 		return
 	}
-	for _, lookup := range behavioralRatingLookupRefs(ref.ModelRef) {
+	lookups, err := behavioralRatingLookupRefs(ref.ModelRef)
+	if err != nil {
+		return
+	}
+	for _, lookup := range lookups {
 		published, err := reader.GetPublishedModelByRef(ctx, lookup)
 		if err != nil || published == nil || published.DefinitionV2 == nil {
 			continue
 		}
 		requested := domain.Algorithm(ref.ModelRef.Algorithm)
-		if requested != "" && !domain.BehavioralAlgorithmsEquivalent(published.Algorithm, requested) {
+		if requested != "" && published.Algorithm != requested {
 			continue
 		}
 		port.AttachCanonicalDefinition(snapshot, published.DefinitionV2)
@@ -59,10 +63,7 @@ func attachBehavioralCanonical(ctx context.Context, reader rulesetport.Published
 func attachCognitiveCanonical(ctx context.Context, reader rulesetport.PublishedModelReader, ref port.InputRef, snapshot *port.InputSnapshot) {
 	algorithm := domain.Algorithm(ref.ModelRef.Algorithm)
 	if algorithm == "" {
-		algorithm = domain.AlgorithmSPM
-		domain.ObserveAlgorithmFallback(
-			domain.KindCognitive, "", algorithm, "infra.cognitive_canonical_attach",
-		)
+		return
 	}
 	attachPublishedCanonical(ctx, reader, rulesetport.Ref{
 		Kind: domain.KindCognitive, Algorithm: algorithm, Code: ref.ModelRef.Code, Version: ref.ModelRef.Version,

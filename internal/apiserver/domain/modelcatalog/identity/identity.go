@@ -125,14 +125,14 @@ func CompatibleAlgorithmBinding(kind Kind, subKind SubKind, algorithm Algorithm)
 			return false
 		}
 		switch algorithm {
-		case "", AlgorithmMBTI, AlgorithmSBTI, AlgorithmBigFive, AlgorithmPersonalityTypology:
+		case "", AlgorithmPersonalityTypology:
 			return true
 		default:
 			return false
 		}
 	case KindBehavioralRating:
 		switch algorithm {
-		case "", AlgorithmBrief2, AlgorithmSPMSensory, AlgorithmBehavioralRatingDefault:
+		case "", AlgorithmBrief2, AlgorithmSPMSensory:
 			return true
 		default:
 			return false

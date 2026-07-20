@@ -78,16 +78,17 @@ func validatePublishAlgorithmPolicy(model *domain.AssessmentModel) []domain.Doma
 			Field: "algorithm", Code: "algorithm.publish.required",
 			Message: publishAlgorithmRequiredMessage(model.Kind), Level: domain.ValidationLevelError,
 		}}
-	case domain.AlgorithmWriteRetainedRead:
-		code := "algorithm.publish.legacy_alias"
-		if model.Kind == domain.KindBehavioralRating {
-			code = "behavioral_rating.algorithm.required"
-		}
-		return []domain.DomainValidationIssue{{
-			Field: "algorithm", Code: code,
-			Message: publishLegacyAlgorithmMessage(model.Kind, model.Algorithm), Level: domain.ValidationLevelError,
-		}}
 	default:
+		if domain.IsRetainedReadAliasAlgorithm(model.Algorithm) {
+			code := "algorithm.publish.legacy_alias"
+			if model.Kind == domain.KindBehavioralRating {
+				code = "behavioral_rating.algorithm.required"
+			}
+			return []domain.DomainValidationIssue{{
+				Field: "algorithm", Code: code,
+				Message: publishLegacyAlgorithmMessage(model.Kind, model.Algorithm), Level: domain.ValidationLevelError,
+			}}
+		}
 		return []domain.DomainValidationIssue{{
 			Field: "algorithm", Code: "algorithm.publish.unsupported",
 			Message: fmt.Sprintf("algorithm %q is not supported for publish on kind %s", model.Algorithm, model.Kind),

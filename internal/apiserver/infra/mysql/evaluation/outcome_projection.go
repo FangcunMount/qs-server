@@ -12,13 +12,11 @@ func applyAssessmentOutcomeV2Fields(po *AssessmentPO, a *assessment.Assessment) 
 	}
 	if ref := a.EvaluationModelRef(); ref != nil && !ref.IsEmpty() {
 		subKind, algorithm := ref.SubKind(), ref.Algorithm()
-		if subKind == "" || algorithm == "" {
-			legacyIdentity := ref.ExecutionIdentity()
-			if subKind == "" {
-				subKind = legacyIdentity.SubKind
-			}
-			if algorithm == "" {
-				algorithm = legacyIdentity.Algorithm
+		// SubKind may be recovered from family route identity; Algorithm must stay
+		// explicit — do not invent brief2/spm/behavioral_rating_default.
+		if subKind == "" {
+			if legacy := ref.ExecutionIdentity(); legacy.SubKind != "" {
+				subKind = legacy.SubKind
 			}
 		}
 		if subKind != "" {

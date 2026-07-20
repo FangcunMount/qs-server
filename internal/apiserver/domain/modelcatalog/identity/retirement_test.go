@@ -78,10 +78,10 @@ func TestIsRetainedReadAliasAlgorithm(t *testing.T) {
 
 func TestRetirementDeleteChecklistNonEmpty(t *testing.T) {
 	t.Parallel()
-	if len(identity.DualIdentityDeleteChecklist()) < 2 {
-		t.Fatal("dual checklist too short")
+	if len(identity.DualIdentityDeleteChecklist()) != 0 {
+		t.Fatal("dual-identity checklist should be empty after retirement")
 	}
-	if len(identity.RetirementDeleteChecklist()) < 5 {
+	if len(identity.RetirementDeleteChecklist()) < 3 {
 		t.Fatal("full checklist too short")
 	}
 }

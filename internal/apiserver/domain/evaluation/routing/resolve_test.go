@@ -27,7 +27,7 @@ func TestDescriptorKeyFromRouteUsesDecisionKind(t *testing.T) {
 	}
 }
 
-func TestDescriptorKeyFromRouteClassifiesRetainedTypologyAlias(t *testing.T) {
+func TestDescriptorKeyFromRouteClassifiesRetiredTypologyAliasFamily(t *testing.T) {
 	t.Parallel()
 	route := ModelRoute{
 		Kind:          modelcatalog.KindTypology,
@@ -36,8 +36,8 @@ func TestDescriptorKeyFromRouteClassifiesRetainedTypologyAlias(t *testing.T) {
 		DecisionKind:  modelcatalog.DecisionKindPoleComposition,
 		PayloadFormat: modelcatalog.PayloadFormatPersonalityTypologyV1,
 	}
-	if !modelcatalog.IsRetainedReadAlgorithm(route.Kind, route.Algorithm) {
-		t.Fatalf("algorithm %s should be retained_read", route.Algorithm)
+	if modelcatalog.IsRetainedReadAlgorithm(route.Kind, route.Algorithm) {
+		t.Fatalf("algorithm %s must not be retained_read after dual-identity retirement", route.Algorithm)
 	}
 	key, err := DescriptorKeyFromRoute(route)
 	if err != nil {

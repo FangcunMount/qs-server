@@ -15,8 +15,8 @@ const (
 )
 
 // ClassifyAlgorithmWritePolicy reports the write/read lifecycle for Kind+Algorithm.
-// CompatibleAlgorithmBinding remains the broader draft/read matrix; this policy
-// separates new-write from retained-read without deleting historical aliases.
+// CompatibleAlgorithmBinding remains the draft/read matrix; this policy separates
+// new-write (canonical/draft_ok) from retired aliases (unknown).
 func ClassifyAlgorithmWritePolicy(kind Kind, algorithm Algorithm) AlgorithmWritePolicy {
 	switch kind {
 	case KindScale:
@@ -32,8 +32,6 @@ func ClassifyAlgorithmWritePolicy(kind Kind, algorithm Algorithm) AlgorithmWrite
 		switch algorithm {
 		case AlgorithmPersonalityTypology:
 			return AlgorithmWriteCanonical
-		case AlgorithmMBTI, AlgorithmSBTI, AlgorithmBigFive:
-			return AlgorithmWriteRetainedRead
 		case "":
 			return AlgorithmWriteDraftOK
 		default:
@@ -43,8 +41,6 @@ func ClassifyAlgorithmWritePolicy(kind Kind, algorithm Algorithm) AlgorithmWrite
 		switch algorithm {
 		case AlgorithmBrief2, AlgorithmSPMSensory:
 			return AlgorithmWriteCanonical
-		case AlgorithmBehavioralRatingDefault:
-			return AlgorithmWriteRetainedRead
 		case "":
 			return AlgorithmWriteDraftOK
 		default:

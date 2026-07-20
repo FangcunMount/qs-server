@@ -46,9 +46,10 @@ func TestPublishedCognitiveCatalogDecodesPublishedModel(t *testing.T) {
 	}}
 	catalog := NewPublishedCognitiveCatalog(reader)
 	got, err := catalog.GetCognitiveByRef(context.Background(), port.ModelRef{
-		Kind:    port.EvaluationModelKindCognitive,
-		Code:    "COG-001",
-		Version: "1.0.0",
+		Kind:      port.EvaluationModelKindCognitive,
+		Algorithm: string(domain.AlgorithmSPM),
+		Code:      "COG-001",
+		Version:   "1.0.0",
 	})
 	if err != nil {
 		t.Fatalf("GetCognitiveByRef: %v", err)

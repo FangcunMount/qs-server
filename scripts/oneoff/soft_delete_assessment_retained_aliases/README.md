@@ -28,6 +28,6 @@ go run ./scripts/oneoff/observe_identity_retirement_gate/ \
 
 ## 注意
 
-- 不处理 `scale|空` 等 empty-algorithm 行（约 4k）。
+- 空 Algorithm 行见 `soft_delete_assessment_empty_algorithms`。
 - 软删后相关答卷/报告/统计可能成为孤儿，需按现有 orphan cleanup 流程另清。
 - dual_identity_gate=PASS（可加 `--metrics-ok`）后，才可按 dual-identity checklist 删代码。

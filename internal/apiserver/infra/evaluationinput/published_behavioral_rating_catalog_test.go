@@ -47,9 +47,10 @@ func TestPublishedBehavioralRatingCatalogDecodesPublishedModel(t *testing.T) {
 	}}
 	catalog := NewPublishedBehavioralRatingCatalog(reader)
 	got, err := catalog.GetBehavioralRatingByRef(context.Background(), port.ModelRef{
-		Kind:    port.EvaluationModelKindBehavioralRating,
-		Code:    "BR-001",
-		Version: "1.0.0",
+		Kind:      port.EvaluationModelKindBehavioralRating,
+		Algorithm: string(domain.AlgorithmBehavioralRatingDefault),
+		Code:      "BR-001",
+		Version:   "1.0.0",
 	})
 	if err != nil {
 		t.Fatalf("GetBehavioralRatingByRef: %v", err)
@@ -106,25 +107,30 @@ func TestPublishedBehavioralRatingCatalogDecodesBrief2Snapshot(t *testing.T) {
 	}
 }
 
-func TestBehavioralRatingLookupRefsIncludesAlternates(t *testing.T) {
+func TestBehavioralRatingLookupRefsExactAlgorithmOnly(t *testing.T) {
 	t.Parallel()
-	refs := behavioralRatingLookupRefs(port.ModelRef{
+	refs, err := behavioralRatingLookupRefs(port.ModelRef{
 		Kind: port.EvaluationModelKindBehavioralRating, Code: "BR", Version: "1",
 		Algorithm: string(domain.AlgorithmBehavioralRatingDefault),
 	})
-	if len(refs) < 3 || refs[0].Algorithm != domain.AlgorithmBehavioralRatingDefault {
+	if err != nil {
+		t.Fatalf("behavioralRatingLookupRefs: %v", err)
+	}
+	if len(refs) != 1 || refs[0].Algorithm != domain.AlgorithmBehavioralRatingDefault {
 		t.Fatalf("refs = %#v", refs)
-	}
-	seen := map[domain.Algorithm]bool{}
-	for _, ref := range refs {
-		seen[ref.Algorithm] = true
-	}
-	if !seen[domain.AlgorithmBrief2] || !seen[domain.AlgorithmSPMSensory] {
-		t.Fatalf("missing alternates: %#v", refs)
 	}
 }
 
-func TestPublishedBehavioralRatingCatalogAcceptsEquivalentAlias(t *testing.T) {
+func TestBehavioralRatingLookupRefsRejectsEmptyAlgorithm(t *testing.T) {
+	t.Parallel()
+	if _, err := behavioralRatingLookupRefs(port.ModelRef{
+		Kind: port.EvaluationModelKindBehavioralRating, Code: "BR", Version: "1",
+	}); err == nil {
+		t.Fatal("expected empty algorithm rejection")
+	}
+}
+
+func TestPublishedBehavioralRatingCatalogRejectsNonExactAlias(t *testing.T) {
 	t.Parallel()
 	raw := []byte(`{
 		"dimensions": [{"code": "total", "title": "总分", "question_codes": ["q1"], "scoring_strategy": "sum", "is_total_score": true}],
@@ -148,17 +154,13 @@ func TestPublishedBehavioralRatingCatalogAcceptsEquivalentAlias(t *testing.T) {
 		domain.AlgorithmBrief2: canonical,
 	}}
 	catalog := NewPublishedBehavioralRatingCatalog(reader)
-	got, err := catalog.GetBehavioralRatingByRef(context.Background(), port.ModelRef{
+	if _, err := catalog.GetBehavioralRatingByRef(context.Background(), port.ModelRef{
 		Kind:      port.EvaluationModelKindBehavioralRating,
 		Algorithm: string(domain.AlgorithmBehavioralRatingDefault),
 		Code:      "BR-ALIAS",
 		Version:   "1.0.0",
-	})
-	if err != nil {
-		t.Fatalf("GetBehavioralRatingByRef via retained alias: %v", err)
-	}
-	if got.Code != "BR-ALIAS" {
-		t.Fatalf("snapshot = %#v", got)
+	}); err == nil {
+		t.Fatal("retained alias must not resolve via dual-identity after retirement")
 	}
 }
 

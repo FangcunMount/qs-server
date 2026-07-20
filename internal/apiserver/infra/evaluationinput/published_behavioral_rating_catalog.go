@@ -34,7 +34,11 @@ func (c PublishedBehavioralRatingCatalog) GetBehavioralRatingByRef(ctx context.C
 		return nil, domain.ErrVersionRequired
 	}
 	requested := domain.Algorithm(ref.Algorithm)
-	for _, lookup := range behavioralRatingLookupRefs(ref) {
+	lookups, err := behavioralRatingLookupRefs(ref)
+	if err != nil {
+		return nil, err
+	}
+	for _, lookup := range lookups {
 		snapshot, err := c.reader.GetPublishedModelByRef(ctx, lookup)
 		if err != nil {
 			if domain.IsNotFound(err) {
@@ -42,8 +46,7 @@ func (c PublishedBehavioralRatingCatalog) GetBehavioralRatingByRef(ctx context.C
 			}
 			return nil, err
 		}
-		if requested != "" && snapshot != nil &&
-			!domain.BehavioralAlgorithmsEquivalent(snapshot.Algorithm, requested) {
+		if requested != "" && snapshot != nil && snapshot.Algorithm != requested {
 			continue
 		}
 		return c.decodePublished(ctx, snapshot)
@@ -86,30 +89,16 @@ func (c PublishedBehavioralRatingCatalog) decodePublished(ctx context.Context, s
 	return aminfrac.DecodeBehavioralRatingFromDefinition(snapshot, tables)
 }
 
-func behavioralRatingLookupRefs(ref port.ModelRef) []rulesetport.Ref {
+func behavioralRatingLookupRefs(ref port.ModelRef) ([]rulesetport.Ref, error) {
 	algorithm := domain.Algorithm(ref.Algorithm)
 	if algorithm == "" {
-		algorithm = domain.AlgorithmBrief2
-		domain.ObserveAlgorithmFallback(
-			domain.KindBehavioralRating, "", algorithm, "infra.behavioral_lookup_ref",
-		)
+		return nil, fmt.Errorf("behavioral_rating algorithm is required")
 	}
-	algorithms := []domain.Algorithm{algorithm}
-	algorithms = append(algorithms, domain.BehavioralAlgorithmLookupAlternates(algorithm)...)
-	seen := make(map[domain.Algorithm]struct{}, len(algorithms))
-	refs := make([]rulesetport.Ref, 0, len(algorithms))
-	for _, alg := range algorithms {
-		if _, ok := seen[alg]; ok {
-			continue
-		}
-		seen[alg] = struct{}{}
-		refs = append(refs, rulesetport.Ref{
-			Kind:      domain.KindBehavioralRating,
-			Algorithm: alg,
-			Code:      ref.Code,
-			Version:   ref.Version,
-			Title:     ref.Title,
-		})
-	}
-	return refs
+	return []rulesetport.Ref{{
+		Kind:      domain.KindBehavioralRating,
+		Algorithm: algorithm,
+		Code:      ref.Code,
+		Version:   ref.Version,
+		Title:     ref.Title,
+	}}, nil
 }

@@ -32,7 +32,11 @@ func (c PublishedCognitiveCatalog) GetCognitiveByRef(ctx context.Context, ref po
 	if ref.Version == "" {
 		return nil, domain.ErrVersionRequired
 	}
-	snapshot, err := c.reader.GetPublishedModelByRef(ctx, cognitiveLookupRef(ref))
+	lookup, err := cognitiveLookupRef(ref)
+	if err != nil {
+		return nil, err
+	}
+	snapshot, err := c.reader.GetPublishedModelByRef(ctx, lookup)
 	if err != nil {
 		return nil, err
 	}
@@ -73,13 +77,10 @@ func (c PublishedCognitiveCatalog) decodePublished(ctx context.Context, model *r
 	return snapshot, nil
 }
 
-func cognitiveLookupRef(ref port.ModelRef) rulesetport.Ref {
+func cognitiveLookupRef(ref port.ModelRef) (rulesetport.Ref, error) {
 	algorithm := domain.Algorithm(ref.Algorithm)
 	if algorithm == "" {
-		algorithm = domain.AlgorithmSPM
-		domain.ObserveAlgorithmFallback(
-			domain.KindCognitive, "", algorithm, "infra.cognitive_lookup_ref",
-		)
+		return rulesetport.Ref{}, fmt.Errorf("cognitive algorithm is required")
 	}
 	return rulesetport.Ref{
 		Kind:      domain.KindCognitive,
@@ -87,7 +88,7 @@ func cognitiveLookupRef(ref port.ModelRef) rulesetport.Ref {
 		Code:      ref.Code,
 		Version:   ref.Version,
 		Title:     ref.Title,
-	}
+	}, nil
 }
 
 func decodePublishedCognitiveModel(model *rulesetport.PublishedModel) (*taskperfsnapshot.Snapshot, error) {

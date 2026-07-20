@@ -27,7 +27,7 @@ func TestRegistryResolveByIdentity(t *testing.T) {
 	t.Parallel()
 
 	registry := NewRegistry(stubHandler{kind: domain.KindTypology})
-	handler, ok := registry.Resolve(domain.Identity{Kind: domain.KindTypology, Algorithm: domain.AlgorithmMBTI})
+	handler, ok := registry.Resolve(domain.Identity{Kind: domain.KindTypology, Algorithm: domain.AlgorithmPersonalityTypology})
 	if !ok || handler == nil {
 		t.Fatal("Resolve() did not return typology handler")
 	}
@@ -71,7 +71,7 @@ func TestRegistryResolvesAllCanonicalDefinitionStrategies(t *testing.T) {
 		{Kind: domain.KindScale, Algorithm: domain.AlgorithmScaleDefault},
 		{Kind: domain.KindBehavioralRating, Algorithm: domain.AlgorithmBrief2},
 		{Kind: domain.KindCognitive, Algorithm: domain.AlgorithmSPM},
-		{Kind: domain.KindTypology, SubKind: domain.SubKindTypology, Algorithm: domain.AlgorithmMBTI},
+		{Kind: domain.KindTypology, SubKind: domain.SubKindTypology, Algorithm: domain.AlgorithmPersonalityTypology},
 	} {
 		binding := AlgorithmBindingFromIdentity(identity)
 		handler, ok := registry.ResolveBinding(binding)

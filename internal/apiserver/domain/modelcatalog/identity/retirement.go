@@ -76,25 +76,19 @@ func IsRetainedReadAliasAlgorithm(algorithm Algorithm) bool {
 	}
 }
 
-// DualIdentityDeleteChecklist lists surfaces removable after
-// EvaluateDualIdentityRetirementGate == PASS.
+// DualIdentityDeleteChecklist is empty after dual-identity retirement (MC-R018).
+// Prefer FullDeleteChecklist / EvaluateRetirementGate for remaining empty-algorithm work.
 func DualIdentityDeleteChecklist() []string {
-	return []string{
-		"identity.TypologyAlgorithmsEquivalent + TypologyAlgorithmLookupAlternates dual-identity",
-		"identity.BehavioralAlgorithmsEquivalent + BehavioralAlgorithmLookupAlternates dual-identity",
-		"write_policy retained_read branches (mbti/sbti/bigfive, behavioral_rating_default)",
-		"oneoff backfill_*_algorithm_identity (published) + soft_delete_assessment_retained_aliases",
-	}
+	return nil
 }
 
-// RetirementDeleteChecklist lists all compatibility surfaces to remove only after
-// EvaluateRetirementGate returns PASS (includes empty-algorithm fallback).
+// RetirementDeleteChecklist lists remaining compatibility surfaces after dual-identity
+// retirement. Remove only after EvaluateRetirementGate returns PASS.
 func RetirementDeleteChecklist() []string {
-	return append(DualIdentityDeleteChecklist(),
-		"infra published_*_catalog empty-Algorithm ObserveAlgorithmFallback fills",
-		"port/evaluationinput NewBehavioralRatingModelSnapshot empty-Algorithm fill",
+	return []string{
 		"compat ModelPayload decoder retained-read paths (MC-R017 overlap)",
-		"ExecutionIdentityBehavioralRatingDefault algorithm field (family route key remap)",
+		"ExecutionIdentityBehavioralRatingDefault / CognitiveDefault family route key remap",
 		"oneoff audit_assessment_retained_algorithms.sql",
-	)
+		"oneoff soft_delete_assessment_empty_algorithms (full_gate inventory)",
+	}
 }

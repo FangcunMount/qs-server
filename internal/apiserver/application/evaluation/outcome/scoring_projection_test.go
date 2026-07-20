@@ -51,7 +51,7 @@ func TestBehavioralRatingModelIdentitySurvivesExecutionProjectionRoundTrip(t *te
 	}
 }
 
-func TestModelRefFromAssessmentCompletesLegacyScaleAlgorithm(t *testing.T) {
+func TestModelRefFromAssessmentKeepsEmptyAlgorithm(t *testing.T) {
 	t.Parallel()
 
 	modelRef := assessment.NewScaleEvaluationModelRef(
@@ -62,7 +62,10 @@ func TestModelRefFromAssessmentCompletesLegacyScaleAlgorithm(t *testing.T) {
 	)
 
 	executionRef := ModelRefFromAssessment(modelRef)
-	if executionRef.Algorithm() != modelcatalog.AlgorithmScaleDefault {
-		t.Fatalf("execution algorithm = %s, want %s", executionRef.Algorithm(), modelcatalog.AlgorithmScaleDefault)
+	if executionRef.Algorithm() != "" {
+		t.Fatalf("execution algorithm = %q, want empty (no invent)", executionRef.Algorithm())
+	}
+	if executionRef.Kind() != modelcatalog.KindScale {
+		t.Fatalf("kind = %s, want scale", executionRef.Kind())
 	}
 }

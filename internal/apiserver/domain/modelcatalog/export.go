@@ -212,12 +212,8 @@ var (
 	AuditIdentityWritePolicy          = identitypkg.AuditIdentityWritePolicy
 	ObserveWritePolicy                = identitypkg.ObserveWritePolicy
 	ObserveAlgorithmFallback          = identitypkg.ObserveAlgorithmFallback
-	TypologyAlgorithmsEquivalent      = identitypkg.TypologyAlgorithmsEquivalent
-	TypologyAlgorithmLookupAlternates = identitypkg.TypologyAlgorithmLookupAlternates
 	TypologyAlgorithmBackfillTarget   = identitypkg.TypologyAlgorithmBackfillTarget
 	CanonicalTypologyPublishAlgorithm = identitypkg.CanonicalTypologyPublishAlgorithm
-	BehavioralAlgorithmsEquivalent      = identitypkg.BehavioralAlgorithmsEquivalent
-	BehavioralAlgorithmLookupAlternates = identitypkg.BehavioralAlgorithmLookupAlternates
 	BehavioralAlgorithmBackfillTarget   = identitypkg.BehavioralAlgorithmBackfillTarget
 	EvaluateRetirementGate              = identitypkg.EvaluateRetirementGate
 	EvaluateDualIdentityRetirementGate  = identitypkg.EvaluateDualIdentityRetirementGate

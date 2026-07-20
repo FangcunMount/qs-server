@@ -8,7 +8,7 @@ import (
 
 func TestObserveWritePolicyIncrementsRetainedRead(t *testing.T) {
 	t.Parallel()
-	labels := []string{string(KindTypology), string(AlgorithmMBTI), string(AlgorithmWriteRetainedRead)}
+	labels := []string{string(KindTypology), string(AlgorithmMBTI), string(AlgorithmWriteUnknown)}
 	before := testutil.ToFloat64(identityWritePolicyTotal.WithLabelValues(labels...))
 	ObserveWritePolicy(KindTypology, AlgorithmMBTI)
 	after := testutil.ToFloat64(identityWritePolicyTotal.WithLabelValues(labels...))

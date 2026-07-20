@@ -40,8 +40,8 @@ func TestApplyAssessmentOutcomeV2FieldsProjectsScaleRiskLevel(t *testing.T) {
 	if po.Severity == nil || *po.Severity != "high" {
 		t.Fatalf("severity = %v, want high", po.Severity)
 	}
-	if po.EvaluationModelAlgorithm == nil || *po.EvaluationModelAlgorithm != "scale_default" {
-		t.Fatalf("algorithm = %v, want scale_default", po.EvaluationModelAlgorithm)
+	if po.EvaluationModelAlgorithm != nil {
+		t.Fatalf("algorithm = %v, want nil (no invent from family route key)", po.EvaluationModelAlgorithm)
 	}
 }
 

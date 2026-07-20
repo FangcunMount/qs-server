@@ -69,7 +69,6 @@ func typologyLookupRefs(ref port.ModelRef, algorithm domain.Algorithm) []ruleset
 		return refs
 	}
 	algorithms := []domain.Algorithm{algorithm}
-	algorithms = append(algorithms, domain.TypologyAlgorithmLookupAlternates(algorithm)...)
 	seen := make(map[domain.Algorithm]struct{}, len(algorithms))
 	refs := make([]rulesetport.Ref, 0, len(algorithms))
 	for _, alg := range algorithms {
@@ -92,7 +91,7 @@ func assertTypologyAlgorithm(payload *modeltypology.Payload, algorithm domain.Al
 	if payload == nil {
 		return nil, fmt.Errorf("typology payload is nil")
 	}
-	if domain.TypologyAlgorithmsEquivalent(payload.Algorithm, algorithm) {
+	if payload.Algorithm == algorithm {
 		return payload, nil
 	}
 	return nil, fmt.Errorf("typology algorithm %s does not match ref %s", payload.Algorithm, algorithm)

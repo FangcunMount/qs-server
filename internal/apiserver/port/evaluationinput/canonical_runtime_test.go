@@ -75,7 +75,7 @@ func TestAuditLegacyIdentityFlagsRetainedAlgorithm(t *testing.T) {
 			Kind: evaluationinput.EvaluationModelKindTypology, Algorithm: string(modelcatalog.AlgorithmMBTI),
 		},
 	})
-	if len(issues) == 0 || issues[0].Code != "identity.algorithm.retained_read" {
+	if len(issues) == 0 || issues[0].Code != "identity.algorithm.unknown" {
 		t.Fatalf("issues = %#v", issues)
 	}
 	_ = interpretationassets.Assets{}
