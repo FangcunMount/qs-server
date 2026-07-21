@@ -267,5 +267,7 @@ func (s *starter) startNext(ctx context.Context, generationRecord *domaingenerat
 }
 
 func isClaimConflict(err error) bool {
-	return errors.Is(err, domaingeneration.ErrAlreadyExists) || errors.Is(err, domaingeneration.ErrVersionConflict)
+	return errors.Is(err, domaingeneration.ErrAlreadyExists) ||
+		errors.Is(err, domaingeneration.ErrVersionConflict) ||
+		errors.Is(err, interpretationrun.ErrAlreadyExists)
 }

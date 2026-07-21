@@ -90,9 +90,10 @@ func (r *memoryGenerationRepo) Save(_ context.Context, item *domaingeneration.Re
 }
 
 type memoryRunRepo struct {
-	items   map[meta.ID]*interpretationrun.InterpretationRun
-	creates int
-	saves   int
+	items    map[meta.ID]*interpretationrun.InterpretationRun
+	creates  int
+	saves    int
+	conflict func()
 }
 
 func newMemoryRunRepo() *memoryRunRepo {
@@ -101,10 +102,22 @@ func newMemoryRunRepo() *memoryRunRepo {
 
 func (r *memoryRunRepo) Create(_ context.Context, item *interpretationrun.InterpretationRun) error {
 	r.creates++
+	if r.conflict != nil {
+		fn := r.conflict
+		r.conflict = nil
+		fn()
+		return interpretationrun.ErrAlreadyExists
+	}
 	if _, ok := r.items[item.ID()]; ok {
 		return interpretationrun.ErrAlreadyExists
 	}
-	r.items[item.ID()] = item
+	for _, existing := range r.items {
+		if existing.GenerationID() == item.GenerationID() && existing.Attempt() == item.Attempt() {
+			return interpretationrun.ErrAlreadyExists
+		}
+	}
+	clone := *item
+	r.items[item.ID()] = &clone
 	return nil
 }
 
@@ -199,6 +212,32 @@ func TestStarterReturnsProcessingForActiveLeaseAndRereadsUniqueConflict(t *testi
 	}
 	if result.Status != StartStatusProcessing || result.Generation != winnerGeneration || generations.findCalls < 2 || tx.calls != 1 || runs.creates != 0 {
 		t.Fatalf("conflict/process result=%#v finds=%d tx=%d creates=%d", result, generations.findCalls, tx.calls, runs.creates)
+	}
+}
+
+func TestStarterRereadsRunDuplicateAsClaimConflict(t *testing.T) {
+	now := time.Date(2026, 7, 14, 10, 0, 0, 0, time.UTC)
+	service, generations, runs, tx := newStarterFixture(t, now)
+	pending, err := domaingeneration.New(meta.FromUint64(1), starterKey(), now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	generations.put(pending)
+	winnerGeneration, winnerRun := seedGenerating(t, now, time.Minute)
+	runs.conflict = func() {
+		generations.put(winnerGeneration)
+		runs.items[winnerRun.ID()] = winnerRun
+	}
+
+	result, err := service.Start(context.Background(), StartRequest{Key: starterKey(), TraceID: "loser"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != StartStatusProcessing || result.Run.ID() != winnerRun.ID() || generations.findCalls < 2 {
+		t.Fatalf("run duplicate result=%#v finds=%d creates=%d", result, generations.findCalls, runs.creates)
+	}
+	if tx.calls != 1 || runs.creates != 1 {
+		t.Fatalf("run duplicate writes tx=%d creates=%d", tx.calls, runs.creates)
 	}
 }
 
