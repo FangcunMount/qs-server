@@ -254,6 +254,19 @@ func TestValidateRuntimeSpecForPublishValidatesAdapterCompatibility(t *testing.T
 	}
 }
 
+func TestValidateRuntimeSpecForPublishRejectsUnknownTemplateID(t *testing.T) {
+	spec := validRuntimeSpec()
+	spec.Report.TemplateID = "not-a-registered-template"
+
+	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
+		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
+		Outcomes:  []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
+	})
+	if !hasIssueCode(issues, "report.template_id.unknown") {
+		t.Fatalf("issues = %#v, want report.template_id.unknown", issues)
+	}
+}
+
 func validRuntimeSpec() *typology.RuntimeSpec {
 	return &typology.RuntimeSpec{
 		FactorGraph: typology.FactorGraphSpec{

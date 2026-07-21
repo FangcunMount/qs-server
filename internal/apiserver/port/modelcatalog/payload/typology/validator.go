@@ -371,6 +371,9 @@ func (v *runtimeSpecValidator) validateReport(report ReportSpec, mapping Outcome
 	if report.Kind == "" {
 		v.add("report.kind", "report.kind.required", "report kind 不能为空")
 	}
+	if report.TemplateID != "" && !IsRegisteredReportTemplateID(report.TemplateID) {
+		v.add("report.template_id", "report.template_id.unknown", fmt.Sprintf("report template_id %s 未注册", report.TemplateID))
+	}
 	if report.Kind != "" && !isSupportedReportKind(report.Kind) {
 		v.add("report.kind", "report.kind.unsupported", fmt.Sprintf("report kind %s 不支持", report.Kind))
 		return

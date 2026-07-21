@@ -16,6 +16,7 @@ import (
 	evaluationfactcodec "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact/codec"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 )
 
@@ -69,12 +70,13 @@ func FromPreviewOutcome(outcome PreviewOutcome) (interpinput.InterpretationInput
 		if err := populateTypologyFacts(&in, outcome.Execution, outcome.Input); err != nil {
 			return interpinput.InterpretationInput{}, err
 		}
-		if payload, ok := evaluationinput.TypologyPayload(outcome.Input); ok && payload != nil {
-			if runtimeSpec, err := payload.ToRuntimeSpec(); err == nil {
-				in.Report.TemplateID = runtimeSpec.Report.TemplateID
-				in.Report.AdapterKey = string(runtimeSpec.Report.ResolvedAdapterKey(runtimeSpec.OutcomeMapping, runtimeSpec.Decision.Kind))
-			}
+		payload, _ := evaluationinput.TypologyPayload(outcome.Input)
+		routing, err := modeltypology.ResolveTypologyReportRouting(payload)
+		if err != nil {
+			return interpinput.InterpretationInput{}, err
 		}
+		in.Report.TemplateID = routing.TemplateID
+		in.Report.AdapterKey = string(routing.AdapterKey)
 	}
 	return in, nil
 }

@@ -11,6 +11,7 @@ import (
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	evaluationfactcodec "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact/codec"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 // DefaultTemplateVersion freezes the current compatible interpretation assets
@@ -68,12 +69,13 @@ func FromOutcomeRecord(record *domainoutcome.Record) (interpinput.Interpretation
 		if err := populateTypologyFacts(&in, execution, assets); err != nil {
 			return interpinput.InterpretationInput{}, err
 		}
-		if payload, ok := evaluationinput.TypologyPayload(assets); ok && payload != nil {
-			if runtimeSpec, err := payload.ToRuntimeSpec(); err == nil {
-				in.Report.TemplateID = runtimeSpec.Report.TemplateID
-				in.Report.AdapterKey = string(runtimeSpec.Report.ResolvedAdapterKey(runtimeSpec.OutcomeMapping, runtimeSpec.Decision.Kind))
-			}
+		payload, _ := evaluationinput.TypologyPayload(assets)
+		routing, err := modeltypology.ResolveTypologyReportRouting(payload)
+		if err != nil {
+			return interpinput.InterpretationInput{}, err
 		}
+		in.Report.TemplateID = routing.TemplateID
+		in.Report.AdapterKey = string(routing.AdapterKey)
 	}
 	return in, nil
 }

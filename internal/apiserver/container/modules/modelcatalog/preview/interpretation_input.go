@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact/codec"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelpreview"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -29,14 +30,17 @@ func previewInterpretationInput(req modelpreview.Request, outcome *domainoutcome
 	if outcome.Level != nil {
 		in.Result.Level = &report.ResultLevel{Code: outcome.Level.Code, Label: outcome.Level.Label, Severity: outcome.Level.Severity}
 	}
-	if payload, ok := evaluationinput.TypologyPayload(req.Input); ok && payload != nil {
-		if spec, err := payload.ToRuntimeSpec(); err == nil {
-			in.Runtime.DecisionKind = spec.Decision.Kind
-			in.Report.ReportProfile = policy.ReportProfileForDecisionKind(spec.Decision.Kind)
-			in.Report.TemplateID = spec.Report.TemplateID
-			in.Report.AdapterKey = string(spec.Report.ResolvedAdapterKey(spec.OutcomeMapping, spec.Decision.Kind))
-		}
+	payload, _ := evaluationinput.TypologyPayload(req.Input)
+	routing, err := modeltypology.ResolveTypologyReportRouting(payload)
+	if err != nil {
+		return interpinput.InterpretationInput{}, err
 	}
+	if routing.DecisionKind != "" {
+		in.Runtime.DecisionKind = routing.DecisionKind
+		in.Report.ReportProfile = policy.ReportProfileForDecisionKind(routing.DecisionKind)
+	}
+	in.Report.TemplateID = routing.TemplateID
+	in.Report.AdapterKey = string(routing.AdapterKey)
 	if detail, ok := codec.PersonalityTypeDetailFromPayload(outcome.Detail.Payload); ok {
 		in.PersonalityType = &interpinput.PersonalityTypeFacts{Detail: personalityDetail(detail)}
 		if in.Runtime.DecisionKind == "" {

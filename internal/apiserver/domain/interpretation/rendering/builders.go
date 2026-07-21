@@ -118,10 +118,14 @@ func (b TypologyBuilder) Build(_ context.Context, input interpinput.Interpretati
 		if _, ok := b.adapters[adapter]; !ok {
 			return nil, fmt.Errorf("unsupported report adapter key: %s", adapter)
 		}
+		tmpl, err := reporttypology.PersonalityTypeTemplateForSpec(reporttypology.ReportSpec{AdapterKey: adapter, TemplateID: input.Report.TemplateID})
+		if err != nil {
+			return nil, err
+		}
 		content, err := reporttypology.BuildPersonalityTypeContent(reporttypology.PersonalityTypeReportInput{
 			AssessmentID: report.ID(input.Association.AssessmentID), ModelCode: input.Model.Code,
 			TotalScore: primaryValue(input), RiskLevel: riskLevel(input), Detail: input.PersonalityType.Detail,
-		}, reporttypology.PersonalityTypeTemplateForSpec(reporttypology.ReportSpec{AdapterKey: adapter, TemplateID: input.Report.TemplateID}))
+		}, tmpl)
 		if err != nil {
 			return nil, err
 		}
@@ -133,10 +137,14 @@ func (b TypologyBuilder) Build(_ context.Context, input interpinput.Interpretati
 		if _, ok := b.adapters[adapter]; !ok {
 			return nil, fmt.Errorf("unsupported report adapter key: %s", adapter)
 		}
+		tmpl, err := reporttypology.TraitProfileTemplateForSpec(reporttypology.ReportSpec{AdapterKey: adapter, TemplateID: input.Report.TemplateID})
+		if err != nil {
+			return nil, err
+		}
 		content, err := reporttypology.BuildTraitProfileContent(reporttypology.TraitProfileReportInput{
 			AssessmentID: report.ID(input.Association.AssessmentID), ModelCode: input.Model.Code,
 			TotalScore: primaryValue(input), RiskLevel: riskLevel(input), Detail: input.TraitProfile.Detail,
-		}, reporttypology.TraitProfileTemplateForSpec(reporttypology.ReportSpec{AdapterKey: adapter, TemplateID: input.Report.TemplateID}))
+		}, tmpl)
 		if err != nil {
 			return nil, err
 		}

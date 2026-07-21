@@ -52,7 +52,7 @@ func TestValidateAcceptsCompleteDefinition(t *testing.T) {
 			},
 		},
 		ReportMap: definition.ReportMap{Sections: []definition.ReportSection{{
-			Code: "personality", Kind: "template", TemplateID: "type_a", AdapterKey: "trait_profile",
+			Code: "personality", Kind: "template", TemplateID: "bigfive", AdapterKey: "trait_profile",
 		}}},
 	}
 
@@ -222,6 +222,18 @@ func TestValidateRejectsReportAdapterIncompatibleWithDecisionKind(t *testing.T) 
 	issues = definition.Validate(def)
 	if hasValidationCode(issues, "report_section.adapter.decision_mismatch") || hasValidationCode(issues, "report_section.adapter.legacy") {
 		t.Fatalf("issues = %#v, want no adapter issues for compatible adapter", issues)
+	}
+
+	def.ReportMap.Sections[0].TemplateID = "not-registered"
+	issues = definition.Validate(def)
+	if !hasValidationCode(issues, "report_section.template_id.unknown") {
+		t.Fatalf("issues = %#v, want report_section.template_id.unknown", issues)
+	}
+
+	def.ReportMap.Sections[0].TemplateID = "mbti"
+	issues = definition.Validate(def)
+	if hasValidationCode(issues, "report_section.template_id.unknown") {
+		t.Fatalf("issues = %#v, want registered template_id accepted", issues)
 	}
 }
 

@@ -2,6 +2,7 @@ package input
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -53,5 +54,99 @@ func TestFromOutcomeRecordSchemaV2RejectsCodeMissingFromFrozenInput(t *testing.T
 	})
 	if _, err := FromOutcomeRecord(record); err == nil {
 		t.Fatal("expected frozen report input lookup failure")
+	}
+}
+
+func TestFromOutcomeRecordReportRouting_LegacyAbsentAllowsDerive(t *testing.T) {
+	assets, err := json.Marshal(evaluationinput.TypologyModelPayload{Payload: &modeltypology.Payload{
+		Code: "MBTI", Version: "1", Algorithm: modelcatalog.AlgorithmMBTI,
+		DimensionOrder: []string{"EI"},
+		Dimensions:     map[string]modeltypology.Dimension{"EI": {Code: "EI", Name: "EI", LeftPole: "I", RightPole: "E"}},
+		MatchingSpec:   modeltypology.MatchingSpec{Kind: modelcatalog.DecisionKindPoleComposition},
+		Outcomes:       []modeltypology.Outcome{{Code: "INTJ", Name: "建筑师"}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := evaluationfact.NewRecord(evaluationfact.NewRecordInput{
+		ID: meta.FromUint64(30), AssessmentID: meta.FromUint64(30), TesteeID: 2, RunID: "30:1",
+		Model:         evaluationfact.ModelIdentity{Kind: modelcatalog.KindTypology, Algorithm: modelcatalog.AlgorithmMBTI, Code: "MBTI", Version: "1"},
+		Runtime:       evaluationfact.RuntimeIdentity{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindPoleComposition},
+		SchemaVersion: 2, EvaluatedAt: time.Unix(100, 0), ReportInput: assets,
+		Payload: []byte(`{"Detail":{"Payload":{"type_code":"INTJ","match_percent":80}},"Primary":{"Kind":"match_percent","Value":80,"Label":"INTJ"}}`),
+	})
+
+	got, err := FromOutcomeRecord(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Report.TemplateID != "mbti" {
+		t.Fatalf("TemplateID = %q, want mbti from legacy derive", got.Report.TemplateID)
+	}
+	if got.Report.AdapterKey != string(modeltypology.ReportAdapterPersonalityType) {
+		t.Fatalf("AdapterKey = %q, want personality_type", got.Report.AdapterKey)
+	}
+}
+
+func TestFromOutcomeRecordReportRouting_ExplicitValid(t *testing.T) {
+	assets, err := json.Marshal(evaluationinput.TypologyModelPayload{Payload: &modeltypology.Payload{
+		Code: "MBTI", Version: "1",
+		Outcomes: []modeltypology.Outcome{{Code: "INTJ", Name: "建筑师"}},
+		Runtime: &modeltypology.RuntimeSpec{
+			FactorGraph: modeltypology.FactorGraphSpec{
+				DimensionOrder: []string{"EI"},
+				Dimensions:     map[string]modeltypology.Dimension{"EI": {Code: "EI", Name: "EI", LeftPole: "I", RightPole: "E"}},
+			},
+			Decision:       modeltypology.PersonalityDecisionSpec{Kind: modelcatalog.DecisionKindPoleComposition},
+			OutcomeMapping: modeltypology.OutcomeMappingSpec{DetailKind: modeltypology.OutcomeDetailPersonalityType},
+			Report: modeltypology.ReportSpec{
+				Kind:       modeltypology.ReportKindTemplate,
+				AdapterKey: modeltypology.ReportAdapterPersonalityType,
+				TemplateID: "mbti",
+			},
+		},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := evaluationfact.NewRecord(evaluationfact.NewRecordInput{
+		ID: meta.FromUint64(31), AssessmentID: meta.FromUint64(31), TesteeID: 2, RunID: "31:1",
+		Model:         evaluationfact.ModelIdentity{Kind: modelcatalog.KindTypology, Algorithm: modelcatalog.AlgorithmMBTI, Code: "MBTI", Version: "1"},
+		Runtime:       evaluationfact.RuntimeIdentity{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindPoleComposition},
+		SchemaVersion: 2, EvaluatedAt: time.Unix(100, 0), ReportInput: assets,
+		Payload: []byte(`{"Detail":{"Payload":{"type_code":"INTJ","match_percent":80}},"Primary":{"Kind":"match_percent","Value":80,"Label":"INTJ"}}`),
+	})
+
+	got, err := FromOutcomeRecord(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Report.TemplateID != "mbti" || got.Report.AdapterKey != string(modeltypology.ReportAdapterPersonalityType) {
+		t.Fatalf("report routing = TemplateID=%q AdapterKey=%q", got.Report.TemplateID, got.Report.AdapterKey)
+	}
+}
+
+func TestFromOutcomeRecordReportRouting_ExplicitMalformedFailClosed(t *testing.T) {
+	assets, err := json.Marshal(evaluationinput.TypologyModelPayload{Payload: &modeltypology.Payload{
+		Code: "MBTI", Version: "1",
+		Outcomes: []modeltypology.Outcome{{Code: "INTJ", Name: "建筑师"}},
+		Runtime: &modeltypology.RuntimeSpec{
+			Report: modeltypology.ReportSpec{Kind: modeltypology.ReportKindTemplate},
+		},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := evaluationfact.NewRecord(evaluationfact.NewRecordInput{
+		ID: meta.FromUint64(32), AssessmentID: meta.FromUint64(32), TesteeID: 2, RunID: "32:1",
+		Model:         evaluationfact.ModelIdentity{Kind: modelcatalog.KindTypology, Algorithm: modelcatalog.AlgorithmMBTI, Code: "MBTI", Version: "1"},
+		Runtime:       evaluationfact.RuntimeIdentity{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindPoleComposition},
+		SchemaVersion: 2, EvaluatedAt: time.Unix(100, 0), ReportInput: assets,
+		Payload: []byte(`{"Detail":{"Payload":{"type_code":"INTJ","match_percent":80}},"Primary":{"Kind":"match_percent","Value":80,"Label":"INTJ"}}`),
+	})
+
+	_, err = FromOutcomeRecord(record)
+	if err == nil || !errors.Is(err, modeltypology.ErrRuntimeSpecInvalid) {
+		t.Fatalf("err = %v, want ErrRuntimeSpecInvalid", err)
 	}
 }

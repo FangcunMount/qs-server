@@ -316,6 +316,13 @@ func validateReportMapAgainstDecision(def Definition) []ValidationIssue {
 	}
 	issues := make([]ValidationIssue, 0)
 	for _, section := range def.ReportMap.Sections {
+		if section.TemplateID != "" && !isRegisteredReportTemplateID(section.TemplateID) {
+			issues = append(issues, ValidationIssue{
+				Field:   "report_map.sections." + section.Code + ".template_id",
+				Code:    "report_section.template_id.unknown",
+				Message: fmt.Sprintf("report template_id %q is not registered", section.TemplateID),
+			})
+		}
 		if section.AdapterKey == "" {
 			continue
 		}
@@ -336,6 +343,18 @@ func validateReportMapAgainstDecision(def Definition) []ValidationIssue {
 		}
 	}
 	return issues
+}
+
+// isRegisteredReportTemplateID mirrors the interpretation template registry
+// (mbti / sbti / bigfive). Keep in sync with typology.IsRegisteredReportTemplateID
+// and patterns.IsRegisteredTemplateID.
+func isRegisteredReportTemplateID(templateID string) bool {
+	switch templateID {
+	case "mbti", "sbti", "bigfive":
+		return true
+	default:
+		return false
+	}
 }
 
 func isLegacyReportAdapter(adapter string) bool {
