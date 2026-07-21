@@ -12,12 +12,12 @@ type pathMaterialization struct {
 }
 
 func defaultPathMaterializations() []pathMaterialization {
-	return []pathMaterialization{
-		{path: modelcatalog.ExecutionPathScaleDescriptor, family: modelcatalog.AlgorithmFamilyFactorScoring},
-		{path: modelcatalog.ExecutionPathTypologyDescriptor, family: modelcatalog.AlgorithmFamilyFactorClassification},
-		{path: modelcatalog.ExecutionPathBehavioralRatingDescriptor, family: modelcatalog.AlgorithmFamilyFactorNorm},
-		{path: modelcatalog.ExecutionPathCognitiveDescriptor, family: modelcatalog.AlgorithmFamilyTaskPerformance},
+	manifest := RequiredFamilyManifest()
+	specs := make([]pathMaterialization, 0, len(manifest))
+	for _, entry := range manifest {
+		specs = append(specs, pathMaterialization{path: entry.Path, family: entry.Family})
 	}
+	return specs
 }
 
 func materializationOrder() []modelcatalog.ExecutionPath {

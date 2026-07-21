@@ -29,7 +29,7 @@ func AttachNativePipelines(registry *evalpipeline.RuntimeDescriptorRegistry, dep
 			return err
 		}
 	}
-	return nil
+	return ValidateFamilyManifestCompleteness(registry)
 }
 
 func attachFactorScoringNativePipeline(registry *evalpipeline.RuntimeDescriptorRegistry, deps NativePipelineDeps) error {
