@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/attentionprojection"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
@@ -29,6 +30,7 @@ type HandlerDependencies struct {
 	LockKeyBuilder                 *keyspace.Builder
 	Notifier                       port.TaskNotifier
 	ReportStatusReporter           *reportstatus.Reporter
+	AttentionProjector             *attentionprojection.Projector
 	DisableAutomaticRetry          bool
 }
 
@@ -136,6 +138,7 @@ func (d *Dispatcher) buildHandlerDependencies() *handlers.Dependencies {
 		LockKeyBuilder:                 d.deps.LockKeyBuilder,
 		Notifier:                       d.deps.Notifier,
 		ReportStatusReporter:           d.deps.ReportStatusReporter,
+		AttentionProjector:             d.deps.AttentionProjector,
 		DisableAutomaticRetry:          d.deps.DisableAutomaticRetry,
 	}
 }

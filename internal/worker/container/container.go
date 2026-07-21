@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/qs-server/internal/pkg/attentionprojection"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
@@ -24,20 +25,24 @@ import (
 	"github.com/FangcunMount/qs-server/internal/worker/options"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
 	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/worker/resilience/subsystem"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // Container 主容器，负责管理所有组件
 type Container struct {
-	initialized      bool
-	opts             *options.Options
-	logger           *slog.Logger
-	locks            *locksubsystem.Subsystem
-	resilience       *resiliencesubsystem.Subsystem
-	resilienceCancel context.CancelFunc
-	opsHandle        *redisruntime.Handle
-	lockBuilder      *keyspace.Builder
-	eventCatalog     *eventcatalog.Catalog
-	reportStatus     *reportstatus.Reporter
+	initialized         bool
+	opts                *options.Options
+	logger              *slog.Logger
+	locks               *locksubsystem.Subsystem
+	resilience          *resiliencesubsystem.Subsystem
+	resilienceCancel    context.CancelFunc
+	opsHandle           *redisruntime.Handle
+	lockBuilder         *keyspace.Builder
+	eventCatalog        *eventcatalog.Catalog
+	reportStatus        *reportstatus.Reporter
+	mongoDatabase       *mongo.Database
+	attentionProjector  *attentionprojection.Projector
+	attentionReconciler *attentionprojection.Reconciler
 
 	// gRPC 客户端（由 GRPCClientRegistry 注入）
 	answerSheetClient              *grpcclient.AnswerSheetClient
@@ -88,6 +93,32 @@ func NewContainer(opts *options.Options, logger *slog.Logger, opsHandle *redisru
 	return c, nil
 }
 
+// SetMongoDatabase enables durable attention projection when Mongo is configured.
+func (c *Container) SetMongoDatabase(db *mongo.Database) {
+	if c == nil {
+		return
+	}
+	c.mongoDatabase = db
+}
+
+func (c *Container) initAttentionProjection() {
+	if c == nil || c.mongoDatabase == nil || c.internalClient == nil {
+		return
+	}
+	store, err := attentionprojection.NewMongoStore(c.mongoDatabase)
+	if err != nil {
+		log.Warnf("attention projection store disabled: %v", err)
+		return
+	}
+	c.attentionProjector = attentionprojection.NewProjector(
+		store,
+		&internalAttentionSyncClient{client: c.internalClient},
+		attentionprojection.DefaultMaxAttempts,
+		c.logger,
+	)
+	c.attentionReconciler = attentionprojection.NewReconciler(c.attentionProjector, 0, 100, c.logger)
+}
+
 func (c *Container) buildReportStatusReporter() *reportstatus.Reporter {
 	if c == nil {
 		return nil
@@ -122,6 +153,7 @@ func (c *Container) Initialize() error {
 	if err := c.validateRuntimeClients(); err != nil {
 		return err
 	}
+	c.initAttentionProjection()
 
 	// 初始化事件分发器
 	if err := c.initEventDispatcher(); err != nil {
@@ -129,6 +161,9 @@ func (c *Container) Initialize() error {
 	}
 	if c.resilience != nil {
 		c.resilienceCancel = c.resilience.Start(context.Background())
+	}
+	if c.attentionReconciler != nil {
+		c.attentionReconciler.Start(context.Background())
 	}
 
 	c.initialized = true
@@ -161,6 +196,7 @@ func (c *Container) initEventDispatcher() error {
 		LockKeyBuilder:                 c.lockBuilder,
 		Notifier:                       c.buildNotifier(),
 		ReportStatusReporter:           c.reportStatus,
+		AttentionProjector:             c.attentionProjector,
 		DisableAutomaticRetry:          c.opts != nil && c.opts.RetryGovernance != nil && !c.opts.RetryGovernance.AutomaticRetryEnabled,
 	}
 
@@ -207,6 +243,9 @@ func (c *Container) buildNotifier() port.TaskNotifier {
 // Cleanup 清理资源
 func (c *Container) Cleanup() {
 	log.Info("🧹 Cleaning up container resources...")
+	if c.attentionReconciler != nil {
+		c.attentionReconciler.Close()
+	}
 	if c.resilienceCancel != nil {
 		c.resilienceCancel()
 		c.resilienceCancel = nil

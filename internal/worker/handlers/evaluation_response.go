@@ -61,7 +61,7 @@ func handleGenerateReportResponse(resp *interpretationpb.GenerateReportFromAsses
 }
 
 func isTerminalReportGenerationStatus(status string) bool {
-	if status == "failed" {
+	if status == "failed" || status == "admission_rejected" {
 		return true
 	}
 	return status == "already_generated"

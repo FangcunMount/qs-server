@@ -30,6 +30,7 @@ type fakeWorkerInternalClient struct {
 	calls                          []string
 	syncAssessmentAttentionCalls   int
 	syncAssessmentAttentionRequest *pb.SyncAssessmentAttentionRequest
+	syncAssessmentAttentionErr     error
 	questionnaireQRCodeCalls       int
 	scaleQRCodeCalls               int
 	calculateScoreSuccess          bool
@@ -105,6 +106,9 @@ func (f *fakeWorkerInternalClient) SyncAssessmentAttention(
 ) (*pb.SyncAssessmentAttentionResponse, error) {
 	f.syncAssessmentAttentionCalls++
 	f.syncAssessmentAttentionRequest = req
+	if f.syncAssessmentAttentionErr != nil {
+		return nil, f.syncAssessmentAttentionErr
+	}
 	return &pb.SyncAssessmentAttentionResponse{}, nil
 }
 

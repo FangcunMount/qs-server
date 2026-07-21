@@ -3,11 +3,13 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/attentionprojection"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 )
 
@@ -61,7 +63,71 @@ func TestHandleInterpretationReportGeneratedSyncsAssessmentAttentionForHighRisk(
 	}
 }
 
+func TestHandleInterpretationReportGeneratedPersistsAttentionFailureWithoutFailingHandler(t *testing.T) {
+	store := attentionprojection.NewMemoryStore()
+	client := &fakeWorkerInternalClient{syncAssessmentAttentionErr: errors.New("rpc unavailable")}
+	projector := attentionprojection.NewProjector(
+		store,
+		&internalAttentionSyncClient{client: client},
+		attentionprojection.DefaultMaxAttempts,
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+	)
+	reporter := &reportStatusWriterStub{}
+	handler := handleInterpretationReportGenerated(&Dependencies{
+		Logger:               slog.New(slog.NewTextHandler(io.Discard, nil)),
+		InternalClient:       client,
+		AttentionProjector:   projector,
+		ReportStatusReporter: reporter,
+	})
 
+	if err := handler(context.Background(), eventcatalog.InterpretationReportGenerated, mustBuildReportGeneratedOutcomePayload(t, "high", "severe")); err != nil {
+		t.Fatalf("handler returned error: %v", err)
+	}
+	if reporter.completedAssessmentID != "123" {
+		t.Fatalf("report status should still complete, got assessment=%q", reporter.completedAssessmentID)
+	}
+	rec, err := store.GetByEventID(context.Background(), "evt-report-generated-outcome")
+	if err != nil {
+		t.Fatalf("GetByEventID: %v", err)
+	}
+	if rec.Status != attentionprojection.StatusFailed {
+		t.Fatalf("status = %q, want failed", rec.Status)
+	}
+}
+
+func TestHandleInterpretationReportGeneratedAttentionProjectionIsIdempotent(t *testing.T) {
+	store := attentionprojection.NewMemoryStore()
+	client := &fakeWorkerInternalClient{}
+	projector := attentionprojection.NewProjector(
+		store,
+		&internalAttentionSyncClient{client: client},
+		attentionprojection.DefaultMaxAttempts,
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+	)
+	handler := handleInterpretationReportGenerated(&Dependencies{
+		Logger:             slog.New(slog.NewTextHandler(io.Discard, nil)),
+		InternalClient:     client,
+		AttentionProjector: projector,
+	})
+	payload := mustBuildReportGeneratedOutcomePayload(t, "low", "low")
+
+	if err := handler(context.Background(), eventcatalog.InterpretationReportGenerated, payload); err != nil {
+		t.Fatalf("first handler: %v", err)
+	}
+	if err := handler(context.Background(), eventcatalog.InterpretationReportGenerated, payload); err != nil {
+		t.Fatalf("second handler: %v", err)
+	}
+	if client.syncAssessmentAttentionCalls != 1 {
+		t.Fatalf("rpc calls = %d, want 1", client.syncAssessmentAttentionCalls)
+	}
+	rec, err := store.GetByEventID(context.Background(), "evt-report-generated-outcome")
+	if err != nil {
+		t.Fatalf("GetByEventID: %v", err)
+	}
+	if rec.Status != attentionprojection.StatusSucceeded {
+		t.Fatalf("status = %q, want succeeded", rec.Status)
+	}
+}
 
 func TestHandleInterpretationReportGeneratedDoesNotAutoMarkLowerRisk(t *testing.T) {
 	client := &fakeWorkerInternalClient{}

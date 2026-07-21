@@ -13,5 +13,12 @@ func (s *server) initializeContainer(resources resourceOutput) (containerOutput,
 	if err != nil {
 		return containerOutput{}, err
 	}
+	if resources.handles.dbManager != nil {
+		if db, err := resources.handles.dbManager.GetMongoDatabase(); err == nil {
+			workerContainer.SetMongoDatabase(db)
+		} else if s.logger != nil {
+			s.logger.Warn("attention projection disabled", "error", err.Error())
+		}
+	}
 	return containerOutput{container: workerContainer}, nil
 }

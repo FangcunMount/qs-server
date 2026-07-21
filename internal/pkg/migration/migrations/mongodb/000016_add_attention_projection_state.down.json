@@ -1,0 +1,4 @@
+[
+  { "dropIndexes": "interpretation_attention_projections", "index": "*" },
+  { "drop": "interpretation_attention_projections" }
+]

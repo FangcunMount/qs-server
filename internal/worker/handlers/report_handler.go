@@ -114,9 +114,16 @@ func handleReportGeneratedOutcome(ctx context.Context, deps *Dependencies, paylo
 		return err
 	}
 	riskLevel := attentionRiskLevelFromOutcome(data.Level)
+	markKeyFocus := isHighRiskOutcomeLevel(data.Level)
 	handleHighRiskAlert(deps, riskLevel, primaryScoreValue(data.PrimaryScore), data.ReportID, data.TesteeID)
-	if deps.InternalClient != nil {
-		syncAssessmentAttention(ctx, deps, data.TesteeID, riskLevel, isHighRiskOutcomeLevel(data.Level))
+	if err := projectAssessmentAttention(ctx, deps, env.ID, attentionReportGeneratedData{
+		ReportID:     data.ReportID,
+		AssessmentID: data.AssessmentID,
+		TesteeID:     data.TesteeID,
+		RiskLevel:    riskLevel,
+		MarkKeyFocus: markKeyFocus,
+	}); err != nil {
+		return err
 	}
 	return nil
 }

@@ -10,18 +10,22 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
 	redis "github.com/redis/go-redis/v9"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // DatabaseManager 数据库管理器
 type DatabaseManager struct {
-	config        *config.Config
-	redisProfiles *database.NamedRedisRegistry
+	config          *config.Config
+	registry        *database.Registry
+	redisProfiles   *database.NamedRedisRegistry
+	mongoRegistered bool
 }
 
 // NewDatabaseManager 创建数据库管理器
 func NewDatabaseManager(cfg *config.Config) *DatabaseManager {
 	return &DatabaseManager{
-		config: cfg,
+		config:   cfg,
+		registry: database.NewRegistry(),
 	}
 }
 
@@ -31,6 +35,16 @@ func (m *DatabaseManager) Initialize() error {
 
 	if err := m.initRedis(); err != nil {
 		return fmt.Errorf("failed to initialize Redis: %w", err)
+	}
+
+	if err := m.initMongoDB(); err != nil {
+		return fmt.Errorf("failed to initialize MongoDB: %w", err)
+	}
+
+	if m.registry != nil && m.mongoRegistered {
+		if err := m.registry.Init(); err != nil {
+			return fmt.Errorf("failed to initialize database registry: %w", err)
+		}
 	}
 
 	log.Info("All database connections initialized successfully")
@@ -105,6 +119,12 @@ func (m *DatabaseManager) Close() error {
 	if m.redisProfiles != nil {
 		if err := m.redisProfiles.Close(); err != nil {
 			log.Warnf("Failed to close redis profiles: %v", err)
+			return err
+		}
+	}
+	if m.registry != nil {
+		if err := m.registry.Close(); err != nil {
+			log.Warnf("Failed to close database registry: %v", err)
 			return err
 		}
 	}
@@ -204,6 +224,68 @@ func mergeWorkerDatabaseRedisConfig(base, override *database.RedisConfig) *datab
 	}
 
 	return merged
+}
+
+func (m *DatabaseManager) initMongoDB() error {
+	if m.config == nil || m.config.MongoDB == nil {
+		log.Warn("MongoDB not configured, skipping")
+		return nil
+	}
+	opts := m.config.MongoDB
+	if opts.URL == "" && opts.Host == "" {
+		log.Warn("MongoDB host not configured, skipping")
+		return nil
+	}
+	if opts.URL == "" && opts.Database == "" {
+		log.Warn("MongoDB database not configured, skipping")
+		return nil
+	}
+	mongoConfig := &database.MongoConfig{
+		URL:                      opts.URL,
+		Host:                     opts.Host,
+		Username:                 opts.Username,
+		Password:                 opts.Password,
+		Database:                 opts.Database,
+		ReplicaSet:               opts.ReplicaSet,
+		DirectConnection:         opts.DirectConnection,
+		UseSSL:                   opts.UseSSL,
+		SSLInsecureSkipVerify:    opts.SSLInsecureSkipVerify,
+		SSLAllowInvalidHostnames: opts.SSLAllowInvalidHostnames,
+		SSLCAFile:                opts.SSLCAFile,
+		SSLPEMKeyfile:            opts.SSLPEMKeyfile,
+		EnableLogger:             opts.EnableLogger,
+		SlowThreshold:            opts.SlowThreshold,
+		LogCommandDetail:         opts.LogCommandDetail,
+		LogReplyDetail:           opts.LogReplyDetail,
+		LogStarted:               opts.LogStarted,
+	}
+	if err := m.registry.Register(database.MongoDB, mongoConfig, database.NewMongoDBConnection(mongoConfig)); err != nil {
+		return err
+	}
+	m.mongoRegistered = true
+	return nil
+}
+
+// GetMongoDatabase returns the configured Mongo database when available.
+func (m *DatabaseManager) GetMongoDatabase() (*mongo.Database, error) {
+	if m == nil || m.registry == nil || m.config == nil || m.config.MongoDB == nil {
+		return nil, fmt.Errorf("mongodb is not configured")
+	}
+	if m.config.MongoDB.URL == "" && m.config.MongoDB.Host == "" {
+		return nil, fmt.Errorf("mongodb is not configured")
+	}
+	if m.config.MongoDB.URL == "" && m.config.MongoDB.Database == "" {
+		return nil, fmt.Errorf("mongodb is not configured")
+	}
+	client, err := m.registry.GetClient(database.MongoDB)
+	if err != nil {
+		return nil, err
+	}
+	mongoClient, ok := client.(*mongo.Client)
+	if !ok {
+		return nil, fmt.Errorf("failed to cast client to *mongo.Client")
+	}
+	return mongoClient.Database(m.config.MongoDB.Database), nil
 }
 
 func cloneWorkerDatabaseRedisConfig(cfg *database.RedisConfig) *database.RedisConfig {

@@ -14,6 +14,7 @@ import (
 	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
+	"github.com/FangcunMount/qs-server/internal/pkg/attentionprojection"
 	eventruntime "github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
@@ -83,6 +84,7 @@ type Dependencies struct {
 	LockKeyBuilder                 *keyspace.Builder
 	Notifier                       port.TaskNotifier
 	ReportStatusReporter           ReportStatusWriter
+	AttentionProjector             *attentionprojection.Projector
 	DisableAutomaticRetry          bool
 }
 

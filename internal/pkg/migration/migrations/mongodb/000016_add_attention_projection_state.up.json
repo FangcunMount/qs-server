@@ -1,0 +1,17 @@
+[
+  { "create": "interpretation_attention_projections" },
+  {
+    "createIndexes": "interpretation_attention_projections",
+    "indexes": [
+      {
+        "key": { "event_id": 1 },
+        "name": "uk_attention_projection_event_id",
+        "unique": true
+      },
+      {
+        "key": { "status": 1, "updated_at": 1 },
+        "name": "idx_attention_projection_status_updated"
+      }
+    ]
+  }
+]
