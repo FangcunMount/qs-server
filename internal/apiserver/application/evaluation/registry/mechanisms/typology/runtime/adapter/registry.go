@@ -15,15 +15,6 @@ type ModelAdapter interface {
 	Algorithm() modelcatalog.Algorithm
 	Score(
 		payload *modeltypology.Payload,
-		sheet *evalinput.AnswerSheet,
-	) (outcometypology.ScoringResult, error)
-}
-
-// CanonicalScorer scores typology using canonical Definition when available (MC-R017 batch 5).
-type CanonicalScorer interface {
-	ModelAdapter
-	ScoreWithDefinition(
-		payload *modeltypology.Payload,
 		def *modeldefinition.Definition,
 		sheet *evalinput.AnswerSheet,
 	) (outcometypology.ScoringResult, error)

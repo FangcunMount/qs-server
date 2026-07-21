@@ -42,7 +42,6 @@ func FromPreviewOutcome(outcome PreviewOutcome) (interpinput.InterpretationInput
 		Runtime: interpinput.RuntimeIdentity{
 			AlgorithmFamily: outcome.Runtime.AlgorithmFamily,
 			DecisionKind:    outcome.Runtime.DecisionKind,
-			PayloadFormat:   outcome.Runtime.PayloadFormat,
 		},
 		Result: interpinput.ResultFacts{Primary: primary(outcome.Execution), Level: level(outcome.Execution)},
 		Report: interpinput.ReportSpec{

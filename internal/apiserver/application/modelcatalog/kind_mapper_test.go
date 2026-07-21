@@ -41,16 +41,3 @@ func TestBehavioralRatingKindMapperBoundary(t *testing.T) {
 		t.Fatalf("DomainKindToAPIKind(behavioral_rating) = %q, want behavioral_rating", got)
 	}
 }
-
-func TestPayloadFormatMappingIsIdentity(t *testing.T) {
-	t.Parallel()
-
-	got := APIPayloadFormatToDomain(domain.PayloadFormatAssessmentScaleV1)
-	if got != domain.PayloadFormatAssessmentScaleV1 {
-		t.Fatalf("APIPayloadFormatToDomain() = %q, want %q", got, domain.PayloadFormatAssessmentScaleV1)
-	}
-	roundTrip := DomainPayloadFormatToAPI(KindScale, got)
-	if roundTrip != domain.PayloadFormatAssessmentScaleV1 {
-		t.Fatalf("DomainPayloadFormatToAPI() = %q, want %q", roundTrip, domain.PayloadFormatAssessmentScaleV1)
-	}
-}

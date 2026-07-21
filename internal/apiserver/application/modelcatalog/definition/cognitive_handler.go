@@ -25,14 +25,12 @@ func (h CognitiveDefinitionHandler) ValidateForPublish(ctx context.Context, mode
 	return ComposePublishValidation(ctx, model, PublicationComposerOptions{
 		NormRepo:                h.NormRepo,
 		QuestionnaireQuery:      h.QuestionnaireQuery,
-		RequireLegacyDefinition: true,
-		LegacyDefinitionMessage: "认知模型定义不能为空",
 		IncludeAlgorithmBinding: true,
 		StrategyCapabilityPath:  capability.PathCognitiveDescriptor,
 	})
 }
 
-// BuildSnapshotPayload 构建评估模型快照负载
-func (CognitiveDefinitionHandler) BuildSnapshotPayload(_ context.Context, model *domain.AssessmentModel) (SnapshotBuildResult, error) {
-	return (CompatibilityPayloadProjector{}).ProjectCognitive(model)
+// MaterializeSnapshot validates the DefinitionV2 cognitive runtime projection.
+func (CognitiveDefinitionHandler) MaterializeSnapshot(_ context.Context, model *domain.AssessmentModel) (Materialization, error) {
+	return (RuntimeMaterializer{}).MaterializeCognitive(model)
 }

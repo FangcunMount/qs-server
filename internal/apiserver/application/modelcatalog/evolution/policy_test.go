@@ -12,7 +12,7 @@ import (
 func TestPolicyAllowsChangesBeforeFirstPublish(t *testing.T) {
 	t.Parallel()
 	policy := evolution.Policy{History: historyStub{}}
-	if err := policy.GuardAlgorithmChange(context.Background(), "M1", domain.AlgorithmMBTI); err != nil {
+	if err := policy.GuardAlgorithmChange(context.Background(), "M1", domain.AlgorithmPersonalityTypology); err != nil {
 		t.Fatalf("GuardAlgorithmChange: %v", err)
 	}
 	if err := policy.GuardQuestionnaireCodeChange(context.Background(), "M1", "Q-NEW"); err != nil {
@@ -23,13 +23,13 @@ func TestPolicyAllowsChangesBeforeFirstPublish(t *testing.T) {
 func TestPolicyFreezesAlgorithmAndQuestionnaireCode(t *testing.T) {
 	t.Parallel()
 	policy := evolution.Policy{History: historyStub{items: []*modelcatalogport.PublishedModel{
-		{Code: "M1", Algorithm: domain.AlgorithmBigFive, QuestionnaireCode: "Q-A", Version: "2"},
-		{Code: "M1", Algorithm: domain.AlgorithmMBTI, QuestionnaireCode: "Q-A", Version: "1"},
+		{Code: "M1", Algorithm: domain.AlgorithmPersonalityTypology, QuestionnaireCode: "Q-A", Version: "2"},
+		{Code: "M1", Algorithm: domain.AlgorithmPersonalityTypology, QuestionnaireCode: "Q-A", Version: "1"},
 	}}}
-	if err := policy.GuardAlgorithmChange(context.Background(), "M1", domain.AlgorithmMBTI); err != nil {
+	if err := policy.GuardAlgorithmChange(context.Background(), "M1", domain.AlgorithmPersonalityTypology); err != nil {
 		t.Fatalf("same algorithm should pass: %v", err)
 	}
-	if err := policy.GuardAlgorithmChange(context.Background(), "M1", domain.AlgorithmBigFive); err == nil {
+	if err := policy.GuardAlgorithmChange(context.Background(), "M1", domain.AlgorithmBrief2); err == nil {
 		t.Fatal("expected algorithm freeze rejection")
 	}
 	if err := policy.GuardQuestionnaireCodeChange(context.Background(), "M1", "Q-A"); err != nil {
@@ -43,16 +43,16 @@ func TestPolicyFreezesAlgorithmAndQuestionnaireCode(t *testing.T) {
 func TestPolicyGuardPublishIdentity(t *testing.T) {
 	t.Parallel()
 	policy := evolution.Policy{History: historyStub{items: []*modelcatalogport.PublishedModel{
-		{Code: "M1", Algorithm: domain.AlgorithmMBTI, QuestionnaireCode: "Q-A"},
+		{Code: "M1", Algorithm: domain.AlgorithmPersonalityTypology, QuestionnaireCode: "Q-A"},
 	}}}
 	model := &domain.AssessmentModel{
-		Code: "M1", Algorithm: domain.AlgorithmMBTI,
+		Code: "M1", Algorithm: domain.AlgorithmPersonalityTypology,
 		Binding: domain.QuestionnaireBinding{QuestionnaireCode: "Q-A", QuestionnaireVersion: "2"},
 	}
 	if err := policy.GuardPublishIdentity(context.Background(), model); err != nil {
 		t.Fatalf("GuardPublishIdentity: %v", err)
 	}
-	model.Algorithm = domain.AlgorithmBigFive
+	model.Algorithm = domain.AlgorithmBrief2
 	if err := policy.GuardPublishIdentity(context.Background(), model); err == nil {
 		t.Fatal("expected publish identity rejection")
 	}

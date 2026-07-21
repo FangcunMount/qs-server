@@ -22,7 +22,6 @@ type (
 var (
 	ExecutionIdentityScaleDefault            = evalrouting.ExecutionIdentityScaleDefault
 	ExecutionIdentityPersonalityTypology     = evalrouting.ExecutionIdentityPersonalityTypology
-	ExecutionIdentityBehavioralRatingDefault = evalrouting.ExecutionIdentityBehavioralRatingDefault
 	ExecutionIdentityCognitiveDefault        = evalrouting.ExecutionIdentityCognitiveDefault
 )
 
@@ -63,7 +62,6 @@ type OutcomeAssembler interface {
 type RuntimeDescriptor struct {
 	Key              DescriptorKey
 	AlgorithmFamily  modelcatalog.AlgorithmFamily
-	PayloadFormat    string
 	DecisionKind     modelcatalog.DecisionKind
 	ExecutionPath    modelcatalog.ExecutionPath
 	InputAssembler   InputAssembler

@@ -10,10 +10,9 @@ import (
 func TestMapperRoundTripPublishedModel(t *testing.T) {
 	original := &port.PublishedModel{
 		SchemaVersion:        domain.SchemaVersionV2,
-		PayloadFormat:        domain.PayloadFormatPersonalityTypologyV1,
 		Kind:                 domain.KindTypology,
 		SubKind:              domain.SubKindTypology,
-		Algorithm:            domain.AlgorithmMBTI,
+		Algorithm:            domain.AlgorithmPersonalityTypology,
 		AlgorithmFamily:      domain.AlgorithmFamilyFactorClassification,
 		Code:                 "MBTI_OEJTS",
 		Version:              "1.0.0",
@@ -29,7 +28,6 @@ func TestMapperRoundTripPublishedModel(t *testing.T) {
 		QuestionnaireVersion: "1.0.0",
 		DecisionKind:         domain.DecisionKindPoleComposition,
 		Source:               map[string]any{"license": "CC BY-NC-SA 4.0"},
-		Payload:              []byte(`{"code":"MBTI_OEJTS","algorithm":"mbti"}`),
 		DefinitionV2:         sampleDefinitionV2(),
 	}
 
@@ -45,7 +43,7 @@ func TestMapperRoundTripPublishedModel(t *testing.T) {
 		t.Fatalf("definition_v2 po = %#v", po.DefinitionV2)
 	}
 	got := mapper.ToPublished(po)
-	if got.Code != original.Code || got.Algorithm != domain.AlgorithmMBTI {
+	if got.Code != original.Code || got.Algorithm != domain.AlgorithmPersonalityTypology {
 		t.Fatalf("published round trip = %#v", got)
 	}
 	if got.Description != "personality type" || got.Category != "personality" || got.Stages[0] != "intake" ||
@@ -55,10 +53,9 @@ func TestMapperRoundTripPublishedModel(t *testing.T) {
 	assertDefinitionV2RoundTrip(t, got.DefinitionV2)
 }
 
-func TestPublishedMapperReadsLegacyDocumentWithoutDefinitionV2(t *testing.T) {
+func TestPublishedMapperLeavesMissingDefinitionV2Nil(t *testing.T) {
 	po := &PublishedAssessmentModelPO{
 		SchemaVersion:  domain.SchemaVersionV2,
-		PayloadFormat:  domain.PayloadFormatBehavioralRatingBrief2V1,
 		RecordRole:     recordRolePublishedSnapshot,
 		Kind:           string(domain.KindBehavioralRating),
 		Algorithm:      string(domain.AlgorithmBrief2),
@@ -67,13 +64,9 @@ func TestPublishedMapperReadsLegacyDocumentWithoutDefinitionV2(t *testing.T) {
 		Title:          "BRIEF-2",
 		Status:         "published",
 		DecisionKind:   string(domain.DecisionKindNormLookup),
-		Payload:        []byte(`{"dimensions":[]}`),
 	}
 	got := NewMapper().ToPublished(po)
 	if got.DefinitionV2 != nil {
 		t.Fatalf("definition v2 = %#v, want nil for old document", got.DefinitionV2)
-	}
-	if string(got.Payload) != `{"dimensions":[]}` {
-		t.Fatalf("payload = %s", got.Payload)
 	}
 }

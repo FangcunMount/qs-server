@@ -38,15 +38,8 @@ func (m *AssessmentModel) ValidateBasic() DomainValidationResult {
 	if m.Binding.QuestionnaireVersion == "" {
 		issues = append(issues, DomainValidationIssue{Field: "binding.questionnaire_version", Message: "questionnaire version is required", Code: "binding.questionnaire_version.required", Level: ValidationLevelError})
 	}
-	if m.Definition.IsEmpty() {
-		issues = append(issues, DomainValidationIssue{Field: "definition", Message: "definition payload is required", Code: "definition.required", Level: ValidationLevelError})
-	}
-	if m.Definition.Format != "" {
-		if err := validatePublishPayloadFormat(m.Definition.Format); err != nil {
-			issues = append(issues, DomainValidationIssue{
-				Field: "definition.format", Message: err.Error(), Code: "definition.format.legacy_decode_only", Level: ValidationLevelError,
-			})
-		}
+	if m.DefinitionV2 == nil {
+		issues = append(issues, DomainValidationIssue{Field: "definition_v2", Message: "definition_v2 is required", Code: "definition_v2.required", Level: ValidationLevelError})
 	}
 	if m.Kind == binding.KindTypology {
 		if m.SubKind != binding.SubKindTypology {
@@ -55,37 +48,8 @@ func (m *AssessmentModel) ValidateBasic() DomainValidationResult {
 		if m.Algorithm == "" {
 			issues = append(issues, DomainValidationIssue{Field: "algorithm", Message: "algorithm is required", Code: "algorithm.required", Level: ValidationLevelError})
 		}
-		if m.Definition.Format != "" && m.Definition.Format != "assessmentmodel.personality.typology.v1" {
-			issues = append(issues, DomainValidationIssue{Field: "definition.format", Message: "unsupported personality payload format", Code: "definition.format.unsupported", Level: ValidationLevelError})
-		}
 	}
 	return DomainValidationResult{Issues: issues}
-}
-
-func validatePublishPayloadFormat(format string) error {
-	for _, legacy := range []string{
-		"ruleset.scale.v1",
-		"ruleset.mbti.v1",
-		"ruleset.sbti.v1",
-		"evaluationinput.scale.v1",
-		"evaluationinput.mbti.v1",
-		"evaluationinput.sbti.v1",
-		"assessmentmodel.behavioral_rating.brief2.v1",
-		"assessmentmodel.cognitive.spm.v1",
-	} {
-		if format == legacy {
-			return &legacyPayloadFormatError{format: format}
-		}
-	}
-	return nil
-}
-
-type legacyPayloadFormatError struct {
-	format string
-}
-
-func (e *legacyPayloadFormatError) Error() string {
-	return "payload format " + `"` + e.format + `"` + " is legacy-decode-only and cannot be published"
 }
 
 // ValidateForPublish checks domain-owned publish readiness. Family wire payload

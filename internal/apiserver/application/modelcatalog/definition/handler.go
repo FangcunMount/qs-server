@@ -9,15 +9,14 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// SnapshotBuildResult 只包含评估模型快照所需的家庭特定部分
-type SnapshotBuildResult struct {
+// Materialization describes the validated runtime identity derived from DefinitionV2.
+// It deliberately contains no compatibility payload bytes or format labels.
+type Materialization struct {
 	Kind            domain.Kind
 	SubKind         domain.SubKind
 	Algorithm       domain.Algorithm
-	AlgorithmFamily domain.AlgorithmFamily // optional; publisher freezes via ResolveRuntimeIdentity when empty
-	PayloadFormat   string
+	AlgorithmFamily domain.AlgorithmFamily
 	DecisionKind    domain.DecisionKind
-	Payload         []byte
 	Version         string
 }
 
@@ -29,8 +28,9 @@ type Handler interface {
 	Supports(identity domain.Identity) bool
 	// ValidateForPublish 验证发布
 	ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue
-	// BuildSnapshotPayload 构建评估模型快照负载
-	BuildSnapshotPayload(ctx context.Context, model *domain.AssessmentModel) (SnapshotBuildResult, error)
+	// MaterializeSnapshot validates that DefinitionV2 can build the family runtime DTO
+	// and returns the complete frozen routing identity.
+	MaterializeSnapshot(ctx context.Context, model *domain.AssessmentModel) (Materialization, error)
 }
 
 // PreviewResult 是策略拥有的定义报告预览表示

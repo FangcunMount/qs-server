@@ -35,8 +35,7 @@ type LookupEntry struct {
 	RawScoreMin float64
 	RawScoreMax float64
 	// MinAgeMonths, MaxAgeMonths and Gender scope a direct lookup to a
-	// demographic norm stratum. Empty scope keeps compatibility with legacy,
-	// unstratified norm tables.
+	// demographic norm stratum. Empty scope denotes an explicitly generic row.
 	MinAgeMonths  int
 	MaxAgeMonths  int
 	Gender        string

@@ -22,7 +22,6 @@ type ResolvedExecution struct {
 type RuntimeResolver struct {
 	descriptors *evalpipeline.RuntimeDescriptorRegistry
 	executor    evalpipeline.DescriptorExecutor
-	compat      evaluation.CompatibilityResolver
 }
 
 // NewRuntimeResolver creates the descriptor-only runtime resolver.
@@ -33,7 +32,6 @@ func NewRuntimeResolver(
 	return &RuntimeResolver{
 		descriptors: descriptors,
 		executor:    executor,
-		compat:      evaluation.NewCompatibilityResolver(),
 	}
 }
 
@@ -45,12 +43,9 @@ func (r *RuntimeResolver) ResolveExecution(a *assessment.Assessment, input *eval
 	executionIdentity := resolveExecutionIdentity(a, input)
 	resolved := ResolvedExecution{ExecutionIdentity: executionIdentity}
 
-	route, ok, frozen := resolveModelRoute(a, input, r.compat)
+	route, ok := resolveModelRoute(input)
 	if !ok {
-		if frozen {
-			return resolved, fmt.Errorf("evaluation runtime cannot resolve frozen model route")
-		}
-		return resolved, fmt.Errorf("evaluation runtime requires model route")
+		return resolved, fmt.Errorf("evaluation runtime requires complete frozen model route")
 	}
 
 	desc, err := r.descriptors.Resolve(route)
@@ -66,39 +61,15 @@ func (r *RuntimeResolver) ResolveExecution(a *assessment.Assessment, input *eval
 	return resolved, nil
 }
 
-// resolveModelRoute prefers InputSnapshot. Frozen RuntimeIdentity never falls back to
-// Assessment ModelRef. Legacy routes may use Assessment ModelRef only as an explicit
-// CompatibilityResolver source (EV-R008).
-func resolveModelRoute(
-	a *assessment.Assessment,
-	input *evaluationinput.InputSnapshot,
-	compat evaluation.CompatibilityResolver,
-) (route evalpipeline.ModelRoute, ok bool, frozen bool) {
-	frozen = input != nil && input.Model != nil && input.Model.HasFrozenRuntime()
-	route, fromInput := modelRouteFromInput(input)
-	if fromInput {
-		if _, familyOK := evalpipeline.ExecutionFamilyFromRoute(route); familyOK {
-			if frozen {
-				return route, true, true
-			}
-			return compat.EnrichLegacyRoute(route), true, false
-		}
-		if frozen {
-			return route, false, true
-		}
-	} else if frozen {
-		return evalpipeline.ModelRoute{}, false, true
+func resolveModelRoute(input *evaluationinput.InputSnapshot) (evalpipeline.ModelRoute, bool) {
+	route, ok := modelRouteFromInput(input)
+	if !ok || !route.HasFrozenRuntime() {
+		return evalpipeline.ModelRoute{}, false
 	}
-
-	route, ok = modelRouteFromAssessment(a)
-	if !ok {
-		return evalpipeline.ModelRoute{}, false, false
+	if _, err := evalpipeline.DescriptorKeyFromRoute(route); err != nil {
+		return evalpipeline.ModelRoute{}, false
 	}
-	evaluation.ObserveRuntimeCompat(evaluation.CompatibilityHit{
-		Used:   true,
-		Source: evaluation.CompatibilitySourceAssessmentModelRef,
-	}, "route")
-	return compat.EnrichLegacyRoute(route), true, false
+	return route, true
 }
 
 // Execute runs Evaluation through the resolved descriptor pipeline.

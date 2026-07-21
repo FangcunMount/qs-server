@@ -8,7 +8,7 @@ import (
 )
 
 // MarshalRecordV2 serializes only durable scoring/classification facts. The
-// legacy Summary/Tags projection is intentionally not part of schema v2.
+// Presentation Summary/Tags are intentionally not part of current schema v2.
 func MarshalRecordV2(source *domainoutcome.Execution) ([]byte, error) {
 	execution := executionForRecordV2(source)
 	if execution == nil {

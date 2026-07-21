@@ -2,10 +2,8 @@ package typology
 
 import (
 	"fmt"
-	"math"
-	"strings"
-
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
+	"math"
 )
 
 // QuestionnaireSnapshot 是minimal 问卷 结构 needed 到 有效ate 运行时规格。
@@ -86,9 +84,6 @@ func (v *runtimeSpecValidator) loadOutcomes(outcomes []Outcome) {
 		v.outcomes[outcome.Code] = outcome
 		if outcome.Name == "" {
 			v.add("outcomes."+outcome.Code+".title", "outcome.title.required", fmt.Sprintf("outcome %s 标题不能为空", outcome.Code))
-		}
-		if v.algorithm == binding.AlgorithmMBTI && strings.TrimSpace(outcome.ImageURL) == "" {
-			v.add("outcomes."+outcome.Code+".image_url", "outcome.image_url.required", fmt.Sprintf("MBTI 结果 %s 必须配置人物图片", outcome.Code))
 		}
 	}
 }
@@ -172,12 +167,7 @@ func (v *runtimeSpecValidator) validateContribution(factorKey string, contributi
 	}
 	field := "factor_graph.factors." + factorKey + ".contributions"
 	if contribution.ScoringMode == "" {
-		v.addWarning(field+".scoring_mode", "question_contribution.legacy_implicit", fmt.Sprintf("题目 %s 使用旧版隐式计分规则", contribution.QuestionCode))
-		for optionCode := range contribution.OptionScores {
-			if _, exists := options[optionCode]; !exists {
-				v.add(field+".option_scores", "question_mapping.option_not_found", fmt.Sprintf("题目 %s 的选项 %s 不存在", contribution.QuestionCode, optionCode))
-			}
-		}
+		v.add(field+".scoring_mode", "scoring_mode.required", fmt.Sprintf("题目 %s 必须显式声明 scoring_mode", contribution.QuestionCode))
 		return
 	}
 	if contribution.ScoringMode != QuestionScoringModeQuestionScore && contribution.ScoringMode != QuestionScoringModeOptionOverride {
@@ -322,11 +312,6 @@ func (v *runtimeSpecValidator) validateOutcomeMapping(mapping OutcomeMappingSpec
 		v.add("outcome_mapping.detail_adapter_key", "outcome_mapping.detail_adapter.required", "outcome detail adapter 不能为空")
 		return
 	}
-	if mapping.DetailAdapterKey != "" && isLegacyDetailAdapter(mapping.DetailAdapterKey) {
-		v.add("outcome_mapping.detail_adapter_key", "outcome_mapping.detail_adapter.deprecated",
-			fmt.Sprintf("outcome detail adapter %s 已废弃，请使用 personality_type 或 trait_profile", mapping.DetailAdapterKey))
-		return
-	}
 	if !isSupportedDetailAdapter(adapterKey) {
 		v.add("outcome_mapping.detail_adapter_key", "outcome_mapping.detail_adapter.unsupported", fmt.Sprintf("outcome detail adapter %s 不支持", adapterKey))
 		return
@@ -346,9 +331,9 @@ func (v *runtimeSpecValidator) validateSpecialRules(rules []SpecialRuleSpec) {
 			v.add("special_rules."+rule.Code+".phase", "special_rule.phase.unsupported", fmt.Sprintf("special rule phase %s 不支持", rule.Phase))
 		}
 		switch rule.ResolvedKind() {
-		case "", SpecialRuleKindAnswerMatch, SpecialRuleKindFallbackThreshold:
+		case SpecialRuleKindAnswerMatch, SpecialRuleKindFallbackThreshold:
 		default:
-			v.add("special_rules."+rule.Code+".kind", "special_rule.kind.unsupported", fmt.Sprintf("special rule kind %s 不支持", rule.ResolvedKind()))
+			v.add("special_rules."+rule.Code+".kind", "special_rule.kind.unsupported", fmt.Sprintf("special rule kind %s 必须显式声明且受支持", rule.ResolvedKind()))
 		}
 		if outcomeCode := firstNonEmpty(rule.OutcomeCode, rule.Code); outcomeCode != "" {
 			v.validateOutcomeCode("special_rules."+rule.Code+".outcome_code", "special_rule.outcome.not_found", outcomeCode)
@@ -398,11 +383,6 @@ func (v *runtimeSpecValidator) validateReport(report ReportSpec, mapping Outcome
 		v.add("report.adapter_key", "report.adapter.required", "template report adapter_key 不能为空")
 		return
 	}
-	if report.AdapterKey != "" && isLegacyReportAdapter(report.AdapterKey) {
-		v.add("report.adapter_key", "report.adapter.deprecated",
-			fmt.Sprintf("report adapter %s 已废弃，请使用 personality_type 或 trait_profile", report.AdapterKey))
-		return
-	}
 	adapterKey := report.ResolvedAdapterKey(mapping, decisionKind)
 	if adapterKey == "" {
 		return
@@ -434,12 +414,6 @@ func (v *runtimeSpecValidator) add(field, code, message string) {
 	})
 }
 
-func (v *runtimeSpecValidator) addWarning(field, code, message string) {
-	v.issues = append(v.issues, binding.DomainValidationIssue{
-		Field: field, Code: code, Message: message, Level: binding.ValidationLevelWarning,
-	})
-}
-
 func isSupportedDecisionKind(kind binding.DecisionKind) bool {
 	switch kind {
 	case binding.DecisionKindPoleComposition,
@@ -464,10 +438,7 @@ func isSupportedOutcomeDetailKind(kind OutcomeDetailKind) bool {
 func isSupportedDetailAdapter(adapter DetailAdapterKey) bool {
 	switch adapter {
 	case DetailAdapterPersonalityType,
-		DetailAdapterTraitProfile,
-		DetailAdapterMBTI,
-		DetailAdapterSBTI,
-		DetailAdapterBigFive:
+		DetailAdapterTraitProfile:
 		return true
 	default:
 		return false
@@ -486,28 +457,7 @@ func isSupportedReportKind(kind ReportKind) bool {
 func isSupportedReportAdapter(adapter ReportAdapterKey) bool {
 	switch adapter {
 	case ReportAdapterPersonalityType,
-		ReportAdapterTraitProfile,
-		ReportAdapterMBTI,
-		ReportAdapterSBTI,
-		ReportAdapterBigFive:
-		return true
-	default:
-		return false
-	}
-}
-
-func isLegacyDetailAdapter(adapter DetailAdapterKey) bool {
-	switch adapter {
-	case DetailAdapterMBTI, DetailAdapterSBTI, DetailAdapterBigFive:
-		return true
-	default:
-		return false
-	}
-}
-
-func isLegacyReportAdapter(adapter ReportAdapterKey) bool {
-	switch adapter {
-	case ReportAdapterMBTI, ReportAdapterSBTI, ReportAdapterBigFive:
+		ReportAdapterTraitProfile:
 		return true
 	default:
 		return false
@@ -515,29 +465,9 @@ func isLegacyReportAdapter(adapter ReportAdapterKey) bool {
 }
 
 func isDetailAdapterCompatible(algorithm binding.Algorithm, adapter DetailAdapterKey) bool {
-	if algorithm == "" || algorithm == binding.AlgorithmPersonalityTypology {
-		return true
-	}
-	switch algorithm {
-	case binding.AlgorithmMBTI, binding.AlgorithmSBTI:
-		return adapter == DetailAdapterPersonalityType
-	case binding.AlgorithmBigFive:
-		return adapter == DetailAdapterTraitProfile
-	default:
-		return true
-	}
+	return algorithm == "" || algorithm == binding.AlgorithmPersonalityTypology
 }
 
 func isReportAdapterCompatible(algorithm binding.Algorithm, adapter ReportAdapterKey) bool {
-	if algorithm == "" || algorithm == binding.AlgorithmPersonalityTypology {
-		return true
-	}
-	switch algorithm {
-	case binding.AlgorithmMBTI, binding.AlgorithmSBTI:
-		return adapter == ReportAdapterPersonalityType
-	case binding.AlgorithmBigFive:
-		return adapter == ReportAdapterTraitProfile
-	default:
-		return true
-	}
+	return algorithm == "" || algorithm == binding.AlgorithmPersonalityTypology
 }

@@ -42,7 +42,8 @@ message ModelIdentity {
   string algorithm_family = 8;
   // Publish-time frozen RuntimeIdentity fields (MC-R006).
   string decision_kind = 9;
-  string payload_format = 10;
+  reserved 10;
+  reserved "payload_format";
 }
 
 message ScoreValue {

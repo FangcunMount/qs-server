@@ -97,7 +97,7 @@ func (h *TypologyAssessmentHandler) Get(c *gin.Context) {
 
 // GetReport returns a typology assessment report.
 // @Summary 获取类型学测评报告
-// @Description 仅在 report-status 终态 interpreted 后调用。model.kind 规范值为 typology，读兼容历史 personality。
+// @Description 仅在 report-status 终态 interpreted 后调用。model.kind 规范值为 typology。
 // @Tags 类型学测评
 // @Produce json
 // @Param id path int true "测评ID"

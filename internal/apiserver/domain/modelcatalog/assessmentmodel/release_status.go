@@ -10,14 +10,11 @@ const (
 	ReleaseStatusArchived ReleaseStatus = "archived"
 )
 
-func NormalizeReleaseStatus(value ReleaseStatus, legacyActive bool) ReleaseStatus {
+func NormalizeReleaseStatus(value ReleaseStatus) ReleaseStatus {
 	switch value {
 	case ReleaseStatusActive, ReleaseStatusArchived:
 		return value
 	default:
-		if legacyActive {
-			return ReleaseStatusActive
-		}
 		return ReleaseStatusArchived
 	}
 }

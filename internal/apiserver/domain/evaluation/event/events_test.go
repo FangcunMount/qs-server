@@ -19,7 +19,7 @@ func TestNewRequestedEventIncludesModelIdentityFields(t *testing.T) {
 		AnswerSheetID:     "2001",
 		ModelKind:         "personality",
 		ModelSubKind:      string(modelcatalog.SubKindTypology),
-		ModelAlgorithm:    string(modelcatalog.AlgorithmMBTI),
+		ModelAlgorithm:    string(modelcatalog.AlgorithmPersonalityTypology),
 		ModelCode:         "MBTI-16P",
 		ModelVersion:      "2.0.1",
 		RequestedAt:       time.Now(),
@@ -28,7 +28,7 @@ func TestNewRequestedEventIncludesModelIdentityFields(t *testing.T) {
 	if data.ModelSubKind != string(modelcatalog.SubKindTypology) {
 		t.Fatalf("ModelSubKind = %q", data.ModelSubKind)
 	}
-	if data.ModelAlgorithm != string(modelcatalog.AlgorithmMBTI) {
+	if data.ModelAlgorithm != string(modelcatalog.AlgorithmPersonalityTypology) {
 		t.Fatalf("ModelAlgorithm = %q", data.ModelAlgorithm)
 	}
 }

@@ -19,40 +19,27 @@ func TestSpecialRuleSpecResolvedKind(t *testing.T) {
 		}
 	})
 
-	t.Run("legacy flat fields infer answer_match", func(t *testing.T) {
+	t.Run("kind must be explicit", func(t *testing.T) {
 		rule := SpecialRuleSpec{
-			Phase:         SpecialRuleBeforeScore,
-			QuestionCodes: []string{"q1"},
-			OptionValues:  []string{"B"},
+			Phase: SpecialRuleBeforeScore,
+			Condition: SpecialRuleCondition{
+				QuestionCodes: []string{"q1"},
+				OptionValues:  []string{"B"},
+			},
 		}
-		if rule.ResolvedKind() != SpecialRuleKindAnswerMatch {
-			t.Fatalf("ResolvedKind() = %s", rule.ResolvedKind())
+		if rule.ResolvedKind() != "" {
+			t.Fatalf("ResolvedKind() = %s, want empty", rule.ResolvedKind())
 		}
 	})
 
-	t.Run("after_decision infers fallback_threshold", func(t *testing.T) {
+	t.Run("explicit fallback_threshold", func(t *testing.T) {
 		rule := SpecialRuleSpec{
 			Phase:       SpecialRuleAfterDecision,
+			Kind:        SpecialRuleKindFallbackThreshold,
 			OutcomeCode: "LOW_MATCH",
 		}
 		if rule.ResolvedKind() != SpecialRuleKindFallbackThreshold {
 			t.Fatalf("ResolvedKind() = %s", rule.ResolvedKind())
 		}
 	})
-}
-
-func TestFallbackCodeFromOutcomesNoDefault(t *testing.T) {
-	if got := fallbackCodeFromOutcomes(nil); got != "" {
-		t.Fatalf("fallbackCodeFromOutcomes(nil) = %q, want empty", got)
-	}
-	if got := fallbackCodeFromOutcomes([]Outcome{
-		{Code: "SPECIAL", IsSpecial: true, Trigger: "hidden:drink"},
-	}); got != "" {
-		t.Fatalf("fallbackCodeFromOutcomes(hidden) = %q, want empty", got)
-	}
-	if got := fallbackCodeFromOutcomes([]Outcome{
-		{Code: "HHHH", IsSpecial: true, Trigger: "fallback:best_match<60%"},
-	}); got != "HHHH" {
-		t.Fatalf("fallbackCodeFromOutcomes(fallback) = %q, want HHHH", got)
-	}
 }

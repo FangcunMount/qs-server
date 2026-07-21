@@ -1,24 +1,20 @@
 package modelcatalog
 
 import (
-	"encoding/json"
-
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 const (
-	KindScale                          = string(domain.KindScale)
-	KindTypology                       = string(domain.KindTypology)
-	KindBehavioralRating               = string(domain.KindBehavioralRating)
-	KindCognitive                      = string(domain.KindCognitive)
-	SubKindTypology                    = "typology"
-	SubKindScale                       = "scale"
-	StatusDraft                        = "draft"
-	StatusPublished                    = "published"
-	StatusArchived                     = "archived"
-	PayloadFormatScaleV1               = domain.PayloadFormatAssessmentScaleV1
-	PayloadFormatPersonalityTypologyV1 = "assessmentmodel.personality.typology.v1"
+	KindScale            = string(domain.KindScale)
+	KindTypology         = string(domain.KindTypology)
+	KindBehavioralRating = string(domain.KindBehavioralRating)
+	KindCognitive        = string(domain.KindCognitive)
+	SubKindTypology      = "typology"
+	SubKindScale         = "scale"
+	StatusDraft          = "draft"
+	StatusPublished      = "published"
+	StatusArchived       = "archived"
 )
 
 type Option struct {
@@ -78,16 +74,6 @@ type BindQuestionnaireDTO struct {
 	QuestionnaireVersion string
 }
 
-type DefinitionDTO struct {
-	Kind            string          `json:"kind" example:"typology"`
-	SubKind         string          `json:"sub_kind,omitempty" example:"typology"`
-	Algorithm       string          `json:"algorithm,omitempty"`
-	ProductChannel  string          `json:"product_channel,omitempty"`
-	AlgorithmFamily string          `json:"algorithm_family,omitempty"`
-	PayloadFormat   string          `json:"payload_format"`
-	Payload         json.RawMessage `json:"payload"`
-}
-
 type ApplyCodesDTO struct {
 	Code   string
 	Target string
@@ -102,7 +88,6 @@ type ModelSummary struct {
 	ProductChannel       string       `json:"product_channel,omitempty" example:"typology"`
 	AlgorithmFamily      string       `json:"algorithm_family,omitempty"`
 	DecisionKind         string       `json:"decision_kind,omitempty"`
-	PayloadFormat        string       `json:"payload_format,omitempty"`
 	Title                string       `json:"title"`
 	Description          string       `json:"description,omitempty"`
 	Status               string       `json:"status"`
@@ -137,14 +122,12 @@ type AssessmentReleaseVersion struct {
 }
 
 // PublishedModelDetail is the transport-neutral published catalogue view.
-// Definition is canonical DefinitionV2 and is never reconstructed from a
-// legacy payload.
+// Definition is canonical DefinitionV2 and is never reconstructed from a runtime DTO.
 type PublishedModelDetail struct {
 	ModelSummary
-	Version       string             `json:"version"`
-	DecisionKind  string             `json:"decision_kind,omitempty"`
-	PayloadFormat string             `json:"payload_format,omitempty"`
-	Definition    *domain.Definition `json:"definition"`
+	Version      string             `json:"version"`
+	DecisionKind string             `json:"decision_kind,omitempty"`
+	Definition   *domain.Definition `json:"definition"`
 }
 
 type PublishedModelListResult struct {

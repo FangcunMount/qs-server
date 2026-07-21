@@ -2,13 +2,11 @@ package typology
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
-	sharedpayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/shared"
 )
 
 // DefinitionEnvelope carries wire metadata while a Definition is projected to a runtime payload.
@@ -22,262 +20,12 @@ type DefinitionEnvelope struct {
 	Algorithm            binding.Algorithm
 }
 
-// ImportLegacyDefinition imports a complete typology Definition from legacy or explicit wire payload.
-func ImportLegacyDefinition(payload []byte, algorithm binding.Algorithm) (sharedpayload.DefinitionMaterialization, error) {
-	decoded, runtime, err := PayloadAndRuntimeSpecFromDefinition(payload, algorithm)
-	if err != nil {
-		return sharedpayload.DefinitionMaterialization{}, err
+// ResolveRuntimeSpec materializes runtime only from canonical DefinitionV2.
+func ResolveRuntimeSpec(def *definition.Definition) (*RuntimeSpec, error) {
+	if def == nil {
+		return nil, fmt.Errorf("typology definition_v2 is required")
 	}
-	def, err := definitionFromRuntime(decoded, runtime)
-	if err != nil {
-		return sharedpayload.DefinitionMaterialization{}, err
-	}
-	return sharedpayload.DefinitionMaterialization{Definition: def}, nil
-}
-
-// DefinitionFromLegacyPayload imports the target typology definition model
-// without changing the payload contract.
-func DefinitionFromLegacyPayload(payload []byte, algorithm binding.Algorithm) (*definition.Definition, error) {
-	materialized, err := ImportLegacyDefinition(payload, algorithm)
-	if err != nil {
-		return nil, err
-	}
-	return materialized.Definition, nil
-}
-
-// DefinitionFromRuntime remains a compatibility helper for callers that already decoded runtime payload.
-func DefinitionFromRuntime(payload *Payload, runtime *RuntimeSpec) *definition.Definition {
-	def, err := definitionFromRuntime(payload, runtime)
-	if err != nil {
-		return &definition.Definition{}
-	}
-	return def
-}
-
-func definitionFromRuntime(payload *Payload, runtime *RuntimeSpec) (*definition.Definition, error) {
-	if runtime == nil {
-		return &definition.Definition{}, nil
-	}
-	measure, codes, err := measureSpecFromRuntime(runtime.FactorGraph, runtime.Decision.Kind)
-	if err != nil {
-		return nil, err
-	}
-	outcomes := conclusionOutcomes(payload)
-	typeConclusion := conclusion.TypeConclusion{
-		FactorCodes:    orderedFactorCodes(measure),
-		Decision:       typeDecisionFromRuntime(runtime, codes),
-		SpecialRules:   typeSpecialRulesFromRuntime(runtime.SpecialRules),
-		OutcomeMapping: typeOutcomeMappingFromRuntime(runtime.OutcomeMapping),
-		Profiles:       typeOutcomeProfilesFromPayload(payload),
-		Outcomes:       outcomes,
-	}
-	return &definition.Definition{
-		Measure:     measure,
-		Conclusions: []conclusion.Conclusion{typeConclusion},
-		Outcomes:    outcomes,
-		ReportMap:   reportMapFromRuntime(runtime),
-	}, nil
-}
-
-func measureSpecFromRuntime(graph FactorGraphSpec, decisionKind binding.DecisionKind) (definition.MeasureSpec, map[string]string, error) {
-	if graph.HasExplicitFactorGraph() {
-		return measureSpecFromExplicitGraph(graph)
-	}
-	return measureSpecFromLegacyGraph(graph, decisionKind)
-}
-
-func measureSpecFromExplicitGraph(graph FactorGraphSpec) (definition.MeasureSpec, map[string]string, error) {
-	keys := make([]string, 0, len(graph.Factors))
-	for key := range graph.Factors {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	codes := make(map[string]string, len(graph.Factors))
-	usedCodes := make(map[string]struct{}, len(graph.Factors))
-	for _, key := range keys {
-		spec := graph.Factors[key]
-		id := firstNonEmpty(spec.ID, key)
-		code := firstNonEmpty(spec.Code, id)
-		if code == "" {
-			return definition.MeasureSpec{}, nil, fmt.Errorf("typology factor %s code is required", key)
-		}
-		if _, exists := usedCodes[code]; exists {
-			return definition.MeasureSpec{}, nil, fmt.Errorf("typology factor code %s is duplicated", code)
-		}
-		codes[id] = code
-		codes[key] = code
-		usedCodes[code] = struct{}{}
-	}
-	measure := definition.MeasureSpec{
-		Factors:     make([]factor.Factor, 0, len(keys)),
-		Scoring:     make([]factor.Scoring, 0, len(keys)),
-		FactorGraph: factor.FactorGraph{SortOrders: make(map[string]int, len(keys))},
-	}
-	for order, key := range keys {
-		spec := graph.Factors[key]
-		id := firstNonEmpty(spec.ID, key)
-		code := codes[id]
-		name := spec.Name
-		if meta, ok := graph.Dimensions[id]; ok && name == "" {
-			name = meta.Name
-		}
-		role := factor.FactorRoleDimension
-		if spec.Kind == FactorSpecKindComposite {
-			role = factor.FactorRoleIndex
-		}
-		measure.Factors = append(measure.Factors, factor.Factor{Code: code, Title: name, Role: role})
-		measure.FactorGraph.SortOrders[code] = order + 1
-		scoring, edges, err := scoringFromExplicitFactor(spec, code, codes)
-		if err != nil {
-			return definition.MeasureSpec{}, nil, err
-		}
-		if scoring != nil {
-			measure.Scoring = append(measure.Scoring, *scoring)
-		}
-		measure.FactorGraph.Edges = append(measure.FactorGraph.Edges, edges...)
-	}
-	for _, rootID := range graph.Roots {
-		code, ok := codes[rootID]
-		if !ok {
-			return definition.MeasureSpec{}, nil, fmt.Errorf("typology root %s is not defined", rootID)
-		}
-		measure.FactorGraph.Roots = append(measure.FactorGraph.Roots, code)
-	}
-	if len(measure.FactorGraph.Roots) == 0 {
-		measure.FactorGraph.Roots = rootsFromEdges(measure.Factors, measure.FactorGraph.Edges)
-	}
-	return measure, codes, nil
-}
-
-func scoringFromExplicitFactor(spec FactorSpec, code string, codes map[string]string) (*factor.Scoring, []factor.FactorEdge, error) {
-	if spec.Kind == FactorSpecKindComposite {
-		sources := make([]factor.ScoringSource, 0, len(spec.Children))
-		edges := make([]factor.FactorEdge, 0, len(spec.Children))
-		weights := make(map[string]float64, len(spec.Weights))
-		for _, childID := range spec.Children {
-			childCode, ok := codes[childID]
-			if !ok {
-				return nil, nil, fmt.Errorf("typology composite %s child %s is not defined", code, childID)
-			}
-			sources = append(sources, factor.ScoringSource{Kind: factor.ScoringSourceFactor, Code: childCode})
-			edges = append(edges, factor.FactorEdge{ParentCode: code, ChildCode: childCode})
-			if weight, ok := spec.Weights[childID]; ok {
-				weights[childCode] = weight
-			}
-		}
-		if len(weights) == 0 {
-			weights = nil
-		}
-		return &factor.Scoring{FactorCode: code, Sources: sources, Strategy: scoringStrategyFromAggregation(spec.Aggregation), Weights: weights}, edges, nil
-	}
-	sources := make([]factor.ScoringSource, 0, len(spec.Contributions))
-	for _, contribution := range spec.Contributions {
-		sources = append(sources, factor.ScoringSource{
-			Kind: factor.ScoringSourceQuestion, Code: contribution.QuestionCode,
-			ScoringMode: factor.QuestionScoringMode(contribution.ScoringMode), Sign: contribution.Sign, Weight: contribution.Weight,
-			OptionScores: cloneFloatMap(contribution.OptionScores),
-		})
-	}
-	return &factor.Scoring{FactorCode: code, Sources: sources, Strategy: factor.ScoringStrategySum, Constant: spec.Constant, OptionScoring: optionScoringFromRuntime(spec.OptionScoring)}, nil, nil
-}
-
-func measureSpecFromLegacyGraph(graph FactorGraphSpec, decisionKind binding.DecisionKind) (definition.MeasureSpec, map[string]string, error) {
-	codes := make(map[string]string, len(graph.DimensionOrder))
-	measure := definition.MeasureSpec{
-		Factors:     make([]factor.Factor, 0, len(graph.DimensionOrder)),
-		Scoring:     make([]factor.Scoring, 0, len(graph.DimensionOrder)),
-		FactorGraph: factor.FactorGraph{Roots: make([]string, 0, len(graph.DimensionOrder)), SortOrders: make(map[string]int, len(graph.DimensionOrder))},
-	}
-	mappings := mappingsByDimension(graph.QuestionMappings)
-	for order, id := range graph.DimensionOrder {
-		dimension, ok := graph.Dimensions[id]
-		if !ok {
-			return definition.MeasureSpec{}, nil, fmt.Errorf("typology dimension %s is not defined", id)
-		}
-		code := firstNonEmpty(dimension.Code, id)
-		if _, exists := codes[id]; exists {
-			return definition.MeasureSpec{}, nil, fmt.Errorf("typology dimension %s is duplicated", code)
-		}
-		codes[id] = code
-		measure.Factors = append(measure.Factors, factor.Factor{Code: code, Title: dimension.Name, Role: factor.FactorRoleDimension})
-		measure.FactorGraph.Roots = append(measure.FactorGraph.Roots, code)
-		measure.FactorGraph.SortOrders[code] = order + 1
-		sources := make([]factor.ScoringSource, 0, len(mappings[id]))
-		for _, mapping := range mappings[id] {
-			sources = append(sources, factor.ScoringSource{Kind: factor.ScoringSourceQuestion, Code: mapping.QuestionCode, Sign: mapping.Sign, OptionScores: cloneFloatMap(mapping.OptionScores)})
-		}
-		optionScoring := factor.OptionScoringStrict
-		if decisionKind == binding.DecisionKindNearestPattern {
-			optionScoring = factor.OptionScoringCompat
-		}
-		measure.Scoring = append(measure.Scoring, factor.Scoring{FactorCode: code, Sources: sources, Strategy: factor.ScoringStrategySum, Constant: dimension.Constant, OptionScoring: optionScoring})
-	}
-	return measure, codes, nil
-}
-
-func typeDecisionFromRuntime(runtime *RuntimeSpec, codes map[string]string) conclusion.TypeDecision {
-	if runtime == nil {
-		return conclusion.TypeDecision{}
-	}
-	out := conclusion.TypeDecision{Kind: runtime.Decision.Kind, FallbackSimilarityThreshold: runtime.Decision.FallbackSimilarityThreshold, FallbackCode: runtime.Decision.FallbackCode, TopK: runtime.Decision.TopK}
-	if runtime.Decision.LevelRule != nil {
-		out.LevelRule = &conclusion.TypeLevelRule{LowMax: runtime.Decision.LevelRule.LowMax, HighMin: runtime.Decision.LevelRule.HighMin}
-	}
-	for _, id := range runtime.FactorGraph.DecisionFactorOrder() {
-		code := codes[id]
-		if code == "" {
-			continue
-		}
-		meta, ok := runtime.FactorGraph.Dimensions[id]
-		if !ok {
-			meta, ok = runtime.FactorGraph.Dimensions[code]
-		}
-		if !ok {
-			continue
-		}
-		out.Poles = append(out.Poles, conclusion.TypePole{FactorCode: code, LeftPole: meta.LeftPole, RightPole: meta.RightPole, Threshold: meta.Threshold, Model: meta.Model})
-	}
-	return out
-}
-
-func typeSpecialRulesFromRuntime(items []SpecialRuleSpec) []conclusion.TypeSpecialRule {
-	if items == nil {
-		return nil
-	}
-	out := make([]conclusion.TypeSpecialRule, 0, len(items))
-	for _, item := range items {
-		out = append(out, conclusion.TypeSpecialRule{
-			Code: item.Code, Kind: conclusion.TypeSpecialRuleKind(item.ResolvedKind()), Phase: conclusion.TypeSpecialRulePhase(item.Phase), Trigger: item.Trigger,
-			OutcomeCode: item.OutcomeCode, QuestionCodes: item.ResolvedQuestionCodes(), OptionValues: item.ResolvedOptionValues(),
-		})
-	}
-	return out
-}
-
-func typeOutcomeMappingFromRuntime(value OutcomeMappingSpec) conclusion.TypeOutcomeMapping {
-	return conclusion.TypeOutcomeMapping{DetailKind: string(value.DetailKind), DetailAdapterKey: string(value.DetailAdapterKey), Algorithm: value.Algorithm}
-}
-
-func typeOutcomeProfilesFromPayload(payload *Payload) []conclusion.TypeOutcomeProfile {
-	if payload == nil || payload.Outcomes == nil {
-		return nil
-	}
-	out := make([]conclusion.TypeOutcomeProfile, 0, len(payload.Outcomes))
-	for _, item := range payload.Outcomes {
-		out = append(out, conclusion.TypeOutcomeProfile{OutcomeCode: item.Code, Pattern: item.Pattern, Traits: append([]string(nil), item.Traits...), Strengths: append([]string(nil), item.Strengths...), Weaknesses: append([]string(nil), item.Weaknesses...), Suggestions: append([]string(nil), item.Suggestions...), ImageURL: item.ImageURL, Image: item.Image, Rarity: conclusion.Rarity{Percent: item.Rarity.Percent, Label: item.Rarity.Label, OneInX: item.Rarity.OneInX}, IsSpecial: item.IsSpecial, Trigger: item.Trigger, Commentary: item.Commentary})
-	}
-	return out
-}
-
-// ResolveRuntimeSpec prefers canonical Definition over compat payload projection (MC-R017 batch 5).
-func ResolveRuntimeSpec(def *definition.Definition, payload *Payload) (*RuntimeSpec, error) {
-	if def != nil {
-		return RuntimeSpecFromDefinition(def)
-	}
-	if payload == nil {
-		return nil, fmt.Errorf("typology payload is required")
-	}
-	return payload.ToRuntimeSpec()
+	return RuntimeSpecFromDefinition(def)
 }
 
 // RuntimeSpecFromDefinition reconstructs the typology execution DTO solely from Definition semantics.
@@ -316,7 +64,7 @@ func PayloadFromDefinition(env DefinitionEnvelope, def *definition.Definition) (
 		profile := profiles[item.Code]
 		outcomes = append(outcomes, Outcome{Code: item.Code, Name: item.Title, OneLiner: item.Description, Summary: item.Summary, Pattern: profile.Pattern, Traits: append([]string(nil), profile.Traits...), Strengths: append([]string(nil), profile.Strengths...), Weaknesses: append([]string(nil), profile.Weaknesses...), Suggestions: append([]string(nil), profile.Suggestions...), ImageURL: profile.ImageURL, Image: profile.Image, Rarity: Rarity{Percent: profile.Rarity.Percent, Label: profile.Rarity.Label, OneInX: profile.Rarity.OneInX}, IsSpecial: profile.IsSpecial, Trigger: profile.Trigger, Commentary: profile.Commentary})
 	}
-	return &Payload{Code: env.Code, Version: env.Version, Title: env.Title, QuestionnaireCode: env.QuestionnaireCode, QuestionnaireVersion: env.QuestionnaireVersion, Status: env.Status, Algorithm: env.Algorithm, Outcomes: outcomes, MatchingSpec: MatchingSpec{Kind: runtime.Decision.Kind, FallbackSimilarityThreshold: runtime.Decision.FallbackSimilarityThreshold}, Runtime: runtime}, nil
+	return &Payload{Code: env.Code, Version: env.Version, Title: env.Title, QuestionnaireCode: env.QuestionnaireCode, QuestionnaireVersion: env.QuestionnaireVersion, Status: env.Status, Algorithm: env.Algorithm, Outcomes: outcomes, Runtime: runtime}, nil
 }
 
 func runtimeGraphFromMeasure(measure definition.MeasureSpec, decision conclusion.TypeDecision) (FactorGraphSpec, error) {
@@ -345,7 +93,6 @@ func runtimeGraphFromMeasure(measure definition.MeasureSpec, decision conclusion
 		} else {
 			spec.Kind = FactorSpecKindLeaf
 			spec.Constant = rule.Constant
-			spec.OptionScoring = FactorOptionScoring(rule.OptionScoring)
 			for _, source := range rule.Sources {
 				if source.Kind == factor.ScoringSourceQuestion {
 					spec.Contributions = append(spec.Contributions, FactorContributionSpec{
@@ -377,13 +124,6 @@ func reportSpecFromDefinition(reportMap definition.ReportMap) ReportSpec {
 	return ReportSpec{Kind: ReportKind(section.Kind), AdapterKey: ReportAdapterKey(section.AdapterKey), TemplateID: section.TemplateID, TemplateVersion: section.TemplateVersion, CategoryLabel: section.CategoryLabel}
 }
 
-func reportMapFromRuntime(runtime *RuntimeSpec) definition.ReportMap {
-	if runtime == nil || runtime.Report.Kind == "" {
-		return definition.ReportMap{}
-	}
-	return definition.ReportMap{Sections: []definition.ReportSection{{Code: string(runtime.Report.Kind), Title: firstNonEmpty(runtime.Report.CategoryLabel, string(runtime.Report.Kind)), Kind: string(runtime.Report.Kind), AdapterKey: string(runtime.Report.ResolvedAdapterKey(runtime.OutcomeMapping, runtime.Decision.Kind)), TemplateID: runtime.Report.TemplateID, TemplateVersion: runtime.Report.TemplateVersion, CategoryLabel: runtime.Report.CategoryLabel}}}
-}
-
 func findTypeConclusion(items []conclusion.Conclusion) (conclusion.TypeConclusion, bool) {
 	for _, item := range items {
 		if typed, ok := item.(conclusion.TypeConclusion); ok {
@@ -411,38 +151,6 @@ func typeSpecialRulesToRuntime(items []conclusion.TypeSpecialRule) []SpecialRule
 	return out
 }
 
-func conclusionOutcomes(payload *Payload) []conclusion.Outcome {
-	if payload == nil || payload.Outcomes == nil {
-		return nil
-	}
-	out := make([]conclusion.Outcome, 0, len(payload.Outcomes))
-	for _, item := range payload.Outcomes {
-		out = append(out, conclusion.Outcome{Code: item.Code, Title: item.Name, Summary: item.Summary, Description: item.OneLiner})
-	}
-	return out
-}
-
-func orderedFactorCodes(measure definition.MeasureSpec) []string {
-	if measure.Factors == nil {
-		return nil
-	}
-	out := make([]string, 0, len(measure.Factors))
-	for _, item := range measure.Factors {
-		if item.Code != "" {
-			out = append(out, item.Code)
-		}
-	}
-	return out
-}
-
-func mappingsByDimension(items []QuestionMapping) map[string][]QuestionMapping {
-	out := make(map[string][]QuestionMapping)
-	for _, item := range items {
-		out[item.Dimension] = append(out[item.Dimension], item)
-	}
-	return out
-}
-
 func rootsFromEdges(factors []factor.Factor, edges []factor.FactorEdge) []string {
 	children := make(map[string]bool, len(edges))
 	for _, edge := range edges {
@@ -457,17 +165,6 @@ func rootsFromEdges(factors []factor.Factor, edges []factor.FactorEdge) []string
 	return out
 }
 
-func scoringStrategyFromAggregation(value FactorAggregation) factor.ScoringStrategy {
-	switch value {
-	case FactorAggregationAvg:
-		return factor.ScoringStrategyAvg
-	case FactorAggregationWeightedAvg:
-		return factor.ScoringStrategyWeightedAvg
-	default:
-		return factor.ScoringStrategySum
-	}
-}
-
 func aggregationFromScoring(value factor.ScoringStrategy) FactorAggregation {
 	switch value {
 	case factor.ScoringStrategyAvg:
@@ -477,13 +174,6 @@ func aggregationFromScoring(value factor.ScoringStrategy) FactorAggregation {
 	default:
 		return FactorAggregationSum
 	}
-}
-
-func optionScoringFromRuntime(value FactorOptionScoring) factor.OptionScoring {
-	if value == FactorOptionScoringCompat {
-		return factor.OptionScoringCompat
-	}
-	return factor.OptionScoringStrict
 }
 
 func hasSourceKind(items []factor.ScoringSource, kind factor.ScoringSourceKind) bool {

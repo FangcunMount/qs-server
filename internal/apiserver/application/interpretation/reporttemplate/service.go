@@ -126,8 +126,8 @@ func actorLabel(actor Actor) string {
 	return fmt.Sprintf("user:%d", actor.OperatorUserID)
 }
 
-// LegacyBootstrapDrafts are compatibility releases seeded on repository init.
-var LegacyBootstrapDrafts = []CreateDraftCommand{
+// BootstrapDrafts are canonical report-template releases seeded on repository init.
+var BootstrapDrafts = []CreateDraftCommand{
 	{TemplateID: "standard", TemplateVersion: policy.TemplateVersionV1, BuilderIdentity: report.BuilderIdentityFactorScoring},
 	{TemplateID: "mbti", TemplateVersion: policy.TemplateVersionV1, BuilderIdentity: report.BuilderIdentityTypology, AdapterKey: "personality_type"},
 	{TemplateID: "sbti", TemplateVersion: policy.TemplateVersionV1, BuilderIdentity: report.BuilderIdentityTypology, AdapterKey: "personality_type"},

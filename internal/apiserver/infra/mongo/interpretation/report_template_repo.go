@@ -47,7 +47,7 @@ func NewReportTemplateRepository(db *mongo.Database, opts ...base.BaseRepository
 	if _, err := repo.Collection().Indexes().CreateMany(context.Background(), reportTemplateIndexModels()); err != nil {
 		return nil, fmt.Errorf("create interpretation report template indexes: %w", err)
 	}
-	if err := repo.ensureLegacyBootstrap(context.Background()); err != nil {
+	if err := repo.ensureBootstrap(context.Background()); err != nil {
 		return nil, err
 	}
 	return repo, nil
@@ -108,10 +108,10 @@ func (r *ReportTemplateRepository) IsPublished(templateID string, version string
 	return err == nil
 }
 
-func (r *ReportTemplateRepository) ensureLegacyBootstrap(ctx context.Context) error {
+func (r *ReportTemplateRepository) ensureBootstrap(ctx context.Context) error {
 	svc := appreporttemplate.NewService(r)
 	now := time.Now().UTC()
-	for _, seed := range appreporttemplate.LegacyBootstrapDrafts {
+	for _, seed := range appreporttemplate.BootstrapDrafts {
 		if _, err := r.FindByKey(ctx, seed.TemplateID, seed.TemplateVersion); err == nil {
 			continue
 		} else if !errors.Is(err, domainreporttemplate.ErrNotFound) {

@@ -86,7 +86,7 @@ func TestPublishReleaseRejectsIncompletePublishedPair(t *testing.T) {
 func TestUnpublishReleaseArchivesPairAndKeepsHeadEditable(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 7, 17, 9, 0, 0, 0, time.UTC)
-	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{Code: "MODEL-1", Kind: domain.KindTypology, Algorithm: domain.AlgorithmMBTI, Title: "Model", Now: now})
+	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{Code: "MODEL-1", Kind: domain.KindTypology, Algorithm: domain.AlgorithmPersonalityTypology, Title: "Model", Now: now})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestUnpublishReleaseArchivesPairAndKeepsHeadEditable(t *testing.T) {
 func TestArchiveReleaseArchivesActiveSnapshotWhenHeadHasDraftChanges(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 7, 17, 10, 0, 0, 0, time.UTC)
-	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{Code: "MODEL-1", Kind: domain.KindTypology, Algorithm: domain.AlgorithmMBTI, Title: "Model", Now: now})
+	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{Code: "MODEL-1", Kind: domain.KindTypology, Algorithm: domain.AlgorithmPersonalityTypology, Title: "Model", Now: now})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestArchiveReleaseArchivesActiveSnapshotWhenHeadHasDraftChanges(t *testing.
 func TestReleaseEffectsDoNotRunWhenTransactionRollsBack(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 7, 17, 11, 0, 0, 0, time.UTC)
-	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{Code: "MODEL-1", Kind: domain.KindTypology, Algorithm: domain.AlgorithmMBTI, Title: "Model", Now: now})
+	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{Code: "MODEL-1", Kind: domain.KindTypology, Algorithm: domain.AlgorithmPersonalityTypology, Title: "Model", Now: now})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +212,7 @@ func (r *publishedReleaseModelRepo) FindByCode(context.Context, string) (*domain
 }
 
 type noopPublishedModelRepo struct {
-	modelcatalogport.PublishedModelRepository
+	modelcatalogport.PublishedSnapshotRepository
 }
 
 func (noopPublishedModelRepo) FindPublishedByModelCode(context.Context, domain.Kind, string) (*modelcatalogport.PublishedModel, error) {
@@ -220,7 +220,7 @@ func (noopPublishedModelRepo) FindPublishedByModelCode(context.Context, domain.K
 }
 
 type idempotentPublishedRepo struct {
-	modelcatalogport.PublishedModelRepository
+	modelcatalogport.PublishedSnapshotRepository
 	model *domain.AssessmentModel
 }
 
@@ -252,7 +252,7 @@ type noopQuestionnaireLifecycle struct {
 }
 
 type unpublishPublishedRepo struct {
-	modelcatalogport.PublishedModelRepository
+	modelcatalogport.PublishedSnapshotRepository
 	deleted bool
 }
 

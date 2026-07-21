@@ -18,7 +18,6 @@ func toEvaluationProtoModelIdentity(model evaluationtestee.ModelIdentity) *evalu
 		ProductChannel:  model.ProductChannel,
 		AlgorithmFamily: model.AlgorithmFamily,
 		DecisionKind:    model.DecisionKind,
-		PayloadFormat:   model.PayloadFormat,
 	}
 }
 

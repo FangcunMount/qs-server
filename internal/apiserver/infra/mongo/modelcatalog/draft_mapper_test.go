@@ -10,17 +10,13 @@ import (
 func TestDraftMapperRoundTrip(t *testing.T) {
 	original, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
 		Code: "personality_demo", Kind: domain.KindTypology,
-		SubKind: domain.SubKindTypology, Algorithm: domain.AlgorithmMBTI, Title: "Demo",
+		SubKind: domain.SubKindTypology, Algorithm: domain.AlgorithmPersonalityTypology, Title: "Demo",
 		Category: "personality", Stages: []string{"intake"}, ApplicableAges: []string{"adult"}, Reporters: []string{"self"}, Tags: []string{"demo"},
 	})
 	if err != nil {
 		t.Fatalf("NewAssessmentModel: %v", err)
 	}
-	_ = original.UpdateDefinition(domain.DefinitionPayload{
-		Format: domain.PayloadFormatPersonalityTypologyV1,
-		Data:   []byte(`{"decision":{"kind":"pole_composition"}}`),
-	}, original.CreatedAt)
-	original.DefinitionV2 = sampleDefinitionV2()
+	_ = original.UpdateDefinition(sampleDefinitionV2(), original.CreatedAt)
 
 	mapper := NewDraftMapper()
 	po := mapper.ToPO(original)
@@ -41,21 +37,13 @@ func TestDraftMapperRoundTrip(t *testing.T) {
 	assertDefinitionV2RoundTrip(t, got.DefinitionV2)
 }
 
-func TestDraftMapperReadsLegacyDocumentWithoutDefinitionV2(t *testing.T) {
+func TestDraftMapperRejectsNoDefinitionByLeavingItNil(t *testing.T) {
 	po := &AssessmentModelPO{
-		Code:                    "legacy",
-		Kind:                    string(domain.KindBehavioralRating),
-		Title:                   "Legacy",
-		Status:                  string(domain.ModelStatusDraft),
-		DefinitionPayloadFormat: domain.PayloadFormatBehavioralRatingBrief2V1,
-		DefinitionPayload:       []byte(`{"dimensions":[]}`),
+		Code: "invalid", Kind: string(domain.KindBehavioralRating), Title: "Invalid", Status: string(domain.ModelStatusDraft),
 	}
 	got := NewDraftMapper().ToDomain(po)
 	if got.DefinitionV2 != nil {
 		t.Fatalf("definition v2 = %#v, want nil for old document", got.DefinitionV2)
-	}
-	if got.Definition.Data == nil || string(got.Definition.Data) != `{"dimensions":[]}` {
-		t.Fatalf("legacy definition = %#v", got.Definition)
 	}
 }
 

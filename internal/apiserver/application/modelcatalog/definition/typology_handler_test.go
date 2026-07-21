@@ -41,12 +41,12 @@ func TestTypologyValidateForPublishRejectsMissingQuestionnaire(t *testing.T) {
 	}
 }
 
-func TestTypologyBuildSnapshotPayloadRejectsWrongSubKind(t *testing.T) {
+func TestTypologyMaterializationRejectsWrongSubKind(t *testing.T) {
 	t.Parallel()
 	model := publishableTypologyShell()
 	model.SubKind = domain.SubKindEmpty
 	model.DefinitionV2 = &modeldefinition.Definition{}
-	_, err := (TypologyDefinitionHandler{}).BuildSnapshotPayload(context.Background(), model)
+	_, err := (TypologyDefinitionHandler{}).MaterializeSnapshot(context.Background(), model)
 	if err == nil || !strings.Contains(err.Error(), "sub_kind") {
 		t.Fatalf("err = %v, want sub_kind rejection", err)
 	}
@@ -54,12 +54,11 @@ func TestTypologyBuildSnapshotPayloadRejectsWrongSubKind(t *testing.T) {
 
 func publishableTypologyShell() *domain.AssessmentModel {
 	return &domain.AssessmentModel{
-		Kind:       domain.KindTypology,
-		SubKind:    domain.SubKindTypology,
-		Algorithm:  domain.AlgorithmPersonalityTypology,
-		Code:       "TYPOLOGY_SHELL",
-		Title:      "Typology",
-		Binding:    domain.QuestionnaireBinding{QuestionnaireCode: "Q", QuestionnaireVersion: "1"},
-		Definition: domain.DefinitionPayload{Format: domain.PayloadFormatPersonalityTypologyV1, Data: []byte(`{}`)},
+		Kind:      domain.KindTypology,
+		SubKind:   domain.SubKindTypology,
+		Algorithm: domain.AlgorithmPersonalityTypology,
+		Code:      "TYPOLOGY_SHELL",
+		Title:     "Typology",
+		Binding:   domain.QuestionnaireBinding{QuestionnaireCode: "Q", QuestionnaireVersion: "1"},
 	}
 }

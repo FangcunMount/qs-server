@@ -4,48 +4,17 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 	cognitivepayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
-
-// RuntimeProjectionSource records whether runtime consumed canonical Definition or compat payload.
-type RuntimeProjectionSource string
-
-const (
-	RuntimeProjectionCanonical RuntimeProjectionSource = "canonical_definition"
-	RuntimeProjectionCompat    RuntimeProjectionSource = "compat_payload"
-)
-
-// TypologyRuntimeSpec prefers canonical Definition over compat payload (MC-R017 batch 5).
-func TypologyRuntimeSpec(input *InputSnapshot, payload *modeltypology.Payload) (*modeltypology.RuntimeSpec, RuntimeProjectionSource, error) {
-	if def, ok := DefinitionV2FromSnapshot(input); ok {
-		spec, err := modeltypology.RuntimeSpecFromDefinition(def)
-		if err != nil {
-			return nil, "", err
-		}
-		return spec, RuntimeProjectionCanonical, nil
-	}
-	if payload == nil {
-		return nil, "", nil
-	}
-	spec, err := payload.ToRuntimeSpec()
-	if err != nil {
-		return nil, "", err
-	}
-	return spec, RuntimeProjectionCompat, nil
-}
 
 // AbilityConclusionsFromSnapshot prefers canonical Definition conclusions (MC-R017 batch 5).
 func AbilityConclusionsFromSnapshot(input *InputSnapshot) []conclusion.AbilityConclusion {
 	if def, ok := DefinitionV2FromSnapshot(input); ok {
 		return cognitivepayload.AbilityConclusions(def)
 	}
-	if cognitive, ok := CognitivePayload(input); ok && cognitive.Snapshot != nil {
-		return cognitive.Snapshot.AbilityConclusions
-	}
 	return nil
 }
 
-// CognitiveExecutionSnapshot prefers canonical Definition projection over compat payload.
+// CognitiveExecutionSnapshot projects the canonical Definition into the calculation DTO.
 func CognitiveExecutionSnapshot(input *InputSnapshot) (*cognitivepayload.Snapshot, bool) {
 	if def, ok := DefinitionV2FromSnapshot(input); ok {
 		env := cognitiveDefinitionEnvelope(input)
@@ -53,9 +22,6 @@ func CognitiveExecutionSnapshot(input *InputSnapshot) (*cognitivepayload.Snapsho
 		if err == nil && snapshot != nil {
 			return snapshot, true
 		}
-	}
-	if cognitive, ok := CognitivePayload(input); ok && cognitive.Snapshot != nil {
-		return cognitive.Snapshot, true
 	}
 	return nil, false
 }
@@ -77,26 +43,21 @@ func cognitiveDefinitionEnvelope(input *InputSnapshot) cognitivepayload.Definiti
 	return env
 }
 
-// AuditRuntimeInputSource reports when runtime still depends on compat payload projection.
+// AuditRuntimeInputSource requires canonical DefinitionV2 runtime material.
 func AuditRuntimeInputSource(input *InputSnapshot) []ReportInputAuditIssue {
 	if input == nil {
 		return nil
 	}
-	issues := AuditLegacyIdentity(input)
+	issues := AuditInputIdentity(input)
 	if _, ok := DefinitionV2FromSnapshot(input); ok {
 		return issues
 	}
-	if input.ModelPayload != nil {
-		issues = append(issues, ReportInputAuditIssue{
-			Code:    "runtime.compat_payload_only",
-			Message: "evaluation input lacks DefinitionV2; runtime falls back to compat payload projection",
-		})
-	}
+	issues = append(issues, ReportInputAuditIssue{Code: "runtime.definition_v2_missing", Message: "evaluation input lacks DefinitionV2"})
 	return issues
 }
 
-// AuditLegacyIdentity flags retained-read / empty algorithm identities (MC-R018).
-func AuditLegacyIdentity(input *InputSnapshot) []ReportInputAuditIssue {
+// AuditInputIdentity flags empty or unsupported runtime identities.
+func AuditInputIdentity(input *InputSnapshot) []ReportInputAuditIssue {
 	if input == nil || input.Model == nil {
 		return nil
 	}
@@ -113,20 +74,14 @@ func AuditLegacyIdentity(input *InputSnapshot) []ReportInputAuditIssue {
 	return out
 }
 
-// HasReportInputFreezeMaterial reports whether commit can freeze report input without legacy payload-only shape.
+// HasReportInputFreezeMaterial reports whether commit can freeze current report input.
 func HasReportInputFreezeMaterial(input *InputSnapshot) bool {
 	if input == nil {
 		return false
 	}
-	if input.ModelPayload != nil {
-		return true
-	}
 	if def, ok := DefinitionV2FromSnapshot(input); ok {
 		assets := def.ResolvedInterpretationAssets()
 		return assets.IsMaterialized()
-	}
-	if input.InterpretationAssets != nil && input.InterpretationAssets.IsMaterialized() {
-		return true
 	}
 	return false
 }

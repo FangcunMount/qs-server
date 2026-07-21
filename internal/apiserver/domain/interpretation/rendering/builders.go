@@ -91,7 +91,6 @@ type TypologyBuilder struct {
 func NewTypologyBuilder() TypologyBuilder {
 	return TypologyBuilder{adapters: map[reporttypology.ReportAdapterKey]struct{}{
 		reporttypology.ReportAdapterPersonalityType: {}, reporttypology.ReportAdapterTraitProfile: {},
-		reporttypology.ReportAdapterMBTI: {}, reporttypology.ReportAdapterSBTI: {}, reporttypology.ReportAdapterBigFive: {},
 	}}
 }
 func (TypologyBuilder) ReportType() policy.ReportType {
@@ -189,21 +188,11 @@ func personalityAdapter(input interpinput.InterpretationInput) reporttypology.Re
 	if input.Report.AdapterKey != "" {
 		return reporttypology.ReportAdapterKey(input.Report.AdapterKey)
 	}
-	switch input.Model.Algorithm {
-	case "mbti":
-		return reporttypology.ReportAdapterMBTI
-	case "sbti":
-		return reporttypology.ReportAdapterSBTI
-	default:
-		return reporttypology.ReportAdapterPersonalityType
-	}
+	return reporttypology.ReportAdapterPersonalityType
 }
 func traitAdapter(input interpinput.InterpretationInput) reporttypology.ReportAdapterKey {
 	if input.Report.AdapterKey != "" {
 		return reporttypology.ReportAdapterKey(input.Report.AdapterKey)
-	}
-	if input.Model.Algorithm == "bigfive" {
-		return reporttypology.ReportAdapterBigFive
 	}
 	return reporttypology.ReportAdapterTraitProfile
 }

@@ -5,34 +5,18 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
-	cognitive "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
 )
 
 func TestPublishedCognitiveCatalogDecodesPublishedModel(t *testing.T) {
 	t.Parallel()
 
-	raw := []byte(`{
-		"dimensions": [{
-			"code": "total",
-			"title": "总分",
-			"question_codes": ["q1", "q2"],
-			"scoring_strategy": "sum",
-			"is_total_score": true
-		}],
-		"interpret_rules": [{
-			"dimension_code": "total",
-			"ranges": [{"min_score": 0, "max_score": 10, "conclusion": "low", "level": "low"}]
-		}]
-	}`)
-	materialized, err := cognitive.ImportLegacyDefinition(raw)
-	if err != nil {
-		t.Fatalf("ImportLegacyDefinition: %v", err)
-	}
 	reader := stubPublishedCognitiveReader{snapshot: &rulesetport.PublishedModel{
 		SchemaVersion:        domain.SchemaVersionV2,
-		PayloadFormat:        domain.PayloadFormatCognitiveDefaultV1,
 		Kind:                 domain.KindCognitive,
 		Algorithm:            domain.AlgorithmSPM,
 		Code:                 "COG-001",
@@ -41,8 +25,7 @@ func TestPublishedCognitiveCatalogDecodesPublishedModel(t *testing.T) {
 		Status:               "published",
 		QuestionnaireCode:    "Q-001",
 		QuestionnaireVersion: "1.0.0",
-		Payload:              []byte("not-json"),
-		DefinitionV2:         materialized.Definition,
+		DefinitionV2:         cognitiveDefinition(false),
 	}}
 	catalog := NewPublishedCognitiveCatalog(reader)
 	got, err := catalog.GetCognitiveByRef(context.Background(), port.ModelRef{
@@ -66,26 +49,15 @@ func TestPublishedCognitiveCatalogDecodesPublishedModel(t *testing.T) {
 func TestPublishedCognitiveCatalogDecodesSPMSnapshot(t *testing.T) {
 	t.Parallel()
 
-	raw := []byte(`{
-		"dimensions": [{"code": "total", "title": "总分", "question_codes": ["q1"], "scoring_strategy": "sum", "is_total_score": true}],
-		"interpret_rules": [{"dimension_code": "total", "ranges": [{"min_score": 0, "max_score": 10, "conclusion": "ok"}]}],
-		"spm": {"time_limit_seconds": 900, "item_set_codes": ["A", "B"], "norm_table_version": "2024"}
-	}`)
-	materialized, err := cognitive.ImportLegacyDefinition(raw)
-	if err != nil {
-		t.Fatalf("ImportLegacyDefinition: %v", err)
-	}
 	reader := stubPublishedCognitiveReader{snapshot: &rulesetport.PublishedModel{
 		SchemaVersion: domain.SchemaVersionV2,
-		PayloadFormat: domain.PayloadFormatCognitiveSPMV1,
 		Kind:          domain.KindCognitive,
 		Algorithm:     domain.AlgorithmSPM,
 		Code:          "COG-SPM",
 		Version:       "1.0.0",
 		Title:         "SPM",
 		Status:        "published",
-		Payload:       []byte("not-json"),
-		DefinitionV2:  materialized.Definition,
+		DefinitionV2:  cognitiveDefinition(true),
 	}}
 	catalog := NewPublishedCognitiveCatalog(reader)
 	got, err := catalog.GetCognitiveByRef(context.Background(), port.ModelRef{
@@ -100,6 +72,21 @@ func TestPublishedCognitiveCatalogDecodesSPMSnapshot(t *testing.T) {
 	if got.Factors[0].Norm == nil || got.Factors[0].Norm.NormTableVersion != "2024" {
 		t.Fatalf("total factor norm = %#v", got.Factors[0].Norm)
 	}
+}
+
+func cognitiveDefinition(withNorm bool) *modeldefinition.Definition {
+	def := &modeldefinition.Definition{
+		Measure: modeldefinition.MeasureSpec{
+			Factors:     []factor.Factor{{Code: "total", Title: "总分", Role: factor.FactorRoleTotal}},
+			FactorGraph: factor.FactorGraph{Roots: []string{"total"}},
+			Scoring:     []factor.Scoring{{FactorCode: "total", Sources: []factor.ScoringSource{{Kind: factor.ScoringSourceQuestion, Code: "q1"}}, Strategy: factor.ScoringStrategySum}},
+		},
+		Execution: modeldefinition.ExecutionSpec{SPM: &modeldefinition.SPMSpec{TimeLimitSeconds: 900, TotalFactorCode: "total"}},
+	}
+	if withNorm {
+		def.Calibration.NormRefs = []norm.Ref{{FactorCode: "total", NormTableVersion: "2024"}}
+	}
+	return def
 }
 
 type stubPublishedCognitiveReader struct {

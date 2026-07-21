@@ -24,7 +24,6 @@ type Outcome struct {
 	Algorithm       string
 	AlgorithmFamily string
 	DecisionKind    string
-	PayloadFormat   string
 	ModelCode       string
 	Version         string
 	Title           string
@@ -146,7 +145,7 @@ func (s *service) readReceipt(ctx context.Context, assessmentID uint64) (*Result
 	runtime := record.Runtime()
 	out := &Outcome{
 		ID: record.ID().String(), ModelKind: string(model.Kind), SubKind: string(model.SubKind), Algorithm: string(model.Algorithm),
-		AlgorithmFamily: string(runtime.AlgorithmFamily), DecisionKind: string(runtime.DecisionKind), PayloadFormat: runtime.PayloadFormat,
+		AlgorithmFamily: string(runtime.AlgorithmFamily), DecisionKind: string(runtime.DecisionKind),
 		ModelCode: model.Code, Version: model.Version, Title: model.Title,
 	}
 	if execution.Primary != nil {

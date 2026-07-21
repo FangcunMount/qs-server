@@ -32,7 +32,7 @@ func TestPublishedModelValidatorUsesActiveReleaseBoundaryForEveryKind(t *testing
 		algorithm domainmodel.Algorithm
 	}{
 		{name: "scale", kind: domainmodel.KindScale, algorithm: domainmodel.AlgorithmScaleDefault},
-		{name: "typology", kind: domainmodel.KindTypology, subKind: domainmodel.SubKindTypology, algorithm: domainmodel.AlgorithmMBTI},
+		{name: "typology", kind: domainmodel.KindTypology, subKind: domainmodel.SubKindTypology, algorithm: domainmodel.AlgorithmPersonalityTypology},
 		{name: "cognitive", kind: domainmodel.KindCognitive, algorithm: domainmodel.AlgorithmSPM},
 		{name: "behavioral-rating", kind: domainmodel.KindBehavioralRating, algorithm: domainmodel.AlgorithmSPMSensory},
 	}

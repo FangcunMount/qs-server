@@ -13,7 +13,7 @@ import (
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-func TestSaveDefinitionBuildsPayloadFromDefinitionV2(t *testing.T) {
+func TestSaveDefinitionMaterializesDefinitionV2(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, 7, 10, 0, 0, 0, 0, time.UTC)
@@ -43,7 +43,7 @@ func TestSaveDefinitionBuildsPayloadFromDefinitionV2(t *testing.T) {
 	if got != definition || !handler.called {
 		t.Fatalf("SaveDefinition result = %#v, handler called = %t", got, handler.called)
 	}
-	if repo.updates != 1 || model.DefinitionV2 != definition || string(model.Definition.Data) != `{"source":"definition_v2"}` {
+	if repo.updates != 1 || model.DefinitionV2 != definition {
 		t.Fatalf("model update = %#v, updates = %d", model, repo.updates)
 	}
 }
@@ -145,9 +145,9 @@ func (h *recordingDefinitionHandler) ValidateForPublish(context.Context, *domain
 	return h.validateIssues
 }
 
-func (h *recordingDefinitionHandler) BuildSnapshotPayload(context.Context, *domain.AssessmentModel) (appdefinition.SnapshotBuildResult, error) {
+func (h *recordingDefinitionHandler) MaterializeSnapshot(context.Context, *domain.AssessmentModel) (appdefinition.Materialization, error) {
 	h.called = true
-	return appdefinition.SnapshotBuildResult{PayloadFormat: domain.PayloadFormatAssessmentScaleV1, Payload: []byte(`{"source":"definition_v2"}`)}, nil
+	return appdefinition.Materialization{}, nil
 }
 
 type allowDefinitionAuthorizer struct{}

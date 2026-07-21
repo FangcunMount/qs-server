@@ -10,8 +10,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
+	evaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -57,8 +58,9 @@ func withTestEvaluator(evaluator testEvaluator) EngineOption {
 			panic("test evaluator has unsupported execution identity: " + identity.String())
 		}
 		registry := evalpipeline.NewRuntimeDescriptorRegistry()
+		decision := evaluation.DecisionKindForFamily(family)
 		if err := registry.Register(evalpipeline.RuntimeDescriptor{
-			Key: evalpipeline.DescriptorKey{AlgorithmFamily: family}, AlgorithmFamily: family,
+			Key: evalpipeline.DescriptorKey{AlgorithmFamily: family, DecisionKind: decision}, AlgorithmFamily: family, DecisionKind: decision,
 		}); err != nil {
 			panic(err)
 		}
@@ -83,7 +85,15 @@ func (e *countingEvaluator) Execute(context.Context, ExecutionInput) (*domainout
 type stubInputResolver struct{}
 
 func (stubInputResolver) Resolve(context.Context, evaluationinput.InputRef) (*evaluationinput.InputSnapshot, error) {
-	return &evaluationinput.InputSnapshot{}, nil
+	return &evaluationinput.InputSnapshot{
+		Model: &evaluationinput.ModelSnapshot{
+			Kind: evaluationinput.EvaluationModelKindScale, Algorithm: string(modelcatalog.AlgorithmScaleDefault),
+			Code: "SCALE-1", Version: "1.0.0", AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorScoring), DecisionKind: string(modelcatalog.DecisionKindScoreRange),
+		},
+		DefinitionV2:  &modeldefinition.Definition{},
+		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-001", Version: "1.0.0"},
+		AnswerSheet:   &evaluationinput.AnswerSheetSnapshot{ID: 8001, QuestionnaireCode: "Q-001", QuestionnaireVersion: "1.0.0"},
+	}, nil
 }
 
 type splitPhaseCapture struct {

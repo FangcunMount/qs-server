@@ -13,7 +13,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
@@ -85,73 +84,11 @@ func (r *Repository) DeletePublished(ctx context.Context, kind domain.Kind, code
 	return err
 }
 
-// BackfillPublishedDefinitionV2 updates only DefinitionV2 on the exact
-// historical published row. It intentionally does not normalize identity or
-// rewrite payload fields, which makes it safe for one-off migrations.
-func (r *Repository) BackfillPublishedDefinitionV2(ctx context.Context, model *port.PublishedModel, definitionV2 *modeldefinition.Definition) error {
-	if model == nil || definitionV2 == nil || model.Code == "" || model.Version == "" {
-		return fmt.Errorf("%w: published model and definition_v2 are required", domain.ErrInvalidArgument)
-	}
-	filter := publishedFilter(bson.M{
-		"code":            model.Code,
-		"release_version": model.Version,
-		"payload":         model.Payload,
-	})
-	result, err := r.Collection().UpdateOne(ctx, filter, bson.M{"$set": bson.M{
-		"definition_schema_version": definitionSchemaVersion(definitionV2),
-		"definition_v2":             definitionToPO(definitionV2),
-		"updated_at":                time.Now(),
-	}})
-	if err != nil {
-		return err
-	}
-	if result.MatchedCount != 1 {
-		return fmt.Errorf("%w: published model %s@%s", domain.ErrNotFound, model.Code, model.Version)
-	}
-	return nil
-}
-
-// BackfillPublishedProjectionHashes writes missing projection hashes when absent.
-func (r *Repository) BackfillPublishedProjectionHashes(ctx context.Context, model *port.PublishedModel, defHash, payloadHash string) error {
-	if model == nil || model.Code == "" || model.Version == "" {
-		return fmt.Errorf("%w: published model is required", domain.ErrInvalidArgument)
-	}
-	if defHash == "" && payloadHash == "" {
-		return fmt.Errorf("%w: at least one projection hash is required", domain.ErrInvalidArgument)
-	}
-	existingDef, existingPayload := port.ProjectionHashesFromSource(model.Source)
-	if existingDef != "" && existingPayload != "" {
-		return nil
-	}
-	filter := publishedFilter(bson.M{
-		"code": model.Code, "release_version": model.Version, "payload": model.Payload,
-	})
-	set := bson.M{"updated_at": time.Now()}
-	if existingDef == "" && defHash != "" {
-		set["source.definition_content_hash"] = defHash
-	}
-	if existingPayload == "" && payloadHash != "" {
-		set["source.payload_projection_hash"] = payloadHash
-	}
-	if _, ok := model.Source[port.SourceProjectionHashSchema]; !ok {
-		set["source.projection_hash_schema"] = modeldefinition.ProjectionHashSchemaV1
-	}
-	result, err := r.Collection().UpdateOne(ctx, filter, bson.M{"$set": set})
-	if err != nil {
-		return err
-	}
-	if result.MatchedCount != 1 {
-		return fmt.Errorf("%w: published model %s@%s", domain.ErrNotFound, model.Code, model.Version)
-	}
-	return nil
-}
-
 func (r *Repository) upsertPublishedModel(ctx context.Context, model *port.PublishedModel) error {
 	po := r.mapper.ToPO(model)
 	now := time.Now()
 	po.Status = statusPublished
 	po.ReleaseStatus = string(domain.ReleaseStatusActive)
-	po.IsActivePublished = false
 	po.PublishedAt = &now
 	po.ReleaseArchivedAt = nil
 
@@ -164,7 +101,7 @@ func (r *Repository) upsertPublishedModel(ctx context.Context, model *port.Publi
 		if !sameImmutablePublishedContent(persisted, incoming) {
 			return fmt.Errorf("%w: %s@%s", domain.ErrReleaseVersionConflict, model.Code, model.Version)
 		}
-		if domain.NormalizeReleaseStatus(domain.ReleaseStatus(existing.ReleaseStatus), existing.IsActivePublished) != domain.ReleaseStatusActive {
+		if domain.NormalizeReleaseStatus(domain.ReleaseStatus(existing.ReleaseStatus)) != domain.ReleaseStatusActive {
 			return fmt.Errorf("%w: archived release %s@%s cannot be reactivated", domain.ErrInvalidState, model.Code, model.Version)
 		}
 		return nil
@@ -405,24 +342,8 @@ func (r *Repository) ListPublishedAlgorithms(ctx context.Context) ([]domain.Algo
 }
 
 func sortAlgorithms(algorithms []domain.Algorithm) {
-	order := map[domain.Algorithm]int{
-		domain.AlgorithmMBTI:    0,
-		domain.AlgorithmSBTI:    1,
-		domain.AlgorithmBigFive: 2,
-	}
 	sort.Slice(algorithms, func(i, j int) bool {
-		left, okLeft := order[algorithms[i]]
-		right, okRight := order[algorithms[j]]
-		switch {
-		case okLeft && okRight:
-			return left < right
-		case okLeft:
-			return true
-		case okRight:
-			return false
-		default:
-			return algorithms[i] < algorithms[j]
-		}
+		return algorithms[i] < algorithms[j]
 	})
 }
 

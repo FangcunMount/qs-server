@@ -18,9 +18,7 @@ func TestClassifyAlgorithmWritePolicy(t *testing.T) {
 		{name: "scale_default", kind: binding.KindScale, algorithm: binding.AlgorithmScaleDefault, want: identity.AlgorithmWriteCanonical},
 		{name: "scale_empty", kind: binding.KindScale, want: identity.AlgorithmWriteDraftOK},
 		{name: "typology_canonical", kind: binding.KindTypology, algorithm: binding.AlgorithmPersonalityTypology, want: identity.AlgorithmWriteCanonical},
-		{name: "typology_mbti_retired", kind: binding.KindTypology, algorithm: binding.AlgorithmMBTI, want: identity.AlgorithmWriteUnknown},
 		{name: "typology_empty_draft", kind: binding.KindTypology, want: identity.AlgorithmWriteDraftOK},
-		{name: "behavioral_default_retired", kind: binding.KindBehavioralRating, algorithm: binding.AlgorithmBehavioralRatingDefault, want: identity.AlgorithmWriteUnknown},
 		{name: "behavioral_brief2", kind: binding.KindBehavioralRating, algorithm: binding.AlgorithmBrief2, want: identity.AlgorithmWriteCanonical},
 		{name: "cognitive_spm", kind: binding.KindCognitive, algorithm: binding.AlgorithmSPM, want: identity.AlgorithmWriteCanonical},
 	}
@@ -35,12 +33,8 @@ func TestClassifyAlgorithmWritePolicy(t *testing.T) {
 	}
 }
 
-func TestAuditIdentityWritePolicyRetained(t *testing.T) {
+func TestAuditIdentityWritePolicyAcceptsCanonicalIdentity(t *testing.T) {
 	t.Parallel()
-	issues := identity.AuditIdentityWritePolicy(binding.KindTypology, binding.AlgorithmSBTI)
-	if len(issues) != 1 || issues[0].Policy != identity.AlgorithmWriteUnknown {
-		t.Fatalf("issues = %#v", issues)
-	}
 	if issues := identity.AuditIdentityWritePolicy(binding.KindTypology, binding.AlgorithmPersonalityTypology); len(issues) != 0 {
 		t.Fatalf("canonical issues = %#v", issues)
 	}

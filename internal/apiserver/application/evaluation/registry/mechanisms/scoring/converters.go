@@ -20,9 +20,7 @@ func calcInputFromSnapshot(snapshot *evaluationinput.InputSnapshot) calcscoring.
 			}
 		}
 	}
-	scaleSnapshot, _ := evaluationinput.ScalePayload(snapshot)
 	return calcscoring.Input{
-		Model:         modelFromSnapshot(scaleSnapshot),
 		AnswerSheet:   scaleAnswerSheetFromDomain(answerSheetFromPort(snapshot.AnswerSheet)),
 		Questionnaire: scaleQuestionnaireFromDomain(questionnaireFromPort(snapshot.Questionnaire)),
 	}
@@ -110,25 +108,10 @@ func scaleSnapshotFromDefinition(input *evaluationinput.InputSnapshot, def *mode
 }
 
 func modelFromSnapshot(snapshot *scalesnapshot.ScaleSnapshot) calcscoring.Model {
-	if snapshot == nil {
+	if snapshot == nil || !snapshot.HasCanonicalMeasure() {
 		return calcscoring.Model{}
 	}
-	if snapshot.HasCanonicalMeasure() {
-		return modelFromCanonicalMeasure(snapshot)
-	}
-	factors := make([]calcscoring.Factor, 0, len(snapshot.Factors))
-	for _, factor := range snapshot.Factors {
-		factors = append(factors, factorFromSnapshot(factor))
-	}
-	return calcscoring.Model{
-		Code:                 snapshot.Code,
-		ScaleVersion:         snapshot.ScaleVersion,
-		Title:                snapshot.Title,
-		QuestionnaireCode:    snapshot.QuestionnaireCode,
-		QuestionnaireVersion: snapshot.QuestionnaireVersion,
-		Status:               snapshot.Status,
-		Factors:              factors,
-	}
+	return modelFromCanonicalMeasure(snapshot)
 }
 
 func modelFromCanonicalMeasure(snapshot *scalesnapshot.ScaleSnapshot) calcscoring.Model {
@@ -220,21 +203,6 @@ func applyMeasureScoring(projected *calcscoring.Factor, rule factor.Scoring) {
 				projected.ChildWeights[k] = v
 			}
 		}
-	}
-}
-
-func factorFromSnapshot(factor scalesnapshot.FactorSnapshot) calcscoring.Factor {
-	return calcscoring.Factor{
-		Code:            factor.Code,
-		Title:           factor.Title,
-		ScoringStrategy: factor.ScoringStrategy,
-		ScoringParams: calcscoring.CntParams{
-			CntOptionContents: append([]string(nil), factor.ScoringParams.CntOptionContents...),
-		},
-		QuestionCodes:  append([]string(nil), factor.QuestionCodes...),
-		MaxScore:       factor.MaxScore,
-		IsTotalScore:   factor.IsTotalScore,
-		InterpretRules: interpretRulesFromSnapshot(factor.InterpretRules),
 	}
 }
 

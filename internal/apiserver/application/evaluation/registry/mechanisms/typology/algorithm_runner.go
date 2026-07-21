@@ -1,6 +1,8 @@
 package typology
 
 import (
+	"fmt"
+
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	personalityadapter "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/adapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -27,7 +29,7 @@ func (r algorithmRunner) buildOutcome(
 	if err != nil {
 		return nil, err
 	}
-	spec, err := modeltypology.ResolveRuntimeSpec(def, payload)
+	spec, err := modeltypology.ResolveRuntimeSpec(def)
 	if err != nil {
 		return nil, err
 	}
@@ -40,10 +42,8 @@ func scoreTypology(
 	def *modeldefinition.Definition,
 	sheet *evalinput.AnswerSheet,
 ) (outcometypology.ScoringResult, error) {
-	if def != nil {
-		if canonical, ok := adapter.(personalityadapter.CanonicalScorer); ok {
-			return canonical.ScoreWithDefinition(payload, def, sheet)
-		}
+	if def == nil {
+		return outcometypology.ScoringResult{}, fmt.Errorf("typology definition_v2 is required")
 	}
-	return adapter.Score(payload, sheet)
+	return adapter.Score(payload, def, sheet)
 }

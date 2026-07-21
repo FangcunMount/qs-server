@@ -35,16 +35,6 @@ func DomainKindToAPIKind(kind domain.Kind) string {
 	}
 }
 
-// APIPayloadFormatToDomain 归一化API 载荷格式 到 规范领域格式。
-func APIPayloadFormatToDomain(format string) string {
-	return format
-}
-
-// DomainPayloadFormatToAPI 映射规范 领域载荷格式 back 到 API 值。
-func DomainPayloadFormatToAPI(kind string, format string) string {
-	return format
-}
-
 func IsSupportedAPIKind(kind string) bool {
 	_, ok := APIKindToDomainKind(kind)
 	return ok

@@ -29,11 +29,9 @@ func TestPublisherBuildSnapshotUsesDefinitionHandler(t *testing.T) {
 	if snapshot.Kind != domain.KindCognitive ||
 		snapshot.Algorithm != domain.AlgorithmSPM ||
 		snapshot.AlgorithmFamily != domain.AlgorithmFamilyTaskPerformance ||
-		snapshot.PayloadFormat != domain.PayloadFormatCognitiveDefaultV1 ||
 		snapshot.DecisionKind != domain.DecisionKindAbilityLevel ||
 		snapshot.Version != "v3" ||
-		snapshot.QuestionnaireVersion != "1.0.0" ||
-		string(snapshot.Payload) != `{"dimensions":[{"code":"total"}]}` {
+		snapshot.QuestionnaireVersion != "1.0.0" || snapshot.DefinitionV2 == nil {
 		t.Fatalf("snapshot = %#v", snapshot)
 	}
 }
@@ -72,7 +70,7 @@ func TestPublisherAllowsNonBlockingValidationWarnings(t *testing.T) {
 	}
 }
 
-func TestPublisherPublishAttachesProjectionHashes(t *testing.T) {
+func TestPublisherPublishAttachesDefinitionHash(t *testing.T) {
 	t.Parallel()
 	model := newPublishedTestModel(t)
 	model.DefinitionV2 = completeScaleDefinitionForPublishTest()
@@ -85,8 +83,8 @@ func TestPublisherPublishAttachesProjectionHashes(t *testing.T) {
 		t.Fatalf("Publish: %v", err)
 	}
 	snapshot := repo.snapshots[model.Code]
-	if snapshot == nil || snapshot.Source[port.SourceDefinitionContentHash] == "" || snapshot.Source[port.SourcePayloadProjectionHash] == "" {
-		t.Fatalf("projection hashes = %#v", snapshot.Source)
+	if snapshot == nil || snapshot.Source[port.SourceDefinitionContentHash] == "" || snapshot.Source[port.SourceDefinitionHashSchema] == "" {
+		t.Fatalf("definition hash = %#v", snapshot.Source)
 	}
 }
 
@@ -112,13 +110,10 @@ func (snapshotHandler) ValidateForPublish(context.Context, *domain.AssessmentMod
 	return nil
 }
 
-func (snapshotHandler) BuildSnapshotPayload(_ context.Context, model *domain.AssessmentModel) (definition.SnapshotBuildResult, error) {
-	return definition.SnapshotBuildResult{
-		Kind:          domain.KindCognitive,
-		Algorithm:     domain.AlgorithmSPM,
-		PayloadFormat: domain.PayloadFormatCognitiveDefaultV1,
-		DecisionKind:  domain.DecisionKindAbilityLevel,
-		Payload:       append([]byte(nil), model.Definition.Data...),
+func (snapshotHandler) MaterializeSnapshot(_ context.Context, _ *domain.AssessmentModel) (definition.Materialization, error) {
+	return definition.Materialization{
+		Kind: domain.KindCognitive, Algorithm: domain.AlgorithmSPM,
+		AlgorithmFamily: domain.AlgorithmFamilyTaskPerformance, DecisionKind: domain.DecisionKindAbilityLevel,
 	}, nil
 }
 
@@ -203,9 +198,7 @@ func newPublishedTestModel(t *testing.T) *domain.AssessmentModel {
 	}, now); err != nil {
 		t.Fatalf("BindQuestionnaire: %v", err)
 	}
-	if err := model.UpdateDefinition(domain.DefinitionPayload{
-		Data: []byte(`{"dimensions":[{"code":"total"}]}`),
-	}, now); err != nil {
+	if err := model.UpdateDefinition(&modeldefinition.Definition{Conclusions: []conclusion.Conclusion{conclusion.AbilityConclusion{FactorCode: "total", ScoreBasis: conclusion.ScoreBasisRaw}}}, now); err != nil {
 		t.Fatalf("UpdateDefinition: %v", err)
 	}
 	return model

@@ -109,7 +109,7 @@ func TestResolverComposesSnapshotReadersUsingAnswerSheetExactVersion(t *testing.
 	}
 
 	snapshot, err := resolver.Resolve(context.Background(), port.InputRef{
-		ModelRef:             port.ModelRef{Kind: port.EvaluationModelKindScale, Code: "SDS", Version: "2.0.0", Title: "SDS"},
+		ModelRef:             port.ModelRef{Kind: port.EvaluationModelKindScale, Algorithm: string(modelcatalog.AlgorithmScaleDefault), Code: "SDS", Version: "2.0.0", Title: "SDS"},
 		AnswerSheetID:        2001,
 		QuestionnaireCode:    "ignored",
 		QuestionnaireVersion: "ignored",
@@ -176,27 +176,25 @@ func TestModelInputProviderRegistryRejectsDuplicateAndUnknownKind(t *testing.T) 
 	if err != nil {
 		t.Fatalf("NewModelInputProviderRegistry returned error: %v", err)
 	}
-	if _, err := registry.Resolve(evaldomain.PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI)); err == nil {
+	if _, err := registry.Resolve(evaldomain.PersonalityTypologyIdentity(modelcatalog.AlgorithmPersonalityTypology)); err == nil {
 		t.Fatal("expected unknown provider key error")
 	}
 }
 
-func TestModelInputProviderRegistryResolvesLegacyTypologyViaConfiguredKey(t *testing.T) {
+func TestModelInputProviderRegistryResolvesExactTypologyKey(t *testing.T) {
 	registry, err := NewModelInputProviderRegistry(fakeInputProvider{
 		key: evaldomain.ExecutionIdentityPersonalityTypology,
 	})
 	if err != nil {
 		t.Fatalf("NewModelInputProviderRegistry returned error: %v", err)
 	}
-	for _, algorithm := range []modelcatalog.Algorithm{modelcatalog.AlgorithmMBTI, modelcatalog.AlgorithmSBTI, modelcatalog.AlgorithmBigFive} {
-		legacyKey := evaldomain.PersonalityTypologyIdentity(algorithm)
-		provider, err := registry.Resolve(legacyKey)
-		if err != nil {
-			t.Fatalf("Resolve(%s): %v", legacyKey, err)
-		}
-		if provider.ExecutionIdentity() != evaldomain.ExecutionIdentityPersonalityTypology {
-			t.Fatalf("provider key = %#v", provider.ExecutionIdentity())
-		}
+	key := evaldomain.PersonalityTypologyIdentity(modelcatalog.AlgorithmPersonalityTypology)
+	provider, err := registry.Resolve(key)
+	if err != nil {
+		t.Fatalf("Resolve(%s): %v", key, err)
+	}
+	if provider.ExecutionIdentity() != evaldomain.ExecutionIdentityPersonalityTypology {
+		t.Fatalf("provider key = %#v", provider.ExecutionIdentity())
 	}
 }
 

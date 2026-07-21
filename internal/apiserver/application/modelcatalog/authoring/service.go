@@ -55,14 +55,10 @@ func (s Service) SaveDefinition(ctx context.Context, actor modelcatalog.ActorCon
 	}
 	candidate := *model
 	candidate.DefinitionV2 = value
-	built, err := handler.BuildSnapshotPayload(ctx, &candidate)
-	if err != nil {
+	if _, err := handler.MaterializeSnapshot(ctx, &candidate); err != nil {
 		return nil, err
 	}
-	if len(built.Payload) == 0 {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "definition payload projection is empty")
-	}
-	if err := model.UpdateDefinitionWithV2(domain.DefinitionPayload{Format: built.PayloadFormat, Data: built.Payload}, value, s.now()); err != nil {
+	if err := model.UpdateDefinition(value, s.now()); err != nil {
 		return nil, err
 	}
 	if err := s.ModelRepo.Update(ctx, model); err != nil {

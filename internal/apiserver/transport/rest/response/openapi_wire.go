@@ -34,14 +34,13 @@ type DefinitionFactorEdgeWire struct {
 }
 
 type DefinitionScoringWire struct {
-	FactorCode    string                        `json:"FactorCode"`
-	Sources       []DefinitionScoringSourceWire `json:"Sources"`
-	Strategy      string                        `json:"Strategy" enums:"sum,avg,weighted_sum,weighted_avg,cnt,none,lookup,custom"`
-	Params        *DefinitionScoringParamsWire  `json:"Params,omitempty"`
-	MaxScore      *float64                      `json:"MaxScore,omitempty"`
-	Weights       map[string]float64            `json:"Weights,omitempty"`
-	Constant      float64                       `json:"Constant,omitempty"`
-	OptionScoring string                        `json:"OptionScoring,omitempty" enums:"strict,compat"`
+	FactorCode string                        `json:"FactorCode"`
+	Sources    []DefinitionScoringSourceWire `json:"Sources"`
+	Strategy   string                        `json:"Strategy" enums:"sum,avg,weighted_sum,weighted_avg,cnt,none,lookup,custom"`
+	Params     *DefinitionScoringParamsWire  `json:"Params,omitempty"`
+	MaxScore   *float64                      `json:"MaxScore,omitempty"`
+	Weights    map[string]float64            `json:"Weights,omitempty"`
+	Constant   float64                       `json:"Constant,omitempty"`
 }
 
 type DefinitionScoringSourceWire struct {

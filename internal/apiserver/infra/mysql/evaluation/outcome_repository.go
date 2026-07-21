@@ -27,7 +27,6 @@ type EvaluationOutcomePO struct {
 	ModelTitle       *string   `gorm:"column:model_title;size:255"`
 	AlgorithmFamily  *string   `gorm:"column:algorithm_family;size:50"`
 	DecisionKind     *string   `gorm:"column:decision_kind;size:50"`
-	PayloadFormat    *string   `gorm:"column:payload_format;size:100"`
 	InputSnapshotRef *string   `gorm:"column:input_snapshot_ref;size:200"`
 	ReportInputJSON  *string   `gorm:"column:report_input_json;type:longtext"`
 	PayloadJSON      string    `gorm:"column:payload_json;type:longtext;not null"`
@@ -96,7 +95,6 @@ func outcomeToPO(record *domainoutcome.Record) *EvaluationOutcomePO {
 		ModelTitle:       optionalString(model.Title),
 		AlgorithmFamily:  optionalString(runtime.AlgorithmFamily.String()),
 		DecisionKind:     optionalString(string(runtime.DecisionKind)),
-		PayloadFormat:    optionalString(runtime.PayloadFormat),
 		InputSnapshotRef: optionalString(record.InputSnapshotRef()),
 		ReportInputJSON:  optionalString(string(record.ReportInput())),
 		PayloadJSON:      string(record.Payload()),
@@ -127,7 +125,6 @@ func outcomeFromPO(po *EvaluationOutcomePO) (*domainoutcome.Record, error) {
 		Runtime: domainoutcome.RuntimeIdentity{
 			AlgorithmFamily: modelcatalog.AlgorithmFamily(valueOrEmpty(po.AlgorithmFamily)),
 			DecisionKind:    modelcatalog.DecisionKind(valueOrEmpty(po.DecisionKind)),
-			PayloadFormat:   valueOrEmpty(po.PayloadFormat),
 		},
 		InputSnapshotRef: valueOrEmpty(po.InputSnapshotRef),
 		ReportInput:      []byte(valueOrEmpty(po.ReportInputJSON)),

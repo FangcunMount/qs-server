@@ -149,17 +149,13 @@ func run(cfg config) error {
 	if err != nil {
 		return err
 	}
-	definitionJSON, err := json.Marshal(definition)
-	if err != nil {
-		return fmt.Errorf("marshal DefinitionV2: %w", err)
-	}
 	normRepo := mongomodelcatalog.NewNormRepository(db)
 	runner := modelseed.NewMongoTransactionRunner(client)
 	if err := modelseed.RunAtomically(ctx, runner, func(txCtx context.Context) error {
 		if err := normRepo.UpsertNorm(txCtx, table); err != nil {
 			return fmt.Errorf("upsert norm %s: %w", table.TableVersion, err)
 		}
-		return seedModel(txCtx, db, cfg, questionnaire.GetVersion().Value(), definition, definitionJSON, normRepo)
+		return seedModel(txCtx, db, cfg, questionnaire.GetVersion().Value(), definition, normRepo)
 	}); err != nil {
 		return err
 	}
@@ -167,7 +163,7 @@ func run(cfg config) error {
 	return nil
 }
 
-func seedModel(ctx context.Context, db *mongo.Database, cfg config, questionnaireVersion string, definition *modeldefinition.Definition, definitionJSON []byte, normRepo *mongomodelcatalog.NormRepository) error {
+func seedModel(ctx context.Context, db *mongo.Database, cfg config, questionnaireVersion string, definition *modeldefinition.Definition, normRepo *mongomodelcatalog.NormRepository) error {
 	draftRepo := mongomodelcatalog.NewDraftRepository(db)
 	publishedRepository := mongomodelcatalog.NewRepository(db)
 	publishedRepo := publishedRepository
@@ -202,7 +198,7 @@ func seedModel(ctx context.Context, db *mongo.Database, cfg config, questionnair
 	if err := model.BindQuestionnaire(domain.QuestionnaireBinding{QuestionnaireCode: cfg.questionnaireCode, QuestionnaireVersion: questionnaireVersion}, now); err != nil {
 		return fmt.Errorf("bind questionnaire: %w", err)
 	}
-	if err := model.UpdateDefinitionWithV2(domain.DefinitionPayload{Format: domain.PayloadFormatBehavioralRatingDefaultV1, Data: definitionJSON}, definition, now); err != nil {
+	if err := model.UpdateDefinition(definition, now); err != nil {
 		return fmt.Errorf("save DefinitionV2: %w", err)
 	}
 	handler := appdefinition.BehavioralRatingDefinitionHandler{NormRepo: normRepo}
@@ -496,7 +492,7 @@ func buildDefinition(questionnaire *surveyquestionnaire.Questionnaire, factorMap
 			seenQuestions[questionCode] = code
 			sources = append(sources, factor.ScoringSource{Kind: factor.ScoringSourceQuestion, Code: questionCode, Sign: 1, OptionScores: cloneScores(optionScores)})
 		}
-		definition.Measure.Scoring = append(definition.Measure.Scoring, factor.Scoring{FactorCode: code, Sources: sources, Strategy: factor.ScoringStrategySum, OptionScoring: factor.OptionScoringStrict})
+		definition.Measure.Scoring = append(definition.Measure.Scoring, factor.Scoring{FactorCode: code, Sources: sources, Strategy: factor.ScoringStrategySum})
 	}
 	for questionCode := range questionScores {
 		if _, ok := seenQuestions[questionCode]; !ok {

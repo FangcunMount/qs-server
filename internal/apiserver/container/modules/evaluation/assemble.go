@@ -218,7 +218,7 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 			evaluationintake.WithPostCommitDispatcher(infra.postCommit),
 		)
 	}
-	scoreFacts := evaluationoutcome.NewScoreFactReader(infra.outcomeRepo, infra.scoreProjectionReader, infra.assessmentReader, normalized.ScaleCatalog)
+	scoreFacts := evaluationoutcome.NewScoreFactReader(infra.outcomeRepo, infra.scoreProjectionReader)
 	m.TesteeService = evaluationtestee.NewService(infra.assessmentRepo, infra.assessmentReader, scoreFacts)
 	m.OperatorQuery = evaluationoperator.NewQueryService(infra.assessmentRepo, infra.assessmentReader, normalized.TesteeAccessChecker, scoreFacts, infra.runRepo)
 	m.GovernedRetry = evaluationoperator.NewGovernedRetryService(infra.assessmentRepo, infra.runRepo, infra.txRunner, infra.assessmentOutboxStore, normalized.TesteeAccessChecker)

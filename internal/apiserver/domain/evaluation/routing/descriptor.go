@@ -10,7 +10,6 @@ import (
 type DescriptorKey struct {
 	AlgorithmFamily modelcatalog.AlgorithmFamily
 	DecisionKind    modelcatalog.DecisionKind
-	PayloadFormat   string
 }
 
 // ModelRoute 是运行时路由需要的最小模型身份。
@@ -20,12 +19,11 @@ type ModelRoute struct {
 	Algorithm       modelcatalog.Algorithm
 	AlgorithmFamily modelcatalog.AlgorithmFamily
 	DecisionKind    modelcatalog.DecisionKind
-	PayloadFormat   string
 }
 
 // HasFrozenRuntime reports publish-time complete RuntimeIdentity on the route.
 func (r ModelRoute) HasFrozenRuntime() bool {
-	return r.AlgorithmFamily != "" && r.DecisionKind != "" && r.PayloadFormat != ""
+	return r.AlgorithmFamily != "" && r.DecisionKind != ""
 }
 
 func (k DescriptorKey) IsZero() bool {
@@ -36,9 +34,6 @@ func (k DescriptorKey) String() string {
 	parts := []string{k.AlgorithmFamily.String()}
 	if k.DecisionKind != "" {
 		parts = append(parts, string(k.DecisionKind))
-	}
-	if k.PayloadFormat != "" {
-		parts = append(parts, k.PayloadFormat)
 	}
 	return strings.Join(parts, "/")
 }

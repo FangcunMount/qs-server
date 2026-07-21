@@ -41,7 +41,6 @@ type CatalogModelSummary struct {
 	// Publish-time frozen RuntimeIdentity (MC-R006).
 	AlgorithmFamily string `protobuf:"bytes,16,opt,name=algorithm_family,json=algorithmFamily,proto3" json:"algorithm_family,omitempty"`
 	DecisionKind    string `protobuf:"bytes,17,opt,name=decision_kind,json=decisionKind,proto3" json:"decision_kind,omitempty"`
-	PayloadFormat   string `protobuf:"bytes,18,opt,name=payload_format,json=payloadFormat,proto3" json:"payload_format,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -191,13 +190,6 @@ func (x *CatalogModelSummary) GetAlgorithmFamily() string {
 func (x *CatalogModelSummary) GetDecisionKind() string {
 	if x != nil {
 		return x.DecisionKind
-	}
-	return ""
-}
-
-func (x *CatalogModelSummary) GetPayloadFormat() string {
-	if x != nil {
-		return x.PayloadFormat
 	}
 	return ""
 }
@@ -946,7 +938,7 @@ var File_assessmentmodel_assessment_model_catalog_proto protoreflect.FileDescrip
 
 const file_assessmentmodel_assessment_model_catalog_proto_rawDesc = "" +
 	"\n" +
-	".assessmentmodel/assessment_model_catalog.proto\x12\x0fassessmentmodel\"\xd9\x04\n" +
+	".assessmentmodel/assessment_model_catalog.proto\x12\x0fassessmentmodel\"\xc8\x04\n" +
 	"\x13CatalogModelSummary\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x19\n" +
@@ -965,8 +957,7 @@ const file_assessmentmodel_assessment_model_catalog_proto_rawDesc = "" +
 	"\x12questionnaire_code\x18\x0e \x01(\tR\x11questionnaireCode\x123\n" +
 	"\x15questionnaire_version\x18\x0f \x01(\tR\x14questionnaireVersion\x12)\n" +
 	"\x10algorithm_family\x18\x10 \x01(\tR\x0falgorithmFamily\x12#\n" +
-	"\rdecision_kind\x18\x11 \x01(\tR\fdecisionKind\x12%\n" +
-	"\x0epayload_format\x18\x12 \x01(\tR\rpayloadFormat\"\x9d\x01\n" +
+	"\rdecision_kind\x18\x11 \x01(\tR\fdecisionKindJ\x04\b\x12\x10\x13R\x0epayload_format\"\x9d\x01\n" +
 	"\x18PublishedAssessmentModel\x12>\n" +
 	"\asummary\x18\x01 \x01(\v2$.assessmentmodel.CatalogModelSummaryR\asummary\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12'\n" +

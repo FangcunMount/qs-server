@@ -32,10 +32,8 @@ func (Mapper) ToPO(model *port.PublishedModel) *PublishedAssessmentModelPO {
 	productChannel := domain.ResolveProductChannel(kind, model.ProductChannel)
 	return &PublishedAssessmentModelPO{
 		SchemaVersion:           schemaVersion,
-		PayloadFormat:           model.PayloadFormat,
 		RecordRole:              recordRolePublishedSnapshot,
-		IsActivePublished:       false,
-		ReleaseStatus:           string(domain.NormalizeReleaseStatus(model.ReleaseStatus, true)),
+		ReleaseStatus:           string(domain.NormalizeReleaseStatus(model.ReleaseStatus)),
 		ProductChannel:          string(productChannel),
 		Kind:                    string(kind),
 		SubKind:                 string(model.SubKind),
@@ -55,7 +53,6 @@ func (Mapper) ToPO(model *port.PublishedModel) *PublishedAssessmentModelPO {
 		QuestionnaireCode:       model.QuestionnaireCode,
 		QuestionnaireVersion:    model.QuestionnaireVersion,
 		Source:                  source,
-		Payload:                 append([]byte(nil), model.Payload...),
 		DefinitionSchemaVersion: definitionSchemaVersion(model.DefinitionV2),
 		DefinitionV2:            definitionToPO(model.DefinitionV2),
 		PublishedAt:             model.PublishedAt,
@@ -78,7 +75,6 @@ func (Mapper) ToPublished(po *PublishedAssessmentModelPO) *port.PublishedModel {
 	}
 	model := &port.PublishedModel{
 		SchemaVersion:        po.SchemaVersion,
-		PayloadFormat:        po.PayloadFormat,
 		ProductChannel:       productChannel,
 		Kind:                 kind,
 		SubKind:              domain.SubKind(po.SubKind),
@@ -94,29 +90,14 @@ func (Mapper) ToPublished(po *PublishedAssessmentModelPO) *port.PublishedModel {
 		Reporters:            append([]string(nil), po.Reporters...),
 		Tags:                 append([]string(nil), po.Tags...),
 		Status:               po.Status,
-		ReleaseStatus:        domain.NormalizeReleaseStatus(domain.ReleaseStatus(po.ReleaseStatus), po.IsActivePublished),
+		ReleaseStatus:        domain.NormalizeReleaseStatus(domain.ReleaseStatus(po.ReleaseStatus)),
 		PublishedAt:          po.PublishedAt,
 		ReleaseArchivedAt:    po.ReleaseArchivedAt,
 		DecisionKind:         domain.DecisionKind(po.DecisionKind),
 		QuestionnaireCode:    po.QuestionnaireCode,
 		QuestionnaireVersion: po.QuestionnaireVersion,
 		Source:               source,
-		Payload:              append([]byte(nil), po.Payload...),
 		DefinitionV2:         definitionFromPO(po.DefinitionV2),
 	}
-	backfillAlgorithmFamily(model)
 	return model
-}
-
-func backfillAlgorithmFamily(model *port.PublishedModel) {
-	if model == nil || model.AlgorithmFamily != "" {
-		return
-	}
-	if f, ok := domain.AlgorithmFamilyFromDecisionKind(model.DecisionKind); ok {
-		model.AlgorithmFamily = f
-		return
-	}
-	if f, ok := domain.AlgorithmFamilyFromIdentity(model.Kind, model.SubKind, model.Algorithm); ok {
-		model.AlgorithmFamily = f
-	}
 }

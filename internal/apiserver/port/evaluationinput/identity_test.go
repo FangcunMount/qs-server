@@ -3,6 +3,8 @@ package evaluationinput
 import (
 	"strings"
 	"testing"
+
+	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 )
 
 func ageMonthsPtr(value int) *int { return &value }
@@ -11,7 +13,7 @@ func identityFixtureSnapshot() *InputSnapshot {
 	return &InputSnapshot{
 		Model: &ModelSnapshot{
 			Kind: EvaluationModelKindScale, Algorithm: "scale_default",
-			AlgorithmFamily: "factor_scoring", DecisionKind: "score_banding", PayloadFormat: "scale/v1",
+			AlgorithmFamily: "factor_scoring", DecisionKind: "score_range",
 			Code: "PHQ9", Version: "1.0.0",
 		},
 		Questionnaire: &QuestionnaireSnapshot{
@@ -25,7 +27,8 @@ func identityFixtureSnapshot() *InputSnapshot {
 			ID: 2001, QuestionnaireCode: "PHQ9-Q", QuestionnaireVersion: "1.0.0",
 			Answers: []AnswerSnapshot{{QuestionCode: "q1", Score: 1, Value: "b"}},
 		},
-		NormSubject: &NormSubjectSnapshot{AgeMonths: ageMonthsPtr(120), Gender: "male"},
+		NormSubject:  &NormSubjectSnapshot{AgeMonths: ageMonthsPtr(120), Gender: "male"},
+		DefinitionV2: &modeldefinition.Definition{},
 	}
 }
 
@@ -60,10 +63,6 @@ func TestInputSnapshotIdentityDistinguishesKnownZeroAgeFromMissing(t *testing.T)
 	if missingIdentity.Ref() == knownIdentity.Ref() {
 		t.Fatal("v2 identity conflates missing age with known zero months")
 	}
-	legacy, _ := NewLegacyV1InputSnapshotIdentity(knownZero)
-	if !strings.HasPrefix(legacy.Ref(), IdentityRefV1Prefix) {
-		t.Fatalf("legacy ref = %q", legacy.Ref())
-	}
 }
 
 func TestInputSnapshotIdentityChangesWithAnyComponent(t *testing.T) {
@@ -71,8 +70,11 @@ func TestInputSnapshotIdentityChangesWithAnyComponent(t *testing.T) {
 	base, _ := NewInputSnapshotIdentity(identityFixtureSnapshot())
 
 	mutations := map[string]func(*InputSnapshot){
-		"model version":        func(s *InputSnapshot) { s.Model.Version = "1.0.1" },
-		"payload format":       func(s *InputSnapshot) { s.Model.PayloadFormat = "scale/v2" },
+		"model version": func(s *InputSnapshot) { s.Model.Version = "1.0.1" },
+		"decision kind": func(s *InputSnapshot) { s.Model.DecisionKind = "norm_lookup" },
+		"definition": func(s *InputSnapshot) {
+			s.DefinitionV2.ReportMap.Sections = []modeldefinition.ReportSection{{Code: "summary"}}
+		},
 		"questionnaire option": func(s *InputSnapshot) { s.Questionnaire.Questions[0].Options[1].Score = 2 },
 		"answer score":         func(s *InputSnapshot) { s.AnswerSheet.Answers[0].Score = 3 },
 		"answer value":         func(s *InputSnapshot) { s.AnswerSheet.Answers[0].Value = "a" },
@@ -127,10 +129,10 @@ func TestIsIdentityRefDistinguishesLegacyRefs(t *testing.T) {
 	if IsIdentityRef("model:PHQ9@1.0.0") || IsIdentityRef("answersheet:2001") || IsIdentityRef("") {
 		t.Fatal("legacy refs misclassified")
 	}
-	if !IsIdentityRef("isn:v1:abc") {
-		t.Fatal("v1 identity ref not recognized")
+	if IsIdentityRef("isn:v1:"+strings.Repeat("a", 64)) || IsIdentityRef("isn:v2:abc") {
+		t.Fatal("legacy or malformed identity ref recognized")
 	}
-	if !IsIdentityRef("isn:v2:abc") || !IsV1IdentityRef("isn:v1:abc") || !IsV2IdentityRef("isn:v2:abc") {
-		t.Fatal("versioned identity ref not recognized")
+	if !IsIdentityRef("isn:v2:" + strings.Repeat("a", 64)) {
+		t.Fatal("current identity ref not recognized")
 	}
 }

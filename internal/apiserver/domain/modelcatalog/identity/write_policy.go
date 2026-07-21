@@ -8,8 +8,6 @@ const (
 	AlgorithmWriteCanonical AlgorithmWritePolicy = "canonical"
 	// AlgorithmWriteDraftOK allows empty Algorithm during draft authoring only.
 	AlgorithmWriteDraftOK AlgorithmWritePolicy = "draft_ok"
-	// AlgorithmWriteRetainedRead is readable for historical Assessment/snapshot replay only.
-	AlgorithmWriteRetainedRead AlgorithmWritePolicy = "retained_read"
 	// AlgorithmWriteUnknown is neither a known draft, publish, nor retained-read value.
 	AlgorithmWriteUnknown AlgorithmWritePolicy = "unknown"
 )
@@ -65,13 +63,8 @@ func IsCanonicalPublishAlgorithm(kind Kind, algorithm Algorithm) bool {
 	return ClassifyAlgorithmWritePolicy(kind, algorithm) == AlgorithmWriteCanonical
 }
 
-// IsRetainedReadAlgorithm reports historical aliases still accepted on retained-read paths.
-func IsRetainedReadAlgorithm(kind Kind, algorithm Algorithm) bool {
-	return ClassifyAlgorithmWritePolicy(kind, algorithm) == AlgorithmWriteRetainedRead
-}
-
-// LegacyIdentityAuditIssue records a published or runtime identity that is not canonical.
-type LegacyIdentityAuditIssue struct {
+// IdentityAuditIssue records a published or runtime identity that is not canonical.
+type IdentityAuditIssue struct {
 	Code      string
 	Message   string
 	Kind      Kind
@@ -80,23 +73,18 @@ type LegacyIdentityAuditIssue struct {
 }
 
 // AuditIdentityWritePolicy classifies Kind/Algorithm for inventory and retirement gates.
-func AuditIdentityWritePolicy(kind Kind, algorithm Algorithm) []LegacyIdentityAuditIssue {
+func AuditIdentityWritePolicy(kind Kind, algorithm Algorithm) []IdentityAuditIssue {
 	policy := ClassifyAlgorithmWritePolicy(kind, algorithm)
 	switch policy {
 	case AlgorithmWriteCanonical:
 		return nil
 	case AlgorithmWriteDraftOK:
-		return []LegacyIdentityAuditIssue{{
+		return []IdentityAuditIssue{{
 			Code: "identity.algorithm.empty", Message: "algorithm is empty; draft-only, not publishable",
 			Kind: kind, Algorithm: algorithm, Policy: policy,
 		}}
-	case AlgorithmWriteRetainedRead:
-		return []LegacyIdentityAuditIssue{{
-			Code: "identity.algorithm.retained_read", Message: "algorithm is a retained-read legacy alias",
-			Kind: kind, Algorithm: algorithm, Policy: policy,
-		}}
 	default:
-		return []LegacyIdentityAuditIssue{{
+		return []IdentityAuditIssue{{
 			Code: "identity.algorithm.unknown", Message: "algorithm is not a known identity binding",
 			Kind: kind, Algorithm: algorithm, Policy: policy,
 		}}

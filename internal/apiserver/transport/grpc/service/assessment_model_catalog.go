@@ -100,7 +100,7 @@ func toProtoSummary(summary modelcatalog.ModelSummary) *pb.CatalogModelSummary {
 		Stages: append([]string(nil), summary.Stages...), ApplicableAges: append([]string(nil), summary.ApplicableAges...),
 		Reporters: append([]string(nil), summary.Reporters...), Tags: append([]string(nil), summary.Tags...),
 		QuestionnaireCode: summary.QuestionnaireCode, QuestionnaireVersion: summary.QuestionnaireVersion,
-		AlgorithmFamily: summary.AlgorithmFamily, DecisionKind: summary.DecisionKind, PayloadFormat: summary.PayloadFormat,
+		AlgorithmFamily: summary.AlgorithmFamily, DecisionKind: summary.DecisionKind,
 	}
 }
 
@@ -116,9 +116,6 @@ func toProtoPublishedModel(model *modelcatalog.PublishedModelDetail) (*pb.Publis
 	if summary != nil {
 		if summary.DecisionKind == "" {
 			summary.DecisionKind = model.DecisionKind
-		}
-		if summary.PayloadFormat == "" {
-			summary.PayloadFormat = model.PayloadFormat
 		}
 	}
 	return &pb.PublishedAssessmentModel{Summary: summary, Version: model.Version, DefinitionJson: definition}, nil

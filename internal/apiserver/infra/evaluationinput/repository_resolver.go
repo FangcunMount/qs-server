@@ -164,11 +164,6 @@ func (r *ModelInputProviderRegistry) Resolve(key evaldomain.ExecutionIdentity) (
 	if provider, ok := r.items[key]; ok {
 		return provider, nil
 	}
-	if key.Kind == modelcatalog.KindTypology && key.SubKind == modelcatalog.SubKindTypology {
-		if provider, ok := r.items[evaldomain.ExecutionIdentityPersonalityTypology]; ok {
-			return provider, nil
-		}
-	}
 	return nil, fmt.Errorf("unsupported evaluation model key: %s", key)
 }
 

@@ -13,7 +13,7 @@ func TestApplyScoringProjectionDoesNotTreatTypeCodeAsRiskLevel(t *testing.T) {
 	modelRef := NewEvaluationModelRefWithIdentity(
 		EvaluationModelKindTypology,
 		modelcatalog.SubKindTypology,
-		modelcatalog.AlgorithmMBTI,
+		modelcatalog.AlgorithmPersonalityTypology,
 		meta.ID(0),
 		meta.NewCode("MBTI_TEST"),
 		"1.0.0",

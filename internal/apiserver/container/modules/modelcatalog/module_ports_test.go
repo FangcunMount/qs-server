@@ -18,7 +18,9 @@ func TestEvaluationCatalogExportsRuntimeExecutionPaths(t *testing.T) {
 		modelcatalog.ExecutionPathBehavioralRatingDescriptor,
 		modelcatalog.ExecutionPathCognitiveDescriptor,
 	}
-	if catalog.RuntimeDescriptorRegistry == nil || catalog.RuntimeDescriptorRegistry.Len() != len(want) {
+	// Exact (AlgorithmFamily, DecisionKind) registration intentionally creates
+	// seven descriptors that collapse to four execution paths.
+	if catalog.RuntimeDescriptorRegistry == nil || catalog.RuntimeDescriptorRegistry.Len() != 7 {
 		t.Fatalf("runtime registry = %#v", catalog.RuntimeDescriptorRegistry)
 	}
 	paths, err := evalruntime.ExecutionPathsFromRegistry(catalog.RuntimeDescriptorRegistry)

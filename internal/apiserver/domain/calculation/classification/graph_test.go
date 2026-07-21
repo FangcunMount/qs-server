@@ -37,13 +37,13 @@ func TestFactorGraphScoresLeafAndCompositeSum(t *testing.T) {
 			"EI": {
 				Constant: 10,
 				Contributions: []classification.AnswerContribution{
-					{QuestionCode: "q1", Sign: 1},
+					{QuestionCode: "q1", ScoringMode: classification.QuestionScoringModeQuestionScore, Sign: 1, Weight: 1},
 				},
 			},
 			"SN": {
 				Constant: 5,
 				Contributions: []classification.AnswerContribution{
-					{QuestionCode: "q2", Sign: 2},
+					{QuestionCode: "q2", ScoringMode: classification.QuestionScoringModeQuestionScore, Sign: 1, Weight: 2},
 				},
 			},
 		},
@@ -211,8 +211,8 @@ func TestFactorGraphScoresWeightedAverageByChildrenOrder(t *testing.T) {
 			},
 		},
 		LeafSpecs: map[classification.FactorID]classification.LeafScoringSpec{
-			"a": {Contributions: []classification.AnswerContribution{{QuestionCode: "q1", Sign: 1}}},
-			"b": {Contributions: []classification.AnswerContribution{{QuestionCode: "q2", Sign: 2}}},
+			"a": {Contributions: []classification.AnswerContribution{{QuestionCode: "q1", ScoringMode: classification.QuestionScoringModeQuestionScore, Sign: 1, Weight: 1}}},
+			"b": {Contributions: []classification.AnswerContribution{{QuestionCode: "q2", ScoringMode: classification.QuestionScoringModeQuestionScore, Sign: 1, Weight: 2}}},
 		},
 		Roots: []classification.FactorID{"total"},
 	}

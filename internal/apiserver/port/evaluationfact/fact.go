@@ -23,7 +23,6 @@ type ModelIdentity struct {
 type RuntimeIdentity struct {
 	AlgorithmFamily modelcatalog.AlgorithmFamily
 	DecisionKind    modelcatalog.DecisionKind
-	PayloadFormat   string
 }
 
 type NewRecordInput struct {

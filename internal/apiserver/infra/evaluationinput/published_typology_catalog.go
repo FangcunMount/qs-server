@@ -120,9 +120,6 @@ func decodePublishedTypologyModel(model *rulesetport.PublishedModel) (*modeltypo
 	if model == nil {
 		return nil, domain.ErrNotFound
 	}
-	if model.PayloadFormat != domain.PayloadFormatPersonalityTypologyV1 {
-		return nil, fmt.Errorf("unsupported typology payload format %q", model.PayloadFormat)
-	}
 	if model.DefinitionV2 == nil {
 		return nil, fmt.Errorf("typology definition_v2 is required for runtime: %s", model.Code)
 	}

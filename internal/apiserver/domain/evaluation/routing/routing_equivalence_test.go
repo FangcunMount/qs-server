@@ -3,165 +3,41 @@ package evaluation_test
 import (
 	"testing"
 
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
+	evalrouting "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-func TestDescriptorKeyMatchesIdentityDerivation(t *testing.T) {
-	t.Parallel()
-
-	cases := []evalpipeline.ModelRoute{
-		{
-			Kind:          modelcatalog.KindScale,
-			Algorithm:     modelcatalog.AlgorithmScaleDefault,
-			DecisionKind:  modelcatalog.DecisionKindScoreRange,
-			PayloadFormat: modelcatalog.PayloadFormatAssessmentScaleV1,
-		},
-		{
-			Kind:          modelcatalog.KindTypology,
-			SubKind:       modelcatalog.SubKindTypology,
-			Algorithm:     modelcatalog.AlgorithmMBTI,
-			DecisionKind:  modelcatalog.DecisionKindPoleComposition,
-			PayloadFormat: modelcatalog.PayloadFormatPersonalityTypologyV1,
-		},
-		{
-			DecisionKind:  modelcatalog.DecisionKindNormLookup,
-			PayloadFormat: modelcatalog.PayloadFormatBehavioralRatingBrief2V1,
-		},
+func TestFrozenRoutesAlignFamilyAndDecision(t *testing.T) {
+	cases := []evalrouting.ModelRoute{
+		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
+		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindPoleComposition},
+		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindTraitProfile},
+		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindNearestPattern},
+		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindDominantFactor},
+		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorNorm, DecisionKind: modelcatalog.DecisionKindNormLookup},
+		{AlgorithmFamily: modelcatalog.AlgorithmFamilyTaskPerformance, DecisionKind: modelcatalog.DecisionKindAbilityLevel},
 	}
-	for i, route := range cases {
-		key, err := evalpipeline.DescriptorKeyFromRoute(route)
+	for _, route := range cases {
+		key, err := evalrouting.DescriptorKeyFromRoute(route)
 		if err != nil {
-			t.Fatalf("case %d: %v", i, err)
+			t.Fatalf("route %#v: %v", route, err)
 		}
-		family, ok := evalpipeline.ExecutionFamilyFromRoute(route)
-		if !ok {
-			t.Fatalf("case %d: ExecutionFamilyFromRoute failed", i)
-		}
-		if key.AlgorithmFamily != family {
-			t.Fatalf("case %d: key family=%s route family=%s", i, key.AlgorithmFamily, family)
-		}
-		if route.DecisionKind != "" {
-			wantFamily, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(route.DecisionKind)
-			if !ok {
-				t.Fatalf("case %d: decision kind %s", i, route.DecisionKind)
-			}
-			if key.AlgorithmFamily != wantFamily {
-				t.Fatalf("case %d: family=%s want=%s", i, key.AlgorithmFamily, wantFamily)
-			}
-			if key.DecisionKind != route.DecisionKind {
-				t.Fatalf("case %d: decision=%s want=%s", i, key.DecisionKind, route.DecisionKind)
-			}
+		if key.AlgorithmFamily != route.AlgorithmFamily || key.DecisionKind != route.DecisionKind {
+			t.Fatalf("route %#v => key %#v", route, key)
 		}
 	}
 }
 
-func TestRouteIdentityFamilyMatchesRuntimeFamily(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name  string
-		route evalpipeline.ModelRoute
-		want  modelcatalog.AlgorithmFamily
-	}{
-		{
-			name: "scale",
-			route: evalpipeline.ModelRoute{
-				Kind:      modelcatalog.KindScale,
-				Algorithm: modelcatalog.AlgorithmScaleDefault,
-			},
-			want: modelcatalog.AlgorithmFamilyFactorScoring,
-		},
-		{
-			name: "typology",
-			route: evalpipeline.ModelRoute{
-				Kind:      modelcatalog.KindTypology,
-				SubKind:   modelcatalog.SubKindTypology,
-				Algorithm: modelcatalog.AlgorithmMBTI,
-			},
-			want: modelcatalog.AlgorithmFamilyFactorClassification,
-		},
-		{
-			name: "behavioral_rating",
-			route: evalpipeline.ModelRoute{
-				Kind:      modelcatalog.KindBehavioralRating,
-				Algorithm: modelcatalog.AlgorithmBrief2,
-			},
-			want: modelcatalog.AlgorithmFamilyFactorNorm,
-		},
-		{
-			name: "cognitive_projection",
-			route: evalpipeline.ModelRoute{
-				Kind:      modelcatalog.KindCognitive,
-				Algorithm: modelcatalog.AlgorithmSPM,
-			},
-			want: modelcatalog.AlgorithmFamilyTaskPerformance,
-		},
+func TestIncompleteOrConflictingRoutesFailClosed(t *testing.T) {
+	cases := []evalrouting.ModelRoute{
+		{Kind: modelcatalog.KindScale, Algorithm: modelcatalog.AlgorithmScaleDefault},
+		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring},
+		{DecisionKind: modelcatalog.DecisionKindScoreRange},
+		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorNorm, DecisionKind: modelcatalog.DecisionKindScoreRange},
 	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			fromIdentity, ok := modelcatalog.AlgorithmFamilyFromIdentity(tc.route.Kind, tc.route.SubKind, tc.route.Algorithm)
-			if !ok {
-				t.Fatalf("AlgorithmFamilyFromIdentity(%s,%s,%s) ok = false", tc.route.Kind, tc.route.SubKind, tc.route.Algorithm)
-			}
-			fromRuntime, ok := evalpipeline.ExecutionFamilyFromRoute(tc.route)
-			if !ok {
-				t.Fatalf("ExecutionFamilyFromRoute(%s) ok = false", tc.name)
-			}
-			if fromIdentity != fromRuntime {
-				t.Fatalf("family mismatch: identity=%s runtime=%s", fromIdentity, fromRuntime)
-			}
-			if fromRuntime != tc.want {
-				t.Fatalf("family = %s, want %s", fromRuntime, tc.want)
-			}
-		})
-	}
-}
-
-func TestRouteRoutingUsesCanonicalTypologyKind(t *testing.T) {
-	t.Parallel()
-
-	family, ok := evalpipeline.ExecutionFamilyFromRoute(evalpipeline.ModelRoute{Kind: modelcatalog.KindTypology})
-	if !ok {
-		t.Fatal("ExecutionFamilyFromRoute(typology) ok = false")
-	}
-	if family != modelcatalog.AlgorithmFamilyFactorClassification {
-		t.Fatalf("family = %s, want %s", family, modelcatalog.AlgorithmFamilyFactorClassification)
-	}
-}
-
-func TestDescriptorKeyAlignsWithMechanismReportBuilderFamilyAndDecision(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		route evalpipeline.ModelRoute
-	}{
-		{
-			route: evalpipeline.ModelRoute{DecisionKind: modelcatalog.DecisionKindScoreRange},
-		},
-		{
-			route: evalpipeline.ModelRoute{DecisionKind: modelcatalog.DecisionKindPoleComposition},
-		},
-		{
-			route: evalpipeline.ModelRoute{DecisionKind: modelcatalog.DecisionKindTraitProfile},
-		},
-	}
-	for i, tc := range cases {
-		key, err := evalpipeline.DescriptorKeyFromRoute(tc.route)
-		if err != nil {
-			t.Fatalf("case %d: %v", i, err)
-		}
-		family, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(tc.route.DecisionKind)
-		if !ok {
-			t.Fatalf("case %d: decision %s", i, tc.route.DecisionKind)
-		}
-		if key.AlgorithmFamily != family {
-			t.Fatalf("case %d: family=%s want=%s", i, key.AlgorithmFamily, family)
-		}
-		if key.DecisionKind != tc.route.DecisionKind {
-			t.Fatalf("case %d: decision=%s want=%s", i, key.DecisionKind, tc.route.DecisionKind)
+	for _, route := range cases {
+		if _, err := evalrouting.DescriptorKeyFromRoute(route); err == nil {
+			t.Fatalf("route %#v unexpectedly resolved", route)
 		}
 	}
 }

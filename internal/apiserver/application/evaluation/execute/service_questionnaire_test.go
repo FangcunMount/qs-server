@@ -438,10 +438,11 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 	}
 	input := &successfulInputResolver{snapshot: &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
-			Kind:  evaluationinput.EvaluationModelKindScale,
-			Code:  "S-001",
-			Title: "Scale",
+			Kind: evaluationinput.EvaluationModelKindScale, Algorithm: string(modelcatalog.AlgorithmScaleDefault),
+			AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorScoring), DecisionKind: string(modelcatalog.DecisionKindScoreRange),
+			Code: "S-001", Version: "1.0.0", Title: "Scale",
 		},
+		DefinitionV2:  modeldefinitionForExecutionTest(),
 		ModelPayload:  evaluationinput.ScaleModelPayload{Scale: &scalesnapshot.ScaleSnapshot{Code: "S-001", Title: "Scale"}},
 		AnswerSheet:   &evaluationinput.AnswerSheetSnapshot{ID: 303, QuestionnaireCode: "Q-001", QuestionnaireVersion: "1.0.0"},
 		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-001", Version: "1.0.0"},
@@ -493,11 +494,15 @@ func scaleModelRef() *domainAssessment.EvaluationModelRef {
 	return &ref
 }
 
+func modeldefinitionForExecutionTest() *modelcatalog.Definition {
+	return &modelcatalog.Definition{}
+}
+
 func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	modelRef := domainAssessment.NewEvaluationModelRefWithIdentity(
 		domainAssessment.EvaluationModelKindTypology,
 		modelcatalog.SubKindTypology,
-		modelcatalog.AlgorithmMBTI,
+		modelcatalog.AlgorithmPersonalityTypology,
 		meta.ID(0),
 		meta.NewCode("FAKE-MODEL"),
 		"1.0.0",
@@ -523,19 +528,22 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	}
 	input := &successfulInputResolver{snapshot: &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
-			Kind:      evaluationinput.EvaluationModelKindTypology,
-			SubKind:   string(modelcatalog.SubKindTypology),
-			Algorithm: string(modelcatalog.AlgorithmMBTI),
-			Code:      "FAKE-MODEL",
-			Version:   "1.0.0",
-			Title:     "Fake Model",
+			Kind:            evaluationinput.EvaluationModelKindTypology,
+			SubKind:         string(modelcatalog.SubKindTypology),
+			Algorithm:       string(modelcatalog.AlgorithmPersonalityTypology),
+			Code:            "FAKE-MODEL",
+			Version:         "1.0.0",
+			Title:           "Fake Model",
+			AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorClassification),
+			DecisionKind:    string(modelcatalog.DecisionKindPoleComposition),
 		},
+		DefinitionV2:  modeldefinitionForExecutionTest(),
 		AnswerSheet:   &evaluationinput.AnswerSheetSnapshot{ID: 305, QuestionnaireCode: "Q-FAKE", QuestionnaireVersion: "1.0.0"},
 		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-FAKE", Version: "1.0.0"},
 	}}
 	capture := &splitPhaseCapture{}
 	evaluator := evaluatorStub{
-		key: evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI),
+		key: evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmPersonalityTypology),
 		execute: func(ctx context.Context, input ExecutionInput) (*domainoutcome.Execution, error) {
 			modelRef := *input.Assessment.EvaluationModelRef()
 			execution := domainoutcome.NewExecution(

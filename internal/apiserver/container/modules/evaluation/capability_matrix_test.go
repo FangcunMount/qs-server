@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
-	evalrouting "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -15,21 +15,27 @@ func TestEvaluationModuleRegistersOnlyDeclaredDescriptorFamilies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DefaultRuntimeDescriptorRegistry() error = %v", err)
 	}
-	paths, err := evalruntime.ExecutionPathsFromRegistry(registry)
-	if err != nil {
-		t.Fatal(err)
+	routes := []evalpipeline.ModelRoute{
+		{AlgorithmFamily: domain.AlgorithmFamilyFactorScoring, DecisionKind: domain.DecisionKindScoreRange},
+		{AlgorithmFamily: domain.AlgorithmFamilyFactorNorm, DecisionKind: domain.DecisionKindNormLookup},
+		{AlgorithmFamily: domain.AlgorithmFamilyTaskPerformance, DecisionKind: domain.DecisionKindAbilityLevel},
+		{AlgorithmFamily: domain.AlgorithmFamilyFactorClassification, DecisionKind: domain.DecisionKindPoleComposition},
+		{AlgorithmFamily: domain.AlgorithmFamilyFactorClassification, DecisionKind: domain.DecisionKindTraitProfile},
+		{AlgorithmFamily: domain.AlgorithmFamilyFactorClassification, DecisionKind: domain.DecisionKindNearestPattern},
+		{AlgorithmFamily: domain.AlgorithmFamilyFactorClassification, DecisionKind: domain.DecisionKindDominantFactor},
 	}
-	if registry.Len() != len(paths) {
-		t.Fatalf("runtime descriptor count = %d, paths = %d", registry.Len(), len(paths))
+	if registry.Len() != len(routes) {
+		t.Fatalf("runtime descriptor count = %d, want %d exact routes", registry.Len(), len(routes))
 	}
-	for _, kind := range domain.RuntimeExecutableKinds() {
-		capability, ok := domain.FamilyCapabilityByKind(kind)
-		family, familyOK := evalrouting.ExecutionFamilyFromRoute(evalrouting.ModelRoute{Kind: kind})
-		if !ok || !capability.RuntimeExecutable || !familyOK || !registry.HasAlgorithmFamily(family) {
-			t.Fatalf("runtime descriptor missing for kind %s", kind)
+	for _, route := range routes {
+		if _, err := registry.Resolve(route); err != nil {
+			t.Fatalf("runtime descriptor missing for route %#v: %v", route, err)
 		}
 	}
-	if registry.HasAlgorithmFamily(domain.AlgorithmFamily("custom")) {
-		t.Fatal("custom runtime descriptor must not be registered")
+	if _, err := registry.Resolve(evalpipeline.ModelRoute{
+		AlgorithmFamily: domain.AlgorithmFamilyFactorClassification,
+		DecisionKind:    domain.DecisionKindScoreRange,
+	}); err == nil {
+		t.Fatal("conflicting family and decision must not resolve through fallback")
 	}
 }

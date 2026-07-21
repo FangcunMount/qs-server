@@ -26,7 +26,7 @@ func (h ScaleDefinitionHandler) ValidateForPublish(ctx context.Context, model *d
 	})
 }
 
-// BuildSnapshotPayload 构建评估模型快照负载
-func (ScaleDefinitionHandler) BuildSnapshotPayload(_ context.Context, model *domain.AssessmentModel) (SnapshotBuildResult, error) {
-	return (CompatibilityPayloadProjector{}).ProjectScale(model)
+// MaterializeSnapshot validates the DefinitionV2 scale runtime projection.
+func (ScaleDefinitionHandler) MaterializeSnapshot(_ context.Context, model *domain.AssessmentModel) (Materialization, error) {
+	return (RuntimeMaterializer{}).MaterializeScale(model)
 }

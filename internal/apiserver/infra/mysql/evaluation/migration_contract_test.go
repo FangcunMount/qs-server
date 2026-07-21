@@ -161,3 +161,23 @@ func TestEvaluationRunClaimLeaseMigrationContract(t *testing.T) {
 		}
 	}
 }
+
+func TestDefinitionV2OnlyOutcomeMigrationDropsPayloadFormat(t *testing.T) {
+	t.Parallel()
+	up, err := os.ReadFile("../../../../pkg/migration/migrations/mysql/000053_drop_evaluation_outcome_payload_format.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	down, err := os.ReadFile("../../../../pkg/migration/migrations/mysql/000053_drop_evaluation_outcome_payload_format.down.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(up), "DROP COLUMN `payload_format`") {
+		t.Fatalf("up migration = %s", up)
+	}
+	for _, token := range []string{"ADD COLUMN `payload_format`", "DEFAULT NULL"} {
+		if !strings.Contains(string(down), token) {
+			t.Fatalf("down migration does not contain %q", token)
+		}
+	}
+}

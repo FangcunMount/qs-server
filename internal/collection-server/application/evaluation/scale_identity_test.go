@@ -2,7 +2,7 @@ package evaluation
 
 import "testing"
 
-func TestIsTypologyModelSupportsCanonicalAndLegacyKinds(t *testing.T) {
+func TestIsTypologyModelAcceptsOnlyCanonicalKind(t *testing.T) {
 	t.Parallel()
 
 	for _, tc := range []struct {
@@ -11,9 +11,7 @@ func TestIsTypologyModelSupportsCanonicalAndLegacyKinds(t *testing.T) {
 		want  bool
 	}{
 		{name: "canonical", model: ModelIdentityResponse{Kind: typologyModelKind}, want: true},
-		{name: "legacy minimal identity", model: ModelIdentityResponse{Kind: personalityModelKind}, want: true},
-		{name: "legacy typology sub kind", model: ModelIdentityResponse{Kind: personalityModelKind, SubKind: "typology"}, want: true},
-		{name: "legacy non typology sub kind", model: ModelIdentityResponse{Kind: personalityModelKind, SubKind: "trait"}, want: false},
+		{name: "retired personality kind", model: ModelIdentityResponse{Kind: "personality"}, want: false},
 		{name: "scale", model: ModelIdentityResponse{Kind: "scale"}, want: false},
 	} {
 		tc := tc

@@ -2,8 +2,8 @@ package evaluation
 
 // ModelIdentityResponse 已发布模型引用（测评/报告层）。
 type ModelIdentityResponse struct {
-	// 测评层 Kind；类型学规范值为 typology，读兼容历史 personality。
-	Kind            string `json:"kind" example:"typology" enums:"typology,personality"`
+	// 测评层 Kind；类型学规范值为 typology。
+	Kind            string `json:"kind" example:"typology" enums:"scale,typology,behavioral_rating,cognitive"`
 	SubKind         string `json:"sub_kind,omitempty" example:"typology"`
 	Algorithm       string `json:"algorithm,omitempty"`
 	Code            string `json:"code"`
@@ -12,7 +12,6 @@ type ModelIdentityResponse struct {
 	ProductChannel  string `json:"product_channel,omitempty"`
 	AlgorithmFamily string `json:"algorithm_family,omitempty"`
 	DecisionKind    string `json:"decision_kind,omitempty"`
-	PayloadFormat   string `json:"payload_format,omitempty"`
 }
 
 // ScoreValueResponse 主分投影。

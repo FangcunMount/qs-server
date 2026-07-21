@@ -34,7 +34,7 @@ func registryKey(decision modelcatalog.DecisionKind) Key {
 		DecisionKind:    decision,
 		ReportType:      policy.ReportTypeStandard,
 		TemplateVersion: policy.TemplateVersionV1,
-		Algorithm:       modelcatalog.AlgorithmMBTI,
+		Algorithm:       modelcatalog.AlgorithmPersonalityTypology,
 		ProductChannel:  modelcatalog.ProductChannelTypology,
 		ReportProfile:   policy.ReportProfilePersonalityType,
 	}

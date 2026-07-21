@@ -20,9 +20,6 @@ var (
 		SubKind:   modelcatalog.SubKindTypology,
 		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
 	}
-	// ExecutionIdentityBehavioralRatingDefault is the retired family-route key.
-	// Input providers register under canonical algorithms (brief2 / spm_sensory).
-	ExecutionIdentityBehavioralRatingDefault = BehavioralRatingIdentity(modelcatalog.AlgorithmBehavioralRatingDefault)
 	// ExecutionIdentityCognitiveDefault is the SPM cognitive route identity.
 	ExecutionIdentityCognitiveDefault = CognitiveIdentity(modelcatalog.AlgorithmSPM)
 )
@@ -63,12 +60,4 @@ func (id ExecutionIdentity) String() string {
 
 func (id ExecutionIdentity) IsZero() bool {
 	return id.Kind == "" && id.SubKind == "" && id.Algorithm == ""
-}
-
-func ExecutionIdentityFromLegacyKind(kind modelcatalog.Kind) (ExecutionIdentity, bool) {
-	mappedKind, subKind, algorithm, ok := modelcatalog.LegacyKindMapping(kind)
-	if !ok {
-		return ExecutionIdentity{}, false
-	}
-	return ExecutionIdentity{Kind: mappedKind, SubKind: subKind, Algorithm: algorithm}, true
 }

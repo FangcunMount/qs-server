@@ -40,7 +40,7 @@ func (h TypologyDefinitionHandler) validateTypologyRuntime(
 	model *domain.AssessmentModel,
 	issues []domain.DomainValidationIssue,
 ) []domain.DomainValidationIssue {
-	payload, err := (CompatibilityPayloadProjector{}).ProjectTypologyPayload(model, "")
+	payload, err := (RuntimeMaterializer{}).MaterializeTypologyRuntime(model, "")
 	if err != nil || payload == nil || payload.Runtime == nil {
 		if err == nil {
 			err = fmt.Errorf("typology runtime specification is empty")
@@ -61,9 +61,9 @@ func (h TypologyDefinitionHandler) validateTypologyRuntime(
 	)...)
 }
 
-// BuildSnapshotPayload 构建评估模型快照负载
-func (TypologyDefinitionHandler) BuildSnapshotPayload(_ context.Context, model *domain.AssessmentModel) (SnapshotBuildResult, error) {
-	return (CompatibilityPayloadProjector{}).ProjectTypology(model)
+// MaterializeSnapshot validates the DefinitionV2 typology runtime projection.
+func (TypologyDefinitionHandler) MaterializeSnapshot(_ context.Context, model *domain.AssessmentModel) (Materialization, error) {
+	return (RuntimeMaterializer{}).MaterializeTypology(model)
 }
 
 // PreviewReport 预览报告

@@ -245,7 +245,7 @@ func TestCachedPublishedModelStoreListCatalogCacheKeyIncludesAllQueryPredicates(
 		{name: "code", filter: port.ListPublishedFilter{Code: "model-b", Kind: domain.KindScale, Category: "adhd", Page: 1, PageSize: 100}},
 		{name: "kind", filter: port.ListPublishedFilter{Code: "model-a", Kind: domain.KindTypology, Category: "adhd", Page: 1, PageSize: 100}},
 		{name: "sub kind", filter: port.ListPublishedFilter{Code: "model-a", Kind: domain.KindScale, SubKind: domain.SubKindTypology, Category: "adhd", Page: 1, PageSize: 100}},
-		{name: "algorithm", filter: port.ListPublishedFilter{Code: "model-a", Kind: domain.KindScale, Algorithm: domain.AlgorithmMBTI, Category: "adhd", Page: 1, PageSize: 100}},
+		{name: "algorithm", filter: port.ListPublishedFilter{Code: "model-a", Kind: domain.KindScale, Algorithm: domain.AlgorithmPersonalityTypology, Category: "adhd", Page: 1, PageSize: 100}},
 		{name: "product channel", filter: port.ListPublishedFilter{Code: "model-a", Kind: domain.KindScale, ProductChannel: "collection", Category: "adhd", Page: 1, PageSize: 100}},
 		{name: "category", filter: port.ListPublishedFilter{Code: "model-a", Kind: domain.KindScale, Category: "slp", Page: 1, PageSize: 100}},
 		{name: "keyword", filter: port.ListPublishedFilter{Code: "model-a", Kind: domain.KindScale, Category: "adhd", Keyword: "attention", Page: 1, PageSize: 100}},

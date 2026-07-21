@@ -326,14 +326,6 @@ func validateReportMapAgainstDecision(def Definition) []ValidationIssue {
 		if section.AdapterKey == "" {
 			continue
 		}
-		if isLegacyReportAdapter(section.AdapterKey) {
-			issues = append(issues, ValidationIssue{
-				Field:   "report_map.sections." + section.Code + ".adapter_key",
-				Code:    "report_section.adapter.legacy",
-				Message: fmt.Sprintf("report adapter %q is legacy; use personality_type or trait_profile", section.AdapterKey),
-			})
-			continue
-		}
 		if !reportAdapterCompatibleWithDecision(decisionKind, section.AdapterKey) {
 			issues = append(issues, ValidationIssue{
 				Field:   "report_map.sections." + section.Code + ".adapter_key",
@@ -350,15 +342,6 @@ func validateReportMapAgainstDecision(def Definition) []ValidationIssue {
 // and patterns.IsRegisteredTemplateID.
 func isRegisteredReportTemplateID(templateID string) bool {
 	switch templateID {
-	case "mbti", "sbti", "bigfive":
-		return true
-	default:
-		return false
-	}
-}
-
-func isLegacyReportAdapter(adapter string) bool {
-	switch adapter {
 	case "mbti", "sbti", "bigfive":
 		return true
 	default:

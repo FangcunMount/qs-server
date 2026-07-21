@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	seedfixtures "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/seedfixtures"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -40,13 +39,9 @@ func (s runtimeStubStore) FindPublishedModelByQuestionnaire(_ context.Context, _
 }
 
 func TestRuntimePublishedCatalogReturnsNotFoundWithoutStaticFallback(t *testing.T) {
-	static, err := NewDefaultStaticCatalog()
-	if err != nil {
-		t.Fatalf("NewDefaultStaticCatalog: %v", err)
-	}
 	catalog := NewRuntimePublishedCatalogWithStore(runtimeStubStore{})
 
-	ref, ok, err := catalog.ResolveByQuestionnaire(context.Background(), seedfixtures.SBTIQuestionnaireCode, seedfixtures.SBTIModelVersion)
+	ref, ok, err := catalog.ResolveByQuestionnaire(context.Background(), "retired-questionnaire", "1.0.0")
 	if err != nil {
 		t.Fatalf("ResolveByQuestionnaire: %v", err)
 	}
@@ -54,24 +49,19 @@ func TestRuntimePublishedCatalogReturnsNotFoundWithoutStaticFallback(t *testing.
 		t.Fatalf("expected miss without static fallback, got ref=%#v", ref)
 	}
 
-	staticRef, staticOK, err := static.ResolveByQuestionnaire(context.Background(), seedfixtures.SBTIQuestionnaireCode, seedfixtures.SBTIModelVersion)
-	if err != nil {
-		t.Fatalf("static ResolveByQuestionnaire: %v", err)
-	}
-	if !staticOK {
-		t.Fatal("static catalog should still resolve embedded seed")
-	}
-	if staticRef.Code == "" {
-		t.Fatal("static catalog ref should be populated")
-	}
-
-	_, err = catalog.GetPublishedModelByRef(context.Background(), staticRef)
+	_, err = catalog.GetPublishedModelByRef(context.Background(), port.Ref{
+		Kind:      domain.KindTypology,
+		SubKind:   domain.SubKindTypology,
+		Algorithm: domain.AlgorithmPersonalityTypology,
+		Code:      "retired-model",
+		Version:   "1.0.0",
+	})
 	if err == nil || !domain.IsNotFound(err) {
 		t.Fatalf("GetPublishedModelByRef() err = %v, want not found", err)
 	}
 }
 
-func TestRuntimePublishedCatalogPrefersV2Snapshot(t *testing.T) {
+func TestRuntimePublishedCatalogReturnsPublishedDefinitionV2Snapshot(t *testing.T) {
 	mongoSnapshot := &port.PublishedModel{
 		Kind:                 domain.KindTypology,
 		Code:                 "personality_demo",

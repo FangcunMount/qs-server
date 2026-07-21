@@ -42,7 +42,6 @@ type ListPublishedFilter struct {
 // 字段形态对应 assessment_models 内 record_role=published_snapshot 的 BSON 契约。
 type AssessmentSnapshot struct {
 	SchemaVersion        string
-	PayloadFormat        string
 	ProductChannel       domain.ProductChannel
 	Kind                 domain.Kind
 	SubKind              domain.SubKind
@@ -65,7 +64,6 @@ type AssessmentSnapshot struct {
 	QuestionnaireCode    string
 	QuestionnaireVersion string
 	Source               map[string]any
-	Payload              []byte
 	DefinitionV2         *domain.Definition
 }
 

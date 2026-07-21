@@ -54,7 +54,6 @@ func (s *EvaluationWorkerService) ExecuteEvaluation(ctx context.Context, req *pb
 			Code: result.Outcome.ModelCode, Version: result.Outcome.Version, Title: result.Outcome.Title,
 			AlgorithmFamily: result.Outcome.AlgorithmFamily,
 			DecisionKind:    result.Outcome.DecisionKind,
-			PayloadFormat:   result.Outcome.PayloadFormat,
 		}
 		if result.Outcome.TotalScore != nil {
 			resp.PrimaryScore = &pb.ScoreValue{Kind: "raw_total", Value: *result.Outcome.TotalScore}

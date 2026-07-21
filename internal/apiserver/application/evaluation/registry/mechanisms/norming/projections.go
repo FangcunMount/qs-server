@@ -5,21 +5,11 @@ import (
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/projection"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	portevaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 )
 
-// ApplyFactorProjections 补充原始 scale 结果 使用 复合 rollup 和 常模 投影。
-func ApplyFactorProjections(
-	outcome *domainoutcome.Execution,
-	snapshot *behavioralsnapshot.Snapshot,
-	subject calcnorm.Subject,
-) (*domainoutcome.Execution, error) {
-	return ApplyFactorProjectionsForInput(outcome, nil, snapshot, subject)
-}
-
-// ApplyFactorProjectionsForInput prefers canonical Definition.Measure when present.
+// ApplyFactorProjectionsForInput requires canonical Definition.Measure.
 func ApplyFactorProjectionsForInput(
 	outcome *domainoutcome.Execution,
 	input *portevaluationinput.InputSnapshot,
@@ -29,12 +19,7 @@ func ApplyFactorProjectionsForInput(
 	if outcome == nil {
 		return outcome, nil
 	}
-	var measure modeldefinition.MeasureSpec
-	if spec, ok := portevaluationinput.MeasureSpecFromSnapshot(input); ok {
-		measure = spec
-	} else if snapshot != nil {
-		measure = snapshot.MeasureSpec()
-	}
+	measure, _ := portevaluationinput.MeasureSpecFromSnapshot(input)
 	if len(measure.Factors) == 0 {
 		return outcome, nil
 	}

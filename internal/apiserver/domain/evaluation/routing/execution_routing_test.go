@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-func TestDescriptorKeyFromRouteUsesKindPrimaryFamilies(t *testing.T) {
+func TestDescriptorKeyFromRouteUsesFrozenRuntimeIdentity(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -19,9 +19,10 @@ func TestDescriptorKeyFromRouteUsesKindPrimaryFamilies(t *testing.T) {
 		{
 			name: "behavioral_rating_default",
 			route: evalpipeline.ModelRoute{
-				Kind:         modelcatalog.KindBehavioralRating,
-				Algorithm:    modelcatalog.AlgorithmBehavioralRatingDefault,
-				DecisionKind: modelcatalog.DecisionKindScoreRange,
+				Kind:            modelcatalog.KindBehavioralRating,
+				Algorithm:       modelcatalog.AlgorithmBrief2,
+				AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorNorm,
+				DecisionKind:    modelcatalog.DecisionKindNormLookup,
 			},
 			family:   modelcatalog.AlgorithmFamilyFactorNorm,
 			decision: modelcatalog.DecisionKindNormLookup,
@@ -29,20 +30,22 @@ func TestDescriptorKeyFromRouteUsesKindPrimaryFamilies(t *testing.T) {
 		{
 			name: "cognitive_default",
 			route: evalpipeline.ModelRoute{
-				Kind:         modelcatalog.KindCognitive,
-				Algorithm:    modelcatalog.AlgorithmSPM,
-				DecisionKind: modelcatalog.DecisionKindScoreRange,
+				Kind:            modelcatalog.KindCognitive,
+				Algorithm:       modelcatalog.AlgorithmSPM,
+				AlgorithmFamily: modelcatalog.AlgorithmFamilyTaskPerformance,
+				DecisionKind:    modelcatalog.DecisionKindAbilityLevel,
 			},
 			family:   modelcatalog.AlgorithmFamilyTaskPerformance,
 			decision: modelcatalog.DecisionKindAbilityLevel,
 		},
 		{
-			name: "typology_mbti",
+			name: "typology_pole_composition",
 			route: evalpipeline.ModelRoute{
-				Kind:         modelcatalog.KindTypology,
-				SubKind:      modelcatalog.SubKindTypology,
-				Algorithm:    modelcatalog.AlgorithmMBTI,
-				DecisionKind: modelcatalog.DecisionKindPoleComposition,
+				Kind:            modelcatalog.KindTypology,
+				SubKind:         modelcatalog.SubKindTypology,
+				Algorithm:       modelcatalog.AlgorithmPersonalityTypology,
+				AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+				DecisionKind:    modelcatalog.DecisionKindPoleComposition,
 			},
 			family:   modelcatalog.AlgorithmFamilyFactorClassification,
 			decision: modelcatalog.DecisionKindPoleComposition,

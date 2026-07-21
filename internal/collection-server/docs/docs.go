@@ -2063,7 +2063,7 @@ const docTemplate = `{
         },
         "/api/v1/typology-assessments/{id}/report": {
             "get": {
-                "description": "仅在 report-status 终态 interpreted 后调用。model.kind 规范值为 typology，读兼容历史 personality。",
+                "description": "仅在 report-status 终态 interpreted 后调用。model.kind 规范值为 typology。",
                 "produces": [
                     "application/json"
                 ],
@@ -2742,16 +2742,15 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
-                    "description": "测评层 Kind；类型学规范值为 typology，读兼容历史 personality。",
+                    "description": "测评层 Kind；类型学规范值为 typology。",
                     "type": "string",
                     "enum": [
+                        "scale",
                         "typology",
-                        "personality"
+                        "behavioral_rating",
+                        "cognitive"
                     ],
                     "example": "typology"
-                },
-                "payload_format": {
-                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string"
@@ -3219,16 +3218,15 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
-                    "description": "测评层 Kind；类型学规范值为 typology，读兼容历史 personality。",
+                    "description": "测评层 Kind；类型学规范值为 typology。",
                     "type": "string",
                     "enum": [
+                        "scale",
                         "typology",
-                        "personality"
+                        "behavioral_rating",
+                        "cognitive"
                     ],
                     "example": "typology"
-                },
-                "payload_format": {
-                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string"
@@ -3448,9 +3446,6 @@ const docTemplate = `{
                 "kind": {
                     "type": "string"
                 },
-                "payload_format": {
-                    "type": "string"
-                },
                 "product_channel": {
                     "type": "string"
                 },
@@ -3572,9 +3567,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
-                    "type": "string"
-                },
-                "payload_format": {
                     "type": "string"
                 },
                 "product_channel": {
@@ -4220,16 +4212,15 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
-                    "description": "测评层 Kind；类型学规范值为 typology，读兼容历史 personality。",
+                    "description": "测评层 Kind；类型学规范值为 typology。",
                     "type": "string",
                     "enum": [
+                        "scale",
                         "typology",
-                        "personality"
+                        "behavioral_rating",
+                        "cognitive"
                     ],
                     "example": "typology"
-                },
-                "payload_format": {
-                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string"
@@ -4365,9 +4356,6 @@ const docTemplate = `{
                         "$ref": "#/definitions/typologymodel.TypologyOutcomeResponse"
                     }
                 },
-                "payload_format": {
-                    "type": "string"
-                },
                 "product_channel": {
                     "type": "string",
                     "enum": [
@@ -4424,9 +4412,6 @@ const docTemplate = `{
                         "typology"
                     ],
                     "example": "typology"
-                },
-                "payload_format": {
-                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string",

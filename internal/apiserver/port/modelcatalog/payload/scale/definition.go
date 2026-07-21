@@ -6,61 +6,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 )
 
-// DefinitionFromScaleSnapshot materializes target definition layers from the
-// legacy scale execution snapshot without changing the snapshot payload shape.
-func DefinitionFromScaleSnapshot(snapshot *ScaleSnapshot) *definition.Definition {
-	if snapshot == nil {
-		return nil
-	}
-	conclusions := riskConclusionsFromScaleSnapshot(snapshot)
-	return &definition.Definition{
-		Measure:     measureSpecFromScaleSnapshot(snapshot),
-		Calibration: definition.Calibration{},
-		Conclusions: conclusions,
-		Outcomes:    outcomesFromRiskConclusions(conclusions),
-		ReportMap:   reportMapFromScaleSnapshot(snapshot),
-	}
-}
-
-func reportMapFromScaleSnapshot(snapshot *ScaleSnapshot) definition.ReportMap {
-	if snapshot == nil {
-		return definition.ReportMap{}
-	}
-	return definition.ReportMap{Sections: []definition.ReportSection{{
-		Code:       definition.ReportSectionKindFactorScores,
-		Kind:       definition.ReportSectionKindFactorScores,
-		SourceRefs: scaleFactorCodes(snapshot.Factors),
-	}}}
-}
-
-func outcomesFromRiskConclusions(items []conclusion.Conclusion) []conclusion.Outcome {
-	seen := make(map[string]struct{})
-	out := make([]conclusion.Outcome, 0)
-	for _, item := range items {
-		risk, ok := item.(conclusion.RiskConclusion)
-		if !ok {
-			continue
-		}
-		for _, outcome := range risk.Outcomes {
-			if outcome.Code == "" {
-				continue
-			}
-			if _, exists := seen[outcome.Code]; exists {
-				continue
-			}
-			seen[outcome.Code] = struct{}{}
-			out = append(out, outcome)
-		}
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}
-
 // ScaleSnapshotFromDefinition projects DefinitionV2 into the scale runtime DTO.
-// Flat Factors stay as the factor_scoring compat surface; Measure carries the
-// canonical MeasureSpec so graph/source metadata are not lost (MC-R015).
+// Measure remains canonical; flat Factors are a temporary Calculation/report
+// view materialized from the same DefinitionV2.
 func ScaleSnapshotFromDefinition(env ExecutionEnvelope, def *definition.Definition) *ScaleSnapshot {
 	if def == nil {
 		return nil
@@ -72,53 +20,6 @@ func ScaleSnapshotFromDefinition(env ExecutionEnvelope, def *definition.Definiti
 		snapshot.InterpretationAssets = &cloned
 	}
 	return snapshot
-}
-
-func measureSpecFromScaleSnapshot(snapshot *ScaleSnapshot) definition.MeasureSpec {
-	if snapshot == nil {
-		return definition.MeasureSpec{}
-	}
-	if snapshot.HasCanonicalMeasure() {
-		return cloneMeasureSpec(*snapshot.Measure)
-	}
-	return measureSpecFromFlatFactors(snapshot)
-}
-
-func measureSpecFromFlatFactors(snapshot *ScaleSnapshot) definition.MeasureSpec {
-	if snapshot == nil || snapshot.Factors == nil {
-		return definition.MeasureSpec{}
-	}
-	factors := make([]factor.Factor, 0, len(snapshot.Factors))
-	scoring := make([]factor.Scoring, 0, len(snapshot.Factors))
-	for _, item := range snapshot.Factors {
-		role := factor.FactorRoleDimension
-		if item.IsTotalScore {
-			role = factor.FactorRoleTotal
-		}
-		factors = append(factors, factor.Factor{
-			Code:  item.Code,
-			Title: item.Title,
-			Role:  role,
-		})
-		if len(item.QuestionCodes) == 0 && item.ScoringStrategy == "" &&
-			len(item.ScoringParams.CntOptionContents) == 0 && item.MaxScore == nil {
-			continue
-		}
-		scoring = append(scoring, factor.Scoring{
-			FactorCode: item.Code,
-			Sources:    questionSources(item.QuestionCodes),
-			Strategy:   factor.ScoringStrategy(item.ScoringStrategy),
-			Params:     scoringParamsFromSnapshot(item.ScoringParams),
-			MaxScore:   cloneFloat64(item.MaxScore),
-		})
-	}
-	return definition.MeasureSpec{
-		Factors: factors,
-		FactorGraph: factor.FactorGraph{
-			Roots: scaleFactorCodes(snapshot.Factors),
-		},
-		Scoring: scoring,
-	}
 }
 
 func buildFromMeasureSpec(env ExecutionEnvelope, measure definition.MeasureSpec) *ScaleSnapshot {
@@ -176,13 +77,12 @@ func cloneMeasureSpec(measure definition.MeasureSpec) definition.MeasureSpec {
 	out.Scoring = make([]factor.Scoring, 0, len(measure.Scoring))
 	for _, rule := range measure.Scoring {
 		cloned := factor.Scoring{
-			FactorCode:    rule.FactorCode,
-			Strategy:      rule.Strategy,
-			MaxScore:      cloneFloat64(rule.MaxScore),
-			Constant:      rule.Constant,
-			OptionScoring: rule.OptionScoring,
-			Params:        cloneScoringParams(rule.Params),
-			Sources:       cloneScoringSources(rule.Sources),
+			FactorCode: rule.FactorCode,
+			Strategy:   rule.Strategy,
+			MaxScore:   cloneFloat64(rule.MaxScore),
+			Constant:   rule.Constant,
+			Params:     cloneScoringParams(rule.Params),
+			Sources:    cloneScoringSources(rule.Sources),
 		}
 		if len(rule.Weights) > 0 {
 			cloned.Weights = make(map[string]float64, len(rule.Weights))
@@ -222,37 +122,6 @@ func cloneScoringSources(sources []factor.ScoringSource) []factor.ScoringSource 
 	return out
 }
 
-func questionSources(codes []string) []factor.ScoringSource {
-	if len(codes) == 0 {
-		return nil
-	}
-	out := make([]factor.ScoringSource, 0, len(codes))
-	for _, code := range codes {
-		out = append(out, factor.ScoringSource{Kind: factor.ScoringSourceQuestion, Code: code})
-	}
-	return out
-}
-
-func scaleFactorCodes(factors []FactorSnapshot) []string {
-	if factors == nil {
-		return nil
-	}
-	out := make([]string, 0, len(factors))
-	for _, item := range factors {
-		out = append(out, item.Code)
-	}
-	return out
-}
-
-func scoringParamsFromSnapshot(params ScoringParamsSnapshot) *factor.ScoringParams {
-	if len(params.CntOptionContents) == 0 {
-		return nil
-	}
-	return &factor.ScoringParams{
-		CntOptionContents: append([]string(nil), params.CntOptionContents...),
-	}
-}
-
 func applyScaleScoring(projected *FactorSnapshot, rule factor.Scoring) {
 	projected.ScoringStrategy = rule.Strategy.String()
 	if rule.Params != nil {
@@ -280,65 +149,6 @@ func scaleSourceCodes(sources []factor.ScoringSource) []string {
 	out := make([]string, 0, len(sources))
 	for _, source := range sources {
 		out = append(out, source.Code)
-	}
-	return out
-}
-
-func riskConclusionsFromScaleSnapshot(snapshot *ScaleSnapshot) []conclusion.Conclusion {
-	if snapshot == nil {
-		return nil
-	}
-	out := make([]conclusion.Conclusion, 0, len(snapshot.Factors))
-	for _, item := range snapshot.Factors {
-		if len(item.InterpretRules) == 0 {
-			continue
-		}
-		out = append(out, conclusion.RiskConclusion{
-			FactorCode: item.Code,
-			Rules:      riskRulesFromInterpretRules(item.InterpretRules),
-			Outcomes:   riskOutcomesFromRules(item.InterpretRules),
-		})
-	}
-	return out
-}
-
-func riskRulesFromInterpretRules(rules []InterpretRuleSnapshot) []conclusion.ScoreRangeOutcome {
-	if len(rules) == 0 {
-		return nil
-	}
-	out := make([]conclusion.ScoreRangeOutcome, 0, len(rules))
-	for i, rule := range rules {
-		item := conclusion.ScoreRangeOutcome{
-			MinScore:     rule.Min,
-			MaxScore:     rule.Max,
-			MaxInclusive: rule.MaxInclusive,
-			UnboundedMax: rule.UnboundedMax,
-			OutcomeCode:  rule.RiskLevel,
-			Title:        rule.RiskLevel,
-			Summary:      rule.Conclusion,
-			Description:  rule.Suggestion,
-		}
-		// Publish contract: last range must declare an upper-bound endpoint.
-		if i == len(rules)-1 && !item.MaxInclusive && !item.UnboundedMax {
-			item.MaxInclusive = true
-		}
-		out = append(out, item)
-	}
-	return out
-}
-
-func riskOutcomesFromRules(rules []InterpretRuleSnapshot) []conclusion.Outcome {
-	if len(rules) == 0 {
-		return nil
-	}
-	out := make([]conclusion.Outcome, 0, len(rules))
-	for _, rule := range rules {
-		out = append(out, conclusion.Outcome{
-			Code:        rule.RiskLevel,
-			Title:       rule.RiskLevel,
-			Summary:     rule.Conclusion,
-			Description: rule.Suggestion,
-		})
 	}
 	return out
 }

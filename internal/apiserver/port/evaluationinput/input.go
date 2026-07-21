@@ -20,30 +20,6 @@ const (
 	EvaluationModelKindTypology EvaluationModelKind = "typology"
 )
 
-const (
-	// Deprecated: use infra/ruleset/seedfixtures.SBTIModelCode.
-	DefaultSBTIModelCode = "SBTI_FUN"
-	// Deprecated: use infra/ruleset/seedfixtures.SBTIModelVersion.
-	DefaultSBTIModelVersion = "1.0.0"
-	// Deprecated: use infra/ruleset/seedfixtures.SBTIModelTitle.
-	DefaultSBTIModelTitle = "SBTI 趣味人格测评"
-	// Deprecated: use infra/ruleset/seedfixtures.SBTIQuestionnaireCode.
-	DefaultSBTIQuestionnaireCode = "SBTI_FUN"
-	// Deprecated: use infra/ruleset/seedfixtures.SBTIQuestionnaireTitle.
-	DefaultSBTIQuestionnaireTitle = "SBTI 趣味人格测评"
-
-	// Deprecated: use infra/ruleset/seedfixtures.MBTIModelCode.
-	DefaultMBTIModelCode = "MBTI_OEJTS"
-	// Deprecated: use infra/ruleset/seedfixtures.MBTIModelVersion.
-	DefaultMBTIModelVersion = "2.0.1"
-	// Deprecated: use infra/ruleset/seedfixtures.MBTIModelTitle.
-	DefaultMBTIModelTitle = "MBTI 人格类型测评（OEJTS）"
-	// Deprecated: use infra/ruleset/seedfixtures.MBTIQuestionnaireCode.
-	DefaultMBTIQuestionnaireCode = "MBTI_OEJTS"
-	// Deprecated: use infra/ruleset/seedfixtures.MBTIQuestionnaireTitle.
-	DefaultMBTIQuestionnaireTitle = "MBTI 人格类型测评（OEJTS 32题）"
-)
-
 func (k EvaluationModelKind) String() string {
 	return string(k)
 }
@@ -81,6 +57,7 @@ type InputSnapshot struct {
 	Questionnaire        *QuestionnaireSnapshot
 	NormSubject          *NormSubjectSnapshot
 	InterpretationAssets *interpretationassets.Assets
+	TypologyRouting      *TypologyRoutingFreeze
 	// DefinitionV2 is canonical model semantics for runtime replay (MC-R017 batch 4).
 	DefinitionV2 *modeldefinition.Definition
 }
@@ -110,7 +87,6 @@ type ModelSnapshot struct {
 	Algorithm       string
 	AlgorithmFamily string
 	DecisionKind    string
-	PayloadFormat   string
 	ProductChannel  string
 	Code            string
 	Version         string
@@ -119,19 +95,18 @@ type ModelSnapshot struct {
 }
 
 // ApplyFrozenRuntime copies publish-time RuntimeIdentity onto the evaluation ModelSnapshot.
-func (m *ModelSnapshot) ApplyFrozenRuntime(family, decisionKind, payloadFormat string) *ModelSnapshot {
+func (m *ModelSnapshot) ApplyFrozenRuntime(family, decisionKind string) *ModelSnapshot {
 	if m == nil {
 		return nil
 	}
 	m.AlgorithmFamily = family
 	m.DecisionKind = decisionKind
-	m.PayloadFormat = payloadFormat
 	return m
 }
 
 // HasFrozenRuntime reports whether publish-time runtime identity is complete.
 func (m *ModelSnapshot) HasFrozenRuntime() bool {
-	return m != nil && m.AlgorithmFamily != "" && m.DecisionKind != "" && m.PayloadFormat != ""
+	return m != nil && m.AlgorithmFamily != "" && m.DecisionKind != ""
 }
 
 func (m *ModelSnapshot) ModelRef() ModelRef {
@@ -188,7 +163,7 @@ func applyPublishedRuntime(ms *ModelSnapshot, meta *rulesetport.PublishedRuntime
 	if meta.ProductChannel != "" {
 		ms.ProductChannel = string(meta.ProductChannel)
 	}
-	return ms.ApplyFrozenRuntime(string(meta.AlgorithmFamily), string(meta.DecisionKind), meta.PayloadFormat)
+	return ms.ApplyFrozenRuntime(string(meta.AlgorithmFamily), string(meta.DecisionKind))
 }
 
 type ScaleModelPayload struct {
@@ -231,10 +206,6 @@ func NewTypologyModelSnapshot(payload *typology.Payload) *ModelSnapshot {
 	return applyPublishedRuntime(ms, payload.PublishedRuntime)
 }
 
-func NewSBTIModelSnapshot(model *typology.SBTILegacyModel) *ModelSnapshot {
-	return NewTypologyModelSnapshot(typology.FromSBTI(model))
-}
-
 type TypologyModelPayload struct {
 	Payload *typology.Payload
 }
@@ -245,36 +216,6 @@ func (TypologyModelPayload) RuleSetKind() EvaluationModelKind {
 
 func (TypologyModelPayload) ModelKind() EvaluationModelKind {
 	return EvaluationModelKindTypology
-}
-
-func NewMBTIModelSnapshot(model *typology.MBTILegacyModel) *ModelSnapshot {
-	return NewTypologyModelSnapshot(typology.FromMBTI(model))
-}
-
-// MBTIPayload extracts a legacy MBTI model from a unified typology input snapshot.
-func MBTIPayload(input *InputSnapshot) (*typology.MBTILegacyModel, bool) {
-	payload, ok := TypologyPayload(input)
-	if !ok || payload.Algorithm != "mbti" {
-		return nil, false
-	}
-	legacy, err := typology.ToMBTI(payload)
-	if err != nil {
-		return nil, false
-	}
-	return legacy, true
-}
-
-// SBTIPayload extracts a legacy SBTI model from a unified typology input snapshot.
-func SBTIPayload(input *InputSnapshot) (*typology.SBTILegacyModel, bool) {
-	payload, ok := TypologyPayload(input)
-	if !ok || payload.Algorithm != "sbti" {
-		return nil, false
-	}
-	legacy, err := typology.ToSBTI(payload)
-	if err != nil {
-		return nil, false
-	}
-	return legacy, true
 }
 
 type AnswerSheetSnapshot struct {

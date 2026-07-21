@@ -1,67 +1,43 @@
 package execute
 
 import (
+	"errors"
 	"fmt"
-	"strconv"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
+var (
+	errInputSnapshotIdentityRequired = errors.New("input snapshot identity is required")
+	errUnsupportedInputSnapshotRef   = errors.New("previous input snapshot reference is not an isn:v2 identity")
+)
+
 // inputSnapshotRefFromResolvedInput builds a verifiable audit reference for a
-// resolved input snapshot (EV-R009). New writes use the digest-backed
-// "isn:v2:" form; readable legacy forms remain only as a fallback for
-// degenerate snapshots and for reading historical rows.
-func inputSnapshotRefFromResolvedInput(a *assessment.Assessment, input *evaluationinput.InputSnapshot) string {
+// resolved input snapshot (EV-R009). Every attempt requires the digest-backed
+// isn:v2 form; incomplete material never falls back to a readable label.
+func inputSnapshotRefFromResolvedInput(input *evaluationinput.InputSnapshot) (string, error) {
 	if identity, ok := evaluationinput.NewInputSnapshotIdentity(input); ok {
-		return identity.Ref()
-	}
-	return fallbackInputSnapshotRef(a, input)
-}
-
-func inputSnapshotRefForAttempt(
-	a *assessment.Assessment,
-	input *evaluationinput.InputSnapshot,
-	previous string,
-	origin retrygovernance.AttemptOrigin,
-) string {
-	if evaluationinput.IsV1IdentityRef(previous) && origin != retrygovernance.AttemptOriginForce {
-		if identity, ok := evaluationinput.NewLegacyV1InputSnapshotIdentity(input); ok {
-			return identity.Ref()
+		ref := identity.Ref()
+		if evaluationinput.IsIdentityRef(ref) {
+			return ref, nil
 		}
 	}
-	return inputSnapshotRefFromResolvedInput(a, input)
-}
-
-func fallbackInputSnapshotRef(a *assessment.Assessment, input *evaluationinput.InputSnapshot) string {
-	if input != nil && input.Model != nil {
-		code := input.Model.Code
-		version := input.Model.Version
-		if code != "" {
-			if version != "" {
-				return fmt.Sprintf("model:%s@%s", code, version)
-			}
-			return fmt.Sprintf("model:%s", code)
-		}
-	}
-	if a != nil {
-		if ref := a.AnswerSheetRef(); !ref.IsEmpty() {
-			return "answersheet:" + strconv.FormatUint(ref.ID().Uint64(), 10)
-		}
-	}
-	return ""
+	return "", errInputSnapshotIdentityRequired
 }
 
 // validateInputSnapshotRefAcrossAttempts rejects retries whose re-materialized
-// input differs from the previous attempt (EV-R009). Legacy readable refs
-// carry no content proof; v1/v2 identity refs are both comparable.
+// input differs from the previous attempt (EV-R009). Force retry may establish
+// a different v2 identity, but it never admits an unsupported historical ref.
 func validateInputSnapshotRefAcrossAttempts(previous, current string, origin retrygovernance.AttemptOrigin) error {
-	if previous == "" || current == "" {
+	if !evaluationinput.IsIdentityRef(current) {
+		return errInputSnapshotIdentityRequired
+	}
+	if previous == "" {
 		return nil
 	}
-	if !evaluationinput.IsIdentityRef(previous) || !evaluationinput.IsIdentityRef(current) {
-		return nil
+	if !evaluationinput.IsIdentityRef(previous) {
+		return fmt.Errorf("%w: %s", errUnsupportedInputSnapshotRef, previous)
 	}
 	if origin == retrygovernance.AttemptOriginForce {
 		return nil

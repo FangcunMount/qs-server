@@ -13,7 +13,7 @@ func buildGraphAndDecision(payload *modeltypology.Payload, spec *modeltypology.R
 	if payload == nil || spec == nil {
 		return calcclassification.FactorGraph{}, calcclassification.DecisionSpec{}, fmt.Errorf("payload and runtime spec are required")
 	}
-	graph, err := buildFactorGraph(spec.FactorGraph, spec.Decision.Kind)
+	graph, err := buildFactorGraph(spec.FactorGraph)
 	if err != nil {
 		return calcclassification.FactorGraph{}, calcclassification.DecisionSpec{}, err
 	}
@@ -24,14 +24,14 @@ func buildGraphAndDecision(payload *modeltypology.Payload, spec *modeltypology.R
 	return graph, decision, nil
 }
 
-func buildFactorGraph(fg modeltypology.FactorGraphSpec, kind modelcatalog.DecisionKind) (calcclassification.FactorGraph, error) {
-	if fg.HasExplicitFactorGraph() {
-		return buildExplicitFactorGraph(fg, kind)
+func buildFactorGraph(fg modeltypology.FactorGraphSpec) (calcclassification.FactorGraph, error) {
+	if !fg.HasExplicitFactorGraph() {
+		return calcclassification.FactorGraph{}, fmt.Errorf("explicit factor graph is required")
 	}
-	return buildLegacyFlatFactorGraph(fg, kind)
+	return buildExplicitFactorGraph(fg)
 }
 
-func buildExplicitFactorGraph(fg modeltypology.FactorGraphSpec, kind modelcatalog.DecisionKind) (calcclassification.FactorGraph, error) {
+func buildExplicitFactorGraph(fg modeltypology.FactorGraphSpec) (calcclassification.FactorGraph, error) {
 	factors := make(map[calcclassification.FactorID]calcclassification.PersonalityFactor, len(fg.Factors))
 	leafSpecs := make(map[calcclassification.FactorID]calcclassification.LeafScoringSpec)
 	for id, spec := range fg.Factors {
@@ -56,7 +56,7 @@ func buildExplicitFactorGraph(fg modeltypology.FactorGraphSpec, kind modelcatalo
 				Name: name,
 				Kind: calcclassification.FactorKindLeaf,
 			}
-			leafSpecs[factorID] = leafScoringSpecFromFactorSpec(spec, kind)
+			leafSpecs[factorID] = leafScoringSpecFromFactorSpec(spec)
 		case modeltypology.FactorSpecKindComposite:
 			children := childFactorIDs(spec.Children)
 			if len(children) == 0 {
@@ -94,67 +94,7 @@ func buildExplicitFactorGraph(fg modeltypology.FactorGraphSpec, kind modelcatalo
 	return graph, nil
 }
 
-func buildLegacyFlatFactorGraph(fg modeltypology.FactorGraphSpec, kind modelcatalog.DecisionKind) (calcclassification.FactorGraph, error) {
-	if len(fg.DimensionOrder) == 0 {
-		return calcclassification.FactorGraph{}, fmt.Errorf("dimension order is required")
-	}
-	mappingsByDimension := groupMappings(fg.QuestionMappings)
-	factors := make(map[calcclassification.FactorID]calcclassification.PersonalityFactor, len(fg.DimensionOrder))
-	leafSpecs := make(map[calcclassification.FactorID]calcclassification.LeafScoringSpec, len(fg.DimensionOrder))
-	roots := make([]calcclassification.FactorID, 0, len(fg.DimensionOrder))
-
-	for _, dimCode := range fg.DimensionOrder {
-		meta, ok := fg.Dimensions[dimCode]
-		if !ok {
-			return calcclassification.FactorGraph{}, fmt.Errorf("dimension %s is not defined", dimCode)
-		}
-		mappings := mappingsByDimension[dimCode]
-		if kind == modelcatalog.DecisionKindNearestPattern && len(mappings) == 0 {
-			return calcclassification.FactorGraph{}, fmt.Errorf("dimension %s has no mapped answers", dimCode)
-		}
-		contributions := make([]calcclassification.AnswerContribution, 0, len(mappings))
-		optionScoring := calcclassification.OptionScoringStrict
-		if kind == modelcatalog.DecisionKindNearestPattern {
-			optionScoring = calcclassification.OptionScoringCompat
-		}
-		for _, mapping := range mappings {
-			contribution := calcclassification.AnswerContribution{
-				QuestionCode: mapping.QuestionCode,
-				Sign:         mapping.Sign,
-			}
-			if len(mapping.OptionScores) > 0 {
-				contribution.OptionScores = cloneOptionScores(mapping.OptionScores)
-			}
-			contributions = append(contributions, contribution)
-		}
-		factorID := calcclassification.FactorID(dimCode)
-		factors[factorID] = calcclassification.PersonalityFactor{
-			ID:   factorID,
-			Code: meta.Code,
-			Name: meta.Name,
-			Kind: calcclassification.FactorKindLeaf,
-		}
-		leafSpecs[factorID] = calcclassification.LeafScoringSpec{
-			Constant:      meta.Constant,
-			Contributions: contributions,
-			OptionScoring: optionScoring,
-		}
-		roots = append(roots, factorID)
-	}
-
-	graph := calcclassification.FactorGraph{Factors: factors, LeafSpecs: leafSpecs, Roots: roots}
-	if err := graph.Validate(); err != nil {
-		return calcclassification.FactorGraph{}, err
-	}
-	return graph, nil
-}
-
-func leafScoringSpecFromFactorSpec(spec modeltypology.FactorSpec, kind modelcatalog.DecisionKind) calcclassification.LeafScoringSpec {
-	optionScoring := calcclassification.OptionScoringStrict
-	if spec.OptionScoring == modeltypology.FactorOptionScoringCompat ||
-		(spec.OptionScoring == "" && kind == modelcatalog.DecisionKindNearestPattern) {
-		optionScoring = calcclassification.OptionScoringCompat
-	}
+func leafScoringSpecFromFactorSpec(spec modeltypology.FactorSpec) calcclassification.LeafScoringSpec {
 	contributions := make([]calcclassification.AnswerContribution, 0, len(spec.Contributions))
 	for _, contribution := range spec.Contributions {
 		item := calcclassification.AnswerContribution{
@@ -171,7 +111,6 @@ func leafScoringSpecFromFactorSpec(spec modeltypology.FactorSpec, kind modelcata
 	return calcclassification.LeafScoringSpec{
 		Constant:      spec.Constant,
 		Contributions: contributions,
-		OptionScoring: optionScoring,
 	}
 }
 
@@ -223,13 +162,13 @@ func buildPoleDecision(fg modeltypology.FactorGraphSpec) (calcclassification.Dec
 		if !ok {
 			return calcclassification.DecisionSpec{}, fmt.Errorf("pole metadata for factor %s is not defined", factorID)
 		}
-		mappings := mappingsForFactor(fg, factorID)
+		contributions := contributionsForFactor(fg, factorID)
 		poles = append(poles, calcclassification.PoleSpec{
 			FactorID:     calcclassification.FactorID(factorID),
 			LeftPole:     meta.LeftPole,
 			RightPole:    meta.RightPole,
 			Threshold:    meta.Threshold,
-			MaxDeviation: calcclassification.PoleMaxDeviation(meta.Constant, meta.Threshold, contributionsFromMappings(mappings)),
+			MaxDeviation: calcclassification.PoleMaxDeviation(meta.Constant, meta.Threshold, contributions),
 		})
 	}
 	return calcclassification.DecisionSpec{Kind: calcclassification.DecisionKindPoleComposition, Poles: poles}, nil
@@ -287,38 +226,22 @@ func dimensionMetaForFactor(fg modeltypology.FactorGraphSpec, factorID string) (
 	return modeltypology.Dimension{}, false
 }
 
-func mappingsForFactor(fg modeltypology.FactorGraphSpec, factorID string) []modeltypology.QuestionMapping {
-	if fg.HasExplicitFactorGraph() {
-		spec, ok := fg.Factors[factorID]
-		if !ok {
-			return nil
-		}
-		mappings := make([]modeltypology.QuestionMapping, 0, len(spec.Contributions))
-		for _, contribution := range spec.Contributions {
-			mappings = append(mappings, modeltypology.QuestionMapping{
-				QuestionCode: contribution.QuestionCode,
-				Dimension:    factorID,
-				Sign:         contribution.Sign,
-				OptionScores: contribution.OptionScores,
-			})
-		}
-		return mappings
+func contributionsForFactor(fg modeltypology.FactorGraphSpec, factorID string) []calcclassification.AnswerContribution {
+	spec, ok := fg.Factors[factorID]
+	if !ok {
+		return nil
 	}
-	mappings := make([]modeltypology.QuestionMapping, 0)
-	for _, mapping := range fg.QuestionMappings {
-		if mapping.Dimension == factorID {
-			mappings = append(mappings, mapping)
-		}
+	out := make([]calcclassification.AnswerContribution, 0, len(spec.Contributions))
+	for _, contribution := range spec.Contributions {
+		out = append(out, calcclassification.AnswerContribution{
+			QuestionCode: contribution.QuestionCode,
+			ScoringMode:  calcclassification.QuestionScoringMode(contribution.ScoringMode),
+			Sign:         contribution.Sign,
+			Weight:       contribution.Weight,
+			OptionScores: cloneOptionScores(contribution.OptionScores),
+		})
 	}
-	return mappings
-}
-
-func groupMappings(mappings []modeltypology.QuestionMapping) map[string][]modeltypology.QuestionMapping {
-	grouped := make(map[string][]modeltypology.QuestionMapping)
-	for _, mapping := range mappings {
-		grouped[mapping.Dimension] = append(grouped[mapping.Dimension], mapping)
-	}
-	return grouped
+	return out
 }
 
 func patternLevelsByOrder(pattern string, order []calcclassification.FactorID) map[calcclassification.FactorID]string {
@@ -342,18 +265,6 @@ func cloneOptionScores(source map[string]float64) map[string]float64 {
 		cloned[key] = value
 	}
 	return cloned
-}
-
-func contributionsFromMappings(mappings []modeltypology.QuestionMapping) []calcclassification.AnswerContribution {
-	out := make([]calcclassification.AnswerContribution, 0, len(mappings))
-	for _, mapping := range mappings {
-		out = append(out, calcclassification.AnswerContribution{
-			QuestionCode: mapping.QuestionCode,
-			Sign:         mapping.Sign,
-			OptionScores: cloneOptionScores(mapping.OptionScores),
-		})
-	}
-	return out
 }
 
 func firstNonEmpty(values ...string) string {

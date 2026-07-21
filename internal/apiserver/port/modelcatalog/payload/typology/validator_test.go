@@ -34,15 +34,15 @@ func TestOptionOverrideRequiresExactOptionCoverage(t *testing.T) {
 	}
 }
 
-func TestLegacyContributionProducesNonBlockingWarning(t *testing.T) {
+func TestImplicitContributionIsRejected(t *testing.T) {
 	spec := validRuntimeSpec()
 	factorSpec := spec.FactorGraph.Factors["EI"]
 	factorSpec.Contributions[0].ScoringMode = ""
 	factorSpec.Contributions[0].Weight = 0
 	spec.FactorGraph.Factors["EI"] = factorSpec
 	issues := typology.ValidateRuntimeSpecForPublish(spec, validQuestionnaire())
-	if !hasIssueCode(issues, "question_contribution.legacy_implicit") || modelcatalog.HasValidationErrors(issues) {
-		t.Fatalf("issues = %#v, want non-blocking legacy warning", issues)
+	if !hasIssueCode(issues, "scoring_mode.required") || !modelcatalog.HasValidationErrors(issues) {
+		t.Fatalf("issues = %#v, want blocking scoring_mode.required", issues)
 	}
 }
 
@@ -65,12 +65,7 @@ func TestExplicitContributionJSONAppliesOmittedDefaultsAndPreservesExplicitZero(
 
 func TestValidateRuntimeSpecForPublishRequiresExplicitFactorGraph(t *testing.T) {
 	spec := &typology.RuntimeSpec{
-		FactorGraph: typology.FactorGraphSpec{
-			DimensionOrder: []string{"EI"},
-			Dimensions: map[string]typology.Dimension{
-				"EI": {Code: "EI", Name: "EI"},
-			},
-		},
+		FactorGraph:    typology.FactorGraphSpec{},
 		Decision:       typology.PersonalityDecisionSpec{Kind: modelcatalog.DecisionKindPoleComposition},
 		OutcomeMapping: typology.OutcomeMappingSpec{DetailKind: typology.OutcomeDetailPersonalityType},
 		Report:         typology.ReportSpec{Kind: typology.ReportKindPersonalityType, AdapterKey: typology.ReportAdapterPersonalityType},
@@ -91,7 +86,7 @@ func TestValidateRuntimeSpecForPublishValidatesQuestionAndOptionRefs(t *testing.
 					Code: "EI",
 					Kind: typology.FactorSpecKindLeaf,
 					Contributions: []typology.FactorContributionSpec{{
-						QuestionCode: "q1",
+						QuestionCode: "q1", ScoringMode: typology.QuestionScoringModeOptionOverride, Sign: 1, Weight: 1,
 						OptionScores: map[string]float64{"missing": 1},
 					}},
 				},
@@ -107,8 +102,8 @@ func TestValidateRuntimeSpecForPublishValidatesQuestionAndOptionRefs(t *testing.
 	}
 
 	issues := typology.ValidateRuntimeSpecForPublish(spec, questionnaire)
-	if !hasIssueCode(issues, "question_mapping.option_not_found") {
-		t.Fatalf("issues = %#v, want question_mapping.option_not_found", issues)
+	if !hasIssueCode(issues, "option_scores.unknown_option") {
+		t.Fatalf("issues = %#v, want option_scores.unknown_option", issues)
 	}
 }
 
@@ -116,7 +111,7 @@ func TestValidateRuntimeSpecForPublishValidatesOutcomeDefinitions(t *testing.T) 
 	spec := validRuntimeSpec()
 
 	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
-		Algorithm: modelcatalog.AlgorithmMBTI,
+		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
 		Outcomes: []typology.Outcome{
 			{Code: "INTJ", Name: "建筑师"},
 			{Code: "INTJ", Name: "重复建筑师"},
@@ -132,17 +127,17 @@ func TestValidateRuntimeSpecForPublishValidatesOutcomeDefinitions(t *testing.T) 
 	}
 }
 
-func TestValidateRuntimeSpecForPublishRequiresImagesForMBTIOutcomes(t *testing.T) {
+func TestValidateRuntimeSpecForPublishAllowsOptionalCanonicalOutcomeImages(t *testing.T) {
 	spec := validRuntimeSpec()
 	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
-		Algorithm: modelcatalog.AlgorithmMBTI,
+		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
 		Outcomes: []typology.Outcome{
 			{Code: "INTJ", Name: "建筑师", ImageURL: "https://qs.example/INTJ.png"},
 			{Code: "ENFP", Name: "竞选者"},
 		},
 	})
-	if !hasIssueCode(issues, "outcome.image_url.required") {
-		t.Fatalf("issues = %#v, want outcome.image_url.required", issues)
+	if modelcatalog.HasValidationErrors(issues) {
+		t.Fatalf("issues = %#v, canonical outcomes must not require algorithm-alias-specific images", issues)
 	}
 }
 
@@ -161,7 +156,7 @@ func TestValidateRuntimeSpecForPublishValidatesFallbackAndSpecialOutcomeRefs(t *
 	}}
 
 	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
-		Algorithm: modelcatalog.AlgorithmMBTI,
+		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
 		Outcomes:  []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
 	})
 
@@ -182,7 +177,7 @@ func TestValidateRuntimeSpecForPublishValidatesDecisionAndLevelRule(t *testing.T
 	spec.Decision.LevelRule = &typology.LevelRuleSpec{LowMax: 5, HighMin: 3}
 
 	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
-		Algorithm: modelcatalog.AlgorithmMBTI,
+		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
 		Outcomes:  []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
 	})
 
@@ -196,7 +191,7 @@ func TestValidateRuntimeSpecForPublishRequiresDecisionKind(t *testing.T) {
 	spec.Decision.Kind = ""
 
 	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
-		Algorithm: modelcatalog.AlgorithmMBTI,
+		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
 		Outcomes:  []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
 	})
 
@@ -218,39 +213,36 @@ func TestValidateRuntimeSpecForPublishValidatesDominantFactorTopKAndOutcomes(t *
 	}
 }
 
-func TestValidateRuntimeSpecForPublishRejectsLegacyAdapterKeys(t *testing.T) {
+func TestValidateRuntimeSpecForPublishRejectsModelSpecificAdapterAliases(t *testing.T) {
 	spec := validRuntimeSpec()
-	spec.OutcomeMapping.DetailAdapterKey = typology.DetailAdapterMBTI
-	spec.Report.AdapterKey = typology.ReportAdapterMBTI
+	spec.OutcomeMapping.DetailAdapterKey = typology.DetailAdapterKey("mbti")
+	spec.Report.AdapterKey = typology.ReportAdapterKey("mbti")
 
 	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
-		Algorithm: modelcatalog.AlgorithmMBTI,
+		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
 		Outcomes:  []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
 	})
 
-	if !hasIssueCode(issues, "outcome_mapping.detail_adapter.deprecated") {
-		t.Fatalf("issues = %#v, want outcome_mapping.detail_adapter.deprecated", issues)
+	if !hasIssueCode(issues, "outcome_mapping.detail_adapter.unsupported") {
+		t.Fatalf("issues = %#v, want outcome_mapping.detail_adapter.unsupported", issues)
 	}
-	if !hasIssueCode(issues, "report.adapter.deprecated") {
-		t.Fatalf("issues = %#v, want report.adapter.deprecated", issues)
+	if !hasIssueCode(issues, "report.adapter.unsupported") {
+		t.Fatalf("issues = %#v, want report.adapter.unsupported", issues)
 	}
 }
 
-func TestValidateRuntimeSpecForPublishValidatesAdapterCompatibility(t *testing.T) {
+func TestValidateRuntimeSpecForPublishAllowsDecisionSpecificCanonicalAdapters(t *testing.T) {
 	spec := validRuntimeSpec()
 	spec.OutcomeMapping.DetailAdapterKey = typology.DetailAdapterTraitProfile
 	spec.Report.AdapterKey = typology.ReportAdapterTraitProfile
 
 	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
-		Algorithm: modelcatalog.AlgorithmMBTI,
+		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
 		Outcomes:  []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
 	})
 
-	if !hasIssueCode(issues, "outcome_mapping.detail_adapter.incompatible") {
-		t.Fatalf("issues = %#v, want outcome_mapping.detail_adapter.incompatible", issues)
-	}
-	if !hasIssueCode(issues, "report.adapter.incompatible") {
-		t.Fatalf("issues = %#v, want report.adapter.incompatible", issues)
+	if modelcatalog.HasValidationErrors(issues) {
+		t.Fatalf("issues = %#v, canonical personality_typology must allow trait_profile adapters", issues)
 	}
 }
 

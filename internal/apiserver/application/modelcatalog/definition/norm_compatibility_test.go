@@ -81,3 +81,53 @@ func TestCheckNormCompatibilityRejectsMissingStandardScoreBasis(t *testing.T) {
 		t.Fatalf("issues = %#v, want norm.score_basis.unsupported", issues)
 	}
 }
+
+func TestCheckNormCompatibilityRequiresStandardScoreOnEveryReachableRow(t *testing.T) {
+	t.Parallel()
+	standard := 100.0
+	model := &domain.AssessmentModel{
+		Kind: domain.KindBehavioralRating, Algorithm: domain.AlgorithmBrief2,
+		DefinitionV2: &modeldefinition.Definition{Conclusions: []domain.Conclusion{
+			domain.NormConclusion{FactorCode: "gec", ScoreBasis: domain.ScoreBasisStandardScore, Primary: true},
+		}},
+	}
+	cases := []struct {
+		name   string
+		factor norm.FactorTable
+		wantOK bool
+	}{
+		{
+			name: "all lookup rows provide standard score",
+			factor: norm.FactorTable{FactorCode: "gec", Lookup: []norm.LookupEntry{
+				{RawScoreMin: 0, RawScoreMax: 9, StandardScore: &standard},
+				{RawScoreMin: 10, RawScoreMax: 20, StandardScore: &standard},
+			}},
+			wantOK: true,
+		},
+		{
+			name: "one lookup row missing standard score",
+			factor: norm.FactorTable{FactorCode: "gec", Lookup: []norm.LookupEntry{
+				{RawScoreMin: 0, RawScoreMax: 9, StandardScore: &standard},
+				{RawScoreMin: 10, RawScoreMax: 20},
+			}},
+		},
+		{
+			name: "lookup plus band",
+			factor: norm.FactorTable{FactorCode: "gec",
+				Lookup: []norm.LookupEntry{{RawScoreMin: 0, RawScoreMax: 20, StandardScore: &standard}},
+				Bands:  []norm.Band{{}},
+			},
+		},
+		{name: "bands only", factor: norm.FactorTable{FactorCode: "gec", Bands: []norm.Band{{}}}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			table := &norm.Norm{Kind: domain.KindBehavioralRating, Algorithm: domain.AlgorithmBrief2, FormVariant: "parent", Factors: []norm.FactorTable{tc.factor}}
+			issues := definition.CheckNormCompatibility(model, table, norm.Ref{FactorCode: "gec", NormTableVersion: "brief2-1"})
+			gotOK := !hasIssueCode(issues, "norm.score_basis.unsupported")
+			if gotOK != tc.wantOK {
+				t.Fatalf("issues = %#v, wantOK = %v", issues, tc.wantOK)
+			}
+		})
+	}
+}

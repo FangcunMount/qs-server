@@ -34,13 +34,11 @@ type AssessmentModel struct {
 	Status Status
 	// 绑定问卷
 	Binding binding.QuestionnaireBinding
-	// 定义
-	Definition DefinitionPayload
-	// DefinitionV2 是目标领域定义模型；Definition 保留为 legacy payload 兼容投影。
+	// DefinitionV2 is the only persisted authoring definition.
 	DefinitionV2 *definition.Definition
 	// 版本
-	// Version is the persisted compatibility field for the draft configuration
-	// revision. Business versioning is anchored by QuestionnaireBinding.Version.
+	// Version is the persisted draft configuration revision.
+	// Business versioning is anchored by QuestionnaireBinding.Version.
 	// New domain code should call Revision() when it means config revision.
 	Version int64
 	// 创建时间
@@ -120,8 +118,7 @@ func (m *AssessmentModel) IsDraft() bool {
 	return m != nil && m.Status.IsDraft()
 }
 
-// Revision returns the draft configuration revision kept in the persisted
-// version field for compatibility.
+// Revision returns the persisted draft configuration revision.
 func (m *AssessmentModel) Revision() int64 {
 	if m == nil {
 		return 0
@@ -201,7 +198,7 @@ func (m *AssessmentModel) updateBasicInfo(title, description string, subKind bin
 }
 
 // UpdateAudienceMetadata updates scale-oriented catalog dimensions that are
-// exposed by legacy scale REST contracts and now live on AssessmentModel.
+// exposed by catalog REST contracts and owned by AssessmentModel.
 func (m *AssessmentModel) UpdateAudienceMetadata(stages, applicableAges, reporters []string, now time.Time) error {
 	if err := m.updateAudienceMetadata(stages, applicableAges, reporters); err != nil {
 		return err
@@ -236,22 +233,15 @@ func (m *AssessmentModel) BindQuestionnaire(binding binding.QuestionnaireBinding
 	return nil
 }
 
-// UpdateDefinition replaces the draft definition payload.
-func (m *AssessmentModel) UpdateDefinition(payload DefinitionPayload, now time.Time) error {
-	return m.UpdateDefinitionWithV2(payload, nil, now)
-}
-
-// UpdateDefinitionWithV2 replaces the draft definition payload and optionally stores
-// the target definition model beside the legacy payload.
-func (m *AssessmentModel) UpdateDefinitionWithV2(payload DefinitionPayload, definitionV2 *definition.Definition, now time.Time) error {
+// UpdateDefinition replaces the canonical draft definition.
+func (m *AssessmentModel) UpdateDefinition(value *definition.Definition, now time.Time) error {
 	if err := m.ensureEditable(); err != nil {
 		return err
 	}
-	if payload.IsEmpty() {
-		return fmt.Errorf("%w: definition payload is required", ErrInvalidArgument)
+	if value == nil {
+		return fmt.Errorf("%w: definition_v2 is required", ErrInvalidArgument)
 	}
-	m.Definition = payload
-	m.DefinitionV2 = definitionV2
+	m.DefinitionV2 = value
 	m.touch(now)
 	return nil
 }

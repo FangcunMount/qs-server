@@ -46,13 +46,6 @@ func NewRuntimeAdapterWithEvaluator(evaluator personalityconfigured.Evaluator) A
 
 func (a Adapter) Score(
 	payload *modeltypology.Payload,
-	sheet *evalinput.AnswerSheet,
-) (outcometypology.ScoringResult, error) {
-	return a.ScoreWithDefinition(payload, nil, sheet)
-}
-
-func (a Adapter) ScoreWithDefinition(
-	payload *modeltypology.Payload,
 	def *modeldefinition.Definition,
 	sheet *evalinput.AnswerSheet,
 ) (outcometypology.ScoringResult, error) {
@@ -66,5 +59,5 @@ func (a Adapter) ScoreWithDefinition(
 			a.algorithm,
 		)
 	}
-	return a.evaluator.ScoreWithDefinition(payload, def, sheet)
+	return a.evaluator.Score(payload, def, sheet)
 }

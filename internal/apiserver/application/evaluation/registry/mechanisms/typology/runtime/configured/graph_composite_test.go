@@ -12,7 +12,7 @@ import (
 
 func TestEvaluatorCompositeFactorAggregatesBeforePoleDecision(t *testing.T) {
 	payload := compositePolePayload()
-	got, err := configured.NewEvaluator().Score(payload, compositePoleSheet())
+	got, err := configured.NewEvaluator().Score(payload, canonicalDefinitionFixture(t, payload), compositePoleSheet())
 	if err != nil {
 		t.Fatalf("Score: %v", err)
 	}
@@ -30,13 +30,13 @@ func TestEvaluatorCompositeFactorAggregatesBeforePoleDecision(t *testing.T) {
 
 func TestEvaluatorCompositeFactorMatchesFlatTraitProfileScores(t *testing.T) {
 	explicit := compositeTraitPayload()
-	flat := flatTraitPayload()
+	leaf := leafTraitPayload()
 
-	explicitResult, err := configured.NewEvaluator().Score(explicit, compositeTraitSheet())
+	explicitResult, err := configured.NewEvaluator().Score(explicit, canonicalDefinitionFixture(t, explicit), compositeTraitSheet())
 	if err != nil {
 		t.Fatalf("explicit Score: %v", err)
 	}
-	flatResult, err := configured.NewEvaluator().Score(flat, compositeTraitSheet())
+	flatResult, err := configured.NewEvaluator().Score(leaf, canonicalDefinitionFixture(t, leaf), compositeTraitSheet())
 	if err != nil {
 		t.Fatalf("flat Score: %v", err)
 	}
@@ -68,9 +68,6 @@ func compositePolePayload() *modeltypology.Payload {
 		Outcomes: []modeltypology.Outcome{
 			{Code: "R", Name: "Right"},
 			{Code: "L", Name: "Left"},
-		},
-		Dimensions: map[string]modeltypology.Dimension{
-			"TOTAL": {Code: "TOTAL", Name: "Total", LeftPole: "L", RightPole: "R", Threshold: 24},
 		},
 		Runtime: &modeltypology.RuntimeSpec{
 			FactorGraph: modeltypology.FactorGraphSpec{
@@ -127,7 +124,7 @@ func compositeTraitPayload() *modeltypology.Payload {
 				Factors: map[string]modeltypology.FactorSpec{
 					"O1": {
 						ID:   "O1",
-						Code: "O",
+						Code: "O1",
 						Name: "Openness-1",
 						Kind: modeltypology.FactorSpecKindLeaf,
 						Contributions: []modeltypology.FactorContributionSpec{
@@ -136,7 +133,7 @@ func compositeTraitPayload() *modeltypology.Payload {
 					},
 					"O2": {
 						ID:   "O2",
-						Code: "O",
+						Code: "O2",
 						Name: "Openness-2",
 						Kind: modeltypology.FactorSpecKindLeaf,
 						Contributions: []modeltypology.FactorContributionSpec{
@@ -181,24 +178,32 @@ func compositeTraitPayload() *modeltypology.Payload {
 	}
 }
 
-func flatTraitPayload() *modeltypology.Payload {
+func leafTraitPayload() *modeltypology.Payload {
 	return &modeltypology.Payload{
-		Code:           "FLAT_TRAIT_V1",
-		Version:        "1.0.0",
-		Status:         "published",
-		Algorithm:      modelcatalog.AlgorithmBigFive,
-		DimensionOrder: []string{"O", "C"},
-		Dimensions: map[string]modeltypology.Dimension{
-			"O": {Code: "O", Name: "Openness"},
-			"C": {Code: "C", Name: "Conscientiousness"},
-		},
-		QuestionMappings: []modeltypology.QuestionMapping{
-			{QuestionCode: "O1", Dimension: "O", Sign: 1},
-			{QuestionCode: "O2", Dimension: "O", Sign: 1},
-			{QuestionCode: "C1", Dimension: "C", Sign: 1},
-		},
-		MatchingSpec: modeltypology.MatchingSpec{
-			Kind: modelcatalog.DecisionKindTraitProfile,
+		Code:      "LEAF_TRAIT_V1",
+		Version:   "1.0.0",
+		Status:    "published",
+		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
+		Runtime: &modeltypology.RuntimeSpec{
+			FactorGraph: modeltypology.FactorGraphSpec{
+				Factors: map[string]modeltypology.FactorSpec{
+					"O": {ID: "O", Code: "O", Name: "Openness", Kind: modeltypology.FactorSpecKindLeaf, Contributions: []modeltypology.FactorContributionSpec{
+						{QuestionCode: "O1", ScoringMode: modeltypology.QuestionScoringModeQuestionScore, Sign: 1, Weight: 1},
+						{QuestionCode: "O2", ScoringMode: modeltypology.QuestionScoringModeQuestionScore, Sign: 1, Weight: 1},
+					}},
+					"C": {ID: "C", Code: "C", Name: "Conscientiousness", Kind: modeltypology.FactorSpecKindLeaf, Contributions: []modeltypology.FactorContributionSpec{
+						{QuestionCode: "C1", ScoringMode: modeltypology.QuestionScoringModeQuestionScore, Sign: 1, Weight: 1},
+					}},
+				},
+				Roots: []string{"O", "C"},
+				Dimensions: map[string]modeltypology.Dimension{
+					"O": {Code: "O", Name: "Openness"},
+					"C": {Code: "C", Name: "Conscientiousness"},
+				},
+			},
+			Decision:       modeltypology.PersonalityDecisionSpec{Kind: modelcatalog.DecisionKindTraitProfile},
+			OutcomeMapping: modeltypology.OutcomeMappingSpec{DetailKind: modeltypology.OutcomeDetailTraitProfile, DetailAdapterKey: modeltypology.DetailAdapterTraitProfile},
+			Report:         modeltypology.ReportSpec{Kind: modeltypology.ReportKindTraitProfile, AdapterKey: modeltypology.ReportAdapterTraitProfile},
 		},
 	}
 }

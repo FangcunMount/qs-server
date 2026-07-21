@@ -12,7 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 )
 
-func TestScaleDefinitionHandlerBuildsPayloadFromDefinitionV2(t *testing.T) {
+func TestScaleDefinitionHandlerMaterializesDefinitionV2(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{Code: "SCALE_A", Kind: domain.KindScale, Algorithm: domain.AlgorithmScaleDefault, Title: "Scale A", Now: now})
@@ -20,11 +20,11 @@ func TestScaleDefinitionHandlerBuildsPayloadFromDefinitionV2(t *testing.T) {
 		t.Fatalf("NewAssessmentModel: %v", err)
 	}
 	definition := completeScaleDefinition()
-	result, err := (ScaleDefinitionHandler{}).BuildSnapshotPayload(context.Background(), modelWithDefinition(model, definition))
+	result, err := (ScaleDefinitionHandler{}).MaterializeSnapshot(context.Background(), modelWithDefinition(model, definition))
 	if err != nil {
-		t.Fatalf("BuildSnapshotPayload: %v", err)
+		t.Fatalf("MaterializeSnapshot: %v", err)
 	}
-	if result.PayloadFormat != domain.PayloadFormatAssessmentScaleV1 || len(result.Payload) == 0 || result.DecisionKind != domain.DecisionKindScoreRange {
+	if result.AlgorithmFamily != domain.AlgorithmFamilyFactorScoring || result.DecisionKind != domain.DecisionKindScoreRange {
 		t.Fatalf("snapshot result = %#v", result)
 	}
 }
@@ -98,12 +98,11 @@ func TestScaleValidateForPublishRejectsUnknownQuestionRef(t *testing.T) {
 
 func publishableScaleShell() *domain.AssessmentModel {
 	return &domain.AssessmentModel{
-		Kind:       domain.KindScale,
-		Algorithm:  domain.AlgorithmScaleDefault,
-		Code:       "SCALE_SHELL",
-		Title:      "Scale",
-		Binding:    domain.QuestionnaireBinding{QuestionnaireCode: "Q", QuestionnaireVersion: "1"},
-		Definition: domain.DefinitionPayload{Format: domain.PayloadFormatAssessmentScaleV1, Data: []byte(`{}`)},
+		Kind:      domain.KindScale,
+		Algorithm: domain.AlgorithmScaleDefault,
+		Code:      "SCALE_SHELL",
+		Title:     "Scale",
+		Binding:   domain.QuestionnaireBinding{QuestionnaireCode: "Q", QuestionnaireVersion: "1"},
 	}
 }
 

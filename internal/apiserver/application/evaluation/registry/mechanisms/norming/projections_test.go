@@ -6,8 +6,10 @@ import (
 	factornorm "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/norming"
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
+	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	catalognorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 )
 
@@ -51,8 +53,28 @@ func TestApplyFactorProjectionsRollsUpAndAppliesNorm(t *testing.T) {
 			},
 		},
 	}
+	input := &evaluationinput.InputSnapshot{DefinitionV2: &modeldefinition.Definition{Measure: modeldefinition.MeasureSpec{
+		Factors: []factor.Factor{
+			{Code: "inhibit", Title: "Inhibit", Role: factor.FactorRoleDimension},
+			{Code: "self_monitor", Title: "Self Monitor", Role: factor.FactorRoleDimension},
+			{Code: "bri", Title: "BRI", Role: factor.FactorRoleIndex},
+			{Code: "gec", Title: "GEC", Role: factor.FactorRoleIndex},
+		},
+		FactorGraph: factor.FactorGraph{
+			Roots: []string{"gec"},
+			Edges: []factor.FactorEdge{
+				{ParentCode: "bri", ChildCode: "inhibit"},
+				{ParentCode: "bri", ChildCode: "self_monitor"},
+				{ParentCode: "gec", ChildCode: "bri"},
+			},
+		},
+		Scoring: []factor.Scoring{
+			{FactorCode: "bri", Strategy: factor.ScoringStrategySum, Sources: []factor.ScoringSource{{Kind: factor.ScoringSourceFactor, Code: "inhibit"}, {Kind: factor.ScoringSourceFactor, Code: "self_monitor"}}},
+			{FactorCode: "gec", Strategy: factor.ScoringStrategySum, Sources: []factor.ScoringSource{{Kind: factor.ScoringSourceFactor, Code: "bri"}}},
+		},
+	}}}
 
-	enriched, err := factornorm.ApplyFactorProjections(outcome, snapshot, calcnorm.Subject{})
+	enriched, err := factornorm.ApplyFactorProjectionsForInput(outcome, input, snapshot, calcnorm.Subject{})
 	if err != nil {
 		t.Fatalf("ApplyFactorProjections: %v", err)
 	}

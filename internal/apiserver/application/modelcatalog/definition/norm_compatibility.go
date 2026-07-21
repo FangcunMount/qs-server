@@ -101,36 +101,32 @@ func scoreBasisUnsupported(model *domain.AssessmentModel, factorTable norm.Facto
 		}
 		return ""
 	case conclusion.ScoreBasisStandardScore:
-		if factorHasStandardScore(factorTable) {
+		if factorProducesStandardScore(factorTable) {
 			return ""
 		}
-		return "常模表未提供 standard_score，不能使用 score_basis=standard_score"
+		return "常模表的每个可命中区间都必须提供 standard_score，且不能包含 parametric band"
 	default:
 		return ""
 	}
 }
 
-func factorHasStandardScore(factorTable norm.FactorTable) bool {
+func factorProducesStandardScore(factorTable norm.FactorTable) bool {
+	if len(factorTable.Lookup) == 0 || len(factorTable.Bands) > 0 {
+		return false
+	}
 	for _, row := range factorTable.Lookup {
-		if row.StandardScore != nil {
-			return true
+		if row.StandardScore == nil {
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 func effectiveNormAlgorithm(model *domain.AssessmentModel) domain.Algorithm {
 	if model == nil {
 		return ""
 	}
-	if model.Algorithm != "" {
-		return model.Algorithm
-	}
-	family, ok := domain.AlgorithmFamilyFromIdentity(model.Kind, model.SubKind, model.Algorithm)
-	if ok && family == domain.AlgorithmFamilyTaskPerformance {
-		return domain.AlgorithmSPM
-	}
-	return ""
+	return model.Algorithm
 }
 
 func definitionFormVariant(model *domain.AssessmentModel) string {

@@ -7,8 +7,8 @@ import (
 )
 
 func TestPersonalityTypologyIdentity(t *testing.T) {
-	got := PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI)
-	if got.String() != "typology/typology/mbti" {
+	got := PersonalityTypologyIdentity(modelcatalog.AlgorithmPersonalityTypology)
+	if got.String() != "typology/typology/personality_typology" {
 		t.Fatalf("identity string = %s", got.String())
 	}
 }
@@ -17,9 +17,6 @@ func TestBehavioralRatingIdentityKeepsExactAlgorithm(t *testing.T) {
 	got := BehavioralRatingIdentity(modelcatalog.AlgorithmBrief2)
 	if got.String() != "behavioral_rating//brief2" {
 		t.Fatalf("identity string = %s", got.String())
-	}
-	if BehavioralRatingIdentity(modelcatalog.AlgorithmBrief2) == ExecutionIdentityBehavioralRatingDefault {
-		t.Fatal("brief2 must not equal retired family route key")
 	}
 }
 

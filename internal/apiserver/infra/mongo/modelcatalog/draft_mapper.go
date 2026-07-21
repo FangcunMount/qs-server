@@ -30,8 +30,6 @@ func (DraftMapper) ToPO(model *domain.AssessmentModel) *AssessmentModelPO {
 		Status:                  string(model.Status),
 		QuestionnaireCode:       model.Binding.QuestionnaireCode,
 		QuestionnaireVersion:    model.Binding.QuestionnaireVersion,
-		DefinitionPayloadFormat: model.Definition.Format,
-		DefinitionPayload:       append([]byte(nil), model.Definition.Data...),
 		DefinitionSchemaVersion: definitionSchemaVersion(model.DefinitionV2),
 		DefinitionV2:            definitionToPO(model.DefinitionV2),
 		RecordRole:              recordRoleHead,
@@ -68,10 +66,6 @@ func (DraftMapper) ToDomain(po *AssessmentModelPO) *domain.AssessmentModel {
 		Binding: domain.QuestionnaireBinding{
 			QuestionnaireCode:    po.QuestionnaireCode,
 			QuestionnaireVersion: po.QuestionnaireVersion,
-		},
-		Definition: domain.DefinitionPayload{
-			Format: po.DefinitionPayloadFormat,
-			Data:   append([]byte(nil), po.DefinitionPayload...),
 		},
 		DefinitionV2: definitionFromPO(po.DefinitionV2),
 		Version:      po.Revision,

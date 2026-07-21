@@ -84,7 +84,7 @@ func scoreLeaf(spec LeafScoringSpec, answers map[string]Answer) (float64, error)
 		if !ok {
 			return 0, fmt.Errorf("missing answer for question %s", contribution.QuestionCode)
 		}
-		value, err := CalculateQuestionContribution(spec.OptionScoring, contribution, answer)
+		value, err := CalculateQuestionContribution(contribution, answer)
 		if err != nil {
 			return 0, err
 		}
@@ -93,19 +93,18 @@ func scoreLeaf(spec LeafScoringSpec, answers map[string]Answer) (float64, error)
 	return total, nil
 }
 
-// CalculateQuestionContribution calculates one question's contribution to a leaf factor.
-// An empty scoring mode deliberately preserves the historical snapshot behavior.
-func CalculateQuestionContribution(policy OptionScoringPolicy, contribution AnswerContribution, answer Answer) (float64, error) {
+// CalculateQuestionContribution calculates one explicitly configured question contribution.
+func CalculateQuestionContribution(contribution AnswerContribution, answer Answer) (float64, error) {
 	switch contribution.ScoringMode {
 	case "":
-		return legacyContributionScore(policy, contribution, answer)
+		return 0, fmt.Errorf("scoring mode is required for question %s", contribution.QuestionCode)
 	case QuestionScoringModeQuestionScore:
 		return explicitContributionScore(contribution, answer.Score)
 	case QuestionScoringModeOptionOverride:
 		if len(contribution.OptionScores) == 0 {
 			return 0, fmt.Errorf("option scores are required for question %s", contribution.QuestionCode)
 		}
-		base, err := scoreOptionAnswer(OptionScoringStrict, contribution.OptionScores, answer)
+		base, err := scoreOptionAnswer(contribution.OptionScores, answer)
 		if err != nil {
 			return 0, err
 		}
@@ -113,17 +112,6 @@ func CalculateQuestionContribution(policy OptionScoringPolicy, contribution Answ
 	default:
 		return 0, fmt.Errorf("unsupported scoring mode %s for question %s", contribution.ScoringMode, contribution.QuestionCode)
 	}
-}
-
-func legacyContributionScore(policy OptionScoringPolicy, contribution AnswerContribution, answer Answer) (float64, error) {
-	if len(contribution.OptionScores) > 0 {
-		return scoreOptionAnswer(policy, contribution.OptionScores, answer)
-	}
-	value, err := likertValue(answer)
-	if err != nil {
-		return 0, err
-	}
-	return contribution.Sign * value, nil
 }
 
 func explicitContributionScore(contribution AnswerContribution, base float64) (float64, error) {
@@ -147,7 +135,7 @@ func explicitContributionScore(contribution AnswerContribution, base float64) (f
 	return base * sign * weight, nil
 }
 
-func scoreOptionAnswer(policy OptionScoringPolicy, optionScores map[string]float64, answer Answer) (float64, error) {
+func scoreOptionAnswer(optionScores map[string]float64, answer Answer) (float64, error) {
 	value := answerValueKey(answer.Value)
 	if value != "" {
 		if score, ok := optionScores[value]; ok {
@@ -157,26 +145,7 @@ func scoreOptionAnswer(policy OptionScoringPolicy, optionScores map[string]float
 			return score, nil
 		}
 	}
-	if policy == OptionScoringCompat && answer.Score > 0 {
-		return answer.Score, nil
-	}
 	return 0, fmt.Errorf("invalid answer for question %s: %v", answer.QuestionCode, answer.Value)
-}
-
-func likertValue(answer Answer) (float64, error) {
-	if answer.Score >= 1 && answer.Score <= 5 {
-		return answer.Score, nil
-	}
-	value := answerValueKey(answer.Value)
-	if value == "" {
-		return 0, fmt.Errorf("invalid answer for question %s", answer.QuestionCode)
-	}
-	switch value {
-	case "1", "2", "3", "4", "5":
-		return float64(value[0] - '0'), nil
-	default:
-		return 0, fmt.Errorf("invalid likert value for question %s: %s", answer.QuestionCode, value)
-	}
 }
 
 func aggregateChildren(factor PersonalityFactor, scores map[FactorID]FactorScore) (float64, error) {

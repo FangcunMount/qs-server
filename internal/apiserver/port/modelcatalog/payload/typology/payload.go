@@ -9,21 +9,16 @@ import (
 
 // Payload 是unified personality 类型学 model 载荷。
 type Payload struct {
-	Code                 string               `json:"code"`
-	Version              string               `json:"version"`
-	Title                string               `json:"title"`
-	QuestionnaireCode    string               `json:"questionnaire_code"`
-	QuestionnaireVersion string               `json:"questionnaire_version"`
-	Status               string               `json:"status"`
-	Source               Source               `json:"source"`
-	Algorithm            binding.Algorithm    `json:"algorithm"`
-	DimensionOrder       []string             `json:"dimension_order"`
-	Dimensions           map[string]Dimension `json:"dimensions"`
-	QuestionMappings     []QuestionMapping    `json:"question_mappings"`
-	Outcomes             []Outcome            `json:"outcomes"`
-	MatchingSpec         MatchingSpec         `json:"matching_spec"`
-	SpecialTriggers      []SpecialTrigger     `json:"special_triggers"`
-	Runtime              *RuntimeSpec         `json:"runtime,omitempty"`
+	Code                 string            `json:"code"`
+	Version              string            `json:"version"`
+	Title                string            `json:"title"`
+	QuestionnaireCode    string            `json:"questionnaire_code"`
+	QuestionnaireVersion string            `json:"questionnaire_version"`
+	Status               string            `json:"status"`
+	Source               Source            `json:"source"`
+	Algorithm            binding.Algorithm `json:"algorithm"`
+	Outcomes             []Outcome         `json:"outcomes"`
+	Runtime              *RuntimeSpec      `json:"runtime,omitempty"`
 
 	// PublishedRuntime is evaluation-only metadata from AssessmentSnapshot; not JSON payload.
 	PublishedRuntime *portmodelcatalog.PublishedRuntimeMeta `json:"-"`
@@ -85,13 +80,6 @@ type Dimension struct {
 	Model     string  `json:"model,omitempty"`
 }
 
-type QuestionMapping struct {
-	QuestionCode string             `json:"question_code"`
-	Dimension    string             `json:"dimension"`
-	Sign         float64            `json:"sign,omitempty"`
-	OptionScores map[string]float64 `json:"option_scores,omitempty"`
-}
-
 type Outcome struct {
 	Code        string   `json:"code"`
 	Name        string   `json:"name"`
@@ -114,18 +102,4 @@ type Rarity struct {
 	Percent float64 `json:"percent,omitempty"`
 	Label   string  `json:"label,omitempty"`
 	OneInX  int     `json:"one_in_x,omitempty"`
-}
-
-type MatchingSpec struct {
-	Kind                        binding.DecisionKind `json:"kind"`
-	FallbackSimilarityThreshold float64              `json:"fallback_similarity_threshold,omitempty"`
-}
-
-type SpecialTrigger struct {
-	Code          string   `json:"code"`
-	Name          string   `json:"name,omitempty"`
-	Trigger       string   `json:"trigger"`
-	OutcomeCode   string   `json:"outcome_code,omitempty"`
-	QuestionCodes []string `json:"question_codes,omitempty"`
-	OptionValues  []string `json:"option_values,omitempty"`
 }

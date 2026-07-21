@@ -65,14 +65,13 @@ func (s *ScoringSource) UnmarshalJSON(data []byte) error {
 
 // Scoring 描述一个 Factor 的分数如何由输入来源聚合得到。
 type Scoring struct {
-	FactorCode    string
-	Sources       []ScoringSource
-	Strategy      ScoringStrategy
-	Params        *ScoringParams
-	MaxScore      *float64
-	Weights       map[string]float64
-	Constant      float64
-	OptionScoring OptionScoring
+	FactorCode string
+	Sources    []ScoringSource
+	Strategy   ScoringStrategy
+	Params     *ScoringParams
+	MaxScore   *float64
+	Weights    map[string]float64
+	Constant   float64
 }
 
 // FactorEdge 描述 FactorGraph 中一条父子边。

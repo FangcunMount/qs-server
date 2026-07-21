@@ -15,15 +15,11 @@ type RuntimeSpec struct {
 	Report         ReportSpec              `json:"report"`
 }
 
-// FactorGraphSpec 描述因子 维度 和 question mappings 用于 计分。
-// When 因子 和 根s 是 set, 显式 因子图 takes precedence over。
-// 旧版 维度Order/维度/QuestionMappings flat layout。
+// FactorGraphSpec is the explicit factor graph used for scoring.
 type FactorGraphSpec struct {
-	DimensionOrder   []string              `json:"dimension_order,omitempty"`
-	Dimensions       map[string]Dimension  `json:"dimensions,omitempty"`
-	QuestionMappings []QuestionMapping     `json:"question_mappings,omitempty"`
-	Factors          map[string]FactorSpec `json:"factors,omitempty"`
-	Roots            []string              `json:"roots,omitempty"`
+	Dimensions map[string]Dimension  `json:"dimensions,omitempty"`
+	Factors    map[string]FactorSpec `json:"factors"`
+	Roots      []string              `json:"roots"`
 }
 
 // FactorSpec 定义一个node in 显式 因子图。
@@ -37,7 +33,6 @@ type FactorSpec struct {
 	Weights       map[string]float64       `json:"weights,omitempty"`
 	Constant      float64                  `json:"constant,omitempty"`
 	Contributions []FactorContributionSpec `json:"contributions,omitempty"`
-	OptionScoring FactorOptionScoring      `json:"option_scoring,omitempty"`
 }
 
 // FactorSpecKind 区分叶子 和 复合 因子 nodes。
@@ -55,14 +50,6 @@ const (
 	FactorAggregationSum         FactorAggregation = "sum"
 	FactorAggregationAvg         FactorAggregation = "avg"
 	FactorAggregationWeightedAvg FactorAggregation = "weighted_avg"
-)
-
-// FactorOptionScoring 控制选项-mapped answer 计分 用于 叶子 因子。
-type FactorOptionScoring string
-
-const (
-	FactorOptionScoringStrict FactorOptionScoring = "strict"
-	FactorOptionScoringCompat FactorOptionScoring = "compat"
 )
 
 // FactorContributionSpec 映射问卷题目 到 叶子 因子 score。
@@ -112,10 +99,7 @@ func (fg FactorGraphSpec) HasExplicitFactorGraph() bool {
 
 // DecisionFactorOrder 返回因子 ids 供 decision 和 结果 assembly。
 func (fg FactorGraphSpec) DecisionFactorOrder() []string {
-	if fg.HasExplicitFactorGraph() {
-		return append([]string(nil), fg.Roots...)
-	}
-	return append([]string(nil), fg.DimensionOrder...)
+	return append([]string(nil), fg.Roots...)
 }
 
 // PersonalityDecisionSpec 描述如何画像 向量转成 结果。
@@ -144,14 +128,12 @@ const (
 
 // SpecialRuleSpec 描述配置urable special 结果 rule。
 type SpecialRuleSpec struct {
-	Code          string               `json:"code"`
-	Kind          SpecialRuleKind      `json:"kind,omitempty"`
-	Phase         SpecialRulePhase     `json:"phase"`
-	Trigger       string               `json:"trigger,omitempty"`
-	OutcomeCode   string               `json:"outcome_code,omitempty"`
-	Condition     SpecialRuleCondition `json:"condition,omitempty"`
-	QuestionCodes []string             `json:"question_codes,omitempty"`
-	OptionValues  []string             `json:"option_values,omitempty"`
+	Code        string               `json:"code"`
+	Kind        SpecialRuleKind      `json:"kind,omitempty"`
+	Phase       SpecialRulePhase     `json:"phase"`
+	Trigger     string               `json:"trigger,omitempty"`
+	OutcomeCode string               `json:"outcome_code,omitempty"`
+	Condition   SpecialRuleCondition `json:"condition,omitempty"`
 }
 
 // SpecialRuleKind 选择评估 strategy 用于 special rule。
@@ -168,34 +150,19 @@ type SpecialRuleCondition struct {
 	OptionValues  []string `json:"option_values,omitempty"`
 }
 
-// ResolvedKind 返回配置化 类型, deriving 从 旧版 字段 when needed。
+// ResolvedKind returns the explicitly declared rule kind.
 func (r SpecialRuleSpec) ResolvedKind() SpecialRuleKind {
-	if r.Kind != "" {
-		return r.Kind
-	}
-	if len(r.ResolvedQuestionCodes()) > 0 {
-		return SpecialRuleKindAnswerMatch
-	}
-	if r.Phase == SpecialRuleAfterDecision {
-		return SpecialRuleKindFallbackThreshold
-	}
-	return ""
+	return r.Kind
 }
 
-// ResolvedQuestionCodes 返回question 编码 从 condition 或 旧版 flat 字段。
+// ResolvedQuestionCodes returns condition question codes.
 func (r SpecialRuleSpec) ResolvedQuestionCodes() []string {
-	if len(r.Condition.QuestionCodes) > 0 {
-		return append([]string(nil), r.Condition.QuestionCodes...)
-	}
-	return append([]string(nil), r.QuestionCodes...)
+	return append([]string(nil), r.Condition.QuestionCodes...)
 }
 
-// ResolvedOptionValues 返回选项 values 从 condition 或 旧版 flat 字段。
+// ResolvedOptionValues returns condition option values.
 func (r SpecialRuleSpec) ResolvedOptionValues() []string {
-	if len(r.Condition.OptionValues) > 0 {
-		return append([]string(nil), r.Condition.OptionValues...)
-	}
-	return append([]string(nil), r.OptionValues...)
+	return append([]string(nil), r.Condition.OptionValues...)
 }
 
 // OutcomeDetailKind selects how scoring detail maps to canonical Execution.
@@ -219,12 +186,9 @@ type DetailAdapterKey string
 const (
 	DetailAdapterPersonalityType DetailAdapterKey = "personality_type"
 	DetailAdapterTraitProfile    DetailAdapterKey = "trait_profile"
-	DetailAdapterMBTI            DetailAdapterKey = "mbti"
-	DetailAdapterSBTI            DetailAdapterKey = "sbti"
-	DetailAdapterBigFive         DetailAdapterKey = "bigfive"
 )
 
-// ResolvedDetailAdapterKey 返回配置化 adapter 键, deriving 从 旧版 字段 when needed。
+// ResolvedDetailAdapterKey resolves the explicit mechanism adapter.
 func (m OutcomeMappingSpec) ResolvedDetailAdapterKey(decisionKind binding.DecisionKind) DetailAdapterKey {
 	if m.DetailAdapterKey != "" {
 		return m.DetailAdapterKey
@@ -259,13 +223,9 @@ type ReportAdapterKey string
 const (
 	ReportAdapterPersonalityType ReportAdapterKey = "personality_type"
 	ReportAdapterTraitProfile    ReportAdapterKey = "trait_profile"
-	ReportAdapterMBTI            ReportAdapterKey = "mbti"
-	ReportAdapterSBTI            ReportAdapterKey = "sbti"
-	ReportAdapterBigFive         ReportAdapterKey = "bigfive"
 )
 
-// ResolvedAdapterKey 返回配置化 报告适配器 从 显式 键 或 通用 report 类型。
-// Legacy model-特定 报告适配器 必须 be set on Adapter键 在 旧版 derivation。
+// ResolvedAdapterKey resolves an explicit or report-kind-derived mechanism adapter.
 func (r ReportSpec) ResolvedAdapterKey(_ OutcomeMappingSpec, _ binding.DecisionKind) ReportAdapterKey {
 	if r.AdapterKey != "" {
 		return r.AdapterKey

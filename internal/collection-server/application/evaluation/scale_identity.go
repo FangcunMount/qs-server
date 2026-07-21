@@ -3,22 +3,11 @@ package evaluation
 const (
 	// typologyModelKind 是当前类型学模型的规范 Kind。
 	typologyModelKind = "typology"
-	// personalityModelKind 是迁移前类型学记录的历史 Kind。
-	personalityModelKind = "personality"
 )
 
-// IsTypologyModel reports whether an assessment model belongs to the typology
-// facade. Canonical records use kind=typology; legacy personality records are
-// retained for read compatibility while old assessments are still present.
+// IsTypologyModel reports whether an assessment model uses the canonical typology kind.
 func IsTypologyModel(model ModelIdentityResponse) bool {
-	switch model.Kind {
-	case typologyModelKind:
-		return true
-	case personalityModelKind:
-		return model.SubKind == "" || model.SubKind == "typology"
-	default:
-		return false
-	}
+	return model.Kind == typologyModelKind
 }
 
 // scaleCodeFromModel 返回量表类模型的 code；人格类模型无量表码，返回空串。

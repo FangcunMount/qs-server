@@ -1,16 +1,12 @@
 package modelcatalog
 
 const (
-	// SourceDefinitionContentHash stores CanonicalContentHash of DefinitionV2 authoring layers.
 	SourceDefinitionContentHash = "definition_content_hash"
-	// SourcePayloadProjectionHash stores SHA256 of published compatibility payload bytes.
-	SourcePayloadProjectionHash = "payload_projection_hash"
-	// SourceProjectionHashSchema identifies the hash contract version.
-	SourceProjectionHashSchema = "projection_hash_schema"
+	SourceDefinitionHashSchema  = "definition_hash_schema"
 )
 
-// AttachProjectionHashes writes publish-time projection fingerprints into snapshot Source.
-func AttachProjectionHashes(snapshot *AssessmentSnapshot, definitionHash, payloadHash string) {
+// AttachDefinitionHash records the canonical DefinitionV2 fingerprint.
+func AttachDefinitionHash(snapshot *AssessmentSnapshot, definitionHash string) {
 	if snapshot == nil {
 		return
 	}
@@ -20,22 +16,12 @@ func AttachProjectionHashes(snapshot *AssessmentSnapshot, definitionHash, payloa
 	if definitionHash != "" {
 		snapshot.Source[SourceDefinitionContentHash] = definitionHash
 	}
-	if payloadHash != "" {
-		snapshot.Source[SourcePayloadProjectionHash] = payloadHash
-	}
-	snapshot.Source[SourceProjectionHashSchema] = "definition-projection/v1"
+	snapshot.Source[SourceDefinitionHashSchema] = "definition-v2/v1"
 }
 
-// ProjectionHashesFromSource reads publish-time projection fingerprints from snapshot Source.
-func ProjectionHashesFromSource(source map[string]any) (definitionHash, payloadHash string) {
-	if source == nil {
-		return "", ""
-	}
+func DefinitionHashFromSource(source map[string]any) string {
 	if value, ok := source[SourceDefinitionContentHash].(string); ok {
-		definitionHash = value
+		return value
 	}
-	if value, ok := source[SourcePayloadProjectionHash].(string); ok {
-		payloadHash = value
-	}
-	return definitionHash, payloadHash
+	return ""
 }

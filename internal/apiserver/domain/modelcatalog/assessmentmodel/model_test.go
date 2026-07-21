@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/assessmentmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 )
 
 func TestAssessmentModelLifecycle(t *testing.T) {
@@ -16,7 +17,7 @@ func TestAssessmentModelLifecycle(t *testing.T) {
 		Code:      "personality_mbti_v1",
 		Kind:      binding.KindTypology,
 		SubKind:   binding.SubKindTypology,
-		Algorithm: binding.AlgorithmMBTI,
+		Algorithm: binding.AlgorithmPersonalityTypology,
 		Title:     "MBTI",
 		Now:       now,
 	})
@@ -36,10 +37,7 @@ func TestAssessmentModelLifecycle(t *testing.T) {
 	}, now); err != nil {
 		t.Fatalf("BindQuestionnaire() error = %v", err)
 	}
-	if err := model.UpdateDefinition(assessmentmodel.DefinitionPayload{
-		Format: "assessmentmodel.personality.typology.v1",
-		Data:   []byte(`{"algorithm":"mbti"}`),
-	}, now); err != nil {
+	if err := model.UpdateDefinition(&definition.Definition{}, now); err != nil {
 		t.Fatalf("UpdateDefinition() error = %v", err)
 	}
 	if result := model.ValidateForPublish(); !result.Passed() {
@@ -59,14 +57,14 @@ func TestAssessmentModelLifecycle(t *testing.T) {
 	}
 }
 
-func TestAssessmentModelRejectsLegacyDecodeOnlyDefinitionFormat(t *testing.T) {
+func TestAssessmentModelRejectsMissingDefinitionV2(t *testing.T) {
 	t.Parallel()
 
 	model, err := assessmentmodel.New(assessmentmodel.NewInput{
 		Code:      "personality_legacy_payload",
 		Kind:      binding.KindTypology,
 		SubKind:   binding.SubKindTypology,
-		Algorithm: binding.AlgorithmMBTI,
+		Algorithm: binding.AlgorithmPersonalityTypology,
 		Title:     "Legacy Payload",
 	})
 	if err != nil {
@@ -76,18 +74,11 @@ func TestAssessmentModelRejectsLegacyDecodeOnlyDefinitionFormat(t *testing.T) {
 		QuestionnaireCode:    "q_mbti",
 		QuestionnaireVersion: "v1",
 	}, time.Now())
-	if err := model.UpdateDefinition(assessmentmodel.DefinitionPayload{
-		Format: "ruleset.mbti.v1",
-		Data:   []byte(`{"algorithm":"mbti"}`),
-	}, time.Now()); err != nil {
-		t.Fatalf("UpdateDefinition() error = %v", err)
-	}
-
 	result := model.ValidateForPublish()
 	if result.Passed() {
-		t.Fatal("ValidateForPublish() should reject legacy-decode-only payload format")
+		t.Fatal("ValidateForPublish() should reject missing DefinitionV2")
 	}
-	if result.Issues[0].Code != "definition.format.legacy_decode_only" {
+	if result.Issues[0].Code != "definition_v2.required" {
 		t.Fatalf("issue = %#v", result.Issues[0])
 	}
 }

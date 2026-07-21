@@ -15,7 +15,7 @@ func TestConfiguredEvaluatorMatchesBigFiveTraitProfile(t *testing.T) {
 	sheet := bigFiveSheet()
 	evaluator := configured.NewEvaluator()
 
-	got, err := evaluator.Score(payload, sheet)
+	got, err := evaluator.Score(payload, canonicalDefinitionFixture(t, payload), sheet)
 	if err != nil {
 		t.Fatalf("configured Score: %v", err)
 	}
@@ -30,21 +30,31 @@ func TestConfiguredEvaluatorMatchesBigFiveTraitProfile(t *testing.T) {
 
 func bigFivePayload() *modeltypology.Payload {
 	return &modeltypology.Payload{
-		Code:           "BIGFIVE_V1",
-		Version:        "1.0.0",
-		Algorithm:      modelcatalog.AlgorithmBigFive,
-		DimensionOrder: []string{"O", "C"},
-		Dimensions: map[string]modeltypology.Dimension{
-			"O": {Code: "O", Name: "Openness"},
-			"C": {Code: "C", Name: "Conscientiousness"},
+		Code:      "BIGFIVE_V1",
+		Version:   "1.0.0",
+		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
+		Runtime: &modeltypology.RuntimeSpec{
+			FactorGraph: modeltypology.FactorGraphSpec{
+				Factors: map[string]modeltypology.FactorSpec{
+					"O": {ID: "O", Code: "O", Name: "Openness", Kind: modeltypology.FactorSpecKindLeaf, Contributions: []modeltypology.FactorContributionSpec{
+						{QuestionCode: "O1", ScoringMode: modeltypology.QuestionScoringModeQuestionScore, Sign: 1, Weight: 1},
+						{QuestionCode: "O2", ScoringMode: modeltypology.QuestionScoringModeQuestionScore, Sign: 1, Weight: 1},
+					}},
+					"C": {ID: "C", Code: "C", Name: "Conscientiousness", Kind: modeltypology.FactorSpecKindLeaf, Contributions: []modeltypology.FactorContributionSpec{
+						{QuestionCode: "C1", ScoringMode: modeltypology.QuestionScoringModeQuestionScore, Sign: 1, Weight: 1},
+						{QuestionCode: "C2", ScoringMode: modeltypology.QuestionScoringModeQuestionScore, Sign: 1, Weight: 1},
+					}},
+				},
+				Roots: []string{"O", "C"},
+				Dimensions: map[string]modeltypology.Dimension{
+					"O": {Code: "O", Name: "Openness"},
+					"C": {Code: "C", Name: "Conscientiousness"},
+				},
+			},
+			Decision:       modeltypology.PersonalityDecisionSpec{Kind: modelcatalog.DecisionKindTraitProfile},
+			OutcomeMapping: modeltypology.OutcomeMappingSpec{DetailKind: modeltypology.OutcomeDetailTraitProfile, DetailAdapterKey: modeltypology.DetailAdapterTraitProfile},
+			Report:         modeltypology.ReportSpec{Kind: modeltypology.ReportKindTraitProfile, AdapterKey: modeltypology.ReportAdapterTraitProfile},
 		},
-		QuestionMappings: []modeltypology.QuestionMapping{
-			{QuestionCode: "O1", Dimension: "O", Sign: 1},
-			{QuestionCode: "O2", Dimension: "O", Sign: 1},
-			{QuestionCode: "C1", Dimension: "C", Sign: 1},
-			{QuestionCode: "C2", Dimension: "C", Sign: 1},
-		},
-		MatchingSpec: modeltypology.MatchingSpec{Kind: modelcatalog.DecisionKindTraitProfile},
 	}
 }
 

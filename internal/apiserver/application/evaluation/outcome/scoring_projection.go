@@ -48,16 +48,6 @@ func AssessmentModelRefFromExecution(ref domainoutcome.ModelRef) assessment.Eval
 // canonical Execution.
 func ModelRefFromAssessment(ref assessment.EvaluationModelRef) domainoutcome.ModelRef {
 	kind, subKind, algorithm := modelcatalog.Kind(ref.Kind()), ref.SubKind(), ref.Algorithm()
-	// Kind/SubKind may recover from legacy family route; Algorithm stays explicit.
-	if algorithm == "" || subKind == "" {
-		legacyIdentity := ref.ExecutionIdentity()
-		if kind == "" {
-			kind = legacyIdentity.Kind
-		}
-		if subKind == "" {
-			subKind = legacyIdentity.SubKind
-		}
-	}
 	return domainoutcome.ModelRef{
 		ModelKind: kind, ModelSubKind: subKind, ModelAlgorithm: algorithm,
 		ModelCode: ref.Code().String(), ModelVersion: ref.Version(), ModelTitle: ref.Title(),

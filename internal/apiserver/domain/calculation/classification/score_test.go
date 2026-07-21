@@ -21,7 +21,7 @@ func TestQuestionScoreContributionUsesArbitraryFiniteAnswerScore(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := classification.CalculateQuestionContribution(classification.OptionScoringStrict, classification.AnswerContribution{
+			got, err := classification.CalculateQuestionContribution(classification.AnswerContribution{
 				QuestionCode: "q1", ScoringMode: classification.QuestionScoringModeQuestionScore, Sign: tt.sign, Weight: tt.weight,
 			}, classification.Answer{QuestionCode: "q1", Score: tt.score})
 			if err != nil {
@@ -35,7 +35,7 @@ func TestQuestionScoreContributionUsesArbitraryFiniteAnswerScore(t *testing.T) {
 }
 
 func TestOptionOverrideAppliesSignAndWeight(t *testing.T) {
-	got, err := classification.CalculateQuestionContribution(classification.OptionScoringCompat, classification.AnswerContribution{
+	got, err := classification.CalculateQuestionContribution(classification.AnswerContribution{
 		QuestionCode: "q1", ScoringMode: classification.QuestionScoringModeOptionOverride, Sign: -1, Weight: 0.5,
 		OptionScores: map[string]float64{"A": 4},
 	}, classification.Answer{QuestionCode: "q1", Value: "A", Score: 99})
@@ -48,7 +48,7 @@ func TestOptionOverrideAppliesSignAndWeight(t *testing.T) {
 }
 
 func TestExplicitContributionRejectsNonFiniteScore(t *testing.T) {
-	_, err := classification.CalculateQuestionContribution(classification.OptionScoringStrict, classification.AnswerContribution{
+	_, err := classification.CalculateQuestionContribution(classification.AnswerContribution{
 		QuestionCode: "q1", ScoringMode: classification.QuestionScoringModeQuestionScore,
 	}, classification.Answer{QuestionCode: "q1", Score: math.Inf(1)})
 	if err == nil || !strings.Contains(err.Error(), "finite") {
@@ -56,46 +56,28 @@ func TestExplicitContributionRejectsNonFiniteScore(t *testing.T) {
 	}
 }
 
-func TestLegacyOptionOverrideStillIgnoresSign(t *testing.T) {
-	got, err := classification.CalculateQuestionContribution(classification.OptionScoringStrict, classification.AnswerContribution{
+func TestContributionWithoutScoringModeIsRejected(t *testing.T) {
+	_, err := classification.CalculateQuestionContribution(classification.AnswerContribution{
 		QuestionCode: "q1", Sign: -1, OptionScores: map[string]float64{"A": 4},
 	}, classification.Answer{QuestionCode: "q1", Value: "A"})
-	if err != nil {
-		t.Fatalf("CalculateQuestionContribution: %v", err)
-	}
-	if got != 4 {
-		t.Fatalf("legacy score = %v, want 4", got)
+	if err == nil || !strings.Contains(err.Error(), "scoring mode is required") {
+		t.Fatalf("error = %v, want scoring mode error", err)
 	}
 }
 
-func TestOptionScoringStrictRejectsUnknownOption(t *testing.T) {
-	graph := optionScoringGraph(classification.OptionScoringStrict)
+func TestOptionOverrideRejectsUnknownOption(t *testing.T) {
+	graph := optionScoringGraph()
 	_, err := classification.ScoreGraph(graph, &classification.AnswerSheet{
 		Answers: []classification.Answer{
 			{QuestionCode: "q1", Value: "X", Score: 2},
 		},
 	})
 	if err == nil || !strings.Contains(err.Error(), "invalid answer") {
-		t.Fatalf("ScoreGraph() = %v, want strict option error", err)
+		t.Fatalf("ScoreGraph() = %v, want option error", err)
 	}
 }
 
-func TestOptionScoringCompatFallsBackToAnswerScore(t *testing.T) {
-	graph := optionScoringGraph(classification.OptionScoringCompat)
-	vector, err := classification.ScoreGraph(graph, &classification.AnswerSheet{
-		Answers: []classification.Answer{
-			{QuestionCode: "q1", Value: "X", Score: 2},
-		},
-	})
-	if err != nil {
-		t.Fatalf("ScoreGraph: %v", err)
-	}
-	if vector.Scores["D1"].Raw != 2 {
-		t.Fatalf("D1 raw = %v, want 2", vector.Scores["D1"].Raw)
-	}
-}
-
-func optionScoringGraph(policy classification.OptionScoringPolicy) classification.FactorGraph {
+func optionScoringGraph() classification.FactorGraph {
 	return classification.FactorGraph{
 		Factors: map[classification.FactorID]classification.PersonalityFactor{
 			"D1": {ID: "D1", Code: "D1", Kind: classification.FactorKindLeaf},
@@ -103,9 +85,8 @@ func optionScoringGraph(policy classification.OptionScoringPolicy) classificatio
 		LeafSpecs: map[classification.FactorID]classification.LeafScoringSpec{
 			"D1": {
 				Contributions: []classification.AnswerContribution{
-					{QuestionCode: "q1", OptionScores: map[string]float64{"A": 1}},
+					{QuestionCode: "q1", ScoringMode: classification.QuestionScoringModeOptionOverride, Sign: 1, Weight: 1, OptionScores: map[string]float64{"A": 1}},
 				},
-				OptionScoring: policy,
 			},
 		},
 		Roots: []classification.FactorID{"D1"},

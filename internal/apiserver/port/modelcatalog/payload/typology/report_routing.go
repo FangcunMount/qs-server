@@ -11,10 +11,7 @@ import (
 type ReportRoutingSource string
 
 const (
-	// ReportRoutingHistoricalLegacy means runtime was absent; legacy derivation is allowed.
-	ReportRoutingHistoricalLegacy ReportRoutingSource = "historical_legacy"
-	// ReportRoutingExplicitRuntime means an author-declared runtime section was present and valid.
-	ReportRoutingExplicitRuntime ReportRoutingSource = "explicit_runtime"
+	ReportRoutingDefinitionV2 ReportRoutingSource = "definition_v2"
 )
 
 // ErrRuntimeSpecInvalid marks a declared runtime that fails ToRuntimeSpec validation.
@@ -32,30 +29,17 @@ type TypologyReportRouting struct {
 	Spec            *RuntimeSpec
 }
 
-// ResolveTypologyReportRouting resolves report TemplateID/AdapterKey from a
-// typology payload without silently treating invalid explicit runtime as legacy.
-//
-//	!HasExplicitRuntime → historical_legacy (derive allowed; derive failure leaves fields empty)
-//	HasExplicitRuntime && ToRuntimeSpec err → runtime_spec_invalid (fail closed)
-//	HasExplicitRuntime && success → explicit_runtime
+// ResolveTypologyReportRouting resolves report routing from a DefinitionV2-materialized DTO.
 func ResolveTypologyReportRouting(payload *Payload) (TypologyReportRouting, error) {
 	if payload == nil || !payload.HasExplicitRuntime() {
-		routing := TypologyReportRouting{Source: ReportRoutingHistoricalLegacy}
-		if payload == nil {
-			return routing, nil
-		}
-		spec, err := payload.ToRuntimeSpec()
-		if err != nil {
-			return routing, nil
-		}
-		return routingFromSpec(ReportRoutingHistoricalLegacy, spec), nil
+		return TypologyReportRouting{}, fmt.Errorf("%w: definition_v2 runtime is required", ErrRuntimeSpecInvalid)
 	}
 
 	spec, err := payload.ToRuntimeSpec()
 	if err != nil {
 		return TypologyReportRouting{}, fmt.Errorf("%w: %v", ErrRuntimeSpecInvalid, err)
 	}
-	return routingFromSpec(ReportRoutingExplicitRuntime, spec), nil
+	return routingFromSpec(ReportRoutingDefinitionV2, spec), nil
 }
 
 func routingFromSpec(source ReportRoutingSource, spec *RuntimeSpec) TypologyReportRouting {

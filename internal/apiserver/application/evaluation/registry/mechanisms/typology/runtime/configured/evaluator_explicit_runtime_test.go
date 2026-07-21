@@ -13,7 +13,7 @@ func TestEvaluatorScoresExplicitRuntimeWithoutAlgorithm(t *testing.T) {
 	payload := explicitPoleCompositionPayload()
 	payload.Algorithm = ""
 
-	got, err := configured.NewEvaluator().Score(payload, explicitPoleCompositionSheet())
+	got, err := configured.NewEvaluator().Score(payload, canonicalDefinitionFixture(t, payload), explicitPoleCompositionSheet())
 	if err != nil {
 		t.Fatalf("Score: %v", err)
 	}
@@ -28,7 +28,7 @@ func TestEvaluatorScoresExplicitRuntimeWithoutAlgorithm(t *testing.T) {
 
 func TestEvaluatorAppliesGenericFallbackSpecialRule(t *testing.T) {
 	payload := explicitNearestPatternPayload()
-	got, err := configured.NewEvaluator().Score(payload, explicitNearestPatternLowSheet())
+	got, err := configured.NewEvaluator().Score(payload, canonicalDefinitionFixture(t, payload), explicitNearestPatternLowSheet())
 	if err != nil {
 		t.Fatalf("Score: %v", err)
 	}
@@ -51,36 +51,23 @@ func explicitPoleCompositionPayload() *modeltypology.Payload {
 		QuestionnaireCode:    "CUSTOM_POLE_V1",
 		QuestionnaireVersion: "1.0.0",
 		Status:               "published",
-		DimensionOrder:       []string{"EI", "SN", "TF", "JP"},
-		Dimensions: map[string]modeltypology.Dimension{
-			"EI": {Code: "EI", Name: "外向-内向", LeftPole: "I", RightPole: "E", Constant: 24, Threshold: 24},
-			"SN": {Code: "SN", Name: "感觉-直觉", LeftPole: "S", RightPole: "N", Constant: 24, Threshold: 24},
-			"TF": {Code: "TF", Name: "思考-情感", LeftPole: "T", RightPole: "F", Constant: 24, Threshold: 24},
-			"JP": {Code: "JP", Name: "判断-知觉", LeftPole: "J", RightPole: "P", Constant: 24, Threshold: 24},
-		},
-		QuestionMappings: []modeltypology.QuestionMapping{
-			{QuestionCode: "Q_EI", Dimension: "EI", Sign: -1},
-			{QuestionCode: "Q_SN", Dimension: "SN", Sign: 1},
-			{QuestionCode: "Q_TF", Dimension: "TF", Sign: -1},
-			{QuestionCode: "Q_JP", Dimension: "JP", Sign: -1},
-		},
 		Outcomes: []modeltypology.Outcome{
 			{Code: "INTJ", Name: "建筑师", OneLiner: "独立战略家"},
 		},
 		Runtime: &modeltypology.RuntimeSpec{
 			FactorGraph: modeltypology.FactorGraphSpec{
-				DimensionOrder: []string{"EI", "SN", "TF", "JP"},
+				Factors: map[string]modeltypology.FactorSpec{
+					"EI": {ID: "EI", Code: "EI", Name: "外向-内向", Kind: modeltypology.FactorSpecKindLeaf, Constant: 24, Contributions: []modeltypology.FactorContributionSpec{{QuestionCode: "Q_EI", ScoringMode: modeltypology.QuestionScoringModeQuestionScore, Sign: -1, Weight: 1}}},
+					"SN": {ID: "SN", Code: "SN", Name: "感觉-直觉", Kind: modeltypology.FactorSpecKindLeaf, Constant: 24, Contributions: []modeltypology.FactorContributionSpec{{QuestionCode: "Q_SN", ScoringMode: modeltypology.QuestionScoringModeQuestionScore, Sign: 1, Weight: 1}}},
+					"TF": {ID: "TF", Code: "TF", Name: "思考-情感", Kind: modeltypology.FactorSpecKindLeaf, Constant: 24, Contributions: []modeltypology.FactorContributionSpec{{QuestionCode: "Q_TF", ScoringMode: modeltypology.QuestionScoringModeQuestionScore, Sign: -1, Weight: 1}}},
+					"JP": {ID: "JP", Code: "JP", Name: "判断-知觉", Kind: modeltypology.FactorSpecKindLeaf, Constant: 24, Contributions: []modeltypology.FactorContributionSpec{{QuestionCode: "Q_JP", ScoringMode: modeltypology.QuestionScoringModeQuestionScore, Sign: -1, Weight: 1}}},
+				},
+				Roots: []string{"EI", "SN", "TF", "JP"},
 				Dimensions: map[string]modeltypology.Dimension{
 					"EI": {Code: "EI", Name: "外向-内向", LeftPole: "I", RightPole: "E", Constant: 24, Threshold: 24},
 					"SN": {Code: "SN", Name: "感觉-直觉", LeftPole: "S", RightPole: "N", Constant: 24, Threshold: 24},
 					"TF": {Code: "TF", Name: "思考-情感", LeftPole: "T", RightPole: "F", Constant: 24, Threshold: 24},
 					"JP": {Code: "JP", Name: "判断-知觉", LeftPole: "J", RightPole: "P", Constant: 24, Threshold: 24},
-				},
-				QuestionMappings: []modeltypology.QuestionMapping{
-					{QuestionCode: "Q_EI", Dimension: "EI", Sign: -1},
-					{QuestionCode: "Q_SN", Dimension: "SN", Sign: 1},
-					{QuestionCode: "Q_TF", Dimension: "TF", Sign: -1},
-					{QuestionCode: "Q_JP", Dimension: "JP", Sign: -1},
 				},
 			},
 			Decision: modeltypology.PersonalityDecisionSpec{
@@ -126,7 +113,6 @@ func explicitNearestPatternPayload() *modeltypology.Payload {
 						Contributions: []modeltypology.FactorContributionSpec{
 							{QuestionCode: "Q1", OptionScores: map[string]float64{"A": 1, "C": 6}},
 						},
-						OptionScoring: modeltypology.FactorOptionScoringStrict,
 					},
 					"D2": {
 						ID:   "D2",
@@ -136,7 +122,6 @@ func explicitNearestPatternPayload() *modeltypology.Payload {
 						Contributions: []modeltypology.FactorContributionSpec{
 							{QuestionCode: "Q2", OptionScores: map[string]float64{"A": 1, "C": 6}},
 						},
-						OptionScoring: modeltypology.FactorOptionScoringStrict,
 					},
 				},
 				Roots: []string{"D1", "D2"},

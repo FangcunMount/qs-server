@@ -13,7 +13,7 @@ import (
 // Keeping this mapper shared prevents behavioral and cognitive runtimes from
 // silently diverging when the catalog contract gains a field.
 func FromCatalog(table *modelnorm.Norm) (*calcnorm.NormTables, error) {
-	if err := modelnorm.ValidateRuntimeMaterial(table); err != nil {
+	if err := modelnorm.ValidateImport(table); err != nil {
 		return nil, calcnorm.NewInvalidError("", fmt.Errorf("invalid catalog norm: %w", err))
 	}
 	out := &calcnorm.NormTables{

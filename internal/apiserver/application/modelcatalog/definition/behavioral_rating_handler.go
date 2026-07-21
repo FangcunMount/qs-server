@@ -27,24 +27,22 @@ func (h BehavioralRatingDefinitionHandler) ValidateForPublish(ctx context.Contex
 	return ComposePublishValidation(ctx, model, PublicationComposerOptions{
 		NormRepo:                  h.NormRepo,
 		QuestionnaireQuery:        h.QuestionnaireQuery,
-		RequireLegacyDefinition:   true,
-		LegacyDefinitionMessage:   "行为评定模型定义不能为空",
 		IncludeBehavioralSemantic: true,
 		IncludeAlgorithmBinding:   true,
 		StrategyCapabilityPath:    capability.PathBehavioralRatingDescriptor,
 	})
 }
 
-// BuildSnapshotPayload 构建快照负载
-func (h BehavioralRatingDefinitionHandler) BuildSnapshotPayload(ctx context.Context, model *domain.AssessmentModel) (SnapshotBuildResult, error) {
+// MaterializeSnapshot validates the DefinitionV2 behavioral runtime projection.
+func (h BehavioralRatingDefinitionHandler) MaterializeSnapshot(ctx context.Context, model *domain.AssessmentModel) (Materialization, error) {
 	if model == nil || model.DefinitionV2 == nil {
-		return SnapshotBuildResult{}, fmt.Errorf("behavioral_rating definition_v2 is required")
+		return Materialization{}, fmt.Errorf("behavioral_rating definition_v2 is required")
 	}
 	table, err := h.loadNormTable(ctx, model.DefinitionV2)
 	if err != nil {
-		return SnapshotBuildResult{}, err
+		return Materialization{}, err
 	}
-	return (CompatibilityPayloadProjector{}).ProjectBehavioral(model, table)
+	return (RuntimeMaterializer{}).MaterializeBehavioral(model, table)
 }
 
 func (h BehavioralRatingDefinitionHandler) loadNormTable(ctx context.Context, value *domain.Definition) (*domain.Norm, error) {

@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
+	cognitivesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
@@ -26,14 +27,23 @@ type NormingFreeze struct {
 	NormTables *norm.NormTables `json:"norm_tables,omitempty"`
 }
 
+// TypologyRoutingFreeze is the minimal DefinitionV2 report route needed for replay.
+type TypologyRoutingFreeze struct {
+	DecisionKind    string `json:"decision_kind"`
+	ReportKind      string `json:"report_kind"`
+	AdapterKey      string `json:"adapter_key"`
+	TemplateID      string `json:"template_id,omitempty"`
+	TemplateVersion string `json:"template_version,omitempty"`
+}
+
 // ReportInputFreezeOptions controls how evaluation report input is frozen at commit.
 type ReportInputFreezeOptions struct {
-	Payload         ModelPayload
 	Assets          *interpretationassets.Assets
 	ModelRef        ModelRef
 	AlgorithmFamily modelcatalog.AlgorithmFamily
 	FactorCatalog   []FactorCatalogEntry
 	TypologySource  *typology.Source
+	TypologyRouting *TypologyRoutingFreeze
 	Norming         *NormingFreeze
 }
 
@@ -65,13 +75,19 @@ func CanFreezeMinimalReportInput(opts ReportInputFreezeOptions) bool {
 	if opts.Assets == nil || !opts.Assets.IsMaterialized() {
 		return false
 	}
+	if opts.ModelRef.Kind == "" || opts.ModelRef.Code == "" || opts.ModelRef.Version == "" {
+		return false
+	}
 	switch opts.AlgorithmFamily {
 	case modelcatalog.AlgorithmFamilyFactorScoring:
 		return len(opts.FactorCatalog) > 0
 	case modelcatalog.AlgorithmFamilyFactorClassification:
-		return len(opts.Assets.Profiles) > 0 || len(opts.Assets.Outcomes) > 0
+		return opts.TypologyRouting != nil && opts.TypologyRouting.DecisionKind != "" &&
+			(len(opts.Assets.Profiles) > 0 || len(opts.Assets.Outcomes) > 0)
 	case modelcatalog.AlgorithmFamilyFactorNorm:
 		return opts.Norming != nil && opts.Norming.NormTables != nil && len(opts.FactorCatalog) > 0
+	case modelcatalog.AlgorithmFamilyTaskPerformance:
+		return len(opts.FactorCatalog) > 0
 	default:
 		return false
 	}
@@ -168,6 +184,14 @@ func behavioralPayloadFromFreeze(model ModelRef, catalog []FactorCatalogEntry, a
 	return BehavioralRatingModelPayload{Snapshot: snapshot}
 }
 
+func cognitivePayloadFromFreeze(model ModelRef, catalog []FactorCatalogEntry) CognitiveModelPayload {
+	factors := make([]cognitivesnapshot.FactorSnapshot, 0, len(catalog))
+	for _, item := range catalog {
+		factors = append(factors, cognitivesnapshot.FactorSnapshot{Code: item.Code, Title: item.Title, MaxScore: item.MaxScore, IsTotalScore: item.IsTotalScore})
+	}
+	return CognitiveModelPayload{Snapshot: &cognitivesnapshot.Snapshot{Code: model.Code, Version: model.Version, Title: model.Title, Factors: factors}}
+}
+
 func firstNonEmpty(values ...string) string {
 	for _, value := range values {
 		if value != "" {
@@ -178,7 +202,7 @@ func firstNonEmpty(values ...string) string {
 }
 
 func snapshotFromMinimalReportInput(model ModelRef, decoded decodedReportInput) (*InputSnapshot, error) {
-	snapshot := &InputSnapshot{InterpretationAssets: decoded.InterpretationAssets}
+	snapshot := &InputSnapshot{InterpretationAssets: decoded.InterpretationAssets, TypologyRouting: decoded.TypologyRouting}
 	ref := model
 	if decoded.ModelRef.Kind != "" {
 		ref = decoded.ModelRef
@@ -192,12 +216,20 @@ func snapshotFromMinimalReportInput(model ModelRef, decoded decodedReportInput) 
 		}
 		payload = ScaleModelPayload{Scale: scale}
 	case EvaluationModelKindTypology:
+		if decoded.TypologyRouting == nil {
+			return nil, fmt.Errorf("report input v3 is missing typology routing")
+		}
 		payload = typologyPayloadFromFreeze(ref, decoded.InterpretationAssets, decoded.TypologySource)
 	case EvaluationModelKindBehavioralRating:
 		if len(decoded.FactorCatalog) == 0 || decoded.Norming == nil || decoded.Norming.NormTables == nil {
 			return nil, fmt.Errorf("report input v3 is missing norm catalog for kind %s", model.Kind)
 		}
 		payload = behavioralPayloadFromFreeze(ref, decoded.FactorCatalog, decoded.InterpretationAssets, decoded.Norming)
+	case EvaluationModelKindCognitive:
+		if len(decoded.FactorCatalog) == 0 {
+			return nil, fmt.Errorf("report input v3 is missing factor catalog for kind %s", model.Kind)
+		}
+		payload = cognitivePayloadFromFreeze(ref, decoded.FactorCatalog)
 	default:
 		return nil, fmt.Errorf("report input v3 is unsupported for kind %s", model.Kind)
 	}
@@ -207,4 +239,11 @@ func snapshotFromMinimalReportInput(model ModelRef, decoded decodedReportInput) 
 	}
 	snapshot.ModelPayload = payload
 	return snapshot, nil
+}
+
+func TypologyReportRoutingFromSnapshot(input *InputSnapshot) (TypologyRoutingFreeze, bool) {
+	if input == nil || input.TypologyRouting == nil || input.TypologyRouting.DecisionKind == "" {
+		return TypologyRoutingFreeze{}, false
+	}
+	return *input.TypologyRouting, true
 }

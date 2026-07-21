@@ -70,14 +70,13 @@ type FactorEdgePO struct {
 }
 
 type ScoringPO struct {
-	FactorCode    string             `bson:"factor_code"`
-	Sources       []ScoringSourcePO  `bson:"sources,omitempty"`
-	Strategy      string             `bson:"strategy,omitempty"`
-	Params        *ScoringParamsPO   `bson:"params,omitempty"`
-	MaxScore      *float64           `bson:"max_score,omitempty"`
-	Weights       map[string]float64 `bson:"weights,omitempty"`
-	Constant      float64            `bson:"constant,omitempty"`
-	OptionScoring string             `bson:"option_scoring,omitempty"`
+	FactorCode string             `bson:"factor_code"`
+	Sources    []ScoringSourcePO  `bson:"sources,omitempty"`
+	Strategy   string             `bson:"strategy,omitempty"`
+	Params     *ScoringParamsPO   `bson:"params,omitempty"`
+	MaxScore   *float64           `bson:"max_score,omitempty"`
+	Weights    map[string]float64 `bson:"weights,omitempty"`
+	Constant   float64            `bson:"constant,omitempty"`
 }
 
 type ScoringSourcePO struct {
@@ -354,14 +353,13 @@ func scoringToPO(scoring []factor.Scoring) []ScoringPO {
 	out := make([]ScoringPO, 0, len(scoring))
 	for _, item := range scoring {
 		out = append(out, ScoringPO{
-			FactorCode:    item.FactorCode,
-			Sources:       scoringSourcesToPO(item.Sources),
-			Strategy:      item.Strategy.String(),
-			Params:        scoringParamsToPO(item.Params),
-			MaxScore:      cloneFloat64(item.MaxScore),
-			Weights:       cloneFloat64Map(item.Weights),
-			Constant:      item.Constant,
-			OptionScoring: string(item.OptionScoring),
+			FactorCode: item.FactorCode,
+			Sources:    scoringSourcesToPO(item.Sources),
+			Strategy:   item.Strategy.String(),
+			Params:     scoringParamsToPO(item.Params),
+			MaxScore:   cloneFloat64(item.MaxScore),
+			Weights:    cloneFloat64Map(item.Weights),
+			Constant:   item.Constant,
 		})
 	}
 	return out
@@ -374,14 +372,13 @@ func scoringFromPO(items []ScoringPO) []factor.Scoring {
 	out := make([]factor.Scoring, 0, len(items))
 	for _, item := range items {
 		out = append(out, factor.Scoring{
-			FactorCode:    item.FactorCode,
-			Sources:       scoringSourcesFromPO(item.Sources),
-			Strategy:      factor.ScoringStrategy(item.Strategy),
-			Params:        scoringParamsFromPO(item.Params),
-			MaxScore:      cloneFloat64(item.MaxScore),
-			Weights:       cloneFloat64Map(item.Weights),
-			Constant:      item.Constant,
-			OptionScoring: factor.OptionScoring(item.OptionScoring),
+			FactorCode: item.FactorCode,
+			Sources:    scoringSourcesFromPO(item.Sources),
+			Strategy:   factor.ScoringStrategy(item.Strategy),
+			Params:     scoringParamsFromPO(item.Params),
+			MaxScore:   cloneFloat64(item.MaxScore),
+			Weights:    cloneFloat64Map(item.Weights),
+			Constant:   item.Constant,
 		})
 	}
 	return out

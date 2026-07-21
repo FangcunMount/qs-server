@@ -44,10 +44,6 @@ type PublishedSnapshotRepository interface {
 	DeletePublished(ctx context.Context, kind domain.Kind, code string) error
 }
 
-// PublishedModelRepository is kept as a source-compatible name while callers
-// migrate to the snapshot-oriented port.
-type PublishedModelRepository = PublishedSnapshotRepository
-
 // NormRepository persists immutable norm tables addressed by table version.
 type NormRepository interface {
 	UpsertNorm(ctx context.Context, table *norm.Norm) error

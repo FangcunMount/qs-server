@@ -112,7 +112,7 @@ func listFilter(input modelcatalog.ListNormTablesDTO) (port.NormListFilter, erro
 
 func knownAlgorithm(value identity.Algorithm) bool {
 	switch value {
-	case identity.AlgorithmBrief2, identity.AlgorithmSPMSensory, identity.AlgorithmBehavioralRatingDefault:
+	case identity.AlgorithmBrief2, identity.AlgorithmSPMSensory, identity.AlgorithmSPM:
 		return true
 	default:
 		return false

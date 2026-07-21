@@ -19,7 +19,7 @@ type TrendQuery struct {
 }
 
 type ModelIdentity struct {
-	Kind, SubKind, Algorithm, Code, Version, Title, ProductChannel, AlgorithmFamily, DecisionKind, PayloadFormat string
+	Kind, SubKind, Algorithm, Code, Version, Title, ProductChannel, AlgorithmFamily, DecisionKind string
 }
 type ScoreValue struct {
 	Kind  string

@@ -38,15 +38,16 @@ func (fakeQuestionnaireReader) GetQuestionnaire(context.Context, string, string)
 }
 
 func TestTypologyModelInputProviderReturnsTypologyPayload(t *testing.T) {
-	payload := modeltypology.FromMBTI(&modeltypology.MBTILegacyModel{
+	payload := &modeltypology.Payload{
 		Code:                 "MBTI_TEST",
 		Version:              "1.0.0",
 		QuestionnaireCode:    "MBTI_TEST",
 		QuestionnaireVersion: "1.0.0",
 		Status:               "published",
-	})
+		Algorithm:            modelcatalog.AlgorithmPersonalityTypology,
+	}
 	provider := NewTypologyModelInputProvider(
-		modelcatalog.AlgorithmMBTI,
+		modelcatalog.AlgorithmPersonalityTypology,
 		fakeTypologyCatalog{payload: payload},
 		nil,
 		fakeAnswerSheetReader{sheet: &port.AnswerSheetSnapshot{
@@ -55,7 +56,7 @@ func TestTypologyModelInputProviderReturnsTypologyPayload(t *testing.T) {
 		}},
 		fakeQuestionnaireReader{},
 	)
-	if provider.ExecutionIdentity() != evaldomain.PersonalityTypologyIdentity(modelcatalog.AlgorithmMBTI) {
+	if provider.ExecutionIdentity() != evaldomain.PersonalityTypologyIdentity(modelcatalog.AlgorithmPersonalityTypology) {
 		t.Fatalf("key = %#v", provider.ExecutionIdentity())
 	}
 	snapshot, err := provider.ResolveInput(context.Background(), port.InputRef{AnswerSheetID: 1})
@@ -63,21 +64,22 @@ func TestTypologyModelInputProviderReturnsTypologyPayload(t *testing.T) {
 		t.Fatalf("ResolveInput: %v", err)
 	}
 	got, ok := port.TypologyPayload(snapshot)
-	if !ok || got.Algorithm != modelcatalog.AlgorithmMBTI {
+	if !ok || got.Algorithm != modelcatalog.AlgorithmPersonalityTypology {
 		t.Fatalf("payload = %#v, ok=%v", got, ok)
 	}
 }
 
 func TestTypologyModelInputProviderRejectsAlgorithmMismatch(t *testing.T) {
-	payload := modeltypology.FromSBTI(&modeltypology.SBTILegacyModel{
+	payload := &modeltypology.Payload{
 		Code:                 "SBTI_FUN",
 		Version:              "1.0.0",
 		QuestionnaireCode:    "SBTI_FUN",
 		QuestionnaireVersion: "1.0.0",
 		Status:               "published",
-	})
+		Algorithm:            modelcatalog.Algorithm("unsupported"),
+	}
 	provider := NewTypologyModelInputProvider(
-		modelcatalog.AlgorithmMBTI,
+		modelcatalog.AlgorithmPersonalityTypology,
 		fakeTypologyCatalog{payload: payload},
 		nil,
 		fakeAnswerSheetReader{sheet: &port.AnswerSheetSnapshot{
@@ -96,11 +98,11 @@ func TestTypologyProviderResolvesBigFivePayload(t *testing.T) {
 	payload := &modeltypology.Payload{
 		Code:      "BF",
 		Version:   "1.0.0",
-		Algorithm: modelcatalog.AlgorithmBigFive,
+		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
 		Status:    "published",
 	}
 	provider := NewTypologyModelInputProvider(
-		modelcatalog.AlgorithmBigFive,
+		modelcatalog.AlgorithmPersonalityTypology,
 		fakeTypologyCatalog{payload: payload},
 		nil,
 		fakeAnswerSheetReader{sheet: &port.AnswerSheetSnapshot{}},
@@ -111,7 +113,7 @@ func TestTypologyProviderResolvesBigFivePayload(t *testing.T) {
 		t.Fatalf("ResolveInput: %v", err)
 	}
 	got, ok := port.TypologyPayload(snapshot)
-	if !ok || got.Algorithm != modelcatalog.AlgorithmBigFive {
+	if !ok || got.Algorithm != modelcatalog.AlgorithmPersonalityTypology {
 		t.Fatalf("payload = %#v, ok=%v", got, ok)
 	}
 }

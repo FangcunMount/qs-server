@@ -83,7 +83,7 @@ func catalogModelOutput(value *grpcclient.CatalogModelOutput) *appmodelcatalog.C
 	}
 	return &appmodelcatalog.CatalogModel{
 		Code: value.Code, Kind: value.Kind, SubKind: value.SubKind, Algorithm: value.Algorithm, ProductChannel: value.ProductChannel,
-		AlgorithmFamily: value.AlgorithmFamily, DecisionKind: value.DecisionKind, PayloadFormat: value.PayloadFormat,
+		AlgorithmFamily: value.AlgorithmFamily, DecisionKind: value.DecisionKind,
 		Version: value.Version, Title: value.Title, Description: value.Description, Status: value.Status, Category: value.Category,
 		Stages: append([]string(nil), value.Stages...), ApplicableAges: append([]string(nil), value.ApplicableAges...), Reporters: append([]string(nil), value.Reporters...), Tags: append([]string(nil), value.Tags...),
 		QuestionnaireCode: value.QuestionnaireCode, QuestionnaireVersion: value.QuestionnaireVersion, Definition: append(json.RawMessage(nil), value.Definition...),

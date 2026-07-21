@@ -22,7 +22,7 @@ func TestEvaluationOutcomePersistenceMappingRoundTrip(t *testing.T) {
 		Model: domainoutcome.ModelIdentity{
 			Kind:      modelcatalog.KindTypology,
 			SubKind:   modelcatalog.SubKindTypology,
-			Algorithm: modelcatalog.AlgorithmMBTI,
+			Algorithm: modelcatalog.AlgorithmPersonalityTypology,
 			Code:      "MBTI-16P",
 			Version:   "1.0.0",
 			Title:     "MBTI",
@@ -30,7 +30,6 @@ func TestEvaluationOutcomePersistenceMappingRoundTrip(t *testing.T) {
 		Runtime: domainoutcome.RuntimeIdentity{
 			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
 			DecisionKind:    modelcatalog.DecisionKindPoleComposition,
-			PayloadFormat:   "typology.v2",
 		},
 		InputSnapshotRef: "model:MBTI-16P@1.0.0",
 		ReportInput:      []byte(`{"Payload":{"code":"MBTI-16P"}}`),

@@ -33,7 +33,6 @@
 //   - factor/: Factor 和共享因子图元数据
 //   - norm/: Norm 和 NormRef
 //   - conclusion/: Risk/Type/Norm/Ability Conclusion
-//   - payloadformat/: PayloadFormat、SchemaVersion 和 legacy decode 判定
 //   - taskperformance/: cognitive 测量 metadata
 //
 // 深 import 目标领域子包用于机制专用逻辑；跨机制常用读路径类型经 export.go 薄 re-export。
@@ -47,7 +46,6 @@
 //   - assessmentmodel/: 后台可编辑测评模型配置聚合
 //   - definition/: 测评模型定义主体
 //   - binding/: 基础身份值、产品通道、ExecutionPath、ModelFamilyCapability
-//   - payloadformat/: PayloadFormat、SchemaVersion 和 legacy decode 判定
 //   - factor/: 共享因子图元数据
 //   - norm/: 常模资料与引用
 //   - conclusion/: 解释与结果声明

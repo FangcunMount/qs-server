@@ -24,9 +24,7 @@ type PublishedAssessmentModelPO struct {
 	mongoBase.BaseDocument `bson:",inline"`
 
 	SchemaVersion           string        `bson:"schema_version,omitempty"`
-	PayloadFormat           string        `bson:"payload_format,omitempty"`
 	RecordRole              string        `bson:"record_role"`
-	IsActivePublished       bool          `bson:"is_active_published,omitempty"`
 	ReleaseStatus           string        `bson:"release_status,omitempty"`
 	ProductChannel          string        `bson:"product_channel,omitempty"`
 	Kind                    string        `bson:"kind"`
@@ -47,7 +45,6 @@ type PublishedAssessmentModelPO struct {
 	QuestionnaireCode       string        `bson:"questionnaire_code"`
 	QuestionnaireVersion    string        `bson:"questionnaire_version"`
 	Source                  bson.M        `bson:"source,omitempty"`
-	Payload                 []byte        `bson:"payload"`
 	DefinitionSchemaVersion string        `bson:"definition_schema_version,omitempty"`
 	DefinitionV2            *DefinitionPO `bson:"definition_v2,omitempty"`
 	PublishedAt             *time.Time    `bson:"published_at,omitempty"`
@@ -99,13 +96,7 @@ func publishedFilter(extra bson.M) bson.M {
 
 func activePublishedFilter(extra bson.M) bson.M {
 	filter := publishedFilter(extra)
-	filter["$or"] = bson.A{
-		bson.M{"release_status": string(domain.ReleaseStatusActive)},
-		bson.M{
-			"release_status":      bson.M{"$exists": false},
-			"is_active_published": true,
-		},
-	}
+	filter["release_status"] = string(domain.ReleaseStatusActive)
 	return filter
 }
 
@@ -120,7 +111,7 @@ func publishedModelUpsertFilter(po *PublishedAssessmentModelPO) bson.M {
 		"release_version": po.ReleaseVersion,
 		"deleted_at":      nil,
 	}
-	// Empty sub_kind must not be written as "" — legacy rows store null/absent.
+	// Empty sub_kind is omitted from canonical records.
 	if po.SubKind != "" {
 		filter["sub_kind"] = po.SubKind
 	}

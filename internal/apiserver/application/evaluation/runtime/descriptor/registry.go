@@ -17,7 +17,7 @@ func NewRuntimeDescriptorRegistry() *RuntimeDescriptorRegistry {
 	return &RuntimeDescriptorRegistry{byKey: make(map[DescriptorKey]RuntimeDescriptor)}
 }
 
-// Register 添加运行时描述符. 载荷格式 可以是 空 到 match 任意 格式 在 家族。
+// Register adds one exact (AlgorithmFamily, DecisionKind) descriptor.
 func (r *RuntimeDescriptorRegistry) Register(desc RuntimeDescriptor) error {
 	if r == nil {
 		return fmt.Errorf("runtime descriptor registry is nil")
@@ -26,19 +26,24 @@ func (r *RuntimeDescriptorRegistry) Register(desc RuntimeDescriptor) error {
 		return fmt.Errorf("invalid algorithm family: %s", desc.AlgorithmFamily)
 	}
 	key := desc.Key
-	explicitKey := !key.IsZero()
 	if key.AlgorithmFamily == "" {
 		key.AlgorithmFamily = desc.AlgorithmFamily
 	}
-	if !explicitKey && key.PayloadFormat == "" {
-		key.PayloadFormat = desc.PayloadFormat
-	}
-	if !explicitKey && key.DecisionKind == "" {
+	if key.DecisionKind == "" {
 		key.DecisionKind = desc.DecisionKind
+	}
+	if key.DecisionKind == "" {
+		return fmt.Errorf("decision kind is required for runtime descriptor")
+	}
+	if family, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(key.DecisionKind); !ok || family != key.AlgorithmFamily {
+		return fmt.Errorf("runtime descriptor identity conflict: %s", key)
 	}
 	if _, exists := r.byKey[key]; exists {
 		return fmt.Errorf("runtime descriptor already registered for %s", key)
 	}
+	desc.Key = key
+	desc.AlgorithmFamily = key.AlgorithmFamily
+	desc.DecisionKind = key.DecisionKind
 	r.byKey[key] = desc
 	return nil
 }
@@ -55,23 +60,14 @@ func (r *RuntimeDescriptorRegistry) Resolve(route ModelRoute) (RuntimeDescriptor
 	if desc, ok := r.byKey[key]; ok {
 		return desc, nil
 	}
-	formatKey := DescriptorKey{
-		AlgorithmFamily: key.AlgorithmFamily,
-		PayloadFormat:   key.PayloadFormat,
-	}
-	if desc, ok := r.byKey[formatKey]; ok {
-		return desc, nil
-	}
-	if desc, ok := r.descriptorForFamily(key.AlgorithmFamily); ok {
-		return desc, nil
-	}
 	return RuntimeDescriptor{}, fmt.Errorf("unsupported runtime descriptor key: %s", key)
 }
 
 func (r *RuntimeDescriptorRegistry) descriptorForFamily(family modelcatalog.AlgorithmFamily) (RuntimeDescriptor, bool) {
-	familyKey := DescriptorKey{AlgorithmFamily: family}
-	if desc, ok := r.byKey[familyKey]; ok {
-		return desc, true
+	for key, desc := range r.byKey {
+		if key.AlgorithmFamily == family {
+			return desc, true
+		}
 	}
 	return RuntimeDescriptor{}, false
 }
@@ -101,15 +97,25 @@ func (r *RuntimeDescriptorRegistry) DescriptorForFamily(family modelcatalog.Algo
 	return r.descriptorForFamily(family)
 }
 
-// ReplaceFamilyDescriptor updates the family-level descriptor entry in-place.
+// ReplaceFamilyDescriptor updates every exact decision entry in a family.
 func (r *RuntimeDescriptorRegistry) ReplaceFamilyDescriptor(family modelcatalog.AlgorithmFamily, desc RuntimeDescriptor) error {
 	if r == nil {
 		return fmt.Errorf("runtime descriptor registry is nil")
 	}
-	familyKey := DescriptorKey{AlgorithmFamily: family}
-	if _, ok := r.byKey[familyKey]; !ok {
+	found := false
+	for key := range r.byKey {
+		if key.AlgorithmFamily != family {
+			continue
+		}
+		found = true
+		value := desc
+		value.Key = key
+		value.AlgorithmFamily = key.AlgorithmFamily
+		value.DecisionKind = key.DecisionKind
+		r.byKey[key] = value
+	}
+	if !found {
 		return fmt.Errorf("runtime descriptor is not registered for family %s", family)
 	}
-	r.byKey[familyKey] = desc
 	return nil
 }

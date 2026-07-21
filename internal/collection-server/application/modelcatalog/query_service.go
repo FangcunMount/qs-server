@@ -28,7 +28,6 @@ type CatalogModel struct {
 	ProductChannel       string
 	AlgorithmFamily      string
 	DecisionKind         string
-	PayloadFormat        string
 	Version              string
 	Title                string
 	Description          string
@@ -90,7 +89,6 @@ type ModelResponse struct {
 	ProductChannel       string          `json:"product_channel,omitempty"`
 	AlgorithmFamily      string          `json:"algorithm_family,omitempty"`
 	DecisionKind         string          `json:"decision_kind,omitempty"`
-	PayloadFormat        string          `json:"payload_format,omitempty"`
 	Version              string          `json:"version,omitempty"`
 	Title                string          `json:"title"`
 	Description          string          `json:"description,omitempty"`
@@ -244,7 +242,7 @@ func modelResponse(value *CatalogModel) *ModelResponse {
 	}
 	return &ModelResponse{
 		Code: value.Code, Kind: value.Kind, SubKind: value.SubKind, Algorithm: value.Algorithm, ProductChannel: value.ProductChannel,
-		AlgorithmFamily: value.AlgorithmFamily, DecisionKind: value.DecisionKind, PayloadFormat: value.PayloadFormat,
+		AlgorithmFamily: value.AlgorithmFamily, DecisionKind: value.DecisionKind,
 		Version: value.Version, Title: value.Title, Description: value.Description, Status: value.Status, Category: value.Category,
 		Stages: append([]string(nil), value.Stages...), ApplicableAges: append([]string(nil), value.ApplicableAges...),
 		Reporters: append([]string(nil), value.Reporters...), Tags: append([]string(nil), value.Tags...),

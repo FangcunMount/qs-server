@@ -2,7 +2,7 @@ package modelcatalog
 
 // Root facade: thin aliases over mechanism subpackages. Deep-import factor/scoring/typology
 // when mechanism-specific types are required; use this package for cross-mechanism identity,
-// payload format, and read-model surfaces.
+// and read-model surfaces.
 
 import (
 	assessmentmodelpkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/assessmentmodel"
@@ -12,7 +12,6 @@ import (
 	factorpkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	identitypkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
 	normpkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
-	payloadformatpkg "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/payloadformat"
 )
 
 type (
@@ -29,8 +28,7 @@ type (
 	RuntimeIdentity = identitypkg.RuntimeIdentity
 	ExecutionPath   = binding.ExecutionPath
 
-	AlgorithmWritePolicy     = identitypkg.AlgorithmWritePolicy
-	LegacyIdentityAuditIssue = identitypkg.LegacyIdentityAuditIssue
+	AlgorithmWritePolicy = identitypkg.AlgorithmWritePolicy
 
 	KindCapability        = binding.KindCapability
 	ModelFamilyCapability = binding.ModelFamilyCapability
@@ -47,13 +45,11 @@ type (
 	ScoringSourceKind           = factorpkg.ScoringSourceKind
 	ScoringStrategy             = factorpkg.ScoringStrategy
 	ScoringParams               = factorpkg.ScoringParams
-	OptionScoring               = factorpkg.OptionScoring
 	ChildrenPolicy              = factorpkg.ChildrenPolicy
 	ChildrenAggregationStrategy = factorpkg.ChildrenAggregationStrategy
 
 	AssessmentModel         = assessmentmodelpkg.AssessmentModel
 	NewAssessmentModelInput = assessmentmodelpkg.NewInput
-	DefinitionPayload       = assessmentmodelpkg.DefinitionPayload
 	ModelStatus             = assessmentmodelpkg.Status
 	ReleaseStatus           = assessmentmodelpkg.ReleaseStatus
 	ValidationLevel         = assessmentmodelpkg.ValidationLevel
@@ -102,30 +98,23 @@ const (
 	SubKindTypology = identitypkg.SubKindTypology
 	SubKindTrait    = identitypkg.SubKindTrait
 
-	AlgorithmScaleDefault            = identitypkg.AlgorithmScaleDefault
-	AlgorithmPersonalityTypology     = identitypkg.AlgorithmPersonalityTypology
-	AlgorithmBigFive                 = identitypkg.AlgorithmBigFive
-	AlgorithmMBTI                    = identitypkg.AlgorithmMBTI
-	AlgorithmSBTI                    = identitypkg.AlgorithmSBTI
-	AlgorithmBrief2                  = identitypkg.AlgorithmBrief2
-	AlgorithmSPMSensory              = identitypkg.AlgorithmSPMSensory
-	AlgorithmSPM                     = identitypkg.AlgorithmSPM
-	AlgorithmBehavioralRatingDefault = identitypkg.AlgorithmBehavioralRatingDefault
+	AlgorithmScaleDefault        = identitypkg.AlgorithmScaleDefault
+	AlgorithmPersonalityTypology = identitypkg.AlgorithmPersonalityTypology
+	AlgorithmBrief2              = identitypkg.AlgorithmBrief2
+	AlgorithmSPMSensory          = identitypkg.AlgorithmSPMSensory
+	AlgorithmSPM                 = identitypkg.AlgorithmSPM
 
-	DecisionKindScoreRange                            = identitypkg.DecisionKindScoreRange
-	DecisionKindPoleComposition                       = identitypkg.DecisionKindPoleComposition
-	DecisionKindTraitProfile                          = identitypkg.DecisionKindTraitProfile
-	DecisionKindNearestPattern                        = identitypkg.DecisionKindNearestPattern
-	DecisionKindDominantFactor                        = identitypkg.DecisionKindDominantFactor
-	DecisionKindNormLookup                            = identitypkg.DecisionKindNormLookup
-	DecisionKindAbilityLevel                          = identitypkg.DecisionKindAbilityLevel
-	DecisionKindScoreRangeInterpretation DecisionKind = identitypkg.DecisionKindScoreRangeInterpretation //nolint:staticcheck // legacy decode alias
+	DecisionKindScoreRange      = identitypkg.DecisionKindScoreRange
+	DecisionKindPoleComposition = identitypkg.DecisionKindPoleComposition
+	DecisionKindTraitProfile    = identitypkg.DecisionKindTraitProfile
+	DecisionKindNearestPattern  = identitypkg.DecisionKindNearestPattern
+	DecisionKindDominantFactor  = identitypkg.DecisionKindDominantFactor
+	DecisionKindNormLookup      = identitypkg.DecisionKindNormLookup
+	DecisionKindAbilityLevel    = identitypkg.DecisionKindAbilityLevel
 
 	ScoringSourceQuestion      = factorpkg.ScoringSourceQuestion
 	ScoringSourceFactor        = factorpkg.ScoringSourceFactor
 	ScoringStrategyWeightedAvg = factorpkg.ScoringStrategyWeightedAvg
-	OptionScoringStrict        = factorpkg.OptionScoringStrict
-	OptionScoringCompat        = factorpkg.OptionScoringCompat
 
 	ScoreBasisRaw           = conclusionpkg.ScoreBasisRaw
 	ScoreBasisTScore        = conclusionpkg.ScoreBasisTScore
@@ -156,25 +145,11 @@ const (
 	ExecutionPathBehavioralRatingDescriptor = binding.ExecutionPathBehavioralRatingDescriptor
 	ExecutionPathCognitiveDescriptor        = binding.ExecutionPathCognitiveDescriptor
 
-	PayloadFormatAssessmentScaleV1         = payloadformatpkg.PayloadFormatAssessmentScaleV1
-	PayloadFormatPersonalityTypologyV1     = payloadformatpkg.PayloadFormatPersonalityTypologyV1
-	PayloadFormatTypologyV1                = payloadformatpkg.PayloadFormatTypologyV1
-	PayloadFormatBehavioralRatingDefaultV1 = payloadformatpkg.PayloadFormatBehavioralRatingDefaultV1
-	PayloadFormatBehavioralRatingBrief2V1  = payloadformatpkg.PayloadFormatBehavioralRatingBrief2V1
-	PayloadFormatCognitiveDefaultV1        = payloadformatpkg.PayloadFormatCognitiveDefaultV1
-	PayloadFormatCognitiveSPMV1            = payloadformatpkg.PayloadFormatCognitiveSPMV1
-	PayloadFormatScaleV1                   = payloadformatpkg.PayloadFormatScaleV1
-	PayloadFormatMBTIV1                    = payloadformatpkg.PayloadFormatMBTIV1 //nolint:staticcheck // legacy decode data value
-	PayloadFormatSBTIV1                    = payloadformatpkg.PayloadFormatSBTIV1 //nolint:staticcheck // legacy decode data value
-	PayloadFormatScaleV1Legacy             = payloadformatpkg.PayloadFormatScaleV1Legacy
-	PayloadFormatMBTIV1Legacy              = payloadformatpkg.PayloadFormatMBTIV1Legacy
-	PayloadFormatSBTIV1Legacy              = payloadformatpkg.PayloadFormatSBTIV1Legacy
-
 	CapabilityRoleProductChannel = binding.CapabilityRoleProductChannel
 	CapabilityRoleModelFamily    = binding.CapabilityRoleModelFamily
 
-	SchemaVersionV1 = payloadformatpkg.SchemaVersionV1
-	SchemaVersionV2 = payloadformatpkg.SchemaVersionV2
+	// SchemaVersionV2 is the only persisted Definition schema.
+	SchemaVersionV2 = "2"
 
 	ModelStatusDraft      = assessmentmodelpkg.StatusDraft
 	ModelStatusPublished  = assessmentmodelpkg.StatusPublished
@@ -193,49 +168,25 @@ var (
 	ValidateNewProductChannel = binding.ValidateNewProductChannel
 	HasValidationErrors       = binding.HasValidationErrors
 	AllProductChannels        = binding.AllProductChannels
-	LegacyKindMapping         = binding.LegacyKindMapping
 	ProductFromChannel        = binding.ProductFromChannel
 	NewIdentity               = identitypkg.New
 	FamilyFromDecisionKind    = identitypkg.FamilyFromDecisionKind
 	FamilyFromIdentity        = identitypkg.FamilyFromIdentity
 
-	AlgorithmFamilyFromDecisionKind    = identitypkg.AlgorithmFamilyFromDecisionKind
-	DecisionKindForIdentity            = binding.DecisionKindForIdentity
-	AlgorithmFamilyFromIdentity        = binding.AlgorithmFamilyFromIdentity
-	CompatibleAlgorithmBinding         = identitypkg.CompatibleAlgorithmBinding
-	CompatibleIdentity                 = identitypkg.CompatibleIdentity
-	AllAlgorithmFamilies               = identitypkg.AllAlgorithmFamilies
-	ResolveRuntimeIdentity             = identitypkg.ResolveRuntimeIdentity
-	ClassifyAlgorithmWritePolicy       = identitypkg.ClassifyAlgorithmWritePolicy
-	IsCanonicalPublishAlgorithm        = identitypkg.IsCanonicalPublishAlgorithm
-	IsRetainedReadAlgorithm            = identitypkg.IsRetainedReadAlgorithm
-	AuditIdentityWritePolicy           = identitypkg.AuditIdentityWritePolicy
-	ObserveWritePolicy                 = identitypkg.ObserveWritePolicy
-	ObserveAlgorithmFallback           = identitypkg.ObserveAlgorithmFallback
-	TypologyAlgorithmBackfillTarget    = identitypkg.TypologyAlgorithmBackfillTarget
-	CanonicalTypologyPublishAlgorithm  = identitypkg.CanonicalTypologyPublishAlgorithm
-	BehavioralAlgorithmBackfillTarget  = identitypkg.BehavioralAlgorithmBackfillTarget
-	EvaluateRetirementGate             = identitypkg.EvaluateRetirementGate
-	EvaluateDualIdentityRetirementGate = identitypkg.EvaluateDualIdentityRetirementGate
-	RetirementDeleteChecklist          = identitypkg.RetirementDeleteChecklist
-	DualIdentityDeleteChecklist        = identitypkg.DualIdentityDeleteChecklist
-	IsRetainedReadAliasAlgorithm       = identitypkg.IsRetainedReadAliasAlgorithm
-	AlgorithmWriteCanonical            = identitypkg.AlgorithmWriteCanonical
-	AlgorithmWriteDraftOK              = identitypkg.AlgorithmWriteDraftOK
-	AlgorithmWriteRetainedRead         = identitypkg.AlgorithmWriteRetainedRead
-	AlgorithmWriteUnknown              = identitypkg.AlgorithmWriteUnknown
-
-	IsScalePayloadFormat               = payloadformatpkg.IsScalePayloadFormat
-	IsLegacyDecodeOnlyPayloadFormat    = payloadformatpkg.IsLegacyDecodeOnlyPayloadFormat
-	IsMBTIPayloadFormat                = payloadformatpkg.IsMBTIPayloadFormat
-	IsSBTIPayloadFormat                = payloadformatpkg.IsSBTIPayloadFormat
-	IsPersonalityTypologyPayloadFormat = payloadformatpkg.IsPersonalityTypologyPayloadFormat
-	AlgorithmFromTypologyPayload       = payloadformatpkg.AlgorithmFromTypologyPayload
-	PayloadFormatForBehavioralRating   = payloadformatpkg.PayloadFormatForBehavioralRating
-	PayloadFormatForCognitive          = payloadformatpkg.PayloadFormatForCognitive
-	IsBehavioralRatingPayloadFormat    = payloadformatpkg.IsBehavioralRatingPayloadFormat
-	IsCognitivePayloadFormat           = payloadformatpkg.IsCognitivePayloadFormat
-	DraftPayloadFormatForModel         = payloadformatpkg.DraftPayloadFormatForModel
+	AlgorithmFamilyFromDecisionKind   = identitypkg.AlgorithmFamilyFromDecisionKind
+	DecisionKindForIdentity           = binding.DecisionKindForIdentity
+	AlgorithmFamilyFromIdentity       = binding.AlgorithmFamilyFromIdentity
+	CompatibleAlgorithmBinding        = identitypkg.CompatibleAlgorithmBinding
+	CompatibleIdentity                = identitypkg.CompatibleIdentity
+	AllAlgorithmFamilies              = identitypkg.AllAlgorithmFamilies
+	ResolveRuntimeIdentity            = identitypkg.ResolveRuntimeIdentity
+	ClassifyAlgorithmWritePolicy      = identitypkg.ClassifyAlgorithmWritePolicy
+	IsCanonicalPublishAlgorithm       = identitypkg.IsCanonicalPublishAlgorithm
+	AuditIdentityWritePolicy          = identitypkg.AuditIdentityWritePolicy
+	CanonicalTypologyPublishAlgorithm = identitypkg.CanonicalTypologyPublishAlgorithm
+	AlgorithmWriteCanonical           = identitypkg.AlgorithmWriteCanonical
+	AlgorithmWriteDraftOK             = identitypkg.AlgorithmWriteDraftOK
+	AlgorithmWriteUnknown             = identitypkg.AlgorithmWriteUnknown
 
 	FamilyCapabilityByKind = binding.FamilyCapabilityByKind
 	RuntimeExecutableKinds = binding.RuntimeExecutableKinds

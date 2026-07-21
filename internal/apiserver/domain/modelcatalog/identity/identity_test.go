@@ -20,7 +20,7 @@ func TestIdentityDerivesFamilyAndDecision(t *testing.T) {
 		t.Fatalf("rating decision = %q ok=%v, want norm_lookup", decision, ok)
 	}
 
-	typology := identity.New(binding.KindTypology, binding.SubKindTypology, binding.AlgorithmMBTI)
+	typology := identity.New(binding.KindTypology, binding.SubKindTypology, binding.AlgorithmPersonalityTypology)
 	family, ok = typology.Family()
 	if !ok || family != identity.FamilyFactorClassification {
 		t.Fatalf("typology family = %q ok=%v, want factor_classification", family, ok)
@@ -38,7 +38,6 @@ func TestAlgorithmFamilyFromDecisionKind(t *testing.T) {
 		want     identity.AlgorithmFamily
 	}{
 		{binding.DecisionKindScoreRange, identity.AlgorithmFamilyFactorScoring},
-		{binding.DecisionKind("score_range_interpretation"), identity.AlgorithmFamilyFactorScoring},
 		{binding.DecisionKindPoleComposition, identity.AlgorithmFamilyFactorClassification},
 		{binding.DecisionKindTraitProfile, identity.AlgorithmFamilyFactorClassification},
 		{binding.DecisionKindNearestPattern, identity.AlgorithmFamilyFactorClassification},
@@ -68,12 +67,9 @@ func TestAlgorithmFamilyFromIdentityMatrix(t *testing.T) {
 		wantOK    bool
 	}{
 		{name: "scale", kind: binding.KindScale, algorithm: binding.AlgorithmScaleDefault, want: identity.AlgorithmFamilyFactorScoring, wantOK: true},
-		{name: "personality_mbti", kind: binding.KindTypology, subKind: binding.SubKindTypology, algorithm: binding.AlgorithmMBTI, want: identity.AlgorithmFamilyFactorClassification, wantOK: true},
-		{name: "personality_sbti", kind: binding.KindTypology, subKind: binding.SubKindTypology, algorithm: binding.AlgorithmSBTI, want: identity.AlgorithmFamilyFactorClassification, wantOK: true},
-		{name: "personality_bigfive", kind: binding.KindTypology, subKind: binding.SubKindTypology, algorithm: binding.AlgorithmBigFive, want: identity.AlgorithmFamilyFactorClassification, wantOK: true},
+		{name: "personality_mbti", kind: binding.KindTypology, subKind: binding.SubKindTypology, algorithm: binding.AlgorithmPersonalityTypology, want: identity.AlgorithmFamilyFactorClassification, wantOK: true},
 		{name: "behavioral_rating_brief2", kind: binding.KindBehavioralRating, algorithm: binding.AlgorithmBrief2, want: identity.AlgorithmFamilyFactorNorm, wantOK: true},
 		{name: "behavioral_rating_spm_sensory", kind: binding.KindBehavioralRating, algorithm: binding.AlgorithmSPMSensory, want: identity.AlgorithmFamilyFactorNorm, wantOK: true},
-		{name: "behavioral_rating_default", kind: binding.KindBehavioralRating, algorithm: binding.AlgorithmBehavioralRatingDefault, want: identity.AlgorithmFamilyFactorNorm, wantOK: true},
 		{name: "behavioral_rating_empty_algo", kind: binding.KindBehavioralRating, algorithm: "", want: identity.AlgorithmFamilyFactorNorm, wantOK: true},
 		{name: "cognitive_spm", kind: binding.KindCognitive, algorithm: binding.AlgorithmSPM, want: identity.AlgorithmFamilyTaskPerformance, wantOK: true},
 		{name: "cognitive_empty_algo", kind: binding.KindCognitive, algorithm: "", want: identity.AlgorithmFamilyTaskPerformance, wantOK: true},
@@ -104,9 +100,8 @@ func TestAlgorithmFamilyIdentityMatchesPublishDecision(t *testing.T) {
 		decision  binding.DecisionKind
 	}{
 		{binding.KindScale, binding.SubKindEmpty, binding.AlgorithmScaleDefault, binding.DecisionKindScoreRange},
-		{binding.KindBehavioralRating, binding.SubKindEmpty, binding.AlgorithmBrief2, binding.DecisionKindNormLookup},
 		{binding.KindBehavioralRating, binding.SubKindEmpty, binding.AlgorithmSPMSensory, binding.DecisionKindNormLookup},
-		{binding.KindBehavioralRating, binding.SubKindEmpty, binding.AlgorithmBehavioralRatingDefault, binding.DecisionKindNormLookup},
+		{binding.KindBehavioralRating, binding.SubKindEmpty, binding.AlgorithmBrief2, binding.DecisionKindNormLookup},
 		{binding.KindBehavioralRating, binding.SubKindEmpty, "", binding.DecisionKindNormLookup},
 		{binding.KindCognitive, binding.SubKindEmpty, binding.AlgorithmSPM, binding.DecisionKindAbilityLevel},
 	}
@@ -135,10 +130,10 @@ func TestAlgorithmFamilyIdentityMatchesPublishDecision(t *testing.T) {
 func TestDecisionKindForIdentityRequiresExplicitTypologyDecision(t *testing.T) {
 	t.Parallel()
 
-	if _, ok := identity.DecisionKindForIdentity(binding.KindTypology, binding.SubKindTypology, binding.AlgorithmMBTI); ok {
+	if _, ok := identity.DecisionKindForIdentity(binding.KindTypology, binding.SubKindTypology, binding.AlgorithmPersonalityTypology); ok {
 		t.Fatal("personality typology must not infer decision.kind from algorithm")
 	}
-	family, ok := identity.AlgorithmFamilyFromIdentity(binding.KindTypology, binding.SubKindTypology, binding.AlgorithmMBTI)
+	family, ok := identity.AlgorithmFamilyFromIdentity(binding.KindTypology, binding.SubKindTypology, binding.AlgorithmPersonalityTypology)
 	if !ok || family != identity.AlgorithmFamilyFactorClassification {
 		t.Fatalf("family = %s ok=%v, want factor_classification", family, ok)
 	}

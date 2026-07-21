@@ -358,7 +358,7 @@ behavioral_rating
 - domain identity；
 - ProductChannel 映射；
 - Definition handler；
-- payload format；
+- DefinitionV2 runtime assembler；
 - family capability；
 - input provider；
 - runtime descriptor；

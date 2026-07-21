@@ -19,8 +19,8 @@ func (h stubHandler) ValidateForPublish(context.Context, *domain.AssessmentModel
 	return nil
 }
 
-func (h stubHandler) BuildSnapshotPayload(context.Context, *domain.AssessmentModel) (SnapshotBuildResult, error) {
-	return SnapshotBuildResult{}, nil
+func (h stubHandler) MaterializeSnapshot(context.Context, *domain.AssessmentModel) (Materialization, error) {
+	return Materialization{}, nil
 }
 
 func TestRegistryResolveByIdentity(t *testing.T) {

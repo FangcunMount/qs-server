@@ -13,15 +13,11 @@ func TestAlgorithmConstantsStayFrozen(t *testing.T) {
 	t.Parallel()
 
 	allowed := map[string]string{
-		"AlgorithmScaleDefault":            "scale_default",
-		"AlgorithmPersonalityTypology":     "personality_typology",
-		"AlgorithmBigFive":                 "bigfive",
-		"AlgorithmMBTI":                    "mbti",
-		"AlgorithmSBTI":                    "sbti",
-		"AlgorithmBrief2":                  "brief2",
-		"AlgorithmSPMSensory":              "spm_sensory",
-		"AlgorithmSPM":                     "spm",
-		"AlgorithmBehavioralRatingDefault": "behavioral_rating_default",
+		"AlgorithmScaleDefault":        "scale_default",
+		"AlgorithmPersonalityTypology": "personality_typology",
+		"AlgorithmBrief2":              "brief2",
+		"AlgorithmSPMSensory":          "spm_sensory",
+		"AlgorithmSPM":                 "spm",
 	}
 
 	text := readRepoFile(t, "internal/apiserver/domain/modelcatalog/identity/types.go")
@@ -52,11 +48,11 @@ func TestApiserverDoesNotIntroduceTypologyAlgorithmVariants(t *testing.T) {
 	t.Parallel()
 
 	forbidden := []string{
-		"AlgorithmMBTI9",
-		"AlgorithmMBTI_",
-		"AlgorithmSBTI9",
-		"AlgorithmSBTI_",
-		"AlgorithmBigFive_",
+		"AlgorithmPersonalityTypology9",
+		"AlgorithmPersonalityTypology_",
+		"AlgorithmPersonalityTypology9",
+		"AlgorithmPersonalityTypology_",
+		"AlgorithmPersonalityTypology_",
 		"ExecutionIdentityMBTI9",
 		"ExecutionIdentityMBTI_",
 		"ExecutionIdentitySBTI9",

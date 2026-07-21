@@ -106,9 +106,6 @@ func decodePublishedCognitiveModel(model *rulesetport.PublishedModel) (*taskperf
 	if model.Kind != domain.KindCognitive {
 		return nil, fmt.Errorf("published model kind = %q, want cognitive", model.Kind)
 	}
-	if !domain.IsCognitivePayloadFormat(model.PayloadFormat) {
-		return nil, fmt.Errorf("unsupported cognitive payload format: %s", model.PayloadFormat)
-	}
 	if model.DefinitionV2 == nil {
 		return nil, fmt.Errorf("cognitive definition_v2 is required for runtime: %s", model.Code)
 	}

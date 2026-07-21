@@ -15,7 +15,6 @@ type TypologyModelResponse struct {
 	SubKind         string                      `json:"sub_kind,omitempty" example:"typology"`
 	ProductChannel  string                      `json:"product_channel,omitempty" example:"typology" enums:"typology"`
 	AlgorithmFamily string                      `json:"algorithm_family,omitempty"`
-	PayloadFormat   string                      `json:"payload_format,omitempty"`
 	DecisionKind    string                      `json:"decision_kind,omitempty"`
 	DimensionOrder  []string                    `json:"dimension_order,omitempty"`
 	Dimensions      []TypologyDimensionResponse `json:"dimensions,omitempty"`
@@ -51,7 +50,6 @@ type TypologyModelSummaryResponse struct {
 	SubKind         string `json:"sub_kind,omitempty" example:"typology"`
 	ProductChannel  string `json:"product_channel,omitempty" example:"typology" enums:"typology"`
 	AlgorithmFamily string `json:"algorithm_family,omitempty"`
-	PayloadFormat   string `json:"payload_format,omitempty"`
 	DecisionKind    string `json:"decision_kind,omitempty"`
 }
 

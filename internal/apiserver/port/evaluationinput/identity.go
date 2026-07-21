@@ -9,13 +9,12 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 )
 
 const (
-	IdentityRefV1Prefix = "isn:v1:"
-	IdentityRefV2Prefix = "isn:v2:"
-	// IdentityRefPrefix is the prefix used for new assessment attempts.
-	IdentityRefPrefix = IdentityRefV2Prefix
+	IdentityRefPrefix = "isn:v2:"
 )
 
 // InputSnapshotIdentity is the structured, digest-backed identity of one
@@ -23,7 +22,6 @@ const (
 // a different CompositeDigest, so Run/Outcome refs can prove that retries
 // executed against the same input.
 type InputSnapshotIdentity struct {
-	Version              string
 	ModelCode            string
 	ModelVersion         string
 	ModelDigest          string
@@ -41,82 +39,63 @@ func (id InputSnapshotIdentity) Ref() string {
 	if id.CompositeDigest == "" {
 		return ""
 	}
-	if id.Version == "v1" {
-		return IdentityRefV1Prefix + id.CompositeDigest
-	}
-	return IdentityRefV2Prefix + id.CompositeDigest
+	return IdentityRefPrefix + id.CompositeDigest
 }
 
-// IsIdentityRef reports whether ref is an EV-R009 verifiable reference, as
-// opposed to a legacy "model:..." / "answersheet:..." readable label.
+// IsIdentityRef reports whether ref is a complete EV-R009 v2 identity.
 func IsIdentityRef(ref string) bool {
-	return strings.HasPrefix(ref, IdentityRefV1Prefix) || strings.HasPrefix(ref, IdentityRefV2Prefix)
+	if !strings.HasPrefix(ref, IdentityRefPrefix) {
+		return false
+	}
+	digest := strings.TrimPrefix(ref, IdentityRefPrefix)
+	if len(digest) != sha256.Size*2 {
+		return false
+	}
+	_, err := hex.DecodeString(digest)
+	return err == nil
 }
-
-func IsV1IdentityRef(ref string) bool { return strings.HasPrefix(ref, IdentityRefV1Prefix) }
-
-func IsV2IdentityRef(ref string) bool { return strings.HasPrefix(ref, IdentityRefV2Prefix) }
 
 // NewInputSnapshotIdentity derives the identity from a resolved snapshot.
 // It hashes an explicit whitelist of semantic fields in fixed order and never
-// depends on JSON map iteration order. ok is false when the snapshot carries
-// no identifiable component.
+// depends on JSON map iteration order. Incomplete snapshots are not executable.
 func NewInputSnapshotIdentity(input *InputSnapshot) (InputSnapshotIdentity, bool) {
-	return newInputSnapshotIdentity(input, "v2")
-}
-
-// NewLegacyV1InputSnapshotIdentity reproduces the historical EV-R009 digest.
-// It is used only to keep already-started v1 retry chains stable after v2 is
-// deployed; new assessments must use NewInputSnapshotIdentity.
-func NewLegacyV1InputSnapshotIdentity(input *InputSnapshot) (InputSnapshotIdentity, bool) {
-	return newInputSnapshotIdentity(input, "v1")
-}
-
-func newInputSnapshotIdentity(input *InputSnapshot, version string) (InputSnapshotIdentity, bool) {
-	if input == nil || (input.Model == nil && input.AnswerSheet == nil) {
+	if input == nil || input.Model == nil || input.DefinitionV2 == nil ||
+		input.AnswerSheet == nil || input.Questionnaire == nil || !input.Model.HasFrozenRuntime() {
 		return InputSnapshotIdentity{}, false
 	}
-	id := InputSnapshotIdentity{Version: version}
-	if m := input.Model; m != nil {
-		id.ModelCode = m.Code
-		id.ModelVersion = m.Version
-		id.ModelDigest = digestFields(
-			"model",
-			string(m.Kind), m.SubKind, m.Algorithm,
-			m.AlgorithmFamily, m.DecisionKind, m.PayloadFormat,
-			m.ProductChannel, m.Code, m.Version,
-		)
+	m := input.Model
+	if m.Kind == "" || m.Algorithm == "" || m.Code == "" || m.Version == "" {
+		return InputSnapshotIdentity{}, false
 	}
-	if q := input.Questionnaire; q != nil {
-		id.QuestionnaireCode = q.Code
-		id.QuestionnaireVersion = q.Version
-		id.QuestionnaireDigest = digestQuestionnaire(q)
+	definitionDigest, err := modeldefinition.CanonicalContentHash(input.DefinitionV2)
+	if err != nil || definitionDigest == "" {
+		return InputSnapshotIdentity{}, false
 	}
-	if s := input.AnswerSheet; s != nil {
-		id.AnswerSheetID = s.ID
-		id.AnswerSheetDigest = digestAnswerSheet(s)
-	}
+	id := InputSnapshotIdentity{}
+	id.ModelCode = m.Code
+	id.ModelVersion = m.Version
+	id.ModelDigest = digestFields(
+		"model:v2",
+		string(m.Kind), m.SubKind, m.Algorithm,
+		m.AlgorithmFamily, m.DecisionKind,
+		m.ProductChannel, m.Code, m.Version, definitionDigest,
+	)
+	q := input.Questionnaire
+	id.QuestionnaireCode = q.Code
+	id.QuestionnaireVersion = q.Version
+	id.QuestionnaireDigest = digestQuestionnaire(q)
+	s := input.AnswerSheet
+	id.AnswerSheetID = s.ID
+	id.AnswerSheetDigest = digestAnswerSheet(s)
 	if n := input.NormSubject; n != nil {
-		if version == "v1" {
-			ageMonths := 0
-			if n.AgeMonths != nil {
-				ageMonths = *n.AgeMonths
-			}
-			id.SubjectDigest = digestFields("subject", strconv.Itoa(ageMonths), n.Gender)
-		} else {
-			ageState, ageValue := "missing", ""
-			if n.AgeMonths != nil {
-				ageState, ageValue = "known", strconv.Itoa(*n.AgeMonths)
-			}
-			id.SubjectDigest = digestFields("subject:v2", ageState, ageValue, n.Gender)
+		ageState, ageValue := "missing", ""
+		if n.AgeMonths != nil {
+			ageState, ageValue = "known", strconv.Itoa(*n.AgeMonths)
 		}
-	}
-	compositeVersion := "isn:v2"
-	if version == "v1" {
-		compositeVersion = "isn:v1"
+		id.SubjectDigest = digestFields("subject:v2", ageState, ageValue, n.Gender)
 	}
 	id.CompositeDigest = digestFields(
-		compositeVersion,
+		"isn:v2",
 		id.ModelCode, id.ModelVersion, id.ModelDigest,
 		id.QuestionnaireCode, id.QuestionnaireVersion, id.QuestionnaireDigest,
 		strconv.FormatUint(id.AnswerSheetID, 10), id.AnswerSheetDigest,

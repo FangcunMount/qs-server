@@ -66,27 +66,27 @@ func TestCognitiveValidateForPublishRejectsUnknownSPMOption(t *testing.T) {
 	}
 }
 
-func TestCognitiveBuildSnapshotPayloadRejectsEmptyAlgorithm(t *testing.T) {
+func TestCognitiveMaterializationRejectsEmptyAlgorithm(t *testing.T) {
 	t.Parallel()
 	model := publishableCognitiveShell()
 	model.Algorithm = ""
 	model.DefinitionV2 = cognitiveDefinitionWithAbility()
-	_, err := (CognitiveDefinitionHandler{}).BuildSnapshotPayload(context.Background(), model)
+	_, err := (CognitiveDefinitionHandler{}).MaterializeSnapshot(context.Background(), model)
 	if err == nil {
-		t.Fatal("BuildSnapshotPayload error = nil, want empty algorithm rejection")
+		t.Fatal("MaterializeSnapshot error = nil, want empty algorithm rejection")
 	}
 }
 
-func TestCognitiveBuildSnapshotPayloadUsesExplicitSPM(t *testing.T) {
+func TestCognitiveMaterializationUsesExplicitSPM(t *testing.T) {
 	t.Parallel()
 	model := publishableCognitiveShell()
 	model.Algorithm = domain.AlgorithmSPM
 	model.DefinitionV2 = cognitiveDefinitionWithAbility()
-	result, err := (CognitiveDefinitionHandler{}).BuildSnapshotPayload(context.Background(), model)
+	result, err := (CognitiveDefinitionHandler{}).MaterializeSnapshot(context.Background(), model)
 	if err != nil {
-		t.Fatalf("BuildSnapshotPayload: %v", err)
+		t.Fatalf("MaterializeSnapshot: %v", err)
 	}
-	if result.Algorithm != domain.AlgorithmSPM || result.DecisionKind != domain.DecisionKindAbilityLevel || len(result.Payload) == 0 {
+	if result.Algorithm != domain.AlgorithmSPM || result.AlgorithmFamily != domain.AlgorithmFamilyTaskPerformance || result.DecisionKind != domain.DecisionKindAbilityLevel {
 		t.Fatalf("result = %#v", result)
 	}
 }
@@ -123,12 +123,11 @@ func TestCognitiveValidateForPublishRejectsUnsupportedStrategy(t *testing.T) {
 
 func publishableCognitiveShell() *domain.AssessmentModel {
 	return &domain.AssessmentModel{
-		Kind:       domain.KindCognitive,
-		Algorithm:  domain.AlgorithmSPM,
-		Code:       "COG_SHELL",
-		Title:      "Cognitive",
-		Binding:    domain.QuestionnaireBinding{QuestionnaireCode: "Q", QuestionnaireVersion: "1"},
-		Definition: domain.DefinitionPayload{Format: domain.PayloadFormatCognitiveDefaultV1, Data: []byte(`{}`)},
+		Kind:      domain.KindCognitive,
+		Algorithm: domain.AlgorithmSPM,
+		Code:      "COG_SHELL",
+		Title:     "Cognitive",
+		Binding:   domain.QuestionnaireBinding{QuestionnaireCode: "Q", QuestionnaireVersion: "1"},
 	}
 }
 

@@ -15,7 +15,6 @@ func TestFrozenRuntimeIdentityDoesNotSilentFallback(t *testing.T) {
 		Algorithm:       modelcatalog.AlgorithmBrief2,
 		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorNorm,
 		DecisionKind:    modelcatalog.DecisionKindScoreRange, // incompatible with factor_norm
-		PayloadFormat:   modelcatalog.PayloadFormatBehavioralRatingDefaultV1,
 	}
 	if !route.HasFrozenRuntime() {
 		t.Fatal("expected frozen runtime")
@@ -34,15 +33,14 @@ func TestFrozenRuntimeIdentityPreferredOverIdentityDerivation(t *testing.T) {
 		Algorithm:       modelcatalog.AlgorithmScaleDefault,
 		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
 		DecisionKind:    modelcatalog.DecisionKindScoreRange,
-		PayloadFormat:   modelcatalog.PayloadFormatAssessmentScaleV1,
 	}
 	key, err := evalpipeline.DescriptorKeyFromRoute(route)
 	if err != nil {
 		t.Fatal(err)
 	}
-	family, hit, ok := evalpipeline.ExecutionFamilyFromRouteWithCompat(route)
-	if !ok || hit.Used || hit.Source != evalpipeline.CompatibilitySourceFrozen {
-		t.Fatalf("family compat = %v %#v", ok, hit)
+	family, ok := evalpipeline.ExecutionFamilyFromRoute(route)
+	if !ok {
+		t.Fatal("frozen route was not resolved")
 	}
 	if family != modelcatalog.AlgorithmFamilyFactorScoring || key.DecisionKind != modelcatalog.DecisionKindScoreRange {
 		t.Fatalf("key = %#v", key)

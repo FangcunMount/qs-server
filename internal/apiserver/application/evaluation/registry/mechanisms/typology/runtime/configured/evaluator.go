@@ -30,13 +30,8 @@ func NewEvaluatorWithDetails(details DetailAssemblerRegistry) Evaluator {
 	}
 }
 
-// Score 评估类型学载荷 和 returns 计分结果。
-func (e Evaluator) Score(payload *modeltypology.Payload, sheet *evalinput.AnswerSheet) (outcometypology.ScoringResult, error) {
-	return e.ScoreWithDefinition(payload, nil, sheet)
-}
-
-// ScoreWithDefinition prefers canonical Definition runtime spec over compat payload (MC-R017 batch 5).
-func (e Evaluator) ScoreWithDefinition(
+// Score evaluates a typology payload using its canonical DefinitionV2.
+func (e Evaluator) Score(
 	payload *modeltypology.Payload,
 	def *modeldefinition.Definition,
 	sheet *evalinput.AnswerSheet,
@@ -47,7 +42,7 @@ func (e Evaluator) ScoreWithDefinition(
 	if sheet == nil {
 		return outcometypology.ScoringResult{}, fmt.Errorf("answer sheet is required")
 	}
-	spec, err := modeltypology.ResolveRuntimeSpec(def, payload)
+	spec, err := modeltypology.ResolveRuntimeSpec(def)
 	if err != nil {
 		return outcometypology.ScoringResult{}, err
 	}
@@ -112,8 +107,8 @@ func specialRulesForCalculation(rules []modeltypology.SpecialRuleSpec) []calcspe
 				QuestionCodes: append([]string(nil), rule.Condition.QuestionCodes...),
 				OptionValues:  append([]string(nil), rule.Condition.OptionValues...),
 			},
-			QuestionCodes: append([]string(nil), rule.QuestionCodes...),
-			OptionValues:  append([]string(nil), rule.OptionValues...),
+			QuestionCodes: append([]string(nil), rule.Condition.QuestionCodes...),
+			OptionValues:  append([]string(nil), rule.Condition.OptionValues...),
 		})
 	}
 	return converted

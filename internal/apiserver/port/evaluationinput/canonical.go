@@ -31,7 +31,7 @@ func DefinitionV2FromSnapshot(input *InputSnapshot) (*modeldefinition.Definition
 	return input.DefinitionV2, true
 }
 
-// MeasureSpecFromSnapshot prefers canonical Definition.Measure over compat payload.
+// MeasureSpecFromSnapshot returns the canonical Definition.Measure.
 func MeasureSpecFromSnapshot(input *InputSnapshot) (modeldefinition.MeasureSpec, bool) {
 	if def, ok := DefinitionV2FromSnapshot(input); ok && len(def.Measure.Factors) > 0 {
 		return def.Measure, true
@@ -75,7 +75,7 @@ func InterpretationAssetsFromSnapshot(input *InputSnapshot) (interpretationasset
 			return assets, true
 		}
 	}
-	return interpretationAssetsFromCompatPayload(input)
+	return interpretationassets.Assets{}, false
 }
 
 // FactorScoreVisibleCodesFromSnapshot resolves frozen factor-score section
@@ -91,17 +91,4 @@ func FactorScoreVisibleCodesFromSnapshot(input *InputSnapshot) ([]string, bool) 
 		return nil, false
 	}
 	return append([]string(nil), codes...), true
-}
-
-func interpretationAssetsFromCompatPayload(input *InputSnapshot) (interpretationassets.Assets, bool) {
-	if scale, ok := ScalePayload(input); ok && scale.InterpretationAssets != nil && scale.InterpretationAssets.IsMaterialized() {
-		return *scale.InterpretationAssets, true
-	}
-	if scale, ok := BehavioralRatingScaleSnapshot(input); ok && scale.InterpretationAssets != nil && scale.InterpretationAssets.IsMaterialized() {
-		return *scale.InterpretationAssets, true
-	}
-	if scale, ok := CognitiveScaleSnapshot(input); ok && scale.InterpretationAssets != nil && scale.InterpretationAssets.IsMaterialized() {
-		return *scale.InterpretationAssets, true
-	}
-	return interpretationassets.Assets{}, false
 }

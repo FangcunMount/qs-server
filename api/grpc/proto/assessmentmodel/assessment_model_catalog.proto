@@ -33,7 +33,8 @@ message CatalogModelSummary {
   // Publish-time frozen RuntimeIdentity (MC-R006).
   string algorithm_family = 16;
   string decision_kind = 17;
-  string payload_format = 18;
+  reserved 18;
+  reserved "payload_format";
 }
 
 message PublishedAssessmentModel {

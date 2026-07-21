@@ -26,9 +26,9 @@ func TestDefaultOutcomeAdapterRegistryOnlyRegistersMechanismKeys(t *testing.T) {
 		t.Fatalf("registry len = %d, want 2 mechanism adapters", registry.Len())
 	}
 	for _, key := range []modeltypology.DetailAdapterKey{
-		modeltypology.DetailAdapterMBTI,
-		modeltypology.DetailAdapterSBTI,
-		modeltypology.DetailAdapterBigFive,
+		modeltypology.DetailAdapterKey("mbti"),
+		modeltypology.DetailAdapterKey("sbti"),
+		modeltypology.DetailAdapterKey("bigfive"),
 	} {
 		if _, err := registry.Assemble(key, assessment.EvaluationModelRef{}, outcometypology.ScoringResult{}); err == nil {
 			t.Fatalf("default registry should not register legacy adapter %s", key)

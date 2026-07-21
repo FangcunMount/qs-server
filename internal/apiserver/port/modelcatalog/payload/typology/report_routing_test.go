@@ -8,35 +8,11 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
-func TestResolveTypologyReportRouting_LegacyAbsent(t *testing.T) {
+func TestResolveTypologyReportRouting_RejectsMissingDefinitionV2Runtime(t *testing.T) {
 	t.Parallel()
 
-	routing, err := typology.ResolveTypologyReportRouting(nil)
-	if err != nil {
-		t.Fatalf("ResolveTypologyReportRouting(nil) err = %v", err)
-	}
-	if routing.Source != typology.ReportRoutingHistoricalLegacy {
-		t.Fatalf("Source = %s, want historical_legacy", routing.Source)
-	}
-	if routing.TemplateID != "" || routing.AdapterKey != "" {
-		t.Fatalf("legacy absent should leave routing empty, got %#v", routing)
-	}
-
-	payload := &typology.Payload{
-		Algorithm:      binding.AlgorithmMBTI,
-		DimensionOrder: []string{"EI"},
-		Dimensions:     map[string]typology.Dimension{"EI": {Code: "EI", Name: "EI", LeftPole: "I", RightPole: "E"}},
-		MatchingSpec:   typology.MatchingSpec{Kind: binding.DecisionKindPoleComposition},
-	}
-	routing, err = typology.ResolveTypologyReportRouting(payload)
-	if err != nil {
-		t.Fatalf("legacy payload err = %v", err)
-	}
-	if routing.Source != typology.ReportRoutingHistoricalLegacy {
-		t.Fatalf("Source = %s, want historical_legacy", routing.Source)
-	}
-	if routing.TemplateID == "" && routing.AdapterKey == "" {
-		t.Fatal("legacy derive should populate TemplateID or AdapterKey")
+	if _, err := typology.ResolveTypologyReportRouting(nil); !errors.Is(err, typology.ErrRuntimeSpecInvalid) {
+		t.Fatalf("err = %v, want ErrRuntimeSpecInvalid", err)
 	}
 }
 
@@ -44,13 +20,13 @@ func TestResolveTypologyReportRouting_ExplicitValid(t *testing.T) {
 	t.Parallel()
 
 	payload := &typology.Payload{
-		DimensionOrder: []string{"EI"},
-		Dimensions:     map[string]typology.Dimension{"EI": {Code: "EI", Name: "EI", LeftPole: "I", RightPole: "E"}},
-		MatchingSpec:   typology.MatchingSpec{Kind: binding.DecisionKindPoleComposition},
 		Runtime: &typology.RuntimeSpec{
 			FactorGraph: typology.FactorGraphSpec{
-				DimensionOrder: []string{"EI"},
-				Dimensions:     map[string]typology.Dimension{"EI": {Code: "EI", Name: "EI", LeftPole: "I", RightPole: "E"}},
+				Factors: map[string]typology.FactorSpec{
+					"EI": {ID: "EI", Code: "EI", Name: "EI", Kind: typology.FactorSpecKindLeaf, Contributions: []typology.FactorContributionSpec{{QuestionCode: "q1", ScoringMode: typology.QuestionScoringModeQuestionScore, Sign: 1, Weight: 1}}},
+				},
+				Roots:      []string{"EI"},
+				Dimensions: map[string]typology.Dimension{"EI": {Code: "EI", Name: "EI", LeftPole: "I", RightPole: "E"}},
 			},
 			Decision:       typology.PersonalityDecisionSpec{Kind: binding.DecisionKindPoleComposition},
 			OutcomeMapping: typology.OutcomeMappingSpec{DetailKind: typology.OutcomeDetailPersonalityType},
@@ -66,8 +42,8 @@ func TestResolveTypologyReportRouting_ExplicitValid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveTypologyReportRouting() err = %v", err)
 	}
-	if routing.Source != typology.ReportRoutingExplicitRuntime {
-		t.Fatalf("Source = %s, want explicit_runtime", routing.Source)
+	if routing.Source != typology.ReportRoutingDefinitionV2 {
+		t.Fatalf("Source = %s, want definition_v2", routing.Source)
 	}
 	if routing.TemplateID != "mbti" {
 		t.Fatalf("TemplateID = %q, want mbti", routing.TemplateID)

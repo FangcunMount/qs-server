@@ -7,15 +7,13 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func TestActivePublishedFilterSupportsCanonicalAndLegacyRows(t *testing.T) {
+func TestActivePublishedFilterRequiresCanonicalReleaseStatus(t *testing.T) {
 	t.Parallel()
 	filter := activePublishedFilter(bson.M{"code": "MODEL-1"})
-	or, ok := filter["$or"].(bson.A)
-	if !ok || len(or) != 2 {
-		t.Fatalf("active filter = %#v, want canonical and legacy branches", filter)
+	if filter["release_status"] != string(domain.ReleaseStatusActive) {
+		t.Fatalf("canonical release status = %#v", filter["release_status"])
 	}
-	canonical := or[0].(bson.M)
-	if canonical["release_status"] != string(domain.ReleaseStatusActive) {
-		t.Fatalf("canonical release status = %#v", canonical["release_status"])
+	if _, exists := filter["$or"]; exists {
+		t.Fatalf("active filter must not contain a compatibility branch: %#v", filter)
 	}
 }

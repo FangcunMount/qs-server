@@ -4,13 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/FangcunMount/component-base/pkg/log"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -50,12 +48,10 @@ type ScoreFactReader interface {
 type scoreFactReader struct {
 	outcomes    domainoutcome.Repository
 	projections evaluationreadmodel.ScoreProjectionReader
-	assessments evaluationreadmodel.AssessmentReader
-	scales      evaluationinput.ScaleCatalog
 }
 
-func NewScoreFactReader(outcomes domainoutcome.Repository, projections evaluationreadmodel.ScoreProjectionReader, assessments evaluationreadmodel.AssessmentReader, scales evaluationinput.ScaleCatalog) ScoreFactReader {
-	return &scoreFactReader{outcomes: outcomes, projections: projections, assessments: assessments, scales: scales}
+func NewScoreFactReader(outcomes domainoutcome.Repository, projections evaluationreadmodel.ScoreProjectionReader) ScoreFactReader {
+	return &scoreFactReader{outcomes: outcomes, projections: projections}
 }
 
 func (r *scoreFactReader) Get(ctx context.Context, assessmentID uint64) (*ScoreFact, error) {
@@ -79,21 +75,7 @@ func (r *scoreFactReader) Get(ctx context.Context, assessmentID uint64) (*ScoreF
 	}
 	names, maxScores, frozen := scoreMetadataFromRecord(record, execution)
 	if !frozen {
-		observeScoreCatalogFallback()
-		log.Warnf("evaluation score fact uses legacy current-catalog metadata fallback (assessment_id=%d)", assessmentID)
-		legacyScale := r.loadLegacyScale(ctx, assessmentID)
-		for code, value := range factorMaxScores(legacyScale) {
-			if _, exists := maxScores[code]; !exists {
-				maxScores[code] = value
-			}
-		}
-		if legacyScale != nil {
-			for _, factor := range legacyScale.Factors {
-				if names[factor.Code] == "" {
-					names[factor.Code] = factor.Title
-				}
-			}
-		}
+		return nil, fmt.Errorf("evaluation outcome is missing current frozen report input")
 	}
 	return scoreFactFromProjection(projection, names, maxScores), nil
 }
@@ -127,21 +109,6 @@ func (r *scoreFactReader) Trend(ctx context.Context, testeeID uint64, factorCode
 		}
 	}
 	return result, nil
-}
-
-func (r *scoreFactReader) loadLegacyScale(ctx context.Context, assessmentID uint64) *scalesnapshot.ScaleSnapshot {
-	if r.scales == nil || r.assessments == nil {
-		return nil
-	}
-	row, err := r.assessments.GetAssessment(ctx, assessmentID)
-	if err != nil || row == nil || row.EvaluationModelKind == nil || *row.EvaluationModelKind != "scale" || row.EvaluationModelCode == nil {
-		return nil
-	}
-	scale, err := r.scales.GetScale(ctx, *row.EvaluationModelCode)
-	if err != nil {
-		return nil
-	}
-	return scale
 }
 
 func scoreFactFromProjection(projection *domainassessment.ScaleScoreProjection, names map[string]string, maxScores map[string]*float64) *ScoreFact {
@@ -196,19 +163,4 @@ func scoreMetadataFromRecord(record *domainoutcome.Record, execution *domainoutc
 		}
 	}
 	return names, maxScores, true
-}
-
-func factorMaxScores(scale *scalesnapshot.ScaleSnapshot) map[string]*float64 {
-	result := map[string]*float64{}
-	if scale == nil {
-		return result
-	}
-	for _, factor := range scale.Factors {
-		if factor.MaxScore == nil {
-			continue
-		}
-		value := *factor.MaxScore
-		result[factor.Code] = &value
-	}
-	return result
 }

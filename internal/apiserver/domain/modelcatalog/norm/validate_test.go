@@ -48,6 +48,14 @@ func TestValidateImportRejectsCognitiveWithUnsupportedAlgorithm(t *testing.T) {
 	}
 }
 
+func TestValidateImportRejectsBehavioralWithRavenSPMAlgorithm(t *testing.T) {
+	table := validTable()
+	table.Algorithm = identity.AlgorithmSPM
+	if err := norm.ValidateImport(table); err == nil {
+		t.Fatal("ValidateImport() error = nil, want identity error")
+	}
+}
+
 func TestValidateImportAllowsGenericLookupFallbackWithSpecificRows(t *testing.T) {
 	table := validTable()
 	table.Factors[0].Lookup = append(table.Factors[0].Lookup, norm.LookupEntry{RawScoreMin: 10, RawScoreMax: 10, MinAgeMonths: 60, MaxAgeMonths: 95, Gender: "female", TScore: 60, Percentile: 84})

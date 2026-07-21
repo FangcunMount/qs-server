@@ -38,15 +38,11 @@ type Algorithm string
 const (
 	AlgorithmScaleDefault        Algorithm = "scale_default"
 	AlgorithmPersonalityTypology Algorithm = "personality_typology"
-	AlgorithmBigFive             Algorithm = "bigfive"
-	AlgorithmMBTI                Algorithm = "mbti"
-	AlgorithmSBTI                Algorithm = "sbti"
 	AlgorithmBrief2              Algorithm = "brief2"
 	// AlgorithmSPMSensory is Sensory Processing Measure. It deliberately does
 	// not reuse AlgorithmSPM, which names Raven Standard Progressive Matrices.
-	AlgorithmSPMSensory              Algorithm = "spm_sensory"
-	AlgorithmSPM                     Algorithm = "spm"
-	AlgorithmBehavioralRatingDefault Algorithm = "behavioral_rating_default"
+	AlgorithmSPMSensory Algorithm = "spm_sensory"
+	AlgorithmSPM        Algorithm = "spm"
 )
 
 func (a Algorithm) String() string { return string(a) }
@@ -62,7 +58,4 @@ const (
 	DecisionKindDominantFactor  DecisionKind = "dominant_factor"
 	DecisionKindNormLookup      DecisionKind = "norm_lookup"
 	DecisionKindAbilityLevel    DecisionKind = "ability_level"
-
-	// Deprecated: use DecisionKindScoreRange.
-	DecisionKindScoreRangeInterpretation DecisionKind = "score_range_interpretation"
 )

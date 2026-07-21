@@ -43,13 +43,6 @@ func DecodeScaleFromPublished(model *port.PublishedModel) (*scalesnapshot.ScaleS
 	if model.Kind != domain.KindScale {
 		return nil, fmt.Errorf("published model kind = %q, want scale", model.Kind)
 	}
-	format := model.PayloadFormat
-	if format == "" {
-		format = domain.PayloadFormatAssessmentScaleV1
-	}
-	if !domain.IsScalePayloadFormat(format) {
-		return nil, fmt.Errorf("unsupported scale payload format: %s", format)
-	}
 	if model.DefinitionV2 == nil {
 		return nil, fmt.Errorf("scale definition_v2 is required for runtime: %s", model.Code)
 	}

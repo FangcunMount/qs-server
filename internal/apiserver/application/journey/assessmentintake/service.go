@@ -12,7 +12,6 @@ import (
 	evaluationintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
 	planapp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	answersheetapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	domainanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -355,24 +354,14 @@ func (s *service) applyBinding(ctx context.Context, command Command, dto *evalua
 	if err != nil || !ok {
 		return false, err
 	}
-	kind, subKind, algorithm, mapped := modelcatalog.LegacyKindMapping(binding.Ref.Kind)
-	if !mapped {
-		kind = binding.Ref.Kind
-	}
-	if binding.Ref.SubKind != "" {
-		subKind = binding.Ref.SubKind
-	}
-	if binding.Ref.Algorithm != "" {
-		algorithm = binding.Ref.Algorithm
-	}
-	k := kind.String()
+	k := binding.Ref.Kind.String()
 	dto.ModelKind = &k
-	if subKind != "" {
-		v := subKind.String()
+	if binding.Ref.SubKind != "" {
+		v := binding.Ref.SubKind.String()
 		dto.ModelSubKind = &v
 	}
-	if algorithm != "" {
-		v := algorithm.String()
+	if binding.Ref.Algorithm != "" {
+		v := binding.Ref.Algorithm.String()
 		dto.ModelAlgorithm = &v
 	}
 	dto.ModelCode = &binding.Ref.Code

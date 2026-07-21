@@ -7,16 +7,19 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 )
 
-func TestToRuntimeSpecPrefersExplicitRuntimeOverAlgorithmDerivation(t *testing.T) {
+func TestToRuntimeSpecUsesDefinitionV2Materialization(t *testing.T) {
 	payload := &Payload{
-		Code:           "CUSTOM_V1",
-		Version:        "1.0.0",
-		Algorithm:      binding.AlgorithmMBTI,
-		DimensionOrder: []string{"EI"},
-		Dimensions: map[string]Dimension{
-			"EI": {Code: "EI", Name: "外向-内向", LeftPole: "I", RightPole: "E"},
-		},
+		Code:      "CUSTOM_V1",
+		Version:   "1.0.0",
+		Algorithm: binding.AlgorithmPersonalityTypology,
 		Runtime: &RuntimeSpec{
+			FactorGraph: FactorGraphSpec{
+				Factors: map[string]FactorSpec{
+					"EI": {ID: "EI", Code: "EI", Name: "外向-内向", Kind: FactorSpecKindLeaf, Contributions: []FactorContributionSpec{{QuestionCode: "q1", ScoringMode: QuestionScoringModeQuestionScore, Sign: 1, Weight: 1}}},
+				},
+				Roots:      []string{"EI"},
+				Dimensions: map[string]Dimension{"EI": {Code: "EI", Name: "外向-内向", LeftPole: "I", RightPole: "E"}},
+			},
 			Decision: PersonalityDecisionSpec{
 				Kind: binding.DecisionKindTraitProfile,
 			},
@@ -117,36 +120,23 @@ func explicitPoleCompositionPayload() *Payload {
 		QuestionnaireCode:    "CUSTOM_POLE_V1",
 		QuestionnaireVersion: "1.0.0",
 		Status:               "published",
-		DimensionOrder:       []string{"EI", "SN", "TF", "JP"},
-		Dimensions: map[string]Dimension{
-			"EI": {Code: "EI", Name: "外向-内向", LeftPole: "I", RightPole: "E", Constant: 24, Threshold: 24},
-			"SN": {Code: "SN", Name: "感觉-直觉", LeftPole: "S", RightPole: "N", Constant: 24, Threshold: 24},
-			"TF": {Code: "TF", Name: "思考-情感", LeftPole: "T", RightPole: "F", Constant: 24, Threshold: 24},
-			"JP": {Code: "JP", Name: "判断-知觉", LeftPole: "J", RightPole: "P", Constant: 24, Threshold: 24},
-		},
-		QuestionMappings: []QuestionMapping{
-			{QuestionCode: "Q_EI", Dimension: "EI", Sign: -1},
-			{QuestionCode: "Q_SN", Dimension: "SN", Sign: 1},
-			{QuestionCode: "Q_TF", Dimension: "TF", Sign: -1},
-			{QuestionCode: "Q_JP", Dimension: "JP", Sign: -1},
-		},
 		Outcomes: []Outcome{
 			{Code: "INTJ", Name: "建筑师", OneLiner: "独立战略家"},
 		},
 		Runtime: &RuntimeSpec{
 			FactorGraph: FactorGraphSpec{
-				DimensionOrder: []string{"EI", "SN", "TF", "JP"},
+				Factors: map[string]FactorSpec{
+					"EI": explicitLeaf("EI", "外向-内向", "Q_EI", -1),
+					"SN": explicitLeaf("SN", "感觉-直觉", "Q_SN", 1),
+					"TF": explicitLeaf("TF", "思考-情感", "Q_TF", -1),
+					"JP": explicitLeaf("JP", "判断-知觉", "Q_JP", -1),
+				},
+				Roots: []string{"EI", "SN", "TF", "JP"},
 				Dimensions: map[string]Dimension{
 					"EI": {Code: "EI", Name: "外向-内向", LeftPole: "I", RightPole: "E", Constant: 24, Threshold: 24},
 					"SN": {Code: "SN", Name: "感觉-直觉", LeftPole: "S", RightPole: "N", Constant: 24, Threshold: 24},
 					"TF": {Code: "TF", Name: "思考-情感", LeftPole: "T", RightPole: "F", Constant: 24, Threshold: 24},
 					"JP": {Code: "JP", Name: "判断-知觉", LeftPole: "J", RightPole: "P", Constant: 24, Threshold: 24},
-				},
-				QuestionMappings: []QuestionMapping{
-					{QuestionCode: "Q_EI", Dimension: "EI", Sign: -1},
-					{QuestionCode: "Q_SN", Dimension: "SN", Sign: 1},
-					{QuestionCode: "Q_TF", Dimension: "TF", Sign: -1},
-					{QuestionCode: "Q_JP", Dimension: "JP", Sign: -1},
 				},
 			},
 			Decision: PersonalityDecisionSpec{
@@ -160,5 +150,12 @@ func explicitPoleCompositionPayload() *Payload {
 				CategoryLabel: "Custom Pole Model",
 			},
 		},
+	}
+}
+
+func explicitLeaf(code, name, question string, sign float64) FactorSpec {
+	return FactorSpec{
+		ID: code, Code: code, Name: name, Kind: FactorSpecKindLeaf, Constant: 24,
+		Contributions: []FactorContributionSpec{{QuestionCode: question, ScoringMode: QuestionScoringModeQuestionScore, Sign: sign, Weight: 1}},
 	}
 }

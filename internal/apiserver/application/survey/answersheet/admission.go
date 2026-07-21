@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	domainanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -24,22 +23,12 @@ func (s *submissionService) resolveAdmission(ctx context.Context, questionnaireC
 	if !ok {
 		return domainanswersheet.NewIndependentAdmission(questionnaireCode, questionnaireVersion)
 	}
-	kind, subKind, algorithm, mapped := modelcatalog.LegacyKindMapping(binding.Ref.Kind)
-	if !mapped {
-		kind = binding.Ref.Kind
-	}
-	if binding.Ref.SubKind != "" {
-		subKind = binding.Ref.SubKind
-	}
-	if binding.Ref.Algorithm != "" {
-		algorithm = binding.Ref.Algorithm
-	}
 	return domainanswersheet.NewAssessmentAdmission(
 		questionnaireCode,
 		questionnaireVersion,
-		kind.String(),
-		subKind.String(),
-		algorithm.String(),
+		binding.Ref.Kind.String(),
+		binding.Ref.SubKind.String(),
+		binding.Ref.Algorithm.String(),
 		binding.Ref.Code,
 		binding.Ref.Version,
 		binding.Ref.Title,

@@ -9659,7 +9659,6 @@ const docTemplate = `{
                 "dominant_factor",
                 "norm_lookup",
                 "ability_level",
-                "score_range_interpretation",
                 "score_range",
                 "pole_composition",
                 "trait_profile",
@@ -10255,17 +10254,6 @@ const docTemplate = `{
                 "FactorRoleAbilityDomain"
             ]
         },
-        "factor.OptionScoring": {
-            "type": "string",
-            "enum": [
-                "strict",
-                "compat"
-            ],
-            "x-enum-varnames": [
-                "OptionScoringStrict",
-                "OptionScoringCompat"
-            ]
-        },
         "factor.QuestionScoringMode": {
             "type": "string",
             "enum": [
@@ -10288,9 +10276,6 @@ const docTemplate = `{
                 },
                 "maxScore": {
                     "type": "number"
-                },
-                "optionScoring": {
-                    "$ref": "#/definitions/factor.OptionScoring"
                 },
                 "params": {
                     "$ref": "#/definitions/factor.ScoringParams"
@@ -10783,9 +10768,6 @@ const docTemplate = `{
                     "type": "string",
                     "example": "typology"
                 },
-                "payload_format": {
-                    "type": "string"
-                },
                 "product_channel": {
                     "type": "string",
                     "example": "typology"
@@ -10871,9 +10853,6 @@ const docTemplate = `{
                 "kind": {
                     "type": "string",
                     "example": "typology"
-                },
-                "payload_format": {
-                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string",
@@ -10991,9 +10970,6 @@ const docTemplate = `{
                 "kind": {
                     "type": "string",
                     "example": "typology"
-                },
-                "payload_format": {
-                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string",
@@ -12432,9 +12408,6 @@ const docTemplate = `{
                     "type": "string",
                     "example": "typology"
                 },
-                "payload_format": {
-                    "type": "string"
-                },
                 "product_channel": {
                     "type": "string",
                     "example": "typology"
@@ -13187,13 +13160,6 @@ const docTemplate = `{
                 },
                 "MaxScore": {
                     "type": "number"
-                },
-                "OptionScoring": {
-                    "type": "string",
-                    "enum": [
-                        "strict",
-                        "compat"
-                    ]
                 },
                 "Params": {
                     "$ref": "#/definitions/response.DefinitionScoringParamsWire"
@@ -14273,9 +14239,6 @@ const docTemplate = `{
                 "kind": {
                     "type": "string",
                     "example": "typology"
-                },
-                "payload_format": {
-                    "type": "string"
                 },
                 "product_channel": {
                     "type": "string",

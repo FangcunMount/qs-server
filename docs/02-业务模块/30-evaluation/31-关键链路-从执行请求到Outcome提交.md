@@ -557,30 +557,27 @@ answersheet:<id>
 | 对象 | 示例 | 回答的问题 |
 | --- | --- | --- |
 | ExecutionIdentity | kind + subKind + algorithm | 这是哪一类模型执行身份 |
-| ModelRoute | identity + payload format + decision kind | 这次模型要求什么机制 |
-| DescriptorKey | AlgorithmFamily + PayloadFormat + DecisionKind | 应选择哪个运行时能力 |
+| ModelRoute | identity + AlgorithmFamily + DecisionKind | 这次模型要求什么机制 |
+| DescriptorKey | AlgorithmFamily + DecisionKind | 应选择哪个运行时能力 |
 | RuntimeDescriptor | assembler + calculator + outcome assembler | 实际怎样执行 |
 
 ### 12.2 ResolveExecution
 
 RuntimeResolver：
 
-1. 从 InputSnapshot 优先构造 ModelRoute；
-2. 无法构造时才回退 Assessment ModelRef；
-3. 验证 route 能映射 AlgorithmFamily；
-4. 生成 DescriptorKey；
-5. 从 Registry 选择 descriptor；
-6. 返回 `ResolvedExecution`。
+1. 从 InputSnapshot 的冻结身份构造 ModelRoute；
+2. 要求 AlgorithmFamily 与 DecisionKind 均存在；
+3. 生成精确 DescriptorKey；
+4. 从 Registry 选择 descriptor；
+5. 返回 `ResolvedExecution`。
 
 Descriptor Registry 的查找顺序是：
 
 ```text
-exact family + format + decision
-  -> family + format
-  -> family
+exact AlgorithmFamily + DecisionKind
 ```
 
-它允许同类模型复用机制，同时保留新 payload/decision 的显式扩展点。
+缺少精确注册时直接 validation failure，不做 family 或格式级 fallback。
 
 ### 12.3 为什么只解析一次
 

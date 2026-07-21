@@ -30,8 +30,6 @@ type AssessmentModelPO struct {
 	Status                  string        `bson:"status"`
 	QuestionnaireCode       string        `bson:"questionnaire_code,omitempty"`
 	QuestionnaireVersion    string        `bson:"questionnaire_version,omitempty"`
-	DefinitionPayloadFormat string        `bson:"definition_payload_format,omitempty"`
-	DefinitionPayload       []byte        `bson:"definition_payload,omitempty"`
 	DefinitionSchemaVersion string        `bson:"definition_schema_version,omitempty"`
 	DefinitionV2            *DefinitionPO `bson:"definition_v2,omitempty"`
 	RecordRole              string        `bson:"record_role"`

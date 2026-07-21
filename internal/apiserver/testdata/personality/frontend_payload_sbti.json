@@ -36,7 +36,6 @@
           "code": "D1",
           "name": "D1",
           "kind": "leaf",
-          "option_scoring": "compat",
           "contributions": [
             {
               "question_code": "Q1",
@@ -61,7 +60,6 @@
           "code": "D2",
           "name": "D2",
           "kind": "leaf",
-          "option_scoring": "compat",
           "contributions": [
             {
               "question_code": "Q3",

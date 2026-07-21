@@ -48,7 +48,7 @@ func TestCollectionOpenAPITypologyModelSchemaHasRoutingFields(t *testing.T) {
 	if !ok {
 		t.Fatal("schema has no properties")
 	}
-	for _, field := range []string{"kind", "sub_kind", "product_channel", "algorithm_family", "payload_format", "decision_kind"} {
+	for _, field := range []string{"kind", "sub_kind", "product_channel", "algorithm_family", "decision_kind"} {
 		if _, ok := props[field]; !ok {
 			t.Fatalf("TypologyModelSummaryResponse missing field %q", field)
 		}

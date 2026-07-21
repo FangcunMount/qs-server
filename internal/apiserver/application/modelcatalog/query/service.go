@@ -100,7 +100,7 @@ func (s *catalogQueryService) ListReleaseVersions(ctx context.Context, actor mod
 		if item == nil {
 			continue
 		}
-		status := domain.NormalizeReleaseStatus(item.ReleaseStatus, false)
+		status := domain.NormalizeReleaseStatus(item.ReleaseStatus)
 		entry := modelcatalog.AssessmentReleaseVersion{
 			ModelVersion: item.Version, QuestionnaireCode: item.QuestionnaireCode,
 			QuestionnaireVersion: item.QuestionnaireVersion, ReleaseStatus: string(status),
@@ -354,7 +354,7 @@ func publishedDetailFromModel(model *modelcatalogport.PublishedModel) (*modelcat
 	if model.DefinitionV2 == nil {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "published model definition_v2 is required: %s", model.Code)
 	}
-	releaseStatus := domain.NormalizeReleaseStatus(model.ReleaseStatus, false)
+	releaseStatus := domain.NormalizeReleaseStatus(model.ReleaseStatus)
 	onlineStatus := "offline"
 	activeVersion := ""
 	if releaseStatus.IsActive() {
@@ -369,13 +369,11 @@ func publishedDetailFromModel(model *modelcatalogport.PublishedModel) (*modelcat
 		modelcatalog.PopulateModelSummaryIdentity(&summary, model.Kind, model.SubKind, model.Algorithm, model.ProductChannel)
 	}
 	summary.DecisionKind = string(model.DecisionKind)
-	summary.PayloadFormat = model.PayloadFormat
 	return &modelcatalog.PublishedModelDetail{
-		ModelSummary:  summary,
-		Version:       model.Version,
-		Definition:    model.DefinitionV2,
-		DecisionKind:  string(model.DecisionKind),
-		PayloadFormat: model.PayloadFormat,
+		ModelSummary: summary,
+		Version:      model.Version,
+		Definition:   model.DefinitionV2,
+		DecisionKind: string(model.DecisionKind),
 	}, nil
 }
 

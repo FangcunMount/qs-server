@@ -18,7 +18,7 @@ func TestRuntimeResolverUsesDescriptorPrimaryPath(t *testing.T) {
 
 	registry := evalpipeline.NewRuntimeDescriptorRegistry()
 	if err := registry.Register(evalpipeline.RuntimeDescriptor{
-		Key:              evalpipeline.DescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring},
+		Key:              evalpipeline.DescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
 		AlgorithmFamily:  modelcatalog.AlgorithmFamilyFactorScoring,
 		ExecutionPath:    modelcatalog.ExecutionPathScaleDescriptor,
 		InputAssembler:   runtimeStubInputAssembler{},
@@ -31,9 +31,8 @@ func TestRuntimeResolverUsesDescriptorPrimaryPath(t *testing.T) {
 
 	input := &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
-			Kind:      evaluationinput.EvaluationModelKindScale,
-			Algorithm: "scale_default",
-			Code:      "PHQ9",
+			Kind: evaluationinput.EvaluationModelKindScale, Algorithm: "scale_default", Code: "PHQ9",
+			AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorScoring), DecisionKind: string(modelcatalog.DecisionKindScoreRange),
 		},
 	}
 	outcome, resolved, err := resolver.Execute(context.Background(), nil, input)
@@ -70,7 +69,7 @@ func TestRuntimeResolverRejectsFrozenRouteWithoutFallingBackToAssessment(t *test
 
 	registry := evalpipeline.NewRuntimeDescriptorRegistry()
 	if err := registry.Register(evalpipeline.RuntimeDescriptor{
-		Key:              evalpipeline.DescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring},
+		Key:              evalpipeline.DescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
 		AlgorithmFamily:  modelcatalog.AlgorithmFamilyFactorScoring,
 		ExecutionPath:    modelcatalog.ExecutionPathScaleDescriptor,
 		InputAssembler:   runtimeStubInputAssembler{},
@@ -88,7 +87,6 @@ func TestRuntimeResolverRejectsFrozenRouteWithoutFallingBackToAssessment(t *test
 			Algorithm:       string(modelcatalog.AlgorithmBrief2),
 			AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorNorm),
 			DecisionKind:    string(modelcatalog.DecisionKindNormLookup),
-			PayloadFormat:   modelcatalog.PayloadFormatBehavioralRatingDefaultV1,
 			Code:            "BR-001",
 			Version:         "1.0.0",
 		},
@@ -110,12 +108,12 @@ func TestRuntimeResolverRejectsFrozenRouteWithoutFallingBackToAssessment(t *test
 	}
 }
 
-func TestRuntimeResolverUsesCompatibilityForLegacyInput(t *testing.T) {
+func TestRuntimeResolverRejectsIncompleteInput(t *testing.T) {
 	t.Parallel()
 
 	registry := evalpipeline.NewRuntimeDescriptorRegistry()
 	if err := registry.Register(evalpipeline.RuntimeDescriptor{
-		Key:              evalpipeline.DescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring},
+		Key:              evalpipeline.DescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
 		AlgorithmFamily:  modelcatalog.AlgorithmFamilyFactorScoring,
 		ExecutionPath:    modelcatalog.ExecutionPathScaleDescriptor,
 		InputAssembler:   runtimeStubInputAssembler{},
@@ -132,12 +130,8 @@ func TestRuntimeResolverUsesCompatibilityForLegacyInput(t *testing.T) {
 			Code:      "PHQ9",
 		},
 	}
-	_, resolved, err := resolver.Execute(context.Background(), nil, input)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resolved.DescriptorKey.AlgorithmFamily != modelcatalog.AlgorithmFamilyFactorScoring {
-		t.Fatalf("descriptor key = %#v", resolved.DescriptorKey)
+	if _, _, err := resolver.Execute(context.Background(), nil, input); err == nil {
+		t.Fatal("incomplete input route was accepted")
 	}
 }
 

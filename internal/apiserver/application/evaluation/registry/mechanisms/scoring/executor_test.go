@@ -10,6 +10,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -33,6 +36,7 @@ func TestExecutorConvertsSnapshotThroughScaleEvaluator(t *testing.T) {
 		t.Fatalf("Submit returned error: %v", err)
 	}
 	snapshot := &evaluationinput.InputSnapshot{
+		DefinitionV2: scaleDefinition("total", []string{"q1", "q2"}),
 		Model: &evaluationinput.ModelSnapshot{
 			Kind:    evaluationinput.EvaluationModelKindScale,
 			Code:    "S-001",
@@ -137,6 +141,7 @@ func TestExecutorOrchestratesValidatorAndHandler(t *testing.T) {
 	)
 	_ = a.Submit()
 	snapshot := &evaluationinput.InputSnapshot{
+		DefinitionV2: scaleDefinition("f1", []string{"f1"}),
 		ModelPayload: evaluationinput.ScaleModelPayload{Scale: &scalesnapshot.ScaleSnapshot{
 			Code:                 "S-001",
 			ScaleVersion:         "1.0.0",
@@ -188,6 +193,26 @@ func TestExecutorOrchestratesValidatorAndHandler(t *testing.T) {
 	}
 	if result.Level == nil || result.Level.Code != string(assessment.RiskLevelLow) {
 		t.Fatalf("level = %#v, want low", result.Level)
+	}
+}
+
+func scaleDefinition(factorCode string, questionCodes []string) *definition.Definition {
+	sources := make([]factor.ScoringSource, 0, len(questionCodes))
+	for _, code := range questionCodes {
+		sources = append(sources, factor.ScoringSource{Kind: factor.ScoringSourceQuestion, Code: code, ScoringMode: factor.QuestionScoringModeQuestionScore})
+	}
+	return &definition.Definition{
+		Measure: definition.MeasureSpec{
+			Factors:     []factor.Factor{{Code: factorCode, Title: factorCode, Role: factor.FactorRoleTotal}},
+			FactorGraph: factor.FactorGraph{Roots: []string{factorCode}},
+			Scoring:     []factor.Scoring{{FactorCode: factorCode, Strategy: factor.ScoringStrategySum, Sources: sources}},
+		},
+		Conclusions: []conclusion.Conclusion{conclusion.RiskConclusion{
+			FactorCode: factorCode,
+			Rules: []conclusion.ScoreRangeOutcome{{
+				MinScore: 0, MaxScore: 10, OutcomeCode: "low",
+			}},
+		}},
 	}
 }
 

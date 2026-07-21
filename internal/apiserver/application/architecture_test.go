@@ -469,14 +469,34 @@ func TestModelCatalogJSONAdaptersDoNotReturnToDomain(t *testing.T) {
 	}
 }
 
-func TestLegacyDefinitionImportsStayAtInputAdapters(t *testing.T) {
+func TestDefinitionV2OnlyRuntimeDoesNotRestoreCompatibilityAPIs(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	allowed := map[string]struct{}{
-		"internal/apiserver/port/modelcatalog/payload/behavioral/legacy_import.go": {},
-		"internal/apiserver/port/modelcatalog/payload/cognitive/payload.go":        {},
-		"internal/apiserver/port/modelcatalog/payload/typology/definition.go":      {},
+	forbiddenTokens := []string{
+		"CompatibilityResolver",
+		"ValidateRuntimeMaterial",
+		"DefinitionPayload",
+		"UpdateDefinitionWithV2",
+		"BuildSnapshotPayload",
+		"SnapshotBuildResult",
+		"PayloadProjectionHash",
+		"AttachProjectionHashes",
+		"AuditSnapshotProjection",
+		"ImportLegacyDefinition",
+		"ParsePublishedPayload",
+		"ParseDefinitionPayload",
+		"TryUpgradeReportInput",
+		"DefinitionFromScaleSnapshot",
+		"restoreLegacy",
+		"PayloadFormat",
+		"option_scoring",
+		"isn:v1:",
+		"ExecutionIdentityFromLegacyKind",
+		"LegacyKindMapping",
+		"NewDefaultStaticCatalog",
+		"StaticCompositeCatalog",
+		"DefaultEmbeddedSnapshots",
 	}
 	scanRoot := filepath.Join(root, "internal", "apiserver")
 	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
@@ -490,12 +510,11 @@ func TestLegacyDefinitionImportsStayAtInputAdapters(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if !strings.Contains(string(data), "ImportLegacyDefinition(") {
-			return nil
-		}
-		rel := filepath.ToSlash(mustRel(t, root, path))
-		if _, ok := allowed[rel]; !ok {
-			t.Fatalf("%s imports legacy definition semantics outside an approved input adapter", rel)
+		text := string(data)
+		for _, token := range forbiddenTokens {
+			if strings.Contains(text, token) {
+				t.Fatalf("%s contains retired DefinitionV2 compatibility token %q", filepath.ToSlash(mustRel(t, root, path)), token)
+			}
 		}
 		return nil
 	})

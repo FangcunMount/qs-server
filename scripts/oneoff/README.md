@@ -44,12 +44,10 @@ export MONGO_URI='mongodb://app_user:***@127.0.0.1:27017/qs?directConnection=tru
 | `rebuild_statistics_aggregates_and_cache/main.go` | 重建统计聚合表并刷新统计查询缓存 | MySQL 统计聚合表，Redis 统计查询缓存 |
 | `rebuild_seeddata_access_statistics/main.go` | 一站式修复 seeddata 接入统计历史数据 | MySQL intake/resolve log、`behavior_footprint`、`statistics_journey_daily` |
 | `enroll_testees_after_date.py` | 通过 REST API 将指定日期后创建的受试者批量加入计划 | REST `/plans/enroll` 对应的业务数据 |
-| `seed_personality_typology/` | **统一入口**：重初始化 MBTI@2.0.1、MBTI_FC_93、SBTI、Big5、九型 问卷与解释模型 | Mongo `questionnaires` + `assessment_models` head/snapshot |
-| `repair_sbti_profiles/` | 通过受保护 DefinitionV2 API 定点补齐 SBTI Pattern 和特殊结果标记；默认 dry-run，不自动发布 | `assessment_models` 草稿 |
 | `seed_brief2/` | 从历史 BRIEF-2 常模 PHP 和经过核验的题目-因子映射，初始化 BRIEF-2 家长版行为能力模型 | Mongo `assessment_norms` + `assessment_models` head/snapshot |
 | `seed_spm_sensory/` | 从历史 SPM 感觉统合常模 PHP 和经过核验的题目-因子映射，初始化 `spm_sensory` 行为能力模型 | Mongo `assessment_norms` + `assessment_models` head/snapshot |
-| `audit_scale_models/` | 只读审计所有 canonical Scale 草稿、发布快照、绑定问卷、DefinitionV2 与 payload 投影一致性 | 无写入 |
 | `audit_norm_usage/` | 只读 Norm 反向引用审计：published snapshot NormRef → usage / dangling / unreferenced（MC-R020 A） | 无写入 |
+| `verify_definition_v2_cutover/` | 只读检查 isn:v2、DefinitionV2、冻结运行身份、ReportInput schema 3、Norm 严格导入及旧 ruleset 存量 | 无写入；发现不兼容数据时退出码为 2 |
 | `observe_outbox_by_event_type/` | 只读观测 outbox 按 `event_type` 积压与近期写入，输出 legacy 退役 Gate | 无写入 |
 
 `__pycache__/` 是 Python 运行产物，不是脚本入口。
@@ -63,10 +61,33 @@ export MONGO_URI='mongodb://app_user:***@127.0.0.1:27017/qs?directConnection=tru
 | `backfill_draft_assessment_models_from_scales/` | `scales` head → `assessment_models` draft |
 | `audit_scale_assessment_model_gap/` | scales head 与 assessment_models 差集审计 |
 | `backfill_published_assessment_models/` | legacy `evaluation_rule_sets` → `published_assessment_models` |
-| `seed_evaluation_rule_sets/` | 内置 MBTI/SBTI + 量表 published 种子（已由 `seed_personality_typology` 取代） |
-| `audit_published_model_payload_formats/` | legacy payload_format 审计 |
+| `seed_evaluation_rule_sets/` | 内置人格与量表 published 种子 |
+| `seed_personality_typology/` | 依赖旧算法别名与 payload 的人格种子 |
+| `audit_scale_models/` / `audit_published_model_payload_formats/` | 兼容 payload 投影审计 |
 | `audit_personality_kind_values/` / `migrate_personality_kind_values/` | `personality` → `typology` kind 迁移 |
 | `migrate_modelcatalog_definition_v2/` | DefinitionV2 + norm 行回填 |
+| `backfill_report_input/` | 旧 ReportInput schema 回填 |
+| `audit_legacy_identities/` / `observe_identity_retirement_gate/` | retained alias 和双身份退役审计 |
+| `soft_delete_assessment_retained_aliases/` / `soft_delete_assessment_empty_algorithms/` | 兼容期 Assessment 软删 |
+| `migrate_personality_runtime_adapters/` / `repair_sbti_profiles/` | 旧人格 payload/adapter 定点迁移 |
+| `audit_published_projections/` | compatibility payload 投影重放审计 |
+
+## verify_definition_v2_cutover
+
+维护窗口中先备份数据库，再执行只读审计。脚本不会删除、回填或发布任何数据；总问题数为 0 时退出码为 0，发现不兼容存量时为 2，连接或查询失败时为 1。
+
+```bash
+go run ./scripts/oneoff/verify_definition_v2_cutover/ \
+  --mysql-dsn "$MYSQL_DSN" \
+  --mongo-uri "$MONGO_URI" \
+  --mongo-db qs_server
+
+# 自动化消费
+go run ./scripts/oneoff/verify_definition_v2_cutover/ \
+  --mysql-dsn "$MYSQL_DSN" \
+  --mongo-uri "$MONGO_URI" \
+  --json
+```
 
 ## observe_outbox_by_event_type
 
@@ -105,94 +126,6 @@ go run ./scripts/oneoff/observe_outbox_by_event_type/ \
 至少提供 `--mysql-dsn` 或 `--mongo-uri` 之一；生产建议双查。
 
 > **注意**：包目录，使用 `go run ./scripts/oneoff/observe_outbox_by_event_type/`（带尾部 `/`）。
-
-> **注意**：`seed_personality_typology/` 是包目录，必须用 `go run ./scripts/oneoff/seed_personality_typology/`（带尾部 `/`），**不要** `go run .../main.go`。
-
-## seed_personality_typology
-
-### 做什么
-
-一次性重初始化以下人格测评：
-
-| 模型 | 问卷 | 算法 | 决策 |
-| ---- | ---- | ---- | ---- |
-| `MBTI_OEJTS@2.0.1` | 32题 | mbti | pole_composition |
-| `MBTI_FC_93@1.0.0` | 93题强迫选择 | mbti | pole_composition |
-| `SBTI_FUN@1.0.0` | 30题 | sbti | nearest_pattern |
-| `BIG5_IPIP_50@1.0.0` | 50题 IPIP | bigfive | trait_profile |
-| `ENNEAGRAM_45@1.0.0` | 45题自研 | personality_typology | trait_profile |
-
-1. 发布问卷快照到 `questionnaires`
-2. 写入带 **explicit factor graph** 的解释模型 head，并在 `assessment_models` 中生成 immutable `published_snapshot`
-
-模型 payload 包含：`question_mappings`、`factor.contributions`、`report.kind=personality_type`、`adapter_key=mbti|sbti`、正确的 `questionnaire_binding`。
-
-### 如何调用
-
-```bash
-# dry-run
-go run ./scripts/oneoff/seed_personality_typology/ \
-  --mongo-uri "$MONGO_URI" --mongo-db qs
-
-# 覆盖已有脏数据并写入
-go run ./scripts/oneoff/seed_personality_typology/ \
-  --mongo-uri "$MONGO_URI" --mongo-db qs --force --apply
-```
-
-仅发布问卷、不写解释模型（替代原 `seed_*_questionnaire`）：
-
-```bash
-go run ./scripts/oneoff/seed_personality_typology/ \
-  --mongo-uri "$MONGO_URI" --mongo-db qs --skip-models --force --apply
-```
-
-仅重初始化 Big5 / 九型：
-
-```bash
-go run ./scripts/oneoff/seed_personality_typology/ \
-  --mongo-uri "$MONGO_URI" --mongo-db qs \
-  --skip-mbti --skip-sbti --force --apply
-```
-
-仅重初始化 MBTI 93 题版：
-
-```bash
-go run ./scripts/oneoff/seed_personality_typology/ \
-  --mongo-uri "$MONGO_URI" --mongo-db qs \
-  --skip-mbti --skip-sbti --skip-big5 --skip-enneagram --force --apply
-```
-
-仅重初始化 MBTI 32 题版：
-
-```bash
-go run ./scripts/oneoff/seed_personality_typology/ \
-  --mongo-uri "$MONGO_URI" --mongo-db qs --skip-mbti93 --skip-sbti --skip-big5 --skip-enneagram --force --apply
-```
-
-验收：
-
-```javascript
-db.questionnaires.find(
-  { code: { $in: ["MBTI_OEJTS", "MBTI_FC_93", "SBTI_FUN", "BIG5_IPIP_50", "ENNEAGRAM_45"] }, deleted_at: null },
-  { code: 1, version: 1, status: 1, question_count: 1 }
-)
-db.assessment_models.find(
-  { code: { $in: ["MBTI_OEJTS", "MBTI_FC_93", "SBTI_FUN", "BIG5_IPIP_50", "ENNEAGRAM_45"] }, deleted_at: null },
-  { code: 1, questionnaire_code: 1, questionnaire_version: 1, status: 1, version: 1 }
-)
-```
-
-题库 JSON 位于 `seed_personality_typology/data/`：
-
-| 文件 | 说明 |
-| ---- | ---- |
-| `mbti_questionnaire.json` | MBTI 32 题（OEJTS） |
-| `mbti_fc_93_questionnaire.json` | MBTI 93 题强迫选择（含 stem/placeholder/factor/left/right/options） |
-| `big5_ipip_50_questionnaire.json` | 大五 IPIP-50 |
-| `enneagram_45_questionnaire.json` | 九型 45 题 |
-| `sbti_questionnaire.json` | SBTI 娱乐版 |
-| `gen_seed.py` | 重新生成 MBTI 32 题 JSON |
-| `gen_trait_questionnaires.py` | 重新生成 Big5 / 九型 JSON |
 
 ## cleanup_perf_testee_data/main.go
 

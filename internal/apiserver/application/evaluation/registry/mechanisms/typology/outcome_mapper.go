@@ -1,8 +1,6 @@
 package typology
 
 import (
-	"fmt"
-
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
@@ -62,20 +60,4 @@ func assembleGenericPersonalityTypeOutcome(
 		return nil, err
 	}
 	return executionFromPersonalityType(modelRef, detail), nil
-}
-
-// AssembleFromPayload 推导mapping 从 载荷 和 assembles 结果。
-func (a OutcomeAssembler) AssembleFromPayload(
-	modelRef assessment.EvaluationModelRef,
-	payload *modeltypology.Payload,
-	result outcometypology.ScoringResult,
-) (*domainoutcome.Execution, error) {
-	if payload == nil {
-		return nil, fmt.Errorf("typology payload is required")
-	}
-	spec, err := modeltypology.ResolveRuntimeSpec(nil, payload)
-	if err != nil {
-		return nil, err
-	}
-	return a.Assemble(modelRef, result, spec.OutcomeMapping)
 }

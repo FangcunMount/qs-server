@@ -97,7 +97,7 @@ func TestUpdateBasicInfoRejectsFrozenAlgorithmChange(t *testing.T) {
 	now := time.Date(2026, 7, 14, 10, 0, 0, 0, time.UTC)
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
 		Code: "MBTI-1", Kind: domain.KindTypology, SubKind: domain.SubKindTypology,
-		Algorithm: domain.AlgorithmMBTI, Title: "MBTI", Now: now,
+		Algorithm: domain.AlgorithmPersonalityTypology, Title: "MBTI", Now: now,
 	})
 	if err != nil {
 		t.Fatalf("NewAssessmentModel: %v", err)
@@ -106,12 +106,12 @@ func TestUpdateBasicInfoRejectsFrozenAlgorithmChange(t *testing.T) {
 		ModelRepo:  &revisionCheckingModelRepo{model: model, persistedRevision: model.Revision()},
 		Authorizer: allowManagementAuthorizer{},
 		Evolution: evolution.Policy{History: managementHistoryStub{items: []*modelcatalogport.PublishedModel{
-			{Code: "MBTI-1", Algorithm: domain.AlgorithmMBTI, QuestionnaireCode: "Q-MBTI"},
+			{Code: "MBTI-1", Algorithm: domain.AlgorithmPersonalityTypology, QuestionnaireCode: "Q-MBTI"},
 		}}},
 		Now: func() time.Time { return now.Add(time.Minute) },
 	}
 	_, err = service.UpdateBasicInfo(context.Background(), modelcatalog.ActorContext{}, modelcatalog.UpdateBasicInfoDTO{
-		Code: "MBTI-1", Title: "MBTI", Algorithm: string(domain.AlgorithmBigFive),
+		Code: "MBTI-1", Title: "MBTI", Algorithm: string(domain.AlgorithmBrief2),
 	})
 	if err == nil {
 		t.Fatal("expected frozen algorithm rejection")

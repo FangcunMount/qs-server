@@ -9,7 +9,6 @@ import (
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 func TestScoreFactUsesFrozenOutcomeMaxScoreAndName(t *testing.T) {
@@ -40,7 +39,7 @@ func (s *scoreOutcomeRepoStub) FindByAssessmentID(context.Context, meta.ID) (*do
 	return s.record, nil
 }
 
-func TestScoreFactReaderObservesCatalogFallback(t *testing.T) {
+func TestScoreFactReaderRejectsMissingFrozenReportInput(t *testing.T) {
 	t.Parallel()
 
 	record, err := domainoutcome.NewRecord(domainoutcome.NewRecordInput{
@@ -52,23 +51,14 @@ func TestScoreFactReaderObservesCatalogFallback(t *testing.T) {
 		SchemaVersion: domainoutcome.CurrentSchemaVersion,
 		EvaluatedAt:   time.Unix(100, 0),
 		Payload:       []byte(`{"Dimensions":[{"Code":"total","Name":"总分","Role":"total","Score":{"Value":42}}]}`),
-		// empty ReportInput → frozen=false → current-catalog fallback
+		// Empty ReportInput is invalid after the DefinitionV2-only cutover.
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	before := testutil.ToFloat64(scoreCatalogFallbackTotal)
-	reader := NewScoreFactReader(&scoreOutcomeRepoStub{record: record}, nil, nil, nil)
-	fact, err := reader.Get(context.Background(), 8)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if fact == nil || len(fact.FactorScores) != 1 || fact.FactorScores[0].RawScore != 42 {
-		t.Fatalf("score fact = %#v", fact)
-	}
-	after := testutil.ToFloat64(scoreCatalogFallbackTotal)
-	if after-before != 1 {
-		t.Fatalf("catalog fallback delta = %v, want 1", after-before)
+	reader := NewScoreFactReader(&scoreOutcomeRepoStub{record: record}, nil)
+	if _, err := reader.Get(context.Background(), 8); err == nil {
+		t.Fatal("outcome without schema 3 report input was accepted")
 	}
 }

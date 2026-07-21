@@ -1,7 +1,6 @@
 package characterization_test
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -59,15 +58,11 @@ func TestFrontendDefinitionV2ContractValidatesBuildsAndExecutes(t *testing.T) {
 		t.Fatalf("new assessment model: %v", err)
 	}
 	model.DefinitionV2 = &definition
-	snapshot, err := (appdefinition.TypologyDefinitionHandler{}).BuildSnapshotPayload(context.Background(), model)
+	frozen, err := (appdefinition.RuntimeMaterializer{}).MaterializeTypologyRuntime(model, "published")
 	if err != nil {
-		t.Fatalf("build published snapshot: %v", err)
+		t.Fatalf("materialize published runtime: %v", err)
 	}
-	var frozen modeltypology.Payload
-	if err := json.Unmarshal(snapshot.Payload, &frozen); err != nil {
-		t.Fatalf("decode frozen snapshot: %v", err)
-	}
-	result, err := configured.NewEvaluator().Score(&frozen, &evalinput.AnswerSheet{
+	result, err := configured.NewEvaluator().Score(frozen, &definition, &evalinput.AnswerSheet{
 		QuestionnaireCode: "q_contract", QuestionnaireVersion: "v1",
 		Answers: []evalinput.Answer{{QuestionCode: "q_drive", Score: 0, Value: "high"}, {QuestionCode: "q_care", Score: -2.5, Value: "low"}},
 	})
@@ -95,19 +90,19 @@ func TestFrontendOptionOverrideContractExecutesWithSignAndWeight(t *testing.T) {
 	if issues := modeltypology.ValidateRuntimeSpecForPublishWithContext(payload.Runtime, questionnaire, modeltypology.RuntimeSpecValidationContext{Algorithm: payload.Algorithm, Outcomes: payload.Outcomes}); modelcatalog.HasValidationErrors(issues) {
 		t.Fatalf("publish validation issues: %#v", issues)
 	}
-	result, err := configured.NewEvaluator().Score(payload, &evalinput.AnswerSheet{Answers: []evalinput.Answer{{QuestionCode: "q_override", Value: "A", Score: 99}}})
+	result, err := configured.NewEvaluator().Score(payload, definition, &evalinput.AnswerSheet{Answers: []evalinput.Answer{{QuestionCode: "q_override", Value: "A", Score: 99}}})
 	if err != nil {
 		t.Fatalf("execute option override: %v", err)
 	}
 	if got := result.Vector.Scores["override"].Raw; got != -2 {
 		t.Fatalf("override score = %v, want -2", got)
 	}
-	if _, err := configured.NewEvaluator().Score(payload, &evalinput.AnswerSheet{Answers: []evalinput.Answer{{QuestionCode: "q_override", Value: "X", Score: 99}}}); err == nil {
+	if _, err := configured.NewEvaluator().Score(payload, definition, &evalinput.AnswerSheet{Answers: []evalinput.Answer{{QuestionCode: "q_override", Value: "X", Score: 99}}}); err == nil {
 		t.Fatal("unknown override option must fail")
 	}
 }
 
-func TestFrontendLegacyContractPreservesPublishedScoring(t *testing.T) {
+func TestFrontendImplicitScoringContractIsRejected(t *testing.T) {
 	definition, ok := loadFrontendDefinition(t, "personalityDefinitionV2.legacy.contract.json")
 	if !ok {
 		t.Skip("qs-operating-system checkout is not present")
@@ -115,15 +110,11 @@ func TestFrontendLegacyContractPreservesPublishedScoring(t *testing.T) {
 	payload := frontendRuntimePayload(t, definition, "FRONTEND_LEGACY")
 	questionnaire := modeltypology.QuestionnaireSnapshot{Questions: []modeltypology.QuestionSnapshot{{Code: "q_legacy", Type: "Radio", OptionCodes: []string{"A", "B"}}}}
 	issues := modeltypology.ValidateRuntimeSpecForPublishWithContext(payload.Runtime, questionnaire, modeltypology.RuntimeSpecValidationContext{Algorithm: payload.Algorithm, Outcomes: payload.Outcomes})
-	if modelcatalog.HasValidationErrors(issues) || !hasIssueCode(issues, "question_contribution.legacy_implicit") {
-		t.Fatalf("legacy issues = %#v, want non-blocking warning", issues)
+	if !modelcatalog.HasValidationErrors(issues) || !hasIssueCode(issues, "scoring_mode.required") {
+		t.Fatalf("issues = %#v, want blocking scoring_mode.required", issues)
 	}
-	result, err := configured.NewEvaluator().Score(payload, &evalinput.AnswerSheet{Answers: []evalinput.Answer{{QuestionCode: "q_legacy", Value: "A", Score: 2}}})
-	if err != nil {
-		t.Fatalf("execute legacy snapshot: %v", err)
-	}
-	if got := result.Vector.Scores["legacy"].Raw; got != 4 {
-		t.Fatalf("legacy score = %v, want historical value 4", got)
+	if _, err := configured.NewEvaluator().Score(payload, definition, &evalinput.AnswerSheet{Answers: []evalinput.Answer{{QuestionCode: "q_legacy", Value: "A", Score: 2}}}); err == nil {
+		t.Fatal("implicit scoring definition executed")
 	}
 }
 

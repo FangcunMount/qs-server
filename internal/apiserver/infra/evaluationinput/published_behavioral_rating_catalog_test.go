@@ -5,50 +5,33 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
+	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
-	behavioral "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 )
 
 func TestPublishedBehavioralRatingCatalogDecodesPublishedModel(t *testing.T) {
 	t.Parallel()
 
-	raw := []byte(`{
-		"dimensions": [{
-			"code": "total",
-			"title": "总分",
-			"question_codes": ["q1", "q2"],
-			"scoring_strategy": "sum",
-			"is_total_score": true
-		}],
-		"interpret_rules": [{
-			"dimension_code": "total",
-			"ranges": [{"min_score": 0, "max_score": 10, "conclusion": "low", "level": "low"}]
-		}]
-	}`)
-	materialized, err := behavioral.ImportLegacyDefinition(raw)
-	if err != nil {
-		t.Fatalf("MaterializeDefinition: %v", err)
-	}
 	reader := stubPublishedBehavioralRatingReader{snapshot: &rulesetport.PublishedModel{
 		SchemaVersion:        domain.SchemaVersionV2,
-		PayloadFormat:        domain.PayloadFormatBehavioralRatingDefaultV1,
 		Kind:                 domain.KindBehavioralRating,
-		Algorithm:            domain.AlgorithmBehavioralRatingDefault,
+		Algorithm:            domain.AlgorithmBrief2,
 		Code:                 "BR-001",
 		Version:              "1.0.0",
 		Title:                "行为评分",
 		Status:               "published",
 		QuestionnaireCode:    "Q-001",
 		QuestionnaireVersion: "1.0.0",
-		Payload:              []byte("not-json"),
-		DefinitionV2:         materialized.Definition,
+		DefinitionV2:         behavioralDefinition(false),
 	}}
 	catalog := NewPublishedBehavioralRatingCatalog(reader)
 	got, err := catalog.GetBehavioralRatingByRef(context.Background(), port.ModelRef{
 		Kind:      port.EvaluationModelKindBehavioralRating,
-		Algorithm: string(domain.AlgorithmBehavioralRatingDefault),
+		Algorithm: string(domain.AlgorithmBrief2),
 		Code:      "BR-001",
 		Version:   "1.0.0",
 	})
@@ -67,32 +50,23 @@ func TestPublishedBehavioralRatingCatalogDecodesPublishedModel(t *testing.T) {
 func TestPublishedBehavioralRatingCatalogDecodesBrief2Snapshot(t *testing.T) {
 	t.Parallel()
 
-	raw := []byte(`{
-		"dimensions": [{"code": "gec", "title": "GEC", "question_codes": ["q1"], "scoring_strategy": "sum"}],
-		"interpret_rules": [{"dimension_code": "gec", "ranges": [{"min_score": 0, "max_score": 10, "conclusion": "ok"}]}],
-		"brief2": {
-			"form_variant": "parent", "norm_table_version": "2024", "index_codes": ["gec"],
-			"norms": [{"factor_code": "gec", "lookup": [{"raw_min": 0, "raw_max": 10, "t_score": 50, "percentile": 50}]}],
-			"t_score_rules": [{"factor_code": "gec", "ranges": [{"min_t": 0, "max_t": 100, "level": "average", "conclusion": "ok"}]}]
-		}
-	}`)
-	materialized, err := behavioral.ImportLegacyDefinition(raw)
-	if err != nil {
-		t.Fatalf("MaterializeDefinition: %v", err)
+	definition := behavioralDefinition(true)
+	table := &norm.Norm{
+		Kind: domain.KindBehavioralRating, Algorithm: domain.AlgorithmBrief2,
+		TableVersion: "2024", FormVariant: "parent",
+		Factors: []norm.FactorTable{{FactorCode: "gec", Lookup: []norm.LookupEntry{{RawScoreMin: 0, RawScoreMax: 10, TScore: 50, Percentile: 50}}}},
 	}
 	reader := stubPublishedBehavioralRatingReader{snapshot: &rulesetport.PublishedModel{
 		SchemaVersion: domain.SchemaVersionV2,
-		PayloadFormat: domain.PayloadFormatBehavioralRatingBrief2V1,
 		Kind:          domain.KindBehavioralRating,
 		Algorithm:     domain.AlgorithmBrief2,
 		Code:          "BR-BRIEF2",
 		Version:       "1.0.0",
 		Title:         "BRIEF-2",
 		Status:        "published",
-		Payload:       []byte("not-json"),
-		DefinitionV2:  materialized.Definition,
+		DefinitionV2:  definition,
 	}}
-	catalog := NewPublishedBehavioralRatingCatalog(reader, stubNormRepository{tables: materialized.Norms})
+	catalog := NewPublishedBehavioralRatingCatalog(reader, stubNormRepository{tables: []*norm.Norm{table}})
 	got, err := catalog.GetBehavioralRatingByRef(context.Background(), port.ModelRef{
 		Kind:      port.EvaluationModelKindBehavioralRating,
 		Algorithm: string(domain.AlgorithmBrief2),
@@ -111,12 +85,12 @@ func TestBehavioralRatingLookupRefsExactAlgorithmOnly(t *testing.T) {
 	t.Parallel()
 	refs, err := behavioralRatingLookupRefs(port.ModelRef{
 		Kind: port.EvaluationModelKindBehavioralRating, Code: "BR", Version: "1",
-		Algorithm: string(domain.AlgorithmBehavioralRatingDefault),
+		Algorithm: string(domain.AlgorithmBrief2),
 	})
 	if err != nil {
 		t.Fatalf("behavioralRatingLookupRefs: %v", err)
 	}
-	if len(refs) != 1 || refs[0].Algorithm != domain.AlgorithmBehavioralRatingDefault {
+	if len(refs) != 1 || refs[0].Algorithm != domain.AlgorithmBrief2 {
 		t.Fatalf("refs = %#v", refs)
 	}
 }
@@ -130,38 +104,49 @@ func TestBehavioralRatingLookupRefsRejectsEmptyAlgorithm(t *testing.T) {
 	}
 }
 
-func TestPublishedBehavioralRatingCatalogRejectsNonExactAlias(t *testing.T) {
+func TestPublishedBehavioralRatingCatalogRejectsMismatchedPublishedAlgorithm(t *testing.T) {
 	t.Parallel()
-	raw := []byte(`{
-		"dimensions": [{"code": "total", "title": "总分", "question_codes": ["q1"], "scoring_strategy": "sum", "is_total_score": true}],
-		"interpret_rules": [{"dimension_code": "total", "ranges": [{"min_score": 0, "max_score": 10, "conclusion": "low"}]}]
-	}`)
-	materialized, err := behavioral.ImportLegacyDefinition(raw)
-	if err != nil {
-		t.Fatalf("ImportLegacyDefinition: %v", err)
-	}
-	canonical := &rulesetport.PublishedModel{
+	mismatched := &rulesetport.PublishedModel{
 		SchemaVersion: domain.SchemaVersionV2,
-		PayloadFormat: domain.PayloadFormatBehavioralRatingDefaultV1,
 		Kind:          domain.KindBehavioralRating,
-		Algorithm:     domain.AlgorithmBrief2,
+		Algorithm:     domain.AlgorithmSPM,
 		Code:          "BR-ALIAS",
 		Version:       "1.0.0",
 		Status:        "published",
-		DefinitionV2:  materialized.Definition,
+		DefinitionV2:  behavioralDefinition(false),
 	}
 	reader := stubPublishedBehavioralRatingReader{byAlgorithm: map[domain.Algorithm]*rulesetport.PublishedModel{
-		domain.AlgorithmBrief2: canonical,
+		domain.AlgorithmBrief2: mismatched,
 	}}
 	catalog := NewPublishedBehavioralRatingCatalog(reader)
 	if _, err := catalog.GetBehavioralRatingByRef(context.Background(), port.ModelRef{
 		Kind:      port.EvaluationModelKindBehavioralRating,
-		Algorithm: string(domain.AlgorithmBehavioralRatingDefault),
+		Algorithm: string(domain.AlgorithmBrief2),
 		Code:      "BR-ALIAS",
 		Version:   "1.0.0",
 	}); err == nil {
-		t.Fatal("retained alias must not resolve via dual-identity after retirement")
+		t.Fatal("mismatched published algorithm must fail closed")
 	}
+}
+
+func behavioralDefinition(withNorm bool) *modeldefinition.Definition {
+	factorCode := "total"
+	if withNorm {
+		factorCode = "gec"
+	}
+	def := &modeldefinition.Definition{
+		Measure: modeldefinition.MeasureSpec{
+			Factors:     []factor.Factor{{Code: factorCode, Title: "总分", Role: factor.FactorRoleTotal}},
+			FactorGraph: factor.FactorGraph{Roots: []string{factorCode}},
+			Scoring:     []factor.Scoring{{FactorCode: factorCode, Sources: []factor.ScoringSource{{Kind: factor.ScoringSourceQuestion, Code: "q1"}}, Strategy: factor.ScoringStrategySum}},
+		},
+		Execution: modeldefinition.ExecutionSpec{Brief2: &modeldefinition.Brief2Spec{PrimaryFactorCode: factorCode}},
+	}
+	if withNorm {
+		def.Calibration.NormRefs = []norm.Ref{{FactorCode: factorCode, NormTableVersion: "2024"}}
+		def.Conclusions = []conclusion.Conclusion{conclusion.NormConclusion{FactorCode: factorCode, ScoreBasis: conclusion.ScoreBasisTScore, Primary: true}}
+	}
+	return def
 }
 
 type stubNormRepository struct {

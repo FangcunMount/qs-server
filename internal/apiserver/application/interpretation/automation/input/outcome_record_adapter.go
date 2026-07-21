@@ -8,11 +8,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	evaluationfactcodec "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact/codec"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
 // DefaultTemplateVersion freezes the current compatible interpretation assets
@@ -44,7 +42,6 @@ func FromOutcomeRecord(record *domainoutcome.Record) (interpinput.Interpretation
 		Runtime: interpinput.RuntimeIdentity{
 			AlgorithmFamily: record.Runtime().AlgorithmFamily,
 			DecisionKind:    record.Runtime().DecisionKind,
-			PayloadFormat:   record.Runtime().PayloadFormat,
 		},
 		Result: interpinput.ResultFacts{Primary: primary(execution), Level: level(execution)},
 		Report: interpinput.ReportSpec{
@@ -52,11 +49,8 @@ func FromOutcomeRecord(record *domainoutcome.Record) (interpinput.Interpretation
 			Algorithm: modelcatalog.Algorithm(model.Algorithm), ProductChannel: modelcatalog.ProductChannel(model.ProductChannel),
 		},
 	}
-	if in.Runtime.AlgorithmFamily == "" {
-		in.Runtime.AlgorithmFamily, _ = modelcatalog.AlgorithmFamilyFromIdentity(modelcatalog.Kind(model.Kind), modelcatalog.SubKind(model.SubKind), modelcatalog.Algorithm(model.Algorithm))
-	}
-	if in.Runtime.DecisionKind == "" {
-		in.Runtime.DecisionKind = policy.DefaultDecisionKind(in.Runtime.AlgorithmFamily)
+	if in.Runtime.AlgorithmFamily == "" || in.Runtime.DecisionKind == "" {
+		return interpinput.InterpretationInput{}, fmt.Errorf("evaluation outcome runtime identity is incomplete")
 	}
 	in.Report.ReportProfile = policy.ReportProfileForDecisionKind(in.Runtime.DecisionKind)
 	if codes, ok := evaluationinput.FactorScoreVisibleCodesFromSnapshot(assets); ok {
@@ -79,10 +73,9 @@ func FromOutcomeRecord(record *domainoutcome.Record) (interpinput.Interpretation
 		if err := populateTypologyFacts(&in, execution, assets); err != nil {
 			return interpinput.InterpretationInput{}, err
 		}
-		payload, _ := evaluationinput.TypologyPayload(assets)
-		routing, err := modeltypology.ResolveTypologyReportRouting(payload)
-		if err != nil {
-			return interpinput.InterpretationInput{}, err
+		routing, ok := evaluationinput.TypologyReportRoutingFromSnapshot(assets)
+		if !ok {
+			return interpinput.InterpretationInput{}, fmt.Errorf("report input typology routing is required")
 		}
 		in.Report.TemplateID = routing.TemplateID
 		in.Report.AdapterKey = string(routing.AdapterKey)
@@ -95,18 +88,9 @@ func FromOutcomeRecord(record *domainoutcome.Record) (interpinput.Interpretation
 
 func modelIdentityFromRecord(record *domainoutcome.Record) report.ModelIdentity {
 	model := record.Model()
-	algorithm := model.Algorithm
-	if algorithm == "" {
-		switch model.Kind {
-		case modelcatalog.KindScale:
-			algorithm = modelcatalog.AlgorithmScaleDefault
-		case modelcatalog.KindTypology:
-			algorithm = modelcatalog.AlgorithmPersonalityTypology
-		}
-	}
 	return report.ModelIdentity{
-		Kind: string(model.Kind), SubKind: string(model.SubKind), Algorithm: string(algorithm), Code: model.Code, Version: model.Version, Title: model.Title,
+		Kind: string(model.Kind), SubKind: string(model.SubKind), Algorithm: string(model.Algorithm), Code: model.Code, Version: model.Version, Title: model.Title,
 		ProductChannel:  string(modelcatalog.DefaultProductChannelFor(model.Kind)),
-		AlgorithmFamily: binding.AlgorithmFamilyStringFromIdentity(model.Kind, model.SubKind, algorithm),
+		AlgorithmFamily: string(record.Runtime().AlgorithmFamily),
 	}
 }

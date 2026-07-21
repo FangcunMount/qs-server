@@ -742,7 +742,7 @@ level_label = 中度风险或相应显示结论
 - Outcome ID；
 - org、Assessment、testee、EvaluationRun 身份；
 - 精确模型 Kind/SubKind/Algorithm/code/version；
-- `AlgorithmFamily`、`DecisionKind`、`PayloadFormat`；
+- `AlgorithmFamily`、`DecisionKind`；
 - 输入快照引用；
 - `ReportInput`；
 - 版本化 Outcome payload；

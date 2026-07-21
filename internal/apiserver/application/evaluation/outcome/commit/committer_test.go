@@ -3,6 +3,7 @@ package commit
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +15,10 @@ import (
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -147,13 +152,14 @@ func TestCommitPersistsEvaluationFactsAndEventInOneTransaction(t *testing.T) {
 	if err := run.Start(time.Unix(100, 0)); err != nil {
 		t.Fatal(err)
 	}
-	if err := run.AttachInputSnapshot("model:SCALE-1@1.0.0"); err != nil {
+	if err := run.AttachInputSnapshot("isn:v2:" + strings.Repeat("a", 64)); err != nil {
 		t.Fatal(err)
 	}
 	evaluatedAt := time.Unix(200, 0)
 
 	record, err := c.Commit(context.Background(), CommitRequest{
 		Assessment:    a,
+		Input:         commitTestInput(),
 		Execution:     execution,
 		DescriptorKey: evalpipeline.DescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
 		Run:           &run,
@@ -257,9 +263,13 @@ func TestCommitFailureDoesNotPublishPreparedTerminalStateToCaller(t *testing.T) 
 			if err := run.Start(time.Unix(100, 0)); err != nil {
 				t.Fatal(err)
 			}
+			if err := run.AttachInputSnapshot("isn:v2:" + strings.Repeat("b", 64)); err != nil {
+				t.Fatal(err)
+			}
 
 			_, err := c.Commit(context.Background(), CommitRequest{
 				Assessment:    a,
+				Input:         commitTestInput(),
 				Execution:     execution,
 				DescriptorKey: evalpipeline.DescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
 				Run:           &run,
@@ -278,6 +288,25 @@ func TestCommitFailureDoesNotPublishPreparedTerminalStateToCaller(t *testing.T) 
 				t.Fatalf("caller assessment events were polluted: %#v", a.Events())
 			}
 		})
+	}
+}
+
+func commitTestInput() *evaluationinput.InputSnapshot {
+	def := &modeldefinition.Definition{
+		Measure: modeldefinition.MeasureSpec{
+			Factors: []factor.Factor{{Code: "total", Title: "总分", Role: factor.FactorRoleTotal}},
+		},
+		InterpretationAssets: interpretationassets.Assets{
+			Outcomes: []interpretationassets.OutcomePresentation{{OutcomeCode: "high", Title: "高风险"}},
+		},
+	}
+	return &evaluationinput.InputSnapshot{
+		Model: &evaluationinput.ModelSnapshot{
+			Kind: evaluationinput.EvaluationModelKindScale, Algorithm: string(modelcatalog.AlgorithmScaleDefault),
+			AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorScoring), DecisionKind: string(modelcatalog.DecisionKindScoreRange),
+			Code: "SCALE-1", Version: "1.0.0",
+		},
+		DefinitionV2: def,
 	}
 }
 

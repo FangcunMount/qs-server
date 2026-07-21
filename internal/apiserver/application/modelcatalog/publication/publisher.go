@@ -37,16 +37,10 @@ func (p Publisher) BuildSnapshot(ctx context.Context, model *domain.AssessmentMo
 	if err != nil {
 		return nil, err
 	}
-	// 构建评估模型快照负载
-	result, err := handler.BuildSnapshotPayload(ctx, model)
+	result, err := handler.MaterializeSnapshot(ctx, model)
 	if err != nil {
 		return nil, err
 	}
-	runtime, err := domain.ResolveRuntimeIdentity(result.Kind, result.SubKind, result.Algorithm, result.DecisionKind, result.PayloadFormat)
-	if err != nil {
-		return nil, fmt.Errorf("freeze runtime identity: %w", err)
-	}
-	result.AlgorithmFamily = runtime.AlgorithmFamily
 	// 创建评估模型快照
 	return snapshotFromModel(model, result), nil
 }
@@ -82,7 +76,7 @@ func (p Publisher) Publish(ctx context.Context, model *domain.AssessmentModel, o
 	}
 	now := p.now()
 	if model.IsPublished() {
-		// Allow callers to pre-mark the draft model after legacy-compatible validation.
+		// Allow callers to pre-mark the draft model after canonical validation.
 	} else if err := model.MarkPublished(now); err != nil {
 		return nil, err
 	}
@@ -91,14 +85,11 @@ func (p Publisher) Publish(ctx context.Context, model *domain.AssessmentModel, o
 		return nil, err
 	}
 	if model.DefinitionV2 != nil {
-		if issues := AuditSnapshotProjection(ctx, model, handler, snapshot); domain.HasValidationErrors(issues) {
-			return nil, definition.NewValidationError(issues)
-		}
 		defHash, hashErr := modeldefinition.CanonicalContentHash(model.DefinitionV2)
 		if hashErr != nil {
 			return nil, fmt.Errorf("compute definition content hash: %w", hashErr)
 		}
-		port.AttachProjectionHashes(snapshot, defHash, modeldefinition.PayloadProjectionHash(snapshot.Payload))
+		port.AttachDefinitionHash(snapshot, defHash)
 	}
 	if err := p.Repo.Save(ctx, snapshot); err != nil {
 		return nil, err
@@ -121,14 +112,13 @@ func (p Publisher) now() time.Time {
 }
 
 // snapshotFromModel 从模型和结果创建评估模型快照
-func snapshotFromModel(model *domain.AssessmentModel, result definition.SnapshotBuildResult) *port.AssessmentSnapshot {
+func snapshotFromModel(model *domain.AssessmentModel, result definition.Materialization) *port.AssessmentSnapshot {
 	version := modelVersionString(model)
 	if result.Version != "" {
 		version = result.Version
 	}
 	snapshot := &port.AssessmentSnapshot{
 		SchemaVersion:        domain.SchemaVersionV2,
-		PayloadFormat:        result.PayloadFormat,
 		ProductChannel:       domain.ResolveProductChannel(model.Kind, model.ProductChannel),
 		Kind:                 result.Kind,
 		SubKind:              result.SubKind,
@@ -148,7 +138,6 @@ func snapshotFromModel(model *domain.AssessmentModel, result definition.Snapshot
 		QuestionnaireCode:    model.Binding.QuestionnaireCode,
 		QuestionnaireVersion: model.Binding.QuestionnaireVersion,
 		Source:               map[string]any{},
-		Payload:              result.Payload,
 		DefinitionV2:         model.DefinitionV2,
 	}
 	return snapshot

@@ -23,11 +23,3 @@ func (s ScoringStrategy) String() string { return string(s) }
 type ScoringParams struct {
 	CntOptionContents []string
 }
-
-// OptionScoring controls how option values are interpreted for question sources.
-type OptionScoring string
-
-const (
-	OptionScoringStrict OptionScoring = "strict"
-	OptionScoringCompat OptionScoring = "compat"
-)

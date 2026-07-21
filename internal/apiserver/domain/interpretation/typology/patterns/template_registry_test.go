@@ -7,15 +7,15 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology/patterns"
 )
 
-func TestPersonalityTypeTemplateForSpec_EmptyFallsBackToAdapter(t *testing.T) {
+func TestPersonalityTypeTemplateForSpec_EmptyUsesGenericTemplate(t *testing.T) {
 	t.Parallel()
 
-	tmpl, err := patterns.PersonalityTypeTemplateForSpec(patterns.ReportSpec{AdapterKey: patterns.ReportAdapterMBTI})
+	tmpl, err := patterns.PersonalityTypeTemplateForSpec(patterns.ReportSpec{AdapterKey: patterns.ReportAdapterPersonalityType})
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}
-	if tmpl.Kind != "mbti" {
-		t.Fatalf("Kind = %q, want mbti", tmpl.Kind)
+	if tmpl.Kind != "" {
+		t.Fatalf("Kind = %q, want generic", tmpl.Kind)
 	}
 }
 
@@ -34,7 +34,7 @@ func TestPersonalityTypeTemplateForSpec_KnownTemplateID(t *testing.T) {
 func TestPersonalityTypeTemplateForSpec_UnknownTemplateID(t *testing.T) {
 	t.Parallel()
 
-	_, err := patterns.PersonalityTypeTemplateForSpec(patterns.ReportSpec{TemplateID: "not-registered", AdapterKey: patterns.ReportAdapterMBTI})
+	_, err := patterns.PersonalityTypeTemplateForSpec(patterns.ReportSpec{TemplateID: "not-registered", AdapterKey: patterns.ReportAdapterPersonalityType})
 	if !errors.Is(err, patterns.ErrUnknownTemplateID) {
 		t.Fatalf("err = %v, want ErrUnknownTemplateID", err)
 	}
@@ -43,7 +43,7 @@ func TestPersonalityTypeTemplateForSpec_UnknownTemplateID(t *testing.T) {
 func TestTraitProfileTemplateForSpec_UnknownTemplateID(t *testing.T) {
 	t.Parallel()
 
-	_, err := patterns.TraitProfileTemplateForSpec(patterns.ReportSpec{TemplateID: "mbti", AdapterKey: patterns.ReportAdapterBigFive})
+	_, err := patterns.TraitProfileTemplateForSpec(patterns.ReportSpec{TemplateID: "mbti", AdapterKey: patterns.ReportAdapterTraitProfile})
 	if !errors.Is(err, patterns.ErrUnknownTemplateID) {
 		t.Fatalf("err = %v, want ErrUnknownTemplateID", err)
 	}

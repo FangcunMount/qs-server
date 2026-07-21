@@ -49,13 +49,9 @@ func (s TypologyPreviewService) PreviewReport(ctx context.Context, model *domain
 	if issues := validateTypologyPreviewAnswers(input.Answers, questionnaire); len(issues) > 0 {
 		return nil, NewValidationError(issues)
 	}
-	built, err := (CompatibilityPayloadProjector{}).ProjectTypology(model)
+	payload, err := (RuntimeMaterializer{}).MaterializeTypologyRuntime(model, string(domain.ModelStatusPublished))
 	if err != nil {
 		return nil, err
-	}
-	var payload modeltypology.Payload
-	if err := json.Unmarshal(built.Payload, &payload); err != nil {
-		return nil, previewInvalid("模型定义 payload 格式无效")
 	}
 	if s.ReportPreviewer == nil {
 		return nil, errors.WithCode(code.ErrInternalServerError, "报告预览服务未配置")
@@ -63,7 +59,7 @@ func (s TypologyPreviewService) PreviewReport(ctx context.Context, model *domain
 	result, err := s.ReportPreviewer.PreviewReport(ctx, modelpreview.Request{
 		SubKind: model.SubKind, Algorithm: model.Algorithm, Code: model.Code, Version: modelRevisionVersion(model), Title: model.Title,
 		QuestionnaireCode: model.Binding.QuestionnaireCode, QuestionnaireVersion: model.Binding.QuestionnaireVersion,
-		Input: typologyPreviewExecutionInput(model, questionnaire, &payload, input.Answers),
+		Input: typologyPreviewExecutionInput(model, questionnaire, payload, input.Answers),
 	})
 	if err != nil {
 		return nil, err

@@ -31,10 +31,10 @@ func TestResolveExecutionIdentityPrefersInputAlgorithmWhenAssessmentMissingIt(t 
 	}
 	input := &evaluationinput.InputSnapshot{
 		Model: evaluationinput.NewTypologyModelSnapshot(&modeltypology.Payload{
-			Code: "BIG5_IPIP_50", Version: "1.0.0", Algorithm: modelcatalog.AlgorithmBigFive, Status: "published",
+			Code: "BIG5_IPIP_50", Version: "1.0.0", Algorithm: modelcatalog.AlgorithmPersonalityTypology, Status: "published",
 		}),
 	}
-	if got := resolveExecutionIdentity(a, input); got != evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmBigFive) {
-		t.Fatalf("resolveExecutionIdentity() = %s, want %s", got, evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmBigFive))
+	if got := resolveExecutionIdentity(a, input); got != evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmPersonalityTypology) {
+		t.Fatalf("resolveExecutionIdentity() = %s, want %s", got, evaluation.PersonalityTypologyIdentity(modelcatalog.AlgorithmPersonalityTypology))
 	}
 }

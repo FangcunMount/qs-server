@@ -56,7 +56,6 @@ func TestDraftMapperLeavesCanonicalProductChannelUntouched(t *testing.T) {
 func TestPublishedMapperRoundTripProductChannel(t *testing.T) {
 	original := &port.PublishedModel{
 		SchemaVersion:  domain.SchemaVersionV2,
-		PayloadFormat:  domain.PayloadFormatBehavioralRatingBrief2V1,
 		ProductChannel: domain.ProductChannelMedicalScale,
 		Kind:           domain.KindBehavioralRating,
 		Algorithm:      domain.AlgorithmBrief2,
@@ -65,7 +64,6 @@ func TestPublishedMapperRoundTripProductChannel(t *testing.T) {
 		Title:          "BRIEF-2",
 		Status:         "published",
 		DecisionKind:   domain.DecisionKindNormLookup,
-		Payload:        []byte(`{}`),
 	}
 
 	mapper := NewMapper()
@@ -84,13 +82,12 @@ func TestPublishedMapperDerivesMissingProductChannel(t *testing.T) {
 		RecordRole:     recordRolePublishedSnapshot,
 		Kind:           string(domain.KindTypology),
 		SubKind:        string(domain.SubKindTypology),
-		Algorithm:      string(domain.AlgorithmMBTI),
+		Algorithm:      string(domain.AlgorithmPersonalityTypology),
 		Code:           "mbti",
 		ReleaseVersion: "v1",
 		Title:          "MBTI",
 		Status:         "published",
 		DecisionKind:   string(domain.DecisionKindPoleComposition),
-		Payload:        []byte(`{}`),
 	}
 	got := NewMapper().ToPublished(po)
 	if got.ProductChannel != domain.ProductChannelTypology {
@@ -109,7 +106,6 @@ func TestPublishedMapperLeavesCanonicalProductChannelUntouched(t *testing.T) {
 		Title:          "SPM",
 		Status:         "published",
 		DecisionKind:   string(domain.DecisionKindAbilityLevel),
-		Payload:        []byte(`{}`),
 	}
 	got := NewMapper().ToPublished(po)
 	if got.ProductChannel != domain.ProductChannelBehaviorAbility {

@@ -129,7 +129,7 @@ func TestApplyAssessmentOutcomeV2FieldsKeepsTypologyLevelWhenRiskIsNone(t *testi
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
 		assessment.EvaluationModelKindTypology,
 		modelcatalog.SubKindTypology,
-		modelcatalog.AlgorithmMBTI,
+		modelcatalog.AlgorithmPersonalityTypology,
 		meta.ID(0),
 		meta.NewCode("MBTI-16P"),
 		"1.0.0",
@@ -167,8 +167,8 @@ func TestApplyAssessmentOutcomeV2FieldsKeepsTypologyLevelWhenRiskIsNone(t *testi
 	if po.Severity == nil || *po.Severity != "none" {
 		t.Fatalf("severity = %v, want none", po.Severity)
 	}
-	if po.EvaluationModelAlgorithm == nil || *po.EvaluationModelAlgorithm != "mbti" {
-		t.Fatalf("algorithm = %v, want mbti", po.EvaluationModelAlgorithm)
+	if po.EvaluationModelAlgorithm == nil || *po.EvaluationModelAlgorithm != string(modelcatalog.AlgorithmPersonalityTypology) {
+		t.Fatalf("algorithm = %v, want %s", po.EvaluationModelAlgorithm, modelcatalog.AlgorithmPersonalityTypology)
 	}
 }
 

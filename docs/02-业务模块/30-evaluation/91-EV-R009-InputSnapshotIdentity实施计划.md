@@ -1,6 +1,6 @@
-# EV-R009：可验证 InputSnapshotIdentity 实施计划
+# EV-R009：可验证 InputSnapshotIdentity 实施说明
 
-> 独立于 EV-R008；本文件是下一编码批次的有界计划。状态：已实施（2026-07-21，见台账 EV-R009「实施结果」）。
+> 状态：已实施（2026-07-21）。当前系统只接受 `isn:v2`；本文不定义任何旧身份兼容路径。
 
 ## 目标
 
@@ -21,15 +21,17 @@ InputSnapshotIdentity
   model_code / model_version / model_digest
   questionnaire_code / questionnaire_version / questionnaire_digest
   answersheet_id / answersheet_digest
+  algorithm_family / decision_kind
+  definition_v2_digest
   norm_table / norm_version / norm_band          (optional)
-  subject_digest                                (optional)
+  subject_digest                                (显式编码年龄是否存在、年龄值和性别)
   composite_digest                              (hash over canonical field order)
 ```
 
 对外仍写单一字符串，建议：
 
 ```text
-isn:v1:<composite_digest>
+isn:v2:<64-hex-composite-digest>
 ```
 
 长度控制在 `input_snapshot_ref` VARCHAR(200) 内。
@@ -38,7 +40,9 @@ isn:v1:<composite_digest>
 
 - Claim / 物化成功后：由 [`input_snapshot_ref.go`](../../../internal/apiserver/application/evaluation/execute/input_snapshot_ref.go) 生成 identity，写入 EvaluationRun。
 - Outcome commit：复制同一 ref，禁止二次物化后静默改写。
-- 重试：重新物化后与原 Run ref 比对；不一致 → validation/terminal（沿用 R004 taxonomy）。
+- automatic、manual 和 lease recovery：重新物化后必须与上一 attempt 的 v2 ref 完全一致；不一致即 validation/terminal。
+- force：只允许 `isn:v2` → `isn:v2` 修订，并记录 previous/current ref、action request ID 和 attempt origin。
+- 任意 v1、可读 label、畸形 v2 ref 均拒绝执行；运营侧删除旧 Assessment 后重建。
 
 ### 3. 稳定序列化
 
@@ -51,16 +55,18 @@ isn:v1:<composite_digest>
 - 任一成分变化 → 不同 ref。
 - Run 与 Outcome 同 ref。
 - 重试校验失败可观测。
-- 旧 `model:` / `answersheet:` ref 读路径兼容，新写入只用 `isn:v1:`。
+- 只有严格的 `isn:v2:<64-hex>` 可执行。
+- 普通重试发生输入漂移时终态失败。
+- force 修订保留完整审计证据；旧 ref 即使 force 也拒绝。
 
 ## 实施顺序
 
 1. Domain/port 定义 `InputSnapshotIdentity` + canonical digest helper + 单测。
-2. 替换 `inputSnapshotRefFromResolvedInput`；表征测试保护旧 fixture 读。
-3. Engine/Worker 重试校验钩子。
-4. 更新台账 EV-R009 → 已实现待验收。
+2. `inputSnapshotRefFromResolvedInput` 只生成 v2，无法生成时 fail closed。
+3. Engine/Worker 对普通重试做同一性校验，对 force 做 v2 修订审计。
+4. 架构 ratchet 禁止 v1 生成器、识别逻辑和 label fallback 回归。
 
 ## 依赖
 
-- EV-R008 已收口 CompatibilityResolver（已完成编码）。
+- EV-R008 已删除 CompatibilityResolver；InputSnapshot 必须携带冻结的 DefinitionV2 与精确运行身份。
 - 不依赖 R010/R012 生产证据。

@@ -14,8 +14,6 @@ import (
 type PublicationComposerOptions struct {
 	NormRepo                  port.NormRepository
 	QuestionnaireQuery        questionnaireapp.QuestionnaireQueryService
-	RequireLegacyDefinition   bool
-	LegacyDefinitionMessage   string
 	IncludeBehavioralSemantic bool
 	IncludeAlgorithmBinding   bool
 	// StrategyCapabilityPath enables MC-R014 Scoring.Strategy checks against the
@@ -38,16 +36,6 @@ func ComposePublishValidation(
 ) []domain.DomainValidationIssue {
 	if model == nil {
 		return []domain.DomainValidationIssue{modelRequiredIssue()}
-	}
-	if opts.RequireLegacyDefinition && model.Definition.IsEmpty() {
-		message := opts.LegacyDefinitionMessage
-		if message == "" {
-			message = "模型定义不能为空"
-		}
-		return []domain.DomainValidationIssue{{
-			Field: "definition", Message: message,
-			Code: "definition.required", Level: domain.ValidationLevelError,
-		}}
 	}
 	issues := model.ValidateForPublish().Issues
 	issues = append(issues, ValidateDefinitionForPublish(ctx, model, opts.NormRepo)...)

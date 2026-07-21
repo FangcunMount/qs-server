@@ -67,7 +67,7 @@ func FamilyFromIdentity(identity Identity) (Family, bool) {
 // AlgorithmFamilyFromDecisionKind 映射 published 判定策略到执行家族。
 func AlgorithmFamilyFromDecisionKind(decision DecisionKind) (AlgorithmFamily, bool) {
 	switch decision {
-	case DecisionKindScoreRange, DecisionKindScoreRangeInterpretation:
+	case DecisionKindScoreRange:
 		return AlgorithmFamilyFactorScoring, true
 	case DecisionKindPoleComposition, DecisionKindTraitProfile, DecisionKindNearestPattern, DecisionKindDominantFactor:
 		return AlgorithmFamilyFactorClassification, true

@@ -55,30 +55,6 @@ func TestValidateAlgorithmBindingRejectsEmptyCognitiveAlgorithm(t *testing.T) {
 	}
 }
 
-func TestValidateAlgorithmBindingRejectsLegacyTypologyAlias(t *testing.T) {
-	t.Parallel()
-	model := &domain.AssessmentModel{
-		Kind: domain.KindTypology, SubKind: domain.SubKindTypology, Algorithm: domain.AlgorithmMBTI,
-		DefinitionV2: &modeldefinition.Definition{},
-	}
-	issues := ValidateAlgorithmBinding(model)
-	if !hasIssueCode(issues, "algorithm.publish.legacy_alias") {
-		t.Fatalf("issues = %#v, want algorithm.publish.legacy_alias", issues)
-	}
-}
-
-func TestValidateAlgorithmBindingRejectsBehavioralDefault(t *testing.T) {
-	t.Parallel()
-	model := &domain.AssessmentModel{
-		Kind: domain.KindBehavioralRating, Algorithm: domain.AlgorithmBehavioralRatingDefault,
-		DefinitionV2: &modeldefinition.Definition{},
-	}
-	issues := ValidateAlgorithmBinding(model)
-	if !hasIssueCode(issues, "behavioral_rating.algorithm.required") {
-		t.Fatalf("issues = %#v, want behavioral_rating.algorithm.required", issues)
-	}
-}
-
 func TestValidateAlgorithmBindingAcceptsPersonalityTypology(t *testing.T) {
 	t.Parallel()
 	model := &domain.AssessmentModel{

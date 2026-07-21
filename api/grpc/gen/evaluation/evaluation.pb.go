@@ -33,7 +33,6 @@ type ModelIdentity struct {
 	AlgorithmFamily string                 `protobuf:"bytes,8,opt,name=algorithm_family,json=algorithmFamily,proto3" json:"algorithm_family,omitempty"`
 	// Publish-time frozen RuntimeIdentity fields (MC-R006).
 	DecisionKind  string `protobuf:"bytes,9,opt,name=decision_kind,json=decisionKind,proto3" json:"decision_kind,omitempty"`
-	PayloadFormat string `protobuf:"bytes,10,opt,name=payload_format,json=payloadFormat,proto3" json:"payload_format,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -127,13 +126,6 @@ func (x *ModelIdentity) GetAlgorithmFamily() string {
 func (x *ModelIdentity) GetDecisionKind() string {
 	if x != nil {
 		return x.DecisionKind
-	}
-	return ""
-}
-
-func (x *ModelIdentity) GetPayloadFormat() string {
-	if x != nil {
-		return x.PayloadFormat
 	}
 	return ""
 }
@@ -2008,7 +2000,7 @@ var File_evaluation_evaluation_proto protoreflect.FileDescriptor
 const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\n" +
 	"\x1bevaluation/evaluation.proto\x12\n" +
-	"evaluation\"\xc0\x02\n" +
+	"evaluation\"\xaf\x02\n" +
 	"\rModelIdentity\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x19\n" +
 	"\bsub_kind\x18\x02 \x01(\tR\asubKind\x12\x1c\n" +
@@ -2018,9 +2010,8 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\x05title\x18\x06 \x01(\tR\x05title\x12'\n" +
 	"\x0fproduct_channel\x18\a \x01(\tR\x0eproductChannel\x12)\n" +
 	"\x10algorithm_family\x18\b \x01(\tR\x0falgorithmFamily\x12#\n" +
-	"\rdecision_kind\x18\t \x01(\tR\fdecisionKind\x12%\n" +
-	"\x0epayload_format\x18\n" +
-	" \x01(\tR\rpayloadFormat\"k\n" +
+	"\rdecision_kind\x18\t \x01(\tR\fdecisionKindJ\x04\b\n" +
+	"\x10\vR\x0epayload_format\"k\n" +
 	"\n" +
 	"ScoreValue\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x14\n" +

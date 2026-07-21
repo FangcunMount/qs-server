@@ -209,7 +209,11 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, inputResolveFailureReason(err), runFailureFromInputResolveError(err), err)
 	}
 
-	if ref := inputSnapshotRefForAttempt(a, input, previousInputSnapshotRef, evaluationRun.Origin()); ref != "" {
+	ref, refErr := inputSnapshotRefFromResolvedInput(input)
+	if refErr != nil {
+		return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, "评估输入快照无效: "+refErr.Error(), evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: refErr.Error()}, refErr)
+	}
+	if ref != "" {
 		// EV-R009: a retry must execute against the same verified input as the
 		// previous attempt; drift is a terminal validation failure, not a
 		// silent recompute over different data.

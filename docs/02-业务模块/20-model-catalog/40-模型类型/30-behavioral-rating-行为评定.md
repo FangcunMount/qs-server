@@ -52,9 +52,8 @@ behavioral_rating
 | ProductChannel | `behavior_ability` |
 | AlgorithmFamily | `factor_norm` |
 | ExecutionPath | `behavioral_rating_descriptor` |
-| Algorithms | `brief2`、`spm_sensory`；另有兼容 default |
-| PayloadFormat | 新发布统一 `assessmentmodel.behavioral_rating.default.v1` |
-| DecisionKind | 目标固定 `norm_lookup` |
+| Algorithms | `brief2`、`spm_sensory` |
+| DecisionKind | `norm_lookup` |
 
 ---
 

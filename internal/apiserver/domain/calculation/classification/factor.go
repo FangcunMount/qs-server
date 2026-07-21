@@ -20,18 +20,7 @@ const (
 	AggregationWeightedAvg AggregationMethod = "weighted_avg"
 )
 
-// OptionScoringPolicy 控制如何选项-mapped answers 是 scored。
-type OptionScoringPolicy string
-
-const (
-	// OptionScoringStrict requires known 选项键 in 选项cores。
-	OptionScoringStrict OptionScoringPolicy = "strict"
-	// OptionScoringCompat falls back 到 answer.Score when 选项键 是 unknown。
-	OptionScoringCompat OptionScoringPolicy = "compat"
-)
-
 // QuestionScoringMode selects the source of a question contribution's base score.
-// The empty value is reserved for published legacy snapshots.
 type QuestionScoringMode string
 
 const (
@@ -52,7 +41,6 @@ type AnswerContribution struct {
 type LeafScoringSpec struct {
 	Constant      float64
 	Contributions []AnswerContribution
-	OptionScoring OptionScoringPolicy
 }
 
 // PersonalityFactor 是node in 因子 层级。

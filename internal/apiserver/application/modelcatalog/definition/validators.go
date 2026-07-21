@@ -79,16 +79,6 @@ func validatePublishAlgorithmPolicy(model *domain.AssessmentModel) []domain.Doma
 			Message: publishAlgorithmRequiredMessage(model.Kind), Level: domain.ValidationLevelError,
 		}}
 	default:
-		if domain.IsRetainedReadAliasAlgorithm(model.Algorithm) {
-			code := "algorithm.publish.legacy_alias"
-			if model.Kind == domain.KindBehavioralRating {
-				code = "behavioral_rating.algorithm.required"
-			}
-			return []domain.DomainValidationIssue{{
-				Field: "algorithm", Code: code,
-				Message: publishLegacyAlgorithmMessage(model.Kind, model.Algorithm), Level: domain.ValidationLevelError,
-			}}
-		}
 		return []domain.DomainValidationIssue{{
 			Field: "algorithm", Code: "algorithm.publish.unsupported",
 			Message: fmt.Sprintf("algorithm %q is not supported for publish on kind %s", model.Algorithm, model.Kind),
@@ -109,20 +99,6 @@ func publishAlgorithmRequiredMessage(kind domain.Kind) string {
 		return "scale 发布必须指定 Algorithm（scale_default）"
 	default:
 		return "algorithm is required for publish"
-	}
-}
-
-func publishLegacyAlgorithmMessage(kind domain.Kind, algorithm domain.Algorithm) string {
-	switch kind {
-	case domain.KindTypology:
-		return fmt.Sprintf("新发布不允许 legacy typology algorithm %q；请使用 personality_typology", algorithm)
-	case domain.KindBehavioralRating:
-		if algorithm == domain.AlgorithmBehavioralRatingDefault {
-			return "新发布不允许 behavioral_rating_default；请使用 brief2 或 spm_sensory"
-		}
-		return fmt.Sprintf("behavioral_rating algorithm %q 不受支持；请使用 brief2 或 spm_sensory", algorithm)
-	default:
-		return fmt.Sprintf("新发布不允许 retained-read algorithm %q", algorithm)
 	}
 }
 

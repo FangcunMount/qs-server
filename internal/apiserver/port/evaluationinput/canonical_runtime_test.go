@@ -3,11 +3,8 @@ package evaluationinput_test
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	cognitivepayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
@@ -31,30 +28,11 @@ func TestAbilityConclusionsFromSnapshotPrefersDefinition(t *testing.T) {
 	}
 }
 
-func TestTryUpgradeReportInputToV3WithDefinitionFromLegacyPayloadOnly(t *testing.T) {
+func TestCognitiveExecutionSnapshotRejectsPayloadOnlyInput(t *testing.T) {
 	t.Parallel()
-	raw, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
-		Payload: evaluationinput.ScaleModelPayload{Scale: &scalesnapshot.ScaleSnapshot{
-			Code: "PHQ9", Factors: []scalesnapshot.FactorSnapshot{{Code: "TOTAL", IsTotalScore: true}},
-		}},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	def := &modeldefinition.Definition{
-		Measure: modeldefinition.MeasureSpec{
-			Factors: []factor.Factor{{Code: "TOTAL", Title: "总分", Role: factor.FactorRoleTotal}},
-		},
-		Outcomes: []conclusion.Outcome{{Code: "low", Summary: "偏低"}},
-	}
-	modeldefinition.MaterializeLayers(def)
-	modelRef := evaluationinput.ModelRef{Kind: evaluationinput.EvaluationModelKindScale, Code: "PHQ9", Version: "v1"}
-	upgrade, err := evaluationinput.TryUpgradeReportInputToV3WithDefinition(raw, modelRef, modelcatalog.AlgorithmFamilyFactorScoring, def)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if upgrade.Skipped != "" || upgrade.ToSchema != evaluationinput.ReportInputSchemaV3 {
-		t.Fatalf("upgrade = %#v", upgrade)
+	input := &evaluationinput.InputSnapshot{ModelPayload: evaluationinput.CognitiveModelPayload{Snapshot: &cognitivepayload.Snapshot{}}}
+	if _, ok := evaluationinput.CognitiveExecutionSnapshot(input); ok {
+		t.Fatal("payload-only cognitive input was accepted")
 	}
 }
 
@@ -63,20 +41,19 @@ func TestAuditRuntimeInputSourceDetectsCompatFallback(t *testing.T) {
 	issues := evaluationinput.AuditRuntimeInputSource(&evaluationinput.InputSnapshot{
 		ModelPayload: evaluationinput.ScaleModelPayload{Scale: &scalesnapshot.ScaleSnapshot{Code: "PHQ9"}},
 	})
-	if len(issues) == 0 || issues[0].Code != "runtime.compat_payload_only" {
+	if len(issues) == 0 || issues[len(issues)-1].Code != "runtime.definition_v2_missing" {
 		t.Fatalf("issues = %#v", issues)
 	}
 }
 
-func TestAuditLegacyIdentityFlagsRetainedAlgorithm(t *testing.T) {
+func TestAuditInputIdentityFlagsUnsupportedAlgorithm(t *testing.T) {
 	t.Parallel()
-	issues := evaluationinput.AuditLegacyIdentity(&evaluationinput.InputSnapshot{
+	issues := evaluationinput.AuditInputIdentity(&evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
-			Kind: evaluationinput.EvaluationModelKindTypology, Algorithm: string(modelcatalog.AlgorithmMBTI),
+			Kind: evaluationinput.EvaluationModelKindTypology, Algorithm: "unsupported",
 		},
 	})
 	if len(issues) == 0 || issues[0].Code != "identity.algorithm.unknown" {
 		t.Fatalf("issues = %#v", issues)
 	}
-	_ = interpretationassets.Assets{}
 }

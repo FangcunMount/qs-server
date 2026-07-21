@@ -3,7 +3,6 @@ package commit
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -93,24 +92,18 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 	if err != nil {
 		return nil, fmt.Errorf("marshal canonical evaluation outcome: %w", err)
 	}
-	var reportInput json.RawMessage
-	if request.Input != nil && evaluationinput.HasReportInputFreezeMaterial(request.Input) {
-		modelRef := evaluationinput.ModelRef{}
-		if request.Execution != nil {
-			modelRef = evaluationinput.ModelRef{
-				Kind:      evaluationinput.EvaluationModelKind(request.Execution.ModelRef.Kind()),
-				SubKind:   string(request.Execution.ModelRef.SubKind()),
-				Algorithm: string(request.Execution.ModelRef.Algorithm()),
-				Code:      request.Execution.ModelRef.Code().String(),
-				Version:   request.Execution.ModelRef.Version(),
-				Title:     request.Execution.ModelRef.Title(),
-			}
-		}
-		opts := evaluationinput.BuildFreezeOptionsFromSnapshot(request.Input, modelRef, request.DescriptorKey.AlgorithmFamily)
-		reportInput, err = evaluationinput.MarshalReportInput(opts)
-		if err != nil {
-			return nil, fmt.Errorf("marshal evaluation report input: %w", err)
-		}
+	modelRef := evaluationinput.ModelRef{
+		Kind:      evaluationinput.EvaluationModelKind(request.Execution.ModelRef.Kind()),
+		SubKind:   string(request.Execution.ModelRef.SubKind()),
+		Algorithm: string(request.Execution.ModelRef.Algorithm()),
+		Code:      request.Execution.ModelRef.Code().String(),
+		Version:   request.Execution.ModelRef.Version(),
+		Title:     request.Execution.ModelRef.Title(),
+	}
+	opts := evaluationinput.BuildFreezeOptionsFromSnapshot(request.Input, modelRef, request.DescriptorKey.AlgorithmFamily)
+	reportInput, err := evaluationinput.MarshalReportInput(opts)
+	if err != nil {
+		return nil, fmt.Errorf("marshal evaluation report input: %w", err)
 	}
 	record, err := domainoutcome.NewRecord(domainoutcome.NewRecordInput{
 		ID:           c.newID(),
@@ -129,7 +122,6 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 		Runtime: domainoutcome.RuntimeIdentity{
 			AlgorithmFamily: request.DescriptorKey.AlgorithmFamily,
 			DecisionKind:    request.DescriptorKey.DecisionKind,
-			PayloadFormat:   request.DescriptorKey.PayloadFormat,
 		},
 		InputSnapshotRef: runToCommit.InputSnapshotRef(),
 		ReportInput:      reportInput,
@@ -200,6 +192,15 @@ func (c *committer) validate(request CommitRequest) error {
 	}
 	if request.Run.AssessmentID() != request.Assessment.ID().Uint64() {
 		return fmt.Errorf("evaluation run assessment does not match outcome assessment")
+	}
+	if request.Input == nil || request.Input.Model == nil || request.Input.DefinitionV2 == nil || !request.Input.Model.HasFrozenRuntime() {
+		return fmt.Errorf("complete definition_v2 evaluation input is required")
+	}
+	if !evaluationinput.IsIdentityRef(request.Run.InputSnapshotRef()) {
+		return fmt.Errorf("evaluation run input snapshot ref must be isn:v2")
+	}
+	if request.DescriptorKey.AlgorithmFamily == "" || request.DescriptorKey.DecisionKind == "" {
+		return fmt.Errorf("evaluation descriptor identity is incomplete")
 	}
 	return nil
 }

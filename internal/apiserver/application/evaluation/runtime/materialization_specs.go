@@ -32,17 +32,31 @@ func materializationOrder() []modelcatalog.ExecutionPath {
 func runtimeDescriptorsFromSpecs(specs []pathMaterialization) ([]evalpipeline.RuntimeDescriptor, error) {
 	descs := make([]evalpipeline.RuntimeDescriptor, 0, len(specs))
 	for _, spec := range specs {
-		decisionKind := evalrouting.DecisionKindForFamily(spec.family)
-		descs = append(descs, evalpipeline.RuntimeDescriptor{
-			Key: evalpipeline.DescriptorKey{
+		for _, decisionKind := range decisionKindsForFamily(spec.family) {
+			descs = append(descs, evalpipeline.RuntimeDescriptor{
+				Key:             evalpipeline.DescriptorKey{AlgorithmFamily: spec.family, DecisionKind: decisionKind},
 				AlgorithmFamily: spec.family,
-			},
-			AlgorithmFamily: spec.family,
-			DecisionKind:    decisionKind,
-			ExecutionPath:   spec.path,
-		})
+				DecisionKind:    decisionKind,
+				ExecutionPath:   spec.path,
+			})
+		}
 	}
 	return descs, nil
+}
+
+func decisionKindsForFamily(family modelcatalog.AlgorithmFamily) []modelcatalog.DecisionKind {
+	if family == modelcatalog.AlgorithmFamilyFactorClassification {
+		return []modelcatalog.DecisionKind{
+			modelcatalog.DecisionKindPoleComposition,
+			modelcatalog.DecisionKindTraitProfile,
+			modelcatalog.DecisionKindNearestPattern,
+			modelcatalog.DecisionKindDominantFactor,
+		}
+	}
+	if decision := evalrouting.DecisionKindForFamily(family); decision != "" {
+		return []modelcatalog.DecisionKind{decision}
+	}
+	return nil
 }
 
 func algorithmFamilyForExecutionPath(path modelcatalog.ExecutionPath) (modelcatalog.AlgorithmFamily, bool) {

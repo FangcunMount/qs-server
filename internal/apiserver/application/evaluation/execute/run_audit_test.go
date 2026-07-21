@@ -9,6 +9,8 @@ import (
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -17,7 +19,17 @@ type modelInputResolver struct {
 }
 
 func (r modelInputResolver) Resolve(_ context.Context, _ evaluationinput.InputRef) (*evaluationinput.InputSnapshot, error) {
-	return &evaluationinput.InputSnapshot{Model: r.model}, nil
+	if r.model != nil && r.model.AlgorithmFamily == "" {
+		r.model.Kind = evaluationinput.EvaluationModelKindScale
+		r.model.Algorithm = string(modelcatalog.AlgorithmScaleDefault)
+		r.model.AlgorithmFamily = string(modelcatalog.AlgorithmFamilyFactorScoring)
+		r.model.DecisionKind = string(modelcatalog.DecisionKindScoreRange)
+	}
+	return &evaluationinput.InputSnapshot{
+		Model: r.model, DefinitionV2: &modeldefinition.Definition{},
+		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-001", Version: "1.0.0"},
+		AnswerSheet:   &evaluationinput.AnswerSheetSnapshot{ID: 8001, QuestionnaireCode: "Q-001", QuestionnaireVersion: "1.0.0"},
+	}, nil
 }
 
 func scaleEvaluatorForAssessment(a *domainAssessment.Assessment) *countingEvaluator {
@@ -77,7 +89,7 @@ func TestEvaluatePersistsInputSnapshotRefBeforeExecuting(t *testing.T) {
 		t.Fatalf("saved runs = %d, want one input snapshot update", len(runRepo.saved))
 	}
 	if got := runRepo.saved[0].InputSnapshotRef(); !evaluationinput.IsIdentityRef(got) {
-		t.Fatalf("saved input_snapshot_ref = %q, want isn:v1 identity ref", got)
+		t.Fatalf("saved input_snapshot_ref = %q, want isn:v2 identity ref", got)
 	}
 }
 
@@ -93,7 +105,7 @@ func TestEvaluateRejectsInputSnapshotDriftAcrossRetries(t *testing.T) {
 		AssessmentID:     a.ID().Uint64(),
 		Attempt:          evalrun.Attempt{Number: 1, Status: evalrun.StatusFailed},
 		Failure:          &evalrun.Failure{Kind: evalrun.FailureKindCalculation, Retryable: true},
-		InputSnapshotRef: "isn:v1:previous-attempt-digest",
+		InputSnapshotRef: "isn:v2:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 	})
 	runRepo := &stubRunRepo{latest: &previous}
 	evaluator := scaleEvaluatorForAssessment(a)
@@ -148,7 +160,7 @@ func TestEvaluateReturnsInputSnapshotPersistenceErrorBeforeExecuting(t *testing.
 		t.Fatalf("saved runs = %d, want failed input snapshot update", len(runRepo.saved))
 	}
 	if got := runRepo.saved[len(runRepo.saved)-1].InputSnapshotRef(); !evaluationinput.IsIdentityRef(got) {
-		t.Fatalf("last saved input_snapshot_ref = %q, want isn:v1 identity ref", got)
+		t.Fatalf("last saved input_snapshot_ref = %q, want isn:v2 identity ref", got)
 	}
 	if got := runRepo.saved[len(runRepo.saved)-1].Attempt().Status; got != evalrun.StatusRunning {
 		t.Fatalf("last saved status = %s, want running", got)

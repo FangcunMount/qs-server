@@ -8,7 +8,7 @@ import (
 )
 
 // DecisionKindForDefinition derives publication routing from canonical model
-// identity and DefinitionV2, never from the legacy payload bytes.
+// identity and DefinitionV2, never from a runtime projection.
 func (m *AssessmentModel) DecisionKindForDefinition() (binding.DecisionKind, error) {
 	if m == nil {
 		return "", fmt.Errorf("assessment model is nil")

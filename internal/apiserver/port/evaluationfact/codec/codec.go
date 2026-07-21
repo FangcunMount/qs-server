@@ -11,38 +11,24 @@ import (
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
 
-const (
-	schemaV1 uint = 1
-	schemaV2 uint = 2
-)
+const currentOutcomeSchema uint = 2
 
 func DecodeExecution(record *evaluationfact.Record) (*evaluationfact.Execution, error) {
 	if record == nil {
 		return nil, fmt.Errorf("evaluation outcome is required")
 	}
 	schema := record.SchemaVersion()
-	if schema != 0 && schema != schemaV1 && schema != schemaV2 {
+	if schema != currentOutcomeSchema {
 		return nil, fmt.Errorf("unsupported evaluation outcome schema version %d", schema)
 	}
-	observeOutcomeSchemaDecode(schema)
-	execution, err := decodeExecution(record.Payload(), record.Model(), record.Runtime(), schema)
+	execution, err := decodeExecution(record.Payload(), record.Model(), record.Runtime())
 	if err != nil {
 		return nil, fmt.Errorf("decode evaluation outcome %s: %w", record.ID(), err)
 	}
 	return execution, nil
 }
 
-// DecodeTransientExecution applies the fact codec to Preview output without
-// manufacturing a committed Evaluation record.
-func DecodeTransientExecution(value any, model evaluationfact.ModelIdentity, runtime evaluationfact.RuntimeIdentity) (*evaluationfact.Execution, error) {
-	payload, err := json.Marshal(value)
-	if err != nil {
-		return nil, fmt.Errorf("encode transient evaluation execution: %w", err)
-	}
-	return decodeExecution(payload, model, runtime, schemaV1)
-}
-
-func decodeExecution(payload []byte, model evaluationfact.ModelIdentity, runtime evaluationfact.RuntimeIdentity, schema uint) (*evaluationfact.Execution, error) {
+func decodeExecution(payload []byte, model evaluationfact.ModelIdentity, runtime evaluationfact.RuntimeIdentity) (*evaluationfact.Execution, error) {
 	var execution evaluationfact.Execution
 	if err := json.Unmarshal(payload, &execution); err != nil {
 		return nil, err
@@ -51,11 +37,7 @@ func decodeExecution(payload []byte, model evaluationfact.ModelIdentity, runtime
 		ModelKind: model.Kind, ModelSubKind: model.SubKind, ModelAlgorithm: model.Algorithm,
 		ModelCode: model.Code, ModelVersion: model.Version, ModelTitle: model.Title,
 	}
-	if schema == schemaV2 {
-		if err := restoreV2TypedDetail(payload, runtime, &execution); err != nil {
-			return nil, err
-		}
-	} else if err := restoreTypedDetail(payload, model, runtime, &execution); err != nil {
+	if err := restoreCurrentTypedDetail(payload, runtime, &execution); err != nil {
 		return nil, err
 	}
 	return &execution, nil
@@ -83,7 +65,7 @@ func ClassificationFactFromPayload(payload any) (ClassificationFact, bool) {
 	return ClassificationFact{}, false
 }
 
-func restoreV2TypedDetail(payload []byte, runtime evaluationfact.RuntimeIdentity, execution *evaluationfact.Execution) error {
+func restoreCurrentTypedDetail(payload []byte, runtime evaluationfact.RuntimeIdentity, execution *evaluationfact.Execution) error {
 	if runtime.AlgorithmFamily != modelcatalog.AlgorithmFamilyFactorClassification {
 		execution.Detail.Payload = nil
 		return nil
@@ -132,62 +114,6 @@ func DecodeReportInput(record *evaluationfact.Record) (*evaluationinput.InputSna
 
 func decodeReportInputError(record *evaluationfact.Record, err error) error {
 	return fmt.Errorf("decode report input %s: %w", record.ID(), err)
-}
-
-func restoreTypedDetail(payload []byte, model evaluationfact.ModelIdentity, runtime evaluationfact.RuntimeIdentity, execution *evaluationfact.Execution) error {
-	var wire struct {
-		Detail struct{ Payload json.RawMessage }
-	}
-	if err := json.Unmarshal(payload, &wire); err != nil || len(wire.Detail.Payload) == 0 || string(wire.Detail.Payload) == "null" {
-		return err
-	}
-	switch runtime.DecisionKind {
-	case modelcatalog.DecisionKindPoleComposition, modelcatalog.DecisionKindNearestPattern, modelcatalog.DecisionKindDominantFactor:
-		detail, err := decodePersonalityTypeDetail(wire.Detail.Payload, model.Algorithm)
-		if err != nil {
-			return err
-		}
-		execution.Detail.Payload = detail
-	case modelcatalog.DecisionKindTraitProfile:
-		detail, err := decodeTraitProfileDetail(wire.Detail.Payload)
-		if err != nil {
-			return err
-		}
-		execution.Detail.Payload = detail
-	default:
-		if detail, err := decodePersonalityTypeDetail(wire.Detail.Payload, model.Algorithm); err == nil && detail.TypeCode != "" {
-			execution.Detail.Payload = detail
-			return nil
-		}
-		if detail, err := decodeTraitProfileDetail(wire.Detail.Payload); err == nil && len(detail.Traits) > 0 {
-			execution.Detail.Payload = detail
-			return nil
-		}
-		return restoreLegacyFactorScores(wire.Detail.Payload, execution)
-	}
-	return nil
-}
-
-func restoreLegacyFactorScores(payload []byte, execution *evaluationfact.Execution) error {
-	var factors []legacyFactorScoreWire
-	if err := json.Unmarshal(payload, &factors); err != nil {
-		return err
-	}
-	if len(execution.Dimensions) == 0 {
-		execution.Dimensions = make([]evaluationfact.DimensionResult, 0, len(factors))
-		for _, factor := range factors {
-			dimension := evaluationfact.DimensionResult{Code: factor.FactorCode, Name: factor.FactorName, Kind: evaluationfact.DimensionKindFactor, Score: &evaluationfact.ScoreValue{Kind: evaluationfact.ScoreKindRawTotal, Value: factor.RawScore}}
-			if factor.IsTotalScore {
-				dimension.Role = "total"
-			}
-			if factor.RiskLevel != "" {
-				dimension.Level = &evaluationfact.ResultLevel{Code: factor.RiskLevel, Label: factor.RiskLevel}
-			}
-			execution.Dimensions = append(execution.Dimensions, dimension)
-		}
-	}
-	execution.Detail.Payload = nil
-	return nil
 }
 
 type PersonalityDimensionResult struct {
@@ -251,97 +177,4 @@ func TraitProfileDetailFromPayload(payload any) (TraitProfileDetail, bool) {
 		return *detail, true
 	}
 	return TraitProfileDetail{}, false
-}
-
-func decodePersonalityTypeDetail(payload []byte, _ modelcatalog.Algorithm) (PersonalityTypeDetail, error) {
-	var envelope map[string]json.RawMessage
-	_ = json.Unmarshal(payload, &envelope)
-	if _, legacyMBTI := envelope["profile"]; legacyMBTI {
-		var wire mbtiDetailWire
-		if err := json.Unmarshal(payload, &wire); err != nil {
-			return PersonalityTypeDetail{}, err
-		}
-		return personalityTypeFromMBTIWire(wire), nil
-	}
-	var result PersonalityTypeDetail
-	if err := json.Unmarshal(payload, &result); err != nil || result.TypeCode == "" {
-		return result, fmt.Errorf("unsupported personality detail payload")
-	}
-	if result.MatchPercent == 0 && result.Similarity > 0 {
-		result.MatchPercent = result.Similarity * 100
-	}
-	if result.Similarity == 0 && result.MatchPercent > 0 {
-		result.Similarity = result.MatchPercent / 100
-	}
-	if result.Outcome.Code != "" {
-		result.IsSpecial = result.IsSpecial || result.Outcome.IsSpecial
-		if result.Commentary == "" {
-			result.Commentary = result.Outcome.Commentary
-		}
-	}
-	return result, nil
-}
-
-func decodeTraitProfileDetail(payload []byte) (TraitProfileDetail, error) {
-	var result TraitProfileDetail
-	if err := json.Unmarshal(payload, &result); err != nil || len(result.Traits) == 0 {
-		return result, fmt.Errorf("unsupported trait profile detail payload")
-	}
-	return result, nil
-}
-
-type mbtiDimensionWire struct {
-	Code       string  `json:"code"`
-	Name       string  `json:"name"`
-	LeftPole   string  `json:"left_pole"`
-	RightPole  string  `json:"right_pole"`
-	RawScore   float64 `json:"raw_score"`
-	Preference string  `json:"preference"`
-	Strength   float64 `json:"strength"`
-}
-type mbtiProfileWire struct {
-	Summary     string   `json:"summary"`
-	Strengths   []string `json:"strengths"`
-	Weaknesses  []string `json:"weaknesses"`
-	Suggestions []string `json:"suggestions"`
-}
-type mbtiSourceWire struct {
-	Attribution   string `json:"attribution"`
-	License       string `json:"license"`
-	NonCommercial bool   `json:"non_commercial"`
-}
-type mbtiDetailWire struct {
-	TypeCode     string              `json:"type_code"`
-	TypeName     string              `json:"type_name"`
-	OneLiner     string              `json:"one_liner"`
-	MatchPercent float64             `json:"match_percent"`
-	ImageURL     string              `json:"image_url"`
-	Dimensions   []mbtiDimensionWire `json:"dimensions"`
-	Profile      mbtiProfileWire     `json:"profile"`
-	Source       mbtiSourceWire      `json:"source"`
-}
-
-func personalityTypeFromMBTIWire(wire mbtiDetailWire) PersonalityTypeDetail {
-	dimensions := make([]PersonalityDimensionResult, 0, len(wire.Dimensions))
-	for _, dim := range wire.Dimensions {
-		dimensions = append(dimensions, PersonalityDimensionResult{Code: dim.Code, Name: dim.Name, LeftPole: dim.LeftPole, RightPole: dim.RightPole, RawScore: dim.RawScore, Preference: dim.Preference, Strength: dim.Strength})
-	}
-	return PersonalityTypeDetail{
-		TypeCode: wire.TypeCode, TypeName: wire.TypeName, OneLiner: wire.OneLiner, Summary: wire.Profile.Summary, MatchPercent: wire.MatchPercent, Similarity: wire.MatchPercent / 100, ImageURL: wire.ImageURL,
-		Dimensions: dimensions, Strengths: append([]string(nil), wire.Profile.Strengths...), Weaknesses: append([]string(nil), wire.Profile.Weaknesses...), Suggestions: append([]string(nil), wire.Profile.Suggestions...),
-		Outcome: modeltypology.Outcome{Code: wire.TypeCode, Name: wire.TypeName, OneLiner: wire.OneLiner, Summary: wire.Profile.Summary},
-		Source:  modeltypology.Source{Attribution: wire.Source.Attribution, License: wire.Source.License, NonCommercial: wire.Source.NonCommercial},
-	}
-}
-
-// legacyFactorScoreWire is the schema-v1 decoder retained until production
-// data audit confirms no historical scale Outcome requires it.
-type legacyFactorScoreWire struct {
-	FactorCode   string
-	FactorName   string
-	RawScore     float64
-	RiskLevel    string
-	Conclusion   string
-	Suggestion   string
-	IsTotalScore bool
 }

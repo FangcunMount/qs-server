@@ -18,7 +18,7 @@ func FactRecord(record *domainoutcome.Record) *evaluationfact.Record {
 	return evaluationfact.NewRecord(evaluationfact.NewRecordInput{
 		ID: record.ID(), OrgID: record.OrgID(), AssessmentID: record.AssessmentID(), TesteeID: record.TesteeID(), RunID: record.RunID(),
 		Model:            evaluationfact.ModelIdentity{Kind: model.Kind, SubKind: model.SubKind, Algorithm: model.Algorithm, Code: model.Code, Version: model.Version, Title: model.Title},
-		Runtime:          evaluationfact.RuntimeIdentity{AlgorithmFamily: runtime.AlgorithmFamily, DecisionKind: runtime.DecisionKind, PayloadFormat: runtime.PayloadFormat},
+		Runtime:          evaluationfact.RuntimeIdentity{AlgorithmFamily: runtime.AlgorithmFamily, DecisionKind: runtime.DecisionKind},
 		InputSnapshotRef: record.InputSnapshotRef(), SchemaVersion: record.SchemaVersion(), Payload: record.Payload(), ReportInput: record.ReportInput(), EvaluatedAt: record.EvaluatedAt(),
 	})
 }

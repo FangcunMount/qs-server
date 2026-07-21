@@ -88,18 +88,10 @@ func typologyResponseFromCatalog(model *modelcatalog.ModelResponse, incoming err
 		Code: model.Code, Version: model.Version, Title: model.Title, Algorithm: model.Algorithm, Description: model.Description,
 		QuestionnaireCode: model.QuestionnaireCode, QuestionnaireVersion: model.QuestionnaireVersion, Status: model.Status,
 		Kind: string(modeldomain.KindTypology), SubKind: model.SubKind, ProductChannel: model.ProductChannel,
-		PayloadFormat: model.PayloadFormat, DecisionKind: model.DecisionKind, AlgorithmFamily: model.AlgorithmFamily,
+		DecisionKind: model.DecisionKind, AlgorithmFamily: model.AlgorithmFamily,
 	}
-	if response.PayloadFormat == "" {
-		response.PayloadFormat = modeldomain.PayloadFormatPersonalityTypologyV1
-	}
-	if response.DecisionKind == "" {
-		response.DecisionKind = string(runtime.Decision.Kind)
-	}
-	if response.AlgorithmFamily == "" {
-		if family, ok := modeldomain.AlgorithmFamilyFromIdentity(modeldomain.KindTypology, modeldomain.SubKind(model.SubKind), modeldomain.Algorithm(model.Algorithm)); ok {
-			response.AlgorithmFamily = string(family)
-		}
+	if response.DecisionKind == "" || response.AlgorithmFamily == "" {
+		return nil, fmt.Errorf("catalog typology runtime identity is incomplete")
 	}
 	response.QuestionCount = int32(countRuntimeQuestions(runtime))
 	response.DimensionOrder = append([]string(nil), runtime.FactorGraph.DecisionFactorOrder()...)
@@ -118,46 +110,23 @@ func typologyResponseFromCatalog(model *modelcatalog.ModelResponse, incoming err
 	return response, nil
 }
 
-// isTypologyCatalogModel keeps the BFF readable while the data migration is
-// rolled out. The retired personality kind is accepted only when the remaining
-// identity fields prove that the row is one of the old typology records.
 func isTypologyCatalogModel(model *modelcatalog.ModelResponse) bool {
-	if model == nil {
-		return false
-	}
-	if model.Kind == string(modeldomain.KindTypology) {
-		return true
-	}
-	if model.Kind != "personality" || model.SubKind != string(modeldomain.SubKindTypology) {
-		return false
-	}
-	switch modeldomain.Algorithm(model.Algorithm) {
-	case modeldomain.AlgorithmPersonalityTypology,
-		modeldomain.AlgorithmBigFive,
-		modeldomain.AlgorithmMBTI,
-		modeldomain.AlgorithmSBTI:
-		return true
-	default:
-		return false
-	}
+	return model != nil && model.Kind == string(modeldomain.KindTypology) &&
+		model.SubKind == string(modeldomain.SubKindTypology) &&
+		model.Algorithm == string(modeldomain.AlgorithmPersonalityTypology)
 }
 
 func typologySummaryResponse(value *typologymodel.TypologyModelResponse) typologymodel.TypologyModelSummaryResponse {
 	if value == nil {
 		return typologymodel.TypologyModelSummaryResponse{}
 	}
-	return typologymodel.TypologyModelSummaryResponse{Code: value.Code, Version: value.Version, Title: value.Title, Algorithm: value.Algorithm, Description: value.Description, QuestionnaireCode: value.QuestionnaireCode, QuestionnaireVersion: value.QuestionnaireVersion, Status: value.Status, QuestionCount: value.QuestionCount, Kind: value.Kind, SubKind: value.SubKind, ProductChannel: value.ProductChannel, AlgorithmFamily: value.AlgorithmFamily, PayloadFormat: value.PayloadFormat, DecisionKind: value.DecisionKind}
+	return typologymodel.TypologyModelSummaryResponse{Code: value.Code, Version: value.Version, Title: value.Title, Algorithm: value.Algorithm, Description: value.Description, QuestionnaireCode: value.QuestionnaireCode, QuestionnaireVersion: value.QuestionnaireVersion, Status: value.Status, QuestionCount: value.QuestionCount, Kind: value.Kind, SubKind: value.SubKind, ProductChannel: value.ProductChannel, AlgorithmFamily: value.AlgorithmFamily, DecisionKind: value.DecisionKind}
 }
 
 func countRuntimeQuestions(runtime *modeltypology.RuntimeSpec) int {
 	seen := make(map[string]struct{})
 	if runtime == nil {
 		return 0
-	}
-	for _, mapping := range runtime.FactorGraph.QuestionMappings {
-		if mapping.QuestionCode != "" {
-			seen[mapping.QuestionCode] = struct{}{}
-		}
 	}
 	for _, factor := range runtime.FactorGraph.Factors {
 		for _, contribution := range factor.Contributions {

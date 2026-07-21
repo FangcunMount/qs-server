@@ -135,23 +135,9 @@ func (p TypologyModelInputProvider) resolveConfiguredInput(ctx context.Context, 
 }
 
 func typologyModelNotFoundMessage(algorithm modelcatalog.Algorithm) string {
-	switch algorithm {
-	case modelcatalog.AlgorithmSBTI:
-		return "SBTI 模型不存在"
-	case modelcatalog.AlgorithmMBTI:
-		return "MBTI 模型不存在"
-	default:
-		return "人格模型不存在"
-	}
+	return "人格模型不存在"
 }
 
 func typologyModelUnavailableMessage(algorithm modelcatalog.Algorithm) string {
-	switch algorithm {
-	case modelcatalog.AlgorithmSBTI:
-		return "SBTI 模型不可用"
-	case modelcatalog.AlgorithmMBTI:
-		return "MBTI 模型不可用"
-	default:
-		return "人格模型不可用"
-	}
+	return "人格模型不可用"
 }

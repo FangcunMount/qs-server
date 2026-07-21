@@ -6,7 +6,6 @@ import (
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modelbinding "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
@@ -50,15 +49,6 @@ func outcomeFromRow(row evaluationreadmodel.AssessmentRow) (*OutcomeAssessment, 
 
 func modelFromRow(row evaluationreadmodel.AssessmentRow) ModelIdentity {
 	kind, sub, algorithm := deref(row.EvaluationModelKind), deref(row.EvaluationModelSubKind), deref(row.EvaluationModelAlgorithm)
-	if algorithm == "" && kind != "" {
-		if k, s, a, ok := modelcatalog.LegacyKindMapping(modelcatalog.Kind(kind)); ok {
-			kind = string(k)
-			if sub == "" {
-				sub = string(s)
-			}
-			algorithm = string(a)
-		}
-	}
 	result := ModelIdentity{Kind: kind, SubKind: sub, Algorithm: algorithm, Code: deref(row.EvaluationModelCode), Version: deref(row.EvaluationModelVersion), Title: deref(row.EvaluationModelTitle)}
 	k := modelbinding.Kind(result.Kind)
 	result.ProductChannel = modelbinding.ProductChannelForIdentity(k, "")

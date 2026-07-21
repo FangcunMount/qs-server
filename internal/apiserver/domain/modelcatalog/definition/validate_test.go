@@ -27,8 +27,7 @@ func TestValidateAcceptsCompleteDefinition(t *testing.T) {
 					Sign:         -1,
 					OptionScores: map[string]float64{"A": 1, "B": 5},
 				}},
-				Strategy:      factor.ScoringStrategySum,
-				OptionScoring: factor.OptionScoringCompat,
+				Strategy: factor.ScoringStrategySum,
 			}},
 		},
 		Calibration: definition.Calibration{NormRefs: []norm.Ref{{FactorCode: "total", NormTableVersion: "2026"}}},
@@ -214,13 +213,13 @@ func TestValidateRejectsReportAdapterIncompatibleWithDecisionKind(t *testing.T) 
 
 	def.ReportMap.Sections[0].AdapterKey = "mbti"
 	issues = definition.Validate(def)
-	if !hasValidationCode(issues, "report_section.adapter.legacy") {
-		t.Fatalf("issues = %#v, want report_section.adapter.legacy", issues)
+	if !hasValidationCode(issues, "report_section.adapter.decision_mismatch") {
+		t.Fatalf("issues = %#v, want report_section.adapter.decision_mismatch", issues)
 	}
 
 	def.ReportMap.Sections[0].AdapterKey = "personality_type"
 	issues = definition.Validate(def)
-	if hasValidationCode(issues, "report_section.adapter.decision_mismatch") || hasValidationCode(issues, "report_section.adapter.legacy") {
+	if hasValidationCode(issues, "report_section.adapter.decision_mismatch") {
 		t.Fatalf("issues = %#v, want no adapter issues for compatible adapter", issues)
 	}
 

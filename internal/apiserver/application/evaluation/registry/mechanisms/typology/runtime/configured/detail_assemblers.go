@@ -72,7 +72,7 @@ func assembleTraitProfileDetail(input DetailInput) (any, error) {
 	}, nil
 }
 
-// AssemblePersonalityTypeDetail 暴露机制中性人格类型明细组装，供 legacy adapter 使用。
+// AssemblePersonalityTypeDetail 暴露机制中性人格类型明细组装。
 func AssemblePersonalityTypeDetail(input DetailInput) (outcometypology.PersonalityTypeDetail, error) {
 	generic, err := assemblePersonalityTypeDetail(input)
 	if err != nil {
@@ -81,7 +81,7 @@ func AssemblePersonalityTypeDetail(input DetailInput) (outcometypology.Personali
 	return generic.(outcometypology.PersonalityTypeDetail), nil
 }
 
-// AssembleTraitProfileDetail 暴露机制中性特质画像明细组装，供 legacy adapter 使用。
+// AssembleTraitProfileDetail 暴露机制中性特质画像明细组装。
 func AssembleTraitProfileDetail(input DetailInput) (outcometypology.TraitProfileDetail, error) {
 	generic, err := assembleTraitProfileDetail(input)
 	if err != nil {

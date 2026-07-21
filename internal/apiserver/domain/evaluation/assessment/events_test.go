@@ -16,7 +16,7 @@ func TestNewEvaluationRequestedEventIncludesModelIdentityFields(t *testing.T) {
 	modelRef := NewEvaluationModelRefWithIdentity(
 		EvaluationModelKindTypology,
 		modelcatalog.SubKindTypology,
-		modelcatalog.AlgorithmMBTI,
+		modelcatalog.AlgorithmPersonalityTypology,
 		meta.ID(0),
 		meta.NewCode("MBTI-16P"),
 		"2.0.1",
@@ -35,7 +35,7 @@ func TestNewEvaluationRequestedEventIncludesModelIdentityFields(t *testing.T) {
 	if data.ModelSubKind != string(modelcatalog.SubKindTypology) {
 		t.Fatalf("ModelSubKind = %q", data.ModelSubKind)
 	}
-	if data.ModelAlgorithm != string(modelcatalog.AlgorithmMBTI) {
+	if data.ModelAlgorithm != string(modelcatalog.AlgorithmPersonalityTypology) {
 		t.Fatalf("ModelAlgorithm = %q", data.ModelAlgorithm)
 	}
 	if evt.EventType() != evaldomainevent.TypeRequested {

@@ -219,7 +219,7 @@ func (s Service) ensurePublishedPair(ctx context.Context, model *domain.Assessme
 	if active == nil {
 		return errors.WithCode(code.ErrConflict, "release.pair.incomplete: active assessment snapshot is missing")
 	}
-	if status := domain.NormalizeReleaseStatus(active.ReleaseStatus, active.Status == "published"); status != "" && !status.IsActive() {
+	if status := domain.NormalizeReleaseStatus(active.ReleaseStatus); !status.IsActive() {
 		return errors.WithCode(code.ErrConflict, "release.pair.incomplete: active assessment snapshot is missing")
 	}
 	if active.QuestionnaireCode != model.Binding.QuestionnaireCode || active.QuestionnaireVersion != model.Binding.QuestionnaireVersion {

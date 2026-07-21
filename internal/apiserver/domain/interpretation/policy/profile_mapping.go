@@ -14,7 +14,7 @@ const (
 // ReportProfileForDecisionKind maps execution decision kind to report presentation profile.
 func ReportProfileForDecisionKind(decision modelcatalog.DecisionKind) ReportProfile {
 	switch decision {
-	case modelcatalog.DecisionKindScoreRange, modelcatalog.DecisionKindScoreRangeInterpretation:
+	case modelcatalog.DecisionKindScoreRange:
 		return ReportProfileScale
 	case modelcatalog.DecisionKindNormLookup:
 		return ReportProfileNorm

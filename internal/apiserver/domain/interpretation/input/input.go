@@ -31,7 +31,6 @@ type InterpretationInput struct {
 type RuntimeIdentity struct {
 	AlgorithmFamily modelcatalog.AlgorithmFamily
 	DecisionKind    modelcatalog.DecisionKind
-	PayloadFormat   string
 }
 
 type ResultFacts struct {

@@ -18,9 +18,6 @@ type ReportAdapterKey string
 const (
 	ReportAdapterPersonalityType ReportAdapterKey = "personality_type"
 	ReportAdapterTraitProfile    ReportAdapterKey = "trait_profile"
-	ReportAdapterMBTI            ReportAdapterKey = "mbti"
-	ReportAdapterSBTI            ReportAdapterKey = "sbti"
-	ReportAdapterBigFive         ReportAdapterKey = "bigfive"
 )
 
 // ErrUnknownTemplateID marks a non-empty TemplateID that is not registered.
@@ -71,14 +68,7 @@ func PersonalityTypeTemplateForSpec(spec ReportSpec) (PersonalityTypeReportTempl
 		}
 		return PersonalityTypeReportTemplate{}, fmt.Errorf("%w: %s", ErrUnknownTemplateID, spec.TemplateID)
 	}
-	switch spec.AdapterKey {
-	case ReportAdapterSBTI:
-		return SBTIPersonalityTypeTemplate(), nil
-	case ReportAdapterMBTI:
-		return MBTIPersonalityTypeTemplate(), nil
-	default:
-		return PersonalityTypeReportTemplate{}, nil
-	}
+	return PersonalityTypeReportTemplate{}, nil
 }
 
 // TraitProfileTemplateForSpec resolves templates from report spec.
@@ -91,10 +81,5 @@ func TraitProfileTemplateForSpec(spec ReportSpec) (TraitProfileReportTemplate, e
 		}
 		return TraitProfileReportTemplate{}, fmt.Errorf("%w: %s", ErrUnknownTemplateID, spec.TemplateID)
 	}
-	switch spec.AdapterKey {
-	case ReportAdapterBigFive:
-		return BigFiveTraitProfileTemplate(), nil
-	default:
-		return TraitProfileReportTemplate{}, nil
-	}
+	return TraitProfileReportTemplate{}, nil
 }

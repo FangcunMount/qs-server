@@ -58,20 +58,17 @@ func TestModelFromSnapshotPrefersCanonicalMeasureSemantics(t *testing.T) {
 	}
 }
 
-func TestModelFromSnapshotFallsBackToFlatFactors(t *testing.T) {
+func TestModelFromSnapshotRejectsFlatOnlyRuntimeProjection(t *testing.T) {
 	t.Parallel()
 	snapshot := &scalesnapshot.ScaleSnapshot{
-		Code: "LEGACY",
+		Code: "FLAT_ONLY",
 		Factors: []scalesnapshot.FactorSnapshot{{
 			Code: "total", IsTotalScore: true, QuestionCodes: []string{"q1"}, ScoringStrategy: "sum",
 		}},
 	}
 	model := modelFromSnapshot(snapshot)
-	if len(model.Factors) != 1 || len(model.Factors[0].ChildCodes) != 0 {
-		t.Fatalf("model = %#v", model)
-	}
-	if len(model.Factors[0].QuestionCodes) != 1 || model.Factors[0].QuestionCodes[0] != "q1" {
-		t.Fatalf("flat factor = %#v", model.Factors[0])
+	if len(model.Factors) != 0 || model.Code != "" {
+		t.Fatalf("flat-only runtime projection must not be executable: %#v", model)
 	}
 }
 

@@ -20,17 +20,6 @@ func ValidateImport(table *Norm) error {
 	return validateMaterialFactors(table)
 }
 
-// ValidateRuntimeMaterial validates the executable Norm material without
-// requiring identity metadata. Canonical imports must use ValidateImport;
-// this compatibility seam exists for older published snapshots whose tables
-// predate Kind/Algorithm persistence.
-func ValidateRuntimeMaterial(table *Norm) error {
-	if err := validateMaterialHeader(table); err != nil {
-		return err
-	}
-	return validateMaterialFactors(table)
-}
-
 func validateMaterialHeader(table *Norm) error {
 	if table == nil {
 		return invalid("norm table is required")
@@ -78,7 +67,7 @@ func validateIdentity(kind identity.Kind, algorithm identity.Algorithm) error {
 	switch kind {
 	case identity.KindBehavioralRating:
 		switch algorithm {
-		case identity.AlgorithmBrief2, identity.AlgorithmSPMSensory, identity.AlgorithmBehavioralRatingDefault:
+		case identity.AlgorithmBrief2, identity.AlgorithmSPMSensory:
 			return nil
 		}
 	case identity.KindCognitive:
