@@ -430,6 +430,10 @@ system_governance:
   retry:
     manual_actions_enabled: true
     lease_reconcile_enabled: true
+    lease:
+      run_duration: 5m
+      reconcile_interval: 10s
+      reconcile_jitter_fraction: 0
     business:
       max_automatic_attempts: 3
       base_delay: 30s

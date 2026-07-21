@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/leasemetrics"
 	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 )
@@ -31,6 +32,7 @@ func (r *leaseRecoverer) RecoverExpiredLeases(ctx context.Context, now time.Time
 	if err != nil {
 		return 0, err
 	}
+	leasemetrics.ObserveExpiredLeases(len(leases))
 	recovered := 0
 	for _, lease := range leases {
 		generationRecord, err := r.generations.FindByID(ctx, lease.GenerationID)
@@ -45,6 +47,7 @@ func (r *leaseRecoverer) RecoverExpiredLeases(ctx context.Context, now time.Time
 				return recovered, err
 			}
 		}
+		leasemetrics.ObserveRecovery(lease.LeaseExpiredAt, now)
 		recovered++
 	}
 	return recovered, nil

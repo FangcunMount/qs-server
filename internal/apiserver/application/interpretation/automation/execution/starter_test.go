@@ -116,8 +116,7 @@ func (r *memoryRunRepo) Create(_ context.Context, item *interpretationrun.Interp
 			return interpretationrun.ErrAlreadyExists
 		}
 	}
-	clone := *item
-	r.items[item.ID()] = &clone
+	r.items[item.ID()] = item
 	return nil
 }
 
@@ -255,8 +254,8 @@ func TestStarterReclaimsExpiredLeaseWithoutCreatingNextAttempt(t *testing.T) {
 	if result.Status != StartStatusStarted || result.Run.Attempt() != 1 || result.Generation.Status() != domaingeneration.StatusGenerating || result.Generation.LatestRunID() != result.Run.ID() {
 		t.Fatalf("recovery result = %#v", result)
 	}
-	if staleRun.Status() != interpretationrun.StatusRunning || staleRun.Origin() != retrygovernance.AttemptOriginLeaseRecovery || !staleRun.HasActiveLease(now) {
-		t.Fatalf("stale run not reclaimed = %#v", staleRun)
+	if staleRun.Status() != interpretationrun.StatusRunning || staleRun.Origin() != retrygovernance.AttemptOriginInitial || !staleRun.HasActiveLease(now) {
+		t.Fatalf("stale run not reclaimed = origin:%s recovery:%d history:%#v", staleRun.Origin(), staleRun.RecoveryCount(), staleRun.ClaimHistory())
 	}
 	if tx.calls != 1 || runs.saves != 1 || runs.creates != 0 || generationRecord.Version() != 2 {
 		t.Fatalf("recovery writes tx=%d saves=%d creates=%d generation_version=%d", tx.calls, runs.saves, runs.creates, generationRecord.Version())
@@ -393,7 +392,16 @@ func testArtifact(t *testing.T, generationRecord *domaingeneration.ReportGenerat
 		Association:         domainreport.Association{OrgID: 1, AssessmentID: meta.FromUint64(7), TesteeID: 8},
 		ReportType:          generationRecord.Key().ReportType,
 		TemplateVersion:     generationRecord.Key().TemplateVersion,
-		GeneratedAt:         at,
+		BuilderIdentity:     domainreport.BuilderIdentityFactorScoring,
+		ContentSchemaVersion: domainreport.ContentSchemaVersionV1,
+		Content: domainreport.Content{
+			Model:        domainreport.ModelIdentity{Kind: "scale", Code: "PHQ9", Version: "v1"},
+			PrimaryScore: domainreport.NewRawTotalScore(8, nil),
+			Dimensions: []domainreport.DimensionInterpret{
+				domainreport.NewDimensionInterpret(domainreport.NewFactorCode("TOTAL"), "总分", 8, nil, domainreport.RiskLevelLow, "ok", "ok"),
+			},
+		},
+		GeneratedAt: at,
 	})
 	if err != nil {
 		t.Fatal(err)

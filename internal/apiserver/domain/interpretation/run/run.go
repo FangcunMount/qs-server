@@ -59,6 +59,12 @@ func (f Failure) Validate() error {
 	return nil
 }
 
+// ClaimRecord captures one lease reclaim on the same business attempt.
+type ClaimRecord struct {
+	ReclaimedAt time.Time
+	TraceID     string
+}
+
 // InterpretationRun is one attempt under a ReportGeneration. It never owns
 // report content and it cannot modify Evaluation facts.
 type InterpretationRun struct {
@@ -71,8 +77,11 @@ type InterpretationRun struct {
 	startedAt      *time.Time
 	leaseExpiresAt *time.Time
 	finishedAt     *time.Time
-	origin         retrygovernance.AttemptOrigin
-	retryDecision  *retrygovernance.Decision
+	origin          retrygovernance.AttemptOrigin
+	retryDecision   *retrygovernance.Decision
+	claimHistory    []ClaimRecord
+	recoveryCount   int
+	lastReclaimedAt *time.Time
 }
 
 func NewPending(id, generationID meta.ID, attempt int) (*InterpretationRun, error) {
@@ -127,8 +136,11 @@ func Restore(input RestoreInput) (*InterpretationRun, error) {
 		startedAt:      copyTimePtr(input.StartedAt),
 		leaseExpiresAt: copyTimePtr(input.LeaseExpiresAt),
 		finishedAt:     copyTimePtr(input.FinishedAt),
-		origin:         input.Origin,
-		retryDecision:  copyRetryDecision(input.RetryDecision),
+		origin:          input.Origin,
+		retryDecision:   copyRetryDecision(input.RetryDecision),
+		claimHistory:    copyClaimHistory(input.ClaimHistory),
+		recoveryCount:   input.RecoveryCount,
+		lastReclaimedAt: copyTimePtr(input.LastReclaimedAt),
 	}
 	if input.Failure != nil {
 		failure := *input.Failure
@@ -147,8 +159,11 @@ type RestoreInput struct {
 	StartedAt      *time.Time
 	LeaseExpiresAt *time.Time
 	FinishedAt     *time.Time
-	Origin         retrygovernance.AttemptOrigin
-	RetryDecision  *retrygovernance.Decision
+	Origin          retrygovernance.AttemptOrigin
+	RetryDecision   *retrygovernance.Decision
+	ClaimHistory    []ClaimRecord
+	RecoveryCount   int
+	LastReclaimedAt *time.Time
 }
 
 func Next(id meta.ID, latest *InterpretationRun) (*InterpretationRun, error) {
@@ -176,6 +191,9 @@ func (r *InterpretationRun) Start(at time.Time, traceID string) error {
 // StartWithLease claims this Run for one worker attempt. A lease is required
 // by GenerationStarter so a crashed worker can be recovered without creating
 // concurrent attempts.
+//
+// IR-R011: heartbeat renew stays deferred until builder p95/p99 evidence shows
+// runs approaching the configured RunLeaseDuration.
 func (r *InterpretationRun) StartWithLease(at time.Time, traceID string, leaseExpiresAt time.Time) error {
 	if leaseExpiresAt.IsZero() || !leaseExpiresAt.After(at) {
 		return fmt.Errorf("interpretation run lease expiry must follow start")
@@ -282,8 +300,28 @@ func (r *InterpretationRun) ReclaimExpiredLease(at time.Time, traceID string, le
 	}
 	r.traceID = traceID
 	r.leaseExpiresAt = copyTime(leaseExpiresAt)
-	r.origin = retrygovernance.AttemptOriginLeaseRecovery
+	r.recoveryCount++
+	r.lastReclaimedAt = copyTime(at)
+	r.claimHistory = append(copyClaimHistory(r.claimHistory), ClaimRecord{ReclaimedAt: at, TraceID: traceID})
 	return nil
+}
+
+func (r *InterpretationRun) RecoveryCount() int {
+	if r == nil {
+		return 0
+	}
+	return r.recoveryCount
+}
+
+func (r *InterpretationRun) LastReclaimedAt() *time.Time {
+	if r == nil {
+		return nil
+	}
+	return copyTimePtr(r.lastReclaimedAt)
+}
+
+func (r *InterpretationRun) ClaimHistory() []ClaimRecord {
+	return copyClaimHistory(r.claimHistory)
 }
 
 func (r *InterpretationRun) FinishedAt() *time.Time { return copyTimePtr(r.finishedAt) }
@@ -353,4 +391,13 @@ func copyRetryDecision(value *retrygovernance.Decision) *retrygovernance.Decisio
 	copy := *value
 	copy.NextAttemptAt = copyTimePtr(value.NextAttemptAt)
 	return &copy
+}
+
+func copyClaimHistory(records []ClaimRecord) []ClaimRecord {
+	if len(records) == 0 {
+		return nil
+	}
+	out := make([]ClaimRecord, len(records))
+	copy(out, records)
+	return out
 }

@@ -34,8 +34,9 @@ type LeaseReclaimer interface {
 }
 
 type ExpiredLease struct {
-	RunID        ID
-	GenerationID ID
+	RunID          ID
+	GenerationID   ID
+	LeaseExpiredAt time.Time
 }
 
 type ExpiredLeaseReader interface {

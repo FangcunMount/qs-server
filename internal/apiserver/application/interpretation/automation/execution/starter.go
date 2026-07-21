@@ -9,6 +9,7 @@ import (
 	"time"
 
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/leasemetrics"
 	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
@@ -168,12 +169,14 @@ func (s *starter) resumeOrRecover(ctx context.Context, generationRecord *domaing
 	if latest.Status() != interpretationrun.StatusRunning {
 		return nil, fmt.Errorf("generating report generation has non-running run %s", latest.Status())
 	}
+	expiredAt := latest.LeaseExpiresAt()
 	if reclaimer, ok := s.runs.(interpretationrun.LeaseReclaimer); ok {
 		reclaimed, claimed, reclaimErr := reclaimer.ReclaimExpiredLease(ctx, latest.ID(), at, request.TraceID, at.Add(s.leaseDuration))
 		if reclaimErr != nil {
 			return nil, reclaimErr
 		}
 		if claimed {
+			recordLeaseRecovery(expiredAt, at)
 			return &StartResult{Status: StartStatusStarted, Generation: generationRecord, Run: reclaimed}, nil
 		}
 		winner, findErr := s.runs.FindByID(ctx, latest.ID())
@@ -190,7 +193,15 @@ func (s *starter) resumeOrRecover(ctx context.Context, generationRecord *domaing
 	}); err != nil {
 		return nil, err
 	}
+	recordLeaseRecovery(expiredAt, at)
 	return &StartResult{Status: StartStatusStarted, Generation: generationRecord, Run: latest}, nil
+}
+
+func recordLeaseRecovery(expiredAt *time.Time, reclaimedAt time.Time) {
+	if expiredAt == nil {
+		return
+	}
+	leasemetrics.ObserveRecovery(*expiredAt, reclaimedAt)
 }
 
 func (s *starter) startFailedIfAuthorized(ctx context.Context, generationRecord *domaingeneration.ReportGeneration, request StartRequest) (*StartResult, error) {

@@ -72,6 +72,29 @@ func TestRestoreRunRejectsInconsistentTerminalFacts(t *testing.T) {
 	}
 }
 
+func TestInterpretationRunReclaimPreservesOriginAndRecordsClaimHistory(t *testing.T) {
+	now := time.Date(2026, 7, 21, 10, 0, 0, 0, time.UTC)
+	run, err := NewPending(meta.FromUint64(1), meta.FromUint64(2), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := run.StartWithLease(now.Add(-2*time.Minute), "initial-trace", now.Add(-time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if err := run.ReclaimExpiredLease(now, "recovery-trace", now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if run.Origin() != retrygovernance.AttemptOriginInitial {
+		t.Fatalf("origin = %s, want initial", run.Origin())
+	}
+	if run.RecoveryCount() != 1 || run.LastReclaimedAt() == nil || len(run.ClaimHistory()) != 1 || run.ClaimHistory()[0].TraceID != "recovery-trace" {
+		t.Fatalf("claim history = count:%d last:%v history:%#v", run.RecoveryCount(), run.LastReclaimedAt(), run.ClaimHistory())
+	}
+	if run.Attempt() != 1 {
+		t.Fatalf("attempt = %d, want same business attempt", run.Attempt())
+	}
+}
+
 func TestInterpretationRunLeaseExpiresAndIsClearedAtTerminalState(t *testing.T) {
 	now := time.Date(2026, 7, 14, 10, 0, 0, 0, time.UTC)
 	r, err := NewPending(meta.FromUint64(1), meta.FromUint64(2), 1)
