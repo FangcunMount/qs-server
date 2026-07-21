@@ -325,6 +325,7 @@ func createAssessmentFromAnswerSheet(ctx context.Context, deps *Dependencies, an
 		OrgId:                data.OrgID,
 		FillerId:             data.FillerID,
 		TaskId:               data.TaskID,
+		Admission:            assessmentAdmissionFromEvent(data.Admission),
 	}
 	if data.TaskID == "" {
 		assessmentReq.OriginType = "adhoc"
@@ -344,4 +345,21 @@ func createAssessmentFromAnswerSheet(ctx context.Context, deps *Dependencies, an
 		"created", assessmentResp.Created,
 	)
 	return nil
+}
+
+func assessmentAdmissionFromEvent(in *eventpayload.AssessmentAdmission) *evalpb.AssessmentAdmission {
+	if in == nil || in.Purpose == "" {
+		return nil
+	}
+	return &evalpb.AssessmentAdmission{
+		Purpose:              string(in.Purpose),
+		QuestionnaireCode:    in.QuestionnaireCode,
+		QuestionnaireVersion: in.QuestionnaireVersion,
+		ModelKind:            in.ModelKind,
+		ModelSubKind:         in.ModelSubKind,
+		ModelAlgorithm:       in.ModelAlgorithm,
+		ModelCode:            in.ModelCode,
+		ModelVersion:         in.ModelVersion,
+		ModelTitle:           in.ModelTitle,
+	}
 }

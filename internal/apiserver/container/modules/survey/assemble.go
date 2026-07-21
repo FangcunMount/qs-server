@@ -16,6 +16,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	ruleengineInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -142,6 +143,16 @@ func (m *Module) SetCatalogManagementService(service modelcatalogApp.CatalogMana
 		return
 	}
 	m.bindingSyncer.SetCatalogManagementService(service)
+}
+
+// SetAssessmentBindingResolver injects admission binding into answer-sheet submit (EV-R001).
+func (m *Module) SetAssessmentBindingResolver(binding rulesetport.AssessmentBindingResolver) {
+	if m == nil || m.AnswerSheet == nil {
+		return
+	}
+	if injector, ok := m.AnswerSheet.SubmissionService.(asApp.AssessmentBindingInjector); ok {
+		injector.SetAssessmentBindingResolver(binding)
+	}
 }
 
 func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, profile appEventing.ProfileBinding) error {

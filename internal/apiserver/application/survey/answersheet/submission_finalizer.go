@@ -22,7 +22,20 @@ func (s *submissionService) createAndSaveAnswerSheet(
 	qnr *questionnaire.Questionnaire,
 	answers []answersheet.Answer,
 ) (*answersheet.AnswerSheet, error) {
-	sheet, err := createAnswerSheet(l, dto, qnr, answers)
+	admission, err := s.resolveAdmission(ctx, dto.QuestionnaireCode, dto.QuestionnaireVer)
+	if err != nil {
+		return nil, err
+	}
+	if !admission.IsZero() {
+		l.Infow("答卷准入意图已冻结",
+			"action", "submit_answersheet",
+			"stage", "admission",
+			"purpose", string(admission.Purpose()),
+			"model_code", admission.ModelCode(),
+			"model_version", admission.ModelVersion(),
+		)
+	}
+	sheet, err := createAnswerSheet(l, dto, qnr, answers, admission)
 	if err != nil {
 		return nil, err
 	}
@@ -34,6 +47,7 @@ func createAnswerSheet(
 	dto SubmitAnswerSheetDTO,
 	qnr *questionnaire.Questionnaire,
 	answers []answersheet.Answer,
+	admission answersheet.Admission,
 ) (*answersheet.AnswerSheet, error) {
 	questionnaireRef, err := answersheet.NewQuestionnaireRef(
 		dto.QuestionnaireCode,
@@ -57,12 +71,23 @@ func createAnswerSheet(
 	if err != nil {
 		return nil, err
 	}
-	submissionContext, err := answersheet.NewSubmissionContext(
-		fillerRef,
-		actor.NewTesteeRef(testeeID),
-		orgID,
-		dto.TaskID,
-	)
+	var submissionContext answersheet.SubmissionContext
+	if admission.IsZero() {
+		submissionContext, err = answersheet.NewSubmissionContext(
+			fillerRef,
+			actor.NewTesteeRef(testeeID),
+			orgID,
+			dto.TaskID,
+		)
+	} else {
+		submissionContext, err = answersheet.NewSubmissionContext(
+			fillerRef,
+			actor.NewTesteeRef(testeeID),
+			orgID,
+			dto.TaskID,
+			admission,
+		)
+	}
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "创建答卷提交上下文失败")
 	}

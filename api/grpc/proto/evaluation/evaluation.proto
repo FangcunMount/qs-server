@@ -146,6 +146,21 @@ message EnsureAssessmentRequest {
   string task_id = 7;
   string origin_type = 8;
   string origin_id = 9;
+  // Submit-time frozen evaluation admission (EV-R001). Empty purpose = legacy.
+  AssessmentAdmission admission = 10;
+}
+
+// AssessmentAdmission freezes independent vs assessment intent and exact release.
+message AssessmentAdmission {
+  string purpose = 1;
+  string questionnaire_code = 2;
+  string questionnaire_version = 3;
+  string model_kind = 4;
+  string model_sub_kind = 5;
+  string model_algorithm = 6;
+  string model_code = 7;
+  string model_version = 8;
+  string model_title = 9;
 }
 
 message EnsureAssessmentResponse {

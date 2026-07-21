@@ -22,13 +22,14 @@ func (s scoringStub) CalculateAndSave(context.Context, uint64) error {
 }
 
 type intakeStub struct {
-	calls     *[]string
-	created   *evaluationintake.Assessment
-	existing  *evaluationintake.Assessment
-	findErr   error
-	createErr error
-	submitErr error
-	submitted bool
+	calls         *[]string
+	created       *evaluationintake.Assessment
+	existing      *evaluationintake.Assessment
+	findErr       error
+	createErr     error
+	submitErr     error
+	submitted     bool
+	lastCreateCmd evaluationintake.CreateCommand
 }
 
 func (s *intakeStub) FindByAnswerSheetID(context.Context, uint64) (*evaluationintake.Assessment, error) {
@@ -41,8 +42,9 @@ func (s *intakeStub) FindByAnswerSheetID(context.Context, uint64) (*evaluationin
 	}
 	return nil, errors.New("not found")
 }
-func (s *intakeStub) CreateForAnswerSheet(context.Context, evaluationintake.CreateCommand) (*evaluationintake.Assessment, error) {
+func (s *intakeStub) CreateForAnswerSheet(_ context.Context, cmd evaluationintake.CreateCommand) (*evaluationintake.Assessment, error) {
 	*s.calls = append(*s.calls, "create")
+	s.lastCreateCmd = cmd
 	return s.created, s.createErr
 }
 func (s *intakeStub) SubmitForEvaluation(context.Context, uint64) (*evaluationintake.Assessment, error) {
@@ -178,6 +180,72 @@ func TestEnsureWorkerReplaySubmitsExistingBoundPendingAssessment(t *testing.T) {
 		t.Fatalf("result = %#v, submitted = %v", result, intake.submitted)
 	}
 	if !reflect.DeepEqual(calls, []string{"score", "find", "submit"}) {
+		t.Fatalf("calls = %v", calls)
+	}
+}
+
+func TestEnsureFrozenAdmissionIgnoresLiveBindingVersionDrift(t *testing.T) {
+	calls := []string{}
+	intake := &intakeStub{
+		calls:   &calls,
+		created: &evaluationintake.Assessment{ID: 91, Status: "pending"},
+	}
+	// Live binding would resolve to a newer version; frozen admission must win.
+	svc := NewService(scoringStub{calls: &calls}, bindingStub{
+		binding: rulesetport.AssessmentBinding{Ref: rulesetport.Ref{
+			Kind: modelcatalog.KindScale, Code: "MODEL-1", Version: "9.9.9", Title: "new",
+		}},
+		ok: true,
+	}, nil, nil, intake, nil)
+
+	result, err := svc.Ensure(context.Background(), Command{
+		OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8,
+		Admission: &Admission{
+			Purpose: "assessment", QuestionnaireCode: "Q", QuestionnaireVersion: "1",
+			ModelKind: "scale", ModelCode: "MODEL-1", ModelVersion: "1.0.0", ModelTitle: "old",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.AssessmentID != 91 || !result.Created || !result.AutoSubmitted {
+		t.Fatalf("result = %#v", result)
+	}
+	if intake.lastCreateCmd.ModelVersion == nil || *intake.lastCreateCmd.ModelVersion != "1.0.0" {
+		t.Fatalf("create cmd model version = %#v, want frozen 1.0.0", intake.lastCreateCmd.ModelVersion)
+	}
+}
+
+func TestEnsureFrozenIndependentAdmissionSkipsAssessment(t *testing.T) {
+	calls := []string{}
+	intake := &intakeStub{calls: &calls, created: &evaluationintake.Assessment{ID: 91}}
+	svc := NewService(scoringStub{calls: &calls}, boundScaleBinding(), nil, nil, intake, nil)
+
+	result, err := svc.Ensure(context.Background(), Command{
+		OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8,
+		Admission: &Admission{Purpose: "independent_questionnaire", QuestionnaireCode: "Q", QuestionnaireVersion: "1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.AssessmentID != 0 || result.Created || intake.submitted {
+		t.Fatalf("result = %#v submitted=%v", result, intake.submitted)
+	}
+	if !reflect.DeepEqual(calls, []string{"score", "find"}) {
+		t.Fatalf("calls = %v", calls)
+	}
+}
+
+func TestEnsureIncompleteFrozenAdmissionFailsClosed(t *testing.T) {
+	calls := []string{}
+	svc := NewService(scoringStub{calls: &calls}, nil, nil, nil, &intakeStub{calls: &calls}, nil)
+	if _, err := svc.Ensure(context.Background(), Command{
+		OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8,
+		Admission: &Admission{Purpose: "assessment", QuestionnaireCode: "Q", QuestionnaireVersion: "1", ModelKind: "scale"},
+	}); err == nil {
+		t.Fatal("expected incomplete assessment admission to fail closed")
+	}
+	if !reflect.DeepEqual(calls, []string{"score"}) {
 		t.Fatalf("calls = %v", calls)
 	}
 }

@@ -13,6 +13,7 @@ import (
 	planapp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	answersheetapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	domainanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -33,6 +34,30 @@ type Command struct {
 	TaskID               string // 任务ID
 	OriginType           string // 来源类型
 	OriginID             string // 来源ID
+	// Admission is the submit-time frozen evaluation intent (EV-R001).
+	// Nil means legacy event without admission; Journey falls back to live binding.
+	Admission *Admission
+}
+
+// Admission freezes evaluation purpose and exact release for Journey Ensure.
+type Admission struct {
+	Purpose              string
+	QuestionnaireCode    string
+	QuestionnaireVersion string
+	ModelKind            string
+	ModelSubKind         string
+	ModelAlgorithm       string
+	ModelCode            string
+	ModelVersion         string
+	ModelTitle           string
+}
+
+func (a *Admission) RequiresAssessment() bool {
+	return a != nil && a.Purpose == string(domainanswersheet.AdmissionPurposeAssessment)
+}
+
+func (a *Admission) IsIndependent() bool {
+	return a != nil && a.Purpose == string(domainanswersheet.AdmissionPurposeIndependentQuestionnaire)
 }
 
 // Result 评估入库结果。
@@ -104,8 +129,8 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 		dto.OriginID = &command.OriginID
 	}
 
-	// 应用绑定
-	bound, err := s.applyBinding(ctx, command, &dto)
+	// 应用绑定：优先消费提交时冻结的 Admission（EV-R001）。
+	bound, admissionSource, err := s.applyAdmissionOrBinding(ctx, command, &dto)
 	if err != nil {
 		return nil, err
 	}
@@ -113,6 +138,7 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 		"action", "ensure_assessment",
 		"answersheet_id", command.AnswerSheetID,
 		"bound", bound,
+		"admission_source", admissionSource,
 		"model_kind", valueOrEmpty(dto.ModelKind),
 		"model_code", valueOrEmpty(dto.ModelCode),
 		"model_version", valueOrEmpty(dto.ModelVersion),
@@ -237,6 +263,52 @@ func valueOrEmpty(value *string) string {
 		return ""
 	}
 	return *value
+}
+
+// applyAdmissionOrBinding prefers submit-time Admission; legacy events fall back to live binding.
+func (s *service) applyAdmissionOrBinding(ctx context.Context, command Command, dto *evaluationintake.CreateCommand) (bound bool, source string, err error) {
+	if command.Admission != nil {
+		if command.Admission.IsIndependent() {
+			return false, "frozen_admission", nil
+		}
+		if command.Admission.RequiresAssessment() {
+			if err := applyFrozenAdmission(command.Admission, dto); err != nil {
+				return false, "frozen_admission", err
+			}
+			return true, "frozen_admission", nil
+		}
+		return false, "frozen_admission", errors.WithCode(code.ErrInvalidArgument, "admission purpose is invalid: %s", command.Admission.Purpose)
+	}
+	bound, err = s.applyBinding(ctx, command, dto)
+	return bound, "legacy_binding", err
+}
+
+func applyFrozenAdmission(admission *Admission, dto *evaluationintake.CreateCommand) error {
+	if admission == nil || !admission.RequiresAssessment() {
+		return errors.WithCode(code.ErrInvalidArgument, "assessment admission is required")
+	}
+	if admission.ModelKind == "" || admission.ModelCode == "" || admission.ModelVersion == "" {
+		return errors.WithCode(code.ErrInvalidArgument, "assessment admission model identity is incomplete")
+	}
+	kind := admission.ModelKind
+	dto.ModelKind = &kind
+	if admission.ModelSubKind != "" {
+		v := admission.ModelSubKind
+		dto.ModelSubKind = &v
+	}
+	if admission.ModelAlgorithm != "" {
+		v := admission.ModelAlgorithm
+		dto.ModelAlgorithm = &v
+	}
+	modelCode := admission.ModelCode
+	modelVersion := admission.ModelVersion
+	dto.ModelCode = &modelCode
+	dto.ModelVersion = &modelVersion
+	if admission.ModelTitle != "" {
+		title := admission.ModelTitle
+		dto.ModelTitle = &title
+	}
+	return nil
 }
 
 // applyBinding 应用绑定

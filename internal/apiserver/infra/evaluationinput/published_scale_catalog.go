@@ -32,7 +32,7 @@ func (c PublishedScaleCatalog) GetScale(ctx context.Context, code string) (*scal
 				return decoded, nil
 			}
 			if !domain.IsNotFound(err) {
-				return nil, port.NewResolveError(port.FailureKindScaleNotFound, err, "量表不存在", "加载量表失败")
+				return nil, port.NewDependencyResolveError(port.DependencyCategoryModelCatalog, err, "加载量表依赖失败", "加载量表失败")
 			}
 		}
 	}
@@ -57,7 +57,7 @@ func (c PublishedScaleCatalog) GetScaleByRef(ctx context.Context, ref port.Model
 			return decoded, nil
 		}
 		if !domain.IsNotFound(err) {
-			return nil, port.NewResolveError(port.FailureKindModelNotFound, err, "解释模型不存在", "加载解释模型失败")
+			return nil, port.NewDependencyResolveError(port.DependencyCategoryModelCatalog, err, "加载解释模型依赖失败", "加载解释模型失败")
 		}
 	}
 	return nil, port.NewResolveError(port.FailureKindModelNotFound, domain.ErrNotFound, "解释模型不存在", "加载解释模型失败")

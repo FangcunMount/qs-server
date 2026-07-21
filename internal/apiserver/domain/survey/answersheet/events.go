@@ -61,6 +61,7 @@ func NewAnswerSheetSubmittedEvent(sheet *AnswerSheet) AnswerSheetSubmittedEvent 
 			FillerType:           filler.FillerType().String(),
 			TaskID:               submissionContext.TaskID(),
 			SubmittedAt:          sheet.FilledAt(),
+			Admission:            submissionContext.Admission().ToEventPayload(),
 		},
 	)
 }

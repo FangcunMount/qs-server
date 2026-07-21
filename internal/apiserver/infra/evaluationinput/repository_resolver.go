@@ -250,6 +250,17 @@ func (r *RepositoryAnswerSheetSnapshotReader) GetAnswerSheet(ctx context.Context
 			"result", "failed",
 			"error", err.Error(),
 		)
+		// Mongo answersheet repo returns (nil, nil) for missing docs; any error here is dependency.
+		return nil, port.NewDependencyResolveError(port.DependencyCategorySurvey, err, "加载答卷依赖失败", "加载答卷失败")
+	}
+	if answerSheet == nil {
+		err = fmt.Errorf("answersheet %d not found", answerSheetID)
+		l.Errorw("答卷不存在",
+			"answer_sheet_id", answerSheetID,
+			"action", "evaluate_assessment",
+			"result", "failed",
+			"error", err.Error(),
+		)
 		return nil, port.NewResolveError(port.FailureKindAnswerSheetNotFound, err, "答卷不存在", "加载答卷失败")
 	}
 
@@ -286,7 +297,10 @@ func (r *RepositoryQuestionnaireSnapshotReader) GetQuestionnaire(ctx context.Con
 			"questionnaire_version", version,
 			"error", err.Error(),
 		)
-		return nil, port.NewResolveError(port.FailureKindQuestionnaireNotFound, err, "加载问卷失败", "加载问卷失败")
+		if questionnaire.IsNotFound(err) {
+			return nil, port.NewResolveError(port.FailureKindQuestionnaireNotFound, err, "加载问卷失败", "加载问卷失败")
+		}
+		return nil, port.NewDependencyResolveError(port.DependencyCategorySurvey, err, "加载问卷依赖失败", "加载问卷失败")
 	}
 	if qnr == nil {
 		err = fmt.Errorf("问卷不存在或版本不匹配")

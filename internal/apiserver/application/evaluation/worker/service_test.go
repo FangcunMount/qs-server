@@ -48,7 +48,15 @@ func (s runRepoStub) FindLatestByAssessmentID(context.Context, uint64) (*evalrun
 }
 
 func TestExecuteReturnsRetryableFailureReceiptWithoutTransportRequery(t *testing.T) {
-	a, err := domainassessment.NewAssessment(9, domaintestee.NewID(7), domainassessment.NewQuestionnaireRefByCode(meta.NewCode("Q"), "1"), domainassessment.NewAnswerSheetRef(meta.FromUint64(3)), domainassessment.NewAdhocOrigin(), domainassessment.WithID(meta.FromUint64(1)))
+	a, err := domainassessment.NewAssessment(
+		9,
+		domaintestee.NewID(7),
+		domainassessment.NewQuestionnaireRefByCode(meta.NewCode("Q"), "1"),
+		domainassessment.NewAnswerSheetRef(meta.FromUint64(3)),
+		domainassessment.NewAdhocOrigin(),
+		domainassessment.WithID(meta.FromUint64(1)),
+		domainassessment.WithEvaluationModel(domainassessment.NewScaleEvaluationModelRef(meta.ID(0), meta.NewCode("S"), "1", "scale")),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

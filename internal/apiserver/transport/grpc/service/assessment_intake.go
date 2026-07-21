@@ -45,7 +45,13 @@ func (s *AssessmentIntakeService) EnsureAssessment(ctx context.Context, req *pb.
 		"questionnaire_code", req.QuestionnaireCode,
 		"questionnaire_version", req.QuestionnaireVersion,
 	)
-	result, err := s.journey.Ensure(ctx, journey.Command{OrgID: orgID, AnswerSheetID: req.AnswerSheetId, QuestionnaireCode: req.QuestionnaireCode, QuestionnaireVersion: req.QuestionnaireVersion, TesteeID: req.TesteeId, FillerID: req.FillerId, TaskID: req.TaskId, OriginType: req.OriginType, OriginID: req.OriginId})
+	result, err := s.journey.Ensure(ctx, journey.Command{
+		OrgID: orgID, AnswerSheetID: req.AnswerSheetId,
+		QuestionnaireCode: req.QuestionnaireCode, QuestionnaireVersion: req.QuestionnaireVersion,
+		TesteeID: req.TesteeId, FillerID: req.FillerId, TaskID: req.TaskId,
+		OriginType: req.OriginType, OriginID: req.OriginId,
+		Admission: admissionFromProto(req.GetAdmission()),
+	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -67,4 +73,21 @@ func (s *AssessmentIntakeService) ResolveAssessmentByAnswerSheetID(ctx context.C
 		return nil, toAssessmentQueryGRPCError(err)
 	}
 	return &pb.ResolveAssessmentByAnswerSheetIDResponse{TesteeId: result.TesteeID, AssessmentId: result.ID}, nil
+}
+
+func admissionFromProto(in *pb.AssessmentAdmission) *journey.Admission {
+	if in == nil || in.GetPurpose() == "" {
+		return nil
+	}
+	return &journey.Admission{
+		Purpose:              in.GetPurpose(),
+		QuestionnaireCode:    in.GetQuestionnaireCode(),
+		QuestionnaireVersion: in.GetQuestionnaireVersion(),
+		ModelKind:            in.GetModelKind(),
+		ModelSubKind:         in.GetModelSubKind(),
+		ModelAlgorithm:       in.GetModelAlgorithm(),
+		ModelCode:            in.GetModelCode(),
+		ModelVersion:         in.GetModelVersion(),
+		ModelTitle:           in.GetModelTitle(),
+	}
 }

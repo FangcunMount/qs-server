@@ -129,3 +129,39 @@ func TestPublishedScaleCatalogRejectsMissingPublishedModel(t *testing.T) {
 		t.Fatalf("failure kind = %s, want %s", got, port.FailureKindModelNotFound)
 	}
 }
+
+type stubScalePublishedReaderDependencyError struct{}
+
+func (stubScalePublishedReaderDependencyError) GetPublishedModelByRef(context.Context, rulesetport.Ref) (*rulesetport.PublishedModel, error) {
+	return nil, errors.New("mongo timeout")
+}
+func (stubScalePublishedReaderDependencyError) FindPublishedModelByQuestionnaire(context.Context, string, string) (*rulesetport.PublishedModel, error) {
+	return nil, errors.New("mongo timeout")
+}
+func (stubScalePublishedReaderDependencyError) FindPublishedModelByCode(context.Context, domain.Kind, string) (*rulesetport.PublishedModel, error) {
+	return nil, errors.New("mongo timeout")
+}
+func (stubScalePublishedReaderDependencyError) ListPublishedModels(context.Context, rulesetport.ListPublishedFilter) ([]*rulesetport.PublishedModel, int64, error) {
+	return nil, 0, errors.New("mongo timeout")
+}
+
+func TestPublishedScaleCatalogClassifiesDependencyErrorsAsRetryable(t *testing.T) {
+	t.Parallel()
+	catalog := NewPublishedScaleCatalog(stubScalePublishedReaderDependencyError{})
+	_, err := catalog.GetScaleByRef(t.Context(), port.ModelRef{
+		Kind:    port.EvaluationModelKindScale,
+		Code:    "SCL-DEP",
+		Version: "1.0.0",
+	})
+	if err == nil {
+		t.Fatal("expected dependency failure")
+	}
+	var kindCarrier port.FailureKindCarrier
+	var retryCarrier port.RetryableCarrier
+	if !errors.As(err, &kindCarrier) || kindCarrier.FailureKind() != port.FailureKindDependencyUnavailable {
+		t.Fatalf("kind = %#v err=%v", kindCarrier, err)
+	}
+	if !errors.As(err, &retryCarrier) || !retryCarrier.Retryable() {
+		t.Fatalf("expected retryable dependency error, got %v", err)
+	}
+}

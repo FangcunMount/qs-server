@@ -349,17 +349,43 @@ const (
 	FailureKindAnswerSheetNotFound          FailureKind = "answersheet_not_found"
 	FailureKindQuestionnaireNotFound        FailureKind = "questionnaire_not_found"
 	FailureKindQuestionnaireVersionMismatch FailureKind = "questionnaire_version_mismatch"
+	// FailureKindDependencyUnavailable is a transient dependency/infrastructure fault (EV-R004).
+	FailureKindDependencyUnavailable FailureKind = "dependency_unavailable"
+)
+
+// DependencyCategory identifies which external system produced a resolve failure.
+type DependencyCategory string
+
+const (
+	DependencyCategoryUnknown      DependencyCategory = ""
+	DependencyCategoryModelCatalog DependencyCategory = "modelcatalog"
+	DependencyCategorySurvey       DependencyCategory = "survey"
+	DependencyCategoryActor        DependencyCategory = "actor"
+	DependencyCategoryDatabase     DependencyCategory = "database"
+	DependencyCategoryTransport    DependencyCategory = "transport"
 )
 
 type FailureKindCarrier interface {
 	FailureKind() FailureKind
 }
 
+// RetryableCarrier reports whether an input-resolve failure may be automatically retried.
+type RetryableCarrier interface {
+	Retryable() bool
+}
+
+// DependencyCategoryCarrier reports the upstream dependency class for operators.
+type DependencyCategoryCarrier interface {
+	DependencyCategory() DependencyCategory
+}
+
 type ResolveError struct {
-	kind          FailureKind
-	message       string
-	cause         error
-	failureReason string
+	kind               FailureKind
+	message            string
+	cause              error
+	failureReason      string
+	retryable          bool
+	dependencyCategory DependencyCategory
 }
 
 func NewResolveError(kind FailureKind, cause error, message, failurePrefix string) *ResolveError {
@@ -368,6 +394,19 @@ func NewResolveError(kind FailureKind, cause error, message, failurePrefix strin
 		message:       message,
 		cause:         cause,
 		failureReason: failureReason(failurePrefix, cause),
+		retryable:     false,
+	}
+}
+
+// NewDependencyResolveError builds a retryable infrastructure failure (EV-R004).
+func NewDependencyResolveError(category DependencyCategory, cause error, message, failurePrefix string) *ResolveError {
+	return &ResolveError{
+		kind:               FailureKindDependencyUnavailable,
+		message:            message,
+		cause:              cause,
+		failureReason:      failureReason(failurePrefix, cause),
+		retryable:          true,
+		dependencyCategory: category,
 	}
 }
 
@@ -409,6 +448,17 @@ func (e *ResolveError) FailureReason() string {
 		return e.failureReason
 	}
 	return failureReason("评估输入加载失败", e.cause)
+}
+
+func (e *ResolveError) Retryable() bool {
+	return e != nil && e.retryable
+}
+
+func (e *ResolveError) DependencyCategory() DependencyCategory {
+	if e == nil {
+		return DependencyCategoryUnknown
+	}
+	return e.dependencyCategory
 }
 
 func failureReason(prefix string, cause error) string {

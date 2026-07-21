@@ -39,6 +39,7 @@ func TestAssessmentFailedAndRetryLifecycleEvents(t *testing.T) {
 		NewAnswerSheetRef(meta.FromUint64(2002)),
 		NewAdhocOrigin(),
 		WithID(NewID(5001)),
+		WithEvaluationModel(NewScaleEvaluationModelRef(meta.ID(0), meta.NewCode("s-code"), "1.0.0", "scale")),
 	)
 	if err != nil {
 		t.Fatalf("NewAssessment returned error: %v", err)
@@ -86,6 +87,7 @@ func TestResumeForExecutionRetryDoesNotEmitDuplicateRequestedEvent(t *testing.T)
 		NewAnswerSheetRef(meta.FromUint64(2002)),
 		NewAdhocOrigin(),
 		WithID(NewID(5001)),
+		WithEvaluationModel(NewScaleEvaluationModelRef(meta.ID(0), meta.NewCode("s-code"), "1.0.0", "scale")),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -264,3 +266,75 @@ func TestApplyScoringProjectionRejectsMismatchedEvaluationModelRef(t *testing.T)
 		t.Fatalf("ApplyScoringProjectionAt error = %v, want ErrEvaluationModelMismatch", err)
 	}
 }
+
+func TestSubmitAndRetryRejectUnboundAssessment(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		run  func(t *testing.T, a *Assessment)
+	}{
+		{
+			name: "submit unbound pending",
+			run: func(t *testing.T, a *Assessment) {
+				if err := a.Submit(); err != ErrNoEvaluationModel {
+					t.Fatalf("Submit error = %v, want ErrNoEvaluationModel", err)
+				}
+				if !a.Status().IsPending() || len(a.Events()) != 0 {
+					t.Fatalf("unbound submit mutated state: status=%s events=%d", a.Status(), len(a.Events()))
+				}
+			},
+		},
+		{
+			name: "retry unbound failed",
+			run: func(t *testing.T, a *Assessment) {
+				// Reconstruct a historical questionnaire-only Assessment that reached failed
+				// without going through the new Submit invariant.
+				failed := Reconstruct(
+					a.ID(),
+					a.OrgID(),
+					a.TesteeID(),
+					a.QuestionnaireRef(),
+					a.AnswerSheetRef(),
+					a.Origin(),
+					StatusFailed,
+					nil,
+					nil,
+					nil,
+					nil,
+					ptrTime(time.Unix(50, 0)),
+					ptrString("legacy unbound"),
+					nil,
+				)
+				if err := failed.RetryFromFailed(); err != ErrNoEvaluationModel {
+					t.Fatalf("RetryFromFailed error = %v, want ErrNoEvaluationModel", err)
+				}
+				if !failed.Status().IsFailed() || len(failed.Events()) != 0 {
+					t.Fatalf("unbound retry mutated state: status=%s events=%d", failed.Status(), len(failed.Events()))
+				}
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			a, err := NewAssessment(
+				1,
+				testee.NewID(1100),
+				NewQuestionnaireRefByCode(meta.NewCode("q-unbound"), "v1"),
+				NewAnswerSheetRef(meta.FromUint64(2100)),
+				NewAdhocOrigin(),
+				WithID(NewID(5100)),
+			)
+			if err != nil {
+				t.Fatalf("NewAssessment: %v", err)
+			}
+			tc.run(t, a)
+		})
+	}
+}
+
+func ptrTime(v time.Time) *time.Time { return &v }
+func ptrString(v string) *string     { return &v }

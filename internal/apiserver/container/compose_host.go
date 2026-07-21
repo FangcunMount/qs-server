@@ -24,6 +24,7 @@ import (
 	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
@@ -165,6 +166,9 @@ func (c *Container) SetAssessmentModelModule(module *ammod.Module) {
 	c.AssessmentModelModule = module
 	if c.SurveyModule != nil {
 		c.SurveyModule.SetCatalogManagementService(module.Management)
+		if module.PublishedCatalog != nil {
+			c.SurveyModule.SetAssessmentBindingResolver(rulesetInfra.NewAssessmentBindingResolver(module.PublishedCatalog))
+		}
 	}
 	c.registerModule("modelcatalog", module)
 }

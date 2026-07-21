@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -21,6 +22,7 @@ type submissionService struct {
 	reader            surveyreadmodel.AnswerSheetReader
 	durableStore      SubmissionDurableStore
 	questionnaireRepo questionnaire.Repository
+	binding           rulesetport.AssessmentBindingResolver
 }
 
 // NewSubmissionService 创建答卷提交服务

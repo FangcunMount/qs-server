@@ -157,21 +157,73 @@ func TestMapInputResolveErrorPreservesExternalAPICodes(t *testing.T) {
 		{name: "answer sheet", kind: evaluationinput.FailureKindAnswerSheetNotFound, code: errorCode.ErrAnswerSheetNotFound},
 		{name: "questionnaire", kind: evaluationinput.FailureKindQuestionnaireNotFound, code: errorCode.ErrQuestionnaireNotFound},
 		{name: "questionnaire version", kind: evaluationinput.FailureKindQuestionnaireVersionMismatch, code: errorCode.ErrQuestionnaireNotFound},
+		{name: "dependency", kind: evaluationinput.FailureKindDependencyUnavailable, code: errorCode.ErrDatabase},
 	}
 	for _, tc := range cases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			err := evaluationinput.NewResolveError(tc.kind, errors.New("missing"), "missing", "load failed")
+			var err error
+			if tc.kind == evaluationinput.FailureKindDependencyUnavailable {
+				err = evaluationinput.NewDependencyResolveError(evaluationinput.DependencyCategoryModelCatalog, errors.New("timeout"), "dep failed", "load failed")
+			} else {
+				err = evaluationinput.NewResolveError(tc.kind, errors.New("missing"), "missing", "load failed")
+			}
 			mapped := mapInputResolveError(err)
 			if !cberrors.IsCode(mapped, tc.code) {
 				t.Fatalf("mapped code = %d, want %d", cberrors.ParseCoder(mapped).Code(), tc.code)
 			}
-			var reason evaluationinput.FailureReasonCarrier
-			if !errors.As(mapped, &reason) || reason.FailureReason() != "load failed: missing" {
-				t.Fatalf("mapped error should preserve failure reason, got %v", mapped)
+			if tc.kind != evaluationinput.FailureKindDependencyUnavailable {
+				var reason evaluationinput.FailureReasonCarrier
+				if !errors.As(mapped, &reason) || reason.FailureReason() != "load failed: missing" {
+					t.Fatalf("mapped error should preserve failure reason, got %v", mapped)
+				}
 			}
 		})
+	}
+}
+
+func TestRunFailureFromInputResolveErrorClassifiesRetryability(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name      string
+		err       error
+		wantKind  evalrun.FailureKind
+		retryable bool
+	}{
+		{
+			name:      "model not found terminal",
+			err:       evaluationinput.NewResolveError(evaluationinput.FailureKindModelNotFound, errors.New("gone"), "missing", "load"),
+			wantKind:  evalrun.FailureKindValidation,
+			retryable: false,
+		},
+		{
+			name:      "dependency retryable",
+			err:       evaluationinput.NewDependencyResolveError(evaluationinput.DependencyCategorySurvey, errors.New("timeout"), "dep", "load"),
+			wantKind:  evalrun.FailureKindDependency,
+			retryable: true,
+		},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := runFailureFromInputResolveError(tc.err)
+			if got.Kind != tc.wantKind || got.Retryable != tc.retryable {
+				t.Fatalf("failure = %#v, want kind=%s retryable=%v", got, tc.wantKind, tc.retryable)
+			}
+		})
+	}
+}
+
+func TestIsInputResolveInterrupted(t *testing.T) {
+	t.Parallel()
+	if !isInputResolveInterrupted(context.Canceled) {
+		t.Fatal("canceled must be interrupted")
+	}
+	if isInputResolveInterrupted(errors.New("boom")) {
+		t.Fatal("ordinary error must not be interrupted")
 	}
 }
 

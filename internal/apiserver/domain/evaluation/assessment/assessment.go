@@ -163,11 +163,14 @@ func Reconstruct(
 // ==================== 状态迁移方法 ====================
 
 // Submit 提交答卷
-// 前置条件：只有 pending 状态可以提交
+// 前置条件：pending，且 ModelRef / QuestionnaireRef / AnswerSheetRef 完整（EV-R003）
 // 后置条件：状态变为 submitted，发布 evaluation.requested
 func (a *Assessment) Submit() error {
 	if !a.status.IsPending() {
 		return NewInvalidStatusError("submit", a.status)
+	}
+	if err := a.ensureReadyForEvaluationRequest(); err != nil {
+		return err
 	}
 
 	now := time.Now()
@@ -299,11 +302,14 @@ func (a *Assessment) PrepareFailure(reason string, failedAt time.Time) (*Assessm
 }
 
 // RetryFromFailed 从失败状态重试
-// 前置条件：只有 failed 状态可以重试
+// 前置条件：failed，且 ModelRef / QuestionnaireRef / AnswerSheetRef 完整（EV-R003）
 // 后置条件：状态变为 submitted，清除失败信息，发布 evaluation.requested
 func (a *Assessment) RetryFromFailed() error {
 	if !a.status.IsFailed() {
 		return NewInvalidStatusError("retry from failed", a.status)
+	}
+	if err := a.ensureReadyForEvaluationRequest(); err != nil {
+		return err
 	}
 
 	now := time.Now()
@@ -323,6 +329,21 @@ func (a *Assessment) RetryFromFailed() error {
 		now,
 	))
 
+	return nil
+}
+
+// ensureReadyForEvaluationRequest rejects emitting evaluation.requested without
+// a complete model and questionnaire/answersheet identity (EV-R003).
+func (a *Assessment) ensureReadyForEvaluationRequest() error {
+	if a.questionnaireRef.IsEmpty() {
+		return fmt.Errorf("%w: questionnaire reference is required", ErrInvalidArgument)
+	}
+	if a.answerSheetRef.IsEmpty() {
+		return fmt.Errorf("%w: answer sheet reference is required", ErrInvalidArgument)
+	}
+	if !a.HasEvaluationModel() {
+		return ErrNoEvaluationModel
+	}
 	return nil
 }
 

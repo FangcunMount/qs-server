@@ -69,19 +69,23 @@ func (r QuestionnaireRef) IsEmpty() bool {
 
 // SubmissionContext 描述一次答卷提交的业务上下文。
 type SubmissionContext struct {
-	filler *actor.FillerRef
-	testee *actor.TesteeRef
-	orgID  meta.ID
-	taskID string
+	filler    *actor.FillerRef
+	testee    *actor.TesteeRef
+	orgID     meta.ID
+	taskID    string
+	admission Admission
 }
 
 // NewSubmissionContext 创建提交上下文。
-func NewSubmissionContext(filler *actor.FillerRef, testee *actor.TesteeRef, orgID meta.ID, taskID string) (SubmissionContext, error) {
+func NewSubmissionContext(filler *actor.FillerRef, testee *actor.TesteeRef, orgID meta.ID, taskID string, admission ...Admission) (SubmissionContext, error) {
 	ctx := SubmissionContext{
 		filler: cloneFillerRef(filler),
 		testee: cloneTesteeRef(testee),
 		orgID:  orgID,
 		taskID: strings.TrimSpace(taskID),
+	}
+	if len(admission) > 0 {
+		ctx.admission = admission[0]
 	}
 	if err := ctx.Validate(); err != nil {
 		return SubmissionContext{}, err
@@ -90,13 +94,17 @@ func NewSubmissionContext(filler *actor.FillerRef, testee *actor.TesteeRef, orgI
 }
 
 // ReconstructSubmissionContext 从持久化数据重建提交上下文，允许历史数据缺字段。
-func ReconstructSubmissionContext(filler *actor.FillerRef, testee *actor.TesteeRef, orgID meta.ID, taskID string) SubmissionContext {
-	return SubmissionContext{
+func ReconstructSubmissionContext(filler *actor.FillerRef, testee *actor.TesteeRef, orgID meta.ID, taskID string, admission ...Admission) SubmissionContext {
+	ctx := SubmissionContext{
 		filler: cloneFillerRef(filler),
 		testee: cloneTesteeRef(testee),
 		orgID:  orgID,
 		taskID: taskID,
 	}
+	if len(admission) > 0 {
+		ctx.admission = admission[0]
+	}
+	return ctx
 }
 
 func (c SubmissionContext) Validate() error {
@@ -114,6 +122,11 @@ func (c SubmissionContext) Validate() error {
 	}
 	if c.orgID.IsZero() {
 		return errors.New("org id is required")
+	}
+	if !c.admission.IsZero() {
+		if err := c.admission.Validate(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -141,12 +154,21 @@ func (c SubmissionContext) TaskID() string {
 	return c.taskID
 }
 
+func (c SubmissionContext) Admission() Admission {
+	return c.admission
+}
+
+func (c SubmissionContext) HasAdmission() bool {
+	return !c.admission.IsZero()
+}
+
 func (c SubmissionContext) clone() SubmissionContext {
 	return SubmissionContext{
-		filler: cloneFillerRef(c.filler),
-		testee: cloneTesteeRef(c.testee),
-		orgID:  c.orgID,
-		taskID: c.taskID,
+		filler:    cloneFillerRef(c.filler),
+		testee:    cloneTesteeRef(c.testee),
+		orgID:     c.orgID,
+		taskID:    c.taskID,
+		admission: c.admission,
 	}
 }
 

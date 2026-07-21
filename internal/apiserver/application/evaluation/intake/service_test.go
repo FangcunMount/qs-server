@@ -52,10 +52,20 @@ func (s *stagerStub) Stage(_ context.Context, events ...event.DomainEvent) error
 	return nil
 }
 
+type validatorStub struct{}
+
+func (validatorStub) ValidateEvaluationModel(context.Context, domainassessment.EvaluationModelRef, domainassessment.QuestionnaireRef) error {
+	return nil
+}
+
 func TestServiceCreatesThenSubmitsAssessmentThroughTransactionalOutbox(t *testing.T) {
 	repo, tx, stager := &intakeRepoStub{}, &txStub{}, &stagerStub{}
-	service := NewService(repo, nil, tx, stager, nil)
-	created, err := service.CreateForAnswerSheet(context.Background(), CreateCommand{OrgID: 1, TesteeID: 2, QuestionnaireCode: "Q-001", QuestionnaireVersion: "v1", AnswerSheetID: 3, OriginType: "adhoc"})
+	service := NewService(repo, validatorStub{}, tx, stager, nil)
+	kind, code, version := "scale", "MODEL-1", "1.0.0"
+	created, err := service.CreateForAnswerSheet(context.Background(), CreateCommand{
+		OrgID: 1, TesteeID: 2, QuestionnaireCode: "Q-001", QuestionnaireVersion: "v1", AnswerSheetID: 3, OriginType: "adhoc",
+		ModelKind: &kind, ModelCode: &code, ModelVersion: &version,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,6 +87,23 @@ func TestServiceCreatesThenSubmitsAssessmentThroughTransactionalOutbox(t *testin
 	}
 	if !found {
 		t.Fatalf("staged=%v", stager.types)
+	}
+}
+
+func TestServiceRejectsSubmitForEvaluationWithoutModel(t *testing.T) {
+	repo, tx, stager := &intakeRepoStub{}, &txStub{}, &stagerStub{}
+	service := NewService(repo, nil, tx, stager, nil)
+	created, err := service.CreateForAnswerSheet(context.Background(), CreateCommand{
+		OrgID: 1, TesteeID: 2, QuestionnaireCode: "Q-001", QuestionnaireVersion: "v1", AnswerSheetID: 3, OriginType: "adhoc",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.SubmitForEvaluation(context.Background(), created.ID); err == nil {
+		t.Fatal("expected SubmitForEvaluation without model to fail")
+	}
+	if repo.saves != 1 || repo.aggregate == nil || !repo.aggregate.Status().IsPending() {
+		t.Fatalf("unbound submit mutated durable state: saves=%d status=%v", repo.saves, repo.aggregate)
 	}
 }
 

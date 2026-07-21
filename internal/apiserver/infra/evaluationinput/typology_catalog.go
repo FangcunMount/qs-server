@@ -89,7 +89,10 @@ func (p TypologyModelInputProvider) resolveConfiguredInput(ctx context.Context, 
 	}
 	payload, err := p.catalog.GetTypologyModelByRef(ctx, ref.ModelRef)
 	if err != nil {
-		return nil, port.NewResolveError(port.FailureKindModelNotFound, err, typologyModelNotFoundMessage(p.algorithm), "加载解释模型失败")
+		if modelcatalog.IsNotFound(err) {
+			return nil, port.NewResolveError(port.FailureKindModelNotFound, err, typologyModelNotFoundMessage(p.algorithm), "加载解释模型失败")
+		}
+		return nil, port.NewDependencyResolveError(port.DependencyCategoryModelCatalog, err, "加载解释模型依赖失败", "加载解释模型失败")
 	}
 	if payload == nil {
 		return nil, port.NewResolveError(port.FailureKindModelNotFound, fmt.Errorf("typology model payload is nil"), typologyModelNotFoundMessage(p.algorithm), "加载解释模型失败")

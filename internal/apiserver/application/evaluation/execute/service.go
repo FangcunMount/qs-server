@@ -190,7 +190,10 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	// 解析评估输入
 	input, err := evaluationInputWorkflow{resolver: s.inputResolver}.Resolve(ctx, a, assessmentID)
 	if err != nil {
-		return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, inputResolveFailureReason(err), evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: err.Error()}, err)
+		if isInputResolveInterrupted(err) {
+			return err
+		}
+		return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, inputResolveFailureReason(err), runFailureFromInputResolveError(err), err)
 	}
 
 	if ref := inputSnapshotRefFromResolvedInput(a, input); ref != "" {

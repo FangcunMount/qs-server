@@ -129,6 +129,8 @@ func mapInputResolveError(err error) error {
 		return evalerrors.QuestionnaireNotFound(err, "加载问卷失败")
 	case evaluationinput.FailureKindQuestionnaireVersionMismatch:
 		return evalerrors.QuestionnaireNotFound(err, "问卷不存在或版本不匹配")
+	case evaluationinput.FailureKindDependencyUnavailable:
+		return evalerrors.Database(err, "评估输入依赖暂时不可用")
 	default:
 		return err
 	}
@@ -141,6 +143,36 @@ func inputResolveFailureReason(err error) string {
 		return carrier.FailureReason()
 	}
 	return "评估输入加载失败: " + err.Error()
+}
+
+// isInputResolveInterrupted reports shutdown/cancel that must not become a terminal Assessment failure.
+func isInputResolveInterrupted(err error) bool {
+	return stderrors.Is(err, context.Canceled) || stderrors.Is(err, context.DeadlineExceeded)
+}
+
+// runFailureFromInputResolveError maps ResolveError carriers to EvaluationRun Failure (EV-R004).
+func runFailureFromInputResolveError(err error) evalrun.Failure {
+	var retryCarrier evaluationinput.RetryableCarrier
+	retryable := stderrors.As(err, &retryCarrier) && retryCarrier.Retryable()
+
+	var kindCarrier evaluationinput.FailureKindCarrier
+	if stderrors.As(err, &kindCarrier) {
+		switch kindCarrier.FailureKind() {
+		case evaluationinput.FailureKindDependencyUnavailable:
+			return evalrun.Failure{Kind: evalrun.FailureKindDependency, Message: err.Error(), Retryable: true}
+		case evaluationinput.FailureKindModelNotFound,
+			evaluationinput.FailureKindUnsupportedModel,
+			evaluationinput.FailureKindScaleNotFound,
+			evaluationinput.FailureKindAnswerSheetNotFound,
+			evaluationinput.FailureKindQuestionnaireNotFound,
+			evaluationinput.FailureKindQuestionnaireVersionMismatch:
+			return evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: err.Error(), Retryable: false}
+		}
+	}
+	if retryable {
+		return evalrun.Failure{Kind: evalrun.FailureKindDependency, Message: err.Error(), Retryable: true}
+	}
+	return evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: err.Error(), Retryable: false}
 }
 
 // evaluationFailureFinalizer 评估失败标记器

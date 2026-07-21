@@ -28,12 +28,20 @@ func TestNewAssessmentRepositoryCreatesCommandRepository(t *testing.T) {
 // both writes to the concrete MySQL repository. A dry-run DB keeps the test
 // hermetic; the lookup wrapper only provides the just-persisted aggregate for
 // SubmitForEvaluation's repository read.
+type acceptingModelValidator struct{}
+
+func (acceptingModelValidator) ValidateEvaluationModel(context.Context, domainassessment.EvaluationModelRef, domainassessment.QuestionnaireRef) error {
+	return nil
+}
+
 func TestCreateForAnswerSheetThenSubmitForEvaluationWithConcreteRepository(t *testing.T) {
 	repo := &persistedAssessmentRepository{Repository: NewAssessmentRepository(newDryRunAssessmentDB(t))}
-	service := evaluationintake.NewService(repo, nil, immediateTransactionRunner{}, discardEventStager{}, nil)
+	service := evaluationintake.NewService(repo, acceptingModelValidator{}, immediateTransactionRunner{}, discardEventStager{}, nil)
 
+	kind, code, version := "scale", "MODEL-1", "1.0.0"
 	created, err := service.CreateForAnswerSheet(context.Background(), evaluationintake.CreateCommand{
 		OrgID: 1, TesteeID: 2, QuestionnaireCode: "Q-001", QuestionnaireVersion: "v1", AnswerSheetID: 3, OriginType: "adhoc",
+		ModelKind: &kind, ModelCode: &code, ModelVersion: &version,
 	})
 	if err != nil {
 		t.Fatalf("CreateForAnswerSheet: %v", err)

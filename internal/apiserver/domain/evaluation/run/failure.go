@@ -8,6 +8,8 @@ const (
 	FailureKindCalculation FailureKind = "calculation"
 	FailureKindTimeout     FailureKind = "timeout"
 	FailureKindInternal    FailureKind = "internal"
+	// FailureKindDependency is a transient upstream dependency fault (EV-R004).
+	FailureKindDependency FailureKind = "dependency"
 )
 
 func (k FailureKind) String() string { return string(k) }

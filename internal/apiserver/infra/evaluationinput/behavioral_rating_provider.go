@@ -57,7 +57,10 @@ func (p BehavioralRatingModelInputProvider) ResolveInput(ctx context.Context, re
 	}
 	model, err := p.catalog.GetBehavioralRatingByRef(ctx, ref.ModelRef)
 	if err != nil {
-		return nil, port.NewResolveError(port.FailureKindModelNotFound, err, "解释模型不存在", "加载解释模型失败")
+		if modelcatalog.IsNotFound(err) {
+			return nil, port.NewResolveError(port.FailureKindModelNotFound, err, "解释模型不存在", "加载解释模型失败")
+		}
+		return nil, port.NewDependencyResolveError(port.DependencyCategoryModelCatalog, err, "加载解释模型依赖失败", "加载解释模型失败")
 	}
 	answerSheet, err := p.answerSheetReader.GetAnswerSheet(ctx, ref.AnswerSheetID)
 	if err != nil {
