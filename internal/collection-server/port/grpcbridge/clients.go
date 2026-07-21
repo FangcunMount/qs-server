@@ -21,7 +21,7 @@ type ParticipantReportReader interface {
 	GetAssessmentReport(context.Context, uint64, uint64) (*AssessmentReportOutput, error)
 }
 type AssessmentIntakeReader interface {
-	ResolveAssessmentByAnswerSheetID(context.Context, uint64) (uint64, uint64, error)
+	ResolveAssessmentByAnswerSheetID(context.Context, uint64) (testeeID, assessmentID uint64, readinessPhase string, err error)
 }
 
 // ActorReader 受试者读端口。

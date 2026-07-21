@@ -84,13 +84,14 @@ func (s submissionGuardStub) Run(ctx context.Context, _ string, body func(contex
 }
 
 type assessmentResolverStub struct {
-	testeeID     uint64
-	assessmentID uint64
-	err          error
+	testeeID       uint64
+	assessmentID   uint64
+	readinessPhase string
+	err            error
 }
 
-func (s assessmentResolverStub) ResolveAssessmentByAnswerSheetID(context.Context, uint64) (uint64, uint64, error) {
-	return s.testeeID, s.assessmentID, s.err
+func (s assessmentResolverStub) ResolveAssessmentByAnswerSheetID(context.Context, uint64) (uint64, uint64, string, error) {
+	return s.testeeID, s.assessmentID, s.readinessPhase, s.err
 }
 
 func publishedQuestionnaire() *collectionquestionnaire.QuestionnaireResponse {
@@ -257,13 +258,57 @@ func TestAssessmentReadinessPending(t *testing.T) {
 	}
 }
 
+func TestAssessmentReadinessPendingByPhase(t *testing.T) {
+	service := newAcceptService(nil, submissionReaderStub{sheet: &AnswerSheetResponse{ID: "42", TesteeID: "7"}}, assessmentResolverStub{testeeID: 7, readinessPhase: "pending"})
+	got, err := service.GetAssessmentReadiness(t.Context(), 11, 42, 7)
+	if err != nil {
+		t.Fatalf("GetAssessmentReadiness() error = %v", err)
+	}
+	if got.Status != "pending" || got.NextPollAfterMs != 2000 {
+		t.Fatalf("GetAssessmentReadiness() = %#v", got)
+	}
+}
+
 func TestAssessmentReadinessReady(t *testing.T) {
-	service := newAcceptService(nil, submissionReaderStub{sheet: &AnswerSheetResponse{ID: "42", TesteeID: "7", CreatedAt: "2026-07-18 12:34:56"}}, assessmentResolverStub{testeeID: 7, assessmentID: 99})
+	service := newAcceptService(nil, submissionReaderStub{sheet: &AnswerSheetResponse{ID: "42", TesteeID: "7", CreatedAt: "2026-07-18 12:34:56"}}, assessmentResolverStub{testeeID: 7, assessmentID: 99, readinessPhase: "ready"})
 	got, err := service.GetAssessmentReadiness(t.Context(), 11, 42, 7)
 	if err != nil {
 		t.Fatalf("GetAssessmentReadiness() error = %v", err)
 	}
 	if got.Status != "ready" || got.AssessmentID != "99" || got.NextPollAfterMs != 0 {
+		t.Fatalf("GetAssessmentReadiness() = %#v", got)
+	}
+}
+
+func TestAssessmentReadinessNoAssessmentRequired(t *testing.T) {
+	service := newAcceptService(nil, submissionReaderStub{sheet: &AnswerSheetResponse{ID: "42", TesteeID: "7"}}, assessmentResolverStub{testeeID: 7, readinessPhase: "no_assessment_required"})
+	got, err := service.GetAssessmentReadiness(t.Context(), 11, 42, 7)
+	if err != nil {
+		t.Fatalf("GetAssessmentReadiness() error = %v", err)
+	}
+	if got.Status != "no_assessment_required" || got.AssessmentID != "" || got.NextPollAfterMs != 0 {
+		t.Fatalf("GetAssessmentReadiness() = %#v", got)
+	}
+}
+
+func TestAssessmentReadinessFailed(t *testing.T) {
+	service := newAcceptService(nil, submissionReaderStub{sheet: &AnswerSheetResponse{ID: "42", TesteeID: "7"}}, assessmentResolverStub{testeeID: 7, assessmentID: 99, readinessPhase: "failed"})
+	got, err := service.GetAssessmentReadiness(t.Context(), 11, 42, 7)
+	if err != nil {
+		t.Fatalf("GetAssessmentReadiness() error = %v", err)
+	}
+	if got.Status != "failed" || got.AssessmentID != "99" || got.NextPollAfterMs != 0 {
+		t.Fatalf("GetAssessmentReadiness() = %#v", got)
+	}
+}
+
+func TestAssessmentReadinessUnknownPhaseKeepsPolling(t *testing.T) {
+	service := newAcceptService(nil, submissionReaderStub{sheet: &AnswerSheetResponse{ID: "42", TesteeID: "7"}}, assessmentResolverStub{testeeID: 7, readinessPhase: "weird"})
+	got, err := service.GetAssessmentReadiness(t.Context(), 11, 42, 7)
+	if err != nil {
+		t.Fatalf("GetAssessmentReadiness() error = %v", err)
+	}
+	if got.Status != "pending" || got.NextPollAfterMs != 2000 {
 		t.Fatalf("GetAssessmentReadiness() = %#v", got)
 	}
 }

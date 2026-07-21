@@ -16,9 +16,9 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// AssessmentResolver reads the asynchronous Assessment created by the worker.
+// AssessmentResolver reads Assessment readiness for a submitted AnswerSheet.
 type AssessmentResolver interface {
-	ResolveAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (testeeID, assessmentID uint64, err error)
+	ResolveAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (testeeID, assessmentID uint64, readinessPhase string, err error)
 }
 
 type LeaseIdempotencyGuard interface {
@@ -328,8 +328,9 @@ func (s *SubmissionService) GetAssessmentReadiness(ctx context.Context, writerID
 	if s.assessmentResolver == nil {
 		return nil, status.Error(codes.Unavailable, "assessment readiness is unavailable")
 	}
-	resolvedTesteeID, assessmentID, err := s.assessmentResolver.ResolveAssessmentByAnswerSheetID(ctx, answerSheetID)
+	resolvedTesteeID, assessmentID, readinessPhase, err := s.assessmentResolver.ResolveAssessmentByAnswerSheetID(ctx, answerSheetID)
 	if status.Code(err) == codes.NotFound {
+		// Legacy servers that still return NotFound for missing Assessment.
 		logger.L(ctx).Infow("测评尚未就绪", "action", "assessment_readiness", "stage", "assessment_pending",
 			"answersheet_id", answerSheetID, "testee_id", actualTesteeID, "result", "pending")
 		return &AssessmentReadinessResponse{Status: "pending", AnswerSheetID: strconv.FormatUint(answerSheetID, 10), NextPollAfterMs: 2000}, nil
@@ -337,21 +338,60 @@ func (s *SubmissionService) GetAssessmentReadiness(ctx context.Context, writerID
 	if err != nil {
 		return nil, status.Error(codes.Unavailable, "assessment readiness is unavailable")
 	}
-	if resolvedTesteeID != actualTesteeID || assessmentID == 0 {
+	if resolvedTesteeID != actualTesteeID {
 		return nil, status.Error(codes.Unavailable, "assessment readiness is inconsistent")
 	}
-	if createdAt, parseErr := parseAnswerSheetCreatedAt(sheet.CreatedAt); parseErr == nil {
-		resilience.ObserveSubmitToAssessmentReady(time.Since(createdAt))
-	} else {
-		resilience.ObserveAssessmentReadiness("invalid_created_at")
+
+	phase := readinessPhase
+	if phase == "" {
+		// Old clients/servers without readiness_phase: ID present => ready, else pending.
+		if assessmentID != 0 {
+			phase = "ready"
+		} else {
+			phase = "pending"
+		}
 	}
-	logger.L(ctx).Infow("测评已就绪", "action", "assessment_readiness", "stage", "assessment_ready",
-		"answersheet_id", answerSheetID, "assessment_id", assessmentID, "testee_id", actualTesteeID, "result", "ready")
-	return &AssessmentReadinessResponse{
-		Status:        "ready",
-		AnswerSheetID: strconv.FormatUint(answerSheetID, 10),
-		AssessmentID:  strconv.FormatUint(assessmentID, 10),
-	}, nil
+
+	answerSheetIDStr := strconv.FormatUint(answerSheetID, 10)
+	switch phase {
+	case "pending":
+		logger.L(ctx).Infow("测评尚未就绪", "action", "assessment_readiness", "stage", "assessment_pending",
+			"answersheet_id", answerSheetID, "testee_id", actualTesteeID, "result", "pending")
+		return &AssessmentReadinessResponse{Status: "pending", AnswerSheetID: answerSheetIDStr, NextPollAfterMs: 2000}, nil
+	case "no_assessment_required":
+		logger.L(ctx).Infow("无需创建测评", "action", "assessment_readiness", "stage", "no_assessment_required",
+			"answersheet_id", answerSheetID, "testee_id", actualTesteeID, "result", "no_assessment_required")
+		return &AssessmentReadinessResponse{Status: "no_assessment_required", AnswerSheetID: answerSheetIDStr}, nil
+	case "failed":
+		logger.L(ctx).Infow("测评准入失败", "action", "assessment_readiness", "stage", "assessment_failed",
+			"answersheet_id", answerSheetID, "assessment_id", assessmentID, "testee_id", actualTesteeID, "result", "failed")
+		resp := &AssessmentReadinessResponse{Status: "failed", AnswerSheetID: answerSheetIDStr}
+		if assessmentID != 0 {
+			resp.AssessmentID = strconv.FormatUint(assessmentID, 10)
+		}
+		return resp, nil
+	case "ready":
+		if assessmentID == 0 {
+			return nil, status.Error(codes.Unavailable, "assessment readiness is inconsistent")
+		}
+		if createdAt, parseErr := parseAnswerSheetCreatedAt(sheet.CreatedAt); parseErr == nil {
+			resilience.ObserveSubmitToAssessmentReady(time.Since(createdAt))
+		} else {
+			resilience.ObserveAssessmentReadiness("invalid_created_at")
+		}
+		logger.L(ctx).Infow("测评已就绪", "action", "assessment_readiness", "stage", "assessment_ready",
+			"answersheet_id", answerSheetID, "assessment_id", assessmentID, "testee_id", actualTesteeID, "result", "ready")
+		return &AssessmentReadinessResponse{
+			Status:        "ready",
+			AnswerSheetID: answerSheetIDStr,
+			AssessmentID:  strconv.FormatUint(assessmentID, 10),
+		}, nil
+	default:
+		// Unknown phase: keep polling so old/new clients do not hang on a terminal assumption.
+		logger.L(ctx).Infow("未知 readiness phase，按 pending 轮询", "action", "assessment_readiness", "stage", "assessment_pending",
+			"answersheet_id", answerSheetID, "testee_id", actualTesteeID, "readiness_phase", phase, "result", "pending")
+		return &AssessmentReadinessResponse{Status: "pending", AnswerSheetID: answerSheetIDStr, NextPollAfterMs: 2000}, nil
+	}
 }
 
 func parseAnswerSheetCreatedAt(value string) (time.Time, error) {

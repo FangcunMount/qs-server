@@ -388,7 +388,7 @@ type AssessmentIntakeClient struct {
 func NewAssessmentIntakeClient(client *Client) *AssessmentIntakeClient {
 	return &AssessmentIntakeClient{client: client, intakeClient: pb.NewAssessmentIntakeServiceClient(client.Conn())}
 }
-func (c *AssessmentIntakeClient) ResolveAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (testeeID, assessmentID uint64, err error) {
+func (c *AssessmentIntakeClient) ResolveAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (testeeID, assessmentID uint64, readinessPhase string, err error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
@@ -396,9 +396,9 @@ func (c *AssessmentIntakeClient) ResolveAssessmentByAnswerSheetID(ctx context.Co
 		AnswerSheetId: answerSheetID,
 	})
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, "", err
 	}
-	return resp.GetTesteeId(), resp.GetAssessmentId(), nil
+	return resp.GetTesteeId(), resp.GetAssessmentId(), resp.GetReadinessPhase(), nil
 }
 
 func convertAssessmentDetail(assessment *pb.AssessmentDetail) *AssessmentDetailOutput {

@@ -134,6 +134,10 @@ message ResolveAssessmentByAnswerSheetIDRequest {
 message ResolveAssessmentByAnswerSheetIDResponse {
   uint64 testee_id = 1;
   uint64 assessment_id = 2;
+  // readiness_phase: pending | no_assessment_required | ready | failed (EV-R007)
+  string readiness_phase = 3;
+  string assessment_status = 4;
+  string failure_reason = 5;
 }
 
 message EnsureAssessmentRequest {

@@ -839,11 +839,15 @@ func (x *ResolveAssessmentByAnswerSheetIDRequest) GetAnswerSheetId() uint64 {
 }
 
 type ResolveAssessmentByAnswerSheetIDResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	TesteeId      uint64                 `protobuf:"varint,1,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
-	AssessmentId  uint64                 `protobuf:"varint,2,opt,name=assessment_id,json=assessmentId,proto3" json:"assessment_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	TesteeId     uint64                 `protobuf:"varint,1,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
+	AssessmentId uint64                 `protobuf:"varint,2,opt,name=assessment_id,json=assessmentId,proto3" json:"assessment_id,omitempty"`
+	// readiness_phase: pending | no_assessment_required | ready | failed (EV-R007)
+	ReadinessPhase   string `protobuf:"bytes,3,opt,name=readiness_phase,json=readinessPhase,proto3" json:"readiness_phase,omitempty"`
+	AssessmentStatus string `protobuf:"bytes,4,opt,name=assessment_status,json=assessmentStatus,proto3" json:"assessment_status,omitempty"`
+	FailureReason    string `protobuf:"bytes,5,opt,name=failure_reason,json=failureReason,proto3" json:"failure_reason,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ResolveAssessmentByAnswerSheetIDResponse) Reset() {
@@ -888,6 +892,27 @@ func (x *ResolveAssessmentByAnswerSheetIDResponse) GetAssessmentId() uint64 {
 		return x.AssessmentId
 	}
 	return 0
+}
+
+func (x *ResolveAssessmentByAnswerSheetIDResponse) GetReadinessPhase() string {
+	if x != nil {
+		return x.ReadinessPhase
+	}
+	return ""
+}
+
+func (x *ResolveAssessmentByAnswerSheetIDResponse) GetAssessmentStatus() string {
+	if x != nil {
+		return x.AssessmentStatus
+	}
+	return ""
+}
+
+func (x *ResolveAssessmentByAnswerSheetIDResponse) GetFailureReason() string {
+	if x != nil {
+		return x.FailureReason
+	}
+	return ""
 }
 
 type EnsureAssessmentRequest struct {
@@ -2075,10 +2100,13 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"assessment\x18\x01 \x01(\v2\x1c.evaluation.AssessmentDetailR\n" +
 	"assessment\"Q\n" +
 	"'ResolveAssessmentByAnswerSheetIDRequest\x12&\n" +
-	"\x0fanswer_sheet_id\x18\x01 \x01(\x04R\ranswerSheetId\"l\n" +
+	"\x0fanswer_sheet_id\x18\x01 \x01(\x04R\ranswerSheetId\"\xe9\x01\n" +
 	"(ResolveAssessmentByAnswerSheetIDResponse\x12\x1b\n" +
 	"\ttestee_id\x18\x01 \x01(\x04R\btesteeId\x12#\n" +
-	"\rassessment_id\x18\x02 \x01(\x04R\fassessmentId\"\x8c\x03\n" +
+	"\rassessment_id\x18\x02 \x01(\x04R\fassessmentId\x12'\n" +
+	"\x0freadiness_phase\x18\x03 \x01(\tR\x0ereadinessPhase\x12+\n" +
+	"\x11assessment_status\x18\x04 \x01(\tR\x10assessmentStatus\x12%\n" +
+	"\x0efailure_reason\x18\x05 \x01(\tR\rfailureReason\"\x8c\x03\n" +
 	"\x17EnsureAssessmentRequest\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\x04R\x05orgId\x12&\n" +
 	"\x0fanswer_sheet_id\x18\x02 \x01(\x04R\ranswerSheetId\x12-\n" +

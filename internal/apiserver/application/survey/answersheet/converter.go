@@ -22,6 +22,8 @@ type AnswerSheetResult struct {
 	FilledAt           time.Time      // 填写时间
 	Score              float64        // 总分
 	Answers            []AnswerResult // 答案列表
+	// AdmissionPurpose is independent_questionnaire | assessment | "" (legacy).
+	AdmissionPurpose string
 }
 
 // AnswerResult 答案结果
@@ -78,6 +80,9 @@ func toAnswerSheetResult(as *answersheet.AnswerSheet) *AnswerSheetResult {
 	}
 	if submissionContext := as.SubmissionContext(); !submissionContext.TesteeID().IsZero() {
 		result.TesteeID = submissionContext.TesteeID().Uint64()
+	}
+	if admission := as.SubmissionContext().Admission(); !admission.IsZero() {
+		result.AdmissionPurpose = string(admission.Purpose())
 	}
 
 	// 填写人信息

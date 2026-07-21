@@ -218,7 +218,7 @@ func (r *Registry) registerEvaluationService() error {
 	)
 	r.server.RegisterService(service.NewTesteeEvaluationService(r.deps.Evaluation.TesteeService))
 	r.server.RegisterService(service.NewParticipantReportService(r.deps.Interpretation.ParticipantService))
-	r.server.RegisterService(service.NewAssessmentIntakeService(journey, r.deps.Evaluation.IntakeService))
+	r.server.RegisterService(service.NewAssessmentIntakeService(journey, r.deps.Evaluation.IntakeService, r.deps.Survey.AnswerSheetManagementService))
 	r.server.RegisterService(service.NewEvaluationWorkerService(r.deps.Evaluation.WorkerService))
 	r.server.RegisterService(service.NewInterpretationAutomationService(r.deps.Interpretation.AutomationService))
 	log.Info("   📊 actor-oriented Evaluation/Interpretation services registered")

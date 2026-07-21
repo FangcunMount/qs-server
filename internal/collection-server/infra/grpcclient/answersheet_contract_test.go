@@ -59,13 +59,14 @@ func (contractProfileLink) HasActiveProfileLink(context.Context, string, string)
 }
 
 type contractAssessmentResolver struct {
-	testeeID     uint64
-	assessmentID uint64
-	err          error
+	testeeID       uint64
+	assessmentID   uint64
+	readinessPhase string
+	err            error
 }
 
-func (r contractAssessmentResolver) ResolveAssessmentByAnswerSheetID(context.Context, uint64) (uint64, uint64, error) {
-	return r.testeeID, r.assessmentID, r.err
+func (r contractAssessmentResolver) ResolveAssessmentByAnswerSheetID(context.Context, uint64) (uint64, uint64, string, error) {
+	return r.testeeID, r.assessmentID, r.readinessPhase, r.err
 }
 
 func TestAnswerSheetOwnershipSurvivesRealGRPCContract(t *testing.T) {
@@ -102,7 +103,7 @@ func TestAnswerSheetOwnershipSurvivesRealGRPCContract(t *testing.T) {
 	}
 
 	readyService := collectionanswersheet.NewSubmissionService(nil, reader, contractActorLookup{}, contractProfileLink{}, nil,
-		contractAssessmentResolver{testeeID: 77, assessmentID: 99}, nil, time.Second)
+		contractAssessmentResolver{testeeID: 77, assessmentID: 99, readinessPhase: "ready"}, nil, time.Second)
 	ready, err := readyService.GetAssessmentReadiness(t.Context(), 11, 42, 77)
 	if err != nil || ready.Status != "ready" || ready.AssessmentID != "99" {
 		t.Fatalf("ready readiness = %#v, error = %v", ready, err)

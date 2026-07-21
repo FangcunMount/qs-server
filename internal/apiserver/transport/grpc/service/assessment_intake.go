@@ -9,19 +9,35 @@ import (
 	"google.golang.org/grpc/status"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	evaluationintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
 	journey "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/assessmentintake"
+	answersheetapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
+	domainanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+)
+
+const (
+	readinessPhasePending              = "pending"
+	readinessPhaseNoAssessmentRequired = "no_assessment_required"
+	readinessPhaseReady                = "ready"
+	readinessPhaseFailed               = "failed"
+	assessmentStatusPending            = "pending"
+	assessmentStatusSubmitted          = "submitted"
+	assessmentStatusEvaluated          = "evaluated"
+	assessmentStatusFailed             = "failed"
 )
 
 type AssessmentIntakeService struct {
 	pb.UnimplementedAssessmentIntakeServiceServer
 	journey journey.Service
 	intake  evaluationintake.Service
+	sheets  answersheetapp.AnswerSheetManagementService
 }
 
-func NewAssessmentIntakeService(journey journey.Service, intake evaluationintake.Service) *AssessmentIntakeService {
-	return &AssessmentIntakeService{journey: journey, intake: intake}
+func NewAssessmentIntakeService(journey journey.Service, intake evaluationintake.Service, sheets answersheetapp.AnswerSheetManagementService) *AssessmentIntakeService {
+	return &AssessmentIntakeService{journey: journey, intake: intake, sheets: sheets}
 }
+
 func (s *AssessmentIntakeService) RegisterService(server *grpc.Server) {
 	pb.RegisterAssessmentIntakeServiceServer(server, s)
 }
@@ -68,11 +84,60 @@ func (s *AssessmentIntakeService) ResolveAssessmentByAnswerSheetID(ctx context.C
 	if req == nil || req.AnswerSheetId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "answer_sheet_id 不能为空")
 	}
+
 	result, err := s.intake.FindByAnswerSheetID(ctx, req.AnswerSheetId)
-	if err != nil {
+	if err == nil && result != nil {
+		return readinessFromAssessment(result), nil
+	}
+	if err != nil && !evalerrors.IsAssessmentNotFound(err) {
 		return nil, toAssessmentQueryGRPCError(err)
 	}
-	return &pb.ResolveAssessmentByAnswerSheetIDResponse{TesteeId: result.TesteeID, AssessmentId: result.ID}, nil
+
+	// No Assessment row: classify via AnswerSheet admission (EV-R007).
+	if s.sheets == nil {
+		return nil, status.Error(codes.NotFound, "assessment not found")
+	}
+	sheet, sheetErr := s.sheets.GetByID(ctx, req.AnswerSheetId)
+	if sheetErr != nil {
+		return nil, toAssessmentQueryGRPCError(sheetErr)
+	}
+	if sheet == nil {
+		return nil, status.Error(codes.NotFound, "answer sheet not found")
+	}
+
+	phase := readinessPhasePending
+	if sheet.AdmissionPurpose == string(domainanswersheet.AdmissionPurposeIndependentQuestionnaire) {
+		phase = readinessPhaseNoAssessmentRequired
+	}
+	return &pb.ResolveAssessmentByAnswerSheetIDResponse{
+		TesteeId:         sheet.TesteeID,
+		AssessmentId:     0,
+		ReadinessPhase:   phase,
+		AssessmentStatus: "",
+	}, nil
+}
+
+func readinessFromAssessment(result *evaluationintake.Assessment) *pb.ResolveAssessmentByAnswerSheetIDResponse {
+	phase := readinessPhasePending
+	switch result.Status {
+	case assessmentStatusSubmitted, assessmentStatusEvaluated:
+		phase = readinessPhaseReady
+	case assessmentStatusFailed:
+		phase = readinessPhaseFailed
+	case assessmentStatusPending:
+		phase = readinessPhasePending
+	}
+	failureReason := ""
+	if result.FailureReason != nil {
+		failureReason = *result.FailureReason
+	}
+	return &pb.ResolveAssessmentByAnswerSheetIDResponse{
+		TesteeId:         result.TesteeID,
+		AssessmentId:     result.ID,
+		ReadinessPhase:   phase,
+		AssessmentStatus: result.Status,
+		FailureReason:    failureReason,
+	}
 }
 
 func admissionFromProto(in *pb.AssessmentAdmission) *journey.Admission {

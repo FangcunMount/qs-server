@@ -60,6 +60,7 @@ func (m *AnswerSheetMapper) ToPO(bo *answersheet.AnswerSheet) *AnswerSheetPO {
 		TesteeID:             testeeID,
 		OrgID:                orgID,
 		TaskID:               submissionContext.TaskID(),
+		Admission:            admissionToPO(submissionContext.Admission()),
 		TotalScore:           bo.Score(),
 		FilledAt:             bo.FilledAt(),
 		Answers:              answers,
@@ -102,14 +103,27 @@ func (m *AnswerSheetMapper) ToBO(po *AnswerSheetPO) *answersheet.AnswerSheet {
 
 	// 构建填写者引用
 	filler := actor.NewFillerRef(po.FillerID, actor.FillerType(po.FillerType))
+	admission := admissionFromPO(po.Admission)
 	submissionContext := answersheet.ReconstructSubmissionContext(filler, nil, 0, po.TaskID)
 	if po.TesteeID != 0 && po.OrgID != 0 {
-		submissionContext = answersheet.ReconstructSubmissionContext(
-			filler,
-			actor.NewTesteeRef(meta.FromUint64(po.TesteeID)),
-			meta.FromUint64(po.OrgID),
-			po.TaskID,
-		)
+		if admission.IsZero() {
+			submissionContext = answersheet.ReconstructSubmissionContext(
+				filler,
+				actor.NewTesteeRef(meta.FromUint64(po.TesteeID)),
+				meta.FromUint64(po.OrgID),
+				po.TaskID,
+			)
+		} else {
+			submissionContext = answersheet.ReconstructSubmissionContext(
+				filler,
+				actor.NewTesteeRef(meta.FromUint64(po.TesteeID)),
+				meta.FromUint64(po.OrgID),
+				po.TaskID,
+				admission,
+			)
+		}
+	} else if !admission.IsZero() {
+		submissionContext = answersheet.ReconstructSubmissionContext(filler, nil, 0, po.TaskID, admission)
 	}
 
 	// 使用 Reconstruct 重建答卷对象
@@ -158,4 +172,47 @@ func (m *AnswerSheetMapper) mapAnswerToBO(answerPO AnswerPO) (answersheet.Answer
 	}
 
 	return answer, nil
+}
+
+func admissionToPO(a answersheet.Admission) *AdmissionPO {
+	if a.IsZero() {
+		return nil
+	}
+	return &AdmissionPO{
+		Purpose:              string(a.Purpose()),
+		QuestionnaireCode:    a.QuestionnaireCode(),
+		QuestionnaireVersion: a.QuestionnaireVersion(),
+		ModelKind:            a.ModelKind(),
+		ModelSubKind:         a.ModelSubKind(),
+		ModelAlgorithm:       a.ModelAlgorithm(),
+		ModelCode:            a.ModelCode(),
+		ModelVersion:         a.ModelVersion(),
+		ModelTitle:           a.ModelTitle(),
+	}
+}
+
+func admissionFromPO(po *AdmissionPO) answersheet.Admission {
+	if po == nil || po.Purpose == "" {
+		return answersheet.Admission{}
+	}
+	switch answersheet.AdmissionPurpose(po.Purpose) {
+	case answersheet.AdmissionPurposeIndependentQuestionnaire:
+		a, err := answersheet.NewIndependentAdmission(po.QuestionnaireCode, po.QuestionnaireVersion)
+		if err != nil {
+			return answersheet.Admission{}
+		}
+		return a
+	case answersheet.AdmissionPurposeAssessment:
+		a, err := answersheet.NewAssessmentAdmission(
+			po.QuestionnaireCode, po.QuestionnaireVersion,
+			po.ModelKind, po.ModelSubKind, po.ModelAlgorithm,
+			po.ModelCode, po.ModelVersion, po.ModelTitle,
+		)
+		if err != nil {
+			return answersheet.Admission{}
+		}
+		return a
+	default:
+		return answersheet.Admission{}
+	}
 }

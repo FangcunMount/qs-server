@@ -99,5 +99,14 @@ func (r *EvaluationBFFReader) ResolveAssessmentByAnswerSheetID(ctx context.Conte
 	if r == nil || r.intake == nil {
 		return 0, 0, nil
 	}
+	testeeID, assessmentID, _, err := r.intake.ResolveAssessmentByAnswerSheetID(ctx, answerSheetID)
+	return testeeID, assessmentID, err
+}
+
+// ResolveAssessmentReadiness returns readiness phase for answer-sheet polling (EV-R007).
+func (r *EvaluationBFFReader) ResolveAssessmentReadiness(ctx context.Context, answerSheetID uint64) (testeeID, assessmentID uint64, readinessPhase string, err error) {
+	if r == nil || r.intake == nil {
+		return 0, 0, "", nil
+	}
 	return r.intake.ResolveAssessmentByAnswerSheetID(ctx, answerSheetID)
 }

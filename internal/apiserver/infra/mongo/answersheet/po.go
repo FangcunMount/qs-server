@@ -13,17 +13,31 @@ import (
 // 对应MongoDB集合结构
 type AnswerSheetPO struct {
 	base.BaseDocument    `bson:",inline"`
-	QuestionnaireCode    string     `bson:"questionnaire_code" json:"questionnaire_code"`
-	QuestionnaireVersion string     `bson:"questionnaire_version" json:"questionnaire_version"`
-	QuestionnaireTitle   string     `bson:"questionnaire_title" json:"questionnaire_title"`
-	FillerID             int64      `bson:"filler_id" json:"filler_id"`
-	FillerType           string     `bson:"filler_type" json:"filler_type"`
-	TesteeID             uint64     `bson:"testee_id,omitempty" json:"testee_id,omitempty"`
-	OrgID                uint64     `bson:"org_id,omitempty" json:"org_id,omitempty"`
-	TaskID               string     `bson:"task_id,omitempty" json:"task_id,omitempty"`
-	TotalScore           float64    `bson:"total_score" json:"total_score"`
-	FilledAt             time.Time  `bson:"filled_at" json:"filled_at"`
-	Answers              []AnswerPO `bson:"answers" json:"answers"`
+	QuestionnaireCode    string       `bson:"questionnaire_code" json:"questionnaire_code"`
+	QuestionnaireVersion string       `bson:"questionnaire_version" json:"questionnaire_version"`
+	QuestionnaireTitle   string       `bson:"questionnaire_title" json:"questionnaire_title"`
+	FillerID             int64        `bson:"filler_id" json:"filler_id"`
+	FillerType           string       `bson:"filler_type" json:"filler_type"`
+	TesteeID             uint64       `bson:"testee_id,omitempty" json:"testee_id,omitempty"`
+	OrgID                uint64       `bson:"org_id,omitempty" json:"org_id,omitempty"`
+	TaskID               string       `bson:"task_id,omitempty" json:"task_id,omitempty"`
+	Admission            *AdmissionPO `bson:"admission,omitempty" json:"admission,omitempty"`
+	TotalScore           float64      `bson:"total_score" json:"total_score"`
+	FilledAt             time.Time    `bson:"filled_at" json:"filled_at"`
+	Answers              []AnswerPO   `bson:"answers" json:"answers"`
+}
+
+// AdmissionPO freezes submit-time evaluation intent (EV-R001/R007).
+type AdmissionPO struct {
+	Purpose              string `bson:"purpose" json:"purpose"`
+	QuestionnaireCode    string `bson:"questionnaire_code,omitempty" json:"questionnaire_code,omitempty"`
+	QuestionnaireVersion string `bson:"questionnaire_version,omitempty" json:"questionnaire_version,omitempty"`
+	ModelKind            string `bson:"model_kind,omitempty" json:"model_kind,omitempty"`
+	ModelSubKind         string `bson:"model_sub_kind,omitempty" json:"model_sub_kind,omitempty"`
+	ModelAlgorithm       string `bson:"model_algorithm,omitempty" json:"model_algorithm,omitempty"`
+	ModelCode            string `bson:"model_code,omitempty" json:"model_code,omitempty"`
+	ModelVersion         string `bson:"model_version,omitempty" json:"model_version,omitempty"`
+	ModelTitle           string `bson:"model_title,omitempty" json:"model_title,omitempty"`
 }
 
 // CollectionName 集合名称
