@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
@@ -48,7 +48,7 @@ func TestScoreFactReaderObservesCatalogFallback(t *testing.T) {
 		Model: domainoutcome.ModelIdentity{
 			Kind: modelcatalog.KindScale, Code: "SDS", Version: "1.0.0", Title: "SDS",
 		},
-		Runtime: domainoutcome.RuntimeIdentity{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring},
+		Runtime:       domainoutcome.RuntimeIdentity{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring},
 		SchemaVersion: domainoutcome.CurrentSchemaVersion,
 		EvaluatedAt:   time.Unix(100, 0),
 		Payload:       []byte(`{"Dimensions":[{"Code":"total","Name":"总分","Role":"total","Score":{"Value":42}}]}`),

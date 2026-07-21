@@ -186,6 +186,12 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return nil
 	}
 	evaluationRun := claim.Run
+	// EV-R010: observe wall time only for claimed attempts (not skips/duplicates).
+	algorithmFamily := "unknown"
+	runResult := "failed"
+	defer func() {
+		observeEvaluationRunDuration(algorithmFamily, runResult, time.Since(startTime), s.runLease)
+	}()
 	if a.Status().IsFailed() {
 		if err := a.ResumeForExecutionRetry(); err != nil {
 			return err
@@ -233,6 +239,9 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 			"error", resolveErr.Error(),
 		)
 		return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, "评估流程执行失败: "+resolveErr.Error(), evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: resolveErr.Error()}, resolveErr)
+	}
+	if family := string(resolved.DescriptorKey.AlgorithmFamily); family != "" {
+		algorithmFamily = family
 	}
 
 	l.Infow("开始执行评估器",
@@ -293,6 +302,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		"duration_ms", time.Since(startTime).Milliseconds(),
 	)
 
+	runResult = "success"
 	return nil
 }
 

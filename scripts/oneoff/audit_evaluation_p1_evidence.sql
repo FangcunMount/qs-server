@@ -6,7 +6,8 @@
 -- EV-R010: execution duration vs default 120s Lease (by model_kind)
 -- =============================================================================
 -- Approximate percentiles via sorted sample buckets; prefer Prometheus histograms
--- in production when available (qs_evaluation_* latency metrics).
+-- in production: qs_evaluation_run_duration_seconds{algorithm_family,result}
+-- and qs_evaluation_run_lease_budget_breach_total{algorithm_family,threshold}.
 
 SELECT
     COALESCE(eo.model_kind, 'unknown') AS model_kind,

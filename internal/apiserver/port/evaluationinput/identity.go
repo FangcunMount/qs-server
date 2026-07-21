@@ -151,8 +151,8 @@ func newDigest(domain string) hash.Hash {
 // writeField length-prefixes each field so adjacent fields can never collide
 // regardless of their content.
 func writeField(h hash.Hash, field string) {
-	fmt.Fprintf(h, "|%d:", len(field))
-	h.Write([]byte(field))
+	_, _ = fmt.Fprintf(h, "|%d:", len(field))
+	_, _ = h.Write([]byte(field))
 }
 
 func finishDigest(h hash.Hash) string {
