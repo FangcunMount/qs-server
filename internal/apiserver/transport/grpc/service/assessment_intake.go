@@ -69,7 +69,7 @@ func (s *AssessmentIntakeService) EnsureAssessment(ctx context.Context, req *pb.
 		Admission: admissionFromProto(req.GetAdmission()),
 	})
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, toEvaluationGRPCError(err)
 	}
 	logger.L(ctx).Infow("gRPC: ensure assessment completed",
 		"answersheet_id", req.AnswerSheetId,

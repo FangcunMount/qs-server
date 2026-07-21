@@ -33,7 +33,7 @@ func (s *EvaluationWorkerService) ExecuteEvaluation(ctx context.Context, req *pb
 	ctx = withRetryAuthorization(ctx)
 	result, err := s.service.Execute(ctx, evaluationworker.Command{AssessmentID: req.AssessmentId})
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, toEvaluationGRPCError(err)
 	}
 	resp := &pb.ExecuteEvaluationResponse{
 		Status: result.Status, Retryable: result.Retryable, RunId: result.RunID,
