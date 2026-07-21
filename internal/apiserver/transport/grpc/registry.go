@@ -25,6 +25,7 @@ import (
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
+	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 )
 
@@ -82,9 +83,10 @@ type EvaluationDeps struct {
 }
 
 type InterpretationDeps struct {
-	AutomationService    interpretationAutomation.Service
-	ParticipantService   interpretationParticipant.Service
-	ReportStatusReporter *reportstatus.Reporter
+	AutomationService          interpretationAutomation.Service
+	ParticipantService         interpretationParticipant.Service
+	ReportStatusReporter       *reportstatus.Reporter
+	DelegatedSubjectVerifier   *delegatedsubject.Verifier
 }
 
 type AssessmentModelCatalogDeps struct {
@@ -217,7 +219,7 @@ func (r *Registry) registerEvaluationService() error {
 		r.deps.Interpretation.ReportStatusReporter,
 	)
 	r.server.RegisterService(service.NewTesteeEvaluationService(r.deps.Evaluation.TesteeService))
-	r.server.RegisterService(service.NewParticipantReportService(r.deps.Interpretation.ParticipantService))
+	r.server.RegisterService(service.NewParticipantReportService(r.deps.Interpretation.ParticipantService, r.deps.Interpretation.DelegatedSubjectVerifier))
 	r.server.RegisterService(service.NewAssessmentIntakeService(journey, r.deps.Evaluation.IntakeService, r.deps.Survey.AnswerSheetManagementService))
 	r.server.RegisterService(service.NewEvaluationWorkerService(r.deps.Evaluation.WorkerService))
 	r.server.RegisterService(service.NewInterpretationAutomationService(r.deps.Interpretation.AutomationService))

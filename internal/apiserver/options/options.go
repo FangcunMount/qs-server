@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
 	"github.com/FangcunMount/qs-server/pkg/app"
 	"github.com/FangcunMount/qs-server/pkg/configmask"
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
@@ -44,6 +45,7 @@ type Options struct {
 	StatisticsSync                 *StatisticsSyncOptions                  `json:"statistics_sync" mapstructure:"statistics_sync"`
 	Signaling                      *genericoptions.SignalingOptions        `json:"signaling" mapstructure:"signaling"`
 	SystemGovernance               *SystemGovernanceOptions                `json:"system_governance" mapstructure:"system_governance"`
+	DelegatedSubject               *delegatedsubject.Options               `json:"delegated_subject" mapstructure:"delegated-subject"`
 	rawSettingsSource              app.RawSettingsSource
 }
 

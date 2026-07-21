@@ -1,0 +1,18 @@
+# gRPC method ACL example (IR-R016 Phase A)
+#
+# Enable on apiserver with:
+#   grpc.acl.enabled: true
+#   grpc.acl.config-file: configs/grpc-acl.example.yaml
+#   grpc.acl.default-policy: deny
+#
+# service_name must match the mTLS ServiceName extracted from the client certificate.
+# For collection-server the CN is typically qs-collection.svc.
+
+default_policy: deny
+
+services:
+  - service_name: qs-collection.svc
+    enabled: true
+    description: collection-server BFF may call participant report APIs only
+    allowed_methods:
+      - /interpretation.ParticipantReportService/*

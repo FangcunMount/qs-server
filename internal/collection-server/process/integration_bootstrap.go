@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	grpcclientintegration "github.com/FangcunMount/qs-server/internal/collection-server/integration/grpcclient"
 	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
+	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
 	iamauth "github.com/FangcunMount/qs-server/internal/pkg/iamauth"
 	"google.golang.org/grpc/credentials"
 )
@@ -24,6 +25,11 @@ func (s *server) initializeIntegrations(_ resourceOutput, containerOutput contai
 		perRPC = h
 	}
 
+	signer, err := delegatedsubject.NewSignerFromOptions(s.config.DelegatedSubject)
+	if err != nil {
+		return integrationOutput{}, err
+	}
+
 	grpcManager, err := grpcclientintegration.CreateGRPCClientManager(
 		s.config.GRPCClient.Endpoint,
 		s.config.GRPCClient.Timeout,
@@ -35,6 +41,7 @@ func (s *server) initializeIntegrations(_ resourceOutput, containerOutput contai
 		s.config.GRPCClient.InflightWaitMs,
 		containerOutput.container.GRPCDownstreamGate(),
 		perRPC,
+		signer,
 	)
 	if err != nil {
 		return integrationOutput{}, err

@@ -85,6 +85,17 @@ func validateRetryGovernance(opts *SystemGovernanceOptions) []error {
 			errs = append(errs, fmt.Errorf("system_governance.retry.%s.jitter_fraction must be between 0 and 1", name))
 		}
 	}
+	if lease := opts.Retry.Lease; lease != nil {
+		if lease.RunDuration <= 0 {
+			errs = append(errs, fmt.Errorf("system_governance.retry.lease.run_duration must be greater than 0"))
+		}
+		if lease.ReconcileInterval <= 0 {
+			errs = append(errs, fmt.Errorf("system_governance.retry.lease.reconcile_interval must be greater than 0"))
+		}
+		if lease.ReconcileJitterFraction < 0 || lease.ReconcileJitterFraction > 1 {
+			errs = append(errs, fmt.Errorf("system_governance.retry.lease.reconcile_jitter_fraction must be between 0 and 1"))
+		}
+	}
 	return errs
 }
 

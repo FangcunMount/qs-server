@@ -269,7 +269,6 @@ func (c *Container) initApplicationServices() {
 	c.submissionService = submitRuntime.submission
 	c.evaluationQueryService = evaluation.NewQueryService(
 		grpcbridge.NewEvaluationBFFReader(c.testeeEvaluationClient, c.participantReportClient, c.assessmentIntakeClient),
-		c.assessmentModelCatalogQueryService,
 	)
 	reportRuntime := c.buildReportRuntime(c.evaluationQueryService)
 	c.reportStatusReporter = reportRuntime.reporter

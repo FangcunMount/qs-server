@@ -12,6 +12,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
+	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/admission"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -40,6 +41,8 @@ type ManagerConfig struct {
 
 	// PerRPCCredentials 可选；启用 iam.service_auth 时由 collection 注入，向 apiserver 出站 RPC 附加 authorization（服务 JWT）
 	PerRPCCredentials credentials.PerRPCCredentials
+
+	DelegatedSubjectSigner *delegatedsubject.Signer
 }
 
 // Manager gRPC 客户端管理器，负责连接池管理和客户端缓存
@@ -255,7 +258,7 @@ func (m *Manager) RegisterClients() error {
 
 	// 注册 Evaluation 客户端
 	m.testeeEvaluationClient = NewTesteeEvaluationClient(baseClient)
-	m.participantReportClient = NewParticipantReportClient(baseClient)
+	m.participantReportClient = NewParticipantReportClient(baseClient, m.config.DelegatedSubjectSigner)
 	m.assessmentIntakeClient = NewAssessmentIntakeClient(baseClient)
 	m.clients["testeeEvaluation"] = m.testeeEvaluationClient
 	m.clients["participantReport"] = m.participantReportClient

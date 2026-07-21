@@ -9,15 +9,17 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	participant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
+	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
 )
 
 type ParticipantReportService struct {
 	pb.UnimplementedParticipantReportServiceServer
-	service participant.Service
+	service           participant.Service
+	delegatedVerifier *delegatedsubject.Verifier
 }
 
-func NewParticipantReportService(service participant.Service) *ParticipantReportService {
-	return &ParticipantReportService{service: service}
+func NewParticipantReportService(service participant.Service, delegatedVerifier *delegatedsubject.Verifier) *ParticipantReportService {
+	return &ParticipantReportService{service: service, delegatedVerifier: delegatedVerifier}
 }
 
 func (s *ParticipantReportService) RegisterService(server *grpc.Server) {
@@ -27,6 +29,9 @@ func (s *ParticipantReportService) RegisterService(server *grpc.Server) {
 func (s *ParticipantReportService) GetAssessmentReport(ctx context.Context, req *pb.GetAssessmentReportRequest) (*pb.GetAssessmentReportResponse, error) {
 	if req.TesteeId == 0 || req.AssessmentId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "testee_id 和 assessment_id 不能为空")
+	}
+	if err := s.authorizeDelegatedSubject(ctx, req.TesteeId, delegatedsubject.PurposeGetAssessmentReport); err != nil {
+		return nil, err
 	}
 	result, err := s.service.GetMyReport(ctx, participant.Actor{TesteeID: req.TesteeId}, participant.GetQuery{AssessmentID: req.AssessmentId})
 	if err != nil {
@@ -41,6 +46,9 @@ func (s *ParticipantReportService) GetAssessmentReport(ctx context.Context, req 
 func (s *ParticipantReportService) ListMyReports(ctx context.Context, req *pb.ListMyReportsRequest) (*pb.ListMyReportsResponse, error) {
 	if req.TesteeId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "testee_id 不能为空")
+	}
+	if err := s.authorizeDelegatedSubject(ctx, req.TesteeId, delegatedsubject.PurposeListMyReports); err != nil {
+		return nil, err
 	}
 	page, pageSize := int(req.Page), int(req.PageSize)
 	if page <= 0 {

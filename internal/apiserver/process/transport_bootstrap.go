@@ -7,6 +7,7 @@ import (
 	grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
+	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	"github.com/FangcunMount/qs-server/internal/pkg/orgscope"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
@@ -40,7 +41,13 @@ func (s *server) buildTransportStageDeps(containerOutput containerOutput) transp
 			resttransport.NewRouter(containerOutput.container.BuildRESTDeps(s.config.RateLimit)).RegisterRoutes(httpServer.Engine)
 		},
 		registerGRPC: func(grpcServer *grpcpkg.Server) error {
-			return grpctransport.NewRegistry(containerOutput.container.BuildGRPCDeps(grpcServer)).RegisterServices()
+			deps := containerOutput.container.BuildGRPCDeps(grpcServer)
+			verifier, err := delegatedsubject.NewVerifierFromOptions(s.config.DelegatedSubject)
+			if err != nil {
+				return err
+			}
+			deps.Interpretation.DelegatedSubjectVerifier = verifier
+			return grpctransport.NewRegistry(deps).RegisterServices()
 		},
 	}
 }
@@ -186,6 +193,10 @@ func applyGRPCOptions(cfg *config.Config, grpcConfig *grpcpkg.Config) error {
 	// 应用 ACL 配置
 	if opts.ACL != nil {
 		grpcConfig.ACL.Enabled = opts.ACL.Enabled
+		grpcConfig.ACL.ConfigFile = opts.ACL.ConfigFile
+		if opts.ACL.DefaultPolicy != "" {
+			grpcConfig.ACL.DefaultPolicy = opts.ACL.DefaultPolicy
+		}
 	}
 
 	// 应用审计配置

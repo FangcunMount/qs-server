@@ -10,6 +10,7 @@ import (
 	evaluationtestee "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/testee"
 	interpretationadmin "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
 	interpretationclinician "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reportprojection"
 	interpretationparticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
 	modelcatalogHotRank "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/hotrank"
 	actormod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/actor"
@@ -74,6 +75,11 @@ func (c *Container) initEvaluationModule() error {
 	}
 	if err := c.ReportModule.BindOutcomeRepository(c.EvaluationModule.OutcomeRepository()); err != nil {
 		return fmt.Errorf("failed to bind interpretation outcome service: %w", err)
+	}
+	if c.AssessmentModelModule != nil {
+		c.ReportModule.BindReportProjection(reportprojection.Mapper{
+			Legacy: reportprojection.NewModelCatalogLegacyVisibility(c.AssessmentModelModule.PublishedLister),
+		})
 	}
 	if err := c.ReportModule.BindParticipantAccess(participantInterpretationAccess{testees: c.ActorModule.TesteeQueryService, assessments: c.EvaluationModule.TesteeService}); err != nil {
 		return fmt.Errorf("failed to bind interpretation participant service: %w", err)

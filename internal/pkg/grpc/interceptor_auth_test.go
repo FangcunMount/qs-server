@@ -133,18 +133,31 @@ func TestVerifyIdentityMatchUsesLegacyMTLSIdentityMapContract(t *testing.T) {
 	}
 }
 
-func TestLoadACLConfigUsesDefaultPolicyOnlyUntilFileLoaderExists(t *testing.T) {
-	denyACL := loadACLConfig("acl.yaml", "deny")
+func TestLoadACLConfigUsesDefaultPolicyWhenFileMissing(t *testing.T) {
+	denyACL := loadACLConfig("missing-acl.yaml", "deny")
 	if services := denyACL.ListServices(); len(services) != 0 {
-		t.Fatalf("loaded ACL services = %v, want none while file loader is not implemented", services)
+		t.Fatalf("loaded ACL services = %v, want none when file is missing", services)
 	}
 	if err := denyACL.CheckAccess("collection-server", "/qs.Internal/Submit"); err == nil {
 		t.Fatal("deny default policy allowed unconfigured service")
 	}
 
-	allowACL := loadACLConfig("acl.yaml", "allow")
+	allowACL := loadACLConfig("missing-acl.yaml", "allow")
 	if err := allowACL.CheckAccess("collection-server", "/qs.Internal/Submit"); err != nil {
 		t.Fatalf("allow default policy rejected unconfigured service: %v", err)
+	}
+}
+
+func TestLoadACLConfigLoadsParticipantReportRules(t *testing.T) {
+	acl := loadACLConfig("../../../configs/grpc-acl.example.yaml", "deny")
+	if err := acl.CheckAccess("qs-collection.svc", "/interpretation.ParticipantReportService/GetAssessmentReport"); err != nil {
+		t.Fatalf("collection caller should be allowed: %v", err)
+	}
+	if err := acl.CheckAccess("qs-worker.svc", "/interpretation.ParticipantReportService/GetAssessmentReport"); err == nil {
+		t.Fatal("non-collection caller should be denied")
+	}
+	if err := acl.CheckAccess("qs-collection.svc", "/interpretation.InterpretationAutomationService/Run"); err == nil {
+		t.Fatal("collection caller should not access unrelated service methods")
 	}
 }
 

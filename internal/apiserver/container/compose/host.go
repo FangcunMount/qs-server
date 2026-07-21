@@ -1,6 +1,8 @@
 package compose
 
 import (
+	"time"
+
 	"github.com/FangcunMount/component-base/pkg/event"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
@@ -58,6 +60,7 @@ type Host interface {
 
 	DefaultEvaluationCatalog() (EvaluationCatalog, error)
 	PublishedModelCatalog() rulesetport.Catalog
+	InterpretationRunLeaseDuration() time.Duration
 
 	SurveyPorts() SurveyPorts
 	ActorPorts() ActorPorts

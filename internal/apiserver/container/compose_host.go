@@ -2,6 +2,7 @@ package container
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/event"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
@@ -23,6 +24,7 @@ import (
 	platformmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
 	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
+	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -79,6 +81,14 @@ func (c *Container) PlanEntryBaseURL() string { return c.planEntryURL }
 func (c *Container) StatisticsRepairWindowDays() int { return c.statisticsRepairWindowDays }
 
 func (c *Container) ReportStatusConfig() reportstatus.Config { return c.reportStatusConfig }
+
+func (c *Container) InterpretationRunLeaseDuration() time.Duration {
+	defaults := apiserveroptions.NewInterpretationLeaseGovernanceOptions()
+	if c == nil || c.systemGovernanceOptions == nil || c.systemGovernanceOptions.Retry == nil || c.systemGovernanceOptions.Retry.Lease == nil {
+		return defaults.RunLeaseDuration()
+	}
+	return c.systemGovernanceOptions.Retry.Lease.RunLeaseDuration()
+}
 
 func (c *Container) StatisticsOverviewGuardOptions() statisticsApp.StatisticsReadGuardOptions {
 	return toStatisticsReadGuardOptions(c.cacheOptions.StatisticsOverview)

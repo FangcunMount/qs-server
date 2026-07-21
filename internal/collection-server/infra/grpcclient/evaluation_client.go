@@ -5,6 +5,7 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
+	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
 )
 
 // FactorScoreOutput 因子得分输出
@@ -360,14 +361,32 @@ func (c *TesteeEvaluationClient) ListMyAssessmentsByModelKinds(
 type ParticipantReportClient struct {
 	client       *Client
 	reportClient interpretationpb.ParticipantReportServiceClient
+	signer       *delegatedsubject.Signer
 }
 
-func NewParticipantReportClient(client *Client) *ParticipantReportClient {
-	return &ParticipantReportClient{client: client, reportClient: interpretationpb.NewParticipantReportServiceClient(client.Conn())}
+func NewParticipantReportClient(client *Client, signer *delegatedsubject.Signer) *ParticipantReportClient {
+	return &ParticipantReportClient{client: client, reportClient: interpretationpb.NewParticipantReportServiceClient(client.Conn()), signer: signer}
 }
+
+func (c *ParticipantReportClient) attachDelegatedSubject(ctx context.Context, testeeID uint64, purpose string) (context.Context, error) {
+	if c == nil || c.signer == nil || !c.signer.Enabled() {
+		return ctx, nil
+	}
+	input, err := delegatedsubject.SignInputFromContext(ctx, testeeID, purpose, 0)
+	if err != nil {
+		return ctx, err
+	}
+	return delegatedsubject.AppendToOutgoingContext(ctx, c.signer, input)
+}
+
 func (c *ParticipantReportClient) GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentReportOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
+
+	ctx, err := c.attachDelegatedSubject(ctx, testeeID, delegatedsubject.PurposeGetAssessmentReport)
+	if err != nil {
+		return nil, err
+	}
 
 	resp, err := c.reportClient.GetAssessmentReport(ctx, &interpretationpb.GetAssessmentReportRequest{
 		AssessmentId: assessmentID,

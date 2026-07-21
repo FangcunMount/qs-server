@@ -206,18 +206,16 @@ func loadACLConfig(configFile, defaultPolicy string) *basegrpc.ServiceACL {
 	}
 
 	if configFile != "" {
-		// TODO: 从 YAML/JSON 文件加载 ACL 规则
-		// 示例配置文件格式:
-		// default_policy: deny
-		// services:
-		//   - service_name: collection-server
-		//     enabled: true
-		//     allowed_methods:
-		//       - /qs.survey.v1.SurveyService/*
-		//       - /qs.evaluation.v1.EvaluationService/*
-		//     denied_methods:
-		//       - /qs.admin.v1.AdminService/*
-		log.Infof("gRPC ACL: loading config from %s (not yet implemented)", configFile)
+		loaded, err := parseACLConfigFile(configFile)
+		if err != nil {
+			log.Warnf("gRPC ACL: failed to load %s: %v; using default policy only", configFile, err)
+		} else {
+			cfg = loaded
+			if cfg.DefaultPolicy == "" {
+				cfg.DefaultPolicy = defaultPolicy
+			}
+			log.Infof("gRPC ACL: loaded %d service rule(s) from %s", len(cfg.Services), configFile)
+		}
 	}
 
 	return basegrpc.NewServiceACL(cfg)

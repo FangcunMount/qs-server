@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/pkg/configmask"
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
@@ -34,6 +35,7 @@ type Options struct {
 	IAMOptions              *genericoptions.IAMOptions              `json:"iam" mapstructure:"iam"`
 	Runtime                 *RuntimeOptions                         `json:"runtime" mapstructure:"runtime"`
 	Resilience              *ResilienceOptions                      `json:"resilience" mapstructure:"resilience"`
+	DelegatedSubject        *delegatedsubject.Options               `json:"delegated_subject" mapstructure:"delegated-subject"`
 }
 
 type ResilienceOptions struct {
