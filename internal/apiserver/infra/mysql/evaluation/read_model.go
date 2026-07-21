@@ -167,9 +167,10 @@ func (r *assessmentReadModel) ListSubmittedAssessmentIDsAfter(ctx context.Contex
 		return []uint64{}, nil
 	}
 	ids := make([]uint64, 0, limit)
+	// EV-R011: include submitted/evaluated/failed so classifyDrift can cover the matrix.
 	err := r.WithContext(ctx).
 		Model(&AssessmentPO{}).
-		Where("status = ? AND id > ? AND deleted_at IS NULL", "submitted", afterID).
+		Where("status IN ? AND id > ? AND deleted_at IS NULL", []string{"submitted", "evaluated", "failed"}, afterID).
 		Order("id ASC").
 		Limit(limit).
 		Pluck("id", &ids).Error

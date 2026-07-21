@@ -227,7 +227,7 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 }
 
 func (m *Module) wireScheduler(infra *evaluationInfra) {
-	m.SchedulerService = evaluationscheduler.NewService(infra.assessmentRepo, infra.outcomeRepo, infra.submittedCandidateReader)
+	m.SchedulerService = evaluationscheduler.NewServiceWithRuns(infra.assessmentRepo, infra.outcomeRepo, infra.submittedCandidateReader, infra.runRepo)
 }
 
 func normalizeDeps(deps Deps) (Deps, error) {

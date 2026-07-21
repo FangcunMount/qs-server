@@ -4,9 +4,11 @@ import (
 	"context"
 	"reflect"
 	"testing"
+	"time"
 
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
+	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 )
 
 type candidateReaderStub struct {
@@ -62,6 +64,56 @@ func TestAuditOnceTraversesAllBatchesAndRestartsAfterEnd(t *testing.T) {
 	}
 	if reader.after[len(reader.after)-1] != 0 {
 		t.Fatalf("scan did not restart: %v", reader.after)
+	}
+}
+
+func TestClassifyDriftMatrix(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 7, 21, 10, 0, 0, 0, time.UTC)
+	expired := now.Add(-time.Minute)
+	runningExpired := evalrun.Reconstruct(evalrun.ReconstructInput{
+		RunID: "r1", AssessmentID: 1, Attempt: evalrun.Attempt{Number: 1, Status: evalrun.StatusRunning},
+		LeaseExpiresAt: &expired, StartedAt: now.Add(-2 * time.Minute),
+	})
+	succeeded := evalrun.Reconstruct(evalrun.ReconstructInput{
+		RunID: "r2", AssessmentID: 1, Attempt: evalrun.Attempt{Number: 1, Status: evalrun.StatusSucceeded},
+		StartedAt: now.Add(-time.Minute), FinishedAt: &now,
+	})
+	failedRun := evalrun.Reconstruct(evalrun.ReconstructInput{
+		RunID: "r3", AssessmentID: 1, Attempt: evalrun.Attempt{Number: 1, Status: evalrun.StatusFailed},
+		StartedAt: now.Add(-time.Minute), FinishedAt: &now,
+	})
+
+	cases := []struct {
+		name       string
+		status     domainassessment.Status
+		hasOutcome bool
+		run        *evalrun.EvaluationRun
+		wantKind   mismatchKind
+	}{
+		{name: "submitted+outcome", status: domainassessment.StatusSubmitted, hasOutcome: true, wantKind: mismatchOutcomeWithoutEvaluatedStatus},
+		{name: "submitted+outcome+succeeded", status: domainassessment.StatusSubmitted, hasOutcome: true, run: &succeeded, wantKind: mismatchSuccessProjectionDrift},
+		{name: "lease expired", status: domainassessment.StatusSubmitted, run: &runningExpired, wantKind: mismatchLeaseRecoveryCandidate},
+		{name: "evaluated missing outcome", status: domainassessment.StatusEvaluated, wantKind: mismatchCanonicalOutcomeMissing},
+		{name: "evaluated run mismatch", status: domainassessment.StatusEvaluated, hasOutcome: true, run: &failedRun, wantKind: mismatchRunStatusMismatch},
+		{name: "terminal conflict", status: domainassessment.StatusFailed, hasOutcome: true, run: &succeeded, wantKind: mismatchTerminalConflict},
+		{name: "healthy submitted", status: domainassessment.StatusSubmitted, wantKind: ""},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := classifyDrift(tc.status, tc.hasOutcome, tc.run, now)
+			if tc.wantKind == "" {
+				if got != nil {
+					t.Fatalf("classifyDrift() = %#v, want nil", got)
+				}
+				return
+			}
+			if got == nil || got.Kind != tc.wantKind || got.RecommendedAction == "" {
+				t.Fatalf("classifyDrift() = %#v, want kind %s", got, tc.wantKind)
+			}
+		})
 	}
 }
 

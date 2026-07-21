@@ -10,6 +10,8 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
+	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -17,12 +19,29 @@ import (
 
 type mismatchKind string
 
-const mismatchOutcomeWithoutEvaluatedStatus mismatchKind = "outcome_without_evaluated_status"
+const (
+	mismatchOutcomeWithoutEvaluatedStatus mismatchKind = "outcome_without_evaluated_status"
+	mismatchLeaseRecoveryCandidate        mismatchKind = "lease_recovery_candidate"
+	mismatchSuccessProjectionDrift        mismatchKind = "success_projection_drift"
+	mismatchCanonicalOutcomeMissing       mismatchKind = "canonical_outcome_missing"
+	mismatchRunStatusMismatch             mismatchKind = "run_status_mismatch"
+	mismatchTerminalConflict              mismatchKind = "terminal_conflict"
+)
+
+type mismatchSeverity string
+
+const (
+	severityHigh   mismatchSeverity = "high"
+	severityMedium mismatchSeverity = "medium"
+	severityLow    mismatchSeverity = "low"
+)
 
 type mismatch struct {
-	AssessmentID uint64
-	Kind         mismatchKind
-	DetectedAt   time.Time
+	AssessmentID      uint64
+	Kind              mismatchKind
+	Severity          mismatchSeverity
+	RecommendedAction string
+	DetectedAt        time.Time
 }
 
 type Service interface {
@@ -35,16 +54,39 @@ type SubmittedCandidateReader interface {
 	ListSubmittedAssessmentIDsAfter(context.Context, uint64, int) ([]uint64, error)
 }
 
+// LatestRunReader is optional; when nil, AuditOnce classifies without Run evidence.
+type LatestRunReader interface {
+	FindLatestByAssessmentID(ctx context.Context, assessmentID uint64) (*evalrun.EvaluationRun, error)
+}
+
 type service struct {
 	assessments domainassessment.Repository
 	outcomes    domainoutcome.Repository
+	runs        LatestRunReader
 	reader      SubmittedCandidateReader
 	mu          sync.Mutex
 	cursor      uint64
+	now         func() time.Time
 }
 
 func NewService(assessments domainassessment.Repository, outcomes domainoutcome.Repository, reader SubmittedCandidateReader) Service {
-	return &service{assessments: assessments, outcomes: outcomes, reader: reader}
+	return NewServiceWithRuns(assessments, outcomes, reader, nil)
+}
+
+// NewServiceWithRuns wires optional Run lookup for EV-R011 matrix classification.
+func NewServiceWithRuns(
+	assessments domainassessment.Repository,
+	outcomes domainoutcome.Repository,
+	reader SubmittedCandidateReader,
+	runs LatestRunReader,
+) Service {
+	return &service{
+		assessments: assessments,
+		outcomes:    outcomes,
+		runs:        runs,
+		reader:      reader,
+		now:         time.Now,
+	}
 }
 
 func (s *service) AuditOnce(ctx context.Context, limit int) (int, error) {
@@ -69,16 +111,19 @@ func (s *service) AuditOnce(ctx context.Context, limit int) (int, error) {
 		if assessmentID == 0 {
 			continue
 		}
-		mismatch, scanErr := s.scanOne(ctx, assessmentID)
+		item, scanErr := s.scanOne(ctx, assessmentID)
 		if scanErr != nil {
 			return 0, scanErr
 		}
-		if mismatch == nil {
+		if item == nil {
 			continue
 		}
-		observeMismatch(mismatch.Kind)
-		observeDisposition(mismatch.Kind, "deferred")
-		log.Warnf("evaluation consistency drift requires audited migration (assessment_id=%d, kind=%s)", mismatch.AssessmentID, mismatch.Kind)
+		observeMismatch(item.Kind)
+		observeDisposition(item.Kind, "deferred")
+		log.Warnf(
+			"evaluation consistency drift requires audited migration (assessment_id=%d, kind=%s, severity=%s, action=%s)",
+			item.AssessmentID, item.Kind, item.Severity, item.RecommendedAction,
+		)
 		detected++
 	}
 	s.cursor = ids[len(ids)-1]
@@ -90,17 +135,85 @@ func (s *service) scanOne(ctx context.Context, assessmentID uint64) (*mismatch, 
 	if err != nil || a == nil {
 		return nil, err
 	}
-	if !a.Status().IsSubmitted() {
-		return nil, nil
-	}
 	record, err := s.outcomes.FindByAssessmentID(ctx, meta.FromUint64(assessmentID))
 	if err != nil {
 		return nil, err
 	}
-	if record == nil {
+	var run *evalrun.EvaluationRun
+	if s.runs != nil {
+		run, err = s.runs.FindLatestByAssessmentID(ctx, assessmentID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	item := classifyDrift(a.Status(), record != nil, run, s.now())
+	if item == nil {
 		return nil, nil
 	}
-	return &mismatch{AssessmentID: assessmentID, Kind: mismatchOutcomeWithoutEvaluatedStatus, DetectedAt: time.Now()}, nil
+	item.AssessmentID = assessmentID
+	return item, nil
+}
+
+// classifyDrift maps Assessment/Run/Outcome evidence to EV-R011 drift classes.
+// Projection/Outbox columns remain deferred until dedicated readers exist; this
+// function stays read-only and never mutates aggregates.
+func classifyDrift(
+	status domainassessment.Status,
+	hasOutcome bool,
+	run *evalrun.EvaluationRun,
+	now time.Time,
+) *mismatch {
+	runStatus := evalrun.Status("")
+	leaseExpired := false
+	if run != nil {
+		runStatus = run.Attempt().Status
+		if runStatus == evalrun.StatusRunning {
+			if lease := run.LeaseExpiresAt(); lease != nil && !lease.After(now) {
+				leaseExpired = true
+			}
+		}
+	}
+
+	switch {
+	case status.IsSubmitted() && hasOutcome && runStatus == evalrun.StatusSucceeded:
+		return &mismatch{
+			Kind: mismatchSuccessProjectionDrift, Severity: severityMedium,
+			RecommendedAction: "verify projection/outbox then migrate assessment to evaluated",
+			DetectedAt:        now,
+		}
+	case status.IsSubmitted() && hasOutcome:
+		return &mismatch{
+			Kind: mismatchOutcomeWithoutEvaluatedStatus, Severity: severityHigh,
+			RecommendedAction: "audited migration to evaluated after confirming canonical outcome",
+			DetectedAt:        now,
+		}
+	case status.IsSubmitted() && !hasOutcome && leaseExpired:
+		return &mismatch{
+			Kind: mismatchLeaseRecoveryCandidate, Severity: severityMedium,
+			RecommendedAction: "lease recovery / redelivery; do not rewrite assessment status here",
+			DetectedAt:        now,
+		}
+	case status.IsEvaluated() && !hasOutcome:
+		return &mismatch{
+			Kind: mismatchCanonicalOutcomeMissing, Severity: severityHigh,
+			RecommendedAction: "investigate missing outcome; never invent outcome from current catalog",
+			DetectedAt:        now,
+		}
+	case status.IsEvaluated() && hasOutcome && (runStatus == evalrun.StatusFailed || runStatus == evalrun.StatusRunning):
+		return &mismatch{
+			Kind: mismatchRunStatusMismatch, Severity: severityMedium,
+			RecommendedAction: "audit run/status mismatch; manual confirmation required",
+			DetectedAt:        now,
+		}
+	case status.IsFailed() && hasOutcome && runStatus == evalrun.StatusSucceeded:
+		return &mismatch{
+			Kind: mismatchTerminalConflict, Severity: severityHigh,
+			RecommendedAction: "terminal conflict; require operator decision",
+			DetectedAt:        now,
+		}
+	default:
+		return nil
+	}
 }
 
 var (
@@ -114,3 +227,6 @@ func observeMismatch(kind mismatchKind) {
 func observeDisposition(kind mismatchKind, disposition string) {
 	evaluationConsistencyDispositionTotal.WithLabelValues(string(kind), disposition).Inc()
 }
+
+// Ensure evaluationrun.Repository satisfies LatestRunReader when wired.
+var _ LatestRunReader = evaluationrun.Repository(nil)
