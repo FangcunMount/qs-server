@@ -41,8 +41,25 @@ func TestApplyFrozenNormInterpretationRestoresDimensionLabelAndSuggestion(t *tes
 	}}}, nil)
 	assets := &evaluationinput.InputSnapshot{ModelPayload: evaluationinput.BehavioralRatingModelPayload{Snapshot: &behavioralsnapshot.Snapshot{Norming: &behavioralsnapshot.NormingProfile{NormTables: &calcnorm.NormTables{TScoreRules: []calcnorm.TScoreInterpretRule{{FactorCode: "gec", Ranges: []calcnorm.TScoreRange{{MinT: 60, MaxT: 100, Level: "elevated", Conclusion: "偏高", Suggestion: "建议关注"}}}}}}}}}
 
-	applyFrozenNormInterpretation(factors, assets)
-	if factors[0].Level == nil || factors[0].Level.Label != "偏高" || factors[0].Conclusion != "偏高" || factors[0].Suggestion != "建议关注" {
+	if err := applyFrozenNormInterpretation(factors, assets); err != nil {
+		t.Fatal(err)
+	}
+	if factors[0].Level == nil || factors[0].Level.Code != "elevated" || factors[0].Level.Label != "偏高" || factors[0].Conclusion != "偏高" || factors[0].Suggestion != "建议关注" {
 		t.Fatalf("restored norm interpretation = %#v", factors[0])
+	}
+}
+
+func TestApplyFrozenNormInterpretationRejectsTScoreWithoutLevel(t *testing.T) {
+	factors := factorScores(&evaluationfact.Execution{Dimensions: []evaluationfact.DimensionResult{{
+		Code:          "gec",
+		Score:         &evaluationfact.ScoreValue{Value: 10},
+		DerivedScores: []evaluationfact.ScoreValue{{Kind: evaluationfact.ScoreKindTScore, Value: 65}},
+	}}}, nil)
+
+	if err := applyFrozenNormInterpretation(factors, nil); err == nil {
+		t.Fatal("expected T-score without Outcome Level to fail closed")
+	}
+	if factors[0].Level != nil {
+		t.Fatalf("Level was derived by Interpretation: %#v", factors[0].Level)
 	}
 }

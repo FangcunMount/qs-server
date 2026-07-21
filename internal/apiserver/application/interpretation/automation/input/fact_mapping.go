@@ -163,15 +163,23 @@ func factorScores(execution *domainoutcome.Execution, model *reportscore.ReportM
 }
 
 // applyFrozenNormInterpretation restores display prose from the immutable
-// report-input snapshot. Evaluation outcomes retain only scoring facts.
-func applyFrozenNormInterpretation(items []reportscore.FactorReportScore, assets *evaluationinput.InputSnapshot) {
+// report-input snapshot. It never derives the Outcome-owned Level code.
+func applyFrozenNormInterpretation(items []reportscore.FactorReportScore, assets *evaluationinput.InputSnapshot) error {
+	for i := range items {
+		if _, ok := reportScoreValue(items[i].DerivedScores, report.ScoreKindTScore); !ok {
+			continue
+		}
+		if items[i].Level == nil || items[i].Level.Code == "" {
+			return fmt.Errorf("norm factor %q has T-score but no outcome level code", items[i].FactorCode)
+		}
+	}
 	payload, ok := evaluationinput.BehavioralRatingPayload(assets)
 	if !ok || payload.Snapshot == nil || payload.Snapshot.Norming == nil {
-		return
+		return nil
 	}
 	tables := payload.Snapshot.Norming.NormTablesOrNil()
 	if tables == nil {
-		return
+		return nil
 	}
 	for i := range items {
 		tScore, ok := reportScoreValue(items[i].DerivedScores, report.ScoreKindTScore)
@@ -182,18 +190,16 @@ func applyFrozenNormInterpretation(items []reportscore.FactorReportScore, assets
 		if !interpreted {
 			continue
 		}
+		if items[i].Level.Code != level {
+			return fmt.Errorf("norm factor %q outcome level %q does not match frozen norm level %q", items[i].FactorCode, items[i].Level.Code, level)
+		}
 		items[i].Conclusion = conclusion
 		items[i].Suggestion = suggestion
-		if items[i].Level == nil {
-			items[i].Level = &report.ResultLevel{Code: level}
-		}
-		if items[i].Level.Code == "" {
-			items[i].Level.Code = level
-		}
-		if items[i].Level.Label == "" && (level == "" || items[i].Level.Code == level) {
+		if items[i].Level.Label == "" {
 			items[i].Level.Label = conclusion
 		}
 	}
+	return nil
 }
 
 func reportScoreValue(scores []report.ScoreValue, kind string) (float64, bool) {
