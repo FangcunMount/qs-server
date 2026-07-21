@@ -32,7 +32,10 @@ func TestPresentationByOutcomeCodeDoesNotRequireScoreRematch(t *testing.T) {
 		FactorCode: "mood", FactorName: "情绪", RawScore: 80, RiskLevel: report.RiskLevelLow,
 		Level: &report.ResultLevel{Code: "low"},
 	}
-	conclusion, suggestion := interpretScaleFactor(model, fs)
+	conclusion, suggestion, err := interpretScaleFactor(model, fs)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if conclusion != "偏低" || suggestion != "建议观察" {
 		t.Fatalf("presentation = (%q,%q), want OutcomeCode lookup", conclusion, suggestion)
 	}
@@ -54,8 +57,14 @@ func TestPresentationByOutcomeCodeRewritesCopyWithoutChangingDecisionFact(t *tes
 		}},
 	}
 	fs := FactorReportScore{FactorCode: "total", RawScore: 42, Level: &report.ResultLevel{Code: "ability_high"}}
-	gotA, _ := interpretScaleFactor(&ReportModel{Assets: &assetsA}, fs)
-	gotB, _ := interpretScaleFactor(&ReportModel{Assets: &assetsB}, fs)
+	gotA, _, err := interpretScaleFactor(&ReportModel{Assets: &assetsA}, fs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotB, _, err := interpretScaleFactor(&ReportModel{Assets: &assetsB}, fs)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if gotA == gotB {
 		t.Fatalf("presentation should differ after assets rewrite: %q vs %q", gotA, gotB)
 	}
@@ -74,9 +83,12 @@ func TestPresentationFallsBackToScoreRematchWithoutAssets(t *testing.T) {
 			},
 		}},
 	}
-	conclusion, suggestion := interpretScaleFactor(model, FactorReportScore{
+	conclusion, suggestion, err := interpretScaleFactor(model, FactorReportScore{
 		FactorCode: "total", RawScore: 5, RiskLevel: report.RiskLevelLow,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if conclusion != "legacy-conclusion" || suggestion != "legacy-suggestion" {
 		t.Fatalf("legacy fallback = (%q,%q)", conclusion, suggestion)
 	}

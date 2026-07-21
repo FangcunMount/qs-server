@@ -1,6 +1,7 @@
 package scoring_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
@@ -50,5 +51,21 @@ func TestBuildFactorScoringDraftAssemblesScoreBasedContent(t *testing.T) {
 	dimensions := content.Dimensions
 	if len(dimensions) != 1 || dimensions[0].Name() != "总分" || dimensions[0].MaxScore() == nil || *dimensions[0].MaxScore() != totalMax {
 		t.Fatalf("unexpected dimensions: %#v", dimensions)
+	}
+}
+
+func TestBuildFactorScoringDraftFailsOnInterpretRuleMiss(t *testing.T) {
+	_, err := scoring.BuildFactorScoringDraft(builder.NewDefaultReportBuilder(), scoring.FactorScoringReportInput{
+		AssessmentID: report.ID(9002),
+		Scale: &scoring.ReportModel{Factors: []scoring.FactorReportModel{{
+			Code: "TOTAL",
+			InterpretRules: []scoring.FactorInterpretRule{{
+				Min: 0, Max: 10, Conclusion: "low",
+			}},
+		}}},
+		FactorScores: []scoring.FactorReportScore{{FactorCode: "TOTAL", RawScore: 20}},
+	})
+	if !errors.Is(err, scoring.ErrInterpretationRuleMiss) {
+		t.Fatalf("error = %v, want ErrInterpretationRuleMiss", err)
 	}
 }

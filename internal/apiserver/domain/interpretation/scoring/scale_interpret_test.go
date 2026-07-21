@@ -1,12 +1,13 @@
 package scoring
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 )
 
-func TestInterpretScaleFactorNoLastRuleFallback(t *testing.T) {
+func TestInterpretScaleFactorRuleMissFailsClosed(t *testing.T) {
 	t.Parallel()
 
 	model := &ReportModel{Factors: []FactorReportModel{{
@@ -18,14 +19,14 @@ func TestInterpretScaleFactorNoLastRuleFallback(t *testing.T) {
 		},
 	}}}
 
-	conclusionText, suggestion := interpretScaleFactor(model, FactorReportScore{
+	conclusionText, suggestion, err := interpretScaleFactor(model, FactorReportScore{
 		FactorCode: "mood", FactorName: "情绪", RawScore: 80, RiskLevel: report.RiskLevelNone,
 	})
-	if conclusionText != "情绪得分80.0分，处于正常水平" {
-		t.Fatalf("conclusion = %q, want default none-level wording (no last-rule fallback)", conclusionText)
+	if !errors.Is(err, ErrInterpretationRuleMiss) {
+		t.Fatalf("error = %v, want ErrInterpretationRuleMiss", err)
 	}
-	if suggestion != "状态良好，继续保持" {
-		t.Fatalf("suggestion = %q", suggestion)
+	if conclusionText != "" || suggestion != "" {
+		t.Fatalf("presentation = (%q,%q), want empty on rule miss", conclusionText, suggestion)
 	}
 }
 
@@ -40,12 +41,33 @@ func TestInterpretScaleFactorMatchesSharedBounds(t *testing.T) {
 		},
 	}}}
 
-	got, _ := interpretScaleFactor(model, FactorReportScore{FactorCode: "mood", RawScore: 100})
+	got, _, err := interpretScaleFactor(model, FactorReportScore{FactorCode: "mood", RawScore: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got != "high" {
 		t.Fatalf("conclusion = %q, want high at max inclusive", got)
 	}
-	got, _ = interpretScaleFactor(model, FactorReportScore{FactorCode: "mood", RawScore: 40})
+	got, _, err = interpretScaleFactor(model, FactorReportScore{FactorCode: "mood", RawScore: 40})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got != "high" {
 		t.Fatalf("conclusion = %q, want high at boundary", got)
+	}
+}
+
+func TestInterpretScaleFactorSoftDefaultsOnlyWithoutRulesOrAssets(t *testing.T) {
+	t.Parallel()
+
+	conclusion, suggestion, err := interpretScaleFactor(
+		&ReportModel{Factors: []FactorReportModel{{Code: "mood", Title: "情绪"}}},
+		FactorReportScore{FactorCode: "mood", FactorName: "情绪", RawScore: 80},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if conclusion != "情绪得分80.0分，处于正常水平" || suggestion != "状态良好，继续保持" {
+		t.Fatalf("soft default = (%q,%q)", conclusion, suggestion)
 	}
 }

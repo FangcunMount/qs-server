@@ -1,6 +1,7 @@
 package scoring
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scorerange"
@@ -8,18 +9,36 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
 )
 
+var (
+	// ErrInterpretationRuleMiss classifies a configured score-range gap.
+	ErrInterpretationRuleMiss = errors.New("factor interpretation rule miss")
+	// ErrOutcomePresentationMiss classifies a frozen OutcomeCode without presentation copy.
+	ErrOutcomePresentationMiss = errors.New("factor outcome presentation miss")
+)
+
 // interpretScaleFactor resolves factor presentation. Primary path: frozen OutcomeCode
 // → InterpretationAssets; legacy fallback: score-range rematch on InterpretRules (MC-R016).
-func interpretScaleFactor(model *ReportModel, fs FactorReportScore) (string, string) {
-	if model != nil && model.Assets != nil {
+func interpretScaleFactor(model *ReportModel, fs FactorReportScore) (string, string, error) {
+	hasAssets := model != nil && model.Assets != nil && model.Assets.IsMaterialized()
+	if hasAssets {
 		if conclusion, suggestion, ok := presentationFromOutcomeCode(*model.Assets, outcomeCodeFromFactorScore(fs)); ok {
-			return conclusion, suggestion
+			return conclusion, suggestion, nil
 		}
 	}
-	if rule := findFactorInterpretRule(model, fs.FactorCode, fs.RawScore); rule != nil && rule.Conclusion != "" {
-		return rule.Conclusion, rule.Suggestion
+	rule, hasRules := findFactorInterpretRule(model, fs.FactorCode, fs.RawScore)
+	if rule != nil && rule.Conclusion != "" {
+		observeFactorInterpretationCompatibility("score_rule_rematch")
+		return rule.Conclusion, rule.Suggestion, nil
 	}
-	return defaultScaleFactorInterpretation(fs.FactorName, fs.RiskLevel, fs.RawScore)
+	if hasRules {
+		return "", "", fmt.Errorf("%w: factor=%q score=%g", ErrInterpretationRuleMiss, fs.FactorCode, fs.RawScore)
+	}
+	if hasAssets {
+		return "", "", fmt.Errorf("%w: factor=%q outcome_code=%q", ErrOutcomePresentationMiss, fs.FactorCode, outcomeCodeFromFactorScore(fs))
+	}
+	observeFactorInterpretationCompatibility("soft_default")
+	conclusion, suggestion := defaultScaleFactorInterpretation(fs.FactorName, fs.RiskLevel, fs.RawScore)
+	return conclusion, suggestion, nil
 }
 
 func outcomeCodeFromFactorScore(fs FactorReportScore) string {
@@ -60,9 +79,9 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func findFactorInterpretRule(model *ReportModel, factorCode string, score float64) *FactorInterpretRule {
+func findFactorInterpretRule(model *ReportModel, factorCode string, score float64) (*FactorInterpretRule, bool) {
 	if model == nil {
-		return nil
+		return nil, false
 	}
 	for i := range model.Factors {
 		if model.Factors[i].Code != factorCode {
@@ -70,7 +89,7 @@ func findFactorInterpretRule(model *ReportModel, factorCode string, score float6
 		}
 		rules := model.Factors[i].InterpretRules
 		if len(rules) == 0 {
-			return nil
+			return nil, false
 		}
 		bounds := make([]scorerange.Bound, len(rules))
 		for j, rule := range rules {
@@ -80,11 +99,11 @@ func findFactorInterpretRule(model *ReportModel, factorCode string, score float6
 		}
 		index, ok := scorerange.MatchBounds(score, bounds)
 		if !ok {
-			return nil
+			return nil, true
 		}
-		return &rules[index]
+		return &rules[index], true
 	}
-	return nil
+	return nil, false
 }
 
 func defaultScaleFactorInterpretation(factorName string, riskLevel report.RiskLevel, score float64) (string, string) {

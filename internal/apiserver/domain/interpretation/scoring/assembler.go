@@ -21,14 +21,22 @@ func BuildFactorScoringDraft(composer report.DraftBuilder, input FactorScoringRe
 	if composer == nil {
 		return nil, report.ErrInvalidArgument
 	}
-	return composer.BuildDraft(generateReportInput(resolveFactorScoringInput(input)))
+	resolved, err := resolveFactorScoringInput(input)
+	if err != nil {
+		return nil, err
+	}
+	return composer.BuildDraft(generateReportInput(resolved))
 }
 
-func resolveFactorScoringInput(input FactorScoringReportInput) ReportInput {
+func resolveFactorScoringInput(input FactorScoringReportInput) (ReportInput, error) {
 	factorScores := make([]FactorReportScore, 0, len(input.FactorScores))
 	for _, fs := range input.FactorScores {
 		if fs.Conclusion == "" && fs.Suggestion == "" {
-			fs.Conclusion, fs.Suggestion = interpretScaleFactor(input.Scale, fs)
+			var err error
+			fs.Conclusion, fs.Suggestion, err = interpretScaleFactor(input.Scale, fs)
+			if err != nil {
+				return ReportInput{}, err
+			}
 		}
 		factorScores = append(factorScores, fs)
 	}
@@ -51,7 +59,7 @@ func resolveFactorScoringInput(input FactorScoringReportInput) ReportInput {
 		Conclusion:   conclusion,
 		Suggestion:   suggestion,
 		FactorScores: factorScores,
-	}
+	}, nil
 }
 
 func generateReportInput(input ReportInput) report.GenerateReportInput {
