@@ -20,6 +20,7 @@ import (
 	platformmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
 	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
+	interpretationpolicy "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 )
 
@@ -77,7 +78,10 @@ func (c *Container) initEvaluationModule() error {
 	if err := c.ReportModule.BindParticipantAccess(participantInterpretationAccess{testees: c.ActorModule.TesteeQueryService, assessments: c.EvaluationModule.TesteeService}); err != nil {
 		return fmt.Errorf("failed to bind interpretation participant service: %w", err)
 	}
-	if err := c.ReportModule.BindAdministrationAccess(administrationInterpretationAccess{access: c.EvaluationModule.OperatorQuery}); err != nil {
+	if err := c.ReportModule.BindAdministrationAccess(administrationInterpretationAccess{
+		access: c.EvaluationModule.OperatorQuery,
+		actors: c.ActorModule.TesteeAccessService,
+	}); err != nil {
 		return fmt.Errorf("failed to bind interpretation administration service: %w", err)
 	}
 	if err := c.ReportModule.BindClinicianAccess(clinicianInterpretationAccess{relations: c.ActorModule.TesteeAccessService, ownership: c.EvaluationModule.TesteeService}); err != nil {
@@ -117,12 +121,15 @@ func (a participantInterpretationAccess) AuthorizeOwnAssessment(ctx context.Cont
 
 type administrationInterpretationAccess struct {
 	access evaluationoperator.QueryService
+	actors actoraccess.TesteeAccessService
 }
 
 type clinicianInterpretationAccess struct {
 	relations actoraccess.TesteeAccessService
 	ownership evaluationtestee.Service
 }
+
+const administrationDecisionSource = "actor.access.ResolveAccessScope"
 
 func (a clinicianInterpretationAccess) AuthorizeParticipant(ctx context.Context, actor interpretationclinician.Actor, testeeID uint64) error {
 	return a.relations.ValidateTesteeAccess(ctx, actor.OrgID, actor.OperatorUserID, testeeID)
@@ -134,16 +141,61 @@ func (a clinicianInterpretationAccess) AuthorizeParticipantAssessment(ctx contex
 	return a.ownership.AuthorizeAssessment(ctx, evaluationtestee.Actor{TesteeID: testeeID}, assessmentID)
 }
 
-func (a administrationInterpretationAccess) AuthorizeAssessment(ctx context.Context, actor interpretationadmin.Actor, assessmentID uint64) error {
-	_, err := a.access.GetAssessment(ctx, evaluationoperator.Actor{OrgID: actor.OrgID, OperatorUserID: actor.OperatorUserID}, assessmentID)
-	return err
+func (a administrationInterpretationAccess) AuthorizeAssessment(ctx context.Context, actor interpretationadmin.Actor, assessmentID uint64) (interpretationadmin.ReportAccessDecision, error) {
+	if a.access == nil {
+		return interpretationadmin.ReportAccessDecision{}, fmt.Errorf("administration assessment access service is not configured")
+	}
+	if _, err := a.access.GetAssessment(ctx, evaluationoperator.Actor{OrgID: actor.OrgID, OperatorUserID: actor.OperatorUserID}, assessmentID); err != nil {
+		return interpretationadmin.ReportAccessDecision{}, err
+	}
+	return a.decide(ctx, actor)
 }
+
 func (a administrationInterpretationAccess) ScopeReports(ctx context.Context, actor interpretationadmin.Actor, testeeID uint64) (interpretationadmin.ListScope, error) {
+	if a.access == nil {
+		return interpretationadmin.ListScope{}, fmt.Errorf("administration report access service is not configured")
+	}
 	scope, err := a.access.ScopeTesteeList(ctx, evaluationoperator.Actor{OrgID: actor.OrgID, OperatorUserID: actor.OperatorUserID}, testeeID)
 	if err != nil {
 		return interpretationadmin.ListScope{}, err
 	}
-	return interpretationadmin.ListScope{OrgID: actor.OrgID, TesteeID: scope.TesteeID, AccessibleTesteeIDs: scope.AccessibleTesteeIDs, Restricted: scope.Restricted}, nil
+	decision, err := a.decide(ctx, actor)
+	if err != nil {
+		return interpretationadmin.ListScope{}, err
+	}
+	return interpretationadmin.ListScope{
+		OrgID:               actor.OrgID,
+		TesteeID:            scope.TesteeID,
+		AccessibleTesteeIDs: scope.AccessibleTesteeIDs,
+		Restricted:          scope.Restricted,
+		Audience:            decision.Audience,
+		IsAdmin:             decision.IsAdmin,
+		DecisionSource:      decision.DecisionSource,
+	}, nil
+}
+
+func (a administrationInterpretationAccess) decide(ctx context.Context, actor interpretationadmin.Actor) (interpretationadmin.ReportAccessDecision, error) {
+	if a.actors == nil {
+		return interpretationadmin.ReportAccessDecision{}, fmt.Errorf("administration actor access service is not configured")
+	}
+	scope, err := a.actors.ResolveAccessScope(ctx, actor.OrgID, actor.OperatorUserID)
+	if err != nil {
+		return interpretationadmin.ReportAccessDecision{}, err
+	}
+	if scope != nil && scope.IsAdmin {
+		return interpretationadmin.ReportAccessDecision{
+			Audience:       interpretationpolicy.AudienceAdmin,
+			IsAdmin:        true,
+			Restricted:     false,
+			DecisionSource: administrationDecisionSource,
+		}, nil
+	}
+	return interpretationadmin.ReportAccessDecision{
+		Audience:       interpretationpolicy.AudienceClinician,
+		IsAdmin:        false,
+		Restricted:     true,
+		DecisionSource: administrationDecisionSource,
+	}, nil
 }
 
 // initPlanModule 初始化计划模块

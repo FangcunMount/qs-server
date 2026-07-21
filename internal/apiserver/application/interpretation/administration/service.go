@@ -18,11 +18,24 @@ type ListQuery struct {
 	TesteeID       uint64
 	Page, PageSize int
 }
+
+// ReportAccessDecision is the actor-derived visibility decision for Administration
+// report queries. Audience must come from this decision, never from the package name.
+type ReportAccessDecision struct {
+	Audience       policy.Audience
+	IsAdmin        bool
+	Restricted     bool
+	DecisionSource string
+}
+
 type ListScope struct {
 	OrgID               int64
 	TesteeID            uint64
 	AccessibleTesteeIDs []uint64
 	Restricted          bool
+	Audience            policy.Audience
+	IsAdmin             bool
+	DecisionSource      string
 }
 
 type Report = reportprojection.Report
@@ -35,7 +48,7 @@ type Dimension = reportprojection.Dimension
 type Suggestion = reportprojection.Suggestion
 
 type Access interface {
-	AuthorizeAssessment(ctx context.Context, actor Actor, assessmentID uint64) error
+	AuthorizeAssessment(ctx context.Context, actor Actor, assessmentID uint64) (ReportAccessDecision, error)
 	ScopeReports(ctx context.Context, actor Actor, testeeID uint64) (ListScope, error)
 }
 
@@ -60,14 +73,18 @@ func (s *service) GetReport(ctx context.Context, actor Actor, query GetQuery) (*
 	if s.reader == nil || s.access == nil {
 		return nil, cberrors.WithCode(code.ErrModuleInitializationFailed, "administration report service is not configured")
 	}
-	if err := s.access.AuthorizeAssessment(ctx, actor, query.AssessmentID); err != nil {
+	decision, err := s.access.AuthorizeAssessment(ctx, actor, query.AssessmentID)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateDecision(decision); err != nil {
 		return nil, err
 	}
 	row, err := s.reader.GetReportByAssessmentID(ctx, query.AssessmentID)
 	if err != nil {
 		return nil, cberrors.WrapC(err, code.ErrInterpretReportNotFound, "报告不存在")
 	}
-	return reportprojection.FromRow(*row, policy.AudienceAdmin)
+	return reportprojection.FromRow(*row, decision.Audience)
 }
 
 func (s *service) ListReports(ctx context.Context, actor Actor, query ListQuery) (*ListResult, error) {
@@ -79,6 +96,14 @@ func (s *service) ListReports(ctx context.Context, actor Actor, query ListQuery)
 	}
 	scope, err := s.access.ScopeReports(ctx, actor, query.TesteeID)
 	if err != nil {
+		return nil, err
+	}
+	if err := validateDecision(ReportAccessDecision{
+		Audience:       scope.Audience,
+		IsAdmin:        scope.IsAdmin,
+		Restricted:     !scope.IsAdmin,
+		DecisionSource: scope.DecisionSource,
+	}); err != nil {
 		return nil, err
 	}
 	filter := interpretationreadmodel.ReportFilter{}
@@ -103,7 +128,7 @@ func (s *service) ListReports(ctx context.Context, actor Actor, query ListQuery)
 	}
 	items := make([]*Report, 0, len(rows))
 	for _, row := range rows {
-		item, mapErr := reportprojection.FromRow(row, policy.AudienceAdmin)
+		item, mapErr := reportprojection.FromRow(row, scope.Audience)
 		if mapErr != nil {
 			return nil, mapErr
 		}
@@ -111,6 +136,28 @@ func (s *service) ListReports(ctx context.Context, actor Actor, query ListQuery)
 	}
 	totalInt := int(total)
 	return &ListResult{Items: items, Total: totalInt, Page: page, PageSize: pageSize, TotalPages: (totalInt + pageSize - 1) / pageSize}, nil
+}
+
+func validateDecision(decision ReportAccessDecision) error {
+	if decision.Audience == "" {
+		return cberrors.WithCode(code.ErrModuleInitializationFailed, "report access decision is missing audience")
+	}
+	if decision.DecisionSource == "" {
+		return cberrors.WithCode(code.ErrModuleInitializationFailed, "report access decision is missing decision source")
+	}
+	switch decision.Audience {
+	case policy.AudienceAdmin:
+		if !decision.IsAdmin || decision.Restricted {
+			return cberrors.WithCode(code.ErrModuleInitializationFailed, "admin audience requires non-restricted admin decision")
+		}
+	case policy.AudienceClinician:
+		if decision.IsAdmin || !decision.Restricted {
+			return cberrors.WithCode(code.ErrModuleInitializationFailed, "clinician audience requires restricted non-admin decision")
+		}
+	default:
+		return cberrors.WithCode(code.ErrInvalidArgument, "unsupported administration report audience %q", decision.Audience)
+	}
+	return nil
 }
 
 func normalize(page, size int) (int, int) {
