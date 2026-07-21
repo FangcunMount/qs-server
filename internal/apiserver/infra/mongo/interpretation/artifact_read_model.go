@@ -171,20 +171,6 @@ func (r *reportReadModel) loadCatalogRows(ctx context.Context, entries []ReportC
 	return rows, nil
 }
 
-func mismatchedAssociationFields(catalog ReportCatalogPO, source catalogSourceEnvelope) []string {
-	var fields []string
-	if catalog.AssessmentID != source.AssessmentID {
-		fields = append(fields, "assessment_id")
-	}
-	if source.HasOrgID && catalog.OrgID != source.OrgID {
-		fields = append(fields, "org_id")
-	}
-	if catalog.TesteeID != source.TesteeID {
-		fields = append(fields, "testee_id")
-	}
-	return fields
-}
-
 func (r *reportReadModel) loadArtifacts(ctx context.Context, ids []uint64, dst map[string]catalogSourceEnvelope) error {
 	if len(ids) == 0 {
 		return nil
@@ -242,6 +228,6 @@ func interpretReportPOToReadRow(po *InterpretReportPO) readmodel.ReportRow {
 	if po == nil {
 		return readmodel.ReportRow{}
 	}
-	archived := &ArchivedReportPO{BaseDocument: base.BaseDocument{DomainID: meta.FromUint64(po.AssessmentID), CreatedAt: po.GeneratedAt}, ScaleName: po.ScaleName, ScaleCode: po.ScaleCode, Model: po.Model, PrimaryScore: po.PrimaryScore, Level: po.Level, TotalScore: po.TotalScore, RiskLevel: po.RiskLevel, Conclusion: po.Conclusion, Dimensions: po.Dimensions, Suggestions: po.Suggestions, ModelExtra: po.ModelExtra}
+	archived := &ArchivedReportPO{BaseDocument: base.BaseDocument{DomainID: meta.FromUint64(po.AssessmentID), CreatedAt: po.GeneratedAt}, ScaleName: po.ScaleName, ScaleCode: po.ScaleCode, Model: po.Model, PrimaryScore: po.PrimaryScore, Level: po.Level, TotalScore: po.TotalScore, RiskLevel: po.RiskLevel, Conclusion: po.Conclusion, Dimensions: po.Dimensions, Suggestions: po.Suggestions, ModelExtra: po.ModelExtra, PresentationProfile: po.PresentationProfile}
 	return projectArchivedReportRow(archived)
 }

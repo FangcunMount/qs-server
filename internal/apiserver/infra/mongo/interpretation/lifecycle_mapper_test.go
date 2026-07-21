@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
+	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -46,15 +47,17 @@ func TestLifecycleMapperRoundTripsThreeInterpretationObjects(t *testing.T) {
 	}
 
 	artifact, err := domainreport.NewInterpretReport(domainreport.InterpretReportInput{
-		ID:                  meta.FromUint64(3),
-		GenerationID:        generationRecord.ID(),
-		OutcomeID:           key.OutcomeID,
-		InterpretationRunID: meta.FromUint64(2),
-		Association:         domainreport.Association{OrgID: 11, AssessmentID: meta.FromUint64(7), TesteeID: 8},
-		ReportType:          key.ReportType,
-		TemplateVersion:     key.TemplateVersion,
+		ID:                   meta.FromUint64(3),
+		GenerationID:         generationRecord.ID(),
+		OutcomeID:            key.OutcomeID,
+		InterpretationRunID:  meta.FromUint64(2),
+		Association:          domainreport.Association{OrgID: 11, AssessmentID: meta.FromUint64(7), TesteeID: 8},
+		ReportType:           key.ReportType,
+		TemplateVersion:      key.TemplateVersion,
+		BuilderIdentity:      domainreport.BuilderIdentityFactorScoring,
+		ContentSchemaVersion: domainreport.ContentSchemaVersionV1,
 		Content: domainreport.Content{
-			Model:        domainreport.ModelIdentity{Code: "SDS", Title: "抑郁自评"},
+			Model:        domainreport.ModelIdentity{Kind: "scale", Code: "SDS", Version: "v1", Title: "抑郁自评"},
 			PrimaryScore: &domainreport.ScoreValue{Kind: domainreport.ScoreKindRawTotal, Value: 42},
 			Level:        &domainreport.ResultLevel{Code: "high", Severity: "high"},
 			Conclusion:   "高风险",
@@ -78,5 +81,55 @@ func TestLifecycleMapperRoundTripsThreeInterpretationObjects(t *testing.T) {
 	dimension := restoredArtifact.Content().Dimensions[0]
 	if len(dimension.DerivedScores()) != 2 || dimension.Level() == nil || dimension.Level().Code != "elevated" || dimension.NormReference() == nil || dimension.NormReference().TableVersion != "2026" {
 		t.Fatalf("dimension score context did not round trip: %#v %#v %#v", dimension.DerivedScores(), dimension.Level(), dimension.NormReference())
+	}
+	if restoredArtifact.BuilderIdentity() != domainreport.BuilderIdentityFactorScoring || restoredArtifact.ContentSchemaVersion() != domainreport.ContentSchemaVersionV1 {
+		t.Fatalf("artifact provenance round trip = %q/%q", restoredArtifact.BuilderIdentity(), restoredArtifact.ContentSchemaVersion())
+	}
+}
+
+func TestLifecycleMapperRestoresLegacyArtifactProvenance(t *testing.T) {
+	mapper := NewLifecycleMapper()
+	now := time.Date(2026, 7, 13, 10, 0, 0, 0, time.UTC)
+	restored, err := mapper.ReportToDomain(&InterpretReportPO{
+		BaseDocument:        base.BaseDocument{DomainID: meta.FromUint64(3), CreatedAt: now, UpdatedAt: now},
+		GenerationID:        1,
+		OutcomeID:           9,
+		InterpretationRunID: 2,
+		ReportType:          string(policy.ReportTypeStandard),
+		TemplateVersion:     "v1",
+		GeneratedAt:         now,
+		OrgID:               11,
+		AssessmentID:        7,
+		TesteeID:            8,
+		ScaleCode:           "SDS",
+		ScaleName:           "抑郁自评",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restored.BuilderIdentity() != domainreport.UnknownBuilderIdentity {
+		t.Fatalf("builder identity = %q, want %q", restored.BuilderIdentity(), domainreport.UnknownBuilderIdentity)
+	}
+	if restored.ContentSchemaVersion() != domainreport.LegacyContentSchemaVersion {
+		t.Fatalf("content schema = %q, want %q", restored.ContentSchemaVersion(), domainreport.LegacyContentSchemaVersion)
+	}
+}
+
+func TestLifecycleMapperRoundTripsClaimHistory(t *testing.T) {
+	now := time.Date(2026, 7, 21, 10, 0, 0, 0, time.UTC)
+	mapper := NewLifecycleMapper()
+	runRecord, err := interpretationrun.NewPending(meta.FromUint64(2), meta.FromUint64(1), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := runRecord.StartWithLease(now.Add(-2*time.Minute), "initial", now.Add(-time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if err := runRecord.ReclaimExpiredLease(now, "recovery", now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := mapper.RunToDomain(mapper.RunToPO(runRecord))
+	if err != nil || restored.RecoveryCount() != 1 || len(restored.ClaimHistory()) != 1 || restored.ClaimHistory()[0].TraceID != "recovery" {
+		t.Fatalf("claim history round trip = count:%d history:%#v err:%v", restored.RecoveryCount(), restored.ClaimHistory(), err)
 	}
 }

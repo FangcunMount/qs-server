@@ -64,6 +64,7 @@ func projectArchivedReportRow(po *ArchivedReportPO) evaluationreadmodel.ReportRo
 		Dimensions:   dimensions,
 		Suggestions:  suggestions,
 		ModelExtra:   reportModelExtraPOToRow(po.ModelExtra),
+		PresentationProfile: presentationProfilePOToRow(po.PresentationProfile),
 		CreatedAt:    po.CreatedAt,
 	}
 	if po.Model != nil {
@@ -122,6 +123,16 @@ func normalizeArchivedReportRow(row *evaluationreadmodel.ReportRow) {
 	}
 	if row.ModelExtra != nil && row.ModelExtra.TypeCode != "" {
 		row.Level = &evaluationreadmodel.ResultLevelRow{Code: row.ModelExtra.TypeCode, Label: row.ModelExtra.TypeCode, Severity: "none"}
+	}
+}
+
+func presentationProfilePOToRow(po *PresentationProfilePO) *evaluationreadmodel.PresentationProfileRow {
+	if po == nil || po.Source == "" {
+		return nil
+	}
+	return &evaluationreadmodel.PresentationProfileRow{
+		VisibleFactorCodes: append([]string(nil), po.VisibleFactorCodes...),
+		Source:             po.Source,
 	}
 }
 

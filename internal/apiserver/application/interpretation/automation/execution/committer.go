@@ -112,7 +112,7 @@ func (c *interpretationCommitter) CommitSuccess(ctx context.Context, request Com
 	if err := generationToCommit.Succeed(runToCommit.ID(), request.InterpretReport.ID(), completedAt); err != nil {
 		return nil, err
 	}
-	events := generatedEvents(request.InterpretReport, runToCommit.Attempt(), request.BuilderIdentity, request.ContentSchemaVersion)
+	events := generatedEvents(request.InterpretReport, runToCommit.Attempt())
 	if err := c.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := c.reports.Insert(txCtx, request.InterpretReport); err != nil {
 			return err
@@ -229,6 +229,12 @@ func (c *interpretationCommitter) validateSuccess(request CommitSuccessRequest) 
 		request.InterpretReport.TemplateVersion() != key.TemplateVersion {
 		return fmt.Errorf("interpretation commit references do not match")
 	}
+	if request.InterpretReport.BuilderIdentity() != request.BuilderIdentity {
+		return fmt.Errorf("artifact builder identity does not match commit request")
+	}
+	if request.InterpretReport.ContentSchemaVersion() != request.ContentSchemaVersion {
+		return fmt.Errorf("artifact content schema version does not match commit request")
+	}
 	return nil
 }
 
@@ -281,7 +287,7 @@ func cloneRun(source *interpretationrun.InterpretationRun) (*interpretationrun.I
 	})
 }
 
-func generatedEvents(artifact *domainreport.InterpretReport, attempt int, builderIdentity, contentSchemaVersion string) []event.DomainEvent {
+func generatedEvents(artifact *domainreport.InterpretReport, attempt int) []event.DomainEvent {
 	if artifact == nil {
 		return nil
 	}
@@ -289,8 +295,8 @@ func generatedEvents(artifact *domainreport.InterpretReport, attempt int, builde
 	generated := domaininterpretation.NewInterpretationReportGeneratedEvent(domaininterpretation.ReportGeneratedEventInput{
 		OrgID: association.OrgID, GenerationID: artifact.GenerationID().String(), RunID: artifact.InterpretationRunID().String(), ReportID: artifact.ID().String(),
 		AssessmentID: association.AssessmentID.String(), OutcomeID: artifact.OutcomeID().String(), TesteeID: association.TesteeID, Attempt: uint(attempt),
-		ReportType: artifact.ReportType().String(), TemplateVersion: artifact.TemplateVersion().String(), BuilderIdentity: builderIdentity,
-		ContentSchemaVersion: contentSchemaVersion, Model: domaininterpretation.EventModelIdentityFrom(content.Model),
+		ReportType: artifact.ReportType().String(), TemplateVersion: artifact.TemplateVersion().String(), BuilderIdentity: artifact.BuilderIdentity(),
+		ContentSchemaVersion: artifact.ContentSchemaVersion(), Model: domaininterpretation.EventModelIdentityFrom(content.Model),
 		PrimaryScore: domaininterpretation.EventScoreValueFrom(content.PrimaryScore), Level: domaininterpretation.EventResultLevelFrom(content.Level), GeneratedAt: artifact.GeneratedAt(),
 	})
 	return []event.DomainEvent{generated}

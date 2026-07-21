@@ -128,6 +128,7 @@ func (e *executor) buildAndCommit(ctx context.Context, input interpinput.Interpr
 	artifact, err := domainreport.NewInterpretReport(domainreport.InterpretReportInput{
 		ID: e.newID(), GenerationID: generationRecord.ID(), OutcomeID: input.OutcomeID, InterpretationRunID: runRecord.ID(),
 		Association: input.Association, ReportType: input.Report.ReportType, TemplateVersion: input.Report.TemplateVersion,
+		BuilderIdentity: builder.BuilderIdentity(), ContentSchemaVersion: builder.ContentSchemaVersion(),
 		Content: draft.Content(), GeneratedAt: at,
 	})
 	if err != nil {

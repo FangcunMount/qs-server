@@ -62,6 +62,14 @@ func (m *LifecycleMapper) RunToPO(domain *interpretationrun.InterpretationRun) *
 		LeaseExpiresAt: domain.LeaseExpiresAt(),
 		FinishedAt:     domain.FinishedAt(),
 		AttemptOrigin:  string(domain.Origin()),
+		RecoveryCount:  domain.RecoveryCount(),
+		LastReclaimedAt: domain.LastReclaimedAt(),
+	}
+	if history := domain.ClaimHistory(); len(history) > 0 {
+		po.ClaimHistory = make([]ClaimHistoryPO, len(history))
+		for i, record := range history {
+			po.ClaimHistory[i] = ClaimHistoryPO{ReclaimedAt: record.ReclaimedAt, TraceID: record.TraceID}
+		}
 	}
 	if decision := domain.RetryDecision(); decision != nil {
 		po.RetryDisposition = string(decision.Disposition)
@@ -95,7 +103,15 @@ func (m *LifecycleMapper) RunToDomain(po *InterpretationRunPO) (*interpretationr
 		StartedAt:      po.StartedAt,
 		LeaseExpiresAt: po.LeaseExpiresAt,
 		FinishedAt:     po.FinishedAt,
-		Origin:         retrygovernance.AttemptOrigin(po.AttemptOrigin),
+		Origin:          retrygovernance.AttemptOrigin(po.AttemptOrigin),
+		RecoveryCount:   po.RecoveryCount,
+		LastReclaimedAt: po.LastReclaimedAt,
+	}
+	if len(po.ClaimHistory) > 0 {
+		restore.ClaimHistory = make([]interpretationrun.ClaimRecord, len(po.ClaimHistory))
+		for i, record := range po.ClaimHistory {
+			restore.ClaimHistory[i] = interpretationrun.ClaimRecord{ReclaimedAt: record.ReclaimedAt, TraceID: record.TraceID}
+		}
 	}
 	if po.RetryDisposition != "" {
 		restore.RetryDecision = &retrygovernance.Decision{
@@ -127,9 +143,11 @@ func (m *LifecycleMapper) ReportToPO(domain *domainreport.InterpretReport) *Inte
 		GenerationID:        domain.GenerationID().Uint64(),
 		OutcomeID:           domain.OutcomeID().Uint64(),
 		InterpretationRunID: domain.InterpretationRunID().Uint64(),
-		ReportType:          domain.ReportType().String(),
-		TemplateVersion:     domain.TemplateVersion().String(),
-		GeneratedAt:         domain.GeneratedAt(),
+		ReportType:           domain.ReportType().String(),
+		TemplateVersion:      domain.TemplateVersion().String(),
+		BuilderIdentity:      domain.BuilderIdentity(),
+		ContentSchemaVersion: domain.ContentSchemaVersion(),
+		GeneratedAt:          domain.GeneratedAt(),
 		OrgID:               association.OrgID,
 		AssessmentID:        association.AssessmentID.Uint64(),
 		TesteeID:            association.TesteeID,
@@ -142,6 +160,7 @@ func (m *LifecycleMapper) ReportToPO(domain *domainreport.InterpretReport) *Inte
 		Dimensions:          dimensionsToPO(content.Dimensions),
 		Suggestions:         toSuggestionPOs(content.Suggestions),
 		ModelExtra:          toModelExtraPO(content.ModelExtra),
+		PresentationProfile: presentationProfileToPO(content.PresentationProfile),
 	}
 	if content.PrimaryScore != nil {
 		po.TotalScore = content.PrimaryScore.Value
@@ -165,14 +184,16 @@ func (m *LifecycleMapper) ReportToDomain(po *InterpretReportPO) (*domainreport.I
 	if po == nil {
 		return nil, nil
 	}
-	artifact, err := domainreport.NewInterpretReport(domainreport.InterpretReportInput{
-		ID:                  po.DomainID,
-		GenerationID:        meta.FromUint64(po.GenerationID),
-		OutcomeID:           meta.FromUint64(po.OutcomeID),
-		InterpretationRunID: meta.FromUint64(po.InterpretationRunID),
-		Association:         domainreport.Association{OrgID: po.OrgID, AssessmentID: meta.FromUint64(po.AssessmentID), TesteeID: po.TesteeID},
-		ReportType:          policy.ReportType(po.ReportType),
-		TemplateVersion:     policy.TemplateVersion(po.TemplateVersion),
+	artifact, err := domainreport.RestoreInterpretReport(domainreport.InterpretReportInput{
+		ID:                   po.DomainID,
+		GenerationID:         meta.FromUint64(po.GenerationID),
+		OutcomeID:            meta.FromUint64(po.OutcomeID),
+		InterpretationRunID:  meta.FromUint64(po.InterpretationRunID),
+		Association:          domainreport.Association{OrgID: po.OrgID, AssessmentID: meta.FromUint64(po.AssessmentID), TesteeID: po.TesteeID},
+		ReportType:           policy.ReportType(po.ReportType),
+		TemplateVersion:      policy.TemplateVersion(po.TemplateVersion),
+		BuilderIdentity:      po.BuilderIdentity,
+		ContentSchemaVersion: po.ContentSchemaVersion,
 		Content: domainreport.Content{
 			Model:        modelIdentityToDomain(po.Model),
 			PrimaryScore: scoreValueToDomain(po.PrimaryScore),
@@ -181,6 +202,7 @@ func (m *LifecycleMapper) ReportToDomain(po *InterpretReportPO) (*domainreport.I
 			Dimensions:   dimensionsToDomain(po.Dimensions),
 			Suggestions:  toDomainSuggestions(po.Suggestions),
 			ModelExtra:   toDomainModelExtra(po.ModelExtra),
+			PresentationProfile: presentationProfileToDomain(po.PresentationProfile),
 		},
 		GeneratedAt: po.GeneratedAt,
 	})
@@ -379,4 +401,24 @@ func normReferenceToDomain(reference *NormReferencePO) *domainreport.NormReferen
 		return nil
 	}
 	return &domainreport.NormReference{ScoreKind: reference.ScoreKind, Benchmark: reference.Benchmark, TableVersion: reference.TableVersion, FormVariant: reference.FormVariant, MinAgeMonths: reference.MinAgeMonths, MaxAgeMonths: reference.MaxAgeMonths, Gender: reference.Gender}
+}
+
+func presentationProfileToPO(profile *domainreport.PresentationProfile) *PresentationProfilePO {
+	if profile == nil || profile.Source == "" {
+		return nil
+	}
+	return &PresentationProfilePO{
+		VisibleFactorCodes: append([]string(nil), profile.VisibleFactorCodes...),
+		Source:             string(profile.Source),
+	}
+}
+
+func presentationProfileToDomain(po *PresentationProfilePO) *domainreport.PresentationProfile {
+	if po == nil || po.Source == "" {
+		return nil
+	}
+	return &domainreport.PresentationProfile{
+		VisibleFactorCodes: append([]string(nil), po.VisibleFactorCodes...),
+		Source:             domainreport.PresentationProfileSource(po.Source),
+	}
 }

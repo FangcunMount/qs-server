@@ -15,7 +15,6 @@ import (
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 type GenerationRepository struct {
@@ -188,7 +187,11 @@ func (r *RunRepository) ListExpiredLeases(ctx context.Context, now time.Time, li
 		if err := cursor.Decode(&po); err != nil {
 			return nil, err
 		}
-		result = append(result, interpretationrun.ExpiredLease{RunID: po.DomainID, GenerationID: meta.FromUint64(po.GenerationID)})
+		result = append(result, interpretationrun.ExpiredLease{
+			RunID:          po.DomainID,
+			GenerationID:   meta.FromUint64(po.GenerationID),
+			LeaseExpiredAt: *po.LeaseExpiresAt,
+		})
 	}
 	return result, cursor.Err()
 }
@@ -197,13 +200,32 @@ func (r *RunRepository) ReclaimExpiredLease(ctx context.Context, id interpretati
 	if id.IsZero() || at.IsZero() || !leaseUntil.After(at) {
 		return nil, false, fmt.Errorf("invalid interpretation lease reclaim")
 	}
+	var current InterpretationRunPO
+	if err := r.FindOne(ctx, bson.M{
+		"domain_id": id.Uint64(), "status": interpretationrun.StatusRunning,
+		"lease_expires_at": bson.M{"$lte": at},
+	}, &current); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	domain, err := r.mapper.RunToDomain(&current)
+	if err != nil {
+		return nil, false, err
+	}
+	if err := domain.ReclaimExpiredLease(at, traceID, leaseUntil); err != nil {
+		return nil, false, err
+	}
+	updated := r.mapper.RunToPO(domain)
 	var po InterpretationRunPO
-	err := r.Collection().FindOneAndUpdate(ctx, bson.M{
+	err = r.Collection().FindOneAndUpdate(ctx, bson.M{
 		"domain_id": id.Uint64(), "status": interpretationrun.StatusRunning,
 		"lease_expires_at": bson.M{"$lte": at},
 	}, bson.M{"$set": bson.M{
-		"trace_id": traceID, "lease_expires_at": leaseUntil,
-		"attempt_origin": string(retrygovernance.AttemptOriginLeaseRecovery), "updated_at": at,
+		"trace_id": updated.TraceID, "lease_expires_at": updated.LeaseExpiresAt,
+		"recovery_count": updated.RecoveryCount, "last_reclaimed_at": updated.LastReclaimedAt,
+		"claim_history": updated.ClaimHistory, "updated_at": at,
 	}}, options.FindOneAndUpdate().SetReturnDocument(options.After)).Decode(&po)
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		return nil, false, nil
@@ -211,8 +233,8 @@ func (r *RunRepository) ReclaimExpiredLease(ctx context.Context, id interpretati
 	if err != nil {
 		return nil, false, err
 	}
-	domain, err := r.mapper.RunToDomain(&po)
-	return domain, err == nil, err
+	reclaimed, err := r.mapper.RunToDomain(&po)
+	return reclaimed, err == nil, err
 }
 
 func (r *RunRepository) AuthorizeRetry(ctx context.Context, request interpretationrun.RetryAuthorizationRequest) (*interpretationrun.InterpretationRun, error) {
@@ -306,7 +328,9 @@ func (r *RunRepository) Save(ctx context.Context, domain *interpretationrun.Inte
 		"attempt_origin": po.AttemptOrigin, "retry_disposition": po.RetryDisposition,
 		"next_attempt_at": po.NextAttemptAt, "policy_max_attempts": po.PolicyMaxAttempts,
 		"retry_policy_version": po.RetryPolicyVersion, "retry_event_id": po.RetryEventID,
-		"action_request_id": po.ActionRequestID, "updated_at": time.Now(),
+		"action_request_id": po.ActionRequestID, "recovery_count": po.RecoveryCount,
+		"last_reclaimed_at": po.LastReclaimedAt, "claim_history": po.ClaimHistory,
+		"updated_at": time.Now(),
 	}}
 	result, err := r.UpdateOne(ctx, bson.M{"domain_id": domain.ID().Uint64()}, update)
 	if err != nil {

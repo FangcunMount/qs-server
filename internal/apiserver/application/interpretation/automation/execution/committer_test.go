@@ -48,7 +48,7 @@ func (s catalogProjectorStub) ProjectCurrent(context.Context, *domainreport.Inte
 func TestInterpretationCommitterCatalogFailureDoesNotPublishTerminalState(t *testing.T) {
 	committer, generationRecord, runRecord, _, _, _, _, now := commitFixture(t, &eventStagerStub{})
 	committer.catalog = catalogProjectorStub{err: errors.New("catalog unavailable")}
-	_, err := committer.CommitSuccess(context.Background(), CommitSuccessRequest{Generation: generationRecord, Run: runRecord, InterpretReport: commitArtifact(t, generationRecord, runRecord, now), BuilderIdentity: "builder", ContentSchemaVersion: "v1", CompletedAt: now})
+	_, err := committer.CommitSuccess(context.Background(), CommitSuccessRequest{Generation: generationRecord, Run: runRecord, InterpretReport: commitArtifact(t, generationRecord, runRecord, now), BuilderIdentity: domainreport.BuilderIdentityFactorScoring, ContentSchemaVersion: domainreport.ContentSchemaVersionV1, CompletedAt: now})
 	if err == nil {
 		t.Fatal("expected catalog error")
 	}
@@ -62,7 +62,16 @@ func commitArtifact(t *testing.T, generation *domaingeneration.ReportGeneration,
 	artifact, err := domainreport.NewInterpretReport(domainreport.InterpretReportInput{
 		ID: meta.FromUint64(900), GenerationID: generation.ID(), OutcomeID: meta.FromUint64(42), InterpretationRunID: run.ID(),
 		Association: domainreport.Association{OrgID: 1, AssessmentID: meta.FromUint64(7), TesteeID: 8},
-		ReportType:  policy.ReportTypeStandard, TemplateVersion: policy.TemplateVersion("v1"), GeneratedAt: now,
+		ReportType:  policy.ReportTypeStandard, TemplateVersion: policy.TemplateVersion("v1"),
+		BuilderIdentity: domainreport.BuilderIdentityFactorScoring, ContentSchemaVersion: domainreport.ContentSchemaVersionV1,
+		Content: domainreport.Content{
+			Model:        domainreport.ModelIdentity{Kind: "scale", Code: "PHQ9", Version: "v1"},
+			PrimaryScore: domainreport.NewRawTotalScore(8, nil),
+			Dimensions: []domainreport.DimensionInterpret{
+				domainreport.NewDimensionInterpret(domainreport.NewFactorCode("TOTAL"), "总分", 8, nil, domainreport.RiskLevelLow, "ok", "ok"),
+			},
+		},
+		GeneratedAt: now,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -75,7 +84,7 @@ func TestInterpretationCommitterCommitsReportTerminalStateAndOutbox(t *testing.T
 	committer, generationRecord, runRecord, gens, runs, reports, tx, now := commitFixture(t, stager)
 	artifact := commitArtifact(t, generationRecord, runRecord, now)
 
-	result, err := committer.CommitSuccess(context.Background(), CommitSuccessRequest{Generation: generationRecord, Run: runRecord, InterpretReport: artifact, BuilderIdentity: "test-committer-builder", ContentSchemaVersion: "report-content/v1", CompletedAt: now})
+	result, err := committer.CommitSuccess(context.Background(), CommitSuccessRequest{Generation: generationRecord, Run: runRecord, InterpretReport: artifact, BuilderIdentity: domainreport.BuilderIdentityFactorScoring, ContentSchemaVersion: domainreport.ContentSchemaVersionV1, CompletedAt: now})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,8 +102,11 @@ func TestInterpretationCommitterCommitsReportTerminalStateAndOutbox(t *testing.T
 		t.Fatalf("generated event type=%T", stager.events[0][0])
 	}
 	payload := generated.Payload()
-	if generated.AggregateType() != domaininterpretation.AggregateType || generated.AggregateID() != generationRecord.ID().String() || payload.GenerationID != generationRecord.ID().String() || payload.RunID != runRecord.ID().String() || payload.ReportID != artifact.ID().String() || payload.ReportType != "standard" || payload.TemplateVersion != "v1" || payload.BuilderIdentity != "test-committer-builder" || payload.ContentSchemaVersion != "report-content/v1" {
+	if generated.AggregateType() != domaininterpretation.AggregateType || generated.AggregateID() != generationRecord.ID().String() || payload.GenerationID != generationRecord.ID().String() || payload.RunID != runRecord.ID().String() || payload.ReportID != artifact.ID().String() || payload.ReportType != "standard" || payload.TemplateVersion != "v1" || payload.BuilderIdentity != domainreport.BuilderIdentityFactorScoring || payload.ContentSchemaVersion != domainreport.ContentSchemaVersionV1 {
 		t.Fatalf("generated payload=%#v aggregate=%s/%s", payload, generated.AggregateType(), generated.AggregateID())
+	}
+	if artifact.BuilderIdentity() != domainreport.BuilderIdentityFactorScoring || artifact.ContentSchemaVersion() != domainreport.ContentSchemaVersionV1 {
+		t.Fatalf("artifact provenance=%q/%q", artifact.BuilderIdentity(), artifact.ContentSchemaVersion())
 	}
 	if persistedGeneration, err := gens.FindByID(context.Background(), generationRecord.ID()); err != nil || persistedGeneration.Status() != domaingeneration.StatusGenerated {
 		t.Fatalf("persisted generation=%#v err=%v", persistedGeneration, err)
@@ -110,7 +122,7 @@ func TestInterpretationCommitterFailureDoesNotPublishTerminalStateToCaller(t *te
 	committer, generationRecord, runRecord, _, _, _, _, now := commitFixture(t, stager)
 	artifact := commitArtifact(t, generationRecord, runRecord, now)
 
-	_, err := committer.CommitSuccess(context.Background(), CommitSuccessRequest{Generation: generationRecord, Run: runRecord, InterpretReport: artifact, BuilderIdentity: "test-committer-builder", ContentSchemaVersion: "report-content/v1", CompletedAt: now})
+	_, err := committer.CommitSuccess(context.Background(), CommitSuccessRequest{Generation: generationRecord, Run: runRecord, InterpretReport: artifact, BuilderIdentity: domainreport.BuilderIdentityFactorScoring, ContentSchemaVersion: domainreport.ContentSchemaVersionV1, CompletedAt: now})
 	if !errors.Is(err, commitErr) {
 		t.Fatalf("CommitSuccess error = %v, want %v", err, commitErr)
 	}
@@ -119,6 +131,19 @@ func TestInterpretationCommitterFailureDoesNotPublishTerminalStateToCaller(t *te
 	}
 	if runRecord.Status() != interpretationrun.StatusRunning || runRecord.FinishedAt() != nil || runRecord.Failure() != nil {
 		t.Fatalf("caller run was polluted: %#v", runRecord)
+	}
+}
+
+func TestInterpretationCommitterRejectsMismatchedProvenance(t *testing.T) {
+	committer, generationRecord, runRecord, _, _, _, _, now := commitFixture(t, &eventStagerStub{})
+	artifact := commitArtifact(t, generationRecord, runRecord, now)
+
+	_, err := committer.CommitSuccess(context.Background(), CommitSuccessRequest{
+		Generation: generationRecord, Run: runRecord, InterpretReport: artifact,
+		BuilderIdentity: "other-builder", ContentSchemaVersion: domainreport.ContentSchemaVersionV1, CompletedAt: now,
+	})
+	if err == nil {
+		t.Fatal("CommitSuccess accepted mismatched builder identity")
 	}
 }
 
@@ -154,7 +179,7 @@ func TestInterpretationCommitterRejectsMismatchedSuccessReferences(t *testing.T)
 			artifact := artifactWithIdentity(t, generationRecord, candidateRun, tt.outcomeID, tt.reportType, tt.templateVersion, now)
 			_, err := committer.CommitSuccess(context.Background(), CommitSuccessRequest{
 				Generation: generationRecord, Run: candidateRun, InterpretReport: artifact,
-				BuilderIdentity: "builder", ContentSchemaVersion: "report-content/v1", CompletedAt: now,
+				BuilderIdentity: domainreport.BuilderIdentityFactorScoring, ContentSchemaVersion: domainreport.ContentSchemaVersionV1, CompletedAt: now,
 			})
 			if err == nil {
 				t.Fatal("CommitSuccess accepted mismatched references")
@@ -195,7 +220,16 @@ func artifactWithIdentity(
 	artifact, err := domainreport.NewInterpretReport(domainreport.InterpretReportInput{
 		ID: meta.New(), GenerationID: generationRecord.ID(), OutcomeID: outcomeID, InterpretationRunID: runRecord.ID(),
 		Association: domainreport.Association{OrgID: 1, AssessmentID: meta.FromUint64(7), TesteeID: 8},
-		ReportType:  reportType, TemplateVersion: templateVersion, GeneratedAt: at,
+		ReportType:  reportType, TemplateVersion: templateVersion,
+		BuilderIdentity: domainreport.BuilderIdentityFactorScoring, ContentSchemaVersion: domainreport.ContentSchemaVersionV1,
+		Content: domainreport.Content{
+			Model:        domainreport.ModelIdentity{Kind: "scale", Code: "PHQ9", Version: "v1"},
+			PrimaryScore: domainreport.NewRawTotalScore(8, nil),
+			Dimensions: []domainreport.DimensionInterpret{
+				domainreport.NewDimensionInterpret(domainreport.NewFactorCode("TOTAL"), "总分", 8, nil, domainreport.RiskLevelLow, "ok", "ok"),
+			},
+		},
+		GeneratedAt: at,
 	})
 	if err != nil {
 		t.Fatal(err)

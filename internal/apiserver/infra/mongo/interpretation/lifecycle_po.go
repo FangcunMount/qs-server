@@ -46,6 +46,14 @@ type InterpretationRunPO struct {
 	RetryPolicyVersion string                   `bson:"retry_policy_version,omitempty"`
 	RetryEventID       string                   `bson:"retry_event_id,omitempty"`
 	ActionRequestID    string                   `bson:"action_request_id,omitempty"`
+	RecoveryCount      int                      `bson:"recovery_count,omitempty"`
+	LastReclaimedAt    *time.Time               `bson:"last_reclaimed_at,omitempty"`
+	ClaimHistory       []ClaimHistoryPO         `bson:"claim_history,omitempty"`
+}
+
+type ClaimHistoryPO struct {
+	ReclaimedAt time.Time `bson:"reclaimed_at"`
+	TraceID     string    `bson:"trace_id"`
 }
 
 func (InterpretationRunPO) CollectionName() string { return "interpretation_runs" }
@@ -59,6 +67,8 @@ type InterpretReportPO struct {
 	InterpretationRunID uint64    `bson:"interpretation_run_id"`
 	ReportType          string    `bson:"report_type"`
 	TemplateVersion     string    `bson:"template_version"`
+	BuilderIdentity     string    `bson:"builder_identity,omitempty"`
+	ContentSchemaVersion string   `bson:"content_schema_version,omitempty"`
 	GeneratedAt         time.Time `bson:"generated_at"`
 
 	// Frozen Outcome correlation doubles as the query envelope. It is a value
@@ -78,6 +88,7 @@ type InterpretReportPO struct {
 	Dimensions   []DimensionInterpretPO `bson:"dimensions,omitempty"`
 	Suggestions  []SuggestionPO         `bson:"suggestions,omitempty"`
 	ModelExtra   *ModelExtraPO          `bson:"model_extra,omitempty"`
+	PresentationProfile *PresentationProfilePO `bson:"presentation_profile,omitempty"`
 }
 
 func (InterpretReportPO) CollectionName() string { return "interpret_report_artifacts" }

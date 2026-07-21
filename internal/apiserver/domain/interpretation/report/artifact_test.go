@@ -13,15 +13,18 @@ func TestInterpretReportIsSuccessOnlyAndDefensivelyCopiesContent(t *testing.T) {
 	max := 100.0
 	factor := NewFactorCode("sleep")
 	input := InterpretReportInput{
-		ID:                  meta.FromUint64(1),
-		GenerationID:        meta.FromUint64(2),
-		OutcomeID:           meta.FromUint64(3),
-		InterpretationRunID: meta.FromUint64(4),
-		Association:         Association{OrgID: 7, AssessmentID: meta.FromUint64(5), TesteeID: 6},
-		ReportType:          policy.ReportTypeStandard,
-		TemplateVersion:     policy.TemplateVersion("v1"),
-		GeneratedAt:         time.Date(2026, 7, 12, 10, 0, 0, 0, time.UTC),
+		ID:                   meta.FromUint64(1),
+		GenerationID:         meta.FromUint64(2),
+		OutcomeID:            meta.FromUint64(3),
+		InterpretationRunID:  meta.FromUint64(4),
+		Association:          Association{OrgID: 7, AssessmentID: meta.FromUint64(5), TesteeID: 6},
+		ReportType:           policy.ReportTypeStandard,
+		TemplateVersion:      policy.TemplateVersion("v1"),
+		BuilderIdentity:      BuilderIdentityFactorScoring,
+		ContentSchemaVersion: ContentSchemaVersionV1,
+		GeneratedAt:          time.Date(2026, 7, 12, 10, 0, 0, 0, time.UTC),
 		Content: Content{
+			Model: ModelIdentity{Kind: "scale", Code: "PHQ9", Version: "v1"},
 			PrimaryScore: &ScoreValue{Kind: ScoreKindRawTotal, Value: 42, Max: &max},
 			Dimensions: []DimensionInterpret{
 				NewDimensionInterpret(NewFactorCode("sleep"), "sleep", 10, &max, RiskLevelLow, "low", "rest"),
@@ -57,10 +60,27 @@ func TestInterpretReportIsSuccessOnlyAndDefensivelyCopiesContent(t *testing.T) {
 	}
 }
 
-func TestInterpretReportRejectsIncompleteProvenance(t *testing.T) {
-	_, err := NewInterpretReport(InterpretReportInput{ID: meta.FromUint64(1), GeneratedAt: time.Now()})
+func TestInterpretReportRejectsMissingProvenance(t *testing.T) {
+	content := factorScoringMinimalContentForTest()
+	_, err := NewInterpretReport(InterpretReportInput{
+		ID: meta.FromUint64(1), GenerationID: meta.FromUint64(2), OutcomeID: meta.FromUint64(3),
+		InterpretationRunID: meta.FromUint64(4),
+		Association:         Association{OrgID: 1, AssessmentID: meta.FromUint64(5), TesteeID: 6},
+		ReportType:          policy.ReportTypeStandard, TemplateVersion: policy.TemplateVersionV1,
+		Content: content, GeneratedAt: time.Now(),
+	})
 	if err == nil {
-		t.Fatal("artifact accepted incomplete provenance")
+		t.Fatal("artifact accepted missing provenance")
+	}
+}
+
+func factorScoringMinimalContentForTest() Content {
+	return Content{
+		Model:        ModelIdentity{Kind: "scale", Code: "PHQ9", Version: "v1"},
+		PrimaryScore: NewRawTotalScore(8, nil),
+		Dimensions: []DimensionInterpret{
+			NewDimensionInterpret(NewFactorCode("TOTAL"), "总分", 8, nil, RiskLevelLow, "ok", "ok"),
+		},
 	}
 }
 

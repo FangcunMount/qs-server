@@ -26,7 +26,7 @@ type executorBuilder struct {
 
 func (*executorBuilder) ReportType() policy.ReportType           { return policy.ReportTypeStandard }
 func (*executorBuilder) TemplateVersion() policy.TemplateVersion { return policy.TemplateVersionV1 }
-func (*executorBuilder) BuilderIdentity() string                 { return "test-executor-builder" }
+func (*executorBuilder) BuilderIdentity() string                 { return report.BuilderIdentityFactorScoring }
 func (*executorBuilder) ContentSchemaVersion() string            { return "report-content/v1" }
 func (*executorBuilder) MechanismKey() rendering.Key {
 	return rendering.Key{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange, ReportType: policy.ReportTypeStandard}
@@ -36,7 +36,15 @@ func (b *executorBuilder) Build(context.Context, interpinput.InterpretationInput
 	if b.err != nil {
 		return nil, b.err
 	}
-	return report.NewDraft(report.Content{Model: report.ModelIdentity{Kind: "scale", Code: "S-1", Title: "Scale"}, PrimaryScore: report.NewRawTotalScore(12, nil), Level: report.LevelFromRisk(report.RiskLevelLow), Conclusion: "ok"}), nil
+	return report.NewDraft(report.Content{
+		Model:        report.ModelIdentity{Kind: "scale", Code: "S-1", Version: "v1", Title: "Scale"},
+		PrimaryScore: report.NewRawTotalScore(12, nil),
+		Level:        report.LevelFromRisk(report.RiskLevelLow),
+		Conclusion:   "ok",
+		Dimensions: []report.DimensionInterpret{
+			report.NewDimensionInterpret(report.NewFactorCode("TOTAL"), "总分", 12, nil, report.RiskLevelLow, "ok", "ok"),
+		},
+	}), nil
 }
 
 type eventStagerStub struct {

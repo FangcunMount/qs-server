@@ -167,6 +167,10 @@ func withInputSummary(input interpinput.InterpretationInput, draft *report.Draft
 		content.Model = input.Model
 	}
 	content.PrimaryScore, content.Level = input.Result.Primary, input.Result.Level
+	if input.PresentationProfile != nil {
+		copy := *input.PresentationProfile
+		content.PresentationProfile = &copy
+	}
 	return report.NewDraft(content)
 }
 func primaryValue(input interpinput.InterpretationInput) float64 {

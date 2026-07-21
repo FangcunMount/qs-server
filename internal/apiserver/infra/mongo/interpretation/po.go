@@ -49,6 +49,8 @@ type ArchivedReportPO struct {
 
 	// 解释模型扩展（SBTI 等人格类测评）
 	ModelExtra *ModelExtraPO `bson:"model_extra,omitempty" json:"model_extra,omitempty"`
+
+	PresentationProfile *PresentationProfilePO `bson:"presentation_profile,omitempty" json:"presentation_profile,omitempty"`
 }
 
 // DimensionInterpretPO 维度解读持久化对象
@@ -80,6 +82,11 @@ type ModelIdentityPO struct {
 	Title           string `bson:"title,omitempty" json:"title,omitempty"`
 	ProductChannel  string `bson:"product_channel,omitempty" json:"product_channel,omitempty"`
 	AlgorithmFamily string `bson:"algorithm_family,omitempty" json:"algorithm_family,omitempty"`
+}
+
+type PresentationProfilePO struct {
+	VisibleFactorCodes []string `bson:"visible_factor_codes,omitempty" json:"visible_factor_codes,omitempty"`
+	Source             string   `bson:"source,omitempty" json:"source,omitempty"`
 }
 
 type ScoreValuePO struct {

@@ -11,27 +11,30 @@ import (
 // InterpretReport is the immutable successful report produced by one
 // InterpretationRun under a ReportGeneration.
 type InterpretReport struct {
-	id                  meta.ID
-	generationID        meta.ID
-	outcomeID           meta.ID
-	interpretationRunID meta.ID
-	association         Association
-	reportType          policy.ReportType
-	templateVersion     policy.TemplateVersion
-	content             Content
-	generatedAt         time.Time
+	id                   meta.ID
+	generationID         meta.ID
+	outcomeID            meta.ID
+	interpretationRunID  meta.ID
+	association          Association
+	reportType           policy.ReportType
+	templateVersion      policy.TemplateVersion
+	builderIdentity      string
+	contentSchemaVersion string
+	content              Content
+	generatedAt          time.Time
 }
 
 // Content is the immutable report payload. It intentionally has no lifecycle,
 // attempt or failure state.
 type Content struct {
-	Model        ModelIdentity
-	PrimaryScore *ScoreValue
-	Level        *ResultLevel
-	Conclusion   string
-	Dimensions   []DimensionInterpret
-	Suggestions  []Suggestion
-	ModelExtra   *ModelExtra
+	Model               ModelIdentity
+	PrimaryScore        *ScoreValue
+	Level               *ResultLevel
+	Conclusion          string
+	Dimensions          []DimensionInterpret
+	Suggestions         []Suggestion
+	ModelExtra          *ModelExtra
+	PresentationProfile *PresentationProfile
 }
 
 // Association is a frozen read-side correlation copied from EvaluationOutcome.
@@ -43,41 +46,77 @@ type Association struct {
 }
 
 type InterpretReportInput struct {
-	ID                  meta.ID
-	GenerationID        meta.ID
-	OutcomeID           meta.ID
-	InterpretationRunID meta.ID
-	Association         Association
-	ReportType          policy.ReportType
-	TemplateVersion     policy.TemplateVersion
-	Content             Content
-	GeneratedAt         time.Time
+	ID                   meta.ID
+	GenerationID         meta.ID
+	OutcomeID            meta.ID
+	InterpretationRunID  meta.ID
+	Association          Association
+	ReportType           policy.ReportType
+	TemplateVersion      policy.TemplateVersion
+	BuilderIdentity      string
+	ContentSchemaVersion string
+	Content              Content
+	GeneratedAt          time.Time
 }
 
+// NewInterpretReport validates write-path provenance and content contracts.
 func NewInterpretReport(input InterpretReportInput) (*InterpretReport, error) {
+	if err := validateInterpretReportInput(input); err != nil {
+		return nil, err
+	}
+	if input.BuilderIdentity == "" || input.ContentSchemaVersion == "" {
+		return nil, fmt.Errorf("builder identity and content schema version are required")
+	}
+	if err := CrossMechanismArtifactContract(input.Content); err != nil {
+		return nil, err
+	}
+	if err := BuilderSpecificDraftContract(input.BuilderIdentity, input.Content); err != nil {
+		return nil, err
+	}
+	return buildInterpretReport(input), nil
+}
+
+// RestoreInterpretReport rehydrates persisted artifacts without write-path contracts.
+// Missing provenance is mapped to explicit legacy/unknown markers instead of the
+// current builder declaration.
+func RestoreInterpretReport(input InterpretReportInput) (*InterpretReport, error) {
+	if err := validateInterpretReportInput(input); err != nil {
+		return nil, err
+	}
+	input.BuilderIdentity, input.ContentSchemaVersion = normalizeLegacyProvenance(input.BuilderIdentity, input.ContentSchemaVersion)
+	return buildInterpretReport(input), nil
+}
+
+func validateInterpretReportInput(input InterpretReportInput) error {
 	if input.ID.IsZero() || input.GenerationID.IsZero() || input.OutcomeID.IsZero() || input.InterpretationRunID.IsZero() {
-		return nil, fmt.Errorf("report, generation, outcome and interpretation run ids are required")
+		return fmt.Errorf("report, generation, outcome and interpretation run ids are required")
 	}
 	if input.Association.OrgID == 0 || input.Association.AssessmentID.IsZero() || input.Association.TesteeID == 0 {
-		return nil, fmt.Errorf("report organization, assessment and testee association are required")
+		return fmt.Errorf("report organization, assessment and testee association are required")
 	}
 	if input.ReportType.IsEmpty() || input.TemplateVersion.IsEmpty() {
-		return nil, fmt.Errorf("report type and template version are required")
+		return fmt.Errorf("report type and template version are required")
 	}
 	if input.GeneratedAt.IsZero() {
-		return nil, fmt.Errorf("report generated at is required")
+		return fmt.Errorf("report generated at is required")
 	}
+	return nil
+}
+
+func buildInterpretReport(input InterpretReportInput) *InterpretReport {
 	return &InterpretReport{
-		id:                  input.ID,
-		generationID:        input.GenerationID,
-		outcomeID:           input.OutcomeID,
-		interpretationRunID: input.InterpretationRunID,
-		association:         input.Association,
-		reportType:          input.ReportType,
-		templateVersion:     input.TemplateVersion,
-		content:             cloneContent(input.Content),
-		generatedAt:         input.GeneratedAt,
-	}, nil
+		id:                   input.ID,
+		generationID:         input.GenerationID,
+		outcomeID:            input.OutcomeID,
+		interpretationRunID:  input.InterpretationRunID,
+		association:          input.Association,
+		reportType:           input.ReportType,
+		templateVersion:      input.TemplateVersion,
+		builderIdentity:      input.BuilderIdentity,
+		contentSchemaVersion: input.ContentSchemaVersion,
+		content:              cloneContent(input.Content),
+		generatedAt:          input.GeneratedAt,
+	}
 }
 
 func (r *InterpretReport) ID() meta.ID { return r.id }
@@ -94,16 +133,21 @@ func (r *InterpretReport) ReportType() policy.ReportType { return r.reportType }
 
 func (r *InterpretReport) TemplateVersion() policy.TemplateVersion { return r.templateVersion }
 
+func (r *InterpretReport) BuilderIdentity() string { return r.builderIdentity }
+
+func (r *InterpretReport) ContentSchemaVersion() string { return r.contentSchemaVersion }
+
 func (r *InterpretReport) Content() Content { return cloneContent(r.content) }
 
 func (r *InterpretReport) GeneratedAt() time.Time { return r.generatedAt }
 
 func cloneContent(content Content) Content {
 	cloned := Content{
-		Model:       content.Model,
-		Conclusion:  content.Conclusion,
-		Dimensions:  cloneDimensions(content.Dimensions),
-		Suggestions: cloneSuggestions(content.Suggestions),
+		Model:               content.Model,
+		Conclusion:          content.Conclusion,
+		Dimensions:          cloneDimensions(content.Dimensions),
+		Suggestions:         cloneSuggestions(content.Suggestions),
+		PresentationProfile: clonePresentationProfile(content.PresentationProfile),
 	}
 	if content.PrimaryScore != nil {
 		cloned.PrimaryScore = &ScoreValue{Kind: content.PrimaryScore.Kind, Value: content.PrimaryScore.Value, Label: content.PrimaryScore.Label}
