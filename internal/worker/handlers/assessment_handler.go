@@ -32,10 +32,22 @@ func handleEvaluationRequested(deps *Dependencies) HandlerFunc {
 			"model_kind", data.ModelKind,
 			"model_sub_kind", data.ModelSubKind,
 			"model_algorithm", data.ModelAlgorithm,
-			"needs_evaluation", data.NeedsEvaluation(),
+			"payload_gate", string(data.ClassifyPayloadGate()),
+			"has_model_identity", data.HasModelIdentity(),
 		)
-		if !data.NeedsEvaluation() {
-			return nil
+		// EV-R015: do not ACK on missing payload model identity. Canonical
+		// Assessment.NeedsEvaluation decides skip vs evaluate inside Execute.
+		gate := data.ClassifyPayloadGate()
+		observeEvaluationPayloadGate(gate)
+		switch gate {
+		case eventpayload.PayloadGateInvalid:
+			return fmt.Errorf("invalid evaluation.requested: assessment_id must be positive")
+		case eventpayload.PayloadGateLegacyIncomplete:
+			deps.Logger.Warn("evaluation.requested missing model identity; forwarding to Execute for Assessment authority",
+				"event_id", env.ID,
+				"assessment_id", data.AssessmentID,
+				"payload_gate", string(gate),
+			)
 		}
 		if deps.DisableAutomaticRetry && data.AttemptOrigin == "automatic" {
 			deps.Logger.Warn("automatic evaluation retry disabled by emergency switch", "event_id", env.ID, "assessment_id", data.AssessmentID)

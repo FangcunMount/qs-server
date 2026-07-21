@@ -37,6 +37,28 @@ func TestHandleEvaluationRequestedCallsEvaluate(t *testing.T) {
 	}
 }
 
+func TestHandleEvaluationRequestedForwardsLegacyIncompletePayload(t *testing.T) {
+	client := &assessmentEvaluateClient{resp: &evalpb.ExecuteEvaluationResponse{Status: "already_evaluated"}}
+	handler := handleEvaluationRequested(newAnswerSheetHandlerTestDeps(client, nil))
+	if err := handler(context.Background(), eventcatalog.EvaluationRequested, mustBuildEvaluationRequestedPayloadWithoutModel(t, 42)); err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	if client.evaluateCalls != 1 {
+		t.Fatalf("evaluate calls = %d, want 1 (Assessment authority, not payload early ACK)", client.evaluateCalls)
+	}
+}
+
+func TestHandleEvaluationRequestedRejectsInvalidAssessmentID(t *testing.T) {
+	client := &assessmentEvaluateClient{resp: &evalpb.ExecuteEvaluationResponse{Status: "evaluated"}}
+	handler := handleEvaluationRequested(newAnswerSheetHandlerTestDeps(client, nil))
+	if err := handler(context.Background(), eventcatalog.EvaluationRequested, mustBuildEvaluationRequestedPayload(t, 0)); err == nil {
+		t.Fatal("expected invalid assessment_id to be rejected")
+	}
+	if client.evaluateCalls != 0 {
+		t.Fatalf("evaluate calls = %d, want 0", client.evaluateCalls)
+	}
+}
+
 func TestAutomaticEvaluationRetryEmergencySwitchDoesNotBlockManualRetry(t *testing.T) {
 	client := &assessmentEvaluateClient{resp: &evalpb.ExecuteEvaluationResponse{Status: "evaluated", RunId: "42:4", OutcomeId: "9001"}}
 	deps := newAnswerSheetHandlerTestDeps(client, nil)
@@ -114,6 +136,21 @@ func mustBuildEvaluationRequestedPayload(t *testing.T, assessmentID int64) []byt
 		"id": "evt-evaluation-requested", "eventType": eventcatalog.EvaluationRequested, "occurredAt": now, "aggregateType": "Evaluation", "aggregateID": "42",
 		"data": map[string]any{
 			"org_id": 18, "assessment_id": assessmentID, "testee_id": 99, "questionnaire_code": "QNR-001", "questionnaire_version": "1.0.0", "answersheet_id": "456", "model_code": "model-1", "requested_at": now,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return payload
+}
+
+func mustBuildEvaluationRequestedPayloadWithoutModel(t *testing.T, assessmentID int64) []byte {
+	t.Helper()
+	now := time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC)
+	payload, err := json.Marshal(map[string]any{
+		"id": "evt-evaluation-requested-legacy", "eventType": eventcatalog.EvaluationRequested, "occurredAt": now, "aggregateType": "Evaluation", "aggregateID": "42",
+		"data": map[string]any{
+			"org_id": 18, "assessment_id": assessmentID, "testee_id": 99, "questionnaire_code": "QNR-001", "questionnaire_version": "1.0.0", "answersheet_id": "456", "requested_at": now,
 		},
 	})
 	if err != nil {
