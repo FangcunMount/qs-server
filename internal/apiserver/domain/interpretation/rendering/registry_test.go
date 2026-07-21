@@ -40,6 +40,27 @@ func registryKey(decision modelcatalog.DecisionKind) Key {
 	}
 }
 
+func TestRegistrySupportsMultipleTemplateVersionsForSameMechanism(t *testing.T) {
+	key := registryKey(modelcatalog.DecisionKindPoleComposition)
+	legacy := registryBuilder{key: key, keys: []Key{key}, name: "legacy"}
+	v2Key := key
+	v2Key.TemplateVersion = "custom-v2"
+	modern := registryBuilder{key: v2Key, keys: []Key{v2Key}, name: "modern"}
+	registry, err := NewRegistry(
+		Versioned(legacy, policy.TemplateVersionV1),
+		Versioned(modern, policy.TemplateVersion("custom-v2")),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := registry.ResolveByMechanism(key); err != nil || got.BuilderIdentity() != "legacy" {
+		t.Fatalf("legacy resolve = %v, %v", got, err)
+	}
+	if got, err := registry.ResolveByMechanism(v2Key); err != nil || got.BuilderIdentity() != "modern" {
+		t.Fatalf("custom-v2 resolve = %v, %v", got, err)
+	}
+}
+
 func TestRegistryResolvesCompleteKeyAndFallbackWithinTemplateVersion(t *testing.T) {
 	key := registryKey(modelcatalog.DecisionKindPoleComposition)
 	builder := registryBuilder{key: key, keys: []Key{key}, name: "complete"}

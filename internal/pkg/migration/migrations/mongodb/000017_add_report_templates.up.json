@@ -1,0 +1,11 @@
+[
+  { "create": "interpretation_report_templates" },
+  {
+    "createIndexes": "interpretation_report_templates",
+    "indexes": [
+      { "key": { "domain_id": 1 }, "name": "uk_report_template_domain_id", "unique": true },
+      { "key": { "template_id": 1, "template_version": 1 }, "name": "uk_report_template_release", "unique": true },
+      { "key": { "template_id": 1, "status": 1 }, "name": "idx_report_template_status" }
+    ]
+  }
+]

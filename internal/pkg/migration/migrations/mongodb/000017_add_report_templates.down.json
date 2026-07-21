@@ -1,0 +1,6 @@
+[
+  { "dropIndexes": "interpretation_report_templates", "index": "idx_report_template_status" },
+  { "dropIndexes": "interpretation_report_templates", "index": "uk_report_template_release" },
+  { "dropIndexes": "interpretation_report_templates", "index": "uk_report_template_domain_id" },
+  { "drop": "interpretation_report_templates" }
+]
