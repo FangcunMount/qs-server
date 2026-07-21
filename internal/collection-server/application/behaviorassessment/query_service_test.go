@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	evaluationapp "github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportstatus"
 )
 
 type fakeReader struct {
@@ -77,5 +78,15 @@ func TestQueryServiceStatusRejectsOtherAssessmentBeforeWaiting(t *testing.T) {
 	_, err := service.GetReportStatus(context.Background(), 1, 2)
 	if !errors.Is(err, ErrNotBehaviorAssessment) {
 		t.Fatalf("GetReportStatus() error = %v, want ErrNotBehaviorAssessment", err)
+	}
+}
+
+func TestQueryServiceStatusDeniesMissingAssessmentBeforeWaiting(t *testing.T) {
+	t.Parallel()
+
+	service := NewQueryService(&fakeReader{}, nil)
+	_, err := service.GetReportStatus(context.Background(), 1, 2)
+	if !errors.Is(err, reportstatus.ErrAssessmentAccess) {
+		t.Fatalf("GetReportStatus() error = %v, want %v", err, reportstatus.ErrAssessmentAccess)
 	}
 }

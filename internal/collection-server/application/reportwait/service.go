@@ -9,6 +9,7 @@ import (
 	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportnotify"
+	appreportstatus "github.com/FangcunMount/qs-server/internal/collection-server/application/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -108,6 +109,9 @@ func (s *Service) GetStatus(ctx context.Context, testeeID, assessmentID uint64) 
 	if s == nil {
 		return pendingResponse("queued", "报告排队生成中", 3000), nil
 	}
+	if err := s.authorize(ctx, testeeID, assessmentID); err != nil {
+		return nil, err
+	}
 	assessmentKey := fmt.Sprintf("%d", assessmentID)
 	resp, _, err := s.checkCurrentStatus(ctx, testeeID, assessmentID, assessmentKey)
 	if err != nil {
@@ -126,6 +130,9 @@ func (s *Service) Wait(ctx context.Context, testeeID, assessmentID uint64, timeo
 	reportstatus.IncWaitReportRequest()
 	if s == nil {
 		return pendingResponse("pending", "报告生成中", 3000), nil
+	}
+	if err := s.authorize(ctx, testeeID, assessmentID); err != nil {
+		return nil, err
 	}
 	if timeout <= 0 {
 		timeout = s.cfg.DefaultTimeout
@@ -184,6 +191,25 @@ func (s *Service) Wait(ctx context.Context, testeeID, assessmentID uint64, timeo
 			}
 		}
 	}
+}
+
+func (s *Service) authorize(ctx context.Context, testeeID, assessmentID uint64) error {
+	started := time.Now()
+	if s.query == nil {
+		reportstatus.ObserveAssessmentOwnership("misconfigured", time.Since(started))
+		return fmt.Errorf("assessment query service is not configured")
+	}
+	result, err := s.query.GetMyAssessment(ctx, testeeID, assessmentID)
+	if err != nil {
+		reportstatus.ObserveAssessmentOwnership("error", time.Since(started))
+		return err
+	}
+	if result == nil {
+		reportstatus.ObserveAssessmentOwnership("denied", time.Since(started))
+		return appreportstatus.ErrAssessmentAccess
+	}
+	reportstatus.ObserveAssessmentOwnership("allowed", time.Since(started))
+	return nil
 }
 
 func (s *Service) waitByPolling(

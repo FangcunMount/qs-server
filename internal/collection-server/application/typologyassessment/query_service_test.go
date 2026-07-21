@@ -7,6 +7,7 @@ import (
 	"time"
 
 	evaluationapp "github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
+	appreportstatus "github.com/FangcunMount/qs-server/internal/collection-server/application/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 )
@@ -120,12 +121,18 @@ func TestQueryServiceListUsesCanonicalTypologyKind(t *testing.T) {
 func TestQueryServiceGetReportStatus(t *testing.T) {
 	t.Parallel()
 
-	wait := reportwait.NewService(nil, &fakeStatusCache{
+	reader := &fakeEvaluationReader{
+		detail: &evaluationapp.AssessmentDetailResponse{
+			ID:    "2",
+			Model: evaluationapp.ModelIdentityResponse{Kind: typologyModelKind},
+		},
+	}
+	wait := reportwait.NewService(reader, &fakeStatusCache{
 		snapshots: map[string]*reportstatus.Snapshot{
 			"2": {Status: "processing", Stage: "scoring", UpdatedAt: time.Unix(99, 0).UTC()},
 		},
 	}, nil, nil, reportwait.DefaultConfig())
-	svc := NewQueryService(&fakeEvaluationReader{}, wait)
+	svc := NewQueryService(reader, wait)
 
 	status, err := svc.GetReportStatus(context.Background(), 1, 2)
 	if err != nil {
@@ -133,6 +140,22 @@ func TestQueryServiceGetReportStatus(t *testing.T) {
 	}
 	if status.Status != "processing" || status.Stage != "scoring" {
 		t.Fatalf("unexpected status: %+v", status)
+	}
+}
+
+func TestQueryServiceGetReportStatusDeniesForeignAssessment(t *testing.T) {
+	t.Parallel()
+
+	wait := reportwait.NewService(&fakeEvaluationReader{}, &fakeStatusCache{
+		snapshots: map[string]*reportstatus.Snapshot{
+			"2": {Status: "completed", Stage: "completed", UpdatedAt: time.Unix(99, 0).UTC()},
+		},
+	}, nil, nil, reportwait.DefaultConfig())
+	svc := NewQueryService(&fakeEvaluationReader{}, wait)
+
+	_, err := svc.GetReportStatus(context.Background(), 1, 2)
+	if !errors.Is(err, appreportstatus.ErrAssessmentAccess) {
+		t.Fatalf("GetReportStatus error = %v, want %v", err, appreportstatus.ErrAssessmentAccess)
 	}
 }
 
@@ -168,18 +191,19 @@ func TestQueryServiceGetPropagatesError(t *testing.T) {
 func TestQueryServiceGetReportStatusInterpretedEnrichesModel(t *testing.T) {
 	t.Parallel()
 
-	wait := reportwait.NewService(nil, &fakeStatusCache{
-		snapshots: map[string]*reportstatus.Snapshot{
-			"42": {Status: "interpreted", Stage: "done", UpdatedAt: time.Unix(1, 0).UTC()},
-		},
-	}, nil, nil, reportwait.DefaultConfig())
-	svc := NewQueryService(&fakeEvaluationReader{
+	reader := &fakeEvaluationReader{
 		detail: &evaluationapp.AssessmentDetailResponse{
 			ID:    "42",
 			Model: evaluationapp.ModelIdentityResponse{Kind: typologyModelKind, Code: "sbti"},
 			Level: &evaluationapp.ResultLevelResponse{Code: "INTJ"},
 		},
-	}, wait)
+	}
+	wait := reportwait.NewService(reader, &fakeStatusCache{
+		snapshots: map[string]*reportstatus.Snapshot{
+			"42": {Status: "interpreted", Stage: "done", UpdatedAt: time.Unix(1, 0).UTC()},
+		},
+	}, nil, nil, reportwait.DefaultConfig())
+	svc := NewQueryService(reader, wait)
 
 	status, err := svc.GetReportStatus(context.Background(), 1, 42)
 	if err != nil {

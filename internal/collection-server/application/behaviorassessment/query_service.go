@@ -37,8 +37,11 @@ func (s *QueryService) List(ctx context.Context, testeeID uint64, req *ListAsses
 
 func (s *QueryService) Get(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentDetailResponse, error) {
 	result, err := s.reader.GetMyAssessment(ctx, testeeID, assessmentID)
-	if err != nil || result == nil {
-		return result, err
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return nil, reportstatus.ErrAssessmentAccess
 	}
 	if !isBehaviorAbilityModel(result.Model) {
 		return nil, ErrNotBehaviorAssessment

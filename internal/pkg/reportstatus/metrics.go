@@ -1,6 +1,8 @@
 package reportstatus
 
 import (
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -79,6 +81,15 @@ var (
 	waitReportSignalWakeupTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "wait_report_signal_wakeup_total",
 		Help: "Total wait-report wakeups triggered by signaling.",
+	})
+	assessmentOwnershipTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "report_status_assessment_ownership_total",
+		Help: "Total Assessment ownership checks before report-status cache/DB reads.",
+	}, []string{"result"})
+	assessmentOwnershipDuration = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:    "report_status_assessment_ownership_duration_seconds",
+		Help:    "Latency of Assessment ownership checks before report-status reads.",
+		Buckets: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2},
 	})
 
 	reportStatusGetTotal = promauto.NewCounterVec(prometheus.CounterOpts{
@@ -185,4 +196,12 @@ func IncWaitReportDBFallback() {
 
 func IncWaitReportSignalWakeup() {
 	waitReportSignalWakeupTotal.Inc()
+}
+
+func ObserveAssessmentOwnership(result string, duration time.Duration) {
+	if result == "" {
+		result = "unknown"
+	}
+	assessmentOwnershipTotal.WithLabelValues(result).Inc()
+	assessmentOwnershipDuration.Observe(duration.Seconds())
 }
