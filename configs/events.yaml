@@ -93,7 +93,7 @@ events:
     delivery: durable_outbox
     aggregate: Report
     domain: interpretation/report
-    description: "报告生成尝试失败"
+    description: "报告生成尝试失败（含持久化 RetryDecision 投影）"
     handler: interpretation_report_failed_handler
 
   interpretation.retry.requested:

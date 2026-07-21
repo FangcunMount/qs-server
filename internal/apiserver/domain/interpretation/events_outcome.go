@@ -69,6 +69,7 @@ type ReportFailedEventInput struct {
 	Retryable       bool
 	SafeReason      string
 	FailedAt        time.Time
+	RetryDecision   *eventoutcome.RetryDecisionPayload
 }
 
 func NewInterpretationReportFailedEvent(input ReportFailedEventInput) ReportFailedOutcomeEvent {
@@ -78,8 +79,21 @@ func NewInterpretationReportFailedEvent(input ReportFailedEventInput) ReportFail
 			OutcomeID: input.OutcomeID, TesteeID: input.TesteeID, Attempt: input.Attempt, ReportType: input.ReportType,
 			TemplateVersion: input.TemplateVersion, FailureKind: input.FailureKind, FailureCode: input.FailureCode,
 			Retryable: input.Retryable, SafeReason: input.SafeReason, FailedAt: input.FailedAt,
+			RetryDecision: cloneRetryDecisionPayload(input.RetryDecision),
 		},
 	)
+}
+
+func cloneRetryDecisionPayload(value *eventoutcome.RetryDecisionPayload) *eventoutcome.RetryDecisionPayload {
+	if value == nil {
+		return nil
+	}
+	copied := *value
+	if value.NextAttemptAt != nil {
+		next := *value.NextAttemptAt
+		copied.NextAttemptAt = &next
+	}
+	return &copied
 }
 
 type RetryRequestedEventInput struct {

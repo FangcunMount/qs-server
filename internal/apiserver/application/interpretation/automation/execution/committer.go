@@ -13,6 +13,7 @@ import (
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
+	eventoutcome "github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
@@ -157,16 +158,18 @@ func (c *interpretationCommitter) CommitFailure(ctx context.Context, request Com
 		return nil, err
 	}
 	key := generationToCommit.Key()
+	decision := runToCommit.RetryDecision()
 	events := []event.DomainEvent{domaininterpretation.NewInterpretationReportFailedEvent(domaininterpretation.ReportFailedEventInput{
 		OrgID: request.Association.OrgID, GenerationID: generationToCommit.ID().String(), RunID: runToCommit.ID().String(),
 		AssessmentID: request.Association.AssessmentID.String(), OutcomeID: request.OutcomeID.String(), TesteeID: request.Association.TesteeID,
 		Attempt: uint(runToCommit.Attempt()), ReportType: key.ReportType.String(), TemplateVersion: key.TemplateVersion.String(),
 		FailureKind: string(request.Failure.Kind), FailureCode: request.Failure.Code, Retryable: request.Failure.Retryable,
 		SafeReason: request.Failure.SafeMessage, FailedAt: failedAt,
+		RetryDecision: retryDecisionPayload(decision, request.Failure.Retryable),
 	})}
 	var retryEvent event.DomainEvent
 	var retryAt time.Time
-	if decision := runToCommit.RetryDecision(); decision != nil && decision.Disposition == retrygovernance.DispositionAutomatic && decision.NextAttemptAt != nil {
+	if decision != nil && decision.Disposition == retrygovernance.DispositionAutomatic && decision.NextAttemptAt != nil {
 		retryAt = *decision.NextAttemptAt
 		retry := domaininterpretation.NewInterpretationRetryRequestedEvent(domaininterpretation.RetryRequestedEventInput{
 			OrgID: request.Association.OrgID, GenerationID: generationToCommit.ID().String(), RunID: runToCommit.ID().String(),
@@ -291,4 +294,27 @@ func generatedEvents(artifact *domainreport.InterpretReport, attempt int, builde
 		PrimaryScore: domaininterpretation.EventScoreValueFrom(content.PrimaryScore), Level: domaininterpretation.EventResultLevelFrom(content.Level), GeneratedAt: artifact.GeneratedAt(),
 	})
 	return []event.DomainEvent{generated}
+}
+
+// retryDecisionPayload copies the persisted Run decision onto the failed event.
+// Event consumers must not recompute disposition from Retryable alone.
+func retryDecisionPayload(decision *retrygovernance.Decision, failureRetryable bool) *eventoutcome.RetryDecisionPayload {
+	if decision == nil {
+		return nil
+	}
+	payload := &eventoutcome.RetryDecisionPayload{
+		Disposition:                string(decision.Disposition),
+		Retryable:                  failureRetryable,
+		Attempt:                    decision.Attempt,
+		MaxAutomaticAttempts:       decision.MaxAutomaticAttempts,
+		RemainingAutomaticAttempts: decision.RemainingAutomaticAttempts,
+		RetryEventID:               decision.RetryEventID,
+		ActionRequestID:            decision.ActionRequestID,
+		PolicyVersion:              decision.PolicyVersion,
+	}
+	if decision.NextAttemptAt != nil {
+		next := *decision.NextAttemptAt
+		payload.NextAttemptAt = &next
+	}
+	return payload
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventoutcome "github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 )
 
 // Batch I0 freezes the two terminal facts. pending/generating remain query
@@ -35,11 +36,18 @@ func TestReportTerminalEventsCarryStableOutcomeCorrelation(t *testing.T) {
 		t.Fatalf("generated payload = %#v", payload)
 	}
 
-	failed := NewInterpretationReportFailedEvent(ReportFailedEventInput{OrgID: 11, GenerationID: "generation-5", RunID: "run-2", AssessmentID: "assessment-3", OutcomeID: "outcome-9", TesteeID: 42, Attempt: 2, ReportType: "standard", TemplateVersion: "v2", FailureKind: "template", FailureCode: "not_found", Retryable: true, SafeReason: "template unavailable", FailedAt: at})
+	failed := NewInterpretationReportFailedEvent(ReportFailedEventInput{
+		OrgID: 11, GenerationID: "generation-5", RunID: "run-2", AssessmentID: "assessment-3", OutcomeID: "outcome-9", TesteeID: 42, Attempt: 2,
+		ReportType: "standard", TemplateVersion: "v2", FailureKind: "template", FailureCode: "not_found", Retryable: true,
+		SafeReason: "template unavailable", FailedAt: at,
+		RetryDecision: &eventoutcome.RetryDecisionPayload{
+			Disposition: "manual_required", Retryable: true, Attempt: 2, PolicyVersion: "business-retry/v1",
+		},
+	})
 	if failed.EventType() != EventTypeReportFailed || failed.AggregateType() != AggregateType || failed.AggregateID() != "generation-5" {
 		t.Fatalf("failed event identity = type:%q aggregate:%q/%q", failed.EventType(), failed.AggregateType(), failed.AggregateID())
 	}
-	if payload := failed.Payload(); payload.OrgID != 11 || payload.GenerationID != "generation-5" || payload.RunID != "run-2" || payload.OutcomeID != "outcome-9" || payload.ReportType != "standard" || payload.TemplateVersion != "v2" || payload.FailureKind != "template" || payload.FailureCode != "not_found" || !payload.Retryable || payload.SafeReason != "template unavailable" || payload.AssessmentID != "assessment-3" || payload.TesteeID != 42 || payload.Attempt != 2 || !payload.FailedAt.Equal(at) {
+	if payload := failed.Payload(); payload.OrgID != 11 || payload.GenerationID != "generation-5" || payload.RunID != "run-2" || payload.OutcomeID != "outcome-9" || payload.ReportType != "standard" || payload.TemplateVersion != "v2" || payload.FailureKind != "template" || payload.FailureCode != "not_found" || !payload.Retryable || payload.SafeReason != "template unavailable" || payload.AssessmentID != "assessment-3" || payload.TesteeID != 42 || payload.Attempt != 2 || !payload.FailedAt.Equal(at) || payload.RetryDecision == nil || payload.RetryDecision.Disposition != "manual_required" || payload.RetryDecision.PolicyVersion != "business-retry/v1" {
 		t.Fatalf("failed payload = %#v", payload)
 	}
 }

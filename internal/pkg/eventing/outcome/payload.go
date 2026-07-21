@@ -29,20 +29,36 @@ func (d ReportGeneratedPayload) IsHighRisk() bool {
 
 // ReportFailedPayload records one failed interpretation report attempt.
 type ReportFailedPayload struct {
-	OrgID           int64     `json:"org_id"`
-	GenerationID    string    `json:"generation_id"`
-	RunID           string    `json:"run_id"`
-	AssessmentID    string    `json:"assessment_id"`
-	OutcomeID       string    `json:"outcome_id"`
-	TesteeID        uint64    `json:"testee_id"`
-	Attempt         uint      `json:"attempt"`
-	ReportType      string    `json:"report_type"`
-	TemplateVersion string    `json:"template_version"`
-	FailureKind     string    `json:"failure_kind"`
-	FailureCode     string    `json:"failure_code"`
-	Retryable       bool      `json:"retryable"`
-	SafeReason      string    `json:"safe_reason"`
-	FailedAt        time.Time `json:"failed_at"`
+	OrgID           int64                 `json:"org_id"`
+	GenerationID    string                `json:"generation_id"`
+	RunID           string                `json:"run_id"`
+	AssessmentID    string                `json:"assessment_id"`
+	OutcomeID       string                `json:"outcome_id"`
+	TesteeID        uint64                `json:"testee_id"`
+	Attempt         uint                  `json:"attempt"`
+	ReportType      string                `json:"report_type"`
+	TemplateVersion string                `json:"template_version"`
+	FailureKind     string                `json:"failure_kind"`
+	FailureCode     string                `json:"failure_code"`
+	Retryable       bool                  `json:"retryable"`
+	SafeReason      string                `json:"safe_reason"`
+	FailedAt        time.Time             `json:"failed_at"`
+	RetryDecision   *RetryDecisionPayload `json:"retry_decision,omitempty"`
+}
+
+// RetryDecisionPayload is the durable Run RetryDecision copied onto failed events.
+// Consumers must treat this as the source of truth for disposition; Retryable alone
+// cannot distinguish automatic recovery from manual_required waits.
+type RetryDecisionPayload struct {
+	Disposition                string     `json:"disposition"`
+	Retryable                  bool       `json:"retryable"`
+	Attempt                    int        `json:"attempt"`
+	MaxAutomaticAttempts       int        `json:"max_automatic_attempts,omitempty"`
+	RemainingAutomaticAttempts int        `json:"remaining_automatic_attempts,omitempty"`
+	NextAttemptAt              *time.Time `json:"next_attempt_at,omitempty"`
+	RetryEventID               string     `json:"retry_event_id,omitempty"`
+	ActionRequestID            string     `json:"action_request_id,omitempty"`
+	PolicyVersion              string     `json:"policy_version,omitempty"`
 }
 
 // InterpretationRetryRequestedPayload wakes a generation only after its
