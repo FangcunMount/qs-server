@@ -151,6 +151,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	}
 	a := loaded.assessment
 	claimAt := time.Now()
+	var previousInputSnapshotRef string
 	if a.Status().IsFailed() {
 		if s.runRepo == nil {
 			return evalerrors.ModuleNotConfigured("evaluation run repository is not configured")
@@ -167,6 +168,9 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 				"result", "terminal_failure_skipped",
 			)
 			return nil
+		}
+		if latest != nil {
+			previousInputSnapshotRef = latest.InputSnapshotRef()
 		}
 	}
 	claim, err := s.claimEvaluationRun(ctx, assessmentID, uuid.NewString(), log.ExtractTraceID(ctx), claimAt)
@@ -197,6 +201,12 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	}
 
 	if ref := inputSnapshotRefFromResolvedInput(a, input); ref != "" {
+		// EV-R009: a retry must execute against the same verified input as the
+		// previous attempt; drift is a terminal validation failure, not a
+		// silent recompute over different data.
+		if err := validateInputSnapshotRefAcrossAttempts(previousInputSnapshotRef, ref); err != nil {
+			return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, "评估输入在重试间发生漂移: "+err.Error(), evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: err.Error()}, err)
+		}
 		if err := evaluationRun.AttachInputSnapshot(ref); err != nil {
 			return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, "评估输入快照无效: "+err.Error(), evalrun.Failure{Kind: evalrun.FailureKindInternal, Message: err.Error()}, err)
 		}
