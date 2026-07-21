@@ -1,11 +1,15 @@
 package outcome
 
 import (
+	"context"
 	"testing"
+	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 func TestScoreFactUsesFrozenOutcomeMaxScoreAndName(t *testing.T) {
@@ -21,5 +25,50 @@ func TestScoreFactUsesFrozenOutcomeMaxScoreAndName(t *testing.T) {
 	fact := scoreFactFromProjection(projection, names, maxScores)
 	if len(fact.FactorScores) != 1 || fact.FactorScores[0].FactorName != "Frozen factor" || fact.FactorScores[0].MaxScore == nil || *fact.FactorScores[0].MaxScore != 20 {
 		t.Fatalf("score fact = %#v", fact)
+	}
+}
+
+type scoreOutcomeRepoStub struct {
+	record *domainoutcome.Record
+}
+
+func (s *scoreOutcomeRepoStub) Save(context.Context, *domainoutcome.Record) error { return nil }
+func (s *scoreOutcomeRepoStub) FindByID(context.Context, domainoutcome.ID) (*domainoutcome.Record, error) {
+	return s.record, nil
+}
+func (s *scoreOutcomeRepoStub) FindByAssessmentID(context.Context, meta.ID) (*domainoutcome.Record, error) {
+	return s.record, nil
+}
+
+func TestScoreFactReaderObservesCatalogFallback(t *testing.T) {
+	t.Parallel()
+
+	record, err := domainoutcome.NewRecord(domainoutcome.NewRecordInput{
+		ID: meta.FromUint64(10), AssessmentID: meta.FromUint64(8), TesteeID: 9, RunID: "8:1",
+		Model: domainoutcome.ModelIdentity{
+			Kind: modelcatalog.KindScale, Code: "SDS", Version: "1.0.0", Title: "SDS",
+		},
+		Runtime: domainoutcome.RuntimeIdentity{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring},
+		SchemaVersion: domainoutcome.CurrentSchemaVersion,
+		EvaluatedAt:   time.Unix(100, 0),
+		Payload:       []byte(`{"Dimensions":[{"Code":"total","Name":"总分","Role":"total","Score":{"Value":42}}]}`),
+		// empty ReportInput → frozen=false → current-catalog fallback
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	before := testutil.ToFloat64(scoreCatalogFallbackTotal)
+	reader := NewScoreFactReader(&scoreOutcomeRepoStub{record: record}, nil, nil, nil)
+	fact, err := reader.Get(context.Background(), 8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fact == nil || len(fact.FactorScores) != 1 || fact.FactorScores[0].RawScore != 42 {
+		t.Fatalf("score fact = %#v", fact)
+	}
+	after := testutil.ToFloat64(scoreCatalogFallbackTotal)
+	if after-before != 1 {
+		t.Fatalf("catalog fallback delta = %v, want 1", after-before)
 	}
 }

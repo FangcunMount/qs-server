@@ -79,6 +79,7 @@ func (r *scoreFactReader) Get(ctx context.Context, assessmentID uint64) (*ScoreF
 	}
 	names, maxScores, frozen := scoreMetadataFromRecord(record, execution)
 	if !frozen {
+		observeScoreCatalogFallback()
 		log.Warnf("evaluation score fact uses legacy current-catalog metadata fallback (assessment_id=%d)", assessmentID)
 		legacyScale := r.loadLegacyScale(ctx, assessmentID)
 		for code, value := range factorMaxScores(legacyScale) {

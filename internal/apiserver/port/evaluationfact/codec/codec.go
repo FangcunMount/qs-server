@@ -20,10 +20,12 @@ func DecodeExecution(record *evaluationfact.Record) (*evaluationfact.Execution, 
 	if record == nil {
 		return nil, fmt.Errorf("evaluation outcome is required")
 	}
-	if record.SchemaVersion() != 0 && record.SchemaVersion() != schemaV1 && record.SchemaVersion() != schemaV2 {
-		return nil, fmt.Errorf("unsupported evaluation outcome schema version %d", record.SchemaVersion())
+	schema := record.SchemaVersion()
+	if schema != 0 && schema != schemaV1 && schema != schemaV2 {
+		return nil, fmt.Errorf("unsupported evaluation outcome schema version %d", schema)
 	}
-	execution, err := decodeExecution(record.Payload(), record.Model(), record.Runtime(), record.SchemaVersion())
+	observeOutcomeSchemaDecode(schema)
+	execution, err := decodeExecution(record.Payload(), record.Model(), record.Runtime(), schema)
 	if err != nil {
 		return nil, fmt.Errorf("decode evaluation outcome %s: %w", record.ID(), err)
 	}
