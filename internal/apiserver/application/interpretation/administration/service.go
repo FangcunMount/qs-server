@@ -6,7 +6,7 @@ import (
 	"context"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/internal/reportprojection"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reportprojection"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -58,12 +58,17 @@ type Service interface {
 }
 
 type service struct {
-	reader interpretationreadmodel.ReportReader
-	access Access
+	reader     interpretationreadmodel.ReportReader
+	access     Access
+	projection reportprojection.Mapper
 }
 
-func NewService(reader interpretationreadmodel.ReportReader, access Access) Service {
-	return &service{reader: reader, access: access}
+func NewService(reader interpretationreadmodel.ReportReader, access Access, projection ...reportprojection.Mapper) Service {
+	mapper := reportprojection.Mapper{}
+	if len(projection) > 0 {
+		mapper = projection[0]
+	}
+	return &service{reader: reader, access: access, projection: mapper}
 }
 
 func (s *service) GetReport(ctx context.Context, actor Actor, query GetQuery) (*Report, error) {
@@ -84,7 +89,7 @@ func (s *service) GetReport(ctx context.Context, actor Actor, query GetQuery) (*
 	if err != nil {
 		return nil, cberrors.WrapC(err, code.ErrInterpretReportNotFound, "报告不存在")
 	}
-	return reportprojection.FromRow(*row, decision.Audience)
+	return s.projection.FromRow(ctx, *row, decision.Audience)
 }
 
 func (s *service) ListReports(ctx context.Context, actor Actor, query ListQuery) (*ListResult, error) {
@@ -128,7 +133,7 @@ func (s *service) ListReports(ctx context.Context, actor Actor, query ListQuery)
 	}
 	items := make([]*Report, 0, len(rows))
 	for _, row := range rows {
-		item, mapErr := reportprojection.FromRow(row, scope.Audience)
+		item, mapErr := s.projection.FromRow(ctx, row, scope.Audience)
 		if mapErr != nil {
 			return nil, mapErr
 		}

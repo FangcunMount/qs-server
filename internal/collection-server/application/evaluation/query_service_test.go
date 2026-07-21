@@ -37,7 +37,7 @@ func TestQueryServiceListMyAssessmentsUsesScaleModelKind(t *testing.T) {
 	t.Parallel()
 
 	reader := &listAssessmentsReader{}
-	svc := NewQueryService(reader, nil)
+	svc := NewQueryService(reader)
 	_, err := svc.ListMyAssessments(context.Background(), 1, &ListAssessmentsRequest{AssessmentKind: "medical"})
 	if err != nil {
 		t.Fatal(err)

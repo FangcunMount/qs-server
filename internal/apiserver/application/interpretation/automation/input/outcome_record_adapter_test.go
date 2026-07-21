@@ -126,6 +126,71 @@ func TestFromOutcomeRecordReportRouting_ExplicitValid(t *testing.T) {
 	}
 }
 
+func TestFromOutcomeRecordUsesExplicitFrozenTemplateVersion(t *testing.T) {
+	assets, err := json.Marshal(evaluationinput.TypologyModelPayload{Payload: &modeltypology.Payload{
+		Code: "MBTI", Version: "1",
+		Outcomes: []modeltypology.Outcome{{Code: "INTJ", Name: "建筑师"}},
+		Runtime: &modeltypology.RuntimeSpec{
+			FactorGraph: modeltypology.FactorGraphSpec{
+				DimensionOrder: []string{"EI"},
+				Dimensions:     map[string]modeltypology.Dimension{"EI": {Code: "EI", Name: "EI", LeftPole: "I", RightPole: "E"}},
+			},
+			Decision:       modeltypology.PersonalityDecisionSpec{Kind: modelcatalog.DecisionKindPoleComposition},
+			OutcomeMapping: modeltypology.OutcomeMappingSpec{DetailKind: modeltypology.OutcomeDetailPersonalityType},
+			Report: modeltypology.ReportSpec{
+				Kind: modeltypology.ReportKindTemplate, AdapterKey: modeltypology.ReportAdapterPersonalityType,
+				TemplateID: "mbti", TemplateVersion: "custom-v2",
+			},
+		},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := evaluationfact.NewRecord(evaluationfact.NewRecordInput{
+		ID: meta.FromUint64(33), AssessmentID: meta.FromUint64(33), TesteeID: 2, RunID: "33:1",
+		Model:         evaluationfact.ModelIdentity{Kind: modelcatalog.KindTypology, Algorithm: modelcatalog.AlgorithmMBTI, Code: "MBTI", Version: "1"},
+		Runtime:       evaluationfact.RuntimeIdentity{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindPoleComposition},
+		SchemaVersion: 2, EvaluatedAt: time.Unix(100, 0), ReportInput: assets,
+		Payload: []byte(`{"Detail":{"Payload":{"type_code":"INTJ","match_percent":80}},"Primary":{"Kind":"match_percent","Value":80,"Label":"INTJ"}}`),
+	})
+
+	got, err := FromOutcomeRecord(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Report.TemplateVersion.String() != "custom-v2" {
+		t.Fatalf("TemplateVersion = %q, want custom-v2", got.Report.TemplateVersion)
+	}
+}
+
+func TestFromOutcomeRecordDefaultsTemplateVersionToLegacyV1(t *testing.T) {
+	assets, err := json.Marshal(evaluationinput.TypologyModelPayload{Payload: &modeltypology.Payload{
+		Code: "MBTI", Version: "1", Algorithm: modelcatalog.AlgorithmMBTI,
+		DimensionOrder: []string{"EI"},
+		Dimensions:     map[string]modeltypology.Dimension{"EI": {Code: "EI", Name: "EI", LeftPole: "I", RightPole: "E"}},
+		MatchingSpec:   modeltypology.MatchingSpec{Kind: modelcatalog.DecisionKindPoleComposition},
+		Outcomes:       []modeltypology.Outcome{{Code: "INTJ", Name: "建筑师"}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := evaluationfact.NewRecord(evaluationfact.NewRecordInput{
+		ID: meta.FromUint64(34), AssessmentID: meta.FromUint64(34), TesteeID: 2, RunID: "34:1",
+		Model:         evaluationfact.ModelIdentity{Kind: modelcatalog.KindTypology, Algorithm: modelcatalog.AlgorithmMBTI, Code: "MBTI", Version: "1"},
+		Runtime:       evaluationfact.RuntimeIdentity{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindPoleComposition},
+		SchemaVersion: 2, EvaluatedAt: time.Unix(100, 0), ReportInput: assets,
+		Payload: []byte(`{"Detail":{"Payload":{"type_code":"INTJ","match_percent":80}},"Primary":{"Kind":"match_percent","Value":80,"Label":"INTJ"}}`),
+	})
+
+	got, err := FromOutcomeRecord(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Report.TemplateVersion.String() != DefaultTemplateVersion.String() {
+		t.Fatalf("TemplateVersion = %q, want %q", got.Report.TemplateVersion, DefaultTemplateVersion)
+	}
+}
+
 func TestFromOutcomeRecordReportRouting_ExplicitMalformedFailClosed(t *testing.T) {
 	assets, err := json.Marshal(evaluationinput.TypologyModelPayload{Payload: &modeltypology.Payload{
 		Code: "MBTI", Version: "1",

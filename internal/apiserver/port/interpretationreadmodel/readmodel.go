@@ -99,19 +99,25 @@ type ReportSuggestionRow struct {
 }
 
 type ReportRow struct {
-	AssessmentID uint64
-	ModelName    string
-	ModelCode    string
-	Model        ModelIdentityRow
-	PrimaryScore *ScoreValueRow
-	Level        *ResultLevelRow
-	TotalScore   float64
-	RiskLevel    string
-	Conclusion   string
-	Dimensions   []ReportDimensionRow
-	Suggestions  []ReportSuggestionRow
-	ModelExtra   *ReportModelExtraRow
-	CreatedAt    time.Time
+	AssessmentID        uint64
+	ModelName           string
+	ModelCode           string
+	Model               ModelIdentityRow
+	PrimaryScore        *ScoreValueRow
+	Level               *ResultLevelRow
+	TotalScore          float64
+	RiskLevel           string
+	Conclusion          string
+	Dimensions          []ReportDimensionRow
+	Suggestions         []ReportSuggestionRow
+	ModelExtra          *ReportModelExtraRow
+	PresentationProfile *PresentationProfileRow
+	CreatedAt           time.Time
+}
+
+type PresentationProfileRow struct {
+	VisibleFactorCodes []string
+	Source             string
 }
 
 type ModelIdentityRow struct {

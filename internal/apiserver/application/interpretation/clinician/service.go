@@ -5,7 +5,7 @@ package clinician
 import (
 	"context"
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/internal/reportprojection"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reportprojection"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -28,12 +28,17 @@ type Service interface {
 	ListParticipantReports(context.Context, Actor, ListQuery) (*ListResult, error)
 }
 type service struct {
-	reader interpretationreadmodel.ReportReader
-	access Access
+	reader     interpretationreadmodel.ReportReader
+	access     Access
+	projection reportprojection.Mapper
 }
 
-func NewService(reader interpretationreadmodel.ReportReader, access Access) Service {
-	return &service{reader: reader, access: access}
+func NewService(reader interpretationreadmodel.ReportReader, access Access, projection ...reportprojection.Mapper) Service {
+	mapper := reportprojection.Mapper{}
+	if len(projection) > 0 {
+		mapper = projection[0]
+	}
+	return &service{reader: reader, access: access, projection: mapper}
 }
 func (s *service) GetParticipantReport(ctx context.Context, actor Actor, q GetQuery) (*Report, error) {
 	if actor.OrgID == 0 || actor.OperatorUserID == 0 || q.TesteeID == 0 || q.AssessmentID == 0 {
@@ -49,7 +54,7 @@ func (s *service) GetParticipantReport(ctx context.Context, actor Actor, q GetQu
 	if err != nil {
 		return nil, cberrors.WrapC(err, code.ErrInterpretReportNotFound, "报告不存在")
 	}
-	return reportprojection.FromRow(*row, policy.AudienceClinician)
+	return s.projection.FromRow(ctx, *row, policy.AudienceClinician)
 }
 func (s *service) ListParticipantReports(ctx context.Context, actor Actor, q ListQuery) (*ListResult, error) {
 	if actor.OrgID == 0 || actor.OperatorUserID == 0 || q.TesteeID == 0 {
@@ -69,7 +74,7 @@ func (s *service) ListParticipantReports(ctx context.Context, actor Actor, q Lis
 	}
 	items := make([]*Report, 0, len(rows))
 	for _, row := range rows {
-		item, mapErr := reportprojection.FromRow(row, policy.AudienceClinician)
+		item, mapErr := s.projection.FromRow(ctx, row, policy.AudienceClinician)
 		if mapErr != nil {
 			return nil, mapErr
 		}

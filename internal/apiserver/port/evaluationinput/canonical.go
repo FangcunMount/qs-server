@@ -1,6 +1,7 @@
 package evaluationinput
 
 import (
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
@@ -76,6 +77,20 @@ func InterpretationAssetsFromSnapshot(input *InputSnapshot) (interpretationasset
 		}
 	}
 	return interpretationAssetsFromCompatPayload(input)
+}
+
+// FactorScorePresentationProfileFromSnapshot resolves the frozen factor-score
+// report section from canonical DefinitionV2 on the evaluation input snapshot.
+func FactorScorePresentationProfileFromSnapshot(input *InputSnapshot) (domainreport.PresentationProfile, bool) {
+	def, ok := DefinitionV2FromSnapshot(input)
+	if !ok || def == nil {
+		return domainreport.PresentationProfile{}, false
+	}
+	codes, configured := def.ReportMap.FactorScoreSources()
+	if !configured {
+		return domainreport.PresentationProfile{}, false
+	}
+	return domainreport.NewFrozenPresentationProfile(codes), true
 }
 
 func interpretationAssetsFromCompatPayload(input *InputSnapshot) (interpretationassets.Assets, bool) {

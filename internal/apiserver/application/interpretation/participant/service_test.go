@@ -5,13 +5,14 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reportprojection"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 )
 
 func TestGetMyReportAuthorizesBeforeReading(t *testing.T) {
 	denied := errors.New("denied")
 	reader := &readerStub{}
-	service := NewService(reader, accessStub{err: denied})
+	service := NewService(reader, accessStub{err: denied}, reportprojection.Mapper{})
 	_, err := service.GetMyReport(context.Background(), Actor{TesteeID: 7}, GetQuery{AssessmentID: 42})
 	if !errors.Is(err, denied) {
 		t.Fatalf("error = %v, want denied", err)
@@ -23,7 +24,7 @@ func TestGetMyReportAuthorizesBeforeReading(t *testing.T) {
 
 func TestListMyReportsScopesToActor(t *testing.T) {
 	reader := &readerStub{}
-	service := NewService(reader, accessStub{})
+	service := NewService(reader, accessStub{}, reportprojection.Mapper{})
 	if _, err := service.ListMyReports(context.Background(), Actor{TesteeID: 7}, ListQuery{}); err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +36,7 @@ func TestListMyReportsScopesToActor(t *testing.T) {
 func TestListMyReportsAuthorizesBeforeReading(t *testing.T) {
 	denied := errors.New("denied")
 	reader := &readerStub{}
-	service := NewService(reader, accessStub{participantErr: denied})
+	service := NewService(reader, accessStub{participantErr: denied}, reportprojection.Mapper{})
 	_, err := service.ListMyReports(context.Background(), Actor{TesteeID: 7}, ListQuery{})
 	if !errors.Is(err, denied) {
 		t.Fatalf("error = %v, want denied", err)

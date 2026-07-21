@@ -56,15 +56,16 @@ type Suggestion struct {
 }
 
 type Report struct {
-	AssessmentID uint64
-	Model        ModelIdentity
-	PrimaryScore *ScoreValue
-	Level        *ResultLevel
-	Conclusion   string
-	Dimensions   []Dimension
-	Suggestions  []Suggestion
-	ModelExtra   *ModelExtra
-	CreatedAt    time.Time
+	AssessmentID       uint64
+	Model              ModelIdentity
+	PrimaryScore       *ScoreValue
+	Level              *ResultLevel
+	Conclusion         string
+	Dimensions         []Dimension
+	Suggestions        []Suggestion
+	ModelExtra         *ModelExtra
+	CreatedAt          time.Time
+	PresentationSource string
 }
 
 type ListResult struct {

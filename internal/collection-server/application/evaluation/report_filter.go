@@ -11,6 +11,8 @@ type FactorVisibilityResolver interface {
 }
 
 // ReportDimensionFilter 按量表可见因子过滤报告维度。
+// Deprecated: IR-R017 moved dimension visibility to frozen InterpretReport
+// presentation profiles projected in apiserver. Keep for legacy unit tests only.
 type ReportDimensionFilter struct {
 	resolver FactorVisibilityResolver
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reportprojection"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 )
@@ -19,8 +20,8 @@ func TestRestrictedClinicianAdministrationMatchesClinicianModelExtra(t *testing.
 	}
 	reader := &sharedReportReader{row: row}
 
-	adminSvc := administration.NewService(reader, restrictedAdminAccess{})
-	clinicianSvc := clinician.NewService(reader, clinicianAccess{})
+	adminSvc := administration.NewService(reader, restrictedAdminAccess{}, reportprojection.Mapper{})
+	clinicianSvc := clinician.NewService(reader, clinicianAccess{}, reportprojection.Mapper{})
 
 	adminReport, err := adminSvc.GetReport(context.Background(), administration.Actor{OrgID: 1, OperatorUserID: 2}, administration.GetQuery{AssessmentID: 42})
 	if err != nil {
@@ -46,7 +47,7 @@ func TestAdminAdministrationStillSeesModelExtra(t *testing.T) {
 		ModelExtra:   &interpretationreadmodel.ReportModelExtraRow{TypeCode: "secret", TypeName: "visible"},
 	}
 	reader := &sharedReportReader{row: row}
-	adminSvc := administration.NewService(reader, adminActorAccess{})
+	adminSvc := administration.NewService(reader, adminActorAccess{}, reportprojection.Mapper{})
 
 	report, err := adminSvc.GetReport(context.Background(), administration.Actor{OrgID: 1, OperatorUserID: 2}, administration.GetQuery{AssessmentID: 42})
 	if err != nil {

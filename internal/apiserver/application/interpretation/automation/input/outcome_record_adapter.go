@@ -5,6 +5,7 @@ import (
 
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
+	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
@@ -58,6 +59,13 @@ func FromOutcomeRecord(record *domainoutcome.Record) (interpinput.Interpretation
 		in.Runtime.DecisionKind = policy.DefaultDecisionKind(in.Runtime.AlgorithmFamily)
 	}
 	in.Report.ReportProfile = policy.ReportProfileForDecisionKind(in.Runtime.DecisionKind)
+	if profile, ok := evaluationinput.FactorScorePresentationProfileFromSnapshot(assets); ok {
+		copy := profile
+		in.PresentationProfile = &copy
+	}
+	if materialized, ok := evaluationinput.InterpretationAssetsFromSnapshot(assets); ok {
+		in.Report.TemplateVersion = domainreporttemplate.ResolveFromAssets(materialized)
+	}
 
 	switch in.Runtime.AlgorithmFamily {
 	case modelcatalog.AlgorithmFamilyFactorScoring, modelcatalog.AlgorithmFamilyFactorNorm, modelcatalog.AlgorithmFamilyTaskPerformance:
@@ -78,6 +86,9 @@ func FromOutcomeRecord(record *domainoutcome.Record) (interpinput.Interpretation
 		}
 		in.Report.TemplateID = routing.TemplateID
 		in.Report.AdapterKey = string(routing.AdapterKey)
+		if version := policy.TemplateVersion(routing.TemplateVersion); !version.IsEmpty() {
+			in.Report.TemplateVersion = version
+		}
 	}
 	return in, nil
 }

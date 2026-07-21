@@ -15,17 +15,14 @@ import (
 // 2. 转换 gRPC 响应到 REST DTO
 type QueryService struct {
 	evaluationClient BFFReader
-	reportFilter     *ReportDimensionFilter
 }
 
 // NewQueryService 创建测评查询服务
 func NewQueryService(
 	evaluationClient BFFReader,
-	visibilityResolver FactorVisibilityResolver,
 ) *QueryService {
 	return &QueryService{
 		evaluationClient: evaluationClient,
-		reportFilter:     NewReportDimensionFilter(visibilityResolver),
 	}
 }
 
@@ -84,15 +81,11 @@ func (s *QueryService) GetAssessmentScores(ctx context.Context, testeeID, assess
 	return result, nil
 }
 
-// GetAssessmentReport 获取测评报告（outcome 投影，量表类按可见因子过滤维度）。
+// GetAssessmentReport 获取测评报告（outcome 投影；维度可见性已在 apiserver 成品投影中冻结）。
 func (s *QueryService) GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentReportResponse, error) {
-	result, err := queryDetail(ctx, "get_assessment_report", func() (*AssessmentReportResponse, error) {
+	return queryDetail(ctx, "get_assessment_report", func() (*AssessmentReportResponse, error) {
 		return s.evaluationClient.GetAssessmentReport(ctx, testeeID, assessmentID)
 	}, "testee_id", testeeID, "assessment_id", assessmentID)
-	if err != nil || result == nil {
-		return result, err
-	}
-	return s.reportFilter.Apply(ctx, result)
 }
 
 // GetFactorTrend 获取因子得分趋势

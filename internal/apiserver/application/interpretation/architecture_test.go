@@ -122,7 +122,7 @@ func TestInterpretationRootContainsOnlyTerminalEventSurface(t *testing.T) {
 func TestApplicationProjectionDoesNotInferLegacyPersistenceFields(t *testing.T) {
 	t.Parallel()
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "application", "interpretation", "internal", "reportprojection", "mapper.go")
+	path := filepath.Join(root, "internal", "apiserver", "application", "interpretation", "reportprojection", "mapper.go")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)

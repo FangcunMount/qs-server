@@ -3,6 +3,7 @@ package clinician
 import (
 	"context"
 	"errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reportprojection"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 	"testing"
 )
@@ -10,7 +11,7 @@ import (
 func TestClinicianAuthorizationPrecedesRead(t *testing.T) {
 	denied := errors.New("denied")
 	r := &reader{}
-	s := NewService(r, access{err: denied})
+	s := NewService(r, access{err: denied}, reportprojection.Mapper{})
 	_, err := s.GetParticipantReport(context.Background(), Actor{OrgID: 1, OperatorUserID: 2}, GetQuery{TesteeID: 3, AssessmentID: 4})
 	if !errors.Is(err, denied) {
 		t.Fatal(err)
@@ -21,7 +22,7 @@ func TestClinicianAuthorizationPrecedesRead(t *testing.T) {
 }
 func TestClinicianViewHidesModelExtra(t *testing.T) {
 	r := &reader{row: interpretationreadmodel.ReportRow{ModelExtra: &interpretationreadmodel.ReportModelExtraRow{TypeCode: "secret"}}}
-	s := NewService(r, access{})
+	s := NewService(r, access{}, reportprojection.Mapper{})
 	result, err := s.GetParticipantReport(context.Background(), Actor{OrgID: 1, OperatorUserID: 2}, GetQuery{TesteeID: 3, AssessmentID: 4})
 	if err != nil {
 		t.Fatal(err)

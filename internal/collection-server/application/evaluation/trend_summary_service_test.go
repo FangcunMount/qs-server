@@ -90,7 +90,7 @@ func TestGetAssessmentTrendSummaryUsesCompletedAssessmentHistory(t *testing.T) {
 		},
 	}
 
-	summary, err := NewQueryService(reader, nil).GetAssessmentTrendSummary(context.Background(), testeeID, 101)
+	summary, err := NewQueryService(reader).GetAssessmentTrendSummary(context.Background(), testeeID, 101)
 	if err != nil {
 		t.Fatalf("GetAssessmentTrendSummary() error = %v", err)
 	}

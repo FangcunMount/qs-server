@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reportprojection"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 )
@@ -12,7 +13,7 @@ import (
 func TestGetAuthorizesBeforeRead(t *testing.T) {
 	denied := errors.New("denied")
 	r := &adminReader{}
-	s := NewService(r, adminAccess{err: denied})
+	s := NewService(r, adminAccess{err: denied}, reportprojection.Mapper{})
 	_, err := s.GetReport(context.Background(), Actor{OrgID: 1, OperatorUserID: 2}, GetQuery{AssessmentID: 3})
 	if !errors.Is(err, denied) {
 		t.Fatal(err)
@@ -30,7 +31,7 @@ func TestListUsesResolvedScope(t *testing.T) {
 		Audience:            policy.AudienceClinician,
 		IsAdmin:             false,
 		DecisionSource:      "test",
-	}})
+	}}, reportprojection.Mapper{})
 	_, err := s.ListReports(context.Background(), Actor{OrgID: 1, OperatorUserID: 2}, ListQuery{})
 	if err != nil {
 		t.Fatal(err)
@@ -47,7 +48,7 @@ func TestListUsesOrganizationScopeForAdministrator(t *testing.T) {
 		Audience:       policy.AudienceAdmin,
 		IsAdmin:        true,
 		DecisionSource: "test",
-	}})
+	}}, reportprojection.Mapper{})
 	if _, err := s.ListReports(context.Background(), Actor{OrgID: 9, OperatorUserID: 2}, ListQuery{}); err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +66,7 @@ func TestRestrictedClinicianAdministrationHidesModelExtra(t *testing.T) {
 		IsAdmin:        false,
 		Restricted:     true,
 		DecisionSource: "test",
-	}})
+	}}, reportprojection.Mapper{})
 	result, err := s.GetReport(context.Background(), Actor{OrgID: 1, OperatorUserID: 2}, GetQuery{AssessmentID: 3})
 	if err != nil {
 		t.Fatal(err)
@@ -84,7 +85,7 @@ func TestAdminAdministrationKeepsModelExtra(t *testing.T) {
 		IsAdmin:        true,
 		Restricted:     false,
 		DecisionSource: "test",
-	}})
+	}}, reportprojection.Mapper{})
 	result, err := s.GetReport(context.Background(), Actor{OrgID: 1, OperatorUserID: 2}, GetQuery{AssessmentID: 3})
 	if err != nil {
 		t.Fatal(err)

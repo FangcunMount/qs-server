@@ -1,14 +1,47 @@
 package reportprojection
 
 import (
+	"context"
+
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/presentation"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 )
 
+// Mapper projects read-model rows into audience-aware report DTOs.
+type Mapper struct {
+	Legacy domainreport.LegacyDimensionVisibilityResolver
+}
+
+func (m Mapper) FromRow(ctx context.Context, row interpretationreadmodel.ReportRow, audience policy.Audience) (*Report, error) {
+	model := modelIdentityFromRow(row)
+	profile, configured, err := domainreport.ResolvePresentationProfile(ctx, model, presentationProfileFromRow(&row), m.Legacy)
+	if err != nil {
+		return nil, err
+	}
+	dimensions := row.Dimensions
+	if configured {
+		dimensions = filterDimensionRows(row.Dimensions, profile.VisibleSet())
+	}
+	return fromProjectedRow(row, dimensions, audience, profileSource(configured, profile))
+}
+
+func profileSource(configured bool, profile domainreport.PresentationProfile) string {
+	if !configured {
+		return ""
+	}
+	return string(profile.Source)
+}
+
+// FromRow keeps the historical call shape for tests that do not need legacy fallback.
 func FromRow(row interpretationreadmodel.ReportRow, audience policy.Audience) (*Report, error) {
-	dimensions := make([]Dimension, 0, len(row.Dimensions))
-	for _, dimension := range row.Dimensions {
+	return Mapper{}.FromRow(context.Background(), row, audience)
+}
+
+func fromProjectedRow(row interpretationreadmodel.ReportRow, dimensions []interpretationreadmodel.ReportDimensionRow, audience policy.Audience, presentationSource string) (*Report, error) {
+	projected := make([]Dimension, 0, len(dimensions))
+	for _, dimension := range dimensions {
 		item := Dimension{
 			FactorCode: dimension.FactorCode, FactorName: dimension.FactorName,
 			RawScore: dimension.RawScore, MaxScore: dimension.MaxScore, RiskLevel: dimension.RiskLevel,
@@ -24,7 +57,7 @@ func FromRow(row interpretationreadmodel.ReportRow, audience policy.Audience) (*
 		if dimension.NormReference != nil {
 			item.NormReference = &NormReference{ScoreKind: dimension.NormReference.ScoreKind, Benchmark: dimension.NormReference.Benchmark, TableVersion: dimension.NormReference.TableVersion, FormVariant: dimension.NormReference.FormVariant, MinAgeMonths: dimension.NormReference.MinAgeMonths, MaxAgeMonths: dimension.NormReference.MaxAgeMonths, Gender: dimension.NormReference.Gender}
 		}
-		dimensions = append(dimensions, item)
+		projected = append(projected, item)
 	}
 	suggestions := make([]Suggestion, 0, len(row.Suggestions))
 	for _, suggestion := range row.Suggestions {
@@ -32,8 +65,9 @@ func FromRow(row interpretationreadmodel.ReportRow, audience policy.Audience) (*
 	}
 	result := &Report{
 		AssessmentID: row.AssessmentID, Model: modelIdentity(row), PrimaryScore: primaryScore(row), Level: resultLevel(row),
-		Conclusion: row.Conclusion, Dimensions: dimensions, Suggestions: suggestions,
+		Conclusion: row.Conclusion, Dimensions: projected, Suggestions: suggestions,
 		ModelExtra: modelExtra(row.ModelExtra), CreatedAt: row.CreatedAt,
+		PresentationSource: presentationSource,
 	}
 	visible, err := (presentation.Presenter{}).Allows(audience, presentation.SectionModelExtra)
 	if err != nil {
