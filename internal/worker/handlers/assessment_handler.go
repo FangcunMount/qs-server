@@ -8,6 +8,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
@@ -38,7 +39,7 @@ func handleEvaluationRequested(deps *Dependencies) HandlerFunc {
 		// EV-R015: do not ACK on missing payload model identity. Canonical
 		// Assessment.NeedsEvaluation decides skip vs evaluate inside Execute.
 		gate := data.ClassifyPayloadGate()
-		observeEvaluationPayloadGate(gate)
+		resilience.ObserveEvaluationPayloadGate(string(gate))
 		switch gate {
 		case eventpayload.PayloadGateInvalid:
 			return fmt.Errorf("invalid evaluation.requested: assessment_id must be positive")

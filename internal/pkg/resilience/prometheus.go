@@ -88,6 +88,15 @@ var collectionSubmitToAssessmentReadyDuration = promauto.NewHistogram(prometheus
 	Buckets: prometheus.ExponentialBuckets(1, 2, 10),
 })
 
+// Offline condition (ops / EV-R015): when
+// qs_worker_evaluation_payload_gate_total{class="legacy_incomplete"} stays flat
+// (rate≈0) for a sustained window (e.g. 14d), retire incomplete-payload
+// compatibility and treat missing model identity as invalid for new publishers.
+var workerEvaluationPayloadGateTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "qs_worker_evaluation_payload_gate_total",
+	Help: "evaluation.requested payload gate classifications before Execute (EV-R015).",
+}, []string{"class"})
+
 var resilienceControlOperationTotal = promauto.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "resilience_control_operation_total",
@@ -215,6 +224,13 @@ func ObserveAssessmentReadiness(status string) {
 		status = "unknown"
 	}
 	collectionAssessmentReadinessTotal.WithLabelValues(status).Inc()
+}
+
+func ObserveEvaluationPayloadGate(class string) {
+	if class == "" {
+		class = "invalid"
+	}
+	workerEvaluationPayloadGateTotal.WithLabelValues(class).Inc()
 }
 
 func ObserveSubmitToAssessmentReady(duration time.Duration) {
