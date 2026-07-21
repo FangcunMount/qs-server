@@ -35,13 +35,14 @@ type RarityPresentation struct {
 
 // ReportSection is one report assembly instruction.
 type ReportSection struct {
-	Code          string
-	Title         string
-	SourceRefs    []string
-	Kind          string
-	AdapterKey    string
-	TemplateID    string
-	CategoryLabel string
+	Code            string
+	Title           string
+	SourceRefs      []string
+	Kind            string
+	AdapterKey      string
+	TemplateID      string
+	TemplateVersion string
+	CategoryLabel   string
 }
 
 // ReportSpec is the Interpretation-facing report map.

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -658,19 +659,16 @@ func printPhaseResult(c config, result phaseResult) {
 }
 
 func ensureIndexes(ctx context.Context, db *mongo.Database) error {
-	_, err := db.Collection("report_query_catalog").Indexes().CreateMany(ctx, []mongo.IndexModel{
-		{Keys: bson.D{{Key: "assessment_id", Value: 1}}, Options: options.Index().SetName("uk_report_catalog_assessment").SetUnique(true)},
-		{Keys: bson.D{{Key: "org_id", Value: 1}, {Key: "sort_at", Value: -1}, {Key: "assessment_id", Value: -1}}, Options: options.Index().SetName("idx_report_catalog_org_sort")},
-		{Keys: bson.D{{Key: "testee_id", Value: 1}, {Key: "sort_at", Value: -1}, {Key: "assessment_id", Value: -1}}, Options: options.Index().SetName("idx_report_catalog_testee_sort")},
-		{Keys: bson.D{{Key: "org_id", Value: 1}, {Key: "model_code", Value: 1}, {Key: "sort_at", Value: -1}}, Options: options.Index().SetName("idx_report_catalog_org_model_sort")},
-		{Keys: bson.D{{Key: "org_id", Value: 1}, {Key: "risk_level", Value: 1}, {Key: "sort_at", Value: -1}}, Options: options.Index().SetName("idx_report_catalog_org_risk_sort")},
-		{Keys: bson.D{{Key: "testee_id", Value: 1}, {Key: "model_code", Value: 1}, {Key: "sort_at", Value: -1}}, Options: options.Index().SetName("idx_report_catalog_testee_model_sort")},
-		{Keys: bson.D{{Key: "testee_id", Value: 1}, {Key: "risk_level", Value: 1}, {Key: "sort_at", Value: -1}}, Options: options.Index().SetName("idx_report_catalog_testee_risk_sort")},
-	})
+	_, err := db.Collection("report_query_catalog").Indexes().CreateMany(ctx, interpretation.ReportCatalogIndexModels())
 	return err
 }
 
 func verify(ctx context.Context, db *mongo.Database, mysqlDB *sql.DB, batchSize int64) error {
+	reconcileStore := interpretation.NewCatalogReconcileStore(db)
+	drift, err := reconcileStore.CountDrifts(ctx, interpretation.CatalogReconcileFilter{})
+	if err != nil {
+		return err
+	}
 	cat := db.Collection("report_query_catalog")
 	total, err := cat.CountDocuments(ctx, bson.M{})
 	if err != nil {
@@ -692,35 +690,14 @@ func verify(ctx context.Context, db *mongo.Database, mysqlDB *sql.DB, batchSize 
 	if err != nil {
 		return err
 	}
-	wrongPriority, err := aggregateCount(ctx, db.Collection("interpret_report_artifacts"), mongo.Pipeline{
-		{{Key: "$match", Value: bson.M{"deleted_at": nil}}},
-		{{Key: "$sort", Value: bson.D{{Key: "assessment_id", Value: 1}, {Key: "generated_at", Value: -1}, {Key: "domain_id", Value: -1}}}},
-		{{Key: "$group", Value: bson.M{"_id": "$assessment_id", "source_id": bson.M{"$first": "$domain_id"}}}},
-		{{Key: "$lookup", Value: bson.M{"from": "report_query_catalog", "localField": "_id", "foreignField": "assessment_id", "as": "catalog"}}},
-		{{Key: "$unwind", Value: bson.M{"path": "$catalog", "preserveNullAndEmptyArrays": true}}},
-		{{Key: "$match", Value: bson.M{"$expr": bson.M{"$or": bson.A{bson.M{"$ne": bson.A{"$catalog.source_kind", "artifact"}}, bson.M{"$ne": bson.A{"$catalog.source_id", "$source_id"}}}}}}},
-	})
-	if err != nil {
-		return err
-	}
-	danglingArtifact, err := aggregateCount(ctx, cat, danglingSourcePipeline("artifact", "interpret_report_artifacts"))
-	if err != nil {
-		return err
-	}
-	danglingArchive, err := aggregateCount(ctx, cat, danglingSourcePipeline("archive", "archived_reports"))
-	if err != nil {
-		return err
-	}
-	missingArchive, err := aggregateCount(ctx, db.Collection("archived_reports"), mongo.Pipeline{{{Key: "$match", Value: bson.M{"deleted_at": nil}}}, {{Key: "$lookup", Value: bson.M{"from": "report_query_catalog", "localField": "domain_id", "foreignField": "assessment_id", "as": "catalog"}}}, {{Key: "$match", Value: bson.M{"catalog": bson.M{"$size": 0}}}}})
-	if err != nil {
-		return err
-	}
 	countMismatch := int64(0)
 	if total != expectedTotal {
 		countMismatch = 1
 	}
-	fmt.Printf("verify catalog=%d expected_catalog=%d count_mismatch=%d missing_assessment=%d missing_org=%d missing_testee=%d missing_archive=%d wrong_priority=%d dangling_source=%d\n", total, expectedTotal, countMismatch, missingAssessment, missingOrg, missingTestee, missingArchive, wrongPriority, danglingArtifact+danglingArchive)
-	if countMismatch+missingAssessment+missingOrg+missingTestee+missingArchive+wrongPriority+danglingArtifact+danglingArchive > 0 {
+	fmt.Printf("verify catalog=%d expected_catalog=%d count_mismatch=%d missing_assessment=%d missing_org=%d missing_testee=%d missing=%d dangling=%d association_mismatch=%d wrong_winner=%d\n",
+		total, expectedTotal, countMismatch, missingAssessment, missingOrg, missingTestee,
+		drift.Missing, drift.Dangling, drift.AssociationMismatch, drift.WrongWinner)
+	if countMismatch+missingAssessment+missingOrg+missingTestee+drift.Total() > 0 {
 		return fmt.Errorf("catalog reconciliation failed")
 	}
 	return nil

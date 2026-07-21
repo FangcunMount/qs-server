@@ -29,17 +29,25 @@ func ValidateRuntimeSpecForPublish(spec *RuntimeSpec, questionnaire Questionnair
 
 // RuntimeSpecValidationContext 携带载荷-等级 元数据 needed 按 publish 校验。
 type RuntimeSpecValidationContext struct {
-	Algorithm binding.Algorithm
-	Outcomes  []Outcome
+	Algorithm          binding.Algorithm
+	Outcomes           []Outcome
+	PublishedTemplates PublishedTemplateLookup
+}
+
+// PublishedTemplateLookup validates frozen TemplateID+TemplateVersion references.
+// ModelCatalog publish UI/API wiring is a follow-up item (IR-R013).
+type PublishedTemplateLookup interface {
+	IsPublished(templateID string, version string) bool
 }
 
 // ValidateRuntimeSpecForPublishWithContext performs strong 校验 gate 用于之前 发布。
 func ValidateRuntimeSpecForPublishWithContext(spec *RuntimeSpec, questionnaire QuestionnaireSnapshot, validationContext RuntimeSpecValidationContext) []binding.DomainValidationIssue {
 	validator := runtimeSpecValidator{
-		questions:     map[string]map[string]struct{}{},
-		questionTypes: map[string]string{},
-		algorithm:     validationContext.Algorithm,
-		outcomes:      map[string]Outcome{},
+		questions:          map[string]map[string]struct{}{},
+		questionTypes:      map[string]string{},
+		algorithm:          validationContext.Algorithm,
+		outcomes:           map[string]Outcome{},
+		publishedTemplates: validationContext.PublishedTemplates,
 	}
 	for _, question := range questionnaire.Questions {
 		options := make(map[string]struct{}, len(question.OptionCodes))
@@ -57,11 +65,12 @@ func ValidateRuntimeSpecForPublishWithContext(spec *RuntimeSpec, questionnaire Q
 }
 
 type runtimeSpecValidator struct {
-	questions     map[string]map[string]struct{}
-	questionTypes map[string]string
-	algorithm     binding.Algorithm
-	outcomes      map[string]Outcome
-	issues        []binding.DomainValidationIssue
+	questions          map[string]map[string]struct{}
+	questionTypes      map[string]string
+	algorithm          binding.Algorithm
+	outcomes           map[string]Outcome
+	publishedTemplates PublishedTemplateLookup
+	issues             []binding.DomainValidationIssue
 }
 
 func (v *runtimeSpecValidator) loadOutcomes(outcomes []Outcome) {
@@ -373,6 +382,13 @@ func (v *runtimeSpecValidator) validateReport(report ReportSpec, mapping Outcome
 	}
 	if report.TemplateID != "" && !IsRegisteredReportTemplateID(report.TemplateID) {
 		v.add("report.template_id", "report.template_id.unknown", fmt.Sprintf("report template_id %s 未注册", report.TemplateID))
+	}
+	if report.TemplateVersion != "" {
+		if report.TemplateID == "" {
+			v.add("report.template_id", "report.template_id.required", "template_version 需要同时声明 template_id")
+		} else if v.publishedTemplates != nil && !v.publishedTemplates.IsPublished(report.TemplateID, report.TemplateVersion) {
+			v.add("report.template_version", "report.template_version.unpublished", fmt.Sprintf("report template %s@%s 未发布", report.TemplateID, report.TemplateVersion))
+		}
 	}
 	if report.Kind != "" && !isSupportedReportKind(report.Kind) {
 		v.add("report.kind", "report.kind.unsupported", fmt.Sprintf("report kind %s 不支持", report.Kind))

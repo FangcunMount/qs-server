@@ -374,14 +374,14 @@ func reportSpecFromDefinition(reportMap definition.ReportMap) ReportSpec {
 		return ReportSpec{}
 	}
 	section := reportMap.Sections[0]
-	return ReportSpec{Kind: ReportKind(section.Kind), AdapterKey: ReportAdapterKey(section.AdapterKey), TemplateID: section.TemplateID, CategoryLabel: section.CategoryLabel}
+	return ReportSpec{Kind: ReportKind(section.Kind), AdapterKey: ReportAdapterKey(section.AdapterKey), TemplateID: section.TemplateID, TemplateVersion: section.TemplateVersion, CategoryLabel: section.CategoryLabel}
 }
 
 func reportMapFromRuntime(runtime *RuntimeSpec) definition.ReportMap {
 	if runtime == nil || runtime.Report.Kind == "" {
 		return definition.ReportMap{}
 	}
-	return definition.ReportMap{Sections: []definition.ReportSection{{Code: string(runtime.Report.Kind), Title: firstNonEmpty(runtime.Report.CategoryLabel, string(runtime.Report.Kind)), Kind: string(runtime.Report.Kind), AdapterKey: string(runtime.Report.ResolvedAdapterKey(runtime.OutcomeMapping, runtime.Decision.Kind)), TemplateID: runtime.Report.TemplateID, CategoryLabel: runtime.Report.CategoryLabel}}}
+	return definition.ReportMap{Sections: []definition.ReportSection{{Code: string(runtime.Report.Kind), Title: firstNonEmpty(runtime.Report.CategoryLabel, string(runtime.Report.Kind)), Kind: string(runtime.Report.Kind), AdapterKey: string(runtime.Report.ResolvedAdapterKey(runtime.OutcomeMapping, runtime.Decision.Kind)), TemplateID: runtime.Report.TemplateID, TemplateVersion: runtime.Report.TemplateVersion, CategoryLabel: runtime.Report.CategoryLabel}}}
 }
 
 func findTypeConclusion(items []conclusion.Conclusion) (conclusion.TypeConclusion, bool) {

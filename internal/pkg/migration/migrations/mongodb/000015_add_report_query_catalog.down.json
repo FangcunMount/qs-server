@@ -1,0 +1,4 @@
+[
+  { "dropIndexes": "report_query_catalog", "index": "*" },
+  { "drop": "report_query_catalog" }
+]

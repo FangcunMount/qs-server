@@ -198,13 +198,14 @@ type ReportMapPO struct {
 }
 
 type ReportSectionPO struct {
-	Code          string   `bson:"code"`
-	Title         string   `bson:"title,omitempty"`
-	SourceRefs    []string `bson:"source_refs,omitempty"`
-	Kind          string   `bson:"kind,omitempty"`
-	AdapterKey    string   `bson:"adapter_key,omitempty"`
-	TemplateID    string   `bson:"template_id,omitempty"`
-	CategoryLabel string   `bson:"category_label,omitempty"`
+	Code            string   `bson:"code"`
+	Title           string   `bson:"title,omitempty"`
+	SourceRefs      []string `bson:"source_refs,omitempty"`
+	Kind            string   `bson:"kind,omitempty"`
+	AdapterKey      string   `bson:"adapter_key,omitempty"`
+	TemplateID      string   `bson:"template_id,omitempty"`
+	TemplateVersion string   `bson:"template_version,omitempty"`
+	CategoryLabel   string   `bson:"category_label,omitempty"`
 }
 
 func definitionToPO(def *domain.Definition) *DefinitionPO {
@@ -586,13 +587,9 @@ func reportMapToPO(reportMap domain.ReportMap) ReportMapPO {
 	sections := make([]ReportSectionPO, 0, len(reportMap.Sections))
 	for _, section := range reportMap.Sections {
 		sections = append(sections, ReportSectionPO{
-			Code:          section.Code,
-			Title:         section.Title,
-			SourceRefs:    append([]string(nil), section.SourceRefs...),
-			Kind:          section.Kind,
-			AdapterKey:    section.AdapterKey,
-			TemplateID:    section.TemplateID,
-			CategoryLabel: section.CategoryLabel,
+			Code: section.Code, Title: section.Title, SourceRefs: append([]string(nil), section.SourceRefs...),
+			Kind: section.Kind, AdapterKey: section.AdapterKey, TemplateID: section.TemplateID,
+			TemplateVersion: section.TemplateVersion, CategoryLabel: section.CategoryLabel,
 		})
 	}
 	return ReportMapPO{Sections: sections}
@@ -602,13 +599,9 @@ func reportMapFromPO(po ReportMapPO) domain.ReportMap {
 	sections := make([]domain.ReportSection, 0, len(po.Sections))
 	for _, section := range po.Sections {
 		sections = append(sections, domain.ReportSection{
-			Code:          section.Code,
-			Title:         section.Title,
-			SourceRefs:    append([]string(nil), section.SourceRefs...),
-			Kind:          section.Kind,
-			AdapterKey:    section.AdapterKey,
-			TemplateID:    section.TemplateID,
-			CategoryLabel: section.CategoryLabel,
+			Code: section.Code, Title: section.Title, SourceRefs: append([]string(nil), section.SourceRefs...),
+			Kind: section.Kind, AdapterKey: section.AdapterKey, TemplateID: section.TemplateID,
+			TemplateVersion: section.TemplateVersion, CategoryLabel: section.CategoryLabel,
 		})
 	}
 	return domain.ReportMap{Sections: sections}

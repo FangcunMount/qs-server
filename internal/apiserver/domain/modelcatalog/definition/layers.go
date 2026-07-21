@@ -219,13 +219,9 @@ func reportSpecFrom(reportMap ReportMap) interpretationassets.ReportSpec {
 	sections := make([]interpretationassets.ReportSection, 0, len(reportMap.Sections))
 	for _, section := range reportMap.Sections {
 		sections = append(sections, interpretationassets.ReportSection{
-			Code:          section.Code,
-			Title:         section.Title,
-			SourceRefs:    append([]string(nil), section.SourceRefs...),
-			Kind:          section.Kind,
-			AdapterKey:    section.AdapterKey,
-			TemplateID:    section.TemplateID,
-			CategoryLabel: section.CategoryLabel,
+			Code: section.Code, Title: section.Title, SourceRefs: append([]string(nil), section.SourceRefs...),
+			Kind: section.Kind, AdapterKey: section.AdapterKey, TemplateID: section.TemplateID,
+			TemplateVersion: section.TemplateVersion, CategoryLabel: section.CategoryLabel,
 		})
 	}
 	return interpretationassets.ReportSpec{Sections: sections}

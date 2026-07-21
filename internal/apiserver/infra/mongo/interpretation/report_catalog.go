@@ -3,6 +3,7 @@ package interpretation
 import (
 	"context"
 	"fmt"
+	"time"
 
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
@@ -24,6 +25,13 @@ func NewReportCatalogProjector(db *mongo.Database, opts ...base.BaseRepositoryOp
 	return p, nil
 }
 
+// ReportCatalogIndexModels returns the canonical report_query_catalog indexes.
+// Mongo migration 000015 is the deployment source of truth; runtime CreateMany
+// reuses this list as a defensive reconcile only.
+func ReportCatalogIndexModels() []mongo.IndexModel {
+	return reportCatalogIndexModels()
+}
+
 func reportCatalogIndexModels() []mongo.IndexModel {
 	return []mongo.IndexModel{
 		{Keys: bson.D{{Key: "assessment_id", Value: 1}}, Options: options.Index().SetName("uk_report_catalog_assessment").SetUnique(true)},
@@ -34,6 +42,58 @@ func reportCatalogIndexModels() []mongo.IndexModel {
 		{Keys: bson.D{{Key: "testee_id", Value: 1}, {Key: "model_code", Value: 1}, {Key: "sort_at", Value: -1}}, Options: options.Index().SetName("idx_report_catalog_testee_model_sort")},
 		{Keys: bson.D{{Key: "testee_id", Value: 1}, {Key: "risk_level", Value: 1}, {Key: "sort_at", Value: -1}}, Options: options.Index().SetName("idx_report_catalog_testee_risk_sort")},
 	}
+}
+
+// RequiredReportCatalogIndexNames lists canonical indexes that must exist after
+// Mongo migration 000015. Runtime CreateMany remains a defensive reconcile only.
+func RequiredReportCatalogIndexNames() []string {
+	models := reportCatalogIndexModels()
+	names := make([]string, 0, len(models))
+	for _, model := range models {
+		if model.Options != nil && model.Options.Name != nil {
+			names = append(names, *model.Options.Name)
+		}
+	}
+	return names
+}
+
+// VerifyReportCatalogIndexes fails closed when required catalog indexes are missing.
+func VerifyReportCatalogIndexes(ctx context.Context, db *mongo.Database) error {
+	if db == nil {
+		return fmt.Errorf("mongo database is required")
+	}
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	present, err := listReportCatalogIndexNames(ctx, db.Collection((ReportCatalogPO{}).CollectionName()))
+	if err != nil {
+		return fmt.Errorf("list report_query_catalog indexes: %w", err)
+	}
+	for _, name := range RequiredReportCatalogIndexNames() {
+		if !present[name] {
+			return fmt.Errorf("required report catalog index report_query_catalog.%s is missing; run Mongo migration 000015", name)
+		}
+	}
+	return nil
+}
+
+func listReportCatalogIndexNames(ctx context.Context, collection *mongo.Collection) (map[string]bool, error) {
+	cursor, err := collection.Indexes().List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+	out := make(map[string]bool)
+	for cursor.Next(ctx) {
+		var item struct {
+			Name string `bson:"name"`
+		}
+		if err := cursor.Decode(&item); err != nil {
+			return nil, err
+		}
+		out[item.Name] = true
+	}
+	return out, cursor.Err()
 }
 
 func (p *ReportCatalogProjector) ProjectCurrent(ctx context.Context, report *domainreport.InterpretReport) error {

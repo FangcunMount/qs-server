@@ -24,6 +24,27 @@ mongodb/
 | `report_generations` | 报告生成意图（v2） | outcome_id, report_type, template_version |
 | `interpretation_runs` | 报告生成尝试（v2） | generation_id, attempt |
 | `interpret_report_artifacts` | 成功报告成品（v2） | generation_id, assessment_id, testee_id |
+| `interpretation_admission_failures` | 生命周期前准入失败证据（v2） | fingerprint unique, outcome_id+occurred_at（见 000014） |
+| `report_query_catalog` | Assessment 级当前报告查询索引（v2） | assessment_id unique, org/testee sort indexes（见 000015） |
+| `interpretation_attention_projections` | 报告生成后 attention 投影状态（v2） | event_id unique, status+updated_at（见 000016） |
+| `interpretation_report_templates` | Interpretation 报告模板发布资产（v2） | template_id+template_version unique（见 000017） |
+
+## Report templates（000017）
+
+`000017_add_report_templates` 创建 `interpretation_report_templates` 集合与 release unique 索引。Repository 启动时会幂等 seed 并 publish `legacy-v1` 兼容模板（standard/mbti/sbti/bigfive）。
+
+ModelCatalog 发布 UI/API 绑定 `PublishedTemplateLookup` 为后续项（IR-R013）。
+
+## Report query catalog（000015）
+
+`000015_add_report_query_catalog` 是 `report_query_catalog` 集合与索引的标准部署入口：
+
+1. 创建 `report_query_catalog` 集合
+2. 建立与 `reportCatalogIndexModels()` 对齐的 7 个索引（含 `uk_report_catalog_assessment` unique）
+
+Runtime `ReportCatalogProjector` 的 `CreateMany` 仅作防御性 reconcile，不替代 migration 契约。
+
+启动时 `bootstrap` 会在 Mongo migration 后执行 `VerifyReportCatalogIndexes`（缺失 required index → 拒绝启动）。
 
 ## Unified schema（000013）
 

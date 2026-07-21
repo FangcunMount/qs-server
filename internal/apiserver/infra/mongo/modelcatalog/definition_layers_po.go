@@ -72,13 +72,14 @@ type InterpretationReportPO struct {
 }
 
 type InterpretationReportSectionPO struct {
-	Code          string   `bson:"code,omitempty"`
-	Title         string   `bson:"title,omitempty"`
-	SourceRefs    []string `bson:"source_refs,omitempty"`
-	Kind          string   `bson:"kind,omitempty"`
-	AdapterKey    string   `bson:"adapter_key,omitempty"`
-	TemplateID    string   `bson:"template_id,omitempty"`
-	CategoryLabel string   `bson:"category_label,omitempty"`
+	Code            string   `bson:"code,omitempty"`
+	Title           string   `bson:"title,omitempty"`
+	SourceRefs      []string `bson:"source_refs,omitempty"`
+	Kind            string   `bson:"kind,omitempty"`
+	AdapterKey      string   `bson:"adapter_key,omitempty"`
+	TemplateID      string   `bson:"template_id,omitempty"`
+	TemplateVersion string   `bson:"template_version,omitempty"`
+	CategoryLabel   string   `bson:"category_label,omitempty"`
 }
 
 func decisionSpecToPO(spec decision.Spec) DecisionSpecPO {
@@ -173,7 +174,8 @@ func interpretationAssetsToPO(assets interpretationassets.Assets) Interpretation
 		for _, section := range assets.ReportSpec.Sections {
 			sections = append(sections, InterpretationReportSectionPO{
 				Code: section.Code, Title: section.Title, SourceRefs: append([]string(nil), section.SourceRefs...),
-				Kind: section.Kind, AdapterKey: section.AdapterKey, TemplateID: section.TemplateID, CategoryLabel: section.CategoryLabel,
+				Kind: section.Kind, AdapterKey: section.AdapterKey, TemplateID: section.TemplateID,
+				TemplateVersion: section.TemplateVersion, CategoryLabel: section.CategoryLabel,
 			})
 		}
 		out.ReportSpec = InterpretationReportPO{Sections: sections}
@@ -207,7 +209,8 @@ func interpretationAssetsFromPO(po InterpretationAssetsPO) interpretationassets.
 		for _, section := range po.ReportSpec.Sections {
 			sections = append(sections, interpretationassets.ReportSection{
 				Code: section.Code, Title: section.Title, SourceRefs: append([]string(nil), section.SourceRefs...),
-				Kind: section.Kind, AdapterKey: section.AdapterKey, TemplateID: section.TemplateID, CategoryLabel: section.CategoryLabel,
+				Kind: section.Kind, AdapterKey: section.AdapterKey, TemplateID: section.TemplateID,
+				TemplateVersion: section.TemplateVersion, CategoryLabel: section.CategoryLabel,
 			})
 		}
 		assets.ReportSpec = interpretationassets.ReportSpec{Sections: sections}

@@ -1,0 +1,37 @@
+[
+  { "create": "report_query_catalog" },
+  {
+    "createIndexes": "report_query_catalog",
+    "indexes": [
+      {
+        "key": { "assessment_id": 1 },
+        "name": "uk_report_catalog_assessment",
+        "unique": true
+      },
+      {
+        "key": { "org_id": 1, "sort_at": -1, "assessment_id": -1 },
+        "name": "idx_report_catalog_org_sort"
+      },
+      {
+        "key": { "testee_id": 1, "sort_at": -1, "assessment_id": -1 },
+        "name": "idx_report_catalog_testee_sort"
+      },
+      {
+        "key": { "org_id": 1, "model_code": 1, "sort_at": -1 },
+        "name": "idx_report_catalog_org_model_sort"
+      },
+      {
+        "key": { "org_id": 1, "risk_level": 1, "sort_at": -1 },
+        "name": "idx_report_catalog_org_risk_sort"
+      },
+      {
+        "key": { "testee_id": 1, "model_code": 1, "sort_at": -1 },
+        "name": "idx_report_catalog_testee_model_sort"
+      },
+      {
+        "key": { "testee_id": 1, "risk_level": 1, "sort_at": -1 },
+        "name": "idx_report_catalog_testee_risk_sort"
+      }
+    ]
+  }
+]

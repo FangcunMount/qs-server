@@ -24,11 +24,12 @@ var ErrRuntimeSpecInvalid = errors.New("runtime_spec_invalid")
 // TypologyReportRouting is the pure report-template routing result shared by
 // production Outcome adapters and Preview adapters.
 type TypologyReportRouting struct {
-	Source       ReportRoutingSource
-	TemplateID   string
-	AdapterKey   ReportAdapterKey
-	DecisionKind binding.DecisionKind
-	Spec         *RuntimeSpec
+	Source          ReportRoutingSource
+	TemplateID      string
+	TemplateVersion string
+	AdapterKey      ReportAdapterKey
+	DecisionKind    binding.DecisionKind
+	Spec            *RuntimeSpec
 }
 
 // ResolveTypologyReportRouting resolves report TemplateID/AdapterKey from a
@@ -62,11 +63,12 @@ func routingFromSpec(source ReportRoutingSource, spec *RuntimeSpec) TypologyRepo
 		return TypologyReportRouting{Source: source}
 	}
 	return TypologyReportRouting{
-		Source:       source,
-		TemplateID:   spec.Report.TemplateID,
-		AdapterKey:   spec.Report.ResolvedAdapterKey(spec.OutcomeMapping, spec.Decision.Kind),
-		DecisionKind: spec.Decision.Kind,
-		Spec:         spec,
+		Source:          source,
+		TemplateID:      spec.Report.TemplateID,
+		TemplateVersion: spec.Report.TemplateVersion,
+		AdapterKey:      spec.Report.ResolvedAdapterKey(spec.OutcomeMapping, spec.Decision.Kind),
+		DecisionKind:    spec.Decision.Kind,
+		Spec:            spec,
 	}
 }
 

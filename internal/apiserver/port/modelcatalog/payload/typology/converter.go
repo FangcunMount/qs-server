@@ -113,6 +113,9 @@ func mergeRuntimeSpec(explicit, legacy *RuntimeSpec) {
 		if explicit.Report.AdapterKey == "" {
 			explicit.Report.AdapterKey = legacy.Report.AdapterKey
 		}
+		if explicit.Report.TemplateVersion == "" {
+			explicit.Report.TemplateVersion = legacy.Report.TemplateVersion
+		}
 	}
 }
 

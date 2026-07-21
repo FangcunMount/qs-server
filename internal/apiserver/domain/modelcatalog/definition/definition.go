@@ -75,13 +75,14 @@ type ReportMap struct {
 const ReportSectionKindFactorScores = "factor_scores"
 
 type ReportSection struct {
-	Code          string
-	Title         string
-	SourceRefs    []string
-	Kind          string
-	AdapterKey    string
-	TemplateID    string
-	CategoryLabel string
+	Code            string
+	Title           string
+	SourceRefs      []string
+	Kind            string
+	AdapterKey      string
+	TemplateID      string
+	TemplateVersion string
+	CategoryLabel   string
 }
 
 // FactorScoreSources returns the explicitly configured report-visible factor

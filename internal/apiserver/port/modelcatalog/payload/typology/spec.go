@@ -246,10 +246,11 @@ const (
 
 // ReportSpec 描述如何 build interpret reports 用于 类型学 model。
 type ReportSpec struct {
-	Kind          ReportKind       `json:"kind"`
-	AdapterKey    ReportAdapterKey `json:"adapter_key,omitempty"`
-	TemplateID    string           `json:"template_id,omitempty"`
-	CategoryLabel string           `json:"category_label,omitempty"`
+	Kind            ReportKind       `json:"kind"`
+	AdapterKey      ReportAdapterKey `json:"adapter_key,omitempty"`
+	TemplateID      string           `json:"template_id,omitempty"`
+	TemplateVersion string           `json:"template_version,omitempty"`
+	CategoryLabel   string           `json:"category_label,omitempty"`
 }
 
 // ReportAdapterKey 选择报告构建器 实现。

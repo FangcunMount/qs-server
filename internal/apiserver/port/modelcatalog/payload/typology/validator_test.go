@@ -254,6 +254,28 @@ func TestValidateRuntimeSpecForPublishValidatesAdapterCompatibility(t *testing.T
 	}
 }
 
+func TestValidateRuntimeSpecForPublishRejectsUnpublishedTemplateVersion(t *testing.T) {
+	spec := validRuntimeSpec()
+	spec.Report.TemplateID = "mbti"
+	spec.Report.TemplateVersion = "custom-v2"
+
+	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
+		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
+		Outcomes:  []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
+		PublishedTemplates: publishedTemplateLookup{"mbti|legacy-v1": struct{}{}},
+	})
+	if !hasIssueCode(issues, "report.template_version.unpublished") {
+		t.Fatalf("issues = %#v, want report.template_version.unpublished", issues)
+	}
+}
+
+type publishedTemplateLookup map[string]struct{}
+
+func (l publishedTemplateLookup) IsPublished(templateID, version string) bool {
+	_, ok := l[templateID+"|"+version]
+	return ok
+}
+
 func TestValidateRuntimeSpecForPublishRejectsUnknownTemplateID(t *testing.T) {
 	spec := validRuntimeSpec()
 	spec.Report.TemplateID = "not-a-registered-template"
