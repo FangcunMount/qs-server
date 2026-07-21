@@ -183,7 +183,7 @@ func (s *MongoStore) ListRetryable(ctx context.Context, maxAttempts int, limit i
 	if err != nil {
 		return nil, fmt.Errorf("list retryable attention projections: %w", err)
 	}
-	defer cur.Close(ctx)
+	defer func() { _ = cur.Close(ctx) }()
 
 	items := make([]Record, 0)
 	for cur.Next(ctx) {

@@ -260,8 +260,8 @@ func TestValidateRuntimeSpecForPublishRejectsUnpublishedTemplateVersion(t *testi
 	spec.Report.TemplateVersion = "custom-v2"
 
 	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
-		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
-		Outcomes:  []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
+		Algorithm:          modelcatalog.AlgorithmPersonalityTypology,
+		Outcomes:           []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
 		PublishedTemplates: publishedTemplateLookup{"mbti|legacy-v1": struct{}{}},
 	})
 	if !hasIssueCode(issues, "report.template_version.unpublished") {

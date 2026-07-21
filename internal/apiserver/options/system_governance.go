@@ -11,11 +11,11 @@ type SystemGovernanceOptions struct {
 }
 
 type RetryGovernanceOptions struct {
-	ManualActionsEnabled  bool                                `json:"manual_actions_enabled" mapstructure:"manual_actions_enabled"`
-	LeaseReconcileEnabled bool                                `json:"lease_reconcile_enabled" mapstructure:"lease_reconcile_enabled"`
+	ManualActionsEnabled  bool                                  `json:"manual_actions_enabled" mapstructure:"manual_actions_enabled"`
+	LeaseReconcileEnabled bool                                  `json:"lease_reconcile_enabled" mapstructure:"lease_reconcile_enabled"`
 	Lease                 *InterpretationLeaseGovernanceOptions `json:"lease" mapstructure:"lease"`
-	Business              *RetryPolicyOptions                 `json:"business" mapstructure:"business"`
-	Outbox                *RetryPolicyOptions                 `json:"outbox" mapstructure:"outbox"`
+	Business              *RetryPolicyOptions                   `json:"business" mapstructure:"business"`
+	Outbox                *RetryPolicyOptions                   `json:"outbox" mapstructure:"outbox"`
 }
 
 // InterpretationLeaseGovernanceOptions keeps Interpretation Run lease duration and
@@ -29,9 +29,9 @@ type RetryGovernanceOptions struct {
 // evaluation_consistency_reconcile scheduler may wait up to one scan period
 // (plus jitter) before reclaiming the same attempt number.
 type InterpretationLeaseGovernanceOptions struct {
-	RunDuration               time.Duration `json:"run_duration" mapstructure:"run_duration"`
-	ReconcileInterval         time.Duration `json:"reconcile_interval" mapstructure:"reconcile_interval"`
-	ReconcileJitterFraction   float64       `json:"reconcile_jitter_fraction" mapstructure:"reconcile_jitter_fraction"`
+	RunDuration             time.Duration `json:"run_duration" mapstructure:"run_duration"`
+	ReconcileInterval       time.Duration `json:"reconcile_interval" mapstructure:"reconcile_interval"`
+	ReconcileJitterFraction float64       `json:"reconcile_jitter_fraction" mapstructure:"reconcile_jitter_fraction"`
 }
 
 func NewInterpretationLeaseGovernanceOptions() *InterpretationLeaseGovernanceOptions {

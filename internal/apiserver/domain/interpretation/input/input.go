@@ -16,16 +16,16 @@ import (
 // attempt. Association is correlation data only; it grants no Assessment write
 // authority.
 type InterpretationInput struct {
-	OutcomeID             meta.ID
-	Association           report.Association
-	Model                 report.ModelIdentity
-	Runtime               RuntimeIdentity
-	Result                ResultFacts
-	Report                ReportSpec
-	PresentationProfile   *report.PresentationProfile
-	FactorScoring         *FactorScoringFacts
-	PersonalityType       *PersonalityTypeFacts
-	TraitProfile          *TraitProfileFacts
+	OutcomeID           meta.ID
+	Association         report.Association
+	Model               report.ModelIdentity
+	Runtime             RuntimeIdentity
+	Result              ResultFacts
+	Report              ReportSpec
+	PresentationProfile *report.PresentationProfile
+	FactorScoring       *FactorScoringFacts
+	PersonalityType     *PersonalityTypeFacts
+	TraitProfile        *TraitProfileFacts
 }
 
 type RuntimeIdentity struct {

@@ -40,7 +40,7 @@ func (b versionedBuilder) ReportType() policy.ReportType { return b.inner.Report
 func (b versionedBuilder) TemplateVersion() policy.TemplateVersion {
 	return b.version
 }
-func (b versionedBuilder) BuilderIdentity() string    { return b.inner.BuilderIdentity() }
+func (b versionedBuilder) BuilderIdentity() string      { return b.inner.BuilderIdentity() }
 func (b versionedBuilder) ContentSchemaVersion() string { return b.inner.ContentSchemaVersion() }
 func (b versionedBuilder) Build(ctx context.Context, input interpinput.InterpretationInput) (*report.Draft, error) {
 	return b.inner.Build(ctx, input)

@@ -149,6 +149,12 @@ func OrgScopeFromContext(ctx context.Context) (securityplane.OrgScope, bool) {
 	return securityprojection.OrgScopeFromIdentity(tenantDomain, orgID, hasOrg, ""), true
 }
 
+// ContextWithMTLSIdentityMap attaches an mTLS identity map using the typed context key.
+// Prefer this over string keys so callers do not collide with other context values.
+func ContextWithMTLSIdentityMap(ctx context.Context, identity map[string]interface{}) context.Context {
+	return context.WithValue(ctx, mtlsIdentityKey, identity)
+}
+
 // ServiceIdentityFromMTLSContext returns the mTLS service identity projection when present.
 func ServiceIdentityFromMTLSContext(ctx context.Context) (securityplane.ServiceIdentity, bool) {
 	if ctx == nil {

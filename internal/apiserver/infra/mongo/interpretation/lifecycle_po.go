@@ -62,14 +62,14 @@ func (InterpretationRunPO) CollectionName() string { return "interpretation_runs
 type InterpretReportPO struct {
 	base.BaseDocument `bson:",inline"`
 
-	GenerationID        uint64    `bson:"generation_id"`
-	OutcomeID           uint64    `bson:"outcome_id"`
-	InterpretationRunID uint64    `bson:"interpretation_run_id"`
-	ReportType          string    `bson:"report_type"`
-	TemplateVersion     string    `bson:"template_version"`
-	BuilderIdentity     string    `bson:"builder_identity,omitempty"`
-	ContentSchemaVersion string   `bson:"content_schema_version,omitempty"`
-	GeneratedAt         time.Time `bson:"generated_at"`
+	GenerationID         uint64    `bson:"generation_id"`
+	OutcomeID            uint64    `bson:"outcome_id"`
+	InterpretationRunID  uint64    `bson:"interpretation_run_id"`
+	ReportType           string    `bson:"report_type"`
+	TemplateVersion      string    `bson:"template_version"`
+	BuilderIdentity      string    `bson:"builder_identity,omitempty"`
+	ContentSchemaVersion string    `bson:"content_schema_version,omitempty"`
+	GeneratedAt          time.Time `bson:"generated_at"`
 
 	// Frozen Outcome correlation doubles as the query envelope. It is a value
 	// snapshot, not an Assessment aggregate reference.
@@ -77,17 +77,17 @@ type InterpretReportPO struct {
 	AssessmentID uint64 `bson:"assessment_id"`
 	TesteeID     uint64 `bson:"testee_id"`
 
-	ScaleName    string                 `bson:"scale_name,omitempty"`
-	ScaleCode    string                 `bson:"scale_code,omitempty"`
-	Model        *ModelIdentityPO       `bson:"model,omitempty"`
-	PrimaryScore *ScoreValuePO          `bson:"primary_score,omitempty"`
-	Level        *ResultLevelPO         `bson:"level,omitempty"`
-	TotalScore   float64                `bson:"total_score"`
-	RiskLevel    string                 `bson:"risk_level,omitempty"`
-	Conclusion   string                 `bson:"conclusion,omitempty"`
-	Dimensions   []DimensionInterpretPO `bson:"dimensions,omitempty"`
-	Suggestions  []SuggestionPO         `bson:"suggestions,omitempty"`
-	ModelExtra   *ModelExtraPO          `bson:"model_extra,omitempty"`
+	ScaleName           string                 `bson:"scale_name,omitempty"`
+	ScaleCode           string                 `bson:"scale_code,omitempty"`
+	Model               *ModelIdentityPO       `bson:"model,omitempty"`
+	PrimaryScore        *ScoreValuePO          `bson:"primary_score,omitempty"`
+	Level               *ResultLevelPO         `bson:"level,omitempty"`
+	TotalScore          float64                `bson:"total_score"`
+	RiskLevel           string                 `bson:"risk_level,omitempty"`
+	Conclusion          string                 `bson:"conclusion,omitempty"`
+	Dimensions          []DimensionInterpretPO `bson:"dimensions,omitempty"`
+	Suggestions         []SuggestionPO         `bson:"suggestions,omitempty"`
+	ModelExtra          *ModelExtraPO          `bson:"model_extra,omitempty"`
 	PresentationProfile *PresentationProfilePO `bson:"presentation_profile,omitempty"`
 }
 

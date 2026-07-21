@@ -8,8 +8,8 @@ import (
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	grpcclientintegration "github.com/FangcunMount/qs-server/internal/collection-server/integration/grpcclient"
-	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
 	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
+	eventtransport "github.com/FangcunMount/qs-server/internal/pkg/eventing/transport"
 	iamauth "github.com/FangcunMount/qs-server/internal/pkg/iamauth"
 	"google.golang.org/grpc/credentials"
 )

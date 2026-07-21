@@ -11,10 +11,10 @@ import (
 )
 
 const (
-	CatalogDriftMissing              = "missing"
-	CatalogDriftDangling             = "dangling"
-	CatalogDriftAssociationMismatch  = "association_mismatch"
-	CatalogDriftWrongWinner          = "wrong_winner"
+	CatalogDriftMissing             = "missing"
+	CatalogDriftDangling            = "dangling"
+	CatalogDriftAssociationMismatch = "association_mismatch"
+	CatalogDriftWrongWinner         = "wrong_winner"
 )
 
 // CatalogReconcileFilter scopes read-only catalog drift scans.

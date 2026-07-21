@@ -5,8 +5,8 @@ import (
 
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
-	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
+	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
@@ -59,9 +59,9 @@ func FromOutcomeRecord(record *domainoutcome.Record) (interpinput.Interpretation
 		in.Runtime.DecisionKind = policy.DefaultDecisionKind(in.Runtime.AlgorithmFamily)
 	}
 	in.Report.ReportProfile = policy.ReportProfileForDecisionKind(in.Runtime.DecisionKind)
-	if profile, ok := evaluationinput.FactorScorePresentationProfileFromSnapshot(assets); ok {
-		copy := profile
-		in.PresentationProfile = &copy
+	if codes, ok := evaluationinput.FactorScoreVisibleCodesFromSnapshot(assets); ok {
+		profile := report.NewFrozenPresentationProfile(codes)
+		in.PresentationProfile = &profile
 	}
 	if materialized, ok := evaluationinput.InterpretationAssetsFromSnapshot(assets); ok {
 		in.Report.TemplateVersion = domainreporttemplate.ResolveFromAssets(materialized)

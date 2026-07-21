@@ -24,8 +24,8 @@ import (
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
-	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
+	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 )
 
@@ -83,10 +83,10 @@ type EvaluationDeps struct {
 }
 
 type InterpretationDeps struct {
-	AutomationService          interpretationAutomation.Service
-	ParticipantService         interpretationParticipant.Service
-	ReportStatusReporter       *reportstatus.Reporter
-	DelegatedSubjectVerifier   *delegatedsubject.Verifier
+	AutomationService        interpretationAutomation.Service
+	ParticipantService       interpretationParticipant.Service
+	ReportStatusReporter     *reportstatus.Reporter
+	DelegatedSubjectVerifier *delegatedsubject.Verifier
 }
 
 type AssessmentModelCatalogDeps struct {

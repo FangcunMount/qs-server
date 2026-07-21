@@ -16,14 +16,14 @@ import (
 type Kind string
 
 const (
-	KindOutcomeNotFound      Kind = "outcome_not_found"
-	KindOutcomeUnauthorized  Kind = "outcome_unauthorized"
-	KindPayloadDecode        Kind = "payload_decode"
-	KindReportInputDecode    Kind = "report_input_decode"
-	KindMapping              Kind = "mapping"
-	KindFrozenIdentity       Kind = "frozen_identity"
-	KindRuntimeSpecInvalid   Kind = "runtime_spec_invalid"
-	KindUnknown              Kind = "unknown"
+	KindOutcomeNotFound     Kind = "outcome_not_found"
+	KindOutcomeUnauthorized Kind = "outcome_unauthorized"
+	KindPayloadDecode       Kind = "payload_decode"
+	KindReportInputDecode   Kind = "report_input_decode"
+	KindMapping             Kind = "mapping"
+	KindFrozenIdentity      Kind = "frozen_identity"
+	KindRuntimeSpecInvalid  Kind = "runtime_spec_invalid"
+	KindUnknown             Kind = "unknown"
 )
 
 func (k Kind) IsValid() bool {
@@ -38,19 +38,19 @@ func (k Kind) IsValid() bool {
 
 // Failure is durable evidence for a rejected Interpretation admission.
 type Failure struct {
-	id          meta.ID
-	outcomeID   meta.ID
-	orgID       int64
+	id           meta.ID
+	outcomeID    meta.ID
+	orgID        int64
 	assessmentID meta.ID
-	testeeID    uint64
-	eventID     string
-	traceID     string
-	kind        Kind
-	code        string
-	safeMessage string
-	retryable   bool
-	fingerprint string
-	occurredAt  time.Time
+	testeeID     uint64
+	eventID      string
+	traceID      string
+	kind         Kind
+	code         string
+	safeMessage  string
+	retryable    bool
+	fingerprint  string
+	occurredAt   time.Time
 }
 
 // Input constructs one admission failure.
@@ -101,16 +101,16 @@ func Fingerprint(eventID string, outcomeID meta.ID, kind Kind, code string) stri
 	return "hash:" + hex.EncodeToString(sum[:16])
 }
 
-func (f *Failure) ID() meta.ID            { return f.id }
-func (f *Failure) OutcomeID() meta.ID     { return f.outcomeID }
-func (f *Failure) OrgID() int64           { return f.orgID }
-func (f *Failure) AssessmentID() meta.ID  { return f.assessmentID }
-func (f *Failure) TesteeID() uint64       { return f.testeeID }
-func (f *Failure) EventID() string        { return f.eventID }
-func (f *Failure) TraceID() string        { return f.traceID }
-func (f *Failure) Kind() Kind             { return f.kind }
-func (f *Failure) Code() string           { return f.code }
-func (f *Failure) SafeMessage() string    { return f.safeMessage }
-func (f *Failure) Retryable() bool        { return f.retryable }
-func (f *Failure) Fingerprint() string    { return f.fingerprint }
-func (f *Failure) OccurredAt() time.Time  { return f.occurredAt }
+func (f *Failure) ID() meta.ID           { return f.id }
+func (f *Failure) OutcomeID() meta.ID    { return f.outcomeID }
+func (f *Failure) OrgID() int64          { return f.orgID }
+func (f *Failure) AssessmentID() meta.ID { return f.assessmentID }
+func (f *Failure) TesteeID() uint64      { return f.testeeID }
+func (f *Failure) EventID() string       { return f.eventID }
+func (f *Failure) TraceID() string       { return f.traceID }
+func (f *Failure) Kind() Kind            { return f.kind }
+func (f *Failure) Code() string          { return f.code }
+func (f *Failure) SafeMessage() string   { return f.safeMessage }
+func (f *Failure) Retryable() bool       { return f.retryable }
+func (f *Failure) Fingerprint() string   { return f.fingerprint }
+func (f *Failure) OccurredAt() time.Time { return f.occurredAt }

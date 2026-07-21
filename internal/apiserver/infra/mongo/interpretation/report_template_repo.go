@@ -10,9 +10,9 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	appreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporttemplate"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
+	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -118,7 +118,7 @@ func (r *ReportTemplateRepository) ensureLegacyBootstrap(ctx context.Context) er
 			return err
 		}
 		draft, err := svc.CreateDraft(ctx, appreporttemplate.CreateDraftCommand{
-			Actor: appreporttemplate.Actor{OperatorUserID: 1},
+			Actor:      appreporttemplate.Actor{OperatorUserID: 1},
 			TemplateID: seed.TemplateID, TemplateVersion: seed.TemplateVersion,
 			BuilderIdentity: seed.BuilderIdentity, AdapterKey: seed.AdapterKey,
 		})
@@ -126,7 +126,7 @@ func (r *ReportTemplateRepository) ensureLegacyBootstrap(ctx context.Context) er
 			return err
 		}
 		if _, err := svc.Publish(ctx, appreporttemplate.PublishCommand{
-			Actor: appreporttemplate.Actor{OperatorUserID: 1},
+			Actor:      appreporttemplate.Actor{OperatorUserID: 1},
 			TemplateID: draft.TemplateID(), TemplateVersion: draft.TemplateVersion(),
 		}); err != nil {
 			return err

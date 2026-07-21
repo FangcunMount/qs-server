@@ -105,7 +105,7 @@ func TestRestoreInterpretReportMapsLegacyProvenance(t *testing.T) {
 		InterpretationRunID: meta.FromUint64(4),
 		Association:         report.Association{OrgID: 1, AssessmentID: meta.FromUint64(5), TesteeID: 6},
 		ReportType:          policy.ReportTypeStandard, TemplateVersion: policy.TemplateVersionV1,
-		GeneratedAt:         time.Date(2026, 7, 12, 10, 0, 0, 0, time.UTC),
+		GeneratedAt: time.Date(2026, 7, 12, 10, 0, 0, 0, time.UTC),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -124,9 +124,9 @@ func TestRestoreInterpretReportAllowsEmptyContent(t *testing.T) {
 		InterpretationRunID: meta.FromUint64(4),
 		Association:         report.Association{OrgID: 1, AssessmentID: meta.FromUint64(5), TesteeID: 6},
 		ReportType:          policy.ReportTypeStandard, TemplateVersion: policy.TemplateVersionV1,
-		BuilderIdentity:       report.BuilderIdentityFactorScoring,
-		ContentSchemaVersion:  report.ContentSchemaVersionV1,
-		GeneratedAt:           time.Date(2026, 7, 12, 10, 0, 0, 0, time.UTC),
+		BuilderIdentity:      report.BuilderIdentityFactorScoring,
+		ContentSchemaVersion: report.ContentSchemaVersionV1,
+		GeneratedAt:          time.Date(2026, 7, 12, 10, 0, 0, 0, time.UTC),
 	})
 	if err != nil {
 		t.Fatalf("historical read must not enforce content contract: %v", err)

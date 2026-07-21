@@ -59,7 +59,7 @@ type AuthOptions struct {
 // ACLOptions ACL 配置选项
 type ACLOptions struct {
 	Enabled       bool   `json:"enabled" mapstructure:"enabled"`               // 是否启用 ACL
-	ConfigFile    string `json:"config_file" mapstructure:"config-file"`     // ACL 规则文件
+	ConfigFile    string `json:"config_file" mapstructure:"config-file"`       // ACL 规则文件
 	DefaultPolicy string `json:"default_policy" mapstructure:"default-policy"` // allow | deny
 }
 

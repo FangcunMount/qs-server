@@ -9,6 +9,7 @@ import (
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	interpretationParticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
 	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
+	pkggrpc "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -120,7 +121,7 @@ func TestParticipantReportServiceReturnsReportWithValidDelegation(t *testing.T) 
 func TestParticipantReportServiceRejectsUntrustedWorkloadIdentity(t *testing.T) {
 	svc := NewParticipantReportService(&fakeParticipantReportService{}, testDelegatedVerifier(t))
 	ctx := testDelegatedContext(t, 7)
-	ctx = context.WithValue(ctx, "mtls.identity", map[string]interface{}{"common_name": "qs-worker.svc"})
+	ctx = pkggrpc.ContextWithMTLSIdentityMap(ctx, map[string]interface{}{"common_name": "qs-worker.svc"})
 	_, err := svc.GetAssessmentReport(ctx, &pb.GetAssessmentReportRequest{TesteeId: 7, AssessmentId: 42})
 	if status.Code(err) != codes.PermissionDenied {
 		t.Fatalf("code = %v, want PermissionDenied", status.Code(err))

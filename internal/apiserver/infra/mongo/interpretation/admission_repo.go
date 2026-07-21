@@ -97,7 +97,7 @@ func (r *AdmissionFailureRepository) FindByOutcomeID(ctx context.Context, outcom
 	if err != nil {
 		return nil, fmt.Errorf("list admission failures: %w", err)
 	}
-	defer cur.Close(ctx)
+	defer func() { _ = cur.Close(ctx) }()
 	items := make([]*admission.Failure, 0)
 	for cur.Next(ctx) {
 		var po AdmissionFailurePO

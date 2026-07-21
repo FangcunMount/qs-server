@@ -32,18 +32,18 @@ func (s Status) IsValid() bool {
 
 // ReportTemplate is one published-or-draft release of report-producing assets.
 type ReportTemplate struct {
-	id               meta.ID
-	templateID       string
-	templateVersion  policy.TemplateVersion
-	builderIdentity  string
-	adapterKey       string
-	status           Status
-	createdAt        time.Time
-	updatedAt        time.Time
-	publishedAt      *time.Time
-	publishedBy      string
-	disabledAt       *time.Time
-	disabledBy       string
+	id              meta.ID
+	templateID      string
+	templateVersion policy.TemplateVersion
+	builderIdentity string
+	adapterKey      string
+	status          Status
+	createdAt       time.Time
+	updatedAt       time.Time
+	publishedAt     *time.Time
+	publishedBy     string
+	disabledAt      *time.Time
+	disabledBy      string
 }
 
 // CreateInput constructs a draft template release.
@@ -78,8 +78,8 @@ func NewDraft(input CreateInput) (*ReportTemplate, error) {
 	return &ReportTemplate{
 		id: input.ID, templateID: templateID, templateVersion: version,
 		builderIdentity: strings.TrimSpace(input.BuilderIdentity),
-		adapterKey: strings.TrimSpace(input.AdapterKey),
-		status: StatusDraft, createdAt: input.CreatedAt, updatedAt: input.CreatedAt,
+		adapterKey:      strings.TrimSpace(input.AdapterKey),
+		status:          StatusDraft, createdAt: input.CreatedAt, updatedAt: input.CreatedAt,
 	}, nil
 }
 

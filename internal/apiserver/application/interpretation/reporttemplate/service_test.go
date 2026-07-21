@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
+	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 

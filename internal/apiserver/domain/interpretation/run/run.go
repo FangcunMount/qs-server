@@ -68,15 +68,15 @@ type ClaimRecord struct {
 // InterpretationRun is one attempt under a ReportGeneration. It never owns
 // report content and it cannot modify Evaluation facts.
 type InterpretationRun struct {
-	id             ID
-	generationID   meta.ID
-	attempt        int
-	status         Status
-	failure        *Failure
-	traceID        string
-	startedAt      *time.Time
-	leaseExpiresAt *time.Time
-	finishedAt     *time.Time
+	id              ID
+	generationID    meta.ID
+	attempt         int
+	status          Status
+	failure         *Failure
+	traceID         string
+	startedAt       *time.Time
+	leaseExpiresAt  *time.Time
+	finishedAt      *time.Time
 	origin          retrygovernance.AttemptOrigin
 	retryDecision   *retrygovernance.Decision
 	claimHistory    []ClaimRecord
@@ -128,14 +128,14 @@ func Restore(input RestoreInput) (*InterpretationRun, error) {
 		return nil, fmt.Errorf("interpretation run finished at precedes started at")
 	}
 	r := &InterpretationRun{
-		id:             input.ID,
-		generationID:   input.GenerationID,
-		attempt:        input.Attempt,
-		status:         input.Status,
-		traceID:        input.TraceID,
-		startedAt:      copyTimePtr(input.StartedAt),
-		leaseExpiresAt: copyTimePtr(input.LeaseExpiresAt),
-		finishedAt:     copyTimePtr(input.FinishedAt),
+		id:              input.ID,
+		generationID:    input.GenerationID,
+		attempt:         input.Attempt,
+		status:          input.Status,
+		traceID:         input.TraceID,
+		startedAt:       copyTimePtr(input.StartedAt),
+		leaseExpiresAt:  copyTimePtr(input.LeaseExpiresAt),
+		finishedAt:      copyTimePtr(input.FinishedAt),
 		origin:          input.Origin,
 		retryDecision:   copyRetryDecision(input.RetryDecision),
 		claimHistory:    copyClaimHistory(input.ClaimHistory),
@@ -150,15 +150,15 @@ func Restore(input RestoreInput) (*InterpretationRun, error) {
 }
 
 type RestoreInput struct {
-	ID             ID
-	GenerationID   meta.ID
-	Attempt        int
-	Status         Status
-	Failure        *Failure
-	TraceID        string
-	StartedAt      *time.Time
-	LeaseExpiresAt *time.Time
-	FinishedAt     *time.Time
+	ID              ID
+	GenerationID    meta.ID
+	Attempt         int
+	Status          Status
+	Failure         *Failure
+	TraceID         string
+	StartedAt       *time.Time
+	LeaseExpiresAt  *time.Time
+	FinishedAt      *time.Time
 	Origin          retrygovernance.AttemptOrigin
 	RetryDecision   *retrygovernance.Decision
 	ClaimHistory    []ClaimRecord

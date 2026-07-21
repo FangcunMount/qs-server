@@ -1,7 +1,6 @@
 package evaluationinput
 
 import (
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
@@ -79,18 +78,19 @@ func InterpretationAssetsFromSnapshot(input *InputSnapshot) (interpretationasset
 	return interpretationAssetsFromCompatPayload(input)
 }
 
-// FactorScorePresentationProfileFromSnapshot resolves the frozen factor-score
-// report section from canonical DefinitionV2 on the evaluation input snapshot.
-func FactorScorePresentationProfileFromSnapshot(input *InputSnapshot) (domainreport.PresentationProfile, bool) {
+// FactorScoreVisibleCodesFromSnapshot resolves frozen factor-score section
+// visibility codes from canonical DefinitionV2 on the evaluation input snapshot.
+// Callers map these codes into Interpretation-owned presentation types.
+func FactorScoreVisibleCodesFromSnapshot(input *InputSnapshot) ([]string, bool) {
 	def, ok := DefinitionV2FromSnapshot(input)
 	if !ok || def == nil {
-		return domainreport.PresentationProfile{}, false
+		return nil, false
 	}
 	codes, configured := def.ReportMap.FactorScoreSources()
 	if !configured {
-		return domainreport.PresentationProfile{}, false
+		return nil, false
 	}
-	return domainreport.NewFrozenPresentationProfile(codes), true
+	return append([]string(nil), codes...), true
 }
 
 func interpretationAssetsFromCompatPayload(input *InputSnapshot) (interpretationassets.Assets, bool) {

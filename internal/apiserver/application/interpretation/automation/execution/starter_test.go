@@ -385,14 +385,14 @@ func seedFailed(t *testing.T, failedAt time.Time, attempt int, retryable bool) (
 func testArtifact(t *testing.T, generationRecord *domaingeneration.ReportGeneration, runRecord *interpretationrun.InterpretationRun, id meta.ID, at time.Time) *domainreport.InterpretReport {
 	t.Helper()
 	artifact, err := domainreport.NewInterpretReport(domainreport.InterpretReportInput{
-		ID:                  id,
-		GenerationID:        generationRecord.ID(),
-		OutcomeID:           generationRecord.Key().OutcomeID,
-		InterpretationRunID: runRecord.ID(),
-		Association:         domainreport.Association{OrgID: 1, AssessmentID: meta.FromUint64(7), TesteeID: 8},
-		ReportType:          generationRecord.Key().ReportType,
-		TemplateVersion:     generationRecord.Key().TemplateVersion,
-		BuilderIdentity:     domainreport.BuilderIdentityFactorScoring,
+		ID:                   id,
+		GenerationID:         generationRecord.ID(),
+		OutcomeID:            generationRecord.Key().OutcomeID,
+		InterpretationRunID:  runRecord.ID(),
+		Association:          domainreport.Association{OrgID: 1, AssessmentID: meta.FromUint64(7), TesteeID: 8},
+		ReportType:           generationRecord.Key().ReportType,
+		TemplateVersion:      generationRecord.Key().TemplateVersion,
+		BuilderIdentity:      domainreport.BuilderIdentityFactorScoring,
 		ContentSchemaVersion: domainreport.ContentSchemaVersionV1,
 		Content: domainreport.Content{
 			Model:        domainreport.ModelIdentity{Kind: "scale", Code: "PHQ9", Version: "v1"},

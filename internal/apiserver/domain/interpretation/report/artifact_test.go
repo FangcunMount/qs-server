@@ -24,7 +24,7 @@ func TestInterpretReportIsSuccessOnlyAndDefensivelyCopiesContent(t *testing.T) {
 		ContentSchemaVersion: ContentSchemaVersionV1,
 		GeneratedAt:          time.Date(2026, 7, 12, 10, 0, 0, 0, time.UTC),
 		Content: Content{
-			Model: ModelIdentity{Kind: "scale", Code: "PHQ9", Version: "v1"},
+			Model:        ModelIdentity{Kind: "scale", Code: "PHQ9", Version: "v1"},
 			PrimaryScore: &ScoreValue{Kind: ScoreKindRawTotal, Value: 42, Max: &max},
 			Dimensions: []DimensionInterpret{
 				NewDimensionInterpret(NewFactorCode("sleep"), "sleep", 10, &max, RiskLevelLow, "low", "rest"),

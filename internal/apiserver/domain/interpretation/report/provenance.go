@@ -8,8 +8,8 @@ const (
 
 	ContentSchemaVersionV1 = "report-content/v1"
 
-	UnknownBuilderIdentity       = "unknown"
-	LegacyContentSchemaVersion   = "legacy"
+	UnknownBuilderIdentity     = "unknown"
+	LegacyContentSchemaVersion = "legacy"
 )
 
 func normalizeLegacyProvenance(builderIdentity, contentSchemaVersion string) (string, string) {

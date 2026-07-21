@@ -180,7 +180,6 @@ func classifyInputError(err error) admission.Kind {
 }
 
 func admissionCodeMessage(kind admission.Kind, cause error) (code, message string, retryable bool) {
-	retryable = false
 	switch kind {
 	case admission.KindOutcomeNotFound:
 		return "outcome_not_found", "评估结果不存在", false

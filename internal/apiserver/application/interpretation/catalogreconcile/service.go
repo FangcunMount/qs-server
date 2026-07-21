@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	mongointerpretation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 	"github.com/FangcunMount/component-base/pkg/log"
 )
 
@@ -13,10 +12,10 @@ import (
 type DriftKind = string
 
 const (
-	DriftMissing             DriftKind = mongointerpretation.CatalogDriftMissing
-	DriftDangling            DriftKind = mongointerpretation.CatalogDriftDangling
-	DriftAssociationMismatch DriftKind = mongointerpretation.CatalogDriftAssociationMismatch
-	DriftWrongWinner         DriftKind = mongointerpretation.CatalogDriftWrongWinner
+	DriftMissing             DriftKind = "missing"
+	DriftDangling            DriftKind = "dangling"
+	DriftAssociationMismatch DriftKind = "association_mismatch"
+	DriftWrongWinner         DriftKind = "wrong_winner"
 )
 
 // Filter scopes read-only reconcile scans.

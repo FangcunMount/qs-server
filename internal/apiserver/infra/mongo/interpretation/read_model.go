@@ -55,17 +55,17 @@ func projectArchivedReportRow(po *ArchivedReportPO) evaluationreadmodel.ReportRo
 		}
 	}
 	row := evaluationreadmodel.ReportRow{
-		AssessmentID: po.DomainID.Uint64(),
-		ModelName:    modelName,
-		ModelCode:    modelCode,
-		TotalScore:   po.TotalScore,
-		RiskLevel:    po.RiskLevel,
-		Conclusion:   po.Conclusion,
-		Dimensions:   dimensions,
-		Suggestions:  suggestions,
-		ModelExtra:   reportModelExtraPOToRow(po.ModelExtra),
+		AssessmentID:        po.DomainID.Uint64(),
+		ModelName:           modelName,
+		ModelCode:           modelCode,
+		TotalScore:          po.TotalScore,
+		RiskLevel:           po.RiskLevel,
+		Conclusion:          po.Conclusion,
+		Dimensions:          dimensions,
+		Suggestions:         suggestions,
+		ModelExtra:          reportModelExtraPOToRow(po.ModelExtra),
 		PresentationProfile: presentationProfilePOToRow(po.PresentationProfile),
-		CreatedAt:    po.CreatedAt,
+		CreatedAt:           po.CreatedAt,
 	}
 	if po.Model != nil {
 		row.Model = evaluationreadmodel.ModelIdentityRow{

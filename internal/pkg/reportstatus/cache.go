@@ -171,14 +171,14 @@ func (c *Cache) keyspace() keyspace {
 
 func shouldOverride(current, incoming string) bool {
 	priority := map[string]int{
-		"submitted":                 1,
-		"queued":                    2,
-		"processing":                3,
-		"scoring":                   4,
-		"interpreting":              5,
-		"temporarily_unavailable":   90,
-		"completed":                 100,
-		"failed":                    100,
+		"submitted":               1,
+		"queued":                  2,
+		"processing":              3,
+		"scoring":                 4,
+		"interpreting":            5,
+		"temporarily_unavailable": 90,
+		"completed":               100,
+		"failed":                  100,
 	}
 	cur, okCur := priority[current]
 	in, okIn := priority[incoming]
