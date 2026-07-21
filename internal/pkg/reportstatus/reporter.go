@@ -91,6 +91,24 @@ func (r *Reporter) SetFailed(ctx context.Context, assessmentID, answerSheetID, r
 	})
 }
 
+func (r *Reporter) SetTemporarilyUnavailable(ctx context.Context, assessmentID, answerSheetID, reason, message string) {
+	if r == nil {
+		return
+	}
+	if err := r.cache.SetTemporarilyUnavailable(ctx, assessmentID, answerSheetID, reason, message, r.ttl); err != nil {
+		r.logSetError(ctx, "temporarily_unavailable", assessmentID, err)
+	}
+	r.notify(ctx, ChangedSignal{
+		AssessmentID:  assessmentID,
+		AnswerSheetID: answerSheetID,
+		Status:        "temporarily_unavailable",
+		Stage:         "temporarily_unavailable",
+		Reason:        reason,
+		Message:       message,
+		OccurredAt:    time.Now().UTC(),
+	})
+}
+
 func (r *Reporter) Cache() *Cache {
 	if r == nil {
 		return nil

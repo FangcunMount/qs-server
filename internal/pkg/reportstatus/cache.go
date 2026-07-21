@@ -139,6 +139,21 @@ func (c *Cache) SetFailed(ctx context.Context, assessmentID, answerSheetID, reas
 	}, ttl)
 }
 
+func (c *Cache) SetTemporarilyUnavailable(ctx context.Context, assessmentID, answerSheetID, reason, message string, ttl time.Duration) error {
+	if message == "" {
+		message = "报告暂不可用，请稍后重试"
+	}
+	return c.SetIfHigherPriority(ctx, &Snapshot{
+		AssessmentID:  assessmentID,
+		AnswerSheetID: answerSheetID,
+		Status:        "temporarily_unavailable",
+		Stage:         "temporarily_unavailable",
+		Reason:        reason,
+		Message:       message,
+		UpdatedAt:     time.Now().UTC(),
+	}, ttl)
+}
+
 func (c *Cache) redisClient() redis.UniversalClient {
 	if c == nil || c.opsHandle == nil {
 		return nil
@@ -156,13 +171,14 @@ func (c *Cache) keyspace() keyspace {
 
 func shouldOverride(current, incoming string) bool {
 	priority := map[string]int{
-		"submitted":    1,
-		"queued":       2,
-		"processing":   3,
-		"scoring":      4,
-		"interpreting": 5,
-		"completed":    100,
-		"failed":       100,
+		"submitted":                 1,
+		"queued":                    2,
+		"processing":                3,
+		"scoring":                   4,
+		"interpreting":              5,
+		"temporarily_unavailable":   90,
+		"completed":                 100,
+		"failed":                    100,
 	}
 	cur, okCur := priority[current]
 	in, okIn := priority[incoming]

@@ -12,10 +12,12 @@ import (
 )
 
 type reportStatusWriterStub struct {
-	completedAssessmentID string
-	completedReportID     string
-	failedAssessmentID    string
-	failedReason          string
+	completedAssessmentID        string
+	completedReportID            string
+	failedAssessmentID           string
+	failedReason                 string
+	temporarilyUnavailableID     string
+	temporarilyUnavailableReason string
 }
 
 func (s *reportStatusWriterStub) SetProcessing(context.Context, string, string, string) {}
@@ -28,6 +30,11 @@ func (s *reportStatusWriterStub) SetCompleted(_ context.Context, assessmentID, _
 func (s *reportStatusWriterStub) SetFailed(_ context.Context, assessmentID, _ string, reason, _ string) {
 	s.failedAssessmentID = assessmentID
 	s.failedReason = reason
+}
+
+func (s *reportStatusWriterStub) SetTemporarilyUnavailable(_ context.Context, assessmentID, _ string, reason, _ string) {
+	s.temporarilyUnavailableID = assessmentID
+	s.temporarilyUnavailableReason = reason
 }
 
 func TestHandleInterpretationReportGeneratedSyncsAssessmentAttentionForHighRisk(t *testing.T) {
@@ -53,6 +60,8 @@ func TestHandleInterpretationReportGeneratedSyncsAssessmentAttentionForHighRisk(
 		t.Fatalf("unexpected attention sync request: %#v", req)
 	}
 }
+
+
 
 func TestHandleInterpretationReportGeneratedDoesNotAutoMarkLowerRisk(t *testing.T) {
 	client := &fakeWorkerInternalClient{}
@@ -100,7 +109,7 @@ func TestHandleInterpretationReportFailedDoesNotTriggerReportGeneration(t *testi
 	}
 	handler := handleInterpretationReportFailed(deps)
 
-	if err := handler(context.Background(), eventcatalog.InterpretationReportFailed, mustBuildReportFailedPayload(t, true)); err != nil {
+	if err := handler(context.Background(), eventcatalog.InterpretationReportFailed, mustBuildReportFailedPayload(t, true, "automatic")); err != nil {
 		t.Fatalf("handler returned error: %v", err)
 	}
 	if client.generateReportCalls != 0 {
@@ -115,11 +124,44 @@ func TestHandleInterpretationReportFailedMarksTerminalStatus(t *testing.T) {
 		ReportStatusReporter: reporter,
 	})
 
-	if err := handler(context.Background(), eventcatalog.InterpretationReportFailed, mustBuildReportFailedPayload(t, false)); err != nil {
+	if err := handler(context.Background(), eventcatalog.InterpretationReportFailed, mustBuildReportFailedPayload(t, false, "terminal")); err != nil {
 		t.Fatalf("handler returned error: %v", err)
 	}
 	if reporter.failedAssessmentID != "123" || reporter.failedReason != "interpretation_report_failed" {
 		t.Fatalf("failed status = assessment:%q reason:%q", reporter.failedAssessmentID, reporter.failedReason)
+	}
+}
+
+func TestHandleInterpretationReportFailedProjectsManualRequiredAsTemporarilyUnavailable(t *testing.T) {
+	reporter := &reportStatusWriterStub{}
+	handler := handleInterpretationReportFailed(&Dependencies{
+		Logger:               slog.New(slog.NewTextHandler(io.Discard, nil)),
+		ReportStatusReporter: reporter,
+	})
+
+	if err := handler(context.Background(), eventcatalog.InterpretationReportFailed, mustBuildReportFailedPayload(t, true, "manual_required")); err != nil {
+		t.Fatalf("handler returned error: %v", err)
+	}
+	if reporter.temporarilyUnavailableID != "123" || reporter.temporarilyUnavailableReason != "waiting_manual_action" {
+		t.Fatalf("manual projection = assessment:%q reason:%q", reporter.temporarilyUnavailableID, reporter.temporarilyUnavailableReason)
+	}
+	if reporter.failedAssessmentID != "" {
+		t.Fatalf("manual_required must not mark failed, got reason=%q", reporter.failedReason)
+	}
+}
+
+func TestHandleInterpretationReportFailedKeepsAutomaticInFlight(t *testing.T) {
+	reporter := &reportStatusWriterStub{}
+	handler := handleInterpretationReportFailed(&Dependencies{
+		Logger:               slog.New(slog.NewTextHandler(io.Discard, nil)),
+		ReportStatusReporter: reporter,
+	})
+
+	if err := handler(context.Background(), eventcatalog.InterpretationReportFailed, mustBuildReportFailedPayload(t, true, "automatic")); err != nil {
+		t.Fatalf("handler returned error: %v", err)
+	}
+	if reporter.failedAssessmentID != "" || reporter.temporarilyUnavailableID != "" {
+		t.Fatalf("automatic retry must keep patient projection in-flight, failed=%q unavailable=%q", reporter.failedAssessmentID, reporter.temporarilyUnavailableID)
 	}
 }
 
@@ -162,32 +204,40 @@ func mustBuildReportGeneratedOutcomePayload(t *testing.T, severity, levelCode st
 	return payload
 }
 
-func mustBuildReportFailedPayload(t *testing.T, retryable bool) []byte {
+func mustBuildReportFailedPayload(t *testing.T, retryable bool, disposition string) []byte {
 	t.Helper()
 
 	now := time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC)
+	data := map[string]any{
+		"org_id":           18,
+		"generation_id":    "generation-1",
+		"run_id":           "run-2",
+		"assessment_id":    "123",
+		"outcome_id":       "9001",
+		"testee_id":        99,
+		"attempt":          2,
+		"report_type":      "standard",
+		"template_version": "v2",
+		"failure_kind":     "template",
+		"failure_code":     "not_found",
+		"retryable":        retryable,
+		"safe_reason":      "template unavailable",
+		"failed_at":        now,
+	}
+	if disposition != "" {
+		data["retry_decision"] = map[string]any{
+			"disposition": disposition,
+			"retryable":   retryable,
+			"attempt":     2,
+		}
+	}
 	payload, err := json.Marshal(map[string]any{
 		"id":            "evt-report-failed",
 		"eventType":     eventcatalog.InterpretationReportFailed,
 		"occurredAt":    now,
 		"aggregateType": "ReportGeneration",
 		"aggregateID":   "generation-1",
-		"data": map[string]any{
-			"org_id":           18,
-			"generation_id":    "generation-1",
-			"run_id":           "run-2",
-			"assessment_id":    "123",
-			"outcome_id":       "9001",
-			"testee_id":        99,
-			"attempt":          2,
-			"report_type":      "standard",
-			"template_version": "v2",
-			"failure_kind":     "template",
-			"failure_code":     "not_found",
-			"retryable":        retryable,
-			"safe_reason":      "template unavailable",
-			"failed_at":        now,
-		},
+		"data":          data,
 	})
 	if err != nil {
 		t.Fatalf("marshal payload: %v", err)

@@ -67,6 +67,7 @@ type ReportStatusWriter interface {
 	SetProcessing(ctx context.Context, assessmentID, answerSheetID, stage string)
 	SetCompleted(ctx context.Context, assessmentID, answerSheetID, reportID string)
 	SetFailed(ctx context.Context, assessmentID, answerSheetID, reason, message string)
+	SetTemporarilyUnavailable(ctx context.Context, assessmentID, answerSheetID, reason, message string)
 }
 
 // Dependencies 处理器依赖

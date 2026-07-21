@@ -9,6 +9,7 @@ import (
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/outcome"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -25,6 +26,7 @@ func handleInterpretationReportFailed(deps *Dependencies) HandlerFunc {
 		if err != nil {
 			return fmt.Errorf("failed to parse interpretation report failed event: %w", err)
 		}
+		disposition := failedDisposition(data)
 		deps.Logger.Warn("interpretation report failed",
 			slog.String("event_id", env.ID),
 			slog.String("generation_id", data.GenerationID),
@@ -36,16 +38,34 @@ func handleInterpretationReportFailed(deps *Dependencies) HandlerFunc {
 			slog.String("failure_kind", data.FailureKind),
 			slog.String("failure_code", data.FailureCode),
 			slog.Bool("retryable", data.Retryable),
+			slog.String("disposition", disposition),
 			slog.String("safe_reason", data.SafeReason),
 			slog.Time("failed_at", data.FailedAt),
 		)
-		if !data.Retryable {
-			if err := markReportFailed(ctx, deps, data.AssessmentID, "interpretation_report_failed", data.SafeReason); err != nil {
-				return err
+		switch disposition {
+		case string(retrygovernance.DispositionAutomatic):
+			// Automatic recovery continues; keep patient projection in-flight.
+			return nil
+		case string(retrygovernance.DispositionManualRequired):
+			return markReportTemporarilyUnavailable(ctx, deps, data.AssessmentID, "waiting_manual_action", data.SafeReason)
+		default:
+			// Terminal or legacy events without retry_decision that are non-retryable.
+			if disposition == string(retrygovernance.DispositionTerminal) || !data.Retryable {
+				return markReportFailed(ctx, deps, data.AssessmentID, "interpretation_report_failed", data.SafeReason)
 			}
+			return nil
 		}
-		return nil
 	}
+}
+
+func failedDisposition(data eventoutcome.ReportFailedPayload) string {
+	if data.RetryDecision != nil && data.RetryDecision.Disposition != "" {
+		return data.RetryDecision.Disposition
+	}
+	if data.Retryable {
+		return string(retrygovernance.DispositionAutomatic)
+	}
+	return string(retrygovernance.DispositionTerminal)
 }
 
 func handleInterpretationRetryRequested(deps *Dependencies) HandlerFunc {
@@ -122,6 +142,21 @@ func markReportFailed(ctx context.Context, deps *Dependencies, assessmentID, rea
 		return fmt.Errorf("invalid assessment id in report failed event: %q", assessmentID)
 	}
 	deps.ReportStatusReporter.SetFailed(ctx, reportstatus.AssessmentKey(id), "", reason, message)
+	return nil
+}
+
+func markReportTemporarilyUnavailable(ctx context.Context, deps *Dependencies, assessmentID, reason, message string) error {
+	if deps.ReportStatusReporter == nil {
+		return nil
+	}
+	id, err := strconv.ParseUint(assessmentID, 10, 64)
+	if err != nil || id == 0 {
+		return fmt.Errorf("invalid assessment id in report failed event: %q", assessmentID)
+	}
+	if message == "" {
+		message = "报告暂不可用，请稍后重试"
+	}
+	deps.ReportStatusReporter.SetTemporarilyUnavailable(ctx, reportstatus.AssessmentKey(id), "", reason, message)
 	return nil
 }
 

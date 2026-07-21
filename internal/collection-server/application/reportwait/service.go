@@ -179,7 +179,7 @@ func (s *Service) Wait(ctx context.Context, testeeID, assessmentID uint64, timeo
 				return s.processingFromCache(ctx, assessmentKey), nil
 			}
 			reportstatus.IncWaitReportSignalWakeup()
-			if signal.Status != "completed" && signal.Status != "failed" {
+			if signal.Status != "completed" && signal.Status != "failed" && signal.Status != "temporarily_unavailable" {
 				continue
 			}
 			result, done, err := s.checkCurrentStatus(ctx, testeeID, assessmentID, assessmentKey)
@@ -365,7 +365,7 @@ func recordTerminalResponse(resp *evaluation.AssessmentStatusResponse) {
 	switch resp.Status {
 	case "completed":
 		reportstatus.IncWaitReportCompleted()
-	case "failed":
+	case "failed", "temporarily_unavailable":
 		reportstatus.IncWaitReportFailed()
 	default:
 		reportstatus.IncWaitReportProcessing()
@@ -474,5 +474,5 @@ func nextPollAfterMs(stage, status string) int {
 }
 
 func isTerminalStatus(status string) bool {
-	return status == "completed" || status == "failed"
+	return status == "completed" || status == "failed" || status == "temporarily_unavailable"
 }

@@ -79,5 +79,5 @@ func ViewFromFields(fields StatusFields) *View {
 
 // IsTerminalStatus 判断对外状态是否终态。
 func IsTerminalStatus(status string) bool {
-	return status == "interpreted" || status == "failed" || status == "completed"
+	return status == "interpreted" || status == "failed" || status == "completed" || status == "temporarily_unavailable"
 }
