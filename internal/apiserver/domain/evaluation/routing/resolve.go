@@ -10,13 +10,14 @@ import (
 type CompatibilitySource string
 
 const (
-	CompatibilitySourceNone           CompatibilitySource = ""
-	CompatibilitySourceFrozen         CompatibilitySource = "frozen"
-	CompatibilitySourceIdentity       CompatibilitySource = "identity"
-	CompatibilitySourceDecisionKind   CompatibilitySource = "decision_kind"
-	CompatibilitySourceLegacyTypology CompatibilitySource = "legacy_typology"
-	CompatibilitySourceFamilyDefault  CompatibilitySource = "family_default_decision"
-	CompatibilitySourceDraftFormat    CompatibilitySource = "draft_payload_format"
+	CompatibilitySourceNone               CompatibilitySource = ""
+	CompatibilitySourceFrozen             CompatibilitySource = "frozen"
+	CompatibilitySourceIdentity           CompatibilitySource = "identity"
+	CompatibilitySourceDecisionKind       CompatibilitySource = "decision_kind"
+	CompatibilitySourceLegacyTypology     CompatibilitySource = "legacy_typology"
+	CompatibilitySourceFamilyDefault      CompatibilitySource = "family_default_decision"
+	CompatibilitySourceDraftFormat        CompatibilitySource = "draft_payload_format"
+	CompatibilitySourceAssessmentModelRef CompatibilitySource = "assessment_model_ref"
 )
 
 // CompatibilityHit records whether evaluation used a migration fallback.
@@ -26,6 +27,7 @@ type CompatibilityHit struct {
 }
 
 // DescriptorKeyFromRoute derives the single runtime routing key from a model route.
+// Frozen RuntimeIdentity is validated exactly; legacy routes go through CompatibilityResolver (EV-R008).
 func DescriptorKeyFromRoute(route ModelRoute) (DescriptorKey, error) {
 	modelcatalog.ObserveWritePolicy(route.Kind, route.Algorithm)
 	if route.HasFrozenRuntime() {
@@ -43,29 +45,7 @@ func DescriptorKeyFromRoute(route ModelRoute) (DescriptorKey, error) {
 			PayloadFormat:   route.PayloadFormat,
 		}, nil
 	}
-
-	family, hit, ok := ExecutionFamilyFromRouteWithCompat(route)
-	if !ok {
-		return DescriptorKey{}, fmt.Errorf("unsupported model route for runtime descriptor: %s/%s", route.Kind, route.Algorithm)
-	}
-	observeRuntimeCompat(hit, "family")
-
-	decision, decisionHit := ExecutionDecisionFromRouteWithCompat(route, family)
-	if decision == "" {
-		return DescriptorKey{}, fmt.Errorf("unable to resolve decision kind for route %s/%s", route.Kind, route.Algorithm)
-	}
-	observeRuntimeCompat(decisionHit, "decision")
-
-	format := route.PayloadFormat
-	if format == "" {
-		format = modelcatalog.DraftPayloadFormatForModel(route.Kind, route.Algorithm)
-		observeRuntimeCompat(CompatibilityHit{Used: true, Source: CompatibilitySourceDraftFormat}, "payload_format")
-	}
-	return DescriptorKey{
-		AlgorithmFamily: family,
-		DecisionKind:    decision,
-		PayloadFormat:   format,
-	}, nil
+	return NewCompatibilityResolver().ResolveDescriptorKey(route)
 }
 
 // ExecutionFamilyFromRoute 解析执行家族 using frozen RuntimeIdentity first.

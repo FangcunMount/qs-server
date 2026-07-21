@@ -45,9 +45,6 @@ func ModelRouteFromInput(input *evaluationinput.InputSnapshot) (evalpipeline.Mod
 	if route.HasFrozenRuntime() {
 		return route, true
 	}
-	// Legacy incomplete inputs may still draft payload format; counted in DescriptorKeyFromRoute.
-	if route.PayloadFormat == "" {
-		route.PayloadFormat = modelcatalog.DraftPayloadFormatForModel(kind, algorithm)
-	}
+	// Legacy incomplete routes stay unfrozen here; CompatibilityResolver drafts format (EV-R008).
 	return route, true
 }

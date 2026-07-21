@@ -5,9 +5,12 @@ import (
 	"testing"
 
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 func TestRuntimeResolverUsesDescriptorPrimaryPath(t *testing.T) {
@@ -62,11 +65,66 @@ func TestRuntimeResolverRejectsMissingDescriptorRegistry(t *testing.T) {
 	}
 }
 
-func TestRuntimeResolverReturnsDescriptorErrorWhenRegistryCannotResolveSnapshot(t *testing.T) {
+func TestRuntimeResolverRejectsFrozenRouteWithoutFallingBackToAssessment(t *testing.T) {
 	t.Parallel()
 
-	resolver := NewRuntimeResolver(evalpipeline.NewRuntimeDescriptorRegistry(), descriptorDrivenExecutor{})
+	registry := evalpipeline.NewRuntimeDescriptorRegistry()
+	if err := registry.Register(evalpipeline.RuntimeDescriptor{
+		Key:              evalpipeline.DescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring},
+		AlgorithmFamily:  modelcatalog.AlgorithmFamilyFactorScoring,
+		ExecutionPath:    modelcatalog.ExecutionPathScaleDescriptor,
+		InputAssembler:   runtimeStubInputAssembler{},
+		Calculator:       runtimeStubCalculator{},
+		OutcomeAssembler: runtimeStubOutcomeAssembler{},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	resolver := NewRuntimeResolver(registry, descriptorDrivenExecutor{})
 
+	// Frozen behavioral/norm route is not registered; Assessment ModelRef is scale and WOULD match the registry.
+	input := &evaluationinput.InputSnapshot{
+		Model: &evaluationinput.ModelSnapshot{
+			Kind:            evaluationinput.EvaluationModelKindBehavioralRating,
+			Algorithm:       string(modelcatalog.AlgorithmBrief2),
+			AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorNorm),
+			DecisionKind:    string(modelcatalog.DecisionKindNormLookup),
+			PayloadFormat:   modelcatalog.PayloadFormatBehavioralRatingDefaultV1,
+			Code:            "BR-001",
+			Version:         "1.0.0",
+		},
+	}
+	a, err := domainAssessment.NewAssessment(
+		1,
+		testee.NewID(9001),
+		domainAssessment.NewQuestionnaireRefByCode(meta.NewCode("Q"), "1"),
+		domainAssessment.NewAnswerSheetRef(meta.FromUint64(1)),
+		domainAssessment.NewAdhocOrigin(),
+		domainAssessment.WithEvaluationModel(domainAssessment.NewScaleEvaluationModelRef(meta.ID(0), meta.NewCode("PHQ9"), "1.0.0", "PHQ9")),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = resolver.Execute(context.Background(), a, input)
+	if err == nil {
+		t.Fatal("expected frozen route failure without Assessment ModelRef fallback to scale descriptor")
+	}
+}
+
+func TestRuntimeResolverUsesCompatibilityForLegacyInput(t *testing.T) {
+	t.Parallel()
+
+	registry := evalpipeline.NewRuntimeDescriptorRegistry()
+	if err := registry.Register(evalpipeline.RuntimeDescriptor{
+		Key:              evalpipeline.DescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring},
+		AlgorithmFamily:  modelcatalog.AlgorithmFamilyFactorScoring,
+		ExecutionPath:    modelcatalog.ExecutionPathScaleDescriptor,
+		InputAssembler:   runtimeStubInputAssembler{},
+		Calculator:       runtimeStubCalculator{},
+		OutcomeAssembler: runtimeStubOutcomeAssembler{},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	resolver := NewRuntimeResolver(registry, descriptorDrivenExecutor{})
 	input := &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
 			Kind:      evaluationinput.EvaluationModelKindScale,
@@ -74,9 +132,12 @@ func TestRuntimeResolverReturnsDescriptorErrorWhenRegistryCannotResolveSnapshot(
 			Code:      "PHQ9",
 		},
 	}
-	_, _, err := resolver.Execute(context.Background(), nil, input)
-	if err == nil {
-		t.Fatal("Execute error = nil, want descriptor resolve error when registry is configured")
+	_, resolved, err := resolver.Execute(context.Background(), nil, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.DescriptorKey.AlgorithmFamily != modelcatalog.AlgorithmFamilyFactorScoring {
+		t.Fatalf("descriptor key = %#v", resolved.DescriptorKey)
 	}
 }
 

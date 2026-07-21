@@ -7,7 +7,7 @@ import (
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
+	evaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -22,6 +22,7 @@ type ResolvedExecution struct {
 type RuntimeResolver struct {
 	descriptors *evalpipeline.RuntimeDescriptorRegistry
 	executor    evalpipeline.DescriptorExecutor
+	compat      evaluation.CompatibilityResolver
 }
 
 // NewRuntimeResolver creates the descriptor-only runtime resolver.
@@ -32,6 +33,7 @@ func NewRuntimeResolver(
 	return &RuntimeResolver{
 		descriptors: descriptors,
 		executor:    executor,
+		compat:      evaluation.NewCompatibilityResolver(),
 	}
 }
 
@@ -43,21 +45,14 @@ func (r *RuntimeResolver) ResolveExecution(a *assessment.Assessment, input *eval
 	executionIdentity := resolveExecutionIdentity(a, input)
 	resolved := ResolvedExecution{ExecutionIdentity: executionIdentity}
 
-	route, ok := modelRouteFromInput(input)
-	if ok {
-		_, ok = evalpipeline.ExecutionFamilyFromRoute(route)
-	}
-	// New published models carry frozen RuntimeIdentity on InputSnapshot; do not
-	// silently fall back to Assessment ModelRef (identity-only, no family/decision/format).
+	route, ok, frozen := resolveModelRoute(a, input, r.compat)
 	if !ok {
-		if input != nil && input.Model != nil && input.Model.HasFrozenRuntime() {
+		if frozen {
 			return resolved, fmt.Errorf("evaluation runtime cannot resolve frozen model route")
 		}
-		route, ok = modelRouteFromAssessment(a)
-	}
-	if !ok {
 		return resolved, fmt.Errorf("evaluation runtime requires model route")
 	}
+
 	desc, err := r.descriptors.Resolve(route)
 	if err != nil {
 		return resolved, err
@@ -69,6 +64,41 @@ func (r *RuntimeResolver) ResolveExecution(a *assessment.Assessment, input *eval
 	resolved.DescriptorKey = key
 	resolved.Descriptor = desc
 	return resolved, nil
+}
+
+// resolveModelRoute prefers InputSnapshot. Frozen RuntimeIdentity never falls back to
+// Assessment ModelRef. Legacy routes may use Assessment ModelRef only as an explicit
+// CompatibilityResolver source (EV-R008).
+func resolveModelRoute(
+	a *assessment.Assessment,
+	input *evaluationinput.InputSnapshot,
+	compat evaluation.CompatibilityResolver,
+) (route evalpipeline.ModelRoute, ok bool, frozen bool) {
+	frozen = input != nil && input.Model != nil && input.Model.HasFrozenRuntime()
+	route, fromInput := modelRouteFromInput(input)
+	if fromInput {
+		if _, familyOK := evalpipeline.ExecutionFamilyFromRoute(route); familyOK {
+			if frozen {
+				return route, true, true
+			}
+			return compat.EnrichLegacyRoute(route), true, false
+		}
+		if frozen {
+			return route, false, true
+		}
+	} else if frozen {
+		return evalpipeline.ModelRoute{}, false, true
+	}
+
+	route, ok = modelRouteFromAssessment(a)
+	if !ok {
+		return evalpipeline.ModelRoute{}, false, false
+	}
+	evaluation.ObserveRuntimeCompat(evaluation.CompatibilityHit{
+		Used:   true,
+		Source: evaluation.CompatibilitySourceAssessmentModelRef,
+	}, "route")
+	return compat.EnrichLegacyRoute(route), true, false
 }
 
 // Execute runs Evaluation through the resolved descriptor pipeline.
