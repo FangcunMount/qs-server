@@ -21,6 +21,7 @@ import (
 	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	statisticsV2App "github.com/FangcunMount/qs-server/internal/apiserver/application/statisticsv2"
 	systemgovApp "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	workbenchApp "github.com/FangcunMount/qs-server/internal/apiserver/application/workbench"
 	platformmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
@@ -366,6 +367,7 @@ type ServerRuntimeDeps struct {
 	WarmupCoordinator                     statisticsApp.WarmupCoordinator
 	PlanCommandService                    planApp.PlanCommandService
 	StatisticsSyncService                 statisticsApp.StatisticsSyncService
+	StatisticsV2Coordinator               *statisticsV2App.Coordinator
 	BehaviorProjectorService              statisticsApp.BehaviorProjectorService
 	BehaviorJourneyScanService            statisticsApp.BehaviorJourneyScanService
 	EvaluationConsistencyReconcileService evaluationScheduler.Service
@@ -404,6 +406,7 @@ func (c *Container) BuildServerRuntimeDeps() ServerRuntimeDeps {
 	}
 	if c.StatisticsModule != nil {
 		deps.StatisticsSyncService = c.StatisticsModule.SyncService
+		deps.StatisticsV2Coordinator = c.StatisticsModule.V2Coordinator
 		deps.BehaviorProjectorService = c.StatisticsModule.BehaviorProjectorService
 		deps.BehaviorJourneyScanService = c.StatisticsModule.BehaviorJourneyScanService
 	}

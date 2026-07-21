@@ -8075,6 +8075,236 @@
                 }
             }
         },
+        "/api/v2/plans/testees/{testee_id}/enrollments": {
+            "get": {
+                "tags": [
+                    "Plan-Enrollment"
+                ],
+                "summary": "查询受试者 Plan Enrollment 轮次",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "受试者 ID",
+                        "name": "testee_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Plan ID",
+                        "name": "plan_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "active/closed/terminated",
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/statistics/clinicians": {
+            "get": {
+                "tags": [
+                    "Statistics-V2"
+                ],
+                "summary": "查询 Statistics V2 医生列表",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/statistics/clinicians/me/entries": {
+            "get": {
+                "tags": [
+                    "Statistics-V2"
+                ],
+                "summary": "查询当前医生 Statistics V2 入口",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/statistics/clinicians/me/overview": {
+            "get": {
+                "tags": [
+                    "Statistics-V2"
+                ],
+                "summary": "查询当前医生 Statistics V2 总览",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/statistics/clinicians/me/testees-summary": {
+            "get": {
+                "tags": [
+                    "Statistics-V2"
+                ],
+                "summary": "查询当前医生 Statistics V2 受试者摘要",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/statistics/clinicians/{id}": {
+            "get": {
+                "tags": [
+                    "Statistics-V2"
+                ],
+                "summary": "查询 Statistics V2 医生详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "医生 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/statistics/contents/batch": {
+            "post": {
+                "tags": [
+                    "Statistics-V2"
+                ],
+                "summary": "批量查询 Statistics V2 内容统计",
+                "parameters": [
+                    {
+                        "description": "内容引用",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.statisticsV2ContentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/statistics/entries": {
+            "get": {
+                "tags": [
+                    "Statistics-V2"
+                ],
+                "summary": "查询 Statistics V2 入口列表",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/statistics/entries/{id}": {
+            "get": {
+                "tags": [
+                    "Statistics-V2"
+                ],
+                "summary": "查询 Statistics V2 入口详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "入口 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/statistics/overview": {
+            "get": {
+                "tags": [
+                    "Statistics-V2"
+                ],
+                "summary": "查询 Statistics V2 机构总览",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "latest_complete_day/7d/30d/custom",
+                        "name": "preset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "上海日期 YYYY-MM-DD",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "上海日期 YYYY-MM-DD",
+                        "name": "to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/governance/redis": {
             "get": {
                 "description": "返回 apiserver Redis family 的运行状态。",
@@ -9275,6 +9505,97 @@
                 }
             }
         },
+        "/internal/v2/statistics/runs": {
+            "get": {
+                "tags": [
+                    "Statistics-V2-Internal"
+                ],
+                "summary": "查询 Statistics V2 同步批次",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Statistics-V2-Internal"
+                ],
+                "summary": "创建 Statistics V2 同步批次",
+                "parameters": [
+                    {
+                        "description": "批次窗口",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.statisticsRunRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/statistics/runs/{id}": {
+            "get": {
+                "tags": [
+                    "Statistics-V2-Internal"
+                ],
+                "summary": "查询 Statistics V2 同步批次详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "批次 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/statistics/runs/{id}/resume-cache": {
+            "post": {
+                "tags": [
+                    "Statistics-V2-Internal"
+                ],
+                "summary": "恢复 Statistics V2 批次缓存发布",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "批次 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/ping": {
             "get": {
                 "produces": [
@@ -9325,6 +9646,35 @@
         }
     },
     "definitions": {
+        "binding.DecisionKind": {
+            "type": "string",
+            "enum": [
+                "score_range",
+                "pole_composition",
+                "trait_profile",
+                "nearest_pattern",
+                "dominant_factor",
+                "norm_lookup",
+                "ability_level",
+                "score_range_interpretation",
+                "score_range",
+                "pole_composition",
+                "trait_profile",
+                "nearest_pattern",
+                "dominant_factor",
+                "norm_lookup",
+                "ability_level"
+            ],
+            "x-enum-varnames": [
+                "DecisionKindScoreRange",
+                "DecisionKindPoleComposition",
+                "DecisionKindTraitProfile",
+                "DecisionKindNearestPattern",
+                "DecisionKindDominantFactor",
+                "DecisionKindNormLookup",
+                "DecisionKindAbilityLevel"
+            ]
+        },
         "cachemodel.FamilyStatus": {
             "type": "object",
             "properties": {
@@ -9579,6 +9929,102 @@
                 }
             }
         },
+        "decision.FactorScoreRanges": {
+            "type": "object",
+            "properties": {
+                "factorCode": {
+                    "type": "string"
+                },
+                "kind": {
+                    "description": "risk | norm | ability",
+                    "type": "string"
+                },
+                "primary": {
+                    "type": "boolean"
+                },
+                "rules": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/decision.ScoreRangeRule"
+                    }
+                }
+            }
+        },
+        "decision.OutcomeRef": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                }
+            }
+        },
+        "decision.ScoreRangeRule": {
+            "type": "object",
+            "properties": {
+                "level": {
+                    "type": "string"
+                },
+                "maxInclusive": {
+                    "type": "boolean"
+                },
+                "maxScore": {
+                    "type": "number"
+                },
+                "minScore": {
+                    "type": "number"
+                },
+                "outcomeCode": {
+                    "type": "string"
+                },
+                "unboundedMax": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "decision.Spec": {
+            "type": "object",
+            "properties": {
+                "outcomeRefs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/decision.OutcomeRef"
+                    }
+                },
+                "scoreRanges": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/decision.FactorScoreRanges"
+                    }
+                },
+                "specialOutcomes": {
+                    "description": "special-rule / profile outcome codes referenced by decision",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "typeDecision": {
+                    "$ref": "#/definitions/decision.TypeDecisionFact"
+                }
+            }
+        },
+        "decision.TypeDecisionFact": {
+            "type": "object",
+            "properties": {
+                "fallbackCode": {
+                    "type": "string"
+                },
+                "fallbackSimilarityThreshold": {
+                    "type": "number"
+                },
+                "kind": {
+                    "$ref": "#/definitions/binding.DecisionKind"
+                },
+                "topK": {
+                    "type": "integer"
+                }
+            }
+        },
         "definition.Brief2Spec": {
             "type": "object",
             "properties": {
@@ -9677,6 +10123,9 @@
                     }
                 },
                 "templateID": {
+                    "type": "string"
+                },
+                "templateVersion": {
                     "type": "string"
                 },
                 "title": {
@@ -10022,6 +10471,184 @@
                 }
             }
         },
+        "handler.statisticsRunRequest": {
+            "type": "object",
+            "properties": {
+                "confirm": {
+                    "type": "boolean"
+                },
+                "from_date": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "to_date": {
+                    "type": "string"
+                },
+                "validate_only": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "handler.statisticsV2ContentRequest": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statisticsv2.ContentRef"
+                    }
+                }
+            }
+        },
+        "interpretationassets.Assets": {
+            "type": "object",
+            "properties": {
+                "outcomes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/interpretationassets.OutcomePresentation"
+                    }
+                },
+                "profiles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/interpretationassets.TypeProfilePresentation"
+                    }
+                },
+                "reportSpec": {
+                    "$ref": "#/definitions/interpretationassets.ReportSpec"
+                }
+            }
+        },
+        "interpretationassets.OutcomePresentation": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "outcomeCode": {
+                    "type": "string"
+                },
+                "summary": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "interpretationassets.RarityPresentation": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "type": "string"
+                },
+                "oneInX": {
+                    "type": "integer"
+                },
+                "percent": {
+                    "type": "number"
+                }
+            }
+        },
+        "interpretationassets.ReportSection": {
+            "type": "object",
+            "properties": {
+                "adapterKey": {
+                    "type": "string"
+                },
+                "categoryLabel": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "sourceRefs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "templateID": {
+                    "type": "string"
+                },
+                "templateVersion": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "interpretationassets.ReportSpec": {
+            "type": "object",
+            "properties": {
+                "sections": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/interpretationassets.ReportSection"
+                    }
+                }
+            }
+        },
+        "interpretationassets.TypeProfilePresentation": {
+            "type": "object",
+            "properties": {
+                "commentary": {
+                    "type": "string"
+                },
+                "image": {
+                    "type": "string"
+                },
+                "imageURL": {
+                    "type": "string"
+                },
+                "isSpecial": {
+                    "type": "boolean"
+                },
+                "outcomeCode": {
+                    "type": "string"
+                },
+                "pattern": {
+                    "type": "string"
+                },
+                "rarity": {
+                    "$ref": "#/definitions/interpretationassets.RarityPresentation"
+                },
+                "strengths": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "suggestions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "traits": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "trigger": {
+                    "type": "string"
+                },
+                "weaknesses": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "meta.ID": {
             "type": "integer",
             "enum": [
@@ -10086,6 +10713,12 @@
         "modelcatalog.Definition": {
             "type": "object",
             "properties": {
+                "DecisionSpec": {
+                    "$ref": "#/definitions/decision.Spec"
+                },
+                "InterpretationAssets": {
+                    "$ref": "#/definitions/interpretationassets.Assets"
+                },
                 "calibration": {
                     "$ref": "#/definitions/definition.Calibration"
                 },
@@ -10540,6 +11173,9 @@
                     "type": "string",
                     "maxLength": 128,
                     "minLength": 8
+                },
+                "origin_ref": {
+                    "$ref": "#/definitions/request.OriginRefRequest"
                 },
                 "questionnaire_code": {
                     "type": "string"
@@ -11074,6 +11710,20 @@
                 },
                 "t_score": {
                     "type": "number"
+                }
+            }
+        },
+        "request.OriginRefRequest": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
                 }
             }
         },
@@ -14968,6 +15618,17 @@
                 "TimeRangePreset7D",
                 "TimeRangePreset30D"
             ]
+        },
+        "statisticsv2.ContentRef": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                }
+            }
         },
         "systemgovernance.ActionDescriptor": {
             "type": "object",

@@ -109,7 +109,7 @@ func TestDurableSubmissionTransactionAgainstMongoReplicaSet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRepository: %v", err)
 	}
-	indexCursor, err := idempotency.Indexes().List(ctx)
+	indexCursor, err := db.Collection("answersheets").Indexes().List(ctx)
 	if err != nil {
 		t.Fatalf("list indexes: %v", err)
 	}
@@ -121,8 +121,8 @@ func TestDurableSubmissionTransactionAgainstMongoReplicaSet(t *testing.T) {
 	for _, index := range indexes {
 		indexNames[fmt.Sprint(index["name"])] = true
 	}
-	if !indexNames["uk_writer_id_idempotency_key"] || indexNames["uk_idempotency_key"] {
-		t.Fatalf("idempotency indexes = %v, want scoped unique and no legacy global unique", indexNames)
+	if !indexNames["uk_answersheet_submit_intent"] {
+		t.Fatalf("answersheet indexes = %v, want embedded submit intent unique index", indexNames)
 	}
 
 	outbox := db.Collection("domain_event_outbox")
@@ -138,7 +138,8 @@ func TestDurableSubmissionTransactionAgainstMongoReplicaSet(t *testing.T) {
 		t.Fatalf("CreateDurably() = stored=%v existed=%v err=%v", stored != nil, existed, err)
 	}
 	assertMongoCount(t, ctx, db.Collection("answersheets"), bson.M{"domain_id": uint64(90010001)}, 1)
-	assertMongoCount(t, ctx, idempotency, bson.M{"writer_id": uint64(301), "idempotency_key": metaInfo.IdempotencyKey}, 1)
+	assertMongoCount(t, ctx, db.Collection("answersheets"), bson.M{"submit_meta.writer_id": uint64(301), "submit_meta.idempotency_key": metaInfo.IdempotencyKey}, 1)
+	assertMongoCount(t, ctx, idempotency, bson.M{"writer_id": uint64(301), "idempotency_key": metaInfo.IdempotencyKey}, 0)
 	assertMongoCount(t, ctx, outbox, bson.M{"aggregate_id": sheet.ID().String()}, 1)
 
 	stageFailure := errors.New("injected outbox stage failure")
@@ -184,7 +185,7 @@ func TestDurableSubmissionTransactionAgainstMongoReplicaSet(t *testing.T) {
 			t.Fatalf("concurrent ids differ: %d and %d", winner, id)
 		}
 	}
-	assertMongoCount(t, ctx, idempotency, bson.M{"writer_id": uint64(301), "idempotency_key": concurrentKey}, 1)
+	assertMongoCount(t, ctx, db.Collection("answersheets"), bson.M{"submit_meta.writer_id": uint64(301), "submit_meta.idempotency_key": concurrentKey}, 1)
 
 	conflictingKey := "integration-idem-conflicting"
 	conflictingSheets := []*domainanswersheet.AnswerSheet{newIntegrationSheet(t, 90010005, "left"), newIntegrationSheet(t, 90010006, "right")}
@@ -217,7 +218,7 @@ func TestDurableSubmissionTransactionAgainstMongoReplicaSet(t *testing.T) {
 	if successes != 1 || conflicts != 1 {
 		t.Fatalf("conflicting concurrent results: successes=%d conflicts=%d", successes, conflicts)
 	}
-	assertMongoCount(t, ctx, idempotency, bson.M{"writer_id": uint64(301), "idempotency_key": conflictingKey}, 1)
+	assertMongoCount(t, ctx, db.Collection("answersheets"), bson.M{"submit_meta.writer_id": uint64(301), "submit_meta.idempotency_key": conflictingKey}, 1)
 	assertMongoCount(t, ctx, db.Collection("answersheets"), bson.M{"domain_id": bson.M{"$in": []uint64{90010005, 90010006}}}, 1)
 }
 

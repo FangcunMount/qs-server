@@ -85,12 +85,12 @@ func buildTaskOpenedFixture(t *testing.T, testeeID uint64, seq int, totalTimes i
 	currentTask := domainPlan.NewAssessmentTask(planAggregate.GetID(), seq, 1, testeeDomain.NewID(testeeID), "scale-code", plannedAt)
 	openAt := time.Date(2026, 4, 3, 10, 30, 0, 0, time.Local)
 	expireAt := openAt.Add(24 * time.Hour)
-	currentTask.RestoreFromRepository(currentTask.GetID(), domainPlan.TaskStatusOpened, &openAt, &expireAt, nil, nil, "entry-token", "https://collect.example.com/entry?token=abc123&task_id="+currentTask.GetID().String())
+	currentTask.RestoreFromRepository(currentTask.GetID(), currentTask.GetEnrollmentID(), domainPlan.TaskStatusOpened, &openAt, &expireAt, nil, nil, nil, nil, "entry-token", "https://collect.example.com/entry?token=abc123&task_id="+currentTask.GetID().String())
 
 	peerTask := domainPlan.NewAssessmentTask(planAggregate.GetID(), seq+1, 1, testeeDomain.NewID(testeeID), "scale-code", plannedAt)
 	peerOpenAt := openAt.Add(5 * time.Minute)
 	peerExpireAt := peerOpenAt.Add(24 * time.Hour)
-	peerTask.RestoreFromRepository(peerTask.GetID(), domainPlan.TaskStatusOpened, &peerOpenAt, &peerExpireAt, nil, nil, "entry-token-2", "")
+	peerTask.RestoreFromRepository(peerTask.GetID(), peerTask.GetEnrollmentID(), domainPlan.TaskStatusOpened, &peerOpenAt, &peerExpireAt, nil, nil, nil, nil, "entry-token-2", "")
 
 	return planAggregate, currentTask, []*domainPlan.AssessmentTask{currentTask, peerTask}
 }

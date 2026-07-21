@@ -38,6 +38,7 @@ func InstallFrom(host InstallHost) error {
 		OverviewGuardOpts:     host.StatisticsOverviewGuardOptions(),
 		HotsetRecorder:        host.HotsetRecorder(),
 		LockManager:           host.LockManager(),
+		LockRunner:            host.LockRunner(),
 		Observer:              host.CacheObserver(),
 		MySQLLimiter:          host.MySQLLimiter(),
 		WarmupCoordinator:     host.WarmupCoordinator(),

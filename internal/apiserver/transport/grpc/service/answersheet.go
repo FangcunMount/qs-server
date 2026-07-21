@@ -97,6 +97,9 @@ func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAn
 		TaskID:            req.TaskId,
 		Answers:           answers,
 	}
+	if req.OriginRef != nil {
+		dto.OriginRef = &answersheet.OriginRefDTO{Type: req.OriginRef.Type, ID: req.OriginRef.Id}
+	}
 
 	// 调用应用服务
 	result, err := s.submissionService.Submit(ctx, dto)

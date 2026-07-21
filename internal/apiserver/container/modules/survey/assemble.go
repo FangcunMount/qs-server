@@ -15,10 +15,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	attributioninfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/answersheetattribution"
 	ruleengineInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"gorm.io/gorm"
 )
 
 // Module assembles survey application services.
@@ -33,6 +35,7 @@ type Module struct {
 // Deps defines explicit constructor dependencies for the survey module.
 type Deps struct {
 	MongoDB             *mongo.Database
+	MySQLDB             *gorm.DB
 	EventPublisher      event.EventPublisher
 	IdentityService     *iam.IdentityService
 	HotsetRecorder      cachetarget.HotsetRecorder
@@ -92,6 +95,7 @@ func New(deps Deps) (*Module, error) {
 
 	if err := module.initAnswerSheetSubModule(
 		normalized.MongoDB,
+		normalized.MySQLDB,
 		normalized.AnswerSheetRepo,
 		normalized.AnswerSheetReader,
 		normalized.QuestionnaireRepo,
@@ -155,7 +159,7 @@ func (m *Module) SetAssessmentBindingResolver(binding rulesetport.AssessmentBind
 	}
 }
 
-func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, profile appEventing.ProfileBinding) error {
+func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, mysqlDB *gorm.DB, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, profile appEventing.ProfileBinding) error {
 	sub := m.AnswerSheet
 
 	answerScorer := ruleengineInfra.NewAnswerScorer()
@@ -166,6 +170,10 @@ func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, repo AnswerSh
 	}
 	durableStore := asApp.NewTransactionalSubmissionDurableStore(mongoTxRunner, repo, profile.Stager, profile.PostCommit)
 	sub.SubmissionService = asApp.NewSubmissionService(repo, durableStore, questionnaireRepo, reader)
+	if injector, ok := sub.SubmissionService.(asApp.AttributionResolverInjector); ok && mysqlDB != nil {
+		// Resolver reads authoritative Actor/Plan facts before the Mongo durable transaction.
+		injector.SetAttributionResolver(attributioninfra.NewResolver(mysqlDB))
+	}
 	sub.ManagementService = asApp.NewManagementService(repo, reader)
 	sub.ScoringService = asApp.NewAnswerSheetScoringService(repo, questionnaireRepo, answerScorer)
 	return nil

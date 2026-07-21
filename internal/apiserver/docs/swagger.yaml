@@ -1,5 +1,31 @@
 basePath: /api/v1
 definitions:
+  binding.DecisionKind:
+    enum:
+    - score_range
+    - pole_composition
+    - trait_profile
+    - nearest_pattern
+    - dominant_factor
+    - norm_lookup
+    - ability_level
+    - score_range_interpretation
+    - score_range
+    - pole_composition
+    - trait_profile
+    - nearest_pattern
+    - dominant_factor
+    - norm_lookup
+    - ability_level
+    type: string
+    x-enum-varnames:
+    - DecisionKindScoreRange
+    - DecisionKindPoleComposition
+    - DecisionKindTraitProfile
+    - DecisionKindNearestPattern
+    - DecisionKindDominantFactor
+    - DecisionKindNormLookup
+    - DecisionKindAbilityLevel
   cachemodel.FamilyStatus:
     properties:
       allow_warmup:
@@ -173,6 +199,69 @@ definitions:
         description: Reference 返回参考文档（错误时使用）
         type: string
     type: object
+  decision.FactorScoreRanges:
+    properties:
+      factorCode:
+        type: string
+      kind:
+        description: risk | norm | ability
+        type: string
+      primary:
+        type: boolean
+      rules:
+        items:
+          $ref: '#/definitions/decision.ScoreRangeRule'
+        type: array
+    type: object
+  decision.OutcomeRef:
+    properties:
+      code:
+        type: string
+    type: object
+  decision.ScoreRangeRule:
+    properties:
+      level:
+        type: string
+      maxInclusive:
+        type: boolean
+      maxScore:
+        type: number
+      minScore:
+        type: number
+      outcomeCode:
+        type: string
+      unboundedMax:
+        type: boolean
+    type: object
+  decision.Spec:
+    properties:
+      outcomeRefs:
+        items:
+          $ref: '#/definitions/decision.OutcomeRef'
+        type: array
+      scoreRanges:
+        items:
+          $ref: '#/definitions/decision.FactorScoreRanges'
+        type: array
+      specialOutcomes:
+        description: special-rule / profile outcome codes referenced by decision
+        items:
+          type: string
+        type: array
+      typeDecision:
+        $ref: '#/definitions/decision.TypeDecisionFact'
+    type: object
+  decision.TypeDecisionFact:
+    properties:
+      fallbackCode:
+        type: string
+      fallbackSimilarityThreshold:
+        type: number
+      kind:
+        $ref: '#/definitions/binding.DecisionKind'
+      topK:
+        type: integer
+    type: object
   definition.Brief2Spec:
     properties:
       formVariant:
@@ -237,6 +326,8 @@ definitions:
           type: string
         type: array
       templateID:
+        type: string
+      templateVersion:
         type: string
       title:
         type: string
@@ -474,6 +565,122 @@ definitions:
           $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_apiserver_domain_statistics.ContentReference'
         type: array
     type: object
+  handler.statisticsRunRequest:
+    properties:
+      confirm:
+        type: boolean
+      from_date:
+        type: string
+      reason:
+        type: string
+      to_date:
+        type: string
+      validate_only:
+        type: boolean
+    type: object
+  handler.statisticsV2ContentRequest:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/statisticsv2.ContentRef'
+        type: array
+    type: object
+  interpretationassets.Assets:
+    properties:
+      outcomes:
+        items:
+          $ref: '#/definitions/interpretationassets.OutcomePresentation'
+        type: array
+      profiles:
+        items:
+          $ref: '#/definitions/interpretationassets.TypeProfilePresentation'
+        type: array
+      reportSpec:
+        $ref: '#/definitions/interpretationassets.ReportSpec'
+    type: object
+  interpretationassets.OutcomePresentation:
+    properties:
+      description:
+        type: string
+      outcomeCode:
+        type: string
+      summary:
+        type: string
+      title:
+        type: string
+    type: object
+  interpretationassets.RarityPresentation:
+    properties:
+      label:
+        type: string
+      oneInX:
+        type: integer
+      percent:
+        type: number
+    type: object
+  interpretationassets.ReportSection:
+    properties:
+      adapterKey:
+        type: string
+      categoryLabel:
+        type: string
+      code:
+        type: string
+      kind:
+        type: string
+      sourceRefs:
+        items:
+          type: string
+        type: array
+      templateID:
+        type: string
+      templateVersion:
+        type: string
+      title:
+        type: string
+    type: object
+  interpretationassets.ReportSpec:
+    properties:
+      sections:
+        items:
+          $ref: '#/definitions/interpretationassets.ReportSection'
+        type: array
+    type: object
+  interpretationassets.TypeProfilePresentation:
+    properties:
+      commentary:
+        type: string
+      image:
+        type: string
+      imageURL:
+        type: string
+      isSpecial:
+        type: boolean
+      outcomeCode:
+        type: string
+      pattern:
+        type: string
+      rarity:
+        $ref: '#/definitions/interpretationassets.RarityPresentation'
+      strengths:
+        items:
+          type: string
+        type: array
+      suggestions:
+        items:
+          type: string
+        type: array
+      traits:
+        items:
+          type: string
+        type: array
+      trigger:
+        type: string
+      weaknesses:
+        items:
+          type: string
+        type: array
+    type: object
   meta.ID:
     enum:
     - 0
@@ -516,6 +723,10 @@ definitions:
     type: object
   modelcatalog.Definition:
     properties:
+      DecisionSpec:
+        $ref: '#/definitions/decision.Spec'
+      InterpretationAssets:
+        $ref: '#/definitions/interpretationassets.Assets'
       calibration:
         $ref: '#/definitions/definition.Calibration'
       conclusions:
@@ -817,6 +1028,8 @@ definitions:
         maxLength: 128
         minLength: 8
         type: string
+      origin_ref:
+        $ref: '#/definitions/request.OriginRefRequest'
       questionnaire_code:
         type: string
       questionnaire_version:
@@ -1181,6 +1394,15 @@ definitions:
     - raw_score_max
     - raw_score_min
     - t_score
+    type: object
+  request.OriginRefRequest:
+    properties:
+      id:
+        type: string
+      type:
+        type: string
+    required:
+    - type
     type: object
   request.ReorderQuestionsRequest:
     properties:
@@ -3798,6 +4020,13 @@ definitions:
     - TimeRangePresetToday
     - TimeRangePreset7D
     - TimeRangePreset30D
+  statisticsv2.ContentRef:
+    properties:
+      code:
+        type: string
+      kind:
+        type: string
+    type: object
   systemgovernance.ActionDescriptor:
     properties:
       domain:
@@ -9178,6 +9407,152 @@ paths:
       summary: 查询 outcome 报告列表
       tags:
       - Evaluation-Report-Outcome
+  /api/v2/plans/testees/{testee_id}/enrollments:
+    get:
+      parameters:
+      - description: 受试者 ID
+        in: path
+        name: testee_id
+        required: true
+        type: integer
+      - description: Plan ID
+        in: query
+        name: plan_id
+        type: integer
+      - description: active/closed/terminated
+        in: query
+        name: status
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询受试者 Plan Enrollment 轮次
+      tags:
+      - Plan-Enrollment
+  /api/v2/statistics/clinicians:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询 Statistics V2 医生列表
+      tags:
+      - Statistics-V2
+  /api/v2/statistics/clinicians/{id}:
+    get:
+      parameters:
+      - description: 医生 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询 Statistics V2 医生详情
+      tags:
+      - Statistics-V2
+  /api/v2/statistics/clinicians/me/entries:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询当前医生 Statistics V2 入口
+      tags:
+      - Statistics-V2
+  /api/v2/statistics/clinicians/me/overview:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询当前医生 Statistics V2 总览
+      tags:
+      - Statistics-V2
+  /api/v2/statistics/clinicians/me/testees-summary:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询当前医生 Statistics V2 受试者摘要
+      tags:
+      - Statistics-V2
+  /api/v2/statistics/contents/batch:
+    post:
+      parameters:
+      - description: 内容引用
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.statisticsV2ContentRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 批量查询 Statistics V2 内容统计
+      tags:
+      - Statistics-V2
+  /api/v2/statistics/entries:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询 Statistics V2 入口列表
+      tags:
+      - Statistics-V2
+  /api/v2/statistics/entries/{id}:
+    get:
+      parameters:
+      - description: 入口 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询 Statistics V2 入口详情
+      tags:
+      - Statistics-V2
+  /api/v2/statistics/overview:
+    get:
+      parameters:
+      - description: latest_complete_day/7d/30d/custom
+        in: query
+        name: preset
+        type: string
+      - description: 上海日期 YYYY-MM-DD
+        in: query
+        name: from
+        type: string
+      - description: 上海日期 YYYY-MM-DD
+        in: query
+        name: to
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询 Statistics V2 机构总览
+      tags:
+      - Statistics-V2
   /governance/redis:
     get:
       description: 返回 apiserver Redis family 的运行状态。
@@ -9932,6 +10307,64 @@ paths:
       summary: 系统治理-承压保护
       tags:
       - System-Governance
+  /internal/v2/statistics/runs:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询 Statistics V2 同步批次
+      tags:
+      - Statistics-V2-Internal
+    post:
+      parameters:
+      - description: 批次窗口
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.statisticsRunRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 创建 Statistics V2 同步批次
+      tags:
+      - Statistics-V2-Internal
+  /internal/v2/statistics/runs/{id}:
+    get:
+      parameters:
+      - description: 批次 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询 Statistics V2 同步批次详情
+      tags:
+      - Statistics-V2-Internal
+  /internal/v2/statistics/runs/{id}/resume-cache:
+    post:
+      parameters:
+      - description: 批次 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 恢复 Statistics V2 批次缓存发布
+      tags:
+      - Statistics-V2-Internal
   /ping:
     get:
       produces:

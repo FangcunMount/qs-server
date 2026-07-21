@@ -65,6 +65,13 @@ func (r *enrollmentTaskRepoStub) FindByTesteeIDAndPlanID(context.Context, testee
 	return append([]*domainPlan.AssessmentTask(nil), r.existingEnrollmentTasks...), nil
 }
 
+func (r *enrollmentTaskRepoStub) FindByEnrollmentID(context.Context, domainPlan.PlanEnrollmentID) ([]*domainPlan.AssessmentTask, error) {
+	if len(r.existingEnrollmentTasks) > 0 {
+		return append([]*domainPlan.AssessmentTask(nil), r.existingEnrollmentTasks...), nil
+	}
+	return append([]*domainPlan.AssessmentTask(nil), r.planTasks...), nil
+}
+
 func (r *enrollmentTaskRepoStub) FindPendingTasks(context.Context, int64, time.Time) ([]*domainPlan.AssessmentTask, error) {
 	return nil, nil
 }
@@ -99,6 +106,62 @@ type enrollmentEventPublisherStub struct {
 	events []event.DomainEvent
 }
 
+type enrollmentRepoStub struct {
+	active *domainPlan.Enrollment
+	latest *domainPlan.Enrollment
+}
+
+func (r *enrollmentRepoStub) FindByID(context.Context, domainPlan.PlanEnrollmentID) (*domainPlan.Enrollment, error) {
+	return r.active, nil
+}
+
+func (r *enrollmentRepoStub) FindActive(context.Context, int64, domainPlan.AssessmentPlanID, testeeDomain.ID) (*domainPlan.Enrollment, error) {
+	if r.active != nil && r.active.IsActive() {
+		return r.active, nil
+	}
+	return nil, nil
+}
+
+func (r *enrollmentRepoStub) FindLatest(context.Context, int64, domainPlan.AssessmentPlanID, testeeDomain.ID) (*domainPlan.Enrollment, error) {
+	if r.latest != nil {
+		return r.latest, nil
+	}
+	return r.active, nil
+}
+
+func (r *enrollmentRepoStub) Save(_ context.Context, enrollment *domainPlan.Enrollment) error {
+	r.active = enrollment
+	r.latest = enrollment
+	return nil
+}
+
+func (r *enrollmentRepoStub) CloseIfAllTasksTerminal(context.Context, domainPlan.PlanEnrollmentID, time.Time) (bool, error) {
+	return false, nil
+}
+
+type directPlanTxRunner struct{}
+
+func (directPlanTxRunner) WithinTransaction(ctx context.Context, fn func(context.Context) error) error {
+	return fn(ctx)
+}
+
+func newEnrollmentServiceForTest(planRepo domainPlan.AssessmentPlanRepository, taskRepo *enrollmentTaskRepoStub, publisher event.EventPublisher) PlanEnrollmentService {
+	repo := &enrollmentRepoStub{}
+	tasks := taskRepo.existingEnrollmentTasks
+	if len(tasks) == 0 {
+		tasks = taskRepo.planTasks
+	}
+	if len(tasks) > 0 {
+		first := tasks[0]
+		repo.active = domainPlan.NewEnrollment(first.GetOrgID(), first.GetPlanID(), first.GetTesteeID(), 1, first.GetPlannedAt(), first.GetPlannedAt())
+		repo.latest = repo.active
+		for _, task := range tasks {
+			task.AssignEnrollment(repo.active.ID())
+		}
+	}
+	return NewEnrollmentService(planRepo, taskRepo, repo, directPlanTxRunner{}, publisher)
+}
+
 func (p *enrollmentEventPublisherStub) Publish(_ context.Context, evt event.DomainEvent) error {
 	p.events = append(p.events, evt)
 	return nil
@@ -123,7 +186,7 @@ func TestEnrollmentServiceDoesNotPublishPlanEventOnEnroll(t *testing.T) {
 
 	taskRepo := &enrollmentTaskRepoStub{}
 	publisher := &enrollmentEventPublisherStub{}
-	service := NewEnrollmentService(
+	service := newEnrollmentServiceForTest(
 		&enrollmentPlanRepoStub{plan: planAggregate},
 		taskRepo,
 		publisher,
@@ -158,7 +221,7 @@ func TestEnrollmentServiceSchedulesGeneratedTasksAtSevenPM(t *testing.T) {
 	planAggregate.ClearEvents()
 
 	taskRepo := &enrollmentTaskRepoStub{}
-	service := NewEnrollmentService(
+	service := newEnrollmentServiceForTest(
 		&enrollmentPlanRepoStub{plan: planAggregate},
 		taskRepo,
 		&enrollmentEventPublisherStub{},
@@ -204,7 +267,7 @@ func TestEnrollmentServiceSchedulesGeneratedTasksUsingPlanTriggerTime(t *testing
 	planAggregate.ClearEvents()
 
 	taskRepo := &enrollmentTaskRepoStub{}
-	service := NewEnrollmentService(
+	service := newEnrollmentServiceForTest(
 		&enrollmentPlanRepoStub{plan: planAggregate},
 		taskRepo,
 		&enrollmentEventPublisherStub{},
@@ -251,7 +314,7 @@ func TestEnrollmentServiceIdempotentEnrollPublishesNoPlanEvent(t *testing.T) {
 
 	taskRepo := &enrollmentTaskRepoStub{existingEnrollmentTasks: existingTasks}
 	publisher := &enrollmentEventPublisherStub{}
-	service := NewEnrollmentService(
+	service := newEnrollmentServiceForTest(
 		&enrollmentPlanRepoStub{plan: planAggregate},
 		taskRepo,
 		publisher,
@@ -299,7 +362,7 @@ func TestEnrollmentServiceTerminatePublishesOnlyTaskCanceledEvents(t *testing.T)
 		planTasks: []*domainPlan.AssessmentTask{pendingTask, openedTask},
 	}
 	publisher := &enrollmentEventPublisherStub{}
-	service := NewEnrollmentService(
+	service := newEnrollmentServiceForTest(
 		&enrollmentPlanRepoStub{plan: planAggregate},
 		taskRepo,
 		publisher,

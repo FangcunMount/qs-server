@@ -41,6 +41,7 @@ func (c *SubmissionCommitter) Save(
 		WriterID:             writerID,
 		TesteeID:             testeeID,
 		TaskID:               req.TaskID,
+		OriginRef:            req.OriginRef,
 		OrgID:                orgID,
 		Answers:              answers,
 	})

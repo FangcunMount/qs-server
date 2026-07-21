@@ -14,9 +14,15 @@ type SubmitAnswerSheetRequest struct {
 	Title                string `json:"title"`
 	// The decoder accepts both JSON number and string. Publish string to avoid
 	// JavaScript precision loss for uint64 identifiers.
-	TesteeID uint64   `json:"testee_id" binding:"required" swaggertype:"string" example:"618855887087350318"`
-	TaskID   string   `json:"task_id,omitempty"`
-	Answers  []Answer `json:"answers" binding:"required"`
+	TesteeID  uint64     `json:"testee_id" binding:"required" swaggertype:"string" example:"618855887087350318"`
+	TaskID    string     `json:"task_id,omitempty"`
+	OriginRef *OriginRef `json:"origin_ref,omitempty"`
+	Answers   []Answer   `json:"answers" binding:"required"`
+}
+
+type OriginRef struct {
+	Type string `json:"type" binding:"required"`
+	ID   string `json:"id,omitempty"`
 }
 
 // UnmarshalJSON 自定义 JSON 反序列化，支持 testee_id 为字符串或数字

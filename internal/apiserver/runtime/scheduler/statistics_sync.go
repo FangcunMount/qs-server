@@ -6,6 +6,8 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	statisticsV2App "github.com/FangcunMount/qs-server/internal/apiserver/application/statisticsv2"
+	statisticsV2Domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics/v2"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
@@ -22,6 +24,7 @@ type statisticsSyncService interface {
 type StatisticsSyncRunner struct {
 	opts              *apiserveroptions.StatisticsSyncOptions
 	syncService       statisticsSyncService
+	v2Coordinator     *statisticsV2App.Coordinator
 	warmupCoordinator statisticsApp.WarmupCoordinator
 	leader            leaderLeaseRunner
 	clock             DailyClock
@@ -35,8 +38,9 @@ func NewStatisticsSyncRunner(
 	warmupCoordinator statisticsApp.WarmupCoordinator,
 	lockManager locklease.Manager,
 	lockBuilder *keyspace.Builder,
+	v2Coordinator ...*statisticsV2App.Coordinator,
 ) *StatisticsSyncRunner {
-	return newStatisticsSyncRunnerWithHooks(
+	runner := newStatisticsSyncRunnerWithHooks(
 		opts,
 		syncService,
 		warmupCoordinator,
@@ -49,6 +53,10 @@ func NewStatisticsSyncRunner(
 			return lockManager.ReleaseSpec(ctx, spec, key, lease)
 		},
 	)
+	if runner != nil && len(v2Coordinator) > 0 {
+		runner.v2Coordinator = v2Coordinator[0]
+	}
+	return runner
 }
 
 func newStatisticsSyncRunnerWithHooks(
@@ -133,7 +141,7 @@ func (r *StatisticsSyncRunner) Start(ctx context.Context) {
 
 	go func() {
 		for {
-			now := r.now().In(time.Local)
+			now := r.now().In(statisticsV2Domain.Shanghai)
 			nextRun := NextDailyRun(now, r.clock.Hour, r.clock.Minute)
 			timer := time.NewTimer(time.Until(nextRun))
 			select {
@@ -165,7 +173,7 @@ func (r *StatisticsSyncRunner) runOnce(ctx context.Context) error {
 		},
 	}, func(ctx context.Context) error {
 		for _, orgID := range r.opts.OrgIDs {
-			start, end := statisticsSyncRepairWindow(r.now().In(time.Local), r.opts.RepairWindowDays)
+			start, end := statisticsSyncRepairWindow(r.now().In(statisticsV2Domain.Shanghai), r.opts.RepairWindowDays)
 			dailyOpts := statisticsApp.SyncDailyOptions{StartDate: &start, EndDate: &end}
 			if err := r.syncService.SyncDailyStatistics(ctx, orgID, dailyOpts); err != nil {
 				log.Warnf("statistics nightly daily sync failed (org=%d): %v", orgID, err)
@@ -178,6 +186,18 @@ func (r *StatisticsSyncRunner) runOnce(ctx context.Context) error {
 			if err := r.syncService.SyncPlanStatistics(ctx, orgID); err != nil {
 				log.Warnf("statistics nightly plan sync failed (org=%d): %v", orgID, err)
 				continue
+			}
+			if r.v2Coordinator != nil {
+				toDate := end.AddDate(0, 0, -1)
+				run, err := r.v2Coordinator.Run(ctx, statisticsV2App.RunRequest{OrgID: orgID, FromDate: start, ToDate: toDate, Reason: "nightly shadow statistics v2", TriggerType: "scheduled"})
+				if err != nil {
+					status := "unknown"
+					if run != nil {
+						status = string(run.Status)
+					}
+					log.Warnf("statistics v2 nightly shadow run failed (org=%d,status=%s): %v", orgID, status, err)
+					continue
+				}
 			}
 			if r.warmupCoordinator != nil {
 				if err := r.warmupCoordinator.HandleStatisticsSync(ctx, orgID); err != nil {

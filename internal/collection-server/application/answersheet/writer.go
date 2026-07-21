@@ -16,6 +16,7 @@ type SaveAnswerSheetInput struct {
 	WriterID             uint64
 	TesteeID             uint64
 	TaskID               string
+	OriginRef            *OriginRef
 	OrgID                uint64
 	Answers              []AnswerInput
 }

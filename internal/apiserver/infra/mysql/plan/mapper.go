@@ -159,15 +159,16 @@ func (m *TaskMapper) ToPO(domain *domainPlan.AssessmentTask) *AssessmentTaskPO {
 	}
 
 	po := &AssessmentTaskPO{
-		PlanID:     domain.GetPlanID().Uint64(),
-		Seq:        domain.GetSeq(),
-		OrgID:      domain.GetOrgID(),
-		TesteeID:   domain.GetTesteeID().Uint64(),
-		ScaleCode:  domain.GetScaleCode(),
-		PlannedAt:  domain.GetPlannedAt(),
-		Status:     string(domain.GetStatus()),
-		EntryToken: domain.GetEntryToken(),
-		EntryURL:   domain.GetEntryURL(),
+		PlanID:       domain.GetPlanID().Uint64(),
+		EnrollmentID: domain.GetEnrollmentID().Uint64(),
+		Seq:          domain.GetSeq(),
+		OrgID:        domain.GetOrgID(),
+		TesteeID:     domain.GetTesteeID().Uint64(),
+		ScaleCode:    domain.GetScaleCode(),
+		PlannedAt:    domain.GetPlannedAt(),
+		Status:       string(domain.GetStatus()),
+		EntryToken:   domain.GetEntryToken(),
+		EntryURL:     domain.GetEntryURL(),
 	}
 
 	// 设置ID（如果已存在）
@@ -185,6 +186,8 @@ func (m *TaskMapper) ToPO(domain *domainPlan.AssessmentTask) *AssessmentTaskPO {
 	if completedAt := domain.GetCompletedAt(); completedAt != nil {
 		po.CompletedAt = completedAt
 	}
+	po.ExpiredAt = domain.GetExpiredAt()
+	po.CanceledAt = domain.GetCanceledAt()
 	if assessmentID := domain.GetAssessmentID(); assessmentID != nil {
 		assessmentIDUint64 := assessmentID.Uint64()
 		po.AssessmentID = &assessmentIDUint64
@@ -219,10 +222,13 @@ func (m *TaskMapper) ToDomain(po *AssessmentTaskPO) *domainPlan.AssessmentTask {
 	// 恢复ID和状态（使用 RestoreFromRepository）
 	task.RestoreFromRepository(
 		meta.ID(po.ID),
+		meta.FromUint64(po.EnrollmentID),
 		domainPlan.TaskStatus(po.Status),
 		po.OpenAt,
 		po.ExpireAt,
 		po.CompletedAt,
+		po.ExpiredAt,
+		po.CanceledAt,
 		assessmentIDPtr,
 		po.EntryToken,
 		po.EntryURL,
@@ -257,10 +263,13 @@ func (m *TaskMapper) SyncID(po *AssessmentTaskPO, domain *domainPlan.AssessmentT
 		}
 		domain.RestoreFromRepository(
 			meta.ID(po.ID),
+			meta.FromUint64(po.EnrollmentID),
 			domain.GetStatus(),
 			po.OpenAt,
 			po.ExpireAt,
 			po.CompletedAt,
+			po.ExpiredAt,
+			po.CanceledAt,
 			assessmentIDPtr,
 			po.EntryToken,
 			po.EntryURL,

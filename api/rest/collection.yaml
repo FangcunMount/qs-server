@@ -2294,6 +2294,8 @@ components:
           type: string
           maxLength: 128
           minLength: 8
+        origin_ref:
+          $ref: '#/components/schemas/github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.OriginRef'
         questionnaire_code:
           type: string
         questionnaire_version:
@@ -2840,6 +2842,15 @@ components:
           type: integer
         value:
           description: JSON 字符串
+          type: string
+    github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.OriginRef:
+      type: object
+      required:
+      - type
+      properties:
+        id:
+          type: string
+        type:
           type: string
     github_com_FangcunMount_qs-server_internal_collection-server_application_questionnaire.ListQuestionnairesResponse:
       type: object

@@ -91,6 +91,7 @@ func buildSchedulerManager(cfg *config.Config, deps container.ServerRuntimeDeps)
 			deps.WarmupCoordinator,
 			deps.LockManager,
 			deps.LockBuilder,
+			deps.StatisticsV2Coordinator,
 		),
 		runtimescheduler.NewBehaviorPendingReconcileRunner(
 			cfg.BehaviorPendingReconcile,

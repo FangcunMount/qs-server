@@ -1,11 +1,22 @@
 package statistics_test
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"gorm.io/gorm"
 )
+
+type lockRunnerStub struct{}
+
+func (lockRunnerStub) Run(ctx context.Context, _ locklease.WorkloadID, _ string, _ time.Duration, body func(context.Context) error) (locklease.RunResult, error) {
+	return locklease.RunResult{Acquired: true}, body(ctx)
+}
 
 func TestNewRequiresMySQLDB(t *testing.T) {
 	t.Parallel()
@@ -18,7 +29,11 @@ func TestNewRequiresMySQLDB(t *testing.T) {
 func TestNewBuildsServicesWithoutExposingCache(t *testing.T) {
 	t.Parallel()
 
-	module, err := statistics.New(statistics.Deps{MySQLDB: &gorm.DB{}})
+	client, err := mongo.NewClient(options.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	module, err := statistics.New(statistics.Deps{MySQLDB: &gorm.DB{}, MongoDB: client.Database("test"), LockRunner: lockRunnerStub{}})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}

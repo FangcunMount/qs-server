@@ -59,6 +59,8 @@ definitions:
         maxLength: 128
         minLength: 8
         type: string
+      origin_ref:
+        $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.OriginRef'
       questionnaire_code:
         type: string
       questionnaire_version:
@@ -611,6 +613,15 @@ definitions:
     - question_code
     - question_type
     - value
+    type: object
+  github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.OriginRef:
+    properties:
+      id:
+        type: string
+      type:
+        type: string
+    required:
+    - type
     type: object
   github_com_FangcunMount_qs-server_internal_collection-server_application_questionnaire.ListQuestionnairesResponse:
     properties:

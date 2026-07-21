@@ -2553,6 +2553,9 @@ const docTemplate = `{
                     "maxLength": 128,
                     "minLength": 8
                 },
+                "origin_ref": {
+                    "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.OriginRef"
+                },
                 "questionnaire_code": {
                     "type": "string"
                 },
@@ -3365,6 +3368,20 @@ const docTemplate = `{
                 },
                 "value": {
                     "description": "JSON 字符串",
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.OriginRef": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "type": {
                     "type": "string"
                 }
             }

@@ -20,6 +20,7 @@ func InstallFrom(host InstallHost) error {
 	}
 	module, err := Wire(WireInput{
 		MongoDB:             host.MongoDB(),
+		MySQLDB:             host.MySQLDB(),
 		EventPublisher:      host.EventPublisher(),
 		IdentityService:     host.IdentityService(),
 		HotsetRecorder:      host.HotsetRecorder(),

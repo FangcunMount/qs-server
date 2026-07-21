@@ -13,18 +13,43 @@ import (
 // 对应MongoDB集合结构
 type AnswerSheetPO struct {
 	base.BaseDocument    `bson:",inline"`
-	QuestionnaireCode    string       `bson:"questionnaire_code" json:"questionnaire_code"`
-	QuestionnaireVersion string       `bson:"questionnaire_version" json:"questionnaire_version"`
-	QuestionnaireTitle   string       `bson:"questionnaire_title" json:"questionnaire_title"`
-	FillerID             int64        `bson:"filler_id" json:"filler_id"`
-	FillerType           string       `bson:"filler_type" json:"filler_type"`
-	TesteeID             uint64       `bson:"testee_id,omitempty" json:"testee_id,omitempty"`
-	OrgID                uint64       `bson:"org_id,omitempty" json:"org_id,omitempty"`
-	TaskID               string       `bson:"task_id,omitempty" json:"task_id,omitempty"`
-	Admission            *AdmissionPO `bson:"admission,omitempty" json:"admission,omitempty"`
-	TotalScore           float64      `bson:"total_score" json:"total_score"`
-	FilledAt             time.Time    `bson:"filled_at" json:"filled_at"`
-	Answers              []AnswerPO   `bson:"answers" json:"answers"`
+	QuestionnaireCode    string                 `bson:"questionnaire_code" json:"questionnaire_code"`
+	QuestionnaireVersion string                 `bson:"questionnaire_version" json:"questionnaire_version"`
+	QuestionnaireTitle   string                 `bson:"questionnaire_title" json:"questionnaire_title"`
+	FillerID             int64                  `bson:"filler_id" json:"filler_id"`
+	FillerType           string                 `bson:"filler_type" json:"filler_type"`
+	TesteeID             uint64                 `bson:"testee_id,omitempty" json:"testee_id,omitempty"`
+	OrgID                uint64                 `bson:"org_id,omitempty" json:"org_id,omitempty"`
+	TaskID               string                 `bson:"task_id,omitempty" json:"task_id,omitempty"`
+	Admission            *AdmissionPO           `bson:"admission,omitempty" json:"admission,omitempty"`
+	Attribution          *AttributionSnapshotPO `bson:"attribution,omitempty" json:"attribution,omitempty"`
+	SubmitMeta           *SubmitMetaPO          `bson:"submit_meta,omitempty" json:"submit_meta,omitempty"`
+	TotalScore           float64                `bson:"total_score" json:"total_score"`
+	FilledAt             time.Time              `bson:"filled_at" json:"filled_at"`
+	Answers              []AnswerPO             `bson:"answers" json:"answers"`
+}
+
+// SubmitMetaPO is a technical acceptance fact embedded in the AnswerSheet
+// document. It protects the submission contract but is not a domain aggregate.
+type SubmitMetaPO struct {
+	IdempotencyKey string    `bson:"idempotency_key" json:"idempotency_key"`
+	WriterID       uint64    `bson:"writer_id" json:"writer_id"`
+	Fingerprint    string    `bson:"fingerprint" json:"fingerprint"`
+	RequestID      string    `bson:"request_id,omitempty" json:"request_id,omitempty"`
+	AcceptedAt     time.Time `bson:"accepted_at" json:"accepted_at"`
+}
+
+type AttributionSnapshotPO struct {
+	OriginType   string    `bson:"origin_type" json:"origin_type"`
+	OriginID     string    `bson:"origin_id,omitempty" json:"origin_id,omitempty"`
+	ClinicianID  string    `bson:"clinician_id,omitempty" json:"clinician_id,omitempty"`
+	EntryID      string    `bson:"entry_id,omitempty" json:"entry_id,omitempty"`
+	PlanID       string    `bson:"plan_id,omitempty" json:"plan_id,omitempty"`
+	EnrollmentID string    `bson:"enrollment_id,omitempty" json:"enrollment_id,omitempty"`
+	TaskID       string    `bson:"task_id,omitempty" json:"task_id,omitempty"`
+	CapturedAt   time.Time `bson:"captured_at" json:"captured_at"`
+	Version      uint32    `bson:"version" json:"version"`
+	Mode         string    `bson:"mode" json:"mode"`
 }
 
 // AdmissionPO freezes submit-time evaluation intent (EV-R001/R007).

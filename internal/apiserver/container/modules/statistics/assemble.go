@@ -3,12 +3,16 @@ package statistics
 import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	statisticsV2App "github.com/FangcunMount/qs-server/internal/apiserver/application/statisticsv2"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/cache/statistics"
+	statisticsV2Cache "github.com/FangcunMount/qs-server/internal/apiserver/cache/statisticsv2"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
+	statisticsV2Domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics/v2"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	statisticsReadModelInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics/readmodel"
+	statisticsV2Infra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statisticsv2"
 	statisticsQueryInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
@@ -30,6 +34,9 @@ type Module struct {
 	SyncService                statisticsApp.StatisticsSyncService
 	BehaviorProjectorService   statisticsApp.BehaviorProjectorService
 	BehaviorJourneyScanService statisticsApp.BehaviorJourneyScanService
+	V2Coordinator              *statisticsV2App.Coordinator
+	V2RunStore                 *statisticsV2Infra.RunStore
+	V2ReadService              *statisticsV2App.ReadService
 }
 
 // Deps defines explicit constructor dependencies for the statistics module.
@@ -44,6 +51,7 @@ type Deps struct {
 	OverviewGuardOpts     statisticsApp.StatisticsReadGuardOptions
 	HotsetRecorder        cachetarget.HotsetRecorder
 	LockManager           locklease.Manager
+	LockRunner            locklease.Runner
 	VersionStore          querycache.VersionTokenStore
 	Observer              *observability.ComponentObserver
 	MySQLLimiter          backpressure.Acquirer
@@ -100,6 +108,34 @@ func New(deps Deps) (*Module, error) {
 		statisticsQueryInfra.NewReportScanSource(normalized.MySQLDB, normalized.MongoDB),
 	)
 	module.SyncService = statisticsApp.NewSyncServiceWithTransactionRunner(txRunner, repo, normalized.RepairWindowDays, normalized.LockManager)
+	collectors, err := statisticsV2Domain.NewCollectorSet(
+		statisticsV2Infra.NewAccessFactCollector(normalized.MySQLDB),
+		statisticsV2Infra.NewAssessmentFactCollector(normalized.MySQLDB, normalized.MongoDB),
+		statisticsV2Infra.NewPlanFactCollector(normalized.MySQLDB),
+	)
+	if err != nil {
+		return nil, err
+	}
+	engine, err := statisticsV2Domain.NewProjectionEngine(statisticsV2Infra.NewProjections(normalized.MySQLDB)...)
+	if err != nil {
+		return nil, err
+	}
+	module.V2RunStore = statisticsV2Infra.NewRunStore(normalized.MySQLDB)
+	module.V2ReadService = statisticsV2App.NewReadService(
+		statisticsV2Infra.NewReadStore(normalized.MySQLDB, normalized.MySQLLimiter),
+		statisticsV2Cache.NewQueryCache(normalized.RedisClient),
+	)
+	module.V2Coordinator = statisticsV2App.NewCoordinator(
+		collectors,
+		engine,
+		module.V2RunStore,
+		txRunner,
+		normalized.LockRunner,
+		statisticsV2Cache.NewPublisher(
+			statisticsV2Cache.NewGenerationPublisher(normalized.RedisClient),
+			module.V2ReadService,
+		),
+	)
 
 	return module, nil
 }
@@ -107,6 +143,12 @@ func New(deps Deps) (*Module, error) {
 func normalizeDeps(deps Deps) (Deps, error) {
 	if deps.MySQLDB == nil {
 		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
+	}
+	if deps.MongoDB == nil {
+		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "mongo database connection is nil")
+	}
+	if deps.LockRunner == nil {
+		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "lock runner is nil")
 	}
 	return deps, nil
 }

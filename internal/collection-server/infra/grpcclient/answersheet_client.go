@@ -17,8 +17,14 @@ type SaveAnswerSheetInput struct {
 	WriterID             uint64
 	TesteeID             uint64
 	TaskID               string
+	OriginRef            *OriginRef
 	OrgID                uint64
 	Answers              []AnswerInput
+}
+
+type OriginRef struct {
+	Type string
+	ID   string
 }
 
 // AnswerInput 答案输入
@@ -101,6 +107,9 @@ func (c *AnswerSheetClient) SaveAnswerSheet(ctx context.Context, input *SaveAnsw
 		TaskId:               input.TaskID,
 		OrgId:                input.OrgID,
 		Answers:              answers,
+	}
+	if input.OriginRef != nil {
+		req.OriginRef = &pb.OriginRef{Type: input.OriginRef.Type, Id: input.OriginRef.ID}
 	}
 
 	resp, err := c.grpcClient.SaveAnswerSheet(ctx, req)

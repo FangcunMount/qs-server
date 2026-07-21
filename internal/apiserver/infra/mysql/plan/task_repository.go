@@ -110,6 +110,17 @@ func (r *taskRepository) FindByTesteeIDAndPlanID(ctx context.Context, testeeID t
 	return r.mapper.ToDomainList(pos), nil
 }
 
+func (r *taskRepository) FindByEnrollmentID(ctx context.Context, enrollmentID domainPlan.PlanEnrollmentID) ([]*domainPlan.AssessmentTask, error) {
+	var pos []*AssessmentTaskPO
+	err := r.WithContext(ctx).
+		Where("enrollment_id = ? AND deleted_at IS NULL", enrollmentID.Uint64()).
+		Order("seq ASC").Find(&pos).Error
+	if err != nil {
+		return nil, err
+	}
+	return r.mapper.ToDomainList(pos), nil
+}
+
 // FindPendingTasks 查询待推送的任务（计划时间 <= before）
 func (r *taskRepository) FindPendingTasks(ctx context.Context, orgID int64, before time.Time) ([]*domainPlan.AssessmentTask, error) {
 	var pos []*AssessmentTaskPO

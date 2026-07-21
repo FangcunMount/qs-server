@@ -10,6 +10,14 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
+var planBusinessLocation = func() *time.Location {
+	location, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		panic(err)
+	}
+	return location
+}()
+
 // ============= Result 定义 =============
 // Results 用于应用服务层的输出结果
 
@@ -50,6 +58,8 @@ type TaskResult struct {
 // EnrollmentResult 加入计划结果
 type EnrollmentResult struct {
 	PlanID           string        // 计划ID
+	EnrollmentID     string        // 参与轮次ID
+	Round            uint32        // 参与轮次
 	Tasks            []*TaskResult // 生成/复用后的任务列表
 	Idempotent       bool          // 是否命中幂等路径
 	CreatedTaskCount int           // 本次新建任务数量
@@ -254,7 +264,7 @@ func parseTime(timeStr string) (time.Time, error) {
 		"2006-01-02",
 	}
 	for _, format := range formats {
-		if t, err := time.ParseInLocation(format, timeStr, time.Local); err == nil {
+		if t, err := time.ParseInLocation(format, timeStr, planBusinessLocation); err == nil {
 			return t, nil
 		}
 	}
@@ -266,7 +276,7 @@ func parseDate(dateStr string) (time.Time, error) {
 	if dateStr == "" {
 		return time.Time{}, nil
 	}
-	return time.ParseInLocation("2006-01-02", dateStr, time.Local)
+	return time.ParseInLocation("2006-01-02", dateStr, planBusinessLocation)
 }
 
 // toPlanScheduleType 转换为计划周期类型

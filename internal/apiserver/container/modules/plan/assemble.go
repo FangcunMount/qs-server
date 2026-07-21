@@ -12,7 +12,9 @@ import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	plancache "github.com/FangcunMount/qs-server/internal/apiserver/cache/plan"
+	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
+	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	planInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	planEntryInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/plan"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
@@ -30,6 +32,7 @@ import (
 type Module struct {
 	CommandService                planApp.PlanCommandService
 	QueryService                  planApp.PlanQueryService
+	EnrollmentQueryService        planApp.EnrollmentQueryService
 	TaskAssessmentResolver        planApp.TaskAssessmentResolver
 	TaskNotificationContextReader planApp.TaskNotificationContextReader
 	FollowUpQueueReader           planreadmodel.FollowUpQueueReader
@@ -72,15 +75,21 @@ func New(deps Deps) (*Module, error) {
 	}
 
 	taskRepo := planInfra.NewTaskRepository(normalized.MySQLDB, mysqlOptions)
+	enrollmentRepo := planInfra.NewEnrollmentRepository(normalized.MySQLDB, mysqlOptions)
+	txRunner := modtx.NewMySQLRunner(normalized.MySQLDB)
 	entryGenerator := planEntryInfra.NewEntryGenerator(normalized.EntryBaseURL)
 	scaleCatalog := planApp.NewPublishedScaleCatalog(normalized.PublishedModels)
 	planReadModel := planInfra.NewReadModel(normalized.MySQLDB)
 	module.FollowUpQueueReader = planReadModel
 
-	lifecycleService := planApp.NewLifecycleServiceWithScaleCatalog(planRepo, taskRepo, scaleCatalog, module.eventPublisher)
-	enrollmentService := planApp.NewEnrollmentService(planRepo, taskRepo, module.eventPublisher)
-	taskSchedulerService := planApp.NewTaskSchedulerService(taskRepo, planRepo, entryGenerator, module.eventPublisher)
-	taskManagementService := planApp.NewTaskManagementService(taskRepo, entryGenerator, module.eventPublisher)
+	lifecycleEnrollments, ok := enrollmentRepo.(planDomain.PlanEnrollmentLifecycleRepository)
+	if !ok {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "enrollment repository lacks lifecycle transitions")
+	}
+	lifecycleService := planApp.NewLifecycleServiceWithEnrollment(planRepo, taskRepo, scaleCatalog, lifecycleEnrollments, txRunner, module.eventPublisher)
+	enrollmentService := planApp.NewEnrollmentService(planRepo, taskRepo, enrollmentRepo, txRunner, module.eventPublisher)
+	taskSchedulerService := planApp.NewTaskSchedulerServiceWithEnrollment(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher)
+	taskManagementService := planApp.NewTaskManagementServiceWithEnrollment(taskRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher)
 	module.CommandService = planApp.NewCommandService(
 		lifecycleService,
 		enrollmentService,
@@ -90,6 +99,7 @@ func New(deps Deps) (*Module, error) {
 		taskRepo,
 	)
 	module.QueryService = planApp.NewQueryService(planReadModel, planReadModel, scaleCatalog)
+	module.EnrollmentQueryService = planApp.NewEnrollmentQueryService(planInfra.NewEnrollmentReadStore(normalized.MySQLDB, normalized.MySQLLimiter))
 	module.TaskAssessmentResolver = planApp.NewTaskAssessmentResolver(taskRepo)
 	module.TaskNotificationContextReader = planApp.NewTaskNotificationContextReader(taskRepo, planRepo)
 

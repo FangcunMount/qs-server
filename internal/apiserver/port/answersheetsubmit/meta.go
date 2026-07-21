@@ -37,6 +37,8 @@ func Fingerprint(sheet *domainanswersheet.AnswerSheet) (string, error) {
 		TesteeID             uint64            `json:"testee_id"`
 		OrgID                uint64            `json:"org_id"`
 		TaskID               string            `json:"task_id"`
+		OriginType           string            `json:"origin_type"`
+		OriginID             string            `json:"origin_id"`
 		QuestionnaireCode    string            `json:"questionnaire_code"`
 		QuestionnaireVersion string            `json:"questionnaire_version"`
 		Answers              []canonicalAnswer `json:"answers"`
@@ -62,11 +64,14 @@ func Fingerprint(sheet *domainanswersheet.AnswerSheet) (string, error) {
 		}
 		return answers[i].Value < answers[j].Value
 	})
+	attribution := ctx.Attribution()
 	payload, err := json.Marshal(canonicalSubmission{
 		WriterID:             ctx.Filler().UserID(),
 		TesteeID:             ctx.TesteeID().Uint64(),
 		OrgID:                ctx.OrgID().Uint64(),
 		TaskID:               ctx.TaskID(),
+		OriginType:           string(attribution.OriginType()),
+		OriginID:             attribution.OriginID(),
 		QuestionnaireCode:    code,
 		QuestionnaireVersion: version,
 		Answers:              answers,

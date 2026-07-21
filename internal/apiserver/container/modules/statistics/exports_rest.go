@@ -26,5 +26,8 @@ func (m *Module) ExportRESTDeps(opts RESTExportOptions) resttransport.Statistics
 	deps.TesteeAccessService = opts.TesteeAccessService
 	deps.WarmupCoordinator = opts.WarmupCoordinator
 	deps.CacheGovernanceStatusService = opts.CacheGovernanceStatusService
+	deps.V2ReadService = m.V2ReadService
+	deps.V2Coordinator = m.V2Coordinator
+	deps.V2RunStore = m.V2RunStore
 	return deps
 }

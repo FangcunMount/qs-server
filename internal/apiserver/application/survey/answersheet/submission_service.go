@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	attributionport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetattribution"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -23,6 +24,15 @@ type submissionService struct {
 	durableStore      SubmissionDurableStore
 	questionnaireRepo questionnaire.Repository
 	binding           rulesetport.AssessmentBindingResolver
+	attribution       attributionport.Resolver
+}
+
+func (s *submissionService) SetAttributionResolver(resolver attributionport.Resolver) {
+	s.attribution = resolver
+}
+
+type AttributionResolverInjector interface {
+	SetAttributionResolver(attributionport.Resolver)
 }
 
 // NewSubmissionService 创建答卷提交服务

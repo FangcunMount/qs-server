@@ -36,4 +36,18 @@ type AnswerSheetSubmittedData struct {
 	RequestID            string               `json:"request_id,omitempty"`
 	SubmittedAt          time.Time            `json:"submitted_at"`
 	Admission            *AssessmentAdmission `json:"admission,omitempty"`
+	Attribution          *AttributionSnapshot `json:"attribution,omitempty"`
+}
+
+type AttributionSnapshot struct {
+	OriginType   string    `json:"origin_type"`
+	OriginID     string    `json:"origin_id,omitempty"`
+	ClinicianID  string    `json:"clinician_id,omitempty"`
+	EntryID      string    `json:"entry_id,omitempty"`
+	PlanID       string    `json:"plan_id,omitempty"`
+	EnrollmentID string    `json:"enrollment_id,omitempty"`
+	TaskID       string    `json:"task_id,omitempty"`
+	CapturedAt   time.Time `json:"captured_at"`
+	Version      uint32    `json:"version"`
+	Mode         string    `json:"mode"`
 }

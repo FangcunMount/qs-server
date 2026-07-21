@@ -1,6 +1,6 @@
 # Statistics 模块
 
-> 状态：**规划改造方案已定稿，代码尚未按 V2 完成重建**。当前运行代码仍以 `BehaviorFootprint`、`AssessmentEpisode`、`statistics_journey_daily`、`statistics_plan_daily` 和混合实时查询为主；本目录记录已经确认的 Statistics V2 目标、迁移边界和验收标准。阅读时必须区分“当前实现”和“目标设计”。
+> 状态：**V2 核心代码已落地，V1/V2 并存迁移中**。V2 已具备 PlanEnrollment、AttributionSnapshot、三类 Fact、五个 Projection、SyncRun、缓存与查询接口；V1 的 `BehaviorFootprint`、`AssessmentEpisode`、旧 Daily 和查询接口仍保留用于生产回滚。历史回填、连续七天影子对账、切流和 V1 退役尚未执行。阅读时必须区分“代码能力已具备”和“生产迁移已验收”。
 
 ## 1. 30 秒结论
 
@@ -255,4 +255,4 @@ make docs-facts
 git diff --check
 ```
 
-这些命令只能验证结构和关键名称，不能证明 V2 已经实现。V2 条目只有在代码、migration、测试和运行证据全部完成后，才能从“规划改造”改为“已实现”。
+这些命令只能验证结构和关键名称，不能证明生产迁移已经完成。V2 条目只有在代码、migration、测试、历史回填、影子对账和运行证据全部完成后，才能标记为“生产已验收”。

@@ -7,15 +7,21 @@ import "time"
 
 // SubmitAnswerSheetDTO 提交答卷 DTO
 type SubmitAnswerSheetDTO struct {
-	QuestionnaireCode string      // 问卷编码
-	QuestionnaireVer  string      // 问卷版本（如 "1.0.1"，空字符串表示使用最新版本）
-	IdempotencyKey    string      // 业务幂等键（可选）
-	RequestID         string      // 一次入口请求的观测关联 ID，不参与业务幂等
-	TesteeID          uint64      // 受试者ID（传递给测评层）
-	OrgID             uint64      // 组织ID（传递给测评层）
-	FillerID          uint64      // 填写人ID
-	TaskID            string      // 计划任务ID（可选）
-	Answers           []AnswerDTO // 答案列表
+	QuestionnaireCode string        // 问卷编码
+	QuestionnaireVer  string        // 问卷版本（如 "1.0.1"，空字符串表示使用最新版本）
+	IdempotencyKey    string        // 业务幂等键（可选）
+	RequestID         string        // 一次入口请求的观测关联 ID，不参与业务幂等
+	TesteeID          uint64        // 受试者ID（传递给测评层）
+	OrgID             uint64        // 组织ID（传递给测评层）
+	FillerID          uint64        // 填写人ID
+	TaskID            string        // 计划任务ID（可选）
+	OriginRef         *OriginRefDTO // 受理来源（可选；旧 task_id 过渡期会映射为 plan_task）
+	Answers           []AnswerDTO   // 答案列表
+}
+
+type OriginRefDTO struct {
+	Type string
+	ID   string
 }
 
 // AnswerDTO 答案 DTO

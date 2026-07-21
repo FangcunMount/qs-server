@@ -45,3 +45,23 @@ type AssessmentTaskRepository interface {
 	// SaveBatch 批量保存任务
 	SaveBatch(ctx context.Context, tasks []*AssessmentTask) error
 }
+
+type EnrollmentTaskRepository interface {
+	FindByEnrollmentID(ctx context.Context, enrollmentID PlanEnrollmentID) ([]*AssessmentTask, error)
+}
+
+// EnrollmentRepository 持久化患者参与 Plan 的轮次事实。
+type EnrollmentRepository interface {
+	FindByID(ctx context.Context, id PlanEnrollmentID) (*Enrollment, error)
+	FindActive(ctx context.Context, orgID int64, planID AssessmentPlanID, testeeID testee.ID) (*Enrollment, error)
+	FindLatest(ctx context.Context, orgID int64, planID AssessmentPlanID, testeeID testee.ID) (*Enrollment, error)
+	Save(ctx context.Context, enrollment *Enrollment) error
+	CloseIfAllTasksTerminal(ctx context.Context, id PlanEnrollmentID, closedAt time.Time) (bool, error)
+}
+
+// PlanEnrollmentLifecycleRepository performs set-based Enrollment transitions
+// required by a Plan lifecycle transaction.
+type PlanEnrollmentLifecycleRepository interface {
+	TerminateActiveByPlan(ctx context.Context, orgID int64, planID AssessmentPlanID, reason string, at time.Time) (int64, error)
+	CloseActiveByPlanIfAllTasksTerminal(ctx context.Context, orgID int64, planID AssessmentPlanID, at time.Time) (int64, error)
+}

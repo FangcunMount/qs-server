@@ -70,6 +70,12 @@ message SaveAnswerSheetRequest {
   repeated Answer answers = 7;
   uint64 org_id = 8;  // 机构ID
   string task_id = 9; // 计划任务ID（可选）
+  OriginRef origin_ref = 10; // 受理来源；过渡期可与 task_id 同时提供
+}
+
+message OriginRef {
+  string type = 1; // assessment_entry/plan_task/clinician_direct/self_service
+  string id = 2;
 }
 
 // 保存答卷响应

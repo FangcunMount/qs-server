@@ -366,8 +366,9 @@ type SaveAnswerSheetRequest struct {
 	WriterId             uint64                 `protobuf:"varint,5,opt,name=writer_id,json=writerId,proto3" json:"writer_id,omitempty"`
 	TesteeId             uint64                 `protobuf:"varint,6,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
 	Answers              []*Answer              `protobuf:"bytes,7,rep,name=answers,proto3" json:"answers,omitempty"`
-	OrgId                uint64                 `protobuf:"varint,8,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`   // 机构ID
-	TaskId               string                 `protobuf:"bytes,9,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"` // 计划任务ID（可选）
+	OrgId                uint64                 `protobuf:"varint,8,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`             // 机构ID
+	TaskId               string                 `protobuf:"bytes,9,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`           // 计划任务ID（可选）
+	OriginRef            *OriginRef             `protobuf:"bytes,10,opt,name=origin_ref,json=originRef,proto3" json:"origin_ref,omitempty"` // 受理来源；过渡期可与 task_id 同时提供
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -465,6 +466,65 @@ func (x *SaveAnswerSheetRequest) GetTaskId() string {
 	return ""
 }
 
+func (x *SaveAnswerSheetRequest) GetOriginRef() *OriginRef {
+	if x != nil {
+		return x.OriginRef
+	}
+	return nil
+}
+
+type OriginRef struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"` // assessment_entry/plan_task/clinician_direct/self_service
+	Id            string                 `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OriginRef) Reset() {
+	*x = OriginRef{}
+	mi := &file_answersheet_answersheet_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OriginRef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OriginRef) ProtoMessage() {}
+
+func (x *OriginRef) ProtoReflect() protoreflect.Message {
+	mi := &file_answersheet_answersheet_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OriginRef.ProtoReflect.Descriptor instead.
+func (*OriginRef) Descriptor() ([]byte, []int) {
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *OriginRef) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *OriginRef) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
 // 保存答卷响应
 type SaveAnswerSheetResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -476,7 +536,7 @@ type SaveAnswerSheetResponse struct {
 
 func (x *SaveAnswerSheetResponse) Reset() {
 	*x = SaveAnswerSheetResponse{}
-	mi := &file_answersheet_answersheet_proto_msgTypes[4]
+	mi := &file_answersheet_answersheet_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -488,7 +548,7 @@ func (x *SaveAnswerSheetResponse) String() string {
 func (*SaveAnswerSheetResponse) ProtoMessage() {}
 
 func (x *SaveAnswerSheetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_answersheet_answersheet_proto_msgTypes[4]
+	mi := &file_answersheet_answersheet_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -501,7 +561,7 @@ func (x *SaveAnswerSheetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveAnswerSheetResponse.ProtoReflect.Descriptor instead.
 func (*SaveAnswerSheetResponse) Descriptor() ([]byte, []int) {
-	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{4}
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SaveAnswerSheetResponse) GetId() uint64 {
@@ -528,7 +588,7 @@ type GetAnswerSheetRequest struct {
 
 func (x *GetAnswerSheetRequest) Reset() {
 	*x = GetAnswerSheetRequest{}
-	mi := &file_answersheet_answersheet_proto_msgTypes[5]
+	mi := &file_answersheet_answersheet_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -540,7 +600,7 @@ func (x *GetAnswerSheetRequest) String() string {
 func (*GetAnswerSheetRequest) ProtoMessage() {}
 
 func (x *GetAnswerSheetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_answersheet_answersheet_proto_msgTypes[5]
+	mi := &file_answersheet_answersheet_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -553,7 +613,7 @@ func (x *GetAnswerSheetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAnswerSheetRequest.ProtoReflect.Descriptor instead.
 func (*GetAnswerSheetRequest) Descriptor() ([]byte, []int) {
-	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{5}
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetAnswerSheetRequest) GetId() uint64 {
@@ -573,7 +633,7 @@ type GetAnswerSheetResponse struct {
 
 func (x *GetAnswerSheetResponse) Reset() {
 	*x = GetAnswerSheetResponse{}
-	mi := &file_answersheet_answersheet_proto_msgTypes[6]
+	mi := &file_answersheet_answersheet_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -585,7 +645,7 @@ func (x *GetAnswerSheetResponse) String() string {
 func (*GetAnswerSheetResponse) ProtoMessage() {}
 
 func (x *GetAnswerSheetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_answersheet_answersheet_proto_msgTypes[6]
+	mi := &file_answersheet_answersheet_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -598,7 +658,7 @@ func (x *GetAnswerSheetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAnswerSheetResponse.ProtoReflect.Descriptor instead.
 func (*GetAnswerSheetResponse) Descriptor() ([]byte, []int) {
-	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{6}
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetAnswerSheetResponse) GetAnswerSheet() *AnswerSheet {
@@ -623,7 +683,7 @@ type ListAnswerSheetsRequest struct {
 
 func (x *ListAnswerSheetsRequest) Reset() {
 	*x = ListAnswerSheetsRequest{}
-	mi := &file_answersheet_answersheet_proto_msgTypes[7]
+	mi := &file_answersheet_answersheet_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -635,7 +695,7 @@ func (x *ListAnswerSheetsRequest) String() string {
 func (*ListAnswerSheetsRequest) ProtoMessage() {}
 
 func (x *ListAnswerSheetsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_answersheet_answersheet_proto_msgTypes[7]
+	mi := &file_answersheet_answersheet_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -648,7 +708,7 @@ func (x *ListAnswerSheetsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAnswerSheetsRequest.ProtoReflect.Descriptor instead.
 func (*ListAnswerSheetsRequest) Descriptor() ([]byte, []int) {
-	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{7}
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ListAnswerSheetsRequest) GetQuestionnaireCode() string {
@@ -704,7 +764,7 @@ type ListAnswerSheetsResponse struct {
 
 func (x *ListAnswerSheetsResponse) Reset() {
 	*x = ListAnswerSheetsResponse{}
-	mi := &file_answersheet_answersheet_proto_msgTypes[8]
+	mi := &file_answersheet_answersheet_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -716,7 +776,7 @@ func (x *ListAnswerSheetsResponse) String() string {
 func (*ListAnswerSheetsResponse) ProtoMessage() {}
 
 func (x *ListAnswerSheetsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_answersheet_answersheet_proto_msgTypes[8]
+	mi := &file_answersheet_answersheet_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -729,7 +789,7 @@ func (x *ListAnswerSheetsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAnswerSheetsResponse.ProtoReflect.Descriptor instead.
 func (*ListAnswerSheetsResponse) Descriptor() ([]byte, []int) {
-	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{8}
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListAnswerSheetsResponse) GetAnswerSheets() []*AnswerSheetSummary {
@@ -758,7 +818,7 @@ type SaveAnswerSheetScoresRequest struct {
 
 func (x *SaveAnswerSheetScoresRequest) Reset() {
 	*x = SaveAnswerSheetScoresRequest{}
-	mi := &file_answersheet_answersheet_proto_msgTypes[9]
+	mi := &file_answersheet_answersheet_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -770,7 +830,7 @@ func (x *SaveAnswerSheetScoresRequest) String() string {
 func (*SaveAnswerSheetScoresRequest) ProtoMessage() {}
 
 func (x *SaveAnswerSheetScoresRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_answersheet_answersheet_proto_msgTypes[9]
+	mi := &file_answersheet_answersheet_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -783,7 +843,7 @@ func (x *SaveAnswerSheetScoresRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveAnswerSheetScoresRequest.ProtoReflect.Descriptor instead.
 func (*SaveAnswerSheetScoresRequest) Descriptor() ([]byte, []int) {
-	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{9}
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *SaveAnswerSheetScoresRequest) GetAnswerSheetId() uint64 {
@@ -819,7 +879,7 @@ type SaveAnswerSheetScoresResponse struct {
 
 func (x *SaveAnswerSheetScoresResponse) Reset() {
 	*x = SaveAnswerSheetScoresResponse{}
-	mi := &file_answersheet_answersheet_proto_msgTypes[10]
+	mi := &file_answersheet_answersheet_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -831,7 +891,7 @@ func (x *SaveAnswerSheetScoresResponse) String() string {
 func (*SaveAnswerSheetScoresResponse) ProtoMessage() {}
 
 func (x *SaveAnswerSheetScoresResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_answersheet_answersheet_proto_msgTypes[10]
+	mi := &file_answersheet_answersheet_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -844,7 +904,7 @@ func (x *SaveAnswerSheetScoresResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveAnswerSheetScoresResponse.ProtoReflect.Descriptor instead.
 func (*SaveAnswerSheetScoresResponse) Descriptor() ([]byte, []int) {
-	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{10}
+	return file_answersheet_answersheet_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *SaveAnswerSheetScoresResponse) GetAnswerSheetId() uint64 {
@@ -913,7 +973,7 @@ const file_answersheet_answersheet_proto_rawDesc = "" +
 	"\rquestion_code\x18\x01 \x01(\tR\fquestionCode\x12#\n" +
 	"\rquestion_type\x18\x02 \x01(\tR\fquestionType\x12\x14\n" +
 	"\x05score\x18\x03 \x01(\rR\x05score\x12\x14\n" +
-	"\x05value\x18\x04 \x01(\tR\x05value\"\xd4\x02\n" +
+	"\x05value\x18\x04 \x01(\tR\x05value\"\x8b\x03\n" +
 	"\x16SaveAnswerSheetRequest\x12-\n" +
 	"\x12questionnaire_code\x18\x01 \x01(\tR\x11questionnaireCode\x123\n" +
 	"\x15questionnaire_version\x18\x02 \x01(\tR\x14questionnaireVersion\x12'\n" +
@@ -923,7 +983,13 @@ const file_answersheet_answersheet_proto_rawDesc = "" +
 	"\ttestee_id\x18\x06 \x01(\x04R\btesteeId\x12-\n" +
 	"\aanswers\x18\a \x03(\v2\x13.answersheet.AnswerR\aanswers\x12\x15\n" +
 	"\x06org_id\x18\b \x01(\x04R\x05orgId\x12\x17\n" +
-	"\atask_id\x18\t \x01(\tR\x06taskId\"C\n" +
+	"\atask_id\x18\t \x01(\tR\x06taskId\x125\n" +
+	"\n" +
+	"origin_ref\x18\n" +
+	" \x01(\v2\x16.answersheet.OriginRefR\toriginRef\"/\n" +
+	"\tOriginRef\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12\x0e\n" +
+	"\x02id\x18\x02 \x01(\tR\x02id\"C\n" +
 	"\x17SaveAnswerSheetResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"'\n" +
@@ -969,39 +1035,41 @@ func file_answersheet_answersheet_proto_rawDescGZIP() []byte {
 	return file_answersheet_answersheet_proto_rawDescData
 }
 
-var file_answersheet_answersheet_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_answersheet_answersheet_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_answersheet_answersheet_proto_goTypes = []any{
 	(*AnswerSheet)(nil),                   // 0: answersheet.AnswerSheet
 	(*AnswerSheetSummary)(nil),            // 1: answersheet.AnswerSheetSummary
 	(*Answer)(nil),                        // 2: answersheet.Answer
 	(*SaveAnswerSheetRequest)(nil),        // 3: answersheet.SaveAnswerSheetRequest
-	(*SaveAnswerSheetResponse)(nil),       // 4: answersheet.SaveAnswerSheetResponse
-	(*GetAnswerSheetRequest)(nil),         // 5: answersheet.GetAnswerSheetRequest
-	(*GetAnswerSheetResponse)(nil),        // 6: answersheet.GetAnswerSheetResponse
-	(*ListAnswerSheetsRequest)(nil),       // 7: answersheet.ListAnswerSheetsRequest
-	(*ListAnswerSheetsResponse)(nil),      // 8: answersheet.ListAnswerSheetsResponse
-	(*SaveAnswerSheetScoresRequest)(nil),  // 9: answersheet.SaveAnswerSheetScoresRequest
-	(*SaveAnswerSheetScoresResponse)(nil), // 10: answersheet.SaveAnswerSheetScoresResponse
+	(*OriginRef)(nil),                     // 4: answersheet.OriginRef
+	(*SaveAnswerSheetResponse)(nil),       // 5: answersheet.SaveAnswerSheetResponse
+	(*GetAnswerSheetRequest)(nil),         // 6: answersheet.GetAnswerSheetRequest
+	(*GetAnswerSheetResponse)(nil),        // 7: answersheet.GetAnswerSheetResponse
+	(*ListAnswerSheetsRequest)(nil),       // 8: answersheet.ListAnswerSheetsRequest
+	(*ListAnswerSheetsResponse)(nil),      // 9: answersheet.ListAnswerSheetsResponse
+	(*SaveAnswerSheetScoresRequest)(nil),  // 10: answersheet.SaveAnswerSheetScoresRequest
+	(*SaveAnswerSheetScoresResponse)(nil), // 11: answersheet.SaveAnswerSheetScoresResponse
 }
 var file_answersheet_answersheet_proto_depIdxs = []int32{
 	2,  // 0: answersheet.AnswerSheet.answers:type_name -> answersheet.Answer
 	2,  // 1: answersheet.SaveAnswerSheetRequest.answers:type_name -> answersheet.Answer
-	0,  // 2: answersheet.GetAnswerSheetResponse.answer_sheet:type_name -> answersheet.AnswerSheet
-	1,  // 3: answersheet.ListAnswerSheetsResponse.answer_sheets:type_name -> answersheet.AnswerSheetSummary
-	2,  // 4: answersheet.SaveAnswerSheetScoresRequest.answers:type_name -> answersheet.Answer
-	3,  // 5: answersheet.AnswerSheetService.SaveAnswerSheet:input_type -> answersheet.SaveAnswerSheetRequest
-	5,  // 6: answersheet.AnswerSheetService.GetAnswerSheet:input_type -> answersheet.GetAnswerSheetRequest
-	7,  // 7: answersheet.AnswerSheetService.ListAnswerSheets:input_type -> answersheet.ListAnswerSheetsRequest
-	9,  // 8: answersheet.AnswerSheetService.SaveAnswerSheetScores:input_type -> answersheet.SaveAnswerSheetScoresRequest
-	4,  // 9: answersheet.AnswerSheetService.SaveAnswerSheet:output_type -> answersheet.SaveAnswerSheetResponse
-	6,  // 10: answersheet.AnswerSheetService.GetAnswerSheet:output_type -> answersheet.GetAnswerSheetResponse
-	8,  // 11: answersheet.AnswerSheetService.ListAnswerSheets:output_type -> answersheet.ListAnswerSheetsResponse
-	10, // 12: answersheet.AnswerSheetService.SaveAnswerSheetScores:output_type -> answersheet.SaveAnswerSheetScoresResponse
-	9,  // [9:13] is the sub-list for method output_type
-	5,  // [5:9] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	4,  // 2: answersheet.SaveAnswerSheetRequest.origin_ref:type_name -> answersheet.OriginRef
+	0,  // 3: answersheet.GetAnswerSheetResponse.answer_sheet:type_name -> answersheet.AnswerSheet
+	1,  // 4: answersheet.ListAnswerSheetsResponse.answer_sheets:type_name -> answersheet.AnswerSheetSummary
+	2,  // 5: answersheet.SaveAnswerSheetScoresRequest.answers:type_name -> answersheet.Answer
+	3,  // 6: answersheet.AnswerSheetService.SaveAnswerSheet:input_type -> answersheet.SaveAnswerSheetRequest
+	6,  // 7: answersheet.AnswerSheetService.GetAnswerSheet:input_type -> answersheet.GetAnswerSheetRequest
+	8,  // 8: answersheet.AnswerSheetService.ListAnswerSheets:input_type -> answersheet.ListAnswerSheetsRequest
+	10, // 9: answersheet.AnswerSheetService.SaveAnswerSheetScores:input_type -> answersheet.SaveAnswerSheetScoresRequest
+	5,  // 10: answersheet.AnswerSheetService.SaveAnswerSheet:output_type -> answersheet.SaveAnswerSheetResponse
+	7,  // 11: answersheet.AnswerSheetService.GetAnswerSheet:output_type -> answersheet.GetAnswerSheetResponse
+	9,  // 12: answersheet.AnswerSheetService.ListAnswerSheets:output_type -> answersheet.ListAnswerSheetsResponse
+	11, // 13: answersheet.AnswerSheetService.SaveAnswerSheetScores:output_type -> answersheet.SaveAnswerSheetScoresResponse
+	10, // [10:14] is the sub-list for method output_type
+	6,  // [6:10] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_answersheet_answersheet_proto_init() }
@@ -1015,7 +1083,7 @@ func file_answersheet_answersheet_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_answersheet_answersheet_proto_rawDesc), len(file_answersheet_answersheet_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

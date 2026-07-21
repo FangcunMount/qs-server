@@ -58,6 +58,14 @@ func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
 	}
 }
 
+func (r *Router) registerPlanV2ProtectedRoutes(apiV2 *gin.RouterGroup) {
+	if r.deps.Plan.EnrollmentQueryService == nil {
+		return
+	}
+	h := handler.NewPlanEnrollmentQueryHandler(r.deps.Plan.EnrollmentQueryService, r.deps.Plan.TesteeAccessService)
+	apiV2.GET("/plans/testees/:testee_id/enrollments", r.rateLimitedHandlers(rateLimitBudgetQuery, h.List)...)
+}
+
 func (r *Router) registerPlanInternalRoutes(internalV1 *gin.RouterGroup) {
 	planHandler := r.newPlanHandler()
 	if planHandler == nil {

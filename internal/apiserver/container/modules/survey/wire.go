@@ -7,11 +7,13 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
 // WireInput carries composition-root inputs for survey module installation.
 type WireInput struct {
 	MongoDB             *mongo.Database
+	MySQLDB             *gorm.DB
 	EventPublisher      event.EventPublisher
 	IdentityService     *iam.IdentityService
 	HotsetRecorder      cachetarget.HotsetRecorder
@@ -24,6 +26,7 @@ type WireInput struct {
 func Wire(in WireInput) (*Module, error) {
 	bootstrap := BootstrapInput{
 		MongoDB:             in.MongoDB,
+		MySQLDB:             in.MySQLDB,
 		EventPublisher:      in.EventPublisher,
 		IdentityService:     in.IdentityService,
 		HotsetRecorder:      in.HotsetRecorder,

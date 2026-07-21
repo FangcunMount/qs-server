@@ -58,6 +58,10 @@ func toGRPCSaveAnswerSheetInput(input *answersheet.SaveAnswerSheetInput) *grpcbr
 			Value:        answer.Value,
 		}
 	}
+	var originRef *grpcbridge.OriginRef
+	if input.OriginRef != nil {
+		originRef = &grpcbridge.OriginRef{Type: input.OriginRef.Type, ID: input.OriginRef.ID}
+	}
 	return &grpcbridge.SaveAnswerSheetInput{
 		QuestionnaireCode:    input.QuestionnaireCode,
 		QuestionnaireVersion: input.QuestionnaireVersion,
@@ -66,6 +70,7 @@ func toGRPCSaveAnswerSheetInput(input *answersheet.SaveAnswerSheetInput) *grpcbr
 		WriterID:             input.WriterID,
 		TesteeID:             input.TesteeID,
 		TaskID:               input.TaskID,
+		OriginRef:            originRef,
 		OrgID:                input.OrgID,
 		Answers:              answers,
 	}

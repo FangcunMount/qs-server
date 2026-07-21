@@ -2,11 +2,14 @@ package plan
 
 import (
 	"context"
+	stderrors "errors"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -14,27 +17,37 @@ import (
 // enrollmentService 受试者加入计划服务实现
 // 行为者：受试者管理服务
 type enrollmentService struct {
-	planRepo       plan.AssessmentPlanRepository
-	taskRepo       plan.AssessmentTaskRepository
-	enrollment     *plan.PlanEnrollment
-	eventPublisher event.EventPublisher
+	planRepo        plan.AssessmentPlanRepository
+	taskRepo        plan.AssessmentTaskRepository
+	enrollmentTasks plan.EnrollmentTaskRepository
+	enrollmentRepo  plan.EnrollmentRepository
+	txRunner        apptransaction.Runner
+	taskGenerator   *plan.TaskGenerator
+	validator       *plan.PlanValidator
+	eventPublisher  event.EventPublisher
 }
 
 // NewEnrollmentService 创建受试者加入计划服务
 func NewEnrollmentService(
 	planRepo plan.AssessmentPlanRepository,
 	taskRepo plan.AssessmentTaskRepository,
+	enrollmentRepo plan.EnrollmentRepository,
+	txRunner apptransaction.Runner,
 	eventPublisher event.EventPublisher,
 ) PlanEnrollmentService {
-	taskGenerator := plan.NewTaskGenerator()
-	validator := plan.NewPlanValidator()
-	enrollment := plan.NewPlanEnrollment(planRepo, taskRepo, taskGenerator, validator)
-
+	enrollmentTasks, ok := taskRepo.(plan.EnrollmentTaskRepository)
+	if !ok {
+		panic("plan task repository must implement EnrollmentTaskRepository")
+	}
 	return &enrollmentService{
-		planRepo:       planRepo,
-		taskRepo:       taskRepo,
-		enrollment:     enrollment,
-		eventPublisher: eventPublisher,
+		planRepo:        planRepo,
+		taskRepo:        taskRepo,
+		enrollmentTasks: enrollmentTasks,
+		enrollmentRepo:  enrollmentRepo,
+		txRunner:        txRunner,
+		taskGenerator:   plan.NewTaskGenerator(),
+		validator:       plan.NewPlanValidator(),
+		eventPublisher:  eventPublisher,
 	}
 }
 
@@ -79,14 +92,70 @@ func (s *enrollmentService) EnrollTestee(ctx context.Context, dto EnrollTesteeDT
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的开始日期: %v", err)
 	}
 
-	// 2. 校验计划机构范围
-	if _, err := s.loadPlanInOrg(ctx, dto.OrgID, planID, "enroll_testee"); err != nil {
-		return nil, err
-	}
+	var result *EnrollmentResult
+	err = s.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
+		planAggregate, err := s.loadPlanInOrg(txCtx, dto.OrgID, planID, "enroll_testee")
+		if err != nil {
+			return err
+		}
 
-	// 3. 调用领域服务加入计划
-	enrollmentResult, err := s.enrollment.EnrollTestee(ctx, planID, testeeID, startDate)
+		active, err := s.enrollmentRepo.FindActive(txCtx, dto.OrgID, planID, testeeID)
+		if err != nil {
+			return errors.WrapC(err, errorCode.ErrDatabase, "查询活动参与轮次失败")
+		}
+		if active != nil {
+			if !sameBusinessDate(active.StartDate(), startDate) {
+				return errors.WithCode(errorCode.ErrInvalidArgument, "受试者已加入此计划，且开始日期与活动轮次不一致")
+			}
+			tasks, err := s.enrollmentTasks.FindByEnrollmentID(txCtx, active.ID())
+			if err != nil {
+				return errors.WrapC(err, errorCode.ErrDatabase, "查询参与任务失败")
+			}
+			result = &EnrollmentResult{PlanID: dto.PlanID, EnrollmentID: active.ID().String(), Round: active.Round(), Tasks: toTaskResults(tasks), Idempotent: true}
+			return nil
+		}
+
+		if validationErrors := s.validator.ValidateForEnrollment(planAggregate, testeeID, startDate); len(validationErrors) > 0 {
+			return plan.ToError(validationErrors)
+		}
+		latest, err := s.enrollmentRepo.FindLatest(txCtx, dto.OrgID, planID, testeeID)
+		if err != nil {
+			return errors.WrapC(err, errorCode.ErrDatabase, "查询参与轮次失败")
+		}
+		round := uint32(1)
+		if latest != nil {
+			round = latest.Round() + 1
+		}
+		enrollment := plan.NewEnrollment(dto.OrgID, planID, testeeID, round, startDate, time.Now())
+		tasks := s.taskGenerator.GenerateTasks(planAggregate, testeeID, startDate)
+		if len(tasks) == 0 {
+			return errors.WithCode(errorCode.ErrInvalidArgument, "未能生成任何任务")
+		}
+		for _, task := range tasks {
+			task.AssignEnrollment(enrollment.ID())
+		}
+		if err := s.enrollmentRepo.Save(txCtx, enrollment); err != nil {
+			return err
+		}
+		if err := s.taskRepo.SaveBatch(txCtx, tasks); err != nil {
+			return errors.WrapC(err, errorCode.ErrDatabase, "保存任务失败")
+		}
+		result = &EnrollmentResult{
+			PlanID: dto.PlanID, EnrollmentID: enrollment.ID().String(), Round: enrollment.Round(),
+			Tasks: toTaskResults(tasks), CreatedTaskCount: len(tasks),
+		}
+		return nil
+	})
 	if err != nil {
+		if stderrors.Is(err, plan.ErrActiveEnrollmentExists) {
+			active, lookupErr := s.enrollmentRepo.FindActive(ctx, dto.OrgID, planID, testeeID)
+			if lookupErr == nil && active != nil && sameBusinessDate(active.StartDate(), startDate) {
+				tasks, taskErr := s.enrollmentTasks.FindByEnrollmentID(ctx, active.ID())
+				if taskErr == nil {
+					return &EnrollmentResult{PlanID: dto.PlanID, EnrollmentID: active.ID().String(), Round: active.Round(), Tasks: toTaskResults(tasks), Idempotent: true}, nil
+				}
+			}
+		}
 		logger.L(ctx).Errorw("Failed to enroll testee",
 			"action", "enroll_testee",
 			"plan_id", dto.PlanID,
@@ -96,44 +165,17 @@ func (s *enrollmentService) EnrollTestee(ctx context.Context, dto EnrollTesteeDT
 		return nil, err
 	}
 
-	logger.L(ctx).Infow("Tasks generated for enrollment",
-		"action", "enroll_testee",
-		"plan_id", dto.PlanID,
-		"testee_id", dto.TesteeID,
-		"tasks_count", len(enrollmentResult.Tasks),
-		"tasks_to_save_count", len(enrollmentResult.TasksToSave),
-		"idempotent", enrollmentResult.Idempotent,
-	)
-
-	// 4. 持久化任务
-	if len(enrollmentResult.TasksToSave) > 0 {
-		if err := s.taskRepo.SaveBatch(ctx, enrollmentResult.TasksToSave); err != nil {
-			logger.L(ctx).Errorw("Failed to save tasks",
-				"action", "enroll_testee",
-				"plan_id", dto.PlanID,
-				"testee_id", dto.TesteeID,
-				"tasks_count", len(enrollmentResult.TasksToSave),
-				"error", err.Error(),
-			)
-			return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存任务失败")
-		}
-	}
-
 	logger.L(ctx).Infow("Testee enrolled successfully",
 		"action", "enroll_testee",
 		"plan_id", dto.PlanID,
 		"testee_id", dto.TesteeID,
-		"tasks_count", len(enrollmentResult.Tasks),
-		"tasks_to_save_count", len(enrollmentResult.TasksToSave),
-		"idempotent", enrollmentResult.Idempotent,
+		"enrollment_id", result.EnrollmentID,
+		"round", result.Round,
+		"tasks_count", len(result.Tasks),
+		"idempotent", result.Idempotent,
 	)
 
-	return &EnrollmentResult{
-		PlanID:           dto.PlanID,
-		Tasks:            toTaskResults(enrollmentResult.Tasks),
-		Idempotent:       enrollmentResult.Idempotent,
-		CreatedTaskCount: len(enrollmentResult.TasksToSave),
-	}, nil
+	return result, nil
 }
 
 // TerminateEnrollment 终止受试者的计划参与
@@ -166,13 +208,41 @@ func (s *enrollmentService) TerminateEnrollment(ctx context.Context, orgID int64
 		return errors.WithCode(errorCode.ErrInvalidArgument, "无效的受试者ID: %v", err)
 	}
 
-	// 2. 校验计划机构范围
-	if _, err := s.loadPlanInOrg(ctx, orgID, planIDDomain, "terminate_enrollment"); err != nil {
-		return err
-	}
-
-	// 3. 调用领域服务终止参与
-	canceledTasks, err := s.enrollment.TerminateEnrollment(ctx, planIDDomain, testeeIDDomain)
+	var canceledTasks []*plan.AssessmentTask
+	err = s.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
+		if _, err := s.loadPlanInOrg(txCtx, orgID, planIDDomain, "terminate_enrollment"); err != nil {
+			return err
+		}
+		enrollment, err := s.enrollmentRepo.FindActive(txCtx, orgID, planIDDomain, testeeIDDomain)
+		if err != nil {
+			return errors.WrapC(err, errorCode.ErrDatabase, "查询活动参与轮次失败")
+		}
+		if enrollment == nil {
+			return nil
+		}
+		tasks, err := s.enrollmentTasks.FindByEnrollmentID(txCtx, enrollment.ID())
+		if err != nil {
+			return errors.WrapC(err, errorCode.ErrDatabase, "查询参与任务失败")
+		}
+		lifecycle := plan.NewTaskLifecycle()
+		for _, task := range tasks {
+			if task.IsTerminal() {
+				continue
+			}
+			if err := lifecycle.Cancel(txCtx, task); err != nil {
+				return err
+			}
+			if err := s.taskRepo.Save(txCtx, task); err != nil {
+				return errors.WrapC(err, errorCode.ErrDatabase, "保存取消任务失败")
+			}
+			canceledTasks = append(canceledTasks, task)
+		}
+		enrollment.Terminate(time.Now(), "terminated_by_command")
+		if err := s.enrollmentRepo.Save(txCtx, enrollment); err != nil {
+			return errors.WrapC(err, errorCode.ErrDatabase, "保存终止参与轮次失败")
+		}
+		return nil
+	})
 	if err != nil {
 		logger.L(ctx).Errorw("Failed to terminate enrollment",
 			"action", "terminate_enrollment",
@@ -190,21 +260,7 @@ func (s *enrollmentService) TerminateEnrollment(ctx context.Context, orgID int64
 		"canceled_tasks_count", len(canceledTasks),
 	)
 
-	// 4. 持久化被取消的任务
-	savedTaskCount := 0
 	for _, task := range canceledTasks {
-		if err := s.taskRepo.Save(ctx, task); err != nil {
-			logger.L(ctx).Errorw("Failed to save canceled task",
-				"action", "terminate_enrollment",
-				"plan_id", planID,
-				"testee_id", testeeID,
-				"task_id", task.GetID().String(),
-				"error", err.Error(),
-			)
-			continue
-		}
-		savedTaskCount++
-
 		eventing.PublishCollectedEvents(ctx, s.eventPublisher, task, nil, func(evt event.DomainEvent, err error) {
 			logger.L(ctx).Errorw("Failed to publish task event",
 				"action", "terminate_enrollment",
@@ -220,10 +276,16 @@ func (s *enrollmentService) TerminateEnrollment(ctx context.Context, orgID int64
 		"plan_id", planID,
 		"testee_id", testeeID,
 		"canceled_tasks_count", len(canceledTasks),
-		"saved_tasks_count", savedTaskCount,
+		"saved_tasks_count", len(canceledTasks),
 	)
 
 	return nil
+}
+
+func sameBusinessDate(left, right time.Time) bool {
+	ly, lm, ld := left.Date()
+	ry, rm, rd := right.Date()
+	return ly == ry && lm == rm && ld == rd
 }
 
 func (s *enrollmentService) loadPlanInOrg(ctx context.Context, orgID int64, planID plan.AssessmentPlanID, action string) (*plan.AssessmentPlan, error) {

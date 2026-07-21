@@ -230,7 +230,7 @@ func buildAdminSubmitDTO(req request.AdminSubmitAnswerSheetRequest, fillerID, or
 		})
 	}
 
-	return answersheet.SubmitAnswerSheetDTO{
+	dto := answersheet.SubmitAnswerSheetDTO{
 		QuestionnaireCode: req.QuestionnaireCode,
 		QuestionnaireVer:  req.QuestionnaireVersion,
 		IdempotencyKey:    strings.TrimSpace(req.IdempotencyKey),
@@ -241,4 +241,8 @@ func buildAdminSubmitDTO(req request.AdminSubmitAnswerSheetRequest, fillerID, or
 		TaskID:            req.TaskID,
 		Answers:           answers,
 	}
+	if req.OriginRef != nil {
+		dto.OriginRef = &answersheet.OriginRefDTO{Type: req.OriginRef.Type, ID: req.OriginRef.ID}
+	}
+	return dto
 }

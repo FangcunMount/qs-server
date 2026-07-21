@@ -19,6 +19,7 @@ type (
 	FactorScoreOutput         = grpcclient.FactorScoreOutput
 	ListAssessmentsOutput     = grpcclient.ListAssessmentsOutput
 	ListQuestionnairesOutput  = grpcclient.ListQuestionnairesOutput
+	OriginRef                 = grpcclient.OriginRef
 	ModelExtraOutput          = grpcclient.ModelExtraOutput
 	ModelIdentityOutput       = grpcclient.ModelIdentityOutput
 	QuestionOutput            = grpcclient.QuestionOutput

@@ -22,6 +22,7 @@ import (
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	statisticsV2App "github.com/FangcunMount/qs-server/internal/apiserver/application/statisticsv2"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	systemgovApp "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
@@ -138,9 +139,10 @@ type InterpretationDeps struct {
 }
 
 type PlanDeps struct {
-	CommandService      planApp.PlanCommandService
-	QueryService        planApp.PlanQueryService
-	TesteeAccessService actorAccessApp.TesteeAccessService
+	CommandService         planApp.PlanCommandService
+	QueryService           planApp.PlanQueryService
+	EnrollmentQueryService planApp.EnrollmentQueryService
+	TesteeAccessService    actorAccessApp.TesteeAccessService
 }
 
 type WorkbenchDeps struct {
@@ -156,6 +158,9 @@ type StatisticsDeps struct {
 	TesteeAccessService          statisticsApp.TesteeAccessValidator
 	WarmupCoordinator            statisticsApp.WarmupCoordinator
 	CacheGovernanceStatusService statisticsApp.GovernanceStatusReader
+	V2ReadService                *statisticsV2App.ReadService
+	V2Coordinator                *statisticsV2App.Coordinator
+	V2RunStore                   statisticsV2App.RunStore
 }
 
 type IAMDeps struct {

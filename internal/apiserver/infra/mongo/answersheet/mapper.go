@@ -61,6 +61,7 @@ func (m *AnswerSheetMapper) ToPO(bo *answersheet.AnswerSheet) *AnswerSheetPO {
 		OrgID:                orgID,
 		TaskID:               submissionContext.TaskID(),
 		Admission:            admissionToPO(submissionContext.Admission()),
+		Attribution:          attributionToPO(submissionContext.Attribution()),
 		TotalScore:           bo.Score(),
 		FilledAt:             bo.FilledAt(),
 		Answers:              answers,
@@ -104,6 +105,7 @@ func (m *AnswerSheetMapper) ToBO(po *AnswerSheetPO) *answersheet.AnswerSheet {
 	// 构建填写者引用
 	filler := actor.NewFillerRef(po.FillerID, actor.FillerType(po.FillerType))
 	admission := admissionFromPO(po.Admission)
+	attribution := attributionFromPO(po.Attribution)
 	submissionContext := answersheet.ReconstructSubmissionContext(filler, nil, 0, po.TaskID)
 	if po.TesteeID != 0 && po.OrgID != 0 {
 		if admission.IsZero() {
@@ -125,6 +127,11 @@ func (m *AnswerSheetMapper) ToBO(po *AnswerSheetPO) *answersheet.AnswerSheet {
 	} else if !admission.IsZero() {
 		submissionContext = answersheet.ReconstructSubmissionContext(filler, nil, 0, po.TaskID, admission)
 	}
+	if !attribution.IsZero() {
+		submissionContext = answersheet.ReconstructSubmissionContextWithAttribution(
+			filler, submissionContext.Testee(), submissionContext.OrgID(), po.TaskID, attribution, admission,
+		)
+	}
 
 	// 使用 Reconstruct 重建答卷对象
 	return answersheet.ReconstructWithSubmissionContext(
@@ -134,6 +141,27 @@ func (m *AnswerSheetMapper) ToBO(po *AnswerSheetPO) *answersheet.AnswerSheet {
 		answers,
 		po.FilledAt,
 		po.TotalScore,
+	)
+}
+
+func attributionToPO(snapshot answersheet.AttributionSnapshot) *AttributionSnapshotPO {
+	if snapshot.IsZero() {
+		return nil
+	}
+	return &AttributionSnapshotPO{
+		OriginType: string(snapshot.OriginType()), OriginID: snapshot.OriginID(), ClinicianID: snapshot.ClinicianID(),
+		EntryID: snapshot.EntryID(), PlanID: snapshot.PlanID(), EnrollmentID: snapshot.EnrollmentID(), TaskID: snapshot.TaskID(),
+		CapturedAt: snapshot.CapturedAt(), Version: snapshot.Version(), Mode: string(snapshot.Mode()),
+	}
+}
+
+func attributionFromPO(po *AttributionSnapshotPO) answersheet.AttributionSnapshot {
+	if po == nil || po.OriginType == "" {
+		return answersheet.AttributionSnapshot{}
+	}
+	return answersheet.ReconstructAttributionSnapshot(
+		answersheet.OriginType(po.OriginType), po.OriginID, po.ClinicianID, po.EntryID, po.PlanID, po.EnrollmentID, po.TaskID,
+		po.CapturedAt, po.Version, answersheet.AttributionMode(po.Mode),
 	)
 }
 

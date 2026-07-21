@@ -1,6 +1,6 @@
 # 核心设计：Projection Engine、同步与最终一致性
 
-> 状态：**V2 目标设计，规划改造**。当前 Scheduler、SyncService 和重建 SQL 仍服务 V1；本文确定 Typed Projection Engine、T+1 批次、时间、事务、SyncRun、缓存和恢复语义。
+> 状态：**V2 目标设计及核心实现，V1/V2 并行运行**。Typed Projection Engine、T+1 批次、结果事务、SyncRun、Cache Generation 和 `resume-cache` 已实现；Scheduler 暂时同时保留 V1 并影子触发 V2，直至切流门槛满足。
 
 ## 1. 本文回答
 

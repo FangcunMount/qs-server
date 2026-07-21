@@ -21,9 +21,10 @@ import (
 // - 审计字段（createdAt, updatedAt, version 等）由基础设施层处理，领域层不关心
 type AssessmentTask struct {
 	// === 核心标识 ===
-	id     AssessmentTaskID
-	planID AssessmentPlanID
-	seq    int // 第 N 次测评
+	id           AssessmentTaskID
+	planID       AssessmentPlanID
+	enrollmentID PlanEnrollmentID
+	seq          int // 第 N 次测评
 
 	// === 关联实体引用 ===
 	orgID     int64 // 机构ID（用于查询优化和权限控制）
@@ -35,6 +36,8 @@ type AssessmentTask struct {
 	openAt      *time.Time // 实际开放时间
 	expireAt    *time.Time // 截止时间
 	completedAt *time.Time // 完成时间
+	expiredAt   *time.Time // 实际过期状态迁移时间
+	canceledAt  *time.Time // 实际取消状态迁移时间
 
 	// === 状态与关联 ===
 	status       TaskStatus
@@ -84,6 +87,10 @@ func (t *AssessmentTask) GetPlanID() AssessmentPlanID {
 	return t.planID
 }
 
+func (t *AssessmentTask) GetEnrollmentID() PlanEnrollmentID { return t.enrollmentID }
+
+func (t *AssessmentTask) AssignEnrollment(id PlanEnrollmentID) { t.enrollmentID = id }
+
 // GetSeq 获取序号
 func (t *AssessmentTask) GetSeq() int {
 	return t.seq
@@ -123,6 +130,10 @@ func (t *AssessmentTask) GetExpireAt() *time.Time {
 func (t *AssessmentTask) GetCompletedAt() *time.Time {
 	return t.completedAt
 }
+
+func (t *AssessmentTask) GetExpiredAt() *time.Time { return t.expiredAt }
+
+func (t *AssessmentTask) GetCanceledAt() *time.Time { return t.canceledAt }
 
 // GetStatus 获取状态
 func (t *AssessmentTask) GetStatus() TaskStatus {
@@ -229,6 +240,7 @@ func (t *AssessmentTask) expire(expiredAt time.Time) error {
 	}
 
 	t.status = TaskStatusExpired
+	t.expiredAt = &expiredAt
 
 	// 发布任务过期事件
 	t.addEvent(NewTaskExpiredEvent(
@@ -248,6 +260,7 @@ func (t *AssessmentTask) cancel(canceledAt time.Time) {
 	}
 
 	t.status = TaskStatusCanceled
+	t.canceledAt = &canceledAt
 	t.addEvent(NewTaskCanceledEvent(
 		t.id,
 		t.planID,
@@ -270,6 +283,8 @@ func (t *AssessmentTask) reschedule(plannedAt time.Time) error {
 	t.openAt = nil
 	t.expireAt = nil
 	t.completedAt = nil
+	t.expiredAt = nil
+	t.canceledAt = nil
 	t.assessmentID = nil
 	t.entryToken = ""
 	t.entryURL = ""
@@ -299,19 +314,25 @@ func (t *AssessmentTask) addEvent(evt event.DomainEvent) {
 // RestoreFromRepository 从仓储恢复状态（仅供仓储层使用）
 func (t *AssessmentTask) RestoreFromRepository(
 	id AssessmentTaskID,
+	enrollmentID PlanEnrollmentID,
 	status TaskStatus,
 	openAt *time.Time,
 	expireAt *time.Time,
 	completedAt *time.Time,
+	expiredAt *time.Time,
+	canceledAt *time.Time,
 	assessmentID *assessment.ID,
 	entryToken string,
 	entryURL string,
 ) {
 	t.id = id
+	t.enrollmentID = enrollmentID
 	t.status = status
 	t.openAt = openAt
 	t.expireAt = expireAt
 	t.completedAt = completedAt
+	t.expiredAt = expiredAt
+	t.canceledAt = canceledAt
 	t.assessmentID = assessmentID
 	t.entryToken = entryToken
 	t.entryURL = entryURL

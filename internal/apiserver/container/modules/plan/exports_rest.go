@@ -13,6 +13,7 @@ func (m *Module) ExportRESTDeps(testeeAccess actorAccessApp.TesteeAccessService)
 	}
 	deps.CommandService = m.CommandService
 	deps.QueryService = m.QueryService
+	deps.EnrollmentQueryService = m.EnrollmentQueryService
 	deps.TesteeAccessService = testeeAccess
 	return deps
 }

@@ -69,11 +69,21 @@ func (r QuestionnaireRef) IsEmpty() bool {
 
 // SubmissionContext 描述一次答卷提交的业务上下文。
 type SubmissionContext struct {
-	filler    *actor.FillerRef
-	testee    *actor.TesteeRef
-	orgID     meta.ID
-	taskID    string
-	admission Admission
+	filler      *actor.FillerRef
+	testee      *actor.TesteeRef
+	orgID       meta.ID
+	taskID      string
+	admission   Admission
+	attribution AttributionSnapshot
+}
+
+func NewSubmissionContextWithAttribution(filler *actor.FillerRef, testee *actor.TesteeRef, orgID meta.ID, taskID string, attribution AttributionSnapshot, admission ...Admission) (SubmissionContext, error) {
+	ctx, err := NewSubmissionContext(filler, testee, orgID, taskID, admission...)
+	if err != nil {
+		return SubmissionContext{}, err
+	}
+	ctx.attribution = attribution
+	return ctx, nil
 }
 
 // NewSubmissionContext 创建提交上下文。
@@ -104,6 +114,12 @@ func ReconstructSubmissionContext(filler *actor.FillerRef, testee *actor.TesteeR
 	if len(admission) > 0 {
 		ctx.admission = admission[0]
 	}
+	return ctx
+}
+
+func ReconstructSubmissionContextWithAttribution(filler *actor.FillerRef, testee *actor.TesteeRef, orgID meta.ID, taskID string, attribution AttributionSnapshot, admission ...Admission) SubmissionContext {
+	ctx := ReconstructSubmissionContext(filler, testee, orgID, taskID, admission...)
+	ctx.attribution = attribution
 	return ctx
 }
 
@@ -162,13 +178,16 @@ func (c SubmissionContext) HasAdmission() bool {
 	return !c.admission.IsZero()
 }
 
+func (c SubmissionContext) Attribution() AttributionSnapshot { return c.attribution }
+
 func (c SubmissionContext) clone() SubmissionContext {
 	return SubmissionContext{
-		filler:    cloneFillerRef(c.filler),
-		testee:    cloneTesteeRef(c.testee),
-		orgID:     c.orgID,
-		taskID:    c.taskID,
-		admission: c.admission,
+		filler:      cloneFillerRef(c.filler),
+		testee:      cloneTesteeRef(c.testee),
+		orgID:       c.orgID,
+		taskID:      c.taskID,
+		admission:   c.admission,
+		attribution: c.attribution,
 	}
 }
 

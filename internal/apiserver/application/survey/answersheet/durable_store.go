@@ -19,6 +19,13 @@ type SubmissionDurableStore interface {
 	CreateDurably(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, bool, error)
 }
 
+// SubmissionIdempotencyReader is an optional preflight seam. It lets the
+// application return an already accepted business intent before revalidating a
+// mutable source resource such as an Entry or Task.
+type SubmissionIdempotencyReader interface {
+	FindCompleted(ctx context.Context, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error)
+}
+
 type SubmissionDurableWriter interface {
 	FindCompletedSubmission(ctx context.Context, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error)
 	SaveSubmittedAnswerSheet(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, meta DurableSubmitMeta) ([]event.DomainEvent, error)

@@ -59,16 +59,18 @@ type AssessmentTaskPO struct {
 	mysql.AuditFields
 
 	// 关联计划
-	PlanID uint64 `gorm:"column:plan_id;not null;uniqueIndex:uk_plan_testee_seq,priority:1"`
+	PlanID uint64 `gorm:"column:plan_id;not null"`
+
+	EnrollmentID uint64 `gorm:"column:enrollment_id;not null;uniqueIndex:uk_enrollment_seq,priority:1;index:idx_task_enrollment_status,priority:1"`
 
 	// 序号
-	Seq int `gorm:"column:seq;not null;index:idx_plan_seq;uniqueIndex:uk_plan_testee_seq,priority:3"` // 计划内的序号
+	Seq int `gorm:"column:seq;not null;index:idx_plan_seq;uniqueIndex:uk_enrollment_seq,priority:2"` // 本轮参与内的序号
 
 	// 组织信息（冗余，用于查询优化和权限控制）
 	OrgID int64 `gorm:"column:org_id;not null"`
 
 	// 受试者信息
-	TesteeID uint64 `gorm:"column:testee_id;not null;uniqueIndex:uk_plan_testee_seq,priority:2"`
+	TesteeID uint64 `gorm:"column:testee_id;not null"`
 
 	// 量表引用（冗余，用于查询优化）
 	ScaleCode string `gorm:"column:scale_code;size:100;not null;index:idx_scale_code"`
@@ -78,6 +80,8 @@ type AssessmentTaskPO struct {
 	OpenAt      *time.Time `gorm:"column:open_at;index:idx_open_at"`
 	ExpireAt    *time.Time `gorm:"column:expire_at"`
 	CompletedAt *time.Time `gorm:"column:completed_at"`
+	ExpiredAt   *time.Time `gorm:"column:expired_at"`
+	CanceledAt  *time.Time `gorm:"column:canceled_at"`
 
 	// 状态与关联
 	Status       string  `gorm:"column:status;size:50;not null;default:'pending'"`
@@ -88,6 +92,34 @@ type AssessmentTaskPO struct {
 	EntryURL   string `gorm:"column:entry_url;size:500"`
 
 	// 唯一索引：计划ID + 受试者ID + 序号（保证同一受试者在同一计划下每个 seq 只有一条任务）
+}
+
+// PlanEnrollmentPO 计划参与轮次持久化对象。
+type PlanEnrollmentPO struct {
+	mysql.AuditFields
+	OrgID            int64      `gorm:"column:org_id;not null"`
+	PlanID           uint64     `gorm:"column:plan_id;not null"`
+	TesteeID         uint64     `gorm:"column:testee_id;not null"`
+	Round            uint32     `gorm:"column:round;not null"`
+	StartDate        time.Time  `gorm:"column:start_date;type:date;not null"`
+	Status           string     `gorm:"column:status;size:32;not null"`
+	JoinedAt         time.Time  `gorm:"column:joined_at;not null"`
+	ClosedAt         *time.Time `gorm:"column:closed_at"`
+	TerminatedAt     *time.Time `gorm:"column:terminated_at"`
+	TerminatedReason string     `gorm:"column:terminated_reason;size:500;not null"`
+	RecordOrigin     string     `gorm:"column:record_origin;size:32;not null"`
+}
+
+func (PlanEnrollmentPO) TableName() string { return "plan_enrollment" }
+
+func (p *PlanEnrollmentPO) BeforeCreate(_ *gorm.DB) error {
+	if p.ID == 0 {
+		p.ID = meta.New()
+	}
+	if p.Version == 0 {
+		p.Version = mysql.InitialVersion
+	}
+	return nil
 }
 
 // TableName 指定表名

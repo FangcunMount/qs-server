@@ -27,6 +27,7 @@ type WireInput struct {
 	OverviewGuardOpts     statisticsApp.StatisticsReadGuardOptions
 	HotsetRecorder        cachetarget.HotsetRecorder
 	LockManager           locklease.Manager
+	LockRunner            locklease.Runner
 	Observer              *observability.ComponentObserver
 	MySQLLimiter          backpressure.Acquirer
 	WarmupCoordinator     statisticsApp.WarmupCoordinator
@@ -54,6 +55,7 @@ func Wire(in WireInput) (*Module, error) {
 		OverviewGuardOpts:     in.OverviewGuardOpts,
 		HotsetRecorder:        in.HotsetRecorder,
 		LockManager:           in.LockManager,
+		LockRunner:            in.LockRunner,
 		VersionStore:          versionStore,
 		Observer:              in.Observer,
 		MySQLLimiter:          in.MySQLLimiter,

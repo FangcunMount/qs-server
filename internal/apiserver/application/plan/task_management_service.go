@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	planentryport "github.com/FangcunMount/qs-server/internal/apiserver/port/planentry"
@@ -20,6 +21,7 @@ type taskManagementService struct {
 	taskLifecycle  *plan.TaskLifecycle
 	entryGenerator planentryport.Generator
 	eventPublisher event.EventPublisher
+	persistence    taskPersistence
 }
 
 // NewTaskManagementService 创建任务管理服务
@@ -34,7 +36,20 @@ func NewTaskManagementService(
 		taskLifecycle:  taskLifecycle,
 		entryGenerator: entryGenerator,
 		eventPublisher: eventPublisher,
+		persistence:    taskPersistence{tasks: taskRepo},
 	}
+}
+
+func NewTaskManagementServiceWithEnrollment(
+	taskRepo plan.AssessmentTaskRepository,
+	enrollmentRepo plan.EnrollmentRepository,
+	txRunner apptransaction.Runner,
+	entryGenerator planentryport.Generator,
+	eventPublisher event.EventPublisher,
+) TaskManagementService {
+	service := NewTaskManagementService(taskRepo, entryGenerator, eventPublisher).(*taskManagementService)
+	service.persistence = taskPersistence{tasks: taskRepo, enrollments: enrollmentRepo, tx: txRunner}
+	return service
 }
 
 // OpenTask 开放任务
@@ -73,7 +88,7 @@ func (s *taskManagementService) OpenTask(ctx context.Context, orgID int64, taskI
 	}
 
 	// 4. 持久化
-	if err := s.taskRepo.Save(ctx, task); err != nil {
+	if err := s.persistence.save(ctx, task, false); err != nil {
 		logger.L(ctx).Errorw("Failed to save opened task",
 			"action", "open_task",
 			"task_id", taskID,
@@ -138,7 +153,7 @@ func (s *taskManagementService) CompleteTask(ctx context.Context, orgID int64, t
 	}
 
 	// 4. 持久化
-	if err := s.taskRepo.Save(ctx, task); err != nil {
+	if err := s.persistence.save(ctx, task, true); err != nil {
 		logger.L(ctx).Errorw("Failed to save completed task",
 			"action", "complete_task",
 			"task_id", taskID,
@@ -191,7 +206,7 @@ func (s *taskManagementService) ExpireTask(ctx context.Context, orgID int64, tas
 	}
 
 	// 3. 持久化
-	if err := s.taskRepo.Save(ctx, task); err != nil {
+	if err := s.persistence.save(ctx, task, true); err != nil {
 		logger.L(ctx).Errorw("Failed to save expired task",
 			"action", "expire_task",
 			"task_id", taskID,
@@ -243,7 +258,7 @@ func (s *taskManagementService) CancelTask(ctx context.Context, orgID int64, tas
 	}
 
 	// 3. 持久化
-	if err := s.taskRepo.Save(ctx, task); err != nil {
+	if err := s.persistence.save(ctx, task, true); err != nil {
 		logger.L(ctx).Errorw("Failed to save canceled task",
 			"action", "cancel_task",
 			"task_id", taskID,

@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS `statistics_sync_run`;
+DROP TABLE IF EXISTS `statistics_org_snapshot`;
+DROP TABLE IF EXISTS `statistics_plan_fulfillment_daily`;
+DROP TABLE IF EXISTS `statistics_plan_activity_daily`;
+DROP TABLE IF EXISTS `statistics_assessment_daily`;
+DROP TABLE IF EXISTS `statistics_access_daily`;
+DROP TABLE IF EXISTS `statistics_plan_fact`;
+DROP TABLE IF EXISTS `statistics_assessment_fact`;
+DROP TABLE IF EXISTS `statistics_access_fact`;

@@ -41,6 +41,15 @@ func NewAnswerSheetSubmittedEvent(sheet *AnswerSheet) AnswerSheetSubmittedEvent 
 		panic(fmt.Errorf("answersheet filler id: %w", err))
 	}
 	submissionContext := sheet.SubmissionContext()
+	attribution := submissionContext.Attribution()
+	var attributionPayload *eventpayload.AttributionSnapshot
+	if !attribution.IsZero() {
+		attributionPayload = &eventpayload.AttributionSnapshot{
+			OriginType: string(attribution.OriginType()), OriginID: attribution.OriginID(), ClinicianID: attribution.ClinicianID(),
+			EntryID: attribution.EntryID(), PlanID: attribution.PlanID(), EnrollmentID: attribution.EnrollmentID(), TaskID: attribution.TaskID(),
+			CapturedAt: attribution.CapturedAt(), Version: attribution.Version(), Mode: string(attribution.Mode()),
+		}
+	}
 	testeeID, err := safeconv.MetaIDToUint64(submissionContext.TesteeID())
 	if err != nil {
 		panic(fmt.Errorf("answersheet testee id: %w", err))
@@ -62,6 +71,7 @@ func NewAnswerSheetSubmittedEvent(sheet *AnswerSheet) AnswerSheetSubmittedEvent 
 			TaskID:               submissionContext.TaskID(),
 			SubmittedAt:          sheet.FilledAt(),
 			Admission:            submissionContext.Admission().ToEventPayload(),
+			Attribution:          attributionPayload,
 		},
 	)
 }

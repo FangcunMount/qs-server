@@ -23,6 +23,13 @@ type transactionalSubmissionDurableStore struct {
 
 const durableSubmitRecoveryTimeout = 500 * time.Millisecond
 
+func (s transactionalSubmissionDurableStore) FindCompleted(ctx context.Context, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error) {
+	if s.writer == nil || meta.IdempotencyKey == "" {
+		return nil, nil
+	}
+	return s.writer.FindCompletedSubmission(ctx, meta)
+}
+
 func (s transactionalSubmissionDurableStore) CreateDurably(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, bool, error) {
 	if sheet == nil {
 		return nil, false, fmt.Errorf("answer sheet is required")

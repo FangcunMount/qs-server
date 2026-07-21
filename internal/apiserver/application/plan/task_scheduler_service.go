@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	planentryport "github.com/FangcunMount/qs-server/internal/apiserver/port/planentry"
@@ -25,6 +26,7 @@ type taskSchedulerService struct {
 	taskLifecycle  *plan.TaskLifecycle
 	entryGenerator planentryport.Generator // 入口生成器（由基础设施层实现）
 	eventPublisher event.EventPublisher
+	persistence    taskPersistence
 }
 
 // NewTaskSchedulerService 创建任务调度服务
@@ -41,7 +43,21 @@ func NewTaskSchedulerService(
 		taskLifecycle:  taskLifecycle,
 		entryGenerator: entryGenerator,
 		eventPublisher: eventPublisher,
+		persistence:    taskPersistence{tasks: taskRepo},
 	}
+}
+
+func NewTaskSchedulerServiceWithEnrollment(
+	taskRepo plan.AssessmentTaskRepository,
+	planRepo plan.AssessmentPlanRepository,
+	enrollmentRepo plan.EnrollmentRepository,
+	txRunner apptransaction.Runner,
+	entryGenerator planentryport.Generator,
+	eventPublisher event.EventPublisher,
+) TaskSchedulerService {
+	service := NewTaskSchedulerService(taskRepo, planRepo, entryGenerator, eventPublisher).(*taskSchedulerService)
+	service.persistence = taskPersistence{tasks: taskRepo, enrollments: enrollmentRepo, tx: txRunner}
+	return service
 }
 
 // SchedulePendingTasks 调度待推送的任务
@@ -149,7 +165,7 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 		}
 
 		// 持久化任务
-		if err := s.taskRepo.Save(ctx, task); err != nil {
+		if err := s.persistence.save(ctx, task, false); err != nil {
 			logger.L(ctx).Errorw("Failed to save opened task",
 				"action", "schedule_pending_tasks",
 				"task_id", task.GetID().String(),
@@ -353,7 +369,7 @@ func (s *taskSchedulerService) expireOverdueTasks(ctx context.Context, orgID int
 			continue
 		}
 
-		if err := s.taskRepo.Save(ctx, task); err != nil {
+		if err := s.persistence.save(ctx, task, true); err != nil {
 			logger.L(ctx).Errorw("Failed to save expired task",
 				"action", "schedule_pending_tasks",
 				"task_id", task.GetID().String(),
@@ -413,7 +429,7 @@ func (s *taskSchedulerService) cancelTaskForInactivePlan(
 	if err := s.taskLifecycle.Cancel(ctx, task); err != nil {
 		return err
 	}
-	if err := s.taskRepo.Save(ctx, task); err != nil {
+	if err := s.persistence.save(ctx, task, true); err != nil {
 		return err
 	}
 	eventing.PublishCollectedEvents(ctx, s.eventPublisher, task, nil, func(evt event.DomainEvent, err error) {

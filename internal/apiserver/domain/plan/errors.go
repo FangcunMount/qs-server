@@ -54,4 +54,6 @@ var (
 
 	// ErrInvalidTriggerTime 无效的计划触发时间
 	ErrInvalidTriggerTime = errors.New("invalid trigger time")
+
+	ErrActiveEnrollmentExists = errors.New("active enrollment already exists")
 )

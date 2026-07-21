@@ -87,6 +87,8 @@ func (registrar protectedRouteRegistrar) register(engine *gin.Engine) {
 	apiV2 := engine.Group("/api/v2")
 	r.applyProtectedGroupMiddlewares(apiV2, "/api/v2")
 	r.registerEvaluationOutcomeProtectedRoutes(apiV2)
+	r.registerStatisticsV2ProtectedRoutes(apiV2)
+	r.registerPlanV2ProtectedRoutes(apiV2)
 }
 
 func (registrar internalRouteRegistrar) register(engine *gin.Engine) {
@@ -102,6 +104,10 @@ func (registrar internalRouteRegistrar) register(engine *gin.Engine) {
 	r.registerSystemGovernanceInternalRoutes(internalV1)
 	r.registerEvaluationRunInternalRoutes(internalV1)
 	r.registerInterpretationInternalRoutes(internalV1)
+
+	internalV2 := engine.Group("/internal/v2")
+	r.applyProtectedGroupMiddlewares(internalV2, "/internal/v2")
+	r.registerStatisticsV2InternalRoutes(internalV2)
 }
 
 func (composer protectedGroupMiddlewareComposer) apply(group *gin.RouterGroup, routePrefix string) {

@@ -26,22 +26,12 @@ func (r *Repository) ensureIndexes(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	if _, err := r.idempotencyColl.Indexes().CreateOne(ctx, mongo.IndexModel{
-		Keys:    bson.D{{Key: "writer_id", Value: 1}, {Key: "idempotency_key", Value: 1}},
-		Options: options.Index().SetName("uk_writer_id_idempotency_key").SetUnique(true),
+	if _, err := r.Collection().Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "submit_meta.writer_id", Value: 1}, {Key: "submit_meta.idempotency_key", Value: 1}},
+		Options: options.Index().SetName("uk_answersheet_submit_intent").SetUnique(true).
+			SetPartialFilterExpression(bson.M{"submit_meta.idempotency_key": bson.M{"$exists": true}}),
 	}); err != nil {
-		return fmt.Errorf("create scoped answersheet idempotency index: %w", err)
-	}
-	if _, err := r.idempotencyColl.Indexes().DropOne(ctx, "uk_idempotency_key"); err != nil && !isIndexNotFound(err) {
-		return fmt.Errorf("drop legacy answersheet idempotency index: %w", err)
-	}
-	if _, err := r.idempotencyColl.Indexes().CreateMany(ctx, []mongo.IndexModel{
-		{
-			Keys:    bson.D{{Key: "status", Value: 1}, {Key: "updated_at", Value: 1}},
-			Options: options.Index().SetName("idx_status_updated_at"),
-		},
-	}); err != nil {
-		return fmt.Errorf("create answersheet idempotency indexes: %w", err)
+		return fmt.Errorf("create embedded answersheet idempotency index: %w", err)
 	}
 
 	return nil
@@ -80,40 +70,16 @@ func (r *Repository) SaveSubmittedAnswerSheet(ctx context.Context, sheet *domain
 	mongoBase.ApplyAuditCreate(ctx, po)
 	po.BeforeInsert()
 
-	answerSheetDoc, err := po.ToBsonM()
-	if err != nil {
-		return nil, err
-	}
 	writerID, err := safeconv.Int64ToUint64(submissionContext.Filler().UserID())
 	if err != nil {
 		return nil, err
 	}
-	testeeID, err := safeconv.MetaIDToUint64(submissionContext.TesteeID())
+	if metaInfo.IdempotencyKey != "" {
+		po.SubmitMeta = &SubmitMetaPO{IdempotencyKey: metaInfo.IdempotencyKey, WriterID: writerID, Fingerprint: metaInfo.Fingerprint, RequestID: metaInfo.RequestID, AcceptedAt: time.Now()}
+	}
+	answerSheetDoc, err := po.ToBsonM()
 	if err != nil {
 		return nil, err
-	}
-	var idempotencyDoc *AnswerSheetSubmitIdempotencyPO
-	if metaInfo.IdempotencyKey != "" {
-		code, version, _ := sheet.QuestionnaireInfo()
-		now := time.Now()
-		idempotencyDoc = &AnswerSheetSubmitIdempotencyPO{
-			IdempotencyKey:       metaInfo.IdempotencyKey,
-			WriterID:             writerID,
-			Fingerprint:          metaInfo.Fingerprint,
-			TesteeID:             testeeID,
-			QuestionnaireCode:    code,
-			QuestionnaireVersion: version,
-			AnswerSheetID:        sheet.ID().Uint64(),
-			Status:               idempotencyStatusCompleted,
-			CreatedAt:            now,
-			UpdatedAt:            now,
-		}
-	}
-
-	if idempotencyDoc != nil {
-		if _, err := r.idempotencyColl.InsertOne(ctx, idempotencyDoc); err != nil {
-			return nil, err
-		}
 	}
 
 	if _, err := r.Collection().InsertOne(ctx, answerSheetDoc); err != nil {
@@ -129,30 +95,67 @@ func (r *Repository) findByIdempotencyKey(ctx context.Context, metaInfo submitpo
 		return nil, nil
 	}
 
+	var sheetPO AnswerSheetPO
+	if err := r.Collection().FindOne(ctx, bson.M{
+		"submit_meta.writer_id":       metaInfo.WriterID,
+		"submit_meta.idempotency_key": metaInfo.IdempotencyKey,
+		"deleted_at":                  nil,
+	}).Decode(&sheetPO); err != nil {
+		if stderrors.Is(err, mongo.ErrNoDocuments) {
+			return r.findLegacyIdempotentSubmission(ctx, metaInfo)
+		}
+		return nil, err
+	}
+	sheet := r.mapper.ToBO(&sheetPO)
+	if sheet == nil || metaInfo.Fingerprint == "" {
+		return sheet, nil
+	}
+	storedFingerprint := ""
+	if sheetPO.SubmitMeta != nil {
+		storedFingerprint = sheetPO.SubmitMeta.Fingerprint
+	}
+	if storedFingerprint == "" {
+		storedFingerprint, err := submitport.Fingerprint(sheet)
+		if err != nil {
+			return nil, err
+		}
+		if storedFingerprint != metaInfo.Fingerprint {
+			return nil, submitport.ErrIdempotencyConflict
+		}
+		return sheet, nil
+	}
+	if storedFingerprint != metaInfo.Fingerprint {
+		return nil, submitport.ErrIdempotencyConflict
+	}
+	return sheet, nil
+}
+
+// findLegacyIdempotentSubmission keeps pre-migration retry keys readable. New
+// submissions never write this collection; it can be archived after the
+// compatibility window and an explicit data migration.
+func (r *Repository) findLegacyIdempotentSubmission(ctx context.Context, metaInfo submitport.DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error) {
+	if r.idempotencyColl == nil {
+		return nil, nil
+	}
 	var po AnswerSheetSubmitIdempotencyPO
-	if err := r.idempotencyColl.FindOne(ctx, bson.M{
-		"writer_id":       metaInfo.WriterID,
-		"idempotency_key": metaInfo.IdempotencyKey,
-		"status":          idempotencyStatusCompleted,
-	}).Decode(&po); err != nil {
+	if err := r.idempotencyColl.FindOne(ctx, bson.M{"writer_id": metaInfo.WriterID, "idempotency_key": metaInfo.IdempotencyKey, "status": idempotencyStatusCompleted}).Decode(&po); err != nil {
 		if stderrors.Is(err, mongo.ErrNoDocuments) {
 			return nil, nil
 		}
 		return nil, err
 	}
-
 	sheet, err := r.FindByID(ctx, meta.MustFromUint64(po.AnswerSheetID))
 	if err != nil || sheet == nil || metaInfo.Fingerprint == "" {
 		return sheet, err
 	}
-	storedFingerprint := po.Fingerprint
-	if storedFingerprint == "" {
-		storedFingerprint, err = submitport.Fingerprint(sheet)
+	stored := po.Fingerprint
+	if stored == "" {
+		stored, err = submitport.Fingerprint(sheet)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if storedFingerprint != metaInfo.Fingerprint {
+	if stored != metaInfo.Fingerprint {
 		return nil, submitport.ErrIdempotencyConflict
 	}
 	return sheet, nil

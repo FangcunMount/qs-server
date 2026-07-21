@@ -28,6 +28,7 @@ type BootstrapInput struct {
 	OverviewGuardOpts     statisticsApp.StatisticsReadGuardOptions
 	HotsetRecorder        cachetarget.HotsetRecorder
 	LockManager           locklease.Manager
+	LockRunner            locklease.Runner
 	VersionStore          querycache.VersionTokenStore
 	Observer              *observability.ComponentObserver
 	MySQLLimiter          backpressure.Acquirer

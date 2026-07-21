@@ -3,6 +3,7 @@ package survey
 import (
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 
 	"github.com/FangcunMount/component-base/pkg/event"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
@@ -15,6 +16,7 @@ import (
 // BootstrapInput carries container integration inputs for survey module bootstrap.
 type BootstrapInput struct {
 	MongoDB             *mongo.Database
+	MySQLDB             *gorm.DB
 	EventPublisher      event.EventPublisher
 	IdentityService     *iam.IdentityService
 	HotsetRecorder      cachetarget.HotsetRecorder

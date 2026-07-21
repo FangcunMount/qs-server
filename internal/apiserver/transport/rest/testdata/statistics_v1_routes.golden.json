@@ -1,0 +1,12 @@
+[
+  "GET /api/v1/statistics/clinicians",
+  "GET /api/v1/statistics/clinicians/:id",
+  "GET /api/v1/statistics/clinicians/me/entries",
+  "GET /api/v1/statistics/clinicians/me/overview",
+  "GET /api/v1/statistics/clinicians/me/testees-summary",
+  "GET /api/v1/statistics/entries",
+  "GET /api/v1/statistics/entries/:id",
+  "GET /api/v1/statistics/overview",
+  "GET /api/v1/statistics/testees/:testee_id/periodic",
+  "POST /api/v1/statistics/contents/batch"
+]

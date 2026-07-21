@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	attributionport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetattribution"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -16,6 +17,26 @@ type durableStoreCaptureStub struct {
 	lastSheet     *domainAnswerSheet.AnswerSheet
 	existing      bool
 	returnedSheet *domainAnswerSheet.AnswerSheet
+}
+
+type preflightDurableStoreStub struct {
+	existing    *domainAnswerSheet.AnswerSheet
+	createCalls int
+}
+
+func (s *preflightDurableStoreStub) FindCompleted(context.Context, DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error) {
+	return s.existing, nil
+}
+func (s *preflightDurableStoreStub) CreateDurably(_ context.Context, sheet *domainAnswerSheet.AnswerSheet, _ DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, bool, error) {
+	s.createCalls++
+	return sheet, false, nil
+}
+
+type attributionResolverCaptureStub struct{ calls int }
+
+func (s *attributionResolverCaptureStub) Resolve(context.Context, attributionport.ResolveRequest) (domainAnswerSheet.AttributionSnapshot, error) {
+	s.calls++
+	return domainAnswerSheet.AttributionSnapshot{}, context.Canceled
 }
 
 func (s *durableStoreCaptureStub) CreateDurably(_ context.Context, sheet *domainAnswerSheet.AnswerSheet, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, bool, error) {
@@ -97,6 +118,24 @@ func TestSubmissionServiceCreateAndSaveAnswerSheetReturnsExistingSheet(t *testin
 	}
 	if result != existing {
 		t.Fatalf("expected existing sheet to be returned")
+	}
+}
+
+func TestSubmissionServiceReturnsIdempotentAnswerBeforeMutableAttributionRevalidation(t *testing.T) {
+	existing := domainAnswerSheet.Reconstruct(meta.FromUint64(999), mustQuestionnaireRefForSubmissionTest(t), nil, mustAnswersForSubmissionTest(t), nowForSubmissionTest(), 0)
+	store := &preflightDurableStoreStub{existing: existing}
+	resolver := &attributionResolverCaptureStub{}
+	svc := &submissionService{durableStore: store, attribution: resolver}
+	qnr, _ := domainQuestionnaire.NewQuestionnaire(meta.NewCode("QNR-1"), "Questionnaire")
+	result, err := svc.createAndSaveAnswerSheet(context.Background(), logger.L(context.Background()), SubmitAnswerSheetDTO{
+		IdempotencyKey: "idem-existing", FillerID: 301, TesteeID: 401, OrgID: 501,
+		QuestionnaireCode: "QNR-1", QuestionnaireVer: "1.0.0", OriginRef: &OriginRefDTO{Type: "assessment_entry", ID: "9001"},
+	}, qnr, mustAnswersForSubmissionTest(t))
+	if err != nil || result != existing {
+		t.Fatalf("result=%p existing=%p err=%v", result, existing, err)
+	}
+	if resolver.calls != 0 || store.createCalls != 0 {
+		t.Fatalf("mutable source was revalidated or rewritten: resolver=%d create=%d", resolver.calls, store.createCalls)
 	}
 }
 

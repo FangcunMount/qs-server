@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -39,6 +40,17 @@ func NewLifecycleServiceWithScaleCatalog(
 	scaleCatalog ScaleCatalog,
 	eventPublisher event.EventPublisher,
 ) PlanLifecycleService {
+	return NewLifecycleServiceWithEnrollment(planRepo, taskRepo, scaleCatalog, nil, nil, eventPublisher)
+}
+
+func NewLifecycleServiceWithEnrollment(
+	planRepo plan.AssessmentPlanRepository,
+	taskRepo plan.AssessmentTaskRepository,
+	scaleCatalog ScaleCatalog,
+	enrollments plan.PlanEnrollmentLifecycleRepository,
+	tx apptransaction.Runner,
+	eventPublisher event.EventPublisher,
+) PlanLifecycleService {
 	taskGenerator := plan.NewTaskGenerator()
 	taskLifecycle := plan.NewTaskLifecycle()
 	lifecycle := plan.NewPlanLifecycle(taskRepo, taskGenerator, taskLifecycle)
@@ -48,7 +60,7 @@ func NewLifecycleServiceWithScaleCatalog(
 		taskRepo:           taskRepo,
 		lifecycle:          lifecycle,
 		createWorkflow:     newPlanCreateWorkflow(planRepo, scaleCatalog, plan.NewPlanValidator()),
-		transitionWorkflow: newPlanTransitionWorkflow(planRepo, taskRepo, eventPublisher),
+		transitionWorkflow: newPlanTransitionWorkflow(planRepo, taskRepo, enrollments, tx, eventPublisher),
 	}
 }
 
@@ -168,13 +180,14 @@ func (s *lifecycleService) FinishPlan(ctx context.Context, orgID int64, planID s
 		orgID,
 		planID,
 		planTransitionSpec{
-			action:          "finish_plan",
-			startLog:        "Finishing assessment plan",
-			transitionLog:   "Plan finished, canceling outstanding tasks",
-			transitionError: "Failed to finish plan",
-			planSaveError:   "Failed to save finished plan",
-			taskSaveError:   "Failed to save canceled task while finishing plan",
-			successLog:      "Plan finished successfully",
+			action:           "finish_plan",
+			startLog:         "Finishing assessment plan",
+			transitionLog:    "Plan finished, canceling outstanding tasks",
+			transitionError:  "Failed to finish plan",
+			planSaveError:    "Failed to save finished plan",
+			taskSaveError:    "Failed to save canceled task while finishing plan",
+			successLog:       "Plan finished successfully",
+			enrollmentAction: "close",
 		},
 		s.lifecycle.Finish,
 	)
@@ -187,13 +200,14 @@ func (s *lifecycleService) CancelPlan(ctx context.Context, orgID int64, planID s
 		orgID,
 		planID,
 		planTransitionSpec{
-			action:          "cancel_plan",
-			startLog:        "Canceling assessment plan",
-			transitionLog:   "Plan canceled, canceling tasks",
-			transitionError: "Failed to cancel plan",
-			planSaveError:   "Failed to save canceled plan",
-			taskSaveError:   "Failed to save canceled task",
-			successLog:      "Plan canceled successfully",
+			action:           "cancel_plan",
+			startLog:         "Canceling assessment plan",
+			transitionLog:    "Plan canceled, canceling tasks",
+			transitionError:  "Failed to cancel plan",
+			planSaveError:    "Failed to save canceled plan",
+			taskSaveError:    "Failed to save canceled task",
+			successLog:       "Plan canceled successfully",
+			enrollmentAction: "terminate",
 		},
 		s.lifecycle.Cancel,
 	)

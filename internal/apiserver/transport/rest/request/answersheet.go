@@ -8,9 +8,15 @@ type AdminSubmitAnswerSheetRequest struct {
 	Title                string              `json:"title"`
 	TesteeID             uint64              `json:"testee_id" binding:"required"`
 	TaskID               string              `json:"task_id,omitempty"`
+	OriginRef            *OriginRefRequest   `json:"origin_ref,omitempty"`
 	WriterID             uint64              `json:"writer_id"`
 	FillerID             uint64              `json:"filler_id"`
 	Answers              []AdminAnswerSubmit `json:"answers" binding:"required"`
+}
+
+type OriginRefRequest struct {
+	Type string `json:"type" binding:"required"`
+	ID   string `json:"id,omitempty"`
 }
 
 // AdminAnswerSubmit 管理员提交答案

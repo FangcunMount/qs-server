@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	attributionport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetattribution"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -35,11 +36,43 @@ func (s *submissionService) createAndSaveAnswerSheet(
 			"model_version", admission.ModelVersion(),
 		)
 	}
-	sheet, err := createAnswerSheet(l, dto, qnr, answers, admission)
+	if existing, err := s.findExistingSubmissionBeforeAttribution(ctx, dto, qnr, answers, admission); err != nil || existing != nil {
+		return existing, err
+	}
+	attribution, err := s.resolveAttribution(ctx, dto, admission)
+	if err != nil {
+		return nil, err
+	}
+	sheet, err := createAnswerSheet(l, dto, qnr, answers, admission, attribution)
 	if err != nil {
 		return nil, err
 	}
 	return s.persistSubmittedAnswerSheet(ctx, l, dto, sheet)
+}
+
+func (s *submissionService) findExistingSubmissionBeforeAttribution(ctx context.Context, dto SubmitAnswerSheetDTO, qnr *questionnaire.Questionnaire, answers []answersheet.Answer, admission answersheet.Admission) (*answersheet.AnswerSheet, error) {
+	reader, ok := s.durableStore.(SubmissionIdempotencyReader)
+	if !ok || dto.IdempotencyKey == "" {
+		return nil, nil
+	}
+	ref, err := originRefFromDTO(dto)
+	if err != nil {
+		return nil, err
+	}
+	placeholder := answersheet.ReconstructAttributionSnapshot(ref.Type, ref.ID, "", "", "", "", "", time.Now(), 1, answersheet.AttributionModeUnknown)
+	candidate, err := createAnswerSheet(logger.L(ctx), dto, qnr, answers, admission, placeholder)
+	if err != nil {
+		return nil, err
+	}
+	fingerprint, err := submitport.Fingerprint(candidate)
+	if err != nil {
+		return nil, err
+	}
+	existing, err := reader.FindCompleted(ctx, DurableSubmitMeta{IdempotencyKey: dto.IdempotencyKey, WriterID: dto.FillerID, Fingerprint: fingerprint, RequestID: dto.RequestID})
+	if stderrors.Is(err, submitport.ErrIdempotencyConflict) {
+		return nil, errors.WithCode(errorCode.ErrConflict, "%v", err)
+	}
+	return existing, err
 }
 
 func createAnswerSheet(
@@ -48,6 +81,7 @@ func createAnswerSheet(
 	qnr *questionnaire.Questionnaire,
 	answers []answersheet.Answer,
 	admission answersheet.Admission,
+	attribution answersheet.AttributionSnapshot,
 ) (*answersheet.AnswerSheet, error) {
 	questionnaireRef, err := answersheet.NewQuestionnaireRef(
 		dto.QuestionnaireCode,
@@ -73,18 +107,20 @@ func createAnswerSheet(
 	}
 	var submissionContext answersheet.SubmissionContext
 	if admission.IsZero() {
-		submissionContext, err = answersheet.NewSubmissionContext(
+		submissionContext, err = answersheet.NewSubmissionContextWithAttribution(
 			fillerRef,
 			actor.NewTesteeRef(testeeID),
 			orgID,
 			dto.TaskID,
+			attribution,
 		)
 	} else {
-		submissionContext, err = answersheet.NewSubmissionContext(
+		submissionContext, err = answersheet.NewSubmissionContextWithAttribution(
 			fillerRef,
 			actor.NewTesteeRef(testeeID),
 			orgID,
 			dto.TaskID,
+			attribution,
 			admission,
 		)
 	}
@@ -99,6 +135,51 @@ func createAnswerSheet(
 		return nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "创建答卷失败")
 	}
 	return sheet, nil
+}
+
+func (s *submissionService) resolveAttribution(ctx context.Context, dto SubmitAnswerSheetDTO, admission answersheet.Admission) (answersheet.AttributionSnapshot, error) {
+	ref, err := originRefFromDTO(dto)
+	if err != nil {
+		return answersheet.AttributionSnapshot{}, err
+	}
+	if s.attribution == nil {
+		if ref.Type == answersheet.OriginTypePlanTask {
+			// Compatibility for isolated unit/bootstrap environments. Production
+			// wiring always installs the MySQL resolver and therefore never takes
+			// this unvalidated legacy path.
+			return answersheet.ReconstructAttributionSnapshot(
+				ref.Type, ref.ID, "", "", "", "", ref.ID, time.Now(), 1, answersheet.AttributionModeDerivedLegacy,
+			), nil
+		}
+		if ref.Type != answersheet.OriginTypeSelfService {
+			return answersheet.AttributionSnapshot{}, errors.WithCode(errorCode.ErrInternalServerError, "答卷归属解析器未配置")
+		}
+		return answersheet.NewAttributionSnapshot(ref, "", "", "", "", "", time.Now())
+	}
+	snapshot, err := s.attribution.Resolve(ctx, attributionport.ResolveRequest{
+		OriginRef: ref, OrgID: dto.OrgID, TesteeID: dto.TesteeID,
+		QuestionnaireCode: dto.QuestionnaireCode, QuestionnaireVersion: dto.QuestionnaireVer, Admission: admission,
+	})
+	if err != nil {
+		return answersheet.AttributionSnapshot{}, errors.WrapC(err, errorCode.ErrInvalidArgument, "答卷来源校验失败")
+	}
+	return snapshot, nil
+}
+
+func originRefFromDTO(dto SubmitAnswerSheetDTO) (answersheet.OriginRef, error) {
+	ref := answersheet.OriginRef{Type: answersheet.OriginTypeSelfService}
+	if dto.OriginRef != nil {
+		ref = answersheet.OriginRef{Type: answersheet.OriginType(dto.OriginRef.Type), ID: dto.OriginRef.ID}
+	} else if dto.TaskID != "" {
+		ref = answersheet.OriginRef{Type: answersheet.OriginTypePlanTask, ID: dto.TaskID}
+	}
+	if err := ref.Validate(); err != nil {
+		return answersheet.OriginRef{}, errors.WrapC(err, errorCode.ErrInvalidArgument, "无效的答卷来源")
+	}
+	if dto.TaskID != "" && (ref.Type != answersheet.OriginTypePlanTask || ref.ID != dto.TaskID) {
+		return answersheet.OriginRef{}, errors.WithCode(errorCode.ErrInvalidArgument, "task_id 与 origin_ref 不一致")
+	}
+	return ref, nil
 }
 
 func (s *submissionService) persistSubmittedAnswerSheet(
