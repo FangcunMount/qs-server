@@ -35,17 +35,13 @@ name: Production Deploy
 #   serverD：qs-worker（跨云 gRPC 连 apiserver）
 #   WWW_UID, WWW_GID（与宿主机运行用户一致，部署时 chown TLS 与 configs；镜像 RUN_UID 与之一致）
 #
-# 可选 Repository / Organization Variables（自托管部署机 ServerD）:
-#   QS_DEPLOY_RUNNER=serverd          deploy-* job 的 runs-on；组织级 runner 标签，多仓库共用
-#   QS_DEPLOY_EXPORT_REGISTRY=acr      ServerD export 镜像源；留空默认 acr（国内 ACR pull）
-#   QS_DEPLOY_HTTP_PROXY=http://127.0.0.1:7890  Mihomo HTTP 代理
-#   QS_DEPLOY_HTTPS_PROXY=（默认同 HTTP）
-#   QS_DEPLOY_ALL_PROXY=socks5://127.0.0.1:7891
-#   QS_DEPLOY_NO_PROXY=127.0.0.1,localhost,内网域名/IP
+# 可选 Repository / Organization Variables（Mac mini self-hosted deploy）:
+#   QS_DEPLOY_EXPORT_REGISTRY=acr      export 镜像源；留空默认 acr
+#   SVRA_PUBLIC_HOST / SVRD_PUBLIC_HOST  大文件上传优先公网（避免 Tailscale DERP）
+#   SVR_MINI_SSH_KEY（可选）Mac mini 部署优先 SSH 私钥
 #
-# Repository Secrets（自托管 checkout）:
-#   QS_SERVER_DEPLOY_KEY  GitHub Deploy Key 私钥（只读），用于 actions/checkout ssh-key
-# 组织级 runner 注册见 .github/workflows/README.md §自托管 Runner
+# Deploy jobs 跑在 Mac mini（group: qlume, macOS/ARM64），替代原 ServerD runner。
+# 组织级 runner 注册见 .github/workflows/README.md
 # ============================================================================
 
 on:
@@ -190,7 +186,9 @@ jobs:
   deploy-apiserver:
     name: Deploy API Server
     needs: [plan, docker]
-    runs-on: ${{ vars.QS_DEPLOY_RUNNER || 'ubuntu-latest' }}
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64]
     environment:
       name: production
     permissions:
@@ -203,59 +201,28 @@ jobs:
       WWW_UID: ${{ secrets.WWW_UID }}
       WWW_GID: ${{ secrets.WWW_GID }}
     steps:
-      - name: Configure runner network (proxy + GitHub SSH)
-        if: vars.QS_DEPLOY_RUNNER != ''
-        env:
-          PLAN_HTTP_PROXY: ${{ needs.plan.outputs.self_hosted_http_proxy }}
-          PLAN_HTTPS_PROXY: ${{ needs.plan.outputs.self_hosted_https_proxy }}
-          PLAN_ALL_PROXY: ${{ needs.plan.outputs.self_hosted_all_proxy }}
-          PLAN_NO_PROXY: ${{ needs.plan.outputs.self_hosted_no_proxy }}
-          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
-        run: |
-          for env_file in \
-            "${HOME}/.env" \
-            "/opt/actions-runner/runner1/.env" \
-            "/opt/actions-runner/runner2/.env" \
-            "/opt/actions-runner/runner3/.env"; do
-            if [ -f "$env_file" ]; then
-              set -a
-              # shellcheck source=/dev/null
-              . "$env_file"
-              set +a
-              break
-            fi
-          done
-          export HTTP_PROXY="${HTTP_PROXY:-$PLAN_HTTP_PROXY}"
-          export HTTPS_PROXY="${HTTPS_PROXY:-$PLAN_HTTPS_PROXY}"
-          export ALL_PROXY="${ALL_PROXY:-$PLAN_ALL_PROXY}"
-          export NO_PROXY="${NO_PROXY:-$PLAN_NO_PROXY}"
-          script_ref="${DEPLOY_SHA:-main}"
-          curl -fsSL --proxy "${HTTP_PROXY}" \
-            "https://raw.githubusercontent.com/FangcunMount/qs-server/${script_ref}/scripts/cd/setup-runner-network.sh" \
-            | bash
-
-      - name: Checkout (self-hosted SSH)
-        if: vars.QS_DEPLOY_RUNNER != ''
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ env.DEPLOY_SHA }}
-          fetch-depth: 1
-          ssh-key: ${{ secrets.QS_SERVER_DEPLOY_KEY }}
-
-      - name: Checkout (GitHub-hosted HTTPS)
-        if: vars.QS_DEPLOY_RUNNER == ''
+      - name: Checkout
         uses: actions/checkout@v6
         with:
           ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 1
 
-      - name: Login to Aliyun ACR
+      - name: Login ACR (isolated config, no keychain)
         if: needs.plan.outputs.deploy_export_registry == 'acr'
+        shell: bash
         env:
           ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
           ALIYUN_ACR_USERNAME: ${{ secrets.ALIYUN_ACR_USERNAME }}
           ALIYUN_ACR_PASSWORD: ${{ secrets.ALIYUN_ACR_PASSWORD }}
-        run: echo "$ALIYUN_ACR_PASSWORD" | docker login "$ALIYUN_ACR_REGISTRY" -u "$ALIYUN_ACR_USERNAME" --password-stdin
+        run: |
+          set -Eeuo pipefail
+          DOCKER_CONFIG_DIR="${RUNNER_TEMP}/docker-config-${GITHUB_RUN_ID}-${{ github.job }}"
+          mkdir -p "${DOCKER_CONFIG_DIR}"
+          AUTH="$(printf '%s:%s' "${ALIYUN_ACR_USERNAME}" "${ALIYUN_ACR_PASSWORD}" | base64 | tr -d '\n')"
+          umask 077
+          printf '{"auths":{"%s":{"auth":"%s"}}}\n' "${ALIYUN_ACR_REGISTRY}" "${AUTH}" \
+            > "${DOCKER_CONFIG_DIR}/config.json"
+          echo "DOCKER_CONFIG=${DOCKER_CONFIG_DIR}" >> "${GITHUB_ENV}"
 
       - name: Export deployment image tarball
         if: needs.plan.outputs.deploy_export_registry == 'acr'
@@ -297,17 +264,18 @@ jobs:
 
       - name: Setup deploy SSH
         env:
-          RUNNER_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
-          RUNNER_SSH_HOST: ${{ vars.SVRA_HOST }}
+          RUNNER_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          RUNNER_SSH_HOST: ${{ vars.SVRA_PUBLIC_HOST || secrets.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
           RUNNER_SSH_USER: ${{ vars.SVRA_USERNAME }}
           RUNNER_SSH_PORT: ${{ vars.SVRA_SSH_PORT || 22 }}
           RUNNER_SSH_ALIAS: deploy-target-apiserver
+          DEPLOY_NODE_HOSTNAME: serverA
         run: bash scripts/cd/setup-runner-ssh.sh
 
       - name: Upload and deploy apiserver
         env:
           RUNNER_SSH_ALIAS: deploy-target-apiserver
-          RUNNER_SSH_HOST: ${{ vars.SVRA_HOST }}
+          RUNNER_SSH_HOST: ${{ vars.SVRA_PUBLIC_HOST || secrets.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
           SERVICE: apiserver
           DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
           DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
@@ -322,10 +290,21 @@ jobs:
           DEPLOY_IMAGE_SOURCE: tarball
         run: bash scripts/cd/runner-upload-and-deploy.sh
 
+      - name: Cleanup runner artifacts
+        if: always()
+        shell: bash
+        run: |
+          rm -f deploy-image-*.tar.gz deploy-package-*.tar.gz
+          rm -f "${RUNNER_SSH_KEY_FILE:-}" 2>/dev/null || true
+          rm -rf "${DOCKER_CONFIG:-}" 2>/dev/null || true
+          docker image prune -f >/dev/null 2>&1 || true
+
   deploy-collection:
     name: Deploy Collection Server
     needs: [plan, docker]
-    runs-on: ${{ vars.QS_DEPLOY_RUNNER || 'ubuntu-latest' }}
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64]
     environment:
       name: production
     permissions:
@@ -338,59 +317,28 @@ jobs:
       WWW_UID: ${{ secrets.WWW_UID }}
       WWW_GID: ${{ secrets.WWW_GID }}
     steps:
-      - name: Configure runner network (proxy + GitHub SSH)
-        if: vars.QS_DEPLOY_RUNNER != ''
-        env:
-          PLAN_HTTP_PROXY: ${{ needs.plan.outputs.self_hosted_http_proxy }}
-          PLAN_HTTPS_PROXY: ${{ needs.plan.outputs.self_hosted_https_proxy }}
-          PLAN_ALL_PROXY: ${{ needs.plan.outputs.self_hosted_all_proxy }}
-          PLAN_NO_PROXY: ${{ needs.plan.outputs.self_hosted_no_proxy }}
-          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
-        run: |
-          for env_file in \
-            "${HOME}/.env" \
-            "/opt/actions-runner/runner1/.env" \
-            "/opt/actions-runner/runner2/.env" \
-            "/opt/actions-runner/runner3/.env"; do
-            if [ -f "$env_file" ]; then
-              set -a
-              # shellcheck source=/dev/null
-              . "$env_file"
-              set +a
-              break
-            fi
-          done
-          export HTTP_PROXY="${HTTP_PROXY:-$PLAN_HTTP_PROXY}"
-          export HTTPS_PROXY="${HTTPS_PROXY:-$PLAN_HTTPS_PROXY}"
-          export ALL_PROXY="${ALL_PROXY:-$PLAN_ALL_PROXY}"
-          export NO_PROXY="${NO_PROXY:-$PLAN_NO_PROXY}"
-          script_ref="${DEPLOY_SHA:-main}"
-          curl -fsSL --proxy "${HTTP_PROXY}" \
-            "https://raw.githubusercontent.com/FangcunMount/qs-server/${script_ref}/scripts/cd/setup-runner-network.sh" \
-            | bash
-
-      - name: Checkout (self-hosted SSH)
-        if: vars.QS_DEPLOY_RUNNER != ''
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ env.DEPLOY_SHA }}
-          fetch-depth: 1
-          ssh-key: ${{ secrets.QS_SERVER_DEPLOY_KEY }}
-
-      - name: Checkout (GitHub-hosted HTTPS)
-        if: vars.QS_DEPLOY_RUNNER == ''
+      - name: Checkout
         uses: actions/checkout@v6
         with:
           ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 1
 
-      - name: Login to Aliyun ACR
+      - name: Login ACR (isolated config, no keychain)
         if: needs.plan.outputs.deploy_export_registry == 'acr'
+        shell: bash
         env:
           ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
           ALIYUN_ACR_USERNAME: ${{ secrets.ALIYUN_ACR_USERNAME }}
           ALIYUN_ACR_PASSWORD: ${{ secrets.ALIYUN_ACR_PASSWORD }}
-        run: echo "$ALIYUN_ACR_PASSWORD" | docker login "$ALIYUN_ACR_REGISTRY" -u "$ALIYUN_ACR_USERNAME" --password-stdin
+        run: |
+          set -Eeuo pipefail
+          DOCKER_CONFIG_DIR="${RUNNER_TEMP}/docker-config-${GITHUB_RUN_ID}-${{ github.job }}"
+          mkdir -p "${DOCKER_CONFIG_DIR}"
+          AUTH="$(printf '%s:%s' "${ALIYUN_ACR_USERNAME}" "${ALIYUN_ACR_PASSWORD}" | base64 | tr -d '\n')"
+          umask 077
+          printf '{"auths":{"%s":{"auth":"%s"}}}\n' "${ALIYUN_ACR_REGISTRY}" "${AUTH}" \
+            > "${DOCKER_CONFIG_DIR}/config.json"
+          echo "DOCKER_CONFIG=${DOCKER_CONFIG_DIR}" >> "${GITHUB_ENV}"
 
       - name: Export deployment image tarball
         if: needs.plan.outputs.deploy_export_registry == 'acr'
@@ -416,17 +364,18 @@ jobs:
 
       - name: Setup deploy SSH
         env:
-          RUNNER_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
-          RUNNER_SSH_HOST: ${{ vars.SVRA_HOST }}
+          RUNNER_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          RUNNER_SSH_HOST: ${{ vars.SVRA_PUBLIC_HOST || secrets.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
           RUNNER_SSH_USER: ${{ vars.SVRA_USERNAME }}
           RUNNER_SSH_PORT: ${{ vars.SVRA_SSH_PORT || 22 }}
           RUNNER_SSH_ALIAS: deploy-target-collection
+          DEPLOY_NODE_HOSTNAME: serverA
         run: bash scripts/cd/setup-runner-ssh.sh
 
       - name: Upload and deploy collection
         env:
           RUNNER_SSH_ALIAS: deploy-target-collection
-          RUNNER_SSH_HOST: ${{ vars.SVRA_HOST }}
+          RUNNER_SSH_HOST: ${{ vars.SVRA_PUBLIC_HOST || secrets.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
           SERVICE: collection
           DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
           DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
@@ -441,10 +390,21 @@ jobs:
           DEPLOY_IMAGE_SOURCE: tarball
         run: bash scripts/cd/runner-upload-and-deploy.sh
 
+      - name: Cleanup runner artifacts
+        if: always()
+        shell: bash
+        run: |
+          rm -f deploy-image-*.tar.gz deploy-package-*.tar.gz
+          rm -f "${RUNNER_SSH_KEY_FILE:-}" 2>/dev/null || true
+          rm -rf "${DOCKER_CONFIG:-}" 2>/dev/null || true
+          docker image prune -f >/dev/null 2>&1 || true
+
   deploy-worker:
     name: Deploy Worker
     needs: [plan, docker]
-    runs-on: ${{ vars.QS_DEPLOY_RUNNER || 'ubuntu-latest' }}
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64]
     environment:
       name: production
     permissions:
@@ -458,59 +418,28 @@ jobs:
       WWW_GID: ${{ secrets.WWW_GID }}
       WORKER_REPLICAS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.worker_replicas || vars.QS_WORKER_REPLICAS || '3' }}
     steps:
-      - name: Configure runner network (proxy + GitHub SSH)
-        if: vars.QS_DEPLOY_RUNNER != ''
-        env:
-          PLAN_HTTP_PROXY: ${{ needs.plan.outputs.self_hosted_http_proxy }}
-          PLAN_HTTPS_PROXY: ${{ needs.plan.outputs.self_hosted_https_proxy }}
-          PLAN_ALL_PROXY: ${{ needs.plan.outputs.self_hosted_all_proxy }}
-          PLAN_NO_PROXY: ${{ needs.plan.outputs.self_hosted_no_proxy }}
-          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
-        run: |
-          for env_file in \
-            "${HOME}/.env" \
-            "/opt/actions-runner/runner1/.env" \
-            "/opt/actions-runner/runner2/.env" \
-            "/opt/actions-runner/runner3/.env"; do
-            if [ -f "$env_file" ]; then
-              set -a
-              # shellcheck source=/dev/null
-              . "$env_file"
-              set +a
-              break
-            fi
-          done
-          export HTTP_PROXY="${HTTP_PROXY:-$PLAN_HTTP_PROXY}"
-          export HTTPS_PROXY="${HTTPS_PROXY:-$PLAN_HTTPS_PROXY}"
-          export ALL_PROXY="${ALL_PROXY:-$PLAN_ALL_PROXY}"
-          export NO_PROXY="${NO_PROXY:-$PLAN_NO_PROXY}"
-          script_ref="${DEPLOY_SHA:-main}"
-          curl -fsSL --proxy "${HTTP_PROXY}" \
-            "https://raw.githubusercontent.com/FangcunMount/qs-server/${script_ref}/scripts/cd/setup-runner-network.sh" \
-            | bash
-
-      - name: Checkout (self-hosted SSH)
-        if: vars.QS_DEPLOY_RUNNER != ''
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ env.DEPLOY_SHA }}
-          fetch-depth: 1
-          ssh-key: ${{ secrets.QS_SERVER_DEPLOY_KEY }}
-
-      - name: Checkout (GitHub-hosted HTTPS)
-        if: vars.QS_DEPLOY_RUNNER == ''
+      - name: Checkout
         uses: actions/checkout@v6
         with:
           ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 1
 
-      - name: Login to Aliyun ACR
+      - name: Login ACR (isolated config, no keychain)
         if: needs.plan.outputs.deploy_export_registry == 'acr'
+        shell: bash
         env:
           ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
           ALIYUN_ACR_USERNAME: ${{ secrets.ALIYUN_ACR_USERNAME }}
           ALIYUN_ACR_PASSWORD: ${{ secrets.ALIYUN_ACR_PASSWORD }}
-        run: echo "$ALIYUN_ACR_PASSWORD" | docker login "$ALIYUN_ACR_REGISTRY" -u "$ALIYUN_ACR_USERNAME" --password-stdin
+        run: |
+          set -Eeuo pipefail
+          DOCKER_CONFIG_DIR="${RUNNER_TEMP}/docker-config-${GITHUB_RUN_ID}-${{ github.job }}"
+          mkdir -p "${DOCKER_CONFIG_DIR}"
+          AUTH="$(printf '%s:%s' "${ALIYUN_ACR_USERNAME}" "${ALIYUN_ACR_PASSWORD}" | base64 | tr -d '\n')"
+          umask 077
+          printf '{"auths":{"%s":{"auth":"%s"}}}\n' "${ALIYUN_ACR_REGISTRY}" "${AUTH}" \
+            > "${DOCKER_CONFIG_DIR}/config.json"
+          echo "DOCKER_CONFIG=${DOCKER_CONFIG_DIR}" >> "${GITHUB_ENV}"
 
       - name: Export deployment image tarball
         if: needs.plan.outputs.deploy_export_registry == 'acr'
@@ -550,19 +479,20 @@ jobs:
 
       - name: Setup deploy SSH
         env:
-          RUNNER_SSH_KEY: ${{ secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
-          RUNNER_SSH_HOST: ${{ vars.SVRD_HOST }}
+          RUNNER_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          RUNNER_SSH_HOST: ${{ vars.SVRD_PUBLIC_HOST || secrets.SVRD_PUBLIC_HOST || vars.SVRD_HOST }}
           RUNNER_SSH_USER: ${{ vars.SVRD_USERNAME || vars.SVRA_USERNAME }}
           RUNNER_SSH_PORT: ${{ vars.SVRD_SSH_PORT || vars.SVRA_SSH_PORT || 22 }}
           RUNNER_SSH_ALIAS: deploy-target-worker
+          DEPLOY_NODE_HOSTNAME: serverD
         run: bash scripts/cd/setup-runner-ssh.sh
 
       - name: Upload and deploy worker
         env:
           RUNNER_SSH_ALIAS: deploy-target-worker
-          RUNNER_SSH_HOST: ${{ vars.SVRD_HOST }}
+          RUNNER_SSH_HOST: ${{ vars.SVRD_PUBLIC_HOST || secrets.SVRD_PUBLIC_HOST || vars.SVRD_HOST }}
           # worker 与 apiserver/collection 共用 docker-compose.prod.yml；
-          # compose 会解析全文件，qs-apiserver.extra_hosts 仍需 IAM_GRPC_HOST。
+          # compose 会解析全文件，qs-apiserver.extra_hosts 仍需 IAM_GRPC_HOST（集群内用 Tailscale）。
           IAM_GRPC_HOST: ${{ vars.SVRB_HOST }}
           SERVICE: worker
           DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
@@ -578,6 +508,15 @@ jobs:
           IMAGE_TAG: ${{ env.DEPLOY_SHA }}
           DEPLOY_IMAGE_SOURCE: tarball
         run: bash scripts/cd/runner-upload-and-deploy.sh
+
+      - name: Cleanup runner artifacts
+        if: always()
+        shell: bash
+        run: |
+          rm -f deploy-image-*.tar.gz deploy-package-*.tar.gz
+          rm -f "${RUNNER_SSH_KEY_FILE:-}" 2>/dev/null || true
+          rm -rf "${DOCKER_CONFIG:-}" 2>/dev/null || true
+          docker image prune -f >/dev/null 2>&1 || true
 
   notify:
     name: Send Notification

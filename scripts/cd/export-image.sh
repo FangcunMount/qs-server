@@ -33,7 +33,8 @@ OUTPUT="${DEPLOY_IMAGE_PACKAGE:-deploy-image-${PACKAGE_SUFFIX}.tar.gz}"
 
 echo "Pulling ${IMAGE} (${EXPORT_IMAGE_REGISTRY}) for tarball export..."
 pull_started=$(date +%s)
-docker pull "$IMAGE"
+# Mac mini runner 为 ARM64，目标机为 linux/amd64，必须指定平台
+docker pull --platform linux/amd64 "$IMAGE"
 pull_elapsed=$(($(date +%s) - pull_started))
 echo "Pulled ${IMAGE} in ${pull_elapsed}s"
 

@@ -60,44 +60,32 @@ Secrets 传递规则：
 - 不把 token/password 作为 Make 参数或脚本 CLI 参数传递。
 - 生产 `config.prod.env` 只在部署包中生成，日志输出必须脱敏。
 
-## 自托管 Runner（ServerD，组织级）
+## 自托管 Runner（Mac mini，组织级）
 
-在 **GitHub 组织 `fangcunmount`** 注册 **一台** ServerD runner，组织内多个仓库可共用（无需每个项目一个 `/opt/actions-runner` 目录）。
+`plan` / `docker` / `notify` 仍跑 GitHub-hosted；各仓库的 `deploy-*` 跑在 Mac mini runner group `qlume`（标签 `self-hosted, macOS, ARM64`），替代原 ServerD `QS_DEPLOY_RUNNER=serverd`。
 
-`plan` / `docker` / `notify` 仍跑 GitHub-hosted；各仓库的 `deploy-*` 通过变量 `QS_DEPLOY_RUNNER=serverd` 切到该 runner。
+部署链路：
 
-### 1. ServerD 前置依赖
+1. GitHub-hosted 构建镜像并推 GHCR / Docker Hub / ACR
+2. Mac mini：ACR `docker pull --platform linux/amd64` → 导出 tarball
+3. 公网 SCP（`SVRA_PUBLIC_HOST` / `SVRD_PUBLIC_HOST`）→ 目标机 `docker load` + compose up
 
-- Docker（daemon + **containerd** 均需配置 HTTP 代理，见下方「Docker daemon 代理」）
-- `git`、`make`、`gzip`、`openssh-clients`（`ssh`/`scp`/`nc`）
-- Mihomo 代理（默认 `127.0.0.1:7890` HTTP / `7891` SOCKS5）
-- 到 ServerA/ServerB/ServerD 的 SSH（内网直连，不走 GitHub 代理）
+前置：
 
-```bash
-# 每个 runner 实例各一份 .env（进程级代理，供拉 action / git 等）
-for d in runner1 runner2 runner3; do
-  cp scripts/cd/runner-dotenv.example /opt/actions-runner/$d/.env
-  chown deploy:deploy /opt/actions-runner/$d/.env
-done
-```
+- runner group `qlume` 允许本仓库
+- org Variables：`SVRA_PUBLIC_HOST`、`SVRD_PUBLIC_HOST`（已配置）
+- org Secret：`SVR_MINI_SSH_KEY`（或回退 `SVRA_SSH_KEY` / `SVRD_SSH_KEY`）
+- Mac mini Docker Desktop 可用；隔离 `DOCKER_CONFIG` 避免 keychain 卡住
 
-**Docker daemon 代理**（`docker pull` / `docker login` 走 daemon，不是 shell 代理）：
+目标主机：
 
-```bash
-sudo tee /etc/systemd/system/docker.service.d/http-proxy.conf <<'EOF'
-[Service]
-Environment="HTTP_PROXY=http://127.0.0.1:7890"
-Environment="HTTPS_PROXY=http://127.0.0.1:7890"
-Environment="NO_PROXY=127.0.0.1,localhost,100.64.0.0/10,.aliyuncs.com"
-EOF
-sudo mkdir -p /etc/systemd/system/containerd.service.d
-sudo cp /etc/systemd/system/docker.service.d/http-proxy.conf \
-  /etc/systemd/system/containerd.service.d/http-proxy.conf
-sudo systemctl daemon-reload && sudo systemctl restart containerd docker
+| Job | 目标 | 公网 Variable | hostname 校验 |
+| --- | --- | --- | --- |
+| deploy-apiserver | serverA | `SVRA_PUBLIC_HOST` | `serverA` |
+| deploy-collection | serverA | `SVRA_PUBLIC_HOST` | `serverA` |
+| deploy-worker | serverD | `SVRD_PUBLIC_HOST` | `serverD`（不区分大小写） |
 
-# 验证 ACR 直连（不走代理，期望 401 或 200）
-curl -sS -o /dev/null -w "acr:%{http_code}\n" https://<ALIYUN_ACR_REGISTRY>/v2/
-```
+> `IAM_GRPC_HOST` 仍用 `SVRB_HOST`（Tailscale），供 worker 机上 compose 解析集群内 IAM，不要改成公网 IP。
 
 ### 1.1 阿里云 ACR（组织 Secrets）
 

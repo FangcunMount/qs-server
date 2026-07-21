@@ -33,8 +33,17 @@ DEPLOY_HOST="${DEPLOY_HOST:-${RUNNER_SSH_HOST:-}}"
 echo "=========================================="
 echo "CD upload+deploy: service=${SERVICE} image_tag=${IMAGE_TAG}"
 echo "SSH alias=${RUNNER_SSH_ALIAS} target_host=${DEPLOY_HOST:-unknown}"
+
+# 使用 setup-runner-ssh.sh 写出的隔离 config（Mac mini 场景必需）
+SSH=(ssh)
+SCP=(scp)
+if [ -n "${RUNNER_SSH_CONFIG:-}" ] && [ -f "${RUNNER_SSH_CONFIG}" ]; then
+  SSH=(ssh -F "${RUNNER_SSH_CONFIG}")
+  SCP=(scp -F "${RUNNER_SSH_CONFIG}")
+fi
+
 if command -v ssh >/dev/null 2>&1 && [ -n "${RUNNER_SSH_ALIAS:-}" ]; then
-  ssh -G "${RUNNER_SSH_ALIAS}" 2>/dev/null | awk '/^(hostname|user|port) /{print "ssh -G resolved: "$0}' || true
+  "${SSH[@]}" -G "${RUNNER_SSH_ALIAS}" 2>/dev/null | awk '/^(hostname|user|port) /{print "ssh -G resolved: "$0}' || true
 fi
 echo "Deploy runner local: hostname=$(hostname) tailscale_ip=$(tailscale ip -4 2>/dev/null || true)"
 echo "=========================================="
@@ -111,8 +120,8 @@ upload_and_verify() {
   local local_file="$1" remote_path="$2" attempts="${3:-3}" i
   for ((i = 1; i <= attempts; i++)); do
     echo "Uploading $(basename "$local_file") -> ${RUNNER_SSH_ALIAS}:${remote_path} (attempt ${i}/${attempts})..."
-    if scp "$local_file" "${RUNNER_SSH_ALIAS}:${remote_path}" \
-      && ssh "${RUNNER_SSH_ALIAS}" "gzip -t ${remote_path}"; then
+    if "${SCP[@]}" "$local_file" "${RUNNER_SSH_ALIAS}:${remote_path}" \
+      && "${SSH[@]}" "${RUNNER_SSH_ALIAS}" "gzip -t ${remote_path}"; then
       echo "Verified ${remote_path} integrity (gzip -t ok)"
       return 0
     fi
@@ -129,14 +138,14 @@ upload_and_verify "$PACKAGE_FILE" "$REMOTE_PACKAGE"
 
 REMOTE_BOOT="/tmp/qs-cd-bootstrap-${SERVICE}-$$.sh"
 echo "Uploading bootstrap script to ${RUNNER_SSH_ALIAS}:${REMOTE_BOOT} ..."
-scp "$LOCAL_BOOT" "${RUNNER_SSH_ALIAS}:${REMOTE_BOOT}"
-ssh "${RUNNER_SSH_ALIAS}" "chmod 600 ${REMOTE_BOOT}" || true
+"${SCP[@]}" "$LOCAL_BOOT" "${RUNNER_SSH_ALIAS}:${REMOTE_BOOT}"
+"${SSH[@]}" "${RUNNER_SSH_ALIAS}" "chmod 600 ${REMOTE_BOOT}" || true
 
 # 远端只执行脚本本身，不在命令行 inline 任何变量（变量已写进脚本的 export 段）。
 echo "Running remote-deploy.sh on ${RUNNER_SSH_ALIAS}..."
 rc=0
-ssh "${RUNNER_SSH_ALIAS}" "bash ${REMOTE_BOOT}" || rc=$?
-ssh "${RUNNER_SSH_ALIAS}" "rm -f ${REMOTE_BOOT}" || true
+"${SSH[@]}" "${RUNNER_SSH_ALIAS}" "bash ${REMOTE_BOOT}" || rc=$?
+"${SSH[@]}" "${RUNNER_SSH_ALIAS}" "rm -f ${REMOTE_BOOT}" || true
 if [ "$rc" -ne 0 ]; then
   echo "remote-deploy.sh failed on ${RUNNER_SSH_ALIAS} (exit ${rc})" >&2
   exit "$rc"

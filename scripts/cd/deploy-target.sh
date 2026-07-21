@@ -34,5 +34,9 @@ resolve_ssh_hostname() {
   if [ -z "$alias" ] || ! command -v ssh >/dev/null 2>&1; then
     return 1
   fi
-  ssh -G "$alias" 2>/dev/null | awk '/^hostname / { print $2; exit }'
+  if [ -n "${RUNNER_SSH_CONFIG:-}" ] && [ -f "${RUNNER_SSH_CONFIG}" ]; then
+    ssh -F "${RUNNER_SSH_CONFIG}" -G "$alias" 2>/dev/null | awk '/^hostname / { print $2; exit }'
+  else
+    ssh -G "$alias" 2>/dev/null | awk '/^hostname / { print $2; exit }'
+  fi
 }
