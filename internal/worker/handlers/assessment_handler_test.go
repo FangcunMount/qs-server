@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
 	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 )
 
 func TestHandleEvaluationRequestedFailsWhenInternalClientMissing(t *testing.T) {
@@ -38,6 +40,9 @@ func TestHandleEvaluationRequestedCallsEvaluate(t *testing.T) {
 }
 
 func TestHandleEvaluationRequestedForwardsLegacyIncompletePayload(t *testing.T) {
+	// EV-R015: missing model identity must not early-ACK; gate metric lives in
+	// resilience.ObserveEvaluationPayloadGate (handlers must not import prometheus).
+	resilience.ObserveEvaluationPayloadGate("legacy_incomplete")
 	client := &assessmentEvaluateClient{resp: &evalpb.ExecuteEvaluationResponse{Status: "already_evaluated"}}
 	handler := handleEvaluationRequested(newAnswerSheetHandlerTestDeps(client, nil))
 	if err := handler(context.Background(), eventcatalog.EvaluationRequested, mustBuildEvaluationRequestedPayloadWithoutModel(t, 42)); err != nil {
@@ -51,8 +56,12 @@ func TestHandleEvaluationRequestedForwardsLegacyIncompletePayload(t *testing.T) 
 func TestHandleEvaluationRequestedRejectsInvalidAssessmentID(t *testing.T) {
 	client := &assessmentEvaluateClient{resp: &evalpb.ExecuteEvaluationResponse{Status: "evaluated"}}
 	handler := handleEvaluationRequested(newAnswerSheetHandlerTestDeps(client, nil))
-	if err := handler(context.Background(), eventcatalog.EvaluationRequested, mustBuildEvaluationRequestedPayload(t, 0)); err == nil {
+	err := handler(context.Background(), eventcatalog.EvaluationRequested, mustBuildEvaluationRequestedPayload(t, 0))
+	if err == nil {
 		t.Fatal("expected invalid assessment_id to be rejected")
+	}
+	if !strings.Contains(err.Error(), "assessment_id") {
+		t.Fatalf("error = %v, want assessment_id mention", err)
 	}
 	if client.evaluateCalls != 0 {
 		t.Fatalf("evaluate calls = %d, want 0", client.evaluateCalls)
