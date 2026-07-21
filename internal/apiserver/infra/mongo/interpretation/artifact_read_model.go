@@ -90,6 +90,17 @@ func buildCatalogQuery(filter readmodel.ReportFilter) bson.M {
 	return q
 }
 
+// catalogSourceEnvelope carries the loaded report body together with the
+// association identity used for IR-R002 catalog↔source fail-closed checks.
+// Association fields are never taken from ReportRow (which omits org/testee).
+type catalogSourceEnvelope struct {
+	AssessmentID uint64
+	OrgID        int64
+	HasOrgID     bool
+	TesteeID     uint64
+	Row          readmodel.ReportRow
+}
+
 func (r *reportReadModel) loadCatalogRows(ctx context.Context, entries []ReportCatalogPO) ([]readmodel.ReportRow, error) {
 	if len(entries) == 0 {
 		return []readmodel.ReportRow{}, nil
@@ -105,7 +116,7 @@ func (r *reportReadModel) loadCatalogRows(ctx context.Context, entries []ReportC
 			return nil, fmt.Errorf("unknown report catalog source %q", e.SourceKind)
 		}
 	}
-	byKey := map[string]readmodel.ReportRow{}
+	byKey := map[string]catalogSourceEnvelope{}
 	if err := r.loadArtifacts(ctx, artifactIDs, byKey); err != nil {
 		return nil, err
 	}
@@ -115,7 +126,7 @@ func (r *reportReadModel) loadCatalogRows(ctx context.Context, entries []ReportC
 	rows := make([]readmodel.ReportRow, 0, len(entries))
 	for _, e := range entries {
 		key := fmt.Sprintf("%s:%d", e.SourceKind, e.SourceID)
-		row, ok := byKey[key]
+		env, ok := byKey[key]
 		if !ok {
 			logger.L(ctx).Errorw("report catalog points to a missing source",
 				"assessment_id", e.AssessmentID,
@@ -124,12 +135,57 @@ func (r *reportReadModel) loadCatalogRows(ctx context.Context, entries []ReportC
 			)
 			return nil, &readmodel.CatalogDanglingSourceError{AssessmentID: e.AssessmentID, SourceKind: e.SourceKind, SourceID: e.SourceID}
 		}
-		rows = append(rows, row)
+		if fields := mismatchedAssociationFields(e, env); len(fields) > 0 {
+			observeCatalogAssociationMismatch(e.SourceKind)
+			logger.L(ctx).Errorw("report catalog source association mismatch",
+				"assessment_id", e.AssessmentID,
+				"source_kind", e.SourceKind,
+				"source_id", e.SourceID,
+				"mismatched_fields", fields,
+				"catalog_assessment_id", e.AssessmentID,
+				"source_assessment_id", env.AssessmentID,
+				"catalog_org_id", e.OrgID,
+				"source_org_id", env.OrgID,
+				"source_has_org_id", env.HasOrgID,
+				"catalog_testee_id", e.TesteeID,
+				"source_testee_id", env.TesteeID,
+			)
+			return nil, &readmodel.CatalogSourceAssociationMismatchError{
+				AssessmentID:     e.AssessmentID,
+				SourceKind:       e.SourceKind,
+				SourceID:         e.SourceID,
+				MismatchedFields: fields,
+			}
+		}
+		if e.SourceKind == ReportCatalogSourceArchive && !env.HasOrgID {
+			observeCatalogArchiveOrgUnproven()
+			logger.L(ctx).Infow("report catalog archive source missing org_id; org not compared",
+				"assessment_id", e.AssessmentID,
+				"source_kind", e.SourceKind,
+				"source_id", e.SourceID,
+				"catalog_org_id", e.OrgID,
+			)
+		}
+		rows = append(rows, env.Row)
 	}
 	return rows, nil
 }
 
-func (r *reportReadModel) loadArtifacts(ctx context.Context, ids []uint64, dst map[string]readmodel.ReportRow) error {
+func mismatchedAssociationFields(catalog ReportCatalogPO, source catalogSourceEnvelope) []string {
+	var fields []string
+	if catalog.AssessmentID != source.AssessmentID {
+		fields = append(fields, "assessment_id")
+	}
+	if source.HasOrgID && catalog.OrgID != source.OrgID {
+		fields = append(fields, "org_id")
+	}
+	if catalog.TesteeID != source.TesteeID {
+		fields = append(fields, "testee_id")
+	}
+	return fields
+}
+
+func (r *reportReadModel) loadArtifacts(ctx context.Context, ids []uint64, dst map[string]catalogSourceEnvelope) error {
 	if len(ids) == 0 {
 		return nil
 	}
@@ -143,11 +199,18 @@ func (r *reportReadModel) loadArtifacts(ctx context.Context, ids []uint64, dst m
 		if err := cur.Decode(&po); err != nil {
 			return err
 		}
-		dst[fmt.Sprintf("%s:%d", ReportCatalogSourceArtifact, po.DomainID.Uint64())] = interpretReportPOToReadRow(&po)
+		dst[fmt.Sprintf("%s:%d", ReportCatalogSourceArtifact, po.DomainID.Uint64())] = catalogSourceEnvelope{
+			AssessmentID: po.AssessmentID,
+			OrgID:        po.OrgID,
+			HasOrgID:     true,
+			TesteeID:     po.TesteeID,
+			Row:          interpretReportPOToReadRow(&po),
+		}
 	}
 	return cur.Err()
 }
-func (r *reportReadModel) loadArchives(ctx context.Context, ids []uint64, dst map[string]readmodel.ReportRow) error {
+
+func (r *reportReadModel) loadArchives(ctx context.Context, ids []uint64, dst map[string]catalogSourceEnvelope) error {
 	if len(ids) == 0 {
 		return nil
 	}
@@ -161,7 +224,16 @@ func (r *reportReadModel) loadArchives(ctx context.Context, ids []uint64, dst ma
 		if err := cur.Decode(&po); err != nil {
 			return err
 		}
-		dst[fmt.Sprintf("%s:%d", ReportCatalogSourceArchive, po.DomainID.Uint64())] = projectArchivedReportRow(&po)
+		env := catalogSourceEnvelope{
+			AssessmentID: po.DomainID.Uint64(),
+			TesteeID:     po.TesteeID,
+			Row:          projectArchivedReportRow(&po),
+		}
+		if po.OrgID != nil {
+			env.OrgID = *po.OrgID
+			env.HasOrgID = true
+		}
+		dst[fmt.Sprintf("%s:%d", ReportCatalogSourceArchive, po.DomainID.Uint64())] = env
 	}
 	return cur.Err()
 }

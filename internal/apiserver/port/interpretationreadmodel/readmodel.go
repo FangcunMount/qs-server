@@ -24,6 +24,24 @@ func (e *CatalogDanglingSourceError) Error() string {
 	return fmt.Sprintf("report catalog dangling source: assessment=%d source=%s/%d", e.AssessmentID, e.SourceKind, e.SourceID)
 }
 
+// CatalogSourceAssociationMismatchError identifies a catalog entry whose
+// selected report body exists but disagrees on Assessment / Org / Testee
+// association. It carries only identity and mismatched field names — never
+// report body content.
+type CatalogSourceAssociationMismatchError struct {
+	AssessmentID     uint64
+	SourceKind       string
+	SourceID         uint64
+	MismatchedFields []string
+}
+
+func (e *CatalogSourceAssociationMismatchError) Error() string {
+	return fmt.Sprintf(
+		"report catalog source association mismatch: assessment=%d source=%s/%d fields=%v",
+		e.AssessmentID, e.SourceKind, e.SourceID, e.MismatchedFields,
+	)
+}
+
 type PageRequest struct {
 	Page     int
 	PageSize int

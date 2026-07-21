@@ -31,6 +31,11 @@ type ArchivedReportPO struct {
 	// 受试者ID（冗余，用于查询）
 	TesteeID uint64 `bson:"testee_id" json:"testee_id"`
 
+	// OrgID is optional on historical archives. When present it participates in
+	// catalog↔source association checks (IR-R002). When absent, read paths still
+	// fail-closed on assessment_id/testee_id and only observe the unproven org.
+	OrgID *int64 `bson:"org_id,omitempty" json:"org_id,omitempty"`
+
 	// 评估结果汇总
 	TotalScore float64 `bson:"total_score" json:"total_score"`
 	RiskLevel  string  `bson:"risk_level" json:"risk_level"`

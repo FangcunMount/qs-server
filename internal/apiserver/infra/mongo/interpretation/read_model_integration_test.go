@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -225,6 +226,7 @@ func TestReportReadModelPrefersCurrentReportsAndFallsBackToArchivesAgainstMongo(
 		ReportType:          "standard",
 		TemplateVersion:     "v1",
 		GeneratedAt:         now,
+		OrgID:               1,
 		AssessmentID:        baseID + 1,
 		TesteeID:            testeeID,
 		ScaleCode:           "SDS",
@@ -257,6 +259,154 @@ func TestReportReadModelPrefersCurrentReportsAndFallsBackToArchivesAgainstMongo(
 	rows, total, err := reader.ListReports(ctx, evaluationreadmodel.ReportFilter{TesteeID: &testeeID}, evaluationreadmodel.PageRequest{Page: 1, PageSize: 10})
 	if err != nil || total != 2 || len(rows) != 2 || rows[0].AssessmentID != baseID+1 || rows[0].Conclusion != "current report wins" {
 		t.Fatalf("new-first report list = %#v total=%d err=%v", rows, total, err)
+	}
+}
+
+func TestReportReadModelFailsClosedOnArtifactAssociationMismatchAgainstMongo(t *testing.T) {
+	db := openEvaluationMongoContractDB(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	baseID := uint64(time.Now().UnixNano() / int64(time.Millisecond))
+	catalogAssessment := baseID + 1
+	foreignAssessment := baseID + 2
+	testeeID := baseID + 1000
+	foreignTestee := baseID + 1001
+	now := time.Now().UTC().Truncate(time.Second)
+	reportID := primitive.NewObjectID()
+	reportDomainID := baseID + 101
+
+	reportCollection := db.Collection((InterpretReportPO{}).CollectionName())
+	catalogCollection := db.Collection((ReportCatalogPO{}).CollectionName())
+
+	// Catalog authorizes assessment A / testee T, but source body belongs to assessment B / testee U.
+	reportPO := InterpretReportPO{
+		BaseDocument:        base.BaseDocument{ID: reportID, DomainID: meta.FromUint64(reportDomainID), CreatedAt: now, UpdatedAt: now},
+		GenerationID:        baseID + 201,
+		OutcomeID:           baseID + 301,
+		InterpretationRunID: baseID + 401,
+		ReportType:          "standard",
+		TemplateVersion:     "v1",
+		GeneratedAt:         now,
+		OrgID:               99,
+		AssessmentID:        foreignAssessment,
+		TesteeID:            foreignTestee,
+		ScaleCode:           "SDS",
+		Conclusion:          "SECRET_FOREIGN_BODY",
+		TotalScore:          77,
+	}
+	if _, err := reportCollection.InsertOne(ctx, reportPO); err != nil {
+		t.Fatalf("insert mismatched artifact: %v", err)
+	}
+	if _, err := catalogCollection.InsertOne(ctx, ReportCatalogPO{
+		AssessmentID: catalogAssessment,
+		OrgID:        1,
+		TesteeID:     testeeID,
+		SourceKind:   ReportCatalogSourceArtifact,
+		SourceID:     reportDomainID,
+		ModelCode:    "SDS",
+		SortAt:       now,
+		SortReportID: reportDomainID,
+	}); err != nil {
+		t.Fatalf("insert catalog: %v", err)
+	}
+	t.Cleanup(func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cleanupCancel()
+		_, _ = reportCollection.DeleteOne(cleanupCtx, bson.M{"_id": reportID})
+		_, _ = catalogCollection.DeleteMany(cleanupCtx, bson.M{"assessment_id": catalogAssessment})
+	})
+
+	reader := NewReportReadModel(db)
+	assertAssociationMismatchFailClosed(t, reader, ctx, catalogAssessment, testeeID, ReportCatalogSourceArtifact, reportDomainID, "SECRET_FOREIGN_BODY")
+}
+
+func TestReportReadModelFailsClosedOnArchiveAssociationMismatchAgainstMongo(t *testing.T) {
+	db := openEvaluationMongoContractDB(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	baseID := uint64(time.Now().UnixNano() / int64(time.Millisecond))
+	catalogAssessment := baseID + 1
+	archiveDomainID := baseID + 2 // assessment_id for archive source (= domain_id)
+	testeeID := baseID + 1000
+	foreignTestee := baseID + 1001
+	now := time.Now().UTC().Truncate(time.Second)
+	archiveID := primitive.NewObjectID()
+
+	archiveCollection := db.Collection((&ArchivedReportPO{}).CollectionName())
+	catalogCollection := db.Collection((ReportCatalogPO{}).CollectionName())
+
+	archivePO := ArchivedReportPO{
+		BaseDocument: base.BaseDocument{ID: archiveID, DomainID: meta.FromUint64(archiveDomainID), CreatedAt: now, UpdatedAt: now},
+		TesteeID:     foreignTestee,
+		ScaleCode:    "SDS",
+		Conclusion:   "SECRET_ARCHIVE_BODY",
+		TotalScore:   88,
+	}
+	if _, err := archiveCollection.InsertOne(ctx, archivePO); err != nil {
+		t.Fatalf("insert mismatched archive: %v", err)
+	}
+	if _, err := catalogCollection.InsertOne(ctx, ReportCatalogPO{
+		AssessmentID: catalogAssessment,
+		OrgID:        1,
+		TesteeID:     testeeID,
+		SourceKind:   ReportCatalogSourceArchive,
+		SourceID:     archiveDomainID,
+		ModelCode:    "SDS",
+		SortAt:       now,
+	}); err != nil {
+		t.Fatalf("insert catalog: %v", err)
+	}
+	t.Cleanup(func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cleanupCancel()
+		_, _ = archiveCollection.DeleteOne(cleanupCtx, bson.M{"_id": archiveID})
+		_, _ = catalogCollection.DeleteMany(cleanupCtx, bson.M{"assessment_id": catalogAssessment})
+	})
+
+	reader := NewReportReadModel(db)
+	assertAssociationMismatchFailClosed(t, reader, ctx, catalogAssessment, testeeID, ReportCatalogSourceArchive, archiveDomainID, "SECRET_ARCHIVE_BODY")
+}
+
+func assertAssociationMismatchFailClosed(
+	t *testing.T,
+	reader evaluationreadmodel.ReportReader,
+	ctx context.Context,
+	assessmentID, testeeID uint64,
+	sourceKind string,
+	sourceID uint64,
+	secretBody string,
+) {
+	t.Helper()
+
+	row, err := reader.GetReportByAssessmentID(ctx, assessmentID)
+	if row != nil {
+		t.Fatalf("detail must not return body on mismatch: %#v", row)
+	}
+	var mismatch *evaluationreadmodel.CatalogSourceAssociationMismatchError
+	if !errors.As(err, &mismatch) {
+		t.Fatalf("detail err = %v, want CatalogSourceAssociationMismatchError", err)
+	}
+	if mismatch.AssessmentID != assessmentID || mismatch.SourceKind != sourceKind || mismatch.SourceID != sourceID {
+		t.Fatalf("detail mismatch identity = %#v", mismatch)
+	}
+	if err != nil && strings.Contains(err.Error(), secretBody) {
+		t.Fatalf("detail error leaked report body: %v", err)
+	}
+
+	rows, _, err := reader.ListReports(ctx, evaluationreadmodel.ReportFilter{TesteeID: &testeeID}, evaluationreadmodel.PageRequest{Page: 1, PageSize: 10})
+	if len(rows) != 0 {
+		t.Fatalf("list must not return body on mismatch: %#v", rows)
+	}
+	if !errors.As(err, &mismatch) {
+		t.Fatalf("list err = %v, want CatalogSourceAssociationMismatchError", err)
+	}
+	if mismatch.AssessmentID != assessmentID || mismatch.SourceKind != sourceKind || mismatch.SourceID != sourceID {
+		t.Fatalf("list mismatch identity = %#v", mismatch)
+	}
+	if err != nil && strings.Contains(err.Error(), secretBody) {
+		t.Fatalf("list error leaked report body: %v", err)
 	}
 }
 
