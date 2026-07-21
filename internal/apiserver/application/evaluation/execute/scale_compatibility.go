@@ -1,8 +1,6 @@
 package execute
 
 import (
-	"time"
-
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -21,9 +19,6 @@ func inputRefFromAssessment(a *assessment.Assessment, assessmentID uint64) evalu
 	}
 	if submittedAt := a.SubmittedAt(); submittedAt != nil {
 		ref.AsOf = submittedAt.UTC()
-	} else {
-		// Evaluation should only run after submit; keep a stable clock for AgeMonths.
-		ref.AsOf = time.Now().UTC()
 	}
 	return ref
 }

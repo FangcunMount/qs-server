@@ -88,5 +88,5 @@ func (factorNormOutcomeAssembler) Assemble(result any) (any, error) {
 	if !ok || payload.Snapshot == nil {
 		return pipelineResult.outcome, nil
 	}
-	return ApplyFactorProjectionsForInput(pipelineResult.outcome, pipelineResult.input, payload.Snapshot, NormSubjectFromInput(pipelineResult.input)), nil
+	return ApplyFactorProjectionsForInput(pipelineResult.outcome, pipelineResult.input, payload.Snapshot, NormSubjectFromInput(pipelineResult.input))
 }

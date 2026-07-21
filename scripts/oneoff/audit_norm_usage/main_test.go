@@ -144,3 +144,22 @@ func TestBuildReportFilterDangling(t *testing.T) {
 		t.Fatalf("usage_count=%d", r.UsageCount)
 	}
 }
+
+func TestBuildReportListsDemographicLookupNormsWithPublishedReferences(t *testing.T) {
+	t.Parallel()
+	r := buildReportWithAssets(
+		[]normAsset{
+			{TableVersion: "scoped", DemographicLookupFactors: []string{"gec", "bri"}},
+			{TableVersion: "generic"},
+		},
+		[]snapshotRef{{Code: "BRIEF2", Version: "1", Kind: "behavioral_rating", Algorithm: "brief2", NormRefs: []normRef{{FactorCode: "gec", NormTableVersion: "scoped"}}}},
+		"",
+	)
+	if r.DemographicNormCount != 1 || len(r.DemographicNorms) != 1 {
+		t.Fatalf("demographic norms = %#v", r.DemographicNorms)
+	}
+	got := r.DemographicNorms[0]
+	if got.NormTableVersion != "scoped" || len(got.FactorCodes) != 2 || len(got.Models) != 1 || got.Models[0].Code != "BRIEF2" {
+		t.Fatalf("demographic norm usage = %#v", got)
+	}
+}

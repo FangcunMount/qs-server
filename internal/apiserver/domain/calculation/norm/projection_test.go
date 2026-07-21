@@ -1,6 +1,7 @@
 package norm_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
@@ -26,7 +27,7 @@ func TestProjectionKeepsOutcomeCodeWithoutPresentationCopy(t *testing.T) {
 			}},
 		}},
 	}
-	result := calcnorm.Projection{
+	result, err := calcnorm.Projection{
 		Tables:               tables,
 		PrimaryDimensionCode: "gec",
 	}.Apply(&calculation.Result{
@@ -35,6 +36,9 @@ func TestProjectionKeepsOutcomeCodeWithoutPresentationCopy(t *testing.T) {
 			Score: &calculation.ScoreValue{Value: 10},
 		}},
 	})
+	if err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
 	dim := result.Dimensions[0]
 	if dim.Level == nil || dim.Level.Code != outcomeCode {
 		t.Fatalf("level code = %#v, want %q", dim.Level, outcomeCode)
@@ -44,5 +48,47 @@ func TestProjectionKeepsOutcomeCodeWithoutPresentationCopy(t *testing.T) {
 	}
 	if result.PrimaryLabel != "" {
 		t.Fatalf("PrimaryLabel = %q, want unset", result.PrimaryLabel)
+	}
+}
+
+func TestProjectionRequiredFactorFailureIsAtomic(t *testing.T) {
+	t.Parallel()
+
+	tables := &calcnorm.NormTables{Factors: []calcnorm.FactorNormTable{
+		{FactorCode: "optional", Lookup: []calcnorm.NormLookupEntry{{RawMin: 0, RawMax: 10, TScore: 55, Percentile: 70}}},
+		{FactorCode: "required", Lookup: []calcnorm.NormLookupEntry{{RawMin: 0, RawMax: 10, MinAgeMonths: 60, MaxAgeMonths: 95, Gender: "female", TScore: 65, Percentile: 92}}},
+	}}
+	result := &calculation.Result{Dimensions: []calculation.DimensionResult{
+		{Code: "optional", Score: &calculation.ScoreValue{Value: 5}},
+		{Code: "required", Score: &calculation.ScoreValue{Value: 5}},
+	}}
+
+	got, err := (calcnorm.Projection{Tables: tables, RequiredFactorCodes: []string{"required"}}).Apply(result)
+	if got != nil {
+		t.Fatalf("result = %#v, want nil on required failure", got)
+	}
+	var resolutionErr *calcnorm.ResolutionError
+	if !errors.As(err, &resolutionErr) || resolutionErr.Kind != calcnorm.ErrorKindSubjectMissing {
+		t.Fatalf("error = %T %v, want norm_subject_missing", err, err)
+	}
+	for _, dim := range result.Dimensions {
+		if len(dim.DerivedScores) != 0 || dim.NormReference != nil {
+			t.Fatalf("original result was partially mutated: %#v", result)
+		}
+	}
+}
+
+func TestProjectionOptionalFactorMissKeepsRawScore(t *testing.T) {
+	t.Parallel()
+
+	result := &calculation.Result{Dimensions: []calculation.DimensionResult{{Code: "optional", Score: &calculation.ScoreValue{Value: 20}}}}
+	got, err := (calcnorm.Projection{Tables: &calcnorm.NormTables{Factors: []calcnorm.FactorNormTable{{
+		FactorCode: "optional", Lookup: []calcnorm.NormLookupEntry{{RawMin: 0, RawMax: 10, TScore: 55, Percentile: 70}},
+	}}}}).Apply(result)
+	if err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	if got.Dimensions[0].Score == nil || got.Dimensions[0].Score.Value != 20 || len(got.Dimensions[0].DerivedScores) != 0 || got.Dimensions[0].NormReference != nil {
+		t.Fatalf("optional miss = %#v", got.Dimensions[0])
 	}
 }

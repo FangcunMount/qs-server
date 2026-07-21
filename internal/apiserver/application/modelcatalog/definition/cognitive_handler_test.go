@@ -37,6 +37,22 @@ func TestCognitiveValidateForPublishAcceptsAbilityDecision(t *testing.T) {
 	}
 }
 
+func TestCognitiveValidateForPublishRejectsDerivedAbilityWithoutNormRef(t *testing.T) {
+	t.Parallel()
+	model := publishableCognitiveShell()
+	model.DefinitionV2 = cognitiveDefinitionWithAbility()
+	ability := model.DefinitionV2.Conclusions[0].(conclusion.AbilityConclusion)
+	ability.ScoreBasis = conclusion.ScoreBasisPercentile
+	model.DefinitionV2.Conclusions[0] = ability
+	handler := CognitiveDefinitionHandler{QuestionnaireQuery: publishedQuestionnaireStub("Q", "1",
+		questionnaireapp.QuestionResult{Code: "Q1", Options: []questionnaireapp.OptionResult{{Value: "A"}}},
+	)}
+	issues := handler.ValidateForPublish(context.Background(), model)
+	if !hasIssueCode(issues, "conclusion.norm_ref.missing") {
+		t.Fatalf("issues = %#v, want conclusion.norm_ref.missing", issues)
+	}
+}
+
 func TestCognitiveValidateForPublishRejectsUnknownSPMOption(t *testing.T) {
 	t.Parallel()
 	model := publishableCognitiveShell()

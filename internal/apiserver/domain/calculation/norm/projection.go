@@ -1,6 +1,8 @@
 package norm
 
 import (
+	"fmt"
+
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 )
 
@@ -9,23 +11,52 @@ type Projection struct {
 	Tables               *NormTables
 	Subject              Subject
 	PrimaryDimensionCode string
+	RequiredFactorCodes  []string
 }
 
 // Apply 补充计算结果 使用 常模推导的分数和等级。
-func (p Projection) Apply(result *calculation.Result) *calculation.Result {
+func (p Projection) Apply(result *calculation.Result) (*calculation.Result, error) {
 	if result == nil {
-		return result
+		return result, nil
 	}
-	if p.Tables != nil {
+	required := make(map[string]struct{}, len(p.RequiredFactorCodes))
+	for _, factorCode := range p.RequiredFactorCodes {
+		if factorCode != "" {
+			required[factorCode] = struct{}{}
+		}
+	}
+	if p.Tables == nil {
+		if factorCode := firstRequiredFactor(p.RequiredFactorCodes); factorCode != "" {
+			return nil, resolutionError(ErrorKindInvalid, factorCode, nil, fmt.Errorf("required norm tables are missing"))
+		}
+	} else {
+		if err := ValidateTables(p.Tables); err != nil {
+			return nil, resolutionError(ErrorKindInvalid, firstRequiredFactor(p.RequiredFactorCodes), nil, err)
+		}
+		resolvedRequired := make(map[string]struct{}, len(required))
 		dimensions := make([]calculation.DimensionResult, 0, len(result.Dimensions))
 		for _, dim := range result.Dimensions {
 			enriched := dim
-			if dim.Score == nil {
+			_, isRequired := required[dim.Code]
+			_, hasNormTable := factorTable(p.Tables, dim.Code)
+			if !isRequired && !hasNormTable {
 				dimensions = append(dimensions, enriched)
 				continue
 			}
-			normScore, ok := LookupNormScore(p.Tables, dim.Code, dim.Score.Value, p.Subject)
-			if ok {
+			if dim.Score == nil {
+				if isRequired {
+					return nil, resolutionError(ErrorKindInvalid, dim.Code, nil, fmt.Errorf("required factor raw score is missing"))
+				}
+				dimensions = append(dimensions, enriched)
+				continue
+			}
+			resolution, err := ResolveNormScore(p.Tables, dim.Code, dim.Score.Value, p.Subject)
+			if err != nil {
+				if isRequired {
+					return nil, err
+				}
+			} else {
+				normScore := resolution.Score
 				enriched.DerivedScores = append(enriched.DerivedScores,
 					calculation.ScoreValue{Kind: calculation.ScoreKindTScore, Value: normScore.TScore},
 					calculation.ScoreValue{Kind: calculation.ScoreKindPercentile, Value: normScore.Percentile},
@@ -43,15 +74,35 @@ func (p Projection) Apply(result *calculation.Result) *calculation.Result {
 					// Decision path keeps OutcomeCode only; presentation is restored at Interpretation (MC-R016).
 					enriched.Level = &calculation.ResultLevel{Code: level}
 				}
+				if isRequired {
+					resolvedRequired[dim.Code] = struct{}{}
+				}
 			}
 			dimensions = append(dimensions, enriched)
+		}
+		for _, factorCode := range p.RequiredFactorCodes {
+			if factorCode == "" {
+				continue
+			}
+			if _, ok := resolvedRequired[factorCode]; !ok {
+				return nil, resolutionError(ErrorKindInvalid, factorCode, nil, fmt.Errorf("required norm factor is absent from calculation result"))
+			}
 		}
 		result.Dimensions = dimensions
 	}
 	if primary := primaryDimension(result.Dimensions, p.PrimaryDimensionCode); primary != nil && primary.Level != nil {
 		result.Level = primary.Level
 	}
-	return result
+	return result, nil
+}
+
+func firstRequiredFactor(factorCodes []string) string {
+	for _, factorCode := range factorCodes {
+		if factorCode != "" {
+			return factorCode
+		}
+	}
+	return ""
 }
 
 func primaryDimension(dimensions []calculation.DimensionResult, configuredCode string) *calculation.DimensionResult {

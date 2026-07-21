@@ -51,6 +51,7 @@ func ComposePublishValidation(
 	}
 	issues := model.ValidateForPublish().Issues
 	issues = append(issues, ValidateDefinitionForPublish(ctx, model, opts.NormRepo)...)
+	issues = append(issues, ValidateDerivedConclusionNormRefs(model)...)
 	if opts.IncludeBehavioralSemantic {
 		issues = append(issues, ValidateBehavioralSemantic(model)...)
 	}

@@ -1,6 +1,7 @@
 package task_performance
 
 import (
+	"errors"
 	"testing"
 
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
@@ -8,6 +9,8 @@ import (
 	portevaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	taskperfsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
 )
+
+func spmAgePtr(value int) *int { return &value }
 
 func TestCalculateSPMUsesFrozenAnswerKeys(t *testing.T) {
 	t.Parallel()
@@ -30,6 +33,29 @@ func TestCalculateSPMUsesFrozenAnswerKeys(t *testing.T) {
 	}
 }
 
+func TestCalculateSPMRequiredNormFailureReturnsNoOutcome(t *testing.T) {
+	t.Parallel()
+
+	snapshot := &taskperfsnapshot.Snapshot{Code: "SPM", Version: "1", Title: "SPM", SPM: &taskperfsnapshot.SPMSpec{
+		TotalFactorCode: "total", NormRequired: true,
+		ItemSets: []taskperfsnapshot.SPMItemSet{{Code: "A", Items: []taskperfsnapshot.SPMItem{{QuestionCode: "A1", CorrectOptionCode: "1"}}}},
+		NormTables: &calcnorm.NormTables{Factors: []calcnorm.FactorNormTable{{
+			FactorCode: "total",
+			Lookup:     []calcnorm.NormLookupEntry{{RawMin: 1, RawMax: 1, MinAgeMonths: 60, MaxAgeMonths: 95, Gender: "female", TScore: 60, Percentile: 84}},
+		}}},
+	}}
+	input := &portevaluationinput.InputSnapshot{AnswerSheet: &portevaluationinput.AnswerSheetSnapshot{Answers: []portevaluationinput.AnswerSnapshot{{QuestionCode: "A1", Value: "1"}}}}
+
+	got, err := CalculateSPM(input, snapshot)
+	if got != nil {
+		t.Fatalf("outcome = %#v, want nil", got)
+	}
+	var resolutionErr *calcnorm.ResolutionError
+	if !errors.As(err, &resolutionErr) || resolutionErr.Kind != calcnorm.ErrorKindSubjectMissing {
+		t.Fatalf("error = %T %v", err, err)
+	}
+}
+
 func TestCalculateSPMRetainsNormReference(t *testing.T) {
 	t.Parallel()
 	standard := 110.0
@@ -49,7 +75,7 @@ func TestCalculateSPMRetainsNormReference(t *testing.T) {
 	}}
 	input := &portevaluationinput.InputSnapshot{
 		AnswerSheet: &portevaluationinput.AnswerSheetSnapshot{Answers: []portevaluationinput.AnswerSnapshot{{QuestionCode: "A1", Value: "1"}}},
-		NormSubject: &portevaluationinput.NormSubjectSnapshot{AgeMonths: 72, Gender: "female"},
+		NormSubject: &portevaluationinput.NormSubjectSnapshot{AgeMonths: spmAgePtr(72), Gender: "female"},
 	}
 	got, err := CalculateSPM(input, snapshot)
 	if err != nil {

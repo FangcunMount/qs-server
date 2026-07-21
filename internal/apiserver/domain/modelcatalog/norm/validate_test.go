@@ -80,6 +80,19 @@ func TestValidateImportRejectsOverlappingParametricBands(t *testing.T) {
 	}
 }
 
+func TestValidateImportAllowsExplicitGenericBandFallback(t *testing.T) {
+	mean, stdDev := 10.0, 2.0
+	table := validTable()
+	table.Factors[0].Lookup = nil
+	table.Factors[0].Bands = []norm.Band{
+		{MinAgeMonths: 60, MaxAgeMonths: 95, Gender: "female", Mean: &mean, StdDev: &stdDev},
+		{Mean: &mean, StdDev: &stdDev},
+	}
+	if err := norm.ValidateImport(table); err != nil {
+		t.Fatalf("ValidateImport: %v", err)
+	}
+}
+
 func validTable() *norm.Norm {
 	return &norm.Norm{
 		TableVersion: "brief2-parent-2026", FormVariant: "parent",

@@ -147,7 +147,7 @@ func (r *Repository) claimOnce(ctx context.Context, request evaluationrun.ClaimR
 				result = evaluationrun.ClaimResult{Run: run}
 				return nil
 			}
-			run = evalrun.NextEvaluationRunWithOrigin(run, request.Origin)
+			run = evalrun.NextEvaluationRunWithAuthorization(run, request.Origin, request.ActionRequestID)
 		case evalrun.StatusSucceeded:
 			result = evaluationrun.ClaimResult{Run: run}
 			return nil
@@ -436,6 +436,10 @@ func runToPO(run evalrun.EvaluationRun) *RuntimeCheckpointPO {
 	po.LeaseExpiresAt = run.LeaseExpiresAt()
 	origin := string(run.Origin())
 	po.AttemptOrigin = &origin
+	if run.ActionRequestID() != "" {
+		requestID := run.ActionRequestID()
+		po.ActionRequestID = &requestID
+	}
 	if decision := run.RetryDecision(); decision != nil {
 		disposition := string(decision.Disposition)
 		maxAttempts := uint(decision.MaxAutomaticAttempts)
@@ -482,6 +486,9 @@ func runFromPO(po RuntimeCheckpointPO) evalrun.EvaluationRun {
 	}
 	if po.AttemptOrigin != nil {
 		input.Origin = retrygovernance.AttemptOrigin(*po.AttemptOrigin)
+	}
+	if po.ActionRequestID != nil {
+		input.ActionRequestID = *po.ActionRequestID
 	}
 	if po.ErrorCode != nil || po.ErrorMessage != nil {
 		failure := evalrun.Failure{Retryable: po.Retryable}

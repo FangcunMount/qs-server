@@ -18,6 +18,7 @@ import (
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"github.com/google/uuid"
 )
 
@@ -162,7 +163,9 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		}
 		retryableFailure := latest != nil && latest.Retryable()
 		expiredRunningAttempt := latest != nil && latest.Attempt().Status == evalrun.StatusRunning && !latest.HasActiveLease(claimAt)
-		if !retryableFailure && !expiredRunningAttempt {
+		authorization, authorized := retrygovernance.AuthorizationFromContext(ctx)
+		forceAuthorized := authorized && authorization.Origin == retrygovernance.AttemptOriginForce
+		if !retryableFailure && !expiredRunningAttempt && !forceAuthorized {
 			l.Infow("测评失败且不存在可重试运行，跳过重复请求",
 				"assessment_id", assessmentID,
 				"result", "terminal_failure_skipped",
@@ -206,11 +209,23 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, inputResolveFailureReason(err), runFailureFromInputResolveError(err), err)
 	}
 
-	if ref := inputSnapshotRefFromResolvedInput(a, input); ref != "" {
+	if ref := inputSnapshotRefForAttempt(a, input, previousInputSnapshotRef, evaluationRun.Origin()); ref != "" {
 		// EV-R009: a retry must execute against the same verified input as the
 		// previous attempt; drift is a terminal validation failure, not a
 		// silent recompute over different data.
-		if err := validateInputSnapshotRefAcrossAttempts(previousInputSnapshotRef, ref); err != nil {
+		if evaluationRun.Origin() == retrygovernance.AttemptOriginForce && previousInputSnapshotRef != "" && previousInputSnapshotRef != ref {
+			l.Infow("强制重试已建立修订输入快照",
+				"action", "evaluation.force_retry",
+				"assessment_id", assessmentID,
+				"evaluation_run_id", evaluationRun.ID().String(),
+				"attempt_origin", string(evaluationRun.Origin()),
+				"action_request_id", evaluationRun.ActionRequestID(),
+				"previous_input_snapshot_ref", previousInputSnapshotRef,
+				"current_input_snapshot_ref", ref,
+				"result", "input_revision_accepted",
+			)
+		}
+		if err := validateInputSnapshotRefAcrossAttempts(previousInputSnapshotRef, ref, evaluationRun.Origin()); err != nil {
 			return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, "评估输入在重试间发生漂移: "+err.Error(), evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: err.Error()}, err)
 		}
 		if err := evaluationRun.AttachInputSnapshot(ref); err != nil {
@@ -265,7 +280,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 			"result", "failed",
 			"error", err.Error(),
 		)
-		return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, "评估流程执行失败: "+err.Error(), evalrun.Failure{Kind: evalrun.FailureKindCalculation, Message: err.Error(), Retryable: true}, err)
+		return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, "评估流程执行失败: "+err.Error(), runFailureFromExecutionError(err), err)
 	}
 
 	// 执行评估成功，可靠提交规范 EvaluationOutcome。

@@ -6,6 +6,7 @@ import (
 
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 func TestRunCheckpointPORoundTrip(t *testing.T) {
@@ -27,9 +28,11 @@ func TestRunCheckpointPORoundTrip(t *testing.T) {
 			Number: 2,
 			Status: evalrun.StatusFailed,
 		},
-		StartedAt:  started,
-		FinishedAt: &finished,
-		TraceID:    traceID,
+		StartedAt:       started,
+		FinishedAt:      &finished,
+		TraceID:         traceID,
+		Origin:          retrygovernance.AttemptOriginForce,
+		ActionRequestID: "force-request-1",
 		Failure: &evalrun.Failure{
 			Kind:      evalrun.FailureKindCalculation,
 			Message:   message,
@@ -65,5 +68,8 @@ func TestRunCheckpointPORoundTrip(t *testing.T) {
 	}
 	if roundTrip.ClaimToken() != claimToken || roundTrip.LeaseExpiresAt() == nil || !roundTrip.LeaseExpiresAt().Equal(leaseExpiresAt) {
 		t.Fatalf("round-trip claim = token:%q lease:%v", roundTrip.ClaimToken(), roundTrip.LeaseExpiresAt())
+	}
+	if roundTrip.Origin() != retrygovernance.AttemptOriginForce || roundTrip.ActionRequestID() != "force-request-1" {
+		t.Fatalf("round-trip authorization = origin:%q action_request_id:%q", roundTrip.Origin(), roundTrip.ActionRequestID())
 	}
 }

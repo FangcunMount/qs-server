@@ -95,7 +95,7 @@ func TestBehavioralValidateForPublishRejectsConclusionWithoutNormRef(t *testing.
 	})
 	model.DefinitionV2.Conclusions = append(model.DefinitionV2.Conclusions, domain.NormConclusion{FactorCode: "gec", ScoreBasis: domain.ScoreBasisTScore})
 	issues := handler.ValidateForPublish(context.Background(), model)
-	if !hasIssueCode(issues, "behavioral_rating.conclusion.norm_ref.missing") {
+	if !hasIssueCode(issues, "conclusion.norm_ref.missing") {
 		t.Fatalf("issues = %#v, want conclusion/norm_ref mismatch", issues)
 	}
 }

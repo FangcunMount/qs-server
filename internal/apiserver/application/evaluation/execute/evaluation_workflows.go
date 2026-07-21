@@ -152,6 +152,9 @@ func isInputResolveInterrupted(err error) bool {
 
 // runFailureFromInputResolveError maps ResolveError carriers to EvaluationRun Failure (EV-R004).
 func runFailureFromInputResolveError(err error) evalrun.Failure {
+	if failure, ok := runFailureFromNormError(err); ok {
+		return failure
+	}
 	var retryCarrier evaluationinput.RetryableCarrier
 	retryable := stderrors.As(err, &retryCarrier) && retryCarrier.Retryable()
 
@@ -173,6 +176,36 @@ func runFailureFromInputResolveError(err error) evalrun.Failure {
 		return evalrun.Failure{Kind: evalrun.FailureKindDependency, Message: err.Error(), Retryable: true}
 	}
 	return evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: err.Error(), Retryable: false}
+}
+
+func runFailureFromExecutionError(err error) evalrun.Failure {
+	if failure, ok := runFailureFromNormError(err); ok {
+		return failure
+	}
+	return evalrun.Failure{Kind: evalrun.FailureKindCalculation, Message: err.Error(), Retryable: true}
+}
+
+// runFailureKindCarrier is implemented by norm ResolutionError (and wrappers)
+// so execute can map terminal kinds without importing domain/calculation.
+type runFailureKindCarrier interface {
+	RunFailureKind() string
+}
+
+func runFailureFromNormError(err error) (evalrun.Failure, bool) {
+	var carrier runFailureKindCarrier
+	if !stderrors.As(err, &carrier) {
+		return evalrun.Failure{}, false
+	}
+	kind := evalrun.FailureKind(carrier.RunFailureKind())
+	switch kind {
+	case evalrun.FailureKindNormSubjectMissing,
+		evalrun.FailureKindNormCohortNotFound,
+		evalrun.FailureKindNormRawScoreOutOfRange,
+		evalrun.FailureKindNormInvalid:
+		return evalrun.Failure{Kind: kind, Message: err.Error(), Retryable: false}, true
+	default:
+		return evalrun.Failure{}, false
+	}
 }
 
 // evaluationFailureFinalizer 评估失败标记器

@@ -5,6 +5,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/task_performance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
@@ -12,6 +13,8 @@ import (
 	portevaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	cognitivepayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
 )
+
+func outcomeAgePtr(value int) *int { return &value }
 
 func TestImportToOutcomeCognitiveSPMRetainsNormReference(t *testing.T) {
 	t.Parallel()
@@ -41,7 +44,10 @@ func TestImportToOutcomeCognitiveSPMRetainsNormReference(t *testing.T) {
 	if issues := definition.CheckNormCompatibility(model, table, norm.Ref{FactorCode: "total", NormTableVersion: table.TableVersion}); len(issues) != 0 {
 		t.Fatalf("CheckNormCompatibility issues = %#v", issues)
 	}
-	runtimeTables := cognitivepayload.NormTablesFromCatalog(table)
+	runtimeTables, err := cognitivepayload.NormTablesFromCatalog(table)
+	if err != nil {
+		t.Fatalf("NormTablesFromCatalog: %v", err)
+	}
 	if runtimeTables == nil || runtimeTables.NormTableVersion != table.TableVersion {
 		t.Fatalf("NormTablesFromCatalog = %#v", runtimeTables)
 	}
@@ -49,13 +55,14 @@ func TestImportToOutcomeCognitiveSPMRetainsNormReference(t *testing.T) {
 		Code: "SPM", Version: "1", Title: "SPM",
 		SPM: &cognitivepayload.SPMSpec{
 			TotalFactorCode: "total",
+			NormRequired:    true,
 			ItemSets:        []cognitivepayload.SPMItemSet{{Code: "A", Items: []cognitivepayload.SPMItem{{QuestionCode: "A1", CorrectOptionCode: "1"}}}},
 			NormTables:      runtimeTables,
 		},
 	}
 	input := &portevaluationinput.InputSnapshot{
 		AnswerSheet: &portevaluationinput.AnswerSheetSnapshot{Answers: []portevaluationinput.AnswerSnapshot{{QuestionCode: "A1", Value: "1"}}},
-		NormSubject: &portevaluationinput.NormSubjectSnapshot{AgeMonths: 72, Gender: "female"},
+		NormSubject: &portevaluationinput.NormSubjectSnapshot{AgeMonths: outcomeAgePtr(72), Gender: "female"},
 	}
 	got, err := task_performance.CalculateSPM(input, snapshot)
 	if err != nil {
@@ -64,6 +71,15 @@ func TestImportToOutcomeCognitiveSPMRetainsNormReference(t *testing.T) {
 	total := got.Dimensions[len(got.Dimensions)-1]
 	if total.NormReference == nil || total.NormReference.TableVersion != "spm-cn-2024" {
 		t.Fatalf("NormReference = %#v", total.NormReference)
+	}
+	foundStandard := false
+	for _, score := range total.DerivedScores {
+		if score.Kind == domainoutcome.ScoreKindStandardScore && score.Value == standard {
+			foundStandard = true
+		}
+	}
+	if !foundStandard {
+		t.Fatalf("derived scores = %#v, want standard_score=%v", total.DerivedScores, standard)
 	}
 }
 

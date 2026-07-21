@@ -5,6 +5,8 @@ import (
 	"testing"
 )
 
+func ageMonthsPtr(value int) *int { return &value }
+
 func identityFixtureSnapshot() *InputSnapshot {
 	return &InputSnapshot{
 		Model: &ModelSnapshot{
@@ -23,7 +25,7 @@ func identityFixtureSnapshot() *InputSnapshot {
 			ID: 2001, QuestionnaireCode: "PHQ9-Q", QuestionnaireVersion: "1.0.0",
 			Answers: []AnswerSnapshot{{QuestionCode: "q1", Score: 1, Value: "b"}},
 		},
-		NormSubject: &NormSubjectSnapshot{AgeMonths: 120, Gender: "male"},
+		NormSubject: &NormSubjectSnapshot{AgeMonths: ageMonthsPtr(120), Gender: "male"},
 	}
 }
 
@@ -45,6 +47,25 @@ func TestInputSnapshotIdentityIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestInputSnapshotIdentityDistinguishesKnownZeroAgeFromMissing(t *testing.T) {
+	t.Parallel()
+
+	missing := identityFixtureSnapshot()
+	missing.NormSubject.AgeMonths = nil
+	missingIdentity, _ := NewInputSnapshotIdentity(missing)
+
+	knownZero := identityFixtureSnapshot()
+	knownZero.NormSubject.AgeMonths = ageMonthsPtr(0)
+	knownIdentity, _ := NewInputSnapshotIdentity(knownZero)
+	if missingIdentity.Ref() == knownIdentity.Ref() {
+		t.Fatal("v2 identity conflates missing age with known zero months")
+	}
+	legacy, _ := NewLegacyV1InputSnapshotIdentity(knownZero)
+	if !strings.HasPrefix(legacy.Ref(), IdentityRefV1Prefix) {
+		t.Fatalf("legacy ref = %q", legacy.Ref())
+	}
+}
+
 func TestInputSnapshotIdentityChangesWithAnyComponent(t *testing.T) {
 	t.Parallel()
 	base, _ := NewInputSnapshotIdentity(identityFixtureSnapshot())
@@ -56,7 +77,7 @@ func TestInputSnapshotIdentityChangesWithAnyComponent(t *testing.T) {
 		"answer score":         func(s *InputSnapshot) { s.AnswerSheet.Answers[0].Score = 3 },
 		"answer value":         func(s *InputSnapshot) { s.AnswerSheet.Answers[0].Value = "a" },
 		"answersheet id":       func(s *InputSnapshot) { s.AnswerSheet.ID = 2002 },
-		"subject age":          func(s *InputSnapshot) { s.NormSubject.AgeMonths = 121 },
+		"subject age":          func(s *InputSnapshot) { s.NormSubject.AgeMonths = ageMonthsPtr(121) },
 	}
 	for name, mutate := range mutations {
 		snapshot := identityFixtureSnapshot()
@@ -107,6 +128,9 @@ func TestIsIdentityRefDistinguishesLegacyRefs(t *testing.T) {
 		t.Fatal("legacy refs misclassified")
 	}
 	if !IsIdentityRef("isn:v1:abc") {
-		t.Fatal("identity ref not recognized")
+		t.Fatal("v1 identity ref not recognized")
+	}
+	if !IsIdentityRef("isn:v2:abc") || !IsV1IdentityRef("isn:v1:abc") || !IsV2IdentityRef("isn:v2:abc") {
+		t.Fatal("versioned identity ref not recognized")
 	}
 }

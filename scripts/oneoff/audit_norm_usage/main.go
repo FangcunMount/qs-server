@@ -58,6 +58,17 @@ type usageEntry struct {
 	Models           []modelUsage `json:"models"`
 }
 
+type normAsset struct {
+	TableVersion             string
+	DemographicLookupFactors []string
+}
+
+type demographicNormUsage struct {
+	NormTableVersion string       `json:"norm_table_version"`
+	FactorCodes      []string     `json:"factor_codes"`
+	Models           []modelUsage `json:"models"`
+}
+
 type danglingRef struct {
 	Code             string `json:"code"`
 	Version          string `json:"version"`
@@ -83,10 +94,12 @@ type report struct {
 	DanglingCount         int                    `json:"dangling_count"`
 	UnreferencedCount     int                    `json:"unreferenced_count"`
 	MultiVersionCount     int                    `json:"multi_version_count"`
+	DemographicNormCount  int                    `json:"demographic_norm_count"`
 	Usages                []usageEntry           `json:"usages"`
 	DanglingRefs          []danglingRef          `json:"dangling_refs"`
 	UnreferencedNorms     []string               `json:"unreferenced_norms"`
 	MultiVersionSnapshots []multiVersionSnapshot `json:"multi_version_snapshots"`
+	DemographicNorms      []demographicNormUsage `json:"demographic_norms"`
 }
 
 type snapshotDoc struct {
@@ -106,6 +119,14 @@ type snapshotDoc struct {
 
 type normDoc struct {
 	TableVersion string `bson:"table_version"`
+	Factors      []struct {
+		FactorCode string `bson:"factor_code"`
+		Lookup     []struct {
+			MinAgeMonths int    `bson:"min_age_months"`
+			MaxAgeMonths int    `bson:"max_age_months"`
+			Gender       string `bson:"gender"`
+		} `bson:"lookup"`
+	} `bson:"factors"`
 }
 
 func main() {
@@ -131,7 +152,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "audit norm usage failed:", err)
 		os.Exit(1)
 	}
-	result := buildReport(norms, snaps, cfg.normVersion)
+	result := buildReportWithAssets(norms, snaps, cfg.normVersion)
 	if cfg.jsonOut {
 		_ = json.NewEncoder(os.Stdout).Encode(result)
 	} else {
@@ -160,8 +181,8 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
-func loadInputs(ctx context.Context, db *mongo.Database) ([]string, []snapshotRef, error) {
-	norms, err := loadNormVersions(ctx, db)
+func loadInputs(ctx context.Context, db *mongo.Database) ([]normAsset, []snapshotRef, error) {
+	norms, err := loadNormAssets(ctx, db)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -172,16 +193,20 @@ func loadInputs(ctx context.Context, db *mongo.Database) ([]string, []snapshotRe
 	return norms, snaps, nil
 }
 
-func loadNormVersions(ctx context.Context, db *mongo.Database) ([]string, error) {
+func loadNormAssets(ctx context.Context, db *mongo.Database) ([]normAsset, error) {
 	collName := (&mongomodelcatalog.NormPO{}).CollectionName()
 	cur, err := db.Collection(collName).Find(ctx, bson.M{"deleted_at": nil}, options.Find().SetProjection(bson.M{
-		"table_version": 1,
+		"table_version":                 1,
+		"factors.factor_code":           1,
+		"factors.lookup.min_age_months": 1,
+		"factors.lookup.max_age_months": 1,
+		"factors.lookup.gender":         1,
 	}))
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = cur.Close(ctx) }()
-	var out []string
+	var out []normAsset
 	for cur.Next(ctx) {
 		var doc normDoc
 		if err := cur.Decode(&doc); err != nil {
@@ -190,7 +215,16 @@ func loadNormVersions(ctx context.Context, db *mongo.Database) ([]string, error)
 		if doc.TableVersion == "" {
 			continue
 		}
-		out = append(out, doc.TableVersion)
+		factorSet := map[string]struct{}{}
+		for _, factor := range doc.Factors {
+			for _, row := range factor.Lookup {
+				if row.MinAgeMonths != 0 || row.MaxAgeMonths != 0 || row.Gender != "" {
+					factorSet[factor.FactorCode] = struct{}{}
+					break
+				}
+			}
+		}
+		out = append(out, normAsset{TableVersion: doc.TableVersion, DemographicLookupFactors: sortedKeys(factorSet)})
 	}
 	return out, cur.Err()
 }
@@ -241,12 +275,19 @@ func loadPublishedSnapshots(ctx context.Context, db *mongo.Database) ([]snapshot
 
 // buildReport is the pure audit core: Norm catalog + published snapshot refs → report.
 func buildReport(normVersions []string, snaps []snapshotRef, filterVersion string) report {
-	normSet := make(map[string]struct{}, len(normVersions))
+	assets := make([]normAsset, 0, len(normVersions))
 	for _, v := range normVersions {
-		if v == "" {
-			continue
+		assets = append(assets, normAsset{TableVersion: v})
+	}
+	return buildReportWithAssets(assets, snaps, filterVersion)
+}
+
+func buildReportWithAssets(norms []normAsset, snaps []snapshotRef, filterVersion string) report {
+	normSet := make(map[string]struct{}, len(norms))
+	for _, asset := range norms {
+		if asset.TableVersion != "" {
+			normSet[asset.TableVersion] = struct{}{}
 		}
-		normSet[v] = struct{}{}
 	}
 
 	type modelKey struct {
@@ -358,6 +399,23 @@ func buildReport(normVersions []string, snaps []snapshotRef, filterVersion strin
 		}
 		return multi[i].Version < multi[j].Version
 	})
+	demographicNorms := make([]demographicNormUsage, 0)
+	for _, asset := range norms {
+		if len(asset.DemographicLookupFactors) == 0 || (filterVersion != "" && asset.TableVersion != filterVersion) {
+			continue
+		}
+		entry := demographicNormUsage{NormTableVersion: asset.TableVersion, FactorCodes: append([]string(nil), asset.DemographicLookupFactors...)}
+		for _, usage := range usages {
+			if usage.NormTableVersion == asset.TableVersion {
+				entry.Models = append(entry.Models, usage.Models...)
+				break
+			}
+		}
+		demographicNorms = append(demographicNorms, entry)
+	}
+	sort.Slice(demographicNorms, func(i, j int) bool {
+		return demographicNorms[i].NormTableVersion < demographicNorms[j].NormTableVersion
+	})
 
 	return report{
 		PublishedScanned:      len(snaps),
@@ -367,10 +425,12 @@ func buildReport(normVersions []string, snaps []snapshotRef, filterVersion strin
 		DanglingCount:         len(dangling),
 		UnreferencedCount:     len(unreferenced),
 		MultiVersionCount:     len(multi),
+		DemographicNormCount:  len(demographicNorms),
 		Usages:                usages,
 		DanglingRefs:          dangling,
 		UnreferencedNorms:     unreferenced,
 		MultiVersionSnapshots: multi,
+		DemographicNorms:      demographicNorms,
 	}
 }
 
@@ -384,8 +444,8 @@ func sortedKeys(set map[string]struct{}) []string {
 }
 
 func printReport(r report) {
-	fmt.Printf("published_scanned=%d published_with_refs=%d norms_total=%d usages=%d dangling=%d unreferenced=%d multi_version=%d\n",
-		r.PublishedScanned, r.PublishedWithRefs, r.NormsTotal, r.UsageCount, r.DanglingCount, r.UnreferencedCount, r.MultiVersionCount)
+	fmt.Printf("published_scanned=%d published_with_refs=%d norms_total=%d usages=%d dangling=%d unreferenced=%d multi_version=%d demographic_norms=%d\n",
+		r.PublishedScanned, r.PublishedWithRefs, r.NormsTotal, r.UsageCount, r.DanglingCount, r.UnreferencedCount, r.MultiVersionCount, r.DemographicNormCount)
 	for _, u := range r.Usages {
 		codes := make([]string, 0, len(u.Models))
 		for _, m := range u.Models {
@@ -401,5 +461,12 @@ func printReport(r report) {
 	}
 	for _, m := range r.MultiVersionSnapshots {
 		fmt.Printf("  multi_version %s@%s versions=[%s]\n", m.Code, m.Version, strings.Join(m.NormTableVersions, ", "))
+	}
+	for _, item := range r.DemographicNorms {
+		models := make([]string, 0, len(item.Models))
+		for _, model := range item.Models {
+			models = append(models, fmt.Sprintf("%s@%s", model.Code, model.Version))
+		}
+		fmt.Printf("  demographic_norm %s factors=[%s] published_models=[%s]\n", item.NormTableVersion, strings.Join(item.FactorCodes, ", "), strings.Join(models, ", "))
 	}
 }

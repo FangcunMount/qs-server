@@ -8,10 +8,10 @@ import (
 )
 
 // AgeMonthsAt computes completed age in months at asOf from birthday.
-// Returns 0 when inputs are incomplete or asOf is before birthday.
-func AgeMonthsAt(birthday, asOf time.Time) int {
+// The bool is false when inputs are incomplete or asOf is before birthday.
+func AgeMonthsAt(birthday, asOf time.Time) (int, bool) {
 	if birthday.IsZero() || asOf.IsZero() || asOf.Before(birthday) {
-		return 0
+		return 0, false
 	}
 	years := asOf.Year() - birthday.Year()
 	months := int(asOf.Month()) - int(birthday.Month())
@@ -20,9 +20,9 @@ func AgeMonthsAt(birthday, asOf time.Time) int {
 		total--
 	}
 	if total < 0 {
-		return 0
+		return 0, false
 	}
-	return total
+	return total, true
 }
 
 // BuildNormSubjectSnapshot freezes demographics for norm matching at asOf.
@@ -32,7 +32,9 @@ func BuildNormSubjectSnapshot(facts *port.NormSubjectFacts, asOf time.Time) *por
 	}
 	snap := &port.NormSubjectSnapshot{Gender: facts.Gender}
 	if facts.Birthday != nil && !asOf.IsZero() {
-		snap.AgeMonths = AgeMonthsAt(*facts.Birthday, asOf)
+		if ageMonths, ok := AgeMonthsAt(*facts.Birthday, asOf); ok {
+			snap.AgeMonths = &ageMonths
+		}
 	}
 	return snap
 }

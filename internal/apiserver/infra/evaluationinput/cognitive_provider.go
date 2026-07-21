@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -57,6 +58,9 @@ func (p CognitiveModelInputProvider) ResolveInput(ctx context.Context, ref port.
 	}
 	model, err := p.catalog.GetCognitiveByRef(ctx, ref.ModelRef)
 	if err != nil {
+		if _, ok := calcnorm.ErrorKindOf(err); ok {
+			return nil, err
+		}
 		if modelcatalog.IsNotFound(err) {
 			return nil, port.NewResolveError(port.FailureKindModelNotFound, err, "解释模型不存在", "加载解释模型失败")
 		}

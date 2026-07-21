@@ -79,4 +79,7 @@ func TestParseSPMPayloadAppliesTaskPerformanceMetadata(t *testing.T) {
 	if got.Factors[1].Norm == nil || got.Factors[1].Norm.NormTableVersion != "2024" {
 		t.Fatalf("total norm = %#v", got.Factors[1].Norm)
 	}
+	if got.SPM == nil || !got.SPM.NormRequired {
+		t.Fatalf("SPM norm required = %#v", got.SPM)
+	}
 }

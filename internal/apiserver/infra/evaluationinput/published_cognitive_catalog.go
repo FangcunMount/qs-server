@@ -60,6 +60,7 @@ func (c PublishedCognitiveCatalog) decodePublished(ctx context.Context, model *r
 		return snapshot, err
 	}
 	var table *norm.Norm
+	foundNormRef := false
 	for _, ref := range model.DefinitionV2.Calibration.NormRefs {
 		if ref.FactorCode != snapshot.SPM.TotalFactorCode || ref.NormTableVersion == "" {
 			continue
@@ -67,13 +68,20 @@ func (c PublishedCognitiveCatalog) decodePublished(ctx context.Context, model *r
 		if c.norms == nil {
 			return nil, fmt.Errorf("cognitive norm repository is not configured")
 		}
+		foundNormRef = true
 		table, err = c.norms.FindNorm(ctx, ref.NormTableVersion)
 		if err != nil {
 			return nil, err
 		}
 		break
 	}
-	snapshot.SPM.NormTables = taskperfsnapshot.NormTablesFromCatalog(table)
+	if !foundNormRef {
+		return snapshot, nil
+	}
+	snapshot.SPM.NormTables, err = taskperfsnapshot.NormTablesFromCatalog(table)
+	if err != nil {
+		return nil, err
+	}
 	return snapshot, nil
 }
 

@@ -37,6 +37,7 @@ type EvaluationRun struct {
 	startedAt        time.Time
 	finishedAt       *time.Time
 	origin           retrygovernance.AttemptOrigin
+	actionRequestID  string
 	retryDecision    *retrygovernance.Decision
 }
 
@@ -59,6 +60,7 @@ type ReconstructInput struct {
 	StartedAt        time.Time
 	FinishedAt       *time.Time
 	Origin           retrygovernance.AttemptOrigin
+	ActionRequestID  string
 	RetryDecision    *retrygovernance.Decision
 }
 
@@ -69,7 +71,8 @@ func Reconstruct(input ReconstructInput) EvaluationRun {
 		inputSnapshotRef: input.InputSnapshotRef, claimToken: input.ClaimToken,
 		leaseExpiresAt: cloneTime(input.LeaseExpiresAt), startedAt: input.StartedAt,
 		finishedAt: cloneTime(input.FinishedAt), origin: input.Origin,
-		retryDecision: cloneRetryDecision(input.RetryDecision),
+		actionRequestID: input.ActionRequestID,
+		retryDecision:   cloneRetryDecision(input.RetryDecision),
 	}
 }
 
@@ -89,6 +92,7 @@ func (r EvaluationRun) Origin() retrygovernance.AttemptOrigin {
 	}
 	return r.origin
 }
+func (r EvaluationRun) ActionRequestID() string { return r.actionRequestID }
 func (r EvaluationRun) RetryDecision() *retrygovernance.Decision {
 	return cloneRetryDecision(r.retryDecision)
 }
@@ -184,10 +188,15 @@ func NextEvaluationRun(latest EvaluationRun) EvaluationRun {
 }
 
 func NextEvaluationRunWithOrigin(latest EvaluationRun, origin retrygovernance.AttemptOrigin) EvaluationRun {
+	return NextEvaluationRunWithAuthorization(latest, origin, "")
+}
+
+func NextEvaluationRunWithAuthorization(latest EvaluationRun, origin retrygovernance.AttemptOrigin, actionRequestID string) EvaluationRun {
 	next := NewEvaluationRunWithAttempt(latest.assessmentID, latest.attempt.Number+1)
 	if origin.IsValid() {
 		next.origin = origin
 	}
+	next.actionRequestID = actionRequestID
 	return next
 }
 

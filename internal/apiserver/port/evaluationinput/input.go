@@ -87,7 +87,9 @@ type InputSnapshot struct {
 
 // NormSubjectSnapshot carries demographics for norm-based scoring such as Brief-2 T-scores.
 type NormSubjectSnapshot struct {
-	AgeMonths int
+	// AgeMonths is nil when birthday/as-of facts are incomplete. A non-nil
+	// zero is a valid known age for a child younger than one completed month.
+	AgeMonths *int
 	Gender    string
 }
 

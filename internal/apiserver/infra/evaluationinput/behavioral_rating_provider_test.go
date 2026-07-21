@@ -62,7 +62,7 @@ func TestBehavioralRatingProviderAttachesNormSubject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if snapshot.NormSubject == nil || snapshot.NormSubject.AgeMonths != 72 || snapshot.NormSubject.Gender != "male" {
+	if snapshot.NormSubject == nil || snapshot.NormSubject.AgeMonths == nil || *snapshot.NormSubject.AgeMonths != 72 || snapshot.NormSubject.Gender != "male" {
 		t.Fatalf("NormSubject = %#v", snapshot.NormSubject)
 	}
 }

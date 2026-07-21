@@ -52,7 +52,10 @@ func TestApplyFactorProjectionsRollsUpAndAppliesNorm(t *testing.T) {
 		},
 	}
 
-	enriched := factornorm.ApplyFactorProjections(outcome, snapshot, calcnorm.Subject{})
+	enriched, err := factornorm.ApplyFactorProjections(outcome, snapshot, calcnorm.Subject{})
+	if err != nil {
+		t.Fatalf("ApplyFactorProjections: %v", err)
+	}
 	if got := dimensionScore(enriched.Dimensions, "bri"); got != 10 {
 		t.Fatalf("bri raw = %v, want 10", got)
 	}

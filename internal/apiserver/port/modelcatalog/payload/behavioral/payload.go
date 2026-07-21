@@ -36,6 +36,7 @@ type NormingProfile struct {
 	IndexCodes           []string
 	ValidityCodes        []string
 	PrimaryDimensionCode string
+	RequiredFactorCodes  []string
 	NormTables           *calcnorm.NormTables
 }
 
@@ -182,6 +183,7 @@ func parseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 			IndexCodes:           append([]string(nil), body.Brief2.IndexCodes...),
 			ValidityCodes:        append([]string(nil), body.Brief2.ValidityCodes...),
 			PrimaryDimensionCode: legacyPrimaryDimensionCode(body.Brief2, factors),
+			RequiredFactorCodes:  normFactorCodesFromPayload(body.Brief2),
 			NormTables:           normTablesFromPayload(body.Brief2),
 		}
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/event"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
@@ -214,6 +215,39 @@ func TestRunFailureFromInputResolveErrorClassifiesRetryability(t *testing.T) {
 				t.Fatalf("failure = %#v, want kind=%s retryable=%v", got, tc.wantKind, tc.retryable)
 			}
 		})
+	}
+}
+
+func TestRunFailureFromExecutionErrorPreservesNormFailureKinds(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		kind calcnorm.ErrorKind
+		want evalrun.FailureKind
+	}{
+		{calcnorm.ErrorKindSubjectMissing, evalrun.FailureKindNormSubjectMissing},
+		{calcnorm.ErrorKindCohortNotFound, evalrun.FailureKindNormCohortNotFound},
+		{calcnorm.ErrorKindRawScoreOutOfRange, evalrun.FailureKindNormRawScoreOutOfRange},
+		{calcnorm.ErrorKindInvalid, evalrun.FailureKindNormInvalid},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(string(tt.kind), func(t *testing.T) {
+			t.Parallel()
+			err := &calcnorm.ResolutionError{Kind: tt.kind, FactorCode: "total"}
+			failure := runFailureFromExecutionError(err)
+			if failure.Kind != tt.want || failure.Retryable {
+				t.Fatalf("failure = %#v, want kind=%s non-retryable", failure, tt.want)
+			}
+		})
+	}
+}
+
+func TestRunFailureFromInputResolveErrorPreservesNormInvalid(t *testing.T) {
+	t.Parallel()
+	failure := runFailureFromInputResolveError(calcnorm.NewInvalidError("total", errors.New("invalid norm")))
+	if failure.Kind != evalrun.FailureKindNormInvalid || failure.Retryable {
+		t.Fatalf("failure = %#v", failure)
 	}
 }
 

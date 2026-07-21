@@ -34,6 +34,9 @@ func TestV1Brief2ExecuteAppliesNormTScore(t *testing.T) {
 	if dim.Level == nil || dim.Level.Code != "elevated" {
 		t.Fatalf("dimension level = %#v, want elevated", dim.Level)
 	}
+	if dim.NormReference == nil || dim.NormReference.TableVersion != "2024" || dim.NormReference.FormVariant != "parent" || dim.NormReference.MinAgeMonths != 60 || dim.NormReference.MaxAgeMonths != 95 || dim.NormReference.Gender != "male" {
+		t.Fatalf("norm reference = %#v", dim.NormReference)
+	}
 }
 
 func charDerivedScore(scores []evaluationfact.ScoreValue, kind evaluationfact.ScoreKind) float64 {

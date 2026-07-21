@@ -21,6 +21,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 // v1SplitPhaseConfig preserves the legacy characterization fixtures while keeping
@@ -56,6 +57,7 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 	}
 	reportSaver := &charSplitPhaseReportSaver{}
 	committer := &charCapturingEvaluationCommitter{stage: cfg.StageEvaluated}
+	runRepo := &charRunRepo{}
 
 	reportBuilders, err := interpretationreporting.NewRegistry(cfg.ReportBuilder)
 	if err != nil {
@@ -66,7 +68,7 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 	opts := []evaluationexecute.EngineOption{
 		evaluationexecute.WithRuntimeDescriptorRegistry(runtimeDescriptorRegistry),
 		evaluationexecute.WithEvaluationCommitter(committer),
-		evaluationexecute.WithRunRepository(&charRunRepo{}),
+		evaluationexecute.WithRunRepository(runRepo),
 		evaluationexecute.WithTransactionalOutbox(&charTxRunner{}, charEventStagerFunc(func(ctx context.Context, events ...event.DomainEvent) error {
 			if cfg.StageEvaluated != nil {
 				return cfg.StageEvaluated(ctx, events...)
@@ -75,14 +77,17 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 		})),
 	}
 
+	inputResolver := &charInputResolver{snapshot: cfg.Input}
 	core := evaluationexecute.NewEngine(
 		repo,
-		&charInputResolver{snapshot: cfg.Input},
+		inputResolver,
 		opts...,
 	)
 	return &charSplitPhaseService{
 		Engine:       core,
 		capture:      committer,
+		runRepo:      runRepo,
+		input:        inputResolver,
 		inlineLegacy: !cfg.Async,
 		generateReport: func(ctx context.Context, outcome interpretationinput.PreviewOutcome) error {
 			input, err := interpretationinput.FromPreviewOutcome(outcome)
@@ -144,6 +149,8 @@ func (c *charCapturingEvaluationCommitter) Commit(ctx context.Context, request o
 type charSplitPhaseService struct {
 	evaluationexecute.Engine
 	capture        *charCapturingEvaluationCommitter
+	runRepo        *charRunRepo
+	input          *charInputResolver
 	inlineLegacy   bool
 	generateReport func(context.Context, interpretationinput.PreviewOutcome) error
 }
@@ -203,6 +210,9 @@ func (r *charRunRepo) Claim(_ context.Context, request evaluationrun.ClaimReques
 	run := evalrun.NewEvaluationRun(request.AssessmentID)
 	if r.latest != nil {
 		run = *r.latest
+	}
+	if run.Attempt().Status == evalrun.StatusFailed && request.Origin.IsValid() && request.Origin != retrygovernance.AttemptOriginInitial {
+		run = evalrun.NextEvaluationRunWithAuthorization(run, request.Origin, request.ActionRequestID)
 	}
 	if run.Attempt().Status == evalrun.StatusRunning && run.HasActiveLease(request.ClaimedAt) {
 		return evaluationrun.ClaimResult{Run: run}, nil
@@ -267,17 +277,20 @@ func newV1RecordingExecuteService(
 	t.Helper()
 	capture := &charSplitPhaseCapture{}
 	recording := &charCapturingEvaluationCommitter{}
+	runRepo := &charRunRepo{}
 	core := evaluationexecute.NewEngine(
 		&charAssessmentRepo{assessment: a},
 		input,
 		evaluationexecute.WithRuntimeDescriptorRegistry(wireV1RuntimeDescriptorRegistry(t)),
 		evaluationexecute.WithEvaluationCommitter(recording),
-		evaluationexecute.WithRunRepository(&charRunRepo{}),
+		evaluationexecute.WithRunRepository(runRepo),
 		evaluationexecute.WithTransactionalOutbox(&charTxRunner{}, charEventStagerFunc(func(context.Context, ...event.DomainEvent) error { return nil })),
 	)
 	return &charSplitPhaseService{
 		Engine:       core,
 		capture:      recording,
+		runRepo:      runRepo,
+		input:        input,
 		inlineLegacy: true,
 		generateReport: func(ctx context.Context, outcome interpretationinput.PreviewOutcome) error {
 			return (&charRecordingInterpretation{cap: capture}).GenerateAndPersist(ctx, outcome)

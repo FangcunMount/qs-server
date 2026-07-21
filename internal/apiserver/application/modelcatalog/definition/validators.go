@@ -139,24 +139,36 @@ func ValidateBehavioralSemantic(model *domain.AssessmentModel) []domain.DomainVa
 			Level:   domain.ValidationLevelError,
 		})
 	}
-	normRefFactors := map[string]struct{}{}
-	for _, ref := range def.Calibration.NormRefs {
-		if ref.FactorCode != "" {
-			normRefFactors[ref.FactorCode] = struct{}{}
+	return issues
+}
+
+// ValidateDerivedConclusionNormRefs requires every non-raw conclusion to name
+// a factor backed by an explicit NormRef. Raw-score conclusions remain valid
+// without a norm dependency.
+func ValidateDerivedConclusionNormRefs(model *domain.AssessmentModel) []domain.DomainValidationIssue {
+	if model == nil || model.DefinitionV2 == nil {
+		return nil
+	}
+	refFactors := make(map[string]struct{}, len(model.DefinitionV2.Calibration.NormRefs))
+	for _, ref := range model.DefinitionV2.Calibration.NormRefs {
+		if ref.FactorCode != "" && ref.NormTableVersion != "" {
+			refFactors[ref.FactorCode] = struct{}{}
 		}
 	}
-	for _, item := range def.Conclusions {
-		normConclusion, ok := item.(domain.NormConclusion)
-		if !ok {
+	issues := make([]domain.DomainValidationIssue, 0)
+	for _, item := range model.DefinitionV2.Conclusions {
+		basis, factorCode, kind := conclusionScoreBasis(item)
+		if factorCode == "" || basis == "" || basis == domain.ScoreBasisRaw {
 			continue
 		}
-		if _, ok := normRefFactors[normConclusion.FactorCode]; normConclusion.FactorCode != "" && !ok {
-			issues = append(issues, domain.DomainValidationIssue{
-				Field: "definition_v2.conclusions", Code: "behavioral_rating.conclusion.norm_ref.missing",
-				Message: fmt.Sprintf("NormConclusion factor %s 缺少对应 NormRef", normConclusion.FactorCode),
-				Level:   domain.ValidationLevelError,
-			})
+		if _, exists := refFactors[factorCode]; exists {
+			continue
 		}
+		issues = append(issues, domain.DomainValidationIssue{
+			Field: "definition_v2.conclusions", Code: "conclusion.norm_ref.missing",
+			Message: fmt.Sprintf("%s conclusion factor %s 缺少对应 NormRef", kind, factorCode),
+			Level:   domain.ValidationLevelError,
+		})
 	}
 	return issues
 }

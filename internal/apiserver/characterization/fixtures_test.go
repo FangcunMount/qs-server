@@ -18,6 +18,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
+func fixtureIntPtr(value int) *int { return &value }
+
 func scaleInputSnapshot() *evaluationinput.InputSnapshot {
 	return &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
@@ -337,13 +339,16 @@ func brief2InputSnapshot() *evaluationinput.InputSnapshot {
 			},
 		},
 		Norming: &behavioralsnapshot.NormingProfile{
-			Variant:          "parent",
-			NormTableVersion: "2024",
+			Variant:             "parent",
+			NormTableVersion:    "2024",
+			RequiredFactorCodes: []string{"gec"},
 			NormTables: &calcnorm.NormTables{
+				NormTableVersion: "2024",
+				FormVariant:      "parent",
 				Factors: []calcnorm.FactorNormTable{{
 					FactorCode: "gec",
 					Lookup: []calcnorm.NormLookupEntry{
-						{RawMin: 0, RawMax: 10, TScore: 65, Percentile: 90},
+						{RawMin: 0, RawMax: 10, MinAgeMonths: 60, MaxAgeMonths: 95, Gender: "male", TScore: 65, Percentile: 90},
 					},
 				}},
 				TScoreRules: []calcnorm.TScoreInterpretRule{{
@@ -358,7 +363,7 @@ func brief2InputSnapshot() *evaluationinput.InputSnapshot {
 	return &evaluationinput.InputSnapshot{
 		Model:        evaluationinput.NewBehavioralRatingModelSnapshot(snapshot, modelcatalog.AlgorithmBrief2),
 		ModelPayload: evaluationinput.BehavioralRatingModelPayload{Snapshot: snapshot},
-		NormSubject:  &evaluationinput.NormSubjectSnapshot{AgeMonths: 72, Gender: "male"},
+		NormSubject:  &evaluationinput.NormSubjectSnapshot{AgeMonths: fixtureIntPtr(72), Gender: "male"},
 		AnswerSheet: &evaluationinput.AnswerSheetSnapshot{
 			QuestionnaireCode:    "Q-001",
 			QuestionnaireVersion: "1.0.0",
@@ -474,6 +479,66 @@ func draftCognitiveAssessment(t *testing.T) *assessment.Assessment {
 		assessment.NewAnswerSheetRef(meta.FromUint64(6006)),
 		assessment.NewAdhocOrigin(),
 		assessment.WithID(assessment.NewID(7006)),
+		assessment.WithEvaluationModel(modelRef),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment: %v", err)
+	}
+	return a
+}
+
+func spmNormInputSnapshot() *evaluationinput.InputSnapshot {
+	standardScore := 110.0
+	snapshot := &taskperfsnapshot.Snapshot{
+		Code: "COG-SPM", Version: "1.0.0", Title: "Raven SPM", Status: "published",
+		QuestionnaireCode: "Q-SPM", QuestionnaireVersion: "1.0.0",
+		SPM: &taskperfsnapshot.SPMSpec{
+			TotalFactorCode: "total",
+			NormRequired:    true,
+			ItemSets: []taskperfsnapshot.SPMItemSet{{Code: "A", Items: []taskperfsnapshot.SPMItem{{
+				QuestionCode: "A1", CorrectOptionCode: "1",
+			}}}},
+			NormTables: &calcnorm.NormTables{
+				NormTableVersion: "spm-cn-2026", FormVariant: "standard",
+				Factors: []calcnorm.FactorNormTable{{FactorCode: "total", Lookup: []calcnorm.NormLookupEntry{{
+					RawMin: 1, RawMax: 1, MinAgeMonths: 60, MaxAgeMonths: 95, Gender: "female",
+					TScore: 55, Percentile: 70, StandardScore: &standardScore,
+				}}}},
+			},
+		},
+	}
+	modelSnapshot := evaluationinput.NewCognitiveModelSnapshot(snapshot)
+	modelSnapshot.Algorithm = string(modelcatalog.AlgorithmSPM)
+	return &evaluationinput.InputSnapshot{
+		Model:        modelSnapshot,
+		ModelPayload: evaluationinput.CognitiveModelPayload{Snapshot: snapshot},
+		NormSubject:  &evaluationinput.NormSubjectSnapshot{AgeMonths: fixtureIntPtr(72), Gender: "female"},
+		AnswerSheet: &evaluationinput.AnswerSheetSnapshot{
+			QuestionnaireCode: "Q-SPM", QuestionnaireVersion: "1.0.0",
+			Answers: []evaluationinput.AnswerSnapshot{{QuestionCode: "A1", Value: "1"}},
+		},
+		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-SPM", Version: "1.0.0"},
+	}
+}
+
+func draftSPMAssessment(t *testing.T) *assessment.Assessment {
+	t.Helper()
+	modelRef := assessment.NewEvaluationModelRefWithIdentity(
+		modelcatalog.KindCognitive,
+		modelcatalog.SubKindEmpty,
+		modelcatalog.AlgorithmSPM,
+		meta.ZeroID,
+		meta.NewCode("COG-SPM"),
+		"1.0.0",
+		"Raven SPM",
+	)
+	a, err := assessment.NewAssessment(
+		1,
+		testee.NewID(8010),
+		assessment.NewQuestionnaireRefByCode(meta.NewCode("Q-SPM"), "1.0.0"),
+		assessment.NewAnswerSheetRef(meta.FromUint64(6010)),
+		assessment.NewAdhocOrigin(),
+		assessment.WithID(assessment.NewID(7010)),
 		assessment.WithEvaluationModel(modelRef),
 	)
 	if err != nil {

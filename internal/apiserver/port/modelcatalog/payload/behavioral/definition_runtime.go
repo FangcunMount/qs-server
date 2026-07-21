@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	catalognorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/normruntime"
 )
 
 // DefinitionEnvelope carries published metadata while a behavioral Definition is projected to execution DTO.
@@ -93,7 +94,10 @@ func normingProfileFromDefinition(def *definition.Definition, tables map[string]
 	if table == nil {
 		return nil, fmt.Errorf("behavioral norm table %s is not available", version)
 	}
-	calcTables := calcNormTables(table, conclusions)
+	calcTables, err := calcNormTables(table, conclusions)
+	if err != nil {
+		return nil, err
+	}
 	primary := ""
 	for _, item := range conclusions {
 		if item.Primary {
@@ -101,24 +105,27 @@ func normingProfileFromDefinition(def *definition.Definition, tables map[string]
 			break
 		}
 	}
-	return &NormingProfile{Variant: table.FormVariant, NormTableVersion: version, PrimaryDimensionCode: primary, NormTables: calcTables}, nil
+	required := make([]string, 0, len(def.Calibration.NormRefs))
+	seenRequired := make(map[string]struct{}, len(def.Calibration.NormRefs))
+	for _, ref := range def.Calibration.NormRefs {
+		if ref.FactorCode == "" {
+			continue
+		}
+		if _, exists := seenRequired[ref.FactorCode]; exists {
+			continue
+		}
+		seenRequired[ref.FactorCode] = struct{}{}
+		required = append(required, ref.FactorCode)
+	}
+	return &NormingProfile{Variant: table.FormVariant, NormTableVersion: version, PrimaryDimensionCode: primary, RequiredFactorCodes: required, NormTables: calcTables}, nil
 }
 
-func calcNormTables(table *catalognorm.Norm, conclusions []conclusion.NormConclusion) *calcnorm.NormTables {
-	if table == nil {
-		return nil
+func calcNormTables(table *catalognorm.Norm, conclusions []conclusion.NormConclusion) (*calcnorm.NormTables, error) {
+	out, err := normruntime.FromCatalog(table)
+	if err != nil {
+		return nil, err
 	}
-	out := &calcnorm.NormTables{FormVariant: table.FormVariant, NormTableVersion: table.TableVersion, Factors: make([]calcnorm.FactorNormTable, 0, len(table.Factors)), TScoreRules: make([]calcnorm.TScoreInterpretRule, 0, len(conclusions))}
-	for _, item := range table.Factors {
-		factorTable := calcnorm.FactorNormTable{FactorCode: item.FactorCode, Bands: make([]calcnorm.NormBand, 0, len(item.Bands)), Lookup: make([]calcnorm.NormLookupEntry, 0, len(item.Lookup))}
-		for _, band := range item.Bands {
-			factorTable.Bands = append(factorTable.Bands, calcnorm.NormBand{MinAgeMonths: band.MinAgeMonths, MaxAgeMonths: band.MaxAgeMonths, Gender: band.Gender, Mean: cloneFloat64(band.Mean), StdDev: cloneFloat64(band.StdDev)})
-		}
-		for _, lookup := range item.Lookup {
-			factorTable.Lookup = append(factorTable.Lookup, calcnorm.NormLookupEntry{RawMin: lookup.RawScoreMin, RawMax: lookup.RawScoreMax, TScore: lookup.TScore, Percentile: lookup.Percentile})
-		}
-		out.Factors = append(out.Factors, factorTable)
-	}
+	out.TScoreRules = make([]calcnorm.TScoreInterpretRule, 0, len(conclusions))
 	for _, item := range conclusions {
 		if item.ScoreBasis != conclusion.ScoreBasisTScore {
 			continue
@@ -132,7 +139,7 @@ func calcNormTables(table *catalognorm.Norm, conclusions []conclusion.NormConclu
 		}
 		out.TScoreRules = append(out.TScoreRules, rule)
 	}
-	return out
+	return out, nil
 }
 
 func hasFactorSources(items []factor.ScoringSource) bool {

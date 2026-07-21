@@ -1,6 +1,7 @@
 package norming_test
 
 import (
+	"errors"
 	"testing"
 
 	factornorm "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/norming"
@@ -9,6 +10,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 )
+
+func agePtr(value int) *int { return &value }
 
 func TestApplyNormProjectionAppliesNormAndInterpretation(t *testing.T) {
 	t.Parallel()
@@ -22,6 +25,7 @@ func TestApplyNormProjectionAppliesNormAndInterpretation(t *testing.T) {
 	snapshot := &behavioralsnapshot.Snapshot{
 		Norming: &behavioralsnapshot.NormingProfile{
 			PrimaryDimensionCode: "gec",
+			RequiredFactorCodes:  []string{"gec"},
 			NormTables: &calcnorm.NormTables{
 				NormTableVersion: "2026",
 				FormVariant:      "teacher",
@@ -41,7 +45,10 @@ func TestApplyNormProjectionAppliesNormAndInterpretation(t *testing.T) {
 		},
 	}
 
-	enriched := factornorm.ApplyNormProjection(outcome, snapshot, calcnorm.Subject{AgeMonths: 72, Gender: "female"})
+	enriched, err := factornorm.ApplyNormProjection(outcome, snapshot, calcnorm.Subject{AgeMonths: agePtr(72), Gender: "female"})
+	if err != nil {
+		t.Fatalf("ApplyNormProjection: %v", err)
+	}
 	if len(enriched.Dimensions) != 1 {
 		t.Fatalf("dimensions = %#v", enriched.Dimensions)
 	}
@@ -63,13 +70,40 @@ func TestApplyNormProjectionAppliesNormAndInterpretation(t *testing.T) {
 	}
 }
 
+func TestApplyNormProjectionRequiredMissDoesNotMutateOutcome(t *testing.T) {
+	t.Parallel()
+
+	outcome := &domainoutcome.Execution{Dimensions: []domainoutcome.DimensionResult{{
+		Code: "gec", Score: &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: 5},
+	}}}
+	snapshot := &behavioralsnapshot.Snapshot{Norming: &behavioralsnapshot.NormingProfile{
+		RequiredFactorCodes: []string{"gec"},
+		NormTables: &calcnorm.NormTables{Factors: []calcnorm.FactorNormTable{{
+			FactorCode: "gec",
+			Lookup:     []calcnorm.NormLookupEntry{{RawMin: 0, RawMax: 10, MinAgeMonths: 60, MaxAgeMonths: 95, Gender: "female", TScore: 65, Percentile: 90}},
+		}}},
+	}}
+
+	got, err := factornorm.ApplyNormProjection(outcome, snapshot, calcnorm.Subject{})
+	if got != nil {
+		t.Fatalf("outcome = %#v, want nil", got)
+	}
+	var resolutionErr *calcnorm.ResolutionError
+	if !errors.As(err, &resolutionErr) || resolutionErr.Kind != calcnorm.ErrorKindSubjectMissing {
+		t.Fatalf("error = %T %v", err, err)
+	}
+	if len(outcome.Dimensions[0].DerivedScores) != 0 || outcome.Dimensions[0].NormReference != nil {
+		t.Fatalf("outcome partially mutated = %#v", outcome)
+	}
+}
+
 func TestNormSubjectFromInput(t *testing.T) {
 	t.Parallel()
 
 	subject := factornorm.NormSubjectFromInput(&evaluationinput.InputSnapshot{
-		NormSubject: &evaluationinput.NormSubjectSnapshot{AgeMonths: 72, Gender: "male"},
+		NormSubject: &evaluationinput.NormSubjectSnapshot{AgeMonths: agePtr(72), Gender: "male"},
 	})
-	if subject.AgeMonths != 72 || subject.Gender != "male" {
+	if subject.AgeMonths == nil || *subject.AgeMonths != 72 || subject.Gender != "male" {
 		t.Fatalf("subject = %#v", subject)
 	}
 }

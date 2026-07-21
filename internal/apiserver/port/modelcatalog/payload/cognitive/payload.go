@@ -11,6 +11,7 @@ import (
 	catalognorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 	taskperf "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance"
 	portmodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/normruntime"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 	sharedpayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/shared"
 )
@@ -79,27 +80,14 @@ type SPMSpec struct {
 	TimeLimitSeconds int
 	TotalFactorCode  string
 	ItemSets         []SPMItemSet
+	NormRequired     bool
 	NormTables       *calcnorm.NormTables
 }
 
 // NormTablesFromCatalog converts the immutable catalog table into the
 // calculation DTO used by native SPM execution.
-func NormTablesFromCatalog(table *catalognorm.Norm) *calcnorm.NormTables {
-	if table == nil {
-		return nil
-	}
-	out := &calcnorm.NormTables{FormVariant: table.FormVariant, NormTableVersion: table.TableVersion, Factors: make([]calcnorm.FactorNormTable, 0, len(table.Factors))}
-	for _, factor := range table.Factors {
-		item := calcnorm.FactorNormTable{FactorCode: factor.FactorCode, Bands: make([]calcnorm.NormBand, 0, len(factor.Bands)), Lookup: make([]calcnorm.NormLookupEntry, 0, len(factor.Lookup))}
-		for _, band := range factor.Bands {
-			item.Bands = append(item.Bands, calcnorm.NormBand{MinAgeMonths: band.MinAgeMonths, MaxAgeMonths: band.MaxAgeMonths, Gender: band.Gender, Mean: cloneFloat64(band.Mean), StdDev: cloneFloat64(band.StdDev)})
-		}
-		for _, lookup := range factor.Lookup {
-			item.Lookup = append(item.Lookup, calcnorm.NormLookupEntry{RawMin: lookup.RawScoreMin, RawMax: lookup.RawScoreMax, TScore: lookup.TScore, Percentile: lookup.Percentile, StandardScore: cloneFloat64(lookup.StandardScore)})
-		}
-		out.Factors = append(out.Factors, item)
-	}
-	return out
+func NormTablesFromCatalog(table *catalognorm.Norm) (*calcnorm.NormTables, error) {
+	return normruntime.FromCatalog(table)
 }
 
 type SPMItemSet struct {
@@ -338,6 +326,12 @@ func runtimeSPMSpecFromPayload(payload *spmExtension, factors []FactorSnapshot) 
 				spec.TotalFactorCode = item.Code
 				break
 			}
+		}
+	}
+	for _, item := range factors {
+		if item.Code == spec.TotalFactorCode && item.Norm != nil && item.Norm.NormTableVersion != "" {
+			spec.NormRequired = true
+			break
 		}
 	}
 	for _, set := range payload.ItemSets {

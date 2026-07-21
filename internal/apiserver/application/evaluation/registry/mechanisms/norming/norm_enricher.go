@@ -14,30 +14,31 @@ func ApplyNormProjection(
 	outcome *domainoutcome.Execution,
 	snapshot *behavioralsnapshot.Snapshot,
 	subject calcnorm.Subject,
-) *domainoutcome.Execution {
+) (*domainoutcome.Execution, error) {
 	if outcome == nil || snapshot == nil {
-		return outcome
+		return outcome, nil
 	}
-	calcResult := enrichNormCalcResult(calculationadapter.CalcResultFromOutcome(outcome), snapshot, subject)
-	return calculationadapter.MergeCalcResultIntoOutcome(outcome, calcResult)
+	calcResult, err := enrichNormCalcResult(calculationadapter.CalcResultFromOutcome(outcome), snapshot, subject)
+	if err != nil {
+		return nil, err
+	}
+	return calculationadapter.MergeCalcResultIntoOutcome(outcome, calcResult), nil
 }
 
 func enrichNormCalcResult(
 	calcResult *calculation.Result,
 	snapshot *behavioralsnapshot.Snapshot,
 	subject calcnorm.Subject,
-) *calculation.Result {
+) (*calculation.Result, error) {
 	if calcResult == nil || snapshot == nil || snapshot.Norming == nil {
-		return calcResult
+		return calcResult, nil
 	}
 	tables := snapshot.Norming.NormTablesOrNil()
-	if tables == nil {
-		return calcResult
-	}
 	return calcnorm.Projection{
 		Tables:               tables,
 		Subject:              subject,
 		PrimaryDimensionCode: snapshot.Norming.PrimaryDimensionCode,
+		RequiredFactorCodes:  snapshot.Norming.RequiredFactorCodes,
 	}.Apply(calcResult)
 }
 

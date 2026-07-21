@@ -11,6 +11,27 @@ import (
 // ValidateImport validates immutable norm reference material before it reaches
 // persistence. Runtime lookup assumes these ranges are finite and unambiguous.
 func ValidateImport(table *Norm) error {
+	if err := validateMaterialHeader(table); err != nil {
+		return err
+	}
+	if err := validateIdentity(table.Kind, table.Algorithm); err != nil {
+		return err
+	}
+	return validateMaterialFactors(table)
+}
+
+// ValidateRuntimeMaterial validates the executable Norm material without
+// requiring identity metadata. Canonical imports must use ValidateImport;
+// this compatibility seam exists for older published snapshots whose tables
+// predate Kind/Algorithm persistence.
+func ValidateRuntimeMaterial(table *Norm) error {
+	if err := validateMaterialHeader(table); err != nil {
+		return err
+	}
+	return validateMaterialFactors(table)
+}
+
+func validateMaterialHeader(table *Norm) error {
 	if table == nil {
 		return invalid("norm table is required")
 	}
@@ -20,9 +41,10 @@ func ValidateImport(table *Norm) error {
 	if table.FormVariant == "" {
 		return invalid("norm form variant is required")
 	}
-	if err := validateIdentity(table.Kind, table.Algorithm); err != nil {
-		return err
-	}
+	return nil
+}
+
+func validateMaterialFactors(table *Norm) error {
 	if len(table.Factors) == 0 {
 		return invalid("norm table requires at least one factor")
 	}
@@ -110,7 +132,7 @@ func validateBands(factorCode string, bands []Band) error {
 	}
 	for left := 0; left < len(bands); left++ {
 		for right := left + 1; right < len(bands); right++ {
-			if demographicScopesOverlap(bands[left].MinAgeMonths, bands[left].MaxAgeMonths, bands[left].Gender, bands[right].MinAgeMonths, bands[right].MaxAgeMonths, bands[right].Gender) {
+			if bandScopesAmbiguous(bands[left], bands[right]) {
 				return invalid("factor %s bands %d and %d overlap for the same demographic scope", factorCode, left, right)
 			}
 		}
@@ -128,6 +150,17 @@ func lookupScopesAmbiguous(left, right LookupEntry) bool {
 	if leftGeneric || rightGeneric {
 		// Generic lookup rows are explicit fallbacks and may cover the same raw
 		// score as a more specific demographic row.
+		return leftGeneric && rightGeneric
+	}
+	return demographicScopesOverlap(left.MinAgeMonths, left.MaxAgeMonths, left.Gender, right.MinAgeMonths, right.MaxAgeMonths, right.Gender)
+}
+
+func bandScopesAmbiguous(left, right Band) bool {
+	leftGeneric := left.MinAgeMonths == 0 && left.MaxAgeMonths == 0 && left.Gender == ""
+	rightGeneric := right.MinAgeMonths == 0 && right.MaxAgeMonths == 0 && right.Gender == ""
+	if leftGeneric || rightGeneric {
+		// A generic band is an explicit fallback and may coexist with specific
+		// cohorts; two generic bands remain ambiguous.
 		return leftGeneric && rightGeneric
 	}
 	return demographicScopesOverlap(left.MinAgeMonths, left.MaxAgeMonths, left.Gender, right.MinAgeMonths, right.MaxAgeMonths, right.Gender)
