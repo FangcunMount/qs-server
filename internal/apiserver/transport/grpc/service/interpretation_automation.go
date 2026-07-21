@@ -12,6 +12,7 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	automation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/admission"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
@@ -63,6 +64,19 @@ func (s *InterpretationAutomationService) GenerateReportFromAssessment(ctx conte
 
 func generateReportFailureResponse(err error) *pb.GenerateReportFromAssessmentResponse {
 	resp := &pb.GenerateReportFromAssessmentResponse{Success: false, Status: "failed", Message: "报告生成失败", Retryable: true, FailureKind: "internal"}
+	if rejected, ok := admission.RejectedFrom(err); ok && rejected.Failure != nil {
+		f := rejected.Failure
+		resp.Retryable = f.Retryable()
+		resp.FailureKind = "admission_" + string(f.Kind())
+		resp.FailureCode = f.Code()
+		resp.Message = f.SafeMessage()
+		resp.Status = "admission_rejected"
+		resp.RetryDisposition = "terminal"
+		if f.Retryable() {
+			resp.RetryDisposition = "automatic"
+		}
+		return resp
+	}
 	if failed, ok := automation.FailureFrom(err); ok {
 		resp.Retryable, resp.GenerationId, resp.RunId = failed.Retryable, failed.GenerationID.String(), failed.RunID.String()
 		resp.FailureKind, resp.FailureCode, resp.Message = string(failed.Kind), failed.Code, failed.SafeMessage

@@ -13,6 +13,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/database"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
+	mongo_interpretation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 	"github.com/FangcunMount/qs-server/internal/pkg/migration"
 	mongo_indexes "github.com/FangcunMount/qs-server/internal/pkg/mongodb"
 	options "github.com/FangcunMount/qs-server/internal/pkg/options"
@@ -598,7 +599,10 @@ func (dm *DatabaseManager) runMigrations(ctx context.Context) error {
 		if err := indexManager.VerifyUnifiedModelCatalogIndexes(ctx); err != nil {
 			return fmt.Errorf("mongodb unified schema index verification failed: %w", err)
 		}
-		logger.L(ctx).Infow("✅ MongoDB unified model-catalog indexes verified",
+		if err := mongo_interpretation.VerifyReportCatalogIndexes(ctx, mongoClient.Database(mongoDatabase)); err != nil {
+			return fmt.Errorf("mongodb report catalog index verification failed: %w", err)
+		}
+		logger.L(ctx).Infow("✅ MongoDB unified model-catalog and report catalog indexes verified",
 			"component", "MongoDBMigration",
 			"action", "verify_indexes",
 			"result", "success",

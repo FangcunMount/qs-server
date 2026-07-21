@@ -5,13 +5,16 @@ package operations
 import (
 	"context"
 	"fmt"
+	"time"
+
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/admission"
 	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	domainrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"time"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 type Actor struct {
@@ -44,9 +47,17 @@ type Run struct {
 	Failure                                          *Failure
 	StartedAt, LeaseExpiresAt, FinishedAt            *time.Time
 	AttemptOrigin, RetryDisposition                  string
+	GovernanceStatus                                 string
 	MaxAutomaticAttempts, RemainingAutomaticAttempts int
 	NextAttemptAt                                    *time.Time
 	RetryEventID, ActionRequestID                    string
+	RecoveryCount                                    int
+	LastReclaimedAt                                  *time.Time
+	ClaimHistory                                     []ClaimHistoryEntry
+}
+type ClaimHistoryEntry struct {
+	ReclaimedAt time.Time
+	TraceID     string
 }
 type Failure struct {
 	Kind, Code, SafeMessage string
@@ -57,22 +68,39 @@ type Report struct {
 	ReportType, TemplateVersion                      string
 	GeneratedAt                                      time.Time
 }
+type AdmissionFailure struct {
+	ID, OutcomeID, AssessmentID uint64
+	OrgID                       int64
+	TesteeID                    uint64
+	EventID, TraceID            string
+	Kind, Code, SafeMessage     string
+	Retryable                   bool
+	Fingerprint                 string
+	OccurredAt                  time.Time
+}
+
 type Service interface {
 	FindReportByID(context.Context, Actor, meta.ID) (*Report, error)
 	FindGenerationsByOutcomeID(context.Context, Actor, meta.ID) ([]Generation, error)
 	FindLifecycleByAssessmentID(context.Context, Actor, meta.ID) ([]Generation, error)
 	ListHistoricalReportsByAssessmentID(context.Context, Actor, meta.ID) ([]Report, error)
+	FindAdmissionFailuresByOutcomeID(context.Context, Actor, meta.ID) ([]AdmissionFailure, error)
 }
 type service struct {
 	outcomes    OutcomeCorrelation
 	generations domaingeneration.Repository
 	runs        domainrun.Repository
 	reports     domainreport.ReportRepository
+	admissions  admission.Repository
 	access      Access
 }
 
-func NewService(outcomes OutcomeCorrelation, g domaingeneration.Repository, r domainrun.Repository, reports domainreport.ReportRepository, access Access) Service {
-	return &service{outcomes: outcomes, generations: g, runs: r, reports: reports, access: access}
+func NewService(outcomes OutcomeCorrelation, g domaingeneration.Repository, r domainrun.Repository, reports domainreport.ReportRepository, access Access, admissions ...admission.Repository) Service {
+	var admissionRepo admission.Repository
+	if len(admissions) > 0 {
+		admissionRepo = admissions[0]
+	}
+	return &service{outcomes: outcomes, generations: g, runs: r, reports: reports, access: access, admissions: admissionRepo}
 }
 func (s *service) FindReportByID(ctx context.Context, a Actor, id meta.ID) (*Report, error) {
 	if err := s.ensureConfigured(); err != nil {
@@ -150,6 +178,43 @@ func (s *service) ListHistoricalReportsByAssessmentID(ctx context.Context, a Act
 	}
 	return result, nil
 }
+
+func (s *service) FindAdmissionFailuresByOutcomeID(ctx context.Context, a Actor, id meta.ID) ([]AdmissionFailure, error) {
+	if err := s.ensureConfigured(); err != nil {
+		return nil, err
+	}
+	if s.admissions == nil {
+		return nil, cberrors.WithCode(code.ErrModuleInitializationFailed, "interpretation admission repository is not configured")
+	}
+	if id.IsZero() {
+		return nil, fmt.Errorf("evaluation outcome id is required")
+	}
+	ref, err := s.outcomes.FindOutcomeByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.authorize(ctx, a, ref.OrgID); err != nil {
+		return nil, err
+	}
+	items, err := s.admissions.FindByOutcomeID(ctx, id, 50)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]AdmissionFailure, 0, len(items))
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		result = append(result, AdmissionFailure{
+			ID: item.ID().Uint64(), OutcomeID: item.OutcomeID().Uint64(), AssessmentID: item.AssessmentID().Uint64(),
+			OrgID: item.OrgID(), TesteeID: item.TesteeID(), EventID: item.EventID(), TraceID: item.TraceID(),
+			Kind: string(item.Kind()), Code: item.Code(), SafeMessage: item.SafeMessage(), Retryable: item.Retryable(),
+			Fingerprint: item.Fingerprint(), OccurredAt: item.OccurredAt(),
+		})
+	}
+	return result, nil
+}
+
 func (s *service) authorize(ctx context.Context, a Actor, resourceOrgID int64) error {
 	if a.OperatorUserID == 0 || a.OrgID == 0 || resourceOrgID == 0 {
 		return cberrors.WithCode(code.ErrPermissionDenied, "operations actor is required")
@@ -209,8 +274,17 @@ func mapRun(r *domainrun.InterpretationRun) *Run {
 	}
 	result := &Run{ID: r.ID().Uint64(), GenerationID: r.GenerationID().Uint64(), Attempt: r.Attempt(), Status: string(r.Status()), TraceID: r.TraceID(), StartedAt: r.StartedAt(), LeaseExpiresAt: r.LeaseExpiresAt(), FinishedAt: r.FinishedAt()}
 	result.AttemptOrigin = string(r.Origin())
+	result.RecoveryCount = r.RecoveryCount()
+	result.LastReclaimedAt = r.LastReclaimedAt()
+	if history := r.ClaimHistory(); len(history) > 0 {
+		result.ClaimHistory = make([]ClaimHistoryEntry, len(history))
+		for i, record := range history {
+			result.ClaimHistory[i] = ClaimHistoryEntry{ReclaimedAt: record.ReclaimedAt, TraceID: record.TraceID}
+		}
+	}
 	if decision := r.RetryDecision(); decision != nil {
 		result.RetryDisposition = string(decision.Disposition)
+		result.GovernanceStatus = governanceStatusForDisposition(decision.Disposition)
 		result.MaxAutomaticAttempts = decision.MaxAutomaticAttempts
 		result.RemainingAutomaticAttempts = decision.RemainingAutomaticAttempts
 		result.NextAttemptAt = decision.NextAttemptAt
@@ -221,6 +295,19 @@ func mapRun(r *domainrun.InterpretationRun) *Run {
 		result.Failure = &Failure{Kind: string(f.Kind), Code: f.Code, SafeMessage: f.SafeMessage, Retryable: f.Retryable}
 	}
 	return result
+}
+
+func governanceStatusForDisposition(disposition retrygovernance.Disposition) string {
+	switch disposition {
+	case retrygovernance.DispositionManualRequired:
+		return "waiting_manual_action"
+	case retrygovernance.DispositionAutomatic:
+		return "waiting_automatic_retry"
+	case retrygovernance.DispositionTerminal:
+		return "terminal"
+	default:
+		return ""
+	}
 }
 func mapReport(r *domainreport.InterpretReport) *Report {
 	if r == nil {

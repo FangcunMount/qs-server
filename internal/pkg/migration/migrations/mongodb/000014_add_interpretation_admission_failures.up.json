@@ -1,0 +1,11 @@
+[
+  { "create": "interpretation_admission_failures" },
+  {
+    "createIndexes": "interpretation_admission_failures",
+    "indexes": [
+      { "key": { "domain_id": 1 }, "name": "uk_admission_failure_domain_id", "unique": true },
+      { "key": { "fingerprint": 1 }, "name": "uk_admission_failure_fingerprint", "unique": true },
+      { "key": { "outcome_id": 1, "occurred_at": -1 }, "name": "idx_admission_failure_outcome_occurred" }
+    ]
+  }
+]

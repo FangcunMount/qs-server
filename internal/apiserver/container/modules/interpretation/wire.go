@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 	"go.mongodb.org/mongo-driver/mongo"
+	"time"
 )
 
 // WireInput carries composition-root inputs for report module installation.
@@ -15,6 +16,7 @@ type WireInput struct {
 	OpsHandle          *redisruntime.Handle
 	ReportStatusConfig reportstatus.Config
 	OutboxProfile      appEventing.ProfileBinding
+	RunLeaseDuration   time.Duration
 }
 
 // Wire builds and bootstraps the report module from composition inputs.

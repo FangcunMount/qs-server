@@ -16,6 +16,8 @@ import (
 	interpretationclinician "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
 	interpretationoperations "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/operations"
 	interpretationparticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
+	appreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporttemplate"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reportprojection"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
@@ -39,7 +41,11 @@ type Module struct {
 	generationRepo        *mongoEval.GenerationRepository
 	runRepo               *mongoEval.RunRepository
 	reportRepo            *mongoEval.ReportRepository
+	admissionRepo         *mongoEval.AdmissionFailureRepository
+	reportTemplateRepo    *mongoEval.ReportTemplateRepository
+	reportTemplateService appreporttemplate.Service
 	automationService     interpretationautomation.Service
+	projectionMapper      reportprojection.Mapper
 	participantService    interpretationparticipant.Service
 	administrationService interpretationadmin.Service
 	clinicianService      interpretationclinician.Service
@@ -58,6 +64,7 @@ type Deps struct {
 	OpsHandle          *redisruntime.Handle
 	ReportStatusConfig reportstatus.Config
 	OutboxProfile      appEventing.ProfileBinding
+	RunLeaseDuration   time.Duration
 }
 
 // New assembles the report module.
@@ -89,6 +96,17 @@ func New(deps Deps) (*Module, error) {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation report repository: %v", err)
 	}
 	module.reportRepo = reportRepo
+	admissionRepo, err := mongoEval.NewAdmissionFailureRepository(deps.MongoDB, mongoOptions)
+	if err != nil {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation admission failure repository: %v", err)
+	}
+	module.admissionRepo = admissionRepo
+	reportTemplateRepo, err := mongoEval.NewReportTemplateRepository(deps.MongoDB, mongoOptions)
+	if err != nil {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report template repository: %v", err)
+	}
+	module.reportTemplateRepo = reportTemplateRepo
+	module.reportTemplateService = appreporttemplate.NewService(reportTemplateRepo)
 	catalogProjector, err := mongoEval.NewReportCatalogProjector(deps.MongoDB, mongoOptions)
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report catalog projector: %v", err)
@@ -105,7 +123,7 @@ func New(deps Deps) (*Module, error) {
 		if err != nil {
 			return nil, err
 		}
-		starter, err := interpretationexecution.NewStarter(mongoTxRunner, module.generationRepo, module.runRepo, module.reportRepo, 5*time.Minute)
+		starter, err := interpretationexecution.NewStarter(mongoTxRunner, module.generationRepo, module.runRepo, module.reportRepo, deps.RunLeaseDuration)
 		if err != nil {
 			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report generation starter: %v", err)
 		}
@@ -129,7 +147,7 @@ func (m *Module) BindOutcomeRepository(repo domainoutcome.Repository) error {
 	if m == nil || repo == nil || m.executionExecutor == nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "interpretation outcome service dependencies are not configured")
 	}
-	automationService, err := interpretationautomation.NewService(repo, m.executionExecutor)
+	automationService, err := interpretationautomation.NewService(repo, m.executionExecutor, m.admissionRepo)
 	if err != nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation automation service: %v", err)
 	}
@@ -140,6 +158,7 @@ func (m *Module) BindOutcomeRepository(repo domainoutcome.Repository) error {
 		m.runRepo,
 		m.reportRepo,
 		operationsAccessAdapter{},
+		m.admissionRepo,
 	)
 	m.governedRetryService = interpretationautomation.NewGovernedRetryService(m.generationRepo, m.runRepo, repo, m.txRunner, m.eventStager)
 	m.leaseRecoverer = interpretationautomation.NewLeaseRecoverer(m.runRepo, m.generationRepo, m.automationService)
@@ -227,11 +246,18 @@ func (m *Module) AutomationService() interpretationautomation.Service {
 
 // BindParticipantAccess installs the participant-owned read use cases after
 // Evaluation has exposed its ownership-checking query service.
+func (m *Module) BindReportProjection(projection reportprojection.Mapper) {
+	if m == nil {
+		return
+	}
+	m.projectionMapper = projection
+}
+
 func (m *Module) BindParticipantAccess(access interpretationparticipant.Access) error {
 	if m == nil || access == nil || m.reader == nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "interpretation participant service dependencies are not configured")
 	}
-	m.participantService = interpretationparticipant.NewService(m.reader, access)
+	m.participantService = interpretationparticipant.NewService(m.reader, access, m.projectionMapper)
 	return nil
 }
 
@@ -239,7 +265,7 @@ func (m *Module) BindAdministrationAccess(access interpretationadmin.Access) err
 	if m == nil || access == nil || m.reader == nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "interpretation administration service dependencies are not configured")
 	}
-	m.administrationService = interpretationadmin.NewService(m.reader, access)
+	m.administrationService = interpretationadmin.NewService(m.reader, access, m.projectionMapper)
 	return nil
 }
 
@@ -254,7 +280,7 @@ func (m *Module) BindClinicianAccess(access interpretationclinician.Access) erro
 	if m == nil || access == nil || m.reader == nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "interpretation clinician service dependencies are not configured")
 	}
-	m.clinicianService = interpretationclinician.NewService(m.reader, access)
+	m.clinicianService = interpretationclinician.NewService(m.reader, access, m.projectionMapper)
 	return nil
 }
 func (m *Module) ClinicianService() interpretationclinician.Service {
@@ -269,6 +295,13 @@ func (m *Module) ParticipantService() interpretationparticipant.Service {
 		return nil
 	}
 	return m.participantService
+}
+
+func (m *Module) ReportTemplateService() appreporttemplate.Service {
+	if m == nil {
+		return nil
+	}
+	return m.reportTemplateService
 }
 
 func buildReportBuilderRegistry() (rendering.Registry, error) {

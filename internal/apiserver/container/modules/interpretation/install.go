@@ -20,6 +20,7 @@ func InstallFrom(host InstallHost) error {
 		OpsHandle:          host.CacheHandle(redisruntime.FamilyOps),
 		ReportStatusConfig: host.ReportStatusConfig(),
 		OutboxProfile:      host.EventProfile(eventcatalog.OutboxProfileMongoDomain),
+		RunLeaseDuration:   host.InterpretationRunLeaseDuration(),
 	})
 	if err != nil {
 		return err
