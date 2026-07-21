@@ -116,7 +116,11 @@ func New(deps Deps) (*Module, error) {
 	if err != nil {
 		return nil, err
 	}
-	engine, err := statisticsV2Domain.NewProjectionEngine(statisticsV2Infra.NewProjections(normalized.MySQLDB)...)
+	dailyEngine, err := statisticsV2Domain.NewProjectionEngine(statisticsV2Infra.NewDailyProjections(normalized.MySQLDB)...)
+	if err != nil {
+		return nil, err
+	}
+	globalEngine, err := statisticsV2Domain.NewProjectionEngine(statisticsV2Infra.NewGlobalProjections(normalized.MySQLDB)...)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +131,8 @@ func New(deps Deps) (*Module, error) {
 	)
 	module.V2Coordinator = statisticsV2App.NewCoordinator(
 		collectors,
-		engine,
+		dailyEngine,
+		globalEngine,
 		module.V2RunStore,
 		txRunner,
 		normalized.LockRunner,

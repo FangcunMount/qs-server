@@ -84,7 +84,7 @@ CREATE TABLE `statistics_plan_fulfillment_daily` (
   UNIQUE KEY `uk_statistics_plan_fulfillment_daily` (`org_id`,`cohort_date`,`plan_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE `statistics_org_snapshot` (
+CREATE TABLE `statistics_v2_org_snapshot` (
   `org_id` BIGINT NOT NULL, `as_of_date` DATE NOT NULL, `snapshot_at` DATETIME(3) NOT NULL,
   `testee_count` BIGINT UNSIGNED NOT NULL DEFAULT 0, `clinician_count` BIGINT UNSIGNED NOT NULL DEFAULT 0,
   `active_clinician_count` BIGINT UNSIGNED NOT NULL DEFAULT 0, `entry_count` BIGINT UNSIGNED NOT NULL DEFAULT 0,

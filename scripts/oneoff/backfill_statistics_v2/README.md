@@ -27,8 +27,13 @@ QS_STATISTICS_V2_TOKEN='***' go run ./scripts/oneoff/backfill_statistics_v2 \
   --to 2025-12-31 \
   --window-days 7 \
   --reason approved_history_backfill \
+  --mode repair \
   --confirm
 ```
 
 单次 Run 最多 31 天。工具不会打印 Token，遇到任一机构或窗口失败时立即停止；修复后重跑
 同一窗口即可依靠 `fact_key` 完成幂等补偿。`org_id` 通过受保护请求作用域传递，不进入请求体。
+
+`repair` 是历史回填的默认模式：它写入 Fact 并重建指定窗口的 Daily，但不会移动机构的
+`as_of_date` 或切换缓存。全部历史窗口修复并完成对账后，再对最近 7 个完整自然日显式执行
+一次 `--mode publish --confirm`，用于重建全局 Fulfillment/Snapshot 并发布新的缓存 Generation。

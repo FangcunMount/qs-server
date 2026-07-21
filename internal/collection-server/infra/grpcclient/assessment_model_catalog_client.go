@@ -135,7 +135,7 @@ func catalogSummaryFromProto(value *pb.CatalogModelSummary) *CatalogModelOutput 
 		Code: value.GetCode(), Kind: value.GetKind(), SubKind: value.GetSubKind(), Algorithm: value.GetAlgorithm(),
 		ProductChannel: value.GetProductChannel(), AlgorithmFamily: value.GetAlgorithmFamily(),
 		DecisionKind: value.GetDecisionKind(),
-		Title: value.GetTitle(), Description: value.GetDescription(), Status: value.GetStatus(), Category: value.GetCategory(),
+		Title:        value.GetTitle(), Description: value.GetDescription(), Status: value.GetStatus(), Category: value.GetCategory(),
 		Stages: append([]string(nil), value.GetStages()...), ApplicableAges: append([]string(nil), value.GetApplicableAges()...),
 		Reporters: append([]string(nil), value.GetReporters()...), Tags: append([]string(nil), value.GetTags()...),
 		QuestionnaireCode: value.GetQuestionnaireCode(), QuestionnaireVersion: value.GetQuestionnaireVersion(),

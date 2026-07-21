@@ -21,11 +21,11 @@ const (
 	SubKindTrait    = identitypkg.SubKindTrait
 	SubKindTypology = identitypkg.SubKindTypology
 
-	AlgorithmScaleDefault            = identitypkg.AlgorithmScaleDefault
-	AlgorithmPersonalityTypology     = identitypkg.AlgorithmPersonalityTypology
-	AlgorithmBrief2                  = identitypkg.AlgorithmBrief2
-	AlgorithmSPMSensory              = identitypkg.AlgorithmSPMSensory
-	AlgorithmSPM                     = identitypkg.AlgorithmSPM
+	AlgorithmScaleDefault        = identitypkg.AlgorithmScaleDefault
+	AlgorithmPersonalityTypology = identitypkg.AlgorithmPersonalityTypology
+	AlgorithmBrief2              = identitypkg.AlgorithmBrief2
+	AlgorithmSPMSensory          = identitypkg.AlgorithmSPMSensory
+	AlgorithmSPM                 = identitypkg.AlgorithmSPM
 
 	DecisionKindScoreRange      = identitypkg.DecisionKindScoreRange
 	DecisionKindPoleComposition = identitypkg.DecisionKindPoleComposition

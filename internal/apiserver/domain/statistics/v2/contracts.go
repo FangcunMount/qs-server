@@ -43,6 +43,26 @@ const (
 	CollectModeBackfill CollectMode = "backfill"
 )
 
+// RunMode separates read-only validation, historical repair, and externally
+// visible publication. A repair may rebuild facts and daily projections, but
+// it must never move the organization's published statistics watermark.
+type RunMode string
+
+const (
+	RunModeValidate RunMode = "validate"
+	RunModeRepair   RunMode = "repair"
+	RunModePublish  RunMode = "publish"
+)
+
+func (m RunMode) Validate() error {
+	switch m {
+	case RunModeValidate, RunModeRepair, RunModePublish:
+		return nil
+	default:
+		return fmt.Errorf("invalid statistics run mode %q", m)
+	}
+}
+
 type CollectRequest struct {
 	RunID    uint64
 	OrgID    int64
@@ -79,6 +99,16 @@ func NewCollectorSet(collectors ...FactCollector) (*CollectorSet, error) {
 		seen[collector.Name()] = struct{}{}
 	}
 	return &CollectorSet{ordered: append([]FactCollector(nil), collectors...)}, nil
+}
+
+// Ordered returns a defensive copy so the application coordinator can persist
+// an exact stop point before and after every collector without allowing callers
+// to mutate the validated registration order.
+func (s *CollectorSet) Ordered() []FactCollector {
+	if s == nil {
+		return nil
+	}
+	return append([]FactCollector(nil), s.ordered...)
 }
 
 func (s *CollectorSet) Collect(ctx context.Context, request CollectRequest) ([]CollectResult, error) {
@@ -124,6 +154,14 @@ func NewProjectionEngine(projections ...Projection) (*ProjectionEngine, error) {
 		seen[projection.Name()] = struct{}{}
 	}
 	return &ProjectionEngine{ordered: append([]Projection(nil), projections...)}, nil
+}
+
+// Ordered returns a defensive copy for stage-aware application orchestration.
+func (e *ProjectionEngine) Ordered() []Projection {
+	if e == nil {
+		return nil
+	}
+	return append([]Projection(nil), e.ordered...)
 }
 
 func (e *ProjectionEngine) Project(ctx context.Context, request ProjectionRequest) ([]ProjectionResult, error) {

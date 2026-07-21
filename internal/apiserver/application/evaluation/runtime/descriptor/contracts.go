@@ -20,9 +20,9 @@ type (
 )
 
 var (
-	ExecutionIdentityScaleDefault            = evalrouting.ExecutionIdentityScaleDefault
-	ExecutionIdentityPersonalityTypology     = evalrouting.ExecutionIdentityPersonalityTypology
-	ExecutionIdentityCognitiveDefault        = evalrouting.ExecutionIdentityCognitiveDefault
+	ExecutionIdentityScaleDefault        = evalrouting.ExecutionIdentityScaleDefault
+	ExecutionIdentityPersonalityTypology = evalrouting.ExecutionIdentityPersonalityTypology
+	ExecutionIdentityCognitiveDefault    = evalrouting.ExecutionIdentityCognitiveDefault
 )
 
 func DescriptorKeyFromRoute(route ModelRoute) (DescriptorKey, error) {

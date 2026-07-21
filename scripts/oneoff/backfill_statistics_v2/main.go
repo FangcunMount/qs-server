@@ -22,6 +22,7 @@ type dateWindow struct {
 }
 
 type runRequest struct {
+	Mode         string `json:"mode"`
 	FromDate     string `json:"from_date"`
 	ToDate       string `json:"to_date"`
 	Reason       string `json:"reason"`
@@ -37,8 +38,28 @@ type options struct {
 	To           time.Time
 	WindowDays   int
 	Reason       string
+	Mode         string
 	Confirm      bool
 	ValidateOnly bool
+}
+
+type runResult struct {
+	ID           uint64           `json:"id"`
+	Mode         string           `json:"mode"`
+	Status       string           `json:"status"`
+	Stage        string           `json:"stage"`
+	AsOfDate     string           `json:"as_of_date"`
+	SourceCounts map[string]int64 `json:"source_counts"`
+	FactCounts   map[string]int64 `json:"fact_counts"`
+	ResultCounts map[string]int64 `json:"result_counts"`
+	ErrorCode    string           `json:"error_code"`
+	ErrorMessage string           `json:"error_message"`
+}
+
+type runResponse struct {
+	Code    int       `json:"code"`
+	Message string    `json:"message"`
+	Data    runResult `json:"data"`
 }
 
 func main() {
@@ -60,6 +81,7 @@ func run(args []string, output io.Writer) error {
 	flags.StringVar(&to, "to", "", "last Shanghai business date, inclusive")
 	flags.IntVar(&cfg.WindowDays, "window-days", 7, "dates per run, maximum 31")
 	flags.StringVar(&cfg.Reason, "reason", "statistics_v2_backfill", "audited run reason")
+	flags.StringVar(&cfg.Mode, "mode", "repair", "run mode: validate, repair, or publish")
 	flags.BoolVar(&cfg.Confirm, "confirm", false, "confirm writes")
 	flags.BoolVar(&cfg.ValidateOnly, "validate-only", false, "read, map and validate without writing")
 	if err := flags.Parse(args); err != nil {
@@ -83,12 +105,18 @@ func run(args []string, output io.Writer) error {
 	}
 
 	client := &http.Client{Timeout: 10 * time.Minute}
+	if cfg.ValidateOnly {
+		cfg.Mode = "validate"
+	}
 	for _, orgID := range cfg.OrgIDs {
 		for _, window := range splitWindows(cfg.From, cfg.To, cfg.WindowDays) {
-			fmt.Fprintf(output, "org=%d window=%s..%s validate_only=%t\n", orgID, window.From.Format(dateLayout), window.To.Format(dateLayout), cfg.ValidateOnly)
-			if err := executeRun(client, cfg, orgID, window); err != nil {
+			fmt.Fprintf(output, "org=%d window=%s..%s mode=%s\n", orgID, window.From.Format(dateLayout), window.To.Format(dateLayout), cfg.Mode)
+			result, err := executeRun(client, cfg, orgID, window)
+			if err != nil {
 				return fmt.Errorf("org %d window %s..%s: %w", orgID, window.From.Format(dateLayout), window.To.Format(dateLayout), err)
 			}
+			encoded, _ := json.Marshal(result)
+			fmt.Fprintln(output, string(encoded))
 		}
 	}
 	return nil
@@ -110,27 +138,38 @@ func (o options) validate() error {
 	if o.WindowDays < 1 || o.WindowDays > 31 {
 		return errors.New("window-days must be between 1 and 31")
 	}
-	if !o.ValidateOnly && !o.Confirm {
+	mode := strings.TrimSpace(o.Mode)
+	if o.ValidateOnly {
+		mode = "validate"
+	}
+	if mode != "validate" && mode != "repair" && mode != "publish" {
+		return errors.New("mode must be validate, repair, or publish")
+	}
+	if mode != "validate" && !o.Confirm {
 		return errors.New("write mode requires --confirm")
 	}
 	if strings.TrimSpace(o.Reason) == "" {
 		return errors.New("reason is required")
 	}
+	if len([]rune(o.Reason)) > 500 {
+		return errors.New("reason exceeds 500 characters")
+	}
 	return nil
 }
 
-func executeRun(client *http.Client, cfg options, orgID int64, window dateWindow) error {
+func executeRun(client *http.Client, cfg options, orgID int64, window dateWindow) (runResult, error) {
 	body, err := json.Marshal(runRequest{
+		Mode:     cfg.Mode,
 		FromDate: window.From.Format(dateLayout), ToDate: window.To.Format(dateLayout),
 		Reason: cfg.Reason, Confirm: cfg.Confirm, ValidateOnly: cfg.ValidateOnly,
 	})
 	if err != nil {
-		return err
+		return runResult{}, err
 	}
 	url := strings.TrimRight(cfg.BaseURL, "/") + "/internal/v2/statistics/runs"
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
-		return err
+		return runResult{}, err
 	}
 	req.Header.Set("Authorization", "Bearer "+cfg.Token)
 	req.Header.Set("Content-Type", "application/json")
@@ -139,17 +178,33 @@ func executeRun(client *http.Client, cfg options, orgID int64, window dateWindow
 	req.Header.Set("X-Org-ID", strconv.FormatInt(orgID, 10))
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return runResult{}, err
 	}
 	defer resp.Body.Close()
 	responseBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if readErr != nil {
-		return readErr
+		return runResult{}, readErr
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("server returned %s: %s", resp.Status, strings.TrimSpace(string(responseBody)))
+		return runResult{}, fmt.Errorf("server returned %s: %s", resp.Status, strings.TrimSpace(string(responseBody)))
 	}
-	return nil
+	var envelope runResponse
+	if err := json.Unmarshal(responseBody, &envelope); err != nil {
+		return runResult{}, fmt.Errorf("decode run response: %w", err)
+	}
+	if envelope.Code != 0 {
+		return runResult{}, fmt.Errorf("server returned business code %d: %s", envelope.Code, envelope.Message)
+	}
+	if envelope.Data.ID == 0 {
+		return runResult{}, errors.New("server response does not contain a run id")
+	}
+	if envelope.Data.Status != "succeeded" {
+		if envelope.Data.Status == "data_committed" {
+			return envelope.Data, fmt.Errorf("run %d is data_committed; resume cache before continuing", envelope.Data.ID)
+		}
+		return envelope.Data, fmt.Errorf("run %d ended status=%s stage=%s code=%s: %s", envelope.Data.ID, envelope.Data.Status, envelope.Data.Stage, envelope.Data.ErrorCode, envelope.Data.ErrorMessage)
+	}
+	return envelope.Data, nil
 }
 
 func splitWindows(from, to time.Time, days int) []dateWindow {

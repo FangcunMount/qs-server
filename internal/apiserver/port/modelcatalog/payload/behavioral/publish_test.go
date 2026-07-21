@@ -46,10 +46,10 @@ func TestBehavioralMaterializationRejectsMismatchedNormVersion(t *testing.T) {
 
 func behavioralModel() *domain.AssessmentModel {
 	return &domain.AssessmentModel{Kind: domain.KindBehavioralRating, Algorithm: domain.AlgorithmBrief2, Code: "brief2-v2", Version: 1, Title: "Brief-2 V2", DefinitionV2: &domain.Definition{
-		Measure: modeldefinition.MeasureSpec{Factors: []factor.Factor{{Code: "bri", Title: "BRI", Role: factor.FactorRoleIndex}}},
+		Measure:     modeldefinition.MeasureSpec{Factors: []factor.Factor{{Code: "bri", Title: "BRI", Role: factor.FactorRoleIndex}}},
 		Calibration: modeldefinition.Calibration{NormRefs: []norm.Ref{{FactorCode: "bri", NormTableVersion: "brief2-cn-2024"}}},
 		Conclusions: []domain.Conclusion{domain.NormConclusion{FactorCode: "bri", ScoreBasis: domain.ScoreBasisTScore, Primary: true}},
-		Execution: modeldefinition.ExecutionSpec{Brief2: &modeldefinition.Brief2Spec{PrimaryFactorCode: "bri"}},
+		Execution:   modeldefinition.ExecutionSpec{Brief2: &modeldefinition.Brief2Spec{PrimaryFactorCode: "bri"}},
 	}}
 }
 
@@ -58,9 +58,17 @@ func behavioralNormWithVersion(version string) *norm.Norm {
 	return &norm.Norm{Kind: domain.KindBehavioralRating, Algorithm: domain.AlgorithmBrief2, TableVersion: version, FormVariant: "teacher", Factors: []norm.FactorTable{{FactorCode: "bri", Lookup: []norm.LookupEntry{{RawScoreMin: 0, RawScoreMax: 100, TScore: 50, Percentile: 50}}}}}
 }
 
-type normRepositoryStub struct{ table *norm.Norm; err error }
+type normRepositoryStub struct {
+	table *norm.Norm
+	err   error
+}
+
 func (s normRepositoryStub) UpsertNorm(context.Context, *norm.Norm) error { return nil }
-func (s normRepositoryStub) ListNorms(context.Context, modelcatalogport.NormListFilter) ([]*norm.Norm, int64, error) { return []*norm.Norm{s.table}, 1, s.err }
-func (s normRepositoryStub) FindNorm(context.Context, string) (*norm.Norm, error) { return s.table, s.err }
+func (s normRepositoryStub) ListNorms(context.Context, modelcatalogport.NormListFilter) ([]*norm.Norm, int64, error) {
+	return []*norm.Norm{s.table}, 1, s.err
+}
+func (s normRepositoryStub) FindNorm(context.Context, string) (*norm.Norm, error) {
+	return s.table, s.err
+}
 
 var _ modelcatalogport.NormRepository = normRepositoryStub{}

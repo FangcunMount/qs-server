@@ -21,7 +21,16 @@ func (statisticsV2RunStoreStub) Create(context.Context, statisticsv2.Run) (*stat
 func (statisticsV2RunStoreStub) UpdateProgress(context.Context, uint64, string, map[string]int64, map[string]int64, map[string]int64) error {
 	return nil
 }
+func (statisticsV2RunStoreStub) AssertPublishable(context.Context, int64, time.Time) error {
+	return nil
+}
 func (statisticsV2RunStoreStub) MarkDataCommitted(context.Context, uint64, time.Time) error {
+	return nil
+}
+func (statisticsV2RunStoreStub) MarkCachePublishFailed(context.Context, uint64, string, time.Time) error {
+	return nil
+}
+func (statisticsV2RunStoreStub) RecordCacheResume(context.Context, uint64, uint64, string, string, time.Time) error {
 	return nil
 }
 func (statisticsV2RunStoreStub) MarkSucceeded(context.Context, uint64, time.Time) error { return nil }

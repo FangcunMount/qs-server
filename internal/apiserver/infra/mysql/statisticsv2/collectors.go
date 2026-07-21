@@ -105,10 +105,10 @@ func (c *AccessFactCollector) Collect(ctx context.Context, req domainv2.CollectR
 			fact["clinician_id"] = row.ClinicianID
 			fact["entry_id"] = row.EntryID
 			i, e, x, err := c.writer.write(ctx, "statistics_access_fact", fact, req.Mode == domainv2.CollectModeValidate)
+			addResult(&result, "entry_opened", i, e, x)
 			if err != nil {
 				return err
 			}
-			addResult(&result, "entry_opened", i, e, x)
 		}
 		return nil
 	}); err != nil {
@@ -137,10 +137,10 @@ func (c *AccessFactCollector) Collect(ctx context.Context, req domainv2.CollectR
 				fact["entry_id"] = row.EntryID
 				fact["testee_id"] = row.TesteeID
 				i, e, x, err := c.writer.write(ctx, "statistics_access_fact", fact, req.Mode == domainv2.CollectModeValidate)
+				addResult(&result, typ, i, e, x)
 				if err != nil {
 					return err
 				}
-				addResult(&result, typ, i, e, x)
 			}
 		}
 		return nil
@@ -174,10 +174,10 @@ func (c *AccessFactCollector) Collect(ctx context.Context, req domainv2.CollectR
 			fact := baseFact(req.OrgID, fmt.Sprintf("clinician_relation:%d:transferred", row.ID), "care_relationship_transferred", row.BoundAt, "clinician_relation", strconv.FormatUint(row.ID, 10))
 			fact["clinician_id"], fact["source_clinician_id"], fact["testee_id"] = row.ClinicianID, row.SourceClinicianID, row.TesteeID
 			i, e, x, err := c.writer.write(ctx, "statistics_access_fact", fact, req.Mode == domainv2.CollectModeValidate)
+			addResult(&result, "care_relationship_transferred", i, e, x)
 			if err != nil {
 				return result, err
 			}
-			addResult(&result, "care_relationship_transferred", i, e, x)
 		}
 		last := transfers[len(transfers)-1]
 		lastTransferAt, lastTransferID = last.BoundAt, last.ID
@@ -222,10 +222,10 @@ func (c *PlanFactCollector) Collect(ctx context.Context, req domainv2.CollectReq
 				fact["enrollment_id"] = row.ID
 				fact["testee_id"] = row.TesteeID
 				i, e, x, err := c.writer.write(ctx, "statistics_plan_fact", fact, req.Mode == domainv2.CollectModeValidate)
+				addResult(&result, event.typ, i, e, x)
 				if err != nil {
 					return err
 				}
-				addResult(&result, event.typ, i, e, x)
 			}
 		}
 		return nil
@@ -263,10 +263,10 @@ func (c *PlanFactCollector) Collect(ctx context.Context, req domainv2.CollectReq
 				fact["due_at"] = row.ExpireAt
 				applyTaskLifecycleFields(fact, event.typ, event.at)
 				i, e, x, err := c.writer.write(ctx, "statistics_plan_fact", fact, req.Mode == domainv2.CollectModeValidate)
+				addResult(&result, event.typ, i, e, x)
 				if err != nil {
 					return err
 				}
-				addResult(&result, event.typ, i, e, x)
 			}
 		}
 		return nil
@@ -444,10 +444,10 @@ func (c *AssessmentFactCollector) Collect(ctx context.Context, req domainv2.Coll
 			applyFrozenAttribution(fact, attribution)
 		}
 		i, e, x, err := c.writer.write(ctx, "statistics_assessment_fact", fact, req.Mode == domainv2.CollectModeValidate)
+		addResult(&result, "answersheet_submitted", i, e, x)
 		if err != nil {
 			return result, err
 		}
-		addResult(&result, "answersheet_submitted", i, e, x)
 	}
 	if err := cursor.Err(); err != nil {
 		return result, err
@@ -502,10 +502,10 @@ func (c *AssessmentFactCollector) collectAssessmentMySQL(ctx context.Context, re
 				fact["model_version"] = row.ModelVersion
 				applyFrozenAttribution(fact, attribution)
 				i, e, x, err := c.writer.write(ctx, "statistics_assessment_fact", fact, req.Mode == domainv2.CollectModeValidate)
+				addResult(result, event.typ, i, e, x)
 				if err != nil {
 					return err
 				}
-				addResult(result, event.typ, i, e, x)
 			}
 		}
 		return nil
@@ -539,10 +539,10 @@ func (c *AssessmentFactCollector) collectAssessmentMySQL(ctx context.Context, re
 			fact["questionnaire_version"] = row.QuestionnaireVersion
 			applyFrozenAttribution(fact, attribution)
 			i, e, x, err := c.writer.write(ctx, "statistics_assessment_fact", fact, req.Mode == domainv2.CollectModeValidate)
+			addResult(result, "outcome_committed", i, e, x)
 			if err != nil {
 				return err
 			}
-			addResult(result, "outcome_committed", i, e, x)
 		}
 		return nil
 	}); err != nil {
@@ -600,10 +600,10 @@ func (c *AssessmentFactCollector) collectReports(ctx context.Context, req domain
 			fact["model_version"] = row.Model.Version
 		}
 		i, e, x, err := c.writer.write(ctx, "statistics_assessment_fact", fact, req.Mode == domainv2.CollectModeValidate)
+		addResult(result, "report_generated", i, e, x)
 		if err != nil {
 			return err
 		}
-		addResult(result, "report_generated", i, e, x)
 	}
 	return cursor.Err()
 }
@@ -654,10 +654,10 @@ func (c *AssessmentFactCollector) collectReportFailures(ctx context.Context, req
 		fact["questionnaire_code"], fact["questionnaire_version"] = source.QuestionnaireCode, source.QuestionnaireVersion
 		applyFrozenAttribution(fact, attribution)
 		i, e, x, err := c.writer.write(ctx, "statistics_assessment_fact", fact, req.Mode == domainv2.CollectModeValidate)
+		addResult(result, "report_failed", i, e, x)
 		if err != nil {
 			return err
 		}
-		addResult(result, "report_failed", i, e, x)
 	}
 	return cursor.Err()
 }

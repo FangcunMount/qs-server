@@ -306,6 +306,13 @@ func TestOptionsValidateStatisticsSync(t *testing.T) {
 			},
 		},
 		{
+			name: "enabled statistics sync requires valid version mode",
+			mutate: func(opts *Options) {
+				opts.StatisticsSync.VersionMode = "dual-write"
+			},
+			wantErr: "statistics_sync.version_mode must be one of v1, shadow, or v2",
+		},
+		{
 			name: "enabled statistics sync requires org ids",
 			mutate: func(opts *Options) {
 				opts.StatisticsSync.OrgIDs = nil

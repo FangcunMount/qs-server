@@ -52,7 +52,7 @@ func parseV2Page(c *gin.Context) (int, int, error) {
 // @Param preset query string false "latest_complete_day/7d/30d/custom"
 // @Param from query string false "上海日期 YYYY-MM-DD"
 // @Param to query string false "上海日期 YYYY-MM-DD"
-// @Success 200 {object} core.Response
+// @Success 200 {object} core.Response{data=statisticsv2.Overview}
 // @Router /api/v2/statistics/overview [get]
 func (h *StatisticsV2Handler) Overview(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
@@ -71,7 +71,7 @@ func (h *StatisticsV2Handler) Overview(c *gin.Context) {
 // Clinicians godoc
 // @Summary 查询 Statistics V2 医生列表
 // @Tags Statistics-V2
-// @Success 200 {object} core.Response
+// @Success 200 {object} core.Response{data=statisticsv2.Page[statisticsv2.ClinicianItem]}
 // @Router /api/v2/statistics/clinicians [get]
 func (h *StatisticsV2Handler) Clinicians(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
@@ -96,7 +96,7 @@ func (h *StatisticsV2Handler) Clinicians(c *gin.Context) {
 // @Summary 查询 Statistics V2 医生详情
 // @Tags Statistics-V2
 // @Param id path uint64 true "医生 ID"
-// @Success 200 {object} core.Response
+// @Success 200 {object} core.Response{data=StatisticsV2ClinicianDetailResponse}
 // @Router /api/v2/statistics/clinicians/{id} [get]
 func (h *StatisticsV2Handler) Clinician(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
@@ -118,13 +118,13 @@ func (h *StatisticsV2Handler) Clinician(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrPageNotFound, "clinician not found"))
 		return
 	}
-	h.Success(c, gin.H{"item": value.Items[0], "time_range": value.TimeRange, "freshness": value.Freshness})
+	h.Success(c, StatisticsV2ClinicianDetailResponse{Item: value.Items[0], TimeRange: value.TimeRange, Freshness: value.Freshness})
 }
 
 // CurrentClinicianOverview godoc
 // @Summary 查询当前医生 Statistics V2 总览
 // @Tags Statistics-V2
-// @Success 200 {object} core.Response
+// @Success 200 {object} core.Response{data=StatisticsV2ClinicianDetailResponse}
 // @Router /api/v2/statistics/clinicians/me/overview [get]
 func (h *StatisticsV2Handler) CurrentClinicianOverview(c *gin.Context) {
 	orgID, userID, err := h.RequireProtectedScope(c)
@@ -141,13 +141,13 @@ func (h *StatisticsV2Handler) CurrentClinicianOverview(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "current operator is not an active clinician"))
 		return
 	}
-	h.Success(c, gin.H{"item": value.Items[0], "time_range": value.TimeRange, "freshness": value.Freshness})
+	h.Success(c, StatisticsV2ClinicianDetailResponse{Item: value.Items[0], TimeRange: value.TimeRange, Freshness: value.Freshness})
 }
 
 // Entries godoc
 // @Summary 查询 Statistics V2 入口列表
 // @Tags Statistics-V2
-// @Success 200 {object} core.Response
+// @Success 200 {object} core.Response{data=statisticsv2.Page[statisticsv2.EntryItem]}
 // @Router /api/v2/statistics/entries [get]
 func (h *StatisticsV2Handler) Entries(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
@@ -190,7 +190,7 @@ func (h *StatisticsV2Handler) Entries(c *gin.Context) {
 // @Summary 查询 Statistics V2 入口详情
 // @Tags Statistics-V2
 // @Param id path uint64 true "入口 ID"
-// @Success 200 {object} core.Response
+// @Success 200 {object} core.Response{data=StatisticsV2EntryDetailResponse}
 // @Router /api/v2/statistics/entries/{id} [get]
 func (h *StatisticsV2Handler) Entry(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
@@ -211,7 +211,7 @@ func (h *StatisticsV2Handler) Entry(c *gin.Context) {
 		return
 	}
 	if len(value.Items) > 0 {
-		h.Success(c, gin.H{"item": value.Items[0], "time_range": value.TimeRange, "freshness": value.Freshness})
+		h.Success(c, StatisticsV2EntryDetailResponse{Item: value.Items[0], TimeRange: value.TimeRange, Freshness: value.Freshness})
 		return
 	}
 	h.Error(c, errors.WithCode(code.ErrPageNotFound, "entry not found"))
@@ -220,7 +220,7 @@ func (h *StatisticsV2Handler) Entry(c *gin.Context) {
 // CurrentClinicianEntries godoc
 // @Summary 查询当前医生 Statistics V2 入口
 // @Tags Statistics-V2
-// @Success 200 {object} core.Response
+// @Success 200 {object} core.Response{data=statisticsv2.Page[statisticsv2.EntryItem]}
 // @Router /api/v2/statistics/clinicians/me/entries [get]
 func (h *StatisticsV2Handler) CurrentClinicianEntries(c *gin.Context) {
 	orgID, userID, err := h.RequireProtectedScope(c)
@@ -249,7 +249,7 @@ func (h *StatisticsV2Handler) CurrentClinicianEntries(c *gin.Context) {
 // CurrentClinicianTestees godoc
 // @Summary 查询当前医生 Statistics V2 受试者摘要
 // @Tags Statistics-V2
-// @Success 200 {object} core.Response
+// @Success 200 {object} core.Response{data=statisticsv2.TesteeSummary}
 // @Router /api/v2/statistics/clinicians/me/testees-summary [get]
 func (h *StatisticsV2Handler) CurrentClinicianTestees(c *gin.Context) {
 	orgID, userID, err := h.RequireProtectedScope(c)
@@ -265,18 +265,39 @@ func (h *StatisticsV2Handler) CurrentClinicianTestees(c *gin.Context) {
 	h.Success(c, value)
 }
 
-type statisticsV2ContentRequest struct {
+type StatisticsV2ContentRequest struct {
 	Items []statisticsv2.ContentRef `json:"items"`
+}
+
+type StatisticsV2ClinicianDetailResponse struct {
+	Item      statisticsv2.ClinicianItem `json:"item"`
+	TimeRange statisticsv2.DateRange     `json:"time_range"`
+	Freshness statisticsv2.Freshness     `json:"freshness"`
+}
+
+type StatisticsV2EntryDetailResponse struct {
+	Item      statisticsv2.EntryItem `json:"item"`
+	TimeRange statisticsv2.DateRange `json:"time_range"`
+	Freshness statisticsv2.Freshness `json:"freshness"`
+}
+
+type StatisticsV2RunListResponse struct {
+	Items []statisticsv2.Run `json:"items"`
+}
+
+type StatisticsResumeCacheRequest struct {
+	Reason  string `json:"reason"`
+	Confirm bool   `json:"confirm"`
 }
 
 // Contents godoc
 // @Summary 批量查询 Statistics V2 内容统计
 // @Tags Statistics-V2
-// @Param request body statisticsV2ContentRequest true "内容引用"
-// @Success 200 {object} core.Response
+// @Param request body StatisticsV2ContentRequest true "内容引用"
+// @Success 200 {object} core.Response{data=statisticsv2.ContentBatch}
 // @Router /api/v2/statistics/contents/batch [post]
 func (h *StatisticsV2Handler) Contents(c *gin.Context) {
-	var request statisticsV2ContentRequest
+	var request StatisticsV2ContentRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid request body"))
 		return
@@ -318,7 +339,8 @@ func (h *StatisticsV2Handler) Contents(c *gin.Context) {
 	h.Success(c, value)
 }
 
-type statisticsRunRequest struct {
+type StatisticsRunRequest struct {
+	Mode         string `json:"mode"`
 	FromDate     string `json:"from_date"`
 	ToDate       string `json:"to_date"`
 	Reason       string `json:"reason"`
@@ -329,8 +351,8 @@ type statisticsRunRequest struct {
 // CreateRun godoc
 // @Summary 创建 Statistics V2 同步批次
 // @Tags Statistics-V2-Internal
-// @Param request body statisticsRunRequest true "批次窗口"
-// @Success 200 {object} core.Response
+// @Param request body StatisticsRunRequest true "批次窗口"
+// @Success 200 {object} core.Response{data=statisticsv2.Run}
 // @Router /internal/v2/statistics/runs [post]
 func (h *StatisticsV2Handler) CreateRun(c *gin.Context) {
 	orgID, userID, err := h.RequireProtectedScope(c)
@@ -338,17 +360,23 @@ func (h *StatisticsV2Handler) CreateRun(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	var request statisticsRunRequest
+	var request StatisticsRunRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid request body"))
 		return
 	}
-	if !request.ValidateOnly && !request.Confirm {
+	mode := domainv2.RunMode(strings.TrimSpace(request.Mode))
+	isValidate := request.ValidateOnly || mode == domainv2.RunModeValidate
+	if !isValidate && !request.Confirm {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "confirm=true is required"))
 		return
 	}
 	if strings.TrimSpace(request.Reason) == "" {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "reason is required"))
+		return
+	}
+	if len([]rune(request.Reason)) > 500 {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "reason exceeds 500 characters"))
 		return
 	}
 	from, err := time.ParseInLocation("2006-01-02", request.FromDate, domainv2.Shanghai)
@@ -361,7 +389,11 @@ func (h *StatisticsV2Handler) CreateRun(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid to_date"))
 		return
 	}
-	run, runErr := h.coordinator.Run(c.Request.Context(), statisticsv2.RunRequest{OrgID: orgID, FromDate: from, ToDate: to, Reason: request.Reason, TriggerType: "manual", OperatorID: uint64(userID), ValidateOnly: request.ValidateOnly})
+	run, runErr := h.coordinator.Run(c.Request.Context(), statisticsv2.RunRequest{OrgID: orgID, FromDate: from, ToDate: to, Reason: strings.TrimSpace(request.Reason), TriggerType: "manual", OperatorID: uint64(userID), Mode: mode, ValidateOnly: request.ValidateOnly})
+	if statisticsv2.IsInvalidRunRequest(runErr) {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "%s", runErr.Error()))
+		return
+	}
 	if runErr != nil && (run == nil || run.Status != domainv2.RunStatusDataCommitted) {
 		h.Error(c, runErr)
 		return
@@ -372,7 +404,7 @@ func (h *StatisticsV2Handler) CreateRun(c *gin.Context) {
 // ListRuns godoc
 // @Summary 查询 Statistics V2 同步批次
 // @Tags Statistics-V2-Internal
-// @Success 200 {object} core.Response
+// @Success 200 {object} core.Response{data=StatisticsV2RunListResponse}
 // @Router /internal/v2/statistics/runs [get]
 func (h *StatisticsV2Handler) ListRuns(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
@@ -393,14 +425,14 @@ func (h *StatisticsV2Handler) ListRuns(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	h.Success(c, gin.H{"items": runs})
+	h.Success(c, StatisticsV2RunListResponse{Items: runs})
 }
 
 // GetRun godoc
 // @Summary 查询 Statistics V2 同步批次详情
 // @Tags Statistics-V2-Internal
 // @Param id path uint64 true "批次 ID"
-// @Success 200 {object} core.Response
+// @Success 200 {object} core.Response{data=statisticsv2.Run}
 // @Router /internal/v2/statistics/runs/{id} [get]
 func (h *StatisticsV2Handler) GetRun(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
@@ -429,10 +461,11 @@ func (h *StatisticsV2Handler) GetRun(c *gin.Context) {
 // @Summary 恢复 Statistics V2 批次缓存发布
 // @Tags Statistics-V2-Internal
 // @Param id path uint64 true "批次 ID"
-// @Success 200 {object} core.Response
+// @Param request body StatisticsResumeCacheRequest true "审计原因与明确确认"
+// @Success 200 {object} core.Response{data=statisticsv2.Run}
 // @Router /internal/v2/statistics/runs/{id}/resume-cache [post]
 func (h *StatisticsV2Handler) ResumeCache(c *gin.Context) {
-	orgID, err := h.RequireProtectedOrgID(c)
+	orgID, userID, err := h.RequireProtectedScope(c)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -451,7 +484,24 @@ func (h *StatisticsV2Handler) ResumeCache(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrPageNotFound, "statistics run not found"))
 		return
 	}
-	run, err := h.coordinator.ResumeCache(c.Request.Context(), id)
+	var request StatisticsResumeCacheRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid request body"))
+		return
+	}
+	if !request.Confirm {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "confirm=true is required"))
+		return
+	}
+	if strings.TrimSpace(request.Reason) == "" {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "reason is required"))
+		return
+	}
+	if len([]rune(request.Reason)) > 500 {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "reason exceeds 500 characters"))
+		return
+	}
+	run, err := h.coordinator.ResumeCache(c.Request.Context(), id, statisticsv2.CacheResumeRequest{OperatorID: uint64(userID), Reason: strings.TrimSpace(request.Reason)})
 	if err != nil {
 		h.Error(c, err)
 		return

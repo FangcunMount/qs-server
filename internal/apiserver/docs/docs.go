@@ -8125,7 +8125,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/statisticsv2.Page-statisticsv2_ClinicianItem"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -8141,7 +8153,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/statisticsv2.Page-statisticsv2_EntryItem"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -8157,7 +8181,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.StatisticsV2ClinicianDetailResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -8173,7 +8209,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/statisticsv2.TesteeSummary"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -8198,7 +8246,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.StatisticsV2ClinicianDetailResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -8217,7 +8277,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handler.statisticsV2ContentRequest"
+                            "$ref": "#/definitions/handler.StatisticsV2ContentRequest"
                         }
                     }
                 ],
@@ -8225,7 +8285,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/statisticsv2.ContentBatch"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -8241,7 +8313,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/statisticsv2.Page-statisticsv2_EntryItem"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -8266,7 +8350,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.StatisticsV2EntryDetailResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -8302,7 +8398,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/statisticsv2.Overview"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -9518,7 +9626,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.StatisticsV2RunListResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -9535,7 +9655,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handler.statisticsRunRequest"
+                            "$ref": "#/definitions/handler.StatisticsRunRequest"
                         }
                     }
                 ],
@@ -9543,7 +9663,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/statisticsv2.Run"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -9568,7 +9700,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/statisticsv2.Run"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -9587,13 +9731,34 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "审计原因与明确确认",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.StatisticsResumeCacheRequest"
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/statisticsv2.Run"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -10448,24 +10613,27 @@ const docTemplate = `{
                 }
             }
         },
-        "handler.contentBatchRequest": {
+        "handler.StatisticsResumeCacheRequest": {
             "type": "object",
             "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_apiserver_domain_statistics.ContentReference"
-                    }
+                "confirm": {
+                    "type": "boolean"
+                },
+                "reason": {
+                    "type": "string"
                 }
             }
         },
-        "handler.statisticsRunRequest": {
+        "handler.StatisticsRunRequest": {
             "type": "object",
             "properties": {
                 "confirm": {
                     "type": "boolean"
                 },
                 "from_date": {
+                    "type": "string"
+                },
+                "mode": {
                     "type": "string"
                 },
                 "reason": {
@@ -10479,13 +10647,63 @@ const docTemplate = `{
                 }
             }
         },
-        "handler.statisticsV2ContentRequest": {
+        "handler.StatisticsV2ClinicianDetailResponse": {
+            "type": "object",
+            "properties": {
+                "freshness": {
+                    "$ref": "#/definitions/statisticsv2.Freshness"
+                },
+                "item": {
+                    "$ref": "#/definitions/statisticsv2.ClinicianItem"
+                },
+                "time_range": {
+                    "$ref": "#/definitions/statisticsv2.DateRange"
+                }
+            }
+        },
+        "handler.StatisticsV2ContentRequest": {
             "type": "object",
             "properties": {
                 "items": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/statisticsv2.ContentRef"
+                    }
+                }
+            }
+        },
+        "handler.StatisticsV2EntryDetailResponse": {
+            "type": "object",
+            "properties": {
+                "freshness": {
+                    "$ref": "#/definitions/statisticsv2.Freshness"
+                },
+                "item": {
+                    "$ref": "#/definitions/statisticsv2.EntryItem"
+                },
+                "time_range": {
+                    "$ref": "#/definitions/statisticsv2.DateRange"
+                }
+            }
+        },
+        "handler.StatisticsV2RunListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statisticsv2.Run"
+                    }
+                }
+            }
+        },
+        "handler.contentBatchRequest": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_apiserver_domain_statistics.ContentReference"
                     }
                 }
             }
@@ -15585,6 +15803,102 @@ const docTemplate = `{
                 "TimeRangePreset30D"
             ]
         },
+        "statisticsv2.ClinicianItem": {
+            "type": "object",
+            "properties": {
+                "active_entry_count": {
+                    "type": "integer"
+                },
+                "assessment_created_count": {
+                    "type": "integer"
+                },
+                "attending_testee_count": {
+                    "type": "integer"
+                },
+                "care_relationship_established_count": {
+                    "type": "integer"
+                },
+                "clinician_type": {
+                    "type": "string"
+                },
+                "collaborator_testee_count": {
+                    "type": "integer"
+                },
+                "department": {
+                    "type": "string"
+                },
+                "entry_opened_count": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "intake_confirmed_count": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "operator_id": {
+                    "type": "integer"
+                },
+                "outcome_committed_count": {
+                    "type": "integer"
+                },
+                "primary_testee_count": {
+                    "type": "integer"
+                },
+                "report_generated_count": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "total_accessible_testees": {
+                    "type": "integer"
+                }
+            }
+        },
+        "statisticsv2.ContentBatch": {
+            "type": "object",
+            "properties": {
+                "freshness": {
+                    "$ref": "#/definitions/statisticsv2.Freshness"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statisticsv2.ContentItem"
+                    }
+                }
+            }
+        },
+        "statisticsv2.ContentItem": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "completion_rate": {
+                    "type": "number"
+                },
+                "has_completion": {
+                    "type": "boolean"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "total_completions": {
+                    "type": "integer"
+                },
+                "total_submissions": {
+                    "type": "integer"
+                }
+            }
+        },
         "statisticsv2.ContentRef": {
             "type": "object",
             "properties": {
@@ -15593,6 +15907,387 @@ const docTemplate = `{
                 },
                 "kind": {
                     "type": "string"
+                }
+            }
+        },
+        "statisticsv2.DateRange": {
+            "type": "object",
+            "properties": {
+                "from": {
+                    "type": "string"
+                },
+                "preset": {
+                    "type": "string"
+                },
+                "to": {
+                    "type": "string"
+                }
+            }
+        },
+        "statisticsv2.EntryItem": {
+            "type": "object",
+            "properties": {
+                "assessment_created_count": {
+                    "type": "integer"
+                },
+                "clinician_id": {
+                    "type": "integer"
+                },
+                "clinician_name": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "entry_opened_count": {
+                    "type": "integer"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "intake_confirmed_count": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "outcome_committed_count": {
+                    "type": "integer"
+                },
+                "report_generated_count": {
+                    "type": "integer"
+                },
+                "target_code": {
+                    "type": "string"
+                },
+                "target_type": {
+                    "type": "string"
+                },
+                "target_version": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "statisticsv2.Freshness": {
+            "type": "object",
+            "properties": {
+                "as_of_date": {
+                    "type": "string"
+                },
+                "is_stale": {
+                    "type": "boolean"
+                },
+                "snapshot_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "statisticsv2.Overview": {
+            "type": "object",
+            "properties": {
+                "access_funnel": {
+                    "$ref": "#/definitions/statistics.AccessFunnelStatistics"
+                },
+                "assessment_service": {
+                    "$ref": "#/definitions/statistics.AssessmentServiceStatistics"
+                },
+                "dimension_analysis": {
+                    "$ref": "#/definitions/statistics.DimensionAnalysisSummary"
+                },
+                "freshness": {
+                    "$ref": "#/definitions/statisticsv2.Freshness"
+                },
+                "metrics": {
+                    "$ref": "#/definitions/statisticsv2.OverviewMetrics"
+                },
+                "org_id": {
+                    "type": "integer"
+                },
+                "organization_overview": {
+                    "$ref": "#/definitions/statistics.OrganizationOverview"
+                },
+                "plan": {
+                    "$ref": "#/definitions/statistics.PlanDomainStatistics"
+                },
+                "time_range": {
+                    "$ref": "#/definitions/statisticsv2.DateRange"
+                }
+            }
+        },
+        "statisticsv2.OverviewMetrics": {
+            "type": "object",
+            "properties": {
+                "active_clinician_count": {
+                    "type": "integer"
+                },
+                "active_enrollment_count": {
+                    "type": "integer"
+                },
+                "active_entry_count": {
+                    "type": "integer"
+                },
+                "answersheet_submission_count": {
+                    "type": "integer"
+                },
+                "assessment_count": {
+                    "type": "integer"
+                },
+                "care_relationship_established_count": {
+                    "type": "integer"
+                },
+                "care_relationship_transferred_count": {
+                    "type": "integer"
+                },
+                "clinician_count": {
+                    "type": "integer"
+                },
+                "completed_on_time_count": {
+                    "type": "integer"
+                },
+                "completed_overdue_count": {
+                    "type": "integer"
+                },
+                "content_count": {
+                    "type": "integer"
+                },
+                "due_task_count": {
+                    "type": "integer"
+                },
+                "entry_count": {
+                    "type": "integer"
+                },
+                "entry_opened_count": {
+                    "type": "integer"
+                },
+                "intake_confirmed_count": {
+                    "type": "integer"
+                },
+                "planned_task_count": {
+                    "type": "integer"
+                },
+                "report_count": {
+                    "type": "integer"
+                },
+                "task_canceled_count": {
+                    "type": "integer"
+                },
+                "task_completed_count": {
+                    "type": "integer"
+                },
+                "task_created_count": {
+                    "type": "integer"
+                },
+                "task_expired_count": {
+                    "type": "integer"
+                },
+                "task_opened_count": {
+                    "type": "integer"
+                },
+                "testee_count": {
+                    "type": "integer"
+                },
+                "testee_created_count": {
+                    "type": "integer"
+                },
+                "uncompleted_overdue_count": {
+                    "type": "integer"
+                },
+                "window_answersheet_submitted_count": {
+                    "type": "integer"
+                },
+                "window_assessment_created_count": {
+                    "type": "integer"
+                },
+                "window_assessment_failed_count": {
+                    "type": "integer"
+                },
+                "window_outcome_committed_count": {
+                    "type": "integer"
+                },
+                "window_report_failed_count": {
+                    "type": "integer"
+                },
+                "window_report_generated_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "statisticsv2.Page-statisticsv2_ClinicianItem": {
+            "type": "object",
+            "properties": {
+                "freshness": {
+                    "$ref": "#/definitions/statisticsv2.Freshness"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statisticsv2.ClinicianItem"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "time_range": {
+                    "$ref": "#/definitions/statisticsv2.DateRange"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "statisticsv2.Page-statisticsv2_EntryItem": {
+            "type": "object",
+            "properties": {
+                "freshness": {
+                    "$ref": "#/definitions/statisticsv2.Freshness"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statisticsv2.EntryItem"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "time_range": {
+                    "$ref": "#/definitions/statisticsv2.DateRange"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "statisticsv2.Run": {
+            "type": "object",
+            "properties": {
+                "as_of_date": {
+                    "type": "string"
+                },
+                "attempt": {
+                    "type": "integer"
+                },
+                "batch_key": {
+                    "type": "string"
+                },
+                "cache_resume_count": {
+                    "type": "integer"
+                },
+                "data_committed_at": {
+                    "type": "string"
+                },
+                "error_code": {
+                    "type": "string"
+                },
+                "error_message": {
+                    "type": "string"
+                },
+                "fact_counts": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "last_cache_resume_at": {
+                    "type": "string"
+                },
+                "last_cache_resume_operator_id": {
+                    "type": "integer"
+                },
+                "last_cache_resume_reason": {
+                    "type": "string"
+                },
+                "last_cache_resume_status": {
+                    "type": "string"
+                },
+                "mode": {
+                    "$ref": "#/definitions/v2.RunMode"
+                },
+                "operator_id": {
+                    "type": "integer"
+                },
+                "org_id": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "result_counts": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "source_counts": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "stage": {
+                    "type": "string"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/v2.RunStatus"
+                },
+                "trigger_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "statisticsv2.TesteeSummary": {
+            "type": "object",
+            "properties": {
+                "assessed_in_window_count": {
+                    "type": "integer"
+                },
+                "attending_testee_count": {
+                    "type": "integer"
+                },
+                "collaborator_testee_count": {
+                    "type": "integer"
+                },
+                "freshness": {
+                    "$ref": "#/definitions/statisticsv2.Freshness"
+                },
+                "key_focus_testee_count": {
+                    "type": "integer"
+                },
+                "primary_testee_count": {
+                    "type": "integer"
+                },
+                "time_range": {
+                    "$ref": "#/definitions/statisticsv2.DateRange"
+                },
+                "total_accessible_testees": {
+                    "type": "integer"
                 }
             }
         },
@@ -15919,6 +16614,34 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "v2.RunMode": {
+            "type": "string",
+            "enum": [
+                "validate",
+                "repair",
+                "publish"
+            ],
+            "x-enum-varnames": [
+                "RunModeValidate",
+                "RunModeRepair",
+                "RunModePublish"
+            ]
+        },
+        "v2.RunStatus": {
+            "type": "string",
+            "enum": [
+                "running",
+                "failed",
+                "data_committed",
+                "succeeded"
+            ],
+            "x-enum-varnames": [
+                "RunStatusRunning",
+                "RunStatusFailed",
+                "RunStatusDataCommitted",
+                "RunStatusSucceeded"
+            ]
         },
         "viewmodel.AnswerDTO": {
             "type": "object",

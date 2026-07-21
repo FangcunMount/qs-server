@@ -547,18 +547,20 @@ definitions:
       type:
         $ref: '#/definitions/statistics.ContentType'
     type: object
-  handler.contentBatchRequest:
+  handler.StatisticsResumeCacheRequest:
     properties:
-      items:
-        items:
-          $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_apiserver_domain_statistics.ContentReference'
-        type: array
+      confirm:
+        type: boolean
+      reason:
+        type: string
     type: object
-  handler.statisticsRunRequest:
+  handler.StatisticsRunRequest:
     properties:
       confirm:
         type: boolean
       from_date:
+        type: string
+      mode:
         type: string
       reason:
         type: string
@@ -567,11 +569,43 @@ definitions:
       validate_only:
         type: boolean
     type: object
-  handler.statisticsV2ContentRequest:
+  handler.StatisticsV2ClinicianDetailResponse:
+    properties:
+      freshness:
+        $ref: '#/definitions/statisticsv2.Freshness'
+      item:
+        $ref: '#/definitions/statisticsv2.ClinicianItem'
+      time_range:
+        $ref: '#/definitions/statisticsv2.DateRange'
+    type: object
+  handler.StatisticsV2ContentRequest:
     properties:
       items:
         items:
           $ref: '#/definitions/statisticsv2.ContentRef'
+        type: array
+    type: object
+  handler.StatisticsV2EntryDetailResponse:
+    properties:
+      freshness:
+        $ref: '#/definitions/statisticsv2.Freshness'
+      item:
+        $ref: '#/definitions/statisticsv2.EntryItem'
+      time_range:
+        $ref: '#/definitions/statisticsv2.DateRange'
+    type: object
+  handler.StatisticsV2RunListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/statisticsv2.Run'
+        type: array
+    type: object
+  handler.contentBatchRequest:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_apiserver_domain_statistics.ContentReference'
         type: array
     type: object
   interpretationassets.Assets:
@@ -3994,12 +4028,326 @@ definitions:
     - TimeRangePresetToday
     - TimeRangePreset7D
     - TimeRangePreset30D
+  statisticsv2.ClinicianItem:
+    properties:
+      active_entry_count:
+        type: integer
+      assessment_created_count:
+        type: integer
+      attending_testee_count:
+        type: integer
+      care_relationship_established_count:
+        type: integer
+      clinician_type:
+        type: string
+      collaborator_testee_count:
+        type: integer
+      department:
+        type: string
+      entry_opened_count:
+        type: integer
+      id:
+        type: integer
+      intake_confirmed_count:
+        type: integer
+      is_active:
+        type: boolean
+      name:
+        type: string
+      operator_id:
+        type: integer
+      outcome_committed_count:
+        type: integer
+      primary_testee_count:
+        type: integer
+      report_generated_count:
+        type: integer
+      title:
+        type: string
+      total_accessible_testees:
+        type: integer
+    type: object
+  statisticsv2.ContentBatch:
+    properties:
+      freshness:
+        $ref: '#/definitions/statisticsv2.Freshness'
+      items:
+        items:
+          $ref: '#/definitions/statisticsv2.ContentItem'
+        type: array
+    type: object
+  statisticsv2.ContentItem:
+    properties:
+      code:
+        type: string
+      completion_rate:
+        type: number
+      has_completion:
+        type: boolean
+      kind:
+        type: string
+      total_completions:
+        type: integer
+      total_submissions:
+        type: integer
+    type: object
   statisticsv2.ContentRef:
     properties:
       code:
         type: string
       kind:
         type: string
+    type: object
+  statisticsv2.DateRange:
+    properties:
+      from:
+        type: string
+      preset:
+        type: string
+      to:
+        type: string
+    type: object
+  statisticsv2.EntryItem:
+    properties:
+      assessment_created_count:
+        type: integer
+      clinician_id:
+        type: integer
+      clinician_name:
+        type: string
+      created_at:
+        type: string
+      entry_opened_count:
+        type: integer
+      expires_at:
+        type: string
+      id:
+        type: integer
+      intake_confirmed_count:
+        type: integer
+      is_active:
+        type: boolean
+      outcome_committed_count:
+        type: integer
+      report_generated_count:
+        type: integer
+      target_code:
+        type: string
+      target_type:
+        type: string
+      target_version:
+        type: string
+      token:
+        type: string
+    type: object
+  statisticsv2.Freshness:
+    properties:
+      as_of_date:
+        type: string
+      is_stale:
+        type: boolean
+      snapshot_at:
+        type: string
+    type: object
+  statisticsv2.Overview:
+    properties:
+      access_funnel:
+        $ref: '#/definitions/statistics.AccessFunnelStatistics'
+      assessment_service:
+        $ref: '#/definitions/statistics.AssessmentServiceStatistics'
+      dimension_analysis:
+        $ref: '#/definitions/statistics.DimensionAnalysisSummary'
+      freshness:
+        $ref: '#/definitions/statisticsv2.Freshness'
+      metrics:
+        $ref: '#/definitions/statisticsv2.OverviewMetrics'
+      org_id:
+        type: integer
+      organization_overview:
+        $ref: '#/definitions/statistics.OrganizationOverview'
+      plan:
+        $ref: '#/definitions/statistics.PlanDomainStatistics'
+      time_range:
+        $ref: '#/definitions/statisticsv2.DateRange'
+    type: object
+  statisticsv2.OverviewMetrics:
+    properties:
+      active_clinician_count:
+        type: integer
+      active_enrollment_count:
+        type: integer
+      active_entry_count:
+        type: integer
+      answersheet_submission_count:
+        type: integer
+      assessment_count:
+        type: integer
+      care_relationship_established_count:
+        type: integer
+      care_relationship_transferred_count:
+        type: integer
+      clinician_count:
+        type: integer
+      completed_on_time_count:
+        type: integer
+      completed_overdue_count:
+        type: integer
+      content_count:
+        type: integer
+      due_task_count:
+        type: integer
+      entry_count:
+        type: integer
+      entry_opened_count:
+        type: integer
+      intake_confirmed_count:
+        type: integer
+      planned_task_count:
+        type: integer
+      report_count:
+        type: integer
+      task_canceled_count:
+        type: integer
+      task_completed_count:
+        type: integer
+      task_created_count:
+        type: integer
+      task_expired_count:
+        type: integer
+      task_opened_count:
+        type: integer
+      testee_count:
+        type: integer
+      testee_created_count:
+        type: integer
+      uncompleted_overdue_count:
+        type: integer
+      window_answersheet_submitted_count:
+        type: integer
+      window_assessment_created_count:
+        type: integer
+      window_assessment_failed_count:
+        type: integer
+      window_outcome_committed_count:
+        type: integer
+      window_report_failed_count:
+        type: integer
+      window_report_generated_count:
+        type: integer
+    type: object
+  statisticsv2.Page-statisticsv2_ClinicianItem:
+    properties:
+      freshness:
+        $ref: '#/definitions/statisticsv2.Freshness'
+      items:
+        items:
+          $ref: '#/definitions/statisticsv2.ClinicianItem'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      time_range:
+        $ref: '#/definitions/statisticsv2.DateRange'
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  statisticsv2.Page-statisticsv2_EntryItem:
+    properties:
+      freshness:
+        $ref: '#/definitions/statisticsv2.Freshness'
+      items:
+        items:
+          $ref: '#/definitions/statisticsv2.EntryItem'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      time_range:
+        $ref: '#/definitions/statisticsv2.DateRange'
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  statisticsv2.Run:
+    properties:
+      as_of_date:
+        type: string
+      attempt:
+        type: integer
+      batch_key:
+        type: string
+      cache_resume_count:
+        type: integer
+      data_committed_at:
+        type: string
+      error_code:
+        type: string
+      error_message:
+        type: string
+      fact_counts:
+        additionalProperties:
+          type: integer
+        type: object
+      finished_at:
+        type: string
+      id:
+        type: integer
+      last_cache_resume_at:
+        type: string
+      last_cache_resume_operator_id:
+        type: integer
+      last_cache_resume_reason:
+        type: string
+      last_cache_resume_status:
+        type: string
+      mode:
+        $ref: '#/definitions/v2.RunMode'
+      operator_id:
+        type: integer
+      org_id:
+        type: integer
+      reason:
+        type: string
+      result_counts:
+        additionalProperties:
+          type: integer
+        type: object
+      source_counts:
+        additionalProperties:
+          type: integer
+        type: object
+      stage:
+        type: string
+      started_at:
+        type: string
+      status:
+        $ref: '#/definitions/v2.RunStatus'
+      trigger_type:
+        type: string
+    type: object
+  statisticsv2.TesteeSummary:
+    properties:
+      assessed_in_window_count:
+        type: integer
+      attending_testee_count:
+        type: integer
+      collaborator_testee_count:
+        type: integer
+      freshness:
+        $ref: '#/definitions/statisticsv2.Freshness'
+      key_focus_testee_count:
+        type: integer
+      primary_testee_count:
+        type: integer
+      time_range:
+        $ref: '#/definitions/statisticsv2.DateRange'
+      total_accessible_testees:
+        type: integer
     type: object
   systemgovernance.ActionDescriptor:
     properties:
@@ -4218,6 +4566,28 @@ definitions:
       title:
         type: string
     type: object
+  v2.RunMode:
+    enum:
+    - validate
+    - repair
+    - publish
+    type: string
+    x-enum-varnames:
+    - RunModeValidate
+    - RunModeRepair
+    - RunModePublish
+  v2.RunStatus:
+    enum:
+    - running
+    - failed
+    - data_committed
+    - succeeded
+    type: string
+    x-enum-varnames:
+    - RunStatusRunning
+    - RunStatusFailed
+    - RunStatusDataCommitted
+    - RunStatusSucceeded
   viewmodel.AnswerDTO:
     properties:
       question_code:
@@ -9411,7 +9781,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/core.Response'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/statisticsv2.Page-statisticsv2_ClinicianItem'
+              type: object
       summary: 查询 Statistics V2 医生列表
       tags:
       - Statistics-V2
@@ -9427,7 +9802,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/core.Response'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.StatisticsV2ClinicianDetailResponse'
+              type: object
       summary: 查询 Statistics V2 医生详情
       tags:
       - Statistics-V2
@@ -9437,7 +9817,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/core.Response'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/statisticsv2.Page-statisticsv2_EntryItem'
+              type: object
       summary: 查询当前医生 Statistics V2 入口
       tags:
       - Statistics-V2
@@ -9447,7 +9832,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/core.Response'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.StatisticsV2ClinicianDetailResponse'
+              type: object
       summary: 查询当前医生 Statistics V2 总览
       tags:
       - Statistics-V2
@@ -9457,7 +9847,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/core.Response'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/statisticsv2.TesteeSummary'
+              type: object
       summary: 查询当前医生 Statistics V2 受试者摘要
       tags:
       - Statistics-V2
@@ -9469,12 +9864,17 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/handler.statisticsV2ContentRequest'
+          $ref: '#/definitions/handler.StatisticsV2ContentRequest'
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/core.Response'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/statisticsv2.ContentBatch'
+              type: object
       summary: 批量查询 Statistics V2 内容统计
       tags:
       - Statistics-V2
@@ -9484,7 +9884,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/core.Response'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/statisticsv2.Page-statisticsv2_EntryItem'
+              type: object
       summary: 查询 Statistics V2 入口列表
       tags:
       - Statistics-V2
@@ -9500,7 +9905,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/core.Response'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.StatisticsV2EntryDetailResponse'
+              type: object
       summary: 查询 Statistics V2 入口详情
       tags:
       - Statistics-V2
@@ -9523,7 +9933,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/core.Response'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/statisticsv2.Overview'
+              type: object
       summary: 查询 Statistics V2 机构总览
       tags:
       - Statistics-V2
@@ -10287,7 +10702,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/core.Response'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.StatisticsV2RunListResponse'
+              type: object
       summary: 查询 Statistics V2 同步批次
       tags:
       - Statistics-V2-Internal
@@ -10298,12 +10718,17 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/handler.statisticsRunRequest'
+          $ref: '#/definitions/handler.StatisticsRunRequest'
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/core.Response'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/statisticsv2.Run'
+              type: object
       summary: 创建 Statistics V2 同步批次
       tags:
       - Statistics-V2-Internal
@@ -10319,7 +10744,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/core.Response'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/statisticsv2.Run'
+              type: object
       summary: 查询 Statistics V2 同步批次详情
       tags:
       - Statistics-V2-Internal
@@ -10331,11 +10761,22 @@ paths:
         name: id
         required: true
         type: integer
+      - description: 审计原因与明确确认
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.StatisticsResumeCacheRequest'
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/core.Response'
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/statisticsv2.Run'
+              type: object
       summary: 恢复 Statistics V2 批次缓存发布
       tags:
       - Statistics-V2-Internal

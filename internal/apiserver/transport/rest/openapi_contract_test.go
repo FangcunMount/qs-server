@@ -77,6 +77,41 @@ func TestApiserverOpenAPIHasExplicitModelAndInterpretationWireSchemas(t *testing
 	}
 }
 
+func TestStatisticsV2OpenAPIExposesRunModesAndAuditedCacheResume(t *testing.T) {
+	t.Parallel()
+
+	spec := loadOpenAPISpec(t, "../../../../api/rest/apiserver.yaml")
+	for path, method := range map[string]string{
+		"/api/v2/statistics/overview":                    "get",
+		"/internal/v2/statistics/runs":                   "post",
+		"/internal/v2/statistics/runs/{id}/resume-cache": "post",
+	} {
+		assertOpenAPIOperation(t, spec, path, method)
+	}
+	resume := spec.Paths["/internal/v2/statistics/runs/{id}/resume-cache"]["post"].(map[string]any)
+	if _, ok := resume["requestBody"].(map[string]any); !ok {
+		t.Fatal("resume-cache OpenAPI must require an audited request body")
+	}
+
+	schemas := loadOpenAPIComponents(t, "../../../../api/rest/apiserver.yaml")
+	runRequest := schemas["handler.StatisticsRunRequest"].(map[string]any)["properties"].(map[string]any)
+	if _, ok := runRequest["mode"]; !ok {
+		t.Fatal("StatisticsRunRequest must expose mode")
+	}
+	run := schemas["statisticsv2.Run"].(map[string]any)["properties"].(map[string]any)
+	for _, property := range []string{"error_code", "error_message", "source_counts", "fact_counts", "result_counts"} {
+		if _, ok := run[property]; !ok {
+			t.Fatalf("statisticsv2.Run missing %s", property)
+		}
+	}
+	resumeRequest := schemas["handler.StatisticsResumeCacheRequest"].(map[string]any)["properties"].(map[string]any)
+	for _, property := range []string{"confirm", "reason"} {
+		if _, ok := resumeRequest[property]; !ok {
+			t.Fatalf("StatisticsResumeCacheRequest missing %s", property)
+		}
+	}
+}
+
 func TestAdminSubmitOpenAPIExposesOptionalIdempotencyContract(t *testing.T) {
 	t.Parallel()
 

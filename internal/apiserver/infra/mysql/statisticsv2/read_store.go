@@ -38,9 +38,11 @@ func (s *ReadStore) LatestSuccessfulSnapshot(ctx context.Context, orgID int64) (
 	defer release()
 	var row struct{ AsOfDate, SnapshotAt time.Time }
 	err = s.db.WithContext(ctx).Raw(`
-		SELECT o.as_of_date,o.snapshot_at FROM statistics_org_snapshot o
+		SELECT o.as_of_date,o.snapshot_at FROM statistics_v2_org_snapshot o
 		WHERE o.org_id=? AND EXISTS (
-		 SELECT 1 FROM statistics_sync_run r WHERE r.org_id=o.org_id AND r.as_of_date=o.as_of_date AND r.status='succeeded'
+		 SELECT 1 FROM statistics_sync_run r
+		 WHERE r.org_id=o.org_id AND r.as_of_date=o.as_of_date
+		   AND r.run_mode='publish' AND r.status='succeeded'
 		) LIMIT 1`, orgID).Scan(&row).Error
 	if err != nil {
 		return nil, err
@@ -58,7 +60,7 @@ func (s *ReadStore) SnapshotForDate(ctx context.Context, orgID int64, asOfDate t
 	}
 	defer release()
 	var row struct{ AsOfDate, SnapshotAt time.Time }
-	if err := s.db.WithContext(ctx).Raw(`SELECT as_of_date,snapshot_at FROM statistics_org_snapshot WHERE org_id=? AND as_of_date=? LIMIT 1`, orgID, asOfDate).Scan(&row).Error; err != nil {
+	if err := s.db.WithContext(ctx).Raw(`SELECT as_of_date,snapshot_at FROM statistics_v2_org_snapshot WHERE org_id=? AND as_of_date=? LIMIT 1`, orgID, asOfDate).Scan(&row).Error; err != nil {
 		return nil, err
 	}
 	if row.AsOfDate.IsZero() {
@@ -88,7 +90,7 @@ func (s *ReadStore) Overview(ctx context.Context, orgID int64, from, to time.Tim
 		 COALESCE(f.planned_task_count,0) planned_task_count,COALESCE(f.due_task_count,0) due_task_count,
 		 COALESCE(f.completed_on_time_count,0) completed_on_time_count,COALESCE(f.completed_overdue_count,0) completed_overdue_count,
 		 COALESCE(f.uncompleted_overdue_count,0) uncompleted_overdue_count
-		FROM statistics_org_snapshot o
+		FROM statistics_v2_org_snapshot o
 		LEFT JOIN (SELECT org_id,SUM(entry_opened_count) entry_opened_count,SUM(intake_confirmed_count) intake_confirmed_count,SUM(testee_created_count) testee_created_count,SUM(care_relationship_established_count) care_relationship_established_count,SUM(care_relationship_transferred_count) care_relationship_transferred_count FROM statistics_access_daily WHERE org_id=? AND stat_date>=? AND stat_date<? GROUP BY org_id) a ON a.org_id=o.org_id
 		LEFT JOIN (SELECT org_id,SUM(answersheet_submitted_count) answersheet_submitted_count,SUM(assessment_created_count) assessment_created_count,SUM(outcome_committed_count) outcome_committed_count,SUM(assessment_failed_count) assessment_failed_count,SUM(report_generated_count) report_generated_count,SUM(report_failed_count) report_failed_count FROM statistics_assessment_daily WHERE org_id=? AND stat_date>=? AND stat_date<? GROUP BY org_id) e ON e.org_id=o.org_id
 		LEFT JOIN (SELECT org_id,SUM(task_created_count) task_created_count,SUM(task_opened_count) task_opened_count,SUM(task_completed_count) task_completed_count,SUM(task_expired_count) task_expired_count,SUM(task_canceled_count) task_canceled_count FROM statistics_plan_activity_daily WHERE org_id=? AND stat_date>=? AND stat_date<? GROUP BY org_id) p ON p.org_id=o.org_id

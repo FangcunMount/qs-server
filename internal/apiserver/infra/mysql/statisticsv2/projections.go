@@ -15,11 +15,20 @@ type PlanActivityProjection struct{ db *gorm.DB }
 type PlanFulfillmentProjection struct{ db *gorm.DB }
 type OrganizationSnapshotProjection struct{ db *gorm.DB }
 
-func NewProjections(db *gorm.DB) []statisticsv2.Projection {
+func NewDailyProjections(db *gorm.DB) []statisticsv2.Projection {
 	return []statisticsv2.Projection{
 		&AccessDailyProjection{db}, &AssessmentDailyProjection{db}, &PlanActivityProjection{db},
-		&PlanFulfillmentProjection{db}, &OrganizationSnapshotProjection{db},
 	}
+}
+
+func NewGlobalProjections(db *gorm.DB) []statisticsv2.Projection {
+	return []statisticsv2.Projection{&PlanFulfillmentProjection{db}, &OrganizationSnapshotProjection{db}}
+}
+
+// NewProjections is retained for callers that only need the complete ordered
+// registry. Runtime assembly uses the explicit daily/global sets.
+func NewProjections(db *gorm.DB) []statisticsv2.Projection {
+	return append(NewDailyProjections(db), NewGlobalProjections(db)...)
 }
 
 func projectionDB(ctx context.Context, db *gorm.DB) *gorm.DB {
@@ -98,7 +107,7 @@ func (p *PlanFulfillmentProjection) Project(ctx context.Context, r statisticsv2.
 func (*OrganizationSnapshotProjection) Name() string { return "organization_snapshot" }
 func (p *OrganizationSnapshotProjection) Project(ctx context.Context, r statisticsv2.ProjectionRequest) (statisticsv2.ProjectionResult, error) {
 	result := projectionDB(ctx, p.db).Exec(`
-		INSERT INTO statistics_org_snapshot (org_id,as_of_date,snapshot_at,testee_count,clinician_count,active_clinician_count,entry_count,active_entry_count,active_enrollment_count,answersheet_submission_count,assessment_count,report_count,content_count)
+		INSERT INTO statistics_v2_org_snapshot (org_id,as_of_date,snapshot_at,testee_count,clinician_count,active_clinician_count,entry_count,active_entry_count,active_enrollment_count,answersheet_submission_count,assessment_count,report_count,content_count)
 		SELECT ?,?,?,
 		 (SELECT COUNT(*) FROM testee WHERE org_id=? AND deleted_at IS NULL),
 		 (SELECT COUNT(*) FROM clinician WHERE org_id=? AND deleted_at IS NULL),

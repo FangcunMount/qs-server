@@ -256,6 +256,7 @@ func (s *ReadService) resolve(ctx context.Context, orgID int64, filter QueryFilt
 		return DateRange{}, Freshness{}, errors.WithCode(code.ErrInvalidArgument, "statistics date range is invalid or exceeds 366 days")
 	}
 	previousDay := domainv2.BusinessDate(s.now()).AddDate(0, 0, -1)
+	observeFreshness(orgID, asOf, previousDay)
 	freshness := Freshness{AsOfDate: asOf.Format("2006-01-02"), SnapshotAt: snapshot.SnapshotAt, IsStale: asOf.Before(previousDay)}
 	return rangeValue, freshness, nil
 }

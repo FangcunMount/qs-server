@@ -9,8 +9,10 @@ import (
 	"time"
 
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	statisticsV2App "github.com/FangcunMount/qs-server/internal/apiserver/application/statisticsv2"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
+	statisticsV2Domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics/v2"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
@@ -118,6 +120,30 @@ func (f *fakeStatisticsWarmupCoordinator) calls() []int64 {
 	orgIDs := make([]int64, len(f.orgIDs))
 	copy(orgIDs, f.orgIDs)
 	return orgIDs
+}
+
+type fakeStatisticsV2Coordinator struct {
+	mu       sync.Mutex
+	orgIDs   []int64
+	errByOrg map[int64]error
+}
+
+func (f *fakeStatisticsV2Coordinator) Run(_ context.Context, request statisticsV2App.RunRequest) (*statisticsV2App.Run, error) {
+	f.mu.Lock()
+	f.orgIDs = append(f.orgIDs, request.OrgID)
+	err := f.errByOrg[request.OrgID]
+	f.mu.Unlock()
+	status := statisticsV2Domain.RunStatusSucceeded
+	if err != nil {
+		status = statisticsV2Domain.RunStatusFailed
+	}
+	return &statisticsV2App.Run{OrgID: request.OrgID, Mode: request.Mode, Status: status}, err
+}
+
+func (f *fakeStatisticsV2Coordinator) calls() []int64 {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]int64(nil), f.orgIDs...)
 }
 
 func TestNewStatisticsSyncRunner(t *testing.T) {
@@ -301,8 +327,13 @@ func TestStatisticsSyncRunnerRunOnceContinuesAfterOrgFailure(t *testing.T) {
 		lock.release,
 	)
 
-	if err := runner.runOnce(context.Background()); err != nil {
-		t.Fatalf("runOnce returned error: %v", err)
+	if err := runner.runOnce(context.Background()); err == nil {
+		t.Fatal("runOnce must report a partial failure")
+	} else {
+		var partial *StatisticsSyncPartialError
+		if !errors.As(err, &partial) || partial.Summary.Failed != 1 || partial.Summary.Succeeded != 2 {
+			t.Fatalf("unexpected partial error: %v", err)
+		}
 	}
 
 	wantCalls := []string{
@@ -325,6 +356,25 @@ func TestStatisticsSyncRunnerRunOnceContinuesAfterOrgFailure(t *testing.T) {
 	}
 	if got := warmup.calls(); len(got) != 2 || got[0] != 1 || got[1] != 3 {
 		t.Fatalf("unexpected warmup calls: %v", got)
+	}
+}
+
+func TestStatisticsSyncRunnerShadowRunsV2WhenV1Fails(t *testing.T) {
+	lock := &fakeSchedulerLockManager{}
+	syncService := &fakeStatisticsSyncService{errByCall: map[string]error{statisticsSyncCall("daily", 1): errors.New("v1 failed")}}
+	v2 := &fakeStatisticsV2Coordinator{}
+	opts := newTestStatisticsSyncOptions(1, 2)
+	opts.VersionMode = "shadow"
+	runner := newStatisticsSyncRunnerWithHooks(opts, syncService, nil, &redisadapter.Manager{}, newTestStatisticsLockBuilder(), lock.acquire, lock.release)
+	runner.v2Coordinator = v2
+
+	err := runner.runOnce(context.Background())
+	var partial *StatisticsSyncPartialError
+	if !errors.As(err, &partial) || partial.Summary.Failed != 1 || partial.Summary.Succeeded != 1 {
+		t.Fatalf("unexpected result: %v", err)
+	}
+	if got := v2.calls(); len(got) != 2 || got[0] != 1 || got[1] != 2 {
+		t.Fatalf("v2 calls=%v", got)
 	}
 }
 
@@ -418,6 +468,7 @@ func newTestStatisticsSyncOptions(orgIDs ...int64) *apiserveroptions.StatisticsS
 	}
 	return &apiserveroptions.StatisticsSyncOptions{
 		Enable:           true,
+		VersionMode:      "v1",
 		OrgIDs:           orgIDs,
 		RunAt:            "00:30",
 		RepairWindowDays: 7,

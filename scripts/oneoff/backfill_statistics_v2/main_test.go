@@ -1,6 +1,10 @@
 package main
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -44,5 +48,51 @@ func TestParseOrgIDsDeduplicates(t *testing.T) {
 	}
 	if len(got) != 2 || got[0] != 3 || got[1] != 1 {
 		t.Fatalf("got %v", got)
+	}
+}
+
+func TestExecuteRunSendsScopedRepairRequestAndParsesCounts(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/internal/v2/statistics/runs" || r.Header.Get("X-Org-ID") != "7" || r.Header.Get("Authorization") != "Bearer secret" {
+			t.Fatalf("path=%s org=%s auth=%s", r.URL.Path, r.Header.Get("X-Org-ID"), r.Header.Get("Authorization"))
+		}
+		var request runRequest
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		if request.Mode != "repair" || request.FromDate != "2026-01-01" || request.ToDate != "2026-01-07" || !request.Confirm {
+			t.Fatalf("request=%+v", request)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":0,"data":{"id":9,"mode":"repair","status":"succeeded","stage":"completed","fact_counts":{"assessment.inserted":3}}}`))
+	}))
+	defer server.Close()
+
+	location, _ := time.LoadLocation("Asia/Shanghai")
+	result, err := executeRun(server.Client(), options{BaseURL: server.URL, Token: "secret", Mode: "repair", Reason: "approved", Confirm: true}, 7, dateWindow{
+		From: time.Date(2026, 1, 1, 0, 0, 0, 0, location),
+		To:   time.Date(2026, 1, 7, 0, 0, 0, 0, location),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ID != 9 || result.FactCounts["assessment.inserted"] != 3 {
+		t.Fatalf("result=%+v", result)
+	}
+}
+
+func TestExecuteRunStopsAtDataCommittedWithResumeGuidance(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"code":0,"data":{"id":11,"mode":"publish","status":"data_committed","stage":"publishing_cache"}}`))
+	}))
+	defer server.Close()
+
+	location, _ := time.LoadLocation("Asia/Shanghai")
+	_, err := executeRun(server.Client(), options{BaseURL: server.URL, Token: "secret", Mode: "publish", Reason: "approved", Confirm: true}, 7, dateWindow{
+		From: time.Date(2026, 1, 1, 0, 0, 0, 0, location),
+		To:   time.Date(2026, 1, 1, 0, 0, 0, 0, location),
+	})
+	if err == nil || !strings.Contains(err.Error(), "resume cache") {
+		t.Fatalf("err=%v", err)
 	}
 }

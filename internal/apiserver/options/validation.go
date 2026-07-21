@@ -303,6 +303,9 @@ func validateStatisticsSync(opts *StatisticsSyncOptions) []error {
 	}
 
 	var errs []error
+	if opts.VersionMode != "v1" && opts.VersionMode != "shadow" && opts.VersionMode != "v2" {
+		errs = append(errs, fmt.Errorf("statistics_sync.version_mode must be one of v1, shadow, or v2"))
+	}
 	if len(opts.OrgIDs) == 0 {
 		errs = append(errs, fmt.Errorf("statistics_sync.org_ids cannot be empty when enabled"))
 	}

@@ -15,7 +15,7 @@ func TestStatisticsV2MigrationIsAdditiveAndDefinesContracts(t *testing.T) {
 	for _, table := range []string{
 		"statistics_access_fact", "statistics_assessment_fact", "statistics_plan_fact",
 		"statistics_access_daily", "statistics_assessment_daily", "statistics_plan_activity_daily",
-		"statistics_plan_fulfillment_daily", "statistics_org_snapshot", "statistics_sync_run",
+		"statistics_plan_fulfillment_daily", "statistics_v2_org_snapshot", "statistics_sync_run",
 	} {
 		if !strings.Contains(text, "CREATE TABLE `"+table+"`") {
 			t.Fatalf("migration does not create %s", table)
@@ -29,6 +29,28 @@ func TestStatisticsV2MigrationIsAdditiveAndDefinesContracts(t *testing.T) {
 	for _, forbidden := range []string{"DROP TABLE", "ALTER TABLE `statistics_"} {
 		if strings.Contains(text, forbidden) {
 			t.Fatalf("additive up migration contains forbidden token %q", forbidden)
+		}
+	}
+}
+
+func TestStatisticsV2RunStrengtheningMigrationIsAdditive(t *testing.T) {
+	data, err := os.ReadFile("../../../../pkg/migration/migrations/mysql/000054_strengthen_statistics_v2_runs.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, token := range []string{
+		"`run_mode`", "`cache_resume_count`", "`last_cache_resume_operator_id`",
+		"`last_cache_resume_reason`", "`last_cache_resume_at`", "`last_cache_resume_status`",
+		"idx_statistics_sync_run_org_status_started",
+	} {
+		if !strings.Contains(text, token) {
+			t.Fatalf("run migration does not contain %q", token)
+		}
+	}
+	for _, forbidden := range []string{"DROP TABLE", "DROP COLUMN"} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("run strengthening migration contains forbidden token %q", forbidden)
 		}
 	}
 }

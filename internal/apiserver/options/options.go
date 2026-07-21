@@ -876,6 +876,7 @@ type WarmupHotsetOptions struct {
 // StatisticsSyncOptions 统计同步定时任务配置
 type StatisticsSyncOptions struct {
 	Enable           bool          `json:"enable" mapstructure:"enable"`
+	VersionMode      string        `json:"version_mode" mapstructure:"version_mode"`
 	OrgIDs           []int64       `json:"org_ids" mapstructure:"org_ids"`
 	RunAt            string        `json:"run_at" mapstructure:"run_at"`
 	RepairWindowDays int           `json:"repair_window_days" mapstructure:"repair_window_days"`
@@ -887,6 +888,7 @@ type StatisticsSyncOptions struct {
 func NewStatisticsSyncOptions() *StatisticsSyncOptions {
 	return &StatisticsSyncOptions{
 		Enable:           true,
+		VersionMode:      "shadow",
 		OrgIDs:           []int64{1},
 		RunAt:            "00:30",
 		RepairWindowDays: 7,
@@ -901,6 +903,7 @@ func (s *StatisticsSyncOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 	fs.BoolVar(&s.Enable, "statistics_sync.enable", s.Enable, "Enable scheduled nightly statistics sync.")
+	fs.StringVar(&s.VersionMode, "statistics_sync.version-mode", s.VersionMode, "Statistics runtime mode: v1, shadow, or v2.")
 	fs.Int64SliceVar(&s.OrgIDs, "statistics_sync.org-ids", s.OrgIDs, "Organization IDs included in scheduled statistics sync.")
 	fs.StringVar(&s.RunAt, "statistics_sync.run-at", s.RunAt, "Daily wall-clock time for statistics sync, in HH:MM format.")
 	fs.IntVar(&s.RepairWindowDays, "statistics_sync.repair-window-days", s.RepairWindowDays, "Number of completed days to rebuild when running scheduled daily statistics sync.")

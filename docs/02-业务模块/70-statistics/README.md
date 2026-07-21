@@ -130,7 +130,7 @@ Statistics 不参与答卷可靠受理、测评执行或报告提交。业务主
 | Result | `statistics_assessment_daily` | 机构 × 日期 ×归属 × 内容 | 测评交付与内容统计 |
 | Result | `statistics_plan_activity_daily` | 机构 × 日期 × Plan | 事件发生量 |
 | Result | `statistics_plan_fulfillment_daily` | 机构 × Cohort 日期 × Plan | 应履约、按时、逾期 |
-| Result | `statistics_org_snapshot` | 每机构一行 | 当前资源和累计量快照 |
+| Result | `statistics_v2_org_snapshot` | 每机构一行 | 当前资源和累计量快照；与 V1 同名表物理隔离 |
 | Runtime | `statistics_sync_run` | 每机构每批次一行 | 运行阶段、范围、计数、错误和新鲜度 |
 
 第一版明确不增加：

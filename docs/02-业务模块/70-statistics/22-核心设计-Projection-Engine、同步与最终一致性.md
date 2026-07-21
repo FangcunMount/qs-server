@@ -176,6 +176,20 @@ snapshot_at 机构当前资源实际扫描时间
 - 事件是否带 offset；
 - 零点附近真实业务记录。
 
+### 5.5 三种 Run 模式
+
+V2 明确区分三种运行意图，不能再用一个日期窗口同时表达“修复历史”和“发布当前水位”：
+
+| 模式 | 写 Fact | 重建 Daily | 重建 Fulfillment/Snapshot | 切换 Cache Generation |
+| --- | --- | --- | --- | --- |
+| `validate` | 否 | 否 | 否 | 否 |
+| `repair` | 是 | 是 | 否 | 否 |
+| `publish` | 是 | 是 | 是 | 是 |
+
+`window_start/window_end` 只定义 Collector 和 Daily 的处理范围。`as_of_date` 由服务端根据运行时刻计算为前一上海完整自然日，不再由手工窗口的 `to_date` 推导。
+
+因此，补跑 2025 年历史窗口不会把 2026 年已经发布的 Snapshot 倒退到 2025 年。历史窗口全部 Repair 并完成对账后，再执行一次当前完整日 Publish。
+
 ## 6. 默认批次范围
 
 ### 6.1 Fact 和 Activity Daily
@@ -217,26 +231,28 @@ end   = todayStart
 stateDiagram-v2
     [*] --> running : create run
     running --> failed : collect/reconcile/project failure
-    running --> data_committed : result transaction committed
+    running --> succeeded : validate / repair completed
+    running --> data_committed : publish result transaction committed
     data_committed --> succeeded : cache generation switched
     data_committed --> data_committed : cache retry failed
     failed --> [*]
     succeeded --> [*]
 ```
 
-`stage` 建议使用：
+`stage` 使用：
 
 ```text
-access_collect
-assessment_collect
-plan_collect
-fact_reconcile
-project_access_daily
-project_assessment_daily
-project_plan_activity
-project_plan_fulfillment
-project_org_snapshot
-cache_switch
+collecting_access
+collecting_assessment
+collecting_plan
+facts_ready
+projecting_access_daily
+projecting_assessment_daily
+projecting_plan_activity_daily
+projecting_plan_fulfillment
+projecting_organization_snapshot
+data_committed
+publishing_cache
 completed
 ```
 
@@ -247,19 +263,21 @@ Run 必须记录：
 - 当前阶段；
 - 错误码和摘要；
 - 手工运行的操作者与原因；
-- `data_committed_at/finished_at`。
+- `data_committed_at/finished_at`；
+- `run_mode`；
+- 缓存恢复次数、操作者、原因、时间与结果。
 
 ## 8. 单机构同步流程
 
 ### 8.1 获取租约
 
-租约键：
+使用机构级租约：
 
 ```text
-statistics:v2:{org_id}:{as_of_date}
+statistics:v2:{org_id}
 ```
 
-作用只是避免多个实例同时处理同一机构同一批次。租约丢失或进程退出后，后续实例仍可依靠幂等机制重跑。
+它避免同一机构的不同历史窗口与 Publish 并发执行。不同机构仍可独立运行；租约丢失或进程退出后，后续实例依靠幂等机制重跑。
 
 ### 8.2 创建 Run
 
@@ -290,16 +308,22 @@ Access -> Assessment -> Plan
 
 ### 8.5 Projection 结果事务
 
-同一 MySQL 事务内：
+`repair` 的同一 MySQL 事务内：
 
 1. Coordinator 开启 MySQL 结果事务；
 2. Engine 调用 AccessDailyProjection；
 3. Engine 调用 AssessmentDailyProjection；
 4. Engine 调用 PlanActivityDailyProjection；
-5. Engine 调用 PlanFulfillmentProjection；
-6. Engine 调用 OrganizationSnapshotProjection；
-7. Coordinator 将 SyncRun 标记为 `data_committed`；
-8. Coordinator 提交。
+5. Coordinator 将 SyncRun 标记为 `succeeded`；
+6. Coordinator 提交。
+
+`publish` 在上述三个 Daily Projection 之后继续：
+
+1. 锁定当前机构 Snapshot 并校验水位只能单调前进；
+2. Engine 调用 PlanFulfillmentProjection；
+3. Engine 调用 OrganizationSnapshotProjection；
+4. Coordinator 将 SyncRun 标记为 `data_committed`；
+5. Coordinator 提交。
 
 这样 API 不会看到“Daily 已更新但 Snapshot 仍旧、Run 却声称完成”的中间状态。
 
@@ -453,11 +477,13 @@ dry_run / execute
 
 1. Dry-run 展示预计来源和影响表；
 2. 明确确认；
-3. 创建 manual SyncRun；
-4. 分窗口执行；
+3. 创建 `validate` SyncRun；
+4. 明确确认后分窗口执行 `repair`；
 5. 完成来源、Fact、Daily、API 对账；
-6. 切换缓存；
+6. 执行一次当前完整日 `publish`；
 7. 保存审计结果。
+
+`resume-cache` 只允许作用于 `publish + data_committed` Run，必须再次提供操作原因和明确确认，且不重新执行 Collector 或 Projection。
 
 不得提供“直接修改某个 count”的运维入口。
 
@@ -470,6 +496,8 @@ dry_run / execute
 - 不能因为部分成功就无条件报告成功；
 - 新机构来源应来自机构权威注册，不依赖多处静态 `org_ids`；
 - 连续失败和落后自然日数必须可告警。
+
+Scheduler 使用 `statistics_sync.version_mode = v1 | shadow | v2`。`shadow` 中 V1 与 V2 独立执行，V1 失败不能阻止 V2；整轮在继续处理其他机构后返回结构化 partial failure。
 
 ## 15. 最终一致状态
 
