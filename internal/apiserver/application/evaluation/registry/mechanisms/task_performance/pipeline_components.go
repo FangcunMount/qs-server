@@ -80,10 +80,10 @@ func (c taskPerformanceCalculator) Calculate(ctx context.Context, calcInput eval
 		return taskPerformancePipelineResult{outcome: ApplyAbilityConclusions(outcome, abilityRules)}, nil
 	}
 	scaleSnapshot := cognitiveSnapshot.ToScaleSnapshot()
-	outcome, err := c.scoring.Execute(ctx, evalpipeline.ExecutionInput{
+	outcome, err := c.scoring.ExecuteForDescriptor(ctx, evalpipeline.ExecutionInput{
 		Assessment: execInput.Assessment,
 		Input:      factorscoring.CloneInputWithScaleSnapshot(execInput.Input, scaleSnapshot),
-	})
+	}, "task_performance")
 	if err != nil {
 		return nil, err
 	}

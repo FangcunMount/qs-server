@@ -54,3 +54,24 @@ func TestStatisticsV2RunStrengtheningMigrationIsAdditive(t *testing.T) {
 		}
 	}
 }
+
+func TestStatisticsV2PublicationMigrationPersistsGenerationAndResumeAudit(t *testing.T) {
+	data, err := os.ReadFile("../../../../pkg/migration/migrations/mysql/000055_finalize_statistics_v2_publication.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, token := range []string{
+		"`cache_generation`", "`cache_published_at`", "`cache_resume_audit_json`",
+		"idx_statistics_sync_run_org_publication",
+	} {
+		if !strings.Contains(text, token) {
+			t.Fatalf("publication migration does not contain %q", token)
+		}
+	}
+	for _, forbidden := range []string{"DROP TABLE", "DROP COLUMN"} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("publication migration contains forbidden token %q", forbidden)
+		}
+	}
+}

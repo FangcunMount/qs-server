@@ -53,12 +53,19 @@ func (e *Executor) ExecutionPath() modelcatalog.ExecutionPath {
 }
 
 func (e *Executor) Execute(ctx context.Context, input evaluationexecute.ExecutionInput) (*domainoutcome.Execution, error) {
+	return e.ExecuteForDescriptor(ctx, input, "factor_scoring")
+}
+
+// ExecuteForDescriptor runs shared factor scoring while preserving the exact
+// descriptor identity in input-invariant failures.
+func (e *Executor) ExecuteForDescriptor(ctx context.Context, input evaluationexecute.ExecutionInput, descriptorKey string) (*domainoutcome.Execution, error) {
 	if e == nil || e.evaluator == nil {
 		return nil, fmt.Errorf("factor_scoring evaluation executor is not configured")
 	}
 	executionInput := ExecutionInput{
-		Assessment: input.Assessment,
-		Input:      input.Input,
+		Assessment:    input.Assessment,
+		Input:         input.Input,
+		DescriptorKey: descriptorKey,
 	}
 	if err := e.validator.Validate(executionInput); err != nil {
 		return nil, err

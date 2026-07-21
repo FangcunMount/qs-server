@@ -5,7 +5,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	catalognorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
-	taskperf "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/taskperformance"
 	portmodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/normruntime"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
@@ -106,57 +105,6 @@ func (s *Snapshot) ToScaleSnapshot() *scalesnapshot.ScaleSnapshot {
 	}
 }
 
-func applyNormMetadataToFactorSnapshots(factors []FactorSnapshot, ctx taskperf.MetadataContext) []FactorSnapshot {
-	if len(factors) == 0 {
-		return factors
-	}
-	itemSetCodes := stringSet(ctx.ItemSetCodes)
-	out := make([]FactorSnapshot, len(factors))
-	for i, item := range factors {
-		out[i] = cloneFactorSnapshot(item)
-		if itemSetCodes[item.Code] {
-			out[i].Role = factor.FactorRoleTaskSet
-		}
-		if ctx.NormTableVersion != "" && (item.ResolvedRole() == factor.FactorRoleTotal || itemSetCodes[item.Code]) {
-			out[i].Norm = &catalognorm.Ref{FactorCode: item.Code, NormTableVersion: ctx.NormTableVersion}
-		}
-	}
-	return out
-}
-
-func cloneFactorSnapshot(item FactorSnapshot) FactorSnapshot {
-	return FactorSnapshot{
-		Code:            item.Code,
-		Title:           item.Title,
-		Role:            item.Role,
-		ParentCode:      item.ParentCode,
-		SortOrder:       item.SortOrder,
-		Level:           item.Level,
-		IsTotalScore:    item.IsTotalScore,
-		QuestionCodes:   cloneStrings(item.QuestionCodes),
-		ScoringStrategy: item.ScoringStrategy,
-		ScoringParams:   cloneScoringParams(item.ScoringParams),
-		MaxScore:        cloneFloat64(item.MaxScore),
-		InterpretRules:  cloneInterpretRules(item.InterpretRules),
-		Norm:            cloneNormRef(item.Norm),
-		ChildrenPolicy:  cloneChildrenPolicy(item.ChildrenPolicy),
-	}
-}
-
-func stringSet(values []string) map[string]bool {
-	if len(values) == 0 {
-		return nil
-	}
-	set := make(map[string]bool, len(values))
-	for _, value := range values {
-		if value == "" {
-			continue
-		}
-		set[value] = true
-	}
-	return set
-}
-
 func cloneStrings(items []string) []string {
 	if items == nil {
 		return nil
@@ -177,32 +125,6 @@ func cloneScoringParams(params *factor.ScoringParams) *factor.ScoringParams {
 		return nil
 	}
 	return &factor.ScoringParams{CntOptionContents: cloneStrings(params.CntOptionContents)}
-}
-
-func cloneInterpretRules(rules []InterpretRuleSnapshot) []InterpretRuleSnapshot {
-	if rules == nil {
-		return nil
-	}
-	return append([]InterpretRuleSnapshot(nil), rules...)
-}
-
-func cloneNormRef(ref *catalognorm.Ref) *catalognorm.Ref {
-	if ref == nil {
-		return nil
-	}
-	cloned := *ref
-	return &cloned
-}
-
-func cloneChildrenPolicy(policy *factor.ChildrenPolicy) *factor.ChildrenPolicy {
-	if policy == nil {
-		return nil
-	}
-	return &factor.ChildrenPolicy{
-		Strategy: policy.Strategy,
-		Children: cloneStrings(policy.Children),
-		Weights:  cloneWeights(policy.Weights),
-	}
 }
 
 func cloneWeights(weights map[string]float64) map[string]float64 {

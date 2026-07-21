@@ -164,10 +164,18 @@ type ContentBatch struct {
 
 type Snapshot struct {
 	AsOfDate, SnapshotAt time.Time
+	VisibleRunID         uint64
+	CacheGeneration      int64
+	DatabaseReadable     bool
+}
+
+type databaseReadPermit struct {
+	visibleRunID uint64
+	readable     bool
 }
 
 type ReadStore interface {
-	LatestSuccessfulSnapshot(context.Context, int64) (*Snapshot, error)
+	LatestVisibleSnapshot(context.Context, int64) (*Snapshot, error)
 	SnapshotForDate(context.Context, int64, time.Time) (*Snapshot, error)
 	Overview(context.Context, int64, time.Time, time.Time) (OverviewMetrics, error)
 	OverviewTrends(context.Context, int64, time.Time, time.Time) (OverviewTrends, error)
@@ -175,7 +183,7 @@ type ReadStore interface {
 	ListEntries(context.Context, int64, *uint64, *uint64, *bool, time.Time, time.Time, int, int) ([]EntryItem, int64, error)
 	CurrentClinicianID(context.Context, int64, int64) (uint64, error)
 	CurrentClinicianTesteeSummary(context.Context, int64, uint64, time.Time, time.Time) (TesteeSummary, error)
-	ContentBatch(context.Context, int64, []ContentRef) ([]ContentItem, error)
+	ContentBatch(context.Context, int64, time.Time, []ContentRef) ([]ContentItem, error)
 }
 
 type ReadService struct {
@@ -215,16 +223,16 @@ func cacheKey(kind string, values ...any) string {
 	return kind + ":" + string(payload)
 }
 
-func (s *ReadService) resolve(ctx context.Context, orgID int64, filter QueryFilter) (DateRange, Freshness, error) {
+func (s *ReadService) resolve(ctx context.Context, orgID int64, filter QueryFilter) (DateRange, Freshness, databaseReadPermit, error) {
 	if s == nil || s.store == nil {
-		return DateRange{}, Freshness{}, fmt.Errorf("statistics v2 read service is unavailable")
+		return DateRange{}, Freshness{}, databaseReadPermit{}, fmt.Errorf("statistics v2 read service is unavailable")
 	}
-	snapshot, err := s.store.LatestSuccessfulSnapshot(ctx, orgID)
+	snapshot, err := s.store.LatestVisibleSnapshot(ctx, orgID)
 	if err != nil {
-		return DateRange{}, Freshness{}, err
+		return DateRange{}, Freshness{}, databaseReadPermit{}, err
 	}
 	if snapshot == nil {
-		return DateRange{}, Freshness{}, errors.WithCode(code.ErrStatisticsNotReady, "statistics_not_ready")
+		return DateRange{}, Freshness{}, databaseReadPermit{}, errors.WithCode(code.ErrStatisticsNotReady, "statistics_not_ready")
 	}
 	asOf := domainv2.BusinessDate(snapshot.AsOfDate)
 	preset := strings.TrimSpace(filter.Preset)
@@ -243,22 +251,43 @@ func (s *ReadService) resolve(ctx context.Context, orgID int64, filter QueryFilt
 		var parseErr error
 		rangeValue.From, parseErr = time.ParseInLocation("2006-01-02", strings.TrimSpace(filter.From), domainv2.Shanghai)
 		if parseErr != nil {
-			return DateRange{}, Freshness{}, errors.WithCode(code.ErrInvalidArgument, "invalid from date")
+			return DateRange{}, Freshness{}, databaseReadPermit{}, errors.WithCode(code.ErrInvalidArgument, "invalid from date")
 		}
 		rangeValue.To, parseErr = time.ParseInLocation("2006-01-02", strings.TrimSpace(filter.To), domainv2.Shanghai)
 		if parseErr != nil {
-			return DateRange{}, Freshness{}, errors.WithCode(code.ErrInvalidArgument, "invalid to date")
+			return DateRange{}, Freshness{}, databaseReadPermit{}, errors.WithCode(code.ErrInvalidArgument, "invalid to date")
 		}
 	default:
-		return DateRange{}, Freshness{}, errors.WithCode(code.ErrInvalidArgument, "unsupported statistics preset: %s", preset)
+		return DateRange{}, Freshness{}, databaseReadPermit{}, errors.WithCode(code.ErrInvalidArgument, "unsupported statistics preset: %s", preset)
 	}
 	if rangeValue.To.After(asOf) || rangeValue.From.After(rangeValue.To) || rangeValue.To.Sub(rangeValue.From) > 365*24*time.Hour {
-		return DateRange{}, Freshness{}, errors.WithCode(code.ErrInvalidArgument, "statistics date range is invalid or exceeds 366 days")
+		return DateRange{}, Freshness{}, databaseReadPermit{}, errors.WithCode(code.ErrInvalidArgument, "statistics date range is invalid or exceeds 366 days")
 	}
 	previousDay := domainv2.BusinessDate(s.now()).AddDate(0, 0, -1)
 	observeFreshness(orgID, asOf, previousDay)
 	freshness := Freshness{AsOfDate: asOf.Format("2006-01-02"), SnapshotAt: snapshot.SnapshotAt, IsStale: asOf.Before(previousDay)}
-	return rangeValue, freshness, nil
+	return rangeValue, freshness, databaseReadPermit{visibleRunID: snapshot.VisibleRunID, readable: snapshot.DatabaseReadable}, nil
+}
+
+func ensurePublishedResults(databaseReadable bool) error {
+	if databaseReadable {
+		return nil
+	}
+	return errors.WithCode(code.ErrStatisticsNotReady, "statistics_publication_in_progress")
+}
+
+func (s *ReadService) validatePublishedResults(ctx context.Context, orgID int64, permit databaseReadPermit) error {
+	if err := ensurePublishedResults(permit.readable); err != nil {
+		return err
+	}
+	snapshot, err := s.store.LatestVisibleSnapshot(ctx, orgID)
+	if err != nil {
+		return err
+	}
+	if snapshot == nil || !snapshot.DatabaseReadable || snapshot.VisibleRunID != permit.visibleRunID {
+		return errors.WithCode(code.ErrStatisticsNotReady, "statistics_publication_changed")
+	}
+	return nil
 }
 
 func queryBounds(value DateRange) (time.Time, time.Time) {
@@ -266,14 +295,14 @@ func queryBounds(value DateRange) (time.Time, time.Time) {
 }
 
 func (s *ReadService) Overview(ctx context.Context, orgID int64, filter QueryFilter) (*Overview, error) {
-	r, freshness, err := s.resolve(ctx, orgID, filter)
+	r, freshness, permit, err := s.resolve(ctx, orgID, filter)
 	if err != nil {
 		return nil, err
 	}
-	return s.overviewResolved(ctx, orgID, r, freshness)
+	return s.overviewResolved(ctx, orgID, r, freshness, &permit)
 }
 
-func (s *ReadService) overviewResolved(ctx context.Context, orgID int64, r DateRange, freshness Freshness) (*Overview, error) {
+func (s *ReadService) overviewResolved(ctx context.Context, orgID int64, r DateRange, freshness Freshness, permit *databaseReadPermit) (*Overview, error) {
 	from, to := queryBounds(r)
 	key := cacheKey("overview", r.Preset, r.From, r.To)
 	cached := &Overview{}
@@ -283,6 +312,11 @@ func (s *ReadService) overviewResolved(ctx context.Context, orgID int64, r DateR
 		}
 		return cached, nil
 	}
+	if permit != nil {
+		if err := ensurePublishedResults(permit.readable); err != nil {
+			return nil, err
+		}
+	}
 	metrics, err := s.store.Overview(ctx, orgID, from, to)
 	if err != nil {
 		return nil, err
@@ -290,6 +324,11 @@ func (s *ReadService) overviewResolved(ctx context.Context, orgID int64, r DateR
 	trends, err := s.store.OverviewTrends(ctx, orgID, from, to)
 	if err != nil {
 		return nil, err
+	}
+	if permit != nil {
+		if err := s.validatePublishedResults(ctx, orgID, *permit); err != nil {
+			return nil, err
+		}
 	}
 	completedTasks := metrics.CompletedOnTimeCount + metrics.CompletedOverdueCount
 	overdueTasks := metrics.CompletedOverdueCount + metrics.UncompletedOverdueCount
@@ -342,7 +381,7 @@ func (s *ReadService) Warm(ctx context.Context, orgID int64, asOfDate time.Time)
 		{Preset: "30d", From: asOf.AddDate(0, 0, -29), To: asOf},
 	}
 	for _, value := range ranges {
-		if _, err := s.overviewResolved(ctx, orgID, value, freshness); err != nil {
+		if _, err := s.overviewResolved(ctx, orgID, value, freshness, nil); err != nil {
 			return err
 		}
 	}
@@ -363,7 +402,7 @@ func normalizePage(page, size int) (int, int) {
 }
 
 func (s *ReadService) Clinicians(ctx context.Context, orgID int64, clinicianID *uint64, operatorUserID *int64, filter QueryFilter, page, size int) (*Page[ClinicianItem], error) {
-	r, freshness, err := s.resolve(ctx, orgID, filter)
+	r, freshness, permit, err := s.resolve(ctx, orgID, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -377,8 +416,14 @@ func (s *ReadService) Clinicians(ctx context.Context, orgID int64, clinicianID *
 		}
 		return cached, nil
 	}
+	if err := ensurePublishedResults(permit.readable); err != nil {
+		return nil, err
+	}
 	items, total, err := s.store.ListClinicians(ctx, orgID, clinicianID, operatorUserID, from, to, page, size)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.validatePublishedResults(ctx, orgID, permit); err != nil {
 		return nil, err
 	}
 	value := &Page[ClinicianItem]{Items: items, Total: total, Page: page, PageSize: size, TotalPages: int((total + int64(size) - 1) / int64(size)), TimeRange: r, Freshness: freshness}
@@ -387,7 +432,7 @@ func (s *ReadService) Clinicians(ctx context.Context, orgID int64, clinicianID *
 }
 
 func (s *ReadService) Entries(ctx context.Context, orgID int64, entryID, clinicianID *uint64, active *bool, filter QueryFilter, page, size int) (*Page[EntryItem], error) {
-	r, freshness, err := s.resolve(ctx, orgID, filter)
+	r, freshness, permit, err := s.resolve(ctx, orgID, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -401,8 +446,14 @@ func (s *ReadService) Entries(ctx context.Context, orgID int64, entryID, clinici
 		}
 		return cached, nil
 	}
+	if err := ensurePublishedResults(permit.readable); err != nil {
+		return nil, err
+	}
 	items, total, err := s.store.ListEntries(ctx, orgID, entryID, clinicianID, active, from, to, page, size)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.validatePublishedResults(ctx, orgID, permit); err != nil {
 		return nil, err
 	}
 	value := &Page[EntryItem]{Items: items, Total: total, Page: page, PageSize: size, TotalPages: int((total + int64(size) - 1) / int64(size)), TimeRange: r, Freshness: freshness}
@@ -415,7 +466,7 @@ func (s *ReadService) CurrentClinicianID(ctx context.Context, orgID, userID int6
 }
 
 func (s *ReadService) CurrentClinicianTesteeSummary(ctx context.Context, orgID, userID int64, filter QueryFilter) (*TesteeSummary, error) {
-	r, freshness, err := s.resolve(ctx, orgID, filter)
+	r, freshness, permit, err := s.resolve(ctx, orgID, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -432,8 +483,14 @@ func (s *ReadService) CurrentClinicianTesteeSummary(ctx context.Context, orgID, 
 		}
 		return cached, nil
 	}
+	if err := ensurePublishedResults(permit.readable); err != nil {
+		return nil, err
+	}
 	value, err := s.store.CurrentClinicianTesteeSummary(ctx, orgID, clinicianID, from, to)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.validatePublishedResults(ctx, orgID, permit); err != nil {
 		return nil, err
 	}
 	value.TimeRange, value.Freshness = r, freshness
@@ -442,7 +499,7 @@ func (s *ReadService) CurrentClinicianTesteeSummary(ctx context.Context, orgID, 
 }
 
 func (s *ReadService) Contents(ctx context.Context, orgID int64, refs []ContentRef) (*ContentBatch, error) {
-	_, freshness, err := s.resolve(ctx, orgID, QueryFilter{Preset: "latest_complete_day"})
+	r, freshness, permit, err := s.resolve(ctx, orgID, QueryFilter{Preset: "latest_complete_day"})
 	if err != nil {
 		return nil, err
 	}
@@ -454,8 +511,14 @@ func (s *ReadService) Contents(ctx context.Context, orgID int64, refs []ContentR
 		}
 		return cached, nil
 	}
-	items, err := s.store.ContentBatch(ctx, orgID, refs)
+	if err := ensurePublishedResults(permit.readable); err != nil {
+		return nil, err
+	}
+	items, err := s.store.ContentBatch(ctx, orgID, r.To, refs)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.validatePublishedResults(ctx, orgID, permit); err != nil {
 		return nil, err
 	}
 	value := &ContentBatch{Items: items, Freshness: freshness}

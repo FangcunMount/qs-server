@@ -69,8 +69,9 @@ func (c factorScoringCalculator) Calculate(ctx context.Context, calcInput evalpi
 	}
 	execInput := calcInput.Execution
 	scoringInput := ExecutionInput{
-		Assessment: execInput.Assessment,
-		Input:      execInput.Input,
+		Assessment:    execInput.Assessment,
+		Input:         execInput.Input,
+		DescriptorKey: "factor_scoring",
 	}
 	if err := c.validator.Validate(scoringInput); err != nil {
 		return nil, err

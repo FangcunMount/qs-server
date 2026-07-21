@@ -82,6 +82,8 @@ mysql:
   max-open-connections: 50
   max-connection-life-time: "1h"
   log-level: 2  # 生产环境只记录 Error
+  location: "Asia/Shanghai"
+  session-time-zone: "+08:00"
 
 # -------------------------------------------------------
 # 4.2 MongoDB 数据库

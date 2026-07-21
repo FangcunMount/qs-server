@@ -385,7 +385,7 @@ func (c *AssessmentFactCollector) Collect(ctx context.Context, req domainv2.Coll
 	if err != nil {
 		return result, err
 	}
-	defer cursor.Close(ctx)
+	defer func() { _ = cursor.Close(ctx) }()
 	for cursor.Next(ctx) {
 		var row struct {
 			DomainID             uint64    `bson:"domain_id"`
@@ -556,7 +556,7 @@ func (c *AssessmentFactCollector) collectReports(ctx context.Context, req domain
 	if err != nil {
 		return err
 	}
-	defer cursor.Close(ctx)
+	defer func() { _ = cursor.Close(ctx) }()
 	for cursor.Next(ctx) {
 		var row struct {
 			DomainID     uint64    `bson:"domain_id"`
@@ -613,7 +613,7 @@ func (c *AssessmentFactCollector) collectReportFailures(ctx context.Context, req
 	if err != nil {
 		return err
 	}
-	defer cursor.Close(ctx)
+	defer func() { _ = cursor.Close(ctx) }()
 	for cursor.Next(ctx) {
 		var run struct {
 			DomainID     uint64     `bson:"domain_id"`

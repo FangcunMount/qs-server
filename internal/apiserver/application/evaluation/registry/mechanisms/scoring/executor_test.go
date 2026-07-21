@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/routing"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
@@ -20,7 +21,7 @@ import (
 
 func TestExecutorConvertsSnapshotThroughScaleEvaluator(t *testing.T) {
 	executor := NewExecutor(nil)
-	modelRef := assessment.NewEvaluationModelRefByCode(assessment.EvaluationModelKindScale, meta.NewCode("S-001"), "1.0.0", "Scale")
+	modelRef := scaleEvaluationModelRef("S-001", "1.0.0")
 	a, err := assessment.NewAssessment(
 		1,
 		testee.NewID(1),
@@ -38,10 +39,11 @@ func TestExecutorConvertsSnapshotThroughScaleEvaluator(t *testing.T) {
 	snapshot := &evaluationinput.InputSnapshot{
 		DefinitionV2: scaleDefinition("total", []string{"q1", "q2"}),
 		Model: &evaluationinput.ModelSnapshot{
-			Kind:    evaluationinput.EvaluationModelKindScale,
-			Code:    "S-001",
-			Version: "1.0.0",
-			Title:   "Scale",
+			Kind:      evaluationinput.EvaluationModelKindScale,
+			Algorithm: string(modelcatalog.AlgorithmScaleDefault),
+			Code:      "S-001",
+			Version:   "1.0.0",
+			Title:     "Scale",
 		},
 		ModelPayload: evaluationinput.ScaleModelPayload{Scale: &scalesnapshot.ScaleSnapshot{
 			Code:                 "S-001",
@@ -95,7 +97,7 @@ func TestExecutorImplementsEvaluationExecutorContract(t *testing.T) {
 }
 
 func TestInputValidatorRejectsQuestionnaireVersionMismatch(t *testing.T) {
-	modelRef := assessment.NewEvaluationModelRefByCode(assessment.EvaluationModelKindScale, meta.NewCode("S-001"), "1.0.0", "Scale")
+	modelRef := scaleEvaluationModelRef("S-001", "1.0.0")
 	a, err := assessment.NewAssessment(
 		1,
 		testee.NewID(1),
@@ -111,7 +113,8 @@ func TestInputValidatorRejectsQuestionnaireVersionMismatch(t *testing.T) {
 		t.Fatalf("Submit returned error: %v", err)
 	}
 	err = DefaultInputValidator{}.Validate(ExecutionInput{
-		Assessment: a,
+		Assessment:    a,
+		DescriptorKey: "factor_scoring",
 		Input: &evaluationinput.InputSnapshot{
 			Model:        evaluationinput.NewScaleModelSnapshot(&scalesnapshot.ScaleSnapshot{Code: "S-001", ScaleVersion: "1.0.0", Title: "Scale"}),
 			ModelPayload: evaluationinput.ScaleModelPayload{Scale: &scalesnapshot.ScaleSnapshot{Code: "S-001", ScaleVersion: "1.0.0", QuestionnaireCode: "Q-001", QuestionnaireVersion: "2.0.0", Status: "published", Factors: []scalesnapshot.FactorSnapshot{{Code: "total"}}}},
@@ -125,6 +128,18 @@ func TestInputValidatorRejectsQuestionnaireVersionMismatch(t *testing.T) {
 	if err == nil {
 		t.Fatal("Validate error = nil, want questionnaire version mismatch")
 	}
+}
+
+func scaleEvaluationModelRef(code, version string) assessment.EvaluationModelRef {
+	return assessment.NewEvaluationModelRefWithIdentity(
+		assessment.EvaluationModelKindScale,
+		modelcatalog.SubKindEmpty,
+		modelcatalog.AlgorithmScaleDefault,
+		meta.ID(0),
+		meta.NewCode(code),
+		version,
+		"Scale",
+	)
 }
 
 func TestExecutorOrchestratesValidatorAndHandler(t *testing.T) {

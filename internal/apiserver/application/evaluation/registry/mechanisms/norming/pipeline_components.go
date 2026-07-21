@@ -64,10 +64,10 @@ func (c factorNormCalculator) Calculate(ctx context.Context, calcInput evalpipel
 	if !ok || scaleSnapshot == nil {
 		return nil, fmt.Errorf("behavioral_rating model payload is required")
 	}
-	outcome, err := c.scoring.Execute(ctx, evalpipeline.ExecutionInput{
+	outcome, err := c.scoring.ExecuteForDescriptor(ctx, evalpipeline.ExecutionInput{
 		Assessment: execInput.Assessment,
 		Input:      factorscoring.CloneInputWithScaleSnapshot(execInput.Input, scaleSnapshot),
-	})
+	}, "factor_norm")
 	if err != nil {
 		return nil, err
 	}

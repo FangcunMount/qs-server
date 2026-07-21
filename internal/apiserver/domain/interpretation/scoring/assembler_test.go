@@ -54,7 +54,7 @@ func TestBuildFactorScoringDraftAssemblesScoreBasedContent(t *testing.T) {
 	}
 }
 
-func TestBuildFactorScoringDraftFailsOnInterpretRuleMiss(t *testing.T) {
+func TestBuildFactorScoringDraftFailsWithoutFrozenInterpretationAssets(t *testing.T) {
 	_, err := scoring.BuildFactorScoringDraft(builder.NewDefaultReportBuilder(), scoring.FactorScoringReportInput{
 		AssessmentID: report.ID(9002),
 		Scale: &scoring.ReportModel{Factors: []scoring.FactorReportModel{{
@@ -65,7 +65,7 @@ func TestBuildFactorScoringDraftFailsOnInterpretRuleMiss(t *testing.T) {
 		}}},
 		FactorScores: []scoring.FactorReportScore{{FactorCode: "TOTAL", RawScore: 20}},
 	})
-	if !errors.Is(err, scoring.ErrInterpretationRuleMiss) {
-		t.Fatalf("error = %v, want ErrInterpretationRuleMiss", err)
+	if !errors.Is(err, scoring.ErrInterpretationAssetsMissing) {
+		t.Fatalf("error = %v, want ErrInterpretationAssetsMissing", err)
 	}
 }

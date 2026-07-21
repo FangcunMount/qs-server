@@ -125,6 +125,8 @@ mysql:
   max-connection-life-time: 30m   # 缩短连接生命周期，避免超时
   max-idle-time: 10m              # 添加空闲超时
   log-level: 4 # 生产降低日志级别
+  location: "Asia/Shanghai"      # DATETIME 解析统一使用上海时区
+  session-time-zone: "+08:00"   # 每个连接显式设置 MySQL session time_zone
 
 # ----------------------------------------------------------------------------
 # 3.2 数据库迁移配置

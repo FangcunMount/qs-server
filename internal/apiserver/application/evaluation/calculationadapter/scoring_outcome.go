@@ -40,9 +40,10 @@ func dimensionResultsFromScoring(result *scoring.Result) []domainoutcome.Dimensi
 	dimensions := make([]domainoutcome.DimensionResult, 0, len(result.FactorScores))
 	for _, score := range result.FactorScores {
 		dim := domainoutcome.DimensionResult{
-			Code: score.FactorCode,
-			Name: score.FactorName,
-			Kind: domainoutcome.DimensionKindFactor,
+			Code:      score.FactorCode,
+			Name:      score.FactorName,
+			Kind:      domainoutcome.DimensionKindFactor,
+			SortOrder: score.SortOrder,
 			Score: &domainoutcome.ScoreValue{
 				Kind:  domainoutcome.ScoreKindRawTotal,
 				Value: score.RawScore,

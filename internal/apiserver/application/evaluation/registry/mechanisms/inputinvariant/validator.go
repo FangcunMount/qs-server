@@ -38,6 +38,9 @@ func (e *Error) Error() string {
 // payload-shape, scoring, and NormSubject checks.
 func Validate(in Input) error {
 	ctx := newFailureContext(in)
+	if in.DescriptorKey == "" {
+		return ctx.fail("input.descriptor.required", "runtime descriptor key is required")
+	}
 	if in.Assessment == nil {
 		return ctx.fail("input.assessment.required", "assessment is required")
 	}
@@ -96,16 +99,44 @@ func Validate(in Input) error {
 
 func requireModelIdentity(a *assessment.Assessment, snapshot *evaluationinput.InputSnapshot, ctx failureContext) error {
 	modelRef := a.EvaluationModelRef()
-	if modelRef == nil || snapshot.Model == nil {
-		return nil
+	if modelRef == nil || modelRef.IsEmpty() {
+		return ctx.fail("input.model_ref.required", "assessment evaluation model reference is required")
+	}
+	if snapshot.Model == nil {
+		return ctx.fail("input.model_snapshot.required", "evaluation model snapshot is required")
 	}
 	ctx.ModelRef = fmt.Sprintf("%s@%s", snapshot.Model.Code, snapshot.Model.Version)
+	refKind := string(modelRef.Kind())
+	snapshotKind := string(snapshot.Model.Kind)
+	if refKind == "" || snapshotKind == "" {
+		return ctx.fail("input.model.kind_required", "evaluation model kind is required")
+	}
+	if refKind != snapshotKind {
+		return ctx.fail("input.model.kind_mismatch", "evaluation model kind does not match the input model snapshot")
+	}
+	refSubKind := string(modelRef.SubKind())
+	if refSubKind != snapshot.Model.SubKind {
+		return ctx.fail("input.model.subkind_mismatch", "evaluation model subkind does not match the input model snapshot")
+	}
+	refAlgorithm := string(modelRef.Algorithm())
+	if refAlgorithm == "" || snapshot.Model.Algorithm == "" {
+		return ctx.fail("input.model.algorithm_required", "evaluation model algorithm is required")
+	}
+	if refAlgorithm != snapshot.Model.Algorithm {
+		return ctx.fail("input.model.algorithm_mismatch", "evaluation model algorithm does not match the input model snapshot")
+	}
 	refCode := modelRef.Code().String()
-	if refCode != "" && snapshot.Model.Code != "" && refCode != snapshot.Model.Code {
+	if refCode == "" || snapshot.Model.Code == "" {
+		return ctx.fail("input.model.code_required", "evaluation model code is required")
+	}
+	if refCode != snapshot.Model.Code {
 		return ctx.fail("input.model.code_mismatch", "evaluation model code does not match the input model snapshot")
 	}
 	refVersion := modelRef.Version()
-	if refVersion != "" && snapshot.Model.Version != "" && refVersion != snapshot.Model.Version {
+	if refVersion == "" || snapshot.Model.Version == "" {
+		return ctx.fail("input.model.version_required", "evaluation model version is required")
+	}
+	if refVersion != snapshot.Model.Version {
 		return ctx.fail("input.model.version_mismatch", "evaluation model version does not match the input model snapshot")
 	}
 	return nil

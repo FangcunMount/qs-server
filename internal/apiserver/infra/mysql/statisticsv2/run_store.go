@@ -23,6 +23,8 @@ type runPO struct {
 	TriggerType                                        string
 	RunMode                                            string
 	WindowStart, WindowEnd, AsOfDate                   time.Time
+	CacheGeneration                                    int64
+	CachePublishedAt                                   *time.Time
 	Status                                             string
 	Stage                                              string
 	SourceCountsJSON, FactCountsJSON, ResultCountsJSON []byte
@@ -36,6 +38,7 @@ type runPO struct {
 	LastCacheResumeReason                              string
 	LastCacheResumeAt                                  *time.Time
 	LastCacheResumeStatus                              string
+	CacheResumeAuditJSON                               []byte
 }
 
 func (runPO) TableName() string { return "statistics_sync_run" }
@@ -50,18 +53,26 @@ func (s *RunStore) dbFor(ctx context.Context) *gorm.DB {
 	return s.db.WithContext(ctx)
 }
 func (s *RunStore) Create(ctx context.Context, in appv2.Run) (*appv2.Run, error) {
-	var max uint32
-	s.dbFor(ctx).Table("statistics_sync_run").Where("batch_key=?", in.BatchKey).Select("COALESCE(MAX(attempt),0)").Scan(&max)
 	var operatorID *uint64
 	if in.OperatorID != 0 {
 		value := in.OperatorID
 		operatorID = &value
 	}
-	po := runPO{ID: meta.New().Uint64(), OrgID: in.OrgID, BatchKey: in.BatchKey, Attempt: max + 1, TriggerType: in.TriggerType, RunMode: string(in.Mode), WindowStart: in.Window.From, WindowEnd: in.Window.To, AsOfDate: in.AsOfDate, Status: string(in.Status), Stage: in.Stage, OperatorID: operatorID, Reason: in.Reason, StartedAt: in.StartedAt}
-	if err := s.dbFor(ctx).Create(&po).Error; err != nil {
-		return nil, err
+	for retry := 0; retry < 8; retry++ {
+		var latestAttempt uint32
+		if err := s.dbFor(ctx).Table("statistics_sync_run").Where("batch_key=?", in.BatchKey).Select("COALESCE(MAX(attempt),0)").Scan(&latestAttempt).Error; err != nil {
+			return nil, err
+		}
+		po := runPO{ID: meta.New().Uint64(), OrgID: in.OrgID, BatchKey: in.BatchKey, Attempt: latestAttempt + 1, TriggerType: in.TriggerType, RunMode: string(in.Mode), WindowStart: in.Window.From, WindowEnd: in.Window.To, AsOfDate: in.AsOfDate, Status: string(in.Status), Stage: in.Stage, OperatorID: operatorID, Reason: in.Reason, StartedAt: in.StartedAt}
+		if err := s.dbFor(ctx).Create(&po).Error; err != nil {
+			if mysql.IsDuplicateError(err) {
+				continue
+			}
+			return nil, err
+		}
+		return fromRunPO(po), nil
 	}
-	return fromRunPO(po), nil
+	return nil, fmt.Errorf("allocate statistics run attempt for batch %q after concurrent retries", in.BatchKey)
 }
 func (s *RunStore) UpdateProgress(ctx context.Context, id uint64, stage string, sources, facts, results map[string]int64) error {
 	values := map[string]any{"stage": stage}
@@ -97,17 +108,35 @@ func (s *RunStore) AssertPublishable(ctx context.Context, orgID int64, target ti
 func (s *RunStore) MarkDataCommitted(ctx context.Context, id uint64, at time.Time) error {
 	return s.dbFor(ctx).Table("statistics_sync_run").Where("id=?", id).Updates(map[string]any{"status": domainv2.RunStatusDataCommitted, "stage": "data_committed", "data_committed_at": at}).Error
 }
-func (s *RunStore) MarkCachePublishFailed(ctx context.Context, id uint64, message string, _ time.Time) error {
+func (s *RunStore) MarkCachePublished(ctx context.Context, id uint64, generation int64, at time.Time) error {
+	if generation <= 0 {
+		return fmt.Errorf("cache generation must be positive")
+	}
 	return s.dbFor(ctx).Table("statistics_sync_run").Where("id=?", id).Updates(map[string]any{
-		"status": domainv2.RunStatusDataCommitted, "stage": "publishing_cache",
-		"error_code": "cache_publish_failed", "error_message": truncateRunText(message, 1000),
+		"cache_generation": generation, "cache_published_at": at,
+		"error_code": "", "error_message": "",
 	}).Error
 }
-func (s *RunStore) RecordCacheResume(ctx context.Context, id uint64, operatorID uint64, reason, status string, at time.Time) error {
+func (s *RunStore) MarkCachePublishFailed(ctx context.Context, id uint64, generation int64, message string, at time.Time) error {
+	values := map[string]any{
+		"status": domainv2.RunStatusDataCommitted, "stage": "publishing_cache",
+		"error_code": "cache_publish_failed", "error_message": truncateRunText(message, 1000),
+	}
+	if generation > 0 {
+		values["cache_generation"] = generation
+		values["cache_published_at"] = at
+	}
+	return s.dbFor(ctx).Table("statistics_sync_run").Where("id=?", id).Updates(values).Error
+}
+func (s *RunStore) RecordCacheResume(ctx context.Context, id uint64, operatorID uint64, reason, status string, generation int64, at time.Time) error {
 	values := map[string]any{
 		"cache_resume_count":       gorm.Expr("cache_resume_count + 1"),
 		"last_cache_resume_reason": reason, "last_cache_resume_at": at,
 		"last_cache_resume_status": status,
+		"cache_resume_audit_json": gorm.Expr(
+			"JSON_ARRAY_APPEND(COALESCE(cache_resume_audit_json, JSON_ARRAY()), '$', JSON_OBJECT('operator_id', ?, 'reason', ?, 'status', ?, 'generation', ?, 'occurred_at', ?))",
+			operatorID, reason, status, generation, at.Format(time.RFC3339Nano),
+		),
 	}
 	if operatorID != 0 {
 		values["last_cache_resume_operator_id"] = operatorID
@@ -160,7 +189,7 @@ func fromRunPO(po runPO) *appv2.Run {
 	if mode == "" {
 		mode = domainv2.RunModePublish
 	}
-	r := &appv2.Run{ID: po.ID, OrgID: po.OrgID, BatchKey: po.BatchKey, Attempt: po.Attempt, TriggerType: po.TriggerType, Mode: mode, Window: domainv2.InstantRange{From: po.WindowStart, To: po.WindowEnd}, AsOfDate: po.AsOfDate, Status: domainv2.RunStatus(po.Status), Stage: po.Stage, Reason: po.Reason, StartedAt: po.StartedAt, DataCommittedAt: po.DataCommittedAt, FinishedAt: po.FinishedAt, ErrorCode: po.ErrorCode, ErrorMessage: po.ErrorMessage}
+	r := &appv2.Run{ID: po.ID, OrgID: po.OrgID, BatchKey: po.BatchKey, Attempt: po.Attempt, TriggerType: po.TriggerType, Mode: mode, Window: domainv2.InstantRange{From: po.WindowStart, To: po.WindowEnd}, AsOfDate: po.AsOfDate, CacheGeneration: po.CacheGeneration, CachePublishedAt: po.CachePublishedAt, Status: domainv2.RunStatus(po.Status), Stage: po.Stage, Reason: po.Reason, StartedAt: po.StartedAt, DataCommittedAt: po.DataCommittedAt, FinishedAt: po.FinishedAt, ErrorCode: po.ErrorCode, ErrorMessage: po.ErrorMessage}
 	r.CacheResumeCount = po.CacheResumeCount
 	r.LastCacheResumeReason = po.LastCacheResumeReason
 	r.LastCacheResumeAt = po.LastCacheResumeAt

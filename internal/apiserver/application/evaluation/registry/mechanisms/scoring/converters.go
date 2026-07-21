@@ -1,6 +1,8 @@
 package scoring
 
 import (
+	"sort"
+
 	calcscoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/scoring"
 	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
 	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
@@ -125,10 +127,11 @@ func modelFromCanonicalMeasure(snapshot *scalesnapshot.ScaleSnapshot) calcscorin
 		scoringByFactor[rule.FactorCode] = rule
 	}
 	factors := make([]calcscoring.Factor, 0, len(measure.Factors))
-	for _, item := range measure.Factors {
+	for _, item := range orderedMeasureFactors(measure) {
 		projected := calcscoring.Factor{
 			Code:           item.Code,
 			Title:          item.Title,
+			SortOrder:      measure.FactorGraph.SortOrders[item.Code],
 			IsTotalScore:   item.ResolvedRole() == factor.FactorRoleTotal,
 			InterpretRules: interpretByCode[item.Code],
 		}
@@ -146,6 +149,30 @@ func modelFromCanonicalMeasure(snapshot *scalesnapshot.ScaleSnapshot) calcscorin
 		Status:               snapshot.Status,
 		Factors:              factors,
 	}
+}
+
+func orderedMeasureFactors(measure *modeldefinition.MeasureSpec) []factor.Factor {
+	if measure == nil || len(measure.Factors) == 0 {
+		return nil
+	}
+	ordered := append([]factor.Factor(nil), measure.Factors...)
+	positions := make(map[string]int, len(measure.Factors))
+	for index, item := range measure.Factors {
+		positions[item.Code] = index
+	}
+	sort.SliceStable(ordered, func(i, j int) bool {
+		left, leftSet := measure.FactorGraph.SortOrders[ordered[i].Code]
+		right, rightSet := measure.FactorGraph.SortOrders[ordered[j].Code]
+		switch {
+		case leftSet && rightSet && left != right:
+			return left < right
+		case leftSet != rightSet:
+			return leftSet
+		default:
+			return positions[ordered[i].Code] < positions[ordered[j].Code]
+		}
+	})
+	return ordered
 }
 
 func applyMeasureScoring(projected *calcscoring.Factor, rule factor.Scoring) {

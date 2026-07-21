@@ -83,6 +83,20 @@ func TestScaleValidateForPublishRejectsMissingExecutableScoring(t *testing.T) {
 	}
 }
 
+func TestScaleValidateForPublishRejectsNonZeroScoringConstant(t *testing.T) {
+	t.Parallel()
+	model := publishableScaleShell()
+	model.DefinitionV2 = completeScaleDefinition()
+	model.DefinitionV2.Measure.Scoring[0].Constant = 10
+	handler := ScaleDefinitionHandler{QuestionnaireQuery: publishedQuestionnaireStub("Q", "1",
+		questionnaireapp.QuestionResult{Code: "Q1", Type: "single_choice", Options: []questionnaireapp.OptionResult{{Value: "A"}, {Value: "B"}}},
+	)}
+	issues := handler.ValidateForPublish(context.Background(), model)
+	if !hasIssueCode(issues, "factor.scoring.constant.unsupported") {
+		t.Fatalf("issues = %#v, want factor.scoring.constant.unsupported", issues)
+	}
+}
+
 func TestScaleValidateForPublishRejectsUnknownQuestionRef(t *testing.T) {
 	t.Parallel()
 	model := publishableScaleShell()

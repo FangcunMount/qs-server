@@ -16185,6 +16185,12 @@
                 "batch_key": {
                     "type": "string"
                 },
+                "cache_generation": {
+                    "type": "integer"
+                },
+                "cache_published_at": {
+                    "type": "string"
+                },
                 "cache_resume_count": {
                     "type": "integer"
                 },

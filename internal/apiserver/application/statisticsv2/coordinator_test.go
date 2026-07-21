@@ -44,7 +44,6 @@ type runStoreStub struct {
 	failed         int
 	committed      int
 	succeeded      int
-	nextStatus     domainv2.RunStatus
 	publishableErr error
 	failedStage    string
 	failedCode     string
@@ -87,10 +86,19 @@ func (s *runStoreStub) MarkDataCommitted(_ context.Context, _ uint64, at time.Ti
 	s.run.DataCommittedAt = &at
 	return nil
 }
-func (s *runStoreStub) MarkCachePublishFailed(context.Context, uint64, string, time.Time) error {
+func (s *runStoreStub) MarkCachePublished(_ context.Context, _ uint64, generation int64, at time.Time) error {
+	s.run.CacheGeneration = generation
+	s.run.CachePublishedAt = &at
 	return nil
 }
-func (s *runStoreStub) RecordCacheResume(context.Context, uint64, uint64, string, string, time.Time) error {
+func (s *runStoreStub) MarkCachePublishFailed(_ context.Context, _ uint64, generation int64, _ string, at time.Time) error {
+	if generation > 0 {
+		s.run.CacheGeneration = generation
+		s.run.CachePublishedAt = &at
+	}
+	return nil
+}
+func (s *runStoreStub) RecordCacheResume(context.Context, uint64, uint64, string, string, int64, time.Time) error {
 	return nil
 }
 func (s *runStoreStub) MarkSucceeded(_ context.Context, _ uint64, at time.Time) error {
@@ -120,15 +128,20 @@ func (lockRunnerStub) Run(ctx context.Context, _ locklease.WorkloadID, _ string,
 	return locklease.RunResult{Acquired: true}, body(ctx)
 }
 
-type cachePublisherStub struct{ err error }
+type cachePublisherStub struct {
+	generation int64
+	err        error
+}
 
-func (s cachePublisherStub) Publish(context.Context, int64, time.Time) error { return s.err }
+func (s cachePublisherStub) Publish(context.Context, int64, time.Time) (int64, error) {
+	return s.generation, s.err
+}
 
 type countingCachePublisher struct{ called int }
 
-func (s *countingCachePublisher) Publish(context.Context, int64, time.Time) error {
+func (s *countingCachePublisher) Publish(context.Context, int64, time.Time) (int64, error) {
 	s.called++
-	return nil
+	return int64(s.called), nil
 }
 
 func newCoordinatorForTest(t *testing.T, cache CachePublisher) (*Coordinator, *collectorStub, *projectionStub, *projectionStub, *runStoreStub, *int) {
@@ -160,7 +173,7 @@ func newCoordinatorForTest(t *testing.T, cache CachePublisher) (*Coordinator, *c
 }
 
 func TestCoordinatorCacheFailurePreservesDataCommitted(t *testing.T) {
-	coordinator, _, _, _, store, _ := newCoordinatorForTest(t, cachePublisherStub{err: errors.New("redis unavailable")})
+	coordinator, _, _, _, store, _ := newCoordinatorForTest(t, cachePublisherStub{generation: 8, err: errors.New("warmup unavailable")})
 	run, err := coordinator.Run(context.Background(), RunRequest{OrgID: 7, FromDate: time.Date(2026, 7, 21, 0, 0, 0, 0, domainv2.Shanghai), ToDate: time.Date(2026, 7, 21, 0, 0, 0, 0, domainv2.Shanghai), TriggerType: "manual"})
 	if err == nil {
 		t.Fatal("expected cache publication error")
@@ -170,6 +183,23 @@ func TestCoordinatorCacheFailurePreservesDataCommitted(t *testing.T) {
 	}
 	if store.failed != 0 || store.committed != 1 || store.succeeded != 0 {
 		t.Fatalf("failed=%d committed=%d succeeded=%d", store.failed, store.committed, store.succeeded)
+	}
+	if run.CacheGeneration != 8 || run.CachePublishedAt == nil {
+		t.Fatalf("switched generation was not recorded: %+v", run)
+	}
+}
+
+func TestCoordinatorPersistsPublishedCacheGeneration(t *testing.T) {
+	coordinator, _, _, _, _, _ := newCoordinatorForTest(t, cachePublisherStub{generation: 9})
+	run, err := coordinator.Run(context.Background(), RunRequest{
+		OrgID: 7, FromDate: time.Date(2026, 7, 21, 0, 0, 0, 0, domainv2.Shanghai),
+		ToDate: time.Date(2026, 7, 21, 0, 0, 0, 0, domainv2.Shanghai), TriggerType: "scheduled", Mode: domainv2.RunModePublish,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.Status != domainv2.RunStatusSucceeded || run.CacheGeneration != 9 || run.CachePublishedAt == nil {
+		t.Fatalf("run=%+v", run)
 	}
 }
 
@@ -282,7 +312,7 @@ func TestCoordinatorPersistsPartialCollectorCountsBeforeFailure(t *testing.T) {
 }
 
 func TestCoordinatorResumeCacheDoesNotRecollectOrReproject(t *testing.T) {
-	coordinator, collector, projection, global, store, _ := newCoordinatorForTest(t, cachePublisherStub{})
+	coordinator, collector, projection, global, store, _ := newCoordinatorForTest(t, cachePublisherStub{generation: 4})
 	store.run = Run{ID: 9, OrgID: 7, Mode: domainv2.RunModePublish, AsOfDate: time.Date(2026, 7, 21, 0, 0, 0, 0, domainv2.Shanghai), Status: domainv2.RunStatusDataCommitted}
 	run, err := coordinator.ResumeCache(context.Background(), 9)
 	if err != nil {
@@ -290,5 +320,8 @@ func TestCoordinatorResumeCacheDoesNotRecollectOrReproject(t *testing.T) {
 	}
 	if run.Status != domainv2.RunStatusSucceeded || collector.called != 0 || projection.called != 0 || global.called != 0 || store.succeeded != 1 {
 		t.Fatalf("run=%+v collector=%d projection=%d succeeded=%d", run, collector.called, projection.called, store.succeeded)
+	}
+	if run.CacheGeneration != 4 || run.CachePublishedAt == nil {
+		t.Fatalf("cache publication was not persisted: %+v", run)
 	}
 }

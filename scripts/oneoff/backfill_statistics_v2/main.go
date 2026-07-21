@@ -44,16 +44,18 @@ type options struct {
 }
 
 type runResult struct {
-	ID           uint64           `json:"id"`
-	Mode         string           `json:"mode"`
-	Status       string           `json:"status"`
-	Stage        string           `json:"stage"`
-	AsOfDate     string           `json:"as_of_date"`
-	SourceCounts map[string]int64 `json:"source_counts"`
-	FactCounts   map[string]int64 `json:"fact_counts"`
-	ResultCounts map[string]int64 `json:"result_counts"`
-	ErrorCode    string           `json:"error_code"`
-	ErrorMessage string           `json:"error_message"`
+	ID               uint64           `json:"id"`
+	Mode             string           `json:"mode"`
+	Status           string           `json:"status"`
+	Stage            string           `json:"stage"`
+	AsOfDate         string           `json:"as_of_date"`
+	CacheGeneration  int64            `json:"cache_generation"`
+	CachePublishedAt string           `json:"cache_published_at"`
+	SourceCounts     map[string]int64 `json:"source_counts"`
+	FactCounts       map[string]int64 `json:"fact_counts"`
+	ResultCounts     map[string]int64 `json:"result_counts"`
+	ErrorCode        string           `json:"error_code"`
+	ErrorMessage     string           `json:"error_message"`
 }
 
 type runResponse struct {
@@ -110,13 +112,13 @@ func run(args []string, output io.Writer) error {
 	}
 	for _, orgID := range cfg.OrgIDs {
 		for _, window := range splitWindows(cfg.From, cfg.To, cfg.WindowDays) {
-			fmt.Fprintf(output, "org=%d window=%s..%s mode=%s\n", orgID, window.From.Format(dateLayout), window.To.Format(dateLayout), cfg.Mode)
+			_, _ = fmt.Fprintf(output, "org=%d window=%s..%s mode=%s\n", orgID, window.From.Format(dateLayout), window.To.Format(dateLayout), cfg.Mode)
 			result, err := executeRun(client, cfg, orgID, window)
 			if err != nil {
 				return fmt.Errorf("org %d window %s..%s: %w", orgID, window.From.Format(dateLayout), window.To.Format(dateLayout), err)
 			}
 			encoded, _ := json.Marshal(result)
-			fmt.Fprintln(output, string(encoded))
+			_, _ = fmt.Fprintln(output, string(encoded))
 		}
 	}
 	return nil
@@ -180,7 +182,7 @@ func executeRun(client *http.Client, cfg options, orgID int64, window dateWindow
 	if err != nil {
 		return runResult{}, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	responseBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if readErr != nil {
 		return runResult{}, readErr

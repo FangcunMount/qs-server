@@ -65,6 +65,7 @@ func (e *Evaluator) calculateScores(ctx context.Context, input Input) ([]FactorS
 		factorScores = append(factorScores, FactorScore{
 			FactorCode:   factor.Code,
 			FactorName:   factor.Title,
+			SortOrder:    factor.SortOrder,
 			RawScore:     rawScore,
 			MaxScore:     cloneFloat64Ptr(factor.MaxScore),
 			RiskLevel:    RiskLevelNone,

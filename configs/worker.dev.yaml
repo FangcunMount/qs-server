@@ -82,6 +82,8 @@ mysql:
   max-open-connections: 50         # 最大打开连接数
   max-connection-life-time: "1h"   # 连接最大生存时间
   log-level: 4                     # 日志级别 (1=Silent, 2=Error, 3=Warn, 4=Info)
+  location: "Asia/Shanghai"       # DATETIME 解析统一使用上海时区
+  session-time-zone: "+08:00"    # 每个连接显式设置 MySQL session time_zone
 
 # -------------------------------------------------------
 # 4.2 MongoDB 数据库

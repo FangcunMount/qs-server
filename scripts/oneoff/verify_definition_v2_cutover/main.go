@@ -21,10 +21,13 @@ import (
 
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
+	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modelnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
+	evaluationinputport "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	mongoindexes "github.com/FangcunMount/qs-server/internal/pkg/mongodb"
 )
 
 const sampleLimit = 20
@@ -113,12 +116,12 @@ func auditMySQL(ctx context.Context, dsn string) ([]finding, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	if err := db.PingContext(ctx); err != nil {
 		return nil, err
 	}
 
-	items := make([]finding, 0, 4)
+	items := make([]finding, 0, 7)
 	assessment, err := querySamples(ctx, db, "assessment", "model_identity.incomplete", `
 SELECT CAST(id AS CHAR)
 FROM assessment
@@ -155,7 +158,87 @@ WHERE model_kind = '' OR model_algorithm IS NULL OR model_algorithm = ''
 		return nil, err
 	}
 	items = appendFinding(items, outcomes)
+
+	outcomeContracts, err := auditOutcomeContracts(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	items = append(items, outcomeContracts...)
 	return items, nil
+}
+
+type outcomeContractRow struct {
+	ID              string
+	SchemaVersion   uint
+	ModelKind       string
+	ModelSubKind    string
+	ModelAlgorithm  string
+	ModelCode       string
+	ModelVersion    string
+	DecisionKind    string
+	ReportInputJSON string
+	PayloadJSON     string
+}
+
+func auditOutcomeContracts(ctx context.Context, db *sql.DB) ([]finding, error) {
+	rows, err := db.QueryContext(ctx, `
+SELECT CAST(id AS CHAR), schema_version, model_kind, COALESCE(model_sub_kind, ''),
+       COALESCE(model_algorithm, ''), model_code, model_version,
+       COALESCE(decision_kind, ''), COALESCE(report_input_json, ''), payload_json
+FROM evaluation_outcome`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	byRule := map[string]*finding{}
+	for rows.Next() {
+		var row outcomeContractRow
+		if err := rows.Scan(
+			&row.ID, &row.SchemaVersion, &row.ModelKind, &row.ModelSubKind,
+			&row.ModelAlgorithm, &row.ModelCode, &row.ModelVersion,
+			&row.DecisionKind, &row.ReportInputJSON, &row.PayloadJSON,
+		); err != nil {
+			return nil, err
+		}
+		for _, rule := range auditOutcomeContractRow(row) {
+			addFindingRule(byRule, "evaluation_outcome", rule, row.ID)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return sortedFindings(byRule), nil
+}
+
+func auditOutcomeContractRow(row outcomeContractRow) []string {
+	rules := make([]string, 0, 3)
+	if row.SchemaVersion != domainoutcome.CurrentSchemaVersion {
+		rules = append(rules, "schema_version.not_2")
+	}
+	modelRef := evaluationinputport.ModelRef{
+		Kind: evaluationinputport.EvaluationModelKind(row.ModelKind), SubKind: row.ModelSubKind,
+		Algorithm: row.ModelAlgorithm, Code: row.ModelCode, Version: row.ModelVersion,
+	}
+	if issues := evaluationinputport.AuditReportInput([]byte(row.ReportInputJSON), modelRef); len(issues) > 0 {
+		rules = append(rules, "report_input.invalid")
+	}
+	if domain.DecisionKind(row.DecisionKind) == domain.DecisionKindNormLookup {
+		var execution domainoutcome.Execution
+		if json.Unmarshal([]byte(row.PayloadJSON), &execution) != nil || !hasNormReference(execution.Dimensions) {
+			rules = append(rules, "norm_reference.missing")
+		}
+	}
+	return rules
+}
+
+func hasNormReference(dimensions []domainoutcome.DimensionResult) bool {
+	for _, dimension := range dimensions {
+		if dimension.NormReference != nil && dimension.NormReference.TableVersion != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func querySamples(ctx context.Context, db *sql.DB, source, rule, query string) (finding, error) {
@@ -163,7 +246,7 @@ func querySamples(ctx context.Context, db *sql.DB, source, rule, query string) (
 	if err != nil {
 		return finding{}, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	result := finding{Source: source, Rule: rule}
 	for rows.Next() {
 		var sample string
@@ -183,7 +266,7 @@ func queryInvalidRefSamples(ctx context.Context, db *sql.DB, source, rule, query
 	if err != nil {
 		return finding{}, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	result := finding{Source: source, Rule: rule}
 	for rows.Next() {
 		var id, ref string
@@ -206,12 +289,22 @@ func auditMongo(ctx context.Context, uri, database string) ([]finding, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer client.Disconnect(context.Background())
+	defer func() { _ = client.Disconnect(context.Background()) }()
 	if err := client.Ping(ctx, nil); err != nil {
 		return nil, err
 	}
 	db := client.Database(database)
-	items := make([]finding, 0, 8)
+	items := make([]finding, 0, 12)
+	migrationItems, err := auditMongoMigrationState(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	items = append(items, migrationItems...)
+	indexItems, err := auditModelCatalogIndexes(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	items = append(items, indexItems...)
 	models := db.Collection("assessment_models")
 	for _, check := range []struct {
 		rule   string
@@ -263,6 +356,83 @@ func auditMongo(ctx context.Context, uri, database string) ([]finding, error) {
 	}
 	items = append(items, runtimeItems...)
 	return items, nil
+}
+
+func auditMongoMigrationState(ctx context.Context, db *mongo.Database) ([]finding, error) {
+	var state struct {
+		Version int64 `bson:"version"`
+		Dirty   bool  `bson:"dirty"`
+	}
+	err := db.Collection("schema_migrations").FindOne(ctx, bson.M{}).Decode(&state)
+	if err == mongo.ErrNoDocuments {
+		return []finding{{Source: "schema_migrations", Rule: "state.missing", Count: 1}}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !state.Dirty {
+		return nil, nil
+	}
+	return []finding{{
+		Source: "schema_migrations", Rule: "state.dirty", Count: 1,
+		Samples: []string{fmt.Sprintf("version=%d", state.Version)},
+	}}, nil
+}
+
+func auditModelCatalogIndexes(ctx context.Context, db *mongo.Database) ([]finding, error) {
+	byRule := map[string]*finding{}
+	legacyByCollection := mongoindexes.ForbiddenLegacyIndexNames()
+	for collection, required := range mongoindexes.RequiredUnifiedIndexNames() {
+		names, err := mongoIndexNames(ctx, db.Collection(collection))
+		if err != nil {
+			return nil, err
+		}
+		for _, rule := range auditIndexNames(collection, names, required, legacyByCollection[collection]) {
+			addFindingRule(byRule, "mongo_indexes", rule.rule, rule.sample)
+		}
+	}
+	return sortedFindings(byRule), nil
+}
+
+type indexAuditRule struct {
+	rule   string
+	sample string
+}
+
+func auditIndexNames(collection string, names map[string]struct{}, required, legacy []string) []indexAuditRule {
+	issues := make([]indexAuditRule, 0)
+	for _, name := range required {
+		if _, ok := names[name]; !ok {
+			issues = append(issues, indexAuditRule{rule: "required.missing", sample: collection + "/" + name})
+		}
+	}
+	for _, name := range legacy {
+		if _, ok := names[name]; ok {
+			issues = append(issues, indexAuditRule{rule: "legacy.present", sample: collection + "/" + name})
+		}
+	}
+	return issues
+}
+
+func mongoIndexNames(ctx context.Context, collection *mongo.Collection) (map[string]struct{}, error) {
+	cursor, err := collection.Indexes().List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+	names := make(map[string]struct{})
+	for cursor.Next(ctx) {
+		var row struct {
+			Name string `bson:"name"`
+		}
+		if err := cursor.Decode(&row); err != nil {
+			return nil, err
+		}
+		if row.Name != "" {
+			names[row.Name] = struct{}{}
+		}
+	}
+	return names, cursor.Err()
 }
 
 func auditNorms(ctx context.Context, repo *mongomodelcatalog.NormRepository) ([]finding, error) {
@@ -321,15 +491,33 @@ func auditPublishedRuntime(ctx context.Context, repo *mongomodelcatalog.Reposito
 }
 
 func addRule(items map[string]*finding, rule, sample string) {
-	item := items[rule]
+	addFindingRule(items, "published_runtime", rule, sample)
+}
+
+func addFindingRule(items map[string]*finding, source, rule, sample string) {
+	key := source + "\x00" + rule
+	item := items[key]
 	if item == nil {
-		item = &finding{Source: "published_runtime", Rule: rule}
-		items[rule] = item
+		item = &finding{Source: source, Rule: rule}
+		items[key] = item
 	}
 	item.Count++
 	if len(item.Samples) < sampleLimit {
 		item.Samples = append(item.Samples, sample)
 	}
+}
+
+func sortedFindings(byRule map[string]*finding) []finding {
+	keys := make([]string, 0, len(byRule))
+	for key := range byRule {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	out := make([]finding, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, *byRule[key])
+	}
+	return out
 }
 
 func mongoSamples(ctx context.Context, collection *mongo.Collection, source, rule string, filter bson.M) (finding, error) {
@@ -345,7 +533,7 @@ func mongoSamples(ctx context.Context, collection *mongo.Collection, source, rul
 	if err != nil {
 		return finding{}, err
 	}
-	defer cursor.Close(ctx)
+	defer func() { _ = cursor.Close(ctx) }()
 	for cursor.Next(ctx) {
 		var row struct {
 			ID             any    `bson:"_id"`

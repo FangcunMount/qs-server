@@ -27,10 +27,13 @@ func (statisticsV2RunStoreStub) AssertPublishable(context.Context, int64, time.T
 func (statisticsV2RunStoreStub) MarkDataCommitted(context.Context, uint64, time.Time) error {
 	return nil
 }
-func (statisticsV2RunStoreStub) MarkCachePublishFailed(context.Context, uint64, string, time.Time) error {
+func (statisticsV2RunStoreStub) MarkCachePublished(context.Context, uint64, int64, time.Time) error {
 	return nil
 }
-func (statisticsV2RunStoreStub) RecordCacheResume(context.Context, uint64, uint64, string, string, time.Time) error {
+func (statisticsV2RunStoreStub) MarkCachePublishFailed(context.Context, uint64, int64, string, time.Time) error {
+	return nil
+}
+func (statisticsV2RunStoreStub) RecordCacheResume(context.Context, uint64, uint64, string, string, int64, time.Time) error {
 	return nil
 }
 func (statisticsV2RunStoreStub) MarkSucceeded(context.Context, uint64, time.Time) error { return nil }

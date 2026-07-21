@@ -1,6 +1,7 @@
 package scoring
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
@@ -73,7 +74,7 @@ func TestPresentationByOutcomeCodeRewritesCopyWithoutChangingDecisionFact(t *tes
 	}
 }
 
-func TestPresentationFallsBackToScoreRematchWithoutAssets(t *testing.T) {
+func TestPresentationDoesNotFallBackToScoreRematchWithoutAssets(t *testing.T) {
 	t.Parallel()
 	model := &ReportModel{
 		Factors: []FactorReportModel{{
@@ -85,11 +86,12 @@ func TestPresentationFallsBackToScoreRematchWithoutAssets(t *testing.T) {
 	}
 	conclusion, suggestion, err := interpretScaleFactor(model, FactorReportScore{
 		FactorCode: "total", RawScore: 5, RiskLevel: report.RiskLevelLow,
+		Level: &report.ResultLevel{Code: "low"},
 	})
-	if err != nil {
-		t.Fatal(err)
+	if !errors.Is(err, ErrInterpretationAssetsMissing) {
+		t.Fatalf("error = %v, want ErrInterpretationAssetsMissing", err)
 	}
-	if conclusion != "legacy-conclusion" || suggestion != "legacy-suggestion" {
-		t.Fatalf("legacy fallback = (%q,%q)", conclusion, suggestion)
+	if conclusion != "" || suggestion != "" {
+		t.Fatalf("fallback presentation = (%q,%q), want empty", conclusion, suggestion)
 	}
 }

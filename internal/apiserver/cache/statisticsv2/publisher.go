@@ -23,12 +23,16 @@ func NewPublisher(generation *GenerationPublisher, warmer Warmer) *Publisher {
 	return &Publisher{generation: generation, warmer: warmer}
 }
 
-func (p *Publisher) Publish(ctx context.Context, orgID int64, asOfDate time.Time) error {
+func (p *Publisher) Publish(ctx context.Context, orgID int64, asOfDate time.Time) (int64, error) {
 	if p == nil || p.generation == nil || p.warmer == nil {
-		return fmt.Errorf("statistics v2 cache publisher is unavailable")
+		return 0, fmt.Errorf("statistics v2 cache publisher is unavailable")
 	}
-	if err := p.generation.Publish(ctx, orgID, asOfDate); err != nil {
-		return err
+	generation, err := p.generation.Publish(ctx, orgID, asOfDate)
+	if err != nil {
+		return 0, err
 	}
-	return p.warmer.Warm(ctx, orgID, asOfDate)
+	if err := p.warmer.Warm(ctx, orgID, asOfDate); err != nil {
+		return generation, err
+	}
+	return generation, nil
 }

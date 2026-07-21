@@ -25,8 +25,12 @@ func TestPublisherSwitchesGenerationBeforeWarmup(t *testing.T) {
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	warmer := &warmerStub{err: errors.New("warm failed")}
 	publisher := NewPublisher(NewGenerationPublisher(client), warmer)
-	if err := publisher.Publish(context.Background(), 9, time.Now()); err == nil {
+	generation, err := publisher.Publish(context.Background(), 9, time.Now())
+	if err == nil {
 		t.Fatal("warmup failure must be returned")
+	}
+	if generation != 1 {
+		t.Fatalf("generation=%d", generation)
 	}
 	if !warmer.called {
 		t.Fatal("warmer was not called")

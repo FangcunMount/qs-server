@@ -20,10 +20,25 @@ func (ScaleDefinitionHandler) Supports(identity domain.Identity) bool {
 
 // ValidateForPublish 验证发布
 func (h ScaleDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
-	return ComposePublishValidation(ctx, model, PublicationComposerOptions{
+	issues := ComposePublishValidation(ctx, model, PublicationComposerOptions{
 		QuestionnaireQuery:     h.QuestionnaireQuery,
 		StrategyCapabilityPath: capability.PathScaleDescriptor,
 	})
+	if model == nil || model.DefinitionV2 == nil {
+		return issues
+	}
+	for _, rule := range model.DefinitionV2.Measure.Scoring {
+		if rule.Constant == 0 {
+			continue
+		}
+		issues = append(issues, domain.DomainValidationIssue{
+			Field:   "measure.scoring[" + rule.FactorCode + "].constant",
+			Code:    "factor.scoring.constant.unsupported",
+			Message: "scale factor_scoring 不支持 scoring.constant；请移除该字段或使用具备 constant 语义的模型类型",
+			Level:   domain.ValidationLevelError,
+		})
+	}
+	return issues
 }
 
 // MaterializeSnapshot validates the DefinitionV2 scale runtime projection.

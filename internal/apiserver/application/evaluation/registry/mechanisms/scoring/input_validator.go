@@ -12,6 +12,8 @@ import (
 type ExecutionInput struct {
 	Assessment *assessment.Assessment
 	Input      *evaluationinput.InputSnapshot
+	// DescriptorKey records the exact runtime descriptor invoking factor scoring.
+	DescriptorKey string
 }
 
 // InputValidator 校验因子计分 execution input。
@@ -24,8 +26,9 @@ type DefaultInputValidator struct{}
 
 func (DefaultInputValidator) Validate(input ExecutionInput) error {
 	if err := inputinvariant.Validate(inputinvariant.Input{
-		Assessment: input.Assessment,
-		Snapshot:   input.Input,
+		Assessment:    input.Assessment,
+		Snapshot:      input.Input,
+		DescriptorKey: input.DescriptorKey,
 	}); err != nil {
 		return err
 	}

@@ -30,27 +30,44 @@ func (s *ReadStore) acquire(ctx context.Context) (context.Context, func(), error
 	return s.limiter.Acquire(ctx)
 }
 
-func (s *ReadStore) LatestSuccessfulSnapshot(ctx context.Context, orgID int64) (*appv2.Snapshot, error) {
+func (s *ReadStore) LatestVisibleSnapshot(ctx context.Context, orgID int64) (*appv2.Snapshot, error) {
 	ctx, release, err := s.acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer release()
-	var row struct{ AsOfDate, SnapshotAt time.Time }
+	var row struct {
+		ID              uint64
+		AsOfDate        time.Time
+		SnapshotAt      time.Time
+		CacheGeneration int64
+	}
 	err = s.db.WithContext(ctx).Raw(`
-		SELECT o.as_of_date,o.snapshot_at FROM statistics_v2_org_snapshot o
-		WHERE o.org_id=? AND EXISTS (
-		 SELECT 1 FROM statistics_sync_run r
-		 WHERE r.org_id=o.org_id AND r.as_of_date=o.as_of_date
-		   AND r.run_mode='publish' AND r.status='succeeded'
-		) LIMIT 1`, orgID).Scan(&row).Error
+		SELECT id,as_of_date,COALESCE(data_committed_at,finished_at,started_at) snapshot_at,cache_generation
+		FROM statistics_sync_run
+		WHERE org_id=? AND run_mode='publish'
+		  AND (status='succeeded' OR (status='data_committed' AND cache_generation>0))
+		ORDER BY id DESC LIMIT 1`, orgID).Scan(&row).Error
 	if err != nil {
 		return nil, err
 	}
 	if row.AsOfDate.IsZero() {
 		return nil, nil
 	}
-	return &appv2.Snapshot{AsOfDate: row.AsOfDate, SnapshotAt: row.SnapshotAt}, nil
+	var unsafeCount int64
+	err = s.db.WithContext(ctx).Raw(`
+		SELECT COUNT(*) FROM statistics_sync_run
+		WHERE org_id=? AND id>? AND (
+		  (run_mode='repair' AND status='succeeded') OR
+		  (run_mode='publish' AND status='data_committed' AND cache_generation=0)
+		)`, orgID, row.ID).Scan(&unsafeCount).Error
+	if err != nil {
+		return nil, err
+	}
+	return &appv2.Snapshot{
+		AsOfDate: row.AsOfDate, SnapshotAt: row.SnapshotAt,
+		VisibleRunID: row.ID, CacheGeneration: row.CacheGeneration, DatabaseReadable: unsafeCount == 0,
+	}, nil
 }
 
 func (s *ReadStore) SnapshotForDate(ctx context.Context, orgID int64, asOfDate time.Time) (*appv2.Snapshot, error) {
@@ -66,7 +83,7 @@ func (s *ReadStore) SnapshotForDate(ctx context.Context, orgID int64, asOfDate t
 	if row.AsOfDate.IsZero() {
 		return nil, nil
 	}
-	return &appv2.Snapshot{AsOfDate: row.AsOfDate, SnapshotAt: row.SnapshotAt}, nil
+	return &appv2.Snapshot{AsOfDate: row.AsOfDate, SnapshotAt: row.SnapshotAt, DatabaseReadable: true}, nil
 }
 
 func (s *ReadStore) Overview(ctx context.Context, orgID int64, from, to time.Time) (appv2.OverviewMetrics, error) {
@@ -300,7 +317,7 @@ func (s *ReadStore) CurrentClinicianTesteeSummary(ctx context.Context, orgID int
 	return value, err
 }
 
-func (s *ReadStore) ContentBatch(ctx context.Context, orgID int64, refs []appv2.ContentRef) ([]appv2.ContentItem, error) {
+func (s *ReadStore) ContentBatch(ctx context.Context, orgID int64, asOfDate time.Time, refs []appv2.ContentRef) ([]appv2.ContentItem, error) {
 	ctx, release, err := s.acquire(ctx)
 	if err != nil {
 		return nil, err
@@ -310,9 +327,9 @@ func (s *ReadStore) ContentBatch(ctx context.Context, orgID int64, refs []appv2.
 	for _, ref := range refs {
 		item := appv2.ContentItem{Kind: ref.Kind, Code: ref.Code, HasCompletion: ref.Kind != "questionnaire"}
 		if ref.Kind == "questionnaire" {
-			err = s.db.WithContext(ctx).Raw(`SELECT COALESCE(SUM(answersheet_submitted_count),0) total_submissions FROM statistics_assessment_daily WHERE org_id=? AND questionnaire_code=?`, orgID, ref.Code).Scan(&item).Error
+			err = s.db.WithContext(ctx).Raw(`SELECT COALESCE(SUM(answersheet_submitted_count),0) total_submissions FROM statistics_assessment_daily WHERE org_id=? AND stat_date<=? AND questionnaire_code=?`, orgID, asOfDate, ref.Code).Scan(&item).Error
 		} else {
-			err = s.db.WithContext(ctx).Raw(`SELECT COALESCE(SUM(assessment_created_count),0) total_submissions,COALESCE(SUM(outcome_committed_count),0) total_completions FROM statistics_assessment_daily WHERE org_id=? AND model_kind=? AND model_code=?`, orgID, ref.Kind, ref.Code).Scan(&item).Error
+			err = s.db.WithContext(ctx).Raw(`SELECT COALESCE(SUM(assessment_created_count),0) total_submissions,COALESCE(SUM(outcome_committed_count),0) total_completions FROM statistics_assessment_daily WHERE org_id=? AND stat_date<=? AND model_kind=? AND model_code=?`, orgID, asOfDate, ref.Kind, ref.Code).Scan(&item).Error
 			if item.TotalSubmissions > 0 {
 				item.CompletionRate = float64(item.TotalCompletions) * 100 / float64(item.TotalSubmissions)
 			}

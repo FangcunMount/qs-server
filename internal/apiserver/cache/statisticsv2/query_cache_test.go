@@ -20,7 +20,7 @@ func TestQueryCacheUsesGenerationAndFallsBackToL1Stale(t *testing.T) {
 	if hit, stale := cache.Get(context.Background(), 7, "overview:7d", &got); !hit || stale || got.Value != 42 {
 		t.Fatalf("hit=%v stale=%v got=%+v", hit, stale, got)
 	}
-	if err := cache.gen.Publish(context.Background(), 7, cache.now()); err != nil {
+	if _, err := cache.gen.Publish(context.Background(), 7, cache.now()); err != nil {
 		t.Fatal(err)
 	}
 	if hit, _ := cache.Get(context.Background(), 7, "overview:7d", &got); hit {

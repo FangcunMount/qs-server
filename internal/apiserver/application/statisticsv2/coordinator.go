@@ -26,6 +26,8 @@ type Run struct {
 	Mode                      domainv2.RunMode      `json:"mode"`
 	Window                    domainv2.InstantRange `json:"-"`
 	AsOfDate                  time.Time             `json:"as_of_date"`
+	CacheGeneration           int64                 `json:"cache_generation"`
+	CachePublishedAt          *time.Time            `json:"cache_published_at,omitempty"`
 	Status                    domainv2.RunStatus    `json:"status"`
 	Stage                     string                `json:"stage"`
 	Reason                    string                `json:"reason"`
@@ -50,8 +52,9 @@ type RunStore interface {
 	UpdateProgress(context.Context, uint64, string, map[string]int64, map[string]int64, map[string]int64) error
 	AssertPublishable(context.Context, int64, time.Time) error
 	MarkDataCommitted(context.Context, uint64, time.Time) error
-	MarkCachePublishFailed(context.Context, uint64, string, time.Time) error
-	RecordCacheResume(context.Context, uint64, uint64, string, string, time.Time) error
+	MarkCachePublished(context.Context, uint64, int64, time.Time) error
+	MarkCachePublishFailed(context.Context, uint64, int64, string, time.Time) error
+	RecordCacheResume(context.Context, uint64, uint64, string, string, int64, time.Time) error
 	MarkSucceeded(context.Context, uint64, time.Time) error
 	MarkFailed(context.Context, uint64, string, string, string, time.Time) error
 	Get(context.Context, uint64) (*Run, error)
@@ -59,7 +62,7 @@ type RunStore interface {
 }
 
 type CachePublisher interface {
-	Publish(context.Context, int64, time.Time) error
+	Publish(context.Context, int64, time.Time) (int64, error)
 }
 
 type CacheResumeRequest struct {
@@ -241,9 +244,10 @@ func daysBetween(from, to time.Time) int {
 
 func (c *Coordinator) execute(ctx context.Context, run *Run) error {
 	collectMode := domainv2.CollectModeNormal
-	if run.Mode == domainv2.RunModeValidate {
+	switch run.Mode {
+	case domainv2.RunModeValidate:
 		collectMode = domainv2.CollectModeValidate
-	} else if run.Mode == domainv2.RunModeRepair {
+	case domainv2.RunModeRepair:
 		collectMode = domainv2.CollectModeBackfill
 	}
 
@@ -301,7 +305,7 @@ func (c *Coordinator) execute(ctx context.Context, run *Run) error {
 		if err := c.project(txCtx, run.ID, c.globalEngine, request, resultCounts); err != nil {
 			return err
 		}
-		if err := c.store.MarkDataCommitted(txCtx, run.ID, c.now()); err != nil {
+		if err := c.store.MarkDataCommitted(txCtx, run.ID, snapshotAt); err != nil {
 			return executionError("data_committed", "result_tx_failed", err)
 		}
 		return nil
@@ -320,12 +324,16 @@ func (c *Coordinator) execute(ctx context.Context, run *Run) error {
 		if err := c.store.UpdateProgress(ctx, run.ID, "publishing_cache", nil, nil, nil); err != nil {
 			return executionError("publishing_cache", "run_progress_failed", err)
 		}
-		if err := c.cache.Publish(ctx, run.OrgID, run.AsOfDate); err != nil {
+		generation, err := c.cache.Publish(ctx, run.OrgID, run.AsOfDate)
+		if err != nil {
 			observeCachePublish("publish", err)
-			if markErr := c.store.MarkCachePublishFailed(ctx, run.ID, err.Error(), c.now()); markErr != nil {
+			if markErr := c.store.MarkCachePublishFailed(ctx, run.ID, generation, err.Error(), c.now()); markErr != nil {
 				err = errors.Join(err, fmt.Errorf("persist cache publication failure: %w", markErr))
 			}
 			return executionError("publishing_cache", "cache_publish_failed", err)
+		}
+		if err := c.store.MarkCachePublished(ctx, run.ID, generation, c.now()); err != nil {
+			return executionError("publishing_cache", "cache_publication_audit_failed", err)
 		}
 		observeCachePublish("publish", nil)
 	}
@@ -385,21 +393,27 @@ func (c *Coordinator) ResumeCache(ctx context.Context, id uint64, request ...Cac
 	if run == nil || run.Status != domainv2.RunStatusDataCommitted || run.Mode != domainv2.RunModePublish {
 		return nil, fmt.Errorf("run is not a publish run in data_committed state")
 	}
+	generation := run.CacheGeneration
 	if c.cache != nil {
-		if err := c.cache.Publish(ctx, run.OrgID, run.AsOfDate); err != nil {
+		generation, err = c.cache.Publish(ctx, run.OrgID, run.AsOfDate)
+		if err != nil {
 			observeCachePublish("resume", err)
-			if auditErr := c.store.RecordCacheResume(ctx, id, resume.OperatorID, resume.Reason, "failed", c.now()); auditErr != nil {
-				err = errors.Join(err, fmt.Errorf("persist cache resume audit: %w", auditErr))
-			}
-			if markErr := c.store.MarkCachePublishFailed(ctx, id, err.Error(), c.now()); markErr != nil {
+			if markErr := c.store.MarkCachePublishFailed(ctx, id, generation, err.Error(), c.now()); markErr != nil {
 				err = errors.Join(err, fmt.Errorf("persist cache publication failure: %w", markErr))
+			}
+			if auditErr := c.store.RecordCacheResume(ctx, id, resume.OperatorID, resume.Reason, "failed", generation, c.now()); auditErr != nil {
+				err = errors.Join(err, fmt.Errorf("persist cache resume audit: %w", auditErr))
 			}
 			latest, _ := c.store.Get(ctx, id)
 			return latest, err
 		}
+		if err := c.store.MarkCachePublished(ctx, id, generation, c.now()); err != nil {
+			_ = c.store.RecordCacheResume(ctx, id, resume.OperatorID, resume.Reason, "failed", generation, c.now())
+			return nil, fmt.Errorf("persist resumed cache generation: %w", err)
+		}
 		observeCachePublish("resume", nil)
 	}
-	if err := c.store.RecordCacheResume(ctx, id, resume.OperatorID, resume.Reason, "succeeded", c.now()); err != nil {
+	if err := c.store.RecordCacheResume(ctx, id, resume.OperatorID, resume.Reason, "succeeded", generation, c.now()); err != nil {
 		return nil, err
 	}
 	if err := c.store.MarkSucceeded(ctx, id, c.now()); err != nil {

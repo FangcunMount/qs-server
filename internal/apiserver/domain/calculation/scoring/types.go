@@ -35,6 +35,7 @@ type QuestionContribution struct {
 type Factor struct {
 	Code            string
 	Title           string
+	SortOrder       int
 	ScoringStrategy string
 	ScoringParams   CntParams
 	QuestionCodes   []string
@@ -106,6 +107,7 @@ type Result struct {
 type FactorScore struct {
 	FactorCode   string
 	FactorName   string
+	SortOrder    int
 	RawScore     float64
 	MaxScore     *float64
 	RiskLevel    RiskLevel

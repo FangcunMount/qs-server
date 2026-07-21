@@ -290,8 +290,8 @@ AssessmentModel head
 | --- | --- | --- | --- |
 | scale | 高 | 创建、编辑、发布、因子计分、区间判定、报告 | capability 元数据部分字段与真实管理入口不一致；暂不支持常模型 scale |
 | typology | 高但兼容面较多 | 统一运行时、四种决策、预览、类型/特质报告 | Algorithm 选项和历史发布身份并未完全统一，兼容 alias 较多 |
-| behavioral_rating | 中高 | BRIEF-2、感觉统合 SPM、复合因子、常模投影 | 代码仍允许无 Norm definition；NormSubject 生产链未闭环 |
-| cognitive | 中 | Raven SPM 正确答案、题组、总分、能力结论 | 仅一个成熟 Algorithm；服务端不执行限时；常模导入和 NormSubject 未闭环 |
+| behavioral_rating | 中高 | BRIEF-2、感觉统合 SPM、复合因子、常模投影、NormSubject 装配 | 目前只支持单 NormTableVersion 物化；多常模生命周期尚未产品化 |
+| cognitive | 中 | Raven SPM 正确答案、题组、总分、能力结论与可选常模投影 | 仅一个成熟 Algorithm；服务端不执行限时；新认知任务尚未产品化 |
 
 这里的成熟度是源码能力评估，不是医学有效性评价。量表和常模是否经过专业验证仍属于运营、医学和数据资产治理责任。
 

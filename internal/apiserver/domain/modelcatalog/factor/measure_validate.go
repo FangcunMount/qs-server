@@ -94,6 +94,7 @@ func ValidateMeasureSpecParts(factors []Factor, graph FactorGraph, scoring []Sco
 
 func validateFactorGraph(graph FactorGraph, byCode map[string]Factor, scoring []Scoring) []HierarchyIssue {
 	issues := make([]HierarchyIssue, 0)
+	issues = append(issues, validateFactorGraphSortOrders(graph, byCode)...)
 	seenEdge := make(map[string]struct{}, len(graph.Edges))
 	parentByChild := make(map[string]string, len(graph.Edges))
 	nodesInEdges := make(map[string]struct{}, len(graph.Edges)*2)
@@ -157,6 +158,35 @@ func validateFactorGraph(graph FactorGraph, byCode map[string]Factor, scoring []
 		issues = append(issues, validateFactorGraphReachability(graph, nodesInEdges)...)
 	}
 	issues = append(issues, validateFactorGraphScoringConsistency(graph, scoring)...)
+	return issues
+}
+
+func validateFactorGraphSortOrders(graph FactorGraph, byCode map[string]Factor) []HierarchyIssue {
+	issues := make([]HierarchyIssue, 0)
+	byOrder := make(map[int]string, len(graph.SortOrders))
+	for code, order := range graph.SortOrders {
+		if _, ok := byCode[code]; !ok {
+			issues = append(issues, HierarchyIssue{
+				Field: "factor_graph.sort_orders", Code: "factor_graph.sort_order.not_found",
+				Message: fmt.Sprintf("factor graph sort order 引用了不存在的因子 %s", code),
+			})
+		}
+		if order <= 0 {
+			issues = append(issues, HierarchyIssue{
+				Field: "factor_graph.sort_orders", Code: "factor_graph.sort_order.invalid",
+				Message: fmt.Sprintf("factor %s 的 sort order 必须大于 0", code),
+			})
+			continue
+		}
+		if previous, duplicate := byOrder[order]; duplicate {
+			issues = append(issues, HierarchyIssue{
+				Field: "factor_graph.sort_orders", Code: "factor_graph.sort_order.duplicate",
+				Message: fmt.Sprintf("factor %s 与 %s 使用了重复的 sort order %d", previous, code, order),
+			})
+			continue
+		}
+		byOrder[order] = code
+	}
 	return issues
 }
 

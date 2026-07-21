@@ -23,11 +23,11 @@ func GenerationKey(orgID int64) string {
 	return fmt.Sprintf("query:version:statistics:v2:org:%d", orgID)
 }
 
-func (p *GenerationPublisher) Publish(ctx context.Context, orgID int64, _ time.Time) error {
+func (p *GenerationPublisher) Publish(ctx context.Context, orgID int64, _ time.Time) (int64, error) {
 	if p == nil || p.client == nil {
-		return fmt.Errorf("statistics v2 generation cache is unavailable")
+		return 0, fmt.Errorf("statistics v2 generation cache is unavailable")
 	}
-	return p.client.Incr(ctx, GenerationKey(orgID)).Err()
+	return p.client.Incr(ctx, GenerationKey(orgID)).Result()
 }
 
 func (p *GenerationPublisher) Generation(ctx context.Context, orgID int64) (int64, error) {

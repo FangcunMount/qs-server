@@ -29,10 +29,11 @@ func TestNewRequiresMySQLDB(t *testing.T) {
 func TestNewBuildsServicesWithoutExposingCache(t *testing.T) {
 	t.Parallel()
 
-	client, err := mongo.NewClient(options.Client())
+	client, err := mongo.Connect(context.Background(), options.Client())
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
 	module, err := statistics.New(statistics.Deps{MySQLDB: &gorm.DB{}, MongoDB: client.Database("test"), LockRunner: lockRunnerStub{}})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)

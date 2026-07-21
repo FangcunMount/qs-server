@@ -37,11 +37,6 @@ func (r *Repository) ensureIndexes(ctx context.Context) error {
 	return nil
 }
 
-func isIndexNotFound(err error) bool {
-	var commandErr mongo.CommandError
-	return stderrors.As(err, &commandErr) && commandErr.HasErrorCode(27)
-}
-
 func (r *Repository) FindCompletedSubmission(ctx context.Context, metaInfo submitport.DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error) {
 	return r.findByIdempotencyKey(ctx, metaInfo)
 }

@@ -54,6 +54,28 @@ func TestValidateMeasureSpecPartsAcceptsFlatRootsWithoutEdges(t *testing.T) {
 	}
 }
 
+func TestValidateMeasureSpecPartsRejectsInvalidSortOrders(t *testing.T) {
+	t.Parallel()
+	factors := []factor.Factor{{Code: "a"}, {Code: "b"}}
+	tests := []struct {
+		name string
+		sort map[string]int
+		code string
+	}{
+		{name: "unknown factor", sort: map[string]int{"missing": 1}, code: "factor_graph.sort_order.not_found"},
+		{name: "non positive", sort: map[string]int{"a": 0}, code: "factor_graph.sort_order.invalid"},
+		{name: "duplicate", sort: map[string]int{"a": 1, "b": 1}, code: "factor_graph.sort_order.duplicate"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			issues := factor.ValidateMeasureSpecParts(factors, factor.FactorGraph{SortOrders: tt.sort}, nil)
+			if !hasHierarchyIssueCode(issues, tt.code) {
+				t.Fatalf("issues = %#v, want %s", issues, tt.code)
+			}
+		})
+	}
+}
+
 func TestValidateMeasureSpecPartsRejectsEdgesWithoutRoots(t *testing.T) {
 	t.Parallel()
 	issues := factor.ValidateMeasureSpecParts(

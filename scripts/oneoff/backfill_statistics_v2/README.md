@@ -37,3 +37,8 @@ QS_STATISTICS_V2_TOKEN='***' go run ./scripts/oneoff/backfill_statistics_v2 \
 `repair` 是历史回填的默认模式：它写入 Fact 并重建指定窗口的 Daily，但不会移动机构的
 `as_of_date` 或切换缓存。全部历史窗口修复并完成对账后，再对最近 7 个完整自然日显式执行
 一次 `--mode publish --confirm`，用于重建全局 Fulfillment/Snapshot 并发布新的缓存 Generation。
+
+从 migration `000055` 起，Repair 提交后、最终 Publish 完成前，V2 热请求仍可命中上一代缓存，
+但冷请求会返回 `statistics_publication_in_progress`，不会读取尚未正式发布的 Daily。操作窗口必须
+连续完成 Repair、对账和最终 Publish，不能把机构长期留在“结果已修复但未发布”状态。脚本输出的
+`cache_generation/cache_published_at` 用于核对最终 Publish 实际切换的缓存代际。

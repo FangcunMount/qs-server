@@ -5,6 +5,7 @@
 package options
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -20,6 +21,8 @@ type MySQLOptions struct {
 	MaxOpenConnections    int           `json:"max-open-connections,omitempty"     mapstructure:"max-open-connections"`
 	MaxConnectionLifeTime time.Duration `json:"max-connection-life-time,omitempty" mapstructure:"max-connection-life-time"`
 	LogLevel              int           `json:"log-level"                          mapstructure:"log-level"`
+	Location              string        `json:"location"                           mapstructure:"location"`
+	SessionTimeZone       string        `json:"session-time-zone"                  mapstructure:"session-time-zone"`
 }
 
 // NewMySQLOptions create a `zero` value instance.
@@ -33,12 +36,20 @@ func NewMySQLOptions() *MySQLOptions {
 		MaxOpenConnections:    100,
 		MaxConnectionLifeTime: time.Duration(10) * time.Second,
 		LogLevel:              1, // Silent
+		Location:              "Asia/Shanghai",
+		SessionTimeZone:       "+08:00",
 	}
 }
 
 // Validate verifies flags passed to MySQLOptions.
 func (o *MySQLOptions) Validate() []error {
 	errs := []error{}
+	if _, err := time.LoadLocation(o.Location); err != nil {
+		errs = append(errs, fmt.Errorf("invalid mysql location %q: %w", o.Location, err))
+	}
+	if _, err := time.Parse("-07:00", o.SessionTimeZone); err != nil {
+		errs = append(errs, fmt.Errorf("invalid mysql session time zone %q: %w", o.SessionTimeZone, err))
+	}
 
 	return errs
 }
@@ -68,4 +79,10 @@ func (o *MySQLOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.IntVar(&o.LogLevel, "mysql.log-mode", o.LogLevel, ""+
 		"Specify gorm log level.")
+
+	fs.StringVar(&o.Location, "mysql.location", o.Location, ""+
+		"IANA time zone used to parse MySQL DATETIME values.")
+
+	fs.StringVar(&o.SessionTimeZone, "mysql.session-time-zone", o.SessionTimeZone, ""+
+		"Fixed MySQL session time zone offset, for example +08:00.")
 }

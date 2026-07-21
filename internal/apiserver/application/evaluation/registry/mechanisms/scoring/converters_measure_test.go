@@ -72,6 +72,30 @@ func TestModelFromSnapshotRejectsFlatOnlyRuntimeProjection(t *testing.T) {
 	}
 }
 
+func TestModelFromSnapshotUsesFactorGraphSortOrders(t *testing.T) {
+	t.Parallel()
+	snapshot := &scalesnapshot.ScaleSnapshot{
+		Code: "SORTED",
+		Measure: &definition.MeasureSpec{
+			Factors: []factor.Factor{
+				{Code: "unspecified", Title: "Unspecified"},
+				{Code: "second", Title: "Second"},
+				{Code: "first", Title: "First"},
+			},
+			FactorGraph: factor.FactorGraph{SortOrders: map[string]int{"first": 1, "second": 2}},
+		},
+	}
+	model := modelFromSnapshot(snapshot)
+	if len(model.Factors) != 3 {
+		t.Fatalf("factors = %#v", model.Factors)
+	}
+	if model.Factors[0].Code != "first" || model.Factors[0].SortOrder != 1 ||
+		model.Factors[1].Code != "second" || model.Factors[1].SortOrder != 2 ||
+		model.Factors[2].Code != "unspecified" || model.Factors[2].SortOrder != 0 {
+		t.Fatalf("ordered factors = %#v", model.Factors)
+	}
+}
+
 func findCalcFactor(factors []calcscoring.Factor, code string) *calcscoring.Factor {
 	for i := range factors {
 		if factors[i].Code == code {

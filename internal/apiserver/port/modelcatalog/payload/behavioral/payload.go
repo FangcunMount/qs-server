@@ -96,25 +96,6 @@ func (s *Snapshot) ToScaleSnapshot() *scalesnapshot.ScaleSnapshot {
 	}
 }
 
-func cloneFactorSnapshot(item FactorSnapshot) FactorSnapshot {
-	return FactorSnapshot{
-		Code:            item.Code,
-		Title:           item.Title,
-		Role:            item.Role,
-		ParentCode:      item.ParentCode,
-		SortOrder:       item.SortOrder,
-		Level:           item.Level,
-		IsTotalScore:    item.IsTotalScore,
-		QuestionCodes:   cloneStrings(item.QuestionCodes),
-		ScoringStrategy: item.ScoringStrategy,
-		ScoringParams:   cloneScoringParams(item.ScoringParams),
-		MaxScore:        cloneFloat64(item.MaxScore),
-		InterpretRules:  cloneInterpretRules(item.InterpretRules),
-		Norm:            cloneNormRef(item.Norm),
-		ChildrenPolicy:  cloneChildrenPolicy(item.ChildrenPolicy),
-	}
-}
-
 func cloneStrings(items []string) []string {
 	if items == nil {
 		return nil
@@ -135,32 +116,6 @@ func cloneScoringParams(params *factor.ScoringParams) *factor.ScoringParams {
 		return nil
 	}
 	return &factor.ScoringParams{CntOptionContents: cloneStrings(params.CntOptionContents)}
-}
-
-func cloneInterpretRules(rules []InterpretRuleSnapshot) []InterpretRuleSnapshot {
-	if rules == nil {
-		return nil
-	}
-	return append([]InterpretRuleSnapshot(nil), rules...)
-}
-
-func cloneNormRef(ref *catalognorm.Ref) *catalognorm.Ref {
-	if ref == nil {
-		return nil
-	}
-	cloned := *ref
-	return &cloned
-}
-
-func cloneChildrenPolicy(policy *factor.ChildrenPolicy) *factor.ChildrenPolicy {
-	if policy == nil {
-		return nil
-	}
-	return &factor.ChildrenPolicy{
-		Strategy: policy.Strategy,
-		Children: cloneStrings(policy.Children),
-		Weights:  cloneWeights(policy.Weights),
-	}
 }
 
 func cloneWeights(weights map[string]float64) map[string]float64 {

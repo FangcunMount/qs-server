@@ -91,6 +91,8 @@ func (dm *DatabaseManager) initMySQL(ctx context.Context) error {
 		MaxOpenConnections:    dm.config.MySQLOptions.MaxOpenConnections,
 		MaxConnectionLifeTime: dm.config.MySQLOptions.MaxConnectionLifeTime,
 		LogLevel:              dm.config.MySQLOptions.LogLevel,
+		Location:              dm.config.MySQLOptions.Location,
+		SessionTimeZone:       dm.config.MySQLOptions.SessionTimeZone,
 		Logger:                logger.NewGormLogger(dm.config.MySQLOptions.LogLevel),
 	}
 
