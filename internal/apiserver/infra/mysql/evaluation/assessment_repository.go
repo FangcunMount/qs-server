@@ -54,7 +54,7 @@ func (r *assessmentRepository) FindByID(ctx context.Context, id assessment.ID) (
 	po, err := r.BaseRepository.FindByID(ctx, id.Uint64())
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.WithCode(code.ErrAssessmentNotFound, "assessment not found")
+			return nil, errors.WrapC(assessment.ErrNotFound, code.ErrAssessmentNotFound, "assessment not found")
 		}
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func (r *assessmentRepository) FindByAnswerSheetID(ctx context.Context, answerSh
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.WithCode(code.ErrAssessmentNotFound, "assessment not found")
+			return nil, errors.WrapC(assessment.ErrNotFound, code.ErrAssessmentNotFound, "assessment not found")
 		}
 		return nil, err
 	}

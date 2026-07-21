@@ -6,9 +6,12 @@ import (
 	"reflect"
 	"testing"
 
+	cberrors "github.com/FangcunMount/component-base/pkg/errors"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	evaluationintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 type scoringStub struct {
@@ -40,7 +43,7 @@ func (s *intakeStub) FindByAnswerSheetID(context.Context, uint64) (*evaluationin
 	if s.findErr != nil {
 		return nil, s.findErr
 	}
-	return nil, errors.New("not found")
+	return nil, evalerrors.AssessmentNotFound(errors.New("missing"), "测评不存在")
 }
 func (s *intakeStub) CreateForAnswerSheet(_ context.Context, cmd evaluationintake.CreateCommand) (*evaluationintake.Assessment, error) {
 	*s.calls = append(*s.calls, "create")
@@ -246,6 +249,104 @@ func TestEnsureIncompleteFrozenAdmissionFailsClosed(t *testing.T) {
 		t.Fatal("expected incomplete assessment admission to fail closed")
 	}
 	if !reflect.DeepEqual(calls, []string{"score"}) {
+		t.Fatalf("calls = %v", calls)
+	}
+}
+
+func TestEnsureFindDependencyErrorDoesNotCreate(t *testing.T) {
+	calls := []string{}
+	intake := &intakeStub{
+		calls:   &calls,
+		created: &evaluationintake.Assessment{ID: 91, Status: "pending"},
+		findErr: evalerrors.Database(errors.New("timeout"), "查询测评失败"),
+	}
+	svc := NewService(scoringStub{calls: &calls}, boundScaleBinding(), nil, nil, intake, nil)
+
+	if _, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8}); err == nil {
+		t.Fatal("expected dependency error")
+	}
+	if !reflect.DeepEqual(calls, []string{"score", "find"}) {
+		t.Fatalf("calls = %v, want score+find without create", calls)
+	}
+}
+
+func TestEnsureNotFoundCreatesBoundAssessment(t *testing.T) {
+	calls := []string{}
+	intake := &intakeStub{
+		calls:   &calls,
+		created: &evaluationintake.Assessment{ID: 91, Status: "pending"},
+	}
+	svc := NewService(scoringStub{calls: &calls}, boundScaleBinding(), nil, nil, intake, nil)
+
+	result, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.AssessmentID != 91 || !result.Created {
+		t.Fatalf("result = %#v", result)
+	}
+	if !reflect.DeepEqual(calls, []string{"score", "find", "create", "submit"}) {
+		t.Fatalf("calls = %v", calls)
+	}
+}
+
+type duplicateThenRefindIntake struct {
+	calls     *[]string
+	findCalls int
+	existing  *evaluationintake.Assessment
+	refindErr error
+}
+
+func (s *duplicateThenRefindIntake) FindByAnswerSheetID(context.Context, uint64) (*evaluationintake.Assessment, error) {
+	*s.calls = append(*s.calls, "find")
+	s.findCalls++
+	if s.findCalls == 1 {
+		return nil, evalerrors.AssessmentNotFound(errors.New("missing"), "测评不存在")
+	}
+	if s.refindErr != nil {
+		return nil, s.refindErr
+	}
+	return s.existing, nil
+}
+func (s *duplicateThenRefindIntake) CreateForAnswerSheet(context.Context, evaluationintake.CreateCommand) (*evaluationintake.Assessment, error) {
+	*s.calls = append(*s.calls, "create")
+	return nil, cberrors.WithCode(code.ErrAssessmentDuplicate, "assessment already exists")
+}
+func (s *duplicateThenRefindIntake) SubmitForEvaluation(context.Context, uint64) (*evaluationintake.Assessment, error) {
+	*s.calls = append(*s.calls, "submit")
+	return s.existing, nil
+}
+
+func TestEnsureDuplicateThenRefindReusesAssessment(t *testing.T) {
+	calls := []string{}
+	intake := &duplicateThenRefindIntake{
+		calls:    &calls,
+		existing: &evaluationintake.Assessment{ID: 91, Status: "pending"},
+	}
+	svc := NewService(scoringStub{calls: &calls}, boundScaleBinding(), nil, nil, intake, nil)
+	result, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.AssessmentID != 91 || result.Created || !result.AutoSubmitted {
+		t.Fatalf("result = %#v", result)
+	}
+	if !reflect.DeepEqual(calls, []string{"score", "find", "create", "find", "submit"}) {
+		t.Fatalf("calls = %v", calls)
+	}
+}
+
+func TestEnsureDuplicateThenRefindDependencyFails(t *testing.T) {
+	calls := []string{}
+	intake := &duplicateThenRefindIntake{
+		calls:     &calls,
+		refindErr: evalerrors.Database(errors.New("timeout"), "查询测评失败"),
+	}
+	svc := NewService(scoringStub{calls: &calls}, boundScaleBinding(), nil, nil, intake, nil)
+	if _, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8}); err == nil {
+		t.Fatal("expected dependency error after duplicate")
+	}
+	if !reflect.DeepEqual(calls, []string{"score", "find", "create", "find"}) {
 		t.Fatalf("calls = %v", calls)
 	}
 }

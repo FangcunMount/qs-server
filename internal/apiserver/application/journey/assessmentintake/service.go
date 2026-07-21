@@ -155,7 +155,9 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 	}
 
 	// 查找已存在的评估（含历史空壳 Assessment 的幂等复用）
-	if existing, findErr := s.intake.FindByAnswerSheetID(ctx, command.AnswerSheetID); findErr == nil && existing != nil {
+	existing, findErr := s.intake.FindByAnswerSheetID(ctx, command.AnswerSheetID)
+	switch {
+	case findErr == nil && existing != nil:
 		autoSubmitted, submitErr := s.submitPendingBoundAssessment(ctx, command, existing, bound)
 		if submitErr != nil {
 			return nil, submitErr
@@ -170,9 +172,25 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 			"assessment_status", existing.Status,
 			"bound", bound,
 			"auto_submitted", autoSubmitted,
+			"find_result", "found",
 			"result", "idempotent_hit",
 		)
 		return &Result{AssessmentID: existing.ID, AutoSubmitted: autoSubmitted}, nil
+	case findErr != nil && !evalerrors.IsAssessmentNotFound(findErr):
+		l.Errorw("答卷测评查询依赖失败，跳过创建",
+			"action", "ensure_assessment",
+			"answersheet_id", command.AnswerSheetID,
+			"find_result", "dependency_error",
+			"error", findErr.Error(),
+		)
+		return nil, findErr
+	default:
+		l.Infow("答卷尚无关联测评",
+			"action", "ensure_assessment",
+			"answersheet_id", command.AnswerSheetID,
+			"find_result", "not_found",
+			"bound", bound,
+		)
 	}
 
 	// 独立 Questionnaire：保留 AnswerSheet 与基础题分后结束，不创建 Assessment。
@@ -190,13 +208,30 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 	created, err := s.intake.CreateForAnswerSheet(ctx, dto)
 	if err != nil {
 		if errors.IsCode(err, code.ErrAssessmentDuplicate) {
-			if existing, findErr := s.intake.FindByAnswerSheetID(ctx, command.AnswerSheetID); findErr == nil && existing != nil {
+			existing, findErr := s.intake.FindByAnswerSheetID(ctx, command.AnswerSheetID)
+			switch {
+			case findErr == nil && existing != nil:
 				autoSubmitted, submitErr := s.submitPendingBoundAssessment(ctx, command, existing, bound)
 				if submitErr != nil {
 					return nil, submitErr
 				}
 				s.completePlanBestEffort(ctx, command.OrgID, matched, existing.ID)
+				l.Infow("测评创建冲突后复用已有测评",
+					"action", "ensure_assessment",
+					"answersheet_id", command.AnswerSheetID,
+					"assessment_id", existing.ID,
+					"find_result", "found",
+					"result", "duplicate_hit",
+				)
 				return &Result{AssessmentID: existing.ID, AutoSubmitted: autoSubmitted}, nil
+			case findErr != nil && !evalerrors.IsAssessmentNotFound(findErr):
+				l.Errorw("测评创建冲突后再查依赖失败",
+					"action", "ensure_assessment",
+					"answersheet_id", command.AnswerSheetID,
+					"find_result", "dependency_error",
+					"error", findErr.Error(),
+				)
+				return nil, findErr
 			}
 		}
 		return nil, err

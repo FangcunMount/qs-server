@@ -25,6 +25,10 @@ func AssessmentNotFound(err error, format string, args ...interface{}) error {
 	return cberrors.WrapC(err, errorCode.ErrAssessmentNotFound, format, args...)
 }
 
+func IsAssessmentNotFound(err error) bool {
+	return cberrors.IsCode(err, errorCode.ErrAssessmentNotFound)
+}
+
 func MedicalScaleNotFound(err error, format string, args ...interface{}) error {
 	return cberrors.WrapC(err, errorCode.ErrMedicalScaleNotFound, format, args...)
 }

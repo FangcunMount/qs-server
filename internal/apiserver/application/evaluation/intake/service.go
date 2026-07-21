@@ -117,7 +117,10 @@ func (s *service) SubmitForEvaluation(ctx context.Context, id uint64) (*Assessme
 func (s *service) FindByAnswerSheetID(ctx context.Context, id uint64) (*Assessment, error) {
 	a, err := s.repo.FindByAnswerSheetID(ctx, domainassessment.NewAnswerSheetRef(meta.FromUint64(id)))
 	if err != nil {
-		return nil, evalerrors.AssessmentNotFound(err, "测评不存在")
+		if domainassessment.IsNotFoundError(err) || evalerrors.IsAssessmentNotFound(err) {
+			return nil, evalerrors.AssessmentNotFound(err, "测评不存在")
+		}
+		return nil, evalerrors.Database(err, "查询测评失败")
 	}
 	return resultFromDomain(a)
 }
