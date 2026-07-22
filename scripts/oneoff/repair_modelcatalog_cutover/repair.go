@@ -467,7 +467,7 @@ func inspectModels(ctx context.Context, db *mongo.Database, plan *repairPlan) er
 		return fmt.Errorf("count legacy model documents: %w", err)
 	}
 
-	normRepo := mongomodelcatalog.NewNormRepository(db)
+	normRepo := plannedNormRepository{base: mongomodelcatalog.NewNormRepository(db)}
 	questionnaireRepo := mongoquestionnaire.NewRepository(db)
 	questionnaireQuery := questionnaireapp.NewQueryService(
 		questionnaireRepo,
@@ -534,6 +534,56 @@ func inspectModels(ctx context.Context, db *mongo.Database, plan *repairPlan) er
 		}
 	}
 	return nil
+}
+
+// plannedNormRepository presents the exact post-repair Norm view to the
+// Definition publish guards during dry-run. It never writes and never hides an
+// unknown Norm error; apply persists the same known repair in the transaction.
+type plannedNormRepository struct {
+	base modelcatalogport.NormRepository
+}
+
+func (r plannedNormRepository) UpsertNorm(context.Context, *modelnorm.Norm) error {
+	return fmt.Errorf("planned norm repository is read-only")
+}
+
+func (r plannedNormRepository) FindNorm(ctx context.Context, tableVersion string) (*modelnorm.Norm, error) {
+	if r.base == nil {
+		return nil, fmt.Errorf("base norm repository is required")
+	}
+	table, err := r.base.FindNorm(ctx, tableVersion)
+	if err != nil || table == nil {
+		return table, err
+	}
+	planned := cloneNorm(table)
+	if _, err := normalizeKnownNormCorruption(planned); err != nil {
+		return nil, err
+	}
+	return planned, nil
+}
+
+func (r plannedNormRepository) ListNorms(ctx context.Context, filter modelcatalogport.NormListFilter) ([]*modelnorm.Norm, int64, error) {
+	if r.base == nil {
+		return nil, 0, fmt.Errorf("base norm repository is required")
+	}
+	return r.base.ListNorms(ctx, filter)
+}
+
+func cloneNorm(table *modelnorm.Norm) *modelnorm.Norm {
+	if table == nil {
+		return nil
+	}
+	out := *table
+	if table.Factors == nil {
+		return &out
+	}
+	out.Factors = make([]modelnorm.FactorTable, len(table.Factors))
+	for index := range table.Factors {
+		out.Factors[index] = table.Factors[index]
+		out.Factors[index].Bands = append([]modelnorm.Band(nil), table.Factors[index].Bands...)
+		out.Factors[index].Lookup = append([]modelnorm.LookupEntry(nil), table.Factors[index].Lookup...)
+	}
+	return &out
 }
 
 func canonicalRepairItem(

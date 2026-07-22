@@ -258,6 +258,34 @@ func TestNormalizeKnownNormCorruptionRequiresExactBRIEF2Row(t *testing.T) {
 	}
 }
 
+func TestPlannedNormRepositoryExposesPostRepairViewWithoutMutatingStoredTable(t *testing.T) {
+	t.Parallel()
+	stored := &modelnorm.Norm{
+		TableVersion: brief2LegacyNormVersion,
+		FormVariant:  "parent",
+		Kind:         domain.KindBehavioralRating,
+		Algorithm:    domain.AlgorithmBrief2,
+		Factors: []modelnorm.FactorTable{{FactorCode: brief2LegacyNormFactor, Lookup: []modelnorm.LookupEntry{
+			{RawScoreMin: 125, RawScoreMax: 125, MinAgeMonths: 60, MaxAgeMonths: 95, Gender: "male", TScore: 65, Percentile: 952},
+		}}},
+	}
+	repo := plannedNormRepository{base: normRepositoryStub{table: stored}}
+
+	planned, err := repo.FindNorm(context.Background(), brief2LegacyNormVersion)
+	if err != nil {
+		t.Fatalf("FindNorm() error = %v", err)
+	}
+	if got := planned.Factors[0].Lookup[0].Percentile; got != 92 {
+		t.Fatalf("planned percentile = %v, want 92", got)
+	}
+	if got := stored.Factors[0].Lookup[0].Percentile; got != 952 {
+		t.Fatalf("stored percentile mutated to %v", got)
+	}
+	if err := modelnorm.ValidateImport(planned); err != nil {
+		t.Fatalf("planned norm is invalid: %v", err)
+	}
+}
+
 func TestMySQLDerivedHistoryTablesIncludesOnlyExistingHistoryTables(t *testing.T) {
 	t.Parallel()
 	db, mock, err := sqlmock.New()
@@ -423,6 +451,22 @@ type recordingRepairCollection struct {
 	deleteCalls      int
 	updateOneCalls   int
 	updateManyCalls  int
+}
+
+type normRepositoryStub struct {
+	table *modelnorm.Norm
+	err   error
+}
+
+func (s normRepositoryStub) UpsertNorm(context.Context, *modelnorm.Norm) error { return s.err }
+func (s normRepositoryStub) FindNorm(context.Context, string) (*modelnorm.Norm, error) {
+	return s.table, s.err
+}
+func (s normRepositoryStub) ListNorms(context.Context, modelcatalogport.NormListFilter) ([]*modelnorm.Norm, int64, error) {
+	if s.table == nil {
+		return nil, 0, s.err
+	}
+	return []*modelnorm.Norm{s.table}, 1, s.err
 }
 
 func (c *recordingRepairCollection) DeleteMany(_ context.Context, filter interface{}, _ ...*options.DeleteOptions) (*mongo.DeleteResult, error) {
