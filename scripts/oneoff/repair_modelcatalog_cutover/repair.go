@@ -527,9 +527,7 @@ func inspectModels(ctx context.Context, db *mongo.Database, plan *repairPlan) er
 			continue
 		}
 		item, issues := canonicalRepairItem(ctx, db, registry, current)
-		for _, issue := range issues {
-			plan.Issues = append(plan.Issues, issue)
-		}
+		plan.Issues = append(plan.Issues, issues...)
 		if len(issues) == 0 {
 			plan.Repairs = append(plan.Repairs, item)
 		}

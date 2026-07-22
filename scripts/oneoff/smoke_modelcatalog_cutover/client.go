@@ -183,7 +183,7 @@ func (c *smokeClient) checkReady(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(response.Body, 2048))
 		return fmt.Errorf("GET /readyz returned HTTP %d: %s", response.StatusCode, strings.TrimSpace(string(body)))
@@ -467,7 +467,7 @@ func (c *smokeClient) doJSON(ctx context.Context, method, path string, input, ou
 	if err != nil {
 		return err
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	contents, err := io.ReadAll(io.LimitReader(response.Body, 4<<20))
 	if err != nil {
 		return err

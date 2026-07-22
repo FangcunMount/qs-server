@@ -9,7 +9,6 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	domainstats "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
-	statisticsDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -234,7 +233,7 @@ func (s *ReadService) resolve(ctx context.Context, orgID int64, filter QueryFilt
 	if snapshot == nil {
 		return DateRange{}, Freshness{}, databaseReadPermit{}, errors.WithCode(code.ErrStatisticsNotReady, "statistics_not_ready")
 	}
-	asOf := statisticsDomain.BusinessDate(snapshot.AsOfDate)
+	asOf := domainstats.BusinessDate(snapshot.AsOfDate)
 	preset := strings.TrimSpace(filter.Preset)
 	if preset == "" {
 		preset = "7d"
@@ -249,11 +248,11 @@ func (s *ReadService) resolve(ctx context.Context, orgID int64, filter QueryFilt
 		rangeValue.From, rangeValue.To = asOf.AddDate(0, 0, -29), asOf
 	case "custom":
 		var parseErr error
-		rangeValue.From, parseErr = time.ParseInLocation("2006-01-02", strings.TrimSpace(filter.From), statisticsDomain.Shanghai)
+		rangeValue.From, parseErr = time.ParseInLocation("2006-01-02", strings.TrimSpace(filter.From), domainstats.Shanghai)
 		if parseErr != nil {
 			return DateRange{}, Freshness{}, databaseReadPermit{}, errors.WithCode(code.ErrInvalidArgument, "invalid from date")
 		}
-		rangeValue.To, parseErr = time.ParseInLocation("2006-01-02", strings.TrimSpace(filter.To), statisticsDomain.Shanghai)
+		rangeValue.To, parseErr = time.ParseInLocation("2006-01-02", strings.TrimSpace(filter.To), domainstats.Shanghai)
 		if parseErr != nil {
 			return DateRange{}, Freshness{}, databaseReadPermit{}, errors.WithCode(code.ErrInvalidArgument, "invalid to date")
 		}
@@ -263,7 +262,7 @@ func (s *ReadService) resolve(ctx context.Context, orgID int64, filter QueryFilt
 	if rangeValue.To.After(asOf) || rangeValue.From.After(rangeValue.To) || rangeValue.To.Sub(rangeValue.From) > 365*24*time.Hour {
 		return DateRange{}, Freshness{}, databaseReadPermit{}, errors.WithCode(code.ErrInvalidArgument, "statistics date range is invalid or exceeds 366 days")
 	}
-	previousDay := statisticsDomain.BusinessDate(s.now()).AddDate(0, 0, -1)
+	previousDay := domainstats.BusinessDate(s.now()).AddDate(0, 0, -1)
 	observeFreshness(orgID, asOf, previousDay)
 	freshness := Freshness{AsOfDate: asOf.Format("2006-01-02"), SnapshotAt: snapshot.SnapshotAt, IsStale: asOf.Before(previousDay)}
 	return rangeValue, freshness, databaseReadPermit{visibleRunID: snapshot.VisibleRunID, readable: snapshot.DatabaseReadable}, nil
@@ -366,14 +365,14 @@ func (s *ReadService) overviewResolved(ctx context.Context, orgID int64, r DateR
 // It intentionally resolves the just-committed snapshot directly because the
 // SyncRun is still data_committed until prewarming finishes.
 func (s *ReadService) Warm(ctx context.Context, orgID int64, asOfDate time.Time) error {
-	snapshot, err := s.store.SnapshotForDate(ctx, orgID, statisticsDomain.BusinessDate(asOfDate))
+	snapshot, err := s.store.SnapshotForDate(ctx, orgID, domainstats.BusinessDate(asOfDate))
 	if err != nil {
 		return err
 	}
 	if snapshot == nil {
 		return fmt.Errorf("statistics snapshot is unavailable for cache warmup")
 	}
-	asOf := statisticsDomain.BusinessDate(snapshot.AsOfDate)
+	asOf := domainstats.BusinessDate(snapshot.AsOfDate)
 	freshness := Freshness{AsOfDate: asOf.Format("2006-01-02"), SnapshotAt: snapshot.SnapshotAt, IsStale: false}
 	ranges := []DateRange{
 		{Preset: "latest_complete_day", From: asOf, To: asOf},

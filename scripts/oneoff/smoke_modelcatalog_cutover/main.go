@@ -40,7 +40,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		if errors.Is(err, flag.ErrHelp) {
 			return exitOK
 		}
-		fmt.Fprintf(stderr, "modelcatalog smoke: configuration: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "modelcatalog smoke: configuration: %v\n", err)
 		return exitUnavailable
 	}
 
@@ -49,7 +49,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	err = client.checkReady(ctx)
 	cancel()
 	if err != nil {
-		fmt.Fprintf(stderr, "modelcatalog smoke: collection readiness unavailable: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "modelcatalog smoke: collection readiness unavailable: %v\n", err)
 		return exitUnavailable
 	}
 
@@ -61,36 +61,36 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	for _, modelCode := range cfg.ModelCodes {
-		fmt.Fprintf(stdout, "SMOKE start model=%s testee=%s\n", modelCode, cfg.TesteeID)
+		_, _ = fmt.Fprintf(stdout, "SMOKE start model=%s testee=%s\n", modelCode, cfg.TesteeID)
 		caseCtx, caseCancel := context.WithTimeout(context.Background(), cfg.Timeout)
 		result := client.runCase(caseCtx, cfg.TesteeID, modelCode, cfg.Title)
 		caseCancel()
 		runResult.Results = append(runResult.Results, result)
 		if result.Passed {
-			fmt.Fprintf(stdout, "SMOKE PASS model=%s kind=%s algorithm=%s answersheet=%s assessment=%s level=%s norm_refs=%d duration=%s\n",
+			_, _ = fmt.Fprintf(stdout, "SMOKE PASS model=%s kind=%s algorithm=%s answersheet=%s assessment=%s level=%s norm_refs=%d duration=%s\n",
 				result.Model.Code, result.Model.Kind, result.Model.Algorithm, result.AnswerSheetID,
 				result.AssessmentID, result.Level.Code, result.NormReferenceCount, result.Duration)
 			continue
 		}
-		fmt.Fprintf(stdout, "SMOKE FAIL model=%s step=%s error=%s duration=%s\n",
+		_, _ = fmt.Fprintf(stdout, "SMOKE FAIL model=%s step=%s error=%s duration=%s\n",
 			modelCode, result.FailedStep, result.Error, result.Duration)
 	}
 
 	runResult.FinishedAt = time.Now().UTC()
 	runResult.Passed = allPassed(runResult.Results)
 	if err := writeResult(cfg.OutputPath, runResult); err != nil {
-		fmt.Fprintf(stderr, "modelcatalog smoke: write result: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "modelcatalog smoke: write result: %v\n", err)
 		return exitUnavailable
 	}
 	if cfg.OutputPath != "" {
-		fmt.Fprintf(stdout, "SMOKE evidence=%s\n", cfg.OutputPath)
+		_, _ = fmt.Fprintf(stdout, "SMOKE evidence=%s\n", cfg.OutputPath)
 	}
 
 	if !runResult.Passed {
-		fmt.Fprintf(stdout, "MODELCATALOG_SMOKE_FAILED passed=%d failed=%d\n", passedCount(runResult.Results), failedCount(runResult.Results))
+		_, _ = fmt.Fprintf(stdout, "MODELCATALOG_SMOKE_FAILED passed=%d failed=%d\n", passedCount(runResult.Results), failedCount(runResult.Results))
 		return exitFailed
 	}
-	fmt.Fprintf(stdout, "MODELCATALOG_SMOKE_OK passed=%d failed=0\n", len(runResult.Results))
+	_, _ = fmt.Fprintf(stdout, "MODELCATALOG_SMOKE_OK passed=%d failed=0\n", len(runResult.Results))
 	return exitOK
 }
 

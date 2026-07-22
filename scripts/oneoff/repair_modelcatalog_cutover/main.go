@@ -43,7 +43,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 		if errors.Is(err, flag.ErrHelp) {
 			return exitOK
 		}
-		fmt.Fprintln(stderr, "repair modelcatalog cutover:", err)
+		_, _ = fmt.Fprintln(stderr, "repair modelcatalog cutover:", err)
 		return exitUnavailable
 	}
 
@@ -52,30 +52,30 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 
 	mysqlDB, err := sql.Open("mysql", cfg.mysqlDSN)
 	if err != nil {
-		fmt.Fprintln(stderr, "repair modelcatalog cutover: open mysql:", err)
+		_, _ = fmt.Fprintln(stderr, "repair modelcatalog cutover: open mysql:", err)
 		return exitUnavailable
 	}
 	defer func() { _ = mysqlDB.Close() }()
 	if err := mysqlDB.PingContext(ctx); err != nil {
-		fmt.Fprintln(stderr, "repair modelcatalog cutover: ping mysql:", err)
+		_, _ = fmt.Fprintln(stderr, "repair modelcatalog cutover: ping mysql:", err)
 		return exitUnavailable
 	}
 
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.mongoURI))
 	if err != nil {
-		fmt.Fprintln(stderr, "repair modelcatalog cutover: connect mongo:", err)
+		_, _ = fmt.Fprintln(stderr, "repair modelcatalog cutover: connect mongo:", err)
 		return exitUnavailable
 	}
 	defer func() { _ = client.Disconnect(context.Background()) }()
 	if err := client.Ping(ctx, nil); err != nil {
-		fmt.Fprintln(stderr, "repair modelcatalog cutover: ping mongo:", err)
+		_, _ = fmt.Fprintln(stderr, "repair modelcatalog cutover: ping mongo:", err)
 		return exitUnavailable
 	}
 
 	db := client.Database(cfg.mongoDB)
 	plan, err := buildRepairPlan(ctx, mysqlDB, db)
 	if err != nil {
-		fmt.Fprintln(stderr, "repair modelcatalog cutover: build plan:", err)
+		_, _ = fmt.Fprintln(stderr, "repair modelcatalog cutover: build plan:", err)
 		return exitUnavailable
 	}
 	plan.Mode = "dry-run"
@@ -83,7 +83,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 		plan.Mode = "apply"
 	}
 	if err := writePlan(stdout, plan, cfg.jsonOut); err != nil {
-		fmt.Fprintln(stderr, "repair modelcatalog cutover: write plan:", err)
+		_, _ = fmt.Fprintln(stderr, "repair modelcatalog cutover: write plan:", err)
 		return exitUnavailable
 	}
 	if plan.Blocked() {
@@ -94,18 +94,18 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 	}
 
 	if err := requireWritableReplicaSet(ctx, client); err != nil {
-		fmt.Fprintln(stderr, "repair modelcatalog cutover: apply guard:", err)
+		_, _ = fmt.Fprintln(stderr, "repair modelcatalog cutover: apply guard:", err)
 		return exitUnavailable
 	}
 	if err := applyRepairPlan(ctx, client, db, plan); err != nil {
-		fmt.Fprintln(stderr, "repair modelcatalog cutover: apply:", err)
+		_, _ = fmt.Fprintln(stderr, "repair modelcatalog cutover: apply:", err)
 		return exitUnavailable
 	}
 	if err := verifyAppliedRepair(ctx, mysqlDB, db, plan); err != nil {
-		fmt.Fprintln(stderr, "repair modelcatalog cutover: post-apply verification:", err)
+		_, _ = fmt.Fprintln(stderr, "repair modelcatalog cutover: post-apply verification:", err)
 		return exitUnavailable
 	}
-	fmt.Fprintln(stdout, "MODELCATALOG_CUTOVER_REPAIR_OK")
+	_, _ = fmt.Fprintln(stdout, "MODELCATALOG_CUTOVER_REPAIR_OK")
 	return exitOK
 }
 
