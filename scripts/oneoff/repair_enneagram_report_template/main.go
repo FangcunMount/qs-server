@@ -97,7 +97,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 		if errors.Is(err, flag.ErrHelp) {
 			return exitOK
 		}
-		fmt.Fprintln(stderr, "repair enneagram report template:", err)
+		_, _ = fmt.Fprintln(stderr, "repair enneagram report template:", err)
 		return exitUnavailable
 	}
 	ctx, cancel := context.WithTimeout(ctx, cfg.timeout)
@@ -105,19 +105,19 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.mongoURI))
 	if err != nil {
-		fmt.Fprintln(stderr, "repair enneagram report template: connect mongo:", err)
+		_, _ = fmt.Fprintln(stderr, "repair enneagram report template: connect mongo:", err)
 		return exitUnavailable
 	}
 	defer func() { _ = client.Disconnect(context.Background()) }()
 	if err := client.Ping(ctx, nil); err != nil {
-		fmt.Fprintln(stderr, "repair enneagram report template: ping mongo:", err)
+		_, _ = fmt.Fprintln(stderr, "repair enneagram report template: ping mongo:", err)
 		return exitUnavailable
 	}
 
 	collection := client.Database(cfg.mongoDB).Collection("assessment_models")
 	plan, err := buildPlan(ctx, collection)
 	if err != nil {
-		fmt.Fprintln(stderr, "repair enneagram report template: build plan:", err)
+		_, _ = fmt.Fprintln(stderr, "repair enneagram report template: build plan:", err)
 		return exitUnavailable
 	}
 	plan.Mode = "dry-run"
@@ -125,7 +125,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 		plan.Mode = "apply"
 	}
 	if err := writePlan(stdout, plan, cfg.jsonOut); err != nil {
-		fmt.Fprintln(stderr, "repair enneagram report template: write plan:", err)
+		_, _ = fmt.Fprintln(stderr, "repair enneagram report template: write plan:", err)
 		return exitUnavailable
 	}
 	if plan.blocked() {
@@ -135,23 +135,23 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 		return exitOK
 	}
 	if err := requireWritableReplicaSet(ctx, client); err != nil {
-		fmt.Fprintln(stderr, "repair enneagram report template: apply guard:", err)
+		_, _ = fmt.Fprintln(stderr, "repair enneagram report template: apply guard:", err)
 		return exitUnavailable
 	}
 	if err := applyPlan(ctx, client, collection, plan); err != nil {
-		fmt.Fprintln(stderr, "repair enneagram report template: apply:", err)
+		_, _ = fmt.Fprintln(stderr, "repair enneagram report template: apply:", err)
 		return exitUnavailable
 	}
 	verified, err := buildPlan(ctx, collection)
 	if err != nil {
-		fmt.Fprintln(stderr, "repair enneagram report template: post-apply verify:", err)
+		_, _ = fmt.Fprintln(stderr, "repair enneagram report template: post-apply verify:", err)
 		return exitUnavailable
 	}
 	if verified.blocked() || verified.Action != "noop" || verified.BeforeHash != plan.AfterHash {
-		fmt.Fprintln(stderr, "repair enneagram report template: post-apply state is not canonical")
+		_, _ = fmt.Fprintln(stderr, "repair enneagram report template: post-apply state is not canonical")
 		return exitUnavailable
 	}
-	fmt.Fprintln(stdout, "ENNEAGRAM_REPORT_TEMPLATE_REPAIR_OK")
+	_, _ = fmt.Fprintln(stdout, "ENNEAGRAM_REPORT_TEMPLATE_REPAIR_OK")
 	return exitOK
 }
 
