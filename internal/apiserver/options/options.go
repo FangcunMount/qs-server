@@ -34,9 +34,7 @@ type Options struct {
 	WeChatOptions                  *genericoptions.WeChatOptions           `json:"wechat"    mapstructure:"wechat"`
 	Plan                           *PlanOptions                            `json:"plan"      mapstructure:"plan"`
 	PlanScheduler                  *PlanSchedulerOptions                   `json:"plan_scheduler" mapstructure:"plan_scheduler"`
-	BehaviorPendingReconcile       *BehaviorPendingReconcileOptions        `json:"behavior_pending_reconcile" mapstructure:"behavior_pending_reconcile"`
 	EvaluationConsistencyReconcile *EvaluationConsistencyReconcileOptions  `json:"evaluation_consistency_reconcile" mapstructure:"evaluation_consistency_reconcile"`
-	BehaviorJourneyScan            *BehaviorJourneyScanOptions             `json:"behavior_journey_scan" mapstructure:"behavior_journey_scan"`
 	OutboxRelay                    *OutboxRelayOptions                     `json:"outbox_relay" mapstructure:"outbox_relay"`
 	Eventing                       *EventingOptions                        `json:"eventing" mapstructure:"eventing"`
 	RateLimit                      *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
@@ -84,9 +82,7 @@ func NewOptions() *Options {
 		WeChatOptions:                  genericoptions.NewWeChatOptions(),
 		Plan:                           NewPlanOptions(),
 		PlanScheduler:                  NewPlanSchedulerOptions(),
-		BehaviorPendingReconcile:       NewBehaviorPendingReconcileOptions(),
 		EvaluationConsistencyReconcile: NewEvaluationConsistencyReconcileOptions(),
-		BehaviorJourneyScan:            NewBehaviorJourneyScanOptions(),
 		OutboxRelay:                    NewOutboxRelayOptions(),
 		Eventing:                       NewEventingOptions(),
 		RateLimit:                      NewRateLimitOptions(),
@@ -244,38 +240,6 @@ func (p *PlanSchedulerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&p.LockTTL, "plan_scheduler.lock-ttl", p.LockTTL, "Redis distributed lock TTL used by the built-in plan scheduler.")
 }
 
-// BehaviorPendingReconcileOptions 控制 pending behavior 事件归因补偿任务。
-type BehaviorPendingReconcileOptions struct {
-	Enable     bool          `json:"enable" mapstructure:"enable"`
-	Interval   time.Duration `json:"interval" mapstructure:"interval"`
-	BatchLimit int           `json:"batch_limit" mapstructure:"batch_limit"`
-	LockKey    string        `json:"lock_key" mapstructure:"lock_key"`
-	LockTTL    time.Duration `json:"lock_ttl" mapstructure:"lock_ttl"`
-}
-
-// NewBehaviorPendingReconcileOptions 创建默认 behavior pending reconcile 配置。
-func NewBehaviorPendingReconcileOptions() *BehaviorPendingReconcileOptions {
-	return &BehaviorPendingReconcileOptions{
-		Enable:     true,
-		Interval:   10 * time.Second,
-		BatchLimit: 100,
-		LockKey:    "qs:behavior-pending-reconcile:leader",
-		LockTTL:    30 * time.Second,
-	}
-}
-
-// AddFlags 注册 behavior pending reconcile 相关参数。
-func (b *BehaviorPendingReconcileOptions) AddFlags(fs *pflag.FlagSet) {
-	if b == nil {
-		return
-	}
-	fs.BoolVar(&b.Enable, "behavior_pending_reconcile.enable", b.Enable, "Enable scheduled pending behavior reconcile.")
-	fs.DurationVar(&b.Interval, "behavior_pending_reconcile.interval", b.Interval, "Interval for scanning pending behavior events.")
-	fs.IntVar(&b.BatchLimit, "behavior_pending_reconcile.batch-limit", b.BatchLimit, "Maximum pending behavior events to process in one reconcile tick.")
-	fs.StringVar(&b.LockKey, "behavior_pending_reconcile.lock-key", b.LockKey, "Redis distributed lock key used by the pending behavior reconcile scheduler.")
-	fs.DurationVar(&b.LockTTL, "behavior_pending_reconcile.lock-ttl", b.LockTTL, "Redis distributed lock TTL used by the pending behavior reconcile scheduler.")
-}
-
 // EvaluationConsistencyReconcileOptions 控制 scoring/reporting 跨库终态对账补偿任务。
 type EvaluationConsistencyReconcileOptions struct {
 	Enable     bool          `json:"enable" mapstructure:"enable"`
@@ -306,60 +270,6 @@ func (e *EvaluationConsistencyReconcileOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&e.BatchLimit, "evaluation_consistency_reconcile.batch-limit", e.BatchLimit, "Maximum assessments to scan in one evaluation consistency reconcile tick.")
 	fs.StringVar(&e.LockKey, "evaluation_consistency_reconcile.lock-key", e.LockKey, "Redis distributed lock key used by the evaluation consistency reconcile scheduler.")
 	fs.DurationVar(&e.LockTTL, "evaluation_consistency_reconcile.lock-ttl", e.LockTTL, "Redis distributed lock TTL used by the evaluation consistency reconcile scheduler.")
-}
-
-// BehaviorJourneyScanOptions controls background behavior journey scan projection.
-type BehaviorJourneyScanOptions struct {
-	Enable       bool          `json:"enable" mapstructure:"enable"`
-	OrgIDs       []int64       `json:"org_ids" mapstructure:"org_ids"`
-	InitialDelay time.Duration `json:"initial_delay" mapstructure:"initial_delay"`
-	Interval     time.Duration `json:"interval" mapstructure:"interval"`
-	BatchSize    int           `json:"batch_size" mapstructure:"batch_size"`
-	Lookback     time.Duration `json:"lookback" mapstructure:"lookback"`
-	LockKey      string        `json:"lock_key" mapstructure:"lock_key"`
-	LockTTL      time.Duration `json:"lock_ttl" mapstructure:"lock_ttl"`
-	Sources      []string      `json:"sources" mapstructure:"sources"`
-	DryRun       bool          `json:"dry_run" mapstructure:"dry_run"`
-	WindowRecalc bool          `json:"window_recalc" mapstructure:"window_recalc"`
-}
-
-// NewBehaviorJourneyScanOptions creates default behavior journey scan options.
-func NewBehaviorJourneyScanOptions() *BehaviorJourneyScanOptions {
-	return &BehaviorJourneyScanOptions{
-		Enable:       false,
-		InitialDelay: 2 * time.Minute,
-		Interval:     30 * time.Minute,
-		BatchSize:    1000,
-		Lookback:     2 * time.Hour,
-		LockKey:      "qs:behavior-journey-scan:leader",
-		LockTTL:      25 * time.Minute,
-		Sources: []string{
-			"entry_resolve_log",
-			"entry_intake_log",
-			"answersheet",
-			"assessment",
-			"report",
-		},
-		WindowRecalc: true,
-	}
-}
-
-// AddFlags registers behavior journey scan flags.
-func (b *BehaviorJourneyScanOptions) AddFlags(fs *pflag.FlagSet) {
-	if b == nil {
-		return
-	}
-	fs.BoolVar(&b.Enable, "behavior_journey_scan.enable", b.Enable, "Enable background behavior journey scan projection.")
-	fs.Int64SliceVar(&b.OrgIDs, "behavior_journey_scan.org-ids", b.OrgIDs, "Organization IDs included in behavior journey scan.")
-	fs.DurationVar(&b.InitialDelay, "behavior_journey_scan.initial-delay", b.InitialDelay, "Initial delay before starting behavior journey scan.")
-	fs.DurationVar(&b.Interval, "behavior_journey_scan.interval", b.Interval, "Interval for behavior journey scan ticks.")
-	fs.IntVar(&b.BatchSize, "behavior_journey_scan.batch-size", b.BatchSize, "Maximum facts to scan per source in one tick.")
-	fs.DurationVar(&b.Lookback, "behavior_journey_scan.lookback", b.Lookback, "Lookback window when no watermark exists.")
-	fs.StringVar(&b.LockKey, "behavior_journey_scan.lock-key", b.LockKey, "Redis distributed lock key used by behavior journey scan.")
-	fs.DurationVar(&b.LockTTL, "behavior_journey_scan.lock-ttl", b.LockTTL, "Redis distributed lock TTL used by behavior journey scan.")
-	fs.StringSliceVar(&b.Sources, "behavior_journey_scan.sources", b.Sources, "Scan sources in execution order.")
-	fs.BoolVar(&b.DryRun, "behavior_journey_scan.dry-run", b.DryRun, "Scan facts without writing projections.")
-	fs.BoolVar(&b.WindowRecalc, "behavior_journey_scan.window-recalc", b.WindowRecalc, "Rebuild statistics_journey_daily for the lookback window after each org scan.")
 }
 
 // OutboxRelayOptions controls durable outbox relay loops inside qs-apiserver.
@@ -500,9 +410,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.WeChatOptions.AddFlags(fss.FlagSet("wechat"))
 	o.Plan.AddFlags(fss.FlagSet("plan"))
 	o.PlanScheduler.AddFlags(fss.FlagSet("plan_scheduler"))
-	o.BehaviorPendingReconcile.AddFlags(fss.FlagSet("behavior_pending_reconcile"))
 	o.EvaluationConsistencyReconcile.AddFlags(fss.FlagSet("evaluation_consistency_reconcile"))
-	o.BehaviorJourneyScan.AddFlags(fss.FlagSet("behavior_journey_scan"))
 	o.OutboxRelay.AddFlags(fss.FlagSet("outbox_relay"))
 	o.Eventing.AddFlags(fss.FlagSet("eventing"))
 	o.RateLimit.AddFlags(fss.FlagSet("rate_limit"))
@@ -614,9 +522,8 @@ type CacheDefaultsOptions struct {
 }
 
 type CacheGovernanceOptions struct {
-	StatisticsWarmup   *StatisticsWarmupOptions   `json:"statistics_warmup" mapstructure:"statistics_warmup"`
-	StatisticsOverview *StatisticsOverviewOptions `json:"statistics_overview" mapstructure:"statistics_overview"`
-	Warmup             *WarmupOptions             `json:"warmup" mapstructure:"warmup"`
+	StatisticsWarmup *StatisticsWarmupOptions `json:"statistics_warmup" mapstructure:"statistics_warmup"`
+	Warmup           *WarmupOptions           `json:"warmup" mapstructure:"warmup"`
 }
 
 // NewCacheOptions 创建默认缓存配置
@@ -631,7 +538,7 @@ func NewCacheOptions() *CacheOptions {
 			},
 			Actor:        &ActorCacheCapabilities{Testee: &CapabilityPolicyOptions{Enabled: true, TTL: 30 * time.Minute, Negative: cacheBoolPtr(true)}},
 			Plan:         &PlanCacheCapabilities{Detail: &CapabilityPolicyOptions{Enabled: true, TTL: 2 * time.Hour, Singleflight: cacheBoolPtr(true)}},
-			Statistics:   &StatisticsCacheCapabilities{Query: &CapabilityPolicyOptions{Enabled: true, TTL: 5 * time.Minute, Singleflight: cacheBoolPtr(false)}},
+			Statistics:   &StatisticsCacheCapabilities{Query: &CapabilityPolicyOptions{Enabled: true, TTL: 26 * time.Hour, Singleflight: cacheBoolPtr(false)}},
 			ReportStatus: genericoptions.NewReportStatusOptions(),
 		},
 		Defaults: &CacheDefaultsOptions{
@@ -645,12 +552,7 @@ func NewCacheOptions() *CacheOptions {
 				Enable:          false,
 				WarmOnStartup:   true,
 				OrgIDs:          []int64{1},
-				OverviewPresets: []string{"today", "7d", "30d"},
-			},
-			StatisticsOverview: &StatisticsOverviewOptions{
-				ServiceSingleflight: true,
-				StaleOnTimeout:      true,
-				LoadTimeout:         25 * time.Second,
+				OverviewPresets: []string{"latest_complete_day", "7d", "30d"},
 			},
 			Warmup: &WarmupOptions{
 				Enable: true,
@@ -712,14 +614,7 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 			Enable:          false,
 			WarmOnStartup:   true,
 			OrgIDs:          []int64{1},
-			OverviewPresets: []string{"today", "7d", "30d"},
-		}
-	}
-	if c.Governance.StatisticsOverview == nil {
-		c.Governance.StatisticsOverview = &StatisticsOverviewOptions{
-			ServiceSingleflight: true,
-			StaleOnTimeout:      true,
-			LoadTimeout:         25 * time.Second,
+			OverviewPresets: []string{"latest_complete_day", "7d", "30d"},
 		}
 	}
 	if c.Governance.Warmup == nil {
@@ -849,13 +744,6 @@ type StatisticsWarmupOptions struct {
 	OverviewPresets []string `json:"overview_presets" mapstructure:"overview_presets"`
 }
 
-// StatisticsOverviewOptions 机构统计总览读保护与降级配置。
-type StatisticsOverviewOptions struct {
-	ServiceSingleflight bool          `json:"service_singleflight" mapstructure:"service_singleflight"`
-	StaleOnTimeout      bool          `json:"stale_on_timeout" mapstructure:"stale_on_timeout"`
-	LoadTimeout         time.Duration `json:"load_timeout" mapstructure:"load_timeout"`
-}
-
 type WarmupOptions struct {
 	Enable  bool                  `json:"enable" mapstructure:"enable"`
 	Startup *WarmupStartupOptions `json:"startup" mapstructure:"startup"`
@@ -876,7 +764,6 @@ type WarmupHotsetOptions struct {
 // StatisticsSyncOptions 统计同步定时任务配置
 type StatisticsSyncOptions struct {
 	Enable           bool          `json:"enable" mapstructure:"enable"`
-	VersionMode      string        `json:"version_mode" mapstructure:"version_mode"`
 	OrgIDs           []int64       `json:"org_ids" mapstructure:"org_ids"`
 	RunAt            string        `json:"run_at" mapstructure:"run_at"`
 	RepairWindowDays int           `json:"repair_window_days" mapstructure:"repair_window_days"`
@@ -888,7 +775,6 @@ type StatisticsSyncOptions struct {
 func NewStatisticsSyncOptions() *StatisticsSyncOptions {
 	return &StatisticsSyncOptions{
 		Enable:           true,
-		VersionMode:      "shadow",
 		OrgIDs:           []int64{1},
 		RunAt:            "00:30",
 		RepairWindowDays: 7,
@@ -903,7 +789,6 @@ func (s *StatisticsSyncOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 	fs.BoolVar(&s.Enable, "statistics_sync.enable", s.Enable, "Enable scheduled nightly statistics sync.")
-	fs.StringVar(&s.VersionMode, "statistics_sync.version-mode", s.VersionMode, "Statistics runtime mode: v1, shadow, or v2.")
 	fs.Int64SliceVar(&s.OrgIDs, "statistics_sync.org-ids", s.OrgIDs, "Organization IDs included in scheduled statistics sync.")
 	fs.StringVar(&s.RunAt, "statistics_sync.run-at", s.RunAt, "Daily wall-clock time for statistics sync, in HH:MM format.")
 	fs.IntVar(&s.RepairWindowDays, "statistics_sync.repair-window-days", s.RepairWindowDays, "Number of completed days to rebuild when running scheduled daily statistics sync.")

@@ -273,7 +273,7 @@ cache:
     plan:
       detail: {enabled: true, ttl: "1h", singleflight: true}
     statistics:
-      query: {enabled: true, ttl: "5m", singleflight: false}
+      query: {enabled: true, ttl: "26h", singleflight: false}
     report_status:
       ttl_seconds: 172800
   defaults:
@@ -299,11 +299,7 @@ cache:
       enable: false
       warm_on_startup: true
       org_ids: [1]
-      overview_presets: ["today", "7d", "30d"]
-    statistics_overview:
-      service_singleflight: true
-      stale_on_timeout: true
-      load_timeout: 25s
+      overview_presets: ["latest_complete_day", "7d", "30d"]
     warmup:
       enable: true
       startup:
@@ -326,37 +322,12 @@ plan_scheduler:
   lock_key: "qs:plan-scheduler:leader"
   lock_ttl: "50s"
 
-behavior_pending_reconcile:
-  enable: true
-  interval: "10s"
-  batch_limit: 100
-  lock_key: "qs:behavior-pending-reconcile:leader"
-  lock_ttl: "30s"
-
 evaluation_consistency_reconcile:
   enable: true
   interval: "10s"
   batch_limit: 100
   lock_key: "qs:evaluation-consistency-reconcile:leader"
   lock_ttl: "30s"
-
-behavior_journey_scan:
-  enable: true
-  org_ids: [1]
-  initial_delay: "2m"
-  interval: "30m"
-  batch_size: 1000
-  lookback: "2h"
-  lock_key: "qs:behavior-journey-scan:leader"
-  lock_ttl: "25m"
-  dry_run: true
-  window_recalc: true
-  sources:
-    - entry_resolve_log
-    - entry_intake_log
-    - answersheet
-    - assessment
-    - report
 
 # durable event 始终先写本地 Outbox；logging/nop 模式不会把 immediate 标记为 published。
 outbox_relay:
@@ -372,7 +343,6 @@ outbox_relay:
 
 statistics_sync:
   enable: true
-  version_mode: shadow
   org_ids: [1]
   run_at: "00:30"
   repair_window_days: 7

@@ -31,7 +31,7 @@ func TestAPIServerBuildContainerCacheOptions(t *testing.T) {
 	opts.Cache.Governance.StatisticsWarmup = &apiserveroptions.StatisticsWarmupOptions{
 		Enable:          true,
 		OrgIDs:          []int64{101, 202},
-		OverviewPresets: []string{"today", "30d"},
+		OverviewPresets: []string{"latest_complete_day", "30d"},
 	}
 	opts.Cache.Governance.Warmup = &apiserveroptions.WarmupOptions{
 		Enable: true,
@@ -170,30 +170,6 @@ func TestAPIServerBuildContainerOptionsUsesResourceStageCacheSubsystem(t *testin
 
 	if got.CacheSubsystem != subsystem {
 		t.Fatalf("CacheSubsystem = %#v, want %#v", got.CacheSubsystem, subsystem)
-	}
-}
-
-func TestBuildStatisticsOverviewOptionsMapsServiceSingleflight(t *testing.T) {
-	opts := apiserveroptions.NewOptions()
-	opts.Cache.Governance.StatisticsOverview = &apiserveroptions.StatisticsOverviewOptions{
-		ServiceSingleflight: false,
-		StaleOnTimeout:      true,
-		LoadTimeout:         11 * time.Second,
-	}
-
-	got := buildStatisticsOverviewOptions(opts.Cache)
-	if got.ServiceSingleflight {
-		t.Fatal("ServiceSingleflight = true, want false")
-	}
-	if !got.StaleOnTimeout || got.LoadTimeout != 11*time.Second {
-		t.Fatalf("guard options = %+v", got)
-	}
-}
-
-func TestBuildStatisticsOverviewOptionsDefaultsServiceSingleflightTrue(t *testing.T) {
-	got := buildStatisticsOverviewOptions(apiserveroptions.NewOptions().Cache)
-	if !got.ServiceSingleflight {
-		t.Fatal("ServiceSingleflight = false, want true")
 	}
 }
 

@@ -23,10 +23,11 @@ migrate_runtime_paths() {
     def migrate_path:
       gsub("/api/v1/personality-models"; "/api/v1/typology-models")
       | gsub("/api/v1/personality-assessment-sessions"; "/api/v1/typology-assessment-sessions")
-      | gsub("/api/v1/personality-assessments"; "/api/v1/typology-assessments");
+      | gsub("/api/v1/personality-assessments"; "/api/v1/typology-assessments")
+      | gsub("/api/v1/statistics"; "/api/v2/statistics");
     def retired_statistics_path:
-      startswith("/api/v1/statistics/system")
-      or startswith("/api/v1/statistics/questionnaires/");
+      startswith("/api/v2/statistics/system")
+      or startswith("/api/v2/statistics/questionnaires/");
     def current_statistics_paths:
       map(select(retired_statistics_path | not))
       | if length > 0 then . else ($ex[0].paths.statistics // []) end;
@@ -59,7 +60,7 @@ migrated_paths="$(jq -n --argjson before "$before" --argjson after "$next" '
     | map([.. | strings | select(test("/api/v1/personality-"))] | unique | sort)
     | if (.[0] | length) > 0 and (.[0] != .[1]) then ["typology path migration applied"] else [] end)
   + ([ $before, $after ]
-    | map([.. | strings | select(test("/api/v1/statistics/(system|questionnaires/)"))] | unique | sort)
+    | map([.. | strings | select(test("/api/v2/statistics/(system|questionnaires/)"))] | unique | sort)
     | if (.[0] | length) > 0 and (.[0] != .[1]) then ["retired statistics paths removed"] else [] end)
   | join(", ")
 ')"

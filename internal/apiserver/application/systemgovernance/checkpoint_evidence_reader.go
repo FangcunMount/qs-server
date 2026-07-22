@@ -14,7 +14,6 @@ type CheckpointStatusReader interface {
 type CheckpointGovernanceSnapshot struct {
 	EvaluationRunRunning         int64
 	EvaluationRunFailedRetryable int64
-	AnalyticsProjectorProcessing int64
 }
 
 // CheckpointEvidenceReader projects checkpoint snapshots into governance evidence.

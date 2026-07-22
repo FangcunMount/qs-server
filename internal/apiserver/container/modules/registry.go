@@ -120,7 +120,7 @@ var MigratedModuleTransportExportFiles = map[PackageName][]string{
 	PackageActor:        {"exports_rest.go", "exports_grpc.go"},
 	PackageEvaluation:   {"exports_rest.go", "exports_grpc.go"},
 	PackagePlan:         {"exports_rest.go", "exports_grpc.go"},
-	PackageStatistics:   {"exports_rest.go", "exports_grpc.go"},
+	PackageStatistics:   {"exports_rest.go"},
 	PackagePlatform:     {"exports_rest.go", "exports_grpc.go"},
 }
 

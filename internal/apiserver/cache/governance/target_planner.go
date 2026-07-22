@@ -56,14 +56,14 @@ func (p *TargetPlanner) querySeedTargets(orgFilter []int64) []cachetarget.Warmup
 
 func overviewSeedPresets(configured []string) []string {
 	if len(configured) == 0 {
-		return []string{"today", "7d", "30d"}
+		return []string{"latest_complete_day", "7d", "30d"}
 	}
 	result := make([]string, 0, len(configured))
 	seen := map[string]struct{}{}
 	for _, preset := range configured {
 		preset = strings.ToLower(strings.TrimSpace(preset))
 		switch preset {
-		case "today", "7d", "30d":
+		case "latest_complete_day", "7d", "30d":
 			if _, ok := seen[preset]; ok {
 				continue
 			}
@@ -72,7 +72,7 @@ func overviewSeedPresets(configured []string) []string {
 		}
 	}
 	if len(result) == 0 {
-		return []string{"today", "7d", "30d"}
+		return []string{"latest_complete_day", "7d", "30d"}
 	}
 	return result
 }

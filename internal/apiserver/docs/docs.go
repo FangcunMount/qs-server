@@ -6544,740 +6544,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/statistics/clinicians": {
-            "get": {
-                "description": "按机构和时间窗口查询从业者统计列表；仅 qs:admin 可访问",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics"
-                ],
-                "summary": "查询从业者统计列表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "时间窗口预设：today/7d/30d",
-                        "name": "preset",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "自定义开始日期，格式 YYYY-MM-DD",
-                        "name": "from",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "自定义结束日期，格式 YYYY-MM-DD",
-                        "name": "to",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "页码",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "每页数量",
-                        "name": "page_size",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/statistics.ClinicianStatisticsList"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/statistics/clinicians/me/entries": {
-            "get": {
-                "description": "查询当前后台操作者绑定从业者的测评入口统计列表",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics"
-                ],
-                "summary": "查询当前从业者入口统计列表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "时间窗口预设：today/7d/30d",
-                        "name": "preset",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "自定义开始日期，格式 YYYY-MM-DD",
-                        "name": "from",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "自定义结束日期，格式 YYYY-MM-DD",
-                        "name": "to",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "页码",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "每页数量",
-                        "name": "page_size",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/statistics.AssessmentEntryStatisticsList"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/statistics/clinicians/me/overview": {
-            "get": {
-                "description": "查询当前后台操作者绑定从业者的统计概览",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics"
-                ],
-                "summary": "查询当前从业者统计概览",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "时间窗口预设：today/7d/30d",
-                        "name": "preset",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "自定义开始日期，格式 YYYY-MM-DD",
-                        "name": "from",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "自定义结束日期，格式 YYYY-MM-DD",
-                        "name": "to",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/statistics.ClinicianStatistics"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/statistics/clinicians/me/testees-summary": {
-            "get": {
-                "description": "查询当前后台操作者绑定从业者可访问受试者摘要统计",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics"
-                ],
-                "summary": "查询当前从业者受试者摘要",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "时间窗口预设：today/7d/30d",
-                        "name": "preset",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "自定义开始日期，格式 YYYY-MM-DD",
-                        "name": "from",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "自定义结束日期，格式 YYYY-MM-DD",
-                        "name": "to",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/statistics.ClinicianTesteeSummaryStatistics"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/statistics/clinicians/{id}": {
-            "get": {
-                "description": "按从业者 ID 查询统计概览、窗口指标和漏斗指标；仅 qs:admin 可访问",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics"
-                ],
-                "summary": "查询单个从业者统计",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "从业者ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "时间窗口预设：today/7d/30d",
-                        "name": "preset",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "自定义开始日期，格式 YYYY-MM-DD",
-                        "name": "from",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "自定义结束日期，格式 YYYY-MM-DD",
-                        "name": "to",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/statistics.ClinicianStatistics"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/statistics/contents/batch": {
-            "post": {
-                "description": "按内容 type + code 批量查询测评形成数、完成数和完成率；questionnaire 需要 manage_questionnaires，scale 需要 manage_assessment_models，混合请求需要同时具备两项权限",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics"
-                ],
-                "summary": "批量查询统一内容统计",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "description": "内容标识列表",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.contentBatchRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/statistics.ContentBatchStatisticsResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/statistics/entries": {
-            "get": {
-                "description": "查询机构内测评入口统计列表，支持 clinician_id、status 和时间窗口过滤；仅 qs:admin 可访问",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics"
-                ],
-                "summary": "查询测评入口统计列表",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "从业者ID",
-                        "name": "clinician_id",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "入口状态：active/inactive",
-                        "name": "status",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "时间窗口预设：today/7d/30d",
-                        "name": "preset",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "自定义开始日期，格式 YYYY-MM-DD",
-                        "name": "from",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "自定义结束日期，格式 YYYY-MM-DD",
-                        "name": "to",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "页码",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "每页数量",
-                        "name": "page_size",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/statistics.AssessmentEntryStatisticsList"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/statistics/entries/{id}": {
-            "get": {
-                "description": "按入口 ID 查询入口快照、窗口计数和最近事件时间；仅 qs:admin 可访问",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics"
-                ],
-                "summary": "查询单个测评入口统计",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "入口ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "时间窗口预设：today/7d/30d",
-                        "name": "preset",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "自定义开始日期，格式 YYYY-MM-DD",
-                        "name": "from",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "自定义结束日期，格式 YYYY-MM-DD",
-                        "name": "to",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/statistics.AssessmentEntryStatistics"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/statistics/overview": {
-            "get": {
-                "description": "查询机构总览、接入漏斗、测评服务、维度分析和计划任务统计；仅 qs:admin 可访问",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics"
-                ],
-                "summary": "查询机构统计总览",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "时间窗口预设：today/7d/30d",
-                        "name": "preset",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "自定义开始日期，格式 YYYY-MM-DD",
-                        "name": "from",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "自定义结束日期，格式 YYYY-MM-DD",
-                        "name": "to",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/statistics.StatisticsOverview"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/statistics/testees/{testee_id}/periodic": {
-            "get": {
-                "description": "查询受试者周期计划项目、周次任务和完成情况；后台访问范围按 ClinicianTesteeRelation 收口",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics"
-                ],
-                "summary": "查询受试者周期项目统计",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "受试者ID",
-                        "name": "testee_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/response.PeriodicStatsResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/testees": {
             "get": {
                 "produces": [
@@ -8118,9 +7384,9 @@ const docTemplate = `{
         "/api/v2/statistics/clinicians": {
             "get": {
                 "tags": [
-                    "Statistics-V2"
+                    "Statistics"
                 ],
-                "summary": "查询 Statistics V2 医生列表",
+                "summary": "查询 Statistics 医生列表",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -8133,7 +7399,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/statisticsv2.Page-statisticsv2_ClinicianItem"
+                                            "$ref": "#/definitions/statistics.Page-statistics_ClinicianItem"
                                         }
                                     }
                                 }
@@ -8146,9 +7412,9 @@ const docTemplate = `{
         "/api/v2/statistics/clinicians/me/entries": {
             "get": {
                 "tags": [
-                    "Statistics-V2"
+                    "Statistics"
                 ],
-                "summary": "查询当前医生 Statistics V2 入口",
+                "summary": "查询当前医生 Statistics 入口",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -8161,7 +7427,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/statisticsv2.Page-statisticsv2_EntryItem"
+                                            "$ref": "#/definitions/statistics.Page-statistics_EntryItem"
                                         }
                                     }
                                 }
@@ -8174,9 +7440,9 @@ const docTemplate = `{
         "/api/v2/statistics/clinicians/me/overview": {
             "get": {
                 "tags": [
-                    "Statistics-V2"
+                    "Statistics"
                 ],
-                "summary": "查询当前医生 Statistics V2 总览",
+                "summary": "查询当前医生 Statistics 总览",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -8189,7 +7455,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/handler.StatisticsV2ClinicianDetailResponse"
+                                            "$ref": "#/definitions/handler.StatisticsClinicianDetailResponse"
                                         }
                                     }
                                 }
@@ -8202,9 +7468,9 @@ const docTemplate = `{
         "/api/v2/statistics/clinicians/me/testees-summary": {
             "get": {
                 "tags": [
-                    "Statistics-V2"
+                    "Statistics"
                 ],
-                "summary": "查询当前医生 Statistics V2 受试者摘要",
+                "summary": "查询当前医生 Statistics 受试者摘要",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -8217,7 +7483,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/statisticsv2.TesteeSummary"
+                                            "$ref": "#/definitions/statistics.TesteeSummary"
                                         }
                                     }
                                 }
@@ -8230,9 +7496,9 @@ const docTemplate = `{
         "/api/v2/statistics/clinicians/{id}": {
             "get": {
                 "tags": [
-                    "Statistics-V2"
+                    "Statistics"
                 ],
-                "summary": "查询 Statistics V2 医生详情",
+                "summary": "查询 Statistics 医生详情",
                 "parameters": [
                     {
                         "type": "integer",
@@ -8254,7 +7520,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/handler.StatisticsV2ClinicianDetailResponse"
+                                            "$ref": "#/definitions/handler.StatisticsClinicianDetailResponse"
                                         }
                                     }
                                 }
@@ -8267,9 +7533,9 @@ const docTemplate = `{
         "/api/v2/statistics/contents/batch": {
             "post": {
                 "tags": [
-                    "Statistics-V2"
+                    "Statistics"
                 ],
-                "summary": "批量查询 Statistics V2 内容统计",
+                "summary": "批量查询 Statistics 内容统计",
                 "parameters": [
                     {
                         "description": "内容引用",
@@ -8277,7 +7543,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handler.StatisticsV2ContentRequest"
+                            "$ref": "#/definitions/handler.StatisticsContentRequest"
                         }
                     }
                 ],
@@ -8293,7 +7559,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/statisticsv2.ContentBatch"
+                                            "$ref": "#/definitions/statistics.ContentBatch"
                                         }
                                     }
                                 }
@@ -8306,9 +7572,9 @@ const docTemplate = `{
         "/api/v2/statistics/entries": {
             "get": {
                 "tags": [
-                    "Statistics-V2"
+                    "Statistics"
                 ],
-                "summary": "查询 Statistics V2 入口列表",
+                "summary": "查询 Statistics 入口列表",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -8321,7 +7587,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/statisticsv2.Page-statisticsv2_EntryItem"
+                                            "$ref": "#/definitions/statistics.Page-statistics_EntryItem"
                                         }
                                     }
                                 }
@@ -8334,9 +7600,9 @@ const docTemplate = `{
         "/api/v2/statistics/entries/{id}": {
             "get": {
                 "tags": [
-                    "Statistics-V2"
+                    "Statistics"
                 ],
-                "summary": "查询 Statistics V2 入口详情",
+                "summary": "查询 Statistics 入口详情",
                 "parameters": [
                     {
                         "type": "integer",
@@ -8358,7 +7624,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/handler.StatisticsV2EntryDetailResponse"
+                                            "$ref": "#/definitions/handler.StatisticsEntryDetailResponse"
                                         }
                                     }
                                 }
@@ -8371,9 +7637,9 @@ const docTemplate = `{
         "/api/v2/statistics/overview": {
             "get": {
                 "tags": [
-                    "Statistics-V2"
+                    "Statistics"
                 ],
-                "summary": "查询 Statistics V2 机构总览",
+                "summary": "查询 Statistics 机构总览",
                 "parameters": [
                     {
                         "type": "string",
@@ -8406,7 +7672,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/statisticsv2.Overview"
+                                            "$ref": "#/definitions/statistics.Overview"
                                         }
                                     }
                                 }
@@ -8452,165 +7718,6 @@ const docTemplate = `{
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
-        "/internal/v1/cache/governance/hotset": {
-            "get": {
-                "description": "按 kind 和 limit 查询当前缓存热集，仅内部管理员可访问。",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics-Sync"
-                ],
-                "summary": "查询缓存热集",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "缓存类型",
-                        "name": "kind",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "最大条数",
-                        "name": "limit",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/internal/v1/cache/governance/repair-complete": {
-            "post": {
-                "description": "内部治理回调，确认指定组织的缓存修复任务完成。",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics-Sync"
-                ],
-                "summary": "确认缓存修复完成",
-                "parameters": [
-                    {
-                        "description": "修复完成事件",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/statistics.RepairCompleteRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/internal/v1/cache/governance/status": {
-            "get": {
-                "description": "返回缓存治理任务及运行时状态，仅内部管理员可访问。",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics-Sync"
-                ],
-                "summary": "查询缓存治理状态",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/internal/v1/cache/governance/warmup-targets": {
-            "post": {
-                "description": "operating 后台通过 BFF 代理调用，按 target 列表同步触发缓存预热并返回逐项结果；仅 qs:admin 可访问",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics-Sync"
-                ],
-                "summary": "手工触发缓存预热",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌（或内部调用token）",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "description": "预热目标列表",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/cachetarget.ManualWarmupRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/cachemodel.ManualWarmupResult"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
                         }
                     }
                 }
@@ -9107,132 +8214,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/internal/v1/statistics/sync/daily": {
-            "post": {
-                "description": "从 MySQL 原始表重建每日统计；仅 qs:admin 可访问",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics-Sync"
-                ],
-                "summary": "同步每日统计",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌（或内部调用token）",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "补算开始日期（格式：YYYY-MM-DD）",
-                        "name": "start_date",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "补算结束日期（格式：YYYY-MM-DD，包含当天）",
-                        "name": "end_date",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/internal/v1/statistics/sync/org-snapshot": {
-            "post": {
-                "description": "从 MySQL 原始表重建 statistics_org_snapshot；仅 qs:admin 可访问",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics-Sync"
-                ],
-                "summary": "同步机构总览快照",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌（或内部调用token）",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/internal/v1/statistics/sync/plan": {
-            "post": {
-                "description": "从 assessment_task 重建计划统计数据到 MySQL；仅 qs:admin 可访问",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics-Sync"
-                ],
-                "summary": "同步计划统计",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌（或内部调用token）",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/core.Response"
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/internal/v1/system-governance/actions": {
             "get": {
                 "description": "返回可执行与预留治理动作描述符；仅 qs:admin 可访问",
@@ -9619,9 +8600,9 @@ const docTemplate = `{
         "/internal/v2/statistics/runs": {
             "get": {
                 "tags": [
-                    "Statistics-V2-Internal"
+                    "Statistics-Internal"
                 ],
-                "summary": "查询 Statistics V2 同步批次",
+                "summary": "查询 Statistics 同步批次",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -9634,7 +8615,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/handler.StatisticsV2RunListResponse"
+                                            "$ref": "#/definitions/handler.StatisticsRunListResponse"
                                         }
                                     }
                                 }
@@ -9645,9 +8626,9 @@ const docTemplate = `{
             },
             "post": {
                 "tags": [
-                    "Statistics-V2-Internal"
+                    "Statistics-Internal"
                 ],
-                "summary": "创建 Statistics V2 同步批次",
+                "summary": "创建 Statistics 同步批次",
                 "parameters": [
                     {
                         "description": "批次窗口",
@@ -9671,7 +8652,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/statisticsv2.Run"
+                                            "$ref": "#/definitions/statistics.Run"
                                         }
                                     }
                                 }
@@ -9684,9 +8665,9 @@ const docTemplate = `{
         "/internal/v2/statistics/runs/{id}": {
             "get": {
                 "tags": [
-                    "Statistics-V2-Internal"
+                    "Statistics-Internal"
                 ],
-                "summary": "查询 Statistics V2 同步批次详情",
+                "summary": "查询 Statistics 同步批次详情",
                 "parameters": [
                     {
                         "type": "integer",
@@ -9708,7 +8689,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/statisticsv2.Run"
+                                            "$ref": "#/definitions/statistics.Run"
                                         }
                                     }
                                 }
@@ -9721,9 +8702,9 @@ const docTemplate = `{
         "/internal/v2/statistics/runs/{id}/resume-cache": {
             "post": {
                 "tags": [
-                    "Statistics-V2-Internal"
+                    "Statistics-Internal"
                 ],
-                "summary": "恢复 Statistics V2 批次缓存发布",
+                "summary": "恢复 Statistics 批次缓存发布",
                 "parameters": [
                     {
                         "type": "integer",
@@ -9754,7 +8735,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/statisticsv2.Run"
+                                            "$ref": "#/definitions/statistics.Run"
                                         }
                                     }
                                 }
@@ -9889,82 +8870,6 @@ const docTemplate = `{
                 }
             }
         },
-        "cachemodel.ManualWarmupItemResult": {
-            "type": "object",
-            "properties": {
-                "family": {
-                    "type": "string"
-                },
-                "kind": {
-                    "type": "string"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "scope": {
-                    "type": "string"
-                },
-                "status": {
-                    "$ref": "#/definitions/cachemodel.ManualWarmupItemStatus"
-                }
-            }
-        },
-        "cachemodel.ManualWarmupItemStatus": {
-            "type": "string",
-            "enum": [
-                "ok",
-                "skipped",
-                "error"
-            ],
-            "x-enum-varnames": [
-                "ManualWarmupItemStatusOK",
-                "ManualWarmupItemStatusSkipped",
-                "ManualWarmupItemStatusError"
-            ]
-        },
-        "cachemodel.ManualWarmupResult": {
-            "type": "object",
-            "properties": {
-                "finished_at": {
-                    "type": "string"
-                },
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/cachemodel.ManualWarmupItemResult"
-                    }
-                },
-                "started_at": {
-                    "type": "string"
-                },
-                "summary": {
-                    "$ref": "#/definitions/cachemodel.ManualWarmupSummary"
-                },
-                "trigger": {
-                    "type": "string"
-                }
-            }
-        },
-        "cachemodel.ManualWarmupSummary": {
-            "type": "object",
-            "properties": {
-                "error_count": {
-                    "type": "integer"
-                },
-                "ok_count": {
-                    "type": "integer"
-                },
-                "result": {
-                    "type": "string"
-                },
-                "skipped_count": {
-                    "type": "integer"
-                },
-                "target_count": {
-                    "type": "integer"
-                }
-            }
-        },
         "cachemodel.RuntimeSnapshot": {
             "type": "object",
             "properties": {
@@ -10004,43 +8909,6 @@ const docTemplate = `{
                     "type": "integer"
                 }
             }
-        },
-        "cachetarget.ManualWarmupRequest": {
-            "type": "object",
-            "properties": {
-                "targets": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/cachetarget.ManualWarmupTarget"
-                    }
-                }
-            }
-        },
-        "cachetarget.ManualWarmupTarget": {
-            "type": "object",
-            "properties": {
-                "kind": {
-                    "$ref": "#/definitions/cachetarget.WarmupKind"
-                },
-                "scope": {
-                    "type": "string"
-                }
-            }
-        },
-        "cachetarget.WarmupKind": {
-            "type": "string",
-            "enum": [
-                "static.scale",
-                "static.questionnaire",
-                "static.typology_model",
-                "query.stats_overview"
-            ],
-            "x-enum-varnames": [
-                "WarmupKindStaticScale",
-                "WarmupKindStaticQuestionnaire",
-                "WarmupKindStaticTypologyModel",
-                "WarmupKindQueryStatsOverview"
-            ]
         },
         "conclusion.Outcome": {
             "type": "object",
@@ -10602,14 +9470,42 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_FangcunMount_qs-server_internal_apiserver_domain_statistics.ContentReference": {
+        "handler.StatisticsClinicianDetailResponse": {
             "type": "object",
             "properties": {
-                "code": {
-                    "type": "string"
+                "freshness": {
+                    "$ref": "#/definitions/statistics.Freshness"
                 },
-                "type": {
-                    "$ref": "#/definitions/statistics.ContentType"
+                "item": {
+                    "$ref": "#/definitions/statistics.ClinicianItem"
+                },
+                "time_range": {
+                    "$ref": "#/definitions/statistics.DateRange"
+                }
+            }
+        },
+        "handler.StatisticsContentRequest": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.ContentRef"
+                    }
+                }
+            }
+        },
+        "handler.StatisticsEntryDetailResponse": {
+            "type": "object",
+            "properties": {
+                "freshness": {
+                    "$ref": "#/definitions/statistics.Freshness"
+                },
+                "item": {
+                    "$ref": "#/definitions/statistics.EntryItem"
+                },
+                "time_range": {
+                    "$ref": "#/definitions/statistics.DateRange"
                 }
             }
         },
@@ -10621,6 +9517,17 @@ const docTemplate = `{
                 },
                 "reason": {
                     "type": "string"
+                }
+            }
+        },
+        "handler.StatisticsRunListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.Run"
+                    }
                 }
             }
         },
@@ -10644,67 +9551,6 @@ const docTemplate = `{
                 },
                 "validate_only": {
                     "type": "boolean"
-                }
-            }
-        },
-        "handler.StatisticsV2ClinicianDetailResponse": {
-            "type": "object",
-            "properties": {
-                "freshness": {
-                    "$ref": "#/definitions/statisticsv2.Freshness"
-                },
-                "item": {
-                    "$ref": "#/definitions/statisticsv2.ClinicianItem"
-                },
-                "time_range": {
-                    "$ref": "#/definitions/statisticsv2.DateRange"
-                }
-            }
-        },
-        "handler.StatisticsV2ContentRequest": {
-            "type": "object",
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/statisticsv2.ContentRef"
-                    }
-                }
-            }
-        },
-        "handler.StatisticsV2EntryDetailResponse": {
-            "type": "object",
-            "properties": {
-                "freshness": {
-                    "$ref": "#/definitions/statisticsv2.Freshness"
-                },
-                "item": {
-                    "$ref": "#/definitions/statisticsv2.EntryItem"
-                },
-                "time_range": {
-                    "$ref": "#/definitions/statisticsv2.DateRange"
-                }
-            }
-        },
-        "handler.StatisticsV2RunListResponse": {
-            "type": "object",
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/statisticsv2.Run"
-                    }
-                }
-            }
-        },
-        "handler.contentBatchRequest": {
-            "type": "object",
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_apiserver_domain_statistics.ContentReference"
-                    }
                 }
             }
         },
@@ -14117,107 +12963,6 @@ const docTemplate = `{
                 }
             }
         },
-        "response.PeriodicProjectResponse": {
-            "type": "object",
-            "properties": {
-                "completed_weeks": {
-                    "description": "已完成周数",
-                    "type": "integer"
-                },
-                "completion_rate": {
-                    "description": "完成率（0-100）",
-                    "type": "number"
-                },
-                "current_week": {
-                    "description": "当前应该完成的周次",
-                    "type": "integer"
-                },
-                "end_date": {
-                    "description": "项目结束日期",
-                    "type": "string"
-                },
-                "project_id": {
-                    "description": "项目ID",
-                    "type": "string"
-                },
-                "project_name": {
-                    "description": "项目名称",
-                    "type": "string"
-                },
-                "scale_name": {
-                    "description": "关联的量表名称",
-                    "type": "string"
-                },
-                "start_date": {
-                    "description": "项目开始日期",
-                    "type": "string"
-                },
-                "tasks": {
-                    "description": "各周任务状态（按周次升序排列）",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/response.PeriodicTaskResponse"
-                    }
-                },
-                "total_weeks": {
-                    "description": "总周数",
-                    "type": "integer"
-                }
-            }
-        },
-        "response.PeriodicStatsResponse": {
-            "type": "object",
-            "properties": {
-                "active_projects": {
-                    "description": "进行中的项目数",
-                    "type": "integer"
-                },
-                "projects": {
-                    "description": "周期性项目列表",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/response.PeriodicProjectResponse"
-                    }
-                },
-                "total_projects": {
-                    "description": "项目总数",
-                    "type": "integer"
-                }
-            }
-        },
-        "response.PeriodicTaskResponse": {
-            "type": "object",
-            "properties": {
-                "assessment_id": {
-                    "description": "关联的测评ID（如已完成）",
-                    "type": "string"
-                },
-                "completed_at": {
-                    "description": "完成时间",
-                    "type": "string"
-                },
-                "due_date": {
-                    "description": "截止时间",
-                    "type": "string"
-                },
-                "planned_at": {
-                    "description": "计划时间",
-                    "type": "string"
-                },
-                "status": {
-                    "description": "状态：completed/pending/overdue",
-                    "type": "string"
-                },
-                "status_label": {
-                    "description": "状态中文",
-                    "type": "string"
-                },
-                "week": {
-                    "description": "第几周（从1开始）",
-                    "type": "integer"
-                }
-            }
-        },
         "response.PlanListResponse": {
             "type": "object",
             "properties": {
@@ -15193,107 +13938,6 @@ const docTemplate = `{
                 }
             }
         },
-        "statistics.AssessmentEntryStatistics": {
-            "type": "object",
-            "properties": {
-                "entry": {
-                    "$ref": "#/definitions/statistics.AssessmentEntryStatisticsMeta"
-                },
-                "last_intake_at": {
-                    "type": "string"
-                },
-                "last_resolved_at": {
-                    "type": "string"
-                },
-                "snapshot": {
-                    "$ref": "#/definitions/statistics.AssessmentEntryStatisticsCounts"
-                },
-                "time_range": {
-                    "$ref": "#/definitions/statistics.StatisticsTimeRange"
-                },
-                "window": {
-                    "$ref": "#/definitions/statistics.AssessmentEntryStatisticsCounts"
-                }
-            }
-        },
-        "statistics.AssessmentEntryStatisticsCounts": {
-            "type": "object",
-            "properties": {
-                "assessment_count": {
-                    "type": "integer"
-                },
-                "assigned_count": {
-                    "type": "integer"
-                },
-                "intake_count": {
-                    "type": "integer"
-                },
-                "resolve_count": {
-                    "type": "integer"
-                }
-            }
-        },
-        "statistics.AssessmentEntryStatisticsList": {
-            "type": "object",
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/statistics.AssessmentEntryStatistics"
-                    }
-                },
-                "page": {
-                    "type": "integer"
-                },
-                "page_size": {
-                    "type": "integer"
-                },
-                "total": {
-                    "type": "integer"
-                },
-                "total_pages": {
-                    "type": "integer"
-                }
-            }
-        },
-        "statistics.AssessmentEntryStatisticsMeta": {
-            "type": "object",
-            "properties": {
-                "clinician_id": {
-                    "$ref": "#/definitions/meta.ID"
-                },
-                "clinician_name": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "expires_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "$ref": "#/definitions/meta.ID"
-                },
-                "is_active": {
-                    "type": "boolean"
-                },
-                "org_id": {
-                    "type": "integer"
-                },
-                "target_code": {
-                    "type": "string"
-                },
-                "target_type": {
-                    "type": "string"
-                },
-                "target_version": {
-                    "type": "string"
-                },
-                "token": {
-                    "type": "string"
-                }
-            }
-        },
         "statistics.AssessmentServiceStatistics": {
             "type": "object",
             "properties": {
@@ -15351,100 +13995,38 @@ const docTemplate = `{
                 }
             }
         },
-        "statistics.ClinicianStatistics": {
-            "type": "object",
-            "properties": {
-                "clinician": {
-                    "$ref": "#/definitions/statistics.ClinicianStatisticsSubject"
-                },
-                "funnel": {
-                    "$ref": "#/definitions/statistics.ClinicianStatisticsFunnel"
-                },
-                "snapshot": {
-                    "$ref": "#/definitions/statistics.ClinicianStatisticsSnapshot"
-                },
-                "time_range": {
-                    "$ref": "#/definitions/statistics.StatisticsTimeRange"
-                },
-                "window": {
-                    "$ref": "#/definitions/statistics.ClinicianStatisticsWindow"
-                }
-            }
-        },
-        "statistics.ClinicianStatisticsFunnel": {
-            "type": "object",
-            "properties": {
-                "assessment_count": {
-                    "type": "integer"
-                },
-                "assigned_count": {
-                    "type": "integer"
-                },
-                "created_count": {
-                    "type": "integer"
-                },
-                "intake_count": {
-                    "type": "integer"
-                },
-                "resolved_count": {
-                    "type": "integer"
-                }
-            }
-        },
-        "statistics.ClinicianStatisticsList": {
-            "type": "object",
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/statistics.ClinicianStatistics"
-                    }
-                },
-                "page": {
-                    "type": "integer"
-                },
-                "page_size": {
-                    "type": "integer"
-                },
-                "total": {
-                    "type": "integer"
-                },
-                "total_pages": {
-                    "type": "integer"
-                }
-            }
-        },
-        "statistics.ClinicianStatisticsSnapshot": {
+        "statistics.ClinicianItem": {
             "type": "object",
             "properties": {
                 "active_entry_count": {
                     "type": "integer"
                 },
+                "assessment_created_count": {
+                    "type": "integer"
+                },
                 "attending_testee_count": {
                     "type": "integer"
+                },
+                "care_relationship_established_count": {
+                    "type": "integer"
+                },
+                "clinician_type": {
+                    "type": "string"
                 },
                 "collaborator_testee_count": {
                     "type": "integer"
                 },
-                "primary_testee_count": {
-                    "type": "integer"
-                },
-                "total_accessible_testees": {
-                    "type": "integer"
-                }
-            }
-        },
-        "statistics.ClinicianStatisticsSubject": {
-            "type": "object",
-            "properties": {
-                "clinician_type": {
-                    "type": "string"
-                },
                 "department": {
                     "type": "string"
                 },
+                "entry_opened_count": {
+                    "type": "integer"
+                },
                 "id": {
-                    "$ref": "#/definitions/meta.ID"
+                    "type": "integer"
+                },
+                "intake_confirmed_count": {
+                    "type": "integer"
                 },
                 "is_active": {
                     "type": "boolean"
@@ -15453,54 +14035,40 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "operator_id": {
-                    "$ref": "#/definitions/meta.ID"
-                },
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
-        "statistics.ClinicianStatisticsWindow": {
-            "type": "object",
-            "properties": {
-                "assigned_count": {
                     "type": "integer"
                 },
-                "completed_assessment_count": {
-                    "type": "integer"
-                },
-                "intake_count": {
-                    "type": "integer"
-                }
-            }
-        },
-        "statistics.ClinicianTesteeSummaryStatistics": {
-            "type": "object",
-            "properties": {
-                "assessed_in_window_count": {
-                    "type": "integer"
-                },
-                "attending_testee_count": {
-                    "type": "integer"
-                },
-                "collaborator_testee_count": {
-                    "type": "integer"
-                },
-                "key_focus_testee_count": {
+                "outcome_committed_count": {
                     "type": "integer"
                 },
                 "primary_testee_count": {
                     "type": "integer"
                 },
-                "time_range": {
-                    "$ref": "#/definitions/statistics.StatisticsTimeRange"
+                "report_generated_count": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
                 },
                 "total_accessible_testees": {
                     "type": "integer"
                 }
             }
         },
-        "statistics.ContentBatchStatisticsItem": {
+        "statistics.ContentBatch": {
+            "type": "object",
+            "properties": {
+                "freshness": {
+                    "$ref": "#/definitions/statistics.Freshness"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.ContentItem"
+                    }
+                }
+            }
+        },
+        "statistics.ContentItem": {
             "type": "object",
             "properties": {
                 "code": {
@@ -15509,38 +14077,30 @@ const docTemplate = `{
                 "completion_rate": {
                     "type": "number"
                 },
+                "has_completion": {
+                    "type": "boolean"
+                },
+                "kind": {
+                    "type": "string"
+                },
                 "total_completions": {
                     "type": "integer"
                 },
                 "total_submissions": {
                     "type": "integer"
-                },
-                "type": {
-                    "$ref": "#/definitions/statistics.ContentType"
                 }
             }
         },
-        "statistics.ContentBatchStatisticsResponse": {
+        "statistics.ContentRef": {
             "type": "object",
             "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/statistics.ContentBatchStatisticsItem"
-                    }
+                "code": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
                 }
             }
-        },
-        "statistics.ContentType": {
-            "type": "string",
-            "enum": [
-                "questionnaire",
-                "scale"
-            ],
-            "x-enum-varnames": [
-                "ContentTypeQuestionnaire",
-                "ContentTypeScale"
-            ]
         },
         "statistics.DailyCount": {
             "type": "object",
@@ -15549,6 +14109,20 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "date": {
+                    "type": "string"
+                }
+            }
+        },
+        "statistics.DateRange": {
+            "type": "object",
+            "properties": {
+                "from": {
+                    "type": "string"
+                },
+                "preset": {
+                    "type": "string"
+                },
+                "to": {
                     "type": "string"
                 }
             }
@@ -15564,6 +14138,70 @@ const docTemplate = `{
                 },
                 "entry_count": {
                     "type": "integer"
+                }
+            }
+        },
+        "statistics.EntryItem": {
+            "type": "object",
+            "properties": {
+                "assessment_created_count": {
+                    "type": "integer"
+                },
+                "clinician_id": {
+                    "type": "integer"
+                },
+                "clinician_name": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "entry_opened_count": {
+                    "type": "integer"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "intake_confirmed_count": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "outcome_committed_count": {
+                    "type": "integer"
+                },
+                "report_generated_count": {
+                    "type": "integer"
+                },
+                "target_code": {
+                    "type": "string"
+                },
+                "target_type": {
+                    "type": "string"
+                },
+                "target_version": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "statistics.Freshness": {
+            "type": "object",
+            "properties": {
+                "as_of_date": {
+                    "type": "string"
+                },
+                "is_stale": {
+                    "type": "boolean"
+                },
+                "snapshot_at": {
+                    "type": "string"
                 }
             }
         },
@@ -15590,8 +14228,193 @@ const docTemplate = `{
                 },
                 "testee_count": {
                     "type": "integer"
+                }
+            }
+        },
+        "statistics.Overview": {
+            "type": "object",
+            "properties": {
+                "access_funnel": {
+                    "$ref": "#/definitions/statistics.AccessFunnelStatistics"
                 },
-                "today_answer_sheet_submission_count": {
+                "assessment_service": {
+                    "$ref": "#/definitions/statistics.AssessmentServiceStatistics"
+                },
+                "dimension_analysis": {
+                    "$ref": "#/definitions/statistics.DimensionAnalysisSummary"
+                },
+                "freshness": {
+                    "$ref": "#/definitions/statistics.Freshness"
+                },
+                "metrics": {
+                    "$ref": "#/definitions/statistics.OverviewMetrics"
+                },
+                "org_id": {
+                    "type": "integer"
+                },
+                "organization_overview": {
+                    "$ref": "#/definitions/statistics.OrganizationOverview"
+                },
+                "plan": {
+                    "$ref": "#/definitions/statistics.PlanDomainStatistics"
+                },
+                "time_range": {
+                    "$ref": "#/definitions/statistics.DateRange"
+                }
+            }
+        },
+        "statistics.OverviewMetrics": {
+            "type": "object",
+            "properties": {
+                "active_clinician_count": {
+                    "type": "integer"
+                },
+                "active_enrollment_count": {
+                    "type": "integer"
+                },
+                "active_entry_count": {
+                    "type": "integer"
+                },
+                "answersheet_submission_count": {
+                    "type": "integer"
+                },
+                "assessment_count": {
+                    "type": "integer"
+                },
+                "care_relationship_established_count": {
+                    "type": "integer"
+                },
+                "care_relationship_transferred_count": {
+                    "type": "integer"
+                },
+                "clinician_count": {
+                    "type": "integer"
+                },
+                "completed_on_time_count": {
+                    "type": "integer"
+                },
+                "completed_overdue_count": {
+                    "type": "integer"
+                },
+                "content_count": {
+                    "type": "integer"
+                },
+                "due_task_count": {
+                    "type": "integer"
+                },
+                "entry_count": {
+                    "type": "integer"
+                },
+                "entry_opened_count": {
+                    "type": "integer"
+                },
+                "intake_confirmed_count": {
+                    "type": "integer"
+                },
+                "planned_task_count": {
+                    "type": "integer"
+                },
+                "report_count": {
+                    "type": "integer"
+                },
+                "task_canceled_count": {
+                    "type": "integer"
+                },
+                "task_completed_count": {
+                    "type": "integer"
+                },
+                "task_created_count": {
+                    "type": "integer"
+                },
+                "task_expired_count": {
+                    "type": "integer"
+                },
+                "task_opened_count": {
+                    "type": "integer"
+                },
+                "testee_count": {
+                    "type": "integer"
+                },
+                "testee_created_count": {
+                    "type": "integer"
+                },
+                "uncompleted_overdue_count": {
+                    "type": "integer"
+                },
+                "window_answersheet_submitted_count": {
+                    "type": "integer"
+                },
+                "window_assessment_created_count": {
+                    "type": "integer"
+                },
+                "window_assessment_failed_count": {
+                    "type": "integer"
+                },
+                "window_outcome_committed_count": {
+                    "type": "integer"
+                },
+                "window_report_failed_count": {
+                    "type": "integer"
+                },
+                "window_report_generated_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "statistics.Page-statistics_ClinicianItem": {
+            "type": "object",
+            "properties": {
+                "freshness": {
+                    "$ref": "#/definitions/statistics.Freshness"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.ClinicianItem"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "time_range": {
+                    "$ref": "#/definitions/statistics.DateRange"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "statistics.Page-statistics_EntryItem": {
+            "type": "object",
+            "properties": {
+                "freshness": {
+                    "$ref": "#/definitions/statistics.Freshness"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.EntryItem"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "time_range": {
+                    "$ref": "#/definitions/statistics.DateRange"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
                     "type": "integer"
                 }
             }
@@ -15736,447 +14559,7 @@ const docTemplate = `{
                 }
             }
         },
-        "statistics.RepairCompleteRequest": {
-            "type": "object",
-            "properties": {
-                "org_ids": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "repair_kind": {
-                    "type": "string"
-                }
-            }
-        },
-        "statistics.StatisticsOverview": {
-            "type": "object",
-            "properties": {
-                "access_funnel": {
-                    "$ref": "#/definitions/statistics.AccessFunnelStatistics"
-                },
-                "assessment_service": {
-                    "$ref": "#/definitions/statistics.AssessmentServiceStatistics"
-                },
-                "dimension_analysis": {
-                    "$ref": "#/definitions/statistics.DimensionAnalysisSummary"
-                },
-                "org_id": {
-                    "type": "integer"
-                },
-                "organization_overview": {
-                    "$ref": "#/definitions/statistics.OrganizationOverview"
-                },
-                "plan": {
-                    "$ref": "#/definitions/statistics.PlanDomainStatistics"
-                },
-                "time_range": {
-                    "$ref": "#/definitions/statistics.StatisticsTimeRange"
-                }
-            }
-        },
-        "statistics.StatisticsTimeRange": {
-            "type": "object",
-            "properties": {
-                "from": {
-                    "type": "string"
-                },
-                "preset": {
-                    "$ref": "#/definitions/statistics.TimeRangePreset"
-                },
-                "to": {
-                    "type": "string"
-                }
-            }
-        },
-        "statistics.TimeRangePreset": {
-            "type": "string",
-            "enum": [
-                "today",
-                "7d",
-                "30d"
-            ],
-            "x-enum-varnames": [
-                "TimeRangePresetToday",
-                "TimeRangePreset7D",
-                "TimeRangePreset30D"
-            ]
-        },
-        "statisticsv2.ClinicianItem": {
-            "type": "object",
-            "properties": {
-                "active_entry_count": {
-                    "type": "integer"
-                },
-                "assessment_created_count": {
-                    "type": "integer"
-                },
-                "attending_testee_count": {
-                    "type": "integer"
-                },
-                "care_relationship_established_count": {
-                    "type": "integer"
-                },
-                "clinician_type": {
-                    "type": "string"
-                },
-                "collaborator_testee_count": {
-                    "type": "integer"
-                },
-                "department": {
-                    "type": "string"
-                },
-                "entry_opened_count": {
-                    "type": "integer"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "intake_confirmed_count": {
-                    "type": "integer"
-                },
-                "is_active": {
-                    "type": "boolean"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "operator_id": {
-                    "type": "integer"
-                },
-                "outcome_committed_count": {
-                    "type": "integer"
-                },
-                "primary_testee_count": {
-                    "type": "integer"
-                },
-                "report_generated_count": {
-                    "type": "integer"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "total_accessible_testees": {
-                    "type": "integer"
-                }
-            }
-        },
-        "statisticsv2.ContentBatch": {
-            "type": "object",
-            "properties": {
-                "freshness": {
-                    "$ref": "#/definitions/statisticsv2.Freshness"
-                },
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/statisticsv2.ContentItem"
-                    }
-                }
-            }
-        },
-        "statisticsv2.ContentItem": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "completion_rate": {
-                    "type": "number"
-                },
-                "has_completion": {
-                    "type": "boolean"
-                },
-                "kind": {
-                    "type": "string"
-                },
-                "total_completions": {
-                    "type": "integer"
-                },
-                "total_submissions": {
-                    "type": "integer"
-                }
-            }
-        },
-        "statisticsv2.ContentRef": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "kind": {
-                    "type": "string"
-                }
-            }
-        },
-        "statisticsv2.DateRange": {
-            "type": "object",
-            "properties": {
-                "from": {
-                    "type": "string"
-                },
-                "preset": {
-                    "type": "string"
-                },
-                "to": {
-                    "type": "string"
-                }
-            }
-        },
-        "statisticsv2.EntryItem": {
-            "type": "object",
-            "properties": {
-                "assessment_created_count": {
-                    "type": "integer"
-                },
-                "clinician_id": {
-                    "type": "integer"
-                },
-                "clinician_name": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "entry_opened_count": {
-                    "type": "integer"
-                },
-                "expires_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "intake_confirmed_count": {
-                    "type": "integer"
-                },
-                "is_active": {
-                    "type": "boolean"
-                },
-                "outcome_committed_count": {
-                    "type": "integer"
-                },
-                "report_generated_count": {
-                    "type": "integer"
-                },
-                "target_code": {
-                    "type": "string"
-                },
-                "target_type": {
-                    "type": "string"
-                },
-                "target_version": {
-                    "type": "string"
-                },
-                "token": {
-                    "type": "string"
-                }
-            }
-        },
-        "statisticsv2.Freshness": {
-            "type": "object",
-            "properties": {
-                "as_of_date": {
-                    "type": "string"
-                },
-                "is_stale": {
-                    "type": "boolean"
-                },
-                "snapshot_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "statisticsv2.Overview": {
-            "type": "object",
-            "properties": {
-                "access_funnel": {
-                    "$ref": "#/definitions/statistics.AccessFunnelStatistics"
-                },
-                "assessment_service": {
-                    "$ref": "#/definitions/statistics.AssessmentServiceStatistics"
-                },
-                "dimension_analysis": {
-                    "$ref": "#/definitions/statistics.DimensionAnalysisSummary"
-                },
-                "freshness": {
-                    "$ref": "#/definitions/statisticsv2.Freshness"
-                },
-                "metrics": {
-                    "$ref": "#/definitions/statisticsv2.OverviewMetrics"
-                },
-                "org_id": {
-                    "type": "integer"
-                },
-                "organization_overview": {
-                    "$ref": "#/definitions/statistics.OrganizationOverview"
-                },
-                "plan": {
-                    "$ref": "#/definitions/statistics.PlanDomainStatistics"
-                },
-                "time_range": {
-                    "$ref": "#/definitions/statisticsv2.DateRange"
-                }
-            }
-        },
-        "statisticsv2.OverviewMetrics": {
-            "type": "object",
-            "properties": {
-                "active_clinician_count": {
-                    "type": "integer"
-                },
-                "active_enrollment_count": {
-                    "type": "integer"
-                },
-                "active_entry_count": {
-                    "type": "integer"
-                },
-                "answersheet_submission_count": {
-                    "type": "integer"
-                },
-                "assessment_count": {
-                    "type": "integer"
-                },
-                "care_relationship_established_count": {
-                    "type": "integer"
-                },
-                "care_relationship_transferred_count": {
-                    "type": "integer"
-                },
-                "clinician_count": {
-                    "type": "integer"
-                },
-                "completed_on_time_count": {
-                    "type": "integer"
-                },
-                "completed_overdue_count": {
-                    "type": "integer"
-                },
-                "content_count": {
-                    "type": "integer"
-                },
-                "due_task_count": {
-                    "type": "integer"
-                },
-                "entry_count": {
-                    "type": "integer"
-                },
-                "entry_opened_count": {
-                    "type": "integer"
-                },
-                "intake_confirmed_count": {
-                    "type": "integer"
-                },
-                "planned_task_count": {
-                    "type": "integer"
-                },
-                "report_count": {
-                    "type": "integer"
-                },
-                "task_canceled_count": {
-                    "type": "integer"
-                },
-                "task_completed_count": {
-                    "type": "integer"
-                },
-                "task_created_count": {
-                    "type": "integer"
-                },
-                "task_expired_count": {
-                    "type": "integer"
-                },
-                "task_opened_count": {
-                    "type": "integer"
-                },
-                "testee_count": {
-                    "type": "integer"
-                },
-                "testee_created_count": {
-                    "type": "integer"
-                },
-                "uncompleted_overdue_count": {
-                    "type": "integer"
-                },
-                "window_answersheet_submitted_count": {
-                    "type": "integer"
-                },
-                "window_assessment_created_count": {
-                    "type": "integer"
-                },
-                "window_assessment_failed_count": {
-                    "type": "integer"
-                },
-                "window_outcome_committed_count": {
-                    "type": "integer"
-                },
-                "window_report_failed_count": {
-                    "type": "integer"
-                },
-                "window_report_generated_count": {
-                    "type": "integer"
-                }
-            }
-        },
-        "statisticsv2.Page-statisticsv2_ClinicianItem": {
-            "type": "object",
-            "properties": {
-                "freshness": {
-                    "$ref": "#/definitions/statisticsv2.Freshness"
-                },
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/statisticsv2.ClinicianItem"
-                    }
-                },
-                "page": {
-                    "type": "integer"
-                },
-                "page_size": {
-                    "type": "integer"
-                },
-                "time_range": {
-                    "$ref": "#/definitions/statisticsv2.DateRange"
-                },
-                "total": {
-                    "type": "integer"
-                },
-                "total_pages": {
-                    "type": "integer"
-                }
-            }
-        },
-        "statisticsv2.Page-statisticsv2_EntryItem": {
-            "type": "object",
-            "properties": {
-                "freshness": {
-                    "$ref": "#/definitions/statisticsv2.Freshness"
-                },
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/statisticsv2.EntryItem"
-                    }
-                },
-                "page": {
-                    "type": "integer"
-                },
-                "page_size": {
-                    "type": "integer"
-                },
-                "time_range": {
-                    "$ref": "#/definitions/statisticsv2.DateRange"
-                },
-                "total": {
-                    "type": "integer"
-                },
-                "total_pages": {
-                    "type": "integer"
-                }
-            }
-        },
-        "statisticsv2.Run": {
+        "statistics.Run": {
             "type": "object",
             "properties": {
                 "as_of_date": {
@@ -16231,7 +14614,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "mode": {
-                    "$ref": "#/definitions/v2.RunMode"
+                    "$ref": "#/definitions/statistics.RunMode"
                 },
                 "operator_id": {
                     "type": "integer"
@@ -16261,14 +14644,42 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
-                    "$ref": "#/definitions/v2.RunStatus"
+                    "$ref": "#/definitions/statistics.RunStatus"
                 },
                 "trigger_type": {
                     "type": "string"
                 }
             }
         },
-        "statisticsv2.TesteeSummary": {
+        "statistics.RunMode": {
+            "type": "string",
+            "enum": [
+                "validate",
+                "repair",
+                "publish"
+            ],
+            "x-enum-varnames": [
+                "RunModeValidate",
+                "RunModeRepair",
+                "RunModePublish"
+            ]
+        },
+        "statistics.RunStatus": {
+            "type": "string",
+            "enum": [
+                "running",
+                "failed",
+                "data_committed",
+                "succeeded"
+            ],
+            "x-enum-varnames": [
+                "RunStatusRunning",
+                "RunStatusFailed",
+                "RunStatusDataCommitted",
+                "RunStatusSucceeded"
+            ]
+        },
+        "statistics.TesteeSummary": {
             "type": "object",
             "properties": {
                 "assessed_in_window_count": {
@@ -16281,7 +14692,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "freshness": {
-                    "$ref": "#/definitions/statisticsv2.Freshness"
+                    "$ref": "#/definitions/statistics.Freshness"
                 },
                 "key_focus_testee_count": {
                     "type": "integer"
@@ -16290,7 +14701,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "time_range": {
-                    "$ref": "#/definitions/statisticsv2.DateRange"
+                    "$ref": "#/definitions/statistics.DateRange"
                 },
                 "total_accessible_testees": {
                     "type": "integer"
@@ -16386,9 +14797,6 @@ const docTemplate = `{
         "systemgovernance.CheckpointGovernanceSnapshot": {
             "type": "object",
             "properties": {
-                "analyticsProjectorProcessing": {
-                    "type": "integer"
-                },
                 "evaluationRunFailedRetryable": {
                     "type": "integer"
                 },
@@ -16620,34 +15028,6 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
-        },
-        "v2.RunMode": {
-            "type": "string",
-            "enum": [
-                "validate",
-                "repair",
-                "publish"
-            ],
-            "x-enum-varnames": [
-                "RunModeValidate",
-                "RunModeRepair",
-                "RunModePublish"
-            ]
-        },
-        "v2.RunStatus": {
-            "type": "string",
-            "enum": [
-                "running",
-                "failed",
-                "data_committed",
-                "succeeded"
-            ],
-            "x-enum-varnames": [
-                "RunStatusRunning",
-                "RunStatusFailed",
-                "RunStatusDataCommitted",
-                "RunStatusSucceeded"
-            ]
         },
         "viewmodel.AnswerDTO": {
             "type": "object",

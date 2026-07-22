@@ -11,7 +11,6 @@ import (
 type GovernanceSnapshot struct {
 	EvaluationRunRunning         int64 `json:"evaluation_run_running"`
 	EvaluationRunFailedRetryable int64 `json:"evaluation_run_failed_retryable"`
-	AnalyticsProjectorProcessing int64 `json:"analytics_projector_processing"`
 }
 
 func (r *Repository) LoadGovernanceSnapshot(ctx context.Context) (GovernanceSnapshot, error) {
@@ -24,13 +23,6 @@ func (r *Repository) LoadGovernanceSnapshot(ctx context.Context) (GovernanceSnap
 		return GovernanceSnapshot{}, err
 	}
 	if snapshot.EvaluationRunFailedRetryable, err = r.countScopeStatusRetryable(ctx, scopeEvaluationRun, evalrun.StatusFailed.String(), true); err != nil {
-		return GovernanceSnapshot{}, err
-	}
-	if snapshot.AnalyticsProjectorProcessing, err = r.countScopeStatus(
-		ctx,
-		scopeAnalyticsProjector,
-		evalrun.StatusRunning.String(),
-	); err != nil {
 		return GovernanceSnapshot{}, err
 	}
 	return snapshot, nil

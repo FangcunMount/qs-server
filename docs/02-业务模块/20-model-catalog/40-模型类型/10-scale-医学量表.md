@@ -488,7 +488,7 @@ Assessment 冻结 model version 和 questionnaire version，执行和重试读�
 | 输入校验 | [`application/evaluation/registry/mechanisms/scoring/input_validator.go`](../../../../internal/apiserver/application/evaluation/registry/mechanisms/scoring/input_validator.go) |
 | factor_scoring executor | [`application/evaluation/registry/mechanisms/scoring`](../../../../internal/apiserver/application/evaluation/registry/mechanisms/scoring/) |
 | Calculation scoring | [`domain/calculation/scoring`](../../../../internal/apiserver/domain/calculation/scoring/) |
-| Scale 完整性审计 | [`scripts/oneoff/audit_scale_models`](../../../../scripts/oneoff/audit_scale_models/) |
+| Current-only 完整性审计 | [`scripts/oneoff/verify_definition_v2_cutover`](../../../../scripts/oneoff/verify_definition_v2_cutover/) |
 
 ```bash
 go test ./internal/apiserver/application/modelcatalog/definition -run Scale

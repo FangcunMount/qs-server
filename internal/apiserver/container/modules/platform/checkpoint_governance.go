@@ -26,6 +26,5 @@ func (a checkpointGovernanceAdapter) LoadGovernanceSnapshot(ctx context.Context)
 	return systemgov.CheckpointGovernanceSnapshot{
 		EvaluationRunRunning:         snapshot.EvaluationRunRunning,
 		EvaluationRunFailedRetryable: snapshot.EvaluationRunFailedRetryable,
-		AnalyticsProjectorProcessing: snapshot.AnalyticsProjectorProcessing,
 	}, nil
 }

@@ -11,8 +11,8 @@ import (
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
+	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 )
 
 // InternalService 内部 gRPC 服务 - 供 Worker 调用
@@ -24,8 +24,7 @@ type InternalService struct {
 	operatorAuthService        operatorApp.OperatorAuthorizationService
 	operatorQueryService       operatorApp.OperatorQueryService
 	operatorRoleSyncer         operatorBootstrapRoleSyncer
-	behaviorProjectorService   statisticsApp.BehaviorProjectorService
-	warmupCoordinator          statisticsApp.WarmupCoordinator
+	warmupCoordinator          cachegovernance.WarmupCoordinator
 	// 小程序码生成服务（可选）
 	qrCodeService surveyScaleQRCodeGenerator
 	// 小程序 task 消息服务（可选）
@@ -48,8 +47,7 @@ func NewInternalService(
 	operatorAuthService operatorApp.OperatorAuthorizationService,
 	operatorQueryService operatorApp.OperatorQueryService,
 	operatorRoleSyncer operatorBootstrapRoleSyncer,
-	behaviorProjectorService statisticsApp.BehaviorProjectorService,
-	warmupCoordinator statisticsApp.WarmupCoordinator,
+	warmupCoordinator cachegovernance.WarmupCoordinator,
 	qrCodeService surveyScaleQRCodeGenerator,
 	miniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService,
 ) *InternalService {
@@ -59,7 +57,6 @@ func NewInternalService(
 		operatorAuthService:                operatorAuthService,
 		operatorQueryService:               operatorQueryService,
 		operatorRoleSyncer:                 operatorRoleSyncer,
-		behaviorProjectorService:           behaviorProjectorService,
 		warmupCoordinator:                  warmupCoordinator,
 		qrCodeService:                      qrCodeService,
 		miniProgramTaskNotificationService: miniProgramTaskNotificationService,
@@ -69,13 +66,6 @@ func NewInternalService(
 // RegisterService 注册 gRPC 服务
 func (s *InternalService) RegisterService(server *grpc.Server) {
 	pb.RegisterInternalServiceServer(server, s)
-}
-
-func (s *InternalService) ProjectBehaviorEvent(
-	ctx context.Context,
-	req *pb.ProjectBehaviorEventRequest,
-) (*pb.ProjectBehaviorEventResponse, error) {
-	return newBehaviorProjectionFlow(s).ProjectBehaviorEvent(ctx, req)
 }
 
 // SyncAssessmentAttention 同步测评后置关注状态

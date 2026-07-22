@@ -1,42 +1,4 @@
 package statistics
 
-import (
-	"gorm.io/gorm"
-
-	redis "github.com/redis/go-redis/v9"
-	"go.mongodb.org/mongo-driver/mongo"
-
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
-	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
-	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
-)
-
-// BootstrapInput carries container integration inputs for statistics module bootstrap.
-type BootstrapInput struct {
-	MySQLDB               *gorm.DB
-	RedisClient           redis.UniversalClient
-	CacheBuilder          *keyspace.Builder
-	AnswerSheetScanSource statisticsApp.AnswerSheetScanSource
-	MongoDB               *mongo.Database
-	RepairWindowDays      int
-	CachePolicies         sharedcache.PolicyProvider
-	OverviewGuardOpts     statisticsApp.StatisticsReadGuardOptions
-	HotsetRecorder        cachetarget.HotsetRecorder
-	LockManager           locklease.Manager
-	LockRunner            locklease.Runner
-	VersionStore          querycache.VersionTokenStore
-	Observer              *observability.ComponentObserver
-	MySQLLimiter          backpressure.Acquirer
-	WarmupCoordinator     statisticsApp.WarmupCoordinator
-	StatusService         statisticsApp.GovernanceStatusReader
-}
-
-// Bootstrap assembles the statistics module from container integration inputs.
-func Bootstrap(in BootstrapInput) (*Module, error) {
-	return New(Deps(in))
-}
+// Bootstrap is the stable composition seam for the statistics module.
+func Bootstrap(in Deps) (*Module, error) { return New(in) }

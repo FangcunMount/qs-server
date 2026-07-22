@@ -5,8 +5,7 @@ import (
 )
 
 const (
-	scopeEvaluationRun      = "evaluation_run"
-	scopeAnalyticsProjector = "analytics_projector"
+	scopeEvaluationRun = "evaluation_run"
 )
 
 // RuntimeCheckpointPO persists unified runtime checkpoints.

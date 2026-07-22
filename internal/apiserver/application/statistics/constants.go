@@ -1,9 +1,0 @@
-package statistics
-
-// ==================== 统计模块全局常量 ====================
-
-// OriginTypes 测评来源类型列表
-var OriginTypes = []string{
-	"adhoc", // 一次性测评
-	"plan",  // 测评计划
-}

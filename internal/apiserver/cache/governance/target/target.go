@@ -214,7 +214,7 @@ func normalizeOverviewPreset(preset string) string {
 
 func isSupportedOverviewPreset(preset string) bool {
 	switch preset {
-	case "today", "7d", "30d":
+	case "latest_complete_day", "7d", "30d":
 		return true
 	default:
 		return false

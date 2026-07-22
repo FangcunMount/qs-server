@@ -8,6 +8,7 @@ import (
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
+	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	evaluationintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
 	evaluationtestee "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/testee"
 	evaluationworker "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/worker"
@@ -17,7 +18,6 @@ import (
 	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
@@ -43,11 +43,10 @@ type Deps struct {
 	Interpretation         InterpretationDeps
 	AssessmentModelCatalog AssessmentModelCatalogDeps
 	Plan                   PlanDeps
-	Statistics             StatisticsDeps
 	IAM                    IAMDeps
 	PublishedModelCatalog  rulesetport.Catalog
 
-	WarmupCoordinator                  statisticsApp.WarmupCoordinator
+	WarmupCoordinator                  cachegovernance.WarmupCoordinator
 	QRCodeService                      SurveyScaleQRCodeGenerator
 	MiniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService
 }
@@ -96,10 +95,6 @@ type AssessmentModelCatalogDeps struct {
 type PlanDeps struct {
 	CommandService         planApp.PlanCommandService
 	TaskAssessmentResolver planApp.TaskAssessmentResolver
-}
-
-type StatisticsDeps struct {
-	BehaviorProjectorService statisticsApp.BehaviorProjectorService
 }
 
 type IAMDeps struct {
@@ -245,18 +240,12 @@ func (r *Registry) registerInternalService() error {
 		log.Warn("ActorModule is not initialized, skipping internal service registration")
 		return nil
 	}
-	if r.deps.Statistics.BehaviorProjectorService == nil {
-		log.Warn("StatisticsModule is not initialized, skipping internal service registration")
-		return nil
-	}
-
 	internalService := service.NewInternalService(
 		r.deps.Actor.TesteeAssessmentAttentionService,
 		r.deps.Actor.OperatorLifecycleService,
 		r.deps.Actor.OperatorAuthorizationService,
 		r.deps.Actor.OperatorQueryService,
 		r.deps.Actor.OperatorRoleProjectionUpdater,
-		r.deps.Statistics.BehaviorProjectorService,
 		r.deps.WarmupCoordinator,
 		r.deps.QRCodeService,
 		r.deps.MiniProgramTaskNotificationService,

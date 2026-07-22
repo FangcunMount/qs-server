@@ -41,6 +41,9 @@ func TestWarmupTargetParsers(t *testing.T) {
 	if orgID, preset, ok := ParseQueryStatsOverviewScope("org:7:preset:30d"); !ok || orgID != 7 || preset != "30d" {
 		t.Fatalf("ParseQueryStatsOverviewScope() = %d, %q, %v", orgID, preset, ok)
 	}
+	if _, _, ok := ParseQueryStatsOverviewScope("org:7:preset:today"); ok {
+		t.Fatal("ParseQueryStatsOverviewScope() should reject today")
+	}
 }
 
 func TestFamilyForKind(t *testing.T) {

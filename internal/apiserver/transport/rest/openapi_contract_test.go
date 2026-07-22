@@ -35,17 +35,17 @@ func TestApiserverOpenAPIContractCoversKeyPublicRoutes(t *testing.T) {
 	assertOpenAPIOperation(t, spec, "/answersheets/admin-submit", "post")
 	assertOpenAPIOperation(t, spec, "/evaluations/assessments", "get")
 	assertOpenAPIOperation(t, spec, "/plans/{id}/tasks", "get")
-	assertOpenAPIOperation(t, spec, "/statistics/overview", "get")
-	assertOpenAPIOperation(t, spec, "/statistics/clinicians", "get")
-	assertOpenAPIOperation(t, spec, "/statistics/clinicians/{id}", "get")
-	assertOpenAPIOperation(t, spec, "/statistics/clinicians/me/overview", "get")
-	assertOpenAPIOperation(t, spec, "/statistics/clinicians/me/entries", "get")
-	assertOpenAPIOperation(t, spec, "/statistics/clinicians/me/testees-summary", "get")
-	assertOpenAPIOperation(t, spec, "/statistics/entries", "get")
-	assertOpenAPIOperation(t, spec, "/statistics/entries/{id}", "get")
-	assertOpenAPIOperation(t, spec, "/statistics/testees/{testee_id}/periodic", "get")
-	assertOpenAPIOperation(t, spec, "/statistics/contents/batch", "post")
-	assertOpenAPIOperationAbsent(t, spec, "/statistics/questionnaires/batch", "post")
+	assertOpenAPIOperation(t, spec, "/api/v2/statistics/overview", "get")
+	assertOpenAPIOperation(t, spec, "/api/v2/statistics/clinicians", "get")
+	assertOpenAPIOperation(t, spec, "/api/v2/statistics/clinicians/{id}", "get")
+	assertOpenAPIOperation(t, spec, "/api/v2/statistics/clinicians/me/overview", "get")
+	assertOpenAPIOperation(t, spec, "/api/v2/statistics/clinicians/me/entries", "get")
+	assertOpenAPIOperation(t, spec, "/api/v2/statistics/clinicians/me/testees-summary", "get")
+	assertOpenAPIOperation(t, spec, "/api/v2/statistics/entries", "get")
+	assertOpenAPIOperation(t, spec, "/api/v2/statistics/entries/{id}", "get")
+	assertOpenAPIOperation(t, spec, "/api/v2/statistics/contents/batch", "post")
+	assertOpenAPIOperationAbsent(t, spec, "/api/v1/statistics/overview", "get")
+	assertOpenAPIOperation(t, spec, "/api/v2/plans/testees/{testee_id}/enrollments", "get")
 	assertOpenAPIOperation(t, spec, "/testees/{id}", "get")
 	assertOpenAPIOperation(t, spec, "/health", "get")
 }
@@ -77,7 +77,7 @@ func TestApiserverOpenAPIHasExplicitModelAndInterpretationWireSchemas(t *testing
 	}
 }
 
-func TestStatisticsV2OpenAPIExposesRunModesAndAuditedCacheResume(t *testing.T) {
+func TestStatisticsOpenAPIExposesRunModesAndAuditedCacheResume(t *testing.T) {
 	t.Parallel()
 
 	spec := loadOpenAPISpec(t, "../../../../api/rest/apiserver.yaml")
@@ -98,10 +98,10 @@ func TestStatisticsV2OpenAPIExposesRunModesAndAuditedCacheResume(t *testing.T) {
 	if _, ok := runRequest["mode"]; !ok {
 		t.Fatal("StatisticsRunRequest must expose mode")
 	}
-	run := schemas["statisticsv2.Run"].(map[string]any)["properties"].(map[string]any)
+	run := schemas["statistics.Run"].(map[string]any)["properties"].(map[string]any)
 	for _, property := range []string{"error_code", "error_message", "source_counts", "fact_counts", "result_counts"} {
 		if _, ok := run[property]; !ok {
-			t.Fatalf("statisticsv2.Run missing %s", property)
+			t.Fatalf("statistics.Run missing %s", property)
 		}
 	}
 	resumeRequest := schemas["handler.StatisticsResumeCacheRequest"].(map[string]any)["properties"].(map[string]any)

@@ -9,12 +9,12 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readconcern"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 )
 
-// MongoTransactionRunner keeps a one-off model seed atomic across norm and
-// the head/snapshot records in assessment_models. The target MongoDB must support
-// multi-document transactions.
+// MongoTransactionRunner keeps one-off ModelCatalog writes atomic. The target
+// MongoDB must support multi-document transactions.
 type MongoTransactionRunner struct {
 	client *mongo.Client
 }
@@ -47,16 +47,20 @@ func (r MongoTransactionRunner) WithinTransaction(ctx context.Context, fn func(c
 	}
 	defer session.EndSession(ctx)
 
-	txnOptions := options.Transaction().
-		SetReadConcern(readconcern.Snapshot()).
-		SetWriteConcern(writeconcern.Majority())
 	_, err = session.WithTransaction(ctx, func(txCtx mongo.SessionContext) (interface{}, error) {
 		return nil, fn(txCtx)
-	}, txnOptions)
+	}, mongoTransactionOptions())
 	if err != nil {
-		return fmt.Errorf("mongo seed transaction: %w", err)
+		return fmt.Errorf("mongo transaction: %w", err)
 	}
 	return nil
+}
+
+func mongoTransactionOptions() *options.TransactionOptions {
+	return options.Transaction().
+		SetReadPreference(readpref.Primary()).
+		SetReadConcern(readconcern.Snapshot()).
+		SetWriteConcern(writeconcern.Majority())
 }
 
 type PublishedCollection interface {

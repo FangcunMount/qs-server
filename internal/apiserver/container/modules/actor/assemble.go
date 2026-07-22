@@ -20,7 +20,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	actorInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
-	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -106,9 +105,9 @@ func New(deps Deps) (*Module, error) {
 	assessmentEntryRepo := actorInfra.NewAssessmentEntryRepository(mysqlDB, mysqlOptions)
 	actorReadModel := actorInfra.NewReadModel(mysqlDB, mysqlOptions)
 	module.ReadModel = actorReadModel
-	statisticsRepo := statisticsInfra.NewStatisticsRepository(mysqlDB, mysqlOptions)
-	resolveLogWriter := statisticsInfra.NewAssessmentEntryResolveLogger(statisticsRepo)
-	intakeLogWriter := statisticsInfra.NewAssessmentEntryIntakeLogger(statisticsRepo)
+	activityLogRepo := actorInfra.NewAssessmentEntryActivityLogRepository(mysqlDB, mysqlOptions)
+	resolveLogWriter := actorInfra.NewAssessmentEntryResolveLogger(activityLogRepo)
+	intakeLogWriter := actorInfra.NewAssessmentEntryIntakeLogger(activityLogRepo)
 	testeeValidator := testee.NewValidator(testeeRepo)
 	testeeFactory := testee.NewFactory(testeeRepo, testeeValidator)
 	testeeEditor := testee.NewEditor(testeeValidator)

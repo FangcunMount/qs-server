@@ -10,10 +10,10 @@ func TestApiserverOpenAPICoversK6PerfPaths(t *testing.T) {
 
 	spec := loadOpenAPISpec(t, "../../../../api/rest/apiserver.yaml")
 	required := map[string][]string{
-		"/testees":                   {"get"},
-		"/statistics/overview":       {"get"},
-		"/statistics/contents/batch": {"post"},
-		"/evaluations/assessments":   {"get"},
+		"/testees":                          {"get"},
+		"/api/v2/statistics/overview":       {"get"},
+		"/api/v2/statistics/contents/batch": {"post"},
+		"/evaluations/assessments":          {"get"},
 	}
 	for path, methods := range required {
 		for _, method := range methods {

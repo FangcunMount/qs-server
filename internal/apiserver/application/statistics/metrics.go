@@ -1,89 +1,105 @@
 package statistics
 
 import (
+	"strconv"
 	"time"
 
+	statisticsDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-var statsOverviewStaleServedTotal = promauto.NewCounter(prometheus.CounterOpts{
-	Name: "apiserver_stats_overview_stale_served_total",
-	Help: "Total statistics overview responses served from in-process stale cache.",
+var statisticsRunTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+	Namespace: "qs", Subsystem: "statistics", Name: "run_total",
+	Help: "Statistics runs grouped by mode, trigger, and terminal status.",
+}, []string{"mode", "trigger", "status"})
+
+var statisticsRunDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+	Namespace: "qs", Subsystem: "statistics", Name: "run_duration_seconds",
+	Help: "Statistics run duration grouped by mode and trigger.", Buckets: prometheus.DefBuckets,
+}, []string{"mode", "trigger"})
+
+var statisticsStageFailureTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+	Namespace: "qs", Subsystem: "statistics", Name: "stage_failure_total",
+	Help: "Statistics failures grouped by stage and structured error code.",
+}, []string{"stage", "code"})
+
+var statisticsProcessedRows = promauto.NewCounterVec(prometheus.CounterOpts{
+	Namespace: "qs", Subsystem: "statistics", Name: "processed_rows_total",
+	Help: "Rows processed by Statistics collectors and projections.",
+}, []string{"phase", "name", "result"})
+
+var statisticsCachePublishTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+	Namespace: "qs", Subsystem: "statistics", Name: "cache_publish_total",
+	Help: "Statistics cache generation publication attempts.",
+}, []string{"operation", "result"})
+
+var statisticsFreshnessLagDays = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	Namespace: "qs", Subsystem: "statistics", Name: "freshness_lag_days",
+	Help: "Statistics published business-day lag by configured organization.",
+}, []string{"org_id"})
+
+var statisticsLastPublishSuccess = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	Namespace: "qs", Subsystem: "statistics", Name: "last_publish_success_unixtime",
+	Help: "Unix timestamp of the last successful Statistics publish run by organization.",
+}, []string{"org_id"})
+
+var statisticsPublishedAsOf = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	Namespace: "qs", Subsystem: "statistics", Name: "published_as_of_unixtime",
+	Help: "Unix timestamp of the Shanghai business day published by the last successful run.",
+}, []string{"org_id"})
+
+var statisticsStaleResponseTotal = promauto.NewCounter(prometheus.CounterOpts{
+	Namespace: "qs", Subsystem: "statistics", Name: "stale_response_total",
+	Help: "Statistics responses served with stale freshness metadata.",
 })
 
-func incStatsOverviewStaleServed() {
-	statsOverviewStaleServedTotal.Inc()
+func observeStatisticsRun(start time.Time, mode statisticsDomain.RunMode, trigger string, run *Run, err error) {
+	status := "rejected"
+	if run != nil {
+		status = string(run.Status)
+	} else if err == nil {
+		status = "succeeded"
+	}
+	statisticsRunTotal.WithLabelValues(string(mode), trigger, status).Inc()
+	statisticsRunDuration.WithLabelValues(string(mode), trigger).Observe(time.Since(start).Seconds())
+	if run != nil && mode == statisticsDomain.RunModePublish && run.Status == statisticsDomain.RunStatusSucceeded {
+		orgID := strconv.FormatInt(run.OrgID, 10)
+		statisticsLastPublishSuccess.WithLabelValues(orgID).Set(float64(time.Now().Unix()))
+		statisticsPublishedAsOf.WithLabelValues(orgID).Set(float64(run.AsOfDate.Unix()))
+	}
 }
 
-var behaviorScanItemsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-	Name: "apiserver_statistics_behavior_scan_items_total",
-	Help: "Behavior scan items grouped by source and result.",
-}, []string{"source", "result"})
-
-var behaviorScanDuration = promauto.NewHistogram(prometheus.HistogramOpts{
-	Name:    "apiserver_statistics_behavior_scan_duration_seconds",
-	Help:    "Duration of a complete behavior journey scan invocation.",
-	Buckets: prometheus.DefBuckets,
-})
-
-var behaviorPendingReconcileTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-	Name: "apiserver_statistics_behavior_pending_reconcile_items_total",
-	Help: "Pending behavior reconcile items grouped by result.",
-}, []string{"result"})
-
-var behaviorPendingReconcileDuration = promauto.NewHistogram(prometheus.HistogramOpts{
-	Name:    "apiserver_statistics_behavior_pending_reconcile_duration_seconds",
-	Help:    "Duration of pending behavior event reconciliation.",
-	Buckets: prometheus.DefBuckets,
-})
-
-var behaviorProjectionRebuildTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-	Name: "apiserver_statistics_behavior_projection_rebuild_total",
-	Help: "Number of bounded behavior projection rebuilds by result.",
-}, []string{"result"})
-
-var behaviorProjectionRebuildDuration = promauto.NewHistogram(prometheus.HistogramOpts{
-	Name:    "apiserver_statistics_behavior_projection_rebuild_duration_seconds",
-	Help:    "Duration of bounded behavior projection rebuilds.",
-	Buckets: prometheus.DefBuckets,
-})
-
-func observeBehaviorScanDuration(start time.Time) {
-	behaviorScanDuration.Observe(time.Since(start).Seconds())
+func observeStatisticsStageFailure(stage, code string) {
+	statisticsStageFailureTotal.WithLabelValues(stage, code).Inc()
 }
 
-func observeBehaviorScanSource(result BehaviorJourneyScanSourceResult) {
-	behaviorScanItemsTotal.WithLabelValues(result.SourceName, "scanned").Add(float64(result.Scanned))
-	behaviorScanItemsTotal.WithLabelValues(result.SourceName, "projected").Add(float64(result.Projected))
-	behaviorScanItemsTotal.WithLabelValues(result.SourceName, "skipped").Add(float64(result.Skipped))
-	behaviorScanItemsTotal.WithLabelValues(result.SourceName, "failed").Add(float64(result.Failed))
+func observeCollectorResult(item statisticsDomain.CollectResult) {
+	statisticsProcessedRows.WithLabelValues("collector", item.Collector, "source").Add(float64(item.SourceCount))
+	statisticsProcessedRows.WithLabelValues("collector", item.Collector, "inserted").Add(float64(item.InsertedCount))
+	statisticsProcessedRows.WithLabelValues("collector", item.Collector, "existing").Add(float64(item.ExistingCount))
+	statisticsProcessedRows.WithLabelValues("collector", item.Collector, "conflict").Add(float64(item.ConflictCount))
 }
 
-func observeBehaviorProjectionRebuild(start time.Time, err error) {
-	behaviorProjectionRebuildDuration.Observe(time.Since(start).Seconds())
-	result := "success"
+func observeProjectionResult(item statisticsDomain.ProjectionResult) {
+	statisticsProcessedRows.WithLabelValues("projection", item.Name, "rows").Add(float64(item.Rows))
+}
+
+func observeCachePublish(operation string, err error) {
+	result := "succeeded"
 	if err != nil {
 		result = "failed"
 	}
-	behaviorProjectionRebuildTotal.WithLabelValues(result).Inc()
+	statisticsCachePublishTotal.WithLabelValues(operation, result).Inc()
 }
 
-type pendingReconcileMetrics struct {
-	completed          int
-	rescheduledPending int
-	rescheduledError   int
-	failed             int
-}
-
-func observePendingReconcile(start time.Time, metrics pendingReconcileMetrics, err error) {
-	behaviorPendingReconcileTotal.WithLabelValues("ok").Add(float64(metrics.completed))
-	behaviorPendingReconcileTotal.WithLabelValues("rescheduled_pending").Add(float64(metrics.rescheduledPending))
-	behaviorPendingReconcileTotal.WithLabelValues("rescheduled_error").Add(float64(metrics.rescheduledError))
-	failed := metrics.failed
-	if err != nil && failed == 0 {
-		failed = 1
+func observeFreshness(orgID int64, asOf, previousCompleteDay time.Time) {
+	lag := previousCompleteDay.Sub(asOf).Hours() / 24
+	if lag < 0 {
+		lag = 0
 	}
-	behaviorPendingReconcileTotal.WithLabelValues("error").Add(float64(failed))
-	behaviorPendingReconcileDuration.Observe(time.Since(start).Seconds())
+	statisticsFreshnessLagDays.WithLabelValues(strconv.FormatInt(orgID, 10)).Set(lag)
+	if asOf.Before(previousCompleteDay) {
+		statisticsStaleResponseTotal.Inc()
+	}
 }

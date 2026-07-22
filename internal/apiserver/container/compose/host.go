@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/event"
+	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	cachebootstrap "github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
@@ -41,7 +41,6 @@ type Host interface {
 	PlanEntryBaseURL() string
 	StatisticsRepairWindowDays() int
 	ReportStatusConfig() reportstatus.Config
-	StatisticsOverviewGuardOptions() statisticsApp.StatisticsReadGuardOptions
 
 	CacheClient(family redisruntime.Family) redis.UniversalClient
 	CacheBuilder(family redisruntime.Family) *keyspace.Builder
@@ -51,8 +50,8 @@ type Host interface {
 	HotsetRecorder() cachetarget.HotsetRecorder
 	LockManager() locklease.Manager
 	LockRunner() locklease.Runner
-	WarmupCoordinator() statisticsApp.WarmupCoordinator
-	CacheGovernanceStatusService() statisticsApp.GovernanceStatusReader
+	WarmupCoordinator() cachegovernance.WarmupCoordinator
+	CacheGovernanceStatusService() cachegovernance.StatusReader
 	CacheSignalNotifier() cachebootstrap.SignalNotifier
 
 	IdentityService() *iam.IdentityService

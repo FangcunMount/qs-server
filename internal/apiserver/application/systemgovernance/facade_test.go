@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	govcomponent "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/component"
 	govprom "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/prometheus"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
@@ -46,7 +46,7 @@ func TestGetCacheIncludesRemoteComponentDegradationAndHotsets(t *testing.T) {
 	defer remote.Close()
 	governance := &cacheGovernanceForFacade{
 		status: healthyCacheStatus("apiserver"),
-		hotset: &statisticsApp.GovernanceHotsetResponse{
+		hotset: &cachegovernance.HotsetResponse{
 			Family:    "query_result",
 			Kind:      cachetarget.WarmupKindQueryStatsOverview,
 			Limit:     5,
@@ -155,17 +155,17 @@ func (c *countingMetricsClient) Query(_ context.Context, spec govprom.QuerySpec,
 
 type cacheGovernanceForFacade struct {
 	status      *cachemodel.StatusSnapshot
-	hotset      *statisticsApp.GovernanceHotsetResponse
+	hotset      *cachegovernance.HotsetResponse
 	hotsetCalls int
 }
 
 func (c *cacheGovernanceForFacade) TriggerStatisticsWarmup(context.Context, int64, string) {}
 
-func (c *cacheGovernanceForFacade) HandleRepairComplete(context.Context, int64, statisticsApp.RepairCompleteRequest) error {
+func (c *cacheGovernanceForFacade) HandleRepairComplete(context.Context, int64, cachegovernance.RepairCompleteRequest) error {
 	return nil
 }
 
-func (c *cacheGovernanceForFacade) HandleManualWarmup(context.Context, int64, statisticsApp.ManualWarmupRequest) (*cachemodel.ManualWarmupResult, error) {
+func (c *cacheGovernanceForFacade) HandleManualWarmup(context.Context, int64, cachegovernance.ManualWarmupRequest) (*cachemodel.ManualWarmupResult, error) {
 	return nil, nil
 }
 
@@ -173,7 +173,7 @@ func (c *cacheGovernanceForFacade) GetStatus(context.Context) (*cachemodel.Statu
 	return c.status, nil
 }
 
-func (c *cacheGovernanceForFacade) GetHotset(context.Context, string, string) (*statisticsApp.GovernanceHotsetResponse, error) {
+func (c *cacheGovernanceForFacade) GetHotset(context.Context, string, string) (*cachegovernance.HotsetResponse, error) {
 	c.hotsetCalls++
 	return c.hotset, nil
 }

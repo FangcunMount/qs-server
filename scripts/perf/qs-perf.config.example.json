@@ -1016,7 +1016,7 @@
       },
       "paths": {
         "statistics": [
-          "/api/v1/statistics/overview?preset=7d"
+          "/api/v2/statistics/overview?preset=7d"
         ]
       },
       "vusers": {
@@ -1038,7 +1038,7 @@
       },
       "paths": {
         "statistics": [
-          "/api/v1/statistics/overview?preset=7d"
+          "/api/v2/statistics/overview?preset=7d"
         ]
       },
       "vusers": {
@@ -1263,9 +1263,9 @@
       "/api/v1/questionnaires/{questionnaire_code}"
     ],
     "statistics": [
-      "/api/v1/statistics/overview?preset=7d"
+      "/api/v2/statistics/overview?preset=7d"
     ],
-    "statisticsContentBatch": "/api/v1/statistics/contents/batch",
+    "statisticsContentBatch": "/api/v2/statistics/contents/batch",
     "submit": "/api/v1/answersheets",
     "assessmentReadiness": "/api/v1/answersheets/{answersheet_id}/assessment-readiness?testee_id={testee_id}",
     "reportStatus": "/api/v1/assessments/{assessment_id}/report-status?testee_id={testee_id}",

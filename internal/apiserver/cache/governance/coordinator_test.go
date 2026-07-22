@@ -91,9 +91,9 @@ func TestCoordinatorHandleStatisticsSyncWarmsOverviewPresets(t *testing.T) {
 	}
 
 	wantOverview := map[string]bool{
-		"9:today": false,
-		"9:7d":    false,
-		"9:30d":   false,
+		"9:latest_complete_day": false,
+		"9:7d":                  false,
+		"9:30d":                 false,
 	}
 	for _, call := range overviewCalls {
 		if _, ok := wantOverview[call]; ok {

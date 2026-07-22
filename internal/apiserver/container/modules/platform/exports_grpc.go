@@ -1,8 +1,8 @@
 package platform
 
 import (
+	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
@@ -10,7 +10,7 @@ import (
 
 // GRPCIntegrationDeps are platform/integration surfaces wired into gRPC transport.
 type GRPCIntegrationDeps struct {
-	WarmupCoordinator                  statisticsApp.WarmupCoordinator
+	WarmupCoordinator                  cachegovernance.WarmupCoordinator
 	QRCodeService                      grpctransport.SurveyScaleQRCodeGenerator
 	MiniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService
 	AuthzSnapshotLoader                *iaminfra.AuthzSnapshotLoader

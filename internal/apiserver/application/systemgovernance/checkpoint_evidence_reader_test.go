@@ -20,14 +20,13 @@ func TestCheckpointEvidenceReaderReturnsSnapshot(t *testing.T) {
 		snapshot: CheckpointGovernanceSnapshot{
 			EvaluationRunRunning:         2,
 			EvaluationRunFailedRetryable: 1,
-			AnalyticsProjectorProcessing: 3,
 		},
 	})
 	snapshot, ok, err := reader.Snapshot(context.Background(), stubEvalAt())
 	if err != nil || !ok {
 		t.Fatalf("Snapshot() = (%#v, %v, %v), want available snapshot", snapshot, ok, err)
 	}
-	if snapshot.EvaluationRunFailedRetryable != 1 || snapshot.AnalyticsProjectorProcessing != 3 {
+	if snapshot.EvaluationRunFailedRetryable != 1 || snapshot.EvaluationRunRunning != 2 {
 		t.Fatalf("snapshot = %#v", snapshot)
 	}
 }

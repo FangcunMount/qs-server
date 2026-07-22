@@ -11,6 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 type fakePublishedCollection struct {
@@ -136,6 +137,20 @@ func TestMongoTransactionRunnerRejectsNilClient(t *testing.T) {
 	err := NewMongoTransactionRunner(nil).WithinTransaction(context.Background(), func(context.Context) error { return nil })
 	if err == nil || !strings.Contains(err.Error(), "mongo client is nil") {
 		t.Fatalf("WithinTransaction() error = %v", err)
+	}
+}
+
+func TestMongoTransactionOptionsRequirePrimarySnapshotMajority(t *testing.T) {
+	t.Parallel()
+	opts := mongoTransactionOptions()
+	if opts.ReadPreference == nil || opts.ReadPreference.Mode() != readpref.PrimaryMode {
+		t.Fatalf("read preference = %#v, want primary", opts.ReadPreference)
+	}
+	if opts.ReadConcern == nil || opts.ReadConcern.Level != "snapshot" {
+		t.Fatalf("read concern = %#v, want snapshot", opts.ReadConcern)
+	}
+	if opts.WriteConcern == nil || opts.WriteConcern.W != "majority" {
+		t.Fatalf("write concern = %#v, want majority", opts.WriteConcern)
 	}
 }
 

@@ -31,9 +31,7 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateRateLimit(o.RateLimit)...)
 	errs = append(errs, validateBackpressureOptions(o.Backpressure)...)
 	errs = append(errs, validatePlanScheduler(o.PlanScheduler)...)
-	errs = append(errs, validateBehaviorPendingReconcile(o.BehaviorPendingReconcile)...)
 	errs = append(errs, validateEvaluationConsistencyReconcile(o.EvaluationConsistencyReconcile)...)
-	errs = append(errs, validateBehaviorJourneyScan(o.BehaviorJourneyScan)...)
 	errs = append(errs, validateOutboxRelay(o.OutboxRelay, o.MySQLOptions.MaxOpenConnections)...)
 	errs = append(errs, validateStatisticsSync(o.StatisticsSync)...)
 	errs = append(errs, validateCacheOptions(o.Cache)...)
@@ -189,27 +187,6 @@ func validatePlanScheduler(opts *PlanSchedulerOptions) []error {
 	return errs
 }
 
-func validateBehaviorPendingReconcile(opts *BehaviorPendingReconcileOptions) []error {
-	if opts == nil || !opts.Enable {
-		return nil
-	}
-
-	var errs []error
-	if opts.Interval <= 0 {
-		errs = append(errs, fmt.Errorf("behavior_pending_reconcile.interval must be greater than 0"))
-	}
-	if opts.BatchLimit <= 0 {
-		errs = append(errs, fmt.Errorf("behavior_pending_reconcile.batch_limit must be greater than 0"))
-	}
-	if opts.LockKey == "" {
-		errs = append(errs, fmt.Errorf("behavior_pending_reconcile.lock_key cannot be empty when enabled"))
-	}
-	if opts.LockTTL <= 0 {
-		errs = append(errs, fmt.Errorf("behavior_pending_reconcile.lock_ttl must be greater than 0"))
-	}
-	return errs
-}
-
 func validateEvaluationConsistencyReconcile(opts *EvaluationConsistencyReconcileOptions) []error {
 	if opts == nil || !opts.Enable {
 		return nil
@@ -227,29 +204,6 @@ func validateEvaluationConsistencyReconcile(opts *EvaluationConsistencyReconcile
 	}
 	if opts.LockTTL <= 0 {
 		errs = append(errs, fmt.Errorf("evaluation_consistency_reconcile.lock_ttl must be greater than 0"))
-	}
-	return errs
-}
-
-func validateBehaviorJourneyScan(opts *BehaviorJourneyScanOptions) []error {
-	if opts == nil || !opts.Enable {
-		return nil
-	}
-	var errs []error
-	if opts.Interval <= 0 {
-		errs = append(errs, fmt.Errorf("behavior_journey_scan.interval must be greater than 0"))
-	}
-	if opts.BatchSize <= 0 {
-		errs = append(errs, fmt.Errorf("behavior_journey_scan.batch_size must be greater than 0"))
-	}
-	if len(opts.OrgIDs) == 0 {
-		errs = append(errs, fmt.Errorf("behavior_journey_scan.org_ids cannot be empty when enabled"))
-	}
-	if opts.LockKey == "" {
-		errs = append(errs, fmt.Errorf("behavior_journey_scan.lock_key cannot be empty when enabled"))
-	}
-	if opts.LockTTL <= 0 {
-		errs = append(errs, fmt.Errorf("behavior_journey_scan.lock_ttl must be greater than 0"))
 	}
 	return errs
 }
@@ -303,9 +257,6 @@ func validateStatisticsSync(opts *StatisticsSyncOptions) []error {
 	}
 
 	var errs []error
-	if opts.VersionMode != "v1" && opts.VersionMode != "shadow" && opts.VersionMode != "v2" {
-		errs = append(errs, fmt.Errorf("statistics_sync.version_mode must be one of v1, shadow, or v2"))
-	}
 	if len(opts.OrgIDs) == 0 {
 		errs = append(errs, fmt.Errorf("statistics_sync.org_ids cannot be empty when enabled"))
 	}

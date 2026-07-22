@@ -84,34 +84,40 @@ GROUP BY status, event_type
 ORDER BY cnt DESC;
 "
 
-snapshot_mysql_query "analytics-scan-watermarks.txt" "
-SELECT source_name, org_id, last_seen_id, last_seen_time, status, last_error, updated_at
-FROM analytics_scan_watermarks
-ORDER BY updated_at DESC
-LIMIT 50;
+snapshot_mysql_query "statistics-facts.txt" "
+SELECT 'access' AS family, COUNT(*) AS row_count, MAX(occurred_at) AS latest_occurred_at
+FROM statistics_access_fact WHERE org_id = ${PERF_ORG_ID:-1}
+UNION ALL
+SELECT 'assessment', COUNT(*), MAX(occurred_at)
+FROM statistics_assessment_fact WHERE org_id = ${PERF_ORG_ID:-1}
+UNION ALL
+SELECT 'plan', COUNT(*), MAX(occurred_at)
+FROM statistics_plan_fact WHERE org_id = ${PERF_ORG_ID:-1};
 "
 
-snapshot_mysql_query "assessment-episode-status.txt" "
-SELECT status, COUNT(*) AS cnt
-FROM assessment_episode
+snapshot_mysql_query "statistics-results.txt" "
+SELECT 'access_daily' AS result_name, COUNT(*) AS row_count, MAX(updated_at) AS latest_updated_at
+FROM statistics_access_daily WHERE org_id = ${PERF_ORG_ID:-1}
+UNION ALL
+SELECT 'assessment_daily', COUNT(*), MAX(updated_at)
+FROM statistics_assessment_daily WHERE org_id = ${PERF_ORG_ID:-1}
+UNION ALL
+SELECT 'plan_activity_daily', COUNT(*), MAX(updated_at)
+FROM statistics_plan_activity_daily WHERE org_id = ${PERF_ORG_ID:-1}
+UNION ALL
+SELECT 'plan_fulfillment_daily', COUNT(*), MAX(updated_at)
+FROM statistics_plan_fulfillment_daily WHERE org_id = ${PERF_ORG_ID:-1}
+UNION ALL
+SELECT 'org_snapshot', COUNT(*), MAX(updated_at)
+FROM statistics_org_snapshot WHERE org_id = ${PERF_ORG_ID:-1};
+"
+
+snapshot_mysql_query "statistics-sync-runs.txt" "
+SELECT id, mode, status, stage, as_of_date, started_at, finished_at, error_code
+FROM statistics_sync_run
 WHERE org_id = ${PERF_ORG_ID:-1}
-GROUP BY status
-ORDER BY cnt DESC;
-"
-
-snapshot_mysql_query "behavior-footprint-events.txt" "
-SELECT event_name, COUNT(*) AS cnt
-FROM behavior_footprint
-WHERE org_id = ${PERF_ORG_ID:-1}
-GROUP BY event_name
-ORDER BY cnt DESC
-LIMIT 50;
-"
-
-snapshot_mysql_query "statistics-journey-daily.txt" "
-SELECT COUNT(*) AS row_count, MAX(updated_at) AS latest_updated_at
-FROM statistics_journey_daily
-WHERE org_id = ${PERF_ORG_ID:-1};
+ORDER BY id DESC
+LIMIT 20;
 "
 
 echo "$out_dir"

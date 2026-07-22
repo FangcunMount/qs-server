@@ -89,9 +89,7 @@ func (s *server) buildResilienceSubsystem(runtime *cacheplanebootstrap.RuntimeBu
 			locklease.WorkloadPlanSchedulerLeader:            s.config.PlanScheduler != nil && s.config.PlanScheduler.Enable,
 			locklease.WorkloadStatisticsSyncLeader:           s.config.StatisticsSync != nil && s.config.StatisticsSync.Enable,
 			locklease.WorkloadStatisticsSync:                 true,
-			locklease.WorkloadBehaviorPendingReconcile:       s.config.BehaviorPendingReconcile != nil && s.config.BehaviorPendingReconcile.Enable,
 			locklease.WorkloadEvaluationConsistencyReconcile: s.config.EvaluationConsistencyReconcile != nil && s.config.EvaluationConsistencyReconcile.Enable,
-			locklease.WorkloadBehaviorJourneyScanLeader:      s.config.BehaviorJourneyScan != nil && s.config.BehaviorJourneyScan.Enable,
 		},
 	})
 	var stateStore *controlredis.Store
@@ -186,15 +184,14 @@ func buildContainerCacheOptions(cacheCfg *apiserveroptions.CacheOptions) contain
 	}
 	defaults := cacheCfg.Defaults
 	return container.ContainerCacheOptions{
-		Capabilities:       capabilities,
-		TTLJitterRatio:     defaults.TTLJitterRatio,
-		StatisticsWarmup:   buildStatisticsWarmupConfig(cacheCfg),
-		StatisticsOverview: buildStatisticsOverviewOptions(cacheCfg),
-		Warmup:             buildWarmupOptions(cacheCfg),
-		CompressPayload:    defaults.CompressPayload,
-		Static:             buildCacheFamilyOptions(defaults.Static),
-		Object:             buildCacheFamilyOptions(defaults.Object),
-		Query:              buildCacheFamilyOptions(defaults.Query),
+		Capabilities:     capabilities,
+		TTLJitterRatio:   defaults.TTLJitterRatio,
+		StatisticsWarmup: buildStatisticsWarmupConfig(cacheCfg),
+		Warmup:           buildWarmupOptions(cacheCfg),
+		CompressPayload:  defaults.CompressPayload,
+		Static:           buildCacheFamilyOptions(defaults.Static),
+		Object:           buildCacheFamilyOptions(defaults.Object),
+		Query:            buildCacheFamilyOptions(defaults.Query),
 	}
 }
 
@@ -218,24 +215,6 @@ func buildStatisticsWarmupConfig(cacheCfg *apiserveroptions.CacheOptions) *cache
 	return &cachegov.StatisticsWarmupConfig{
 		OrgIDs: config.OrgIDs, OverviewPresets: config.OverviewPresets,
 		WarmOnStartup: config.WarmOnStartup,
-	}
-}
-
-func buildStatisticsOverviewOptions(cacheCfg *apiserveroptions.CacheOptions) cachebootstrap.StatisticsReadGuardOptions {
-	defaults := apiserveroptions.NewCacheOptions().Governance.StatisticsOverview
-	if cacheCfg == nil || cacheCfg.Governance == nil || cacheCfg.Governance.StatisticsOverview == nil {
-		if defaults == nil {
-			return cachebootstrap.StatisticsReadGuardOptions{}
-		}
-		return cachebootstrap.StatisticsReadGuardOptions{
-			ServiceSingleflight: defaults.ServiceSingleflight,
-			StaleOnTimeout:      defaults.StaleOnTimeout,
-			LoadTimeout:         defaults.LoadTimeout,
-		}
-	}
-	config := cacheCfg.Governance.StatisticsOverview
-	return cachebootstrap.StatisticsReadGuardOptions{
-		ServiceSingleflight: config.ServiceSingleflight, StaleOnTimeout: config.StaleOnTimeout, LoadTimeout: config.LoadTimeout,
 	}
 }
 

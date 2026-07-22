@@ -9,7 +9,7 @@ import (
 	"time"
 
 	baseerrors "github.com/FangcunMount/component-base/pkg/errors"
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	internalcode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -287,22 +287,22 @@ func (a *memoryActionAudit) Complete(_ context.Context, record ActionAuditRecord
 
 type fakeStatisticsGovernance struct {
 	manualOrgID int64
-	manualReq   statisticsApp.ManualWarmupRequest
+	manualReq   cachegovernance.ManualWarmupRequest
 	repairOrgID int64
-	repairReq   statisticsApp.RepairCompleteRequest
+	repairReq   cachegovernance.RepairCompleteRequest
 	manualErr   error
 	manualCalls int
 }
 
 func (f *fakeStatisticsGovernance) TriggerStatisticsWarmup(context.Context, int64, string) {}
 
-func (f *fakeStatisticsGovernance) HandleRepairComplete(_ context.Context, orgID int64, req statisticsApp.RepairCompleteRequest) error {
+func (f *fakeStatisticsGovernance) HandleRepairComplete(_ context.Context, orgID int64, req cachegovernance.RepairCompleteRequest) error {
 	f.repairOrgID = orgID
 	f.repairReq = req
 	return nil
 }
 
-func (f *fakeStatisticsGovernance) HandleManualWarmup(_ context.Context, orgID int64, req statisticsApp.ManualWarmupRequest) (*cachemodel.ManualWarmupResult, error) {
+func (f *fakeStatisticsGovernance) HandleManualWarmup(_ context.Context, orgID int64, req cachegovernance.ManualWarmupRequest) (*cachemodel.ManualWarmupResult, error) {
 	f.manualCalls++
 	if f.manualErr != nil {
 		return nil, f.manualErr
@@ -325,6 +325,6 @@ func (f *fakeStatisticsGovernance) GetStatus(context.Context) (*cachemodel.Statu
 	return nil, nil
 }
 
-func (f *fakeStatisticsGovernance) GetHotset(context.Context, string, string) (*statisticsApp.GovernanceHotsetResponse, error) {
+func (f *fakeStatisticsGovernance) GetHotset(context.Context, string, string) (*cachegovernance.HotsetResponse, error) {
 	return nil, nil
 }

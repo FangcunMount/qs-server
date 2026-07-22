@@ -187,6 +187,6 @@ else
   echo "collection questionnaire: skipped (no questionnaire_code)"
 fi
 http_status "apiserver testees" "${apiserver_base_url%/}/api/v1/testees?org_id=${org_id}&page=1&page_size=1" "$apiserver_token"
-http_status "apiserver statistics overview" "${apiserver_base_url%/}/api/v1/statistics/overview?preset=7d" "$apiserver_token"
-http_json_status "apiserver statistics content batch" "${apiserver_base_url%/}/api/v1/statistics/contents/batch" "$apiserver_token" \
+http_status "apiserver statistics overview" "${apiserver_base_url%/}/api/v2/statistics/overview?preset=7d" "$apiserver_token"
+http_json_status "apiserver statistics content batch" "${apiserver_base_url%/}/api/v2/statistics/contents/batch" "$apiserver_token" \
   "{\"items\":[{\"type\":\"scale\",\"code\":\"${scale_code}\"}]}"

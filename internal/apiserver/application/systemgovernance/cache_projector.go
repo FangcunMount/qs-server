@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	cachemodel "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
@@ -329,7 +329,7 @@ func (e *CacheWarmupEvaluator) withHotsetMetricEvidence(
 	return result
 }
 
-func CacheHotsetViewFromResponse(kind cachetarget.WarmupKind, response *statisticsApp.GovernanceHotsetResponse, err error) CacheHotsetView {
+func CacheHotsetViewFromResponse(kind cachetarget.WarmupKind, response *cachegovernance.HotsetResponse, err error) CacheHotsetView {
 	if err != nil {
 		return CacheHotsetView{
 			Family:    cachetarget.FamilyForKind(kind),

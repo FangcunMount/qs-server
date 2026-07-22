@@ -11,7 +11,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	cachemodel "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
@@ -23,7 +23,7 @@ import (
 // ActionExecutor 运行enabled governance actions。
 type ActionExecutor struct {
 	registry       *ActionRegistry
-	governance     statisticsApp.GovernanceFacade
+	governance     cachegovernance.Facade
 	reloader       CachePolicyReloader
 	resilience     control.Governor
 	audit          ActionAuditStore
@@ -57,7 +57,7 @@ func (e *ActionExecutor) BindDeliveryReplay(store DeliveryReplayStore, publisher
 	return e
 }
 
-func NewActionExecutorWithResilience(registry *ActionRegistry, governance statisticsApp.GovernanceFacade, reloader CachePolicyReloader, resilience control.Governor, audits ...ActionAuditStore) *ActionExecutor {
+func NewActionExecutorWithResilience(registry *ActionRegistry, governance cachegovernance.Facade, reloader CachePolicyReloader, resilience control.Governor, audits ...ActionAuditStore) *ActionExecutor {
 	executor := &ActionExecutor{registry: registry, governance: governance, reloader: reloader, resilience: resilience}
 	if len(audits) > 0 {
 		executor.audit = audits[0]
@@ -66,7 +66,7 @@ func NewActionExecutorWithResilience(registry *ActionRegistry, governance statis
 }
 
 // NewActionExecutor 创建action executor。
-func NewActionExecutor(registry *ActionRegistry, governance statisticsApp.GovernanceFacade, reloaders ...CachePolicyReloader) *ActionExecutor {
+func NewActionExecutor(registry *ActionRegistry, governance cachegovernance.Facade, reloaders ...CachePolicyReloader) *ActionExecutor {
 	executor := &ActionExecutor{registry: registry, governance: governance}
 	if len(reloaders) > 0 {
 		executor.reloader = reloaders[0]
@@ -417,7 +417,7 @@ func (e *ActionExecutor) runManualWarmup(ctx context.Context, orgID int64, input
 	if err != nil {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "invalid input: %s", err.Error())
 	}
-	var req statisticsApp.ManualWarmupRequest
+	var req cachegovernance.ManualWarmupRequest
 	if err := json.Unmarshal(payload, &req); err != nil {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "invalid manual warmup input: %s", err.Error())
 	}
@@ -436,7 +436,7 @@ func (e *ActionExecutor) runRepairComplete(ctx context.Context, orgID int64, inp
 	if err != nil {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "invalid input: %s", err.Error())
 	}
-	var req statisticsApp.RepairCompleteRequest
+	var req cachegovernance.RepairCompleteRequest
 	if err := json.Unmarshal(payload, &req); err != nil {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "invalid repair complete input: %s", err.Error())
 	}

@@ -56,57 +56,6 @@ definitions:
       updated_at:
         type: string
     type: object
-  cachemodel.ManualWarmupItemResult:
-    properties:
-      family:
-        type: string
-      kind:
-        type: string
-      message:
-        type: string
-      scope:
-        type: string
-      status:
-        $ref: '#/definitions/cachemodel.ManualWarmupItemStatus'
-    type: object
-  cachemodel.ManualWarmupItemStatus:
-    enum:
-    - ok
-    - skipped
-    - error
-    type: string
-    x-enum-varnames:
-    - ManualWarmupItemStatusOK
-    - ManualWarmupItemStatusSkipped
-    - ManualWarmupItemStatusError
-  cachemodel.ManualWarmupResult:
-    properties:
-      finished_at:
-        type: string
-      items:
-        items:
-          $ref: '#/definitions/cachemodel.ManualWarmupItemResult'
-        type: array
-      started_at:
-        type: string
-      summary:
-        $ref: '#/definitions/cachemodel.ManualWarmupSummary'
-      trigger:
-        type: string
-    type: object
-  cachemodel.ManualWarmupSummary:
-    properties:
-      error_count:
-        type: integer
-      ok_count:
-        type: integer
-      result:
-        type: string
-      skipped_count:
-        type: integer
-      target_count:
-        type: integer
-    type: object
   cachemodel.RuntimeSnapshot:
     properties:
       component:
@@ -133,32 +82,6 @@ definitions:
       unavailable_count:
         type: integer
     type: object
-  cachetarget.ManualWarmupRequest:
-    properties:
-      targets:
-        items:
-          $ref: '#/definitions/cachetarget.ManualWarmupTarget'
-        type: array
-    type: object
-  cachetarget.ManualWarmupTarget:
-    properties:
-      kind:
-        $ref: '#/definitions/cachetarget.WarmupKind'
-      scope:
-        type: string
-    type: object
-  cachetarget.WarmupKind:
-    enum:
-    - static.scale
-    - static.questionnaire
-    - static.typology_model
-    - query.stats_overview
-    type: string
-    x-enum-varnames:
-    - WarmupKindStaticScale
-    - WarmupKindStaticQuestionnaire
-    - WarmupKindStaticTypologyModel
-    - WarmupKindQueryStatsOverview
   conclusion.Outcome:
     properties:
       code:
@@ -540,12 +463,30 @@ definitions:
       t_score:
         type: number
     type: object
-  github_com_FangcunMount_qs-server_internal_apiserver_domain_statistics.ContentReference:
+  handler.StatisticsClinicianDetailResponse:
     properties:
-      code:
-        type: string
-      type:
-        $ref: '#/definitions/statistics.ContentType'
+      freshness:
+        $ref: '#/definitions/statistics.Freshness'
+      item:
+        $ref: '#/definitions/statistics.ClinicianItem'
+      time_range:
+        $ref: '#/definitions/statistics.DateRange'
+    type: object
+  handler.StatisticsContentRequest:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/statistics.ContentRef'
+        type: array
+    type: object
+  handler.StatisticsEntryDetailResponse:
+    properties:
+      freshness:
+        $ref: '#/definitions/statistics.Freshness'
+      item:
+        $ref: '#/definitions/statistics.EntryItem'
+      time_range:
+        $ref: '#/definitions/statistics.DateRange'
     type: object
   handler.StatisticsResumeCacheRequest:
     properties:
@@ -553,6 +494,13 @@ definitions:
         type: boolean
       reason:
         type: string
+    type: object
+  handler.StatisticsRunListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/statistics.Run'
+        type: array
     type: object
   handler.StatisticsRunRequest:
     properties:
@@ -568,45 +516,6 @@ definitions:
         type: string
       validate_only:
         type: boolean
-    type: object
-  handler.StatisticsV2ClinicianDetailResponse:
-    properties:
-      freshness:
-        $ref: '#/definitions/statisticsv2.Freshness'
-      item:
-        $ref: '#/definitions/statisticsv2.ClinicianItem'
-      time_range:
-        $ref: '#/definitions/statisticsv2.DateRange'
-    type: object
-  handler.StatisticsV2ContentRequest:
-    properties:
-      items:
-        items:
-          $ref: '#/definitions/statisticsv2.ContentRef'
-        type: array
-    type: object
-  handler.StatisticsV2EntryDetailResponse:
-    properties:
-      freshness:
-        $ref: '#/definitions/statisticsv2.Freshness'
-      item:
-        $ref: '#/definitions/statisticsv2.EntryItem'
-      time_range:
-        $ref: '#/definitions/statisticsv2.DateRange'
-    type: object
-  handler.StatisticsV2RunListResponse:
-    properties:
-      items:
-        items:
-          $ref: '#/definitions/statisticsv2.Run'
-        type: array
-    type: object
-  handler.contentBatchRequest:
-    properties:
-      items:
-        items:
-          $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_apiserver_domain_statistics.ContentReference'
-        type: array
     type: object
   interpretationassets.Assets:
     properties:
@@ -2892,79 +2801,6 @@ definitions:
       total:
         type: integer
     type: object
-  response.PeriodicProjectResponse:
-    properties:
-      completed_weeks:
-        description: 已完成周数
-        type: integer
-      completion_rate:
-        description: 完成率（0-100）
-        type: number
-      current_week:
-        description: 当前应该完成的周次
-        type: integer
-      end_date:
-        description: 项目结束日期
-        type: string
-      project_id:
-        description: 项目ID
-        type: string
-      project_name:
-        description: 项目名称
-        type: string
-      scale_name:
-        description: 关联的量表名称
-        type: string
-      start_date:
-        description: 项目开始日期
-        type: string
-      tasks:
-        description: 各周任务状态（按周次升序排列）
-        items:
-          $ref: '#/definitions/response.PeriodicTaskResponse'
-        type: array
-      total_weeks:
-        description: 总周数
-        type: integer
-    type: object
-  response.PeriodicStatsResponse:
-    properties:
-      active_projects:
-        description: 进行中的项目数
-        type: integer
-      projects:
-        description: 周期性项目列表
-        items:
-          $ref: '#/definitions/response.PeriodicProjectResponse'
-        type: array
-      total_projects:
-        description: 项目总数
-        type: integer
-    type: object
-  response.PeriodicTaskResponse:
-    properties:
-      assessment_id:
-        description: 关联的测评ID（如已完成）
-        type: string
-      completed_at:
-        description: 完成时间
-        type: string
-      due_date:
-        description: 截止时间
-        type: string
-      planned_at:
-        description: 计划时间
-        type: string
-      status:
-        description: 状态：completed/pending/overdue
-        type: string
-      status_label:
-        description: 状态中文
-        type: string
-      week:
-        description: 第几周（从1开始）
-        type: integer
-    type: object
   response.PlanListResponse:
     properties:
       page:
@@ -3629,72 +3465,6 @@ definitions:
       testee_created_count:
         type: integer
     type: object
-  statistics.AssessmentEntryStatistics:
-    properties:
-      entry:
-        $ref: '#/definitions/statistics.AssessmentEntryStatisticsMeta'
-      last_intake_at:
-        type: string
-      last_resolved_at:
-        type: string
-      snapshot:
-        $ref: '#/definitions/statistics.AssessmentEntryStatisticsCounts'
-      time_range:
-        $ref: '#/definitions/statistics.StatisticsTimeRange'
-      window:
-        $ref: '#/definitions/statistics.AssessmentEntryStatisticsCounts'
-    type: object
-  statistics.AssessmentEntryStatisticsCounts:
-    properties:
-      assessment_count:
-        type: integer
-      assigned_count:
-        type: integer
-      intake_count:
-        type: integer
-      resolve_count:
-        type: integer
-    type: object
-  statistics.AssessmentEntryStatisticsList:
-    properties:
-      items:
-        items:
-          $ref: '#/definitions/statistics.AssessmentEntryStatistics'
-        type: array
-      page:
-        type: integer
-      page_size:
-        type: integer
-      total:
-        type: integer
-      total_pages:
-        type: integer
-    type: object
-  statistics.AssessmentEntryStatisticsMeta:
-    properties:
-      clinician_id:
-        $ref: '#/definitions/meta.ID'
-      clinician_name:
-        type: string
-      created_at:
-        type: string
-      expires_at:
-        type: string
-      id:
-        $ref: '#/definitions/meta.ID'
-      is_active:
-        type: boolean
-      org_id:
-        type: integer
-      target_code:
-        type: string
-      target_type:
-        type: string
-      target_version:
-        type: string
-      token:
-        type: string
-    type: object
   statistics.AssessmentServiceStatistics:
     properties:
       trend:
@@ -3732,136 +3502,90 @@ definitions:
       report_generated_count:
         type: integer
     type: object
-  statistics.ClinicianStatistics:
-    properties:
-      clinician:
-        $ref: '#/definitions/statistics.ClinicianStatisticsSubject'
-      funnel:
-        $ref: '#/definitions/statistics.ClinicianStatisticsFunnel'
-      snapshot:
-        $ref: '#/definitions/statistics.ClinicianStatisticsSnapshot'
-      time_range:
-        $ref: '#/definitions/statistics.StatisticsTimeRange'
-      window:
-        $ref: '#/definitions/statistics.ClinicianStatisticsWindow'
-    type: object
-  statistics.ClinicianStatisticsFunnel:
-    properties:
-      assessment_count:
-        type: integer
-      assigned_count:
-        type: integer
-      created_count:
-        type: integer
-      intake_count:
-        type: integer
-      resolved_count:
-        type: integer
-    type: object
-  statistics.ClinicianStatisticsList:
-    properties:
-      items:
-        items:
-          $ref: '#/definitions/statistics.ClinicianStatistics'
-        type: array
-      page:
-        type: integer
-      page_size:
-        type: integer
-      total:
-        type: integer
-      total_pages:
-        type: integer
-    type: object
-  statistics.ClinicianStatisticsSnapshot:
+  statistics.ClinicianItem:
     properties:
       active_entry_count:
         type: integer
+      assessment_created_count:
+        type: integer
       attending_testee_count:
         type: integer
-      collaborator_testee_count:
+      care_relationship_established_count:
         type: integer
-      primary_testee_count:
-        type: integer
-      total_accessible_testees:
-        type: integer
-    type: object
-  statistics.ClinicianStatisticsSubject:
-    properties:
       clinician_type:
         type: string
+      collaborator_testee_count:
+        type: integer
       department:
         type: string
+      entry_opened_count:
+        type: integer
       id:
-        $ref: '#/definitions/meta.ID'
+        type: integer
+      intake_confirmed_count:
+        type: integer
       is_active:
         type: boolean
       name:
         type: string
       operator_id:
-        $ref: '#/definitions/meta.ID'
-      title:
-        type: string
-    type: object
-  statistics.ClinicianStatisticsWindow:
-    properties:
-      assigned_count:
         type: integer
-      completed_assessment_count:
-        type: integer
-      intake_count:
-        type: integer
-    type: object
-  statistics.ClinicianTesteeSummaryStatistics:
-    properties:
-      assessed_in_window_count:
-        type: integer
-      attending_testee_count:
-        type: integer
-      collaborator_testee_count:
-        type: integer
-      key_focus_testee_count:
+      outcome_committed_count:
         type: integer
       primary_testee_count:
         type: integer
-      time_range:
-        $ref: '#/definitions/statistics.StatisticsTimeRange'
+      report_generated_count:
+        type: integer
+      title:
+        type: string
       total_accessible_testees:
         type: integer
     type: object
-  statistics.ContentBatchStatisticsItem:
+  statistics.ContentBatch:
+    properties:
+      freshness:
+        $ref: '#/definitions/statistics.Freshness'
+      items:
+        items:
+          $ref: '#/definitions/statistics.ContentItem'
+        type: array
+    type: object
+  statistics.ContentItem:
     properties:
       code:
         type: string
       completion_rate:
         type: number
+      has_completion:
+        type: boolean
+      kind:
+        type: string
       total_completions:
         type: integer
       total_submissions:
         type: integer
-      type:
-        $ref: '#/definitions/statistics.ContentType'
     type: object
-  statistics.ContentBatchStatisticsResponse:
+  statistics.ContentRef:
     properties:
-      items:
-        items:
-          $ref: '#/definitions/statistics.ContentBatchStatisticsItem'
-        type: array
+      code:
+        type: string
+      kind:
+        type: string
     type: object
-  statistics.ContentType:
-    enum:
-    - questionnaire
-    - scale
-    type: string
-    x-enum-varnames:
-    - ContentTypeQuestionnaire
-    - ContentTypeScale
   statistics.DailyCount:
     properties:
       count:
         type: integer
       date:
+        type: string
+    type: object
+  statistics.DateRange:
+    properties:
+      from:
+        type: string
+      preset:
+        type: string
+      to:
         type: string
     type: object
   statistics.DimensionAnalysisSummary:
@@ -3872,6 +3596,48 @@ definitions:
         type: integer
       entry_count:
         type: integer
+    type: object
+  statistics.EntryItem:
+    properties:
+      assessment_created_count:
+        type: integer
+      clinician_id:
+        type: integer
+      clinician_name:
+        type: string
+      created_at:
+        type: string
+      entry_opened_count:
+        type: integer
+      expires_at:
+        type: string
+      id:
+        type: integer
+      intake_confirmed_count:
+        type: integer
+      is_active:
+        type: boolean
+      outcome_committed_count:
+        type: integer
+      report_generated_count:
+        type: integer
+      target_code:
+        type: string
+      target_type:
+        type: string
+      target_version:
+        type: string
+      token:
+        type: string
+    type: object
+  statistics.Freshness:
+    properties:
+      as_of_date:
+        type: string
+      is_stale:
+        type: boolean
+      snapshot_at:
+        type: string
     type: object
   statistics.OrganizationOverview:
     properties:
@@ -3889,7 +3655,129 @@ definitions:
         type: integer
       testee_count:
         type: integer
-      today_answer_sheet_submission_count:
+    type: object
+  statistics.Overview:
+    properties:
+      access_funnel:
+        $ref: '#/definitions/statistics.AccessFunnelStatistics'
+      assessment_service:
+        $ref: '#/definitions/statistics.AssessmentServiceStatistics'
+      dimension_analysis:
+        $ref: '#/definitions/statistics.DimensionAnalysisSummary'
+      freshness:
+        $ref: '#/definitions/statistics.Freshness'
+      metrics:
+        $ref: '#/definitions/statistics.OverviewMetrics'
+      org_id:
+        type: integer
+      organization_overview:
+        $ref: '#/definitions/statistics.OrganizationOverview'
+      plan:
+        $ref: '#/definitions/statistics.PlanDomainStatistics'
+      time_range:
+        $ref: '#/definitions/statistics.DateRange'
+    type: object
+  statistics.OverviewMetrics:
+    properties:
+      active_clinician_count:
+        type: integer
+      active_enrollment_count:
+        type: integer
+      active_entry_count:
+        type: integer
+      answersheet_submission_count:
+        type: integer
+      assessment_count:
+        type: integer
+      care_relationship_established_count:
+        type: integer
+      care_relationship_transferred_count:
+        type: integer
+      clinician_count:
+        type: integer
+      completed_on_time_count:
+        type: integer
+      completed_overdue_count:
+        type: integer
+      content_count:
+        type: integer
+      due_task_count:
+        type: integer
+      entry_count:
+        type: integer
+      entry_opened_count:
+        type: integer
+      intake_confirmed_count:
+        type: integer
+      planned_task_count:
+        type: integer
+      report_count:
+        type: integer
+      task_canceled_count:
+        type: integer
+      task_completed_count:
+        type: integer
+      task_created_count:
+        type: integer
+      task_expired_count:
+        type: integer
+      task_opened_count:
+        type: integer
+      testee_count:
+        type: integer
+      testee_created_count:
+        type: integer
+      uncompleted_overdue_count:
+        type: integer
+      window_answersheet_submitted_count:
+        type: integer
+      window_assessment_created_count:
+        type: integer
+      window_assessment_failed_count:
+        type: integer
+      window_outcome_committed_count:
+        type: integer
+      window_report_failed_count:
+        type: integer
+      window_report_generated_count:
+        type: integer
+    type: object
+  statistics.Page-statistics_ClinicianItem:
+    properties:
+      freshness:
+        $ref: '#/definitions/statistics.Freshness'
+      items:
+        items:
+          $ref: '#/definitions/statistics.ClinicianItem'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      time_range:
+        $ref: '#/definitions/statistics.DateRange'
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  statistics.Page-statistics_EntryItem:
+    properties:
+      freshness:
+        $ref: '#/definitions/statistics.Freshness'
+      items:
+        items:
+          $ref: '#/definitions/statistics.EntryItem'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      time_range:
+        $ref: '#/definitions/statistics.DateRange'
+      total:
+        type: integer
+      total_pages:
         type: integer
     type: object
   statistics.PlanDomainStatistics:
@@ -3983,297 +3871,7 @@ definitions:
       planned_task_count:
         type: integer
     type: object
-  statistics.RepairCompleteRequest:
-    properties:
-      org_ids:
-        items:
-          type: integer
-        type: array
-      repair_kind:
-        type: string
-    type: object
-  statistics.StatisticsOverview:
-    properties:
-      access_funnel:
-        $ref: '#/definitions/statistics.AccessFunnelStatistics'
-      assessment_service:
-        $ref: '#/definitions/statistics.AssessmentServiceStatistics'
-      dimension_analysis:
-        $ref: '#/definitions/statistics.DimensionAnalysisSummary'
-      org_id:
-        type: integer
-      organization_overview:
-        $ref: '#/definitions/statistics.OrganizationOverview'
-      plan:
-        $ref: '#/definitions/statistics.PlanDomainStatistics'
-      time_range:
-        $ref: '#/definitions/statistics.StatisticsTimeRange'
-    type: object
-  statistics.StatisticsTimeRange:
-    properties:
-      from:
-        type: string
-      preset:
-        $ref: '#/definitions/statistics.TimeRangePreset'
-      to:
-        type: string
-    type: object
-  statistics.TimeRangePreset:
-    enum:
-    - today
-    - 7d
-    - 30d
-    type: string
-    x-enum-varnames:
-    - TimeRangePresetToday
-    - TimeRangePreset7D
-    - TimeRangePreset30D
-  statisticsv2.ClinicianItem:
-    properties:
-      active_entry_count:
-        type: integer
-      assessment_created_count:
-        type: integer
-      attending_testee_count:
-        type: integer
-      care_relationship_established_count:
-        type: integer
-      clinician_type:
-        type: string
-      collaborator_testee_count:
-        type: integer
-      department:
-        type: string
-      entry_opened_count:
-        type: integer
-      id:
-        type: integer
-      intake_confirmed_count:
-        type: integer
-      is_active:
-        type: boolean
-      name:
-        type: string
-      operator_id:
-        type: integer
-      outcome_committed_count:
-        type: integer
-      primary_testee_count:
-        type: integer
-      report_generated_count:
-        type: integer
-      title:
-        type: string
-      total_accessible_testees:
-        type: integer
-    type: object
-  statisticsv2.ContentBatch:
-    properties:
-      freshness:
-        $ref: '#/definitions/statisticsv2.Freshness'
-      items:
-        items:
-          $ref: '#/definitions/statisticsv2.ContentItem'
-        type: array
-    type: object
-  statisticsv2.ContentItem:
-    properties:
-      code:
-        type: string
-      completion_rate:
-        type: number
-      has_completion:
-        type: boolean
-      kind:
-        type: string
-      total_completions:
-        type: integer
-      total_submissions:
-        type: integer
-    type: object
-  statisticsv2.ContentRef:
-    properties:
-      code:
-        type: string
-      kind:
-        type: string
-    type: object
-  statisticsv2.DateRange:
-    properties:
-      from:
-        type: string
-      preset:
-        type: string
-      to:
-        type: string
-    type: object
-  statisticsv2.EntryItem:
-    properties:
-      assessment_created_count:
-        type: integer
-      clinician_id:
-        type: integer
-      clinician_name:
-        type: string
-      created_at:
-        type: string
-      entry_opened_count:
-        type: integer
-      expires_at:
-        type: string
-      id:
-        type: integer
-      intake_confirmed_count:
-        type: integer
-      is_active:
-        type: boolean
-      outcome_committed_count:
-        type: integer
-      report_generated_count:
-        type: integer
-      target_code:
-        type: string
-      target_type:
-        type: string
-      target_version:
-        type: string
-      token:
-        type: string
-    type: object
-  statisticsv2.Freshness:
-    properties:
-      as_of_date:
-        type: string
-      is_stale:
-        type: boolean
-      snapshot_at:
-        type: string
-    type: object
-  statisticsv2.Overview:
-    properties:
-      access_funnel:
-        $ref: '#/definitions/statistics.AccessFunnelStatistics'
-      assessment_service:
-        $ref: '#/definitions/statistics.AssessmentServiceStatistics'
-      dimension_analysis:
-        $ref: '#/definitions/statistics.DimensionAnalysisSummary'
-      freshness:
-        $ref: '#/definitions/statisticsv2.Freshness'
-      metrics:
-        $ref: '#/definitions/statisticsv2.OverviewMetrics'
-      org_id:
-        type: integer
-      organization_overview:
-        $ref: '#/definitions/statistics.OrganizationOverview'
-      plan:
-        $ref: '#/definitions/statistics.PlanDomainStatistics'
-      time_range:
-        $ref: '#/definitions/statisticsv2.DateRange'
-    type: object
-  statisticsv2.OverviewMetrics:
-    properties:
-      active_clinician_count:
-        type: integer
-      active_enrollment_count:
-        type: integer
-      active_entry_count:
-        type: integer
-      answersheet_submission_count:
-        type: integer
-      assessment_count:
-        type: integer
-      care_relationship_established_count:
-        type: integer
-      care_relationship_transferred_count:
-        type: integer
-      clinician_count:
-        type: integer
-      completed_on_time_count:
-        type: integer
-      completed_overdue_count:
-        type: integer
-      content_count:
-        type: integer
-      due_task_count:
-        type: integer
-      entry_count:
-        type: integer
-      entry_opened_count:
-        type: integer
-      intake_confirmed_count:
-        type: integer
-      planned_task_count:
-        type: integer
-      report_count:
-        type: integer
-      task_canceled_count:
-        type: integer
-      task_completed_count:
-        type: integer
-      task_created_count:
-        type: integer
-      task_expired_count:
-        type: integer
-      task_opened_count:
-        type: integer
-      testee_count:
-        type: integer
-      testee_created_count:
-        type: integer
-      uncompleted_overdue_count:
-        type: integer
-      window_answersheet_submitted_count:
-        type: integer
-      window_assessment_created_count:
-        type: integer
-      window_assessment_failed_count:
-        type: integer
-      window_outcome_committed_count:
-        type: integer
-      window_report_failed_count:
-        type: integer
-      window_report_generated_count:
-        type: integer
-    type: object
-  statisticsv2.Page-statisticsv2_ClinicianItem:
-    properties:
-      freshness:
-        $ref: '#/definitions/statisticsv2.Freshness'
-      items:
-        items:
-          $ref: '#/definitions/statisticsv2.ClinicianItem'
-        type: array
-      page:
-        type: integer
-      page_size:
-        type: integer
-      time_range:
-        $ref: '#/definitions/statisticsv2.DateRange'
-      total:
-        type: integer
-      total_pages:
-        type: integer
-    type: object
-  statisticsv2.Page-statisticsv2_EntryItem:
-    properties:
-      freshness:
-        $ref: '#/definitions/statisticsv2.Freshness'
-      items:
-        items:
-          $ref: '#/definitions/statisticsv2.EntryItem'
-        type: array
-      page:
-        type: integer
-      page_size:
-        type: integer
-      time_range:
-        $ref: '#/definitions/statisticsv2.DateRange'
-      total:
-        type: integer
-      total_pages:
-        type: integer
-    type: object
-  statisticsv2.Run:
+  statistics.Run:
     properties:
       as_of_date:
         type: string
@@ -4310,7 +3908,7 @@ definitions:
       last_cache_resume_status:
         type: string
       mode:
-        $ref: '#/definitions/v2.RunMode'
+        $ref: '#/definitions/statistics.RunMode'
       operator_id:
         type: integer
       org_id:
@@ -4330,11 +3928,33 @@ definitions:
       started_at:
         type: string
       status:
-        $ref: '#/definitions/v2.RunStatus'
+        $ref: '#/definitions/statistics.RunStatus'
       trigger_type:
         type: string
     type: object
-  statisticsv2.TesteeSummary:
+  statistics.RunMode:
+    enum:
+    - validate
+    - repair
+    - publish
+    type: string
+    x-enum-varnames:
+    - RunModeValidate
+    - RunModeRepair
+    - RunModePublish
+  statistics.RunStatus:
+    enum:
+    - running
+    - failed
+    - data_committed
+    - succeeded
+    type: string
+    x-enum-varnames:
+    - RunStatusRunning
+    - RunStatusFailed
+    - RunStatusDataCommitted
+    - RunStatusSucceeded
+  statistics.TesteeSummary:
     properties:
       assessed_in_window_count:
         type: integer
@@ -4343,13 +3963,13 @@ definitions:
       collaborator_testee_count:
         type: integer
       freshness:
-        $ref: '#/definitions/statisticsv2.Freshness'
+        $ref: '#/definitions/statistics.Freshness'
       key_focus_testee_count:
         type: integer
       primary_testee_count:
         type: integer
       time_range:
-        $ref: '#/definitions/statisticsv2.DateRange'
+        $ref: '#/definitions/statistics.DateRange'
       total_accessible_testees:
         type: integer
     type: object
@@ -4412,8 +4032,6 @@ definitions:
     type: object
   systemgovernance.CheckpointGovernanceSnapshot:
     properties:
-      analyticsProjectorProcessing:
-        type: integer
       evaluationRunFailedRetryable:
         type: integer
       evaluationRunRunning:
@@ -4570,28 +4188,6 @@ definitions:
       title:
         type: string
     type: object
-  v2.RunMode:
-    enum:
-    - validate
-    - repair
-    - publish
-    type: string
-    x-enum-varnames:
-    - RunModeValidate
-    - RunModeRepair
-    - RunModePublish
-  v2.RunStatus:
-    enum:
-    - running
-    - failed
-    - data_committed
-    - succeeded
-    type: string
-    x-enum-varnames:
-    - RunStatusRunning
-    - RunStatusFailed
-    - RunStatusDataCommitted
-    - RunStatusSucceeded
   viewmodel.AnswerDTO:
     properties:
       question_code:
@@ -8803,464 +8399,6 @@ paths:
       summary: 更新员工
       tags:
       - Staff
-  /api/v1/statistics/clinicians:
-    get:
-      consumes:
-      - application/json
-      description: 按机构和时间窗口查询从业者统计列表；仅 qs:admin 可访问
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 时间窗口预设：today/7d/30d
-        in: query
-        name: preset
-        type: string
-      - description: 自定义开始日期，格式 YYYY-MM-DD
-        in: query
-        name: from
-        type: string
-      - description: 自定义结束日期，格式 YYYY-MM-DD
-        in: query
-        name: to
-        type: string
-      - description: 页码
-        in: query
-        name: page
-        type: integer
-      - description: 每页数量
-        in: query
-        name: page_size
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/statistics.ClinicianStatisticsList'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 查询从业者统计列表
-      tags:
-      - Statistics
-  /api/v1/statistics/clinicians/{id}:
-    get:
-      consumes:
-      - application/json
-      description: 按从业者 ID 查询统计概览、窗口指标和漏斗指标；仅 qs:admin 可访问
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 从业者ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: 时间窗口预设：today/7d/30d
-        in: query
-        name: preset
-        type: string
-      - description: 自定义开始日期，格式 YYYY-MM-DD
-        in: query
-        name: from
-        type: string
-      - description: 自定义结束日期，格式 YYYY-MM-DD
-        in: query
-        name: to
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/statistics.ClinicianStatistics'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 查询单个从业者统计
-      tags:
-      - Statistics
-  /api/v1/statistics/clinicians/me/entries:
-    get:
-      consumes:
-      - application/json
-      description: 查询当前后台操作者绑定从业者的测评入口统计列表
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 时间窗口预设：today/7d/30d
-        in: query
-        name: preset
-        type: string
-      - description: 自定义开始日期，格式 YYYY-MM-DD
-        in: query
-        name: from
-        type: string
-      - description: 自定义结束日期，格式 YYYY-MM-DD
-        in: query
-        name: to
-        type: string
-      - description: 页码
-        in: query
-        name: page
-        type: integer
-      - description: 每页数量
-        in: query
-        name: page_size
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/statistics.AssessmentEntryStatisticsList'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 查询当前从业者入口统计列表
-      tags:
-      - Statistics
-  /api/v1/statistics/clinicians/me/overview:
-    get:
-      consumes:
-      - application/json
-      description: 查询当前后台操作者绑定从业者的统计概览
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 时间窗口预设：today/7d/30d
-        in: query
-        name: preset
-        type: string
-      - description: 自定义开始日期，格式 YYYY-MM-DD
-        in: query
-        name: from
-        type: string
-      - description: 自定义结束日期，格式 YYYY-MM-DD
-        in: query
-        name: to
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/statistics.ClinicianStatistics'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 查询当前从业者统计概览
-      tags:
-      - Statistics
-  /api/v1/statistics/clinicians/me/testees-summary:
-    get:
-      consumes:
-      - application/json
-      description: 查询当前后台操作者绑定从业者可访问受试者摘要统计
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 时间窗口预设：today/7d/30d
-        in: query
-        name: preset
-        type: string
-      - description: 自定义开始日期，格式 YYYY-MM-DD
-        in: query
-        name: from
-        type: string
-      - description: 自定义结束日期，格式 YYYY-MM-DD
-        in: query
-        name: to
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/statistics.ClinicianTesteeSummaryStatistics'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 查询当前从业者受试者摘要
-      tags:
-      - Statistics
-  /api/v1/statistics/contents/batch:
-    post:
-      consumes:
-      - application/json
-      description: 按内容 type + code 批量查询测评形成数、完成数和完成率；questionnaire 需要 manage_questionnaires，scale
-        需要 manage_assessment_models，混合请求需要同时具备两项权限
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 内容标识列表
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handler.contentBatchRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/statistics.ContentBatchStatisticsResponse'
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 批量查询统一内容统计
-      tags:
-      - Statistics
-  /api/v1/statistics/entries:
-    get:
-      consumes:
-      - application/json
-      description: 查询机构内测评入口统计列表，支持 clinician_id、status 和时间窗口过滤；仅 qs:admin 可访问
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 从业者ID
-        in: query
-        name: clinician_id
-        type: integer
-      - description: 入口状态：active/inactive
-        in: query
-        name: status
-        type: string
-      - description: 时间窗口预设：today/7d/30d
-        in: query
-        name: preset
-        type: string
-      - description: 自定义开始日期，格式 YYYY-MM-DD
-        in: query
-        name: from
-        type: string
-      - description: 自定义结束日期，格式 YYYY-MM-DD
-        in: query
-        name: to
-        type: string
-      - description: 页码
-        in: query
-        name: page
-        type: integer
-      - description: 每页数量
-        in: query
-        name: page_size
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/statistics.AssessmentEntryStatisticsList'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 查询测评入口统计列表
-      tags:
-      - Statistics
-  /api/v1/statistics/entries/{id}:
-    get:
-      consumes:
-      - application/json
-      description: 按入口 ID 查询入口快照、窗口计数和最近事件时间；仅 qs:admin 可访问
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 入口ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: 时间窗口预设：today/7d/30d
-        in: query
-        name: preset
-        type: string
-      - description: 自定义开始日期，格式 YYYY-MM-DD
-        in: query
-        name: from
-        type: string
-      - description: 自定义结束日期，格式 YYYY-MM-DD
-        in: query
-        name: to
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/statistics.AssessmentEntryStatistics'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 查询单个测评入口统计
-      tags:
-      - Statistics
-  /api/v1/statistics/overview:
-    get:
-      consumes:
-      - application/json
-      description: 查询机构总览、接入漏斗、测评服务、维度分析和计划任务统计；仅 qs:admin 可访问
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 时间窗口预设：today/7d/30d
-        in: query
-        name: preset
-        type: string
-      - description: 自定义开始日期，格式 YYYY-MM-DD
-        in: query
-        name: from
-        type: string
-      - description: 自定义结束日期，格式 YYYY-MM-DD
-        in: query
-        name: to
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/statistics.StatisticsOverview'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 查询机构统计总览
-      tags:
-      - Statistics
-  /api/v1/statistics/testees/{testee_id}/periodic:
-    get:
-      consumes:
-      - application/json
-      description: 查询受试者周期计划项目、周次任务和完成情况；后台访问范围按 ClinicianTesteeRelation 收口
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 受试者ID
-        in: path
-        name: testee_id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.PeriodicStatsResponse'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 查询受试者周期项目统计
-      tags:
-      - Statistics
   /api/v1/testees:
     get:
       parameters:
@@ -9789,11 +8927,11 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/statisticsv2.Page-statisticsv2_ClinicianItem'
+                  $ref: '#/definitions/statistics.Page-statistics_ClinicianItem'
               type: object
-      summary: 查询 Statistics V2 医生列表
+      summary: 查询 Statistics 医生列表
       tags:
-      - Statistics-V2
+      - Statistics
   /api/v2/statistics/clinicians/{id}:
     get:
       parameters:
@@ -9810,11 +8948,11 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/handler.StatisticsV2ClinicianDetailResponse'
+                  $ref: '#/definitions/handler.StatisticsClinicianDetailResponse'
               type: object
-      summary: 查询 Statistics V2 医生详情
+      summary: 查询 Statistics 医生详情
       tags:
-      - Statistics-V2
+      - Statistics
   /api/v2/statistics/clinicians/me/entries:
     get:
       responses:
@@ -9825,11 +8963,11 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/statisticsv2.Page-statisticsv2_EntryItem'
+                  $ref: '#/definitions/statistics.Page-statistics_EntryItem'
               type: object
-      summary: 查询当前医生 Statistics V2 入口
+      summary: 查询当前医生 Statistics 入口
       tags:
-      - Statistics-V2
+      - Statistics
   /api/v2/statistics/clinicians/me/overview:
     get:
       responses:
@@ -9840,11 +8978,11 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/handler.StatisticsV2ClinicianDetailResponse'
+                  $ref: '#/definitions/handler.StatisticsClinicianDetailResponse'
               type: object
-      summary: 查询当前医生 Statistics V2 总览
+      summary: 查询当前医生 Statistics 总览
       tags:
-      - Statistics-V2
+      - Statistics
   /api/v2/statistics/clinicians/me/testees-summary:
     get:
       responses:
@@ -9855,11 +8993,11 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/statisticsv2.TesteeSummary'
+                  $ref: '#/definitions/statistics.TesteeSummary'
               type: object
-      summary: 查询当前医生 Statistics V2 受试者摘要
+      summary: 查询当前医生 Statistics 受试者摘要
       tags:
-      - Statistics-V2
+      - Statistics
   /api/v2/statistics/contents/batch:
     post:
       parameters:
@@ -9868,7 +9006,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/handler.StatisticsV2ContentRequest'
+          $ref: '#/definitions/handler.StatisticsContentRequest'
       responses:
         "200":
           description: OK
@@ -9877,11 +9015,11 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/statisticsv2.ContentBatch'
+                  $ref: '#/definitions/statistics.ContentBatch'
               type: object
-      summary: 批量查询 Statistics V2 内容统计
+      summary: 批量查询 Statistics 内容统计
       tags:
-      - Statistics-V2
+      - Statistics
   /api/v2/statistics/entries:
     get:
       responses:
@@ -9892,11 +9030,11 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/statisticsv2.Page-statisticsv2_EntryItem'
+                  $ref: '#/definitions/statistics.Page-statistics_EntryItem'
               type: object
-      summary: 查询 Statistics V2 入口列表
+      summary: 查询 Statistics 入口列表
       tags:
-      - Statistics-V2
+      - Statistics
   /api/v2/statistics/entries/{id}:
     get:
       parameters:
@@ -9913,11 +9051,11 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/handler.StatisticsV2EntryDetailResponse'
+                  $ref: '#/definitions/handler.StatisticsEntryDetailResponse'
               type: object
-      summary: 查询 Statistics V2 入口详情
+      summary: 查询 Statistics 入口详情
       tags:
-      - Statistics-V2
+      - Statistics
   /api/v2/statistics/overview:
     get:
       parameters:
@@ -9941,11 +9079,11 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/statisticsv2.Overview'
+                  $ref: '#/definitions/statistics.Overview'
               type: object
-      summary: 查询 Statistics V2 机构总览
+      summary: 查询 Statistics 机构总览
       tags:
-      - Statistics-V2
+      - Statistics
   /governance/redis:
     get:
       description: 返回 apiserver Redis family 的运行状态。
@@ -9973,107 +9111,6 @@ paths:
       summary: 健康检查
       tags:
       - health
-  /internal/v1/cache/governance/hotset:
-    get:
-      description: 按 kind 和 limit 查询当前缓存热集，仅内部管理员可访问。
-      parameters:
-      - description: 缓存类型
-        in: query
-        name: kind
-        type: string
-      - description: 最大条数
-        in: query
-        name: limit
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-      summary: 查询缓存热集
-      tags:
-      - Statistics-Sync
-  /internal/v1/cache/governance/repair-complete:
-    post:
-      consumes:
-      - application/json
-      description: 内部治理回调，确认指定组织的缓存修复任务完成。
-      parameters:
-      - description: 修复完成事件
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/statistics.RepairCompleteRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 确认缓存修复完成
-      tags:
-      - Statistics-Sync
-  /internal/v1/cache/governance/status:
-    get:
-      description: 返回缓存治理任务及运行时状态，仅内部管理员可访问。
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-      summary: 查询缓存治理状态
-      tags:
-      - Statistics-Sync
-  /internal/v1/cache/governance/warmup-targets:
-    post:
-      consumes:
-      - application/json
-      description: operating 后台通过 BFF 代理调用，按 target 列表同步触发缓存预热并返回逐项结果；仅 qs:admin 可访问
-      parameters:
-      - description: Bearer 用户令牌（或内部调用token）
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 预热目标列表
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/cachetarget.ManualWarmupRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/cachemodel.ManualWarmupResult'
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 手工触发缓存预热
-      tags:
-      - Statistics-Sync
   /internal/v1/evaluation-runs/failed:
     get:
       description: operating 内部接口，按组织返回可重试的失败运行
@@ -10373,89 +9410,6 @@ paths:
       summary: 韧性治理状态
       tags:
       - System-Governance
-  /internal/v1/statistics/sync/daily:
-    post:
-      consumes:
-      - application/json
-      description: 从 MySQL 原始表重建每日统计；仅 qs:admin 可访问
-      parameters:
-      - description: Bearer 用户令牌（或内部调用token）
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 补算开始日期（格式：YYYY-MM-DD）
-        in: query
-        name: start_date
-        type: string
-      - description: 补算结束日期（格式：YYYY-MM-DD，包含当天）
-        in: query
-        name: end_date
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 同步每日统计
-      tags:
-      - Statistics-Sync
-  /internal/v1/statistics/sync/org-snapshot:
-    post:
-      consumes:
-      - application/json
-      description: 从 MySQL 原始表重建 statistics_org_snapshot；仅 qs:admin 可访问
-      parameters:
-      - description: Bearer 用户令牌（或内部调用token）
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 同步机构总览快照
-      tags:
-      - Statistics-Sync
-  /internal/v1/statistics/sync/plan:
-    post:
-      consumes:
-      - application/json
-      description: 从 assessment_task 重建计划统计数据到 MySQL；仅 qs:admin 可访问
-      parameters:
-      - description: Bearer 用户令牌（或内部调用token）
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 同步计划统计
-      tags:
-      - Statistics-Sync
   /internal/v1/system-governance/actions:
     get:
       description: 返回可执行与预留治理动作描述符；仅 qs:admin 可访问
@@ -10710,11 +9664,11 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/handler.StatisticsV2RunListResponse'
+                  $ref: '#/definitions/handler.StatisticsRunListResponse'
               type: object
-      summary: 查询 Statistics V2 同步批次
+      summary: 查询 Statistics 同步批次
       tags:
-      - Statistics-V2-Internal
+      - Statistics-Internal
     post:
       parameters:
       - description: 批次窗口
@@ -10731,11 +9685,11 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/statisticsv2.Run'
+                  $ref: '#/definitions/statistics.Run'
               type: object
-      summary: 创建 Statistics V2 同步批次
+      summary: 创建 Statistics 同步批次
       tags:
-      - Statistics-V2-Internal
+      - Statistics-Internal
   /internal/v2/statistics/runs/{id}:
     get:
       parameters:
@@ -10752,11 +9706,11 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/statisticsv2.Run'
+                  $ref: '#/definitions/statistics.Run'
               type: object
-      summary: 查询 Statistics V2 同步批次详情
+      summary: 查询 Statistics 同步批次详情
       tags:
-      - Statistics-V2-Internal
+      - Statistics-Internal
   /internal/v2/statistics/runs/{id}/resume-cache:
     post:
       parameters:
@@ -10779,11 +9733,11 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/statisticsv2.Run'
+                  $ref: '#/definitions/statistics.Run'
               type: object
-      summary: 恢复 Statistics V2 批次缓存发布
+      summary: 恢复 Statistics 批次缓存发布
       tags:
-      - Statistics-V2-Internal
+      - Statistics-Internal
   /ping:
     get:
       produces:

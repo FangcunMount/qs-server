@@ -11,16 +11,15 @@ import (
 
 // CacheOptions 描述 apiserver cache 子系统的运行时配置。
 type CacheOptions struct {
-	Capabilities       map[sharedcache.Capability]cachepolicy.Binding
-	TTLJitterRatio     float64
-	StatisticsWarmup   *cachegov.StatisticsWarmupConfig
-	StatisticsOverview StatisticsReadGuardOptions
-	Warmup             WarmupOptions
-	Signal             SignalOptions
-	CompressPayload    bool
-	Static             CacheFamilyOptions
-	Object             CacheFamilyOptions
-	Query              CacheFamilyOptions
+	Capabilities     map[sharedcache.Capability]cachepolicy.Binding
+	TTLJitterRatio   float64
+	StatisticsWarmup *cachegov.StatisticsWarmupConfig
+	Warmup           WarmupOptions
+	Signal           SignalOptions
+	CompressPayload  bool
+	Static           CacheFamilyOptions
+	Object           CacheFamilyOptions
+	Query            CacheFamilyOptions
 }
 
 // SignalOptions controls the best-effort Redis Pub/Sub cache invalidation signals.
@@ -36,13 +35,6 @@ type SignalNotifier interface {
 	NotifyQuestionnaireCacheChanged(context.Context, string, string, string)
 	NotifyScaleCacheChanged(context.Context, string, string)
 	NotifyTypologyModelCacheChanged(context.Context, string, string)
-}
-
-// StatisticsReadGuardOptions controls Overview read coalescing and stale fallback.
-type StatisticsReadGuardOptions struct {
-	ServiceSingleflight bool
-	StaleOnTimeout      bool
-	LoadTimeout         time.Duration
 }
 
 type WarmupOptions struct {

@@ -38,7 +38,7 @@ func TestNewBuildsServicesWithoutExposingCache(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	if module.ReadService == nil || module.SyncService == nil {
+	if module.ReadService == nil || module.Coordinator == nil || module.RunStore == nil {
 		t.Fatalf("statistics services not initialized: %#v", module)
 	}
 }

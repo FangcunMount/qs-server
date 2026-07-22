@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	cachemodel "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
@@ -34,7 +34,7 @@ func TestCacheWarmupProjectionBuildsRowsKindsHotsetsAndScopedMetrics(t *testing.
 			},
 		},
 	}
-	hotset := CacheHotsetViewFromResponse(cachetarget.WarmupKindQueryStatsOverview, &statisticsApp.GovernanceHotsetResponse{
+	hotset := CacheHotsetViewFromResponse(cachetarget.WarmupKindQueryStatsOverview, &cachegovernance.HotsetResponse{
 		Family:    "query_result",
 		Kind:      cachetarget.WarmupKindQueryStatsOverview,
 		Limit:     5,

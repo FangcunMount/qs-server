@@ -553,7 +553,7 @@ Algorithm 表示稳定代码能力，DecisionKind 表示本次发布模型怎样
 | Typology input provider | [`infra/evaluationinput/typology_catalog.go`](../../../../internal/apiserver/infra/evaluationinput/typology_catalog.go) |
 | Configured evaluator | [`application/evaluation/registry/mechanisms/typology/runtime/configured`](../../../../internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured/) |
 | Classification calculation | [`domain/calculation/classification`](../../../../internal/apiserver/domain/calculation/classification/) |
-| Personality seed/migration | [`scripts/oneoff/seed_personality_typology`](../../../../scripts/oneoff/seed_personality_typology/) |
+| Typology 发布契约测试 | [`port/modelcatalog/payload/typology/payload_publish_test.go`](../../../../internal/apiserver/port/modelcatalog/payload/typology/payload_publish_test.go) |
 
 ```bash
 go test ./internal/apiserver/application/modelcatalog/definition -run Typology

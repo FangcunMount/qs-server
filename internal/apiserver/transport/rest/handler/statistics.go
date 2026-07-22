@@ -6,686 +6,505 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/component-base/pkg/logger"
-	authzApp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
+	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	cachemodel "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
-	cachetarget "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
-	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
-	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
+	statisticsDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/gin-gonic/gin"
 )
 
-// StatisticsHandler 统计处理器
 type StatisticsHandler struct {
-	BaseHandler
-	readService                  statisticsApp.ReadService
-	periodicStatsService         statisticsApp.PeriodicStatsService
-	syncService                  statisticsApp.StatisticsSyncService
-	testeeAccessService          statisticsApp.TesteeAccessValidator
-	warmupCoordinator            statisticsApp.WarmupCoordinator
-	cacheGovernanceStatusService statisticsApp.GovernanceStatusReader
-	governanceFacade             statisticsApp.GovernanceFacade
+	*BaseHandler
+	read        *statisticsApp.ReadService
+	coordinator *statisticsApp.Coordinator
+	runs        statisticsApp.RunStore
 }
 
-// NewStatisticsHandler 创建统计处理器
-func NewStatisticsHandler(
-	readService statisticsApp.ReadService,
-	periodicStatsService statisticsApp.PeriodicStatsService,
-	syncService statisticsApp.StatisticsSyncService,
-) *StatisticsHandler {
-	return &StatisticsHandler{
-		readService:          readService,
-		periodicStatsService: periodicStatsService,
-		syncService:          syncService,
-	}
+func NewStatisticsHandler(read *statisticsApp.ReadService, coordinator *statisticsApp.Coordinator, runs statisticsApp.RunStore) *StatisticsHandler {
+	return &StatisticsHandler{BaseHandler: NewBaseHandler(), read: read, coordinator: coordinator, runs: runs}
 }
 
-// SetTesteeAccessService 设置 testee 访问控制服务。
-func (h *StatisticsHandler) SetTesteeAccessService(testeeAccessService statisticsApp.TesteeAccessValidator) {
-	h.testeeAccessService = testeeAccessService
+func statisticsFilter(c *gin.Context) statisticsApp.QueryFilter {
+	return statisticsApp.QueryFilter{Preset: c.Query("preset"), From: c.Query("from"), To: c.Query("to")}
 }
 
-func (h *StatisticsHandler) SetWarmupCoordinator(coordinator statisticsApp.WarmupCoordinator) {
-	h.warmupCoordinator = coordinator
-	h.governanceFacade = nil
-}
-
-func (h *StatisticsHandler) SetCacheGovernanceStatusService(service statisticsApp.GovernanceStatusReader) {
-	h.cacheGovernanceStatusService = service
-	h.governanceFacade = nil
-}
-
-func (h *StatisticsHandler) SetGovernanceFacade(facade statisticsApp.GovernanceFacade) {
-	h.governanceFacade = facade
-}
-
-func (h *StatisticsHandler) bindJSON(c *gin.Context, req interface{}) bool {
-	if err := c.ShouldBindJSON(req); err != nil {
-		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid request body: %v", err))
-		return false
-	}
-	return true
-}
-
-func (h *StatisticsHandler) parsePage(c *gin.Context) (int, int, error) {
-	page := 1
-	pageSize := 20
+func parseStatisticsPage(c *gin.Context) (int, int, error) {
+	page, size := 1, 20
+	var err error
 	if raw := c.Query("page"); raw != "" {
-		value, err := strconv.Atoi(raw)
+		page, err = strconv.Atoi(raw)
 		if err != nil {
-			return 0, 0, errors.WithCode(code.ErrInvalidArgument, "invalid page: %s", raw)
+			return 0, 0, errors.WithCode(code.ErrInvalidArgument, "invalid page")
 		}
-		page = value
 	}
 	if raw := c.Query("page_size"); raw != "" {
-		value, err := strconv.Atoi(raw)
+		size, err = strconv.Atoi(raw)
 		if err != nil {
-			return 0, 0, errors.WithCode(code.ErrInvalidArgument, "invalid page_size: %s", raw)
+			return 0, 0, errors.WithCode(code.ErrInvalidArgument, "invalid page_size")
 		}
-		pageSize = value
 	}
-	return page, pageSize, nil
+	return page, size, nil
 }
 
-func buildStatisticsQueryFilter(c *gin.Context) statisticsApp.QueryFilter {
-	return statisticsApp.QueryFilter{
-		Preset: c.Query("preset"),
-		From:   c.Query("from"),
-		To:     c.Query("to"),
-	}
-}
-
-func parseStatisticsSyncDateRange(c *gin.Context) (statisticsApp.SyncDailyOptions, error) {
-	startRaw := strings.TrimSpace(c.Query("start_date"))
-	endRaw := strings.TrimSpace(c.Query("end_date"))
-	if startRaw == "" && endRaw == "" {
-		return statisticsApp.SyncDailyOptions{}, nil
-	}
-	if startRaw == "" || endRaw == "" {
-		return statisticsApp.SyncDailyOptions{}, errors.WithCode(code.ErrInvalidArgument, "start_date 和 end_date 必须同时提供")
-	}
-
-	start, err := time.ParseInLocation("2006-01-02", startRaw, time.Local)
-	if err != nil {
-		return statisticsApp.SyncDailyOptions{}, errors.WithCode(code.ErrInvalidArgument, "start_date 格式无效，必须为 YYYY-MM-DD")
-	}
-	endInclusive, err := time.ParseInLocation("2006-01-02", endRaw, time.Local)
-	if err != nil {
-		return statisticsApp.SyncDailyOptions{}, errors.WithCode(code.ErrInvalidArgument, "end_date 格式无效，必须为 YYYY-MM-DD")
-	}
-	endExclusive := endInclusive.AddDate(0, 0, 1)
-	if !start.Before(endExclusive) {
-		return statisticsApp.SyncDailyOptions{}, errors.WithCode(code.ErrInvalidArgument, "start_date 不能晚于 end_date")
-	}
-
-	return statisticsApp.SyncDailyOptions{
-		StartDate: &start,
-		EndDate:   &endExclusive,
-	}, nil
-}
-
-type contentBatchRequest struct {
-	Items []domainStatistics.ContentReference `json:"items"`
-}
-
-// GetOverview 查询机构统计总览。
-// @Summary 查询机构统计总览
-// @Description 查询机构总览、接入漏斗、测评服务、维度分析和计划任务统计；仅 qs:admin 可访问
+// Overview godoc
+// @Summary 查询 Statistics 机构总览
 // @Tags Statistics
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param preset query string false "时间窗口预设：today/7d/30d"
-// @Param from query string false "自定义开始日期，格式 YYYY-MM-DD"
-// @Param to query string false "自定义结束日期，格式 YYYY-MM-DD"
-// @Success 200 {object} core.Response{data=statistics.StatisticsOverview}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/statistics/overview [get]
-func (h *StatisticsHandler) GetOverview(c *gin.Context) {
-	ctx := c.Request.Context()
+// @Param preset query string false "latest_complete_day/7d/30d/custom"
+// @Param from query string false "上海日期 YYYY-MM-DD"
+// @Param to query string false "上海日期 YYYY-MM-DD"
+// @Success 200 {object} core.Response{data=statisticsApp.Overview}
+// @Router /api/v2/statistics/overview [get]
+func (h *StatisticsHandler) Overview(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	stats, err := h.readService.GetOverview(ctx, orgID, buildStatisticsQueryFilter(c))
+	value, err := h.read.Overview(c.Request.Context(), orgID, statisticsFilter(c))
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	h.Success(c, stats)
+	h.Success(c, value)
 }
 
-// ListClinicianStatistics 查询从业者统计列表。
-// @Summary 查询从业者统计列表
-// @Description 按机构和时间窗口查询从业者统计列表；仅 qs:admin 可访问
+// Clinicians godoc
+// @Summary 查询 Statistics 医生列表
 // @Tags Statistics
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param preset query string false "时间窗口预设：today/7d/30d"
-// @Param from query string false "自定义开始日期，格式 YYYY-MM-DD"
-// @Param to query string false "自定义结束日期，格式 YYYY-MM-DD"
-// @Param page query int false "页码"
-// @Param page_size query int false "每页数量"
-// @Success 200 {object} core.Response{data=statistics.ClinicianStatisticsList}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/statistics/clinicians [get]
-func (h *StatisticsHandler) ListClinicianStatistics(c *gin.Context) {
-	ctx := c.Request.Context()
+// @Success 200 {object} core.Response{data=statisticsApp.Page[statisticsApp.ClinicianItem]}
+// @Router /api/v2/statistics/clinicians [get]
+func (h *StatisticsHandler) Clinicians(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	page, pageSize, err := h.parsePage(c)
+	page, size, err := parseStatisticsPage(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	stats, err := h.readService.ListClinicianStatistics(ctx, orgID, buildStatisticsQueryFilter(c), page, pageSize)
+	value, err := h.read.Clinicians(c.Request.Context(), orgID, nil, nil, statisticsFilter(c), page, size)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	h.Success(c, stats)
+	h.Success(c, value)
 }
 
-// GetClinicianStatistics 查询单个从业者统计。
-// @Summary 查询单个从业者统计
-// @Description 按从业者 ID 查询统计概览、窗口指标和漏斗指标；仅 qs:admin 可访问
+// Clinician godoc
+// @Summary 查询 Statistics 医生详情
 // @Tags Statistics
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param id path uint64 true "从业者ID"
-// @Param preset query string false "时间窗口预设：today/7d/30d"
-// @Param from query string false "自定义开始日期，格式 YYYY-MM-DD"
-// @Param to query string false "自定义结束日期，格式 YYYY-MM-DD"
-// @Success 200 {object} core.Response{data=statistics.ClinicianStatistics}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/statistics/clinicians/{id} [get]
-func (h *StatisticsHandler) GetClinicianStatistics(c *gin.Context) {
-	ctx := c.Request.Context()
+// @Param id path uint64 true "医生 ID"
+// @Success 200 {object} core.Response{data=StatisticsClinicianDetailResponse}
+// @Router /api/v2/statistics/clinicians/{id} [get]
+func (h *StatisticsHandler) Clinician(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	clinicianID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid clinician id: %s", c.Param("id")))
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid clinician id"))
 		return
 	}
-	stats, err := h.readService.GetClinicianStatistics(ctx, orgID, clinicianID, buildStatisticsQueryFilter(c))
+	value, err := h.read.Clinicians(c.Request.Context(), orgID, &id, nil, statisticsFilter(c), 1, 1)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	h.Success(c, stats)
+	if len(value.Items) == 0 {
+		h.Error(c, errors.WithCode(code.ErrPageNotFound, "clinician not found"))
+		return
+	}
+	h.Success(c, StatisticsClinicianDetailResponse{Item: value.Items[0], TimeRange: value.TimeRange, Freshness: value.Freshness})
 }
 
-// ListAssessmentEntryStatistics 查询测评入口统计列表。
-// @Summary 查询测评入口统计列表
-// @Description 查询机构内测评入口统计列表，支持 clinician_id、status 和时间窗口过滤；仅 qs:admin 可访问
+// CurrentClinicianOverview godoc
+// @Summary 查询当前医生 Statistics 总览
 // @Tags Statistics
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param clinician_id query uint64 false "从业者ID"
-// @Param status query string false "入口状态：active/inactive"
-// @Param preset query string false "时间窗口预设：today/7d/30d"
-// @Param from query string false "自定义开始日期，格式 YYYY-MM-DD"
-// @Param to query string false "自定义结束日期，格式 YYYY-MM-DD"
-// @Param page query int false "页码"
-// @Param page_size query int false "每页数量"
-// @Success 200 {object} core.Response{data=statistics.AssessmentEntryStatisticsList}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/statistics/entries [get]
-func (h *StatisticsHandler) ListAssessmentEntryStatistics(c *gin.Context) {
-	ctx := c.Request.Context()
+// @Success 200 {object} core.Response{data=StatisticsClinicianDetailResponse}
+// @Router /api/v2/statistics/clinicians/me/overview [get]
+func (h *StatisticsHandler) CurrentClinicianOverview(c *gin.Context) {
+	orgID, userID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	value, err := h.read.Clinicians(c.Request.Context(), orgID, nil, &userID, statisticsFilter(c), 1, 1)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if len(value.Items) == 0 {
+		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "current operator is not an active clinician"))
+		return
+	}
+	h.Success(c, StatisticsClinicianDetailResponse{Item: value.Items[0], TimeRange: value.TimeRange, Freshness: value.Freshness})
+}
+
+// Entries godoc
+// @Summary 查询 Statistics 入口列表
+// @Tags Statistics
+// @Success 200 {object} core.Response{data=statisticsApp.Page[statisticsApp.EntryItem]}
+// @Router /api/v2/statistics/entries [get]
+func (h *StatisticsHandler) Entries(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	page, pageSize, err := h.parsePage(c)
+	page, size, err := parseStatisticsPage(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
 	var clinicianID *uint64
 	if raw := c.Query("clinician_id"); raw != "" {
-		value, err := strconv.ParseUint(raw, 10, 64)
-		if err != nil {
-			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid clinician_id: %s", raw))
+		id, parseErr := strconv.ParseUint(raw, 10, 64)
+		if parseErr != nil {
+			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid clinician_id"))
 			return
 		}
-		clinicianID = &value
+		clinicianID = &id
 	}
-	var activeOnly *bool
+	var active *bool
 	if raw := c.Query("status"); raw != "" {
+		if raw != "active" && raw != "inactive" {
+			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid entry status"))
+			return
+		}
 		value := raw == "active"
-		activeOnly = &value
+		active = &value
 	}
-	stats, err := h.readService.ListAssessmentEntryStatistics(ctx, orgID, clinicianID, activeOnly, buildStatisticsQueryFilter(c), page, pageSize)
+	value, err := h.read.Entries(c.Request.Context(), orgID, nil, clinicianID, active, statisticsFilter(c), page, size)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	h.Success(c, stats)
+	h.Success(c, value)
 }
 
-// GetAssessmentEntryStatistics 查询单个测评入口统计。
-// @Summary 查询单个测评入口统计
-// @Description 按入口 ID 查询入口快照、窗口计数和最近事件时间；仅 qs:admin 可访问
+// Entry godoc
+// @Summary 查询 Statistics 入口详情
 // @Tags Statistics
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param id path uint64 true "入口ID"
-// @Param preset query string false "时间窗口预设：today/7d/30d"
-// @Param from query string false "自定义开始日期，格式 YYYY-MM-DD"
-// @Param to query string false "自定义结束日期，格式 YYYY-MM-DD"
-// @Success 200 {object} core.Response{data=statistics.AssessmentEntryStatistics}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/statistics/entries/{id} [get]
-func (h *StatisticsHandler) GetAssessmentEntryStatistics(c *gin.Context) {
-	ctx := c.Request.Context()
+// @Param id path uint64 true "入口 ID"
+// @Success 200 {object} core.Response{data=StatisticsEntryDetailResponse}
+// @Router /api/v2/statistics/entries/{id} [get]
+func (h *StatisticsHandler) Entry(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	entryID, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid entry id: %s", c.Param("id")))
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid entry id"))
 		return
 	}
-	stats, err := h.readService.GetAssessmentEntryStatistics(ctx, orgID, entryID, buildStatisticsQueryFilter(c))
+	// The entry read port filters by clinician, so retrieve one page and select
+	// the organization-scoped identifier explicitly.
+	value, err := h.read.Entries(c.Request.Context(), orgID, &id, nil, nil, statisticsFilter(c), 1, 1)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	h.Success(c, stats)
+	if len(value.Items) > 0 {
+		h.Success(c, StatisticsEntryDetailResponse{Item: value.Items[0], TimeRange: value.TimeRange, Freshness: value.Freshness})
+		return
+	}
+	h.Error(c, errors.WithCode(code.ErrPageNotFound, "entry not found"))
 }
 
-// GetCurrentClinicianOverview 查询当前从业者统计概览。
-// @Summary 查询当前从业者统计概览
-// @Description 查询当前后台操作者绑定从业者的统计概览
+// CurrentClinicianEntries godoc
+// @Summary 查询当前医生 Statistics 入口
 // @Tags Statistics
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param preset query string false "时间窗口预设：today/7d/30d"
-// @Param from query string false "自定义开始日期，格式 YYYY-MM-DD"
-// @Param to query string false "自定义结束日期，格式 YYYY-MM-DD"
-// @Success 200 {object} core.Response{data=statistics.ClinicianStatistics}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/statistics/clinicians/me/overview [get]
-func (h *StatisticsHandler) GetCurrentClinicianOverview(c *gin.Context) {
-	ctx := c.Request.Context()
-	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+// @Success 200 {object} core.Response{data=statisticsApp.Page[statisticsApp.EntryItem]}
+// @Router /api/v2/statistics/clinicians/me/entries [get]
+func (h *StatisticsHandler) CurrentClinicianEntries(c *gin.Context) {
+	orgID, userID, err := h.RequireProtectedScope(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	stats, err := h.readService.GetCurrentClinicianStatistics(ctx, orgID, operatorUserID, buildStatisticsQueryFilter(c))
+	clinicianID, err := h.read.CurrentClinicianID(c.Request.Context(), orgID, userID)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	h.Success(c, stats)
+	page, size, err := parseStatisticsPage(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	value, err := h.read.Entries(c.Request.Context(), orgID, nil, &clinicianID, nil, statisticsFilter(c), page, size)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, value)
 }
 
-// ListCurrentClinicianEntryStatistics 查询当前从业者入口统计列表。
-// @Summary 查询当前从业者入口统计列表
-// @Description 查询当前后台操作者绑定从业者的测评入口统计列表
+// CurrentClinicianTestees godoc
+// @Summary 查询当前医生 Statistics 受试者摘要
 // @Tags Statistics
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param preset query string false "时间窗口预设：today/7d/30d"
-// @Param from query string false "自定义开始日期，格式 YYYY-MM-DD"
-// @Param to query string false "自定义结束日期，格式 YYYY-MM-DD"
-// @Param page query int false "页码"
-// @Param page_size query int false "每页数量"
-// @Success 200 {object} core.Response{data=statistics.AssessmentEntryStatisticsList}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/statistics/clinicians/me/entries [get]
-func (h *StatisticsHandler) ListCurrentClinicianEntryStatistics(c *gin.Context) {
-	ctx := c.Request.Context()
-	orgID, operatorUserID, err := h.RequireProtectedScope(c)
+// @Success 200 {object} core.Response{data=statisticsApp.TesteeSummary}
+// @Router /api/v2/statistics/clinicians/me/testees-summary [get]
+func (h *StatisticsHandler) CurrentClinicianTestees(c *gin.Context) {
+	orgID, userID, err := h.RequireProtectedScope(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	page, pageSize, err := h.parsePage(c)
+	value, err := h.read.CurrentClinicianTesteeSummary(c.Request.Context(), orgID, userID, statisticsFilter(c))
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	stats, err := h.readService.ListCurrentClinicianEntryStatistics(ctx, orgID, operatorUserID, buildStatisticsQueryFilter(c), page, pageSize)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	h.Success(c, stats)
+	h.Success(c, value)
 }
 
-// GetCurrentClinicianTesteeSummary 查询当前从业者受试者摘要。
-// @Summary 查询当前从业者受试者摘要
-// @Description 查询当前后台操作者绑定从业者可访问受试者摘要统计
+type StatisticsContentRequest struct {
+	Items []statisticsApp.ContentRef `json:"items"`
+}
+
+type StatisticsClinicianDetailResponse struct {
+	Item      statisticsApp.ClinicianItem `json:"item"`
+	TimeRange statisticsApp.DateRange     `json:"time_range"`
+	Freshness statisticsApp.Freshness     `json:"freshness"`
+}
+
+type StatisticsEntryDetailResponse struct {
+	Item      statisticsApp.EntryItem `json:"item"`
+	TimeRange statisticsApp.DateRange `json:"time_range"`
+	Freshness statisticsApp.Freshness `json:"freshness"`
+}
+
+type StatisticsRunListResponse struct {
+	Items []statisticsApp.Run `json:"items"`
+}
+
+type StatisticsResumeCacheRequest struct {
+	Reason  string `json:"reason"`
+	Confirm bool   `json:"confirm"`
+}
+
+// Contents godoc
+// @Summary 批量查询 Statistics 内容统计
 // @Tags Statistics
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param preset query string false "时间窗口预设：today/7d/30d"
-// @Param from query string false "自定义开始日期，格式 YYYY-MM-DD"
-// @Param to query string false "自定义结束日期，格式 YYYY-MM-DD"
-// @Success 200 {object} core.Response{data=statistics.ClinicianTesteeSummaryStatistics}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/statistics/clinicians/me/testees-summary [get]
-func (h *StatisticsHandler) GetCurrentClinicianTesteeSummary(c *gin.Context) {
-	ctx := c.Request.Context()
-	orgID, operatorUserID, err := h.RequireProtectedScope(c)
-	if err != nil {
-		h.Error(c, err)
+// @Param request body StatisticsContentRequest true "内容引用"
+// @Success 200 {object} core.Response{data=statisticsApp.ContentBatch}
+// @Router /api/v2/statistics/contents/batch [post]
+func (h *StatisticsHandler) Contents(c *gin.Context) {
+	var request StatisticsContentRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid request body"))
 		return
 	}
-	stats, err := h.readService.GetCurrentClinicianTesteeSummary(ctx, orgID, operatorUserID, buildStatisticsQueryFilter(c))
-	if err != nil {
-		h.Error(c, err)
+	if len(request.Items) == 0 || len(request.Items) > 100 {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "items must contain 1..100 entries"))
 		return
 	}
-	h.Success(c, stats)
-}
-
-// GetTesteePeriodicStatistics 查询受试者周期项目统计。
-// @Summary 查询受试者周期项目统计
-// @Description 查询受试者周期计划项目、周次任务和完成情况；后台访问范围按 ClinicianTesteeRelation 收口
-// @Tags Statistics
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param testee_id path uint64 true "受试者ID"
-// @Success 200 {object} core.Response{data=response.PeriodicStatsResponse}
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/statistics/testees/{testee_id}/periodic [get]
-func (h *StatisticsHandler) GetTesteePeriodicStatistics(c *gin.Context) {
-	ctx := c.Request.Context()
-	testeeID, err := strconv.ParseUint(c.Param("testee_id"), 10, 64)
-	if err != nil {
-		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid testee id: %s", c.Param("testee_id")))
-		return
-	}
-	orgID, operatorUserID, err := h.RequireProtectedScope(c)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	if err := h.testeeAccessService.ValidateTesteeAccess(ctx, orgID, operatorUserID, testeeID); err != nil {
-		h.Error(c, err)
-		return
-	}
-	stats, err := h.periodicStatsService.GetPeriodicStats(ctx, orgID, testeeID)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	h.Success(c, response.NewPeriodicStatsResponse(stats))
-}
-
-// BatchContentStatistics 批量查询统一内容统计。
-// @Summary 批量查询统一内容统计
-// @Description 按内容 type + code 批量查询测评形成数、完成数和完成率；questionnaire 需要 manage_questionnaires，scale 需要 manage_assessment_models，混合请求需要同时具备两项权限
-// @Tags Statistics
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param request body contentBatchRequest true "内容标识列表"
-// @Success 200 {object} core.Response{data=statistics.ContentBatchStatisticsResponse}
-// @Failure 400 {object} core.ErrResponse
-// @Failure 403 {object} core.ErrResponse
-// @Failure 429 {object} core.ErrResponse
-// @Router /api/v1/statistics/contents/batch [post]
-func (h *StatisticsHandler) BatchContentStatistics(c *gin.Context) {
-	var req contentBatchRequest
-	if !h.bindJSON(c, &req) {
-		return
+	allowed := map[string]bool{"questionnaire": true, "scale": true, "typology": true, "behavioral_rating": true, "cognitive": true}
+	seen := map[string]bool{}
+	snapshot, _ := authzapp.FromContext(c.Request.Context())
+	canQuestionnaire := authzapp.DecideCapability(snapshot, authzapp.CapabilityManageQuestionnaires).Allowed
+	canModel := authzapp.DecideCapability(snapshot, authzapp.CapabilityManageAssessmentModels).Allowed
+	for index := range request.Items {
+		request.Items[index].Kind = strings.TrimSpace(request.Items[index].Kind)
+		request.Items[index].Code = strings.TrimSpace(request.Items[index].Code)
+		item := request.Items[index]
+		key := item.Kind + "\x00" + item.Code
+		if !allowed[item.Kind] || item.Code == "" || seen[key] {
+			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid or duplicate content item"))
+			return
+		}
+		if (item.Kind == "questionnaire" && !canQuestionnaire) || (item.Kind != "questionnaire" && !canModel) {
+			h.Error(c, errors.WithCode(code.ErrPermissionDenied, "content kind is outside caller capability"))
+			return
+		}
+		seen[key] = true
 	}
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	snapshot, _ := authzApp.FromContext(c.Request.Context())
-	access := statisticsApp.ContentStatisticsAccess{
-		Questionnaire: authzApp.DecideCapability(snapshot, authzApp.CapabilityManageQuestionnaires).Allowed,
-		Scale:         authzApp.DecideCapability(snapshot, authzApp.CapabilityManageAssessmentModels).Allowed,
-	}
-	stats, err := h.readService.GetContentBatchStatistics(c.Request.Context(), orgID, req.Items, access)
+	value, err := h.read.Contents(c.Request.Context(), orgID, request.Items)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	h.Success(c, stats)
+	h.Success(c, value)
 }
 
-// ============= 定时任务 API =============
+type StatisticsRunRequest struct {
+	Mode         string `json:"mode"`
+	FromDate     string `json:"from_date"`
+	ToDate       string `json:"to_date"`
+	Reason       string `json:"reason"`
+	Confirm      bool   `json:"confirm"`
+	ValidateOnly bool   `json:"validate_only"`
+}
 
-// SyncDailyStatistics 同步每日统计（内部系统动作）
-// @Summary 同步每日统计
-// @Description 从 MySQL 原始表重建每日统计；仅 qs:admin 可访问
-// @Tags Statistics-Sync
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
-// @Param start_date query string false "补算开始日期（格式：YYYY-MM-DD）"
-// @Param end_date query string false "补算结束日期（格式：YYYY-MM-DD，包含当天）"
-// @Success 200 {object} core.Response
-// @Failure 429 {object} core.ErrResponse
-// @Router /internal/v1/statistics/sync/daily [post]
-func (h *StatisticsHandler) SyncDailyStatistics(c *gin.Context) {
-	ctx := c.Request.Context()
-	logger.L(ctx).Infow("同步每日统计", "action", "sync_daily_statistics")
+// CreateRun godoc
+// @Summary 创建 Statistics 同步批次
+// @Tags Statistics-Internal
+// @Param request body StatisticsRunRequest true "批次窗口"
+// @Success 200 {object} core.Response{data=statisticsApp.Run}
+// @Router /internal/v2/statistics/runs [post]
+func (h *StatisticsHandler) CreateRun(c *gin.Context) {
+	orgID, userID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	var request StatisticsRunRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid request body"))
+		return
+	}
+	mode := statisticsDomain.RunMode(strings.TrimSpace(request.Mode))
+	isValidate := request.ValidateOnly || mode == statisticsDomain.RunModeValidate
+	if !isValidate && !request.Confirm {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "confirm=true is required"))
+		return
+	}
+	if strings.TrimSpace(request.Reason) == "" {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "reason is required"))
+		return
+	}
+	if len([]rune(request.Reason)) > 500 {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "reason exceeds 500 characters"))
+		return
+	}
+	from, err := time.ParseInLocation("2006-01-02", request.FromDate, statisticsDomain.Shanghai)
+	if err != nil {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid from_date"))
+		return
+	}
+	to, err := time.ParseInLocation("2006-01-02", request.ToDate, statisticsDomain.Shanghai)
+	if err != nil {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid to_date"))
+		return
+	}
+	run, runErr := h.coordinator.Run(c.Request.Context(), statisticsApp.RunRequest{OrgID: orgID, FromDate: from, ToDate: to, Reason: strings.TrimSpace(request.Reason), TriggerType: "manual", OperatorID: uint64(userID), Mode: mode, ValidateOnly: request.ValidateOnly})
+	if statisticsApp.IsInvalidRunRequest(runErr) {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "%s", runErr.Error()))
+		return
+	}
+	if runErr != nil && (run == nil || run.Status != statisticsDomain.RunStatusDataCommitted) {
+		h.Error(c, runErr)
+		return
+	}
+	h.Success(c, run)
+}
+
+// ListRuns godoc
+// @Summary 查询 Statistics 同步批次
+// @Tags Statistics-Internal
+// @Success 200 {object} core.Response{data=StatisticsRunListResponse}
+// @Router /internal/v2/statistics/runs [get]
+func (h *StatisticsHandler) ListRuns(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-
-	opts, err := parseStatisticsSyncDateRange(c)
+	limit := 20
+	if raw := c.Query("limit"); raw != "" {
+		limit, err = strconv.Atoi(raw)
+		if err != nil {
+			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid limit"))
+			return
+		}
+	}
+	runs, err := h.runs.List(c.Request.Context(), orgID, limit)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-
-	if err := h.syncService.SyncDailyStatistics(ctx, orgID, opts); err != nil {
-		logger.L(ctx).Errorw("同步每日统计失败",
-			"action", "sync_daily_statistics",
-			"org_id", orgID,
-			"error", err.Error(),
-		)
-		h.Error(c, err)
-		return
-	}
-	h.governance().TriggerStatisticsWarmup(ctx, orgID, "sync_daily_statistics")
-
-	h.Success(c, gin.H{"message": "每日统计同步完成"})
+	h.Success(c, StatisticsRunListResponse{Items: runs})
 }
 
-// SyncOrgSnapshotStatistics 同步机构总览快照（内部系统动作）
-// @Summary 同步机构总览快照
-// @Description 从 MySQL 原始表重建 statistics_org_snapshot；仅 qs:admin 可访问
-// @Tags Statistics-Sync
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
-// @Success 200 {object} core.Response
-// @Failure 429 {object} core.ErrResponse
-// @Router /internal/v1/statistics/sync/org-snapshot [post]
-func (h *StatisticsHandler) SyncOrgSnapshotStatistics(c *gin.Context) {
-	ctx := c.Request.Context()
-	logger.L(ctx).Infow("同步机构总览快照", "action", "sync_org_snapshot_statistics")
+// GetRun godoc
+// @Summary 查询 Statistics 同步批次详情
+// @Tags Statistics-Internal
+// @Param id path uint64 true "批次 ID"
+// @Success 200 {object} core.Response{data=statisticsApp.Run}
+// @Router /internal/v2/statistics/runs/{id} [get]
+func (h *StatisticsHandler) GetRun(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-
-	if err := h.syncService.SyncOrgSnapshotStatistics(ctx, orgID); err != nil {
-		logger.L(ctx).Errorw("同步机构总览快照失败",
-			"action", "sync_org_snapshot_statistics",
-			"org_id", orgID,
-			"error", err.Error(),
-		)
-		h.Error(c, err)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid run id"))
 		return
 	}
-	h.governance().TriggerStatisticsWarmup(ctx, orgID, "sync_org_snapshot_statistics")
-
-	h.Success(c, gin.H{"message": "机构总览快照同步完成"})
-}
-
-// SyncPlanStatistics 同步计划统计（定时任务调用）
-// @Summary 同步计划统计
-// @Description 从 assessment_task 重建计划统计数据到 MySQL；仅 qs:admin 可访问
-// @Tags Statistics-Sync
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
-// @Success 200 {object} core.Response
-// @Failure 429 {object} core.ErrResponse
-// @Router /internal/v1/statistics/sync/plan [post]
-func (h *StatisticsHandler) SyncPlanStatistics(c *gin.Context) {
-	ctx := c.Request.Context()
-	logger.L(ctx).Infow("同步计划统计", "action", "sync_plan_statistics")
-	orgID, err := h.RequireProtectedOrgID(c)
+	run, err := h.runs.Get(c.Request.Context(), id)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-
-	if err := h.syncService.SyncPlanStatistics(ctx, orgID); err != nil {
-		logger.L(ctx).Errorw("同步计划统计失败",
-			"action", "sync_plan_statistics",
-			"org_id", orgID,
-			"error", err.Error(),
-		)
-		h.Error(c, err)
+	if run == nil || run.OrgID != orgID {
+		h.Error(c, errors.WithCode(code.ErrPageNotFound, "statistics run not found"))
 		return
 	}
-	h.governance().TriggerStatisticsWarmup(ctx, orgID, "sync_plan_statistics")
-
-	h.Success(c, gin.H{"message": "计划统计同步完成"})
+	h.Success(c, run)
 }
 
-// RepairComplete marks an asynchronous cache repair as complete.
-// @Summary 确认缓存修复完成
-// @Description 内部治理回调，确认指定组织的缓存修复任务完成。
-// @Tags Statistics-Sync
-// @Accept json
-// @Produce json
-// @Param request body statistics.RepairCompleteRequest true "修复完成事件"
-// @Success 200 {object} core.Response
-// @Failure 400 {object} core.ErrResponse
-// @Router /internal/v1/cache/governance/repair-complete [post]
-func (h *StatisticsHandler) RepairComplete(c *gin.Context) {
-	ctx := c.Request.Context()
-	orgID, err := h.RequireProtectedOrgID(c)
+// ResumeCache godoc
+// @Summary 恢复 Statistics 批次缓存发布
+// @Tags Statistics-Internal
+// @Param id path uint64 true "批次 ID"
+// @Param request body StatisticsResumeCacheRequest true "审计原因与明确确认"
+// @Success 200 {object} core.Response{data=statisticsApp.Run}
+// @Router /internal/v2/statistics/runs/{id}/resume-cache [post]
+func (h *StatisticsHandler) ResumeCache(c *gin.Context) {
+	orgID, userID, err := h.RequireProtectedScope(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-
-	var req statisticsApp.RepairCompleteRequest
-	if !h.bindJSON(c, &req) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid run id"))
 		return
 	}
-	if err := h.governance().HandleRepairComplete(ctx, orgID, req); err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	h.Success(c, gin.H{"message": "repair complete hook accepted"})
-}
-
-// WarmupTargets 手工触发缓存预热目标（内部治理动作）
-// @Summary 手工触发缓存预热
-// @Description operating 后台通过 BFF 代理调用，按 target 列表同步触发缓存预热并返回逐项结果；仅 qs:admin 可访问
-// @Tags Statistics-Sync
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
-// @Param request body cachetarget.ManualWarmupRequest true "预热目标列表"
-// @Success 200 {object} core.Response{data=cachemodel.ManualWarmupResult}
-// @Failure 400 {object} core.ErrResponse
-// @Failure 429 {object} core.ErrResponse
-// @Router /internal/v1/cache/governance/warmup-targets [post]
-func (h *StatisticsHandler) WarmupTargets(c *gin.Context) {
-	ctx := c.Request.Context()
-	orgID, err := h.RequireProtectedOrgID(c)
+	existing, err := h.runs.Get(c.Request.Context(), id)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	var req cachetarget.ManualWarmupRequest
-	if !h.bindJSON(c, &req) {
+	if existing == nil || existing.OrgID != orgID {
+		h.Error(c, errors.WithCode(code.ErrPageNotFound, "statistics run not found"))
 		return
 	}
-
-	var result *cachemodel.ManualWarmupResult
-	result, err = h.governance().HandleManualWarmup(ctx, orgID, req)
+	var request StatisticsResumeCacheRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid request body"))
+		return
+	}
+	if !request.Confirm {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "confirm=true is required"))
+		return
+	}
+	if strings.TrimSpace(request.Reason) == "" {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "reason is required"))
+		return
+	}
+	if len([]rune(request.Reason)) > 500 {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "reason exceeds 500 characters"))
+		return
+	}
+	run, err := h.coordinator.ResumeCache(c.Request.Context(), id, statisticsApp.CacheResumeRequest{OperatorID: uint64(userID), Reason: strings.TrimSpace(request.Reason)})
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	h.Success(c, result)
-}
-
-// CacheGovernanceStatus returns the cache-governance runtime status.
-// @Summary 查询缓存治理状态
-// @Description 返回缓存治理任务及运行时状态，仅内部管理员可访问。
-// @Tags Statistics-Sync
-// @Produce json
-// @Success 200 {object} core.Response
-// @Router /internal/v1/cache/governance/status [get]
-func (h *StatisticsHandler) CacheGovernanceStatus(c *gin.Context) {
-	result, err := h.governance().GetStatus(c.Request.Context())
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	h.Success(c, result)
-}
-
-// CacheGovernanceHotset returns the active cache hotset.
-// @Summary 查询缓存热集
-// @Description 按 kind 和 limit 查询当前缓存热集，仅内部管理员可访问。
-// @Tags Statistics-Sync
-// @Produce json
-// @Param kind query string false "缓存类型"
-// @Param limit query int false "最大条数"
-// @Success 200 {object} core.Response
-// @Router /internal/v1/cache/governance/hotset [get]
-func (h *StatisticsHandler) CacheGovernanceHotset(c *gin.Context) {
-	result, err := h.governance().GetHotset(c.Request.Context(), c.Query("kind"), c.Query("limit"))
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-	h.Success(c, result)
-}
-
-func (h *StatisticsHandler) governance() statisticsApp.GovernanceFacade {
-	if h == nil {
-		return statisticsApp.NewGovernanceFacade("apiserver", nil, nil)
-	}
-	if h.governanceFacade == nil {
-		h.governanceFacade = statisticsApp.NewGovernanceFacade("apiserver", h.warmupCoordinator, h.cacheGovernanceStatusService)
-	}
-	return h.governanceFacade
+	h.Success(c, run)
 }

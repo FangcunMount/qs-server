@@ -3,8 +3,8 @@ package systemgovernance
 import (
 	"context"
 
+	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	govcomponent "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/component"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
@@ -51,7 +51,7 @@ func (c eventGovernanceCollector) Collect(ctx context.Context, evalCtx evaluatio
 }
 
 type cacheGovernanceCollector struct {
-	governance statisticsApp.GovernanceFacade
+	governance cachegovernance.Facade
 	components *govcomponent.Adapter
 	metrics    MetricsReader
 }

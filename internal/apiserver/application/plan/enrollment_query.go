@@ -29,19 +29,24 @@ type EnrollmentTaskItem struct {
 }
 
 type EnrollmentItem struct {
-	ID               uint64               `json:"id"`
-	OrgID            int64                `json:"org_id"`
-	PlanID           uint64               `json:"plan_id"`
-	TesteeID         uint64               `json:"testee_id"`
-	Round            uint32               `json:"round"`
-	StartDate        time.Time            `json:"start_date"`
-	Status           string               `json:"status"`
-	JoinedAt         time.Time            `json:"joined_at"`
-	ClosedAt         *time.Time           `json:"closed_at,omitempty"`
-	TerminatedAt     *time.Time           `json:"terminated_at,omitempty"`
-	TerminatedReason string               `json:"terminated_reason,omitempty"`
-	RecordOrigin     string               `json:"record_origin"`
-	Tasks            []EnrollmentTaskItem `json:"tasks"`
+	ID                 uint64               `json:"id"`
+	OrgID              int64                `json:"org_id"`
+	PlanID             uint64               `json:"plan_id"`
+	TesteeID           uint64               `json:"testee_id"`
+	Round              uint32               `json:"round"`
+	StartDate          time.Time            `json:"start_date"`
+	Status             string               `json:"status"`
+	JoinedAt           time.Time            `json:"joined_at"`
+	ClosedAt           *time.Time           `json:"closed_at,omitempty"`
+	TerminatedAt       *time.Time           `json:"terminated_at,omitempty"`
+	TerminatedReason   string               `json:"terminated_reason,omitempty"`
+	RecordOrigin       string               `json:"record_origin"`
+	ScaleCode          string               `json:"scale_code"`
+	ScaleTitle         string               `json:"scale_title"`
+	TaskCount          int                  `json:"task_count"`
+	CompletedTaskCount int                  `json:"completed_task_count"`
+	CompletionRate     float64              `json:"completion_rate"`
+	Tasks              []EnrollmentTaskItem `json:"tasks"`
 }
 
 type EnrollmentPage struct {
@@ -60,10 +65,13 @@ type EnrollmentQueryService interface {
 	ListEnrollments(context.Context, EnrollmentQuery) (*EnrollmentPage, error)
 }
 
-type enrollmentQueryService struct{ store EnrollmentQueryStore }
+type enrollmentQueryService struct {
+	store   EnrollmentQueryStore
+	catalog ScaleCatalog
+}
 
-func NewEnrollmentQueryService(store EnrollmentQueryStore) EnrollmentQueryService {
-	return &enrollmentQueryService{store: store}
+func NewEnrollmentQueryService(store EnrollmentQueryStore, catalog ScaleCatalog) EnrollmentQueryService {
+	return &enrollmentQueryService{store: store, catalog: catalog}
 }
 
 func (s *enrollmentQueryService) ListEnrollments(ctx context.Context, query EnrollmentQuery) (*EnrollmentPage, error) {
@@ -79,6 +87,31 @@ func (s *enrollmentQueryService) ListEnrollments(ctx context.Context, query Enro
 	items, total, err := s.store.ListEnrollments(ctx, query)
 	if err != nil {
 		return nil, err
+	}
+	codes := make([]string, 0, len(items))
+	for index := range items {
+		item := &items[index]
+		item.TaskCount = len(item.Tasks)
+		for _, task := range item.Tasks {
+			if item.ScaleCode == "" {
+				item.ScaleCode = task.ScaleCode
+			}
+			if task.Status == "completed" {
+				item.CompletedTaskCount++
+			}
+		}
+		if item.TaskCount > 0 {
+			item.CompletionRate = float64(item.CompletedTaskCount) / float64(item.TaskCount)
+		}
+		if item.ScaleCode != "" {
+			codes = append(codes, item.ScaleCode)
+		}
+	}
+	if s.catalog != nil {
+		titles := s.catalog.ResolveTitles(ctx, codes)
+		for index := range items {
+			items[index].ScaleTitle = titles[items[index].ScaleCode]
+		}
 	}
 	return &EnrollmentPage{Items: items, Total: total, Page: query.Page, PageSize: query.PageSize, TotalPages: int((total + int64(query.PageSize) - 1) / int64(query.PageSize))}, nil
 }

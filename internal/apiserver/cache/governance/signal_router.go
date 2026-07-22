@@ -54,7 +54,7 @@ func (c *coordinator) HandleStatisticsSync(ctx context.Context, orgID int64) err
 		return nil
 	}
 	targets := []cachetarget.WarmupTarget{
-		cachetarget.NewQueryStatsOverviewWarmupTarget(orgID, "today"),
+		cachetarget.NewQueryStatsOverviewWarmupTarget(orgID, "latest_complete_day"),
 		cachetarget.NewQueryStatsOverviewWarmupTarget(orgID, "7d"),
 		cachetarget.NewQueryStatsOverviewWarmupTarget(orgID, "30d"),
 	}

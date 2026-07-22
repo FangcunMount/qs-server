@@ -10,10 +10,8 @@ import (
 	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	modelcatalogRuntime "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/runtime"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	cachetarget "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	actormod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/actor"
@@ -88,18 +86,6 @@ func (c *Container) InterpretationRunLeaseDuration() time.Duration {
 		return defaults.RunLeaseDuration()
 	}
 	return c.systemGovernanceOptions.Retry.Lease.RunLeaseDuration()
-}
-
-func (c *Container) StatisticsOverviewGuardOptions() statisticsApp.StatisticsReadGuardOptions {
-	return toStatisticsReadGuardOptions(c.cacheOptions.StatisticsOverview)
-}
-
-func toStatisticsReadGuardOptions(opts cachebootstrap.StatisticsReadGuardOptions) statisticsApp.StatisticsReadGuardOptions {
-	return statisticsApp.StatisticsReadGuardOptions{
-		ServiceSingleflight: opts.ServiceSingleflight,
-		StaleOnTimeout:      opts.StaleOnTimeout,
-		LoadTimeout:         opts.LoadTimeout,
-	}
 }
 
 func (c *Container) CacheObserver() *observability.ComponentObserver {

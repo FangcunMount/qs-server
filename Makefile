@@ -114,7 +114,7 @@ COLOR_RED := \033[31m
 .PHONY: perf-init perf-ensure-config perf-tokens perf-tokens-collection perf-tokens-apiserver
 .PHONY: perf-preflight perf-check-k6 perf-k6 perf-smoke perf-pretest60 perf-pretest120 perf-pretest120-submit-only perf-pretest120-balanced perf-reliable-submit24 perf-reliable-submit48-burst perf-reliable-submit96-boundary
 .PHONY: perf-mixed140 perf-mixed140-submit24 perf-mixed160 perf-mixed180 perf-mixed200 perf-mixed220 perf-mixed240 perf-mixed240-models perf-mixed280 perf-mixed280-models perf-mixed280-models-short-report perf-mixed280-models-ws perf-special-report-short-poll perf-special-report-long-poll perf-mixed300 perf-mixed300-http perf-mixed300-http-query perf-mixed300-http-query-nostats perf-stats-isolate29 perf-stats-warmup perf-mixed300probe
-.PHONY: perf-model-smoke perf-outbox120 perf-personality60 perf-mixed300-models perf-mixed300-scanner
+.PHONY: perf-model-smoke perf-outbox120 perf-personality60 perf-mixed300-models
 .PHONY: perf-diag-report120 perf-diag-query120 perf-diag-submit120 perf-diag-query-submit120 perf-sync-profiles perf-sync-vusers perf-verify
 
 # ============================================================================
@@ -377,12 +377,6 @@ perf-mixed300-models: perf-preflight ## k6 mixed_300_models 医学+人格混合 
 	OUT_DIR=$(PERF_DIR)/300qps-models $(PERF_SCRIPT_DIR)/snapshot-observability.sh before
 	$(MAKE) perf-k6 QPS_PROFILE=mixed_300_models SUMMARY_EXPORT=$(PERF_DIR)/300qps-models/k6-summary.json
 	OUT_DIR=$(PERF_DIR)/300qps-models $(PERF_SCRIPT_DIR)/snapshot-observability.sh after
-
-perf-mixed300-scanner: perf-preflight ## k6 capacity_with_scanner（需先开启 behavior_journey_scan）+ 前后 snapshot
-	@mkdir -p $(PERF_DIR)/300qps-scanner
-	OUT_DIR=$(PERF_DIR)/300qps-scanner $(PERF_SCRIPT_DIR)/snapshot-observability.sh before
-	$(MAKE) perf-k6 QPS_PROFILE=capacity_with_scanner SUMMARY_EXPORT=$(PERF_DIR)/300qps-scanner/k6-summary.json
-	OUT_DIR=$(PERF_DIR)/300qps-scanner $(PERF_SCRIPT_DIR)/snapshot-observability.sh after
 
 perf-diag-report120: perf-preflight ## 诊断 pretest_120：仅 report_status_query=36QPS
 	QUERY_RPS=0 SUBMIT_RPS=0 REPORT_RPS=36 STATS_RPS=0 \

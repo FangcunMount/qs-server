@@ -281,12 +281,7 @@ cache:
       enable: true              # 启用统计缓存预热，生产环境建议开启以提升关键统计查询的性能
       warm_on_startup: true     # 进程启动预热 overview（不依赖 warmup.startup.query）
       org_ids: [1]              # 组织ID列表（从配置读取，默认预热所有组织）
-      overview_presets: ["today", "7d", "30d"] # 首页概览常用窗口
-
-    statistics_overview:        # 机构总览读保护与降级
-      service_singleflight: true
-      stale_on_timeout: true
-      load_timeout: 25s
+      overview_presets: ["latest_complete_day", "7d", "30d"] # 首页概览常用窗口
 
     warmup:
       enable: true              # 启用缓存预热，生产环境建议开启以提升关键数据的访问性能
@@ -325,41 +320,10 @@ evaluation_consistency_reconcile:
   lock_ttl: "5m"               # 锁过期时间
 
 # ----------------------------------------------------------------------------
-# 3.6.3 行为待处理项调和任务
-# ----------------------------------------------------------------------------
-behavior_pending_reconcile:
-  enable: true                  # 启用行为待处理项调和任务
-  interval: "10m"                # 2C4G 临时降配阶段回到保守扫描频率
-  batch_limit: 50               # 降低单次调和负载，减少瞬时 CPU/DB 峰值
-  lock_key: "qs:behavior-pending-reconcile:leader"  # 分布式锁键，确保单实例执行
-  lock_ttl: "5m"                # 锁过期时间，略长于调和间隔，避免死锁
-
-# ----------------------------------------------------------------------------
-# 3.6.4 行为轨迹扫描任务
-# ----------------------------------------------------------------------------
-behavior_journey_scan:    # behavior_footprint 的唯一常规写入路径；不消费 Event/Outbox/MQ
-  enable: true            # 启用行为轨迹扫描
-  org_ids: [1]            # 组织ID列表（从配置读取，默认扫描所有组织）
-  initial_delay: "2m"     # 启动后首次扫描延迟
-  interval: "10m"         # 扫描间隔
-  batch_size: 1000        # 每轮最多扫描的记录数
-  lookback: "2h"          # 扫描时间窗口
-  lock_key: "qs:behavior-journey-scan:leader" # 分布式锁键，确保单实例执行
-  lock_ttl: "25m"         # 锁过期时间，略长于扫描间隔，避免死锁
-  dry_run: false          # false 时写入扫描投影；true 时只演练不写入
-  window_recalc: true     # 启用窗口重新计算
-  sources:
-    - entry_resolve_log   # 扫描入口解析日志
-    - entry_intake_log    # 扫描接纳日志
-    - answersheet         # 扫描答卷日志
-    - assessment          # 扫描测评日志
-    - report              # 扫描报告日志
-
-# ----------------------------------------------------------------------------
 # 3.6.5 事件出库重投任务
 # ----------------------------------------------------------------------------
 # durable_outbox 只排空 configs/events.yaml 中的可靠业务事件；
-# 禁止用它驱动 behavior_footprint，行为轨迹由 behavior_journey_scan 重建。
+# durable_outbox 不承担 Statistics 投影；Statistics 由夜间 Collector 读取权威业务数据。
 outbox_relay:
   mongo:
     interval: "1s"                # mongo_domain_events DB fallback relay 周期；ready-index/immediate 可更早触发
@@ -377,7 +341,6 @@ outbox_relay:
 # ----------------------------------------------------------------------------
 statistics_sync:                # 统计数据同步任务配置
   enable: true                  # 启用统计数据同步任务: true
-  version_mode: shadow          # v1 | shadow | v2
   org_ids: [1]                  # 组织ID列表（从配置读取，默认同步所有组织）: [1]
   run_at: "00:30"               # 每天凌晨 00:30 执行，避开业务高峰期: 00:30
   repair_window_days: 7         # 同步修复数据的时间窗口，默认最近 7 天: 7

@@ -3,72 +3,55 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	statisticsV2App "github.com/FangcunMount/qs-server/internal/apiserver/application/statisticsv2"
-	statisticsV2Domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics/v2"
+	statisticsDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 )
 
-type statisticsSyncService interface {
-	SyncDailyStatistics(ctx context.Context, orgID int64, opts statisticsApp.SyncDailyOptions) error
-	SyncOrgSnapshotStatistics(ctx context.Context, orgID int64) error
-	SyncPlanStatistics(ctx context.Context, orgID int64) error
-}
-
-type statisticsV2Coordinator interface {
-	Run(context.Context, statisticsV2App.RunRequest) (*statisticsV2App.Run, error)
+type statisticsCoordinator interface {
+	Run(context.Context, statisticsApp.RunRequest) (*statisticsApp.Run, error)
 }
 
 type StatisticsSyncOrgResult struct {
-	OrgID    int64
-	V1Status string
-	V2Status string
+	OrgID  int64
+	Status string
 }
 
 type StatisticsSyncSummary struct {
-	VersionMode string
-	Orgs        []StatisticsSyncOrgResult
-	Succeeded   int
-	Failed      int
+	Orgs      []StatisticsSyncOrgResult
+	Succeeded int
+	Failed    int
 }
 
 type StatisticsSyncPartialError struct{ Summary StatisticsSyncSummary }
 
 func (e *StatisticsSyncPartialError) Error() string {
-	return fmt.Sprintf("statistics sync partially failed: mode=%s succeeded=%d failed=%d", e.Summary.VersionMode, e.Summary.Succeeded, e.Summary.Failed)
+	return fmt.Sprintf("statistics sync partially failed: succeeded=%d failed=%d", e.Summary.Succeeded, e.Summary.Failed)
 }
 
-// StatisticsSyncRunner executes nightly statistics sync inside apiserver.
 type StatisticsSyncRunner struct {
-	opts              *apiserveroptions.StatisticsSyncOptions
-	syncService       statisticsSyncService
-	v2Coordinator     statisticsV2Coordinator
-	warmupCoordinator statisticsApp.WarmupCoordinator
-	leader            leaderLeaseRunner
-	clock             DailyClock
-	now               func() time.Time
+	opts        *apiserveroptions.StatisticsSyncOptions
+	coordinator statisticsCoordinator
+	leader      leaderLeaseRunner
+	clock       DailyClock
+	now         func() time.Time
 }
 
-// NewStatisticsSyncRunner creates the statistics sync scheduler runner.
 func NewStatisticsSyncRunner(
 	opts *apiserveroptions.StatisticsSyncOptions,
-	syncService statisticsSyncService,
-	warmupCoordinator statisticsApp.WarmupCoordinator,
+	coordinator statisticsCoordinator,
 	lockManager locklease.Manager,
 	lockBuilder *keyspace.Builder,
-	v2Coordinator ...statisticsV2Coordinator,
 ) *StatisticsSyncRunner {
-	runner := newStatisticsSyncRunnerWithHooks(
+	return newStatisticsSyncRunnerWithHooks(
 		opts,
-		syncService,
-		warmupCoordinator,
+		coordinator,
 		lockManager,
 		lockBuilder,
 		func(ctx context.Context, spec locklease.Spec, key string, ttl time.Duration) (*locklease.Lease, bool, error) {
@@ -78,27 +61,21 @@ func NewStatisticsSyncRunner(
 			return lockManager.ReleaseSpec(ctx, spec, key, lease)
 		},
 	)
-	if runner != nil && len(v2Coordinator) > 0 {
-		runner.v2Coordinator = v2Coordinator[0]
-	}
-	return runner
 }
 
 func newStatisticsSyncRunnerWithHooks(
 	opts *apiserveroptions.StatisticsSyncOptions,
-	syncService statisticsSyncService,
-	warmupCoordinator statisticsApp.WarmupCoordinator,
+	coordinator statisticsCoordinator,
 	lockManager locklease.Manager,
 	lockBuilder *keyspace.Builder,
-	acquireLock func(ctx context.Context, spec locklease.Spec, key string, ttl time.Duration) (*locklease.Lease, bool, error),
-	releaseLock func(ctx context.Context, spec locklease.Spec, key string, lease *locklease.Lease) error,
+	acquireLock func(context.Context, locklease.Spec, string, time.Duration) (*locklease.Lease, bool, error),
+	releaseLock func(context.Context, locklease.Spec, string, *locklease.Lease) error,
 ) *StatisticsSyncRunner {
 	if opts == nil || !opts.Enable {
 		return nil
 	}
-	mode := normalizeStatisticsVersionMode(opts.VersionMode)
-	if statisticsV1Enabled(mode) && syncService == nil {
-		log.Warnf("statistics sync scheduler not started (module or sync service unavailable)")
+	if coordinator == nil {
+		log.Warnf("statistics sync scheduler not started (coordinator unavailable)")
 		return nil
 	}
 	if len(opts.OrgIDs) == 0 {
@@ -110,32 +87,21 @@ func newStatisticsSyncRunnerWithHooks(
 		log.Warnf("statistics sync scheduler disabled: invalid run_at %q: %v", opts.RunAt, err)
 		return nil
 	}
-	if opts.RepairWindowDays <= 0 {
-		log.Warnf("statistics sync scheduler not started (repair_window_days must be greater than 0)")
-		return nil
-	}
-	if opts.LockKey == "" {
-		log.Warnf("statistics sync scheduler not started (lock_key is empty)")
-		return nil
-	}
-	if opts.LockTTL <= 0 {
-		log.Warnf("statistics sync scheduler not started (lock_ttl must be greater than 0)")
+	if opts.RepairWindowDays <= 0 || opts.LockKey == "" || opts.LockTTL <= 0 {
+		log.Warnf("statistics sync scheduler not started (invalid repair window or lock settings)")
 		return nil
 	}
 	if lockManager == nil {
 		observability.ObserveLockDegraded("statistics_sync_leader", "redis_unavailable")
-		log.Warnf("statistics sync scheduler not started (HA lock unavailable: redis client unavailable)")
+		log.Warnf("statistics sync scheduler not started (HA lock unavailable)")
 		return nil
 	}
 	if acquireLock == nil || releaseLock == nil {
-		log.Warnf("statistics sync scheduler not started (lock hooks unavailable)")
 		return nil
 	}
-
 	return &StatisticsSyncRunner{
-		opts:              opts,
-		syncService:       syncService,
-		warmupCoordinator: warmupCoordinator,
+		opts:        opts,
+		coordinator: coordinator,
 		leader: newLeaderLock(
 			workloadSpec(locklease.WorkloadStatisticsSyncLeader),
 			opts.LockKey,
@@ -150,42 +116,28 @@ func newStatisticsSyncRunnerWithHooks(
 	}
 }
 
-// Name returns the runner name.
-func (r *StatisticsSyncRunner) Name() string {
-	return "statistics_sync"
-}
+func (r *StatisticsSyncRunner) Name() string { return "statistics_sync" }
 
-// Start starts the nightly statistics sync loop.
 func (r *StatisticsSyncRunner) Start(ctx context.Context) {
 	if r == nil {
 		return
 	}
-
-	lockKey := r.lockKey()
-	log.Infof("statistics sync scheduler started (org_ids=%v, version_mode=%s, run_at=%s, repair_window_days=%d, lock_key=%s, lock_ttl=%s)",
-		r.opts.OrgIDs, normalizeStatisticsVersionMode(r.opts.VersionMode), r.opts.RunAt, r.opts.RepairWindowDays, lockKey, r.opts.LockTTL)
-
+	log.Infof("statistics sync scheduler started (org_ids=%v, run_at=%s, repair_window_days=%d, lock_key=%s, lock_ttl=%s)", r.opts.OrgIDs, r.opts.RunAt, r.opts.RepairWindowDays, r.lockKey(), r.opts.LockTTL)
 	go func() {
 		for {
-			now := r.now().In(statisticsV2Domain.Shanghai)
-			nextRun := NextDailyRun(now, r.clock.Hour, r.clock.Minute)
-			timer := time.NewTimer(time.Until(nextRun))
+			now := r.now().In(statisticsDomain.Shanghai)
+			timer := time.NewTimer(time.Until(NextDailyRun(now, r.clock.Hour, r.clock.Minute)))
 			select {
 			case <-ctx.Done():
 				timer.Stop()
 				return
 			case <-timer.C:
 			}
-
-			r.executeTick(ctx)
+			if err := r.runOnce(ctx); err != nil {
+				log.Warnf("statistics sync scheduler tick failed: %v", err)
+			}
 		}
 	}()
-}
-
-func (r *StatisticsSyncRunner) executeTick(ctx context.Context) {
-	if err := r.runOnce(ctx); err != nil {
-		log.Warnf("statistics sync scheduler tick failed: %v", err)
-	}
 }
 
 func (r *StatisticsSyncRunner) runOnce(ctx context.Context) error {
@@ -198,49 +150,23 @@ func (r *StatisticsSyncRunner) runOnce(ctx context.Context) error {
 			log.Warnf("failed to release statistics sync scheduler lock (lock_key=%s): %v", lockKey, err)
 		},
 	}, func(ctx context.Context) error {
-		mode := normalizeStatisticsVersionMode(r.opts.VersionMode)
-		summary := StatisticsSyncSummary{VersionMode: mode, Orgs: make([]StatisticsSyncOrgResult, 0, len(r.opts.OrgIDs))}
+		summary := StatisticsSyncSummary{Orgs: make([]StatisticsSyncOrgResult, 0, len(r.opts.OrgIDs))}
 		for _, orgID := range r.opts.OrgIDs {
-			start, end := statisticsSyncRepairWindow(r.now().In(statisticsV2Domain.Shanghai), r.opts.RepairWindowDays)
-			orgResult := StatisticsSyncOrgResult{OrgID: orgID, V1Status: "disabled", V2Status: "disabled"}
-			orgFailed := false
-			if statisticsV1Enabled(mode) {
-				if err := r.runV1Org(ctx, orgID, start, end); err != nil {
-					orgResult.V1Status = "failed"
-					orgFailed = true
-					log.Warnf("statistics v1 nightly sync failed (org=%d): %v", orgID, err)
-				} else {
-					orgResult.V1Status = "succeeded"
-				}
-				observeStatisticsSchedulerOrg("v1", orgResult.V1Status)
+			start, end := statisticsSyncRepairWindow(r.now().In(statisticsDomain.Shanghai), r.opts.RepairWindowDays)
+			toDate := end.AddDate(0, 0, -1)
+			run, err := r.coordinator.Run(ctx, statisticsApp.RunRequest{OrgID: orgID, FromDate: start, ToDate: toDate, Reason: "nightly statistics publish", TriggerType: "scheduled", Mode: statisticsDomain.RunModePublish})
+			statusValue := "failed"
+			if run != nil {
+				statusValue = string(run.Status)
 			}
-			if statisticsV2Enabled(mode) {
-				if r.v2Coordinator == nil {
-					orgResult.V2Status = "unavailable"
-					orgFailed = true
-					log.Warnf("statistics v2 nightly sync unavailable (org=%d)", orgID)
-				} else {
-					toDate := end.AddDate(0, 0, -1)
-					run, err := r.v2Coordinator.Run(ctx, statisticsV2App.RunRequest{OrgID: orgID, FromDate: start, ToDate: toDate, Reason: "nightly shadow statistics v2", TriggerType: "scheduled", Mode: statisticsV2Domain.RunModePublish})
-					if err != nil {
-						orgResult.V2Status = "failed"
-						if run != nil {
-							orgResult.V2Status = string(run.Status)
-						}
-						orgFailed = true
-						log.Warnf("statistics v2 nightly run failed (org=%d,status=%s): %v", orgID, orgResult.V2Status, err)
-					} else {
-						orgResult.V2Status = string(run.Status)
-					}
-				}
-				observeStatisticsSchedulerOrg("v2", orgResult.V2Status)
-			}
-			if orgFailed {
+			if err != nil {
 				summary.Failed++
+				log.Warnf("statistics nightly run failed (org=%d,status=%s): %v", orgID, statusValue, err)
 			} else {
 				summary.Succeeded++
 			}
-			summary.Orgs = append(summary.Orgs, orgResult)
+			observeStatisticsSchedulerOrg(statusValue)
+			summary.Orgs = append(summary.Orgs, StatisticsSyncOrgResult{OrgID: orgID, Status: statusValue})
 		}
 		if summary.Failed > 0 {
 			return &StatisticsSyncPartialError{Summary: summary}
@@ -248,36 +174,6 @@ func (r *StatisticsSyncRunner) runOnce(ctx context.Context) error {
 		return nil
 	})
 }
-
-func (r *StatisticsSyncRunner) runV1Org(ctx context.Context, orgID int64, start, end time.Time) error {
-	dailyOpts := statisticsApp.SyncDailyOptions{StartDate: &start, EndDate: &end}
-	if err := r.syncService.SyncDailyStatistics(ctx, orgID, dailyOpts); err != nil {
-		return fmt.Errorf("daily: %w", err)
-	}
-	if err := r.syncService.SyncOrgSnapshotStatistics(ctx, orgID); err != nil {
-		return fmt.Errorf("org_snapshot: %w", err)
-	}
-	if err := r.syncService.SyncPlanStatistics(ctx, orgID); err != nil {
-		return fmt.Errorf("plan: %w", err)
-	}
-	if r.warmupCoordinator != nil {
-		if err := r.warmupCoordinator.HandleStatisticsSync(ctx, orgID); err != nil {
-			return fmt.Errorf("cache_warmup: %w", err)
-		}
-	}
-	return nil
-}
-
-func normalizeStatisticsVersionMode(mode string) string {
-	mode = strings.ToLower(strings.TrimSpace(mode))
-	if mode == "" {
-		return "shadow"
-	}
-	return mode
-}
-
-func statisticsV1Enabled(mode string) bool { return mode == "v1" || mode == "shadow" }
-func statisticsV2Enabled(mode string) bool { return mode == "v2" || mode == "shadow" }
 
 func (r *StatisticsSyncRunner) lockKey() string {
 	if r == nil {

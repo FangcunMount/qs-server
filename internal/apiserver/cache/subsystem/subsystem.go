@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/hotset"
@@ -299,14 +299,14 @@ func (s *Subsystem) HotsetInspector() cachetarget.HotsetInspector {
 	return s.hotsetInspector
 }
 
-func (s *Subsystem) WarmupCoordinator() statisticsApp.WarmupCoordinator {
+func (s *Subsystem) WarmupCoordinator() cachegovernance.WarmupCoordinator {
 	if s == nil {
 		return nil
 	}
 	return s.warmupCoordinator
 }
 
-func (s *Subsystem) StatusService() statisticsApp.GovernanceStatusReader {
+func (s *Subsystem) StatusService() cachegovernance.StatusReader {
 	if s == nil {
 		return nil
 	}

@@ -125,8 +125,8 @@ func TestPerfPathsMatchCurrentRuntimeContract(t *testing.T) {
 	}
 
 	for _, retired := range []string{
-		"/api/v1/statistics/system",
-		"/api/v1/statistics/questionnaires/",
+		"/api/v2/statistics/system",
+		"/api/v2/statistics/questionnaires/",
 	} {
 		if strings.Contains(string(raw), retired) {
 			t.Fatalf("perf config still references retired statistics route %q", retired)
@@ -144,7 +144,7 @@ func TestPerfPathsMatchCurrentRuntimeContract(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if config.Paths.StatisticsContentBatch != "/api/v1/statistics/contents/batch" {
+	if config.Paths.StatisticsContentBatch != "/api/v2/statistics/contents/batch" {
 		t.Fatalf("statisticsContentBatch = %q, want current batch endpoint", config.Paths.StatisticsContentBatch)
 	}
 	if config.Paths.BehaviorReportStatus != "/api/v1/behavior-assessments/{assessment_id}/report-status?testee_id={testee_id}" {

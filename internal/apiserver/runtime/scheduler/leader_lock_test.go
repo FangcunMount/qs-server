@@ -85,8 +85,8 @@ func TestLeaderLockRunSkipsBodyWhenNotAcquired(t *testing.T) {
 func TestLeaderLockRunWrapsAcquireError(t *testing.T) {
 	acquireErr := errors.New("redis unavailable")
 	lock := newLeaderLock(
-		workloadSpec(locklease.WorkloadBehaviorPendingReconcile),
-		"qs:behavior-pending-reconcile:test",
+		workloadSpec(locklease.WorkloadEvaluationConsistencyReconcile),
+		"qs:evaluation-consistency-reconcile:test",
 		time.Minute,
 		nil,
 		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {

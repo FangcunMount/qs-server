@@ -29,17 +29,20 @@
 | 工具 | 用途 |
 | --- | --- |
 | `cleanup_perf_testee_data` | 按明确范围清理压测受试者数据 |
-| `cleanup_deleted_assessment_orphans.go` | 清理已物理删除 Assessment 留下的 MySQL/Mongo 孤儿 |
 | `cleanup_orphaned_assessment_documents` | 对账并清理缺少 MySQL Assessment 的 Mongo 报告/答卷 |
-| `backfill_statistics_v2` | 通过受保护 API 修复 Statistics V2 历史窗口 |
-| `rebuild_statistics_facts_from_sources` | 从事实源重建 Statistics Fact |
-| `rebuild_statistics_aggregates_and_cache` | 重建 Statistics 聚合与缓存 |
-| `rebuild_access_funnel_from_sources` | 重建访问漏斗 |
-| `rebuild_seeddata_access_statistics` | 重建种子数据访问统计 |
+| `rebuild_statistics` | 通过受保护 Run API 校验、修复或重建 Statistics |
 | `rewrite_seeddata_assessment_times` | 修正种子测评时间 |
 | `enroll_testees_after_date.py` | 按时间范围补录受试者关系 |
 
 这些工具不是“执行一次就永久完成”的迁移，它们保留是因为故障恢复、环境重建或受控数据修复仍可能复用。具体参数以各命令的 `--help`、相邻 README 和测试为准。
+
+### 当前维护窗口专用
+
+| 工具 | 用途 | 生命周期 |
+| --- | --- | --- |
+| `repair_modelcatalog_cutover` | 在历史事实清零后，以当前 Handler 和 published head 原子重建 active Model snapshot | G5 严格关闭并保存证据后删除 |
+
+该工具默认 dry-run，只有所有 MySQL/Mongo 历史清零、Norm、DefinitionV2、精确 Questionnaire 绑定、migration 和索引检查全部通过，才允许显式 `--apply`。它不修 Norm、不猜字段、不兼容旧问卷版本；操作细节见相邻 README。
 
 ### 仅限全新环境初始化
 
@@ -61,6 +64,7 @@
 - MBTI OEJTS 单次题干更新脚本；
 - 已被 `verify_definition_v2_cutover` 覆盖的旧 identity/Evaluation 审计 SQL；
 - 指向旧问卷版本和已删除工具的 BRIEF-2/SPM/SBTI 维护手册。
+- Statistics V1 的 Journey/Episode/Footprint 回填、漏斗重建和孤儿清理脚本。
 
 退役脚本不得从 Git 历史直接复制到生产运行。若相同需求再次出现，应先按当前 schema 和业务契约重新实现、测试和评审。
 

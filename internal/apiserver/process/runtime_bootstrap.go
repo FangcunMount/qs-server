@@ -87,27 +87,13 @@ func buildSchedulerManager(cfg *config.Config, deps container.ServerRuntimeDeps)
 		),
 		runtimescheduler.NewStatisticsSyncRunner(
 			cfg.StatisticsSync,
-			deps.StatisticsSyncService,
-			deps.WarmupCoordinator,
-			deps.LockManager,
-			deps.LockBuilder,
-			deps.StatisticsV2Coordinator,
-		),
-		runtimescheduler.NewBehaviorPendingReconcileRunner(
-			cfg.BehaviorPendingReconcile,
-			deps.BehaviorProjectorService,
+			deps.StatisticsCoordinator,
 			deps.LockManager,
 			deps.LockBuilder,
 		),
 		runtimescheduler.NewEvaluationConsistencyReconcileRunner(
 			cfg.EvaluationConsistencyReconcile,
 			deps.EvaluationConsistencyReconcileService,
-			deps.LockManager,
-			deps.LockBuilder,
-		),
-		runtimescheduler.NewBehaviorJourneyScanRunner(
-			cfg.BehaviorJourneyScan,
-			deps.BehaviorJourneyScanService,
 			deps.LockManager,
 			deps.LockBuilder,
 		),

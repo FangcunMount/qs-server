@@ -14,9 +14,7 @@ const (
 	WorkloadPlanSchedulerLeader            WorkloadID = "plan_scheduler_leader"
 	WorkloadStatisticsSyncLeader           WorkloadID = "statistics_sync_leader"
 	WorkloadStatisticsSync                 WorkloadID = "statistics_sync"
-	WorkloadBehaviorPendingReconcile       WorkloadID = "behavior_pending_reconcile"
 	WorkloadEvaluationConsistencyReconcile WorkloadID = "evaluation_consistency_reconcile"
-	WorkloadBehaviorJourneyScanLeader      WorkloadID = "behavior_journey_scan_leader"
 	WorkloadCollectionSubmit               WorkloadID = "collection_submit"
 )
 
@@ -51,9 +49,7 @@ var capabilities = [...]Capability{
 	{WorkloadPlanSchedulerLeader, "apiserver", KindLeader, Spec{Name: string(WorkloadPlanSchedulerLeader), Description: "用于 apiserver 计划调度器多实例抢占 leader 的分布式锁。", DefaultTTL: 50 * time.Second}, RenewalModeAuto},
 	{WorkloadStatisticsSyncLeader, "apiserver", KindLeader, Spec{Name: string(WorkloadStatisticsSyncLeader), Description: "用于 apiserver 统计同步调度器多实例抢占 leader 的分布式锁。", DefaultTTL: 30 * time.Minute}, RenewalModeAuto},
 	{WorkloadStatisticsSync, "apiserver", KindTaskLock, Spec{Name: string(WorkloadStatisticsSync), Description: "用于 apiserver 统计同步任务串行化执行的分布式锁。", DefaultTTL: 30 * time.Minute}, RenewalModeAuto},
-	{WorkloadBehaviorPendingReconcile, "apiserver", KindLeader, Spec{Name: string(WorkloadBehaviorPendingReconcile), Description: "用于 apiserver behavior pending reconcile 多实例串行化执行的分布式锁。", DefaultTTL: 30 * time.Second}, RenewalModeAuto},
 	{WorkloadEvaluationConsistencyReconcile, "apiserver", KindLeader, Spec{Name: string(WorkloadEvaluationConsistencyReconcile), Description: "用于 apiserver evaluation consistency reconcile 多实例串行化执行的分布式锁。", DefaultTTL: 30 * time.Second}, RenewalModeAuto},
-	{WorkloadBehaviorJourneyScanLeader, "apiserver", KindLeader, Spec{Name: string(WorkloadBehaviorJourneyScanLeader), Description: "用于 apiserver behavior journey scan 多实例抢占 leader 的分布式锁。", DefaultTTL: 25 * time.Minute}, RenewalModeAuto},
 	{WorkloadCollectionSubmit, "collection-server", KindIdempotency, Spec{Name: string(WorkloadCollectionSubmit), Description: "用于 collection-server 答卷提交幂等与进行中抑制的分布式锁。", DefaultTTL: 5 * time.Minute}, RenewalModeAuto},
 }
 

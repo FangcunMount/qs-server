@@ -43,7 +43,7 @@ func (c checkpointGovernanceCollector) Collect(ctx context.Context, evalCtx eval
 }
 
 func checkpointSignals(snapshot CheckpointGovernanceSnapshot) []Signal {
-	signals := make([]Signal, 0, 2)
+	signals := make([]Signal, 0, 1)
 	if snapshot.EvaluationRunFailedRetryable > 0 {
 		signals = append(signals, Signal{
 			ID:       "checkpoint_evaluation_run_retryable_failed",
@@ -53,18 +53,6 @@ func checkpointSignals(snapshot CheckpointGovernanceSnapshot) []Signal {
 			Title:    "Retryable evaluation runs need attention",
 			Evidence: map[string]interface{}{
 				"evaluation_run_failed_retryable": snapshot.EvaluationRunFailedRetryable,
-			},
-		})
-	}
-	if snapshot.AnalyticsProjectorProcessing > 0 {
-		signals = append(signals, Signal{
-			ID:       "checkpoint_analytics_projector_processing",
-			Domain:   DomainCheckpoint,
-			Severity: SeverityWarning,
-			Status:   "analytics_projector_inflight",
-			Title:    "Analytics projector checkpoints still processing",
-			Evidence: map[string]interface{}{
-				"analytics_projector_processing": snapshot.AnalyticsProjectorProcessing,
 			},
 		})
 	}

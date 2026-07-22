@@ -1,0 +1,231 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
+	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+)
+
+func TestParseConfigDefaultsToDryRun(t *testing.T) {
+	t.Parallel()
+	getenv := func(key string) string {
+		return map[string]string{
+			"MYSQL_DSN": "user:pass@tcp(mysql:3306)/qs",
+			"MONGO_URI": "mongodb://mongo/qs",
+			"MONGO_DB":  "qs",
+		}[key]
+	}
+	var stderr bytes.Buffer
+	cfg, err := parseConfig(nil, &stderr, getenv)
+	if err != nil {
+		t.Fatalf("parseConfig() error = %v", err)
+	}
+	if cfg.apply || cfg.mongoDB != "qs" || cfg.timeout != 10*time.Minute {
+		t.Fatalf("config = %#v", cfg)
+	}
+}
+
+func TestRunHelpExitsSuccessfullyWithoutConnecting(t *testing.T) {
+	t.Parallel()
+	var stdout, stderr bytes.Buffer
+	if code := run(context.Background(), []string{"--help"}, &stdout, &stderr, nil); code != exitOK {
+		t.Fatalf("run(--help) exit = %d, stderr=%q", code, stderr.String())
+	}
+}
+
+func TestRepairPlanTextIncludesExactBlockingReason(t *testing.T) {
+	t.Parallel()
+	plan := &repairPlan{Mode: "dry-run", Issues: []repairIssue{{
+		Scope: "assessment_norms", Code: "brief-v1", Rule: "validate_import.failed",
+		Message: "factor F1 lookup rows 1 and 2 overlap", Count: 1,
+	}}}
+	text := plan.Text()
+	if !plan.Blocked() || !strings.Contains(text, "brief-v1") || !strings.Contains(text, "rows 1 and 2 overlap") {
+		t.Fatalf("plan text = %q", text)
+	}
+}
+
+func TestMySQLDerivedHistoryTablesIncludesAllStatisticsAndAnalyticsTables(t *testing.T) {
+	t.Parallel()
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	mock.ExpectQuery("SELECT table_name").WillReturnRows(sqlmock.NewRows([]string{"table_name"}).
+		AddRow("statistics_assessment_fact").
+		AddRow("analytics_pending_event"))
+	tables, err := mysqlDerivedHistoryTables(context.Background(), db)
+	if err != nil {
+		t.Fatalf("mysqlDerivedHistoryTables() error = %v", err)
+	}
+	for _, want := range []string{"assessment", "statistics_assessment_fact", "analytics_pending_event"} {
+		found := false
+		for _, table := range tables {
+			found = found || table == want
+		}
+		if !found {
+			t.Fatalf("tables %v missing %s", tables, want)
+		}
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
+func TestCanonicalSnapshotUpdateUsesCanonicalFieldsAndPreservesAuditOwnership(t *testing.T) {
+	t.Parallel()
+	now := time.Unix(100, 0).UTC()
+	snapshot := &modelcatalogport.AssessmentSnapshot{
+		SchemaVersion: "definition-v2", Kind: domain.KindCognitive, Algorithm: domain.AlgorithmSPM,
+		AlgorithmFamily: domain.AlgorithmFamilyTaskPerformance, DecisionKind: domain.DecisionKindAbilityLevel,
+		Code: "SPM", Version: "v3", Status: "published", ReleaseStatus: domain.ReleaseStatusActive,
+		QuestionnaireCode: "Q-SPM", QuestionnaireVersion: "3.0.0", PublishedAt: &now,
+		DefinitionV2: &modeldefinition.Definition{},
+		Source: map[string]any{
+			modelcatalogport.SourceDefinitionContentHash: "hash",
+			modelcatalogport.SourceDefinitionHashSchema:  "definition-v2/v1",
+		},
+	}
+	update, err := canonicalSnapshotUpdate(snapshot)
+	if err != nil {
+		t.Fatalf("canonicalSnapshotUpdate() error = %v", err)
+	}
+	set := update["$set"].(bson.M)
+	unset := update["$unset"].(bson.M)
+	if set["algorithm_family"] != string(domain.AlgorithmFamilyTaskPerformance) || set["decision_kind"] != string(domain.DecisionKindAbilityLevel) {
+		t.Fatalf("canonical set = %#v", set)
+	}
+	for _, field := range []string{"_id", "created_at", "created_by", "deleted_at", "deleted_by"} {
+		if _, exists := set[field]; exists {
+			t.Fatalf("canonical set unexpectedly owns %s: %#v", field, set)
+		}
+	}
+	for _, field := range []string{"payload", "definition_payload", "is_active_published", "release_archived_at"} {
+		if _, exists := unset[field]; !exists {
+			t.Fatalf("canonical unset missing %s: %#v", field, unset)
+		}
+	}
+}
+
+func TestApplyRepairDocumentsChecksEveryWriteBoundary(t *testing.T) {
+	t.Parallel()
+	now := time.Unix(100, 0).UTC()
+	head := &domain.AssessmentModel{
+		Code: "SPM", Kind: domain.KindCognitive, Algorithm: domain.AlgorithmSPM,
+		Title: "SPM", Status: domain.ModelStatusPublished, Version: 3,
+		Binding:      domain.QuestionnaireBinding{QuestionnaireCode: "Q-SPM", QuestionnaireVersion: "3.0.0"},
+		DefinitionV2: &modeldefinition.Definition{},
+	}
+	snapshot := &modelcatalogport.AssessmentSnapshot{
+		Kind: domain.KindCognitive, Algorithm: domain.AlgorithmSPM,
+		AlgorithmFamily: domain.AlgorithmFamilyTaskPerformance, DecisionKind: domain.DecisionKindAbilityLevel,
+		Code: "SPM", Version: "v3", Status: "published", ReleaseStatus: domain.ReleaseStatusActive,
+		QuestionnaireCode: "Q-SPM", QuestionnaireVersion: "3.0.0", PublishedAt: &now,
+		DefinitionV2: &modeldefinition.Definition{}, Source: map[string]any{},
+	}
+	plan := &repairPlan{ArchivedSnapshotCount: 2, Repairs: []repairItem{{
+		Code: "SPM", Version: "v3", headRevision: 3, head: head, snapshot: snapshot,
+	}}}
+	collection := &recordingRepairCollection{
+		deleteResult:     &mongo.DeleteResult{DeletedCount: 2},
+		updateOneResults: []*mongo.UpdateResult{{MatchedCount: 1}, {MatchedCount: 1}},
+	}
+	if err := applyRepairDocuments(context.Background(), collection, plan); err != nil {
+		t.Fatalf("applyRepairDocuments() error = %v", err)
+	}
+	if collection.deleteCalls != 1 || collection.updateOneCalls != 2 || collection.updateManyCalls != 1 {
+		t.Fatalf("calls delete=%d updateOne=%d updateMany=%d", collection.deleteCalls, collection.updateOneCalls, collection.updateManyCalls)
+	}
+	if !reflect.DeepEqual(collection.deleteFilter, archivedSnapshotFilter()) {
+		t.Fatalf("delete filter = %#v", collection.deleteFilter)
+	}
+}
+
+func TestApplyRepairDocumentsStopsOnSnapshotCASMismatch(t *testing.T) {
+	t.Parallel()
+	plan := minimalRepairPlan()
+	collection := &recordingRepairCollection{
+		deleteResult:     &mongo.DeleteResult{},
+		updateOneResults: []*mongo.UpdateResult{{MatchedCount: 1}, {MatchedCount: 0}},
+	}
+	err := applyRepairDocuments(context.Background(), collection, plan)
+	if err == nil || !strings.Contains(err.Error(), "matched=0 want=1") {
+		t.Fatalf("applyRepairDocuments() error = %v", err)
+	}
+	if collection.updateManyCalls != 0 {
+		t.Fatalf("legacy cleanup ran after CAS mismatch")
+	}
+}
+
+func TestApplyRepairDocumentsPropagatesLegacyCleanupFailure(t *testing.T) {
+	t.Parallel()
+	plan := minimalRepairPlan()
+	collection := &recordingRepairCollection{
+		deleteResult:     &mongo.DeleteResult{},
+		updateOneResults: []*mongo.UpdateResult{{MatchedCount: 1}, {MatchedCount: 1}},
+		updateManyErr:    errors.New("write failed"),
+	}
+	err := applyRepairDocuments(context.Background(), collection, plan)
+	if err == nil || !strings.Contains(err.Error(), "remove legacy model fields") {
+		t.Fatalf("applyRepairDocuments() error = %v", err)
+	}
+}
+
+func minimalRepairPlan() *repairPlan {
+	head := &domain.AssessmentModel{Code: "M1", Title: "M1", Status: domain.ModelStatusPublished, Version: 1, DefinitionV2: &modeldefinition.Definition{}}
+	snapshot := &modelcatalogport.AssessmentSnapshot{Code: "M1", Version: "v1", Status: "published", DefinitionV2: &modeldefinition.Definition{}, Source: map[string]any{}}
+	return &repairPlan{Repairs: []repairItem{{Code: "M1", Version: "v1", headRevision: 1, head: head, snapshot: snapshot}}}
+}
+
+type recordingRepairCollection struct {
+	deleteResult     *mongo.DeleteResult
+	deleteErr        error
+	updateOneResults []*mongo.UpdateResult
+	updateOneErr     error
+	updateManyErr    error
+	deleteFilter     interface{}
+	deleteCalls      int
+	updateOneCalls   int
+	updateManyCalls  int
+}
+
+func (c *recordingRepairCollection) DeleteMany(_ context.Context, filter interface{}, _ ...*options.DeleteOptions) (*mongo.DeleteResult, error) {
+	c.deleteCalls++
+	c.deleteFilter = filter
+	if c.deleteResult == nil {
+		c.deleteResult = &mongo.DeleteResult{}
+	}
+	return c.deleteResult, c.deleteErr
+}
+
+func (c *recordingRepairCollection) UpdateOne(_ context.Context, _, _ interface{}, _ ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+	c.updateOneCalls++
+	if c.updateOneErr != nil {
+		return nil, c.updateOneErr
+	}
+	if len(c.updateOneResults) == 0 {
+		return &mongo.UpdateResult{}, nil
+	}
+	result := c.updateOneResults[0]
+	c.updateOneResults = c.updateOneResults[1:]
+	return result, nil
+}
+
+func (c *recordingRepairCollection) UpdateMany(_ context.Context, _, _ interface{}, _ ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+	c.updateManyCalls++
+	return &mongo.UpdateResult{}, c.updateManyErr
+}

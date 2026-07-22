@@ -7,9 +7,9 @@ import (
 
 var statisticsSchedulerOrgTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 	Namespace: "qs", Subsystem: "statistics_scheduler", Name: "organization_total",
-	Help: "Nightly statistics organization executions grouped by version and result.",
-}, []string{"version", "result"})
+	Help: "Nightly statistics organization executions grouped by result.",
+}, []string{"result"})
 
-func observeStatisticsSchedulerOrg(version, result string) {
-	statisticsSchedulerOrgTotal.WithLabelValues(version, result).Inc()
+func observeStatisticsSchedulerOrg(result string) {
+	statisticsSchedulerOrgTotal.WithLabelValues(result).Inc()
 }

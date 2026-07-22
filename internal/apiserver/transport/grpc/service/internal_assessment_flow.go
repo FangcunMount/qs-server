@@ -9,36 +9,12 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 )
 
-type behaviorProjectionFlow struct{ service *InternalService }
 type assessmentFlow struct{ service *InternalService }
 
-func newBehaviorProjectionFlow(service *InternalService) behaviorProjectionFlow {
-	return behaviorProjectionFlow{service: service}
-}
 func newAssessmentFlow(service *InternalService) assessmentFlow {
 	return assessmentFlow{service: service}
-}
-
-func (flow behaviorProjectionFlow) ProjectBehaviorEvent(ctx context.Context, req *pb.ProjectBehaviorEventRequest) (*pb.ProjectBehaviorEventResponse, error) {
-	s := flow.service
-	if s.behaviorProjectorService == nil {
-		return nil, status.Error(codes.FailedPrecondition, "behavior projector service is not available")
-	}
-	if req == nil || req.EventId == "" || req.EventType == "" || req.OccurredAt == nil {
-		return nil, status.Error(codes.InvalidArgument, "event_id, event_type, org_id and occurred_at are required")
-	}
-	orgID, err := requestPlanOrgID(ctx, req.OrgId)
-	if err != nil {
-		return nil, err
-	}
-	result, err := s.behaviorProjectorService.ProjectBehaviorEvent(ctx, statisticsApp.BehaviorProjectEventInput{EventID: req.EventId, EventType: req.EventType, OrgID: orgID, ClinicianID: req.ClinicianId, SourceClinicianID: req.SourceClinicianId, EntryID: req.EntryId, TesteeID: req.TesteeId, AnswerSheetID: req.AnswersheetId, AssessmentID: req.AssessmentId, ReportID: req.ReportId, FailureReason: req.FailureReason, OccurredAt: req.OccurredAt.AsTime()})
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	return &pb.ProjectBehaviorEventResponse{Status: string(result.Status), Message: "ok"}, nil
 }
 
 func (flow assessmentFlow) SyncAssessmentAttention(ctx context.Context, req *pb.SyncAssessmentAttentionRequest) (*pb.SyncAssessmentAttentionResponse, error) {

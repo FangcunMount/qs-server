@@ -13,6 +13,7 @@ import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
+	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	evaluationOperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	evaluationScheduler "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scheduler"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
@@ -21,11 +22,9 @@ import (
 	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	statisticsV2App "github.com/FangcunMount/qs-server/internal/apiserver/application/statisticsv2"
 	systemgovApp "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	workbenchApp "github.com/FangcunMount/qs-server/internal/apiserver/application/workbench"
 	platformmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
-	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
@@ -110,21 +109,15 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 	}
 	deps.Workbench = composeRESTWorkbenchDeps(c)
 	if c.StatisticsModule != nil {
-		var testeeAccess statmod.RESTExportOptions
-		if c.ActorModule != nil {
-			testeeAccess.TesteeAccessService = c.ActorModule.TesteeAccessService
-		}
-		testeeAccess.WarmupCoordinator = c.WarmupCoordinator()
-		testeeAccess.CacheGovernanceStatusService = c.CacheGovernanceStatusService()
-		deps.Statistics = c.StatisticsModule.ExportRESTDeps(testeeAccess)
+		deps.Statistics = c.StatisticsModule.ExportRESTDeps()
 	}
 
-	deps.SystemGovernanceFacade = c.buildRESTSystemGovernanceFacade(deps.Statistics)
+	deps.SystemGovernanceFacade = c.buildRESTSystemGovernanceFacade()
 
 	return deps
 }
 
-func (c *Container) buildRESTSystemGovernanceFacade(statisticsDeps resttransport.StatisticsDeps) systemgovApp.Facade {
+func (c *Container) buildRESTSystemGovernanceFacade() systemgovApp.Facade {
 	if c == nil {
 		return platformmod.BuildRESTSystemGovernanceFacade(platformmod.RESTSystemGovernanceInput{})
 	}
@@ -133,10 +126,10 @@ func (c *Container) buildRESTSystemGovernanceFacade(statisticsDeps resttransport
 	if c.eventSubsystem != nil {
 		outboxes = c.eventSubsystem.Outboxes()
 	}
-	cacheGovernance := statisticsApp.NewGovernanceFacade(
+	cacheGovernance := cachegovernance.NewFacade(
 		"apiserver",
-		statisticsDeps.WarmupCoordinator,
-		statisticsDeps.CacheGovernanceStatusService,
+		c.WarmupCoordinator(),
+		c.CacheGovernanceStatusService(),
 	)
 	return platformmod.BuildRESTSystemGovernanceFacade(platformmod.RESTSystemGovernanceInput{
 		Options:                 c.systemGovernanceOptions,
@@ -307,10 +300,6 @@ func (c *Container) BuildGRPCDeps(server *grpcpkg.Server) grpctransport.Deps {
 	if c.PlanModule != nil {
 		deps.Plan = c.PlanModule.ExportGRPCDeps()
 	}
-	if c.StatisticsModule != nil {
-		deps.Statistics = c.StatisticsModule.ExportGRPCDeps()
-	}
-
 	return deps
 }
 
@@ -364,12 +353,9 @@ type ServerGRPCBootstrapDeps struct {
 type ServerRuntimeDeps struct {
 	LockBuilder                           *keyspace.Builder
 	LockManager                           locklease.Manager
-	WarmupCoordinator                     statisticsApp.WarmupCoordinator
+	WarmupCoordinator                     cachegovernance.WarmupCoordinator
 	PlanCommandService                    planApp.PlanCommandService
-	StatisticsSyncService                 statisticsApp.StatisticsSyncService
-	StatisticsV2Coordinator               *statisticsV2App.Coordinator
-	BehaviorProjectorService              statisticsApp.BehaviorProjectorService
-	BehaviorJourneyScanService            statisticsApp.BehaviorJourneyScanService
+	StatisticsCoordinator                 *statisticsApp.Coordinator
 	EvaluationConsistencyReconcileService evaluationScheduler.Service
 }
 
@@ -405,10 +391,7 @@ func (c *Container) BuildServerRuntimeDeps() ServerRuntimeDeps {
 		deps.PlanCommandService = c.PlanModule.CommandService
 	}
 	if c.StatisticsModule != nil {
-		deps.StatisticsSyncService = c.StatisticsModule.SyncService
-		deps.StatisticsV2Coordinator = c.StatisticsModule.V2Coordinator
-		deps.BehaviorProjectorService = c.StatisticsModule.BehaviorProjectorService
-		deps.BehaviorJourneyScanService = c.StatisticsModule.BehaviorJourneyScanService
+		deps.StatisticsCoordinator = c.StatisticsModule.Coordinator
 	}
 	if c.EvaluationModule != nil {
 		recoverers := []evaluationScheduler.LeaseRecoverer{}

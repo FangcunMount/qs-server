@@ -53,14 +53,12 @@ func TestContainerBuildServerRuntimeDeps(t *testing.T) {
 	c.cache.BindGovernance(cachebootstrap.GovernanceBindings{})
 
 	planCommand := &planCommandServiceStub{}
-	statsSync := &statisticsSyncServiceStub{}
-	behaviorProjector := &behaviorProjectorServiceStub{}
+	statisticsCoordinator := &statisticsApp.Coordinator{}
 	consistencyReconcile := &evaluationConsistencyReconcileServiceStub{}
 
 	c.PlanModule = &PlanModule{CommandService: planCommand}
 	c.StatisticsModule = &StatisticsModule{
-		SyncService:              statsSync,
-		BehaviorProjectorService: behaviorProjector,
+		Coordinator: statisticsCoordinator,
 	}
 	c.EvaluationModule = &EvaluationModule{
 		SchedulerService: consistencyReconcile,
@@ -79,11 +77,8 @@ func TestContainerBuildServerRuntimeDeps(t *testing.T) {
 	if deps.PlanCommandService != planCommand {
 		t.Fatalf("PlanCommandService = %#v, want %#v", deps.PlanCommandService, planCommand)
 	}
-	if deps.StatisticsSyncService != statsSync {
-		t.Fatalf("StatisticsSyncService = %#v, want %#v", deps.StatisticsSyncService, statsSync)
-	}
-	if deps.BehaviorProjectorService != behaviorProjector {
-		t.Fatalf("BehaviorProjectorService = %#v, want %#v", deps.BehaviorProjectorService, behaviorProjector)
+	if deps.StatisticsCoordinator != statisticsCoordinator {
+		t.Fatalf("StatisticsCoordinator = %#v, want %#v", deps.StatisticsCoordinator, statisticsCoordinator)
 	}
 	if deps.EvaluationConsistencyReconcileService != consistencyReconcile {
 		t.Fatalf("EvaluationConsistencyReconcileService = %#v, want %#v", deps.EvaluationConsistencyReconcileService, consistencyReconcile)
@@ -148,23 +143,6 @@ func (*planCommandServiceStub) CancelTask(context.Context, int64, string) (*plan
 	return nil, nil
 }
 
-type statisticsSyncServiceStub struct{}
-
-func (*statisticsSyncServiceStub) SyncDailyStatistics(context.Context, int64, statisticsApp.SyncDailyOptions) error {
-	return nil
-}
-func (*statisticsSyncServiceStub) SyncOrgSnapshotStatistics(context.Context, int64) error { return nil }
-func (*statisticsSyncServiceStub) SyncPlanStatistics(context.Context, int64) error        { return nil }
-
-type behaviorProjectorServiceStub struct{}
-
-func (*behaviorProjectorServiceStub) ProjectBehaviorEvent(context.Context, statisticsApp.BehaviorProjectEventInput) (statisticsApp.BehaviorProjectEventResult, error) {
-	return statisticsApp.BehaviorProjectEventResult{}, nil
-}
-func (*behaviorProjectorServiceStub) ReconcilePendingBehaviorEvents(context.Context, int) (int, error) {
-	return 0, nil
-}
-
 type evaluationConsistencyReconcileServiceStub struct{}
 
 func (*evaluationConsistencyReconcileServiceStub) AuditOnce(context.Context, int) (int, error) {
@@ -184,6 +162,4 @@ func (*serverBootstrapRoleUpdaterStub) PersistFromSnapshotByUser(context.Context
 func (*serverBootstrapRoleUpdaterStub) SyncRoles(context.Context, int64, uint64) error { return nil }
 
 var _ planApp.PlanCommandService = (*planCommandServiceStub)(nil)
-var _ statisticsApp.StatisticsSyncService = (*statisticsSyncServiceStub)(nil)
-var _ statisticsApp.BehaviorProjectorService = (*behaviorProjectorServiceStub)(nil)
 var _ cachegov.Coordinator = cachegov.NewCoordinator(cachegov.Config{}, cachegov.Dependencies{})

@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -74,13 +73,9 @@ func TestMongoOutboxFiltersAreChunked(t *testing.T) {
 func TestMySQLOutboxScopeStatementsConstrainAggregateType(t *testing.T) {
 	statements := mysqlOutboxScopeStatements(config{})
 	required := map[string]string{
-		"mysql outbox ids from assessment aggregate":           "o.aggregate_type = 'Assessment'",
-		"mysql outbox ids from report aggregate":               "o.aggregate_type = 'Report'",
-		"mysql outbox ids from answersheet aggregate":          "o.aggregate_type = 'AnswerSheet'",
-		"mysql outbox ids from behavior testee aggregate":      "o.aggregate_type = 'BehaviorFootprint'",
-		"mysql outbox ids from behavior answersheet aggregate": "o.aggregate_type = 'BehaviorFootprint'",
-		"mysql outbox ids from behavior assessment aggregate":  "o.aggregate_type = 'BehaviorFootprint'",
-		"mysql outbox ids from behavior report aggregate":      "o.aggregate_type = 'BehaviorFootprint'",
+		"mysql outbox ids from assessment aggregate":  "o.aggregate_type = 'Assessment'",
+		"mysql outbox ids from report aggregate":      "o.aggregate_type = 'Report'",
+		"mysql outbox ids from answersheet aggregate": "o.aggregate_type = 'AnswerSheet'",
 	}
 
 	seen := map[string]struct{}{}
@@ -113,54 +108,12 @@ func TestMySQLOutboxScopePayloadScanIsExplicitOptIn(t *testing.T) {
 	}
 
 	optInStatements := mysqlOutboxScopeStatements(config{scanEventPayloads: true})
-	var outboxPayload, pendingPayload bool
+	var outboxPayload bool
 	for _, statement := range optInStatements {
 		outboxPayload = outboxPayload || statement.name == "mysql outbox ids from payload_json"
-		pendingPayload = pendingPayload || statement.name == "analytics pending ids from payload_json"
 	}
-	if !outboxPayload || !pendingPayload {
-		t.Fatalf("scanEventPayloads should add both payload_json statements; outbox=%v pending=%v", outboxPayload, pendingPayload)
-	}
-}
-
-func TestIsMySQLUnknownTable(t *testing.T) {
-	tests := []struct {
-		name string
-		err  error
-		want bool
-	}{
-		{
-			name: "mysql error 1146",
-			err:  &mysql.MySQLError{Number: 1146, Message: "Table 'qs.statistics_daily' doesn't exist"},
-			want: true,
-		},
-		{
-			name: "wrapped text error",
-			err:  fmt.Errorf("delete: %w", errors.New("Error 1146 (42S02): Table 'qs.statistics_daily' doesn't exist")),
-			want: true,
-		},
-		{
-			name: "other mysql error",
-			err:  &mysql.MySQLError{Number: 1064, Message: "syntax error"},
-			want: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := isMySQLUnknownTable(tt.err); got != tt.want {
-				t.Fatalf("isMySQLUnknownTable() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestValidateMySQLTableName(t *testing.T) {
-	if err := validateMySQLTableName("statistics_daily"); err != nil {
-		t.Fatalf("validateMySQLTableName() = %v, want nil", err)
-	}
-	if err := validateMySQLTableName("stats;drop"); err == nil {
-		t.Fatal("validateMySQLTableName() should reject unsafe table names")
+	if !outboxPayload {
+		t.Fatal("scanEventPayloads should add the outbox payload_json statement")
 	}
 }
 
@@ -185,13 +138,7 @@ func TestIsMySQLLockError(t *testing.T) {
 
 func TestMySQLChunkedDeleteSpecForLargeDeleteTables(t *testing.T) {
 	for _, name := range []string{
-		"statistics_daily_testee",
-		"statistics_accumulated_testee",
-		"runtime_checkpoint",
-		"analytics_pending_event",
 		"domain_event_outbox",
-		"behavior_footprint",
-		"assessment_episode",
 		"assessment_entry_intake_log",
 		"clinician_relation",
 		"assessment_task",
@@ -225,7 +172,7 @@ func TestMySQLChunkedDeleteSpecForLargeDeleteTables(t *testing.T) {
 }
 
 func TestMySQLChunkedDeleteUsesStagingTablesForMultiSourceTables(t *testing.T) {
-	for _, name := range []string{"behavior_footprint", "assessment_episode", "assessment_task", "assessment_score"} {
+	for _, name := range []string{"assessment_task", "assessment_score"} {
 		t.Run(name, func(t *testing.T) {
 			spec, ok := mysqlChunkedDeleteSpecFor(name)
 			if !ok {

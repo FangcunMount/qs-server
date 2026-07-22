@@ -2,8 +2,8 @@ package platform
 
 import (
 	"github.com/FangcunMount/component-base/pkg/event"
+	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	govcomponent "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/component"
 	govprom "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/prometheus"
@@ -24,7 +24,7 @@ type RESTSystemGovernanceInput struct {
 	Options                 *options.SystemGovernanceOptions
 	EventStatusService      appEventing.StatusService
 	EventOutboxes           []appEventing.NamedOutboxStatusReader
-	CacheGovernance         statisticsApp.GovernanceFacade
+	CacheGovernance         cachegovernance.Facade
 	CachePolicyReloader     systemgov.CachePolicyReloader
 	LocalResilienceSnapshot func() resilience.RuntimeSnapshot
 	MySQLDB                 *gorm.DB

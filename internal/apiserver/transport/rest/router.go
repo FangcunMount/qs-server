@@ -11,6 +11,7 @@ import (
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
 	operatorapp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
+	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
@@ -22,7 +23,6 @@ import (
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	statisticsV2App "github.com/FangcunMount/qs-server/internal/apiserver/application/statisticsv2"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	systemgovApp "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
@@ -82,7 +82,7 @@ type Deps struct {
 	QRCodeObjectKeyPrefix    string
 	AssessmentAssetStore     objectstorageport.ObjectStore
 	AssessmentAssetKeyPrefix string
-	GovernanceStatusService  statisticsApp.GovernanceStatusReader
+	GovernanceStatusService  cachegovernance.StatusReader
 	EventStatusService       appEventing.StatusService
 	SystemGovernanceFacade   systemgovApp.Facade
 	ResilienceSnapshot       func() resilience.RuntimeSnapshot
@@ -150,17 +150,10 @@ type WorkbenchDeps struct {
 }
 
 type StatisticsDeps struct {
-	Enabled bool
-
-	ReadService                  statisticsApp.ReadService
-	PeriodicStatsService         statisticsApp.PeriodicStatsService
-	SyncService                  statisticsApp.StatisticsSyncService
-	TesteeAccessService          statisticsApp.TesteeAccessValidator
-	WarmupCoordinator            statisticsApp.WarmupCoordinator
-	CacheGovernanceStatusService statisticsApp.GovernanceStatusReader
-	V2ReadService                *statisticsV2App.ReadService
-	V2Coordinator                *statisticsV2App.Coordinator
-	V2RunStore                   statisticsV2App.RunStore
+	Enabled     bool
+	ReadService *statisticsApp.ReadService
+	Coordinator *statisticsApp.Coordinator
+	RunStore    statisticsApp.RunStore
 }
 
 type IAMDeps struct {

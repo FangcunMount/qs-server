@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	systemgovApp "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
@@ -94,14 +95,14 @@ func (c *Container) LockRunner() locklease.Runner {
 	return c.locks
 }
 
-func (c *Container) WarmupCoordinator() statisticsApp.WarmupCoordinator {
+func (c *Container) WarmupCoordinator() cachegovernance.WarmupCoordinator {
 	if c == nil || c.cache == nil {
 		return nil
 	}
 	return c.cache.WarmupCoordinator()
 }
 
-func (c *Container) CacheGovernanceStatusService() statisticsApp.GovernanceStatusReader {
+func (c *Container) CacheGovernanceStatusService() cachegovernance.StatusReader {
 	if c == nil || c.cache == nil {
 		return nil
 	}
@@ -292,6 +293,6 @@ func (a cacheGovernanceAdapter) warmOverviewStatsTarget(ctx context.Context, org
 	if c == nil || c.StatisticsModule == nil || c.StatisticsModule.ReadService == nil {
 		return nil
 	}
-	_, err := c.StatisticsModule.ReadService.GetOverview(ctx, orgID, statisticsApp.QueryFilter{Preset: preset})
+	_, err := c.StatisticsModule.ReadService.Overview(ctx, orgID, statisticsApp.QueryFilter{Preset: preset})
 	return err
 }

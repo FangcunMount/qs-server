@@ -520,12 +520,12 @@ export const QUERY_PATHS = applySmokeQueryPathOverride(
 export const STATS_PATHS = envOrConfigList(
   'STATISTICS_PATHS',
   ['statisticsPaths', 'statistics_paths', 'paths.statistics'],
-  '/api/v1/statistics/overview?preset=7d'
+  '/api/v2/statistics/overview?preset=7d'
 );
 export const STATS_CONTENT_BATCH_PATH = envOrConfigString(
   'STATISTICS_CONTENT_BATCH_PATH',
   ['statisticsContentBatchPath', 'statistics_content_batch_path', 'paths.statisticsContentBatch', 'paths.statistics_content_batch'],
-  '/api/v1/statistics/contents/batch'
+  '/api/v2/statistics/contents/batch'
 );
 
 export const SUBMIT_PATH = envOrConfigString('SUBMIT_PATH', ['submitPath', 'submit_path', 'paths.submit'], '/api/v1/answersheets');

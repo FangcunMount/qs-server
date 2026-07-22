@@ -12,14 +12,12 @@ import (
 	iammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/iam"
 	ammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/modelcatalog"
 	platformmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
-	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
-	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -136,53 +134,6 @@ func TestAssessmentModelModuleRegistersAggregateOnly(t *testing.T) {
 	}
 	if got[0] != "modelcatalog" {
 		t.Fatalf("GetLoadedModules() = %v, want [modelcatalog]", got)
-	}
-}
-
-func TestContainerBuildStatisticsModuleDepsSelectsQueryCacheAndLockManager(t *testing.T) {
-	t.Parallel()
-
-	queryClient := redis.NewClient(&redis.Options{Addr: "127.0.0.1:0"})
-	t.Cleanup(func() { _ = queryClient.Close() })
-
-	c := NewContainer(nil, nil, nil)
-	c.cache = newTestCacheSubsystem(t, ContainerCacheOptions{}, map[string]redis.UniversalClient{
-		"query": queryClient,
-	})
-	c.locks = locksubsystem.New(locksubsystem.Options{Component: "apiserver"})
-
-	wire := statmod.WireInput{
-		FallbackRedisClient: c.CacheClient(redisruntime.FamilyQuery),
-		CacheBuilder:        c.CacheBuilder(redisruntime.FamilyQuery),
-		CachePolicies:       c.CachePolicyProvider(),
-		LockManager:         c.LockManager(),
-		Observer:            c.cacheObserver(),
-		MetaRedisClient:     c.CacheClient(redisruntime.FamilyMeta),
-	}
-	if wire.FallbackRedisClient != queryClient {
-		t.Fatalf("redis client = %#v, want query cache %#v", wire.FallbackRedisClient, queryClient)
-	}
-	if wire.CacheBuilder != c.CacheBuilder(redisruntime.FamilyQuery) {
-		t.Fatalf("cache builder = %#v, want %#v", wire.CacheBuilder, c.CacheBuilder(redisruntime.FamilyQuery))
-	}
-	if wire.CachePolicies != c.CachePolicyProvider() {
-		t.Fatalf("policy provider = %#v, want %#v", wire.CachePolicies, c.CachePolicyProvider())
-	}
-	if wire.LockManager == nil {
-		t.Fatalf("lock manager = %#v, want *redisadapter.Manager", wire.LockManager)
-	}
-	if wire.Observer != c.cacheObserver() {
-		t.Fatalf("observer = %#v, want %#v", wire.Observer, c.cacheObserver())
-	}
-
-}
-
-func TestContainerBuildStatisticsModuleDepsHandlesNilContainer(t *testing.T) {
-	t.Parallel()
-
-	wire := statmod.WireInput{}
-	if wire.FallbackRedisClient != nil {
-		t.Fatalf("empty wire input should not preset redis clients: %#v", wire)
 	}
 }
 
@@ -370,7 +321,7 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	}
 }
 
-func TestContainerBuildRESTDepsWiresStatisticsGovernanceDependencies(t *testing.T) {
+func TestContainerBuildRESTDepsKeepsCacheGovernanceIndependentFromStatistics(t *testing.T) {
 	t.Parallel()
 
 	c := NewContainer(nil, nil, nil)
@@ -390,11 +341,8 @@ func TestContainerBuildRESTDepsWiresStatisticsGovernanceDependencies(t *testing.
 	if !deps.Statistics.Enabled {
 		t.Fatal("statistics deps disabled, want enabled")
 	}
-	if deps.Statistics.WarmupCoordinator == nil {
-		t.Fatal("warmup coordinator = nil, want wired dependency")
-	}
-	if deps.Statistics.CacheGovernanceStatusService == nil {
-		t.Fatal("cache governance status service = nil, want wired dependency")
+	if deps.GovernanceStatusService == nil {
+		t.Fatal("cache governance status service = nil, want independent platform dependency")
 	}
 }
 

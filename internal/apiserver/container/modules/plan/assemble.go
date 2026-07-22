@@ -99,7 +99,7 @@ func New(deps Deps) (*Module, error) {
 		taskRepo,
 	)
 	module.QueryService = planApp.NewQueryService(planReadModel, planReadModel, scaleCatalog)
-	module.EnrollmentQueryService = planApp.NewEnrollmentQueryService(planInfra.NewEnrollmentReadStore(normalized.MySQLDB, normalized.MySQLLimiter))
+	module.EnrollmentQueryService = planApp.NewEnrollmentQueryService(planInfra.NewEnrollmentReadStore(normalized.MySQLDB, normalized.MySQLLimiter), scaleCatalog)
 	module.TaskAssessmentResolver = planApp.NewTaskAssessmentResolver(taskRepo)
 	module.TaskNotificationContextReader = planApp.NewTaskNotificationContextReader(taskRepo, planRepo)
 

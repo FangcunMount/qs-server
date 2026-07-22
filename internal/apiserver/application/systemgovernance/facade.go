@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	govcomponent "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/component"
 	govprom "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/prometheus"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
@@ -33,7 +33,7 @@ type MetricsClient interface {
 type FacadeDeps struct {
 	EventStatusService      appEventing.StatusService
 	EventTypeSources        []EventTypeStatusSource
-	CacheGovernance         statisticsApp.GovernanceFacade
+	CacheGovernance         cachegovernance.Facade
 	LocalResilienceSnapshot func() resilience.RuntimeSnapshot
 	CheckpointReader        CheckpointStatusReader
 	Metrics                 MetricsClient

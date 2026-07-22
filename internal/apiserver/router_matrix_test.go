@@ -15,6 +15,7 @@ import (
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
+	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	workbenchApp "github.com/FangcunMount/qs-server/internal/apiserver/application/workbench"
@@ -27,6 +28,7 @@ import (
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	eventsubsystem "github.com/FangcunMount/qs-server/internal/apiserver/eventing/subsystem"
+	mysqlstatistics "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
@@ -177,26 +179,22 @@ func TestRouterRegisterRoutesIncludesKeyPaths(t *testing.T) {
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/practitioners/me/workbench/queues/:queue_type")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/staff")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/assessment-entries/:id")
-	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/statistics/overview")
-	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/statistics/clinicians")
-	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/statistics/clinicians/:id")
-	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/statistics/entries")
-	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/statistics/entries/:id")
-	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/statistics/clinicians/me/overview")
-	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/statistics/clinicians/me/entries")
-	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/statistics/clinicians/me/testees-summary")
-	assertRoutePresent(t, routes, http.MethodPost, "/api/v1/statistics/contents/batch")
-	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/statistics/testees/:testee_id/periodic")
-	assertRouteAbsent(t, routes, http.MethodGet, "/api/v1/statistics/system")
-	assertRouteAbsent(t, routes, http.MethodGet, "/api/v1/statistics/questionnaires/:code")
-	assertRouteAbsent(t, routes, http.MethodGet, "/api/v1/statistics/testees/:testee_id")
-	assertRouteAbsent(t, routes, http.MethodGet, "/api/v1/statistics/plans/:plan_id")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v2/statistics/overview")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v2/statistics/clinicians")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v2/statistics/clinicians/:id")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v2/statistics/entries")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v2/statistics/entries/:id")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v2/statistics/clinicians/me/overview")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v2/statistics/clinicians/me/entries")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v2/statistics/clinicians/me/testees-summary")
+	assertRoutePresent(t, routes, http.MethodPost, "/api/v2/statistics/contents/batch")
+	assertRouteAbsent(t, routes, http.MethodGet, "/api/v1/statistics/overview")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/testees/:id/plans")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v2/plans/testees/:testee_id/enrollments")
 	assertRoutePresent(t, routes, http.MethodPost, "/internal/v1/plans/tasks/window")
-	assertRoutePresent(t, routes, http.MethodPost, "/internal/v1/statistics/sync/daily")
-	assertRoutePresent(t, routes, http.MethodPost, "/internal/v1/statistics/sync/org-snapshot")
-	assertRoutePresent(t, routes, http.MethodPost, "/internal/v1/statistics/sync/plan")
-	assertRoutePresent(t, routes, http.MethodGet, "/internal/v1/cache/governance/status")
+	assertRoutePresent(t, routes, http.MethodPost, "/internal/v2/statistics/runs")
+	assertRouteAbsent(t, routes, http.MethodPost, "/internal/v1/statistics/sync/daily")
+	assertRouteAbsent(t, routes, http.MethodGet, "/internal/v1/cache/governance/status")
 	assertRoutePresent(t, routes, http.MethodGet, "/internal/v1/events/status")
 	assertRoutePresent(t, routes, http.MethodGet, "/internal/v1/resilience/status")
 	assertRoutePresent(t, routes, http.MethodGet, "/internal/v1/system-governance/overview")
@@ -381,10 +379,15 @@ func newRouterTestContainer() *container.Container {
 	c.EvaluationModule = evaluationModule
 	c.ReportModule = &interpretationmod.Module{}
 	c.PlanModule = &planmod.Module{
-		CommandService: planApp.NewCommandService(nil, nil, nil, nil, nil, nil),
-		QueryService:   planApp.NewQueryService(nil, nil, nil),
+		CommandService:         planApp.NewCommandService(nil, nil, nil, nil, nil, nil),
+		QueryService:           planApp.NewQueryService(nil, nil, nil),
+		EnrollmentQueryService: planApp.NewEnrollmentQueryService(nil, nil),
 	}
-	c.StatisticsModule = &statmod.Module{}
+	c.StatisticsModule = &statmod.Module{
+		ReadService: new(statisticsApp.ReadService),
+		Coordinator: new(statisticsApp.Coordinator),
+		RunStore:    new(mysqlstatistics.RunStore),
+	}
 	return c
 }
 

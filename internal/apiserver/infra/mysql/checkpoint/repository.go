@@ -7,7 +7,6 @@ import (
 	"time"
 
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
-	domainstatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
@@ -331,81 +330,6 @@ func (r *Repository) ListRetryableFailed(ctx context.Context, params evaluationr
 		Items:      items,
 		NextCursor: nextCursor,
 	}, nil
-}
-
-func (r *Repository) TryBeginAnalyticsProjectorCheckpoint(ctx context.Context, eventID, eventType string) (string, error) {
-	if r == nil || r.db == nil {
-		return "", fmt.Errorf("runtime checkpoint repository is not configured")
-	}
-	if eventID == "" {
-		return "", nil
-	}
-	now := time.Now()
-	eventTypeCopy := eventType
-	po := &RuntimeCheckpointPO{
-		Scope:      scopeAnalyticsProjector,
-		ResourceID: eventID,
-		AttemptNo:  1,
-		EventType:  &eventTypeCopy,
-		Status:     analyticsStatusToCheckpoint(domainstatistics.AnalyticsProjectorCheckpointStatusProcessing),
-		StartedAt:  now,
-	}
-	if err := r.db.WithContext(ctx).Create(po).Error; err == nil {
-		return "", nil
-	}
-	var existing RuntimeCheckpointPO
-	if err := r.db.WithContext(ctx).
-		Where("scope = ? AND resource_id = ? AND attempt_no = ? AND deleted_at IS NULL",
-			scopeAnalyticsProjector, eventID, 1).
-		First(&existing).Error; err != nil {
-		return "", err
-	}
-	return analyticsStatusFromCheckpoint(existing.Status), nil
-}
-
-func (r *Repository) MarkAnalyticsProjectorCheckpointStatus(ctx context.Context, eventID, status string) error {
-	if r == nil || r.db == nil {
-		return fmt.Errorf("runtime checkpoint repository is not configured")
-	}
-	if eventID == "" {
-		return nil
-	}
-	unified := analyticsStatusToCheckpoint(status)
-	updates := map[string]interface{}{
-		"status":      unified,
-		"finished_at": time.Now(),
-	}
-	return r.db.WithContext(ctx).
-		Model(&RuntimeCheckpointPO{}).
-		Where("scope = ? AND resource_id = ? AND attempt_no = ? AND deleted_at IS NULL",
-			scopeAnalyticsProjector, eventID, 1).
-		Updates(updates).Error
-}
-
-func analyticsStatusToCheckpoint(status string) string {
-	switch status {
-	case domainstatistics.AnalyticsProjectorCheckpointStatusProcessing:
-		return evalrun.StatusRunning.String()
-	case domainstatistics.AnalyticsProjectorCheckpointStatusCompleted:
-		return evalrun.StatusSucceeded.String()
-	case domainstatistics.AnalyticsProjectorCheckpointStatusPending:
-		return evalrun.StatusPending.String()
-	default:
-		return status
-	}
-}
-
-func analyticsStatusFromCheckpoint(status string) string {
-	switch evalrun.Status(status) {
-	case evalrun.StatusRunning:
-		return domainstatistics.AnalyticsProjectorCheckpointStatusProcessing
-	case evalrun.StatusSucceeded:
-		return domainstatistics.AnalyticsProjectorCheckpointStatusCompleted
-	case evalrun.StatusPending:
-		return domainstatistics.AnalyticsProjectorCheckpointStatusPending
-	default:
-		return status
-	}
 }
 
 func runToPO(run evalrun.EvaluationRun) *RuntimeCheckpointPO {
