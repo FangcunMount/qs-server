@@ -56,3 +56,54 @@ func TestBehavioralReportInputRequiresAndRestoresNorming(t *testing.T) {
 		t.Fatalf("snapshot = %#v", snapshot)
 	}
 }
+
+func TestTraitProfileReportInputAllowsFrozenReportSpecAndFactorCatalogWithoutOutcomeRegistry(t *testing.T) {
+	assets := &interpretationassets.Assets{ReportSpec: interpretationassets.ReportSpec{Sections: []interpretationassets.ReportSection{{
+		Code: "trait_profile", Kind: "trait_profile", AdapterKey: "trait_profile", TemplateID: "enneagram",
+	}}}}
+	opts := evaluationinput.ReportInputFreezeOptions{
+		Assets: assets,
+		ModelRef: evaluationinput.ModelRef{
+			Kind: evaluationinput.EvaluationModelKindTypology, SubKind: "typology",
+			Algorithm: "personality_typology", Code: "ENNEAGRAM_45", Version: "v16",
+		},
+		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+		FactorCatalog:   []evaluationinput.FactorCatalogEntry{{Code: "type_1", Title: "完美型"}},
+		TypologyRouting: &evaluationinput.TypologyRoutingFreeze{
+			DecisionKind: "trait_profile", ReportKind: "trait_profile", AdapterKey: "trait_profile", TemplateID: "enneagram",
+		},
+	}
+
+	raw, err := evaluationinput.MarshalReportInput(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := evaluationinput.SnapshotFromReportInput(raw, opts.ModelRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snapshot.FactorCatalog) != 1 || snapshot.FactorCatalog[0].Title != "完美型" {
+		t.Fatalf("factor catalog = %#v", snapshot.FactorCatalog)
+	}
+}
+
+func TestClassifiedTypeReportInputStillRequiresFrozenOutcomePresentation(t *testing.T) {
+	assets := &interpretationassets.Assets{ReportSpec: interpretationassets.ReportSpec{Sections: []interpretationassets.ReportSection{{
+		Code: "personality_type", Kind: "personality_type", AdapterKey: "personality_type", TemplateID: "mbti",
+	}}}}
+	_, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
+		Assets: assets,
+		ModelRef: evaluationinput.ModelRef{
+			Kind: evaluationinput.EvaluationModelKindTypology, SubKind: "typology",
+			Algorithm: "personality_typology", Code: "MBTI", Version: "v1",
+		},
+		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+		FactorCatalog:   []evaluationinput.FactorCatalogEntry{{Code: "EI", Title: "外向-内向"}},
+		TypologyRouting: &evaluationinput.TypologyRoutingFreeze{
+			DecisionKind: "pole_composition", ReportKind: "personality_type", AdapterKey: "personality_type", TemplateID: "mbti",
+		},
+	})
+	if err == nil {
+		t.Fatal("classified personality type without frozen outcomes/profiles was accepted")
+	}
+}

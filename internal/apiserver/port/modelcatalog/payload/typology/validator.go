@@ -426,8 +426,22 @@ func (v *runtimeSpecValidator) validateReport(report ReportSpec, mapping Outcome
 		v.add("report.adapter_key", "report.adapter.unsupported", fmt.Sprintf("report adapter %s 不支持", adapterKey))
 		return
 	}
+	if report.TemplateID != "" && IsRegisteredReportTemplateID(report.TemplateID) && !isReportTemplateCompatible(report.TemplateID, adapterKey) {
+		v.add("report.template_id", "report.template_id.adapter_mismatch", fmt.Sprintf("report template %s 不兼容 adapter %s", report.TemplateID, adapterKey))
+	}
 	if !isReportAdapterCompatible(v.algorithm, adapterKey) {
 		v.add("report.adapter_key", "report.adapter.incompatible", fmt.Sprintf("algorithm %s 不兼容 report adapter %s", v.algorithm, adapterKey))
+	}
+}
+
+func isReportTemplateCompatible(templateID string, adapter ReportAdapterKey) bool {
+	switch adapter {
+	case ReportAdapterPersonalityType:
+		return templateID == "mbti" || templateID == "sbti"
+	case ReportAdapterTraitProfile:
+		return templateID == "bigfive" || templateID == "enneagram"
+	default:
+		return false
 	}
 }
 

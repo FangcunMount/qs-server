@@ -344,11 +344,27 @@ func validateReportMapAgainstDecision(def Definition) []ValidationIssue {
 	}
 	issues := make([]ValidationIssue, 0)
 	for _, section := range def.ReportMap.Sections {
-		if section.TemplateID != "" && !isRegisteredReportTemplateID(section.TemplateID) {
+		templateRegistered := section.TemplateID == "" || isRegisteredReportTemplateID(section.TemplateID)
+		if !templateRegistered {
 			issues = append(issues, ValidationIssue{
 				Field:   "report_map.sections." + section.Code + ".template_id",
 				Code:    "report_section.template_id.unknown",
 				Message: fmt.Sprintf("report template_id %q is not registered", section.TemplateID),
+			})
+		}
+		adapter := section.AdapterKey
+		if adapter == "" {
+			if decisionKind == binding.DecisionKindTraitProfile {
+				adapter = "trait_profile"
+			} else {
+				adapter = "personality_type"
+			}
+		}
+		if section.TemplateID != "" && templateRegistered && !reportTemplateCompatibleWithAdapter(section.TemplateID, adapter) {
+			issues = append(issues, ValidationIssue{
+				Field:   "report_map.sections." + section.Code + ".template_id",
+				Code:    "report_section.template_id.adapter_mismatch",
+				Message: fmt.Sprintf("report template %q is incompatible with adapter %q", section.TemplateID, adapter),
 			})
 		}
 		if section.AdapterKey == "" {
@@ -366,12 +382,23 @@ func validateReportMapAgainstDecision(def Definition) []ValidationIssue {
 }
 
 // isRegisteredReportTemplateID mirrors the interpretation template registry
-// (mbti / sbti / bigfive). Keep in sync with typology.IsRegisteredReportTemplateID
+// (mbti / sbti / bigfive / enneagram). Keep in sync with typology.IsRegisteredReportTemplateID
 // and patterns.IsRegisteredTemplateID.
 func isRegisteredReportTemplateID(templateID string) bool {
 	switch templateID {
-	case "mbti", "sbti", "bigfive":
+	case "mbti", "sbti", "bigfive", "enneagram":
 		return true
+	default:
+		return false
+	}
+}
+
+func reportTemplateCompatibleWithAdapter(templateID, adapter string) bool {
+	switch adapter {
+	case "personality_type":
+		return templateID == "mbti" || templateID == "sbti"
+	case "trait_profile":
+		return templateID == "bigfive" || templateID == "enneagram"
 	default:
 		return false
 	}

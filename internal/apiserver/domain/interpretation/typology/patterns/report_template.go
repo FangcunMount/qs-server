@@ -54,3 +54,17 @@ func BigFiveTraitProfileTemplate() TraitProfileReportTemplate {
 		OneLiner:         "基于各维度原始分展示人格特质分布",
 	}
 }
+
+// EnneagramTraitProfileTemplate returns the presentation template for the
+// nine-factor Enneagram trait profile. The current model reports the complete
+// vector rather than selecting one OutcomeCode.
+func EnneagramTraitProfileTemplate() TraitProfileReportTemplate {
+	return TraitProfileReportTemplate{
+		Kind:             string(ReportAdapterTraitProfile),
+		DefaultModelName: "九型人格测评",
+		DefaultModelCode: "ENNEAGRAM_45",
+		TypeName:         "九型人格特质",
+		ConclusionTitle:  "九型人格特质画像",
+		OneLiner:         "基于九个人格类型因子的原始分展示特质分布",
+	}
+}

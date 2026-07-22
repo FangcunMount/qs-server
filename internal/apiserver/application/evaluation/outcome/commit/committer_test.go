@@ -205,6 +205,90 @@ func TestCommitPersistsEvaluationFactsAndEventInOneTransaction(t *testing.T) {
 	}
 }
 
+func TestCommitFreezesTraitProfileWithoutOutcomeRegistry(t *testing.T) {
+	t.Parallel()
+
+	modelRef := assessment.NewEvaluationModelRefWithIdentity(
+		assessment.EvaluationModelKindTypology, modelcatalog.SubKindTypology, modelcatalog.AlgorithmPersonalityTypology,
+		meta.ZeroID, meta.NewCode("ENNEAGRAM_45"), "v16", "九型人格",
+	)
+	a, err := assessment.NewAssessment(
+		1, testee.NewID(1001), assessment.NewQuestionnaireRefByCode(meta.NewCode("ENNEAGRAM_45"), "3.0.1"),
+		assessment.NewAnswerSheetRef(meta.FromUint64(2101)), assessment.NewAdhocOrigin(),
+		assessment.WithID(assessment.NewID(5101)), assessment.WithEvaluationModel(modelRef),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Submit(); err != nil {
+		t.Fatal(err)
+	}
+	a.ClearEvents()
+	execution := domainoutcome.NewExecution(
+		evaloutcome.ModelRefFromAssessment(modelRef), domainoutcome.Summary{}, domainoutcome.Detail{Kind: modelcatalog.KindTypology},
+	)
+	execution.Profile = &domainoutcome.ProfileResult{Kind: domainoutcome.ProfileKindPersonalityTrait}
+	execution.Dimensions = []domainoutcome.DimensionResult{{
+		Code: "type_1", Name: "完美型", Kind: domainoutcome.DimensionKindTrait,
+		Score: &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: 8},
+	}}
+	input := &evaluationinput.InputSnapshot{
+		Model: &evaluationinput.ModelSnapshot{
+			Kind: evaluationinput.EvaluationModelKindTypology, SubKind: string(modelcatalog.SubKindTypology),
+			Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorClassification),
+			DecisionKind: string(modelcatalog.DecisionKindTraitProfile), Code: "ENNEAGRAM_45", Version: "v16", Title: "九型人格",
+		},
+		DefinitionV2: &modeldefinition.Definition{
+			Measure: modeldefinition.MeasureSpec{Factors: []factor.Factor{{Code: "type_1", Title: "完美型", Role: factor.FactorRoleDimension}}},
+			ReportMap: modeldefinition.ReportMap{Sections: []modeldefinition.ReportSection{{
+				Code: "trait_profile", Kind: "trait_profile", AdapterKey: "trait_profile", TemplateID: "enneagram",
+			}}},
+			InterpretationAssets: interpretationassets.Assets{ReportSpec: interpretationassets.ReportSpec{Sections: []interpretationassets.ReportSection{{
+				Code: "trait_profile", Kind: "trait_profile", AdapterKey: "trait_profile", TemplateID: "enneagram",
+			}}}},
+		},
+	}
+
+	order := make([]string, 0, 5)
+	outcomeRepo := &commitOutcomeRepoStub{order: &order}
+	c := NewCommitter(
+		commitRunnerStub{}, commitAssessmentRepoStub{order: &order}, outcomeRepo, &commitRunRepoStub{order: &order},
+		commitScoreProjectorStub{order: &order}, &commitEventStagerStub{order: &order}, nil,
+	).(*committer)
+	c.newID = func() meta.ID { return meta.FromUint64(9101) }
+	run := evalrun.NewEvaluationRunWithAttempt(a.ID().Uint64(), 1)
+	if err := run.Start(time.Unix(100, 0)); err != nil {
+		t.Fatal(err)
+	}
+	if err := run.AttachInputSnapshot("isn:v2:" + strings.Repeat("c", 64)); err != nil {
+		t.Fatal(err)
+	}
+
+	record, err := c.Commit(context.Background(), CommitRequest{
+		Assessment: a, Input: input, Execution: execution,
+		DescriptorKey: evalpipeline.DescriptorKey{
+			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindTraitProfile,
+		},
+		Run: &run, EvaluatedAt: time.Unix(300, 0),
+	})
+	if err != nil {
+		t.Fatalf("Commit: %v", err)
+	}
+	if evaluationinput.ReportInputSchema(record.ReportInput()) != evaluationinput.CurrentReportInputSchema {
+		t.Fatalf("report input = %s", record.ReportInput())
+	}
+	frozen, err := evaluationinput.SnapshotFromReportInput(record.ReportInput(), evaluationinput.ModelRef{
+		Kind: evaluationinput.EvaluationModelKindTypology, SubKind: string(modelcatalog.SubKindTypology),
+		Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "ENNEAGRAM_45", Version: "v16", Title: "九型人格",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(frozen.FactorCatalog) != 1 || frozen.FactorCatalog[0].Title != "完美型" {
+		t.Fatalf("factor catalog = %#v", frozen.FactorCatalog)
+	}
+}
+
 func TestCommitFailureDoesNotPublishPreparedTerminalStateToCaller(t *testing.T) {
 	t.Parallel()
 

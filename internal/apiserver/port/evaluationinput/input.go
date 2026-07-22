@@ -58,6 +58,9 @@ type InputSnapshot struct {
 	NormSubject          *NormSubjectSnapshot
 	InterpretationAssets *interpretationassets.Assets
 	TypologyRouting      *TypologyRoutingFreeze
+	// FactorCatalog is the frozen, presentation-safe factor metadata carried by
+	// ReportInput schema 3. It restores labels without retaining runtime payloads.
+	FactorCatalog []FactorCatalogEntry
 	// DefinitionV2 is canonical model semantics for runtime replay (MC-R017 batch 4).
 	DefinitionV2 *modeldefinition.Definition
 }

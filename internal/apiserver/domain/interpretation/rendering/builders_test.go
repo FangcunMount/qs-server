@@ -156,6 +156,16 @@ func TestTypologyTemplatesBuildCanonicalArtifacts(t *testing.T) {
 				}}
 			},
 		},
+		{
+			name: "enneagram", templateID: "enneagram", adapterKey: reporttypology.ReportAdapterTraitProfile,
+			decisionKind: modelcatalog.DecisionKindTraitProfile, wantKind: string(reporttypology.ReportAdapterTraitProfile),
+			facts: func(input *interpinput.InterpretationInput) {
+				input.Model.Code, input.Model.Title = "ENNEAGRAM_45", "九型人格"
+				input.TraitProfile = &interpinput.TraitProfileFacts{Detail: reporttypology.TraitProfileReportDetail{
+					Traits: []reporttypology.TraitProfileFactorReport{{Code: "type_1", Name: "完美型", RawScore: 8}},
+				}}
+			},
+		},
 	}
 
 	for _, tc := range tests {

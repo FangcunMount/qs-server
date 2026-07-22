@@ -41,6 +41,8 @@ func TraitProfileTemplateByID(templateID string) (TraitProfileReportTemplate, bo
 	switch templateID {
 	case "bigfive":
 		return BigFiveTraitProfileTemplate(), true
+	case "enneagram":
+		return EnneagramTraitProfileTemplate(), true
 	default:
 		return TraitProfileReportTemplate{}, false
 	}

@@ -252,10 +252,18 @@ func setPersonalityTypeFactsFromV2(input *interpinput.InterpretationInput, execu
 }
 
 func setTraitProfileFactsFromV2(input *interpinput.InterpretationInput, execution *domainoutcome.Execution, assets *evaluationinput.InputSnapshot) {
+	factorNames := make(map[string]string, len(assets.FactorCatalog))
+	for _, factor := range assets.FactorCatalog {
+		if factor.Code != "" && factor.Title != "" {
+			factorNames[factor.Code] = factor.Title
+		}
+	}
 	traits := make([]reporttypology.TraitProfileFactorReport, 0, len(execution.Dimensions))
 	for _, dimension := range execution.Dimensions {
 		if dimension.Score != nil {
-			traits = append(traits, reporttypology.TraitProfileFactorReport{Code: dimension.Code, Name: dimension.Name, RawScore: dimension.Score.Value})
+			traits = append(traits, reporttypology.TraitProfileFactorReport{
+				Code: dimension.Code, Name: firstNonEmpty(dimension.Name, factorNames[dimension.Code]), RawScore: dimension.Score.Value,
+			})
 		}
 	}
 	detail := reporttypology.TraitProfileReportDetail{Traits: traits}

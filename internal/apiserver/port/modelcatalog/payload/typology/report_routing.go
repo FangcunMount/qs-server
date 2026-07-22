@@ -60,7 +60,7 @@ func routingFromSpec(source ReportRoutingSource, spec *RuntimeSpec) TypologyRepo
 // interpretation template registry. Empty IDs are not registered.
 func IsRegisteredReportTemplateID(templateID string) bool {
 	switch templateID {
-	case "mbti", "sbti", "bigfive":
+	case "mbti", "sbti", "bigfive", "enneagram":
 		return true
 	default:
 		return false

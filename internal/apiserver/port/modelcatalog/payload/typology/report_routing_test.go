@@ -78,7 +78,7 @@ func TestResolveTypologyReportRouting_ExplicitMalformed(t *testing.T) {
 func TestIsRegisteredReportTemplateID(t *testing.T) {
 	t.Parallel()
 
-	for _, id := range []string{"mbti", "sbti", "bigfive"} {
+	for _, id := range []string{"mbti", "sbti", "bigfive", "enneagram"} {
 		if !typology.IsRegisteredReportTemplateID(id) {
 			t.Fatalf("IsRegisteredReportTemplateID(%q) = false", id)
 		}

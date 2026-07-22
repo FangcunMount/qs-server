@@ -351,6 +351,32 @@ func TestValidateRuntimeSpecForPublishRejectsUnknownTemplateID(t *testing.T) {
 	}
 }
 
+func TestValidateRuntimeSpecForPublishRejectsTemplateAdapterMismatch(t *testing.T) {
+	spec := validRuntimeSpec()
+	spec.Decision.Kind = modelcatalog.DecisionKindTraitProfile
+	spec.OutcomeMapping = typology.OutcomeMappingSpec{
+		DetailKind: typology.OutcomeDetailTraitProfile, DetailAdapterKey: typology.DetailAdapterTraitProfile,
+	}
+	spec.Report = typology.ReportSpec{
+		Kind: typology.ReportKindTraitProfile, AdapterKey: typology.ReportAdapterTraitProfile, TemplateID: "mbti",
+	}
+
+	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
+		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
+	})
+	if !hasIssueCode(issues, "report.template_id.adapter_mismatch") {
+		t.Fatalf("issues = %#v, want report.template_id.adapter_mismatch", issues)
+	}
+
+	spec.Report.TemplateID = "enneagram"
+	issues = typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
+		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
+	})
+	if hasIssueCode(issues, "report.template_id.unknown") || hasIssueCode(issues, "report.template_id.adapter_mismatch") {
+		t.Fatalf("issues = %#v, want enneagram compatible with trait_profile", issues)
+	}
+}
+
 func validRuntimeSpec() *typology.RuntimeSpec {
 	return &typology.RuntimeSpec{
 		FactorGraph: typology.FactorGraphSpec{

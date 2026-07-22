@@ -82,6 +82,56 @@ func TestFromOutcomeRecordPreservesDimensionlessSpecialTypologyFact(t *testing.T
 	}
 }
 
+func TestFromOutcomeRecordRestoresTraitProfileNamesFromFrozenFactorCatalog(t *testing.T) {
+	assets := &interpretationassets.Assets{ReportSpec: interpretationassets.ReportSpec{Sections: []interpretationassets.ReportSection{{
+		Code: "trait_profile", Kind: "trait_profile", AdapterKey: "trait_profile", TemplateID: "enneagram",
+	}}}}
+	reportInput, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
+		Assets: assets,
+		ModelRef: evaluationinput.ModelRef{
+			Kind: evaluationinput.EvaluationModelKindTypology, SubKind: string(modelcatalog.SubKindTypology),
+			Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "ENNEAGRAM_45", Version: "v16",
+		},
+		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+		FactorCatalog:   []evaluationinput.FactorCatalogEntry{{Code: "type_1", Title: "完美型"}},
+		TypologyRouting: &evaluationinput.TypologyRoutingFreeze{
+			DecisionKind: string(modelcatalog.DecisionKindTraitProfile), ReportKind: string(modeltypology.ReportKindTraitProfile),
+			AdapterKey: string(modeltypology.ReportAdapterTraitProfile), TemplateID: "enneagram",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := evaluationfact.NewRecord(evaluationfact.NewRecordInput{
+		ID: meta.FromUint64(40), OrgID: 1, AssessmentID: meta.FromUint64(41), TesteeID: 42, RunID: "41:1",
+		Model: evaluationfact.ModelIdentity{
+			Kind: modelcatalog.KindTypology, SubKind: modelcatalog.SubKindTypology,
+			Algorithm: modelcatalog.AlgorithmPersonalityTypology, Code: "ENNEAGRAM_45", Version: "v16",
+		},
+		Runtime: evaluationfact.RuntimeIdentity{
+			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+			DecisionKind:    modelcatalog.DecisionKindTraitProfile,
+		},
+		SchemaVersion: 2, EvaluatedAt: time.Unix(300, 0), ReportInput: reportInput,
+		Payload: []byte(`{"Dimensions":[{"Code":"type_1","Kind":"trait","Score":{"Kind":"raw_total","Value":8}}],"Profile":{"Kind":"personality_trait"}}`),
+	})
+
+	got, err := FromOutcomeRecord(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.TraitProfile == nil || len(got.TraitProfile.Detail.Traits) != 1 {
+		t.Fatalf("trait profile = %#v", got.TraitProfile)
+	}
+	trait := got.TraitProfile.Detail.Traits[0]
+	if trait.Code != "type_1" || trait.Name != "完美型" || trait.RawScore != 8 {
+		t.Fatalf("trait = %#v", trait)
+	}
+	if got.Report.TemplateID != "enneagram" || got.Report.AdapterKey != string(modeltypology.ReportAdapterTraitProfile) {
+		t.Fatalf("report routing = %#v", got.Report)
+	}
+}
+
 func TestFromOutcomeRecordRejectsNonCurrentReportInput(t *testing.T) {
 	record := typologyOutcomeRecord([]byte(`{"schema_version":2}`))
 	if _, err := FromOutcomeRecord(record); err == nil {

@@ -290,6 +290,25 @@ func TestValidateRejectsReportAdapterIncompatibleWithDecisionKind(t *testing.T) 
 	if hasValidationCode(issues, "report_section.template_id.unknown") {
 		t.Fatalf("issues = %#v, want registered template_id accepted", issues)
 	}
+	if hasValidationCode(issues, "report_section.template_id.adapter_mismatch") {
+		t.Fatalf("issues = %#v, want mbti compatible with personality_type", issues)
+	}
+
+	def.Conclusions = []conclusion.Conclusion{conclusion.TypeConclusion{
+		FactorCodes: []string{"E"}, Decision: conclusion.TypeDecision{Kind: binding.DecisionKindTraitProfile},
+	}}
+	def.Outcomes = nil
+	def.ReportMap.Sections[0].AdapterKey = "trait_profile"
+	issues = definition.Validate(def)
+	if !hasValidationCode(issues, "report_section.template_id.adapter_mismatch") {
+		t.Fatalf("issues = %#v, want report_section.template_id.adapter_mismatch", issues)
+	}
+
+	def.ReportMap.Sections[0].TemplateID = "enneagram"
+	issues = definition.Validate(def)
+	if hasValidationCode(issues, "report_section.template_id.unknown") || hasValidationCode(issues, "report_section.template_id.adapter_mismatch") {
+		t.Fatalf("issues = %#v, want enneagram compatible with trait_profile", issues)
+	}
 }
 
 func TestValidateReportMapFactorScoreSources(t *testing.T) {

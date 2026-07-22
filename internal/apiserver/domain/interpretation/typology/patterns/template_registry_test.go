@@ -49,10 +49,22 @@ func TestTraitProfileTemplateForSpec_UnknownTemplateID(t *testing.T) {
 	}
 }
 
+func TestTraitProfileTemplateForSpec_Enneagram(t *testing.T) {
+	tmpl, err := patterns.TraitProfileTemplateForSpec(patterns.ReportSpec{
+		TemplateID: "enneagram", AdapterKey: patterns.ReportAdapterTraitProfile,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tmpl.Kind != string(patterns.ReportAdapterTraitProfile) || tmpl.DefaultModelCode != "ENNEAGRAM_45" || tmpl.TypeName != "九型人格特质" {
+		t.Fatalf("template = %#v", tmpl)
+	}
+}
+
 func TestIsRegisteredTemplateID(t *testing.T) {
 	t.Parallel()
 
-	if !patterns.IsRegisteredTemplateID("mbti") || !patterns.IsRegisteredTemplateID("bigfive") {
+	if !patterns.IsRegisteredTemplateID("mbti") || !patterns.IsRegisteredTemplateID("bigfive") || !patterns.IsRegisteredTemplateID("enneagram") {
 		t.Fatal("known TemplateIDs must be registered")
 	}
 	if patterns.IsRegisteredTemplateID("") || patterns.IsRegisteredTemplateID("nope") {

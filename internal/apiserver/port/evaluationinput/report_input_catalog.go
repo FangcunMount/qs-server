@@ -82,8 +82,21 @@ func CanFreezeMinimalReportInput(opts ReportInputFreezeOptions) bool {
 	case modelcatalog.AlgorithmFamilyFactorScoring:
 		return len(opts.FactorCatalog) > 0
 	case modelcatalog.AlgorithmFamilyFactorClassification:
-		return opts.TypologyRouting != nil && opts.TypologyRouting.DecisionKind != "" &&
-			(len(opts.Assets.Profiles) > 0 || len(opts.Assets.Outcomes) > 0)
+		if opts.TypologyRouting == nil {
+			return false
+		}
+		switch binding.DecisionKind(opts.TypologyRouting.DecisionKind) {
+		case binding.DecisionKindTraitProfile:
+			// A trait profile reports the complete scored factor vector. It has no
+			// selected OutcomeCode and therefore does not require an outcome registry.
+			return len(opts.FactorCatalog) > 0
+		case binding.DecisionKindPoleComposition,
+			binding.DecisionKindNearestPattern,
+			binding.DecisionKindDominantFactor:
+			return len(opts.Assets.Profiles) > 0 || len(opts.Assets.Outcomes) > 0
+		default:
+			return false
+		}
 	case modelcatalog.AlgorithmFamilyFactorNorm:
 		return opts.Norming != nil && opts.Norming.NormTables != nil && len(opts.FactorCatalog) > 0
 	case modelcatalog.AlgorithmFamilyTaskPerformance:
@@ -202,7 +215,11 @@ func firstNonEmpty(values ...string) string {
 }
 
 func snapshotFromMinimalReportInput(model ModelRef, decoded decodedReportInput) (*InputSnapshot, error) {
-	snapshot := &InputSnapshot{InterpretationAssets: decoded.InterpretationAssets, TypologyRouting: decoded.TypologyRouting}
+	snapshot := &InputSnapshot{
+		InterpretationAssets: decoded.InterpretationAssets,
+		TypologyRouting:      decoded.TypologyRouting,
+		FactorCatalog:        append([]FactorCatalogEntry(nil), decoded.FactorCatalog...),
+	}
 	ref := model
 	if decoded.ModelRef.Kind != "" {
 		ref = decoded.ModelRef
