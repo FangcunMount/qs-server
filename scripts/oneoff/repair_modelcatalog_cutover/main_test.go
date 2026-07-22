@@ -86,6 +86,17 @@ func TestPublicRepairItemIgnoresOneTimeNormalizationEvidence(t *testing.T) {
 	}
 }
 
+func TestClonePublishedSnapshotPreservesSemanticReleaseVersion(t *testing.T) {
+	t.Parallel()
+	snapshot := &modelcatalogport.AssessmentSnapshot{
+		Code: "M1", Version: "4.0.1", DefinitionV2: &modeldefinition.Definition{}, Source: map[string]any{},
+	}
+	clone := clonePublishedSnapshot(snapshot)
+	if clone == nil || clone.Version != "4.0.1" {
+		t.Fatalf("clone = %#v", clone)
+	}
+}
+
 func TestNormalizeLegacyDefinitionMakesOnlyUniqueCompatibilitySemanticsExplicit(t *testing.T) {
 	t.Parallel()
 	definition := &modeldefinition.Definition{

@@ -11,6 +11,8 @@ G5 维护窗口专用的 current-only ModelCatalog 修复工具。历史 Assessm
 
 active snapshot 与 head 不要求内容相同：published snapshot 可以与后续 draft head 合法并存。工具不会用 active snapshot 覆盖 draft head，也不会用尚未发布的 head 改写线上 runtime。
 
+active snapshot 的 `release_version` 是已经发布的不可变身份，由工具原样保留。对于 `4.0.1` 等语义版本，临时 domain model 无法表示为整数 revision；Handler 内部生成的 `v0` 只用于临时 runtime DTO，不参与 cutover 版本判定，也不会写回 snapshot。
+
 该工具不会猜测或改写 Norm、缺失题目映射、没有 legacy level 的 OutcomeCode、非单位/小数区间缺口，也不会修改 Questionnaire。任一 Norm、DefinitionV2、head/snapshot、Questionnaire 绑定、索引、migration 或历史清零证据不满足条件时，整个 apply 都会 fail closed。
 
 ## 前置条件

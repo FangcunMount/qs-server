@@ -507,9 +507,6 @@ func canonicalRepairItem(
 		add("definition.runtime.invalid", err.Error())
 		return repairItem{}, issues
 	}
-	if materialized.Version != "" && materialized.Version != current.Version {
-		add("release_version.mismatch", fmt.Sprintf("DefinitionV2 materializes version %s but active snapshot is %s", materialized.Version, current.Version))
-	}
 	definitionHash, err := modeldefinition.CanonicalContentHash(model.DefinitionV2)
 	if err != nil {
 		add("definition.active_hash_failed", err.Error())
