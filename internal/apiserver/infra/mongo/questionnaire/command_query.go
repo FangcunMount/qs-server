@@ -133,6 +133,7 @@ func commandBaseProjectStage() bson.M {
 		"description":         1,
 		"img_url":             1,
 		"version":             1,
+		"revision":            1,
 		"status":              1,
 		"type":                1,
 		"record_role":         1,

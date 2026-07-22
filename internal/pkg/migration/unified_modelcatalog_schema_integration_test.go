@@ -81,10 +81,50 @@ func TestUnifiedModelCatalogSchemaMigrationFreshInstall(t *testing.T) {
 		t.Fatal("expected duplicate table_version to violate idx_assessment_norms_table_version")
 	}
 
+	// The legacy schema permits only one live model document per code. Restore
+	// compatible data before exercising a successful down migration.
+	deleteResult, err := db.Collection("assessment_models").DeleteOne(ctx, bson.M{
+		"code":        "M1",
+		"record_role": "published_snapshot",
+	})
+	if err != nil {
+		t.Fatalf("remove snapshot before compatible down migration: %v", err)
+	}
+	if deleteResult.DeletedCount != 1 {
+		t.Fatalf("removed snapshots = %d, want 1", deleteResult.DeletedCount)
+	}
+
 	execMongoMigration(t, db, "000013_unified_modelcatalog_schema.down.json")
 	assertMongoIndex(t, db.Collection("assessment_models"), "idx_assessment_models_head_code", false)
 	assertMongoIndex(t, db.Collection("assessment_models"), "idx_assessment_models_code", true)
 	assertMongoIndex(t, db.Collection("questionnaires"), "idx_code_version", true)
+}
+
+func TestUnifiedModelCatalogSchemaDownRejectsHeadSnapshotCodeCollision(t *testing.T) {
+	ctx := t.Context()
+	_, db := mongodbtest.ReplicaSetDatabase(t)
+
+	for _, collection := range []string{"assessment_models", "questionnaires", "assessment_norms"} {
+		if err := db.CreateCollection(ctx, collection); err != nil {
+			t.Fatal(err)
+		}
+	}
+	execMongoMigration(t, db, "000013_unified_modelcatalog_schema.up.json")
+
+	if _, err := db.Collection("assessment_models").InsertMany(ctx, []any{
+		bson.M{"code": "M1", "record_role": "head", "deleted_at": nil},
+		bson.M{"code": "M1", "record_role": "published_snapshot", "release_status": "active", "release_version": "1.0.0", "kind": "scale", "deleted_at": nil},
+	}); err != nil {
+		t.Fatalf("insert unified head+snapshot pair: %v", err)
+	}
+
+	err := runMongoMigration(ctx, db, "000013_unified_modelcatalog_schema.down.json")
+	if err == nil {
+		t.Fatal("expected down migration to reject data incompatible with legacy unique(code)")
+	}
+	if !mongo.IsDuplicateKeyError(err) {
+		t.Fatalf("down migration error = %v, want duplicate-key rejection", err)
+	}
 }
 
 func TestUnifiedModelCatalogSchemaDirty13FailsClosed(t *testing.T) {

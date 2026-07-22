@@ -67,6 +67,18 @@ func TestQuestionnaireHeadReadModelPipelineAppliesSortPaginationAndProjection(t 
 	}
 }
 
+func TestQuestionnaireCommandProjectionIncludesRevisionForCAS(t *testing.T) {
+	t.Parallel()
+
+	project, ok := commandBaseProjectStage()["$project"].(bson.M)
+	if !ok {
+		t.Fatalf("command project stage = %#v, want bson.M", commandBaseProjectStage())
+	}
+	if project["revision"] != 1 {
+		t.Fatalf("command project[revision] = %#v, want 1", project["revision"])
+	}
+}
+
 func TestQuestionnairePublishedReadModelFilterDefaultsToPublishedSnapshotSemantics(t *testing.T) {
 	t.Parallel()
 
