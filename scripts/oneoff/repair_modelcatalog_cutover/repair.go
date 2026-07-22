@@ -286,32 +286,35 @@ WHERE total_assessments <> 0
 }
 
 func mysqlDerivedHistoryTables(ctx context.Context, db *sql.DB) ([]string, error) {
-	seen := make(map[string]struct{}, len(mysqlHistoryTables)+16)
+	wanted := make(map[string]struct{}, len(mysqlHistoryTables))
 	for _, table := range mysqlHistoryTables {
-		seen[table] = struct{}{}
+		wanted[table] = struct{}{}
 	}
 	rows, err := db.QueryContext(ctx, `
 SELECT table_name
 FROM information_schema.tables
 WHERE table_schema = DATABASE()
-  AND (LEFT(table_name, 11) = 'statistics_'
-       OR LEFT(table_name, 10) = 'analytics_')`)
+  AND table_type = 'BASE TABLE'`)
 	if err != nil {
-		return nil, fmt.Errorf("list statistics and analytics tables: %w", err)
+		return nil, fmt.Errorf("list MySQL tables for history guard: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
+	seen := make(map[string]struct{}, len(mysqlHistoryTables)+16)
 	for rows.Next() {
 		var table string
 		if err := rows.Scan(&table); err != nil {
-			return nil, fmt.Errorf("scan statistics or analytics table: %w", err)
+			return nil, fmt.Errorf("scan MySQL table for history guard: %w", err)
 		}
 		if strings.Contains(table, "`") {
 			return nil, fmt.Errorf("unsafe MySQL table name %q", table)
 		}
-		seen[table] = struct{}{}
+		_, fixedHistoryTable := wanted[table]
+		if fixedHistoryTable || strings.HasPrefix(table, "statistics_") || strings.HasPrefix(table, "analytics_") {
+			seen[table] = struct{}{}
+		}
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("list statistics and analytics tables: %w", err)
+		return nil, fmt.Errorf("list MySQL tables for history guard: %w", err)
 	}
 	result := make([]string, 0, len(seen))
 	for table := range seen {

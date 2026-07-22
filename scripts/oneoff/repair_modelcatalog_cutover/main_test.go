@@ -258,7 +258,7 @@ func TestNormalizeKnownNormCorruptionRequiresExactBRIEF2Row(t *testing.T) {
 	}
 }
 
-func TestMySQLDerivedHistoryTablesIncludesAllStatisticsAndAnalyticsTables(t *testing.T) {
+func TestMySQLDerivedHistoryTablesIncludesOnlyExistingHistoryTables(t *testing.T) {
 	t.Parallel()
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -266,8 +266,10 @@ func TestMySQLDerivedHistoryTablesIncludesAllStatisticsAndAnalyticsTables(t *tes
 	}
 	defer func() { _ = db.Close() }()
 	mock.ExpectQuery("SELECT table_name").WillReturnRows(sqlmock.NewRows([]string{"table_name"}).
+		AddRow("assessment").
 		AddRow("statistics_assessment_fact").
-		AddRow("analytics_pending_event"))
+		AddRow("analytics_pending_event").
+		AddRow("assessment_plan"))
 	tables, err := mysqlDerivedHistoryTables(context.Background(), db)
 	if err != nil {
 		t.Fatalf("mysqlDerivedHistoryTables() error = %v", err)
@@ -279,6 +281,13 @@ func TestMySQLDerivedHistoryTablesIncludesAllStatisticsAndAnalyticsTables(t *tes
 		}
 		if !found {
 			t.Fatalf("tables %v missing %s", tables, want)
+		}
+	}
+	for _, absent := range []string{"assessment_episode", "assessment_plan"} {
+		for _, table := range tables {
+			if table == absent {
+				t.Fatalf("tables %v unexpectedly include %s", tables, absent)
+			}
 		}
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
