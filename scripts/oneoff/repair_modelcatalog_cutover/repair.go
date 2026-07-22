@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
 	"strings"
@@ -17,7 +18,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modelconclusion "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
+	modelfactor "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	modelnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	mongoquestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
@@ -69,16 +72,17 @@ type repairPlan struct {
 }
 
 type repairItem struct {
-	Code                 string `json:"code"`
-	Version              string `json:"version"`
-	Kind                 string `json:"kind"`
-	SubKind              string `json:"sub_kind,omitempty"`
-	Algorithm            string `json:"algorithm"`
-	AlgorithmFamily      string `json:"algorithm_family"`
-	DecisionKind         string `json:"decision_kind"`
-	QuestionnaireCode    string `json:"questionnaire_code"`
-	QuestionnaireVersion string `json:"questionnaire_version"`
-	DefinitionHash       string `json:"definition_hash"`
+	Code                 string   `json:"code"`
+	Version              string   `json:"version"`
+	Kind                 string   `json:"kind"`
+	SubKind              string   `json:"sub_kind,omitempty"`
+	Algorithm            string   `json:"algorithm"`
+	AlgorithmFamily      string   `json:"algorithm_family"`
+	DecisionKind         string   `json:"decision_kind"`
+	QuestionnaireCode    string   `json:"questionnaire_code"`
+	QuestionnaireVersion string   `json:"questionnaire_version"`
+	DefinitionHash       string   `json:"definition_hash"`
+	Normalizations       []string `json:"normalizations,omitempty"`
 
 	snapshot *modelcatalogport.AssessmentSnapshot
 }
@@ -108,6 +112,9 @@ func (p *repairPlan) Text() string {
 		fmt.Fprintf(&out, "- repair %s@%s identity=%s/%s/%s runtime=%s/%s questionnaire=%s@%s hash=%s\n",
 			item.Code, item.Version, item.Kind, item.SubKind, item.Algorithm, item.AlgorithmFamily, item.DecisionKind,
 			item.QuestionnaireCode, item.QuestionnaireVersion, item.DefinitionHash)
+		if len(item.Normalizations) > 0 {
+			fmt.Fprintf(&out, "  normalizations=%s\n", strings.Join(item.Normalizations, ","))
+		}
 	}
 	for _, issue := range p.Issues {
 		fmt.Fprintf(&out, "- BLOCKED %s %s", issue.Scope, issue.Rule)
@@ -477,6 +484,7 @@ func canonicalRepairItem(
 	}
 
 	canonical := clonePublishedSnapshot(current)
+	normalizations := normalizeLegacyDefinition(canonical.DefinitionV2)
 	modeldefinition.MaterializeLayers(canonical.DefinitionV2)
 	model := publication.ModelFromPublishedSnapshot(canonical)
 	handler, err := registry.MustResolveBinding(appdefinition.AlgorithmBindingFromModel(model))
@@ -533,8 +541,127 @@ func canonicalRepairItem(
 		Kind: string(canonical.Kind), SubKind: string(canonical.SubKind), Algorithm: string(canonical.Algorithm),
 		AlgorithmFamily: string(canonical.AlgorithmFamily), DecisionKind: string(canonical.DecisionKind),
 		QuestionnaireCode: canonical.QuestionnaireCode, QuestionnaireVersion: canonical.QuestionnaireVersion,
-		DefinitionHash: definitionHash, snapshot: canonical,
+		DefinitionHash: definitionHash, Normalizations: normalizations, snapshot: canonical,
 	}, nil
+}
+
+// normalizeLegacyDefinition makes historical implicit semantics explicit only
+// where the current runtime already has a unique compatibility interpretation.
+// It must not guess questionnaire refs, outcome codes without a legacy level,
+// arbitrary score gaps, or invalid norm values.
+func normalizeLegacyDefinition(def *modeldefinition.Definition) []string {
+	if def == nil {
+		return nil
+	}
+	var scoringModes, contributionDefaults int
+	for ruleIndex := range def.Measure.Scoring {
+		for sourceIndex := range def.Measure.Scoring[ruleIndex].Sources {
+			source := &def.Measure.Scoring[ruleIndex].Sources[sourceIndex]
+			if source.Kind != modelfactor.ScoringSourceQuestion || source.ScoringMode != "" {
+				continue
+			}
+			if source.OptionScores != nil && len(source.OptionScores) == 0 {
+				continue
+			}
+			if len(source.OptionScores) > 0 {
+				source.ScoringMode = modelfactor.QuestionScoringModeOptionOverride
+			} else {
+				source.ScoringMode = modelfactor.QuestionScoringModeQuestionScore
+			}
+			scoringModes++
+			if source.Sign == 0 {
+				source.Sign = 1
+				contributionDefaults++
+			}
+			if source.Weight == 0 {
+				source.Weight = 1
+				contributionDefaults++
+			}
+		}
+	}
+
+	var outcomeCodes, rangeAdjacency, rangeEndpoints int
+	knownOutcomeCodes := make(map[string]struct{}, len(def.Outcomes))
+	for _, outcome := range def.Outcomes {
+		if outcome.Code != "" {
+			knownOutcomeCodes[outcome.Code] = struct{}{}
+		}
+	}
+	for index, item := range def.Conclusions {
+		switch typed := item.(type) {
+		case modelconclusion.RiskConclusion:
+			normalizeLegacyScoreRanges(typed.Rules, knownOutcomeCodes, &outcomeCodes, &rangeAdjacency, &rangeEndpoints)
+			def.Conclusions[index] = typed
+		case modelconclusion.NormConclusion:
+			normalizeLegacyScoreRanges(typed.Rules, knownOutcomeCodes, &outcomeCodes, &rangeAdjacency, &rangeEndpoints)
+			def.Conclusions[index] = typed
+		case modelconclusion.AbilityConclusion:
+			normalizeLegacyScoreRanges(typed.Rules, knownOutcomeCodes, &outcomeCodes, &rangeAdjacency, &rangeEndpoints)
+			def.Conclusions[index] = typed
+		}
+	}
+
+	result := make([]string, 0, 5)
+	appendCount := func(name string, count int) {
+		if count > 0 {
+			result = append(result, fmt.Sprintf("%s:%d", name, count))
+		}
+	}
+	appendCount("scoring_mode", scoringModes)
+	appendCount("contribution_defaults", contributionDefaults)
+	appendCount("outcome_code", outcomeCodes)
+	appendCount("range_adjacency", rangeAdjacency)
+	appendCount("range_endpoint", rangeEndpoints)
+	return result
+}
+
+func normalizeLegacyScoreRanges(
+	rules []modelconclusion.ScoreRangeOutcome,
+	knownOutcomeCodes map[string]struct{},
+	outcomeCodes, rangeAdjacency, rangeEndpoints *int,
+) {
+	if len(rules) == 0 {
+		return
+	}
+	for index := range rules {
+		_, levelIsCanonicalCode := knownOutcomeCodes[rules[index].Level]
+		if rules[index].OutcomeCode == "" && rules[index].Level != "" && levelIsCanonicalCode {
+			rules[index].OutcomeCode = rules[index].Level
+			(*outcomeCodes)++
+		}
+	}
+
+	ordered := make([]int, len(rules))
+	for index := range rules {
+		ordered[index] = index
+	}
+	sort.SliceStable(ordered, func(i, j int) bool {
+		left, right := rules[ordered[i]], rules[ordered[j]]
+		if left.MinScore == right.MinScore {
+			return left.MaxScore < right.MaxScore
+		}
+		return left.MinScore < right.MinScore
+	})
+	for index := 0; index+1 < len(ordered); index++ {
+		left := &rules[ordered[index]]
+		right := rules[ordered[index+1]]
+		if left.UnboundedMax || left.MaxInclusive || !legacyUnitGap(left.MaxScore, right.MinScore) {
+			continue
+		}
+		left.MaxScore = right.MinScore
+		(*rangeAdjacency)++
+	}
+	last := &rules[ordered[len(ordered)-1]]
+	if !last.UnboundedMax && !last.MaxInclusive {
+		last.MaxInclusive = true
+		(*rangeEndpoints)++
+	}
+}
+
+func legacyUnitGap(leftMax, rightMin float64) bool {
+	return math.Trunc(leftMax) == leftMax &&
+		math.Trunc(rightMin) == rightMin &&
+		rightMin-leftMax == 1
 }
 
 func clonePublishedSnapshot(snapshot *modelcatalogport.PublishedModel) *modelcatalogport.PublishedModel {
@@ -704,6 +831,7 @@ func verifyAppliedRepair(ctx context.Context, mysqlDB *sql.DB, db *mongo.Databas
 
 func publicRepairItem(item repairItem) repairItem {
 	item.snapshot = nil
+	item.Normalizations = nil
 	return item
 }
 

@@ -268,7 +268,7 @@ cache:
       singleflight: true  # 启用单飞，避免缓存穿透时的雪崩效应
       negative: false     # 生产环境建议禁用负缓存，避免数据更新后长时间读取旧数据；依赖单飞机制保护数据库安全
 
-    query:                # 查询结果缓存（如统计数据等），适合短期缓存，性能优先
+    query:                # 查询结果缓存 family 默认值；Statistics capability 单独使用 26h TTL
       negative_ttl: "5m"
       compress: false     # 生产环境可以适度启用压缩，节省内存和网络带宽
       singleflight: true  # 线 B1：统计 query cache miss 合并回源，避免缓存击穿雪崩

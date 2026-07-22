@@ -4,13 +4,14 @@ G5 维护窗口专用的 current-only ModelCatalog 修复工具。历史 Assessm
 
 - 删除 retained archived Model snapshot；
 - 按当前 family Handler 重新生成 `AlgorithmFamily`、`DecisionKind` 和冻结 DefinitionV2 layers；
+- 将旧 runtime 已有唯一兼容解释的隐式语义显式化：题目计分模式及默认 sign/weight、由 legacy level 确定的 OutcomeCode、离散整数区间的相邻半开边界和末端闭区间；
 - 使用 `CanonicalContentHash` 写入 DefinitionV2 hash；
 - 清除 `payload`、`definition_payload`、`is_active_published` 等退役字段；
 - 保持 Model code/version、Questionnaire 精确绑定、发布时间及所有 head 内容不变。
 
 active snapshot 与 head 不要求内容相同：published snapshot 可以与后续 draft head 合法并存。工具不会用 active snapshot 覆盖 draft head，也不会用尚未发布的 head 改写线上 runtime。
 
-该工具不会猜测或改写 Norm，也不会修改 Questionnaire。任一 Norm、DefinitionV2、head/snapshot、Questionnaire 绑定、索引、migration 或历史清零证据不满足条件时，整个 apply 都会 fail closed。
+该工具不会猜测或改写 Norm、缺失题目映射、没有 legacy level 的 OutcomeCode、非单位/小数区间缺口，也不会修改 Questionnaire。任一 Norm、DefinitionV2、head/snapshot、Questionnaire 绑定、索引、migration 或历史清零证据不满足条件时，整个 apply 都会 fail closed。
 
 ## 前置条件
 

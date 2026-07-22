@@ -15,7 +15,9 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modelconclusion "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
+	modelfactor "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -72,6 +74,97 @@ func TestRepairPlanCoalescesRepeatedFindings(t *testing.T) {
 	text := plan.Text()
 	if !strings.Contains(text, "issue_groups=2 findings=3") || !strings.Contains(text, "count=2") {
 		t.Fatalf("plan text = %q", text)
+	}
+}
+
+func TestPublicRepairItemIgnoresOneTimeNormalizationEvidence(t *testing.T) {
+	t.Parallel()
+	item := repairItem{Code: "M1", Version: "v1", Normalizations: []string{"range_endpoint:1"}, snapshot: &modelcatalogport.AssessmentSnapshot{Code: "M1"}}
+	public := publicRepairItem(item)
+	if public.snapshot != nil || public.Normalizations != nil || public.Code != "M1" || public.Version != "v1" {
+		t.Fatalf("public item = %#v", public)
+	}
+}
+
+func TestNormalizeLegacyDefinitionMakesOnlyUniqueCompatibilitySemanticsExplicit(t *testing.T) {
+	t.Parallel()
+	definition := &modeldefinition.Definition{
+		Measure: modeldefinition.MeasureSpec{Scoring: []modelfactor.Scoring{{
+			FactorCode: "F1",
+			Sources: []modelfactor.ScoringSource{
+				{Kind: modelfactor.ScoringSourceQuestion, Code: "Q1"},
+				{Kind: modelfactor.ScoringSourceQuestion, Code: "Q2", OptionScores: map[string]float64{"A": 2}},
+				{Kind: modelfactor.ScoringSourceQuestion, Code: "Q3", OptionScores: map[string]float64{}},
+			},
+		}}},
+		Conclusions: []modelconclusion.Conclusion{modelconclusion.NormConclusion{
+			FactorCode: "F1",
+			Rules: []modelconclusion.ScoreRangeOutcome{
+				{MinScore: 0, MaxScore: 59, Level: "low"},
+				{MinScore: 60, MaxScore: 69, Level: "medium"},
+				{MinScore: 70, MaxScore: 100, Level: "high"},
+			},
+		}},
+		Outcomes: []modelconclusion.Outcome{{Code: "low"}, {Code: "medium"}, {Code: "high"}},
+	}
+
+	got := normalizeLegacyDefinition(definition)
+	if !reflect.DeepEqual(got, []string{
+		"scoring_mode:2", "contribution_defaults:4", "outcome_code:3", "range_adjacency:2", "range_endpoint:1",
+	}) {
+		t.Fatalf("normalizations = %v", got)
+	}
+	sources := definition.Measure.Scoring[0].Sources
+	if sources[0].ScoringMode != modelfactor.QuestionScoringModeQuestionScore || sources[0].Sign != 1 || sources[0].Weight != 1 {
+		t.Fatalf("question score source = %#v", sources[0])
+	}
+	if sources[1].ScoringMode != modelfactor.QuestionScoringModeOptionOverride || sources[1].Sign != 1 || sources[1].Weight != 1 {
+		t.Fatalf("option override source = %#v", sources[1])
+	}
+	if sources[2].ScoringMode != "" {
+		t.Fatalf("ambiguous empty option map must remain blocked: %#v", sources[2])
+	}
+	rules := definition.Conclusions[0].(modelconclusion.NormConclusion).Rules
+	if rules[0].OutcomeCode != "low" || rules[0].MaxScore != 60 || rules[0].MaxInclusive ||
+		rules[1].OutcomeCode != "medium" || rules[1].MaxScore != 70 || rules[1].MaxInclusive ||
+		rules[2].OutcomeCode != "high" || !rules[2].MaxInclusive {
+		t.Fatalf("normalized rules = %#v", rules)
+	}
+}
+
+func TestNormalizeLegacyDefinitionDoesNotGuessNonUnitOrFractionalGaps(t *testing.T) {
+	t.Parallel()
+	rules := []modelconclusion.ScoreRangeOutcome{
+		{MinScore: 0, MaxScore: 10.5, OutcomeCode: "low"},
+		{MinScore: 11.5, MaxScore: 100, OutcomeCode: "high"},
+	}
+	definition := &modeldefinition.Definition{Conclusions: []modelconclusion.Conclusion{
+		modelconclusion.RiskConclusion{FactorCode: "F1", Rules: rules},
+	}}
+	got := normalizeLegacyDefinition(definition)
+	normalized := definition.Conclusions[0].(modelconclusion.RiskConclusion).Rules
+	if normalized[0].MaxScore != 10.5 || !reflect.DeepEqual(got, []string{"range_endpoint:1"}) {
+		t.Fatalf("normalizations=%v rules=%#v", got, normalized)
+	}
+}
+
+func TestNormalizeLegacyDefinitionDoesNotPromoteDisplayLevelToUnknownOutcomeCode(t *testing.T) {
+	t.Parallel()
+	definition := &modeldefinition.Definition{
+		Outcomes: []modelconclusion.Outcome{{Code: "moderate"}},
+		Conclusions: []modelconclusion.Conclusion{modelconclusion.RiskConclusion{
+			FactorCode: "F1",
+			Rules: []modelconclusion.ScoreRangeOutcome{{
+				MinScore: 0, MaxScore: 10, Level: "中度", MaxInclusive: true,
+			}},
+		}},
+	}
+	if got := normalizeLegacyDefinition(definition); len(got) != 0 {
+		t.Fatalf("normalizations = %v", got)
+	}
+	rule := definition.Conclusions[0].(modelconclusion.RiskConclusion).Rules[0]
+	if rule.OutcomeCode != "" {
+		t.Fatalf("outcome code = %q, want blocked empty code", rule.OutcomeCode)
 	}
 }
 

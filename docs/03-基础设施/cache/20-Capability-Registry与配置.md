@@ -20,7 +20,7 @@ Capability 是 Cache 的最小治理单位。apiserver 的 [`catalog.Spec`](../.
 | `evaluation.assessment_list` | evaluation | cache | L1+L2 | `query_result` | 10m | 10m | `assessment_list` |
 | `actor.testee` | actor | cache | L2 | `object_view` | 30m | 30m | `testee` |
 | `plan.detail` | plan | cache | L2 | `object_view` | 2h | 12h | `plan` |
-| `statistics.query` | statistics | cache | L2 | `query_result` | 5m | 15m | `stats_query` |
+| `statistics.query` | statistics | cache | L2 + bounded L1 stale | `query_result` | 26h | 26h | `stats_query` |
 | `report_status` | interpretation | operational_state | runtime | `ops_runtime` | 48h | 48h | `report_status` |
 
 `evaluation.assessment_list` 和 `statistics.query` 的 version token 使用 `meta_hotset`，但 capability family 仍分别投影为 `query_result`；version token 是查询缓存的支撑元数据，不是第二个业务 capability。

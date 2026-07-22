@@ -67,13 +67,11 @@ gRPC 服务按依赖是否完整进行注册。某个模块没有成功装配时
 
 事件子系统启动失败会阻止后续 scheduler 启动。这是合理的失败关闭：业务调度可能产生新事实和事件，不能在可靠事件基础设施没有准备好时继续推进。
 
-当前 scheduler manager 最多装配五个 runner：
+当前 scheduler manager 最多装配三个 runner：
 
 - `PlanRunner`：按 Plan 周期创建或更新待执行 Task；
 - `StatisticsSyncRunner`：按机构执行唯一 publish Run，编排 Collector、Projection、SyncRun、Cache Generation 与预热；
-- `BehaviorPendingReconcileRunner`：补偿未完成的行为事件归因；
 - `EvaluationConsistencyReconcileRunner`：审计并修复评分/报告跨存储终态漂移；
-- `BehaviorJourneyScanRunner`：从事实表扫描并投影行为旅程统计。
 
 runner 是否真正存在取决于 enable 开关、必要 service、org_ids、Redis 分布式锁和配置合法性。
 
