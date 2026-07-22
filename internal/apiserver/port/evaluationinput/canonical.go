@@ -79,16 +79,25 @@ func InterpretationAssetsFromSnapshot(input *InputSnapshot) (interpretationasset
 }
 
 // FactorScoreVisibleCodesFromSnapshot resolves frozen factor-score section
-// visibility codes from canonical DefinitionV2 on the evaluation input snapshot.
+// visibility codes. Runtime inputs use canonical DefinitionV2; current report
+// replay uses the ReportSpec already frozen in InterpretationAssets.
 // Callers map these codes into Interpretation-owned presentation types.
 func FactorScoreVisibleCodesFromSnapshot(input *InputSnapshot) ([]string, bool) {
-	def, ok := DefinitionV2FromSnapshot(input)
-	if !ok || def == nil {
+	if def, ok := DefinitionV2FromSnapshot(input); ok && def != nil {
+		codes, configured := def.ReportMap.FactorScoreSources()
+		if !configured {
+			return nil, false
+		}
+		return append([]string(nil), codes...), true
+	}
+	if input == nil || input.InterpretationAssets == nil {
 		return nil, false
 	}
-	codes, configured := def.ReportMap.FactorScoreSources()
-	if !configured {
-		return nil, false
+	for _, section := range input.InterpretationAssets.ReportSpec.Sections {
+		if section.Kind != modeldefinition.ReportSectionKindFactorScores {
+			continue
+		}
+		return append([]string(nil), section.SourceRefs...), true
 	}
-	return append([]string(nil), codes...), true
+	return nil, false
 }

@@ -1,9 +1,13 @@
 package input
 
 import (
+	"context"
 	"testing"
 	"time"
 
+	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
@@ -129,6 +133,74 @@ func TestFromOutcomeRecordRestoresTraitProfileNamesFromFrozenFactorCatalog(t *te
 	}
 	if got.Report.TemplateID != "enneagram" || got.Report.AdapterKey != string(modeltypology.ReportAdapterTraitProfile) {
 		t.Fatalf("report routing = %#v", got.Report)
+	}
+}
+
+func TestSPMSensoryReportInputHidesHelperFactorFromInterpretation(t *testing.T) {
+	assets := &interpretationassets.Assets{
+		Outcomes: []interpretationassets.OutcomePresentation{{OutcomeCode: "normal", Title: "与同龄儿童相似"}},
+		ReportSpec: interpretationassets.ReportSpec{Sections: []interpretationassets.ReportSection{{
+			Code: "spm_sensory_scores", Kind: "factor_scores", SourceRefs: []string{"visible", "total"},
+		}}},
+	}
+	modelRef := evaluationinput.ModelRef{
+		Kind: evaluationinput.EvaluationModelKindBehavioralRating, Algorithm: string(modelcatalog.AlgorithmSPMSensory),
+		Code: "bJFKi3", Version: "v16", Title: "SPM 感觉处理测量",
+	}
+	reportInput, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
+		Assets: assets, ModelRef: modelRef, AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorNorm,
+		FactorCatalog: []evaluationinput.FactorCatalogEntry{
+			{Code: "visible", Title: "社会参与"},
+			{Code: "total", Title: "总分", IsTotalScore: true},
+			{Code: "wcgKM7uV", Title: "味觉与嗅觉（仅计入 TOT）"},
+		},
+		Norming: &evaluationinput.NormingFreeze{NormTables: &calcnorm.NormTables{
+			TScoreRules: []calcnorm.TScoreInterpretRule{
+				{FactorCode: "visible", Ranges: []calcnorm.TScoreRange{{MinT: 0, MaxT: 100, Level: "normal", Conclusion: "正常"}}},
+				{FactorCode: "total", Ranges: []calcnorm.TScoreRange{{MinT: 0, MaxT: 100, Level: "normal", Conclusion: "正常"}}},
+			},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := evaluationfact.NewRecord(evaluationfact.NewRecordInput{
+		ID: meta.FromUint64(50), OrgID: 1, AssessmentID: meta.FromUint64(51), TesteeID: 52, RunID: "51:1",
+		Model: evaluationfact.ModelIdentity{
+			Kind: modelcatalog.KindBehavioralRating, Algorithm: modelcatalog.AlgorithmSPMSensory,
+			Code: "bJFKi3", Version: "v16", Title: "SPM 感觉处理测量",
+		},
+		Runtime: evaluationfact.RuntimeIdentity{
+			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorNorm,
+			DecisionKind:    modelcatalog.DecisionKindNormLookup,
+		},
+		SchemaVersion: 2, EvaluatedAt: time.Unix(400, 0), ReportInput: reportInput,
+		Payload: []byte(`{
+			"Primary":{"Kind":"raw_total","Value":30},
+			"Level":{"Code":"normal"},
+			"Dimensions":[
+				{"Code":"visible","Score":{"Kind":"raw_total","Value":10},"DerivedScores":[{"Kind":"t_score","Value":50}],"Level":{"Code":"normal"}},
+				{"Code":"total","Role":"total","Score":{"Kind":"raw_total","Value":20},"DerivedScores":[{"Kind":"t_score","Value":50}],"Level":{"Code":"normal"}},
+				{"Code":"wcgKM7uV","Score":{"Kind":"raw_total","Value":4},"DerivedScores":[{"Kind":"t_score","Value":50}],"Level":{"Code":"none"}}
+			]
+		}`),
+	})
+
+	input, err := FromOutcomeRecord(record)
+	if err != nil {
+		t.Fatalf("FromOutcomeRecord: %v", err)
+	}
+	if input.PresentationProfile == nil || !input.PresentationProfile.Configured() {
+		t.Fatalf("presentation profile = %#v, want frozen visibility", input.PresentationProfile)
+	}
+	visible := input.PresentationProfile.VisibleSet()
+	if !visible["visible"] || !visible["total"] || visible["wcgKM7uV"] {
+		t.Fatalf("visible factors = %#v", visible)
+	}
+
+	reportBuilder := rendering.NewNormProfileBuilder(builder.NewDefaultReportBuilder())
+	if _, err := reportBuilder.Build(context.Background(), input); err != nil {
+		t.Fatalf("hidden helper factor must not require outcome presentation: %v", err)
 	}
 }
 

@@ -57,6 +57,69 @@ func TestBehavioralReportInputRequiresAndRestoresNorming(t *testing.T) {
 	}
 }
 
+func TestReportInputRestoresFrozenFactorScoreVisibility(t *testing.T) {
+	tests := []struct {
+		name       string
+		sections   []interpretationassets.ReportSection
+		wantCodes  []string
+		configured bool
+	}{
+		{name: "not configured"},
+		{
+			name: "explicit empty hides every factor",
+			sections: []interpretationassets.ReportSection{{
+				Code: "factor_scores", Kind: "factor_scores", SourceRefs: []string{},
+			}},
+			configured: true,
+		},
+		{
+			name: "exact visible factors",
+			sections: []interpretationassets.ReportSection{{
+				Code: "factor_scores", Kind: "factor_scores", SourceRefs: []string{"visible", "total"},
+			}},
+			wantCodes: []string{"visible", "total"}, configured: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assets := &interpretationassets.Assets{
+				Outcomes:   []interpretationassets.OutcomePresentation{{OutcomeCode: "normal", Summary: "正常"}},
+				ReportSpec: interpretationassets.ReportSpec{Sections: tt.sections},
+			}
+			opts := evaluationinput.ReportInputFreezeOptions{
+				Assets: assets,
+				ModelRef: evaluationinput.ModelRef{
+					Kind: evaluationinput.EvaluationModelKindScale, Code: "SCALE", Version: "v1",
+				},
+				AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
+				FactorCatalog:   []evaluationinput.FactorCatalogEntry{{Code: "visible"}, {Code: "total", IsTotalScore: true}},
+			}
+			raw, err := evaluationinput.MarshalReportInput(opts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			snapshot, err := evaluationinput.SnapshotFromReportInput(raw, opts.ModelRef)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			gotCodes, configured := evaluationinput.FactorScoreVisibleCodesFromSnapshot(snapshot)
+			if configured != tt.configured {
+				t.Fatalf("configured = %v, want %v; codes = %#v", configured, tt.configured, gotCodes)
+			}
+			if len(gotCodes) != len(tt.wantCodes) {
+				t.Fatalf("codes = %#v, want %#v", gotCodes, tt.wantCodes)
+			}
+			for i := range tt.wantCodes {
+				if gotCodes[i] != tt.wantCodes[i] {
+					t.Fatalf("codes = %#v, want %#v", gotCodes, tt.wantCodes)
+				}
+			}
+		})
+	}
+}
+
 func TestTraitProfileReportInputAllowsFrozenReportSpecAndFactorCatalogWithoutOutcomeRegistry(t *testing.T) {
 	assets := &interpretationassets.Assets{ReportSpec: interpretationassets.ReportSpec{Sections: []interpretationassets.ReportSection{{
 		Code: "trait_profile", Kind: "trait_profile", AdapterKey: "trait_profile", TemplateID: "enneagram",
