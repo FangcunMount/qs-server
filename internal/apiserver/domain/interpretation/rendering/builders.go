@@ -37,8 +37,8 @@ func (b FactorScoringBuilder) Build(_ context.Context, input interpinput.Interpr
 		return nil, fmt.Errorf("factor_scoring interpretation facts are required")
 	}
 	draft, err := reportscore.BuildFactorScoringDraft(b.composer, reportscore.FactorScoringReportInput{
-		AssessmentID: report.ID(input.Association.AssessmentID), Scale: input.FactorScoring.Model,
-		TotalScore: primaryValue(input), RiskLevel: riskLevel(input), FactorScores: input.FactorScoring.Factors,
+		AssessmentID: report.ID(input.Association.AssessmentID), PresentationProfile: input.PresentationProfile,
+		Scale: input.FactorScoring.Model, TotalScore: primaryValue(input), RiskLevel: riskLevel(input), FactorScores: input.FactorScoring.Factors,
 	})
 	if err != nil {
 		return nil, err

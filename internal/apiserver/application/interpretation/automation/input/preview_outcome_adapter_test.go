@@ -41,7 +41,7 @@ func TestApplyFrozenNormInterpretationRestoresDimensionLabelAndSuggestion(t *tes
 	}}}, nil)
 	assets := &evaluationinput.InputSnapshot{ModelPayload: evaluationinput.BehavioralRatingModelPayload{Snapshot: &behavioralsnapshot.Snapshot{Norming: &behavioralsnapshot.NormingProfile{NormTables: &calcnorm.NormTables{TScoreRules: []calcnorm.TScoreInterpretRule{{FactorCode: "gec", Ranges: []calcnorm.TScoreRange{{MinT: 60, MaxT: 100, Level: "elevated", Conclusion: "偏高", Suggestion: "建议关注"}}}}}}}}}
 
-	if err := applyFrozenNormInterpretation(factors, assets); err != nil {
+	if err := applyFrozenNormInterpretation(factors, assets, nil); err != nil {
 		t.Fatal(err)
 	}
 	if factors[0].Level == nil || factors[0].Level.Code != "elevated" || factors[0].Level.Label != "偏高" || factors[0].Conclusion != "偏高" || factors[0].Suggestion != "建议关注" {
@@ -56,10 +56,38 @@ func TestApplyFrozenNormInterpretationRejectsTScoreWithoutLevel(t *testing.T) {
 		DerivedScores: []evaluationfact.ScoreValue{{Kind: evaluationfact.ScoreKindTScore, Value: 65}},
 	}}}, nil)
 
-	if err := applyFrozenNormInterpretation(factors, nil); err == nil {
+	if err := applyFrozenNormInterpretation(factors, nil, nil); err == nil {
 		t.Fatal("expected T-score without Outcome Level to fail closed")
 	}
 	if factors[0].Level != nil {
 		t.Fatalf("Level was derived by Interpretation: %#v", factors[0].Level)
+	}
+}
+
+func TestApplyFrozenNormInterpretationSkipsHiddenTScoreWithoutLevel(t *testing.T) {
+	factors := factorScores(&evaluationfact.Execution{Dimensions: []evaluationfact.DimensionResult{
+		{
+			Code:          "visible",
+			Score:         &evaluationfact.ScoreValue{Value: 10},
+			DerivedScores: []evaluationfact.ScoreValue{{Kind: evaluationfact.ScoreKindTScore, Value: 65}},
+			Level:         &evaluationfact.ResultLevel{Code: "elevated"},
+		},
+		{
+			Code:          "hidden",
+			Score:         &evaluationfact.ScoreValue{Value: 12},
+			DerivedScores: []evaluationfact.ScoreValue{{Kind: evaluationfact.ScoreKindTScore, Value: 55}},
+		},
+	}}, nil)
+	assets := &evaluationinput.InputSnapshot{ModelPayload: evaluationinput.BehavioralRatingModelPayload{Snapshot: &behavioralsnapshot.Snapshot{Norming: &behavioralsnapshot.NormingProfile{NormTables: &calcnorm.NormTables{TScoreRules: []calcnorm.TScoreInterpretRule{{FactorCode: "visible", Ranges: []calcnorm.TScoreRange{{MinT: 60, MaxT: 100, Level: "elevated", Conclusion: "偏高", Suggestion: "建议关注"}}}}}}}}}
+	profile := report.NewFrozenPresentationProfile([]string{"visible"})
+
+	if err := applyFrozenNormInterpretation(factors, assets, &profile); err != nil {
+		t.Fatalf("hidden factor must not require display interpretation: %v", err)
+	}
+	if factors[0].Conclusion != "偏高" || factors[0].Suggestion != "建议关注" {
+		t.Fatalf("visible factor interpretation = %#v", factors[0])
+	}
+	if factors[1].Level != nil || factors[1].Conclusion != "" || factors[1].Suggestion != "" {
+		t.Fatalf("hidden factor was interpreted: %#v", factors[1])
 	}
 }

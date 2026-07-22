@@ -6,14 +6,47 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
+	reportscore "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scoring"
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology/patterns"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
+
+func TestNormProfileBuilderCarriesFrozenVisibilityWithoutInterpretingHiddenFactor(t *testing.T) {
+	t.Parallel()
+
+	profile := report.NewFrozenPresentationProfile([]string{"visible"})
+	reportBuilder := rendering.NewNormProfileBuilder(builder.NewDefaultReportBuilder())
+	draft, err := reportBuilder.Build(context.Background(), interpinput.InterpretationInput{
+		Association:         report.Association{AssessmentID: meta.FromUint64(201)},
+		PresentationProfile: &profile,
+		FactorScoring: &interpinput.FactorScoringFacts{
+			Model: &reportscore.ReportModel{Factors: []reportscore.FactorReportModel{
+				{Code: "visible", Title: "可见因子"},
+				{Code: "hidden", Title: "隐藏因子"},
+			}},
+			Factors: []reportscore.FactorReportScore{
+				{FactorCode: "visible", RawScore: 10, Conclusion: "正常", Suggestion: "保持"},
+				{FactorCode: "hidden", RawScore: 12},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	content := draft.Content()
+	if len(content.Dimensions) != 2 {
+		t.Fatalf("len(Dimensions) = %d, want hidden facts retained", len(content.Dimensions))
+	}
+	if content.PresentationProfile == nil || !content.PresentationProfile.Configured() || len(content.PresentationProfile.VisibleFactorCodes) != 1 || content.PresentationProfile.VisibleFactorCodes[0] != "visible" {
+		t.Fatalf("presentation profile = %#v", content.PresentationProfile)
+	}
+}
 
 func TestTypologyBuilderUnknownTemplateIDFailClosed(t *testing.T) {
 	t.Parallel()

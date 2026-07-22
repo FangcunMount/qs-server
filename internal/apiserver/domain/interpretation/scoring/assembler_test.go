@@ -69,3 +69,47 @@ func TestBuildFactorScoringDraftFailsWithoutFrozenInterpretationAssets(t *testin
 		t.Fatalf("error = %v, want ErrInterpretationAssetsMissing", err)
 	}
 }
+
+func TestBuildFactorScoringDraftRetainsHiddenFactorWithoutResolvingPresentation(t *testing.T) {
+	profile := report.NewFrozenPresentationProfile([]string{"VISIBLE"})
+	got, err := scoring.BuildFactorScoringDraft(builder.NewDefaultReportBuilder(), scoring.FactorScoringReportInput{
+		AssessmentID:        report.ID(9003),
+		PresentationProfile: &profile,
+		Scale: &scoring.ReportModel{Factors: []scoring.FactorReportModel{
+			{Code: "VISIBLE", Title: "可见因子"},
+			{Code: "HIDDEN", Title: "隐藏因子"},
+		}},
+		FactorScores: []scoring.FactorReportScore{
+			{FactorCode: "VISIBLE", RawScore: 5, Conclusion: "正常", Suggestion: "保持"},
+			{FactorCode: "HIDDEN", RawScore: 20},
+		},
+	})
+	if err != nil {
+		t.Fatalf("BuildFactorScoringDraft: %v", err)
+	}
+	dimensions := got.Content().Dimensions
+	if len(dimensions) != 2 {
+		t.Fatalf("len(Dimensions) = %d, want hidden facts retained", len(dimensions))
+	}
+	if dimensions[1].Code().String() != "HIDDEN" || dimensions[1].Description() != "" || dimensions[1].Suggestion() != "" {
+		t.Fatalf("hidden dimension = %#v", dimensions[1])
+	}
+}
+
+func TestBuildFactorScoringDraftStillFailsForVisibleFactorWithoutFrozenAssets(t *testing.T) {
+	profile := report.NewFrozenPresentationProfile([]string{"TOTAL"})
+	_, err := scoring.BuildFactorScoringDraft(builder.NewDefaultReportBuilder(), scoring.FactorScoringReportInput{
+		AssessmentID:        report.ID(9004),
+		PresentationProfile: &profile,
+		Scale: &scoring.ReportModel{Factors: []scoring.FactorReportModel{{
+			Code: "TOTAL",
+			InterpretRules: []scoring.FactorInterpretRule{{
+				Min: 0, Max: 10, Conclusion: "low",
+			}},
+		}}},
+		FactorScores: []scoring.FactorReportScore{{FactorCode: "TOTAL", RawScore: 20}},
+	})
+	if !errors.Is(err, scoring.ErrInterpretationAssetsMissing) {
+		t.Fatalf("error = %v, want visible factor to fail closed", err)
+	}
+}

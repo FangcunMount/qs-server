@@ -124,8 +124,12 @@ func factorScores(execution *domainoutcome.Execution, model *reportscore.ReportM
 
 // applyFrozenNormInterpretation restores display prose from the immutable
 // report-input snapshot. It never derives the Outcome-owned Level code.
-func applyFrozenNormInterpretation(items []reportscore.FactorReportScore, assets *evaluationinput.InputSnapshot) error {
+func applyFrozenNormInterpretation(items []reportscore.FactorReportScore, assets *evaluationinput.InputSnapshot, profile *report.PresentationProfile) error {
+	visible, configured := visibleFactorCodes(profile)
 	for i := range items {
+		if configured && !visible[items[i].FactorCode] {
+			continue
+		}
 		if _, ok := reportScoreValue(items[i].DerivedScores, report.ScoreKindTScore); !ok {
 			continue
 		}
@@ -142,6 +146,9 @@ func applyFrozenNormInterpretation(items []reportscore.FactorReportScore, assets
 		return nil
 	}
 	for i := range items {
+		if configured && !visible[items[i].FactorCode] {
+			continue
+		}
 		tScore, ok := reportScoreValue(items[i].DerivedScores, report.ScoreKindTScore)
 		if !ok {
 			continue
@@ -160,6 +167,13 @@ func applyFrozenNormInterpretation(items []reportscore.FactorReportScore, assets
 		}
 	}
 	return nil
+}
+
+func visibleFactorCodes(profile *report.PresentationProfile) (map[string]bool, bool) {
+	if profile == nil || !profile.Configured() {
+		return nil, false
+	}
+	return profile.VisibleSet(), true
 }
 
 func reportScoreValue(scores []report.ScoreValue, kind string) (float64, bool) {

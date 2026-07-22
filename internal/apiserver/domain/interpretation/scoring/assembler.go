@@ -6,13 +6,14 @@ import (
 
 // FactorScoringReportInput is factor-scoring mechanism report assembly input.
 type FactorScoringReportInput struct {
-	AssessmentID report.ID
-	Scale        *ReportModel
-	TotalScore   float64
-	RiskLevel    report.RiskLevel
-	Conclusion   string
-	Suggestion   string
-	FactorScores []FactorReportScore
+	AssessmentID        report.ID
+	PresentationProfile *report.PresentationProfile
+	Scale               *ReportModel
+	TotalScore          float64
+	RiskLevel           report.RiskLevel
+	Conclusion          string
+	Suggestion          string
+	FactorScores        []FactorReportScore
 }
 
 // BuildFactorScoringDraft assembles the same factor-scoring content without
@@ -30,7 +31,12 @@ func BuildFactorScoringDraft(composer report.DraftBuilder, input FactorScoringRe
 
 func resolveFactorScoringInput(input FactorScoringReportInput) (ReportInput, error) {
 	factorScores := make([]FactorReportScore, 0, len(input.FactorScores))
+	visible, configured := factorScoreVisibility(input.PresentationProfile)
 	for _, fs := range input.FactorScores {
+		if configured && !visible[fs.FactorCode] {
+			factorScores = append(factorScores, fs)
+			continue
+		}
 		if fs.Conclusion == "" && fs.Suggestion == "" {
 			var err error
 			fs.Conclusion, fs.Suggestion, err = interpretScaleFactor(input.Scale, fs)
@@ -60,6 +66,13 @@ func resolveFactorScoringInput(input FactorScoringReportInput) (ReportInput, err
 		Suggestion:   suggestion,
 		FactorScores: factorScores,
 	}, nil
+}
+
+func factorScoreVisibility(profile *report.PresentationProfile) (map[string]bool, bool) {
+	if profile == nil || !profile.Configured() {
+		return nil, false
+	}
+	return profile.VisibleSet(), true
 }
 
 func generateReportInput(input ReportInput) report.GenerateReportInput {
