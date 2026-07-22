@@ -41,7 +41,7 @@ type executor struct {
 	committer     InterpretationCommitter
 	now           func() time.Time
 	newID         func() meta.ID
-	logBuildError func(context.Context, error, *domaingeneration.ReportGeneration, *interpretationrun.InterpretationRun, rendering.Builder)
+	logBuildError func(context.Context, string, error, *domaingeneration.ReportGeneration, *interpretationrun.InterpretationRun, rendering.Builder)
 }
 
 func NewExecutor(
@@ -54,7 +54,7 @@ func NewExecutor(
 	}
 	return &executor{
 		starter: starter, builders: builders, committer: committer, now: time.Now, newID: meta.New,
-		logBuildError: logBuilderFailure,
+		logBuildError: logBuildFailure,
 	}, nil
 }
 
@@ -117,7 +117,7 @@ func (e *executor) buildAndCommit(ctx context.Context, input interpinput.Interpr
 	}
 	draft, err := builder.Build(ctx, input)
 	if err != nil {
-		e.logBuildError(ctx, err, generationRecord, runRecord, builder)
+		e.logBuildError(ctx, "builder", err, generationRecord, runRecord, builder)
 		return nil, e.fail(ctx, generationRecord, runRecord, input, interpretationrun.Failure{Kind: interpretationrun.FailureKindBuild, Code: "build_failed", SafeMessage: "报告生成失败", Retryable: true})
 	}
 	if draft == nil {
@@ -132,6 +132,7 @@ func (e *executor) buildAndCommit(ctx context.Context, input interpinput.Interpr
 		Content: draft.Content(), GeneratedAt: at,
 	})
 	if err != nil {
+		e.logBuildError(ctx, "artifact_validation", err, generationRecord, runRecord, builder)
 		return nil, e.fail(ctx, generationRecord, runRecord, input, interpretationrun.Failure{Kind: interpretationrun.FailureKindBuild, Code: "invalid_artifact", SafeMessage: "报告生成失败", Retryable: false})
 	}
 	committed, err := e.committer.CommitSuccess(ctx, CommitSuccessRequest{
@@ -154,8 +155,8 @@ func (e *executor) buildAndCommit(ctx context.Context, input interpinput.Interpr
 	return &ExecuteResult{Status: ExecuteStatusGenerated, Generation: committed.Generation, Run: committed.Run, InterpretReport: committed.InterpretReport}, nil
 }
 
-func logBuilderFailure(ctx context.Context, err error, generationRecord *domaingeneration.ReportGeneration, runRecord *interpretationrun.InterpretationRun, builder rendering.Builder) {
-	fields := []interface{}{"error", err}
+func logBuildFailure(ctx context.Context, phase string, err error, generationRecord *domaingeneration.ReportGeneration, runRecord *interpretationrun.InterpretationRun, builder rendering.Builder) {
+	fields := []interface{}{"phase", phase, "error", err}
 	if generationRecord != nil {
 		fields = append(fields, "generation_id", generationRecord.ID().String(), "outcome_id", generationRecord.Key().OutcomeID.String(), "template_version", generationRecord.Key().TemplateVersion.String())
 	}
@@ -165,7 +166,7 @@ func logBuilderFailure(ctx context.Context, err error, generationRecord *domaing
 	if builder != nil {
 		fields = append(fields, "builder_identity", builder.BuilderIdentity())
 	}
-	logger.L(ctx).Errorw("interpretation report builder failed", fields...)
+	logger.L(ctx).Errorw("interpretation report build failed", fields...)
 }
 
 func (e *executor) fail(ctx context.Context, generationRecord *domaingeneration.ReportGeneration, runRecord *interpretationrun.InterpretationRun, input interpinput.InterpretationInput, failure interpretationrun.Failure) error {

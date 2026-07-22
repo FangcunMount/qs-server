@@ -26,8 +26,8 @@ func TestPersonalityTypeTemplateForSpec_KnownTemplateID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}
-	if tmpl.Kind != "sbti" {
-		t.Fatalf("Kind = %q, want sbti", tmpl.Kind)
+	if tmpl.Kind != string(patterns.ReportAdapterPersonalityType) {
+		t.Fatalf("Kind = %q, want %q", tmpl.Kind, patterns.ReportAdapterPersonalityType)
 	}
 }
 

@@ -134,7 +134,9 @@ func calcNormTables(table *catalognorm.Norm, conclusions []conclusion.NormConclu
 		for _, item := range item.Rules {
 			rule.Ranges = append(rule.Ranges, calcnorm.TScoreRange{
 				MinT: item.MinScore, MaxT: item.MaxScore, MaxInclusive: item.MaxInclusive, UnboundedMax: item.UnboundedMax,
-				Level: item.Level, Conclusion: item.Summary, Suggestion: item.Description,
+				// TScoreRange.Level is retained for the runtime/ReportInput JSON
+				// contract, but current-only execution stores canonical OutcomeCode.
+				Level: item.OutcomeCode, Conclusion: item.Summary, Suggestion: item.Description,
 			})
 		}
 		out.TScoreRules = append(out.TScoreRules, rule)

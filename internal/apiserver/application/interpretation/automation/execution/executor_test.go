@@ -22,6 +22,7 @@ import (
 type executorBuilder struct {
 	err   error
 	calls int
+	draft *report.Draft
 }
 
 func (*executorBuilder) ReportType() policy.ReportType           { return policy.ReportTypeStandard }
@@ -35,6 +36,9 @@ func (b *executorBuilder) Build(context.Context, interpinput.InterpretationInput
 	b.calls++
 	if b.err != nil {
 		return nil, b.err
+	}
+	if b.draft != nil {
+		return b.draft, nil
 	}
 	return report.NewDraft(report.Content{
 		Model:        report.ModelIdentity{Kind: "scale", Code: "S-1", Version: "v1", Title: "Scale"},
@@ -131,8 +135,11 @@ func TestExecutorPersistsFailedRunThenRetriesWithoutEvaluation(t *testing.T) {
 	builder := &executorBuilder{err: errors.New("boom")}
 	service, gens, runs, _, stager, _ := newExecutorFixture(t, builder)
 	var loggedErr error
-	service.logBuildError = func(_ context.Context, err error, generation *domaingeneration.ReportGeneration, run *interpretationrun.InterpretationRun, gotBuilder rendering.Builder) {
+	service.logBuildError = func(_ context.Context, phase string, err error, generation *domaingeneration.ReportGeneration, run *interpretationrun.InterpretationRun, gotBuilder rendering.Builder) {
 		loggedErr = err
+		if phase != "builder" {
+			t.Fatalf("failure phase = %q, want builder", phase)
+		}
 		if generation == nil || run == nil || gotBuilder != builder {
 			t.Fatal("builder failure log context is incomplete")
 		}
@@ -185,5 +192,49 @@ func TestExecutorPersistsFailedRunThenRetriesWithoutEvaluation(t *testing.T) {
 	run, err := runs.FindByID(context.Background(), result.InterpretReport.InterpretationRunID())
 	if err != nil || run.Attempt() != 2 {
 		t.Fatalf("retry run=%#v err=%v", run, err)
+	}
+}
+
+func TestExecutorLogsArtifactValidationFailureWithoutLeakingIt(t *testing.T) {
+	builder := &executorBuilder{draft: report.NewDraft(report.Content{
+		Model:        report.ModelIdentity{Kind: "scale", Code: "S-1", Version: "v1", Title: "Scale"},
+		PrimaryScore: report.NewRawTotalScore(12, nil),
+		Level:        report.LevelFromRisk(report.RiskLevelLow),
+		Dimensions: []report.DimensionInterpret{
+			report.NewDimensionInterpret(report.NewFactorCode("TOTAL"), "总分", 12, nil, report.RiskLevelLow, "ok", "ok"),
+		},
+		ModelExtra: &report.ModelExtra{Kind: "personality_type", TypeCode: "INTJ"},
+	})}
+	service, _, _, reports, stager, _ := newExecutorFixture(t, builder)
+	var (
+		loggedPhase string
+		loggedErr   error
+	)
+	service.logBuildError = func(_ context.Context, phase string, err error, generation *domaingeneration.ReportGeneration, run *interpretationrun.InterpretationRun, gotBuilder rendering.Builder) {
+		loggedPhase, loggedErr = phase, err
+		if generation == nil || run == nil || gotBuilder != builder {
+			t.Fatal("artifact validation log context is incomplete")
+		}
+	}
+
+	_, executeErr := service.Execute(context.Background(), executorInput(), "trace")
+	if executeErr == nil {
+		t.Fatal("execution error = nil")
+	}
+	if loggedPhase != "artifact_validation" || loggedErr == nil || loggedErr.Error() != `model extra kind "personality_type" does not match scale model` {
+		t.Fatalf("logged failure = phase:%q err:%v", loggedPhase, loggedErr)
+	}
+	failedError, ok := FailureFrom(executeErr)
+	if !ok || failedError.Failure.Code != "invalid_artifact" || failedError.Failure.Retryable {
+		t.Fatalf("public failure = %#v ok=%v", failedError, ok)
+	}
+	if failedError.Decision == nil || failedError.Decision.Disposition != retrygovernance.DispositionTerminal {
+		t.Fatalf("retry decision = %#v, want terminal", failedError.Decision)
+	}
+	if executeErr.Error() != "interpretation report generation failed: invalid_artifact" {
+		t.Fatalf("public error leaked internal detail: %v", executeErr)
+	}
+	if len(reports.items) != 0 || len(stager.events) != 1 {
+		t.Fatalf("reports=%d events=%d", len(reports.items), len(stager.events))
 	}
 }

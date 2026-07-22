@@ -9,7 +9,7 @@ import (
 func MBTIPersonalityTypeTemplate() PersonalityTypeReportTemplate {
 	maxScore := 40.0
 	return PersonalityTypeReportTemplate{
-		Kind:              "mbti",
+		Kind:              string(ReportAdapterPersonalityType),
 		DefaultModelName:  "MBTI 人格类型测评",
 		DefaultModelCode:  "MBTI_OEJTS",
 		DimensionMaxScore: &maxScore,
@@ -23,7 +23,7 @@ func MBTIPersonalityTypeTemplate() PersonalityTypeReportTemplate {
 func SBTIPersonalityTypeTemplate() PersonalityTypeReportTemplate {
 	maxScore := 6.0
 	return PersonalityTypeReportTemplate{
-		Kind:              "sbti",
+		Kind:              string(ReportAdapterPersonalityType),
 		DefaultModelName:  "SBTI 趣味人格测评",
 		DefaultModelCode:  "SBTI_FUN",
 		DimensionMaxScore: &maxScore,
@@ -46,7 +46,7 @@ func SBTIPersonalityTypeTemplate() PersonalityTypeReportTemplate {
 // BigFiveTraitProfileTemplate 返回呈现 template 用于 Big Five reports。
 func BigFiveTraitProfileTemplate() TraitProfileReportTemplate {
 	return TraitProfileReportTemplate{
-		Kind:             "bigfive",
+		Kind:             string(ReportAdapterTraitProfile),
 		DefaultModelName: "Big Five 五大人格特质测评",
 		DefaultModelCode: "BIGFIVE_V1",
 		TypeName:         "五大人格特质",
