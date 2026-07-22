@@ -49,7 +49,7 @@ func BuilderSpecificDraftContract(builderIdentity string, content Content) error
 		if content.ModelExtra.TypeCode == "" && content.ModelExtra.TypeName == "" {
 			return fmt.Errorf("typology report requires type identity in model extra")
 		}
-		if len(content.Dimensions) == 0 {
+		if len(content.Dimensions) == 0 && !isDimensionlessSpecialTypology(content.ModelExtra) {
 			return fmt.Errorf("typology report requires dimensions")
 		}
 	case BuilderIdentityTaskPerformance:
@@ -60,6 +60,13 @@ func BuilderSpecificDraftContract(builderIdentity string, content Content) error
 		return fmt.Errorf("unsupported builder identity %q", builderIdentity)
 	}
 	return nil
+}
+
+// isDimensionlessSpecialTypology recognizes an explicitly frozen special
+// result. Special rules may intentionally produce no scored vector; ordinary
+// and incompletely identified typology results continue to require dimensions.
+func isDimensionlessSpecialTypology(extra *ModelExtra) bool {
+	return extra != nil && extra.IsSpecial && extra.SpecialTrigger != ""
 }
 
 func isContentEmpty(content Content) bool {

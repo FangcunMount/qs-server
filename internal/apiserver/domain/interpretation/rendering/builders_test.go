@@ -71,6 +71,51 @@ func TestTypologyBuilderUnknownTemplateIDFailClosed(t *testing.T) {
 	}
 }
 
+func TestSBTISpecialOutcomeBuildsArtifactWithoutSyntheticDimensions(t *testing.T) {
+	t.Parallel()
+
+	reportBuilder := rendering.NewTypologyBuilder()
+	input := interpinput.InterpretationInput{
+		OutcomeID:   meta.FromUint64(301),
+		Association: report.Association{OrgID: 1, AssessmentID: meta.FromUint64(302), TesteeID: 303},
+		Model: report.ModelIdentity{
+			Kind: string(modelcatalog.KindTypology), SubKind: string(modelcatalog.SubKindTypology), Algorithm: string(modelcatalog.AlgorithmPersonalityTypology),
+			Code: "SBTI_FUN", Version: "v48", Title: "SBTI 趣味人格测评", AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorClassification),
+		},
+		Runtime: interpinput.RuntimeIdentity{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindNearestPattern},
+		Result:  interpinput.ResultFacts{Primary: report.NewMatchPercentScore(100, "100%"), Level: &report.ResultLevel{Code: "DRUNK", Label: "饮酒特殊结果"}},
+		Report: interpinput.ReportSpec{
+			ReportType: policy.ReportTypeStandard, TemplateVersion: policy.TemplateVersionV1,
+			TemplateID: "sbti", AdapterKey: string(reporttypology.ReportAdapterPersonalityType),
+		},
+		PersonalityType: &interpinput.PersonalityTypeFacts{Detail: reporttypology.PersonalityTypeReportDetail{
+			TypeCode: "DRUNK", TypeName: "饮酒特殊结果", OneLiner: "特殊结果",
+			MatchPercent: 100, IsSpecial: true, SpecialTrigger: "hidden:drink",
+		}},
+	}
+
+	draft, err := reportBuilder.Build(context.Background(), input)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	artifact, err := report.NewInterpretReport(report.InterpretReportInput{
+		ID: meta.FromUint64(304), GenerationID: meta.FromUint64(305), OutcomeID: input.OutcomeID, InterpretationRunID: meta.FromUint64(306),
+		Association: input.Association, ReportType: input.Report.ReportType, TemplateVersion: input.Report.TemplateVersion,
+		BuilderIdentity: reportBuilder.BuilderIdentity(), ContentSchemaVersion: reportBuilder.ContentSchemaVersion(),
+		Content: draft.Content(), GeneratedAt: time.Date(2026, 7, 22, 0, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("NewInterpretReport: %v", err)
+	}
+	content := artifact.Content()
+	if len(content.Dimensions) != 0 {
+		t.Fatalf("special outcome dimensions = %#v, want no synthetic dimensions", content.Dimensions)
+	}
+	if content.ModelExtra == nil || !content.ModelExtra.IsSpecial || content.ModelExtra.SpecialTrigger != "hidden:drink" || content.ModelExtra.TypeCode != "DRUNK" {
+		t.Fatalf("special outcome model extra = %#v", content.ModelExtra)
+	}
+}
+
 func TestTypologyTemplatesBuildCanonicalArtifacts(t *testing.T) {
 	t.Parallel()
 

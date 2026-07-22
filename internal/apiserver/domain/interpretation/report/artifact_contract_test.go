@@ -75,6 +75,35 @@ func TestBuilderSpecificDraftContractTypologyGolden(t *testing.T) {
 	}
 }
 
+func TestBuilderSpecificDraftContractAllowsDimensionlessSpecialTypologyResult(t *testing.T) {
+	content := typologyMinimalContent()
+	content.Dimensions = nil
+	content.ModelExtra.TypeCode = "DRUNK"
+	content.ModelExtra.TypeName = "饮酒特殊结果"
+	content.ModelExtra.IsSpecial = true
+	content.ModelExtra.SpecialTrigger = "hidden:drink"
+
+	if err := report.BuilderSpecificDraftContract(report.BuilderIdentityTypology, content); err != nil {
+		t.Fatalf("dimensionless special typology content rejected: %v", err)
+	}
+	if _, err := report.NewInterpretReport(newWriteInput(report.BuilderIdentityTypology, content)); err != nil {
+		t.Fatalf("dimensionless special typology artifact rejected: %v", err)
+	}
+}
+
+func TestBuilderSpecificDraftContractRejectsDimensionlessOrdinaryTypologyResult(t *testing.T) {
+	content := typologyMinimalContent()
+	content.Dimensions = nil
+
+	if err := report.BuilderSpecificDraftContract(report.BuilderIdentityTypology, content); err == nil {
+		t.Fatal("dimensionless ordinary typology content must fail closed")
+	}
+	content.ModelExtra.IsSpecial = true
+	if err := report.BuilderSpecificDraftContract(report.BuilderIdentityTypology, content); err == nil {
+		t.Fatal("dimensionless typology content without a frozen special trigger must fail closed")
+	}
+}
+
 func TestBuilderSpecificDraftContractTaskPerformanceGolden(t *testing.T) {
 	content := taskPerformanceMinimalContent()
 	if err := report.BuilderSpecificDraftContract(report.BuilderIdentityTaskPerformance, content); err != nil {

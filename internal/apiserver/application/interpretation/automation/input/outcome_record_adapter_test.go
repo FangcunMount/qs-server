@@ -36,6 +36,52 @@ func TestFromOutcomeRecordUsesCurrentFrozenTypologyInput(t *testing.T) {
 	}
 }
 
+func TestFromOutcomeRecordPreservesDimensionlessSpecialTypologyFact(t *testing.T) {
+	assets := &interpretationassets.Assets{
+		Outcomes: []interpretationassets.OutcomePresentation{{OutcomeCode: "DRUNK", Title: "饮酒特殊结果", Summary: "冻结特殊结果摘要"}},
+		Profiles: []interpretationassets.TypeProfilePresentation{{OutcomeCode: "DRUNK", Commentary: "冻结特殊结果摘要"}},
+	}
+	reportInput, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
+		Assets: assets,
+		ModelRef: evaluationinput.ModelRef{
+			Kind: evaluationinput.EvaluationModelKindTypology, SubKind: string(modelcatalog.SubKindTypology),
+			Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "SBTI_FUN", Version: "v48",
+		},
+		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+		TypologyRouting: &evaluationinput.TypologyRoutingFreeze{
+			DecisionKind: string(modelcatalog.DecisionKindNearestPattern), ReportKind: string(modeltypology.ReportKindPersonalityType),
+			AdapterKey: string(modeltypology.ReportAdapterPersonalityType), TemplateID: "sbti", TemplateVersion: "legacy-v1",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := evaluationfact.NewRecord(evaluationfact.NewRecordInput{
+		ID: meta.FromUint64(30), OrgID: 1, AssessmentID: meta.FromUint64(31), TesteeID: 32, RunID: "31:1",
+		Model: evaluationfact.ModelIdentity{
+			Kind: modelcatalog.KindTypology, SubKind: modelcatalog.SubKindTypology,
+			Algorithm: modelcatalog.AlgorithmPersonalityTypology, Code: "SBTI_FUN", Version: "v48",
+		},
+		Runtime: evaluationfact.RuntimeIdentity{
+			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+			DecisionKind:    modelcatalog.DecisionKindNearestPattern,
+		},
+		SchemaVersion: 2, EvaluatedAt: time.Unix(200, 0), ReportInput: reportInput,
+		Payload: []byte(`{"Detail":{"Payload":{"type_code":"DRUNK","match_percent":100,"is_special":true,"special_trigger":"hidden:drink"}},"Primary":{"Kind":"match_percent","Value":100},"Level":{"Code":"DRUNK"},"Profile":{"Kind":"personality_type","Code":"DRUNK"}}`),
+	})
+
+	got, err := FromOutcomeRecord(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.PersonalityType == nil || !got.PersonalityType.Detail.IsSpecial || got.PersonalityType.Detail.SpecialTrigger != "hidden:drink" || got.PersonalityType.Detail.TypeCode != "DRUNK" {
+		t.Fatalf("special personality detail = %#v", got.PersonalityType)
+	}
+	if len(got.PersonalityType.Detail.Dimensions) != 0 {
+		t.Fatalf("dimensionless special fact gained dimensions: %#v", got.PersonalityType.Detail.Dimensions)
+	}
+}
+
 func TestFromOutcomeRecordRejectsNonCurrentReportInput(t *testing.T) {
 	record := typologyOutcomeRecord([]byte(`{"schema_version":2}`))
 	if _, err := FromOutcomeRecord(record); err == nil {
