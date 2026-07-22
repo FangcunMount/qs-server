@@ -554,7 +554,7 @@ TScoreRange 仍携带 Conclusion/Suggestion，Calculation projection 会写进�
 | Behavioral input catalog/provider | [`infra/evaluationinput/published_behavioral_rating_catalog.go`](../../../../internal/apiserver/infra/evaluationinput/published_behavioral_rating_catalog.go)、[`behavioral_rating_provider.go`](../../../../internal/apiserver/infra/evaluationinput/behavioral_rating_provider.go) |
 | factor_norm pipeline | [`application/evaluation/registry/mechanisms/norming`](../../../../internal/apiserver/application/evaluation/registry/mechanisms/norming/) |
 | Norm calculation | [`domain/calculation/norm`](../../../../internal/apiserver/domain/calculation/norm/) |
-| BRIEF-2/SPM sensory seed | [`scripts/oneoff/seed_brief2`](../../../../scripts/oneoff/seed_brief2/)、[`seed_spm_sensory`](../../../../scripts/oneoff/seed_spm_sensory/) |
+| BRIEF-2/SPM sensory 全新环境 seed（仅旧 4.0.1 映射，不用于当前生产修复） | [`scripts/oneoff/seed_brief2`](../../../../scripts/oneoff/seed_brief2/)、[`seed_spm_sensory`](../../../../scripts/oneoff/seed_spm_sensory/) |
 
 ```bash
 go test ./internal/apiserver/application/modelcatalog/definition -run Behavioral
