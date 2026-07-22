@@ -18,6 +18,7 @@ import (
 	modelconclusion "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	modelfactor "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
+	modelnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -179,6 +180,84 @@ func TestNormalizeLegacyDefinitionDoesNotPromoteDisplayLevelToUnknownOutcomeCode
 	}
 }
 
+func TestNormalizeLegacyDefinitionSynthesizesRegistryFromConsistentLegacyCodes(t *testing.T) {
+	t.Parallel()
+	definition := &modeldefinition.Definition{
+		Conclusions: []modelconclusion.Conclusion{
+			modelconclusion.NormConclusion{FactorCode: "F1", Rules: []modelconclusion.ScoreRangeOutcome{
+				{MinScore: 0, MaxScore: 60, Level: "normal", Title: "与同龄儿童相似"},
+				{MinScore: 60, MaxScore: 100, Level: "severe", Title: "严重困难", MaxInclusive: true},
+			}},
+			modelconclusion.NormConclusion{FactorCode: "F2", Rules: []modelconclusion.ScoreRangeOutcome{
+				{MinScore: 0, MaxScore: 60, Level: "normal", Title: "与同龄儿童相似"},
+				{MinScore: 60, MaxScore: 100, Level: "severe", Title: "严重困难", MaxInclusive: true},
+			}},
+		},
+	}
+
+	got := normalizeLegacyDefinition(definition)
+	if !reflect.DeepEqual(got, []string{"outcome_registry:2", "outcome_code:4"}) {
+		t.Fatalf("normalizations = %v", got)
+	}
+	if !reflect.DeepEqual(definition.Outcomes, []modelconclusion.Outcome{
+		{Code: "normal", Title: "与同龄儿童相似"},
+		{Code: "severe", Title: "严重困难"},
+	}) {
+		t.Fatalf("outcomes = %#v", definition.Outcomes)
+	}
+	for _, item := range definition.Conclusions {
+		for _, rule := range item.(modelconclusion.NormConclusion).Rules {
+			if rule.OutcomeCode != rule.Level {
+				t.Fatalf("rule = %#v", rule)
+			}
+		}
+	}
+}
+
+func TestNormalizeLegacyDefinitionDoesNotSynthesizeConflictingLegacyPresentation(t *testing.T) {
+	t.Parallel()
+	definition := &modeldefinition.Definition{Conclusions: []modelconclusion.Conclusion{
+		modelconclusion.NormConclusion{FactorCode: "F1", Rules: []modelconclusion.ScoreRangeOutcome{
+			{MinScore: 0, MaxScore: 60, Level: "normal", Title: "正常"},
+			{MinScore: 60, MaxScore: 100, Level: "normal", Title: "一般", MaxInclusive: true},
+		}},
+	}}
+
+	if got := normalizeLegacyDefinition(definition); len(got) != 0 {
+		t.Fatalf("normalizations = %v", got)
+	}
+	if len(definition.Outcomes) != 0 {
+		t.Fatalf("outcomes = %#v", definition.Outcomes)
+	}
+}
+
+func TestNormalizeKnownNormCorruptionRequiresExactBRIEF2Row(t *testing.T) {
+	t.Parallel()
+	table := &modelnorm.Norm{
+		TableVersion: brief2LegacyNormVersion,
+		Factors: []modelnorm.FactorTable{{FactorCode: brief2LegacyNormFactor, Lookup: []modelnorm.LookupEntry{
+			{RawScoreMin: 125, RawScoreMax: 125, MinAgeMonths: 60, MaxAgeMonths: 95, Gender: "male", TScore: 65, Percentile: 952},
+		}}},
+	}
+
+	repairs, err := normalizeKnownNormCorruption(table)
+	if err != nil {
+		t.Fatalf("normalizeKnownNormCorruption() error = %v", err)
+	}
+	if len(repairs) != 1 || repairs[0].BeforePercentile != 952 || repairs[0].AfterPercentile != 92 {
+		t.Fatalf("repairs = %#v", repairs)
+	}
+	if got := table.Factors[0].Lookup[0].Percentile; got != 92 {
+		t.Fatalf("percentile = %v, want 92", got)
+	}
+
+	table.Factors[0].Lookup[0].Percentile = 951
+	repairs, err = normalizeKnownNormCorruption(table)
+	if err != nil || len(repairs) != 0 || table.Factors[0].Lookup[0].Percentile != 951 {
+		t.Fatalf("non-exact row changed: repairs=%#v err=%v row=%#v", repairs, err, table.Factors[0].Lookup[0])
+	}
+}
+
 func TestMySQLDerivedHistoryTablesIncludesAllStatisticsAndAnalyticsTables(t *testing.T) {
 	t.Parallel()
 	db, mock, err := sqlmock.New()
@@ -265,6 +344,28 @@ func TestApplyRepairDocumentsChecksEveryWriteBoundary(t *testing.T) {
 	}
 	if !reflect.DeepEqual(collection.deleteFilter, archivedSnapshotFilter()) {
 		t.Fatalf("delete filter = %#v", collection.deleteFilter)
+	}
+}
+
+func TestApplyNormRepairDocumentsRequiresExactCASModification(t *testing.T) {
+	t.Parallel()
+	repair := normRepairItem{
+		TableVersion: brief2LegacyNormVersion, FactorCode: brief2LegacyNormFactor,
+		RawScoreMin: 125, RawScoreMax: 125, MinAgeMonths: 60, MaxAgeMonths: 95,
+		Gender: "male", TScore: 65, BeforePercentile: 952, AfterPercentile: 92,
+	}
+	collection := &recordingRepairCollection{updateOneResults: []*mongo.UpdateResult{{MatchedCount: 1, ModifiedCount: 1}}}
+	if err := applyNormRepairDocuments(context.Background(), collection, []normRepairItem{repair}); err != nil {
+		t.Fatalf("applyNormRepairDocuments() error = %v", err)
+	}
+	if collection.updateOneCalls != 1 {
+		t.Fatalf("update calls = %d, want 1", collection.updateOneCalls)
+	}
+
+	collection = &recordingRepairCollection{updateOneResults: []*mongo.UpdateResult{{MatchedCount: 1, ModifiedCount: 0}}}
+	err := applyNormRepairDocuments(context.Background(), collection, []normRepairItem{repair})
+	if err == nil || !strings.Contains(err.Error(), "matched=1 modified=0 want=1/1") {
+		t.Fatalf("applyNormRepairDocuments() error = %v", err)
 	}
 }
 

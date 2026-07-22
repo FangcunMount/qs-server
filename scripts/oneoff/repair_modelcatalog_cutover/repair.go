@@ -31,6 +31,11 @@ import (
 
 const minimumUnifiedMongoMigration = int64(13)
 
+const (
+	brief2LegacyNormVersion = "brief2-parent-cn-legacy-gXkk9W-v1"
+	brief2LegacyNormFactor  = "XTwK5RCb"
+)
+
 var (
 	legacyModelFields = bson.M{
 		"payload":                   "",
@@ -67,8 +72,22 @@ type repairPlan struct {
 	ArchivedSnapshotCount    int64            `json:"archived_snapshot_count"`
 	LegacyModelDocumentCount int64            `json:"legacy_model_document_count"`
 	NormCount                int64            `json:"norm_count"`
+	NormRepairs              []normRepairItem `json:"norm_repairs,omitempty"`
 	Repairs                  []repairItem     `json:"repairs"`
 	Issues                   []repairIssue    `json:"issues,omitempty"`
+}
+
+type normRepairItem struct {
+	TableVersion     string  `json:"table_version"`
+	FactorCode       string  `json:"factor_code"`
+	RawScoreMin      float64 `json:"raw_score_min"`
+	RawScoreMax      float64 `json:"raw_score_max"`
+	MinAgeMonths     int     `json:"min_age_months"`
+	MaxAgeMonths     int     `json:"max_age_months"`
+	Gender           string  `json:"gender"`
+	TScore           float64 `json:"t_score"`
+	BeforePercentile float64 `json:"before_percentile"`
+	AfterPercentile  float64 `json:"after_percentile"`
 }
 
 type repairItem struct {
@@ -115,6 +134,11 @@ func (p *repairPlan) Text() string {
 		if len(item.Normalizations) > 0 {
 			fmt.Fprintf(&out, "  normalizations=%s\n", strings.Join(item.Normalizations, ","))
 		}
+	}
+	for _, item := range p.NormRepairs {
+		fmt.Fprintf(&out, "- repair norm %s factor=%s raw=%g age=%d-%d gender=%s t=%g percentile=%g->%g\n",
+			item.TableVersion, item.FactorCode, item.RawScoreMin, item.MinAgeMonths, item.MaxAgeMonths,
+			item.Gender, item.TScore, item.BeforePercentile, item.AfterPercentile)
 	}
 	for _, issue := range p.Issues {
 		fmt.Fprintf(&out, "- BLOCKED %s %s", issue.Scope, issue.Rule)
@@ -359,6 +383,12 @@ func inspectNorms(ctx context.Context, db *mongo.Database, plan *repairPlan) err
 		}
 		plan.NormCount = total
 		for _, table := range rows {
+			repairs, normalizeErr := normalizeKnownNormCorruption(table)
+			if normalizeErr != nil {
+				plan.addIssue("assessment_norms", table.TableVersion, "known_repair.ambiguous", normalizeErr.Error(), 1)
+			} else {
+				plan.NormRepairs = append(plan.NormRepairs, repairs...)
+			}
 			if err := modelnorm.ValidateImport(table); err != nil {
 				plan.addIssue("assessment_norms", table.TableVersion, "validate_import.failed", err.Error(), 1)
 			}
@@ -368,6 +398,50 @@ func inspectNorms(ctx context.Context, db *mongo.Database, plan *repairPlan) err
 		}
 	}
 	return nil
+}
+
+// normalizeKnownNormCorruption repairs one source-proven transcription error.
+// Every identifying field and the corrupt value must match exactly; all other
+// invalid norm data remains a blocking finding.
+func normalizeKnownNormCorruption(table *modelnorm.Norm) ([]normRepairItem, error) {
+	if table == nil || table.TableVersion != brief2LegacyNormVersion {
+		return nil, nil
+	}
+	type location struct {
+		factor int
+		row    int
+	}
+	matches := make([]location, 0, 1)
+	for factorIndex := range table.Factors {
+		factor := &table.Factors[factorIndex]
+		if factor.FactorCode != brief2LegacyNormFactor {
+			continue
+		}
+		for rowIndex := range factor.Lookup {
+			row := factor.Lookup[rowIndex]
+			if row.RawScoreMin == 125 && row.RawScoreMax == 125 &&
+				row.MinAgeMonths == 60 && row.MaxAgeMonths == 95 && row.Gender == "male" &&
+				row.TScore == 65 && row.Percentile == 952 {
+				matches = append(matches, location{factor: factorIndex, row: rowIndex})
+			}
+		}
+	}
+	if len(matches) == 0 {
+		return nil, nil
+	}
+	if len(matches) != 1 {
+		return nil, fmt.Errorf("known BRIEF-2 percentile corruption matched %d rows, want exactly 1", len(matches))
+	}
+	match := matches[0]
+	row := &table.Factors[match.factor].Lookup[match.row]
+	repair := normRepairItem{
+		TableVersion: table.TableVersion, FactorCode: brief2LegacyNormFactor,
+		RawScoreMin: row.RawScoreMin, RawScoreMax: row.RawScoreMax,
+		MinAgeMonths: row.MinAgeMonths, MaxAgeMonths: row.MaxAgeMonths, Gender: row.Gender,
+		TScore: row.TScore, BeforePercentile: row.Percentile, AfterPercentile: 92,
+	}
+	table.Factors[match.factor].Lookup[match.row].Percentile = repair.AfterPercentile
+	return []normRepairItem{repair}, nil
 }
 
 func inspectModels(ctx context.Context, db *mongo.Database, plan *repairPlan) error {
@@ -545,7 +619,7 @@ func canonicalRepairItem(
 // normalizeLegacyDefinition makes historical implicit semantics explicit only
 // where the current runtime already has a unique compatibility interpretation.
 // It must not guess questionnaire refs, outcome codes without a legacy level,
-// arbitrary score gaps, or invalid norm values.
+// arbitrary score gaps, or unknown norm values.
 func normalizeLegacyDefinition(def *modeldefinition.Definition) []string {
 	if def == nil {
 		return nil
@@ -577,6 +651,7 @@ func normalizeLegacyDefinition(def *modeldefinition.Definition) []string {
 		}
 	}
 
+	outcomeRegistry := synthesizeLegacyOutcomeRegistry(def)
 	var outcomeCodes, rangeAdjacency, rangeEndpoints int
 	knownOutcomeCodes := make(map[string]struct{}, len(def.Outcomes))
 	for _, outcome := range def.Outcomes {
@@ -598,7 +673,7 @@ func normalizeLegacyDefinition(def *modeldefinition.Definition) []string {
 		}
 	}
 
-	result := make([]string, 0, 5)
+	result := make([]string, 0, 6)
 	appendCount := func(name string, count int) {
 		if count > 0 {
 			result = append(result, fmt.Sprintf("%s:%d", name, count))
@@ -606,10 +681,93 @@ func normalizeLegacyDefinition(def *modeldefinition.Definition) []string {
 	}
 	appendCount("scoring_mode", scoringModes)
 	appendCount("contribution_defaults", contributionDefaults)
+	appendCount("outcome_registry", outcomeRegistry)
 	appendCount("outcome_code", outcomeCodes)
 	appendCount("range_adjacency", rangeAdjacency)
 	appendCount("range_endpoint", rangeEndpoints)
 	return result
+}
+
+type legacyOutcomeCandidate struct {
+	code     string
+	title    string
+	invalid  bool
+	observed bool
+}
+
+func synthesizeLegacyOutcomeRegistry(def *modeldefinition.Definition) int {
+	if def == nil {
+		return 0
+	}
+	known := make(map[string]struct{}, len(def.Outcomes))
+	for _, outcome := range def.Outcomes {
+		if outcome.Code != "" {
+			known[outcome.Code] = struct{}{}
+		}
+	}
+	order := make([]string, 0)
+	candidates := make(map[string]*legacyOutcomeCandidate)
+	visit := func(rules []modelconclusion.ScoreRangeOutcome) {
+		for _, rule := range rules {
+			if rule.OutcomeCode != "" || rule.Level == "" {
+				continue
+			}
+			if _, exists := known[rule.Level]; exists {
+				continue
+			}
+			candidate := candidates[rule.Level]
+			if candidate == nil {
+				candidate = &legacyOutcomeCandidate{code: rule.Level}
+				candidates[rule.Level] = candidate
+				order = append(order, rule.Level)
+			}
+			if !isSafeLegacyOutcomeCode(rule.Level) || rule.Title == "" {
+				candidate.invalid = true
+				continue
+			}
+			if candidate.observed && candidate.title != rule.Title {
+				candidate.invalid = true
+				continue
+			}
+			candidate.title = rule.Title
+			candidate.observed = true
+		}
+	}
+	for _, item := range def.Conclusions {
+		switch typed := item.(type) {
+		case modelconclusion.RiskConclusion:
+			visit(typed.Rules)
+		case modelconclusion.NormConclusion:
+			visit(typed.Rules)
+		case modelconclusion.AbilityConclusion:
+			visit(typed.Rules)
+		}
+	}
+	added := 0
+	for _, code := range order {
+		candidate := candidates[code]
+		if candidate.invalid || !candidate.observed {
+			continue
+		}
+		def.Outcomes = append(def.Outcomes, modelconclusion.Outcome{Code: candidate.code, Title: candidate.title})
+		known[code] = struct{}{}
+		added++
+	}
+	return added
+}
+
+func isSafeLegacyOutcomeCode(code string) bool {
+	if len(code) == 0 || len(code) > 64 || code[0] < 'a' || code[0] > 'z' {
+		return false
+	}
+	for index := 1; index < len(code); index++ {
+		value := code[index]
+		if (value >= 'a' && value <= 'z') || (value >= '0' && value <= '9') || value == '_' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func normalizeLegacyScoreRanges(
@@ -720,8 +878,56 @@ func applyRepairPlan(ctx context.Context, client *mongo.Client, db *mongo.Databa
 	}
 	runner := modelseed.NewMongoTransactionRunner(client)
 	return modelseed.RunAtomically(ctx, runner, func(txCtx context.Context) error {
+		if err := applyNormRepairDocuments(txCtx, db.Collection("assessment_norms"), plan.NormRepairs); err != nil {
+			return err
+		}
 		return applyRepairDocuments(txCtx, db.Collection("assessment_models"), plan)
 	})
+}
+
+type normRepairCollection interface {
+	UpdateOne(context.Context, interface{}, interface{}, ...*options.UpdateOptions) (*mongo.UpdateResult, error)
+}
+
+func applyNormRepairDocuments(ctx context.Context, norms normRepairCollection, repairs []normRepairItem) error {
+	if norms == nil {
+		return fmt.Errorf("assessment_norms collection is required")
+	}
+	for _, item := range repairs {
+		rowFilter := bson.M{
+			"row.raw_score_min": item.RawScoreMin, "row.raw_score_max": item.RawScoreMax,
+			"row.min_age_months": item.MinAgeMonths, "row.max_age_months": item.MaxAgeMonths,
+			"row.gender": item.Gender, "row.t_score": item.TScore, "row.percentile": item.BeforePercentile,
+		}
+		result, err := norms.UpdateOne(ctx,
+			bson.M{
+				"table_version": item.TableVersion, "deleted_at": nil,
+				"factors": bson.M{"$elemMatch": bson.M{
+					"factor_code": item.FactorCode,
+					"lookup": bson.M{"$elemMatch": bson.M{
+						"raw_score_min": item.RawScoreMin, "raw_score_max": item.RawScoreMax,
+						"min_age_months": item.MinAgeMonths, "max_age_months": item.MaxAgeMonths,
+						"gender": item.Gender, "t_score": item.TScore, "percentile": item.BeforePercentile,
+					}},
+				}},
+			},
+			bson.M{"$set": bson.M{
+				"factors.$[factor].lookup.$[row].percentile": item.AfterPercentile,
+				"updated_at": time.Now().UTC(),
+			}},
+			options.Update().SetArrayFilters(options.ArrayFilters{Filters: []interface{}{
+				bson.M{"factor.factor_code": item.FactorCode}, rowFilter,
+			}}),
+		)
+		if err != nil {
+			return fmt.Errorf("repair norm %s factor %s: %w", item.TableVersion, item.FactorCode, err)
+		}
+		if result.MatchedCount != 1 || result.ModifiedCount != 1 {
+			return fmt.Errorf("repair norm %s factor %s: matched=%d modified=%d want=1/1",
+				item.TableVersion, item.FactorCode, result.MatchedCount, result.ModifiedCount)
+		}
+	}
+	return nil
 }
 
 type modelRepairCollection interface {
@@ -812,6 +1018,9 @@ func verifyAppliedRepair(ctx context.Context, mysqlDB *sql.DB, db *mongo.Databas
 	if post.LegacyModelDocumentCount != 0 {
 		return fmt.Errorf("legacy model documents remain: %d", post.LegacyModelDocumentCount)
 	}
+	if len(post.NormRepairs) != 0 {
+		return fmt.Errorf("known norm repairs remain after apply: %d", len(post.NormRepairs))
+	}
 	if post.ActiveSnapshotCount != applied.ActiveSnapshotCount {
 		return fmt.Errorf("active snapshot count=%d want=%d", post.ActiveSnapshotCount, applied.ActiveSnapshotCount)
 	}
@@ -851,3 +1060,4 @@ func legacyModelFilter() bson.M {
 }
 
 var _ modelRepairCollection = (*mongo.Collection)(nil)
+var _ normRepairCollection = (*mongo.Collection)(nil)

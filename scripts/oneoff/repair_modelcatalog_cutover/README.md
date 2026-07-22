@@ -3,8 +3,9 @@
 G5 维护窗口专用的 current-only ModelCatalog 修复工具。历史 Assessment、AnswerSheet、Outcome、Report、任务和统计事实已清零后，它以当前实际生效的 active snapshot 为事实源重新物化 canonical runtime，并在一个 MongoDB 事务内：
 
 - 删除 retained archived Model snapshot；
+- 在完整前值守卫下修正 `brief2-parent-cn-legacy-gXkk9W-v1` 中唯一已确认的转录错误：`XTwK5RCb`、男、60～95 月、raw=125、T=65 的 percentile 从 `952` 修正为 `92`；
 - 按当前 family Handler 重新生成 `AlgorithmFamily`、`DecisionKind` 和冻结 DefinitionV2 layers；
-- 将旧 runtime 已有唯一兼容解释的隐式语义显式化：题目计分模式及默认 sign/weight、由 legacy level 确定的 OutcomeCode、离散整数区间的相邻半开边界和末端闭区间；
+- 将旧 runtime 已有唯一兼容解释的隐式语义显式化：题目计分模式及默认 sign/weight、由一致 legacy level/title 确定的 Outcome registry 与 OutcomeCode、离散整数区间的相邻半开边界和末端闭区间；
 - 使用 `CanonicalContentHash` 写入 DefinitionV2 hash；
 - 清除 `payload`、`definition_payload`、`is_active_published` 等退役字段；
 - 保持 Model code/version、Questionnaire 精确绑定、发布时间及所有 head 内容不变。
@@ -13,7 +14,7 @@ active snapshot 与 head 不要求内容相同：published snapshot 可以与后
 
 active snapshot 的 `release_version` 是已经发布的不可变身份，由工具原样保留。对于 `4.0.1` 等语义版本，临时 domain model 无法表示为整数 revision；Handler 内部生成的 `v0` 只用于临时 runtime DTO，不参与 cutover 版本判定，也不会写回 snapshot。
 
-该工具不会猜测或改写 Norm、缺失题目映射、没有 legacy level 的 OutcomeCode、非单位/小数区间缺口，也不会修改 Questionnaire。任一 Norm、DefinitionV2、head/snapshot、Questionnaire 绑定、索引、migration 或历史清零证据不满足条件时，整个 apply 都会 fail closed。
+除上述单条、有完整前值约束且已同步修正仓库内嵌资产的 BRIEF-2 转录错误外，该工具不会猜测或改写其他 Norm，也不会猜测缺失题目映射、没有安全 legacy level/title 的 OutcomeCode、非单位/小数区间缺口或修改 Questionnaire。任一 Norm、DefinitionV2、head/snapshot、Questionnaire 绑定、索引、migration 或历史清零证据不满足条件时，整个 apply 都会 fail closed。
 
 ## 前置条件
 

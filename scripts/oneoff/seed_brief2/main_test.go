@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
+	modelnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 	surveyquestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -101,8 +102,12 @@ func TestEmbeddedNormSourceIsUsableWithoutExternalFiles(t *testing.T) {
 	if len(source.Factors) != 13 || len(source.Scores) != 6 {
 		t.Fatalf("embedded source factors=%d strata=%d, want 13 and 6", len(source.Factors), len(source.Scores))
 	}
-	if _, _, err := buildNormTable(source, defaultNormVersion, defaultFormVariant); err != nil {
+	table, _, err := buildNormTable(source, defaultNormVersion, defaultFormVariant)
+	if err != nil {
 		t.Fatalf("buildNormTable() error = %v", err)
+	}
+	if err := modelnorm.ValidateImport(table); err != nil {
+		t.Fatalf("embedded norm source is not publishable: %v", err)
 	}
 }
 
