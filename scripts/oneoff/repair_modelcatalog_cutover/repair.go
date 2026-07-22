@@ -15,10 +15,12 @@ import (
 
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
+	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	modelnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
+	mongoquestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	mongoindexes "github.com/FangcunMount/qs-server/internal/pkg/mongodb"
 	"github.com/FangcunMount/qs-server/scripts/oneoff/internal/modelseed"
@@ -78,9 +80,7 @@ type repairItem struct {
 	QuestionnaireVersion string `json:"questionnaire_version"`
 	DefinitionHash       string `json:"definition_hash"`
 
-	headRevision int64
-	snapshot     *modelcatalogport.AssessmentSnapshot
-	head         *domain.AssessmentModel
+	snapshot *modelcatalogport.AssessmentSnapshot
 }
 
 type repairIssue struct {
@@ -102,8 +102,8 @@ func (p *repairPlan) Text() string {
 		return "ModelCatalog cutover repair: unavailable\n"
 	}
 	var out strings.Builder
-	fmt.Fprintf(&out, "ModelCatalog cutover repair: mode=%s active=%d archived=%d heads=%d legacy=%d norms=%d issues=%d generated_at=%s\n",
-		p.Mode, p.ActiveSnapshotCount, p.ArchivedSnapshotCount, p.HeadCount, p.LegacyModelDocumentCount, p.NormCount, len(p.Issues), p.GeneratedAt.Format(time.RFC3339))
+	fmt.Fprintf(&out, "ModelCatalog cutover repair: mode=%s active=%d archived=%d heads=%d legacy=%d norms=%d issue_groups=%d findings=%d generated_at=%s\n",
+		p.Mode, p.ActiveSnapshotCount, p.ArchivedSnapshotCount, p.HeadCount, p.LegacyModelDocumentCount, p.NormCount, len(p.Issues), p.findingCount(), p.GeneratedAt.Format(time.RFC3339))
 	for _, item := range p.Repairs {
 		fmt.Fprintf(&out, "- repair %s@%s identity=%s/%s/%s runtime=%s/%s questionnaire=%s@%s hash=%s\n",
 			item.Code, item.Version, item.Kind, item.SubKind, item.Algorithm, item.AlgorithmFamily, item.DecisionKind,
@@ -123,6 +123,46 @@ func (p *repairPlan) Text() string {
 		fmt.Fprintln(&out, "PASS: repair plan is complete and apply-safe")
 	}
 	return out.String()
+}
+
+func (p *repairPlan) findingCount() int64 {
+	var total int64
+	for _, issue := range p.Issues {
+		if issue.Count > 0 {
+			total += issue.Count
+		} else {
+			total++
+		}
+	}
+	return total
+}
+
+func (p *repairPlan) coalesceIssues() {
+	type issueKey struct {
+		scope   string
+		code    string
+		rule    string
+		message string
+	}
+	grouped := make(map[issueKey]repairIssue, len(p.Issues))
+	for _, issue := range p.Issues {
+		key := issueKey{scope: issue.Scope, code: issue.Code, rule: issue.Rule, message: issue.Message}
+		count := issue.Count
+		if count <= 0 {
+			count = 1
+		}
+		if existing, ok := grouped[key]; ok {
+			existing.Count += count
+			grouped[key] = existing
+			continue
+		}
+		issue.Count = count
+		grouped[key] = issue
+	}
+	p.Issues = p.Issues[:0]
+	for _, issue := range grouped {
+		p.Issues = append(p.Issues, issue)
+	}
 }
 
 func buildRepairPlan(ctx context.Context, mysqlDB *sql.DB, db *mongo.Database) (*repairPlan, error) {
@@ -146,6 +186,7 @@ func buildRepairPlan(ctx context.Context, mysqlDB *sql.DB, db *mongo.Database) (
 	if err := inspectModels(ctx, db, plan); err != nil {
 		return nil, err
 	}
+	plan.coalesceIssues()
 	sort.Slice(plan.Repairs, func(i, j int) bool { return plan.Repairs[i].Code < plan.Repairs[j].Code })
 	sort.Slice(plan.Issues, func(i, j int) bool {
 		left, right := plan.Issues[i], plan.Issues[j]
@@ -155,7 +196,10 @@ func buildRepairPlan(ctx context.Context, mysqlDB *sql.DB, db *mongo.Database) (
 		if left.Code != right.Code {
 			return left.Code < right.Code
 		}
-		return left.Rule < right.Rule
+		if left.Rule != right.Rule {
+			return left.Rule < right.Rule
+		}
+		return left.Message < right.Message
 	})
 	return plan, nil
 }
@@ -340,13 +384,19 @@ func inspectModels(ctx context.Context, db *mongo.Database, plan *repairPlan) er
 	}
 
 	normRepo := mongomodelcatalog.NewNormRepository(db)
-	registry := appdefinition.NewRegistry(
-		appdefinition.ScaleDefinitionHandler{},
-		appdefinition.TypologyDefinitionHandler{},
-		appdefinition.BehavioralRatingDefinitionHandler{NormRepo: normRepo},
-		appdefinition.CognitiveDefinitionHandler{NormRepo: normRepo},
+	questionnaireRepo := mongoquestionnaire.NewRepository(db)
+	questionnaireQuery := questionnaireapp.NewQueryService(
+		questionnaireRepo,
+		nil,
+		nil,
+		mongoquestionnaire.NewQuestionnaireReadModel(questionnaireRepo),
 	)
-	publisher := publication.Publisher{Registry: registry}
+	registry := appdefinition.NewRegistry(
+		appdefinition.ScaleDefinitionHandler{QuestionnaireQuery: questionnaireQuery},
+		appdefinition.TypologyDefinitionHandler{QuestionnaireQuery: questionnaireQuery},
+		appdefinition.BehavioralRatingDefinitionHandler{NormRepo: normRepo, QuestionnaireQuery: questionnaireQuery},
+		appdefinition.CognitiveDefinitionHandler{NormRepo: normRepo, QuestionnaireQuery: questionnaireQuery},
+	)
 	draftRepo := mongomodelcatalog.NewDraftRepository(db)
 	publishedRepo := mongomodelcatalog.NewRepository(db)
 
@@ -386,11 +436,7 @@ func inspectModels(ctx context.Context, db *mongo.Database, plan *repairPlan) er
 			plan.addIssue("assessment_models", current.Code, "head.missing", "active snapshot has no model head", 1)
 			continue
 		}
-		if !head.IsPublished() {
-			plan.addIssue("assessment_models", current.Code, "head.not_published", fmt.Sprintf("active snapshot head status is %q", head.Status), 1)
-			continue
-		}
-		item, issues := canonicalRepairItem(ctx, db, publisher, registry, head, current)
+		item, issues := canonicalRepairItem(ctx, db, registry, current)
 		for _, issue := range issues {
 			plan.Issues = append(plan.Issues, issue)
 		}
@@ -409,28 +455,20 @@ func inspectModels(ctx context.Context, db *mongo.Database, plan *repairPlan) er
 func canonicalRepairItem(
 	ctx context.Context,
 	db *mongo.Database,
-	publisher publication.Publisher,
 	registry appdefinition.Registry,
-	head *domain.AssessmentModel,
 	current *modelcatalogport.PublishedModel,
 ) (repairItem, []repairIssue) {
 	issues := make([]repairIssue, 0)
 	add := func(rule, message string) {
 		issues = append(issues, repairIssue{Scope: "published_runtime", Code: current.Code + "@" + current.Version, Rule: rule, Message: message, Count: 1})
 	}
-	if head.DefinitionV2 == nil || current.DefinitionV2 == nil {
-		add("definition_v2.required", "head and active snapshot must both contain DefinitionV2")
+	if current.DefinitionV2 == nil {
+		add("definition_v2.required", "active snapshot must contain DefinitionV2")
 		return repairItem{}, issues
-	}
-	if head.Kind != current.Kind || head.SubKind != current.SubKind || head.Algorithm != current.Algorithm {
-		add("identity.head_mismatch", fmt.Sprintf("head identity %s/%s/%s differs from active %s/%s/%s", head.Kind, head.SubKind, head.Algorithm, current.Kind, current.SubKind, current.Algorithm))
-	}
-	if head.Binding.QuestionnaireCode != current.QuestionnaireCode || head.Binding.QuestionnaireVersion != current.QuestionnaireVersion {
-		add("questionnaire.head_mismatch", fmt.Sprintf("head binding %s@%s differs from active %s@%s", head.Binding.QuestionnaireCode, head.Binding.QuestionnaireVersion, current.QuestionnaireCode, current.QuestionnaireVersion))
 	}
 	questionnaireCount, err := db.Collection("questionnaires").CountDocuments(ctx, bson.M{
 		"deleted_at": nil, "record_role": "published_snapshot", "release_status": "active", "status": "published",
-		"code": head.Binding.QuestionnaireCode, "version": head.Binding.QuestionnaireVersion,
+		"code": current.QuestionnaireCode, "version": current.QuestionnaireVersion,
 	})
 	if err != nil {
 		add("questionnaire.lookup_failed", err.Error())
@@ -438,25 +476,15 @@ func canonicalRepairItem(
 		add("questionnaire.active_not_exact", fmt.Sprintf("exact active questionnaire snapshot count is %d, want 1", questionnaireCount))
 	}
 
-	headHash, err := modeldefinition.CanonicalContentHash(head.DefinitionV2)
-	if err != nil {
-		add("definition.head_hash_failed", err.Error())
-	}
-	activeHash, err := modeldefinition.CanonicalContentHash(current.DefinitionV2)
-	if err != nil {
-		add("definition.active_hash_failed", err.Error())
-	} else if headHash != "" && activeHash != headHash {
-		add("definition.head_active_mismatch", "head and active snapshot DefinitionV2 content hashes differ")
-	}
-
-	clone := cloneModel(head)
-	modeldefinition.MaterializeLayers(clone.DefinitionV2)
-	handler, err := registry.MustResolveBinding(appdefinition.AlgorithmBindingFromModel(clone))
+	canonical := clonePublishedSnapshot(current)
+	modeldefinition.MaterializeLayers(canonical.DefinitionV2)
+	model := publication.ModelFromPublishedSnapshot(canonical)
+	handler, err := registry.MustResolveBinding(appdefinition.AlgorithmBindingFromModel(model))
 	if err != nil {
 		add("handler.missing", err.Error())
 		return repairItem{}, issues
 	}
-	validation := handler.ValidateForPublish(ctx, clone)
+	validation := handler.ValidateForPublish(ctx, model)
 	if domain.HasValidationErrors(validation) {
 		for _, issue := range validation {
 			if issue.Level == "warning" {
@@ -466,18 +494,19 @@ func canonicalRepairItem(
 		}
 		return repairItem{}, issues
 	}
-	canonical, err := publisher.BuildSnapshot(ctx, clone)
+	materialized, err := handler.MaterializeSnapshot(ctx, model)
 	if err != nil {
 		add("definition.runtime.invalid", err.Error())
 		return repairItem{}, issues
 	}
-	if canonical.Version != current.Version {
-		add("release_version.mismatch", fmt.Sprintf("head materializes version %s but active snapshot is %s", canonical.Version, current.Version))
+	if materialized.Version != "" && materialized.Version != current.Version {
+		add("release_version.mismatch", fmt.Sprintf("DefinitionV2 materializes version %s but active snapshot is %s", materialized.Version, current.Version))
 	}
-	if canonical.QuestionnaireCode != current.QuestionnaireCode || canonical.QuestionnaireVersion != current.QuestionnaireVersion {
-		add("questionnaire.materialized_mismatch", fmt.Sprintf("materialized binding %s@%s differs from active %s@%s", canonical.QuestionnaireCode, canonical.QuestionnaireVersion, current.QuestionnaireCode, current.QuestionnaireVersion))
+	definitionHash, err := modeldefinition.CanonicalContentHash(model.DefinitionV2)
+	if err != nil {
+		add("definition.active_hash_failed", err.Error())
 	}
-	if headHash == "" {
+	if definitionHash == "" {
 		add("definition.hash.empty", "canonical DefinitionV2 hash is empty")
 	}
 	if current.PublishedAt == nil {
@@ -486,7 +515,16 @@ func canonicalRepairItem(
 	if len(issues) > 0 {
 		return repairItem{}, issues
 	}
-	modelcatalogport.AttachDefinitionHash(canonical, headHash)
+	canonical.SchemaVersion = domain.SchemaVersionV2
+	canonical.ProductChannel = domain.ResolveProductChannel(materialized.Kind, canonical.ProductChannel)
+	canonical.Kind = materialized.Kind
+	canonical.SubKind = materialized.SubKind
+	canonical.Algorithm = materialized.Algorithm
+	canonical.AlgorithmFamily = materialized.AlgorithmFamily
+	canonical.DecisionKind = materialized.DecisionKind
+	canonical.Status = string(domain.ModelStatusPublished)
+	canonical.DefinitionV2 = model.DefinitionV2
+	modelcatalogport.AttachDefinitionHash(canonical, definitionHash)
 	canonical.ReleaseStatus = domain.ReleaseStatusActive
 	canonical.PublishedAt = current.PublishedAt
 	canonical.ReleaseArchivedAt = nil
@@ -495,13 +533,13 @@ func canonicalRepairItem(
 		Kind: string(canonical.Kind), SubKind: string(canonical.SubKind), Algorithm: string(canonical.Algorithm),
 		AlgorithmFamily: string(canonical.AlgorithmFamily), DecisionKind: string(canonical.DecisionKind),
 		QuestionnaireCode: canonical.QuestionnaireCode, QuestionnaireVersion: canonical.QuestionnaireVersion,
-		DefinitionHash: headHash, headRevision: head.Revision(), snapshot: canonical, head: clone,
+		DefinitionHash: definitionHash, snapshot: canonical,
 	}, nil
 }
 
-func cloneModel(model *domain.AssessmentModel) *domain.AssessmentModel {
-	mapper := mongomodelcatalog.NewDraftMapper()
-	return mapper.ToDomain(mapper.ToPO(model))
+func clonePublishedSnapshot(snapshot *modelcatalogport.PublishedModel) *modelcatalogport.PublishedModel {
+	mapper := mongomodelcatalog.NewMapper()
+	return mapper.ToPublished(mapper.ToPO(snapshot))
 }
 
 func listAllHeads(ctx context.Context, repo *mongomodelcatalog.DraftRepository) ([]*domain.AssessmentModel, error) {
@@ -584,20 +622,6 @@ func applyRepairDocuments(ctx context.Context, models modelRepairCollection, pla
 	}
 
 	for _, item := range plan.Repairs {
-		headUpdate, err := canonicalHeadUpdate(item.head)
-		if err != nil {
-			return fmt.Errorf("build head update %s: %w", item.Code, err)
-		}
-		headResult, err := models.UpdateOne(ctx, bson.M{
-			"deleted_at": nil, "record_role": "head", "code": item.Code, "revision": item.headRevision,
-		}, headUpdate)
-		if err != nil {
-			return fmt.Errorf("update head %s: %w", item.Code, err)
-		}
-		if headResult.MatchedCount != 1 {
-			return fmt.Errorf("update head %s: matched=%d want=1", item.Code, headResult.MatchedCount)
-		}
-
 		snapshotUpdate, err := canonicalSnapshotUpdate(item.snapshot)
 		if err != nil {
 			return fmt.Errorf("build snapshot update %s: %w", item.Code, err)
@@ -618,17 +642,6 @@ func applyRepairDocuments(ctx context.Context, models modelRepairCollection, pla
 		return fmt.Errorf("remove legacy model fields: %w", err)
 	}
 	return nil
-}
-
-func canonicalHeadUpdate(model *domain.AssessmentModel) (bson.M, error) {
-	po := mongomodelcatalog.NewDraftMapper().ToPO(model)
-	data, err := po.ToBsonM()
-	if err != nil {
-		return nil, err
-	}
-	stripAuditFields(data)
-	data["updated_at"] = time.Now().UTC()
-	return bson.M{"$set": data, "$unset": legacyModelFields}, nil
 }
 
 func canonicalSnapshotUpdate(snapshot *modelcatalogport.AssessmentSnapshot) (bson.M, error) {
@@ -690,9 +703,7 @@ func verifyAppliedRepair(ctx context.Context, mysqlDB *sql.DB, db *mongo.Databas
 }
 
 func publicRepairItem(item repairItem) repairItem {
-	item.head = nil
 	item.snapshot = nil
-	item.headRevision = 0
 	return item
 }
 

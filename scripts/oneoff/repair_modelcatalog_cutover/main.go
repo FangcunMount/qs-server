@@ -1,5 +1,5 @@
-// repair_modelcatalog_cutover rebuilds current ModelCatalog snapshots from
-// their published heads after historical runtime data has been removed.
+// repair_modelcatalog_cutover canonicalizes current active ModelCatalog
+// snapshots after historical runtime data has been removed.
 package main
 
 import (

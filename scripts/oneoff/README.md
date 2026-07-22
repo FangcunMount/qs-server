@@ -40,7 +40,7 @@
 
 | 工具 | 用途 | 生命周期 |
 | --- | --- | --- |
-| `repair_modelcatalog_cutover` | 在历史事实清零后，以当前 Handler 和 published head 原子重建 active Model snapshot | G5 严格关闭并保存证据后删除 |
+| `repair_modelcatalog_cutover` | 在历史事实清零后，以当前 Handler 和 active snapshot 原子规范化线上 Model runtime；不覆盖 draft head | G5 严格关闭并保存证据后删除 |
 
 该工具默认 dry-run，只有所有 MySQL/Mongo 历史清零、Norm、DefinitionV2、精确 Questionnaire 绑定、migration 和索引检查全部通过，才允许显式 `--apply`。它不修 Norm、不猜字段、不兼容旧问卷版本；操作细节见相邻 README。
 

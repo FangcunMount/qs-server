@@ -27,9 +27,7 @@ var forbiddenModuleEdges = []struct{ from, to string }{
 //   - 标 accepted 的条目是设计上可接受的依赖（例如只消费事件类型常量）。
 //
 // 当某条目对应的越界已被消除时，测试会报「allowlist 条目已失效」以提醒收紧护栏。
-var forbiddenDepAllowlist = map[string]string{
-	"internal/apiserver/application/statistics/journey_router.go": "accepted: 仅消费 evaluation 事件类型常量(domain/evaluation/assessment)",
-}
+var forbiddenDepAllowlist = map[string]string{}
 
 // TestForbiddenCrossModuleImports 守护模块间禁止的反向依赖方向。
 func TestForbiddenCrossModuleImports(t *testing.T) {

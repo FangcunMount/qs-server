@@ -70,7 +70,7 @@ gRPC 服务按依赖是否完整进行注册。某个模块没有成功装配时
 当前 scheduler manager 最多装配五个 runner：
 
 - `PlanRunner`：按 Plan 周期创建或更新待执行 Task；
-- `StatisticsSyncRunner`：同步日统计、组织快照和 Plan 统计，并协调预热；
+- `StatisticsSyncRunner`：按机构执行唯一 publish Run，编排 Collector、Projection、SyncRun、Cache Generation 与预热；
 - `BehaviorPendingReconcileRunner`：补偿未完成的行为事件归因；
 - `EvaluationConsistencyReconcileRunner`：审计并修复评分/报告跨存储终态漂移；
 - `BehaviorJourneyScanRunner`：从事实表扫描并投影行为旅程统计。

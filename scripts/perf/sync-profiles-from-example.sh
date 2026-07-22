@@ -23,8 +23,7 @@ migrate_runtime_paths() {
     def migrate_path:
       gsub("/api/v1/personality-models"; "/api/v1/typology-models")
       | gsub("/api/v1/personality-assessment-sessions"; "/api/v1/typology-assessment-sessions")
-      | gsub("/api/v1/personality-assessments"; "/api/v1/typology-assessments")
-      | gsub("/api/v1/statistics"; "/api/v2/statistics");
+      | gsub("/api/v1/personality-assessments"; "/api/v1/typology-assessments");
     def retired_statistics_path:
       startswith("/api/v2/statistics/system")
       or startswith("/api/v2/statistics/questionnaires/");
@@ -55,7 +54,7 @@ if [[ "$next" == "$before" ]]; then
   exit 0
 fi
 
-migrated_paths="$(jq -n --argjson before "$before" --argjson after "$next" '
+migrated_paths="$(jq -r -n --argjson before "$before" --argjson after "$next" '
   ([ $before, $after ]
     | map([.. | strings | select(test("/api/v1/personality-"))] | unique | sort)
     | if (.[0] | length) > 0 and (.[0] != .[1]) then ["typology path migration applied"] else [] end)
@@ -65,11 +64,11 @@ migrated_paths="$(jq -n --argjson before "$before" --argjson after "$next" '
   | join(", ")
 ')"
 
-added_profiles="$(jq -n --argjson before "$before_profile_keys" --argjson after "$(jq -c '.qpsProfiles // {} | keys' <<<"$next")" '
+added_profiles="$(jq -r -n --argjson before "$before_profile_keys" --argjson after "$(jq -c '.qpsProfiles // {} | keys' <<<"$next")" '
   [$after[] | select(. as $k | ($before | index($k) | not))]
   | if length > 0 then join(", ") else empty end
 ')"
-added_paths="$(jq -n --argjson before "$before_path_keys" --argjson after "$(jq -c '.paths // {} | keys' <<<"$next")" '
+added_paths="$(jq -r -n --argjson before "$before_path_keys" --argjson after "$(jq -c '.paths // {} | keys' <<<"$next")" '
   [$after[] | select(. as $k | ($before | index($k) | not))]
   | if length > 0 then join(", ") else empty end
 ')"

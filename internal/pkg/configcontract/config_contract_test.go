@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	apiserverconfig "github.com/FangcunMount/qs-server/internal/apiserver/config"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
@@ -56,9 +57,33 @@ func TestAPIServerDevProdConfigContracts(t *testing.T) {
 				t.Fatal("apiserver IAM service auth config must be traceable")
 			}
 			assertSystemGovernanceConfig(t, name, opts.SystemGovernance)
+			assertStatisticsCacheContract(t, name, opts.Cache)
 			assertIAMJWKSURLContract(t, "apiserver", name, opts.IAMOptions)
 			assertEventCatalogLoads(t)
 		})
+	}
+}
+
+func assertStatisticsCacheContract(t *testing.T, configName string, opts *apiserveroptions.CacheOptions) {
+	t.Helper()
+	if opts == nil || opts.Capabilities == nil || opts.Capabilities.Statistics == nil || opts.Capabilities.Statistics.Query == nil {
+		t.Fatalf("%s statistics.query cache capability must be traceable", configName)
+	}
+	if got := opts.Capabilities.Statistics.Query.TTL; got != 26*time.Hour {
+		t.Fatalf("%s statistics.query TTL = %s, want 26h", configName, got)
+	}
+	if opts.Governance == nil || opts.Governance.StatisticsWarmup == nil {
+		t.Fatalf("%s statistics warmup config must be traceable", configName)
+	}
+	want := []string{"latest_complete_day", "7d", "30d"}
+	got := opts.Governance.StatisticsWarmup.OverviewPresets
+	if len(got) != len(want) {
+		t.Fatalf("%s statistics warmup presets = %v, want %v", configName, got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("%s statistics warmup presets = %v, want %v", configName, got, want)
+		}
 	}
 }
 

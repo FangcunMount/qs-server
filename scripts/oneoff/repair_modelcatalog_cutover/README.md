@@ -1,12 +1,14 @@
 # repair_modelcatalog_cutover
 
-G5 维护窗口专用的 current-only ModelCatalog 修复工具。历史 Assessment、AnswerSheet、Outcome、Report、任务和统计事实已清零后，它从仍在使用的 published head 重新物化 active snapshot，并在一个 MongoDB 事务内：
+G5 维护窗口专用的 current-only ModelCatalog 修复工具。历史 Assessment、AnswerSheet、Outcome、Report、任务和统计事实已清零后，它以当前实际生效的 active snapshot 为事实源重新物化 canonical runtime，并在一个 MongoDB 事务内：
 
 - 删除 retained archived Model snapshot；
 - 按当前 family Handler 重新生成 `AlgorithmFamily`、`DecisionKind` 和冻结 DefinitionV2 layers；
 - 使用 `CanonicalContentHash` 写入 DefinitionV2 hash；
 - 清除 `payload`、`definition_payload`、`is_active_published` 等退役字段；
-- 保持 Model code/version、Questionnaire 精确绑定、发布时间和 head revision 不变。
+- 保持 Model code/version、Questionnaire 精确绑定、发布时间及所有 head 内容不变。
+
+active snapshot 与 head 不要求内容相同：published snapshot 可以与后续 draft head 合法并存。工具不会用 active snapshot 覆盖 draft head，也不会用尚未发布的 head 改写线上 runtime。
 
 该工具不会猜测或改写 Norm，也不会修改 Questionnaire。任一 Norm、DefinitionV2、head/snapshot、Questionnaire 绑定、索引、migration 或历史清零证据不满足条件时，整个 apply 都会 fail closed。
 
@@ -20,7 +22,7 @@ G5 维护窗口专用的 current-only ModelCatalog 修复工具。历史 Assessm
 
 ## Dry-run
 
-默认只读。它会打印每个 active snapshot 的 canonical identity/hash，以及精确的阻断原因：
+默认只读。它会使用与生产发布守卫相同的 Questionnaire 查询服务检查绑定，打印每个 active snapshot 的 canonical identity/hash，并将相同 code/rule/message 的重复 finding 聚合为一组：
 
 ```bash
 go build -o /tmp/repair-modelcatalog-cutover \

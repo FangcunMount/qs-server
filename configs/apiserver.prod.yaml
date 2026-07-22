@@ -250,7 +250,7 @@ cache:
     plan:
       detail: {enabled: true, ttl: "12h", singleflight: true}
     statistics:
-      query: {enabled: true, ttl: "15m", singleflight: false}
+      query: {enabled: true, ttl: "26h", singleflight: false}
     report_status:
       ttl_seconds: 172800
   defaults:

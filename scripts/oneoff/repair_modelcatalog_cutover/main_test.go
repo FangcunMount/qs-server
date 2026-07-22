@@ -58,6 +58,23 @@ func TestRepairPlanTextIncludesExactBlockingReason(t *testing.T) {
 	}
 }
 
+func TestRepairPlanCoalescesRepeatedFindings(t *testing.T) {
+	t.Parallel()
+	plan := &repairPlan{Issues: []repairIssue{
+		{Scope: "published_runtime", Code: "M1@v1", Rule: "outcome.not_found", Message: "outcome low is not defined", Count: 1},
+		{Scope: "published_runtime", Code: "M1@v1", Rule: "outcome.not_found", Message: "outcome low is not defined", Count: 1},
+		{Scope: "published_runtime", Code: "M1@v1", Rule: "outcome.not_found", Message: "outcome high is not defined", Count: 1},
+	}}
+	plan.coalesceIssues()
+	if len(plan.Issues) != 2 || plan.findingCount() != 3 {
+		t.Fatalf("issues=%#v groups=%d findings=%d", plan.Issues, len(plan.Issues), plan.findingCount())
+	}
+	text := plan.Text()
+	if !strings.Contains(text, "issue_groups=2 findings=3") || !strings.Contains(text, "count=2") {
+		t.Fatalf("plan text = %q", text)
+	}
+}
+
 func TestMySQLDerivedHistoryTablesIncludesAllStatisticsAndAnalyticsTables(t *testing.T) {
 	t.Parallel()
 	db, mock, err := sqlmock.New()
@@ -124,12 +141,6 @@ func TestCanonicalSnapshotUpdateUsesCanonicalFieldsAndPreservesAuditOwnership(t 
 func TestApplyRepairDocumentsChecksEveryWriteBoundary(t *testing.T) {
 	t.Parallel()
 	now := time.Unix(100, 0).UTC()
-	head := &domain.AssessmentModel{
-		Code: "SPM", Kind: domain.KindCognitive, Algorithm: domain.AlgorithmSPM,
-		Title: "SPM", Status: domain.ModelStatusPublished, Version: 3,
-		Binding:      domain.QuestionnaireBinding{QuestionnaireCode: "Q-SPM", QuestionnaireVersion: "3.0.0"},
-		DefinitionV2: &modeldefinition.Definition{},
-	}
 	snapshot := &modelcatalogport.AssessmentSnapshot{
 		Kind: domain.KindCognitive, Algorithm: domain.AlgorithmSPM,
 		AlgorithmFamily: domain.AlgorithmFamilyTaskPerformance, DecisionKind: domain.DecisionKindAbilityLevel,
@@ -137,17 +148,15 @@ func TestApplyRepairDocumentsChecksEveryWriteBoundary(t *testing.T) {
 		QuestionnaireCode: "Q-SPM", QuestionnaireVersion: "3.0.0", PublishedAt: &now,
 		DefinitionV2: &modeldefinition.Definition{}, Source: map[string]any{},
 	}
-	plan := &repairPlan{ArchivedSnapshotCount: 2, Repairs: []repairItem{{
-		Code: "SPM", Version: "v3", headRevision: 3, head: head, snapshot: snapshot,
-	}}}
+	plan := &repairPlan{ArchivedSnapshotCount: 2, Repairs: []repairItem{{Code: "SPM", Version: "v3", snapshot: snapshot}}}
 	collection := &recordingRepairCollection{
 		deleteResult:     &mongo.DeleteResult{DeletedCount: 2},
-		updateOneResults: []*mongo.UpdateResult{{MatchedCount: 1}, {MatchedCount: 1}},
+		updateOneResults: []*mongo.UpdateResult{{MatchedCount: 1}},
 	}
 	if err := applyRepairDocuments(context.Background(), collection, plan); err != nil {
 		t.Fatalf("applyRepairDocuments() error = %v", err)
 	}
-	if collection.deleteCalls != 1 || collection.updateOneCalls != 2 || collection.updateManyCalls != 1 {
+	if collection.deleteCalls != 1 || collection.updateOneCalls != 1 || collection.updateManyCalls != 1 {
 		t.Fatalf("calls delete=%d updateOne=%d updateMany=%d", collection.deleteCalls, collection.updateOneCalls, collection.updateManyCalls)
 	}
 	if !reflect.DeepEqual(collection.deleteFilter, archivedSnapshotFilter()) {
@@ -160,7 +169,7 @@ func TestApplyRepairDocumentsStopsOnSnapshotCASMismatch(t *testing.T) {
 	plan := minimalRepairPlan()
 	collection := &recordingRepairCollection{
 		deleteResult:     &mongo.DeleteResult{},
-		updateOneResults: []*mongo.UpdateResult{{MatchedCount: 1}, {MatchedCount: 0}},
+		updateOneResults: []*mongo.UpdateResult{{MatchedCount: 0}},
 	}
 	err := applyRepairDocuments(context.Background(), collection, plan)
 	if err == nil || !strings.Contains(err.Error(), "matched=0 want=1") {
@@ -176,7 +185,7 @@ func TestApplyRepairDocumentsPropagatesLegacyCleanupFailure(t *testing.T) {
 	plan := minimalRepairPlan()
 	collection := &recordingRepairCollection{
 		deleteResult:     &mongo.DeleteResult{},
-		updateOneResults: []*mongo.UpdateResult{{MatchedCount: 1}, {MatchedCount: 1}},
+		updateOneResults: []*mongo.UpdateResult{{MatchedCount: 1}},
 		updateManyErr:    errors.New("write failed"),
 	}
 	err := applyRepairDocuments(context.Background(), collection, plan)
@@ -186,9 +195,8 @@ func TestApplyRepairDocumentsPropagatesLegacyCleanupFailure(t *testing.T) {
 }
 
 func minimalRepairPlan() *repairPlan {
-	head := &domain.AssessmentModel{Code: "M1", Title: "M1", Status: domain.ModelStatusPublished, Version: 1, DefinitionV2: &modeldefinition.Definition{}}
 	snapshot := &modelcatalogport.AssessmentSnapshot{Code: "M1", Version: "v1", Status: "published", DefinitionV2: &modeldefinition.Definition{}, Source: map[string]any{}}
-	return &repairPlan{Repairs: []repairItem{{Code: "M1", Version: "v1", headRevision: 1, head: head, snapshot: snapshot}}}
+	return &repairPlan{Repairs: []repairItem{{Code: "M1", Version: "v1", snapshot: snapshot}}}
 }
 
 type recordingRepairCollection struct {
