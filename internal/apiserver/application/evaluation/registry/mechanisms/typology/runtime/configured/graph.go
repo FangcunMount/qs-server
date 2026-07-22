@@ -2,6 +2,7 @@ package configured
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	calcclassification "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/classification"
@@ -190,18 +191,25 @@ func buildPatternDecision(payload *modeltypology.Payload, spec *modeltypology.Ru
 			Pattern: patternLevelsByOrder(outcome.Pattern, patternOrder),
 		})
 	}
-	levelRule := calcclassification.LevelRule{LowMax: 3, HighMin: 5}
-	if spec.Decision.LevelRule != nil {
-		levelRule = calcclassification.LevelRule{
-			LowMax:  spec.Decision.LevelRule.LowMax,
-			HighMin: spec.Decision.LevelRule.HighMin,
-		}
+	if spec.Decision.LevelRule == nil {
+		return calcclassification.DecisionSpec{}, fmt.Errorf("nearest_pattern requires explicit level rule")
+	}
+	levelRule := calcclassification.LevelRule{
+		LowMax:  spec.Decision.LevelRule.LowMax,
+		HighMin: spec.Decision.LevelRule.HighMin,
+	}
+	if !finite(levelRule.LowMax) || !finite(levelRule.HighMin) || levelRule.LowMax >= levelRule.HighMin {
+		return calcclassification.DecisionSpec{}, fmt.Errorf("nearest_pattern level rule is invalid")
 	}
 	threshold := spec.Decision.FallbackSimilarityThreshold
-	if threshold <= 0 {
-		threshold = 0.6
-	}
 	fallbackCode := spec.Decision.FallbackCode
+	hasFallback := fallbackCode != "" || runtimeHasFallbackRule(spec.SpecialRules)
+	if hasFallback && (!finite(threshold) || threshold <= 0 || threshold > 1) {
+		return calcclassification.DecisionSpec{}, fmt.Errorf("nearest_pattern fallback threshold is invalid")
+	}
+	if !hasFallback && threshold != 0 {
+		return calcclassification.DecisionSpec{}, fmt.Errorf("nearest_pattern fallback threshold has no fallback result")
+	}
 	return calcclassification.DecisionSpec{
 		Kind:              calcclassification.DecisionKindNearestPattern,
 		PatternOrder:      patternOrder,
@@ -210,6 +218,19 @@ func buildPatternDecision(payload *modeltypology.Payload, spec *modeltypology.Ru
 		FallbackThreshold: threshold,
 		FallbackCode:      fallbackCode,
 	}, nil
+}
+
+func finite(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0)
+}
+
+func runtimeHasFallbackRule(rules []modeltypology.SpecialRuleSpec) bool {
+	for _, rule := range rules {
+		if rule.ResolvedKind() == modeltypology.SpecialRuleKindFallbackThreshold {
+			return true
+		}
+	}
+	return false
 }
 
 func dimensionMetaForFactor(fg modeltypology.FactorGraphSpec, factorID string) (modeltypology.Dimension, bool) {

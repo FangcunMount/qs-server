@@ -2,8 +2,9 @@ package typology
 
 import (
 	"fmt"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	"math"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 )
 
 // QuestionnaireSnapshot 是minimal 问卷 结构 needed 到 有效ate 运行时规格。
@@ -253,7 +254,7 @@ func (v *runtimeSpecValidator) validateDecision(spec RuntimeSpec) {
 	if spec.Decision.FallbackCode != "" {
 		v.validateOutcomeCode("decision.fallback_code", "decision.fallback_code.not_found", spec.Decision.FallbackCode)
 	}
-	if spec.Decision.LevelRule != nil && spec.Decision.LevelRule.LowMax >= spec.Decision.LevelRule.HighMin {
+	if spec.Decision.LevelRule != nil && !validLevelRule(*spec.Decision.LevelRule) {
 		v.add("decision.level_rule", "decision.level_rule.invalid", "level_rule low_max 必须小于 high_min")
 	}
 	switch spec.Decision.Kind {
@@ -265,6 +266,19 @@ func (v *runtimeSpecValidator) validateDecision(spec RuntimeSpec) {
 			}
 		}
 	case binding.DecisionKindNearestPattern:
+		if spec.Decision.LevelRule == nil {
+			v.add("decision.level_rule", "decision.level_rule.required", "nearest_pattern 必须显式配置 level_rule")
+		}
+		hasFallback := spec.Decision.FallbackCode != "" || hasFallbackSpecialRule(spec.SpecialRules)
+		threshold := spec.Decision.FallbackSimilarityThreshold
+		switch {
+		case hasFallback && threshold == 0:
+			v.add("decision.fallback_similarity_threshold", "decision.fallback_threshold.required", "配置 fallback 时必须显式配置 similarity threshold")
+		case hasFallback && !validSimilarityThreshold(threshold):
+			v.add("decision.fallback_similarity_threshold", "decision.fallback_threshold.invalid", "fallback similarity threshold 必须是 (0,1] 内的有限数字")
+		case !hasFallback && threshold != 0:
+			v.add("decision.fallback_similarity_threshold", "decision.fallback_threshold.orphaned", "未配置 fallback 结果时不能配置 similarity threshold")
+		}
 		hasPattern := false
 		for _, outcome := range v.outcomes {
 			hasPattern = hasPattern || (!outcome.IsSpecial && outcome.Pattern != "")
@@ -287,6 +301,27 @@ func (v *runtimeSpecValidator) validateDecision(spec RuntimeSpec) {
 			}
 		}
 	}
+}
+
+func validLevelRule(rule LevelRuleSpec) bool {
+	return isFinite(rule.LowMax) && isFinite(rule.HighMin) && rule.LowMax < rule.HighMin
+}
+
+func validSimilarityThreshold(value float64) bool {
+	return isFinite(value) && value > 0 && value <= 1
+}
+
+func isFinite(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0)
+}
+
+func hasFallbackSpecialRule(rules []SpecialRuleSpec) bool {
+	for _, rule := range rules {
+		if rule.ResolvedKind() == SpecialRuleKindFallbackThreshold {
+			return true
+		}
+	}
+	return false
 }
 
 func dimensionForValidation(graph FactorGraphSpec, factorCode string) (Dimension, bool) {

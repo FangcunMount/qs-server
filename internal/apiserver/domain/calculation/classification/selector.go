@@ -128,18 +128,10 @@ func PoleStrength(raw float64, pole PoleSpec) float64 {
 
 // LevelForScore 映射原始分 到 L/M/H using 配置化 等级 rule。
 func LevelForScore(raw float64, rule LevelRule) string {
-	lowMax := rule.LowMax
-	if lowMax == 0 {
-		lowMax = 3
-	}
-	highMin := rule.HighMin
-	if highMin == 0 {
-		highMin = 5
-	}
 	switch {
-	case raw <= lowMax:
+	case raw <= rule.LowMax:
 		return "L"
-	case raw >= highMin:
+	case raw >= rule.HighMin:
 		return "H"
 	default:
 		return "M"

@@ -44,6 +44,26 @@ func TestEvaluatorAppliesGenericFallbackSpecialRule(t *testing.T) {
 	}
 }
 
+func TestEvaluatorRejectsImplicitNearestPatternBoundaries(t *testing.T) {
+	t.Parallel()
+
+	t.Run("missing level rule", func(t *testing.T) {
+		payload := explicitNearestPatternPayload()
+		payload.Runtime.Decision.LevelRule = nil
+		if _, err := configured.NewEvaluator().Score(payload, canonicalDefinitionFixture(t, payload), explicitNearestPatternLowSheet()); err == nil {
+			t.Fatal("Score error = nil, want explicit level rule failure")
+		}
+	})
+
+	t.Run("missing fallback threshold", func(t *testing.T) {
+		payload := explicitNearestPatternPayload()
+		payload.Runtime.Decision.FallbackSimilarityThreshold = 0
+		if _, err := configured.NewEvaluator().Score(payload, canonicalDefinitionFixture(t, payload), explicitNearestPatternLowSheet()); err == nil {
+			t.Fatal("Score error = nil, want explicit fallback threshold failure")
+		}
+	})
+}
+
 func explicitPoleCompositionPayload() *modeltypology.Payload {
 	return &modeltypology.Payload{
 		Code:                 "CUSTOM_POLE_V1",

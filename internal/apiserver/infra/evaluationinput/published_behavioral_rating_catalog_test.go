@@ -10,6 +10,7 @@ import (
 	evaldescriptor "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	appdefinition "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
+	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -108,13 +109,27 @@ func TestPublishedBehavioralRatingRetainedReleaseReplaysExactNormToOutcome(t *te
 				}
 			}
 
-			handler := appdefinition.BehavioralRatingDefinitionHandler{NormRepo: stubNormRepository{tables: []*norm.Norm{v1Table, v2Table}}}
+			handler := appdefinition.BehavioralRatingDefinitionHandler{
+				NormRepo: stubNormRepository{tables: []*norm.Norm{v1Table, v2Table}},
+				QuestionnaireQuery: behavioralContractQuestionnaireQuery{result: &questionnaireapp.QuestionnaireResult{
+					Code: "Q-BEH", Version: "1", Status: "published",
+					Questions: []questionnaireapp.QuestionResult{{Code: "q1", Type: "number"}},
+				}},
+			}
 			publisher := publication.Publisher{Registry: appdefinition.NewRegistry(handler)}
-			v1, err := publisher.BuildSnapshot(context.Background(), retainedBehavioralModel(algorithm, 1, v1Table.TableVersion))
+			v1Model := retainedBehavioralModel(algorithm, 1, v1Table.TableVersion)
+			if issues := handler.ValidateForPublish(context.Background(), v1Model); domain.HasValidationErrors(issues) {
+				t.Fatalf("ValidateForPublish(v1) issues = %#v", issues)
+			}
+			v1, err := publisher.BuildSnapshot(context.Background(), v1Model)
 			if err != nil {
 				t.Fatalf("BuildSnapshot(v1): %v", err)
 			}
-			v2, err := publisher.BuildSnapshot(context.Background(), retainedBehavioralModel(algorithm, 2, v2Table.TableVersion))
+			v2Model := retainedBehavioralModel(algorithm, 2, v2Table.TableVersion)
+			if issues := handler.ValidateForPublish(context.Background(), v2Model); domain.HasValidationErrors(issues) {
+				t.Fatalf("ValidateForPublish(v2) issues = %#v", issues)
+			}
+			v2, err := publisher.BuildSnapshot(context.Background(), v2Model)
 			if err != nil {
 				t.Fatalf("BuildSnapshot(v2): %v", err)
 			}
@@ -264,6 +279,168 @@ func TestPublishedBehavioralRatingMissingNormSubjectProducesNoPartialOutcome(t *
 	}
 }
 
+func TestPublishedBehavioralRatingNormResolutionContract(t *testing.T) {
+	t.Parallel()
+
+	specific := norm.LookupEntry{
+		RawScoreMin: 10, RawScoreMax: 10, TScore: 55, Percentile: 50,
+		MinAgeMonths: 60, MaxAgeMonths: 95, Gender: "female",
+	}
+	generic := norm.LookupEntry{RawScoreMin: 10, RawScoreMax: 10, TScore: 45, Percentile: 40}
+	for _, tc := range []struct {
+		name       string
+		rows       []norm.LookupEntry
+		rawScore   float64
+		facts      *port.NormSubjectFacts
+		asOf       time.Time
+		wantKind   calcnorm.ErrorKind
+		wantCohort bool
+		wantTScore float64
+	}{
+		{name: "specific lower age endpoint", rows: []norm.LookupEntry{specific, generic}, rawScore: 10, facts: normFactsAtAgeMonths(60), asOf: normAsOf(), wantCohort: true, wantTScore: 55},
+		{name: "specific upper age endpoint", rows: []norm.LookupEntry{specific, generic}, rawScore: 10, facts: normFactsAtAgeMonths(95), asOf: normAsOf(), wantCohort: true, wantTScore: 55},
+		{name: "explicit generic fallback", rows: []norm.LookupEntry{specific, generic}, rawScore: 10, facts: &port.NormSubjectFacts{}, asOf: normAsOf(), wantTScore: 45},
+		{name: "no cohort", rows: []norm.LookupEntry{specific}, rawScore: 10, facts: normFactsAtAgeMonthsWithGender(72, "male"), asOf: normAsOf(), wantKind: calcnorm.ErrorKindCohortNotFound},
+		{name: "raw score out of range", rows: []norm.LookupEntry{specific}, rawScore: 11, facts: normFactsAtAgeMonths(72), asOf: normAsOf(), wantKind: calcnorm.ErrorKindRawScoreOutOfRange},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			table := retainedBehavioralNorm(domain.AlgorithmBrief2, "norm-contract", 55)
+			table.Factors[0].Lookup = append([]norm.LookupEntry(nil), tc.rows...)
+			outcome, err := runBehavioralNormContract(t, table, tc.rawScore, tc.facts, tc.asOf)
+			if tc.wantKind != "" {
+				if outcome != nil {
+					t.Fatalf("partial Outcome = %#v, want nil", outcome)
+				}
+				kind, ok := calcnorm.ErrorKindOf(err)
+				if !ok || kind != tc.wantKind {
+					t.Fatalf("error = %v, kind = %q; want %q", err, kind, tc.wantKind)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("runBehavioralNormContract: %v", err)
+			}
+			dimension := outcome.Dimensions[len(outcome.Dimensions)-1]
+			if dimension.NormReference == nil || dimension.NormReference.TableVersion != "norm-contract" || dimension.NormReference.FormVariant != "parent" {
+				t.Fatalf("NormReference = %#v", dimension.NormReference)
+			}
+			if gotSpecific := dimension.NormReference.MinAgeMonths != 0 || dimension.NormReference.MaxAgeMonths != 0 || dimension.NormReference.Gender != ""; gotSpecific != tc.wantCohort {
+				t.Fatalf("specific cohort = %t, want %t; ref = %#v", gotSpecific, tc.wantCohort, dimension.NormReference)
+			}
+			if !hasDerivedScore(dimension.DerivedScores, domainoutcome.ScoreKindTScore, tc.wantTScore) {
+				t.Fatalf("DerivedScores = %#v, want T score %.0f", dimension.DerivedScores, tc.wantTScore)
+			}
+		})
+	}
+}
+
+func TestBehavioralNormImportRejectsAmbiguousMaterialBeforePublication(t *testing.T) {
+	t.Parallel()
+
+	table := retainedBehavioralNorm(domain.AlgorithmBrief2, "norm-invalid", 55)
+	table.Factors[0].Lookup = append(table.Factors[0].Lookup, table.Factors[0].Lookup[0])
+	if err := norm.ValidateImport(table); err == nil {
+		t.Fatal("ValidateImport error = nil, want overlapping cohort rejection")
+	}
+}
+
+func runBehavioralNormContract(
+	t *testing.T,
+	table *norm.Norm,
+	rawScore float64,
+	facts *port.NormSubjectFacts,
+	asOf time.Time,
+) (*domainoutcome.Execution, error) {
+	t.Helper()
+	if err := norm.ValidateImport(table); err != nil {
+		t.Fatalf("ValidateImport: %v", err)
+	}
+	questionnaire := &questionnaireapp.QuestionnaireResult{
+		Code: "Q-BEH", Version: "1", Status: "published",
+		Questions: []questionnaireapp.QuestionResult{{Code: "q1", Type: "number"}},
+	}
+	handler := appdefinition.BehavioralRatingDefinitionHandler{
+		NormRepo:           stubNormRepository{tables: []*norm.Norm{table}},
+		QuestionnaireQuery: behavioralContractQuestionnaireQuery{result: questionnaire},
+	}
+	model := retainedBehavioralModel(domain.AlgorithmBrief2, 1, table.TableVersion)
+	if issues := handler.ValidateForPublish(context.Background(), model); domain.HasValidationErrors(issues) {
+		t.Fatalf("ValidateForPublish issues = %#v", issues)
+	}
+	published, err := (publication.Publisher{Registry: appdefinition.NewRegistry(handler)}).BuildSnapshot(context.Background(), model)
+	if err != nil {
+		t.Fatalf("BuildSnapshot: %v", err)
+	}
+	reader := retainedBehavioralReader{snapshots: map[string]*rulesetport.PublishedModel{retainedSnapshotKey(published): published}}
+	provider := NewBehavioralRatingModelInputProvider(
+		domain.AlgorithmBrief2,
+		NewPublishedBehavioralRatingCatalog(reader, stubNormRepository{tables: []*norm.Norm{table}}),
+		reader, behavioralContractAnswerSheetReader{score: rawScore}, retainedQuestionnaireReader{},
+		retainedNormSubjectReader{facts: facts},
+	)
+	input, err := provider.ResolveInput(context.Background(), port.InputRef{
+		AnswerSheetID: 1, TesteeID: 7, AsOf: asOf,
+		ModelRef: port.ModelRef{
+			Kind: port.EvaluationModelKindBehavioralRating, Algorithm: string(domain.AlgorithmBrief2),
+			Code: published.Code, Version: published.Version,
+		},
+	})
+	if err != nil {
+		t.Fatalf("ResolveInput: %v", err)
+	}
+	identity, ok := port.NewInputSnapshotIdentity(input)
+	if !ok || !port.IsIdentityRef(identity.Ref()) {
+		t.Fatalf("input identity = %#v, ref = %q", identity, identity.Ref())
+	}
+	modelRef := assessment.NewEvaluationModelRefWithIdentity(
+		domain.KindBehavioralRating, domain.SubKindEmpty, domain.AlgorithmBrief2,
+		meta.ID(0), meta.NewCode(published.Code), published.Version, published.Title,
+	)
+	currentAssessment, err := assessment.NewAssessment(
+		1, testee.NewID(7), assessment.NewQuestionnaireRefByCode(meta.NewCode("Q-BEH"), "1"),
+		assessment.NewAnswerSheetRef(meta.FromUint64(1)), assessment.NewAdhocOrigin(), assessment.WithEvaluationModel(modelRef),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment: %v", err)
+	}
+	if err := currentAssessment.Submit(); err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+	components := norming.NewPipelineComponents(nil)
+	calculationInput, err := components.InputAssembler.Assemble(evaldescriptor.ExecutionInput{Assessment: currentAssessment, Input: input})
+	if err != nil {
+		t.Fatalf("InputAssembler: %v", err)
+	}
+	calculated, err := components.Calculator.Calculate(context.Background(), calculationInput)
+	if err != nil {
+		return nil, err
+	}
+	assembled, err := components.OutcomeAssembler.Assemble(calculated)
+	if err != nil {
+		return nil, err
+	}
+	outcome, ok := assembled.(*domainoutcome.Execution)
+	if !ok {
+		t.Fatalf("Outcome = %T, want *outcome.Execution", assembled)
+	}
+	return outcome, nil
+}
+
+func normAsOf() time.Time {
+	return time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+}
+
+func normFactsAtAgeMonths(ageMonths int) *port.NormSubjectFacts {
+	return normFactsAtAgeMonthsWithGender(ageMonths, "female")
+}
+
+func normFactsAtAgeMonthsWithGender(ageMonths int, gender string) *port.NormSubjectFacts {
+	birthday := normAsOf().AddDate(0, -ageMonths, 0)
+	return &port.NormSubjectFacts{Gender: gender, Birthday: &birthday}
+}
+
 func retainedBehavioralNorm(algorithm domain.Algorithm, version string, tScore float64) *norm.Norm {
 	return &norm.Norm{
 		TableVersion: version, FormVariant: "parent", Kind: domain.KindBehavioralRating, Algorithm: algorithm,
@@ -324,6 +501,17 @@ func (retainedAnswerSheetReader) GetAnswerSheet(context.Context, uint64) (*port.
 	}, nil
 }
 
+type behavioralContractAnswerSheetReader struct {
+	score float64
+}
+
+func (r behavioralContractAnswerSheetReader) GetAnswerSheet(context.Context, uint64) (*port.AnswerSheetSnapshot, error) {
+	return &port.AnswerSheetSnapshot{
+		ID: 1, QuestionnaireCode: "Q-BEH", QuestionnaireVersion: "1",
+		Answers: []port.AnswerSnapshot{{QuestionCode: "q1", Score: r.score}},
+	}, nil
+}
+
 type retainedQuestionnaireReader struct{}
 
 func (retainedQuestionnaireReader) GetQuestionnaire(context.Context, string, string) (*port.QuestionnaireSnapshot, error) {
@@ -332,6 +520,15 @@ func (retainedQuestionnaireReader) GetQuestionnaire(context.Context, string, str
 
 type retainedNormSubjectReader struct {
 	facts *port.NormSubjectFacts
+}
+
+type behavioralContractQuestionnaireQuery struct {
+	questionnaireapp.QuestionnaireQueryService
+	result *questionnaireapp.QuestionnaireResult
+}
+
+func (s behavioralContractQuestionnaireQuery) GetPublishedByCodeVersion(context.Context, string, string) (*questionnaireapp.QuestionnaireResult, error) {
+	return s.result, nil
 }
 
 func (r retainedNormSubjectReader) ReadNormSubjectFacts(context.Context, uint64) (*port.NormSubjectFacts, error) {

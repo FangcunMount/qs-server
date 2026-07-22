@@ -2,6 +2,7 @@ package typology_test
 
 import (
 	"encoding/json"
+	"math"
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -184,6 +185,75 @@ func TestValidateRuntimeSpecForPublishValidatesDecisionAndLevelRule(t *testing.T
 	if !hasIssueCode(issues, "decision.level_rule.invalid") {
 		t.Fatalf("issues = %#v, want decision.level_rule.invalid", issues)
 	}
+}
+
+func TestValidateRuntimeSpecForPublishRequiresExplicitNearestPatternBoundaries(t *testing.T) {
+	t.Parallel()
+
+	newSpec := func() *typology.RuntimeSpec {
+		spec := validRuntimeSpec()
+		spec.Decision = typology.PersonalityDecisionSpec{
+			Kind:      modelcatalog.DecisionKindNearestPattern,
+			LevelRule: &typology.LevelRuleSpec{LowMax: 3, HighMin: 5},
+		}
+		return spec
+	}
+	validate := func(spec *typology.RuntimeSpec) []modelcatalog.DomainValidationIssue {
+		return typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
+			Algorithm: modelcatalog.AlgorithmPersonalityTypology,
+			Outcomes:  []typology.Outcome{{Code: "HIGH", Name: "High", Pattern: "H"}, {Code: "LOW_MATCH", Name: "Low Match", IsSpecial: true}},
+		})
+	}
+
+	t.Run("level rule required", func(t *testing.T) {
+		spec := newSpec()
+		spec.Decision.LevelRule = nil
+		if issues := validate(spec); !hasIssueCode(issues, "decision.level_rule.required") {
+			t.Fatalf("issues = %#v, want decision.level_rule.required", issues)
+		}
+	})
+
+	t.Run("level rule finite", func(t *testing.T) {
+		spec := newSpec()
+		spec.Decision.LevelRule.LowMax = math.NaN()
+		if issues := validate(spec); !hasIssueCode(issues, "decision.level_rule.invalid") {
+			t.Fatalf("issues = %#v, want decision.level_rule.invalid", issues)
+		}
+	})
+
+	t.Run("fallback threshold required", func(t *testing.T) {
+		spec := newSpec()
+		spec.Decision.FallbackCode = "LOW_MATCH"
+		if issues := validate(spec); !hasIssueCode(issues, "decision.fallback_threshold.required") {
+			t.Fatalf("issues = %#v, want decision.fallback_threshold.required", issues)
+		}
+	})
+
+	t.Run("fallback threshold bounded", func(t *testing.T) {
+		spec := newSpec()
+		spec.Decision.FallbackCode = "LOW_MATCH"
+		spec.Decision.FallbackSimilarityThreshold = 1.1
+		if issues := validate(spec); !hasIssueCode(issues, "decision.fallback_threshold.invalid") {
+			t.Fatalf("issues = %#v, want decision.fallback_threshold.invalid", issues)
+		}
+	})
+
+	t.Run("orphaned fallback threshold rejected", func(t *testing.T) {
+		spec := newSpec()
+		spec.Decision.FallbackSimilarityThreshold = 0.9
+		if issues := validate(spec); !hasIssueCode(issues, "decision.fallback_threshold.orphaned") {
+			t.Fatalf("issues = %#v, want decision.fallback_threshold.orphaned", issues)
+		}
+	})
+
+	t.Run("explicit boundaries accepted", func(t *testing.T) {
+		spec := newSpec()
+		spec.Decision.FallbackCode = "LOW_MATCH"
+		spec.Decision.FallbackSimilarityThreshold = 0.9
+		if issues := validate(spec); modelcatalog.HasValidationErrors(issues) {
+			t.Fatalf("issues = %#v", issues)
+		}
+	})
 }
 
 func TestValidateRuntimeSpecForPublishRequiresDecisionKind(t *testing.T) {

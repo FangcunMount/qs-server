@@ -43,3 +43,38 @@ func TestFindInterpretRuleExplicitMaxInclusive(t *testing.T) {
 		t.Fatalf("score 100.1 = %#v, want no match", got)
 	}
 }
+
+func TestFindInterpretRuleBoundaryGolden(t *testing.T) {
+	t.Parallel()
+
+	factor := Factor{InterpretRules: []InterpretRule{
+		{Min: 0, Max: 40, RiskLevel: string(RiskLevelLow)},
+		{Min: 40, Max: 100, RiskLevel: string(RiskLevelHigh), MaxInclusive: true},
+	}}
+	cases := []struct {
+		name  string
+		score float64
+		want  string
+	}{
+		{name: "below minimum", score: -0.1},
+		{name: "minimum", score: 0, want: string(RiskLevelLow)},
+		{name: "below boundary", score: 39.9, want: string(RiskLevelLow)},
+		{name: "boundary", score: 40, want: string(RiskLevelHigh)},
+		{name: "maximum", score: 100, want: string(RiskLevelHigh)},
+		{name: "above maximum", score: 100.1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := findInterpretRule(factor, tc.score)
+			if tc.want == "" {
+				if got != nil {
+					t.Fatalf("rule = %#v, want nil", got)
+				}
+				return
+			}
+			if got == nil || got.RiskLevel != tc.want {
+				t.Fatalf("rule = %#v, want %s", got, tc.want)
+			}
+		})
+	}
+}

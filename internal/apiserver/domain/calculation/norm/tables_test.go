@@ -183,4 +183,22 @@ func TestInterpretTScore(t *testing.T) {
 	if !ok || level != "elevated" {
 		t.Fatalf("upper bound 100 = %q %q ok=%v, want elevated via last-range inclusive max", level, conclusion, ok)
 	}
+	for _, tc := range []struct {
+		name  string
+		score float64
+		level string
+		ok    bool
+	}{
+		{name: "below minimum", score: -0.1},
+		{name: "minimum", score: 0, level: "low", ok: true},
+		{name: "below boundary", score: 59.9, level: "low", ok: true},
+		{name: "above maximum", score: 100.1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, _, _, matched := calcnorm.InterpretTScore(tables, "gec", tc.score)
+			if matched != tc.ok || got != tc.level {
+				t.Fatalf("InterpretTScore(%v) = (%q,%v), want (%q,%v)", tc.score, got, matched, tc.level, tc.ok)
+			}
+		})
+	}
 }

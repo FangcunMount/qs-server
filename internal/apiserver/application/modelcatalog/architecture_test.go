@@ -75,6 +75,7 @@ func TestRootPackageContainsOnlySharedContracts(t *testing.T) {
 		"doc.go":                    {},
 		"dto.go":                    {},
 		"errors.go":                 {},
+		"errors_test.go":            {},
 		"identity.go":               {},
 		"kind_mapper.go":            {},
 		"kind_mapper_test.go":       {},

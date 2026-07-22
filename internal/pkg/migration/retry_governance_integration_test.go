@@ -12,15 +12,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/mongodbtest"
 	drivermysql "github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func TestRetryGovernanceMySQLMigrationsUpDown(t *testing.T) {
 	dsn := os.Getenv("MYSQL_DSN")
 	if dsn == "" {
+		if os.Getenv("QS_SERVER_TEST_MONGO_REQUIRED") == "1" {
+			t.Log("MYSQL_DSN is outside the Mongo-only integration gate")
+			return
+		}
 		t.Skip("MYSQL_DSN is required for migration integration tests")
 	}
 	cfg, err := drivermysql.ParseDSN(dsn)
@@ -87,18 +91,7 @@ VALUES ('event-2','message-1','nsq','topic','channel','{}',1,'paused',NOW(3))`);
 }
 
 func TestRetryGovernanceMongoMigrationUpDown(t *testing.T) {
-	uri := os.Getenv("MONGO_URI")
-	if uri == "" {
-		t.Skip("MONGO_URI is required for migration integration tests")
-	}
-	client, err := mongo.Connect(t.Context(), options.Client().ApplyURI(uri))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Disconnect(context.Background())
-	databaseName := fmt.Sprintf("qs_retry_migration_%d", time.Now().UnixNano())
-	db := client.Database(databaseName)
-	defer db.Drop(context.Background())
+	_, db := mongodbtest.ReplicaSetDatabase(t)
 	if err := db.CreateCollection(t.Context(), "interpretation_runs"); err != nil {
 		t.Fatal(err)
 	}

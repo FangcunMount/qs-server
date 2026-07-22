@@ -191,6 +191,62 @@ func TestValidateRequiresOutcomeCodeAndRejectsOverlapOrGap(t *testing.T) {
 	})
 }
 
+func TestValidateScoreRangeCoverageForEveryRangeFamily(t *testing.T) {
+	t.Parallel()
+
+	type conclusionFactory func([]conclusion.ScoreRangeOutcome) conclusion.Conclusion
+	families := map[string]conclusionFactory{
+		"scale": func(rules []conclusion.ScoreRangeOutcome) conclusion.Conclusion {
+			return conclusion.RiskConclusion{FactorCode: "total", Rules: rules}
+		},
+		"behavioral": func(rules []conclusion.ScoreRangeOutcome) conclusion.Conclusion {
+			return conclusion.NormConclusion{FactorCode: "total", ScoreBasis: conclusion.ScoreBasisTScore, Primary: true, Rules: rules}
+		},
+		"cognitive": func(rules []conclusion.ScoreRangeOutcome) conclusion.Conclusion {
+			return conclusion.AbilityConclusion{FactorCode: "total", ScoreBasis: conclusion.ScoreBasisRaw, Primary: true, Rules: rules}
+		},
+	}
+	base := definition.Definition{
+		Measure:  definition.MeasureSpec{Factors: []factor.Factor{{Code: "total", Role: factor.FactorRoleTotal}}},
+		Outcomes: []conclusion.Outcome{{Code: "low"}, {Code: "high"}},
+	}
+	for family, factory := range families {
+		family, factory := family, factory
+		t.Run(family, func(t *testing.T) {
+			t.Run("adjacent accepted", func(t *testing.T) {
+				def := base
+				def.Conclusions = []conclusion.Conclusion{factory([]conclusion.ScoreRangeOutcome{
+					{MinScore: 0, MaxScore: 40, OutcomeCode: "low"},
+					{MinScore: 40, MaxScore: 100, OutcomeCode: "high", MaxInclusive: true},
+				})}
+				if issues := definition.Validate(def); len(issues) != 0 {
+					t.Fatalf("issues = %#v", issues)
+				}
+			})
+			t.Run("gap rejected", func(t *testing.T) {
+				def := base
+				def.Conclusions = []conclusion.Conclusion{factory([]conclusion.ScoreRangeOutcome{
+					{MinScore: 0, MaxScore: 30, OutcomeCode: "low"},
+					{MinScore: 40, MaxScore: 100, OutcomeCode: "high", MaxInclusive: true},
+				})}
+				if issues := definition.Validate(def); !hasValidationCode(issues, "conclusion.range.gap") {
+					t.Fatalf("issues = %#v, want conclusion.range.gap", issues)
+				}
+			})
+			t.Run("overlap rejected", func(t *testing.T) {
+				def := base
+				def.Conclusions = []conclusion.Conclusion{factory([]conclusion.ScoreRangeOutcome{
+					{MinScore: 0, MaxScore: 50, OutcomeCode: "low"},
+					{MinScore: 40, MaxScore: 100, OutcomeCode: "high", MaxInclusive: true},
+				})}
+				if issues := definition.Validate(def); !hasValidationCode(issues, "conclusion.range.overlap") {
+					t.Fatalf("issues = %#v, want conclusion.range.overlap", issues)
+				}
+			})
+		})
+	}
+}
+
 func TestValidateRejectsReportAdapterIncompatibleWithDecisionKind(t *testing.T) {
 	t.Parallel()
 
@@ -233,6 +289,57 @@ func TestValidateRejectsReportAdapterIncompatibleWithDecisionKind(t *testing.T) 
 	issues = definition.Validate(def)
 	if hasValidationCode(issues, "report_section.template_id.unknown") {
 		t.Fatalf("issues = %#v, want registered template_id accepted", issues)
+	}
+}
+
+func TestValidateReportMapFactorScoreSources(t *testing.T) {
+	t.Parallel()
+
+	base := definition.Definition{Measure: definition.MeasureSpec{Factors: []factor.Factor{
+		{Code: "total", Role: factor.FactorRoleTotal},
+		{Code: "detail", Role: factor.FactorRoleDimension},
+	}}}
+
+	t.Run("absent mapping accepted", func(t *testing.T) {
+		if issues := definition.Validate(base); len(issues) != 0 {
+			t.Fatalf("issues = %#v", issues)
+		}
+	})
+
+	t.Run("explicit empty mapping accepted", func(t *testing.T) {
+		def := base
+		def.ReportMap.Sections = []definition.ReportSection{{Code: "factors", Kind: definition.ReportSectionKindFactorScores}}
+		if issues := definition.Validate(def); len(issues) != 0 {
+			t.Fatalf("issues = %#v", issues)
+		}
+	})
+
+	t.Run("known sources accepted", func(t *testing.T) {
+		def := base
+		def.ReportMap.Sections = []definition.ReportSection{{Code: "factors", Kind: definition.ReportSectionKindFactorScores, SourceRefs: []string{"total", "detail"}}}
+		if issues := definition.Validate(def); len(issues) != 0 {
+			t.Fatalf("issues = %#v", issues)
+		}
+	})
+
+	cases := []struct {
+		name     string
+		sections []definition.ReportSection
+		code     string
+	}{
+		{name: "blank source", sections: []definition.ReportSection{{Code: "factors", Kind: definition.ReportSectionKindFactorScores, SourceRefs: []string{""}}}, code: "report_section.source_ref.required"},
+		{name: "duplicate source", sections: []definition.ReportSection{{Code: "factors", Kind: definition.ReportSectionKindFactorScores, SourceRefs: []string{"total", "total"}}}, code: "report_section.source_ref.duplicate"},
+		{name: "unknown source", sections: []definition.ReportSection{{Code: "factors", Kind: definition.ReportSectionKindFactorScores, SourceRefs: []string{"missing"}}}, code: "report_section.source_ref.not_found"},
+		{name: "multiple factor sections", sections: []definition.ReportSection{{Code: "factors-a", Kind: definition.ReportSectionKindFactorScores}, {Code: "factors-b", Kind: definition.ReportSectionKindFactorScores}}, code: "report_section.factor_scores.multiple"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			def := base
+			def.ReportMap.Sections = tc.sections
+			if issues := definition.Validate(def); !hasValidationCode(issues, tc.code) {
+				t.Fatalf("issues = %#v, want %s", issues, tc.code)
+			}
+		})
 	}
 }
 

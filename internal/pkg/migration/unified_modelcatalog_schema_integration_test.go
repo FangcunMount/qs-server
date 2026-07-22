@@ -3,34 +3,18 @@
 package migration
 
 import (
-	"context"
-	"fmt"
-	"os"
 	"testing"
-	"time"
 
 	mongo_indexes "github.com/FangcunMount/qs-server/internal/pkg/mongodb"
+	"github.com/FangcunMount/qs-server/internal/pkg/mongodbtest"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func TestUnifiedModelCatalogSchemaMigrationFreshInstall(t *testing.T) {
-	uri := os.Getenv("MONGO_URI")
-	if uri == "" {
-		t.Skip("MONGO_URI is required for migration integration tests")
-	}
-
 	ctx := t.Context()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Disconnect(context.Background())
-
-	databaseName := fmt.Sprintf("qs_unified_schema_%d", time.Now().UnixNano())
-	db := client.Database(databaseName)
-	defer db.Drop(context.Background())
+	_, db := mongodbtest.ReplicaSetDatabase(t)
 
 	for _, collection := range []string{"assessment_models", "questionnaires"} {
 		if err := db.CreateCollection(ctx, collection); err != nil {
@@ -58,6 +42,9 @@ func TestUnifiedModelCatalogSchemaMigrationFreshInstall(t *testing.T) {
 	if err := mgr.ReconcileUnifiedModelCatalogIndexes(ctx); err != nil {
 		t.Fatalf("ReconcileUnifiedModelCatalogIndexes: %v", err)
 	}
+	if err := mgr.ReconcileUnifiedModelCatalogIndexes(ctx); err != nil {
+		t.Fatalf("idempotent ReconcileUnifiedModelCatalogIndexes: %v", err)
+	}
 
 	assertMongoIndex(t, db.Collection("assessment_models"), "idx_assessment_models_code", false)
 	assertMongoIndex(t, db.Collection("questionnaires"), "idx_code_version", false)
@@ -79,7 +66,7 @@ func TestUnifiedModelCatalogSchemaMigrationFreshInstall(t *testing.T) {
 		t.Fatalf("insert head+snapshot same code: %v", err)
 	}
 	// Duplicate active snapshot for same code must be rejected.
-	_, err = db.Collection("assessment_models").InsertOne(ctx, bson.M{
+	_, err := db.Collection("assessment_models").InsertOne(ctx, bson.M{
 		"code": "M1", "record_role": "published_snapshot", "release_status": "active", "release_version": "1.0.1", "kind": "scale", "deleted_at": nil,
 	})
 	if err == nil {
@@ -98,4 +85,16 @@ func TestUnifiedModelCatalogSchemaMigrationFreshInstall(t *testing.T) {
 	assertMongoIndex(t, db.Collection("assessment_models"), "idx_assessment_models_head_code", false)
 	assertMongoIndex(t, db.Collection("assessment_models"), "idx_assessment_models_code", true)
 	assertMongoIndex(t, db.Collection("questionnaires"), "idx_code_version", true)
+}
+
+func TestUnifiedModelCatalogSchemaDirty13FailsClosed(t *testing.T) {
+	client, db := mongodbtest.ReplicaSetDatabase(t)
+	if _, err := db.Collection("schema_migrations").InsertOne(t.Context(), bson.M{"version": int64(13), "dirty": true}); err != nil {
+		t.Fatal(err)
+	}
+	migrator := NewMongoMigrator(client, &Config{Enabled: true, Database: db.Name()})
+	version, changed, err := migrator.Run()
+	if err == nil || version != 13 || changed {
+		t.Fatalf("Run() = version %d, changed %t, err %v; want dirty@13 diagnostic", version, changed, err)
+	}
 }

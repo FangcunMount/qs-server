@@ -162,7 +162,8 @@ func TestTaskSchedulerServiceSchedulesScopedTasksWithoutGlobalPendingScan(t *tes
 		t.Fatalf("NewAssessmentPlan returned error: %v", err)
 	}
 
-	before := time.Now()
+	// before 必须用业务时区墙钟，才能与 parseTime(Asia/Shanghai) 对齐；CI runner 默认 UTC。
+	before := time.Now().In(planBusinessLocation)
 	scopedTask := domainPlan.NewAssessmentTask(
 		p.GetID(),
 		1,
@@ -222,7 +223,7 @@ func TestTaskSchedulerServiceSkipsPendingTasksBeforeLowerBound(t *testing.T) {
 		t.Fatalf("NewAssessmentPlan returned error: %v", err)
 	}
 
-	before := time.Date(2026, 4, 25, 10, 0, 0, 0, time.Local)
+	before := time.Date(2026, 4, 25, 10, 0, 0, 0, planBusinessLocation)
 	oldTask := domainPlan.NewAssessmentTask(
 		p.GetID(),
 		1,

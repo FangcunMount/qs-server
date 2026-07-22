@@ -1,6 +1,8 @@
 package definition
 
 import (
+	"context"
+	"encoding/json"
 	"testing"
 
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
@@ -34,6 +36,25 @@ func TestTypologyPreviewAllowsFiniteScoreForQuestionWithoutOptions(t *testing.T)
 	issues := validateTypologyPreviewAnswers([]typologyPreviewAnswer{{QuestionCode: "q2", Score: &score}}, questionnaire)
 	if domain.HasValidationErrors(issues) {
 		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestTypologyPreviewUsesPublishValidationForReportMap(t *testing.T) {
+	t.Parallel()
+
+	service := TypologyPreviewService{ValidateForPublish: func(context.Context, *domain.AssessmentModel) []domain.DomainValidationIssue {
+		return []domain.DomainValidationIssue{{
+			Field: "report_map.sections.factors.source_refs", Code: "report_section.source_ref.not_found",
+			Message: "factor source ref missing is not defined", Level: domain.ValidationLevelError,
+		}}
+	}}
+	_, err := service.PreviewReport(context.Background(), &domain.AssessmentModel{}, json.RawMessage(`[{"question_code":"q1","value":"A"}]`))
+	validationErr, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("error = %T %v, want *ValidationError", err, err)
+	}
+	if len(validationErr.Issues) != 1 || validationErr.Issues[0].Code != "report_section.source_ref.not_found" {
+		t.Fatalf("issues = %#v", validationErr.Issues)
 	}
 }
 

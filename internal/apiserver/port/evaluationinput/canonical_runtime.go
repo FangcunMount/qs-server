@@ -20,10 +20,34 @@ func CognitiveExecutionSnapshot(input *InputSnapshot) (*cognitivepayload.Snapsho
 		env := cognitiveDefinitionEnvelope(input)
 		snapshot, err := cognitivepayload.SnapshotFromDefinition(env, def)
 		if err == nil && snapshot != nil {
+			attachExactCognitiveNormTables(input, snapshot)
 			return snapshot, true
 		}
 	}
 	return nil, false
+}
+
+// attachExactCognitiveNormTables carries only immutable Norm material into the
+// canonical DefinitionV2 projection. Executable semantics still come from the
+// Definition; a missing or mismatched frozen Norm version remains fail-closed.
+func attachExactCognitiveNormTables(input *InputSnapshot, canonical *cognitivepayload.Snapshot) {
+	if canonical == nil || canonical.SPM == nil || !canonical.SPM.NormRequired {
+		return
+	}
+	payload, ok := CognitivePayload(input)
+	if !ok || payload.Snapshot == nil || payload.Snapshot.SPM == nil || payload.Snapshot.SPM.NormTables == nil {
+		return
+	}
+	tables := payload.Snapshot.SPM.NormTables
+	for _, item := range canonical.Factors {
+		if item.Code != canonical.SPM.TotalFactorCode || item.Norm == nil {
+			continue
+		}
+		if item.Norm.NormTableVersion == tables.NormTableVersion {
+			canonical.SPM.NormTables = tables
+		}
+		return
+	}
 }
 
 func cognitiveDefinitionEnvelope(input *InputSnapshot) cognitivepayload.DefinitionEnvelope {

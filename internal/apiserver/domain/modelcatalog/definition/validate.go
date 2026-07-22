@@ -32,7 +32,7 @@ func Validate(def Definition) []ValidationIssue {
 	outcomeCodes, outcomeIssues := validateOutcomes(def.Outcomes)
 	issues = append(issues, outcomeIssues...)
 	issues = append(issues, validateConclusions(def.Conclusions, factorCodes, outcomeCodes)...)
-	issues = append(issues, validateReportMap(def.ReportMap)...)
+	issues = append(issues, validateReportMap(def.ReportMap, factorCodes)...)
 	issues = append(issues, validateReportMapAgainstDecision(def)...)
 	return issues
 }
@@ -281,9 +281,10 @@ func validateTypeConclusion(item conclusion.TypeConclusion, factorCodes, outcome
 	return issues
 }
 
-func validateReportMap(reportMap ReportMap) []ValidationIssue {
+func validateReportMap(reportMap ReportMap, factorCodes map[string]struct{}) []ValidationIssue {
 	issues := make([]ValidationIssue, 0)
 	seen := makeStringSet()
+	factorScoreSections := 0
 	for _, section := range reportMap.Sections {
 		if section.Code == "" {
 			issues = append(issues, ValidationIssue{Field: "report_map.sections", Code: "report_section.code.required", Message: "report section code is required"})
@@ -293,6 +294,33 @@ func validateReportMap(reportMap ReportMap) []ValidationIssue {
 			issues = append(issues, ValidationIssue{Field: "report_map.sections", Code: "report_section.code.duplicate", Message: fmt.Sprintf("report section %s is duplicated", section.Code)})
 		}
 		seen[section.Code] = struct{}{}
+		if section.Kind != ReportSectionKindFactorScores {
+			continue
+		}
+		factorScoreSections++
+		if factorScoreSections > 1 {
+			issues = append(issues, ValidationIssue{
+				Field:   "report_map.sections",
+				Code:    "report_section.factor_scores.multiple",
+				Message: "report_map may contain only one factor_scores section",
+			})
+		}
+		refs := makeStringSet()
+		for _, ref := range section.SourceRefs {
+			field := "report_map.sections." + section.Code + ".source_refs"
+			if ref == "" {
+				issues = append(issues, ValidationIssue{Field: field, Code: "report_section.source_ref.required", Message: "factor_scores source ref is required"})
+				continue
+			}
+			if _, duplicate := refs[ref]; duplicate {
+				issues = append(issues, ValidationIssue{Field: field, Code: "report_section.source_ref.duplicate", Message: fmt.Sprintf("factor source ref %s is duplicated", ref)})
+				continue
+			}
+			refs[ref] = struct{}{}
+			if _, exists := factorCodes[ref]; !exists {
+				issues = append(issues, ValidationIssue{Field: field, Code: "report_section.source_ref.not_found", Message: fmt.Sprintf("factor source ref %s is not defined", ref)})
+			}
+		}
 	}
 	return issues
 }

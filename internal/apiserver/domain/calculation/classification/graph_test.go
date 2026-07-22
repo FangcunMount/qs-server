@@ -132,6 +132,36 @@ func TestSelectNearestPatternChoosesClosestOutcome(t *testing.T) {
 	}
 }
 
+func TestLevelForScoreUsesOnlyExplicitBoundaries(t *testing.T) {
+	t.Parallel()
+
+	rule := classification.LevelRule{LowMax: 3, HighMin: 5}
+	cases := []struct {
+		name string
+		raw  float64
+		want string
+	}{
+		{name: "minimum", raw: -10, want: "L"},
+		{name: "low boundary", raw: 3, want: "L"},
+		{name: "middle lower", raw: 3.1, want: "M"},
+		{name: "middle upper", raw: 4.9, want: "M"},
+		{name: "high boundary", raw: 5, want: "H"},
+		{name: "maximum", raw: 100, want: "H"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := classification.LevelForScore(tc.raw, rule); got != tc.want {
+				t.Fatalf("LevelForScore(%v) = %q, want %q", tc.raw, got, tc.want)
+			}
+		})
+	}
+
+	// Zero is a valid explicit boundary and must not be replaced by historical 3/5 defaults.
+	if got := classification.LevelForScore(1, classification.LevelRule{LowMax: 0, HighMin: 2}); got != "M" {
+		t.Fatalf("zero-boundary LevelForScore(1) = %q, want M", got)
+	}
+}
+
 func TestSelectTraitProfileReturnsFactorScores(t *testing.T) {
 	vector := classification.ProfileVector{
 		Scores: map[classification.FactorID]classification.FactorScore{

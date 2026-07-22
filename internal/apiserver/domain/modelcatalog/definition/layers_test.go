@@ -67,6 +67,8 @@ func TestInterpretationAssetsFromKeepsPresentationAndProfiles(t *testing.T) {
 		},
 		ReportMap: definition.ReportMap{Sections: []definition.ReportSection{{
 			Code: "main", AdapterKey: "personality_type", TemplateID: "tpl-1",
+		}, {
+			Code: "factors", Kind: definition.ReportSectionKindFactorScores, SourceRefs: []string{"E", "N"},
 		}}},
 	}
 	assets := definition.InterpretationAssetsFrom(def)
@@ -81,8 +83,11 @@ func TestInterpretationAssetsFromKeepsPresentationAndProfiles(t *testing.T) {
 	if profile.Rarity.Label != "稀少" || profile.Rarity.OneInX != 56 {
 		t.Fatalf("rarity = %#v", profile.Rarity)
 	}
-	if len(assets.ReportSpec.Sections) != 1 || assets.ReportSpec.Sections[0].AdapterKey != "personality_type" {
+	if len(assets.ReportSpec.Sections) != 2 || assets.ReportSpec.Sections[0].AdapterKey != "personality_type" {
 		t.Fatalf("report = %#v", assets.ReportSpec)
+	}
+	if got := assets.ReportSpec.Sections[1].SourceRefs; len(got) != 2 || got[0] != "E" || got[1] != "N" {
+		t.Fatalf("frozen source refs = %#v", got)
 	}
 }
 
