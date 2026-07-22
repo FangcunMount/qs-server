@@ -132,6 +132,18 @@ func TestReadServiceKeepsServingPublishedCacheWhileDatabaseIsUnsafe(t *testing.T
 	}
 }
 
+func TestReadServiceMarksL1FallbackAsStale(t *testing.T) {
+	store := &readStoreStub{snapshot: &Snapshot{AsOfDate: time.Date(2026, 7, 21, 0, 0, 0, 0, time.UTC), DatabaseReadable: true}}
+	cache := &readCacheStub{hit: true, stale: true, value: Overview{OrgID: 7, Freshness: Freshness{AsOfDate: "2026-07-21"}}}
+	value, err := NewReadService(store, cache).Overview(context.Background(), 7, QueryFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !value.Freshness.IsStale || store.overviewReadHit != 0 {
+		t.Fatalf("value=%+v reads=%d", value, store.overviewReadHit)
+	}
+}
+
 func TestContentBatchIsBoundedByPublishedAsOfDate(t *testing.T) {
 	asOf := time.Date(2026, 7, 21, 0, 0, 0, 0, time.UTC)
 	store := &readStoreStub{snapshot: &Snapshot{AsOfDate: asOf, DatabaseReadable: true}}

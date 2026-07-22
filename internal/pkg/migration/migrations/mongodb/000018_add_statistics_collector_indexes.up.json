@@ -1,0 +1,30 @@
+[
+  {
+    "createIndexes": "answersheets",
+    "indexes": [
+      {
+        "key": { "org_id": 1, "filled_at": 1, "domain_id": 1 },
+        "name": "idx_answersheets_statistics_org_filled",
+        "partialFilterExpression": { "deleted_at": null }
+      }
+    ]
+  },
+  {
+    "createIndexes": "interpret_report_artifacts",
+    "indexes": [
+      {
+        "key": { "org_id": 1, "generated_at": 1, "domain_id": 1 },
+        "name": "idx_artifacts_statistics_org_generated"
+      }
+    ]
+  },
+  {
+    "createIndexes": "interpretation_runs",
+    "indexes": [
+      {
+        "key": { "org_id": 1, "status": 1, "finished_at": 1, "domain_id": 1 },
+        "name": "idx_interpretation_runs_statistics_org_failed"
+      }
+    ]
+  }
+]

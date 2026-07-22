@@ -7798,6 +7798,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/statistics.Page-statistics_ClinicianItem'
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '401':
           description: 认证失败或访问令牌无效
           content:
@@ -7835,6 +7841,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/statistics.Page-statistics_EntryItem'
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '401':
           description: 认证失败或访问令牌无效
           content:
@@ -7872,6 +7884,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/handler.StatisticsClinicianDetailResponse'
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '401':
           description: 认证失败或访问令牌无效
           content:
@@ -7909,6 +7927,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/statistics.TesteeSummary'
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '401':
           description: 认证失败或访问令牌无效
           content:
@@ -7952,6 +7976,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/handler.StatisticsClinicianDetailResponse'
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '401':
           description: 认证失败或访问令牌无效
           content:
@@ -7995,6 +8025,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/statistics.ContentBatch'
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '401':
           description: 认证失败或访问令牌无效
           content:
@@ -8032,6 +8068,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/statistics.Page-statistics_EntryItem'
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '401':
           description: 认证失败或访问令牌无效
           content:
@@ -8075,6 +8117,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/handler.StatisticsEntryDetailResponse'
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '401':
           description: 认证失败或访问令牌无效
           content:
@@ -8125,6 +8173,12 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/statistics.Overview'
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '401':
           description: 认证失败或访问令牌无效
           content:

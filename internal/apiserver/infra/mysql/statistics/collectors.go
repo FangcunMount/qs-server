@@ -19,14 +19,31 @@ import (
 
 const collectorBatchSize = 500
 
-func findInStableBatches[T any](query *gorm.DB, rows *[]T, handle func([]T) error) error {
-	return query.FindInBatches(rows, collectorBatchSize, func(_ *gorm.DB, _ int) error {
-		// GORM reuses the destination slice between batches. The handler is
-		// synchronous today, but copying keeps that implementation detail from
-		// leaking into a future collector extension.
+func scanStableBatches[T any](
+	from time.Time,
+	rows *[]T,
+	fetch func(lastAt time.Time, lastID uint64) error,
+	cursor func(T) (time.Time, uint64),
+	handle func([]T) error,
+) error {
+	lastAt, lastID := from, uint64(0)
+	for {
+		*rows = (*rows)[:0]
+		if err := fetch(lastAt, lastID); err != nil {
+			return err
+		}
+		if len(*rows) == 0 {
+			return nil
+		}
 		batch := append([]T(nil), (*rows)...)
-		return handle(batch)
-	}).Error
+		if err := handle(batch); err != nil {
+			return err
+		}
+		lastAt, lastID = cursor(batch[len(batch)-1])
+		if len(batch) < collectorBatchSize {
+			return nil
+		}
+	}
 }
 
 type factWriter struct{ db *gorm.DB }
@@ -97,8 +114,13 @@ func (c *AccessFactCollector) Collect(ctx context.Context, req statisticsDomain.
 		ResolvedAt               time.Time
 	}
 	var resolves []resolveRow
-	resolveQuery := c.db.WithContext(ctx).Table("assessment_entry_resolve_log").Select("id,clinician_id,entry_id,resolved_at").Where("org_id=? AND resolved_at>=? AND resolved_at<? AND deleted_at IS NULL", req.OrgID, req.Window.From, req.Window.To).Order("resolved_at,id")
-	if err := findInStableBatches(resolveQuery, &resolves, func(batch []resolveRow) error {
+	if err := scanStableBatches(req.Window.From, &resolves, func(lastAt time.Time, lastID uint64) error {
+		return c.db.WithContext(ctx).Table("assessment_entry_resolve_log").
+			Select("id,clinician_id,entry_id,resolved_at").
+			Where("org_id=? AND resolved_at>=? AND resolved_at<? AND deleted_at IS NULL", req.OrgID, req.Window.From, req.Window.To).
+			Where("(resolved_at>? OR (resolved_at=? AND id>?))", lastAt, lastAt, lastID).
+			Order("resolved_at,id").Limit(collectorBatchSize).Find(&resolves).Error
+	}, func(row resolveRow) (time.Time, uint64) { return row.ResolvedAt, row.ID }, func(batch []resolveRow) error {
 		for _, row := range batch {
 			result.SourceCount++
 			fact := baseFact(req.OrgID, fmt.Sprintf("entry_resolve:%d:entry_opened", row.ID), "entry_opened", row.ResolvedAt, "entry_resolve", strconv.FormatUint(row.ID, 10))
@@ -120,8 +142,13 @@ func (c *AccessFactCollector) Collect(ctx context.Context, req statisticsDomain.
 		IntakeAt                           time.Time
 	}
 	var intakes []intakeRow
-	intakeQuery := c.db.WithContext(ctx).Table("assessment_entry_intake_log").Select("id,clinician_id,entry_id,testee_id,testee_created,assignment_created,intake_at").Where("org_id=? AND intake_at>=? AND intake_at<? AND deleted_at IS NULL", req.OrgID, req.Window.From, req.Window.To).Order("intake_at,id")
-	if err := findInStableBatches(intakeQuery, &intakes, func(batch []intakeRow) error {
+	if err := scanStableBatches(req.Window.From, &intakes, func(lastAt time.Time, lastID uint64) error {
+		return c.db.WithContext(ctx).Table("assessment_entry_intake_log").
+			Select("id,clinician_id,entry_id,testee_id,testee_created,assignment_created,intake_at").
+			Where("org_id=? AND intake_at>=? AND intake_at<? AND deleted_at IS NULL", req.OrgID, req.Window.From, req.Window.To).
+			Where("(intake_at>? OR (intake_at=? AND id>?))", lastAt, lastAt, lastID).
+			Order("intake_at,id").Limit(collectorBatchSize).Find(&intakes).Error
+	}, func(row intakeRow) (time.Time, uint64) { return row.IntakeAt, row.ID }, func(batch []intakeRow) error {
 		for _, row := range batch {
 			result.SourceCount++
 			types := []string{"intake_confirmed"}
@@ -226,29 +253,13 @@ func scanLifecycleRows[T any](
 	cursor func(T) (time.Time, uint64),
 	handle func([]T) error,
 ) error {
-	lastAt, lastID := req.Window.From, uint64(0)
-	for {
-		*rows = (*rows)[:0]
-		query := db.WithContext(ctx).Table(table).
+	return scanStableBatches(req.Window.From, rows, func(lastAt time.Time, lastID uint64) error {
+		return db.WithContext(ctx).Table(table).
 			Select(selectColumns+", "+timeField+" AS occurred_at").
 			Where("org_id=? AND deleted_at IS NULL AND "+timeField+">=? AND "+timeField+"<?", req.OrgID, req.Window.From, req.Window.To).
 			Where("("+timeField+">? OR ("+timeField+"=? AND id>?))", lastAt, lastAt, lastID).
-			Order(timeField + ",id").Limit(collectorBatchSize)
-		if err := query.Find(rows).Error; err != nil {
-			return err
-		}
-		if len(*rows) == 0 {
-			return nil
-		}
-		batch := append([]T(nil), (*rows)...)
-		if err := handle(batch); err != nil {
-			return err
-		}
-		lastAt, lastID = cursor(batch[len(batch)-1])
-		if len(batch) < collectorBatchSize {
-			return nil
-		}
-	}
+			Order(timeField + ",id").Limit(collectorBatchSize).Find(rows).Error
+	}, cursor, handle)
 }
 
 func (c *PlanFactCollector) Collect(ctx context.Context, req statisticsDomain.CollectRequest) (statisticsDomain.CollectResult, error) {
@@ -417,7 +428,7 @@ func (c *AssessmentFactCollector) Collect(ctx context.Context, req statisticsDom
 	if c.mongo == nil {
 		return result, fmt.Errorf("mongo database is required")
 	}
-	cursor, err := c.mongo.Collection("answersheets").Find(ctx, bson.M{"org_id": uint64(req.OrgID), "filled_at": bson.M{"$gte": req.Window.From, "$lt": req.Window.To}}, options.Find().SetSort(bson.D{{Key: "filled_at", Value: 1}, {Key: "domain_id", Value: 1}}).SetBatchSize(500))
+	cursor, err := c.mongo.Collection("answersheets").Find(ctx, bson.M{"org_id": uint64(req.OrgID), "deleted_at": nil, "filled_at": bson.M{"$gte": req.Window.From, "$lt": req.Window.To}}, options.Find().SetSort(bson.D{{Key: "filled_at", Value: 1}, {Key: "domain_id", Value: 1}}).SetBatchSize(collectorBatchSize))
 	if err != nil {
 		return result, err
 	}
@@ -552,8 +563,14 @@ func (c *AssessmentFactCollector) collectAssessmentMySQL(ctx context.Context, re
 		EvaluatedAt                               time.Time
 	}
 	var outcomes []outcomeRow
-	outcomeQuery := c.db.WithContext(ctx).Table("evaluation_outcome o").Select("o.id,o.assessment_id,o.testee_id,o.model_kind,o.model_code,o.model_version,o.evaluated_at,a.answer_sheet_id,a.questionnaire_code,a.questionnaire_version").Joins("JOIN assessment a ON a.id=o.assessment_id AND a.org_id=o.org_id").Where("o.org_id=? AND o.evaluated_at>=? AND o.evaluated_at<?", req.OrgID, req.Window.From, req.Window.To).Order("o.evaluated_at,o.id")
-	if err := findInStableBatches(outcomeQuery, &outcomes, func(batch []outcomeRow) error {
+	if err := scanStableBatches(req.Window.From, &outcomes, func(lastAt time.Time, lastID uint64) error {
+		return c.db.WithContext(ctx).Table("evaluation_outcome o").
+			Select("o.id,o.assessment_id,o.testee_id,o.model_kind,o.model_code,o.model_version,o.evaluated_at,a.answer_sheet_id,a.questionnaire_code,a.questionnaire_version").
+			Joins("JOIN assessment a ON a.id=o.assessment_id AND a.org_id=o.org_id").
+			Where("o.org_id=? AND o.evaluated_at>=? AND o.evaluated_at<?", req.OrgID, req.Window.From, req.Window.To).
+			Where("(o.evaluated_at>? OR (o.evaluated_at=? AND o.id>?))", lastAt, lastAt, lastID).
+			Order("o.evaluated_at,o.id").Limit(collectorBatchSize).Find(&outcomes).Error
+	}, func(row outcomeRow) (time.Time, uint64) { return row.EvaluatedAt, row.ID }, func(batch []outcomeRow) error {
 		for _, row := range batch {
 			result.SourceCount++
 			attribution, err := c.loadAnswerSheetAttribution(ctx, req.OrgID, row.AnswerSheetID)
@@ -585,7 +602,7 @@ func (c *AssessmentFactCollector) collectAssessmentMySQL(ctx context.Context, re
 }
 
 func (c *AssessmentFactCollector) collectReports(ctx context.Context, req statisticsDomain.CollectRequest, result *statisticsDomain.CollectResult) error {
-	cursor, err := c.mongo.Collection("interpret_report_artifacts").Find(ctx, bson.M{"org_id": req.OrgID, "generated_at": bson.M{"$gte": req.Window.From, "$lt": req.Window.To}}, options.Find().SetBatchSize(500))
+	cursor, err := c.mongo.Collection("interpret_report_artifacts").Find(ctx, bson.M{"org_id": req.OrgID, "generated_at": bson.M{"$gte": req.Window.From, "$lt": req.Window.To}}, options.Find().SetSort(bson.D{{Key: "generated_at", Value: 1}, {Key: "domain_id", Value: 1}}).SetBatchSize(collectorBatchSize))
 	if err != nil {
 		return err
 	}
@@ -642,7 +659,7 @@ func (c *AssessmentFactCollector) collectReports(ctx context.Context, req statis
 }
 
 func (c *AssessmentFactCollector) collectReportFailures(ctx context.Context, req statisticsDomain.CollectRequest, result *statisticsDomain.CollectResult) error {
-	cursor, err := c.mongo.Collection("interpretation_runs").Find(ctx, bson.M{"status": "failed", "finished_at": bson.M{"$gte": req.Window.From, "$lt": req.Window.To}}, options.Find().SetSort(bson.D{{Key: "finished_at", Value: 1}, {Key: "domain_id", Value: 1}}).SetBatchSize(500))
+	cursor, err := c.mongo.Collection("interpretation_runs").Find(ctx, bson.M{"org_id": req.OrgID, "status": "failed", "finished_at": bson.M{"$gte": req.Window.From, "$lt": req.Window.To}}, options.Find().SetSort(bson.D{{Key: "finished_at", Value: 1}, {Key: "domain_id", Value: 1}}).SetBatchSize(collectorBatchSize))
 	if err != nil {
 		return err
 	}

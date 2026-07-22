@@ -224,11 +224,51 @@ func TestCoordinatorRepairRebuildsDailyWithoutPublishingGlobalResults(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	if run.Status != statisticsDomain.RunStatusSucceeded || run.AsOfDate.Format("2006-01-02") != "2026-07-21" {
+	if run.Status != statisticsDomain.RunStatusSucceeded || run.AsOfDate.Format("2006-01-02") != "2025-01-07" {
 		t.Fatalf("run=%+v", run)
 	}
 	if collector.called != 1 || daily.called != 1 || global.called != 0 || cache.called != 0 || *txCalls != 1 || store.committed != 0 {
 		t.Fatalf("collector=%d daily=%d global=%d cache=%d tx=%d committed=%d", collector.called, daily.called, global.called, cache.called, *txCalls, store.committed)
+	}
+}
+
+func TestCoordinatorRejectsHistoricalPublishBeforeCreatingRun(t *testing.T) {
+	coordinator, collector, daily, global, store, txCalls := newCoordinatorForTest(t, nil)
+	run, err := coordinator.Run(context.Background(), RunRequest{
+		OrgID: 7, FromDate: time.Date(2026, 7, 1, 0, 0, 0, 0, statisticsDomain.Shanghai),
+		ToDate: time.Date(2026, 7, 7, 0, 0, 0, 0, statisticsDomain.Shanghai), TriggerType: "manual", Mode: statisticsDomain.RunModePublish,
+	})
+	if err == nil || !IsInvalidRunRequest(err) || run != nil {
+		t.Fatalf("run=%+v err=%v", run, err)
+	}
+	if store.run.ID != 0 || collector.called != 0 || daily.called != 0 || global.called != 0 || *txCalls != 0 {
+		t.Fatalf("run_id=%d collector=%d daily=%d global=%d tx=%d", store.run.ID, collector.called, daily.called, global.called, *txCalls)
+	}
+}
+
+func TestCoordinatorPublishUsesLatestCompleteShanghaiBusinessDay(t *testing.T) {
+	tests := []struct {
+		name string
+		now  time.Time
+		to   time.Time
+	}{
+		{name: "month boundary", now: time.Date(2026, 8, 1, 0, 5, 0, 0, statisticsDomain.Shanghai), to: time.Date(2026, 7, 31, 0, 0, 0, 0, statisticsDomain.Shanghai)},
+		{name: "year boundary", now: time.Date(2027, 1, 1, 0, 5, 0, 0, statisticsDomain.Shanghai), to: time.Date(2026, 12, 31, 0, 0, 0, 0, statisticsDomain.Shanghai)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			coordinator, _, _, _, _, _ := newCoordinatorForTest(t, cachePublisherStub{generation: 1})
+			coordinator.now = func() time.Time { return tt.now }
+			run, err := coordinator.Run(context.Background(), RunRequest{
+				OrgID: 7, FromDate: tt.to, ToDate: tt.to, TriggerType: "manual", Mode: statisticsDomain.RunModePublish,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !run.AsOfDate.Equal(tt.to) {
+				t.Fatalf("as_of_date=%s want %s", run.AsOfDate, tt.to)
+			}
+		})
 	}
 }
 

@@ -8929,6 +8929,10 @@ paths:
                 data:
                   $ref: '#/definitions/statistics.Page-statistics_ClinicianItem'
               type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 查询 Statistics 医生列表
       tags:
       - Statistics
@@ -8950,6 +8954,10 @@ paths:
                 data:
                   $ref: '#/definitions/handler.StatisticsClinicianDetailResponse'
               type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 查询 Statistics 医生详情
       tags:
       - Statistics
@@ -8965,6 +8973,10 @@ paths:
                 data:
                   $ref: '#/definitions/statistics.Page-statistics_EntryItem'
               type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 查询当前医生 Statistics 入口
       tags:
       - Statistics
@@ -8980,6 +8992,10 @@ paths:
                 data:
                   $ref: '#/definitions/handler.StatisticsClinicianDetailResponse'
               type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 查询当前医生 Statistics 总览
       tags:
       - Statistics
@@ -8995,6 +9011,10 @@ paths:
                 data:
                   $ref: '#/definitions/statistics.TesteeSummary'
               type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 查询当前医生 Statistics 受试者摘要
       tags:
       - Statistics
@@ -9017,6 +9037,10 @@ paths:
                 data:
                   $ref: '#/definitions/statistics.ContentBatch'
               type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 批量查询 Statistics 内容统计
       tags:
       - Statistics
@@ -9032,6 +9056,10 @@ paths:
                 data:
                   $ref: '#/definitions/statistics.Page-statistics_EntryItem'
               type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 查询 Statistics 入口列表
       tags:
       - Statistics
@@ -9053,6 +9081,10 @@ paths:
                 data:
                   $ref: '#/definitions/handler.StatisticsEntryDetailResponse'
               type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 查询 Statistics 入口详情
       tags:
       - Statistics
@@ -9081,6 +9113,10 @@ paths:
                 data:
                   $ref: '#/definitions/statistics.Overview'
               type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 查询 Statistics 机构总览
       tags:
       - Statistics

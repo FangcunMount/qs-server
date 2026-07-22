@@ -186,9 +186,9 @@ Statistics 明确区分三种运行意图，不能再用一个日期窗口同时
 | `repair` | 是 | 是 | 否 | 否 |
 | `publish` | 是 | 是 | 是 | 是 |
 
-`window_start/window_end` 只定义 Collector 和 Daily 的处理范围。`as_of_date` 由服务端根据运行时刻计算为前一上海完整自然日，不再由手工窗口的 `to_date` 推导。
+`window_start/window_end` 定义 Collector 和 Daily 的处理范围，`as_of_date` 等于请求包含式 `to_date`。`publish` 的 `to_date` 必须是前一上海完整自然日；较早窗口只能执行 `validate` 或 `repair`，不能把不完整窗口发布为最新水位。
 
-因此，修复较早窗口不会把已经发布的 Snapshot 倒退。需要对外发布新水位时，必须再执行一次当前完整日 Publish。
+因此，修复较早窗口不会改变已发布 Snapshot。需要对外发布新水位时，必须再执行一次以最近完整日结尾的 Publish。
 
 ## 6. 默认批次范围
 

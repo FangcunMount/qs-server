@@ -7,8 +7,6 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"sort"
-	"strings"
 	"testing"
 	"time"
 
@@ -22,25 +20,19 @@ func TestStatisticsCanonicalSchemaFromEmptyDatabaseAndRetirementRollback(t *test
 	}
 
 	db, databaseName := openStatisticsMigrationDatabase(t, dsn)
-
-	entries, err := os.ReadDir("migrations/mysql")
+	migrator := NewMigrator(db, &Config{Enabled: true, Database: databaseName})
+	version, migrated, err := migrator.Run()
 	if err != nil {
 		t.Fatal(err)
 	}
-	var migrations []string
-	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".up.sql") {
-			migrations = append(migrations, entry.Name())
-		}
-	}
-	sort.Strings(migrations)
-	for _, name := range migrations {
-		execSQLMigration(t, db, name)
+	if !migrated || version != 57 {
+		t.Fatalf("migration version=%d migrated=%v, want version 57", version, migrated)
 	}
 
 	assertCanonicalStatisticsSchema(t, db, databaseName)
 	assertStatisticsCollectorIndexes(t, db, databaseName)
 
+	execSQLMigration(t, db, "000057_add_statistics_collector_indexes.down.sql")
 	execSQLMigration(t, db, "000056_retire_statistics_v1.down.sql")
 	assertMySQLTable(t, db, databaseName, "statistics_org_snapshot", true)
 	assertMySQLTable(t, db, databaseName, "statistics_v2_org_snapshot", true)
@@ -49,8 +41,35 @@ func TestStatisticsCanonicalSchemaFromEmptyDatabaseAndRetirementRollback(t *test
 	}
 
 	execSQLMigration(t, db, "000056_retire_statistics_v1.up.sql")
+	execSQLMigration(t, db, "000057_add_statistics_collector_indexes.up.sql")
 	assertCanonicalStatisticsSchema(t, db, databaseName)
 	assertStatisticsCollectorIndexes(t, db, databaseName)
+}
+
+func TestStatisticsAuditMigrationReplaysAfterInitialSchema(t *testing.T) {
+	dsn := os.Getenv("MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("MYSQL_DSN is required for migration integration tests")
+	}
+	db, databaseName := openStatisticsMigrationDatabase(t, dsn)
+	execSQLMigration(t, db, "000005_init_statistics_schema.up.sql")
+	execSQLMigration(t, db, "000007_add_statistics_audit_fields.up.sql")
+
+	for _, table := range []string{"statistics_daily", "statistics_accumulated", "statistics_plan"} {
+		for _, column := range []string{"created_at", "updated_at", "deleted_at", "created_by", "updated_by", "deleted_by", "version"} {
+			assertStatisticsMySQLColumn(t, db, databaseName, table, column, true)
+		}
+	}
+
+	execSQLMigration(t, db, "000007_add_statistics_audit_fields.down.sql")
+	for _, table := range []string{"statistics_daily", "statistics_accumulated", "statistics_plan"} {
+		for _, column := range []string{"created_at", "updated_at"} {
+			assertStatisticsMySQLColumn(t, db, databaseName, table, column, true)
+		}
+		for _, column := range []string{"deleted_at", "created_by", "updated_by", "deleted_by", "version"} {
+			assertStatisticsMySQLColumn(t, db, databaseName, table, column, false)
+		}
+	}
 }
 
 func openStatisticsMigrationDatabase(t *testing.T, dsn string) (*sql.DB, string) {
@@ -131,12 +150,31 @@ func assertMySQLTable(t *testing.T, db *sql.DB, databaseName, table string, want
 	}
 }
 
+func assertStatisticsMySQLColumn(t *testing.T, db *sql.DB, databaseName, table, column string, want bool) {
+	t.Helper()
+	var count int
+	if err := db.QueryRowContext(t.Context(),
+		"SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=? AND table_name=? AND column_name=?",
+		databaseName,
+		table,
+		column,
+	).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if (count == 1) != want {
+		t.Fatalf("column %s.%s exists=%v, want %v", table, column, count == 1, want)
+	}
+}
+
 func assertStatisticsCollectorIndexes(t *testing.T, db *sql.DB, databaseName string) {
 	t.Helper()
 	for table, indexes := range map[string][]string{
-		"plan_enrollment": {"idx_enrollment_collect_joined", "idx_enrollment_collect_closed", "idx_enrollment_collect_terminated"},
-		"assessment_task": {"idx_task_collect_created", "idx_task_collect_opened", "idx_task_collect_completed", "idx_task_collect_expired", "idx_task_collect_canceled"},
-		"assessment":      {"idx_assessment_collect_created", "idx_assessment_collect_failed"},
+		"plan_enrollment":              {"idx_enrollment_collect_joined", "idx_enrollment_collect_closed", "idx_enrollment_collect_terminated"},
+		"assessment_task":              {"idx_task_collect_created", "idx_task_collect_opened", "idx_task_collect_completed", "idx_task_collect_expired", "idx_task_collect_canceled"},
+		"assessment":                   {"idx_assessment_collect_created", "idx_assessment_collect_failed"},
+		"assessment_entry_resolve_log": {"idx_entry_resolve_collect"},
+		"assessment_entry_intake_log":  {"idx_entry_intake_collect"},
+		"evaluation_outcome":           {"idx_evaluation_outcome_collect"},
 	} {
 		for _, index := range indexes {
 			var count int

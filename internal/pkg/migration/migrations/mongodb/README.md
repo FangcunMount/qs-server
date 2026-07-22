@@ -29,6 +29,16 @@ mongodb/
 | `interpretation_attention_projections` | 报告生成后 attention 投影状态（v2） | event_id unique, status+updated_at（见 000016） |
 | `interpretation_report_templates` | Interpretation 报告模板发布资产（v2） | template_id+template_version unique（见 000017） |
 
+## Statistics Collector indexes（000018）
+
+`000018_add_statistics_collector_indexes` 为 canonical Statistics Collector 的 Mongo 来源建立机构级稳定扫描索引：
+
+- `answersheets(org_id, filled_at, domain_id)`，仅覆盖 `deleted_at:null`；
+- `interpret_report_artifacts(org_id, generated_at, domain_id)`；
+- `interpretation_runs(org_id, status, finished_at, domain_id)`。
+
+这些索引与 Collector 的 `[from,to)` 窗口、机构过滤和 `(event_time,domain_id)` 排序共同构成扫描契约；down migration 只删除本 migration 拥有的三个索引。
+
 ## Report templates（000017）
 
 `000017_add_report_templates` 创建 `interpretation_report_templates` 集合与 release unique 索引。Repository 启动时会幂等 seed 并 publish `legacy-v1` 兼容模板（standard/mbti/sbti/bigfive）。

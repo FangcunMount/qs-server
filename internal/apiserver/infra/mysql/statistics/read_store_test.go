@@ -2,15 +2,51 @@ package statistics
 
 import (
 	"context"
+	stderrors "errors"
 	"regexp"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	componenterrors "github.com/FangcunMount/component-base/pkg/errors"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
+
+type readLimiterStub struct {
+	err error
+}
+
+func (s readLimiterStub) Acquire(ctx context.Context) (context.Context, func(), error) {
+	return ctx, func() {}, s.err
+}
+
+var _ backpressure.Acquirer = readLimiterStub{}
+
+func TestReadStoreMapsInternalBackpressureTimeoutToServiceUnavailable(t *testing.T) {
+	store := NewReadStore(nil, readLimiterStub{err: context.DeadlineExceeded})
+	_, _, err := store.acquire(context.Background())
+	if err == nil {
+		t.Fatal("expected overload error")
+	}
+	coder := componenterrors.ParseCoder(err)
+	if coder == nil || coder.Code() != code.ErrStatisticsOverloaded || coder.HTTPStatus() != 503 {
+		t.Fatalf("coder=%+v err=%v", coder, err)
+	}
+}
+
+func TestReadStorePreservesCallerCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	store := NewReadStore(nil, readLimiterStub{err: context.Canceled})
+	_, _, err := store.acquire(ctx)
+	if !stderrors.Is(err, context.Canceled) {
+		t.Fatalf("err=%v", err)
+	}
+}
 
 func newReadStoreTestDB(t *testing.T) (*ReadStore, sqlmock.Sqlmock) {
 	t.Helper()

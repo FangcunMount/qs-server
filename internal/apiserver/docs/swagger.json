@@ -7402,6 +7402,12 @@
                                 }
                             ]
                         }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
                     }
                 }
             }
@@ -7429,6 +7435,12 @@
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
                         }
                     }
                 }
@@ -7458,6 +7470,12 @@
                                 }
                             ]
                         }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
                     }
                 }
             }
@@ -7485,6 +7503,12 @@
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
                         }
                     }
                 }
@@ -7522,6 +7546,12 @@
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
                         }
                     }
                 }
@@ -7562,6 +7592,12 @@
                                 }
                             ]
                         }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
                     }
                 }
             }
@@ -7589,6 +7625,12 @@
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
                         }
                     }
                 }
@@ -7626,6 +7668,12 @@
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
                         }
                     }
                 }
@@ -7674,6 +7722,12 @@
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
                         }
                     }
                 }

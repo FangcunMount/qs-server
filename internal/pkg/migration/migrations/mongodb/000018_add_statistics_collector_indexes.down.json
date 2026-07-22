@@ -1,0 +1,5 @@
+[
+  { "dropIndexes": "interpretation_runs", "index": "idx_interpretation_runs_statistics_org_failed" },
+  { "dropIndexes": "interpret_report_artifacts", "index": "idx_artifacts_statistics_org_generated" },
+  { "dropIndexes": "answersheets", "index": "idx_answersheets_statistics_org_filled" }
+]

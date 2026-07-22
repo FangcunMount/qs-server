@@ -2,6 +2,7 @@ package statistics
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"strings"
 	"time"
@@ -27,7 +28,11 @@ func (s *ReadStore) acquire(ctx context.Context) (context.Context, func(), error
 	if s == nil || s.limiter == nil {
 		return ctx, func() {}, nil
 	}
-	return s.limiter.Acquire(ctx)
+	limitedCtx, release, err := s.limiter.Acquire(ctx)
+	if err != nil && ctx.Err() == nil && stderrors.Is(err, context.DeadlineExceeded) {
+		return ctx, func() {}, errors.WithCode(code.ErrStatisticsOverloaded, "statistics_read_overloaded")
+	}
+	return limitedCtx, release, err
 }
 
 func (s *ReadStore) LatestVisibleSnapshot(ctx context.Context, orgID int64) (*statisticsApp.Snapshot, error) {

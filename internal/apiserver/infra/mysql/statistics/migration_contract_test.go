@@ -114,3 +114,30 @@ func TestStatisticsPublicationMigrationPersistsGenerationAndResumeAudit(t *testi
 		}
 	}
 }
+
+func TestStatisticsCollectorIndexMigrationMatchesStableSourceScans(t *testing.T) {
+	up, err := os.ReadFile("../../../../pkg/migration/migrations/mysql/000057_add_statistics_collector_indexes.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(up)
+	for _, token := range []string{
+		"idx_entry_resolve_collect", "(`org_id`, `deleted_at`, `resolved_at`, `id`)",
+		"idx_entry_intake_collect", "(`org_id`, `deleted_at`, `intake_at`, `id`)",
+		"idx_evaluation_outcome_collect", "(`org_id`, `evaluated_at`, `id`)",
+	} {
+		if !strings.Contains(text, token) {
+			t.Fatalf("collector index migration does not contain %q", token)
+		}
+	}
+
+	down, err := os.ReadFile("../../../../pkg/migration/migrations/mysql/000057_add_statistics_collector_indexes.down.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, index := range []string{"idx_entry_resolve_collect", "idx_entry_intake_collect", "idx_evaluation_outcome_collect"} {
+		if !strings.Contains(string(down), "DROP KEY `"+index+"`") {
+			t.Fatalf("collector index down migration does not remove %s", index)
+		}
+	}
+}

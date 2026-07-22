@@ -1,6 +1,6 @@
+-- created_at and updated_at belong to 000005 and intentionally survive this
+-- rollback. Only fields introduced by 000007 are removed.
 ALTER TABLE `statistics_daily`
-    DROP COLUMN `created_at`,
-    DROP COLUMN `updated_at`,
     DROP COLUMN `deleted_at`,
     DROP COLUMN `created_by`,
     DROP COLUMN `updated_by`,
@@ -8,8 +8,6 @@ ALTER TABLE `statistics_daily`
     DROP COLUMN `version`;
 
 ALTER TABLE `statistics_accumulated`
-    DROP COLUMN `created_at`,
-    DROP COLUMN `updated_at`,
     DROP COLUMN `deleted_at`,
     DROP COLUMN `created_by`,
     DROP COLUMN `updated_by`,
@@ -17,8 +15,6 @@ ALTER TABLE `statistics_accumulated`
     DROP COLUMN `version`;
 
 ALTER TABLE `statistics_plan`
-    DROP COLUMN `created_at`,
-    DROP COLUMN `updated_at`,
     DROP COLUMN `deleted_at`,
     DROP COLUMN `created_by`,
     DROP COLUMN `updated_by`,

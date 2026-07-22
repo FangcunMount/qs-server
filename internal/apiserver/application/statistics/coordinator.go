@@ -163,6 +163,9 @@ func (c *Coordinator) Run(ctx context.Context, request RunRequest) (resultRun *R
 	if toDate.After(latestCompleteDay) {
 		return nil, invalidRunRequest("statistics window cannot exceed latest complete business day %s", latestCompleteDay.Format("2006-01-02"))
 	}
+	if mode == statisticsDomain.RunModePublish && !toDate.Equal(latestCompleteDay) {
+		return nil, invalidRunRequest("statistics publish must end at latest complete business day %s; use repair for historical windows", latestCompleteDay.Format("2006-01-02"))
+	}
 	window := statisticsDomain.InstantRange{From: fromDate, To: toDate.AddDate(0, 0, 1)}
 	if err := window.Validate(); err != nil {
 		return nil, invalidRunRequest("%s", err)
@@ -177,7 +180,7 @@ func (c *Coordinator) Run(ctx context.Context, request RunRequest) (resultRun *R
 		TriggerType: request.TriggerType,
 		Mode:        mode,
 		Window:      window,
-		AsOfDate:    latestCompleteDay,
+		AsOfDate:    toDate,
 		Status:      statisticsDomain.RunStatusRunning,
 		Stage:       "created",
 		Reason:      request.Reason,

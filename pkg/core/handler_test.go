@@ -73,6 +73,29 @@ func TestBaseHandlerErrorResponseKeepsGenericMessageForServerErrors(t *testing.T
 	}
 }
 
+func TestBaseHandlerErrorResponseMapsStatisticsOverloadToServiceUnavailable(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/v2/statistics/overview", nil)
+
+	NewBaseHandler().Error(ctx, cberrors.WithCode(errorCode.ErrStatisticsOverloaded, "statistics_read_overloaded"))
+
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusServiceUnavailable)
+	}
+	var body Response
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != errorCode.ErrStatisticsOverloaded {
+		t.Fatalf("code = %d, want %d", body.Code, errorCode.ErrStatisticsOverloaded)
+	}
+	if body.Message != "Statistics temporarily overloaded" {
+		t.Fatalf("message = %q", body.Message)
+	}
+}
+
 func TestBaseHandlerErrorResponseTreatsContextCanceledAsClientClosedRequest(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	recorder := httptest.NewRecorder()

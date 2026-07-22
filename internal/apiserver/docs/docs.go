@@ -7405,6 +7405,12 @@ const docTemplate = `{
                                 }
                             ]
                         }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
                     }
                 }
             }
@@ -7432,6 +7438,12 @@ const docTemplate = `{
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
                         }
                     }
                 }
@@ -7461,6 +7473,12 @@ const docTemplate = `{
                                 }
                             ]
                         }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
                     }
                 }
             }
@@ -7488,6 +7506,12 @@ const docTemplate = `{
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
                         }
                     }
                 }
@@ -7525,6 +7549,12 @@ const docTemplate = `{
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
                         }
                     }
                 }
@@ -7565,6 +7595,12 @@ const docTemplate = `{
                                 }
                             ]
                         }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
                     }
                 }
             }
@@ -7592,6 +7628,12 @@ const docTemplate = `{
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
                         }
                     }
                 }
@@ -7629,6 +7671,12 @@ const docTemplate = `{
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
                         }
                     }
                 }
@@ -7677,6 +7725,12 @@ const docTemplate = `{
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
                         }
                     }
                 }

@@ -53,6 +53,7 @@ func parseStatisticsPage(c *gin.Context) (int, int, error) {
 // @Param from query string false "上海日期 YYYY-MM-DD"
 // @Param to query string false "上海日期 YYYY-MM-DD"
 // @Success 200 {object} core.Response{data=statisticsApp.Overview}
+// @Failure 503 {object} core.ErrResponse
 // @Router /api/v2/statistics/overview [get]
 func (h *StatisticsHandler) Overview(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
@@ -72,6 +73,7 @@ func (h *StatisticsHandler) Overview(c *gin.Context) {
 // @Summary 查询 Statistics 医生列表
 // @Tags Statistics
 // @Success 200 {object} core.Response{data=statisticsApp.Page[statisticsApp.ClinicianItem]}
+// @Failure 503 {object} core.ErrResponse
 // @Router /api/v2/statistics/clinicians [get]
 func (h *StatisticsHandler) Clinicians(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
@@ -97,6 +99,7 @@ func (h *StatisticsHandler) Clinicians(c *gin.Context) {
 // @Tags Statistics
 // @Param id path uint64 true "医生 ID"
 // @Success 200 {object} core.Response{data=StatisticsClinicianDetailResponse}
+// @Failure 503 {object} core.ErrResponse
 // @Router /api/v2/statistics/clinicians/{id} [get]
 func (h *StatisticsHandler) Clinician(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
@@ -125,6 +128,7 @@ func (h *StatisticsHandler) Clinician(c *gin.Context) {
 // @Summary 查询当前医生 Statistics 总览
 // @Tags Statistics
 // @Success 200 {object} core.Response{data=StatisticsClinicianDetailResponse}
+// @Failure 503 {object} core.ErrResponse
 // @Router /api/v2/statistics/clinicians/me/overview [get]
 func (h *StatisticsHandler) CurrentClinicianOverview(c *gin.Context) {
 	orgID, userID, err := h.RequireProtectedScope(c)
@@ -148,6 +152,7 @@ func (h *StatisticsHandler) CurrentClinicianOverview(c *gin.Context) {
 // @Summary 查询 Statistics 入口列表
 // @Tags Statistics
 // @Success 200 {object} core.Response{data=statisticsApp.Page[statisticsApp.EntryItem]}
+// @Failure 503 {object} core.ErrResponse
 // @Router /api/v2/statistics/entries [get]
 func (h *StatisticsHandler) Entries(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
@@ -191,6 +196,7 @@ func (h *StatisticsHandler) Entries(c *gin.Context) {
 // @Tags Statistics
 // @Param id path uint64 true "入口 ID"
 // @Success 200 {object} core.Response{data=StatisticsEntryDetailResponse}
+// @Failure 503 {object} core.ErrResponse
 // @Router /api/v2/statistics/entries/{id} [get]
 func (h *StatisticsHandler) Entry(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
@@ -221,6 +227,7 @@ func (h *StatisticsHandler) Entry(c *gin.Context) {
 // @Summary 查询当前医生 Statistics 入口
 // @Tags Statistics
 // @Success 200 {object} core.Response{data=statisticsApp.Page[statisticsApp.EntryItem]}
+// @Failure 503 {object} core.ErrResponse
 // @Router /api/v2/statistics/clinicians/me/entries [get]
 func (h *StatisticsHandler) CurrentClinicianEntries(c *gin.Context) {
 	orgID, userID, err := h.RequireProtectedScope(c)
@@ -250,6 +257,7 @@ func (h *StatisticsHandler) CurrentClinicianEntries(c *gin.Context) {
 // @Summary 查询当前医生 Statistics 受试者摘要
 // @Tags Statistics
 // @Success 200 {object} core.Response{data=statisticsApp.TesteeSummary}
+// @Failure 503 {object} core.ErrResponse
 // @Router /api/v2/statistics/clinicians/me/testees-summary [get]
 func (h *StatisticsHandler) CurrentClinicianTestees(c *gin.Context) {
 	orgID, userID, err := h.RequireProtectedScope(c)
@@ -295,6 +303,7 @@ type StatisticsResumeCacheRequest struct {
 // @Tags Statistics
 // @Param request body StatisticsContentRequest true "内容引用"
 // @Success 200 {object} core.Response{data=statisticsApp.ContentBatch}
+// @Failure 503 {object} core.ErrResponse
 // @Router /api/v2/statistics/contents/batch [post]
 func (h *StatisticsHandler) Contents(c *gin.Context) {
 	var request StatisticsContentRequest
