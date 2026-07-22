@@ -160,6 +160,31 @@ func TestNormalizeLegacyDefinitionDoesNotGuessNonUnitOrFractionalGaps(t *testing
 	}
 }
 
+func TestNormalizeKnownQuestionnaireBindingRequiresExactZOOEvidence(t *testing.T) {
+	t.Parallel()
+	sources := make([]modelfactor.ScoringSource, 0, len(knownZOOQuestionRefs))
+	for _, code := range knownZOOQuestionRefs {
+		sources = append(sources, modelfactor.ScoringSource{Kind: modelfactor.ScoringSourceQuestion, Code: code})
+	}
+	snapshot := &modelcatalogport.PublishedModel{
+		Code: "zOO4eG", Version: "v9", QuestionnaireCode: "zOO4eG", QuestionnaireVersion: "6.0.1",
+		DefinitionV2: &modeldefinition.Definition{Measure: modeldefinition.MeasureSpec{Scoring: []modelfactor.Scoring{{FactorCode: "total", Sources: sources}}}},
+	}
+
+	if got := normalizeKnownQuestionnaireBinding(snapshot); !reflect.DeepEqual(got, []string{"questionnaire_binding:1"}) {
+		t.Fatalf("normalizations = %v", got)
+	}
+	if snapshot.QuestionnaireVersion != "5.0.1" {
+		t.Fatalf("questionnaire version = %s", snapshot.QuestionnaireVersion)
+	}
+
+	snapshot.QuestionnaireVersion = "6.0.1"
+	snapshot.DefinitionV2.Measure.Scoring[0].Sources = sources[:len(sources)-1]
+	if got := normalizeKnownQuestionnaireBinding(snapshot); len(got) != 0 || snapshot.QuestionnaireVersion != "6.0.1" {
+		t.Fatalf("incomplete evidence changed binding: normalizations=%v version=%s", got, snapshot.QuestionnaireVersion)
+	}
+}
+
 func TestNormalizeLegacyDefinitionDoesNotPromoteDisplayLevelToUnknownOutcomeCode(t *testing.T) {
 	t.Parallel()
 	definition := &modeldefinition.Definition{

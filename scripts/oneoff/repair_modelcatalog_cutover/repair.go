@@ -60,6 +60,12 @@ var (
 		"cleanup_bak_orphans_archived_reports_orphan_reports_20260712",
 		"cleanup_bak_orphans_interpret_reports_orphan_reports_20260712",
 	}
+	knownZOOQuestionRefs = []string{
+		"7X2uSso2", "BhPDSP3i", "C54P1JBI", "D6BGiI9R", "DYWcJzmg",
+		"JdHFdzgH", "KPijIhCr", "NaYz2zGp", "UZ28oCO9", "WnWSyHbZ",
+		"bATLzBFo", "dWgLjZUJ", "disdOion", "fTyRCnAT", "fXMq8eYc",
+		"lwDL7JEa", "scDrv1nz", "wDKVJwVR", "yM5i6mFK", "z1GFqkYx",
+	}
 )
 
 type repairPlan struct {
@@ -600,18 +606,19 @@ func canonicalRepairItem(
 		add("definition_v2.required", "active snapshot must contain DefinitionV2")
 		return repairItem{}, issues
 	}
+	canonical := clonePublishedSnapshot(current)
+	bindingNormalizations := normalizeKnownQuestionnaireBinding(canonical)
 	questionnaireCount, err := db.Collection("questionnaires").CountDocuments(ctx, bson.M{
-		"deleted_at": nil, "record_role": "published_snapshot", "release_status": "active", "status": "published",
-		"code": current.QuestionnaireCode, "version": current.QuestionnaireVersion,
+		"deleted_at": nil, "record_role": "published_snapshot", "release_status": bson.M{"$in": bson.A{"active", "archived"}}, "status": "published",
+		"code": canonical.QuestionnaireCode, "version": canonical.QuestionnaireVersion,
 	})
 	if err != nil {
 		add("questionnaire.lookup_failed", err.Error())
 	} else if questionnaireCount != 1 {
-		add("questionnaire.active_not_exact", fmt.Sprintf("exact active questionnaire snapshot count is %d, want 1", questionnaireCount))
+		add("questionnaire.published_not_exact", fmt.Sprintf("exact retained published questionnaire snapshot count is %d, want 1", questionnaireCount))
 	}
 
-	canonical := clonePublishedSnapshot(current)
-	normalizations := normalizeLegacyDefinition(canonical.DefinitionV2)
+	normalizations := append(bindingNormalizations, normalizeLegacyDefinition(canonical.DefinitionV2)...)
 	modeldefinition.MaterializeLayers(canonical.DefinitionV2)
 	model := publication.ModelFromPublishedSnapshot(canonical)
 	handler, err := registry.MustResolveBinding(appdefinition.AlgorithmBindingFromModel(model))
@@ -667,6 +674,36 @@ func canonicalRepairItem(
 		QuestionnaireCode: canonical.QuestionnaireCode, QuestionnaireVersion: canonical.QuestionnaireVersion,
 		DefinitionHash: definitionHash, Normalizations: normalizations, snapshot: canonical,
 	}, nil
+}
+
+// normalizeKnownQuestionnaireBinding restores the frozen questionnaire
+// identity for one source-proven catalog mismatch. The 20 Definition question
+// refs match zOO4eG@5.0.1 exactly and none exists in the incorrectly bound
+// zOO4eG@6.0.1 snapshot. Any identity or ref drift leaves the item blocked.
+func normalizeKnownQuestionnaireBinding(snapshot *modelcatalogport.PublishedModel) []string {
+	if snapshot == nil || snapshot.DefinitionV2 == nil ||
+		snapshot.Code != "zOO4eG" || snapshot.Version != "v9" ||
+		snapshot.QuestionnaireCode != "zOO4eG" || snapshot.QuestionnaireVersion != "6.0.1" {
+		return nil
+	}
+	actual := make(map[string]struct{}, len(knownZOOQuestionRefs))
+	for _, scoring := range snapshot.DefinitionV2.Measure.Scoring {
+		for _, source := range scoring.Sources {
+			if source.Kind == modelfactor.ScoringSourceQuestion && source.Code != "" {
+				actual[source.Code] = struct{}{}
+			}
+		}
+	}
+	if len(actual) != len(knownZOOQuestionRefs) {
+		return nil
+	}
+	for _, code := range knownZOOQuestionRefs {
+		if _, exists := actual[code]; !exists {
+			return nil
+		}
+	}
+	snapshot.QuestionnaireVersion = "5.0.1"
+	return []string{"questionnaire_binding:1"}
 }
 
 // normalizeLegacyDefinition makes historical implicit semantics explicit only
