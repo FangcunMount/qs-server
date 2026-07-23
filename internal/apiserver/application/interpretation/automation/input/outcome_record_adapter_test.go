@@ -63,7 +63,7 @@ func TestFromOutcomeRecordPreservesDimensionlessSpecialTypologyFact(t *testing.T
 	record := evaluationfact.NewRecord(evaluationfact.NewRecordInput{
 		ID: meta.FromUint64(30), OrgID: 1, AssessmentID: meta.FromUint64(31), TesteeID: 32, RunID: "31:1",
 		Model: evaluationfact.ModelIdentity{
-			Kind: modelcatalog.KindTypology,
+			Kind:      modelcatalog.KindTypology,
 			Algorithm: modelcatalog.AlgorithmPersonalityTypology, Code: "SBTI_FUN", Version: "v48",
 		},
 		Runtime: evaluationfact.RuntimeIdentity{
@@ -108,7 +108,7 @@ func TestFromOutcomeRecordRestoresTraitProfileNamesFromFrozenFactorCatalog(t *te
 	record := evaluationfact.NewRecord(evaluationfact.NewRecordInput{
 		ID: meta.FromUint64(40), OrgID: 1, AssessmentID: meta.FromUint64(41), TesteeID: 42, RunID: "41:1",
 		Model: evaluationfact.ModelIdentity{
-			Kind: modelcatalog.KindTypology,
+			Kind:      modelcatalog.KindTypology,
 			Algorithm: modelcatalog.AlgorithmPersonalityTypology, Code: "ENNEAGRAM_45", Version: "v16",
 		},
 		Runtime: evaluationfact.RuntimeIdentity{
@@ -273,7 +273,7 @@ func typologyOutcomeRecord(reportInput []byte) *evaluationfact.Record {
 	return evaluationfact.NewRecord(evaluationfact.NewRecordInput{
 		ID: meta.FromUint64(20), OrgID: 1, AssessmentID: meta.FromUint64(10), TesteeID: 2, RunID: "10:1",
 		Model: evaluationfact.ModelIdentity{
-			Kind: modelcatalog.KindTypology,
+			Kind:      modelcatalog.KindTypology,
 			Algorithm: modelcatalog.AlgorithmPersonalityTypology, Code: "PERSONALITY", Version: "1.0.0",
 		},
 		Runtime: evaluationfact.RuntimeIdentity{

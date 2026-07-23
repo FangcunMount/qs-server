@@ -15,7 +15,7 @@ func DescriptorKeyFromRoute(route ModelRoute) (DescriptorKey, error) {
 	if _, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(route.DecisionKind); !ok {
 		return DescriptorKey{}, fmt.Errorf("unknown frozen decision_kind: %s", route.DecisionKind)
 	}
-	return DescriptorKey{DecisionKind: route.DecisionKind}, nil
+	return DescriptorKey(route), nil
 }
 
 func ExecutionFamilyFromRoute(route ModelRoute) (modelcatalog.AlgorithmFamily, bool) {

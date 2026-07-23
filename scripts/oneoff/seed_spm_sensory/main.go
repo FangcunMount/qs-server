@@ -181,14 +181,14 @@ func seedModel(ctx context.Context, db *mongo.Database, cfg config, questionnair
 
 	now := time.Now().UTC()
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
-		Code:           cfg.modelCode,
-		Kind:           domain.KindBehavioralRating,
-		Algorithm:      domain.AlgorithmSPMSensory,
-		Title:          "SPM 感觉统合量表",
-		Description:    "Sensory Processing Measure，评估社会参与与感觉处理功能。",
-		Category:       "behavior_ability",
-		Reporters:      []string{"parent"},
-		Now:            now,
+		Code:        cfg.modelCode,
+		Kind:        domain.KindBehavioralRating,
+		Algorithm:   domain.AlgorithmSPMSensory,
+		Title:       "SPM 感觉统合量表",
+		Description: "Sensory Processing Measure，评估社会参与与感觉处理功能。",
+		Category:    "behavior_ability",
+		Reporters:   []string{"parent"},
+		Now:         now,
 	})
 	if err != nil {
 		return fmt.Errorf("new SPM sensory model: %w", err)

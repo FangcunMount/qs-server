@@ -368,15 +368,15 @@ func TestCanonicalSnapshotUpdateUsesCanonicalFieldsAndPreservesAuditOwnership(t 
 	}
 	set := update["$set"].(bson.M)
 	unset := update["$unset"].(bson.M)
-	if set["algorithm_family"] != string(domain.AlgorithmFamilyTaskPerformance) || set["decision_kind"] != string(domain.DecisionKindAbilityLevel) {
+	if set["decision_kind"] != string(domain.DecisionKindAbilityLevel) {
 		t.Fatalf("canonical set = %#v", set)
 	}
-	for _, field := range []string{"_id", "created_at", "created_by", "deleted_at", "deleted_by"} {
+	for _, field := range []string{"_id", "created_at", "created_by", "deleted_at", "deleted_by", "algorithm_family", "sub_kind", "product_channel"} {
 		if _, exists := set[field]; exists {
 			t.Fatalf("canonical set unexpectedly owns %s: %#v", field, set)
 		}
 	}
-	for _, field := range []string{"payload", "definition_payload", "is_active_published", "release_archived_at"} {
+	for _, field := range []string{"payload", "definition_payload", "is_active_published", "release_archived_at", "algorithm_family", "sub_kind", "product_channel"} {
 		if _, exists := unset[field]; !exists {
 			t.Fatalf("canonical unset missing %s: %#v", field, unset)
 		}

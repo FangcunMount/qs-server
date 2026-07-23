@@ -9,8 +9,16 @@ func InvalidArgument(format string, args ...interface{}) error {
 	return cberrors.WithCode(errorCode.ErrInvalidArgument, format, args...)
 }
 
+func IsInvalidArgument(err error) bool {
+	return cberrors.IsCode(err, errorCode.ErrInvalidArgument)
+}
+
 func ModuleNotConfigured(format string, args ...interface{}) error {
 	return cberrors.WithCode(errorCode.ErrModuleInitializationFailed, format, args...)
+}
+
+func IsModuleNotConfigured(err error) bool {
+	return cberrors.IsCode(err, errorCode.ErrModuleInitializationFailed)
 }
 
 func Database(err error, format string, args ...interface{}) error {

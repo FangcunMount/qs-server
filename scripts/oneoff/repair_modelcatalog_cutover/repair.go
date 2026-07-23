@@ -43,6 +43,9 @@ var (
 		"definition_payload":        "",
 		"definition_payload_format": "",
 		"is_active_published":       "",
+		"algorithm_family":          "",
+		"sub_kind":                  "",
+		"product_channel":           "",
 	}
 	mysqlHistoryTables = []string{
 		"assessment", "assessment_score", "evaluation_outcome", "runtime_checkpoint",

@@ -5,12 +5,10 @@ import (
 	"context"
 	"time"
 
-	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
@@ -106,8 +104,7 @@ func (s *service) CreateForAnswerSheet(ctx context.Context, command CreateComman
 			return nil, evalerrors.ModuleNotConfigured("evaluation model validator is not configured")
 		}
 		if err := s.validator.ValidateEvaluationModel(ctx, *req.ModelRef, req.QuestionnaireRef, validationMode); err != nil {
-			if cberrors.IsCode(err, errorCode.ErrModuleInitializationFailed) ||
-				cberrors.IsCode(err, errorCode.ErrInvalidArgument) {
+			if evalerrors.IsModuleNotConfigured(err) || evalerrors.IsInvalidArgument(err) {
 				return nil, err
 			}
 			return nil, evalerrors.AssessmentCreateFailed(err, "创建测评失败")

@@ -13,6 +13,7 @@ import (
 	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
+	eventpayload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
@@ -597,6 +598,35 @@ func mustBuildAnswerSheetSubmittedPayloadWithRequestID(t *testing.T, answerSheet
 		t.Fatalf("marshal payload: %v", err)
 	}
 	return payload
+}
+
+func TestAssessmentAdmissionFromEventOmitsRetiredModelSubKind(t *testing.T) {
+	t.Parallel()
+	got := assessmentAdmissionFromEvent(&eventpayload.AssessmentAdmission{
+		Purpose:              eventpayload.AdmissionPurposeAssessment,
+		QuestionnaireCode:    "Q-1",
+		QuestionnaireVersion: "v1",
+		ModelKind:            "behavioral_rating",
+		ModelAlgorithm:       "brief2",
+		ModelCode:            "BRIEF2",
+		ModelVersion:         "v1",
+		ModelTitle:           "BRIEF-2",
+	})
+	if got == nil {
+		t.Fatal("expected admission mapping")
+	}
+	if got.GetModelKind() != "behavioral_rating" || got.GetModelAlgorithm() != "brief2" || got.GetModelCode() != "BRIEF2" {
+		t.Fatalf("admission identity = %#v", got)
+	}
+	if got.GetQuestionnaireCode() != "Q-1" || got.GetModelTitle() != "BRIEF-2" {
+		t.Fatalf("admission fields = %#v", got)
+	}
+	if assessmentAdmissionFromEvent(nil) != nil {
+		t.Fatal("nil admission should stay nil")
+	}
+	if assessmentAdmissionFromEvent(&eventpayload.AssessmentAdmission{}) != nil {
+		t.Fatal("empty purpose should stay nil")
+	}
 }
 
 type workerGateRecordingObserver struct {
