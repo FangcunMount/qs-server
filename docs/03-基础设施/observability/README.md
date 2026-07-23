@@ -9,7 +9,7 @@
 - 请求：request ID、进程、路由、租户、结果与耗时；
 - 异步：event ID/type、topic、attempt、Ack/Nack、最终结果；
 - 业务：AnswerSheet、Evaluation、Outcome、Report 的关联标识与阶段；
-- 保护：限流、队列深度、防重命中、背压、租约丢失；
+- 保护：限流决策、准入等待与拒绝、防重命中、背压等待、租约丢失；
 - 治理：操作人/请求、目标、幂等键、执行结果、恢复状态；
 - 投影：checkpoint、pending、lag、reconcile 结果。
 

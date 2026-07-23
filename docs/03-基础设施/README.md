@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | 高频读与缓存一致性 | [Cache](./cache/README.md) | capability registry、L1/L2、失效、预热、治理 |
 | 异步执行与可靠协作 | [Event](./event/README.md) | Outbox、MQ、Redis signal、handler |
-| 突发流量与故障隔离 | [Concurrency / Resilience](./concurrency/README.md) | 限流、队列、防重、背压、租约、治理操作 |
+| 突发流量与故障隔离 | [Concurrency / Resilience](./concurrency/README.md) | 准入、限流、防重、背压、租约、治理操作 |
 
 ## 2. 支撑能力
 
@@ -23,5 +23,5 @@
 
 - Outbox 保证业务事件可靠出站；MQ 解耦异步消费；Redis signal 只做可丢失唤醒。
 - cache miss/失效不能改变业务事实，只影响读性能和新鲜度。
-- 限流、排队、防重、背压分别解决不同压力，不应合并成一个“失败重试”。
+- 限流、有界等待、防重、背压分别解决不同压力，不应合并成一个“失败重试”。
 - 治理操作必须带审计、幂等和恢复路径，不能绕过业务边界直接修改主事实。
