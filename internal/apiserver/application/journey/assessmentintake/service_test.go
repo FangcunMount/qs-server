@@ -12,6 +12,7 @@ import (
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 type scoringStub struct {
@@ -83,7 +84,10 @@ func TestEnsureUnboundAnswerSheetEndsWithoutCreatingAssessment(t *testing.T) {
 	calls := []string{}
 	intake := &intakeStub{calls: &calls, created: &evaluationintake.Assessment{ID: 91}}
 	svc := NewService(scoringStub{calls: &calls}, nil, nil, nil, intake, nil)
-	result, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8})
+	result, err := svc.Ensure(context.Background(), Command{
+		OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8,
+		Admission: &Admission{Purpose: "independent_questionnaire", QuestionnaireCode: "Q", QuestionnaireVersion: "1"},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +99,7 @@ func TestEnsureUnboundAnswerSheetEndsWithoutCreatingAssessment(t *testing.T) {
 	}
 }
 
-func TestEnsureUnboundReplayReusesLegacyAssessmentWithoutSubmit(t *testing.T) {
+func TestEnsureIndependentReplayReusesLegacyAssessmentWithoutSubmit(t *testing.T) {
 	calls := []string{}
 	intake := &intakeStub{
 		calls:    &calls,
@@ -103,7 +107,10 @@ func TestEnsureUnboundReplayReusesLegacyAssessmentWithoutSubmit(t *testing.T) {
 	}
 	svc := NewService(scoringStub{calls: &calls}, nil, nil, nil, intake, nil)
 
-	result, err := svc.Ensure(context.Background(), Command{OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8})
+	result, err := svc.Ensure(context.Background(), Command{
+		OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8,
+		Admission: &Admission{Purpose: "independent_questionnaire", QuestionnaireCode: "Q", QuestionnaireVersion: "1"},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,6 +119,49 @@ func TestEnsureUnboundReplayReusesLegacyAssessmentWithoutSubmit(t *testing.T) {
 	}
 	if !reflect.DeepEqual(calls, []string{"score", "find"}) {
 		t.Fatalf("calls = %v", calls)
+	}
+}
+
+func TestEnsureLegacyMissingBindingResolverFailsClosed(t *testing.T) {
+	calls := []string{}
+	svc := NewService(scoringStub{calls: &calls}, nil, nil, nil, &intakeStub{calls: &calls}, nil)
+
+	_, err := svc.Ensure(context.Background(), Command{
+		OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8,
+	})
+	if !cberrors.IsCode(err, code.ErrModuleInitializationFailed) {
+		t.Fatalf("error = %v, want ModuleNotConfigured", err)
+	}
+	if !reflect.DeepEqual(calls, []string{"score"}) {
+		t.Fatalf("calls = %v, want scoring only", calls)
+	}
+}
+
+func TestEnsureLegacyWithoutLiveBindingIsUnclassified(t *testing.T) {
+	calls := []string{}
+	impl := &service{
+		scoring: scoringStub{calls: &calls},
+		binding: bindingStub{},
+		intake:  &intakeStub{calls: &calls},
+	}
+	svc := Service(impl)
+
+	_, err := svc.Ensure(context.Background(), Command{
+		OrgID: 9, AnswerSheetID: 3, QuestionnaireCode: "Q", QuestionnaireVersion: "1", TesteeID: 7, FillerID: 8,
+	})
+	if !cberrors.IsCode(err, code.ErrAssessmentModelValidationFailed) {
+		t.Fatalf("error = %v, want AssessmentModelValidationFailed", err)
+	}
+	_, source, sourceErr := impl.applyAdmissionOrBinding(
+		context.Background(),
+		Command{QuestionnaireCode: "Q", QuestionnaireVersion: "1"},
+		&evaluationintake.CreateCommand{},
+	)
+	if sourceErr == nil || source != "legacy_unclassified" {
+		t.Fatalf("source = %q, error = %v, want legacy_unclassified", source, sourceErr)
+	}
+	if !reflect.DeepEqual(calls, []string{"score"}) {
+		t.Fatalf("calls = %v, want scoring only", calls)
 	}
 }
 
@@ -260,6 +310,7 @@ func TestEnsureIncompleteFrozenAdmissionFailsClosed(t *testing.T) {
 }
 
 func TestEnsureFindDependencyErrorDoesNotCreate(t *testing.T) {
+	before := testutil.ToFloat64(assessmentIntakeLookupTotal.WithLabelValues(intakeLookupDependencyError))
 	calls := []string{}
 	intake := &intakeStub{
 		calls:   &calls,
@@ -274,9 +325,13 @@ func TestEnsureFindDependencyErrorDoesNotCreate(t *testing.T) {
 	if !reflect.DeepEqual(calls, []string{"score", "find"}) {
 		t.Fatalf("calls = %v, want score+find without create", calls)
 	}
+	if delta := testutil.ToFloat64(assessmentIntakeLookupTotal.WithLabelValues(intakeLookupDependencyError)) - before; delta != 1 {
+		t.Fatalf("dependency_error metric delta = %v, want 1", delta)
+	}
 }
 
 func TestEnsureNotFoundCreatesBoundAssessment(t *testing.T) {
+	before := testutil.ToFloat64(assessmentIntakeLookupTotal.WithLabelValues(intakeLookupNotFound))
 	calls := []string{}
 	intake := &intakeStub{
 		calls:   &calls,
@@ -293,6 +348,9 @@ func TestEnsureNotFoundCreatesBoundAssessment(t *testing.T) {
 	}
 	if !reflect.DeepEqual(calls, []string{"score", "find", "create", "submit"}) {
 		t.Fatalf("calls = %v", calls)
+	}
+	if delta := testutil.ToFloat64(assessmentIntakeLookupTotal.WithLabelValues(intakeLookupNotFound)) - before; delta != 1 {
+		t.Fatalf("not_found metric delta = %v, want 1", delta)
 	}
 }
 
@@ -324,6 +382,7 @@ func (s *duplicateThenRefindIntake) SubmitForEvaluation(context.Context, uint64)
 }
 
 func TestEnsureDuplicateThenRefindReusesAssessment(t *testing.T) {
+	before := testutil.ToFloat64(assessmentIntakeLookupTotal.WithLabelValues(intakeLookupDuplicateHit))
 	calls := []string{}
 	intake := &duplicateThenRefindIntake{
 		calls:    &calls,
@@ -339,6 +398,9 @@ func TestEnsureDuplicateThenRefindReusesAssessment(t *testing.T) {
 	}
 	if !reflect.DeepEqual(calls, []string{"score", "find", "create", "find", "submit"}) {
 		t.Fatalf("calls = %v", calls)
+	}
+	if delta := testutil.ToFloat64(assessmentIntakeLookupTotal.WithLabelValues(intakeLookupDuplicateHit)) - before; delta != 1 {
+		t.Fatalf("duplicate_hit metric delta = %v, want 1", delta)
 	}
 }
 

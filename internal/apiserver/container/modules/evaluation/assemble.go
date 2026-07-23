@@ -28,6 +28,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationconsistency"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
@@ -111,6 +112,7 @@ type evaluationInfra struct {
 	submittedCandidateReader evaluationscheduler.SubmittedCandidateReader
 	latestRiskReader         workbenchreadmodel.LatestRiskReader
 	scoreProjectionReader    evaluationreadmodel.ScoreProjectionReader
+	consistencyReader        evaluationconsistency.Reader
 	assessmentOutboxStore    appEventing.EventStager
 	txRunner                 apptransaction.Runner
 	postCommit               appEventing.PostCommitDispatcher
@@ -132,6 +134,7 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 	infra.latestRiskReader = assessmentReadModel
 	infra.scoreRepo = mysqlEval.NewScoreRepository(normalized.MySQLDB, mysqlOptions)
 	infra.scoreProjectionReader = mysqlEval.NewScoreProjectionReadModel(normalized.MySQLDB, mysqlOptions)
+	infra.consistencyReader = mysqlEval.NewConsistencyReadModel(normalized.MySQLDB)
 	infra.runRepo = mysqlEval.NewRunRepository(normalized.MySQLDB)
 	infra.outcomeRepo = mysqlEval.NewOutcomeRepository(normalized.MySQLDB)
 	infra.txRunner = modtx.NewMySQLRunner(normalized.MySQLDB)
@@ -230,7 +233,13 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 }
 
 func (m *Module) wireScheduler(infra *evaluationInfra) {
-	m.SchedulerService = evaluationscheduler.NewServiceWithRuns(infra.assessmentRepo, infra.outcomeRepo, infra.submittedCandidateReader, infra.runRepo)
+	m.SchedulerService = evaluationscheduler.NewService(
+		infra.assessmentRepo,
+		infra.outcomeRepo,
+		infra.submittedCandidateReader,
+		infra.runRepo,
+		infra.consistencyReader,
+	)
 }
 
 func normalizeDeps(deps Deps) (Deps, error) {

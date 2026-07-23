@@ -9,6 +9,9 @@ import (
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationconsistency"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 type candidateReaderStub struct {
@@ -48,9 +51,30 @@ func (outcomeRepoStub) FindByAssessmentID(context.Context, domainoutcome.ID) (*d
 	return nil, nil
 }
 
+type latestRunReaderStub struct {
+	run *evalrun.EvaluationRun
+}
+
+func (s latestRunReaderStub) FindLatestByAssessmentID(context.Context, uint64) (*evalrun.EvaluationRun, error) {
+	return s.run, nil
+}
+
+type consistencyReaderStub struct {
+	projection *evaluationconsistency.ProjectionEvidence
+	outbox     *evaluationconsistency.CommittedOutboxEvidence
+}
+
+func (s consistencyReaderStub) FindProjectionEvidence(context.Context, uint64) (*evaluationconsistency.ProjectionEvidence, error) {
+	return s.projection, nil
+}
+
+func (s consistencyReaderStub) FindCommittedOutboxEvidence(context.Context, uint64) (*evaluationconsistency.CommittedOutboxEvidence, error) {
+	return s.outbox, nil
+}
+
 func TestAuditOnceTraversesAllBatchesAndRestartsAfterEnd(t *testing.T) {
 	reader := &candidateReaderStub{ids: []uint64{1, 2, 3, 4, 5}}
-	service := NewService(assessmentRepoStub{}, outcomeRepoStub{}, reader)
+	service := NewService(assessmentRepoStub{}, outcomeRepoStub{}, reader, latestRunReaderStub{}, consistencyReaderStub{})
 	for range 4 {
 		if _, err := service.AuditOnce(context.Background(), 2); err != nil {
 			t.Fatal(err)
@@ -83,34 +107,47 @@ func TestClassifyDriftMatrix(t *testing.T) {
 		RunID: "r3", AssessmentID: 1, Attempt: evalrun.Attempt{Number: 1, Status: evalrun.StatusFailed},
 		StartedAt: now.Add(-time.Minute), FinishedAt: &now,
 	})
+	outcome := mustTestOutcome(t, modelcatalog.KindScale, "r2", now)
+	projection := &evaluationconsistency.ProjectionEvidence{
+		RowCount: 1, DistinctOutcomeCount: 1, OutcomeID: outcome.ID().String(),
+	}
+	outbox := &evaluationconsistency.CommittedOutboxEvidence{
+		RowCount: 1, OutcomeID: outcome.ID().String(), RunID: outcome.RunID(), Status: "published",
+	}
 
 	cases := []struct {
-		name       string
-		status     domainassessment.Status
-		hasOutcome bool
-		run        *evalrun.EvaluationRun
-		wantKind   mismatchKind
+		name     string
+		evidence consistencyEvidence
+		wantKind mismatchKind
 	}{
-		{name: "submitted+outcome", status: domainassessment.StatusSubmitted, hasOutcome: true, wantKind: mismatchOutcomeWithoutEvaluatedStatus},
-		{name: "submitted+outcome+succeeded", status: domainassessment.StatusSubmitted, hasOutcome: true, run: &succeeded, wantKind: mismatchSuccessProjectionDrift},
-		{name: "lease expired", status: domainassessment.StatusSubmitted, run: &runningExpired, wantKind: mismatchLeaseRecoveryCandidate},
-		{name: "evaluated missing outcome", status: domainassessment.StatusEvaluated, wantKind: mismatchCanonicalOutcomeMissing},
-		{name: "evaluated run mismatch", status: domainassessment.StatusEvaluated, hasOutcome: true, run: &failedRun, wantKind: mismatchRunStatusMismatch},
-		{name: "terminal conflict", status: domainassessment.StatusFailed, hasOutcome: true, run: &succeeded, wantKind: mismatchTerminalConflict},
-		{name: "healthy submitted", status: domainassessment.StatusSubmitted, wantKind: ""},
+		{name: "submitted+outcome", evidence: consistencyEvidence{status: domainassessment.StatusSubmitted, outcome: outcome, projection: projection, outbox: outbox}, wantKind: mismatchOutcomeWithoutEvaluatedStatus},
+		{name: "submitted+outcome+succeeded", evidence: consistencyEvidence{status: domainassessment.StatusSubmitted, outcome: outcome, run: &succeeded, projection: projection, outbox: outbox}, wantKind: mismatchSuccessProjectionDrift},
+		{name: "lease expired", evidence: consistencyEvidence{status: domainassessment.StatusSubmitted, run: &runningExpired}, wantKind: mismatchLeaseRecoveryCandidate},
+		{name: "evaluated missing outcome", evidence: consistencyEvidence{status: domainassessment.StatusEvaluated}, wantKind: mismatchCanonicalOutcomeMissing},
+		{name: "evaluated run mismatch", evidence: consistencyEvidence{status: domainassessment.StatusEvaluated, outcome: outcome, run: &failedRun, projection: projection, outbox: outbox}, wantKind: mismatchRunStatusMismatch},
+		{name: "terminal conflict", evidence: consistencyEvidence{status: domainassessment.StatusFailed, outcome: outcome, run: &succeeded, projection: projection, outbox: outbox}, wantKind: mismatchTerminalConflict},
+		{name: "projection without outcome", evidence: consistencyEvidence{status: domainassessment.StatusSubmitted, projection: projection}, wantKind: mismatchProjectionWithoutOutcome},
+		{name: "scale projection missing", evidence: consistencyEvidence{status: domainassessment.StatusEvaluated, outcome: outcome, run: &succeeded, outbox: outbox}, wantKind: mismatchProjectionMissing},
+		{name: "projection outcome mismatch", evidence: consistencyEvidence{status: domainassessment.StatusEvaluated, outcome: outcome, run: &succeeded, projection: &evaluationconsistency.ProjectionEvidence{RowCount: 1, DistinctOutcomeCount: 1, OutcomeID: "other"}, outbox: outbox}, wantKind: mismatchProjectionOutcomeMismatch},
+		{name: "outbox without outcome", evidence: consistencyEvidence{status: domainassessment.StatusSubmitted, outbox: outbox}, wantKind: mismatchCommittedOutboxWithoutOutcome},
+		{name: "committed outbox missing", evidence: consistencyEvidence{status: domainassessment.StatusEvaluated, outcome: outcome, run: &succeeded, projection: projection}, wantKind: mismatchCommittedOutboxMissing},
+		{name: "committed outbox mismatch", evidence: consistencyEvidence{status: domainassessment.StatusEvaluated, outcome: outcome, run: &succeeded, projection: projection, outbox: &evaluationconsistency.CommittedOutboxEvidence{RowCount: 1, OutcomeID: "other", RunID: "other"}}, wantKind: mismatchCommittedOutboxMismatch},
+		{name: "run outcome reference mismatch", evidence: consistencyEvidence{status: domainassessment.StatusEvaluated, outcome: outcome, run: &failedRun, projection: projection, outbox: outbox}, wantKind: mismatchRunOutcomeReferenceMismatch},
+		{name: "healthy submitted", evidence: consistencyEvidence{status: domainassessment.StatusSubmitted}, wantKind: ""},
+		{name: "healthy evaluated", evidence: consistencyEvidence{status: domainassessment.StatusEvaluated, outcome: outcome, run: &succeeded, projection: projection, outbox: outbox}, wantKind: ""},
 	}
 	for _, tc := range cases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := classifyDrift(tc.status, tc.hasOutcome, tc.run, now)
+			got := classifyDrifts(tc.evidence, now)
 			if tc.wantKind == "" {
-				if got != nil {
+				if len(got) != 0 {
 					t.Fatalf("classifyDrift() = %#v, want nil", got)
 				}
 				return
 			}
-			if got == nil || got.Kind != tc.wantKind || got.RecommendedAction == "" {
+			if !containsMismatch(got, tc.wantKind) {
 				t.Fatalf("classifyDrift() = %#v, want kind %s", got, tc.wantKind)
 			}
 		})
@@ -120,12 +157,40 @@ func TestClassifyDriftMatrix(t *testing.T) {
 func TestAuditOnceRejectsMissingDependencies(t *testing.T) {
 	reader := &candidateReaderStub{}
 	for _, service := range []Service{
-		NewService(nil, outcomeRepoStub{}, reader),
-		NewService(assessmentRepoStub{}, nil, reader),
-		NewService(assessmentRepoStub{}, outcomeRepoStub{}, nil),
+		NewService(nil, outcomeRepoStub{}, reader, latestRunReaderStub{}, consistencyReaderStub{}),
+		NewService(assessmentRepoStub{}, nil, reader, latestRunReaderStub{}, consistencyReaderStub{}),
+		NewService(assessmentRepoStub{}, outcomeRepoStub{}, nil, latestRunReaderStub{}, consistencyReaderStub{}),
+		NewService(assessmentRepoStub{}, outcomeRepoStub{}, reader, nil, consistencyReaderStub{}),
+		NewService(assessmentRepoStub{}, outcomeRepoStub{}, reader, latestRunReaderStub{}, nil),
 	} {
 		if _, err := service.AuditOnce(context.Background(), 10); err == nil {
 			t.Fatal("expected module configuration error")
 		}
 	}
+}
+
+func mustTestOutcome(t *testing.T, kind modelcatalog.Kind, runID string, evaluatedAt time.Time) *domainoutcome.Record {
+	t.Helper()
+	record, err := domainoutcome.NewRecord(domainoutcome.NewRecordInput{
+		ID:           meta.FromUint64(101),
+		AssessmentID: meta.FromUint64(1),
+		TesteeID:     7,
+		RunID:        runID,
+		Model:        domainoutcome.ModelIdentity{Kind: kind, Code: "MODEL", Version: "1"},
+		Payload:      []byte(`{"schema_version":2}`),
+		EvaluatedAt:  evaluatedAt,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return record
+}
+
+func containsMismatch(items []*mismatch, kind mismatchKind) bool {
+	for _, item := range items {
+		if item != nil && item.Kind == kind && item.RecommendedAction != "" {
+			return true
+		}
+	}
+	return false
 }

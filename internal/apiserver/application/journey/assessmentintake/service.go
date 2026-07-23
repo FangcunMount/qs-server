@@ -131,6 +131,12 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 	// 应用绑定：优先消费提交时冻结的 Admission（EV-R001）。
 	bound, admissionSource, err := s.applyAdmissionOrBinding(ctx, command, &dto)
 	if err != nil {
+		l.Errorw("答卷测评准入来源解析失败",
+			"action", "ensure_assessment",
+			"answersheet_id", command.AnswerSheetID,
+			"admission_source", admissionSource,
+			"error", err.Error(),
+		)
 		return nil, err
 	}
 	l.Infow("答卷测评绑定已解析",
@@ -157,6 +163,7 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 	existing, findErr := s.intake.FindByAnswerSheetID(ctx, command.AnswerSheetID)
 	switch {
 	case findErr == nil && existing != nil:
+		observeAssessmentIntakeLookup(intakeLookupFound)
 		autoSubmitted, submitErr := s.submitPendingBoundAssessment(ctx, command, existing, bound)
 		if submitErr != nil {
 			return nil, submitErr
@@ -176,6 +183,7 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 		)
 		return &Result{AssessmentID: existing.ID, AutoSubmitted: autoSubmitted}, nil
 	case findErr != nil && !evalerrors.IsAssessmentNotFound(findErr):
+		observeAssessmentIntakeLookup(intakeLookupDependencyError)
 		l.Errorw("答卷测评查询依赖失败，跳过创建",
 			"action", "ensure_assessment",
 			"answersheet_id", command.AnswerSheetID,
@@ -184,6 +192,7 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 		)
 		return nil, findErr
 	default:
+		observeAssessmentIntakeLookup(intakeLookupNotFound)
 		l.Infow("答卷尚无关联测评",
 			"action", "ensure_assessment",
 			"answersheet_id", command.AnswerSheetID,
@@ -210,6 +219,7 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 			existing, findErr := s.intake.FindByAnswerSheetID(ctx, command.AnswerSheetID)
 			switch {
 			case findErr == nil && existing != nil:
+				observeAssessmentIntakeLookup(intakeLookupDuplicateHit)
 				autoSubmitted, submitErr := s.submitPendingBoundAssessment(ctx, command, existing, bound)
 				if submitErr != nil {
 					return nil, submitErr
@@ -224,6 +234,7 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 				)
 				return &Result{AssessmentID: existing.ID, AutoSubmitted: autoSubmitted}, nil
 			case findErr != nil && !evalerrors.IsAssessmentNotFound(findErr):
+				observeAssessmentIntakeLookup(intakeLookupDependencyError)
 				l.Errorw("测评创建冲突后再查依赖失败",
 					"action", "ensure_assessment",
 					"answersheet_id", command.AnswerSheetID,
@@ -313,8 +324,7 @@ func (s *service) applyAdmissionOrBinding(ctx context.Context, command Command, 
 		}
 		return false, "frozen_admission", errors.WithCode(code.ErrInvalidArgument, "admission purpose is invalid: %s", command.Admission.Purpose)
 	}
-	bound, err = s.applyBinding(ctx, command, dto)
-	return bound, "legacy_binding", err
+	return s.applyBinding(ctx, command, dto)
 }
 
 func applyFrozenAdmission(admission *Admission, dto *evaluationintake.CreateCommand) error {
@@ -347,13 +357,19 @@ func applyFrozenAdmission(admission *Admission, dto *evaluationintake.CreateComm
 }
 
 // applyBinding 应用绑定
-func (s *service) applyBinding(ctx context.Context, command Command, dto *evaluationintake.CreateCommand) (bool, error) {
+func (s *service) applyBinding(ctx context.Context, command Command, dto *evaluationintake.CreateCommand) (bool, string, error) {
 	if s.binding == nil {
-		return false, nil
+		return false, "legacy_binding", errors.WithCode(code.ErrModuleInitializationFailed, "assessment binding resolver is not configured for legacy admission")
 	}
 	binding, ok, err := s.binding.ResolveAssessmentBinding(ctx, command.QuestionnaireCode, command.QuestionnaireVersion)
-	if err != nil || !ok {
-		return false, err
+	if err != nil {
+		return false, "legacy_binding", err
+	}
+	if !ok {
+		return false, "legacy_unclassified", errors.WithCode(
+			code.ErrAssessmentModelValidationFailed,
+			"legacy_unclassified: answer sheet has no frozen admission and live binding is unavailable",
+		)
 	}
 	k := binding.Ref.Kind.String()
 	dto.ModelKind = &k
@@ -369,7 +385,7 @@ func (s *service) applyBinding(ctx context.Context, command Command, dto *evalua
 	dto.ModelVersion = &binding.Ref.Version
 	dto.ModelTitle = &binding.Ref.Title
 	dto.ModelValidationMode = evaluationintake.ModelValidationModeActiveRelease
-	return true, nil
+	return true, "legacy_binding", nil
 }
 
 // matchPlan 匹配计划

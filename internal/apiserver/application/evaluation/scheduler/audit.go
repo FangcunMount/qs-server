@@ -11,6 +11,8 @@ import (
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationconsistency"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/prometheus/client_golang/prometheus"
@@ -26,6 +28,14 @@ const (
 	mismatchCanonicalOutcomeMissing       mismatchKind = "canonical_outcome_missing"
 	mismatchRunStatusMismatch             mismatchKind = "run_status_mismatch"
 	mismatchTerminalConflict              mismatchKind = "terminal_conflict"
+	mismatchProjectionWithoutOutcome      mismatchKind = "projection_without_outcome"
+	mismatchProjectionMissing             mismatchKind = "projection_missing"
+	mismatchProjectionOutcomeMismatch     mismatchKind = "projection_outcome_mismatch"
+	mismatchUnexpectedProjection          mismatchKind = "unexpected_projection"
+	mismatchCommittedOutboxWithoutOutcome mismatchKind = "committed_outbox_without_outcome"
+	mismatchCommittedOutboxMissing        mismatchKind = "committed_outbox_missing"
+	mismatchCommittedOutboxMismatch       mismatchKind = "committed_outbox_reference_mismatch"
+	mismatchRunOutcomeReferenceMismatch   mismatchKind = "run_outcome_reference_mismatch"
 )
 
 type mismatchSeverity string
@@ -63,35 +73,34 @@ type service struct {
 	assessments domainassessment.Repository
 	outcomes    domainoutcome.Repository
 	runs        LatestRunReader
+	consistency evaluationconsistency.Reader
 	reader      SubmittedCandidateReader
 	mu          sync.Mutex
 	cursor      uint64
 	now         func() time.Time
 }
 
-func NewService(assessments domainassessment.Repository, outcomes domainoutcome.Repository, reader SubmittedCandidateReader) Service {
-	return NewServiceWithRuns(assessments, outcomes, reader, nil)
-}
-
-// NewServiceWithRuns wires optional Run lookup for EV-R011 matrix classification.
-func NewServiceWithRuns(
+// NewService wires the complete read-only EV-R011 consistency matrix.
+func NewService(
 	assessments domainassessment.Repository,
 	outcomes domainoutcome.Repository,
 	reader SubmittedCandidateReader,
 	runs LatestRunReader,
+	consistency evaluationconsistency.Reader,
 ) Service {
 	return &service{
 		assessments: assessments,
 		outcomes:    outcomes,
 		runs:        runs,
+		consistency: consistency,
 		reader:      reader,
 		now:         time.Now,
 	}
 }
 
 func (s *service) AuditOnce(ctx context.Context, limit int) (int, error) {
-	if s == nil || s.assessments == nil || s.outcomes == nil || s.reader == nil {
-		return 0, fmt.Errorf("evaluation consistency audit is not configured: assessment, outcome and candidate repositories are required")
+	if s == nil || s.assessments == nil || s.outcomes == nil || s.reader == nil || s.runs == nil || s.consistency == nil {
+		return 0, fmt.Errorf("evaluation consistency audit is not configured: assessment, run, outcome, projection, outbox and candidate readers are required")
 	}
 	if limit <= 0 {
 		return 0, nil
@@ -111,26 +120,25 @@ func (s *service) AuditOnce(ctx context.Context, limit int) (int, error) {
 		if assessmentID == 0 {
 			continue
 		}
-		item, scanErr := s.scanOne(ctx, assessmentID)
+		items, scanErr := s.scanOne(ctx, assessmentID)
 		if scanErr != nil {
 			return 0, scanErr
 		}
-		if item == nil {
-			continue
+		for _, item := range items {
+			observeMismatch(item.Kind)
+			observeDisposition(item.Kind, "deferred")
+			log.Warnf(
+				"evaluation consistency drift requires audited migration (assessment_id=%d, kind=%s, severity=%s, action=%s)",
+				item.AssessmentID, item.Kind, item.Severity, item.RecommendedAction,
+			)
+			detected++
 		}
-		observeMismatch(item.Kind)
-		observeDisposition(item.Kind, "deferred")
-		log.Warnf(
-			"evaluation consistency drift requires audited migration (assessment_id=%d, kind=%s, severity=%s, action=%s)",
-			item.AssessmentID, item.Kind, item.Severity, item.RecommendedAction,
-		)
-		detected++
 	}
 	s.cursor = ids[len(ids)-1]
 	return detected, nil
 }
 
-func (s *service) scanOne(ctx context.Context, assessmentID uint64) (*mismatch, error) {
+func (s *service) scanOne(ctx context.Context, assessmentID uint64) ([]*mismatch, error) {
 	a, err := s.assessments.FindByID(ctx, domainassessment.NewID(assessmentID))
 	if err != nil || a == nil {
 		return nil, err
@@ -139,81 +147,111 @@ func (s *service) scanOne(ctx context.Context, assessmentID uint64) (*mismatch, 
 	if err != nil {
 		return nil, err
 	}
-	var run *evalrun.EvaluationRun
-	if s.runs != nil {
-		run, err = s.runs.FindLatestByAssessmentID(ctx, assessmentID)
-		if err != nil {
-			return nil, err
-		}
+	run, err := s.runs.FindLatestByAssessmentID(ctx, assessmentID)
+	if err != nil {
+		return nil, err
 	}
-	item := classifyDrift(a.Status(), record != nil, run, s.now())
-	if item == nil {
-		return nil, nil
+	projection, err := s.consistency.FindProjectionEvidence(ctx, assessmentID)
+	if err != nil {
+		return nil, err
 	}
-	item.AssessmentID = assessmentID
-	return item, nil
+	outbox, err := s.consistency.FindCommittedOutboxEvidence(ctx, assessmentID)
+	if err != nil {
+		return nil, err
+	}
+	items := classifyDrifts(consistencyEvidence{
+		status:     a.Status(),
+		outcome:    record,
+		run:        run,
+		projection: projection,
+		outbox:     outbox,
+	}, s.now())
+	for _, item := range items {
+		item.AssessmentID = assessmentID
+	}
+	return items, nil
 }
 
-// classifyDrift maps Assessment/Run/Outcome evidence to EV-R011 drift classes.
-// Projection/Outbox columns remain deferred until dedicated readers exist; this
-// function stays read-only and never mutates aggregates.
-func classifyDrift(
-	status domainassessment.Status,
-	hasOutcome bool,
-	run *evalrun.EvaluationRun,
-	now time.Time,
-) *mismatch {
+type consistencyEvidence struct {
+	status     domainassessment.Status
+	outcome    *domainoutcome.Record
+	run        *evalrun.EvaluationRun
+	projection *evaluationconsistency.ProjectionEvidence
+	outbox     *evaluationconsistency.CommittedOutboxEvidence
+}
+
+// classifyDrifts maps the complete Assessment/Run/Outcome/Projection/Outbox
+// matrix to explicit read-only drift classes.
+func classifyDrifts(evidence consistencyEvidence, now time.Time) []*mismatch {
+	items := make([]*mismatch, 0, 4)
+	add := func(kind mismatchKind, severity mismatchSeverity, action string) {
+		items = append(items, &mismatch{
+			Kind: kind, Severity: severity, RecommendedAction: action, DetectedAt: now,
+		})
+	}
+
 	runStatus := evalrun.Status("")
 	leaseExpired := false
-	if run != nil {
-		runStatus = run.Attempt().Status
+	if evidence.run != nil {
+		runStatus = evidence.run.Attempt().Status
 		if runStatus == evalrun.StatusRunning {
-			if lease := run.LeaseExpiresAt(); lease != nil && !lease.After(now) {
+			if lease := evidence.run.LeaseExpiresAt(); lease != nil && !lease.After(now) {
 				leaseExpired = true
 			}
 		}
 	}
 
-	switch {
-	case status.IsSubmitted() && hasOutcome && runStatus == evalrun.StatusSucceeded:
-		return &mismatch{
-			Kind: mismatchSuccessProjectionDrift, Severity: severityMedium,
-			RecommendedAction: "verify projection/outbox then migrate assessment to evaluated",
-			DetectedAt:        now,
+	if evidence.outcome == nil {
+		if evidence.projection != nil && evidence.projection.RowCount > 0 {
+			add(mismatchProjectionWithoutOutcome, severityHigh, "remove or rebuild projection only after locating the canonical outcome")
 		}
-	case status.IsSubmitted() && hasOutcome:
-		return &mismatch{
-			Kind: mismatchOutcomeWithoutEvaluatedStatus, Severity: severityHigh,
-			RecommendedAction: "audited migration to evaluated after confirming canonical outcome",
-			DetectedAt:        now,
+		if evidence.outbox != nil && evidence.outbox.RowCount > 0 {
+			add(mismatchCommittedOutboxWithoutOutcome, severityHigh, "quarantine committed event and investigate missing canonical outcome")
 		}
-	case status.IsSubmitted() && !hasOutcome && leaseExpired:
-		return &mismatch{
-			Kind: mismatchLeaseRecoveryCandidate, Severity: severityMedium,
-			RecommendedAction: "lease recovery / redelivery; do not rewrite assessment status here",
-			DetectedAt:        now,
+	} else {
+		outcomeID := evidence.outcome.ID().String()
+		if evidence.outcome.Model().Kind == modelcatalog.KindScale {
+			switch {
+			case evidence.projection == nil || evidence.projection.RowCount == 0:
+				add(mismatchProjectionMissing, severityMedium, "rebuild scale projection from the canonical outcome in an audited maintenance window")
+			case evidence.projection.UnlinkedRowCount > 0 ||
+				evidence.projection.DistinctOutcomeCount != 1 ||
+				evidence.projection.OutcomeID != outcomeID:
+				add(mismatchProjectionOutcomeMismatch, severityHigh, "replace projection from the canonical outcome after operator confirmation")
+			}
+		} else if evidence.projection != nil && evidence.projection.RowCount > 0 {
+			add(mismatchUnexpectedProjection, severityMedium, "inspect legacy scale projection attached to a non-scale outcome")
 		}
-	case status.IsEvaluated() && !hasOutcome:
-		return &mismatch{
-			Kind: mismatchCanonicalOutcomeMissing, Severity: severityHigh,
-			RecommendedAction: "investigate missing outcome; never invent outcome from current catalog",
-			DetectedAt:        now,
+
+		switch {
+		case evidence.outbox == nil || evidence.outbox.RowCount == 0:
+			add(mismatchCommittedOutboxMissing, severityHigh, "stage a governed replay only after verifying the committed outcome")
+		case evidence.outbox.RowCount != 1 ||
+			evidence.outbox.OutcomeID != outcomeID ||
+			evidence.outbox.RunID != evidence.outcome.RunID():
+			add(mismatchCommittedOutboxMismatch, severityHigh, "quarantine conflicting outbox evidence and require operator decision")
 		}
-	case status.IsEvaluated() && hasOutcome && (runStatus == evalrun.StatusFailed || runStatus == evalrun.StatusRunning):
-		return &mismatch{
-			Kind: mismatchRunStatusMismatch, Severity: severityMedium,
-			RecommendedAction: "audit run/status mismatch; manual confirmation required",
-			DetectedAt:        now,
+
+		if evidence.run == nil || evidence.run.ID().String() != evidence.outcome.RunID() {
+			add(mismatchRunOutcomeReferenceMismatch, severityHigh, "locate the exact run referenced by the canonical outcome")
 		}
-	case status.IsFailed() && hasOutcome && runStatus == evalrun.StatusSucceeded:
-		return &mismatch{
-			Kind: mismatchTerminalConflict, Severity: severityHigh,
-			RecommendedAction: "terminal conflict; require operator decision",
-			DetectedAt:        now,
-		}
-	default:
-		return nil
 	}
+
+	switch {
+	case evidence.status.IsSubmitted() && evidence.outcome != nil && runStatus == evalrun.StatusSucceeded:
+		add(mismatchSuccessProjectionDrift, severityMedium, "verify projection/outbox then migrate assessment to evaluated")
+	case evidence.status.IsSubmitted() && evidence.outcome != nil:
+		add(mismatchOutcomeWithoutEvaluatedStatus, severityHigh, "audited migration to evaluated after confirming canonical outcome")
+	case evidence.status.IsSubmitted() && evidence.outcome == nil && leaseExpired:
+		add(mismatchLeaseRecoveryCandidate, severityMedium, "lease recovery / redelivery; do not rewrite assessment status here")
+	case evidence.status.IsEvaluated() && evidence.outcome == nil:
+		add(mismatchCanonicalOutcomeMissing, severityHigh, "investigate missing outcome; never invent outcome from current catalog")
+	case evidence.status.IsEvaluated() && evidence.outcome != nil && (runStatus == evalrun.StatusFailed || runStatus == evalrun.StatusRunning):
+		add(mismatchRunStatusMismatch, severityMedium, "audit run/status mismatch; manual confirmation required")
+	case evidence.status.IsFailed() && evidence.outcome != nil && runStatus == evalrun.StatusSucceeded:
+		add(mismatchTerminalConflict, severityHigh, "terminal conflict; require operator decision")
+	}
+	return items
 }
 
 var (
