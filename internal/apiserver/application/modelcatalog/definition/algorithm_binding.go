@@ -28,7 +28,7 @@ func AlgorithmBindingFromModel(model *domain.AssessmentModel) AlgorithmBinding {
 		return AlgorithmBinding{}
 	}
 	return AlgorithmBindingFromIdentity(domain.Identity{
-		Kind: model.Kind, SubKind: model.SubKind, Algorithm: model.Algorithm,
+		Kind: model.Kind, SubKind: domain.CanonicalSubKindFor(model.Kind), Algorithm: model.Algorithm,
 	})
 }
 

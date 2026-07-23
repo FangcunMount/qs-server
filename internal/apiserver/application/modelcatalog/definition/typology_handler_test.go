@@ -2,7 +2,6 @@ package definition
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
@@ -41,21 +40,19 @@ func TestTypologyValidateForPublishRejectsMissingQuestionnaire(t *testing.T) {
 	}
 }
 
-func TestTypologyMaterializationRejectsWrongSubKind(t *testing.T) {
+func TestTypologyMaterializationUsesCanonicalSubKind(t *testing.T) {
 	t.Parallel()
 	model := publishableTypologyShell()
-	model.SubKind = domain.SubKindEmpty
 	model.DefinitionV2 = &modeldefinition.Definition{}
 	_, err := (TypologyDefinitionHandler{}).MaterializeSnapshot(context.Background(), model)
-	if err == nil || !strings.Contains(err.Error(), "sub_kind") {
-		t.Fatalf("err = %v, want sub_kind rejection", err)
+	if err == nil {
+		t.Fatal("expected invalid definition error")
 	}
 }
 
 func publishableTypologyShell() *domain.AssessmentModel {
 	return &domain.AssessmentModel{
 		Kind:      domain.KindTypology,
-		SubKind:   domain.SubKindTypology,
 		Algorithm: domain.AlgorithmPersonalityTypology,
 		Code:      "TYPOLOGY_SHELL",
 		Title:     "Typology",

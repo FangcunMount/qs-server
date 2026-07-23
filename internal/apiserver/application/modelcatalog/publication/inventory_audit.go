@@ -28,7 +28,6 @@ func ModelFromPublishedSnapshot(snapshot *port.PublishedModel) *domain.Assessmen
 	return &domain.AssessmentModel{
 		Code:      snapshot.Code,
 		Kind:      snapshot.Kind,
-		SubKind:   snapshot.SubKind,
 		Algorithm: snapshot.Algorithm,
 		Title:     snapshot.Title,
 		Binding: domain.QuestionnaireBinding{

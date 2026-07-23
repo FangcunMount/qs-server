@@ -54,9 +54,6 @@ func (m RuntimeMaterializer) MaterializeTypology(model *domain.AssessmentModel) 
 	if model == nil || model.DefinitionV2 == nil {
 		return Materialization{}, fmt.Errorf("typology definition_v2 is required")
 	}
-	if model.SubKind != domain.SubKindTypology {
-		return Materialization{}, fmt.Errorf("typology model sub_kind %s is not typology", model.SubKind)
-	}
 	if _, err := m.MaterializeTypologyRuntime(model, string(domain.ModelStatusPublished)); err != nil {
 		return Materialization{}, err
 	}

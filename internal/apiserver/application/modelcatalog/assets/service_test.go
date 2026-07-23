@@ -124,7 +124,7 @@ func (s *memoryStore) Get(context.Context, string) (*assessmentasset.ObjectReade
 }
 
 func mbtiDraft() *domain.AssessmentModel {
-	return &domain.AssessmentModel{Code: "MBTI_DEMO", Kind: domain.KindTypology, SubKind: domain.SubKindTypology, Algorithm: binding.AlgorithmPersonalityTypology, Status: domain.ModelStatusDraft}
+	return &domain.AssessmentModel{Code: "MBTI_DEMO", Kind: domain.KindTypology, Algorithm: binding.AlgorithmPersonalityTypology, Status: domain.ModelStatusDraft}
 }
 
 var _ io.Reader = (*bytes.Reader)(nil)

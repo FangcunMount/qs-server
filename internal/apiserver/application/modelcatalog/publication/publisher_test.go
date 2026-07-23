@@ -182,12 +182,11 @@ func newPublishedTestModel(t *testing.T) *domain.AssessmentModel {
 
 	now := time.Date(2026, 7, 9, 0, 0, 0, 0, time.UTC)
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
-		Code:           "SPM",
-		Kind:           domain.KindCognitive,
-		Algorithm:      domain.AlgorithmSPM,
-		ProductChannel: domain.ProductChannelBehaviorAbility,
-		Title:          "SPM",
-		Now:            now,
+		Code:      "SPM",
+		Kind:      domain.KindCognitive,
+		Algorithm: domain.AlgorithmSPM,
+		Title:     "SPM",
+		Now:       now,
 	})
 	if err != nil {
 		t.Fatalf("NewAssessmentModel: %v", err)

@@ -62,7 +62,7 @@ func (r Policies) resolve(model *domain.AssessmentModel) Policy {
 	if model == nil {
 		return nil
 	}
-	identity := domain.Identity{Kind: model.Kind, SubKind: model.SubKind, Algorithm: model.Algorithm}
+	identity := domain.Identity{Kind: model.Kind, SubKind: domain.CanonicalSubKindFor(model.Kind), Algorithm: model.Algorithm}
 	for _, policy := range r.policies {
 		if policy.Supports(identity) {
 			return policy

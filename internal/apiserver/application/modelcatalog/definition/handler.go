@@ -118,7 +118,7 @@ func (r Registry) PreviewReport(ctx context.Context, model *domain.AssessmentMod
 	}
 	preview, ok := handler.(PreviewHandler)
 	if !ok {
-		return nil, fmt.Errorf("report preview is not configured for model identity %s/%s/%s", model.Kind, model.SubKind, model.Algorithm)
+		return nil, fmt.Errorf("report preview is not configured for model identity %s/%s", model.Kind, model.Algorithm)
 	}
 	return preview.PreviewReport(ctx, model, input)
 }

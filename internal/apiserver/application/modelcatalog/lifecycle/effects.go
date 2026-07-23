@@ -46,7 +46,7 @@ func (r EffectsRegistry) AfterTransition(ctx context.Context, model *domain.Asse
 	if model == nil {
 		return
 	}
-	identity := domain.Identity{Kind: model.Kind, SubKind: model.SubKind, Algorithm: model.Algorithm}
+	identity := domain.Identity{Kind: model.Kind, SubKind: domain.CanonicalSubKindFor(model.Kind), Algorithm: model.Algorithm}
 	for _, effect := range r.effects {
 		if effect.Supports(identity) {
 			effect.AfterTransition(ctx, model, action)

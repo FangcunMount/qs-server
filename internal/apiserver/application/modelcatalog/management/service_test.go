@@ -96,7 +96,7 @@ func TestUpdateBasicInfoRejectsFrozenAlgorithmChange(t *testing.T) {
 
 	now := time.Date(2026, 7, 14, 10, 0, 0, 0, time.UTC)
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
-		Code: "MBTI-1", Kind: domain.KindTypology, SubKind: domain.SubKindTypology,
+		Code: "MBTI-1", Kind: domain.KindTypology,
 		Algorithm: domain.AlgorithmPersonalityTypology, Title: "MBTI", Now: now,
 	})
 	if err != nil {

@@ -57,7 +57,7 @@ func (s TypologyPreviewService) PreviewReport(ctx context.Context, model *domain
 		return nil, errors.WithCode(code.ErrInternalServerError, "报告预览服务未配置")
 	}
 	result, err := s.ReportPreviewer.PreviewReport(ctx, modelpreview.Request{
-		SubKind: model.SubKind, Algorithm: model.Algorithm, Code: model.Code, Version: modelRevisionVersion(model), Title: model.Title,
+		SubKind: domain.CanonicalSubKindFor(model.Kind), Algorithm: model.Algorithm, Code: model.Code, Version: modelRevisionVersion(model), Title: model.Title,
 		QuestionnaireCode: model.Binding.QuestionnaireCode, QuestionnaireVersion: model.Binding.QuestionnaireVersion,
 		Input: typologyPreviewExecutionInput(model, questionnaire, payload, input.Answers),
 	})

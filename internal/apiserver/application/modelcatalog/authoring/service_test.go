@@ -88,7 +88,7 @@ func TestSaveDefinitionForksPublishedModelToDraft(t *testing.T) {
 
 func TestValidateDefinitionUsesThePublishValidationHandler(t *testing.T) {
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
-		Code: "TYPOLOGY-1", Kind: domain.KindTypology, SubKind: domain.SubKindTypology,
+		Code: "TYPOLOGY-1", Kind: domain.KindTypology,
 		Algorithm: domain.AlgorithmPersonalityTypology, Title: "Typology", Now: time.Now(),
 	})
 	if err != nil {
@@ -111,7 +111,7 @@ func TestValidateDefinitionUsesThePublishValidationHandler(t *testing.T) {
 
 func TestValidateDefinitionReturnsWarningsWithoutFailing(t *testing.T) {
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
-		Code: "TYPOLOGY-WARNING", Kind: domain.KindTypology, SubKind: domain.SubKindTypology,
+		Code: "TYPOLOGY-WARNING", Kind: domain.KindTypology,
 		Algorithm: domain.AlgorithmPersonalityTypology, Title: "Typology", Now: time.Now(),
 	})
 	if err != nil {

@@ -7,7 +7,7 @@ import (
 )
 
 func TestRuntimeMaterializerRejectsTypologyWrongSubKind(t *testing.T) {
-	model := &domain.AssessmentModel{Kind: domain.KindTypology, SubKind: domain.SubKindEmpty, Algorithm: domain.AlgorithmPersonalityTypology, DefinitionV2: &domain.Definition{}}
+	model := &domain.AssessmentModel{Kind: domain.KindTypology, Algorithm: domain.AlgorithmPersonalityTypology, DefinitionV2: &domain.Definition{}}
 	if _, err := (RuntimeMaterializer{}).MaterializeTypology(model); err == nil {
 		t.Fatal("expected sub_kind rejection")
 	}

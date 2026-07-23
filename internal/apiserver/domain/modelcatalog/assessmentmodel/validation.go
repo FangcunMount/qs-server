@@ -42,9 +42,6 @@ func (m *AssessmentModel) ValidateBasic() DomainValidationResult {
 		issues = append(issues, DomainValidationIssue{Field: "definition_v2", Message: "definition_v2 is required", Code: "definition_v2.required", Level: ValidationLevelError})
 	}
 	if m.Kind == binding.KindTypology {
-		if m.SubKind != binding.SubKindTypology {
-			issues = append(issues, DomainValidationIssue{Field: "sub_kind", Message: "typology models require sub_kind typology", Code: "sub_kind.typology.required", Level: ValidationLevelError})
-		}
 		if m.Algorithm == "" {
 			issues = append(issues, DomainValidationIssue{Field: "algorithm", Message: "algorithm is required", Code: "algorithm.required", Level: ValidationLevelError})
 		}

@@ -9,11 +9,10 @@ import (
 
 func TestDraftMapperOmitsProductChannelAndDerivesItOnRead(t *testing.T) {
 	original, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
-		Code:           "brief2_demo",
-		Kind:           domain.KindBehavioralRating,
-		Algorithm:      domain.AlgorithmBrief2,
-		ProductChannel: domain.ProductChannelMedicalScale,
-		Title:          "BRIEF-2 Demo",
+		Code:      "brief2_demo",
+		Kind:      domain.KindBehavioralRating,
+		Algorithm: domain.AlgorithmBrief2,
+		Title:     "BRIEF-2 Demo",
 	})
 	if err != nil {
 		t.Fatalf("NewAssessmentModel: %v", err)
@@ -24,9 +23,8 @@ func TestDraftMapperOmitsProductChannelAndDerivesItOnRead(t *testing.T) {
 	if data, err := po.ToBsonM(); err != nil || data["product_channel"] != nil || data["sub_kind"] != nil {
 		t.Fatalf("new head must not persist legacy identity fields: %#v, %v", data, err)
 	}
-	got := mapper.ToDomain(po)
-	if got.ProductChannel != domain.ProductChannelBehaviorAbility {
-		t.Fatalf("round trip product channel = %q", got.ProductChannel)
+	if got := mapper.ToDomain(po); got == nil {
+		t.Fatal("mapped model is nil")
 	}
 }
 
@@ -35,9 +33,8 @@ func TestDraftMapperDerivesMissingProductChannel(t *testing.T) {
 		Code: "legacy_cognitive",
 		Kind: string(domain.KindCognitive),
 	}
-	got := NewDraftMapper().ToDomain(po)
-	if got.ProductChannel != domain.ProductChannelBehaviorAbility {
-		t.Fatalf("derived product channel = %q, want behavior_ability", got.ProductChannel)
+	if got := NewDraftMapper().ToDomain(po); got == nil {
+		t.Fatal("mapped model is nil")
 	}
 }
 

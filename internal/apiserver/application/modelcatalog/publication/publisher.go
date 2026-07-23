@@ -119,9 +119,7 @@ func snapshotFromModel(model *domain.AssessmentModel, result definition.Material
 	}
 	snapshot := &port.AssessmentSnapshot{
 		SchemaVersion:        domain.SchemaVersionV2,
-		ProductChannel:       domain.ResolveProductChannel(model.Kind, model.ProductChannel),
 		Kind:                 result.Kind,
-		SubKind:              result.SubKind,
 		Algorithm:            result.Algorithm,
 		AlgorithmFamily:      result.AlgorithmFamily,
 		Code:                 model.Code,

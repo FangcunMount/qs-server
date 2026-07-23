@@ -14,8 +14,7 @@ type AssessmentModel struct {
 	ID   string
 	Code string
 	// 类型
-	Kind    binding.Kind
-	SubKind binding.SubKind
+	Kind binding.Kind
 	// 算法
 	Algorithm binding.Algorithm
 
@@ -24,7 +23,6 @@ type AssessmentModel struct {
 	Description string
 	// 分类
 	Category       string
-	ProductChannel binding.ProductChannel
 	Stages         []string
 	ApplicableAges []string
 	Reporters      []string
@@ -54,9 +52,7 @@ type AssessmentModel struct {
 type NewInput struct {
 	Code           string
 	Kind           binding.Kind
-	SubKind        binding.SubKind
 	Algorithm      binding.Algorithm
-	ProductChannel binding.ProductChannel
 	Title          string
 	Description    string
 	Category       string
@@ -78,10 +74,6 @@ func New(input NewInput) (*AssessmentModel, error) {
 	if !input.Kind.IsValid() {
 		return nil, fmt.Errorf("%w: kind is invalid", ErrInvalidArgument)
 	}
-	productChannel, err := binding.CompleteProductChannel(input.Kind, input.ProductChannel)
-	if err != nil {
-		return nil, err
-	}
 	now := input.Now
 	if now.IsZero() {
 		now = time.Now().UTC()
@@ -89,9 +81,7 @@ func New(input NewInput) (*AssessmentModel, error) {
 	return &AssessmentModel{
 		Code:           input.Code,
 		Kind:           input.Kind,
-		SubKind:        input.SubKind,
 		Algorithm:      input.Algorithm,
-		ProductChannel: productChannel,
 		Title:          input.Title,
 		Description:    input.Description,
 		Category:       input.Category,
@@ -145,8 +135,8 @@ func (m *AssessmentModel) touch(now time.Time) {
 }
 
 // UpdateBasicInfo updates editable metadata on the draft model.
-func (m *AssessmentModel) UpdateBasicInfo(title, description string, subKind binding.SubKind, algorithm binding.Algorithm, productChannel binding.ProductChannel, category string, tags []string, now time.Time) error {
-	if err := m.updateBasicInfo(title, description, subKind, algorithm, productChannel, category, tags); err != nil {
+func (m *AssessmentModel) UpdateBasicInfo(title, description string, algorithm binding.Algorithm, category string, tags []string, now time.Time) error {
+	if err := m.updateBasicInfo(title, description, algorithm, category, tags); err != nil {
 		return err
 	}
 	m.touch(now)
@@ -156,11 +146,11 @@ func (m *AssessmentModel) UpdateBasicInfo(title, description string, subKind bin
 // UpdateScaleBasicInfo updates scale metadata and audience metadata as one
 // draft revision. A repository update uses Version for optimistic locking, so
 // a single command must advance that revision only once.
-func (m *AssessmentModel) UpdateScaleBasicInfo(title, description string, subKind binding.SubKind, algorithm binding.Algorithm, productChannel binding.ProductChannel, category string, tags, stages, applicableAges, reporters []string, now time.Time) error {
+func (m *AssessmentModel) UpdateScaleBasicInfo(title, description string, algorithm binding.Algorithm, category string, tags, stages, applicableAges, reporters []string, now time.Time) error {
 	if m == nil || m.Kind != binding.KindScale {
 		return fmt.Errorf("%w: scale metadata is only supported by scale models", ErrInvalidArgument)
 	}
-	if err := m.updateBasicInfo(title, description, subKind, algorithm, productChannel, category, tags); err != nil {
+	if err := m.updateBasicInfo(title, description, algorithm, category, tags); err != nil {
 		return err
 	}
 	if err := m.updateAudienceMetadata(stages, applicableAges, reporters); err != nil {
@@ -170,7 +160,7 @@ func (m *AssessmentModel) UpdateScaleBasicInfo(title, description string, subKin
 	return nil
 }
 
-func (m *AssessmentModel) updateBasicInfo(title, description string, subKind binding.SubKind, algorithm binding.Algorithm, productChannel binding.ProductChannel, category string, tags []string) error {
+func (m *AssessmentModel) updateBasicInfo(title, description string, algorithm binding.Algorithm, category string, tags []string) error {
 	if err := m.ensureEditable(); err != nil {
 		return err
 	}
@@ -179,18 +169,8 @@ func (m *AssessmentModel) updateBasicInfo(title, description string, subKind bin
 	}
 	m.Title = title
 	m.Description = description
-	if subKind != "" {
-		m.SubKind = subKind
-	}
 	if algorithm != "" {
 		m.Algorithm = algorithm
-	}
-	if productChannel != "" {
-		resolved, err := binding.CompleteProductChannel(m.Kind, productChannel)
-		if err != nil {
-			return err
-		}
-		m.ProductChannel = resolved
 	}
 	m.Category = category
 	m.Tags = append([]string(nil), tags...)

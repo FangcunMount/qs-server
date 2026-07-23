@@ -16,7 +16,6 @@ func TestAssessmentModelLifecycle(t *testing.T) {
 	model, err := assessmentmodel.New(assessmentmodel.NewInput{
 		Code:      "personality_mbti_v1",
 		Kind:      binding.KindTypology,
-		SubKind:   binding.SubKindTypology,
 		Algorithm: binding.AlgorithmPersonalityTypology,
 		Title:     "MBTI",
 		Now:       now,
@@ -63,7 +62,6 @@ func TestAssessmentModelRejectsMissingDefinitionV2(t *testing.T) {
 	model, err := assessmentmodel.New(assessmentmodel.NewInput{
 		Code:      "personality_legacy_payload",
 		Kind:      binding.KindTypology,
-		SubKind:   binding.SubKindTypology,
 		Algorithm: binding.AlgorithmPersonalityTypology,
 		Title:     "Legacy Payload",
 	})

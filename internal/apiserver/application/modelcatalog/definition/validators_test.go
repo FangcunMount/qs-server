@@ -58,7 +58,7 @@ func TestValidateAlgorithmBindingRejectsEmptyCognitiveAlgorithm(t *testing.T) {
 func TestValidateAlgorithmBindingAcceptsPersonalityTypology(t *testing.T) {
 	t.Parallel()
 	model := &domain.AssessmentModel{
-		Kind: domain.KindTypology, SubKind: domain.SubKindTypology, Algorithm: domain.AlgorithmPersonalityTypology,
+		Kind: domain.KindTypology, Algorithm: domain.AlgorithmPersonalityTypology,
 		DefinitionV2: &modeldefinition.Definition{},
 	}
 	if issues := ValidateAlgorithmBinding(model); len(issues) != 0 {

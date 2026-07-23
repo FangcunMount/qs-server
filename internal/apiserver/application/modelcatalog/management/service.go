@@ -46,16 +46,14 @@ func (s Service) Create(ctx context.Context, actor modelcatalog.ActorContext, in
 		return nil, err
 	}
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
-		Code:           codeValue,
-		Kind:           kind,
-		SubKind:        domain.CanonicalSubKindFor(kind),
-		Algorithm:      createAlgorithm(kind, input.Algorithm),
-		ProductChannel: domain.DefaultProductChannelFor(kind),
-		Title:          input.Title,
-		Description:    input.Description,
-		Category:       input.Category,
-		Tags:           input.Tags,
-		Now:            s.now(),
+		Code:        codeValue,
+		Kind:        kind,
+		Algorithm:   createAlgorithm(kind, input.Algorithm),
+		Title:       input.Title,
+		Description: input.Description,
+		Category:    input.Category,
+		Tags:        input.Tags,
+		Now:         s.now(),
 	})
 	if err != nil {
 		return nil, err
@@ -101,13 +99,13 @@ func (s Service) UpdateBasicInfo(ctx context.Context, actor modelcatalog.ActorCo
 		return nil, err
 	}
 	if model.Kind == domain.KindScale {
-		if err := model.UpdateScaleBasicInfo(input.Title, input.Description, domain.CanonicalSubKindFor(model.Kind), domain.Algorithm(input.Algorithm), domain.DefaultProductChannelFor(model.Kind), input.Category, input.Tags, input.Stages, input.ApplicableAges, input.Reporters, s.now()); err != nil {
+		if err := model.UpdateScaleBasicInfo(input.Title, input.Description, domain.Algorithm(input.Algorithm), input.Category, input.Tags, input.Stages, input.ApplicableAges, input.Reporters, s.now()); err != nil {
 			return nil, err
 		}
 		if err := appdefinition.RefreshScaleDraftProjection(model); err != nil {
 			return nil, err
 		}
-	} else if err := model.UpdateBasicInfo(input.Title, input.Description, domain.CanonicalSubKindFor(model.Kind), domain.Algorithm(input.Algorithm), domain.DefaultProductChannelFor(model.Kind), input.Category, input.Tags, s.now()); err != nil {
+	} else if err := model.UpdateBasicInfo(input.Title, input.Description, domain.Algorithm(input.Algorithm), input.Category, input.Tags, s.now()); err != nil {
 		return nil, err
 	}
 	if err := s.ModelRepo.Update(ctx, model); err != nil {

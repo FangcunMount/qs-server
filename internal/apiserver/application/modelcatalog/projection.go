@@ -16,7 +16,7 @@ func ModelSummaryFromAssessmentModel(model *domain.AssessmentModel) *ModelSummar
 	result := &ModelSummary{
 		Code:                 model.Code,
 		Kind:                 DomainKindToAPIKind(model.Kind),
-		SubKind:              string(model.SubKind),
+		SubKind:              string(domain.CanonicalSubKindFor(model.Kind)),
 		Algorithm:            string(model.Algorithm),
 		Title:                model.Title,
 		Description:          model.Description,
@@ -41,7 +41,7 @@ func ModelSummaryFromAssessmentModel(model *domain.AssessmentModel) *ModelSummar
 			}(),
 		},
 	}
-	PopulateModelSummaryIdentity(result, model.Kind, model.SubKind, model.Algorithm, model.ProductChannel)
+	PopulateModelSummaryIdentity(result, model.Kind, domain.CanonicalSubKindFor(model.Kind), model.Algorithm, domain.DefaultProductChannelFor(model.Kind))
 	return result
 }
 
