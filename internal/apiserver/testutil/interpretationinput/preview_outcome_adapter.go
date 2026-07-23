@@ -97,13 +97,13 @@ func modelIdentity(outcome PreviewOutcome) report.ModelIdentity {
 			model.Kind = string(payload.Kind)
 		}
 		if model.SubKind == "" {
-			model.SubKind = payload.SubKind
+			model.SubKind = string(modelcatalog.CanonicalSubKindFor(modelcatalog.Kind(payload.Kind)))
 		}
 		if model.Algorithm == "" {
 			model.Algorithm = payload.Algorithm
 		}
 		if model.ProductChannel == "" {
-			model.ProductChannel = payload.ProductChannel
+			model.ProductChannel = string(binding.ProductChannelForIdentity(modelcatalog.Kind(payload.Kind), ""))
 		}
 	}
 	if model.Algorithm == "" {

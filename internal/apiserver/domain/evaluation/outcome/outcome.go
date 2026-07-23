@@ -16,7 +16,6 @@ type ID = meta.ID
 
 type ModelIdentity struct {
 	Kind      modelcatalog.Kind
-	SubKind   modelcatalog.SubKind
 	Algorithm modelcatalog.Algorithm
 	Code      string
 	Version   string
@@ -24,8 +23,7 @@ type ModelIdentity struct {
 }
 
 type RuntimeIdentity struct {
-	AlgorithmFamily modelcatalog.AlgorithmFamily
-	DecisionKind    modelcatalog.DecisionKind
+	DecisionKind modelcatalog.DecisionKind
 }
 
 // Record is the canonical, immutable output of one successful EvaluationRun.

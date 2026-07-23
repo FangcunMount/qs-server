@@ -329,7 +329,9 @@ func modelIdentityToPO(model domainreport.ModelIdentity) *ModelIdentityPO {
 	if model.IsEmpty() {
 		return nil
 	}
-	return &ModelIdentityPO{Kind: model.Kind, SubKind: model.SubKind, Algorithm: model.Algorithm, Code: model.Code, Version: model.Version, Title: model.Title, ProductChannel: model.ProductChannel, AlgorithmFamily: model.AlgorithmFamily}
+	// New report documents persist only canonical directory identity. The legacy
+	// fields remain on the PO solely so historical archived reports can be read.
+	return &ModelIdentityPO{Kind: model.Kind, Algorithm: model.Algorithm, Code: model.Code, Version: model.Version, Title: model.Title}
 }
 
 func modelIdentityToDomain(po *ModelIdentityPO) domainreport.ModelIdentity {

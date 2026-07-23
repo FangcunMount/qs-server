@@ -13,7 +13,7 @@ func identityFixtureSnapshot() *InputSnapshot {
 	return &InputSnapshot{
 		Model: &ModelSnapshot{
 			Kind: EvaluationModelKindScale, Algorithm: "scale_default",
-			AlgorithmFamily: "factor_scoring", DecisionKind: "score_range",
+			DecisionKind: "score_range",
 			Code: "PHQ9", Version: "1.0.0",
 		},
 		Questionnaire: &QuestionnaireSnapshot{

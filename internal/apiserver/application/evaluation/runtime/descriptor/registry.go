@@ -17,7 +17,8 @@ func NewRuntimeDescriptorRegistry() *RuntimeDescriptorRegistry {
 	return &RuntimeDescriptorRegistry{byKey: make(map[DescriptorKey]RuntimeDescriptor)}
 }
 
-// Register adds one exact (AlgorithmFamily, DecisionKind) descriptor.
+// Register adds one exact DecisionKind descriptor. Its family is validated and
+// retained only by the in-process descriptor implementation.
 func (r *RuntimeDescriptorRegistry) Register(desc RuntimeDescriptor) error {
 	if r == nil {
 		return fmt.Errorf("runtime descriptor registry is nil")
@@ -26,23 +27,19 @@ func (r *RuntimeDescriptorRegistry) Register(desc RuntimeDescriptor) error {
 		return fmt.Errorf("invalid algorithm family: %s", desc.AlgorithmFamily)
 	}
 	key := desc.Key
-	if key.AlgorithmFamily == "" {
-		key.AlgorithmFamily = desc.AlgorithmFamily
-	}
 	if key.DecisionKind == "" {
 		key.DecisionKind = desc.DecisionKind
 	}
 	if key.DecisionKind == "" {
 		return fmt.Errorf("decision kind is required for runtime descriptor")
 	}
-	if family, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(key.DecisionKind); !ok || family != key.AlgorithmFamily {
+	if family, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(key.DecisionKind); !ok || family != desc.AlgorithmFamily {
 		return fmt.Errorf("runtime descriptor identity conflict: %s", key)
 	}
 	if _, exists := r.byKey[key]; exists {
 		return fmt.Errorf("runtime descriptor already registered for %s", key)
 	}
 	desc.Key = key
-	desc.AlgorithmFamily = key.AlgorithmFamily
 	desc.DecisionKind = key.DecisionKind
 	r.byKey[key] = desc
 	return nil
@@ -65,7 +62,7 @@ func (r *RuntimeDescriptorRegistry) Resolve(route ModelRoute) (RuntimeDescriptor
 
 func (r *RuntimeDescriptorRegistry) descriptorForFamily(family modelcatalog.AlgorithmFamily) (RuntimeDescriptor, bool) {
 	for key, desc := range r.byKey {
-		if key.AlgorithmFamily == family {
+		if derived, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(key.DecisionKind); ok && derived == family {
 			return desc, true
 		}
 	}
@@ -104,13 +101,14 @@ func (r *RuntimeDescriptorRegistry) ReplaceFamilyDescriptor(family modelcatalog.
 	}
 	found := false
 	for key := range r.byKey {
-		if key.AlgorithmFamily != family {
+		derived, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(key.DecisionKind)
+		if !ok || derived != family {
 			continue
 		}
 		found = true
 		value := desc
 		value.Key = key
-		value.AlgorithmFamily = key.AlgorithmFamily
+		value.AlgorithmFamily = family
 		value.DecisionKind = key.DecisionKind
 		r.byKey[key] = value
 	}

@@ -82,6 +82,7 @@ type ModelIdentityPO struct {
 	Title           string `bson:"title,omitempty" json:"title,omitempty"`
 	ProductChannel  string `bson:"product_channel,omitempty" json:"product_channel,omitempty"`
 	AlgorithmFamily string `bson:"algorithm_family,omitempty" json:"algorithm_family,omitempty"`
+	DecisionKind    string `bson:"decision_kind,omitempty" json:"decision_kind,omitempty"`
 }
 
 type PresentationProfilePO struct {

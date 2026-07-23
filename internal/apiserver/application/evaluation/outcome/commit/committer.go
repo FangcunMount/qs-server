@@ -94,13 +94,12 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 	}
 	modelRef := evaluationinput.ModelRef{
 		Kind:      evaluationinput.EvaluationModelKind(request.Execution.ModelRef.Kind()),
-		SubKind:   string(request.Execution.ModelRef.SubKind()),
 		Algorithm: string(request.Execution.ModelRef.Algorithm()),
 		Code:      request.Execution.ModelRef.Code().String(),
 		Version:   request.Execution.ModelRef.Version(),
 		Title:     request.Execution.ModelRef.Title(),
 	}
-	opts := evaluationinput.BuildFreezeOptionsFromSnapshot(request.Input, modelRef, request.DescriptorKey.AlgorithmFamily)
+	opts := evaluationinput.BuildFreezeOptionsFromSnapshot(request.Input, modelRef, request.DescriptorKey.DecisionKind)
 	reportInput, err := evaluationinput.MarshalReportInput(opts)
 	if err != nil {
 		return nil, fmt.Errorf("marshal evaluation report input: %w", err)
@@ -113,15 +112,13 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 		RunID:        runToCommit.ID().String(),
 		Model: domainoutcome.ModelIdentity{
 			Kind:      request.Execution.ModelRef.Kind(),
-			SubKind:   request.Execution.ModelRef.SubKind(),
 			Algorithm: request.Execution.ModelRef.Algorithm(),
 			Code:      request.Execution.ModelRef.Code().String(),
 			Version:   request.Execution.ModelRef.Version(),
 			Title:     request.Execution.ModelRef.Title(),
 		},
 		Runtime: domainoutcome.RuntimeIdentity{
-			AlgorithmFamily: request.DescriptorKey.AlgorithmFamily,
-			DecisionKind:    request.DescriptorKey.DecisionKind,
+			DecisionKind: request.DescriptorKey.DecisionKind,
 		},
 		InputSnapshotRef: runToCommit.InputSnapshotRef(),
 		ReportInput:      reportInput,
@@ -199,7 +196,7 @@ func (c *committer) validate(request CommitRequest) error {
 	if !evaluationinput.IsIdentityRef(request.Run.InputSnapshotRef()) {
 		return fmt.Errorf("evaluation run input snapshot ref must be isn:v2")
 	}
-	if request.DescriptorKey.AlgorithmFamily == "" || request.DescriptorKey.DecisionKind == "" {
+	if request.DescriptorKey.DecisionKind == "" {
 		return fmt.Errorf("evaluation descriptor identity is incomplete")
 	}
 	return nil

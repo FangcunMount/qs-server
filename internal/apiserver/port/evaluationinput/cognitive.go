@@ -2,8 +2,6 @@ package evaluationinput
 
 import (
 	"context"
-
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	taskperfsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/cognitive"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
 )
@@ -23,12 +21,11 @@ func NewCognitiveModelSnapshot(snapshot *taskperfsnapshot.Snapshot) *ModelSnapsh
 		return nil
 	}
 	ms := &ModelSnapshot{
-		Kind:           EvaluationModelKindCognitive,
-		ProductChannel: string(modelcatalog.ProductChannelBehaviorAbility),
-		Code:           snapshot.Code,
-		Version:        snapshot.Version,
-		Title:          snapshot.Title,
-		Payload:        CognitiveModelPayload{Snapshot: snapshot},
+		Kind:    EvaluationModelKindCognitive,
+		Code:    snapshot.Code,
+		Version: snapshot.Version,
+		Title:   snapshot.Title,
+		Payload: CognitiveModelPayload{Snapshot: snapshot},
 	}
 	return applyPublishedRuntime(ms, snapshot.PublishedRuntime)
 }

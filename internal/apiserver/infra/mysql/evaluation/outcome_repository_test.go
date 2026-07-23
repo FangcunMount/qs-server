@@ -21,14 +21,12 @@ func TestEvaluationOutcomePersistenceMappingRoundTrip(t *testing.T) {
 		RunID:        "5001:1",
 		Model: domainoutcome.ModelIdentity{
 			Kind:      modelcatalog.KindTypology,
-			SubKind:   modelcatalog.SubKindTypology,
 			Algorithm: modelcatalog.AlgorithmPersonalityTypology,
 			Code:      "MBTI-16P",
 			Version:   "1.0.0",
 			Title:     "MBTI",
 		},
 		Runtime: domainoutcome.RuntimeIdentity{
-			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
 			DecisionKind:    modelcatalog.DecisionKindPoleComposition,
 		},
 		InputSnapshotRef: "model:MBTI-16P@1.0.0",

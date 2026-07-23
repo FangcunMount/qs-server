@@ -81,13 +81,14 @@ func outcomeToPO(record *domainoutcome.Record) *EvaluationOutcomePO {
 	model := record.Model()
 	runtime := record.Runtime()
 	return &EvaluationOutcomePO{
-		ID:               record.ID().Uint64(),
-		OrgID:            record.OrgID(),
-		AssessmentID:     record.AssessmentID().Uint64(),
-		TesteeID:         record.TesteeID(),
-		EvaluationRunID:  record.RunID(),
-		ModelKind:        model.Kind.String(),
-		ModelSubKind:     optionalString(string(model.SubKind)),
+		ID:              record.ID().Uint64(),
+		OrgID:           record.OrgID(),
+		AssessmentID:    record.AssessmentID().Uint64(),
+		TesteeID:        record.TesteeID(),
+		EvaluationRunID: record.RunID(),
+		ModelKind:       model.Kind.String(),
+		// model_sub_kind is retained only for reading immutable historical rows.
+		// New canonical outcome writes intentionally leave it empty.
 		ModelAlgorithm:   optionalString(string(model.Algorithm)),
 		ModelCode:        model.Code,
 		ModelVersion:     model.Version,
@@ -107,7 +108,6 @@ func outcomeFromPO(po *EvaluationOutcomePO) (*domainoutcome.Record, error) {
 		return nil, nil
 	}
 	modelKind := modelcatalog.Kind(po.ModelKind)
-	subKind := modelcatalog.CanonicalSubKindFor(modelKind)
 	algorithm := modelcatalog.Algorithm(valueOrEmpty(po.ModelAlgorithm))
 	runtime, err := modelcatalog.ResolveLegacyRuntime(modelKind, algorithm, modelcatalog.DecisionKind(valueOrEmpty(po.DecisionKind)))
 	if err != nil {
@@ -121,13 +121,12 @@ func outcomeFromPO(po *EvaluationOutcomePO) (*domainoutcome.Record, error) {
 		RunID:        po.EvaluationRunID,
 		Model: domainoutcome.ModelIdentity{
 			Kind:      modelKind,
-			SubKind:   subKind,
 			Algorithm: algorithm,
 			Code:      po.ModelCode,
 			Version:   po.ModelVersion,
 			Title:     valueOrEmpty(po.ModelTitle),
 		},
-		Runtime:          domainoutcome.RuntimeIdentity{AlgorithmFamily: runtime.AlgorithmFamily, DecisionKind: runtime.DecisionKind},
+		Runtime:          domainoutcome.RuntimeIdentity{DecisionKind: runtime.DecisionKind},
 		InputSnapshotRef: valueOrEmpty(po.InputSnapshotRef),
 		ReportInput:      []byte(valueOrEmpty(po.ReportInputJSON)),
 		Payload:          []byte(po.PayloadJSON),

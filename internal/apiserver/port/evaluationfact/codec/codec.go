@@ -103,7 +103,7 @@ func DecodeReportInput(record *evaluationfact.Record) (*evaluationinput.InputSna
 	}
 	model := record.Model()
 	snapshot, err := evaluationinput.SnapshotFromReportInput(record.ReportInput(), evaluationinput.ModelRef{
-		Kind: evaluationinput.EvaluationModelKind(model.Kind), SubKind: string(model.SubKind),
+		Kind: evaluationinput.EvaluationModelKind(model.Kind),
 		Algorithm: string(model.Algorithm), Code: model.Code, Version: model.Version, Title: model.Title,
 	})
 	if err != nil {

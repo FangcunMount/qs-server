@@ -161,7 +161,7 @@ func TestCommitPersistsEvaluationFactsAndEventInOneTransaction(t *testing.T) {
 		Assessment:    a,
 		Input:         commitTestInput(),
 		Execution:     execution,
-		DescriptorKey: evalpipeline.DescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
+		DescriptorKey: evalpipeline.DescriptorKey{DecisionKind: modelcatalog.DecisionKindScoreRange},
 		Run:           &run,
 		EvaluatedAt:   evaluatedAt,
 	})
@@ -234,8 +234,8 @@ func TestCommitFreezesTraitProfileWithoutOutcomeRegistry(t *testing.T) {
 	}}
 	input := &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
-			Kind: evaluationinput.EvaluationModelKindTypology, SubKind: string(modelcatalog.SubKindTypology),
-			Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorClassification),
+			Kind: evaluationinput.EvaluationModelKindTypology,
+			Algorithm: string(modelcatalog.AlgorithmPersonalityTypology),
 			DecisionKind: string(modelcatalog.DecisionKindTraitProfile), Code: "ENNEAGRAM_45", Version: "v16", Title: "九型人格",
 		},
 		DefinitionV2: &modeldefinition.Definition{
@@ -266,9 +266,7 @@ func TestCommitFreezesTraitProfileWithoutOutcomeRegistry(t *testing.T) {
 
 	record, err := c.Commit(context.Background(), CommitRequest{
 		Assessment: a, Input: input, Execution: execution,
-		DescriptorKey: evalpipeline.DescriptorKey{
-			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindTraitProfile,
-		},
+		DescriptorKey: evalpipeline.DescriptorKey{DecisionKind: modelcatalog.DecisionKindTraitProfile},
 		Run: &run, EvaluatedAt: time.Unix(300, 0),
 	})
 	if err != nil {
@@ -278,7 +276,7 @@ func TestCommitFreezesTraitProfileWithoutOutcomeRegistry(t *testing.T) {
 		t.Fatalf("report input = %s", record.ReportInput())
 	}
 	frozen, err := evaluationinput.SnapshotFromReportInput(record.ReportInput(), evaluationinput.ModelRef{
-		Kind: evaluationinput.EvaluationModelKindTypology, SubKind: string(modelcatalog.SubKindTypology),
+		Kind: evaluationinput.EvaluationModelKindTypology,
 		Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "ENNEAGRAM_45", Version: "v16", Title: "九型人格",
 	})
 	if err != nil {
@@ -355,7 +353,7 @@ func TestCommitFailureDoesNotPublishPreparedTerminalStateToCaller(t *testing.T) 
 				Assessment:    a,
 				Input:         commitTestInput(),
 				Execution:     execution,
-				DescriptorKey: evalpipeline.DescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
+				DescriptorKey: evalpipeline.DescriptorKey{DecisionKind: modelcatalog.DecisionKindScoreRange},
 				Run:           &run,
 				EvaluatedAt:   time.Unix(200, 0),
 			})
@@ -387,7 +385,7 @@ func commitTestInput() *evaluationinput.InputSnapshot {
 	return &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
 			Kind: evaluationinput.EvaluationModelKindScale, Algorithm: string(modelcatalog.AlgorithmScaleDefault),
-			AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorScoring), DecisionKind: string(modelcatalog.DecisionKindScoreRange),
+			DecisionKind: string(modelcatalog.DecisionKindScoreRange),
 			Code: "SCALE-1", Version: "1.0.0",
 		},
 		DefinitionV2: def,

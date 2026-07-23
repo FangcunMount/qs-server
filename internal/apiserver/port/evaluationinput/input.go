@@ -26,7 +26,6 @@ func (k EvaluationModelKind) String() string {
 
 type ModelRef struct {
 	Kind      EvaluationModelKind
-	SubKind   string
 	Algorithm string
 	Code      string
 	Version   string
@@ -85,31 +84,27 @@ type NormSubjectReader interface {
 }
 
 type ModelSnapshot struct {
-	Kind            EvaluationModelKind
-	SubKind         string
-	Algorithm       string
-	AlgorithmFamily string
-	DecisionKind    string
-	ProductChannel  string
-	Code            string
-	Version         string
-	Title           string
-	Payload         ModelPayload
+	Kind         EvaluationModelKind
+	Algorithm    string
+	DecisionKind string
+	Code         string
+	Version      string
+	Title        string
+	Payload      ModelPayload
 }
 
 // ApplyFrozenRuntime copies publish-time RuntimeIdentity onto the evaluation ModelSnapshot.
-func (m *ModelSnapshot) ApplyFrozenRuntime(family, decisionKind string) *ModelSnapshot {
+func (m *ModelSnapshot) ApplyFrozenRuntime(decisionKind string) *ModelSnapshot {
 	if m == nil {
 		return nil
 	}
-	m.AlgorithmFamily = family
 	m.DecisionKind = decisionKind
 	return m
 }
 
 // HasFrozenRuntime reports whether publish-time runtime identity is complete.
 func (m *ModelSnapshot) HasFrozenRuntime() bool {
-	return m != nil && m.AlgorithmFamily != "" && m.DecisionKind != ""
+	return m != nil && m.DecisionKind != ""
 }
 
 func (m *ModelSnapshot) ModelRef() ModelRef {
@@ -118,7 +113,6 @@ func (m *ModelSnapshot) ModelRef() ModelRef {
 	}
 	return ModelRef{
 		Kind:      m.Kind,
-		SubKind:   m.SubKind,
 		Algorithm: m.Algorithm,
 		Code:      m.Code,
 		Version:   m.Version,
@@ -139,13 +133,12 @@ func NewScaleModelSnapshot(scale *scalesnapshot.ScaleSnapshot) *ModelSnapshot {
 		version = scale.QuestionnaireVersion
 	}
 	ms := &ModelSnapshot{
-		Kind:           EvaluationModelKindScale,
-		Algorithm:      string(modelcatalog.AlgorithmScaleDefault),
-		ProductChannel: string(modelcatalog.ProductChannelMedicalScale),
-		Code:           scale.Code,
-		Version:        version,
-		Title:          scale.Title,
-		Payload:        ScaleModelPayload{Scale: scale},
+		Kind:      EvaluationModelKindScale,
+		Algorithm: string(modelcatalog.AlgorithmScaleDefault),
+		Code:      scale.Code,
+		Version:   version,
+		Title:     scale.Title,
+		Payload:   ScaleModelPayload{Scale: scale},
 	}
 	return applyPublishedRuntime(ms, scale.PublishedRuntime)
 }
@@ -157,16 +150,10 @@ func applyPublishedRuntime(ms *ModelSnapshot, meta *rulesetport.PublishedRuntime
 	if meta.Kind != "" {
 		ms.Kind = EvaluationModelKind(meta.Kind)
 	}
-	if meta.SubKind != "" {
-		ms.SubKind = string(meta.SubKind)
-	}
 	if meta.Algorithm != "" {
 		ms.Algorithm = string(meta.Algorithm)
 	}
-	if meta.ProductChannel != "" {
-		ms.ProductChannel = string(meta.ProductChannel)
-	}
-	return ms.ApplyFrozenRuntime(string(meta.AlgorithmFamily), string(meta.DecisionKind))
+	return ms.ApplyFrozenRuntime(string(meta.DecisionKind))
 }
 
 type ScaleModelPayload struct {
@@ -197,14 +184,12 @@ func NewTypologyModelSnapshot(payload *typology.Payload) *ModelSnapshot {
 		return nil
 	}
 	ms := &ModelSnapshot{
-		Kind:           EvaluationModelKindTypology,
-		SubKind:        "typology",
-		Algorithm:      string(payload.Algorithm),
-		ProductChannel: string(modelcatalog.ProductChannelTypology),
-		Code:           payload.Code,
-		Version:        payload.Version,
-		Title:          payload.Title,
-		Payload:        TypologyModelPayload{Payload: payload},
+		Kind:      EvaluationModelKindTypology,
+		Algorithm: string(payload.Algorithm),
+		Code:      payload.Code,
+		Version:   payload.Version,
+		Title:     payload.Title,
+		Payload:   TypologyModelPayload{Payload: payload},
 	}
 	return applyPublishedRuntime(ms, payload.PublishedRuntime)
 }

@@ -439,7 +439,7 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 	input := &successfulInputResolver{snapshot: &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
 			Kind: evaluationinput.EvaluationModelKindScale, Algorithm: string(modelcatalog.AlgorithmScaleDefault),
-			AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorScoring), DecisionKind: string(modelcatalog.DecisionKindScoreRange),
+			DecisionKind: string(modelcatalog.DecisionKindScoreRange),
 			Code: "S-001", Version: "1.0.0", Title: "Scale",
 		},
 		DefinitionV2:  modeldefinitionForExecutionTest(),
@@ -529,12 +529,10 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	input := &successfulInputResolver{snapshot: &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
 			Kind:            evaluationinput.EvaluationModelKindTypology,
-			SubKind:         string(modelcatalog.SubKindTypology),
 			Algorithm:       string(modelcatalog.AlgorithmPersonalityTypology),
 			Code:            "FAKE-MODEL",
 			Version:         "1.0.0",
 			Title:           "Fake Model",
-			AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorClassification),
 			DecisionKind:    string(modelcatalog.DecisionKindPoleComposition),
 		},
 		DefinitionV2:  modeldefinitionForExecutionTest(),

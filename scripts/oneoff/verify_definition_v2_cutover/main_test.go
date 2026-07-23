@@ -44,7 +44,7 @@ func TestAuditOutcomeContractRowAcceptsCurrentNormativeOutcome(t *testing.T) {
 		Assets: &interpretationassets.Assets{Outcomes: []interpretationassets.OutcomePresentation{{
 			OutcomeCode: "normal", Title: "Normal",
 		}}},
-		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorNorm,
+		DecisionKind:    modelcatalog.DecisionKindNormLookup,
 		FactorCatalog:   []evaluationinput.FactorCatalogEntry{{Code: "total", IsTotalScore: true}},
 		Norming:         &evaluationinput.NormingFreeze{NormTables: &calcnorm.NormTables{NormTableVersion: "norm-v1"}},
 	})

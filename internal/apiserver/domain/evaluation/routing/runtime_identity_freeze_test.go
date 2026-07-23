@@ -10,30 +10,20 @@ import (
 func TestFrozenRuntimeIdentityDoesNotSilentFallback(t *testing.T) {
 	t.Parallel()
 
-	route := evalpipeline.ModelRoute{
-		Kind:            modelcatalog.KindBehavioralRating,
-		Algorithm:       modelcatalog.AlgorithmBrief2,
-		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorNorm,
-		DecisionKind:    modelcatalog.DecisionKindScoreRange, // incompatible with factor_norm
-	}
+	route := evalpipeline.ModelRoute{DecisionKind: modelcatalog.DecisionKind("unknown")}
 	if !route.HasFrozenRuntime() {
 		t.Fatal("expected frozen runtime")
 	}
 	_, err := evalpipeline.DescriptorKeyFromRoute(route)
 	if err == nil {
-		t.Fatal("expected error when frozen decision conflicts with family")
+		t.Fatal("expected error for unknown frozen decision")
 	}
 }
 
 func TestFrozenRuntimeIdentityPreferredOverIdentityDerivation(t *testing.T) {
 	t.Parallel()
 
-	route := evalpipeline.ModelRoute{
-		Kind:            modelcatalog.KindScale,
-		Algorithm:       modelcatalog.AlgorithmScaleDefault,
-		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
-		DecisionKind:    modelcatalog.DecisionKindScoreRange,
-	}
+	route := evalpipeline.ModelRoute{DecisionKind: modelcatalog.DecisionKindScoreRange}
 	key, err := evalpipeline.DescriptorKeyFromRoute(route)
 	if err != nil {
 		t.Fatal(err)

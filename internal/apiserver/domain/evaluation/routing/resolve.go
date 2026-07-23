@@ -6,24 +6,24 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// DescriptorKeyFromRoute accepts only a complete, internally consistent
-// publish-time route. There is no format, family, or model-reference fallback.
+// DescriptorKeyFromRoute accepts only a frozen DecisionKind. AlgorithmFamily is
+// an in-process implementation detail derived from that canonical input.
 func DescriptorKeyFromRoute(route ModelRoute) (DescriptorKey, error) {
 	if !route.HasFrozenRuntime() {
-		return DescriptorKey{}, fmt.Errorf("complete frozen runtime identity is required")
+		return DescriptorKey{}, fmt.Errorf("frozen decision_kind is required")
 	}
-	family, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(route.DecisionKind)
-	if !ok || family != route.AlgorithmFamily {
-		return DescriptorKey{}, fmt.Errorf("frozen runtime identity conflict: family=%s decision=%s", route.AlgorithmFamily, route.DecisionKind)
+	if _, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(route.DecisionKind); !ok {
+		return DescriptorKey{}, fmt.Errorf("unknown frozen decision_kind: %s", route.DecisionKind)
 	}
-	return DescriptorKey{AlgorithmFamily: route.AlgorithmFamily, DecisionKind: route.DecisionKind}, nil
+	return DescriptorKey{DecisionKind: route.DecisionKind}, nil
 }
 
 func ExecutionFamilyFromRoute(route ModelRoute) (modelcatalog.AlgorithmFamily, bool) {
 	if _, err := DescriptorKeyFromRoute(route); err != nil {
 		return "", false
 	}
-	return route.AlgorithmFamily, true
+	family, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(route.DecisionKind)
+	return family, ok
 }
 
 func DecisionKindForFamily(family modelcatalog.AlgorithmFamily) modelcatalog.DecisionKind {

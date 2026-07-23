@@ -259,7 +259,8 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		)
 		return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, "评估流程执行失败: "+resolveErr.Error(), evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: resolveErr.Error()}, resolveErr)
 	}
-	if family := string(resolved.DescriptorKey.AlgorithmFamily); family != "" {
+	if family, ok := evalpipeline.ExecutionFamilyFromRoute(evalpipeline.ModelRoute{DecisionKind: resolved.DescriptorKey.DecisionKind}); ok {
+		family := string(family)
 		algorithmFamily = family
 	}
 

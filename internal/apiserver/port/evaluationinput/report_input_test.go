@@ -15,7 +15,7 @@ func reportAssets() *interpretationassets.Assets {
 }
 
 func TestMarshalReportInputEmitsOnlyCurrentSchemaWithoutPayload(t *testing.T) {
-	opts := evaluationinput.ReportInputFreezeOptions{Assets: reportAssets(), ModelRef: evaluationinput.ModelRef{Kind: evaluationinput.EvaluationModelKindScale, Code: "PHQ9", Version: "v1"}, AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, FactorCatalog: []evaluationinput.FactorCatalogEntry{{Code: "TOTAL", IsTotalScore: true}}}
+	opts := evaluationinput.ReportInputFreezeOptions{Assets: reportAssets(), ModelRef: evaluationinput.ModelRef{Kind: evaluationinput.EvaluationModelKindScale, Code: "PHQ9", Version: "v1"}, DecisionKind: modelcatalog.DecisionKindScoreRange, FactorCatalog: []evaluationinput.FactorCatalogEntry{{Code: "TOTAL", IsTotalScore: true}}}
 	raw, err := evaluationinput.MarshalReportInput(opts)
 	if err != nil {
 		t.Fatal(err)
@@ -42,7 +42,7 @@ func TestReportInputRejectsNonCurrentSchemas(t *testing.T) {
 }
 
 func TestBehavioralReportInputRequiresAndRestoresNorming(t *testing.T) {
-	opts := evaluationinput.ReportInputFreezeOptions{Assets: reportAssets(), ModelRef: evaluationinput.ModelRef{Kind: evaluationinput.EvaluationModelKindBehavioralRating, Code: "BRIEF2", Version: "v1"}, AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorNorm, FactorCatalog: []evaluationinput.FactorCatalogEntry{{Code: "gec"}}, Norming: &evaluationinput.NormingFreeze{NormTables: &calcnorm.NormTables{NormTableVersion: "n1"}}}
+	opts := evaluationinput.ReportInputFreezeOptions{Assets: reportAssets(), ModelRef: evaluationinput.ModelRef{Kind: evaluationinput.EvaluationModelKindBehavioralRating, Code: "BRIEF2", Version: "v1"}, DecisionKind: modelcatalog.DecisionKindNormLookup, FactorCatalog: []evaluationinput.FactorCatalogEntry{{Code: "gec"}}, Norming: &evaluationinput.NormingFreeze{NormTables: &calcnorm.NormTables{NormTableVersion: "n1"}}}
 	raw, err := evaluationinput.MarshalReportInput(opts)
 	if err != nil {
 		t.Fatal(err)
@@ -92,7 +92,7 @@ func TestReportInputRestoresFrozenFactorScoreVisibility(t *testing.T) {
 				ModelRef: evaluationinput.ModelRef{
 					Kind: evaluationinput.EvaluationModelKindScale, Code: "SCALE", Version: "v1",
 				},
-				AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
+				DecisionKind:    modelcatalog.DecisionKindScoreRange,
 				FactorCatalog:   []evaluationinput.FactorCatalogEntry{{Code: "visible"}, {Code: "total", IsTotalScore: true}},
 			}
 			raw, err := evaluationinput.MarshalReportInput(opts)
@@ -127,10 +127,10 @@ func TestTraitProfileReportInputAllowsFrozenReportSpecAndFactorCatalogWithoutOut
 	opts := evaluationinput.ReportInputFreezeOptions{
 		Assets: assets,
 		ModelRef: evaluationinput.ModelRef{
-			Kind: evaluationinput.EvaluationModelKindTypology, SubKind: "typology",
+			Kind: evaluationinput.EvaluationModelKindTypology,
 			Algorithm: "personality_typology", Code: "ENNEAGRAM_45", Version: "v16",
 		},
-		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+		DecisionKind:    modelcatalog.DecisionKindTraitProfile,
 		FactorCatalog:   []evaluationinput.FactorCatalogEntry{{Code: "type_1", Title: "完美型"}},
 		TypologyRouting: &evaluationinput.TypologyRoutingFreeze{
 			DecisionKind: "trait_profile", ReportKind: "trait_profile", AdapterKey: "trait_profile", TemplateID: "enneagram",
@@ -157,10 +157,10 @@ func TestClassifiedTypeReportInputStillRequiresFrozenOutcomePresentation(t *test
 	_, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
 		Assets: assets,
 		ModelRef: evaluationinput.ModelRef{
-			Kind: evaluationinput.EvaluationModelKindTypology, SubKind: "typology",
+			Kind: evaluationinput.EvaluationModelKindTypology,
 			Algorithm: "personality_typology", Code: "MBTI", Version: "v1",
 		},
-		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+		DecisionKind:    modelcatalog.DecisionKindPoleComposition,
 		FactorCatalog:   []evaluationinput.FactorCatalogEntry{{Code: "EI", Title: "外向-内向"}},
 		TypologyRouting: &evaluationinput.TypologyRoutingFreeze{
 			DecisionKind: "pole_composition", ReportKind: "personality_type", AdapterKey: "personality_type", TemplateID: "mbti",

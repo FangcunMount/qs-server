@@ -144,9 +144,9 @@ func (s *service) readReceipt(ctx context.Context, assessmentID uint64) (*Result
 	model := record.Model()
 	runtime := record.Runtime()
 	out := &Outcome{
-		ID: record.ID().String(), ModelKind: string(model.Kind), SubKind: string(model.SubKind), Algorithm: string(model.Algorithm),
-		AlgorithmFamily: string(runtime.AlgorithmFamily), DecisionKind: string(runtime.DecisionKind),
-		ModelCode: model.Code, Version: model.Version, Title: model.Title,
+		ID: record.ID().String(), ModelKind: string(model.Kind), Algorithm: string(model.Algorithm),
+		DecisionKind: string(runtime.DecisionKind),
+		ModelCode:    model.Code, Version: model.Version, Title: model.Title,
 	}
 	if execution.Primary != nil {
 		value := execution.Primary.Value

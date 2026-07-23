@@ -25,22 +25,22 @@ func TestDefaultRuntimeDescriptorRegistryCoversMaterializePaths(t *testing.T) {
 	}{
 		{
 			name:  "scale",
-			route: evalpipeline.ModelRoute{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
+			route: evalpipeline.ModelRoute{DecisionKind: modelcatalog.DecisionKindScoreRange},
 			path:  modelcatalog.ExecutionPathScaleDescriptor,
 		},
 		{
 			name:  "typology",
-			route: evalpipeline.ModelRoute{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindPoleComposition},
+			route: evalpipeline.ModelRoute{DecisionKind: modelcatalog.DecisionKindPoleComposition},
 			path:  modelcatalog.ExecutionPathTypologyDescriptor,
 		},
 		{
 			name:  "norm",
-			route: evalpipeline.ModelRoute{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorNorm, DecisionKind: modelcatalog.DecisionKindNormLookup},
+			route: evalpipeline.ModelRoute{DecisionKind: modelcatalog.DecisionKindNormLookup},
 			path:  modelcatalog.ExecutionPathBehavioralRatingDescriptor,
 		},
 		{
 			name:  "task",
-			route: evalpipeline.ModelRoute{AlgorithmFamily: modelcatalog.AlgorithmFamilyTaskPerformance, DecisionKind: modelcatalog.DecisionKindAbilityLevel},
+			route: evalpipeline.ModelRoute{DecisionKind: modelcatalog.DecisionKindAbilityLevel},
 			path:  modelcatalog.ExecutionPathCognitiveDescriptor,
 		},
 	}

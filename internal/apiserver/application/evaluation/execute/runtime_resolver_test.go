@@ -18,7 +18,7 @@ func TestRuntimeResolverUsesDescriptorPrimaryPath(t *testing.T) {
 
 	registry := evalpipeline.NewRuntimeDescriptorRegistry()
 	if err := registry.Register(evalpipeline.RuntimeDescriptor{
-		Key:              evalpipeline.DescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
+		Key:              evalpipeline.DescriptorKey{DecisionKind: modelcatalog.DecisionKindScoreRange},
 		AlgorithmFamily:  modelcatalog.AlgorithmFamilyFactorScoring,
 		ExecutionPath:    modelcatalog.ExecutionPathScaleDescriptor,
 		InputAssembler:   runtimeStubInputAssembler{},
@@ -32,7 +32,7 @@ func TestRuntimeResolverUsesDescriptorPrimaryPath(t *testing.T) {
 	input := &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
 			Kind: evaluationinput.EvaluationModelKindScale, Algorithm: "scale_default", Code: "PHQ9",
-			AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorScoring), DecisionKind: string(modelcatalog.DecisionKindScoreRange),
+			DecisionKind: string(modelcatalog.DecisionKindScoreRange),
 		},
 	}
 	outcome, resolved, err := resolver.Execute(context.Background(), nil, input)
@@ -69,7 +69,7 @@ func TestRuntimeResolverRejectsFrozenRouteWithoutFallingBackToAssessment(t *test
 
 	registry := evalpipeline.NewRuntimeDescriptorRegistry()
 	if err := registry.Register(evalpipeline.RuntimeDescriptor{
-		Key:              evalpipeline.DescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
+		Key:              evalpipeline.DescriptorKey{DecisionKind: modelcatalog.DecisionKindScoreRange},
 		AlgorithmFamily:  modelcatalog.AlgorithmFamilyFactorScoring,
 		ExecutionPath:    modelcatalog.ExecutionPathScaleDescriptor,
 		InputAssembler:   runtimeStubInputAssembler{},
@@ -83,12 +83,11 @@ func TestRuntimeResolverRejectsFrozenRouteWithoutFallingBackToAssessment(t *test
 	// Frozen behavioral/norm route is not registered; Assessment ModelRef is scale and WOULD match the registry.
 	input := &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
-			Kind:            evaluationinput.EvaluationModelKindBehavioralRating,
-			Algorithm:       string(modelcatalog.AlgorithmBrief2),
-			AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorNorm),
-			DecisionKind:    string(modelcatalog.DecisionKindNormLookup),
-			Code:            "BR-001",
-			Version:         "1.0.0",
+			Kind:         evaluationinput.EvaluationModelKindBehavioralRating,
+			Algorithm:    string(modelcatalog.AlgorithmBrief2),
+			DecisionKind: string(modelcatalog.DecisionKindNormLookup),
+			Code:         "BR-001",
+			Version:      "1.0.0",
 		},
 	}
 	a, err := domainAssessment.NewAssessment(
@@ -113,7 +112,7 @@ func TestRuntimeResolverRejectsIncompleteInput(t *testing.T) {
 
 	registry := evalpipeline.NewRuntimeDescriptorRegistry()
 	if err := registry.Register(evalpipeline.RuntimeDescriptor{
-		Key:              evalpipeline.DescriptorKey{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange},
+		Key:              evalpipeline.DescriptorKey{DecisionKind: modelcatalog.DecisionKindScoreRange},
 		AlgorithmFamily:  modelcatalog.AlgorithmFamilyFactorScoring,
 		ExecutionPath:    modelcatalog.ExecutionPathScaleDescriptor,
 		InputAssembler:   runtimeStubInputAssembler{},

@@ -76,9 +76,8 @@ func NewInputSnapshotIdentity(input *InputSnapshot) (InputSnapshotIdentity, bool
 	id.ModelVersion = m.Version
 	id.ModelDigest = digestFields(
 		"model:v2",
-		string(m.Kind), m.SubKind, m.Algorithm,
-		m.AlgorithmFamily, m.DecisionKind,
-		m.ProductChannel, m.Code, m.Version, definitionDigest,
+		string(m.Kind), m.Algorithm, m.DecisionKind,
+		m.Code, m.Version, definitionDigest,
 	)
 	q := input.Questionnaire
 	id.QuestionnaireCode = q.Code

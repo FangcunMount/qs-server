@@ -21,8 +21,8 @@ func ReportInputSchema(data []byte) uint {
 	return envelope.SchemaVersion
 }
 
-func BuildFreezeOptionsFromSnapshot(input *InputSnapshot, modelRef ModelRef, family modelcatalog.AlgorithmFamily) ReportInputFreezeOptions {
-	opts := ReportInputFreezeOptions{ModelRef: modelRef, AlgorithmFamily: family}
+func BuildFreezeOptionsFromSnapshot(input *InputSnapshot, modelRef ModelRef, decisionKind modelcatalog.DecisionKind) ReportInputFreezeOptions {
+	opts := ReportInputFreezeOptions{ModelRef: modelRef, DecisionKind: decisionKind}
 	if input == nil {
 		return opts
 	}
@@ -32,6 +32,7 @@ func BuildFreezeOptionsFromSnapshot(input *InputSnapshot, modelRef ModelRef, fam
 	}
 	if def, ok := DefinitionV2FromSnapshot(input); ok {
 		opts.FactorCatalog = FactorCatalogFromDefinition(def.Measure)
+		family, _ := modelcatalog.AlgorithmFamilyFromDecisionKind(decisionKind)
 		if family == modelcatalog.AlgorithmFamilyFactorClassification && input.Model != nil && len(def.ReportMap.Sections) > 0 {
 			section := def.ReportMap.Sections[0]
 			opts.TypologyRouting = &TypologyRoutingFreeze{

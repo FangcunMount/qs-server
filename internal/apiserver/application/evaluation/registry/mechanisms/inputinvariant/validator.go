@@ -114,10 +114,6 @@ func requireModelIdentity(a *assessment.Assessment, snapshot *evaluationinput.In
 	if refKind != snapshotKind {
 		return ctx.fail("input.model.kind_mismatch", "evaluation model kind does not match the input model snapshot")
 	}
-	refSubKind := string(modelRef.SubKind())
-	if refSubKind != snapshot.Model.SubKind {
-		return ctx.fail("input.model.subkind_mismatch", "evaluation model subkind does not match the input model snapshot")
-	}
 	refAlgorithm := string(modelRef.Algorithm())
 	if refAlgorithm == "" || snapshot.Model.Algorithm == "" {
 		return ctx.fail("input.model.algorithm_required", "evaluation model algorithm is required")

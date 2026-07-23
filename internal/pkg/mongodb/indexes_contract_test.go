@@ -13,7 +13,7 @@ func TestRequiredUnifiedIndexNamesContract(t *testing.T) {
 	for collection, names := range map[string][]string{
 		"assessment_models": {
 			"idx_assessment_models_head_code",
-			"idx_assessment_models_snapshot_identity_version",
+			"idx_assessment_models_snapshot_identity_version_v2",
 			"idx_assessment_models_active_code",
 			"idx_assessment_models_active_questionnaire",
 			"idx_assessment_models_active_catalog",

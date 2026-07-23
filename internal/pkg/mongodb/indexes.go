@@ -226,10 +226,10 @@ func unifiedAssessmentModelIndexModels() []mongo.IndexModel {
 		},
 		{
 			Keys: bson.D{
-				{Key: "kind", Value: 1}, {Key: "sub_kind", Value: 1}, {Key: "algorithm", Value: 1},
+				{Key: "kind", Value: 1}, {Key: "algorithm", Value: 1},
 				{Key: "code", Value: 1}, {Key: "release_version", Value: 1}, {Key: "record_role", Value: 1},
 			},
-			Options: options.Index().SetName("idx_assessment_models_snapshot_identity_version").SetUnique(true).
+			Options: options.Index().SetName("idx_assessment_models_snapshot_identity_version_v2").SetUnique(true).
 				SetPartialFilterExpression(bson.M{"record_role": "published_snapshot", "deleted_at": nil}),
 		},
 		{
@@ -296,7 +296,7 @@ func RequiredUnifiedIndexNames() map[string][]string {
 	return map[string][]string{
 		"assessment_models": {
 			"idx_assessment_models_head_code",
-			"idx_assessment_models_snapshot_identity_version",
+			"idx_assessment_models_snapshot_identity_version_v2",
 			"idx_assessment_models_active_code",
 			"idx_assessment_models_active_questionnaire",
 			"idx_assessment_models_active_catalog",

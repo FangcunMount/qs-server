@@ -5,12 +5,9 @@ import domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/model
 // PublishedRuntimeMeta carries AssessmentSnapshot RuntimeIdentity for evaluation input
 // materialization. It is not part of the published payload JSON envelope.
 type PublishedRuntimeMeta struct {
-	AlgorithmFamily domain.AlgorithmFamily
-	DecisionKind    domain.DecisionKind
-	ProductChannel  domain.ProductChannel
-	Kind            domain.Kind
-	SubKind         domain.SubKind
-	Algorithm       domain.Algorithm
+	Kind         domain.Kind
+	Algorithm    domain.Algorithm
+	DecisionKind domain.DecisionKind
 }
 
 // RuntimeMetaFromPublished builds evaluation-only runtime metadata from a published snapshot.
@@ -20,11 +17,8 @@ func RuntimeMetaFromPublished(model *PublishedModel) *PublishedRuntimeMeta {
 		return nil
 	}
 	return &PublishedRuntimeMeta{
-		AlgorithmFamily: model.AlgorithmFamily,
-		DecisionKind:    model.DecisionKind,
-		ProductChannel:  model.ProductChannel,
-		Kind:            model.Kind,
-		SubKind:         model.SubKind,
-		Algorithm:       model.Algorithm,
+		Kind:         model.Kind,
+		Algorithm:    model.Algorithm,
+		DecisionKind: model.DecisionKind,
 	}
 }

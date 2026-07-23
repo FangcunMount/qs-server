@@ -1229,7 +1229,7 @@ func TestEvaluationInputPortTypologySnapshotsUseV2Kind(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	if !strings.Contains(text, "Kind:           EvaluationModelKindTypology") {
+	if !strings.Contains(text, "Kind:      EvaluationModelKindTypology") {
 		t.Fatal("port/evaluationinput typology snapshots must set Kind=typology")
 	}
 	for _, want := range []string{

@@ -48,10 +48,10 @@ func TestFromOutcomeRecordPreservesDimensionlessSpecialTypologyFact(t *testing.T
 	reportInput, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
 		Assets: assets,
 		ModelRef: evaluationinput.ModelRef{
-			Kind: evaluationinput.EvaluationModelKindTypology, SubKind: string(modelcatalog.SubKindTypology),
+			Kind: evaluationinput.EvaluationModelKindTypology,
 			Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "SBTI_FUN", Version: "v48",
 		},
-		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+		DecisionKind:    modelcatalog.DecisionKindNearestPattern,
 		TypologyRouting: &evaluationinput.TypologyRoutingFreeze{
 			DecisionKind: string(modelcatalog.DecisionKindNearestPattern), ReportKind: string(modeltypology.ReportKindPersonalityType),
 			AdapterKey: string(modeltypology.ReportAdapterPersonalityType), TemplateID: "sbti", TemplateVersion: "legacy-v1",
@@ -93,10 +93,10 @@ func TestFromOutcomeRecordRestoresTraitProfileNamesFromFrozenFactorCatalog(t *te
 	reportInput, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
 		Assets: assets,
 		ModelRef: evaluationinput.ModelRef{
-			Kind: evaluationinput.EvaluationModelKindTypology, SubKind: string(modelcatalog.SubKindTypology),
+			Kind: evaluationinput.EvaluationModelKindTypology,
 			Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "ENNEAGRAM_45", Version: "v16",
 		},
-		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+		DecisionKind:    modelcatalog.DecisionKindTraitProfile,
 		FactorCatalog:   []evaluationinput.FactorCatalogEntry{{Code: "type_1", Title: "完美型"}},
 		TypologyRouting: &evaluationinput.TypologyRoutingFreeze{
 			DecisionKind: string(modelcatalog.DecisionKindTraitProfile), ReportKind: string(modeltypology.ReportKindTraitProfile),
@@ -148,7 +148,7 @@ func TestSPMSensoryReportInputHidesHelperFactorFromInterpretation(t *testing.T) 
 		Code: "bJFKi3", Version: "v16", Title: "SPM 感觉处理测量",
 	}
 	reportInput, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
-		Assets: assets, ModelRef: modelRef, AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorNorm,
+		Assets: assets, ModelRef: modelRef, DecisionKind: modelcatalog.DecisionKindNormLookup,
 		FactorCatalog: []evaluationinput.FactorCatalogEntry{
 			{Code: "visible", Title: "社会参与"},
 			{Code: "total", Title: "总分", IsTotalScore: true},
@@ -248,7 +248,7 @@ func TestFromOutcomeRecordRejectsMissingFrozenTypologyRouting(t *testing.T) {
 	_, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
 		Assets:          assets,
 		ModelRef:        evaluationinput.ModelRef{Kind: evaluationinput.EvaluationModelKindTypology, Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "PERSONALITY", Version: "1.0.0"},
-		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+		DecisionKind:    modelcatalog.DecisionKindPoleComposition,
 	})
 	if err == nil {
 		t.Fatal("typology report input without routing was frozen")
@@ -263,8 +263,8 @@ func currentTypologyReportInput(t *testing.T, routing *evaluationinput.TypologyR
 	}
 	raw, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
 		Assets:          assets,
-		ModelRef:        evaluationinput.ModelRef{Kind: evaluationinput.EvaluationModelKindTypology, SubKind: string(modelcatalog.SubKindTypology), Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "PERSONALITY", Version: "1.0.0"},
-		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+		ModelRef:        evaluationinput.ModelRef{Kind: evaluationinput.EvaluationModelKindTypology, Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "PERSONALITY", Version: "1.0.0"},
+		DecisionKind:    modelcatalog.DecisionKindPoleComposition,
 		TypologyRouting: routing,
 	})
 	if err != nil {

@@ -23,13 +23,12 @@ func NewBehavioralRatingModelSnapshot(snapshot *behavioralsnapshot.Snapshot, alg
 		return nil
 	}
 	ms := &ModelSnapshot{
-		Kind:           EvaluationModelKindBehavioralRating,
-		Algorithm:      string(algorithm),
-		ProductChannel: string(modelcatalog.ProductChannelBehaviorAbility),
-		Code:           snapshot.Code,
-		Version:        snapshot.Version,
-		Title:          snapshot.Title,
-		Payload:        BehavioralRatingModelPayload{Snapshot: snapshot},
+		Kind:      EvaluationModelKindBehavioralRating,
+		Algorithm: string(algorithm),
+		Code:      snapshot.Code,
+		Version:   snapshot.Version,
+		Title:     snapshot.Title,
+		Payload:   BehavioralRatingModelPayload{Snapshot: snapshot},
 	}
 	return applyPublishedRuntime(ms, snapshot.PublishedRuntime)
 }

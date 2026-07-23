@@ -35,11 +35,13 @@ const sampleLimit = 20
 var identityRefPattern = regexp.MustCompile(`^isn:v2:[0-9a-f]{64}$`)
 
 type config struct {
-	mysqlDSN string
-	mongoURI string
-	mongoDB  string
-	jsonOut  bool
-	timeout  time.Duration
+	mysqlDSN               string
+	mongoURI               string
+	mongoDB                string
+	modelCatalogIdentity   bool
+	applyModelCatalogFixes bool
+	jsonOut                bool
+	timeout                time.Duration
 }
 
 type finding struct {
@@ -98,6 +100,20 @@ func main() {
 	if result.Total > 0 {
 		os.Exit(2)
 	}
+	if cfg.applyModelCatalogFixes {
+		if !cfg.modelCatalogIdentity {
+			fmt.Fprintln(os.Stderr, "verify cutover failed: --apply requires --modelcatalog-identity")
+			os.Exit(1)
+		}
+		if cfg.mongoURI == "" || cfg.mongoDB == "" {
+			fmt.Fprintln(os.Stderr, "verify cutover failed: --apply requires --mongo-uri and --mongo-db")
+			os.Exit(1)
+		}
+		if err := applyModelCatalogIdentity(ctx, cfg.mongoURI, cfg.mongoDB); err != nil {
+			fmt.Fprintln(os.Stderr, "verify cutover failed: apply modelcatalog identity:", err)
+			os.Exit(1)
+		}
+	}
 }
 
 func parseFlags() config {
@@ -105,10 +121,43 @@ func parseFlags() config {
 	flag.StringVar(&cfg.mysqlDSN, "mysql-dsn", os.Getenv("MYSQL_DSN"), "MySQL DSN")
 	flag.StringVar(&cfg.mongoURI, "mongo-uri", os.Getenv("MONGO_URI"), "MongoDB URI")
 	flag.StringVar(&cfg.mongoDB, "mongo-db", envOr("MONGO_DB", "qs_server"), "MongoDB database")
+	flag.BoolVar(&cfg.modelCatalogIdentity, "modelcatalog-identity", false, "audit ModelCatalog canonical identity and legacy runtime recoverability")
+	flag.BoolVar(&cfg.applyModelCatalogFixes, "apply", false, "apply the audited ModelCatalog Mongo cleanup; requires --modelcatalog-identity")
 	flag.BoolVar(&cfg.jsonOut, "json", false, "emit JSON")
 	flag.DurationVar(&cfg.timeout, "timeout", 5*time.Minute, "audit timeout")
 	flag.Parse()
 	return cfg
+}
+
+// applyModelCatalogIdentity is deliberately opt-in. It creates the canonical
+// index before removing redundant fields and leaves immutable reports and SQL
+// history untouched. The caller must run the dry-run audit to zero findings.
+func applyModelCatalogIdentity(ctx context.Context, uri, database string) error {
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	if err != nil {
+		return err
+	}
+	defer func() { _ = client.Disconnect(context.Background()) }()
+	models := client.Database(database).Collection("assessment_models")
+	_, err = models.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "kind", Value: 1}, {Key: "algorithm", Value: 1}, {Key: "code", Value: 1}, {Key: "release_version", Value: 1}, {Key: "record_role", Value: 1}},
+		Options: options.Index().SetName("idx_assessment_models_snapshot_identity_version_v2").SetUnique(true).
+			SetPartialFilterExpression(bson.M{"record_role": "published_snapshot", "deleted_at": nil}),
+	})
+	if err != nil {
+		return fmt.Errorf("create canonical snapshot identity index: %w", err)
+	}
+	_, err = models.UpdateMany(ctx,
+		bson.M{"deleted_at": nil, "record_role": bson.M{"$in": bson.A{"head", "published_snapshot"}}},
+		bson.M{"$unset": bson.M{"sub_kind": "", "product_channel": "", "algorithm_family": ""}},
+	)
+	if err != nil {
+		return fmt.Errorf("unset redundant assessment model identity fields: %w", err)
+	}
+	if _, err := models.Indexes().DropOne(ctx, "idx_assessment_models_snapshot_identity_version"); err != nil && !strings.Contains(err.Error(), "index not found") {
+		return fmt.Errorf("drop legacy snapshot identity index: %w", err)
+	}
+	return nil
 }
 
 func auditMySQL(ctx context.Context, dsn string) ([]finding, error) {
@@ -149,7 +198,6 @@ SELECT CAST(id AS CHAR)
 FROM evaluation_outcome
 WHERE model_kind = '' OR model_algorithm IS NULL OR model_algorithm = ''
    OR model_code = '' OR model_version = ''
-   OR algorithm_family IS NULL OR algorithm_family = ''
    OR decision_kind IS NULL OR decision_kind = ''
    OR input_snapshot_ref IS NULL
    OR input_snapshot_ref NOT REGEXP '^isn:v2:[0-9a-f]{64}$'
@@ -217,7 +265,7 @@ func auditOutcomeContractRow(row outcomeContractRow) []string {
 		rules = append(rules, "schema_version.not_2")
 	}
 	modelRef := evaluationinputport.ModelRef{
-		Kind: evaluationinputport.EvaluationModelKind(row.ModelKind), SubKind: row.ModelSubKind,
+		Kind:      evaluationinputport.EvaluationModelKind(row.ModelKind),
 		Algorithm: row.ModelAlgorithm, Code: row.ModelCode, Version: row.ModelVersion,
 	}
 	if issues := evaluationinputport.AuditReportInput([]byte(row.ReportInputJSON), modelRef); len(issues) > 0 {
@@ -319,7 +367,7 @@ func auditMongo(ctx context.Context, uri, database string) ([]finding, error) {
 			bson.M{"definition_v2": bson.M{"$exists": false}}, bson.M{"definition_v2": nil},
 		}}},
 		{"published_identity.incomplete", bson.M{"deleted_at": nil, "record_role": "published_snapshot", "$or": bson.A{
-			bson.M{"kind": ""}, bson.M{"algorithm": ""}, bson.M{"algorithm_family": ""}, bson.M{"decision_kind": ""},
+			bson.M{"kind": ""}, bson.M{"algorithm": ""}, bson.M{"decision_kind": ""},
 			bson.M{"source.definition_content_hash": bson.M{"$exists": false}},
 		}}},
 	} {

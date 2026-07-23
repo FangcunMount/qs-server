@@ -19,7 +19,7 @@ func TestValidateRejectsQuestionnaireVersionMismatch(t *testing.T) {
 	err := inputinvariant.Validate(inputinvariant.Input{
 		Assessment: a,
 		Snapshot: &evaluationinput.InputSnapshot{
-			Model: &evaluationinput.ModelSnapshot{Kind: evaluationinput.EvaluationModelKindTypology, SubKind: string(modelcatalog.SubKindTypology), Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "M-1", Version: "1.0.0"},
+			Model: &evaluationinput.ModelSnapshot{Kind: evaluationinput.EvaluationModelKindTypology, Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "M-1", Version: "1.0.0"},
 			ModelPayload: evaluationinput.TypologyModelPayload{Payload: &typology.Payload{
 				Code: "M-1", Version: "1.0.0", QuestionnaireCode: "Q-1", QuestionnaireVersion: "2.0.0", Status: "published",
 			}},
@@ -46,7 +46,7 @@ func TestValidateAcceptsAlignedTypologyInput(t *testing.T) {
 	err := inputinvariant.Validate(inputinvariant.Input{
 		Assessment: a,
 		Snapshot: &evaluationinput.InputSnapshot{
-			Model: &evaluationinput.ModelSnapshot{Kind: evaluationinput.EvaluationModelKindTypology, SubKind: string(modelcatalog.SubKindTypology), Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "M-1", Version: "1.0.0"},
+			Model: &evaluationinput.ModelSnapshot{Kind: evaluationinput.EvaluationModelKindTypology, Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "M-1", Version: "1.0.0"},
 			ModelPayload: evaluationinput.TypologyModelPayload{Payload: &typology.Payload{
 				Code: "M-1", Version: "1.0.0", QuestionnaireCode: "Q-1", QuestionnaireVersion: "1.0.0", Status: "published",
 			}},
@@ -66,7 +66,7 @@ func TestValidateRejectsModelVersionMismatch(t *testing.T) {
 	err := inputinvariant.Validate(inputinvariant.Input{
 		Assessment: a,
 		Snapshot: &evaluationinput.InputSnapshot{
-			Model:         &evaluationinput.ModelSnapshot{Kind: evaluationinput.EvaluationModelKindTypology, SubKind: string(modelcatalog.SubKindTypology), Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "M-1", Version: "2.0.0"},
+			Model:         &evaluationinput.ModelSnapshot{Kind: evaluationinput.EvaluationModelKindTypology, Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "M-1", Version: "2.0.0"},
 			AnswerSheet:   &evaluationinput.AnswerSheetSnapshot{ID: 1, QuestionnaireCode: "Q-1", QuestionnaireVersion: "1.0.0"},
 			Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-1", Version: "1.0.0"},
 		},
@@ -89,14 +89,13 @@ func TestValidateRejectsExactModelIdentityMismatch(t *testing.T) {
 		code   string
 	}{
 		{name: "kind", mutate: func(m *evaluationinput.ModelSnapshot) { m.Kind = evaluationinput.EvaluationModelKindScale }, code: "input.model.kind_mismatch"},
-		{name: "subkind", mutate: func(m *evaluationinput.ModelSnapshot) { m.SubKind = "" }, code: "input.model.subkind_mismatch"},
 		{name: "algorithm", mutate: func(m *evaluationinput.ModelSnapshot) { m.Algorithm = "brief2" }, code: "input.model.algorithm_mismatch"},
 		{name: "code", mutate: func(m *evaluationinput.ModelSnapshot) { m.Code = "OTHER" }, code: "input.model.code_mismatch"},
 		{name: "version", mutate: func(m *evaluationinput.ModelSnapshot) { m.Version = "2.0.0" }, code: "input.model.version_mismatch"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			model := &evaluationinput.ModelSnapshot{Kind: evaluationinput.EvaluationModelKindTypology, SubKind: string(modelcatalog.SubKindTypology), Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "M-1", Version: "1.0.0"}
+			model := &evaluationinput.ModelSnapshot{Kind: evaluationinput.EvaluationModelKindTypology, Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "M-1", Version: "1.0.0"}
 			tt.mutate(model)
 			err := inputinvariant.Validate(inputinvariant.Input{
 				Assessment: submittedAssessment("Q-1", "1.0.0", "M-1", "1.0.0"),

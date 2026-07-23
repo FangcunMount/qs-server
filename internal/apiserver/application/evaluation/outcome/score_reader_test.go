@@ -47,7 +47,7 @@ func TestScoreFactReaderRejectsMissingFrozenReportInput(t *testing.T) {
 		Model: domainoutcome.ModelIdentity{
 			Kind: modelcatalog.KindScale, Code: "SDS", Version: "1.0.0", Title: "SDS",
 		},
-		Runtime:       domainoutcome.RuntimeIdentity{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring},
+		Runtime:       domainoutcome.RuntimeIdentity{DecisionKind: modelcatalog.DecisionKindScoreRange},
 		SchemaVersion: domainoutcome.CurrentSchemaVersion,
 		EvaluatedAt:   time.Unix(100, 0),
 		Payload:       []byte(`{"Dimensions":[{"Code":"total","Name":"总分","Role":"total","Score":{"Value":42}}]}`),

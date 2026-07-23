@@ -31,7 +31,6 @@ func modelRefFromAssessment(a *assessment.Assessment) evaluationinput.ModelRef {
 	ref := a.EvaluationModelRef()
 	return evaluationinput.ModelRef{
 		Kind:      evaluationinput.EvaluationModelKind(ref.Kind().String()),
-		SubKind:   string(ref.SubKind()),
 		Algorithm: string(ref.Algorithm()),
 		Code:      ref.Code().String(),
 		Version:   ref.Version(),

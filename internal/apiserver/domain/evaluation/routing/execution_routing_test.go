@@ -18,35 +18,19 @@ func TestDescriptorKeyFromRouteUsesFrozenRuntimeIdentity(t *testing.T) {
 	}{
 		{
 			name: "behavioral_rating_default",
-			route: evalpipeline.ModelRoute{
-				Kind:            modelcatalog.KindBehavioralRating,
-				Algorithm:       modelcatalog.AlgorithmBrief2,
-				AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorNorm,
-				DecisionKind:    modelcatalog.DecisionKindNormLookup,
-			},
+			route: evalpipeline.ModelRoute{DecisionKind: modelcatalog.DecisionKindNormLookup},
 			family:   modelcatalog.AlgorithmFamilyFactorNorm,
 			decision: modelcatalog.DecisionKindNormLookup,
 		},
 		{
 			name: "cognitive_default",
-			route: evalpipeline.ModelRoute{
-				Kind:            modelcatalog.KindCognitive,
-				Algorithm:       modelcatalog.AlgorithmSPM,
-				AlgorithmFamily: modelcatalog.AlgorithmFamilyTaskPerformance,
-				DecisionKind:    modelcatalog.DecisionKindAbilityLevel,
-			},
+			route: evalpipeline.ModelRoute{DecisionKind: modelcatalog.DecisionKindAbilityLevel},
 			family:   modelcatalog.AlgorithmFamilyTaskPerformance,
 			decision: modelcatalog.DecisionKindAbilityLevel,
 		},
 		{
 			name: "typology_pole_composition",
-			route: evalpipeline.ModelRoute{
-				Kind:            modelcatalog.KindTypology,
-				SubKind:         modelcatalog.SubKindTypology,
-				Algorithm:       modelcatalog.AlgorithmPersonalityTypology,
-				AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
-				DecisionKind:    modelcatalog.DecisionKindPoleComposition,
-			},
+			route: evalpipeline.ModelRoute{DecisionKind: modelcatalog.DecisionKindPoleComposition},
 			family:   modelcatalog.AlgorithmFamilyFactorClassification,
 			decision: modelcatalog.DecisionKindPoleComposition,
 		},
@@ -59,8 +43,9 @@ func TestDescriptorKeyFromRouteUsesFrozenRuntimeIdentity(t *testing.T) {
 			if err != nil {
 				t.Fatalf("DescriptorKeyFromRoute: %v", err)
 			}
-			if key.AlgorithmFamily != tc.family {
-				t.Fatalf("family=%s want=%s", key.AlgorithmFamily, tc.family)
+			family, ok := evalpipeline.ExecutionFamilyFromRoute(tc.route)
+			if !ok || family != tc.family {
+				t.Fatalf("derived family=%s want=%s", family, tc.family)
 			}
 			if key.DecisionKind != tc.decision {
 				t.Fatalf("decision=%s want=%s", key.DecisionKind, tc.decision)

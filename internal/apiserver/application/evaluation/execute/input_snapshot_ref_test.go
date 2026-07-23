@@ -17,7 +17,7 @@ func TestInputSnapshotRefFromResolvedInputUsesVerifiableIdentity(t *testing.T) {
 		return &evaluationinput.InputSnapshot{
 			Model: &evaluationinput.ModelSnapshot{
 				Kind: evaluationinput.EvaluationModelKindScale, Algorithm: string(modelcatalog.AlgorithmScaleDefault),
-				AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorScoring), DecisionKind: string(modelcatalog.DecisionKindScoreRange),
+				DecisionKind: string(modelcatalog.DecisionKindScoreRange),
 				Code: "PHQ9", Version: "1.0.0",
 			},
 			DefinitionV2: &modeldefinition.Definition{},

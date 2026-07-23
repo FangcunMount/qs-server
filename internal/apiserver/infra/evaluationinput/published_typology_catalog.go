@@ -44,15 +44,7 @@ func (c PublishedTypologyCatalog) GetTypologyModelByRef(ctx context.Context, ref
 
 func typologyLookupRefs(ref port.ModelRef, algorithm domain.Algorithm) []rulesetport.Ref {
 	if algorithm == "" {
-		refs := make([]rulesetport.Ref, 0, 3)
-		if ref.SubKind != "" {
-			refs = append(refs, rulesetport.Ref{
-				Kind:    domain.KindTypology,
-				SubKind: domain.SubKind(ref.SubKind),
-				Code:    ref.Code,
-				Version: ref.Version,
-			})
-		}
+		refs := make([]rulesetport.Ref, 0, 2)
 		refs = append(refs,
 			rulesetport.Ref{
 				Kind:    domain.KindTypology,

@@ -26,7 +26,6 @@ func CalculateSPM(input *portevaluationinput.InputSnapshot, snapshot *taskperfsn
 	modelRef := domainoutcome.ModelRef{ModelKind: modelcatalog.KindCognitive, ModelAlgorithm: modelcatalog.AlgorithmSPM, ModelCode: snapshot.Code, ModelVersion: snapshot.Version, ModelTitle: snapshot.Title}
 	if input.Model != nil {
 		modelRef.ModelKind = modelcatalog.Kind(input.Model.Kind)
-		modelRef.ModelSubKind = modelcatalog.SubKind(input.Model.SubKind)
 		modelRef.ModelAlgorithm = modelcatalog.Algorithm(input.Model.Algorithm)
 		modelRef.ModelCode = input.Model.Code
 		modelRef.ModelVersion = input.Model.Version

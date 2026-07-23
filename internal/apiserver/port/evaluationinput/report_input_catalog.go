@@ -40,7 +40,7 @@ type TypologyRoutingFreeze struct {
 type ReportInputFreezeOptions struct {
 	Assets          *interpretationassets.Assets
 	ModelRef        ModelRef
-	AlgorithmFamily modelcatalog.AlgorithmFamily
+	DecisionKind    modelcatalog.DecisionKind
 	FactorCatalog   []FactorCatalogEntry
 	TypologySource  *typology.Source
 	TypologyRouting *TypologyRoutingFreeze
@@ -78,7 +78,11 @@ func CanFreezeMinimalReportInput(opts ReportInputFreezeOptions) bool {
 	if opts.ModelRef.Kind == "" || opts.ModelRef.Code == "" || opts.ModelRef.Version == "" {
 		return false
 	}
-	switch opts.AlgorithmFamily {
+	family, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(opts.DecisionKind)
+	if !ok {
+		return false
+	}
+	switch family {
 	case modelcatalog.AlgorithmFamilyFactorScoring:
 		return len(opts.FactorCatalog) > 0
 	case modelcatalog.AlgorithmFamilyFactorClassification:
@@ -250,10 +254,7 @@ func snapshotFromMinimalReportInput(model ModelRef, decoded decodedReportInput) 
 	default:
 		return nil, fmt.Errorf("report input v3 is unsupported for kind %s", model.Kind)
 	}
-	snapshot.Model = &ModelSnapshot{
-		Kind: ref.Kind, SubKind: ref.SubKind, Algorithm: ref.Algorithm,
-		Code: ref.Code, Version: ref.Version, Title: ref.Title, Payload: payload,
-	}
+	snapshot.Model = &ModelSnapshot{Kind: ref.Kind, Algorithm: ref.Algorithm, Code: ref.Code, Version: ref.Version, Title: ref.Title, Payload: payload}
 	snapshot.ModelPayload = payload
 	return snapshot, nil
 }

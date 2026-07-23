@@ -19,10 +19,9 @@ type modelInputResolver struct {
 }
 
 func (r modelInputResolver) Resolve(_ context.Context, _ evaluationinput.InputRef) (*evaluationinput.InputSnapshot, error) {
-	if r.model != nil && r.model.AlgorithmFamily == "" {
+	if r.model != nil && r.model.DecisionKind == "" {
 		r.model.Kind = evaluationinput.EvaluationModelKindScale
 		r.model.Algorithm = string(modelcatalog.AlgorithmScaleDefault)
-		r.model.AlgorithmFamily = string(modelcatalog.AlgorithmFamilyFactorScoring)
 		r.model.DecisionKind = string(modelcatalog.DecisionKindScoreRange)
 	}
 	return &evaluationinput.InputSnapshot{

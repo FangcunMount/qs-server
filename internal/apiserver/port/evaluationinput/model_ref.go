@@ -9,7 +9,7 @@ import (
 func (r ModelRef) ExecutionIdentity() evaldomain.ExecutionIdentity {
 	return evaldomain.ExecutionIdentity{
 		Kind:      modelcatalog.Kind(r.Kind),
-		SubKind:   modelcatalog.SubKind(r.SubKind),
+		SubKind:   modelcatalog.CanonicalSubKindFor(modelcatalog.Kind(r.Kind)),
 		Algorithm: modelcatalog.Algorithm(r.Algorithm),
 	}
 }

@@ -60,7 +60,7 @@ func withTestEvaluator(evaluator testEvaluator) EngineOption {
 		registry := evalpipeline.NewRuntimeDescriptorRegistry()
 		decision := evaluation.DecisionKindForFamily(family)
 		if err := registry.Register(evalpipeline.RuntimeDescriptor{
-			Key: evalpipeline.DescriptorKey{AlgorithmFamily: family, DecisionKind: decision}, AlgorithmFamily: family, DecisionKind: decision,
+			Key: evalpipeline.DescriptorKey{DecisionKind: decision}, AlgorithmFamily: family, DecisionKind: decision,
 		}); err != nil {
 			panic(err)
 		}
@@ -88,7 +88,7 @@ func (stubInputResolver) Resolve(context.Context, evaluationinput.InputRef) (*ev
 	return &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
 			Kind: evaluationinput.EvaluationModelKindScale, Algorithm: string(modelcatalog.AlgorithmScaleDefault),
-			Code: "SCALE-1", Version: "1.0.0", AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorScoring), DecisionKind: string(modelcatalog.DecisionKindScoreRange),
+			Code: "SCALE-1", Version: "1.0.0", DecisionKind: string(modelcatalog.DecisionKindScoreRange),
 		},
 		DefinitionV2:  &modeldefinition.Definition{},
 		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-001", Version: "1.0.0"},
