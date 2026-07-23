@@ -342,7 +342,11 @@ func TestReportEventsDeniesAccessWithoutSubscriptionOrDetailLeak(t *testing.T) {
 			server := newWSTestServer(handler, true)
 			defer server.Close()
 			conn := dialWSTest(t, server)
-			defer conn.CloseNow()
+			defer func() {
+				if err := conn.CloseNow(); err != nil {
+					t.Fatalf("close websocket: %v", err)
+				}
+			}()
 
 			kind := tt.kind
 			if kind == "" {
@@ -383,7 +387,11 @@ func TestReportEventsAllowsAllSupportedKinds(t *testing.T) {
 			server := newWSTestServer(handler, true)
 			defer server.Close()
 			conn := dialWSTest(t, server)
-			defer conn.CloseNow()
+			defer func() {
+				if err := conn.CloseNow(); err != nil {
+					t.Fatalf("close websocket: %v", err)
+				}
+			}()
 
 			writeWSFrame(t, conn, inboundFrame{Op: OpSubscribe, AssessmentID: "42", TesteeID: "7", Kind: kind})
 			if frame := readWSFrame(t, conn); frame.Op != OpSubscribed {
@@ -405,7 +413,10 @@ func TestReportEventsRechecksTesteeAccessAfterSignal(t *testing.T) {
 	server := newWSTestServer(handler, true)
 	defer server.Close()
 	conn := dialWSTest(t, server)
-	defer conn.CloseNow()
+	defer func() {
+		// Server already closes with StatusPolicyViolation after access revocation.
+		_ = conn.CloseNow()
+	}()
 
 	writeWSFrame(t, conn, inboundFrame{Op: OpSubscribe, AssessmentID: "42", TesteeID: "7", Kind: appreportstatus.KindMedical})
 	if frame := readWSFrame(t, conn); frame.Op != OpSubscribed {
