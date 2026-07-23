@@ -217,7 +217,9 @@ func (p ScaleModelInputProvider) ResolveInput(ctx context.Context, ref port.Inpu
 		AnswerSheet:   answerSheet,
 		Questionnaire: qnr,
 	}
-	attachScaleCanonical(ctx, p.publishedModels, ref, snapshot)
+	if err := attachScaleCanonical(ctx, p.publishedModels, ref, snapshot); err != nil {
+		return nil, err
+	}
 	return snapshot, nil
 }
 

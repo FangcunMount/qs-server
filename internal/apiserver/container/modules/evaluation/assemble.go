@@ -187,9 +187,12 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 
 func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationInfra) {
 	var modelValidator evaluationintake.EvaluationModelValidator
-	if normalized.ActivePublishedModelReader != nil {
+	if normalized.ActivePublishedModelReader != nil || normalized.PublishedModelReader != nil {
 		modelValidator = evaluationintake.NewCompositeEvaluationModelValidator(
-			evaluationintake.NewPublishedEvaluationModelValidator(normalized.ActivePublishedModelReader),
+			evaluationintake.NewPublishedEvaluationModelValidator(
+				normalized.ActivePublishedModelReader,
+				normalized.PublishedModelReader,
+			),
 		)
 	}
 	if normalized.QueryRedisClient != nil && normalized.VersionStore != nil {

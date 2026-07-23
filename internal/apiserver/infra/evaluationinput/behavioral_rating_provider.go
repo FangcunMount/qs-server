@@ -86,6 +86,8 @@ func (p BehavioralRatingModelInputProvider) ResolveInput(ctx context.Context, re
 		Questionnaire: qnr,
 		NormSubject:   normSubject,
 	}
-	attachBehavioralCanonical(ctx, p.publishedModels, ref, snapshot)
+	if err := attachBehavioralCanonical(ctx, p.publishedModels, ref, snapshot); err != nil {
+		return nil, err
+	}
 	return snapshot, nil
 }

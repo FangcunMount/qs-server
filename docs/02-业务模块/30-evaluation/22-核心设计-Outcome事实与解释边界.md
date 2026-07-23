@@ -491,20 +491,16 @@ OutcomeCommitted 之后：
 
 ---
 
-## 11. 历史 schema 的兼容边界
+## 11. Current-only schema 边界
 
-`evaluationfact/codec` 当前支持：
+`evaluationfact/codec` 当前只接受：
 
 | SchemaVersion | 读取政策 | 特点 |
 | --- | --- | --- |
-| `0` | legacy 只读兼容 | 早期未显式标版本的数据 |
-| `1` | legacy 只读兼容 | Execution 中仍可能包含展示字段和机制特有旧 detail |
 | `2` | 当前生产写入 | 纯事实 payload + 独立冻结 ReportInput |
-| 其他 | 拒绝 | 不猜测未知结构 |
+| 其他（含 `0`、`1`） | 拒绝 | 不猜测或兼容未知/旧结构 |
 
-兼容读取不是继续写旧格式的理由。新写入只使用 v2；删除 v0/v1 decoder 前，必须先审计生产 Outcome 的 schema 分布并完成必要迁移。
-
-当前有一个明确的历史例外：部分旧量表 Outcome 缺少 `ReportInput`。量表评分查询会记录告警，并可能从当前 catalog 补充 factor name/max score。这是为了历史数据可读而保留的兼容降级，不是新链路可以依赖的正确语义，也不应扩展到新模型类型。
+ReportInput 只接受 schema 3。空输入、旧 schema 或冻结资产不完整均在 `DecodeReportInput` / `SnapshotFromReportInput` 入口 fail closed；禁止从当前 ModelCatalog 重建历史解释资产。部署前必须执行只读 `verify_definition_v2_cutover --json`，只有 `total=0` 才可继续；非零时按维护窗口备份、删除不兼容派生数据并重建。
 
 ---
 

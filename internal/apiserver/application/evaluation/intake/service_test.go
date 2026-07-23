@@ -54,7 +54,7 @@ func (s *stagerStub) Stage(_ context.Context, events ...event.DomainEvent) error
 
 type validatorStub struct{}
 
-func (validatorStub) ValidateEvaluationModel(context.Context, domainassessment.EvaluationModelRef, domainassessment.QuestionnaireRef) error {
+func (validatorStub) ValidateEvaluationModel(context.Context, domainassessment.EvaluationModelRef, domainassessment.QuestionnaireRef, ModelValidationMode) error {
 	return nil
 }
 

@@ -86,6 +86,8 @@ func (p CognitiveModelInputProvider) ResolveInput(ctx context.Context, ref port.
 		Questionnaire: qnr,
 		NormSubject:   normSubject,
 	}
-	attachCognitiveCanonical(ctx, p.publishedModels, ref, snapshot)
+	if err := attachCognitiveCanonical(ctx, p.publishedModels, ref, snapshot); err != nil {
+		return nil, err
+	}
 	return snapshot, nil
 }

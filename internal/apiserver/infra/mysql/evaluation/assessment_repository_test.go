@@ -30,7 +30,7 @@ func TestNewAssessmentRepositoryCreatesCommandRepository(t *testing.T) {
 // SubmitForEvaluation's repository read.
 type acceptingModelValidator struct{}
 
-func (acceptingModelValidator) ValidateEvaluationModel(context.Context, domainassessment.EvaluationModelRef, domainassessment.QuestionnaireRef) error {
+func (acceptingModelValidator) ValidateEvaluationModel(context.Context, domainassessment.EvaluationModelRef, domainassessment.QuestionnaireRef, evaluationintake.ModelValidationMode) error {
 	return nil
 }
 

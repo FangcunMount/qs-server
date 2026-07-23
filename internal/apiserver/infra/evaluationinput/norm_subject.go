@@ -49,7 +49,12 @@ func resolveNormSubject(
 	}
 	facts, err := reader.ReadNormSubjectFacts(ctx, ref.TesteeID)
 	if err != nil {
-		return nil, err
+		return nil, port.NewDependencyResolveError(
+			port.DependencyCategoryActor,
+			err,
+			"加载受试者常模信息依赖失败",
+			"加载受试者常模信息失败",
+		)
 	}
 	return BuildNormSubjectSnapshot(facts, ref.AsOf), nil
 }

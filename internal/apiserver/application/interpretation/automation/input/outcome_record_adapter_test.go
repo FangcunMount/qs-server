@@ -211,6 +211,38 @@ func TestFromOutcomeRecordRejectsNonCurrentReportInput(t *testing.T) {
 	}
 }
 
+func TestFromOutcomeRecordRejectsMissingReportInputForFactorScoring(t *testing.T) {
+	record := evaluationfact.NewRecord(evaluationfact.NewRecordInput{
+		ID:           meta.FromUint64(60),
+		OrgID:        1,
+		AssessmentID: meta.FromUint64(61),
+		TesteeID:     62,
+		RunID:        "61:1",
+		Model: evaluationfact.ModelIdentity{
+			Kind:      modelcatalog.KindScale,
+			Algorithm: modelcatalog.AlgorithmScaleDefault,
+			Code:      "SCALE-1",
+			Version:   "1.0.0",
+		},
+		Runtime: evaluationfact.RuntimeIdentity{
+			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
+			DecisionKind:    modelcatalog.DecisionKindScoreRange,
+		},
+		SchemaVersion: 2,
+		EvaluatedAt:   time.Unix(500, 0),
+		Payload: []byte(`{
+			"Primary":{"Kind":"raw_total","Value":10},
+			"Dimensions":[
+				{"Code":"total","Role":"total","Score":{"Kind":"raw_total","Value":10},"Level":{"Code":"normal"}}
+			]
+		}`),
+	})
+
+	if _, err := FromOutcomeRecord(record); err == nil {
+		t.Fatal("factor-scoring outcome without ReportInput was accepted")
+	}
+}
+
 func TestFromOutcomeRecordRejectsMissingFrozenTypologyRouting(t *testing.T) {
 	assets := &interpretationassets.Assets{Profiles: []interpretationassets.TypeProfilePresentation{{OutcomeCode: "INTJ", Commentary: "冻结摘要"}}}
 	_, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{

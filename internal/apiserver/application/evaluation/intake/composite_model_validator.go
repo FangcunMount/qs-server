@@ -24,9 +24,10 @@ func (v compositeEvaluationModelValidator) ValidateEvaluationModel(
 	ctx context.Context,
 	modelRef evalassessment.EvaluationModelRef,
 	questionnaireRef evalassessment.QuestionnaireRef,
+	mode ModelValidationMode,
 ) error {
 	for _, validator := range v.validators {
-		if err := validator.ValidateEvaluationModel(ctx, modelRef, questionnaireRef); err != nil {
+		if err := validator.ValidateEvaluationModel(ctx, modelRef, questionnaireRef, mode); err != nil {
 			return err
 		}
 	}

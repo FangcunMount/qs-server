@@ -5,18 +5,39 @@ import (
 	"context"
 	"time"
 
+	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
+
+type ModelValidationMode string
+
+const (
+	ModelValidationModeActiveRelease ModelValidationMode = "active_release"
+	ModelValidationModeRetainedExact ModelValidationMode = "retained_exact"
+)
+
+func normalizeModelValidationMode(mode ModelValidationMode) (ModelValidationMode, error) {
+	switch mode {
+	case "", ModelValidationModeActiveRelease:
+		return ModelValidationModeActiveRelease, nil
+	case ModelValidationModeRetainedExact:
+		return ModelValidationModeRetainedExact, nil
+	default:
+		return "", evalerrors.InvalidArgument("invalid evaluation model validation mode: %s", mode)
+	}
+}
 
 type CreateCommand struct {
 	OrgID, TesteeID, AnswerSheetID                                               uint64
 	QuestionnaireCode, QuestionnaireVersion                                      string
 	ModelKind, ModelSubKind, ModelAlgorithm, ModelCode, ModelVersion, ModelTitle *string
+	ModelValidationMode                                                          ModelValidationMode
 	OriginType                                                                   string
 	OriginID                                                                     *string
 }
@@ -37,7 +58,7 @@ type assessmentListCache interface {
 	Invalidate(context.Context, uint64) error
 }
 type EvaluationModelValidator interface {
-	ValidateEvaluationModel(context.Context, domainassessment.EvaluationModelRef, domainassessment.QuestionnaireRef) error
+	ValidateEvaluationModel(context.Context, domainassessment.EvaluationModelRef, domainassessment.QuestionnaireRef, ModelValidationMode) error
 }
 type service struct {
 	repo       domainassessment.Repository
@@ -77,10 +98,18 @@ func (s *service) CreateForAnswerSheet(ctx context.Context, command CreateComman
 		return nil, err
 	}
 	if req.ModelRef != nil {
+		validationMode, err := normalizeModelValidationMode(command.ModelValidationMode)
+		if err != nil {
+			return nil, err
+		}
 		if s.validator == nil {
 			return nil, evalerrors.ModuleNotConfigured("evaluation model validator is not configured")
 		}
-		if err := s.validator.ValidateEvaluationModel(ctx, *req.ModelRef, req.QuestionnaireRef); err != nil {
+		if err := s.validator.ValidateEvaluationModel(ctx, *req.ModelRef, req.QuestionnaireRef, validationMode); err != nil {
+			if cberrors.IsCode(err, errorCode.ErrModuleInitializationFailed) ||
+				cberrors.IsCode(err, errorCode.ErrInvalidArgument) {
+				return nil, err
+			}
 			return nil, evalerrors.AssessmentCreateFailed(err, "创建测评失败")
 		}
 	}

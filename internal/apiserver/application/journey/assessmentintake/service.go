@@ -338,6 +338,7 @@ func applyFrozenAdmission(admission *Admission, dto *evaluationintake.CreateComm
 	modelVersion := admission.ModelVersion
 	dto.ModelCode = &modelCode
 	dto.ModelVersion = &modelVersion
+	dto.ModelValidationMode = evaluationintake.ModelValidationModeRetainedExact
 	if admission.ModelTitle != "" {
 		title := admission.ModelTitle
 		dto.ModelTitle = &title
@@ -367,6 +368,7 @@ func (s *service) applyBinding(ctx context.Context, command Command, dto *evalua
 	dto.ModelCode = &binding.Ref.Code
 	dto.ModelVersion = &binding.Ref.Version
 	dto.ModelTitle = &binding.Ref.Title
+	dto.ModelValidationMode = evaluationintake.ModelValidationModeActiveRelease
 	return true, nil
 }
 

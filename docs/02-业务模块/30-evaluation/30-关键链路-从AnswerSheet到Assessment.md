@@ -1,6 +1,6 @@
 # 关键链路：从 AnswerSheet 到 Assessment
 
-> 状态：AnswerSheet 可靠受理、durable Outbox、Worker 单一入口、基础题分派生、模型 Binding 解析、Assessment 幂等创建和 `evaluation.requested` 事务提交已经形成主链路。“独立问卷不创建 Assessment”“测评受理时冻结完整模型发布身份”和 Binding 失败分类仍是规划改造。
+> 状态：AnswerSheet 可靠受理、durable Outbox、Worker 单一入口、基础题分派生、提交时冻结 Admission、Assessment 幂等创建和 `evaluation.requested` 事务提交已经形成主链路。无 Admission 的历史事件仍保留 live binding 兼容入口。
 
 ## 1. 本文回答
 
@@ -32,8 +32,8 @@ flowchart LR
     W["qs-worker<br/>重复消费降噪"]
     J["Assessment Intake Journey<br/>跨模块编排"]
     S["Survey 基础题分<br/>精确问卷版本"]
-    B{"是否存在已发布<br/>AssessmentModel Binding"}
-    U["目标：独立问卷正常结束<br/>不创建 Assessment"]
+    B{"冻结 Admission purpose"}
+    U["独立问卷正常结束<br/>不创建 Assessment"]
     C["创建或复用 Assessment<br/>answer_sheet_id 唯一"]
     P["Assessment pending -> submitted<br/>evaluation.requested Outbox"]
 
@@ -54,7 +54,7 @@ flowchart LR
 3. Redis lease 只用于重复消费降噪；最终幂等依靠 AnswerSheet ID、Journey 可重入逻辑和 MySQL 唯一索引。
 4. Survey 先按 AnswerSheet 冻结的 Questionnaire version 派生单题基础分；跨题因子、常模、Decision 和报告不属于这一步。
 5. 只有绑定了已发布 AssessmentModel 的 Questionnaire 才应创建 Assessment 并发出 `evaluation.requested`。
-6. 当前代码在 Binding 缺失时仍会创建 unbound pending Assessment。这是已经确认的实现偏差，不是目标业务规则。
+6. 冻结 Admission 为独立问卷时 Journey 正常结束且不创建 Assessment；测评型 Admission 使用冻结的精确 release。
 
 ---
 
@@ -393,25 +393,22 @@ Binding Resolver 负责找到候选已发布模型；Evaluation `CreateForAnswer
 
 缺失 validator 会返回 ModuleNotConfigured，而不是绕过验证。
 
-### 10.3 Binding 解析发生得太晚
+### 10.3 提交时冻结 Admission，Worker 按来源选择验证边界
 
-当前 AnswerSheet 的可靠提交事务只冻结 Questionnaire code/version。完整 AssessmentModel Binding 在 Worker 稍后消费事件时解析：
+当前 AnswerSheet 的可靠提交事务同时冻结 Questionnaire code/version 与 Admission。Worker 稍后消费时不重新选择新 release：
 
 ```text
-T1  AnswerSheet + Outbox commit
-T2  HTTP 返回 202
-T3  模型发布或 active binding 状态可能变化
-T4  Worker 才解析 Questionnaire -> AssessmentModel
+T1  可靠受理解析 active binding，冻结 purpose + exact release
+T2  AnswerSheet + Admission + Outbox commit
+T3  HTTP 返回 202
+T4  Worker 消费冻结 Admission
+T5  frozen assessment -> retained_exact
+    legacy no-admission -> active_release
 ```
 
-这会产生两个问题：
+两种模式都校验 model identity、version 与 QuestionnaireRef。`retained_exact` 只读取保留的精确版本，允许冻结后 release 已归档；`active_release` 仍拒绝归档版本。选中 reader 未装配或 mode 非法时 fail closed，不跨模式降级。
 
-1. 对一个明确的测评入口，`202` 时系统尚未冻结实际要执行的 Assessment release；
-2. `bound=false` 无法表达“这是独立问卷”还是“测评 Binding 已丢失”。
-
-已确认的目标边界是：
-
-> 测评型提交应冻结完整 AssessmentReleaseRef；独立问卷应被显式识别并在 Survey 结束。测评型提交如果 Binding 缺失，必须进入可观察的失败、重试或人工补偿，而不能静默变成无模型 Assessment。
+无 Admission 的历史事件仍通过 live binding 解析当前 active release；该兼容入口不改变新提交必须冻结意图与精确版本的要求。
 
 ---
 
@@ -437,50 +434,16 @@ flowchart TD
 - 进入报告等待页；
 - 长期显示为 Assessment pending。
 
-### 11.2 当前实现偏差
+### 11.2 当前实现
 
-当前 `Ensure` 在 `bound=false` 时仍继续：
+| 场景 | 当前实现 |
+| --- | --- |
+| 冻结 `assessment + exact release` | 使用 `retained_exact` 校验，创建/复用并自动提交 Assessment |
+| 冻结 `independent_questionnaire` | 基础计分后成功结束，返回 `no_assessment_required` |
+| Admission model identity 不完整 | fail closed |
+| 历史事件无 Admission | 走 live binding，并使用 `active_release` |
 
-```text
-FindByAnswerSheetID
-  -> CreateForAnswerSheet(without ModelRef)
-  -> keep Assessment pending
-  -> ACK answersheet.submitted
-```
-
-测试 `TestEnsureUnboundAnswerSheetCreatesWithoutAutoSubmit` 明确固化了这个现状。
-
-| 场景 | 当前实现 | 目标语义 |
-| --- | --- | --- |
-| 已发布 Binding 存在 | 创建/复用并自动提交 Assessment | 保持 |
-| 独立 Questionnaire | 创建 unbound pending Assessment | 基础计分后成功结束 |
-| 测评型提交 Binding 缺失 | 同样创建 unbound pending Assessment | 明确失败并进入恢复治理 |
-| Binding Resolver 未装配 | 被当成 `bound=false` | ModuleNotConfigured / fail closed |
-
-当前最大问题不是“多了一条 pending 数据”，而是系统把三种语义压缩成同一个 `bound=false`：
-
-```text
-合法独立问卷
-测评配置缺失
-Binding 模块未装配
-```
-
-它们需要不同处理策略，却无法从现有 Result 和持久化状态中区分。
-
-### 11.3 不能只用一条 if 语句修复
-
-修复需要同时调整：
-
-- 提交或入口契约怎样显式标识 independent questionnaire / assessment release；
-- AnswerSheet 是否冻结 AssessmentReleaseRef；
-- Journey Result 怎样表达 `no_assessment_required`；
-- Worker 怎样把独立问卷视为正常成功；
-- 测评 Binding 缺失怎样形成可重试/人工补偿事实；
-- internal gRPC response；
-- collection-system 何时轮询 assessment-readiness；
-- Plan Task 在没有 Assessment 时能否完成；
-- report-status 是否应写 queued；
-- 当前固化 unbound Assessment 行为的测试。
+Plan Task 和 queued report-status 只在真正创建 Assessment 后进入后续处理。独立问卷不产生 `evaluation.requested`。
 
 ---
 
@@ -689,7 +652,7 @@ sequenceDiagram
     end
 ```
 
-图中独立问卷和 Binding 缺失分支是目标语义；当前代码把它们合并为“创建 unbound pending Assessment 后成功 ACK”。
+图中独立问卷与测评型 Admission 已按冻结 purpose 分流；无 Admission 的历史事件仍由 legacy live binding 兼容处理。
 
 ---
 
@@ -707,19 +670,17 @@ collection-server 会：
 2. 校验 AnswerSheet 的 testee 归属；
 3. 重新校验 writer 对 testee 的 ProfileLink；
 4. 按 AnswerSheet ID 查询 Assessment；
-5. 未找到时返回 `pending` 和 `next_poll_after_ms=2000`；
-6. 找到且 testee 一致时返回 `ready + assessment_id`。
+5. 未找到时结合冻结 Admission：独立问卷返回 `no_assessment_required`，应有 Assessment 的请求返回 `pending + next_poll_after_ms=2000`；
+6. Assessment 为 `pending` 时返回 `pending`，为 `submitted|evaluated` 时返回 `ready + assessment_id`，为 `failed` 时返回 `failed + failure_reason`。
 
-`ready` 只表示 Assessment 已经存在，不表示：
+四种 phase 的客户端行为是：
 
-- Assessment 一定已经 submitted；
-- Evaluation 已经完成；
-- Outcome 已经提交；
-- Report 已经生成。
+- `pending`：继续按服务端建议间隔轮询；
+- `ready`：停止 readiness，使用真实 `assessment_id` 进入 report-status/WS；
+- `no_assessment_required`：停止轮询，回到 AnswerSheet 详情；
+- `failed`：停止自动轮询并展示明确原因，允许用户主动重新查询。
 
-这也是当前接口语义可以继续收紧的地方：若客户端真正需要的是“已进入 Evaluation”，只以 Assessment 存在作为 ready 可能把 unbound/pending Assessment 误报为就绪。
-
-独立问卷不应轮询 assessment-readiness，它的业务终态就是 AnswerSheet accepted。
+`ready` 表示 Assessment 已进入可等待报告的状态，不表示 Outcome 或 Report 已完成。独立问卷正常流程不应进入报告等待页；若兼容路径已经查询 readiness，也必须将 `no_assessment_required` 作为正常终态。
 
 ---
 

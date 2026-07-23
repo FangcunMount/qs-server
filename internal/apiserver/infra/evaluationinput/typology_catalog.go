@@ -130,7 +130,9 @@ func (p TypologyModelInputProvider) resolveConfiguredInput(ctx context.Context, 
 		AnswerSheet:   answerSheet,
 		Questionnaire: qnr,
 	}
-	attachTypologyCanonical(ctx, p.publishedModels, ref, p.algorithm, snapshot)
+	if err := attachTypologyCanonical(ctx, p.publishedModels, ref, p.algorithm, snapshot); err != nil {
+		return nil, err
+	}
 	return snapshot, nil
 }
 

@@ -99,7 +99,7 @@ func DecodeReportInput(record *evaluationfact.Record) (*evaluationinput.InputSna
 		return nil, fmt.Errorf("evaluation outcome is required")
 	}
 	if len(record.ReportInput()) == 0 {
-		return nil, nil
+		return nil, decodeReportInputError(record, fmt.Errorf("report input is required"))
 	}
 	model := record.Model()
 	snapshot, err := evaluationinput.SnapshotFromReportInput(record.ReportInput(), evaluationinput.ModelRef{

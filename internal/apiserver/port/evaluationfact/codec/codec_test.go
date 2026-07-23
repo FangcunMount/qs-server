@@ -1,6 +1,7 @@
 package codec
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -34,5 +35,24 @@ func TestDecodeExecutionReadsSchemaV2ClassificationFacts(t *testing.T) {
 	}
 	if len(execution.Dimensions) != 1 || execution.Dimensions[0].Preference != "I" {
 		t.Fatalf("dimensions = %#v", execution.Dimensions)
+	}
+}
+
+func TestDecodeReportInputRejectsMissingFrozenInputWithOutcomeID(t *testing.T) {
+	t.Parallel()
+
+	record := evaluationfact.NewRecord(evaluationfact.NewRecordInput{
+		ID:            meta.FromUint64(42),
+		SchemaVersion: currentOutcomeSchema,
+	})
+	snapshot, err := DecodeReportInput(record)
+	if err == nil {
+		t.Fatal("expected missing report input to fail closed")
+	}
+	if snapshot != nil {
+		t.Fatalf("snapshot = %#v, want nil", snapshot)
+	}
+	if message := err.Error(); !strings.Contains(message, "42") || !strings.Contains(message, "report input is required") {
+		t.Fatalf("error = %q, want outcome id and missing input reason", message)
 	}
 }

@@ -133,6 +133,9 @@ func TestEnsureBoundAnswerSheetCreatesAndAutoSubmits(t *testing.T) {
 	if !reflect.DeepEqual(calls, []string{"score", "find", "create", "submit"}) {
 		t.Fatalf("calls = %v", calls)
 	}
+	if intake.lastCreateCmd.ModelValidationMode != evaluationintake.ModelValidationModeActiveRelease {
+		t.Fatalf("validation mode = %q, want active_release", intake.lastCreateCmd.ModelValidationMode)
+	}
 }
 
 func TestEnsureTreatsScoringFailureAsHardFailure(t *testing.T) {
@@ -216,6 +219,9 @@ func TestEnsureFrozenAdmissionIgnoresLiveBindingVersionDrift(t *testing.T) {
 	}
 	if intake.lastCreateCmd.ModelVersion == nil || *intake.lastCreateCmd.ModelVersion != "1.0.0" {
 		t.Fatalf("create cmd model version = %#v, want frozen 1.0.0", intake.lastCreateCmd.ModelVersion)
+	}
+	if intake.lastCreateCmd.ModelValidationMode != evaluationintake.ModelValidationModeRetainedExact {
+		t.Fatalf("validation mode = %q, want retained_exact", intake.lastCreateCmd.ModelValidationMode)
 	}
 }
 
