@@ -23,6 +23,7 @@ func TestRunObservesRevisionConflictAndRestoresBothDrafts(t *testing.T) {
 		"--token", "token",
 		"--model-code", "SMOKE_MODEL",
 		"--questionnaire-code", "SMOKE_QUESTIONNAIRE",
+		"--confirm-targets", "SMOKE_MODEL,SMOKE_QUESTIONNAIRE",
 		"--concurrency", "4",
 		"--rounds", "1",
 		"--output", output,
@@ -62,6 +63,7 @@ func TestRunFailsWhenConflictIsNotObservedButStillRestores(t *testing.T) {
 		"--token", "token",
 		"--model-code", "SMOKE_MODEL",
 		"--questionnaire-code", "SMOKE_QUESTIONNAIRE",
+		"--confirm-targets", "SMOKE_MODEL,SMOKE_QUESTIONNAIRE",
 		"--concurrency", "4",
 		"--rounds", "1",
 		"--apply",
@@ -72,17 +74,19 @@ func TestRunFailsWhenConflictIsNotObservedButStillRestores(t *testing.T) {
 	server.assertRestored(t)
 }
 
-func TestRunDryRunRejectsWrongPrefixBeforeCallingServer(t *testing.T) {
+func TestRunApplyRequiresExactTargetConfirmation(t *testing.T) {
 	server := newConflictServer(t, 2, true)
 	defer server.Close()
 	var stdout, stderr bytes.Buffer
 	exitCode := run([]string{
 		"--api-base-url", server.URL,
 		"--token", "token",
-		"--model-code", "MODEL",
+		"--model-code", "SMOKE_MODEL",
 		"--questionnaire-code", "SMOKE_QUESTIONNAIRE",
+		"--confirm-targets", "wrong-targets",
+		"--apply",
 	}, &stdout, &stderr)
-	if exitCode != exitUnavailable || !strings.Contains(stderr.String(), "required dedicated prefix") {
+	if exitCode != exitUnavailable || !strings.Contains(stderr.String(), "must exactly equal") {
 		t.Fatalf("run()=%d stdout=%s stderr=%s", exitCode, stdout.String(), stderr.String())
 	}
 }
@@ -94,7 +98,7 @@ func TestValidateDedicatedDraftRejectsPublishedTarget(t *testing.T) {
 		ReleaseState: releaseState{WorkingStatus: "draft", OnlineStatus: "online", ActiveVersion: "v1"},
 		Model:        modelSnapshot{Code: "SMOKE_MODEL", Title: "smoke model"},
 	}
-	if err := validateDedicatedDraft(snapshot, "SMOKE_"); err == nil || !strings.Contains(err.Error(), "active_version") {
+	if err := validateDedicatedDraft(snapshot); err == nil || !strings.Contains(err.Error(), "active_version") {
 		t.Fatalf("validateDedicatedDraft() error=%v", err)
 	}
 }

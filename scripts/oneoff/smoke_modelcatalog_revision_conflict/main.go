@@ -23,17 +23,17 @@ const (
 )
 
 type config struct {
-	APIBaseURL         string
-	Token              string
-	TokenFile          string
-	ModelCode          string
-	QuestionnaireCode  string
-	RequiredCodePrefix string
-	Concurrency        int
-	Rounds             int
-	Timeout            time.Duration
-	OutputPath         string
-	Apply              bool
+	APIBaseURL        string
+	Token             string
+	TokenFile         string
+	ModelCode         string
+	QuestionnaireCode string
+	ConfirmTargets    string
+	Concurrency       int
+	Rounds            int
+	Timeout           time.Duration
+	OutputPath        string
+	Apply             bool
 }
 
 type runEvidence struct {
@@ -94,7 +94,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 			evidence.Error = fmt.Sprintf("preflight %s %s: %v", target.Kind, target.Code, getErr)
 			return finishRun(cfg, stdout, stderr, evidence, exitUnavailable)
 		}
-		if guardErr := validateDedicatedDraft(snapshot, cfg.RequiredCodePrefix); guardErr != nil {
+		if guardErr := validateDedicatedDraft(snapshot); guardErr != nil {
 			evidence.Error = fmt.Sprintf("preflight %s %s: %v", target.Kind, target.Code, guardErr)
 			return finishRun(cfg, stdout, stderr, evidence, exitUnavailable)
 		}
@@ -166,7 +166,7 @@ func parseConfig(args []string, stderr io.Writer) (config, error) {
 	tokenFile := fs.String("token-file", strings.TrimSpace(os.Getenv("QS_MODELCATALOG_CONFLICT_TOKEN_FILE")), "text or perf tokens JSON file; first token is used")
 	modelCode := fs.String("model-code", strings.TrimSpace(os.Getenv("QS_MODELCATALOG_CONFLICT_MODEL_CODE")), "dedicated unpublished draft model code")
 	questionnaireCode := fs.String("questionnaire-code", strings.TrimSpace(os.Getenv("QS_MODELCATALOG_CONFLICT_QUESTIONNAIRE_CODE")), "dedicated unpublished draft questionnaire code bound to the model")
-	requiredPrefix := fs.String("required-code-prefix", envOr("QS_MODELCATALOG_CONFLICT_CODE_PREFIX", "SMOKE_"), "required prefix for both dedicated target codes")
+	confirmTargets := fs.String("confirm-targets", strings.TrimSpace(os.Getenv("QS_MODELCATALOG_CONFLICT_CONFIRM_TARGETS")), "required with --apply; exact '<model-code>,<questionnaire-code>' confirmation")
 	concurrency := fs.Int("concurrency", envInt("QS_MODELCATALOG_CONFLICT_CONCURRENCY", 16), "simultaneous PUT requests per round")
 	rounds := fs.Int("rounds", envInt("QS_MODELCATALOG_CONFLICT_ROUNDS", 5), "maximum rounds per target")
 	timeout := fs.Duration("timeout", envDuration("QS_MODELCATALOG_CONFLICT_TIMEOUT", 2*time.Minute), "overall smoke timeout")
@@ -180,17 +180,17 @@ func parseConfig(args []string, stderr io.Writer) (config, error) {
 	}
 
 	cfg := config{
-		APIBaseURL:         strings.TrimRight(strings.TrimSpace(*apiBaseURL), "/"),
-		Token:              strings.TrimSpace(*token),
-		TokenFile:          strings.TrimSpace(*tokenFile),
-		ModelCode:          strings.TrimSpace(*modelCode),
-		QuestionnaireCode:  strings.TrimSpace(*questionnaireCode),
-		RequiredCodePrefix: strings.TrimSpace(*requiredPrefix),
-		Concurrency:        *concurrency,
-		Rounds:             *rounds,
-		Timeout:            *timeout,
-		OutputPath:         strings.TrimSpace(*output),
-		Apply:              *apply,
+		APIBaseURL:        strings.TrimRight(strings.TrimSpace(*apiBaseURL), "/"),
+		Token:             strings.TrimSpace(*token),
+		TokenFile:         strings.TrimSpace(*tokenFile),
+		ModelCode:         strings.TrimSpace(*modelCode),
+		QuestionnaireCode: strings.TrimSpace(*questionnaireCode),
+		ConfirmTargets:    strings.TrimSpace(*confirmTargets),
+		Concurrency:       *concurrency,
+		Rounds:            *rounds,
+		Timeout:           *timeout,
+		OutputPath:        strings.TrimSpace(*output),
+		Apply:             *apply,
 	}
 	if err := validateBaseURL(cfg.APIBaseURL); err != nil {
 		return config{}, err
@@ -208,11 +208,11 @@ func parseConfig(args []string, stderr io.Writer) (config, error) {
 	if cfg.ModelCode == "" || cfg.QuestionnaireCode == "" {
 		return config{}, errors.New("--model-code and --questionnaire-code are required")
 	}
-	if cfg.RequiredCodePrefix == "" {
-		return config{}, errors.New("--required-code-prefix must not be empty")
-	}
-	if !strings.HasPrefix(cfg.ModelCode, cfg.RequiredCodePrefix) || !strings.HasPrefix(cfg.QuestionnaireCode, cfg.RequiredCodePrefix) {
-		return config{}, fmt.Errorf("--model-code and --questionnaire-code must use required dedicated prefix %q", cfg.RequiredCodePrefix)
+	if cfg.Apply {
+		wantConfirmation := cfg.ModelCode + "," + cfg.QuestionnaireCode
+		if cfg.ConfirmTargets != wantConfirmation {
+			return config{}, fmt.Errorf("--confirm-targets must exactly equal %q when --apply is set", wantConfirmation)
+		}
 	}
 	if cfg.Concurrency < 2 || cfg.Concurrency > 128 {
 		return config{}, errors.New("--concurrency must be between 2 and 128")
@@ -278,13 +278,6 @@ func writeEvidence(path string, evidence runEvidence) error {
 	}
 	contents = append(contents, '\n')
 	return os.WriteFile(path, contents, 0o600)
-}
-
-func envOr(name, fallback string) string {
-	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
-		return value
-	}
-	return fallback
 }
 
 func envInt(name string, fallback int) int {

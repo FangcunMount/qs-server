@@ -43,10 +43,7 @@ func newPreflightEvidence(snapshot targetSnapshot) targetEvidence {
 	}
 }
 
-func validateDedicatedDraft(snapshot targetSnapshot, requiredPrefix string) error {
-	if !strings.HasPrefix(snapshot.Spec.Code, requiredPrefix) {
-		return fmt.Errorf("refusing target without required dedicated prefix %q", requiredPrefix)
-	}
+func validateDedicatedDraft(snapshot targetSnapshot) error {
 	if strings.ToLower(strings.TrimSpace(snapshot.Status)) != "draft" {
 		return fmt.Errorf("refusing non-draft target with status %q", snapshot.Status)
 	}

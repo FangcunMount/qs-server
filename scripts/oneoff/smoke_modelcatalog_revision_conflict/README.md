@@ -12,7 +12,7 @@ REST 请求没有暴露 revision，因此无法从客户端精确指定两个写
 ## 安全边界
 
 - 只能操作专门创建、从未发布的 draft Model 和 Questionnaire。
-- 两个 code 默认都必须以 `SMOKE_` 开头，并且 Model 必须绑定到指定 Questionnaire。
+- Model 必须绑定到指定 Questionnaire；apply 时还必须用 `--confirm-targets` 再次精确确认两个 code。
 - 目标只要存在 active version、在线状态或不是 `draft`，脚本立即拒绝。
 - 默认仅做 preflight；只有显式 `--apply` 才会并发写入。
 - 每个目标执行后会恢复原始 basic-info 并再次 GET 校验；恢复失败时退出 2，并停止操作下一个目标。
@@ -54,6 +54,7 @@ set -o pipefail
   --token-file "$QS_MODELCATALOG_ADMIN_TOKEN_FILE" \
   --model-code 'SMOKE_CAS_MODEL' \
   --questionnaire-code 'SMOKE_CAS_QUESTIONNAIRE' \
+  --confirm-targets 'SMOKE_CAS_MODEL,SMOKE_CAS_QUESTIONNAIRE' \
   --concurrency 16 \
   --rounds 5 \
   --timeout 2m \
@@ -65,7 +66,7 @@ QS_CONFLICT_SMOKE_RC=$?
 echo "revision-conflict smoke 退出码=$QS_CONFLICT_SMOKE_RC"
 ```
 
-如果专用资源使用其他明确前缀，可显式传 `--required-code-prefix`；不能设置为空来关闭保护。
+`--confirm-targets` 的顺序固定为 `<model-code>,<questionnaire-code>`，内容必须与前两个参数逐字一致。
 
 ## 判定
 
