@@ -217,17 +217,19 @@ func (r *Repository) ListPublishedModels(ctx context.Context, filter port.ListPu
 	if codeValue := strings.TrimSpace(filter.Code); codeValue != "" {
 		extra["code"] = codeValue
 	}
-	if filter.Kind != "" {
+	if len(filter.Kinds) == 1 {
+		extra["kind"] = kindBSONFilter(filter.Kinds[0])
+	} else if len(filter.Kinds) > 1 {
+		values := make([]any, 0, len(filter.Kinds))
+		for _, kind := range filter.Kinds {
+			values = append(values, kindBSONFilter(kind))
+		}
+		extra["kind"] = bson.M{"$in": values}
+	} else if filter.Kind != "" {
 		extra["kind"] = kindBSONFilter(filter.Kind)
 	}
 	if filter.Algorithm != "" {
 		extra["algorithm"] = string(filter.Algorithm)
-	}
-	if filter.ProductChannel != "" {
-		extra["product_channel"] = string(filter.ProductChannel)
-	}
-	if filter.SubKind != "" {
-		extra["sub_kind"] = string(filter.SubKind)
 	}
 	if filter.Category != "" {
 		extra["category"] = filter.Category
@@ -304,8 +306,7 @@ func (r *Repository) ListPublishedAlgorithms(ctx context.Context) ([]domain.Algo
 		return nil, domain.ErrNotFound
 	}
 	mongoFilter := activePublishedFilter(bson.M{
-		"kind":     kindBSONFilter(domain.KindTypology),
-		"sub_kind": string(domain.SubKindTypology),
+		"kind": kindBSONFilter(domain.KindTypology),
 	})
 	pipeline := mongo.Pipeline{
 		bson.D{{Key: "$match", Value: mongoFilter}},

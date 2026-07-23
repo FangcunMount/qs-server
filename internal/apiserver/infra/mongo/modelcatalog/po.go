@@ -26,11 +26,8 @@ type PublishedAssessmentModelPO struct {
 	SchemaVersion           string        `bson:"schema_version,omitempty"`
 	RecordRole              string        `bson:"record_role"`
 	ReleaseStatus           string        `bson:"release_status,omitempty"`
-	ProductChannel          string        `bson:"product_channel,omitempty"`
 	Kind                    string        `bson:"kind"`
-	SubKind                 string        `bson:"sub_kind,omitempty"`
 	Algorithm               string        `bson:"algorithm,omitempty"`
-	AlgorithmFamily         string        `bson:"algorithm_family,omitempty"`
 	Code                    string        `bson:"code"`
 	ReleaseVersion          string        `bson:"release_version"`
 	Title                   string        `bson:"title"`
@@ -110,10 +107,6 @@ func publishedModelUpsertFilter(po *PublishedAssessmentModelPO) bson.M {
 		"code":            po.Code,
 		"release_version": po.ReleaseVersion,
 		"deleted_at":      nil,
-	}
-	// Empty sub_kind is omitted from canonical records.
-	if po.SubKind != "" {
-		filter["sub_kind"] = po.SubKind
 	}
 	return filter
 }

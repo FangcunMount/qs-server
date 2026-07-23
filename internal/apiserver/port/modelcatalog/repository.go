@@ -10,6 +10,7 @@ import (
 // ListFilter narrows draft-model list queries for admin consoles.
 type ListFilter struct {
 	Kind                 domain.Kind
+	Kinds                []domain.Kind
 	SubKind              domain.SubKind
 	Status               domain.ModelStatus
 	Keyword              string

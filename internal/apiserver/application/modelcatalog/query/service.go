@@ -3,6 +3,7 @@ package query
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -321,30 +322,92 @@ func (s *catalogQueryService) authorizePublished(ctx context.Context, actor mode
 }
 
 func draftListFilter(input modelcatalog.ListModelsDTO) (modelcatalogport.ListFilter, error) {
-	kind, err := kindFromListInput(input)
+	kinds, err := kindsFromListInput(input)
 	if err != nil {
 		return modelcatalogport.ListFilter{}, err
 	}
-	return modelcatalogport.ListFilter{Kind: kind, SubKind: domain.SubKind(input.SubKind), Status: domain.ModelStatus(input.Status), Keyword: input.Keyword, Category: input.Category, Algorithm: domain.Algorithm(input.Algorithm), ProductChannel: domain.ProductChannel(input.ProductChannel), QuestionnaireCode: input.QuestionnaireCode, QuestionnaireVersion: input.QuestionnaireVersion, Page: normalizePage(input.Page), PageSize: normalizePageSize(input.PageSize)}, nil
+	return modelcatalogport.ListFilter{Kinds: kinds, Status: domain.ModelStatus(input.Status), Keyword: input.Keyword, Category: input.Category, Algorithm: domain.Algorithm(input.Algorithm), QuestionnaireCode: input.QuestionnaireCode, QuestionnaireVersion: input.QuestionnaireVersion, Page: normalizePage(input.Page), PageSize: normalizePageSize(input.PageSize)}, nil
 }
 
 func publishedListFilter(input modelcatalog.ListModelsDTO) (modelcatalogport.ListPublishedFilter, error) {
-	kind, err := kindFromListInput(input)
+	kinds, err := kindsFromListInput(input)
 	if err != nil {
 		return modelcatalogport.ListPublishedFilter{}, err
 	}
-	return modelcatalogport.ListPublishedFilter{Kind: kind, SubKind: domain.SubKind(input.SubKind), Algorithm: domain.Algorithm(input.Algorithm), ProductChannel: domain.ProductChannel(input.ProductChannel), Category: input.Category, Keyword: input.Keyword, QuestionnaireCode: input.QuestionnaireCode, QuestionnaireVersion: input.QuestionnaireVersion, Page: normalizePage(input.Page), PageSize: normalizePageSize(input.PageSize)}, nil
+	return modelcatalogport.ListPublishedFilter{Kinds: kinds, Algorithm: domain.Algorithm(input.Algorithm), Category: input.Category, Keyword: input.Keyword, QuestionnaireCode: input.QuestionnaireCode, QuestionnaireVersion: input.QuestionnaireVersion, Page: normalizePage(input.Page), PageSize: normalizePageSize(input.PageSize)}, nil
 }
 
-func kindFromListInput(input modelcatalog.ListModelsDTO) (domain.Kind, error) {
-	if input.Kind == "" {
-		return "", nil
+func kindsFromListInput(input modelcatalog.ListModelsDTO) ([]domain.Kind, error) {
+	if input.Kind != "" && len(input.Kinds) > 0 {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "kind and kinds cannot be used together")
 	}
-	kind, ok := modelcatalog.APIKindToDomainKind(input.Kind)
-	if !ok {
-		return "", errors.WithCode(code.ErrInvalidArgument, "model kind is invalid")
+	var selected []domain.Kind
+	if input.Kind != "" {
+		kind, ok := modelcatalog.APIKindToDomainKind(input.Kind)
+		if !ok {
+			return nil, errors.WithCode(code.ErrInvalidArgument, "model kind is invalid")
+		}
+		selected = []domain.Kind{kind}
+	} else if len(input.Kinds) > 0 {
+		seen := make(map[domain.Kind]struct{}, len(input.Kinds))
+		for _, value := range input.Kinds {
+			kind, ok := modelcatalog.APIKindToDomainKind(value)
+			if !ok {
+				return nil, errors.WithCode(code.ErrInvalidArgument, "model kinds contains invalid value %q", value)
+			}
+			seen[kind] = struct{}{}
+		}
+		for kind := range seen {
+			selected = append(selected, kind)
+		}
+		sort.Slice(selected, func(i, j int) bool { return selected[i] < selected[j] })
 	}
-	return kind, nil
+	if input.SubKind != "" {
+		if input.SubKind != string(domain.SubKindTypology) {
+			return nil, errors.WithCode(code.ErrInvalidArgument, "sub_kind is invalid")
+		}
+		hadSelection := len(selected) > 0
+		selected = intersectKinds(selected, []domain.Kind{domain.KindTypology})
+		if hadSelection && len(selected) == 0 {
+			return nil, errors.WithCode(code.ErrInvalidArgument, "kind and sub_kind are incompatible")
+		}
+	}
+	if input.ProductChannel != "" {
+		var legacyKinds []domain.Kind
+		switch domain.ProductChannel(input.ProductChannel) {
+		case domain.ProductChannelMedicalScale:
+			legacyKinds = []domain.Kind{domain.KindScale}
+		case domain.ProductChannelTypology:
+			legacyKinds = []domain.Kind{domain.KindTypology}
+		case domain.ProductChannelBehaviorAbility:
+			legacyKinds = []domain.Kind{domain.KindBehavioralRating, domain.KindCognitive}
+		default:
+			return nil, errors.WithCode(code.ErrInvalidArgument, "product_channel is invalid")
+		}
+		hadSelection := len(selected) > 0
+		selected = intersectKinds(selected, legacyKinds)
+		if hadSelection && len(selected) == 0 {
+			return nil, errors.WithCode(code.ErrInvalidArgument, "kind and product_channel are incompatible")
+		}
+	}
+	return selected, nil
+}
+
+func intersectKinds(current, restriction []domain.Kind) []domain.Kind {
+	if len(current) == 0 {
+		return append([]domain.Kind(nil), restriction...)
+	}
+	allowed := make(map[domain.Kind]struct{}, len(restriction))
+	for _, kind := range restriction {
+		allowed[kind] = struct{}{}
+	}
+	result := make([]domain.Kind, 0, len(current))
+	for _, kind := range current {
+		if _, ok := allowed[kind]; ok {
+			result = append(result, kind)
+		}
+	}
+	return result
 }
 
 func publishedDetailFromModel(model *modelcatalogport.PublishedModel) (*modelcatalog.PublishedModelDetail, error) {
@@ -361,13 +424,8 @@ func publishedDetailFromModel(model *modelcatalogport.PublishedModel) (*modelcat
 		onlineStatus = "online"
 		activeVersion = model.Version
 	}
-	summary := modelcatalog.ModelSummary{Code: model.Code, Kind: modelcatalog.DomainKindToAPIKind(model.Kind), SubKind: string(model.SubKind), Algorithm: string(model.Algorithm), Title: model.Title, Description: model.Description, Status: model.Status, Category: model.Category, Stages: append([]string(nil), model.Stages...), ApplicableAges: append([]string(nil), model.ApplicableAges...), Reporters: append([]string(nil), model.Reporters...), Tags: append([]string(nil), model.Tags...), QuestionnaireCode: model.QuestionnaireCode, QuestionnaireVersion: model.QuestionnaireVersion, ReleaseState: modelcatalog.ReleaseState{WorkingStatus: model.Status, WorkingVersion: model.Version, OnlineStatus: onlineStatus, ActiveVersion: activeVersion}}
-	if model.AlgorithmFamily != "" {
-		summary.AlgorithmFamily = string(model.AlgorithmFamily)
-		summary.ProductChannel = string(domain.ResolveProductChannel(model.Kind, model.ProductChannel))
-	} else {
-		modelcatalog.PopulateModelSummaryIdentity(&summary, model.Kind, model.SubKind, model.Algorithm, model.ProductChannel)
-	}
+	summary := modelcatalog.ModelSummary{Code: model.Code, Kind: modelcatalog.DomainKindToAPIKind(model.Kind), Algorithm: string(model.Algorithm), Title: model.Title, Description: model.Description, Status: model.Status, Category: model.Category, Stages: append([]string(nil), model.Stages...), ApplicableAges: append([]string(nil), model.ApplicableAges...), Reporters: append([]string(nil), model.Reporters...), Tags: append([]string(nil), model.Tags...), QuestionnaireCode: model.QuestionnaireCode, QuestionnaireVersion: model.QuestionnaireVersion, ReleaseState: modelcatalog.ReleaseState{WorkingStatus: model.Status, WorkingVersion: model.Version, OnlineStatus: onlineStatus, ActiveVersion: activeVersion}}
+	modelcatalog.PopulateModelSummaryIdentity(&summary, model.Kind, domain.CanonicalSubKindFor(model.Kind), model.Algorithm, domain.DefaultProductChannelFor(model.Kind))
 	summary.DecisionKind = string(model.DecisionKind)
 	return &modelcatalog.PublishedModelDetail{
 		ModelSummary: summary,

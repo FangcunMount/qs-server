@@ -33,8 +33,8 @@ func TestMapperRoundTripPublishedModel(t *testing.T) {
 
 	mapper := NewMapper()
 	po := mapper.ToPO(original)
-	if po.AlgorithmFamily != string(domain.AlgorithmFamilyFactorClassification) {
-		t.Fatalf("po algorithm_family = %q", po.AlgorithmFamily)
+	if data, err := po.ToBsonM(); err != nil || data["algorithm_family"] != nil {
+		t.Fatalf("new snapshot must not persist algorithm_family: %#v, %v", data, err)
 	}
 	if po.DefinitionSchemaVersion != domain.SchemaVersionV2 {
 		t.Fatalf("definition schema version = %q", po.DefinitionSchemaVersion)
@@ -45,6 +45,9 @@ func TestMapperRoundTripPublishedModel(t *testing.T) {
 	got := mapper.ToPublished(po)
 	if got.Code != original.Code || got.Algorithm != domain.AlgorithmPersonalityTypology {
 		t.Fatalf("published round trip = %#v", got)
+	}
+	if got.AlgorithmFamily != domain.AlgorithmFamilyFactorClassification {
+		t.Fatalf("algorithm family must derive from decision_kind: %q", got.AlgorithmFamily)
 	}
 	if got.Description != "personality type" || got.Category != "personality" || got.Stages[0] != "intake" ||
 		got.ApplicableAges[0] != "adult" || got.Reporters[0] != "self" || got.Tags[0] != "demo" {

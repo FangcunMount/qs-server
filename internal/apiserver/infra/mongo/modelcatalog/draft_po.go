@@ -16,9 +16,7 @@ type AssessmentModelPO struct {
 	mongoBase.BaseDocument `bson:",inline"`
 
 	Code                    string        `bson:"code"`
-	ProductChannel          string        `bson:"product_channel,omitempty"`
 	Kind                    string        `bson:"kind"`
-	SubKind                 string        `bson:"sub_kind,omitempty"`
 	Algorithm               string        `bson:"algorithm,omitempty"`
 	Title                   string        `bson:"title"`
 	Description             string        `bson:"description,omitempty"`

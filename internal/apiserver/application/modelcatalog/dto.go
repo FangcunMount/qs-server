@@ -25,6 +25,7 @@ type Option struct {
 
 type ListModelsDTO struct {
 	Kind                 string
+	Kinds                []string
 	SubKind              string
 	Status               string
 	Keyword              string

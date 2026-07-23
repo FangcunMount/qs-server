@@ -44,6 +44,30 @@ func DefaultProductChannelFor(kind Kind) ProductChannel {
 	}
 }
 
+// CanonicalSubKindFor derives the legacy sub-kind representation from the
+// canonical Kind. It exists solely at compatibility boundaries; new catalog
+// records must not persist it.
+func CanonicalSubKindFor(kind Kind) SubKind {
+	if kind == KindTypology {
+		return SubKindTypology
+	}
+	return SubKindEmpty
+}
+
+// IsCanonicalProductChannel reports whether a legacy product-channel value is
+// the value derived from Kind. Empty is accepted so new clients need not send
+// the deprecated field.
+func IsCanonicalProductChannel(kind Kind, channel ProductChannel) bool {
+	return channel == "" || channel == DefaultProductChannelFor(kind)
+}
+
+// IsCanonicalSubKind reports whether a legacy sub-kind value agrees with the
+// value derived from Kind. Empty is accepted for compatibility with clients
+// that already stopped sending it.
+func IsCanonicalSubKind(kind Kind, subKind SubKind) bool {
+	return subKind == "" || subKind == CanonicalSubKindFor(kind)
+}
+
 // ResolveProductChannel 返回显式 channel when set, otherwise 类型 默认。
 func ResolveProductChannel(kind Kind, channel ProductChannel) ProductChannel {
 	if channel != "" {

@@ -25,7 +25,6 @@ type EvaluationOutcomePO struct {
 	ModelCode        string    `gorm:"column:model_code;size:100;not null"`
 	ModelVersion     string    `gorm:"column:model_version;size:50;not null"`
 	ModelTitle       *string   `gorm:"column:model_title;size:255"`
-	AlgorithmFamily  *string   `gorm:"column:algorithm_family;size:50"`
 	DecisionKind     *string   `gorm:"column:decision_kind;size:50"`
 	InputSnapshotRef *string   `gorm:"column:input_snapshot_ref;size:200"`
 	ReportInputJSON  *string   `gorm:"column:report_input_json;type:longtext"`
@@ -93,7 +92,6 @@ func outcomeToPO(record *domainoutcome.Record) *EvaluationOutcomePO {
 		ModelCode:        model.Code,
 		ModelVersion:     model.Version,
 		ModelTitle:       optionalString(model.Title),
-		AlgorithmFamily:  optionalString(runtime.AlgorithmFamily.String()),
 		DecisionKind:     optionalString(string(runtime.DecisionKind)),
 		InputSnapshotRef: optionalString(record.InputSnapshotRef()),
 		ReportInputJSON:  optionalString(string(record.ReportInput())),
@@ -108,6 +106,14 @@ func outcomeFromPO(po *EvaluationOutcomePO) (*domainoutcome.Record, error) {
 	if po == nil {
 		return nil, nil
 	}
+	modelKind := modelcatalog.Kind(po.ModelKind)
+	subKind := modelcatalog.CanonicalSubKindFor(modelKind)
+	algorithm := modelcatalog.Algorithm(valueOrEmpty(po.ModelAlgorithm))
+	decisionKind := modelcatalog.DecisionKind(valueOrEmpty(po.DecisionKind))
+	algorithmFamily, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(decisionKind)
+	if !ok {
+		algorithmFamily, _ = modelcatalog.AlgorithmFamilyFromIdentity(modelKind, subKind, algorithm)
+	}
 	return domainoutcome.NewRecord(domainoutcome.NewRecordInput{
 		ID:           meta.FromUint64(po.ID),
 		OrgID:        po.OrgID,
@@ -115,16 +121,16 @@ func outcomeFromPO(po *EvaluationOutcomePO) (*domainoutcome.Record, error) {
 		TesteeID:     po.TesteeID,
 		RunID:        po.EvaluationRunID,
 		Model: domainoutcome.ModelIdentity{
-			Kind:      modelcatalog.Kind(po.ModelKind),
-			SubKind:   modelcatalog.SubKind(valueOrEmpty(po.ModelSubKind)),
-			Algorithm: modelcatalog.Algorithm(valueOrEmpty(po.ModelAlgorithm)),
+			Kind:      modelKind,
+			SubKind:   subKind,
+			Algorithm: algorithm,
 			Code:      po.ModelCode,
 			Version:   po.ModelVersion,
 			Title:     valueOrEmpty(po.ModelTitle),
 		},
 		Runtime: domainoutcome.RuntimeIdentity{
-			AlgorithmFamily: modelcatalog.AlgorithmFamily(valueOrEmpty(po.AlgorithmFamily)),
-			DecisionKind:    modelcatalog.DecisionKind(valueOrEmpty(po.DecisionKind)),
+			AlgorithmFamily: algorithmFamily,
+			DecisionKind:    decisionKind,
 		},
 		InputSnapshotRef: valueOrEmpty(po.InputSnapshotRef),
 		ReportInput:      []byte(valueOrEmpty(po.ReportInputJSON)),

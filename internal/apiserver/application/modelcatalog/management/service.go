@@ -35,7 +35,7 @@ func (s Service) Create(ctx context.Context, actor modelcatalog.ActorContext, in
 	if !ok {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "model kind is invalid")
 	}
-	if err := domain.ValidateNewProductChannel(kind, domain.ProductChannel(input.ProductChannel)); err != nil {
+	if err := validateLegacyIdentity(kind, input.SubKind, input.ProductChannel); err != nil {
 		return nil, err
 	}
 	if err := s.authorize(ctx, actor, modelcatalog.Resource{Kind: kind}); err != nil {
@@ -48,9 +48,9 @@ func (s Service) Create(ctx context.Context, actor modelcatalog.ActorContext, in
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
 		Code:           codeValue,
 		Kind:           kind,
-		SubKind:        createSubKind(kind, input.SubKind),
+		SubKind:        domain.CanonicalSubKindFor(kind),
 		Algorithm:      createAlgorithm(kind, input.Algorithm),
-		ProductChannel: domain.ProductChannel(input.ProductChannel),
+		ProductChannel: domain.DefaultProductChannelFor(kind),
 		Title:          input.Title,
 		Description:    input.Description,
 		Category:       input.Category,
@@ -94,17 +94,20 @@ func (s Service) UpdateBasicInfo(ctx context.Context, actor modelcatalog.ActorCo
 	if err := s.Evolution.GuardAlgorithmChange(ctx, model.Code, domain.Algorithm(input.Algorithm)); err != nil {
 		return nil, err
 	}
+	if err := validateLegacyIdentity(model.Kind, input.SubKind, input.ProductChannel); err != nil {
+		return nil, err
+	}
 	if err := model.ForkDraftFromPublished(s.now()); err != nil {
 		return nil, err
 	}
 	if model.Kind == domain.KindScale {
-		if err := model.UpdateScaleBasicInfo(input.Title, input.Description, domain.SubKind(input.SubKind), domain.Algorithm(input.Algorithm), domain.ProductChannel(input.ProductChannel), input.Category, input.Tags, input.Stages, input.ApplicableAges, input.Reporters, s.now()); err != nil {
+		if err := model.UpdateScaleBasicInfo(input.Title, input.Description, domain.CanonicalSubKindFor(model.Kind), domain.Algorithm(input.Algorithm), domain.DefaultProductChannelFor(model.Kind), input.Category, input.Tags, input.Stages, input.ApplicableAges, input.Reporters, s.now()); err != nil {
 			return nil, err
 		}
 		if err := appdefinition.RefreshScaleDraftProjection(model); err != nil {
 			return nil, err
 		}
-	} else if err := model.UpdateBasicInfo(input.Title, input.Description, domain.SubKind(input.SubKind), domain.Algorithm(input.Algorithm), domain.ProductChannel(input.ProductChannel), input.Category, input.Tags, s.now()); err != nil {
+	} else if err := model.UpdateBasicInfo(input.Title, input.Description, domain.CanonicalSubKindFor(model.Kind), domain.Algorithm(input.Algorithm), domain.DefaultProductChannelFor(model.Kind), input.Category, input.Tags, s.now()); err != nil {
 		return nil, err
 	}
 	if err := s.ModelRepo.Update(ctx, model); err != nil {
@@ -290,14 +293,14 @@ func (s Service) now() time.Time {
 	return time.Now().UTC()
 }
 
-func createSubKind(kind domain.Kind, input string) domain.SubKind {
-	if input != "" {
-		return domain.SubKind(input)
+func validateLegacyIdentity(kind domain.Kind, subKind, productChannel string) error {
+	if !domain.IsCanonicalSubKind(kind, domain.SubKind(subKind)) {
+		return errors.WithCode(code.ErrInvalidArgument, "sub_kind %q is incompatible with kind %q", subKind, kind)
 	}
-	if kind == domain.KindTypology {
-		return domain.SubKindTypology
+	if !domain.IsCanonicalProductChannel(kind, domain.ProductChannel(productChannel)) {
+		return errors.WithCode(code.ErrInvalidArgument, "product_channel %q is incompatible with kind %q", productChannel, kind)
 	}
-	return ""
+	return nil
 }
 
 func createAlgorithm(kind domain.Kind, input string) domain.Algorithm {

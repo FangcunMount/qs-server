@@ -25,6 +25,7 @@ func (r Ref) IsEmpty() bool {
 type ListPublishedFilter struct {
 	Code                 string
 	Kind                 domain.Kind
+	Kinds                []domain.Kind
 	SubKind              domain.SubKind
 	Algorithm            domain.Algorithm
 	ProductChannel       domain.ProductChannel

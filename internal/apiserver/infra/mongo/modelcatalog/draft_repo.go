@@ -129,11 +129,16 @@ func (r *DraftRepository) List(ctx context.Context, filter port.ListFilter) ([]*
 	}
 
 	extra := bson.M{}
-	if filter.Kind != "" {
+	if len(filter.Kinds) == 1 {
+		extra["kind"] = string(filter.Kinds[0])
+	} else if len(filter.Kinds) > 1 {
+		values := make([]string, 0, len(filter.Kinds))
+		for _, kind := range filter.Kinds {
+			values = append(values, string(kind))
+		}
+		extra["kind"] = bson.M{"$in": values}
+	} else if filter.Kind != "" {
 		extra["kind"] = string(filter.Kind)
-	}
-	if filter.SubKind != "" {
-		extra["sub_kind"] = string(filter.SubKind)
 	}
 	if filter.Status != "" {
 		extra["status"] = string(filter.Status)
@@ -143,9 +148,6 @@ func (r *DraftRepository) List(ctx context.Context, filter port.ListFilter) ([]*
 	}
 	if filter.Algorithm != "" {
 		extra["algorithm"] = string(filter.Algorithm)
-	}
-	if filter.ProductChannel != "" {
-		extra["product_channel"] = string(filter.ProductChannel)
 	}
 	if filter.QuestionnaireCode != "" {
 		extra["questionnaire_code"] = filter.QuestionnaireCode

@@ -28,17 +28,12 @@ func (Mapper) ToPO(model *port.PublishedModel) *PublishedAssessmentModelPO {
 	if schemaVersion == "" {
 		schemaVersion = domain.SchemaVersionV2
 	}
-	kind := model.Kind
-	productChannel := domain.ResolveProductChannel(kind, model.ProductChannel)
 	return &PublishedAssessmentModelPO{
 		SchemaVersion:           schemaVersion,
 		RecordRole:              recordRolePublishedSnapshot,
 		ReleaseStatus:           string(domain.NormalizeReleaseStatus(model.ReleaseStatus)),
-		ProductChannel:          string(productChannel),
-		Kind:                    string(kind),
-		SubKind:                 string(model.SubKind),
+		Kind:                    string(model.Kind),
 		Algorithm:               string(model.Algorithm),
-		AlgorithmFamily:         string(model.AlgorithmFamily),
 		Code:                    model.Code,
 		ReleaseVersion:          model.Version,
 		Title:                   model.Title,
@@ -69,17 +64,19 @@ func (Mapper) ToPublished(po *PublishedAssessmentModelPO) *port.PublishedModel {
 		source[key] = value
 	}
 	kind := domain.Kind(po.Kind)
-	productChannel := domain.ProductChannel(po.ProductChannel)
-	if productChannel == "" {
-		productChannel = domain.DefaultProductChannelFor(kind)
+	decisionKind := domain.DecisionKind(po.DecisionKind)
+	subKind := domain.CanonicalSubKindFor(kind)
+	algorithmFamily, ok := domain.AlgorithmFamilyFromDecisionKind(decisionKind)
+	if !ok {
+		algorithmFamily, _ = domain.AlgorithmFamilyFromIdentity(kind, subKind, domain.Algorithm(po.Algorithm))
 	}
 	model := &port.PublishedModel{
 		SchemaVersion:        po.SchemaVersion,
-		ProductChannel:       productChannel,
+		ProductChannel:       domain.DefaultProductChannelFor(kind),
 		Kind:                 kind,
-		SubKind:              domain.SubKind(po.SubKind),
+		SubKind:              subKind,
 		Algorithm:            domain.Algorithm(po.Algorithm),
-		AlgorithmFamily:      domain.AlgorithmFamily(po.AlgorithmFamily),
+		AlgorithmFamily:      algorithmFamily,
 		Code:                 po.Code,
 		Version:              po.ReleaseVersion,
 		Title:                po.Title,
@@ -93,7 +90,7 @@ func (Mapper) ToPublished(po *PublishedAssessmentModelPO) *port.PublishedModel {
 		ReleaseStatus:        domain.NormalizeReleaseStatus(domain.ReleaseStatus(po.ReleaseStatus)),
 		PublishedAt:          po.PublishedAt,
 		ReleaseArchivedAt:    po.ReleaseArchivedAt,
-		DecisionKind:         domain.DecisionKind(po.DecisionKind),
+		DecisionKind:         decisionKind,
 		QuestionnaireCode:    po.QuestionnaireCode,
 		QuestionnaireVersion: po.QuestionnaireVersion,
 		Source:               source,

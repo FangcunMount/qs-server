@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
@@ -49,6 +50,7 @@ func NewAssessmentModelHandler(
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param kind query string false "模型类型"
+// @Param kinds query string false "模型类型集合，逗号分隔；不能与 kind 同时使用"
 // @Param status query string false "状态"
 // @Param product_channel query string false "产品通道"
 // @Param questionnaire_code query string false "问卷编码"
@@ -573,7 +575,18 @@ func modelListInput(c *gin.Context) (modelcatalog.ListModelsDTO, error) {
 	if err != nil {
 		return modelcatalog.ListModelsDTO{}, err
 	}
-	return modelcatalog.ListModelsDTO{Kind: c.Query("kind"), SubKind: c.Query("sub_kind"), Status: c.Query("status"), Keyword: c.Query("keyword"), Category: c.Query("category"), Algorithm: c.Query("algorithm"), ProductChannel: c.Query("product_channel"), QuestionnaireCode: c.Query("questionnaire_code"), QuestionnaireVersion: c.Query("questionnaire_version"), Page: page, PageSize: pageSize}, nil
+	var kinds []string
+	if raw := c.Query("kinds"); raw != "" {
+		for _, value := range strings.Split(raw, ",") {
+			if value = strings.TrimSpace(value); value != "" {
+				kinds = append(kinds, value)
+			}
+		}
+		if len(kinds) == 0 {
+			return modelcatalog.ListModelsDTO{}, errors.WithCode(code.ErrInvalidArgument, "kinds is invalid")
+		}
+	}
+	return modelcatalog.ListModelsDTO{Kind: c.Query("kind"), Kinds: kinds, SubKind: c.Query("sub_kind"), Status: c.Query("status"), Keyword: c.Query("keyword"), Category: c.Query("category"), Algorithm: c.Query("algorithm"), ProductChannel: c.Query("product_channel"), QuestionnaireCode: c.Query("questionnaire_code"), QuestionnaireVersion: c.Query("questionnaire_version"), Page: page, PageSize: pageSize}, nil
 }
 
 func queryPositiveInt(c *gin.Context, key string, fallback int) (int, error) {

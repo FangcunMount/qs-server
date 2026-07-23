@@ -181,3 +181,23 @@ func TestDefinitionV2OnlyOutcomeMigrationDropsPayloadFormat(t *testing.T) {
 		}
 	}
 }
+
+func TestEvaluationOutcomeMigrationDropsAlgorithmFamily(t *testing.T) {
+	t.Parallel()
+	up, err := os.ReadFile("../../../../pkg/migration/migrations/mysql/000058_drop_evaluation_outcome_algorithm_family.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	down, err := os.ReadFile("../../../../pkg/migration/migrations/mysql/000058_drop_evaluation_outcome_algorithm_family.down.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(up), "DROP COLUMN `algorithm_family`") {
+		t.Fatalf("up migration = %s", up)
+	}
+	for _, token := range []string{"ADD COLUMN `algorithm_family`", "DEFAULT NULL"} {
+		if !strings.Contains(string(down), token) {
+			t.Fatalf("down migration does not contain %q", token)
+		}
+	}
+}

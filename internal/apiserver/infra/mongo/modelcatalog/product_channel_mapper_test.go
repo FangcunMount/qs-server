@@ -7,7 +7,7 @@ import (
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
-func TestDraftMapperRoundTripProductChannel(t *testing.T) {
+func TestDraftMapperOmitsProductChannelAndDerivesItOnRead(t *testing.T) {
 	original, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
 		Code:           "brief2_demo",
 		Kind:           domain.KindBehavioralRating,
@@ -21,11 +21,11 @@ func TestDraftMapperRoundTripProductChannel(t *testing.T) {
 
 	mapper := NewDraftMapper()
 	po := mapper.ToPO(original)
-	if po.ProductChannel != string(domain.ProductChannelMedicalScale) {
-		t.Fatalf("po.ProductChannel = %q", po.ProductChannel)
+	if data, err := po.ToBsonM(); err != nil || data["product_channel"] != nil || data["sub_kind"] != nil {
+		t.Fatalf("new head must not persist legacy identity fields: %#v, %v", data, err)
 	}
 	got := mapper.ToDomain(po)
-	if got.ProductChannel != domain.ProductChannelMedicalScale {
+	if got.ProductChannel != domain.ProductChannelBehaviorAbility {
 		t.Fatalf("round trip product channel = %q", got.ProductChannel)
 	}
 }
@@ -41,19 +41,7 @@ func TestDraftMapperDerivesMissingProductChannel(t *testing.T) {
 	}
 }
 
-func TestDraftMapperLeavesCanonicalProductChannelUntouched(t *testing.T) {
-	po := &AssessmentModelPO{
-		Code:           "legacy_cognitive",
-		Kind:           string(domain.KindCognitive),
-		ProductChannel: string(domain.ProductChannelBehaviorAbility),
-	}
-	got := NewDraftMapper().ToDomain(po)
-	if got.ProductChannel != domain.ProductChannelBehaviorAbility {
-		t.Fatalf("product channel = %q, want behavior_ability", got.ProductChannel)
-	}
-}
-
-func TestPublishedMapperRoundTripProductChannel(t *testing.T) {
+func TestPublishedMapperOmitsProductChannelAndDerivesItOnRead(t *testing.T) {
 	original := &port.PublishedModel{
 		SchemaVersion:  domain.SchemaVersionV2,
 		ProductChannel: domain.ProductChannelMedicalScale,
@@ -68,11 +56,11 @@ func TestPublishedMapperRoundTripProductChannel(t *testing.T) {
 
 	mapper := NewMapper()
 	po := mapper.ToPO(original)
-	if po.ProductChannel != string(domain.ProductChannelMedicalScale) {
-		t.Fatalf("po.ProductChannel = %q", po.ProductChannel)
+	if data, err := po.ToBsonM(); err != nil || data["product_channel"] != nil || data["sub_kind"] != nil {
+		t.Fatalf("new snapshot must not persist legacy identity fields: %#v, %v", data, err)
 	}
 	got := mapper.ToPublished(po)
-	if got.ProductChannel != domain.ProductChannelMedicalScale {
+	if got.ProductChannel != domain.ProductChannelBehaviorAbility {
 		t.Fatalf("round trip product channel = %q", got.ProductChannel)
 	}
 }
@@ -81,7 +69,6 @@ func TestPublishedMapperDerivesMissingProductChannel(t *testing.T) {
 	po := &PublishedAssessmentModelPO{
 		RecordRole:     recordRolePublishedSnapshot,
 		Kind:           string(domain.KindTypology),
-		SubKind:        string(domain.SubKindTypology),
 		Algorithm:      string(domain.AlgorithmPersonalityTypology),
 		Code:           "mbti",
 		ReleaseVersion: "v1",
@@ -95,32 +82,12 @@ func TestPublishedMapperDerivesMissingProductChannel(t *testing.T) {
 	}
 }
 
-func TestPublishedMapperLeavesCanonicalProductChannelUntouched(t *testing.T) {
+func TestPublishedModelUpsertFilterUsesCanonicalIdentityOnly(t *testing.T) {
 	po := &PublishedAssessmentModelPO{
-		ProductChannel: string(domain.ProductChannelBehaviorAbility),
-		RecordRole:     recordRolePublishedSnapshot,
-		Kind:           string(domain.KindCognitive),
-		Algorithm:      string(domain.AlgorithmSPM),
-		Code:           "spm",
-		ReleaseVersion: "v1",
-		Title:          "SPM",
-		Status:         "published",
-		DecisionKind:   string(domain.DecisionKindAbilityLevel),
-	}
-	got := NewMapper().ToPublished(po)
-	if got.ProductChannel != domain.ProductChannelBehaviorAbility {
-		t.Fatalf("product channel = %q, want behavior_ability", got.ProductChannel)
-	}
-}
-
-func TestPublishedModelUpsertFilterExcludesProductChannel(t *testing.T) {
-	po := &PublishedAssessmentModelPO{
-		ProductChannel: string(domain.ProductChannelMedicalScale),
-		RecordRole:     recordRolePublishedSnapshot,
-		Kind:           string(domain.KindBehavioralRating),
-		SubKind:        "",
-		Algorithm:      string(domain.AlgorithmBrief2),
-		Code:           "brief2",
+		RecordRole: recordRolePublishedSnapshot,
+		Kind:       string(domain.KindBehavioralRating),
+		Algorithm:  string(domain.AlgorithmBrief2),
+		Code:       "brief2",
 	}
 	filter := publishedModelUpsertFilter(po)
 	for key := range filter {
@@ -129,6 +96,6 @@ func TestPublishedModelUpsertFilterExcludesProductChannel(t *testing.T) {
 		}
 	}
 	if _, ok := filter["sub_kind"]; ok {
-		t.Fatalf("upsert filter must not include empty sub_kind: %#v", filter)
+		t.Fatalf("upsert filter must not include sub_kind: %#v", filter)
 	}
 }
