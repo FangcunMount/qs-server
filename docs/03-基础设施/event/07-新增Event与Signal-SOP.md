@@ -64,7 +64,7 @@
 - immediate 只能用于 durable event。
 - profile 必须是 `mongo_domain_events` 或 `assessment_mysql_events`。
 - priority 是 claim 顺序，不是 SLA 标签。
-- 当前 settlement 使用 `handler_error_nack`；若要改变全局 poison/unknown 行为，必须单独设计运输协议。
+- 当前 settlement 使用 `handler_error_nack`；若要改变全局 decode-invalid/unknown 行为、运输预算或死信处置，必须同时设计 provider 协议、持久化证据和治理重放。
 
 ### Step 5：实现 producer
 
@@ -164,10 +164,12 @@ Best-effort producer：
 
 ### Consumer
 
-- poison ACK。
+- decode-invalid NACK，并在运输预算耗尽后保存死信。
 - unknown ACK。
 - handler error NACK。
 - handled/duplicate ACK。
+- automatic retry 暂停时 hold 成功 ACK；hold 持久化失败 NACK。
+- terminal dead letter 的组织范围、expected attempts 冲突检查和一次重放。
 - 重复 event ID 不重复产生受保护副作用。
 - 附加 channel 故障不影响主 channel。
 
