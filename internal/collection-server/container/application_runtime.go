@@ -14,6 +14,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportnotify"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
+	grpcclient "github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	redisops "github.com/FangcunMount/qs-server/internal/collection-server/infra/redisops"
 	"github.com/FangcunMount/qs-server/internal/collection-server/port/acl"
@@ -82,9 +83,9 @@ func (c *Container) buildCatalogRuntime() catalogRuntime {
 			questionnaireCache,
 			questionnaireSingleflight,
 		),
-		assessmentModels: appmodelcatalog.NewQueryService(grpcbridge.NewAssessmentModelCatalogReader(c.assessmentModelCatalogClient)),
+		assessmentModels: newAssessmentModelQueryService(c.assessmentModelCatalogClient),
 		typology: typologymodel.NewQueryService(
-			grpcbridge.NewTypologyCatalogProjector(appmodelcatalog.NewQueryService(grpcbridge.NewAssessmentModelCatalogReader(c.assessmentModelCatalogClient))),
+			grpcbridge.NewTypologyCatalogProjector(newAssessmentModelQueryService(c.assessmentModelCatalogClient)),
 			typologyCache,
 			typologySingleflight,
 		),
@@ -92,6 +93,11 @@ func (c *Container) buildCatalogRuntime() catalogRuntime {
 	c.l1PeekRegistry = catalogpeek.NewRegistry()
 	catalogpeek.RegisterCatalogL1(c.l1PeekRegistry, rt.typology, rt.questionnaire)
 	return rt
+}
+
+func newAssessmentModelQueryService(client *grpcclient.AssessmentModelCatalogClient) *appmodelcatalog.QueryService {
+	reader := grpcbridge.NewAssessmentModelCatalogReader(client)
+	return appmodelcatalog.NewQueryService(reader, reader)
 }
 
 func (c *Container) buildReportRuntime(evaluationQuery *evaluation.QueryService) reportRuntime {

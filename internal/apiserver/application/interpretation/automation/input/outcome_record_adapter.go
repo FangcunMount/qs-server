@@ -40,16 +40,16 @@ func FromOutcomeRecord(record *domainoutcome.Record) (interpinput.Interpretation
 		},
 		Model: model,
 		Runtime: interpinput.RuntimeIdentity{
-			AlgorithmFamily: record.Runtime().AlgorithmFamily,
-			DecisionKind:    record.Runtime().DecisionKind,
+			DecisionKind: record.Runtime().DecisionKind,
 		},
 		Result: interpinput.ResultFacts{Primary: primary(execution), Level: level(execution)},
 		Report: interpinput.ReportSpec{
 			ReportType: policy.ReportTypeStandard, TemplateVersion: DefaultTemplateVersion,
-			Algorithm: modelcatalog.Algorithm(model.Algorithm), ProductChannel: modelcatalog.ProductChannel(model.ProductChannel),
+			Algorithm: modelcatalog.Algorithm(model.Algorithm),
 		},
 	}
-	if in.Runtime.AlgorithmFamily == "" || in.Runtime.DecisionKind == "" {
+	family, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(in.Runtime.DecisionKind)
+	if !ok {
 		return interpinput.InterpretationInput{}, fmt.Errorf("evaluation outcome runtime identity is incomplete")
 	}
 	in.Report.ReportProfile = policy.ReportProfileForDecisionKind(in.Runtime.DecisionKind)
@@ -61,9 +61,9 @@ func FromOutcomeRecord(record *domainoutcome.Record) (interpinput.Interpretation
 		in.Report.TemplateVersion = domainreporttemplate.ResolveFromAssets(materialized)
 	}
 
-	switch in.Runtime.AlgorithmFamily {
+	switch family {
 	case modelcatalog.AlgorithmFamilyFactorScoring, modelcatalog.AlgorithmFamilyFactorNorm, modelcatalog.AlgorithmFamilyTaskPerformance:
-		assetModel := factorModel(assets, in.Runtime.AlgorithmFamily)
+		assetModel := factorModel(assets, family)
 		factors := factorScores(execution, assetModel)
 		if err := applyFrozenNormInterpretation(factors, assets, in.PresentationProfile); err != nil {
 			return interpinput.InterpretationInput{}, err
@@ -89,8 +89,6 @@ func FromOutcomeRecord(record *domainoutcome.Record) (interpinput.Interpretation
 func modelIdentityFromRecord(record *domainoutcome.Record) report.ModelIdentity {
 	model := record.Model()
 	return report.ModelIdentity{
-		Kind: string(model.Kind), SubKind: string(model.SubKind), Algorithm: string(model.Algorithm), Code: model.Code, Version: model.Version, Title: model.Title,
-		ProductChannel:  string(modelcatalog.DefaultProductChannelFor(model.Kind)),
-		AlgorithmFamily: string(record.Runtime().AlgorithmFamily),
+		Kind: string(model.Kind), Algorithm: string(model.Algorithm), Code: model.Code, Version: model.Version, Title: model.Title,
 	}
 }

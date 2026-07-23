@@ -49,7 +49,7 @@ func UsesFactorScoreVisibility(model ModelIdentity) bool {
 	case string(modelcatalog.KindTypology):
 		return false
 	case "personality":
-		return model.SubKind != "" && model.SubKind != "typology"
+		return false
 	default:
 		return model.Code != ""
 	}

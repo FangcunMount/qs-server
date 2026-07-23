@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	modeldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	appmodelcatalog "github.com/FangcunMount/qs-server/internal/collection-server/application/modelcatalog"
 	grpcclient "github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 )
@@ -16,6 +17,18 @@ type AssessmentModelCatalogAdapter struct {
 
 func NewAssessmentModelCatalogReader(inner *grpcclient.AssessmentModelCatalogClient) *AssessmentModelCatalogAdapter {
 	return &AssessmentModelCatalogAdapter{inner: inner}
+}
+
+// DeriveLegacyIdentity is the collection ACL's single compatibility boundary.
+// The returned values are response-only and are never copied into catalog DTOs.
+func (r *AssessmentModelCatalogAdapter) DeriveLegacyIdentity(kindText, algorithm, decisionKind string) appmodelcatalog.LegacyIdentityFields {
+	kind := modeldomain.Kind(kindText)
+	family, _ := modeldomain.AlgorithmFamilyFromDecisionKind(modeldomain.DecisionKind(decisionKind))
+	return appmodelcatalog.LegacyIdentityFields{
+		SubKind:         string(modeldomain.CanonicalSubKindFor(kind)),
+		ProductChannel:  string(modeldomain.DefaultProductChannelFor(kind)),
+		AlgorithmFamily: string(family),
+	}
 }
 
 func (r *AssessmentModelCatalogAdapter) GetPublishedModel(ctx context.Context, code, version string) (*appmodelcatalog.CatalogModel, error) {
@@ -82,8 +95,7 @@ func catalogModelOutput(value *grpcclient.CatalogModelOutput) *appmodelcatalog.C
 		return nil
 	}
 	return &appmodelcatalog.CatalogModel{
-		Code: value.Code, Kind: value.Kind, SubKind: value.SubKind, Algorithm: value.Algorithm, ProductChannel: value.ProductChannel,
-		AlgorithmFamily: value.AlgorithmFamily, DecisionKind: value.DecisionKind,
+		Code: value.Code, Kind: value.Kind, Algorithm: value.Algorithm, DecisionKind: value.DecisionKind,
 		Version: value.Version, Title: value.Title, Description: value.Description, Status: value.Status, Category: value.Category,
 		Stages: append([]string(nil), value.Stages...), ApplicableAges: append([]string(nil), value.ApplicableAges...), Reporters: append([]string(nil), value.Reporters...), Tags: append([]string(nil), value.Tags...),
 		QuestionnaireCode: value.QuestionnaireCode, QuestionnaireVersion: value.QuestionnaireVersion, Definition: append(json.RawMessage(nil), value.Definition...),
@@ -99,3 +111,4 @@ func catalogOptionOutputs(values []grpcclient.CatalogOptionOutput) []appmodelcat
 }
 
 var _ appmodelcatalog.CatalogReader = (*AssessmentModelCatalogAdapter)(nil)
+var _ appmodelcatalog.IdentityCompatibility = (*AssessmentModelCatalogAdapter)(nil)

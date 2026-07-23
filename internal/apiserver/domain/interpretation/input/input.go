@@ -29,8 +29,7 @@ type InterpretationInput struct {
 }
 
 type RuntimeIdentity struct {
-	AlgorithmFamily modelcatalog.AlgorithmFamily
-	DecisionKind    modelcatalog.DecisionKind
+	DecisionKind modelcatalog.DecisionKind
 }
 
 type ResultFacts struct {
@@ -45,7 +44,6 @@ type ReportSpec struct {
 	ReportType      policy.ReportType
 	TemplateVersion policy.TemplateVersion
 	Algorithm       modelcatalog.Algorithm
-	ProductChannel  modelcatalog.ProductChannel
 	ReportProfile   policy.ReportProfile
 	AdapterKey      string
 	TemplateID      string

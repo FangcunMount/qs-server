@@ -53,10 +53,7 @@ func TestTypologyBuilderUnknownTemplateIDFailClosed(t *testing.T) {
 
 	builder := rendering.NewTypologyBuilder()
 	_, err := builder.Build(context.Background(), interpinput.InterpretationInput{
-		Runtime: interpinput.RuntimeIdentity{
-			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
-			DecisionKind:    modelcatalog.DecisionKindPoleComposition,
-		},
+		Runtime: interpinput.RuntimeIdentity{DecisionKind: modelcatalog.DecisionKindPoleComposition},
 		Report: interpinput.ReportSpec{
 			ReportType: policy.ReportTypeStandard,
 			TemplateID: "not-registered",
@@ -79,10 +76,10 @@ func TestSBTISpecialOutcomeBuildsArtifactWithoutSyntheticDimensions(t *testing.T
 		OutcomeID:   meta.FromUint64(301),
 		Association: report.Association{OrgID: 1, AssessmentID: meta.FromUint64(302), TesteeID: 303},
 		Model: report.ModelIdentity{
-			Kind: string(modelcatalog.KindTypology), SubKind: string(modelcatalog.SubKindTypology), Algorithm: string(modelcatalog.AlgorithmPersonalityTypology),
-			Code: "SBTI_FUN", Version: "v48", Title: "SBTI 趣味人格测评", AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorClassification),
+			Kind: string(modelcatalog.KindTypology), Algorithm: string(modelcatalog.AlgorithmPersonalityTypology),
+			Code: "SBTI_FUN", Version: "v48", Title: "SBTI 趣味人格测评",
 		},
-		Runtime: interpinput.RuntimeIdentity{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindNearestPattern},
+		Runtime: interpinput.RuntimeIdentity{DecisionKind: modelcatalog.DecisionKindNearestPattern},
 		Result:  interpinput.ResultFacts{Primary: report.NewMatchPercentScore(100, "100%"), Level: &report.ResultLevel{Code: "DRUNK", Label: "饮酒特殊结果"}},
 		Report: interpinput.ReportSpec{
 			ReportType: policy.ReportTypeStandard, TemplateVersion: policy.TemplateVersionV1,
@@ -178,10 +175,10 @@ func TestTypologyTemplatesBuildCanonicalArtifacts(t *testing.T) {
 				OutcomeID:   meta.FromUint64(100),
 				Association: report.Association{OrgID: 1, AssessmentID: meta.FromUint64(101), TesteeID: 102},
 				Model: report.ModelIdentity{
-					Kind: string(modelcatalog.KindTypology), SubKind: string(modelcatalog.SubKindTypology), Algorithm: string(modelcatalog.AlgorithmPersonalityTypology),
-					Code: "TYPOLOGY", Version: "v1", Title: "人格测评", AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorClassification),
+					Kind: string(modelcatalog.KindTypology), Algorithm: string(modelcatalog.AlgorithmPersonalityTypology),
+					Code: "TYPOLOGY", Version: "v1", Title: "人格测评",
 				},
-				Runtime: interpinput.RuntimeIdentity{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: tc.decisionKind},
+				Runtime: interpinput.RuntimeIdentity{DecisionKind: tc.decisionKind},
 				Result:  interpinput.ResultFacts{Primary: report.NewMatchPercentScore(88, "88%"), Level: &report.ResultLevel{Code: "TYPE", Label: "类型"}},
 				Report: interpinput.ReportSpec{
 					ReportType: policy.ReportTypeStandard, TemplateVersion: policy.TemplateVersionV1,

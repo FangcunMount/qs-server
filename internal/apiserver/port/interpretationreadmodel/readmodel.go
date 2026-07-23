@@ -121,14 +121,15 @@ type PresentationProfileRow struct {
 }
 
 type ModelIdentityRow struct {
-	Kind            string
-	SubKind         string
-	Algorithm       string
-	Code            string
-	Version         string
-	Title           string
-	ProductChannel  string
-	AlgorithmFamily string
+	Kind         string
+	Algorithm    string
+	Code         string
+	Version      string
+	Title        string
+	DecisionKind string
+	// StaticOnly marks archived content that has no safe runtime identity.
+	// It may be displayed but cannot be rebuilt or sent to a renderer.
+	StaticOnly bool
 }
 
 type ScoreValueRow struct {

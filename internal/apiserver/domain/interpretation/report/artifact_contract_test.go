@@ -177,7 +177,6 @@ func factorScoringMinimalContent() report.Content {
 	return report.Content{
 		Model: report.ModelIdentity{
 			Kind: string(modelcatalog.KindScale), Code: "PHQ9", Version: "v1", Title: "抑郁筛查",
-			AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorScoring),
 		},
 		PrimaryScore: report.NewRawTotalScore(8, nil),
 		Level:        report.LevelFromRisk(report.RiskLevelLow),
@@ -192,7 +191,6 @@ func normProfileMinimalContent() report.Content {
 	return report.Content{
 		Model: report.ModelIdentity{
 			Kind: string(modelcatalog.KindScale), Code: "CBCL", Version: "v1", Title: "儿童行为",
-			AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorNorm),
 		},
 		PrimaryScore: report.NewRawTotalScore(42, nil),
 		Level:        report.LevelFromRisk(report.RiskLevelHigh),
@@ -210,7 +208,6 @@ func typologyMinimalContent() report.Content {
 	return report.Content{
 		Model: report.ModelIdentity{
 			Kind: string(modelcatalog.KindTypology), Code: "MBTI", Version: "v1", Title: "MBTI",
-			AlgorithmFamily: string(modelcatalog.AlgorithmFamilyFactorClassification),
 		},
 		Conclusion: "INTJ 建筑师",
 		Dimensions: []report.DimensionInterpret{
@@ -226,7 +223,6 @@ func taskPerformanceMinimalContent() report.Content {
 	return report.Content{
 		Model: report.ModelIdentity{
 			Kind: string(modelcatalog.KindCognitive), Code: "SPM", Version: "v1", Title: "瑞文推理",
-			AlgorithmFamily: string(modelcatalog.AlgorithmFamilyTaskPerformance),
 		},
 		PrimaryScore: report.NewRawTotalScore(36, nil),
 		Dimensions: []report.DimensionInterpret{

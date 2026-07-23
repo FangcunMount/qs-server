@@ -5,6 +5,7 @@ import (
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	evaluationtestee "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/testee"
 	interpretationParticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
+	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 func toEvaluationProtoModelIdentity(model evaluationtestee.ModelIdentity) *evaluationpb.ModelIdentity {
@@ -106,12 +107,8 @@ func toProtoParticipantReport(result *interpretationParticipant.Report) *interpr
 	}
 	report := &interpretationpb.AssessmentReport{
 		AssessmentId: result.AssessmentID,
-		Model: &evaluationpb.ModelIdentity{
-			Kind: result.Model.Kind, SubKind: result.Model.SubKind, Algorithm: result.Model.Algorithm,
-			Code: result.Model.Code, Version: result.Model.Version, Title: result.Model.Title,
-			ProductChannel: result.Model.ProductChannel, AlgorithmFamily: result.Model.AlgorithmFamily,
-		},
-		Conclusion: result.Conclusion, CreatedAt: result.CreatedAt.Format("2006-01-02 15:04:05"),
+		Model:        derivedProtoReportModelIdentity(result.Model.Kind, result.Model.Algorithm, result.Model.Code, result.Model.Version, result.Model.Title),
+		Conclusion:   result.Conclusion, CreatedAt: result.CreatedAt.Format("2006-01-02 15:04:05"),
 	}
 	if result.PrimaryScore != nil {
 		report.PrimaryScore = &evaluationpb.ScoreValue{Kind: result.PrimaryScore.Kind, Value: result.PrimaryScore.Value, Label: result.PrimaryScore.Label, Max: result.PrimaryScore.Max}
@@ -146,6 +143,24 @@ func toProtoParticipantReport(result *interpretationParticipant.Report) *interpr
 		}
 	}
 	return report
+}
+
+// derivedProtoReportModelIdentity keeps the Phase-1 protobuf fields compatible
+// without allowing report persistence to carry legacy identity values.
+func derivedProtoReportModelIdentity(kindText, algorithm, code, version, title string) *evaluationpb.ModelIdentity {
+	kind := modelcatalog.Kind(kindText)
+	subKind := modelcatalog.CanonicalSubKindFor(kind)
+	family, _ := modelcatalog.AlgorithmFamilyFromIdentity(kind, subKind, modelcatalog.Algorithm(algorithm))
+	return &evaluationpb.ModelIdentity{
+		Kind:            kindText,
+		SubKind:         string(subKind),
+		Algorithm:       algorithm,
+		Code:            code,
+		Version:         version,
+		Title:           title,
+		ProductChannel:  string(modelcatalog.DefaultProductChannelFor(kind)),
+		AlgorithmFamily: string(family),
+	}
 }
 
 func derefFloat64(v *float64) float64 {

@@ -30,12 +30,10 @@ func (registryBuilder) Build(context.Context, interpinput.InterpretationInput) (
 
 func registryKey(decision modelcatalog.DecisionKind) Key {
 	return Key{
-		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
 		DecisionKind:    decision,
 		ReportType:      policy.ReportTypeStandard,
 		TemplateVersion: policy.TemplateVersionV1,
 		Algorithm:       modelcatalog.AlgorithmPersonalityTypology,
-		ProductChannel:  modelcatalog.ProductChannelTypology,
 		ReportProfile:   policy.ReportProfilePersonalityType,
 	}
 }

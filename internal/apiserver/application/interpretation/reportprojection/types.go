@@ -3,8 +3,7 @@ package reportprojection
 import "time"
 
 type ModelIdentity struct {
-	Kind, SubKind, Algorithm, Code, Version, Title string
-	ProductChannel, AlgorithmFamily                string
+	Kind, Algorithm, Code, Version, Title string
 }
 
 type ScoreValue struct {

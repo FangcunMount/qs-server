@@ -17,10 +17,7 @@ type AssessmentModelCatalogClient struct {
 type CatalogModelOutput struct {
 	Code                 string
 	Kind                 string
-	SubKind              string
 	Algorithm            string
-	ProductChannel       string
-	AlgorithmFamily      string
 	DecisionKind         string
 	Version              string
 	Title                string
@@ -132,8 +129,7 @@ func catalogSummaryFromProto(value *pb.CatalogModelSummary) *CatalogModelOutput 
 		return &CatalogModelOutput{}
 	}
 	return &CatalogModelOutput{
-		Code: value.GetCode(), Kind: value.GetKind(), SubKind: value.GetSubKind(), Algorithm: value.GetAlgorithm(),
-		ProductChannel: value.GetProductChannel(), AlgorithmFamily: value.GetAlgorithmFamily(),
+		Code: value.GetCode(), Kind: value.GetKind(), Algorithm: value.GetAlgorithm(),
 		DecisionKind: value.GetDecisionKind(),
 		Title:        value.GetTitle(), Description: value.GetDescription(), Status: value.GetStatus(), Category: value.GetCategory(),
 		Stages: append([]string(nil), value.GetStages()...), ApplicableAges: append([]string(nil), value.GetApplicableAges()...),

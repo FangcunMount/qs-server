@@ -21,22 +21,17 @@ type Builder interface {
 }
 
 type Key struct {
-	AlgorithmFamily modelcatalog.AlgorithmFamily
 	DecisionKind    modelcatalog.DecisionKind
 	ReportType      policy.ReportType
 	TemplateVersion policy.TemplateVersion
 	Algorithm       modelcatalog.Algorithm
-	ProductChannel  modelcatalog.ProductChannel
 	ReportProfile   policy.ReportProfile
 }
 
 func (k Key) String() string {
-	base := k.AlgorithmFamily.String() + "/" + string(k.DecisionKind) + "/" + string(k.ReportType) + "/" + k.TemplateVersion.String()
+	base := string(k.DecisionKind) + "/" + string(k.ReportType) + "/" + k.TemplateVersion.String()
 	if k.Algorithm != "" {
 		base += "/" + string(k.Algorithm)
-	}
-	if k.ProductChannel != "" {
-		base += "/" + string(k.ProductChannel)
 	}
 	if k.ReportProfile != "" {
 		base += "/" + string(k.ReportProfile)
@@ -59,11 +54,18 @@ type Registry interface {
 }
 
 type registry struct {
-	items map[Key]Builder
+	items map[builderIndexKey]Builder
+}
+
+// builderIndexKey is an in-process index detail. AlgorithmFamily is deliberately
+// derived from DecisionKind here rather than accepted from report input.
+type builderIndexKey struct {
+	AlgorithmFamily modelcatalog.AlgorithmFamily
+	Key
 }
 
 func NewRegistry(builders ...Builder) (Registry, error) {
-	r := &registry{items: make(map[Key]Builder, len(builders))}
+	r := &registry{items: make(map[builderIndexKey]Builder, len(builders))}
 	for _, builder := range builders {
 		if err := r.register(builder); err != nil {
 			return nil, err
@@ -100,10 +102,14 @@ func (r *registry) register(builder Builder) error {
 		if key.TemplateVersion != builder.TemplateVersion() {
 			return fmt.Errorf("interpretation report builder template version mismatch: %s", key)
 		}
-		if _, exists := r.items[key]; exists {
+		registryKey, err := toBuilderIndexKey(key)
+		if err != nil {
+			return err
+		}
+		if _, exists := r.items[registryKey]; exists {
 			return fmt.Errorf("interpretation report builder already registered for mechanism %s", key)
 		}
-		r.items[key] = builder
+		r.items[registryKey] = builder
 	}
 	return nil
 }
@@ -119,7 +125,11 @@ func (r *registry) ResolveByMechanism(key Key) (Builder, error) {
 		key.TemplateVersion = policy.TemplateVersionV1
 	}
 	for _, candidate := range fallbackCandidates(key) {
-		if builder, ok := r.items[candidate]; ok {
+		registryKey, err := toBuilderIndexKey(candidate)
+		if err != nil {
+			return nil, err
+		}
+		if builder, ok := r.items[registryKey]; ok {
 			return builder, nil
 		}
 	}
@@ -127,23 +137,19 @@ func (r *registry) ResolveByMechanism(key Key) (Builder, error) {
 }
 
 type RoutingContext struct {
-	AlgorithmFamily modelcatalog.AlgorithmFamily
 	DecisionKind    modelcatalog.DecisionKind
 	ReportType      policy.ReportType
 	TemplateVersion policy.TemplateVersion
 	Algorithm       modelcatalog.Algorithm
-	ProductChannel  modelcatalog.ProductChannel
 	ReportProfile   policy.ReportProfile
 }
 
 func RoutingContextFromInput(input interpinput.InterpretationInput) (RoutingContext, bool) {
 	value := RoutingContext{
-		AlgorithmFamily: input.Runtime.AlgorithmFamily,
 		DecisionKind:    input.Runtime.DecisionKind,
 		ReportType:      input.Report.ReportType,
 		TemplateVersion: input.Report.TemplateVersion,
 		Algorithm:       input.Report.Algorithm,
-		ProductChannel:  input.Report.ProductChannel,
 		ReportProfile:   input.Report.ReportProfile,
 	}
 	if value.ReportType == "" {
@@ -152,13 +158,14 @@ func RoutingContextFromInput(input interpinput.InterpretationInput) (RoutingCont
 	if value.TemplateVersion.IsEmpty() {
 		value.TemplateVersion = policy.TemplateVersionV1
 	}
-	if value.DecisionKind == "" {
-		value.DecisionKind = policy.DefaultDecisionKind(value.AlgorithmFamily)
+	_, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(value.DecisionKind)
+	if !ok {
+		return RoutingContext{}, false
 	}
 	if value.ReportProfile == "" {
 		value.ReportProfile = policy.ReportProfileForDecisionKind(value.DecisionKind)
 	}
-	if value.AlgorithmFamily == "" || value.DecisionKind == "" {
+	if value.DecisionKind == "" {
 		return RoutingContext{}, false
 	}
 	return value, true
@@ -175,15 +182,10 @@ func KeyFromInput(input interpinput.InterpretationInput) (Key, bool) {
 func fallbackCandidates(key Key) []Key {
 	base := []Key{
 		key,
-		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, Algorithm: key.Algorithm, ProductChannel: key.ProductChannel, ReportProfile: key.ReportProfile},
-		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, Algorithm: key.Algorithm, ProductChannel: key.ProductChannel},
-		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, Algorithm: key.Algorithm, ReportProfile: key.ReportProfile},
-		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, Algorithm: key.Algorithm},
-		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, ProductChannel: key.ProductChannel, ReportProfile: key.ReportProfile},
-		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, ProductChannel: key.ProductChannel},
-		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType, ReportProfile: key.ReportProfile},
-		{AlgorithmFamily: key.AlgorithmFamily, DecisionKind: key.DecisionKind, ReportType: key.ReportType},
-		{AlgorithmFamily: key.AlgorithmFamily, ReportType: key.ReportType},
+		{DecisionKind: key.DecisionKind, ReportType: key.ReportType, Algorithm: key.Algorithm, ReportProfile: key.ReportProfile},
+		{DecisionKind: key.DecisionKind, ReportType: key.ReportType, Algorithm: key.Algorithm},
+		{DecisionKind: key.DecisionKind, ReportType: key.ReportType, ReportProfile: key.ReportProfile},
+		{DecisionKind: key.DecisionKind, ReportType: key.ReportType},
 	}
 	out := make([]Key, 0, len(base))
 	seen := make(map[Key]struct{}, len(base))
@@ -196,4 +198,12 @@ func fallbackCandidates(key Key) []Key {
 		out = append(out, candidate)
 	}
 	return out
+}
+
+func toBuilderIndexKey(key Key) (builderIndexKey, error) {
+	family, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(key.DecisionKind)
+	if !ok {
+		return builderIndexKey{}, fmt.Errorf("unknown interpretation decision_kind: %s", key.DecisionKind)
+	}
+	return builderIndexKey{AlgorithmFamily: family, Key: key}, nil
 }

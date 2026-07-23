@@ -45,10 +45,11 @@ type config struct {
 }
 
 type finding struct {
-	Source  string   `json:"source"`
-	Rule    string   `json:"rule"`
-	Count   int64    `json:"count"`
-	Samples []string `json:"samples,omitempty"`
+	Severity string   `json:"severity,omitempty"`
+	Source   string   `json:"source"`
+	Rule     string   `json:"rule"`
+	Count    int64    `json:"count"`
+	Samples  []string `json:"samples,omitempty"`
 }
 
 type report struct {
@@ -68,7 +69,13 @@ func main() {
 
 	result := report{GeneratedAt: time.Now().UTC()}
 	if cfg.mysqlDSN != "" {
-		items, err := auditMySQL(ctx, cfg.mysqlDSN)
+		var items []finding
+		var err error
+		if cfg.modelCatalogIdentity {
+			items, err = auditModelCatalogIdentityMySQL(ctx, cfg.mysqlDSN)
+		} else {
+			items, err = auditMySQL(ctx, cfg.mysqlDSN)
+		}
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "verify cutover failed: mysql:", err)
 			os.Exit(1)
@@ -76,7 +83,13 @@ func main() {
 		result.Findings = append(result.Findings, items...)
 	}
 	if cfg.mongoURI != "" {
-		items, err := auditMongo(ctx, cfg.mongoURI, cfg.mongoDB)
+		var items []finding
+		var err error
+		if cfg.modelCatalogIdentity {
+			items, err = auditModelCatalogIdentityMongo(ctx, cfg.mongoURI, cfg.mongoDB)
+		} else {
+			items, err = auditMongo(ctx, cfg.mongoURI, cfg.mongoDB)
+		}
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "verify cutover failed: mongo:", err)
 			os.Exit(1)
@@ -90,7 +103,9 @@ func main() {
 		return result.Findings[i].Rule < result.Findings[j].Rule
 	})
 	for _, item := range result.Findings {
-		result.Total += item.Count
+		if item.Severity != "info" {
+			result.Total += item.Count
+		}
 	}
 	if cfg.jsonOut {
 		_ = json.NewEncoder(os.Stdout).Encode(result)
@@ -154,6 +169,18 @@ func applyModelCatalogIdentity(ctx context.Context, uri, database string) error 
 	if err != nil {
 		return fmt.Errorf("unset redundant assessment model identity fields: %w", err)
 	}
+	remaining, err := models.CountDocuments(ctx, bson.M{
+		"deleted_at": nil, "record_role": "published_snapshot",
+		"$or": bson.A{
+			bson.M{"kind": ""}, bson.M{"algorithm": ""}, bson.M{"code": ""}, bson.M{"release_version": ""},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("verify canonical active snapshots: %w", err)
+	}
+	if remaining != 0 {
+		return fmt.Errorf("verify canonical active snapshots: %d incomplete records remain", remaining)
+	}
 	if _, err := models.Indexes().DropOne(ctx, "idx_assessment_models_snapshot_identity_version"); err != nil && !strings.Contains(err.Error(), "index not found") {
 		return fmt.Errorf("drop legacy snapshot identity index: %w", err)
 	}
@@ -213,6 +240,131 @@ WHERE model_kind = '' OR model_algorithm IS NULL OR model_algorithm = ''
 	}
 	items = append(items, outcomeContracts...)
 	return items, nil
+}
+
+// auditModelCatalogIdentityMySQL is intentionally separate from the
+// DefinitionV2 contract audit. It only judges whether outcome runtime identity
+// can be restored without trusting the retired algorithm_family column.
+func auditModelCatalogIdentityMySQL(ctx context.Context, dsn string) ([]finding, error) {
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = db.Close() }()
+	if err := db.PingContext(ctx); err != nil {
+		return nil, err
+	}
+	rows, err := db.QueryContext(ctx, `
+SELECT CAST(id AS CHAR), COALESCE(model_kind, ''), COALESCE(model_algorithm, ''), COALESCE(decision_kind, '')
+FROM evaluation_outcome`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	byRule := map[string]*finding{}
+	for rows.Next() {
+		var id, kindText, algorithmText, decisionText string
+		if err := rows.Scan(&id, &kindText, &algorithmText, &decisionText); err != nil {
+			return nil, err
+		}
+		if _, err := domain.ResolveLegacyRuntime(domain.Kind(kindText), domain.Algorithm(algorithmText), domain.DecisionKind(decisionText)); err != nil {
+			addFindingRule(byRule, "evaluation_outcome", "runtime_identity.unrecoverable", id)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return sortedFindings(byRule), nil
+}
+
+// auditModelCatalogIdentityMongo deliberately does not call DefinitionV2
+// validators. It examines both catalog record roles and verifies that a frozen
+// runtime route is either valid or uniquely recoverable from Kind+Algorithm.
+func auditModelCatalogIdentityMongo(ctx context.Context, uri, database string) ([]finding, error) {
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = client.Disconnect(context.Background()) }()
+	if err := client.Ping(ctx, nil); err != nil {
+		return nil, err
+	}
+	db := client.Database(database)
+	items, err := auditModelCatalogIdentityModels(ctx, db.Collection("assessment_models"))
+	if err != nil {
+		return nil, err
+	}
+	indexItems, err := auditModelCatalogIdentityIndexes(ctx, db.Collection("assessment_models"))
+	if err != nil {
+		return nil, err
+	}
+	return append(items, indexItems...), nil
+}
+
+func auditModelCatalogIdentityModels(ctx context.Context, models *mongo.Collection) ([]finding, error) {
+	cursor, err := models.Find(ctx, bson.M{"deleted_at": nil, "record_role": bson.M{"$in": bson.A{"head", "published_snapshot"}}}, options.Find().SetProjection(bson.M{
+		"_id": 1, "code": 1, "record_role": 1, "kind": 1, "algorithm": 1, "decision_kind": 1,
+		"sub_kind": 1, "product_channel": 1, "algorithm_family": 1,
+	}))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+	byRule := map[string]*finding{}
+	for cursor.Next(ctx) {
+		var row struct {
+			ID              any    `bson:"_id"`
+			Code            string `bson:"code"`
+			RecordRole      string `bson:"record_role"`
+			Kind            string `bson:"kind"`
+			Algorithm       string `bson:"algorithm"`
+			DecisionKind    string `bson:"decision_kind"`
+			SubKind         string `bson:"sub_kind"`
+			ProductChannel  string `bson:"product_channel"`
+			AlgorithmFamily string `bson:"algorithm_family"`
+		}
+		if err := cursor.Decode(&row); err != nil {
+			return nil, err
+		}
+		sample := row.Code
+		if sample == "" {
+			sample = fmt.Sprint(row.ID)
+		}
+		if row.Kind == "" || row.Algorithm == "" {
+			addFindingRule(byRule, "assessment_models", "canonical_identity.incomplete", sample)
+			continue
+		}
+		kind := domain.Kind(row.Kind)
+		if row.SubKind != "" && row.SubKind != string(domain.CanonicalSubKindFor(kind)) {
+			addFindingRule(byRule, "assessment_models", "legacy_sub_kind.inconsistent", sample)
+		}
+		if row.ProductChannel != "" && row.ProductChannel != string(domain.DefaultProductChannelFor(kind)) {
+			addFindingRule(byRule, "assessment_models", "legacy_product_channel.inconsistent", sample)
+		}
+		runtime, runtimeErr := domain.ResolveLegacyRuntime(kind, domain.Algorithm(row.Algorithm), domain.DecisionKind(row.DecisionKind))
+		if runtimeErr != nil {
+			addFindingRule(byRule, "assessment_models", "runtime_identity.unrecoverable", sample)
+			continue
+		}
+		if row.AlgorithmFamily != "" && row.AlgorithmFamily != string(runtime.AlgorithmFamily) {
+			addFindingRule(byRule, "assessment_models", "legacy_algorithm_family.inconsistent", sample)
+		}
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+	return sortedFindings(byRule), nil
+}
+
+func auditModelCatalogIdentityIndexes(ctx context.Context, models *mongo.Collection) ([]finding, error) {
+	names, err := mongoIndexNames(ctx, models)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := names["idx_assessment_models_snapshot_identity_version_v2"]; !ok {
+		return []finding{{Severity: "info", Source: "mongo_indexes", Rule: "canonical_snapshot_identity.missing", Count: 1}}, nil
+	}
+	return nil, nil
 }
 
 type outcomeContractRow struct {
@@ -617,7 +769,11 @@ func printReport(result report) {
 		return
 	}
 	for _, item := range result.Findings {
-		fmt.Printf("- %s %s: %d", item.Source, item.Rule, item.Count)
+		prefix := "-"
+		if item.Severity == "info" {
+			prefix = "- INFO"
+		}
+		fmt.Printf("%s %s %s: %d", prefix, item.Source, item.Rule, item.Count)
 		if len(item.Samples) > 0 {
 			fmt.Printf(" samples=%s", strings.Join(item.Samples, ","))
 		}

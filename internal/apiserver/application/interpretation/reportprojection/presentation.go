@@ -52,9 +52,8 @@ func presentationProfileFromRow(row *interpretationreadmodel.ReportRow) *domainr
 
 func modelIdentityFromRow(row interpretationreadmodel.ReportRow) domainreport.ModelIdentity {
 	return domainreport.ModelIdentity{
-		Kind: row.Model.Kind, SubKind: row.Model.SubKind, Algorithm: row.Model.Algorithm,
+		Kind: row.Model.Kind, Algorithm: row.Model.Algorithm,
 		Code: row.Model.Code, Version: row.Model.Version, Title: row.Model.Title,
-		ProductChannel: row.Model.ProductChannel, AlgorithmFamily: row.Model.AlgorithmFamily,
 	}
 }
 

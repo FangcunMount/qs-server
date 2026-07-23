@@ -3,6 +3,7 @@ package grpcbridge
 import (
 	"strconv"
 
+	modeldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 )
 
@@ -157,15 +158,18 @@ func toAssessmentReportResponse(report *AssessmentReportOutput) *evaluation.Asse
 }
 
 func toModelIdentityResponse(model ModelIdentityOutput) evaluation.ModelIdentityResponse {
+	kind := modeldomain.Kind(model.Kind)
+	subKind := modeldomain.CanonicalSubKindFor(kind)
+	family, _ := modeldomain.AlgorithmFamilyFromDecisionKind(modeldomain.DecisionKind(model.DecisionKind))
 	return evaluation.ModelIdentityResponse{
 		Kind:            model.Kind,
-		SubKind:         model.SubKind,
+		SubKind:         string(subKind),
 		Algorithm:       model.Algorithm,
 		Code:            model.Code,
 		Version:         model.Version,
 		Title:           model.Title,
-		ProductChannel:  model.ProductChannel,
-		AlgorithmFamily: model.AlgorithmFamily,
+		ProductChannel:  string(modeldomain.DefaultProductChannelFor(kind)),
+		AlgorithmFamily: string(family),
 		DecisionKind:    model.DecisionKind,
 	}
 }

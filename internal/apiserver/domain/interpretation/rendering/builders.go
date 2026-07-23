@@ -27,7 +27,7 @@ func (FactorScoringBuilder) TemplateVersion() policy.TemplateVersion { return po
 func (FactorScoringBuilder) BuilderIdentity() string                 { return "factor-scoring" }
 func (FactorScoringBuilder) ContentSchemaVersion() string            { return "report-content/v1" }
 func (b FactorScoringBuilder) MechanismKey() Key {
-	return Key{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange, ReportType: b.ReportType()}
+	return Key{DecisionKind: modelcatalog.DecisionKindScoreRange, ReportType: b.ReportType()}
 }
 func (b FactorScoringBuilder) Build(_ context.Context, input interpinput.InterpretationInput) (*report.Draft, error) {
 	if b.composer == nil {
@@ -58,7 +58,7 @@ func (NormProfileBuilder) TemplateVersion() policy.TemplateVersion { return poli
 func (NormProfileBuilder) BuilderIdentity() string                 { return "norm-profile" }
 func (NormProfileBuilder) ContentSchemaVersion() string            { return "report-content/v1" }
 func (b NormProfileBuilder) MechanismKey() Key {
-	return Key{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorNorm, DecisionKind: modelcatalog.DecisionKindNormLookup, ReportType: b.ReportType()}
+	return Key{DecisionKind: modelcatalog.DecisionKindNormLookup, ReportType: b.ReportType()}
 }
 func (b NormProfileBuilder) Build(ctx context.Context, input interpinput.InterpretationInput) (*report.Draft, error) {
 	return b.scoring.Build(ctx, input)
@@ -78,7 +78,7 @@ func (TaskPerformanceBuilder) TemplateVersion() policy.TemplateVersion {
 func (TaskPerformanceBuilder) BuilderIdentity() string      { return "task-performance" }
 func (TaskPerformanceBuilder) ContentSchemaVersion() string { return "report-content/v1" }
 func (b TaskPerformanceBuilder) MechanismKey() Key {
-	return Key{AlgorithmFamily: modelcatalog.AlgorithmFamilyTaskPerformance, DecisionKind: modelcatalog.DecisionKindAbilityLevel, ReportType: b.ReportType()}
+	return Key{DecisionKind: modelcatalog.DecisionKindAbilityLevel, ReportType: b.ReportType()}
 }
 func (b TaskPerformanceBuilder) Build(ctx context.Context, input interpinput.InterpretationInput) (*report.Draft, error) {
 	return b.scoring.Build(ctx, input)
@@ -102,10 +102,10 @@ func (TypologyBuilder) ContentSchemaVersion() string            { return "report
 func (b TypologyBuilder) MechanismKey() Key                     { return b.MechanismKeys()[0] }
 func (TypologyBuilder) MechanismKeys() []Key {
 	return []Key{
-		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindPoleComposition, ReportType: policy.ReportTypeStandard},
-		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindTraitProfile, ReportType: policy.ReportTypeStandard},
-		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindNearestPattern, ReportType: policy.ReportTypeStandard},
-		{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindDominantFactor, ReportType: policy.ReportTypeStandard},
+		{DecisionKind: modelcatalog.DecisionKindPoleComposition, ReportType: policy.ReportTypeStandard},
+		{DecisionKind: modelcatalog.DecisionKindTraitProfile, ReportType: policy.ReportTypeStandard},
+		{DecisionKind: modelcatalog.DecisionKindNearestPattern, ReportType: policy.ReportTypeStandard},
+		{DecisionKind: modelcatalog.DecisionKindDominantFactor, ReportType: policy.ReportTypeStandard},
 	}
 }
 func (b TypologyBuilder) Build(_ context.Context, input interpinput.InterpretationInput) (*report.Draft, error) {

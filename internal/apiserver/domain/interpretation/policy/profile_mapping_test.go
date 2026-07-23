@@ -25,20 +25,3 @@ func TestReportProfileForDecisionKind(t *testing.T) {
 		}
 	}
 }
-
-func TestDefaultDecisionKind(t *testing.T) {
-	tests := map[modelcatalog.AlgorithmFamily]modelcatalog.DecisionKind{
-		modelcatalog.AlgorithmFamilyFactorScoring:        modelcatalog.DecisionKindScoreRange,
-		modelcatalog.AlgorithmFamilyFactorClassification: modelcatalog.DecisionKindPoleComposition,
-		modelcatalog.AlgorithmFamilyFactorNorm:           modelcatalog.DecisionKindNormLookup,
-		modelcatalog.AlgorithmFamilyTaskPerformance:      modelcatalog.DecisionKindAbilityLevel,
-	}
-	for family, want := range tests {
-		if got := policy.DefaultDecisionKind(family); got != want {
-			t.Fatalf("DefaultDecisionKind(%q) = %q, want %q", family, got, want)
-		}
-	}
-	if got := policy.DefaultDecisionKind("unknown"); got != "" {
-		t.Fatalf("unknown family decision = %q", got)
-	}
-}

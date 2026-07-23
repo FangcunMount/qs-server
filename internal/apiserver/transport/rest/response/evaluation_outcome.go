@@ -5,6 +5,7 @@ import (
 
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	interpretation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
+	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 // ModelIdentityResponse is the outcome published-model reference on REST responses.
@@ -239,10 +240,13 @@ func newResultLevelResponse(level *evaluationoperator.ResultLevel) *ResultLevelR
 }
 
 func newReportModelIdentityResponse(model interpretation.ModelIdentity) ModelIdentityResponse {
+	kind := modelcatalog.Kind(model.Kind)
+	subKind := modelcatalog.CanonicalSubKindFor(kind)
+	family, _ := modelcatalog.AlgorithmFamilyFromIdentity(kind, subKind, modelcatalog.Algorithm(model.Algorithm))
 	return ModelIdentityResponse{
-		Kind: model.Kind, SubKind: model.SubKind, Algorithm: model.Algorithm,
+		Kind: model.Kind, SubKind: string(subKind), Algorithm: model.Algorithm,
 		Code: model.Code, Version: model.Version, Title: model.Title,
-		ProductChannel: model.ProductChannel, AlgorithmFamily: model.AlgorithmFamily,
+		ProductChannel: string(modelcatalog.DefaultProductChannelFor(kind)), AlgorithmFamily: string(family),
 	}
 }
 

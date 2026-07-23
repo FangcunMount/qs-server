@@ -15,7 +15,7 @@ type EventScoreValue = eventoutcome.ScoreValue
 type EventResultLevel = eventoutcome.ResultLevel
 
 func EventModelIdentityFrom(model report.ModelIdentity) EventModelIdentity {
-	return EventModelIdentity(model)
+	return EventModelIdentity{Kind: model.Kind, Algorithm: model.Algorithm, Code: model.Code, Version: model.Version, Title: model.Title}
 }
 
 func EventScoreValueFrom(score *report.ScoreValue) *EventScoreValue {

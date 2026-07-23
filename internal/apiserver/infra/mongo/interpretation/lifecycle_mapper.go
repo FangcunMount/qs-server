@@ -338,7 +338,7 @@ func modelIdentityToDomain(po *ModelIdentityPO) domainreport.ModelIdentity {
 	if po == nil {
 		return domainreport.ModelIdentity{}
 	}
-	return domainreport.ModelIdentity{Kind: po.Kind, SubKind: po.SubKind, Algorithm: po.Algorithm, Code: po.Code, Version: po.Version, Title: po.Title, ProductChannel: po.ProductChannel, AlgorithmFamily: po.AlgorithmFamily}
+	return domainreport.ModelIdentity{Kind: po.Kind, Algorithm: po.Algorithm, Code: po.Code, Version: po.Version, Title: po.Title}
 }
 
 func scoreValueToPO(score *domainreport.ScoreValue) *ScoreValuePO {

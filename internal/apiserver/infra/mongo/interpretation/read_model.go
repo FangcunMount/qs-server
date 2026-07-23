@@ -2,7 +2,6 @@ package interpretation
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	evaluationreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 )
 
@@ -69,14 +68,12 @@ func projectArchivedReportRow(po *ArchivedReportPO) evaluationreadmodel.ReportRo
 	}
 	if po.Model != nil {
 		row.Model = evaluationreadmodel.ModelIdentityRow{
-			Kind:            po.Model.Kind,
-			SubKind:         po.Model.SubKind,
-			Algorithm:       po.Model.Algorithm,
-			Code:            po.Model.Code,
-			Version:         po.Model.Version,
-			Title:           po.Model.Title,
-			ProductChannel:  po.Model.ProductChannel,
-			AlgorithmFamily: po.Model.AlgorithmFamily,
+			Kind:         po.Model.Kind,
+			Algorithm:    po.Model.Algorithm,
+			Code:         po.Model.Code,
+			Version:      po.Model.Version,
+			Title:        po.Model.Title,
+			DecisionKind: po.Model.DecisionKind,
 		}
 	}
 	if po.PrimaryScore != nil {
@@ -107,9 +104,13 @@ func normalizeArchivedReportRow(row *evaluationreadmodel.ReportRow) {
 		row.Model.Code = row.ModelCode
 		row.Model.Title = row.ModelName
 	}
-	kind := binding.Kind(row.Model.Kind)
-	row.Model.ProductChannel = binding.ProductChannelForIdentity(kind, row.Model.ProductChannel)
-	row.Model.AlgorithmFamily = binding.AlgorithmFamilyStringFromIdentity(kind, binding.SubKind(row.Model.SubKind), binding.Algorithm(row.Model.Algorithm))
+	if row.Model.Algorithm == "" {
+		row.Model.StaticOnly = true
+	} else if runtime, err := modelcatalog.ResolveLegacyRuntime(modelcatalog.Kind(row.Model.Kind), modelcatalog.Algorithm(row.Model.Algorithm), modelcatalog.DecisionKind(row.Model.DecisionKind)); err == nil {
+		row.Model.DecisionKind = string(runtime.DecisionKind)
+	} else {
+		row.Model.StaticOnly = true
+	}
 
 	if row.PrimaryScore == nil && (row.TotalScore != 0 || row.RiskLevel != "") {
 		row.PrimaryScore = &evaluationreadmodel.ScoreValueRow{Kind: "raw_total", Value: row.TotalScore}

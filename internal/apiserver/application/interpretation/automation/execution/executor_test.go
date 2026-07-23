@@ -30,7 +30,7 @@ func (*executorBuilder) TemplateVersion() policy.TemplateVersion { return policy
 func (*executorBuilder) BuilderIdentity() string                 { return report.BuilderIdentityFactorScoring }
 func (*executorBuilder) ContentSchemaVersion() string            { return "report-content/v1" }
 func (*executorBuilder) MechanismKey() rendering.Key {
-	return rendering.Key{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange, ReportType: policy.ReportTypeStandard}
+	return rendering.Key{DecisionKind: modelcatalog.DecisionKindScoreRange, ReportType: policy.ReportTypeStandard}
 }
 func (b *executorBuilder) Build(context.Context, interpinput.InterpretationInput) (*report.Draft, error) {
 	b.calls++
@@ -74,7 +74,7 @@ func (s *eventStagerStub) StageAt(_ context.Context, _ time.Time, events ...even
 }
 
 func executorInput() interpinput.InterpretationInput {
-	return interpinput.InterpretationInput{OutcomeID: meta.FromUint64(42), Association: report.Association{OrgID: 1, AssessmentID: meta.FromUint64(7), TesteeID: 8}, Runtime: interpinput.RuntimeIdentity{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalog.DecisionKindScoreRange}, Report: interpinput.ReportSpec{ReportType: policy.ReportTypeStandard, TemplateVersion: policy.TemplateVersionV1}, FactorScoring: &interpinput.FactorScoringFacts{}}
+	return interpinput.InterpretationInput{OutcomeID: meta.FromUint64(42), Association: report.Association{OrgID: 1, AssessmentID: meta.FromUint64(7), TesteeID: 8}, Runtime: interpinput.RuntimeIdentity{DecisionKind: modelcatalog.DecisionKindScoreRange}, Report: interpinput.ReportSpec{ReportType: policy.ReportTypeStandard, TemplateVersion: policy.TemplateVersionV1}, FactorScoring: &interpinput.FactorScoringFacts{}}
 }
 
 func newExecutorFixture(t *testing.T, builder *executorBuilder) (*executor, *memoryGenerationRepo, *memoryRunRepo, *memoryArtifactRepo, *eventStagerStub, *starterTx) {

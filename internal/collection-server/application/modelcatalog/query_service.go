@@ -14,19 +14,38 @@ type CatalogReader interface {
 	GetCatalogOptions(context.Context, string) (*CatalogOptions, error)
 }
 
-type QueryService struct{ client CatalogReader }
+type QueryService struct {
+	client        CatalogReader
+	compatibility IdentityCompatibility
+}
 
-func NewQueryService(client CatalogReader) *QueryService { return &QueryService{client: client} }
+func NewQueryService(client CatalogReader, compatibility ...IdentityCompatibility) *QueryService {
+	service := &QueryService{client: client}
+	if len(compatibility) > 0 {
+		service.compatibility = compatibility[0]
+	}
+	return service
+}
+
+// LegacyIdentityFields are Phase-1 response-only compatibility fields.
+// They must never become part of CatalogModel or any reader contract.
+type LegacyIdentityFields struct {
+	SubKind, ProductChannel, AlgorithmFamily string
+}
+
+// IdentityCompatibility belongs to the collection ACL boundary. Its concrete
+// implementation may use the central server normalizer, while this application
+// package remains independent from the apiserver domain.
+type IdentityCompatibility interface {
+	DeriveLegacyIdentity(kind, algorithm, decisionKind string) LegacyIdentityFields
+}
 
 // CatalogModel is the application-owned published-model DTO returned by the
 // collection catalogue port. It contains canonical DefinitionV2 JSON only.
 type CatalogModel struct {
 	Code                 string
 	Kind                 string
-	SubKind              string
 	Algorithm            string
-	ProductChannel       string
-	AlgorithmFamily      string
 	DecisionKind         string
 	Version              string
 	Title                string
@@ -161,7 +180,7 @@ func (s *QueryService) Get(ctx context.Context, code string) (*ModelResponse, er
 	if err != nil || value == nil {
 		return nil, err
 	}
-	return modelResponse(value), nil
+	return s.modelResponse(value), nil
 }
 func (s *QueryService) List(ctx context.Context, request *ListRequest) (*ListResponse, error) {
 	if request == nil {
@@ -177,7 +196,7 @@ func (s *QueryService) List(ctx context.Context, request *ListRequest) (*ListRes
 	}
 	result := &ListResponse{Models: make([]ModelResponse, 0, len(value.Models)), Total: value.Total, Page: value.Page, PageSize: value.PageSize}
 	for index := range value.Models {
-		result.Models = append(result.Models, *modelResponse(&value.Models[index]))
+		result.Models = append(result.Models, *s.modelResponse(&value.Models[index]))
 	}
 	return result, nil
 }
@@ -203,7 +222,7 @@ func (s *QueryService) ListHot(ctx context.Context, request *HotRequest) (*HotRe
 	}
 	result := &HotResponse{Models: make([]HotModelResponse, 0, len(value.Models)), Total: value.Total, Limit: value.Limit, WindowDays: value.WindowDays}
 	for _, item := range value.Models {
-		result.Models = append(result.Models, HotModelResponse{ModelResponse: *modelResponse(&item.Model), Rank: item.Rank, SubmissionCount: item.SubmissionCount, HeatScore: item.HeatScore})
+		result.Models = append(result.Models, HotModelResponse{ModelResponse: *s.modelResponse(&item.Model), Rank: item.Rank, SubmissionCount: item.SubmissionCount, HeatScore: item.HeatScore})
 	}
 	return result, nil
 }
@@ -236,13 +255,17 @@ func normalizeList(request *ListRequest) {
 		request.PageSize = 20
 	}
 }
-func modelResponse(value *CatalogModel) *ModelResponse {
+func (s *QueryService) modelResponse(value *CatalogModel) *ModelResponse {
 	if value == nil {
 		return nil
 	}
+	legacy := LegacyIdentityFields{}
+	if s != nil && s.compatibility != nil {
+		legacy = s.compatibility.DeriveLegacyIdentity(value.Kind, value.Algorithm, value.DecisionKind)
+	}
 	return &ModelResponse{
-		Code: value.Code, Kind: value.Kind, SubKind: value.SubKind, Algorithm: value.Algorithm, ProductChannel: value.ProductChannel,
-		AlgorithmFamily: value.AlgorithmFamily, DecisionKind: value.DecisionKind,
+		Code: value.Code, Kind: value.Kind, SubKind: legacy.SubKind, Algorithm: value.Algorithm,
+		ProductChannel: legacy.ProductChannel, AlgorithmFamily: legacy.AlgorithmFamily, DecisionKind: value.DecisionKind,
 		Version: value.Version, Title: value.Title, Description: value.Description, Status: value.Status, Category: value.Category,
 		Stages: append([]string(nil), value.Stages...), ApplicableAges: append([]string(nil), value.ApplicableAges...),
 		Reporters: append([]string(nil), value.Reporters...), Tags: append([]string(nil), value.Tags...),
