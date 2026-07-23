@@ -19,7 +19,6 @@ type AssessmentResponse struct {
 	QuestionnaireVersion string   `json:"questionnaire_version"`       // 问卷版本
 	AnswerSheetID        string   `json:"answer_sheet_id"`             // 答卷ID
 	ModelKind            *string  `json:"model_kind"`                  // 解释模型类型
-	ModelSubKind         *string  `json:"model_sub_kind"`              // 解释模型子类型
 	ModelAlgorithm       *string  `json:"model_algorithm"`             // 解释模型算法
 	ModelCode            *string  `json:"model_code"`                  // 解释模型编码
 	ModelVersion         *string  `json:"model_version"`               // 解释模型版本
@@ -188,7 +187,6 @@ func NewAssessmentResponse(result *evaluationoperator.Assessment) *AssessmentRes
 		QuestionnaireVersion: result.QuestionnaireVersion,
 		AnswerSheetID:        answerSheetIDStr,
 		ModelKind:            result.ModelKind,
-		ModelSubKind:         result.ModelSubKind,
 		ModelAlgorithm:       result.ModelAlgorithm,
 		ModelCode:            result.ModelCode,
 		ModelVersion:         result.ModelVersion,

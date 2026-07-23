@@ -36,7 +36,7 @@ type TrendQuery struct {
 	Limit      int
 }
 
-type ModelIdentity struct{ Kind, SubKind, Algorithm, Code, Version, Title, ProductChannel, AlgorithmFamily string }
+type ModelIdentity struct{ Kind, Algorithm, Code, Version, Title string }
 type ScoreValue struct {
 	Kind  string
 	Value float64
@@ -48,7 +48,7 @@ type ResultLevel struct{ Code, Label, Severity string }
 type Assessment struct {
 	ID, OrgID, TesteeID, AnswerSheetID      uint64
 	QuestionnaireCode, QuestionnaireVersion string
-	ModelKind, ModelSubKind, ModelAlgorithm *string
+	ModelKind, ModelAlgorithm               *string
 	ModelCode, ModelVersion, ModelTitle     *string
 	OriginType                              string
 	OriginID                                *string

@@ -59,7 +59,7 @@ type CatalogOptionOutput struct {
 	Disabled     bool
 }
 type CatalogOptionsOutput struct {
-	Kinds, ProductChannels, AlgorithmFamilies, Algorithms, SubKinds, Categories, Stages, ApplicableAges, Reporters []CatalogOptionOutput
+	Kinds, Algorithms, Categories, Stages, ApplicableAges, Reporters []CatalogOptionOutput
 }
 
 func NewAssessmentModelCatalogClient(client *Client) *AssessmentModelCatalogClient {
@@ -76,10 +76,10 @@ func (c *AssessmentModelCatalogClient) GetPublishedModel(ctx context.Context, co
 	return catalogModelFromProto(response.GetModel()), nil
 }
 
-func (c *AssessmentModelCatalogClient) ListPublishedModels(ctx context.Context, kind, subKind, algorithm, category, keyword, questionnaireCode, questionnaireVersion string, page, pageSize int32) (*CatalogListOutput, error) {
+func (c *AssessmentModelCatalogClient) ListPublishedModels(ctx context.Context, kind string, kinds []string, algorithm, category, keyword, questionnaireCode, questionnaireVersion string, page, pageSize int32) (*CatalogListOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
-	response, err := c.grpcClient.ListPublishedModels(ctx, &pb.ListPublishedModelsRequest{Kind: kind, SubKind: subKind, Algorithm: algorithm, Category: category, Keyword: keyword, QuestionnaireCode: questionnaireCode, QuestionnaireVersion: questionnaireVersion, Page: page, PageSize: pageSize})
+	response, err := c.grpcClient.ListPublishedModels(ctx, &pb.ListPublishedModelsRequest{Kind: kind, Kinds: kinds, Algorithm: algorithm, Category: category, Keyword: keyword, QuestionnaireCode: questionnaireCode, QuestionnaireVersion: questionnaireVersion, Page: page, PageSize: pageSize})
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func (c *AssessmentModelCatalogClient) GetCatalogOptions(ctx context.Context, ki
 	if err != nil {
 		return nil, err
 	}
-	return &CatalogOptionsOutput{Kinds: catalogOptionsFromProto(response.GetKinds()), ProductChannels: catalogOptionsFromProto(response.GetProductChannels()), AlgorithmFamilies: catalogOptionsFromProto(response.GetAlgorithmFamilies()), Algorithms: catalogOptionsFromProto(response.GetAlgorithms()), SubKinds: catalogOptionsFromProto(response.GetSubKinds()), Categories: catalogOptionsFromProto(response.GetCategories()), Stages: catalogOptionsFromProto(response.GetStages()), ApplicableAges: catalogOptionsFromProto(response.GetApplicableAges()), Reporters: catalogOptionsFromProto(response.GetReporters())}, nil
+	return &CatalogOptionsOutput{Kinds: catalogOptionsFromProto(response.GetKinds()), Algorithms: catalogOptionsFromProto(response.GetAlgorithms()), Categories: catalogOptionsFromProto(response.GetCategories()), Stages: catalogOptionsFromProto(response.GetStages()), ApplicableAges: catalogOptionsFromProto(response.GetApplicableAges()), Reporters: catalogOptionsFromProto(response.GetReporters())}, nil
 }
 
 func catalogModelFromProto(value *pb.PublishedAssessmentModel) *CatalogModelOutput {

@@ -51,7 +51,6 @@ type RequestedInput struct {
 	QuestionnaireVer  string
 	AnswerSheetID     string
 	ModelKind         string
-	ModelSubKind      string
 	ModelAlgorithm    string
 	ModelCode         string
 	ModelVersion      string
@@ -82,7 +81,6 @@ func newRequestedEvent(eventType string, in RequestedInput) RequestedEvent {
 		AnswerSheetID:     in.AnswerSheetID,
 		RequestedAt:       in.RequestedAt,
 		ModelKind:         in.ModelKind,
-		ModelSubKind:      in.ModelSubKind,
 		ModelAlgorithm:    in.ModelAlgorithm,
 		ModelCode:         in.ModelCode,
 		ModelVersion:      in.ModelVersion,

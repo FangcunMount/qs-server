@@ -5,20 +5,15 @@ import (
 
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	interpretation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
-	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 // ModelIdentityResponse is the outcome published-model reference on REST responses.
 type ModelIdentityResponse struct {
-	// 测评层 kind；人格线当前输出 personality，读兼容 typology。
-	Kind            string `json:"kind" example:"personality" enums:"personality,typology"`
-	SubKind         string `json:"sub_kind,omitempty" example:"typology"`
-	Algorithm       string `json:"algorithm,omitempty"`
-	Code            string `json:"code"`
-	Version         string `json:"version,omitempty"`
-	Title           string `json:"title,omitempty"`
-	ProductChannel  string `json:"product_channel,omitempty"`
-	AlgorithmFamily string `json:"algorithm_family,omitempty"`
+	Kind      string `json:"kind" example:"typology" enums:"scale,typology,behavioral_rating,cognitive"`
+	Algorithm string `json:"algorithm,omitempty"`
+	Code      string `json:"code"`
+	Version   string `json:"version,omitempty"`
+	Title     string `json:"title,omitempty"`
 }
 
 // ScoreValueResponse is the outcome primary score projection.
@@ -205,14 +200,7 @@ func NewReportOutcomeListResponse(result *interpretation.ListResult) *ReportOutc
 
 func newModelIdentityResponse(model evaluationoperator.ModelIdentity) ModelIdentityResponse {
 	return ModelIdentityResponse{
-		Kind:            model.Kind,
-		SubKind:         model.SubKind,
-		Algorithm:       model.Algorithm,
-		Code:            model.Code,
-		Version:         model.Version,
-		Title:           model.Title,
-		ProductChannel:  model.ProductChannel,
-		AlgorithmFamily: model.AlgorithmFamily,
+		Kind: model.Kind, Algorithm: model.Algorithm, Code: model.Code, Version: model.Version, Title: model.Title,
 	}
 }
 
@@ -240,13 +228,8 @@ func newResultLevelResponse(level *evaluationoperator.ResultLevel) *ResultLevelR
 }
 
 func newReportModelIdentityResponse(model interpretation.ModelIdentity) ModelIdentityResponse {
-	kind := modelcatalog.Kind(model.Kind)
-	subKind := modelcatalog.CanonicalSubKindFor(kind)
-	family, _ := modelcatalog.AlgorithmFamilyFromIdentity(kind, subKind, modelcatalog.Algorithm(model.Algorithm))
 	return ModelIdentityResponse{
-		Kind: model.Kind, SubKind: string(subKind), Algorithm: model.Algorithm,
-		Code: model.Code, Version: model.Version, Title: model.Title,
-		ProductChannel: string(modelcatalog.DefaultProductChannelFor(kind)), AlgorithmFamily: string(family),
+		Kind: model.Kind, Algorithm: model.Algorithm, Code: model.Code, Version: model.Version, Title: model.Title,
 	}
 }
 

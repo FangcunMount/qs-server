@@ -26,12 +26,10 @@ type Option struct {
 type ListModelsDTO struct {
 	Kind                 string
 	Kinds                []string
-	SubKind              string
 	Status               string
 	Keyword              string
 	Category             string
 	Algorithm            string
-	ProductChannel       string
 	QuestionnaireCode    string
 	QuestionnaireVersion string
 	Page                 int
@@ -41,9 +39,7 @@ type ListModelsDTO struct {
 type CreateModelDTO struct {
 	Code                 string
 	Kind                 string
-	SubKind              string
 	Algorithm            string
-	ProductChannel       string
 	Title                string
 	Description          string
 	Category             string
@@ -59,9 +55,7 @@ type UpdateBasicInfoDTO struct {
 	Code           string
 	Title          string
 	Description    string
-	SubKind        string
 	Algorithm      string
-	ProductChannel string
 	Category       string
 	Tags           []string
 	Stages         []string
@@ -84,10 +78,7 @@ type ApplyCodesDTO struct {
 type ModelSummary struct {
 	Code                 string       `json:"code"`
 	Kind                 string       `json:"kind" example:"typology"`
-	SubKind              string       `json:"sub_kind,omitempty" example:"typology"`
 	Algorithm            string       `json:"algorithm,omitempty"`
-	ProductChannel       string       `json:"product_channel,omitempty" example:"typology"`
-	AlgorithmFamily      string       `json:"algorithm_family,omitempty"`
 	DecisionKind         string       `json:"decision_kind,omitempty"`
 	Title                string       `json:"title"`
 	Description          string       `json:"description,omitempty"`
@@ -183,11 +174,8 @@ type AssessmentRelease struct {
 type OptionsResult struct {
 	Kinds             []Option `json:"kinds"`
 	ModelFamilies     []Option `json:"model_families,omitempty"`
-	ProductChannels   []Option `json:"product_channels,omitempty"`
-	AlgorithmFamilies []Option `json:"algorithm_families,omitempty"`
 	Categories        []Option `json:"categories"`
 	Algorithms        []Option `json:"algorithms"`
-	SubKinds          []Option `json:"sub_kinds"`
 	ScoringStrategies []Option `json:"scoring_strategies,omitempty"`
 	Tags              []Option `json:"tags,omitempty"`
 	Stages            []Option `json:"stages,omitempty"`

@@ -9,11 +9,8 @@ import (
 type CreateAssessmentModelRequest struct {
 	Code string `json:"code"`
 	// 模型族仅接受 canonical identity。
-	Kind      string `json:"kind" valid:"required~模型类型不能为空" example:"typology" enums:"scale,typology,behavioral_rating,cognitive"`
-	SubKind   string `json:"sub_kind" example:"typology"`
-	Algorithm string `json:"algorithm"`
-	// 产品通道；人格测评为 typology。
-	ProductChannel       string   `json:"product_channel" example:"typology" enums:"medical_scale,typology,behavior_ability"`
+	Kind                 string   `json:"kind" valid:"required~模型类型不能为空" example:"typology" enums:"scale,typology,behavioral_rating,cognitive"`
+	Algorithm            string   `json:"algorithm"`
 	Title                string   `json:"title" valid:"required~模型标题不能为空"`
 	Description          string   `json:"description"`
 	Category             string   `json:"category"`
@@ -28,9 +25,7 @@ type CreateAssessmentModelRequest struct {
 type UpdateAssessmentModelBasicInfoRequest struct {
 	Title          string   `json:"title" valid:"required~模型标题不能为空"`
 	Description    string   `json:"description"`
-	SubKind        string   `json:"sub_kind"`
 	Algorithm      string   `json:"algorithm"`
-	ProductChannel string   `json:"product_channel"`
 	Category       string   `json:"category"`
 	Stages         []string `json:"stages"`
 	ApplicableAges []string `json:"applicable_ages"`

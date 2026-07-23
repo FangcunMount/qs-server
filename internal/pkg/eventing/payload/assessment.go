@@ -11,7 +11,6 @@ type EvaluationRequestedData struct {
 	QuestionnaireVer  string    `json:"questionnaire_version"`
 	AnswerSheetID     string    `json:"answersheet_id"`
 	ModelKind         string    `json:"model_kind,omitempty"`
-	ModelSubKind      string    `json:"model_sub_kind,omitempty"`
 	ModelAlgorithm    string    `json:"model_algorithm,omitempty"`
 	ModelCode         string    `json:"model_code,omitempty"`
 	ModelVersion      string    `json:"model_version,omitempty"`

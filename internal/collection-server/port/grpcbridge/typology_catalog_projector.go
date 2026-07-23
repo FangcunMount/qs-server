@@ -87,14 +87,12 @@ func typologyResponseFromCatalog(model *modelcatalog.ModelResponse, incoming err
 	response := &typologymodel.TypologyModelResponse{
 		Code: model.Code, Version: model.Version, Title: model.Title, Algorithm: model.Algorithm, Description: model.Description,
 		QuestionnaireCode: model.QuestionnaireCode, QuestionnaireVersion: model.QuestionnaireVersion, Status: model.Status,
-		Kind: string(modeldomain.KindTypology), SubKind: string(modeldomain.CanonicalSubKindFor(modeldomain.KindTypology)), ProductChannel: string(modeldomain.DefaultProductChannelFor(modeldomain.KindTypology)),
+		Kind:         string(modeldomain.KindTypology),
 		DecisionKind: model.DecisionKind,
 	}
-	family, ok := modeldomain.AlgorithmFamilyFromDecisionKind(modeldomain.DecisionKind(response.DecisionKind))
-	if response.DecisionKind == "" || !ok {
+	if response.DecisionKind == "" {
 		return nil, fmt.Errorf("catalog typology runtime identity is incomplete")
 	}
-	response.AlgorithmFamily = string(family)
 	response.QuestionCount = int32(countRuntimeQuestions(runtime))
 	response.DimensionOrder = append([]string(nil), runtime.FactorGraph.DecisionFactorOrder()...)
 	for _, code := range response.DimensionOrder {
@@ -121,7 +119,7 @@ func typologySummaryResponse(value *typologymodel.TypologyModelResponse) typolog
 	if value == nil {
 		return typologymodel.TypologyModelSummaryResponse{}
 	}
-	return typologymodel.TypologyModelSummaryResponse{Code: value.Code, Version: value.Version, Title: value.Title, Algorithm: value.Algorithm, Description: value.Description, QuestionnaireCode: value.QuestionnaireCode, QuestionnaireVersion: value.QuestionnaireVersion, Status: value.Status, QuestionCount: value.QuestionCount, Kind: value.Kind, SubKind: value.SubKind, ProductChannel: value.ProductChannel, AlgorithmFamily: value.AlgorithmFamily, DecisionKind: value.DecisionKind}
+	return typologymodel.TypologyModelSummaryResponse{Code: value.Code, Version: value.Version, Title: value.Title, Algorithm: value.Algorithm, Description: value.Description, QuestionnaireCode: value.QuestionnaireCode, QuestionnaireVersion: value.QuestionnaireVersion, Status: value.Status, QuestionCount: value.QuestionCount, Kind: value.Kind, DecisionKind: value.DecisionKind}
 }
 
 func countRuntimeQuestions(runtime *modeltypology.RuntimeSpec) int {

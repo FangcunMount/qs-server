@@ -3,8 +3,6 @@ package grpcbridge
 import (
 	"context"
 	"encoding/json"
-
-	modeldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	appmodelcatalog "github.com/FangcunMount/qs-server/internal/collection-server/application/modelcatalog"
 	grpcclient "github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 )
@@ -19,18 +17,6 @@ func NewAssessmentModelCatalogReader(inner *grpcclient.AssessmentModelCatalogCli
 	return &AssessmentModelCatalogAdapter{inner: inner}
 }
 
-// DeriveLegacyIdentity is the collection ACL's single compatibility boundary.
-// The returned values are response-only and are never copied into catalog DTOs.
-func (r *AssessmentModelCatalogAdapter) DeriveLegacyIdentity(kindText, algorithm, decisionKind string) appmodelcatalog.LegacyIdentityFields {
-	kind := modeldomain.Kind(kindText)
-	family, _ := modeldomain.AlgorithmFamilyFromDecisionKind(modeldomain.DecisionKind(decisionKind))
-	return appmodelcatalog.LegacyIdentityFields{
-		SubKind:         string(modeldomain.CanonicalSubKindFor(kind)),
-		ProductChannel:  string(modeldomain.DefaultProductChannelFor(kind)),
-		AlgorithmFamily: string(family),
-	}
-}
-
 func (r *AssessmentModelCatalogAdapter) GetPublishedModel(ctx context.Context, code, version string) (*appmodelcatalog.CatalogModel, error) {
 	if r == nil || r.inner == nil {
 		return nil, nil
@@ -39,11 +25,11 @@ func (r *AssessmentModelCatalogAdapter) GetPublishedModel(ctx context.Context, c
 	return catalogModelOutput(value), err
 }
 
-func (r *AssessmentModelCatalogAdapter) ListPublishedModels(ctx context.Context, kind, subKind, algorithm, category, keyword, questionnaireCode, questionnaireVersion string, page, pageSize int32) (*appmodelcatalog.CatalogList, error) {
+func (r *AssessmentModelCatalogAdapter) ListPublishedModels(ctx context.Context, kind string, kinds []string, algorithm, category, keyword, questionnaireCode, questionnaireVersion string, page, pageSize int32) (*appmodelcatalog.CatalogList, error) {
 	if r == nil || r.inner == nil {
 		return nil, nil
 	}
-	value, err := r.inner.ListPublishedModels(ctx, kind, subKind, algorithm, category, keyword, questionnaireCode, questionnaireVersion, page, pageSize)
+	value, err := r.inner.ListPublishedModels(ctx, kind, kinds, algorithm, category, keyword, questionnaireCode, questionnaireVersion, page, pageSize)
 	if err != nil || value == nil {
 		return nil, err
 	}
@@ -78,15 +64,12 @@ func (r *AssessmentModelCatalogAdapter) GetCatalogOptions(ctx context.Context, k
 		return nil, err
 	}
 	return &appmodelcatalog.CatalogOptions{
-		Kinds:             catalogOptionOutputs(value.Kinds),
-		ProductChannels:   catalogOptionOutputs(value.ProductChannels),
-		AlgorithmFamilies: catalogOptionOutputs(value.AlgorithmFamilies),
-		Algorithms:        catalogOptionOutputs(value.Algorithms),
-		SubKinds:          catalogOptionOutputs(value.SubKinds),
-		Categories:        catalogOptionOutputs(value.Categories),
-		Stages:            catalogOptionOutputs(value.Stages),
-		ApplicableAges:    catalogOptionOutputs(value.ApplicableAges),
-		Reporters:         catalogOptionOutputs(value.Reporters),
+		Kinds:          catalogOptionOutputs(value.Kinds),
+		Algorithms:     catalogOptionOutputs(value.Algorithms),
+		Categories:     catalogOptionOutputs(value.Categories),
+		Stages:         catalogOptionOutputs(value.Stages),
+		ApplicableAges: catalogOptionOutputs(value.ApplicableAges),
+		Reporters:      catalogOptionOutputs(value.Reporters),
 	}, nil
 }
 
@@ -111,4 +94,3 @@ func catalogOptionOutputs(values []grpcclient.CatalogOptionOutput) []appmodelcat
 }
 
 var _ appmodelcatalog.CatalogReader = (*AssessmentModelCatalogAdapter)(nil)
-var _ appmodelcatalog.IdentityCompatibility = (*AssessmentModelCatalogAdapter)(nil)

@@ -490,14 +490,14 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "状态",
-                        "name": "status",
+                        "description": "模型类型集合，逗号分隔；不能与 kind 同时使用",
+                        "name": "kinds",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "产品通道",
-                        "name": "product_channel",
+                        "description": "状态",
+                        "name": "status",
                         "in": "query"
                     },
                     {
@@ -9855,9 +9855,6 @@ const docTemplate = `{
                 "algorithm": {
                     "type": "string"
                 },
-                "algorithm_family": {
-                    "type": "string"
-                },
                 "applicable_ages": {
                     "type": "array",
                     "items": {
@@ -9883,10 +9880,6 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "kind": {
-                    "type": "string",
-                    "example": "typology"
-                },
-                "product_channel": {
                     "type": "string",
                     "example": "typology"
                 },
@@ -9917,10 +9910,6 @@ const docTemplate = `{
                 "status": {
                     "type": "string"
                 },
-                "sub_kind": {
-                    "type": "string",
-                    "example": "typology"
-                },
                 "submission_count": {
                     "type": "integer"
                 },
@@ -9942,9 +9931,6 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "algorithm": {
-                    "type": "string"
-                },
-                "algorithm_family": {
                     "type": "string"
                 },
                 "applicable_ages": {
@@ -9972,10 +9958,6 @@ const docTemplate = `{
                     "type": "string",
                     "example": "typology"
                 },
-                "product_channel": {
-                    "type": "string",
-                    "example": "typology"
-                },
                 "questionnaire_code": {
                     "type": "string"
                 },
@@ -9999,10 +9981,6 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "string"
-                },
-                "sub_kind": {
-                    "type": "string",
-                    "example": "typology"
                 },
                 "tags": {
                     "type": "array",
@@ -10058,9 +10036,6 @@ const docTemplate = `{
                 "algorithm": {
                     "type": "string"
                 },
-                "algorithm_family": {
-                    "type": "string"
-                },
                 "applicable_ages": {
                     "type": "array",
                     "items": {
@@ -10089,10 +10064,6 @@ const docTemplate = `{
                     "type": "string",
                     "example": "typology"
                 },
-                "product_channel": {
-                    "type": "string",
-                    "example": "typology"
-                },
                 "questionnaire_code": {
                     "type": "string"
                 },
@@ -10116,10 +10087,6 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "string"
-                },
-                "sub_kind": {
-                    "type": "string",
-                    "example": "typology"
                 },
                 "tags": {
                     "type": "array",
@@ -10448,16 +10415,6 @@ const docTemplate = `{
                     ],
                     "example": "typology"
                 },
-                "product_channel": {
-                    "description": "产品通道；人格测评为 typology。",
-                    "type": "string",
-                    "enum": [
-                        "medical_scale",
-                        "typology",
-                        "behavior_ability"
-                    ],
-                    "example": "typology"
-                },
                 "questionnaire_code": {
                     "type": "string"
                 },
@@ -10475,10 +10432,6 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
-                },
-                "sub_kind": {
-                    "type": "string",
-                    "example": "typology"
                 },
                 "tags": {
                     "type": "array",
@@ -10889,9 +10842,6 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
-                "product_channel": {
-                    "type": "string"
-                },
                 "reporters": {
                     "type": "array",
                     "items": {
@@ -10903,9 +10853,6 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
-                },
-                "sub_kind": {
-                    "type": "string"
                 },
                 "tags": {
                     "type": "array",
@@ -11401,12 +11348,6 @@ const docTemplate = `{
         "response.AssessmentModelOptionsResponse": {
             "type": "object",
             "properties": {
-                "algorithm_families": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/modelcatalog.Option"
-                    }
-                },
                 "algorithms": {
                     "type": "array",
                     "items": {
@@ -11437,12 +11378,6 @@ const docTemplate = `{
                         "$ref": "#/definitions/modelcatalog.Option"
                     }
                 },
-                "product_channels": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/modelcatalog.Option"
-                    }
-                },
                 "reporters": {
                     "type": "array",
                     "items": {
@@ -11456,12 +11391,6 @@ const docTemplate = `{
                     }
                 },
                 "stages": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/modelcatalog.Option"
-                    }
-                },
-                "sub_kinds": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/modelcatalog.Option"
@@ -11498,9 +11427,6 @@ const docTemplate = `{
                 "algorithm": {
                     "type": "string"
                 },
-                "algorithm_family": {
-                    "type": "string"
-                },
                 "applicable_ages": {
                     "type": "array",
                     "items": {
@@ -11523,10 +11449,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
-                    "type": "string",
-                    "example": "typology"
-                },
-                "product_channel": {
                     "type": "string",
                     "example": "typology"
                 },
@@ -11553,10 +11475,6 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "string"
-                },
-                "sub_kind": {
-                    "type": "string",
-                    "example": "typology"
                 },
                 "tags": {
                     "type": "array",
@@ -11709,10 +11627,6 @@ const docTemplate = `{
                 },
                 "model_kind": {
                     "description": "解释模型类型",
-                    "type": "string"
-                },
-                "model_sub_kind": {
-                    "description": "解释模型子类型",
                     "type": "string"
                 },
                 "model_title": {
@@ -12927,26 +12841,17 @@ const docTemplate = `{
                 "algorithm": {
                     "type": "string"
                 },
-                "algorithm_family": {
-                    "type": "string"
-                },
                 "code": {
                     "type": "string"
                 },
                 "kind": {
-                    "description": "测评层 kind；人格线当前输出 personality，读兼容 typology。",
                     "type": "string",
                     "enum": [
-                        "personality",
-                        "typology"
+                        "scale",
+                        "typology",
+                        "behavioral_rating",
+                        "cognitive"
                     ],
-                    "example": "personality"
-                },
-                "product_channel": {
-                    "type": "string"
-                },
-                "sub_kind": {
-                    "type": "string",
                     "example": "typology"
                 },
                 "title": {
@@ -13226,9 +13131,6 @@ const docTemplate = `{
                 "algorithm": {
                     "type": "string"
                 },
-                "algorithm_family": {
-                    "type": "string"
-                },
                 "applicable_ages": {
                     "type": "array",
                     "items": {
@@ -13257,10 +13159,6 @@ const docTemplate = `{
                     "type": "string",
                     "example": "typology"
                 },
-                "product_channel": {
-                    "type": "string",
-                    "example": "typology"
-                },
                 "questionnaire_code": {
                     "type": "string"
                 },
@@ -13284,10 +13182,6 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "string"
-                },
-                "sub_kind": {
-                    "type": "string",
-                    "example": "typology"
                 },
                 "tags": {
                     "type": "array",

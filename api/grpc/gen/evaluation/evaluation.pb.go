@@ -22,15 +22,12 @@ const (
 )
 
 type ModelIdentity struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Kind            string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
-	SubKind         string                 `protobuf:"bytes,2,opt,name=sub_kind,json=subKind,proto3" json:"sub_kind,omitempty"`
-	Algorithm       string                 `protobuf:"bytes,3,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
-	Code            string                 `protobuf:"bytes,4,opt,name=code,proto3" json:"code,omitempty"`
-	Version         string                 `protobuf:"bytes,5,opt,name=version,proto3" json:"version,omitempty"`
-	Title           string                 `protobuf:"bytes,6,opt,name=title,proto3" json:"title,omitempty"`
-	ProductChannel  string                 `protobuf:"bytes,7,opt,name=product_channel,json=productChannel,proto3" json:"product_channel,omitempty"`
-	AlgorithmFamily string                 `protobuf:"bytes,8,opt,name=algorithm_family,json=algorithmFamily,proto3" json:"algorithm_family,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Kind      string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
+	Algorithm string                 `protobuf:"bytes,3,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
+	Code      string                 `protobuf:"bytes,4,opt,name=code,proto3" json:"code,omitempty"`
+	Version   string                 `protobuf:"bytes,5,opt,name=version,proto3" json:"version,omitempty"`
+	Title     string                 `protobuf:"bytes,6,opt,name=title,proto3" json:"title,omitempty"`
 	// Publish-time frozen RuntimeIdentity fields (MC-R006).
 	DecisionKind  string `protobuf:"bytes,9,opt,name=decision_kind,json=decisionKind,proto3" json:"decision_kind,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -74,13 +71,6 @@ func (x *ModelIdentity) GetKind() string {
 	return ""
 }
 
-func (x *ModelIdentity) GetSubKind() string {
-	if x != nil {
-		return x.SubKind
-	}
-	return ""
-}
-
 func (x *ModelIdentity) GetAlgorithm() string {
 	if x != nil {
 		return x.Algorithm
@@ -105,20 +95,6 @@ func (x *ModelIdentity) GetVersion() string {
 func (x *ModelIdentity) GetTitle() string {
 	if x != nil {
 		return x.Title
-	}
-	return ""
-}
-
-func (x *ModelIdentity) GetProductChannel() string {
-	if x != nil {
-		return x.ProductChannel
-	}
-	return ""
-}
-
-func (x *ModelIdentity) GetAlgorithmFamily() string {
-	if x != nil {
-		return x.AlgorithmFamily
 	}
 	return ""
 }
@@ -1031,7 +1007,6 @@ type AssessmentAdmission struct {
 	QuestionnaireCode    string                 `protobuf:"bytes,2,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
 	QuestionnaireVersion string                 `protobuf:"bytes,3,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
 	ModelKind            string                 `protobuf:"bytes,4,opt,name=model_kind,json=modelKind,proto3" json:"model_kind,omitempty"`
-	ModelSubKind         string                 `protobuf:"bytes,5,opt,name=model_sub_kind,json=modelSubKind,proto3" json:"model_sub_kind,omitempty"`
 	ModelAlgorithm       string                 `protobuf:"bytes,6,opt,name=model_algorithm,json=modelAlgorithm,proto3" json:"model_algorithm,omitempty"`
 	ModelCode            string                 `protobuf:"bytes,7,opt,name=model_code,json=modelCode,proto3" json:"model_code,omitempty"`
 	ModelVersion         string                 `protobuf:"bytes,8,opt,name=model_version,json=modelVersion,proto3" json:"model_version,omitempty"`
@@ -1094,13 +1069,6 @@ func (x *AssessmentAdmission) GetQuestionnaireVersion() string {
 func (x *AssessmentAdmission) GetModelKind() string {
 	if x != nil {
 		return x.ModelKind
-	}
-	return ""
-}
-
-func (x *AssessmentAdmission) GetModelSubKind() string {
-	if x != nil {
-		return x.ModelSubKind
 	}
 	return ""
 }
@@ -2000,18 +1968,15 @@ var File_evaluation_evaluation_proto protoreflect.FileDescriptor
 const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\n" +
 	"\x1bevaluation/evaluation.proto\x12\n" +
-	"evaluation\"\xaf\x02\n" +
+	"evaluation\"\xff\x01\n" +
 	"\rModelIdentity\x12\x12\n" +
-	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x19\n" +
-	"\bsub_kind\x18\x02 \x01(\tR\asubKind\x12\x1c\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x1c\n" +
 	"\talgorithm\x18\x03 \x01(\tR\talgorithm\x12\x12\n" +
 	"\x04code\x18\x04 \x01(\tR\x04code\x12\x18\n" +
 	"\aversion\x18\x05 \x01(\tR\aversion\x12\x14\n" +
-	"\x05title\x18\x06 \x01(\tR\x05title\x12'\n" +
-	"\x0fproduct_channel\x18\a \x01(\tR\x0eproductChannel\x12)\n" +
-	"\x10algorithm_family\x18\b \x01(\tR\x0falgorithmFamily\x12#\n" +
-	"\rdecision_kind\x18\t \x01(\tR\fdecisionKindJ\x04\b\n" +
-	"\x10\vR\x0epayload_format\"k\n" +
+	"\x05title\x18\x06 \x01(\tR\x05title\x12#\n" +
+	"\rdecision_kind\x18\t \x01(\tR\fdecisionKindJ\x04\b\x02\x10\x03J\x04\b\a\x10\bJ\x04\b\b\x10\tJ\x04\b\n" +
+	"\x10\vR\bsub_kindR\x0fproduct_channelR\x10algorithm_familyR\x0epayload_format\"k\n" +
 	"\n" +
 	"ScoreValue\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x14\n" +
@@ -2110,20 +2075,19 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"originType\x12\x1b\n" +
 	"\torigin_id\x18\t \x01(\tR\boriginId\x12=\n" +
 	"\tadmission\x18\n" +
-	" \x01(\v2\x1f.evaluation.AssessmentAdmissionR\tadmission\"\xe6\x02\n" +
+	" \x01(\v2\x1f.evaluation.AssessmentAdmissionR\tadmission\"\xd6\x02\n" +
 	"\x13AssessmentAdmission\x12\x18\n" +
 	"\apurpose\x18\x01 \x01(\tR\apurpose\x12-\n" +
 	"\x12questionnaire_code\x18\x02 \x01(\tR\x11questionnaireCode\x123\n" +
 	"\x15questionnaire_version\x18\x03 \x01(\tR\x14questionnaireVersion\x12\x1d\n" +
 	"\n" +
-	"model_kind\x18\x04 \x01(\tR\tmodelKind\x12$\n" +
-	"\x0emodel_sub_kind\x18\x05 \x01(\tR\fmodelSubKind\x12'\n" +
+	"model_kind\x18\x04 \x01(\tR\tmodelKind\x12'\n" +
 	"\x0fmodel_algorithm\x18\x06 \x01(\tR\x0emodelAlgorithm\x12\x1d\n" +
 	"\n" +
 	"model_code\x18\a \x01(\tR\tmodelCode\x12#\n" +
 	"\rmodel_version\x18\b \x01(\tR\fmodelVersion\x12\x1f\n" +
 	"\vmodel_title\x18\t \x01(\tR\n" +
-	"modelTitle\"\x80\x01\n" +
+	"modelTitleJ\x04\b\x05\x10\x06R\x0emodel_sub_kind\"\x80\x01\n" +
 	"\x18EnsureAssessmentResponse\x12#\n" +
 	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\x12\x18\n" +
 	"\acreated\x18\x02 \x01(\bR\acreated\x12%\n" +

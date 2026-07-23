@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	eventpayload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 )
 
@@ -106,7 +107,6 @@ func (a Admission) ToEventPayload() *eventpayload.AssessmentAdmission {
 		QuestionnaireCode:    a.questionnaireCode,
 		QuestionnaireVersion: a.questionnaireVersion,
 		ModelKind:            a.modelKind,
-		ModelSubKind:         a.modelSubKind,
 		ModelAlgorithm:       a.modelAlgorithm,
 		ModelCode:            a.modelCode,
 		ModelVersion:         a.modelVersion,
@@ -125,7 +125,7 @@ func AdmissionFromEventPayload(p *eventpayload.AssessmentAdmission) (Admission, 
 	case AdmissionPurposeAssessment:
 		return NewAssessmentAdmission(
 			p.QuestionnaireCode, p.QuestionnaireVersion,
-			p.ModelKind, p.ModelSubKind, p.ModelAlgorithm,
+			p.ModelKind, string(modelcatalog.CanonicalSubKindFor(modelcatalog.Kind(p.ModelKind))), p.ModelAlgorithm,
 			p.ModelCode, p.ModelVersion, p.ModelTitle,
 		)
 	default:

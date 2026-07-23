@@ -5,7 +5,6 @@ import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	modelbinding "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
@@ -19,12 +18,7 @@ func assessmentFromRow(row evaluationreadmodel.AssessmentRow) (*Assessment, erro
 }
 
 func modelFromRow(row evaluationreadmodel.AssessmentRow) ModelIdentity {
-	kind, sub, algorithm := deref(row.EvaluationModelKind), deref(row.EvaluationModelSubKind), deref(row.EvaluationModelAlgorithm)
-	result := ModelIdentity{Kind: kind, SubKind: sub, Algorithm: algorithm, Code: deref(row.EvaluationModelCode), Version: deref(row.EvaluationModelVersion), Title: deref(row.EvaluationModelTitle)}
-	k := modelbinding.Kind(result.Kind)
-	result.ProductChannel = modelbinding.ProductChannelForIdentity(k, result.ProductChannel)
-	result.AlgorithmFamily = modelbinding.AlgorithmFamilyStringFromIdentity(k, modelbinding.SubKind(result.SubKind), modelbinding.Algorithm(result.Algorithm))
-	return result
+	return ModelIdentity{Kind: deref(row.EvaluationModelKind), Algorithm: deref(row.EvaluationModelAlgorithm), Code: deref(row.EvaluationModelCode), Version: deref(row.EvaluationModelVersion), Title: deref(row.EvaluationModelTitle)}
 }
 
 func primaryScoreFromRow(row evaluationreadmodel.AssessmentRow) *ScoreValue {

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	evaluationfactcodec "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact/codec"
 )
@@ -18,15 +17,10 @@ func FactRecord(record *domainoutcome.Record) *evaluationfact.Record {
 	runtime := record.Runtime()
 	return evaluationfact.NewRecord(evaluationfact.NewRecordInput{
 		ID: record.ID(), OrgID: record.OrgID(), AssessmentID: record.AssessmentID(), TesteeID: record.TesteeID(), RunID: record.RunID(),
-		Model:            evaluationfact.ModelIdentity{Kind: model.Kind, SubKind: modelcatalog.CanonicalSubKindFor(model.Kind), Algorithm: model.Algorithm, Code: model.Code, Version: model.Version, Title: model.Title},
-		Runtime:          evaluationfact.RuntimeIdentity{AlgorithmFamily: algorithmFamilyForDecision(runtime.DecisionKind), DecisionKind: runtime.DecisionKind},
+		Model:            evaluationfact.ModelIdentity{Kind: model.Kind, Algorithm: model.Algorithm, Code: model.Code, Version: model.Version, Title: model.Title},
+		Runtime:          evaluationfact.RuntimeIdentity{DecisionKind: runtime.DecisionKind},
 		InputSnapshotRef: record.InputSnapshotRef(), SchemaVersion: record.SchemaVersion(), Payload: record.Payload(), ReportInput: record.ReportInput(), EvaluatedAt: record.EvaluatedAt(),
 	})
-}
-
-func algorithmFamilyForDecision(decision modelcatalog.DecisionKind) modelcatalog.AlgorithmFamily {
-	family, _ := modelcatalog.AlgorithmFamilyFromDecisionKind(decision)
-	return family
 }
 
 // RestoreExecution decodes a durable record through the shared versioned fact codec.

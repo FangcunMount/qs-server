@@ -35,9 +35,6 @@ func (s Service) Create(ctx context.Context, actor modelcatalog.ActorContext, in
 	if !ok {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "model kind is invalid")
 	}
-	if err := validateLegacyIdentity(kind, input.SubKind, input.ProductChannel); err != nil {
-		return nil, err
-	}
 	if err := s.authorize(ctx, actor, modelcatalog.Resource{Kind: kind}); err != nil {
 		return nil, err
 	}
@@ -90,9 +87,6 @@ func (s Service) UpdateBasicInfo(ctx context.Context, actor modelcatalog.ActorCo
 		return nil, err
 	}
 	if err := s.Evolution.GuardAlgorithmChange(ctx, model.Code, domain.Algorithm(input.Algorithm)); err != nil {
-		return nil, err
-	}
-	if err := validateLegacyIdentity(model.Kind, input.SubKind, input.ProductChannel); err != nil {
 		return nil, err
 	}
 	if err := model.ForkDraftFromPublished(s.now()); err != nil {
@@ -289,16 +283,6 @@ func (s Service) now() time.Time {
 		return s.Now().UTC()
 	}
 	return time.Now().UTC()
-}
-
-func validateLegacyIdentity(kind domain.Kind, subKind, productChannel string) error {
-	if !domain.IsCanonicalSubKind(kind, domain.SubKind(subKind)) {
-		return errors.WithCode(code.ErrInvalidArgument, "sub_kind %q is incompatible with kind %q", subKind, kind)
-	}
-	if !domain.IsCanonicalProductChannel(kind, domain.ProductChannel(productChannel)) {
-		return errors.WithCode(code.ErrInvalidArgument, "product_channel %q is incompatible with kind %q", productChannel, kind)
-	}
-	return nil
 }
 
 func createAlgorithm(kind domain.Kind, input string) domain.Algorithm {

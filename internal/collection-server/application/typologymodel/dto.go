@@ -1,24 +1,20 @@
 package typologymodel
 
 type TypologyModelResponse struct {
-	Code                 string `json:"code"`
-	Version              string `json:"version"`
-	Title                string `json:"title"`
-	Algorithm            string `json:"algorithm"`
-	Description          string `json:"description"`
-	QuestionnaireCode    string `json:"questionnaire_code"`
-	QuestionnaireVersion string `json:"questionnaire_version"`
-	Status               string `json:"status"`
-	QuestionCount        int32  `json:"question_count"`
-	Kind                 string `json:"kind,omitempty" example:"typology" enums:"typology"`
-	// 子机制，人格测评固定 typology。
-	SubKind         string                      `json:"sub_kind,omitempty" example:"typology"`
-	ProductChannel  string                      `json:"product_channel,omitempty" example:"typology" enums:"typology"`
-	AlgorithmFamily string                      `json:"algorithm_family,omitempty"`
-	DecisionKind    string                      `json:"decision_kind,omitempty"`
-	DimensionOrder  []string                    `json:"dimension_order,omitempty"`
-	Dimensions      []TypologyDimensionResponse `json:"dimensions,omitempty"`
-	Outcomes        []TypologyOutcomeResponse   `json:"outcomes,omitempty"`
+	Code                 string                      `json:"code"`
+	Version              string                      `json:"version"`
+	Title                string                      `json:"title"`
+	Algorithm            string                      `json:"algorithm"`
+	Description          string                      `json:"description"`
+	QuestionnaireCode    string                      `json:"questionnaire_code"`
+	QuestionnaireVersion string                      `json:"questionnaire_version"`
+	Status               string                      `json:"status"`
+	QuestionCount        int32                       `json:"question_count"`
+	Kind                 string                      `json:"kind,omitempty" example:"typology" enums:"typology"`
+	DecisionKind         string                      `json:"decision_kind,omitempty"`
+	DimensionOrder       []string                    `json:"dimension_order,omitempty"`
+	Dimensions           []TypologyDimensionResponse `json:"dimensions,omitempty"`
+	Outcomes             []TypologyOutcomeResponse   `json:"outcomes,omitempty"`
 }
 
 type TypologyDimensionResponse struct {
@@ -46,11 +42,7 @@ type TypologyModelSummaryResponse struct {
 	Status               string `json:"status"`
 	QuestionCount        int32  `json:"question_count"`
 	Kind                 string `json:"kind,omitempty" example:"typology" enums:"typology"`
-	// 子机制，人格测评固定 typology。
-	SubKind         string `json:"sub_kind,omitempty" example:"typology"`
-	ProductChannel  string `json:"product_channel,omitempty" example:"typology" enums:"typology"`
-	AlgorithmFamily string `json:"algorithm_family,omitempty"`
-	DecisionKind    string `json:"decision_kind,omitempty"`
+	DecisionKind         string `json:"decision_kind,omitempty"`
 }
 
 type ListTypologyModelsRequest struct {

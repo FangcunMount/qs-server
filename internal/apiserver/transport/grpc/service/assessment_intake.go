@@ -149,7 +149,6 @@ func admissionFromProto(in *pb.AssessmentAdmission) *journey.Admission {
 		QuestionnaireCode:    in.GetQuestionnaireCode(),
 		QuestionnaireVersion: in.GetQuestionnaireVersion(),
 		ModelKind:            in.GetModelKind(),
-		ModelSubKind:         in.GetModelSubKind(),
 		ModelAlgorithm:       in.GetModelAlgorithm(),
 		ModelCode:            in.GetModelCode(),
 		ModelVersion:         in.GetModelVersion(),

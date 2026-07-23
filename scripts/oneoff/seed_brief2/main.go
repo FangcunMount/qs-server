@@ -184,9 +184,7 @@ func seedModel(ctx context.Context, db *mongo.Database, cfg config, questionnair
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
 		Code:           cfg.modelCode,
 		Kind:           domain.KindBehavioralRating,
-		SubKind:        domain.SubKindEmpty,
 		Algorithm:      domain.AlgorithmBrief2,
-		ProductChannel: domain.ProductChannelBehaviorAbility,
 		Title:          "BRIEF-2 执行功能行为评定量表（家长版）",
 		Description:    "BRIEF-2 家长版，9 个临床分量表、3 个指数及总执行功能指数。",
 		Category:       "behavior_ability",

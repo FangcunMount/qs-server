@@ -13,7 +13,6 @@ import (
 
 type ModelIdentity struct {
 	Kind      modelcatalog.Kind
-	SubKind   modelcatalog.SubKind
 	Algorithm modelcatalog.Algorithm
 	Code      string
 	Version   string
@@ -21,8 +20,7 @@ type ModelIdentity struct {
 }
 
 type RuntimeIdentity struct {
-	AlgorithmFamily modelcatalog.AlgorithmFamily
-	DecisionKind    modelcatalog.DecisionKind
+	DecisionKind modelcatalog.DecisionKind
 }
 
 type NewRecordInput struct {
@@ -99,7 +97,6 @@ type Execution struct {
 
 type ModelRef struct {
 	ModelKind      modelcatalog.Kind      `json:"kind"`
-	ModelSubKind   modelcatalog.SubKind   `json:"sub_kind,omitempty"`
 	ModelAlgorithm modelcatalog.Algorithm `json:"algorithm,omitempty"`
 	ModelCode      string                 `json:"code"`
 	ModelVersion   string                 `json:"version,omitempty"`
@@ -108,7 +105,6 @@ type ModelRef struct {
 
 func (r ModelRef) IsEmpty() bool                     { return r.ModelKind == "" && r.ModelCode == "" }
 func (r ModelRef) Kind() modelcatalog.Kind           { return r.ModelKind }
-func (r ModelRef) SubKind() modelcatalog.SubKind     { return r.ModelSubKind }
 func (r ModelRef) Algorithm() modelcatalog.Algorithm { return r.ModelAlgorithm }
 func (r ModelRef) Code() meta.Code                   { return meta.NewCode(r.ModelCode) }
 func (r ModelRef) Version() string                   { return r.ModelVersion }

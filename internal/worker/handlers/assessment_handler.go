@@ -31,7 +31,6 @@ func handleEvaluationRequested(deps *Dependencies) HandlerFunc {
 			"questionnaire_code", data.QuestionnaireCode,
 			"answersheet_id", data.AnswerSheetID,
 			"model_kind", data.ModelKind,
-			"model_sub_kind", data.ModelSubKind,
 			"model_algorithm", data.ModelAlgorithm,
 			"payload_gate", string(data.ClassifyPayloadGate()),
 			"has_model_identity", data.HasModelIdentity(),

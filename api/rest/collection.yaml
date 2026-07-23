@@ -249,6 +249,10 @@ paths:
         description: 模型类型
         name: kind
         in: query
+      - type: string
+        description: 模型类型集合，逗号分隔；不能与 kind 同时使用
+        name: kinds
+        in: query
       - type: integer
         description: 页码
         name: page
@@ -1703,8 +1707,8 @@ paths:
       summary: 开始类型学测评会话
       description: 小程序推荐入口。根据 model_code 聚合返回模型摘要、精确题版问卷、答卷提交契约与后续 URL 模板；不提前创建测评。推荐流程：session
         → POST /answersheets → GET /answersheets/{id}/assessment-readiness → GET .../report-status（或
-        WSS /report-events，subscribe.kind=personality）→ GET .../report。模型目录 kind/product_channel
-        为 typology；报告 model.kind 仍为 personality。
+        WSS /report-events，subscribe.kind=personality）→ GET .../report。模型目录以 kind=typology
+        与 algorithm=personality_typology 标识；报告 model.kind 仍为 personality。
       operationId: 开始类型学测评会话
       requestBody:
         required: true
@@ -2012,8 +2016,8 @@ paths:
       tags:
       - 类型学模型
       summary: 获取类型学模型列表
-      description: 浏览已发布类型学模型目录。model.kind/product_channel canonical 为 typology（R128b）。单模型详情与题版绑定请用
-        GET /typology-models/{code} 或推荐入口 POST /typology-assessment-sessions。
+      description: 浏览已发布类型学模型目录。类型学模型以 kind=typology 与 algorithm=personality_typology
+        标识。单模型详情与题版绑定请用 GET /typology-models/{code} 或推荐入口 POST /typology-assessment-sessions。
       operationId: 获取类型学模型列表
       security: []
       parameters:
@@ -2415,8 +2419,6 @@ components:
       properties:
         algorithm:
           type: string
-        algorithm_family:
-          type: string
         code:
           type: string
         decision_kind:
@@ -2429,11 +2431,6 @@ components:
           - typology
           - behavioral_rating
           - cognitive
-          example: typology
-        product_channel:
-          type: string
-        sub_kind:
-          type: string
           example: typology
         title:
           type: string
@@ -2734,8 +2731,6 @@ components:
       properties:
         algorithm:
           type: string
-        algorithm_family:
-          type: string
         code:
           type: string
         decision_kind:
@@ -2748,11 +2743,6 @@ components:
           - typology
           - behavioral_rating
           - cognitive
-          example: typology
-        product_channel:
-          type: string
-        sub_kind:
-          type: string
           example: typology
         title:
           type: string
@@ -2871,8 +2861,6 @@ components:
       properties:
         algorithm:
           type: string
-        algorithm_family:
-          type: string
         applicable_ages:
           type: array
           items:
@@ -2893,8 +2881,6 @@ components:
           type: integer
         kind:
           type: string
-        product_channel:
-          type: string
         questionnaire_code:
           type: string
         questionnaire_version:
@@ -2910,8 +2896,6 @@ components:
           items:
             type: string
         status:
-          type: string
-        sub_kind:
           type: string
         submission_count:
           type: integer
@@ -2954,8 +2938,6 @@ components:
       properties:
         algorithm:
           type: string
-        algorithm_family:
-          type: string
         applicable_ages:
           type: array
           items:
@@ -2974,8 +2956,6 @@ components:
           type: string
         kind:
           type: string
-        product_channel:
-          type: string
         questionnaire_code:
           type: string
         questionnaire_version:
@@ -2989,8 +2969,6 @@ components:
           items:
             type: string
         status:
-          type: string
-        sub_kind:
           type: string
         tags:
           type: array
@@ -3012,10 +2990,6 @@ components:
     modelcatalog.OptionsResponse:
       type: object
       properties:
-        algorithm_families:
-          type: array
-          items:
-            $ref: '#/components/schemas/modelcatalog.OptionResponse'
         algorithms:
           type: array
           items:
@@ -3032,19 +3006,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/modelcatalog.OptionResponse'
-        product_channels:
-          type: array
-          items:
-            $ref: '#/components/schemas/modelcatalog.OptionResponse'
         reporters:
           type: array
           items:
             $ref: '#/components/schemas/modelcatalog.OptionResponse'
         stages:
-          type: array
-          items:
-            $ref: '#/components/schemas/modelcatalog.OptionResponse'
-        sub_kinds:
           type: array
           items:
             $ref: '#/components/schemas/modelcatalog.OptionResponse'
@@ -3397,8 +3363,6 @@ components:
       properties:
         algorithm:
           type: string
-        algorithm_family:
-          type: string
         code:
           type: string
         decision_kind:
@@ -3411,11 +3375,6 @@ components:
           - typology
           - behavioral_rating
           - cognitive
-          example: typology
-        product_channel:
-          type: string
-        sub_kind:
-          type: string
           example: typology
         title:
           type: string
@@ -3475,8 +3434,6 @@ components:
       properties:
         algorithm:
           type: string
-        algorithm_family:
-          type: string
         code:
           type: string
         decision_kind:
@@ -3500,11 +3457,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/typologymodel.TypologyOutcomeResponse'
-        product_channel:
-          type: string
-          enum:
-          - typology
-          example: typology
         question_count:
           type: integer
         questionnaire_code:
@@ -3513,10 +3465,6 @@ components:
           type: string
         status:
           type: string
-        sub_kind:
-          description: 子机制，人格测评固定 typology。
-          type: string
-          example: typology
         title:
           type: string
         version:
@@ -3525,8 +3473,6 @@ components:
       type: object
       properties:
         algorithm:
-          type: string
-        algorithm_family:
           type: string
         code:
           type: string
@@ -3539,11 +3485,6 @@ components:
           enum:
           - typology
           example: typology
-        product_channel:
-          type: string
-          enum:
-          - typology
-          example: typology
         question_count:
           type: integer
         questionnaire_code:
@@ -3552,10 +3493,6 @@ components:
           type: string
         status:
           type: string
-        sub_kind:
-          description: 子机制，人格测评固定 typology。
-          type: string
-          example: typology
         title:
           type: string
         version:

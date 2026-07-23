@@ -356,7 +356,6 @@ func assessmentAdmissionFromEvent(in *eventpayload.AssessmentAdmission) *evalpb.
 		QuestionnaireCode:    in.QuestionnaireCode,
 		QuestionnaireVersion: in.QuestionnaireVersion,
 		ModelKind:            in.ModelKind,
-		ModelSubKind:         in.ModelSubKind,
 		ModelAlgorithm:       in.ModelAlgorithm,
 		ModelCode:            in.ModelCode,
 		ModelVersion:         in.ModelVersion,

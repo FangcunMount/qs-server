@@ -17,9 +17,9 @@ service AssessmentModelCatalogService {
 message CatalogModelSummary {
   string code = 1;
   string kind = 2;
-  string sub_kind = 3;
+  reserved 3, 5, 16;
+  reserved "sub_kind", "product_channel", "algorithm_family";
   string algorithm = 4;
-  string product_channel = 5;
   string title = 6;
   string description = 7;
   string status = 8;
@@ -30,8 +30,6 @@ message CatalogModelSummary {
   repeated string tags = 13;
   string questionnaire_code = 14;
   string questionnaire_version = 15;
-  // Publish-time frozen RuntimeIdentity (MC-R006).
-  string algorithm_family = 16;
   string decision_kind = 17;
   reserved 18;
   reserved "payload_format";
@@ -54,7 +52,8 @@ message GetPublishedModelResponse {
 
 message ListPublishedModelsRequest {
   string kind = 1;
-  string sub_kind = 2;
+  reserved 2;
+  reserved "sub_kind";
   string algorithm = 3;
   string category = 4;
   string keyword = 5;
@@ -62,6 +61,7 @@ message ListPublishedModelsRequest {
   string questionnaire_version = 7;
   int32 page = 8;
   int32 page_size = 9;
+  repeated string kinds = 10;
 }
 
 message ListPublishedModelsResponse {
@@ -103,10 +103,9 @@ message GetCatalogOptionsRequest {
 
 message GetCatalogOptionsResponse {
   repeated CatalogOption kinds = 1;
-  repeated CatalogOption product_channels = 2;
-  repeated CatalogOption algorithm_families = 3;
+  reserved 2, 3, 5;
+  reserved "product_channels", "algorithm_families", "sub_kinds";
   repeated CatalogOption algorithms = 4;
-  repeated CatalogOption sub_kinds = 5;
   repeated CatalogOption categories = 6;
   repeated CatalogOption stages = 7;
   repeated CatalogOption applicable_ages = 8;

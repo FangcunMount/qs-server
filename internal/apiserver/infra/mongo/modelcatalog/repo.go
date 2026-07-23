@@ -354,9 +354,6 @@ func (r *Repository) refFilter(ref port.Ref) bson.M {
 		"code":            ref.Code,
 		"release_version": ref.Version,
 	}
-	if ref.SubKind != "" {
-		filter["sub_kind"] = string(ref.SubKind)
-	}
 	if ref.Algorithm != "" {
 		filter["algorithm"] = string(ref.Algorithm)
 	}

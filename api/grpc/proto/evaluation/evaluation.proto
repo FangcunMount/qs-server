@@ -33,13 +33,12 @@ service EvaluationWorkerService {
 
 message ModelIdentity {
   string kind = 1;
-  string sub_kind = 2;
+  reserved 2, 7, 8;
+  reserved "sub_kind", "product_channel", "algorithm_family";
   string algorithm = 3;
   string code = 4;
   string version = 5;
   string title = 6;
-  string product_channel = 7;
-  string algorithm_family = 8;
   // Publish-time frozen RuntimeIdentity fields (MC-R006).
   string decision_kind = 9;
   reserved 10;
@@ -161,7 +160,8 @@ message AssessmentAdmission {
   string questionnaire_code = 2;
   string questionnaire_version = 3;
   string model_kind = 4;
-  string model_sub_kind = 5;
+  reserved 5;
+  reserved "model_sub_kind";
   string model_algorithm = 6;
   string model_code = 7;
   string model_version = 8;

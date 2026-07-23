@@ -48,9 +48,14 @@ func TestCollectionOpenAPITypologyModelSchemaHasRoutingFields(t *testing.T) {
 	if !ok {
 		t.Fatal("schema has no properties")
 	}
-	for _, field := range []string{"kind", "sub_kind", "product_channel", "algorithm_family", "decision_kind"} {
+	for _, field := range []string{"kind", "algorithm", "decision_kind"} {
 		if _, ok := props[field]; !ok {
 			t.Fatalf("TypologyModelSummaryResponse missing field %q", field)
+		}
+	}
+	for _, field := range []string{"sub_kind", "product_channel", "algorithm_family"} {
+		if _, ok := props[field]; ok {
+			t.Fatalf("TypologyModelSummaryResponse must not expose legacy field %q", field)
 		}
 	}
 	kindProp, ok := props["kind"].(map[string]any)
@@ -74,9 +79,14 @@ func TestCollectionOpenAPIModelIdentityHasRoutingFields(t *testing.T) {
 	if !ok {
 		t.Fatal("schema has no properties")
 	}
-	for _, field := range []string{"product_channel", "algorithm_family"} {
+	for _, field := range []string{"kind", "algorithm", "decision_kind"} {
 		if _, ok := props[field]; !ok {
-			t.Fatalf("ModelIdentityResponse missing field %q", field)
+			t.Fatalf("ModelIdentityResponse missing canonical field %q", field)
+		}
+	}
+	for _, field := range []string{"sub_kind", "product_channel", "algorithm_family"} {
+		if _, ok := props[field]; ok {
+			t.Fatalf("ModelIdentityResponse must not expose legacy field %q", field)
 		}
 	}
 }

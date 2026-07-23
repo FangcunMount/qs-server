@@ -34,7 +34,7 @@ func decodeExecution(payload []byte, model evaluationfact.ModelIdentity, runtime
 		return nil, err
 	}
 	execution.ModelRef = evaluationfact.ModelRef{
-		ModelKind: model.Kind, ModelSubKind: model.SubKind, ModelAlgorithm: model.Algorithm,
+		ModelKind: model.Kind, ModelAlgorithm: model.Algorithm,
 		ModelCode: model.Code, ModelVersion: model.Version, ModelTitle: model.Title,
 	}
 	if err := restoreCurrentTypedDetail(payload, runtime, &execution); err != nil {
@@ -66,7 +66,8 @@ func ClassificationFactFromPayload(payload any) (ClassificationFact, bool) {
 }
 
 func restoreCurrentTypedDetail(payload []byte, runtime evaluationfact.RuntimeIdentity, execution *evaluationfact.Execution) error {
-	if runtime.AlgorithmFamily != modelcatalog.AlgorithmFamilyFactorClassification {
+	family, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(runtime.DecisionKind)
+	if !ok || family != modelcatalog.AlgorithmFamilyFactorClassification {
 		execution.Detail.Payload = nil
 		return nil
 	}

@@ -9,7 +9,6 @@ type CreateAssessmentRequest struct {
 	QuestionnaireVersion string  `json:"questionnaire_version" valid:"required"` // 问卷版本
 	AnswerSheetID        uint64  `json:"answer_sheet_id" valid:"required"`       // 答卷ID
 	ModelKind            *string `json:"model_kind"`                             // 解释模型类型（可选）
-	ModelSubKind         *string `json:"model_sub_kind"`                         // 解释模型子类型（可选）
 	ModelAlgorithm       *string `json:"model_algorithm"`                        // 解释模型算法（可选）
 	ModelCode            *string `json:"model_code"`                             // 解释模型编码（可选）
 	ModelVersion         *string `json:"model_version"`                          // 解释模型版本（可选）

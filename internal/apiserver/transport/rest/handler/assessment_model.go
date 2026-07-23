@@ -52,7 +52,6 @@ func NewAssessmentModelHandler(
 // @Param kind query string false "模型类型"
 // @Param kinds query string false "模型类型集合，逗号分隔；不能与 kind 同时使用"
 // @Param status query string false "状态"
-// @Param product_channel query string false "产品通道"
 // @Param questionnaire_code query string false "问卷编码"
 // @Param questionnaire_version query string false "问卷版本"
 // @Param page query int false "页码"
@@ -100,7 +99,7 @@ func (h *AssessmentModelHandler) Create(c *gin.Context) {
 		return
 	}
 	result, err := h.management.Create(c.Request.Context(), actor, modelcatalog.CreateModelDTO{
-		Code: req.Code, Kind: req.Kind, SubKind: req.SubKind, Algorithm: req.Algorithm, ProductChannel: req.ProductChannel,
+		Code: req.Code, Kind: req.Kind, Algorithm: req.Algorithm,
 		Title: req.Title, Description: req.Description, Category: req.Category, Stages: req.Stages, ApplicableAges: req.ApplicableAges,
 		Reporters: req.Reporters, Tags: req.Tags, QuestionnaireCode: req.QuestionnaireCode, QuestionnaireVersion: req.QuestionnaireVersion,
 	})
@@ -155,8 +154,7 @@ func (h *AssessmentModelHandler) UpdateBasicInfo(c *gin.Context) {
 		return
 	}
 	result, err := h.management.UpdateBasicInfo(c.Request.Context(), actor, modelcatalog.UpdateBasicInfoDTO{
-		Code: h.modelCode(c), Title: req.Title, Description: req.Description, SubKind: req.SubKind, Algorithm: req.Algorithm,
-		ProductChannel: req.ProductChannel, Category: req.Category, Stages: req.Stages, ApplicableAges: req.ApplicableAges,
+		Code: h.modelCode(c), Title: req.Title, Description: req.Description, Algorithm: req.Algorithm, Category: req.Category, Stages: req.Stages, ApplicableAges: req.ApplicableAges,
 		Reporters: req.Reporters, Tags: req.Tags,
 	})
 	if err != nil {
@@ -586,7 +584,7 @@ func modelListInput(c *gin.Context) (modelcatalog.ListModelsDTO, error) {
 			return modelcatalog.ListModelsDTO{}, errors.WithCode(code.ErrInvalidArgument, "kinds is invalid")
 		}
 	}
-	return modelcatalog.ListModelsDTO{Kind: c.Query("kind"), Kinds: kinds, SubKind: c.Query("sub_kind"), Status: c.Query("status"), Keyword: c.Query("keyword"), Category: c.Query("category"), Algorithm: c.Query("algorithm"), ProductChannel: c.Query("product_channel"), QuestionnaireCode: c.Query("questionnaire_code"), QuestionnaireVersion: c.Query("questionnaire_version"), Page: page, PageSize: pageSize}, nil
+	return modelcatalog.ListModelsDTO{Kind: c.Query("kind"), Kinds: kinds, Status: c.Query("status"), Keyword: c.Query("keyword"), Category: c.Query("category"), Algorithm: c.Query("algorithm"), QuestionnaireCode: c.Query("questionnaire_code"), QuestionnaireVersion: c.Query("questionnaire_version"), Page: page, PageSize: pageSize}, nil
 }
 
 func queryPositiveInt(c *gin.Context, key string, fallback int) (int, error) {

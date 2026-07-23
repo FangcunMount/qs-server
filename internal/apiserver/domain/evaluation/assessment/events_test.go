@@ -32,9 +32,6 @@ func TestNewEvaluationRequestedEventIncludesModelIdentityFields(t *testing.T) {
 		time.Now(),
 	)
 	data := evt.Payload()
-	if data.ModelSubKind != string(modelcatalog.SubKindTypology) {
-		t.Fatalf("ModelSubKind = %q", data.ModelSubKind)
-	}
 	if data.ModelAlgorithm != string(modelcatalog.AlgorithmPersonalityTypology) {
 		t.Fatalf("ModelAlgorithm = %q", data.ModelAlgorithm)
 	}

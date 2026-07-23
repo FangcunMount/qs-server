@@ -157,7 +157,7 @@ func TestBehavioralOutcomeCodeSurvivesDefinitionToInterpretation(t *testing.T) {
 				Model: report.ModelIdentity{
 					Kind: string(identity.KindBehavioralRating), Algorithm: string(algorithm), Code: "BEHAVIORAL", Version: "v1", Title: "行为测评",
 				},
-				Runtime: interpinput.RuntimeIdentity{AlgorithmFamily: identity.AlgorithmFamilyFactorNorm, DecisionKind: identity.DecisionKindNormLookup},
+				Runtime: interpinput.RuntimeIdentity{DecisionKind: identity.DecisionKindNormLookup},
 				Result:  interpinput.ResultFacts{Primary: report.NewRawTotalScore(5, nil), Level: reportLevel},
 				Report:  interpinput.ReportSpec{ReportType: policy.ReportTypeStandard, TemplateVersion: policy.TemplateVersionV1},
 				FactorScoring: &interpinput.FactorScoringFacts{

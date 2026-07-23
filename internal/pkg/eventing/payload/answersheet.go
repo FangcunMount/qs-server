@@ -16,7 +16,6 @@ type AssessmentAdmission struct {
 	QuestionnaireCode    string           `json:"questionnaire_code,omitempty"`
 	QuestionnaireVersion string           `json:"questionnaire_version,omitempty"`
 	ModelKind            string           `json:"model_kind,omitempty"`
-	ModelSubKind         string           `json:"model_sub_kind,omitempty"`
 	ModelAlgorithm       string           `json:"model_algorithm,omitempty"`
 	ModelCode            string           `json:"model_code,omitempty"`
 	ModelVersion         string           `json:"model_version,omitempty"`

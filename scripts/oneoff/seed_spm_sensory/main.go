@@ -183,9 +183,7 @@ func seedModel(ctx context.Context, db *mongo.Database, cfg config, questionnair
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
 		Code:           cfg.modelCode,
 		Kind:           domain.KindBehavioralRating,
-		SubKind:        domain.SubKindEmpty,
 		Algorithm:      domain.AlgorithmSPMSensory,
-		ProductChannel: domain.ProductChannelBehaviorAbility,
 		Title:          "SPM 感觉统合量表",
 		Description:    "Sensory Processing Measure，评估社会参与与感觉处理功能。",
 		Category:       "behavior_ability",

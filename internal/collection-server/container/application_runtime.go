@@ -97,7 +97,7 @@ func (c *Container) buildCatalogRuntime() catalogRuntime {
 
 func newAssessmentModelQueryService(client *grpcclient.AssessmentModelCatalogClient) *appmodelcatalog.QueryService {
 	reader := grpcbridge.NewAssessmentModelCatalogReader(client)
-	return appmodelcatalog.NewQueryService(reader, reader)
+	return appmodelcatalog.NewQueryService(reader)
 }
 
 func (c *Container) buildReportRuntime(evaluationQuery *evaluation.QueryService) reportRuntime {

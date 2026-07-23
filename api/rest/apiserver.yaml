@@ -577,12 +577,12 @@ paths:
         name: kind
         in: query
       - type: string
-        description: 状态
-        name: status
+        description: 模型类型集合，逗号分隔；不能与 kind 同时使用
+        name: kinds
         in: query
       - type: string
-        description: 产品通道
-        name: product_channel
+        description: 状态
+        name: status
         in: query
       - type: string
         description: 问卷编码
@@ -10061,8 +10061,6 @@ components:
       properties:
         algorithm:
           type: string
-        algorithm_family:
-          type: string
         applicable_ages:
           type: array
           items:
@@ -10080,9 +10078,6 @@ components:
         heat_score:
           type: integer
         kind:
-          type: string
-          example: typology
-        product_channel:
           type: string
           example: typology
         questionnaire_code:
@@ -10103,9 +10098,6 @@ components:
             type: string
         status:
           type: string
-        sub_kind:
-          type: string
-          example: typology
         submission_count:
           type: integer
         tags:
@@ -10120,8 +10112,6 @@ components:
       type: object
       properties:
         algorithm:
-          type: string
-        algorithm_family:
           type: string
         applicable_ages:
           type: array
@@ -10140,9 +10130,6 @@ components:
         kind:
           type: string
           example: typology
-        product_channel:
-          type: string
-          example: typology
         questionnaire_code:
           type: string
         questionnaire_version:
@@ -10159,9 +10146,6 @@ components:
             type: string
         status:
           type: string
-        sub_kind:
-          type: string
-          example: typology
         tags:
           type: array
           items:
@@ -10197,8 +10181,6 @@ components:
       properties:
         algorithm:
           type: string
-        algorithm_family:
-          type: string
         applicable_ages:
           type: array
           items:
@@ -10218,9 +10200,6 @@ components:
         kind:
           type: string
           example: typology
-        product_channel:
-          type: string
-          example: typology
         questionnaire_code:
           type: string
         questionnaire_version:
@@ -10237,9 +10216,6 @@ components:
             type: string
         status:
           type: string
-        sub_kind:
-          type: string
-          example: typology
         tags:
           type: array
           items:
@@ -10458,14 +10434,6 @@ components:
           - behavioral_rating
           - cognitive
           example: typology
-        product_channel:
-          description: 产品通道；人格测评为 typology。
-          type: string
-          enum:
-          - medical_scale
-          - typology
-          - behavior_ability
-          example: typology
         questionnaire_code:
           type: string
         questionnaire_version:
@@ -10478,9 +10446,6 @@ components:
           type: array
           items:
             type: string
-        sub_kind:
-          type: string
-          example: typology
         tags:
           type: array
           items:
@@ -10755,8 +10720,6 @@ components:
           type: string
         description:
           type: string
-        product_channel:
-          type: string
         reporters:
           type: array
           items:
@@ -10765,8 +10728,6 @@ components:
           type: array
           items:
             type: string
-        sub_kind:
-          type: string
         tags:
           type: array
           items:
@@ -11095,10 +11056,6 @@ components:
     response.AssessmentModelOptionsResponse:
       type: object
       properties:
-        algorithm_families:
-          type: array
-          items:
-            $ref: '#/components/schemas/modelcatalog.Option'
         algorithms:
           type: array
           items:
@@ -11119,10 +11076,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/modelcatalog.Option'
-        product_channels:
-          type: array
-          items:
-            $ref: '#/components/schemas/modelcatalog.Option'
         reporters:
           type: array
           items:
@@ -11132,10 +11085,6 @@ components:
           items:
             $ref: '#/components/schemas/modelcatalog.Option'
         stages:
-          type: array
-          items:
-            $ref: '#/components/schemas/modelcatalog.Option'
-        sub_kinds:
           type: array
           items:
             $ref: '#/components/schemas/modelcatalog.Option'
@@ -11159,8 +11108,6 @@ components:
       properties:
         algorithm:
           type: string
-        algorithm_family:
-          type: string
         applicable_ages:
           type: array
           items:
@@ -11176,9 +11123,6 @@ components:
         description:
           type: string
         kind:
-          type: string
-          example: typology
-        product_channel:
           type: string
           example: typology
         questionnaire_code:
@@ -11197,9 +11141,6 @@ components:
             type: string
         status:
           type: string
-        sub_kind:
-          type: string
-          example: typology
         tags:
           type: array
           items:
@@ -11302,9 +11243,6 @@ components:
           type: string
         model_kind:
           description: 解释模型类型
-          type: string
-        model_sub_kind:
-          description: 解释模型子类型
           type: string
         model_title:
           description: 解释模型标题
@@ -12123,21 +12061,15 @@ components:
       properties:
         algorithm:
           type: string
-        algorithm_family:
-          type: string
         code:
           type: string
         kind:
-          description: 测评层 kind；人格线当前输出 personality，读兼容 typology。
           type: string
           enum:
-          - personality
+          - scale
           - typology
-          example: personality
-        product_channel:
-          type: string
-        sub_kind:
-          type: string
+          - behavioral_rating
+          - cognitive
           example: typology
         title:
           type: string
@@ -12324,8 +12256,6 @@ components:
       properties:
         algorithm:
           type: string
-        algorithm_family:
-          type: string
         applicable_ages:
           type: array
           items:
@@ -12345,9 +12275,6 @@ components:
         kind:
           type: string
           example: typology
-        product_channel:
-          type: string
-          example: typology
         questionnaire_code:
           type: string
         questionnaire_version:
@@ -12364,9 +12291,6 @@ components:
             type: string
         status:
           type: string
-        sub_kind:
-          type: string
-          example: typology
         tags:
           type: array
           items:

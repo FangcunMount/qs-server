@@ -47,7 +47,7 @@ func TestApiserverOpenAPIAssessmentModelKindSemantics(t *testing.T) {
 	if !ok {
 		t.Fatal("ModelIdentityResponse.kind must be an object")
 	}
-	if example, _ := idKind["example"].(string); example != "personality" {
-		t.Fatalf("ModelIdentityResponse.kind example = %v, want personality", idKind["example"])
+	if example, _ := idKind["example"].(string); example != "typology" {
+		t.Fatalf("ModelIdentityResponse.kind example = %v, want typology", idKind["example"])
 	}
 }

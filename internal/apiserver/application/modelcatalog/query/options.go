@@ -29,10 +29,7 @@ func apiKindOptions() []modelcatalog.Option {
 func catalogOptionsForKind(kind string) modelcatalog.OptionsResult {
 	result := modelcatalog.OptionsResult{
 		Kinds:             apiKindOptions(),
-		ProductChannels:   modelcatalog.ProductChannelOptions(),
-		AlgorithmFamilies: modelcatalog.AlgorithmFamilyOptions(),
 		Algorithms:        algorithmOptions(kind),
-		SubKinds:          subKindOptions(kind),
 		ScoringStrategies: scoringStrategyOptions(kind),
 		Categories:        []modelcatalog.Option{},
 	}
@@ -116,18 +113,4 @@ func algorithmOptions(kind string) []modelcatalog.Option {
 		}
 	}
 	return filtered
-}
-
-func subKindOptions(kind string) []modelcatalog.Option {
-	if kind == "" {
-		return []modelcatalog.Option{{Label: "量表评分", Value: modelcatalog.SubKindScale}, {Label: "类型人格", Value: modelcatalog.SubKindTypology}}
-	}
-	switch kind {
-	case modelcatalog.KindScale:
-		return []modelcatalog.Option{{Label: "量表评分", Value: modelcatalog.SubKindScale}}
-	case modelcatalog.KindTypology:
-		return []modelcatalog.Option{{Label: "类型人格", Value: modelcatalog.SubKindTypology}}
-	default:
-		return []modelcatalog.Option{}
-	}
 }

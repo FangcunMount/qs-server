@@ -22,7 +22,7 @@ func TestDecodeExecutionReadsSchemaV2ClassificationFacts(t *testing.T) {
 	record := evaluationfact.NewRecord(evaluationfact.NewRecordInput{
 		ID: meta.FromUint64(12), SchemaVersion: 2,
 		Model:   evaluationfact.ModelIdentity{Kind: modelcatalog.KindTypology, Algorithm: modelcatalog.AlgorithmPersonalityTypology, Code: "MBTI"},
-		Runtime: evaluationfact.RuntimeIdentity{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindPoleComposition},
+		Runtime: evaluationfact.RuntimeIdentity{DecisionKind: modelcatalog.DecisionKindPoleComposition},
 		Payload: []byte(`{"Detail":{"Payload":{"type_code":"INTJ","match_percent":80,"special_trigger":"stable"}},"Dimensions":[{"Code":"EI","Score":{"Value":8},"Preference":"I"}]}`),
 	})
 	execution, err := DecodeExecution(record)

@@ -6,7 +6,6 @@ import (
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
-	modelbinding "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
@@ -25,8 +24,8 @@ func assessmentFromDomain(a *domainassessment.Assessment) (*Assessment, error) {
 		result.RiskLevel = &value
 	}
 	if model := a.EvaluationModelRef(); model != nil && !model.IsEmpty() {
-		kind, sub, algorithm, code, version, title := model.Kind().String(), string(model.SubKind()), string(model.Algorithm()), model.Code().String(), model.Version(), model.Title()
-		result.ModelKind, result.ModelSubKind, result.ModelAlgorithm, result.ModelCode, result.ModelVersion, result.ModelTitle = &kind, &sub, &algorithm, &code, &version, &title
+		kind, algorithm, code, version, title := model.Kind().String(), string(model.Algorithm()), model.Code().String(), model.Version(), model.Title()
+		result.ModelKind, result.ModelAlgorithm, result.ModelCode, result.ModelVersion, result.ModelTitle = &kind, &algorithm, &code, &version, &title
 	}
 	return result, nil
 }
@@ -36,7 +35,7 @@ func assessmentFromRow(row evaluationreadmodel.AssessmentRow) (*Assessment, erro
 	if err != nil {
 		return nil, evalerrors.DatabaseMessage("测评机构ID超出安全范围")
 	}
-	return &Assessment{ID: row.ID, OrgID: orgID, TesteeID: row.TesteeID, QuestionnaireCode: row.QuestionnaireCode, QuestionnaireVersion: row.QuestionnaireVersion, AnswerSheetID: row.AnswerSheetID, ModelKind: row.EvaluationModelKind, ModelSubKind: row.EvaluationModelSubKind, ModelAlgorithm: row.EvaluationModelAlgorithm, ModelCode: row.EvaluationModelCode, ModelVersion: row.EvaluationModelVersion, ModelTitle: row.EvaluationModelTitle, OriginType: row.OriginType, OriginID: row.OriginID, Status: row.Status, TotalScore: row.TotalScore, RiskLevel: row.RiskLevel, SubmittedAt: row.SubmittedAt, EvaluatedAt: row.EvaluatedAt, FailedAt: row.FailedAt, FailureReason: row.FailureReason}, nil
+	return &Assessment{ID: row.ID, OrgID: orgID, TesteeID: row.TesteeID, QuestionnaireCode: row.QuestionnaireCode, QuestionnaireVersion: row.QuestionnaireVersion, AnswerSheetID: row.AnswerSheetID, ModelKind: row.EvaluationModelKind, ModelAlgorithm: row.EvaluationModelAlgorithm, ModelCode: row.EvaluationModelCode, ModelVersion: row.EvaluationModelVersion, ModelTitle: row.EvaluationModelTitle, OriginType: row.OriginType, OriginID: row.OriginID, Status: row.Status, TotalScore: row.TotalScore, RiskLevel: row.RiskLevel, SubmittedAt: row.SubmittedAt, EvaluatedAt: row.EvaluatedAt, FailedAt: row.FailedAt, FailureReason: row.FailureReason}, nil
 }
 
 func outcomeFromRow(row evaluationreadmodel.AssessmentRow) (*OutcomeAssessment, error) {
@@ -48,12 +47,7 @@ func outcomeFromRow(row evaluationreadmodel.AssessmentRow) (*OutcomeAssessment, 
 }
 
 func modelFromRow(row evaluationreadmodel.AssessmentRow) ModelIdentity {
-	kind, sub, algorithm := deref(row.EvaluationModelKind), deref(row.EvaluationModelSubKind), deref(row.EvaluationModelAlgorithm)
-	result := ModelIdentity{Kind: kind, SubKind: sub, Algorithm: algorithm, Code: deref(row.EvaluationModelCode), Version: deref(row.EvaluationModelVersion), Title: deref(row.EvaluationModelTitle)}
-	k := modelbinding.Kind(result.Kind)
-	result.ProductChannel = modelbinding.ProductChannelForIdentity(k, "")
-	result.AlgorithmFamily = modelbinding.AlgorithmFamilyStringFromIdentity(k, modelbinding.SubKind(result.SubKind), modelbinding.Algorithm(result.Algorithm))
-	return result
+	return ModelIdentity{Kind: deref(row.EvaluationModelKind), Algorithm: deref(row.EvaluationModelAlgorithm), Code: deref(row.EvaluationModelCode), Version: deref(row.EvaluationModelVersion), Title: deref(row.EvaluationModelTitle)}
 }
 
 func primaryScoreFromRow(row evaluationreadmodel.AssessmentRow) *ScoreValue {

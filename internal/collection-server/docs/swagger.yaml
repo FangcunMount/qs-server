@@ -186,8 +186,6 @@ definitions:
     properties:
       algorithm:
         type: string
-      algorithm_family:
-        type: string
       code:
         type: string
       decision_kind:
@@ -199,11 +197,6 @@ definitions:
         - typology
         - behavioral_rating
         - cognitive
-        example: typology
-        type: string
-      product_channel:
-        type: string
-      sub_kind:
         example: typology
         type: string
       title:
@@ -505,8 +498,6 @@ definitions:
     properties:
       algorithm:
         type: string
-      algorithm_family:
-        type: string
       code:
         type: string
       decision_kind:
@@ -518,11 +509,6 @@ definitions:
         - typology
         - behavioral_rating
         - cognitive
-        example: typology
-        type: string
-      product_channel:
-        type: string
-      sub_kind:
         example: typology
         type: string
       title:
@@ -642,8 +628,6 @@ definitions:
     properties:
       algorithm:
         type: string
-      algorithm_family:
-        type: string
       applicable_ages:
         items:
           type: string
@@ -664,8 +648,6 @@ definitions:
         type: integer
       kind:
         type: string
-      product_channel:
-        type: string
       questionnaire_code:
         type: string
       questionnaire_version:
@@ -681,8 +663,6 @@ definitions:
           type: string
         type: array
       status:
-        type: string
-      sub_kind:
         type: string
       submission_count:
         type: integer
@@ -725,8 +705,6 @@ definitions:
     properties:
       algorithm:
         type: string
-      algorithm_family:
-        type: string
       applicable_ages:
         items:
           type: string
@@ -745,8 +723,6 @@ definitions:
         type: string
       kind:
         type: string
-      product_channel:
-        type: string
       questionnaire_code:
         type: string
       questionnaire_version:
@@ -760,8 +736,6 @@ definitions:
           type: string
         type: array
       status:
-        type: string
-      sub_kind:
         type: string
       tags:
         items:
@@ -783,10 +757,6 @@ definitions:
     type: object
   modelcatalog.OptionsResponse:
     properties:
-      algorithm_families:
-        items:
-          $ref: '#/definitions/modelcatalog.OptionResponse'
-        type: array
       algorithms:
         items:
           $ref: '#/definitions/modelcatalog.OptionResponse'
@@ -803,19 +773,11 @@ definitions:
         items:
           $ref: '#/definitions/modelcatalog.OptionResponse'
         type: array
-      product_channels:
-        items:
-          $ref: '#/definitions/modelcatalog.OptionResponse'
-        type: array
       reporters:
         items:
           $ref: '#/definitions/modelcatalog.OptionResponse'
         type: array
       stages:
-        items:
-          $ref: '#/definitions/modelcatalog.OptionResponse'
-        type: array
-      sub_kinds:
         items:
           $ref: '#/definitions/modelcatalog.OptionResponse'
         type: array
@@ -1168,8 +1130,6 @@ definitions:
     properties:
       algorithm:
         type: string
-      algorithm_family:
-        type: string
       code:
         type: string
       decision_kind:
@@ -1181,11 +1141,6 @@ definitions:
         - typology
         - behavioral_rating
         - cognitive
-        example: typology
-        type: string
-      product_channel:
-        type: string
-      sub_kind:
         example: typology
         type: string
       title:
@@ -1246,8 +1201,6 @@ definitions:
     properties:
       algorithm:
         type: string
-      algorithm_family:
-        type: string
       code:
         type: string
       decision_kind:
@@ -1271,11 +1224,6 @@ definitions:
         items:
           $ref: '#/definitions/typologymodel.TypologyOutcomeResponse'
         type: array
-      product_channel:
-        enum:
-        - typology
-        example: typology
-        type: string
       question_count:
         type: integer
       questionnaire_code:
@@ -1283,10 +1231,6 @@ definitions:
       questionnaire_version:
         type: string
       status:
-        type: string
-      sub_kind:
-        description: 子机制，人格测评固定 typology。
-        example: typology
         type: string
       title:
         type: string
@@ -1296,8 +1240,6 @@ definitions:
   typologymodel.TypologyModelSummaryResponse:
     properties:
       algorithm:
-        type: string
-      algorithm_family:
         type: string
       code:
         type: string
@@ -1310,11 +1252,6 @@ definitions:
         - typology
         example: typology
         type: string
-      product_channel:
-        enum:
-        - typology
-        example: typology
-        type: string
       question_count:
         type: integer
       questionnaire_code:
@@ -1322,10 +1259,6 @@ definitions:
       questionnaire_version:
         type: string
       status:
-        type: string
-      sub_kind:
-        description: 子机制，人格测评固定 typology。
-        example: typology
         type: string
       title:
         type: string
@@ -1558,6 +1491,10 @@ paths:
       - description: 模型类型
         in: query
         name: kind
+        type: string
+      - description: 模型类型集合，逗号分隔；不能与 kind 同时使用
+        in: query
+        name: kinds
         type: string
       - description: 页码
         in: query
@@ -2570,8 +2507,8 @@ paths:
       - application/json
       description: 小程序推荐入口。根据 model_code 聚合返回模型摘要、精确题版问卷、答卷提交契约与后续 URL 模板；不提前创建测评。推荐流程：session
         → POST /answersheets → GET /answersheets/{id}/assessment-readiness → GET .../report-status（或
-        WSS /report-events，subscribe.kind=personality）→ GET .../report。模型目录 kind/product_channel
-        为 typology；报告 model.kind 仍为 personality。
+        WSS /report-events，subscribe.kind=personality）→ GET .../report。模型目录以 kind=typology
+        与 algorithm=personality_typology 标识；报告 model.kind 仍为 personality。
       parameters:
       - description: 开始会话请求
         in: body
@@ -2765,8 +2702,8 @@ paths:
       - 类型学测评
   /api/v1/typology-models:
     get:
-      description: 浏览已发布类型学模型目录。model.kind/product_channel canonical 为 typology（R128b）。单模型详情与题版绑定请用
-        GET /typology-models/{code} 或推荐入口 POST /typology-assessment-sessions。
+      description: 浏览已发布类型学模型目录。类型学模型以 kind=typology 与 algorithm=personality_typology
+        标识。单模型详情与题版绑定请用 GET /typology-models/{code} 或推荐入口 POST /typology-assessment-sessions。
       parameters:
       - default: 1
         description: 页码

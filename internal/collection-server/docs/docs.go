@@ -266,6 +266,12 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "type": "string",
+                        "description": "模型类型集合，逗号分隔；不能与 kind 同时使用",
+                        "name": "kinds",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
                         "description": "页码",
                         "name": "page",
@@ -1911,7 +1917,7 @@ const docTemplate = `{
         },
         "/api/v1/typology-assessment-sessions": {
             "post": {
-                "description": "小程序推荐入口。根据 model_code 聚合返回模型摘要、精确题版问卷、答卷提交契约与后续 URL 模板；不提前创建测评。推荐流程：session → POST /answersheets → GET /answersheets/{id}/assessment-readiness → GET .../report-status（或 WSS /report-events，subscribe.kind=personality）→ GET .../report。模型目录 kind/product_channel 为 typology；报告 model.kind 仍为 personality。",
+                "description": "小程序推荐入口。根据 model_code 聚合返回模型摘要、精确题版问卷、答卷提交契约与后续 URL 模板；不提前创建测评。推荐流程：session → POST /answersheets → GET /answersheets/{id}/assessment-readiness → GET .../report-status（或 WSS /report-events，subscribe.kind=personality）→ GET .../report。模型目录以 kind=typology 与 algorithm=personality_typology 标识；报告 model.kind 仍为 personality。",
                 "consumes": [
                     "application/json"
                 ],
@@ -2232,7 +2238,7 @@ const docTemplate = `{
         },
         "/api/v1/typology-models": {
             "get": {
-                "description": "浏览已发布类型学模型目录。model.kind/product_channel canonical 为 typology（R128b）。单模型详情与题版绑定请用 GET /typology-models/{code} 或推荐入口 POST /typology-assessment-sessions。",
+                "description": "浏览已发布类型学模型目录。类型学模型以 kind=typology 与 algorithm=personality_typology 标识。单模型详情与题版绑定请用 GET /typology-models/{code} 或推荐入口 POST /typology-assessment-sessions。",
                 "produces": [
                     "application/json"
                 ],
@@ -2732,9 +2738,6 @@ const docTemplate = `{
                 "algorithm": {
                     "type": "string"
                 },
-                "algorithm_family": {
-                    "type": "string"
-                },
                 "code": {
                     "type": "string"
                 },
@@ -2750,13 +2753,6 @@ const docTemplate = `{
                         "behavioral_rating",
                         "cognitive"
                     ],
-                    "example": "typology"
-                },
-                "product_channel": {
-                    "type": "string"
-                },
-                "sub_kind": {
-                    "type": "string",
                     "example": "typology"
                 },
                 "title": {
@@ -3208,9 +3204,6 @@ const docTemplate = `{
                 "algorithm": {
                     "type": "string"
                 },
-                "algorithm_family": {
-                    "type": "string"
-                },
                 "code": {
                     "type": "string"
                 },
@@ -3226,13 +3219,6 @@ const docTemplate = `{
                         "behavioral_rating",
                         "cognitive"
                     ],
-                    "example": "typology"
-                },
-                "product_channel": {
-                    "type": "string"
-                },
-                "sub_kind": {
-                    "type": "string",
                     "example": "typology"
                 },
                 "title": {
@@ -3413,9 +3399,6 @@ const docTemplate = `{
                 "algorithm": {
                     "type": "string"
                 },
-                "algorithm_family": {
-                    "type": "string"
-                },
                 "applicable_ages": {
                     "type": "array",
                     "items": {
@@ -3446,9 +3429,6 @@ const docTemplate = `{
                 "kind": {
                     "type": "string"
                 },
-                "product_channel": {
-                    "type": "string"
-                },
                 "questionnaire_code": {
                     "type": "string"
                 },
@@ -3471,9 +3451,6 @@ const docTemplate = `{
                     }
                 },
                 "status": {
-                    "type": "string"
-                },
-                "sub_kind": {
                     "type": "string"
                 },
                 "submission_count": {
@@ -3539,9 +3516,6 @@ const docTemplate = `{
                 "algorithm": {
                     "type": "string"
                 },
-                "algorithm_family": {
-                    "type": "string"
-                },
                 "applicable_ages": {
                     "type": "array",
                     "items": {
@@ -3569,9 +3543,6 @@ const docTemplate = `{
                 "kind": {
                     "type": "string"
                 },
-                "product_channel": {
-                    "type": "string"
-                },
                 "questionnaire_code": {
                     "type": "string"
                 },
@@ -3591,9 +3562,6 @@ const docTemplate = `{
                     }
                 },
                 "status": {
-                    "type": "string"
-                },
-                "sub_kind": {
                     "type": "string"
                 },
                 "tags": {
@@ -3627,12 +3595,6 @@ const docTemplate = `{
         "modelcatalog.OptionsResponse": {
             "type": "object",
             "properties": {
-                "algorithm_families": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/modelcatalog.OptionResponse"
-                    }
-                },
                 "algorithms": {
                     "type": "array",
                     "items": {
@@ -3657,12 +3619,6 @@ const docTemplate = `{
                         "$ref": "#/definitions/modelcatalog.OptionResponse"
                     }
                 },
-                "product_channels": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/modelcatalog.OptionResponse"
-                    }
-                },
                 "reporters": {
                     "type": "array",
                     "items": {
@@ -3670,12 +3626,6 @@ const docTemplate = `{
                     }
                 },
                 "stages": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/modelcatalog.OptionResponse"
-                    }
-                },
-                "sub_kinds": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/modelcatalog.OptionResponse"
@@ -4202,9 +4152,6 @@ const docTemplate = `{
                 "algorithm": {
                     "type": "string"
                 },
-                "algorithm_family": {
-                    "type": "string"
-                },
                 "code": {
                     "type": "string"
                 },
@@ -4220,13 +4167,6 @@ const docTemplate = `{
                         "behavioral_rating",
                         "cognitive"
                     ],
-                    "example": "typology"
-                },
-                "product_channel": {
-                    "type": "string"
-                },
-                "sub_kind": {
-                    "type": "string",
                     "example": "typology"
                 },
                 "title": {
@@ -4319,9 +4259,6 @@ const docTemplate = `{
                 "algorithm": {
                     "type": "string"
                 },
-                "algorithm_family": {
-                    "type": "string"
-                },
                 "code": {
                     "type": "string"
                 },
@@ -4356,13 +4293,6 @@ const docTemplate = `{
                         "$ref": "#/definitions/typologymodel.TypologyOutcomeResponse"
                     }
                 },
-                "product_channel": {
-                    "type": "string",
-                    "enum": [
-                        "typology"
-                    ],
-                    "example": "typology"
-                },
                 "question_count": {
                     "type": "integer"
                 },
@@ -4374,11 +4304,6 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "string"
-                },
-                "sub_kind": {
-                    "description": "子机制，人格测评固定 typology。",
-                    "type": "string",
-                    "example": "typology"
                 },
                 "title": {
                     "type": "string"
@@ -4392,9 +4317,6 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "algorithm": {
-                    "type": "string"
-                },
-                "algorithm_family": {
                     "type": "string"
                 },
                 "code": {
@@ -4413,13 +4335,6 @@ const docTemplate = `{
                     ],
                     "example": "typology"
                 },
-                "product_channel": {
-                    "type": "string",
-                    "enum": [
-                        "typology"
-                    ],
-                    "example": "typology"
-                },
                 "question_count": {
                     "type": "integer"
                 },
@@ -4431,11 +4346,6 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "string"
-                },
-                "sub_kind": {
-                    "description": "子机制，人格测评固定 typology。",
-                    "type": "string",
-                    "example": "typology"
                 },
                 "title": {
                     "type": "string"

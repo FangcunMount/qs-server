@@ -41,6 +41,7 @@ func (h *AssessmentModelCatalogHandler) Get(c *gin.Context) {
 // @Tags AssessmentModelCatalog
 // @Produce json
 // @Param kind query string false "模型类型"
+// @Param kinds query string false "模型类型集合，逗号分隔；不能与 kind 同时使用"
 // @Param page query int false "页码"
 // @Param page_size query int false "每页数量"
 // @Success 200 {object} core.Response{data=modelcatalog.ListResponse}

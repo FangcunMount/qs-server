@@ -679,8 +679,6 @@ definitions:
     properties:
       algorithm:
         type: string
-      algorithm_family:
-        type: string
       applicable_ages:
         items:
           type: string
@@ -698,9 +696,6 @@ definitions:
       heat_score:
         type: integer
       kind:
-        example: typology
-        type: string
-      product_channel:
         example: typology
         type: string
       questionnaire_code:
@@ -721,9 +716,6 @@ definitions:
         type: array
       status:
         type: string
-      sub_kind:
-        example: typology
-        type: string
       submission_count:
         type: integer
       tags:
@@ -738,8 +730,6 @@ definitions:
   modelcatalog.ModelSummary:
     properties:
       algorithm:
-        type: string
-      algorithm_family:
         type: string
       applicable_ages:
         items:
@@ -758,9 +748,6 @@ definitions:
       kind:
         example: typology
         type: string
-      product_channel:
-        example: typology
-        type: string
       questionnaire_code:
         type: string
       questionnaire_version:
@@ -776,9 +763,6 @@ definitions:
           type: string
         type: array
       status:
-        type: string
-      sub_kind:
-        example: typology
         type: string
       tags:
         items:
@@ -815,8 +799,6 @@ definitions:
     properties:
       algorithm:
         type: string
-      algorithm_family:
-        type: string
       applicable_ages:
         items:
           type: string
@@ -836,9 +818,6 @@ definitions:
       kind:
         example: typology
         type: string
-      product_channel:
-        example: typology
-        type: string
       questionnaire_code:
         type: string
       questionnaire_version:
@@ -854,9 +833,6 @@ definitions:
           type: string
         type: array
       status:
-        type: string
-      sub_kind:
-        example: typology
         type: string
       tags:
         items:
@@ -1076,14 +1052,6 @@ definitions:
         - cognitive
         example: typology
         type: string
-      product_channel:
-        description: 产品通道；人格测评为 typology。
-        enum:
-        - medical_scale
-        - typology
-        - behavior_ability
-        example: typology
-        type: string
       questionnaire_code:
         type: string
       questionnaire_version:
@@ -1096,9 +1064,6 @@ definitions:
         items:
           type: string
         type: array
-      sub_kind:
-        example: typology
-        type: string
       tags:
         items:
           type: string
@@ -1373,8 +1338,6 @@ definitions:
         type: string
       description:
         type: string
-      product_channel:
-        type: string
       reporters:
         items:
           type: string
@@ -1383,8 +1346,6 @@ definitions:
         items:
           type: string
         type: array
-      sub_kind:
-        type: string
       tags:
         items:
           type: string
@@ -1713,10 +1674,6 @@ definitions:
     type: object
   response.AssessmentModelOptionsResponse:
     properties:
-      algorithm_families:
-        items:
-          $ref: '#/definitions/modelcatalog.Option'
-        type: array
       algorithms:
         items:
           $ref: '#/definitions/modelcatalog.Option'
@@ -1737,10 +1694,6 @@ definitions:
         items:
           $ref: '#/definitions/modelcatalog.Option'
         type: array
-      product_channels:
-        items:
-          $ref: '#/definitions/modelcatalog.Option'
-        type: array
       reporters:
         items:
           $ref: '#/definitions/modelcatalog.Option'
@@ -1750,10 +1703,6 @@ definitions:
           $ref: '#/definitions/modelcatalog.Option'
         type: array
       stages:
-        items:
-          $ref: '#/definitions/modelcatalog.Option'
-        type: array
-      sub_kinds:
         items:
           $ref: '#/definitions/modelcatalog.Option'
         type: array
@@ -1777,8 +1726,6 @@ definitions:
     properties:
       algorithm:
         type: string
-      algorithm_family:
-        type: string
       applicable_ages:
         items:
           type: string
@@ -1796,9 +1743,6 @@ definitions:
       kind:
         example: typology
         type: string
-      product_channel:
-        example: typology
-        type: string
       questionnaire_code:
         type: string
       questionnaire_version:
@@ -1814,9 +1758,6 @@ definitions:
           type: string
         type: array
       status:
-        type: string
-      sub_kind:
-        example: typology
         type: string
       tags:
         items:
@@ -1920,9 +1861,6 @@ definitions:
         type: string
       model_kind:
         description: 解释模型类型
-        type: string
-      model_sub_kind:
-        description: 解释模型子类型
         type: string
       model_title:
         description: 解释模型标题
@@ -2741,20 +2679,14 @@ definitions:
     properties:
       algorithm:
         type: string
-      algorithm_family:
-        type: string
       code:
         type: string
       kind:
-        description: 测评层 kind；人格线当前输出 personality，读兼容 typology。
         enum:
-        - personality
+        - scale
         - typology
-        example: personality
-        type: string
-      product_channel:
-        type: string
-      sub_kind:
+        - behavioral_rating
+        - cognitive
         example: typology
         type: string
       title:
@@ -2942,8 +2874,6 @@ definitions:
     properties:
       algorithm:
         type: string
-      algorithm_family:
-        type: string
       applicable_ages:
         items:
           type: string
@@ -2963,9 +2893,6 @@ definitions:
       kind:
         example: typology
         type: string
-      product_channel:
-        example: typology
-        type: string
       questionnaire_code:
         type: string
       questionnaire_version:
@@ -2981,9 +2908,6 @@ definitions:
           type: string
         type: array
       status:
-        type: string
-      sub_kind:
-        example: typology
         type: string
       tags:
         items:
@@ -4591,13 +4515,13 @@ paths:
         in: query
         name: kind
         type: string
+      - description: 模型类型集合，逗号分隔；不能与 kind 同时使用
+        in: query
+        name: kinds
+        type: string
       - description: 状态
         in: query
         name: status
-        type: string
-      - description: 产品通道
-        in: query
-        name: product_channel
         type: string
       - description: 问卷编码
         in: query

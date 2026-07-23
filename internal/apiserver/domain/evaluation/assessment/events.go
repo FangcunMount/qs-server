@@ -53,9 +53,6 @@ func NewEvaluationRequestedEvent(
 	}
 	if modelRef != nil && !modelRef.IsEmpty() {
 		in.ModelKind = modelRef.Kind().String()
-		if subKind := modelRef.SubKind(); subKind != "" {
-			in.ModelSubKind = string(subKind)
-		}
 		if algorithm := modelRef.Algorithm(); algorithm != "" {
 			in.ModelAlgorithm = string(algorithm)
 		}
@@ -83,7 +80,7 @@ func NewEvaluationRetryRequestedEvent(a *Assessment, expectedAttempt int, origin
 	}
 	if modelRef := a.EvaluationModelRef(); modelRef != nil && !modelRef.IsEmpty() {
 		in.ModelKind, in.ModelCode, in.ModelVersion = modelRef.Kind().String(), modelRef.Code().String(), modelRef.Version()
-		in.ModelSubKind, in.ModelAlgorithm = string(modelRef.SubKind()), string(modelRef.Algorithm())
+		in.ModelAlgorithm = string(modelRef.Algorithm())
 	}
 	return evaldomainevent.NewRetryRequestedEvent(in)
 }

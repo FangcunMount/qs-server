@@ -362,52 +362,7 @@ func kindsFromListInput(input modelcatalog.ListModelsDTO) ([]domain.Kind, error)
 		}
 		sort.Slice(selected, func(i, j int) bool { return selected[i] < selected[j] })
 	}
-	if input.SubKind != "" {
-		if input.SubKind != string(domain.SubKindTypology) {
-			return nil, errors.WithCode(code.ErrInvalidArgument, "sub_kind is invalid")
-		}
-		hadSelection := len(selected) > 0
-		selected = intersectKinds(selected, []domain.Kind{domain.KindTypology})
-		if hadSelection && len(selected) == 0 {
-			return nil, errors.WithCode(code.ErrInvalidArgument, "kind and sub_kind are incompatible")
-		}
-	}
-	if input.ProductChannel != "" {
-		var legacyKinds []domain.Kind
-		switch domain.ProductChannel(input.ProductChannel) {
-		case domain.ProductChannelMedicalScale:
-			legacyKinds = []domain.Kind{domain.KindScale}
-		case domain.ProductChannelTypology:
-			legacyKinds = []domain.Kind{domain.KindTypology}
-		case domain.ProductChannelBehaviorAbility:
-			legacyKinds = []domain.Kind{domain.KindBehavioralRating, domain.KindCognitive}
-		default:
-			return nil, errors.WithCode(code.ErrInvalidArgument, "product_channel is invalid")
-		}
-		hadSelection := len(selected) > 0
-		selected = intersectKinds(selected, legacyKinds)
-		if hadSelection && len(selected) == 0 {
-			return nil, errors.WithCode(code.ErrInvalidArgument, "kind and product_channel are incompatible")
-		}
-	}
 	return selected, nil
-}
-
-func intersectKinds(current, restriction []domain.Kind) []domain.Kind {
-	if len(current) == 0 {
-		return append([]domain.Kind(nil), restriction...)
-	}
-	allowed := make(map[domain.Kind]struct{}, len(restriction))
-	for _, kind := range restriction {
-		allowed[kind] = struct{}{}
-	}
-	result := make([]domain.Kind, 0, len(current))
-	for _, kind := range current {
-		if _, ok := allowed[kind]; ok {
-			result = append(result, kind)
-		}
-	}
-	return result
 }
 
 func publishedDetailFromModel(model *modelcatalogport.PublishedModel) (*modelcatalog.PublishedModelDetail, error) {
@@ -425,7 +380,6 @@ func publishedDetailFromModel(model *modelcatalogport.PublishedModel) (*modelcat
 		activeVersion = model.Version
 	}
 	summary := modelcatalog.ModelSummary{Code: model.Code, Kind: modelcatalog.DomainKindToAPIKind(model.Kind), Algorithm: string(model.Algorithm), Title: model.Title, Description: model.Description, Status: model.Status, Category: model.Category, Stages: append([]string(nil), model.Stages...), ApplicableAges: append([]string(nil), model.ApplicableAges...), Reporters: append([]string(nil), model.Reporters...), Tags: append([]string(nil), model.Tags...), QuestionnaireCode: model.QuestionnaireCode, QuestionnaireVersion: model.QuestionnaireVersion, ReleaseState: modelcatalog.ReleaseState{WorkingStatus: model.Status, WorkingVersion: model.Version, OnlineStatus: onlineStatus, ActiveVersion: activeVersion}}
-	modelcatalog.PopulateModelSummaryIdentity(&summary, model.Kind, domain.CanonicalSubKindFor(model.Kind), model.Algorithm, domain.DefaultProductChannelFor(model.Kind))
 	summary.DecisionKind = string(model.DecisionKind)
 	return &modelcatalog.PublishedModelDetail{
 		ModelSummary: summary,

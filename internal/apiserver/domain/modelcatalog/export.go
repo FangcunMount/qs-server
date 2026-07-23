@@ -162,6 +162,7 @@ const (
 )
 
 var (
+	ErrLegacyRuntimeIdentity  = identitypkg.ErrLegacyRuntimeIdentity
 	DefaultProductChannelFor  = binding.DefaultProductChannelFor
 	CanonicalSubKindFor       = binding.CanonicalSubKindFor
 	IsCanonicalProductChannel = binding.IsCanonicalProductChannel

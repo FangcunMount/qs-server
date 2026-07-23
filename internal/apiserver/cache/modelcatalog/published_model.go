@@ -358,12 +358,11 @@ func (c *CachedPublishedModelStore) listCatalogCacheKeyAtVersion(filter port.Lis
 	// catalogue version. The version token invalidates every filtered list after
 	// a publish without requiring Redis pattern deletion.
 	raw := fmt.Sprintf(
-		"code=%q&kind=%q&sub_kind=%q&algorithm=%q&product_channel=%q&category=%q&keyword=%q&questionnaire_code=%q&questionnaire_version=%q&page=%d&page_size=%d",
+		"code=%q&kind=%q&kinds=%q&algorithm=%q&category=%q&keyword=%q&questionnaire_code=%q&questionnaire_version=%q&page=%d&page_size=%d",
 		filter.Code,
 		filter.Kind,
-		filter.SubKind,
+		filter.Kinds,
 		filter.Algorithm,
-		filter.ProductChannel,
 		filter.Category,
 		filter.Keyword,
 		filter.QuestionnaireCode,

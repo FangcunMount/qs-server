@@ -25,9 +25,7 @@ type CatalogModelSummary struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	Code                 string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
 	Kind                 string                 `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
-	SubKind              string                 `protobuf:"bytes,3,opt,name=sub_kind,json=subKind,proto3" json:"sub_kind,omitempty"`
 	Algorithm            string                 `protobuf:"bytes,4,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
-	ProductChannel       string                 `protobuf:"bytes,5,opt,name=product_channel,json=productChannel,proto3" json:"product_channel,omitempty"`
 	Title                string                 `protobuf:"bytes,6,opt,name=title,proto3" json:"title,omitempty"`
 	Description          string                 `protobuf:"bytes,7,opt,name=description,proto3" json:"description,omitempty"`
 	Status               string                 `protobuf:"bytes,8,opt,name=status,proto3" json:"status,omitempty"`
@@ -38,11 +36,9 @@ type CatalogModelSummary struct {
 	Tags                 []string               `protobuf:"bytes,13,rep,name=tags,proto3" json:"tags,omitempty"`
 	QuestionnaireCode    string                 `protobuf:"bytes,14,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
 	QuestionnaireVersion string                 `protobuf:"bytes,15,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
-	// Publish-time frozen RuntimeIdentity (MC-R006).
-	AlgorithmFamily string `protobuf:"bytes,16,opt,name=algorithm_family,json=algorithmFamily,proto3" json:"algorithm_family,omitempty"`
-	DecisionKind    string `protobuf:"bytes,17,opt,name=decision_kind,json=decisionKind,proto3" json:"decision_kind,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	DecisionKind         string                 `protobuf:"bytes,17,opt,name=decision_kind,json=decisionKind,proto3" json:"decision_kind,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *CatalogModelSummary) Reset() {
@@ -89,23 +85,9 @@ func (x *CatalogModelSummary) GetKind() string {
 	return ""
 }
 
-func (x *CatalogModelSummary) GetSubKind() string {
-	if x != nil {
-		return x.SubKind
-	}
-	return ""
-}
-
 func (x *CatalogModelSummary) GetAlgorithm() string {
 	if x != nil {
 		return x.Algorithm
-	}
-	return ""
-}
-
-func (x *CatalogModelSummary) GetProductChannel() string {
-	if x != nil {
-		return x.ProductChannel
 	}
 	return ""
 }
@@ -176,13 +158,6 @@ func (x *CatalogModelSummary) GetQuestionnaireCode() string {
 func (x *CatalogModelSummary) GetQuestionnaireVersion() string {
 	if x != nil {
 		return x.QuestionnaireVersion
-	}
-	return ""
-}
-
-func (x *CatalogModelSummary) GetAlgorithmFamily() string {
-	if x != nil {
-		return x.AlgorithmFamily
 	}
 	return ""
 }
@@ -353,7 +328,6 @@ func (x *GetPublishedModelResponse) GetModel() *PublishedAssessmentModel {
 type ListPublishedModelsRequest struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	Kind                 string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
-	SubKind              string                 `protobuf:"bytes,2,opt,name=sub_kind,json=subKind,proto3" json:"sub_kind,omitempty"`
 	Algorithm            string                 `protobuf:"bytes,3,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
 	Category             string                 `protobuf:"bytes,4,opt,name=category,proto3" json:"category,omitempty"`
 	Keyword              string                 `protobuf:"bytes,5,opt,name=keyword,proto3" json:"keyword,omitempty"`
@@ -361,6 +335,7 @@ type ListPublishedModelsRequest struct {
 	QuestionnaireVersion string                 `protobuf:"bytes,7,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
 	Page                 int32                  `protobuf:"varint,8,opt,name=page,proto3" json:"page,omitempty"`
 	PageSize             int32                  `protobuf:"varint,9,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	Kinds                []string               `protobuf:"bytes,10,rep,name=kinds,proto3" json:"kinds,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -398,13 +373,6 @@ func (*ListPublishedModelsRequest) Descriptor() ([]byte, []int) {
 func (x *ListPublishedModelsRequest) GetKind() string {
 	if x != nil {
 		return x.Kind
-	}
-	return ""
-}
-
-func (x *ListPublishedModelsRequest) GetSubKind() string {
-	if x != nil {
-		return x.SubKind
 	}
 	return ""
 }
@@ -456,6 +424,13 @@ func (x *ListPublishedModelsRequest) GetPageSize() int32 {
 		return x.PageSize
 	}
 	return 0
+}
+
+func (x *ListPublishedModelsRequest) GetKinds() []string {
+	if x != nil {
+		return x.Kinds
+	}
+	return nil
 }
 
 type ListPublishedModelsResponse struct {
@@ -827,18 +802,15 @@ func (x *GetCatalogOptionsRequest) GetKind() string {
 }
 
 type GetCatalogOptionsResponse struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Kinds             []*CatalogOption       `protobuf:"bytes,1,rep,name=kinds,proto3" json:"kinds,omitempty"`
-	ProductChannels   []*CatalogOption       `protobuf:"bytes,2,rep,name=product_channels,json=productChannels,proto3" json:"product_channels,omitempty"`
-	AlgorithmFamilies []*CatalogOption       `protobuf:"bytes,3,rep,name=algorithm_families,json=algorithmFamilies,proto3" json:"algorithm_families,omitempty"`
-	Algorithms        []*CatalogOption       `protobuf:"bytes,4,rep,name=algorithms,proto3" json:"algorithms,omitempty"`
-	SubKinds          []*CatalogOption       `protobuf:"bytes,5,rep,name=sub_kinds,json=subKinds,proto3" json:"sub_kinds,omitempty"`
-	Categories        []*CatalogOption       `protobuf:"bytes,6,rep,name=categories,proto3" json:"categories,omitempty"`
-	Stages            []*CatalogOption       `protobuf:"bytes,7,rep,name=stages,proto3" json:"stages,omitempty"`
-	ApplicableAges    []*CatalogOption       `protobuf:"bytes,8,rep,name=applicable_ages,json=applicableAges,proto3" json:"applicable_ages,omitempty"`
-	Reporters         []*CatalogOption       `protobuf:"bytes,9,rep,name=reporters,proto3" json:"reporters,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Kinds          []*CatalogOption       `protobuf:"bytes,1,rep,name=kinds,proto3" json:"kinds,omitempty"`
+	Algorithms     []*CatalogOption       `protobuf:"bytes,4,rep,name=algorithms,proto3" json:"algorithms,omitempty"`
+	Categories     []*CatalogOption       `protobuf:"bytes,6,rep,name=categories,proto3" json:"categories,omitempty"`
+	Stages         []*CatalogOption       `protobuf:"bytes,7,rep,name=stages,proto3" json:"stages,omitempty"`
+	ApplicableAges []*CatalogOption       `protobuf:"bytes,8,rep,name=applicable_ages,json=applicableAges,proto3" json:"applicable_ages,omitempty"`
+	Reporters      []*CatalogOption       `protobuf:"bytes,9,rep,name=reporters,proto3" json:"reporters,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetCatalogOptionsResponse) Reset() {
@@ -878,30 +850,9 @@ func (x *GetCatalogOptionsResponse) GetKinds() []*CatalogOption {
 	return nil
 }
 
-func (x *GetCatalogOptionsResponse) GetProductChannels() []*CatalogOption {
-	if x != nil {
-		return x.ProductChannels
-	}
-	return nil
-}
-
-func (x *GetCatalogOptionsResponse) GetAlgorithmFamilies() []*CatalogOption {
-	if x != nil {
-		return x.AlgorithmFamilies
-	}
-	return nil
-}
-
 func (x *GetCatalogOptionsResponse) GetAlgorithms() []*CatalogOption {
 	if x != nil {
 		return x.Algorithms
-	}
-	return nil
-}
-
-func (x *GetCatalogOptionsResponse) GetSubKinds() []*CatalogOption {
-	if x != nil {
-		return x.SubKinds
 	}
 	return nil
 }
@@ -938,13 +889,11 @@ var File_assessmentmodel_assessment_model_catalog_proto protoreflect.FileDescrip
 
 const file_assessmentmodel_assessment_model_catalog_proto_rawDesc = "" +
 	"\n" +
-	".assessmentmodel/assessment_model_catalog.proto\x12\x0fassessmentmodel\"\xc8\x04\n" +
+	".assessmentmodel/assessment_model_catalog.proto\x12\x0fassessmentmodel\"\x98\x04\n" +
 	"\x13CatalogModelSummary\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
-	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x19\n" +
-	"\bsub_kind\x18\x03 \x01(\tR\asubKind\x12\x1c\n" +
-	"\talgorithm\x18\x04 \x01(\tR\talgorithm\x12'\n" +
-	"\x0fproduct_channel\x18\x05 \x01(\tR\x0eproductChannel\x12\x14\n" +
+	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x1c\n" +
+	"\talgorithm\x18\x04 \x01(\tR\talgorithm\x12\x14\n" +
 	"\x05title\x18\x06 \x01(\tR\x05title\x12 \n" +
 	"\vdescription\x18\a \x01(\tR\vdescription\x12\x16\n" +
 	"\x06status\x18\b \x01(\tR\x06status\x12\x1a\n" +
@@ -955,9 +904,8 @@ const file_assessmentmodel_assessment_model_catalog_proto_rawDesc = "" +
 	"\treporters\x18\f \x03(\tR\treporters\x12\x12\n" +
 	"\x04tags\x18\r \x03(\tR\x04tags\x12-\n" +
 	"\x12questionnaire_code\x18\x0e \x01(\tR\x11questionnaireCode\x123\n" +
-	"\x15questionnaire_version\x18\x0f \x01(\tR\x14questionnaireVersion\x12)\n" +
-	"\x10algorithm_family\x18\x10 \x01(\tR\x0falgorithmFamily\x12#\n" +
-	"\rdecision_kind\x18\x11 \x01(\tR\fdecisionKindJ\x04\b\x12\x10\x13R\x0epayload_format\"\x9d\x01\n" +
+	"\x15questionnaire_version\x18\x0f \x01(\tR\x14questionnaireVersion\x12#\n" +
+	"\rdecision_kind\x18\x11 \x01(\tR\fdecisionKindJ\x04\b\x03\x10\x04J\x04\b\x05\x10\x06J\x04\b\x10\x10\x11J\x04\b\x12\x10\x13R\bsub_kindR\x0fproduct_channelR\x10algorithm_familyR\x0epayload_format\"\x9d\x01\n" +
 	"\x18PublishedAssessmentModel\x12>\n" +
 	"\asummary\x18\x01 \x01(\v2$.assessmentmodel.CatalogModelSummaryR\asummary\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12'\n" +
@@ -966,17 +914,18 @@ const file_assessmentmodel_assessment_model_catalog_proto_rawDesc = "" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\"\\\n" +
 	"\x19GetPublishedModelResponse\x12?\n" +
-	"\x05model\x18\x01 \x01(\v2).assessmentmodel.PublishedAssessmentModelR\x05model\"\xb4\x02\n" +
+	"\x05model\x18\x01 \x01(\v2).assessmentmodel.PublishedAssessmentModelR\x05model\"\xbf\x02\n" +
 	"\x1aListPublishedModelsRequest\x12\x12\n" +
-	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x19\n" +
-	"\bsub_kind\x18\x02 \x01(\tR\asubKind\x12\x1c\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x1c\n" +
 	"\talgorithm\x18\x03 \x01(\tR\talgorithm\x12\x1a\n" +
 	"\bcategory\x18\x04 \x01(\tR\bcategory\x12\x18\n" +
 	"\akeyword\x18\x05 \x01(\tR\akeyword\x12-\n" +
 	"\x12questionnaire_code\x18\x06 \x01(\tR\x11questionnaireCode\x123\n" +
 	"\x15questionnaire_version\x18\a \x01(\tR\x14questionnaireVersion\x12\x12\n" +
 	"\x04page\x18\b \x01(\x05R\x04page\x12\x1b\n" +
-	"\tpage_size\x18\t \x01(\x05R\bpageSize\"\xa7\x01\n" +
+	"\tpage_size\x18\t \x01(\x05R\bpageSize\x12\x14\n" +
+	"\x05kinds\x18\n" +
+	" \x03(\tR\x05kindsJ\x04\b\x02\x10\x03R\bsub_kind\"\xa7\x01\n" +
 	"\x1bListPublishedModelsResponse\x12A\n" +
 	"\x06models\x18\x01 \x03(\v2).assessmentmodel.PublishedAssessmentModelR\x06models\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x03R\x05total\x12\x12\n" +
@@ -1004,21 +953,18 @@ const file_assessmentmodel_assessment_model_catalog_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value\x12\x1a\n" +
 	"\bdisabled\x18\x03 \x01(\bR\bdisabled\".\n" +
 	"\x18GetCatalogOptionsRequest\x12\x12\n" +
-	"\x04kind\x18\x01 \x01(\tR\x04kind\"\xe7\x04\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\"\xd3\x03\n" +
 	"\x19GetCatalogOptionsResponse\x124\n" +
-	"\x05kinds\x18\x01 \x03(\v2\x1e.assessmentmodel.CatalogOptionR\x05kinds\x12I\n" +
-	"\x10product_channels\x18\x02 \x03(\v2\x1e.assessmentmodel.CatalogOptionR\x0fproductChannels\x12M\n" +
-	"\x12algorithm_families\x18\x03 \x03(\v2\x1e.assessmentmodel.CatalogOptionR\x11algorithmFamilies\x12>\n" +
+	"\x05kinds\x18\x01 \x03(\v2\x1e.assessmentmodel.CatalogOptionR\x05kinds\x12>\n" +
 	"\n" +
 	"algorithms\x18\x04 \x03(\v2\x1e.assessmentmodel.CatalogOptionR\n" +
-	"algorithms\x12;\n" +
-	"\tsub_kinds\x18\x05 \x03(\v2\x1e.assessmentmodel.CatalogOptionR\bsubKinds\x12>\n" +
+	"algorithms\x12>\n" +
 	"\n" +
 	"categories\x18\x06 \x03(\v2\x1e.assessmentmodel.CatalogOptionR\n" +
 	"categories\x126\n" +
 	"\x06stages\x18\a \x03(\v2\x1e.assessmentmodel.CatalogOptionR\x06stages\x12G\n" +
 	"\x0fapplicable_ages\x18\b \x03(\v2\x1e.assessmentmodel.CatalogOptionR\x0eapplicableAges\x12<\n" +
-	"\treporters\x18\t \x03(\v2\x1e.assessmentmodel.CatalogOptionR\treporters2\xe4\x03\n" +
+	"\treporters\x18\t \x03(\v2\x1e.assessmentmodel.CatalogOptionR\treportersJ\x04\b\x02\x10\x03J\x04\b\x03\x10\x04J\x04\b\x05\x10\x06R\x10product_channelsR\x12algorithm_familiesR\tsub_kinds2\xe4\x03\n" +
 	"\x1dAssessmentModelCatalogService\x12j\n" +
 	"\x11GetPublishedModel\x12).assessmentmodel.GetPublishedModelRequest\x1a*.assessmentmodel.GetPublishedModelResponse\x12p\n" +
 	"\x13ListPublishedModels\x12+.assessmentmodel.ListPublishedModelsRequest\x1a,.assessmentmodel.ListPublishedModelsResponse\x12y\n" +
@@ -1059,27 +1005,24 @@ var file_assessmentmodel_assessment_model_catalog_proto_depIdxs = []int32{
 	0,  // 3: assessmentmodel.HotPublishedAssessmentModel.summary:type_name -> assessmentmodel.CatalogModelSummary
 	7,  // 4: assessmentmodel.ListHotPublishedModelsResponse.models:type_name -> assessmentmodel.HotPublishedAssessmentModel
 	9,  // 5: assessmentmodel.GetCatalogOptionsResponse.kinds:type_name -> assessmentmodel.CatalogOption
-	9,  // 6: assessmentmodel.GetCatalogOptionsResponse.product_channels:type_name -> assessmentmodel.CatalogOption
-	9,  // 7: assessmentmodel.GetCatalogOptionsResponse.algorithm_families:type_name -> assessmentmodel.CatalogOption
-	9,  // 8: assessmentmodel.GetCatalogOptionsResponse.algorithms:type_name -> assessmentmodel.CatalogOption
-	9,  // 9: assessmentmodel.GetCatalogOptionsResponse.sub_kinds:type_name -> assessmentmodel.CatalogOption
-	9,  // 10: assessmentmodel.GetCatalogOptionsResponse.categories:type_name -> assessmentmodel.CatalogOption
-	9,  // 11: assessmentmodel.GetCatalogOptionsResponse.stages:type_name -> assessmentmodel.CatalogOption
-	9,  // 12: assessmentmodel.GetCatalogOptionsResponse.applicable_ages:type_name -> assessmentmodel.CatalogOption
-	9,  // 13: assessmentmodel.GetCatalogOptionsResponse.reporters:type_name -> assessmentmodel.CatalogOption
-	2,  // 14: assessmentmodel.AssessmentModelCatalogService.GetPublishedModel:input_type -> assessmentmodel.GetPublishedModelRequest
-	4,  // 15: assessmentmodel.AssessmentModelCatalogService.ListPublishedModels:input_type -> assessmentmodel.ListPublishedModelsRequest
-	6,  // 16: assessmentmodel.AssessmentModelCatalogService.ListHotPublishedModels:input_type -> assessmentmodel.ListHotPublishedModelsRequest
-	10, // 17: assessmentmodel.AssessmentModelCatalogService.GetCatalogOptions:input_type -> assessmentmodel.GetCatalogOptionsRequest
-	3,  // 18: assessmentmodel.AssessmentModelCatalogService.GetPublishedModel:output_type -> assessmentmodel.GetPublishedModelResponse
-	5,  // 19: assessmentmodel.AssessmentModelCatalogService.ListPublishedModels:output_type -> assessmentmodel.ListPublishedModelsResponse
-	8,  // 20: assessmentmodel.AssessmentModelCatalogService.ListHotPublishedModels:output_type -> assessmentmodel.ListHotPublishedModelsResponse
-	11, // 21: assessmentmodel.AssessmentModelCatalogService.GetCatalogOptions:output_type -> assessmentmodel.GetCatalogOptionsResponse
-	18, // [18:22] is the sub-list for method output_type
-	14, // [14:18] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	9,  // 6: assessmentmodel.GetCatalogOptionsResponse.algorithms:type_name -> assessmentmodel.CatalogOption
+	9,  // 7: assessmentmodel.GetCatalogOptionsResponse.categories:type_name -> assessmentmodel.CatalogOption
+	9,  // 8: assessmentmodel.GetCatalogOptionsResponse.stages:type_name -> assessmentmodel.CatalogOption
+	9,  // 9: assessmentmodel.GetCatalogOptionsResponse.applicable_ages:type_name -> assessmentmodel.CatalogOption
+	9,  // 10: assessmentmodel.GetCatalogOptionsResponse.reporters:type_name -> assessmentmodel.CatalogOption
+	2,  // 11: assessmentmodel.AssessmentModelCatalogService.GetPublishedModel:input_type -> assessmentmodel.GetPublishedModelRequest
+	4,  // 12: assessmentmodel.AssessmentModelCatalogService.ListPublishedModels:input_type -> assessmentmodel.ListPublishedModelsRequest
+	6,  // 13: assessmentmodel.AssessmentModelCatalogService.ListHotPublishedModels:input_type -> assessmentmodel.ListHotPublishedModelsRequest
+	10, // 14: assessmentmodel.AssessmentModelCatalogService.GetCatalogOptions:input_type -> assessmentmodel.GetCatalogOptionsRequest
+	3,  // 15: assessmentmodel.AssessmentModelCatalogService.GetPublishedModel:output_type -> assessmentmodel.GetPublishedModelResponse
+	5,  // 16: assessmentmodel.AssessmentModelCatalogService.ListPublishedModels:output_type -> assessmentmodel.ListPublishedModelsResponse
+	8,  // 17: assessmentmodel.AssessmentModelCatalogService.ListHotPublishedModels:output_type -> assessmentmodel.ListHotPublishedModelsResponse
+	11, // 18: assessmentmodel.AssessmentModelCatalogService.GetCatalogOptions:output_type -> assessmentmodel.GetCatalogOptionsResponse
+	15, // [15:19] is the sub-list for method output_type
+	11, // [11:15] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_assessmentmodel_assessment_model_catalog_proto_init() }

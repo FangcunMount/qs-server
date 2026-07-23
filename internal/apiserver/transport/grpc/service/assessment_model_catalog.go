@@ -49,7 +49,7 @@ func (s *AssessmentModelCatalogService) GetPublishedModel(ctx context.Context, r
 }
 
 func (s *AssessmentModelCatalogService) ListPublishedModels(ctx context.Context, req *pb.ListPublishedModelsRequest) (*pb.ListPublishedModelsResponse, error) {
-	result, err := s.query.ListPublished(ctx, s.actor, catalogListInput(req.GetKind(), req.GetSubKind(), req.GetAlgorithm(), req.GetCategory(), req.GetKeyword(), req.GetQuestionnaireCode(), req.GetQuestionnaireVersion(), req.GetPage(), req.GetPageSize()))
+	result, err := s.query.ListPublished(ctx, s.actor, catalogListInput(req.GetKind(), req.GetKinds(), req.GetAlgorithm(), req.GetCategory(), req.GetKeyword(), req.GetQuestionnaireCode(), req.GetQuestionnaireVersion(), req.GetPage(), req.GetPageSize()))
 	if err != nil {
 		return nil, catalogStatusError(err)
 	}
@@ -82,25 +82,23 @@ func (s *AssessmentModelCatalogService) GetCatalogOptions(ctx context.Context, r
 		return nil, catalogStatusError(err)
 	}
 	return &pb.GetCatalogOptionsResponse{
-		Kinds: optionValues(result.Kinds), ProductChannels: optionValues(result.ProductChannels), AlgorithmFamilies: optionValues(result.AlgorithmFamilies),
-		Algorithms: optionValues(result.Algorithms), SubKinds: optionValues(result.SubKinds), Categories: optionValues(result.Categories),
+		Kinds: optionValues(result.Kinds), Algorithms: optionValues(result.Algorithms), Categories: optionValues(result.Categories),
 		Stages: optionValues(result.Stages), ApplicableAges: optionValues(result.ApplicableAges), Reporters: optionValues(result.Reporters),
 	}, nil
 }
 
-func catalogListInput(kind, subKind, algorithm, category, keyword, questionnaireCode, questionnaireVersion string, page, pageSize int32) modelcatalog.ListModelsDTO {
-	return modelcatalog.ListModelsDTO{Kind: kind, SubKind: subKind, Algorithm: algorithm, Category: category, Keyword: keyword, QuestionnaireCode: questionnaireCode, QuestionnaireVersion: questionnaireVersion, Page: int(page), PageSize: int(pageSize)}
+func catalogListInput(kind string, kinds []string, algorithm, category, keyword, questionnaireCode, questionnaireVersion string, page, pageSize int32) modelcatalog.ListModelsDTO {
+	return modelcatalog.ListModelsDTO{Kind: kind, Kinds: append([]string(nil), kinds...), Algorithm: algorithm, Category: category, Keyword: keyword, QuestionnaireCode: questionnaireCode, QuestionnaireVersion: questionnaireVersion, Page: int(page), PageSize: int(pageSize)}
 }
 
 func toProtoSummary(summary modelcatalog.ModelSummary) *pb.CatalogModelSummary {
 	return &pb.CatalogModelSummary{
-		Code: summary.Code, Kind: summary.Kind, SubKind: summary.SubKind, Algorithm: summary.Algorithm,
-		ProductChannel: summary.ProductChannel, Title: summary.Title, Description: summary.Description,
+		Code: summary.Code, Kind: summary.Kind, Algorithm: summary.Algorithm, Title: summary.Title, Description: summary.Description,
 		Status: summary.Status, Category: summary.Category,
 		Stages: append([]string(nil), summary.Stages...), ApplicableAges: append([]string(nil), summary.ApplicableAges...),
 		Reporters: append([]string(nil), summary.Reporters...), Tags: append([]string(nil), summary.Tags...),
 		QuestionnaireCode: summary.QuestionnaireCode, QuestionnaireVersion: summary.QuestionnaireVersion,
-		AlgorithmFamily: summary.AlgorithmFamily, DecisionKind: summary.DecisionKind,
+		DecisionKind: summary.DecisionKind,
 	}
 }
 

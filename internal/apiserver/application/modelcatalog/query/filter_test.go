@@ -15,10 +15,7 @@ func TestKindsFromListInput(t *testing.T) {
 		fail  bool
 	}{
 		{name: "deduplicates kinds", input: modelcatalog.ListModelsDTO{Kinds: []string{"cognitive", "behavioral_rating", "cognitive"}}, want: []domain.Kind{domain.KindBehavioralRating, domain.KindCognitive}},
-		{name: "legacy product channel maps to kinds", input: modelcatalog.ListModelsDTO{ProductChannel: "behavior_ability"}, want: []domain.Kind{domain.KindBehavioralRating, domain.KindCognitive}},
-		{name: "legacy sub kind maps to typology", input: modelcatalog.ListModelsDTO{SubKind: "typology"}, want: []domain.Kind{domain.KindTypology}},
 		{name: "kind and kinds are exclusive", input: modelcatalog.ListModelsDTO{Kind: "scale", Kinds: []string{"scale"}}, fail: true},
-		{name: "conflicting legacy filter is rejected", input: modelcatalog.ListModelsDTO{Kind: "scale", ProductChannel: "behavior_ability"}, fail: true},
 		{name: "invalid kind is rejected", input: modelcatalog.ListModelsDTO{Kinds: []string{"unknown"}}, fail: true},
 	}
 	for _, tt := range tests {

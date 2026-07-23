@@ -63,12 +63,11 @@ func TestFromOutcomeRecordPreservesDimensionlessSpecialTypologyFact(t *testing.T
 	record := evaluationfact.NewRecord(evaluationfact.NewRecordInput{
 		ID: meta.FromUint64(30), OrgID: 1, AssessmentID: meta.FromUint64(31), TesteeID: 32, RunID: "31:1",
 		Model: evaluationfact.ModelIdentity{
-			Kind: modelcatalog.KindTypology, SubKind: modelcatalog.SubKindTypology,
+			Kind: modelcatalog.KindTypology,
 			Algorithm: modelcatalog.AlgorithmPersonalityTypology, Code: "SBTI_FUN", Version: "v48",
 		},
 		Runtime: evaluationfact.RuntimeIdentity{
-			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
-			DecisionKind:    modelcatalog.DecisionKindNearestPattern,
+			DecisionKind: modelcatalog.DecisionKindNearestPattern,
 		},
 		SchemaVersion: 2, EvaluatedAt: time.Unix(200, 0), ReportInput: reportInput,
 		Payload: []byte(`{"Detail":{"Payload":{"type_code":"DRUNK","match_percent":100,"is_special":true,"special_trigger":"hidden:drink"}},"Primary":{"Kind":"match_percent","Value":100},"Level":{"Code":"DRUNK"},"Profile":{"Kind":"personality_type","Code":"DRUNK"}}`),
@@ -109,12 +108,11 @@ func TestFromOutcomeRecordRestoresTraitProfileNamesFromFrozenFactorCatalog(t *te
 	record := evaluationfact.NewRecord(evaluationfact.NewRecordInput{
 		ID: meta.FromUint64(40), OrgID: 1, AssessmentID: meta.FromUint64(41), TesteeID: 42, RunID: "41:1",
 		Model: evaluationfact.ModelIdentity{
-			Kind: modelcatalog.KindTypology, SubKind: modelcatalog.SubKindTypology,
+			Kind: modelcatalog.KindTypology,
 			Algorithm: modelcatalog.AlgorithmPersonalityTypology, Code: "ENNEAGRAM_45", Version: "v16",
 		},
 		Runtime: evaluationfact.RuntimeIdentity{
-			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
-			DecisionKind:    modelcatalog.DecisionKindTraitProfile,
+			DecisionKind: modelcatalog.DecisionKindTraitProfile,
 		},
 		SchemaVersion: 2, EvaluatedAt: time.Unix(300, 0), ReportInput: reportInput,
 		Payload: []byte(`{"Dimensions":[{"Code":"type_1","Kind":"trait","Score":{"Kind":"raw_total","Value":8}}],"Profile":{"Kind":"personality_trait"}}`),
@@ -171,8 +169,7 @@ func TestSPMSensoryReportInputHidesHelperFactorFromInterpretation(t *testing.T) 
 			Code: "bJFKi3", Version: "v16", Title: "SPM 感觉处理测量",
 		},
 		Runtime: evaluationfact.RuntimeIdentity{
-			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorNorm,
-			DecisionKind:    modelcatalog.DecisionKindNormLookup,
+			DecisionKind: modelcatalog.DecisionKindNormLookup,
 		},
 		SchemaVersion: 2, EvaluatedAt: time.Unix(400, 0), ReportInput: reportInput,
 		Payload: []byte(`{
@@ -225,8 +222,7 @@ func TestFromOutcomeRecordRejectsMissingReportInputForFactorScoring(t *testing.T
 			Version:   "1.0.0",
 		},
 		Runtime: evaluationfact.RuntimeIdentity{
-			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
-			DecisionKind:    modelcatalog.DecisionKindScoreRange,
+			DecisionKind: modelcatalog.DecisionKindScoreRange,
 		},
 		SchemaVersion: 2,
 		EvaluatedAt:   time.Unix(500, 0),
@@ -277,12 +273,11 @@ func typologyOutcomeRecord(reportInput []byte) *evaluationfact.Record {
 	return evaluationfact.NewRecord(evaluationfact.NewRecordInput{
 		ID: meta.FromUint64(20), OrgID: 1, AssessmentID: meta.FromUint64(10), TesteeID: 2, RunID: "10:1",
 		Model: evaluationfact.ModelIdentity{
-			Kind: modelcatalog.KindTypology, SubKind: modelcatalog.SubKindTypology,
+			Kind: modelcatalog.KindTypology,
 			Algorithm: modelcatalog.AlgorithmPersonalityTypology, Code: "PERSONALITY", Version: "1.0.0",
 		},
 		Runtime: evaluationfact.RuntimeIdentity{
-			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
-			DecisionKind:    modelcatalog.DecisionKindPoleComposition,
+			DecisionKind: modelcatalog.DecisionKindPoleComposition,
 		},
 		SchemaVersion: 2, EvaluatedAt: time.Unix(100, 0), ReportInput: reportInput,
 		Payload: []byte(`{"Detail":{"Payload":{"type_code":"INTJ","match_percent":80}},"Primary":{"Kind":"match_percent","Value":80,"Label":"INTJ"},"Profile":{"Kind":"personality_type","Code":"INTJ"}}`),

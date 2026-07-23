@@ -3,42 +3,24 @@ package modelcatalog
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
 )
 
 // CatalogReader is the published-model contract consumed by collection-server
 // application code. It intentionally has no scale-specific DTO methods.
 type CatalogReader interface {
 	GetPublishedModel(context.Context, string, string) (*CatalogModel, error)
-	ListPublishedModels(context.Context, string, string, string, string, string, string, string, int32, int32) (*CatalogList, error)
+	ListPublishedModels(context.Context, string, []string, string, string, string, string, string, int32, int32) (*CatalogList, error)
 	ListHotPublishedModels(context.Context, string, int32, int32) (*HotCatalogList, error)
 	GetCatalogOptions(context.Context, string) (*CatalogOptions, error)
 }
 
 type QueryService struct {
-	client        CatalogReader
-	compatibility IdentityCompatibility
+	client CatalogReader
 }
 
-func NewQueryService(client CatalogReader, compatibility ...IdentityCompatibility) *QueryService {
-	service := &QueryService{client: client}
-	if len(compatibility) > 0 {
-		service.compatibility = compatibility[0]
-	}
-	return service
-}
-
-// LegacyIdentityFields are Phase-1 response-only compatibility fields.
-// They must never become part of CatalogModel or any reader contract.
-type LegacyIdentityFields struct {
-	SubKind, ProductChannel, AlgorithmFamily string
-}
-
-// IdentityCompatibility belongs to the collection ACL boundary. Its concrete
-// implementation may use the central server normalizer, while this application
-// package remains independent from the apiserver domain.
-type IdentityCompatibility interface {
-	DeriveLegacyIdentity(kind, algorithm, decisionKind string) LegacyIdentityFields
-}
+func NewQueryService(client CatalogReader) *QueryService { return &QueryService{client: client} }
 
 // CatalogModel is the application-owned published-model DTO returned by the
 // collection catalogue port. It contains canonical DefinitionV2 JSON only.
@@ -89,24 +71,13 @@ type CatalogOption struct {
 }
 
 type CatalogOptions struct {
-	Kinds             []CatalogOption
-	ProductChannels   []CatalogOption
-	AlgorithmFamilies []CatalogOption
-	Algorithms        []CatalogOption
-	SubKinds          []CatalogOption
-	Categories        []CatalogOption
-	Stages            []CatalogOption
-	ApplicableAges    []CatalogOption
-	Reporters         []CatalogOption
+	Kinds, Algorithms, Categories, Stages, ApplicableAges, Reporters []CatalogOption
 }
 
 type ModelResponse struct {
 	Code                 string          `json:"code"`
 	Kind                 string          `json:"kind"`
-	SubKind              string          `json:"sub_kind,omitempty"`
 	Algorithm            string          `json:"algorithm,omitempty"`
-	ProductChannel       string          `json:"product_channel,omitempty"`
-	AlgorithmFamily      string          `json:"algorithm_family,omitempty"`
 	DecisionKind         string          `json:"decision_kind,omitempty"`
 	Version              string          `json:"version,omitempty"`
 	Title                string          `json:"title"`
@@ -123,7 +94,7 @@ type ModelResponse struct {
 }
 type ListRequest struct {
 	Kind                 string `form:"kind"`
-	SubKind              string `form:"sub_kind"`
+	Kinds                string `form:"kinds"`
 	Algorithm            string `form:"algorithm"`
 	Category             string `form:"category"`
 	Keyword              string `form:"keyword"`
@@ -131,6 +102,7 @@ type ListRequest struct {
 	QuestionnaireVersion string `form:"questionnaire_version"`
 	Page                 int32  `form:"page"`
 	PageSize             int32  `form:"page_size"`
+	kinds                []string
 }
 type ListResponse struct {
 	Models   []ModelResponse `json:"models"`
@@ -161,15 +133,12 @@ type OptionResponse struct {
 	Disabled bool   `json:"disabled,omitempty"`
 }
 type OptionsResponse struct {
-	Kinds             []OptionResponse `json:"kinds"`
-	ProductChannels   []OptionResponse `json:"product_channels"`
-	AlgorithmFamilies []OptionResponse `json:"algorithm_families"`
-	Algorithms        []OptionResponse `json:"algorithms"`
-	SubKinds          []OptionResponse `json:"sub_kinds"`
-	Categories        []OptionResponse `json:"categories"`
-	Stages            []OptionResponse `json:"stages"`
-	ApplicableAges    []OptionResponse `json:"applicable_ages"`
-	Reporters         []OptionResponse `json:"reporters"`
+	Kinds          []OptionResponse `json:"kinds"`
+	Algorithms     []OptionResponse `json:"algorithms"`
+	Categories     []OptionResponse `json:"categories"`
+	Stages         []OptionResponse `json:"stages"`
+	ApplicableAges []OptionResponse `json:"applicable_ages"`
+	Reporters      []OptionResponse `json:"reporters"`
 }
 
 func (s *QueryService) Get(ctx context.Context, code string) (*ModelResponse, error) {
@@ -186,11 +155,13 @@ func (s *QueryService) List(ctx context.Context, request *ListRequest) (*ListRes
 	if request == nil {
 		request = &ListRequest{}
 	}
-	normalizeList(request)
+	if err := normalizeList(request); err != nil {
+		return nil, err
+	}
 	if s == nil || s.client == nil {
 		return nil, nil
 	}
-	value, err := s.client.ListPublishedModels(ctx, request.Kind, request.SubKind, request.Algorithm, request.Category, request.Keyword, request.QuestionnaireCode, request.QuestionnaireVersion, request.Page, request.PageSize)
+	value, err := s.client.ListPublishedModels(ctx, request.Kind, request.kinds, request.Algorithm, request.Category, request.Keyword, request.QuestionnaireCode, request.QuestionnaireVersion, request.Page, request.PageSize)
 	if err != nil || value == nil {
 		return nil, err
 	}
@@ -234,7 +205,7 @@ func (s *QueryService) Options(ctx context.Context, kind string) (*OptionsRespon
 	if err != nil || value == nil {
 		return nil, err
 	}
-	return &OptionsResponse{Kinds: options(value.Kinds), ProductChannels: options(value.ProductChannels), AlgorithmFamilies: options(value.AlgorithmFamilies), Algorithms: options(value.Algorithms), SubKinds: options(value.SubKinds), Categories: options(value.Categories), Stages: options(value.Stages), ApplicableAges: options(value.ApplicableAges), Reporters: options(value.Reporters)}, nil
+	return &OptionsResponse{Kinds: options(value.Kinds), Algorithms: options(value.Algorithms), Categories: options(value.Categories), Stages: options(value.Stages), ApplicableAges: options(value.ApplicableAges), Reporters: options(value.Reporters)}, nil
 }
 
 // VisibleFactorCodes resolves the factor-score report mapping from canonical
@@ -247,25 +218,38 @@ func (s *QueryService) VisibleFactorCodes(ctx context.Context, code string) (map
 	}
 	return visibleFactorCodesFromDefinition(model.Definition)
 }
-func normalizeList(request *ListRequest) {
+func normalizeList(request *ListRequest) error {
+	if request.Kind != "" && strings.TrimSpace(request.Kinds) != "" {
+		return fmt.Errorf("kind and kinds cannot be used together")
+	}
+	if request.Kinds != "" {
+		seen := make(map[string]struct{})
+		for _, raw := range strings.Split(request.Kinds, ",") {
+			kind := strings.TrimSpace(raw)
+			if kind == "" {
+				continue
+			}
+			if _, exists := seen[kind]; exists {
+				continue
+			}
+			seen[kind] = struct{}{}
+			request.kinds = append(request.kinds, kind)
+		}
+	}
 	if request.Page <= 0 {
 		request.Page = 1
 	}
 	if request.PageSize <= 0 || request.PageSize > 100 {
 		request.PageSize = 20
 	}
+	return nil
 }
 func (s *QueryService) modelResponse(value *CatalogModel) *ModelResponse {
 	if value == nil {
 		return nil
 	}
-	legacy := LegacyIdentityFields{}
-	if s != nil && s.compatibility != nil {
-		legacy = s.compatibility.DeriveLegacyIdentity(value.Kind, value.Algorithm, value.DecisionKind)
-	}
 	return &ModelResponse{
-		Code: value.Code, Kind: value.Kind, SubKind: legacy.SubKind, Algorithm: value.Algorithm,
-		ProductChannel: legacy.ProductChannel, AlgorithmFamily: legacy.AlgorithmFamily, DecisionKind: value.DecisionKind,
+		Code: value.Code, Kind: value.Kind, Algorithm: value.Algorithm, DecisionKind: value.DecisionKind,
 		Version: value.Version, Title: value.Title, Description: value.Description, Status: value.Status, Category: value.Category,
 		Stages: append([]string(nil), value.Stages...), ApplicableAges: append([]string(nil), value.ApplicableAges...),
 		Reporters: append([]string(nil), value.Reporters...), Tags: append([]string(nil), value.Tags...),
