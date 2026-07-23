@@ -55,7 +55,7 @@ func NewInterpretationAutomationClient(manager *Manager) *InterpretationAutomati
 func (c *InterpretationAutomationClient) GenerateReportFromOutcome(ctx context.Context, outcomeID string) (*interpretationpb.GenerateReportFromAssessmentResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
 	defer cancel()
-	resp, err := c.client.GenerateReportFromAssessment(ctx, &interpretationpb.GenerateReportFromAssessmentRequest{OutcomeId: outcomeID})
+	resp, err := c.client.GenerateReportFromOutcome(ctx, &interpretationpb.GenerateReportFromOutcomeRequest{OutcomeId: outcomeID})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate report from outcome: %w", err)
 	}

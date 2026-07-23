@@ -99,6 +99,7 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 		)
 		deps.Interpretation.ClinicianService = c.ReportModule.ClinicianService()
 		deps.Interpretation.OperationsService = c.ReportModule.OperationsService()
+		deps.Interpretation.CatalogReconcile = c.ReportModule.CatalogReconcileService()
 	}
 	if c.PlanModule != nil {
 		var testeeAccess actorAccessApp.TesteeAccessService
@@ -395,6 +396,7 @@ func (c *Container) BuildServerRuntimeDeps() ServerRuntimeDeps {
 	}
 	if c.EvaluationModule != nil {
 		recoverers := []evaluationScheduler.LeaseRecoverer{}
+		auditors := []evaluationScheduler.ConsistencyAuditor{}
 		leaseRecoveryEnabled := c.systemGovernanceOptions == nil || c.systemGovernanceOptions.Retry == nil || c.systemGovernanceOptions.Retry.LeaseReconcileEnabled
 		if leaseRecoveryEnabled && c.EvaluationModule.LeaseRecoverer != nil {
 			recoverers = append(recoverers, c.EvaluationModule.LeaseRecoverer)
@@ -402,7 +404,14 @@ func (c *Container) BuildServerRuntimeDeps() ServerRuntimeDeps {
 		if leaseRecoveryEnabled && c.ReportModule != nil && c.ReportModule.LeaseRecoverer() != nil {
 			recoverers = append(recoverers, c.ReportModule.LeaseRecoverer())
 		}
-		deps.EvaluationConsistencyReconcileService = evaluationScheduler.NewGovernedService(c.EvaluationModule.SchedulerService, recoverers...)
+		if c.ReportModule != nil && c.ReportModule.CatalogReconcileAuditor() != nil {
+			auditors = append(auditors, c.ReportModule.CatalogReconcileAuditor())
+		}
+		deps.EvaluationConsistencyReconcileService = evaluationScheduler.NewGovernedServiceWithAuditors(
+			c.EvaluationModule.SchedulerService,
+			auditors,
+			recoverers...,
+		)
 	}
 
 	return deps

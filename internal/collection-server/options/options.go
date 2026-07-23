@@ -505,6 +505,9 @@ func (o *Options) Validate() []error {
 	if o.Resilience == nil || o.Resilience.Control == nil {
 		errs = append(errs, fmt.Errorf("resilience.control cannot be nil"))
 	}
+	if err := o.DelegatedSubject.Validate(); err != nil {
+		errs = append(errs, err)
+	}
 
 	return errs
 }

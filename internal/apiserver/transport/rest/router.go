@@ -15,6 +15,7 @@ import (
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	interpretationcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/catalogreconcile"
 	interpretationclinician "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
 	interpretationoperations "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/operations"
 	reportqueryjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
@@ -136,6 +137,7 @@ type InterpretationDeps struct {
 	ReportWaitJourney  reportwaitjourney.Service
 	ClinicianService   interpretationclinician.Service
 	OperationsService  interpretationoperations.Service
+	CatalogReconcile   interpretationcatalog.Service
 }
 
 type PlanDeps struct {

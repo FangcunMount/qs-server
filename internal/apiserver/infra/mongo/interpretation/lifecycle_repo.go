@@ -10,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/operations"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
@@ -390,6 +391,32 @@ func (r *ReportRepository) FindByID(ctx context.Context, id meta.ID) (*domainrep
 		return nil, fmt.Errorf("find interpretation report by id: %w", err)
 	}
 	return r.mapper.ReportToDomain(&po)
+}
+
+func (r *ReportRepository) FindMetadataByID(ctx context.Context, id meta.ID) (*operations.ArtifactMetadata, error) {
+	var po InterpretReportPO
+	err := r.Collection().FindOne(
+		ctx,
+		bson.M{"domain_id": id.Uint64()},
+		options.FindOne().SetProjection(bson.M{
+			"domain_id":     1,
+			"org_id":        1,
+			"assessment_id": 1,
+			"generation_id": 1,
+		}),
+	).Decode(&po)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, domainreport.ErrInterpretReportNotFound
+		}
+		return nil, fmt.Errorf("find interpretation report metadata by id: %w", err)
+	}
+	return &operations.ArtifactMetadata{
+		ID:           po.DomainID,
+		OrgID:        po.OrgID,
+		AssessmentID: meta.FromUint64(po.AssessmentID),
+		GenerationID: meta.FromUint64(po.GenerationID),
+	}, nil
 }
 
 func (r *ReportRepository) FindByGenerationID(ctx context.Context, generationID meta.ID) (*domainreport.InterpretReport, error) {

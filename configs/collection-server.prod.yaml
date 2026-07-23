@@ -240,6 +240,15 @@ iam:
     ttl: 10m
     max-size: 20000
 
+# 调用 ParticipantReportService 时签发 IAM User -> Testee 委托凭据。
+# current-key 必须与 apiserver 当前验证密钥一致，并通过
+# QS_DELEGATED_SUBJECT_CURRENT_KEY 注入；previous-key 仅用于轮换兼容。
+delegated-subject:
+  enabled: true
+  current-key: ""
+  previous-key: ""
+  ttl: 5m
+
 # ============================================================
 # 5. 系统配置
 # ============================================================

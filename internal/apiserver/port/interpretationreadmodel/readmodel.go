@@ -115,6 +115,28 @@ type ReportRow struct {
 	CreatedAt           time.Time
 }
 
+type CurrentReportMetadataStatus string
+
+const (
+	CurrentReportMetadataFound    CurrentReportMetadataStatus = "found"
+	CurrentReportMetadataMissing  CurrentReportMetadataStatus = "missing"
+	CurrentReportMetadataDangling CurrentReportMetadataStatus = "dangling"
+	CurrentReportMetadataMismatch CurrentReportMetadataStatus = "mismatch"
+)
+
+type CurrentReportMetadata struct {
+	AssessmentID     uint64
+	Status           CurrentReportMetadataStatus
+	CreatedAt        time.Time
+	SourceKind       string
+	SourceID         uint64
+	MismatchedFields []string
+}
+
+type BatchReportMetadataReader interface {
+	GetCurrentReportMetadataByAssessmentIDs(context.Context, []uint64) (map[uint64]CurrentReportMetadata, error)
+}
+
 type PresentationProfileRow struct {
 	VisibleFactorCodes []string
 	Source             string

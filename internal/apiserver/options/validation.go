@@ -36,6 +36,9 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateStatisticsSync(o.StatisticsSync)...)
 	errs = append(errs, validateCacheOptions(o.Cache)...)
 	errs = append(errs, validateRetryGovernance(o.SystemGovernance)...)
+	if err := o.DelegatedSubject.Validate(); err != nil {
+		errs = append(errs, err)
+	}
 
 	errs = append(errs, redisruntime.ValidateRuntimeOptions(
 		o.RedisRuntime,

@@ -132,7 +132,7 @@ func TestInternalServiceHasNoEvaluationJourneyRPCs(t *testing.T) {
 		t.Fatal("InternalService is unterminated")
 	}
 	body := source[start : start+end]
-	for _, rpc := range []string{"CalculateAnswerSheetScore", "CreateAssessmentFromAnswerSheet", "EvaluateAssessment", "GenerateReportFromAssessment"} {
+	for _, rpc := range []string{"CalculateAnswerSheetScore", "CreateAssessmentFromAnswerSheet", "EvaluateAssessment", "GenerateReportFromOutcome", "GenerateReportFromAssessment"} {
 		if strings.Contains(body, "rpc "+rpc+"(") {
 			t.Fatalf("InternalService still owns %s", rpc)
 		}

@@ -162,6 +162,7 @@ func TestCommitPersistsEvaluationFactsAndEventInOneTransaction(t *testing.T) {
 		Input:         commitTestInput(),
 		Execution:     execution,
 		DescriptorKey: evalpipeline.DescriptorKey{DecisionKind: modelcatalog.DecisionKindScoreRange},
+		OutcomePolicy: evalpipeline.DefaultOutcomeCompletenessPolicy(modelcatalog.DecisionKindScoreRange),
 		Run:           &run,
 		EvaluatedAt:   evaluatedAt,
 	})
@@ -267,6 +268,7 @@ func TestCommitFreezesTraitProfileWithoutOutcomeRegistry(t *testing.T) {
 	record, err := c.Commit(context.Background(), CommitRequest{
 		Assessment: a, Input: input, Execution: execution,
 		DescriptorKey: evalpipeline.DescriptorKey{DecisionKind: modelcatalog.DecisionKindTraitProfile},
+		OutcomePolicy: evalpipeline.DefaultOutcomeCompletenessPolicy(modelcatalog.DecisionKindTraitProfile),
 		Run:           &run, EvaluatedAt: time.Unix(300, 0),
 	})
 	if err != nil {
@@ -354,6 +356,7 @@ func TestCommitFailureDoesNotPublishPreparedTerminalStateToCaller(t *testing.T) 
 				Input:         commitTestInput(),
 				Execution:     execution,
 				DescriptorKey: evalpipeline.DescriptorKey{DecisionKind: modelcatalog.DecisionKindScoreRange},
+				OutcomePolicy: evalpipeline.DefaultOutcomeCompletenessPolicy(modelcatalog.DecisionKindScoreRange),
 				Run:           &run,
 				EvaluatedAt:   time.Unix(200, 0),
 			})

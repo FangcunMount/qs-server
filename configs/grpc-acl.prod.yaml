@@ -1,0 +1,14 @@
+# Production gRPC method ACL.
+#
+# The service_name is the mTLS identity extracted from the collection-server
+# client certificate. Keep the default policy deny so a missing rule never
+# widens access.
+
+default_policy: deny
+
+services:
+  - service_name: qs-collection.svc
+    enabled: true
+    description: collection-server BFF may call participant report APIs only
+    allowed_methods:
+      - /interpretation.ParticipantReportService/*

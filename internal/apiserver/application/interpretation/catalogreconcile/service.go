@@ -3,6 +3,7 @@ package catalogreconcile
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
@@ -59,6 +60,44 @@ type service struct {
 
 func NewService(store Store) Service {
 	return &service{store: store}
+}
+
+// ScheduledAuditor adapts read-only catalog reconciliation to the shared
+// HA consistency scheduler without running on every fast lease-recovery tick.
+type ScheduledAuditor struct {
+	service     Service
+	minInterval time.Duration
+	mu          sync.Mutex
+	lastRun     time.Time
+	now         func() time.Time
+}
+
+func NewScheduledAuditor(service Service, minInterval time.Duration) *ScheduledAuditor {
+	if minInterval <= 0 {
+		minInterval = 10 * time.Minute
+	}
+	return &ScheduledAuditor{service: service, minInterval: minInterval, now: time.Now}
+}
+
+// AuditOnce implements the Evaluation scheduler consistency-auditor contract.
+// The scheduler's limit applies to repairable assessment rows; catalog drift is
+// count-only and uses its own fixed Mongo batch size.
+func (a *ScheduledAuditor) AuditOnce(ctx context.Context, _ int) (int, error) {
+	if a == nil || a.service == nil {
+		return 0, fmt.Errorf("catalog reconcile auditor is not configured")
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	now := a.now()
+	if !a.lastRun.IsZero() && now.Sub(a.lastRun) < a.minInterval {
+		return 0, nil
+	}
+	counts, err := a.service.ReconcileOnce(ctx, Filter{})
+	if err != nil {
+		return 0, err
+	}
+	a.lastRun = now
+	return int(counts.Total()), nil
 }
 
 // ReconcileOnce is dry-run by design: it only counts drift and emits metrics.

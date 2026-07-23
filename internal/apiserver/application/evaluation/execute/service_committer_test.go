@@ -63,6 +63,9 @@ func TestEvaluateDelegatesSuccessfulTerminalPersistenceToEvaluationCommitter(t *
 	if committer.calls != 1 || committer.request.Run == nil || committer.request.Run.Attempt().Status.String() != "succeeded" {
 		t.Fatalf("committer request = %#v calls=%d", committer.request, committer.calls)
 	}
+	if err := committer.request.OutcomePolicy.Validate(); err != nil {
+		t.Fatalf("committer outcome policy = %#v: %v", committer.request.OutcomePolicy, err)
+	}
 	for _, saved := range runRepo.saved {
 		if saved.Attempt().Status.String() == "succeeded" {
 			t.Fatalf("service persisted succeeded run outside committer: %#v", runRepo.saved)

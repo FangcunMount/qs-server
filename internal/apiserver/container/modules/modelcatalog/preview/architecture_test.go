@@ -12,10 +12,13 @@ func TestPreviewRemainsIndependentInProcessComposition(t *testing.T) {
 		t.Fatal(err)
 	}
 	source := string(data)
-	for _, required := range []string{"executor.Execute(", "rendering.NewTypologyBuilder().Build("} {
+	for _, required := range []string{"executor.Execute(", "ResolveByMechanism(", "reportBuilder.Build("} {
 		if !strings.Contains(source, required) {
 			t.Fatalf("preview composition must contain %q", required)
 		}
+	}
+	if strings.Contains(source, "rendering.NewTypologyBuilder(") {
+		t.Fatal("preview must resolve builders through the shared registry")
 	}
 	for _, forbidden := range []string{"OutcomeReportService", "GenerateByOutcomeID", "ReportDurableSaver", "application/interpretation"} {
 		if strings.Contains(source, forbidden) {

@@ -96,9 +96,11 @@ grpc:
   auth:
     enabled: false  # 内部服务通信无需 JWT，mTLS 已提供身份验证
 
-  # ACL 配置（未来扩展）
+  # 方法级 ACL：默认拒绝，只允许 collection-server 访问患者报告服务。
   acl:
-    enabled: false
+    enabled: true
+    config-file: "configs/grpc-acl.prod.yaml"
+    default-policy: "deny"
 
   # 审计配置（未来扩展）
   audit:
@@ -107,6 +109,16 @@ grpc:
   # 功能开关
   enable-reflection: false    # 生产环境禁用反射（安全考虑）
   enable-health-check: true   # 启用健康检查
+
+# collection-server 代表 IAM User 调用患者报告 gRPC 时的短期委托凭据。
+# 密钥只允许通过环境变量注入：
+#   QS_DELEGATED_SUBJECT_CURRENT_KEY
+#   QS_DELEGATED_SUBJECT_PREVIOUS_KEY（轮换窗口可选）
+delegated-subject:
+  enabled: true
+  current-key: ""
+  previous-key: ""
+  ttl: 5m
 
 # ============================================================================
 # 3. 数据存储配置

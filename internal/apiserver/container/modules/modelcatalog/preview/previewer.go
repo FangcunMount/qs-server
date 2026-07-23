@@ -9,28 +9,42 @@ package preview
 
 import (
 	"context"
+	"fmt"
 
 	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
+	interpretationbuilder "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelpreview"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // Previewer implements modelpreview.ReportPreviewer.
-type Previewer struct{}
+type Previewer struct {
+	builders rendering.Registry
+	initErr  error
+}
 
 // NewPreviewer builds a report previewer.
-func NewPreviewer() *Previewer { return &Previewer{} }
+func NewPreviewer() *Previewer {
+	registry, err := rendering.NewDefaultRegistry(interpretationbuilder.NewDefaultReportBuilder())
+	return &Previewer{builders: registry, initErr: err}
+}
 
 var _ modelpreview.ReportPreviewer = (*Previewer)(nil)
 
 // PreviewReport runs the typology executor and report builder against a
 // synthetic submitted assessment, then projects the transient result.
 func (p *Previewer) PreviewReport(ctx context.Context, req modelpreview.Request) (*modelpreview.Result, error) {
+	if p == nil || p.initErr != nil || p.builders == nil {
+		if p != nil && p.initErr != nil {
+			return nil, p.initErr
+		}
+		return nil, fmt.Errorf("preview report builder registry is not configured")
+	}
 	submitted, err := buildSubmittedAssessment(req)
 	if err != nil {
 		return nil, err
@@ -50,7 +64,15 @@ func (p *Previewer) PreviewReport(ctx context.Context, req modelpreview.Request)
 	if err != nil {
 		return nil, err
 	}
-	draft, err := rendering.NewTypologyBuilder().Build(ctx, input)
+	key, ok := rendering.KeyFromInput(input)
+	if !ok {
+		return nil, fmt.Errorf("preview interpretation routing context is incomplete")
+	}
+	reportBuilder, err := p.builders.ResolveByMechanism(key)
+	if err != nil {
+		return nil, err
+	}
+	draft, err := reportBuilder.Build(ctx, input)
 	if err != nil {
 		return nil, err
 	}

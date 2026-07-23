@@ -16,6 +16,23 @@ type Options struct {
 // DefaultTTL is used when ttl is not configured.
 const DefaultTTL = 5 * time.Minute
 
+// Validate returns an error when an enabled production-facing delegated
+// subject configuration cannot both sign and verify newly issued tokens.
+// PreviousKey is deliberately optional: it only exists for a bounded rotation
+// window and must never be the sole configured key.
+func (o *Options) Validate() error {
+	if o == nil || !o.Enabled {
+		return nil
+	}
+	if len(o.CurrentKey) == 0 {
+		return fmt.Errorf("delegated subject current key is required when enabled")
+	}
+	if o.TTL <= 0 {
+		return fmt.Errorf("delegated subject ttl must be greater than zero when enabled")
+	}
+	return nil
+}
+
 // Signer signs delegated-subject tokens for outbound internal RPCs.
 type Signer struct {
 	key []byte

@@ -3,6 +3,7 @@ package interpretation
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
@@ -40,6 +41,159 @@ func (r *reportReadModel) GetReportByAssessmentID(ctx context.Context, assessmen
 		return nil, err
 	}
 	return &rows[0], nil
+}
+
+func (r *reportReadModel) GetCurrentReportMetadataByAssessmentIDs(ctx context.Context, assessmentIDs []uint64) (map[uint64]readmodel.CurrentReportMetadata, error) {
+	result := make(map[uint64]readmodel.CurrentReportMetadata, len(assessmentIDs))
+	uniqueIDs := make([]uint64, 0, len(assessmentIDs))
+	for _, assessmentID := range assessmentIDs {
+		if assessmentID == 0 {
+			continue
+		}
+		if _, exists := result[assessmentID]; exists {
+			continue
+		}
+		result[assessmentID] = readmodel.CurrentReportMetadata{AssessmentID: assessmentID, Status: readmodel.CurrentReportMetadataMissing}
+		uniqueIDs = append(uniqueIDs, assessmentID)
+	}
+	if len(uniqueIDs) == 0 {
+		return result, nil
+	}
+
+	cursor, err := r.catalog.Find(
+		ctx,
+		bson.M{"assessment_id": bson.M{"$in": uniqueIDs}},
+		options.Find().SetProjection(bson.M{
+			"assessment_id": 1,
+			"org_id":        1,
+			"testee_id":     1,
+			"source_kind":   1,
+			"source_id":     1,
+		}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+	entries := make([]ReportCatalogPO, 0, len(uniqueIDs))
+	for cursor.Next(ctx) {
+		var entry ReportCatalogPO
+		if err := cursor.Decode(&entry); err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	sources, err := r.loadCatalogSourceMetadata(ctx, entries)
+	if err != nil {
+		return nil, err
+	}
+	for _, entry := range entries {
+		item := readmodel.CurrentReportMetadata{
+			AssessmentID: entry.AssessmentID,
+			Status:       readmodel.CurrentReportMetadataDangling,
+			SourceKind:   entry.SourceKind,
+			SourceID:     entry.SourceID,
+		}
+		source, found := sources[fmt.Sprintf("%s:%d", entry.SourceKind, entry.SourceID)]
+		if found {
+			item.CreatedAt = source.CreatedAt
+			if fields := MismatchedAssociationFields(entry, source.Association); len(fields) > 0 {
+				item.Status = readmodel.CurrentReportMetadataMismatch
+				item.MismatchedFields = fields
+			} else {
+				item.Status = readmodel.CurrentReportMetadataFound
+			}
+		}
+		result[entry.AssessmentID] = item
+	}
+	return result, nil
+}
+
+type catalogSourceMetadata struct {
+	Association CatalogSourceAssociation
+	CreatedAt   time.Time
+}
+
+func (r *reportReadModel) loadCatalogSourceMetadata(ctx context.Context, entries []ReportCatalogPO) (map[string]catalogSourceMetadata, error) {
+	artifactIDs, archiveIDs := make([]uint64, 0, len(entries)), make([]uint64, 0, len(entries))
+	for _, entry := range entries {
+		switch entry.SourceKind {
+		case ReportCatalogSourceArtifact:
+			artifactIDs = append(artifactIDs, entry.SourceID)
+		case ReportCatalogSourceArchive:
+			archiveIDs = append(archiveIDs, entry.SourceID)
+		}
+	}
+	result := make(map[string]catalogSourceMetadata, len(entries))
+	if len(artifactIDs) > 0 {
+		cursor, err := r.reports.Find(
+			ctx,
+			bson.M{"domain_id": bson.M{"$in": artifactIDs}, "deleted_at": nil},
+			options.Find().SetProjection(bson.M{
+				"domain_id":     1,
+				"assessment_id": 1,
+				"org_id":        1,
+				"testee_id":     1,
+				"generated_at":  1,
+			}),
+		)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = cursor.Close(ctx) }()
+		for cursor.Next(ctx) {
+			var po InterpretReportPO
+			if err := cursor.Decode(&po); err != nil {
+				return nil, err
+			}
+			result[fmt.Sprintf("%s:%d", ReportCatalogSourceArtifact, po.DomainID.Uint64())] = catalogSourceMetadata{
+				Association: CatalogSourceAssociation{AssessmentID: po.AssessmentID, OrgID: po.OrgID, HasOrgID: true, TesteeID: po.TesteeID},
+				CreatedAt:   po.GeneratedAt,
+			}
+		}
+		if err := cursor.Err(); err != nil {
+			return nil, err
+		}
+	}
+	if len(archiveIDs) > 0 {
+		cursor, err := r.archives.Find(
+			ctx,
+			bson.M{"domain_id": bson.M{"$in": archiveIDs}, "deleted_at": nil},
+			options.Find().SetProjection(bson.M{
+				"domain_id":  1,
+				"org_id":     1,
+				"testee_id":  1,
+				"created_at": 1,
+			}),
+		)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = cursor.Close(ctx) }()
+		for cursor.Next(ctx) {
+			var po ArchivedReportPO
+			if err := cursor.Decode(&po); err != nil {
+				return nil, err
+			}
+			association := CatalogSourceAssociation{AssessmentID: po.DomainID.Uint64(), TesteeID: po.TesteeID}
+			if po.OrgID != nil {
+				association.OrgID = *po.OrgID
+				association.HasOrgID = true
+			}
+			result[fmt.Sprintf("%s:%d", ReportCatalogSourceArchive, po.DomainID.Uint64())] = catalogSourceMetadata{
+				Association: association,
+				CreatedAt:   po.CreatedAt,
+			}
+		}
+		if err := cursor.Err(); err != nil {
+			return nil, err
+		}
+	}
+	return result, nil
 }
 
 func (r *reportReadModel) ListReports(ctx context.Context, filter readmodel.ReportFilter, page readmodel.PageRequest) ([]readmodel.ReportRow, int64, error) {

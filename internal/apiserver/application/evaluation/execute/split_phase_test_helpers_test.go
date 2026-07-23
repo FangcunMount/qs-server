@@ -61,6 +61,7 @@ func withTestEvaluator(evaluator testEvaluator) EngineOption {
 		decision := evaluation.DecisionKindForFamily(family)
 		if err := registry.Register(evalpipeline.RuntimeDescriptor{
 			Key: evalpipeline.DescriptorKey{DecisionKind: decision}, AlgorithmFamily: family, DecisionKind: decision,
+			CompletenessPolicy: evalpipeline.DefaultOutcomeCompletenessPolicy(decision),
 		}); err != nil {
 			panic(err)
 		}

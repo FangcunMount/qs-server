@@ -6,6 +6,7 @@ import (
 	"context"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/queryerror"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reportprojection"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
@@ -55,7 +56,7 @@ func (s *service) GetMyReport(ctx context.Context, actor Actor, query GetQuery) 
 	}
 	row, err := s.reader.GetReportByAssessmentID(ctx, query.AssessmentID)
 	if err != nil {
-		return nil, cberrors.WrapC(err, code.ErrInterpretReportNotFound, "报告不存在")
+		return nil, queryerror.MapReadError(err)
 	}
 	return s.projection.FromRow(ctx, *row, policy.AudienceParticipant)
 }
@@ -74,7 +75,7 @@ func (s *service) ListMyReports(ctx context.Context, actor Actor, query ListQuer
 	testeeID := actor.TesteeID
 	rows, total, err := s.reader.ListReports(ctx, interpretationreadmodel.ReportFilter{TesteeID: &testeeID}, interpretationreadmodel.PageRequest{Page: page, PageSize: pageSize})
 	if err != nil {
-		return nil, cberrors.WrapC(err, code.ErrDatabase, "查询报告列表失败")
+		return nil, queryerror.MapReadError(err)
 	}
 	items := make([]*Report, 0, len(rows))
 	for _, row := range rows {

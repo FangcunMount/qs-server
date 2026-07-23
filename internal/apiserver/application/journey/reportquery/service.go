@@ -89,6 +89,26 @@ func (s *service) ListAssessmentProjection(ctx context.Context, scope Scope, que
 		return nil, err
 	}
 	out := &AssessmentListProjection{Items: make([]*AssessmentProjection, 0, len(result.Items)), Total: result.Total, Page: result.Page, PageSize: result.PageSize, TotalPages: result.TotalPages}
+	if batchReader, ok := s.reader.(interpretationreadmodel.BatchReportMetadataReader); ok {
+		assessmentIDs := make([]uint64, 0, len(result.Items))
+		for _, item := range result.Items {
+			if item != nil && item.Status == "evaluated" {
+				assessmentIDs = append(assessmentIDs, item.ID)
+			}
+		}
+		metadata, metadataErr := batchReader.GetCurrentReportMetadataByAssessmentIDs(ctx, assessmentIDs)
+		if metadataErr != nil {
+			return nil, metadataErr
+		}
+		for _, item := range result.Items {
+			projected, projectErr := projectAssessmentFromMetadata(item, metadata)
+			if projectErr != nil {
+				return nil, projectErr
+			}
+			out.Items = append(out.Items, projected)
+		}
+		return out, nil
+	}
 	for _, item := range result.Items {
 		projected, projectErr := s.ProjectAssessment(ctx, item)
 		if projectErr != nil {
@@ -97,6 +117,43 @@ func (s *service) ListAssessmentProjection(ctx context.Context, scope Scope, que
 		out.Items = append(out.Items, projected)
 	}
 	return out, nil
+}
+
+func projectAssessmentFromMetadata(result *evaluationoperator.Assessment, metadata map[uint64]interpretationreadmodel.CurrentReportMetadata) (*AssessmentProjection, error) {
+	projected := &AssessmentProjection{Assessment: result}
+	if result == nil {
+		return projected, nil
+	}
+	projected.Status = result.Status
+	if result.Status != "evaluated" {
+		return projected, nil
+	}
+	item, ok := metadata[result.ID]
+	if !ok || item.Status == interpretationreadmodel.CurrentReportMetadataMissing {
+		return projected, nil
+	}
+	switch item.Status {
+	case interpretationreadmodel.CurrentReportMetadataFound:
+		projected.Status = "interpreted"
+		at := item.CreatedAt
+		projected.InterpretedAt = &at
+		return projected, nil
+	case interpretationreadmodel.CurrentReportMetadataDangling:
+		return nil, &interpretationreadmodel.CatalogDanglingSourceError{
+			AssessmentID: item.AssessmentID,
+			SourceKind:   item.SourceKind,
+			SourceID:     item.SourceID,
+		}
+	case interpretationreadmodel.CurrentReportMetadataMismatch:
+		return nil, &interpretationreadmodel.CatalogSourceAssociationMismatchError{
+			AssessmentID:     item.AssessmentID,
+			SourceKind:       item.SourceKind,
+			SourceID:         item.SourceID,
+			MismatchedFields: item.MismatchedFields,
+		}
+	default:
+		return nil, errors.New("unsupported interpretation report metadata status")
+	}
 }
 
 // ProjectAssessment 投影评估

@@ -13,6 +13,7 @@ import (
 	interpretationadmin "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
 	interpretationautomation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
 	interpretationexecution "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/execution"
+	interpretationcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/catalogreconcile"
 	interpretationclinician "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
 	interpretationoperations "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/operations"
 	interpretationparticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
@@ -50,6 +51,8 @@ type Module struct {
 	administrationService interpretationadmin.Service
 	clinicianService      interpretationclinician.Service
 	operationsService     interpretationoperations.Service
+	catalogReconcile      interpretationcatalog.Service
+	catalogAuditor        *interpretationcatalog.ScheduledAuditor
 	governedRetryService  interpretationautomation.GovernedRetryService
 	leaseRecoverer        interpretationautomation.LeaseRecoverer
 	txRunner              apptransaction.Runner
@@ -81,6 +84,10 @@ func New(deps Deps) (*Module, error) {
 	module.ReportStatusReporter = reportStatusReporter
 	mongoOptions := mongoBase.BaseRepositoryOptions{Limiter: deps.MongoLimiter}
 	module.reader = mongoEval.NewReportReadModel(deps.MongoDB, mongoOptions)
+	module.catalogReconcile = interpretationcatalog.NewService(catalogReconcileStoreAdapter{
+		store: mongoEval.NewCatalogReconcileStore(deps.MongoDB),
+	})
+	module.catalogAuditor = interpretationcatalog.NewScheduledAuditor(module.catalogReconcile, 10*time.Minute)
 	generationRepo, err := mongoEval.NewGenerationRepository(deps.MongoDB, mongoOptions)
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report generation repository: %v", err)
@@ -184,6 +191,43 @@ func (m *Module) OperationsService() interpretationoperations.Service {
 		return nil
 	}
 	return m.operationsService
+}
+
+func (m *Module) CatalogReconcileService() interpretationcatalog.Service {
+	if m == nil {
+		return nil
+	}
+	return m.catalogReconcile
+}
+
+func (m *Module) CatalogReconcileAuditor() *interpretationcatalog.ScheduledAuditor {
+	if m == nil {
+		return nil
+	}
+	return m.catalogAuditor
+}
+
+type catalogReconcileStoreAdapter struct {
+	store *mongoEval.CatalogReconcileStore
+}
+
+func (a catalogReconcileStoreAdapter) CountDrifts(
+	ctx context.Context,
+	filter interpretationcatalog.Filter,
+) (interpretationcatalog.DriftCounts, error) {
+	if a.store == nil {
+		return interpretationcatalog.DriftCounts{}, fmt.Errorf("catalog reconcile store is not configured")
+	}
+	counts, err := a.store.CountDrifts(ctx, mongoEval.CatalogReconcileFilter{
+		OrgID: filter.OrgID, SortAtAfter: filter.SortAtAfter, SortAtBefore: filter.SortAtBefore,
+	})
+	if err != nil {
+		return interpretationcatalog.DriftCounts{}, err
+	}
+	return interpretationcatalog.DriftCounts{
+		Missing: counts.Missing, Dangling: counts.Dangling,
+		AssociationMismatch: counts.AssociationMismatch, WrongWinner: counts.WrongWinner,
+	}, nil
 }
 
 func (m *Module) ReportReader() evaluationreadmodel.ReportReader {
@@ -305,8 +349,7 @@ func (m *Module) ReportTemplateService() appreporttemplate.Service {
 }
 
 func buildReportBuilderRegistry() (rendering.Registry, error) {
-	builders := rendering.DefaultBuilders(interpretationbuilder.NewDefaultReportBuilder())
-	registry, err := rendering.NewRegistry(builders...)
+	registry, err := rendering.NewDefaultRegistry(interpretationbuilder.NewDefaultReportBuilder())
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report builder registry: %v", err)
 	}

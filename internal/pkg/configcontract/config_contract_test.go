@@ -13,6 +13,7 @@ import (
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	collectionconfig "github.com/FangcunMount/qs-server/internal/collection-server/config"
 	collectionoptions "github.com/FangcunMount/qs-server/internal/collection-server/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
@@ -28,6 +29,7 @@ func TestAPIServerDevProdConfigContracts(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			opts := apiserveroptions.NewOptions()
 			loadConfig(t, filepath.Join(repoRoot(t), "configs", name), opts)
+			prepareDelegatedSubjectContract(t, name, opts.DelegatedSubject)
 			stubSecureTLSFiles(t, opts.SecureServing)
 			completeAndValidate(t, opts)
 			cfg, err := apiserverconfig.CreateConfigFromOptions(opts)
@@ -59,6 +61,7 @@ func TestAPIServerDevProdConfigContracts(t *testing.T) {
 			assertSystemGovernanceConfig(t, name, opts.SystemGovernance)
 			assertStatisticsCacheContract(t, name, opts.Cache)
 			assertIAMJWKSURLContract(t, "apiserver", name, opts.IAMOptions)
+			assertAPIServerGRPCTrustContract(t, name, opts)
 			assertEventCatalogLoads(t)
 		})
 	}
@@ -94,6 +97,7 @@ func TestCollectionDevProdConfigContracts(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			opts := collectionoptions.NewOptions()
 			loadConfig(t, filepath.Join(repoRoot(t), "configs", name), opts)
+			prepareDelegatedSubjectContract(t, name, opts.DelegatedSubject)
 			stubSecureTLSFiles(t, opts.SecureServing)
 			completeAndValidate(t, opts)
 			cfg, err := collectionconfig.CreateConfigFromOptions(opts)
@@ -116,6 +120,55 @@ func TestCollectionDevProdConfigContracts(t *testing.T) {
 			}
 			assertIAMJWKSURLContract(t, "collection", name, opts.IAMOptions)
 		})
+	}
+}
+
+func prepareDelegatedSubjectContract(t *testing.T, configName string, opts *delegatedsubject.Options) {
+	t.Helper()
+	if !strings.Contains(configName, ".prod.") {
+		return
+	}
+	if opts == nil || !opts.Enabled {
+		t.Fatalf("%s delegated-subject must be present and enabled", configName)
+	}
+	if opts.TTL != delegatedsubject.DefaultTTL {
+		t.Fatalf("%s delegated-subject ttl = %s, want %s", configName, opts.TTL, delegatedsubject.DefaultTTL)
+	}
+	if opts.CurrentKey != "" || opts.PreviousKey != "" {
+		t.Fatalf("%s delegated-subject keys must not be committed to config", configName)
+	}
+	// Production injects this value through QS_DELEGATED_SUBJECT_CURRENT_KEY.
+	// Supply a non-secret test value only after proving the file itself is empty.
+	opts.CurrentKey = "config-contract-test-key"
+}
+
+func assertAPIServerGRPCTrustContract(t *testing.T, configName string, opts *apiserveroptions.Options) {
+	t.Helper()
+	if !strings.Contains(configName, ".prod.") {
+		return
+	}
+	if opts.GRPCOptions == nil || opts.GRPCOptions.ACL == nil || !opts.GRPCOptions.ACL.Enabled {
+		t.Fatalf("%s grpc ACL must be enabled", configName)
+	}
+	if opts.GRPCOptions.ACL.DefaultPolicy != "deny" {
+		t.Fatalf("%s grpc ACL default policy = %q, want deny", configName, opts.GRPCOptions.ACL.DefaultPolicy)
+	}
+	if opts.GRPCOptions.ACL.ConfigFile != "configs/grpc-acl.prod.yaml" {
+		t.Fatalf("%s grpc ACL config file = %q", configName, opts.GRPCOptions.ACL.ConfigFile)
+	}
+	data, err := os.ReadFile(filepath.Join(repoRoot(t), opts.GRPCOptions.ACL.ConfigFile))
+	if err != nil {
+		t.Fatalf("read production grpc ACL: %v", err)
+	}
+	rules := string(data)
+	for _, required := range []string{
+		"default_policy: deny",
+		"service_name: qs-collection.svc",
+		"/interpretation.ParticipantReportService/*",
+	} {
+		if !strings.Contains(rules, required) {
+			t.Fatalf("production grpc ACL must contain %q", required)
+		}
 	}
 }
 

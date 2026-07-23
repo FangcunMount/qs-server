@@ -57,6 +57,13 @@ type registry struct {
 	items map[builderIndexKey]Builder
 }
 
+// NewDefaultRegistry is the single production/preview composition for
+// Interpretation builders. Callers may replace the output adapter around a
+// resolved Builder, but must not bypass mechanism resolution.
+func NewDefaultRegistry(composer report.DraftBuilder) (Registry, error) {
+	return NewRegistry(DefaultBuilders(composer)...)
+}
+
 // builderIndexKey is an in-process index detail. AlgorithmFamily is deliberately
 // derived from DecisionKind here rather than accepted from report input.
 type builderIndexKey struct {

@@ -33,6 +33,7 @@ type CommitRequest struct {
 	Input         *evaluationinput.InputSnapshot
 	Execution     *domainoutcome.Execution
 	DescriptorKey evalpipeline.DescriptorKey
+	OutcomePolicy evalpipeline.OutcomeCompletenessPolicy
 	Run           *evalrun.EvaluationRun
 	EvaluatedAt   time.Time
 }
@@ -198,6 +199,9 @@ func (c *committer) validate(request CommitRequest) error {
 	}
 	if request.DescriptorKey.DecisionKind == "" {
 		return fmt.Errorf("evaluation descriptor identity is incomplete")
+	}
+	if err := request.OutcomePolicy.ValidateExecution(request.Execution); err != nil {
+		return fmt.Errorf("evaluation outcome completeness: %w", err)
 	}
 	return nil
 }

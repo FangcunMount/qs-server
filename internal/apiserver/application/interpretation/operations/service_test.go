@@ -22,13 +22,26 @@ func TestOperationsRejectsUnconfiguredServiceBeforeRepositoryAccess(t *testing.T
 
 func TestOperationsRequiresAuditPermissionBeforeRepositoryRead(t *testing.T) {
 	g := &genRepo{}
-	s := NewService(outcome{}, g, runRepo{}, reportRepo{}, access{err: context.Canceled})
+	s := NewService(outcome{}, g, runRepo{}, &reportRepo{}, access{err: context.Canceled})
 	_, err := s.FindGenerationsByOutcomeID(context.Background(), Actor{OrgID: 1, OperatorUserID: 1}, meta.ID(2))
 	if err == nil {
 		t.Fatal("expected permission error")
 	}
 	if g.calls != 0 {
 		t.Fatal("repository read before authorization")
+	}
+}
+
+func TestFindReportAuthorizesMetadataBeforeReadingArtifact(t *testing.T) {
+	reports := &reportRepo{metadata: &ArtifactMetadata{ID: meta.ID(9), OrgID: 8}}
+	service := NewService(outcome{}, &genRepo{}, runRepo{}, reports, access{err: context.Canceled})
+
+	_, err := service.FindReportByID(context.Background(), Actor{OrgID: 8, OperatorUserID: 1}, meta.ID(9))
+	if err == nil {
+		t.Fatal("expected authorization error")
+	}
+	if reports.metadataCalls != 1 || reports.fullCalls != 0 {
+		t.Fatalf("metadata/full calls = %d/%d, want 1/0", reports.metadataCalls, reports.fullCalls)
 	}
 }
 
@@ -73,15 +86,24 @@ func (runRepo) FindLatestByGenerationID(context.Context, meta.ID) (*domainrun.In
 }
 func (runRepo) Save(context.Context, *domainrun.InterpretationRun) error { return nil }
 
-type reportRepo struct{}
+type reportRepo struct {
+	metadata      *ArtifactMetadata
+	metadataCalls int
+	fullCalls     int
+}
 
-func (reportRepo) Insert(context.Context, *domainreport.InterpretReport) error { return nil }
-func (reportRepo) FindByID(context.Context, meta.ID) (*domainreport.InterpretReport, error) {
+func (*reportRepo) Insert(context.Context, *domainreport.InterpretReport) error { return nil }
+func (r *reportRepo) FindMetadataByID(context.Context, meta.ID) (*ArtifactMetadata, error) {
+	r.metadataCalls++
+	return r.metadata, nil
+}
+func (r *reportRepo) FindByID(context.Context, meta.ID) (*domainreport.InterpretReport, error) {
+	r.fullCalls++
 	return nil, nil
 }
-func (reportRepo) FindByGenerationID(context.Context, meta.ID) (*domainreport.InterpretReport, error) {
+func (*reportRepo) FindByGenerationID(context.Context, meta.ID) (*domainreport.InterpretReport, error) {
 	return nil, nil
 }
-func (reportRepo) ListByAssessmentID(context.Context, meta.ID) ([]*domainreport.InterpretReport, error) {
+func (*reportRepo) ListByAssessmentID(context.Context, meta.ID) ([]*domainreport.InterpretReport, error) {
 	return nil, nil
 }

@@ -18,12 +18,13 @@ func TestRuntimeResolverUsesDescriptorPrimaryPath(t *testing.T) {
 
 	registry := evalpipeline.NewRuntimeDescriptorRegistry()
 	if err := registry.Register(evalpipeline.RuntimeDescriptor{
-		Key:              evalpipeline.DescriptorKey{DecisionKind: modelcatalog.DecisionKindScoreRange},
-		AlgorithmFamily:  modelcatalog.AlgorithmFamilyFactorScoring,
-		ExecutionPath:    modelcatalog.ExecutionPathScaleDescriptor,
-		InputAssembler:   runtimeStubInputAssembler{},
-		Calculator:       runtimeStubCalculator{},
-		OutcomeAssembler: runtimeStubOutcomeAssembler{},
+		Key:                evalpipeline.DescriptorKey{DecisionKind: modelcatalog.DecisionKindScoreRange},
+		AlgorithmFamily:    modelcatalog.AlgorithmFamilyFactorScoring,
+		ExecutionPath:      modelcatalog.ExecutionPathScaleDescriptor,
+		CompletenessPolicy: evalpipeline.DefaultOutcomeCompletenessPolicy(modelcatalog.DecisionKindScoreRange),
+		InputAssembler:     runtimeStubInputAssembler{},
+		Calculator:         runtimeStubCalculator{},
+		OutcomeAssembler:   runtimeStubOutcomeAssembler{},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -69,12 +70,13 @@ func TestRuntimeResolverRejectsFrozenRouteWithoutFallingBackToAssessment(t *test
 
 	registry := evalpipeline.NewRuntimeDescriptorRegistry()
 	if err := registry.Register(evalpipeline.RuntimeDescriptor{
-		Key:              evalpipeline.DescriptorKey{DecisionKind: modelcatalog.DecisionKindScoreRange},
-		AlgorithmFamily:  modelcatalog.AlgorithmFamilyFactorScoring,
-		ExecutionPath:    modelcatalog.ExecutionPathScaleDescriptor,
-		InputAssembler:   runtimeStubInputAssembler{},
-		Calculator:       runtimeStubCalculator{},
-		OutcomeAssembler: runtimeStubOutcomeAssembler{},
+		Key:                evalpipeline.DescriptorKey{DecisionKind: modelcatalog.DecisionKindScoreRange},
+		AlgorithmFamily:    modelcatalog.AlgorithmFamilyFactorScoring,
+		ExecutionPath:      modelcatalog.ExecutionPathScaleDescriptor,
+		CompletenessPolicy: evalpipeline.DefaultOutcomeCompletenessPolicy(modelcatalog.DecisionKindScoreRange),
+		InputAssembler:     runtimeStubInputAssembler{},
+		Calculator:         runtimeStubCalculator{},
+		OutcomeAssembler:   runtimeStubOutcomeAssembler{},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -112,12 +114,13 @@ func TestRuntimeResolverRejectsIncompleteInput(t *testing.T) {
 
 	registry := evalpipeline.NewRuntimeDescriptorRegistry()
 	if err := registry.Register(evalpipeline.RuntimeDescriptor{
-		Key:              evalpipeline.DescriptorKey{DecisionKind: modelcatalog.DecisionKindScoreRange},
-		AlgorithmFamily:  modelcatalog.AlgorithmFamilyFactorScoring,
-		ExecutionPath:    modelcatalog.ExecutionPathScaleDescriptor,
-		InputAssembler:   runtimeStubInputAssembler{},
-		Calculator:       runtimeStubCalculator{},
-		OutcomeAssembler: runtimeStubOutcomeAssembler{},
+		Key:                evalpipeline.DescriptorKey{DecisionKind: modelcatalog.DecisionKindScoreRange},
+		AlgorithmFamily:    modelcatalog.AlgorithmFamilyFactorScoring,
+		ExecutionPath:      modelcatalog.ExecutionPathScaleDescriptor,
+		CompletenessPolicy: evalpipeline.DefaultOutcomeCompletenessPolicy(modelcatalog.DecisionKindScoreRange),
+		InputAssembler:     runtimeStubInputAssembler{},
+		Calculator:         runtimeStubCalculator{},
+		OutcomeAssembler:   runtimeStubOutcomeAssembler{},
 	}); err != nil {
 		t.Fatal(err)
 	}

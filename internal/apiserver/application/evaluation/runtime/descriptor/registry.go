@@ -36,6 +36,9 @@ func (r *RuntimeDescriptorRegistry) Register(desc RuntimeDescriptor) error {
 	if family, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(key.DecisionKind); !ok || family != desc.AlgorithmFamily {
 		return fmt.Errorf("runtime descriptor identity conflict: %s", key)
 	}
+	if err := desc.CompletenessPolicy.Validate(); err != nil {
+		return fmt.Errorf("runtime descriptor %s: %w", key, err)
+	}
 	if _, exists := r.byKey[key]; exists {
 		return fmt.Errorf("runtime descriptor already registered for %s", key)
 	}

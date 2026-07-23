@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/executionmetrics"
 	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
@@ -106,7 +107,14 @@ func (e *executor) Execute(ctx context.Context, input interpinput.Interpretation
 	}
 }
 
-func (e *executor) buildAndCommit(ctx context.Context, input interpinput.InterpretationInput, generationRecord *domaingeneration.ReportGeneration, runRecord *interpretationrun.InterpretationRun) (*ExecuteResult, error) {
+func (e *executor) buildAndCommit(ctx context.Context, input interpinput.InterpretationInput, generationRecord *domaingeneration.ReportGeneration, runRecord *interpretationrun.InterpretationRun) (result *ExecuteResult, resultErr error) {
+	runStartedAt := time.Now()
+	builderIdentity := ""
+	runResult := executionmetrics.ResultError
+	defer func() {
+		executionmetrics.ObserveRun(builderIdentity, runResult, time.Since(runStartedAt))
+	}()
+
 	key, ok := rendering.KeyFromInput(input)
 	if !ok {
 		return nil, e.fail(ctx, generationRecord, runRecord, input, interpretationrun.Failure{Kind: interpretationrun.FailureKindInput, Code: "unsupported_mechanism", SafeMessage: "报告生成配置不受支持", Retryable: false})
@@ -115,14 +123,19 @@ func (e *executor) buildAndCommit(ctx context.Context, input interpinput.Interpr
 	if err != nil {
 		return nil, e.fail(ctx, generationRecord, runRecord, input, interpretationrun.Failure{Kind: interpretationrun.FailureKindTemplate, Code: "builder_not_found", SafeMessage: "报告生成器未配置", Retryable: false})
 	}
+	builderIdentity = builder.BuilderIdentity()
+	buildStartedAt := time.Now()
 	draft, err := builder.Build(ctx, input)
 	if err != nil {
+		executionmetrics.ObserveBuild(builderIdentity, executionmetrics.ResultError, time.Since(buildStartedAt))
 		e.logBuildError(ctx, "builder", err, generationRecord, runRecord, builder)
 		return nil, e.fail(ctx, generationRecord, runRecord, input, interpretationrun.Failure{Kind: interpretationrun.FailureKindBuild, Code: "build_failed", SafeMessage: "报告生成失败", Retryable: true})
 	}
 	if draft == nil {
+		executionmetrics.ObserveBuild(builderIdentity, executionmetrics.ResultError, time.Since(buildStartedAt))
 		return nil, e.fail(ctx, generationRecord, runRecord, input, interpretationrun.Failure{Kind: interpretationrun.FailureKindBuild, Code: "empty_draft", SafeMessage: "报告生成失败", Retryable: true})
 	}
+	executionmetrics.ObserveBuild(builderIdentity, executionmetrics.ResultSuccess, time.Since(buildStartedAt))
 
 	at := e.now()
 	artifact, err := domainreport.NewInterpretReport(domainreport.InterpretReportInput{
@@ -152,6 +165,7 @@ func (e *executor) buildAndCommit(ctx context.Context, input interpinput.Interpr
 		"builder_identity", builder.BuilderIdentity(),
 		"result", "success",
 	)
+	runResult = executionmetrics.ResultSuccess
 	return &ExecuteResult{Status: ExecuteStatusGenerated, Generation: committed.Generation, Run: committed.Run, InterpretReport: committed.InterpretReport}, nil
 }
 

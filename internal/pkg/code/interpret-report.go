@@ -19,6 +19,9 @@ const (
 
 	// ErrInterpretItemInvalid - 400: Interpret item is invalid.
 	ErrInterpretItemInvalid
+
+	// ErrInterpretReportConsistency - 500: Report catalog and immutable source disagree.
+	ErrInterpretReportConsistency
 )
 
 func init() {
@@ -28,4 +31,5 @@ func init() {
 	register(ErrInterpretReportGenerationFailed, 500, "Interpret report generation failed")
 	register(ErrInterpretItemNotFound, 404, "Interpret item not found")
 	register(ErrInterpretItemInvalid, 400, "Interpret item is invalid")
+	register(ErrInterpretReportConsistency, 500, "report temporarily unavailable")
 }

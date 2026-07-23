@@ -60,6 +60,31 @@ func TestVerifierAcceptsPreviousKeyDuringRotation(t *testing.T) {
 	}
 }
 
+func TestEnabledOptionsRequireCurrentKeyAndPositiveTTL(t *testing.T) {
+	tests := []struct {
+		name string
+		opts *Options
+		ok   bool
+	}{
+		{name: "nil", opts: nil, ok: true},
+		{name: "disabled", opts: &Options{}, ok: true},
+		{name: "previous only", opts: &Options{Enabled: true, PreviousKey: "old", TTL: time.Minute}},
+		{name: "missing ttl", opts: &Options{Enabled: true, CurrentKey: "current"}},
+		{name: "valid", opts: &Options{Enabled: true, CurrentKey: "current", TTL: DefaultTTL}, ok: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.opts.Validate()
+			if tc.ok && err != nil {
+				t.Fatalf("Validate() error = %v", err)
+			}
+			if !tc.ok && err == nil {
+				t.Fatal("Validate() error = nil")
+			}
+		})
+	}
+}
+
 func TestVerifierRejectsTamperedTestee(t *testing.T) {
 	signer, _ := NewSignerFromOptions(testOptions("key-a", ""))
 	verifier, _ := NewVerifierFromOptions(testOptions("key-a", ""))

@@ -8,7 +8,11 @@ import (
 
 func TestRegistryResolvesOnlyExactFamilyDecision(t *testing.T) {
 	registry := NewRuntimeDescriptorRegistry()
-	desc := RuntimeDescriptor{Key: DescriptorKey{DecisionKind: modelcatalog.DecisionKindTraitProfile}, AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification, DecisionKind: modelcatalog.DecisionKindTraitProfile, ExecutionPath: modelcatalog.ExecutionPathTypologyDescriptor}
+	desc := RuntimeDescriptor{
+		Key: DescriptorKey{DecisionKind: modelcatalog.DecisionKindTraitProfile}, AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+		DecisionKind: modelcatalog.DecisionKindTraitProfile, ExecutionPath: modelcatalog.ExecutionPathTypologyDescriptor,
+		CompletenessPolicy: DefaultOutcomeCompletenessPolicy(modelcatalog.DecisionKindTraitProfile),
+	}
 	if err := registry.Register(desc); err != nil {
 		t.Fatal(err)
 	}
@@ -25,5 +29,15 @@ func TestRegistryRejectsIncompleteKey(t *testing.T) {
 	err := registry.Register(RuntimeDescriptor{AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring})
 	if err == nil {
 		t.Fatal("Register accepted descriptor without decision kind")
+	}
+}
+
+func TestRegistryRejectsMissingOutcomeCompletenessPolicy(t *testing.T) {
+	registry := NewRuntimeDescriptorRegistry()
+	err := registry.Register(RuntimeDescriptor{
+		Key: DescriptorKey{DecisionKind: modelcatalog.DecisionKindScoreRange}, AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
+	})
+	if err == nil {
+		t.Fatal("Register accepted descriptor without outcome completeness policy")
 	}
 }

@@ -294,6 +294,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		Input:         input,
 		Execution:     evaluationOutcome,
 		DescriptorKey: resolved.DescriptorKey,
+		OutcomePolicy: resolved.Descriptor.CompletenessPolicy,
 		Run:           &evaluationRun,
 		EvaluatedAt:   time.Now(),
 	})

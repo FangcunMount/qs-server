@@ -15,6 +15,7 @@ const (
 	CatalogDriftDangling            = "dangling"
 	CatalogDriftAssociationMismatch = "association_mismatch"
 	CatalogDriftWrongWinner         = "wrong_winner"
+	catalogReconcileBatchSize       = 500
 )
 
 // CatalogReconcileFilter scopes read-only catalog drift scans.
@@ -104,26 +105,137 @@ func (s *CatalogReconcileStore) countDangling(ctx context.Context, filter Catalo
 }
 
 func (s *CatalogReconcileStore) countAssociationMismatch(ctx context.Context, filter CatalogReconcileFilter) (int64, error) {
+	var total int64
+	for _, sourceKind := range []string{ReportCatalogSourceArtifact, ReportCatalogSourceArchive} {
+		count, err := s.countAssociationMismatchForSource(ctx, filter, sourceKind)
+		if err != nil {
+			return 0, err
+		}
+		total += count
+	}
+	return total, nil
+}
+
+func (s *CatalogReconcileStore) countAssociationMismatchForSource(
+	ctx context.Context,
+	filter CatalogReconcileFilter,
+	sourceKind string,
+) (int64, error) {
+	var total int64
+	var afterAssessmentID uint64
 	catalog := s.db.Collection((ReportCatalogPO{}).CollectionName())
-	artifact, err := aggregateCount(ctx, catalog, associationMismatchPipeline(
-		ReportCatalogSourceArtifact,
-		(InterpretReportPO{}).CollectionName(),
-		catalogMatchStage(filter),
-		artifactAssociationMismatchExpr(),
-	))
-	if err != nil {
-		return 0, err
+	for {
+		query := catalogMatchStage(filter)
+		query["source_kind"] = sourceKind
+		if afterAssessmentID != 0 {
+			query["assessment_id"] = bson.M{"$gt": afterAssessmentID}
+		}
+		cur, err := catalog.Find(ctx, query, options.Find().
+			SetSort(bson.D{{Key: "assessment_id", Value: 1}}).
+			SetLimit(catalogReconcileBatchSize))
+		if err != nil {
+			return 0, err
+		}
+		entries := make([]ReportCatalogPO, 0, catalogReconcileBatchSize)
+		for cur.Next(ctx) {
+			var entry ReportCatalogPO
+			if err := cur.Decode(&entry); err != nil {
+				_ = cur.Close(ctx)
+				return 0, err
+			}
+			entries = append(entries, entry)
+		}
+		if err := cur.Err(); err != nil {
+			_ = cur.Close(ctx)
+			return 0, err
+		}
+		_ = cur.Close(ctx)
+		if len(entries) == 0 {
+			return total, nil
+		}
+		sources, err := s.loadCatalogSourceAssociations(ctx, sourceKind, entries)
+		if err != nil {
+			return 0, err
+		}
+		total += countAssociationMismatches(entries, sources)
+		afterAssessmentID = entries[len(entries)-1].AssessmentID
+		if len(entries) < catalogReconcileBatchSize {
+			return total, nil
+		}
 	}
-	archive, err := aggregateCount(ctx, catalog, associationMismatchPipeline(
-		ReportCatalogSourceArchive,
-		(ArchivedReportPO{}).CollectionName(),
-		catalogMatchStage(filter),
-		archiveAssociationMismatchExpr(),
-	))
-	if err != nil {
-		return 0, err
+}
+
+func (s *CatalogReconcileStore) loadCatalogSourceAssociations(
+	ctx context.Context,
+	sourceKind string,
+	entries []ReportCatalogPO,
+) (map[uint64]CatalogSourceAssociation, error) {
+	ids := make([]uint64, 0, len(entries))
+	for _, entry := range entries {
+		ids = append(ids, entry.SourceID)
 	}
-	return artifact + archive, nil
+	sources := make(map[uint64]CatalogSourceAssociation, len(ids))
+	switch sourceKind {
+	case ReportCatalogSourceArtifact:
+		cur, err := s.db.Collection((InterpretReportPO{}).CollectionName()).Find(
+			ctx,
+			bson.M{"domain_id": bson.M{"$in": ids}, "deleted_at": nil},
+			options.Find().SetProjection(bson.M{"domain_id": 1, "assessment_id": 1, "org_id": 1, "testee_id": 1}),
+		)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = cur.Close(ctx) }()
+		for cur.Next(ctx) {
+			var po InterpretReportPO
+			if err := cur.Decode(&po); err != nil {
+				return nil, err
+			}
+			sources[po.DomainID.Uint64()] = CatalogSourceAssociation{
+				AssessmentID: po.AssessmentID, OrgID: po.OrgID, HasOrgID: true, TesteeID: po.TesteeID,
+			}
+		}
+		return sources, cur.Err()
+	case ReportCatalogSourceArchive:
+		cur, err := s.db.Collection((ArchivedReportPO{}).CollectionName()).Find(
+			ctx,
+			bson.M{"domain_id": bson.M{"$in": ids}, "deleted_at": nil},
+			options.Find().SetProjection(bson.M{"domain_id": 1, "org_id": 1, "testee_id": 1}),
+		)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = cur.Close(ctx) }()
+		for cur.Next(ctx) {
+			var po ArchivedReportPO
+			if err := cur.Decode(&po); err != nil {
+				return nil, err
+			}
+			source := CatalogSourceAssociation{AssessmentID: po.DomainID.Uint64(), TesteeID: po.TesteeID}
+			if po.OrgID != nil {
+				source.OrgID = *po.OrgID
+				source.HasOrgID = true
+			}
+			sources[po.DomainID.Uint64()] = source
+		}
+		return sources, cur.Err()
+	default:
+		return nil, fmt.Errorf("unknown report catalog source %q", sourceKind)
+	}
+}
+
+func countAssociationMismatches(entries []ReportCatalogPO, sources map[uint64]CatalogSourceAssociation) int64 {
+	var count int64
+	for _, entry := range entries {
+		source, ok := sources[entry.SourceID]
+		if !ok {
+			continue // Counted independently as dangling.
+		}
+		if HasAssociationMismatch(entry, source) {
+			count++
+		}
+	}
+	return count
 }
 
 func (s *CatalogReconcileStore) countWrongWinner(ctx context.Context, filter CatalogReconcileFilter) (int64, error) {
@@ -192,52 +304,6 @@ func danglingSourcePipeline(sourceKind, collection string, catalogMatch bson.M) 
 		bson.D{{Key: "$match", Value: bson.M{"source": bson.M{"$size": 0}}}},
 	)
 	return pipeline
-}
-
-func associationMismatchPipeline(sourceKind, collection string, catalogMatch, mismatchExpr bson.M) mongo.Pipeline {
-	pipeline := mongo.Pipeline{}
-	if len(catalogMatch) > 0 {
-		pipeline = append(pipeline, bson.D{{Key: "$match", Value: catalogMatch}})
-	}
-	pipeline = append(pipeline,
-		bson.D{{Key: "$match", Value: bson.M{"source_kind": sourceKind}}},
-		bson.D{{Key: "$lookup", Value: bson.M{
-			"from": collection,
-			"let":  bson.M{"source_id": "$source_id"},
-			"pipeline": mongo.Pipeline{
-				{{Key: "$match", Value: bson.M{"$expr": bson.M{"$and": bson.A{
-					bson.M{"$eq": bson.A{"$domain_id", "$$source_id"}},
-					bson.M{"$eq": bson.A{bson.M{"$ifNull": bson.A{"$deleted_at", nil}}, nil}},
-				}}}}},
-			},
-			"as": "source",
-		}}},
-		bson.D{{Key: "$unwind", Value: "$source"}},
-		bson.D{{Key: "$match", Value: bson.M{"$expr": mismatchExpr}}},
-	)
-	return pipeline
-}
-
-func artifactAssociationMismatchExpr() bson.M {
-	return bson.M{"$or": bson.A{
-		bson.M{"$ne": bson.A{"$assessment_id", "$source.assessment_id"}},
-		bson.M{"$ne": bson.A{"$testee_id", "$source.testee_id"}},
-		bson.M{"$and": bson.A{
-			bson.M{"$ne": bson.A{bson.M{"$ifNull": bson.A{"$source.org_id", nil}}, nil}},
-			bson.M{"$ne": bson.A{"$org_id", "$source.org_id"}},
-		}},
-	}}
-}
-
-func archiveAssociationMismatchExpr() bson.M {
-	return bson.M{"$or": bson.A{
-		bson.M{"$ne": bson.A{"$assessment_id", "$source.domain_id"}},
-		bson.M{"$ne": bson.A{"$testee_id", "$source.testee_id"}},
-		bson.M{"$and": bson.A{
-			bson.M{"$ne": bson.A{bson.M{"$ifNull": bson.A{"$source.org_id", nil}}, nil}},
-			bson.M{"$ne": bson.A{"$org_id", "$source.org_id"}},
-		}},
-	}}
 }
 
 func aggregateCount(ctx context.Context, collection *mongo.Collection, pipeline mongo.Pipeline) (int64, error) {

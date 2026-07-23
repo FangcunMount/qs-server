@@ -3,6 +3,7 @@ package handler
 import (
 	"strconv"
 
+	interpretationcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/catalogreconcile"
 	interpretationclinician "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
 	interpretationoperations "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/operations"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
@@ -13,6 +14,35 @@ import (
 type InterpretationClinicianHandler struct {
 	*BaseHandler
 	service interpretationclinician.Service
+}
+
+type InterpretationCatalogReconcileHandler struct {
+	*BaseHandler
+	service interpretationcatalog.Service
+}
+
+func NewInterpretationCatalogReconcileHandler(s interpretationcatalog.Service) *InterpretationCatalogReconcileHandler {
+	return &InterpretationCatalogReconcileHandler{BaseHandler: &BaseHandler{}, service: s}
+}
+
+// Reconcile godoc
+// @Summary 只读检查当前组织的 Interpretation Catalog 漂移
+// @Tags Interpretation-Operations
+// @Produce json
+// @Success 200 {object} core.Response{data=interpretationcatalog.DriftCounts}
+// @Router /internal/v1/interpretation/catalog/reconcile [get]
+func (h *InterpretationCatalogReconcileHandler) Reconcile(c *gin.Context) {
+	orgID, _, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.service.ReconcileOnce(c.Request.Context(), interpretationcatalog.Filter{OrgID: &orgID})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, result)
 }
 
 func NewInterpretationClinicianHandler(s interpretationclinician.Service) *InterpretationClinicianHandler {
@@ -136,6 +166,30 @@ func (h *InterpretationOperationsHandler) FindOutcomeGenerations(c *gin.Context)
 		return
 	}
 	v, err := h.service.FindGenerationsByOutcomeID(c.Request.Context(), a, id)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, v)
+}
+
+// FindOutcomeAdmissionFailures godoc
+// @Summary 查询 Outcome 在创建 Generation 前的准入失败证据
+// @Tags Interpretation-Operations
+// @Produce json
+// @Param outcome_id path string true "OutcomeID"
+// @Success 200 {object} core.Response{data=[]interpretationoperations.AdmissionFailure}
+// @Router /internal/v1/interpretation/outcomes/{outcome_id}/admission-failures [get]
+func (h *InterpretationOperationsHandler) FindOutcomeAdmissionFailures(c *gin.Context) {
+	a, ok := h.actor(c)
+	if !ok {
+		return
+	}
+	id, ok := parseMetaPath(c, "outcome_id", h.BaseHandler)
+	if !ok {
+		return
+	}
+	v, err := h.service.FindAdmissionFailuresByOutcomeID(c.Request.Context(), a, id)
 	if err != nil {
 		h.Error(c, err)
 		return

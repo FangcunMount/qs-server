@@ -160,6 +160,7 @@ var ParticipantReportService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
+	InterpretationAutomationService_GenerateReportFromOutcome_FullMethodName    = "/interpretation.InterpretationAutomationService/GenerateReportFromOutcome"
 	InterpretationAutomationService_GenerateReportFromAssessment_FullMethodName = "/interpretation.InterpretationAutomationService/GenerateReportFromAssessment"
 )
 
@@ -167,6 +168,8 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type InterpretationAutomationServiceClient interface {
+	GenerateReportFromOutcome(ctx context.Context, in *GenerateReportFromOutcomeRequest, opts ...grpc.CallOption) (*GenerateReportFromAssessmentResponse, error)
+	// Deprecated: Do not use.
 	GenerateReportFromAssessment(ctx context.Context, in *GenerateReportFromAssessmentRequest, opts ...grpc.CallOption) (*GenerateReportFromAssessmentResponse, error)
 }
 
@@ -178,6 +181,17 @@ func NewInterpretationAutomationServiceClient(cc grpc.ClientConnInterface) Inter
 	return &interpretationAutomationServiceClient{cc}
 }
 
+func (c *interpretationAutomationServiceClient) GenerateReportFromOutcome(ctx context.Context, in *GenerateReportFromOutcomeRequest, opts ...grpc.CallOption) (*GenerateReportFromAssessmentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GenerateReportFromAssessmentResponse)
+	err := c.cc.Invoke(ctx, InterpretationAutomationService_GenerateReportFromOutcome_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// Deprecated: Do not use.
 func (c *interpretationAutomationServiceClient) GenerateReportFromAssessment(ctx context.Context, in *GenerateReportFromAssessmentRequest, opts ...grpc.CallOption) (*GenerateReportFromAssessmentResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GenerateReportFromAssessmentResponse)
@@ -192,6 +206,8 @@ func (c *interpretationAutomationServiceClient) GenerateReportFromAssessment(ctx
 // All implementations must embed UnimplementedInterpretationAutomationServiceServer
 // for forward compatibility.
 type InterpretationAutomationServiceServer interface {
+	GenerateReportFromOutcome(context.Context, *GenerateReportFromOutcomeRequest) (*GenerateReportFromAssessmentResponse, error)
+	// Deprecated: Do not use.
 	GenerateReportFromAssessment(context.Context, *GenerateReportFromAssessmentRequest) (*GenerateReportFromAssessmentResponse, error)
 	mustEmbedUnimplementedInterpretationAutomationServiceServer()
 }
@@ -203,6 +219,9 @@ type InterpretationAutomationServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedInterpretationAutomationServiceServer struct{}
 
+func (UnimplementedInterpretationAutomationServiceServer) GenerateReportFromOutcome(context.Context, *GenerateReportFromOutcomeRequest) (*GenerateReportFromAssessmentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GenerateReportFromOutcome not implemented")
+}
 func (UnimplementedInterpretationAutomationServiceServer) GenerateReportFromAssessment(context.Context, *GenerateReportFromAssessmentRequest) (*GenerateReportFromAssessmentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GenerateReportFromAssessment not implemented")
 }
@@ -226,6 +245,24 @@ func RegisterInterpretationAutomationServiceServer(s grpc.ServiceRegistrar, srv 
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&InterpretationAutomationService_ServiceDesc, srv)
+}
+
+func _InterpretationAutomationService_GenerateReportFromOutcome_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GenerateReportFromOutcomeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InterpretationAutomationServiceServer).GenerateReportFromOutcome(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InterpretationAutomationService_GenerateReportFromOutcome_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InterpretationAutomationServiceServer).GenerateReportFromOutcome(ctx, req.(*GenerateReportFromOutcomeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _InterpretationAutomationService_GenerateReportFromAssessment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -253,6 +290,10 @@ var InterpretationAutomationService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "interpretation.InterpretationAutomationService",
 	HandlerType: (*InterpretationAutomationServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GenerateReportFromOutcome",
+			Handler:    _InterpretationAutomationService_GenerateReportFromOutcome_Handler,
+		},
 		{
 			MethodName: "GenerateReportFromAssessment",
 			Handler:    _InterpretationAutomationService_GenerateReportFromAssessment_Handler,

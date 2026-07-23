@@ -24,6 +24,11 @@ func (r *Router) registerInterpretationInternalRoutes(internalV1 *gin.RouterGrou
 	g := internalV1.Group("/interpretation", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityAuditInterpretation))
 	g.GET("/reports/:report_id", h.FindReport)
 	g.GET("/outcomes/:outcome_id/generations", h.FindOutcomeGenerations)
+	g.GET("/outcomes/:outcome_id/admission-failures", h.FindOutcomeAdmissionFailures)
 	g.GET("/assessments/:assessment_id/lifecycle", h.FindAssessmentLifecycle)
 	g.GET("/assessments/:assessment_id/reports", h.ListAssessmentReports)
+	if r.deps.Interpretation.CatalogReconcile != nil {
+		reconcile := handler.NewInterpretationCatalogReconcileHandler(r.deps.Interpretation.CatalogReconcile)
+		g.GET("/catalog/reconcile", reconcile.Reconcile)
+	}
 }

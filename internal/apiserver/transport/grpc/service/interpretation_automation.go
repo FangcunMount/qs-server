@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -22,6 +24,13 @@ type InterpretationAutomationService struct {
 	service automation.Service
 }
 
+var deprecatedGenerateReportFromAssessmentTotal = promauto.NewCounter(prometheus.CounterOpts{
+	Namespace: "qs",
+	Subsystem: "interpretation",
+	Name:      "deprecated_generate_report_from_assessment_total",
+	Help:      "Calls to the deprecated assessment-named report generation RPC (IR-R024).",
+})
+
 func NewInterpretationAutomationService(service automation.Service) *InterpretationAutomationService {
 	return &InterpretationAutomationService{service: service}
 }
@@ -30,20 +39,35 @@ func (s *InterpretationAutomationService) RegisterService(server *grpc.Server) {
 }
 
 func (s *InterpretationAutomationService) GenerateReportFromAssessment(ctx context.Context, req *pb.GenerateReportFromAssessmentRequest) (*pb.GenerateReportFromAssessmentResponse, error) {
-	if req == nil || req.OutcomeId == "" {
+	deprecatedGenerateReportFromAssessmentTotal.Inc()
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "outcome_id 不能为空")
+	}
+	return s.generateReportFromOutcomeID(ctx, req.OutcomeId)
+}
+
+func (s *InterpretationAutomationService) GenerateReportFromOutcome(ctx context.Context, req *pb.GenerateReportFromOutcomeRequest) (*pb.GenerateReportFromAssessmentResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "outcome_id 不能为空")
+	}
+	return s.generateReportFromOutcomeID(ctx, req.OutcomeId)
+}
+
+func (s *InterpretationAutomationService) generateReportFromOutcomeID(ctx context.Context, rawOutcomeID string) (*pb.GenerateReportFromAssessmentResponse, error) {
+	if rawOutcomeID == "" {
 		return nil, status.Error(codes.InvalidArgument, "outcome_id 不能为空")
 	}
 	if s.service == nil {
 		return generateReportFailureResponse(fmt.Errorf("interpretation automation service is not configured")), nil
 	}
-	outcomeID, err := meta.ParseID(req.OutcomeId)
+	outcomeID, err := meta.ParseID(rawOutcomeID)
 	if err != nil || outcomeID.IsZero() {
 		return nil, status.Error(codes.InvalidArgument, "outcome_id 无效")
 	}
 	ctx = withRetryAuthorization(ctx)
 	result, err := s.service.Generate(ctx, automation.GenerateCommand{Actor: automation.TrustedServiceActor("internal-grpc"), OutcomeID: outcomeID, TraceID: interpretationTraceID(ctx)})
 	if err != nil {
-		slog.ErrorContext(ctx, "interpretation automation failed", "outcome_id", req.OutcomeId, "error", err)
+		slog.ErrorContext(ctx, "interpretation automation failed", "outcome_id", rawOutcomeID, "error", err)
 		return generateReportFailureResponse(err), nil
 	}
 	statusValue, message := "generated", "报告生成完成"

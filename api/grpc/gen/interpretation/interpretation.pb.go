@@ -858,6 +858,50 @@ func (x *GenerateReportFromAssessmentRequest) GetOutcomeId() string {
 	return ""
 }
 
+type GenerateReportFromOutcomeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OutcomeId     string                 `protobuf:"bytes,1,opt,name=outcome_id,json=outcomeId,proto3" json:"outcome_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GenerateReportFromOutcomeRequest) Reset() {
+	*x = GenerateReportFromOutcomeRequest{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GenerateReportFromOutcomeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GenerateReportFromOutcomeRequest) ProtoMessage() {}
+
+func (x *GenerateReportFromOutcomeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GenerateReportFromOutcomeRequest.ProtoReflect.Descriptor instead.
+func (*GenerateReportFromOutcomeRequest) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GenerateReportFromOutcomeRequest) GetOutcomeId() string {
+	if x != nil {
+		return x.OutcomeId
+	}
+	return ""
+}
+
 type GenerateReportFromAssessmentResponse struct {
 	state                      protoimpl.MessageState `protogen:"open.v1"`
 	Success                    bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
@@ -883,7 +927,7 @@ type GenerateReportFromAssessmentResponse struct {
 
 func (x *GenerateReportFromAssessmentResponse) Reset() {
 	*x = GenerateReportFromAssessmentResponse{}
-	mi := &file_interpretation_interpretation_proto_msgTypes[11]
+	mi := &file_interpretation_interpretation_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -895,7 +939,7 @@ func (x *GenerateReportFromAssessmentResponse) String() string {
 func (*GenerateReportFromAssessmentResponse) ProtoMessage() {}
 
 func (x *GenerateReportFromAssessmentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_interpretation_interpretation_proto_msgTypes[11]
+	mi := &file_interpretation_interpretation_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -908,7 +952,7 @@ func (x *GenerateReportFromAssessmentResponse) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use GenerateReportFromAssessmentResponse.ProtoReflect.Descriptor instead.
 func (*GenerateReportFromAssessmentResponse) Descriptor() ([]byte, []int) {
-	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{11}
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GenerateReportFromAssessmentResponse) GetSuccess() bool {
@@ -1126,7 +1170,10 @@ const file_interpretation_interpretation_proto_rawDesc = "" +
 	"#GenerateReportFromAssessmentRequest\x12#\n" +
 	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\x12\x1d\n" +
 	"\n" +
-	"outcome_id\x18\x02 \x01(\tR\toutcomeId\"\x9e\x05\n" +
+	"outcome_id\x18\x02 \x01(\tR\toutcomeId\"A\n" +
+	" GenerateReportFromOutcomeRequest\x12\x1d\n" +
+	"\n" +
+	"outcome_id\x18\x01 \x01(\tR\toutcomeId\"\x9e\x05\n" +
 	"$GenerateReportFromAssessmentResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x18\n" +
@@ -1148,9 +1195,10 @@ const file_interpretation_interpretation_proto_rawDesc = "" +
 	"\x11action_request_id\x18\x11 \x01(\tR\x0factionRequestId2\xe8\x01\n" +
 	"\x18ParticipantReportService\x12n\n" +
 	"\x13GetAssessmentReport\x12*.interpretation.GetAssessmentReportRequest\x1a+.interpretation.GetAssessmentReportResponse\x12\\\n" +
-	"\rListMyReports\x12$.interpretation.ListMyReportsRequest\x1a%.interpretation.ListMyReportsResponse2\xad\x01\n" +
-	"\x1fInterpretationAutomationService\x12\x89\x01\n" +
-	"\x1cGenerateReportFromAssessment\x123.interpretation.GenerateReportFromAssessmentRequest\x1a4.interpretation.GenerateReportFromAssessmentResponseB?Z=github.com/FangcunMount/qs-server/api/grpc/gen/interpretationb\x06proto3"
+	"\rListMyReports\x12$.interpretation.ListMyReportsRequest\x1a%.interpretation.ListMyReportsResponse2\xb8\x02\n" +
+	"\x1fInterpretationAutomationService\x12\x83\x01\n" +
+	"\x19GenerateReportFromOutcome\x120.interpretation.GenerateReportFromOutcomeRequest\x1a4.interpretation.GenerateReportFromAssessmentResponse\x12\x8e\x01\n" +
+	"\x1cGenerateReportFromAssessment\x123.interpretation.GenerateReportFromAssessmentRequest\x1a4.interpretation.GenerateReportFromAssessmentResponse\"\x03\x88\x02\x01B?Z=github.com/FangcunMount/qs-server/api/grpc/gen/interpretationb\x06proto3"
 
 var (
 	file_interpretation_interpretation_proto_rawDescOnce sync.Once
@@ -1164,7 +1212,7 @@ func file_interpretation_interpretation_proto_rawDescGZIP() []byte {
 	return file_interpretation_interpretation_proto_rawDescData
 }
 
-var file_interpretation_interpretation_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_interpretation_interpretation_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_interpretation_interpretation_proto_goTypes = []any{
 	(*Suggestion)(nil),                           // 0: interpretation.Suggestion
 	(*NormReference)(nil),                        // 1: interpretation.NormReference
@@ -1177,32 +1225,35 @@ var file_interpretation_interpretation_proto_goTypes = []any{
 	(*ListMyReportsRequest)(nil),                 // 8: interpretation.ListMyReportsRequest
 	(*ListMyReportsResponse)(nil),                // 9: interpretation.ListMyReportsResponse
 	(*GenerateReportFromAssessmentRequest)(nil),  // 10: interpretation.GenerateReportFromAssessmentRequest
-	(*GenerateReportFromAssessmentResponse)(nil), // 11: interpretation.GenerateReportFromAssessmentResponse
-	(*evaluation.ScoreValue)(nil),                // 12: evaluation.ScoreValue
-	(*evaluation.ResultLevel)(nil),               // 13: evaluation.ResultLevel
-	(*evaluation.ModelIdentity)(nil),             // 14: evaluation.ModelIdentity
+	(*GenerateReportFromOutcomeRequest)(nil),     // 11: interpretation.GenerateReportFromOutcomeRequest
+	(*GenerateReportFromAssessmentResponse)(nil), // 12: interpretation.GenerateReportFromAssessmentResponse
+	(*evaluation.ScoreValue)(nil),                // 13: evaluation.ScoreValue
+	(*evaluation.ResultLevel)(nil),               // 14: evaluation.ResultLevel
+	(*evaluation.ModelIdentity)(nil),             // 15: evaluation.ModelIdentity
 }
 var file_interpretation_interpretation_proto_depIdxs = []int32{
-	12, // 0: interpretation.DimensionInterpret.derived_scores:type_name -> evaluation.ScoreValue
-	13, // 1: interpretation.DimensionInterpret.level:type_name -> evaluation.ResultLevel
+	13, // 0: interpretation.DimensionInterpret.derived_scores:type_name -> evaluation.ScoreValue
+	14, // 1: interpretation.DimensionInterpret.level:type_name -> evaluation.ResultLevel
 	1,  // 2: interpretation.DimensionInterpret.norm_reference:type_name -> interpretation.NormReference
 	3,  // 3: interpretation.ModelExtra.rarity:type_name -> interpretation.ModelRarity
 	2,  // 4: interpretation.AssessmentReport.dimensions:type_name -> interpretation.DimensionInterpret
 	0,  // 5: interpretation.AssessmentReport.suggestions:type_name -> interpretation.Suggestion
 	4,  // 6: interpretation.AssessmentReport.model_extra:type_name -> interpretation.ModelExtra
-	14, // 7: interpretation.AssessmentReport.model:type_name -> evaluation.ModelIdentity
-	12, // 8: interpretation.AssessmentReport.primary_score:type_name -> evaluation.ScoreValue
-	13, // 9: interpretation.AssessmentReport.level:type_name -> evaluation.ResultLevel
+	15, // 7: interpretation.AssessmentReport.model:type_name -> evaluation.ModelIdentity
+	13, // 8: interpretation.AssessmentReport.primary_score:type_name -> evaluation.ScoreValue
+	14, // 9: interpretation.AssessmentReport.level:type_name -> evaluation.ResultLevel
 	5,  // 10: interpretation.GetAssessmentReportResponse.report:type_name -> interpretation.AssessmentReport
 	5,  // 11: interpretation.ListMyReportsResponse.items:type_name -> interpretation.AssessmentReport
 	6,  // 12: interpretation.ParticipantReportService.GetAssessmentReport:input_type -> interpretation.GetAssessmentReportRequest
 	8,  // 13: interpretation.ParticipantReportService.ListMyReports:input_type -> interpretation.ListMyReportsRequest
-	10, // 14: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:input_type -> interpretation.GenerateReportFromAssessmentRequest
-	7,  // 15: interpretation.ParticipantReportService.GetAssessmentReport:output_type -> interpretation.GetAssessmentReportResponse
-	9,  // 16: interpretation.ParticipantReportService.ListMyReports:output_type -> interpretation.ListMyReportsResponse
-	11, // 17: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:output_type -> interpretation.GenerateReportFromAssessmentResponse
-	15, // [15:18] is the sub-list for method output_type
-	12, // [12:15] is the sub-list for method input_type
+	11, // 14: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:input_type -> interpretation.GenerateReportFromOutcomeRequest
+	10, // 15: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:input_type -> interpretation.GenerateReportFromAssessmentRequest
+	7,  // 16: interpretation.ParticipantReportService.GetAssessmentReport:output_type -> interpretation.GetAssessmentReportResponse
+	9,  // 17: interpretation.ParticipantReportService.ListMyReports:output_type -> interpretation.ListMyReportsResponse
+	12, // 18: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:output_type -> interpretation.GenerateReportFromAssessmentResponse
+	12, // 19: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:output_type -> interpretation.GenerateReportFromAssessmentResponse
+	16, // [16:20] is the sub-list for method output_type
+	12, // [12:16] is the sub-list for method input_type
 	12, // [12:12] is the sub-list for extension type_name
 	12, // [12:12] is the sub-list for extension extendee
 	0,  // [0:12] is the sub-list for field type_name
@@ -1219,7 +1270,7 @@ func file_interpretation_interpretation_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_interpretation_interpretation_proto_rawDesc), len(file_interpretation_interpretation_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

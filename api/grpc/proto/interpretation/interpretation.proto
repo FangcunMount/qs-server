@@ -12,7 +12,10 @@ service ParticipantReportService {
 }
 
 service InterpretationAutomationService {
-  rpc GenerateReportFromAssessment(GenerateReportFromAssessmentRequest) returns (GenerateReportFromAssessmentResponse);
+  rpc GenerateReportFromOutcome(GenerateReportFromOutcomeRequest) returns (GenerateReportFromAssessmentResponse);
+  rpc GenerateReportFromAssessment(GenerateReportFromAssessmentRequest) returns (GenerateReportFromAssessmentResponse) {
+    option deprecated = true;
+  }
 }
 
 message Suggestion { string category = 1; string content = 2; string factor_code = 3; }
@@ -55,6 +58,7 @@ message ListMyReportsResponse {
   int32 page_size = 4; int32 total_pages = 5;
 }
 message GenerateReportFromAssessmentRequest { uint64 assessment_id = 1; string outcome_id = 2; }
+message GenerateReportFromOutcomeRequest { string outcome_id = 1; }
 message GenerateReportFromAssessmentResponse {
   bool success = 1; string status = 2; string message = 3; bool retryable = 4;
   string run_id = 5; string failure_kind = 6; string generation_id = 7;

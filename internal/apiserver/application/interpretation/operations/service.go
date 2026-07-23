@@ -31,6 +31,13 @@ type OutcomeCorrelation interface {
 type Access interface {
 	AuthorizeAudit(context.Context, Actor, int64) error
 }
+type ArtifactMetadata struct {
+	ID, AssessmentID, GenerationID meta.ID
+	OrgID                          int64
+}
+type ArtifactMetadataReader interface {
+	FindMetadataByID(context.Context, meta.ID) (*ArtifactMetadata, error)
+}
 type Generation struct {
 	ID, OutcomeID, LatestRunID, ReportID uint64
 	ReportType, TemplateVersion, Status  string
@@ -91,6 +98,7 @@ type service struct {
 	generations domaingeneration.Repository
 	runs        domainrun.Repository
 	reports     domainreport.ReportRepository
+	metadata    ArtifactMetadataReader
 	admissions  admission.Repository
 	access      Access
 }
@@ -100,17 +108,28 @@ func NewService(outcomes OutcomeCorrelation, g domaingeneration.Repository, r do
 	if len(admissions) > 0 {
 		admissionRepo = admissions[0]
 	}
-	return &service{outcomes: outcomes, generations: g, runs: r, reports: reports, access: access, admissions: admissionRepo}
+	metadata, _ := reports.(ArtifactMetadataReader)
+	return &service{outcomes: outcomes, generations: g, runs: r, reports: reports, metadata: metadata, access: access, admissions: admissionRepo}
 }
 func (s *service) FindReportByID(ctx context.Context, a Actor, id meta.ID) (*Report, error) {
 	if err := s.ensureConfigured(); err != nil {
 		return nil, err
 	}
-	item, err := s.reports.FindByID(ctx, id)
+	if id.IsZero() {
+		return nil, fmt.Errorf("interpretation report id is required")
+	}
+	metadata, err := s.metadata.FindMetadataByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.authorize(ctx, a, item.Association().OrgID); err != nil {
+	if metadata == nil {
+		return nil, domainreport.ErrInterpretReportNotFound
+	}
+	if err := s.authorize(ctx, a, metadata.OrgID); err != nil {
+		return nil, err
+	}
+	item, err := s.reports.FindByID(ctx, id)
+	if err != nil {
 		return nil, err
 	}
 	return mapReport(item), nil
@@ -223,7 +242,7 @@ func (s *service) authorize(ctx context.Context, a Actor, resourceOrgID int64) e
 }
 
 func (s *service) ensureConfigured() error {
-	if s == nil || s.outcomes == nil || s.generations == nil || s.runs == nil || s.reports == nil || s.access == nil {
+	if s == nil || s.outcomes == nil || s.generations == nil || s.runs == nil || s.reports == nil || s.metadata == nil || s.access == nil {
 		return cberrors.WithCode(code.ErrModuleInitializationFailed, "interpretation operations service is not configured")
 	}
 	return nil

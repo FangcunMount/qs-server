@@ -45,6 +45,9 @@ func ValidateFamilyManifestCompleteness(registry *evalpipeline.RuntimeDescriptor
 		if desc.InputAssembler == nil || desc.Calculator == nil || desc.OutcomeAssembler == nil {
 			return fmt.Errorf("EV-R014: incomplete native pipeline for algorithm family %s", entry.Family)
 		}
+		if err := desc.CompletenessPolicy.Validate(); err != nil {
+			return fmt.Errorf("IR-R006: incomplete outcome policy for algorithm family %s: %w", entry.Family, err)
+		}
 	}
 	return nil
 }

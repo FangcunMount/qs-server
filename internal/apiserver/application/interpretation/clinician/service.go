@@ -4,7 +4,9 @@ package clinician
 
 import (
 	"context"
+
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/queryerror"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reportprojection"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
@@ -52,7 +54,7 @@ func (s *service) GetParticipantReport(ctx context.Context, actor Actor, q GetQu
 	}
 	row, err := s.reader.GetReportByAssessmentID(ctx, q.AssessmentID)
 	if err != nil {
-		return nil, cberrors.WrapC(err, code.ErrInterpretReportNotFound, "报告不存在")
+		return nil, queryerror.MapReadError(err)
 	}
 	return s.projection.FromRow(ctx, *row, policy.AudienceClinician)
 }
@@ -70,7 +72,7 @@ func (s *service) ListParticipantReports(ctx context.Context, actor Actor, q Lis
 	id := q.TesteeID
 	rows, total, err := s.reader.ListReports(ctx, interpretationreadmodel.ReportFilter{TesteeID: &id}, interpretationreadmodel.PageRequest{Page: page, PageSize: size})
 	if err != nil {
-		return nil, cberrors.WrapC(err, code.ErrDatabase, "查询报告列表失败")
+		return nil, queryerror.MapReadError(err)
 	}
 	items := make([]*Report, 0, len(rows))
 	for _, row := range rows {
