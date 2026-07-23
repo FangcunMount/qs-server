@@ -87,12 +87,14 @@ func typologyResponseFromCatalog(model *modelcatalog.ModelResponse, incoming err
 	response := &typologymodel.TypologyModelResponse{
 		Code: model.Code, Version: model.Version, Title: model.Title, Algorithm: model.Algorithm, Description: model.Description,
 		QuestionnaireCode: model.QuestionnaireCode, QuestionnaireVersion: model.QuestionnaireVersion, Status: model.Status,
-		Kind: string(modeldomain.KindTypology), SubKind: model.SubKind, ProductChannel: model.ProductChannel,
-		DecisionKind: model.DecisionKind, AlgorithmFamily: model.AlgorithmFamily,
+		Kind: string(modeldomain.KindTypology), SubKind: string(modeldomain.CanonicalSubKindFor(modeldomain.KindTypology)), ProductChannel: string(modeldomain.DefaultProductChannelFor(modeldomain.KindTypology)),
+		DecisionKind: model.DecisionKind,
 	}
-	if response.DecisionKind == "" || response.AlgorithmFamily == "" {
+	family, ok := modeldomain.AlgorithmFamilyFromDecisionKind(modeldomain.DecisionKind(response.DecisionKind))
+	if response.DecisionKind == "" || !ok {
 		return nil, fmt.Errorf("catalog typology runtime identity is incomplete")
 	}
+	response.AlgorithmFamily = string(family)
 	response.QuestionCount = int32(countRuntimeQuestions(runtime))
 	response.DimensionOrder = append([]string(nil), runtime.FactorGraph.DecisionFactorOrder()...)
 	for _, code := range response.DimensionOrder {
@@ -112,7 +114,6 @@ func typologyResponseFromCatalog(model *modelcatalog.ModelResponse, incoming err
 
 func isTypologyCatalogModel(model *modelcatalog.ModelResponse) bool {
 	return model != nil && model.Kind == string(modeldomain.KindTypology) &&
-		model.SubKind == string(modeldomain.SubKindTypology) &&
 		model.Algorithm == string(modeldomain.AlgorithmPersonalityTypology)
 }
 
