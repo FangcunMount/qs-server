@@ -18,6 +18,7 @@
 | --- | --- | --- |
 | `verify_definition_v2_cutover` | ModelCatalog G5/current-only 数据与契约审计 | 否 |
 | `smoke_modelcatalog_cutover` | 按 testee 与 model codes 串行完成 AnswerSheet → Assessment → Outcome → Report 部署 smoke | 是，创建 smoke 事实 |
+| `smoke_modelcatalog_revision_conflict` | 对专用未发布草稿并发更新，验证 Model/Questionnaire revision conflict 的 REST 409 映射并恢复 basic-info | 是，递增草稿 revision 后恢复字段 |
 | `audit_norm_usage` | Norm 反向引用、悬空引用和人口学常模审计 | 否 |
 | `audit_evaluation_p1_evidence.sql` | Evaluation P1 证据查询 | 否 |
 | `audit_evaluation_p2_evidence.sql` | Evaluation P2 证据查询 | 否 |
