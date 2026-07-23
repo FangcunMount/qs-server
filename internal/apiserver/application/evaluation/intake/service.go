@@ -104,7 +104,8 @@ func (s *service) CreateForAnswerSheet(ctx context.Context, command CreateComman
 			return nil, evalerrors.ModuleNotConfigured("evaluation model validator is not configured")
 		}
 		if err := s.validator.ValidateEvaluationModel(ctx, *req.ModelRef, req.QuestionnaireRef, validationMode); err != nil {
-			if evalerrors.IsModuleNotConfigured(err) || evalerrors.IsInvalidArgument(err) {
+			if evalerrors.IsModuleNotConfigured(err) ||
+				evalerrors.IsInvalidArgument(err) {
 				return nil, err
 			}
 			return nil, evalerrors.AssessmentCreateFailed(err, "创建测评失败")
