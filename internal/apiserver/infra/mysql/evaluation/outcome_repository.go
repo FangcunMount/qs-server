@@ -109,10 +109,9 @@ func outcomeFromPO(po *EvaluationOutcomePO) (*domainoutcome.Record, error) {
 	modelKind := modelcatalog.Kind(po.ModelKind)
 	subKind := modelcatalog.CanonicalSubKindFor(modelKind)
 	algorithm := modelcatalog.Algorithm(valueOrEmpty(po.ModelAlgorithm))
-	decisionKind := modelcatalog.DecisionKind(valueOrEmpty(po.DecisionKind))
-	algorithmFamily, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(decisionKind)
-	if !ok {
-		algorithmFamily, _ = modelcatalog.AlgorithmFamilyFromIdentity(modelKind, subKind, algorithm)
+	runtime, err := modelcatalog.ResolveLegacyRuntime(modelKind, algorithm, modelcatalog.DecisionKind(valueOrEmpty(po.DecisionKind)))
+	if err != nil {
+		return nil, fmt.Errorf("normalize evaluation outcome runtime %d: %w", po.ID, err)
 	}
 	return domainoutcome.NewRecord(domainoutcome.NewRecordInput{
 		ID:           meta.FromUint64(po.ID),
@@ -128,10 +127,7 @@ func outcomeFromPO(po *EvaluationOutcomePO) (*domainoutcome.Record, error) {
 			Version:   po.ModelVersion,
 			Title:     valueOrEmpty(po.ModelTitle),
 		},
-		Runtime: domainoutcome.RuntimeIdentity{
-			AlgorithmFamily: algorithmFamily,
-			DecisionKind:    decisionKind,
-		},
+		Runtime:          domainoutcome.RuntimeIdentity{AlgorithmFamily: runtime.AlgorithmFamily, DecisionKind: runtime.DecisionKind},
 		InputSnapshotRef: valueOrEmpty(po.InputSnapshotRef),
 		ReportInput:      []byte(valueOrEmpty(po.ReportInputJSON)),
 		Payload:          []byte(po.PayloadJSON),
