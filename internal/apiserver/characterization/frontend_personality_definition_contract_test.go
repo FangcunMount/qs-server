@@ -51,7 +51,7 @@ func TestFrontendDefinitionV2ContractValidatesBuildsAndExecutes(t *testing.T) {
 	}
 
 	model, err := modelcatalog.NewAssessmentModel(modelcatalog.NewAssessmentModelInput{
-		Code: "FRONTEND_CONTRACT", Kind: modelcatalog.KindTypology, SubKind: modelcatalog.SubKindTypology,
+		Code: "FRONTEND_CONTRACT", Kind: modelcatalog.KindTypology,
 		Algorithm: modelcatalog.AlgorithmPersonalityTypology, Title: "Frontend contract", Now: time.Now(),
 	})
 	if err != nil {
