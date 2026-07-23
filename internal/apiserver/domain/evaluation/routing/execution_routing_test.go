@@ -17,20 +17,20 @@ func TestDescriptorKeyFromRouteUsesFrozenRuntimeIdentity(t *testing.T) {
 		decision modelcatalog.DecisionKind
 	}{
 		{
-			name: "behavioral_rating_default",
-			route: evalpipeline.ModelRoute{DecisionKind: modelcatalog.DecisionKindNormLookup},
+			name:     "behavioral_rating_default",
+			route:    evalpipeline.ModelRoute{DecisionKind: modelcatalog.DecisionKindNormLookup},
 			family:   modelcatalog.AlgorithmFamilyFactorNorm,
 			decision: modelcatalog.DecisionKindNormLookup,
 		},
 		{
-			name: "cognitive_default",
-			route: evalpipeline.ModelRoute{DecisionKind: modelcatalog.DecisionKindAbilityLevel},
+			name:     "cognitive_default",
+			route:    evalpipeline.ModelRoute{DecisionKind: modelcatalog.DecisionKindAbilityLevel},
 			family:   modelcatalog.AlgorithmFamilyTaskPerformance,
 			decision: modelcatalog.DecisionKindAbilityLevel,
 		},
 		{
-			name: "typology_pole_composition",
-			route: evalpipeline.ModelRoute{DecisionKind: modelcatalog.DecisionKindPoleComposition},
+			name:     "typology_pole_composition",
+			route:    evalpipeline.ModelRoute{DecisionKind: modelcatalog.DecisionKindPoleComposition},
 			family:   modelcatalog.AlgorithmFamilyFactorClassification,
 			decision: modelcatalog.DecisionKindPoleComposition,
 		},

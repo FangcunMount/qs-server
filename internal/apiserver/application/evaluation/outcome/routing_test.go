@@ -15,9 +15,9 @@ func TestModelRouteFromInputPreservesFrozenRuntimeIdentity(t *testing.T) {
 			Kind:         evaluationinput.EvaluationModelKindBehavioralRating,
 			Algorithm:    string(modelcatalog.AlgorithmBrief2),
 			DecisionKind: string(modelcatalog.DecisionKindNormLookup),
-			Code:            "BR-001",
-			Version:         "1.0.0",
-			Title:           "筛查行为评分",
+			Code:         "BR-001",
+			Version:      "1.0.0",
+			Title:        "筛查行为评分",
 		},
 	})
 	if !ok {
@@ -35,9 +35,9 @@ func TestModelRouteFromInputPreservesRuntimeIdentity(t *testing.T) {
 		Model: &evaluationinput.ModelSnapshot{
 			Kind:      evaluationinput.EvaluationModelKindBehavioralRating,
 			Algorithm: string(modelcatalog.AlgorithmBrief2),
-			Code:           "BR-001",
-			Version:        "1.0.0",
-			Title:          "筛查行为评分",
+			Code:      "BR-001",
+			Version:   "1.0.0",
+			Title:     "筛查行为评分",
 		},
 	})
 	if ok {

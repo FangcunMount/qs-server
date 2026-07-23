@@ -48,10 +48,10 @@ func TestFromOutcomeRecordPreservesDimensionlessSpecialTypologyFact(t *testing.T
 	reportInput, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
 		Assets: assets,
 		ModelRef: evaluationinput.ModelRef{
-			Kind: evaluationinput.EvaluationModelKindTypology,
+			Kind:      evaluationinput.EvaluationModelKindTypology,
 			Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "SBTI_FUN", Version: "v48",
 		},
-		DecisionKind:    modelcatalog.DecisionKindNearestPattern,
+		DecisionKind: modelcatalog.DecisionKindNearestPattern,
 		TypologyRouting: &evaluationinput.TypologyRoutingFreeze{
 			DecisionKind: string(modelcatalog.DecisionKindNearestPattern), ReportKind: string(modeltypology.ReportKindPersonalityType),
 			AdapterKey: string(modeltypology.ReportAdapterPersonalityType), TemplateID: "sbti", TemplateVersion: "legacy-v1",
@@ -93,11 +93,11 @@ func TestFromOutcomeRecordRestoresTraitProfileNamesFromFrozenFactorCatalog(t *te
 	reportInput, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
 		Assets: assets,
 		ModelRef: evaluationinput.ModelRef{
-			Kind: evaluationinput.EvaluationModelKindTypology,
+			Kind:      evaluationinput.EvaluationModelKindTypology,
 			Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "ENNEAGRAM_45", Version: "v16",
 		},
-		DecisionKind:    modelcatalog.DecisionKindTraitProfile,
-		FactorCatalog:   []evaluationinput.FactorCatalogEntry{{Code: "type_1", Title: "完美型"}},
+		DecisionKind:  modelcatalog.DecisionKindTraitProfile,
+		FactorCatalog: []evaluationinput.FactorCatalogEntry{{Code: "type_1", Title: "完美型"}},
 		TypologyRouting: &evaluationinput.TypologyRoutingFreeze{
 			DecisionKind: string(modelcatalog.DecisionKindTraitProfile), ReportKind: string(modeltypology.ReportKindTraitProfile),
 			AdapterKey: string(modeltypology.ReportAdapterTraitProfile), TemplateID: "enneagram",
@@ -246,9 +246,9 @@ func TestFromOutcomeRecordRejectsMissingReportInputForFactorScoring(t *testing.T
 func TestFromOutcomeRecordRejectsMissingFrozenTypologyRouting(t *testing.T) {
 	assets := &interpretationassets.Assets{Profiles: []interpretationassets.TypeProfilePresentation{{OutcomeCode: "INTJ", Commentary: "冻结摘要"}}}
 	_, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
-		Assets:          assets,
-		ModelRef:        evaluationinput.ModelRef{Kind: evaluationinput.EvaluationModelKindTypology, Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "PERSONALITY", Version: "1.0.0"},
-		DecisionKind:    modelcatalog.DecisionKindPoleComposition,
+		Assets:       assets,
+		ModelRef:     evaluationinput.ModelRef{Kind: evaluationinput.EvaluationModelKindTypology, Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "PERSONALITY", Version: "1.0.0"},
+		DecisionKind: modelcatalog.DecisionKindPoleComposition,
 	})
 	if err == nil {
 		t.Fatal("typology report input without routing was frozen")

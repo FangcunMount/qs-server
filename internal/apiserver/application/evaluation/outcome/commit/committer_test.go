@@ -234,8 +234,8 @@ func TestCommitFreezesTraitProfileWithoutOutcomeRegistry(t *testing.T) {
 	}}
 	input := &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
-			Kind: evaluationinput.EvaluationModelKindTypology,
-			Algorithm: string(modelcatalog.AlgorithmPersonalityTypology),
+			Kind:         evaluationinput.EvaluationModelKindTypology,
+			Algorithm:    string(modelcatalog.AlgorithmPersonalityTypology),
 			DecisionKind: string(modelcatalog.DecisionKindTraitProfile), Code: "ENNEAGRAM_45", Version: "v16", Title: "九型人格",
 		},
 		DefinitionV2: &modeldefinition.Definition{
@@ -267,7 +267,7 @@ func TestCommitFreezesTraitProfileWithoutOutcomeRegistry(t *testing.T) {
 	record, err := c.Commit(context.Background(), CommitRequest{
 		Assessment: a, Input: input, Execution: execution,
 		DescriptorKey: evalpipeline.DescriptorKey{DecisionKind: modelcatalog.DecisionKindTraitProfile},
-		Run: &run, EvaluatedAt: time.Unix(300, 0),
+		Run:           &run, EvaluatedAt: time.Unix(300, 0),
 	})
 	if err != nil {
 		t.Fatalf("Commit: %v", err)
@@ -276,7 +276,7 @@ func TestCommitFreezesTraitProfileWithoutOutcomeRegistry(t *testing.T) {
 		t.Fatalf("report input = %s", record.ReportInput())
 	}
 	frozen, err := evaluationinput.SnapshotFromReportInput(record.ReportInput(), evaluationinput.ModelRef{
-		Kind: evaluationinput.EvaluationModelKindTypology,
+		Kind:      evaluationinput.EvaluationModelKindTypology,
 		Algorithm: string(modelcatalog.AlgorithmPersonalityTypology), Code: "ENNEAGRAM_45", Version: "v16", Title: "九型人格",
 	})
 	if err != nil {
@@ -386,7 +386,7 @@ func commitTestInput() *evaluationinput.InputSnapshot {
 		Model: &evaluationinput.ModelSnapshot{
 			Kind: evaluationinput.EvaluationModelKindScale, Algorithm: string(modelcatalog.AlgorithmScaleDefault),
 			DecisionKind: string(modelcatalog.DecisionKindScoreRange),
-			Code: "SCALE-1", Version: "1.0.0",
+			Code:         "SCALE-1", Version: "1.0.0",
 		},
 		DefinitionV2: def,
 	}

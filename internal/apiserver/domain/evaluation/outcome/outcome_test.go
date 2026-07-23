@@ -25,7 +25,7 @@ func TestRecordCopiesCanonicalPayload(t *testing.T) {
 			Title:   "scale",
 		},
 		Runtime: RuntimeIdentity{
-			DecisionKind:    modelcatalog.DecisionKindScoreRange,
+			DecisionKind: modelcatalog.DecisionKindScoreRange,
 		},
 		Payload:     payload,
 		EvaluatedAt: time.Unix(100, 0),

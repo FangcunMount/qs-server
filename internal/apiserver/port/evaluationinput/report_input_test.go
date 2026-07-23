@@ -92,8 +92,8 @@ func TestReportInputRestoresFrozenFactorScoreVisibility(t *testing.T) {
 				ModelRef: evaluationinput.ModelRef{
 					Kind: evaluationinput.EvaluationModelKindScale, Code: "SCALE", Version: "v1",
 				},
-				DecisionKind:    modelcatalog.DecisionKindScoreRange,
-				FactorCatalog:   []evaluationinput.FactorCatalogEntry{{Code: "visible"}, {Code: "total", IsTotalScore: true}},
+				DecisionKind:  modelcatalog.DecisionKindScoreRange,
+				FactorCatalog: []evaluationinput.FactorCatalogEntry{{Code: "visible"}, {Code: "total", IsTotalScore: true}},
 			}
 			raw, err := evaluationinput.MarshalReportInput(opts)
 			if err != nil {
@@ -127,11 +127,11 @@ func TestTraitProfileReportInputAllowsFrozenReportSpecAndFactorCatalogWithoutOut
 	opts := evaluationinput.ReportInputFreezeOptions{
 		Assets: assets,
 		ModelRef: evaluationinput.ModelRef{
-			Kind: evaluationinput.EvaluationModelKindTypology,
+			Kind:      evaluationinput.EvaluationModelKindTypology,
 			Algorithm: "personality_typology", Code: "ENNEAGRAM_45", Version: "v16",
 		},
-		DecisionKind:    modelcatalog.DecisionKindTraitProfile,
-		FactorCatalog:   []evaluationinput.FactorCatalogEntry{{Code: "type_1", Title: "完美型"}},
+		DecisionKind:  modelcatalog.DecisionKindTraitProfile,
+		FactorCatalog: []evaluationinput.FactorCatalogEntry{{Code: "type_1", Title: "完美型"}},
 		TypologyRouting: &evaluationinput.TypologyRoutingFreeze{
 			DecisionKind: "trait_profile", ReportKind: "trait_profile", AdapterKey: "trait_profile", TemplateID: "enneagram",
 		},
@@ -157,11 +157,11 @@ func TestClassifiedTypeReportInputStillRequiresFrozenOutcomePresentation(t *test
 	_, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
 		Assets: assets,
 		ModelRef: evaluationinput.ModelRef{
-			Kind: evaluationinput.EvaluationModelKindTypology,
+			Kind:      evaluationinput.EvaluationModelKindTypology,
 			Algorithm: "personality_typology", Code: "MBTI", Version: "v1",
 		},
-		DecisionKind:    modelcatalog.DecisionKindPoleComposition,
-		FactorCatalog:   []evaluationinput.FactorCatalogEntry{{Code: "EI", Title: "外向-内向"}},
+		DecisionKind:  modelcatalog.DecisionKindPoleComposition,
+		FactorCatalog: []evaluationinput.FactorCatalogEntry{{Code: "EI", Title: "外向-内向"}},
 		TypologyRouting: &evaluationinput.TypologyRoutingFreeze{
 			DecisionKind: "pole_composition", ReportKind: "personality_type", AdapterKey: "personality_type", TemplateID: "mbti",
 		},

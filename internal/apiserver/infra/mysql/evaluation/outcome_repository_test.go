@@ -27,7 +27,7 @@ func TestEvaluationOutcomePersistenceMappingRoundTrip(t *testing.T) {
 			Title:     "MBTI",
 		},
 		Runtime: domainoutcome.RuntimeIdentity{
-			DecisionKind:    modelcatalog.DecisionKindPoleComposition,
+			DecisionKind: modelcatalog.DecisionKindPoleComposition,
 		},
 		InputSnapshotRef: "model:MBTI-16P@1.0.0",
 		ReportInput:      []byte(`{"Payload":{"code":"MBTI-16P"}}`),

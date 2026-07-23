@@ -440,7 +440,7 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 		Model: &evaluationinput.ModelSnapshot{
 			Kind: evaluationinput.EvaluationModelKindScale, Algorithm: string(modelcatalog.AlgorithmScaleDefault),
 			DecisionKind: string(modelcatalog.DecisionKindScoreRange),
-			Code: "S-001", Version: "1.0.0", Title: "Scale",
+			Code:         "S-001", Version: "1.0.0", Title: "Scale",
 		},
 		DefinitionV2:  modeldefinitionForExecutionTest(),
 		ModelPayload:  evaluationinput.ScaleModelPayload{Scale: &scalesnapshot.ScaleSnapshot{Code: "S-001", Title: "Scale"}},
@@ -528,12 +528,12 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	}
 	input := &successfulInputResolver{snapshot: &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
-			Kind:            evaluationinput.EvaluationModelKindTypology,
-			Algorithm:       string(modelcatalog.AlgorithmPersonalityTypology),
-			Code:            "FAKE-MODEL",
-			Version:         "1.0.0",
-			Title:           "Fake Model",
-			DecisionKind:    string(modelcatalog.DecisionKindPoleComposition),
+			Kind:         evaluationinput.EvaluationModelKindTypology,
+			Algorithm:    string(modelcatalog.AlgorithmPersonalityTypology),
+			Code:         "FAKE-MODEL",
+			Version:      "1.0.0",
+			Title:        "Fake Model",
+			DecisionKind: string(modelcatalog.DecisionKindPoleComposition),
 		},
 		DefinitionV2:  modeldefinitionForExecutionTest(),
 		AnswerSheet:   &evaluationinput.AnswerSheetSnapshot{ID: 305, QuestionnaireCode: "Q-FAKE", QuestionnaireVersion: "1.0.0"},

@@ -11,7 +11,6 @@ import (
 	reportscore "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scoring"
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology/patterns"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	evaluationfactcodec "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact/codec"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -36,34 +35,36 @@ func FromPreviewOutcome(outcome PreviewOutcome) (interpinput.InterpretationInput
 		return interpinput.InterpretationInput{}, fmt.Errorf("preview evaluation execution is required")
 	}
 	model := modelIdentity(outcome)
+	decision := outcome.Runtime.DecisionKind
+	if decision == "" {
+		subKind := modelcatalog.CanonicalSubKindFor(modelcatalog.Kind(model.Kind))
+		decision, _ = modelcatalog.DecisionKindForIdentity(
+			modelcatalog.Kind(model.Kind), subKind, modelcatalog.Algorithm(model.Algorithm),
+		)
+	}
+	if decision == "" {
+		return interpinput.InterpretationInput{}, fmt.Errorf("preview runtime decision_kind is required")
+	}
+	family, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(decision)
+	if !ok {
+		return interpinput.InterpretationInput{}, fmt.Errorf("preview runtime decision_kind %q is unsupported", decision)
+	}
 	in := interpinput.InterpretationInput{
 		Association: outcome.Association,
 		Model:       model,
-		Runtime: interpinput.RuntimeIdentity{
-			AlgorithmFamily: outcome.Runtime.AlgorithmFamily,
-			DecisionKind:    outcome.Runtime.DecisionKind,
-		},
-		Result: interpinput.ResultFacts{Primary: primary(outcome.Execution), Level: level(outcome.Execution)},
+		Runtime:     interpinput.RuntimeIdentity{DecisionKind: decision},
+		Result:      interpinput.ResultFacts{Primary: primary(outcome.Execution), Level: level(outcome.Execution)},
 		Report: interpinput.ReportSpec{
 			ReportType:      policy.ReportTypeStandard,
 			TemplateVersion: PreviewTemplateVersion,
 			Algorithm:       modelcatalog.Algorithm(model.Algorithm),
-			ProductChannel:  modelcatalog.ProductChannel(model.ProductChannel),
+			ReportProfile:   policy.ReportProfileForDecisionKind(decision),
 		},
 	}
-	if in.Runtime.AlgorithmFamily == "" {
-		in.Runtime.AlgorithmFamily, _ = modelcatalog.AlgorithmFamilyFromIdentity(
-			modelcatalog.Kind(model.Kind), modelcatalog.SubKind(model.SubKind), modelcatalog.Algorithm(model.Algorithm),
-		)
-	}
-	if in.Runtime.DecisionKind == "" {
-		in.Runtime.DecisionKind = policy.DefaultDecisionKind(in.Runtime.AlgorithmFamily)
-	}
-	in.Report.ReportProfile = policy.ReportProfileForDecisionKind(in.Runtime.DecisionKind)
 
-	switch in.Runtime.AlgorithmFamily {
+	switch family {
 	case modelcatalog.AlgorithmFamilyFactorScoring, modelcatalog.AlgorithmFamilyFactorNorm, modelcatalog.AlgorithmFamilyTaskPerformance:
-		model := factorModel(outcome.Input, in.Runtime.AlgorithmFamily)
+		model := factorModel(outcome.Input, family)
 		in.FactorScoring = &interpinput.FactorScoringFacts{Model: model, Factors: factorScores(outcome.Execution, model)}
 	case modelcatalog.AlgorithmFamilyFactorClassification:
 		if err := populateTypologyFacts(&in, outcome.Execution, outcome.Input); err != nil {
@@ -85,10 +86,8 @@ func modelIdentity(outcome PreviewOutcome) report.ModelIdentity {
 	if outcome.Execution != nil && !outcome.Execution.ModelRef.IsEmpty() {
 		ref := outcome.Execution.ModelRef
 		model = report.ModelIdentity{
-			Kind: string(ref.ModelKind), SubKind: string(ref.ModelSubKind), Algorithm: string(ref.ModelAlgorithm),
+			Kind: string(ref.ModelKind), Algorithm: string(ref.ModelAlgorithm),
 			Code: ref.ModelCode, Version: ref.ModelVersion, Title: ref.ModelTitle,
-			ProductChannel:  string(binding.ProductChannelForIdentity(ref.ModelKind, "")),
-			AlgorithmFamily: binding.AlgorithmFamilyStringFromIdentity(ref.ModelKind, ref.ModelSubKind, ref.ModelAlgorithm),
 		}
 	}
 	if outcome.Input != nil && outcome.Input.Model != nil {
@@ -96,14 +95,8 @@ func modelIdentity(outcome PreviewOutcome) report.ModelIdentity {
 		if model.Kind == "" {
 			model.Kind = string(payload.Kind)
 		}
-		if model.SubKind == "" {
-			model.SubKind = string(modelcatalog.CanonicalSubKindFor(modelcatalog.Kind(payload.Kind)))
-		}
 		if model.Algorithm == "" {
 			model.Algorithm = payload.Algorithm
-		}
-		if model.ProductChannel == "" {
-			model.ProductChannel = string(binding.ProductChannelForIdentity(modelcatalog.Kind(payload.Kind), ""))
 		}
 	}
 	if model.Algorithm == "" {
@@ -113,12 +106,6 @@ func modelIdentity(outcome PreviewOutcome) report.ModelIdentity {
 		case modelcatalog.KindTypology:
 			model.Algorithm = string(modelcatalog.AlgorithmPersonalityTypology)
 		}
-	}
-	if model.ProductChannel == "" {
-		model.ProductChannel = string(modelcatalog.DefaultProductChannelFor(modelcatalog.Kind(model.Kind)))
-	}
-	if model.AlgorithmFamily == "" {
-		model.AlgorithmFamily = binding.AlgorithmFamilyStringFromIdentity(modelcatalog.Kind(model.Kind), modelcatalog.SubKind(model.SubKind), modelcatalog.Algorithm(model.Algorithm))
 	}
 	return model
 }
