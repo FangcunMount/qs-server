@@ -56,11 +56,11 @@ func (m *connectionManager) TryAcquire(testeeID string) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.total >= m.maxTotal {
-		incSubscribeDenied("max_connections")
+		incSubscribeDenied("capacity_exhausted")
 		return false
 	}
 	if m.perTestee[testeeID] >= m.maxPerTestee {
-		incSubscribeDenied("max_per_testee")
+		incSubscribeDenied("capacity_exhausted")
 		return false
 	}
 	m.total++

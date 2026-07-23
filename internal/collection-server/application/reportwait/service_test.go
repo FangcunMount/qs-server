@@ -43,9 +43,11 @@ type fakeAssessmentQuery struct {
 	err       error
 	report    *evaluation.AssessmentReportResponse
 	reportErr error
+	getCalls  int
 }
 
 func (f *fakeAssessmentQuery) GetMyAssessment(context.Context, uint64, uint64) (*evaluation.AssessmentDetailResponse, error) {
+	f.getCalls++
 	return f.result, f.err
 }
 
@@ -137,9 +139,10 @@ func TestWaitDeniesForeignAssessmentBeforeRedisHit(t *testing.T) {
 }
 
 func TestGetStatusRedisMissDBFallbackInterpreted(t *testing.T) {
-	svc := NewService(&fakeAssessmentQuery{
+	query := &fakeAssessmentQuery{
 		result: &evaluation.AssessmentDetailResponse{Status: "interpreted"},
-	}, &fakeStatusCache{snapshots: map[string]*reportstatus.Snapshot{}}, nil, nil, DefaultConfig())
+	}
+	svc := NewService(query, &fakeStatusCache{snapshots: map[string]*reportstatus.Snapshot{}}, nil, nil, DefaultConfig())
 
 	resp, err := svc.GetStatus(context.Background(), 1, 99)
 	if err != nil {
@@ -147,6 +150,50 @@ func TestGetStatusRedisMissDBFallbackInterpreted(t *testing.T) {
 	}
 	if resp.Status != "completed" {
 		t.Fatalf("expected completed, got %s", resp.Status)
+	}
+	if query.getCalls != 1 {
+		t.Fatalf("GetMyAssessment calls = %d, want 1", query.getCalls)
+	}
+}
+
+func TestWaitFirstRedisMissReusesAuthorizedAssessment(t *testing.T) {
+	query := &fakeAssessmentQuery{
+		result: &evaluation.AssessmentDetailResponse{Status: "interpreted"},
+	}
+	svc := NewService(query, &fakeStatusCache{snapshots: map[string]*reportstatus.Snapshot{}}, nil, nil, DefaultConfig())
+
+	resp, err := svc.Wait(context.Background(), 1, 99, time.Second)
+	if err != nil {
+		t.Fatalf("Wait: %v", err)
+	}
+	if resp.Status != "completed" {
+		t.Fatalf("status = %s, want completed", resp.Status)
+	}
+	if query.getCalls != 1 {
+		t.Fatalf("GetMyAssessment calls = %d, want 1", query.getCalls)
+	}
+}
+
+func TestGetStatusNormalizesAssessmentAccessErrorsBeforeCache(t *testing.T) {
+	for _, code := range []codes.Code{codes.NotFound, codes.PermissionDenied} {
+		t.Run(code.String(), func(t *testing.T) {
+			cache := &fakeStatusCache{snapshots: map[string]*reportstatus.Snapshot{
+				"42": {AssessmentID: "42", Status: "completed"},
+			}}
+			query := &fakeAssessmentQuery{err: status.Error(code, "sensitive detail")}
+			svc := NewService(query, cache, nil, nil, DefaultConfig())
+
+			resp, err := svc.GetStatus(context.Background(), 1, 42)
+			if !errors.Is(err, appreportstatus.ErrAssessmentAccess) {
+				t.Fatalf("error = %v, want assessment access", err)
+			}
+			if resp != nil {
+				t.Fatalf("response = %#v, want nil", resp)
+			}
+			if cache.getCalls != 0 {
+				t.Fatalf("cache Get calls = %d, want 0", cache.getCalls)
+			}
+		})
 	}
 }
 

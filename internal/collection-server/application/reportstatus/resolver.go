@@ -50,6 +50,15 @@ func (r *Resolver) CurrentStatus(ctx context.Context, kind string, testeeID, ass
 	if err := r.Authorize(ctx, kind, testeeID, assessmentID); err != nil {
 		return nil, err
 	}
+	return r.CurrentStatusAuthorized(ctx, kind, testeeID, assessmentID)
+}
+
+// CurrentStatusAuthorized reads status after the caller has completed the
+// resolver's Assessment ownership check in the same application operation.
+func (r *Resolver) CurrentStatusAuthorized(ctx context.Context, kind string, testeeID, assessmentID uint64) (*View, error) {
+	if r == nil {
+		return nil, fmt.Errorf("report status resolver is not configured")
+	}
 	reader := r.readers[kind]
 	if reader == nil {
 		return nil, ErrInvalidKind

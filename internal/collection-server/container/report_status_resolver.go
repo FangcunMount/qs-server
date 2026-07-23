@@ -8,6 +8,8 @@ import (
 	evaluationapp "github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologyassessment"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type medicalKindReader struct {
@@ -25,7 +27,7 @@ func (m medicalKindReader) Authorize(ctx context.Context, testeeID, assessmentID
 	}
 	result, err := m.medical.GetMyAssessment(ctx, testeeID, assessmentID)
 	if err != nil {
-		return err
+		return normalizeAssessmentAccessError(err)
 	}
 	if result == nil {
 		return reportstatus.ErrAssessmentAccess
@@ -64,7 +66,7 @@ func (p behaviorKindReader) Authorize(ctx context.Context, testeeID, assessmentI
 	}
 	result, err := p.behavior.Get(ctx, testeeID, assessmentID)
 	if err != nil {
-		return err
+		return normalizeAssessmentAccessError(err)
 	}
 	if result == nil {
 		return reportstatus.ErrAssessmentAccess
@@ -92,12 +94,21 @@ func (p typologyKindReader) Authorize(ctx context.Context, testeeID, assessmentI
 	}
 	result, err := p.typology.Get(ctx, testeeID, assessmentID)
 	if err != nil {
-		return err
+		return normalizeAssessmentAccessError(err)
 	}
 	if result == nil {
 		return reportstatus.ErrAssessmentAccess
 	}
 	return nil
+}
+
+func normalizeAssessmentAccessError(err error) error {
+	switch status.Code(err) {
+	case codes.NotFound, codes.PermissionDenied:
+		return reportstatus.ErrAssessmentAccess
+	default:
+		return err
+	}
 }
 
 func (p typologyKindReader) CurrentStatus(ctx context.Context, testeeID, assessmentID uint64) (*reportstatus.View, error) {

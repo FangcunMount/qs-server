@@ -106,7 +106,8 @@ func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 // @Success 200 {object} core.Response{data=[]evaluation.FactorScoreResponse}
 // @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
-// @Failure 500 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
+// @Failure 503 {object} core.ErrResponse
 // @Security BearerAuth
 // @Router /api/v1/assessments/{id}/scores [get]
 func (h *EvaluationHandler) GetAssessmentScores(c *gin.Context) {
@@ -182,7 +183,7 @@ func (h *EvaluationHandler) GetReportStatus(c *gin.Context) {
 	}
 	statusResponse, err := h.waitReportService.GetStatus(c.Request.Context(), testeeID, assessmentID)
 	if err != nil {
-		h.InternalErrorResponse(c, "get report status failed", err)
+		h.writeReportStatusError(c, "medical_report_status", err)
 		return
 	}
 	h.Success(c, reportstatus.ToPublicAssessmentStatus(statusResponse))
@@ -199,7 +200,8 @@ func (h *EvaluationHandler) GetReportStatus(c *gin.Context) {
 // @Success 200 {object} core.Response{data=evaluation.AssessmentStatusResponse}
 // @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
-// @Failure 500 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
+// @Failure 503 {object} core.ErrResponse
 // @Security BearerAuth
 // @Router /api/v1/assessments/{id}/wait-report [get]
 func (h *EvaluationHandler) WaitReport(c *gin.Context) {
@@ -220,7 +222,7 @@ func (h *EvaluationHandler) WaitReport(c *gin.Context) {
 			"elapsed_ms", time.Since(start).Milliseconds(),
 			"error", err.Error(),
 		)
-		h.InternalErrorResponse(c, "wait report failed", err)
+		h.writeReportStatusError(c, "medical_wait_report", err)
 		return
 	}
 	logger.L(c.Request.Context()).Infow("wait-report completed",

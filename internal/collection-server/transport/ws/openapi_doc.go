@@ -5,7 +5,7 @@ type ReportEventsSubscribeFrame struct {
 	Op           string `json:"op" example:"subscribe"`
 	AssessmentID string `json:"assessment_id" example:"8001"`
 	// 对外订阅 kind：人格线为 personality，量表线为 medical，行为能力线为 behavior。
-	Kind     string `json:"kind" example:"personality" enums:"personality,medical"`
+	Kind     string `json:"kind" example:"personality" enums:"personality,medical,behavior"`
 	TesteeID string `json:"testee_id" example:"618855887087350318"`
 }
 
@@ -26,6 +26,7 @@ type ReportEventsStatusFrame struct {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Success 101 {object} ReportEventsStatusFrame "Switching Protocols"
 // @Failure 400 {object} core.ErrResponse
+// @Failure 401 {object} core.ErrResponse "JWT UserID 缺失"
 // @Failure 404 {object} core.ErrResponse "report_events 未开启"
 // @Router /api/v1/report-events [get]
 func ReportEventsWebSocket() {}

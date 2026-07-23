@@ -7,6 +7,7 @@ import (
 
 	evaluationapp "github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportstatus"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/testeeaccess"
 )
 
 type fakeMedicalReader struct {
@@ -21,6 +22,14 @@ func (f *fakeMedicalReader) GetMyAssessment(context.Context, uint64, uint64) (*e
 type fakeWaitReport struct {
 	status *evaluationapp.AssessmentStatusResponse
 	err    error
+}
+
+type fakeTesteeAccess struct {
+	err error
+}
+
+func (f fakeTesteeAccess) Authorize(context.Context, string, uint64) error {
+	return f.err
 }
 
 func (f *fakeWaitReport) GetStatus(context.Context, uint64, uint64) (*evaluationapp.AssessmentStatusResponse, error) {
@@ -67,7 +76,7 @@ func (m medicalKindReaderTest) CurrentStatus(ctx context.Context, testeeID, asse
 }
 
 func newTestService(wait *fakeWaitReport, medical *fakeMedicalReader) *Service {
-	return NewService(newTestResolver(wait, medical))
+	return NewService(fakeTesteeAccess{}, newTestResolver(wait, medical))
 }
 
 func TestServiceAuthorizeMedical(t *testing.T) {
@@ -75,14 +84,14 @@ func TestServiceAuthorizeMedical(t *testing.T) {
 		&fakeWaitReport{status: &evaluationapp.AssessmentStatusResponse{Status: "processing"}},
 		&fakeMedicalReader{result: &evaluationapp.AssessmentDetailResponse{ID: "1"}},
 	)
-	if err := svc.Authorize(context.Background(), reportstatus.KindMedical, 1, 2); err != nil {
+	if err := svc.Authorize(context.Background(), "user-1", reportstatus.KindMedical, 1, 2); err != nil {
 		t.Fatalf("authorize: %v", err)
 	}
 }
 
 func TestServiceAuthorizeMedicalDenied(t *testing.T) {
 	svc := newTestService(nil, &fakeMedicalReader{result: nil})
-	if err := svc.Authorize(context.Background(), reportstatus.KindMedical, 1, 2); !errors.Is(err, reportstatus.ErrAssessmentAccess) {
+	if err := svc.Authorize(context.Background(), "user-1", reportstatus.KindMedical, 1, 2); !errors.Is(err, reportstatus.ErrAssessmentAccess) {
 		t.Fatalf("expected access denied, got %v", err)
 	}
 }
@@ -97,7 +106,7 @@ func TestServiceCurrentStatusMedical(t *testing.T) {
 		}},
 		&fakeMedicalReader{result: &evaluationapp.AssessmentDetailResponse{ID: "1"}},
 	)
-	payload, err := svc.CurrentStatus(context.Background(), reportstatus.KindMedical, 1, 2)
+	payload, err := svc.CurrentStatus(context.Background(), "user-1", reportstatus.KindMedical, 1, 2)
 	if err != nil {
 		t.Fatalf("current status: %v", err)
 	}
@@ -108,7 +117,19 @@ func TestServiceCurrentStatusMedical(t *testing.T) {
 
 func TestServiceInvalidKind(t *testing.T) {
 	svc := newTestService(&fakeWaitReport{}, &fakeMedicalReader{})
-	if err := svc.Authorize(context.Background(), "unknown", 1, 2); !errors.Is(err, reportstatus.ErrInvalidKind) {
+	if err := svc.Authorize(context.Background(), "user-1", "unknown", 1, 2); !errors.Is(err, reportstatus.ErrInvalidKind) {
 		t.Fatalf("expected invalid kind, got %v", err)
+	}
+}
+
+func TestServiceTesteeAccessDeniedBeforeAssessmentLookup(t *testing.T) {
+	resolver := newTestResolver(nil, &fakeMedicalReader{
+		err: errors.New("assessment lookup must not run"),
+	})
+	svc := NewService(fakeTesteeAccess{err: testeeaccess.ErrAccessDenied}, resolver)
+
+	_, err := svc.CurrentStatus(context.Background(), "user-1", reportstatus.KindMedical, 1, 2)
+	if !errors.Is(err, testeeaccess.ErrAccessDenied) {
+		t.Fatalf("expected testee access denied, got %v", err)
 	}
 }

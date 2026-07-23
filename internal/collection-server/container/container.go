@@ -13,6 +13,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportnotify"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/testee"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/testeeaccess"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologyassessment"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologysession"
@@ -70,6 +71,7 @@ type Container struct {
 	behaviorAssessmentQueryService     *behaviorassessment.QueryService
 	typologySessionService             *typologysession.Service
 	testeeService                      *testee.Service
+	testeeAccessAuthorizer             *testeeaccess.Authorizer
 	reportStatusReporter               *reportstatus.Reporter
 	reportNotifier                     reportnotify.Notifier
 	waitWatcherCancel                  context.CancelFunc
@@ -113,6 +115,13 @@ func (c *Container) TesteeService() *testee.Service {
 		return nil
 	}
 	return c.testeeService
+}
+
+func (c *Container) TesteeAccessAuthorizer() *testeeaccess.Authorizer {
+	if c == nil {
+		return nil
+	}
+	return c.testeeAccessAuthorizer
 }
 
 // NewContainer 创建新的容器
@@ -286,6 +295,7 @@ func (c *Container) initApplicationServices() {
 	)
 	c.typologySessionService = typologysession.NewService(c.typologyModelQueryService, c.questionnaireQueryService)
 	c.testeeService = testee.NewService(acl.NewTesteeActorAdapter(c.actorClient), profileLinkService, profileService)
+	c.testeeAccessAuthorizer = testeeaccess.NewAuthorizer(c.testeeService, profileLinkService)
 	c.reportEventsHandler = c.buildReportEventsHandler()
 
 	log.Info("✅ Application services initialized")

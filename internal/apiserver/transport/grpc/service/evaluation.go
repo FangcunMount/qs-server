@@ -37,7 +37,7 @@ func (s *TesteeEvaluationService) GetMyAssessment(ctx context.Context, req *pb.G
 	}
 	result, err := s.testeeService.GetAssessment(ctx, evaluationtestee.Actor{TesteeID: req.TesteeId}, req.AssessmentId)
 	if err != nil {
-		return nil, err
+		return nil, toAssessmentQueryGRPCError(err)
 	}
 	return &pb.GetMyAssessmentResponse{Assessment: toProtoAssessmentDetailFromOutcome(result)}, nil
 }

@@ -7,10 +7,34 @@ import (
 
 	pkgerrors "github.com/FangcunMount/component-base/pkg/errors"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
+	evaluationtestee "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/testee"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+type testeeEvaluationServiceStub struct {
+	getAssessmentErr error
+}
+
+func (s testeeEvaluationServiceStub) AuthorizeAssessment(context.Context, evaluationtestee.Actor, uint64) error {
+	return nil
+}
+func (s testeeEvaluationServiceStub) GetAssessment(context.Context, evaluationtestee.Actor, uint64) (*evaluationtestee.Assessment, error) {
+	return nil, s.getAssessmentErr
+}
+func (s testeeEvaluationServiceStub) ListAssessments(context.Context, evaluationtestee.Actor, evaluationtestee.ListQuery) (*evaluationtestee.AssessmentList, error) {
+	return nil, nil
+}
+func (s testeeEvaluationServiceStub) GetScore(context.Context, evaluationtestee.Actor, uint64) (*evaluationtestee.Score, error) {
+	return nil, nil
+}
+func (s testeeEvaluationServiceStub) GetFactorTrend(context.Context, evaluationtestee.Actor, evaluationtestee.TrendQuery) (*evaluationtestee.FactorTrend, error) {
+	return nil, nil
+}
+func (s testeeEvaluationServiceStub) GetHighRiskFactors(context.Context, evaluationtestee.Actor, uint64) (*evaluationtestee.HighRiskFactors, error) {
+	return nil, nil
+}
 
 func TestTesteeEvaluationServiceScoreQueriesRequireTesteeSubject(t *testing.T) {
 	t.Parallel()
@@ -72,6 +96,30 @@ func TestToAssessmentQueryGRPCError(t *testing.T) {
 			t.Fatalf("unknown internal error leaked: %q", status.Convert(got).Message())
 		}
 	})
+}
+
+func TestGetMyAssessmentUsesAssessmentQueryGRPCErrorContract(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		code codes.Code
+	}{
+		{name: "not found", err: pkgerrors.WithCode(errorCode.ErrAssessmentNotFound, "missing detail"), code: codes.NotFound},
+		{name: "permission denied", err: pkgerrors.WithCode(errorCode.ErrPermissionDenied, "foreign detail"), code: codes.PermissionDenied},
+		{name: "dependency failure", err: errors.New("database endpoint"), code: codes.Internal},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := NewTesteeEvaluationService(testeeEvaluationServiceStub{getAssessmentErr: tt.err})
+			_, err := svc.GetMyAssessment(context.Background(), &pb.GetMyAssessmentRequest{TesteeId: 7, AssessmentId: 42})
+			if status.Code(err) != tt.code {
+				t.Fatalf("status = %s, want %s; err=%v", status.Code(err), tt.code, err)
+			}
+			if tt.code == codes.Internal && status.Convert(err).Message() != "internal error" {
+				t.Fatalf("internal detail leaked: %q", status.Convert(err).Message())
+			}
+		})
+	}
 }
 
 func TestNormalizeModelKinds(t *testing.T) {

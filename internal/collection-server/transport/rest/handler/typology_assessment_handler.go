@@ -156,7 +156,7 @@ func (h *TypologyAssessmentHandler) GetReportStatus(c *gin.Context) {
 	}
 	result, err := h.queryService.GetReportStatus(c.Request.Context(), testeeID, assessmentID)
 	if err != nil {
-		h.InternalErrorResponse(c, "get typology assessment report status failed", err)
+		h.writeReportStatusError(c, "typology_report_status", err)
 		return
 	}
 	h.Success(c, result)
@@ -184,7 +184,7 @@ func (h *TypologyAssessmentHandler) WaitReport(c *gin.Context) {
 	timeout := h.waitReportService.NormalizeTimeout(c.DefaultQuery("timeout", "20"))
 	result, err := h.queryService.WaitReport(c.Request.Context(), testeeID, assessmentID, timeout)
 	if err != nil {
-		h.InternalErrorResponse(c, "wait typology assessment report failed", err)
+		h.writeReportStatusError(c, "typology_wait_report", err)
 		return
 	}
 	h.Success(c, result)

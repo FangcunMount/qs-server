@@ -1,17 +1,21 @@
 package ws
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportevents"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportnotify"
 	appreportstatus "github.com/FangcunMount/qs-server/internal/collection-server/application/reportstatus"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/testeeaccess"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
@@ -36,6 +40,21 @@ type ReportEventsHandler struct {
 	opts     *options.ReportEventsOptions
 	connMgr  *connectionManager
 	limiter  ratelimit.RateLimiter
+}
+
+// ginWebsocketResponseWriter lets coder/websocket flush Gin's 101 response
+// bookkeeping while bypassing Gin's "already written" guard during hijack.
+type ginWebsocketResponseWriter struct {
+	gin.ResponseWriter
+	underlying http.ResponseWriter
+}
+
+func (w *ginWebsocketResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := w.underlying.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("underlying response writer does not support hijacking")
+	}
+	return hijacker.Hijack()
 }
 
 type subscribeLimiter struct {
@@ -113,7 +132,20 @@ func (h *ReportEventsHandler) ServeHTTP(c *gin.Context) {
 		c.Status(http.StatusNotFound)
 		return
 	}
-	conn, err := websocket.Accept(c.Writer, c.Request, &websocket.AcceptOptions{
+	userID := pkgmiddleware.GetUserID(c)
+	if userID == "" {
+		incSubscribeDenied("unauthenticated")
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "authentication required"})
+		return
+	}
+	responseWriter := http.ResponseWriter(c.Writer)
+	if unwrapper, ok := responseWriter.(interface{ Unwrap() http.ResponseWriter }); ok {
+		responseWriter = &ginWebsocketResponseWriter{
+			ResponseWriter: c.Writer,
+			underlying:     unwrapper.Unwrap(),
+		}
+	}
+	conn, err := websocket.Accept(responseWriter, c.Request, &websocket.AcceptOptions{
 		CompressionMode: websocket.CompressionDisabled,
 	})
 	if err != nil {
@@ -122,7 +154,8 @@ func (h *ReportEventsHandler) ServeHTTP(c *gin.Context) {
 	}
 	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "closed") }()
 
-	ctx := c.Request.Context()
+	ctx, cancelConnection := context.WithCancel(context.WithoutCancel(c.Request.Context()))
+	defer cancelConnection()
 	limitKey := subscribeLimitKey(c)
 	idleTimeout := time.Duration(h.opts.IdleTimeoutSeconds) * time.Second
 	heartbeat := time.Duration(h.opts.HeartbeatIntervalSeconds) * time.Second
@@ -225,18 +258,34 @@ func (h *ReportEventsHandler) ServeHTTP(c *gin.Context) {
 				continue
 			}
 
-			status, err := h.events.CurrentStatus(ctx, frame.Kind, testeeID, assessmentID)
+			var status *reportevents.StatusPayload
+			if h.events == nil {
+				err = testeeaccess.ErrAccessUnavailable
+			} else {
+				status, err = h.events.CurrentStatus(ctx, userID, frame.Kind, testeeID, assessmentID)
+			}
 			if err != nil {
 				h.connMgr.Release(activeTestee)
 				activeTestee = ""
-				code := "forbidden"
-				if errors.Is(err, appreportstatus.ErrInvalidKind) {
-					code = "invalid_kind"
-				} else if errors.Is(err, appreportstatus.ErrAssessmentAccess) {
-					code = "forbidden"
-				}
-				incSubscribeDenied(code)
-				_ = writer.write(ctx, outboundFrame{Op: OpError, Code: code, Message: err.Error()})
+				code, message, reason := reportEventsAccessError(err)
+				incSubscribeDenied(reason)
+				log.Warnw("report-events subscribe denied",
+					"request_id", pkgmiddleware.RequestIDFromStandardContext(ctx),
+					"user_id", userID,
+					"testee_id", testeeID,
+					"assessment_id", assessmentID,
+					"kind", frame.Kind,
+					"reason", reason,
+					"error", err,
+				)
+				_ = writer.write(ctx, outboundFrame{Op: OpError, Code: code, Message: message})
+				continue
+			}
+			if h.notifier == nil {
+				h.connMgr.Release(activeTestee)
+				activeTestee = ""
+				incSubscribeDenied("authorization_unavailable")
+				_ = writer.write(ctx, outboundFrame{Op: OpError, Code: "temporarily_unavailable", Message: "authorization temporarily unavailable"})
 				continue
 			}
 
@@ -257,7 +306,7 @@ func (h *ReportEventsHandler) ServeHTTP(c *gin.Context) {
 				return
 			}
 
-			go h.forwardSignals(ctx, writer, frame.Kind, testeeID, assessmentID, signalCh, touch)
+			go h.forwardSignals(ctx, writer, userID, frame.Kind, testeeID, assessmentID, signalCh, touch)
 		default:
 			_ = writer.write(ctx, outboundFrame{Op: OpError, Code: "bad_request", Message: fmt.Sprintf("unsupported op %q", frame.Op)})
 		}
@@ -267,6 +316,7 @@ func (h *ReportEventsHandler) ServeHTTP(c *gin.Context) {
 func (h *ReportEventsHandler) forwardSignals(
 	ctx context.Context,
 	writer *frameWriter,
+	userID string,
 	kind string,
 	testeeID, assessmentID uint64,
 	signalCh <-chan reportnotify.StatusEvent,
@@ -283,8 +333,23 @@ func (h *ReportEventsHandler) forwardSignals(
 			if signal.Status != "completed" && signal.Status != "failed" {
 				continue
 			}
-			status, err := h.events.CurrentStatus(ctx, kind, testeeID, assessmentID)
+			status, err := h.events.CurrentStatus(ctx, userID, kind, testeeID, assessmentID)
 			if err != nil {
+				code, _, reason := reportEventsAccessError(err)
+				log.Warnw("report-events subscription authorization revoked",
+					"request_id", pkgmiddleware.RequestIDFromStandardContext(ctx),
+					"user_id", userID,
+					"testee_id", testeeID,
+					"assessment_id", assessmentID,
+					"kind", kind,
+					"reason", reason,
+					"error", err,
+				)
+				closeReason := "temporarily unavailable"
+				if code == "forbidden" {
+					closeReason = "assessment access denied"
+				}
+				_ = writer.conn.Close(websocket.StatusPolicyViolation, closeReason)
 				return
 			}
 			touch()
@@ -302,4 +367,17 @@ func (h *ReportEventsHandler) forwardSignals(
 func (h *ReportEventsHandler) pushStatus(ctx context.Context, writer *frameWriter, status *reportevents.StatusPayload) error {
 	incPush()
 	return writer.write(ctx, outboundFrame{Op: OpStatus, Data: status})
+}
+
+func reportEventsAccessError(err error) (code, message, reason string) {
+	switch {
+	case errors.Is(err, appreportstatus.ErrInvalidKind):
+		return "invalid_kind", "invalid assessment kind", "invalid_kind"
+	case errors.Is(err, testeeaccess.ErrAccessDenied):
+		return "forbidden", "assessment access denied", "testee_access"
+	case errors.Is(err, appreportstatus.ErrAssessmentAccess):
+		return "forbidden", "assessment access denied", "assessment_access"
+	default:
+		return "temporarily_unavailable", "authorization temporarily unavailable", "authorization_unavailable"
+	}
 }

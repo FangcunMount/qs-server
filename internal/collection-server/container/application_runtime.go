@@ -157,7 +157,7 @@ func (c *Container) buildReportRuntime(evaluationQuery *evaluation.QueryService)
 func (c *Container) buildReportEventsHandler() *ws.ReportEventsHandler {
 	return ws.NewReportEventsHandler(ws.Dependencies{
 		Notifier: c.reportNotifier,
-		Events: reportevents.NewService(newReportStatusResolver(
+		Events: reportevents.NewService(c.testeeAccessAuthorizer, newReportStatusResolver(
 			c.evaluationQueryService,
 			c.waitReportService,
 			c.typologyAssessmentQueryService,

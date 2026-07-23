@@ -135,10 +135,10 @@ func (h *BehaviorAssessmentHandler) GetReportStatus(c *gin.Context) {
 	result, err := h.queryService.GetReportStatus(c.Request.Context(), testeeID, assessmentID)
 	if err != nil {
 		if errors.Is(err, behaviorassessment.ErrNotBehaviorAssessment) {
-			h.NotFoundResponse(c, "behavior assessment not found", nil)
+			h.NotFoundResponse(c, "assessment not found", nil)
 			return
 		}
-		h.InternalErrorResponse(c, "get behavior assessment report status failed", err)
+		h.writeReportStatusError(c, "behavior_report_status", err)
 		return
 	}
 	h.Success(c, result)
@@ -165,10 +165,10 @@ func (h *BehaviorAssessmentHandler) WaitReport(c *gin.Context) {
 	result, err := h.queryService.WaitReport(c.Request.Context(), testeeID, assessmentID, h.waitReportService.NormalizeTimeout(c.DefaultQuery("timeout", "20")))
 	if err != nil {
 		if errors.Is(err, behaviorassessment.ErrNotBehaviorAssessment) {
-			h.NotFoundResponse(c, "behavior assessment not found", nil)
+			h.NotFoundResponse(c, "assessment not found", nil)
 			return
 		}
-		h.InternalErrorResponse(c, "wait behavior assessment report failed", err)
+		h.writeReportStatusError(c, "behavior_wait_report", err)
 		return
 	}
 	h.Success(c, result)
