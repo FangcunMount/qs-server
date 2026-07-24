@@ -23,6 +23,9 @@ func (r *evaluationFactRepository) FindByID(ctx context.Context, id meta.ID) (*e
 	if err != nil {
 		return nil, err
 	}
+	if record == nil {
+		return nil, evaluationfact.ErrNotFound
+	}
 	return evaloutcome.FactRecord(record), nil
 }
 
@@ -30,6 +33,9 @@ func (r *evaluationFactRepository) FindByAssessmentID(ctx context.Context, asses
 	record, err := r.source.FindByAssessmentID(ctx, assessmentID)
 	if err != nil {
 		return nil, err
+	}
+	if record == nil {
+		return nil, evaluationfact.ErrNotFound
 	}
 	return evaloutcome.FactRecord(record), nil
 }

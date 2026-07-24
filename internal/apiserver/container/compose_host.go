@@ -22,6 +22,7 @@ import (
 	platformmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
 	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
+	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
@@ -86,6 +87,13 @@ func (c *Container) InterpretationRunLeaseDuration() time.Duration {
 		return defaults.RunLeaseDuration()
 	}
 	return c.systemGovernanceOptions.Retry.Lease.RunLeaseDuration()
+}
+
+func (c *Container) PublishedReportTemplateCatalog() domainreporttemplate.Catalog {
+	if c == nil || c.ReportModule == nil {
+		return nil
+	}
+	return c.ReportModule.ReportTemplateCatalog()
 }
 
 func (c *Container) CacheObserver() *observability.ComponentObserver {

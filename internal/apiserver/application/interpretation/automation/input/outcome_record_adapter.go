@@ -1,8 +1,7 @@
 package input
 
 import (
-	"fmt"
-
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/admission"
 	interpinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
@@ -22,15 +21,15 @@ const DefaultTemplateVersion policy.TemplateVersion = policy.TemplateVersionV1
 // Assessment or create application/evaluation/outcome.Outcome.
 func FromOutcomeRecord(record *domainoutcome.Record) (interpinput.InterpretationInput, error) {
 	if record == nil {
-		return interpinput.InterpretationInput{}, fmt.Errorf("evaluation outcome is required")
+		return interpinput.InterpretationInput{}, classify(admission.KindOutcomeIncomplete, nil, "evaluation outcome is required")
 	}
 	execution, err := evaluationfactcodec.DecodeExecution(record)
 	if err != nil {
-		return interpinput.InterpretationInput{}, err
+		return interpinput.InterpretationInput{}, classify(admission.KindOutcomeIncomplete, err, "decode committed outcome")
 	}
 	assets, err := evaluationfactcodec.DecodeReportInput(record)
 	if err != nil {
-		return interpinput.InterpretationInput{}, err
+		return interpinput.InterpretationInput{}, classify(admission.KindArtifactContractInvalid, err, "decode frozen report input")
 	}
 	model := modelIdentityFromRecord(record)
 	in := interpinput.InterpretationInput{
@@ -50,7 +49,7 @@ func FromOutcomeRecord(record *domainoutcome.Record) (interpinput.Interpretation
 	}
 	family, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(in.Runtime.DecisionKind)
 	if !ok {
-		return interpinput.InterpretationInput{}, fmt.Errorf("evaluation outcome runtime identity is incomplete")
+		return interpinput.InterpretationInput{}, classify(admission.KindCatalogIncompatible, nil, "evaluation outcome runtime identity is incomplete")
 	}
 	in.Report.ReportProfile = policy.ReportProfileForDecisionKind(in.Runtime.DecisionKind)
 	if codes, ok := evaluationinput.FactorScoreVisibleCodesFromSnapshot(assets); ok {
@@ -66,16 +65,16 @@ func FromOutcomeRecord(record *domainoutcome.Record) (interpinput.Interpretation
 		assetModel := factorModel(assets, family)
 		factors := factorScores(execution, assetModel)
 		if err := applyFrozenNormInterpretation(factors, assets, in.PresentationProfile); err != nil {
-			return interpinput.InterpretationInput{}, err
+			return interpinput.InterpretationInput{}, classify(admission.KindOutcomeAssociationMismatch, err, "validate frozen norm interpretation")
 		}
 		in.FactorScoring = &interpinput.FactorScoringFacts{Model: assetModel, Factors: factors}
 	case modelcatalog.AlgorithmFamilyFactorClassification:
 		if err := populateTypologyFacts(&in, execution, assets); err != nil {
-			return interpinput.InterpretationInput{}, err
+			return interpinput.InterpretationInput{}, classify(admission.KindArtifactContractInvalid, err, "restore typology facts")
 		}
 		routing, ok := evaluationinput.TypologyReportRoutingFromSnapshot(assets)
 		if !ok {
-			return interpinput.InterpretationInput{}, fmt.Errorf("report input typology routing is required")
+			return interpinput.InterpretationInput{}, classify(admission.KindCatalogIncompatible, nil, "report input typology routing is required")
 		}
 		in.Report.TemplateID = routing.TemplateID
 		in.Report.AdapterKey = string(routing.AdapterKey)

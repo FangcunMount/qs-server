@@ -28,6 +28,11 @@ mongodb/
 | `report_query_catalog` | Assessment 级当前报告查询索引（v2） | assessment_id unique, org/testee sort indexes（见 000015） |
 | `interpretation_attention_projections` | 报告生成后 attention 投影状态（v2） | event_id unique, status+updated_at（见 000016） |
 | `interpretation_report_templates` | Interpretation 报告模板发布资产（v2） | template_id+template_version unique（见 000017） |
+| `interpretation_catalog_repair_plans` | Catalog 修复 dry-run 快照 | dry_run_id unique、expires_at TTL（见 000019） |
+
+## Interpretation recovery indexes（000019）
+
+`000019_add_interpretation_recovery_indexes` 增加按 ReportID 查询 Attention 投影的索引、AdmissionFailure 运维稳定分页索引，并创建保存 7 天受控 Catalog repair dry-run 的 TTL 集合。down migration 只删除本版本增加的索引和 repair plan 集合。
 
 ## Statistics Collector indexes（000018）
 
@@ -43,7 +48,7 @@ mongodb/
 
 `000017_add_report_templates` 创建 `interpretation_report_templates` 集合与 release unique 索引。Repository 启动时会幂等 seed 并 publish `legacy-v1` 兼容模板（standard/mbti/sbti/bigfive）。
 
-ModelCatalog 发布 UI/API 绑定 `PublishedTemplateLookup` 为后续项（IR-R013）。
+ModelCatalog 发布门禁已绑定 Interpretation `PublishedTemplateLookup`；模板版本未发布或 lookup 缺失时拒绝发布。
 
 ## Report query catalog（000015）
 

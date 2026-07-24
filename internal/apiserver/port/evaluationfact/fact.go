@@ -4,12 +4,17 @@ package evaluationfact
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
+
+var ErrNotFound = errors.New("evaluation fact not found")
 
 type ModelIdentity struct {
 	Kind      modelcatalog.Kind
@@ -77,6 +82,20 @@ func (r *Record) EvaluatedAt() time.Time   { return r.evaluatedAt }
 func (r *Record) Payload() json.RawMessage { return cloneBytes(r.payload) }
 func (r *Record) ReportInput() json.RawMessage {
 	return cloneBytes(r.reportInput)
+}
+
+// VersionToken is a stable content identity for governance CAS. Committed
+// outcomes are immutable, but the token also detects repository corruption or
+// an operator presenting a stale dry-run request.
+func (r *Record) VersionToken() string {
+	if r == nil {
+		return ""
+	}
+	sum := sha256.New()
+	_, _ = fmt.Fprintf(sum, "%d|%d|%d|%d|", r.id.Uint64(), r.orgID, r.assessmentID.Uint64(), r.schemaVersion)
+	_, _ = sum.Write(r.payload)
+	_, _ = sum.Write(r.reportInput)
+	return fmt.Sprintf("sha256:%x", sum.Sum(nil))
 }
 
 func cloneBytes(value []byte) json.RawMessage {

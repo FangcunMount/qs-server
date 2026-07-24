@@ -17,6 +17,7 @@ import (
 	interpretationclinician "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
 	interpretationoperations "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/operations"
 	interpretationparticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
+	interpretationreadmission "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/readmission"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reportprojection"
 	appreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporttemplate"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
@@ -24,6 +25,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	interpretationbuilder "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
+	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
@@ -54,6 +56,7 @@ type Module struct {
 	catalogReconcile      interpretationcatalog.Service
 	catalogAuditor        *interpretationcatalog.ScheduledAuditor
 	governedRetryService  interpretationautomation.GovernedRetryService
+	readmissionService    interpretationreadmission.Service
 	leaseRecoverer        interpretationautomation.LeaseRecoverer
 	txRunner              apptransaction.Runner
 	eventStager           appEventing.EventStager
@@ -84,8 +87,12 @@ func New(deps Deps) (*Module, error) {
 	module.ReportStatusReporter = reportStatusReporter
 	mongoOptions := mongoBase.BaseRepositoryOptions{Limiter: deps.MongoLimiter}
 	module.reader = mongoEval.NewReportReadModel(deps.MongoDB, mongoOptions)
+	catalogReconcileStore, err := mongoEval.NewCatalogReconcileStore(deps.MongoDB)
+	if err != nil {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report catalog reconcile store: %v", err)
+	}
 	module.catalogReconcile = interpretationcatalog.NewService(catalogReconcileStoreAdapter{
-		store: mongoEval.NewCatalogReconcileStore(deps.MongoDB),
+		store: catalogReconcileStore,
 	})
 	module.catalogAuditor = interpretationcatalog.NewScheduledAuditor(module.catalogReconcile, 10*time.Minute)
 	generationRepo, err := mongoEval.NewGenerationRepository(deps.MongoDB, mongoOptions)
@@ -159,6 +166,8 @@ func (m *Module) BindOutcomeRepository(repo domainoutcome.Repository) error {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation automation service: %v", err)
 	}
 	m.automationService = automationService
+	m.readmissionService = interpretationreadmission.NewService(m.admissionRepo, repo, automationService)
+	m.catalogReconcile.BindArchiveAuthority(catalogOutcomeAuthority{repo: repo})
 	m.operationsService = interpretationoperations.NewService(
 		outcomeCorrelationAdapter{repo: repo},
 		m.generationRepo,
@@ -170,6 +179,13 @@ func (m *Module) BindOutcomeRepository(repo domainoutcome.Repository) error {
 	m.governedRetryService = interpretationautomation.NewGovernedRetryService(m.generationRepo, m.runRepo, repo, m.txRunner, m.eventStager)
 	m.leaseRecoverer = interpretationautomation.NewLeaseRecoverer(m.runRepo, m.generationRepo, m.automationService)
 	return nil
+}
+
+func (m *Module) ReadmissionService() interpretationreadmission.Service {
+	if m == nil {
+		return nil
+	}
+	return m.readmissionService
 }
 
 func (m *Module) LeaseRecoverer() interpretationautomation.LeaseRecoverer {
@@ -230,6 +246,84 @@ func (a catalogReconcileStoreAdapter) CountDrifts(
 	}, nil
 }
 
+func (a catalogReconcileStoreAdapter) ListDrifts(
+	ctx context.Context,
+	filter interpretationcatalog.Filter,
+	cursor string,
+	limit int,
+) (interpretationcatalog.DriftPage, error) {
+	if a.store == nil {
+		return interpretationcatalog.DriftPage{}, fmt.Errorf("catalog reconcile store is not configured")
+	}
+	page, err := a.store.ListDrifts(ctx, mongoEval.CatalogReconcileFilter{
+		OrgID: filter.OrgID, AssessmentID: filter.AssessmentID, Kind: filter.Kind,
+		SortAtAfter: filter.SortAtAfter, SortAtBefore: filter.SortAtBefore,
+	}, cursor, limit)
+	if err != nil {
+		return interpretationcatalog.DriftPage{}, err
+	}
+	items := make([]interpretationcatalog.DriftItem, 0, len(page.Items))
+	for _, item := range page.Items {
+		items = append(items, interpretationcatalog.DriftItem{
+			CatalogID: item.CatalogID, ReportID: item.ReportID, AssessmentID: item.AssessmentID,
+			Source: item.Source, Kind: item.Kind, Fields: item.Fields,
+			ObservedState: item.ObservedState, Version: item.Version,
+		})
+	}
+	return interpretationcatalog.DriftPage{Items: items, NextCursor: page.NextCursor}, nil
+}
+
+func (a catalogReconcileStoreAdapter) SaveRepairPlan(ctx context.Context, plan interpretationcatalog.RepairPlan) error {
+	return a.store.SaveRepairPlan(ctx, mongoEval.CatalogRepairPlan{
+		DryRunID: plan.DryRunID, OrgID: plan.OrgID,
+		Item: mongoEval.CatalogDriftItem{
+			CatalogID: plan.Item.CatalogID, ReportID: plan.Item.ReportID, AssessmentID: plan.Item.AssessmentID,
+			Source: plan.Item.Source, Kind: plan.Item.Kind, Fields: plan.Item.Fields,
+			ObservedState: plan.Item.ObservedState, Version: plan.Item.Version,
+		},
+		CreatedAt: plan.CreatedAt, ExpiresAt: plan.ExpiresAt,
+	})
+}
+
+func (a catalogReconcileStoreAdapter) FindRepairPlan(ctx context.Context, dryRunID string) (interpretationcatalog.RepairPlan, error) {
+	plan, err := a.store.FindRepairPlan(ctx, dryRunID)
+	if err != nil {
+		return interpretationcatalog.RepairPlan{}, err
+	}
+	return interpretationcatalog.RepairPlan{
+		DryRunID: plan.DryRunID, OrgID: plan.OrgID,
+		Item: interpretationcatalog.DriftItem{
+			CatalogID: plan.Item.CatalogID, ReportID: plan.Item.ReportID, AssessmentID: plan.Item.AssessmentID,
+			Source: plan.Item.Source, Kind: plan.Item.Kind, Fields: plan.Item.Fields,
+			ObservedState: plan.Item.ObservedState, Version: plan.Item.Version,
+		},
+		CreatedAt: plan.CreatedAt, ExpiresAt: plan.ExpiresAt,
+	}, nil
+}
+
+func (a catalogReconcileStoreAdapter) ApplyRepair(ctx context.Context, plan interpretationcatalog.RepairPlan) (string, error) {
+	return a.store.ApplyRepair(ctx, mongoEval.CatalogRepairPlan{
+		DryRunID: plan.DryRunID, OrgID: plan.OrgID,
+		Item: mongoEval.CatalogDriftItem{
+			CatalogID: plan.Item.CatalogID, ReportID: plan.Item.ReportID, AssessmentID: plan.Item.AssessmentID,
+			Source: plan.Item.Source, Kind: plan.Item.Kind, Fields: plan.Item.Fields,
+			ObservedState: plan.Item.ObservedState, Version: plan.Item.Version,
+		},
+		CreatedAt: plan.CreatedAt, ExpiresAt: plan.ExpiresAt,
+	})
+}
+
+func (a catalogReconcileStoreAdapter) RecoverArchiveAssociation(
+	ctx context.Context,
+	assessmentID uint64,
+	association interpretationcatalog.OutcomeAssociation,
+) (string, error) {
+	return a.store.RecoverArchiveAssociation(ctx, assessmentID, mongoEval.CatalogOutcomeAssociation{
+		OutcomeID: association.OutcomeID, OrgID: association.OrgID,
+		AssessmentID: association.AssessmentID, TesteeID: association.TesteeID,
+	})
+}
+
 func (m *Module) ReportReader() evaluationreadmodel.ReportReader {
 	if m == nil {
 		return nil
@@ -241,6 +335,30 @@ func (m *Module) ReportReader() evaluationreadmodel.ReportReader {
 // composition root so application/interpretation does not import them.
 type outcomeCorrelationAdapter struct {
 	repo domainoutcome.Repository
+}
+
+type catalogOutcomeAuthority struct {
+	repo domainoutcome.Repository
+}
+
+func (a catalogOutcomeAuthority) FindCommittedOutcome(
+	ctx context.Context,
+	assessmentID uint64,
+) (interpretationcatalog.OutcomeAssociation, error) {
+	if a.repo == nil {
+		return interpretationcatalog.OutcomeAssociation{}, fmt.Errorf("evaluation outcome repository is not configured")
+	}
+	record, err := a.repo.FindByAssessmentID(ctx, meta.ID(assessmentID))
+	if err != nil {
+		return interpretationcatalog.OutcomeAssociation{}, err
+	}
+	if record == nil {
+		return interpretationcatalog.OutcomeAssociation{}, domainoutcome.ErrNotFound
+	}
+	return interpretationcatalog.OutcomeAssociation{
+		OutcomeID: record.ID().Uint64(), OrgID: record.OrgID(),
+		AssessmentID: record.AssessmentID().Uint64(), TesteeID: record.TesteeID(),
+	}, nil
 }
 
 func (a outcomeCorrelationAdapter) FindOutcomeByAssessmentID(ctx context.Context, assessmentID meta.ID) (interpretationoperations.OutcomeRef, error) {
@@ -346,6 +464,13 @@ func (m *Module) ReportTemplateService() appreporttemplate.Service {
 		return nil
 	}
 	return m.reportTemplateService
+}
+
+func (m *Module) ReportTemplateCatalog() domainreporttemplate.Catalog {
+	if m == nil {
+		return nil
+	}
+	return m.reportTemplateRepo
 }
 
 func buildReportBuilderRegistry() (rendering.Registry, error) {

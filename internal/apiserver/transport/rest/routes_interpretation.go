@@ -25,10 +25,19 @@ func (r *Router) registerInterpretationInternalRoutes(internalV1 *gin.RouterGrou
 	g.GET("/reports/:report_id", h.FindReport)
 	g.GET("/outcomes/:outcome_id/generations", h.FindOutcomeGenerations)
 	g.GET("/outcomes/:outcome_id/admission-failures", h.FindOutcomeAdmissionFailures)
+	g.GET("/admission-failures", h.ListAdmissionFailures)
 	g.GET("/assessments/:assessment_id/lifecycle", h.FindAssessmentLifecycle)
 	g.GET("/assessments/:assessment_id/reports", h.ListAssessmentReports)
 	if r.deps.Interpretation.CatalogReconcile != nil {
 		reconcile := handler.NewInterpretationCatalogReconcileHandler(r.deps.Interpretation.CatalogReconcile)
 		g.GET("/catalog/reconcile", reconcile.Reconcile)
+		g.GET("/catalog/drifts", reconcile.ListDrifts)
+		g.POST("/catalog/repair-plans", reconcile.CreateRepairPlan)
+	}
+	if r.deps.Interpretation.ReportTemplates != nil {
+		templates := handler.NewInterpretationReportTemplateHandler(r.deps.Interpretation.ReportTemplates)
+		g.GET("/report-templates", templates.List)
+		g.GET("/report-templates/:template_id/versions/:version", templates.Get)
+		g.POST("/report-templates", templates.CreateDraft)
 	}
 }

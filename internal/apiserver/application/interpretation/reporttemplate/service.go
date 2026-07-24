@@ -36,9 +36,25 @@ type DisableCommand struct {
 }
 
 type Service interface {
+	Get(ctx context.Context, templateID string, version policy.TemplateVersion) (*domainreporttemplate.ReportTemplate, error)
+	List(ctx context.Context, templateID string, limit int) ([]*domainreporttemplate.ReportTemplate, error)
 	CreateDraft(ctx context.Context, command CreateDraftCommand) (*domainreporttemplate.ReportTemplate, error)
 	Publish(ctx context.Context, command PublishCommand) (*domainreporttemplate.ReportTemplate, error)
 	Disable(ctx context.Context, command DisableCommand) (*domainreporttemplate.ReportTemplate, error)
+}
+
+func (s *service) List(ctx context.Context, templateID string, limit int) ([]*domainreporttemplate.ReportTemplate, error) {
+	if s == nil || s.repo == nil {
+		return nil, fmt.Errorf("report template service is not configured")
+	}
+	return s.repo.ListByTemplateID(ctx, templateID, limit)
+}
+
+func (s *service) Get(ctx context.Context, templateID string, version policy.TemplateVersion) (*domainreporttemplate.ReportTemplate, error) {
+	if s == nil || s.repo == nil {
+		return nil, fmt.Errorf("report template service is not configured")
+	}
+	return s.repo.FindByKey(ctx, templateID, version)
 }
 
 type service struct {
@@ -89,6 +105,9 @@ func (s *service) Publish(ctx context.Context, command PublishCommand) (*domainr
 	if err != nil {
 		return nil, err
 	}
+	if err := validateReleaseMetadata(tmpl); err != nil {
+		return nil, err
+	}
 	if err := tmpl.Publish(actor, s.now()); err != nil {
 		return nil, err
 	}
@@ -96,6 +115,27 @@ func (s *service) Publish(ctx context.Context, command PublishCommand) (*domainr
 		return nil, err
 	}
 	return tmpl, nil
+}
+
+func validateReleaseMetadata(tmpl *domainreporttemplate.ReportTemplate) error {
+	if tmpl == nil {
+		return fmt.Errorf("report template is required")
+	}
+	switch tmpl.BuilderIdentity() {
+	case report.BuilderIdentityFactorScoring, report.BuilderIdentityNormProfile, report.BuilderIdentityTaskPerformance:
+		if tmpl.AdapterKey() != "" {
+			return fmt.Errorf("report template adapter %q is incompatible with builder %s", tmpl.AdapterKey(), tmpl.BuilderIdentity())
+		}
+	case report.BuilderIdentityTypology:
+		switch tmpl.AdapterKey() {
+		case "personality_type", "trait_profile":
+		default:
+			return fmt.Errorf("report template adapter %q is not registered for typology", tmpl.AdapterKey())
+		}
+	default:
+		return fmt.Errorf("report template builder identity %q is not registered", tmpl.BuilderIdentity())
+	}
+	return nil
 }
 
 func (s *service) Disable(ctx context.Context, command DisableCommand) (*domainreporttemplate.ReportTemplate, error) {

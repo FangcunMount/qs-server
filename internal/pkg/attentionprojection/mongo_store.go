@@ -51,6 +51,10 @@ func mongoIndexModels() []mongo.IndexModel {
 			Keys:    bson.D{{Key: "status", Value: 1}, {Key: "updated_at", Value: 1}},
 			Options: options.Index().SetName("idx_attention_projection_status_updated"),
 		},
+		{
+			Keys:    bson.D{{Key: "report_id", Value: 1}},
+			Options: options.Index().SetName("idx_attention_projection_report"),
+		},
 	}
 }
 
@@ -159,9 +163,20 @@ func (s *MongoStore) GetByEventID(ctx context.Context, eventID string) (*Record,
 	var po projectionPO
 	if err := s.collection.FindOne(ctx, bson.M{"event_id": eventID}).Decode(&po); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, fmt.Errorf("attention projection not found: %s", eventID)
+			return nil, fmt.Errorf("%w: event=%s", ErrNotFound, eventID)
 		}
 		return nil, fmt.Errorf("find attention projection: %w", err)
+	}
+	return poToRecord(&po), nil
+}
+
+func (s *MongoStore) FindByReportID(ctx context.Context, reportID string) (*Record, error) {
+	var po projectionPO
+	if err := s.collection.FindOne(ctx, bson.M{"report_id": reportID}).Decode(&po); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, fmt.Errorf("%w: report=%s", ErrNotFound, reportID)
+		}
+		return nil, fmt.Errorf("find attention projection by report: %w", err)
 	}
 	return poToRecord(&po), nil
 }

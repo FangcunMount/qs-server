@@ -68,13 +68,29 @@ func (r *ReportTemplateRepository) Save(ctx context.Context, template *domainrep
 		return fmt.Errorf("report template is required")
 	}
 	po := reportTemplateToPO(template)
-	_, err := r.Collection().ReplaceOne(ctx,
-		bson.M{"template_id": po.TemplateID, "template_version": po.TemplateVersion},
-		po,
-		options.Replace().SetUpsert(true),
-	)
+	filter := bson.M{"template_id": po.TemplateID, "template_version": po.TemplateVersion}
+	upsert := false
+	switch template.Status() {
+	case domainreporttemplate.StatusDraft:
+		filter["domain_id"] = po.DomainID
+		filter["status"] = string(domainreporttemplate.StatusDraft)
+		upsert = true
+	case domainreporttemplate.StatusPublished:
+		filter["status"] = string(domainreporttemplate.StatusDraft)
+	case domainreporttemplate.StatusDisabled:
+		filter["status"] = string(domainreporttemplate.StatusPublished)
+	default:
+		return fmt.Errorf("save report template: invalid status")
+	}
+	result, err := r.Collection().ReplaceOne(ctx, filter, po, options.Replace().SetUpsert(upsert))
 	if err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			return domainreporttemplate.ErrConflict
+		}
 		return fmt.Errorf("save report template: %w", err)
+	}
+	if !upsert && result.MatchedCount == 0 {
+		return domainreporttemplate.ErrConflict
 	}
 	return nil
 }
@@ -101,6 +117,33 @@ func (r *ReportTemplateRepository) FindPublished(ctx context.Context, templateID
 		return nil, fmt.Errorf("find published report template: %w", err)
 	}
 	return reportTemplateToDomain(&po)
+}
+
+func (r *ReportTemplateRepository) ListByTemplateID(ctx context.Context, templateID string, limit int) ([]*domainreporttemplate.ReportTemplate, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 100
+	}
+	cur, err := r.Collection().Find(ctx,
+		bson.M{"template_id": templateID},
+		options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}, {Key: "domain_id", Value: -1}}).SetLimit(int64(limit)),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list report template versions: %w", err)
+	}
+	defer func() { _ = cur.Close(ctx) }()
+	items := make([]*domainreporttemplate.ReportTemplate, 0)
+	for cur.Next(ctx) {
+		var po ReportTemplatePO
+		if err := cur.Decode(&po); err != nil {
+			return nil, err
+		}
+		item, err := reportTemplateToDomain(&po)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, cur.Err()
 }
 
 func (r *ReportTemplateRepository) IsPublished(templateID string, version string) bool {

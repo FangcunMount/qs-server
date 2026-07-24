@@ -1,0 +1,13 @@
+[
+  {
+    "dropIndexes": "interpretation_attention_projections",
+    "index": "idx_attention_projection_report"
+  },
+  {
+    "drop": "interpretation_catalog_repair_plans"
+  },
+  {
+    "dropIndexes": "interpretation_admission_failures",
+    "index": "idx_admission_failure_operations"
+  }
+]

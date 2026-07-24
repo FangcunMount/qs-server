@@ -65,7 +65,7 @@ func TestAllPackagesIncludesEveryBusinessPackageAndPlatform(t *testing.T) {
 func TestLegacyRegisteredModuleOrderMatchesInitializeSequence(t *testing.T) {
 	t.Parallel()
 
-	want := []string{"survey", "modelcatalog", "actor", "interpretation", "evaluation", "plan", "statistics"}
+	want := []string{"survey", "interpretation", "modelcatalog", "actor", "evaluation", "plan", "statistics"}
 	if got := modules.LegacyRegisteredModuleOrder(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("LegacyRegisteredModuleOrder() = %v, want %v", got, want)
 	}

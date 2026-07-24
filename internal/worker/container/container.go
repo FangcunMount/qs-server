@@ -30,19 +30,20 @@ import (
 
 // Container 主容器，负责管理所有组件
 type Container struct {
-	initialized         bool
-	opts                *options.Options
-	logger              *slog.Logger
-	locks               *locksubsystem.Subsystem
-	resilience          *resiliencesubsystem.Subsystem
-	resilienceCancel    context.CancelFunc
-	opsHandle           *redisruntime.Handle
-	lockBuilder         *keyspace.Builder
-	eventCatalog        *eventcatalog.Catalog
-	reportStatus        *reportstatus.Reporter
-	mongoDatabase       *mongo.Database
-	attentionProjector  *attentionprojection.Projector
-	attentionReconciler *attentionprojection.Reconciler
+	initialized             bool
+	opts                    *options.Options
+	logger                  *slog.Logger
+	locks                   *locksubsystem.Subsystem
+	resilience              *resiliencesubsystem.Subsystem
+	resilienceCancel        context.CancelFunc
+	opsHandle               *redisruntime.Handle
+	lockBuilder             *keyspace.Builder
+	eventCatalog            *eventcatalog.Catalog
+	reportStatus            *reportstatus.Reporter
+	mongoDatabase           *mongo.Database
+	attentionProjector      *attentionprojection.Projector
+	attentionReconciler     *attentionprojection.Reconciler
+	attentionFactReconciler *attentionprojection.FactReconciler
 
 	// gRPC 客户端（由 GRPCClientRegistry 注入）
 	answerSheetClient              *grpcclient.AnswerSheetClient
@@ -101,14 +102,13 @@ func (c *Container) SetMongoDatabase(db *mongo.Database) {
 	c.mongoDatabase = db
 }
 
-func (c *Container) initAttentionProjection() {
+func (c *Container) initAttentionProjection() error {
 	if c == nil || c.mongoDatabase == nil || c.internalClient == nil {
-		return
+		return nil
 	}
 	store, err := attentionprojection.NewMongoStore(c.mongoDatabase)
 	if err != nil {
-		log.Warnf("attention projection store disabled: %v", err)
-		return
+		return fmt.Errorf("initialize attention projection store: %w", err)
 	}
 	c.attentionProjector = attentionprojection.NewProjector(
 		store,
@@ -117,6 +117,24 @@ func (c *Container) initAttentionProjection() {
 		c.logger,
 	)
 	c.attentionReconciler = attentionprojection.NewReconciler(c.attentionProjector, 0, 100, c.logger)
+	if c.opts != nil && c.opts.Worker != nil && c.opts.Worker.AttentionProjectionReconcileEnabled {
+		from, err := time.Parse(time.RFC3339, c.opts.Worker.AttentionProjectionReconcileFrom)
+		if err != nil {
+			return fmt.Errorf("parse attention projection reconcile_from: %w", err)
+		}
+		source, err := attentionprojection.NewMongoFactSource(c.mongoDatabase)
+		if err != nil {
+			return err
+		}
+		c.attentionFactReconciler, err = attentionprojection.NewFactReconciler(
+			source, store, c.attentionProjector, from,
+			c.opts.Worker.AttentionProjectionReconcileDryRun, 0, 500, c.logger,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (c *Container) buildReportStatusReporter() *reportstatus.Reporter {
@@ -153,7 +171,9 @@ func (c *Container) Initialize() error {
 	if err := c.validateRuntimeClients(); err != nil {
 		return err
 	}
-	c.initAttentionProjection()
+	if err := c.initAttentionProjection(); err != nil {
+		return err
+	}
 
 	// 初始化事件分发器
 	if err := c.initEventDispatcher(); err != nil {
@@ -164,6 +184,9 @@ func (c *Container) Initialize() error {
 	}
 	if c.attentionReconciler != nil {
 		c.attentionReconciler.Start(context.Background())
+	}
+	if c.attentionFactReconciler != nil {
+		c.attentionFactReconciler.Start(context.Background())
 	}
 
 	c.initialized = true
@@ -245,6 +268,9 @@ func (c *Container) Cleanup() {
 	log.Info("🧹 Cleaning up container resources...")
 	if c.attentionReconciler != nil {
 		c.attentionReconciler.Close()
+	}
+	if c.attentionFactReconciler != nil {
+		c.attentionFactReconciler.Close()
 	}
 	if c.resilienceCancel != nil {
 		c.resilienceCancel()

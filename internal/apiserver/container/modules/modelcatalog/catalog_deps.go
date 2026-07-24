@@ -6,6 +6,7 @@ import (
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	cachetarget "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
+	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
@@ -32,4 +33,5 @@ type CatalogDeps struct {
 	CacheSignalNotifier TypologyCacheSignalNotifier
 	CacheInvalidator    PublishedModelCacheInvalidator
 	Transactions        apptransaction.Runner
+	PublishedTemplates  domainreporttemplate.Catalog
 }

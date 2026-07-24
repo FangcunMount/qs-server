@@ -164,9 +164,9 @@ start shutdown manager → HTTP and gRPC concurrently
 
 1. EventSubsystem binding。
 2. Survey。
-3. ModelCatalog。
-4. Actor。
-5. Interpretation。
+3. Interpretation，先提供 ReportTemplate 发布目录和报告基础设施。
+4. ModelCatalog，并强制注入 PublishedTemplateLookup。
+5. Actor。
 6. Evaluation，并把 Outcome/participant/admin/clinician access 绑定到 Interpretation。
 7. Plan。
 8. Statistics。

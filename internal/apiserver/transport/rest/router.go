@@ -18,6 +18,7 @@ import (
 	interpretationcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/catalogreconcile"
 	interpretationclinician "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
 	interpretationoperations "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/operations"
+	interpretationreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporttemplate"
 	reportqueryjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
 	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
 	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
@@ -138,6 +139,7 @@ type InterpretationDeps struct {
 	ClinicianService   interpretationclinician.Service
 	OperationsService  interpretationoperations.Service
 	CatalogReconcile   interpretationcatalog.Service
+	ReportTemplates    interpretationreporttemplate.Service
 }
 
 type PlanDeps struct {

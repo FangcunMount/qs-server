@@ -8,6 +8,7 @@ import (
 	modelcatalogcache "github.com/FangcunMount/qs-server/internal/apiserver/cache/modelcatalog"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
+	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
@@ -35,6 +36,7 @@ type WireInput struct {
 	StaticCacheBuilder     *keyspace.Builder
 	CachePolicies          sharedcache.PolicyProvider
 	CacheObserver          *observability.ComponentObserver
+	PublishedTemplates     domainreporttemplate.Catalog
 }
 
 // Wire 构建和启动模型目录模块
@@ -42,7 +44,7 @@ func Wire(in WireInput) (*Module, error) {
 	return Bootstrap(BootstrapInput{
 		HotRank:   buildHotRankDeps(in),
 		Lifecycle: buildLifecycleDeps(in),
-		Catalog:   buildCatalogDeps(in.MongoDB, in.MongoLimiter, in.QuestionnaireQuery, catalogCacheConfig(in)),
+		Catalog:   buildCatalogDeps(in.MongoDB, in.MongoLimiter, in.QuestionnaireQuery, catalogCacheConfig(in), in.PublishedTemplates),
 	})
 }
 
@@ -92,6 +94,7 @@ func buildCatalogDeps(
 	mongoLimiter backpressure.Acquirer,
 	questionnaireQuery quesApp.QuestionnaireQueryService,
 	cacheCfg catalogCacheWireConfig,
+	publishedTemplates domainreporttemplate.Catalog,
 ) CatalogDeps {
 	if mongoDB == nil {
 		return CatalogDeps{}
@@ -129,5 +132,6 @@ func buildCatalogDeps(
 		QuestionnaireQuery:  questionnaireQuery,
 		CacheSignalNotifier: cacheCfg.Notifier,
 		Transactions:        modtx.NewMongoRunner(mongoDB),
+		PublishedTemplates:  publishedTemplates,
 	}
 }

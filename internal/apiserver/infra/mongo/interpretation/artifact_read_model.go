@@ -138,6 +138,8 @@ func (r *reportReadModel) loadCatalogSourceMetadata(ctx context.Context, entries
 				"assessment_id": 1,
 				"org_id":        1,
 				"testee_id":     1,
+				"outcome_id":    1,
+				"generation_id": 1,
 				"generated_at":  1,
 			}),
 		)
@@ -151,7 +153,11 @@ func (r *reportReadModel) loadCatalogSourceMetadata(ctx context.Context, entries
 				return nil, err
 			}
 			result[fmt.Sprintf("%s:%d", ReportCatalogSourceArtifact, po.DomainID.Uint64())] = catalogSourceMetadata{
-				Association: CatalogSourceAssociation{AssessmentID: po.AssessmentID, OrgID: po.OrgID, HasOrgID: true, TesteeID: po.TesteeID},
+				Association: CatalogSourceAssociation{
+					AssessmentID: po.AssessmentID, OrgID: po.OrgID, HasOrgID: true, TesteeID: po.TesteeID,
+					OutcomeID: po.OutcomeID, HasOutcomeID: po.OutcomeID != 0,
+					GenerationID: po.GenerationID, HasGenerationID: po.GenerationID != 0,
+				},
 				CreatedAt:   po.GeneratedAt,
 			}
 		}
@@ -167,6 +173,7 @@ func (r *reportReadModel) loadCatalogSourceMetadata(ctx context.Context, entries
 				"domain_id":  1,
 				"org_id":     1,
 				"testee_id":  1,
+				"outcome_id": 1,
 				"created_at": 1,
 			}),
 		)
@@ -179,7 +186,10 @@ func (r *reportReadModel) loadCatalogSourceMetadata(ctx context.Context, entries
 			if err := cursor.Decode(&po); err != nil {
 				return nil, err
 			}
-			association := CatalogSourceAssociation{AssessmentID: po.DomainID.Uint64(), TesteeID: po.TesteeID}
+			association := CatalogSourceAssociation{
+				AssessmentID: po.DomainID.Uint64(), TesteeID: po.TesteeID,
+				OutcomeID: po.OutcomeID, HasOutcomeID: po.OutcomeID != 0,
+			}
 			if po.OrgID != nil {
 				association.OrgID = *po.OrgID
 				association.HasOrgID = true
@@ -248,11 +258,15 @@ func buildCatalogQuery(filter readmodel.ReportFilter) bson.M {
 // association identity used for IR-R002 catalog↔source fail-closed checks.
 // Association fields are never taken from ReportRow (which omits org/testee).
 type catalogSourceEnvelope struct {
-	AssessmentID uint64
-	OrgID        int64
-	HasOrgID     bool
-	TesteeID     uint64
-	Row          readmodel.ReportRow
+	AssessmentID    uint64
+	OrgID           int64
+	HasOrgID        bool
+	TesteeID        uint64
+	OutcomeID       uint64
+	HasOutcomeID    bool
+	GenerationID    uint64
+	HasGenerationID bool
+	Row             readmodel.ReportRow
 }
 
 func (r *reportReadModel) loadCatalogRows(ctx context.Context, entries []ReportCatalogPO) ([]readmodel.ReportRow, error) {
@@ -311,15 +325,6 @@ func (r *reportReadModel) loadCatalogRows(ctx context.Context, entries []ReportC
 				MismatchedFields: fields,
 			}
 		}
-		if e.SourceKind == ReportCatalogSourceArchive && !env.HasOrgID {
-			observeCatalogArchiveOrgUnproven()
-			logger.L(ctx).Infow("report catalog archive source missing org_id; org not compared",
-				"assessment_id", e.AssessmentID,
-				"source_kind", e.SourceKind,
-				"source_id", e.SourceID,
-				"catalog_org_id", e.OrgID,
-			)
-		}
 		rows = append(rows, env.Row)
 	}
 	return rows, nil
@@ -340,11 +345,15 @@ func (r *reportReadModel) loadArtifacts(ctx context.Context, ids []uint64, dst m
 			return err
 		}
 		dst[fmt.Sprintf("%s:%d", ReportCatalogSourceArtifact, po.DomainID.Uint64())] = catalogSourceEnvelope{
-			AssessmentID: po.AssessmentID,
-			OrgID:        po.OrgID,
-			HasOrgID:     true,
-			TesteeID:     po.TesteeID,
-			Row:          interpretReportPOToReadRow(&po),
+			AssessmentID:    po.AssessmentID,
+			OrgID:           po.OrgID,
+			HasOrgID:        true,
+			TesteeID:        po.TesteeID,
+			OutcomeID:       po.OutcomeID,
+			HasOutcomeID:    po.OutcomeID != 0,
+			GenerationID:    po.GenerationID,
+			HasGenerationID: po.GenerationID != 0,
+			Row:             interpretReportPOToReadRow(&po),
 		}
 	}
 	return cur.Err()
@@ -367,6 +376,8 @@ func (r *reportReadModel) loadArchives(ctx context.Context, ids []uint64, dst ma
 		env := catalogSourceEnvelope{
 			AssessmentID: po.DomainID.Uint64(),
 			TesteeID:     po.TesteeID,
+			OutcomeID:    po.OutcomeID,
+			HasOutcomeID: po.OutcomeID != 0,
 			Row:          projectArchivedReportRow(&po),
 		}
 		if po.OrgID != nil {

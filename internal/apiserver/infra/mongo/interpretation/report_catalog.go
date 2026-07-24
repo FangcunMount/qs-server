@@ -101,7 +101,13 @@ func (p *ReportCatalogProjector) ProjectCurrent(ctx context.Context, report *dom
 		return fmt.Errorf("report catalog projector and report are required")
 	}
 	po := p.mapper.ReportToPO(report)
-	entry := ReportCatalogPO{AssessmentID: po.AssessmentID, OrgID: po.OrgID, TesteeID: po.TesteeID, SourceKind: ReportCatalogSourceArtifact, SourceID: po.DomainID.Uint64(), ModelCode: po.ScaleCode, RiskLevel: po.RiskLevel, SortAt: po.GeneratedAt, SortReportID: po.DomainID.Uint64(), UpdatedAt: po.GeneratedAt}
+	entry := ReportCatalogPO{
+		AssessmentID: po.AssessmentID, OrgID: po.OrgID, TesteeID: po.TesteeID,
+		OutcomeID: po.OutcomeID, GenerationID: po.GenerationID,
+		SourceKind: ReportCatalogSourceArtifact, SourceID: po.DomainID.Uint64(),
+		ModelCode: po.ScaleCode, RiskLevel: po.RiskLevel, SortAt: po.GeneratedAt,
+		SortReportID: po.DomainID.Uint64(), UpdatedAt: po.GeneratedAt,
+	}
 	filter := bson.M{"assessment_id": po.AssessmentID, "$or": bson.A{
 		bson.M{"source_kind": ReportCatalogSourceArchive},
 		bson.M{"sort_at": bson.M{"$lt": po.GeneratedAt}},

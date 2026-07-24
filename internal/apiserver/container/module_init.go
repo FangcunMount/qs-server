@@ -76,11 +76,7 @@ func (c *Container) initEvaluationModule() error {
 	if err := c.ReportModule.BindOutcomeRepository(c.EvaluationModule.OutcomeRepository()); err != nil {
 		return fmt.Errorf("failed to bind interpretation outcome service: %w", err)
 	}
-	if c.AssessmentModelModule != nil {
-		c.ReportModule.BindReportProjection(reportprojection.Mapper{
-			Legacy: reportprojection.NewModelCatalogLegacyVisibility(c.AssessmentModelModule.PublishedLister),
-		})
-	}
+	c.ReportModule.BindReportProjection(reportprojection.Mapper{})
 	if err := c.ReportModule.BindParticipantAccess(participantInterpretationAccess{testees: c.ActorModule.TesteeQueryService, assessments: c.EvaluationModule.TesteeService}); err != nil {
 		return fmt.Errorf("failed to bind interpretation participant service: %w", err)
 	}

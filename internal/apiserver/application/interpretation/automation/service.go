@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"google.golang.org/grpc/metadata"
@@ -89,6 +88,10 @@ func (s *service) Generate(ctx context.Context, command GenerateCommand) (*Resul
 	if err != nil {
 		return nil, s.rejectAdmission(ctx, command, nil, classifyOutcomeLookupError(err), err)
 	}
+	if record == nil {
+		err = evaluationfact.ErrNotFound
+		return nil, s.rejectAdmission(ctx, command, nil, admission.KindOutcomeNotFound, err)
+	}
 	input, err := interpretationinput.FromOutcomeRecord(record)
 	if err != nil {
 		return nil, s.rejectAdmission(ctx, command, record, classifyInputError(err), err)
@@ -136,6 +139,7 @@ func (s *service) rejectAdmission(ctx context.Context, command GenerateCommand, 
 		input.AssessmentID = record.AssessmentID()
 		input.TesteeID = record.TesteeID()
 		input.OutcomeID = record.ID()
+		input.OutcomeVersion = record.VersionToken()
 	}
 	failure, err := admission.NewFailure(input)
 	if err != nil {
@@ -146,43 +150,50 @@ func (s *service) rejectAdmission(ctx context.Context, command GenerateCommand, 
 			return fmt.Errorf("persist admission failure: %w", err)
 		}
 	}
+	observeAdmissionFailure(kind)
 	return &admission.RejectedError{Failure: failure}
 }
 
 func classifyOutcomeLookupError(err error) admission.Kind {
-	if err == nil {
-		return admission.KindUnknown
-	}
-	msg := strings.ToLower(err.Error())
-	if strings.Contains(msg, "not found") {
+	if errors.Is(err, evaluationfact.ErrNotFound) {
 		return admission.KindOutcomeNotFound
 	}
-	return admission.KindUnknown
+	return admission.KindDependencyUnavailable
 }
 
 func classifyInputError(err error) admission.Kind {
+	var classified *interpretationinput.AdmissionError
+	if errors.As(err, &classified) && classified.Kind.IsValid() {
+		return classified.Kind
+	}
 	if errors.Is(err, modeltypology.ErrRuntimeSpecInvalid) {
-		return admission.KindRuntimeSpecInvalid
+		return admission.KindCatalogIncompatible
 	}
-	msg := strings.ToLower(err.Error())
-	switch {
-	case strings.Contains(msg, "unknown template"), strings.Contains(msg, "unknown_template"):
-		return admission.KindRuntimeSpecInvalid
-	case strings.Contains(msg, "report input"), strings.Contains(msg, "decode report"):
-		return admission.KindReportInputDecode
-	case strings.Contains(msg, "decode"), strings.Contains(msg, "payload"):
-		return admission.KindPayloadDecode
-	case strings.Contains(msg, "frozen"), strings.Contains(msg, "identity"):
-		return admission.KindFrozenIdentity
-	default:
-		return admission.KindMapping
-	}
+	return admission.KindInternalError
 }
 
 func admissionCodeMessage(kind admission.Kind, cause error) (code, message string, retryable bool) {
 	switch kind {
 	case admission.KindOutcomeNotFound:
 		return "outcome_not_found", "评估结果不存在", false
+	case admission.KindOutcomeIncomplete:
+		return "outcome_incomplete", "评估结果不完整", false
+	case admission.KindOutcomeAssociationMismatch:
+		return "outcome_association_mismatch", "评估结果关联不一致", false
+	case admission.KindCatalogNotFound:
+		return "catalog_not_found", "报告配置不存在", false
+	case admission.KindCatalogUnpublished:
+		return "catalog_unpublished", "报告配置未发布", false
+	case admission.KindCatalogIncompatible:
+		return "catalog_incompatible", "报告配置不兼容", false
+	case admission.KindArtifactContractInvalid:
+		return "artifact_contract_invalid", "报告素材契约不合法", false
+	case admission.KindGenerationConflict:
+		return "generation_conflict", "报告生成发生并发冲突", true
+	case admission.KindDependencyUnavailable:
+		return "dependency_unavailable", "报告准入依赖暂时不可用", true
+	case admission.KindInternalError:
+		return "internal_error", "报告准入失败", true
 	case admission.KindOutcomeUnauthorized:
 		return "outcome_unauthorized", "评估结果未授权", false
 	case admission.KindPayloadDecode:

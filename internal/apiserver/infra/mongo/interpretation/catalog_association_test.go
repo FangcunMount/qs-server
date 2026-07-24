@@ -55,17 +55,17 @@ func TestMismatchedAssociationFieldsArtifactRequiresOrg(t *testing.T) {
 func TestMismatchedAssociationFieldsArchiveOrgTransition(t *testing.T) {
 	catalog := ReportCatalogPO{AssessmentID: 1, OrgID: 10, TesteeID: 100}
 
-	// Historical archive without org_id: org is not compared; assessment/testee still enforced.
+	// Historical archive without org_id is not safe to serve until repaired.
 	unproven := catalogSourceEnvelope{AssessmentID: 1, HasOrgID: false, TesteeID: 100}
-	if fields := mismatchedAssociationFields(catalog, unproven); len(fields) != 0 {
-		t.Fatalf("unproven org should not mismatch when assessment/testee align: %v", fields)
+	if fields := mismatchedAssociationFields(catalog, unproven); len(fields) != 1 || fields[0] != "org_id" {
+		t.Fatalf("unproven org mismatch = %v, want [org_id]", fields)
 	}
 	unprovenWrongTestee := catalogSourceEnvelope{AssessmentID: 1, HasOrgID: false, TesteeID: 999}
-	if fields := mismatchedAssociationFields(catalog, unprovenWrongTestee); len(fields) != 1 || fields[0] != "testee_id" {
+	if fields := mismatchedAssociationFields(catalog, unprovenWrongTestee); len(fields) != 2 || fields[0] != "org_id" || fields[1] != "testee_id" {
 		t.Fatalf("unproven org must not relax testee check: %v", fields)
 	}
 	unprovenWrongAssessment := catalogSourceEnvelope{AssessmentID: 2, HasOrgID: false, TesteeID: 100}
-	if fields := mismatchedAssociationFields(catalog, unprovenWrongAssessment); len(fields) != 1 || fields[0] != "assessment_id" {
+	if fields := mismatchedAssociationFields(catalog, unprovenWrongAssessment); len(fields) != 2 || fields[0] != "assessment_id" || fields[1] != "org_id" {
 		t.Fatalf("unproven org must not relax assessment check: %v", fields)
 	}
 

@@ -201,6 +201,12 @@ func (c *Container) Initialize() error {
 		return fmt.Errorf("failed to initialize survey module: %w", err)
 	}
 
+	// Interpretation owns the report-template catalog consumed by the
+	// ModelCatalog publish gate, so it must be installed first.
+	if err := c.initReportModule(); err != nil {
+		return fmt.Errorf("failed to initialize report module: %w", err)
+	}
+
 	// 初始化 Assessment model 模块（scale + typology catalog）
 	if err := c.initModelCatalogModule(); err != nil {
 		return fmt.Errorf("failed to initialize assessment model module: %w", err)
@@ -209,11 +215,6 @@ func (c *Container) Initialize() error {
 	// 初始化 Actor 模块
 	if err := c.initActorModule(); err != nil {
 		return fmt.Errorf("failed to initialize actor module: %w", err)
-	}
-
-	// 初始化 Report 模块
-	if err := c.initReportModule(); err != nil {
-		return fmt.Errorf("failed to initialize report module: %w", err)
 	}
 
 	// 初始化 Evaluation 模块

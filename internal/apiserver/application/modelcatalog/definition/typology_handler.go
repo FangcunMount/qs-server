@@ -17,6 +17,7 @@ import (
 type TypologyDefinitionHandler struct {
 	QuestionnaireQuery questionnaireapp.QuestionnaireQueryService
 	ReportPreviewer    modelpreview.ReportPreviewer
+	PublishedTemplates modeltypology.PublishedTemplateLookup
 }
 
 // Supports 支持特定评估模型身份
@@ -57,7 +58,10 @@ func (h TypologyDefinitionHandler) validateTypologyRuntime(
 	return append(issues, modeltypology.ValidateRuntimeSpecForPublishWithContext(
 		payload.Runtime,
 		questionnaireSnapshotFromResult(questionnaire),
-		modeltypology.RuntimeSpecValidationContext{Algorithm: payload.Algorithm, Outcomes: payload.Outcomes},
+		modeltypology.RuntimeSpecValidationContext{
+			Algorithm: payload.Algorithm, Outcomes: payload.Outcomes,
+			PublishedTemplates: h.PublishedTemplates,
+		},
 	)...)
 }
 

@@ -115,6 +115,10 @@ func defaultActions(enabled map[string]bool) []ActionDescriptor {
 		governedRetryAction("evaluation.force_retry", DomainEvents, "Force retry terminal evaluation", "high", manualActionsEnabled),
 		governedRetryAction("interpretation.retry", DomainEvents, "Retry interpretation", "medium", manualActionsEnabled),
 		governedRetryAction("interpretation.force_retry", DomainEvents, "Force retry terminal interpretation", "high", manualActionsEnabled),
+		reportTemplateAction("interpretation.report_template_publish", "Publish report template version", "draft", manualActionsEnabled),
+		reportTemplateAction("interpretation.report_template_disable", "Disable report template version", "published", manualActionsEnabled),
+		readmissionAction(manualActionsEnabled),
+		catalogRepairAction(manualActionsEnabled),
 		{
 			ID: "events.replay_delivery", Domain: DomainEvents, Label: "Replay transport dead letter", RiskLevel: "high",
 			Enabled: manualActionsEnabled, RequiresConfirmation: true, InputSchema: replayDeliverySchema(),
@@ -128,6 +132,57 @@ func defaultActions(enabled map[string]bool) []ActionDescriptor {
 			ID: "resilience.tune_rate_limit", Domain: DomainResilience, Label: "Tune rate limit parameters", RiskLevel: "medium",
 			Enabled: enabled["resilience.tune_rate_limit"], Planned: !enabled["resilience.tune_rate_limit"], RequiresConfirmation: true,
 			InputSchema: map[string]interface{}{"type": "object", "required": []string{"mode", "component", "budget", "expected_version"}},
+		},
+	}
+}
+
+func catalogRepairAction(enabled bool) ActionDescriptor {
+	return ActionDescriptor{
+		ID: "interpretation.catalog_repair", Domain: DomainActions, Label: "Repair interpretation report catalog",
+		RiskLevel: "high", Enabled: enabled, RequiresConfirmation: true,
+		InputSchema: map[string]interface{}{
+			"type":     "object",
+			"required": []string{"dry_run_id", "expected_catalog_version", "expected_source", "reason"},
+			"properties": map[string]interface{}{
+				"dry_run_id":               map[string]interface{}{"type": "string", "minLength": 1},
+				"expected_catalog_version": map[string]interface{}{"type": "string", "minLength": 1},
+				"expected_source":          map[string]interface{}{"type": "string", "enum": []string{"artifact", "archive"}},
+				"reason":                   map[string]interface{}{"type": "string", "minLength": 1},
+			},
+		},
+	}
+}
+
+func readmissionAction(enabled bool) ActionDescriptor {
+	return ActionDescriptor{
+		ID: "interpretation.readmit_outcome", Domain: DomainActions, Label: "Readmit committed interpretation outcome",
+		RiskLevel: "high", Enabled: enabled, RequiresConfirmation: true,
+		InputSchema: map[string]interface{}{
+			"type":     "object",
+			"required": []string{"failure_fingerprint", "expected_reason", "expected_outcome_version", "reason"},
+			"properties": map[string]interface{}{
+				"failure_fingerprint":      map[string]interface{}{"type": "string", "minLength": 1},
+				"expected_reason":          map[string]interface{}{"type": "string", "minLength": 1},
+				"expected_outcome_version": map[string]interface{}{"type": "string", "minLength": 1},
+				"reason":                   map[string]interface{}{"type": "string", "minLength": 1},
+			},
+		},
+	}
+}
+
+func reportTemplateAction(id, label, expectedStatus string, enabled bool) ActionDescriptor {
+	return ActionDescriptor{
+		ID: id, Domain: DomainActions, Label: label, RiskLevel: "high",
+		Enabled: enabled, RequiresConfirmation: true,
+		InputSchema: map[string]interface{}{
+			"type":     "object",
+			"required": []string{"template_id", "template_version", "expected_status", "reason"},
+			"properties": map[string]interface{}{
+				"template_id":      map[string]interface{}{"type": "string", "minLength": 1},
+				"template_version": map[string]interface{}{"type": "string", "minLength": 1},
+				"expected_status":  map[string]interface{}{"type": "string", "enum": []string{expectedStatus}},
+				"reason":           map[string]interface{}{"type": "string", "minLength": 1},
+			},
 		},
 	}
 }

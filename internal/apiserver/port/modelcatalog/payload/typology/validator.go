@@ -406,7 +406,9 @@ func (v *runtimeSpecValidator) validateReport(report ReportSpec, mapping Outcome
 	if report.TemplateVersion != "" {
 		if report.TemplateID == "" {
 			v.add("report.template_id", "report.template_id.required", "template_version 需要同时声明 template_id")
-		} else if v.publishedTemplates != nil && !v.publishedTemplates.IsPublished(report.TemplateID, report.TemplateVersion) {
+		} else if v.publishedTemplates == nil {
+			v.add("report.template_version", "report.template_catalog.unavailable", "report template publish catalog 未配置")
+		} else if !v.publishedTemplates.IsPublished(report.TemplateID, report.TemplateVersion) {
 			v.add("report.template_version", "report.template_version.unpublished", fmt.Sprintf("report template %s@%s 未发布", report.TemplateID, report.TemplateVersion))
 		}
 	}

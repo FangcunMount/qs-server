@@ -18,6 +18,9 @@ import (
 	evaluationScheduler "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scheduler"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	interpretationAutomation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
+	interpretationcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/catalogreconcile"
+	interpretationReadmission "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/readmission"
+	interpretationReportTemplate "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporttemplate"
 	reportqueryjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
 	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
@@ -27,7 +30,10 @@ import (
 	platformmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/admission"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/generation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
+	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
@@ -100,6 +106,7 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 		deps.Interpretation.ClinicianService = c.ReportModule.ClinicianService()
 		deps.Interpretation.OperationsService = c.ReportModule.OperationsService()
 		deps.Interpretation.CatalogReconcile = c.ReportModule.CatalogReconcileService()
+		deps.Interpretation.ReportTemplates = c.ReportModule.ReportTemplateService()
 	}
 	if c.PlanModule != nil {
 		var testeeAccess actorAccessApp.TesteeAccessService
@@ -154,6 +161,27 @@ type retryActionInput struct {
 	Reason          string `json:"reason"`
 }
 
+type reportTemplateActionInput struct {
+	TemplateID      string `json:"template_id"`
+	TemplateVersion string `json:"template_version"`
+	ExpectedStatus  string `json:"expected_status"`
+	Reason          string `json:"reason"`
+}
+
+type readmissionActionInput struct {
+	FailureFingerprint     string `json:"failure_fingerprint"`
+	ExpectedReason         string `json:"expected_reason"`
+	ExpectedOutcomeVersion string `json:"expected_outcome_version"`
+	Reason                 string `json:"reason"`
+}
+
+type catalogRepairActionInput struct {
+	DryRunID               string `json:"dry_run_id"`
+	ExpectedCatalogVersion string `json:"expected_catalog_version"`
+	ExpectedSource         string `json:"expected_source"`
+	Reason                 string `json:"reason"`
+}
+
 func (c *Container) retryGovernanceActionHandlers() map[string]systemgovApp.ActionHandler {
 	handlers := map[string]systemgovApp.ActionHandler{}
 	if c != nil && c.EvaluationModule != nil && c.EvaluationModule.GovernedRetry != nil {
@@ -206,7 +234,102 @@ func (c *Container) retryGovernanceActionHandlers() map[string]systemgovApp.Acti
 			}
 		}
 	}
+	if c != nil && c.ReportModule != nil && c.ReportModule.ReportTemplateService() != nil {
+		service := c.ReportModule.ReportTemplateService()
+		handlers["interpretation.report_template_publish"] = reportTemplateGovernanceHandler(service, true)
+		handlers["interpretation.report_template_disable"] = reportTemplateGovernanceHandler(service, false)
+	}
+	if c != nil && c.ReportModule != nil && c.ReportModule.ReadmissionService() != nil {
+		handlers["interpretation.readmit_outcome"] = func(ctx context.Context, orgID int64, requestID string, input map[string]interface{}) (map[string]interface{}, error) {
+			var request readmissionActionInput
+			payload, err := json.Marshal(input)
+			if err != nil {
+				return nil, err
+			}
+			if err := json.Unmarshal(payload, &request); err != nil {
+				return nil, err
+			}
+			result, err := c.ReportModule.ReadmissionService().Readmit(ctx, interpretationReadmission.Command{
+				OrgID: orgID, OperatorUserID: int64(actorctx.GrantingUserID(ctx)), RequestID: requestID,
+				FailureFingerprint:     request.FailureFingerprint,
+				ExpectedReason:         admission.Kind(request.ExpectedReason),
+				ExpectedOutcomeVersion: request.ExpectedOutcomeVersion, Reason: request.Reason,
+			})
+			if err != nil {
+				return nil, err
+			}
+			return map[string]interface{}{
+				"outcome_id": result.OutcomeID, "generation_id": result.GenerationID,
+				"run_id": result.RunID, "report_id": result.ReportID, "status": result.Status,
+			}, nil
+		}
+	}
+	if c != nil && c.ReportModule != nil && c.ReportModule.CatalogReconcileService() != nil {
+		handlers["interpretation.catalog_repair"] = func(ctx context.Context, orgID int64, _ string, input map[string]interface{}) (map[string]interface{}, error) {
+			var request catalogRepairActionInput
+			payload, err := json.Marshal(input)
+			if err != nil {
+				return nil, err
+			}
+			if err := json.Unmarshal(payload, &request); err != nil {
+				return nil, err
+			}
+			if request.Reason == "" {
+				return nil, fmt.Errorf("catalog repair reason is required")
+			}
+			result, err := c.ReportModule.CatalogReconcileService().Repair(ctx, interpretationcatalog.RepairCommand{
+				OrgID: orgID, DryRunID: request.DryRunID,
+				ExpectedCatalogVersion: request.ExpectedCatalogVersion, ExpectedSource: request.ExpectedSource,
+			})
+			if err != nil {
+				return nil, err
+			}
+			return map[string]interface{}{"status": result.Status, "item": result.Item}, nil
+		}
+	}
 	return handlers
+}
+
+func reportTemplateGovernanceHandler(service interpretationReportTemplate.Service, publish bool) systemgovApp.ActionHandler {
+	return func(ctx context.Context, _ int64, _ string, input map[string]interface{}) (map[string]interface{}, error) {
+		var request reportTemplateActionInput
+		payload, err := json.Marshal(input)
+		if err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(payload, &request); err != nil {
+			return nil, err
+		}
+		if request.TemplateID == "" || request.TemplateVersion == "" || request.ExpectedStatus == "" || request.Reason == "" {
+			return nil, fmt.Errorf("template_id, template_version, expected_status and reason are required")
+		}
+		version := policy.TemplateVersion(request.TemplateVersion)
+		current, err := service.Get(ctx, request.TemplateID, version)
+		if err != nil {
+			return nil, err
+		}
+		if string(current.Status()) != request.ExpectedStatus {
+			return nil, baseerrors.WithCode(code.ErrConflict, "report template status changed")
+		}
+		actor := interpretationReportTemplate.Actor{OperatorUserID: int64(actorctx.GrantingUserID(ctx))}
+		var updated *domainreporttemplate.ReportTemplate
+		if publish {
+			updated, err = service.Publish(ctx, interpretationReportTemplate.PublishCommand{
+				Actor: actor, TemplateID: request.TemplateID, TemplateVersion: version,
+			})
+		} else {
+			updated, err = service.Disable(ctx, interpretationReportTemplate.DisableCommand{
+				Actor: actor, TemplateID: request.TemplateID, TemplateVersion: version,
+			})
+		}
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{
+			"template_id": updated.TemplateID(), "template_version": updated.TemplateVersion().String(),
+			"status": updated.Status(),
+		}, nil
+	}
 }
 
 func normalizeGovernedRetryError(err error) error {

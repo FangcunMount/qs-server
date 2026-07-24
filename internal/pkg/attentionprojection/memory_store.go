@@ -101,10 +101,22 @@ func (s *MemoryStore) GetByEventID(_ context.Context, eventID string) (*Record, 
 
 	rec, ok := s.records[eventID]
 	if !ok {
-		return nil, fmt.Errorf("attention projection not found: %s", eventID)
+		return nil, fmt.Errorf("%w: event=%s", ErrNotFound, eventID)
 	}
 	copy := *rec
 	return &copy, nil
+}
+
+func (s *MemoryStore) FindByReportID(_ context.Context, reportID string) (*Record, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, rec := range s.records {
+		if rec.ReportID == reportID {
+			copy := *rec
+			return &copy, nil
+		}
+	}
+	return nil, fmt.Errorf("%w: report=%s", ErrNotFound, reportID)
 }
 
 func (s *MemoryStore) ListRetryable(_ context.Context, maxAttempts int, limit int) ([]Record, error) {

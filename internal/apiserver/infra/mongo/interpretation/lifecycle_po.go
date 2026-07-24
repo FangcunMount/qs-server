@@ -104,6 +104,8 @@ type ReportCatalogPO struct {
 	AssessmentID uint64    `bson:"assessment_id"`
 	OrgID        int64     `bson:"org_id"`
 	TesteeID     uint64    `bson:"testee_id"`
+	OutcomeID    uint64    `bson:"outcome_id,omitempty"`
+	GenerationID uint64    `bson:"generation_id,omitempty"`
 	SourceKind   string    `bson:"source_kind"`
 	SourceID     uint64    `bson:"source_id"`
 	ModelCode    string    `bson:"model_code,omitempty"`

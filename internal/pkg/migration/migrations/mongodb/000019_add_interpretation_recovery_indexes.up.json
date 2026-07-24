@@ -1,0 +1,42 @@
+[
+  {
+    "createIndexes": "interpretation_attention_projections",
+    "indexes": [
+      {
+        "key": { "report_id": 1 },
+        "name": "idx_attention_projection_report"
+      }
+    ]
+  },
+  { "create": "interpretation_catalog_repair_plans" },
+  {
+    "createIndexes": "interpretation_catalog_repair_plans",
+    "indexes": [
+      {
+        "key": { "dry_run_id": 1 },
+        "name": "uk_catalog_repair_dry_run",
+        "unique": true
+      },
+      {
+        "key": { "expires_at": 1 },
+        "name": "ttl_catalog_repair_plan",
+        "expireAfterSeconds": 0
+      }
+    ]
+  },
+  {
+    "createIndexes": "interpretation_admission_failures",
+    "indexes": [
+      {
+        "key": {
+          "org_id": 1,
+          "kind": 1,
+          "decision": 1,
+          "occurred_at": -1,
+          "domain_id": -1
+        },
+        "name": "idx_admission_failure_operations"
+      }
+    ]
+  }
+]

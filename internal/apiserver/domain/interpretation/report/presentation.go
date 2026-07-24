@@ -11,8 +11,9 @@ import (
 type PresentationProfileSource string
 
 const (
-	PresentationProfileSourceFrozen PresentationProfileSource = "frozen"
-	PresentationProfileSourceLegacy PresentationProfileSource = "legacy"
+	PresentationProfileSourceFrozen         PresentationProfileSource = "frozen"
+	PresentationProfileSourceLegacy         PresentationProfileSource = "legacy"
+	PresentationProfileSourceLegacyArtifact PresentationProfileSource = "legacy_artifact_dimensions/v1"
 )
 
 // PresentationProfile freezes report-visible factor codes at generation time.
@@ -29,7 +30,9 @@ func NewFrozenPresentationProfile(codes []string) PresentationProfile {
 }
 
 func (p PresentationProfile) Configured() bool {
-	return p.Source == PresentationProfileSourceFrozen || p.Source == PresentationProfileSourceLegacy
+	return p.Source == PresentationProfileSourceFrozen ||
+		p.Source == PresentationProfileSourceLegacy ||
+		p.Source == PresentationProfileSourceLegacyArtifact
 }
 
 func (p PresentationProfile) VisibleSet() map[string]bool {
@@ -69,7 +72,7 @@ func ResolvePresentationProfile(
 	stored *PresentationProfile,
 	resolver LegacyDimensionVisibilityResolver,
 ) (PresentationProfile, bool, error) {
-	if stored != nil && stored.Source == PresentationProfileSourceFrozen {
+	if stored != nil && stored.Configured() {
 		return *stored, true, nil
 	}
 	if !UsesFactorScoreVisibility(model) {

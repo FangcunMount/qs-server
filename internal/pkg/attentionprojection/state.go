@@ -1,6 +1,11 @@
 package attentionprojection
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+var ErrNotFound = errors.New("attention projection not found")
 
 // Status is the durable attention projection lifecycle.
 type Status string
@@ -42,4 +47,15 @@ type PendingInput struct {
 	TesteeID     uint64
 	RiskLevel    string
 	MarkKeyFocus bool
+}
+
+// ReportFact is the immutable Interpretation artifact fact used to detect a
+// projection record that was never created by the event consumer.
+type ReportFact struct {
+	ReportID     string
+	AssessmentID string
+	TesteeID     uint64
+	RiskLevel    string
+	MarkKeyFocus bool
+	GeneratedAt  time.Time
 }

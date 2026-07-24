@@ -94,6 +94,11 @@ type WorkerOptions struct {
 	ServiceName string `json:"service_name" mapstructure:"service-name"`
 	// EventConfigPath 事件配置文件路径
 	EventConfigPath string `json:"event_config_path" mapstructure:"event-config-path"`
+	// Attention fact reconciliation is opt-in. Production must set an explicit
+	// immutable cutover before enabling it.
+	AttentionProjectionReconcileEnabled bool   `json:"attention_projection_reconcile_enabled" mapstructure:"attention-projection-reconcile-enabled"`
+	AttentionProjectionReconcileFrom    string `json:"attention_projection_reconcile_from" mapstructure:"attention-projection-reconcile-from"`
+	AttentionProjectionReconcileDryRun  bool   `json:"attention_projection_reconcile_dry_run" mapstructure:"attention-projection-reconcile-dry-run"`
 }
 
 // NotificationOptions 通知配置。
@@ -142,9 +147,10 @@ func NewOptions() *Options {
 			Insecure:      true,
 		},
 		Worker: &WorkerOptions{
-			Concurrency: 10,
-			MaxRetries:  0,
-			ServiceName: "qs-worker",
+			Concurrency:                        10,
+			MaxRetries:                         0,
+			ServiceName:                        "qs-worker",
+			AttentionProjectionReconcileDryRun: true,
 		},
 		Notification: &NotificationOptions{
 			TimeoutMs: 5000,
@@ -256,6 +262,12 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 		"Maximum retry attempts for failed messages")
 	workerFS.StringVar(&o.Worker.ServiceName, "worker.service-name", o.Worker.ServiceName,
 		"Service name for message queue channel")
+	workerFS.BoolVar(&o.Worker.AttentionProjectionReconcileEnabled, "worker.attention-projection-reconcile-enabled", o.Worker.AttentionProjectionReconcileEnabled,
+		"Enable artifact fact reconciliation for missing attention projections")
+	workerFS.StringVar(&o.Worker.AttentionProjectionReconcileFrom, "worker.attention-projection-reconcile-from", o.Worker.AttentionProjectionReconcileFrom,
+		"RFC3339 cutover timestamp for attention projection fact reconciliation")
+	workerFS.BoolVar(&o.Worker.AttentionProjectionReconcileDryRun, "worker.attention-projection-reconcile-dry-run", o.Worker.AttentionProjectionReconcileDryRun,
+		"Detect missing attention projections without creating them")
 
 	notificationFS := fss.FlagSet("notification")
 	notificationFS.StringVar(&o.Notification.GatewayURL, "notification.gateway-url", o.Notification.GatewayURL,
@@ -312,6 +324,13 @@ func (o *Options) Validate() []error {
 		}
 		if policy.JitterFraction < 0 || policy.JitterFraction > 1 {
 			errs = append(errs, fmt.Errorf("retry_governance.hold_replay.jitter_fraction must be between 0 and 1"))
+		}
+	}
+	if o.Worker != nil && o.Worker.AttentionProjectionReconcileEnabled {
+		if o.Worker.AttentionProjectionReconcileFrom == "" {
+			errs = append(errs, fmt.Errorf("worker.attention_projection_reconcile_from is required when attention projection reconcile is enabled"))
+		} else if _, err := time.Parse(time.RFC3339, o.Worker.AttentionProjectionReconcileFrom); err != nil {
+			errs = append(errs, fmt.Errorf("worker.attention_projection_reconcile_from must be RFC3339"))
 		}
 	}
 	if len(o.Redis.Addrs) == 0 && o.Redis.Port <= 0 {

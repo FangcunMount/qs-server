@@ -27,6 +27,10 @@ metrics:
 # 1.2 Worker 配置
 # -------------------------------------------------------
 worker:
+  # Enable only after setting the audited Durable Attention Projection cutover.
+  attention-projection-reconcile-enabled: false
+  attention-projection-reconcile-from: ""
+  attention-projection-reconcile-dry-run: true
   service-name: "qs-worker"   # 服务名称（用于日志和监控）
   concurrency: 48              # 300QPS 目标：serverD 单实例消费并发（与 apiserver gRPC 跨云）
 

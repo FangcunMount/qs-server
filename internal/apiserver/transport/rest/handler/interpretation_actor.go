@@ -1,15 +1,116 @@
 package handler
 
 import (
+	"fmt"
 	"strconv"
+	"time"
 
 	interpretationcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/catalogreconcile"
 	interpretationclinician "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
 	interpretationoperations "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/operations"
+	interpretationreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporttemplate"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/admission"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
+	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/gin-gonic/gin"
 )
+
+type InterpretationReportTemplateHandler struct {
+	*BaseHandler
+	service interpretationreporttemplate.Service
+}
+
+func NewInterpretationReportTemplateHandler(service interpretationreporttemplate.Service) *InterpretationReportTemplateHandler {
+	return &InterpretationReportTemplateHandler{BaseHandler: &BaseHandler{}, service: service}
+}
+
+type reportTemplateWire struct {
+	TemplateID      string     `json:"template_id"`
+	TemplateVersion string     `json:"template_version"`
+	BuilderIdentity string     `json:"builder_identity"`
+	AdapterKey      string     `json:"adapter_key,omitempty"`
+	Status          string     `json:"status"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	PublishedAt     *time.Time `json:"published_at,omitempty"`
+	PublishedBy     string     `json:"published_by,omitempty"`
+	DisabledAt      *time.Time `json:"disabled_at,omitempty"`
+	DisabledBy      string     `json:"disabled_by,omitempty"`
+}
+
+func reportTemplateResponse(item *domainreporttemplate.ReportTemplate) reportTemplateWire {
+	return reportTemplateWire{
+		TemplateID: item.TemplateID(), TemplateVersion: item.TemplateVersion().String(),
+		BuilderIdentity: item.BuilderIdentity(), AdapterKey: item.AdapterKey(), Status: string(item.Status()),
+		CreatedAt: item.CreatedAt(), UpdatedAt: item.UpdatedAt(), PublishedAt: item.PublishedAt(),
+		PublishedBy: item.PublishedBy(), DisabledAt: item.DisabledAt(), DisabledBy: item.DisabledBy(),
+	}
+}
+
+func (h *InterpretationReportTemplateHandler) List(c *gin.Context) {
+	if _, _, err := h.RequireProtectedScope(c); err != nil {
+		h.Error(c, err)
+		return
+	}
+	templateID := c.Query("template_id")
+	if templateID == "" {
+		h.Error(c, fmt.Errorf("template_id is required"))
+		return
+	}
+	items, err := h.service.List(c.Request.Context(), templateID, 100)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result := make([]reportTemplateWire, 0, len(items))
+	for _, item := range items {
+		result = append(result, reportTemplateResponse(item))
+	}
+	h.Success(c, result)
+}
+
+func (h *InterpretationReportTemplateHandler) Get(c *gin.Context) {
+	if _, _, err := h.RequireProtectedScope(c); err != nil {
+		h.Error(c, err)
+		return
+	}
+	item, err := h.service.Get(c.Request.Context(), c.Param("template_id"), policy.TemplateVersion(c.Param("version")))
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, reportTemplateResponse(item))
+}
+
+func (h *InterpretationReportTemplateHandler) CreateDraft(c *gin.Context) {
+	_, userID, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	var request struct {
+		TemplateID      string `json:"template_id"`
+		TemplateVersion string `json:"template_version"`
+		BuilderIdentity string `json:"builder_identity"`
+		AdapterKey      string `json:"adapter_key"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		h.Error(c, err)
+		return
+	}
+	item, err := h.service.CreateDraft(c.Request.Context(), interpretationreporttemplate.CreateDraftCommand{
+		Actor:      interpretationreporttemplate.Actor{OperatorUserID: userID},
+		TemplateID: request.TemplateID, TemplateVersion: policy.TemplateVersion(request.TemplateVersion),
+		BuilderIdentity: request.BuilderIdentity, AdapterKey: request.AdapterKey,
+	})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, reportTemplateResponse(item))
+}
 
 type InterpretationClinicianHandler struct {
 	*BaseHandler
@@ -43,6 +144,63 @@ func (h *InterpretationCatalogReconcileHandler) Reconcile(c *gin.Context) {
 		return
 	}
 	h.Success(c, result)
+}
+
+// ListDrifts godoc
+// @Summary 分页查询当前组织的 Interpretation Catalog 漂移明细
+// @Tags Interpretation-Operations
+// @Produce json
+// @Param kind query string true "missing|dangling|association_mismatch|wrong_winner"
+// @Param cursor query string false "稳定游标"
+// @Param limit query int false "批量" default(500)
+// @Param assessment_id query string false "测评ID"
+// @Router /internal/v1/interpretation/catalog/drifts [get]
+func (h *InterpretationCatalogReconcileHandler) ListDrifts(c *gin.Context) {
+	orgID, _, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	filter := interpretationcatalog.Filter{OrgID: &orgID, Kind: interpretationcatalog.DriftKind(c.Query("kind"))}
+	if value := c.Query("assessment_id"); value != "" {
+		assessmentID, err := strconv.ParseUint(value, 10, 64)
+		if err != nil || assessmentID == 0 {
+			h.Error(c, fmt.Errorf("invalid assessment_id"))
+			return
+		}
+		filter.AssessmentID = &assessmentID
+	}
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "500"))
+	page, err := h.service.ListDrifts(c.Request.Context(), filter, c.Query("cursor"), limit)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, page)
+}
+
+func (h *InterpretationCatalogReconcileHandler) CreateRepairPlan(c *gin.Context) {
+	orgID, _, err := h.RequireProtectedScope(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	var request struct {
+		AssessmentID uint64 `json:"assessment_id"`
+		Kind         string `json:"kind"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		h.Error(c, err)
+		return
+	}
+	plan, err := h.service.CreateRepairPlan(c.Request.Context(), orgID, interpretationcatalog.Filter{
+		OrgID: &orgID, AssessmentID: &request.AssessmentID, Kind: interpretationcatalog.DriftKind(request.Kind),
+	})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, plan)
 }
 
 func NewInterpretationClinicianHandler(s interpretationclinician.Service) *InterpretationClinicianHandler {
@@ -195,6 +353,52 @@ func (h *InterpretationOperationsHandler) FindOutcomeAdmissionFailures(c *gin.Co
 		return
 	}
 	h.Success(c, v)
+}
+
+// ListAdmissionFailures godoc
+// @Summary 分页查询当前组织的 Interpretation 准入失败
+// @Tags Interpretation-Operations
+// @Produce json
+// @Router /internal/v1/interpretation/admission-failures [get]
+func (h *InterpretationOperationsHandler) ListAdmissionFailures(c *gin.Context) {
+	a, ok := h.actor(c)
+	if !ok {
+		return
+	}
+	query := interpretationoperations.AdmissionFailureQuery{
+		Decision: c.Query("decision"), Cursor: c.Query("cursor"),
+	}
+	if value := c.Query("reason"); value != "" {
+		kind := admission.Kind(value)
+		if !kind.IsValid() {
+			h.Error(c, fmt.Errorf("invalid admission failure reason"))
+			return
+		}
+		query.Kind = &kind
+	}
+	if value := c.Query("assessment_id"); value != "" {
+		id, err := meta.ParseID(value)
+		if err != nil || id.IsZero() {
+			h.Error(c, fmt.Errorf("invalid assessment_id"))
+			return
+		}
+		query.AssessmentID = &id
+	}
+	if value := c.Query("outcome_id"); value != "" {
+		id, err := meta.ParseID(value)
+		if err != nil || id.IsZero() {
+			h.Error(c, fmt.Errorf("invalid outcome_id"))
+			return
+		}
+		query.OutcomeID = &id
+	}
+	query.Limit, _ = strconv.Atoi(c.DefaultQuery("limit", "500"))
+	page, err := h.service.ListAdmissionFailures(c.Request.Context(), a, query)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, page)
 }
 
 // FindAssessmentLifecycle godoc

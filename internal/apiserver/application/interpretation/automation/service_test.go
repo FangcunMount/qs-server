@@ -2,7 +2,6 @@ package automation
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -85,7 +84,7 @@ func TestGenerateRequiresTrustedActorBeforeReadingOutcome(t *testing.T) {
 }
 
 func TestGeneratePersistsAdmissionFailureWithoutStartingExecutor(t *testing.T) {
-	repo := &outcomeRepoStub{err: errors.New("evaluation outcome not found")}
+	repo := &outcomeRepoStub{err: evaluationfact.ErrNotFound}
 	admissions := &admissionRepoStub{}
 	executor := &executorStub{}
 	svc, err := NewService(repo, executor, admissions)

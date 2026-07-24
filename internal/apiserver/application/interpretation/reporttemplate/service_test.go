@@ -42,6 +42,19 @@ func (r *memoryRepo) FindPublished(ctx context.Context, templateID string, versi
 	return item, nil
 }
 
+func (r *memoryRepo) ListByTemplateID(_ context.Context, templateID string, limit int) ([]*domainreporttemplate.ReportTemplate, error) {
+	items := make([]*domainreporttemplate.ReportTemplate, 0)
+	for _, item := range r.items {
+		if item.TemplateID() == templateID {
+			items = append(items, item)
+		}
+	}
+	if limit > 0 && len(items) > limit {
+		items = items[:limit]
+	}
+	return items, nil
+}
+
 func (r *memoryRepo) IsPublished(templateID string, version string) bool {
 	item, err := r.FindPublished(context.Background(), templateID, policy.TemplateVersion(version))
 	return err == nil && item != nil

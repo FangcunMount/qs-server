@@ -58,9 +58,9 @@ type LegacyInitStep struct {
 // LegacyInitializeSequence is the current Container.Initialize business-module order.
 var LegacyInitializeSequence = []LegacyInitStep{
 	{InitMethod: "initSurveyModule", RegisterNames: []string{"survey"}},
+	{InitMethod: "initReportModule", RegisterNames: []string{"interpretation"}},
 	{InitMethod: "initModelCatalogModule", RegisterNames: []string{"modelcatalog"}},
 	{InitMethod: "initActorModule", RegisterNames: []string{"actor"}},
-	{InitMethod: "initReportModule", RegisterNames: []string{"interpretation"}},
 	{InitMethod: "initEvaluationModule", RegisterNames: []string{"evaluation"}},
 	{InitMethod: "initPlanModule", RegisterNames: []string{"plan"}},
 	{InitMethod: "initStatisticsModule", RegisterNames: []string{"statistics"}},

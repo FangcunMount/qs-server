@@ -83,7 +83,28 @@ type AdmissionFailure struct {
 	Kind, Code, SafeMessage     string
 	Retryable                   bool
 	Fingerprint                 string
+	GenerationID                uint64
+	OutcomeVersion              string
+	Attempt                     uint
+	Decision                    string
+	FirstFailedAt, LastFailedAt time.Time
 	OccurredAt                  time.Time
+}
+
+type AdmissionFailureQuery struct {
+	Kind         *admission.Kind
+	Decision     string
+	AssessmentID *meta.ID
+	OutcomeID    *meta.ID
+	OccurredFrom *time.Time
+	OccurredTo   *time.Time
+	Cursor       string
+	Limit        int
+}
+
+type AdmissionFailurePage struct {
+	Items      []AdmissionFailure `json:"items"`
+	NextCursor string             `json:"next_cursor,omitempty"`
 }
 
 type Service interface {
@@ -92,7 +113,35 @@ type Service interface {
 	FindLifecycleByAssessmentID(context.Context, Actor, meta.ID) ([]Generation, error)
 	ListHistoricalReportsByAssessmentID(context.Context, Actor, meta.ID) ([]Report, error)
 	FindAdmissionFailuresByOutcomeID(context.Context, Actor, meta.ID) ([]AdmissionFailure, error)
+	ListAdmissionFailures(context.Context, Actor, AdmissionFailureQuery) (AdmissionFailurePage, error)
 }
+
+func (s *service) ListAdmissionFailures(
+	ctx context.Context,
+	a Actor,
+	query AdmissionFailureQuery,
+) (AdmissionFailurePage, error) {
+	if err := s.ensureConfigured(); err != nil {
+		return AdmissionFailurePage{}, err
+	}
+	if err := s.authorize(ctx, a, a.OrgID); err != nil {
+		return AdmissionFailurePage{}, err
+	}
+	repo, ok := s.admissions.(admission.QueryRepository)
+	if !ok {
+		return AdmissionFailurePage{}, cberrors.WithCode(code.ErrModuleInitializationFailed, "admission failure operations query is not configured")
+	}
+	page, err := repo.ListFailures(ctx, admission.QueryFilter{
+		OrgID: a.OrgID, Kind: query.Kind, Decision: query.Decision,
+		AssessmentID: query.AssessmentID, OutcomeID: query.OutcomeID,
+		OccurredFrom: query.OccurredFrom, OccurredTo: query.OccurredTo,
+	}, query.Cursor, query.Limit)
+	if err != nil {
+		return AdmissionFailurePage{}, err
+	}
+	return AdmissionFailurePage{Items: mapAdmissionFailures(page.Items), NextCursor: page.NextCursor}, nil
+}
+
 type service struct {
 	outcomes    OutcomeCorrelation
 	generations domaingeneration.Repository
@@ -219,6 +268,10 @@ func (s *service) FindAdmissionFailuresByOutcomeID(ctx context.Context, a Actor,
 	if err != nil {
 		return nil, err
 	}
+	return mapAdmissionFailures(items), nil
+}
+
+func mapAdmissionFailures(items []*admission.Failure) []AdmissionFailure {
 	result := make([]AdmissionFailure, 0, len(items))
 	for _, item := range items {
 		if item == nil {
@@ -228,10 +281,12 @@ func (s *service) FindAdmissionFailuresByOutcomeID(ctx context.Context, a Actor,
 			ID: item.ID().Uint64(), OutcomeID: item.OutcomeID().Uint64(), AssessmentID: item.AssessmentID().Uint64(),
 			OrgID: item.OrgID(), TesteeID: item.TesteeID(), EventID: item.EventID(), TraceID: item.TraceID(),
 			Kind: string(item.Kind()), Code: item.Code(), SafeMessage: item.SafeMessage(), Retryable: item.Retryable(),
-			Fingerprint: item.Fingerprint(), OccurredAt: item.OccurredAt(),
+			Fingerprint: item.Fingerprint(), GenerationID: item.GenerationID().Uint64(),
+			OutcomeVersion: item.OutcomeVersion(), Attempt: item.Attempt(), Decision: item.Decision(),
+			FirstFailedAt: item.FirstFailedAt(), LastFailedAt: item.LastFailedAt(), OccurredAt: item.OccurredAt(),
 		})
 	}
-	return result, nil
+	return result
 }
 
 func (s *service) authorize(ctx context.Context, a Actor, resourceOrgID int64) error {

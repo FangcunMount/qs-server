@@ -4,6 +4,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
+	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
 
@@ -12,6 +13,7 @@ type InstallHost interface {
 	compose.Host
 	EnsureSurveyRuntimeInfra() (*surveymod.SurveyRuntimeInfra, error)
 	SetAssessmentModelModule(*Module)
+	PublishedReportTemplateCatalog() domainreporttemplate.Catalog
 }
 
 // InstallFrom 使用容器组合根的输入连接和注册模型目录模块
@@ -40,6 +42,7 @@ func InstallFrom(host InstallHost) error {
 		StaticCacheBuilder:     host.CacheBuilder(redisruntime.FamilyStatic),
 		CachePolicies:          provider,
 		CacheObserver:          host.CacheObserver(),
+		PublishedTemplates:     host.PublishedReportTemplateCatalog(),
 	})
 	if err != nil {
 		return err

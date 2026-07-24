@@ -13,6 +13,10 @@ func definitionRegistry(deps Deps) appdefinition.Registry {
 		appdefinition.ScaleDefinitionHandler{QuestionnaireQuery: deps.Catalog.QuestionnaireQuery},
 		appdefinition.BehavioralRatingDefinitionHandler{NormRepo: deps.Catalog.NormRepo, QuestionnaireQuery: deps.Catalog.QuestionnaireQuery},
 		appdefinition.CognitiveDefinitionHandler{NormRepo: deps.Catalog.NormRepo, QuestionnaireQuery: deps.Catalog.QuestionnaireQuery},
-		appdefinition.TypologyDefinitionHandler{QuestionnaireQuery: deps.Catalog.QuestionnaireQuery, ReportPreviewer: previewadapter.NewPreviewer()},
+		appdefinition.TypologyDefinitionHandler{
+			QuestionnaireQuery: deps.Catalog.QuestionnaireQuery,
+			ReportPreviewer:    previewadapter.NewPreviewer(),
+			PublishedTemplates: deps.Catalog.PublishedTemplates,
+		},
 	)
 }
