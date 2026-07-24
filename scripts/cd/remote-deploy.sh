@@ -164,14 +164,33 @@ setup_grpc_certs() {
     fi
   done
 
+  $SUDO chown "$APP_UID:$APP_GID" "$grpc_ca" "$grpc_crt" "$grpc_key"
+  $SUDO chmod 0644 "$grpc_ca" "$grpc_crt"
+  $SUDO chmod 0640 "$grpc_key"
+
   if [ -n "$expected_cn" ]; then
     if ! command -v openssl >/dev/null 2>&1; then
       echo "openssl is required to verify the gRPC certificate identity" >&2
       exit 1
     fi
 
-    local cert_subject cert_cn
-    cert_subject="$($SUDO openssl x509 -in "$grpc_crt" -noout -subject -nameopt RFC2253)"
+    # Do not use `$SUDO openssl`: serverA deploy sudoers allows rsync/chown/chmod
+    # but not /usr/bin/openssl. Copy to a user-owned temp file instead.
+    local tmp_crt cert_subject cert_cn
+    tmp_crt="$(mktemp)"
+    if ! $SUDO rsync -a "$grpc_crt" "$tmp_crt"; then
+      rm -f "$tmp_crt"
+      echo "Failed to stage gRPC certificate for CN verification: $grpc_crt" >&2
+      exit 1
+    fi
+    $SUDO chown "$(id -u):$(id -g)" "$tmp_crt"
+    $SUDO chmod 0600 "$tmp_crt"
+    if ! cert_subject="$(openssl x509 -in "$tmp_crt" -noout -subject -nameopt RFC2253)"; then
+      rm -f "$tmp_crt"
+      echo "Failed to parse gRPC certificate: $grpc_crt" >&2
+      exit 1
+    fi
+    rm -f "$tmp_crt"
     cert_subject="${cert_subject#subject=}"
     cert_cn="$(printf '%s\n' "$cert_subject" | tr ',' '\n' | sed -n 's/^CN=//p' | head -n 1)"
     if [ "$cert_cn" != "$expected_cn" ]; then
@@ -179,10 +198,6 @@ setup_grpc_certs() {
       exit 1
     fi
   fi
-
-  $SUDO chown "$APP_UID:$APP_GID" "$grpc_ca" "$grpc_crt" "$grpc_key"
-  $SUDO chmod 0644 "$grpc_ca" "$grpc_crt"
-  $SUDO chmod 0640 "$grpc_key"
 }
 
 setup_apiserver_paths() {
