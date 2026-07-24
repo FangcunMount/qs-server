@@ -5,8 +5,8 @@
 #   grpc.acl.config-file: configs/grpc-acl.example.yaml
 #   grpc.acl.default-policy: deny
 #
-# service_name must exactly match the mTLS ServiceName extracted from the client
-# certificate. The canonical collection-server CN is qs-collection-server.svc.
+# service_name must exactly match the mTLS ServiceName extracted from each
+# client certificate. Canonical workload CNs end in .svc.
 
 default_policy: deny
 
@@ -39,3 +39,15 @@ services:
       - /assessmentmodel.AssessmentModelCatalogService/ListPublishedModels
       - /assessmentmodel.AssessmentModelCatalogService/ListHotPublishedModels
       - /assessmentmodel.AssessmentModelCatalogService/GetCatalogOptions
+
+  - service_name: qs-worker.svc
+    enabled: true
+    description: worker least-privilege apiserver RPC surface
+    allowed_methods:
+      - /evaluation.AssessmentIntakeService/EnsureAssessment
+      - /evaluation.EvaluationWorkerService/ExecuteEvaluation
+      - /interpretation.InterpretationAutomationService/GenerateReportFromOutcome
+      - /internalapi.InternalService/SyncAssessmentAttention
+      - /internalapi.InternalService/HandleQuestionnairePublishedPostActions
+      - /internalapi.InternalService/HandleScalePublishedPostActions
+      - /internalapi.InternalService/SendTaskOpenedMiniProgramNotification

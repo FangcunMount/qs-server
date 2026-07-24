@@ -177,6 +177,14 @@ func assertAPIServerGRPCTrustContract(t *testing.T, configName string, opts *api
 		"/assessmentmodel.AssessmentModelCatalogService/ListHotPublishedModels",
 		"/evaluation.TesteeEvaluationService/ListMyAssessments",
 		"/interpretation.ParticipantReportService/GetAssessmentReport",
+		"service_name: " + serviceidentity.WorkerCertificateCommonName,
+		"/evaluation.AssessmentIntakeService/EnsureAssessment",
+		"/evaluation.EvaluationWorkerService/ExecuteEvaluation",
+		"/interpretation.InterpretationAutomationService/GenerateReportFromOutcome",
+		"/internalapi.InternalService/SyncAssessmentAttention",
+		"/internalapi.InternalService/HandleQuestionnairePublishedPostActions",
+		"/internalapi.InternalService/HandleScalePublishedPostActions",
+		"/internalapi.InternalService/SendTaskOpenedMiniProgramNotification",
 	} {
 		if !strings.Contains(rules, required) {
 			t.Fatalf("production grpc ACL must contain %q", required)

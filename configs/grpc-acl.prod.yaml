@@ -1,8 +1,8 @@
 # Production gRPC method ACL.
 #
-# service_name is the exact mTLS identity extracted from the collection-server
-# client certificate. Keep this list synchronized with
-# internal/collection-server/infra/grpcclient.ACLAllowedMethods.
+# service_name is the exact mTLS identity extracted from each client
+# certificate. Keep these lists synchronized with the component
+# grpcclient.ACLAllowedMethods contracts.
 
 default_policy: deny
 
@@ -35,3 +35,15 @@ services:
       - /assessmentmodel.AssessmentModelCatalogService/ListPublishedModels
       - /assessmentmodel.AssessmentModelCatalogService/ListHotPublishedModels
       - /assessmentmodel.AssessmentModelCatalogService/GetCatalogOptions
+
+  - service_name: qs-worker.svc
+    enabled: true
+    description: worker least-privilege apiserver RPC surface
+    allowed_methods:
+      - /evaluation.AssessmentIntakeService/EnsureAssessment
+      - /evaluation.EvaluationWorkerService/ExecuteEvaluation
+      - /interpretation.InterpretationAutomationService/GenerateReportFromOutcome
+      - /internalapi.InternalService/SyncAssessmentAttention
+      - /internalapi.InternalService/HandleQuestionnairePublishedPostActions
+      - /internalapi.InternalService/HandleScalePublishedPostActions
+      - /internalapi.InternalService/SendTaskOpenedMiniProgramNotification

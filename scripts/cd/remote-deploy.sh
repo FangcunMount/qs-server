@@ -548,7 +548,7 @@ case "$SERVICE" in
     deploy_http_service
     ;;
   worker)
-    setup_grpc_certs qs-worker
+    setup_grpc_certs qs-worker qs-worker.svc
     select_image
     deploy_worker
     ;;
