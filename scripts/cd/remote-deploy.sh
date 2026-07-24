@@ -453,7 +453,7 @@ verify_collection_nginx() {
     return 1
   fi
 
-  $SUDO env \
+  PRIVILEGE_RUNNER="$SUDO" \
     NGINX_CONFIG_SOURCE="$DEPLOY_TMP/configs/nginx/conf.d/collect.fangcunmount.cn.conf" \
     NGINX_CONFIG_BACKUP_DIR="$BACKUP_DIR" \
     EXPECTED_COLLECTION_REPLICAS="$COLLECTION_REPLICAS" \

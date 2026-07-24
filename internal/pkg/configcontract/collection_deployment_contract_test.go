@@ -186,6 +186,7 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 		`verify_collection_nginx preflight`,
 		`verify_collection_nginx install-and-verify`,
 		`NGINX_CONFIG_BACKUP_DIR="$BACKUP_DIR"`,
+		`PRIVILEGE_RUNNER="$SUDO"`,
 	}
 	for _, required := range remoteNginxContractRequirements {
 		if !strings.Contains(remote, required) {
@@ -200,7 +201,7 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 	verifier := readDeploymentContractFile(t, "scripts", "cd", "verify-collection-nginx.sh")
 	for _, required := range []string{
 		`NGINX_MIN_VERSION="${NGINX_MIN_VERSION:-1.27.3}"`,
-		`docker exec "$NGINX_CONTAINER" nginx -T`,
+		`run_privileged docker exec "$NGINX_CONTAINER" nginx -T`,
 		`getent ahostsv4 "$COLLECTION_DNS_NAME"`,
 		`ROUTING_PROBE_REQUESTS="${ROUTING_PROBE_REQUESTS:-40}"`,
 		`/^gin_requests_total\{/`,
@@ -208,6 +209,14 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 	} {
 		if !strings.Contains(verifier, required) {
 			t.Errorf("collection Nginx verifier must contain %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		`$SUDO env`,
+		`verify-collection-nginx.sh must run as root`,
+	} {
+		if strings.Contains(remote, forbidden) || strings.Contains(verifier, forbidden) {
+			t.Errorf("collection Nginx deployment must not contain privileged script execution %q", forbidden)
 		}
 	}
 
@@ -321,6 +330,58 @@ func TestCollectionNginxMinimumVersionComparison(t *testing.T) {
 				t.Fatalf("version %s should not satisfy minimum", tt.current)
 			}
 		})
+	}
+}
+
+func TestCollectionNginxPreflightUsesGranularPrivilegeRunner(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	logPath := filepath.Join(tempDir, "privileged-commands.log")
+	runnerPath := filepath.Join(tempDir, "privilege-runner")
+	runner := `#!/usr/bin/env bash
+set -Eeuo pipefail
+printf '%s\n' "$*" >>"$PRIVILEGE_LOG"
+case "$*" in
+  "docker inspect nginx --format {{.State.Running}}")
+    printf '%s\n' true
+    ;;
+  "docker exec nginx nginx -v")
+    printf '%s\n' "nginx version: nginx/1.27.3"
+    ;;
+  *)
+    printf 'unexpected privileged command: %s\n' "$*" >&2
+    exit 97
+    ;;
+esac
+`
+	if err := os.WriteFile(runnerPath, []byte(runner), 0o700); err != nil {
+		t.Fatalf("write fake privilege runner: %v", err)
+	}
+
+	script := filepath.Join(repoRoot(t), "scripts", "cd", "verify-collection-nginx.sh")
+	cmd := exec.Command("bash", script, "preflight")
+	cmd.Env = append(os.Environ(),
+		"PRIVILEGE_RUNNER="+runnerPath,
+		"PRIVILEGE_LOG="+logPath,
+	)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("run rootless collection Nginx preflight: %v\n%s", err, output)
+	}
+
+	logged, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read privileged command log: %v", err)
+	}
+	logText := string(logged)
+	for _, required := range []string{
+		"docker inspect nginx --format {{.State.Running}}",
+		"docker exec nginx nginx -v",
+	} {
+		if !strings.Contains(logText, required) {
+			t.Errorf("privileged command log must contain %q, got:\n%s", required, logText)
+		}
 	}
 }
 

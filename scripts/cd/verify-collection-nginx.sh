@@ -14,6 +14,18 @@ EXPECTED_COLLECTION_REPLICAS="${EXPECTED_COLLECTION_REPLICAS:-2}"
 PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://collect.fangcunmount.cn/health}"
 PUBLIC_HEALTH_RESOLVE="${PUBLIC_HEALTH_RESOLVE:-collect.fangcunmount.cn:443:127.0.0.1}"
 ROUTING_PROBE_REQUESTS="${ROUTING_PROBE_REQUESTS:-40}"
+PRIVILEGE_RUNNER="${PRIVILEGE_RUNNER:-sudo}"
+
+require_privilege_runner() {
+  if ! command -v "$PRIVILEGE_RUNNER" >/dev/null 2>&1; then
+    echo "Privilege runner is unavailable: $PRIVILEGE_RUNNER" >&2
+    return 1
+  fi
+}
+
+run_privileged() {
+  "$PRIVILEGE_RUNNER" "$@"
+}
 
 version_at_least() {
   local current="$1"
@@ -54,26 +66,19 @@ require_positive_integer() {
   fi
 }
 
-require_root() {
-  if [ "$(id -u)" -ne 0 ]; then
-    echo "verify-collection-nginx.sh must run as root" >&2
-    return 1
-  fi
-}
-
 nginx_version() {
   local version_output
-  version_output="$(docker exec "$NGINX_CONTAINER" nginx -v 2>&1)"
+  version_output="$(run_privileged docker exec "$NGINX_CONTAINER" nginx -v 2>&1)"
   version_output="${version_output##*nginx/}"
   printf '%s\n' "${version_output%%[[:space:]]*}"
 }
 
 preflight() {
-  require_root
+  require_privilege_runner
   require_positive_integer EXPECTED_COLLECTION_REPLICAS "$EXPECTED_COLLECTION_REPLICAS"
   require_positive_integer ROUTING_PROBE_REQUESTS "$ROUTING_PROBE_REQUESTS"
 
-  if [ "$(docker inspect "$NGINX_CONTAINER" --format '{{.State.Running}}' 2>/dev/null || true)" != "true" ]; then
+  if [ "$(run_privileged docker inspect "$NGINX_CONTAINER" --format '{{.State.Running}}' 2>/dev/null || true)" != "true" ]; then
     echo "Nginx container $NGINX_CONTAINER is not running" >&2
     return 1
   fi
@@ -88,7 +93,7 @@ preflight() {
 }
 
 collection_container_ids() {
-  docker ps \
+  run_privileged docker ps \
     --filter "label=com.docker.compose.project=${COLLECTION_COMPOSE_PROJECT}" \
     --filter "label=com.docker.compose.service=${COLLECTION_COMPOSE_SERVICE}" \
     --filter status=running \
@@ -100,20 +105,20 @@ collection_ip_set() {
   local container_id
   while IFS= read -r container_id; do
     [ -z "$container_id" ] && continue
-    docker inspect "$container_id" \
+    run_privileged docker inspect "$container_id" \
       --format "{{with index .NetworkSettings.Networks \"${COLLECTION_NETWORK}\"}}{{.IPAddress}}{{end}}"
   done <<<"$container_ids" | sed '/^$/d' | sort -u
 }
 
 nginx_dns_ip_set() {
-  docker exec "$NGINX_CONTAINER" getent ahostsv4 "$COLLECTION_DNS_NAME" 2>/dev/null |
+  run_privileged docker exec "$NGINX_CONTAINER" getent ahostsv4 "$COLLECTION_DNS_NAME" 2>/dev/null |
     awk '$1 ~ /^[0-9]+([.][0-9]+){3}$/ {print $1}' |
     sort -u
 }
 
 verify_effective_config() {
   local effective upstream_count upstream
-  effective="$(docker exec "$NGINX_CONTAINER" nginx -T 2>&1)"
+  effective="$(run_privileged docker exec "$NGINX_CONTAINER" nginx -T 2>&1)"
   upstream_count="$(
     printf '%s\n' "$effective" |
       grep -Ec '^[[:space:]]*upstream[[:space:]]+collect-api[[:space:]]*\{' ||
@@ -191,7 +196,7 @@ verify_dns() {
 
 health_request_metric() {
   local container_id="$1"
-  docker exec "$container_id" wget -qO- http://127.0.0.1:8080/metrics |
+  run_privileged docker exec "$container_id" wget -qO- http://127.0.0.1:8080/metrics |
     awk '
       /^gin_requests_total\{/ &&
       /code="200"/ &&
@@ -230,7 +235,7 @@ verify_request_distribution() {
     before_value="${before[$container_id]}"
     after_value="$(health_request_metric "$container_id")"
     delta=$((after_value - before_value))
-    container_name="$(docker inspect "$container_id" --format '{{.Name}}')"
+    container_name="$(run_privileged docker inspect "$container_id" --format '{{.Name}}')"
     container_name="${container_name#/}"
     echo "Collection routing metric ${container_name}: before=${before_value} after=${after_value} delta=${delta}"
     if [ "$delta" -le 0 ]; then
@@ -258,13 +263,10 @@ PREVIOUS_CONFIG_PATH=""
 BACKUP_CONFIG_PATH=""
 
 restore_previous_config() {
-  rm -f "$NGINX_CONFIG_DEST"
+  run_privileged rm -f "$NGINX_CONFIG_DEST"
   if [ -n "$BACKUP_CONFIG_PATH" ] && [ -n "$PREVIOUS_CONFIG_PATH" ]; then
-    local restore_tmp
-    restore_tmp="${PREVIOUS_CONFIG_PATH}.restore.$$"
-    cp "$BACKUP_CONFIG_PATH" "$restore_tmp"
-    chmod 0644 "$restore_tmp"
-    mv -f "$restore_tmp" "$PREVIOUS_CONFIG_PATH"
+    run_privileged rsync -a "$BACKUP_CONFIG_PATH" "$PREVIOUS_CONFIG_PATH"
+    run_privileged chmod 0644 "$PREVIOUS_CONFIG_PATH"
   fi
 }
 
@@ -274,9 +276,9 @@ rollback_config() {
   echo "Collection Nginx verification failed; restoring previous config" >&2
   if ! restore_previous_config; then
     echo "CRITICAL: failed to restore the previous Nginx configuration" >&2
-  elif ! docker exec "$NGINX_CONTAINER" nginx -t; then
+  elif ! run_privileged docker exec "$NGINX_CONTAINER" nginx -t; then
     echo "CRITICAL: restored Nginx configuration does not pass nginx -t" >&2
-  elif ! docker exec "$NGINX_CONTAINER" nginx -s reload; then
+  elif ! run_privileged docker exec "$NGINX_CONTAINER" nginx -s reload; then
     echo "CRITICAL: failed to reload restored Nginx configuration" >&2
   else
     echo "Previous Nginx configuration restored"
@@ -298,8 +300,8 @@ install_and_verify() {
     return 1
   fi
 
-  mkdir -p "$(dirname "$NGINX_CONFIG_DEST")" "$NGINX_CONFIG_BACKUP_DIR"
-  local timestamp install_tmp
+  run_privileged mkdir -p "$(dirname "$NGINX_CONFIG_DEST")" "$NGINX_CONFIG_BACKUP_DIR"
+  local timestamp
   timestamp="$(date +%Y%m%d_%H%M%S)"
   if [ -e "$NGINX_CONFIG_DEST" ]; then
     PREVIOUS_CONFIG_PATH="$NGINX_CONFIG_DEST"
@@ -309,22 +311,22 @@ install_and_verify() {
   fi
   if [ -n "$PREVIOUS_CONFIG_PATH" ]; then
     BACKUP_CONFIG_PATH="${NGINX_CONFIG_BACKUP_DIR}/collect-nginx-${timestamp}.conf"
-    cp "$PREVIOUS_CONFIG_PATH" "$BACKUP_CONFIG_PATH"
-    chmod 0600 "$BACKUP_CONFIG_PATH"
+    run_privileged rsync -a "$PREVIOUS_CONFIG_PATH" "$BACKUP_CONFIG_PATH"
+    run_privileged chmod 0600 "$BACKUP_CONFIG_PATH"
     echo "Backed up ${PREVIOUS_CONFIG_PATH} to ${BACKUP_CONFIG_PATH}"
   fi
 
   trap 'rollback_config $?' ERR
   if [ "$PREVIOUS_CONFIG_PATH" = "$NGINX_CONFIG_LEGACY_DEST" ]; then
-    rm -f "$NGINX_CONFIG_LEGACY_DEST"
+    run_privileged rm -f "$NGINX_CONFIG_LEGACY_DEST"
   fi
-  install_tmp="${NGINX_CONFIG_DEST}.tmp.$$"
-  cp "$NGINX_CONFIG_SOURCE" "$install_tmp"
-  chmod 0644 "$install_tmp"
-  mv -f "$install_tmp" "$NGINX_CONFIG_DEST"
+  # Local rsync writes through a temporary file and renames it into place,
+  # keeping the Nginx config replacement atomic without elevating this script.
+  run_privileged rsync -a "$NGINX_CONFIG_SOURCE" "$NGINX_CONFIG_DEST"
+  run_privileged chmod 0644 "$NGINX_CONFIG_DEST"
 
-  docker exec "$NGINX_CONTAINER" nginx -t
-  docker exec "$NGINX_CONTAINER" nginx -s reload
+  run_privileged docker exec "$NGINX_CONTAINER" nginx -t
+  run_privileged docker exec "$NGINX_CONTAINER" nginx -s reload
   verify_runtime
   trap - ERR
   echo "Collection Nginx config installed and verified: $NGINX_CONFIG_DEST"
