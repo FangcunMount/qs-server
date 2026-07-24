@@ -116,7 +116,7 @@ func (h *SystemGovernanceHandler) Events(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
 // @Param window query string false "指标窗口，如 5m、15m、1h" default(5m)
-// @Success 200 {object} core.Response
+// @Success 200 {object} core.Response{data=systemgovernance.CacheView}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 429 {object} core.ErrResponse
 // @Router /internal/v1/system-governance/cache [get]
@@ -140,7 +140,7 @@ func (h *SystemGovernanceHandler) Cache(c *gin.Context) {
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
 // @Param window query string false "指标窗口，如 5m、15m、1h" default(5m)
-// @Success 200 {object} core.Response
+// @Success 200 {object} core.Response{data=systemgovernance.ResilienceView}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 429 {object} core.ErrResponse
 // @Router /internal/v1/system-governance/resilience [get]

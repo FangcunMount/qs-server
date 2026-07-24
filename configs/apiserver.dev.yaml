@@ -425,10 +425,12 @@ system_governance:
     timeout: 3s
   components:
     collection-server:
+      discovery: single
       resilience_url: "http://127.0.0.1:18083/governance/resilience"
       cache_url: "http://127.0.0.1:18083/governance/redis"
       timeout: 3s
     worker:
+      discovery: single
       resilience_url: "http://127.0.0.1:9092/governance/resilience"
       cache_url: "http://127.0.0.1:9092/governance/redis"
       timeout: 3s

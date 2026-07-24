@@ -123,3 +123,48 @@ func TestResilienceProjectionFlagsQueueUtilizationWithoutMetrics(t *testing.T) {
 		t.Fatalf("signals = %#v, want one critical queue utilization signal", projection.Signals)
 	}
 }
+
+func TestResilienceProjectionKeepsDNSInstancesSeparate(t *testing.T) {
+	now := time.Date(2026, 7, 24, 12, 0, 0, 0, time.UTC)
+	left := resilience.NewRuntimeSnapshot("collection-server", now)
+	left.InstanceID = "collection-a"
+	left.Queues = []resilience.QueueSnapshot{{Name: "submit", Depth: 1, Capacity: 10}}
+	right := resilience.NewRuntimeSnapshot("collection-server", now)
+	right.InstanceID = "collection-b"
+	right.Queues = []resilience.QueueSnapshot{{Name: "submit", Depth: 2, Capacity: 10}}
+
+	projection := NewResilienceProjector(nil).Evaluate(context.Background(), map[string]ComponentResilience{
+		"collection-server": {
+			Available: true, Partial: true,
+			DiscoveredInstanceCount: 2, AvailableInstanceCount: 2,
+			TargetErrors: map[string]string{"10.0.0.3": "duplicate instance_id"},
+			Instances: map[string]*resilience.RuntimeSnapshot{
+				left.InstanceID:  &left,
+				right.InstanceID: &right,
+			},
+			Snapshot: &left,
+		},
+	}, "5m", now)
+
+	if projection.Summary.ComponentCount != 1 || projection.Summary.QueueCount != 2 {
+		t.Fatalf("summary = %#v, want one component and two instance queues", projection.Summary)
+	}
+	instanceRows := map[string]int{}
+	for _, row := range projection.QueueRows {
+		instanceRows[row.InstanceID]++
+	}
+	if len(projection.QueueRows) != 2 ||
+		instanceRows["collection-a"] != 1 ||
+		instanceRows["collection-b"] != 1 {
+		t.Fatalf("rows = %#v, want one row per instance", projection.QueueRows)
+	}
+	var partialSignals int
+	for _, signal := range projection.Signals {
+		if signal.Status == "component_partial" {
+			partialSignals++
+		}
+	}
+	if partialSignals != 1 {
+		t.Fatalf("signals = %#v, want one component partial signal", projection.Signals)
+	}
+}

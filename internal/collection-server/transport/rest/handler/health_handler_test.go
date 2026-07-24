@@ -69,6 +69,89 @@ func TestHealthHandlerReadyWaitsForInitialResilienceControlSync(t *testing.T) {
 	}
 }
 
+func TestHealthHandlerServeReadyAllowsRedisDegradationAfterControlSync(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	registry := observability.NewFamilyStatusRegistry("collection-server")
+	registry.Update(observability.FamilyStatus{
+		Component: "collection-server", Family: "ops_runtime", Profile: "ops_runtime",
+		Available: false, Degraded: true, Mode: observability.FamilyModeDegraded,
+	})
+	handler := NewHealthHandlerWithResilience("collection-server", "2.0.0", registry, nil, func() bool { return true })
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/serve-readyz", nil)
+
+	handler.ServeReady(c)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", recorder.Code)
+	}
+	var payload struct {
+		Data struct {
+			Status          string `json:"status"`
+			ServeReady      bool   `json:"serve_ready"`
+			DependencyReady bool   `json:"dependency_ready"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Data.Status != "degraded" || !payload.Data.ServeReady || payload.Data.DependencyReady {
+		t.Fatalf("payload = %+v", payload.Data)
+	}
+}
+
+func TestHealthHandlerServeReadyWaitsForInitialControlSync(t *testing.T) {
+	handler := NewHealthHandlerWithResilience("collection-server", "2.0.0", nil, nil, func() bool { return false })
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/serve-readyz", nil)
+
+	handler.ServeReady(c)
+
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503", recorder.Code)
+	}
+	var payload struct {
+		Data struct {
+			Status     string `json:"status"`
+			ServeReady bool   `json:"serve_ready"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Data.Status != "synchronizing" || payload.Data.ServeReady {
+		t.Fatalf("payload = %+v", payload.Data)
+	}
+}
+
+func TestHealthHandlerServeReadyReportsHealthyDependencies(t *testing.T) {
+	handler := NewHealthHandlerWithResilience("collection-server", "2.0.0", nil, nil, func() bool { return true })
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/serve-readyz", nil)
+
+	handler.ServeReady(c)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", recorder.Code)
+	}
+	var payload struct {
+		Data struct {
+			Status          string `json:"status"`
+			ServeReady      bool   `json:"serve_ready"`
+			DependencyReady bool   `json:"dependency_ready"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Data.Status != "ready" || !payload.Data.ServeReady || !payload.Data.DependencyReady {
+		t.Fatalf("payload = %+v", payload.Data)
+	}
+}
+
 func TestHealthHandlerRedisFamiliesReturnsSnapshot(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	registry := observability.NewFamilyStatusRegistry("collection-server")
@@ -114,6 +197,38 @@ func TestHealthHandlerRedisFamiliesReturnsSnapshot(t *testing.T) {
 	}
 	if len(payload.Data.Families) != 1 || payload.Data.Families[0].Family != "lock_lease" {
 		t.Fatalf("unexpected families payload: %+v", payload.Data.Families)
+	}
+}
+
+func TestHealthHandlerRedisFamiliesIncludesInstanceIdentity(t *testing.T) {
+	handler := NewHealthHandlerWithResilience(
+		"collection-server",
+		"2.0.0",
+		nil,
+		func() resilience.RuntimeSnapshot {
+			snapshot := resilience.NewRuntimeSnapshot("collection-server", time.Now())
+			snapshot.InstanceID = "collection-a"
+			snapshot.Generation = "generation-a"
+			return snapshot
+		},
+	)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/governance/redis", nil)
+
+	handler.RedisFamilies(c)
+
+	var payload struct {
+		Data struct {
+			InstanceID string `json:"instance_id"`
+			Generation string `json:"generation"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Data.InstanceID != "collection-a" || payload.Data.Generation != "generation-a" {
+		t.Fatalf("identity = %+v", payload.Data)
 	}
 }
 

@@ -9,6 +9,8 @@ import (
 
 	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/gin-gonic/gin"
 )
 
@@ -233,7 +235,13 @@ func TestSystemGovernanceCacheRouteReturnsAdditiveWarmupFields(t *testing.T) {
 		SystemGovernanceFacade: stubSystemGovernanceFacade{cache: &systemgov.CacheView{
 			Window: "5m",
 			Components: map[string]systemgov.ComponentCache{
-				"collection-server": {Available: false, Reason: "connection refused"},
+				"collection-server": {
+					Available: true, DiscoveredInstanceCount: 2, AvailableInstanceCount: 1, Partial: true,
+					Instances: map[string]*observability.RuntimeSnapshot{
+						"collection-a": {Component: "collection-server", InstanceID: "collection-a", Generation: "g1"},
+					},
+					TargetErrors: map[string]string{"10.0.0.2": "connection refused"},
+				},
 			},
 			FamilyRows: []systemgov.CacheFamilyRow{{
 				Component: "apiserver",
@@ -273,8 +281,11 @@ func TestSystemGovernanceCacheRouteReturnsAdditiveWarmupFields(t *testing.T) {
 	var payload struct {
 		Data struct {
 			Components map[string]struct {
-				Available bool   `json:"available"`
-				Reason    string `json:"reason"`
+				Available               bool                                     `json:"available"`
+				Partial                 bool                                     `json:"partial"`
+				DiscoveredInstanceCount int                                      `json:"discovered_instance_count"`
+				AvailableInstanceCount  int                                      `json:"available_instance_count"`
+				Instances               map[string]observability.RuntimeSnapshot `json:"instances"`
 			} `json:"components"`
 			FamilyRows []struct {
 				Family string `json:"family"`
@@ -292,8 +303,11 @@ func TestSystemGovernanceCacheRouteReturnsAdditiveWarmupFields(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
-	if payload.Data.Components["collection-server"].Available {
-		t.Fatal("collection-server component available = true, want false")
+	component := payload.Data.Components["collection-server"]
+	if !component.Available || !component.Partial ||
+		component.DiscoveredInstanceCount != 2 || component.AvailableInstanceCount != 1 ||
+		component.Instances["collection-a"].Generation != "g1" {
+		t.Fatalf("collection-server component = %+v, want partial instance snapshot", component)
 	}
 	if len(payload.Data.FamilyRows) != 1 || payload.Data.FamilyRows[0].Family != "query_result" {
 		t.Fatalf("family_rows = %+v, want query_result row", payload.Data.FamilyRows)
@@ -316,12 +330,23 @@ func TestSystemGovernanceResilienceRouteReturnsAdditivePressureFields(t *testing
 			Window: "5m",
 			Summary: systemgov.ResilienceSummary{
 				ComponentCount:      2,
+				InstanceCount:       3,
 				CriticalQueueCount:  1,
 				BackpressureCount:   1,
 				MaxQueueUtilization: 0.95,
 			},
+			Components: map[string]systemgov.ComponentResilience{
+				"collection-server": {
+					Available: true, DiscoveredInstanceCount: 2, AvailableInstanceCount: 2,
+					Instances: map[string]*resilience.RuntimeSnapshot{
+						"collection-a": {Component: "collection-server", InstanceID: "collection-a", Generation: "g1"},
+						"collection-b": {Component: "collection-server", InstanceID: "collection-b", Generation: "g2"},
+					},
+				},
+			},
 			QueueRows: []systemgov.ResilienceQueueRow{{
 				Component:   "collection-server",
+				InstanceID:  "collection-a",
 				Name:        "answersheet_submit",
 				Depth:       95,
 				Capacity:    100,
@@ -363,13 +388,18 @@ func TestSystemGovernanceResilienceRouteReturnsAdditivePressureFields(t *testing
 		Data struct {
 			Summary struct {
 				ComponentCount      int     `json:"component_count"`
+				InstanceCount       int     `json:"instance_count"`
 				CriticalQueueCount  int     `json:"critical_queue_count"`
 				MaxQueueUtilization float64 `json:"max_queue_utilization"`
 			} `json:"summary"`
 			QueueRows []struct {
 				Name        string  `json:"name"`
+				InstanceID  string  `json:"instance_id"`
 				Utilization float64 `json:"utilization"`
 			} `json:"queue_rows"`
+			Components map[string]struct {
+				Instances map[string]resilience.RuntimeSnapshot `json:"instances"`
+			} `json:"components"`
 			BackpressureRows []struct {
 				Name       string `json:"name"`
 				Dependency string `json:"dependency"`
@@ -383,11 +413,16 @@ func TestSystemGovernanceResilienceRouteReturnsAdditivePressureFields(t *testing
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
-	if payload.Data.Summary.ComponentCount != 2 || payload.Data.Summary.CriticalQueueCount != 1 || payload.Data.Summary.MaxQueueUtilization != 0.95 {
+	if payload.Data.Summary.ComponentCount != 2 || payload.Data.Summary.InstanceCount != 3 ||
+		payload.Data.Summary.CriticalQueueCount != 1 || payload.Data.Summary.MaxQueueUtilization != 0.95 {
 		t.Fatalf("summary = %+v, want additive resilience summary", payload.Data.Summary)
 	}
-	if len(payload.Data.QueueRows) != 1 || payload.Data.QueueRows[0].Name != "answersheet_submit" {
+	if len(payload.Data.QueueRows) != 1 || payload.Data.QueueRows[0].Name != "answersheet_submit" ||
+		payload.Data.QueueRows[0].InstanceID != "collection-a" {
 		t.Fatalf("queue_rows = %+v, want answersheet_submit row", payload.Data.QueueRows)
+	}
+	if len(payload.Data.Components["collection-server"].Instances) != 2 {
+		t.Fatalf("components = %+v, want two collection instances", payload.Data.Components)
 	}
 	if len(payload.Data.BackpressureRows) != 1 || payload.Data.BackpressureRows[0].Dependency != "mysql" {
 		t.Fatalf("backpressure_rows = %+v, want mysql row", payload.Data.BackpressureRows)

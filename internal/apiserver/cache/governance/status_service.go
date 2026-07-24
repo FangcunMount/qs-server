@@ -172,6 +172,8 @@ func projectRuntimeSnapshot(in observability.RuntimeSnapshot) cachemodel.Runtime
 	out := cachemodel.RuntimeSnapshot{
 		GeneratedAt: in.GeneratedAt,
 		Component:   in.Component,
+		InstanceID:  in.InstanceID,
+		Generation:  in.Generation,
 		Summary: cachemodel.RuntimeSummary{
 			FamilyTotal:      in.Summary.FamilyTotal,
 			AvailableCount:   in.Summary.AvailableCount,

@@ -65,22 +65,21 @@ collection 在装配时有 Redis backend 就构造分布式 limiter；没有 bac
 
 ### 5.1 启动时没有 backend
 
-collection `newBudget` 会选择本地 limiter：
+query、wait-report、report-events 的 `newBudget` 会选择按原配置运行的本地 limiter。submit 另有显式保守 fallback：
 
-- global 使用进程内 token bucket；
-- user 使用按 key 的进程内 token bucket；
-- 动态切换 policy 时有 1 秒 conservative transition，旧、新 limiter 中更保守的结果可以继续生效。
+- global 为每实例 30 QPS / burst 45；
+- user 为每实例每用户 10 QPS / burst 15；
+- 可通过 `rate_limit.submit_degraded_local.enabled=false` 回滚到旧行为。
 
 ### 5.2 启动时有 backend，运行期 Redis 出错
 
-分布式 limiter 返回 `degraded_open` 并允许请求通过。当前不会：
+分布式 limiter 返回 `degraded_open` 时：
 
-- 自动改用本地 30 QPS；
-- 根据连续失败次数打开 Circuit Breaker；
-- 半开探测 Redis；
-- 逐步恢复到高阈值。
+- submit 再检查同一组每实例本地 global/user 预算；本地饱和返回 429 与 `Retry-After`；
+- 其他 budget 继续 degraded-open；
+- Redis 下一次调用恢复正常后，submit 立即重新采用分布式决策。
 
-这解释了为什么“Redis 正常高阈值，Redis 故障自动切 30 QPS”目前只能写成规划，不能写成系统现状。
+当前没有连续失败窗口、Circuit Breaker、半开探测或渐进恢复。fallback 只对单次明确的 `degraded_open` 决策生效。
 
 ### 5.3 为什么选择 fail-open
 
@@ -133,31 +132,22 @@ RateLimit 是容量保护，不是业务事实。Redis 故障时一律 fail-clos
 
 实例减少时，本地预算的理论总准入会下降；但系统是否更危险取决于客户端退避。如果客户端收到 429 后立即重试，重试流量会放大。服务端必须提供 `Retry-After`，客户端还应使用指数退避、抖动和最大尝试次数。
 
-## 8. 规划中的 Redis 故障本地保护
+## 8. Redis 故障本地保护
 
-状态：`规划改造`。
+状态：`submit 已实现`。
 
-讨论中的方向是：
+当前路径是：
 
 ```text
 Redis 健康
   -> 使用分布式高阈值
-连续失败 + 窗口失败率越界
-  -> 进入本地保守预算
-恢复窗口满足更严格条件
-  -> 半开、小步抬升、持续观测
-稳定
-  -> 回到分布式预算
+单次 Redis degraded-open
+  -> 检查本实例 30/10 QPS 保守预算
+Redis 下一次调用恢复
+  -> 直接回到分布式预算
 ```
 
-落地前必须补齐：
-
-- 单实例安全预算的推导与压测证据；
-- 状态机、最短驻留时间和抖动控制；
-- Redis 超时与业务拒绝的独立指标；
-- 实例数变化时的预算来源；
-- 恢复时的渐进放量；
-- 故障注入测试。
+半开、连续失败窗口和渐进恢复仍不属于当前实现。实例数变化会改变本地 fallback 的理论聚合上限，扩缩容时必须同步复核配置。
 
 ## 9. 验证入口
 

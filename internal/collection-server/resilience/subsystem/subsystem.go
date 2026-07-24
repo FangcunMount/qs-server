@@ -65,6 +65,7 @@ type Subsystem struct {
 	controlReady     atomic.Bool
 	grpcInflightWait time.Duration
 	controlEnabled   bool
+	submitFallback   options.SubmitDegradedLocalRateLimitOptions
 }
 
 func New(opts Options) (*Subsystem, error) {
@@ -88,9 +89,10 @@ func New(opts Options) (*Subsystem, error) {
 		queues:         make(map[string]queueRegistration),
 		activeCommands: make(map[string]struct{}),
 		controlEnabled: controlEnabled,
+		submitFallback: rateCfg.ResolvedSubmitDegradedLocal(),
 	}
 	s.budgets[BudgetQuery] = newBudget(BudgetQuery, opts.Backend, rateCfg.QueryGlobalQPS, rateCfg.QueryGlobalBurst, rateCfg.QueryUserQPS, rateCfg.QueryUserBurst)
-	s.budgets[BudgetSubmit] = newBudget(BudgetSubmit, opts.Backend, rateCfg.SubmitGlobalQPS, rateCfg.SubmitGlobalBurst, rateCfg.SubmitUserQPS, rateCfg.SubmitUserBurst)
+	s.budgets[BudgetSubmit] = newSubmitBudget(opts.Backend, rateCfg)
 	s.budgets[BudgetWaitReport] = newBudget(BudgetWaitReport, opts.Backend, rateCfg.WaitReportGlobalQPS, rateCfg.WaitReportGlobalBurst, rateCfg.WaitReportUserQPS, rateCfg.WaitReportUserBurst)
 	s.budgets[BudgetReportEvents] = newBudget(BudgetReportEvents, opts.Backend, rateCfg.ReportEventsGlobalQPS, rateCfg.ReportEventsGlobalBurst, rateCfg.ReportEventsUserQPS, rateCfg.ReportEventsUserBurst)
 	s.buildGates(opts.Concurrency, opts.WaitReport)
@@ -291,6 +293,45 @@ func newBudget(id ratelimit.BudgetID, backend ratelimit.Backend, globalQPS float
 	}, opts)
 }
 
+func newSubmitBudget(backend ratelimit.Backend, cfg *options.RateLimitOptions) *ratelimit.Budget {
+	if cfg == nil {
+		cfg = options.NewRateLimitOptions()
+	}
+	fallback := cfg.ResolvedSubmitDegradedLocal()
+	if !fallback.Enabled {
+		return newBudget(BudgetSubmit, backend, cfg.SubmitGlobalQPS, cfg.SubmitGlobalBurst, cfg.SubmitUserQPS, cfg.SubmitUserBurst)
+	}
+
+	opts := ratelimit.BudgetOptions{
+		GlobalFactory: func(policy ratelimit.RateLimitPolicy) ratelimit.RateLimiter {
+			localPolicy := degradedLocalPolicy(policy, fallback.GlobalQPS, fallback.GlobalBurst)
+			return ratelimit.NewDegradedFallbackLimiter(
+				ratelimit.NewDistributedLimiter(backend, policy),
+				ratelimit.NewLocalLimiter(localPolicy),
+			)
+		},
+		UserFactory: func(policy ratelimit.RateLimitPolicy) ratelimit.RateLimiter {
+			localPolicy := degradedLocalPolicy(policy, fallback.UserQPS, fallback.UserBurst)
+			return ratelimit.NewDegradedFallbackLimiter(
+				ratelimit.NewDistributedLimiter(backend, policy),
+				ratelimit.NewKeyedLocalLimiter(localPolicy),
+			)
+		},
+	}
+	return ratelimit.NewBudget(BudgetSubmit, ratelimit.BudgetPolicy{
+		Global: ratePolicy(BudgetSubmit, "global", "redis", cfg.SubmitGlobalQPS, cfg.SubmitGlobalBurst),
+		User:   ratePolicy(BudgetSubmit, "user", "redis", cfg.SubmitUserQPS, cfg.SubmitUserBurst),
+	}, opts)
+}
+
+func degradedLocalPolicy(primary ratelimit.RateLimitPolicy, configuredQPS float64, configuredBurst int) ratelimit.RateLimitPolicy {
+	policy := primary
+	policy.Strategy = "local_fallback"
+	policy.RatePerSecond = min(primary.RatePerSecond, configuredQPS)
+	policy.Burst = min(primary.Burst, configuredBurst)
+	return policy
+}
+
 func ratePolicy(id ratelimit.BudgetID, resource, strategy string, qps float64, burst int) ratelimit.RateLimitPolicy {
 	return ratelimit.RateLimitPolicy{Component: "collection-server", Scope: string(id), Resource: resource, Strategy: strategy, RatePerSecond: qps, Burst: burst}
 }
@@ -372,9 +413,15 @@ func (s *Subsystem) Snapshot(now time.Time) resilience.RuntimeSnapshot {
 	snapshot.InstanceID, snapshot.Generation = s.identity.InstanceID, s.identity.Generation
 	for _, id := range []ratelimit.BudgetID{BudgetQuery, BudgetSubmit, BudgetWaitReport, BudgetReportEvents} {
 		policy := s.budgets[id].Snapshot()
+		global := rateSnapshot(id, "global", s.rateEnabled, policy, policy.Policy.Global)
+		user := rateSnapshot(id, "user", s.rateEnabled, policy, policy.Policy.User)
+		if id == BudgetSubmit && s.submitFallback.Enabled {
+			addFallbackSnapshot(&global, degradedLocalPolicy(policy.Policy.Global, s.submitFallback.GlobalQPS, s.submitFallback.GlobalBurst))
+			addFallbackSnapshot(&user, degradedLocalPolicy(policy.Policy.User, s.submitFallback.UserQPS, s.submitFallback.UserBurst))
+		}
 		snapshot.RateLimits = append(snapshot.RateLimits,
-			rateSnapshot(id, "global", s.rateEnabled, policy, policy.Policy.Global),
-			rateSnapshot(id, "user", s.rateEnabled, policy, policy.Policy.User),
+			global,
+			user,
 		)
 	}
 	s.queueMu.RLock()
@@ -398,6 +445,15 @@ func (s *Subsystem) Snapshot(now time.Time) resilience.RuntimeSnapshot {
 		Configured: configured, Degraded: !configured, Reason: reasonIf(!configured, "submit guard redis runtime unavailable"),
 	}}
 	return resilience.FinalizeRuntimeSnapshot(snapshot)
+}
+
+func addFallbackSnapshot(snapshot *resilience.CapabilitySnapshot, policy ratelimit.RateLimitPolicy) {
+	if snapshot == nil {
+		return
+	}
+	snapshot.FallbackStrategy = policy.Strategy
+	snapshot.FallbackRate = policy.RatePerSecond
+	snapshot.FallbackBurst = policy.Burst
 }
 
 func rateSnapshot(id ratelimit.BudgetID, dimension string, configured bool, snapshot ratelimit.BudgetSnapshot, policy ratelimit.RateLimitPolicy) resilience.CapabilitySnapshot {

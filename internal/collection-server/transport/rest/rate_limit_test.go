@@ -73,6 +73,52 @@ func TestDistributedLimitRejectsWithRetryAfterAndOutcome(t *testing.T) {
 	}
 }
 
+func TestDistributedLimitUsesLocalFallbackAndReturnsRetryAfter(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	fallbackPolicy := ratelimit.RateLimitPolicy{
+		Component: "collection-server", Scope: "submit", Resource: "global", Strategy: "local_fallback",
+		RatePerSecond: 1, Burst: 1,
+	}
+	limiter := ratelimit.NewDegradedFallbackLimiter(
+		rateLimiterFunc(func(context.Context, string) ratelimit.RateLimitDecision {
+			return ratelimit.RateLimitDecision{
+				Allowed: true, Outcome: resilience.OutcomeDegradedOpen,
+				Subject: resilience.Subject{Component: "collection-server", Scope: "submit", Resource: "global", Strategy: "redis"},
+			}
+		}),
+		ratelimit.NewLocalLimiter(fallbackPolicy),
+	)
+	observer := &rateLimitRecordingObserver{}
+	router := gin.New()
+	router.GET("/", distributedLimitWithOptions(limiter, "limit:submit:global", nil, pkgmiddleware.LimitOptions{Observer: observer}), func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	first := httptest.NewRecorder()
+	router.ServeHTTP(first, httptest.NewRequest(http.MethodGet, "/", nil))
+	if first.Code != http.StatusNoContent || !observer.hasWithStrategy(resilience.OutcomeDegradedOpen, "local_fallback") {
+		t.Fatalf("first status=%d decisions=%+v", first.Code, observer.decisions)
+	}
+
+	second := httptest.NewRecorder()
+	router.ServeHTTP(second, httptest.NewRequest(http.MethodGet, "/", nil))
+	if second.Code != http.StatusTooManyRequests {
+		t.Fatalf("second status = %d, want %d", second.Code, http.StatusTooManyRequests)
+	}
+	if second.Header().Get("Retry-After") == "" {
+		t.Fatal("fallback 429 Retry-After header is empty")
+	}
+	if !observer.hasWithStrategy(resilience.OutcomeRateLimited, "local_fallback") {
+		t.Fatalf("fallback rate_limited decision missing: %+v", observer.decisions)
+	}
+}
+
+type rateLimiterFunc func(context.Context, string) ratelimit.RateLimitDecision
+
+func (f rateLimiterFunc) Decide(ctx context.Context, key string) ratelimit.RateLimitDecision {
+	return f(ctx, key)
+}
+
 type rateLimitRecordingObserver struct {
 	decisions []resilience.Decision
 }
@@ -84,6 +130,15 @@ func (r *rateLimitRecordingObserver) ObserveDecision(_ context.Context, decision
 func (r *rateLimitRecordingObserver) has(outcome resilience.Outcome) bool {
 	for _, decision := range r.decisions {
 		if decision.Outcome == outcome {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *rateLimitRecordingObserver) hasWithStrategy(outcome resilience.Outcome, strategy string) bool {
+	for _, decision := range r.decisions {
+		if decision.Outcome == outcome && decision.Subject.Strategy == strategy {
 			return true
 		}
 	}

@@ -42,6 +42,7 @@ type CapabilitySnapshot struct {
 	Name              string    `json:"name"`
 	Kind              string    `json:"kind"`
 	Strategy          string    `json:"strategy"`
+	FallbackStrategy  string    `json:"fallback_strategy,omitempty"`
 	Configured        bool      `json:"configured"`
 	Degraded          bool      `json:"degraded"`
 	Reason            string    `json:"reason,omitempty"`
@@ -50,6 +51,8 @@ type CapabilitySnapshot struct {
 	RenewEverySeconds int64     `json:"renew_every_seconds,omitempty"`
 	RatePerSecond     float64   `json:"rate_per_second,omitempty"`
 	Burst             int       `json:"burst,omitempty"`
+	FallbackRate      float64   `json:"fallback_rate_per_second,omitempty"`
+	FallbackBurst     int       `json:"fallback_burst,omitempty"`
 	PolicyVersion     uint64    `json:"policy_version,omitempty"`
 	PolicySource      string    `json:"policy_source,omitempty"`
 	OverrideExpiresAt time.Time `json:"override_expires_at,omitempty"`

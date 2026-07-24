@@ -7852,6 +7852,18 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v1/interpretation/admission-failures": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Interpretation-Operations"
+                ],
+                "summary": "分页查询当前组织的 Interpretation 准入失败",
+                "responses": {}
+            }
+        },
         "/internal/v1/interpretation/assessments/{assessment_id}/lifecycle": {
             "get": {
                 "produces": [
@@ -7928,6 +7940,120 @@ const docTemplate = `{
                                             "type": "array",
                                             "items": {
                                                 "$ref": "#/definitions/response.InterpretationReportWire"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/interpretation/catalog/drifts": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Interpretation-Operations"
+                ],
+                "summary": "分页查询当前组织的 Interpretation Catalog 漂移明细",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "missing|dangling|association_mismatch|wrong_winner",
+                        "name": "kind",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "稳定游标",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 500,
+                        "description": "批量",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "测评ID",
+                        "name": "assessment_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {}
+            }
+        },
+        "/internal/v1/interpretation/catalog/reconcile": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Interpretation-Operations"
+                ],
+                "summary": "只读检查当前组织的 Interpretation Catalog 漂移",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/catalogreconcile.DriftCounts"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/interpretation/outcomes/{outcome_id}/admission-failures": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Interpretation-Operations"
+                ],
+                "summary": "查询 Outcome 在创建 Generation 前的准入失败证据",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "OutcomeID",
+                        "name": "outcome_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/operations.AdmissionFailure"
                                             }
                                         }
                                     }
@@ -8417,7 +8543,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/systemgovernance.CacheView"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -8633,7 +8771,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/systemgovernance.ResilienceView"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -8877,6 +9027,98 @@ const docTemplate = `{
                 "DecisionKindAbilityLevel"
             ]
         },
+        "cachemodel.CapabilityPolicyView": {
+            "type": "object",
+            "properties": {
+                "capability": {
+                    "type": "string"
+                },
+                "effective": {
+                    "$ref": "#/definitions/cachemodel.PolicyView"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "family": {
+                    "type": "string"
+                },
+                "family_default": {
+                    "$ref": "#/definitions/cachemodel.PolicyView"
+                },
+                "global_default": {
+                    "$ref": "#/definitions/cachemodel.PolicyView"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "layer": {
+                    "type": "string"
+                },
+                "metric_label": {
+                    "type": "string"
+                },
+                "override": {
+                    "$ref": "#/definitions/cachemodel.PolicyView"
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "spec_default": {
+                    "$ref": "#/definitions/cachemodel.PolicyView"
+                }
+            }
+        },
+        "cachemodel.EffectiveRegistrySnapshot": {
+            "type": "object",
+            "properties": {
+                "capabilities": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/cachemodel.CapabilityPolicyView"
+                    }
+                },
+                "catalog_version": {
+                    "type": "string"
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "reload": {
+                    "$ref": "#/definitions/cachemodel.PolicyReloadStatus"
+                },
+                "snapshot_version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "cachemodel.Family": {
+            "type": "string",
+            "enum": [
+                "default",
+                "static_meta",
+                "object_view",
+                "query_result",
+                "meta_hotset",
+                "business_rank",
+                "sdk_token",
+                "lock_lease",
+                "ops_runtime"
+            ],
+            "x-enum-varnames": [
+                "FamilyDefault",
+                "FamilyStatic",
+                "FamilyObject",
+                "FamilyQuery",
+                "FamilyMeta",
+                "FamilyRank",
+                "FamilySDK",
+                "FamilyLock",
+                "FamilyOps"
+            ]
+        },
         "cachemodel.FamilyStatus": {
             "type": "object",
             "properties": {
@@ -8924,6 +9166,46 @@ const docTemplate = `{
                 }
             }
         },
+        "cachemodel.PolicyReloadStatus": {
+            "type": "object",
+            "properties": {
+                "last_attempt_at": {
+                    "type": "string"
+                },
+                "last_error": {
+                    "type": "string"
+                },
+                "last_failure_at": {
+                    "type": "string"
+                },
+                "last_success_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "cachemodel.PolicyView": {
+            "type": "object",
+            "properties": {
+                "compress": {
+                    "type": "string"
+                },
+                "negative": {
+                    "type": "string"
+                },
+                "negative_ttl": {
+                    "type": "string"
+                },
+                "singleflight": {
+                    "type": "string"
+                },
+                "ttl": {
+                    "type": "string"
+                },
+                "ttl_jitter_ratio": {
+                    "type": "number"
+                }
+            }
+        },
         "cachemodel.RuntimeSnapshot": {
             "type": "object",
             "properties": {
@@ -8937,6 +9219,12 @@ const docTemplate = `{
                     }
                 },
                 "generated_at": {
+                    "type": "string"
+                },
+                "generation": {
+                    "type": "string"
+                },
+                "instance_id": {
                     "type": "string"
                 },
                 "summary": {
@@ -8960,6 +9248,144 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "unavailable_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "cachemodel.StatusSnapshot": {
+            "type": "object",
+            "properties": {
+                "component": {
+                    "type": "string"
+                },
+                "effective_registry": {
+                    "$ref": "#/definitions/cachemodel.EffectiveRegistrySnapshot"
+                },
+                "families": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/cachemodel.FamilyStatus"
+                    }
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "generation": {
+                    "type": "string"
+                },
+                "instance_id": {
+                    "type": "string"
+                },
+                "summary": {
+                    "$ref": "#/definitions/cachemodel.RuntimeSummary"
+                },
+                "warmup": {
+                    "$ref": "#/definitions/cachemodel.WarmupStatusSnapshot"
+                }
+            }
+        },
+        "cachemodel.WarmupHotsetStatus": {
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "type": "boolean"
+                },
+                "max_items_per_kind": {
+                    "type": "integer"
+                },
+                "top_n": {
+                    "type": "integer"
+                }
+            }
+        },
+        "cachemodel.WarmupRunSnapshot": {
+            "type": "object",
+            "properties": {
+                "error_count": {
+                    "type": "integer"
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "ok_count": {
+                    "type": "integer"
+                },
+                "result": {
+                    "type": "string"
+                },
+                "skipped_count": {
+                    "type": "integer"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "target_count": {
+                    "type": "integer"
+                },
+                "trigger": {
+                    "type": "string"
+                }
+            }
+        },
+        "cachemodel.WarmupStartupStatus": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "boolean"
+                },
+                "static": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "cachemodel.WarmupStatusSnapshot": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "hotset": {
+                    "$ref": "#/definitions/cachemodel.WarmupHotsetStatus"
+                },
+                "latest_runs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/cachemodel.WarmupRunSnapshot"
+                    }
+                },
+                "startup": {
+                    "$ref": "#/definitions/cachemodel.WarmupStartupStatus"
+                }
+            }
+        },
+        "cachetarget.WarmupKind": {
+            "type": "string",
+            "enum": [
+                "static.scale",
+                "static.questionnaire",
+                "static.typology_model",
+                "query.stats_overview"
+            ],
+            "x-enum-varnames": [
+                "WarmupKindStaticScale",
+                "WarmupKindStaticQuestionnaire",
+                "WarmupKindStaticTypologyModel",
+                "WarmupKindQueryStatsOverview"
+            ]
+        },
+        "catalogreconcile.DriftCounts": {
+            "type": "object",
+            "properties": {
+                "associationMismatch": {
+                    "type": "integer"
+                },
+                "dangling": {
+                    "type": "integer"
+                },
+                "missing": {
+                    "type": "integer"
+                },
+                "wrongWinner": {
                     "type": "integer"
                 }
             }
@@ -10153,6 +10579,161 @@ const docTemplate = `{
                 }
             }
         },
+        "observability.FamilyStatus": {
+            "type": "object",
+            "properties": {
+                "allow_warmup": {
+                    "type": "boolean"
+                },
+                "available": {
+                    "type": "boolean"
+                },
+                "component": {
+                    "type": "string"
+                },
+                "configured": {
+                    "type": "boolean"
+                },
+                "consecutive_failures": {
+                    "type": "integer"
+                },
+                "degraded": {
+                    "type": "boolean"
+                },
+                "family": {
+                    "type": "string"
+                },
+                "last_error": {
+                    "type": "string"
+                },
+                "last_failure_at": {
+                    "type": "string"
+                },
+                "last_success_at": {
+                    "type": "string"
+                },
+                "mode": {
+                    "type": "string"
+                },
+                "namespace": {
+                    "type": "string"
+                },
+                "profile": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "observability.RuntimeSnapshot": {
+            "type": "object",
+            "properties": {
+                "component": {
+                    "type": "string"
+                },
+                "families": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/observability.FamilyStatus"
+                    }
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "generation": {
+                    "type": "string"
+                },
+                "instance_id": {
+                    "type": "string"
+                },
+                "summary": {
+                    "$ref": "#/definitions/observability.RuntimeSummary"
+                }
+            }
+        },
+        "observability.RuntimeSummary": {
+            "type": "object",
+            "properties": {
+                "available_count": {
+                    "type": "integer"
+                },
+                "degraded_count": {
+                    "type": "integer"
+                },
+                "family_total": {
+                    "type": "integer"
+                },
+                "ready": {
+                    "type": "boolean"
+                },
+                "unavailable_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "operations.AdmissionFailure": {
+            "type": "object",
+            "properties": {
+                "assessmentID": {
+                    "type": "integer"
+                },
+                "attempt": {
+                    "type": "integer"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "decision": {
+                    "type": "string"
+                },
+                "eventID": {
+                    "type": "string"
+                },
+                "fingerprint": {
+                    "type": "string"
+                },
+                "firstFailedAt": {
+                    "type": "string"
+                },
+                "generationID": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "lastFailedAt": {
+                    "type": "string"
+                },
+                "occurredAt": {
+                    "type": "string"
+                },
+                "orgID": {
+                    "type": "integer"
+                },
+                "outcomeID": {
+                    "type": "integer"
+                },
+                "outcomeVersion": {
+                    "type": "string"
+                },
+                "retryable": {
+                    "type": "boolean"
+                },
+                "safeMessage": {
+                    "type": "string"
+                },
+                "testeeID": {
+                    "type": "integer"
+                },
+                "traceID": {
+                    "type": "string"
+                }
+            }
+        },
         "questionnaire.QuestionnaireReleaseVersion": {
             "type": "object",
             "properties": {
@@ -11030,6 +11611,15 @@ const docTemplate = `{
                 },
                 "degraded": {
                     "type": "boolean"
+                },
+                "fallback_burst": {
+                    "type": "integer"
+                },
+                "fallback_rate_per_second": {
+                    "type": "number"
+                },
+                "fallback_strategy": {
+                    "type": "string"
                 },
                 "kind": {
                     "type": "string"
@@ -14742,6 +15332,221 @@ const docTemplate = `{
                 }
             }
         },
+        "systemgovernance.CacheCapabilityRow": {
+            "type": "object",
+            "properties": {
+                "capability": {
+                    "type": "string"
+                },
+                "family": {
+                    "type": "string"
+                },
+                "metric_label": {
+                    "type": "string"
+                },
+                "workload": {
+                    "$ref": "#/definitions/systemgovernance.CacheCapabilityWorkload"
+                }
+            }
+        },
+        "systemgovernance.CacheCapabilityWorkload": {
+            "type": "object",
+            "properties": {
+                "error_count": {
+                    "$ref": "#/definitions/systemgovernance.MetricEvidence"
+                },
+                "get_latency_p95": {
+                    "$ref": "#/definitions/systemgovernance.MetricEvidence"
+                },
+                "hit_rate": {
+                    "$ref": "#/definitions/systemgovernance.MetricEvidence"
+                }
+            }
+        },
+        "systemgovernance.CacheFamilyRow": {
+            "type": "object",
+            "properties": {
+                "allow_warmup": {
+                    "type": "boolean"
+                },
+                "available": {
+                    "type": "boolean"
+                },
+                "component": {
+                    "type": "string"
+                },
+                "configured": {
+                    "type": "boolean"
+                },
+                "consecutive_failures": {
+                    "type": "integer"
+                },
+                "degraded": {
+                    "type": "boolean"
+                },
+                "family": {
+                    "type": "string"
+                },
+                "instance_id": {
+                    "type": "string"
+                },
+                "last_error": {
+                    "type": "string"
+                },
+                "last_failure_at": {
+                    "type": "string"
+                },
+                "last_success_at": {
+                    "type": "string"
+                },
+                "metric_evidence": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.MetricEvidence"
+                    }
+                },
+                "mode": {
+                    "type": "string"
+                },
+                "namespace": {
+                    "type": "string"
+                },
+                "profile": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "severity": {
+                    "$ref": "#/definitions/systemgovernance.Severity"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "systemgovernance.CacheHotsetItem": {
+            "type": "object",
+            "properties": {
+                "family": {
+                    "type": "string"
+                },
+                "kind": {
+                    "$ref": "#/definitions/cachetarget.WarmupKind"
+                },
+                "scope": {
+                    "type": "string"
+                },
+                "score": {
+                    "type": "number"
+                }
+            }
+        },
+        "systemgovernance.CacheHotsetView": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "boolean"
+                },
+                "degraded": {
+                    "type": "boolean"
+                },
+                "family": {
+                    "$ref": "#/definitions/cachemodel.Family"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.CacheHotsetItem"
+                    }
+                },
+                "kind": {
+                    "$ref": "#/definitions/cachetarget.WarmupKind"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "metric_evidence": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.MetricEvidence"
+                    }
+                }
+            }
+        },
+        "systemgovernance.CacheView": {
+            "type": "object",
+            "properties": {
+                "capability_rows": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.CacheCapabilityRow"
+                    }
+                },
+                "components": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/systemgovernance.ComponentCache"
+                    }
+                },
+                "family_rows": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.CacheFamilyRow"
+                    }
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "hotsets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.CacheHotsetView"
+                    }
+                },
+                "metrics": {
+                    "$ref": "#/definitions/systemgovernance.MetricsSummary"
+                },
+                "signals": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.Signal"
+                    }
+                },
+                "snapshot": {
+                    "$ref": "#/definitions/cachemodel.StatusSnapshot"
+                },
+                "warmup_kinds": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.CacheWarmupKind"
+                    }
+                },
+                "window": {
+                    "type": "string"
+                }
+            }
+        },
+        "systemgovernance.CacheWarmupKind": {
+            "type": "object",
+            "properties": {
+                "family": {
+                    "$ref": "#/definitions/cachemodel.Family"
+                },
+                "kind": {
+                    "$ref": "#/definitions/cachetarget.WarmupKind"
+                },
+                "scope_example": {
+                    "type": "string"
+                },
+                "supports_manual_warmup": {
+                    "type": "boolean"
+                }
+            }
+        },
         "systemgovernance.CheckpointGovernanceSnapshot": {
             "type": "object",
             "properties": {
@@ -14779,6 +15584,76 @@ const docTemplate = `{
                 },
                 "window": {
                     "type": "string"
+                }
+            }
+        },
+        "systemgovernance.ComponentCache": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "boolean"
+                },
+                "available_instance_count": {
+                    "type": "integer"
+                },
+                "discovered_instance_count": {
+                    "type": "integer"
+                },
+                "instances": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/observability.RuntimeSnapshot"
+                    }
+                },
+                "partial": {
+                    "type": "boolean"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "snapshot": {
+                    "$ref": "#/definitions/observability.RuntimeSnapshot"
+                },
+                "target_errors": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "systemgovernance.ComponentResilience": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "boolean"
+                },
+                "available_instance_count": {
+                    "type": "integer"
+                },
+                "discovered_instance_count": {
+                    "type": "integer"
+                },
+                "instances": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/resilienceplane.RuntimeSnapshot"
+                    }
+                },
+                "partial": {
+                    "type": "boolean"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "snapshot": {
+                    "$ref": "#/definitions/resilienceplane.RuntimeSnapshot"
+                },
+                "target_errors": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -14870,6 +15745,229 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/systemgovernance.Signal"
                     }
+                },
+                "window": {
+                    "type": "string"
+                }
+            }
+        },
+        "systemgovernance.ResilienceBackpressureRow": {
+            "type": "object",
+            "properties": {
+                "component": {
+                    "type": "string"
+                },
+                "degraded": {
+                    "type": "boolean"
+                },
+                "dependency": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "in_flight": {
+                    "type": "integer"
+                },
+                "instance_id": {
+                    "type": "string"
+                },
+                "max_inflight": {
+                    "type": "integer"
+                },
+                "metric_evidence": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.MetricEvidence"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "severity": {
+                    "$ref": "#/definitions/systemgovernance.Severity"
+                },
+                "strategy": {
+                    "type": "string"
+                },
+                "timeout_millis": {
+                    "type": "integer"
+                },
+                "utilization": {
+                    "type": "number"
+                }
+            }
+        },
+        "systemgovernance.ResilienceCapabilityRow": {
+            "type": "object",
+            "properties": {
+                "component": {
+                    "type": "string"
+                },
+                "configured": {
+                    "type": "boolean"
+                },
+                "degraded": {
+                    "type": "boolean"
+                },
+                "instance_id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "severity": {
+                    "$ref": "#/definitions/systemgovernance.Severity"
+                },
+                "strategy": {
+                    "type": "string"
+                }
+            }
+        },
+        "systemgovernance.ResilienceQueueRow": {
+            "type": "object",
+            "properties": {
+                "capacity": {
+                    "type": "integer"
+                },
+                "component": {
+                    "type": "string"
+                },
+                "depth": {
+                    "type": "integer"
+                },
+                "instance_id": {
+                    "type": "string"
+                },
+                "lifecycle_boundary": {
+                    "type": "string"
+                },
+                "metric_evidence": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.MetricEvidence"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "severity": {
+                    "$ref": "#/definitions/systemgovernance.Severity"
+                },
+                "status_counts": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "strategy": {
+                    "type": "string"
+                },
+                "utilization": {
+                    "type": "number"
+                }
+            }
+        },
+        "systemgovernance.ResilienceSummary": {
+            "type": "object",
+            "properties": {
+                "backpressure_count": {
+                    "type": "integer"
+                },
+                "component_count": {
+                    "type": "integer"
+                },
+                "critical_backpressure_count": {
+                    "type": "integer"
+                },
+                "critical_queue_count": {
+                    "type": "integer"
+                },
+                "degraded_capability_count": {
+                    "type": "integer"
+                },
+                "instance_count": {
+                    "type": "integer"
+                },
+                "max_backpressure_utilization": {
+                    "type": "number"
+                },
+                "max_queue_utilization": {
+                    "type": "number"
+                },
+                "not_ready_component_count": {
+                    "type": "integer"
+                },
+                "not_ready_instance_count": {
+                    "type": "integer"
+                },
+                "queue_count": {
+                    "type": "integer"
+                },
+                "unavailable_component_count": {
+                    "type": "integer"
+                },
+                "warning_backpressure_count": {
+                    "type": "integer"
+                },
+                "warning_queue_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "systemgovernance.ResilienceView": {
+            "type": "object",
+            "properties": {
+                "backpressure_rows": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.ResilienceBackpressureRow"
+                    }
+                },
+                "capability_rows": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.ResilienceCapabilityRow"
+                    }
+                },
+                "components": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/systemgovernance.ComponentResilience"
+                    }
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "metrics": {
+                    "$ref": "#/definitions/systemgovernance.MetricsSummary"
+                },
+                "queue_rows": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.ResilienceQueueRow"
+                    }
+                },
+                "signals": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.Signal"
+                    }
+                },
+                "summary": {
+                    "$ref": "#/definitions/systemgovernance.ResilienceSummary"
                 },
                 "window": {
                     "type": "string"

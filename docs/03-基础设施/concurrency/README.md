@@ -69,10 +69,9 @@ flowchart LR
 
 | 状态 | 结论 |
 | --- | --- |
-| `已实现` | collection 在启动时有 Redis rate backend 就构造分布式 limiter；没有 backend 才构造本地 limiter。 |
-| `已实现` | 分布式 limiter 的 Redis 运行期错误为 degraded-open，不会自动切换到本地保守阈值。 |
+| `已实现` | collection submit 在 Redis rate backend 缺失或运行期 degraded-open 时使用每实例 30/10 QPS 本地保守预算；其他 budget 保持原 degraded-open 行为。 |
 | `已实现` | resilience control 保留 queue controller 协议，但生产装配没有注册 queue，action registry 也未暴露 queue action。 |
-| `规划改造` | Redis 限流故障后切换本地保守预算、连续失败与窗口失败率判定、半开探测、渐进恢复。 |
+| `规划改造` | Redis 限流连续失败与窗口失败率判定、半开探测、渐进恢复。 |
 | `规划改造` | 基于依赖饱和信号的自适应并发或 Circuit Breaker。 |
 
 规划项只是讨论入口；在代码、配置、指标与故障测试同时落地前，不得作为现行能力对外承诺。

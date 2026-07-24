@@ -116,3 +116,38 @@ func TestCacheCapabilityRowsProjectCanonicalCapabilitiesAndLegacyMetricLabels(t 
 		}
 	}
 }
+
+func TestCacheProjectionKeepsDNSInstancesSeparate(t *testing.T) {
+	now := time.Date(2026, 7, 24, 12, 0, 0, 0, time.UTC)
+	newSnapshot := func(instanceID string) *observability.RuntimeSnapshot {
+		return &observability.RuntimeSnapshot{
+			GeneratedAt: now,
+			Component:   "collection-server",
+			InstanceID:  instanceID,
+			Summary:     observability.RuntimeSummary{Ready: true, FamilyTotal: 1, AvailableCount: 1},
+			Families: []observability.FamilyStatus{{
+				Component: "collection-server", Family: "ops_runtime",
+				Profile: "ops_runtime", Available: true,
+			}},
+		}
+	}
+
+	projection := NewCacheWarmupEvaluator(nil).Evaluate(context.Background(), map[string]ComponentCache{
+		"collection-server": {
+			Available: true,
+			Instances: map[string]*observability.RuntimeSnapshot{
+				"collection-b": newSnapshot("collection-b"),
+				"collection-a": newSnapshot("collection-a"),
+			},
+		},
+	}, nil, "5m", now)
+
+	if len(projection.FamilyRows) != 2 ||
+		projection.FamilyRows[0].InstanceID != "collection-a" ||
+		projection.FamilyRows[1].InstanceID != "collection-b" {
+		t.Fatalf("family rows = %#v, want two stable instance rows", projection.FamilyRows)
+	}
+	if projection.FamilyRows[0].Component != "collection-server" {
+		t.Fatalf("row = %#v, want component preserved", projection.FamilyRows[0])
+	}
+}

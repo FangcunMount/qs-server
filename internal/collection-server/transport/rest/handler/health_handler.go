@@ -49,7 +49,7 @@ func (h *HealthHandler) Health(c *gin.Context) {
 		"status":  "healthy",
 		"service": h.serviceName,
 		"version": h.version,
-		"redis":   observability.SnapshotForComponent(h.serviceName, h.status),
+		"redis":   h.redisSnapshot(),
 	})
 }
 
@@ -62,14 +62,13 @@ func (h *HealthHandler) Health(c *gin.Context) {
 // @Failure 503 {object} core.Response
 // @Router /readyz [get]
 func (h *HealthHandler) Ready(c *gin.Context) {
-	snapshot := observability.SnapshotForComponent(h.serviceName, h.status)
+	snapshot, controlSynchronized := h.readiness()
 	statusCode := http.StatusOK
 	statusText := "ready"
 	if !snapshot.Summary.Ready {
 		statusCode = http.StatusServiceUnavailable
 		statusText = "degraded"
 	}
-	controlSynchronized := h.controlReady == nil || h.controlReady()
 	if !controlSynchronized {
 		statusCode = http.StatusServiceUnavailable
 		statusText = "synchronizing"
@@ -87,6 +86,61 @@ func (h *HealthHandler) Ready(c *gin.Context) {
 	})
 }
 
+// ServeReady reports whether the process may continue serving low traffic.
+// Redis dependency degradation remains visible in the response, while the
+// initial resilience-control synchronization is still a hard readiness gate.
+//
+// @Summary 服务就绪检查
+// @Description 首次韧性控制同步后，即使 Redis family 降级也允许继续承接低流量。
+// @Tags 系统
+// @Produce json
+// @Success 200 {object} core.Response
+// @Failure 503 {object} core.Response
+// @Router /serve-readyz [get]
+func (h *HealthHandler) ServeReady(c *gin.Context) {
+	snapshot, controlSynchronized := h.readiness()
+	dependencyReady := snapshot.Summary.Ready
+	serveReady := controlSynchronized
+	statusCode := http.StatusOK
+	statusText := "ready"
+	if !dependencyReady {
+		statusText = "degraded"
+	}
+	if !serveReady {
+		statusCode = http.StatusServiceUnavailable
+		statusText = "synchronizing"
+	}
+	c.JSON(statusCode, core.Response{
+		Code:    0,
+		Message: "success",
+		Data: gin.H{
+			"status":                          statusText,
+			"service":                         h.serviceName,
+			"version":                         h.version,
+			"serve_ready":                     serveReady,
+			"dependency_ready":                dependencyReady,
+			"redis":                           snapshot,
+			"resilience_control_synchronized": controlSynchronized,
+		},
+	})
+}
+
+func (h *HealthHandler) readiness() (observability.RuntimeSnapshot, bool) {
+	snapshot := h.redisSnapshot()
+	controlSynchronized := h.controlReady == nil || h.controlReady()
+	return snapshot, controlSynchronized
+}
+
+func (h *HealthHandler) redisSnapshot() observability.RuntimeSnapshot {
+	snapshot := observability.SnapshotForComponent(h.serviceName, h.status)
+	if h != nil && h.resilience != nil {
+		identity := h.resilience()
+		snapshot.InstanceID = identity.InstanceID
+		snapshot.Generation = identity.Generation
+	}
+	return snapshot
+}
+
 // RedisFamilies 返回 Redis family 治理快照
 // @Summary Redis 治理状态
 // @Description 返回 collection-server Redis family 的运行状态。
@@ -95,7 +149,7 @@ func (h *HealthHandler) Ready(c *gin.Context) {
 // @Success 200 {object} core.Response
 // @Router /governance/redis [get]
 func (h *HealthHandler) RedisFamilies(c *gin.Context) {
-	core.WriteResponse(c, nil, observability.SnapshotForComponent(h.serviceName, h.status))
+	core.WriteResponse(c, nil, h.redisSnapshot())
 }
 
 // Resilience 返回 collection-server 高并发治理只读快照。
@@ -144,6 +198,6 @@ func (h *HealthHandler) Info(c *gin.Context) {
 		"version":     h.version,
 		"description": "问卷收集服务 - BFF 层",
 		"status":      "ready",
-		"redis":       observability.SnapshotForComponent(h.serviceName, h.status),
+		"redis":       h.redisSnapshot(),
 	})
 }

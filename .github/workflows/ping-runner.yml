@@ -126,16 +126,16 @@ jobs:
             ready_count=0
             for container_id in $collection_ids; do
               if sudo docker exec "$container_id" wget -qO- \
-                http://127.0.0.1:8080/readyz >/dev/null 2>&1; then
+                http://127.0.0.1:8080/serve-readyz >/dev/null 2>&1; then
                 ready_count=$((ready_count + 1))
               else
-                echo "❌ Collection replica ${container_id} readiness failed"
+                echo "❌ Collection replica ${container_id} serving readiness failed"
               fi
             done
             if [ "$ready_count" -eq "$EXPECTED_COLLECTION_REPLICAS" ]; then
-              echo "✅ Collection replicas ready (${ready_count}/${EXPECTED_COLLECTION_REPLICAS})"
+              echo "✅ Collection replicas serving-ready (${ready_count}/${EXPECTED_COLLECTION_REPLICAS})"
             else
-              echo "❌ Collection replicas ready (${ready_count}/${EXPECTED_COLLECTION_REPLICAS})"
+              echo "❌ Collection replicas serving-ready (${ready_count}/${EXPECTED_COLLECTION_REPLICAS})"
               failed=1
             fi
 

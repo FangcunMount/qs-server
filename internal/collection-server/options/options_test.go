@@ -88,6 +88,26 @@ func TestValidateAllowsSubmitCoalescingRollback(t *testing.T) {
 	}
 }
 
+func TestSubmitDegradedLocalDefaultsAreConservativeAndEnabled(t *testing.T) {
+	opts := NewOptions().RateLimit.ResolvedSubmitDegradedLocal()
+	if !opts.Enabled || opts.GlobalQPS != 30 || opts.GlobalBurst != 45 || opts.UserQPS != 10 || opts.UserBurst != 15 {
+		t.Fatalf("submit degraded local defaults = %+v", opts)
+	}
+}
+
+func TestValidateRejectsInvalidEnabledSubmitDegradedLocalBudget(t *testing.T) {
+	opts := NewOptions()
+	opts.RateLimit.SubmitDegradedLocal.GlobalQPS = 0
+	if !containsCollectionValidationError(opts.Validate(), "rate_limit.submit_degraded_local limits must be greater than 0") {
+		t.Fatalf("Validate() errors = %v", opts.Validate())
+	}
+
+	opts.RateLimit.SubmitDegradedLocal.Enabled = false
+	if containsCollectionValidationError(opts.Validate(), "rate_limit.submit_degraded_local") {
+		t.Fatalf("disabled fallback must ignore tuning values: %v", opts.Validate())
+	}
+}
+
 func TestValidateRejectsSubmitCoalescingWaitThatConsumesAcceptDeadline(t *testing.T) {
 	opts := NewOptions()
 	opts.Submit.CoalescingWaitMs = opts.Submit.AcceptTimeoutMs

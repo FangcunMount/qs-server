@@ -372,3 +372,70 @@ func TestOptionsValidateRetryHardCaps(t *testing.T) {
 		})
 	}
 }
+
+func TestOptionsValidateSystemGovernanceComponentDiscovery(t *testing.T) {
+	tests := []struct {
+		name   string
+		config *GovernanceComponentOptions
+		want   string
+	}{
+		{
+			name: "rejects unknown discovery",
+			config: &GovernanceComponentOptions{
+				Discovery: "round_robin", Timeout: time.Second,
+			},
+			want: "discovery must be single or dns",
+		},
+		{
+			name: "rejects zero dns minimum",
+			config: &GovernanceComponentOptions{
+				Discovery: "dns", MinimumInstances: 0, Timeout: time.Second,
+			},
+			want: "minimum_instances must be between 1 and 16",
+		},
+		{
+			name: "rejects https dns endpoint",
+			config: &GovernanceComponentOptions{
+				Discovery: "dns", MinimumInstances: 2, Timeout: time.Second,
+				ResilienceURL: "https://collection/governance/resilience",
+			},
+			want: "must be an absolute http URL for dns discovery",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := NewOptions()
+			opts.SystemGovernance.Components["collection-server"] = tt.config
+			for _, err := range opts.Validate() {
+				if strings.Contains(err.Error(), tt.want) {
+					return
+				}
+			}
+			t.Fatalf("expected validation error containing %q, got %v", tt.want, opts.Validate())
+		})
+	}
+}
+
+func TestOptionsValidateSystemGovernanceSingleAndDNSDiscovery(t *testing.T) {
+	for _, config := range []*GovernanceComponentOptions{
+		{
+			ResilienceURL: "http://127.0.0.1:18083/governance/resilience",
+			CacheURL:      "http://127.0.0.1:18083/governance/redis",
+			Timeout:       time.Second,
+		},
+		{
+			Discovery: "dns", MinimumInstances: 2,
+			ResilienceURL: "http://qs-collection-server:8080/governance/resilience",
+			CacheURL:      "http://qs-collection-server:8080/governance/redis",
+			Timeout:       time.Second,
+		},
+	} {
+		opts := NewOptions()
+		opts.SystemGovernance.Components["collection-server"] = config
+		for _, err := range opts.Validate() {
+			if strings.Contains(err.Error(), "system_governance.components.collection-server") {
+				t.Fatalf("unexpected component validation error: %v", err)
+			}
+		}
+	}
+}

@@ -83,6 +83,35 @@ func TestMetricsServerGovernanceEndpointReturnsSnapshot(t *testing.T) {
 	}
 }
 
+func TestMetricsServerRedisGovernanceIncludesInstanceIdentity(t *testing.T) {
+	server := NewMetricsServerWithGovernanceAndResilience(
+		"127.0.0.1",
+		19091,
+		"worker",
+		nil,
+		func() resilience.RuntimeSnapshot {
+			snapshot := resilience.NewRuntimeSnapshot("worker", time.Now())
+			snapshot.InstanceID = "worker-a"
+			snapshot.Generation = "generation-a"
+			return snapshot
+		},
+	)
+	req := httptest.NewRequest(http.MethodGet, "/governance/redis", nil)
+	rec := httptest.NewRecorder()
+	server.server.Handler.ServeHTTP(rec, req)
+
+	var payload struct {
+		InstanceID string `json:"instance_id"`
+		Generation string `json:"generation"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.InstanceID != "worker-a" || payload.Generation != "generation-a" {
+		t.Fatalf("identity = %+v", payload)
+	}
+}
+
 func TestMetricsServerResilienceEndpointReturnsSnapshot(t *testing.T) {
 	registry := observability.NewFamilyStatusRegistry("worker")
 	server := NewMetricsServerWithGovernanceAndResilience(

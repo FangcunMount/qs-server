@@ -586,6 +586,27 @@ verify_collection_images() {
   done <<<"$container_ids"
 }
 
+collection_serving_ready() {
+  local container_id="$1"
+  local probe_output
+
+  if probe_output="$($SUDO docker exec "$container_id" wget -S -O /dev/null \
+    "http://127.0.0.1:${INTERNAL_HTTP_PORT}/serve-readyz" 2>&1)"; then
+    return 0
+  fi
+
+  # One-release compatibility window: an old image does not expose the new
+  # serving-readiness endpoint. A real 503 must never fall back to /readyz.
+  if printf '%s\n' "$probe_output" | grep -Eq 'HTTP/[0-9.]+[[:space:]]+404'; then
+    echo "Collection replica ${container_id} does not expose /serve-readyz; falling back to /readyz for this release"
+    $SUDO docker exec "$container_id" wget -qO- \
+      "http://127.0.0.1:${INTERNAL_HTTP_PORT}/readyz" >/dev/null 2>&1
+    return
+  fi
+
+  return 1
+}
+
 deploy_collection() {
   : "${COLLECTION_REPLICAS:?COLLECTION_REPLICAS is required}"
   if ! [[ "$COLLECTION_REPLICAS" =~ ^[0-9]+$ ]] || [ "$COLLECTION_REPLICAS" -lt 1 ]; then
@@ -609,7 +630,7 @@ deploy_collection() {
     --scale "${COMPOSE_SERVICE}=${COLLECTION_REPLICAS}" \
     "$COMPOSE_SERVICE"
 
-  echo "Waiting for ${COLLECTION_REPLICAS} collection replicas to become ready..."
+  echo "Waiting for ${COLLECTION_REPLICAS} collection replicas to become serving-ready..."
   local attempts=0
   local max_attempts=60
   local container_ids running_count ready_count container_id
@@ -619,15 +640,14 @@ deploy_collection() {
     ready_count=0
     while IFS= read -r container_id; do
       [ -z "$container_id" ] && continue
-      if $SUDO docker exec "$container_id" wget -qO- \
-        "http://127.0.0.1:${INTERNAL_HTTP_PORT}/readyz" >/dev/null 2>&1; then
+      if collection_serving_ready "$container_id"; then
         ready_count=$((ready_count + 1))
       fi
     done <<<"$container_ids"
 
     if [ "$running_count" -eq "$COLLECTION_REPLICAS" ] &&
       [ "$ready_count" -eq "$COLLECTION_REPLICAS" ]; then
-      echo "Collection replicas are ready (${ready_count}/${COLLECTION_REPLICAS})"
+      echo "Collection replicas are serving-ready (${ready_count}/${COLLECTION_REPLICAS})"
       verify_collection_images
       quiesce_legacy_collection_service
       if ! verify_collection_nginx install-and-verify; then
@@ -644,12 +664,12 @@ deploy_collection() {
 
     attempts=$((attempts + 1))
     if [ "$attempts" -lt "$max_attempts" ]; then
-      echo "Collection readiness ${ready_count}/${COLLECTION_REPLICAS} (running ${running_count}), attempt ${attempts}/${max_attempts}"
+      echo "Collection serving readiness ${ready_count}/${COLLECTION_REPLICAS} (running ${running_count}), attempt ${attempts}/${max_attempts}"
       sleep 5
     fi
   done
 
-  echo "Collection replicas failed readiness after ${max_attempts} attempts" >&2
+  echo "Collection replicas failed serving readiness after ${max_attempts} attempts" >&2
   docker_compose \
     -p "$COLLECTION_COMPOSE_PROJECT" \
     -f "$DEPLOY_TMP/docker-compose.prod.yml" \

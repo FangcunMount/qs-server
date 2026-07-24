@@ -109,6 +109,12 @@ redis_runtime:
 # ============================================================
 rate_limit:
   enabled: true
+  submit_degraded_local:
+    enabled: true
+    global_qps: 30
+    global_burst: 45
+    user_qps: 10
+    user_burst: 15
   submit_global_qps: 200
   submit_global_burst: 300
   submit_user_qps: 5

@@ -3,6 +3,7 @@ package systemgovernance
 import (
 	"context"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -83,29 +84,37 @@ func (e *CacheWarmupEvaluator) evaluate(
 			})
 			continue
 		}
-		if component.Snapshot == nil {
-			continue
-		}
-		if !component.Snapshot.Summary.Ready {
+		if component.Partial {
 			projection.Signals = append(projection.Signals, Signal{
-				ID:       cacheRuntimeSignalID(component.Snapshot.Component),
+				ID:       "cache.component.partial." + name,
 				Domain:   DomainCache,
-				Severity: SeverityCritical,
-				Status:   "not_ready",
-				Title:    "Cache runtime is not ready",
+				Severity: SeverityWarning,
+				Status:   "component_partial",
+				Title:    "Cache component snapshot is partial: " + name,
 				Evidence: map[string]interface{}{
-					"component":      component.Snapshot.Component,
-					"degraded_count": component.Snapshot.Summary.DegradedCount,
+					"component":                 name,
+					"discovered_instance_count": component.DiscoveredInstanceCount,
+					"available_instance_count":  component.AvailableInstanceCount,
+					"target_errors":             component.TargetErrors,
 				},
-				ActionIDs:    []string{"cache.repair_complete"},
 				DashboardKey: "cache_runtime",
 			})
 		}
-		for _, family := range component.Snapshot.Families {
-			row := e.projectFamilyRow(ctx, family, window, evalAt)
-			projection.FamilyRows = append(projection.FamilyRows, row)
-			projection.Signals = append(projection.Signals, cacheFamilySignals(row)...)
+		if len(component.Instances) > 0 {
+			instanceIDs := make([]string, 0, len(component.Instances))
+			for instanceID := range component.Instances {
+				instanceIDs = append(instanceIDs, instanceID)
+			}
+			sort.Strings(instanceIDs)
+			for _, instanceID := range instanceIDs {
+				e.projectRuntime(ctx, &projection, instanceID, component.Instances[instanceID], window, evalAt)
+			}
+			continue
 		}
+		if component.Snapshot == nil {
+			continue
+		}
+		e.projectRuntime(ctx, &projection, component.Snapshot.InstanceID, component.Snapshot, window, evalAt)
 	}
 	for _, hotset := range projection.Hotsets {
 		if hotset.Degraded {
@@ -133,6 +142,40 @@ func (e *CacheWarmupEvaluator) evaluate(
 	sortCacheHotsets(projection.Hotsets)
 	projection.Signals = SortSignals(projection.Signals)
 	return projection
+}
+
+func (e *CacheWarmupEvaluator) projectRuntime(
+	ctx context.Context,
+	projection *CacheWarmupProjection,
+	instanceID string,
+	snapshot *observability.RuntimeSnapshot,
+	window string,
+	evalAt time.Time,
+) {
+	if snapshot == nil {
+		return
+	}
+	if !snapshot.Summary.Ready {
+		projection.Signals = append(projection.Signals, Signal{
+			ID:       cacheRuntimeSignalID(snapshot.Component, instanceID),
+			Domain:   DomainCache,
+			Severity: SeverityCritical,
+			Status:   "not_ready",
+			Title:    "Cache runtime is not ready",
+			Evidence: map[string]interface{}{
+				"component":      snapshot.Component,
+				"instance_id":    instanceID,
+				"degraded_count": snapshot.Summary.DegradedCount,
+			},
+			ActionIDs:    []string{"cache.repair_complete"},
+			DashboardKey: "cache_runtime",
+		})
+	}
+	for _, family := range snapshot.Families {
+		row := e.projectFamilyRow(ctx, instanceID, family, window, evalAt)
+		projection.FamilyRows = append(projection.FamilyRows, row)
+		projection.Signals = append(projection.Signals, cacheFamilySignals(row)...)
+	}
 }
 
 // CapabilityRows projects bounded near-window workload evidence for canonical
@@ -190,12 +233,14 @@ func (e *CacheWarmupEvaluator) capabilityRow(ctx context.Context, capability cac
 
 func (e *CacheWarmupEvaluator) projectFamilyRow(
 	ctx context.Context,
+	instanceID string,
 	family observability.FamilyStatus,
 	window string,
 	evalAt time.Time,
 ) CacheFamilyRow {
 	row := CacheFamilyRow{
 		Component:           family.Component,
+		InstanceID:          instanceID,
 		Family:              family.Family,
 		Profile:             family.Profile,
 		Namespace:           family.Namespace,
@@ -250,9 +295,10 @@ func cacheFamilySignals(row CacheFamilyRow) []Signal {
 			Status:   "unavailable",
 			Title:    "Cache family unavailable: " + row.Family,
 			Evidence: map[string]interface{}{
-				"family":     row.Family,
-				"component":  row.Component,
-				"last_error": row.LastError,
+				"family":      row.Family,
+				"component":   row.Component,
+				"instance_id": row.InstanceID,
+				"last_error":  row.LastError,
 			},
 			MetricEvidence: row.MetricEvidence,
 			ActionIDs:      []string{"cache.repair_complete", "cache.manual_warmup"},
@@ -267,8 +313,9 @@ func cacheFamilySignals(row CacheFamilyRow) []Signal {
 			Status:   "degraded",
 			Title:    "Cache family degraded: " + row.Family,
 			Evidence: map[string]interface{}{
-				"family":    row.Family,
-				"component": row.Component,
+				"family":      row.Family,
+				"component":   row.Component,
+				"instance_id": row.InstanceID,
 			},
 			MetricEvidence: row.MetricEvidence,
 			ActionIDs:      []string{"cache.manual_warmup"},
@@ -426,6 +473,9 @@ func sortCacheFamilyRows(rows []CacheFamilyRow) {
 		if rows[i].Component != rows[j].Component {
 			return rows[i].Component < rows[j].Component
 		}
+		if rows[i].InstanceID != rows[j].InstanceID {
+			return rows[i].InstanceID < rows[j].InstanceID
+		}
 		return rows[i].Family < rows[j].Family
 	})
 }
@@ -439,16 +489,29 @@ func sortCacheHotsets(hotsets []CacheHotsetView) {
 	})
 }
 
-func cacheRuntimeSignalID(component string) string {
+func cacheRuntimeSignalID(component, instanceID string) string {
 	if component == "" || component == "apiserver" {
-		return "cache.runtime.not_ready"
+		if instanceID == "" {
+			return "cache.runtime.not_ready"
+		}
+		return "cache.runtime.not_ready." + instanceID
 	}
-	return "cache.runtime.not_ready." + component
+	return strings.Join(nonEmptyParts("cache.runtime.not_ready", component, instanceID), ".")
 }
 
 func cacheFamilySignalID(prefix string, row CacheFamilyRow) string {
 	if row.Component == "" || row.Component == "apiserver" {
-		return prefix + "." + row.Family
+		return strings.Join(nonEmptyParts(prefix, row.InstanceID, row.Family), ".")
 	}
-	return prefix + "." + row.Component + "." + row.Family
+	return strings.Join(nonEmptyParts(prefix, row.Component, row.InstanceID, row.Family), ".")
+}
+
+func nonEmptyParts(items ...string) []string {
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		if item != "" {
+			result = append(result, item)
+		}
+	}
+	return result
 }

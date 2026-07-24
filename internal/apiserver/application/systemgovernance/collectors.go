@@ -134,6 +134,8 @@ func projectRedisRuntimeSnapshot(in cachemodel.RuntimeSnapshot) observability.Ru
 	out := observability.RuntimeSnapshot{
 		GeneratedAt: in.GeneratedAt,
 		Component:   in.Component,
+		InstanceID:  in.InstanceID,
+		Generation:  in.Generation,
 		Summary: observability.RuntimeSummary{
 			FamilyTotal: in.Summary.FamilyTotal, AvailableCount: in.Summary.AvailableCount,
 			DegradedCount: in.Summary.DegradedCount, UnavailableCount: in.Summary.UnavailableCount,

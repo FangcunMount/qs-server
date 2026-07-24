@@ -22,7 +22,7 @@
 3. 目标机操作：
    - 备份现有 configs，展开 deploy-package。
    - apiserver 使用单实例 `docker compose up -d`。
-   - collection 使用固定 Compose project `qs-collection`、service key `server` 和 `--scale` 启动全部副本，容器名为 `qs-collection-server-N`，并逐实例检查 `/readyz` 与镜像 tag。
+   - collection 使用固定 Compose project `qs-collection`、service key `server` 和 `--scale` 启动全部副本，容器名为 `qs-collection-server-N`，并逐实例检查 `/serve-readyz` 与镜像 tag。
    - worker 使用固定 Compose project `qs-worker`、service key `runtime` 和 `--scale` 启动全部副本，容器名为 `qs-worker-runtime-N`。
 4. 资源配额：直接维护在 `build/docker/docker-compose.prod.yml`（serverA 4C/8G：apiserver + collection x2 同机；collection 两副本共享原总预算）。
 5. 服务内部并发/连接池：直接维护在 `configs/apiserver.prod.yaml`、`configs/collection-server.prod.yaml`、`configs/worker.prod.yaml`。
@@ -39,7 +39,12 @@
 
 `deploy-collection` 与 `deploy-apiserver` 均 SSH 到 `SVRA_*`；访问 serverB 上的 `iam-apiserver:9090` 依赖 Swarm overlay `infra-network` 跨机 DNS，**不要** `extra_hosts` 到宿主机 Tailscale IP（serverB 宿主机 9090 常被 mihomo 占用）。
 
-collection 副本不发布固定宿主机 `8082/6060` 端口。Nginx 与 apiserver governance 通过外部 Docker 网络上的稳定服务别名 `qs-collection-server` 访问；worker 同样保留稳定网络别名 `qs-worker`。这些 DNS 别名与用于生成可读容器名的短 service key 分离。Prometheus 依靠每个容器的 scrape labels 分别发现 target。部署和 runner 自检通过 Compose label 枚举并逐容器执行 `/readyz`。多副本日志只写 stdout/stderr，由 Docker 为每个容器独立轮转，禁止多个进程写同一个宿主机日志文件。
+collection 副本不发布固定宿主机 `8082/6060` 端口。Nginx 与 apiserver governance 通过外部 Docker 网络上的稳定服务别名 `qs-collection-server` 访问；worker 同样保留稳定网络别名 `qs-worker`。这些 DNS 别名与用于生成可读容器名的短 service key 分离。Prometheus 依靠每个容器的 scrape labels 分别发现 target。部署和 runner 自检通过 Compose label 枚举并逐容器执行 `/serve-readyz`；它要求首次 control sync 已完成，但允许 Redis 运行期降级。可靠提交/K6 仍检查严格 `/readyz`。多副本日志只写 stdout/stderr，由 Docker 为每个容器独立轮转，禁止多个进程写同一个宿主机日志文件。
+
+apiserver 生产配置对 collection governance 使用 `discovery: dns` 和
+`minimum_instances: 2`，对 Docker DNS 返回的两个 IPv4 并发读取
+`/governance/resilience` 与 `/governance/redis`。一个副本不可达时返回 partial，
+不会把存活副本误报 unavailable；worker governance 暂时仍是 single。
 
 collection 发布要求 Nginx `>= 1.27.3`。`collect-api` upstream 在块内使用 Docker resolver 和 `server qs-collection-server:8080 resolve`，保持默认轮询，不设置 `ip_hash`、固定权重或主备关系。CD 会备份并原子安装 `/data/apps/nginx-configs/collect.conf`，通过 `nginx -t` 后 reload，再用 `nginx -T`、Docker DNS 地址集合和两个副本的 `/health` 请求指标完成切流验收；失败时恢复原配置并重启暂时停用的旧 collection service。
 

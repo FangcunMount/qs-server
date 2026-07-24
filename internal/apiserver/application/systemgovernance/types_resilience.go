@@ -21,9 +21,14 @@ type ResilienceView struct {
 
 // ComponentResilience 保存一个组件 resilience 载荷 使用 fetch 元数据。
 type ComponentResilience struct {
-	Available bool                        `json:"available"`
-	Reason    string                      `json:"reason,omitempty"`
-	Snapshot  *resilience.RuntimeSnapshot `json:"snapshot,omitempty"`
+	Available               bool                                   `json:"available"`
+	Reason                  string                                 `json:"reason,omitempty"`
+	Snapshot                *resilience.RuntimeSnapshot            `json:"snapshot,omitempty"`
+	Instances               map[string]*resilience.RuntimeSnapshot `json:"instances,omitempty"`
+	DiscoveredInstanceCount int                                    `json:"discovered_instance_count,omitempty"`
+	AvailableInstanceCount  int                                    `json:"available_instance_count,omitempty"`
+	Partial                 bool                                   `json:"partial,omitempty"`
+	TargetErrors            map[string]string                      `json:"target_errors,omitempty"`
 }
 
 // ResilienceSummary 汇总压力保护健康度 across 组件。
@@ -31,6 +36,8 @@ type ResilienceSummary struct {
 	ComponentCount             int     `json:"component_count"`
 	UnavailableComponentCount  int     `json:"unavailable_component_count"`
 	NotReadyComponentCount     int     `json:"not_ready_component_count"`
+	InstanceCount              int     `json:"instance_count,omitempty"`
+	NotReadyInstanceCount      int     `json:"not_ready_instance_count,omitempty"`
 	QueueCount                 int     `json:"queue_count"`
 	WarningQueueCount          int     `json:"warning_queue_count"`
 	CriticalQueueCount         int     `json:"critical_queue_count"`
@@ -45,6 +52,7 @@ type ResilienceSummary struct {
 // ResilienceQueueRow 是面向 UI submit/worker queue pressure 行。
 type ResilienceQueueRow struct {
 	Component         string           `json:"component"`
+	InstanceID        string           `json:"instance_id,omitempty"`
 	Name              string           `json:"name"`
 	Strategy          string           `json:"strategy"`
 	Depth             int              `json:"depth"`
@@ -60,6 +68,7 @@ type ResilienceQueueRow struct {
 // ResilienceBackpressureRow 是面向 UI d负责tream backpressure 行。
 type ResilienceBackpressureRow struct {
 	Component      string           `json:"component"`
+	InstanceID     string           `json:"instance_id,omitempty"`
 	Name           string           `json:"name"`
 	Dependency     string           `json:"dependency"`
 	Strategy       string           `json:"strategy"`
@@ -77,6 +86,7 @@ type ResilienceBackpressureRow struct {
 // ResilienceCapabilityRow 是面向 UI non-queue resilience 能力 行。
 type ResilienceCapabilityRow struct {
 	Component  string   `json:"component"`
+	InstanceID string   `json:"instance_id,omitempty"`
 	Kind       string   `json:"kind"`
 	Name       string   `json:"name"`
 	Strategy   string   `json:"strategy"`

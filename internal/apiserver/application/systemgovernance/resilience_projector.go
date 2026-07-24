@@ -3,6 +3,7 @@ package systemgovernance
 import (
 	"context"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
@@ -51,10 +52,37 @@ func (p *ResilienceProjector) Evaluate(
 			projection.Signals = append(projection.Signals, resilienceComponentUnavailableSignal(name, component.Reason))
 			continue
 		}
+		if component.Partial {
+			projection.Signals = append(projection.Signals, resilienceComponentPartialSignal(name, component))
+		}
+		if len(component.Instances) > 0 {
+			instanceIDs := make([]string, 0, len(component.Instances))
+			for instanceID := range component.Instances {
+				instanceIDs = append(instanceIDs, instanceID)
+			}
+			sort.Strings(instanceIDs)
+			componentNotReady := false
+			for _, instanceID := range instanceIDs {
+				snapshot := component.Instances[instanceID]
+				if snapshot != nil {
+					projection.Summary.InstanceCount++
+					componentNotReady = componentNotReady || !snapshot.Summary.Ready
+					p.projectComponent(ctx, &projection, name, instanceID, *snapshot, window, evalAt)
+				}
+			}
+			if componentNotReady {
+				projection.Summary.NotReadyComponentCount++
+			}
+			continue
+		}
 		if component.Snapshot == nil {
 			continue
 		}
-		p.projectComponent(ctx, &projection, name, *component.Snapshot, window, evalAt)
+		projection.Summary.InstanceCount++
+		if !component.Snapshot.Summary.Ready {
+			projection.Summary.NotReadyComponentCount++
+		}
+		p.projectComponent(ctx, &projection, name, component.Snapshot.InstanceID, *component.Snapshot, window, evalAt)
 	}
 	sortResilienceQueueRows(projection.QueueRows)
 	sortResilienceBackpressureRows(projection.BackpressureRows)
@@ -67,16 +95,17 @@ func (p *ResilienceProjector) projectComponent(
 	ctx context.Context,
 	projection *ResilienceProjection,
 	component string,
+	instanceID string,
 	snapshot resilience.RuntimeSnapshot,
 	window string,
 	evalAt time.Time,
 ) {
 	if !snapshot.Summary.Ready {
-		projection.Summary.NotReadyComponentCount++
-		projection.Signals = append(projection.Signals, resilienceRuntimeNotReadySignal(component, snapshot))
+		projection.Summary.NotReadyInstanceCount++
+		projection.Signals = append(projection.Signals, resilienceRuntimeNotReadySignal(component, instanceID, snapshot))
 	}
 	for _, queue := range snapshot.Queues {
-		row := p.projectQueueRow(ctx, component, queue, window, evalAt)
+		row := p.projectQueueRow(ctx, component, instanceID, queue, window, evalAt)
 		projection.QueueRows = append(projection.QueueRows, row)
 		projection.Summary.QueueCount++
 		if row.Utilization > projection.Summary.MaxQueueUtilization {
@@ -91,7 +120,7 @@ func (p *ResilienceProjector) projectComponent(
 		projection.Signals = append(projection.Signals, resilienceQueueSignals(row)...)
 	}
 	for _, backpressure := range snapshot.Backpressure {
-		row := p.projectBackpressureRow(ctx, component, backpressure, window, evalAt)
+		row := p.projectBackpressureRow(ctx, component, instanceID, backpressure, window, evalAt)
 		projection.BackpressureRows = append(projection.BackpressureRows, row)
 		projection.Summary.BackpressureCount++
 		if row.Utilization > projection.Summary.MaxBackpressureUtilization {
@@ -105,7 +134,7 @@ func (p *ResilienceProjector) projectComponent(
 		}
 		projection.Signals = append(projection.Signals, resilienceBackpressureSignals(row)...)
 	}
-	for _, row := range resilienceCapabilityRows(component, snapshot) {
+	for _, row := range resilienceCapabilityRows(component, instanceID, snapshot) {
 		if row.Degraded {
 			projection.Summary.DegradedCapabilityCount++
 		}
@@ -116,6 +145,7 @@ func (p *ResilienceProjector) projectComponent(
 func (p *ResilienceProjector) projectQueueRow(
 	ctx context.Context,
 	component string,
+	instanceID string,
 	queue resilience.QueueSnapshot,
 	window string,
 	evalAt time.Time,
@@ -123,6 +153,7 @@ func (p *ResilienceProjector) projectQueueRow(
 	utilization := queueUtilization(queue)
 	row := ResilienceQueueRow{
 		Component:         component,
+		InstanceID:        instanceID,
 		Name:              queue.Name,
 		Strategy:          queue.Strategy,
 		Depth:             queue.Depth,
@@ -150,13 +181,14 @@ func resilienceQueueSignals(row ResilienceQueueRow) []Signal {
 	switch row.Severity {
 	case SeverityCritical:
 		return []Signal{{
-			ID:       "resilience.queue.critical." + row.Component + "." + row.Name,
+			ID:       resilienceRowSignalID("resilience.queue.critical", row.Component, row.InstanceID, row.Name),
 			Domain:   DomainResilience,
 			Severity: SeverityCritical,
 			Status:   "queue_utilization_critical",
 			Title:    "Queue utilization critical: " + row.Name,
 			Evidence: map[string]interface{}{
 				"component":   row.Component,
+				"instance_id": row.InstanceID,
 				"queue":       row.Name,
 				"depth":       row.Depth,
 				"capacity":    row.Capacity,
@@ -167,13 +199,14 @@ func resilienceQueueSignals(row ResilienceQueueRow) []Signal {
 		}}
 	case SeverityWarning:
 		return []Signal{{
-			ID:       "resilience.queue.warning." + row.Component + "." + row.Name,
+			ID:       resilienceRowSignalID("resilience.queue.warning", row.Component, row.InstanceID, row.Name),
 			Domain:   DomainResilience,
 			Severity: SeverityWarning,
 			Status:   "queue_utilization_warning",
 			Title:    "Queue utilization elevated: " + row.Name,
 			Evidence: map[string]interface{}{
 				"component":   row.Component,
+				"instance_id": row.InstanceID,
 				"queue":       row.Name,
 				"depth":       row.Depth,
 				"capacity":    row.Capacity,
@@ -190,6 +223,7 @@ func resilienceQueueSignals(row ResilienceQueueRow) []Signal {
 func (p *ResilienceProjector) projectBackpressureRow(
 	ctx context.Context,
 	component string,
+	instanceID string,
 	backpressure resilience.BackpressureSnapshot,
 	window string,
 	evalAt time.Time,
@@ -197,6 +231,7 @@ func (p *ResilienceProjector) projectBackpressureRow(
 	utilization := backpressureUtilization(backpressure)
 	row := ResilienceBackpressureRow{
 		Component:     component,
+		InstanceID:    instanceID,
 		Name:          backpressure.Name,
 		Dependency:    backpressure.Dependency,
 		Strategy:      backpressure.Strategy,
@@ -234,13 +269,14 @@ func resilienceBackpressureSignals(row ResilienceBackpressureRow) []Signal {
 		return nil
 	}
 	return []Signal{{
-		ID:       "resilience.backpressure." + row.Component + "." + row.Name,
+		ID:       resilienceRowSignalID("resilience.backpressure", row.Component, row.InstanceID, row.Name),
 		Domain:   DomainResilience,
 		Severity: row.Severity,
 		Status:   "backpressure_utilization",
 		Title:    "Backpressure utilization elevated: " + row.Name,
 		Evidence: map[string]interface{}{
 			"component":    row.Component,
+			"instance_id":  row.InstanceID,
 			"name":         row.Name,
 			"in_flight":    row.InFlight,
 			"max_inflight": row.MaxInflight,
@@ -251,7 +287,7 @@ func resilienceBackpressureSignals(row ResilienceBackpressureRow) []Signal {
 	}}
 }
 
-func resilienceCapabilityRows(component string, snapshot resilience.RuntimeSnapshot) []ResilienceCapabilityRow {
+func resilienceCapabilityRows(component, instanceID string, snapshot resilience.RuntimeSnapshot) []ResilienceCapabilityRow {
 	rows := []ResilienceCapabilityRow{}
 	appendRows := func(kind resilience.ProtectionKind, items []resilience.CapabilitySnapshot) {
 		for _, item := range items {
@@ -262,6 +298,7 @@ func resilienceCapabilityRows(component string, snapshot resilience.RuntimeSnaps
 			}
 			rows = append(rows, ResilienceCapabilityRow{
 				Component:  component,
+				InstanceID: instanceID,
 				Kind:       rowKind,
 				Name:       item.Name,
 				Strategy:   item.Strategy,
@@ -279,19 +316,48 @@ func resilienceCapabilityRows(component string, snapshot resilience.RuntimeSnaps
 	return rows
 }
 
-func resilienceRuntimeNotReadySignal(component string, snapshot resilience.RuntimeSnapshot) Signal {
+func resilienceRuntimeNotReadySignal(component, instanceID string, snapshot resilience.RuntimeSnapshot) Signal {
 	return Signal{
-		ID:       "resilience.runtime.not_ready." + component,
+		ID:       resilienceRowSignalID("resilience.runtime.not_ready", component, instanceID, ""),
 		Domain:   DomainResilience,
 		Severity: SeverityWarning,
 		Status:   "not_ready",
 		Title:    "Resilience runtime not ready: " + component,
 		Evidence: map[string]interface{}{
 			"component":      component,
+			"instance_id":    instanceID,
 			"degraded_count": snapshot.Summary.DegradedCount,
 		},
 		DashboardKey: "resilience_runtime",
 	}
+}
+
+func resilienceComponentPartialSignal(component string, result ComponentResilience) Signal {
+	return Signal{
+		ID:       "resilience.component.partial." + component,
+		Domain:   DomainResilience,
+		Severity: SeverityWarning,
+		Status:   "component_partial",
+		Title:    "Component resilience snapshot is partial: " + component,
+		Evidence: map[string]interface{}{
+			"component":                 component,
+			"discovered_instance_count": result.DiscoveredInstanceCount,
+			"available_instance_count":  result.AvailableInstanceCount,
+			"target_errors":             result.TargetErrors,
+		},
+		DashboardKey: "resilience_runtime",
+	}
+}
+
+func resilienceRowSignalID(prefix, component, instanceID, name string) string {
+	parts := []string{prefix, component}
+	if instanceID != "" {
+		parts = append(parts, instanceID)
+	}
+	if name != "" {
+		parts = append(parts, name)
+	}
+	return strings.Join(parts, ".")
 }
 
 func resilienceComponentUnavailableSignal(component, reason string) Signal {
@@ -359,6 +425,9 @@ func sortResilienceQueueRows(rows []ResilienceQueueRow) {
 		if rows[i].Component != rows[j].Component {
 			return rows[i].Component < rows[j].Component
 		}
+		if rows[i].InstanceID != rows[j].InstanceID {
+			return rows[i].InstanceID < rows[j].InstanceID
+		}
 		return rows[i].Name < rows[j].Name
 	})
 }
@@ -374,6 +443,9 @@ func sortResilienceBackpressureRows(rows []ResilienceBackpressureRow) {
 		if rows[i].Component != rows[j].Component {
 			return rows[i].Component < rows[j].Component
 		}
+		if rows[i].InstanceID != rows[j].InstanceID {
+			return rows[i].InstanceID < rows[j].InstanceID
+		}
 		return rows[i].Name < rows[j].Name
 	})
 }
@@ -385,6 +457,9 @@ func sortResilienceCapabilityRows(rows []ResilienceCapabilityRow) {
 		}
 		if rows[i].Component != rows[j].Component {
 			return rows[i].Component < rows[j].Component
+		}
+		if rows[i].InstanceID != rows[j].InstanceID {
+			return rows[i].InstanceID < rows[j].InstanceID
 		}
 		if rows[i].Kind != rows[j].Kind {
 			return rows[i].Kind < rows[j].Kind

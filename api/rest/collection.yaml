@@ -763,14 +763,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '429':
           description: Too Many Requests
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: Internal Server Error
+        '503':
+          description: Service Unavailable
           content:
             application/json:
               schema:
@@ -783,6 +789,12 @@ paths:
                 $ref: '#/components/schemas/core.ErrResponse'
         '403':
           description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
           content:
             application/json:
               schema:
@@ -900,14 +912,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '429':
           description: Too Many Requests
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: Internal Server Error
+        '503':
+          description: Service Unavailable
           content:
             application/json:
               schema:
@@ -920,6 +938,12 @@ paths:
                 $ref: '#/components/schemas/core.ErrResponse'
         '403':
           description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
           content:
             application/json:
               schema:
@@ -1349,14 +1373,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-        '404':
-          description: report_events 未开启
+        '401':
+          description: JWT UserID 缺失
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-        '401':
-          description: 认证失败或访问令牌无效
+        '404':
+          description: report_events 未开启
           content:
             application/json:
               schema:
@@ -2209,6 +2233,33 @@ paths:
       summary: 就绪检查
       description: 返回 collection-server 及 Redis 依赖的就绪状态。
       operationId: 就绪检查
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /serve-readyz:
+    get:
+      tags:
+      - 系统
+      summary: 服务就绪检查
+      description: 首次韧性控制同步后，即使 Redis family 降级也允许继续承接低流量。
+      operationId: 服务就绪检查
       security: []
       responses:
         '200':

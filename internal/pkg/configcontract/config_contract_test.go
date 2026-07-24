@@ -467,6 +467,21 @@ func assertSystemGovernanceConfig(t *testing.T, configName string, opts *apiserv
 		if cfg.Timeout <= 0 {
 			t.Fatalf("%s system_governance.components.%s.timeout must be positive", configName, component)
 		}
+		if component == "worker" && cfg.DiscoveryMode() != "single" {
+			t.Fatalf("%s worker governance discovery = %q, want single", configName, cfg.DiscoveryMode())
+		}
+		if component == "collection-server" {
+			if configName == "apiserver.prod.yaml" {
+				if cfg.DiscoveryMode() != "dns" || cfg.RequiredInstances() != 2 {
+					t.Fatalf("%s collection governance discovery = %q minimum=%d, want dns/2", configName, cfg.DiscoveryMode(), cfg.RequiredInstances())
+				}
+				if parsed, _ := url.Parse(cfg.ResilienceURL); parsed == nil || parsed.Hostname() != "qs-collection-server" {
+					t.Fatalf("%s collection governance must use stable qs-collection-server DNS: %s", configName, cfg.ResilienceURL)
+				}
+			} else if cfg.DiscoveryMode() != "single" {
+				t.Fatalf("%s collection governance discovery = %q, want single", configName, cfg.DiscoveryMode())
+			}
+		}
 	}
 }
 

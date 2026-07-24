@@ -142,7 +142,9 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 		`: "${COLLECTION_REPLICAS:?COLLECTION_REPLICAS is required}"`,
 		`--scale "${COMPOSE_SERVICE}=${COLLECTION_REPLICAS}"`,
 		`ps --status running -q "$COMPOSE_SERVICE"`,
+		`http://127.0.0.1:${INTERNAL_HTTP_PORT}/serve-readyz`,
 		`http://127.0.0.1:${INTERNAL_HTTP_PORT}/readyz`,
+		`grep -Eq 'HTTP/[0-9.]+[[:space:]]+404'`,
 		`verify_collection_images`,
 		`remove_legacy_compose_service "$COLLECTION_COMPOSE_PROJECT" "qs-collection-server"`,
 		`remove_legacy_compose_service "$WORKER_COMPOSE_PROJECT" "qs-worker"`,
@@ -169,7 +171,7 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 		"com.docker.compose.service=server",
 		"com.docker.compose.project=qs-worker",
 		"com.docker.compose.service=runtime",
-		`http://127.0.0.1:8080/readyz`,
+		`http://127.0.0.1:8080/serve-readyz`,
 		"https://collect.fangcunmount.cn/health",
 		"nginx -T",
 		"1.27.3",
@@ -220,6 +222,48 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 		if !strings.Contains(ci, required) {
 			t.Errorf("CI deployment contracts must contain %q", required)
 		}
+	}
+}
+
+func TestRedisDegradedSubmitAcceptanceContract(t *testing.T) {
+	t.Parallel()
+
+	runner := readDeploymentContractFile(t, "scripts", "perf", "run-submit-redis-degraded.sh")
+	for _, required := range []string{
+		`REDIS_FAILURE_CONFIRMED`,
+		`PERF_ISOLATED_ENV`,
+		`/serve-readyz`,
+		`/readyz`,
+		`want 200/503`,
+		`strategy=\"local_fallback\"`,
+		`metric_total "${ARTIFACT_DIR}/${container_id}-metrics-before.prom" degraded_open`,
+		`metric_total "${ARTIFACT_DIR}/${container_id}-metrics-before.prom" rate_limited`,
+		`metrics-before.prom`,
+		`metrics-after.prom`,
+		`k6-summary.json`,
+	} {
+		if !strings.Contains(runner, required) {
+			t.Errorf("Redis degraded submit runner must contain %q", required)
+		}
+	}
+
+	scenario := readDeploymentContractFile(t, "scripts", "perf", "k6-submit-redis-degraded.js")
+	for _, required := range []string{
+		`'low', 'global_overload', 'user_overload'`,
+		`SUBMIT_CASES_JSON`,
+		`response.status === 202`,
+		`response.status === 429`,
+		`Retry-After`,
+		`degraded_submit_rate_limited_total`,
+	} {
+		if !strings.Contains(scenario, required) {
+			t.Errorf("Redis degraded submit k6 scenario must contain %q", required)
+		}
+	}
+
+	coalescing := readDeploymentContractFile(t, "scripts", "perf", "run-submit-coalescing.sh")
+	if !strings.Contains(coalescing, `${base_url}/readyz`) {
+		t.Error("SubmitCoalescer acceptance must keep strict /readyz preflight")
 	}
 }
 

@@ -40,14 +40,20 @@ type CacheCapabilityWorkload struct {
 
 // ComponentCache 保存一个组件 缓存/redis 载荷 使用 fetch 元数据。
 type ComponentCache struct {
-	Available bool                           `json:"available"`
-	Reason    string                         `json:"reason,omitempty"`
-	Snapshot  *observability.RuntimeSnapshot `json:"snapshot,omitempty"`
+	Available               bool                                      `json:"available"`
+	Reason                  string                                    `json:"reason,omitempty"`
+	Snapshot                *observability.RuntimeSnapshot            `json:"snapshot,omitempty"`
+	Instances               map[string]*observability.RuntimeSnapshot `json:"instances,omitempty"`
+	DiscoveredInstanceCount int                                       `json:"discovered_instance_count,omitempty"`
+	AvailableInstanceCount  int                                       `json:"available_instance_count,omitempty"`
+	Partial                 bool                                      `json:"partial,omitempty"`
+	TargetErrors            map[string]string                         `json:"target_errors,omitempty"`
 }
 
 // CacheFamilyRow 是面向 UI 缓存 家族 健康度 行 across 组件。
 type CacheFamilyRow struct {
 	Component           string           `json:"component"`
+	InstanceID          string           `json:"instance_id,omitempty"`
 	Family              string           `json:"family"`
 	Profile             string           `json:"profile"`
 	Namespace           string           `json:"namespace"`

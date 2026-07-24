@@ -6,6 +6,8 @@ import "time"
 type RuntimeSnapshot struct {
 	GeneratedAt time.Time      `json:"generated_at"`
 	Component   string         `json:"component"`
+	InstanceID  string         `json:"instance_id,omitempty"`
+	Generation  string         `json:"generation,omitempty"`
 	Summary     RuntimeSummary `json:"summary"`
 	Families    []FamilyStatus `json:"families"`
 }

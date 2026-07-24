@@ -31,16 +31,25 @@ func NewMetricsServerWithGovernanceAndResilience(
 	snapshotProvider func() resilience.RuntimeSnapshot,
 ) *MetricsServer {
 	mux := http.NewServeMux()
+	redisSnapshot := func() observability.RuntimeSnapshot {
+		snapshot := observability.SnapshotForComponent(component, registry)
+		if snapshotProvider != nil {
+			identity := snapshotProvider()
+			snapshot.InstanceID = identity.InstanceID
+			snapshot.Generation = identity.Generation
+		}
+		return snapshot
+	}
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeGovernanceJSON(w, http.StatusOK, map[string]interface{}{
 			"status":    "healthy",
 			"component": component,
-			"redis":     observability.SnapshotForComponent(component, registry),
+			"redis":     redisSnapshot(),
 		})
 	})
 	mux.HandleFunc("/readyz", func(w http.ResponseWriter, _ *http.Request) {
-		snapshot := observability.SnapshotForComponent(component, registry)
+		snapshot := redisSnapshot()
 		statusCode := http.StatusOK
 		statusText := "ready"
 		if !snapshot.Summary.Ready {
@@ -54,7 +63,7 @@ func NewMetricsServerWithGovernanceAndResilience(
 		})
 	})
 	mux.HandleFunc("/governance/redis", func(w http.ResponseWriter, _ *http.Request) {
-		writeGovernanceJSON(w, http.StatusOK, observability.SnapshotForComponent(component, registry))
+		writeGovernanceJSON(w, http.StatusOK, redisSnapshot())
 	})
 	mux.HandleFunc("/governance/resilience", func(w http.ResponseWriter, _ *http.Request) {
 		if snapshotProvider == nil {

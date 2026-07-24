@@ -2,6 +2,9 @@ package options
 
 import (
 	"fmt"
+	"net/url"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
@@ -40,7 +43,7 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateOutboxRelay(o.OutboxRelay, o.MySQLOptions.MaxOpenConnections)...)
 	errs = append(errs, validateStatisticsSync(o.StatisticsSync)...)
 	errs = append(errs, validateCacheOptions(o.Cache)...)
-	errs = append(errs, validateRetryGovernance(o.SystemGovernance)...)
+	errs = append(errs, validateSystemGovernance(o.SystemGovernance)...)
 	if err := o.DelegatedSubject.Validate(); err != nil {
 		errs = append(errs, err)
 	}
@@ -61,6 +64,50 @@ func (o *Options) Validate() []error {
 		"redis_runtime",
 	)...)
 
+	return errs
+}
+
+func validateSystemGovernance(opts *SystemGovernanceOptions) []error {
+	errs := validateRetryGovernance(opts)
+	if opts == nil {
+		return errs
+	}
+	names := make([]string, 0, len(opts.Components))
+	for name := range opts.Components {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		component := opts.Components[name]
+		if component == nil {
+			continue
+		}
+		discovery := component.DiscoveryMode()
+		if discovery != "single" && discovery != "dns" {
+			errs = append(errs, fmt.Errorf("system_governance.components.%s.discovery must be single or dns", name))
+			continue
+		}
+		if component.Timeout < 0 {
+			errs = append(errs, fmt.Errorf("system_governance.components.%s.timeout cannot be negative", name))
+		}
+		if discovery == "dns" {
+			if component.MinimumInstances < 1 || component.MinimumInstances > 16 {
+				errs = append(errs, fmt.Errorf("system_governance.components.%s.minimum_instances must be between 1 and 16 for dns discovery", name))
+			}
+			for endpointName, endpoint := range map[string]string{
+				"resilience_url": component.ResilienceURL,
+				"cache_url":      component.CacheURL,
+			} {
+				if strings.TrimSpace(endpoint) == "" {
+					continue
+				}
+				parsed, err := url.Parse(endpoint)
+				if err != nil || parsed.Scheme != "http" || parsed.Hostname() == "" {
+					errs = append(errs, fmt.Errorf("system_governance.components.%s.%s must be an absolute http URL for dns discovery", name, endpointName))
+				}
+			}
+		}
+	}
 	return errs
 }
 

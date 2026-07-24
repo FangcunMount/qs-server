@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
 )
 
 func TestSubsystemOwnsBudgetsAndGates(t *testing.T) {
@@ -40,6 +41,81 @@ func TestSubsystemOwnsBudgetsAndGates(t *testing.T) {
 	}
 	if len(snapshot.Backpressure) != 1 || snapshot.Backpressure[0].Name != GateGRPCDownstream || snapshot.Backpressure[0].MaxInflight != 7 || snapshot.Backpressure[0].InFlight != 1 || snapshot.Backpressure[0].TimeoutMillis != 25 {
 		t.Fatalf("grpc backpressure snapshot = %+v", snapshot.Backpressure)
+	}
+}
+
+func TestSubmitBudgetUsesConservativeLocalFallbackOnlyWhenRedisDegrades(t *testing.T) {
+	cfg := options.NewRateLimitOptions()
+	cfg.SubmitDegradedLocal.GlobalQPS = 1
+	cfg.SubmitDegradedLocal.GlobalBurst = 1
+	cfg.SubmitDegradedLocal.UserQPS = 1
+	cfg.SubmitDegradedLocal.UserBurst = 1
+	backend := &rateBackend{allowed: true}
+	s := mustNewSubsystem(t, Options{RateLimit: cfg, Backend: backend})
+	budget, ok := s.Budget(BudgetSubmit)
+	if !ok {
+		t.Fatal("submit budget unavailable")
+	}
+
+	if first := budget.Global.Decide(t.Context(), "submit"); !first.Allowed || first.Outcome != resilience.OutcomeAllowed {
+		t.Fatalf("healthy first decision = %#v", first)
+	}
+	if second := budget.Global.Decide(t.Context(), "submit"); !second.Allowed || second.Outcome != resilience.OutcomeAllowed {
+		t.Fatalf("healthy second decision consumed fallback capacity: %#v", second)
+	}
+
+	backend.err = errors.New("redis down")
+	if degraded := budget.Global.Decide(t.Context(), "submit"); !degraded.Allowed || degraded.Outcome != resilience.OutcomeDegradedOpen || degraded.Subject.Strategy != "local_fallback" {
+		t.Fatalf("degraded first decision = %#v", degraded)
+	}
+	if limited := budget.Global.Decide(t.Context(), "submit"); limited.Allowed || limited.Outcome != resilience.OutcomeRateLimited || limited.Subject.Strategy != "local_fallback" {
+		t.Fatalf("degraded second decision = %#v", limited)
+	}
+
+	query, _ := s.Budget(BudgetQuery)
+	for i := 0; i < 2; i++ {
+		if decision := query.Global.Decide(t.Context(), "query"); !decision.Allowed || decision.Outcome != resilience.OutcomeDegradedOpen {
+			t.Fatalf("query decision %d = %#v, want unchanged fail-open", i, decision)
+		}
+	}
+}
+
+func TestSubmitBudgetWithoutBackendUsesFallbackAndCapsDynamicOverride(t *testing.T) {
+	cfg := options.NewRateLimitOptions()
+	cfg.SubmitDegradedLocal.GlobalQPS = 30
+	cfg.SubmitDegradedLocal.GlobalBurst = 45
+	cfg.SubmitDegradedLocal.UserQPS = 10
+	cfg.SubmitDegradedLocal.UserBurst = 15
+	s := mustNewSubsystem(t, Options{RateLimit: cfg})
+	budget, _ := s.Budget(BudgetSubmit)
+	if decision := budget.Global.Decide(t.Context(), "submit"); !decision.Allowed || decision.Outcome != resilience.OutcomeDegradedOpen {
+		t.Fatalf("nil backend decision = %#v", decision)
+	}
+
+	runtimeBudget, _ := s.RateBudget(BudgetSubmit)
+	_, err := runtimeBudget.Apply(1, ratelimit.BudgetPolicy{
+		Global: ratePolicy(BudgetSubmit, "global", "redis", 5, 6),
+		User:   ratePolicy(BudgetSubmit, "user", "redis", 2, 3),
+	}, "governance", time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := s.Snapshot(time.Now())
+	var global, user *resilience.CapabilitySnapshot
+	for i := range snapshot.RateLimits {
+		item := &snapshot.RateLimits[i]
+		switch item.Name {
+		case "submit_global":
+			global = item
+		case "submit_user":
+			user = item
+		}
+	}
+	if global == nil || global.FallbackRate != 5 || global.FallbackBurst != 6 {
+		t.Fatalf("submit global fallback snapshot = %+v", global)
+	}
+	if user == nil || user.FallbackRate != 2 || user.FallbackBurst != 3 {
+		t.Fatalf("submit user fallback snapshot = %+v", user)
 	}
 }
 
@@ -383,6 +459,15 @@ func mustJSON(t *testing.T, value any) []byte {
 		t.Fatal(err)
 	}
 	return payload
+}
+
+type rateBackend struct {
+	allowed bool
+	err     error
+}
+
+func (b *rateBackend) Allow(context.Context, string, float64, int) (bool, time.Duration, error) {
+	return b.allowed, 0, b.err
 }
 
 func mustNewSubsystem(t *testing.T, opts Options) *Subsystem {

@@ -114,7 +114,7 @@ COLOR_RED := \033[31m
 .PHONY: perf-init perf-ensure-config perf-tokens perf-tokens-collection perf-tokens-apiserver
 .PHONY: perf-preflight perf-check-k6 perf-k6 perf-smoke perf-pretest60 perf-pretest120 perf-pretest120-submit-only perf-pretest120-balanced perf-reliable-submit24 perf-reliable-submit48-burst perf-reliable-submit96-boundary
 .PHONY: perf-mixed140 perf-mixed140-submit24 perf-mixed160 perf-mixed180 perf-mixed200 perf-mixed220 perf-mixed240 perf-mixed240-models perf-mixed280 perf-mixed280-models perf-mixed280-models-short-report perf-mixed280-models-ws perf-special-report-short-poll perf-special-report-long-poll perf-mixed300 perf-mixed300-http perf-mixed300-http-query perf-mixed300-http-query-nostats perf-stats-isolate29 perf-stats-warmup perf-mixed300probe
-.PHONY: perf-model-smoke perf-outbox120 perf-personality60 perf-mixed300-models perf-submit-coalescing100 perf-submit-coalescing-conflict perf-submit-coalescing-redis-lock-failure perf-submit-coalescing-redis-signal-failure perf-submit-coalescing-redis-unavailable
+.PHONY: perf-model-smoke perf-outbox120 perf-personality60 perf-mixed300-models perf-submit-coalescing100 perf-submit-coalescing-conflict perf-submit-coalescing-redis-lock-failure perf-submit-coalescing-redis-signal-failure perf-submit-coalescing-redis-unavailable perf-submit-redis-degraded-low perf-submit-redis-degraded-global-overload perf-submit-redis-degraded-user-overload
 .PHONY: perf-diag-report120 perf-diag-query120 perf-diag-submit120 perf-diag-query-submit120 perf-sync-profiles perf-sync-vusers perf-verify
 
 # ============================================================================
@@ -162,7 +162,7 @@ docs-swagger: ## 生成 swagger 文档 (apiserver & collection)
 docs-rest: docs-swagger ## 从 swagger 生成 api/rest 的 OAS 3.1 摘要
 	@python -c "import yaml" 2>/dev/null || { echo "缺少 PyYAML，先执行: python -m pip install --quiet pyyaml"; exit 1; }
 	python scripts/generate_rest_from_swagger.py --swagger internal/apiserver/docs/swagger.json --output api/rest/apiserver.yaml --server http://localhost:18082 --server https://qs.fangcunmount.cn --public-operation GET:/health --public-operation GET:/readyz --public-operation GET:/ping --public-operation GET:/governance/redis --public-operation GET:/api/v1/public/info --public-operation GET:/api/v1/public/assessment-entries/{token} --public-operation POST:/api/v1/public/assessment-entries/{token}/intake --public-operation GET:/api/v1/qrcodes/{filename} --public-operation GET:/api/v1/assessment-assets/typology/{model}/{outcome}/{filename}
-	python scripts/generate_rest_from_swagger.py --swagger internal/collection-server/docs/swagger.json --output api/rest/collection.yaml --server http://localhost:18083 --server https://collect.fangcunmount.cn --root-security BearerAuth --public-operation GET:/health --public-operation GET:/readyz --public-operation GET:/ping --public-operation GET:/governance/redis --public-operation GET:/governance/resilience --public-operation GET:/api/v1/public/info --public-operation GET:/api/v1/assessment-models --public-operation GET:/api/v1/assessment-models/hot --public-operation GET:/api/v1/assessment-models/options --public-operation GET:/api/v1/typology-models --public-operation GET:/api/v1/typology-models/categories
+	python scripts/generate_rest_from_swagger.py --swagger internal/collection-server/docs/swagger.json --output api/rest/collection.yaml --server http://localhost:18083 --server https://collect.fangcunmount.cn --root-security BearerAuth --public-operation GET:/health --public-operation GET:/readyz --public-operation GET:/serve-readyz --public-operation GET:/ping --public-operation GET:/governance/redis --public-operation GET:/governance/resilience --public-operation GET:/api/v1/public/info --public-operation GET:/api/v1/assessment-models --public-operation GET:/api/v1/assessment-models/hot --public-operation GET:/api/v1/assessment-models/options --public-operation GET:/api/v1/typology-models --public-operation GET:/api/v1/typology-models/categories
 
 docs-hygiene: ## 检查现行 docs/ 的链接、锚点与章节编号
 	python scripts/check_docs_hygiene.py
@@ -408,16 +408,27 @@ perf-submit-coalescing-redis-signal-failure: ## Redis completion signal 故障�
 perf-submit-coalescing-redis-unavailable: ## Redis 完全不可用时低流量验证 Mongo 收敛
 	COALESCING_SCENARIO=redis_unavailable $(PERF_SCRIPT_DIR)/run-submit-coalescing.sh
 
+perf-submit-redis-degraded-low: ## Redis rate 故障时验证 20QPS 多 writer 保守准入
+	DEGRADED_SUBMIT_MODE=low $(PERF_SCRIPT_DIR)/run-submit-redis-degraded.sh
+
+perf-submit-redis-degraded-global-overload: ## Redis rate 故障时验证双实例 global fallback 过载
+	DEGRADED_SUBMIT_MODE=global_overload $(PERF_SCRIPT_DIR)/run-submit-redis-degraded.sh
+
+perf-submit-redis-degraded-user-overload: ## Redis rate 故障时验证单 writer fallback 过载
+	DEGRADED_SUBMIT_MODE=user_overload $(PERF_SCRIPT_DIR)/run-submit-redis-degraded.sh
+
 perf-verify: perf-check-k6 ## 校验压测脚本与 k6 场景
 	bash -n $(PERF_SCRIPT_DIR)/check-token-preflight.sh
 	bash -n $(PERF_SCRIPT_DIR)/fetch-iam-tokens.sh
 	bash -n $(PERF_SCRIPT_DIR)/run-submit-coalescing.sh
+	bash -n $(PERF_SCRIPT_DIR)/run-submit-redis-degraded.sh
 	bash -n $(PERF_SCRIPT_DIR)/snapshot-observability.sh
 	bash -n $(PERF_SCRIPT_DIR)/sync-profiles-from-example.sh
 	bash -n $(PERF_SCRIPT_DIR)/sync-vusers-from-example.sh
 	k6 inspect $(PERF_K6_SCRIPT)
 	k6 inspect $(PERF_SCRIPT_DIR)/k6-mixed-300qps.js
 	k6 inspect $(PERF_SCRIPT_DIR)/k6-submit-coalescing.js
+	k6 inspect -e SUBMIT_CASES_JSON='[{"token":"test","payload":{}}]' -e DEGRADED_SUBMIT_MODE=user_overload -e COLLECTION_BASE_URLS=http://127.0.0.1:18083,http://127.0.0.1:28083 $(PERF_SCRIPT_DIR)/k6-submit-redis-degraded.js
 	k6 inspect $(PERF_SCRIPT_DIR)/k6-answersheet-submit.js
 	k6 inspect $(PERF_SCRIPT_DIR)/k6-collection-questionnaires.js
 	k6 inspect $(PERF_SCRIPT_DIR)/k6-collection-assessments.js
