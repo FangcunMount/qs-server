@@ -62,6 +62,7 @@ func (c *Container) buildSubmitRuntime(profileLinkService *iam.ProfileLinkServic
 	return submitRuntime{
 		submission: answersheet.NewSubmissionService(
 			acl.NewAnswerSheetBFFWriter(c.answerSheetClient),
+			acl.NewAnswerSheetDurableResultReader(c.answerSheetClient),
 			acl.NewAnswerSheetBFFReader(c.answerSheetClient),
 			acl.NewTesteeActorLookup(c.actorClient),
 			profileLinkService,

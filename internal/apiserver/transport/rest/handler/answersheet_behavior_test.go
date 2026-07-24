@@ -49,6 +49,13 @@ func (s *stubAnswerSheetSubmissionService) Submit(_ context.Context, dto answers
 	return s.submitResult, s.submitErr
 }
 
+func (s *stubAnswerSheetSubmissionService) LookupAcceptedSubmission(
+	context.Context,
+	answersheetapp.LookupSubmissionDTO,
+) (*answersheetapp.AnswerSheetResult, bool, error) {
+	return nil, false, nil
+}
+
 func (s *stubAnswerSheetSubmissionService) GetMyAnswerSheet(context.Context, uint64, uint64) (*answersheetapp.AnswerSheetResult, error) {
 	return nil, nil
 }

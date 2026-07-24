@@ -57,6 +57,19 @@ type submissionReaderStub struct {
 	err   error
 }
 
+type submissionDurableResultReaderStub struct {
+	output *LookupAcceptedSubmissionOutput
+	err    error
+	calls  int
+	input  *LookupAcceptedSubmissionInput
+}
+
+func (s *submissionDurableResultReaderStub) LookupAcceptedSubmission(_ context.Context, input *LookupAcceptedSubmissionInput) (*LookupAcceptedSubmissionOutput, error) {
+	s.calls++
+	s.input = input
+	return s.output, s.err
+}
+
 func (s submissionReaderStub) GetAnswerSheet(context.Context, uint64) (*AnswerSheetResponse, error) {
 	return s.sheet, s.err
 }
@@ -126,7 +139,7 @@ func validSubmitRequest() *SubmitAnswerSheetRequest {
 func newAcceptService(writer AnswerSheetWriter, reader AnswerSheetReader, resolver AssessmentResolver) *SubmissionService {
 	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9, IAMProfileID: "profile-7", Name: "testee"}}
 	return NewSubmissionService(
-		writer, reader, actor, submissionProfileLinkStub{enabled: true, allowed: true},
+		writer, nil, reader, actor, submissionProfileLinkStub{enabled: true, allowed: true},
 		submissionCoalescerStub{}, resolver,
 		submissionQuestionnaireStub{questionnaire: publishedQuestionnaire()}, time.Second,
 	)
@@ -134,7 +147,7 @@ func newAcceptService(writer AnswerSheetWriter, reader AnswerSheetReader, resolv
 
 func TestAcceptDurablyFailsClosedWhenProfileLinkUnavailable(t *testing.T) {
 	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9, IAMProfileID: "profile-7"}}
-	service := NewSubmissionService(&submissionWriterStub{}, nil, actor, nil, nil, nil,
+	service := NewSubmissionService(&submissionWriterStub{}, nil, nil, actor, nil, nil, nil,
 		submissionQuestionnaireStub{questionnaire: publishedQuestionnaire()}, time.Second)
 	if _, err := service.AcceptDurably(t.Context(), "request-1", 11, validSubmitRequest()); status.Code(err) != codes.Unavailable {
 		t.Fatalf("AcceptDurably() error = %v, want Unavailable", err)
@@ -143,7 +156,7 @@ func TestAcceptDurablyFailsClosedWhenProfileLinkUnavailable(t *testing.T) {
 
 func TestAcceptDurablyFailsClosedWhenProfileLinkDisabled(t *testing.T) {
 	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9, IAMProfileID: "profile-7"}}
-	service := NewSubmissionService(&submissionWriterStub{}, nil, actor,
+	service := NewSubmissionService(&submissionWriterStub{}, nil, nil, actor,
 		submissionProfileLinkStub{enabled: false, allowed: true}, nil, nil,
 		submissionQuestionnaireStub{questionnaire: publishedQuestionnaire()}, time.Second)
 	if _, err := service.AcceptDurably(t.Context(), "request-1", 11, validSubmitRequest()); status.Code(err) != codes.Unavailable {
@@ -153,7 +166,7 @@ func TestAcceptDurablyFailsClosedWhenProfileLinkDisabled(t *testing.T) {
 
 func TestAcceptDurablyChecksDisabledProfileLinkBeforeTesteeLookup(t *testing.T) {
 	actorCalls := 0
-	service := NewSubmissionService(&submissionWriterStub{}, nil,
+	service := NewSubmissionService(&submissionWriterStub{}, nil, nil,
 		submissionActorStub{calls: &actorCalls},
 		submissionProfileLinkStub{enabled: false}, nil, nil,
 		submissionQuestionnaireStub{questionnaire: publishedQuestionnaire()}, time.Second)
@@ -168,7 +181,7 @@ func TestAcceptDurablyChecksDisabledProfileLinkBeforeTesteeLookup(t *testing.T) 
 
 func TestAssessmentReadinessChecksDisabledProfileLinkBeforeTesteeLookup(t *testing.T) {
 	actorCalls := 0
-	service := NewSubmissionService(nil,
+	service := NewSubmissionService(nil, nil,
 		submissionReaderStub{sheet: &AnswerSheetResponse{ID: "42", TesteeID: "7"}},
 		submissionActorStub{calls: &actorCalls},
 		submissionProfileLinkStub{enabled: false}, nil, assessmentResolverStub{}, nil, time.Second)
@@ -183,7 +196,7 @@ func TestAssessmentReadinessChecksDisabledProfileLinkBeforeTesteeLookup(t *testi
 
 func TestAcceptDurablyRejectsMissingActiveProfileLink(t *testing.T) {
 	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9, IAMProfileID: "profile-7"}}
-	service := NewSubmissionService(&submissionWriterStub{}, nil, actor,
+	service := NewSubmissionService(&submissionWriterStub{}, nil, nil, actor,
 		submissionProfileLinkStub{enabled: true, allowed: false}, nil, nil,
 		submissionQuestionnaireStub{questionnaire: publishedQuestionnaire()}, time.Second)
 	if _, err := service.AcceptDurably(t.Context(), "request-1", 11, validSubmitRequest()); status.Code(err) != codes.PermissionDenied {
@@ -193,7 +206,7 @@ func TestAcceptDurablyRejectsMissingActiveProfileLink(t *testing.T) {
 
 func TestAcceptDurablyMapsProfileLinkDependencyErrorToUnavailable(t *testing.T) {
 	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9, IAMProfileID: "profile-7"}}
-	service := NewSubmissionService(&submissionWriterStub{}, nil, actor,
+	service := NewSubmissionService(&submissionWriterStub{}, nil, nil, actor,
 		submissionProfileLinkStub{enabled: true, err: context.DeadlineExceeded}, nil, nil,
 		submissionQuestionnaireStub{questionnaire: publishedQuestionnaire()}, time.Second)
 	if _, err := service.AcceptDurably(t.Context(), "request-1", 11, validSubmitRequest()); status.Code(err) != codes.Unavailable {
@@ -203,7 +216,7 @@ func TestAcceptDurablyMapsProfileLinkDependencyErrorToUnavailable(t *testing.T) 
 
 func TestAcceptDurablyRejectsTesteeWithoutIAMProfile(t *testing.T) {
 	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9}}
-	service := NewSubmissionService(&submissionWriterStub{}, nil, actor,
+	service := NewSubmissionService(&submissionWriterStub{}, nil, nil, actor,
 		submissionProfileLinkStub{enabled: true, allowed: true}, nil, nil,
 		submissionQuestionnaireStub{questionnaire: publishedQuestionnaire()}, time.Second)
 	if _, err := service.AcceptDurably(t.Context(), "request-1", 11, validSubmitRequest()); status.Code(err) != codes.PermissionDenied {
@@ -212,11 +225,14 @@ func TestAcceptDurablyRejectsTesteeWithoutIAMProfile(t *testing.T) {
 }
 
 func TestAcceptDurablyUsesDurableReadbackAfterLeaseContention(t *testing.T) {
-	writer := &submissionWriterStub{output: &SaveAnswerSheetOutput{ID: 42}}
+	writer := &submissionWriterStub{}
+	durableReader := &submissionDurableResultReaderStub{
+		output: &LookupAcceptedSubmissionOutput{Found: true, ID: 42},
+	}
 	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9, IAMProfileID: "profile-7"}}
 	ownerCalls := 0
 	readbackCalls := 0
-	service := NewSubmissionService(writer, nil, actor,
+	service := NewSubmissionService(writer, durableReader, nil, actor,
 		submissionProfileLinkStub{enabled: true, allowed: true}, submissionCoalescerStub{
 			contender:     true,
 			ownerCalls:    &ownerCalls,
@@ -226,8 +242,145 @@ func TestAcceptDurablyUsesDurableReadbackAfterLeaseContention(t *testing.T) {
 	if got, err := service.AcceptDurably(t.Context(), "request-1", 11, validSubmitRequest()); err != nil || got == nil || got.ID != "42" {
 		t.Fatalf("AcceptDurably() = (%#v, %v), want durable database result", got, err)
 	}
-	if ownerCalls != 0 || readbackCalls != 1 || writer.calls != 1 {
-		t.Fatalf("owner/readback/writer calls = %d/%d/%d, want 0/1/1", ownerCalls, readbackCalls, writer.calls)
+	if ownerCalls != 0 || readbackCalls != 1 || durableReader.calls != 1 || writer.calls != 0 {
+		t.Fatalf(
+			"owner/readback/durable-reader/writer calls = %d/%d/%d/%d, want 0/1/1/0",
+			ownerCalls,
+			readbackCalls,
+			durableReader.calls,
+			writer.calls,
+		)
+	}
+}
+
+func TestAcceptDurablyOwnerChecksDurableResultBeforeMutableDependencies(t *testing.T) {
+	durableReader := &submissionDurableResultReaderStub{
+		output: &LookupAcceptedSubmissionOutput{Found: true, ID: 42},
+	}
+	writer := &submissionWriterStub{}
+	ownerCalls := 0
+	service := NewSubmissionService(
+		writer,
+		durableReader,
+		nil,
+		submissionActorStub{},
+		submissionProfileLinkStub{enabled: true, err: context.DeadlineExceeded},
+		submissionCoalescerStub{ownerCalls: &ownerCalls},
+		nil,
+		submissionQuestionnaireStub{err: status.Error(codes.Unavailable, "questionnaire down")},
+		time.Second,
+	)
+
+	got, err := service.AcceptDurably(t.Context(), "request-owner-replay", 11, validSubmitRequest())
+	if err != nil || got == nil || got.ID != "42" {
+		t.Fatalf("AcceptDurably() = (%#v, %v), want durable replay", got, err)
+	}
+	if ownerCalls != 1 || durableReader.calls != 1 || writer.calls != 0 {
+		t.Fatalf(
+			"owner/durable-reader/writer calls = %d/%d/%d, want 1/1/0",
+			ownerCalls,
+			durableReader.calls,
+			writer.calls,
+		)
+	}
+}
+
+func TestAcceptDurablyReturnsDurableReplayBeforeQuestionnaireAndProfileDependencies(t *testing.T) {
+	reader := &submissionDurableResultReaderStub{
+		output: &LookupAcceptedSubmissionOutput{Found: true, ID: 42},
+	}
+	actorCalls := 0
+	writer := &submissionWriterStub{}
+	service := NewSubmissionService(
+		writer,
+		reader,
+		nil,
+		submissionActorStub{calls: &actorCalls},
+		submissionProfileLinkStub{enabled: true, err: context.DeadlineExceeded},
+		nil,
+		nil,
+		submissionQuestionnaireStub{err: status.Error(codes.Unavailable, "questionnaire down")},
+		time.Second,
+	)
+
+	got, err := service.AcceptDurably(t.Context(), "request-replay", 11, validSubmitRequest())
+	if err != nil || got == nil || got.ID != "42" {
+		t.Fatalf("AcceptDurably() = (%#v, %v), want durable replay", got, err)
+	}
+	if reader.calls != 1 || writer.calls != 0 || actorCalls != 0 {
+		t.Fatalf("readback/writer/actor calls = %d/%d/%d, want 1/0/0", reader.calls, writer.calls, actorCalls)
+	}
+}
+
+func TestAcceptDurablyReturnsReadbackConflictBeforeMutableDependencies(t *testing.T) {
+	reader := &submissionDurableResultReaderStub{
+		err: status.Error(codes.AlreadyExists, "idempotency conflict"),
+	}
+	service := NewSubmissionService(
+		&submissionWriterStub{},
+		reader,
+		nil,
+		submissionActorStub{},
+		submissionProfileLinkStub{enabled: true, err: context.DeadlineExceeded},
+		nil,
+		nil,
+		submissionQuestionnaireStub{err: status.Error(codes.Unavailable, "questionnaire down")},
+		time.Second,
+	)
+
+	if _, err := service.AcceptDurably(t.Context(), "request-conflict", 11, validSubmitRequest()); status.Code(err) != codes.AlreadyExists {
+		t.Fatalf("AcceptDurably() error = %v, want AlreadyExists", err)
+	}
+}
+
+func TestAcceptDurablyReadbackMissRunsFullValidationAndSave(t *testing.T) {
+	reader := &submissionDurableResultReaderStub{
+		output: &LookupAcceptedSubmissionOutput{},
+	}
+	writer := &submissionWriterStub{output: &SaveAnswerSheetOutput{ID: 42}}
+	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9, IAMProfileID: "profile-7"}}
+	service := NewSubmissionService(
+		writer,
+		reader,
+		nil,
+		actor,
+		submissionProfileLinkStub{enabled: true, allowed: true},
+		nil,
+		nil,
+		submissionQuestionnaireStub{questionnaire: publishedQuestionnaire()},
+		time.Second,
+	)
+
+	got, err := service.AcceptDurably(t.Context(), "request-miss", 11, validSubmitRequest())
+	if err != nil || got == nil || got.ID != "42" {
+		t.Fatalf("AcceptDurably() = (%#v, %v)", got, err)
+	}
+	if reader.calls != 1 || writer.calls != 1 {
+		t.Fatalf("readback/writer calls = %d/%d, want 1/1", reader.calls, writer.calls)
+	}
+}
+
+func TestAcceptDurablyUnimplementedReadbackFallsBackForRollingUpgrade(t *testing.T) {
+	reader := &submissionDurableResultReaderStub{
+		err: status.Error(codes.Unimplemented, "old apiserver"),
+	}
+	writer := &submissionWriterStub{output: &SaveAnswerSheetOutput{ID: 42}}
+	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9, IAMProfileID: "profile-7"}}
+	service := NewSubmissionService(
+		writer,
+		reader,
+		nil,
+		actor,
+		submissionProfileLinkStub{enabled: true, allowed: true},
+		nil,
+		nil,
+		submissionQuestionnaireStub{questionnaire: publishedQuestionnaire()},
+		time.Second,
+	)
+
+	got, err := service.AcceptDurably(t.Context(), "request-upgrade", 11, validSubmitRequest())
+	if err != nil || got == nil || got.ID != "42" || writer.calls != 1 {
+		t.Fatalf("AcceptDurably() = (%#v, %v), writer calls=%d", got, err, writer.calls)
 	}
 }
 
@@ -264,7 +417,7 @@ func TestAcceptDurablyRequiresSafeIdempotencyKey(t *testing.T) {
 
 func TestAcceptDurablyFailsClosedWhenQuestionnaireUnavailable(t *testing.T) {
 	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9}}
-	service := NewSubmissionService(&submissionWriterStub{}, nil, actor, nil, nil, nil,
+	service := NewSubmissionService(&submissionWriterStub{}, nil, nil, actor, nil, nil, nil,
 		submissionQuestionnaireStub{err: status.Error(codes.Unavailable, "down")}, time.Second)
 	if _, err := service.AcceptDurably(t.Context(), "request-1", 11, validSubmitRequest()); status.Code(err) != codes.Unavailable {
 		t.Fatalf("AcceptDurably() error = %v, want Unavailable", err)

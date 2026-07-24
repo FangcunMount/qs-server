@@ -19,10 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AnswerSheetService_SaveAnswerSheet_FullMethodName       = "/answersheet.AnswerSheetService/SaveAnswerSheet"
-	AnswerSheetService_GetAnswerSheet_FullMethodName        = "/answersheet.AnswerSheetService/GetAnswerSheet"
-	AnswerSheetService_ListAnswerSheets_FullMethodName      = "/answersheet.AnswerSheetService/ListAnswerSheets"
-	AnswerSheetService_SaveAnswerSheetScores_FullMethodName = "/answersheet.AnswerSheetService/SaveAnswerSheetScores"
+	AnswerSheetService_SaveAnswerSheet_FullMethodName             = "/answersheet.AnswerSheetService/SaveAnswerSheet"
+	AnswerSheetService_LookupAnswerSheetSubmission_FullMethodName = "/answersheet.AnswerSheetService/LookupAnswerSheetSubmission"
+	AnswerSheetService_GetAnswerSheet_FullMethodName              = "/answersheet.AnswerSheetService/GetAnswerSheet"
+	AnswerSheetService_ListAnswerSheets_FullMethodName            = "/answersheet.AnswerSheetService/ListAnswerSheets"
+	AnswerSheetService_SaveAnswerSheetScores_FullMethodName       = "/answersheet.AnswerSheetService/SaveAnswerSheetScores"
 )
 
 // AnswerSheetServiceClient is the client API for AnswerSheetService service.
@@ -33,6 +34,8 @@ const (
 type AnswerSheetServiceClient interface {
 	// 保存答卷
 	SaveAnswerSheet(ctx context.Context, in *SaveAnswerSheetRequest, opts ...grpc.CallOption) (*SaveAnswerSheetResponse, error)
+	// 回读并校验已持久化的答卷提交意图
+	LookupAnswerSheetSubmission(ctx context.Context, in *LookupAnswerSheetSubmissionRequest, opts ...grpc.CallOption) (*LookupAnswerSheetSubmissionResponse, error)
 	// 获取答卷详情
 	GetAnswerSheet(ctx context.Context, in *GetAnswerSheetRequest, opts ...grpc.CallOption) (*GetAnswerSheetResponse, error)
 	// 获取答卷列表
@@ -53,6 +56,16 @@ func (c *answerSheetServiceClient) SaveAnswerSheet(ctx context.Context, in *Save
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SaveAnswerSheetResponse)
 	err := c.cc.Invoke(ctx, AnswerSheetService_SaveAnswerSheet_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *answerSheetServiceClient) LookupAnswerSheetSubmission(ctx context.Context, in *LookupAnswerSheetSubmissionRequest, opts ...grpc.CallOption) (*LookupAnswerSheetSubmissionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LookupAnswerSheetSubmissionResponse)
+	err := c.cc.Invoke(ctx, AnswerSheetService_LookupAnswerSheetSubmission_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -97,6 +110,8 @@ func (c *answerSheetServiceClient) SaveAnswerSheetScores(ctx context.Context, in
 type AnswerSheetServiceServer interface {
 	// 保存答卷
 	SaveAnswerSheet(context.Context, *SaveAnswerSheetRequest) (*SaveAnswerSheetResponse, error)
+	// 回读并校验已持久化的答卷提交意图
+	LookupAnswerSheetSubmission(context.Context, *LookupAnswerSheetSubmissionRequest) (*LookupAnswerSheetSubmissionResponse, error)
 	// 获取答卷详情
 	GetAnswerSheet(context.Context, *GetAnswerSheetRequest) (*GetAnswerSheetResponse, error)
 	// 获取答卷列表
@@ -115,6 +130,9 @@ type UnimplementedAnswerSheetServiceServer struct{}
 
 func (UnimplementedAnswerSheetServiceServer) SaveAnswerSheet(context.Context, *SaveAnswerSheetRequest) (*SaveAnswerSheetResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SaveAnswerSheet not implemented")
+}
+func (UnimplementedAnswerSheetServiceServer) LookupAnswerSheetSubmission(context.Context, *LookupAnswerSheetSubmissionRequest) (*LookupAnswerSheetSubmissionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method LookupAnswerSheetSubmission not implemented")
 }
 func (UnimplementedAnswerSheetServiceServer) GetAnswerSheet(context.Context, *GetAnswerSheetRequest) (*GetAnswerSheetResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAnswerSheet not implemented")
@@ -160,6 +178,24 @@ func _AnswerSheetService_SaveAnswerSheet_Handler(srv interface{}, ctx context.Co
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AnswerSheetServiceServer).SaveAnswerSheet(ctx, req.(*SaveAnswerSheetRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AnswerSheetService_LookupAnswerSheetSubmission_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LookupAnswerSheetSubmissionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AnswerSheetServiceServer).LookupAnswerSheetSubmission(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AnswerSheetService_LookupAnswerSheetSubmission_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AnswerSheetServiceServer).LookupAnswerSheetSubmission(ctx, req.(*LookupAnswerSheetSubmissionRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -228,6 +264,10 @@ var AnswerSheetService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SaveAnswerSheet",
 			Handler:    _AnswerSheetService_SaveAnswerSheet_Handler,
+		},
+		{
+			MethodName: "LookupAnswerSheetSubmission",
+			Handler:    _AnswerSheetService_LookupAnswerSheetSubmission_Handler,
 		},
 		{
 			MethodName: "GetAnswerSheet",

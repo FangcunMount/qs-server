@@ -94,9 +94,9 @@ func NewSubmitCoalescerWithObserver(
 }
 
 // Run chooses one lease owner and makes contenders wait before consulting the
-// durable idempotency path. The owner and readback closures may be identical at
-// the collection boundary because apiserver SaveAnswerSheet performs an early
-// durable lookup before attempting a new transaction.
+// durable idempotency path. Both closures may use the same collection
+// orchestration when it always performs explicit durable readback first and
+// executes the full acceptance path only after a confirmed miss.
 func (c *SubmitCoalescer) Run(
 	ctx context.Context,
 	key string,

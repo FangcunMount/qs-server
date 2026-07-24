@@ -41,6 +41,22 @@ type SaveAnswerSheetOutput struct {
 	Message string
 }
 
+type LookupAnswerSheetSubmissionInput struct {
+	QuestionnaireCode    string
+	QuestionnaireVersion string
+	IdempotencyKey       string
+	WriterID             uint64
+	TesteeID             uint64
+	TaskID               string
+	OriginRef            *OriginRef
+	Answers              []AnswerInput
+}
+
+type LookupAnswerSheetSubmissionOutput struct {
+	Found bool
+	ID    uint64
+}
+
 // AnswerSheetOutput 答卷输出
 type AnswerSheetOutput struct {
 	ID                   uint64
@@ -120,6 +136,43 @@ func (c *AnswerSheetClient) SaveAnswerSheet(ctx context.Context, input *SaveAnsw
 	return &SaveAnswerSheetOutput{
 		ID:      resp.GetId(),
 		Message: resp.GetMessage(),
+	}, nil
+}
+
+func (c *AnswerSheetClient) LookupAnswerSheetSubmission(
+	ctx context.Context,
+	input *LookupAnswerSheetSubmissionInput,
+) (*LookupAnswerSheetSubmissionOutput, error) {
+	ctx, cancel := c.client.ContextWithTimeout(ctx)
+	defer cancel()
+
+	answers := make([]*pb.SubmissionIntentAnswer, len(input.Answers))
+	for i, answer := range input.Answers {
+		answers[i] = &pb.SubmissionIntentAnswer{
+			QuestionCode: answer.QuestionCode,
+			QuestionType: answer.QuestionType,
+			Value:        answer.Value,
+		}
+	}
+	req := &pb.LookupAnswerSheetSubmissionRequest{
+		WriterId:             input.WriterID,
+		IdempotencyKey:       input.IdempotencyKey,
+		QuestionnaireCode:    input.QuestionnaireCode,
+		QuestionnaireVersion: input.QuestionnaireVersion,
+		TesteeId:             input.TesteeID,
+		TaskId:               input.TaskID,
+		Answers:              answers,
+	}
+	if input.OriginRef != nil {
+		req.OriginRef = &pb.OriginRef{Type: input.OriginRef.Type, Id: input.OriginRef.ID}
+	}
+	response, err := c.grpcClient.LookupAnswerSheetSubmission(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return &LookupAnswerSheetSubmissionOutput{
+		Found: response.GetFound(),
+		ID:    response.GetId(),
 	}, nil
 }
 

@@ -22,6 +22,9 @@ type contractSubmissionService struct{}
 func (contractSubmissionService) Submit(context.Context, appanswersheet.SubmitAnswerSheetDTO) (*appanswersheet.AnswerSheetResult, error) {
 	return nil, nil
 }
+func (contractSubmissionService) LookupAcceptedSubmission(context.Context, appanswersheet.LookupSubmissionDTO) (*appanswersheet.AnswerSheetResult, bool, error) {
+	return &appanswersheet.AnswerSheetResult{ID: 88}, true, nil
+}
 func (contractSubmissionService) GetMyAnswerSheet(context.Context, uint64, uint64) (*appanswersheet.AnswerSheetResult, error) {
 	return nil, nil
 }
@@ -86,6 +89,17 @@ func TestAnswerSheetOwnershipSurvivesRealGRPCContract(t *testing.T) {
 	t.Cleanup(func() { _ = baseClient.Close() })
 
 	grpcClient := client.NewAnswerSheetClient(baseClient)
+	lookup, err := grpcClient.LookupAnswerSheetSubmission(t.Context(), &client.LookupAnswerSheetSubmissionInput{
+		WriterID:             11,
+		IdempotencyKey:       "contract-lookup-1",
+		QuestionnaireCode:    "Q",
+		QuestionnaireVersion: "1.2.3",
+		TesteeID:             77,
+		Answers:              []client.AnswerInput{{QuestionCode: "q1", QuestionType: "Text", Value: `"ok"`}},
+	})
+	if err != nil || lookup == nil || !lookup.Found || lookup.ID != 88 {
+		t.Fatalf("LookupAnswerSheetSubmission() = (%#v, %v)", lookup, err)
+	}
 	got, err := grpcClient.GetAnswerSheet(t.Context(), 42)
 	if err != nil {
 		t.Fatal(err)
@@ -95,14 +109,14 @@ func TestAnswerSheetOwnershipSurvivesRealGRPCContract(t *testing.T) {
 	}
 
 	reader := acl.NewAnswerSheetBFFReader(grpcClient)
-	pendingService := collectionanswersheet.NewSubmissionService(nil, reader, contractActorLookup{}, contractProfileLink{}, nil,
+	pendingService := collectionanswersheet.NewSubmissionService(nil, nil, reader, contractActorLookup{}, contractProfileLink{}, nil,
 		contractAssessmentResolver{err: status.Error(codes.NotFound, "not ready")}, nil, time.Second)
 	pending, err := pendingService.GetAssessmentReadiness(t.Context(), 11, 42, 77)
 	if err != nil || pending.Status != "pending" || pending.AnswerSheetID != "42" {
 		t.Fatalf("pending readiness = %#v, error = %v", pending, err)
 	}
 
-	readyService := collectionanswersheet.NewSubmissionService(nil, reader, contractActorLookup{}, contractProfileLink{}, nil,
+	readyService := collectionanswersheet.NewSubmissionService(nil, nil, reader, contractActorLookup{}, contractProfileLink{}, nil,
 		contractAssessmentResolver{testeeID: 77, assessmentID: 99, readinessPhase: "ready"}, nil, time.Second)
 	ready, err := readyService.GetAssessmentReadiness(t.Context(), 11, 42, 77)
 	if err != nil || ready.Status != "ready" || ready.AssessmentID != "99" {

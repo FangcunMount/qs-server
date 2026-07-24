@@ -48,22 +48,24 @@ type submissionQuestionnaireReader interface {
 // 2. 调用 apiserver 的 gRPC 服务
 // 3. 转换 gRPC 响应到 REST DTO
 type SubmissionService struct {
-	answerSheetWriter  AnswerSheetWriter
-	answerSheetReader  AnswerSheetReader
-	actorClient        ActorLookup
-	profileLinkService profileLinkChecker
-	profileAccess      *ProfileAccessResolver
-	answerConverter    AnswerConverter
-	committer          *SubmissionCommitter
-	submitCoalescer    DurableSubmitCoalescer
-	assessmentResolver AssessmentResolver
-	questionnaire      submissionQuestionnaireReader
-	acceptTimeout      time.Duration
+	answerSheetWriter   AnswerSheetWriter
+	durableResultReader DurableSubmitResultReader
+	answerSheetReader   AnswerSheetReader
+	actorClient         ActorLookup
+	profileLinkService  profileLinkChecker
+	profileAccess       *ProfileAccessResolver
+	answerConverter     AnswerConverter
+	committer           *SubmissionCommitter
+	submitCoalescer     DurableSubmitCoalescer
+	assessmentResolver  AssessmentResolver
+	questionnaire       submissionQuestionnaireReader
+	acceptTimeout       time.Duration
 }
 
 // NewSubmissionService 创建答卷提交服务
 func NewSubmissionService(
 	answerSheetWriter AnswerSheetWriter,
+	durableResultReader DurableSubmitResultReader,
 	answerSheetReader AnswerSheetReader,
 	actorClient ActorLookup,
 	profileLinkService profileLinkChecker,
@@ -76,17 +78,18 @@ func NewSubmissionService(
 		acceptTimeout = 2 * time.Second
 	}
 	return &SubmissionService{
-		answerSheetWriter:  answerSheetWriter,
-		answerSheetReader:  answerSheetReader,
-		actorClient:        actorClient,
-		profileLinkService: profileLinkService,
-		profileAccess:      NewProfileAccessResolver(actorClient, profileLinkService),
-		answerConverter:    AnswerConverter{},
-		committer:          NewSubmissionCommitter(answerSheetWriter),
-		submitCoalescer:    submitCoalescer,
-		assessmentResolver: assessmentResolver,
-		questionnaire:      questionnaire,
-		acceptTimeout:      acceptTimeout,
+		answerSheetWriter:   answerSheetWriter,
+		durableResultReader: durableResultReader,
+		answerSheetReader:   answerSheetReader,
+		actorClient:         actorClient,
+		profileLinkService:  profileLinkService,
+		profileAccess:       NewProfileAccessResolver(actorClient, profileLinkService),
+		answerConverter:     AnswerConverter{},
+		committer:           NewSubmissionCommitter(answerSheetWriter),
+		submitCoalescer:     submitCoalescer,
+		assessmentResolver:  assessmentResolver,
+		questionnaire:       questionnaire,
+		acceptTimeout:       acceptTimeout,
 	}
 }
 
@@ -96,13 +99,37 @@ func observeSubmitStage(stage, outcome string, started time.Time) {
 	resilience.ObserveAnswerSheetSubmitStage(stage, outcome, time.Since(started))
 }
 
-func (s *SubmissionService) validateBeforeAccept(ctx context.Context, req *SubmitAnswerSheetRequest) error {
+func (s *SubmissionService) validateSubmitEnvelope(writerID uint64, req *SubmitAnswerSheetRequest) error {
 	if req == nil {
 		return status.Error(codes.InvalidArgument, "answersheet request is required")
+	}
+	if writerID == 0 {
+		return status.Error(codes.InvalidArgument, "writer_id is required")
 	}
 	if !safeIdempotencyKey.MatchString(req.IdempotencyKey) {
 		return status.Error(codes.InvalidArgument, "idempotency_key must contain 8-128 safe characters")
 	}
+	if req.QuestionnaireCode == "" || req.QuestionnaireVersion == "" {
+		return status.Error(codes.InvalidArgument, "questionnaire_code and questionnaire_version are required")
+	}
+	if req.TesteeID == 0 {
+		return status.Error(codes.InvalidArgument, "testee_id is required")
+	}
+	if len(req.Answers) == 0 {
+		return status.Error(codes.InvalidArgument, "answers are required")
+	}
+	for _, answer := range req.Answers {
+		if answer.QuestionCode == "" || answer.QuestionType == "" {
+			return status.Error(codes.InvalidArgument, "answer question_code and question_type are required")
+		}
+		if _, err := surveyvalidation.DecodeAnswerValue(answer.QuestionType, answer.Value); err != nil {
+			return status.Error(codes.InvalidArgument, fmt.Sprintf("问题 %s 的答案格式不正确: %v", answer.QuestionCode, err))
+		}
+	}
+	return nil
+}
+
+func (s *SubmissionService) validatePublishedSubmission(ctx context.Context, req *SubmitAnswerSheetRequest) error {
 	if s.questionnaire == nil {
 		return status.Error(codes.Unavailable, "questionnaire validation is unavailable")
 	}
@@ -169,14 +196,14 @@ func (s *SubmissionService) AcceptDurably(ctx context.Context, requestID string,
 	}()
 	ctx, cancel := context.WithTimeout(ctx, s.acceptTimeout)
 	defer cancel()
-	preflightStarted := time.Now()
-	if err := s.validateBeforeAccept(ctx, req); err != nil {
-		observeSubmitStage("preflight", "failed", preflightStarted)
+	envelopeStarted := time.Now()
+	if err := s.validateSubmitEnvelope(writerID, req); err != nil {
+		observeSubmitStage("envelope", "failed", envelopeStarted)
 		return nil, err
 	}
-	observeSubmitStage("preflight", "ok", preflightStarted)
+	observeSubmitStage("envelope", "ok", envelopeStarted)
 	if s.submitCoalescer == nil {
-		response, err := s.accept(ctx, requestID, writerID, req)
+		response, err := s.lookupThenAccept(ctx, requestID, writerID, req)
 		if err == nil {
 			totalOutcome = "accepted"
 		} else if status.Code(err) == codes.AlreadyExists {
@@ -190,7 +217,7 @@ func (s *SubmissionService) AcceptDurably(ctx context.Context, requestID string,
 	coalescingKey := strconv.FormatUint(writerID, 10) + ":" + req.IdempotencyKey
 	durablePath := func(runCtx context.Context) (string, error) {
 		var acceptErr error
-		response, acceptErr = s.accept(runCtx, requestID, writerID, req)
+		response, acceptErr = s.lookupThenAccept(runCtx, requestID, writerID, req)
 		if acceptErr != nil || response == nil {
 			return "", acceptErr
 		}
@@ -211,6 +238,60 @@ func (s *SubmissionService) AcceptDurably(ctx context.Context, requestID string,
 	}
 	totalOutcome = "accepted"
 	return response, nil
+}
+
+func (s *SubmissionService) lookupThenAccept(
+	ctx context.Context,
+	requestID string,
+	writerID uint64,
+	req *SubmitAnswerSheetRequest,
+) (*SubmitAnswerSheetResponse, error) {
+	if s.durableResultReader != nil {
+		lookupStarted := time.Now()
+		result, err := s.durableResultReader.LookupAcceptedSubmission(ctx, &LookupAcceptedSubmissionInput{
+			QuestionnaireCode:    req.QuestionnaireCode,
+			QuestionnaireVersion: req.QuestionnaireVersion,
+			IdempotencyKey:       req.IdempotencyKey,
+			WriterID:             writerID,
+			TesteeID:             req.TesteeID,
+			TaskID:               req.TaskID,
+			OriginRef:            req.OriginRef,
+			Answers:              s.answerConverter.Convert(req.Answers),
+		})
+		switch {
+		case err == nil && result != nil && result.Found && result.ID != 0:
+			observeSubmitStage("durable_readback", "hit", lookupStarted)
+			resilience.ObserveAnswerSheetSubmitCoalescer("readback_hit")
+			return &SubmitAnswerSheetResponse{
+				ID:      strconv.FormatUint(result.ID, 10),
+				Message: "答卷提交成功",
+			}, nil
+		case err == nil && (result == nil || !result.Found):
+			observeSubmitStage("durable_readback", "miss", lookupStarted)
+			resilience.ObserveAnswerSheetSubmitCoalescer("readback_miss")
+		case status.Code(err) == codes.Unimplemented:
+			observeSubmitStage("durable_readback", "unsupported", lookupStarted)
+			resilience.ObserveAnswerSheetSubmitCoalescer("readback_unsupported")
+		case err != nil:
+			observeSubmitStage("durable_readback", "error", lookupStarted)
+			resilience.ObserveAnswerSheetSubmitCoalescer("readback_error")
+			return nil, err
+		default:
+			observeSubmitStage("durable_readback", "error", lookupStarted)
+			resilience.ObserveAnswerSheetSubmitCoalescer("readback_error")
+			return nil, status.Error(codes.Unavailable, "answer sheet durable readback returned an invalid result")
+		}
+	} else {
+		resilience.ObserveAnswerSheetSubmitCoalescer("readback_unsupported")
+	}
+
+	preflightStarted := time.Now()
+	if err := s.validatePublishedSubmission(ctx, req); err != nil {
+		observeSubmitStage("preflight", "failed", preflightStarted)
+		return nil, err
+	}
+	observeSubmitStage("preflight", "ok", preflightStarted)
+	return s.accept(ctx, requestID, writerID, req)
 }
 
 func (s *SubmissionService) accept(ctx context.Context, requestID string, writerID uint64, req *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {

@@ -21,6 +21,10 @@ type AnswerSheetSubmissionService interface {
 	// 场景：答题者填写完问卷后提交答案
 	Submit(ctx context.Context, dto SubmitAnswerSheetDTO) (*AnswerSheetResult, error)
 
+	// LookupAcceptedSubmission reads and verifies an already durable submission
+	// without revalidating mutable questionnaire, attribution or profile state.
+	LookupAcceptedSubmission(ctx context.Context, dto LookupSubmissionDTO) (*AnswerSheetResult, bool, error)
+
 	// GetMyAnswerSheet 获取我的答卷
 	// 场景：答题者查看自己提交的答卷详情
 	GetMyAnswerSheet(ctx context.Context, fillerID uint64, answerSheetID uint64) (*AnswerSheetResult, error)

@@ -114,6 +114,74 @@ func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAn
 	}, nil
 }
 
+// LookupAnswerSheetSubmission reads an already durable submission without
+// revalidating mutable questionnaire, attribution or profile state.
+func (s *AnswerSheetService) LookupAnswerSheetSubmission(
+	ctx context.Context,
+	req *pb.LookupAnswerSheetSubmissionRequest,
+) (*pb.LookupAnswerSheetSubmissionResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "lookup request 不能为空")
+	}
+	if req.WriterId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "writer_id 不能为空")
+	}
+	if req.TesteeId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "testee_id 不能为空")
+	}
+	if req.QuestionnaireCode == "" || req.QuestionnaireVersion == "" {
+		return nil, status.Error(codes.InvalidArgument, "questionnaire_code 和 questionnaire_version 不能为空")
+	}
+	if !safeAnswerSheetIdempotencyKey.MatchString(req.IdempotencyKey) {
+		return nil, status.Error(codes.InvalidArgument, "idempotency_key 必须包含 8-128 个安全字符")
+	}
+	if len(req.Answers) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "answers 不能为空")
+	}
+
+	answers := make([]answersheet.AnswerDTO, 0, len(req.Answers))
+	for _, answer := range req.Answers {
+		if answer == nil || answer.QuestionCode == "" || answer.QuestionType == "" {
+			return nil, status.Error(codes.InvalidArgument, "answer 的 question_code 和 question_type 不能为空")
+		}
+		rawValue, err := surveyvalidation.DecodeAnswerValue(answer.QuestionType, answer.Value)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("问题 %s 的答案格式不正确: %v", answer.QuestionCode, err))
+		}
+		answers = append(answers, answersheet.AnswerDTO{
+			QuestionCode: answer.QuestionCode,
+			QuestionType: answer.QuestionType,
+			Value:        rawValue,
+		})
+	}
+	dto := answersheet.LookupSubmissionDTO{
+		QuestionnaireCode: req.QuestionnaireCode,
+		QuestionnaireVer:  req.QuestionnaireVersion,
+		IdempotencyKey:    req.IdempotencyKey,
+		FillerID:          req.WriterId,
+		TesteeID:          req.TesteeId,
+		TaskID:            req.TaskId,
+		Answers:           answers,
+	}
+	if req.OriginRef != nil {
+		dto.OriginRef = &answersheet.OriginRefDTO{Type: req.OriginRef.Type, ID: req.OriginRef.Id}
+	}
+	result, found, err := s.submissionService.LookupAcceptedSubmission(ctx, dto)
+	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, status.FromContextError(ctxErr).Err()
+		}
+		return nil, toAnswerSheetGRPCError(err)
+	}
+	if !found {
+		return &pb.LookupAnswerSheetSubmissionResponse{}, nil
+	}
+	if result == nil || result.ID == 0 {
+		return nil, status.Error(codes.Unavailable, "durable submission lookup returned no id")
+	}
+	return &pb.LookupAnswerSheetSubmissionResponse{Found: true, Id: result.ID}, nil
+}
+
 // GetAnswerSheet 获取答卷详情（C端）
 // @Description C端用户查看自己提交的答卷详情
 // Note: gRPC 内部调用，不进行权限验证

@@ -35,10 +35,18 @@ func TestAnswerSheetServiceMapsOwnershipFieldsToProto(t *testing.T) {
 
 type submissionServiceStub struct {
 	submitFunc func(context.Context, appanswersheet.SubmitAnswerSheetDTO) (*appanswersheet.AnswerSheetResult, error)
+	lookupFunc func(context.Context, appanswersheet.LookupSubmissionDTO) (*appanswersheet.AnswerSheetResult, bool, error)
 }
 
 func (s *submissionServiceStub) Submit(ctx context.Context, dto appanswersheet.SubmitAnswerSheetDTO) (*appanswersheet.AnswerSheetResult, error) {
 	return s.submitFunc(ctx, dto)
+}
+
+func (s *submissionServiceStub) LookupAcceptedSubmission(ctx context.Context, dto appanswersheet.LookupSubmissionDTO) (*appanswersheet.AnswerSheetResult, bool, error) {
+	if s.lookupFunc == nil {
+		return nil, false, nil
+	}
+	return s.lookupFunc(ctx, dto)
 }
 
 func (s *submissionServiceStub) GetMyAnswerSheet(context.Context, uint64, uint64) (*appanswersheet.AnswerSheetResult, error) {
@@ -182,5 +190,133 @@ func TestAnswerSheetServiceSaveAnswerSheetMapsIdempotencyConflict(t *testing.T) 
 	})
 	if status.Code(err) != codes.AlreadyExists {
 		t.Fatalf("expected AlreadyExists, got %s", status.Code(err))
+	}
+}
+
+func TestAnswerSheetServiceLookupAnswerSheetSubmissionReturnsDurableHit(t *testing.T) {
+	t.Parallel()
+
+	var captured appanswersheet.LookupSubmissionDTO
+	svc := NewAnswerSheetService(&submissionServiceStub{
+		submitFunc: func(context.Context, appanswersheet.SubmitAnswerSheetDTO) (*appanswersheet.AnswerSheetResult, error) {
+			t.Fatal("lookup must not call Submit")
+			return nil, nil
+		},
+		lookupFunc: func(_ context.Context, dto appanswersheet.LookupSubmissionDTO) (*appanswersheet.AnswerSheetResult, bool, error) {
+			captured = dto
+			return &appanswersheet.AnswerSheetResult{ID: 42}, true, nil
+		},
+	}, &managementServiceStub{})
+
+	response, err := svc.LookupAnswerSheetSubmission(t.Context(), &pb.LookupAnswerSheetSubmissionRequest{
+		WriterId:             101,
+		IdempotencyKey:       "submit-lookup-1",
+		QuestionnaireCode:    "QNR-001",
+		QuestionnaireVersion: "1.0.0",
+		TesteeId:             202,
+		Answers:              []*pb.SubmissionIntentAnswer{{QuestionCode: "q1", QuestionType: "Checkbox", Value: `["A","B"]`}},
+	})
+	if err != nil || response == nil || !response.Found || response.Id != 42 {
+		t.Fatalf("LookupAnswerSheetSubmission() = response=%#v err=%v", response, err)
+	}
+	if len(captured.Answers) != 1 {
+		t.Fatalf("captured answers = %#v", captured.Answers)
+	}
+	if _, ok := captured.Answers[0].Value.([]string); !ok {
+		t.Fatalf("captured answer value type = %T, want []string", captured.Answers[0].Value)
+	}
+}
+
+func TestAnswerSheetServiceLookupAnswerSheetSubmissionReturnsExplicitMiss(t *testing.T) {
+	t.Parallel()
+
+	svc := NewAnswerSheetService(&submissionServiceStub{
+		submitFunc: func(context.Context, appanswersheet.SubmitAnswerSheetDTO) (*appanswersheet.AnswerSheetResult, error) {
+			return nil, nil
+		},
+		lookupFunc: func(context.Context, appanswersheet.LookupSubmissionDTO) (*appanswersheet.AnswerSheetResult, bool, error) {
+			return nil, false, nil
+		},
+	}, &managementServiceStub{})
+
+	response, err := svc.LookupAnswerSheetSubmission(t.Context(), validLookupSubmissionRequest())
+	if err != nil || response == nil || response.Found || response.Id != 0 {
+		t.Fatalf("LookupAnswerSheetSubmission() = response=%#v err=%v", response, err)
+	}
+}
+
+func TestAnswerSheetServiceLookupAnswerSheetSubmissionMapsConflict(t *testing.T) {
+	t.Parallel()
+
+	svc := NewAnswerSheetService(&submissionServiceStub{
+		submitFunc: func(context.Context, appanswersheet.SubmitAnswerSheetDTO) (*appanswersheet.AnswerSheetResult, error) {
+			return nil, nil
+		},
+		lookupFunc: func(context.Context, appanswersheet.LookupSubmissionDTO) (*appanswersheet.AnswerSheetResult, bool, error) {
+			return nil, false, pkgerrors.WithCode(errorCode.ErrConflict, "idempotency conflict")
+		},
+	}, &managementServiceStub{})
+
+	_, err := svc.LookupAnswerSheetSubmission(t.Context(), validLookupSubmissionRequest())
+	if status.Code(err) != codes.AlreadyExists {
+		t.Fatalf("LookupAnswerSheetSubmission() status = %s, want AlreadyExists", status.Code(err))
+	}
+}
+
+func TestAnswerSheetServiceLookupAnswerSheetSubmissionMapsReadErrorToUnavailable(t *testing.T) {
+	t.Parallel()
+
+	svc := NewAnswerSheetService(&submissionServiceStub{
+		lookupFunc: func(context.Context, appanswersheet.LookupSubmissionDTO) (*appanswersheet.AnswerSheetResult, bool, error) {
+			return nil, false, pkgerrors.WithCode(errorCode.ErrDatabase, "mongo unavailable")
+		},
+	}, &managementServiceStub{})
+
+	_, err := svc.LookupAnswerSheetSubmission(t.Context(), validLookupSubmissionRequest())
+	if status.Code(err) != codes.Unavailable {
+		t.Fatalf("LookupAnswerSheetSubmission() status = %s, want Unavailable", status.Code(err))
+	}
+}
+
+func TestAnswerSheetServiceLookupAnswerSheetSubmissionPreservesCancellation(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	svc := NewAnswerSheetService(&submissionServiceStub{
+		lookupFunc: func(context.Context, appanswersheet.LookupSubmissionDTO) (*appanswersheet.AnswerSheetResult, bool, error) {
+			return nil, false, context.Canceled
+		},
+	}, &managementServiceStub{})
+
+	_, err := svc.LookupAnswerSheetSubmission(ctx, validLookupSubmissionRequest())
+	if status.Code(err) != codes.Canceled {
+		t.Fatalf("LookupAnswerSheetSubmission() status = %s, want Canceled", status.Code(err))
+	}
+}
+
+func TestAnswerSheetServiceLookupAnswerSheetSubmissionRejectsFoundWithoutID(t *testing.T) {
+	t.Parallel()
+
+	svc := NewAnswerSheetService(&submissionServiceStub{
+		lookupFunc: func(context.Context, appanswersheet.LookupSubmissionDTO) (*appanswersheet.AnswerSheetResult, bool, error) {
+			return &appanswersheet.AnswerSheetResult{}, true, nil
+		},
+	}, &managementServiceStub{})
+
+	_, err := svc.LookupAnswerSheetSubmission(t.Context(), validLookupSubmissionRequest())
+	if status.Code(err) != codes.Unavailable {
+		t.Fatalf("LookupAnswerSheetSubmission() status = %s, want Unavailable", status.Code(err))
+	}
+}
+
+func validLookupSubmissionRequest() *pb.LookupAnswerSheetSubmissionRequest {
+	return &pb.LookupAnswerSheetSubmissionRequest{
+		WriterId:             101,
+		IdempotencyKey:       "submit-lookup-1",
+		QuestionnaireCode:    "QNR-001",
+		QuestionnaireVersion: "1.0.0",
+		TesteeId:             202,
+		Answers:              []*pb.SubmissionIntentAnswer{{QuestionCode: "q1", QuestionType: "Text", Value: `"ok"`}},
 	}
 }

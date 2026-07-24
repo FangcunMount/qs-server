@@ -23,9 +23,17 @@ type AnswerSheetBFFWriter struct {
 	inner grpcbridge.AnswerSheetWriter
 }
 
+type AnswerSheetDurableResultReader struct {
+	inner grpcbridge.AnswerSheetWriter
+}
+
 // NewAnswerSheetBFFWriter 构造答卷写 ACL 适配器。
 func NewAnswerSheetBFFWriter(inner grpcbridge.AnswerSheetWriter) *AnswerSheetBFFWriter {
 	return &AnswerSheetBFFWriter{inner: inner}
+}
+
+func NewAnswerSheetDurableResultReader(inner grpcbridge.AnswerSheetWriter) *AnswerSheetDurableResultReader {
+	return &AnswerSheetDurableResultReader{inner: inner}
 }
 
 func (w *AnswerSheetBFFWriter) SaveAnswerSheet(ctx context.Context, input *answersheet.SaveAnswerSheetInput) (*answersheet.SaveAnswerSheetOutput, error) {
@@ -74,6 +82,42 @@ func toGRPCSaveAnswerSheetInput(input *answersheet.SaveAnswerSheetInput) *grpcbr
 		OrgID:                input.OrgID,
 		Answers:              answers,
 	}
+}
+
+func (r *AnswerSheetDurableResultReader) LookupAcceptedSubmission(
+	ctx context.Context,
+	input *answersheet.LookupAcceptedSubmissionInput,
+) (*answersheet.LookupAcceptedSubmissionOutput, error) {
+	if r == nil || r.inner == nil || input == nil {
+		return nil, nil
+	}
+	grpcInput := &grpcbridge.LookupAnswerSheetSubmissionInput{
+		QuestionnaireCode:    input.QuestionnaireCode,
+		QuestionnaireVersion: input.QuestionnaireVersion,
+		IdempotencyKey:       input.IdempotencyKey,
+		WriterID:             input.WriterID,
+		TesteeID:             input.TesteeID,
+		TaskID:               input.TaskID,
+		Answers:              make([]grpcbridge.AnswerInput, len(input.Answers)),
+	}
+	if input.OriginRef != nil {
+		grpcInput.OriginRef = &grpcbridge.OriginRef{Type: input.OriginRef.Type, ID: input.OriginRef.ID}
+	}
+	for i, answer := range input.Answers {
+		grpcInput.Answers[i] = grpcbridge.AnswerInput{
+			QuestionCode: answer.QuestionCode,
+			QuestionType: answer.QuestionType,
+			Value:        answer.Value,
+		}
+	}
+	return grpcbridge.CallBridge(r.inner,
+		func() (*grpcbridge.LookupAnswerSheetSubmissionOutput, error) {
+			return r.inner.LookupAnswerSheetSubmission(ctx, grpcInput)
+		},
+		func(result *grpcbridge.LookupAnswerSheetSubmissionOutput) *answersheet.LookupAcceptedSubmissionOutput {
+			return &answersheet.LookupAcceptedSubmissionOutput{Found: result.Found, ID: result.ID}
+		},
+	)
 }
 
 func (r *AnswerSheetBFFReader) GetAnswerSheet(ctx context.Context, id uint64) (*answersheet.AnswerSheetResponse, error) {

@@ -69,6 +69,7 @@ func (s *submissionService) findExistingSubmissionBeforeAttribution(ctx context.
 		return nil, err
 	}
 	existing, err := reader.FindCompleted(ctx, DurableSubmitMeta{IdempotencyKey: dto.IdempotencyKey, WriterID: dto.FillerID, Fingerprint: fingerprint, RequestID: dto.RequestID})
+	observeDurableLookupOperation("early_lookup", existing, err)
 	if stderrors.Is(err, submitport.ErrIdempotencyConflict) {
 		observeDurableSubmit("idempotency_conflict")
 		return nil, errors.WithCode(errorCode.ErrConflict, "%v", err)

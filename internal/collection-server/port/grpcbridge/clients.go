@@ -42,5 +42,6 @@ type ActorWriter interface {
 // AnswerSheetWriter 答卷写端口。
 type AnswerSheetWriter interface {
 	SaveAnswerSheet(ctx context.Context, input *SaveAnswerSheetInput) (*SaveAnswerSheetOutput, error)
+	LookupAnswerSheetSubmission(ctx context.Context, input *LookupAnswerSheetSubmissionInput) (*LookupAnswerSheetSubmissionOutput, error)
 	GetAnswerSheet(ctx context.Context, id uint64) (*AnswerSheetOutput, error)
 }

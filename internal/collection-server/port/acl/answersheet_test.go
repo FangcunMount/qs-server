@@ -10,9 +10,11 @@ import (
 )
 
 type grpcAnswerSheetWriterStub struct {
-	input  *grpcbridge.SaveAnswerSheetInput
-	output *grpcbridge.SaveAnswerSheetOutput
-	err    error
+	input        *grpcbridge.SaveAnswerSheetInput
+	output       *grpcbridge.SaveAnswerSheetOutput
+	lookupInput  *grpcbridge.LookupAnswerSheetSubmissionInput
+	lookupOutput *grpcbridge.LookupAnswerSheetSubmissionOutput
+	err          error
 }
 
 func (s *grpcAnswerSheetWriterStub) SaveAnswerSheet(_ context.Context, input *grpcbridge.SaveAnswerSheetInput) (*grpcbridge.SaveAnswerSheetOutput, error) {
@@ -22,6 +24,11 @@ func (s *grpcAnswerSheetWriterStub) SaveAnswerSheet(_ context.Context, input *gr
 
 func (s *grpcAnswerSheetWriterStub) GetAnswerSheet(context.Context, uint64) (*grpcbridge.AnswerSheetOutput, error) {
 	return nil, nil
+}
+
+func (s *grpcAnswerSheetWriterStub) LookupAnswerSheetSubmission(_ context.Context, input *grpcbridge.LookupAnswerSheetSubmissionInput) (*grpcbridge.LookupAnswerSheetSubmissionOutput, error) {
+	s.lookupInput = input
+	return s.lookupOutput, s.err
 }
 
 func TestAnswerSheetBFFWriterMapsApplicationInputToGRPC(t *testing.T) {
@@ -102,5 +109,32 @@ func TestAnswerSheetBFFWriterAllowsNilGateway(t *testing.T) {
 	}
 	if got != nil {
 		t.Fatalf("SaveAnswerSheet() = %+v, want nil", got)
+	}
+}
+
+func TestAnswerSheetDurableResultReaderMapsLookupContract(t *testing.T) {
+	t.Parallel()
+
+	inner := &grpcAnswerSheetWriterStub{
+		lookupOutput: &grpcbridge.LookupAnswerSheetSubmissionOutput{Found: true, ID: 42},
+	}
+	reader := NewAnswerSheetDurableResultReader(inner)
+	got, err := reader.LookupAcceptedSubmission(t.Context(), &answersheet.LookupAcceptedSubmissionInput{
+		QuestionnaireCode:    "Q-1",
+		QuestionnaireVersion: "1",
+		IdempotencyKey:       "lookup-idem-1",
+		WriterID:             11,
+		TesteeID:             22,
+		Answers: []answersheet.AnswerInput{{
+			QuestionCode: "q1",
+			QuestionType: "Text",
+			Value:        `"ok"`,
+		}},
+	})
+	if err != nil || got == nil || !got.Found || got.ID != 42 {
+		t.Fatalf("LookupAcceptedSubmission() = (%#v, %v)", got, err)
+	}
+	if inner.lookupInput == nil || inner.lookupInput.WriterID != 11 || len(inner.lookupInput.Answers) != 1 {
+		t.Fatalf("lookup input = %#v", inner.lookupInput)
 	}
 }

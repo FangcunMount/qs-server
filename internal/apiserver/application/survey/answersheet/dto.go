@@ -31,6 +31,20 @@ type AnswerDTO struct {
 	Value        interface{} // 答案值（根据问题类型可能是string、number、[]string等）
 }
 
+// LookupSubmissionDTO describes the immutable caller-controlled portion of a
+// durable submission intent. OrgID is deliberately absent: a replay compares
+// against the organization captured by the already accepted AnswerSheet.
+type LookupSubmissionDTO struct {
+	QuestionnaireCode string
+	QuestionnaireVer  string
+	IdempotencyKey    string
+	TesteeID          uint64
+	FillerID          uint64
+	TaskID            string
+	OriginRef         *OriginRefDTO
+	Answers           []AnswerDTO
+}
+
 // ListMyAnswerSheetsDTO 查询我的答卷列表 DTO
 type ListMyAnswerSheetsDTO struct {
 	FillerID          uint64            // 填写人ID（必填）

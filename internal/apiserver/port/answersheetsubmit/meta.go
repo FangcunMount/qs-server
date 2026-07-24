@@ -19,6 +19,27 @@ type DurableSubmitMeta struct {
 	RequestID      string
 }
 
+// SubmissionIntent is the canonical business input covered by the durable
+// submission fingerprint. Derived IDs, timestamps, titles and scores are
+// deliberately excluded.
+type SubmissionIntent struct {
+	WriterID             int64
+	TesteeID             uint64
+	OrgID                uint64
+	TaskID               string
+	OriginType           string
+	OriginID             string
+	QuestionnaireCode    string
+	QuestionnaireVersion string
+	Answers              []SubmissionAnswer
+}
+
+type SubmissionAnswer struct {
+	QuestionCode string
+	QuestionType string
+	Value        any
+}
+
 // Fingerprint returns a stable fingerprint of the submission's business
 // intent. Generated IDs, timestamps and calculated scores are excluded.
 func Fingerprint(sheet *domainanswersheet.AnswerSheet) (string, error) {
@@ -27,6 +48,31 @@ func Fingerprint(sheet *domainanswersheet.AnswerSheet) (string, error) {
 	}
 	ctx := sheet.SubmissionContext()
 	code, version, _ := sheet.QuestionnaireInfo()
+	attribution := ctx.Attribution()
+	intent := SubmissionIntent{
+		WriterID:             ctx.Filler().UserID(),
+		TesteeID:             ctx.TesteeID().Uint64(),
+		OrgID:                ctx.OrgID().Uint64(),
+		TaskID:               ctx.TaskID(),
+		OriginType:           string(attribution.OriginType()),
+		OriginID:             attribution.OriginID(),
+		QuestionnaireCode:    code,
+		QuestionnaireVersion: version,
+		Answers:              make([]SubmissionAnswer, 0, len(sheet.Answers())),
+	}
+	for _, answer := range sheet.Answers() {
+		intent.Answers = append(intent.Answers, SubmissionAnswer{
+			QuestionCode: answer.QuestionCode(),
+			QuestionType: answer.QuestionType(),
+			Value:        answer.Value().Raw(),
+		})
+	}
+	return FingerprintIntent(intent)
+}
+
+// FingerprintIntent hashes an explicit submission intent using the exact
+// canonical JSON shape historically produced by Fingerprint.
+func FingerprintIntent(intent SubmissionIntent) (string, error) {
 	type canonicalAnswer struct {
 		QuestionCode string `json:"question_code"`
 		QuestionType string `json:"question_type"`
@@ -43,15 +89,15 @@ func Fingerprint(sheet *domainanswersheet.AnswerSheet) (string, error) {
 		QuestionnaireVersion string            `json:"questionnaire_version"`
 		Answers              []canonicalAnswer `json:"answers"`
 	}
-	answers := make([]canonicalAnswer, 0, len(sheet.Answers()))
-	for _, answer := range sheet.Answers() {
-		value, err := json.Marshal(answer.Value().Raw())
+	answers := make([]canonicalAnswer, 0, len(intent.Answers))
+	for _, answer := range intent.Answers {
+		value, err := json.Marshal(answer.Value)
 		if err != nil {
 			return "", err
 		}
 		answers = append(answers, canonicalAnswer{
-			QuestionCode: answer.QuestionCode(),
-			QuestionType: answer.QuestionType(),
+			QuestionCode: answer.QuestionCode,
+			QuestionType: answer.QuestionType,
 			Value:        string(value),
 		})
 	}
@@ -64,16 +110,15 @@ func Fingerprint(sheet *domainanswersheet.AnswerSheet) (string, error) {
 		}
 		return answers[i].Value < answers[j].Value
 	})
-	attribution := ctx.Attribution()
 	payload, err := json.Marshal(canonicalSubmission{
-		WriterID:             ctx.Filler().UserID(),
-		TesteeID:             ctx.TesteeID().Uint64(),
-		OrgID:                ctx.OrgID().Uint64(),
-		TaskID:               ctx.TaskID(),
-		OriginType:           string(attribution.OriginType()),
-		OriginID:             attribution.OriginID(),
-		QuestionnaireCode:    code,
-		QuestionnaireVersion: version,
+		WriterID:             intent.WriterID,
+		TesteeID:             intent.TesteeID,
+		OrgID:                intent.OrgID,
+		TaskID:               intent.TaskID,
+		OriginType:           intent.OriginType,
+		OriginID:             intent.OriginID,
+		QuestionnaireCode:    intent.QuestionnaireCode,
+		QuestionnaireVersion: intent.QuestionnaireVersion,
 		Answers:              answers,
 	})
 	if err != nil {
