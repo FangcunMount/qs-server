@@ -137,7 +137,8 @@ func prepareDelegatedSubjectContract(t *testing.T, configName string, opts *dele
 	if opts.CurrentKey != "" || opts.PreviousKey != "" {
 		t.Fatalf("%s delegated-subject keys must not be committed to config", configName)
 	}
-	// Production injects this value through QS_DELEGATED_SUBJECT_CURRENT_KEY.
+	// Production injects this value through the service-prefixed
+	// *_DELEGATED_SUBJECT_CURRENT_KEY environment variable.
 	// Supply a non-secret test value only after proving the file itself is empty.
 	opts.CurrentKey = "config-contract-test-key"
 }

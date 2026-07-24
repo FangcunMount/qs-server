@@ -112,8 +112,8 @@ grpc:
 
 # collection-server 代表 IAM User 调用患者报告 gRPC 时的短期委托凭据。
 # 密钥只允许通过环境变量注入：
-#   QS_DELEGATED_SUBJECT_CURRENT_KEY
-#   QS_DELEGATED_SUBJECT_PREVIOUS_KEY（轮换窗口可选）
+#   QS_APISERVER_DELEGATED_SUBJECT_CURRENT_KEY
+#   QS_APISERVER_DELEGATED_SUBJECT_PREVIOUS_KEY（轮换窗口可选）
 delegated-subject:
   enabled: true
   current-key: ""

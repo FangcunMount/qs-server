@@ -13,9 +13,11 @@ var sensitiveFields = map[string]struct{}{
 	"app_secret":    {},
 	"authorization": {},
 	"client_secret": {},
+	"current_key":   {},
 	"jwt_secret":    {},
 	"key":           {},
 	"password":      {},
+	"previous_key":  {},
 	"private_key":   {},
 	"refresh_token": {},
 	"secret":        {},
@@ -118,6 +120,8 @@ func isSensitiveField(field string) bool {
 	}
 
 	return strings.HasSuffix(normalized, "_password") ||
+		strings.HasSuffix(normalized, "_current_key") ||
+		strings.HasSuffix(normalized, "_previous_key") ||
 		strings.HasSuffix(normalized, "_secret") ||
 		strings.HasSuffix(normalized, "_token")
 }
