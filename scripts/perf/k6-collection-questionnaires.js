@@ -1,13 +1,13 @@
 import http from 'k6/http';
 import { check } from 'k6';
 
-// collection-server 问卷列表压测脚本（固定配置）
-const BASE_URL = 'http://47.94.204.124:8082';
-const TOKEN = 'eyJhbGciOiJSUzI1NiIsImtpZCI6ImI0NmExZTY4LWJlODMtNDFmNS1hYWIxLTA3MTUxNjlhOGVmNSIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjo2MDA5OTcwMzIyNjEzMzM1NTAsImFjY291bnRfaWQiOjYwMDk5NzAzMjI3ODExMDc2NiwiZXhwIjoxNzY4MjgzMzU1LCJqdGkiOiIwIiwiaWF0IjoxNzY4MjgyNDU1LCJuYmYiOjE3NjgyODI0NTUsInN1YiI6IjYwMDk5NzAzMjI2MTMzMzU1MCJ9.kHq6xgkJm88gIJYC4Qk3HsmdaOg7H2FCfnZJoIDb4WVOsWFcZdSToY0m79r613oFWLtVPWEwVjarUksAi2xs58TUBUEGrnar2GITiUEFoJjGLZ3vVUSH5Y9vxTVARAmgOVL2j0VOH60b8D-LGMoNV_IqupK7i4g03ndYhYx8J6vWAwD_dccN3As91HS1pI2sImfPTvzn25YXKRRw0vNvdSYJ5Pqfqn750j3_fV7X0Vn0p7ivvNTJ2FsPFKyLZMvxT2tcA_WfISqOTuBRxZLqMMnjrcFvcoznD8EKibQ0GHKbUA-wQqcJfHz1IC2RiwRFq-tWR4D2zfBpyXNCiXsGDw';
-const RATE = 120;
-const DURATION = '2m';
-const VUS = 60;
-const MAX_VUS = 200;
+// collection-server 问卷列表压测脚本。
+const BASE_URL = __ENV.COLLECTION_BASE_URL || __ENV.BASE_URL || 'http://127.0.0.1:18083';
+const TOKEN = __ENV.COLLECTION_TOKEN || __ENV.TOKEN || '';
+const RATE = Number(__ENV.RPS || 120);
+const DURATION = __ENV.DURATION || '2m';
+const VUS = Number(__ENV.VUS || 60);
+const MAX_VUS = Number(__ENV.MAX_VUS || 200);
 
 const DEFAULT_QUERY = {
   page: 1,

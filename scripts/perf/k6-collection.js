@@ -1,7 +1,7 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 
-const BASE_URL = __ENV.BASE_URL || 'http://127.0.0.1:18081'; // collection-server 默认端口按需改
+const BASE_URL = __ENV.COLLECTION_BASE_URL || __ENV.BASE_URL || 'http://127.0.0.1:18083';
 const TOKEN = __ENV.TOKEN || ''; // 需要保护接口时传 Bearer Token
 
 // 触发 POST 提交答卷：ENABLE_SUBMIT=true 并提供 ANSWER_BODY（JSON 字符串）

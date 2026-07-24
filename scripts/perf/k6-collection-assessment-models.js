@@ -2,8 +2,8 @@ import http from 'k6/http';
 import { check } from 'k6';
 
 // collection-server 已发布测评模型目录压测脚本。
-const BASE_URL = __ENV.BASE_URL || 'http://127.0.0.1:8082';
-const TOKEN = __ENV.TOKEN || '';
+const BASE_URL = __ENV.COLLECTION_BASE_URL || __ENV.BASE_URL || 'http://127.0.0.1:18083';
+const TOKEN = __ENV.COLLECTION_TOKEN || __ENV.TOKEN || '';
 const RATE = Number(__ENV.RPS || '150');
 const DURATION = __ENV.DURATION || '2m';
 const VUS = Number(__ENV.VUS || '80');

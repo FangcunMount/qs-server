@@ -1,15 +1,16 @@
 import http from 'k6/http';
-import { check } from 'k6';
+import { check, fail } from 'k6';
 
-const BASE_URL = __ENV.BASE_URL || 'http://127.0.0.1:18082';
+const BASE_URL = __ENV.COLLECTION_BASE_URL || __ENV.BASE_URL || 'http://127.0.0.1:18083';
 const RAW_PATH = __ENV.PATH || '/api/v1/public/info';
-const TOKEN = __ENV.TOKEN || '';
+const TOKEN = __ENV.COLLECTION_TOKEN || __ENV.TOKEN || '';
 const TESTEE_ID = __ENV.TESTEE_ID || '';
 const METHOD = (__ENV.METHOD || '').toUpperCase() || (RAW_PATH.includes('answersheets') ? 'POST' : 'GET');
 const QUESTIONNAIRE_CODE = __ENV.Q_CODE || __ENV.QUESTIONNAIRE_CODE || '';
 const QUESTIONNAIRE_VER = __ENV.Q_VER || __ENV.QUESTIONNAIRE_VER || '';
 const FILLER_ID = __ENV.FILLER_ID || '';
 const ANSWERS_JSON = __ENV.ANSWERS || '';
+const IDEMPOTENCY_PREFIX = __ENV.IDEMPOTENCY_PREFIX || `k6-qs-${Date.now()}`;
 
 export const options = {
   scenarios: {
@@ -28,6 +29,17 @@ export const options = {
   },
 };
 
+export function setup() {
+  if (METHOD === 'POST' && RAW_PATH.includes('/answersheets')) {
+    if (!TOKEN) {
+      fail('COLLECTION_TOKEN or TOKEN is required for AnswerSheet submit');
+    }
+    if (!ANSWERS_JSON) {
+      fail('ANSWERS is required for AnswerSheet submit; demo business payloads are not generated');
+    }
+  }
+}
+
 export default function () {
   const headers = TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {};
   let path = buildPathWithTestee(RAW_PATH, TESTEE_ID);
@@ -41,9 +53,18 @@ export default function () {
     res = http.get(`${BASE_URL}${path}`, { headers });
   }
 
-  check(res, {
-    'status 200': (r) => r.status === 200,
-  });
+  const isAnswerSheetSubmit = METHOD === 'POST' && path.includes('/answersheets');
+  const expectedStatus = Number(__ENV.EXPECTED_STATUS || (isAnswerSheetSubmit ? 202 : 200));
+  const checks = {
+    [`status ${expectedStatus}`]: (result) => result.status === expectedStatus,
+  };
+  if (isAnswerSheetSubmit) {
+    checks['answersheet submit is durably accepted'] = (result) => {
+      const data = responseData(result);
+      return data.status === 'accepted' && Boolean(data.answersheet_id);
+    };
+  }
+  check(res, checks);
 }
 
 // 如果配置了 TESTEE_ID，且路径指向 assessments 列表而未带 testee_id，则自动补上
@@ -67,6 +88,10 @@ function buildAnswerSheetPayload() {
       title: raw.title,
       testee_id: parseId(raw.testee_id || raw.testeeId || raw.testeeID || TESTEE_ID),
       filler_id: parseId(raw.filler_id || raw.fillerId || raw.fillerID || raw.writer_id || raw.writerId || raw.writerID || FILLER_ID),
+      idempotency_key:
+        raw.idempotency_key ||
+        raw.idempotencyKey ||
+        `${IDEMPOTENCY_PREFIX}-${__VU}-${__ITER}-${Date.now()}`,
       answers: [],
     };
 
@@ -123,4 +148,13 @@ function parseId(val) {
   }
   // 超出 JS 安全整数范围，返回字符串以避免精度丢失（需后端支持字符串数字）
   return str;
+}
+
+function responseData(response) {
+  try {
+    const envelope = response.json();
+    return envelope && envelope.data !== undefined ? envelope.data || {} : envelope || {};
+  } catch (_) {
+    return {};
+  }
 }
