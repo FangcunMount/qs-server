@@ -15,6 +15,7 @@ APP_UID="${WWW_UID}"
 APP_GID="${WWW_GID}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 COLLECTION_COMPOSE_PROJECT="${COLLECTION_COMPOSE_PROJECT:-qs-collection}"
+WORKER_COMPOSE_PROJECT="${WORKER_COMPOSE_PROJECT:-qs-worker}"
 
 case "$IMAGE_TAG" in
   ""|*[!A-Za-z0-9_.-]*)
@@ -381,6 +382,32 @@ stop_single_container() {
   fi
 }
 
+remove_legacy_compose_service() {
+  local project="$1"
+  local legacy_service="$2"
+  local container_ids container_id
+
+  if [ "$legacy_service" = "$COMPOSE_SERVICE" ]; then
+    return 0
+  fi
+
+  container_ids="$(
+    $SUDO docker ps -a \
+      --filter "label=com.docker.compose.project=${project}" \
+      --filter "label=com.docker.compose.service=${legacy_service}" \
+      --format '{{.ID}}'
+  )"
+  if [ -z "$container_ids" ]; then
+    return 0
+  fi
+
+  echo "Removing containers from legacy Compose service ${project}/${legacy_service}..."
+  while IFS= read -r container_id; do
+    [ -z "$container_id" ] && continue
+    $SUDO docker rm -f "$container_id"
+  done <<<"$container_ids"
+}
+
 docker_compose_pull_supports_quiet() {
   $SUDO docker compose pull --help 2>/dev/null | grep -q -- '--quiet'
 }
@@ -547,6 +574,7 @@ deploy_collection() {
       [ "$ready_count" -eq "$COLLECTION_REPLICAS" ]; then
       echo "Collection replicas are ready (${ready_count}/${COLLECTION_REPLICAS})"
       verify_collection_images
+      remove_legacy_compose_service "$COLLECTION_COMPOSE_PROJECT" "qs-collection-server"
       docker_compose \
         -p "$COLLECTION_COMPOSE_PROJECT" \
         -f "$DEPLOY_TMP/docker-compose.prod.yml" \
@@ -581,9 +609,9 @@ deploy_worker() {
   fi
 
   cd "/opt/qs-server/${CONTAINER_NAME}"
-  docker_compose_pull -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml"
+  docker_compose_pull -p "$WORKER_COMPOSE_PROJECT" -f "$DEPLOY_TMP/docker-compose.prod.yml"
 
-  echo "Cleaning up legacy worker containers..."
+  echo "Cleaning up legacy non-Compose worker containers..."
   local legacy_workers
   legacy_workers=$($SUDO docker ps -a --format '{{.ID}} {{.Names}}' | awk '$2 == "qs-worker" || $2 ~ /^qs-deploy-worker-[0-9]+-qs-worker-[0-9]+$/ {print $1}')
   if [ -n "$legacy_workers" ]; then
@@ -595,24 +623,24 @@ deploy_worker() {
   fi
 
   # shellcheck disable=SC2046
-  docker_compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d $(compose_up_pull_never_flag) --scale "${COMPOSE_SERVICE}=${WORKER_REPLICAS}" "$COMPOSE_SERVICE"
+  docker_compose -p "$WORKER_COMPOSE_PROJECT" -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d $(compose_up_pull_never_flag) --scale "${COMPOSE_SERVICE}=${WORKER_REPLICAS}" "$COMPOSE_SERVICE"
 
   echo "Waiting for container to start..."
   sleep 10
 
   local running_count worker_containers first_worker ready
-  running_count=$(docker_compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" ps --status running -q "$COMPOSE_SERVICE" | wc -l | tr -d ' ')
+  running_count=$(docker_compose -p "$WORKER_COMPOSE_PROJECT" -f "$DEPLOY_TMP/docker-compose.prod.yml" ps --status running -q "$COMPOSE_SERVICE" | wc -l | tr -d ' ')
 
   if [ "$running_count" -lt "$WORKER_REPLICAS" ]; then
     echo "Worker replicas failed to reach expected count (${running_count}/${WORKER_REPLICAS})" >&2
-    docker_compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" ps "$COMPOSE_SERVICE" || true
-    docker_compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 100 "$COMPOSE_SERVICE" || true
+    docker_compose -p "$WORKER_COMPOSE_PROJECT" -f "$DEPLOY_TMP/docker-compose.prod.yml" ps "$COMPOSE_SERVICE" || true
+    docker_compose -p "$WORKER_COMPOSE_PROJECT" -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 100 "$COMPOSE_SERVICE" || true
     exit 1
   fi
 
   echo "Worker replicas are running (${running_count}/${WORKER_REPLICAS})"
-  docker_compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" ps "$COMPOSE_SERVICE"
-  worker_containers="$(docker_compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" ps -q "$COMPOSE_SERVICE")"
+  docker_compose -p "$WORKER_COMPOSE_PROJECT" -f "$DEPLOY_TMP/docker-compose.prod.yml" ps "$COMPOSE_SERVICE"
+  worker_containers="$(docker_compose -p "$WORKER_COMPOSE_PROJECT" -f "$DEPLOY_TMP/docker-compose.prod.yml" ps -q "$COMPOSE_SERVICE")"
   first_worker="$(printf '%s\n' "$worker_containers" | sed -n '1p')"
   if [ -z "$first_worker" ]; then
     echo "No running worker container found for connectivity check" >&2
@@ -631,13 +659,14 @@ deploy_worker() {
   if [ "$ready" -ne 1 ]; then
     echo "Worker cannot resolve or reach qs-apiserver:9090 from inside container" >&2
     $SUDO docker exec "$first_worker" sh -lc 'echo "--- /etc/resolv.conf ---"; cat /etc/resolv.conf; echo "--- getent ---"; getent hosts qs-apiserver || true; echo "--- nc ---"; nc -vz qs-apiserver 9090 || true'
-    docker_compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 100 "$COMPOSE_SERVICE" || true
+    docker_compose -p "$WORKER_COMPOSE_PROJECT" -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 100 "$COMPOSE_SERVICE" || true
     exit 1
   fi
 
   echo "Worker can resolve and reach qs-apiserver:9090"
+  remove_legacy_compose_service "$WORKER_COMPOSE_PROJECT" "qs-worker"
   echo "Recent logs (all worker replicas):"
-  docker_compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 20 "$COMPOSE_SERVICE"
+  docker_compose -p "$WORKER_COMPOSE_PROJECT" -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 20 "$COMPOSE_SERVICE"
 }
 
 echo "=========================================="

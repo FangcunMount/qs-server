@@ -37,6 +37,7 @@ func TestSubmitCoalescingPerfContract(t *testing.T) {
 
 	runner := readContractFile(t, filepath.Join(root, "scripts", "perf", "run-submit-coalescing.sh"))
 	for _, required := range []string{
+		`COLLECTION_COMPOSE_SERVICE="${COLLECTION_COMPOSE_SERVICE:-server}"`,
 		"label=com.docker.compose.project=${COLLECTION_COMPOSE_PROJECT}",
 		"label=com.docker.compose.service=${COLLECTION_COMPOSE_SERVICE}",
 		"EXPECTED_COLLECTION_REPLICAS",

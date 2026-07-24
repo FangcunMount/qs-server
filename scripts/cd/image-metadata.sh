@@ -19,7 +19,7 @@ case "$SERVICE" in
     SERVICE=collection
     IMAGE_NAME=qs-collection-server
     DOCKERFILE=build/docker/Dockerfile.collection-server
-    COMPOSE_SERVICE=qs-collection-server
+    COMPOSE_SERVICE=server
     CONTAINER_NAME=qs-collection-server
     PACKAGE_SUFFIX=collection
     IMAGE_ENV_VAR=DOCKER_IMAGE_QS_COLLECTION_SERVER
@@ -30,7 +30,7 @@ case "$SERVICE" in
     SERVICE=worker
     IMAGE_NAME=qs-worker
     DOCKERFILE=build/docker/Dockerfile.qs-worker
-    COMPOSE_SERVICE=qs-worker
+    COMPOSE_SERVICE=runtime
     CONTAINER_NAME=qs-worker
     PACKAGE_SUFFIX=worker
     IMAGE_ENV_VAR=DOCKER_IMAGE_QS_WORKER

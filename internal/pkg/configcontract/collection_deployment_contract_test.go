@@ -23,6 +23,9 @@ type collectionComposeContract struct {
 			Driver  string            `yaml:"driver"`
 			Options map[string]string `yaml:"options"`
 		} `yaml:"logging"`
+		Networks map[string]struct {
+			Aliases []string `yaml:"aliases"`
+		} `yaml:"networks"`
 	} `yaml:"services"`
 }
 
@@ -39,9 +42,12 @@ func TestCollectionComposeSupportsTwoReplicas(t *testing.T) {
 	if err := yaml.Unmarshal(content, &contract); err != nil {
 		t.Fatalf("parse production compose: %v", err)
 	}
-	service, ok := contract.Services["qs-collection-server"]
+	service, ok := contract.Services["server"]
 	if !ok {
-		t.Fatal("production compose must declare qs-collection-server")
+		t.Fatal("production compose must declare collection service key server")
+	}
+	if _, legacy := contract.Services["qs-collection-server"]; legacy {
+		t.Fatal("production compose must not retain duplicated collection service key qs-collection-server")
 	}
 	if service.ContainerName != "" {
 		t.Fatalf("collection container_name = %q, want empty so compose can scale", service.ContainerName)
@@ -72,6 +78,41 @@ func TestCollectionComposeSupportsTwoReplicas(t *testing.T) {
 		service.Logging.Options["max-file"] != "10" {
 		t.Fatalf("collection logging = %#v, want bounded per-container json-file logs", service.Logging)
 	}
+	for _, network := range []string{"qs-network", "infra-network"} {
+		if !slices.Contains(service.Networks[network].Aliases, "qs-collection-server") {
+			t.Errorf("collection network %s aliases = %v, want stable qs-collection-server DNS", network, service.Networks[network].Aliases)
+		}
+	}
+}
+
+func TestWorkerComposeUsesReadableScalableNameAndStableDNS(t *testing.T) {
+	t.Parallel()
+
+	composePath := filepath.Join(repoRoot(t), "build", "docker", "docker-compose.prod.yml")
+	content, err := os.ReadFile(composePath)
+	if err != nil {
+		t.Fatalf("read production compose: %v", err)
+	}
+
+	var contract collectionComposeContract
+	if err := yaml.Unmarshal(content, &contract); err != nil {
+		t.Fatalf("parse production compose: %v", err)
+	}
+	service, ok := contract.Services["runtime"]
+	if !ok {
+		t.Fatal("production compose must declare worker service key runtime")
+	}
+	if _, legacy := contract.Services["qs-worker"]; legacy {
+		t.Fatal("production compose must not retain duplicated worker service key qs-worker")
+	}
+	if service.ContainerName != "" {
+		t.Fatalf("worker container_name = %q, want empty so compose can scale", service.ContainerName)
+	}
+	for _, network := range []string{"qs-network", "infra-network"} {
+		if !slices.Contains(service.Networks[network].Aliases, "qs-worker") {
+			t.Errorf("worker network %s aliases = %v, want stable qs-worker DNS", network, service.Networks[network].Aliases)
+		}
+	}
 }
 
 func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T) {
@@ -96,14 +137,27 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 	remote := readDeploymentContractFile(t, "scripts", "cd", "remote-deploy.sh")
 	for _, required := range []string{
 		`COLLECTION_COMPOSE_PROJECT="${COLLECTION_COMPOSE_PROJECT:-qs-collection}"`,
+		`WORKER_COMPOSE_PROJECT="${WORKER_COMPOSE_PROJECT:-qs-worker}"`,
 		`: "${COLLECTION_REPLICAS:?COLLECTION_REPLICAS is required}"`,
 		`--scale "${COMPOSE_SERVICE}=${COLLECTION_REPLICAS}"`,
 		`ps --status running -q "$COMPOSE_SERVICE"`,
 		`http://127.0.0.1:${INTERNAL_HTTP_PORT}/readyz`,
 		`verify_collection_images`,
+		`remove_legacy_compose_service "$COLLECTION_COMPOSE_PROJECT" "qs-collection-server"`,
+		`remove_legacy_compose_service "$WORKER_COMPOSE_PROJECT" "qs-worker"`,
 	} {
 		if !strings.Contains(remote, required) {
 			t.Errorf("remote deploy must contain %q", required)
+		}
+	}
+
+	metadata := readDeploymentContractFile(t, "scripts", "cd", "image-metadata.sh")
+	for _, required := range []string{
+		"COMPOSE_SERVICE=server",
+		"COMPOSE_SERVICE=runtime",
+	} {
+		if !strings.Contains(metadata, required) {
+			t.Errorf("image metadata must contain %q", required)
 		}
 	}
 
@@ -111,7 +165,9 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 	for _, required := range []string{
 		"EXPECTED_COLLECTION_REPLICAS",
 		"com.docker.compose.project=qs-collection",
-		"com.docker.compose.service=qs-collection-server",
+		"com.docker.compose.service=server",
+		"com.docker.compose.project=qs-worker",
+		"com.docker.compose.service=runtime",
 		`http://127.0.0.1:8080/readyz`,
 		"https://collect.fangcunmount.cn/health",
 	} {
@@ -135,6 +191,8 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 		"github.com/rhysd/actionlint/cmd/actionlint@v1.7.7",
 		"bash -n scripts/cd/*.sh",
 		"docker compose -f build/docker/docker-compose.prod.yml -f - config -q",
+		"'  server:'",
+		"'  runtime:'",
 	} {
 		if !strings.Contains(ci, required) {
 			t.Errorf("CI deployment contracts must contain %q", required)

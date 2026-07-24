@@ -11,8 +11,8 @@ services:
     mem_limit: "4096m"
     cpus: "4"
     networks:
-      - qs-network
-      - infra-network
+      qs-network:
+      infra-network:
     labels:
       - "prometheus.scrape=true"
       - "prometheus.job=qs-apiserver"
@@ -41,15 +41,19 @@ services:
       - GOMAXPROCS=4
     command: ["--config=/app/configs/apiserver.prod.yaml"]
 
-  qs-collection-server:
+  server:
     image: ${DOCKER_IMAGE_QS_COLLECTION_SERVER:-ghcr.io/fangcunmount/qs-collection-server:latest}
     restart: unless-stopped
     # 默认由 CD 扩为 2 副本；每个副本 2C/1.5G，CPU 配额与 GOMAXPROCS 对齐。
     mem_limit: "1536m"
     cpus: "2"
     networks:
-      - qs-network
-      - infra-network
+      qs-network:
+        aliases:
+          - qs-collection-server
+      infra-network:
+        aliases:
+          - qs-collection-server
     labels:
       - "prometheus.scrape=true"
       - "prometheus.job=qs-collection-server"
@@ -76,15 +80,19 @@ services:
         max-file: "10"
     command: ["--config=/app/configs/collection-server.prod.yaml"]
 
-  qs-worker:
+  runtime:
     image: ${DOCKER_IMAGE_QS_WORKER:-ghcr.io/fangcunmount/qs-worker:latest}
     restart: unless-stopped
     # serverD 独立部署（compose -p qs-worker）；此处为资源模板
     mem_limit: "768m"
     cpus: "1.0"
     networks:
-      - qs-network
-      - infra-network
+      qs-network:
+        aliases:
+          - qs-worker
+      infra-network:
+        aliases:
+          - qs-worker
     labels:
       - "prometheus.scrape=true"
       - "prometheus.job=qs-worker"

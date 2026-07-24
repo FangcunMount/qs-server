@@ -125,9 +125,9 @@ jobs:
             'services:' \
             '  qs-apiserver:' \
             '    env_file: !reset []' \
-            '  qs-collection-server:' \
+            '  server:' \
             '    env_file: !reset []' \
-            '  qs-worker:' \
+            '  runtime:' \
             '    env_file: !reset []' |
             docker compose -f build/docker/docker-compose.prod.yml -f - config -q
 

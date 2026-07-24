@@ -81,7 +81,7 @@ jobs:
             esac
             collection_count=$(sudo docker ps \
               --filter "label=com.docker.compose.project=qs-collection" \
-              --filter "label=com.docker.compose.service=qs-collection-server" \
+              --filter "label=com.docker.compose.service=server" \
               --format "{{.ID}}" | sed '/^$/d' | wc -l | tr -d '[:space:]')
             if [ "$collection_count" -eq "$EXPECTED_COLLECTION_REPLICAS" ]; then
               echo "✅ qs-collection-server replicas running (${collection_count}/${EXPECTED_COLLECTION_REPLICAS})"
@@ -121,7 +121,7 @@ jobs:
 
             collection_ids=$(sudo docker ps \
               --filter "label=com.docker.compose.project=qs-collection" \
-              --filter "label=com.docker.compose.service=qs-collection-server" \
+              --filter "label=com.docker.compose.service=server" \
               --format "{{.ID}}")
             ready_count=0
             for container_id in $collection_ids; do
@@ -312,8 +312,15 @@ jobs:
             echo "❌ Docker not accessible"
             exit 1
           fi
-          docker ps --filter "name=qs-worker" --format "table {{.Names}}\t{{.Status}}" || true
-          running="$(docker ps --filter "name=qs-worker" --filter "status=running" -q | wc -l | tr -d ' ')"
+          docker ps \
+            --filter "label=com.docker.compose.project=qs-worker" \
+            --filter "label=com.docker.compose.service=runtime" \
+            --format "table {{.Names}}\t{{.Status}}" || true
+          running="$(docker ps \
+            --filter "label=com.docker.compose.project=qs-worker" \
+            --filter "label=com.docker.compose.service=runtime" \
+            --filter "status=running" \
+            -q | wc -l | tr -d ' ')"
           if [ "${running:-0}" -gt 0 ]; then
             echo "✅ ${running} worker container(s) running"
           else
