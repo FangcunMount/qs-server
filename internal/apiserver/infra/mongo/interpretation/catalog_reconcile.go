@@ -95,10 +95,7 @@ func (s *CatalogReconcileStore) SaveRepairPlan(ctx context.Context, plan Catalog
 	if s == nil || s.db == nil || plan.DryRunID == "" || plan.ExpiresAt.IsZero() {
 		return fmt.Errorf("catalog repair plan is invalid")
 	}
-	_, err := s.db.Collection(catalogRepairPlanCollection).InsertOne(ctx, catalogRepairPlanPO{
-		DryRunID: plan.DryRunID, OrgID: plan.OrgID, Item: plan.Item,
-		CreatedAt: plan.CreatedAt, ExpiresAt: plan.ExpiresAt,
-	})
+	_, err := s.db.Collection(catalogRepairPlanCollection).InsertOne(ctx, catalogRepairPlanPO(plan))
 	if err != nil {
 		return fmt.Errorf("save catalog repair plan: %w", err)
 	}
@@ -110,10 +107,7 @@ func (s *CatalogReconcileStore) FindRepairPlan(ctx context.Context, dryRunID str
 	if err := s.db.Collection(catalogRepairPlanCollection).FindOne(ctx, bson.M{"dry_run_id": dryRunID}).Decode(&po); err != nil {
 		return CatalogRepairPlan{}, fmt.Errorf("find catalog repair plan: %w", err)
 	}
-	return CatalogRepairPlan{
-		DryRunID: po.DryRunID, OrgID: po.OrgID, Item: po.Item,
-		CreatedAt: po.CreatedAt, ExpiresAt: po.ExpiresAt,
-	}, nil
+	return CatalogRepairPlan(po), nil
 }
 
 func (s *CatalogReconcileStore) ApplyRepair(ctx context.Context, plan CatalogRepairPlan) (string, error) {

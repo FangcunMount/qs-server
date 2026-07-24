@@ -158,7 +158,7 @@ func (r *reportReadModel) loadCatalogSourceMetadata(ctx context.Context, entries
 					OutcomeID: po.OutcomeID, HasOutcomeID: po.OutcomeID != 0,
 					GenerationID: po.GenerationID, HasGenerationID: po.GenerationID != 0,
 				},
-				CreatedAt:   po.GeneratedAt,
+				CreatedAt: po.GeneratedAt,
 			}
 		}
 		if err := cursor.Err(); err != nil {

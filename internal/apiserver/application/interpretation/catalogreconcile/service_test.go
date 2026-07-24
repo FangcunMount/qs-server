@@ -13,7 +13,6 @@ type fakeStore struct {
 	recovered string
 	pages     []DriftPage
 	listCalls int
-	authority OutcomeAssociation
 }
 
 func (f *fakeStore) CountDrifts(context.Context, Filter) (DriftCounts, error) {

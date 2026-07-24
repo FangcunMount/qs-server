@@ -1,7 +1,6 @@
 package input
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/admission"
@@ -28,7 +27,7 @@ func (e *AdmissionError) Unwrap() error {
 
 func classify(kind admission.Kind, err error, format string, args ...interface{}) error {
 	if err == nil {
-		err = errors.New(fmt.Sprintf(format, args...))
+		err = fmt.Errorf(format, args...)
 	} else if format != "" {
 		err = fmt.Errorf(format+": %w", append(args, err)...)
 	}
