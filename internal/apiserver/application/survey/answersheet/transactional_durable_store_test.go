@@ -11,6 +11,7 @@ import (
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 type durableStoreTxMarkerKey struct{}
@@ -31,6 +32,7 @@ func (r *durableStoreRunnerStub) WithinTransaction(ctx context.Context, fn func(
 
 type durableStoreWriterStub struct {
 	existing     *domainAnswerSheet.AnswerSheet
+	findErr      error
 	waitExisting *domainAnswerSheet.AnswerSheet
 	waitErr      error
 	saveEvents   []event.DomainEvent
@@ -48,7 +50,7 @@ type durableStoreWriterStub struct {
 func (w *durableStoreWriterStub) FindCompletedSubmission(_ context.Context, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error) {
 	w.findCalled = true
 	w.findMeta = meta
-	return w.existing, nil
+	return w.existing, w.findErr
 }
 
 func (w *durableStoreWriterStub) SaveSubmittedAnswerSheet(ctx context.Context, _ *domainAnswerSheet.AnswerSheet, _ DurableSubmitMeta) ([]event.DomainEvent, error) {
@@ -72,6 +74,8 @@ func TestTransactionalSubmissionDurableStoreUnknownCommitRecoversAfterRequestCan
 	writer := &durableStoreWriterStub{waitExisting: existing}
 	store := NewTransactionalSubmissionDurableStore(runner, writer, &durableStoreStagerStub{}, nil)
 
+	beforeRecovery := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("transaction_error_recovery", "hit"))
+	beforeFailed := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("transaction", "failed"))
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	got, existed, err := store.CreateDurably(ctx, sheet, DurableSubmitMeta{IdempotencyKey: "idem-unknown-commit"})
@@ -83,6 +87,56 @@ func TestTransactionalSubmissionDurableStoreUnknownCommitRecoversAfterRequestCan
 	}
 	if !writer.waitCalled || writer.waitCtxErr != nil {
 		t.Fatalf("recovery lookup context error = %v, want detached live context", writer.waitCtxErr)
+	}
+	if delta := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("transaction", "failed")) - beforeFailed; delta != 1 {
+		t.Fatalf("transaction failed metric delta = %v, want 1", delta)
+	}
+	if delta := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("transaction_error_recovery", "hit")) - beforeRecovery; delta != 1 {
+		t.Fatalf("transaction_error_recovery hit metric delta = %v, want 1", delta)
+	}
+}
+
+func TestTransactionalSubmissionDurableStoreFindCompletedObservesEarlyLookup(t *testing.T) {
+	existing := newDurableStoreTestSheet(t)
+	hitStore, ok := NewTransactionalSubmissionDurableStore(nil, &durableStoreWriterStub{existing: existing}, nil, nil).(SubmissionIdempotencyReader)
+	if !ok {
+		t.Fatal("transactional durable store must implement SubmissionIdempotencyReader")
+	}
+
+	beforeHit := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("early_lookup", "hit"))
+	got, err := hitStore.FindCompleted(t.Context(), DurableSubmitMeta{IdempotencyKey: "idem-early"})
+	if err != nil || got != existing {
+		t.Fatalf("FindCompleted() = (%p, %v), want existing sheet", got, err)
+	}
+	if delta := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("early_lookup", "hit")) - beforeHit; delta != 1 {
+		t.Fatalf("early_lookup hit metric delta = %v, want 1", delta)
+	}
+
+	missStore, ok := NewTransactionalSubmissionDurableStore(nil, &durableStoreWriterStub{}, nil, nil).(SubmissionIdempotencyReader)
+	if !ok {
+		t.Fatal("transactional durable store must implement SubmissionIdempotencyReader")
+	}
+	beforeMiss := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("early_lookup", "miss"))
+	got, err = missStore.FindCompleted(t.Context(), DurableSubmitMeta{IdempotencyKey: "idem-miss"})
+	if err != nil || got != nil {
+		t.Fatalf("FindCompleted() = (%p, %v), want miss", got, err)
+	}
+	if delta := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("early_lookup", "miss")) - beforeMiss; delta != 1 {
+		t.Fatalf("early_lookup miss metric delta = %v, want 1", delta)
+	}
+}
+
+func TestTransactionalSubmissionDurableStorePretransactionLookupConflict(t *testing.T) {
+	writer := &durableStoreWriterStub{findErr: submitport.ErrIdempotencyConflict}
+	store := NewTransactionalSubmissionDurableStore(&durableStoreRunnerStub{}, writer, &durableStoreStagerStub{}, nil)
+
+	before := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("pretransaction_lookup", "conflict"))
+	_, existed, err := store.CreateDurably(t.Context(), newDurableStoreTestSheet(t), DurableSubmitMeta{IdempotencyKey: "idem-conflict-lookup"})
+	if !errors.Is(err, submitport.ErrIdempotencyConflict) || existed {
+		t.Fatalf("CreateDurably() = (%v, %v), want idempotency conflict", existed, err)
+	}
+	if delta := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("pretransaction_lookup", "conflict")) - before; delta != 1 {
+		t.Fatalf("pretransaction_lookup conflict metric delta = %v, want 1", delta)
 	}
 }
 
@@ -160,6 +214,7 @@ func TestTransactionalSubmissionDurableStoreIdempotencyHitDoesNotOpenTransaction
 	stager := &durableStoreStagerStub{}
 	store := NewTransactionalSubmissionDurableStore(runner, writer, stager, nil)
 
+	before := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("pretransaction_lookup", "hit"))
 	got, existed, err := store.CreateDurably(t.Context(), newDurableStoreTestSheet(t), DurableSubmitMeta{IdempotencyKey: "idem-1"})
 	if err != nil {
 		t.Fatalf("CreateDurably() error = %v", err)
@@ -169,6 +224,9 @@ func TestTransactionalSubmissionDurableStoreIdempotencyHitDoesNotOpenTransaction
 	}
 	if runner.called || writer.saveCalled || stager.called {
 		t.Fatalf("idempotency hit should not open write transaction: runner=%v save=%v stage=%v", runner.called, writer.saveCalled, stager.called)
+	}
+	if delta := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("pretransaction_lookup", "hit")) - before; delta != 1 {
+		t.Fatalf("pretransaction_lookup hit metric delta = %v, want 1", delta)
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	attributionport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetattribution"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 type durableStoreCaptureStub struct {
@@ -127,6 +128,7 @@ func TestSubmissionServiceReturnsIdempotentAnswerBeforeMutableAttributionRevalid
 	resolver := &attributionResolverCaptureStub{}
 	svc := &submissionService{durableStore: store, attribution: resolver}
 	qnr, _ := domainQuestionnaire.NewQuestionnaire(meta.NewCode("QNR-1"), "Questionnaire")
+	before := testutil.ToFloat64(durableSubmitTotal.WithLabelValues("idempotency_hit"))
 	result, err := svc.createAndSaveAnswerSheet(context.Background(), logger.L(context.Background()), SubmitAnswerSheetDTO{
 		IdempotencyKey: "idem-existing", FillerID: 301, TesteeID: 401, OrgID: 501,
 		QuestionnaireCode: "QNR-1", QuestionnaireVer: "1.0.0", OriginRef: &OriginRefDTO{Type: "assessment_entry", ID: "9001"},
@@ -136,6 +138,9 @@ func TestSubmissionServiceReturnsIdempotentAnswerBeforeMutableAttributionRevalid
 	}
 	if resolver.calls != 0 || store.createCalls != 0 {
 		t.Fatalf("mutable source was revalidated or rewritten: resolver=%d create=%d", resolver.calls, store.createCalls)
+	}
+	if delta := testutil.ToFloat64(durableSubmitTotal.WithLabelValues("idempotency_hit")) - before; delta != 1 {
+		t.Fatalf("idempotency_hit metric delta = %v, want 1", delta)
 	}
 }
 
