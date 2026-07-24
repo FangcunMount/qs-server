@@ -41,7 +41,9 @@
 
 collection 副本不发布固定宿主机 `8082/6060` 端口。Nginx 与 apiserver governance 通过外部 Docker 网络上的稳定服务别名 `qs-collection-server` 访问；worker 同样保留稳定网络别名 `qs-worker`。这些 DNS 别名与用于生成可读容器名的短 service key 分离。Prometheus 依靠每个容器的 scrape labels 分别发现 target。部署和 runner 自检通过 Compose label 枚举并逐容器执行 `/readyz`。多副本日志只写 stdout/stderr，由 Docker 为每个容器独立轮转，禁止多个进程写同一个宿主机日志文件。
 
-首次采用短 service key 发布时，CD 会先启动并验证新副本，再精确删除同一 Compose project 下旧 `qs-collection-server` / `qs-worker` service 的容器；不会使用固定 `container_name`，也不会无边界执行 `docker compose down` 或全局 orphan 清理。
+collection 发布要求 Nginx `>= 1.27.3`。`collect-api` upstream 在块内使用 Docker resolver 和 `server qs-collection-server:8080 resolve`，保持默认轮询，不设置 `ip_hash`、固定权重或主备关系。CD 会备份并原子安装 `/data/apps/nginx-configs/collect.conf`，通过 `nginx -t` 后 reload，再用 `nginx -T`、Docker DNS 地址集合和两个副本的 `/health` 请求指标完成切流验收；失败时恢复原配置并重启暂时停用的旧 collection service。
+
+首次采用短 service key 发布时，CD 会先启动并验证新副本，暂时停止同一 Compose project 下旧 `qs-collection-server` service 以排除旧 DNS 地址，切流验收通过后再精确删除旧 collection / worker service 容器；不会使用固定 `container_name`，也不会无边界执行 `docker compose down` 或全局 orphan 清理。
 
 将 `QS_COLLECTION_REPLICAS` 改为 `1` 可回滚副本数；若使用 workflow_dispatch 临时覆盖为 `1`，应同步更新仓库变量，否则定时 `ping-runner` 会按期望值 `2` 报警。Compose 扩容只提供进程级冗余，同机 serverA 故障仍会同时影响两个副本。
 

@@ -2,6 +2,7 @@ package configcontract
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -170,19 +171,41 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 		"com.docker.compose.service=runtime",
 		`http://127.0.0.1:8080/readyz`,
 		"https://collect.fangcunmount.cn/health",
+		"nginx -T",
+		"1.27.3",
+		"getent ahostsv4 qs-collection-server",
 	} {
 		if !strings.Contains(ping, required) {
 			t.Errorf("runner health workflow must contain %q", required)
 		}
 	}
 
-	nginx := readDeploymentContractFile(t, "configs", "nginx", "conf.d", "collect.fangcunmount.cn.conf")
+	remoteNginxContractRequirements := []string{
+		`verify_collection_nginx preflight`,
+		`verify_collection_nginx install-and-verify`,
+		`NGINX_CONFIG_BACKUP_DIR="$BACKUP_DIR"`,
+	}
+	for _, required := range remoteNginxContractRequirements {
+		if !strings.Contains(remote, required) {
+			t.Errorf("remote deploy must contain Nginx contract %q", required)
+		}
+	}
+
+	preparePackage := readDeploymentContractFile(t, "scripts", "cd", "prepare-package.sh")
+	if !strings.Contains(preparePackage, "verify-collection-nginx.sh") {
+		t.Error("deployment package must include verify-collection-nginx.sh")
+	}
+	verifier := readDeploymentContractFile(t, "scripts", "cd", "verify-collection-nginx.sh")
 	for _, required := range []string{
-		"resolver 127.0.0.11",
-		"server qs-collection-server:8080 resolve;",
+		`NGINX_MIN_VERSION="${NGINX_MIN_VERSION:-1.27.3}"`,
+		`docker exec "$NGINX_CONTAINER" nginx -T`,
+		`getent ahostsv4 "$COLLECTION_DNS_NAME"`,
+		`ROUTING_PROBE_REQUESTS="${ROUTING_PROBE_REQUESTS:-40}"`,
+		`/^gin_requests_total\{/`,
+		`rollback_config()`,
 	} {
-		if !strings.Contains(nginx, required) {
-			t.Errorf("collection Nginx service discovery must contain %q", required)
+		if !strings.Contains(verifier, required) {
+			t.Errorf("collection Nginx verifier must contain %q", required)
 		}
 	}
 
@@ -197,6 +220,63 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 		if !strings.Contains(ci, required) {
 			t.Errorf("CI deployment contracts must contain %q", required)
 		}
+	}
+}
+
+func TestCollectionNginxUsesDynamicDockerDNSInsideUpstream(t *testing.T) {
+	t.Parallel()
+
+	config := readDeploymentContractFile(t, "configs", "nginx", "conf.d", "collect.fangcunmount.cn.conf")
+	upstream := nginxNamedBlock(t, config, "upstream collect-api")
+
+	for _, required := range []string{
+		"zone collect_api 64k;",
+		"resolver 127.0.0.11 valid=10s ipv6=off;",
+		"resolver_timeout 5s;",
+		"server qs-collection-server:8080 resolve;",
+	} {
+		if !strings.Contains(upstream, required) {
+			t.Errorf("collect-api upstream must contain %q", required)
+		}
+	}
+	for _, forbidden := range []string{"ip_hash;", "weight=", "backup"} {
+		if strings.Contains(upstream, forbidden) {
+			t.Errorf("collect-api upstream must not contain %q", forbidden)
+		}
+	}
+	if count := strings.Count(config, "upstream collect-api"); count != 1 {
+		t.Fatalf("upstream collect-api count = %d, want 1", count)
+	}
+	if count := strings.Count(config, "resolver 127.0.0.11"); count != 1 {
+		t.Fatalf("Docker resolver count = %d, want exactly one inside collect-api", count)
+	}
+}
+
+func TestCollectionNginxMinimumVersionComparison(t *testing.T) {
+	t.Parallel()
+
+	script := filepath.Join(repoRoot(t), "scripts", "cd", "verify-collection-nginx.sh")
+	tests := []struct {
+		name    string
+		current string
+		wantOK  bool
+	}{
+		{name: "below minimum", current: "1.27.2", wantOK: false},
+		{name: "at minimum", current: "1.27.3", wantOK: true},
+		{name: "above minimum", current: "1.28.0", wantOK: true},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := exec.Command("bash", script, "--version-at-least", tt.current, "1.27.3")
+			err := cmd.Run()
+			if tt.wantOK && err != nil {
+				t.Fatalf("version %s should satisfy minimum: %v", tt.current, err)
+			}
+			if !tt.wantOK && err == nil {
+				t.Fatalf("version %s should not satisfy minimum", tt.current)
+			}
+		})
 	}
 }
 
@@ -221,6 +301,34 @@ func TestCollectionProductionLoggingIsReplicaSafe(t *testing.T) {
 			t.Errorf("collection production config must contain %q", required)
 		}
 	}
+}
+
+func nginxNamedBlock(t *testing.T, config, name string) string {
+	t.Helper()
+
+	start := strings.Index(config, name)
+	if start < 0 {
+		t.Fatalf("Nginx config does not contain %q", name)
+	}
+	openOffset := strings.Index(config[start:], "{")
+	if openOffset < 0 {
+		t.Fatalf("Nginx block %q has no opening brace", name)
+	}
+	open := start + openOffset
+	depth := 0
+	for i := open; i < len(config); i++ {
+		switch config[i] {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return config[start : i+1]
+			}
+		}
+	}
+	t.Fatalf("Nginx block %q has no matching closing brace", name)
+	return ""
 }
 
 func readDeploymentContractFile(t *testing.T, parts ...string) string {

@@ -408,6 +408,61 @@ remove_legacy_compose_service() {
   done <<<"$container_ids"
 }
 
+LEGACY_COLLECTION_CONTAINER_IDS=""
+
+quiesce_legacy_collection_service() {
+  LEGACY_COLLECTION_CONTAINER_IDS="$(
+    $SUDO docker ps \
+      --filter "label=com.docker.compose.project=${COLLECTION_COMPOSE_PROJECT}" \
+      --filter "label=com.docker.compose.service=qs-collection-server" \
+      --format '{{.ID}}'
+  )"
+  if [ -z "$LEGACY_COLLECTION_CONTAINER_IDS" ]; then
+    return 0
+  fi
+
+  echo "Stopping legacy collection Compose containers before DNS and routing verification..."
+  local container_id
+  while IFS= read -r container_id; do
+    [ -z "$container_id" ] && continue
+    if ! $SUDO docker stop "$container_id"; then
+      restore_legacy_collection_service
+      return 1
+    fi
+  done <<<"$LEGACY_COLLECTION_CONTAINER_IDS"
+}
+
+restore_legacy_collection_service() {
+  if [ -z "$LEGACY_COLLECTION_CONTAINER_IDS" ]; then
+    return 0
+  fi
+
+  echo "Restarting legacy collection Compose containers after failed cutover..." >&2
+  local container_id
+  while IFS= read -r container_id; do
+    [ -z "$container_id" ] && continue
+    $SUDO docker start "$container_id" || true
+  done <<<"$LEGACY_COLLECTION_CONTAINER_IDS"
+}
+
+verify_collection_nginx() {
+  local mode="$1"
+  local verifier="$DEPLOY_TMP/scripts/cd/verify-collection-nginx.sh"
+  if [ ! -x "$verifier" ]; then
+    echo "Collection Nginx verifier is missing or not executable: $verifier" >&2
+    return 1
+  fi
+
+  $SUDO env \
+    NGINX_CONFIG_SOURCE="$DEPLOY_TMP/configs/nginx/conf.d/collect.fangcunmount.cn.conf" \
+    NGINX_CONFIG_BACKUP_DIR="$BACKUP_DIR" \
+    EXPECTED_COLLECTION_REPLICAS="$COLLECTION_REPLICAS" \
+    COLLECTION_COMPOSE_PROJECT="$COLLECTION_COMPOSE_PROJECT" \
+    COLLECTION_COMPOSE_SERVICE="$COMPOSE_SERVICE" \
+    ROUTING_PROBE_REQUESTS="${COLLECTION_ROUTING_PROBE_REQUESTS:-40}" \
+    bash "$verifier" "$mode"
+}
+
 docker_compose_pull_supports_quiet() {
   $SUDO docker compose pull --help 2>/dev/null | grep -q -- '--quiet'
 }
@@ -574,6 +629,11 @@ deploy_collection() {
       [ "$ready_count" -eq "$COLLECTION_REPLICAS" ]; then
       echo "Collection replicas are ready (${ready_count}/${COLLECTION_REPLICAS})"
       verify_collection_images
+      quiesce_legacy_collection_service
+      if ! verify_collection_nginx install-and-verify; then
+        restore_legacy_collection_service
+        return 1
+      fi
       remove_legacy_compose_service "$COLLECTION_COMPOSE_PROJECT" "qs-collection-server"
       docker_compose \
         -p "$COLLECTION_COMPOSE_PROJECT" \
@@ -691,6 +751,7 @@ case "$SERVICE" in
   collection)
     echo "Deploy target: serverA (co-located with qs-apiserver). Stop legacy qs-collection-server on serverB after cutover."
     setup_grpc_certs qs-collection-server qs-collection-server.svc
+    verify_collection_nginx preflight
     select_image
     deploy_collection
     ;;
