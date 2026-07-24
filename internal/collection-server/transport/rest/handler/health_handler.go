@@ -132,8 +132,11 @@ func (h *HealthHandler) readiness() (observability.RuntimeSnapshot, bool) {
 }
 
 func (h *HealthHandler) redisSnapshot() observability.RuntimeSnapshot {
+	if h == nil {
+		return observability.RuntimeSnapshot{}
+	}
 	snapshot := observability.SnapshotForComponent(h.serviceName, h.status)
-	if h != nil && h.resilience != nil {
+	if h.resilience != nil {
 		identity := h.resilience()
 		snapshot.InstanceID = identity.InstanceID
 		snapshot.Generation = identity.Generation
