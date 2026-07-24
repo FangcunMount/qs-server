@@ -23,13 +23,15 @@ type transactionalSubmissionDurableStore struct {
 
 const durableSubmitRecoveryTimeout = 500 * time.Millisecond
 
-func (s transactionalSubmissionDurableStore) FindCompleted(ctx context.Context, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error) {
+func (s transactionalSubmissionDurableStore) FindCompleted(ctx context.Context, meta DurableSubmitMeta) (*CompletedSubmission, error) {
 	if s.writer == nil || meta.IdempotencyKey == "" {
 		return nil, nil
 	}
-	existing, err := s.writer.FindCompletedSubmission(ctx, meta)
-	observeDurableLookupOperation("early_lookup", existing, err)
-	return existing, err
+	completed, err := s.writer.FindCompletedSubmission(ctx, meta)
+	if err == nil {
+		err = validateCompletedSubmission(completed)
+	}
+	return completed, err
 }
 
 func (s transactionalSubmissionDurableStore) CreateDurably(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, bool, error) {
@@ -42,13 +44,16 @@ func (s transactionalSubmissionDurableStore) CreateDurably(ctx context.Context, 
 	}
 
 	if meta.IdempotencyKey != "" {
-		existing, err := s.writer.FindCompletedSubmission(ctx, meta)
-		observeDurableLookupOperation("pretransaction_lookup", existing, err)
+		completed, err := s.writer.FindCompletedSubmission(ctx, meta)
+		if err == nil {
+			err = validateCompletedSubmission(completed)
+		}
+		observeDurableLookupOperation("pretransaction_lookup", completed, err)
 		if err != nil {
 			return nil, false, err
 		}
-		if existing != nil {
-			return existing, true, nil
+		if completed != nil {
+			return completed.Sheet, true, nil
 		}
 	}
 
@@ -108,13 +113,13 @@ func (s transactionalSubmissionDurableStore) CreateDurably(ctx context.Context, 
 	return sheet, false, nil
 }
 
-func observeDurableLookupOperation(operation string, existing *domainAnswerSheet.AnswerSheet, err error) {
+func observeDurableLookupOperation(operation string, completed *CompletedSubmission, err error) {
 	switch {
 	case stderrors.Is(err, submitport.ErrIdempotencyConflict):
 		observeDurableOperation(operation, "conflict")
 	case err != nil:
 		observeDurableOperation(operation, "error")
-	case existing != nil:
+	case completed != nil:
 		observeDurableOperation(operation, "hit")
 	default:
 		observeDurableOperation(operation, "miss")

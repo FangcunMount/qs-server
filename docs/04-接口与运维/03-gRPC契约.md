@@ -21,7 +21,10 @@ proto 位于 [`api/grpc/proto`](../../api/grpc/proto/)，生成代码位于 `api
 `AnswerSheetService.LookupAnswerSheetSubmission` 是 collection -> apiserver
 的 additive 内部 RPC。请求显式携带 writer、idempotency key、问卷、testee、
 task、origin 和 answers，不携带客户端不可控的 org。apiserver 先按 writer/key
-读取已持久 AnswerSheet，再使用已存 org 与本次稳定输入计算 fingerprint：
+读取已持久 AnswerSheet，再使用已存 org 与本次稳定输入计算候选 fingerprint。
+候选值必须与接受时冻结的 `submit_meta.fingerprint` 比较，不能用当前
+AnswerSheet 重算值覆盖这项历史事实；只有旧文档或 legacy 幂等记录缺少
+fingerprint 时，才按既有算法从 AnswerSheet 回退计算：
 
 - `found=true` 必须同时返回非零 `id`；
 - miss 返回 `found=false`；

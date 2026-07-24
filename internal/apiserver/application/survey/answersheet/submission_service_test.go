@@ -9,6 +9,7 @@ import (
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	attributionport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetattribution"
+	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
@@ -22,11 +23,18 @@ type durableStoreCaptureStub struct {
 
 type preflightDurableStoreStub struct {
 	existing    *domainAnswerSheet.AnswerSheet
+	findErr     error
 	createCalls int
 }
 
-func (s *preflightDurableStoreStub) FindCompleted(context.Context, DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error) {
-	return s.existing, nil
+func (s *preflightDurableStoreStub) FindCompleted(context.Context, DurableSubmitMeta) (*CompletedSubmission, error) {
+	if s.findErr != nil {
+		return nil, s.findErr
+	}
+	if s.existing == nil {
+		return nil, nil
+	}
+	return &CompletedSubmission{Sheet: s.existing, Fingerprint: "verified-by-writer"}, nil
 }
 func (s *preflightDurableStoreStub) CreateDurably(_ context.Context, sheet *domainAnswerSheet.AnswerSheet, _ DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, bool, error) {
 	s.createCalls++
@@ -128,7 +136,8 @@ func TestSubmissionServiceReturnsIdempotentAnswerBeforeMutableAttributionRevalid
 	resolver := &attributionResolverCaptureStub{}
 	svc := &submissionService{durableStore: store, attribution: resolver}
 	qnr, _ := domainQuestionnaire.NewQuestionnaire(meta.NewCode("QNR-1"), "Questionnaire")
-	before := testutil.ToFloat64(durableSubmitTotal.WithLabelValues("idempotency_hit"))
+	beforeHit := testutil.ToFloat64(durableSubmitTotal.WithLabelValues("idempotency_hit"))
+	beforeEarlyLookup := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("early_lookup", "hit"))
 	result, err := svc.createAndSaveAnswerSheet(context.Background(), logger.L(context.Background()), SubmitAnswerSheetDTO{
 		IdempotencyKey: "idem-existing", FillerID: 301, TesteeID: 401, OrgID: 501,
 		QuestionnaireCode: "QNR-1", QuestionnaireVer: "1.0.0", OriginRef: &OriginRefDTO{Type: "assessment_entry", ID: "9001"},
@@ -139,8 +148,52 @@ func TestSubmissionServiceReturnsIdempotentAnswerBeforeMutableAttributionRevalid
 	if resolver.calls != 0 || store.createCalls != 0 {
 		t.Fatalf("mutable source was revalidated or rewritten: resolver=%d create=%d", resolver.calls, store.createCalls)
 	}
-	if delta := testutil.ToFloat64(durableSubmitTotal.WithLabelValues("idempotency_hit")) - before; delta != 1 {
+	if delta := testutil.ToFloat64(durableSubmitTotal.WithLabelValues("idempotency_hit")) - beforeHit; delta != 1 {
 		t.Fatalf("idempotency_hit metric delta = %v, want 1", delta)
+	}
+	if delta := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("early_lookup", "hit")) - beforeEarlyLookup; delta != 1 {
+		t.Fatalf("early_lookup hit metric delta = %v, want 1", delta)
+	}
+}
+
+func TestSubmissionServiceEarlyLookupMetricCountsEachOutcomeOnce(t *testing.T) {
+	existing := domainAnswerSheet.Reconstruct(meta.FromUint64(999), mustQuestionnaireRefForSubmissionTest(t), nil, mustAnswersForSubmissionTest(t), nowForSubmissionTest(), 0)
+	qnr, _ := domainQuestionnaire.NewQuestionnaire(meta.NewCode("QNR-1"), "Questionnaire")
+	dto := SubmitAnswerSheetDTO{
+		IdempotencyKey: "idem-metric", FillerID: 301, TesteeID: 401, OrgID: 501,
+		QuestionnaireCode: "QNR-1", QuestionnaireVer: "1.0.0",
+	}
+
+	for _, testCase := range []struct {
+		name      string
+		outcome   string
+		existing  *domainAnswerSheet.AnswerSheet
+		findErr   error
+		wantError bool
+	}{
+		{name: "hit", outcome: "hit", existing: existing},
+		{name: "miss", outcome: "miss"},
+		{name: "conflict", outcome: "conflict", findErr: submitport.ErrIdempotencyConflict, wantError: true},
+		{name: "error", outcome: "error", findErr: context.DeadlineExceeded, wantError: true},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			store := &preflightDurableStoreStub{existing: testCase.existing, findErr: testCase.findErr}
+			svc := &submissionService{durableStore: store}
+			before := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("early_lookup", testCase.outcome))
+
+			got, err := svc.findExistingSubmissionBeforeAttribution(
+				t.Context(), dto, qnr, mustAnswersForSubmissionTest(t), domainAnswerSheet.Admission{},
+			)
+			if (err != nil) != testCase.wantError {
+				t.Fatalf("findExistingSubmissionBeforeAttribution() = (%#v, %v), wantError=%v", got, err, testCase.wantError)
+			}
+			if testCase.existing != nil && got != testCase.existing {
+				t.Fatalf("findExistingSubmissionBeforeAttribution() = %#v, want existing sheet", got)
+			}
+			if delta := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("early_lookup", testCase.outcome)) - before; delta != 1 {
+				t.Fatalf("early_lookup %s metric delta = %v, want 1", testCase.outcome, delta)
+			}
+		})
 	}
 }
 

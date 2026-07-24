@@ -37,7 +37,7 @@ func (r *Repository) ensureIndexes(ctx context.Context) error {
 	return nil
 }
 
-func (r *Repository) FindCompletedSubmission(ctx context.Context, metaInfo submitport.DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error) {
+func (r *Repository) FindCompletedSubmission(ctx context.Context, metaInfo submitport.DurableSubmitMeta) (*submitport.CompletedSubmission, error) {
 	return r.findByIdempotencyKey(ctx, metaInfo)
 }
 
@@ -85,7 +85,7 @@ func (r *Repository) SaveSubmittedAnswerSheet(ctx context.Context, sheet *domain
 	return events, nil
 }
 
-func (r *Repository) findByIdempotencyKey(ctx context.Context, metaInfo submitport.DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error) {
+func (r *Repository) findByIdempotencyKey(ctx context.Context, metaInfo submitport.DurableSubmitMeta) (*submitport.CompletedSubmission, error) {
 	if metaInfo.IdempotencyKey == "" {
 		return nil, nil
 	}
@@ -102,33 +102,20 @@ func (r *Repository) findByIdempotencyKey(ctx context.Context, metaInfo submitpo
 		return nil, err
 	}
 	sheet := r.mapper.ToBO(&sheetPO)
-	if sheet == nil || metaInfo.Fingerprint == "" {
-		return sheet, nil
+	if sheet == nil {
+		return nil, fmt.Errorf("map completed answersheet submission %q", metaInfo.IdempotencyKey)
 	}
 	storedFingerprint := ""
 	if sheetPO.SubmitMeta != nil {
 		storedFingerprint = sheetPO.SubmitMeta.Fingerprint
 	}
-	if storedFingerprint == "" {
-		storedFingerprint, err := submitport.Fingerprint(sheet)
-		if err != nil {
-			return nil, err
-		}
-		if storedFingerprint != metaInfo.Fingerprint {
-			return nil, submitport.ErrIdempotencyConflict
-		}
-		return sheet, nil
-	}
-	if storedFingerprint != metaInfo.Fingerprint {
-		return nil, submitport.ErrIdempotencyConflict
-	}
-	return sheet, nil
+	return completedSubmission(sheet, storedFingerprint, metaInfo.Fingerprint)
 }
 
 // findLegacyIdempotentSubmission keeps pre-migration retry keys readable. New
 // submissions never write this collection; it can be archived after the
 // compatibility window and an explicit data migration.
-func (r *Repository) findLegacyIdempotentSubmission(ctx context.Context, metaInfo submitport.DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error) {
+func (r *Repository) findLegacyIdempotentSubmission(ctx context.Context, metaInfo submitport.DurableSubmitMeta) (*submitport.CompletedSubmission, error) {
 	if r.idempotencyColl == nil {
 		return nil, nil
 	}
@@ -140,31 +127,46 @@ func (r *Repository) findLegacyIdempotentSubmission(ctx context.Context, metaInf
 		return nil, err
 	}
 	sheet, err := r.FindByID(ctx, meta.MustFromUint64(po.AnswerSheetID))
-	if err != nil || sheet == nil || metaInfo.Fingerprint == "" {
-		return sheet, err
+	if err != nil {
+		return nil, err
+	}
+	if sheet == nil {
+		return nil, fmt.Errorf("legacy completed submission %q references missing answersheet %d", metaInfo.IdempotencyKey, po.AnswerSheetID)
 	}
 	stored := po.Fingerprint
-	if stored == "" {
-		stored, err = submitport.Fingerprint(sheet)
+	return completedSubmission(sheet, stored, metaInfo.Fingerprint)
+}
+
+func completedSubmission(
+	sheet *domainAnswerSheet.AnswerSheet,
+	storedFingerprint string,
+	candidateFingerprint string,
+) (*submitport.CompletedSubmission, error) {
+	if sheet == nil {
+		return nil, fmt.Errorf("completed answersheet submission has no AnswerSheet")
+	}
+	if storedFingerprint == "" {
+		var err error
+		storedFingerprint, err = submitport.Fingerprint(sheet)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if stored != metaInfo.Fingerprint {
+	if candidateFingerprint != "" && storedFingerprint != candidateFingerprint {
 		return nil, submitport.ErrIdempotencyConflict
 	}
-	return sheet, nil
+	return &submitport.CompletedSubmission{Sheet: sheet, Fingerprint: storedFingerprint}, nil
 }
 
 func (r *Repository) waitForCompletedIdempotentResult(ctx context.Context, metaInfo submitport.DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error) {
 	deadline := time.Now().Add(idempotencyLookupTimeout)
 	for {
-		existing, err := r.findByIdempotencyKey(ctx, metaInfo)
+		completed, err := r.findByIdempotencyKey(ctx, metaInfo)
 		if err != nil {
 			return nil, err
 		}
-		if existing != nil {
-			return existing, nil
+		if completed != nil {
+			return completed.Sheet, nil
 		}
 		if time.Now().After(deadline) {
 			return nil, nil

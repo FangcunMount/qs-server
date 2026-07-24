@@ -19,6 +19,15 @@ type DurableSubmitMeta struct {
 	RequestID      string
 }
 
+// CompletedSubmission is the durable idempotency fact returned for a
+// writer-scoped submission key. Fingerprint is the acceptance-time value
+// stored with the submission, or the historical fallback reconstructed for a
+// legacy row that predates the embedded fingerprint.
+type CompletedSubmission struct {
+	Sheet       *domainanswersheet.AnswerSheet
+	Fingerprint string
+}
+
 // SubmissionIntent is the canonical business input covered by the durable
 // submission fingerprint. Derived IDs, timestamps, titles and scores are
 // deliberately excluded.

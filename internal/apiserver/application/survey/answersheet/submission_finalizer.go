@@ -68,19 +68,25 @@ func (s *submissionService) findExistingSubmissionBeforeAttribution(ctx context.
 	if err != nil {
 		return nil, err
 	}
-	existing, err := reader.FindCompleted(ctx, DurableSubmitMeta{IdempotencyKey: dto.IdempotencyKey, WriterID: dto.FillerID, Fingerprint: fingerprint, RequestID: dto.RequestID})
-	observeDurableLookupOperation("early_lookup", existing, err)
+	completed, err := reader.FindCompleted(ctx, DurableSubmitMeta{IdempotencyKey: dto.IdempotencyKey, WriterID: dto.FillerID, Fingerprint: fingerprint, RequestID: dto.RequestID})
+	if err == nil {
+		err = validateCompletedSubmission(completed)
+	}
+	observeDurableLookupOperation("early_lookup", completed, err)
 	if stderrors.Is(err, submitport.ErrIdempotencyConflict) {
 		observeDurableSubmit("idempotency_conflict")
 		return nil, errors.WithCode(errorCode.ErrConflict, "%v", err)
 	}
-	if err == nil && existing != nil {
+	if err == nil && completed != nil {
 		// This is the normal contender readback path after cross-instance
 		// coalescing. It returns before attribution and CreateDurably, so count
 		// it here rather than relying only on the transaction-layer metric.
 		observeDurableSubmit("idempotency_hit")
 	}
-	return existing, err
+	if completed == nil {
+		return nil, err
+	}
+	return completed.Sheet, err
 }
 
 func createAnswerSheet(

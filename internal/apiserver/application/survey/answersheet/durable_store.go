@@ -2,6 +2,7 @@ package answersheet
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/event"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
@@ -13,6 +14,10 @@ import (
 // DurableSubmitMeta 携带application-等级 持久化 write 元数据。
 type DurableSubmitMeta = submitport.DurableSubmitMeta
 
+// CompletedSubmission is the acceptance-time idempotency fact returned by the
+// durable reader.
+type CompletedSubmission = submitport.CompletedSubmission
+
 // SubmissionDurableStore 持久化answersheets together 使用 inbound idempotency。
 // 元数据 和 staged 领域事件。
 type SubmissionDurableStore interface {
@@ -23,11 +28,11 @@ type SubmissionDurableStore interface {
 // application return an already accepted business intent before revalidating a
 // mutable source resource such as an Entry or Task.
 type SubmissionIdempotencyReader interface {
-	FindCompleted(ctx context.Context, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error)
+	FindCompleted(ctx context.Context, meta DurableSubmitMeta) (*CompletedSubmission, error)
 }
 
 type SubmissionDurableWriter interface {
-	FindCompletedSubmission(ctx context.Context, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error)
+	FindCompletedSubmission(ctx context.Context, meta DurableSubmitMeta) (*CompletedSubmission, error)
 	SaveSubmittedAnswerSheet(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, meta DurableSubmitMeta) ([]event.DomainEvent, error)
 	WaitForCompletedSubmission(ctx context.Context, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error)
 }
@@ -48,4 +53,17 @@ func NewTransactionalSubmissionDurableStore(
 		stager:     stager,
 		postCommit: postCommit,
 	}
+}
+
+func validateCompletedSubmission(completed *CompletedSubmission) error {
+	if completed == nil {
+		return nil
+	}
+	if completed.Sheet == nil {
+		return fmt.Errorf("completed answer sheet is required")
+	}
+	if completed.Fingerprint == "" {
+		return fmt.Errorf("completed submission fingerprint is required")
+	}
+	return nil
 }

@@ -22,7 +22,7 @@ func (s *submissionService) LookupAcceptedSubmission(ctx context.Context, dto Lo
 		return nil, false, err
 	}
 
-	existing, err := reader.FindCompleted(ctx, DurableSubmitMeta{
+	completed, err := reader.FindCompleted(ctx, DurableSubmitMeta{
 		IdempotencyKey: dto.IdempotencyKey,
 		WriterID:       dto.FillerID,
 	})
@@ -30,29 +30,28 @@ func (s *submissionService) LookupAcceptedSubmission(ctx context.Context, dto Lo
 		observeDurableOperation("explicit_readback", "error")
 		return nil, false, errors.WrapC(err, errorCode.ErrDatabase, "回读已受理答卷失败")
 	}
-	if existing == nil {
+	if completed == nil {
 		observeDurableOperation("explicit_readback", "miss")
 		return nil, false, nil
 	}
+	if err := validateCompletedSubmission(completed); err != nil {
+		observeDurableOperation("explicit_readback", "error")
+		return nil, false, errors.WithCode(errorCode.ErrDatabase, "已受理答卷持久结果不完整")
+	}
 
-	candidateFingerprint, err := lookupSubmissionFingerprint(existing, dto)
+	candidateFingerprint, err := lookupSubmissionFingerprint(completed.Sheet, dto)
 	if err != nil {
 		observeDurableOperation("explicit_readback", "invalid")
 		return nil, false, err
 	}
-	storedFingerprint, err := submitport.Fingerprint(existing)
-	if err != nil {
-		observeDurableOperation("explicit_readback", "error")
-		return nil, false, errors.WrapC(err, errorCode.ErrDatabase, "计算已受理答卷指纹失败")
-	}
-	if candidateFingerprint != storedFingerprint {
+	if candidateFingerprint != completed.Fingerprint {
 		observeDurableOperation("explicit_readback", "conflict")
 		return nil, false, errors.WithCode(errorCode.ErrConflict, "%v", submitport.ErrIdempotencyConflict)
 	}
 
 	observeDurableOperation("explicit_readback", "hit")
 	observeDurableSubmit("idempotency_hit")
-	return toAnswerSheetResult(existing), true, nil
+	return toAnswerSheetResult(completed.Sheet), true, nil
 }
 
 func validateLookupSubmissionDTO(dto LookupSubmissionDTO) error {

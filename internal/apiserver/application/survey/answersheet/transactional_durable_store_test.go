@@ -31,7 +31,7 @@ func (r *durableStoreRunnerStub) WithinTransaction(ctx context.Context, fn func(
 }
 
 type durableStoreWriterStub struct {
-	existing     *domainAnswerSheet.AnswerSheet
+	completed    *CompletedSubmission
 	findErr      error
 	waitExisting *domainAnswerSheet.AnswerSheet
 	waitErr      error
@@ -47,10 +47,10 @@ type durableStoreWriterStub struct {
 	waitCtxErr   error
 }
 
-func (w *durableStoreWriterStub) FindCompletedSubmission(_ context.Context, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, error) {
+func (w *durableStoreWriterStub) FindCompletedSubmission(_ context.Context, meta DurableSubmitMeta) (*CompletedSubmission, error) {
 	w.findCalled = true
 	w.findMeta = meta
-	return w.existing, w.findErr
+	return w.completed, w.findErr
 }
 
 func (w *durableStoreWriterStub) SaveSubmittedAnswerSheet(ctx context.Context, _ *domainAnswerSheet.AnswerSheet, _ DurableSubmitMeta) ([]event.DomainEvent, error) {
@@ -96,20 +96,21 @@ func TestTransactionalSubmissionDurableStoreUnknownCommitRecoversAfterRequestCan
 	}
 }
 
-func TestTransactionalSubmissionDurableStoreFindCompletedObservesEarlyLookup(t *testing.T) {
+func TestTransactionalSubmissionDurableStoreFindCompletedLeavesLookupMetricsToCaller(t *testing.T) {
 	existing := newDurableStoreTestSheet(t)
-	hitStore, ok := NewTransactionalSubmissionDurableStore(nil, &durableStoreWriterStub{existing: existing}, nil, nil).(SubmissionIdempotencyReader)
+	completed := &CompletedSubmission{Sheet: existing, Fingerprint: "persisted"}
+	hitStore, ok := NewTransactionalSubmissionDurableStore(nil, &durableStoreWriterStub{completed: completed}, nil, nil).(SubmissionIdempotencyReader)
 	if !ok {
 		t.Fatal("transactional durable store must implement SubmissionIdempotencyReader")
 	}
 
 	beforeHit := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("early_lookup", "hit"))
 	got, err := hitStore.FindCompleted(t.Context(), DurableSubmitMeta{IdempotencyKey: "idem-early"})
-	if err != nil || got != existing {
-		t.Fatalf("FindCompleted() = (%p, %v), want existing sheet", got, err)
+	if err != nil || got != completed {
+		t.Fatalf("FindCompleted() = (%p, %v), want completed submission", got, err)
 	}
-	if delta := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("early_lookup", "hit")) - beforeHit; delta != 1 {
-		t.Fatalf("early_lookup hit metric delta = %v, want 1", delta)
+	if delta := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("early_lookup", "hit")) - beforeHit; delta != 0 {
+		t.Fatalf("early_lookup hit metric delta = %v, want 0", delta)
 	}
 
 	missStore, ok := NewTransactionalSubmissionDurableStore(nil, &durableStoreWriterStub{}, nil, nil).(SubmissionIdempotencyReader)
@@ -121,8 +122,49 @@ func TestTransactionalSubmissionDurableStoreFindCompletedObservesEarlyLookup(t *
 	if err != nil || got != nil {
 		t.Fatalf("FindCompleted() = (%p, %v), want miss", got, err)
 	}
-	if delta := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("early_lookup", "miss")) - beforeMiss; delta != 1 {
-		t.Fatalf("early_lookup miss metric delta = %v, want 1", delta)
+	if delta := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("early_lookup", "miss")) - beforeMiss; delta != 0 {
+		t.Fatalf("early_lookup miss metric delta = %v, want 0", delta)
+	}
+}
+
+func TestTransactionalSubmissionDurableStoreRejectsIncompleteCompletedRecord(t *testing.T) {
+	for _, testCase := range []struct {
+		name      string
+		completed *CompletedSubmission
+	}{
+		{name: "missing sheet", completed: &CompletedSubmission{Fingerprint: "persisted"}},
+		{name: "missing fingerprint", completed: &CompletedSubmission{Sheet: newDurableStoreTestSheet(t)}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			writer := &durableStoreWriterStub{completed: testCase.completed}
+			reader, ok := NewTransactionalSubmissionDurableStore(nil, writer, nil, nil).(SubmissionIdempotencyReader)
+			if !ok {
+				t.Fatal("transactional durable store must implement SubmissionIdempotencyReader")
+			}
+
+			completed, err := reader.FindCompleted(t.Context(), DurableSubmitMeta{IdempotencyKey: "idem-incomplete"})
+			if err == nil || completed != testCase.completed {
+				t.Fatalf("FindCompleted() = (%#v, %v), want incomplete record and error", completed, err)
+			}
+		})
+	}
+}
+
+func TestTransactionalSubmissionDurableStorePretransactionRejectsIncompleteCompletedRecord(t *testing.T) {
+	runner := &durableStoreRunnerStub{}
+	writer := &durableStoreWriterStub{completed: &CompletedSubmission{Fingerprint: "persisted"}}
+	store := NewTransactionalSubmissionDurableStore(runner, writer, &durableStoreStagerStub{}, nil)
+
+	before := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("pretransaction_lookup", "error"))
+	_, existed, err := store.CreateDurably(t.Context(), newDurableStoreTestSheet(t), DurableSubmitMeta{IdempotencyKey: "idem-incomplete"})
+	if err == nil || existed {
+		t.Fatalf("CreateDurably() = (%v, %v), want incomplete record error", existed, err)
+	}
+	if runner.called || writer.saveCalled {
+		t.Fatalf("incomplete record must fail before transaction: runner=%v save=%v", runner.called, writer.saveCalled)
+	}
+	if delta := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("pretransaction_lookup", "error")) - before; delta != 1 {
+		t.Fatalf("pretransaction_lookup error metric delta = %v, want 1", delta)
 	}
 }
 
@@ -137,6 +179,24 @@ func TestTransactionalSubmissionDurableStorePretransactionLookupConflict(t *test
 	}
 	if delta := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("pretransaction_lookup", "conflict")) - before; delta != 1 {
 		t.Fatalf("pretransaction_lookup conflict metric delta = %v, want 1", delta)
+	}
+}
+
+func TestTransactionalSubmissionDurableStorePretransactionLookupMissCountsOnce(t *testing.T) {
+	runner := &durableStoreRunnerStub{}
+	writer := &durableStoreWriterStub{}
+	store := NewTransactionalSubmissionDurableStore(runner, writer, &durableStoreStagerStub{}, nil)
+
+	before := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("pretransaction_lookup", "miss"))
+	_, existed, err := store.CreateDurably(t.Context(), newDurableStoreTestSheet(t), DurableSubmitMeta{IdempotencyKey: "idem-miss"})
+	if err != nil || existed {
+		t.Fatalf("CreateDurably() = (%v, %v), want new committed submission", existed, err)
+	}
+	if !runner.called || !writer.saveCalled {
+		t.Fatalf("pretransaction miss must continue to transaction: runner=%v save=%v", runner.called, writer.saveCalled)
+	}
+	if delta := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("pretransaction_lookup", "miss")) - before; delta != 1 {
+		t.Fatalf("pretransaction_lookup miss metric delta = %v, want 1", delta)
 	}
 }
 
@@ -210,7 +270,7 @@ func TestTransactionalSubmissionDurableStoreRequiresAnswerSheet(t *testing.T) {
 func TestTransactionalSubmissionDurableStoreIdempotencyHitDoesNotOpenTransaction(t *testing.T) {
 	existing := newDurableStoreTestSheet(t)
 	runner := &durableStoreRunnerStub{}
-	writer := &durableStoreWriterStub{existing: existing}
+	writer := &durableStoreWriterStub{completed: &CompletedSubmission{Sheet: existing, Fingerprint: "persisted"}}
 	stager := &durableStoreStagerStub{}
 	store := NewTransactionalSubmissionDurableStore(runner, writer, stager, nil)
 
