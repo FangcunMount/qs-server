@@ -1,14 +1,37 @@
 # Production gRPC method ACL.
 #
-# The service_name is the mTLS identity extracted from the collection-server
-# client certificate. Keep the default policy deny so a missing rule never
-# widens access.
+# service_name is the exact mTLS identity extracted from the collection-server
+# client certificate. Keep this list synchronized with
+# internal/collection-server/infra/grpcclient.ACLAllowedMethods.
 
 default_policy: deny
 
 services:
-  - service_name: qs-collection.svc
+  - service_name: qs-collection-server.svc
     enabled: true
-    description: collection-server BFF may call participant report APIs only
+    description: collection-server BFF least-privilege apiserver RPC surface
     allowed_methods:
-      - /interpretation.ParticipantReportService/*
+      - /answersheet.AnswerSheetService/SaveAnswerSheet
+      - /answersheet.AnswerSheetService/LookupAnswerSheetSubmission
+      - /answersheet.AnswerSheetService/GetAnswerSheet
+      - /answersheet.AnswerSheetService/ListAnswerSheets
+      - /questionnaire.QuestionnaireService/GetQuestionnaire
+      - /questionnaire.QuestionnaireService/ListQuestionnaires
+      - /evaluation.TesteeEvaluationService/GetMyAssessment
+      - /evaluation.TesteeEvaluationService/ListMyAssessments
+      - /evaluation.TesteeEvaluationService/GetAssessmentScores
+      - /evaluation.TesteeEvaluationService/GetFactorTrend
+      - /evaluation.TesteeEvaluationService/GetHighRiskFactors
+      - /evaluation.AssessmentIntakeService/ResolveAssessmentByAnswerSheetID
+      - /interpretation.ParticipantReportService/GetAssessmentReport
+      - /actor.ActorService/CreateTestee
+      - /actor.ActorService/GetTestee
+      - /actor.ActorService/UpdateTestee
+      - /actor.ActorService/TesteeExists
+      - /actor.ActorService/ListTesteesByOrg
+      - /actor.ActorService/ListTesteesByUser
+      - /actor.ActorService/GetTesteeCareContext
+      - /assessmentmodel.AssessmentModelCatalogService/GetPublishedModel
+      - /assessmentmodel.AssessmentModelCatalogService/ListPublishedModels
+      - /assessmentmodel.AssessmentModelCatalogService/ListHotPublishedModels
+      - /assessmentmodel.AssessmentModelCatalogService/GetCatalogOptions

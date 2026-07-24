@@ -6,9 +6,11 @@ import (
 	"testing"
 	"time"
 
+	basegrpc "github.com/FangcunMount/component-base/pkg/grpc/interceptors"
 	authnv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/authn/v2"
 	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/serviceidentity"
 )
 
 func TestInjectUserContextIncludesSessionAndMetadata(t *testing.T) {
@@ -133,6 +135,24 @@ func TestVerifyIdentityMatchUsesLegacyMTLSIdentityMapContract(t *testing.T) {
 	}
 }
 
+func TestServiceIdentityFromComponentBaseMTLSContextUsesCanonicalCollectionIdentity(t *testing.T) {
+	ctx := basegrpc.ContextWithServiceIdentity(context.Background(), &basegrpc.ServiceIdentity{
+		ServiceName: serviceidentity.CollectionServerCertificateCommonName,
+		CommonName:  serviceidentity.CollectionServerCertificateCommonName,
+	})
+
+	identity, ok := ServiceIdentityFromMTLSContext(ctx)
+	if !ok {
+		t.Fatal("expected component-base mTLS service identity projection")
+	}
+	if identity.ServiceID != serviceidentity.CollectionServerServiceID {
+		t.Fatalf("service ID = %q, want %q", identity.ServiceID, serviceidentity.CollectionServerServiceID)
+	}
+	if identity.CommonName != serviceidentity.CollectionServerCertificateCommonName {
+		t.Fatalf("common name = %q, want %q", identity.CommonName, serviceidentity.CollectionServerCertificateCommonName)
+	}
+}
+
 func TestLoadACLConfigUsesDefaultPolicyWhenFileMissing(t *testing.T) {
 	denyACL := loadACLConfig("missing-acl.yaml", "deny")
 	if services := denyACL.ListServices(); len(services) != 0 {
@@ -148,15 +168,21 @@ func TestLoadACLConfigUsesDefaultPolicyWhenFileMissing(t *testing.T) {
 	}
 }
 
-func TestLoadACLConfigLoadsParticipantReportRules(t *testing.T) {
+func TestLoadACLConfigLoadsCanonicalCollectionRules(t *testing.T) {
 	acl := loadACLConfig("../../../configs/grpc-acl.example.yaml", "deny")
-	if err := acl.CheckAccess("qs-collection.svc", "/interpretation.ParticipantReportService/GetAssessmentReport"); err != nil {
+	if err := acl.CheckAccess(serviceidentity.CollectionServerCertificateCommonName, "/interpretation.ParticipantReportService/GetAssessmentReport"); err != nil {
 		t.Fatalf("collection caller should be allowed: %v", err)
+	}
+	if err := acl.CheckAccess(serviceidentity.CollectionServerCertificateCommonName, "/assessmentmodel.AssessmentModelCatalogService/ListHotPublishedModels"); err != nil {
+		t.Fatalf("collection catalog caller should be allowed: %v", err)
+	}
+	if err := acl.CheckAccess(serviceidentity.CollectionServerCertificateCommonName, "/evaluation.TesteeEvaluationService/ListMyAssessments"); err != nil {
+		t.Fatalf("collection evaluation caller should be allowed: %v", err)
 	}
 	if err := acl.CheckAccess("qs-worker.svc", "/interpretation.ParticipantReportService/GetAssessmentReport"); err == nil {
 		t.Fatal("non-collection caller should be denied")
 	}
-	if err := acl.CheckAccess("qs-collection.svc", "/interpretation.InterpretationAutomationService/Run"); err == nil {
+	if err := acl.CheckAccess(serviceidentity.CollectionServerCertificateCommonName, "/interpretation.InterpretationAutomationService/GenerateReportFromOutcome"); err == nil {
 		t.Fatal("collection caller should not access unrelated service methods")
 	}
 }

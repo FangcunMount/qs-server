@@ -6,6 +6,7 @@ import (
 	"time"
 
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
+	"github.com/FangcunMount/qs-server/internal/pkg/serviceidentity"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -148,5 +149,17 @@ func TestAllowWorkloadRejectsUnknownCaller(t *testing.T) {
 	verifier, _ := NewVerifierFromOptions(testOptions("key-a", ""))
 	if err := verifier.AllowWorkload("qs-worker.svc"); err == nil {
 		t.Fatal("AllowWorkload() error = nil, want untrusted workload")
+	}
+}
+
+func TestAllowWorkloadAcceptsOnlyCanonicalCollectionServiceID(t *testing.T) {
+	verifier, _ := NewVerifierFromOptions(testOptions("key-a", ""))
+	if err := verifier.AllowWorkload(serviceidentity.CollectionServerServiceID); err != nil {
+		t.Fatalf("canonical collection service ID rejected: %v", err)
+	}
+	for _, legacy := range []string{"qs-collection", "qs-collection.svc", serviceidentity.CollectionServerCertificateCommonName} {
+		if err := verifier.AllowWorkload(legacy); err == nil {
+			t.Errorf("legacy or certificate-form identity %q unexpectedly accepted as service ID", legacy)
+		}
 	}
 }

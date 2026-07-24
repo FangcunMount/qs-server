@@ -5,11 +5,12 @@ import (
 	"testing"
 	"time"
 
+	basegrpc "github.com/FangcunMount/component-base/pkg/grpc/interceptors"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	interpretationParticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
 	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
-	pkggrpc "github.com/FangcunMount/qs-server/internal/pkg/grpc"
+	"github.com/FangcunMount/qs-server/internal/pkg/serviceidentity"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -48,6 +49,13 @@ func testDelegatedContext(t *testing.T, testeeID uint64) context.Context {
 		t.Fatalf("Sign() error = %v", err)
 	}
 	return metadata.NewIncomingContext(context.Background(), metadata.Pairs(delegatedsubject.MetadataKey, raw))
+}
+
+func withMTLSWorkload(ctx context.Context, serviceName string) context.Context {
+	return basegrpc.ContextWithServiceIdentity(ctx, &basegrpc.ServiceIdentity{
+		ServiceName: serviceName,
+		CommonName:  serviceName,
+	})
 }
 
 func TestParticipantReportServiceRejectsMissingDelegatedSubject(t *testing.T) {
@@ -108,7 +116,7 @@ func TestParticipantReportServiceAllowsValidDelegationButRejectsWrongAssessment(
 func TestParticipantReportServiceReturnsReportWithValidDelegation(t *testing.T) {
 	reportSvc := &fakeParticipantReportService{report: &interpretationParticipant.Report{AssessmentID: 42}}
 	svc := NewParticipantReportService(reportSvc, testDelegatedVerifier(t))
-	ctx := testDelegatedContext(t, 7)
+	ctx := withMTLSWorkload(testDelegatedContext(t, 7), serviceidentity.CollectionServerCertificateCommonName)
 	resp, err := svc.GetAssessmentReport(ctx, &pb.GetAssessmentReportRequest{TesteeId: 7, AssessmentId: 42})
 	if err != nil {
 		t.Fatalf("GetAssessmentReport() error = %v", err)
@@ -121,7 +129,7 @@ func TestParticipantReportServiceReturnsReportWithValidDelegation(t *testing.T) 
 func TestParticipantReportServiceRejectsUntrustedWorkloadIdentity(t *testing.T) {
 	svc := NewParticipantReportService(&fakeParticipantReportService{}, testDelegatedVerifier(t))
 	ctx := testDelegatedContext(t, 7)
-	ctx = pkggrpc.ContextWithMTLSIdentityMap(ctx, map[string]interface{}{"common_name": "qs-worker.svc"})
+	ctx = withMTLSWorkload(ctx, "qs-worker.svc")
 	_, err := svc.GetAssessmentReport(ctx, &pb.GetAssessmentReportRequest{TesteeId: 7, AssessmentId: 42})
 	if status.Code(err) != codes.PermissionDenied {
 		t.Fatalf("code = %v, want PermissionDenied", status.Code(err))

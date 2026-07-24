@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/serviceidentity"
 )
 
 const (
@@ -20,8 +22,7 @@ const (
 	PurposeGetAssessmentReport = "participant_report.get_assessment_report"
 	PurposeListMyReports       = "participant_report.list_my_reports"
 
-	TrustedCallerQSCollection    = "qs-collection.svc"
-	TrustedCallerQSCollectionAlt = "qs-collection"
+	TrustedCallerQSCollection = serviceidentity.CollectionServerServiceID
 )
 
 var (

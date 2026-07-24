@@ -17,6 +17,7 @@ import (
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/serviceidentity"
 	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
 	workeroptions "github.com/FangcunMount/qs-server/internal/worker/options"
 	"github.com/spf13/viper"
@@ -145,6 +146,14 @@ func prepareDelegatedSubjectContract(t *testing.T, configName string, opts *dele
 
 func assertAPIServerGRPCTrustContract(t *testing.T, configName string, opts *apiserveroptions.Options) {
 	t.Helper()
+	if strings.Contains(configName, ".dev.") {
+		for _, allowedCN := range opts.GRPCOptions.MTLS.AllowedCNs {
+			if allowedCN == serviceidentity.CollectionServerCertificateCommonName {
+				return
+			}
+		}
+		t.Fatalf("%s grpc mTLS allowed CNs must contain %q", configName, serviceidentity.CollectionServerCertificateCommonName)
+	}
 	if !strings.Contains(configName, ".prod.") {
 		return
 	}
@@ -164,12 +173,25 @@ func assertAPIServerGRPCTrustContract(t *testing.T, configName string, opts *api
 	rules := string(data)
 	for _, required := range []string{
 		"default_policy: deny",
-		"service_name: qs-collection.svc",
-		"/interpretation.ParticipantReportService/*",
+		"service_name: " + serviceidentity.CollectionServerCertificateCommonName,
+		"/assessmentmodel.AssessmentModelCatalogService/ListHotPublishedModels",
+		"/evaluation.TesteeEvaluationService/ListMyAssessments",
+		"/interpretation.ParticipantReportService/GetAssessmentReport",
 	} {
 		if !strings.Contains(rules, required) {
 			t.Fatalf("production grpc ACL must contain %q", required)
 		}
+	}
+}
+
+func TestAPIServerImageIncludesProductionGRPCACL(t *testing.T) {
+	dockerfile, err := os.ReadFile(filepath.Join(repoRoot(t), "build", "docker", "Dockerfile.qs-apiserver"))
+	if err != nil {
+		t.Fatalf("read apiserver Dockerfile: %v", err)
+	}
+	const required = "COPY --chown=www:www configs/grpc-acl.prod.yaml /app/configs/grpc-acl.prod.yaml"
+	if !strings.Contains(string(dockerfile), required) {
+		t.Fatalf("apiserver Dockerfile must contain %q", required)
 	}
 }
 

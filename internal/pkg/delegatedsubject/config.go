@@ -76,8 +76,7 @@ func NewVerifierFromOptions(opts *Options) (*Verifier, error) {
 		currentKey:  current,
 		previousKey: previous,
 		callers: map[string]struct{}{
-			TrustedCallerQSCollection:    {},
-			TrustedCallerQSCollectionAlt: {},
+			TrustedCallerQSCollection: {},
 		},
 	}, nil
 }

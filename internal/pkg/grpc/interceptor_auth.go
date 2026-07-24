@@ -171,7 +171,7 @@ func (i *IAMAuthInterceptor) verifyIdentityMatch(ctx context.Context, claims *au
 	}
 
 	// 验证 JWT 中的 service_id 与证书 CN 是否匹配
-	// 例如：证书 CN 为 "qs-collection.svc"，JWT service_id 应该是 "qs-collection"
+	// 例如：证书 CN 为 "qs-collection-server.svc"，JWT service_id 应该是 "qs-collection-server"
 	expectedServiceID := strings.TrimSuffix(clientCN, ".svc")
 
 	// 从 claims 的 Extra 中获取 service_id（如果是服务间调用）

@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	basegrpc "github.com/FangcunMount/component-base/pkg/grpc/interceptors"
 	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/securityprojection"
@@ -159,6 +160,18 @@ func ContextWithMTLSIdentityMap(ctx context.Context, identity map[string]interfa
 func ServiceIdentityFromMTLSContext(ctx context.Context) (securityplane.ServiceIdentity, bool) {
 	if ctx == nil {
 		return securityplane.ServiceIdentity{}, false
+	}
+	if identity, ok := basegrpc.ServiceIdentityFromContext(ctx); ok && identity != nil {
+		commonName := identity.CommonName
+		if commonName == "" {
+			commonName = identity.ServiceName
+		}
+		return securityprojection.ServiceIdentityFromInput(securityprojection.ServiceIdentityInput{
+			ServiceID:  strings.TrimSuffix(identity.ServiceName, ".svc"),
+			Source:     securityplane.ServiceIdentitySourceMTLS,
+			CommonName: commonName,
+			Namespace:  identity.ServiceNamespace,
+		}), true
 	}
 	mtlsIdentity, ok := ctx.Value(mtlsIdentityKey).(map[string]interface{})
 	if !ok {

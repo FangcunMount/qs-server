@@ -144,6 +144,7 @@ ensure_networks() {
 
 setup_grpc_certs() {
   local cert_name="$1"
+  local expected_cn="${2:-}"
   local grpc_cert_dir="/data/infra/ssl/grpc"
 
   if ! $SUDO test -d "$grpc_cert_dir"; then
@@ -162,6 +163,22 @@ setup_grpc_certs() {
       exit 1
     fi
   done
+
+  if [ -n "$expected_cn" ]; then
+    if ! command -v openssl >/dev/null 2>&1; then
+      echo "openssl is required to verify the gRPC certificate identity" >&2
+      exit 1
+    fi
+
+    local cert_subject cert_cn
+    cert_subject="$($SUDO openssl x509 -in "$grpc_crt" -noout -subject -nameopt RFC2253)"
+    cert_subject="${cert_subject#subject=}"
+    cert_cn="$(printf '%s\n' "$cert_subject" | tr ',' '\n' | sed -n 's/^CN=//p' | head -n 1)"
+    if [ "$cert_cn" != "$expected_cn" ]; then
+      echo "Unexpected gRPC certificate CN for ${cert_name}: got ${cert_cn:-<missing>}, want ${expected_cn}" >&2
+      exit 1
+    fi
+  fi
 
   $SUDO chown "$APP_UID:$APP_GID" "$grpc_ca" "$grpc_crt" "$grpc_key"
   $SUDO chmod 0644 "$grpc_ca" "$grpc_crt"
@@ -526,7 +543,7 @@ case "$SERVICE" in
     ;;
   collection)
     echo "Deploy target: serverA (co-located with qs-apiserver). Stop legacy qs-collection-server on serverB after cutover."
-    setup_grpc_certs qs-collection-server
+    setup_grpc_certs qs-collection-server qs-collection-server.svc
     select_image
     deploy_http_service
     ;;
