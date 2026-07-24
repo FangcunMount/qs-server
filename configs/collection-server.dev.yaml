@@ -132,6 +132,10 @@ rate_limit:
 submit:
   accept_timeout_ms: 2000
   gate_wait_ms: 50
+  coalescing_enabled: true
+  coalescing_wait_ms: 500
+  coalescing_poll_interval_ms: 20
+  coalescing_signal_ttl_seconds: 300
 
 cache:
   capabilities:

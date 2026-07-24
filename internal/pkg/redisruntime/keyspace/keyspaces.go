@@ -177,11 +177,7 @@ func NewOpsKeyspace(ns string) OpsKeyspace {
 	return OpsKeyspace{keyspace: rediskit.NewKeyspace(ns)}
 }
 
-func (k OpsKeyspace) IdempotencyInflight(key string) string {
-	return k.keyspace.Prefix("submit:idempotency:" + key + ":lock")
-}
-
-func (k OpsKeyspace) IdempotencyDone(key string) string {
+func (k OpsKeyspace) SubmitCompletionSignal(key string) string {
 	return k.keyspace.Prefix("submit:idempotency:" + key + ":done")
 }
 

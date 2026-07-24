@@ -70,7 +70,14 @@ func (s *submissionService) findExistingSubmissionBeforeAttribution(ctx context.
 	}
 	existing, err := reader.FindCompleted(ctx, DurableSubmitMeta{IdempotencyKey: dto.IdempotencyKey, WriterID: dto.FillerID, Fingerprint: fingerprint, RequestID: dto.RequestID})
 	if stderrors.Is(err, submitport.ErrIdempotencyConflict) {
+		observeDurableSubmit("idempotency_conflict")
 		return nil, errors.WithCode(errorCode.ErrConflict, "%v", err)
+	}
+	if err == nil && existing != nil {
+		// This is the normal contender readback path after cross-instance
+		// coalescing. It returns before attribution and CreateDurably, so count
+		// it here rather than relying only on the transaction-layer metric.
+		observeDurableSubmit("idempotency_hit")
 	}
 	return existing, err
 }

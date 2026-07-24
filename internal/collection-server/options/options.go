@@ -143,8 +143,12 @@ func (c *ConcurrencyOptions) ResolvedSubmitConcurrency() int {
 }
 
 type SubmitOptions struct {
-	AcceptTimeoutMs int `json:"accept_timeout_ms" mapstructure:"accept_timeout_ms"`
-	GateWaitMs      int `json:"gate_wait_ms" mapstructure:"gate_wait_ms"`
+	AcceptTimeoutMs            int  `json:"accept_timeout_ms" mapstructure:"accept_timeout_ms"`
+	GateWaitMs                 int  `json:"gate_wait_ms" mapstructure:"gate_wait_ms"`
+	CoalescingEnabled          bool `json:"coalescing_enabled" mapstructure:"coalescing_enabled"`
+	CoalescingWaitMs           int  `json:"coalescing_wait_ms" mapstructure:"coalescing_wait_ms"`
+	CoalescingPollIntervalMs   int  `json:"coalescing_poll_interval_ms" mapstructure:"coalescing_poll_interval_ms"`
+	CoalescingSignalTTLSeconds int  `json:"coalescing_signal_ttl_seconds" mapstructure:"coalescing_signal_ttl_seconds"`
 }
 
 func (s *SubmitOptions) ResolvedAcceptTimeout() time.Duration {
@@ -152,6 +156,27 @@ func (s *SubmitOptions) ResolvedAcceptTimeout() time.Duration {
 		return 2 * time.Second
 	}
 	return time.Duration(s.AcceptTimeoutMs) * time.Millisecond
+}
+
+func (s *SubmitOptions) ResolvedCoalescingWait() time.Duration {
+	if s == nil || s.CoalescingWaitMs <= 0 {
+		return 500 * time.Millisecond
+	}
+	return time.Duration(s.CoalescingWaitMs) * time.Millisecond
+}
+
+func (s *SubmitOptions) ResolvedCoalescingPollInterval() time.Duration {
+	if s == nil || s.CoalescingPollIntervalMs <= 0 {
+		return 20 * time.Millisecond
+	}
+	return time.Duration(s.CoalescingPollIntervalMs) * time.Millisecond
+}
+
+func (s *SubmitOptions) ResolvedCoalescingSignalTTL() time.Duration {
+	if s == nil || s.CoalescingSignalTTLSeconds <= 0 {
+		return 5 * time.Minute
+	}
+	return time.Duration(s.CoalescingSignalTTLSeconds) * time.Second
 }
 
 // RateLimitOptions 限流配置
@@ -301,7 +326,14 @@ func NewRuntimeOptions() *RuntimeOptions {
 }
 
 func NewSubmitOptions() *SubmitOptions {
-	return &SubmitOptions{AcceptTimeoutMs: 2000, GateWaitMs: 50}
+	return &SubmitOptions{
+		AcceptTimeoutMs:            2000,
+		GateWaitMs:                 50,
+		CoalescingEnabled:          true,
+		CoalescingWaitMs:           500,
+		CoalescingPollIntervalMs:   20,
+		CoalescingSignalTTLSeconds: 300,
+	}
 }
 
 // NewRateLimitOptions 创建默认限流配置
@@ -412,6 +444,10 @@ func (c *ConcurrencyOptions) AddFlags(fs *pflag.FlagSet) {
 func (s *SubmitOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.AcceptTimeoutMs, "submit.accept-timeout-ms", s.AcceptTimeoutMs, "Reliable submit acceptance timeout in milliseconds.")
 	fs.IntVar(&s.GateWaitMs, "submit.gate-wait-ms", s.GateWaitMs, "Maximum submit gate wait in milliseconds before returning 429.")
+	fs.BoolVar(&s.CoalescingEnabled, "submit.coalescing-enabled", s.CoalescingEnabled, "Coalesce concurrent writer-scoped duplicate submissions across collection-server instances.")
+	fs.IntVar(&s.CoalescingWaitMs, "submit.coalescing-wait-ms", s.CoalescingWaitMs, "Maximum Redis completion-signal wait before durable readback.")
+	fs.IntVar(&s.CoalescingPollIntervalMs, "submit.coalescing-poll-interval-ms", s.CoalescingPollIntervalMs, "Redis completion-signal polling interval.")
+	fs.IntVar(&s.CoalescingSignalTTLSeconds, "submit.coalescing-signal-ttl-seconds", s.CoalescingSignalTTLSeconds, "TTL for advisory durable-completion signals.")
 }
 
 // AddFlags 添加限流相关的命令行参数
@@ -596,6 +632,24 @@ func validateCollectionSubmit(opts *SubmitOptions) []error {
 	}
 	if opts.GateWaitMs <= 0 {
 		errs = append(errs, fmt.Errorf("submit.gate_wait_ms must be greater than 0"))
+	}
+	if !opts.CoalescingEnabled {
+		return errs
+	}
+	if opts.CoalescingWaitMs <= 0 {
+		errs = append(errs, fmt.Errorf("submit.coalescing_wait_ms must be greater than 0 when coalescing is enabled"))
+	}
+	if opts.CoalescingPollIntervalMs <= 0 {
+		errs = append(errs, fmt.Errorf("submit.coalescing_poll_interval_ms must be greater than 0 when coalescing is enabled"))
+	}
+	if opts.CoalescingPollIntervalMs > opts.CoalescingWaitMs {
+		errs = append(errs, fmt.Errorf("submit.coalescing_poll_interval_ms cannot exceed coalescing_wait_ms"))
+	}
+	if opts.CoalescingWaitMs >= opts.AcceptTimeoutMs {
+		errs = append(errs, fmt.Errorf("submit.coalescing_wait_ms must be less than accept_timeout_ms"))
+	}
+	if opts.CoalescingSignalTTLSeconds <= 0 {
+		errs = append(errs, fmt.Errorf("submit.coalescing_signal_ttl_seconds must be greater than 0 when coalescing is enabled"))
 	}
 	return errs
 }

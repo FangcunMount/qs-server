@@ -18,6 +18,11 @@ var durableSubmitStageDuration = promauto.NewHistogramVec(prometheus.HistogramOp
 	Buckets: prometheus.ExponentialBuckets(0.001, 2, 14),
 }, []string{"stage", "outcome"})
 
+var durableSubmitOperationTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "qs_apiserver_answersheet_durable_operation_total",
+	Help: "Durable AnswerSheet store operations by bounded operation and outcome.",
+}, []string{"operation", "outcome"})
+
 func observeDurableSubmit(outcome string) {
 	if outcome == "" {
 		outcome = "unknown"
@@ -30,4 +35,14 @@ func observeDurableStage(stage, outcome string, started time.Time) {
 		outcome = "unknown"
 	}
 	durableSubmitStageDuration.WithLabelValues(stage, outcome).Observe(time.Since(started).Seconds())
+}
+
+func observeDurableOperation(operation, outcome string) {
+	if operation == "" {
+		operation = "unknown"
+	}
+	if outcome == "" {
+		outcome = "unknown"
+	}
+	durableSubmitOperationTotal.WithLabelValues(operation, outcome).Inc()
 }

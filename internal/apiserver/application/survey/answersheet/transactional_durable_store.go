@@ -27,7 +27,9 @@ func (s transactionalSubmissionDurableStore) FindCompleted(ctx context.Context, 
 	if s.writer == nil || meta.IdempotencyKey == "" {
 		return nil, nil
 	}
-	return s.writer.FindCompletedSubmission(ctx, meta)
+	existing, err := s.writer.FindCompletedSubmission(ctx, meta)
+	observeDurableLookupOperation("early_lookup", existing, err)
+	return existing, err
 }
 
 func (s transactionalSubmissionDurableStore) CreateDurably(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, bool, error) {
@@ -41,6 +43,7 @@ func (s transactionalSubmissionDurableStore) CreateDurably(ctx context.Context, 
 
 	if meta.IdempotencyKey != "" {
 		existing, err := s.writer.FindCompletedSubmission(ctx, meta)
+		observeDurableLookupOperation("pretransaction_lookup", existing, err)
 		if err != nil {
 			return nil, false, err
 		}
@@ -69,6 +72,7 @@ func (s transactionalSubmissionDurableStore) CreateDurably(ctx context.Context, 
 		observeDurableStage("outbox_stage", "ok", outboxStarted)
 		return nil
 	}); err != nil {
+		observeDurableOperation("transaction", "failed")
 		observeDurableStage("mongo_transaction", "failed", transactionStarted)
 		if meta.IdempotencyKey != "" {
 			// A Mongo commit result may be unknown precisely because the request
@@ -78,15 +82,23 @@ func (s transactionalSubmissionDurableStore) CreateDurably(ctx context.Context, 
 			existing, lookupErr := s.writer.WaitForCompletedSubmission(recoveryCtx, meta)
 			cancel()
 			if lookupErr != nil && stderrors.Is(lookupErr, submitport.ErrIdempotencyConflict) {
+				observeDurableOperation("transaction_error_recovery", "conflict")
 				return nil, false, lookupErr
 			}
 			if lookupErr == nil && existing != nil {
+				observeDurableOperation("transaction_error_recovery", "hit")
 				sheet.ClearEvents()
 				return existing, true, nil
+			}
+			if lookupErr != nil {
+				observeDurableOperation("transaction_error_recovery", "error")
+			} else {
+				observeDurableOperation("transaction_error_recovery", "miss")
 			}
 		}
 		return nil, false, err
 	}
+	observeDurableOperation("transaction", "committed")
 	observeDurableStage("mongo_transaction", "ok", transactionStarted)
 	if s.postCommit != nil && len(stagedEvents) > 0 {
 		s.postCommit.AfterCommit(ctx, stagedEvents, time.Now())
@@ -94,6 +106,19 @@ func (s transactionalSubmissionDurableStore) CreateDurably(ctx context.Context, 
 
 	sheet.ClearEvents()
 	return sheet, false, nil
+}
+
+func observeDurableLookupOperation(operation string, existing *domainAnswerSheet.AnswerSheet, err error) {
+	switch {
+	case stderrors.Is(err, submitport.ErrIdempotencyConflict):
+		observeDurableOperation(operation, "conflict")
+	case err != nil:
+		observeDurableOperation(operation, "error")
+	case existing != nil:
+		observeDurableOperation(operation, "hit")
+	default:
+		observeDurableOperation(operation, "miss")
+	}
 }
 
 func withSubmissionRequestID(events []event.DomainEvent, requestID string) []event.DomainEvent {

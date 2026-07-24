@@ -16,7 +16,7 @@
 | --- | --- | --- | --- |
 | 高频读与缓存一致性 | [Cache](./cache/README.md) | capability registry、L1/L2、singleflight、失效、预热 | DB/业务 read model |
 | 异步执行与可靠协作 | [Event](./event/README.md) | Event contract、Transactional Outbox、MQ、Signal、dead letter/replay | 本地事务 + Outbox + 业务状态 |
-| 突发流量与故障隔离 | [Concurrency / Resilience](./concurrency/README.md) | Gate、RateLimit、Backpressure、SubmitGuard、LockLease、治理 | DB 唯一约束、claim/CAS、事务 |
+| 突发流量与故障隔离 | [Concurrency / Resilience](./concurrency/README.md) | Gate、RateLimit、Backpressure、SubmitCoalescer、LockLease、治理 | DB 唯一约束、claim/CAS、事务 |
 
 ## 3. 支撑能力
 
@@ -31,7 +31,7 @@
 
 - Outbox 保证已提交业务事件的可靠出站；MQ 提供有界 at-least-once；Redis Signal 只做可丢失唤醒。
 - Cache miss、失效或 Redis 故障不能改变业务事实，只影响性能、新鲜度和部分运行时协调。
-- Gate、RateLimit、Backpressure 控制不同的量；SubmitGuard/LockLease 降低竞态代价，但不能替代数据库约束。
+- Gate、RateLimit、Backpressure 控制不同的量；SubmitCoalescer/LockLease 降低竞态代价，但不能替代数据库约束。
 - AuthN、OrgScope、capability 和资源归属是连续的授权链，任意一层成功都不能替代其它层。
 - `healthy`、`ready`、指标为零和 durable state 已完成不是同一结论。
 - 每个 client、subscriber、scheduler、goroutine 都必须有构造、启动、停止和关闭 owner。

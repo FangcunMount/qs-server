@@ -51,14 +51,21 @@ func (c *Container) profileServices() (*iam.ProfileLinkService, *iam.ProfileServ
 
 func (c *Container) buildSubmitRuntime(profileLinkService *iam.ProfileLinkService, questionnaireReader *questionnaire.QueryService) submitRuntime {
 	// answersheet / testee 经 acl 适配（REST↔gRPC 字段差异）；catalog / evaluation 经 grpcbridge 直出 application DTO。
-	submitGuard := redisops.NewSubmitGuardWithRunner(c.opsHandle, c.locks)
+	var submitCoalescer answersheet.DurableSubmitCoalescer
+	if c.opts.Submit.CoalescingEnabled {
+		submitCoalescer = redisops.NewSubmitCoalescer(c.opsHandle, c.locks, redisops.SubmitCoalescerConfig{
+			WaitTimeout:  c.opts.Submit.ResolvedCoalescingWait(),
+			PollInterval: c.opts.Submit.ResolvedCoalescingPollInterval(),
+			SignalTTL:    c.opts.Submit.ResolvedCoalescingSignalTTL(),
+		})
+	}
 	return submitRuntime{
 		submission: answersheet.NewSubmissionService(
 			acl.NewAnswerSheetBFFWriter(c.answerSheetClient),
 			acl.NewAnswerSheetBFFReader(c.answerSheetClient),
 			acl.NewTesteeActorLookup(c.actorClient),
 			profileLinkService,
-			submitGuard,
+			submitCoalescer,
 			c.assessmentIntakeClient,
 			questionnaireReader,
 			c.opts.Submit.ResolvedAcceptTimeout(),

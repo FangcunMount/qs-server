@@ -131,6 +131,10 @@ rate_limit:                          # 限流配置
 submit:
   accept_timeout_ms: 2000           # 问卷/ProfileLink/gRPC/Mongo 可靠受理总超时
   gate_wait_ms: 50                  # Submit Gate 最长等待，超时返回 429
+  coalescing_enabled: true          # 跨实例相同提交先由 Redis lease 合并；可关闭回滚到 Mongo 收敛
+  coalescing_wait_ms: 500           # contender 有界等待完成信号，超时后进入持久化回读
+  coalescing_poll_interval_ms: 20   # 完成信号轮询间隔
+  coalescing_signal_ttl_seconds: 300 # 完成信号仅作唤醒提示，不作为成功事实
 
 cache:
   capabilities:

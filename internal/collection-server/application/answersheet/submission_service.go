@@ -21,8 +21,13 @@ type AssessmentResolver interface {
 	ResolveAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (testeeID, assessmentID uint64, readinessPhase string, err error)
 }
 
-type LeaseIdempotencyGuard interface {
-	Run(ctx context.Context, key string, body func(context.Context) (answerSheetID string, err error)) (doneAnswerSheetID string, acquired bool, err error)
+type DurableSubmitCoalescer interface {
+	Run(
+		ctx context.Context,
+		key string,
+		owner func(context.Context) (answerSheetID string, err error),
+		readback func(context.Context) (answerSheetID string, err error),
+	) (answerSheetID string, err error)
 }
 
 type profileLinkChecker interface {
@@ -50,7 +55,7 @@ type SubmissionService struct {
 	profileAccess      *ProfileAccessResolver
 	answerConverter    AnswerConverter
 	committer          *SubmissionCommitter
-	submitGuard        LeaseIdempotencyGuard
+	submitCoalescer    DurableSubmitCoalescer
 	assessmentResolver AssessmentResolver
 	questionnaire      submissionQuestionnaireReader
 	acceptTimeout      time.Duration
@@ -62,7 +67,7 @@ func NewSubmissionService(
 	answerSheetReader AnswerSheetReader,
 	actorClient ActorLookup,
 	profileLinkService profileLinkChecker,
-	submitGuard LeaseIdempotencyGuard,
+	submitCoalescer DurableSubmitCoalescer,
 	assessmentResolver AssessmentResolver,
 	questionnaire submissionQuestionnaireReader,
 	acceptTimeout time.Duration,
@@ -78,7 +83,7 @@ func NewSubmissionService(
 		profileAccess:      NewProfileAccessResolver(actorClient, profileLinkService),
 		answerConverter:    AnswerConverter{},
 		committer:          NewSubmissionCommitter(answerSheetWriter),
-		submitGuard:        submitGuard,
+		submitCoalescer:    submitCoalescer,
 		assessmentResolver: assessmentResolver,
 		questionnaire:      questionnaire,
 		acceptTimeout:      acceptTimeout,
@@ -170,7 +175,7 @@ func (s *SubmissionService) AcceptDurably(ctx context.Context, requestID string,
 		return nil, err
 	}
 	observeSubmitStage("preflight", "ok", preflightStarted)
-	if s.submitGuard == nil {
+	if s.submitCoalescer == nil {
 		response, err := s.accept(ctx, requestID, writerID, req)
 		if err == nil {
 			totalOutcome = "accepted"
@@ -182,15 +187,16 @@ func (s *SubmissionService) AcceptDurably(ctx context.Context, requestID string,
 		return response, err
 	}
 	var response *SubmitAnswerSheetResponse
-	guardKey := strconv.FormatUint(writerID, 10) + ":" + req.IdempotencyKey
-	_, acquired, err := s.submitGuard.Run(ctx, guardKey, func(runCtx context.Context) (string, error) {
+	coalescingKey := strconv.FormatUint(writerID, 10) + ":" + req.IdempotencyKey
+	durablePath := func(runCtx context.Context) (string, error) {
 		var acceptErr error
 		response, acceptErr = s.accept(runCtx, requestID, writerID, req)
 		if acceptErr != nil || response == nil {
 			return "", acceptErr
 		}
 		return response.ID, nil
-	})
+	}
+	_, err := s.submitCoalescer.Run(ctx, coalescingKey, durablePath, durablePath)
 	if err != nil {
 		if status.Code(err) == codes.AlreadyExists {
 			totalOutcome = "conflict"
@@ -199,18 +205,9 @@ func (s *SubmissionService) AcceptDurably(ctx context.Context, requestID string,
 		}
 		return nil, err
 	}
-	if !acquired {
-		// The Redis lease is advisory only. Mongo's writer-scoped unique index
-		// and submission fingerprint remain the source of idempotent truth.
-		response, err = s.accept(ctx, requestID, writerID, req)
-		if err != nil {
-			if status.Code(err) == codes.AlreadyExists {
-				totalOutcome = "conflict"
-			} else {
-				totalOutcome = "unavailable"
-			}
-			return nil, err
-		}
+	if response == nil || response.ID == "" {
+		totalOutcome = "unavailable"
+		return nil, status.Error(codes.Unavailable, "answer sheet durable coalescing returned no result")
 	}
 	totalOutcome = "accepted"
 	return response, nil

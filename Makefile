@@ -114,7 +114,7 @@ COLOR_RED := \033[31m
 .PHONY: perf-init perf-ensure-config perf-tokens perf-tokens-collection perf-tokens-apiserver
 .PHONY: perf-preflight perf-check-k6 perf-k6 perf-smoke perf-pretest60 perf-pretest120 perf-pretest120-submit-only perf-pretest120-balanced perf-reliable-submit24 perf-reliable-submit48-burst perf-reliable-submit96-boundary
 .PHONY: perf-mixed140 perf-mixed140-submit24 perf-mixed160 perf-mixed180 perf-mixed200 perf-mixed220 perf-mixed240 perf-mixed240-models perf-mixed280 perf-mixed280-models perf-mixed280-models-short-report perf-mixed280-models-ws perf-special-report-short-poll perf-special-report-long-poll perf-mixed300 perf-mixed300-http perf-mixed300-http-query perf-mixed300-http-query-nostats perf-stats-isolate29 perf-stats-warmup perf-mixed300probe
-.PHONY: perf-model-smoke perf-outbox120 perf-personality60 perf-mixed300-models
+.PHONY: perf-model-smoke perf-outbox120 perf-personality60 perf-mixed300-models perf-submit-coalescing100
 .PHONY: perf-diag-report120 perf-diag-query120 perf-diag-submit120 perf-diag-query-submit120 perf-sync-profiles perf-sync-vusers perf-verify
 
 # ============================================================================
@@ -393,6 +393,9 @@ perf-diag-query-submit120: perf-preflight ## 诊断 pretest_120：query=48QPS + 
 	QUERY_RPS=48 SUBMIT_RPS=24 REPORT_RPS=0 STATS_RPS=0 \
 		$(MAKE) perf-k6 QPS_PROFILE=pretest_120 SUMMARY_EXPORT=$(PERF_DIR)/diag-query-submit/k6-summary.json
 
+perf-submit-coalescing100: ## 两个以上 collection-server 实例处理 100 个相同提交
+	k6 run $(PERF_SCRIPT_DIR)/k6-submit-coalescing.js
+
 perf-verify: perf-check-k6 ## 校验压测脚本与 k6 场景
 	bash -n $(PERF_SCRIPT_DIR)/check-token-preflight.sh
 	bash -n $(PERF_SCRIPT_DIR)/fetch-iam-tokens.sh
@@ -401,6 +404,7 @@ perf-verify: perf-check-k6 ## 校验压测脚本与 k6 场景
 	bash -n $(PERF_SCRIPT_DIR)/sync-vusers-from-example.sh
 	k6 inspect $(PERF_K6_SCRIPT)
 	k6 inspect $(PERF_SCRIPT_DIR)/k6-mixed-300qps.js
+	k6 inspect $(PERF_SCRIPT_DIR)/k6-submit-coalescing.js
 	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e QPS_PROFILE=mixed_300 $(PERF_K6_SCRIPT) | grep -q report_ws_query
 	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e QPS_PROFILE=mixed_240_models $(PERF_K6_SCRIPT) | grep -q medical_model_query
 	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e QPS_PROFILE=mixed_280_models $(PERF_K6_SCRIPT) | grep -q medical_model_query

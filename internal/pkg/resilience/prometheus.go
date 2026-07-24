@@ -77,6 +77,23 @@ var collectionAnswerSheetSubmitStageDuration = promauto.NewHistogramVec(promethe
 	Buckets: prometheus.ExponentialBuckets(0.001, 2, 12),
 }, []string{"stage", "outcome"})
 
+var collectionAnswerSheetSubmitCoalescerTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "qs_collection_answersheet_submit_coalescer_total",
+	Help: "Cross-instance AnswerSheet submit coalescing decisions by bounded outcome.",
+}, []string{"outcome"})
+
+var collectionAnswerSheetSubmitCoalescerWaitDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+	Name:    "qs_collection_answersheet_submit_coalescer_wait_seconds",
+	Help:    "Time contenders spend waiting before durable result readback.",
+	Buckets: prometheus.ExponentialBuckets(0.001, 2, 12),
+}, []string{"outcome"})
+
+var collectionAnswerSheetSubmitCoalescerRedisDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+	Name:    "qs_collection_answersheet_submit_coalescer_redis_seconds",
+	Help:    "Redis lease-decision and completion-signal latency for AnswerSheet submit coalescing.",
+	Buckets: prometheus.ExponentialBuckets(0.0005, 2, 12),
+}, []string{"operation", "outcome"})
+
 var collectionAssessmentReadinessTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 	Name: "qs_collection_assessment_readiness_total",
 	Help: "Assessment readiness checks by result.",
@@ -217,6 +234,36 @@ func ObserveAnswerSheetSubmitOutcome(outcome string) {
 		outcome = "unknown"
 	}
 	collectionAnswerSheetSubmitTotal.WithLabelValues(outcome).Inc()
+}
+
+func ObserveAnswerSheetSubmitCoalescer(outcome string) {
+	if outcome == "" {
+		outcome = "unknown"
+	}
+	collectionAnswerSheetSubmitCoalescerTotal.WithLabelValues(outcome).Inc()
+}
+
+func ObserveAnswerSheetSubmitCoalescerWait(outcome string, duration time.Duration) {
+	if outcome == "" {
+		outcome = "unknown"
+	}
+	if duration < 0 {
+		return
+	}
+	collectionAnswerSheetSubmitCoalescerWaitDuration.WithLabelValues(outcome).Observe(duration.Seconds())
+}
+
+func ObserveAnswerSheetSubmitCoalescerRedis(operation, outcome string, duration time.Duration) {
+	if operation == "" {
+		operation = "unknown"
+	}
+	if outcome == "" {
+		outcome = "unknown"
+	}
+	if duration < 0 {
+		return
+	}
+	collectionAnswerSheetSubmitCoalescerRedisDuration.WithLabelValues(operation, outcome).Observe(duration.Seconds())
 }
 
 func ObserveAssessmentReadiness(status string) {

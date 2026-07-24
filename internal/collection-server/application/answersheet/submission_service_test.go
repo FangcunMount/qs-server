@@ -70,17 +70,32 @@ func (s submissionQuestionnaireStub) Get(context.Context, string, string) (*coll
 	return s.questionnaire, s.err
 }
 
-type submissionGuardStub struct {
-	acquired bool
-	err      error
+type submissionCoalescerStub struct {
+	contender     bool
+	err           error
+	ownerCalls    *int
+	readbackCalls *int
 }
 
-func (s submissionGuardStub) Run(ctx context.Context, _ string, body func(context.Context) (string, error)) (string, bool, error) {
-	if s.err != nil || !s.acquired {
-		return "", s.acquired, s.err
+func (s submissionCoalescerStub) Run(
+	ctx context.Context,
+	_ string,
+	owner func(context.Context) (string, error),
+	readback func(context.Context) (string, error),
+) (string, error) {
+	if s.err != nil {
+		return "", s.err
 	}
-	value, err := body(ctx)
-	return value, true, err
+	if s.contender {
+		if s.readbackCalls != nil {
+			(*s.readbackCalls)++
+		}
+		return readback(ctx)
+	}
+	if s.ownerCalls != nil {
+		(*s.ownerCalls)++
+	}
+	return owner(ctx)
 }
 
 type assessmentResolverStub struct {
@@ -112,7 +127,7 @@ func newAcceptService(writer AnswerSheetWriter, reader AnswerSheetReader, resolv
 	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9, IAMProfileID: "profile-7", Name: "testee"}}
 	return NewSubmissionService(
 		writer, reader, actor, submissionProfileLinkStub{enabled: true, allowed: true},
-		submissionGuardStub{acquired: true}, resolver,
+		submissionCoalescerStub{}, resolver,
 		submissionQuestionnaireStub{questionnaire: publishedQuestionnaire()}, time.Second,
 	)
 }
@@ -196,14 +211,23 @@ func TestAcceptDurablyRejectsTesteeWithoutIAMProfile(t *testing.T) {
 	}
 }
 
-func TestAcceptDurablyFallsThroughAdvisoryLeaseContention(t *testing.T) {
+func TestAcceptDurablyUsesDurableReadbackAfterLeaseContention(t *testing.T) {
 	writer := &submissionWriterStub{output: &SaveAnswerSheetOutput{ID: 42}}
 	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9, IAMProfileID: "profile-7"}}
+	ownerCalls := 0
+	readbackCalls := 0
 	service := NewSubmissionService(writer, nil, actor,
-		submissionProfileLinkStub{enabled: true, allowed: true}, submissionGuardStub{acquired: false}, nil,
+		submissionProfileLinkStub{enabled: true, allowed: true}, submissionCoalescerStub{
+			contender:     true,
+			ownerCalls:    &ownerCalls,
+			readbackCalls: &readbackCalls,
+		}, nil,
 		submissionQuestionnaireStub{questionnaire: publishedQuestionnaire()}, time.Second)
 	if got, err := service.AcceptDurably(t.Context(), "request-1", 11, validSubmitRequest()); err != nil || got == nil || got.ID != "42" {
 		t.Fatalf("AcceptDurably() = (%#v, %v), want durable database result", got, err)
+	}
+	if ownerCalls != 0 || readbackCalls != 1 || writer.calls != 1 {
+		t.Fatalf("owner/readback/writer calls = %d/%d/%d, want 0/1/1", ownerCalls, readbackCalls, writer.calls)
 	}
 }
 

@@ -53,7 +53,7 @@ flowchart TD
     B --> C["提交限流与 Submit Gate"]
     C --> D["问卷可用性校验"]
     D --> E["受试者/填写人与 ProfileLink 校验"]
-    E --> F["advisory SubmitGuard"]
+    E --> F["SubmitCoalescer<br/>lease + bounded wait"]
     F --> G["apiserver SaveAnswerSheet gRPC"]
     G --> H["AnswerSheet + 幂等事实 + Outbox 可靠提交"]
     H --> I["202 Accepted"]
@@ -67,11 +67,15 @@ application service 的入口是 `AcceptDurably`。它只有在 apiserver 返回
 
 当前可靠提交链路明确不再依赖 SubmitQueue，也不会在 collection 同步执行完整 Assessment。入口削峰由有界 Gate、限流和下游在途控制完成，可靠性由 apiserver 的数据库事务、幂等和 Outbox 完成。
 
-### 5.3 SubmitGuard 的边界
+### 5.3 SubmitCoalescer 的边界
 
-Redis SubmitGuard 是减少同一请求并发重复执行的 advisory lease。抢锁失败时，系统仍可让数据库可靠提交与幂等事实给出最终答案。因此：
+Redis SubmitCoalescer 是减少同一请求并发重复执行的 advisory
+coordination。owner 在 lease 内执行 durable submit；contender 有界等待
+completion signal，随后仍调用 apiserver 从 Mongo 回读并校验结果。Redis
+故障或等待超时会进入同一 durable path。因此：
 
 - Redis 锁不能替代幂等键；
+- Redis completion signal 不能直接作为 202 的结果；
 - 锁丢失不能推翻已保存的 AnswerSheet；
 - 重复请求的最终一致性边界在 apiserver 持久化层。
 

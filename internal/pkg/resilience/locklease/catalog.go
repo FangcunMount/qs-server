@@ -50,7 +50,7 @@ var capabilities = [...]Capability{
 	{WorkloadStatisticsSyncLeader, "apiserver", KindLeader, Spec{Name: string(WorkloadStatisticsSyncLeader), Description: "用于 apiserver 统计同步调度器多实例抢占 leader 的分布式锁。", DefaultTTL: 30 * time.Minute}, RenewalModeAuto},
 	{WorkloadStatisticsSync, "apiserver", KindTaskLock, Spec{Name: string(WorkloadStatisticsSync), Description: "用于 apiserver 统计同步任务串行化执行的分布式锁。", DefaultTTL: 30 * time.Minute}, RenewalModeAuto},
 	{WorkloadEvaluationConsistencyReconcile, "apiserver", KindLeader, Spec{Name: string(WorkloadEvaluationConsistencyReconcile), Description: "用于 apiserver evaluation consistency reconcile 多实例串行化执行的分布式锁。", DefaultTTL: 30 * time.Second}, RenewalModeAuto},
-	{WorkloadCollectionSubmit, "collection-server", KindIdempotency, Spec{Name: string(WorkloadCollectionSubmit), Description: "用于 collection-server 答卷提交幂等与进行中抑制的分布式锁。", DefaultTTL: 5 * time.Minute}, RenewalModeAuto},
+	{WorkloadCollectionSubmit, "collection-server", KindDuplicateSuppression, Spec{Name: string(WorkloadCollectionSubmit), Description: "用于 collection-server 跨实例合并相同答卷提交的建议性 lease；最终幂等由 Mongo 裁决。", DefaultTTL: 5 * time.Minute}, RenewalModeAuto},
 }
 
 // Lookup returns a copy of one catalog entry.
