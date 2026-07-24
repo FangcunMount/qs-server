@@ -1,5 +1,5 @@
 # 生产拓扑（2026-07）：
-# - serverA（4C/8G）：qs-apiserver + qs-collection-server（本文件前两段）
+# - serverA（4C/8G）：qs-apiserver + qs-collection-server x2（本文件前两段）
 # - serverB：IAM（iam-apiserver，经 Swarm overlay infra-network 跨机 DNS 解析）
 # - serverD：qs-worker（本文件 qs-worker 段，compose -p qs-worker 独立部署）
 services:
@@ -43,11 +43,10 @@ services:
 
   qs-collection-server:
     image: ${DOCKER_IMAGE_QS_COLLECTION_SERVER:-ghcr.io/fangcunmount/qs-collection-server:latest}
-    container_name: qs-collection-server
     restart: unless-stopped
-    # collection-server 3C/3G；GOMEMLIMIT 取容器内存 75%。
-    mem_limit: "3072m"
-    cpus: "3"
+    # 默认由 CD 扩为 2 副本；每个副本 2C/1.5G，CPU 配额与 GOMAXPROCS 对齐。
+    mem_limit: "1536m"
+    cpus: "2"
     networks:
       - qs-network
       - infra-network
@@ -57,19 +56,24 @@ services:
       - "prometheus.component=qs-collection-server"
       - "prometheus.metrics_port=8080"
       - "prometheus.metrics_path=/metrics"
-    ports:
-      - "8082:8080"
-      - "6060:6060" # pprof（仅内网调试，生产注意访问控制）
+    # 多副本仅通过 Docker 网络暴露；公网流量由 serverA Nginx 负载均衡。
+    expose:
+      - "8080"
+      - "6060"
     env_file:
       - /opt/qs-server/qs-collection-server/configs/env/config.prod.env
     volumes:
       - /opt/qs-server/qs-collection-server/configs:/app/configs
-      - /data/logs/qs-server/qs-collection-server:/data/logs/qs
       # gRPC mTLS 证书目录；公网 HTTPS 由 serverA Nginx 终止
       - /data/infra/ssl/grpc:/etc/qs-server/ssl/grpc:ro
     environment:
-      - GOMEMLIMIT=2304MiB
-      - GOMAXPROCS=3
+      - GOMEMLIMIT=1152MiB
+      - GOMAXPROCS=2
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "10"
     command: ["--config=/app/configs/collection-server.prod.yaml"]
 
   qs-worker:

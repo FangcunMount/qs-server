@@ -279,24 +279,22 @@ log:
   level-output-mode: "duplicate"  # 重复输出模式（推荐）
   level-output-paths:
     all:
-      - stdout                       # 容器/进程标准输出保留完整日志
-      - /data/logs/qs/qs-collection-server.log  # 完整日志（所有级别）
+      - stdout                       # 每副本由 Docker json-file 独立轮转
     error:
-      - stderr                               # ERROR 级别写入标准错误，便于监控采集
-      - /data/logs/qs/qs-collection-server-error.log  # 额外记录 ERROR（快速定位故障）
+      - stderr                       # ERROR 级别写入标准错误，便于监控采集
 
 # ============================================================
 # 6. 调优参数（内存/并发）
 # ============================================================
 # 控制 Go 运行时的 GC/内存行为与并发
 runtime:
-  # 将 GOMEMLIMIT 设置为容器配额的 75% 以避免 OOM（容器 mem_limit=3072MiB）
-  go-mem-limit: "2304MiB"
+  # 将 GOMEMLIMIT 设置为单副本容器配额的 75%（mem_limit=1536MiB）
+  go-mem-limit: "1152MiB"
   # 更积极的 GC，降低峰值内存
   gogc: 50                           # GC 触发阈值: 50%
 
 # 并发/连接池调优
-concurrency:                        # 并发/连接池调优（4C/8G mixed_300 攻关）
+concurrency:                        # 单副本上限；双实例下进程级上限会聚合，发布后必须复测
   max-catalog-concurrency: 512      # catalog L1 独立池（与 heavy query 分池）
   max-query-concurrency: 280        # 非 catalog 读（assessment/stats/report-status）
   max-submit-concurrency: 96        # 写路径（submit 等，与读池隔离）

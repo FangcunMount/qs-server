@@ -97,6 +97,40 @@ jobs:
           version: v2.5.0
           args: --config=.golangci-depguard.yml --timeout=5m
 
+  deployment-contracts:
+    name: Deployment Contracts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+          cache: true
+
+      - name: Validate GitHub Actions
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+          "$(go env GOPATH)/bin/actionlint"
+
+      - name: Validate deployment shell scripts
+        run: bash -n scripts/cd/*.sh
+
+      - name: Validate production Compose
+        run: |
+          printf '%s\n' \
+            'services:' \
+            '  qs-apiserver:' \
+            '    env_file: !reset []' \
+            '  qs-collection-server:' \
+            '    env_file: !reset []' \
+            '  qs-worker:' \
+            '    env_file: !reset []' |
+            docker compose -f build/docker/docker-compose.prod.yml -f - config -q
+
   security:
     name: Security Scan (Advisory)
     runs-on: ubuntu-latest
@@ -223,7 +257,7 @@ jobs:
 
   build:
     name: Build Applications
-    needs: [test, lint, lint-boundaries, tier1-test-policy]
+    needs: [test, lint, lint-boundaries, deployment-contracts, tier1-test-policy]
     runs-on: ubuntu-latest
     strategy:
       matrix:

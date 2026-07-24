@@ -14,6 +14,7 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 APP_UID="${WWW_UID}"
 APP_GID="${WWW_GID}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
+COLLECTION_COMPOSE_PROJECT="${COLLECTION_COMPOSE_PROJECT:-qs-collection}"
 
 case "$IMAGE_TAG" in
   ""|*[!A-Za-z0-9_.-]*)
@@ -97,7 +98,9 @@ docker_login_with_token() {
 
 prepare_dirs_and_backup() {
   $SUDO mkdir -p "/opt/qs-server/${CONTAINER_NAME}/configs/env"
-  $SUDO mkdir -p "/data/logs/qs-server/${CONTAINER_NAME}"
+  if [ "$SERVICE" != "collection" ]; then
+    $SUDO mkdir -p "/data/logs/qs-server/${CONTAINER_NAME}"
+  fi
   $SUDO mkdir -p "/opt/backups/qs-server/${CONTAINER_NAME}"
 
   BACKUP_DIR="/opt/backups/qs-server/${CONTAINER_NAME}"
@@ -470,6 +473,106 @@ deploy_http_service() {
   exit 1
 }
 
+collection_container_ids() {
+  docker_compose \
+    -p "$COLLECTION_COMPOSE_PROJECT" \
+    -f "$DEPLOY_TMP/docker-compose.prod.yml" \
+    ps --status running -q "$COMPOSE_SERVICE"
+}
+
+verify_collection_images() {
+  local container_ids running_count container_id running_image
+  container_ids="$(collection_container_ids)"
+  running_count="$(printf '%s\n' "$container_ids" | sed '/^$/d' | wc -l | tr -d '[:space:]')"
+  if [ "$running_count" -ne "$COLLECTION_REPLICAS" ]; then
+    echo "Collection image verification found ${running_count}/${COLLECTION_REPLICAS} running replicas" >&2
+    return 1
+  fi
+
+  while IFS= read -r container_id; do
+    [ -z "$container_id" ] && continue
+    running_image="$($SUDO docker inspect "$container_id" --format '{{.Config.Image}}' 2>/dev/null || true)"
+    echo "Collection replica ${container_id} image: ${running_image}"
+    case "$running_image" in
+      *:"${IMAGE_TAG}")
+        ;;
+      *)
+        echo "Collection replica ${container_id} is not running tag ${IMAGE_TAG}" >&2
+        return 1
+        ;;
+    esac
+  done <<<"$container_ids"
+}
+
+deploy_collection() {
+  : "${COLLECTION_REPLICAS:?COLLECTION_REPLICAS is required}"
+  if ! [[ "$COLLECTION_REPLICAS" =~ ^[0-9]+$ ]] || [ "$COLLECTION_REPLICAS" -lt 1 ]; then
+    echo "COLLECTION_REPLICAS must be a positive integer, got: $COLLECTION_REPLICAS" >&2
+    exit 1
+  fi
+
+  cd "/opt/qs-server/${CONTAINER_NAME}"
+  docker_compose_pull \
+    -p "$COLLECTION_COMPOSE_PROJECT" \
+    -f "$DEPLOY_TMP/docker-compose.prod.yml"
+
+  # Remove the pre-scale container created by the legacy single-instance
+  # project. Subsequent deploys are reconciled by the stable compose project.
+  stop_single_container
+  # shellcheck disable=SC2046
+  docker_compose \
+    -p "$COLLECTION_COMPOSE_PROJECT" \
+    -f "$DEPLOY_TMP/docker-compose.prod.yml" \
+    up -d $(compose_up_pull_never_flag) \
+    --scale "${COMPOSE_SERVICE}=${COLLECTION_REPLICAS}" \
+    "$COMPOSE_SERVICE"
+
+  echo "Waiting for ${COLLECTION_REPLICAS} collection replicas to become ready..."
+  local attempts=0
+  local max_attempts=60
+  local container_ids running_count ready_count container_id
+  while [ "$attempts" -lt "$max_attempts" ]; do
+    container_ids="$(collection_container_ids)"
+    running_count="$(printf '%s\n' "$container_ids" | sed '/^$/d' | wc -l | tr -d '[:space:]')"
+    ready_count=0
+    while IFS= read -r container_id; do
+      [ -z "$container_id" ] && continue
+      if $SUDO docker exec "$container_id" wget -qO- \
+        "http://127.0.0.1:${INTERNAL_HTTP_PORT}/readyz" >/dev/null 2>&1; then
+        ready_count=$((ready_count + 1))
+      fi
+    done <<<"$container_ids"
+
+    if [ "$running_count" -eq "$COLLECTION_REPLICAS" ] &&
+      [ "$ready_count" -eq "$COLLECTION_REPLICAS" ]; then
+      echo "Collection replicas are ready (${ready_count}/${COLLECTION_REPLICAS})"
+      verify_collection_images
+      docker_compose \
+        -p "$COLLECTION_COMPOSE_PROJECT" \
+        -f "$DEPLOY_TMP/docker-compose.prod.yml" \
+        ps "$COMPOSE_SERVICE"
+      return 0
+    fi
+
+    attempts=$((attempts + 1))
+    if [ "$attempts" -lt "$max_attempts" ]; then
+      echo "Collection readiness ${ready_count}/${COLLECTION_REPLICAS} (running ${running_count}), attempt ${attempts}/${max_attempts}"
+      sleep 5
+    fi
+  done
+
+  echo "Collection replicas failed readiness after ${max_attempts} attempts" >&2
+  docker_compose \
+    -p "$COLLECTION_COMPOSE_PROJECT" \
+    -f "$DEPLOY_TMP/docker-compose.prod.yml" \
+    ps "$COMPOSE_SERVICE" || true
+  docker_compose \
+    -p "$COLLECTION_COMPOSE_PROJECT" \
+    -f "$DEPLOY_TMP/docker-compose.prod.yml" \
+    logs --tail 100 "$COMPOSE_SERVICE" || true
+  exit 1
+}
+
 deploy_worker() {
   : "${WORKER_REPLICAS:?WORKER_REPLICAS is required}"
   if ! [[ "$WORKER_REPLICAS" =~ ^[0-9]+$ ]] || [ "$WORKER_REPLICAS" -lt 1 ]; then
@@ -560,7 +663,7 @@ case "$SERVICE" in
     echo "Deploy target: serverA (co-located with qs-apiserver). Stop legacy qs-collection-server on serverB after cutover."
     setup_grpc_certs qs-collection-server qs-collection-server.svc
     select_image
-    deploy_http_service
+    deploy_collection
     ;;
   worker)
     setup_grpc_certs qs-worker qs-worker.svc
@@ -575,7 +678,7 @@ rm -f "$PKG_PATH"
 
 verify_running_image() {
   case "$SERVICE" in
-    worker)
+    collection|worker)
       return 0
       ;;
   esac

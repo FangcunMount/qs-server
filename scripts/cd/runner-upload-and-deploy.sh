@@ -79,6 +79,7 @@ emit_export DOCKERHUB_TOKEN     "${DOCKERHUB_TOKEN:-}"
 emit_export SUDO_PASSWORD       "${SUDO_PASSWORD:-}"
 emit_export WWW_UID             "$WWW_UID"
 emit_export WWW_GID             "$WWW_GID"
+emit_export COLLECTION_REPLICAS "${COLLECTION_REPLICAS:-}"
 emit_export WORKER_REPLICAS     "${WORKER_REPLICAS:-}"
 emit_export PKG_PATH            "$REMOTE_PACKAGE"
 
