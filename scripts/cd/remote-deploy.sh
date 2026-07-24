@@ -537,7 +537,7 @@ case "$SERVICE" in
   apiserver)
     setup_apiserver_paths
     setup_apiserver_web_tls
-    setup_grpc_certs qs-apiserver
+    setup_grpc_certs qs-apiserver qs-apiserver.svc
     select_image
     deploy_http_service
     ;;

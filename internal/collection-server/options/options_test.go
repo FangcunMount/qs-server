@@ -99,3 +99,62 @@ func TestValidateRejectsSubmitCoalescingWaitThatConsumesAcceptDeadline(t *testin
 	}
 	t.Fatalf("expected coalescing wait validation error, got %v", opts.Validate())
 }
+
+func TestValidateSecureGRPCClientRequiresCompleteMTLSIdentity(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		clear     func(*GRPCClientOptions)
+		wantError string
+	}{
+		{name: "ca", clear: func(opts *GRPCClientOptions) { opts.TLSCAFile = "" }, wantError: "grpc_client.tls-ca-file"},
+		{name: "certificate", clear: func(opts *GRPCClientOptions) { opts.TLSCertFile = "" }, wantError: "grpc_client.tls-cert-file"},
+		{name: "key", clear: func(opts *GRPCClientOptions) { opts.TLSKeyFile = "" }, wantError: "grpc_client.tls-key-file"},
+		{name: "server name", clear: func(opts *GRPCClientOptions) { opts.TLSServerName = "" }, wantError: "grpc_client.tls-server-name"},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			opts := NewOptions()
+			opts.GRPCClient = secureCollectionGRPCOptions()
+			tt.clear(opts.GRPCClient)
+			if !containsCollectionValidationError(opts.Validate(), tt.wantError) {
+				t.Fatalf("Validate() errors = %v, want substring %q", opts.Validate(), tt.wantError)
+			}
+		})
+	}
+}
+
+func TestValidateAcceptsCompleteSecureGRPCClientIdentity(t *testing.T) {
+	t.Parallel()
+
+	opts := NewOptions()
+	opts.GRPCClient = secureCollectionGRPCOptions()
+	if errs := opts.Validate(); containsCollectionValidationError(errs, "grpc_client.") {
+		t.Fatalf("Validate() gRPC client errors = %v, want none", errs)
+	}
+}
+
+func secureCollectionGRPCOptions() *GRPCClientOptions {
+	opts := NewOptions().GRPCClient
+	opts.Endpoint = "qs-apiserver:9090"
+	opts.Insecure = false
+	opts.TLSCAFile = "/tmp/ca.crt"
+	opts.TLSCertFile = "/tmp/collection.crt"
+	opts.TLSKeyFile = "/tmp/collection.key"
+	opts.TLSServerName = "qs-apiserver.svc"
+	return opts
+}
+
+func containsCollectionValidationError(errs []error, substring string) bool {
+	for _, err := range errs {
+		if strings.Contains(err.Error(), substring) {
+			return true
+		}
+	}
+	return false
+}

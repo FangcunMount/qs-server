@@ -41,7 +41,15 @@ func NewServer(config *Config, tokenVerifier *auth.TokenVerifier) (*Server, erro
 	var mtlsCreds *basemtls.ServerCredentials
 
 	// 1. 构建拦截器链（使用 component-base 的拦截器）
-	unaryInterceptors := buildUnaryInterceptors(config, tokenVerifier)
+	var acl *basegrpc.ServiceACL
+	if config.ACL.Enabled {
+		loadedACL, err := loadACLConfig(config.ACL.ConfigFile, config.ACL.DefaultPolicy)
+		if err != nil {
+			return nil, fmt.Errorf("initialize gRPC ACL from %q: %w", config.ACL.ConfigFile, err)
+		}
+		acl = loadedACL
+	}
+	unaryInterceptors := buildUnaryInterceptors(config, tokenVerifier, acl)
 	serverOpts = append(serverOpts, grpc.ChainUnaryInterceptor(unaryInterceptors...))
 
 	// 2. 配置消息大小限制
@@ -120,7 +128,11 @@ func NewServer(config *Config, tokenVerifier *auth.TokenVerifier) (*Server, erro
 }
 
 // buildUnaryInterceptors 构建一元拦截器链（使用 component-base 提供的拦截器）
-func buildUnaryInterceptors(config *Config, tokenVerifier *auth.TokenVerifier) []grpc.UnaryServerInterceptor {
+func buildUnaryInterceptors(
+	config *Config,
+	tokenVerifier *auth.TokenVerifier,
+	acl *basegrpc.ServiceACL,
+) []grpc.UnaryServerInterceptor {
 	var interceptorChain []grpc.UnaryServerInterceptor
 
 	// 1. Recovery（最外层，捕获所有 panic）
@@ -163,7 +175,6 @@ func buildUnaryInterceptors(config *Config, tokenVerifier *auth.TokenVerifier) [
 
 	// 6. ACL（权限控制 - 使用 component-base 的 ServiceACL）
 	if config.ACL.Enabled {
-		acl := loadACLConfig(config.ACL.ConfigFile, config.ACL.DefaultPolicy)
 		interceptorChain = append(interceptorChain,
 			basegrpc.ACLInterceptor(acl, basegrpc.WithACLLogger(NewComponentBaseLogger())))
 		log.Infof("gRPC server: ACL interceptor enabled (default_policy=%s, config_file=%s)",
@@ -197,28 +208,24 @@ func propagatingRequestIDInterceptor() grpc.UnaryServerInterceptor {
 	}
 }
 
-// loadACLConfig 从配置文件加载 ACL 规则
-// 如果文件不存在或解析失败，返回仅包含默认策略的 ACL
-func loadACLConfig(configFile, defaultPolicy string) *basegrpc.ServiceACL {
-	cfg := &basegrpc.ACLConfig{
-		DefaultPolicy: defaultPolicy,
-		Services:      make([]*basegrpc.ServicePermissions, 0),
+// loadACLConfig loads a strict, non-empty, deny-by-default ACL.
+func loadACLConfig(configFile, defaultPolicy string) (*basegrpc.ServiceACL, error) {
+	if defaultPolicy != "deny" {
+		return nil, fmt.Errorf("gRPC ACL default policy must be %q", "deny")
 	}
-
-	if configFile != "" {
-		loaded, err := parseACLConfigFile(configFile)
-		if err != nil {
-			log.Warnf("gRPC ACL: failed to load %s: %v; using default policy only", configFile, err)
-		} else {
-			cfg = loaded
-			if cfg.DefaultPolicy == "" {
-				cfg.DefaultPolicy = defaultPolicy
-			}
-			log.Infof("gRPC ACL: loaded %d service rule(s) from %s", len(cfg.Services), configFile)
-		}
+	cfg, err := parseACLConfigFile(configFile)
+	if err != nil {
+		return nil, err
 	}
-
-	return basegrpc.NewServiceACL(cfg)
+	if cfg.DefaultPolicy != defaultPolicy {
+		return nil, fmt.Errorf(
+			"gRPC ACL file default_policy %q does not match runtime policy %q",
+			cfg.DefaultPolicy,
+			defaultPolicy,
+		)
+	}
+	log.Infof("gRPC ACL: loaded %d service rule(s) from %s", len(cfg.Services), configFile)
+	return basegrpc.NewServiceACL(cfg), nil
 }
 
 // RegisterService 注册服务

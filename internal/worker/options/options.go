@@ -2,6 +2,7 @@ package options
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
@@ -296,6 +297,7 @@ func (o *Options) Validate() []error {
 	errs = append(errs, o.GenericServerRunOptions.Validate()...)
 	errs = append(errs, o.MySQL.Validate()...)
 	errs = append(errs, o.MongoDB.Validate()...)
+	errs = append(errs, validateWorkerGRPC(o.GRPC)...)
 
 	// Redis 校验（单实例主机端口）
 	if o.Redis.Host == "" && len(o.Redis.Addrs) == 0 {
@@ -343,6 +345,34 @@ func (o *Options) Validate() []error {
 		"redis_runtime",
 	)...)
 
+	return errs
+}
+
+func validateWorkerGRPC(opts *GRPCOptions) []error {
+	if opts == nil {
+		return []error{fmt.Errorf("grpc cannot be nil")}
+	}
+
+	var errs []error
+	if strings.TrimSpace(opts.ApiserverAddr) == "" {
+		errs = append(errs, fmt.Errorf("grpc.apiserver-addr cannot be empty"))
+	}
+	if opts.Insecure {
+		return errs
+	}
+	for _, required := range []struct {
+		name  string
+		value string
+	}{
+		{name: "tls-ca-file", value: opts.TLSCAFile},
+		{name: "tls-cert-file", value: opts.TLSCertFile},
+		{name: "tls-key-file", value: opts.TLSKeyFile},
+		{name: "tls-server-name", value: opts.TLSServerName},
+	} {
+		if strings.TrimSpace(required.value) == "" {
+			errs = append(errs, fmt.Errorf("grpc.%s is required when grpc.insecure is false", required.name))
+		}
+	}
 	return errs
 }
 

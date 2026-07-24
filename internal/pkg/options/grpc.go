@@ -3,6 +3,7 @@ package options
 import (
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -132,6 +133,20 @@ func (s *GRPCOptions) Validate() []error {
 		}
 		if s.MTLS.MinTLSVersion != "" && s.MTLS.MinTLSVersion != "1.2" && s.MTLS.MinTLSVersion != "1.3" {
 			errors = append(errors, fmt.Errorf("mtls.min-tls-version must be 1.2 or 1.3"))
+		}
+	}
+
+	if s.ACL != nil && s.ACL.Enabled {
+		if strings.TrimSpace(s.ACL.ConfigFile) == "" {
+			errors = append(errors, fmt.Errorf("grpc.acl.config-file is required when ACL is enabled"))
+		}
+		if s.ACL.DefaultPolicy != "deny" {
+			errors = append(errors, fmt.Errorf("grpc.acl.default-policy must be deny when ACL is enabled"))
+		}
+		if s.MTLS == nil || !s.MTLS.Enabled {
+			errors = append(errors, fmt.Errorf("grpc.mtls.enabled must be true when ACL is enabled"))
+		} else if !s.MTLS.RequireClientCert {
+			errors = append(errors, fmt.Errorf("grpc.mtls.require-client-cert must be true when ACL is enabled"))
 		}
 	}
 

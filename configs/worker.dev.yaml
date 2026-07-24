@@ -67,6 +67,11 @@ retry_governance:
 
 grpc:
   apiserver-addr: "127.0.0.1:9090"  # qs-apiserver gRPC 地址
+  insecure: false
+  tls-ca-file: "/data/infra/ssl/grpc/ca/ca-chain.crt"
+  tls-cert-file: "/data/infra/ssl/grpc/server/qs-worker.crt"
+  tls-key-file: "/data/infra/ssl/grpc/server/qs-worker.key"
+  tls-server-name: "qs-apiserver.svc"
 
 # ============================================================
 # 4. 存储配置

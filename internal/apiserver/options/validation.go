@@ -13,6 +13,11 @@ func (o *Options) Validate() []error {
 	var errs []error
 
 	errs = append(errs, o.GenericServerRunOptions.Validate()...)
+	if o.GRPCOptions == nil {
+		errs = append(errs, fmt.Errorf("grpc is required"))
+	} else {
+		errs = append(errs, o.GRPCOptions.Validate()...)
+	}
 	errs = append(errs, o.MySQLOptions.Validate()...)
 	errs = append(errs, o.Log.Validate()...)
 	errs = append(errs, o.OSSOptions.Validate()...)

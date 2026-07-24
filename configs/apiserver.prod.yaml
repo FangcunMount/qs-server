@@ -96,7 +96,7 @@ grpc:
   auth:
     enabled: false  # 内部服务通信无需 JWT，mTLS 已提供身份验证
 
-  # 方法级 ACL：默认拒绝，只允许 collection-server 访问其 BFF 依赖的精确 RPC。
+  # 方法级 ACL：默认拒绝，仅允许 collection-server 与 worker 访问各自的精确 RPC。
   acl:
     enabled: true
     config-file: "configs/grpc-acl.prod.yaml"

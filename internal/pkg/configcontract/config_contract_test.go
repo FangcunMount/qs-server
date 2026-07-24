@@ -9,9 +9,11 @@ import (
 	"testing"
 	"time"
 
+	basegrpc "github.com/FangcunMount/component-base/pkg/grpc/interceptors"
 	apiserverconfig "github.com/FangcunMount/qs-server/internal/apiserver/config"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	collectionconfig "github.com/FangcunMount/qs-server/internal/collection-server/config"
+	collectiongrpcclient "github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	collectionoptions "github.com/FangcunMount/qs-server/internal/collection-server/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
 	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
@@ -19,8 +21,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/serviceidentity"
 	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
+	workergrpcclient "github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	workeroptions "github.com/FangcunMount/qs-server/internal/worker/options"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 func TestAPIServerDevProdConfigContracts(t *testing.T) {
@@ -119,6 +123,7 @@ func TestCollectionDevProdConfigContracts(t *testing.T) {
 			if opts.IAMOptions == nil || opts.IAMOptions.ServiceAuth == nil {
 				t.Fatal("collection IAM service auth config must be traceable")
 			}
+			assertCollectionGRPCClientIdentityContract(t, name, opts.GRPCClient)
 			assertIAMJWKSURLContract(t, "collection", name, opts.IAMOptions)
 		})
 	}
@@ -147,12 +152,19 @@ func prepareDelegatedSubjectContract(t *testing.T, configName string, opts *dele
 func assertAPIServerGRPCTrustContract(t *testing.T, configName string, opts *apiserveroptions.Options) {
 	t.Helper()
 	if strings.Contains(configName, ".dev.") {
+		found := make(map[string]bool, len(opts.GRPCOptions.MTLS.AllowedCNs))
 		for _, allowedCN := range opts.GRPCOptions.MTLS.AllowedCNs {
-			if allowedCN == serviceidentity.CollectionServerCertificateCommonName {
-				return
+			found[allowedCN] = true
+		}
+		for _, required := range []string{
+			serviceidentity.CollectionServerCertificateCommonName,
+			serviceidentity.WorkerCertificateCommonName,
+		} {
+			if !found[required] {
+				t.Fatalf("%s grpc mTLS allowed CNs must contain %q", configName, required)
 			}
 		}
-		t.Fatalf("%s grpc mTLS allowed CNs must contain %q", configName, serviceidentity.CollectionServerCertificateCommonName)
+		return
 	}
 	if !strings.Contains(configName, ".prod.") {
 		return
@@ -170,24 +182,87 @@ func assertAPIServerGRPCTrustContract(t *testing.T, configName string, opts *api
 	if err != nil {
 		t.Fatalf("read production grpc ACL: %v", err)
 	}
-	rules := string(data)
-	for _, required := range []string{
-		"default_policy: deny",
-		"service_name: " + serviceidentity.CollectionServerCertificateCommonName,
-		"/assessmentmodel.AssessmentModelCatalogService/ListHotPublishedModels",
-		"/evaluation.TesteeEvaluationService/ListMyAssessments",
-		"/interpretation.ParticipantReportService/GetAssessmentReport",
-		"service_name: " + serviceidentity.WorkerCertificateCommonName,
-		"/evaluation.AssessmentIntakeService/EnsureAssessment",
-		"/evaluation.EvaluationWorkerService/ExecuteEvaluation",
-		"/interpretation.InterpretationAutomationService/GenerateReportFromOutcome",
-		"/internalapi.InternalService/SyncAssessmentAttention",
-		"/internalapi.InternalService/HandleQuestionnairePublishedPostActions",
-		"/internalapi.InternalService/HandleScalePublishedPostActions",
-		"/internalapi.InternalService/SendTaskOpenedMiniProgramNotification",
-	} {
-		if !strings.Contains(rules, required) {
-			t.Fatalf("production grpc ACL must contain %q", required)
+	assertExactGRPCACLConfig(t, opts.GRPCOptions.ACL.ConfigFile, data)
+}
+
+func TestGRPCACLFilesMatchCanonicalClientContracts(t *testing.T) {
+	t.Parallel()
+
+	for _, configName := range []string{"grpc-acl.prod.yaml", "grpc-acl.example.yaml"} {
+		configName := configName
+		t.Run(configName, func(t *testing.T) {
+			t.Parallel()
+
+			data, err := os.ReadFile(filepath.Join(repoRoot(t), "configs", configName))
+			if err != nil {
+				t.Fatalf("read %s: %v", configName, err)
+			}
+			assertExactGRPCACLConfig(t, configName, data)
+		})
+	}
+}
+
+func assertExactGRPCACLConfig(t *testing.T, configName string, data []byte) {
+	t.Helper()
+
+	var aclConfig basegrpc.ACLConfig
+	if err := yaml.Unmarshal(data, &aclConfig); err != nil {
+		t.Fatalf("parse %s: %v", configName, err)
+	}
+	if aclConfig.DefaultPolicy != "deny" {
+		t.Fatalf("%s default_policy = %q, want deny", configName, aclConfig.DefaultPolicy)
+	}
+	if len(aclConfig.Services) != 2 {
+		t.Fatalf("%s service rule count = %d, want 2", configName, len(aclConfig.Services))
+	}
+	expectedMethodsByIdentity := map[string][]string{
+		serviceidentity.CollectionServerCertificateCommonName: collectiongrpcclient.ACLAllowedMethods(),
+		serviceidentity.WorkerCertificateCommonName:           workergrpcclient.ACLAllowedMethods(),
+	}
+	seenIdentities := make(map[string]struct{}, len(aclConfig.Services))
+	for _, service := range aclConfig.Services {
+		if service == nil {
+			t.Fatalf("%s contains a null service rule", configName)
+		}
+		expectedMethods, ok := expectedMethodsByIdentity[service.ServiceName]
+		if !ok {
+			t.Fatalf("%s contains non-canonical identity %q", configName, service.ServiceName)
+		}
+		if _, duplicate := seenIdentities[service.ServiceName]; duplicate {
+			t.Fatalf("%s duplicates identity %q", configName, service.ServiceName)
+		}
+		seenIdentities[service.ServiceName] = struct{}{}
+		if !service.Enabled {
+			t.Fatalf("%s identity %q must be enabled", configName, service.ServiceName)
+		}
+		if len(service.DeniedMethods) != 0 || len(service.MethodPermissions) != 0 {
+			t.Fatalf("%s identity %q must use only exact allowed_methods", configName, service.ServiceName)
+		}
+		assertExactStringSet(t, configName+" "+service.ServiceName+" allowed_methods", service.AllowedMethods, expectedMethods)
+	}
+	for identity := range expectedMethodsByIdentity {
+		if _, ok := seenIdentities[identity]; !ok {
+			t.Fatalf("%s missing canonical identity %q", configName, identity)
+		}
+	}
+}
+
+func assertExactStringSet(t *testing.T, name string, actual, expected []string) {
+	t.Helper()
+
+	if len(actual) != len(expected) {
+		t.Fatalf("%s count = %d, want %d", name, len(actual), len(expected))
+	}
+	actualSet := make(map[string]struct{}, len(actual))
+	for _, value := range actual {
+		if _, duplicate := actualSet[value]; duplicate {
+			t.Fatalf("%s contains duplicate %q", name, value)
+		}
+		actualSet[value] = struct{}{}
+	}
+	for _, value := range expected {
+		if _, ok := actualSet[value]; !ok {
+			t.Fatalf("%s missing %q", name, value)
 		}
 	}
 }
@@ -228,11 +303,79 @@ func TestWorkerDevProdConfigContracts(t *testing.T) {
 			if cfg.Worker == nil || cfg.Worker.Concurrency <= 0 {
 				t.Fatal("worker runtime config must define positive concurrency")
 			}
+			assertWorkerGRPCClientIdentityContract(t, name, opts.GRPC)
 			if workerEventConfigPath(cfg.Worker) != "configs/events.yaml" {
 				t.Fatalf("worker event config fallback = %q, want configs/events.yaml", workerEventConfigPath(cfg.Worker))
 			}
 			assertEventCatalogLoads(t)
 		})
+	}
+}
+
+func assertCollectionGRPCClientIdentityContract(
+	t *testing.T,
+	configName string,
+	opts *collectionoptions.GRPCClientOptions,
+) {
+	t.Helper()
+	if opts == nil || opts.Insecure {
+		t.Fatalf("%s collection gRPC client must use mTLS", configName)
+	}
+	if strings.TrimSpace(opts.TLSCAFile) == "" ||
+		strings.TrimSpace(opts.TLSCertFile) == "" ||
+		strings.TrimSpace(opts.TLSKeyFile) == "" {
+		t.Fatalf("%s collection gRPC client mTLS files must be configured", configName)
+	}
+	if opts.TLSServerName != serviceidentity.APIServerCertificateCommonName {
+		t.Fatalf(
+			"%s collection grpc server name = %q, want %q",
+			configName,
+			opts.TLSServerName,
+			serviceidentity.APIServerCertificateCommonName,
+		)
+	}
+}
+
+func assertWorkerGRPCClientIdentityContract(
+	t *testing.T,
+	configName string,
+	opts *workeroptions.GRPCOptions,
+) {
+	t.Helper()
+	if opts == nil || opts.Insecure {
+		t.Fatalf("%s worker gRPC client must use mTLS", configName)
+	}
+	if strings.TrimSpace(opts.TLSCAFile) == "" ||
+		strings.TrimSpace(opts.TLSCertFile) == "" ||
+		strings.TrimSpace(opts.TLSKeyFile) == "" {
+		t.Fatalf("%s worker gRPC client mTLS files must be configured", configName)
+	}
+	if opts.TLSServerName != serviceidentity.APIServerCertificateCommonName {
+		t.Fatalf(
+			"%s worker grpc server name = %q, want %q",
+			configName,
+			opts.TLSServerName,
+			serviceidentity.APIServerCertificateCommonName,
+		)
+	}
+}
+
+func TestRemoteDeployChecksCanonicalGRPCCertificateIdentities(t *testing.T) {
+	t.Parallel()
+
+	script, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "cd", "remote-deploy.sh"))
+	if err != nil {
+		t.Fatalf("read remote deploy script: %v", err)
+	}
+	content := string(script)
+	for _, required := range []string{
+		"setup_grpc_certs qs-apiserver " + serviceidentity.APIServerCertificateCommonName,
+		"setup_grpc_certs qs-collection-server " + serviceidentity.CollectionServerCertificateCommonName,
+		"setup_grpc_certs qs-worker " + serviceidentity.WorkerCertificateCommonName,
+	} {
+		if !strings.Contains(content, required) {
+			t.Fatalf("remote deploy script must contain %q", required)
+		}
 	}
 }
 

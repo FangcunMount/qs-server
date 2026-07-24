@@ -65,3 +65,62 @@ func TestOptionsValidateHoldReplayHardCap(t *testing.T) {
 	}
 	t.Fatal("expected hold replay hard-cap validation error")
 }
+
+func TestOptionsValidateSecureGRPCRequiresCompleteMTLSIdentity(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		clear     func(*GRPCOptions)
+		wantError string
+	}{
+		{name: "ca", clear: func(opts *GRPCOptions) { opts.TLSCAFile = "" }, wantError: "grpc.tls-ca-file"},
+		{name: "certificate", clear: func(opts *GRPCOptions) { opts.TLSCertFile = "" }, wantError: "grpc.tls-cert-file"},
+		{name: "key", clear: func(opts *GRPCOptions) { opts.TLSKeyFile = "" }, wantError: "grpc.tls-key-file"},
+		{name: "server name", clear: func(opts *GRPCOptions) { opts.TLSServerName = "" }, wantError: "grpc.tls-server-name"},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			opts := NewOptions()
+			opts.GRPC = secureWorkerGRPCOptions()
+			tt.clear(opts.GRPC)
+			if !containsWorkerValidationError(opts.Validate(), tt.wantError) {
+				t.Fatalf("Validate() errors = %v, want substring %q", opts.Validate(), tt.wantError)
+			}
+		})
+	}
+}
+
+func TestOptionsValidateAcceptsCompleteSecureGRPCIdentity(t *testing.T) {
+	t.Parallel()
+
+	opts := NewOptions()
+	opts.GRPC = secureWorkerGRPCOptions()
+	if errs := opts.Validate(); containsWorkerValidationError(errs, "grpc.") {
+		t.Fatalf("Validate() gRPC errors = %v, want none", errs)
+	}
+}
+
+func secureWorkerGRPCOptions() *GRPCOptions {
+	return &GRPCOptions{
+		ApiserverAddr: "qs-apiserver:9090",
+		Insecure:      false,
+		TLSCAFile:     "/tmp/ca.crt",
+		TLSCertFile:   "/tmp/worker.crt",
+		TLSKeyFile:    "/tmp/worker.key",
+		TLSServerName: "qs-apiserver.svc",
+	}
+}
+
+func containsWorkerValidationError(errs []error, substring string) bool {
+	for _, err := range errs {
+		if strings.Contains(err.Error(), substring) {
+			return true
+		}
+	}
+	return false
+}

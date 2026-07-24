@@ -153,23 +153,23 @@ func TestServiceIdentityFromComponentBaseMTLSContextUsesCanonicalCollectionIdent
 	}
 }
 
-func TestLoadACLConfigUsesDefaultPolicyWhenFileMissing(t *testing.T) {
-	denyACL := loadACLConfig("missing-acl.yaml", "deny")
-	if services := denyACL.ListServices(); len(services) != 0 {
-		t.Fatalf("loaded ACL services = %v, want none when file is missing", services)
+func TestLoadACLConfigFailsWhenFileMissing(t *testing.T) {
+	if _, err := loadACLConfig("missing-acl.yaml", "deny"); err == nil {
+		t.Fatal("loadACLConfig() error = nil, want missing file failure")
 	}
-	if err := denyACL.CheckAccess("collection-server", "/qs.Internal/Submit"); err == nil {
-		t.Fatal("deny default policy allowed unconfigured service")
-	}
+}
 
-	allowACL := loadACLConfig("missing-acl.yaml", "allow")
-	if err := allowACL.CheckAccess("collection-server", "/qs.Internal/Submit"); err != nil {
-		t.Fatalf("allow default policy rejected unconfigured service: %v", err)
+func TestLoadACLConfigRejectsNonDenyRuntimePolicy(t *testing.T) {
+	if _, err := loadACLConfig("../../../configs/grpc-acl.example.yaml", "allow"); err == nil {
+		t.Fatal("loadACLConfig() error = nil, want non-deny policy failure")
 	}
 }
 
 func TestLoadACLConfigLoadsCanonicalCollectionRules(t *testing.T) {
-	acl := loadACLConfig("../../../configs/grpc-acl.example.yaml", "deny")
+	acl, err := loadACLConfig("../../../configs/grpc-acl.example.yaml", "deny")
+	if err != nil {
+		t.Fatalf("loadACLConfig() error = %v", err)
+	}
 	if err := acl.CheckAccess(serviceidentity.CollectionServerCertificateCommonName, "/interpretation.ParticipantReportService/GetAssessmentReport"); err != nil {
 		t.Fatalf("collection caller should be allowed: %v", err)
 	}

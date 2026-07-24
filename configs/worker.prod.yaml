@@ -67,7 +67,7 @@ grpc:
   tls-ca-file: "/etc/qs-server/ssl/grpc/ca/ca-chain.crt"
   tls-cert-file: "/etc/qs-server/ssl/grpc/server/qs-worker.crt"
   tls-key-file: "/etc/qs-server/ssl/grpc/server/qs-worker.key"
-  tls-server-name: ""
+  tls-server-name: "qs-apiserver.svc"
 
 # ============================================================
 # 4. 存储配置

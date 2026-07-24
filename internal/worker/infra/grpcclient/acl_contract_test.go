@@ -98,43 +98,35 @@ func TestWorkerACLContract(t *testing.T) {
 func discoverWorkerOutboundRPCMethods(t *testing.T) []string {
 	t.Helper()
 
-	type clientFile struct {
-		name              string
-		serviceByReceiver map[string]string
-	}
-	files := []clientFile{
-		{name: "answersheet_client.go", serviceByReceiver: map[string]string{
-			"AnswerSheetClient": "/answersheet.AnswerSheetService/",
-		}},
-		{name: "evaluation_clients.go", serviceByReceiver: map[string]string{
-			"AssessmentIntakeClient":         "/evaluation.AssessmentIntakeService/",
-			"EvaluationWorkerClient":         "/evaluation.EvaluationWorkerService/",
-			"InterpretationAutomationClient": "/interpretation.InterpretationAutomationService/",
-		}},
-		{name: "internal_client.go", serviceByReceiver: map[string]string{
-			"InternalClient": "/internalapi.InternalService/",
-		}},
-		{name: "plan_client.go", serviceByReceiver: map[string]string{
-			"PlanClient": "/internalapi.PlanCommandService/",
-		}},
+	servicePrefixByClientType := map[string]string{
+		"AnswerSheetServiceClient":              "/answersheet.AnswerSheetService/",
+		"AssessmentIntakeServiceClient":         "/evaluation.AssessmentIntakeService/",
+		"EvaluationWorkerServiceClient":         "/evaluation.EvaluationWorkerService/",
+		"InternalServiceClient":                 "/internalapi.InternalService/",
+		"InterpretationAutomationServiceClient": "/interpretation.InterpretationAutomationService/",
+		"PlanCommandServiceClient":              "/internalapi.PlanCommandService/",
 	}
 
+	_, currentFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("resolve current test file")
+	}
+	packageDir := filepath.Dir(currentFile)
+	parsedFiles := parseWorkerNonTestGoFiles(t, packageDir)
+	serviceByStructField := discoverWorkerGeneratedClientFields(t, parsedFiles, servicePrefixByClientType)
+
 	methodSet := make(map[string]struct{}, 13)
-	for _, file := range files {
-		parsed, err := parser.ParseFile(token.NewFileSet(), file.name, nil, 0)
-		if err != nil {
-			t.Fatalf("parse %s: %v", file.name, err)
-		}
+	for _, parsed := range parsedFiles {
 		for _, declaration := range parsed.Decls {
 			function, ok := declaration.(*ast.FuncDecl)
 			if !ok || function.Recv == nil || len(function.Recv.List) != 1 || function.Body == nil {
 				continue
 			}
-			receiverType := receiverTypeName(function.Recv.List[0].Type)
-			prefix, ok := file.serviceByReceiver[receiverType]
-			if !ok {
+			fields := serviceByStructField[workerReceiverTypeName(function.Recv.List[0].Type)]
+			if len(fields) == 0 || len(function.Recv.List[0].Names) != 1 {
 				continue
 			}
+			receiverName := function.Recv.List[0].Names[0].Name
 			ast.Inspect(function.Body, func(node ast.Node) bool {
 				call, ok := node.(*ast.CallExpr)
 				if !ok {
@@ -145,19 +137,98 @@ func discoverWorkerOutboundRPCMethods(t *testing.T) []string {
 					return true
 				}
 				clientField, ok := method.X.(*ast.SelectorExpr)
-				if !ok || clientField.Sel.Name != "client" {
+				if !ok {
 					return true
 				}
 				receiver, ok := clientField.X.(*ast.Ident)
-				if !ok || receiver.Name != "c" {
+				if !ok || receiver.Name != receiverName {
 					return true
 				}
-				methodSet[prefix+method.Sel.Name] = struct{}{}
+				if prefix, ok := fields[clientField.Sel.Name]; ok {
+					methodSet[prefix+method.Sel.Name] = struct{}{}
+				}
 				return true
 			})
 		}
 	}
 	return sortedWorkerMethods(methodSet)
+}
+
+func parseWorkerNonTestGoFiles(t *testing.T, packageDir string) []*ast.File {
+	t.Helper()
+
+	entries, err := os.ReadDir(packageDir)
+	if err != nil {
+		t.Fatalf("read grpcclient package: %v", err)
+	}
+	parsedFiles := make([]*ast.File, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
+			continue
+		}
+		path := filepath.Join(packageDir, entry.Name())
+		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", path, err)
+		}
+		parsedFiles = append(parsedFiles, parsed)
+	}
+	return parsedFiles
+}
+
+func discoverWorkerGeneratedClientFields(
+	t *testing.T,
+	parsedFiles []*ast.File,
+	servicePrefixByClientType map[string]string,
+) map[string]map[string]string {
+	t.Helper()
+
+	serviceByStructField := make(map[string]map[string]string)
+	for _, parsed := range parsedFiles {
+		for _, declaration := range parsed.Decls {
+			general, ok := declaration.(*ast.GenDecl)
+			if !ok || general.Tok != token.TYPE {
+				continue
+			}
+			for _, specification := range general.Specs {
+				typeSpec, ok := specification.(*ast.TypeSpec)
+				if !ok {
+					continue
+				}
+				structType, ok := typeSpec.Type.(*ast.StructType)
+				if !ok {
+					continue
+				}
+				for _, field := range structType.Fields.List {
+					clientType := workerSelectedTypeName(field.Type)
+					if !strings.HasSuffix(clientType, "ServiceClient") {
+						continue
+					}
+					prefix, known := servicePrefixByClientType[clientType]
+					if !known {
+						t.Fatalf("unknown generated gRPC client type %q on %s; review and map it explicitly", clientType, typeSpec.Name.Name)
+					}
+					if serviceByStructField[typeSpec.Name.Name] == nil {
+						serviceByStructField[typeSpec.Name.Name] = make(map[string]string)
+					}
+					for _, name := range field.Names {
+						serviceByStructField[typeSpec.Name.Name][name.Name] = prefix
+					}
+				}
+			}
+		}
+	}
+	return serviceByStructField
+}
+
+func workerSelectedTypeName(expr ast.Expr) string {
+	if pointer, ok := expr.(*ast.StarExpr); ok {
+		expr = pointer.X
+	}
+	if selector, ok := expr.(*ast.SelectorExpr); ok {
+		return selector.Sel.Name
+	}
+	return ""
 }
 
 func discoverWorkerRuntimeRPCMethods(t *testing.T, outbound []string) []string {
@@ -217,7 +288,7 @@ func discoverWorkerRuntimeRPCMethods(t *testing.T, outbound []string) []string {
 	return sortedWorkerMethods(methodSet)
 }
 
-func receiverTypeName(expr ast.Expr) string {
+func workerReceiverTypeName(expr ast.Expr) string {
 	if pointer, ok := expr.(*ast.StarExpr); ok {
 		expr = pointer.X
 	}

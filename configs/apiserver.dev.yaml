@@ -77,9 +77,10 @@ grpc:
     enabled: true
     ca-file: "/data/infra/ssl/grpc/ca/ca-chain.crt"
     require-client-cert: true
-    # 证书白名单：允许 collection-server 访问
+    # 证书白名单：允许规范的 collection-server 与 worker 身份访问
     allowed-cns:
       - "qs-collection-server.svc"  # collection-server 的规范 CN
+      - "qs-worker.svc"             # worker 的规范 CN
       - "localhost"
     allowed-ous:
       - "QS"

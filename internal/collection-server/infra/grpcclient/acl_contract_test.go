@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"testing"
 
 	basegrpc "github.com/FangcunMount/component-base/pkg/grpc/interceptors"
@@ -69,51 +70,59 @@ func TestCollectionServerACLContract(t *testing.T) {
 func discoverOutboundRPCMethods(t *testing.T) []string {
 	t.Helper()
 
-	type clientFile struct {
-		name     string
-		prefixes map[string]string
-	}
-	files := []clientFile{
-		{name: "answersheet_client.go", prefixes: map[string]string{"grpcClient": "/answersheet.AnswerSheetService/"}},
-		{name: "questionnaire_client.go", prefixes: map[string]string{"grpcClient": "/questionnaire.QuestionnaireService/"}},
-		{name: "assessment_model_catalog_client.go", prefixes: map[string]string{"grpcClient": "/assessmentmodel.AssessmentModelCatalogService/"}},
-		{name: "evaluation_client.go", prefixes: map[string]string{
-			"grpcClient":   "/evaluation.TesteeEvaluationService/",
-			"reportClient": "/interpretation.ParticipantReportService/",
-			"intakeClient": "/evaluation.AssessmentIntakeService/",
-		}},
-		{name: "actor_client.go", prefixes: map[string]string{"client": "/actor.ActorService/"}},
+	servicePrefixByClientType := map[string]string{
+		"ActorServiceClient":                  "/actor.ActorService/",
+		"AnswerSheetServiceClient":            "/answersheet.AnswerSheetService/",
+		"AssessmentIntakeServiceClient":       "/evaluation.AssessmentIntakeService/",
+		"AssessmentModelCatalogServiceClient": "/assessmentmodel.AssessmentModelCatalogService/",
+		"ParticipantReportServiceClient":      "/interpretation.ParticipantReportService/",
+		"QuestionnaireServiceClient":          "/questionnaire.QuestionnaireService/",
+		"TesteeEvaluationServiceClient":       "/evaluation.TesteeEvaluationService/",
 	}
 
+	_, currentFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("resolve current test file")
+	}
+	packageDir := filepath.Dir(currentFile)
+	parsedFiles := parseNonTestGoFiles(t, packageDir)
+	serviceByStructField := discoverGeneratedClientFields(t, parsedFiles, servicePrefixByClientType)
+
 	methodSet := make(map[string]struct{}, 24)
-	for _, file := range files {
-		parsed, err := parser.ParseFile(token.NewFileSet(), file.name, nil, 0)
-		if err != nil {
-			t.Fatalf("parse %s: %v", file.name, err)
+	for _, parsed := range parsedFiles {
+		for _, declaration := range parsed.Decls {
+			function, ok := declaration.(*ast.FuncDecl)
+			if !ok || function.Recv == nil || len(function.Recv.List) != 1 || function.Body == nil {
+				continue
+			}
+			fields := serviceByStructField[receiverTypeName(function.Recv.List[0].Type)]
+			if len(fields) == 0 || len(function.Recv.List[0].Names) != 1 {
+				continue
+			}
+			receiverName := function.Recv.List[0].Names[0].Name
+			ast.Inspect(function.Body, func(node ast.Node) bool {
+				call, ok := node.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				method, ok := call.Fun.(*ast.SelectorExpr)
+				if !ok {
+					return true
+				}
+				clientField, ok := method.X.(*ast.SelectorExpr)
+				if !ok {
+					return true
+				}
+				receiver, ok := clientField.X.(*ast.Ident)
+				if !ok || receiver.Name != receiverName {
+					return true
+				}
+				if prefix, ok := fields[clientField.Sel.Name]; ok {
+					methodSet[prefix+method.Sel.Name] = struct{}{}
+				}
+				return true
+			})
 		}
-		ast.Inspect(parsed, func(node ast.Node) bool {
-			call, ok := node.(*ast.CallExpr)
-			if !ok {
-				return true
-			}
-			method, ok := call.Fun.(*ast.SelectorExpr)
-			if !ok {
-				return true
-			}
-			receiver, ok := method.X.(*ast.SelectorExpr)
-			if !ok {
-				return true
-			}
-			receiverName, ok := receiver.X.(*ast.Ident)
-			if !ok || receiverName.Name != "c" {
-				return true
-			}
-			prefix, ok := file.prefixes[receiver.Sel.Name]
-			if ok {
-				methodSet[prefix+method.Sel.Name] = struct{}{}
-			}
-			return true
-		})
 	}
 	methods := make([]string, 0, len(methodSet))
 	for method := range methodSet {
@@ -121,6 +130,93 @@ func discoverOutboundRPCMethods(t *testing.T) []string {
 	}
 	sort.Strings(methods)
 	return methods
+}
+
+func parseNonTestGoFiles(t *testing.T, packageDir string) []*ast.File {
+	t.Helper()
+
+	entries, err := os.ReadDir(packageDir)
+	if err != nil {
+		t.Fatalf("read grpcclient package: %v", err)
+	}
+	parsedFiles := make([]*ast.File, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
+			continue
+		}
+		path := filepath.Join(packageDir, entry.Name())
+		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", path, err)
+		}
+		parsedFiles = append(parsedFiles, parsed)
+	}
+	return parsedFiles
+}
+
+func discoverGeneratedClientFields(
+	t *testing.T,
+	parsedFiles []*ast.File,
+	servicePrefixByClientType map[string]string,
+) map[string]map[string]string {
+	t.Helper()
+
+	serviceByStructField := make(map[string]map[string]string)
+	for _, parsed := range parsedFiles {
+		for _, declaration := range parsed.Decls {
+			general, ok := declaration.(*ast.GenDecl)
+			if !ok || general.Tok != token.TYPE {
+				continue
+			}
+			for _, specification := range general.Specs {
+				typeSpec, ok := specification.(*ast.TypeSpec)
+				if !ok {
+					continue
+				}
+				structType, ok := typeSpec.Type.(*ast.StructType)
+				if !ok {
+					continue
+				}
+				for _, field := range structType.Fields.List {
+					clientType := selectedTypeName(field.Type)
+					if !strings.HasSuffix(clientType, "ServiceClient") {
+						continue
+					}
+					prefix, known := servicePrefixByClientType[clientType]
+					if !known {
+						t.Fatalf("unknown generated gRPC client type %q on %s; review and map it explicitly", clientType, typeSpec.Name.Name)
+					}
+					if serviceByStructField[typeSpec.Name.Name] == nil {
+						serviceByStructField[typeSpec.Name.Name] = make(map[string]string)
+					}
+					for _, name := range field.Names {
+						serviceByStructField[typeSpec.Name.Name][name.Name] = prefix
+					}
+				}
+			}
+		}
+	}
+	return serviceByStructField
+}
+
+func selectedTypeName(expr ast.Expr) string {
+	if pointer, ok := expr.(*ast.StarExpr); ok {
+		expr = pointer.X
+	}
+	if selector, ok := expr.(*ast.SelectorExpr); ok {
+		return selector.Sel.Name
+	}
+	return ""
+}
+
+func receiverTypeName(expr ast.Expr) string {
+	if pointer, ok := expr.(*ast.StarExpr); ok {
+		expr = pointer.X
+	}
+	if ident, ok := expr.(*ast.Ident); ok {
+		return ident.Name
+	}
+	return ""
 }
 
 func loadACLForContractTest(t *testing.T, configName string) *basegrpc.ServiceACL {

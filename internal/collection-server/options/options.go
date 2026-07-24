@@ -2,6 +2,7 @@ package options
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
@@ -562,6 +563,24 @@ func validateCollectionGRPCClient(opts *GRPCClientOptions) []error {
 	}
 	if opts.MaxInflight <= 0 {
 		errs = append(errs, fmt.Errorf("grpc_client.max_inflight must be greater than 0"))
+	}
+	if !opts.Insecure {
+		for _, required := range []struct {
+			name  string
+			value string
+		}{
+			{name: "tls-ca-file", value: opts.TLSCAFile},
+			{name: "tls-cert-file", value: opts.TLSCertFile},
+			{name: "tls-key-file", value: opts.TLSKeyFile},
+			{name: "tls-server-name", value: opts.TLSServerName},
+		} {
+			if strings.TrimSpace(required.value) == "" {
+				errs = append(
+					errs,
+					fmt.Errorf("grpc_client.%s is required when grpc_client.insecure is false", required.name),
+				)
+			}
+		}
 	}
 	return errs
 }
