@@ -26,6 +26,9 @@ on:
   schedule:
     - cron: '0 17 * * *'  # 每天 17:00 UTC (北京时间凌晨 01:00) 自动备份
 
+permissions:
+  contents: read
+
 jobs:
   mongodb-backup:
     name: MongoDB Backup
@@ -33,6 +36,8 @@ jobs:
       (github.event_name == 'schedule') ||
       (github.event.inputs.operation == 'backup' && (github.event.inputs.database == 'mongodb' || github.event.inputs.database == 'all'))
     runs-on: ubuntu-latest
+    # MONGODB_* 等敏感项在 production Environment；缺此行会导致 secrets 为空、备份静默失败。
+    environment: production
     steps:
       - name: Backup MongoDB
         uses: appleboy/ssh-action@v1.2.2
@@ -41,8 +46,22 @@ jobs:
           username: ${{ vars.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          capture_stdout: true
           envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
           script: |
+            set -Eeuo pipefail
+            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+
+            : "${MONGODB_HOST:?MONGODB_HOST is empty (check production Environment secrets)}"
+            : "${MONGODB_DBNAME:?MONGODB_DBNAME is empty}"
+            : "${MONGODB_USERNAME:?MONGODB_USERNAME is empty}"
+            : "${MONGODB_PASSWORD:?MONGODB_PASSWORD is empty}"
+
+            if ! command -v mongodump >/dev/null 2>&1; then
+              echo "❌ mongodump not found on PATH=$PATH" >&2
+              exit 127
+            fi
+
             BACKUP_DIR="/opt/backups/qs-server/mongodb"
             TIMESTAMP=$(date +%Y%m%d_%H%M%S)
             BACKUP_FILE="qs_mongodb_backup_${TIMESTAMP}"
@@ -51,6 +70,7 @@ jobs:
 
             echo "Starting MongoDB backup..."
             echo "Database: $MONGODB_DBNAME"
+            echo "Host: $MONGODB_HOST:${MONGODB_PORT:-27017}"
             echo "Timestamp: $TIMESTAMP"
 
             mongodump --host="$MONGODB_HOST" \
@@ -85,6 +105,7 @@ jobs:
     name: MongoDB Restore
     if: github.event.inputs.operation == 'restore' && github.event.inputs.database == 'mongodb'
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Restore MongoDB
         uses: appleboy/ssh-action@v1.2.2
@@ -93,8 +114,22 @@ jobs:
           username: ${{ vars.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          capture_stdout: true
           envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,BACKUP_FILE_INPUT
           script: |
+            set -Eeuo pipefail
+            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+
+            : "${MONGODB_HOST:?MONGODB_HOST is empty (check production Environment secrets)}"
+            : "${MONGODB_DBNAME:?MONGODB_DBNAME is empty}"
+            : "${MONGODB_USERNAME:?MONGODB_USERNAME is empty}"
+            : "${MONGODB_PASSWORD:?MONGODB_PASSWORD is empty}"
+
+            if ! command -v mongorestore >/dev/null 2>&1; then
+              echo "❌ mongorestore not found on PATH=$PATH" >&2
+              exit 127
+            fi
+
             BACKUP_DIR="/opt/backups/qs-server/mongodb"
             BACKUP_FILE="$BACKUP_FILE_INPUT"
 
@@ -148,6 +183,7 @@ jobs:
     name: MongoDB Status
     if: github.event.inputs.operation == 'status' && (github.event.inputs.database == 'mongodb' || github.event.inputs.database == 'all')
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Check MongoDB Status
         uses: appleboy/ssh-action@v1.2.2
@@ -156,9 +192,21 @@ jobs:
           username: ${{ vars.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          capture_stdout: true
           envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
           script: |
+            set -Eeuo pipefail
+            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+
+            : "${MONGODB_HOST:?MONGODB_HOST is empty (check production Environment secrets)}"
+            : "${MONGODB_DBNAME:?MONGODB_DBNAME is empty}"
+
             echo "=== MongoDB Status ==="
+
+            if ! command -v mongosh >/dev/null 2>&1; then
+              echo "❌ mongosh not found on PATH=$PATH" >&2
+              exit 127
+            fi
 
             if mongosh --host "$MONGODB_HOST" \
                   --port "${MONGODB_PORT:-27017}" \

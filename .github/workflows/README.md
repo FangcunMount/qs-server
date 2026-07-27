@@ -6,11 +6,13 @@
 | ---- | ---- | ---- |
 | `ci.yml` | 代码质量与可构建性（test / lint / depguard / security advisory / build） | `pull_request` / `push` → `main` |
 | `cd.yml` | 生产发布（`workflow_run` 或手动） | `CI` 成功后 / `workflow_dispatch` |
-| `ping-runner.yml` | 生产 ServerA + ServerD runner 健康自检 | 每 6 小时 / `workflow_dispatch` |
-| `db-ops.yml` | MongoDB 备份 / 恢复 / 状态 | 每日定时备份 / `workflow_dispatch` |
+| `sonar.yml` | Mac mini 本地 SonarQube 扫描（不阻断 CD） | `push` → `main` |
+| `ping-runner.yml` | ServerA 生产巡检 + ServerD worker 主机巡检 | 每 6 小时 / `workflow_dispatch` |
+| `db-ops.yml` | MongoDB 备份 / 恢复 / 状态（读 `production` Environment secrets） | 每日定时备份 / `workflow_dispatch` |
 
 已移除的 workflow（冗余或失效）：
 
+- `build.yml`：已更名为 `sonar.yml`（原名易与 CI Build 混淆）
 - `server-check.yml`：与 `ping-runner` 的 ServerA 检查重复，且含自动 restart 容器等高风险逻辑
 - `test-ssh.yml`：手动 SSH 诊断，可由 `ping-runner` `workflow_dispatch` 替代
 - `seeddata-runner.yml`：指向不存在的 `tools/seeddata-runner/`（seeddata 为独立仓库）
@@ -194,7 +196,7 @@ install_runner serverD-runner3 runner3 <TOKEN3>
 
 **Environment 放行**：各仓库 **Settings → Environments → `production`** → 允许 self-hosted runner（否则 deploy job 会 Pending）。
 
-`ping-runner.yml` 的 `ping-serverd` job 同样使用 `QS_DEPLOY_RUNNER`（默认 `serverd`），每 6 小时自检 runner 服务、Docker/部署工具、到 A/B 的 SSH 连通性。
+`ping-runner.yml` 的 `ping-worker-host` job 使用 `QS_DEPLOY_RUNNER`（默认 `serverd`）巡检 **ServerD worker 主机**（Docker / worker 容器 / 到 A·B SSH），不再承担 CD deploy runner 职责；CD deploy 已迁到 Mac mini `qlume`。
 
 自托管 runner 上 **不用** `appleboy/ssh-action`；生产 SSH/SCP 走原生 `setup-runner-ssh.sh`，GitHub 拉代码走 **SSH + Mihomo 代理**（`setup-runner-network.sh`）。
 

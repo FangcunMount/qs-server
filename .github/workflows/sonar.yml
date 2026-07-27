@@ -1,0 +1,29 @@
+name: SonarQube Analysis
+
+# 在 Mac mini（qlume）上对本地 SonarQube（127.0.0.1:9000）做代码扫描。
+# 与 CI 的 Build Applications 无关；失败不阻断 Production Deploy。
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  sonar:
+    name: Scan and analyze
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64]
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: http://127.0.0.1:9000

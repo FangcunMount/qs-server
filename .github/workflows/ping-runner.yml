@@ -19,7 +19,9 @@ jobs:
           username: ${{ vars.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          capture_stdout: true
           script: |
+            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
             echo "=========================================="
             echo "QS-Server - Production Check (ServerA)"
             echo "=========================================="
@@ -49,8 +51,10 @@ jobs:
           username: ${{ vars.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          capture_stdout: true
           envs: EXPECTED_COLLECTION_REPLICAS
           script: |
+            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
             echo "=========================================="
             echo "Docker Service Status (ServerA)"
             echo "=========================================="
@@ -103,8 +107,10 @@ jobs:
           username: ${{ vars.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          capture_stdout: true
           envs: EXPECTED_COLLECTION_REPLICAS
           script: |
+            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
             echo "=========================================="
             echo "API Health Check (ServerA)"
             echo "=========================================="
@@ -206,8 +212,9 @@ jobs:
             fi
             echo "=========================================="
 
-  ping-serverd:
-    name: ServerD Deploy Runner Check
+  # ServerD 仍跑 qs-worker；CD deploy 已迁到 Mac mini（qlume），此处只做 worker 主机巡检。
+  ping-worker-host:
+    name: ServerD Worker Host Check
     runs-on: ${{ vars.QS_DEPLOY_RUNNER || 'serverd' }}
     timeout-minutes: 10
 
@@ -253,7 +260,7 @@ jobs:
       - name: Runner and host info
         run: |
           echo "=========================================="
-          echo "ServerD Self-Hosted Runner"
+          echo "ServerD Worker Host"
           echo "=========================================="
           echo "Runner name: ${{ runner.name }}"
           echo "Runner OS:   ${{ runner.os }}"
@@ -283,10 +290,10 @@ jobs:
           fi
           echo "=========================================="
 
-      - name: Deploy tooling
+      - name: Host tooling
         run: |
           echo "=========================================="
-          echo "Deploy Tooling"
+          echo "Host Tooling"
           echo "=========================================="
           missing=0
           for cmd in docker git make gzip ssh scp; do
@@ -383,7 +390,7 @@ jobs:
 
   report:
     name: Status Report
-    needs: [ping-production, ping-serverd]
+    needs: [ping-production, ping-worker-host]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -392,8 +399,8 @@ jobs:
           echo "=========================================="
           echo "Ping Runner - Status Report"
           echo "=========================================="
-          echo "Production (ServerA):  ${{ needs.ping-production.result }}"
-          echo "ServerD deploy runner: ${{ needs.ping-serverd.result }}"
+          echo "Production (ServerA): ${{ needs.ping-production.result }}"
+          echo "Worker host (ServerD): ${{ needs.ping-worker-host.result }}"
           echo "Time: $(date)"
           echo ""
 
@@ -402,8 +409,8 @@ jobs:
             exit 1
           fi
 
-          if [ "${{ needs.ping-serverd.result }}" != "success" ]; then
-            echo "❌ ServerD runner check failed!"
+          if [ "${{ needs.ping-worker-host.result }}" != "success" ]; then
+            echo "❌ ServerD worker host check failed!"
             exit 1
           fi
 
