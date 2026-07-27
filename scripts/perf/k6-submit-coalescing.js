@@ -1,6 +1,7 @@
 import http from 'k6/http';
 import { check, fail } from 'k6';
 import { Counter, Trend } from 'k6/metrics';
+import { discoverSubmitCases, resolveCollectionToken } from './k6/lib/submit-fixture.js';
 
 const scenario = String(__ENV.COALESCING_SCENARIO || 'healthy').trim().toLowerCase();
 const supportedScenarios = [
@@ -17,7 +18,6 @@ const collectionURLs = splitURLs(
   __ENV.COLLECTION_BASE_URLS || 'http://127.0.0.1:18083,http://127.0.0.1:18084'
 );
 const submitPath = __ENV.SUBMIT_PATH || '/api/v1/answersheets';
-const token = __ENV.COLLECTION_TOKEN || __ENV.TOKEN || '';
 const idempotencyKey = __ENV.IDEMPOTENCY_KEY || `coalesce-${Date.now()}`;
 const verifyMetrics = String(__ENV.VERIFY_METRICS || 'true').toLowerCase() !== 'false';
 const isolatedMetrics = String(__ENV.PERF_ISOLATED_ENV || 'false').toLowerCase() === 'true';
@@ -58,14 +58,8 @@ export function setup() {
   if (collectionURLs.length < 2 || new Set(collectionURLs).size !== collectionURLs.length) {
     fail('COLLECTION_BASE_URLS must contain at least two distinct collection-server instances');
   }
-  if (!token) {
-    fail('COLLECTION_TOKEN or TOKEN is required');
-  }
   if (!Number.isInteger(requestCount) || requestCount < 2 || requestCount > 1000) {
     fail('COALESCING_REQUESTS must be an integer between 2 and 1000');
-  }
-  if (!__ENV.SUBMIT_PAYLOAD_JSON) {
-    fail('SUBMIT_PAYLOAD_JSON is required');
   }
   if (scenario === 'conflict' && !__ENV.CONFLICT_PAYLOAD_JSON) {
     fail('CONFLICT_PAYLOAD_JSON is required for COALESCING_SCENARIO=conflict');
@@ -84,7 +78,13 @@ export function setup() {
     fail('APISERVER_METRICS_URL is required unless VERIFY_METRICS=false');
   }
 
-  const primaryPayload = parsePayload('SUBMIT_PAYLOAD_JSON', __ENV.SUBMIT_PAYLOAD_JSON);
+  const discoveredCase = __ENV.SUBMIT_PAYLOAD_JSON
+    ? null
+    : discoverSubmitCases(collectionURLs, 1)[0];
+  const token = discoveredCase ? discoveredCase.token : resolveCollectionToken();
+  const primaryPayload = discoveredCase
+    ? discoveredCase.payload
+    : parsePayload('SUBMIT_PAYLOAD_JSON', __ENV.SUBMIT_PAYLOAD_JSON);
   primaryPayload.idempotency_key = idempotencyKey;
 
   let conflictPayload = null;
@@ -99,6 +99,7 @@ export function setup() {
   return {
     primaryPayload,
     conflictPayload,
+    token,
     metricsBefore: verifyMetrics ? readMetricsSnapshot() : null,
   };
 }
@@ -116,7 +117,7 @@ export default function (data) {
         responseCallback:
           scenario === 'conflict' ? http.expectedStatuses(202, 409) : http.expectedStatuses(202),
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${data.token}`,
           'Content-Type': 'application/json',
           'X-Request-ID': `${idempotencyKey}-request-${index}`,
         },

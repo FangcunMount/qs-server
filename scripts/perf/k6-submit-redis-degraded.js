@@ -2,6 +2,7 @@ import http from 'k6/http';
 import exec from 'k6/execution';
 import { check, fail } from 'k6';
 import { Counter, Rate, Trend } from 'k6/metrics';
+import { discoverSubmitCases } from './k6/lib/submit-fixture.js';
 
 const mode = String(__ENV.DEGRADED_SUBMIT_MODE || 'low').trim().toLowerCase();
 const supportedModes = ['low', 'global_overload', 'user_overload'];
@@ -94,18 +95,22 @@ export function setup() {
   if (!Number.isFinite(steadyRateTolerance) || steadyRateTolerance < 0 || steadyRateTolerance > 0.5) {
     fail('STEADY_RATE_TOLERANCE must be between 0 and 0.5');
   }
-  let cases;
-  try {
-    cases = JSON.parse(__ENV.SUBMIT_CASES_JSON || '[]');
-  } catch (error) {
-    fail(`SUBMIT_CASES_JSON is not valid JSON: ${error}`);
+  let cases = null;
+  if (__ENV.SUBMIT_CASES_JSON) {
+    try {
+      cases = JSON.parse(__ENV.SUBMIT_CASES_JSON);
+    } catch (error) {
+      fail(`SUBMIT_CASES_JSON is not valid JSON: ${error}`);
+    }
+  } else {
+    cases = discoverSubmitCases(collectionURLs, requiredCaseCount(mode));
   }
   if (!Array.isArray(cases) || cases.length === 0) {
-    fail('SUBMIT_CASES_JSON must be a non-empty array of {token,payload}');
+    fail('Submit cases must be a non-empty array of {token,payload}');
   }
   for (const [index, item] of cases.entries()) {
     if (!item || !item.token || !item.payload || typeof item.payload !== 'object') {
-      fail(`SUBMIT_CASES_JSON[${index}] must contain token and payload`);
+      fail(`Submit case[${index}] must contain token and payload`);
     }
   }
   if (mode === 'low' && cases.length < 2) {
@@ -195,5 +200,16 @@ function defaultRate(selectedMode) {
       return 30;
     default:
       return 20;
+  }
+}
+
+function requiredCaseCount(selectedMode) {
+  switch (selectedMode) {
+    case 'global_overload':
+      return 6;
+    case 'user_overload':
+      return 1;
+    default:
+      return 2;
   }
 }

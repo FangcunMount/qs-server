@@ -421,22 +421,22 @@ perf-submit-redis-degraded-user-overload: ## Redis rate 故障时验证单 write
 perf-collection-runtime-status: ## 输出两个 collection 副本的严格/服务就绪状态
 	$(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh status
 
-perf-collection-runtime-healthy-smoke: ## 已上线环境 HTTP 行为烟测（不做全局指标精确验收）
+perf-collection-runtime-healthy-smoke: perf-preflight ## 已上线环境 HTTP 行为烟测（不做全局指标精确验收）
 	$(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh healthy-smoke
 
-perf-collection-runtime-healthy: ## 隔离/静默窗口健康 Redis 完整基线验收
+perf-collection-runtime-healthy: perf-preflight ## 隔离/静默窗口健康 Redis 完整基线验收
 	$(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh healthy
 
-perf-collection-runtime-degraded-low: ## 隔离环境 Redis 故障 20QPS 低流量验收
+perf-collection-runtime-degraded-low: perf-preflight ## 隔离环境 Redis 故障 20QPS 低流量验收
 	$(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh degraded-low
 
-perf-collection-runtime-degraded-global: ## 隔离环境 Redis 故障 global fallback 稳态上限验收
+perf-collection-runtime-degraded-global: perf-preflight ## 隔离环境 Redis 故障 global fallback 稳态上限验收
 	$(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh degraded-global
 
-perf-collection-runtime-degraded-user: ## 隔离环境 Redis 故障 user fallback 稳态上限验收
+perf-collection-runtime-degraded-user: perf-preflight ## 隔离环境 Redis 故障 user fallback 稳态上限验收
 	$(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh degraded-user
 
-perf-collection-runtime-recovery: ## 隔离环境 Redis 恢复后的严格 readiness 与分布式限流验收
+perf-collection-runtime-recovery: perf-preflight ## 隔离环境 Redis 恢复后的严格 readiness 与分布式限流验收
 	$(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh recovery
 
 perf-verify: perf-check-k6 ## 校验压测脚本与 k6 场景
@@ -450,10 +450,10 @@ perf-verify: perf-check-k6 ## 校验压测脚本与 k6 场景
 	bash -n $(PERF_SCRIPT_DIR)/sync-vusers-from-example.sh
 	k6 inspect $(PERF_K6_SCRIPT)
 	k6 inspect $(PERF_SCRIPT_DIR)/k6-mixed-300qps.js
-	k6 inspect $(PERF_SCRIPT_DIR)/k6-submit-coalescing.js
-	k6 inspect -e SUBMIT_CASES_JSON='[{"token":"test-a","payload":{}},{"token":"test-b","payload":{}}]' -e DEGRADED_SUBMIT_MODE=low -e COLLECTION_BASE_URLS=http://127.0.0.1:18083,http://127.0.0.1:28083 $(PERF_SCRIPT_DIR)/k6-submit-redis-degraded.js
-	k6 inspect -e SUBMIT_CASES_JSON='[{"token":"test-a","payload":{}},{"token":"test-b","payload":{}},{"token":"test-c","payload":{}},{"token":"test-d","payload":{}},{"token":"test-e","payload":{}},{"token":"test-f","payload":{}}]' -e DEGRADED_SUBMIT_MODE=global_overload -e COLLECTION_BASE_URLS=http://127.0.0.1:18083,http://127.0.0.1:28083 $(PERF_SCRIPT_DIR)/k6-submit-redis-degraded.js
-	k6 inspect -e SUBMIT_CASES_JSON='[{"token":"test","payload":{}}]' -e DEGRADED_SUBMIT_MODE=user_overload -e COLLECTION_BASE_URLS=http://127.0.0.1:18083,http://127.0.0.1:28083 $(PERF_SCRIPT_DIR)/k6-submit-redis-degraded.js
+	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e PERF_ROOT_DIR="$(CURDIR)" -e TESTEE_IDS=618855887087350318 $(PERF_SCRIPT_DIR)/k6-submit-coalescing.js
+	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e PERF_ROOT_DIR="$(CURDIR)" -e TESTEE_IDS=1,2 -e DEGRADED_SUBMIT_MODE=low -e COLLECTION_BASE_URLS=http://127.0.0.1:18083,http://127.0.0.1:28083 $(PERF_SCRIPT_DIR)/k6-submit-redis-degraded.js
+	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e PERF_ROOT_DIR="$(CURDIR)" -e TESTEE_IDS=1,2,3,4,5,6 -e DEGRADED_SUBMIT_MODE=global_overload -e COLLECTION_BASE_URLS=http://127.0.0.1:18083,http://127.0.0.1:28083 $(PERF_SCRIPT_DIR)/k6-submit-redis-degraded.js
+	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e PERF_ROOT_DIR="$(CURDIR)" -e TESTEE_IDS=1 -e DEGRADED_SUBMIT_MODE=user_overload -e COLLECTION_BASE_URLS=http://127.0.0.1:18083,http://127.0.0.1:28083 $(PERF_SCRIPT_DIR)/k6-submit-redis-degraded.js
 	k6 inspect $(PERF_SCRIPT_DIR)/k6-answersheet-submit.js
 	k6 inspect $(PERF_SCRIPT_DIR)/k6-collection-questionnaires.js
 	k6 inspect $(PERF_SCRIPT_DIR)/k6-collection-assessments.js

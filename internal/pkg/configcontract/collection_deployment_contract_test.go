@@ -272,6 +272,7 @@ func TestRedisDegradedSubmitAcceptanceContract(t *testing.T) {
 		`submit(data, 'steady')`,
 		`degraded_submit_accepted_total{phase:steady}`,
 		`rate<=`,
+		`discoverSubmitCases`,
 	} {
 		if !strings.Contains(scenario, required) {
 			t.Errorf("Redis degraded submit k6 scenario must contain %q", required)

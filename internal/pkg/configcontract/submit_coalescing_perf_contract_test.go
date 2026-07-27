@@ -29,13 +29,34 @@ func TestSubmitCoalescingPerfContract(t *testing.T) {
 		"lease_acquire",
 		"collectionInstanceActivity",
 		"http.expectedStatuses(202, 409)",
+		"discoverSubmitCases",
 	} {
 		if !strings.Contains(script, required) {
 			t.Errorf("SubmitCoalescer k6 script must contain %q", required)
 		}
 	}
-
 	runner := readContractFile(t, filepath.Join(root, "scripts", "perf", "run-submit-coalescing.sh"))
+	if strings.Contains(runner, `echo "SUBMIT_PAYLOAD_JSON is required"`) {
+		t.Error("SubmitCoalescer runner must auto-discover the SNAP-VI payload when no explicit payload is provided")
+	}
+
+	fixture := readContractFile(t, filepath.Join(root, "scripts", "perf", "k6", "lib", "submit-fixture.js"))
+	for _, required := range []string{
+		"COLLECTION_TOKENS",
+		"TESTEE_IDS",
+		"buildAnswersFromQuestionnaire",
+		"normalizeAnswers",
+		"SNAP-VI",
+		"QUESTIONNAIRE_VERSION",
+		"questionnaire_version",
+		"testee_id",
+		"tokenFileIssueMessage",
+	} {
+		if !strings.Contains(fixture, required) {
+			t.Errorf("submit fixture helper must contain %q", required)
+		}
+	}
+
 	for _, required := range []string{
 		`COLLECTION_COMPOSE_SERVICE="${COLLECTION_COMPOSE_SERVICE:-server}"`,
 		"label=com.docker.compose.project=${COLLECTION_COMPOSE_PROJECT}",
@@ -114,7 +135,11 @@ func TestCollectionRuntimeAcceptanceEntryContract(t *testing.T) {
 		"perf-collection-runtime-degraded-global",
 		"perf-collection-runtime-degraded-user",
 		"perf-collection-runtime-recovery",
+		"perf-collection-runtime-healthy-smoke: perf-preflight",
+		"perf-collection-runtime-degraded-low: perf-preflight",
 		"bash -n $(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh",
+		`-e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json"`,
+		`-e TESTEE_IDS=618855887087350318`,
 	} {
 		if !strings.Contains(makefile, required) {
 			t.Errorf("Makefile runtime acceptance contract must contain %q", required)

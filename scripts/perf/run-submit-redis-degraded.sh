@@ -2,6 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 K6_BIN="${K6_BIN:-k6}"
 DEGRADED_SUBMIT_MODE="${DEGRADED_SUBMIT_MODE:-low}"
 EXPECTED_COLLECTION_REPLICAS="${EXPECTED_COLLECTION_REPLICAS:-2}"
@@ -11,6 +12,11 @@ COLLECTION_NETWORK="${COLLECTION_NETWORK:-qs-network}"
 PERF_ISOLATED_ENV="${PERF_ISOLATED_ENV:-}"
 REDIS_FAILURE_CONFIRMED="${REDIS_FAILURE_CONFIRMED:-}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-artifacts/perf/submit-redis-degraded-${DEGRADED_SUBMIT_MODE}}"
+PERF_ROOT_DIR="${PERF_ROOT_DIR:-${REPO_ROOT}}"
+PERF_CONFIG_FILE="${PERF_CONFIG_FILE:-}"
+if [[ -z "$PERF_CONFIG_FILE" && -f "${REPO_ROOT}/tmp/perf/qs-perf.config.json" ]]; then
+  PERF_CONFIG_FILE="${REPO_ROOT}/tmp/perf/qs-perf.config.json"
+fi
 
 docker_cmd=(docker)
 if [[ "${DOCKER_SUDO:-0}" == "1" ]]; then
@@ -43,14 +49,6 @@ case "$DEGRADED_SUBMIT_MODE" in
     exit 1
     ;;
 esac
-if [[ -z "${SUBMIT_CASES_JSON:-}" ]]; then
-  echo "SUBMIT_CASES_JSON is required; use [{\"token\":\"...\",\"payload\":{...}}]" >&2
-  exit 1
-fi
-
-case_count="$(
-  python3 -c 'import json,os; value=json.loads(os.environ["SUBMIT_CASES_JSON"]); print(len(value) if isinstance(value,list) else 0)'
-)"
 case "$DEGRADED_SUBMIT_MODE" in
   low)
     minimum_cases=2
@@ -60,15 +58,21 @@ case "$DEGRADED_SUBMIT_MODE" in
     ;;
   user_overload)
     minimum_cases=1
-    if [[ "$case_count" -ne 1 ]]; then
-      echo "user_overload requires exactly one submit case" >&2
-      exit 1
-    fi
     ;;
 esac
-if [[ "$case_count" -lt "$minimum_cases" ]]; then
-  echo "${DEGRADED_SUBMIT_MODE} requires at least ${minimum_cases} submit cases, found ${case_count}" >&2
-  exit 1
+case_count="auto(${minimum_cases})"
+if [[ -n "${SUBMIT_CASES_JSON:-}" ]]; then
+  case_count="$(
+    python3 -c 'import json,os; value=json.loads(os.environ["SUBMIT_CASES_JSON"]); print(len(value) if isinstance(value,list) else 0)'
+  )"
+  if [[ "$DEGRADED_SUBMIT_MODE" == "user_overload" && "$case_count" -ne 1 ]]; then
+    echo "user_overload requires exactly one submit case" >&2
+    exit 1
+  fi
+  if [[ "$case_count" -lt "$minimum_cases" ]]; then
+    echo "${DEGRADED_SUBMIT_MODE} requires at least ${minimum_cases} submit cases, found ${case_count}" >&2
+    exit 1
+  fi
 fi
 
 mkdir -p "$ARTIFACT_DIR"
@@ -145,7 +149,11 @@ export FALLBACK_GLOBAL_QPS="${FALLBACK_GLOBAL_QPS:-30}"
 export FALLBACK_USER_QPS="${FALLBACK_USER_QPS:-10}"
 
 echo "Redis-degraded submit acceptance: mode=${DEGRADED_SUBMIT_MODE} replicas=${#container_ids[@]} cases=${case_count} warmup=${WARMUP_DURATION:-15s} steady=${STEADY_DURATION:-${DURATION:-60s}}"
-"$K6_BIN" run \
+k6_env_args=(-e "PERF_ROOT_DIR=${PERF_ROOT_DIR}")
+if [[ -n "$PERF_CONFIG_FILE" ]]; then
+  k6_env_args+=(-e "PERF_CONFIG_FILE=${PERF_CONFIG_FILE}")
+fi
+"$K6_BIN" run "${k6_env_args[@]}" \
   --summary-export "${ARTIFACT_DIR}/k6-summary.json" \
   "${SCRIPT_DIR}/k6-submit-redis-degraded.js" |
   tee "${ARTIFACT_DIR}/k6.log"

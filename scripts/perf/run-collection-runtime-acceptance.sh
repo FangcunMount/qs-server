@@ -27,11 +27,20 @@ Commands:
   degraded-user      Isolated Redis failure: 30 QPS single-writer fallback ceiling.
   recovery           Formal post-recovery baseline and limiter-strategy verification.
 
-Required inputs:
-  healthy-smoke/healthy/recovery:
-    COLLECTION_TOKEN or TOKEN, SUBMIT_PAYLOAD_JSON
-  degraded-*:
-    SUBMIT_CASES_JSON
+Preparation:
+  make perf-init
+  make perf-tokens
+  make perf-preflight
+  export TESTEE_IDS='<id1,id2,...>'
+
+Automatic fixtures:
+  The default questionnaire is SNAP-VI. The scripts load collection tokens from
+  tmp/perf/qs-perf.config.json, fetch the deployed questionnaire, and generate answers.
+  degraded-low/global/user need at least 2/6/1 aligned tokens and TESTEE_IDS.
+
+Optional overrides:
+  QUESTIONNAIRE_CODE, QUESTIONNAIRE_VERSION, COLLECTION_TOKEN, SUBMIT_PAYLOAD_JSON,
+  SUBMIT_CASES_JSON, PERF_CONFIG_FILE
 
 Safety gates:
   healthy:       PERF_ISOLATED_ENV=true

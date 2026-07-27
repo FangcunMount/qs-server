@@ -237,11 +237,20 @@ RPS=200 DURATION=10m VUS=100 MAX_VUS=500 BASE_URL=https://collect.fangcunmount.c
 Redis RateLimit 降级预算必须在隔离灰度环境单独验收：
 
 ```bash
+make perf-init
+# 编辑 tmp/perf/iam-users.json 后刷新 token
+make perf-tokens
+make perf-preflight
+
 PERF_ISOLATED_ENV=true \
 REDIS_FAILURE_CONFIRMED=true \
-SUBMIT_CASES_JSON='<reviewed writer/token/payload cases>' \
+TESTEE_IDS='<at-least-six-token-aligned-testee-ids>' \
 make perf-collection-runtime-degraded-low
 ```
+
+脚本默认读取 `SNAP-VI` 问卷并按题型生成 answers；low、global、user 分别使用
+前 2、6、1 组 collection token 与 `TESTEE_IDS`。只有需要完全控制测试意图时才
+提供 `SUBMIT_CASES_JSON` 覆盖自动生成结果。
 
 过载验收分别使用 `perf-collection-runtime-degraded-global` 与
 `perf-collection-runtime-degraded-user`。脚本以 15 秒 warmup 排除初始 burst，

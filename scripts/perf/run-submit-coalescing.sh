@@ -2,6 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 K6_BIN="${K6_BIN:-k6}"
 EXPECTED_COLLECTION_REPLICAS="${EXPECTED_COLLECTION_REPLICAS:-2}"
 COLLECTION_COMPOSE_PROJECT="${COLLECTION_COMPOSE_PROJECT:-qs-collection}"
@@ -12,6 +13,11 @@ COALESCING_SCENARIO="${COALESCING_SCENARIO:-healthy}"
 PERF_ISOLATED_ENV="${PERF_ISOLATED_ENV:-}"
 VERIFY_METRICS="${VERIFY_METRICS:-true}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-artifacts/perf/submit-coalescing-${COALESCING_SCENARIO}}"
+PERF_ROOT_DIR="${PERF_ROOT_DIR:-${REPO_ROOT}}"
+PERF_CONFIG_FILE="${PERF_CONFIG_FILE:-}"
+if [[ -z "$PERF_CONFIG_FILE" && -f "${REPO_ROOT}/tmp/perf/qs-perf.config.json" ]]; then
+  PERF_CONFIG_FILE="${REPO_ROOT}/tmp/perf/qs-perf.config.json"
+fi
 
 docker_cmd=(docker)
 if [[ "${DOCKER_SUDO:-0}" == "1" ]]; then
@@ -39,14 +45,6 @@ case "$VERIFY_METRICS" in
 esac
 if [[ "$VERIFY_METRICS" == "true" && "$PERF_ISOLATED_ENV" != "true" ]]; then
   echo "PERF_ISOLATED_ENV=true is required: exact Prometheus deltas are unsafe under unrelated submit traffic" >&2
-  exit 1
-fi
-if [[ -z "${COLLECTION_TOKEN:-${TOKEN:-}}" ]]; then
-  echo "COLLECTION_TOKEN or TOKEN is required" >&2
-  exit 1
-fi
-if [[ -z "${SUBMIT_PAYLOAD_JSON:-}" ]]; then
-  echo "SUBMIT_PAYLOAD_JSON is required" >&2
   exit 1
 fi
 if [[ "$COALESCING_SCENARIO" == "conflict" && -z "${CONFLICT_PAYLOAD_JSON:-}" ]]; then
@@ -116,7 +114,11 @@ export VERIFY_METRICS
 
 mkdir -p "$ARTIFACT_DIR"
 echo "SubmitCoalescer acceptance: scenario=${COALESCING_SCENARIO} replicas=${#container_ids[@]} network=${COLLECTION_NETWORK} verify_metrics=${VERIFY_METRICS}"
-"$K6_BIN" run \
+k6_env_args=(-e "PERF_ROOT_DIR=${PERF_ROOT_DIR}")
+if [[ -n "$PERF_CONFIG_FILE" ]]; then
+  k6_env_args+=(-e "PERF_CONFIG_FILE=${PERF_CONFIG_FILE}")
+fi
+"$K6_BIN" run "${k6_env_args[@]}" \
   --summary-export "${ARTIFACT_DIR}/k6-summary.json" \
   "${SCRIPT_DIR}/k6-submit-coalescing.js" |
   tee "${ARTIFACT_DIR}/k6.log"
