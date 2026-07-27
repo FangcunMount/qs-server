@@ -140,8 +140,11 @@ export COLLECTION_BASE_URLS
 COLLECTION_BASE_URLS="$(join_by_comma "${collection_urls[@]}")"
 export DEGRADED_SUBMIT_MODE
 export PERF_ISOLATED_ENV
+export EXPECTED_COLLECTION_REPLICAS
+export FALLBACK_GLOBAL_QPS="${FALLBACK_GLOBAL_QPS:-30}"
+export FALLBACK_USER_QPS="${FALLBACK_USER_QPS:-10}"
 
-echo "Redis-degraded submit acceptance: mode=${DEGRADED_SUBMIT_MODE} replicas=${#container_ids[@]} cases=${case_count}"
+echo "Redis-degraded submit acceptance: mode=${DEGRADED_SUBMIT_MODE} replicas=${#container_ids[@]} cases=${case_count} warmup=${WARMUP_DURATION:-15s} steady=${STEADY_DURATION:-${DURATION:-60s}}"
 "$K6_BIN" run \
   --summary-export "${ARTIFACT_DIR}/k6-summary.json" \
   "${SCRIPT_DIR}/k6-submit-redis-degraded.js" |

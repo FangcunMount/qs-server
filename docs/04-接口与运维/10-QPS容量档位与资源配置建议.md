@@ -240,13 +240,16 @@ Redis RateLimit 降级预算必须在隔离灰度环境单独验收：
 PERF_ISOLATED_ENV=true \
 REDIS_FAILURE_CONFIRMED=true \
 SUBMIT_CASES_JSON='<reviewed writer/token/payload cases>' \
-make perf-submit-redis-degraded-low
+make perf-collection-runtime-degraded-low
 ```
 
-过载验收分别使用 `perf-submit-redis-degraded-global-overload` 与
-`perf-submit-redis-degraded-user-overload`。脚本只验证已经注入的故障，不负责
-停止 Redis；验收完成后必须恢复 Redis 并确认 `/readyz`、`/serve-readyz` 都回到
-200。
+过载验收分别使用 `perf-collection-runtime-degraded-global` 与
+`perf-collection-runtime-degraded-user`。脚本以 15 秒 warmup 排除初始 burst，
+再在默认 60 秒 steady 窗口自动验证双实例 global 成功准入不超过 63 QPS、单
+writer 成功准入不超过 21 QPS。脚本只验证已经注入的故障，不负责停止 Redis；
+验收完成后恢复 Redis，并设置 `REDIS_RECOVERY_CONFIRMED=true` 执行
+`make perf-collection-runtime-recovery`，验证两个 readiness 均为 200、本地 fallback
+停止增长且 Redis 分布式策略恢复。
 
 观测：
 

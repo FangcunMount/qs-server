@@ -45,6 +45,8 @@ func TestSubmitCoalescingPerfContract(t *testing.T) {
 		"COLLECTION_BASE_URLS",
 		"COLLECTION_METRICS_URLS",
 		"APISERVER_METRICS_URL",
+		"k6-summary.json",
+		`if [[ "$VERIFY_METRICS" == "true" && "$PERF_ISOLATED_ENV" != "true" ]]`,
 	} {
 		if !strings.Contains(runner, required) {
 			t.Errorf("SubmitCoalescer runner must contain %q", required)
@@ -73,6 +75,49 @@ func TestSubmitCoalescingPerfContract(t *testing.T) {
 	} {
 		if !strings.Contains(doc, required) {
 			t.Errorf("SubmitCoalescer perf documentation must contain %q", required)
+		}
+	}
+}
+
+func TestCollectionRuntimeAcceptanceEntryContract(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	runner := readContractFile(t, filepath.Join(root, "scripts", "perf", "run-collection-runtime-acceptance.sh"))
+	for _, required := range []string{
+		"healthy-smoke",
+		"healthy",
+		"degraded-low",
+		"degraded-global",
+		"degraded-user",
+		"recovery",
+		`VERIFY_METRICS=false`,
+		`PERF_ISOLATED_ENV=true`,
+		`REDIS_FAILURE_CONFIRMED=true`,
+		`REDIS_RECOVERY_CONFIRMED`,
+		`strategy="local_fallback"`,
+		`strategy="redis"`,
+	} {
+		if !strings.Contains(runner, required) {
+			t.Errorf("collection runtime acceptance entry must contain %q", required)
+		}
+	}
+	if strings.Contains(runner, "docker stop") || strings.Contains(runner, "docker restart") {
+		t.Error("collection runtime acceptance must not mutate Redis or container lifecycle")
+	}
+
+	makefile := readContractFile(t, filepath.Join(root, "Makefile"))
+	for _, required := range []string{
+		"perf-collection-runtime-healthy-smoke",
+		"perf-collection-runtime-healthy",
+		"perf-collection-runtime-degraded-low",
+		"perf-collection-runtime-degraded-global",
+		"perf-collection-runtime-degraded-user",
+		"perf-collection-runtime-recovery",
+		"bash -n $(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh",
+	} {
+		if !strings.Contains(makefile, required) {
+			t.Errorf("Makefile runtime acceptance contract must contain %q", required)
 		}
 	}
 }

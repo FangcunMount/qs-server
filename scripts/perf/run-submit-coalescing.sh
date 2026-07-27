@@ -10,6 +10,8 @@ COLLECTION_NETWORK="${COLLECTION_NETWORK:-qs-network}"
 APISERVER_METRICS_URL="${APISERVER_METRICS_URL:-http://127.0.0.1:8081/metrics}"
 COALESCING_SCENARIO="${COALESCING_SCENARIO:-healthy}"
 PERF_ISOLATED_ENV="${PERF_ISOLATED_ENV:-}"
+VERIFY_METRICS="${VERIFY_METRICS:-true}"
+ARTIFACT_DIR="${ARTIFACT_DIR:-artifacts/perf/submit-coalescing-${COALESCING_SCENARIO}}"
 
 docker_cmd=(docker)
 if [[ "${DOCKER_SUDO:-0}" == "1" ]]; then
@@ -28,7 +30,14 @@ if [[ "$EXPECTED_COLLECTION_REPLICAS" -lt 2 ]]; then
   echo "SubmitCoalescer acceptance requires at least two collection replicas" >&2
   exit 1
 fi
-if [[ "$PERF_ISOLATED_ENV" != "true" ]]; then
+case "$VERIFY_METRICS" in
+  true | false) ;;
+  *)
+    echo "VERIFY_METRICS must be true or false" >&2
+    exit 1
+    ;;
+esac
+if [[ "$VERIFY_METRICS" == "true" && "$PERF_ISOLATED_ENV" != "true" ]]; then
   echo "PERF_ISOLATED_ENV=true is required: exact Prometheus deltas are unsafe under unrelated submit traffic" >&2
   exit 1
 fi
@@ -78,7 +87,7 @@ for container_id in "${container_ids[@]}"; do
     echo "collection replica ${container_id} is not ready at ${base_url}/readyz" >&2
     exit 1
   fi
-  if ! curl -fsS --max-time 5 "${base_url}/metrics" >/dev/null; then
+  if [[ "$VERIFY_METRICS" == "true" ]] && ! curl -fsS --max-time 5 "${base_url}/metrics" >/dev/null; then
     echo "collection replica ${container_id} metrics are unavailable at ${base_url}/metrics" >&2
     exit 1
   fi
@@ -86,7 +95,7 @@ for container_id in "${container_ids[@]}"; do
   collection_metrics_urls+=("${base_url}/metrics")
 done
 
-if ! curl -fsS --max-time 5 "$APISERVER_METRICS_URL" >/dev/null; then
+if [[ "$VERIFY_METRICS" == "true" ]] && ! curl -fsS --max-time 5 "$APISERVER_METRICS_URL" >/dev/null; then
   echo "apiserver metrics are unavailable at ${APISERVER_METRICS_URL}" >&2
   exit 1
 fi
@@ -103,6 +112,12 @@ COLLECTION_METRICS_URLS="$(join_by_comma "${collection_metrics_urls[@]}")"
 export APISERVER_METRICS_URL
 export COALESCING_SCENARIO
 export PERF_ISOLATED_ENV
+export VERIFY_METRICS
 
-echo "SubmitCoalescer acceptance: scenario=${COALESCING_SCENARIO} replicas=${#container_ids[@]} network=${COLLECTION_NETWORK}"
-exec "$K6_BIN" run "${SCRIPT_DIR}/k6-submit-coalescing.js"
+mkdir -p "$ARTIFACT_DIR"
+echo "SubmitCoalescer acceptance: scenario=${COALESCING_SCENARIO} replicas=${#container_ids[@]} network=${COLLECTION_NETWORK} verify_metrics=${VERIFY_METRICS}"
+"$K6_BIN" run \
+  --summary-export "${ARTIFACT_DIR}/k6-summary.json" \
+  "${SCRIPT_DIR}/k6-submit-coalescing.js" |
+  tee "${ARTIFACT_DIR}/k6.log"
+echo "artifacts=${ARTIFACT_DIR}"

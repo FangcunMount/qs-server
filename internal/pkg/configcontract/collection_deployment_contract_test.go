@@ -264,6 +264,14 @@ func TestRedisDegradedSubmitAcceptanceContract(t *testing.T) {
 		`response.status === 429`,
 		`Retry-After`,
 		`degraded_submit_rate_limited_total`,
+		`WARMUP_DURATION`,
+		`STEADY_DURATION`,
+		`EXPECTED_COLLECTION_REPLICAS`,
+		`FALLBACK_GLOBAL_QPS`,
+		`FALLBACK_USER_QPS`,
+		`submit(data, 'steady')`,
+		`degraded_submit_accepted_total{phase:steady}`,
+		`rate<=`,
 	} {
 		if !strings.Contains(scenario, required) {
 			t.Errorf("Redis degraded submit k6 scenario must contain %q", required)

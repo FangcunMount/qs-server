@@ -115,6 +115,7 @@ COLOR_RED := \033[31m
 .PHONY: perf-preflight perf-check-k6 perf-k6 perf-smoke perf-pretest60 perf-pretest120 perf-pretest120-submit-only perf-pretest120-balanced perf-reliable-submit24 perf-reliable-submit48-burst perf-reliable-submit96-boundary
 .PHONY: perf-mixed140 perf-mixed140-submit24 perf-mixed160 perf-mixed180 perf-mixed200 perf-mixed220 perf-mixed240 perf-mixed240-models perf-mixed280 perf-mixed280-models perf-mixed280-models-short-report perf-mixed280-models-ws perf-special-report-short-poll perf-special-report-long-poll perf-mixed300 perf-mixed300-http perf-mixed300-http-query perf-mixed300-http-query-nostats perf-stats-isolate29 perf-stats-warmup perf-mixed300probe
 .PHONY: perf-model-smoke perf-outbox120 perf-personality60 perf-mixed300-models perf-submit-coalescing100 perf-submit-coalescing-conflict perf-submit-coalescing-redis-lock-failure perf-submit-coalescing-redis-signal-failure perf-submit-coalescing-redis-unavailable perf-submit-redis-degraded-low perf-submit-redis-degraded-global-overload perf-submit-redis-degraded-user-overload
+.PHONY: perf-collection-runtime-status perf-collection-runtime-healthy-smoke perf-collection-runtime-healthy perf-collection-runtime-degraded-low perf-collection-runtime-degraded-global perf-collection-runtime-degraded-user perf-collection-runtime-recovery
 .PHONY: perf-diag-report120 perf-diag-query120 perf-diag-submit120 perf-diag-query-submit120 perf-sync-profiles perf-sync-vusers perf-verify
 
 # ============================================================================
@@ -417,17 +418,41 @@ perf-submit-redis-degraded-global-overload: ## Redis rate 故障时验证双实�
 perf-submit-redis-degraded-user-overload: ## Redis rate 故障时验证单 writer fallback 过载
 	DEGRADED_SUBMIT_MODE=user_overload $(PERF_SCRIPT_DIR)/run-submit-redis-degraded.sh
 
+perf-collection-runtime-status: ## 输出两个 collection 副本的严格/服务就绪状态
+	$(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh status
+
+perf-collection-runtime-healthy-smoke: ## 已上线环境 HTTP 行为烟测（不做全局指标精确验收）
+	$(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh healthy-smoke
+
+perf-collection-runtime-healthy: ## 隔离/静默窗口健康 Redis 完整基线验收
+	$(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh healthy
+
+perf-collection-runtime-degraded-low: ## 隔离环境 Redis 故障 20QPS 低流量验收
+	$(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh degraded-low
+
+perf-collection-runtime-degraded-global: ## 隔离环境 Redis 故障 global fallback 稳态上限验收
+	$(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh degraded-global
+
+perf-collection-runtime-degraded-user: ## 隔离环境 Redis 故障 user fallback 稳态上限验收
+	$(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh degraded-user
+
+perf-collection-runtime-recovery: ## 隔离环境 Redis 恢复后的严格 readiness 与分布式限流验收
+	$(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh recovery
+
 perf-verify: perf-check-k6 ## 校验压测脚本与 k6 场景
 	bash -n $(PERF_SCRIPT_DIR)/check-token-preflight.sh
 	bash -n $(PERF_SCRIPT_DIR)/fetch-iam-tokens.sh
 	bash -n $(PERF_SCRIPT_DIR)/run-submit-coalescing.sh
 	bash -n $(PERF_SCRIPT_DIR)/run-submit-redis-degraded.sh
+	bash -n $(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh
 	bash -n $(PERF_SCRIPT_DIR)/snapshot-observability.sh
 	bash -n $(PERF_SCRIPT_DIR)/sync-profiles-from-example.sh
 	bash -n $(PERF_SCRIPT_DIR)/sync-vusers-from-example.sh
 	k6 inspect $(PERF_K6_SCRIPT)
 	k6 inspect $(PERF_SCRIPT_DIR)/k6-mixed-300qps.js
 	k6 inspect $(PERF_SCRIPT_DIR)/k6-submit-coalescing.js
+	k6 inspect -e SUBMIT_CASES_JSON='[{"token":"test-a","payload":{}},{"token":"test-b","payload":{}}]' -e DEGRADED_SUBMIT_MODE=low -e COLLECTION_BASE_URLS=http://127.0.0.1:18083,http://127.0.0.1:28083 $(PERF_SCRIPT_DIR)/k6-submit-redis-degraded.js
+	k6 inspect -e SUBMIT_CASES_JSON='[{"token":"test-a","payload":{}},{"token":"test-b","payload":{}},{"token":"test-c","payload":{}},{"token":"test-d","payload":{}},{"token":"test-e","payload":{}},{"token":"test-f","payload":{}}]' -e DEGRADED_SUBMIT_MODE=global_overload -e COLLECTION_BASE_URLS=http://127.0.0.1:18083,http://127.0.0.1:28083 $(PERF_SCRIPT_DIR)/k6-submit-redis-degraded.js
 	k6 inspect -e SUBMIT_CASES_JSON='[{"token":"test","payload":{}}]' -e DEGRADED_SUBMIT_MODE=user_overload -e COLLECTION_BASE_URLS=http://127.0.0.1:18083,http://127.0.0.1:28083 $(PERF_SCRIPT_DIR)/k6-submit-redis-degraded.js
 	k6 inspect $(PERF_SCRIPT_DIR)/k6-answersheet-submit.js
 	k6 inspect $(PERF_SCRIPT_DIR)/k6-collection-questionnaires.js

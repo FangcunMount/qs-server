@@ -11,9 +11,14 @@ const collectionURLs = String(__ENV.COLLECTION_BASE_URLS || '')
   .filter(Boolean);
 const submitPath = __ENV.SUBMIT_PATH || '/api/v1/answersheets';
 const rate = Number(__ENV.RPS || defaultRate(mode));
-const duration = __ENV.DURATION || '30s';
+const warmupDuration = __ENV.WARMUP_DURATION || '15s';
+const steadyDuration = __ENV.STEADY_DURATION || __ENV.DURATION || '60s';
 const preAllocatedVUs = Number(__ENV.VUS || Math.max(40, rate));
 const maxVUs = Number(__ENV.MAX_VUS || Math.max(120, rate * 2));
+const expectedReplicas = Number(__ENV.EXPECTED_COLLECTION_REPLICAS || 2);
+const fallbackGlobalQPS = Number(__ENV.FALLBACK_GLOBAL_QPS || 30);
+const fallbackUserQPS = Number(__ENV.FALLBACK_USER_QPS || 10);
+const steadyRateTolerance = Number(__ENV.STEADY_RATE_TOLERANCE || 0.05);
 const idempotencyPrefix =
   __ENV.IDEMPOTENCY_PREFIX || `redis-degraded-${mode}-${Date.now()}`;
 
@@ -30,20 +35,36 @@ const thresholds = {
   degraded_submit_duration: ['p(99)<2000'],
 };
 if (mode === 'low') {
-  thresholds.degraded_submit_accepted_rate = ['rate>0.99'];
-  thresholds.degraded_submit_rate_limited_total = ['count==0'];
+  thresholds['degraded_submit_accepted_rate{phase:steady}'] = ['rate>0.99'];
+  thresholds['degraded_submit_rate_limited_total{phase:steady}'] = ['count==0'];
 } else {
-  thresholds.degraded_submit_accepted_total = ['count>0'];
-  thresholds.degraded_submit_rate_limited_total = ['count>0'];
+  const fallbackQPS = mode === 'global_overload' ? fallbackGlobalQPS : fallbackUserQPS;
+  const steadyAcceptedCeiling = expectedReplicas * fallbackQPS * (1 + steadyRateTolerance);
+  thresholds['degraded_submit_accepted_total{phase:steady}'] = [
+    'count>0',
+    `rate<=${steadyAcceptedCeiling}`,
+  ];
+  thresholds['degraded_submit_rate_limited_total{phase:steady}'] = ['count>0'];
 }
 
 export const options = {
   scenarios: {
-    degradedSubmit: {
+    degradedSubmitWarmup: {
       executor: 'constant-arrival-rate',
+      exec: 'warmup',
       rate,
       timeUnit: '1s',
-      duration,
+      duration: warmupDuration,
+      preAllocatedVUs,
+      maxVUs,
+    },
+    degradedSubmitSteady: {
+      executor: 'constant-arrival-rate',
+      exec: 'steady',
+      startTime: warmupDuration,
+      rate,
+      timeUnit: '1s',
+      duration: steadyDuration,
       preAllocatedVUs,
       maxVUs,
     },
@@ -60,6 +81,18 @@ export function setup() {
   }
   if (!Number.isFinite(rate) || rate <= 0) {
     fail('RPS must be a positive number');
+  }
+  if (!Number.isInteger(expectedReplicas) || expectedReplicas < 2) {
+    fail('EXPECTED_COLLECTION_REPLICAS must be an integer of at least 2');
+  }
+  if (!Number.isFinite(fallbackGlobalQPS) || fallbackGlobalQPS <= 0) {
+    fail('FALLBACK_GLOBAL_QPS must be a positive number');
+  }
+  if (!Number.isFinite(fallbackUserQPS) || fallbackUserQPS <= 0) {
+    fail('FALLBACK_USER_QPS must be a positive number');
+  }
+  if (!Number.isFinite(steadyRateTolerance) || steadyRateTolerance < 0 || steadyRateTolerance > 0.5) {
+    fail('STEADY_RATE_TOLERANCE must be between 0 and 0.5');
   }
   let cases;
   try {
@@ -87,12 +120,21 @@ export function setup() {
   return { cases };
 }
 
-export default function (data) {
+export function warmup(data) {
+  submit(data, 'warmup');
+}
+
+export function steady(data) {
+  submit(data, 'steady');
+}
+
+function submit(data, phase) {
   const iteration = Number(exec.scenario.iterationInTest);
   const submitCase = data.cases[iteration % data.cases.length];
   const baseURL = collectionURLs[iteration % collectionURLs.length];
   const payload = JSON.parse(JSON.stringify(submitCase.payload));
-  payload.idempotency_key = `${idempotencyPrefix}-${iteration}`;
+  payload.idempotency_key = `${idempotencyPrefix}-${phase}-${iteration}`;
+  const metricTags = { phase };
 
   const response = http.post(`${baseURL}${submitPath}`, JSON.stringify(payload), {
     responseCallback:
@@ -102,9 +144,9 @@ export default function (data) {
       'Content-Type': 'application/json',
       'X-Request-ID': `${payload.idempotency_key}-request`,
     },
-    tags: { endpoint: 'answersheet_submit', degraded_mode: mode },
+    tags: { endpoint: 'answersheet_submit', degraded_mode: mode, phase },
   });
-  requestDuration.add(response.timings.duration);
+  requestDuration.add(response.timings.duration, metricTags);
 
   const body = responseData(response);
   const accepted =
@@ -119,16 +161,15 @@ export default function (data) {
     Number.isFinite(Number(retryAfter)) &&
     Number(retryAfter) >= 1;
 
-  acceptedRate.add(accepted);
-  if (accepted) {
-    acceptedTotal.add(1);
-  } else if (rateLimited) {
-    rateLimitedTotal.add(1);
+  acceptedRate.add(accepted, metricTags);
+  acceptedTotal.add(accepted ? 1 : 0, metricTags);
+  rateLimitedTotal.add(rateLimited ? 1 : 0, metricTags);
+  if (rateLimited) {
     if (!validRetryAfter) {
-      retryAfterMissingTotal.add(1);
+      retryAfterMissingTotal.add(1, metricTags);
     }
-  } else {
-    unexpectedTotal.add(1);
+  } else if (!accepted) {
+    unexpectedTotal.add(1, metricTags);
   }
 
   check(response, {
