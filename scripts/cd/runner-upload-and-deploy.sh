@@ -63,6 +63,8 @@ emit_export() {
 {
   echo '#!/usr/bin/env bash'
   echo 'set -Eeuo pipefail'
+  # Non-interactive SSH may omit /bin; bootstrap traps call rm before remote-deploy.sh runs.
+  echo 'export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"'
   echo ''
 } >"$LOCAL_BOOT"
 
@@ -146,7 +148,8 @@ echo "Uploading bootstrap script to ${RUNNER_SSH_ALIAS}:${REMOTE_BOOT} ..."
 echo "Running remote-deploy.sh on ${RUNNER_SSH_ALIAS}..."
 rc=0
 "${SSH[@]}" "${RUNNER_SSH_ALIAS}" "bash ${REMOTE_BOOT}" || rc=$?
-"${SSH[@]}" "${RUNNER_SSH_ALIAS}" "rm -f ${REMOTE_BOOT}" || true
+# One-liner SSH inherits host PATH; use absolute rm so cleanup still works if /bin is missing.
+"${SSH[@]}" "${RUNNER_SSH_ALIAS}" "/bin/rm -f ${REMOTE_BOOT}" || true
 if [ "$rc" -ne 0 ]; then
   echo "remote-deploy.sh failed on ${RUNNER_SSH_ALIAS} (exit ${rc})" >&2
   exit "$rc"
