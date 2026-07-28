@@ -74,6 +74,9 @@ func (s *taskManagementService) OpenTask(ctx context.Context, orgID int64, taskI
 	if _, historical := historicalseed.FromContext(ctx); !historical {
 		return s.openTask(ctx, orgID, taskID)
 	}
+	if err := s.beginHistoricalTaskAttempt(ctx, stageport.StageTaskOpen, taskID, historicalTaskBusinessAt(ctx, stageport.StageTaskOpen)); err != nil {
+		return nil, err
+	}
 	var result *TaskResult
 	err := s.persistence.withinTransaction(ctx, func(txCtx context.Context) error {
 		var err error
@@ -165,6 +168,9 @@ func (s *taskManagementService) openTask(ctx context.Context, orgID int64, taskI
 func (s *taskManagementService) CompleteTask(ctx context.Context, orgID int64, taskID string, assessmentID string) (*TaskResult, error) {
 	if _, historical := historicalseed.FromContext(ctx); !historical {
 		return s.completeTask(ctx, orgID, taskID, assessmentID)
+	}
+	if err := s.beginHistoricalTaskAttempt(ctx, stageport.StageTaskComplete, taskID, historicalTaskBusinessAt(ctx, stageport.StageTaskComplete)); err != nil {
+		return nil, err
 	}
 	var result *TaskResult
 	err := s.persistence.withinTransaction(ctx, func(txCtx context.Context) error {
@@ -325,6 +331,14 @@ func (s *taskManagementService) recordHistoricalTaskFailure(ctx context.Context,
 			"error", err.Error(),
 		)
 	}
+}
+
+func (s *taskManagementService) beginHistoricalTaskAttempt(ctx context.Context, stage, taskID string, businessAt time.Time) error {
+	recorder, ok := s.persistence.recorder.(stageport.AttemptRecorder)
+	if !ok || businessAt.IsZero() {
+		return nil
+	}
+	return recorder.Begin(ctx, stageport.Attempt{Stage: stage, BusinessAt: businessAt, ResourceType: "plan_task", ResourceID: taskID})
 }
 
 func historicalTaskBusinessAt(ctx context.Context, stage string) time.Time {

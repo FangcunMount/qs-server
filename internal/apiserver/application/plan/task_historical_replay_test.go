@@ -44,7 +44,21 @@ func (g *historicalEntryGeneratorStub) GenerateEntry(context.Context, *domainPla
 	return "token", "https://example.com/task", g.expireAt, nil
 }
 
-type historicalTaskStageStoreStub struct{ records map[string]stageport.Record }
+type historicalTaskStageStoreStub struct {
+	records       map[string]stageport.Record
+	beginAttempts int
+	failed        int
+}
+
+func (s *historicalTaskStageStoreStub) Begin(_ context.Context, _ stageport.Attempt) error {
+	s.beginAttempts++
+	return nil
+}
+
+func (s *historicalTaskStageStoreStub) RecordFailure(_ context.Context, _ stageport.Failure) error {
+	s.failed++
+	return nil
+}
 
 func (s *historicalTaskStageStoreStub) Complete(_ context.Context, completion stageport.Completion) (*stageport.Record, error) {
 	payload, err := json.Marshal(completion.Payload)
@@ -100,6 +114,9 @@ func TestHistoricalTaskTransitionsReplayPersistedStagesWithoutDuplicateMutation(
 	if repo.lockCalls != 4 {
 		t.Fatalf("historical transitions did not lock every read: %d", repo.lockCalls)
 	}
+	if stages.beginAttempts != 4 || stages.failed != 0 {
+		t.Fatalf("attempt lifecycle begins=%d failed=%d", stages.beginAttempts, stages.failed)
+	}
 }
 
 func TestHistoricalTaskReplayRejectsChangedTimeline(t *testing.T) {
@@ -118,5 +135,8 @@ func TestHistoricalTaskReplayRejectsChangedTimeline(t *testing.T) {
 	_, err := service.OpenTask(historicalseed.WithContext(context.Background(), base), 9, task.GetID().String())
 	if !stderrors.Is(err, stageport.ErrPayloadConflict) {
 		t.Fatalf("err=%v, want payload conflict", err)
+	}
+	if stages.beginAttempts != 2 || stages.failed != 1 {
+		t.Fatalf("attempt lifecycle begins=%d failed=%d", stages.beginAttempts, stages.failed)
 	}
 }

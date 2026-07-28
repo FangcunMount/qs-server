@@ -136,6 +136,17 @@ func (r *Repository) RecordFailure(ctx context.Context, failure stageport.Failur
 	return r.recordAttempt(ctx, historical, failure.Stage, failure.BusinessAt, failure.ResourceType, failure.ResourceID, "failed", failure.Err.Error())
 }
 
+func (r *Repository) Begin(ctx context.Context, attempt stageport.Attempt) error {
+	historical, ok := historicalseed.FromContext(ctx)
+	if !ok {
+		return nil
+	}
+	if strings.TrimSpace(attempt.Stage) == "" || attempt.BusinessAt.IsZero() {
+		return fmt.Errorf("historical seed stage attempt is incomplete")
+	}
+	return r.recordAttempt(ctx, historical, attempt.Stage, attempt.BusinessAt, attempt.ResourceType, attempt.ResourceID, "running", "")
+}
+
 func (r *Repository) recordAttempt(ctx context.Context, historical historicalseed.Context, stage string, businessAt time.Time, resourceType, resourceID, status, errorText string) error {
 	if r == nil || r.db == nil {
 		return fmt.Errorf("historical seed stage repository is not configured")
@@ -160,6 +171,22 @@ func (r *Repository) recordAttempt(ctx context.Context, historical historicalsee
 		}
 		errorValue = &trimmed
 	}
+	contextHash := hex.EncodeToString(digest[:])
+	if status != "running" {
+		var running attemptPO
+		findRunning := db.Where("org_id = ? AND batch_id = ? AND scenario_id = ? AND stage = ? AND context_hash = ? AND status = ?", historical.OrgID, historical.BatchID, historical.ScenarioID, stage, contextHash, "running").
+			Order("attempt_no ASC").First(&running)
+		if findRunning.Error == nil {
+			updates := map[string]any{
+				"status": status, "business_at": businessAt, "resource_type": strings.TrimSpace(resourceType),
+				"resource_id": strings.TrimSpace(resourceID), "error_text": errorValue, "finished_at": now,
+			}
+			return db.Model(&attemptPO{}).Where("id = ? AND status = ?", running.ID, "running").Updates(updates).Error
+		}
+		if !errors.Is(findRunning.Error, gorm.ErrRecordNotFound) {
+			return findRunning.Error
+		}
+	}
 	for retry := 0; retry < 3; retry++ {
 		var maxAttempt uint32
 		if err := db.Model(&attemptPO{}).
@@ -169,7 +196,7 @@ func (r *Repository) recordAttempt(ctx context.Context, historical historicalsee
 		}
 		row := attemptPO{
 			ID: meta.New().Uint64(), OrgID: historical.OrgID, BatchID: historical.BatchID, ScenarioID: historical.ScenarioID,
-			Stage: strings.TrimSpace(stage), AttemptNo: maxAttempt + 1, ContextHash: hex.EncodeToString(digest[:]), Status: status,
+			Stage: strings.TrimSpace(stage), AttemptNo: maxAttempt + 1, ContextHash: contextHash, Status: status,
 			BusinessAt: businessAt, ResourceType: strings.TrimSpace(resourceType), ResourceID: strings.TrimSpace(resourceID), ErrorText: errorValue,
 			StartedAt: now, FinishedAt: now,
 		}

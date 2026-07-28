@@ -60,9 +60,17 @@ type Failure struct {
 	Err          error
 }
 
+type Attempt struct {
+	Stage        string
+	BusinessAt   time.Time
+	ResourceType string
+	ResourceID   string
+}
+
 // AttemptRecorder is diagnostic only. Completion records remain the sole
 // idempotency and business-fact authority.
 type AttemptRecorder interface {
+	Begin(context.Context, Attempt) error
 	RecordFailure(context.Context, Failure) error
 }
 
