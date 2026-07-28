@@ -13,5 +13,6 @@ func (r *Router) registerHistoricalSeedInternalRoutes(internalV1 *gin.RouterGrou
 	h := handler.NewHistoricalSeedStageHandler(r.deps.HistoricalStageReader)
 	g := internalV1.Group("/historical-seed", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
 	g.GET("/batches/:batch_id", r.rateLimitedHandlers(rateLimitBudgetQuery, h.Batch)...)
+	g.GET("/batches/:batch_id/scenarios", r.rateLimitedHandlers(rateLimitBudgetQuery, h.ScenarioQuery)...)
 	g.GET("/batches/:batch_id/scenarios/:scenario_id", r.rateLimitedHandlers(rateLimitBudgetQuery, h.Scenario)...)
 }

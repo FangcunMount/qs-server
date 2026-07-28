@@ -7,6 +7,8 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,8 +27,9 @@ func TestStatisticsCanonicalSchemaFromEmptyDatabaseAndRetirementRollback(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !migrated || version != 57 {
-		t.Fatalf("migration version=%d migrated=%v, want version 57", version, migrated)
+	wantVersion := latestEmbeddedMySQLMigrationVersion(t)
+	if !migrated || version != wantVersion {
+		t.Fatalf("migration version=%d migrated=%v, want version %d", version, migrated, wantVersion)
 	}
 
 	assertCanonicalStatisticsSchema(t, db, databaseName)
@@ -44,6 +47,36 @@ func TestStatisticsCanonicalSchemaFromEmptyDatabaseAndRetirementRollback(t *test
 	execSQLMigration(t, db, "000057_add_statistics_collector_indexes.up.sql")
 	assertCanonicalStatisticsSchema(t, db, databaseName)
 	assertStatisticsCollectorIndexes(t, db, databaseName)
+}
+
+func latestEmbeddedMySQLMigrationVersion(t *testing.T) uint {
+	t.Helper()
+	entries, err := migrations.ReadDir("migrations/mysql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var latest uint64
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".up.sql") {
+			continue
+		}
+		prefix, _, ok := strings.Cut(name, "_")
+		if !ok {
+			continue
+		}
+		version, parseErr := strconv.ParseUint(prefix, 10, 64)
+		if parseErr != nil {
+			t.Fatalf("parse migration version from %s: %v", name, parseErr)
+		}
+		if version > latest {
+			latest = version
+		}
+	}
+	if latest == 0 {
+		t.Fatal("no embedded MySQL migrations found")
+	}
+	return uint(latest)
 }
 
 func TestStatisticsAuditMigrationReplaysAfterInitialSchema(t *testing.T) {

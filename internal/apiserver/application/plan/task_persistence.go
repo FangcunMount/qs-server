@@ -7,6 +7,7 @@ import (
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainplan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	stageport "github.com/FangcunMount/qs-server/internal/apiserver/port/historicalseedstage"
+	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 )
 
 // taskPersistence keeps a task terminal transition and its Enrollment close check
@@ -17,6 +18,12 @@ type taskPersistence struct {
 	enrollments domainplan.EnrollmentRepository
 	tx          apptransaction.Runner
 	recorder    stageport.Recorder
+}
+
+type historicalTaskStagePayload struct {
+	TaskID       string `json:"task_id"`
+	EnrollmentID string `json:"enrollment_id"`
+	AssessmentID string `json:"assessment_id,omitempty"`
 }
 
 func (p taskPersistence) save(ctx context.Context, task *domainplan.AssessmentTask, checkEnrollment bool) error {
@@ -36,7 +43,11 @@ func (p taskPersistence) save(ctx context.Context, task *domainplan.AssessmentTa
 		}
 		return p.recordHistorical(ctx, txCtx, task)
 	}
-	if p.tx == nil {
+	return p.withinTransaction(ctx, write)
+}
+
+func (p taskPersistence) withinTransaction(ctx context.Context, write func(context.Context) error) error {
+	if _, active := mysql.TxFromContext(ctx); active || p.tx == nil {
 		return write(ctx)
 	}
 	return p.tx.WithinTransaction(ctx, write)
@@ -60,10 +71,8 @@ func (p taskPersistence) recordHistorical(_ context.Context, txCtx context.Conte
 	if value := task.GetAssessmentID(); value != nil {
 		assessmentID = value.String()
 	}
-	_, err := p.recorder.Complete(txCtx, stageport.Completion{Stage: stage, BusinessAt: businessAt, ResourceType: "plan_task", ResourceID: task.GetID().String(), Payload: struct {
-		TaskID       string `json:"task_id"`
-		EnrollmentID string `json:"enrollment_id"`
-		AssessmentID string `json:"assessment_id,omitempty"`
-	}{TaskID: task.GetID().String(), EnrollmentID: task.GetEnrollmentID().String(), AssessmentID: assessmentID}})
+	_, err := p.recorder.Complete(txCtx, stageport.Completion{Stage: stage, BusinessAt: businessAt, ResourceType: "plan_task", ResourceID: task.GetID().String(), Payload: historicalTaskStagePayload{
+		TaskID: task.GetID().String(), EnrollmentID: task.GetEnrollmentID().String(), AssessmentID: assessmentID,
+	}})
 	return err
 }

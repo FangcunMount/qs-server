@@ -15,6 +15,7 @@ import (
 	domainanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
@@ -169,7 +170,9 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 			return nil, submitErr
 		}
 		if bound {
-			s.completePlanBestEffort(ctx, command.OrgID, matched, existing.ID)
+			if err := s.completePlan(ctx, command.OrgID, matched, existing.ID); err != nil {
+				return nil, err
+			}
 		}
 		l.Infow("答卷已有关联测评，复用已有测评",
 			"action", "ensure_assessment",
@@ -224,7 +227,9 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 				if submitErr != nil {
 					return nil, submitErr
 				}
-				s.completePlanBestEffort(ctx, command.OrgID, matched, existing.ID)
+				if err := s.completePlan(ctx, command.OrgID, matched, existing.ID); err != nil {
+					return nil, err
+				}
 				l.Infow("测评创建冲突后复用已有测评",
 					"action", "ensure_assessment",
 					"answersheet_id", command.AnswerSheetID,
@@ -254,8 +259,9 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 		return nil, err
 	}
 
-	// 完成计划最佳实践
-	s.completePlanBestEffort(ctx, command.OrgID, matched, created.ID)
+	if err := s.completePlan(ctx, command.OrgID, matched, created.ID); err != nil {
+		return nil, err
+	}
 
 	// 设置报告状态
 	if s.reportStatus != nil {
@@ -406,14 +412,31 @@ func (s *service) matchPlan(ctx context.Context, command Command, modelCode *str
 	return nil
 }
 
-// completePlanBestEffort 完成计划最佳实践
-func (s *service) completePlanBestEffort(ctx context.Context, orgID uint64, task *planapp.TaskAssessmentContext, assessmentID uint64) {
+// completePlan preserves best-effort behavior for ordinary traffic. Historical
+// backfill must surface the error so the durable worker retries the stage.
+func (s *service) completePlan(ctx context.Context, orgID uint64, task *planapp.TaskAssessmentContext, assessmentID uint64) error {
 	if task == nil || task.Completed || s.planCommands == nil {
-		return
+		return nil
 	}
 	orgScope, err := safeconv.Uint64ToInt64(orgID)
 	if err != nil {
-		return
+		if _, historical := historicalseed.FromContext(ctx); historical {
+			return err
+		}
+		return nil
 	}
-	_, _ = s.planCommands.CompleteTask(ctx, orgScope, task.TaskID, meta.FromUint64(assessmentID).String())
+	_, err = s.planCommands.CompleteTask(ctx, orgScope, task.TaskID, meta.FromUint64(assessmentID).String())
+	if err == nil {
+		return nil
+	}
+	if _, historical := historicalseed.FromContext(ctx); historical {
+		return err
+	}
+	logger.L(ctx).Warnw("Plan task completion failed after assessment intake",
+		"action", "complete_plan_task",
+		"task_id", task.TaskID,
+		"assessment_id", assessmentID,
+		"error", err.Error(),
+	)
+	return nil
 }

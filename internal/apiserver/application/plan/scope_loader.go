@@ -105,11 +105,21 @@ func loadTaskInOrg(
 	taskID string,
 	action string,
 ) (*domainplan.AssessmentTask, error) {
+	return loadTaskInOrgWithFinder(ctx, repo.FindByID, orgID, taskID, action)
+}
+
+func loadTaskInOrgWithFinder(
+	ctx context.Context,
+	find func(context.Context, domainplan.AssessmentTaskID) (*domainplan.AssessmentTask, error),
+	orgID int64,
+	taskID string,
+	action string,
+) (*domainplan.AssessmentTask, error) {
 	return loadScopedResource(ctx, scopedResourceLoader[*domainplan.AssessmentTask, domainplan.AssessmentTaskID]{
 		resourceKey:  "task_id",
 		resourceType: "task",
 		parse:        toTaskID,
-		find:         repo.FindByID,
+		find:         find,
 		orgID: func(task *domainplan.AssessmentTask) int64 {
 			return task.GetOrgID()
 		},

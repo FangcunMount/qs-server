@@ -41,6 +41,7 @@ type options struct {
 	Mode         string
 	Confirm      bool
 	ValidateOnly bool
+	Now          func() time.Time
 }
 
 const historicalBackfillMode = "historical-backfill"
@@ -168,11 +169,46 @@ func (o options) validate() error {
 }
 
 func executeHistoricalBackfill(client *http.Client, cfg options, orgID int64, output io.Writer) error {
-	for index, window := range splitWindows(cfg.From, cfg.To, cfg.WindowDays) {
+	latestCompleteDay, err := latestCompleteShanghaiDay(cfg.Now)
+	if err != nil {
+		return err
+	}
+	if latestCompleteDay.Before(cfg.To) {
+		return fmt.Errorf("latest complete Shanghai business day %s is before historical backfill end %s", latestCompleteDay.Format(dateLayout), cfg.To.Format(dateLayout))
+	}
+	if err := executeRepairAndValidateWindows(client, cfg, orgID, output, "historical", splitWindows(cfg.From, cfg.To, cfg.WindowDays)); err != nil {
+		return err
+	}
+	if latestCompleteDay.After(cfg.To) {
+		catchupFrom := cfg.To.AddDate(0, 0, 1)
+		if err := executeRepairAndValidateWindows(client, cfg, orgID, output, "catchup", splitWindows(catchupFrom, latestCompleteDay, cfg.WindowDays)); err != nil {
+			return err
+		}
+	}
+
+	publish := cfg
+	publish.Mode = "publish"
+	publish.ValidateOnly = false
+	finalWindow := dateWindow{From: latestCompleteDay, To: latestCompleteDay}
+	_, _ = fmt.Fprintf(output, "org=%d phase=publish as_of_date=%s\n", orgID, latestCompleteDay.Format(dateLayout))
+	result, err := executeRun(client, publish, orgID, finalWindow)
+	if err != nil {
+		return fmt.Errorf("publish as_of_date %s: %w", latestCompleteDay.Format(dateLayout), err)
+	}
+	if strings.TrimSpace(result.AsOfDate) == "" || result.AsOfDate != latestCompleteDay.Format(dateLayout) {
+		return fmt.Errorf("publish watermark %q does not match latest complete Shanghai business day %s", result.AsOfDate, latestCompleteDay.Format(dateLayout))
+	}
+	encoded, _ := json.Marshal(result)
+	_, _ = fmt.Fprintln(output, string(encoded))
+	return nil
+}
+
+func executeRepairAndValidateWindows(client *http.Client, cfg options, orgID int64, output io.Writer, phase string, windows []dateWindow) error {
+	for index, window := range windows {
 		repair := cfg
 		repair.Mode = "repair"
 		repair.ValidateOnly = false
-		_, _ = fmt.Fprintf(output, "org=%d phase=repair window=%s..%s index=%d\n", orgID, window.From.Format(dateLayout), window.To.Format(dateLayout), index+1)
+		_, _ = fmt.Fprintf(output, "org=%d phase=%s_repair window=%s..%s index=%d\n", orgID, phase, window.From.Format(dateLayout), window.To.Format(dateLayout), index+1)
 		result, err := executeRun(client, repair, orgID, window)
 		if err != nil {
 			return fmt.Errorf("repair window %s..%s: %w", window.From.Format(dateLayout), window.To.Format(dateLayout), err)
@@ -184,7 +220,7 @@ func executeHistoricalBackfill(client *http.Client, cfg options, orgID int64, ou
 		validate.Mode = "validate"
 		validate.Confirm = false
 		validate.ValidateOnly = true
-		_, _ = fmt.Fprintf(output, "org=%d phase=validate window=%s..%s index=%d\n", orgID, window.From.Format(dateLayout), window.To.Format(dateLayout), index+1)
+		_, _ = fmt.Fprintf(output, "org=%d phase=%s_validate window=%s..%s index=%d\n", orgID, phase, window.From.Format(dateLayout), window.To.Format(dateLayout), index+1)
 		result, err = executeRun(client, validate, orgID, window)
 		if err != nil {
 			return fmt.Errorf("validate window %s..%s: %w", window.From.Format(dateLayout), window.To.Format(dateLayout), err)
@@ -192,19 +228,21 @@ func executeHistoricalBackfill(client *http.Client, cfg options, orgID int64, ou
 		encoded, _ = json.Marshal(result)
 		_, _ = fmt.Fprintln(output, string(encoded))
 	}
-
-	publish := cfg
-	publish.Mode = "publish"
-	publish.ValidateOnly = false
-	finalWindow := dateWindow{From: cfg.To, To: cfg.To}
-	_, _ = fmt.Fprintf(output, "org=%d phase=publish as_of_date=%s\n", orgID, cfg.To.Format(dateLayout))
-	result, err := executeRun(client, publish, orgID, finalWindow)
-	if err != nil {
-		return fmt.Errorf("publish as_of_date %s: %w", cfg.To.Format(dateLayout), err)
-	}
-	encoded, _ := json.Marshal(result)
-	_, _ = fmt.Fprintln(output, string(encoded))
 	return nil
+}
+
+func latestCompleteShanghaiDay(nowFn func() time.Time) (time.Time, error) {
+	location, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		return time.Time{}, fmt.Errorf("load Asia/Shanghai: %w", err)
+	}
+	now := time.Now()
+	if nowFn != nil {
+		now = nowFn()
+	}
+	local := now.In(location)
+	today := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, location)
+	return today.AddDate(0, 0, -1), nil
 }
 
 func executeRun(client *http.Client, cfg options, orgID int64, window dateWindow) (runResult, error) {

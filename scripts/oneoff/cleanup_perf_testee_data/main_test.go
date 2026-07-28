@@ -1,7 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -40,7 +43,8 @@ func TestHistoricalBatchScopeUsesLedgerIdentityAndExactLogs(t *testing.T) {
 	for _, required := range []string{
 		"tmp_cleanup_seed_stage_ids", "$.resolve_log_id", "$.intake_log_id",
 		"tmp_cleanup_resolve_log_ids", "tmp_cleanup_intake_log_ids", "tmp_cleanup_plan_enrollment_ids",
-		"tmp_cleanup_outcome_ids", "tmp_cleanup_relation_ids", "tmp_cleanup_statistics_dates",
+		"tmp_cleanup_assessment_task_ids", "tmp_cleanup_seed_attempt_ids", "tmp_cleanup_outcome_ids",
+		"tmp_cleanup_relation_ids", "tmp_cleanup_statistics_dates",
 	} {
 		if !strings.Contains(joined, required) {
 			t.Fatalf("historical scope missing %q", required)
@@ -57,6 +61,79 @@ func TestRollbackPreservesStatisticsRunAuditLedger(t *testing.T) {
 		if item.name == "statistics_sync_run" || strings.Contains(item.stmt, "statistics_sync_run") {
 			t.Fatalf("rollback must preserve statistics_sync_run audit history: %+v", item)
 		}
+	}
+}
+
+func TestHistoricalMongoScopeDoesNotExpandByTestee(t *testing.T) {
+	ids := scopeIDs{TesteeIDs: []uint64{10}, AnswerSheetIDs: []uint64{20}}
+	got := mongoScopeIDs(ids, config{seedBatchID: "hist-batch"})
+	if len(got.TesteeIDs) != 0 || len(got.AnswerSheetIDs) != 1 || got.AnswerSheetIDs[0] != 20 {
+		t.Fatalf("historical mongo scope = %+v, want exact resource IDs without testee IDs", got)
+	}
+	ordinary := mongoScopeIDs(ids, config{})
+	if len(ordinary.TesteeIDs) != 1 || ordinary.TesteeIDs[0] != 10 {
+		t.Fatalf("ordinary mongo scope = %+v, want original testee scope", ordinary)
+	}
+}
+
+func TestHistoricalAttemptLedgerIsDeletedBeforeCompletionLedger(t *testing.T) {
+	items, err := mysqlDeleteItems(nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	positions := map[string]int{}
+	for i, item := range items {
+		positions[item.name] = i
+	}
+	attempt, attemptOK := positions["seed_backfill_stage_attempt"]
+	stage, stageOK := positions["seed_backfill_stage"]
+	if !attemptOK || !stageOK || attempt >= stage {
+		t.Fatalf("delete order=%v, attempt ledger must be deleted immediately before completion ledger", positions)
+	}
+}
+
+func TestExecuteRollbackStatisticsRunUsesProtectedScopeAndRequiresSucceeded(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/internal/v2/statistics/runs" || r.Header.Get("Authorization") != "Bearer secret" || r.Header.Get("X-Org-ID") != "42" {
+			t.Fatalf("request path=%s auth=%q org=%q", r.URL.Path, r.Header.Get("Authorization"), r.Header.Get("X-Org-ID"))
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body["mode"] != "repair" || body["confirm"] != true || body["reason"] != "historical_batch_rollback:hist-batch" {
+			t.Fatalf("body=%v", body)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":0,"data":{"id":7,"status":"succeeded","stage":"completed","as_of_date":"2025-01-31"}}`))
+	}))
+	defer server.Close()
+	from := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2025, 1, 31, 0, 0, 0, 0, time.UTC)
+	result, err := executeRollbackStatisticsRun(t.Context(), server.Client(), config{statisticsBaseURL: server.URL, statisticsToken: "secret", seedBatchID: "hist-batch"}, 42, "repair", from, to, true)
+	if err != nil || result.ID != 7 {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}
+
+func TestHistoricalDryRunReceiptRejectsScopeDrift(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "rollback-receipt.json")
+	ids := scopeIDs{TesteeIDs: []uint64{2, 1}, AssessmentIDs: []uint64{10}}
+	if err := writeHistoricalDryRunReceipt(path, "hist-batch", ids); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyHistoricalDryRunReceipt(path, "hist-batch", scopeIDs{TesteeIDs: []uint64{1, 2}, AssessmentIDs: []uint64{10}}); err != nil {
+		t.Fatalf("same normalized scope should verify: %v", err)
+	}
+	if err := verifyHistoricalDryRunReceipt(path, "hist-batch", scopeIDs{TesteeIDs: []uint64{1, 2}, AssessmentIDs: []uint64{11}}); err == nil {
+		t.Fatal("changed resource scope must invalidate dry-run receipt")
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("receipt mode=%o want=600", info.Mode().Perm())
 	}
 }
 

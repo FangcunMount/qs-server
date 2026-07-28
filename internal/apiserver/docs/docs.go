@@ -7923,6 +7923,67 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v1/historical-seed/batches/{batch_id}/scenarios": {
+            "get": {
+                "description": "使用查询参数传递包含斜杠的场景 ID，按当前机构和批次返回只读阶段终态。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Historical-Seed-Internal"
+                ],
+                "summary": "查询历史回填场景阶段账本（查询参数）",
+                "operationId": "getHistoricalSeedScenarioStagesByQuery",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "批次 ID",
+                        "name": "batch_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "场景 ID",
+                        "name": "scenario_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v1/historical-seed/batches/{batch_id}/scenarios/{scenario_id}": {
             "get": {
                 "description": "按当前机构、批次和场景返回只读阶段终态。",

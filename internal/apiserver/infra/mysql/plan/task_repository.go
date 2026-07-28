@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // taskRepository 任务仓储实现
@@ -40,6 +41,21 @@ func (r *taskRepository) FindByID(ctx context.Context, id domainPlan.AssessmentT
 	}
 
 	return r.mapper.ToDomain(po), nil
+}
+
+// FindByIDForUpdate serializes historical task transitions inside the caller's
+// active transaction. It is exposed as an optional application capability and
+// intentionally does not widen the domain repository contract.
+func (r *taskRepository) FindByIDForUpdate(ctx context.Context, id domainPlan.AssessmentTaskID) (*domainPlan.AssessmentTask, error) {
+	var po AssessmentTaskPO
+	err := r.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", id.Uint64()).First(&po).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.WithCode(code.ErrPageNotFound, "task not found")
+		}
+		return nil, err
+	}
+	return r.mapper.ToDomain(&po), nil
 }
 
 // FindByPlanID 查询某个计划的所有任务

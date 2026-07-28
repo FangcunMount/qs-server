@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func TestHistoricalBackfillWorkflowRepairsAndValidatesEveryWindowThenPublishesFinalDay(t *testing.T) {
+func TestHistoricalBackfillWorkflowRepairsValidatesCatchupAndPublishesLatestCompleteDay(t *testing.T) {
 	var requests []runRequest
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var request runRequest
@@ -19,7 +19,7 @@ func TestHistoricalBackfillWorkflowRepairsAndValidatesEveryWindowThenPublishesFi
 		}
 		requests = append(requests, request)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"code":0,"data":{"id":1,"status":"succeeded","stage":"completed"}}`))
+		_, _ = w.Write([]byte(`{"code":0,"data":{"id":1,"status":"succeeded","stage":"completed","as_of_date":"` + request.ToDate + `"}}`))
 	}))
 	defer server.Close()
 
@@ -29,20 +29,23 @@ func TestHistoricalBackfillWorkflowRepairsAndValidatesEveryWindowThenPublishesFi
 		From:       time.Date(2026, 1, 1, 0, 0, 0, 0, location),
 		To:         time.Date(2026, 1, 5, 0, 0, 0, 0, location),
 		WindowDays: 3, Reason: "historical backfill", Mode: historicalBackfillMode, Confirm: true,
+		Now: func() time.Time { return time.Date(2026, 1, 7, 12, 0, 0, 0, location) },
 	}
 	var output bytes.Buffer
 	if err := executeHistoricalBackfill(server.Client(), cfg, 7, &output); err != nil {
 		t.Fatal(err)
 	}
-	if len(requests) != 5 {
-		t.Fatalf("requests=%d, want 5", len(requests))
+	if len(requests) != 7 {
+		t.Fatalf("requests=%d, want 7", len(requests))
 	}
 	want := []struct{ mode, from, to string }{
 		{"repair", "2026-01-01", "2026-01-03"},
 		{"validate", "2026-01-01", "2026-01-03"},
 		{"repair", "2026-01-04", "2026-01-05"},
 		{"validate", "2026-01-04", "2026-01-05"},
-		{"publish", "2026-01-05", "2026-01-05"},
+		{"repair", "2026-01-06", "2026-01-06"},
+		{"validate", "2026-01-06", "2026-01-06"},
+		{"publish", "2026-01-06", "2026-01-06"},
 	}
 	for index, expected := range want {
 		got := requests[index]
@@ -52,6 +55,19 @@ func TestHistoricalBackfillWorkflowRepairsAndValidatesEveryWindowThenPublishesFi
 		if got.Mode == "validate" && (!got.ValidateOnly || got.Confirm) {
 			t.Fatalf("validate request[%d] must be read-only: %+v", index, got)
 		}
+	}
+}
+
+func TestHistoricalBackfillRejectsWhenLatestCompleteDayPrecedesRequestedEnd(t *testing.T) {
+	location, _ := time.LoadLocation("Asia/Shanghai")
+	cfg := options{
+		BaseURL: "http://localhost", Token: "secret", OrgIDs: []int64{7},
+		From: time.Date(2026, 1, 1, 0, 0, 0, 0, location), To: time.Date(2026, 1, 5, 0, 0, 0, 0, location),
+		WindowDays: 3, Reason: "historical backfill", Mode: historicalBackfillMode, Confirm: true,
+		Now: func() time.Time { return time.Date(2026, 1, 5, 12, 0, 0, 0, location) },
+	}
+	if err := executeHistoricalBackfill(http.DefaultClient, cfg, 7, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "before historical backfill end") {
+		t.Fatalf("err=%v", err)
 	}
 }
 

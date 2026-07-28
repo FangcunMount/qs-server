@@ -67,8 +67,9 @@ func TestStatisticsColdStartPublishIdempotencyAndRedisFailure(t *testing.T) {
 
 	sqlDB, databaseName := openStatisticsMigrationDatabase(t, mysqlDSN)
 	version, _, err := NewMigrator(sqlDB, &Config{Enabled: true, Database: databaseName}).Run()
-	if err != nil || version != 57 {
-		t.Fatalf("migrate empty MySQL: version=%d err=%v", version, err)
+	wantVersion := latestEmbeddedMySQLMigrationVersion(t)
+	if err != nil || version != wantVersion {
+		t.Fatalf("migrate empty MySQL: version=%d want=%d err=%v", version, wantVersion, err)
 	}
 	gormDB, err := gorm.Open(gormmysql.New(gormmysql.Config{Conn: sqlDB, SkipInitializeWithVersion: true}), &gorm.Config{})
 	if err != nil {
@@ -282,8 +283,8 @@ func seedStatisticsColdStartBusinessFacts(t *testing.T, db *gorm.DB, mongoDB *mo
 	outcomeID := meta.New()
 	outcome, err := outcomeDomain.NewRecord(outcomeDomain.NewRecordInput{
 		ID: outcomeID, OrgID: orgID, AssessmentID: assessment.ID(), TesteeID: testee.ID().Uint64(), RunID: "cold-start-evaluation-run",
-		Model:   outcomeDomain.ModelIdentity{Kind: modelcatalogDomain.KindScale, Code: "S-COLD", Version: "v1", Title: "cold-start scale"},
-		Runtime: outcomeDomain.RuntimeIdentity{AlgorithmFamily: modelcatalogDomain.AlgorithmFamilyFactorScoring, DecisionKind: modelcatalogDomain.DecisionKindScoreRange},
+		Model:   outcomeDomain.ModelIdentity{Kind: modelcatalogDomain.KindScale, Algorithm: modelcatalogDomain.AlgorithmScaleDefault, Code: "S-COLD", Version: "v1", Title: "cold-start scale"},
+		Runtime: outcomeDomain.RuntimeIdentity{DecisionKind: modelcatalogDomain.DecisionKindScoreRange},
 		Payload: []byte(`{"status":"ok"}`), SchemaVersion: outcomeDomain.CurrentSchemaVersion, EvaluatedAt: eventAt.Add(6 * time.Minute),
 	})
 	if err != nil {

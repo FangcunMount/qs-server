@@ -51,6 +51,21 @@ type Recorder interface {
 	Complete(context.Context, Completion) (*Record, error)
 }
 
+type Failure struct {
+	Stage        string
+	BusinessAt   time.Time
+	ResourceType string
+	ResourceID   string
+	Payload      any
+	Err          error
+}
+
+// AttemptRecorder is diagnostic only. Completion records remain the sole
+// idempotency and business-fact authority.
+type AttemptRecorder interface {
+	RecordFailure(context.Context, Failure) error
+}
+
 // CurrentReader supports request-level replay before a stage mutates business
 // facts. It resolves batch and scenario from the verified historical context.
 type CurrentReader interface {

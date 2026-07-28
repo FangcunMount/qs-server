@@ -34,7 +34,30 @@ func NewHistoricalSeedStageHandler(reader stageport.Reader) *HistoricalSeedStage
 // @Failure 500 {object} core.ErrResponse
 // @Router /internal/v1/historical-seed/batches/{batch_id}/scenarios/{scenario_id} [get]
 func (h *HistoricalSeedStageHandler) Scenario(c *gin.Context) {
-	batchID, scenarioID := strings.TrimSpace(c.Param("batch_id")), strings.TrimSpace(c.Param("scenario_id"))
+	h.scenario(c, strings.TrimSpace(c.Param("scenario_id")))
+}
+
+// ScenarioQuery is the slash-safe scenario lookup used by the runner. Scenario
+// IDs are business identities and intentionally contain path separators.
+// @Summary 查询历史回填场景阶段账本（查询参数）
+// @ID getHistoricalSeedScenarioStagesByQuery
+// @Description 使用查询参数传递包含斜杠的场景 ID，按当前机构和批次返回只读阶段终态。
+// @Tags Historical-Seed-Internal
+// @Produce json
+// @Param batch_id path string true "批次 ID"
+// @Param scenario_id query string true "场景 ID"
+// @Success 200 {object} core.Response
+// @Failure 400 {object} core.ErrResponse
+// @Failure 401 {object} core.ErrResponse
+// @Failure 403 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
+// @Router /internal/v1/historical-seed/batches/{batch_id}/scenarios [get]
+func (h *HistoricalSeedStageHandler) ScenarioQuery(c *gin.Context) {
+	h.scenario(c, strings.TrimSpace(c.Query("scenario_id")))
+}
+
+func (h *HistoricalSeedStageHandler) scenario(c *gin.Context, scenarioID string) {
+	batchID := strings.TrimSpace(c.Param("batch_id"))
 	if h.reader == nil || batchID == "" || scenarioID == "" {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "batch_id and scenario_id are required"))
 		return

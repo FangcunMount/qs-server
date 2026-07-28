@@ -2,6 +2,8 @@ package plan
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -26,6 +28,7 @@ type taskManagementService struct {
 	entryGenerator planentryport.Generator
 	eventPublisher event.EventPublisher
 	persistence    taskPersistence
+	stageReader    stageport.CurrentReader
 }
 
 // NewTaskManagementService 创建任务管理服务
@@ -59,12 +62,31 @@ func NewTaskManagementServiceWithEnrollment(
 func WithTaskHistoricalStageRecorder(target TaskManagementService, recorder stageport.Recorder) TaskManagementService {
 	if concrete, ok := target.(*taskManagementService); ok {
 		concrete.persistence.recorder = recorder
+		if reader, readable := recorder.(stageport.CurrentReader); readable {
+			concrete.stageReader = reader
+		}
 	}
 	return target
 }
 
 // OpenTask 开放任务
 func (s *taskManagementService) OpenTask(ctx context.Context, orgID int64, taskID string) (*TaskResult, error) {
+	if _, historical := historicalseed.FromContext(ctx); !historical {
+		return s.openTask(ctx, orgID, taskID)
+	}
+	var result *TaskResult
+	err := s.persistence.withinTransaction(ctx, func(txCtx context.Context) error {
+		var err error
+		result, err = s.openTask(txCtx, orgID, taskID)
+		return err
+	})
+	if err != nil {
+		s.recordHistoricalTaskFailure(ctx, stageport.StageTaskOpen, taskID, historicalTaskBusinessAt(ctx, stageport.StageTaskOpen), err)
+	}
+	return result, err
+}
+
+func (s *taskManagementService) openTask(ctx context.Context, orgID int64, taskID string) (*TaskResult, error) {
 	logger.L(ctx).Infow("Opening task",
 		"action", "open_task",
 		"org_id", orgID,
@@ -72,9 +94,22 @@ func (s *taskManagementService) OpenTask(ctx context.Context, orgID int64, taskI
 	)
 
 	// 1. 查询并校验任务
-	task, err := loadTaskInOrg(ctx, s.taskRepo, orgID, taskID, "open_task")
+	task, err := s.loadTaskForTransition(ctx, orgID, taskID, "open_task")
 	if err != nil {
 		return nil, err
+	}
+	orgScope, err := safeconv.Int64ToUint64(orgID)
+	if err != nil {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的机构ID: %v", err)
+	}
+	openedAt, err := historicalseed.OccurredAt(ctx, orgScope, historicalseed.StageTaskOpened, time.Now())
+	if err != nil {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的任务开放时间: %v", err)
+	}
+	if replayed, replayErr := s.replayHistoricalTaskStage(ctx, stageport.StageTaskOpen, task, openedAt, ""); replayErr != nil {
+		return nil, replayErr
+	} else if replayed {
+		return toTaskResult(task), nil
 	}
 
 	// 2. 生成入口
@@ -89,14 +124,6 @@ func (s *taskManagementService) OpenTask(ctx context.Context, orgID int64, taskI
 	}
 
 	// 3. 调用领域服务开放任务
-	orgScope, err := safeconv.Int64ToUint64(orgID)
-	if err != nil {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的机构ID: %v", err)
-	}
-	openedAt, err := historicalseed.OccurredAt(ctx, orgScope, historicalseed.StageTaskOpened, time.Now())
-	if err != nil {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的任务开放时间: %v", err)
-	}
 	if err := s.taskLifecycle.OpenAt(ctx, task, token, url, openedAt, expireAt); err != nil {
 		logger.L(ctx).Errorw("Failed to open task",
 			"action", "open_task",
@@ -136,6 +163,22 @@ func (s *taskManagementService) OpenTask(ctx context.Context, orgID int64, taskI
 
 // CompleteTask 完成任务
 func (s *taskManagementService) CompleteTask(ctx context.Context, orgID int64, taskID string, assessmentID string) (*TaskResult, error) {
+	if _, historical := historicalseed.FromContext(ctx); !historical {
+		return s.completeTask(ctx, orgID, taskID, assessmentID)
+	}
+	var result *TaskResult
+	err := s.persistence.withinTransaction(ctx, func(txCtx context.Context) error {
+		var err error
+		result, err = s.completeTask(txCtx, orgID, taskID, assessmentID)
+		return err
+	})
+	if err != nil {
+		s.recordHistoricalTaskFailure(ctx, stageport.StageTaskComplete, taskID, historicalTaskBusinessAt(ctx, stageport.StageTaskComplete), err)
+	}
+	return result, err
+}
+
+func (s *taskManagementService) completeTask(ctx context.Context, orgID int64, taskID string, assessmentID string) (*TaskResult, error) {
 	logger.L(ctx).Infow("Completing task",
 		"action", "complete_task",
 		"org_id", orgID,
@@ -155,7 +198,7 @@ func (s *taskManagementService) CompleteTask(ctx context.Context, orgID int64, t
 	}
 
 	// 2. 查询并校验任务
-	task, err := loadTaskInOrg(ctx, s.taskRepo, orgID, taskID, "complete_task")
+	task, err := s.loadTaskForTransition(ctx, orgID, taskID, "complete_task")
 	if err != nil {
 		return nil, err
 	}
@@ -168,6 +211,11 @@ func (s *taskManagementService) CompleteTask(ctx context.Context, orgID int64, t
 	completedAt, err := historicalseed.OccurredAt(ctx, orgScope, historicalseed.StageTaskCompleted, time.Now())
 	if err != nil {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的任务完成时间: %v", err)
+	}
+	if replayed, replayErr := s.replayHistoricalTaskStage(ctx, stageport.StageTaskComplete, task, completedAt, assessmentIDDomain.String()); replayErr != nil {
+		return nil, replayErr
+	} else if replayed {
+		return toTaskResult(task), nil
 	}
 	if err := s.taskLifecycle.CompleteAt(ctx, task, assessmentIDDomain, completedAt); err != nil {
 		logger.L(ctx).Errorw("Failed to complete task",
@@ -206,6 +254,95 @@ func (s *taskManagementService) CompleteTask(ctx context.Context, orgID int64, t
 	)
 
 	return toTaskResult(task), nil
+}
+
+type taskForUpdateReader interface {
+	FindByIDForUpdate(context.Context, plan.AssessmentTaskID) (*plan.AssessmentTask, error)
+}
+
+func (s *taskManagementService) loadTaskForTransition(ctx context.Context, orgID int64, taskID, action string) (*plan.AssessmentTask, error) {
+	if _, historical := historicalseed.FromContext(ctx); !historical {
+		return loadTaskInOrg(ctx, s.taskRepo, orgID, taskID, action)
+	}
+	locking, ok := s.taskRepo.(taskForUpdateReader)
+	if !ok {
+		return nil, fmt.Errorf("historical task repository does not support row locking")
+	}
+	return loadTaskInOrgWithFinder(ctx, locking.FindByIDForUpdate, orgID, taskID, action)
+}
+
+func (s *taskManagementService) replayHistoricalTaskStage(ctx context.Context, stage string, task *plan.AssessmentTask, businessAt time.Time, assessmentID string) (bool, error) {
+	if _, historical := historicalseed.FromContext(ctx); !historical {
+		return false, nil
+	}
+	if s.stageReader == nil {
+		return false, fmt.Errorf("historical task stage reader is not configured")
+	}
+	record, err := s.stageReader.FindCurrent(ctx, stage)
+	if err != nil || record == nil {
+		return false, err
+	}
+	want := historicalTaskStagePayload{TaskID: task.GetID().String(), EnrollmentID: task.GetEnrollmentID().String(), AssessmentID: assessmentID}
+	var got historicalTaskStagePayload
+	if unmarshalErr := json.Unmarshal(record.PayloadJSON, &got); unmarshalErr != nil {
+		return false, fmt.Errorf("decode historical task stage %s: %w", stage, unmarshalErr)
+	}
+	if record.Status != "completed" || record.ResourceType != "plan_task" || record.ResourceID != want.TaskID || !record.BusinessAt.Equal(businessAt) || got != want {
+		return false, fmt.Errorf("%w: task=%s stage=%s", stageport.ErrPayloadConflict, want.TaskID, stage)
+	}
+	switch stage {
+	case stageport.StageTaskOpen:
+		openedAt := task.GetOpenAt()
+		if openedAt == nil || !openedAt.Equal(businessAt) || task.IsPending() {
+			return false, fmt.Errorf("%w: task=%s stage=%s persisted task does not match", stageport.ErrPayloadConflict, want.TaskID, stage)
+		}
+	case stageport.StageTaskComplete:
+		completedAt := task.GetCompletedAt()
+		persistedAssessmentID := task.GetAssessmentID()
+		if completedAt == nil || !completedAt.Equal(businessAt) || persistedAssessmentID == nil || persistedAssessmentID.String() != assessmentID {
+			return false, fmt.Errorf("%w: task=%s stage=%s persisted task does not match", stageport.ErrPayloadConflict, want.TaskID, stage)
+		}
+	}
+	if s.persistence.recorder != nil {
+		if _, err := s.persistence.recorder.Complete(ctx, stageport.Completion{
+			Stage: stage, BusinessAt: businessAt, ResourceType: "plan_task", ResourceID: want.TaskID, Payload: want,
+		}); err != nil {
+			return false, err
+		}
+	}
+	return true, nil
+}
+
+func (s *taskManagementService) recordHistoricalTaskFailure(ctx context.Context, stage, taskID string, businessAt time.Time, transitionErr error) {
+	recorder, ok := s.persistence.recorder.(stageport.AttemptRecorder)
+	if !ok || transitionErr == nil || businessAt.IsZero() {
+		return
+	}
+	if err := recorder.RecordFailure(ctx, stageport.Failure{Stage: stage, BusinessAt: businessAt, ResourceType: "plan_task", ResourceID: taskID, Err: transitionErr}); err != nil {
+		logger.L(ctx).Errorw("Failed to record historical task attempt",
+			"action", stage,
+			"task_id", taskID,
+			"error", err.Error(),
+		)
+	}
+}
+
+func historicalTaskBusinessAt(ctx context.Context, stage string) time.Time {
+	historical, ok := historicalseed.FromContext(ctx)
+	if !ok {
+		return time.Time{}
+	}
+	switch stage {
+	case stageport.StageTaskOpen:
+		if historical.Timeline.TaskOpenedAt != nil {
+			return *historical.Timeline.TaskOpenedAt
+		}
+	case stageport.StageTaskComplete:
+		if historical.Timeline.TaskCompletedAt != nil {
+			return *historical.Timeline.TaskCompletedAt
+		}
+	}
+	return time.Time{}
 }
 
 // ExpireTask 过期任务

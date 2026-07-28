@@ -9,9 +9,11 @@ import (
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	evaluationintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
+	planapp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
@@ -63,6 +65,21 @@ type bindingStub struct {
 	err     error
 }
 
+type failingTaskManagementStub struct{ err error }
+
+func (*failingTaskManagementStub) OpenTask(context.Context, int64, string) (*planapp.TaskResult, error) {
+	return nil, errors.New("not implemented")
+}
+func (s *failingTaskManagementStub) CompleteTask(context.Context, int64, string, string) (*planapp.TaskResult, error) {
+	return nil, s.err
+}
+func (*failingTaskManagementStub) ExpireTask(context.Context, int64, string) (*planapp.TaskResult, error) {
+	return nil, errors.New("not implemented")
+}
+func (*failingTaskManagementStub) CancelTask(context.Context, int64, string) error {
+	return errors.New("not implemented")
+}
+
 func (s bindingStub) ResolveByQuestionnaire(context.Context, string, string) (rulesetport.Ref, bool, error) {
 	return s.binding.Ref, s.ok, s.err
 }
@@ -77,6 +94,20 @@ func boundScaleBinding() bindingStub {
 			Kind: modelcatalog.KindScale, Code: "MODEL-1", Version: "v1", Title: "model",
 		}},
 		ok: true,
+	}
+}
+
+func TestCompletePlanPreservesOrdinaryBestEffortButFailsHistoricalAttempt(t *testing.T) {
+	wantErr := errors.New("task completion failed")
+	commands := planapp.NewCommandService(nil, nil, nil, &failingTaskManagementStub{err: wantErr}, nil, nil)
+	svc := &service{planCommands: commands}
+	task := &planapp.TaskAssessmentContext{TaskID: "task-1", PlanID: "plan-1"}
+	if err := svc.completePlan(context.Background(), 9, task, 91); err != nil {
+		t.Fatalf("ordinary completion must remain best-effort: %v", err)
+	}
+	ctx := historicalseed.WithContext(context.Background(), historicalseed.Context{BatchID: "batch", ScenarioID: "scenario", OrgID: 9, Version: historicalseed.Version1})
+	if err := svc.completePlan(ctx, 9, task, 91); !errors.Is(err, wantErr) {
+		t.Fatalf("historical completion err=%v, want %v", err, wantErr)
 	}
 }
 
