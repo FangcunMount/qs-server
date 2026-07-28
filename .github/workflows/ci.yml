@@ -48,6 +48,86 @@ jobs:
           flags: unittests
           name: codecov-umbrella
 
+  historical-backfill-e2e:
+    name: Historical Backfill Cross-Store E2E
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+          cache: true
+
+      - name: Start Mongo Replica Set
+        run: |
+          docker run --detach --rm \
+            --name qs-historical-e2e-mongo \
+            --publish 27017:27017 \
+            mongo:7.0 --replSet rs0 --bind_ip_all
+          for attempt in $(seq 1 30); do
+            if docker exec qs-historical-e2e-mongo mongosh --quiet --eval 'db.adminCommand({ping: 1})' >/dev/null 2>&1; then
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              docker logs qs-historical-e2e-mongo
+              exit 1
+            fi
+            sleep 2
+          done
+          docker exec qs-historical-e2e-mongo mongosh --quiet --eval \
+            'rs.initiate({_id: "rs0", members: [{_id: 0, host: "127.0.0.1:27017"}]})'
+          for attempt in $(seq 1 30); do
+            if docker exec qs-historical-e2e-mongo mongosh --quiet --eval \
+              'quit(db.hello().isWritablePrimary ? 0 : 1)' >/dev/null 2>&1; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              docker logs qs-historical-e2e-mongo
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Run historical backfill production-closure E2E
+        env:
+          MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true&loc=Local
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_historical_backfill_test
+          QS_SERVER_TEST_REDIS_URL: redis://127.0.0.1:6379/15
+        run: |
+          go test -tags=integration \
+            -run '^TestHistoricalBackfillProductionClosure$' \
+            -count=1 -timeout=10m -v ./internal/apiserver/integration/historicalbackfill
+
+      - name: Stop Mongo Replica Set
+        if: always()
+        run: docker stop qs-historical-e2e-mongo || true
+
   lint:
     name: Lint Code
     runs-on: ubuntu-latest
@@ -257,7 +337,7 @@ jobs:
 
   build:
     name: Build Applications
-    needs: [test, lint, lint-boundaries, deployment-contracts, tier1-test-policy]
+    needs: [test, historical-backfill-e2e, lint, lint-boundaries, deployment-contracts, tier1-test-policy]
     runs-on: ubuntu-latest
     strategy:
       matrix:
