@@ -128,5 +128,7 @@ go run ./scripts/oneoff/verify_historical_statistics \
 
 若需回滚，先停止 runner、worker、Plan/Statistics scheduler 和 Outbox relay并完成 MySQL/Mongo
 同时间点备份，再使用 `cleanup_perf_testee_data` 的批次模式 dry-run。只有核对 manifest 与
-`seed_backfill_stage` 精确资源清单后才允许 `--apply`；不得按整个 Org 或模糊日期删除。
-清理后重新执行 Statistics repair/validate/publish，确认一致后再恢复服务。
+`seed_backfill_stage` 精确资源清单并取得 receipt v2 后才允许 `--apply`；不得按整个 Org、模糊
+日期或 `--mongo-only` 删除。apply 由持久化 rollback operation 按 phase 自动恢复，跨存储全部
+成功前保留 stage/attempt；清理会自动执行 Statistics repair/validate/publish。确认 operation
+completed 后再恢复服务，operation/resource/phase attempt、receipt 和备份至少保留 90 天。

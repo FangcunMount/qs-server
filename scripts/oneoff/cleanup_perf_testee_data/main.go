@@ -3,9 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -152,21 +150,6 @@ func main() {
 	if _, err := conn.ExecContext(ctx, "SET NAMES utf8mb4"); err != nil {
 		log.Fatalf("set mysql names: %v", err)
 	}
-	if cfg.seedBatchID != "" {
-		ledgerIDs, err := loadHistoricalBatchTesteeIDs(ctx, conn, cfg.seedBatchID)
-		if err != nil {
-			log.Fatalf("load historical batch testee ids: %v", err)
-		}
-		manifestIDs, err := loadHistoricalManifestTesteeIDs(cfg.seedManifest, cfg.seedBatchID)
-		if err != nil {
-			log.Fatalf("load historical manifest testee ids: %v", err)
-		}
-		testeeIDs = uniqueUint64(append(ledgerIDs, manifestIDs...))
-		if len(testeeIDs) == 0 {
-			log.Fatalf("historical batch %s resolved zero testee ids", cfg.seedBatchID)
-		}
-	}
-
 	mongoClient, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.mongoURI))
 	if err != nil {
 		log.Fatalf("connect mongo: %v", err)
@@ -180,6 +163,12 @@ func main() {
 		log.Fatalf("verify mongo read access: %v", err)
 	}
 	prog.Finish("connect databases", "")
+	if cfg.seedBatchID != "" {
+		if err := runHistoricalRollback(ctx, conn, mongoDB, cfg); err != nil {
+			log.Fatalf("historical rollback: %v", err)
+		}
+		return
+	}
 
 	prog.Phase("prepare mysql scope")
 	if err := prepareMySQLScope(ctx, conn, cfg, testeeIDs); err != nil {
@@ -258,16 +247,6 @@ func main() {
 		log.Fatalf("load preview: %v", err)
 	}
 	printTesteePreview(previews)
-	if cfg.seedBatchID != "" {
-		if cfg.apply {
-			if err := verifyHistoricalDryRunReceipt(cfg.dryRunReceipt, cfg.seedBatchID, ids); err != nil {
-				log.Fatalf("verify historical dry-run receipt: %v", err)
-			}
-		} else if err := writeHistoricalDryRunReceipt(cfg.dryRunReceipt, cfg.seedBatchID, ids); err != nil {
-			log.Fatalf("write historical dry-run receipt: %v", err)
-		}
-	}
-
 	if !cfg.apply {
 		log.Print("dry-run only; re-run with --apply to delete scoped perf data")
 		return
@@ -327,67 +306,6 @@ func main() {
 type rollbackStatisticsWindow struct {
 	orgID    int64
 	from, to time.Time
-}
-
-type historicalDryRunReceipt struct {
-	Version     int       `json:"version"`
-	BatchID     string    `json:"batch_id"`
-	ScopeHash   string    `json:"scope_hash"`
-	GeneratedAt time.Time `json:"generated_at"`
-}
-
-func historicalScopeHash(batchID string, ids scopeIDs) (string, error) {
-	ids.TesteeIDs = uniqueUint64(ids.TesteeIDs)
-	ids.AssessmentIDs = uniqueUint64(ids.AssessmentIDs)
-	ids.AnswerSheetIDs = uniqueUint64(ids.AnswerSheetIDs)
-	ids.OutcomeIDs = uniqueUint64(ids.OutcomeIDs)
-	ids.ReportIDs = uniqueUint64(ids.ReportIDs)
-	ids.GenerationIDs = uniqueUint64(ids.GenerationIDs)
-	ids.ReportRunIDs = uniqueUint64(ids.ReportRunIDs)
-	payload, err := json.Marshal(struct {
-		BatchID string   `json:"batch_id"`
-		Scope   scopeIDs `json:"scope"`
-	}{BatchID: strings.TrimSpace(batchID), Scope: ids})
-	if err != nil {
-		return "", err
-	}
-	digest := sha256.Sum256(payload)
-	return hex.EncodeToString(digest[:]), nil
-}
-
-func writeHistoricalDryRunReceipt(path, batchID string, ids scopeIDs) error {
-	hash, err := historicalScopeHash(batchID, ids)
-	if err != nil {
-		return err
-	}
-	receipt := historicalDryRunReceipt{Version: 1, BatchID: batchID, ScopeHash: hash, GeneratedAt: time.Now().UTC()}
-	data, err := json.MarshalIndent(receipt, "", "  ")
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(path, append(data, '\n'), 0o600); err != nil {
-		return err
-	}
-	return os.Chmod(path, 0o600)
-}
-
-func verifyHistoricalDryRunReceipt(path, batchID string, ids scopeIDs) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	var receipt historicalDryRunReceipt
-	if err := json.Unmarshal(data, &receipt); err != nil {
-		return err
-	}
-	want, err := historicalScopeHash(batchID, ids)
-	if err != nil {
-		return err
-	}
-	if receipt.Version != 1 || receipt.BatchID != batchID || receipt.ScopeHash != want || receipt.GeneratedAt.IsZero() {
-		return fmt.Errorf("dry-run receipt does not match current batch resource scope; run dry-run again")
-	}
-	return nil
 }
 
 type rollbackStatisticsRunResult struct {
@@ -543,8 +461,8 @@ func parseFlags() config {
 		if !regexp.MustCompile(`^[A-Za-z0-9._:-]{8,96}$`).MatchString(cfg.seedBatchID) {
 			log.Fatal("--seed-batch-id contains unsafe characters")
 		}
-		if cfg.apply && strings.TrimSpace(cfg.seedManifest) == "" {
-			log.Fatal("historical batch apply requires --seed-manifest so create_testee and resolve-only scenarios are in scope")
+		if strings.TrimSpace(cfg.seedManifest) == "" {
+			log.Fatal("historical batch cleanup requires --seed-manifest so the persisted rollback scope includes every created testee")
 		}
 		if strings.TrimSpace(cfg.dryRunReceipt) == "" {
 			log.Fatal("historical batch cleanup requires --dry-run-receipt; run without --apply first, then reuse the receipt with --apply")
@@ -555,7 +473,10 @@ func parseFlags() config {
 		if cfg.apply && cfg.skipBackup {
 			log.Fatal("historical batch apply cannot use --skip-backup")
 		}
-		if cfg.apply && !cfg.mongoOnly && (strings.TrimSpace(cfg.statisticsBaseURL) == "" || strings.TrimSpace(cfg.statisticsToken) == "") {
+		if cfg.mongoOnly {
+			log.Fatal("historical batch cleanup rejects --mongo-only; resume the persisted rollback operation with the original receipt")
+		}
+		if cfg.apply && (strings.TrimSpace(cfg.statisticsBaseURL) == "" || strings.TrimSpace(cfg.statisticsToken) == "") {
 			log.Fatal("historical batch apply requires --statistics-base-url and --statistics-token/QS_STATISTICS_TOKEN")
 		}
 		cfg.scanEventPayloads = true
@@ -810,6 +731,26 @@ SELECT DISTINCT f.org_id, f.stat_date FROM statistics_plan_fact f JOIN tmp_clean
 		}
 	}
 	if cfg.seedBatchID != "" {
+		manifestScope, err := loadHistoricalManifestScope(cfg.seedManifest, cfg.seedBatchID)
+		if err != nil {
+			return fmt.Errorf("load historical manifest resource scope: %w", err)
+		}
+		for _, item := range []struct {
+			table string
+			ids   []uint64
+		}{
+			{"tmp_cleanup_testee_ids", manifestScope.TesteeIDs},
+			{"tmp_cleanup_assessment_ids", manifestScope.AssessmentIDs},
+			{"tmp_cleanup_answersheet_ids", manifestScope.AnswerSheetIDs},
+			{"tmp_cleanup_outcome_ids", manifestScope.OutcomeIDs},
+			{"tmp_cleanup_report_ids", manifestScope.ReportIDs},
+			{"tmp_cleanup_plan_enrollment_ids", manifestScope.EnrollmentIDs},
+			{"tmp_cleanup_assessment_task_ids", manifestScope.TaskIDs},
+		} {
+			if err := bulkInsertUint64IDs(ctx, conn, item.table, item.ids); err != nil {
+				return fmt.Errorf("materialize manifest %s: %w", item.table, err)
+			}
+		}
 		if err := materializeScopedDeleteIDs(ctx, conn, true); err != nil {
 			return err
 		}
@@ -989,6 +930,7 @@ func validateHistoricalForeignReferences(ctx context.Context, conn *sql.Conn) er
 		{"plan_enrollment", `SELECT COUNT(*) FROM plan_enrollment e JOIN tmp_cleanup_testee_ids t ON t.id = e.testee_id LEFT JOIN tmp_cleanup_plan_enrollment_ids owned ON owned.id = e.id WHERE owned.id IS NULL`},
 		{"assessment_task", `SELECT COUNT(*) FROM assessment_task task JOIN tmp_cleanup_testee_ids t ON t.id = task.testee_id LEFT JOIN tmp_cleanup_assessment_task_ids owned ON owned.id = task.id WHERE owned.id IS NULL`},
 		{"assessment_score", `SELECT COUNT(*) FROM assessment_score s JOIN tmp_cleanup_testee_ids t ON t.id = s.testee_id LEFT JOIN tmp_cleanup_assessment_score_ids owned ON owned.id = s.id WHERE owned.id IS NULL`},
+		{"evaluation_outcome", `SELECT COUNT(*) FROM evaluation_outcome o JOIN tmp_cleanup_testee_ids t ON t.id = o.testee_id LEFT JOIN tmp_cleanup_outcome_ids owned ON owned.id = o.id WHERE owned.id IS NULL`},
 		{"clinician_relation", `SELECT COUNT(*) FROM clinician_relation r JOIN tmp_cleanup_testee_ids t ON t.id = r.testee_id LEFT JOIN tmp_cleanup_relation_ids owned ON owned.id = r.id WHERE owned.id IS NULL`},
 		{"assessment_entry_intake_log", `SELECT COUNT(*) FROM assessment_entry_intake_log l JOIN tmp_cleanup_testee_ids t ON t.id = l.testee_id LEFT JOIN tmp_cleanup_intake_log_ids owned ON owned.id = l.id WHERE owned.id IS NULL`},
 		{"statistics_access_fact", `SELECT COUNT(*) FROM statistics_access_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_resolve_log_ids r ON f.source_type = 'entry_resolve' AND BINARY f.source_ref = BINARY CAST(r.id AS CHAR) LEFT JOIN tmp_cleanup_intake_log_ids i ON f.source_type = 'entry_intake' AND BINARY f.source_ref = BINARY CAST(i.id AS CHAR) WHERE r.id IS NULL AND i.id IS NULL`},
@@ -1105,6 +1047,12 @@ func loadScopeIDs(ctx context.Context, conn *sql.Conn, cfg config) (scopeIDs, er
 		if err != nil {
 			return scopeIDs{}, err
 		}
+		manifestScope, err := loadHistoricalManifestScope(cfg.seedManifest, cfg.seedBatchID)
+		if err != nil {
+			return scopeIDs{}, err
+		}
+		ids.GenerationIDs = uniqueUint64(append(ids.GenerationIDs, manifestScope.GenerationIDs...))
+		ids.ReportRunIDs = uniqueUint64(append(ids.ReportRunIDs, manifestScope.ReportRunIDs...))
 	}
 	return ids, nil
 }
@@ -2101,6 +2049,7 @@ func mongoCollectionScopes(ids scopeIDs) []mongoCollectionScope {
 		{name: "report_query_catalog", coll: "report_query_catalog", filters: reportCatalogFilters(ids)},
 		{name: "archived_reports", coll: "archived_reports", filters: archivedReportFilters(ids)},
 		{name: "interpretation_admission_failures", coll: "interpretation_admission_failures", filters: interpretationAdmissionFilters(ids)},
+		{name: "interpretation_attention_projections", coll: "interpretation_attention_projections", filters: interpretationAttentionFilters(ids)},
 		{name: "domain_event_outbox", coll: "domain_event_outbox", filters: mongoOutboxFilters(ids)},
 	}
 }
@@ -2197,6 +2146,12 @@ func interpretationAdmissionFilters(ids scopeIDs) []bson.M {
 	return filters
 }
 
+func interpretationAttentionFilters(ids scopeIDs) []bson.M {
+	filters := inStringFilters("report_id", uint64Strings(ids.ReportIDs))
+	filters = append(filters, inStringFilters("assessment_id", uint64Strings(ids.AssessmentIDs))...)
+	return filters
+}
+
 func mongoOutboxFilters(ids scopeIDs) []bson.M {
 	answerStrings := uint64Strings(ids.AnswerSheetIDs)
 	assessmentStrings := uint64Strings(ids.AssessmentIDs)
@@ -2239,6 +2194,19 @@ func inStringWithAggregateFilters(aggregateType string, values []string) []bson.
 			"aggregate_type": aggregateType,
 			"aggregate_id":   bson.M{"$in": values[start:end]},
 		})
+	}
+	return filters
+}
+
+func inStringFilters(field string, values []string) []bson.M {
+	values = uniqueStrings(values)
+	filters := make([]bson.M, 0, (len(values)+mongoIDChunkSize-1)/mongoIDChunkSize)
+	for start := 0; start < len(values); start += mongoIDChunkSize {
+		end := start + mongoIDChunkSize
+		if end > len(values) {
+			end = len(values)
+		}
+		filters = append(filters, bson.M{field: bson.M{"$in": values[start:end]}})
 	}
 	return filters
 }

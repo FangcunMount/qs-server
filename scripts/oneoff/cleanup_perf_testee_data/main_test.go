@@ -34,6 +34,30 @@ func TestHistoricalManifestScopesOnlyCreatedTestees(t *testing.T) {
 	}
 }
 
+func TestHistoricalManifestScopeIncludesEveryPersistedResourceID(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "manifest.json")
+	data := `{"batch_id":"hist-batch","scenarios":{"a":{"testee_id":"10","testee_created":true,"enrollment_id":"20","task_ids":["30"],"answersheet_id":"40","answersheet_ids":["40","41"],"assessment_id":"50","assessment_ids":["50","51"],"outcome_id":"60","report_id":"70","report_generation_id":"80","report_run_id":"90"}}}`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scope, err := loadHistoricalManifestScope(path, "hist-batch")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, got := range map[string][]uint64{
+		"testee": scope.TesteeIDs, "enrollment": scope.EnrollmentIDs, "task": scope.TaskIDs,
+		"answersheet": scope.AnswerSheetIDs, "assessment": scope.AssessmentIDs, "outcome": scope.OutcomeIDs,
+		"report": scope.ReportIDs, "generation": scope.GenerationIDs, "run": scope.ReportRunIDs,
+	} {
+		if len(got) == 0 {
+			t.Fatalf("%s scope is empty", name)
+		}
+	}
+	if len(scope.AnswerSheetIDs) != 2 || len(scope.AssessmentIDs) != 2 {
+		t.Fatalf("scope=%+v, want singular and plural IDs merged without duplicates", scope)
+	}
+}
+
 func TestHistoricalBatchScopeUsesLedgerIdentityAndExactLogs(t *testing.T) {
 	statements := historicalBatchScopeStatements("hist-20250101-20260727-v1")
 	joined := ""
@@ -116,17 +140,30 @@ func TestExecuteRollbackStatisticsRunUsesProtectedScopeAndRequiresSucceeded(t *t
 	}
 }
 
-func TestHistoricalDryRunReceiptRejectsScopeDrift(t *testing.T) {
+func TestHistoricalDryRunReceiptV2RejectsScopeAndManifestDrift(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "rollback-receipt.json")
-	ids := scopeIDs{TesteeIDs: []uint64{2, 1}, AssessmentIDs: []uint64{10}}
-	if err := writeHistoricalDryRunReceipt(path, "hist-batch", ids); err != nil {
+	receipt := historicalDryRunReceipt{
+		Version: 2, OperationID: 17, BatchID: "hist-batch", OrgID: 42,
+		ScopeHash: "scope-a", ManifestHash: "manifest-a", GeneratedAt: time.Now().UTC(),
+	}
+	if err := writeHistoricalDryRunReceipt(path, receipt); err != nil {
 		t.Fatal(err)
 	}
-	if err := verifyHistoricalDryRunReceipt(path, "hist-batch", scopeIDs{TesteeIDs: []uint64{1, 2}, AssessmentIDs: []uint64{10}}); err != nil {
-		t.Fatalf("same normalized scope should verify: %v", err)
+	loaded, err := readHistoricalDryRunReceipt(path)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if err := verifyHistoricalDryRunReceipt(path, "hist-batch", scopeIDs{TesteeIDs: []uint64{1, 2}, AssessmentIDs: []uint64{11}}); err == nil {
-		t.Fatal("changed resource scope must invalidate dry-run receipt")
+	op := historicalRollbackOperation{ID: 17, BatchID: "hist-batch", OrgID: 42, ScopeHash: "scope-a", ManifestHash: "manifest-a"}
+	if err := validateHistoricalReceipt(loaded, op, "hist-batch", "manifest-a"); err != nil {
+		t.Fatalf("matching receipt should verify: %v", err)
+	}
+	op.ScopeHash = "scope-b"
+	if err := validateHistoricalReceipt(loaded, op, "hist-batch", "manifest-a"); err == nil {
+		t.Fatal("changed persisted scope must invalidate receipt")
+	}
+	op.ScopeHash = "scope-a"
+	if err := validateHistoricalReceipt(loaded, op, "hist-batch", "manifest-b"); err == nil {
+		t.Fatal("changed manifest must invalidate receipt")
 	}
 	info, err := os.Stat(path)
 	if err != nil {
@@ -134,6 +171,57 @@ func TestHistoricalDryRunReceiptRejectsScopeDrift(t *testing.T) {
 	}
 	if info.Mode().Perm() != 0o600 {
 		t.Fatalf("receipt mode=%o want=600", info.Mode().Perm())
+	}
+}
+
+func TestHistoricalDryRunReceiptV1RequiresNewDryRun(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "rollback-receipt-v1.json")
+	if err := os.WriteFile(path, []byte(`{"version":1,"batch_id":"hist-batch"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readHistoricalDryRunReceipt(path); err == nil || !strings.Contains(err.Error(), "receipt v2") {
+		t.Fatalf("read v1 err=%v, want rerun guidance", err)
+	}
+}
+
+func TestHistoricalResourceScopeHashIsDeterministicAndManifestBound(t *testing.T) {
+	left := []historicalRollbackResource{
+		{Storage: "mongo", ResourceType: "answersheets", ResourceID: "oid:abc"},
+		{Storage: "mysql", ResourceType: "assessment", ResourceID: "2"},
+		{Storage: "mysql", ResourceType: "assessment", ResourceID: "2"},
+	}
+	right := []historicalRollbackResource{left[1], left[0]}
+	a, err := historicalResourceScopeHash("hist-batch", "manifest-a", left)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := historicalResourceScopeHash("hist-batch", "manifest-a", right)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a != b {
+		t.Fatalf("normalized hashes differ: %s %s", a, b)
+	}
+	c, err := historicalResourceScopeHash("hist-batch", "manifest-b", right)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a == c {
+		t.Fatal("manifest drift must change scope hash")
+	}
+}
+
+func TestParseMongoDocumentIDKeyRoundTripsSupportedIDs(t *testing.T) {
+	ids := []any{"abc", int32(2), int64(3), int(4)}
+	for _, id := range ids {
+		raw := mongoDocumentIDKey(id)
+		got, err := parseMongoDocumentIDKey(raw)
+		if err != nil {
+			t.Fatalf("parse %q: %v", raw, err)
+		}
+		if mongoDocumentIDKey(got) != raw {
+			t.Fatalf("roundtrip %q -> %#v -> %q", raw, got, mongoDocumentIDKey(got))
+		}
 	}
 }
 
