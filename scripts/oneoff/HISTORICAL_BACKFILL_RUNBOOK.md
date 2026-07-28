@@ -104,8 +104,9 @@ go run ./scripts/oneoff/rebuild_statistics \
   --confirm
 ```
 
-该命令对每个窗口按 `repair -> validate` 执行；任一步失败即停止，全部窗口成功后才以
-`2026-07-27` 执行最终 publish。随后进行精确事实与基线增量对账：
+该命令对每个窗口按 `repair -> validate` 执行；任一步失败即停止。历史窗口成功后，
+命令会对 `2026-07-27` 之后到执行时最新完整上海自然日的区间继续分窗
+`repair -> validate`，最后只以该最新完整日执行 publish 并校验水位。随后进行精确事实与基线增量对账：
 
 ```bash
 go run ./scripts/oneoff/verify_historical_statistics \
