@@ -40,8 +40,23 @@ func newIntakeUseCase(service *service) *intakeUseCase {
 
 func (u *intakeUseCase) Execute(ctx context.Context, token string, dto IntakeByAssessmentEntryDTO) (*AssessmentEntryIntakeResult, error) {
 	state := &intakeState{}
+	intakeAt := time.Time{}
+	if historical, ok := historicalseed.FromContext(ctx); ok {
+		var err error
+		intakeAt, err = historicalseed.OccurredAt(ctx, historical.OrgID, historicalseed.StageEntryIntake, time.Now())
+		if err != nil {
+			return nil, errors.WithCode(code.ErrInvalidArgument, "%v", err)
+		}
+	}
+	attemptCtx, handle, err := stageport.BeginStageAttempt(ctx, u.service.stageRecorder, stageport.Attempt{
+		Stage: stageport.StageEntryIntake, BusinessAt: intakeAt, ResourceType: "testee",
+	})
+	if err != nil {
+		return nil, err
+	}
+	ctx = attemptCtx
 
-	err := u.service.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+	err = u.service.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := u.resolveEntry(txCtx, token, state); err != nil {
 			return err
 		}
@@ -66,7 +81,7 @@ func (u *intakeUseCase) Execute(ctx context.Context, token string, dto IntakeByA
 			return err
 		}
 		if u.service.stageRecorder != nil {
-			_, err := u.service.stageRecorder.Complete(txCtx, historicalIntakeCompletion(dto, state))
+			_, err := stageport.CompleteStage(txCtx, u.service.stageRecorder, historicalIntakeCompletion(dto, state))
 			if err != nil {
 				return err
 			}
@@ -74,6 +89,13 @@ func (u *intakeUseCase) Execute(ctx context.Context, token string, dto IntakeByA
 		return nil
 	})
 	if err != nil {
+		resourceID := ""
+		if state.testee != nil {
+			resourceID = state.testee.ID().String()
+		}
+		_ = stageport.FailStageAttempt(ctx, u.service.stageRecorder, handle, stageport.Failure{
+			Stage: stageport.StageEntryIntake, BusinessAt: intakeAt, ResourceType: "testee", ResourceID: resourceID, Err: err,
+		})
 		return nil, err
 	}
 
@@ -141,7 +163,7 @@ func (u *intakeUseCase) restoreHistoricalIntake(ctx context.Context, dto IntakeB
 	state.creatorCreated = payload.CreatorCreated
 	state.assignmentCreated = payload.AssignmentCreated
 	state.intakeLogID = payload.IntakeLogID
-	_, err = u.service.stageRecorder.Complete(ctx, historicalIntakeCompletion(dto, state))
+	_, err = stageport.CompleteStage(ctx, u.service.stageRecorder, historicalIntakeCompletion(dto, state))
 	return err == nil, err
 }
 

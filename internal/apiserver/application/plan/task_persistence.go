@@ -71,7 +71,7 @@ func (p taskPersistence) recordHistorical(_ context.Context, txCtx context.Conte
 	if value := task.GetAssessmentID(); value != nil {
 		assessmentID = value.String()
 	}
-	_, err := p.recorder.Complete(txCtx, stageport.Completion{Stage: stage, BusinessAt: businessAt, ResourceType: "plan_task", ResourceID: task.GetID().String(), Payload: historicalTaskStagePayload{
+	_, err := stageport.CompleteStage(txCtx, p.recorder, stageport.Completion{Stage: stage, BusinessAt: businessAt, ResourceType: "plan_task", ResourceID: task.GetID().String(), Payload: historicalTaskStagePayload{
 		TaskID: task.GetID().String(), EnrollmentID: task.GetEnrollmentID().String(), AssessmentID: assessmentID,
 	}})
 	return err

@@ -81,9 +81,29 @@ func (s *InterpretationAutomationService) generateReportFromOutcomeID(ctx contex
 	if err != nil || outcomeID.IsZero() {
 		return nil, status.Error(codes.InvalidArgument, "outcome_id 无效")
 	}
+	generatedAt := time.Time{}
+	if historical, ok := historicalseed.FromContext(ctx); ok {
+		generatedAt, err = historicalseed.OccurredAt(ctx, historical.OrgID, historicalseed.StageReportGenerated, time.Now())
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+	}
+	attemptCtx, handle, err := stageport.BeginStageAttempt(ctx, s.stageRecorder, stageport.Attempt{
+		Stage: stageport.StageReportGenerated, BusinessAt: generatedAt, ResourceType: "interpretation_report",
+		Payload: struct {
+			OutcomeID string `json:"outcome_id"`
+		}{OutcomeID: outcomeID.String()},
+	})
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	ctx = attemptCtx
 	ctx = withRetryAuthorization(ctx)
 	result, err := s.service.Generate(ctx, automation.GenerateCommand{Actor: automation.TrustedServiceActor("internal-grpc"), OutcomeID: outcomeID, TraceID: interpretationTraceID(ctx)})
 	if err != nil {
+		_ = stageport.FailStageAttempt(ctx, s.stageRecorder, handle, stageport.Failure{
+			Stage: stageport.StageReportGenerated, BusinessAt: generatedAt, ResourceType: "interpretation_report", Err: err,
+		})
 		slog.ErrorContext(ctx, "interpretation automation failed", "outcome_id", rawOutcomeID, "error", err)
 		return generateReportFailureResponse(err), nil
 	}
@@ -101,20 +121,24 @@ func (s *InterpretationAutomationService) generateReportFromOutcomeID(ctx contex
 		applyInterpretationRetryDetails(resp, result.AttemptOrigin, result.RetryDecision)
 	}
 	if result != nil && result.Status == automation.StatusGenerated && !result.ReportID.IsZero() && s.stageRecorder != nil {
-		historical, ok := historicalseed.FromContext(ctx)
+		_, ok := historicalseed.FromContext(ctx)
 		if ok {
-			generatedAt, occurredErr := historicalseed.OccurredAt(ctx, historical.OrgID, historicalseed.StageReportGenerated, time.Now())
-			if occurredErr != nil {
-				return nil, status.Error(codes.InvalidArgument, occurredErr.Error())
-			}
-			if _, recordErr := s.stageRecorder.Complete(ctx, stageport.Completion{Stage: stageport.StageReportGenerated, BusinessAt: generatedAt, ResourceType: "interpretation_report", ResourceID: result.ReportID.String(), Payload: struct {
+			if _, recordErr := stageport.CompleteStage(ctx, s.stageRecorder, stageport.Completion{Stage: stageport.StageReportGenerated, BusinessAt: generatedAt, ResourceType: "interpretation_report", ResourceID: result.ReportID.String(), Payload: struct {
 				ReportID     string `json:"report_id"`
 				GenerationID string `json:"generation_id"`
 				RunID        string `json:"run_id"`
 			}{ReportID: result.ReportID.String(), GenerationID: result.GenerationID.String(), RunID: result.RunID.String()}}); recordErr != nil {
+				_ = stageport.FailStageAttempt(ctx, s.stageRecorder, handle, stageport.Failure{
+					Stage: stageport.StageReportGenerated, BusinessAt: generatedAt, ResourceType: "interpretation_report", ResourceID: result.ReportID.String(), Err: recordErr,
+				})
 				return nil, status.Error(codes.Internal, recordErr.Error())
 			}
 		}
+	} else if !handle.IsZero() {
+		pendingErr := fmt.Errorf("historical report generation did not reach generated terminal state")
+		_ = stageport.FailStageAttempt(ctx, s.stageRecorder, handle, stageport.Failure{
+			Stage: stageport.StageReportGenerated, BusinessAt: generatedAt, ResourceType: "interpretation_report", Err: pendingErr,
+		})
 	}
 	return resp, nil
 }

@@ -48,16 +48,22 @@ type historicalTaskStageStoreStub struct {
 	records       map[string]stageport.Record
 	beginAttempts int
 	failed        int
+	nextAttemptID uint64
 }
 
-func (s *historicalTaskStageStoreStub) Begin(_ context.Context, _ stageport.Attempt) error {
+func (s *historicalTaskStageStoreStub) Begin(_ context.Context, attempt stageport.Attempt) (stageport.AttemptHandle, error) {
 	s.beginAttempts++
-	return nil
+	s.nextAttemptID++
+	return stageport.AttemptHandle{ID: s.nextAttemptID, Stage: attempt.Stage, ContextHash: "test"}, nil
 }
 
-func (s *historicalTaskStageStoreStub) RecordFailure(_ context.Context, _ stageport.Failure) error {
+func (s *historicalTaskStageStoreStub) Fail(_ context.Context, _ stageport.AttemptHandle, _ stageport.Failure) error {
 	s.failed++
 	return nil
+}
+
+func (s *historicalTaskStageStoreStub) CompleteAttempt(ctx context.Context, _ stageport.AttemptHandle, completion stageport.Completion) (*stageport.Record, error) {
+	return s.Complete(ctx, completion)
 }
 
 func (s *historicalTaskStageStoreStub) Complete(_ context.Context, completion stageport.Completion) (*stageport.Record, error) {

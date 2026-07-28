@@ -38,9 +38,17 @@ func saveAssessmentAndStageEvents(
 	if a == nil {
 		return nil
 	}
+	attemptCtx, handle, err := stageport.BeginStageAttempt(ctx, recorder, stageport.Attempt{
+		Stage: completion.Stage, BusinessAt: completion.BusinessAt, ResourceType: completion.ResourceType,
+		ResourceID: completion.ResourceID, Payload: completion.Payload,
+	})
+	if err != nil {
+		return err
+	}
+	ctx = attemptCtx
 
 	var stagedEvents []event.DomainEvent
-	err := txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
+	err = txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := repo.Save(txCtx, a); err != nil {
 			return err
 		}
@@ -48,7 +56,7 @@ func saveAssessmentAndStageEvents(
 			if completion.ResourceID == "" {
 				completion.ResourceID = a.ID().String()
 			}
-			if _, err := recorder.Complete(txCtx, completion); err != nil {
+			if _, err := stageport.CompleteStage(txCtx, recorder, completion); err != nil {
 				return err
 			}
 		}
@@ -61,6 +69,10 @@ func saveAssessmentAndStageEvents(
 		return stager.Stage(txCtx, eventsToStage...)
 	})
 	if err != nil {
+		_ = stageport.FailStageAttempt(ctx, recorder, handle, stageport.Failure{
+			Stage: completion.Stage, BusinessAt: completion.BusinessAt, ResourceType: completion.ResourceType,
+			ResourceID: completion.ResourceID, Payload: completion.Payload, Err: err,
+		})
 		return err
 	}
 	if postCommit != nil && len(stagedEvents) > 0 {

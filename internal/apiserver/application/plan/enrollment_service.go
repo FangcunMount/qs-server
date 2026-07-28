@@ -101,6 +101,25 @@ func (s *enrollmentService) EnrollTestee(ctx context.Context, dto EnrollTesteeDT
 		)
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的开始日期: %v", err)
 	}
+	joinedAt := time.Time{}
+	if historical, ok := historicalseed.FromContext(ctx); ok {
+		joinedAt, err = historicalseed.OccurredAt(ctx, historical.OrgID, historicalseed.StageEnrollmentJoined, time.Now())
+		if err != nil {
+			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "%v", err)
+		}
+	}
+	attemptCtx, handle, err := stageport.BeginStageAttempt(ctx, s.stageRecorder, stageport.Attempt{
+		Stage: stageport.StagePlanEnrollment, BusinessAt: joinedAt, ResourceType: "plan_enrollment",
+		Payload: struct {
+			PlanID    string `json:"plan_id"`
+			TesteeID  string `json:"testee_id"`
+			StartDate string `json:"start_date"`
+		}{PlanID: dto.PlanID, TesteeID: dto.TesteeID, StartDate: dto.StartDate},
+	})
+	if err != nil {
+		return nil, err
+	}
+	ctx = attemptCtx
 
 	var result *EnrollmentResult
 	err = s.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
@@ -169,10 +188,15 @@ func (s *enrollmentService) EnrollTestee(ctx context.Context, dto EnrollTesteeDT
 			if lookupErr == nil && active != nil && sameBusinessDate(active.StartDate(), startDate) {
 				tasks, taskErr := s.enrollmentTasks.FindByEnrollmentID(ctx, active.ID())
 				if taskErr == nil {
-					return &EnrollmentResult{PlanID: dto.PlanID, EnrollmentID: active.ID().String(), Round: active.Round(), Tasks: toTaskResults(tasks), Idempotent: true}, nil
+					if recordErr := s.recordHistoricalEnrollment(ctx, active, tasks); recordErr == nil {
+						return &EnrollmentResult{PlanID: dto.PlanID, EnrollmentID: active.ID().String(), Round: active.Round(), Tasks: toTaskResults(tasks), Idempotent: true}, nil
+					}
 				}
 			}
 		}
+		_ = stageport.FailStageAttempt(ctx, s.stageRecorder, handle, stageport.Failure{
+			Stage: stageport.StagePlanEnrollment, BusinessAt: joinedAt, ResourceType: "plan_enrollment", Err: err,
+		})
 		logger.L(ctx).Errorw("Failed to enroll testee",
 			"action", "enroll_testee",
 			"plan_id", dto.PlanID,
@@ -205,7 +229,7 @@ func (s *enrollmentService) recordHistoricalEnrollment(ctx context.Context, enro
 			taskIDs = append(taskIDs, task.GetID().String())
 		}
 	}
-	_, err := s.stageRecorder.Complete(ctx, stageport.Completion{Stage: stageport.StagePlanEnrollment, BusinessAt: enrollment.JoinedAt(), ResourceType: "plan_enrollment", ResourceID: enrollment.ID().String(), Payload: struct {
+	_, err := stageport.CompleteStage(ctx, s.stageRecorder, stageport.Completion{Stage: stageport.StagePlanEnrollment, BusinessAt: enrollment.JoinedAt(), ResourceType: "plan_enrollment", ResourceID: enrollment.ID().String(), Payload: struct {
 		EnrollmentID string   `json:"enrollment_id"`
 		PlanID       string   `json:"plan_id"`
 		TaskIDs      []string `json:"task_ids"`

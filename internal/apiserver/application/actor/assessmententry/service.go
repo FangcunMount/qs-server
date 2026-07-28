@@ -207,7 +207,22 @@ func (s *service) Resolve(ctx context.Context, token string) (*ResolvedAssessmen
 		entry         *domainAssessmentEntry.AssessmentEntry
 		clinicianItem *domainClinician.Clinician
 	)
-	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+	resolveAt := time.Time{}
+	if historical, ok := historicalseed.FromContext(ctx); ok {
+		var err error
+		resolveAt, err = historicalseed.OccurredAt(ctx, historical.OrgID, historicalseed.StageEntryResolved, time.Now())
+		if err != nil {
+			return nil, errors.WithCode(code.ErrInvalidArgument, "%v", err)
+		}
+	}
+	attemptCtx, handle, err := stageport.BeginStageAttempt(ctx, s.stageRecorder, stageport.Attempt{
+		Stage: stageport.StageEntryResolve, BusinessAt: resolveAt, ResourceType: "assessment_entry",
+	})
+	if err != nil {
+		return nil, err
+	}
+	ctx = attemptCtx
+	err = s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		var err error
 		entry, clinicianItem, err = s.resolveEntry(txCtx, token)
 		if err != nil {
@@ -225,7 +240,8 @@ func (s *service) Resolve(ctx context.Context, token string) (*ResolvedAssessmen
 				}
 				if existing != nil {
 					var payload struct {
-						EntryID string `json:"entry_id"`
+						EntryID      string `json:"entry_id"`
+						ResolveLogID uint64 `json:"resolve_log_id"`
 					}
 					if decodeErr := json.Unmarshal(existing.PayloadJSON, &payload); decodeErr != nil {
 						return fmt.Errorf("decode historical entry resolve stage: %w", decodeErr)
@@ -233,7 +249,10 @@ func (s *service) Resolve(ctx context.Context, token string) (*ResolvedAssessmen
 					if payload.EntryID != entry.ID().String() || !existing.BusinessAt.Equal(resolvedAt) {
 						return fmt.Errorf("%w: entry resolve replay differs from completed stage", stageport.ErrPayloadConflict)
 					}
-					return nil
+					_, completeErr := stageport.CompleteStage(txCtx, s.stageRecorder, stageport.Completion{
+						Stage: stageport.StageEntryResolve, BusinessAt: resolvedAt, ResourceType: "assessment_entry", ResourceID: entry.ID().String(), Payload: payload,
+					})
+					return completeErr
 				}
 			}
 		}
@@ -246,12 +265,19 @@ func (s *service) Resolve(ctx context.Context, token string) (*ResolvedAssessmen
 				EntryID      string `json:"entry_id"`
 				ResolveLogID uint64 `json:"resolve_log_id"`
 			}{EntryID: entry.ID().String(), ResolveLogID: resolveLogID}}
-			_, err = s.stageRecorder.Complete(txCtx, completion)
+			_, err = stageport.CompleteStage(txCtx, s.stageRecorder, completion)
 			return err
 		}
 		return nil
 	})
 	if err != nil {
+		resourceID := ""
+		if entry != nil {
+			resourceID = entry.ID().String()
+		}
+		_ = stageport.FailStageAttempt(ctx, s.stageRecorder, handle, stageport.Failure{
+			Stage: stageport.StageEntryResolve, BusinessAt: resolveAt, ResourceType: "assessment_entry", ResourceID: resourceID, Err: err,
+		})
 		return nil, err
 	}
 

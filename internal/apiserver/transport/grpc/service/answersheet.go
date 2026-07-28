@@ -118,21 +118,38 @@ func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAn
 	if req.OriginRef != nil {
 		dto.OriginRef = &answersheet.OriginRefDTO{Type: req.OriginRef.Type, ID: req.OriginRef.Id}
 	}
+	filledAt, occurredErr := historicalseed.OccurredAt(ctx, orgID, historicalseed.StageAnswerSheetFilled, time.Now())
+	if occurredErr != nil {
+		return nil, status.Error(codes.InvalidArgument, occurredErr.Error())
+	}
+	attemptCtx, handle, attemptErr := stageport.BeginStageAttempt(ctx, s.stageRecorder, stageport.Attempt{
+		Stage: stageport.StageAnswerSheetSubmit, BusinessAt: filledAt, ResourceType: "answer_sheet",
+		Payload: struct {
+			IdempotencyKey string `json:"idempotency_key"`
+			TaskID         string `json:"task_id,omitempty"`
+		}{IdempotencyKey: req.IdempotencyKey, TaskID: req.TaskId},
+	})
+	if attemptErr != nil {
+		return nil, toAnswerSheetGRPCError(attemptErr)
+	}
+	ctx = attemptCtx
 
 	// 调用应用服务
 	result, err := s.submissionService.Submit(ctx, dto)
 	if err != nil {
+		_ = stageport.FailStageAttempt(ctx, s.stageRecorder, handle, stageport.Failure{
+			Stage: stageport.StageAnswerSheetSubmit, BusinessAt: filledAt, ResourceType: "answer_sheet", Err: err,
+		})
 		return nil, toAnswerSheetGRPCError(err)
 	}
 	if s.stageRecorder != nil {
-		filledAt, occurredErr := historicalseed.OccurredAt(ctx, orgID, historicalseed.StageAnswerSheetFilled, time.Now())
-		if occurredErr != nil {
-			return nil, status.Error(codes.InvalidArgument, occurredErr.Error())
-		}
-		if _, recordErr := s.stageRecorder.Complete(ctx, stageport.Completion{Stage: stageport.StageAnswerSheetSubmit, BusinessAt: filledAt, ResourceType: "answer_sheet", ResourceID: fmt.Sprintf("%d", result.ID), Payload: struct {
+		if _, recordErr := stageport.CompleteStage(ctx, s.stageRecorder, stageport.Completion{Stage: stageport.StageAnswerSheetSubmit, BusinessAt: filledAt, ResourceType: "answer_sheet", ResourceID: fmt.Sprintf("%d", result.ID), Payload: struct {
 			AnswerSheetID uint64 `json:"answersheet_id"`
 			TaskID        string `json:"task_id,omitempty"`
 		}{AnswerSheetID: result.ID, TaskID: req.TaskId}}); recordErr != nil {
+			_ = stageport.FailStageAttempt(ctx, s.stageRecorder, handle, stageport.Failure{
+				Stage: stageport.StageAnswerSheetSubmit, BusinessAt: filledAt, ResourceType: "answer_sheet", ResourceID: fmt.Sprintf("%d", result.ID), Err: recordErr,
+			})
 			return nil, toAnswerSheetGRPCError(recordErr)
 		}
 	}

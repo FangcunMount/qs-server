@@ -149,6 +149,19 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 	}
 	assessmentToCommit.StageEvaluatedEventWithHistorical(request.EvaluatedAt, record.ID(), runToCommit.ID(), historical)
 	eventsToStage := assessmentToCommit.Events()
+	completion := stageport.Completion{Stage: stageport.StageOutcomeCommitted, BusinessAt: request.EvaluatedAt, ResourceType: "evaluation_outcome", ResourceID: record.ID().String(), Payload: struct {
+		OutcomeID    string `json:"outcome_id"`
+		AssessmentID string `json:"assessment_id"`
+		RunID        string `json:"run_id"`
+	}{OutcomeID: record.ID().String(), AssessmentID: assessmentToCommit.ID().String(), RunID: runToCommit.ID().String()}}
+	attemptCtx, handle, err := stageport.BeginStageAttempt(ctx, c.stageRecorder, stageport.Attempt{
+		Stage: completion.Stage, BusinessAt: completion.BusinessAt, ResourceType: completion.ResourceType,
+		ResourceID: completion.ResourceID, Payload: completion.Payload,
+	})
+	if err != nil {
+		return nil, err
+	}
+	ctx = attemptCtx
 	err = c.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := c.outcomeRepo.Save(txCtx, record); err != nil {
 			return err
@@ -170,17 +183,17 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 			}
 		}
 		if c.stageRecorder != nil {
-			if _, err := c.stageRecorder.Complete(txCtx, stageport.Completion{Stage: stageport.StageOutcomeCommitted, BusinessAt: request.EvaluatedAt, ResourceType: "evaluation_outcome", ResourceID: record.ID().String(), Payload: struct {
-				OutcomeID    string `json:"outcome_id"`
-				AssessmentID string `json:"assessment_id"`
-				RunID        string `json:"run_id"`
-			}{OutcomeID: record.ID().String(), AssessmentID: assessmentToCommit.ID().String(), RunID: runToCommit.ID().String()}}); err != nil {
+			if _, err := stageport.CompleteStage(txCtx, c.stageRecorder, completion); err != nil {
 				return err
 			}
 		}
 		return nil
 	})
 	if err != nil {
+		_ = stageport.FailStageAttempt(ctx, c.stageRecorder, handle, stageport.Failure{
+			Stage: completion.Stage, BusinessAt: completion.BusinessAt, ResourceType: completion.ResourceType,
+			ResourceID: completion.ResourceID, Payload: completion.Payload, Err: err,
+		})
 		return nil, err
 	}
 	// Publish the prepared terminal state only after every durable fact and the

@@ -74,17 +74,20 @@ func (s *taskManagementService) OpenTask(ctx context.Context, orgID int64, taskI
 	if _, historical := historicalseed.FromContext(ctx); !historical {
 		return s.openTask(ctx, orgID, taskID)
 	}
-	if err := s.beginHistoricalTaskAttempt(ctx, stageport.StageTaskOpen, taskID, historicalTaskBusinessAt(ctx, stageport.StageTaskOpen)); err != nil {
+	businessAt := historicalTaskBusinessAt(ctx, stageport.StageTaskOpen)
+	attemptCtx, handle, err := s.beginHistoricalTaskAttempt(ctx, stageport.StageTaskOpen, taskID, businessAt)
+	if err != nil {
 		return nil, err
 	}
+	ctx = attemptCtx
 	var result *TaskResult
-	err := s.persistence.withinTransaction(ctx, func(txCtx context.Context) error {
+	err = s.persistence.withinTransaction(ctx, func(txCtx context.Context) error {
 		var err error
 		result, err = s.openTask(txCtx, orgID, taskID)
 		return err
 	})
 	if err != nil {
-		s.recordHistoricalTaskFailure(ctx, stageport.StageTaskOpen, taskID, historicalTaskBusinessAt(ctx, stageport.StageTaskOpen), err)
+		s.recordHistoricalTaskFailure(ctx, handle, stageport.StageTaskOpen, taskID, businessAt, err)
 	}
 	return result, err
 }
@@ -169,17 +172,20 @@ func (s *taskManagementService) CompleteTask(ctx context.Context, orgID int64, t
 	if _, historical := historicalseed.FromContext(ctx); !historical {
 		return s.completeTask(ctx, orgID, taskID, assessmentID)
 	}
-	if err := s.beginHistoricalTaskAttempt(ctx, stageport.StageTaskComplete, taskID, historicalTaskBusinessAt(ctx, stageport.StageTaskComplete)); err != nil {
+	businessAt := historicalTaskBusinessAt(ctx, stageport.StageTaskComplete)
+	attemptCtx, handle, err := s.beginHistoricalTaskAttempt(ctx, stageport.StageTaskComplete, taskID, businessAt)
+	if err != nil {
 		return nil, err
 	}
+	ctx = attemptCtx
 	var result *TaskResult
-	err := s.persistence.withinTransaction(ctx, func(txCtx context.Context) error {
+	err = s.persistence.withinTransaction(ctx, func(txCtx context.Context) error {
 		var err error
 		result, err = s.completeTask(txCtx, orgID, taskID, assessmentID)
 		return err
 	})
 	if err != nil {
-		s.recordHistoricalTaskFailure(ctx, stageport.StageTaskComplete, taskID, historicalTaskBusinessAt(ctx, stageport.StageTaskComplete), err)
+		s.recordHistoricalTaskFailure(ctx, handle, stageport.StageTaskComplete, taskID, businessAt, err)
 	}
 	return result, err
 }
@@ -310,7 +316,7 @@ func (s *taskManagementService) replayHistoricalTaskStage(ctx context.Context, s
 		}
 	}
 	if s.persistence.recorder != nil {
-		if _, err := s.persistence.recorder.Complete(ctx, stageport.Completion{
+		if _, err := stageport.CompleteStage(ctx, s.persistence.recorder, stageport.Completion{
 			Stage: stage, BusinessAt: businessAt, ResourceType: "plan_task", ResourceID: want.TaskID, Payload: want,
 		}); err != nil {
 			return false, err
@@ -319,12 +325,11 @@ func (s *taskManagementService) replayHistoricalTaskStage(ctx context.Context, s
 	return true, nil
 }
 
-func (s *taskManagementService) recordHistoricalTaskFailure(ctx context.Context, stage, taskID string, businessAt time.Time, transitionErr error) {
-	recorder, ok := s.persistence.recorder.(stageport.AttemptRecorder)
-	if !ok || transitionErr == nil || businessAt.IsZero() {
+func (s *taskManagementService) recordHistoricalTaskFailure(ctx context.Context, handle stageport.AttemptHandle, stage, taskID string, businessAt time.Time, transitionErr error) {
+	if transitionErr == nil || businessAt.IsZero() {
 		return
 	}
-	if err := recorder.RecordFailure(ctx, stageport.Failure{Stage: stage, BusinessAt: businessAt, ResourceType: "plan_task", ResourceID: taskID, Err: transitionErr}); err != nil {
+	if err := stageport.FailStageAttempt(ctx, s.persistence.recorder, handle, stageport.Failure{Stage: stage, BusinessAt: businessAt, ResourceType: "plan_task", ResourceID: taskID, Err: transitionErr}); err != nil {
 		logger.L(ctx).Errorw("Failed to record historical task attempt",
 			"action", stage,
 			"task_id", taskID,
@@ -333,12 +338,11 @@ func (s *taskManagementService) recordHistoricalTaskFailure(ctx context.Context,
 	}
 }
 
-func (s *taskManagementService) beginHistoricalTaskAttempt(ctx context.Context, stage, taskID string, businessAt time.Time) error {
-	recorder, ok := s.persistence.recorder.(stageport.AttemptRecorder)
-	if !ok || businessAt.IsZero() {
-		return nil
+func (s *taskManagementService) beginHistoricalTaskAttempt(ctx context.Context, stage, taskID string, businessAt time.Time) (context.Context, stageport.AttemptHandle, error) {
+	if businessAt.IsZero() {
+		return ctx, stageport.AttemptHandle{}, nil
 	}
-	return recorder.Begin(ctx, stageport.Attempt{Stage: stage, BusinessAt: businessAt, ResourceType: "plan_task", ResourceID: taskID})
+	return stageport.BeginStageAttempt(ctx, s.persistence.recorder, stageport.Attempt{Stage: stage, BusinessAt: businessAt, ResourceType: "plan_task", ResourceID: taskID})
 }
 
 func historicalTaskBusinessAt(ctx context.Context, stage string) time.Time {

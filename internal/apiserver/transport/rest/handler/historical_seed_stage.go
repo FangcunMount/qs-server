@@ -27,6 +27,7 @@ func NewHistoricalSeedStageHandler(reader stageport.Reader) *HistoricalSeedStage
 // @Produce json
 // @Param batch_id path string true "批次 ID"
 // @Param scenario_id path string true "场景 ID"
+// @Param include_attempts query bool false "附带诊断 attempt" default(false)
 // @Success 200 {object} core.Response
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
@@ -46,6 +47,7 @@ func (h *HistoricalSeedStageHandler) Scenario(c *gin.Context) {
 // @Produce json
 // @Param batch_id path string true "批次 ID"
 // @Param scenario_id query string true "场景 ID"
+// @Param include_attempts query bool false "附带诊断 attempt" default(false)
 // @Success 200 {object} core.Response
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
@@ -72,7 +74,16 @@ func (h *HistoricalSeedStageHandler) scenario(c *gin.Context, scenarioID string)
 		h.Error(c, err)
 		return
 	}
-	h.Success(c, gin.H{"batch_id": batchID, "scenario_id": scenarioID, "stages": records})
+	response := gin.H{"batch_id": batchID, "scenario_id": scenarioID, "stages": records}
+	if includeHistoricalAttempts(c) {
+		attempts, err := h.reader.ListScenarioAttempts(c.Request.Context(), orgID, batchID, scenarioID)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		response["attempts"] = attempts
+	}
+	h.Success(c, response)
 }
 
 // Batch returns one page of immutable stage-ledger records for a batch.
@@ -84,6 +95,7 @@ func (h *HistoricalSeedStageHandler) scenario(c *gin.Context, scenarioID string)
 // @Param batch_id path string true "批次 ID"
 // @Param offset query int false "分页偏移" minimum(0) default(0)
 // @Param limit query int false "返回条数" minimum(1) maximum(10000) default(1000)
+// @Param include_attempts query bool false "附带诊断 attempt" default(false)
 // @Success 200 {object} core.Response
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
@@ -108,5 +120,19 @@ func (h *HistoricalSeedStageHandler) Batch(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	h.Success(c, gin.H{"batch_id": batchID, "offset": offset, "limit": limit, "stages": records})
+	response := gin.H{"batch_id": batchID, "offset": offset, "limit": limit, "stages": records}
+	if includeHistoricalAttempts(c) {
+		attempts, err := h.reader.ListBatchAttempts(c.Request.Context(), orgID, batchID, offset, limit)
+		if err != nil {
+			h.Error(c, err)
+			return
+		}
+		response["attempts"] = attempts
+	}
+	h.Success(c, response)
+}
+
+func includeHistoricalAttempts(c *gin.Context) bool {
+	value, err := strconv.ParseBool(strings.TrimSpace(c.DefaultQuery("include_attempts", "false")))
+	return err == nil && value
 }

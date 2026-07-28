@@ -60,6 +60,24 @@ type Repository struct{ db *gorm.DB }
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) Complete(ctx context.Context, completion stageport.Completion) (*stageport.Record, error) {
+	handle, err := r.Begin(ctx, stageport.Attempt{
+		Stage: completion.Stage, BusinessAt: completion.BusinessAt, ResourceType: completion.ResourceType,
+		ResourceID: completion.ResourceID, Payload: completion.Payload,
+	})
+	if err != nil {
+		return nil, err
+	}
+	record, err := r.CompleteAttempt(ctx, handle, completion)
+	if err != nil && !handle.IsZero() {
+		_ = r.Fail(ctx, handle, stageport.Failure{
+			Stage: completion.Stage, BusinessAt: completion.BusinessAt, ResourceType: completion.ResourceType,
+			ResourceID: completion.ResourceID, Payload: completion.Payload, Err: err,
+		})
+	}
+	return record, err
+}
+
+func (r *Repository) CompleteAttempt(ctx context.Context, handle stageport.AttemptHandle, completion stageport.Completion) (*stageport.Record, error) {
 	historical, ok := historicalseed.FromContext(ctx)
 	if !ok {
 		return nil, nil
@@ -69,6 +87,18 @@ func (r *Repository) Complete(ctx context.Context, completion stageport.Completi
 	}
 	if strings.TrimSpace(completion.Stage) == "" || completion.BusinessAt.IsZero() || strings.TrimSpace(completion.ResourceType) == "" || strings.TrimSpace(completion.ResourceID) == "" {
 		return nil, fmt.Errorf("historical seed stage completion is incomplete")
+	}
+	if handle.IsZero() || handle.Stage != strings.TrimSpace(completion.Stage) {
+		return nil, fmt.Errorf("historical seed stage completion has no matching attempt handle")
+	}
+	if _, active := mysql.TxFromContext(ctx); !active {
+		var record *stageport.Record
+		err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			var completeErr error
+			record, completeErr = r.CompleteAttempt(mysql.WithTx(ctx, tx), handle, completion)
+			return completeErr
+		})
+		return record, err
 	}
 	payload, err := json.Marshal(completion.Payload)
 	if err != nil {
@@ -96,7 +126,7 @@ func (r *Repository) Complete(ctx context.Context, completion stageport.Completi
 		if compareErr != nil {
 			return nil, compareErr
 		}
-		if attemptErr := r.recordAttempt(ctx, historical, completion.Stage, completion.BusinessAt, completion.ResourceType, completion.ResourceID, "completed", ""); attemptErr != nil {
+		if attemptErr := completeAttempt(db, historical, handle, completion); attemptErr != nil {
 			return nil, attemptErr
 		}
 		return record, nil
@@ -112,108 +142,124 @@ func (r *Repository) Complete(ctx context.Context, completion stageport.Completi
 			if compareErr != nil {
 				return nil, compareErr
 			}
-			if attemptErr := r.recordAttempt(ctx, historical, completion.Stage, completion.BusinessAt, completion.ResourceType, completion.ResourceID, "completed", ""); attemptErr != nil {
+			if attemptErr := completeAttempt(db, historical, handle, completion); attemptErr != nil {
 				return nil, attemptErr
 			}
 			return record, nil
 		}
 		return nil, err
 	}
-	if err := r.recordAttempt(ctx, historical, completion.Stage, completion.BusinessAt, completion.ResourceType, completion.ResourceID, "completed", ""); err != nil {
+	if err := completeAttempt(db, historical, handle, completion); err != nil {
 		return nil, err
 	}
 	return toRecord(row), nil
 }
 
-func (r *Repository) RecordFailure(ctx context.Context, failure stageport.Failure) error {
+func (r *Repository) Fail(ctx context.Context, handle stageport.AttemptHandle, failure stageport.Failure) error {
 	historical, ok := historicalseed.FromContext(ctx)
 	if !ok {
 		return nil
 	}
-	if strings.TrimSpace(failure.Stage) == "" || failure.BusinessAt.IsZero() || failure.Err == nil {
+	if handle.IsZero() || handle.Stage != strings.TrimSpace(failure.Stage) || strings.TrimSpace(failure.Stage) == "" || failure.BusinessAt.IsZero() || failure.Err == nil {
 		return fmt.Errorf("historical seed stage failure is incomplete")
 	}
-	return r.recordAttempt(ctx, historical, failure.Stage, failure.BusinessAt, failure.ResourceType, failure.ResourceID, "failed", failure.Err.Error())
-}
-
-func (r *Repository) Begin(ctx context.Context, attempt stageport.Attempt) error {
-	historical, ok := historicalseed.FromContext(ctx)
-	if !ok {
-		return nil
-	}
-	if strings.TrimSpace(attempt.Stage) == "" || attempt.BusinessAt.IsZero() {
-		return fmt.Errorf("historical seed stage attempt is incomplete")
-	}
-	return r.recordAttempt(ctx, historical, attempt.Stage, attempt.BusinessAt, attempt.ResourceType, attempt.ResourceID, "running", "")
-}
-
-func (r *Repository) recordAttempt(ctx context.Context, historical historicalseed.Context, stage string, businessAt time.Time, resourceType, resourceID, status, errorText string) error {
 	if r == nil || r.db == nil {
 		return fmt.Errorf("historical seed stage repository is not configured")
 	}
-	contextPayload, err := json.Marshal(struct {
-		Historical historicalseed.Context `json:"historical"`
-		Stage      string                 `json:"stage"`
-	}{Historical: historical, Stage: strings.TrimSpace(stage)})
-	if err != nil {
-		return fmt.Errorf("marshal historical stage attempt context: %w", err)
-	}
-	digest := sha256.Sum256(contextPayload)
 	db := r.db.WithContext(ctx)
 	if tx, ok := mysql.TxFromContext(ctx); ok {
 		db = tx.WithContext(ctx)
 	}
 	now := time.Now().UTC()
-	var errorValue *string
-	if trimmed := strings.TrimSpace(errorText); trimmed != "" {
-		if len(trimmed) > 1000 {
-			trimmed = trimmed[:1000]
-		}
-		errorValue = &trimmed
+	errorText := strings.TrimSpace(failure.Err.Error())
+	if len(errorText) > 1000 {
+		errorText = errorText[:1000]
 	}
+	result := db.Model(&attemptPO{}).
+		Where("id = ? AND org_id = ? AND batch_id = ? AND scenario_id = ? AND stage = ? AND status = ?", handle.ID, historical.OrgID, historical.BatchID, historical.ScenarioID, handle.Stage, "running").
+		Updates(map[string]any{
+			"status": "failed", "business_at": failure.BusinessAt, "resource_type": strings.TrimSpace(failure.ResourceType),
+			"resource_id": strings.TrimSpace(failure.ResourceID), "error_text": errorText, "finished_at": now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 1 {
+		return nil
+	}
+	var existing attemptPO
+	if err := db.Where("id = ?", handle.ID).First(&existing).Error; err != nil {
+		return err
+	}
+	if existing.Status == "failed" {
+		return nil
+	}
+	return fmt.Errorf("historical seed attempt %d is already %s", handle.ID, existing.Status)
+}
+
+func (r *Repository) Begin(ctx context.Context, attempt stageport.Attempt) (stageport.AttemptHandle, error) {
+	historical, ok := historicalseed.FromContext(ctx)
+	if !ok {
+		return stageport.AttemptHandle{}, nil
+	}
+	if strings.TrimSpace(attempt.Stage) == "" || attempt.BusinessAt.IsZero() {
+		return stageport.AttemptHandle{}, fmt.Errorf("historical seed stage attempt is incomplete")
+	}
+	if r == nil || r.db == nil {
+		return stageport.AttemptHandle{}, fmt.Errorf("historical seed stage repository is not configured")
+	}
+	contextPayload, err := json.Marshal(struct {
+		Historical   historicalseed.Context `json:"historical"`
+		Stage        string                 `json:"stage"`
+		BusinessAt   time.Time              `json:"business_at"`
+		ResourceType string                 `json:"resource_type,omitempty"`
+		ResourceID   string                 `json:"resource_id,omitempty"`
+		Payload      any                    `json:"payload,omitempty"`
+	}{Historical: historical, Stage: strings.TrimSpace(attempt.Stage), BusinessAt: attempt.BusinessAt, ResourceType: strings.TrimSpace(attempt.ResourceType), ResourceID: strings.TrimSpace(attempt.ResourceID), Payload: attempt.Payload})
+	if err != nil {
+		return stageport.AttemptHandle{}, fmt.Errorf("marshal historical stage attempt context: %w", err)
+	}
+	digest := sha256.Sum256(contextPayload)
 	contextHash := hex.EncodeToString(digest[:])
-	if status != "running" {
-		var running attemptPO
-		findRunning := db.Where("org_id = ? AND batch_id = ? AND scenario_id = ? AND stage = ? AND context_hash = ? AND status = ?", historical.OrgID, historical.BatchID, historical.ScenarioID, stage, contextHash, "running").
-			Order("attempt_no ASC").First(&running)
-		if findRunning.Error == nil {
-			updates := map[string]any{
-				"status": status, "business_at": businessAt, "resource_type": strings.TrimSpace(resourceType),
-				"resource_id": strings.TrimSpace(resourceID), "error_text": errorValue, "finished_at": now,
-			}
-			return db.Model(&attemptPO{}).Where("id = ? AND status = ?", running.ID, "running").Updates(updates).Error
-		}
-		if !errors.Is(findRunning.Error, gorm.ErrRecordNotFound) {
-			return findRunning.Error
-		}
+	db := r.db.WithContext(ctx)
+	if tx, ok := mysql.TxFromContext(ctx); ok {
+		db = tx.WithContext(ctx)
 	}
+	now := time.Now().UTC()
 	for retry := 0; retry < 3; retry++ {
 		var maxAttempt uint32
 		if err := db.Model(&attemptPO{}).
-			Where("org_id = ? AND batch_id = ? AND scenario_id = ? AND stage = ?", historical.OrgID, historical.BatchID, historical.ScenarioID, stage).
+			Where("org_id = ? AND batch_id = ? AND scenario_id = ? AND stage = ?", historical.OrgID, historical.BatchID, historical.ScenarioID, attempt.Stage).
 			Select("COALESCE(MAX(attempt_no), 0)").Scan(&maxAttempt).Error; err != nil {
-			return err
-		}
-		initialStatus := status
-		if status != "running" {
-			initialStatus = "running"
+			return stageport.AttemptHandle{}, err
 		}
 		row := attemptPO{
 			ID: meta.New().Uint64(), OrgID: historical.OrgID, BatchID: historical.BatchID, ScenarioID: historical.ScenarioID,
-			Stage: strings.TrimSpace(stage), AttemptNo: maxAttempt + 1, ContextHash: contextHash, Status: initialStatus,
-			BusinessAt: businessAt, ResourceType: strings.TrimSpace(resourceType), ResourceID: strings.TrimSpace(resourceID), ErrorText: errorValue,
+			Stage: strings.TrimSpace(attempt.Stage), AttemptNo: maxAttempt + 1, ContextHash: contextHash, Status: "running",
+			BusinessAt: attempt.BusinessAt, ResourceType: strings.TrimSpace(attempt.ResourceType), ResourceID: strings.TrimSpace(attempt.ResourceID),
 			StartedAt: now, FinishedAt: now,
 		}
 		if err := db.Create(&row).Error; err == nil {
-			if status == "running" {
-				return nil
-			}
-			return db.Model(&attemptPO{}).Where("id = ? AND status = ?", row.ID, "running").Updates(map[string]any{
-				"status": status, "error_text": errorValue, "finished_at": time.Now().UTC(),
-			}).Error
+			return stageport.AttemptHandle{ID: row.ID, Stage: row.Stage, ContextHash: row.ContextHash}, nil
 		} else if retry == 2 {
-			return err
+			return stageport.AttemptHandle{}, err
 		}
+	}
+	return stageport.AttemptHandle{}, fmt.Errorf("create historical seed stage attempt exhausted retries")
+}
+
+func completeAttempt(db *gorm.DB, historical historicalseed.Context, handle stageport.AttemptHandle, completion stageport.Completion) error {
+	result := db.Model(&attemptPO{}).
+		Where("id = ? AND org_id = ? AND batch_id = ? AND scenario_id = ? AND stage = ? AND context_hash = ? AND status = ?", handle.ID, historical.OrgID, historical.BatchID, historical.ScenarioID, handle.Stage, handle.ContextHash, "running").
+		Updates(map[string]any{
+			"status": "completed", "business_at": completion.BusinessAt, "resource_type": strings.TrimSpace(completion.ResourceType),
+			"resource_id": strings.TrimSpace(completion.ResourceID), "error_text": nil, "finished_at": time.Now().UTC(),
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return fmt.Errorf("historical seed attempt %d is missing, stale, or already terminal", handle.ID)
 	}
 	return nil
 }
@@ -270,6 +316,28 @@ func (r *Repository) ListBatch(ctx context.Context, orgID uint64, batchID string
 	return toRecords(rows), nil
 }
 
+func (r *Repository) ListScenarioAttempts(ctx context.Context, orgID uint64, batchID, scenarioID string) ([]stageport.AttemptRecord, error) {
+	var rows []attemptPO
+	if err := r.db.WithContext(ctx).Where("org_id = ? AND batch_id = ? AND scenario_id = ?", orgID, batchID, scenarioID).Order("attempt_no ASC, stage ASC").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	return toAttemptRecords(rows), nil
+}
+
+func (r *Repository) ListBatchAttempts(ctx context.Context, orgID uint64, batchID string, offset, limit int) ([]stageport.AttemptRecord, error) {
+	if limit <= 0 || limit > 10000 {
+		limit = 1000
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	var rows []attemptPO
+	if err := r.db.WithContext(ctx).Where("org_id = ? AND batch_id = ?", orgID, batchID).Order("scenario_id ASC, stage ASC, attempt_no ASC").Offset(offset).Limit(limit).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	return toAttemptRecords(rows), nil
+}
+
 func toRecords(rows []stagePO) []stageport.Record {
 	result := make([]stageport.Record, 0, len(rows))
 	for _, row := range rows {
@@ -284,4 +352,21 @@ func toRecord(row stagePO) *stageport.Record {
 		errorText = *row.ErrorText
 	}
 	return &stageport.Record{ID: row.ID, OrgID: row.OrgID, BatchID: row.BatchID, ScenarioID: row.ScenarioID, Stage: row.Stage, PayloadHash: row.PayloadHash, Status: row.Status, BusinessAt: row.BusinessAt, ResourceType: row.ResourceType, ResourceID: row.ResourceID, PayloadJSON: append(json.RawMessage(nil), row.PayloadJSON...), ErrorText: errorText, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+}
+
+func toAttemptRecords(rows []attemptPO) []stageport.AttemptRecord {
+	result := make([]stageport.AttemptRecord, 0, len(rows))
+	for _, row := range rows {
+		errorText := ""
+		if row.ErrorText != nil {
+			errorText = *row.ErrorText
+		}
+		result = append(result, stageport.AttemptRecord{
+			ID: row.ID, OrgID: row.OrgID, BatchID: row.BatchID, ScenarioID: row.ScenarioID, Stage: row.Stage,
+			AttemptNo: row.AttemptNo, ContextHash: row.ContextHash, Status: row.Status, BusinessAt: row.BusinessAt,
+			ResourceType: row.ResourceType, ResourceID: row.ResourceID, ErrorText: errorText,
+			StartedAt: row.StartedAt, FinishedAt: row.FinishedAt, CreatedAt: row.CreatedAt,
+		})
+	}
+	return result
 }
