@@ -54,6 +54,7 @@
   ],
   "testeeSource": "daily_simulation",
   "autoDiscoverSeeddata": true,
+  "autoCreateSubmitTestees": false,
   "discoverAnswers": true,
   "qpsProfile": "pretest_60",
   "qpsProfiles": {

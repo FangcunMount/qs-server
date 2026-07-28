@@ -60,6 +60,7 @@ export const personalityModelQueryFailed = new Counter('personality_model_query_
 export const personalitySessionFailed = new Counter('personality_session_failed');
 export const answerSubmitFailed = new Counter('answer_submit_failed');
 export const reportStatusFailed = new Counter('report_status_failed');
+export const reportSampleSkipped = new Counter('report_sample_skipped');
 export const medicalReportStatusFailed = new Counter('medical_report_status_failed');
 export const personalityReportStatusFailed = new Counter('personality_report_status_failed');
 export const statisticsFailed = new Counter('statistics_failed');

@@ -170,6 +170,7 @@ export function configAliasesForEnv(name) {
     CHAIN_PROBE_MAX_VUS: ['vusers.chainProbe.max', 'vusers.chain_probe.max', 'chainProbeMaxVus', 'chain_probe_max_vus'],
     DISCOVER_ANSWERS: ['discoverAnswers', 'discover_answers'],
     AUTO_DISCOVER_SEEDDATA: ['autoDiscoverSeeddata', 'auto_discover_seeddata'],
+    AUTO_CREATE_SUBMIT_TESTEES: ['autoCreateSubmitTestees', 'auto_create_submit_testees'],
     DISCOVER_TESTEE_LOOKBACK_DAYS: ['discover.testeeLookbackDays', 'discover.testee_lookback_days', 'discoverTesteeLookbackDays', 'discover_testee_lookback_days'],
     DISCOVER_TESTEE_LIMIT: ['discover.testeeLimit', 'discover.testee_limit', 'discoverTesteeLimit', 'discover_testee_limit'],
     DISCOVER_ASSESSMENT_LIMIT: ['discover.assessmentLimit', 'discover.assessment_limit', 'discoverAssessmentLimit', 'discover_assessment_limit'],
@@ -347,7 +348,7 @@ export function debugSetupState() {
   console.log(`[setup-debug] collectionBaseUrl=${COLLECTION_BASE_URL} apiserverBaseUrl=${APISERVER_BASE_URL}`);
   console.log(`[setup-debug] tokenFileLoads=${JSON.stringify(TOKEN_FILE_LOADS)}`);
   console.log(`[setup-debug] tokenFileIssues=${JSON.stringify(TOKEN_FILE_READ_ISSUES)}`);
-  console.log(`[setup-debug] autoDiscoverSeeddata=${AUTO_DISCOVER_SEEDDATA} testeeSource=${TESTEE_SOURCE || '<any>'} lookbackDays=${DISCOVER_TESTEE_LOOKBACK_DAYS}`);
+  console.log(`[setup-debug] autoDiscoverSeeddata=${AUTO_DISCOVER_SEEDDATA} autoCreateSubmitTestees=${AUTO_CREATE_SUBMIT_TESTEES} testeeSource=${TESTEE_SOURCE || '<any>'} lookbackDays=${DISCOVER_TESTEE_LOOKBACK_DAYS}`);
 }
 
 export function debugSetupRequest(service, endpoint, path, status, token) {
@@ -604,6 +605,7 @@ export const ORG_ID = envOrConfigString('ORG_ID', ['orgId', 'org_id'], '1');
 export const TESTEE_SOURCE = envOrConfigString('TESTEE_SOURCE', ['testeeSource', 'testee_source'], 'daily_simulation');
 export const DISCOVER_ANSWERS = boolEnv('DISCOVER_ANSWERS', true);
 export const AUTO_DISCOVER_SEEDDATA = boolEnv('AUTO_DISCOVER_SEEDDATA', false);
+export const AUTO_CREATE_SUBMIT_TESTEES = boolEnv('AUTO_CREATE_SUBMIT_TESTEES', false);
 export const DISCOVER_TESTEE_LOOKBACK_DAYS = intEnv('DISCOVER_TESTEE_LOOKBACK_DAYS', 7);
 export const DISCOVER_TESTEE_LIMIT = intEnv('DISCOVER_TESTEE_LIMIT', 100);
 export const DISCOVER_ASSESSMENT_LIMIT = intEnv('DISCOVER_ASSESSMENT_LIMIT', 100);

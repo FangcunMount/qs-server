@@ -1,9 +1,9 @@
 import ws from 'k6/ws';
 import { check } from 'k6';
 import { scenarioData, pickReportSample, flattenReportSamples } from '../lib/data.js';
-import { authHeaders, collectionToken } from '../lib/http.js';
+import { authHeaders, collectionTokenAt } from '../lib/http.js';
 import { COLLECTION_BASE_URL, REPORT_EVENTS_PATH, REPORT_WS_HOLD_SECONDS } from '../lib/config.js';
-import { reportStatusDuration, reportStatusFailed, reportStatusSuccessRate } from '../lib/metrics.js';
+import { reportStatusDuration, reportStatusFailed, reportStatusSuccessRate, reportSampleSkipped } from '../lib/metrics.js';
 
 function wsBaseURL(httpBase) {
   if (httpBase.startsWith('https://')) {
@@ -18,12 +18,11 @@ function wsBaseURL(httpBase) {
 function runReportWsQuery(ctx, sample, kind, endpoint) {
   const tags = { endpoint, service: 'collection-server', model_type: kind };
   if (!sample) {
-    reportStatusSuccessRate.add(false, { ...tags, reason: 'missing_report_sample' });
-    reportStatusFailed.add(1, { ...tags, reason: 'missing_report_sample' });
+    reportSampleSkipped.add(1, { ...tags, reason: 'missing_report_sample' });
     return;
   }
   const url = `${wsBaseURL(COLLECTION_BASE_URL)}${REPORT_EVENTS_PATH}`;
-  const headers = authHeaders(collectionToken());
+  const headers = authHeaders(collectionTokenAt(sample.collection_token_index));
   const started = Date.now();
   const res = ws.connect(url, { headers }, (socket) => {
     let terminal = false;

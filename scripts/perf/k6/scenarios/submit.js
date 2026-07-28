@@ -1,6 +1,6 @@
 import { check } from 'k6';
-import { scenarioData, weightedPickModelType, buildMedicalSubmitRequest, buildPersonalitySubmitPayload } from '../lib/data.js';
-import { timedRequest, jsonHeaders, collectionToken, recordHTTPStatus, responseData } from '../lib/http.js';
+import { scenarioData, weightedPickModelType, buildMedicalSubmitRequest, buildPersonalitySubmitRequest } from '../lib/data.js';
+import { timedRequest, jsonHeaders, collectionTokenAt, recordHTTPStatus, responseData } from '../lib/http.js';
 import { COLLECTION_BASE_URL, SUBMIT_PATH, SUBMIT_MIX, IDEMPOTENCY_PREFIX } from '../lib/config.js';
 import { answerSubmitDuration, answerSubmitAccepted, answerSubmitFailed, answerSubmitSuccessRate } from '../lib/metrics.js';
 
@@ -20,21 +20,21 @@ export function personalityAnswerSubmit(data) {
 }
 
 export function submitAnswerSheet(ctx, modelType) {
-  let payload;
+  let request;
   if (modelType === 'personality') {
-    payload = buildPersonalitySubmitPayload(ctx);
+    request = buildPersonalitySubmitRequest(ctx);
   } else {
-    const request = buildMedicalSubmitRequest(ctx);
-    payload = request.payload;
+    request = buildMedicalSubmitRequest(ctx);
     modelType = request.modelType;
   }
+  const payload = request.payload;
   if (!payload) {
     answerSubmitFailed.add(1, { reason: 'missing_submit_payload', model_type: modelType });
     answerSubmitSuccessRate.add(false, { model_type: modelType });
     return;
   }
   const requestID = payload.idempotency_key || `${IDEMPOTENCY_PREFIX}-req-${__VU}-${__ITER}-${Date.now()}`;
-  const headers = jsonHeaders(collectionToken(), requestID);
+  const headers = jsonHeaders(collectionTokenAt(request.collectionTokenIndex), requestID);
   const endpoint = 'answersheet_submit';
   const res = timedRequest('POST', COLLECTION_BASE_URL, SUBMIT_PATH, JSON.stringify(payload), headers, {
     endpoint,

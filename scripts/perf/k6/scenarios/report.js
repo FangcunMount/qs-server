@@ -1,6 +1,6 @@
 import { check, sleep } from 'k6';
 import { scenarioData, pickReportSample, flattenReportSamples, renderPath } from '../lib/data.js';
-import { timedRequest, authHeaders, collectionToken, recordHTTPStatus, responseData } from '../lib/http.js';
+import { timedRequest, authHeaders, collectionTokenAt, recordHTTPStatus, responseData } from '../lib/http.js';
 import {
   COLLECTION_BASE_URL, REPORT_STATUS_PATH, PERSONALITY_REPORT_STATUS_PATH, REPORT_TIMEOUT, REPORT_SHORT_POLL,
   BEHAVIOR_REPORT_STATUS_PATH,
@@ -8,7 +8,7 @@ import {
 import {
   reportStatusDuration, reportStatusFailed, medicalReportStatusDuration, medicalReportStatusFailed,
   personalityReportStatusDuration, personalityReportStatusFailed,
-  reportStatusSuccessRate, reportStatusTerminal, reportStatusPending,
+  reportStatusSuccessRate, reportStatusTerminal, reportStatusPending, reportSampleSkipped,
 } from '../lib/metrics.js';
 
 
@@ -48,8 +48,11 @@ export function personalityReportStatusQuery(data) {
 
 export function runReportStatusQuery(ctx, sample, pathTemplate, endpoint, durationTrend, failedCounter) {
   if (!sample) {
-    failedCounter.add(1, { reason: 'missing_report_sample' });
-    reportStatusSuccessRate.add(false);
+    reportSampleSkipped.add(1, {
+      endpoint,
+      service: 'collection-server',
+      reason: 'missing_report_sample',
+    });
     return;
   }
   const path = renderPath(pathTemplate, {
@@ -57,7 +60,7 @@ export function runReportStatusQuery(ctx, sample, pathTemplate, endpoint, durati
     testee_id: sample.testee_id,
     report_timeout: String(REPORT_TIMEOUT),
   }, ctx);
-  const res = timedRequest('GET', COLLECTION_BASE_URL, path, null, authHeaders(collectionToken()), {
+  const res = timedRequest('GET', COLLECTION_BASE_URL, path, null, authHeaders(collectionTokenAt(sample.collection_token_index)), {
     endpoint,
     service: 'collection-server',
     model_type: sample.model_type || 'medical',

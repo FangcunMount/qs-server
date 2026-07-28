@@ -1,6 +1,6 @@
 import { sleep, check } from 'k6';
 import { scenarioData, buildMedicalSubmitRequest, buildSubmitPayloadFromCase, buildPersonalityCaseFromSession, renderPath } from '../lib/data.js';
-import { timedRequest, authHeaders, jsonHeaders, collectionToken, responseData, recordHTTPStatus } from '../lib/http.js';
+import { timedRequest, authHeaders, jsonHeaders, collectionTokenAt, responseData, recordHTTPStatus } from '../lib/http.js';
 import {
   COLLECTION_BASE_URL, SUBMIT_PATH, ASSESSMENT_READINESS_PATH,
   REPORT_STATUS_PATH, PERSONALITY_REPORT_STATUS_PATH, PERSONALITY_REPORT_PATH,
@@ -30,6 +30,7 @@ export function asyncChainProbe(data) {
 export function runAsyncChainProbe(ctx, modelType) {
   const start = Date.now();
   let payload = null;
+  let collectionTokenIndex;
   if (modelType === 'personality') {
     const personalityCase = buildPersonalityCaseFromSession(ctx, 'chain_probe_personality_session');
     if (!personalityCase) {
@@ -37,9 +38,11 @@ export function runAsyncChainProbe(ctx, modelType) {
       return;
     }
     payload = buildSubmitPayloadFromCase(personalityCase);
+    collectionTokenIndex = personalityCase.collection_token_index;
   } else {
     const request = buildMedicalSubmitRequest(ctx);
     payload = request.payload;
+    collectionTokenIndex = request.collectionTokenIndex;
     modelType = request.modelType;
   }
   if (!payload) {
@@ -48,7 +51,8 @@ export function runAsyncChainProbe(ctx, modelType) {
   }
 
   const requestID = payload.idempotency_key || `${IDEMPOTENCY_PREFIX}-chain-${modelType}-${__VU}-${__ITER}-${start}`;
-  const submitRes = timedRequest('POST', COLLECTION_BASE_URL, SUBMIT_PATH, JSON.stringify(payload), jsonHeaders(collectionToken(), requestID), {
+  const token = collectionTokenAt(collectionTokenIndex);
+  const submitRes = timedRequest('POST', COLLECTION_BASE_URL, SUBMIT_PATH, JSON.stringify(payload), jsonHeaders(token, requestID), {
     endpoint: 'chain_probe_submit',
     service: 'collection-server',
     model_type: modelType,
@@ -60,7 +64,7 @@ export function runAsyncChainProbe(ctx, modelType) {
     return;
   }
 
-  const assessmentID = waitAssessmentReadiness(accepted.answersheet_id, payload.testee_id, modelType);
+  const assessmentID = waitAssessmentReadiness(accepted.answersheet_id, payload.testee_id, modelType, token);
   if (!assessmentID) {
     chainProbeFailed.add(1, { reason: 'assessment_readiness_timeout', model_type: modelType });
     return;
@@ -71,7 +75,7 @@ export function runAsyncChainProbe(ctx, modelType) {
     ? PERSONALITY_REPORT_STATUS_PATH
     : (modelType === 'behavior' ? BEHAVIOR_REPORT_STATUS_PATH : REPORT_STATUS_PATH);
   const assessmentStart = Date.now();
-  const terminalStatus = waitReportTerminal(assessmentID, payload.testee_id, ctx, reportPathTemplate, modelType === 'personality' ? 'chain_probe_personality_report_status' : 'chain_probe_report_status');
+  const terminalStatus = waitReportTerminal(assessmentID, payload.testee_id, ctx, reportPathTemplate, modelType === 'personality' ? 'chain_probe_personality_report_status' : 'chain_probe_report_status', token);
   if (!terminalStatus) {
     chainProbeFailed.add(1, { reason: 'report_timeout', model_type: modelType });
     return;
@@ -93,7 +97,7 @@ export function runAsyncChainProbe(ctx, modelType) {
         assessment_id: assessmentID,
         testee_id: payload.testee_id,
       }, ctx);
-      const reportRes = timedRequest('GET', COLLECTION_BASE_URL, reportPath, null, authHeaders(collectionToken()), {
+      const reportRes = timedRequest('GET', COLLECTION_BASE_URL, reportPath, null, authHeaders(token), {
         endpoint: 'chain_probe_personality_report',
         service: 'collection-server',
         model_type: modelType,
@@ -113,14 +117,14 @@ export function runAsyncChainProbe(ctx, modelType) {
   chainProbeTerminal.add(1, { assessment_status: terminalStatus, model_type: modelType });
 }
 
-export function waitAssessmentReadiness(answerSheetID, testeeID, modelType) {
+export function waitAssessmentReadiness(answerSheetID, testeeID, modelType, token) {
   const deadline = Date.now() + CHAIN_PROBE_TIMEOUT_SECONDS * 1000;
   while (Date.now() < deadline) {
     const path = renderPath(ASSESSMENT_READINESS_PATH, {
       answersheet_id: encodeURIComponent(answerSheetID),
       testee_id: encodeURIComponent(testeeID),
     });
-    const res = timedRequest('GET', COLLECTION_BASE_URL, path, null, authHeaders(collectionToken()), {
+    const res = timedRequest('GET', COLLECTION_BASE_URL, path, null, authHeaders(token), {
       endpoint: 'chain_probe_assessment_readiness',
       service: 'collection-server',
       model_type: modelType,
@@ -138,7 +142,7 @@ export function waitAssessmentReadiness(answerSheetID, testeeID, modelType) {
   return '';
 }
 
-export function waitReportTerminal(assessmentID, testeeID, data, pathTemplate, endpoint) {
+export function waitReportTerminal(assessmentID, testeeID, data, pathTemplate, endpoint, token) {
   const deadline = Date.now() + CHAIN_PROBE_TIMEOUT_SECONDS * 1000;
   while (Date.now() < deadline) {
     const path = renderPath(pathTemplate || REPORT_STATUS_PATH, {
@@ -146,7 +150,7 @@ export function waitReportTerminal(assessmentID, testeeID, data, pathTemplate, e
       testee_id: testeeID,
       report_timeout: String(REPORT_TIMEOUT),
     }, data);
-    const res = timedRequest('GET', COLLECTION_BASE_URL, path, null, authHeaders(collectionToken()), {
+    const res = timedRequest('GET', COLLECTION_BASE_URL, path, null, authHeaders(token), {
       endpoint: endpoint || 'chain_probe_report_status',
       service: 'collection-server',
     });

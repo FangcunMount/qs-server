@@ -22,6 +22,14 @@ export function collectionToken() {
   return pick(COLLECTION_TOKENS);
 }
 
+export function collectionTokenAt(index) {
+  const tokenIndex = Number(index);
+  if (Number.isInteger(tokenIndex) && tokenIndex >= 0 && tokenIndex < COLLECTION_TOKENS.length) {
+    return COLLECTION_TOKENS[tokenIndex];
+  }
+  return collectionToken();
+}
+
 export function apiserverToken() {
   return pick(APISERVER_TOKENS);
 }
@@ -105,6 +113,10 @@ export function responseData(res) {
 
 export function getCollectionData(path, endpoint) {
   const token = collectionToken();
+  return getCollectionDataWithToken(path, endpoint, token);
+}
+
+export function getCollectionDataWithToken(path, endpoint, token) {
   const res = timedRequest('GET', COLLECTION_BASE_URL, path, null, authHeaders(token), {
     endpoint,
     service: 'collection-server',
@@ -130,4 +142,3 @@ export function getApiserverData(path, endpoint) {
   }
   return responseData(res);
 }
-

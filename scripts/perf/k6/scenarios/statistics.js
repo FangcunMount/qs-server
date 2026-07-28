@@ -10,10 +10,10 @@ function contentBatchPayload(ctx) {
   const questionnaireCode = pick(ctx.questionnaireCodes);
   const scaleCode = pick(ctx.scaleCodes);
   if (questionnaireCode) {
-    items.push({ type: 'questionnaire', code: questionnaireCode });
+    items.push({ kind: 'questionnaire', code: questionnaireCode });
   }
   if (scaleCode) {
-    items.push({ type: 'scale', code: scaleCode });
+    items.push({ kind: 'scale', code: scaleCode });
   }
   return items.length > 0 ? { items: [pick(items)] } : null;
 }

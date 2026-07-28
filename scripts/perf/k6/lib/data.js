@@ -1,6 +1,6 @@
 import { pick, clone, nonEmptyList, uniqueList, uniqueReportSamples, responseItems, dateStringDaysAgo, is2xx, readTextFile, timeSnapshot, addDurationMs } from './util.js';
 import { setupDiscoveryFailed } from './metrics.js';
-import { timedRequest, authHeaders, jsonHeaders, collectionToken, getCollectionData, getApiserverData, recordHTTPStatus, responseData } from './http.js';
+import { timedRequest, authHeaders, jsonHeaders, collectionToken, collectionTokenAt, getCollectionData, getCollectionDataWithToken, getApiserverData, recordHTTPStatus, responseData } from './http.js';
 
 import {
   DISCOVER_TESTEE_LOOKBACK_DAYS,
@@ -13,6 +13,7 @@ import {
   PERSONALITY_MODEL_CODES,
   CHAIN_PROBE_MEDICAL_RPS,
   AUTO_DISCOVER_SEEDDATA,
+  AUTO_CREATE_SUBMIT_TESTEES,
   CHAIN_PROBE_MODEL_TYPE,
   PERSONALITY_REPORT_RPS,
   PERSONALITY_SUBMIT_RPS,
@@ -72,6 +73,7 @@ export function scenarioData(data) {
   const fallbackPersonalityCases = staticPersonalityCases;
   return {
     testeeIDs: nonEmptyList(data && data.testeeIDs, fallbackTesteeIDs),
+    submitSubjects: normalizeSubmitSubjects(data && data.submitSubjects),
     questionnaireCodes: nonEmptyList(data && data.questionnaireCodes, fallbackQuestionnaireCodes),
     personalityQuestionnaireCodes: nonEmptyList(data && data.personalityQuestionnaireCodes, []),
     scaleCodes: nonEmptyList(data && data.scaleCodes, SCALE_CODES),
@@ -98,28 +100,42 @@ export function validateScenarioData(data) {
   }
   const needsMedicalCases = LEGACY_SUBMIT_RPS > 0 || MEDICAL_SUBMIT_RPS > 0 || CHAIN_PROBE_MEDICAL_RPS > 0;
   const needsPersonalityCases = PERSONALITY_SUBMIT_RPS > 0 || CHAIN_PROBE_PERSONALITY_RPS > 0 || PERSONALITY_SESSION_RPS > 0 || PERSONALITY_QUESTIONNAIRE_DETAIL_RPS > 0;
+  const needsSubmitSubjects = submitRps > 0 || chainProbeRps > 0 || PERSONALITY_SESSION_RPS > 0;
   if (needsMedicalCases && data.medicalCases.length === 0) {
     throw new Error('No medical answer templates found. Set ANSWERS_JSON/ANSWERS_FILE, or provide valid collection tokens and SCALE_CODES for auto discovery. Check setup_discovery_failed plus http_401_total/http_403_total/http_5xx_total in the k6 summary.');
   }
   if (needsPersonalityCases && data.personalityCases.length === 0) {
     throw new Error('No personality cases found. Set PERSONALITY_MODEL_CODES with discoverAnswers=true, or provide personalityCases / personalityCasesFile in config.');
   }
-  if ((submitRps > 0 || chainProbeRps > 0) && data.testeeIDs.length === 0) {
+  if (needsSubmitSubjects && normalizeSubmitSubjects(data.submitSubjects).length === 0) {
     throw new Error(
-      'No testee IDs found. Set TESTEE_IDS, or ensure AUTO_DISCOVER_SEEDDATA=true with apiserverTokensFile. '
-      + 'If apiserver testees returns 200 in preflight but setup is empty, try TESTEE_SOURCE= or increase discover.testeeLookbackDays in qs-perf.config.json. '
-      + 'Run with DEBUG_SETUP=true to see discover HTTP statuses.'
+      'No authorized collection token/testee pairs found. Ensure AUTO_DISCOVER_SEEDDATA=true and each collection user has an active IAM ProfileLink, '
+      + 'set AUTO_CREATE_SUBMIT_TESTEES=true to bootstrap persistent perf testees, or provide TESTEE_IDS in the same order as collection_users/tokens. '
+      + 'Run with DEBUG_SETUP=true to see collection /api/v1/testees discovery statuses.'
     );
   }
-  if (LEGACY_REPORT_RPS > 0 && flattenReportSamples(data.reportSamples).length === 0) {
-    throw new Error('No report samples found. Set ASSESSMENT_IDS/REPORT_SAMPLES_FILE or run with AUTO_DISCOVER_SEEDDATA=true.');
+  const availability = reportSampleAvailability(data.reportSamples);
+  const missingReportSampleKinds = [];
+  if (LEGACY_REPORT_RPS > 0 && availability.total === 0) {
+    missingReportSampleKinds.push('report');
   }
-  if (MEDICAL_REPORT_RPS > 0 && data.reportSamples.medical.length === 0) {
-    throw new Error('No medical report samples found. Set medical report samples in config or run with AUTO_DISCOVER_SEEDDATA=true.');
+  if (MEDICAL_REPORT_RPS > 0 && availability.medical === 0) {
+    missingReportSampleKinds.push('medical');
   }
-  if (PERSONALITY_REPORT_RPS > 0 && data.reportSamples.personality.length === 0) {
-    throw new Error('No personality report samples found. Enable chain probe to generate samples, or run with AUTO_DISCOVER_SEEDDATA=true.');
+  if (PERSONALITY_REPORT_RPS > 0 && availability.personality === 0) {
+    missingReportSampleKinds.push('personality');
   }
+  if (missingReportSampleKinds.length > 0) {
+    console.warn(
+      `[setup-warning] no report samples for ${missingReportSampleKinds.join(',')}; `
+      + 'report iterations will be skipped while query/submit/statistics continue. '
+      + 'The next run will auto-discover assessments created by this run.'
+    );
+  }
+  return {
+    reportSampleCounts: availability,
+    missingReportSampleKinds,
+  };
 }
 
 export function weightedPickModelType(mix, ctx) {
@@ -142,7 +158,7 @@ export function normalizeMedicalCase(item) {
   if (!questionnaireCode) {
     return null;
   }
-  return {
+  const normalized = {
     model_type: normalizeExecutionModelType(item.model_type || item.modelType || item.kind || 'medical'),
     scale_code: String(item.scale_code || item.scaleCode || ''),
     questionnaire_code: questionnaireCode,
@@ -151,6 +167,11 @@ export function normalizeMedicalCase(item) {
     testee_id: String(item.testee_id || item.testeeId || ''),
     answers: item.answers || [],
   };
+  const tokenIndex = Number(item.collection_token_index === undefined ? item.collectionTokenIndex : item.collection_token_index);
+  if (Number.isInteger(tokenIndex) && tokenIndex >= 0) {
+    normalized.collection_token_index = tokenIndex;
+  }
+  return normalized;
 }
 
 export function normalizeExecutionModelType(raw) {
@@ -172,7 +193,7 @@ export function normalizePersonalityCase(item) {
   if (!questionnaireCode) {
     return null;
   }
-  return {
+  const normalized = {
     model_type: 'personality',
     model_code: String(item.model_code || item.modelCode || ''),
     questionnaire_code: questionnaireCode,
@@ -183,6 +204,51 @@ export function normalizePersonalityCase(item) {
     testee_id: String(item.testee_id || item.testeeId || ''),
     answers: item.answers || [],
   };
+  const tokenIndex = Number(item.collection_token_index === undefined ? item.collectionTokenIndex : item.collection_token_index);
+  if (Number.isInteger(tokenIndex) && tokenIndex >= 0) {
+    normalized.collection_token_index = tokenIndex;
+  }
+  return normalized;
+}
+
+export function normalizeSubmitSubject(item) {
+  if (!item) {
+    return null;
+  }
+  let rawTokenIndex = item.collection_token_index;
+  if (rawTokenIndex === undefined) {
+    rawTokenIndex = item.collectionTokenIndex;
+  }
+  if (rawTokenIndex === undefined) {
+    rawTokenIndex = item.token_index;
+  }
+  if (rawTokenIndex === undefined) {
+    rawTokenIndex = item.tokenIndex;
+  }
+  const tokenIndex = Number(rawTokenIndex);
+  const testeeID = String(item.testee_id || item.testeeId || '').trim();
+  if (!Number.isInteger(tokenIndex) || tokenIndex < 0 || tokenIndex >= COLLECTION_TOKENS.length || !/^\d+$/.test(testeeID)) {
+    return null;
+  }
+  return { collection_token_index: tokenIndex, testee_id: testeeID };
+}
+
+export function normalizeSubmitSubjects(items) {
+  const seen = {};
+  const out = [];
+  (Array.isArray(items) ? items : []).forEach((item) => {
+    const subject = normalizeSubmitSubject(item);
+    if (!subject) {
+      return;
+    }
+    const key = `${subject.collection_token_index}:${subject.testee_id}`;
+    if (seen[key]) {
+      return;
+    }
+    seen[key] = true;
+    out.push(subject);
+  });
+  return out;
 }
 
 export function normalizeReportSamples(raw, fallback) {
@@ -227,11 +293,24 @@ export function normalizeReportSample(item, defaultModelType) {
   if (!assessmentID || !testeeID) {
     return null;
   }
-  return {
+  const normalized = {
     model_type: normalizeExecutionModelType(item.model_type || item.modelType || defaultModelType || 'medical'),
     assessment_id: assessmentID,
     testee_id: testeeID,
   };
+  let rawTokenIndex = item.collection_token_index;
+  if (rawTokenIndex === undefined) {
+    rawTokenIndex = item.collectionTokenIndex;
+  }
+  if (rawTokenIndex === undefined) {
+    const orderedIndex = TESTEE_IDS.indexOf(testeeID);
+    rawTokenIndex = orderedIndex >= 0 ? orderedIndex : undefined;
+  }
+  const tokenIndex = Number(rawTokenIndex);
+  if (Number.isInteger(tokenIndex) && tokenIndex >= 0 && tokenIndex < COLLECTION_TOKENS.length) {
+    normalized.collection_token_index = tokenIndex;
+  }
+  return normalized;
 }
 
 export function pickReportSample(samples) {
@@ -245,11 +324,30 @@ export function flattenReportSamples(reportSamples) {
   const normalized = normalizeReportSamples(reportSamples);
   return normalized.medical.concat(normalized.behavior).concat(normalized.personality);
 }
+
+export function reportSampleAvailability(reportSamples) {
+  const normalized = normalizeReportSamples(reportSamples);
+  const medical = normalized.medical.length;
+  const behavior = normalized.behavior.length;
+  const personality = normalized.personality.length;
+  return {
+    medical,
+    behavior,
+    personality,
+    total: medical + behavior + personality,
+  };
+}
 export function buildMedicalSubmitRequest(data) {
   const template = clone(pick(data.medicalCases.length > 0 ? data.medicalCases : data.answerTemplates));
+  const subject = pick(normalizeSubmitSubjects(data.submitSubjects));
+  if (template && subject) {
+    template.testee_id = subject.testee_id;
+    template.collection_token_index = subject.collection_token_index;
+  }
   return {
     modelType: normalizeExecutionModelType(template && template.model_type),
     payload: buildSubmitPayloadFromCase(template),
+    collectionTokenIndex: template ? template.collection_token_index : undefined,
   };
 }
 export function buildMedicalSubmitPayload(data) {
@@ -257,8 +355,20 @@ export function buildMedicalSubmitPayload(data) {
 }
 
 export function buildPersonalitySubmitPayload(data) {
+  return buildPersonalitySubmitRequest(data).payload;
+}
+
+export function buildPersonalitySubmitRequest(data) {
   const template = clone(pick(data.personalityCases));
-  return buildSubmitPayloadFromCase(template);
+  const subject = pick(normalizeSubmitSubjects(data.submitSubjects));
+  if (template && subject) {
+    template.testee_id = subject.testee_id;
+    template.collection_token_index = subject.collection_token_index;
+  }
+  return {
+    payload: buildSubmitPayloadFromCase(template),
+    collectionTokenIndex: template ? template.collection_token_index : undefined,
+  };
 }
 
 export function buildAnswerPayload(data) {
@@ -622,10 +732,11 @@ export function discoverMedicalCases(testeeIDs) {
   };
 }
 
-export function discoverPersonalityCases(testeeIDs) {
+export function discoverPersonalityCases(testeeIDs, submitSubjects) {
   const cases = [];
   const modelCodes = uniqueList(PERSONALITY_MODEL_CODES);
-  if (!DISCOVER_ANSWERS || COLLECTION_TOKENS.length === 0 || testeeIDs.length === 0) {
+  const subjects = normalizeSubmitSubjects(submitSubjects);
+  if (!DISCOVER_ANSWERS || COLLECTION_TOKENS.length === 0 || subjects.length === 0) {
     return { modelCodes, questionnaireCodes: [], cases };
   }
 
@@ -639,7 +750,7 @@ export function discoverPersonalityCases(testeeIDs) {
   });
 
   uniqueList(modelCodes.concat(discoveredModelCodes)).forEach((modelCode) => {
-    const personalityCase = buildPersonalityCaseFromSession({ testeeIDs, modelCodes: [modelCode] }, 'discover_personality_session', modelCode);
+    const personalityCase = buildPersonalityCaseFromSession({ testeeIDs, submitSubjects: subjects, modelCodes: [modelCode] }, 'discover_personality_session', modelCode);
     if (personalityCase) {
       cases.push(personalityCase);
     }
@@ -654,7 +765,8 @@ export function discoverPersonalityCases(testeeIDs) {
 
 export function buildPersonalityCaseFromSession(ctx, endpoint, forcedModelCode) {
   const modelCode = forcedModelCode || pick(ctx.modelCodes);
-  const testeeID = pick(ctx.testeeIDs);
+  const subject = pick(normalizeSubmitSubjects(ctx.submitSubjects));
+  const testeeID = subject ? subject.testee_id : pick(ctx.testeeIDs);
   if (!modelCode || !testeeID) {
     return null;
   }
@@ -663,7 +775,7 @@ export function buildPersonalityCaseFromSession(ctx, endpoint, forcedModelCode) 
     COLLECTION_BASE_URL,
     PERSONALITY_SESSION_PATH,
     JSON.stringify({ model_code: modelCode, testee_id: testeeID }),
-    jsonHeaders(collectionToken()),
+    jsonHeaders(subject ? collectionTokenAt(subject.collection_token_index) : collectionToken()),
     { endpoint, service: 'collection-server' }
   );
   if (!is2xx(res.status)) {
@@ -686,6 +798,7 @@ export function buildPersonalityCaseFromSession(ctx, endpoint, forcedModelCode) 
     endpoints: session.endpoints || {},
     title: questionnaire.title || envOrConfigString('ANSWERSHEET_TITLE', ['answersheetTitle', 'answersheet_title'], 'k6 personality assessment'),
     testee_id: String(submitContract.testee_id || submitContract.testeeId || testeeID),
+    collection_token_index: subject ? subject.collection_token_index : undefined,
     answers,
   });
 }
@@ -707,6 +820,74 @@ export function appendTesteesFromResponse(data, out, requireSourceMatch) {
     }
     out.push(id);
   });
+}
+
+export function discoverSubmitSubjects() {
+  if (COLLECTION_TOKENS.length === 0) {
+    return [];
+  }
+  if (TESTEE_IDS.length > 0) {
+    return normalizeSubmitSubjects(
+      TESTEE_IDS.slice(0, COLLECTION_TOKENS.length).map((testeeID, index) => ({
+        collection_token_index: index,
+        testee_id: testeeID,
+      }))
+    );
+  }
+  if (!AUTO_DISCOVER_SEEDDATA) {
+    return [];
+  }
+
+  const subjects = [];
+  let bootstrapped = 0;
+  COLLECTION_TOKENS.forEach((token, tokenIndex) => {
+    const data = getCollectionDataWithToken(
+      '/api/v1/testees?offset=0&limit=1',
+      'discover_submit_testees',
+      token
+    );
+    let item = responseItems(data).find((candidate) => {
+      const id = String(candidate.id || candidate.testee_id || candidate.testeeId || '').trim();
+      return /^\d+$/.test(id);
+    });
+    if (data && !item && AUTO_CREATE_SUBMIT_TESTEES) {
+      const res = timedRequest(
+        'POST',
+        COLLECTION_BASE_URL,
+        '/api/v1/testees',
+        JSON.stringify({
+          name: `K6 Perf Testee ${String(tokenIndex + 1).padStart(3, '0')}`,
+          gender: 3,
+          relation: 'self',
+          source: TESTEE_SOURCE || 'daily_simulation',
+          tags: ['k6', 'performance'],
+          is_key_focus: false,
+        }),
+        jsonHeaders(token),
+        { endpoint: 'bootstrap_submit_testee', service: 'collection-server' }
+      );
+      if (!is2xx(res.status)) {
+        recordHTTPStatus(res, setupDiscoveryFailed, 'bootstrap_submit_testee');
+      } else {
+        item = responseData(res);
+        const createdID = String(item.id || item.testee_id || item.testeeId || '').trim();
+        if (/^\d+$/.test(createdID)) {
+          bootstrapped += 1;
+        }
+      }
+    }
+    if (!item) {
+      return;
+    }
+    subjects.push({
+      collection_token_index: tokenIndex,
+      testee_id: String(item.id || item.testee_id || item.testeeId),
+    });
+  });
+  if (bootstrapped > 0) {
+    console.warn(`[setup-warning] bootstrapped ${bootstrapped} submit testee(s) because collection users had no active testee; this creates persistent IAM ProfileLink/testee data.`);
+  }
+  return normalizeSubmitSubjects(subjects);
 }
 
 export function discoverTesteeIDs() {
@@ -753,23 +934,40 @@ export function discoverTesteeIDs() {
   return uniqueList(out).slice(0, DISCOVER_TESTEE_LIMIT);
 }
 
-export function discoverReportSamples(testeeIDs) {
+export function discoverReportSamples(testeeIDs, submitSubjects) {
   if (staticReportSamples.medical.length > 0 || staticReportSamples.behavior.length > 0 || staticReportSamples.personality.length > 0 || !AUTO_DISCOVER_SEEDDATA || APISERVER_TOKENS.length === 0) {
     return staticReportSamples;
   }
+  const subjects = normalizeSubmitSubjects(submitSubjects);
   return {
-    medical: discoverMedicalReportSamples(testeeIDs),
-    behavior: discoverBehaviorReportSamples(testeeIDs),
-    personality: discoverPersonalityReportSamples(testeeIDs),
+    medical: discoverMedicalReportSamples(testeeIDs, subjects),
+    behavior: discoverBehaviorReportSamples(testeeIDs, subjects),
+    personality: discoverPersonalityReportSamples(testeeIDs, subjects),
   };
 }
 
-export function discoverMedicalReportSamples(testeeIDs) {
+export function reportDiscoverySubjects(testeeIDs, submitSubjects) {
+  const subjects = normalizeSubmitSubjects(submitSubjects);
+  if (subjects.length > 0) {
+    return subjects;
+  }
+  return uniqueList(testeeIDs).map((testeeID) => {
+    const orderedIndex = TESTEE_IDS.indexOf(testeeID);
+    return {
+      collection_token_index: orderedIndex >= 0 ? orderedIndex : -1,
+      testee_id: testeeID,
+    };
+  });
+}
+
+export function discoverMedicalReportSamples(testeeIDs, submitSubjects) {
   const out = [];
-  testeeIDs.slice(0, Math.min(testeeIDs.length, DISCOVER_TESTEE_LIMIT)).forEach((testeeID) => {
+  const subjects = reportDiscoverySubjects(testeeIDs, submitSubjects);
+  subjects.slice(0, Math.min(subjects.length, DISCOVER_TESTEE_LIMIT)).forEach((subject) => {
     if (out.length >= DISCOVER_ASSESSMENT_LIMIT) {
       return;
     }
+    const testeeID = subject.testee_id;
     const data = getApiserverData(`/api/v1/evaluations/assessments?testee_id=${encodeURIComponent(testeeID)}&page=1&page_size=20`, 'discover_assessments');
     responseItems(data).forEach((item) => {
       const model = item.model || {};
@@ -779,49 +977,70 @@ export function discoverMedicalReportSamples(testeeIDs) {
       const assessmentID = String(item.id || item.assessment_id || item.assessmentId || '');
       const sampleTesteeID = String(item.testee_id || item.testeeId || testeeID);
       if (assessmentID && sampleTesteeID) {
-        out.push({ model_type: 'medical', assessment_id: assessmentID, testee_id: sampleTesteeID });
+        out.push({
+          model_type: 'medical',
+          assessment_id: assessmentID,
+          testee_id: sampleTesteeID,
+          collection_token_index: subject.collection_token_index,
+        });
       }
     });
   });
   return uniqueReportSamples(out).slice(0, DISCOVER_ASSESSMENT_LIMIT);
 }
 
-export function discoverBehaviorReportSamples(testeeIDs) {
+export function discoverBehaviorReportSamples(testeeIDs, submitSubjects) {
   const out = [];
   if (COLLECTION_TOKENS.length === 0) {
     return out;
   }
-  testeeIDs.slice(0, Math.min(testeeIDs.length, DISCOVER_TESTEE_LIMIT)).forEach((testeeID) => {
+  const subjects = reportDiscoverySubjects(testeeIDs, submitSubjects);
+  subjects.slice(0, Math.min(subjects.length, DISCOVER_TESTEE_LIMIT)).forEach((subject) => {
     if (out.length >= DISCOVER_ASSESSMENT_LIMIT) {
       return;
     }
-    const data = getCollectionData(`/api/v1/behavior-assessments?testee_id=${encodeURIComponent(testeeID)}&page=1&page_size=20`, 'discover_behavior_assessments');
+    const testeeID = subject.testee_id;
+    const token = collectionTokenAt(subject.collection_token_index);
+    const data = getCollectionDataWithToken(`/api/v1/behavior-assessments?testee_id=${encodeURIComponent(testeeID)}&page=1&page_size=20`, 'discover_behavior_assessments', token);
     responseItems(data).forEach((item) => {
       const assessmentID = String(item.id || item.assessment_id || item.assessmentId || '');
       const sampleTesteeID = String(item.testee_id || item.testeeId || testeeID);
       if (assessmentID && sampleTesteeID) {
-        out.push({ model_type: 'behavior', assessment_id: assessmentID, testee_id: sampleTesteeID });
+        out.push({
+          model_type: 'behavior',
+          assessment_id: assessmentID,
+          testee_id: sampleTesteeID,
+          collection_token_index: subject.collection_token_index,
+        });
       }
     });
   });
   return uniqueReportSamples(out).slice(0, DISCOVER_ASSESSMENT_LIMIT);
 }
 
-export function discoverPersonalityReportSamples(testeeIDs) {
+export function discoverPersonalityReportSamples(testeeIDs, submitSubjects) {
   const out = [];
   if (COLLECTION_TOKENS.length === 0) {
     return out;
   }
-  testeeIDs.slice(0, Math.min(testeeIDs.length, DISCOVER_TESTEE_LIMIT)).forEach((testeeID) => {
+  const subjects = reportDiscoverySubjects(testeeIDs, submitSubjects);
+  subjects.slice(0, Math.min(subjects.length, DISCOVER_TESTEE_LIMIT)).forEach((subject) => {
     if (out.length >= DISCOVER_ASSESSMENT_LIMIT) {
       return;
     }
-    const data = getCollectionData(`/api/v1/typology-assessments?testee_id=${encodeURIComponent(testeeID)}&page=1&page_size=20`, 'discover_personality_assessments');
+    const testeeID = subject.testee_id;
+    const token = collectionTokenAt(subject.collection_token_index);
+    const data = getCollectionDataWithToken(`/api/v1/typology-assessments?testee_id=${encodeURIComponent(testeeID)}&page=1&page_size=20`, 'discover_personality_assessments', token);
     responseItems(data).forEach((item) => {
       const assessmentID = String(item.id || item.assessment_id || item.assessmentId || '');
       const sampleTesteeID = String(item.testee_id || item.testeeId || testeeID);
       if (assessmentID && sampleTesteeID) {
-        out.push({ model_type: 'personality', assessment_id: assessmentID, testee_id: sampleTesteeID });
+        out.push({
+          model_type: 'personality',
+          assessment_id: assessmentID,
+          testee_id: sampleTesteeID,
+          collection_token_index: subject.collection_token_index,
+        });
       }
     });
   });

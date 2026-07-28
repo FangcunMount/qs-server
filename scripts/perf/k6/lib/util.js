@@ -131,7 +131,12 @@ export function uniqueReportSamples(samples) {
       return;
     }
     seen[key] = true;
-    out.push({ assessment_id: assessmentID, testee_id: testeeID });
+    const normalized = { assessment_id: assessmentID, testee_id: testeeID };
+    const tokenIndex = Number(sample.collection_token_index);
+    if (Number.isInteger(tokenIndex) && tokenIndex >= 0) {
+      normalized.collection_token_index = tokenIndex;
+    }
+    out.push(normalized);
   });
   return out;
 }
@@ -272,4 +277,3 @@ export function parseListFileContent(content) {
     .map((item) => item.trim())
     .filter((item) => item.length > 0);
 }
-

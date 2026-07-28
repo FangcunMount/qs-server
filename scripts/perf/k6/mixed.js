@@ -17,6 +17,7 @@ import { buildThresholds } from './lib/metrics.js';
 import { scenarios } from './lib/options.js';
 import {
   discoverTesteeIDs,
+  discoverSubmitSubjects,
   discoverMedicalCases,
   discoverPersonalityCases,
   discoverReportSamples,
@@ -58,12 +59,17 @@ export function setup() {
   });
   debugSetupState();
   try {
-    const testeeIDs = discoverTesteeIDs();
+    const discoveredTesteeIDs = discoverTesteeIDs();
+    const submitSubjects = discoverSubmitSubjects();
+    const testeeIDs = uniqueList(
+      discoveredTesteeIDs.concat(submitSubjects.map((subject) => subject.testee_id))
+    );
     const medicalBundle = discoverMedicalCases(testeeIDs);
-    const personalityBundle = discoverPersonalityCases(testeeIDs);
-    const reportSamples = discoverReportSamples(testeeIDs);
+    const personalityBundle = discoverPersonalityCases(testeeIDs, submitSubjects);
+    const reportSamples = discoverReportSamples(testeeIDs, submitSubjects);
     const data = {
       testeeIDs,
+      submitSubjects,
       questionnaireCodes: uniqueList(
         QUESTIONNAIRE_CODES.concat(medicalBundle.questionnaireCodes)
       ),
@@ -75,7 +81,17 @@ export function setup() {
       answerTemplates: medicalBundle.cases,
       reportSamples,
     };
-    validateScenarioData(data);
+    const validation = validateScenarioData(data);
+    logPerfTimeEvent('setup_data_ready', Date.now(), {
+      testee_count: data.testeeIDs.length,
+      submit_subject_count: data.submitSubjects.length,
+      collection_tokens_with_testees: uniqueList(data.submitSubjects.map((subject) => subject.collection_token_index)).length,
+      medical_case_count: data.medicalCases.length,
+      personality_case_count: data.personalityCases.length,
+      report_sample_counts: validation.reportSampleCounts,
+      skipped_report_sample_kinds: validation.missingReportSampleKinds,
+      report_scenarios_degraded: validation.missingReportSampleKinds.length > 0,
+    });
     runTiming.trafficStartAtMs = Date.now();
     runTiming.trafficPlannedEndAtMs = addDurationMs(runTiming.trafficStartAtMs, DURATION);
     logPerfTimeEvent('traffic_start_estimate', runTiming.trafficStartAtMs, {

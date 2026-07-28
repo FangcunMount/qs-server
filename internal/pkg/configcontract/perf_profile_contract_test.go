@@ -3,6 +3,7 @@ package configcontract
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -152,5 +153,100 @@ func TestPerfPathsMatchCurrentRuntimeContract(t *testing.T) {
 	}
 	if config.Paths.BehaviorReport != "/api/v1/behavior-assessments/{assessment_id}/report?testee_id={testee_id}" {
 		t.Fatalf("behaviorReport = %q, want current behavior report endpoint", config.Paths.BehaviorReport)
+	}
+}
+
+func TestPerfStatisticsContentBatchUsesKindContract(t *testing.T) {
+	root := repoRoot(t)
+	files := []struct {
+		path    string
+		wants   []string
+		rejects []string
+	}{
+		{
+			path:    "scripts/perf/k6/scenarios/statistics.js",
+			wants:   []string{"kind: 'questionnaire'", "kind: 'scale'"},
+			rejects: []string{"type: 'questionnaire'", "type: 'scale'"},
+		},
+		{
+			path:    "scripts/perf/check-token-preflight.sh",
+			wants:   []string{`\"kind\":\"scale\"`, `[[ "$status" =~ ^2[0-9][0-9]$ ]]`},
+			rejects: []string{`\"type\":\"scale\"`},
+		},
+	}
+	for _, file := range files {
+		raw, err := os.ReadFile(filepath.Join(root, file.path))
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(raw)
+		for _, want := range file.wants {
+			if !strings.Contains(text, want) {
+				t.Fatalf("%s missing Statistics contract fragment %q", file.path, want)
+			}
+		}
+		for _, reject := range file.rejects {
+			if strings.Contains(text, reject) {
+				t.Fatalf("%s still contains retired Statistics contract fragment %q", file.path, reject)
+			}
+		}
+	}
+}
+
+func TestPerfSyncMigratesRetiredRuntimePaths(t *testing.T) {
+	if _, err := exec.LookPath("jq"); err != nil {
+		t.Skip("jq is required by the perf profile sync script")
+	}
+	root := repoRoot(t)
+	local := filepath.Join(t.TempDir(), "qs-perf.config.json")
+	stale := `{
+  "paths": {
+    "medicalQuery": [
+      "/api/v1/scales?page=1&page_size=20&status=published",
+      "/api/v1/scales/categories",
+      "/api/v1/scales/hot?limit=5",
+      "/api/v1/scales/{scale_code}"
+    ],
+    "statistics": ["/api/v1/statistics/overview?preset=7d"],
+    "statisticsContentBatch": "/api/v1/statistics/contents/batch"
+  },
+  "qpsProfiles": {
+    "smoke_4": {
+      "paths": {
+        "questionnaireQuery": ["/api/v1/scales/{scale_code}"]
+      }
+    }
+  }
+}`
+	if err := os.WriteFile(local, []byte(stale), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	script := filepath.Join(root, "scripts/perf/sync-profiles-from-example.sh")
+	example := filepath.Join(root, "scripts/perf/qs-perf.config.example.json")
+	cmd := exec.Command("bash", script, local, example)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("sync perf profiles: %v\n%s", err, output)
+	}
+	raw, err := os.ReadFile(local)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(raw)
+	for _, retired := range []string{"/api/v1/scales", "/api/v1/statistics/"} {
+		if strings.Contains(text, retired) {
+			t.Fatalf("synced config still contains retired path prefix %q", retired)
+		}
+	}
+	for _, current := range []string{
+		"/api/v1/assessment-models?kind=scale&page=1&page_size=20",
+		"/api/v1/assessment-models/options?kind=scale",
+		"/api/v1/assessment-models/hot?kind=scale&limit=5",
+		"/api/v1/assessment-models/{scale_code}",
+		"/api/v2/statistics/overview?preset=7d",
+		"/api/v2/statistics/contents/batch",
+	} {
+		if !strings.Contains(text, current) {
+			t.Fatalf("synced config missing current path %q", current)
+		}
 	}
 }

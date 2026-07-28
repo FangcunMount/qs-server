@@ -104,11 +104,12 @@ http_status() {
   local token="$3"
   if [[ -z "$token" ]]; then
     echo "$label: no token"
-    return
+    return 1
   fi
   local status
   status="$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $token" "$url")"
   echo "$label: $status"
+  [[ "$status" =~ ^2[0-9][0-9]$ ]]
 }
 
 http_json_status() {
@@ -118,7 +119,7 @@ http_json_status() {
   local body="$4"
   if [[ -z "$token" ]]; then
     echo "$label: no token"
-    return
+    return 1
   fi
   local status
   status="$(curl -sS -o /dev/null -w '%{http_code}' \
@@ -128,6 +129,7 @@ http_json_status() {
     --data "$body" \
     "$url")"
   echo "$label: $status"
+  [[ "$status" =~ ^2[0-9][0-9]$ ]]
 }
 
 tokens_file="$(resolve_path "$(json_value '.tokensFile')")"
@@ -189,4 +191,4 @@ fi
 http_status "apiserver testees" "${apiserver_base_url%/}/api/v1/testees?org_id=${org_id}&page=1&page_size=1" "$apiserver_token"
 http_status "apiserver statistics overview" "${apiserver_base_url%/}/api/v2/statistics/overview?preset=7d" "$apiserver_token"
 http_json_status "apiserver statistics content batch" "${apiserver_base_url%/}/api/v2/statistics/contents/batch" "$apiserver_token" \
-  "{\"items\":[{\"type\":\"scale\",\"code\":\"${scale_code}\"}]}"
+  "{\"items\":[{\"kind\":\"scale\",\"code\":\"${scale_code}\"}]}"

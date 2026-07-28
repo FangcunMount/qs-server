@@ -450,6 +450,8 @@ perf-verify: perf-check-k6 ## 校验压测脚本与 k6 场景
 	bash -n $(PERF_SCRIPT_DIR)/sync-vusers-from-example.sh
 	k6 inspect $(PERF_K6_SCRIPT)
 	k6 inspect $(PERF_SCRIPT_DIR)/k6-mixed-300qps.js
+	k6 run --quiet -e QUERY_RPS=0 -e SUBMIT_RPS=0 -e REPORT_RPS=1 -e STATS_RPS=0 -e CHAIN_PROBE_RPS=0 -e TOKENS=contract-test-token $(PERF_SCRIPT_DIR)/k6/tests/missing-report-sample.js
+	k6 run --quiet -e QUERY_RPS=0 -e SUBMIT_RPS=0 -e REPORT_RPS=0 -e STATS_RPS=0 -e CHAIN_PROBE_RPS=0 -e COLLECTION_TOKENS=token-1,token-2 $(PERF_SCRIPT_DIR)/k6/tests/submit-subject-pairing.js
 	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e PERF_ROOT_DIR="$(CURDIR)" -e TESTEE_IDS=618855887087350318 $(PERF_SCRIPT_DIR)/k6-submit-coalescing.js
 	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e PERF_ROOT_DIR="$(CURDIR)" -e TESTEE_IDS=1,2 -e DEGRADED_SUBMIT_MODE=low -e COLLECTION_BASE_URLS=http://127.0.0.1:18083,http://127.0.0.1:28083 $(PERF_SCRIPT_DIR)/k6-submit-redis-degraded.js
 	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e PERF_ROOT_DIR="$(CURDIR)" -e TESTEE_IDS=1,2,3,4,5,6 -e DEGRADED_SUBMIT_MODE=global_overload -e COLLECTION_BASE_URLS=http://127.0.0.1:18083,http://127.0.0.1:28083 $(PERF_SCRIPT_DIR)/k6-submit-redis-degraded.js

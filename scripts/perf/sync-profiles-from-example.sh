@@ -21,7 +21,19 @@ fi
 migrate_runtime_paths() {
   jq --slurpfile ex "$EXAMPLE" '
     def migrate_path:
-      gsub("/api/v1/personality-models"; "/api/v1/typology-models")
+      (if . == "/api/v1/scales?page=1&page_size=20&status=published"
+       then "/api/v1/assessment-models?kind=scale&page=1&page_size=20"
+       elif . == "/api/v1/scales/categories"
+       then "/api/v1/assessment-models/options?kind=scale"
+       elif . == "/api/v1/scales/hot?limit=5"
+       then "/api/v1/assessment-models/hot?kind=scale&limit=5"
+       elif startswith("/api/v1/scales/")
+       then sub("^/api/v1/scales/"; "/api/v1/assessment-models/")
+       elif startswith("/api/v1/statistics/")
+       then sub("^/api/v1/statistics/"; "/api/v2/statistics/")
+       else .
+       end)
+      | gsub("/api/v1/personality-models"; "/api/v1/typology-models")
       | gsub("/api/v1/personality-assessment-sessions"; "/api/v1/typology-assessment-sessions")
       | gsub("/api/v1/personality-assessments"; "/api/v1/typology-assessments");
     def retired_statistics_path:
@@ -56,6 +68,12 @@ fi
 
 migrated_paths="$(jq -r -n --argjson before "$before" --argjson after "$next" '
   ([ $before, $after ]
+    | map([.. | strings | select(test("/api/v1/scales(/|\\?)"))] | unique | sort)
+    | if (.[0] | length) > 0 and (.[0] != .[1]) then ["assessment-model path migration applied"] else [] end)
+  + ([ $before, $after ]
+    | map([.. | strings | select(startswith("/api/v1/statistics/"))] | unique | sort)
+    | if (.[0] | length) > 0 and (.[0] != .[1]) then ["statistics v2 path migration applied"] else [] end)
+  + ([ $before, $after ]
     | map([.. | strings | select(test("/api/v1/personality-"))] | unique | sort)
     | if (.[0] | length) > 0 and (.[0] != .[1]) then ["typology path migration applied"] else [] end)
   + ([ $before, $after ]
