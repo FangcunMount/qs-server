@@ -7,7 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
+	gormmysql "gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 func TestBaseRepositoryUsesInjectedLimiter(t *testing.T) {
@@ -18,6 +21,29 @@ func TestBaseRepositoryUsesInjectedLimiter(t *testing.T) {
 
 	if _, err := repo.FindByID(context.Background(), 1); !errors.Is(err, wantErr) {
 		t.Fatalf("FindByID() error = %v, want %v", err, wantErr)
+	}
+}
+
+func TestCreateAndSyncAllowsNilCallback(t *testing.T) {
+	sqlDB, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	db, err := gorm.Open(gormmysql.New(gormmysql.Config{Conn: sqlDB, SkipInitializeWithVersion: true}), &gorm.Config{DisableAutomaticPing: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mock.ExpectBegin()
+	mock.ExpectExec("INSERT INTO `test_syncables`").WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	repo := NewBaseRepository[*testSyncable](db)
+	if err := repo.CreateAndSync(t.Context(), &testSyncable{}, nil); err != nil {
+		t.Fatalf("CreateAndSync(nil callback) error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
 	}
 }
 

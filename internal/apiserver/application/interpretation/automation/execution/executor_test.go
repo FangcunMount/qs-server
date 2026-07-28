@@ -15,6 +15,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
@@ -128,6 +129,43 @@ func TestExecutorCommitsReportRunGenerationAndEvents(t *testing.T) {
 	}
 	if builder.calls != 1 || len(stager.events) != 1 || len(gens.items) != 1 {
 		t.Fatalf("duplicate rebuilt builder=%d events=%d gens=%d", builder.calls, len(stager.events), len(gens.items))
+	}
+}
+
+func TestExecutorSeparatesHistoricalReportTimeFromSystemLifecycle(t *testing.T) {
+	builder := &executorBuilder{}
+	service, gens, runs, _, _, _ := newExecutorFixture(t, builder)
+	systemAt := time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC)
+	historicalAt := time.Date(2025, 1, 2, 10, 0, 8, 0, time.UTC)
+	service.now = func() time.Time { return systemAt }
+
+	ctx := historicalseed.WithContext(context.Background(), historicalseed.Context{
+		BatchID:    "hist-test",
+		ScenarioID: "2025-01-02/1/submit_answer/scale",
+		OrgID:      1,
+		Version:    historicalseed.Version1,
+		Timeline:   historicalseed.Timeline{ReportGeneratedAt: &historicalAt},
+	})
+	result, err := service.Execute(ctx, executorInput(), "historical")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := result.InterpretReport.GeneratedAt(); !got.Equal(historicalAt) {
+		t.Fatalf("report generated at = %s, want historical %s", got, historicalAt)
+	}
+	persistedGeneration, err := gens.FindByKey(context.Background(), result.Generation.Key())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := persistedGeneration.UpdatedAt(); !got.Equal(systemAt) {
+		t.Fatalf("generation updated at = %s, want system %s", got, systemAt)
+	}
+	persistedRun, err := runs.FindByID(context.Background(), result.Run.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := persistedRun.FinishedAt(); got == nil || !got.Equal(systemAt) {
+		t.Fatalf("run finished at = %v, want system %s", got, systemAt)
 	}
 }
 

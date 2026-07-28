@@ -1,8 +1,10 @@
 package migration
 
 import (
+	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -32,6 +34,10 @@ type Config struct {
 type Migrator struct {
 	driver Driver
 	config *Config
+}
+
+type runPreparer interface {
+	PrepareRun(context.Context, *Config, uint) (func(context.Context) error, error)
 }
 
 // NewMigrator 创建 MySQL 迁移器（保持向后兼容）
@@ -106,13 +112,32 @@ func (m *Migrator) Run() (uint, bool, error) {
 		return versionBefore, false, fmt.Errorf("database is in dirty state at version %d, please fix manually", versionBefore)
 	}
 
+	cleanup := func(context.Context) error { return nil }
+	if preparer, ok := m.driver.(runPreparer); ok {
+		cleanup, err = preparer.PrepareRun(context.Background(), m.config, versionBefore)
+		if err != nil {
+			return versionBefore, false, fmt.Errorf("prepare migration run: %w", err)
+		}
+	}
+
 	// 执行迁移
-	if err := instance.Up(); err != nil {
-		if err == migrate.ErrNoChange {
+	upErr := instance.Up()
+	cleanupErr := cleanup(context.Background())
+	if upErr != nil {
+		if errors.Is(upErr, migrate.ErrNoChange) {
+			if cleanupErr != nil {
+				return versionBefore, false, fmt.Errorf("cleanup migration run: %w", cleanupErr)
+			}
 			// 数据库已是最新版本
 			return versionBefore, false, nil
 		}
-		return versionBefore, false, fmt.Errorf("migration failed: %w", err)
+		if cleanupErr != nil {
+			return versionBefore, false, fmt.Errorf("migration failed: %w (cleanup failed: %v)", upErr, cleanupErr)
+		}
+		return versionBefore, false, fmt.Errorf("migration failed: %w", upErr)
+	}
+	if cleanupErr != nil {
+		return versionBefore, true, fmt.Errorf("cleanup migration run: %w", cleanupErr)
 	}
 
 	// 获取新版本

@@ -29,7 +29,10 @@ func (f assessmentCreateFinalizer) SaveAndStage(
 	req assessmentCreateSpec,
 	dto CreateCommand,
 ) error {
-	completion := stageport.Completion{Stage: stageport.StageAssessmentCreated, BusinessAt: a.CreatedAt(), ResourceType: "assessment", ResourceID: a.ID().String(), Payload: struct {
+	// A new Assessment receives its ID inside repo.Save. Leave ResourceID empty
+	// so the transactional finalizer fills the assigned ID before completing the
+	// historical stage instead of persisting the zero-value string "0".
+	completion := stageport.Completion{Stage: stageport.StageAssessmentCreated, BusinessAt: a.CreatedAt(), ResourceType: "assessment", Payload: struct {
 		AnswerSheetID string `json:"answersheet_id"`
 	}{AnswerSheetID: a.AnswerSheetRef().ID().String()}}
 	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, f.postCommit, f.stageRecorder, completion); err != nil {

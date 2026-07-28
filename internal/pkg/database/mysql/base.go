@@ -85,7 +85,9 @@ func (r *BaseRepository[T]) CreateAndSync(ctx context.Context, entity T, sync fu
 		}
 		return result.Error
 	}
-	sync(entity)
+	if sync != nil {
+		sync(entity)
+	}
 	return nil
 }
 

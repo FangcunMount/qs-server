@@ -143,7 +143,12 @@ func (e *executor) buildAndCommit(ctx context.Context, input interpinput.Interpr
 	if err != nil {
 		return nil, fmt.Errorf("interpretation org id: %w", err)
 	}
-	at, err := historicalseed.OccurredAt(ctx, orgID, historicalseed.StageReportGenerated, e.now())
+	// Report.GeneratedAt is a business fact and may intentionally be historical.
+	// Generation/Run completion, leases, retries and post-commit dispatch remain
+	// on the system clock so their lifecycle never moves backwards during a
+	// backfill retry.
+	systemCompletedAt := e.now()
+	generatedAt, err := historicalseed.OccurredAt(ctx, orgID, historicalseed.StageReportGenerated, systemCompletedAt)
 	if err != nil {
 		return nil, fmt.Errorf("historical report generation time: %w", err)
 	}
@@ -151,7 +156,7 @@ func (e *executor) buildAndCommit(ctx context.Context, input interpinput.Interpr
 		ID: e.newID(), GenerationID: generationRecord.ID(), OutcomeID: input.OutcomeID, InterpretationRunID: runRecord.ID(),
 		Association: input.Association, ReportType: input.Report.ReportType, TemplateVersion: input.Report.TemplateVersion,
 		BuilderIdentity: builder.BuilderIdentity(), ContentSchemaVersion: builder.ContentSchemaVersion(),
-		Content: draft.Content(), GeneratedAt: at,
+		Content: draft.Content(), GeneratedAt: generatedAt,
 	})
 	if err != nil {
 		e.logBuildError(ctx, "artifact_validation", err, generationRecord, runRecord, builder)
@@ -159,7 +164,7 @@ func (e *executor) buildAndCommit(ctx context.Context, input interpinput.Interpr
 	}
 	committed, err := e.committer.CommitSuccess(ctx, CommitSuccessRequest{
 		Generation: generationRecord, Run: runRecord, InterpretReport: artifact, BuilderIdentity: builder.BuilderIdentity(),
-		ContentSchemaVersion: builder.ContentSchemaVersion(), CompletedAt: at,
+		ContentSchemaVersion: builder.ContentSchemaVersion(), CompletedAt: systemCompletedAt,
 	})
 	if err != nil {
 		return nil, err
