@@ -80,7 +80,7 @@ Secrets 传递规则：
 
 ## 自托管 Runner（Mac mini，组织级）
 
-`plan` / `docker` / `notify` 仍跑 GitHub-hosted；各仓库的 `deploy-*` 跑在 Mac mini runner group `qlume`（标签 `self-hosted, macOS, ARM64`），替代原 ServerD `QS_DEPLOY_RUNNER=serverd`。
+`plan` / `docker` / `notify` 仍跑 GitHub-hosted；各仓库的 `deploy-*` 跑在 Mac mini runner group `qlume`（标签 `self-hosted, macOS, ARM64`），替代原 ServerD `QS_DEPLOY_RUNNER=serverd`。`ping-runner` 的 ServerA 巡检和 `db-ops` 使用同一 runner group 中带 `ops` 标签的实例，因为 `SVRA_HOST` 是 GitHub-hosted runner 无法访问的 Tailscale 地址；ServerD worker 主机巡检仍留在 `serverd` runner。
 
 部署链路：
 
@@ -91,9 +91,19 @@ Secrets 传递规则：
 前置：
 
 - runner group `qlume` 允许本仓库
+- runner group `qlume` 至少有一个带 `self-hosted, macOS, ARM64, ops` 标签的在线 runner
 - org Variables：`SVRA_PUBLIC_HOST`、`SVRD_PUBLIC_HOST`（已配置）
+- org Variable：`SVRA_SSH_FINGERPRINT`（ServerA SSH host key 的 SHA256 指纹）
 - org Secret：`SVR_MINI_SSH_KEY`（或回退 `SVRA_SSH_KEY` / `SVRD_SSH_KEY`）
 - Mac mini Docker Desktop 可用；隔离 `DOCKER_CONFIG` 避免 keychain 卡住
+
+`SVRA_SSH_FINGERPRINT` 应从 ServerA 控制台或已有可信 SSH 会话读取；当前 ServerA 使用 ED25519 host key：
+
+```bash
+ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256
+```
+
+Mac mini ops runner 上线前还应确认 `tailscale ping serverA` 和 `nc -vz 100.85.122.124 22` 成功。DERP 中继会增加时延，但不阻断低流量巡检和远程数据库命令；应继续排查 NAT/UDP 条件以争取直连。
 
 目标主机：
 

@@ -8,10 +8,26 @@ on:
 jobs:
   ping-production:
     name: Production Server Check (ServerA)
-    runs-on: ubuntu-latest
+    # SVRA_HOST is a Tailscale address; run inside the qlume tailnet instead of GitHub-hosted.
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
     timeout-minutes: 5
 
     steps:
+      - name: Validate SSH configuration
+        env:
+          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
+          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+        run: |
+          set -Eeuo pipefail
+          : "${SVRA_HOST:?SVRA_HOST is empty}"
+          : "${SVRA_USERNAME:?SVRA_USERNAME is empty}"
+          : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
+          : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
+
       - name: System Health Check
         uses: appleboy/ssh-action@v1.2.2
         with:
@@ -19,7 +35,7 @@ jobs:
           username: ${{ vars.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
-          capture_stdout: true
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           script: |
             export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
             echo "=========================================="
@@ -51,7 +67,7 @@ jobs:
           username: ${{ vars.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
-          capture_stdout: true
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           envs: EXPECTED_COLLECTION_REPLICAS
           script: |
             export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
@@ -107,7 +123,7 @@ jobs:
           username: ${{ vars.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
-          capture_stdout: true
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           envs: EXPECTED_COLLECTION_REPLICAS
           script: |
             export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"

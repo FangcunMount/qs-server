@@ -1,5 +1,9 @@
 # 声明仓库/组织级 Variables / Secrets，供 actionlint 本地校验。
 # 运行时仍从 GitHub Settings 注入；此处不参与实际传递。
+self-hosted-runner:
+  labels:
+    - ops
+
 config-variables:
   - QS_DEPLOY_EXPORT_REGISTRY
   - QS_DEPLOY_HTTP_PROXY
@@ -13,6 +17,7 @@ config-variables:
   - SVRA_PUBLIC_HOST
   - SVRA_USERNAME
   - SVRA_SSH_PORT
+  - SVRA_SSH_FINGERPRINT
   - SVRB_HOST
   - SVRB_PUBLIC_HOST
   - SVRB_USERNAME

@@ -29,16 +29,37 @@ on:
 permissions:
   contents: read
 
+# Serialize scheduled and manual production database operations across workflow runs.
+concurrency:
+  group: qs-server-db-ops-production
+  cancel-in-progress: false
+
 jobs:
   mongodb-backup:
     name: MongoDB Backup
     if: |
       (github.event_name == 'schedule') ||
       (github.event.inputs.operation == 'backup' && (github.event.inputs.database == 'mongodb' || github.event.inputs.database == 'all'))
-    runs-on: ubuntu-latest
+    # SVRA_HOST is a Tailscale address; run inside the qlume tailnet instead of GitHub-hosted.
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
     # MONGODB_* 等敏感项在 production Environment；缺此行会导致 secrets 为空、备份静默失败。
     environment: production
     steps:
+      - name: Validate SSH configuration
+        env:
+          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
+          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+        run: |
+          set -Eeuo pipefail
+          : "${SVRA_HOST:?SVRA_HOST is empty}"
+          : "${SVRA_USERNAME:?SVRA_USERNAME is empty}"
+          : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
+          : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
+
       - name: Backup MongoDB
         uses: appleboy/ssh-action@v1.2.2
         with:
@@ -46,7 +67,7 @@ jobs:
           username: ${{ vars.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
-          capture_stdout: true
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
           script: |
             set -Eeuo pipefail
@@ -104,9 +125,24 @@ jobs:
   mongodb-restore:
     name: MongoDB Restore
     if: github.event.inputs.operation == 'restore' && github.event.inputs.database == 'mongodb'
-    runs-on: ubuntu-latest
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
     environment: production
     steps:
+      - name: Validate SSH configuration
+        env:
+          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
+          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+        run: |
+          set -Eeuo pipefail
+          : "${SVRA_HOST:?SVRA_HOST is empty}"
+          : "${SVRA_USERNAME:?SVRA_USERNAME is empty}"
+          : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
+          : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
+
       - name: Restore MongoDB
         uses: appleboy/ssh-action@v1.2.2
         with:
@@ -114,7 +150,7 @@ jobs:
           username: ${{ vars.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
-          capture_stdout: true
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,BACKUP_FILE_INPUT
           script: |
             set -Eeuo pipefail
@@ -182,9 +218,24 @@ jobs:
   mongodb-status:
     name: MongoDB Status
     if: github.event.inputs.operation == 'status' && (github.event.inputs.database == 'mongodb' || github.event.inputs.database == 'all')
-    runs-on: ubuntu-latest
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
     environment: production
     steps:
+      - name: Validate SSH configuration
+        env:
+          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
+          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+        run: |
+          set -Eeuo pipefail
+          : "${SVRA_HOST:?SVRA_HOST is empty}"
+          : "${SVRA_USERNAME:?SVRA_USERNAME is empty}"
+          : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
+          : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
+
       - name: Check MongoDB Status
         uses: appleboy/ssh-action@v1.2.2
         with:
@@ -192,7 +243,7 @@ jobs:
           username: ${{ vars.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
-          capture_stdout: true
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
           script: |
             set -Eeuo pipefail
