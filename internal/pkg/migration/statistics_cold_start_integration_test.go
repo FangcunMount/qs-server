@@ -197,10 +197,10 @@ func seedStatisticsColdStartBusinessFacts(t *testing.T, db *gorm.DB, mongoDB *mo
 		t.Fatal(err)
 	}
 	activityRepo := mysqlActor.NewAssessmentEntryActivityLogRepository(db)
-	if err := mysqlActor.NewAssessmentEntryResolveLogger(activityRepo).LogResolve(ctx, orgID, clinician.ID().Uint64(), entry.ID().Uint64(), eventAt); err != nil {
+	if _, err := mysqlActor.NewAssessmentEntryResolveLogger(activityRepo).LogResolve(ctx, orgID, clinician.ID().Uint64(), entry.ID().Uint64(), eventAt); err != nil {
 		t.Fatal(err)
 	}
-	if err := mysqlActor.NewAssessmentEntryIntakeLogger(activityRepo).LogIntake(ctx, orgID, clinician.ID().Uint64(), entry.ID().Uint64(), testee.ID().Uint64(), eventAt.Add(time.Minute), true, true); err != nil {
+	if _, err := mysqlActor.NewAssessmentEntryIntakeLogger(activityRepo).LogIntake(ctx, orgID, clinician.ID().Uint64(), entry.ID().Uint64(), testee.ID().Uint64(), eventAt.Add(time.Minute), true, true); err != nil {
 		t.Fatal(err)
 	}
 

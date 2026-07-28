@@ -6,6 +6,7 @@ import (
 
 	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 )
 
 type AssessmentIntakeClient struct {
@@ -37,7 +38,11 @@ func NewEvaluationWorkerClient(manager *Manager) *EvaluationWorkerClient {
 func (c *EvaluationWorkerClient) ExecuteEvaluation(ctx context.Context, assessmentID uint64) (*evalpb.ExecuteEvaluationResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
 	defer cancel()
-	resp, err := c.client.ExecuteEvaluation(ctx, &evalpb.ExecuteEvaluationRequest{AssessmentId: assessmentID})
+	req := &evalpb.ExecuteEvaluationRequest{AssessmentId: assessmentID}
+	if historical, ok := historicalseed.FromContext(ctx); ok {
+		req.HistoricalContext = historicalseed.ToProto(historical)
+	}
+	resp, err := c.client.ExecuteEvaluation(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute evaluation: %w", err)
 	}
@@ -55,7 +60,11 @@ func NewInterpretationAutomationClient(manager *Manager) *InterpretationAutomati
 func (c *InterpretationAutomationClient) GenerateReportFromOutcome(ctx context.Context, outcomeID string) (*interpretationpb.GenerateReportFromAssessmentResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
 	defer cancel()
-	resp, err := c.client.GenerateReportFromOutcome(ctx, &interpretationpb.GenerateReportFromOutcomeRequest{OutcomeId: outcomeID})
+	req := &interpretationpb.GenerateReportFromOutcomeRequest{OutcomeId: outcomeID}
+	if historical, ok := historicalseed.FromContext(ctx); ok {
+		req.HistoricalContext = historicalseed.ToProto(historical)
+	}
+	resp, err := c.client.GenerateReportFromOutcome(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate report from outcome: %w", err)
 	}

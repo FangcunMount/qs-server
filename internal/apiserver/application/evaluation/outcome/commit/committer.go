@@ -18,6 +18,8 @@ import (
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
+	stageport "github.com/FangcunMount/qs-server/internal/apiserver/port/historicalseedstage"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -51,6 +53,7 @@ type committer struct {
 	eventStager    EventStager
 	postCommit     appEventing.PostCommitDispatcher
 	newID          func() meta.ID
+	stageRecorder  stageport.Recorder
 }
 
 func NewCommitter(
@@ -61,8 +64,9 @@ func NewCommitter(
 	scoreProjector outcomescoring.Projector,
 	eventStager EventStager,
 	postCommit appEventing.PostCommitDispatcher,
+	stageRecorders ...stageport.Recorder,
 ) Committer {
-	return &committer{
+	result := &committer{
 		txRunner:       txRunner,
 		assessmentRepo: assessmentRepo,
 		outcomeRepo:    outcomeRepo,
@@ -72,6 +76,10 @@ func NewCommitter(
 		postCommit:     postCommit,
 		newID:          meta.New,
 	}
+	if len(stageRecorders) > 0 {
+		result.stageRecorder = stageRecorders[0]
+	}
+	return result
 }
 
 func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domainoutcome.Record, error) {
@@ -134,7 +142,12 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 	if err := runToCommit.Succeed(request.EvaluatedAt); err != nil {
 		return nil, err
 	}
-	assessmentToCommit.StageEvaluatedEvent(request.EvaluatedAt, record.ID(), runToCommit.ID())
+	var historical *historicalseed.Context
+	if value, ok := historicalseed.FromContext(ctx); ok {
+		clone := value.Clone()
+		historical = &clone
+	}
+	assessmentToCommit.StageEvaluatedEventWithHistorical(request.EvaluatedAt, record.ID(), runToCommit.ID(), historical)
 	eventsToStage := assessmentToCommit.Events()
 	err = c.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := c.outcomeRepo.Save(txCtx, record); err != nil {
@@ -153,6 +166,15 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 		}
 		if len(eventsToStage) > 0 {
 			if err := c.eventStager.Stage(txCtx, eventsToStage...); err != nil {
+				return err
+			}
+		}
+		if c.stageRecorder != nil {
+			if _, err := c.stageRecorder.Complete(txCtx, stageport.Completion{Stage: stageport.StageOutcomeCommitted, BusinessAt: request.EvaluatedAt, ResourceType: "evaluation_outcome", ResourceID: record.ID().String(), Payload: struct {
+				OutcomeID    string `json:"outcome_id"`
+				AssessmentID string `json:"assessment_id"`
+				RunID        string `json:"run_id"`
+			}{OutcomeID: record.ID().String(), AssessmentID: assessmentToCommit.ID().String(), RunID: runToCommit.ID().String()}}); err != nil {
 				return err
 			}
 		}

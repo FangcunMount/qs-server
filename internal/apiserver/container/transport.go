@@ -36,6 +36,7 @@ import (
 	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	historicalstageinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/historicalseedstage"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -76,6 +77,7 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 		deps.ResilienceSnapshot = func() resilience.RuntimeSnapshot { return c.resilience.Snapshot(time.Now()) }
 	}
 	deps.IAM = platformDeps.IAM
+	deps.HistoricalStageReader = historicalstageinfra.NewRepository(c.mysqlDB)
 
 	if c.SurveyModule != nil {
 		deps.Survey = c.SurveyModule.ExportRESTDeps(surveymod.RESTExportOptions{
@@ -391,6 +393,7 @@ func (c *Container) BuildGRPCDeps(server *grpcpkg.Server) grpctransport.Deps {
 	if c == nil {
 		return deps
 	}
+	deps.HistoricalStageRecorder = historicalstageinfra.NewRepository(c.mysqlDB)
 
 	platformDeps := platformmod.ExportGRPCIntegrationDeps(platformmod.GRPCIntegrationDeps{
 		WarmupCoordinator:                  c.WarmupCoordinator(),

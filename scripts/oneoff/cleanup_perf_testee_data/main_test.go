@@ -2,6 +2,8 @@ package main
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +12,53 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
+
+func TestHistoricalManifestScopesOnlyCreatedTestees(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "manifest.json")
+	data := `{"batch_id":"hist-20250101-20260727-v1","scenarios":{"a":{"testee_id":"10","testee_created":true},"b":{"testee_id":"11","testee_created":false},"c":{}}}`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ids, err := loadHistoricalManifestTesteeIDs(path, "hist-20250101-20260727-v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ids) != 1 || ids[0] != 10 {
+		t.Fatalf("ids=%v, want [10]", ids)
+	}
+	if _, err := loadHistoricalManifestTesteeIDs(path, "other-batch"); err == nil {
+		t.Fatal("batch mismatch must fail")
+	}
+}
+
+func TestHistoricalBatchScopeUsesLedgerIdentityAndExactLogs(t *testing.T) {
+	statements := historicalBatchScopeStatements("hist-20250101-20260727-v1")
+	joined := ""
+	for _, statement := range statements {
+		joined += statement.name + "\n" + statement.sql + "\n"
+	}
+	for _, required := range []string{
+		"tmp_cleanup_seed_stage_ids", "$.resolve_log_id", "$.intake_log_id",
+		"tmp_cleanup_resolve_log_ids", "tmp_cleanup_intake_log_ids", "tmp_cleanup_plan_enrollment_ids",
+		"tmp_cleanup_outcome_ids", "tmp_cleanup_relation_ids", "tmp_cleanup_statistics_dates",
+	} {
+		if !strings.Contains(joined, required) {
+			t.Fatalf("historical scope missing %q", required)
+		}
+	}
+}
+
+func TestRollbackPreservesStatisticsRunAuditLedger(t *testing.T) {
+	items, err := mysqlDeleteItems(nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range items {
+		if item.name == "statistics_sync_run" || strings.Contains(item.stmt, "statistics_sync_run") {
+			t.Fatalf("rollback must preserve statistics_sync_run audit history: %+v", item)
+		}
+	}
+}
 
 func TestIsMongoUnauthorized(t *testing.T) {
 	tests := []struct {

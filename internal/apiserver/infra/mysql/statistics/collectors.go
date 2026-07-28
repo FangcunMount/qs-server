@@ -291,7 +291,7 @@ func (c *PlanFactCollector) Collect(ctx context.Context, req statisticsDomain.Co
 	}
 
 	for _, source := range []lifecycleSource{
-		{factType: "task_created", timeField: "created_at"},
+		{factType: "task_created", timeField: "COALESCE(business_created_at,created_at)"},
 		{factType: "task_opened", timeField: "open_at"},
 		{factType: "task_completed", timeField: "completed_at"},
 		{factType: "task_expired", timeField: "expired_at"},

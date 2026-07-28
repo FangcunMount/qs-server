@@ -4,6 +4,8 @@ package evaluation;
 
 option go_package = "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation";
 
+import "common/historical.proto";
+
 // 受试者测评查询。
 service TesteeEvaluationService {
   // 获取我的测评详情（含 model/primary_score/level outcome 投影）
@@ -152,6 +154,7 @@ message EnsureAssessmentRequest {
   string origin_id = 9;
   // Submit-time frozen evaluation admission (EV-R001). Empty purpose = legacy.
   AssessmentAdmission admission = 10;
+  common.HistoricalExecutionContext historical_context = 11;
 }
 
 // AssessmentAdmission freezes independent vs assessment intent and exact release.
@@ -174,7 +177,10 @@ message EnsureAssessmentResponse {
   bool auto_submitted = 3;
 }
 
-message ExecuteEvaluationRequest { uint64 assessment_id = 1; }
+message ExecuteEvaluationRequest {
+  uint64 assessment_id = 1;
+  common.HistoricalExecutionContext historical_context = 2;
+}
 
 message ExecuteEvaluationResponse {
   string status = 1;

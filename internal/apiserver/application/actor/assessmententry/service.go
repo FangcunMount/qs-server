@@ -2,6 +2,8 @@ package assessmententry
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -12,8 +14,10 @@ import (
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
+	stageport "github.com/FangcunMount/qs-server/internal/apiserver/port/historicalseedstage"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -29,6 +33,16 @@ type service struct {
 	resolveLog    ResolveLogWriter
 	intakeLog     IntakeLogWriter
 	uow           apptransaction.Runner
+	stageRecorder stageport.Recorder
+}
+
+// WithHistoricalStageRecorder decorates the concrete service without changing
+// the public interface or ordinary construction path.
+func WithHistoricalStageRecorder(target AssessmentEntryService, recorder stageport.Recorder) AssessmentEntryService {
+	if concrete, ok := target.(*service); ok {
+		concrete.stageRecorder = recorder
+	}
+	return target
 }
 
 type intakeState struct {
@@ -38,8 +52,10 @@ type intakeState struct {
 	relation          *domainRelation.ClinicianTesteeRelation
 	assignment        *RelationSummaryResult
 	testeeCreated     bool
+	creatorCreated    bool
 	assignmentCreated bool
 	intakeAt          time.Time
+	intakeLogID       uint64
 }
 
 // NewService 创建测评入口服务。
@@ -191,14 +207,46 @@ func (s *service) Resolve(ctx context.Context, token string) (*ResolvedAssessmen
 		entry         *domainAssessmentEntry.AssessmentEntry
 		clinicianItem *domainClinician.Clinician
 	)
-	resolvedAt := time.Now()
 	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		var err error
 		entry, clinicianItem, err = s.resolveEntry(txCtx, token)
 		if err != nil {
 			return err
 		}
-		if err := s.logResolveSuccess(txCtx, entry, resolvedAt); err != nil {
+		resolvedAt, err := historicalseed.OccurredAt(txCtx, uint64(entry.OrgID()), historicalseed.StageEntryResolved, time.Now())
+		if err != nil {
+			return errors.WithCode(code.ErrInvalidArgument, "%v", err)
+		}
+		if s.stageRecorder != nil {
+			if reader, ok := s.stageRecorder.(stageport.CurrentReader); ok {
+				existing, lookupErr := reader.FindCurrent(txCtx, stageport.StageEntryResolve)
+				if lookupErr != nil {
+					return lookupErr
+				}
+				if existing != nil {
+					var payload struct {
+						EntryID string `json:"entry_id"`
+					}
+					if decodeErr := json.Unmarshal(existing.PayloadJSON, &payload); decodeErr != nil {
+						return fmt.Errorf("decode historical entry resolve stage: %w", decodeErr)
+					}
+					if payload.EntryID != entry.ID().String() || !existing.BusinessAt.Equal(resolvedAt) {
+						return fmt.Errorf("%w: entry resolve replay differs from completed stage", stageport.ErrPayloadConflict)
+					}
+					return nil
+				}
+			}
+		}
+		resolveLogID, err := s.logResolveSuccess(txCtx, entry, resolvedAt)
+		if err != nil {
+			return err
+		}
+		if s.stageRecorder != nil {
+			completion := stageport.Completion{Stage: stageport.StageEntryResolve, BusinessAt: resolvedAt, ResourceType: "assessment_entry", ResourceID: entry.ID().String(), Payload: struct {
+				EntryID      string `json:"entry_id"`
+				ResolveLogID uint64 `json:"resolve_log_id"`
+			}{EntryID: entry.ID().String(), ResolveLogID: resolveLogID}}
+			_, err = s.stageRecorder.Complete(txCtx, completion)
 			return err
 		}
 		return nil
@@ -281,7 +329,8 @@ func (s *service) ensureCreatorRelation(
 	ctx context.Context,
 	entry *domainAssessmentEntry.AssessmentEntry,
 	testeeItem *domainTestee.Testee,
-) (*domainRelation.ClinicianTesteeRelation, error) {
+	boundAt time.Time,
+) (*domainRelation.ClinicianTesteeRelation, bool, error) {
 	relationItem, err := s.relationRepo.FindActive(
 		ctx,
 		entry.OrgID(),
@@ -290,23 +339,24 @@ func (s *service) ensureCreatorRelation(
 		domainRelation.RelationTypeCreator,
 	)
 	if err == nil {
-		return relationItem, nil
+		return relationItem, false, nil
 	}
 	if !errors.IsCode(err, code.ErrUserNotFound) {
-		return nil, errors.Wrap(err, "failed to find relation")
+		return nil, false, errors.Wrap(err, "failed to find relation")
 	}
 
-	relationItem = newAssessmentEntryRelation(entry, testeeItem, domainRelation.RelationTypeCreator)
+	relationItem = newAssessmentEntryRelation(entry, testeeItem, domainRelation.RelationTypeCreator, boundAt)
 	if err := s.relationRepo.Save(ctx, relationItem); err != nil {
-		return nil, errors.Wrap(err, "failed to save relation")
+		return nil, false, errors.Wrap(err, "failed to save relation")
 	}
-	return relationItem, nil
+	return relationItem, true, nil
 }
 
 func (s *service) ensureAssignmentRelation(
 	ctx context.Context,
 	entry *domainAssessmentEntry.AssessmentEntry,
 	testeeItem *domainTestee.Testee,
+	boundAt time.Time,
 ) (*domainRelation.ClinicianTesteeRelation, bool, error) {
 	relationItem, err := s.relationRepo.FindActiveByTypes(
 		ctx,
@@ -322,7 +372,7 @@ func (s *service) ensureAssignmentRelation(
 		return nil, false, errors.Wrap(err, "failed to find access relation")
 	}
 
-	relationItem = newAssessmentEntryRelation(entry, testeeItem, domainRelation.RelationTypeAttending)
+	relationItem = newAssessmentEntryRelation(entry, testeeItem, domainRelation.RelationTypeAttending, boundAt)
 	if err := s.relationRepo.Save(ctx, relationItem); err != nil {
 		return nil, false, errors.Wrap(err, "failed to save attending relation")
 	}
@@ -333,6 +383,7 @@ func newAssessmentEntryRelation(
 	entry *domainAssessmentEntry.AssessmentEntry,
 	testeeItem *domainTestee.Testee,
 	relationType domainRelation.RelationType,
+	boundAt time.Time,
 ) *domainRelation.ClinicianTesteeRelation {
 	entryID := entry.ID().Uint64()
 	return domainRelation.NewClinicianTesteeRelation(
@@ -343,7 +394,7 @@ func newAssessmentEntryRelation(
 		domainRelation.SourceTypeAssessmentEntry,
 		&entryID,
 		true,
-		time.Now(),
+		boundAt,
 		nil,
 	)
 }
@@ -356,20 +407,23 @@ func (s *service) logIntakeSuccess(ctx context.Context, state *intakeState) erro
 	clinicianID := state.entry.ClinicianID().Uint64()
 	entryID := state.entry.ID().Uint64()
 	testeeID := state.testee.ID().Uint64()
-	if err := s.intakeLog.LogIntake(ctx, orgID, clinicianID, entryID, testeeID, state.intakeAt, state.testeeCreated, state.assignmentCreated); err != nil {
+	logID, err := s.intakeLog.LogIntake(ctx, orgID, clinicianID, entryID, testeeID, state.intakeAt, state.testeeCreated, state.assignmentCreated)
+	if err != nil {
 		return errors.Wrap(err, "failed to log assessment entry intake")
 	}
+	state.intakeLogID = logID
 	return nil
 }
 
-func (s *service) logResolveSuccess(ctx context.Context, entry *domainAssessmentEntry.AssessmentEntry, resolvedAt time.Time) error {
+func (s *service) logResolveSuccess(ctx context.Context, entry *domainAssessmentEntry.AssessmentEntry, resolvedAt time.Time) (uint64, error) {
 	if s.resolveLog == nil {
-		return nil
+		return 0, nil
 	}
-	if err := s.resolveLog.LogResolve(ctx, entry.OrgID(), entry.ClinicianID().Uint64(), entry.ID().Uint64(), resolvedAt); err != nil {
-		return errors.Wrap(err, "failed to log assessment entry resolve")
+	logID, err := s.resolveLog.LogResolve(ctx, entry.OrgID(), entry.ClinicianID().Uint64(), entry.ID().Uint64(), resolvedAt)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to log assessment entry resolve")
 	}
-	return nil
+	return logID, nil
 }
 
 func (s *service) resolveEntry(

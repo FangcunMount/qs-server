@@ -11,7 +11,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
+	stageport "github.com/FangcunMount/qs-server/internal/apiserver/port/historicalseedstage"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 )
 
 // enrollmentService 受试者加入计划服务实现
@@ -25,6 +27,14 @@ type enrollmentService struct {
 	taskGenerator   *plan.TaskGenerator
 	validator       *plan.PlanValidator
 	eventPublisher  event.EventPublisher
+	stageRecorder   stageport.Recorder
+}
+
+func WithEnrollmentHistoricalStageRecorder(target PlanEnrollmentService, recorder stageport.Recorder) PlanEnrollmentService {
+	if concrete, ok := target.(*enrollmentService); ok {
+		concrete.stageRecorder = recorder
+	}
+	return target
 }
 
 // NewEnrollmentService 创建受试者加入计划服务
@@ -112,7 +122,7 @@ func (s *enrollmentService) EnrollTestee(ctx context.Context, dto EnrollTesteeDT
 				return errors.WrapC(err, errorCode.ErrDatabase, "查询参与任务失败")
 			}
 			result = &EnrollmentResult{PlanID: dto.PlanID, EnrollmentID: active.ID().String(), Round: active.Round(), Tasks: toTaskResults(tasks), Idempotent: true}
-			return nil
+			return s.recordHistoricalEnrollment(txCtx, active, tasks)
 		}
 
 		if validationErrors := s.validator.ValidateForEnrollment(planAggregate, testeeID, startDate); len(validationErrors) > 0 {
@@ -126,13 +136,20 @@ func (s *enrollmentService) EnrollTestee(ctx context.Context, dto EnrollTesteeDT
 		if latest != nil {
 			round = latest.Round() + 1
 		}
-		enrollment := plan.NewEnrollment(dto.OrgID, planID, testeeID, round, startDate, time.Now())
+		joinedAt, err := historicalseed.OccurredAt(txCtx, uint64(dto.OrgID), historicalseed.StageEnrollmentJoined, time.Now())
+		if err != nil {
+			return errors.WithCode(errorCode.ErrInvalidArgument, "%v", err)
+		}
+		enrollment := plan.NewEnrollment(dto.OrgID, planID, testeeID, round, startDate, joinedAt)
 		tasks := s.taskGenerator.GenerateTasks(planAggregate, testeeID, startDate)
 		if len(tasks) == 0 {
 			return errors.WithCode(errorCode.ErrInvalidArgument, "未能生成任何任务")
 		}
 		for _, task := range tasks {
 			task.AssignEnrollment(enrollment.ID())
+			if _, historical := historicalseed.FromContext(txCtx); historical {
+				task.SetBusinessCreatedAt(joinedAt)
+			}
 		}
 		if err := s.enrollmentRepo.Save(txCtx, enrollment); err != nil {
 			return err
@@ -144,7 +161,7 @@ func (s *enrollmentService) EnrollTestee(ctx context.Context, dto EnrollTesteeDT
 			PlanID: dto.PlanID, EnrollmentID: enrollment.ID().String(), Round: enrollment.Round(),
 			Tasks: toTaskResults(tasks), CreatedTaskCount: len(tasks),
 		}
-		return nil
+		return s.recordHistoricalEnrollment(txCtx, enrollment, tasks)
 	})
 	if err != nil {
 		if stderrors.Is(err, plan.ErrActiveEnrollmentExists) {
@@ -176,6 +193,24 @@ func (s *enrollmentService) EnrollTestee(ctx context.Context, dto EnrollTesteeDT
 	)
 
 	return result, nil
+}
+
+func (s *enrollmentService) recordHistoricalEnrollment(ctx context.Context, enrollment *plan.Enrollment, tasks []*plan.AssessmentTask) error {
+	if s.stageRecorder == nil || enrollment == nil {
+		return nil
+	}
+	taskIDs := make([]string, 0, len(tasks))
+	for _, task := range tasks {
+		if task != nil {
+			taskIDs = append(taskIDs, task.GetID().String())
+		}
+	}
+	_, err := s.stageRecorder.Complete(ctx, stageport.Completion{Stage: stageport.StagePlanEnrollment, BusinessAt: enrollment.JoinedAt(), ResourceType: "plan_enrollment", ResourceID: enrollment.ID().String(), Payload: struct {
+		EnrollmentID string   `json:"enrollment_id"`
+		PlanID       string   `json:"plan_id"`
+		TaskIDs      []string `json:"task_ids"`
+	}{EnrollmentID: enrollment.ID().String(), PlanID: enrollment.PlanID().String(), TaskIDs: taskIDs}})
+	return err
 }
 
 // TerminateEnrollment 终止受试者的计划参与

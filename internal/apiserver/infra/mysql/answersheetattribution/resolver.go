@@ -28,7 +28,7 @@ func (r *Resolver) Resolve(ctx context.Context, request attributionport.ResolveR
 	}
 	switch request.OriginRef.Type {
 	case domainanswersheet.OriginTypeSelfService:
-		return domainanswersheet.NewAttributionSnapshot(request.OriginRef, "", "", "", "", "", r.now())
+		return domainanswersheet.NewAttributionSnapshot(request.OriginRef, "", "", "", "", "", r.capturedAt(request))
 	case domainanswersheet.OriginTypeAssessmentEntry:
 		return r.resolveEntry(ctx, request)
 	case domainanswersheet.OriginTypePlanTask:
@@ -74,7 +74,7 @@ func (r *Resolver) resolveEntry(ctx context.Context, request attributionport.Res
 		return domainanswersheet.AttributionSnapshot{}, err
 	}
 	return domainanswersheet.NewAttributionSnapshot(
-		request.OriginRef, strconv.FormatUint(row.ClinicianID, 10), strconv.FormatUint(row.ID, 10), "", "", "", r.now(),
+		request.OriginRef, strconv.FormatUint(row.ClinicianID, 10), strconv.FormatUint(row.ID, 10), "", "", "", r.capturedAt(request),
 	)
 }
 
@@ -136,7 +136,7 @@ func (r *Resolver) resolvePlanTask(ctx context.Context, request attributionport.
 	}
 	return domainanswersheet.NewAttributionSnapshot(
 		request.OriginRef, clinicianID, "", strconv.FormatUint(row.PlanID, 10),
-		strconv.FormatUint(row.EnrollmentID, 10), strconv.FormatUint(row.ID, 10), r.now(),
+		strconv.FormatUint(row.EnrollmentID, 10), strconv.FormatUint(row.ID, 10), r.capturedAt(request),
 	)
 }
 
@@ -154,7 +154,14 @@ func (r *Resolver) resolveClinician(ctx context.Context, request attributionport
 	if count != 1 {
 		return domainanswersheet.AttributionSnapshot{}, fmt.Errorf("clinician is unavailable")
 	}
-	return domainanswersheet.NewAttributionSnapshot(request.OriginRef, strconv.FormatUint(id, 10), "", "", "", "", r.now())
+	return domainanswersheet.NewAttributionSnapshot(request.OriginRef, strconv.FormatUint(id, 10), "", "", "", "", r.capturedAt(request))
+}
+
+func (r *Resolver) capturedAt(request attributionport.ResolveRequest) time.Time {
+	if !request.CapturedAt.IsZero() {
+		return request.CapturedAt
+	}
+	return r.now()
 }
 
 func (r *Resolver) resolvePrimaryClinician(ctx context.Context, orgID, testeeID uint64) (string, error) {

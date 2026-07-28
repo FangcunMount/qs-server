@@ -10,6 +10,7 @@ import (
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	attributionport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetattribution"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
@@ -103,6 +104,32 @@ func TestSubmissionServiceCreateAndSaveAnswerSheetPassesDurableSubmitMeta(t *tes
 	}
 }
 
+func TestSubmissionServiceUsesHistoricalFilledAndCapturedAt(t *testing.T) {
+	store := &durableStoreCaptureStub{}
+	svc := &submissionService{durableStore: store}
+	qnr, err := domainQuestionnaire.NewQuestionnaire(
+		meta.NewCode("QNR-1"), "Questionnaire",
+		domainQuestionnaire.WithVersion(domainQuestionnaire.Version("1.0.0")),
+		domainQuestionnaire.WithStatus(domainQuestionnaire.STATUS_PUBLISHED),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	filledAt := time.Date(2025, 1, 1, 9, 30, 0, 0, time.UTC)
+	ctx := historicalseed.WithContext(context.Background(), historicalseed.Context{
+		OrgID: 501, Timeline: historicalseed.Timeline{AnswerSheetFilledAt: &filledAt},
+	})
+	result, err := svc.createAndSaveAnswerSheet(ctx, logger.L(ctx), SubmitAnswerSheetDTO{
+		FillerID: 301, TesteeID: 401, OrgID: 501, QuestionnaireCode: "QNR-1", QuestionnaireVer: "1.0.0",
+	}, qnr, mustAnswersForSubmissionTest(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.FilledAt().Equal(filledAt) || !result.SubmissionContext().Attribution().CapturedAt().Equal(filledAt) {
+		t.Fatalf("historical answer times mismatch: filled=%v captured=%v", result.FilledAt(), result.SubmissionContext().Attribution().CapturedAt())
+	}
+}
+
 func TestSubmissionServiceCreateAndSaveAnswerSheetReturnsExistingSheet(t *testing.T) {
 	existing := domainAnswerSheet.Reconstruct(
 		meta.FromUint64(999),
@@ -182,7 +209,7 @@ func TestSubmissionServiceEarlyLookupMetricCountsEachOutcomeOnce(t *testing.T) {
 			before := testutil.ToFloat64(durableSubmitOperationTotal.WithLabelValues("early_lookup", testCase.outcome))
 
 			got, err := svc.findExistingSubmissionBeforeAttribution(
-				t.Context(), dto, qnr, mustAnswersForSubmissionTest(t), domainAnswerSheet.Admission{},
+				t.Context(), dto, qnr, mustAnswersForSubmissionTest(t), domainAnswerSheet.Admission{}, time.Now(),
 			)
 			if (err != nil) != testCase.wantError {
 				t.Fatalf("findExistingSubmissionBeforeAttribution() = (%#v, %v), wantError=%v", got, err, testCase.wantError)

@@ -30,13 +30,17 @@
 
 | 工具 | 用途 |
 | --- | --- |
-| `cleanup_perf_testee_data` | 按明确范围清理压测受试者数据 |
+| `cleanup_perf_testee_data` | 按显式 Testee 或 `seed_backfill_stage` + runner manifest 精确备份/回滚压测与历史回填数据 |
+| `verify_historical_statistics` | 保存回填前事实基线，并按批次账本资源 ID 逐日验证 Statistics 增量 |
 | `cleanup_orphaned_assessment_documents` | 对账并清理缺少 MySQL Assessment 的 Mongo 报告/答卷 |
 | `rebuild_statistics` | 通过受保护 Run API 校验、修复或重建 Statistics |
 | `rewrite_seeddata_assessment_times` | 修正种子测评时间 |
 | `enroll_testees_after_date.py` | 按时间范围补录受试者关系 |
 
 这些工具不是“执行一次就永久完成”的迁移，它们保留是因为故障恢复、环境重建或受控数据修复仍可能复用。具体参数以各命令的 `--help`、相邻 README 和测试为准。
+
+`2025-01-01..2026-07-27` 一次性回填的完整启停、基线、执行、对账与回滚顺序见
+[HISTORICAL_BACKFILL_RUNBOOK.md](HISTORICAL_BACKFILL_RUNBOOK.md)。
 
 ### 当前维护窗口专用
 

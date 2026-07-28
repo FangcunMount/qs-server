@@ -43,6 +43,8 @@ type options struct {
 	ValidateOnly bool
 }
 
+const historicalBackfillMode = "historical-backfill"
+
 type runResult struct {
 	ID               uint64           `json:"id"`
 	Mode             string           `json:"mode"`
@@ -83,7 +85,7 @@ func run(args []string, output io.Writer) error {
 	flags.StringVar(&to, "to", "", "last Shanghai business date, inclusive")
 	flags.IntVar(&cfg.WindowDays, "window-days", 7, "dates per run, maximum 31")
 	flags.StringVar(&cfg.Reason, "reason", "statistics_rebuild", "audited run reason")
-	flags.StringVar(&cfg.Mode, "mode", "repair", "run mode: validate, repair, or publish")
+	flags.StringVar(&cfg.Mode, "mode", "repair", "run mode: validate, repair, publish, or historical-backfill")
 	flags.BoolVar(&cfg.Confirm, "confirm", false, "confirm writes")
 	flags.BoolVar(&cfg.ValidateOnly, "validate-only", false, "read, map and validate without writing")
 	if err := flags.Parse(args); err != nil {
@@ -111,6 +113,12 @@ func run(args []string, output io.Writer) error {
 		cfg.Mode = "validate"
 	}
 	for _, orgID := range cfg.OrgIDs {
+		if cfg.Mode == historicalBackfillMode {
+			if err := executeHistoricalBackfill(client, cfg, orgID, output); err != nil {
+				return fmt.Errorf("org %d historical backfill statistics: %w", orgID, err)
+			}
+			continue
+		}
 		for _, window := range splitWindows(cfg.From, cfg.To, cfg.WindowDays) {
 			_, _ = fmt.Fprintf(output, "org=%d window=%s..%s mode=%s\n", orgID, window.From.Format(dateLayout), window.To.Format(dateLayout), cfg.Mode)
 			result, err := executeRun(client, cfg, orgID, window)
@@ -144,8 +152,8 @@ func (o options) validate() error {
 	if o.ValidateOnly {
 		mode = "validate"
 	}
-	if mode != "validate" && mode != "repair" && mode != "publish" {
-		return errors.New("mode must be validate, repair, or publish")
+	if mode != "validate" && mode != "repair" && mode != "publish" && mode != historicalBackfillMode {
+		return errors.New("mode must be validate, repair, publish, or historical-backfill")
 	}
 	if mode != "validate" && !o.Confirm {
 		return errors.New("write mode requires --confirm")
@@ -156,6 +164,46 @@ func (o options) validate() error {
 	if len([]rune(o.Reason)) > 500 {
 		return errors.New("reason exceeds 500 characters")
 	}
+	return nil
+}
+
+func executeHistoricalBackfill(client *http.Client, cfg options, orgID int64, output io.Writer) error {
+	for index, window := range splitWindows(cfg.From, cfg.To, cfg.WindowDays) {
+		repair := cfg
+		repair.Mode = "repair"
+		repair.ValidateOnly = false
+		_, _ = fmt.Fprintf(output, "org=%d phase=repair window=%s..%s index=%d\n", orgID, window.From.Format(dateLayout), window.To.Format(dateLayout), index+1)
+		result, err := executeRun(client, repair, orgID, window)
+		if err != nil {
+			return fmt.Errorf("repair window %s..%s: %w", window.From.Format(dateLayout), window.To.Format(dateLayout), err)
+		}
+		encoded, _ := json.Marshal(result)
+		_, _ = fmt.Fprintln(output, string(encoded))
+
+		validate := cfg
+		validate.Mode = "validate"
+		validate.Confirm = false
+		validate.ValidateOnly = true
+		_, _ = fmt.Fprintf(output, "org=%d phase=validate window=%s..%s index=%d\n", orgID, window.From.Format(dateLayout), window.To.Format(dateLayout), index+1)
+		result, err = executeRun(client, validate, orgID, window)
+		if err != nil {
+			return fmt.Errorf("validate window %s..%s: %w", window.From.Format(dateLayout), window.To.Format(dateLayout), err)
+		}
+		encoded, _ = json.Marshal(result)
+		_, _ = fmt.Fprintln(output, string(encoded))
+	}
+
+	publish := cfg
+	publish.Mode = "publish"
+	publish.ValidateOnly = false
+	finalWindow := dateWindow{From: cfg.To, To: cfg.To}
+	_, _ = fmt.Fprintf(output, "org=%d phase=publish as_of_date=%s\n", orgID, cfg.To.Format(dateLayout))
+	result, err := executeRun(client, publish, orgID, finalWindow)
+	if err != nil {
+		return fmt.Errorf("publish as_of_date %s: %w", cfg.To.Format(dateLayout), err)
+	}
+	encoded, _ := json.Marshal(result)
+	_, _ = fmt.Fprintln(output, string(encoded))
 	return nil
 }
 

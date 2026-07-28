@@ -40,6 +40,7 @@ func TestServiceValidateIntakeProfileUsesProfileReader(t *testing.T) {
 }
 
 type recordingIntakeLogWriter struct {
+	logID             uint64
 	orgID             int64
 	clinicianID       uint64
 	entryID           uint64
@@ -49,7 +50,7 @@ type recordingIntakeLogWriter struct {
 	assignmentCreated bool
 }
 
-func (w *recordingIntakeLogWriter) LogIntake(_ context.Context, orgID int64, clinicianID, entryID, testeeID uint64, intakeAt time.Time, testeeCreated, assignmentCreated bool) error {
+func (w *recordingIntakeLogWriter) LogIntake(_ context.Context, orgID int64, clinicianID, entryID, testeeID uint64, intakeAt time.Time, testeeCreated, assignmentCreated bool) (uint64, error) {
 	w.orgID = orgID
 	w.clinicianID = clinicianID
 	w.entryID = entryID
@@ -57,7 +58,10 @@ func (w *recordingIntakeLogWriter) LogIntake(_ context.Context, orgID int64, cli
 	w.intakeAt = intakeAt
 	w.testeeCreated = testeeCreated
 	w.assignmentCreated = assignmentCreated
-	return nil
+	if w.logID == 0 {
+		w.logID = 401
+	}
+	return w.logID, nil
 }
 
 func TestServiceLogIntakeSuccessPersistsFunnelFacts(t *testing.T) {
@@ -80,13 +84,14 @@ func TestServiceLogIntakeSuccessPersistsFunnelFacts(t *testing.T) {
 	writer := &recordingIntakeLogWriter{}
 	svc := &service{intakeLog: writer}
 
-	err := svc.logIntakeSuccess(context.Background(), &intakeState{
+	state := &intakeState{
 		entry:             entry,
 		testee:            testee,
 		intakeAt:          intakeAt,
 		testeeCreated:     true,
 		assignmentCreated: true,
-	})
+	}
+	err := svc.logIntakeSuccess(context.Background(), state)
 	if err != nil {
 		t.Fatalf("logIntakeSuccess() error = %v", err)
 	}
@@ -96,21 +101,28 @@ func TestServiceLogIntakeSuccessPersistsFunnelFacts(t *testing.T) {
 	if !writer.intakeAt.Equal(intakeAt) || !writer.testeeCreated || !writer.assignmentCreated {
 		t.Fatalf("logged funnel flags/time = time:%v testee:%v assignment:%v", writer.intakeAt, writer.testeeCreated, writer.assignmentCreated)
 	}
+	if state.intakeLogID != 401 {
+		t.Fatalf("intake log id=%d, want 401", state.intakeLogID)
+	}
 }
 
 type recordingResolveLogWriter struct {
+	logID       uint64
 	orgID       int64
 	clinicianID uint64
 	entryID     uint64
 	resolvedAt  time.Time
 }
 
-func (w *recordingResolveLogWriter) LogResolve(_ context.Context, orgID int64, clinicianID, entryID uint64, resolvedAt time.Time) error {
+func (w *recordingResolveLogWriter) LogResolve(_ context.Context, orgID int64, clinicianID, entryID uint64, resolvedAt time.Time) (uint64, error) {
 	w.orgID = orgID
 	w.clinicianID = clinicianID
 	w.entryID = entryID
 	w.resolvedAt = resolvedAt
-	return nil
+	if w.logID == 0 {
+		w.logID = 501
+	}
+	return w.logID, nil
 }
 
 func TestServiceLogResolveSuccessPersistsEntryOpenFact(t *testing.T) {
@@ -131,7 +143,7 @@ func TestServiceLogResolveSuccessPersistsEntryOpenFact(t *testing.T) {
 	writer := &recordingResolveLogWriter{}
 	svc := &service{resolveLog: writer}
 
-	err := svc.logResolveSuccess(context.Background(), entry, resolvedAt)
+	logID, err := svc.logResolveSuccess(context.Background(), entry, resolvedAt)
 	if err != nil {
 		t.Fatalf("logResolveSuccess() error = %v", err)
 	}
@@ -140,5 +152,8 @@ func TestServiceLogResolveSuccessPersistsEntryOpenFact(t *testing.T) {
 	}
 	if !writer.resolvedAt.Equal(resolvedAt) {
 		t.Fatalf("resolvedAt = %v, want %v", writer.resolvedAt, resolvedAt)
+	}
+	if logID != 501 {
+		t.Fatalf("resolve log id=%d, want 501", logID)
 	}
 }

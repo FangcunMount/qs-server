@@ -159,16 +159,17 @@ func (m *TaskMapper) ToPO(domain *domainPlan.AssessmentTask) *AssessmentTaskPO {
 	}
 
 	po := &AssessmentTaskPO{
-		PlanID:       domain.GetPlanID().Uint64(),
-		EnrollmentID: domain.GetEnrollmentID().Uint64(),
-		Seq:          domain.GetSeq(),
-		OrgID:        domain.GetOrgID(),
-		TesteeID:     domain.GetTesteeID().Uint64(),
-		ScaleCode:    domain.GetScaleCode(),
-		PlannedAt:    domain.GetPlannedAt(),
-		Status:       string(domain.GetStatus()),
-		EntryToken:   domain.GetEntryToken(),
-		EntryURL:     domain.GetEntryURL(),
+		PlanID:            domain.GetPlanID().Uint64(),
+		EnrollmentID:      domain.GetEnrollmentID().Uint64(),
+		Seq:               domain.GetSeq(),
+		OrgID:             domain.GetOrgID(),
+		TesteeID:          domain.GetTesteeID().Uint64(),
+		ScaleCode:         domain.GetScaleCode(),
+		PlannedAt:         domain.GetPlannedAt(),
+		BusinessCreatedAt: domain.GetBusinessCreatedAt(),
+		Status:            string(domain.GetStatus()),
+		EntryToken:        domain.GetEntryToken(),
+		EntryURL:          domain.GetEntryURL(),
 	}
 
 	// 设置ID（如果已存在）
@@ -233,6 +234,9 @@ func (m *TaskMapper) ToDomain(po *AssessmentTaskPO) *domainPlan.AssessmentTask {
 		po.EntryToken,
 		po.EntryURL,
 	)
+	if po.BusinessCreatedAt != nil {
+		task.SetBusinessCreatedAt(*po.BusinessCreatedAt)
+	}
 
 	return task
 }
@@ -274,5 +278,8 @@ func (m *TaskMapper) SyncID(po *AssessmentTaskPO, domain *domainPlan.AssessmentT
 			po.EntryToken,
 			po.EntryURL,
 		)
+		if po.BusinessCreatedAt != nil {
+			domain.SetBusinessCreatedAt(*po.BusinessCreatedAt)
+		}
 	}
 }

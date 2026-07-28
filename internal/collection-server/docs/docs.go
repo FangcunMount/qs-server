@@ -3970,6 +3970,10 @@ const docTemplate = `{
                     "description": "IAM档案ID - 使用字符串以兼容 IAM 系统和前端大数字",
                     "type": "string"
                 },
+                "iam_profile_link_id": {
+                    "description": "本次建档建立的 active ProfileLink ID",
+                    "type": "string"
+                },
                 "iam_user_id": {
                     "description": "IAM用户ID - 使用字符串以兼容 IAM 系统和前端大数字",
                     "type": "string"

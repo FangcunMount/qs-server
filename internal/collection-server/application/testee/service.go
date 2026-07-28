@@ -72,7 +72,6 @@ func (s *Service) CreateTestee(ctx context.Context, userID uint64, req *CreateTe
 		)
 		return nil, err
 	}
-
 	// 调用 gRPC 服务
 	l.Debugw("调用 gRPC 服务创建受试者",
 		"org_id", orgID,
@@ -101,6 +100,7 @@ func (s *Service) CreateTestee(ctx context.Context, userID uint64, req *CreateTe
 		)
 		return nil, err
 	}
+	result.IAMProfileLinkID = profile.ProfileLinkID
 
 	duration := time.Since(startTime)
 	l.Infow("创建受试者成功",

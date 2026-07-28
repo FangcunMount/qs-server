@@ -1,26 +1,31 @@
 package eventpayload
 
-import "time"
+import (
+	"time"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
+)
 
 // EvaluationRequestedData is the event body for an assessment ready to evaluate.
 type EvaluationRequestedData struct {
-	OrgID             int64     `json:"org_id"`
-	AssessmentID      int64     `json:"assessment_id"`
-	TesteeID          uint64    `json:"testee_id"`
-	QuestionnaireCode string    `json:"questionnaire_code"`
-	QuestionnaireVer  string    `json:"questionnaire_version"`
-	AnswerSheetID     string    `json:"answersheet_id"`
-	ModelKind         string    `json:"model_kind,omitempty"`
-	ModelAlgorithm    string    `json:"model_algorithm,omitempty"`
-	ModelCode         string    `json:"model_code,omitempty"`
-	ModelVersion      string    `json:"model_version,omitempty"`
-	ScaleCode         string    `json:"scale_code,omitempty"`
-	ScaleVersion      string    `json:"scale_version,omitempty"`
-	RequestedAt       time.Time `json:"requested_at"`
-	ExpectedAttempt   int       `json:"expected_attempt,omitempty"`
-	AttemptOrigin     string    `json:"attempt_origin,omitempty"`
-	ActionRequestID   string    `json:"action_request_id,omitempty"`
-	Mode              string    `json:"mode,omitempty"`
+	OrgID             int64                   `json:"org_id"`
+	AssessmentID      int64                   `json:"assessment_id"`
+	TesteeID          uint64                  `json:"testee_id"`
+	QuestionnaireCode string                  `json:"questionnaire_code"`
+	QuestionnaireVer  string                  `json:"questionnaire_version"`
+	AnswerSheetID     string                  `json:"answersheet_id"`
+	ModelKind         string                  `json:"model_kind,omitempty"`
+	ModelAlgorithm    string                  `json:"model_algorithm,omitempty"`
+	ModelCode         string                  `json:"model_code,omitempty"`
+	ModelVersion      string                  `json:"model_version,omitempty"`
+	ScaleCode         string                  `json:"scale_code,omitempty"`
+	ScaleVersion      string                  `json:"scale_version,omitempty"`
+	RequestedAt       time.Time               `json:"requested_at"`
+	ExpectedAttempt   int                     `json:"expected_attempt,omitempty"`
+	AttemptOrigin     string                  `json:"attempt_origin,omitempty"`
+	ActionRequestID   string                  `json:"action_request_id,omitempty"`
+	Mode              string                  `json:"mode,omitempty"`
+	HistoricalContext *historicalseed.Context `json:"historical_context,omitempty"`
 }
 
 // PayloadGateClass classifies evaluation.requested payloads for Worker dispatch
@@ -73,10 +78,11 @@ type EvaluationFailedData struct {
 
 // EvaluationOutcomeCommittedData is emitted after Evaluation facts commit.
 type EvaluationOutcomeCommittedData struct {
-	OrgID           int64     `json:"org_id"`
-	AssessmentID    int64     `json:"assessment_id"`
-	TesteeID        uint64    `json:"testee_id"`
-	OutcomeID       string    `json:"outcome_id"`
-	EvaluationRunID string    `json:"evaluation_run_id"`
-	CommittedAt     time.Time `json:"committed_at"`
+	OrgID             int64                   `json:"org_id"`
+	AssessmentID      int64                   `json:"assessment_id"`
+	TesteeID          uint64                  `json:"testee_id"`
+	OutcomeID         string                  `json:"outcome_id"`
+	EvaluationRunID   string                  `json:"evaluation_run_id"`
+	CommittedAt       time.Time               `json:"committed_at"`
+	HistoricalContext *historicalseed.Context `json:"historical_context,omitempty"`
 }

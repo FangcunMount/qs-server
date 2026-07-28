@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS `seed_backfill_stage` (
+  `id` BIGINT UNSIGNED NOT NULL,
+  `org_id` BIGINT NOT NULL,
+  `batch_id` VARCHAR(96) NOT NULL,
+  `scenario_id` VARCHAR(255) NOT NULL,
+  `stage` VARCHAR(64) NOT NULL,
+  `payload_hash` CHAR(64) NOT NULL,
+  `status` VARCHAR(24) NOT NULL,
+  `business_at` DATETIME(6) NOT NULL,
+  `resource_type` VARCHAR(64) NOT NULL,
+  `resource_id` VARCHAR(128) NOT NULL,
+  `payload_json` JSON NULL,
+  `error_text` VARCHAR(1000) NULL,
+  `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_seed_backfill_stage_identity` (`batch_id`, `scenario_id`, `stage`),
+  KEY `idx_seed_backfill_stage_batch_status` (`org_id`, `batch_id`, `status`),
+  KEY `idx_seed_backfill_stage_business_at` (`business_at`),
+  KEY `idx_seed_backfill_stage_resource` (`resource_type`, `resource_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

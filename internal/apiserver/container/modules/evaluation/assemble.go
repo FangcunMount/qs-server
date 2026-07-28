@@ -27,6 +27,7 @@ import (
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
+	historicalstageinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/historicalseedstage"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationconsistency"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -169,6 +170,7 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			scoreProjector,
 			infra.assessmentOutboxStore,
 			infra.postCommit,
+			historicalstageinfra.NewRepository(normalized.MySQLDB),
 		)
 		engine := execute.NewEngine(
 			infra.assessmentRepo,
@@ -213,6 +215,7 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 			infra.assessmentOutboxStore,
 			listCache,
 			evaluationintake.WithPostCommitDispatcher(infra.postCommit),
+			evaluationintake.WithHistoricalStageRecorder(historicalstageinfra.NewRepository(normalized.MySQLDB)),
 		)
 	} else {
 		m.IntakeService = evaluationintake.NewService(
@@ -222,6 +225,7 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 			infra.assessmentOutboxStore,
 			nil,
 			evaluationintake.WithPostCommitDispatcher(infra.postCommit),
+			evaluationintake.WithHistoricalStageRecorder(historicalstageinfra.NewRepository(normalized.MySQLDB)),
 		)
 	}
 	scoreFacts := evaluationoutcome.NewScoreFactReader(infra.outcomeRepo, infra.scoreProjectionReader)

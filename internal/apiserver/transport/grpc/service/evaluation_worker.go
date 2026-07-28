@@ -11,11 +11,17 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	evaluationworker "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/worker"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 )
 
 type EvaluationWorkerService struct {
 	pb.UnimplementedEvaluationWorkerServiceServer
-	service evaluationworker.Service
+	service            evaluationworker.Service
+	historicalVerifier *historicalseed.Verifier
+}
+
+func (s *EvaluationWorkerService) SetHistoricalSeedVerifier(verifier *historicalseed.Verifier) {
+	s.historicalVerifier = verifier
 }
 
 func NewEvaluationWorkerService(service evaluationworker.Service) *EvaluationWorkerService {
@@ -28,6 +34,11 @@ func (s *EvaluationWorkerService) RegisterService(server *grpc.Server) {
 func (s *EvaluationWorkerService) ExecuteEvaluation(ctx context.Context, req *pb.ExecuteEvaluationRequest) (*pb.ExecuteEvaluationResponse, error) {
 	if req == nil || req.AssessmentId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "assessment_id 不能为空")
+	}
+	var err error
+	ctx, err = withHistoricalExecutionContext(ctx, req.GetHistoricalContext(), 0, s.historicalVerifier)
+	if err != nil {
+		return nil, err
 	}
 	logger.L(ctx).Infow("gRPC: received evaluation execution request", "assessment_id", req.AssessmentId)
 	ctx = withRetryAuthorization(ctx)

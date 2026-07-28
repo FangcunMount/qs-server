@@ -44,6 +44,11 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateStatisticsSync(o.StatisticsSync)...)
 	errs = append(errs, validateCacheOptions(o.Cache)...)
 	errs = append(errs, validateSystemGovernance(o.SystemGovernance)...)
+	if o.HistoricalSeed == nil {
+		errs = append(errs, fmt.Errorf("historical_seed is required"))
+	} else {
+		errs = append(errs, o.HistoricalSeed.Validate()...)
+	}
 	if err := o.DelegatedSubject.Validate(); err != nil {
 		errs = append(errs, err)
 	}

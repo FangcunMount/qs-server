@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -75,6 +76,7 @@ type SubmissionContext struct {
 	taskID      string
 	admission   Admission
 	attribution AttributionSnapshot
+	historical  *historicalseed.Context
 }
 
 func NewSubmissionContextWithAttribution(filler *actor.FillerRef, testee *actor.TesteeRef, orgID meta.ID, taskID string, attribution AttributionSnapshot, admission ...Admission) (SubmissionContext, error) {
@@ -180,6 +182,22 @@ func (c SubmissionContext) HasAdmission() bool {
 
 func (c SubmissionContext) Attribution() AttributionSnapshot { return c.attribution }
 
+// WithHistoricalContext attaches the already verified execution context to
+// the submitted event. It is intentionally not persisted in the AnswerSheet.
+func (c SubmissionContext) WithHistoricalContext(value historicalseed.Context) SubmissionContext {
+	clone := value.Clone()
+	c.historical = &clone
+	return c
+}
+
+func (c SubmissionContext) HistoricalContext() *historicalseed.Context {
+	if c.historical == nil {
+		return nil
+	}
+	clone := c.historical.Clone()
+	return &clone
+}
+
 func (c SubmissionContext) clone() SubmissionContext {
 	return SubmissionContext{
 		filler:      cloneFillerRef(c.filler),
@@ -188,6 +206,7 @@ func (c SubmissionContext) clone() SubmissionContext {
 		taskID:      c.taskID,
 		admission:   c.admission,
 		attribution: c.attribution,
+		historical:  c.HistoricalContext(),
 	}
 }
 

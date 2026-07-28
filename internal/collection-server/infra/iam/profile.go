@@ -26,7 +26,8 @@ type CreateProfileInput struct {
 }
 
 type CreateProfileResult struct {
-	ProfileID string
+	ProfileID     string
+	ProfileLinkID string
 }
 
 func NewProfileService(client *Client) (*ProfileService, error) {
@@ -76,11 +77,14 @@ func (s *ProfileService) CreateProfile(ctx context.Context, input CreateProfileI
 	if err != nil {
 		return nil, err
 	}
-	if resp == nil || resp.Profile == nil || resp.Profile.Id == "" {
-		return nil, fmt.Errorf("iam profile creation returned empty profile id")
+	if resp == nil || resp.Profile == nil || resp.Profile.Id == "" || resp.ProfileLink == nil || resp.ProfileLink.Id == "" {
+		return nil, fmt.Errorf("iam profile creation returned incomplete profile/profile-link identity")
+	}
+	if resp.ProfileLink.RevokedAt != nil {
+		return nil, fmt.Errorf("iam profile creation returned a revoked profile link")
 	}
 
-	return &CreateProfileResult{ProfileID: resp.Profile.Id}, nil
+	return &CreateProfileResult{ProfileID: resp.Profile.Id, ProfileLinkID: resp.ProfileLink.Id}, nil
 }
 
 func toIAMGender(gender int32) identityv2.Gender {

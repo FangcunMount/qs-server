@@ -60,6 +60,7 @@ func (m *AssessmentMapper) ToPO(domain *assessment.Assessment) *AssessmentPO {
 	}
 
 	// 时间戳
+	po.CreatedAt = domain.CreatedAt()
 	po.SubmittedAt = domain.SubmittedAt()
 	po.EvaluatedAt = domain.EvaluatedAt()
 	po.FailedAt = domain.FailedAt()
@@ -118,7 +119,7 @@ func (m *AssessmentMapper) ToDomain(po *AssessmentPO) *assessment.Assessment {
 	}
 
 	// 使用 Reconstruct 重建领域对象
-	a := assessment.Reconstruct(
+	a := assessment.ReconstructWithCreatedAt(
 		po.ID,
 		po.OrgID,
 		mustTesteeIDFromUint64("assessment.testee_id", po.TesteeID),
@@ -128,6 +129,7 @@ func (m *AssessmentMapper) ToDomain(po *AssessmentPO) *assessment.Assessment {
 		assessment.Status(po.Status),
 		po.TotalScore,
 		riskLevel,
+		po.CreatedAt,
 		po.SubmittedAt,
 		po.EvaluatedAt,
 		po.FailedAt,

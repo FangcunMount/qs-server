@@ -30,16 +30,17 @@ type UpdateTesteeRequest struct {
 
 // TesteeResponse 受试者响应
 type TesteeResponse struct {
-	ID           string        `json:"id"`             // 受试者ID
-	OrgID        string        `json:"org_id"`         // 机构ID
-	IAMUserID    string        `json:"iam_user_id"`    // IAM用户ID - 使用字符串以兼容 IAM 系统和前端大数字
-	IAMProfileID string        `json:"iam_profile_id"` // IAM档案ID - 使用字符串以兼容 IAM 系统和前端大数字
-	Name         string        `json:"name"`           // 姓名
-	Gender       int32         `json:"gender"`         // 性别
-	Birthday     meta.Birthday `json:"birthday"`       // 出生日期（格式：YYYY-MM-DD）
-	Tags         []string      `json:"tags"`           // 标签列表
-	Source       string        `json:"source"`         // 来源
-	IsKeyFocus   bool          `json:"is_key_focus"`   // 是否重点关注
+	ID               string        `json:"id"`                            // 受试者ID
+	OrgID            string        `json:"org_id"`                        // 机构ID
+	IAMUserID        string        `json:"iam_user_id"`                   // IAM用户ID - 使用字符串以兼容 IAM 系统和前端大数字
+	IAMProfileID     string        `json:"iam_profile_id"`                // IAM档案ID - 使用字符串以兼容 IAM 系统和前端大数字
+	IAMProfileLinkID string        `json:"iam_profile_link_id,omitempty"` // 本次建档建立的 active ProfileLink ID
+	Name             string        `json:"name"`                          // 姓名
+	Gender           int32         `json:"gender"`                        // 性别
+	Birthday         meta.Birthday `json:"birthday"`                      // 出生日期（格式：YYYY-MM-DD）
+	Tags             []string      `json:"tags"`                          // 标签列表
+	Source           string        `json:"source"`                        // 来源
+	IsKeyFocus       bool          `json:"is_key_focus"`                  // 是否重点关注
 
 	// 测评统计信息
 	AssessmentStats *AssessmentStatsDTO `json:"assessment_stats,omitempty"`

@@ -18,7 +18,9 @@ import (
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
+	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"github.com/google/uuid"
 )
 
@@ -289,6 +291,14 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	}
 
 	// 执行评估成功，可靠提交规范 EvaluationOutcome。
+	orgID, convErr := safeconv.Int64ToUint64(a.OrgID())
+	if convErr != nil {
+		return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, "评估机构ID无效", evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: convErr.Error()}, convErr)
+	}
+	evaluatedAt, occurredErr := historicalseed.OccurredAt(ctx, orgID, historicalseed.StageEvaluated, time.Now())
+	if occurredErr != nil {
+		return s.finalizeEvaluationFailure(ctx, a, &evaluationRun, "历史评估时间无效: "+occurredErr.Error(), evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: occurredErr.Error()}, occurredErr)
+	}
 	err = s.persistEvaluationOutcome(ctx, outcomecommit.CommitRequest{
 		Assessment:    a,
 		Input:         input,
@@ -296,7 +306,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		DescriptorKey: resolved.DescriptorKey,
 		OutcomePolicy: resolved.Descriptor.CompletenessPolicy,
 		Run:           &evaluationRun,
-		EvaluatedAt:   time.Now(),
+		EvaluatedAt:   evaluatedAt,
 	})
 	if err != nil {
 		l.Errorw("评估结果写入失败",

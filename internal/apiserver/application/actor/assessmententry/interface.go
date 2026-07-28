@@ -18,12 +18,12 @@ type AssessmentEntryService interface {
 
 // ResolveLogWriter 写入入口解析日志。
 type ResolveLogWriter interface {
-	LogResolve(ctx context.Context, orgID int64, clinicianID, entryID uint64, resolvedAt time.Time) error
+	LogResolve(ctx context.Context, orgID int64, clinicianID, entryID uint64, resolvedAt time.Time) (uint64, error)
 }
 
 // IntakeLogWriter 写入入口 intake 成功日志。
 type IntakeLogWriter interface {
-	LogIntake(ctx context.Context, orgID int64, clinicianID, entryID, testeeID uint64, intakeAt time.Time, testeeCreated, assignmentCreated bool) error
+	LogIntake(ctx context.Context, orgID int64, clinicianID, entryID, testeeID uint64, intakeAt time.Time, testeeCreated, assignmentCreated bool) (uint64, error)
 }
 
 // CreateAssessmentEntryDTO 创建测评入口。

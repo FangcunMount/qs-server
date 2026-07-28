@@ -13,6 +13,7 @@ import (
 	attributionport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetattribution"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 )
 
 // createAndSaveAnswerSheet 创建并保存答卷。
@@ -23,6 +24,10 @@ func (s *submissionService) createAndSaveAnswerSheet(
 	qnr *questionnaire.Questionnaire,
 	answers []answersheet.Answer,
 ) (*answersheet.AnswerSheet, error) {
+	filledAt, err := historicalseed.OccurredAt(ctx, dto.OrgID, historicalseed.StageAnswerSheetFilled, time.Now())
+	if err != nil {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "%v", err)
+	}
 	admission, err := s.resolveAdmission(ctx, dto.QuestionnaireCode, dto.QuestionnaireVer)
 	if err != nil {
 		return nil, err
@@ -36,21 +41,26 @@ func (s *submissionService) createAndSaveAnswerSheet(
 			"model_version", admission.ModelVersion(),
 		)
 	}
-	if existing, err := s.findExistingSubmissionBeforeAttribution(ctx, dto, qnr, answers, admission); err != nil || existing != nil {
+	if existing, err := s.findExistingSubmissionBeforeAttribution(ctx, dto, qnr, answers, admission, filledAt); err != nil || existing != nil {
 		return existing, err
 	}
-	attribution, err := s.resolveAttribution(ctx, dto, admission)
+	attribution, err := s.resolveAttribution(ctx, dto, admission, filledAt)
 	if err != nil {
 		return nil, err
 	}
-	sheet, err := createAnswerSheet(l, dto, qnr, answers, admission, attribution)
+	historical, hasHistorical := historicalseed.FromContext(ctx)
+	var historicalContext *historicalseed.Context
+	if hasHistorical {
+		historicalContext = &historical
+	}
+	sheet, err := createAnswerSheet(l, dto, qnr, answers, admission, attribution, filledAt, historicalContext)
 	if err != nil {
 		return nil, err
 	}
 	return s.persistSubmittedAnswerSheet(ctx, l, dto, sheet)
 }
 
-func (s *submissionService) findExistingSubmissionBeforeAttribution(ctx context.Context, dto SubmitAnswerSheetDTO, qnr *questionnaire.Questionnaire, answers []answersheet.Answer, admission answersheet.Admission) (*answersheet.AnswerSheet, error) {
+func (s *submissionService) findExistingSubmissionBeforeAttribution(ctx context.Context, dto SubmitAnswerSheetDTO, qnr *questionnaire.Questionnaire, answers []answersheet.Answer, admission answersheet.Admission, filledAt time.Time) (*answersheet.AnswerSheet, error) {
 	reader, ok := s.durableStore.(SubmissionIdempotencyReader)
 	if !ok || dto.IdempotencyKey == "" {
 		return nil, nil
@@ -59,8 +69,13 @@ func (s *submissionService) findExistingSubmissionBeforeAttribution(ctx context.
 	if err != nil {
 		return nil, err
 	}
-	placeholder := answersheet.ReconstructAttributionSnapshot(ref.Type, ref.ID, "", "", "", "", "", time.Now(), 1, answersheet.AttributionModeUnknown)
-	candidate, err := createAnswerSheet(logger.L(ctx), dto, qnr, answers, admission, placeholder)
+	placeholder := answersheet.ReconstructAttributionSnapshot(ref.Type, ref.ID, "", "", "", "", "", filledAt, 1, answersheet.AttributionModeUnknown)
+	historical, hasHistorical := historicalseed.FromContext(ctx)
+	var historicalContext *historicalseed.Context
+	if hasHistorical {
+		historicalContext = &historical
+	}
+	candidate, err := createAnswerSheet(logger.L(ctx), dto, qnr, answers, admission, placeholder, filledAt, historicalContext)
 	if err != nil {
 		return nil, err
 	}
@@ -96,6 +111,8 @@ func createAnswerSheet(
 	answers []answersheet.Answer,
 	admission answersheet.Admission,
 	attribution answersheet.AttributionSnapshot,
+	filledAt time.Time,
+	historical *historicalseed.Context,
 ) (*answersheet.AnswerSheet, error) {
 	questionnaireRef, err := answersheet.NewQuestionnaireRef(
 		dto.QuestionnaireCode,
@@ -105,7 +122,6 @@ func createAnswerSheet(
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "创建问卷引用失败")
 	}
-
 	fillerUserID, err := fillerUserIDFromUint64("filler_id", dto.FillerID)
 	if err != nil {
 		return nil, err
@@ -141,9 +157,12 @@ func createAnswerSheet(
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "创建答卷提交上下文失败")
 	}
+	if historical != nil {
+		submissionContext = submissionContext.WithHistoricalContext(*historical)
+	}
 
 	l.Debugw("开始创建答卷领域对象", "questionnaire_code", dto.QuestionnaireCode, "filler_id", dto.FillerID, "answer_count", len(answers))
-	sheet, err := answersheet.Submit(answersheet.NewID(), questionnaireRef, submissionContext, answers, time.Now())
+	sheet, err := answersheet.Submit(answersheet.NewID(), questionnaireRef, submissionContext, answers, filledAt)
 	if err != nil {
 		l.Errorw("创建答卷领域对象失败", "questionnaire_code", dto.QuestionnaireCode, "error", err.Error(), "result", "failed")
 		return nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "创建答卷失败")
@@ -151,7 +170,7 @@ func createAnswerSheet(
 	return sheet, nil
 }
 
-func (s *submissionService) resolveAttribution(ctx context.Context, dto SubmitAnswerSheetDTO, admission answersheet.Admission) (answersheet.AttributionSnapshot, error) {
+func (s *submissionService) resolveAttribution(ctx context.Context, dto SubmitAnswerSheetDTO, admission answersheet.Admission, capturedAt time.Time) (answersheet.AttributionSnapshot, error) {
 	ref, err := originRefFromDTO(dto)
 	if err != nil {
 		return answersheet.AttributionSnapshot{}, err
@@ -162,17 +181,18 @@ func (s *submissionService) resolveAttribution(ctx context.Context, dto SubmitAn
 			// wiring always installs the MySQL resolver and therefore never takes
 			// this unvalidated legacy path.
 			return answersheet.ReconstructAttributionSnapshot(
-				ref.Type, ref.ID, "", "", "", "", ref.ID, time.Now(), 1, answersheet.AttributionModeDerivedLegacy,
+				ref.Type, ref.ID, "", "", "", "", ref.ID, capturedAt, 1, answersheet.AttributionModeDerivedLegacy,
 			), nil
 		}
 		if ref.Type != answersheet.OriginTypeSelfService {
 			return answersheet.AttributionSnapshot{}, errors.WithCode(errorCode.ErrInternalServerError, "答卷归属解析器未配置")
 		}
-		return answersheet.NewAttributionSnapshot(ref, "", "", "", "", "", time.Now())
+		return answersheet.NewAttributionSnapshot(ref, "", "", "", "", "", capturedAt)
 	}
 	snapshot, err := s.attribution.Resolve(ctx, attributionport.ResolveRequest{
 		OriginRef: ref, OrgID: dto.OrgID, TesteeID: dto.TesteeID,
 		QuestionnaireCode: dto.QuestionnaireCode, QuestionnaireVersion: dto.QuestionnaireVer, Admission: admission,
+		CapturedAt: capturedAt,
 	})
 	if err != nil {
 		return answersheet.AttributionSnapshot{}, errors.WrapC(err, errorCode.ErrInvalidArgument, "答卷来源校验失败")

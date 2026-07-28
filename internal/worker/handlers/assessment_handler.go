@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
@@ -69,6 +70,9 @@ func handleEvaluationRequested(deps *Dependencies) HandlerFunc {
 		}
 
 		callCtx := outgoingRetryAuthorization(ctx, env.ID, data.ExpectedAttempt, data.AttemptOrigin, data.ActionRequestID, data.Mode)
+		if data.HistoricalContext != nil {
+			callCtx = historicalseed.WithContext(callCtx, data.HistoricalContext.Clone())
+		}
 		resp, err := deps.EvaluationWorkerClient.ExecuteEvaluation(callCtx, assessmentID)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate assessment: %w", err)

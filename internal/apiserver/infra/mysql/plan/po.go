@@ -76,12 +76,13 @@ type AssessmentTaskPO struct {
 	ScaleCode string `gorm:"column:scale_code;size:100;not null;index:idx_scale_code"`
 
 	// 时间点
-	PlannedAt   time.Time  `gorm:"column:planned_at;not null;index:idx_planned_at"`
-	OpenAt      *time.Time `gorm:"column:open_at;index:idx_open_at"`
-	ExpireAt    *time.Time `gorm:"column:expire_at"`
-	CompletedAt *time.Time `gorm:"column:completed_at"`
-	ExpiredAt   *time.Time `gorm:"column:expired_at"`
-	CanceledAt  *time.Time `gorm:"column:canceled_at"`
+	BusinessCreatedAt *time.Time `gorm:"column:business_created_at"`
+	PlannedAt         time.Time  `gorm:"column:planned_at;not null;index:idx_planned_at"`
+	OpenAt            *time.Time `gorm:"column:open_at;index:idx_open_at"`
+	ExpireAt          *time.Time `gorm:"column:expire_at"`
+	CompletedAt       *time.Time `gorm:"column:completed_at"`
+	ExpiredAt         *time.Time `gorm:"column:expired_at"`
+	CanceledAt        *time.Time `gorm:"column:canceled_at"`
 
 	// 状态与关联
 	Status       string  `gorm:"column:status;size:50;not null;default:'pending'"`

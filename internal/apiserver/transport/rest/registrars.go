@@ -101,6 +101,7 @@ func (registrar internalRouteRegistrar) register(engine *gin.Engine) {
 	r.registerSystemGovernanceInternalRoutes(internalV1)
 	r.registerEvaluationRunInternalRoutes(internalV1)
 	r.registerInterpretationInternalRoutes(internalV1)
+	r.registerHistoricalSeedInternalRoutes(internalV1)
 
 	internalV2 := engine.Group("/internal/v2")
 	r.applyProtectedGroupMiddlewares(internalV2, "/internal/v2")

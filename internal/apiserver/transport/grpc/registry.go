@@ -22,10 +22,12 @@ import (
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
+	stageport "github.com/FangcunMount/qs-server/internal/apiserver/port/historicalseedstage"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 )
 
@@ -49,6 +51,8 @@ type Deps struct {
 	WarmupCoordinator                  cachegovernance.WarmupCoordinator
 	QRCodeService                      SurveyScaleQRCodeGenerator
 	MiniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService
+	HistoricalStageRecorder            stageport.Recorder
+	HistoricalSeedVerifier             *historicalseed.Verifier
 }
 
 type SurveyScaleQRCodeGenerator interface {
@@ -153,7 +157,9 @@ func (r *Registry) registerAnswerSheetService() error {
 	answerSheetService := service.NewAnswerSheetService(
 		r.deps.Survey.AnswerSheetSubmissionService,
 		r.deps.Survey.AnswerSheetManagementService,
+		r.deps.HistoricalStageRecorder,
 	)
+	answerSheetService.SetHistoricalSeedVerifier(r.deps.HistoricalSeedVerifier)
 	r.server.RegisterService(answerSheetService)
 	log.Info("   📋 AnswerSheet service registered")
 	return nil
@@ -215,9 +221,15 @@ func (r *Registry) registerEvaluationService() error {
 	)
 	r.server.RegisterService(service.NewTesteeEvaluationService(r.deps.Evaluation.TesteeService))
 	r.server.RegisterService(service.NewParticipantReportService(r.deps.Interpretation.ParticipantService, r.deps.Interpretation.DelegatedSubjectVerifier))
-	r.server.RegisterService(service.NewAssessmentIntakeService(journey, r.deps.Evaluation.IntakeService, r.deps.Survey.AnswerSheetManagementService))
-	r.server.RegisterService(service.NewEvaluationWorkerService(r.deps.Evaluation.WorkerService))
-	r.server.RegisterService(service.NewInterpretationAutomationService(r.deps.Interpretation.AutomationService))
+	assessmentIntakeService := service.NewAssessmentIntakeService(journey, r.deps.Evaluation.IntakeService, r.deps.Survey.AnswerSheetManagementService)
+	assessmentIntakeService.SetHistoricalSeedVerifier(r.deps.HistoricalSeedVerifier)
+	evaluationWorkerService := service.NewEvaluationWorkerService(r.deps.Evaluation.WorkerService)
+	evaluationWorkerService.SetHistoricalSeedVerifier(r.deps.HistoricalSeedVerifier)
+	interpretationAutomationService := service.NewInterpretationAutomationService(r.deps.Interpretation.AutomationService, r.deps.HistoricalStageRecorder)
+	interpretationAutomationService.SetHistoricalSeedVerifier(r.deps.HistoricalSeedVerifier)
+	r.server.RegisterService(assessmentIntakeService)
+	r.server.RegisterService(evaluationWorkerService)
+	r.server.RegisterService(interpretationAutomationService)
 	log.Info("   📊 actor-oriented Evaluation/Interpretation services registered")
 	return nil
 }

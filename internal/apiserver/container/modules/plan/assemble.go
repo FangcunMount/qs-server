@@ -15,6 +15,7 @@ import (
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
+	historicalstageinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/historicalseedstage"
 	planInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	planEntryInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/plan"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
@@ -87,9 +88,10 @@ func New(deps Deps) (*Module, error) {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "enrollment repository lacks lifecycle transitions")
 	}
 	lifecycleService := planApp.NewLifecycleServiceWithEnrollment(planRepo, taskRepo, scaleCatalog, lifecycleEnrollments, txRunner, module.eventPublisher)
-	enrollmentService := planApp.NewEnrollmentService(planRepo, taskRepo, enrollmentRepo, txRunner, module.eventPublisher)
+	stageRecorder := historicalstageinfra.NewRepository(normalized.MySQLDB)
+	enrollmentService := planApp.WithEnrollmentHistoricalStageRecorder(planApp.NewEnrollmentService(planRepo, taskRepo, enrollmentRepo, txRunner, module.eventPublisher), stageRecorder)
 	taskSchedulerService := planApp.NewTaskSchedulerServiceWithEnrollment(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher)
-	taskManagementService := planApp.NewTaskManagementServiceWithEnrollment(taskRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher)
+	taskManagementService := planApp.WithTaskHistoricalStageRecorder(planApp.NewTaskManagementServiceWithEnrollment(taskRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher), stageRecorder)
 	module.CommandService = planApp.NewCommandService(
 		lifecycleService,
 		enrollmentService,

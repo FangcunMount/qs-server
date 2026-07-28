@@ -22,8 +22,11 @@ func NewTaskLifecycle() *TaskLifecycle {
 // Open 开放任务（生成入口）
 // 将待推送状态的任务变更为已推送状态，并设置入口信息
 func (l *TaskLifecycle) Open(ctx context.Context, task *AssessmentTask, entryToken string, entryURL string, expireAt time.Time) error {
+	return l.OpenAt(ctx, task, entryToken, entryURL, time.Now(), expireAt)
+}
+
+func (l *TaskLifecycle) OpenAt(ctx context.Context, task *AssessmentTask, entryToken string, entryURL string, actionAt, expireAt time.Time) error {
 	taskID := task.GetID().String()
-	actionAt := time.Now()
 	logger.L(ctx).Infow("Opening task in domain service",
 		"domain_action", "open_task",
 		"task_id", taskID,
@@ -80,8 +83,11 @@ func (l *TaskLifecycle) Open(ctx context.Context, task *AssessmentTask, entryTok
 // Complete 完成任务
 // 将已推送状态的任务变更为已完成状态，并关联测评记录
 func (l *TaskLifecycle) Complete(ctx context.Context, task *AssessmentTask, assessmentID assessment.ID) error {
+	return l.CompleteAt(ctx, task, assessmentID, time.Now())
+}
+
+func (l *TaskLifecycle) CompleteAt(ctx context.Context, task *AssessmentTask, assessmentID assessment.ID, actionAt time.Time) error {
 	taskID := task.GetID().String()
-	actionAt := time.Now()
 	logger.L(ctx).Infow("Completing task in domain service",
 		"domain_action", "complete_task",
 		"task_id", taskID,

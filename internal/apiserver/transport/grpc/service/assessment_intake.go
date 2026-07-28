@@ -14,6 +14,7 @@ import (
 	journey "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/assessmentintake"
 	answersheetapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	domainanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 )
 
 const (
@@ -29,9 +30,14 @@ const (
 
 type AssessmentIntakeService struct {
 	pb.UnimplementedAssessmentIntakeServiceServer
-	journey journey.Service
-	intake  evaluationintake.Service
-	sheets  answersheetapp.AnswerSheetManagementService
+	journey            journey.Service
+	intake             evaluationintake.Service
+	sheets             answersheetapp.AnswerSheetManagementService
+	historicalVerifier *historicalseed.Verifier
+}
+
+func (s *AssessmentIntakeService) SetHistoricalSeedVerifier(verifier *historicalseed.Verifier) {
+	s.historicalVerifier = verifier
 }
 
 func NewAssessmentIntakeService(journey journey.Service, intake evaluationintake.Service, sheets answersheetapp.AnswerSheetManagementService) *AssessmentIntakeService {
@@ -53,6 +59,11 @@ func (s *AssessmentIntakeService) EnsureAssessment(ctx context.Context, req *pb.
 		if err != nil {
 			return nil, err
 		}
+	}
+	var err error
+	ctx, err = withHistoricalExecutionContext(ctx, req.GetHistoricalContext(), orgID, s.historicalVerifier)
+	if err != nil {
+		return nil, err
 	}
 	logger.L(ctx).Infow("gRPC: received ensure assessment request",
 		"answersheet_id", req.AnswerSheetId,

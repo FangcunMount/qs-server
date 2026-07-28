@@ -2,6 +2,7 @@ package plan
 
 import (
 	"context"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/event"
@@ -10,8 +11,11 @@ import (
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
+	stageport "github.com/FangcunMount/qs-server/internal/apiserver/port/historicalseedstage"
 	planentryport "github.com/FangcunMount/qs-server/internal/apiserver/port/planentry"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
+	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
 // taskManagementService 任务管理服务实现
@@ -52,6 +56,13 @@ func NewTaskManagementServiceWithEnrollment(
 	return service
 }
 
+func WithTaskHistoricalStageRecorder(target TaskManagementService, recorder stageport.Recorder) TaskManagementService {
+	if concrete, ok := target.(*taskManagementService); ok {
+		concrete.persistence.recorder = recorder
+	}
+	return target
+}
+
 // OpenTask 开放任务
 func (s *taskManagementService) OpenTask(ctx context.Context, orgID int64, taskID string) (*TaskResult, error) {
 	logger.L(ctx).Infow("Opening task",
@@ -78,7 +89,15 @@ func (s *taskManagementService) OpenTask(ctx context.Context, orgID int64, taskI
 	}
 
 	// 3. 调用领域服务开放任务
-	if err := s.taskLifecycle.Open(ctx, task, token, url, expireAt); err != nil {
+	orgScope, err := safeconv.Int64ToUint64(orgID)
+	if err != nil {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的机构ID: %v", err)
+	}
+	openedAt, err := historicalseed.OccurredAt(ctx, orgScope, historicalseed.StageTaskOpened, time.Now())
+	if err != nil {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的任务开放时间: %v", err)
+	}
+	if err := s.taskLifecycle.OpenAt(ctx, task, token, url, openedAt, expireAt); err != nil {
 		logger.L(ctx).Errorw("Failed to open task",
 			"action", "open_task",
 			"task_id", taskID,
@@ -142,7 +161,15 @@ func (s *taskManagementService) CompleteTask(ctx context.Context, orgID int64, t
 	}
 
 	// 3. 调用领域服务完成任务
-	if err := s.taskLifecycle.Complete(ctx, task, assessmentIDDomain); err != nil {
+	orgScope, err := safeconv.Int64ToUint64(orgID)
+	if err != nil {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的机构ID: %v", err)
+	}
+	completedAt, err := historicalseed.OccurredAt(ctx, orgScope, historicalseed.StageTaskCompleted, time.Now())
+	if err != nil {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的任务完成时间: %v", err)
+	}
+	if err := s.taskLifecycle.CompleteAt(ctx, task, assessmentIDDomain, completedAt); err != nil {
 		logger.L(ctx).Errorw("Failed to complete task",
 			"action", "complete_task",
 			"task_id", taskID,

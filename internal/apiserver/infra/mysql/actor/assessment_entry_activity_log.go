@@ -50,10 +50,14 @@ func NewAssessmentEntryResolveLogger(repo *AssessmentEntryActivityLogRepository)
 	return &AssessmentEntryResolveLogger{repo: repo}
 }
 
-func (l *AssessmentEntryResolveLogger) LogResolve(ctx context.Context, orgID int64, clinicianID, entryID uint64, resolvedAt time.Time) error {
-	return l.repo.create(ctx, &assessmentEntryResolveLogPO{
+func (l *AssessmentEntryResolveLogger) LogResolve(ctx context.Context, orgID int64, clinicianID, entryID uint64, resolvedAt time.Time) (uint64, error) {
+	row := &assessmentEntryResolveLogPO{
 		OrgID: orgID, ClinicianID: clinicianID, EntryID: entryID, ResolvedAt: resolvedAt,
-	})
+	}
+	if err := l.repo.create(ctx, row); err != nil {
+		return 0, err
+	}
+	return row.ID, nil
 }
 
 type AssessmentEntryIntakeLogger struct {
@@ -64,11 +68,15 @@ func NewAssessmentEntryIntakeLogger(repo *AssessmentEntryActivityLogRepository) 
 	return &AssessmentEntryIntakeLogger{repo: repo}
 }
 
-func (l *AssessmentEntryIntakeLogger) LogIntake(ctx context.Context, orgID int64, clinicianID, entryID, testeeID uint64, intakeAt time.Time, testeeCreated, assignmentCreated bool) error {
-	return l.repo.create(ctx, &assessmentEntryIntakeLogPO{
+func (l *AssessmentEntryIntakeLogger) LogIntake(ctx context.Context, orgID int64, clinicianID, entryID, testeeID uint64, intakeAt time.Time, testeeCreated, assignmentCreated bool) (uint64, error) {
+	row := &assessmentEntryIntakeLogPO{
 		OrgID: orgID, ClinicianID: clinicianID, EntryID: entryID, TesteeID: testeeID,
 		IntakeAt: intakeAt, TesteeCreated: testeeCreated, AssignmentCreated: assignmentCreated,
-	})
+	}
+	if err := l.repo.create(ctx, row); err != nil {
+		return 0, err
+	}
+	return row.ID, nil
 }
 
 type assessmentEntryResolveLogPO struct {

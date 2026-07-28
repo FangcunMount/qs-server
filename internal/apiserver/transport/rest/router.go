@@ -33,6 +33,9 @@ import (
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
+	stageport "github.com/FangcunMount/qs-server/internal/apiserver/port/historicalseedstage"
+	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
@@ -67,8 +70,10 @@ type routeSpec struct {
 }
 
 type Deps struct {
-	RateLimit   *options.RateLimitOptions
-	RateBudgets ratelimit.RateBudgetProvider
+	RateLimit              *options.RateLimitOptions
+	RateBudgets            ratelimit.RateBudgetProvider
+	HistoricalSeedVerifier *historicalseed.Verifier
+	HistoricalStageReader  stageport.Reader
 
 	Survey          SurveyDeps
 	AssessmentModel AssessmentModelDeps
@@ -191,6 +196,7 @@ func NewRouter(deps Deps) *Router {
 
 // RegisterRoutes 注册所有路由。
 func (r *Router) RegisterRoutes(engine *gin.Engine) {
+	engine.Use(restmiddleware.HistoricalSeedMiddleware(r.deps.HistoricalSeedVerifier))
 	engine.Static("/api/rest", "./api/rest")
 	engine.Static("/swagger-ui", "./web/swagger-ui/swagger-ui-dist")
 	engine.GET("/swagger", func(c *gin.Context) {

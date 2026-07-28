@@ -7,6 +7,7 @@
 package evaluation
 
 import (
+	common "github.com/FangcunMount/qs-server/api/grpc/gen/common"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -895,9 +896,10 @@ type EnsureAssessmentRequest struct {
 	OriginType           string                 `protobuf:"bytes,8,opt,name=origin_type,json=originType,proto3" json:"origin_type,omitempty"`
 	OriginId             string                 `protobuf:"bytes,9,opt,name=origin_id,json=originId,proto3" json:"origin_id,omitempty"`
 	// Submit-time frozen evaluation admission (EV-R001). Empty purpose = legacy.
-	Admission     *AssessmentAdmission `protobuf:"bytes,10,opt,name=admission,proto3" json:"admission,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Admission         *AssessmentAdmission               `protobuf:"bytes,10,opt,name=admission,proto3" json:"admission,omitempty"`
+	HistoricalContext *common.HistoricalExecutionContext `protobuf:"bytes,11,opt,name=historical_context,json=historicalContext,proto3" json:"historical_context,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *EnsureAssessmentRequest) Reset() {
@@ -996,6 +998,13 @@ func (x *EnsureAssessmentRequest) GetOriginId() string {
 func (x *EnsureAssessmentRequest) GetAdmission() *AssessmentAdmission {
 	if x != nil {
 		return x.Admission
+	}
+	return nil
+}
+
+func (x *EnsureAssessmentRequest) GetHistoricalContext() *common.HistoricalExecutionContext {
+	if x != nil {
+		return x.HistoricalContext
 	}
 	return nil
 }
@@ -1162,10 +1171,11 @@ func (x *EnsureAssessmentResponse) GetAutoSubmitted() bool {
 }
 
 type ExecuteEvaluationRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AssessmentId  uint64                 `protobuf:"varint,1,opt,name=assessment_id,json=assessmentId,proto3" json:"assessment_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState             `protogen:"open.v1"`
+	AssessmentId      uint64                             `protobuf:"varint,1,opt,name=assessment_id,json=assessmentId,proto3" json:"assessment_id,omitempty"`
+	HistoricalContext *common.HistoricalExecutionContext `protobuf:"bytes,2,opt,name=historical_context,json=historicalContext,proto3" json:"historical_context,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *ExecuteEvaluationRequest) Reset() {
@@ -1203,6 +1213,13 @@ func (x *ExecuteEvaluationRequest) GetAssessmentId() uint64 {
 		return x.AssessmentId
 	}
 	return 0
+}
+
+func (x *ExecuteEvaluationRequest) GetHistoricalContext() *common.HistoricalExecutionContext {
+	if x != nil {
+		return x.HistoricalContext
+	}
+	return nil
 }
 
 type ExecuteEvaluationResponse struct {
@@ -1968,7 +1985,7 @@ var File_evaluation_evaluation_proto protoreflect.FileDescriptor
 const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\n" +
 	"\x1bevaluation/evaluation.proto\x12\n" +
-	"evaluation\"\xff\x01\n" +
+	"evaluation\x1a\x17common/historical.proto\"\xff\x01\n" +
 	"\rModelIdentity\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x1c\n" +
 	"\talgorithm\x18\x03 \x01(\tR\talgorithm\x12\x12\n" +
@@ -2062,7 +2079,7 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\rassessment_id\x18\x02 \x01(\x04R\fassessmentId\x12'\n" +
 	"\x0freadiness_phase\x18\x03 \x01(\tR\x0ereadinessPhase\x12+\n" +
 	"\x11assessment_status\x18\x04 \x01(\tR\x10assessmentStatus\x12%\n" +
-	"\x0efailure_reason\x18\x05 \x01(\tR\rfailureReason\"\x8c\x03\n" +
+	"\x0efailure_reason\x18\x05 \x01(\tR\rfailureReason\"\xdf\x03\n" +
 	"\x17EnsureAssessmentRequest\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\x04R\x05orgId\x12&\n" +
 	"\x0fanswer_sheet_id\x18\x02 \x01(\x04R\ranswerSheetId\x12-\n" +
@@ -2075,7 +2092,8 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"originType\x12\x1b\n" +
 	"\torigin_id\x18\t \x01(\tR\boriginId\x12=\n" +
 	"\tadmission\x18\n" +
-	" \x01(\v2\x1f.evaluation.AssessmentAdmissionR\tadmission\"\xd6\x02\n" +
+	" \x01(\v2\x1f.evaluation.AssessmentAdmissionR\tadmission\x12Q\n" +
+	"\x12historical_context\x18\v \x01(\v2\".common.HistoricalExecutionContextR\x11historicalContext\"\xd6\x02\n" +
 	"\x13AssessmentAdmission\x12\x18\n" +
 	"\apurpose\x18\x01 \x01(\tR\apurpose\x12-\n" +
 	"\x12questionnaire_code\x18\x02 \x01(\tR\x11questionnaireCode\x123\n" +
@@ -2091,9 +2109,10 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\x18EnsureAssessmentResponse\x12#\n" +
 	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\x12\x18\n" +
 	"\acreated\x18\x02 \x01(\bR\acreated\x12%\n" +
-	"\x0eauto_submitted\x18\x03 \x01(\bR\rautoSubmitted\"?\n" +
+	"\x0eauto_submitted\x18\x03 \x01(\bR\rautoSubmitted\"\x92\x01\n" +
 	"\x18ExecuteEvaluationRequest\x12#\n" +
-	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\"\xa8\x06\n" +
+	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\x12Q\n" +
+	"\x12historical_context\x18\x02 \x01(\v2\".common.HistoricalExecutionContextR\x11historicalContext\"\xa8\x06\n" +
 	"\x19ExecuteEvaluationResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12/\n" +
 	"\x05model\x18\x02 \x01(\v2\x19.evaluation.ModelIdentityR\x05model\x12;\n" +
@@ -2222,6 +2241,7 @@ var file_evaluation_evaluation_proto_goTypes = []any{
 	(*GetFactorTrendResponse)(nil),                   // 21: evaluation.GetFactorTrendResponse
 	(*GetHighRiskFactorsRequest)(nil),                // 22: evaluation.GetHighRiskFactorsRequest
 	(*GetHighRiskFactorsResponse)(nil),               // 23: evaluation.GetHighRiskFactorsResponse
+	(*common.HistoricalExecutionContext)(nil),        // 24: common.HistoricalExecutionContext
 }
 var file_evaluation_evaluation_proto_depIdxs = []int32{
 	0,  // 0: evaluation.AssessmentSummary.model:type_name -> evaluation.ModelIdentity
@@ -2232,34 +2252,36 @@ var file_evaluation_evaluation_proto_depIdxs = []int32{
 	2,  // 5: evaluation.AssessmentDetail.level:type_name -> evaluation.ResultLevel
 	4,  // 6: evaluation.GetMyAssessmentResponse.assessment:type_name -> evaluation.AssessmentDetail
 	12, // 7: evaluation.EnsureAssessmentRequest.admission:type_name -> evaluation.AssessmentAdmission
-	0,  // 8: evaluation.ExecuteEvaluationResponse.model:type_name -> evaluation.ModelIdentity
-	1,  // 9: evaluation.ExecuteEvaluationResponse.primary_score:type_name -> evaluation.ScoreValue
-	2,  // 10: evaluation.ExecuteEvaluationResponse.level:type_name -> evaluation.ResultLevel
-	3,  // 11: evaluation.ListMyAssessmentsResponse.items:type_name -> evaluation.AssessmentSummary
-	5,  // 12: evaluation.GetAssessmentScoresResponse.factor_scores:type_name -> evaluation.FactorScore
-	6,  // 13: evaluation.GetFactorTrendResponse.data_points:type_name -> evaluation.TrendPoint
-	5,  // 14: evaluation.GetHighRiskFactorsResponse.high_risk_factors:type_name -> evaluation.FactorScore
-	7,  // 15: evaluation.TesteeEvaluationService.GetMyAssessment:input_type -> evaluation.GetMyAssessmentRequest
-	16, // 16: evaluation.TesteeEvaluationService.ListMyAssessments:input_type -> evaluation.ListMyAssessmentsRequest
-	18, // 17: evaluation.TesteeEvaluationService.GetAssessmentScores:input_type -> evaluation.GetAssessmentScoresRequest
-	20, // 18: evaluation.TesteeEvaluationService.GetFactorTrend:input_type -> evaluation.GetFactorTrendRequest
-	22, // 19: evaluation.TesteeEvaluationService.GetHighRiskFactors:input_type -> evaluation.GetHighRiskFactorsRequest
-	11, // 20: evaluation.AssessmentIntakeService.EnsureAssessment:input_type -> evaluation.EnsureAssessmentRequest
-	9,  // 21: evaluation.AssessmentIntakeService.ResolveAssessmentByAnswerSheetID:input_type -> evaluation.ResolveAssessmentByAnswerSheetIDRequest
-	14, // 22: evaluation.EvaluationWorkerService.ExecuteEvaluation:input_type -> evaluation.ExecuteEvaluationRequest
-	8,  // 23: evaluation.TesteeEvaluationService.GetMyAssessment:output_type -> evaluation.GetMyAssessmentResponse
-	17, // 24: evaluation.TesteeEvaluationService.ListMyAssessments:output_type -> evaluation.ListMyAssessmentsResponse
-	19, // 25: evaluation.TesteeEvaluationService.GetAssessmentScores:output_type -> evaluation.GetAssessmentScoresResponse
-	21, // 26: evaluation.TesteeEvaluationService.GetFactorTrend:output_type -> evaluation.GetFactorTrendResponse
-	23, // 27: evaluation.TesteeEvaluationService.GetHighRiskFactors:output_type -> evaluation.GetHighRiskFactorsResponse
-	13, // 28: evaluation.AssessmentIntakeService.EnsureAssessment:output_type -> evaluation.EnsureAssessmentResponse
-	10, // 29: evaluation.AssessmentIntakeService.ResolveAssessmentByAnswerSheetID:output_type -> evaluation.ResolveAssessmentByAnswerSheetIDResponse
-	15, // 30: evaluation.EvaluationWorkerService.ExecuteEvaluation:output_type -> evaluation.ExecuteEvaluationResponse
-	23, // [23:31] is the sub-list for method output_type
-	15, // [15:23] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	24, // 8: evaluation.EnsureAssessmentRequest.historical_context:type_name -> common.HistoricalExecutionContext
+	24, // 9: evaluation.ExecuteEvaluationRequest.historical_context:type_name -> common.HistoricalExecutionContext
+	0,  // 10: evaluation.ExecuteEvaluationResponse.model:type_name -> evaluation.ModelIdentity
+	1,  // 11: evaluation.ExecuteEvaluationResponse.primary_score:type_name -> evaluation.ScoreValue
+	2,  // 12: evaluation.ExecuteEvaluationResponse.level:type_name -> evaluation.ResultLevel
+	3,  // 13: evaluation.ListMyAssessmentsResponse.items:type_name -> evaluation.AssessmentSummary
+	5,  // 14: evaluation.GetAssessmentScoresResponse.factor_scores:type_name -> evaluation.FactorScore
+	6,  // 15: evaluation.GetFactorTrendResponse.data_points:type_name -> evaluation.TrendPoint
+	5,  // 16: evaluation.GetHighRiskFactorsResponse.high_risk_factors:type_name -> evaluation.FactorScore
+	7,  // 17: evaluation.TesteeEvaluationService.GetMyAssessment:input_type -> evaluation.GetMyAssessmentRequest
+	16, // 18: evaluation.TesteeEvaluationService.ListMyAssessments:input_type -> evaluation.ListMyAssessmentsRequest
+	18, // 19: evaluation.TesteeEvaluationService.GetAssessmentScores:input_type -> evaluation.GetAssessmentScoresRequest
+	20, // 20: evaluation.TesteeEvaluationService.GetFactorTrend:input_type -> evaluation.GetFactorTrendRequest
+	22, // 21: evaluation.TesteeEvaluationService.GetHighRiskFactors:input_type -> evaluation.GetHighRiskFactorsRequest
+	11, // 22: evaluation.AssessmentIntakeService.EnsureAssessment:input_type -> evaluation.EnsureAssessmentRequest
+	9,  // 23: evaluation.AssessmentIntakeService.ResolveAssessmentByAnswerSheetID:input_type -> evaluation.ResolveAssessmentByAnswerSheetIDRequest
+	14, // 24: evaluation.EvaluationWorkerService.ExecuteEvaluation:input_type -> evaluation.ExecuteEvaluationRequest
+	8,  // 25: evaluation.TesteeEvaluationService.GetMyAssessment:output_type -> evaluation.GetMyAssessmentResponse
+	17, // 26: evaluation.TesteeEvaluationService.ListMyAssessments:output_type -> evaluation.ListMyAssessmentsResponse
+	19, // 27: evaluation.TesteeEvaluationService.GetAssessmentScores:output_type -> evaluation.GetAssessmentScoresResponse
+	21, // 28: evaluation.TesteeEvaluationService.GetFactorTrend:output_type -> evaluation.GetFactorTrendResponse
+	23, // 29: evaluation.TesteeEvaluationService.GetHighRiskFactors:output_type -> evaluation.GetHighRiskFactorsResponse
+	13, // 30: evaluation.AssessmentIntakeService.EnsureAssessment:output_type -> evaluation.EnsureAssessmentResponse
+	10, // 31: evaluation.AssessmentIntakeService.ResolveAssessmentByAnswerSheetID:output_type -> evaluation.ResolveAssessmentByAnswerSheetIDResponse
+	15, // 32: evaluation.EvaluationWorkerService.ExecuteEvaluation:output_type -> evaluation.ExecuteEvaluationResponse
+	25, // [25:33] is the sub-list for method output_type
+	17, // [17:25] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_evaluation_evaluation_proto_init() }

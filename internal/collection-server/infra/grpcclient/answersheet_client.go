@@ -4,6 +4,7 @@ import (
 	"context"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/answersheet"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 )
 
 // ==================== Input/Output Types ====================
@@ -126,6 +127,9 @@ func (c *AnswerSheetClient) SaveAnswerSheet(ctx context.Context, input *SaveAnsw
 	}
 	if input.OriginRef != nil {
 		req.OriginRef = &pb.OriginRef{Type: input.OriginRef.Type, Id: input.OriginRef.ID}
+	}
+	if historical, ok := historicalseed.FromContext(ctx); ok {
+		req.HistoricalContext = historicalseed.ToProto(historical)
 	}
 
 	resp, err := c.grpcClient.SaveAnswerSheet(ctx, req)

@@ -46,8 +46,11 @@ type TaskResponse struct {
 
 // EnrollmentResponse 加入计划响应
 type EnrollmentResponse struct {
-	PlanID string         `json:"plan_id"`
-	Tasks  []TaskResponse `json:"tasks"`
+	PlanID       string         `json:"plan_id"`
+	EnrollmentID string         `json:"enrollment_id"`
+	Round        uint32         `json:"round"`
+	Idempotent   bool           `json:"idempotent"`
+	Tasks        []TaskResponse `json:"tasks"`
 }
 
 // PlanListResponse 计划列表响应
@@ -150,8 +153,11 @@ func NewEnrollmentResponse(result *plan.EnrollmentResult) *EnrollmentResponse {
 	}
 
 	return &EnrollmentResponse{
-		PlanID: result.PlanID,
-		Tasks:  tasks,
+		PlanID:       result.PlanID,
+		EnrollmentID: result.EnrollmentID,
+		Round:        result.Round,
+		Idempotent:   result.Idempotent,
+		Tasks:        tasks,
 	}
 }
 

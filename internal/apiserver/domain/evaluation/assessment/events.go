@@ -10,6 +10,7 @@ import (
 	evaldomainevent "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/event"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
@@ -41,6 +42,7 @@ func NewEvaluationRequestedEvent(
 	answerSheetRef AnswerSheetRef,
 	modelRef *EvaluationModelRef,
 	submittedAt time.Time,
+	historical ...*historicalseed.Context,
 ) EvaluationRequestedEvent {
 	in := evaldomainevent.RequestedInput{
 		OrgID:             orgID,
@@ -50,6 +52,10 @@ func NewEvaluationRequestedEvent(
 		QuestionnaireVer:  questionnaireRef.Version(),
 		AnswerSheetID:     strconv.FormatInt(int64(answerSheetRef.ID()), 10),
 		RequestedAt:       submittedAt,
+	}
+	if len(historical) > 0 && historical[0] != nil {
+		clone := historical[0].Clone()
+		in.HistoricalContext = &clone
 	}
 	if modelRef != nil && !modelRef.IsEmpty() {
 		in.ModelKind = modelRef.Kind().String()
@@ -63,7 +69,7 @@ func NewEvaluationRequestedEvent(
 }
 
 // NewEvaluationRetryRequestedEvent creates a deterministic retry wake-up.
-func NewEvaluationRetryRequestedEvent(a *Assessment, expectedAttempt int, origin retrygovernance.AttemptOrigin, actionRequestID string, requestedAt time.Time) EvaluationRequestedEvent {
+func NewEvaluationRetryRequestedEvent(a *Assessment, expectedAttempt int, origin retrygovernance.AttemptOrigin, actionRequestID string, requestedAt time.Time, historical ...*historicalseed.Context) EvaluationRequestedEvent {
 	if a == nil {
 		return EvaluationRequestedEvent{}
 	}
@@ -77,6 +83,10 @@ func NewEvaluationRetryRequestedEvent(a *Assessment, expectedAttempt int, origin
 		QuestionnaireCode: string(a.QuestionnaireRef().Code()), QuestionnaireVer: a.QuestionnaireRef().Version(),
 		AnswerSheetID: strconv.FormatInt(int64(a.AnswerSheetRef().ID()), 10), RequestedAt: requestedAt,
 		ExpectedAttempt: expectedAttempt, AttemptOrigin: string(origin), ActionRequestID: actionRequestID, Mode: "next_attempt",
+	}
+	if len(historical) > 0 && historical[0] != nil {
+		clone := historical[0].Clone()
+		in.HistoricalContext = &clone
 	}
 	if modelRef := a.EvaluationModelRef(); modelRef != nil && !modelRef.IsEmpty() {
 		in.ModelKind, in.ModelCode, in.ModelVersion = modelRef.Kind().String(), modelRef.Code().String(), modelRef.Version()
@@ -102,6 +112,7 @@ func NewEvaluationOutcomeCommittedEvent(
 	outcomeID meta.ID,
 	evaluationRunID evalrun.ID,
 	evaluatedAt time.Time,
+	historical ...*historicalseed.Context,
 ) EvaluationOutcomeCommittedEvent {
 	return evaldomainevent.NewOutcomeCommittedEvent(
 		orgID,
@@ -110,5 +121,6 @@ func NewEvaluationOutcomeCommittedEvent(
 		outcomeID.String(),
 		evaluationRunID.String(),
 		evaluatedAt,
+		historical...,
 	)
 }

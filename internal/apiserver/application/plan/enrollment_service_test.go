@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/event"
 	testeeDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 )
 
 type enrollmentPlanRepoStub struct {
@@ -209,6 +210,31 @@ func TestEnrollmentServiceDoesNotPublishPlanEventOnEnroll(t *testing.T) {
 	}
 	if len(publisher.events) != 0 {
 		t.Fatalf("expected no plan lifecycle event on enroll, got %d", len(publisher.events))
+	}
+}
+
+func TestEnrollmentServiceUsesHistoricalJoinedAt(t *testing.T) {
+	planAggregate, err := domainPlan.NewAssessmentPlan(9, "scale-code", domainPlan.PlanScheduleByDay, 1, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	planAggregate.ClearEvents()
+	taskRepo := &enrollmentTaskRepoStub{}
+	enrollmentRepo := &enrollmentRepoStub{}
+	service := NewEnrollmentService(&enrollmentPlanRepoStub{plan: planAggregate}, taskRepo, enrollmentRepo, directPlanTxRunner{}, &enrollmentEventPublisherStub{})
+	joinedAt := time.Date(2025, 1, 1, 8, 8, 0, 0, time.UTC)
+	ctx := historicalseed.WithContext(context.Background(), historicalseed.Context{
+		OrgID: 9, Timeline: historicalseed.Timeline{EnrollmentJoinedAt: &joinedAt},
+	})
+	_, err = service.EnrollTestee(ctx, EnrollTesteeDTO{OrgID: 9, PlanID: planAggregate.GetID().String(), TesteeID: "3001", StartDate: "2025-01-01"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if enrollmentRepo.active == nil || !enrollmentRepo.active.JoinedAt().Equal(joinedAt) {
+		t.Fatalf("historical joined_at mismatch: %+v", enrollmentRepo.active)
+	}
+	if len(taskRepo.savedBatch) != 1 || taskRepo.savedBatch[0].GetBusinessCreatedAt() == nil || !taskRepo.savedBatch[0].GetBusinessCreatedAt().Equal(joinedAt) {
+		t.Fatalf("historical task business_created_at mismatch: %+v", taskRepo.savedBatch)
 	}
 }
 

@@ -12,7 +12,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
 type ExecuteStatus string
@@ -137,7 +139,14 @@ func (e *executor) buildAndCommit(ctx context.Context, input interpinput.Interpr
 	}
 	executionmetrics.ObserveBuild(builderIdentity, executionmetrics.ResultSuccess, time.Since(buildStartedAt))
 
-	at := e.now()
+	orgID, err := safeconv.Int64ToUint64(input.Association.OrgID)
+	if err != nil {
+		return nil, fmt.Errorf("interpretation org id: %w", err)
+	}
+	at, err := historicalseed.OccurredAt(ctx, orgID, historicalseed.StageReportGenerated, e.now())
+	if err != nil {
+		return nil, fmt.Errorf("historical report generation time: %w", err)
+	}
 	artifact, err := domainreport.NewInterpretReport(domainreport.InterpretReportInput{
 		ID: e.newID(), GenerationID: generationRecord.ID(), OutcomeID: input.OutcomeID, InterpretationRunID: runRecord.ID(),
 		Association: input.Association, ReportType: input.Report.ReportType, TemplateVersion: input.Report.TemplateVersion,

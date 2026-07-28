@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -37,6 +38,7 @@ type Assessment struct {
 	summary    *ResultSummary
 
 	// === 时间戳 ===
+	createdAt   time.Time
 	submittedAt *time.Time
 	evaluatedAt *time.Time
 	failedAt    *time.Time
@@ -86,6 +88,7 @@ func NewAssessment(
 		answerSheetRef:   answerSheetRef,
 		origin:           origin,
 		status:           StatusPending,
+		createdAt:        time.Now(),
 		events:           make([]DomainEvent, 0),
 	}
 
@@ -113,9 +116,19 @@ func WithID(id ID) AssessmentOption {
 	}
 }
 
+// WithCreatedAt sets the explicit business creation time. GORM audit time is
+// otherwise left to the ordinary constructor default.
+func WithCreatedAt(createdAt time.Time) AssessmentOption {
+	return func(a *Assessment) {
+		if !createdAt.IsZero() {
+			a.createdAt = createdAt
+		}
+	}
+}
+
 // ==================== 重建方法（仓储层使用）====================
 
-// Reconstruct 从持久化数据重建测评对象
+// Reconstruct 从持久化数据重建测评对象。旧调用没有独立业务创建时间。
 func Reconstruct(
 	id ID,
 	orgID int64,
@@ -126,6 +139,28 @@ func Reconstruct(
 	status Status,
 	totalScore *float64,
 	riskLevel *RiskLevel,
+	submittedAt *time.Time,
+	evaluatedAt *time.Time,
+	failedAt *time.Time,
+	failureReason *string,
+	modelRefs ...*EvaluationModelRef,
+) *Assessment {
+	return ReconstructWithCreatedAt(id, orgID, testeeID, questionnaireRef, answerSheetRef, origin, status, totalScore, riskLevel, time.Time{}, submittedAt, evaluatedAt, failedAt, failureReason, modelRefs...)
+}
+
+// ReconstructWithCreatedAt restores the explicit persisted assessment
+// creation time used by historical statistics.
+func ReconstructWithCreatedAt(
+	id ID,
+	orgID int64,
+	testeeID testee.ID,
+	questionnaireRef QuestionnaireRef,
+	answerSheetRef AnswerSheetRef,
+	origin Origin,
+	status Status,
+	totalScore *float64,
+	riskLevel *RiskLevel,
+	createdAt time.Time,
 	submittedAt *time.Time,
 	evaluatedAt *time.Time,
 	failedAt *time.Time,
@@ -152,6 +187,7 @@ func Reconstruct(
 		totalScore:       totalScore,
 		riskLevel:        riskLevel,
 		summary:          summary,
+		createdAt:        createdAt,
 		submittedAt:      submittedAt,
 		evaluatedAt:      evaluatedAt,
 		failedAt:         failedAt,
@@ -166,6 +202,12 @@ func Reconstruct(
 // 前置条件：pending，且 ModelRef / QuestionnaireRef / AnswerSheetRef 完整（EV-R003）
 // 后置条件：状态变为 submitted，发布 evaluation.requested
 func (a *Assessment) Submit() error {
+	return a.SubmitAt(time.Now(), nil)
+}
+
+// SubmitAt applies an explicit business time and optionally carries the
+// verified historical context into evaluation.requested.
+func (a *Assessment) SubmitAt(submittedAt time.Time, historical *historicalseed.Context) error {
 	if !a.status.IsPending() {
 		return NewInvalidStatusError("submit", a.status)
 	}
@@ -173,9 +215,11 @@ func (a *Assessment) Submit() error {
 		return err
 	}
 
-	now := time.Now()
+	if submittedAt.IsZero() {
+		return ErrInvalidArgument
+	}
 	a.status = StatusSubmitted
-	a.submittedAt = &now
+	a.submittedAt = &submittedAt
 
 	// 发布领域事件
 	a.addEvent(NewEvaluationRequestedEvent(
@@ -185,7 +229,8 @@ func (a *Assessment) Submit() error {
 		a.questionnaireRef,
 		a.answerSheetRef,
 		a.modelRef,
-		now,
+		submittedAt,
+		historical,
 	))
 
 	return nil
@@ -241,6 +286,10 @@ func (a *Assessment) PrepareScoringProjection(projection ScoringProjection, eval
 // StageEvaluatedEvent records the durable outcome and run references emitted
 // after scoring completes.
 func (a *Assessment) StageEvaluatedEvent(evaluatedAt time.Time, outcomeID meta.ID, runID evalrun.ID) {
+	a.StageEvaluatedEventWithHistorical(evaluatedAt, outcomeID, runID, nil)
+}
+
+func (a *Assessment) StageEvaluatedEventWithHistorical(evaluatedAt time.Time, outcomeID meta.ID, runID evalrun.ID, historical *historicalseed.Context) {
 	a.addEvent(NewEvaluationOutcomeCommittedEvent(
 		a.orgID,
 		a.id,
@@ -248,6 +297,7 @@ func (a *Assessment) StageEvaluatedEvent(evaluatedAt time.Time, outcomeID meta.I
 		outcomeID,
 		runID,
 		evaluatedAt,
+		historical,
 	))
 }
 
@@ -466,6 +516,11 @@ func (a *Assessment) clone() *Assessment {
 }
 
 // ==================== 时间戳查询方法 ====================
+
+// CreatedAt 获取测评业务创建时间。
+func (a *Assessment) CreatedAt() time.Time {
+	return a.createdAt
+}
 
 // SubmittedAt 获取提交时间
 func (a *Assessment) SubmittedAt() *time.Time {

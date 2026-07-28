@@ -43,6 +43,7 @@ type Options struct {
 	StatisticsSync                 *StatisticsSyncOptions                  `json:"statistics_sync" mapstructure:"statistics_sync"`
 	Signaling                      *genericoptions.SignalingOptions        `json:"signaling" mapstructure:"signaling"`
 	SystemGovernance               *SystemGovernanceOptions                `json:"system_governance" mapstructure:"system_governance"`
+	HistoricalSeed                 *HistoricalSeedOptions                  `json:"historical_seed" mapstructure:"historical_seed"`
 	DelegatedSubject               *delegatedsubject.Options               `json:"delegated_subject" mapstructure:"delegated-subject"`
 	rawSettingsSource              app.RawSettingsSource
 }
@@ -91,6 +92,7 @@ func NewOptions() *Options {
 		StatisticsSync:                 NewStatisticsSyncOptions(),
 		Signaling:                      genericoptions.NewSignalingOptions(),
 		SystemGovernance:               NewSystemGovernanceOptions(),
+		HistoricalSeed:                 NewHistoricalSeedOptions(),
 	}
 }
 
@@ -417,6 +419,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.Backpressure.AddFlags(fss.FlagSet("backpressure"))
 	o.Cache.AddFlags(fss.FlagSet("cache"))
 	o.StatisticsSync.AddFlags(fss.FlagSet("statistics_sync"))
+	o.HistoricalSeed.AddFlags(fss.FlagSet("historical_seed"))
 
 	return fss
 }

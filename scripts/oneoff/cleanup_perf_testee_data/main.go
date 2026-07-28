@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -37,6 +38,9 @@ type config struct {
 	mongoDB                   string
 	testeeIDsRaw              string
 	testeeIDsFile             string
+	seedBatchID               string
+	seedManifest              string
+	confirmServicesStopped    bool
 	testeeCreatedAfter        string
 	allowOldTestees           bool
 	scanEventPayloads         bool
@@ -112,9 +116,13 @@ type scopeSummary struct {
 func main() {
 	cfg := parseFlags()
 	initProgress(cfg.noProgress)
-	testeeIDs, err := parseTesteeIDs(cfg.testeeIDsRaw, cfg.testeeIDsFile)
-	if err != nil {
-		log.Fatalf("parse testee ids: %v", err)
+	var testeeIDs []uint64
+	var err error
+	if cfg.seedBatchID == "" {
+		testeeIDs, err = parseTesteeIDs(cfg.testeeIDsRaw, cfg.testeeIDsFile)
+		if err != nil {
+			log.Fatalf("parse testee ids: %v", err)
+		}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
@@ -137,6 +145,20 @@ func main() {
 	if _, err := conn.ExecContext(ctx, "SET NAMES utf8mb4"); err != nil {
 		log.Fatalf("set mysql names: %v", err)
 	}
+	if cfg.seedBatchID != "" {
+		ledgerIDs, err := loadHistoricalBatchTesteeIDs(ctx, conn, cfg.seedBatchID)
+		if err != nil {
+			log.Fatalf("load historical batch testee ids: %v", err)
+		}
+		manifestIDs, err := loadHistoricalManifestTesteeIDs(cfg.seedManifest, cfg.seedBatchID)
+		if err != nil {
+			log.Fatalf("load historical manifest testee ids: %v", err)
+		}
+		testeeIDs = uniqueUint64(append(ledgerIDs, manifestIDs...))
+		if len(testeeIDs) == 0 {
+			log.Fatalf("historical batch %s resolved zero testee ids", cfg.seedBatchID)
+		}
+	}
 
 	mongoClient, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.mongoURI))
 	if err != nil {
@@ -158,7 +180,7 @@ func main() {
 	}
 	prog.Finish("prepare mysql scope", fmt.Sprintf("testees=%d", len(testeeIDs)))
 
-	ids, err := loadScopeIDs(ctx, conn)
+	ids, err := loadScopeIDs(ctx, conn, cfg)
 	if err != nil {
 		log.Fatalf("load scope ids: %v", err)
 	}
@@ -286,6 +308,9 @@ func parseFlags() config {
 	flag.StringVar(&cfg.mongoDB, "mongo-db", "", "MongoDB database name")
 	flag.StringVar(&cfg.testeeIDsRaw, "testee-ids", "", "comma/space/newline separated testee IDs")
 	flag.StringVar(&cfg.testeeIDsFile, "testee-ids-file", "", "file containing comma/space/newline separated testee IDs")
+	flag.StringVar(&cfg.seedBatchID, "seed-batch-id", "", "scope cleanup from seed_backfill_stage instead of a manual testee list")
+	flag.StringVar(&cfg.seedManifest, "seed-manifest", "", "runner historical manifest used to include create_testee/resolve-only scenarios")
+	flag.BoolVar(&cfg.confirmServicesStopped, "confirm-services-stopped", false, "confirm runner, workers, and relevant schedulers are stopped before batch rollback")
 	flag.StringVar(&cfg.testeeCreatedAfter, "testee-created-after", "2026-05-01 00:00:00", "safety guard: selected testees must have created_at after this MySQL timestamp")
 	flag.BoolVar(&cfg.allowOldTestees, "allow-old-testees", false, "bypass --testee-created-after guard")
 	flag.BoolVar(&cfg.scanEventPayloads, "scan-event-payloads", false, "also scan MySQL outbox payload_json for testee_id; expensive on large outbox tables")
@@ -315,8 +340,25 @@ func parseFlags() config {
 			log.Fatalf("%s is required", name)
 		}
 	}
-	if strings.TrimSpace(cfg.testeeIDsRaw) == "" && strings.TrimSpace(cfg.testeeIDsFile) == "" {
-		log.Fatal("either --testee-ids or --testee-ids-file is required")
+	cfg.seedBatchID = strings.TrimSpace(cfg.seedBatchID)
+	hasManualScope := strings.TrimSpace(cfg.testeeIDsRaw) != "" || strings.TrimSpace(cfg.testeeIDsFile) != ""
+	if (cfg.seedBatchID == "") == !hasManualScope {
+		log.Fatal("provide exactly one scope: --seed-batch-id or --testee-ids/--testee-ids-file")
+	}
+	if cfg.seedBatchID != "" {
+		if !regexp.MustCompile(`^[A-Za-z0-9._:-]{8,96}$`).MatchString(cfg.seedBatchID) {
+			log.Fatal("--seed-batch-id contains unsafe characters")
+		}
+		if cfg.apply && strings.TrimSpace(cfg.seedManifest) == "" {
+			log.Fatal("historical batch apply requires --seed-manifest so create_testee and resolve-only scenarios are in scope")
+		}
+		if cfg.apply && !cfg.confirmServicesStopped {
+			log.Fatal("historical batch apply requires --confirm-services-stopped")
+		}
+		if cfg.apply && cfg.skipBackup {
+			log.Fatal("historical batch apply cannot use --skip-backup")
+		}
+		cfg.scanEventPayloads = true
 	}
 	if cfg.previewLimit < 0 {
 		log.Fatal("--preview-limit must be >= 0")
@@ -378,6 +420,79 @@ func parseTesteeIDs(raw, file string) ([]uint64, error) {
 	return ids, nil
 }
 
+func loadHistoricalBatchTesteeIDs(ctx context.Context, conn *sql.Conn, batchID string) ([]uint64, error) {
+	var stageCount int64
+	if err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM seed_backfill_stage WHERE batch_id = ?`, batchID).Scan(&stageCount); err != nil {
+		return nil, err
+	}
+	if stageCount == 0 {
+		return nil, fmt.Errorf("seed_backfill_stage has no rows for batch %s", batchID)
+	}
+	rows, err := conn.QueryContext(ctx, `
+SELECT DISTINCT resource_id
+FROM seed_backfill_stage
+WHERE batch_id = ? AND stage = 'entry_intake' AND resource_type = 'testee'
+  AND JSON_EXTRACT(payload_json, '$.testee_created') = TRUE
+ORDER BY resource_id`, batchID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var ids []uint64
+	for rows.Next() {
+		var raw string
+		if err := rows.Scan(&raw); err != nil {
+			return nil, err
+		}
+		id, err := strconv.ParseUint(strings.TrimSpace(raw), 10, 64)
+		if err != nil || id == 0 {
+			return nil, fmt.Errorf("batch %s has invalid testee resource_id %q", batchID, raw)
+		}
+		ids = append(ids, id)
+	}
+	return uniqueUint64(ids), rows.Err()
+}
+
+func loadHistoricalManifestTesteeIDs(path, batchID string) ([]uint64, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var manifest struct {
+		BatchID   string `json:"batch_id"`
+		Scenarios map[string]struct {
+			TesteeID      string `json:"testee_id"`
+			TesteeCreated bool   `json:"testee_created"`
+		} `json:"scenarios"`
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(manifest.BatchID) != batchID {
+		return nil, fmt.Errorf("manifest batch_id %q does not match %q", manifest.BatchID, batchID)
+	}
+	ids := make([]uint64, 0, len(manifest.Scenarios))
+	for scenarioID, scenario := range manifest.Scenarios {
+		if !scenario.TesteeCreated {
+			continue
+		}
+		raw := strings.TrimSpace(scenario.TesteeID)
+		if raw == "" {
+			continue
+		}
+		id, err := strconv.ParseUint(raw, 10, 64)
+		if err != nil || id == 0 {
+			return nil, fmt.Errorf("scenario %s has invalid testee_id %q", scenarioID, raw)
+		}
+		ids = append(ids, id)
+	}
+	return uniqueUint64(ids), nil
+}
+
 func splitIDs(raw string) []string {
 	fields := strings.FieldsFunc(raw, func(r rune) bool {
 		return r == ',' || r == '\n' || r == '\r' || r == '\t' || r == ' '
@@ -414,6 +529,12 @@ func prepareMySQLScope(ctx context.Context, conn *sql.Conn, cfg config, testeeID
 		fmt.Sprintf(`CREATE TEMPORARY TABLE tmp_cleanup_mysql_outbox_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY, event_id %s NOT NULL, UNIQUE KEY uk_event_id (event_id))`, eventIDType),
 		`CREATE TEMPORARY TABLE tmp_cleanup_assessment_task_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
 		`CREATE TEMPORARY TABLE tmp_cleanup_assessment_score_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
+		`CREATE TEMPORARY TABLE tmp_cleanup_plan_enrollment_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
+		`CREATE TEMPORARY TABLE tmp_cleanup_outcome_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
+		`CREATE TEMPORARY TABLE tmp_cleanup_resolve_log_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
+		`CREATE TEMPORARY TABLE tmp_cleanup_intake_log_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
+		`CREATE TEMPORARY TABLE tmp_cleanup_relation_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
+		`CREATE TEMPORARY TABLE tmp_cleanup_seed_stage_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
 		`CREATE TEMPORARY TABLE tmp_cleanup_statistics_dates (org_id BIGINT NOT NULL, stat_date DATE NOT NULL, PRIMARY KEY (org_id, stat_date))`,
 	}
 	for i, stmt := range stmts {
@@ -445,6 +566,15 @@ SELECT DISTINCT f.assessment_id FROM statistics_assessment_fact f JOIN tmp_clean
 		namedSQL{"answersheet ids from assessment scope", `INSERT IGNORE INTO tmp_cleanup_answersheet_ids (id)
 SELECT DISTINCT a.answer_sheet_id FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id WHERE a.answer_sheet_id <> 0`},
 	)
+	populate = append(populate,
+		namedSQL{"plan enrollment ids from testee scope", `INSERT IGNORE INTO tmp_cleanup_plan_enrollment_ids (id)
+SELECT e.id FROM plan_enrollment e JOIN tmp_cleanup_testee_ids t ON t.id = e.testee_id`},
+		namedSQL{"outcome ids from assessment scope", `INSERT IGNORE INTO tmp_cleanup_outcome_ids (id)
+SELECT o.id FROM evaluation_outcome o JOIN tmp_cleanup_assessment_ids a ON a.id = o.assessment_id`},
+	)
+	if cfg.seedBatchID != "" {
+		populate = append(populate, historicalBatchScopeStatements(cfg.seedBatchID)...)
+	}
 	populate = append(populate, namedSQL{"answersheet ids from statistics facts", `INSERT IGNORE INTO tmp_cleanup_answersheet_ids (id)
 SELECT DISTINCT f.answersheet_id FROM statistics_assessment_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id WHERE f.answersheet_id IS NOT NULL AND f.answersheet_id <> 0`})
 	populate = append(populate,
@@ -494,6 +624,36 @@ func addMySQLOutboxIDsToScope(ctx context.Context, conn *sql.Conn, cfg config) e
 		}
 	}
 	return nil
+}
+
+func historicalBatchScopeStatements(batchID string) []namedSQL {
+	// parseFlags restricts batch IDs to a conservative identifier alphabet, so
+	// this literal cannot terminate or alter the generated one-off SQL.
+	batch := "'" + batchID + "'"
+	return []namedSQL{
+		{"historical stage ids", `INSERT IGNORE INTO tmp_cleanup_seed_stage_ids (id) SELECT id FROM seed_backfill_stage WHERE batch_id = ` + batch},
+		{"historical assessment ids", `INSERT IGNORE INTO tmp_cleanup_assessment_ids (id) SELECT CAST(resource_id AS UNSIGNED) FROM seed_backfill_stage WHERE batch_id = ` + batch + ` AND stage IN ('assessment_created','assessment_submitted') AND resource_type = 'assessment'`},
+		{"historical answersheet ids", `INSERT IGNORE INTO tmp_cleanup_answersheet_ids (id) SELECT CAST(resource_id AS UNSIGNED) FROM seed_backfill_stage WHERE batch_id = ` + batch + ` AND stage = 'answersheet_submit' AND resource_type = 'answer_sheet'`},
+		{"historical outcome ids", `INSERT IGNORE INTO tmp_cleanup_outcome_ids (id) SELECT CAST(resource_id AS UNSIGNED) FROM seed_backfill_stage WHERE batch_id = ` + batch + ` AND stage = 'outcome_committed' AND resource_type = 'evaluation_outcome'`},
+		{"historical report ids", `INSERT IGNORE INTO tmp_cleanup_report_ids (id) SELECT CAST(resource_id AS UNSIGNED) FROM seed_backfill_stage WHERE batch_id = ` + batch + ` AND stage = 'report_generated' AND resource_type = 'interpretation_report'`},
+		{"historical enrollment ids", `INSERT IGNORE INTO tmp_cleanup_plan_enrollment_ids (id) SELECT CAST(resource_id AS UNSIGNED) FROM seed_backfill_stage WHERE batch_id = ` + batch + ` AND stage = 'plan_enrollment' AND resource_type = 'plan_enrollment'`},
+		{"historical resolve log ids", `INSERT IGNORE INTO tmp_cleanup_resolve_log_ids (id)
+		SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.resolve_log_id')) AS UNSIGNED)
+		FROM seed_backfill_stage WHERE batch_id = ` + batch + ` AND stage = 'entry_resolve'
+		  AND JSON_EXTRACT(payload_json, '$.resolve_log_id') IS NOT NULL`},
+		{"historical intake log ids", `INSERT IGNORE INTO tmp_cleanup_intake_log_ids (id)
+		SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.intake_log_id')) AS UNSIGNED)
+		FROM seed_backfill_stage WHERE batch_id = ` + batch + ` AND stage = 'entry_intake'
+		  AND JSON_EXTRACT(payload_json, '$.intake_log_id') IS NOT NULL`},
+		{"historical relation ids", `INSERT IGNORE INTO tmp_cleanup_relation_ids (id)
+SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.creator_relation_id')) AS UNSIGNED)
+FROM seed_backfill_stage WHERE batch_id = ` + batch + ` AND stage = 'entry_intake' AND JSON_EXTRACT(payload_json, '$.creator_created') = TRUE
+UNION
+SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.assignment_relation_id')) AS UNSIGNED)
+FROM seed_backfill_stage WHERE batch_id = ` + batch + ` AND stage = 'entry_intake' AND JSON_EXTRACT(payload_json, '$.assignment_created') = TRUE`},
+		{"historical statistics dates", `INSERT IGNORE INTO tmp_cleanup_statistics_dates (org_id, stat_date)
+SELECT org_id, DATE(business_at) FROM seed_backfill_stage WHERE batch_id = ` + batch},
+	}
 }
 
 func mysqlOutboxScopeStatements(cfg config) []namedSQL {
@@ -645,10 +805,13 @@ type scopeIDs struct {
 	TesteeIDs      []uint64
 	AssessmentIDs  []uint64
 	AnswerSheetIDs []uint64
+	OutcomeIDs     []uint64
 	ReportIDs      []uint64
+	GenerationIDs  []uint64
+	ReportRunIDs   []uint64
 }
 
-func loadScopeIDs(ctx context.Context, conn *sql.Conn) (scopeIDs, error) {
+func loadScopeIDs(ctx context.Context, conn *sql.Conn, cfg config) (scopeIDs, error) {
 	load := func(query string) ([]uint64, error) {
 		rows, err := conn.QueryContext(ctx, query)
 		if err != nil {
@@ -680,11 +843,55 @@ func loadScopeIDs(ctx context.Context, conn *sql.Conn) (scopeIDs, error) {
 	if err != nil {
 		return scopeIDs{}, err
 	}
+	outcomeIDs, err := load(`SELECT id FROM tmp_cleanup_outcome_ids ORDER BY id`)
+	if err != nil {
+		return scopeIDs{}, err
+	}
 	reportIDs, err := load(`SELECT id FROM tmp_cleanup_report_ids ORDER BY id`)
 	if err != nil {
 		return scopeIDs{}, err
 	}
-	return scopeIDs{TesteeIDs: testeeIDs, AssessmentIDs: assessmentIDs, AnswerSheetIDs: answerSheetIDs, ReportIDs: reportIDs}, nil
+	ids := scopeIDs{TesteeIDs: testeeIDs, AssessmentIDs: assessmentIDs, AnswerSheetIDs: answerSheetIDs, OutcomeIDs: outcomeIDs, ReportIDs: reportIDs}
+	if cfg.seedBatchID != "" {
+		ids.GenerationIDs, err = loadHistoricalPayloadIDs(ctx, conn, cfg.seedBatchID, "generation_id")
+		if err != nil {
+			return scopeIDs{}, err
+		}
+		ids.ReportRunIDs, err = loadHistoricalPayloadIDs(ctx, conn, cfg.seedBatchID, "run_id")
+		if err != nil {
+			return scopeIDs{}, err
+		}
+	}
+	return ids, nil
+}
+
+func loadHistoricalPayloadIDs(ctx context.Context, conn *sql.Conn, batchID, field string) ([]uint64, error) {
+	if field != "generation_id" && field != "run_id" {
+		return nil, fmt.Errorf("unsupported historical payload id field %q", field)
+	}
+	query := fmt.Sprintf(`SELECT DISTINCT JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.%s'))
+FROM seed_backfill_stage WHERE batch_id = ? AND stage = 'report_generated'`, field)
+	rows, err := conn.QueryContext(ctx, query, batchID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var ids []uint64
+	for rows.Next() {
+		var raw sql.NullString
+		if err := rows.Scan(&raw); err != nil {
+			return nil, err
+		}
+		if !raw.Valid || strings.TrimSpace(raw.String) == "" {
+			continue
+		}
+		id, err := strconv.ParseUint(raw.String, 10, 64)
+		if err != nil || id == 0 {
+			return nil, fmt.Errorf("invalid historical %s %q", field, raw.String)
+		}
+		ids = append(ids, id)
+	}
+	return uniqueUint64(ids), rows.Err()
 }
 
 func enrichScopeIDsFromMongo(ctx context.Context, db *mongo.Database, ids scopeIDs, workers int) (scopeIDs, error) {
@@ -717,7 +924,34 @@ func enrichScopeIDsFromMongo(ctx context.Context, db *mongo.Database, ids scopeI
 	}
 
 	ids.AnswerSheetIDs = uniqueUint64(append(append(ids.AnswerSheetIDs, results[0]...), results[1]...))
+	reportIDs, err := loadMongoUint64FieldByFilters(ctx, db.Collection("interpret_report_artifacts"), interpretReportFilters(ids), "domain_id", "interpret_report_artifacts.domain_id")
+	if err != nil {
+		return ids, err
+	}
+	ids.ReportIDs = uniqueUint64(append(ids.ReportIDs, reportIDs...))
+	generationIDs, err := loadMongoUint64FieldByFilters(ctx, db.Collection("report_generations"), reportGenerationFilters(ids), "domain_id", "report_generations.domain_id")
+	if err != nil {
+		return ids, err
+	}
+	ids.GenerationIDs = uniqueUint64(append(ids.GenerationIDs, generationIDs...))
+	runIDs, err := loadMongoUint64FieldByFilters(ctx, db.Collection("interpretation_runs"), interpretationRunFilters(ids), "domain_id", "interpretation_runs.domain_id")
+	if err != nil {
+		return ids, err
+	}
+	ids.ReportRunIDs = uniqueUint64(append(ids.ReportRunIDs, runIDs...))
 	return ids, nil
+}
+
+func loadMongoUint64FieldByFilters(ctx context.Context, coll *mongo.Collection, filters []bson.M, field, label string) ([]uint64, error) {
+	var values []uint64
+	for index, filter := range filters {
+		loaded, err := loadMongoUint64Field(ctx, coll, filter, field, fmt.Sprintf("%s[%d]", label, index))
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, loaded...)
+	}
+	return uniqueUint64(values), nil
 }
 
 func loadMongoUint64Field(ctx context.Context, coll *mongo.Collection, filter bson.M, field, label string) ([]uint64, error) {
@@ -1012,20 +1246,25 @@ func countMySQLRows(ctx context.Context, conn *sql.Conn) ([]namedCount, error) {
 	items := []mysqlCountItem{
 		{"testee", `SELECT COUNT(*) FROM testee t JOIN tmp_cleanup_testee_ids x ON x.id = t.id`},
 		{"assessment", `SELECT COUNT(*) FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id`},
+		{"evaluation_outcome", `SELECT COUNT(*) FROM evaluation_outcome o JOIN tmp_cleanup_outcome_ids x ON x.id = o.id`},
 		{"assessment_score", `SELECT COUNT(*) FROM assessment_score s LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id LEFT JOIN tmp_cleanup_testee_ids t ON t.id = s.testee_id WHERE a.id IS NOT NULL OR t.id IS NOT NULL`},
-		{"assessment_task", `SELECT COUNT(*) FROM assessment_task task LEFT JOIN tmp_cleanup_testee_ids t ON t.id = task.testee_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = task.assessment_id WHERE t.id IS NOT NULL OR a.id IS NOT NULL`},
-		{"clinician_relation", `SELECT COUNT(*) FROM clinician_relation r JOIN tmp_cleanup_testee_ids t ON t.id = r.testee_id`},
-		{"assessment_entry_intake_log", `SELECT COUNT(*) FROM assessment_entry_intake_log l JOIN tmp_cleanup_testee_ids t ON t.id = l.testee_id`},
-		{"statistics_access_fact", `SELECT COUNT(*) FROM statistics_access_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id`},
+		{"assessment_task", `SELECT COUNT(*) FROM assessment_task task LEFT JOIN tmp_cleanup_testee_ids t ON t.id = task.testee_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = task.assessment_id LEFT JOIN tmp_cleanup_plan_enrollment_ids e ON e.id = task.enrollment_id WHERE t.id IS NOT NULL OR a.id IS NOT NULL OR e.id IS NOT NULL`},
+		{"plan_enrollment", `SELECT COUNT(*) FROM plan_enrollment e JOIN tmp_cleanup_plan_enrollment_ids x ON x.id = e.id`},
+		{"clinician_relation", `SELECT COUNT(*) FROM clinician_relation r LEFT JOIN tmp_cleanup_testee_ids t ON t.id = r.testee_id LEFT JOIN tmp_cleanup_relation_ids scoped ON scoped.id = r.id WHERE t.id IS NOT NULL OR scoped.id IS NOT NULL`},
+		{"assessment_entry_resolve_log", `SELECT COUNT(*) FROM assessment_entry_resolve_log l JOIN tmp_cleanup_resolve_log_ids x ON x.id = l.id`},
+		{"assessment_entry_intake_log", `SELECT COUNT(*) FROM assessment_entry_intake_log l LEFT JOIN tmp_cleanup_testee_ids t ON t.id = l.testee_id LEFT JOIN tmp_cleanup_intake_log_ids scoped ON scoped.id = l.id WHERE t.id IS NOT NULL OR scoped.id IS NOT NULL`},
+		{"statistics_access_fact", `SELECT COUNT(*) FROM statistics_access_fact f LEFT JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_resolve_log_ids r ON f.source_type = 'entry_resolve' AND BINARY f.source_ref = BINARY CAST(r.id AS CHAR) LEFT JOIN tmp_cleanup_intake_log_ids i ON f.source_type = 'entry_intake' AND BINARY f.source_ref = BINARY CAST(i.id AS CHAR) WHERE t.id IS NOT NULL OR r.id IS NOT NULL OR i.id IS NOT NULL`},
 		{"statistics_assessment_fact", `SELECT COUNT(*) FROM statistics_assessment_fact f LEFT JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = f.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = f.report_id WHERE t.id IS NOT NULL OR s.id IS NOT NULL OR a.id IS NOT NULL OR r.id IS NOT NULL`},
-		{"statistics_plan_fact", `SELECT COUNT(*) FROM statistics_plan_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id`},
+		{"statistics_plan_fact", `SELECT COUNT(*) FROM statistics_plan_fact f LEFT JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_plan_enrollment_ids e ON e.id = f.enrollment_id LEFT JOIN tmp_cleanup_assessment_task_ids task ON task.id = f.task_id WHERE t.id IS NOT NULL OR e.id IS NOT NULL OR task.id IS NOT NULL`},
 		{"statistics_access_daily", `SELECT COUNT(*) FROM statistics_access_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date`},
 		{"statistics_assessment_daily", `SELECT COUNT(*) FROM statistics_assessment_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date`},
 		{"statistics_plan_activity_daily", `SELECT COUNT(*) FROM statistics_plan_activity_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date`},
 		{"statistics_plan_fulfillment_daily", `SELECT COUNT(*) FROM statistics_plan_fulfillment_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.cohort_date`},
 		{"statistics_org_snapshot", `SELECT COUNT(*) FROM statistics_org_snapshot s WHERE EXISTS (SELECT 1 FROM tmp_cleanup_statistics_dates x WHERE x.org_id = s.org_id)`},
-		{"statistics_sync_run", `SELECT COUNT(*) FROM statistics_sync_run r JOIN tmp_cleanup_statistics_dates x ON x.org_id = r.org_id AND x.stat_date = r.as_of_date`},
 		{"domain_event_outbox", `SELECT COUNT(*) FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
+		{"runtime_checkpoint", `SELECT COUNT(*) FROM runtime_checkpoint r JOIN tmp_cleanup_assessment_ids a ON a.id = r.assessment_id`},
+		{"retry_event_hold", `SELECT COUNT(*) FROM retry_event_hold h JOIN tmp_cleanup_event_ids e ON BINARY e.event_id = BINARY h.event_id`},
+		{"seed_backfill_stage", `SELECT COUNT(*) FROM seed_backfill_stage s JOIN tmp_cleanup_seed_stage_ids x ON x.id = s.id`},
 	}
 	out := make([]namedCount, 0, len(items))
 	for i, item := range items {
@@ -1067,20 +1306,25 @@ func backupMySQLRows(ctx context.Context, conn *sql.Conn, suffix string) error {
 	items := []mysqlBackupItem{
 		{"testee", `SELECT t.* FROM testee t JOIN tmp_cleanup_testee_ids x ON x.id = t.id`},
 		{"assessment", `SELECT a.* FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id`},
+		{"evaluation_outcome", `SELECT o.* FROM evaluation_outcome o JOIN tmp_cleanup_outcome_ids x ON x.id = o.id`},
 		{"assessment_score", `SELECT s.* FROM assessment_score s LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id LEFT JOIN tmp_cleanup_testee_ids t ON t.id = s.testee_id WHERE a.id IS NOT NULL OR t.id IS NOT NULL`},
-		{"assessment_task", `SELECT task.* FROM assessment_task task LEFT JOIN tmp_cleanup_testee_ids t ON t.id = task.testee_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = task.assessment_id WHERE t.id IS NOT NULL OR a.id IS NOT NULL`},
-		{"clinician_relation", `SELECT r.* FROM clinician_relation r JOIN tmp_cleanup_testee_ids t ON t.id = r.testee_id`},
-		{"assessment_entry_intake_log", `SELECT l.* FROM assessment_entry_intake_log l JOIN tmp_cleanup_testee_ids t ON t.id = l.testee_id`},
-		{"statistics_access_fact", `SELECT f.* FROM statistics_access_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id`},
+		{"assessment_task", `SELECT task.* FROM assessment_task task LEFT JOIN tmp_cleanup_testee_ids t ON t.id = task.testee_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = task.assessment_id LEFT JOIN tmp_cleanup_plan_enrollment_ids e ON e.id = task.enrollment_id WHERE t.id IS NOT NULL OR a.id IS NOT NULL OR e.id IS NOT NULL`},
+		{"plan_enrollment", `SELECT e.* FROM plan_enrollment e JOIN tmp_cleanup_plan_enrollment_ids x ON x.id = e.id`},
+		{"clinician_relation", `SELECT r.* FROM clinician_relation r LEFT JOIN tmp_cleanup_testee_ids t ON t.id = r.testee_id LEFT JOIN tmp_cleanup_relation_ids scoped ON scoped.id = r.id WHERE t.id IS NOT NULL OR scoped.id IS NOT NULL`},
+		{"assessment_entry_resolve_log", `SELECT l.* FROM assessment_entry_resolve_log l JOIN tmp_cleanup_resolve_log_ids x ON x.id = l.id`},
+		{"assessment_entry_intake_log", `SELECT l.* FROM assessment_entry_intake_log l LEFT JOIN tmp_cleanup_testee_ids t ON t.id = l.testee_id LEFT JOIN tmp_cleanup_intake_log_ids scoped ON scoped.id = l.id WHERE t.id IS NOT NULL OR scoped.id IS NOT NULL`},
+		{"statistics_access_fact", `SELECT f.* FROM statistics_access_fact f LEFT JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_resolve_log_ids r ON f.source_type = 'entry_resolve' AND BINARY f.source_ref = BINARY CAST(r.id AS CHAR) LEFT JOIN tmp_cleanup_intake_log_ids i ON f.source_type = 'entry_intake' AND BINARY f.source_ref = BINARY CAST(i.id AS CHAR) WHERE t.id IS NOT NULL OR r.id IS NOT NULL OR i.id IS NOT NULL`},
 		{"statistics_assessment_fact", `SELECT f.* FROM statistics_assessment_fact f LEFT JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = f.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = f.report_id WHERE t.id IS NOT NULL OR s.id IS NOT NULL OR a.id IS NOT NULL OR r.id IS NOT NULL`},
-		{"statistics_plan_fact", `SELECT f.* FROM statistics_plan_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id`},
+		{"statistics_plan_fact", `SELECT f.* FROM statistics_plan_fact f LEFT JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_plan_enrollment_ids e ON e.id = f.enrollment_id LEFT JOIN tmp_cleanup_assessment_task_ids task ON task.id = f.task_id WHERE t.id IS NOT NULL OR e.id IS NOT NULL OR task.id IS NOT NULL`},
 		{"statistics_access_daily", `SELECT d.* FROM statistics_access_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date`},
 		{"statistics_assessment_daily", `SELECT d.* FROM statistics_assessment_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date`},
 		{"statistics_plan_activity_daily", `SELECT d.* FROM statistics_plan_activity_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date`},
 		{"statistics_plan_fulfillment_daily", `SELECT d.* FROM statistics_plan_fulfillment_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.cohort_date`},
 		{"statistics_org_snapshot", `SELECT s.* FROM statistics_org_snapshot s WHERE EXISTS (SELECT 1 FROM tmp_cleanup_statistics_dates x WHERE x.org_id = s.org_id)`},
-		{"statistics_sync_run", `SELECT r.* FROM statistics_sync_run r JOIN tmp_cleanup_statistics_dates x ON x.org_id = r.org_id AND x.stat_date = r.as_of_date`},
 		{"domain_event_outbox", `SELECT o.* FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
+		{"runtime_checkpoint", `SELECT r.* FROM runtime_checkpoint r JOIN tmp_cleanup_assessment_ids a ON a.id = r.assessment_id`},
+		{"retry_event_hold", `SELECT h.* FROM retry_event_hold h JOIN tmp_cleanup_event_ids e ON BINARY e.event_id = BINARY h.event_id`},
+		{"seed_backfill_stage", `SELECT s.* FROM seed_backfill_stage s JOIN tmp_cleanup_seed_stage_ids x ON x.id = s.id`},
 	}
 	for i, item := range items {
 		item := item
@@ -1182,22 +1426,27 @@ func backupMongoCollection(ctx context.Context, source, backup *mongo.Collection
 
 func mysqlDeleteItems(_ context.Context, _ *sql.Conn) ([]mysqlDeleteItem, error) {
 	items := []mysqlDeleteItem{
-		{"statistics_sync_run", `DELETE r FROM statistics_sync_run r JOIN tmp_cleanup_statistics_dates x ON x.org_id = r.org_id AND x.stat_date = r.as_of_date`},
 		{"statistics_org_snapshot", `DELETE s FROM statistics_org_snapshot s WHERE EXISTS (SELECT 1 FROM tmp_cleanup_statistics_dates x WHERE x.org_id = s.org_id)`},
 		{"statistics_plan_fulfillment_daily", `DELETE d FROM statistics_plan_fulfillment_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.cohort_date`},
 		{"statistics_plan_activity_daily", `DELETE d FROM statistics_plan_activity_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date`},
 		{"statistics_assessment_daily", `DELETE d FROM statistics_assessment_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date`},
 		{"statistics_access_daily", `DELETE d FROM statistics_access_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date`},
-		{"statistics_plan_fact", `DELETE f FROM statistics_plan_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id`},
+		{"statistics_plan_fact", `DELETE f FROM statistics_plan_fact f LEFT JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_plan_enrollment_ids e ON e.id = f.enrollment_id LEFT JOIN tmp_cleanup_assessment_task_ids task ON task.id = f.task_id WHERE t.id IS NOT NULL OR e.id IS NOT NULL OR task.id IS NOT NULL`},
 		{"statistics_assessment_fact", `DELETE f FROM statistics_assessment_fact f LEFT JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = f.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = f.report_id WHERE t.id IS NOT NULL OR s.id IS NOT NULL OR a.id IS NOT NULL OR r.id IS NOT NULL`},
-		{"statistics_access_fact", `DELETE f FROM statistics_access_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id`},
+		{"statistics_access_fact", `DELETE f FROM statistics_access_fact f LEFT JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_resolve_log_ids r ON f.source_type = 'entry_resolve' AND BINARY f.source_ref = BINARY CAST(r.id AS CHAR) LEFT JOIN tmp_cleanup_intake_log_ids i ON f.source_type = 'entry_intake' AND BINARY f.source_ref = BINARY CAST(i.id AS CHAR) WHERE t.id IS NOT NULL OR r.id IS NOT NULL OR i.id IS NOT NULL`},
+		{"retry_event_hold", `DELETE h FROM retry_event_hold h JOIN tmp_cleanup_event_ids e ON BINARY e.event_id = BINARY h.event_id`},
+		{"runtime_checkpoint", `DELETE r FROM runtime_checkpoint r JOIN tmp_cleanup_assessment_ids a ON a.id = r.assessment_id`},
 		{"domain_event_outbox", `DELETE o FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
-		{"assessment_entry_intake_log", `DELETE l FROM assessment_entry_intake_log l JOIN tmp_cleanup_testee_ids t ON t.id = l.testee_id`},
-		{"clinician_relation", `DELETE r FROM clinician_relation r JOIN tmp_cleanup_testee_ids t ON t.id = r.testee_id`},
-		{"assessment_task", `DELETE task FROM assessment_task task LEFT JOIN tmp_cleanup_testee_ids t ON t.id = task.testee_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = task.assessment_id WHERE t.id IS NOT NULL OR a.id IS NOT NULL`},
+		{"assessment_entry_resolve_log", `DELETE l FROM assessment_entry_resolve_log l JOIN tmp_cleanup_resolve_log_ids x ON x.id = l.id`},
+		{"assessment_entry_intake_log", `DELETE l FROM assessment_entry_intake_log l LEFT JOIN tmp_cleanup_testee_ids t ON t.id = l.testee_id LEFT JOIN tmp_cleanup_intake_log_ids scoped ON scoped.id = l.id WHERE t.id IS NOT NULL OR scoped.id IS NOT NULL`},
+		{"clinician_relation", `DELETE r FROM clinician_relation r LEFT JOIN tmp_cleanup_testee_ids t ON t.id = r.testee_id LEFT JOIN tmp_cleanup_relation_ids scoped ON scoped.id = r.id WHERE t.id IS NOT NULL OR scoped.id IS NOT NULL`},
+		{"assessment_task", `DELETE task FROM assessment_task task LEFT JOIN tmp_cleanup_testee_ids t ON t.id = task.testee_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = task.assessment_id LEFT JOIN tmp_cleanup_plan_enrollment_ids e ON e.id = task.enrollment_id WHERE t.id IS NOT NULL OR a.id IS NOT NULL OR e.id IS NOT NULL`},
+		{"plan_enrollment", `DELETE e FROM plan_enrollment e JOIN tmp_cleanup_plan_enrollment_ids x ON x.id = e.id`},
 		{"assessment_score", `DELETE s FROM assessment_score s LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id LEFT JOIN tmp_cleanup_testee_ids t ON t.id = s.testee_id WHERE a.id IS NOT NULL OR t.id IS NOT NULL`},
+		{"evaluation_outcome", `DELETE o FROM evaluation_outcome o JOIN tmp_cleanup_outcome_ids x ON x.id = o.id`},
 		{"assessment", `DELETE a FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id`},
 		{"testee", `DELETE t FROM testee t JOIN tmp_cleanup_testee_ids x ON x.id = t.id`},
+		{"seed_backfill_stage", `DELETE s FROM seed_backfill_stage s JOIN tmp_cleanup_seed_stage_ids x ON x.id = s.id`},
 	}
 	return items, nil
 }
@@ -1211,7 +1460,8 @@ SELECT task.id
 FROM assessment_task task
 LEFT JOIN tmp_cleanup_testee_ids t ON t.id = task.testee_id
 LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = task.assessment_id
-WHERE t.id IS NOT NULL OR a.id IS NOT NULL`,
+LEFT JOIN tmp_cleanup_plan_enrollment_ids e ON e.id = task.enrollment_id
+WHERE t.id IS NOT NULL OR a.id IS NOT NULL OR e.id IS NOT NULL`,
 		},
 		{
 			name: "assessment_score ids",
@@ -1299,7 +1549,9 @@ JOIN tmp_cleanup_batch_ids b ON b.id = o.id`,
 			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_ids (id)
 SELECT l.id
 FROM assessment_entry_intake_log l
-JOIN tmp_cleanup_testee_ids t ON t.id = l.testee_id
+LEFT JOIN tmp_cleanup_testee_ids t ON t.id = l.testee_id
+LEFT JOIN tmp_cleanup_intake_log_ids scoped ON scoped.id = l.id
+WHERE t.id IS NOT NULL OR scoped.id IS NOT NULL
 ORDER BY l.id
 LIMIT ?`,
 			deleteBatch: `DELETE l
@@ -1314,7 +1566,9 @@ JOIN tmp_cleanup_batch_ids b ON b.id = l.id`,
 			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_ids (id)
 SELECT r.id
 FROM clinician_relation r
-JOIN tmp_cleanup_testee_ids t ON t.id = r.testee_id
+LEFT JOIN tmp_cleanup_testee_ids t ON t.id = r.testee_id
+LEFT JOIN tmp_cleanup_relation_ids scoped ON scoped.id = r.id
+WHERE t.id IS NOT NULL OR scoped.id IS NOT NULL
 ORDER BY r.id
 LIMIT ?`,
 			deleteBatch: `DELETE r
@@ -1560,6 +1814,12 @@ func mongoCollectionScopes(ids scopeIDs) []mongoCollectionScope {
 	return []mongoCollectionScope{
 		{name: "answersheets", coll: "answersheets", filters: answersheetFilters(ids)},
 		{name: "answersheet_submit_idempotency", coll: "answersheet_submit_idempotency", filters: answerSheetIdempotencyFilters(ids)},
+		{name: "report_generations", coll: "report_generations", filters: reportGenerationFilters(ids)},
+		{name: "interpretation_runs", coll: "interpretation_runs", filters: interpretationRunFilters(ids)},
+		{name: "interpret_report_artifacts", coll: "interpret_report_artifacts", filters: interpretReportFilters(ids)},
+		{name: "report_query_catalog", coll: "report_query_catalog", filters: reportCatalogFilters(ids)},
+		{name: "archived_reports", coll: "archived_reports", filters: archivedReportFilters(ids)},
+		{name: "interpretation_admission_failures", coll: "interpretation_admission_failures", filters: interpretationAdmissionFilters(ids)},
 		{name: "domain_event_outbox", coll: "domain_event_outbox", filters: mongoOutboxFilters(ids)},
 	}
 }
@@ -1612,6 +1872,48 @@ func answerSheetIdempotencyFilters(ids scopeIDs) []bson.M {
 		inUint64Filters("testee_id", ids.TesteeIDs),
 		inUint64Filters("answersheet_id", ids.AnswerSheetIDs)...,
 	)
+}
+
+func reportGenerationFilters(ids scopeIDs) []bson.M {
+	filters := inUint64Filters("domain_id", ids.GenerationIDs)
+	filters = append(filters, inUint64Filters("outcome_id", ids.OutcomeIDs)...)
+	filters = append(filters, inUint64Filters("report_id", ids.ReportIDs)...)
+	return filters
+}
+
+func interpretationRunFilters(ids scopeIDs) []bson.M {
+	filters := inUint64Filters("domain_id", ids.ReportRunIDs)
+	filters = append(filters, inUint64Filters("generation_id", ids.GenerationIDs)...)
+	return filters
+}
+
+func interpretReportFilters(ids scopeIDs) []bson.M {
+	filters := inUint64Filters("domain_id", ids.ReportIDs)
+	filters = append(filters, inUint64Filters("outcome_id", ids.OutcomeIDs)...)
+	filters = append(filters, inUint64Filters("assessment_id", ids.AssessmentIDs)...)
+	return filters
+}
+
+func reportCatalogFilters(ids scopeIDs) []bson.M {
+	filters := inUint64Filters("assessment_id", ids.AssessmentIDs)
+	filters = append(filters, inUint64Filters("outcome_id", ids.OutcomeIDs)...)
+	filters = append(filters, inUint64Filters("source_id", ids.ReportIDs)...)
+	return filters
+}
+
+func archivedReportFilters(ids scopeIDs) []bson.M {
+	filters := inUint64Filters("domain_id", ids.AssessmentIDs)
+	filters = append(filters, inUint64Filters("outcome_id", ids.OutcomeIDs)...)
+	filters = append(filters, inUint64Filters("testee_id", ids.TesteeIDs)...)
+	return filters
+}
+
+func interpretationAdmissionFilters(ids scopeIDs) []bson.M {
+	filters := inUint64Filters("outcome_id", ids.OutcomeIDs)
+	filters = append(filters, inUint64Filters("assessment_id", ids.AssessmentIDs)...)
+	filters = append(filters, inUint64Filters("testee_id", ids.TesteeIDs)...)
+	filters = append(filters, inUint64Filters("generation_id", ids.GenerationIDs)...)
+	return filters
 }
 
 func mongoOutboxFilters(ids scopeIDs) []bson.M {
@@ -1726,7 +2028,10 @@ func scopeIDsEqual(a, b scopeIDs) bool {
 	return uint64SlicesEqual(uniqueUint64(a.TesteeIDs), uniqueUint64(b.TesteeIDs)) &&
 		uint64SlicesEqual(uniqueUint64(a.AssessmentIDs), uniqueUint64(b.AssessmentIDs)) &&
 		uint64SlicesEqual(uniqueUint64(a.AnswerSheetIDs), uniqueUint64(b.AnswerSheetIDs)) &&
-		uint64SlicesEqual(uniqueUint64(a.ReportIDs), uniqueUint64(b.ReportIDs))
+		uint64SlicesEqual(uniqueUint64(a.OutcomeIDs), uniqueUint64(b.OutcomeIDs)) &&
+		uint64SlicesEqual(uniqueUint64(a.ReportIDs), uniqueUint64(b.ReportIDs)) &&
+		uint64SlicesEqual(uniqueUint64(a.GenerationIDs), uniqueUint64(b.GenerationIDs)) &&
+		uint64SlicesEqual(uniqueUint64(a.ReportRunIDs), uniqueUint64(b.ReportRunIDs))
 }
 
 func uint64SlicesEqual(a, b []uint64) bool {
@@ -1768,8 +2073,8 @@ func printScopeSummary(summary scopeSummary, cfg config) {
 func printScopeIDsSummary(ids scopeIDs, cfg config) {
 	log.Printf("scope: apply=%v backup=%v mongo_only=%v testee_created_after=%q allow_old_testees=%v skip_counts=true",
 		cfg.apply, !cfg.skipBackup, cfg.mongoOnly, cfg.testeeCreatedAfter, cfg.allowOldTestees)
-	log.Printf("scope ids: testees=%d assessments=%d answersheets=%d reports=%d",
-		len(ids.TesteeIDs), len(ids.AssessmentIDs), len(ids.AnswerSheetIDs), len(ids.ReportIDs))
+	log.Printf("scope ids: testees=%d assessments=%d answersheets=%d outcomes=%d reports=%d generations=%d report_runs=%d",
+		len(ids.TesteeIDs), len(ids.AssessmentIDs), len(ids.AnswerSheetIDs), len(ids.OutcomeIDs), len(ids.ReportIDs), len(ids.GenerationIDs), len(ids.ReportRunIDs))
 }
 
 func printCounts(prefix string, counts []namedCount) {

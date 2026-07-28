@@ -32,12 +32,13 @@ type AssessmentTask struct {
 	scaleCode string // 量表编码（用于查询优化）
 
 	// === 时间点 ===
-	plannedAt   time.Time  // 计划时间点
-	openAt      *time.Time // 实际开放时间
-	expireAt    *time.Time // 截止时间
-	completedAt *time.Time // 完成时间
-	expiredAt   *time.Time // 实际过期状态迁移时间
-	canceledAt  *time.Time // 实际取消状态迁移时间
+	businessCreatedAt *time.Time // 可选业务创建时间；历史回填使用，普通任务为空并回退审计 created_at
+	plannedAt         time.Time  // 计划时间点
+	openAt            *time.Time // 实际开放时间
+	expireAt          *time.Time // 截止时间
+	completedAt       *time.Time // 完成时间
+	expiredAt         *time.Time // 实际过期状态迁移时间
+	canceledAt        *time.Time // 实际取消状态迁移时间
 
 	// === 状态与关联 ===
 	status       TaskStatus
@@ -114,6 +115,19 @@ func (t *AssessmentTask) GetScaleCode() string {
 // GetPlannedAt 获取计划时间点
 func (t *AssessmentTask) GetPlannedAt() time.Time {
 	return t.plannedAt
+}
+
+func (t *AssessmentTask) GetBusinessCreatedAt() *time.Time { return t.businessCreatedAt }
+
+// SetBusinessCreatedAt only supplies the business occurrence time consumed by
+// Statistics. It deliberately does not rewrite infrastructure audit clocks.
+func (t *AssessmentTask) SetBusinessCreatedAt(at time.Time) {
+	if at.IsZero() {
+		t.businessCreatedAt = nil
+		return
+	}
+	copyAt := at
+	t.businessCreatedAt = &copyAt
 }
 
 // GetOpenAt 获取开放时间

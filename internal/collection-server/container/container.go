@@ -29,6 +29,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/ws"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
@@ -412,6 +413,13 @@ func (c *Container) BehaviorAssessmentHandler() *handler.BehaviorAssessmentHandl
 // RateLimitOptions 获取限流配置
 func (c *Container) RateLimitOptions() *options.RateLimitOptions {
 	return c.opts.RateLimit
+}
+
+func (c *Container) HistoricalSeedVerifier() (*historicalseed.Verifier, error) {
+	if c == nil || c.opts == nil {
+		return options.NewHistoricalSeedOptions().Verifier()
+	}
+	return c.opts.HistoricalSeed.Verifier()
 }
 
 // OpsHandle returns the collection-server operational Redis handle.

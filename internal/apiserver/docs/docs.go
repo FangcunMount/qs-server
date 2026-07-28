@@ -7852,6 +7852,138 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v1/historical-seed/batches/{batch_id}": {
+            "get": {
+                "description": "按当前机构和批次分页返回只读阶段终态，仅用于受控回填验证。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Historical-Seed-Internal"
+                ],
+                "summary": "查询历史回填批次阶段账本",
+                "operationId": "getHistoricalSeedBatchStages",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "批次 ID",
+                        "name": "batch_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "minimum": 0,
+                        "type": "integer",
+                        "default": 0,
+                        "description": "分页偏移",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 10000,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 1000,
+                        "description": "返回条数",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/historical-seed/batches/{batch_id}/scenarios/{scenario_id}": {
+            "get": {
+                "description": "按当前机构、批次和场景返回只读阶段终态。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Historical-Seed-Internal"
+                ],
+                "summary": "查询历史回填场景阶段账本",
+                "operationId": "getHistoricalSeedScenarioStages",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "批次 ID",
+                        "name": "batch_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "场景 ID",
+                        "name": "scenario_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v1/interpretation/admission-failures": {
             "get": {
                 "produces": [
@@ -13048,8 +13180,17 @@ const docTemplate = `{
         "response.EnrollmentResponse": {
             "type": "object",
             "properties": {
+                "enrollment_id": {
+                    "type": "string"
+                },
+                "idempotent": {
+                    "type": "boolean"
+                },
                 "plan_id": {
                     "type": "string"
+                },
+                "round": {
+                    "type": "integer"
                 },
                 "tasks": {
                     "type": "array",

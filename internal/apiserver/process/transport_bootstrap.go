@@ -9,6 +9,7 @@ import (
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/orgscope"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
 )
@@ -21,10 +22,14 @@ type transportStageDeps struct {
 }
 
 func (s *server) initializeTransports(containerOutput containerOutput) (transportOutput, error) {
-	return bootstrapTransports(s.buildTransportStageDeps(containerOutput))
+	verifier, err := s.config.HistoricalSeed.Verifier()
+	if err != nil {
+		return transportOutput{}, err
+	}
+	return bootstrapTransports(s.buildTransportStageDeps(containerOutput, verifier))
 }
 
-func (s *server) buildTransportStageDeps(containerOutput containerOutput) transportStageDeps {
+func (s *server) buildTransportStageDeps(containerOutput containerOutput, historicalVerifier *historicalseed.Verifier) transportStageDeps {
 	if s == nil || s.config == nil || containerOutput.container == nil {
 		return transportStageDeps{}
 	}
@@ -38,10 +43,13 @@ func (s *server) buildTransportStageDeps(containerOutput containerOutput) transp
 			return buildGRPCServer(s.config, grpcBootstrapDeps)
 		},
 		registerREST: func(httpServer *genericapiserver.GenericAPIServer) {
-			resttransport.NewRouter(containerOutput.container.BuildRESTDeps(s.config.RateLimit)).RegisterRoutes(httpServer.Engine)
+			deps := containerOutput.container.BuildRESTDeps(s.config.RateLimit)
+			deps.HistoricalSeedVerifier = historicalVerifier
+			resttransport.NewRouter(deps).RegisterRoutes(httpServer.Engine)
 		},
 		registerGRPC: func(grpcServer *grpcpkg.Server) error {
 			deps := containerOutput.container.BuildGRPCDeps(grpcServer)
+			deps.HistoricalSeedVerifier = historicalVerifier
 			verifier, err := delegatedsubject.NewVerifierFromOptions(s.config.DelegatedSubject)
 			if err != nil {
 				return err

@@ -15,13 +15,21 @@ import (
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	automation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/admission"
+	stageport "github.com/FangcunMount/qs-server/internal/apiserver/port/historicalseedstage"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
 type InterpretationAutomationService struct {
 	pb.UnimplementedInterpretationAutomationServiceServer
-	service automation.Service
+	service            automation.Service
+	stageRecorder      stageport.Recorder
+	historicalVerifier *historicalseed.Verifier
+}
+
+func (s *InterpretationAutomationService) SetHistoricalSeedVerifier(verifier *historicalseed.Verifier) {
+	s.historicalVerifier = verifier
 }
 
 var deprecatedGenerateReportFromAssessmentTotal = promauto.NewCounter(prometheus.CounterOpts{
@@ -31,8 +39,12 @@ var deprecatedGenerateReportFromAssessmentTotal = promauto.NewCounter(prometheus
 	Help:      "Calls to the deprecated assessment-named report generation RPC (IR-R024).",
 })
 
-func NewInterpretationAutomationService(service automation.Service) *InterpretationAutomationService {
-	return &InterpretationAutomationService{service: service}
+func NewInterpretationAutomationService(service automation.Service, recorders ...stageport.Recorder) *InterpretationAutomationService {
+	result := &InterpretationAutomationService{service: service}
+	if len(recorders) > 0 {
+		result.stageRecorder = recorders[0]
+	}
+	return result
 }
 func (s *InterpretationAutomationService) RegisterService(server *grpc.Server) {
 	pb.RegisterInterpretationAutomationServiceServer(server, s)
@@ -49,6 +61,11 @@ func (s *InterpretationAutomationService) GenerateReportFromAssessment(ctx conte
 func (s *InterpretationAutomationService) GenerateReportFromOutcome(ctx context.Context, req *pb.GenerateReportFromOutcomeRequest) (*pb.GenerateReportFromAssessmentResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "outcome_id 不能为空")
+	}
+	var err error
+	ctx, err = withHistoricalExecutionContext(ctx, req.GetHistoricalContext(), 0, s.historicalVerifier)
+	if err != nil {
+		return nil, err
 	}
 	return s.generateReportFromOutcomeID(ctx, req.OutcomeId)
 }
@@ -82,6 +99,22 @@ func (s *InterpretationAutomationService) generateReportFromOutcomeID(ctx contex
 		resp.RunId = result.RunID.String()
 		resp.ReportId = result.ReportID.String()
 		applyInterpretationRetryDetails(resp, result.AttemptOrigin, result.RetryDecision)
+	}
+	if result != nil && result.Status == automation.StatusGenerated && !result.ReportID.IsZero() && s.stageRecorder != nil {
+		historical, ok := historicalseed.FromContext(ctx)
+		if ok {
+			generatedAt, occurredErr := historicalseed.OccurredAt(ctx, historical.OrgID, historicalseed.StageReportGenerated, time.Now())
+			if occurredErr != nil {
+				return nil, status.Error(codes.InvalidArgument, occurredErr.Error())
+			}
+			if _, recordErr := s.stageRecorder.Complete(ctx, stageport.Completion{Stage: stageport.StageReportGenerated, BusinessAt: generatedAt, ResourceType: "interpretation_report", ResourceID: result.ReportID.String(), Payload: struct {
+				ReportID     string `json:"report_id"`
+				GenerationID string `json:"generation_id"`
+				RunID        string `json:"run_id"`
+			}{ReportID: result.ReportID.String(), GenerationID: result.GenerationID.String(), RunID: result.RunID.String()}}); recordErr != nil {
+				return nil, status.Error(codes.Internal, recordErr.Error())
+			}
+		}
 	}
 	return resp, nil
 }

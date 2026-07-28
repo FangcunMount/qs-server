@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -8,6 +9,63 @@ import (
 	"testing"
 	"time"
 )
+
+func TestHistoricalBackfillWorkflowRepairsAndValidatesEveryWindowThenPublishesFinalDay(t *testing.T) {
+	var requests []runRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request runRequest
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		requests = append(requests, request)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":0,"data":{"id":1,"status":"succeeded","stage":"completed"}}`))
+	}))
+	defer server.Close()
+
+	location, _ := time.LoadLocation("Asia/Shanghai")
+	cfg := options{
+		BaseURL: server.URL, Token: "secret", OrgIDs: []int64{7},
+		From:       time.Date(2026, 1, 1, 0, 0, 0, 0, location),
+		To:         time.Date(2026, 1, 5, 0, 0, 0, 0, location),
+		WindowDays: 3, Reason: "historical backfill", Mode: historicalBackfillMode, Confirm: true,
+	}
+	var output bytes.Buffer
+	if err := executeHistoricalBackfill(server.Client(), cfg, 7, &output); err != nil {
+		t.Fatal(err)
+	}
+	if len(requests) != 5 {
+		t.Fatalf("requests=%d, want 5", len(requests))
+	}
+	want := []struct{ mode, from, to string }{
+		{"repair", "2026-01-01", "2026-01-03"},
+		{"validate", "2026-01-01", "2026-01-03"},
+		{"repair", "2026-01-04", "2026-01-05"},
+		{"validate", "2026-01-04", "2026-01-05"},
+		{"publish", "2026-01-05", "2026-01-05"},
+	}
+	for index, expected := range want {
+		got := requests[index]
+		if got.Mode != expected.mode || got.FromDate != expected.from || got.ToDate != expected.to {
+			t.Fatalf("request[%d]=%+v, want %+v", index, got, expected)
+		}
+		if got.Mode == "validate" && (!got.ValidateOnly || got.Confirm) {
+			t.Fatalf("validate request[%d] must be read-only: %+v", index, got)
+		}
+	}
+}
+
+func TestHistoricalRangeSplitsIntoNineteenWindows(t *testing.T) {
+	from, _ := parseShanghaiDate("2025-01-01")
+	to, _ := parseShanghaiDate("2026-07-27")
+	windows := splitWindows(from, to, 31)
+	if len(windows) != 19 {
+		t.Fatalf("windows=%d, want 19", len(windows))
+	}
+	if windows[len(windows)-1].To.Format(dateLayout) != "2026-07-27" {
+		t.Fatalf("last window=%s", windows[len(windows)-1].To.Format(dateLayout))
+	}
+}
 
 func TestSplitWindowsUsesInclusiveShanghaiDates(t *testing.T) {
 	from, _ := parseShanghaiDate("2026-01-29")
