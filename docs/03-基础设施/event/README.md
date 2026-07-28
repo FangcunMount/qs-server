@@ -2,6 +2,21 @@
 
 Event 模块负责把进程内已经发生的业务事实，按明确的可靠性契约传播给其他处理器。它不是单一的 MQ 封装，而是由事件契约、发布路由、Outbox、消费结算、幂等策略、可观测性和进程级生命周期共同组成的基础设施。
 
+学习本专题时始终沿一条因果链，不按 package 逐个记忆：
+
+```text
+业务事实
+  → 同事务 Outbox 意图
+  → 发现与发布
+  → broker/channel 投递
+  → 业务副作用结算
+  → 有界重试、终态与人工恢复
+```
+
+如果还没有读过根级 [统一模型与推理方法](../04-统一模型与推理方法.md)，建议先读。Event 是其中“持久事实 → 可靠传播 → 派生结果”这一段的展开。
+
+版本基线：`2026-07-28`。本轮已核对 `configs/events.yaml`、`EventSpec`/`EffectiveRegistry`、apiserver EventSubsystem、Mongo/MySQL Outbox 与 worker settlement/replay 链；真实 broker 投递、进程崩溃恢复和积压清理速度仍需环境证据。
+
 ## 先看结论
 
 - 跨事务边界且不能丢失的业务事实使用 `durable_outbox`：业务事实与 Outbox 在同一本地事务提交，提交后由 immediate 和 relay 共同推动投递。
@@ -24,13 +39,16 @@ Event 模块负责把进程内已经发生的业务事实，按明确的可靠�
 
 ## 文档地图
 
-1. [事件模块整体架构](./01-事件模块整体架构.md)：模块边界、所有权、依赖方向和生命周期。
-2. [领域事件设计](./02-领域事件设计.md)：契约来源、wire envelope、完整事件矩阵和演进规则。
-3. [Outbox 可靠出站链路](./03-Outbox可靠出站链路.md)：事务、profile、ready-index、immediate、relay 和恢复语义。
-4. [MQ 发布与消费链路](./04-MQ发布与消费链路.md)：发布模式、消息封装、消费结算和逐事件幂等。
-5. [事件可观测性与故障处理](./05-事件可观测性与故障处理.md)：指标、状态接口、治理页面和排障路径。
-6. [一次性信令链路](./06-一次性信令链路.md)：Signal 与 Event 的边界、拓扑和失效语义。
-7. [新增 Event 与 Signal SOP](./07-新增Event与Signal-SOP.md)：新增、变更和验收清单。
+1. [架构与责任边界](./10-架构与责任边界.md)：模块边界、所有权、依赖方向和生命周期。
+2. [从事实到结算：失败窗口与状态机](./15-从事实到结算-失败窗口与状态机.md)：先区分 T1–T5 完成点，再推导 Outbox、at-least-once、逐副作用幂等和审计化恢复。
+3. [Event 契约与演进](./20-事件契约与演进.md)：契约来源、wire envelope、完整事件矩阵和演进规则。
+4. [Outbox 可靠出站链路](./30-Outbox可靠出站链路.md)：事务、profile、ready-index、immediate、relay 和恢复语义。
+5. [MQ 发布、消费与结算](./40-MQ发布消费与结算.md)：发布模式、消息封装、消费结算和逐事件幂等。
+6. [可观测性与故障恢复](./50-可观测性与故障恢复.md)：指标、状态接口、治理页面和排障路径。
+7. [Signal 一次性信令](./60-Signal一次性信令.md)：Signal 与 Event 的边界、拓扑和失效语义。
+8. [扩展与验收](./70-扩展与验收.md)：新增、变更和验收清单。
+
+前两篇建立概念和推理主轴；20–60 是当前实现事实；70 把新增事件重新带回“业务损失—失败窗口—状态机—证据”的决策闭环。不要从事件矩阵中抄一个相似配置就认为完成了设计。
 
 ## 事实来源
 
@@ -42,7 +60,7 @@ Event 模块负责把进程内已经发生的业务事实，按明确的可靠�
 4. 运行时行为：`internal/apiserver/eventing/subsystem`、Outbox Store/relay、worker eventing。
 5. 本目录文档。
 
-`EffectiveRegistry` 在启动时合并 YAML 与代码契约并做严格校验；[领域事件设计](./02-领域事件设计.md)中的矩阵还有同步测试保护。因此，文档矩阵不是手工维护的旁路清单。
+`EffectiveRegistry` 在启动时合并 YAML 与代码契约并做严格校验；[Event 契约与演进](./20-事件契约与演进.md)中的矩阵还有同步测试保护。因此，文档矩阵不是手工维护的旁路清单。
 
 ## 变更时更新哪里
 
@@ -67,3 +85,16 @@ go test ./internal/pkg/eventing/... \
 go test ./internal/pkg/signalcatalog ./internal/pkg/architecture
 make docs-hygiene
 ```
+
+## 学习检查
+
+读完本目录后，应能独立回答：
+
+1. 为什么“数据库 commit 后直接 Publish”不能保证 durable event？
+2. 为什么 immediate 与 Redis ready-index 都可以失败，而 Outbox Store 不能被绕过？
+3. 为什么 MQ 成功不等于消费者副作用 exactly-once？
+4. unknown event 为什么 ACK，invalid payload 为什么 NACK，两者各自承担什么风险？
+5. business、Outbox、retry-hold 和 transport 四类 attempt 为什么不能相加？
+6. `events.replay_pending` 与 `events.replay_delivery` 分别恢复哪一层事实？
+7. 什么时候应该新增独立 channel，什么时候仍应留在一个 handler 的事务内？
+8. Signal 丢失为什么是设计语义，而不是尚未补齐的可靠性缺陷？

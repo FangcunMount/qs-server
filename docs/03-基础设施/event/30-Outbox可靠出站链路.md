@@ -27,8 +27,8 @@ EventSubsystem 拥有两个 profile：
 
 | Profile | Store | 事件范围 |
 | --- | --- | --- |
-| `mongo_domain_events` | Mongo `domain_event_outbox` | 答卷提交、Interpretation terminal report |
-| `assessment_mysql_events` | MySQL `domain_event_outbox` | Evaluation 请求、结果提交和失败 |
+| `mongo_domain_events` | Mongo `domain_event_outbox` | `answersheet.submitted`、Interpretation 报告生成/失败/重试授权 |
+| `assessment_mysql_events` | MySQL `domain_event_outbox` | Evaluation 请求/重试授权/结果提交/失败 |
 
 每个 profile 构造且只构造一个：
 
@@ -176,7 +176,7 @@ Reconciler 解决的是“Outbox 已提交但 post-commit enqueue 丢失”的�
 - 把 Outbox 失败复制到另一张“Outbox DLQ”表；`failed + manual_required` 本身就是待处置事实。
 - 无审批的批量无限重放或对永久错误的自动修复。
 
-消费者必须按[领域事件设计](./02-领域事件设计.md)中的逐事件策略实现幂等。
+消费者必须按[Event 契约与演进](./20-事件契约与演进.md)中的逐事件策略实现幂等。
 
 ## 10. 代码与验证
 

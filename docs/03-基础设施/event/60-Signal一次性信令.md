@@ -1,4 +1,4 @@
-# 一次性信令链路
+# Signal 一次性信令
 
 ## 1. Signal 不是 Event
 

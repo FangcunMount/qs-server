@@ -2,6 +2,10 @@
 
 Runtime Infrastructure 决定“一份代码最终以什么进程、什么依赖和什么故障语义运行”。它负责读取配置、构造基础设施、装配业务模块、启动 transport/consumer/scheduler，并在进程退出时按明确顺序停止接流量和释放资源。
 
+它是 [基础设施统一模型](../04-统一模型与推理方法.md) 的落地条件：文档中存在一个 Registry、limiter、Outbox 或 watcher，不等于运行时已经构造并启动；必须在三个 composition root 中找到唯一 owner、有效配置和关闭路径。
+
+建议先核对三个进程的当前启动与关闭事实，再阅读本页第 13 节，理解进程划分、composition root、Stage、失败分类和 graceful shutdown 的取舍。
+
 ## 1. 先看结论
 
 - qs-server 不是一个进程，而是 `qs-apiserver`、`collection-server`、`qs-worker` 三个独立进程；它们共享基础设施包，但拥有不同的 composition root 和生命周期。
@@ -394,3 +398,54 @@ go test ./internal/apiserver/process ./internal/apiserver/container/... \
 - 在有 in-flight HTTP、gRPC、MQ handler 时发送 SIGTERM，测量 drain 时间和未完成事实。
 - 让 HTTP/gRPC/metrics listener 发生 bind error，确认 supervisor、日志和 durable recovery。
 - 检查实际监听端口、metrics/pprof/governance 网络 ACL，以及启动日志是否泄密。
+
+## 13. 核心设计取舍与替代方案
+
+### 13.1 为什么是三个进程
+
+apiserver、collection-server 和 worker 的流量特征、依赖与故障域不同：在线 API、采集入口和 MQ 消费需要独立扩缩容、停机与资源预算。合并成单进程可简化部署，却会把 worker 重试和在线流量绑到同一故障域；继续拆成更多微服务又会把当前本地 transaction/container 调用升级为网络契约和分布式一致性问题。当前三进程是在隔离收益与分布式成本之间的选择，不是按目录数量拆分。
+
+### 13.2 为什么具体依赖只在 composition root 创建
+
+业务模块自行创建 client 或使用 package global 虽然调用方便，却会复制连接池、配置、backpressure 和关闭逻辑。显式 composition 代码较长，但能在一个位置证明实际拓扑，让 wiring test 验证注入对象，并为 client 建立唯一 owner。反射型 DI 或代码生成 DI 可以减少样板，不能替代生命周期设计。
+
+### 13.3 为什么用命名 Stage
+
+启动顺序本身就是架构：EventSubsystem 必须先得到 DB/MQ/catalog，transport 应在完整 deps 就绪后构造。Stage 让顺序、输入输出和失败位置可测试，优于继续膨胀一个 main 函数。
+
+当前 Runner 没有通用 rollback，所以 Stage 不是事务。演进有两个选择：每个 Stage 在返回 error 前清理本阶段资源；或从第一个资源开始注册可逆 startup lifecycle，失败时统一逆序 rollback。OS 回收连接不能替代 subscriber stop、flush、lease release 和应用 cleanup。
+
+### 13.4 为什么有效配置是合并结果
+
+defaults + file + env + flags 兼顾本地开发、版本化意图、secret 注入和临时覆盖。替代的纯 env 难表达复杂嵌套配置，纯文件不适合 secret，动态配置中心则会引入 bootstrap、版本和热更新边界。因此生产证据必须保留 masked effective config、外部文件 checksum 和 secret source，不能只引用 repo YAML。
+
+强类型全量 schema 比当前部分 `ValidateRawSettings` 更安全，是合理演进方向。`configmask` 已保护结构化输出，但 Debug 级原始 flag 输出仍意味着 secret 不应通过 CLI flag。
+
+### 13.5 为什么依赖不能统一 fail-fast 或统一降级
+
+依赖应按承诺分类：
+
+| 类别 | 期望行为 | 当前例子 |
+| --- | --- | --- |
+| mandatory | 缺失就拒绝启动 | apiserver MySQL/Mongo；worker subscriber/dead-letter/hold |
+| optional feature | 明确关闭且不暴露假能力 | 部分投影、按开关装配的外部集成 |
+| degraded dependency | 正确性仍成立，公开性能/实时性下降 | 部分 Redis family、authz version signal |
+| safety control | 缺失会扩大权限，应 fail-fast/fail-closed | IAM/verifier/mTLS 等生产安全链 |
+
+“optional”必须从 API 承诺推导。若路由仍返回成功却无法完成关键后续动作，该依赖就不是 optional。
+
+### 13.6 为什么后台任务必须有唯一 owner
+
+匿名 goroutine 或构造时自动启动会导致重复运行、无法测试 Stop、异常不传播和 shutdown 顺序失控。当前把 relay、consumer、scheduler、watcher、replayer 放在 process/container 生命周期是正确方向。更强的替代方案是统一 runtime manager，汇总 Start/Stop/Status；拆成独立 job 进程隔离更强，但会增加部署单元。
+
+评审时必须回答：谁构造、谁启动、谁观测异常、谁停止、Stop 是否等待、超时后怎样处理。
+
+### 13.7 为什么当前 RunGroup 和 shutdown 仍需演进
+
+并发运行 HTTP/gRPC 是必要的，但当前任一 server 返回 error 后不会 cancel 另一个，也不会主动执行 shutdown callback。更合适的实现是 `errgroup`/supervisor：第一个不可恢复错误成为退出原因，触发一次可等待的 drain/cleanup，超预算后强制退出。
+
+正常关闭应遵循“readiness false → 停入口/订阅 → drain in-flight → 停后台任务 → flush → 关 client/DB”。collection 和 worker 大体沿这个方向；apiserver 当前先清 container/DB、后关 transport，worker 又有两个 signal owner，都是现行风险而非设计优点。gRPC `GracefulStop` 也需要 timeout 与 fallback `Stop`。
+
+### 13.8 为什么运维面应与业务面分离
+
+同端口注册 metrics/pprof/governance 部署简单，但普通业务 JWT 往往不覆盖这些端点；独立 management port 更容易实施网络 ACL、mTLS 和单独 timeout。当前三个进程的暴露方式不一致，所以验收必须查看真实 listener 和网络策略。无论使用同端口、独立端口还是 sidecar，都要明确 bind address、认证、probe 语义和 shutdown owner。

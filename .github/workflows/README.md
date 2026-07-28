@@ -97,10 +97,10 @@ Secrets 传递规则：
 - org Secret：`SVR_MINI_SSH_KEY`（或回退 `SVRA_SSH_KEY` / `SVRD_SSH_KEY`）
 - Mac mini Docker Desktop 可用；隔离 `DOCKER_CONFIG` 避免 keychain 卡住
 
-`SVRA_SSH_FINGERPRINT` 应从 ServerA 控制台或已有可信 SSH 会话读取；当前 ServerA 使用 ED25519 host key：
+`SVRA_SSH_FINGERPRINT` 应从 ServerA 控制台或已有可信 SSH 会话读取。`appleboy/ssh-action@v1.2.2` 当前与 ServerA 协商 ECDSA host key，因此这里必须配置 ECDSA 指纹，不能使用 OpenSSH 客户端默认选中的 ED25519 指纹：
 
 ```bash
-ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256
+ssh-keygen -lf /etc/ssh/ssh_host_ecdsa_key.pub -E sha256
 ```
 
 Mac mini ops runner 上线前还应确认 `tailscale ping serverA` 和 `nc -vz 100.85.122.124 22` 成功。DERP 中继会增加时延，但不阻断低流量巡检和远程数据库命令；应继续排查 NAT/UDP 条件以争取直连。

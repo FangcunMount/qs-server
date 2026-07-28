@@ -2,6 +2,10 @@
 
 Data Access 层解决的不是“如何调用数据库 SDK”，而是四个更重要的问题：业务事实归哪个存储所有、一次事务能保护哪些写入、查询模型如何与写模型解耦，以及存储变慢时如何阻止请求把连接池和数据库一起压垮。
 
+它在 [基础设施统一模型](../04-统一模型与推理方法.md) 中负责“持久事实”边界：transaction、unique constraint、claim/CAS 和 durable readback。Concurrency 的协调机制、Event 的传播状态机和 Cache 的派生读取，最终都要回到这里确认什么事实已经成立。
+
+建议先用本页建立当前实现地图，再阅读 [核心设计决策与替代方案](./15-核心设计决策与替代方案.md)，集中理解多存储所有权、本地事务、Outbox、查询模型和迁移策略为什么这样选择。
+
 ## 1. 先看结论
 
 - MySQL 与 MongoDB 都是权威事实源，但各自拥有不同聚合；Redis 只承担缓存、信令、限流、租约和 ready-index 等可重建能力。
@@ -131,7 +135,7 @@ local transaction
 - AnswerSheet：Mongo AnswerSheet、`(writer_id, idempotency_key)` 提交幂等事实和 `answersheet.submitted` Outbox 共享 Mongo transaction。
 - Evaluation：Assessment/Run/Outcome 等 MySQL 事实与对应 lifecycle Outbox 共享 MySQL transaction。
 
-Stager 要求活跃 transaction context；缺少 transaction 时必须报错，不能单独写 Outbox。`AfterCommit` 只做 ready-index/immediate 等提交后推动，失败不能推翻已经 commit 的业务事实。完整状态机见 [Outbox 可靠出站链路](../event/03-Outbox可靠出站链路.md)。
+Stager 要求活跃 transaction context；缺少 transaction 时必须报错，不能单独写 Outbox。`AfterCommit` 只做 ready-index/immediate 等提交后推动，失败不能推翻已经 commit 的业务事实。完整状态机见 [Outbox 可靠出站链路](../event/30-Outbox可靠出站链路.md)。
 
 ## 6. 并发正确性落在哪里
 
@@ -164,7 +168,7 @@ slot obtained ──> DB operation ──> release
 
 它们不能互换。一次请求可能执行多次 DB 操作，事务会持有连接，不同 SQL 的服务时间也不同；因此 `150 max_inflight` 不代表 `150 QPS`，更不代表多实例的全局安全吞吐。
 
-当前 limiter 是每个 apiserver 实例本地状态，并通过 module assembly 注入普通 repository 与 Event Store。新增 raw GORM/Mongo adapter 时必须确认是否显式接入 limiter；只要直接使用裸 `*gorm.DB`/`*mongo.Collection`，就不能假定 BaseRepository 的保护自动生效。容量推导和故障恢复见 [下游背压与容量预算](../concurrency/40-下游背压与容量预算.md)。
+当前 limiter 是每个 apiserver 实例本地状态，并通过 module assembly 注入普通 repository；Mongo Outbox 也显式接入 Mongo limiter。MySQL Outbox 当前直接使用 GORM DB，尚未进入共享 MySQL limiter 计数。新增 raw GORM/Mongo adapter 时必须确认是否显式接入 limiter；只要直接使用裸 `*gorm.DB`/`*mongo.Collection`，就不能假定 BaseRepository 的保护自动生效。容量推导和故障恢复见 [下游背压与容量预算](../concurrency/40-下游背压与容量预算.md)。
 
 ## 8. 错误与幂等映射
 

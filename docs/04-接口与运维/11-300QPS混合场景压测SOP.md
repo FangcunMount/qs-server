@@ -80,7 +80,7 @@ smoke_4
 | HTTP 全局     | `http_req_failed < 1%`                                  |
 | checks      | `checks > 99%`                                          |
 | submit      | `answer_submit_success_rate > 99%`，必须同时满足 202、`status=accepted`、`answersheet_id` 非空 |
-| report      | `report_status_success_rate > 99%`；WS 101 连接成功也计入该 rate |
+| report      | `report_status_success_rate > 99%` 且 `report_sample_skipped=0`；WS 101 连接成功也计入该 rate |
 | chain probe | `chain_probe_failed < 3`，高档目标为 0                        |
 | query 延迟    | 攻关档 query p95 目标 < 500ms；边际档可结合 failed 与尖刺判断            |
 | outbox      | 压测结束 3 分钟内 pending/publishing/failed 回落到近 0             |
@@ -92,6 +92,7 @@ smoke_4
 - catalog 503 是 query semaphore Try reject，不是 rate limit 429。
 - k6 5xx 但应用日志无 5xx 时，优先查 Nginx。
 - report 自动发现会按模型身份拆分 `medical`、`personality`、`behavior`；behavior 报告走 `/behavior-assessments`，WebSocket 订阅使用 `kind=behavior`。
+- 历史 assessment 为空时，报告 iteration 只累计 `report_sample_skipped`，不发 HTTP/WS 请求；query、submit、statistics 继续。该跑次只能用于提交预热，不能作为 report 或全链路验收。
 - `qps.stats` 在机构总览 `GET /statistics/overview` 与内容批量统计 `POST /statistics/contents/batch` 之间分配；后者按 `questionnaire/scale + code` 构造请求。
 
 ---
@@ -116,7 +117,15 @@ make perf-smoke
 - token count 足够，`expired=0`。
 - `min_ttl_seconds` 大于本轮压测时长。
 - collection catalog、personality、questionnaire，以及 apiserver testees/statistics preflight 均为 200。
+- Statistics content batch 请求使用 `{items:[{kind,code}]}`；任一 preflight HTTP 状态非 2xx 时命令直接失败。
 - `report_events.enabled=true`。
+
+混合场景 setup 会逐个使用 collection token 查询 `/api/v1/testees`，把 token 与其
+有权访问的 testee 绑定后再提交，不再把运营端发现的 testee 随机分配给采集用户。
+历史数据清理后若这些用户没有 ProfileLink/testee，可在专用压测环境设置
+`autoCreateSubmitTestees=true`：setup 会为每个空用户创建一条持久化 IAM ProfileLink
+和 testee，再继续提交。example 默认关闭该写入开关；开启前应确认允许生成压测数据。
+assessment 无需手工配置，首轮提交生成后由后续跑次自动发现。
 
 
 
@@ -210,6 +219,8 @@ make perf-smoke
 ```
 
 通过后再继续。失败时先修 token、base URL、preflight、Nginx 和 IAM。
+
+如果历史 assessment 刚被清理，第一次 smoke 会输出 `report_scenarios_degraded=true`，报告场景跳过，但 submit 仍按配置执行。等待 worker 生成 assessment/report 后重跑 `make perf-smoke`；只有 `report_sample_skipped=0` 的后续跑次才算 L0 全链路通过。
 
 ### 4.2 L1：预压
 
@@ -393,7 +404,7 @@ Nginx 判断：
 
 - `qps.report` 表示用户侧查报告频率，不是裸 HTTP RPS。
 - WebSocket 101 成功会写入 `report_status_success_rate=true`。
-- missing sample、非 101、decode/error 会写失败样本或 failed counter。
+- missing sample 不发报告请求，只写 `report_sample_skipped`；非 101、decode/error 才写失败样本或 failed counter。
 - 下游饱和时不要通过提高 report max VU 硬冲，否则会放大排队和 503。
 
 ---
@@ -408,6 +419,7 @@ Nginx 判断：
 | 约 7% failed，应用日志全 200                       | token 过期或无效                | `make perf-tokens && make perf-preflight`，确认 `expired=0`                 |
 | k6 503，应用无 5xx，Nginx request time 0.000     | Nginx `limit_conn`         | 放宽压测 IP，重启 Nginx                                                         |
 | report WS 失败 / EOF                          | report-events 未开启或代理异常     | 查 `report_events.enabled=true`、Nginx WS 代理、`paths.reportEvents`          |
+| `report_sample_skipped > 0`                  | 当前没有可发现的 assessment/report | 仅把本轮作为 submit 预热；等待 worker 完成后重跑，禁止据此验收 report 或全链路               |
 | `mixed_300` failed 约 45%，`vus_max` 接近 2000  | 未同步旧 VU 配置                 | 作废跑次，执行 `make perf-sync-vusers` 后重跑                                      |
 | catalog 503，非 429                           | query semaphore Try reject | 查 `max-query-concurrency`、query p95、dropped iterations；不要按 rate limit 处理 |
 | submit 429                                  | Submit Gate / 入口限流             | 降 submit 到 24/s，跑 reliable-submit 专项诊断                                  |

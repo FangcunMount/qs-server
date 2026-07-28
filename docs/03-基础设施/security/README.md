@@ -2,6 +2,10 @@
 
 Security 层不是一个 JWT middleware。一次请求只有依次通过“凭证可信、主体可识别、组织范围合法、动作被允许、资源确实属于该主体/组织”之后，才具备完整授权。任何一层都不能替代其它层。
 
+它为 [基础设施统一模型](../04-统一模型与推理方法.md) 增加“谁有权建立、读取和恢复事实”的前置条件：身份与 scope 在准入前建立，resource ownership 在 application 事实边界复核，人工 replay/治理动作还需要 capability、确认、幂等 claim 与审计。
+
+建议先核对当前 HTTP/gRPC 安全链，再阅读本页第 12 节，集中理解 tenant/org 分离、snapshot、资源级授权、mTLS/service/delegation 和 fail-closed 的取舍。
+
 ## 1. 先看结论
 
 - AuthN 只回答 token/证书是谁签发、是否有效；AuthZ 才回答该主体能否执行某个动作。
@@ -290,3 +294,53 @@ go test ./internal/apiserver/application/authz \
 ```
 
 代码测试只能证明已覆盖的策略分支；生产验收还必须验证证书链/OU、反向代理暴露面、IAM issuer/audience、JWKS 轮换、真实 ProfileLink 和 disabled/misconfigured 启动门禁。
+
+## 12. 核心设计取舍与替代方案
+
+### 12.1 为什么安全链不能压成一个 JWT middleware
+
+TLS/mTLS、token verification、principal、scope、capability 和 resource authorization 分别阻断不同攻击：mTLS 证明 workload，不证明用户意图；JWT 有效不证明本地 membership 仍 active；拥有 read-report capability 不证明任意 report 都属于该 participant。分层不是重复检查，而是使用不同事实源逐层收窄权限。
+
+### 12.2 为什么 IAM tenant 与 QS org 分离
+
+`tenant_domain` 是 IAM 授权域，QS `org_id` 是本地 active operator membership。直接信任 JWT org 虽然省去一次本地解析，却无法表达 membership 停用、多组织选择和两套 ID 生命周期差异。替代方案包括把全部 membership 迁到 IAM、把 QS org 放进短期 token、每次在线查询；它们分别承担迁移成本、撤权窗口或同步可用性成本。
+
+当前组合的关键约束是：JWT/header/query 中的 org 只能作为候选，最终 OrgScope 必须由本地 active membership 证明。
+
+### 12.3 为什么使用 authorization snapshot
+
+snapshot `(resource, action)` 比 JWT role 更贴近动作权限，比每次在线 IAM 判定降低延迟和故障耦合；TTL + `iam.authz.version` 同时提供最终刷新和快速失效。替代方案各有代价：JWT permissions 受 token 生命周期限制；逐请求在线授权提高实时性却把 IAM 变成同步依赖；本地策略引擎则需要完整的策略分发、版本和审计。
+
+30 秒缓存不是绝对实时承诺。高风险动作可选择 force remote、短 TTL 或额外确认，但不能在 snapshot 不可用时无限沿用旧权限。
+
+### 12.4 为什么 capability 之后仍要资源授权
+
+capability 只说明“原则上可做某类动作”，不说明 resource 123 属于当前 org/user。只在 handler 查出对象后比较容易遗漏并形成 IDOR；当前更合适的方向是 scoped repository/read model + application access service，使查询本身只返回 scope 内资源。
+
+数据库 RLS 或集中 policy engine 是可选替代方案，但当前 MySQL/Mongo 双存储与连接身份未按 RLS 设计；policy engine 仍需可靠获取资源属性，也可能带来 N+1 和同步依赖。
+
+### 12.5 为什么 collection 使用 ProfileLink
+
+authorization snapshot 表达一般权限，ProfileLink 表达当前 User 与特定 Testee Profile 的业务关系。把 Testee ID 等同 User ID 无法支持监护人/多关系；把所有 profile IDs 放进 token 会膨胀并产生撤权窗口；本地复制投影则需新增 Event、版本、lag 和重建协议。当前在线检查语义最清晰，代价是 apiserver/IAM 延迟和可用性，因此故障必须返回 503 而不是放行。
+
+### 12.6 为什么 mTLS、service bearer 和 delegated subject 分开
+
+三者分别表达 workload、service ID/audience 和“代表哪个 Testee/Assessment、出于什么 purpose”。只靠内网无法抵御横向移动；只靠 mTLS 缺少方法和用户意图；只转发用户 JWT 又不适合后台服务动作。SPIFFE/SPIRE 可统一 workload identity 与证书轮换，但仍不能替代业务 delegation。
+
+当前 `RequireTransportSecurity=false` 是兼容边界，意味着 service bearer 不会自行强制 TLS；review 必须同时检查 dialer credentials。
+
+### 12.7 为什么权限不确定时要 fail closed
+
+已挂载链路在 token、scope、snapshot、ProfileLink 无法证明时返回 401/403/503，是正确方向。IAM disabled、TokenVerifier nil 或 gRPC verifier 缺失时跳过控制，则是 composition fail-open 风险，不是成熟降级。生产目标应在启动时校验安全组合，缺失时拒绝启动或不注册受保护路由。
+
+若业务确需离线授权，必须显式限定最大陈旧时间、低风险动作范围、撤销通道和审计，不能用全局 fallback allow。
+
+### 12.8 为什么 Public/Internal 使用精确策略
+
+prefix 白名单维护简单，却会让新增子路由意外公开；“internal” 也只是命名，不提供网络或业务授权。当前精确 method/path public whitelist 更安全，并应由 contract test 固化。更强的 internal listener/network 隔离可以叠加，但仍需要 workload authentication 和方法级授权。
+
+`securityplane`/`securityprojection` 只描述安全上下文，不执行 deny；真正控制点仍在 middleware/interceptor/application access service。这样比一个了解 IAM、transport、repository 和所有业务规则的万能 `SecurityManager` 更可测试。
+
+### 12.9 为什么最小日志也是安全设计
+
+全量 claims/body 能缩短单次排障，却扩大 token、答案、报告和身份数据的泄露、索引和二次传播风险。生产应只记录最小稳定 ID、issuer/audience 判定、阶段和错误分类；secret 通过 secret manager/env/只读 mount 注入，不通过 CLI flag。TLS 只保护传输，不能保护已经持久化到日志平台的敏感内容。

@@ -134,6 +134,29 @@ Release 使用 token 校验，只释放当前持有者自己的 lease。release 
 
 qs-server 当前通用 LockLease 提供随机 ownership token，用于安全 renew/release；它不是对所有业务存储生效的单调 fencing token。文档和面试中必须区分这两个概念。
 
+### 8.1 候选协调机制
+
+| 方案 | 更适合的场景 | 不能忽略的边界 |
+| --- | --- | --- |
+| Redis token lease（当前通用原语） | leader、重复工作抑制、短期执行资格 | 网络分区/GC pause 后旧 body 可能继续；依赖协作式取消 |
+| DB row lock | 同一数据库内的短事务互斥 | 长任务会长期占连接/事务，不适合跨存储副作用 |
+| DB advisory lock | 单数据库内协调且能接受 provider 绑定 | 连接断开语义、跨存储和迁移成本需单独治理 |
+| Kubernetes Lease | 部署级 leader election | 不直接保护业务实体，也不覆盖非 K8s 环境 |
+| 持久 fencing token + 写入校验 | 旧 owner 写会破坏不可恢复不变量 | 所有副作用存储都必须携带并校验单调 token，改造范围最大 |
+
+选择依据不是“哪个锁更强”，而是最终副作用在哪里、允许旧 owner 做到什么程度。SubmitCoalescer 允许失租 owner 最终与 Mongo unique 竞争；强互斥资金/版本推进类动作则通常必须在写入点拒绝旧 token。
+
+### 8.2 什么时候必须升级为 fencing
+
+满足以下条件时，仅调整 TTL 或开启续租都不够：
+
+1. body 的副作用不能靠幂等、唯一键或状态 CAS 收敛；
+2. 旧 owner 在失租后继续写会覆盖新 owner 的合法结果；
+3. 外部系统无法撤销或补偿该副作用；
+4. 运行环境存在可能超过 TTL 的暂停、网络分区或长尾执行。
+
+此时应让最终存储比较 version/fencing token。续租只降低重叠概率，不能成为安全性证明。
+
 ## 9. Key 与信息安全
 
 Redis adapter 通过统一 keyspace builder 构造 key，并用随机 token 标识持有者。治理快照不暴露原始业务 key，只暴露 workload capability、TTL、renewal mode、active 数与 Redis family 健康。

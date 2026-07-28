@@ -9,6 +9,8 @@ RateLimit 与 Gate 都会拒绝请求，但控制的不是同一个量：
 
 当前 collection 提交路由先取得 Submit Gate，再执行全局和用户 RateLimit。这是代码真实顺序，不是理论上唯一正确的顺序。
 
+本章的推理起点不是“限流器放前还是放后”，而是先回答两件事：Redis limiter 本身需不需要并发保护，以及被 rate 拒绝的请求短暂占用 Gate 的代价是否已经成为主要瓶颈。没有这两类证据，交换中间件顺序只是移动排队位置。
+
 ## 2. 提交入口真实顺序
 
 `rateLimitedSubmitHandlers` 先构造 rate handlers，再交给 `submitHandlers` 包裹，所以 Gin handler 链是：
@@ -28,6 +30,16 @@ Submit Gate
 - 结论：不能只看中间件名字猜顺序，必须看组合函数如何 append。
 
 如果未来调整顺序，需要用 Redis 故障、热点用户、突发请求和提交延迟四类场景重新验收，而不是只比较平均 QPS。
+
+三种候选顺序的权衡如下：
+
+| 方案 | 收益 | 新风险 | 适用前提 |
+| --- | --- | --- | --- |
+| RateLimit → Gate | 超额请求更早离开，Gate 留给获准请求 | Redis/limiter 变慢时，入口调用 limiter 的并发没有 Gate 保护 | limiter 已有独立本地并发/超时保护 |
+| Gate → RateLimit（当前） | 先限制本进程占用，Redis 变慢也不会无限放大调用 | 最终被 429 的请求也短暂占 Gate | 优先保证本实例故障边界可控 |
+| 本地粗限流 → 分布式限流 → Gate | Redis 前还能挡住极端 burst | 双重预算会误拒绝，生效 QPS 和指标更难解释 | 有明确攻击/突发模型且能共同校准两套预算 |
+
+重新排序的触发条件应是：Gate 等待主要由“必然会被 RateLimit 拒绝”的请求造成，且 Redis limiter 的延迟和故障已有独立保护。平均 QPS 上升不是充分条件。
 
 ## 3. Route-to-Gate 矩阵
 
@@ -94,6 +106,22 @@ RateLimit 是容量保护，不是业务事实。Redis 故障时一律 fail-clos
 - limiter 对象为 nil：HTTP middleware 走 degraded-open。
 
 前者是显式故障策略，第二种是 composition invariant 破坏，不能混成同一个 Redis 故障。
+
+### 5.4 为什么 submit 不是完全 fail-open
+
+submit 会进入跨服务校验和 Mongo transaction，成本显著高于普通缓存命中。Redis 故障若让每个实例都按 300 QPS 分布式基线无条件放行，扩容会把集群放大量直接推给 gRPC/Mongo。因此当前只在 primary 明确返回 `degraded_open` 时，追加每实例 30/10 QPS 的保守本地预算。
+
+这不是一条通用常数：实例数变化会改变聚合上界；query、wait-report、report-events 尚未复制该策略，也是因为它们的成本与可降级结果不同。应先取得路径成本、cache hit、下游拐点和故障流量证据，再决定每个 budget 的 fallback。
+
+候选恢复模型：
+
+| 模型 | 恢复行为 | 优点 | 风险 |
+| --- | --- | --- | --- |
+| 单次判断、直接恢复（当前） | 下一次 Redis 调用正常即恢复分布式预算 | 无额外状态，恢复快 | Redis 抖动时会在两套预算间切换 |
+| Circuit Breaker + half-open | 连续失败后本地降级，少量探测成功再恢复 | 避免持续打故障 Redis | 需要失败窗口、探测并发和各实例状态治理 |
+| 渐进恢复 | 恢复后逐步放大分布式准入 | 降低瞬时回流 | 控制算法、振荡和多实例协调显著更复杂 |
+
+引入后两者前必须先证明 Redis 抖动和恢复回流已构成现实问题；否则复杂状态机可能比单次失败本身更难解释和运维。
 
 ## 6. 当前生产基线
 
