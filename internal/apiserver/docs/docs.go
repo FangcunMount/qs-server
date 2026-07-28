@@ -7887,6 +7887,13 @@ const docTemplate = `{
                         "description": "返回条数",
                         "name": "limit",
                         "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "附带诊断 attempt",
+                        "name": "include_attempts",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -7948,6 +7955,13 @@ const docTemplate = `{
                         "name": "scenario_id",
                         "in": "query",
                         "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "附带诊断 attempt",
+                        "name": "include_attempts",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -8009,6 +8023,13 @@ const docTemplate = `{
                         "name": "scenario_id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "附带诊断 attempt",
+                        "name": "include_attempts",
+                        "in": "query"
                     }
                 ],
                 "responses": {

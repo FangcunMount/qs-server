@@ -9777,6 +9777,11 @@ paths:
         minimum: 1
         name: limit
         type: integer
+      - default: false
+        description: 附带诊断 attempt
+        in: query
+        name: include_attempts
+        type: boolean
       produces:
       - application/json
       responses:
@@ -9818,6 +9823,11 @@ paths:
         name: scenario_id
         required: true
         type: string
+      - default: false
+        description: 附带诊断 attempt
+        in: query
+        name: include_attempts
+        type: boolean
       produces:
       - application/json
       responses:
@@ -9859,6 +9869,11 @@ paths:
         name: scenario_id
         required: true
         type: string
+      - default: false
+        description: 附带诊断 attempt
+        in: query
+        name: include_attempts
+        type: boolean
       produces:
       - application/json
       responses:
