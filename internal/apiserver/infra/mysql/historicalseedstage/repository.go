@@ -194,14 +194,23 @@ func (r *Repository) recordAttempt(ctx context.Context, historical historicalsee
 			Select("COALESCE(MAX(attempt_no), 0)").Scan(&maxAttempt).Error; err != nil {
 			return err
 		}
+		initialStatus := status
+		if status != "running" {
+			initialStatus = "running"
+		}
 		row := attemptPO{
 			ID: meta.New().Uint64(), OrgID: historical.OrgID, BatchID: historical.BatchID, ScenarioID: historical.ScenarioID,
-			Stage: strings.TrimSpace(stage), AttemptNo: maxAttempt + 1, ContextHash: contextHash, Status: status,
+			Stage: strings.TrimSpace(stage), AttemptNo: maxAttempt + 1, ContextHash: contextHash, Status: initialStatus,
 			BusinessAt: businessAt, ResourceType: strings.TrimSpace(resourceType), ResourceID: strings.TrimSpace(resourceID), ErrorText: errorValue,
 			StartedAt: now, FinishedAt: now,
 		}
 		if err := db.Create(&row).Error; err == nil {
-			return nil
+			if status == "running" {
+				return nil
+			}
+			return db.Model(&attemptPO{}).Where("id = ? AND status = ?", row.ID, "running").Updates(map[string]any{
+				"status": status, "error_text": errorValue, "finished_at": time.Now().UTC(),
+			}).Error
 		} else if retry == 2 {
 			return err
 		}
