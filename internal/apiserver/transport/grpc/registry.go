@@ -195,6 +195,7 @@ func (r *Registry) registerActorService() error {
 		r.deps.Actor.TesteeQueryService,
 		r.deps.Actor.ClinicianRelationshipService,
 	)
+	actorService.SetHistoricalSeedVerifier(r.deps.HistoricalSeedVerifier)
 	r.server.RegisterService(actorService)
 	log.Info("   👥 Actor service registered")
 	return nil

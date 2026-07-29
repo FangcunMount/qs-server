@@ -26,4 +26,5 @@ message BusinessTimeline {
   string assessment_submitted_at = 8;
   string evaluated_at = 9;
   string report_generated_at = 10;
+  string testee_created_at = 11;
 }

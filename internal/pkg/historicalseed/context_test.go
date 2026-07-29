@@ -136,3 +136,12 @@ func TestOccurredAtUsesHistoricalTimeOnlyForMatchingOrg(t *testing.T) {
 		t.Fatalf("expected org mismatch, got %v", err)
 	}
 }
+
+func TestOccurredAtReturnsHistoricalTesteeCreatedAt(t *testing.T) {
+	historicalAt := time.Date(2025, 1, 1, 8, 42, 0, 0, time.UTC)
+	ctx := WithContext(context.Background(), Context{OrgID: 1, Timeline: Timeline{TesteeCreatedAt: &historicalAt}})
+	got, err := OccurredAt(ctx, 1, StageTesteeCreated, time.Now())
+	if err != nil || !got.Equal(historicalAt) {
+		t.Fatalf("historical testee created-at mismatch: %v %v", got, err)
+	}
+}

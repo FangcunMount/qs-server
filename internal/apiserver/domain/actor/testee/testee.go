@@ -177,7 +177,7 @@ func (t *Testee) SetSource(source string) {
 	t.source = Source(source)
 }
 
-// SetCreatedAt 设置创建时间（仅用于从数据库加载）。
+// SetCreatedAt 设置创建时间（用于从数据库加载或受保护的历史回填）。
 func (t *Testee) SetCreatedAt(createdAt time.Time) {
 	t.createdAt = createdAt
 }

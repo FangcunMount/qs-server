@@ -13,6 +13,7 @@ func ToProto(ctx Context) *commonpb.HistoricalExecutionContext {
 	return &commonpb.HistoricalExecutionContext{
 		BatchId: ctx.BatchID, ScenarioId: ctx.ScenarioID, OrgId: ctx.OrgID, Version: uint32(ctx.Version),
 		Timeline: &commonpb.BusinessTimeline{
+			TesteeCreatedAt: formatTime(ctx.Timeline.TesteeCreatedAt),
 			EntryResolvedAt: formatTime(ctx.Timeline.EntryResolvedAt), EntryIntakeAt: formatTime(ctx.Timeline.EntryIntakeAt),
 			EnrollmentJoinedAt: formatTime(ctx.Timeline.EnrollmentJoinedAt), TaskOpenedAt: formatTime(ctx.Timeline.TaskOpenedAt),
 			TaskCompletedAt: formatTime(ctx.Timeline.TaskCompletedAt), AnswersheetFilledAt: formatTime(ctx.Timeline.AnswerSheetFilledAt),
@@ -50,6 +51,7 @@ func FromProto(in *commonpb.HistoricalExecutionContext) (Context, error) {
 		raw  string
 		set  func(*time.Time)
 	}{
+		{"testee_created_at", timeline.GetTesteeCreatedAt(), func(v *time.Time) { out.Timeline.TesteeCreatedAt = v }},
 		{"entry_resolved_at", timeline.GetEntryResolvedAt(), func(v *time.Time) { out.Timeline.EntryResolvedAt = v }},
 		{"entry_intake_at", timeline.GetEntryIntakeAt(), func(v *time.Time) { out.Timeline.EntryIntakeAt = v }},
 		{"enrollment_joined_at", timeline.GetEnrollmentJoinedAt(), func(v *time.Time) { out.Timeline.EnrollmentJoinedAt = v }},

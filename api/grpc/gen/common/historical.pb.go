@@ -112,6 +112,7 @@ type BusinessTimeline struct {
 	AssessmentSubmittedAt string                 `protobuf:"bytes,8,opt,name=assessment_submitted_at,json=assessmentSubmittedAt,proto3" json:"assessment_submitted_at,omitempty"`
 	EvaluatedAt           string                 `protobuf:"bytes,9,opt,name=evaluated_at,json=evaluatedAt,proto3" json:"evaluated_at,omitempty"`
 	ReportGeneratedAt     string                 `protobuf:"bytes,10,opt,name=report_generated_at,json=reportGeneratedAt,proto3" json:"report_generated_at,omitempty"`
+	TesteeCreatedAt       string                 `protobuf:"bytes,11,opt,name=testee_created_at,json=testeeCreatedAt,proto3" json:"testee_created_at,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -216,6 +217,13 @@ func (x *BusinessTimeline) GetReportGeneratedAt() string {
 	return ""
 }
 
+func (x *BusinessTimeline) GetTesteeCreatedAt() string {
+	if x != nil {
+		return x.TesteeCreatedAt
+	}
+	return ""
+}
+
 var File_common_historical_proto protoreflect.FileDescriptor
 
 const file_common_historical_proto_rawDesc = "" +
@@ -227,7 +235,7 @@ const file_common_historical_proto_rawDesc = "" +
 	"scenarioId\x12\x15\n" +
 	"\x06org_id\x18\x03 \x01(\x04R\x05orgId\x12\x18\n" +
 	"\aversion\x18\x04 \x01(\rR\aversion\x124\n" +
-	"\btimeline\x18\x05 \x01(\v2\x18.common.BusinessTimelineR\btimeline\"\xdd\x03\n" +
+	"\btimeline\x18\x05 \x01(\v2\x18.common.BusinessTimelineR\btimeline\"\x89\x04\n" +
 	"\x10BusinessTimeline\x12*\n" +
 	"\x11entry_resolved_at\x18\x01 \x01(\tR\x0fentryResolvedAt\x12&\n" +
 	"\x0fentry_intake_at\x18\x02 \x01(\tR\rentryIntakeAt\x120\n" +
@@ -239,7 +247,8 @@ const file_common_historical_proto_rawDesc = "" +
 	"\x17assessment_submitted_at\x18\b \x01(\tR\x15assessmentSubmittedAt\x12!\n" +
 	"\fevaluated_at\x18\t \x01(\tR\vevaluatedAt\x12.\n" +
 	"\x13report_generated_at\x18\n" +
-	" \x01(\tR\x11reportGeneratedAtB7Z5github.com/FangcunMount/qs-server/api/grpc/gen/commonb\x06proto3"
+	" \x01(\tR\x11reportGeneratedAt\x12*\n" +
+	"\x11testee_created_at\x18\v \x01(\tR\x0ftesteeCreatedAtB7Z5github.com/FangcunMount/qs-server/api/grpc/gen/commonb\x06proto3"
 
 var (
 	file_common_historical_proto_rawDescOnce sync.Once

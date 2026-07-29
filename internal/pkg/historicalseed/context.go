@@ -15,6 +15,7 @@ var ErrOrgMismatch = errors.New("historical seed organization does not match req
 // Timeline contains business occurrence times. Runtime concerns such as auth,
 // leases, retries and outbox scheduling must continue to use the system clock.
 type Timeline struct {
+	TesteeCreatedAt       *time.Time `json:"testee_created_at,omitempty"`
 	EntryResolvedAt       *time.Time `json:"entry_resolved_at,omitempty"`
 	EntryIntakeAt         *time.Time `json:"entry_intake_at,omitempty"`
 	EnrollmentJoinedAt    *time.Time `json:"enrollment_joined_at,omitempty"`
@@ -54,6 +55,7 @@ func (c Context) Validate(earliest, latest time.Time, location *time.Location) e
 		name string
 		at   *time.Time
 	}{
+		{"testee_created_at", c.Timeline.TesteeCreatedAt},
 		{"entry_resolved_at", c.Timeline.EntryResolvedAt},
 		{"entry_intake_at", c.Timeline.EntryIntakeAt},
 		{"enrollment_joined_at", c.Timeline.EnrollmentJoinedAt},
@@ -117,6 +119,7 @@ func FromContext(ctx context.Context) (Context, bool) {
 // Clone returns an isolated copy suitable for event payloads and value objects.
 func (c Context) Clone() Context {
 	clone := c
+	clone.Timeline.TesteeCreatedAt = cloneTime(c.Timeline.TesteeCreatedAt)
 	clone.Timeline.EntryResolvedAt = cloneTime(c.Timeline.EntryResolvedAt)
 	clone.Timeline.EntryIntakeAt = cloneTime(c.Timeline.EntryIntakeAt)
 	clone.Timeline.EnrollmentJoinedAt = cloneTime(c.Timeline.EnrollmentJoinedAt)

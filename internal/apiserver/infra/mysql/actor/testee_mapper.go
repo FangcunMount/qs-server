@@ -38,6 +38,9 @@ func (m *TesteeMapper) ToPO(domain *testee.Testee) *TesteePO {
 	if domain.ID() > 0 {
 		po.ID = meta.ID(domain.ID())
 	}
+	if createdAt := domain.CreatedAt(); !createdAt.IsZero() {
+		po.CreatedAt = createdAt
+	}
 
 	// 映射测评统计
 	if stats := domain.AssessmentStats(); stats != nil {

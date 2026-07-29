@@ -9,6 +9,7 @@ import (
 type Stage string
 
 const (
+	StageTesteeCreated       Stage = "testee_created"
 	StageEntryResolved       Stage = "entry_resolved"
 	StageEntryIntake         Stage = "entry_intake"
 	StageEnrollmentJoined    Stage = "enrollment_joined"
@@ -34,6 +35,8 @@ func OccurredAt(ctx context.Context, orgID uint64, stage Stage, systemNow time.T
 	}
 	var occurredAt *time.Time
 	switch stage {
+	case StageTesteeCreated:
+		occurredAt = historical.Timeline.TesteeCreatedAt
 	case StageEntryResolved:
 		occurredAt = historical.Timeline.EntryResolvedAt
 	case StageEntryIntake:

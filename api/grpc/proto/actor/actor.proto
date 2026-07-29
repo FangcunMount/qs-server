@@ -5,6 +5,7 @@ package actor;
 option go_package = "github.com/FangcunMount/qs-server/api/grpc/gen/actor";
 
 import "google/protobuf/timestamp.proto";
+import "common/historical.proto";
 
 // ActorService Actor 服务 - 管理受试者和员工
 service ActorService {
@@ -47,6 +48,7 @@ message CreateTesteeRequest {
   repeated string tags = 7 [deprecated=true]; // Deprecated: 受试者 tags 暂不作为产品能力使用
   string source = 8;                    // 来源：online_form/plan/imported
   bool is_key_focus = 9;                // 是否重点关注
+  common.HistoricalExecutionContext historical_context = 10; // 可选历史业务时间上下文
 }
 
 // GetTesteeRequest 获取受试者请求

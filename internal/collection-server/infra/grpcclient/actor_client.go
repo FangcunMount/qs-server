@@ -9,6 +9,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/actor"
+	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 )
 
 // ActorClient Actor 服务客户端
@@ -111,6 +112,9 @@ func (c *ActorClient) CreateTestee(ctx context.Context, req *CreateTesteeRequest
 
 	if req.Birthday != nil {
 		pbReq.Birthday = timestamppb.New(*req.Birthday)
+	}
+	if historical, ok := historicalseed.FromContext(ctx); ok {
+		pbReq.HistoricalContext = historicalseed.ToProto(historical)
 	}
 
 	resp, err := c.client.CreateTestee(ctx, pbReq)
