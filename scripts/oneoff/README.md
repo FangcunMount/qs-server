@@ -40,7 +40,9 @@
 
 这些工具不是“执行一次就永久完成”的迁移，它们保留是因为故障恢复、环境重建或受控数据修复仍可能复用。具体参数以各命令的 `--help`、相邻 README 和测试为准。
 
-`2025-01-01..2026-07-27` 一次性回填的完整启停、基线、执行、对账与回滚顺序见
+从全环境 Testee 清零到 `2025-01-01..2026-07-27` 重建、Statistics、K6 和历史能力关闭的
+可执行总步骤见 [TESTEE_HISTORICAL_REBUILD_GUIDE.md](TESTEE_HISTORICAL_REBUILD_GUIDE.md)。
+只需查阅回填工具的启停、基线、执行、对账与回滚细节时，见
 [HISTORICAL_BACKFILL_RUNBOOK.md](HISTORICAL_BACKFILL_RUNBOOK.md)。
 删除旧 IAM/QS mock 数据、使用新批次重建，以及验收后退场一次性控制面的分批方案见
 [HISTORICAL_DATA_REBUILD_AND_RETIREMENT_PLAN.md](HISTORICAL_DATA_REBUILD_AND_RETIREMENT_PLAN.md)。

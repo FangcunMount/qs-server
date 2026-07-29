@@ -4,6 +4,9 @@
 `2025-01-01..2026-07-27`（含首尾，共 573 天）。历史时间只写业务事实；鉴权、IAM 审计、
 锁、Lease、重试和 Outbox 调度继续使用实际系统时间。
 
+若本次操作还包含旧 Testee 数据清零，请从
+[Testee 历史数据重建分步指导](TESTEE_HISTORICAL_REBUILD_GUIDE.md) 开始执行；本文只描述回填阶段。
+
 ## 1. 构建与只读预检
 
 分别在 qs-server 与 seeddata-runner 的待发布 revision 上执行完整测试并保存 revision：
