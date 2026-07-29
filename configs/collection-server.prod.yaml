@@ -310,8 +310,8 @@ resilience:
   control:
     enabled: true
 historical_seed:
-  enabled: false
-  allowed_org_ids: []
+  enabled: true
+  allowed_org_ids: [1]
   earliest_date: "2025-01-01"
   latest_date: "2026-07-27"
   timezone: Asia/Shanghai
