@@ -115,7 +115,7 @@ jobs:
 
       - name: Run historical backfill production-closure E2E
         env:
-          MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true&loc=Local
+          MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true&loc=Asia%2FShanghai
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
           QS_SERVER_TEST_MONGO_DB_PREFIX: qs_historical_backfill_test
           QS_SERVER_TEST_REDIS_URL: redis://127.0.0.1:6379/15

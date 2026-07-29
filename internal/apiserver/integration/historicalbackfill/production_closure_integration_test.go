@@ -296,6 +296,17 @@ func openHistoricalClosureDatabase(t *testing.T, dsn string) (*sql.DB, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	gotLocation := "<nil>"
+	if cfg.Loc != nil {
+		gotLocation = cfg.Loc.String()
+	}
+	if gotLocation != statisticsDomain.Shanghai.String() {
+		t.Fatalf(
+			"MYSQL_DSN loc=%q, want %q for the Shanghai business-date contract",
+			gotLocation,
+			statisticsDomain.Shanghai.String(),
+		)
+	}
 	databaseName := fmt.Sprintf("qs_historical_closure_%d", time.Now().UnixNano())
 	cfg.DBName = ""
 	cfg.MultiStatements = true
