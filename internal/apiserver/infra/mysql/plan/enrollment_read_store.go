@@ -16,6 +16,39 @@ type EnrollmentReadStore struct {
 	limiter backpressure.Acquirer
 }
 
+type enrollmentReadRow struct {
+	ID               uint64     `gorm:"column:id"`
+	OrgID            int64      `gorm:"column:org_id"`
+	PlanID           uint64     `gorm:"column:plan_id"`
+	TesteeID         uint64     `gorm:"column:testee_id"`
+	Round            uint32     `gorm:"column:round"`
+	StartDate        time.Time  `gorm:"column:start_date"`
+	Status           string     `gorm:"column:status"`
+	JoinedAt         time.Time  `gorm:"column:joined_at"`
+	ClosedAt         *time.Time `gorm:"column:closed_at"`
+	TerminatedAt     *time.Time `gorm:"column:terminated_at"`
+	TerminatedReason string     `gorm:"column:terminated_reason"`
+	RecordOrigin     string     `gorm:"column:record_origin"`
+}
+
+func (row enrollmentReadRow) toEnrollmentItem() planapp.EnrollmentItem {
+	return planapp.EnrollmentItem{
+		ID:               row.ID,
+		OrgID:            row.OrgID,
+		PlanID:           row.PlanID,
+		TesteeID:         row.TesteeID,
+		Round:            row.Round,
+		StartDate:        row.StartDate,
+		Status:           row.Status,
+		JoinedAt:         row.JoinedAt,
+		ClosedAt:         row.ClosedAt,
+		TerminatedAt:     row.TerminatedAt,
+		TerminatedReason: row.TerminatedReason,
+		RecordOrigin:     row.RecordOrigin,
+		Tasks:            []planapp.EnrollmentTaskItem{},
+	}
+}
+
 func NewEnrollmentReadStore(db *gorm.DB, limiter backpressure.Acquirer) *EnrollmentReadStore {
 	return &EnrollmentReadStore{db: db, limiter: limiter}
 }
@@ -45,19 +78,22 @@ func (s *EnrollmentReadStore) ListEnrollments(ctx context.Context, query planapp
 	if err := handle.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	var items []planapp.EnrollmentItem
-	if err := handle.Order("joined_at DESC,id DESC").Limit(query.PageSize).Offset((query.Page - 1) * query.PageSize).Scan(&items).Error; err != nil {
+	var rows []enrollmentReadRow
+	if err := handle.Order("joined_at DESC,id DESC").Limit(query.PageSize).Offset((query.Page - 1) * query.PageSize).Scan(&rows).Error; err != nil {
 		return nil, 0, err
 	}
-	if len(items) == 0 {
-		return items, total, nil
+	if len(rows) == 0 {
+		return []planapp.EnrollmentItem{}, total, nil
+	}
+	items := make([]planapp.EnrollmentItem, len(rows))
+	for i := range rows {
+		items[i] = rows[i].toEnrollmentItem()
 	}
 	ids := make([]uint64, 0, len(items))
 	index := make(map[uint64]int, len(items))
 	for i := range items {
 		ids = append(ids, items[i].ID)
 		index[items[i].ID] = i
-		items[i].Tasks = []planapp.EnrollmentTaskItem{}
 	}
 	type taskRow struct {
 		ID, EnrollmentID                                     uint64
