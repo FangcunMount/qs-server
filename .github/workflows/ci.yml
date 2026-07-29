@@ -199,6 +199,9 @@ jobs:
       - name: Validate deployment shell scripts
         run: bash -n scripts/cd/*.sh
 
+      - name: Validate historical secret deployment contract
+        run: bash scripts/cd/test-prepare-package.sh
+
       - name: Validate production Compose
         run: |
           printf '%s\n' \
