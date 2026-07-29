@@ -96,7 +96,7 @@ func run(args []string, output io.Writer) error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	if err := db.PingContext(ctx); err != nil {
@@ -244,7 +244,7 @@ SELECT business_date,fact_type,SUM(expected_count),SUM(matched_count) FROM (
 	if err != nil {
 		return nil, fmt.Errorf("match batch facts: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var result []exactFactCount
 	for rows.Next() {
 		var item exactFactCount
@@ -349,7 +349,7 @@ func writeJSON(output io.Writer, path string, value any) error {
 		return err
 	}
 	tmpPath := tmp.Name()
-	defer os.Remove(tmpPath)
+	defer func() { _ = os.Remove(tmpPath) }()
 	if err := tmp.Chmod(0o600); err != nil {
 		_ = tmp.Close()
 		return err

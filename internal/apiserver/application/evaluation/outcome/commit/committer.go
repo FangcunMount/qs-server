@@ -154,10 +154,7 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 		AssessmentID string `json:"assessment_id"`
 		RunID        string `json:"run_id"`
 	}{OutcomeID: record.ID().String(), AssessmentID: assessmentToCommit.ID().String(), RunID: runToCommit.ID().String()}}
-	attemptCtx, handle, err := stageport.BeginStageAttempt(ctx, c.stageRecorder, stageport.Attempt{
-		Stage: completion.Stage, BusinessAt: completion.BusinessAt, ResourceType: completion.ResourceType,
-		ResourceID: completion.ResourceID, Payload: completion.Payload,
-	})
+	attemptCtx, handle, err := stageport.BeginStageAttempt(ctx, c.stageRecorder, stageport.Attempt(completion))
 	if err != nil {
 		return nil, err
 	}

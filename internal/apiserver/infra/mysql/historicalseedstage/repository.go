@@ -60,10 +60,7 @@ type Repository struct{ db *gorm.DB }
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) Complete(ctx context.Context, completion stageport.Completion) (*stageport.Record, error) {
-	handle, err := r.Begin(ctx, stageport.Attempt{
-		Stage: completion.Stage, BusinessAt: completion.BusinessAt, ResourceType: completion.ResourceType,
-		ResourceID: completion.ResourceID, Payload: completion.Payload,
-	})
+	handle, err := r.Begin(ctx, stageport.Attempt(completion))
 	if err != nil {
 		return nil, err
 	}

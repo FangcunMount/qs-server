@@ -383,7 +383,7 @@ func historicalScopeOrgID(ctx context.Context, conn *sql.Conn) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var orgs []int64
 	for rows.Next() {
 		var org int64
@@ -502,7 +502,7 @@ func persistHistoricalRollbackOperation(ctx context.Context, conn *sql.Conn, wan
 	if err != nil {
 		return historicalRollbackOperation{}, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	result, err := tx.ExecContext(ctx, `INSERT INTO seed_backfill_rollback_operation
 (org_id,batch_id,manifest_hash,scope_hash,backup_suffix,phase,status,started_at)
 VALUES (?,?,?,?,?,?,?,UTC_TIMESTAMP(6))
@@ -608,7 +608,7 @@ func runHistoricalRollbackPhase(ctx context.Context, conn *sql.Conn, op *histori
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	if _, err := tx.ExecContext(ctx, `UPDATE seed_backfill_rollback_phase_attempt SET status='completed',finished_at=UTC_TIMESTAMP(6) WHERE id=? AND status='running'`, attemptID); err != nil {
 		return err
 	}
@@ -800,7 +800,7 @@ func backupHistoricalMongoResources(ctx context.Context, conn *sql.Conn, db *mon
 		if err != nil {
 			return err
 		}
-		defer cur.Close(ctx)
+		defer func() { _ = cur.Close(ctx) }()
 		var docs []interface{}
 		for cur.Next(ctx) {
 			var doc bson.M
@@ -839,7 +839,7 @@ func forEachHistoricalMongoResourceType(ctx context.Context, conn *sql.Conn, ope
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	byCollection := map[string][]any{}
 	for rows.Next() {
 		var collection, raw string

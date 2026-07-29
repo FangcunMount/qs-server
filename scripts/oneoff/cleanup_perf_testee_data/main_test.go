@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -77,7 +78,7 @@ func TestHistoricalBatchScopeUsesLedgerIdentityAndExactLogs(t *testing.T) {
 }
 
 func TestRollbackPreservesStatisticsRunAuditLedger(t *testing.T) {
-	items, err := mysqlDeleteItems(nil, nil)
+	items, err := mysqlDeleteItems(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +102,7 @@ func TestHistoricalMongoScopeDoesNotExpandByTestee(t *testing.T) {
 }
 
 func TestHistoricalAttemptLedgerIsDeletedBeforeCompletionLedger(t *testing.T) {
-	items, err := mysqlDeleteItems(nil, nil)
+	items, err := mysqlDeleteItems(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

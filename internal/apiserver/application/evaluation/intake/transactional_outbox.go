@@ -38,10 +38,7 @@ func saveAssessmentAndStageEvents(
 	if a == nil {
 		return nil
 	}
-	attemptCtx, handle, err := stageport.BeginStageAttempt(ctx, recorder, stageport.Attempt{
-		Stage: completion.Stage, BusinessAt: completion.BusinessAt, ResourceType: completion.ResourceType,
-		ResourceID: completion.ResourceID, Payload: completion.Payload,
-	})
+	attemptCtx, handle, err := stageport.BeginStageAttempt(ctx, recorder, stageport.Attempt(completion))
 	if err != nil {
 		return err
 	}
