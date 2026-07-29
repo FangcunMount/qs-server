@@ -351,7 +351,56 @@ export QS_HISTORICAL_CONTEXT_SECRET='<inject-from-secret-manager>'
 
 ## 9. 执行 573 天历史回填
 
-在 seeddata-runner 仓库执行，使用持久化且受限访问的 state dir：
+### 9.1 锁定源码并构建 seeddata-runner
+
+在 serverA 的 seeddata-runner 仓库执行。正式批次只允许使用已提交、工作区干净且与
+`origin/main` 一致的 revision；不要直接运行未记录源码对应的临时二进制：
+
+```bash
+cd /path/to/seeddata-runner
+
+test -z "$(git status --porcelain)" || {
+  echo "ERROR: seeddata-runner 工作区不干净"
+  exit 1
+}
+
+git fetch origin
+git switch main
+git pull --ff-only origin main
+
+seeddata_revision="$(git rev-parse HEAD)"
+printf '%s\n' "$seeddata_revision" |
+  tee /secure/path/hist-20250101-20260727-v1.seeddata-revision.txt
+
+go version
+env \
+  -u IAM_USERNAME \
+  -u IAM_PASSWORD \
+  -u IAM_MOCK_CONSUMER_SHARED_SECRET \
+  -u QS_HISTORICAL_CONTEXT_SECRET \
+  GOTOOLCHAIN=go1.25.9 \
+  go test ./...
+
+mkdir -p tmp/bin
+GOTOOLCHAIN=go1.25.9 go build -trimpath \
+  -o tmp/bin/seeddata \
+  ./cmd/seeddata
+
+test -x tmp/bin/seeddata
+sha256sum tmp/bin/seeddata |
+  tee /secure/path/hist-20250101-20260727-v1.seeddata-binary.sha256
+go version -m tmp/bin/seeddata |
+  tee /secure/path/hist-20250101-20260727-v1.seeddata-build.txt
+```
+
+`go.mod` 当前要求 Go `1.25.9`。serverA 的基础 Go 可能低于该版本，而普通 `go version` 显示的是
+自动选择后的模块工具链，因此这里显式固定 `GOTOOLCHAIN=go1.25.9`。测试进程同时移除运行期
+Secret，避免环境变量污染负向配置测试。保存 revision、二进制 SHA-256 和 build metadata，后续
+所有 `--resume` 必须继续使用同一 revision 构建的同一二进制。
+
+### 9.2 准备 Secret 和持久化状态目录
+
+使用持久化且受限访问的 state dir：
 
 ```bash
 umask 077
@@ -365,6 +414,30 @@ test -z "$(find /secure/path/seeddata-historical-state -mindepth 1 -maxdepth 1 -
 export IAM_MOCK_CONSUMER_SHARED_SECRET='<inject-from-secret-manager>'
 export QS_HISTORICAL_CONTEXT_SECRET='<same-one-time-secret-as-qs-server>'
 
+# 现有 tenant/org 1 的 qs:admin 账号；用于取得可自动刷新的 QS 管理 API Token。
+export IAM_USERNAME='<existing-qs-admin-username>'
+read -r -s -p 'IAM_PASSWORD: ' IAM_PASSWORD
+echo
+export IAM_PASSWORD
+
+test -n "$IAM_USERNAME"
+test -n "$IAM_PASSWORD"
+test -n "$IAM_MOCK_CONSUMER_SHARED_SECRET"
+test -n "$QS_HISTORICAL_CONTEXT_SECRET"
+```
+
+`IAM_USERNAME/IAM_PASSWORD` 不是模拟 guardian 的身份，而是 runner 获取和刷新 QS 管理 API
+Token 的现有账号。该账号必须属于 tenant/org `1`，处于 active 状态并具有 `qs:admin`；只具有
+`qs:evaluation_plan_manager` 不能访问为任意 clinician 创建入口所需的 Org Admin 路径。
+
+不要打印密码或两个 Secret 的明文。若 runner 与 qs-server 不在同一 shell 中运行，应从受限访问
+的 Secret 文件或 Secret Manager 重新注入，不能依赖上一次 SSH 会话中的临时 shell 变量。
+
+### 9.3 首次执行
+
+仍在刚才完成构建的 seeddata-runner 仓库中执行：
+
+```bash
 tmp/bin/seeddata historical-backfill \
   --config configs/seeddata.yaml \
   --state-dir /secure/path/seeddata-historical-state \
@@ -383,7 +456,8 @@ tmp/bin/seeddata historical-backfill \
 - 所有业务时间位于对应上海自然日且满足阶段顺序。
 
 任一天存在 timeout、failed、conflict、版本漂移、阶段/资源 ID 缺失或时间异常时，命令必须非零停止，
-且不得推进 checkpoint。先修复原因，再用完全相同的 batch、日期范围、配置、冻结版本和 state dir：
+且不得推进 checkpoint。先修复原因，再用完全相同的二进制、batch、日期范围、配置、冻结版本和
+state dir：
 
 ```bash
 tmp/bin/seeddata historical-backfill \

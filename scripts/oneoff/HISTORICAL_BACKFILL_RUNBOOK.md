@@ -16,6 +16,36 @@ go test ./...
 git rev-parse HEAD
 ```
 
+在 seeddata-runner 仓库额外构建并固化正式执行产物。`go.mod` 当前要求 Go `1.25.9`：
+
+```bash
+test -z "$(git status --porcelain)" || {
+  echo "ERROR: seeddata-runner 工作区不干净"
+  exit 1
+}
+
+go version
+env \
+  -u IAM_USERNAME \
+  -u IAM_PASSWORD \
+  -u IAM_MOCK_CONSUMER_SHARED_SECRET \
+  -u QS_HISTORICAL_CONTEXT_SECRET \
+  GOTOOLCHAIN=go1.25.9 \
+  go test ./...
+mkdir -p tmp/bin
+GOTOOLCHAIN=go1.25.9 go build -trimpath -o tmp/bin/seeddata ./cmd/seeddata
+
+test -x tmp/bin/seeddata
+git rev-parse HEAD |
+  tee /secure/path/hist-20250101-20260727-v1.seeddata-revision.txt
+sha256sum tmp/bin/seeddata |
+  tee /secure/path/hist-20250101-20260727-v1.seeddata-binary.sha256
+go version -m tmp/bin/seeddata |
+  tee /secure/path/hist-20250101-20260727-v1.seeddata-build.txt
+```
+
+所有首次执行和 `--resume` 都必须使用这一个已记录 revision 构建的二进制。
+
 确认 migration `000059_add_seed_backfill_stage` 与
 `000060_add_task_business_created_at` 已成功应用；冻结本批次使用的 Plan、Questionnaire、
 Model 精确版本。回填期间不得发布或修改这些版本。
@@ -63,23 +93,42 @@ collection-server 使用相同范围和密钥环境变量。若还有独立 Plan
 
 ## 3. 执行与恢复
 
-在 seeddata-runner 仓库执行：
+在 seeddata-runner 仓库准备持久化 state dir，并使用上一节构建的二进制执行：
 
 ```bash
 export IAM_MOCK_CONSUMER_SHARED_SECRET='<secret>'
 export QS_HISTORICAL_CONTEXT_SECRET='<same-one-time-secret>'
-go run ./cmd/seeddata historical-backfill \
+
+export IAM_USERNAME='<existing-tenant-1-qs-admin-username>'
+read -r -s -p 'IAM_PASSWORD: ' IAM_PASSWORD
+echo
+export IAM_PASSWORD
+
+test -n "$IAM_USERNAME"
+test -n "$IAM_PASSWORD"
+test -n "$IAM_MOCK_CONSUMER_SHARED_SECRET"
+test -n "$QS_HISTORICAL_CONTEXT_SECRET"
+
+umask 077
+mkdir -p /secure/path/seeddata-historical-state
+
+tmp/bin/seeddata historical-backfill \
   --config configs/seeddata.yaml \
+  --state-dir /secure/path/seeddata-historical-state \
   --from 2025-01-01 \
   --to 2026-07-27 \
   --batch-id hist-20250101-20260727-v1
 ```
 
+`IAM_USERNAME/IAM_PASSWORD` 必须对应 tenant/org `1` 下 active 的 `qs:admin`，用于取得并刷新
+QS 管理 API Token；它不是 runner 后续通过 mock-consumer 接口创建的 guardian 身份。
+
 任一天存在终态失败时命令会停止，不能进入下一天。修复原因后必须使用同一批次、配置和冻结版本：
 
 ```bash
-go run ./cmd/seeddata historical-backfill \
+tmp/bin/seeddata historical-backfill \
   --config configs/seeddata.yaml \
+  --state-dir /secure/path/seeddata-historical-state \
   --from 2025-01-01 \
   --to 2026-07-27 \
   --batch-id hist-20250101-20260727-v1 \
