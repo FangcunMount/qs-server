@@ -1,543 +1,503 @@
-# P. 代码分析报告：历史数据重建与回填能力退场计划
+# P. 代码分析报告：Testee 历史数据重建与回填能力退场计划
 
-> 状态：规划改造  
-> 适用仓库：`iam` 、`qs-server` 、`seeddata-runner`  
-> 目标数据范围：`2025-01-01..2026-07-27`（Asia/Shanghai，含首尾）  
-> 文档目标：先精确删除旧的可归属模拟数据，再使用一个全新批次重建历史业务事实，最后将一次性回填控制面从在线系统退场。
+> 状态：规划改造
+>
+> 适用仓库：`iam`、`qs-server`、`seeddata-runner`
+>
+> 重建日期：`2025-01-01..2026-07-27`（Asia/Shanghai，含首尾）
+>
+> 数据边界：删除 Testee 主数据及其业务事实，保留医护人员、入口、计划和内容主数据。
 
-## 1. 结论
+## 1. 修订结论
 
-这项工作不能被当作“删表 + 重跑 seeddata + 删代码”的一次发布。安全边界是三个彼此隔离的发布列车：
+本计划不再使用“按批次枚举每个资源 + 持久化 rollback operation + receipt + foreign-reference coordinator”的数据清理方案。
 
-1. **旧数据清理**：使用现有 `seed_backfill_stage` 、runner manifest 和精确资源 ID 证明归属；先清 QS，后清 IAM。
-2. **新批次重建**：使用新 batch ID 重新生成 IAM 身份和 QS 业务事实，并完成 Statistics 修复、验证和发布。
-3. **一次性能力退场**：先关闭开关和轮换密钥，再删在线传输、编排与诊断代码，最后用新的 forward migration 删除 5 张回填控制表。
+新方案是一次受控的 **Testee 事实域整体重置**：
 
-不允许把第 2 步产生的 AnswerSheet、Assessment、Outcome、Report、Plan、Entry 和 Statistics fact 当成“历史回填复杂度”删除。它们在验收后就是普通业务事实，必须继续支持 Statistics 重建和正常报告查询。
+1. 停止会写入 Testee 事实的进程。
+2. 备份 IAM MySQL、QS MySQL 和 QS MongoDB。
+3. 保存 QS `staff.user_id` 和 `testee.profile_id` 清单。
+4. 在 QS MySQL 中按固定表顺序删除 Testee 主数据、业务事实、事件控制和 Statistics 投影。
+5. 在 MongoDB 中对 Testee 事实 collections 执行 `deleteMany({})`，不 drop collection，保留索引。
+6. 在 IAM MySQL 中删除已删 Testee 对应的 Profile 和 ProfileLink，默认不删 User/LoginIdentity/Credential。
+7. 验证医护人员、Assessment Entry、Assessment Plan、Questionnaire、Model、Norm 和 Report Template 仍然完整。
+8. 使用新 seeddata batch 重建 573 天数据。
+9. 完成 Statistics 修复和 K6 验收后，退场一次性历史回填能力。
 
-IAM 不需要进行生产代码级的“历史时间退场”：当前历史批次元数据只出现在 EnsureMockConsumer 契约测试和请求 Meta 中，IAM 没有回填专用表，也没有回写 `created_at/linked_at`。EnsureMockConsumer、Profile/Meta 传输和 ProfileLink 是普通 seeddata daemon 仍在使用的通用能力，不应随历史回填一起删除。
-
-## 2. 分析目标、范围和边界
-
-### 2.1 目标
-
-- 删除当前能够被证明归属于旧 seeddata/历史批次的 IAM 与 QS 数据。
-- 使用新批次完整重建 `2025-01-01..2026-07-27` 的业务事实。
-- 证明 Statistics 能从重建后的主事实恢复出正确投影。
-- 删除一次性回填的在线入口、传输协议、编排、幂等账本、回滚控制面和秘钥配置。
-- 保留普通 daemon、REST/gRPC、K6、AnswerSheet 可靠受理和业务时间事实的正常语义。
-
-### 2.2 不在本计划内
-
-- 不清理无法证明归属的旧 IAM User/Profile 或 QS Testee。
-- 不按整个 Org、模糊日期区间、昵称、手机号前缀或自增 ID 区间扩大删除。
-- 不删除 IAM 通用 mock consumer 入口，除非另立项并同时退役普通 seeddata daemon。
-- 不重写已执行 migration 59–62；表退场必须使用新的 forward migration。
-- 不为了减少代码而丢掉 MySQL + Mongo + Outbox/Worker 的普通业务链路 E2E 保护。
-
-## 3. 当前责任链与代码判断
-
-### 3.1 当前入口链
+数据清理仅需三份经 DBA 复核的数据库脚本：
 
 ```text
-seeddata-runner historical-backfill
-  -> IAM EnsureMockConsumer
-  -> Collection CreateTestee / Profile / ProfileLink
-  -> Entry resolve / intake
-  -> Plan enrollment / task open / task complete
-  -> AnswerSheet durable accepted + Mongo outbox
-  -> Assessment + MySQL outbox
-  -> Outcome
-  -> Report
-  -> seed_backfill_stage / attempt
-  -> Statistics repair / validate / publish
+01-reset-testee-facts-qs-mysql.sql
+02-reset-testee-facts-qs-mongo.js
+03-reset-testee-profiles-iam-mysql.sql
 ```
 
-退场时需要沿反向责任链处理依赖：先确认没有待处理事件，再删除 QS 业务对象，最后才允许删 IAM 身份对象。
+不新增生产删除 API，不新增数据清理账本表，不使用应用服务逐条删除。
 
-### 3.2 qs-server 的临时复杂度
+## 2. 分析目标
 
-当前检出约 89 个与 `historicalseed` / `HistoricalExecutionContext` / `seed_backfill` 相关的源码、测试、配置和脚本文件，跨越 apiserver、collection-server、worker、proto、migration 和 CI。主要边界是：
+- 明确哪些表/collections 属于 Testee 事实域。
+- 明确哪些表是医护人员及业务配置主数据，不参与删除。
+- 将旧历史数据整体重置，避免新回填与旧事实叠加。
+- 将数据清理与“回填代码退场”分成两个独立发布阶段。
 
-- 签名与时间线：[`internal/pkg/historicalseed`](../../internal/pkg/historicalseed)。
-- apiserver/collection-server 配置：[`internal/apiserver/options/historical_seed.go`](../../internal/apiserver/options/historical_seed.go) 与 [`internal/collection-server/options/historical_seed.go`](../../internal/collection-server/options/historical_seed.go)。
-- REST/gRPC 传输和内部阶段查询：[`internal/apiserver/transport/rest/routes_historical_seed.go`](../../internal/apiserver/transport/rest/routes_historical_seed.go) 与 [`api/grpc/proto/common/historical.proto`](../../api/grpc/proto/common/historical.proto)。
-- 完成账本与 attempt：[`internal/apiserver/port/historicalseedstage/stage.go`](../../internal/apiserver/port/historicalseedstage/stage.go) 与 [`internal/apiserver/infra/mysql/historicalseedstage/repository.go`](../../internal/apiserver/infra/mysql/historicalseedstage/repository.go)。
-- 精确回滚：[`scripts/oneoff/cleanup_perf_testee_data/historical_rollback.go`](../../scripts/oneoff/cleanup_perf_testee_data/historical_rollback.go)。
-- 跨存储 E2E：[`internal/apiserver/integration/historicalbackfill/production_closure_integration_test.go`](../../internal/apiserver/integration/historicalbackfill/production_closure_integration_test.go)。
+## 3. 分析范围
 
-现有 5 张回填控制表由 migration 59、61、62 引入：
+### 3.1 包含
 
-- `seed_backfill_stage`
-- `seed_backfill_stage_attempt`
-- `seed_backfill_rollback_operation`
-- `seed_backfill_rollback_resource`
-- `seed_backfill_rollback_phase_attempt`
+- qs-server MySQL 的 Testee、Entry activity、Plan enrollment/task、Assessment/Outcome、Statistics 和事件控制数据。
+- qs-server MongoDB 的 AnswerSheet、Report、Interpretation lifecycle 和 Mongo outbox。
+- IAM MySQL 中与 QS Testee Profile ID 相关的 `profiles` / `profile_links`。
+- seeddata-runner 重建和历史能力退场。
 
-migration 60 引入的 `assessment_task.business_created_at` **不属于可直接删除的控制面**。Statistics collector 使用 `COALESCE(business_created_at, created_at)` 重建 `task_created` fact。如果删除该列，以后的 Statistics repair 会把历史任务投影到回填执行日，破坏可重建性，因此需要长期保留。
+### 3.2 不包含
 
-### 3.3 IAM 的当前判断
+- 不删 IAM User、LoginIdentity、Credential 和 Token 数据。
+- 不删 qs-server 的 `staff`、`clinician`、`assessment_entry`、`assessment_plan`。
+- 不删 Questionnaire、Assessment Model、Norm、Report Template 等内容数据。
+- 不通过 REST/gRPC 逐条删除。
+- 不在本阶段 drop 任何业务表或 Mongo collection。
 
-IAM 的 EnsureMockConsumer 是 seeddata-only 的通用内部入口，Profile/Meta 保存在 `auth_login_identities.profile_json/meta_json`。相同 provider/realm/identifier 重试会复用原 LoginIdentity，不覆盖原 Profile/Meta。
+## 4. 入口与调用路径
 
-当前 IAM 中明确的 `seeddata_historical` / `seed_batch_id` / `seed_scenario_id` 契约仅位于测试；没有历史专用生产表、历史中间件或时钟。因此 IAM 的主要任务是“精确清理旧批次身份数据”，而不是删除正常生产模块。
+当前 Testee 事实写入链是：
 
-### 3.4 seeddata-runner 的当前判断
+```text
+IAM User/LoginIdentity
+  -> IAM Profile/ProfileLink
+  -> QS Testee
+  -> Entry resolve/intake + ClinicianRelation
+  -> PlanEnrollment/AssessmentTask
+  -> Mongo AnswerSheet + Mongo Outbox
+  -> MySQL Assessment + MySQL Outbox
+  -> EvaluationOutcome
+  -> Mongo Report lifecycle/artifact/catalog
+  -> Statistics facts/daily/snapshot
+```
 
-runner 的临时复杂度分布在约 17 个文件，包括：
+删除顺序必须是反向依赖顺序，最后才删 `testee` 和 IAM `profiles`。
 
-- `historical-backfill` / `historical-verify` / `historical-manifest` 三个 CLI。
-- `HistoricalDaySnapshot`、manifest、checkpoint、冻结版本和阶段级 resume。
-- HMAC 历史上下文和 qs-server stage 查询客户端。
-- journey 中的批次 Meta、时间线和 Plan 子场景恢复分支。
+## 5. 当前职责与依赖
 
-只删 IAM + qs-server 的服务端能力会留下一个无法工作的 runner CLI，因此 runner 必须参与最终退场。普通 daemon 的 Journey 状态机、可靠提交和 `accepted_pending` 语义保留。
+### 5.1 医护人员主数据
 
-## 4. 不可破坏的契约
+[`internal/apiserver/infra/mysql/actor/po.go`](../../internal/apiserver/infra/mysql/actor/po.go) 明确定义：
 
-### 4.1 数据契约
+- `staff`：后台操作者，持有 IAM `user_id`。
+- `clinician`：业务从业者，可通过 `operator_id` 关联 staff。
+- `assessment_entry`：医护人员创建的扫码/测评入口。
+- `clinician_relation`：医护人员与 Testee 的关系事实，不是医护人员主数据。
 
-- 新批次产生的业务事实在退场后仍可被普通 Statistics repair 重建。
-- `entry_resolved_at <= entry_intake_at <= enrollment_joined_at <= answersheet_filled_at <= assessment_created_at <= assessment_submitted_at <= evaluated_at <= report_generated_at`。
-- IAM `users.created_at`、`auth_login_identities.linked_at/created_at`、`profiles.created_at` 始终是实际创建时间，不伪造历史时间。
-- 新批次的每个 Assessment 场景有且只有一个 AnswerSheet、Assessment、Outcome 和 generated Report。
-- Plan 子场景中的 `task_id`、`origin_ref=plan_task/<task_id>` 和 task completion 一致。
-- 不应用 stage/attempt 表代替业务事实；stage 表退场不得影响业务查询。
+因此 `staff`、`clinician`、`assessment_entry` 保留，`clinician_relation` 随 Testee 删除。
 
-### 4.2 兼容契约
+### 5.2 Entry activity
 
-- 普通 REST、gRPC、daemon 和 K6 从未要求历史头，退场后行为不变。
-- proto 删除 `historical_context` 时必须 `reserved` 原字段号和名称，禁止复用 11/2 等线上字段号。
-- 旧 outbox/event 在退场前必须全部 drain；新 consumer 需有“忽略旧 JSON 的 `historical_context`”兼容测试。
-- 已执行 migration 文件不修改、不删除、不重排编号。
+- `assessment_entry_resolve_log` 记录入口扫描/解析行为。
+- `assessment_entry_intake_log` 包含 `testee_id` 和 intake 事实。
 
-### 4.3 安全契约
+这两张表不是入口主数据。重建后 seeddata 会重新产生 resolve/intake，所以两张 activity log 都要清空，否则 `entry_opened` 和 `intake_confirmed` 会重复。
 
-- 没有 manifest + 服务端完成账本 + 实际资源 ID 的交叉证据，不进行批量删除。
-- 发现 Testee、Profile、User 或 LoginIdentity 有批次外引用时，整个删除 operation 在任何业务删除前失败。
-- 密钥不进 YAML、manifest、receipt 或日志。
-- 退场不允许依赖 `down.sql` 返回历史 migration 版本。
+### 5.3 Statistics
 
-## 5. 当前可重构性评估
+Statistics 是可从剩余主事实和新 seeddata 事实重建的读侧。旧 fact/daily/snapshot 必须整体清空，不做逐 Testee 减法。
 
-| 指标 | 判定 | 代码依据与含义 |
+`statistics_sync_run` 是旧统计运行记录，本次也清空，避免新基线与旧 run 证据混用。
+
+### 5.4 IAM
+
+IAM 不存在历史时钟或回填专用表。QS `testee.profile_id` 指向 IAM `profiles.id`，IAM `profile_links.profile_id` 建立 User 与该 Profile 的授权关系。
+
+核心重置只删：
+
+```text
+profile_links WHERE profile_id IN (<deleted testee profile IDs>)
+profiles      WHERE id         IN (<deleted testee profile IDs>)
+```
+
+IAM `users`、`auth_login_identities`、`auth_credentials`、`auth_token_audit` 默认保留。这可以避免在同一 `users` 表中误删医护人员或真实监护人身份。
+
+如未来确实需要删除旧 seed guardian User，应作为独立 IAM 数据治理任务，以 `auth_login_identities.meta_json.source` 和 QS `staff.user_id` 保留清单为边界，不与本次 Testee 重置混合。
+
+## 6. 行为 / 契约 / 不变量边界
+
+### 6.1 必须保留
+
+- `staff` 行数、ID、`user_id`、roles 不变。
+- `clinician` 行数、ID、`operator_id` 和业务属性不变。
+- `assessment_entry` 和 `assessment_plan` 不变。
+- Questionnaire、Published Model、Norm、Report Template 不变。
+- IAM 医护 User/LoginIdentity/Credential 不变。
+- Mongo collections 的结构和索引不变。
+
+### 6.2 必须清空
+
+- QS Testee 及其关系、任务、答卷、测评、结果、报告。
+- 旧 Entry resolve/intake activity。
+- 旧 Statistics fact/daily/snapshot/run。
+- 旧 Testee 事件的 outbox、checkpoint、retry/dead-letter。
+- 旧 historical stage/attempt/rollback 控制数据。
+- IAM Testee Profile 和指向该 Profile 的 ProfileLink。
+
+### 6.3 交叉角色保护
+
+如果某个 `testee.profile_id` 同时被 QS `staff.user_id` 对应的 IAM User 通过 ProfileLink 持有，医护人员保留规则优先：
+
+- QS Testee 和业务事实仍然删除。
+- IAM Profile/ProfileLink 暂不删除，输出冲突 ID 人工复核。
+- 不允许为了“清空 Profile”而删医护 User。
+
+## 7. 需要直接清理的数据表
+
+### 7.1 QS MySQL：Testee 专属表整表删除，共享表按事件类型删除
+
+下列表在本次“保留主数据、重置全部 Testee 事实”边界下属于删除范围。Testee 专属表可分批执行
+等价于无 `WHERE` 的全表 `DELETE`；共享 runtime/event 表必须使用第 7.1 节所列 Testee 事件类型
+或 Evaluation scope 过滤：
+
+| 分组 | 表 |
+|---|---|
+| Entry activity | `assessment_entry_resolve_log`, `assessment_entry_intake_log` |
+| Testee relation | `clinician_relation` |
+| Plan facts | `assessment_task`, `plan_enrollment` |
+| Evaluation facts | `assessment_score`, `evaluation_outcome`, `assessment` |
+| Testee master | `testee` |
+| Statistics facts | `statistics_access_fact`, `statistics_assessment_fact`, `statistics_plan_fact` |
+| Statistics projections | `statistics_access_daily`, `statistics_assessment_daily`, `statistics_plan_activity_daily`, `statistics_plan_fulfillment_daily`, `statistics_org_snapshot` |
+| Statistics audit | `statistics_sync_run` |
+| Runtime control | `runtime_checkpoint` 的 Evaluation rows；`retry_event_hold`、`event_delivery_dead_letter`、`domain_event_outbox` 中属于 Testee 事件目录的 rows |
+| Historical control | `seed_backfill_stage_attempt`, `seed_backfill_stage`, `seed_backfill_rollback_phase_attempt`, `seed_backfill_rollback_resource`, `seed_backfill_rollback_operation` |
+
+Testee 事实表和 Statistics 的“整表 DELETE”结论仅适用于当前明确的环境重置目标。共享事件表
+不扩大到 Questionnaire、AssessmentModel 或未知事件类型。如果未来只删某个 Org 或某部分
+Testee，不得复用这个方案。
+
+### 7.2 QS MySQL：明确保留
+
+| 分组 | 表/资源 |
+|---|---|
+| 医护主数据 | `staff`, `clinician` |
+| 入口主数据 | `assessment_entry` |
+| Plan 定义 | `assessment_plan` |
+| 系统与治理 | 机构、配置、migration 水位、`system_governance_action_runs` |
+| 内容与版本 | 问卷/模型/常模/报告模板等对应主数据 |
+
+### 7.3 QS MongoDB：Testee collection 全删，共享 Outbox 过滤删除
+
+使用 `deleteMany({})`，不使用 `drop()`：
+
+| 分组 | Collection |
+|---|---|
+| AnswerSheet | `answersheets`, `answersheet_submit_idempotency` |
+| Interpretation lifecycle | `report_generations`, `interpretation_runs` |
+| Report | `interpret_report_artifacts`, `report_query_catalog`, `archived_reports` |
+| Failure/projection | `interpretation_admission_failures`, `interpretation_attention_projections` |
+| Durable events | `domain_event_outbox` 中 AnswerSheet、Evaluation、Interpretation、Plan 事件；保留 Questionnaire、AssessmentModel 和未知事件类型 |
+| Transient repair | `interpretation_catalog_repair_plans` |
+| Legacy（若存在） | `interpret_reports` |
+
+明确保留：
+
+- `questionnaires`
+- Assessment Model draft/published collections
+- `assessment_norms`
+- Report Template collections
+- `schema_migrations`
+- 其他目录、字典、配置和内容 collections
+
+### 7.4 IAM MySQL：按 Profile ID 删除
+
+IAM 不做整表清空。在删 QS `testee` 之前导出非空 `profile_id`，导入 IAM 临时表：
+
+```text
+tmp_delete_testee_profile_ids(profile_id PRIMARY KEY)
+tmp_preserve_staff_user_ids(user_id PRIMARY KEY)
+```
+
+先找出冲突 Profile：
+
+```text
+profile_links.profile_id IN tmp_delete_testee_profile_ids
+AND profile_links.user_id IN tmp_preserve_staff_user_ids
+```
+
+冲突集非空时，IAM 脚本在任何持久化删除前整体失败，并输出冲突 ID 供人工复核。冲突为零后按顺序执行：
+
+```text
+DELETE profile_links BY profile_id
+DELETE guardianships BY child_id  -- 仅旧桥接表存在时
+DELETE profiles      BY id
+DELETE children      BY id        -- 仅旧桥接表存在时
+```
+
+不触及 `users`、`auth_login_identities`、`auth_credentials`、`auth_token_audit`。
+
+## 8. 删除顺序
+
+### 8.1 维护窗口前置
+
+1. 停止 seeddata-runner、qs-worker、Outbox relay、Plan scheduler 和 Statistics scheduler。
+2. 禁止 collection/apiserver 接受新 Testee、AnswerSheet 和 Plan 写入，或进入整体维护窗口。
+3. 确认 MySQL/Mongo outbox 没有 `pending/publishing/failed/manual_required` 记录。
+4. 完成 IAM MySQL、QS MySQL、QS MongoDB 的同一维护窗口备份。
+5. 从 QS 导出 `staff.user_id` 和 `testee.profile_id`，并记录行数与 SHA-256。
+
+### 8.2 数据操作顺序
+
+```text
+QS MySQL 备份与导出 ID
+  -> QS MySQL runtime/historical control
+  -> QS MySQL Statistics
+  -> QS MySQL Entry activity / relation
+  -> QS MySQL Task / Enrollment / Score / Outcome / Assessment
+  -> QS MySQL Testee
+  -> QS Mongo deleteMany
+  -> IAM ProfileLink / Profile
+  -> 三库验证
+```
+
+QS MySQL 内部建议的 `DELETE` 顺序：
+
+```text
+seed_backfill_rollback_phase_attempt
+seed_backfill_rollback_resource
+seed_backfill_rollback_operation
+seed_backfill_stage_attempt
+seed_backfill_stage
+event_delivery_dead_letter
+retry_event_hold
+runtime_checkpoint
+domain_event_outbox
+statistics_org_snapshot
+statistics_plan_fulfillment_daily
+statistics_plan_activity_daily
+statistics_assessment_daily
+statistics_access_daily
+statistics_plan_fact
+statistics_assessment_fact
+statistics_access_fact
+statistics_sync_run
+assessment_entry_resolve_log
+assessment_entry_intake_log
+clinician_relation
+assessment_task
+plan_enrollment
+assessment_score
+evaluation_outcome
+assessment
+testee
+```
+
+如数据量较大，使用固定主键批次 `DELETE ... ORDER BY id LIMIT N`，每批独立提交；不使用一个跨所有大表的长事务。当删除完整表数据时仍使用 `DELETE`，不使用 `TRUNCATE`，以便保留更明确的 binlog/审计边界。
+
+## 9. 清理 SQL 的安全形态
+
+三份脚本都必须包含：
+
+- 环境/数据库名白名单断言。
+- 执行前行数快照。
+- 医护主数据基线断言。
+- 事件队列已 drain 断言。
+- 按固定顺序的删除语句。
+- 删除后行数断言。
+- 明确的非零错误与立即停止。
+
+这些断言不需要新的业务表或应用编排器；MySQL 使用临时表、变量和 `SIGNAL SQLSTATE`，MongoDB 脚本使用执行前/后 `countDocuments` 断言即可。
+
+## 10. 清理后验收
+
+### 10.1 应为 0
+
+- `testee`
+- `clinician_relation`
+- `assessment_entry_resolve_log`
+- `assessment_entry_intake_log`
+- `plan_enrollment`
+- `assessment_task`
+- `assessment`
+- `assessment_score`
+- `evaluation_outcome`
+- 所有 Statistics fact/daily/snapshot/run
+- runtime checkpoint 的 Evaluation rows，以及三类共享 event control 表中的 Testee 事件 rows
+- 五类 historical control 表
+- 第 7.3 节列出的 Mongo collections
+- IAM 本次删除集中的 Profile/ProfileLink
+
+### 10.2 应与删除前一致
+
+- `staff`
+- `clinician`
+- `assessment_entry`
+- `assessment_plan`
+- QS 机构和业务配置
+- Mongo Questionnaire/Model/Norm/Template 数量和发布版本
+- IAM `users`、`auth_login_identities`、`auth_credentials`
+- IAM 医护 User 对应 Profile/ProfileLink
+
+### 10.3 应不可见
+
+- 任一旧 Testee 查询结果。
+- 任一旧 AnswerSheet/Assessment/Outcome/Report。
+- 任一旧 Statistics Testee/Assessment/Plan 指标。
+- Retry governance 中的旧 Testee 候选项。
+
+## 11. 测试与可观测性现状
+
+当前 [`cleanup_perf_testee_data`](cleanup_perf_testee_data/main.go) 已给出 MySQL/Mongo 的资源范围、删除顺序和索引关系，可作为直接数据库脚本的代码依据，但本次不调用它的 batch rollback coordinator。
+
+三份新脚本需要先在本地/隔离数据库上运行 characterization test：
+
+- 准备医护人员 + Entry + Plan + Testee + Assessment + AnswerSheet + Report 混合数据。
+- 执行三份脚本。
+- 断言 Testee 事实全部为 0。
+- 断言医护人员、Entry、Plan 和内容数据完整。
+- 断言 Mongo 索引仍存在。
+- 断言第二次执行仍成功，结果不变。
+
+## 12. 分析指标与判定
+
+| 指标 | 判定 | 依据 |
 |---|---|---|
-| 入口清晰度 | 绿 | runner 三个 CLI、QS 历史头和内部 stage API 都可枚举。 |
-| 数据归属性 | 黄 | 新批次有 stage + manifest；旧的无批次 Meta 数据可能不能安全删除。 |
-| 行为边界 | 黄 | 历史分支与普通服务共享 Entry、Plan、Survey、Evaluation、Interpretation 链路。 |
-| 变更放大系数 | 红 | QS 相关文件约 89 个，且包含 proto/generated/OpenAPI/CI 派生变更。 |
-| 测试保护 | 绿 | 已有历史签名、阶段幂等、resume、rollback 和跨存储 E2E。 |
-| 可观测性 | 绿 | stage、attempt、rollback operation/resource/phase 可作为退场前验收证据。 |
-| 安全抽离性 | 黄 | 可先删在线入口后删表，但 migration 60 的业务时间列必须保留。 |
-| 回退性 | 黄 | 表未 drop 时可重发已封存的 backfill build；表 drop 后必须设置新的版本回退底线。 |
+| 入口清晰度 | 绿 | 删除入口收敛为 3 份数据库脚本。 |
+| 责任内聚 | 绿 | 数据库脚本只负责数据重置，seeddata 只负责重建。 |
+| 依赖扩散 | 黄 | QS 事实跨 MySQL/Mongo，IAM Profile 是另一数据库。 |
+| 行为边界 | 绿 | 保留主数据和删除 Testee 事实的表级边界可枚举。 |
+| 变更放大 | 绿 | 数据清理不再修改 IAM/QS 生产服务。 |
+| 测试保护 | 黄 | 现有 cleanup 提供范围依据，但 3 份直接脚本仍需隔离数据库 characterization test。 |
+| 可观测性 | 绿 | 执行前/后 count、备份和主数据基线可直接判定结果。 |
+| 安全抽离性 | 绿 | 数据重置完成后，回填控制面可与业务事实分批退场。 |
 
-## 6. 目标状态
+## 13. 主要风险点
 
-### 6.1 退场后保留
+### 13.1 只运行 MySQL SQL
 
-| 仓库 | 长期保留 |
-|---|---|
-| IAM | EnsureMockConsumer 通用内部入口、Profile/Meta SDK 传输、LoginIdentity 幂等复用、ProfileLink 授权契约、普通时钟。 |
-| qs-server | AnswerSheet 可靠受理、两类 Outbox/Worker、Assessment/Outcome/Report、Entry/Plan 业务事实、Statistics repair/validate/publish、`assessment_task.business_created_at`。 |
-| seeddata-runner | 普通 daemon、Journey 状态机、IAM mock consumer 客户端、可靠提交 ledger 与 daemon `accepted_pending` 语义。 |
-| CI | 不带历史上下文的 AnswerSheet -> Assessment -> Outcome -> Report 跨存储必跑 E2E。 |
+不够。AnswerSheet、Report 和 Mongo outbox 会留下孤儿数据，Statistics 后续 repair 仍可能从 Mongo 重新采集出旧 fact。因此 QS MySQL 和 MongoDB 必须同一维护窗口一起清理。
 
-### 6.2 退场后删除
+### 13.2 保留 resolve log
 
-| 类别 | 删除对象 |
-|---|---|
-| 网络入口 | `X-QS-Historical-*` 中间件、历史签名验证、内部 stage REST API。 |
-| 服务传输 | proto 中的 `HistoricalExecutionContext`、event payload 的 `historical_context`、collection/worker 传递逻辑。 |
-| 应用分支 | `historicalseed.OccurredAt`、batch/scenario 幂等 replay、stage/attempt lifecycle、历史 Plan scheduler 分支。 |
-| 配置与密钥 | apiserver/collection-server `historical_seed` 配置块与 `QS_HISTORICAL_CONTEXT_SECRET`。 |
-| 一次性工具 | runner 历史三 CLI、历史 manifest/resume；QS 的 batch rollback 模式、`verify_historical_statistics`、`historical-backfill` Statistics 编排模式。 |
-| 控制表 | migration 59/61/62 引入的 5 张表，在保留期结束后由新 migration drop。 |
+会让旧 `entry_opened` 在 Statistics repair 后重现，并与新 seeddata 扫描重复。本次保留 `assessment_entry`，但不保留旧 resolve/intake activity。
 
-## 7. 实施总体流程
+### 13.3 整表删 IAM users
 
-```text
-归属盘点
-  -> 冻结旧批次
-  -> QS dry-run / foreign-reference / backup / apply
-  -> IAM dry-run / revoke / backup / apply
-  -> 采集清理后 Statistics 基线
-  -> 新 batch 的 Staging + Production pilot
-  -> 新 batch 全量回填
-  -> Statistics repair / validate / publish / K6
-  -> 封存证据并关闭历史开关
-  -> 删 runner 历史编排
-  -> 删 QS 在线历史控制面
-  -> 观察期结束
-  -> forward migration drop 回填控制表
-```
+会误删医护人员和其他真实身份。核心重置只删 Testee Profile/ProfileLink。
 
-## 8. 阶段 A：旧数据归属盘点与冻结
+### 13.4 服务未停止
 
-### A-1. 建立唯一清理清单
+删除期间 Worker/Outbox/Scheduler 可能重新生成 Assessment、Report、Task 或 Statistics fact。事件必须先 drain，再停服执行。
 
-输出一份不可变的 `old-seed-scope.json`，至少包含：
+### 13.5 整表长事务
 
-- 环境、Org ID、旧 batch ID 列表。
-- 三库 HEAD、构建物 digest、数据库 migration 水位。
-- runner manifest/checkpoint/ledger 的 SHA-256。
-- IAM User、LoginIdentity、Profile、ProfileLink ID。
-- QS Testee、Entry log/relation、Enrollment、Task、AnswerSheet、Assessment、Outcome、Report、Outbox/event 的精确 ID。
-- 每个资源的归属来源：server stage、runner manifest、IAM identity Meta 或人工签名 allowlist。
+大表单事务可造成 lock wait、binlog 压力和长时回滚。应按主键批次删除，每批提交。
 
-归属判定优先级为：
+## 14. 初步发现或假设
 
-1. QS `seed_backfill_stage` 的 completed 资源 + runner manifest 一致。
-2. IAM `auth_login_identities.meta_json.seed_batch_id` + runner manifest 一致。
-3. 对无 batch Meta 的旧数据，只接受明确 ID 的人工审批 allowlist。
+### 已确认
 
-任何只能通过日期、Org 或命名模式猜测归属的数据不进入清理范围。
+- 数据清理无需修改 IAM 和 qs-server 生产 API。
+- 医护人员主数据与 Testee 关系表在存储上可分离。
+- `assessment_entry` 与 resolve/intake activity 是不同责任；可保留入口定义并清空旧活动。
+- Statistics 为可重建读侧，可在本次整体归零。
+- IAM Testee Profile 可由 QS `testee.profile_id` 精确确定。
 
-### A-2. 冻结与基线
+### 待执行前确认
 
-- 停止普通/历史 seeddata runner，不再创建新 mock 数据。
-- 阻止这些 mock 身份继续产生 QS 业务写入。
-- 采集清理前 MySQL、MongoDB、Redis 和 Statistics 基线。
-- 对 IAM 和 QS 分别生成同一时点可恢复备份。
-- 检查 MySQL/Mongo outbox、retry hold、runtime checkpoint，不允许有未完成的旧批次事件。
+- 目标环境确实要删除全部 Org 的 Testee 数据，而不是只删某一 Org。
+- 目标环境 migration 水位已至少到 62，并不存在已退役 V1 表。
+- MongoDB 实际 collection 清单与第 7.3 节一致，没有环境特有 Testee collection。
+- 医护 User 与 Testee Profile 不存在未审批的交叉角色。
 
-### A-3. 停止门禁
+## 15. 使用 seeddata 重建
 
-- manifest/stage 的资源 ID 不一致。
-- 旧批次存在 running attempt 或 rollback operation 未完成。
-- 任一 Testee/Profile/User 存在批次外业务或身份引用。
-- 无法取得可恢复备份或无法证明备份可读。
+### 15.1 使用新 batch
 
-## 9. 阶段 B：精确删除当前 QS 历史数据
-
-### B-1. 使用现有持久化回滚操作
-
-对每个旧 batch 先运行 `cleanup_perf_testee_data --seed-batch-id ...` dry-run，并提供完整 runner manifest。必须验收：
-
-- receipt 为 v2，manifest hash 和 scope hash 与审批清单一致。
-- rollback resource 已物化 MySQL 主键和 Mongo `_id`。
-- MySQL 的 Testee-bearing 表和 Mongo collections 的 foreign-reference 检查均为 0。
-- dry-run 中的 Testee、AnswerSheet、Assessment、Outcome、Report、Plan 数量与 manifest 符合。
-
-apply 必须在受控维护窗口内执行，按现有 operation 水位自动恢复：
-
-```text
-scope 复核
-  -> foreign-reference 再检查
-  -> MySQL/Mongo 备份
-  -> 按 Mongo _id 删除
-  -> 按 MySQL 主键删除业务事实
-  -> Statistics repair / validate / latest-complete-day publish
-  -> 删 stage attempt
-  -> 删 stage
-  -> operation completed
-```
-
-业务删除范围包含 AnswerSheet/idempotency/outbox、Assessment/score/task、Outcome、Report/generation/run/artifact、Plan enrollment/task、Entry resolve/intake log、relation、runtime/retry/outbox 和受影响 Statistics facts/projections。删除完成账本和 attempt 必须是 QS 跨存储操作的最后一步。
-
-### B-2. 清理后验收
-
-- operation 达到 `completed`，每个 phase 有 completed attempt。
-- 精确 ID 在 MySQL/Mongo 中不再存在，批次外控制组未变。
-- Statistics 受影响日期已 repair/validate，publish 水位等于执行时上海时区的最新完整日。
-- 回滚 operation/resource/phase attempt、receipt 和备份仍保留，不在本步删表。
-
-## 10. 阶段 C：精确删除当前 IAM mock 身份数据
-
-IAM 必须在 QS 清理完成后处理，因为 QS Testee 和报告授权仍引用 IAM Profile/ProfileLink。
-
-### C-1. 新增临时 one-off 清理工具，不新增生产 API
-
-在 IAM `scripts/oneoff` 中实现一个只读 dry-run/显式 apply 工具，输入必须是签名审批的 `old-seed-scope.json`。不新增 User/Profile 硬删 REST/gRPC 接口。
-
-dry-run 需要物化并校验：
-
-- `users`、`auth_login_identities`、`auth_credentials`、`auth_token_audit`。
-- `profiles`、`profile_links`。
-- Redis 中与 User/LoginIdentity 相关的活跃 session/revocation 状态。
-- User 是否还有非批次 LoginIdentity，Profile 是否被非批次 ProfileLink 使用，ProfileLink 是否与 manifest ID 一致。
-
-如果某个旧身份因 Ensure 复用而没有新 Meta，不能把“Meta 缺失”自动解释为可删；必须由 runner manifest 中的 User/LoginIdentity ID 和人工 allowlist 证明归属。
-
-### C-2. IAM 删除顺序
-
-```text
-撤销 User/LoginIdentity 活跃 session
-  -> 备份精确行并产生 scope hash receipt
-  -> auth_token_audit
-  -> auth_credentials
-  -> auth_login_identities
-  -> profile_links
-  -> profiles
-  -> users
-  -> 按 ID 复核 + 控制组复核
-```
-
-每个删除是按明确主键执行的幂等操作。一次执行中断后只能用同一 receipt/scope hash 恢复，不能重新扫描并扩大范围。备份与 receipt 至少保留 90 天。
-
-### C-3. IAM 停止门禁
-
-- 批次 User 还有非批次 LoginIdentity、ProfileLink 或审计依赖。
-- Profile 被批次外 User 链接。
-- QS 中仍存在对该 Profile/User/Testee 的引用。
-- session 无法撤销或备份恢复演练失败。
-
-## 11. 阶段 D：使用 seeddata 重建历史数据
-
-### D-1. 必须使用新 batch ID
-
-不得复用已删除的 `hist-20250101-20260727-v1`。新批次建议使用经审批的唯一 ID，例如：
+不复用旧 batch ID。正式重建使用唯一新 ID，例如：
 
 ```text
 hist-20250101-20260727-v2
 ```
 
-原因：
+pilot 使用独立 batch ID。
 
-- IAM 身份命名、QS stage 唯一键、runner checkpoint/manifest 和 rollback receipt 都以 batch 为身份边界。
-- 旧 rollback operation 和证据尚在 90 天保留期内，复用 batch 会混淆新旧归属。
-- 新 batch 命名空间保证 IAM Ensure 只复用同一新场景，不依赖更新旧 Identity Meta。
+### 15.2 回填次序
 
-pilot 必须使用另一 batch ID，不能与正式 v2 共用账本。
+1. 采集重置后的 Statistics 零基线。
+2. 冻结 Plan、Questionnaire、Published Model 精确版本。
+3. Staging 运行 3 天全 journey。
+4. Staging 运行 `2025-01-01..2025-01-31`。
+5. Production 用独立 batch 运行 3 天 pilot，完成表级和 Statistics 验收后清理 pilot。
+6. 运行正式 573 天批次，每日通过 verify 后才推进 checkpoint。
+7. 执行 Statistics repair/validate/catch-up/latest-complete-day publish。
+8. 运行 `perf-preflight` 和 `perf-smoke`，必须发现真实 Report 样本且不 degraded。
 
-### D-2. 回填前准备
+### 15.3 最终数据不变量
 
-- 采集“旧数据删除后、新数据写入前”的 Statistics 基线，作为新批次增量对账起点。
-- 冻结全部 Plan、Questionnaire、Assessment Model 的精确已发布版本，写入 manifest。
-- 重新验证 HMAC 组织、日期、时区和新鲜度边界，密钥只由环境变量注入。
-- 停止普通 seeddata daemon 和 Plan scheduler；保持 Evaluation/Interpretation worker 和 Outbox relay 运行。
-- 确认 migration 59–62 均已应用，因为它们在本次重建完成前仍是幂等、诊断和回滚依据。
+- 新 Testee 全部关联新 IAM Profile/ProfileLink。
+- 旧医护 `staff`/`clinician`/Entry/Plan ID 未变。
+- 新 ClinicianRelation 指向保留的 clinician 和新 Testee。
+- 每个 Assessment 场景有唯一 AnswerSheet、Assessment、Outcome、Report。
+- 时间线满足既定顺序，且不跨对应上海自然日。
+- Statistics 与重置后基线 + 新批次增量一致。
 
-### D-3. 执行次序
+## 16. 历史回填能力退场
 
-1. 本地/CI：3 天，四种 journey 和 Plan 子场景都有样本。
-2. Staging pilot：3 天，注入一次中断并验证 `--resume`。
-3. Staging 整月：`2025-01-01..2025-01-31`，完成 Statistics repair/validate/publish 和一次精确 rollback 演练。
-4. Production pilot：独立 batch 的 3 天，完整验收后精确回滚。
-5. Production full：新的正式 batch，`2025-01-01..2026-07-27`，每日验证后才推进 checkpoint。
+数据重置简化不改变代码退场的原则：新数据验收后先关闭能力，再删代码，最后删控制表。
 
-正式命令必须使用已发布且封存 digest 的 runner build：
-
-```bash
-seeddata historical-backfill \
-  --config configs/seeddata.yaml \
-  --from 2025-01-01 \
-  --to 2026-07-27 \
-  --batch-id hist-20250101-20260727-v2
-```
-
-中断后仅允许用同一 build、配置、batch 和冻结版本执行 `--resume`。
-
-### D-4. 日级和批次级验收
-
-每个业务日都必须验证：
-
-- 确定性人数、journey mix、场景数和 60% Plan 任务完成选择。
-- 本地 ledger、runner manifest 和 QS completed stage 的 payload hash、business_at、resource type/ID 一致。
-- Assessment 场景具备 submitted AnswerSheet、Assessment created/submitted、Outcome committed 和 Report generated。
-- 时间线不倒序、不跨上海自然日、不落入未来。
-- 日级验证成功后才写 `DailyCounts`、Terminal 和 `CompletedThrough`。
-
-全量完成后：
-
-1. 重新运行 batch verify，不复用日级缓存结论。
-2. 对 `2025-01-01..2026-07-27` 按不超过 31 天分窗 repair/validate。
-3. 对截止日之后到执行时最新完整上海自然日的缺口继续分窗 repair/validate。
-4. 只以执行时最新完整日 publish，并校验水位。
-5. 使用清理后基线逐日对比 Statistics 增量。
-6. 运行 `perf-preflight` 和 `perf-smoke`，必须自动发现真实 Report 样本，不得为 no-report degraded。
-
-## 12. 阶段 E：回填证据封存与能力关闭
-
-这一阶段在数据验收后立即执行，但不立即 drop 表。
+### 16.1 立即关闭
 
 - 关闭 apiserver/collection-server `historical_seed.enabled`。
-- 恢复 Plan scheduler 和普通 seeddata daemon。
-- 轮换并移除 `QS_HISTORICAL_CONTEXT_SECRET`，确认所有实例均无旧密钥。
-- 标记和封存三库回填 build/tag、容器 digest、配置 hash 与 migration 水位。
-- 封存 runner manifest/checkpoint/ledger、QS stage/attempt 导出、Statistics 基线/验证结果、K6 结果、rollback receipt 和备份。
-- 建立至少 90 天的可恢复观察期；期间出现数据错误时，使用封存 build 和现存账本 fix-forward，不边删代码边修数据。
+- 轮换并移除 `QS_HISTORICAL_CONTEXT_SECRET`。
+- 封存三库 HEAD、runner build、配置 hash、最终 manifest 和 Statistics/K6 证据。
 
-进入代码退场前必须证明：
+### 16.2 seeddata-runner
 
-- 没有未完成的 historical outbox/retry/hold/runtime checkpoint。
-- 新 batch 没有 failed/running attempt。
-- Statistics 连续两次全量验证结果一致。
-- 封存备份已在隔离环境完成一次读取/恢复演练。
+- 删除 `historical-backfill`、`historical-verify`、`historical-manifest`。
+- 删除 HistoricalDaySnapshot、manifest/checkpoint、历史 HMAC/context 和 stage 查询。
+- 保留普通 daemon、Journey 状态机、IAM mock consumer 和 AnswerSheet 可靠提交。
 
-## 13. 阶段 F：qs-server 在线历史复杂度退场
+### 16.3 qs-server
 
-采用 expand/contract，分批发布，不在同一版本中同时删代码和表。
+- 删除 `X-QS-Historical-*` 签名中间件和 `historical_seed` 配置。
+- 删除 proto/event payload 的 `HistoricalExecutionContext`，原 proto 字段号/名称必须 `reserved`。
+- 删除 Entry/Plan/AnswerSheet/Assessment/Outcome/Report 中的 historical context/stage/attempt 分支。
+- 删除 stage REST API 和 historical Statistics 编排模式。
+- 把 Historical Backfill Cross-Store E2E 改写为普通 AnswerSheet -> Report required E2E，不删跨存储保护。
+- 保留 `assessment_task.business_created_at`，确保已回填任务在未来 Statistics repair 时仍使用正确业务日期。
 
-### F-1. 删除外部与传输入口
+### 16.4 IAM
 
-- 删除 REST historical middleware、stage 查询路由/handler 及 OpenAPI 操作。
-- 删除 apiserver/collection-server 的 `historical_seed` options、flags、YAML 配置和组装逻辑。
-- 删除 `X-QS-Historical-Context/Requested-At/Signature` 验证与 `internal/pkg/historicalseed/signature.go`。
-- 从 answersheet/evaluation/interpretation proto 删除 optional `historical_context`，对原 field number 和 name 增加 `reserved`，再重新生成 Go 代码。
-- 部署前确认没有旧版 runner/collection/worker 仍发送历史上下文。
+- 不删 EnsureMockConsumer、Profile/Meta 传输和 ProfileLink 授权。
+- 将测试中的 `seeddata_historical` 示例改为中性 seeddata Meta。
+- 不新增历史时钟、回填表或删除 API。
 
-### F-2. 删除应用与 Worker 传播
+### 16.5 控制表
 
-- 删除 context 在 Collection -> apiserver -> outbox -> Worker -> gRPC 的传递。
-- 删除 event payload 中的 `historical_context`，保留对旧 JSON 多余字段的兼容测试。
-- 删除 Entry、Plan、AnswerSheet、Assessment、Outcome、Report 中的 batch/scenario/stage/attempt 分支。
-- 删除历史模式的 Plan scheduler pause 和 task replay/strict completion 分支，保持普通请求原有语义。
-- 删 `historicalseed.OccurredAt`；如某个通用 `...At` 领域方法已用于正常业务时钟和测试注入，则保留该通用方法，只删 historical context 判定。
-- 保留 `assessment_task.business_created_at` 及 Statistics collector 的 fallback，确保历史任务可永久重建。
-
-### F-3. 删除阶段账本在线依赖
-
-- 删除 `historicalseedstage` port/repository 与所有 container 注入。
-- 删除 stage reader API 和 `include_attempts=true` 诊断入口。
-- 保留表本身在观察期内的只读取证价值；在线进程已不得读写它们。
-- 连续至少一个完整发布观察窗口确认数据库监控中无这 5 张表的应用读写。
-
-### F-4. 一次性工具与 CI 收敛
-
-- 从 `cleanup_perf_testee_data` 中删除 `--seed-batch-id` 和 persisted historical rollback 模式，保留其他明确仍有用的手工 Testee 清理能力。
-- 删除 `verify_historical_statistics`；`rebuild_statistics` 保留通用 repair/validate/publish，删除只服务于回填的 `historical-backfill` mode。
-- 当前 `Historical Backfill Cross-Store E2E` 不能直接从 CI 消失。将它改写为不带历史上下文的必跑 `AnswerSheet Production Closure E2E`，继续覆盖 MySQL + Mongo Replica Set + Redis + Outbox/Worker + Statistics。
-- 历史特有的签名、stage replay、attempt 注入失败测试随代码删除；普通链路的唯一性和 Worker 重试测试保留。
-
-## 14. 阶段 G：seeddata-runner 历史编排退场
-
-该批应当早于 QS proto/服务端字段删除发布，保证没有活跃客户端继续依赖它们。
-
-- 删除 `historical-backfill`、`historical-verify`、`historical-manifest` CLI 及参数。
-- 删除 `internal/historicalseed`、`historical_backfill.go`、HistoricalDaySnapshot、manifest/checkpoint、冻结版本和阶段级 resume。
-- 删除 seed API/client 的签名历史头和 QS stage 查询。
-- 删除 Journey 中的 `source=seeddata_historical`、batch/scenario Meta、历史时间线和 Plan 子场景恢复分支。
-- 保留共享的 journey 停止语义、origin_ref、AnswerSheet durable accepted、daemon accepted_pending 和通用幂等键。
-- 在删除前以 tag/容器 digest 封存最终 backfill build，但不继续在 `main` 中维护一次性 CLI。
-
-## 15. 阶段 H：IAM 代码和临时工具收尾
-
-- 删除阶段 C 新增的 one-off 身份清理工具，或将其连同 receipt/schema 冻结到受控运维归档；不把它演变成生产删除 API。
-- 将 IAM 契约测试中的 `seeddata_historical` 示例改为中性 `seeddata` Meta，但保留 Profile/Meta 首次写入、重试不覆盖、SDK 传输和 ProfileLink 授权契约。
-- 不删 EnsureMockConsumer、Signup 领域服务、LoginIdentity Profile/Meta 列或 ProfileLink。
-- 不新增、不保留 IAM 历史时钟或硬删 API。
-
-IAM 最终预期是“生产逻辑无回填特例，仅保留普通 seeddata 契约”，而不是删掉整个 mock consumer 能力。
-
-## 16. 阶段 I：控制表退场
-
-只有同时满足以下条件才能创建新的 qs-server forward migration：
-
-- 新批次验收和至少 90 天可恢复观察期结束。
-- 备份、manifest、stage/attempt 导出、rollback 证据的保留策略已转移到数据库外的受控存储。
-- 生产所有 qs-server/worker/collection 版本已不读写 5 张表。
-- 数据库审计或 query telemetry 在至少一个完整发布窗口中证明无访问。
-- 已声明新的 application rollback floor：drop 表后不允许回退到仍依赖历史表的旧版本。
-
-新 migration（实施时使用当时最新编号，不在本文档预占固定号）按外键与诊断价值从低到高删除：
+所有应用版本已不读写后，通过新的 forward migration drop：
 
 ```text
 seed_backfill_rollback_phase_attempt
-  -> seed_backfill_rollback_resource
-  -> seed_backfill_rollback_operation
-  -> seed_backfill_stage_attempt
-  -> seed_backfill_stage
+seed_backfill_rollback_resource
+seed_backfill_rollback_operation
+seed_backfill_stage_attempt
+seed_backfill_stage
 ```
 
-down migration 只能重建空表结构，不能伪装能恢复已删除的诊断数据。生产回退依赖备份和新的 fix-forward，不依赖 down migration。
+不修改已执行的 migration 59/61/62。
 
-## 17. 分批交付与部署顺序
+## 17. 立即停止条件
 
-| 批次 | 仓库 | 交付内容 | 前置门禁 |
-|---|---|---|---|
-| R0 | 三库 | 封存当前 HEAD，产生旧数据归属清单与备份 | 无模糊归属 |
-| R1 | IAM | 临时精确身份清理工具及 characterization tests | dry-run/foreign-reference/中断恢复通过 |
-| R2 | 数据操作 | QS 旧 batch cleanup，然后 IAM cleanup | 双库备份可恢复 |
-| R3 | seeddata + QS + IAM | Staging/Production pilot，正式新 batch 回填 | 每日门禁、Statistics/K6 通过 |
-| R4 | 运维 | 关闭历史开关、轮换密钥、封存证据 | 业务事实与投影对账一致 |
-| R5 | seeddata-runner | 删历史 CLI/编排/上下文，保留 daemon | 封存 backfill build 可取得 |
-| R6 | qs-server | 删历史入口/proto/event/应用分支/stage 在线依赖 | 无待处理历史事件 |
-| R7 | qs-server | 把跨存储 E2E 改为普通链路 required job | 普通链路唯一性/重试已覆盖 |
-| R8 | IAM | 退场临时清理工具，中性化历史测试文案 | 备份/receipt 已归档 |
-| R9 | qs-server | 观察期后新 migration drop 5 张表 | 无应用访问，回退底线生效 |
-| R10 | 文档 | 将旧 runbook 标为历史资料，更新架构索引 | 代码、配置、表均已退场 |
+- 目标数据库名与审批环境不一致。
+- 任一 MySQL/Mongo outbox 还有未完成事件。
+- IAM/QS/Mongo 备份不完整或未做恢复验证。
+- `staff.user_id` 保留清单或 `testee.profile_id` 删除清单导出失败。
+- 医护 User 与待删 Profile 存在未审批冲突。
+- 任一保留表的执行后行数/hash 与基线不同。
+- 任一 Testee/AnswerSheet/Assessment/Outcome/Report/Statistics 旧事实未清空。
+- 重建时出现版本/payload conflict、Report 缺失、时间越界或 Statistics validate 失败。
 
-每个仓库使用 fix-forward 提交，不 force-push、不改写已发布回填历史。结构删除、行为修复、generated 更新和 migration 必须分开提交。
+## 18. 下一步建议
 
-## 18. 测试与验收计划
+三份脚本已落在 `scripts/oneoff/reset_testee_historical_data`，仍不修改 IAM/qs-server 生产代码。下一步是：
 
-### 18.1 数据清理
-
-- QS historical rollback：scope hash 漂移、manifest 不一致、foreign reference、Mongo/MySQL/Statistics 分阶段中断恢复、控制组不受影响。
-- IAM one-off：Meta + manifest 交叉归属、Identity 复用且 Meta 缺失、非批次 Identity/ProfileLink 拒绝、session 撤销、重复 apply 幂等。
-- 对 MySQL/Mongo 备份进行实际恢复演练，不仅检查备份文件存在。
-
-### 18.2 历史重建
-
-- 保留 runner 的 573 日确定性、journey 终态矩阵、60% Plan、版本漂移、每阶段“服务端成功/客户端未落账” resume 测试。
-- 保留 QS 历史签名、stage replay/conflict、attempt lifecycle、rollback 和跨存储 E2E，直到正式批次完成。
-- Staging 和 Production pilot 均必须完成一次真实回滚演练。
-
-### 18.3 代码退场
-
-- 架构检查：全库不再出现 `historicalseed`、`HistoricalExecutionContext`、`X-QS-Historical-`、`seed_backfill_stage` 在线引用；只允许 migration 历史和归档文档中留存。
-- proto 兼容：原字段号/名称已 reserved，旧消息的未知字段可被安全忽略。
-- event 兼容：旧 payload 多余字段不影响普通 consumer，且无待处理历史事件。
-- Statistics 回归：从主事实重建 `2025-01-01..2026-07-27` 仍与退场前基线一致，包括 task business time。
-- 普通 daemon、REST/gRPC、K6 的行为、错误和性能门禁不变。
-
-最终必跑门禁：
-
-```text
-iam:             go test ./... + 关键契约包 race
-qs-server:       go test ./... + 相关 race + docs-verify + perf-verify
-seeddata-runner: go test ./... + go test -race ./...
-cross-store:     MySQL 8 + Mongo Replica Set + Redis + Outbox/Worker required E2E
-workspace:       git diff --check + 工作区无未说明改动
-environment:     Statistics validate + perf-preflight + perf-smoke non-degraded
-```
-
-## 19. 立即停止条件
-
-任一条触发时，不进入下一个数据日、删除 phase 或发布批次：
-
-- batch/manifest/scope/payload/version 不一致。
-- 旧数据不能通过精确 ID 证明归属。
-- IAM 或 QS foreign-reference 检查非 0。
-- 备份不可读、不可恢复或 receipt/scope hash 漂移。
-- 任一必需 stage/resource ID 缺失，Report 未 generated，Plan task 未 completed。
-- 时间越界、倒序、落入未来或 Statistics fact conflict。
-- 退场前仍有旧版实例、待处理历史 event 或对控制表的读写。
-- 跨存储 E2E、Statistics validate 或 non-degraded K6 失败。
-
-## 20. 规模预估
-
-| 工作项 | 预估 |
-|---|---:|
-| 旧数据归属盘点、备份和 IAM one-off 清理工具 | 3–5 工程日 |
-| 旧 QS/IAM 数据清理与恢复演练 | 2–4 工程日 |
-| Staging/pilot/正式重建与 Statistics/K6 验收 | 4–8 工程日，实际运行时间另计 |
-| seeddata-runner 历史编排退场 | 2–4 工程日 |
-| qs-server 传输/应用/账本/工具退场 | 6–10 工程日 |
-| IAM 收尾与契约中性化 | 0.5–1 工程日 |
-| 控制表 forward migration、发布和回退底线 | 1–2 工程日 |
-| **合计** | **18.5–34 工程日 + 90 天观察保留期** |
-
-## 21. 完成定义
-
-只有同时满足以下条件，才可声明历史数据重建与能力退场完成：
-
-- 旧 batch 可归属 IAM/QS 数据已精确删除，不可归属数据被明确保留。
-- 新唯一 batch 已完成 573 个业务日的所有预期场景。
-- IAM 身份与 QS 业务事实的资源 ID、时间顺序和归属证据完整。
-- Statistics 可从主事实重建，最终 publish 水位等于执行时最新完整上海自然日。
-- perf preflight/smoke 能找到真实 Report 样本且不 degraded。
-- 历史开关已关闭，密钥已轮换移除，无待处理历史事件。
-- runner 不再包含历史 CLI，QS 不再包含历史在线入口、传输、stage/attempt 依赖。
-- IAM 无历史特例，但普通 EnsureMockConsumer/Profile/Meta/ProfileLink 契约仍在。
-- 90 天保留期结束后，5 张回填控制表已通过 forward migration 删除，新版本回退底线已生效。
-- 跨存储普通 AnswerSheet -> Report E2E 仍是 CI required job。
-
-## 22. 实施前的下一步
-
-本文档定义了目标和门禁，不授权立即删除生产数据。第一个实施批次只做两件事：
-
-1. 生成旧数据 `old-seed-scope.json` 和三库/三存储基线，全程只读。
-2. 为 IAM 临时 one-off 清理工具补 characterization tests，先证明可精确枚举、可拒绝 foreign reference、可恢复，再实现 apply。
-
-完成这两项并人工审批清单后，才进入 QS -> IAM 的实际数据清理。
+1. 在空库应用最新 migration，并装载包含医护控制组与 Testee 事实的小型 fixture。
+2. 运行三份脚本，证明“Testee 事实全部为 0，医护主数据全部保留”。
+3. 注入一次批次中断，以 resume 模式证明不会扩大删除范围。
+4. 人工复核脚本、备份恢复结果和行数报告后，再安排数据库维护窗口。
