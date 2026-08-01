@@ -92,6 +92,17 @@ func TestOptimizeHighRiskLatestQueueIndexMigrationContract(t *testing.T) {
 	requireSQLContains(t, down, "AND index_name = 'idx_assessment_workbench_latest_id_risk_by_testee'")
 }
 
+func TestOptimizeOutboxAggregateEvidenceIndexMigrationContract(t *testing.T) {
+	up := readMySQLMigration(t, "000063_optimize_outbox_aggregate_evidence_index.up.sql")
+	down := readMySQLMigration(t, "000063_optimize_outbox_aggregate_evidence_index.down.sql")
+
+	const indexName = "idx_outbox_aggregate_event_latest"
+	requireSQLContains(t, up, "ALTER TABLE `domain_event_outbox` ADD INDEX `"+indexName+"` (`aggregate_type`, `aggregate_id`, `event_type`, `id`)")
+	requireSQLContains(t, up, "AND index_name = '"+indexName+"'")
+	requireSQLContains(t, down, "ALTER TABLE `domain_event_outbox` DROP INDEX `"+indexName+"`")
+	requireSQLContains(t, down, "AND index_name = '"+indexName+"'")
+}
+
 func TestEvaluationCompatibilityRetirementMigrationContract(t *testing.T) {
 	retire := readMySQLMigration(t, "000044_retire_assessment_interpreted_and_score_copy_fields.up.sql")
 	for _, token := range []string{

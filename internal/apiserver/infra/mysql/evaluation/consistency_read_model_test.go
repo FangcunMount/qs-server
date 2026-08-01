@@ -50,10 +50,10 @@ func TestConsistencyReadModelReadsProjectionOutcomeLink(t *testing.T) {
 
 func TestConsistencyReadModelReadsCommittedOutboxReferences(t *testing.T) {
 	reader, mock := newConsistencyReadModelTestDB(t)
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT count(*) FROM `domain_event_outbox`")).
+	mock.ExpectQuery("^"+regexp.QuoteMeta("SELECT count(*) FROM `domain_event_outbox` WHERE event_type = ? AND aggregate_type = ? AND aggregate_id = ?")+"$").
 		WithArgs(eventcatalog.EvaluationOutcomeCommitted, evalevent.AggregateType, "42").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT `payload_json`,`status` FROM `domain_event_outbox`")).
+	mock.ExpectQuery("^"+regexp.QuoteMeta("SELECT `payload_json`,`status` FROM `domain_event_outbox` WHERE event_type = ? AND aggregate_type = ? AND aggregate_id = ? ORDER BY id DESC LIMIT ?")+"$").
 		WithArgs(eventcatalog.EvaluationOutcomeCommitted, evalevent.AggregateType, "42", 1).
 		WillReturnRows(sqlmock.NewRows([]string{"payload_json", "status"}).
 			AddRow(`{"data":{"outcome_id":"9001","evaluation_run_id":"42:1"}}`, "published"))
