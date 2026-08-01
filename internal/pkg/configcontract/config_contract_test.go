@@ -162,8 +162,8 @@ func assertHistoricalSeedContract(t *testing.T, configName string, enabled bool,
 	if len(allowedOrgIDs) != 1 || allowedOrgIDs[0] != 1 {
 		t.Fatalf("%s historical_seed.allowed_org_ids = %v, want [1]", configName, allowedOrgIDs)
 	}
-	if earliestDate != "2025-01-01" || latestDate != "2026-07-27" {
-		t.Fatalf("%s historical_seed date range = %s..%s, want 2025-01-01..2026-07-27", configName, earliestDate, latestDate)
+	if earliestDate != "2025-01-01" || latestDate != "2026-08-01" {
+		t.Fatalf("%s historical_seed date range = %s..%s, want 2025-01-01..2026-08-01", configName, earliestDate, latestDate)
 	}
 	if timezone != "Asia/Shanghai" || freshness != 5*time.Minute {
 		t.Fatalf("%s historical_seed time contract = %s/%s, want Asia/Shanghai/5m", configName, timezone, freshness)
