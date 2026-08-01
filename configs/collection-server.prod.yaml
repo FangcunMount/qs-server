@@ -313,7 +313,7 @@ historical_seed:
   enabled: true
   allowed_org_ids: [1]
   earliest_date: "2025-01-01"
-  latest_date: "2026-07-27"
+  latest_date: "2026-08-01"
   timezone: Asia/Shanghai
   freshness: 5m
   secret_env: QS_HISTORICAL_CONTEXT_SECRET
