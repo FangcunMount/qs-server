@@ -315,6 +315,17 @@ func TestMySQLOutboxCleanupIdentityMatchesOutcomeCommittedEvent(t *testing.T) {
 	}
 }
 
+func TestMySQLOutboxCleanupUsesCollationIndependentIdentity(t *testing.T) {
+	for _, required := range []string{
+		"BINARY o.aggregate_id=BINARY CAST(x.assessment_id AS CHAR)",
+		"BINARY JSON_UNQUOTE(JSON_EXTRACT(o.payload_json,'$.data.outcome_id'))=BINARY CAST(x.outcome_id AS CHAR)",
+	} {
+		if !strings.Contains(mysqlOutcomeOutboxCandidateJoin, required) {
+			t.Fatalf("outbox candidate join is missing binary identity predicate %q: %s", required, mysqlOutcomeOutboxCandidateJoin)
+		}
+	}
+}
+
 func TestStatisticsFactSourcesUseCanonicalIndexedIdentity(t *testing.T) {
 	candidates := []orphanCandidate{
 		{AssessmentID: "505", OutcomeID: "503", ReportID: "501", GenerationID: "502"},

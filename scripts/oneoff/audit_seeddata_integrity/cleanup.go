@@ -56,6 +56,17 @@ const statisticsFactSourceJoin = `f FORCE INDEX (idx_statistics_assessment_fact_
 JOIN tmp_seed_orphan_fact_source x
  ON f.source_type=x.source_type AND f.source_ref=x.source_ref AND f.fact_type=x.fact_type`
 
+// mysqlOutcomeOutboxCandidateJoin deliberately uses binary string comparison.
+// domain_event_outbox and the connection-scoped temporary table may inherit
+// different utf8mb4 collations on installations upgraded across MySQL versions.
+// These values are decimal identifiers, so byte-for-byte comparison is the
+// intended identity rule and is independent of either table's collation.
+const mysqlOutcomeOutboxCandidateJoin = `JOIN tmp_seed_orphan_candidate x
+ ON o.aggregate_type='Evaluation'
+ AND BINARY o.aggregate_id=BINARY CAST(x.assessment_id AS CHAR)
+WHERE o.event_type='evaluation.outcome.committed'
+ AND BINARY JSON_UNQUOTE(JSON_EXTRACT(o.payload_json,'$.data.outcome_id'))=BINARY CAST(x.outcome_id AS CHAR)`
+
 type collectionCleanup struct {
 	Name   string
 	Filter bson.M
@@ -592,10 +603,7 @@ func backupMySQLOutbox(ctx context.Context, db *sql.DB, cfg config, candidates [
 		return 0, fmt.Errorf("create MySQL outbox backup table: %w", err)
 	}
 	result, err := conn.ExecContext(ctx, `INSERT INTO `+backupTable+`
-SELECT o.* FROM domain_event_outbox o FORCE INDEX (idx_outbox_aggregate_event_latest) JOIN tmp_seed_orphan_candidate x
- ON o.aggregate_type='Evaluation' AND o.aggregate_id=CAST(x.assessment_id AS CHAR)
-WHERE o.event_type='evaluation.outcome.committed'
-  AND JSON_UNQUOTE(JSON_EXTRACT(o.payload_json,'$.data.outcome_id'))=CAST(x.outcome_id AS CHAR)`)
+SELECT o.* FROM domain_event_outbox o FORCE INDEX (idx_outbox_aggregate_event_latest) `+mysqlOutcomeOutboxCandidateJoin)
 	if err != nil {
 		return 0, fmt.Errorf("backup MySQL outcome outbox: %w", err)
 	}
@@ -613,10 +621,7 @@ func deleteMySQLOutbox(ctx context.Context, db *sql.DB, cfg config, candidates [
 	}
 	backupTable := mysqlOutboxBackupTable(cfg.BackupSuffix)
 	countQuery := func(table string) string {
-		return `SELECT COUNT(*) FROM ` + table + ` o FORCE INDEX (idx_outbox_aggregate_event_latest) JOIN tmp_seed_orphan_candidate x
- ON o.aggregate_type='Evaluation' AND o.aggregate_id=CAST(x.assessment_id AS CHAR)
-WHERE o.event_type='evaluation.outcome.committed'
-  AND JSON_UNQUOTE(JSON_EXTRACT(o.payload_json,'$.data.outcome_id'))=CAST(x.outcome_id AS CHAR)`
+		return `SELECT COUNT(*) FROM ` + table + ` o FORCE INDEX (idx_outbox_aggregate_event_latest) ` + mysqlOutcomeOutboxCandidateJoin
 	}
 	var backedUp, source int64
 	if err := conn.QueryRowContext(ctx, countQuery(backupTable)).Scan(&backedUp); err != nil {
@@ -628,10 +633,7 @@ WHERE o.event_type='evaluation.outcome.committed'
 	if backedUp != source {
 		return 0, fmt.Errorf("MySQL outbox backup does not exactly match source: backed_up=%d source=%d", backedUp, source)
 	}
-	result, err := conn.ExecContext(ctx, `DELETE o FROM domain_event_outbox o FORCE INDEX (idx_outbox_aggregate_event_latest) JOIN tmp_seed_orphan_candidate x
- ON o.aggregate_type='Evaluation' AND o.aggregate_id=CAST(x.assessment_id AS CHAR)
-WHERE o.event_type='evaluation.outcome.committed'
-  AND JSON_UNQUOTE(JSON_EXTRACT(o.payload_json,'$.data.outcome_id'))=CAST(x.outcome_id AS CHAR)`)
+	result, err := conn.ExecContext(ctx, `DELETE o FROM domain_event_outbox o FORCE INDEX (idx_outbox_aggregate_event_latest) `+mysqlOutcomeOutboxCandidateJoin)
 	if err != nil {
 		return 0, fmt.Errorf("delete MySQL outcome outbox: %w", err)
 	}
