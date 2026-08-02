@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -40,19 +41,25 @@ type resumeCacheRequest struct {
 }
 
 type options struct {
-	BaseURL        string
-	Token          string
-	OrgIDs         []int64
-	From           time.Time
-	To             time.Time
-	ResumeFrom     time.Time
-	WindowDays     int
-	RequestTimeout time.Duration
-	Reason         string
-	Mode           string
-	Confirm        bool
-	ValidateOnly   bool
-	Now            func() time.Time
+	BaseURL         string
+	Token           string
+	OrgIDs          []int64
+	From            time.Time
+	To              time.Time
+	ResumeFrom      time.Time
+	WindowDays      int
+	RequestTimeout  time.Duration
+	Reason          string
+	Mode            string
+	Confirm         bool
+	ValidateOnly    bool
+	Now             func() time.Time
+	IAMLoginURL     string
+	IAMUsername     string
+	IAMPasswordFile string
+	IAMTenantID     uint64
+	IAMRefreshSkew  time.Duration
+	TokenSource     bearerTokenSource
 }
 
 const historicalBackfillMode = "historical-backfill"
@@ -88,10 +95,15 @@ func main() {
 func run(args []string, output io.Writer) error {
 	flags := flag.NewFlagSet("rebuild_statistics", flag.ContinueOnError)
 	flags.SetOutput(output)
-	var rawOrgIDs, from, to, resumeFrom string
+	var rawOrgIDs, from, to, resumeFrom, rawIAMTenantID, rawIAMRefreshSkew string
 	var cfg options
 	flags.StringVar(&cfg.BaseURL, "base-url", "", "apiserver base URL")
 	flags.StringVar(&cfg.Token, "token", os.Getenv("QS_STATISTICS_TOKEN"), "bearer token (or QS_STATISTICS_TOKEN)")
+	flags.StringVar(&cfg.IAMLoginURL, "iam-login-url", os.Getenv("QS_STATISTICS_IAM_LOGIN_URL"), "IAM login URL for automatic token refresh")
+	flags.StringVar(&cfg.IAMUsername, "iam-username", os.Getenv("QS_STATISTICS_IAM_USERNAME"), "IAM username for automatic token refresh")
+	flags.StringVar(&cfg.IAMPasswordFile, "iam-password-file", os.Getenv("QS_STATISTICS_IAM_PASSWORD_FILE"), "0600 plain-text IAM password file")
+	flags.StringVar(&rawIAMTenantID, "iam-tenant-id", os.Getenv("QS_STATISTICS_IAM_TENANT_ID"), "optional numeric IAM tenant ID (or QS_STATISTICS_IAM_TENANT_ID)")
+	flags.StringVar(&rawIAMRefreshSkew, "iam-refresh-skew", envOrDefault("QS_STATISTICS_IAM_REFRESH_SKEW", defaultTokenRefreshSkew.String()), "refresh IAM token this long before expiry (or QS_STATISTICS_IAM_REFRESH_SKEW)")
 	flags.StringVar(&rawOrgIDs, "org-ids", "", "comma-separated organization IDs")
 	flags.StringVar(&from, "from", "", "first Shanghai business date, inclusive")
 	flags.StringVar(&to, "to", "", "last Shanghai business date, inclusive")
@@ -106,6 +118,14 @@ func run(args []string, output io.Writer) error {
 		return err
 	}
 	var err error
+	cfg.IAMTenantID, err = parseOptionalUint64("iam-tenant-id", rawIAMTenantID)
+	if err != nil {
+		return err
+	}
+	cfg.IAMRefreshSkew, err = time.ParseDuration(strings.TrimSpace(rawIAMRefreshSkew))
+	if err != nil {
+		return fmt.Errorf("iam-refresh-skew: %w", err)
+	}
 	cfg.OrgIDs, err = parseOrgIDs(rawOrgIDs)
 	if err != nil {
 		return err
@@ -126,6 +146,15 @@ func run(args []string, output io.Writer) error {
 	}
 	if err := cfg.validate(); err != nil {
 		return err
+	}
+	cfg.TokenSource, err = newBearerTokenSource(cfg, output)
+	if err != nil {
+		return err
+	}
+	if cfg.TokenSource != nil {
+		if _, err := cfg.TokenSource.Token(context.Background()); err != nil {
+			return fmt.Errorf("initialize Statistics bearer token: %w", err)
+		}
 	}
 
 	client := &http.Client{Timeout: cfg.RequestTimeout}
@@ -161,8 +190,8 @@ func (o options) validate() error {
 	if strings.TrimSpace(o.BaseURL) == "" {
 		return errors.New("base-url is required")
 	}
-	if strings.TrimSpace(o.Token) == "" {
-		return errors.New("token is required")
+	if err := o.validateAuthentication(); err != nil {
+		return err
 	}
 	if len(o.OrgIDs) == 0 {
 		return errors.New("at least one org-id is required")
@@ -199,6 +228,32 @@ func (o options) validate() error {
 	}
 	if len([]rune(o.Reason)) > 500 {
 		return errors.New("reason exceeds 500 characters")
+	}
+	return nil
+}
+
+func (o options) iamConfigured() bool {
+	return strings.TrimSpace(o.IAMLoginURL) != "" && strings.TrimSpace(o.IAMUsername) != "" && strings.TrimSpace(o.IAMPasswordFile) != ""
+}
+
+func (o options) validateAuthentication() error {
+	loginURL := strings.TrimSpace(o.IAMLoginURL)
+	username := strings.TrimSpace(o.IAMUsername)
+	passwordFile := strings.TrimSpace(o.IAMPasswordFile)
+	configuredFields := 0
+	for _, value := range []string{loginURL, username, passwordFile} {
+		if value != "" {
+			configuredFields++
+		}
+	}
+	if configuredFields != 0 && configuredFields != 3 {
+		return errors.New("iam-login-url, iam-username and iam-password-file must be configured together")
+	}
+	if configuredFields == 3 && o.IAMRefreshSkew <= 0 {
+		return errors.New("iam-refresh-skew must be positive")
+	}
+	if strings.TrimSpace(o.Token) == "" && configuredFields != 3 {
+		return errors.New("token or complete IAM automatic refresh configuration is required")
 	}
 	return nil
 }
@@ -357,26 +412,40 @@ func executeResumeCache(client *http.Client, cfg options, orgID int64, runID uin
 }
 
 func executeRunRequest(client *http.Client, cfg options, orgID int64, url string, body []byte) (runResult, error) {
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
-	if err != nil {
-		return runResult{}, err
-	}
-	req.Header.Set("Authorization", "Bearer "+cfg.Token)
-	req.Header.Set("Content-Type", "application/json")
-	// Organization is supplied through the protected request scope, never in
-	// the JSON body. This header is the existing internal caller scope carrier.
-	req.Header.Set("X-Org-ID", strconv.FormatInt(orgID, 10))
-	resp, err := client.Do(req)
-	if err != nil {
-		return runResult{}, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	responseBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	if readErr != nil {
-		return runResult{}, readErr
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return runResult{}, fmt.Errorf("server returned %s: %s", resp.Status, strings.TrimSpace(string(responseBody)))
+	var responseBody []byte
+	for attempt := 0; attempt < 2; attempt++ {
+		token, err := cfg.bearerToken(context.Background())
+		if err != nil {
+			return runResult{}, err
+		}
+		req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+		if err != nil {
+			return runResult{}, err
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		// Organization is supplied through the protected request scope, never in
+		// the JSON body. This header is the existing internal caller scope carrier.
+		req.Header.Set("X-Org-ID", strconv.FormatInt(orgID, 10))
+		resp, err := client.Do(req)
+		if err != nil {
+			return runResult{}, err
+		}
+		responseBody, err = io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		_ = resp.Body.Close()
+		if err != nil {
+			return runResult{}, err
+		}
+		if resp.StatusCode == http.StatusUnauthorized && attempt == 0 && cfg.TokenSource != nil && cfg.TokenSource.Refreshable() {
+			if _, err := cfg.TokenSource.Refresh(context.Background(), token); err != nil {
+				return runResult{}, fmt.Errorf("refresh Statistics bearer token after 401: %w", err)
+			}
+			continue
+		}
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return runResult{}, fmt.Errorf("server returned %s: %s", resp.Status, strings.TrimSpace(string(responseBody)))
+		}
+		break
 	}
 	var envelope runResponse
 	if err := json.Unmarshal(responseBody, &envelope); err != nil {
@@ -395,6 +464,41 @@ func executeRunRequest(client *http.Client, cfg options, orgID int64, url string
 		return envelope.Data, fmt.Errorf("run %d ended status=%s stage=%s code=%s: %s", envelope.Data.ID, envelope.Data.Status, envelope.Data.Stage, envelope.Data.ErrorCode, envelope.Data.ErrorMessage)
 	}
 	return envelope.Data, nil
+}
+
+func parseOptionalUint64(name, value string) (uint64, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, nil
+	}
+	parsed, err := strconv.ParseUint(value, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be an unsigned integer: %w", name, err)
+	}
+	return parsed, nil
+}
+
+func envOrDefault(name, fallback string) string {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value != "" {
+		return value
+	}
+	return fallback
+}
+
+func (o options) bearerToken(ctx context.Context) (string, error) {
+	if o.TokenSource != nil {
+		token, err := o.TokenSource.Token(ctx)
+		if err != nil {
+			return "", fmt.Errorf("resolve Statistics bearer token: %w", err)
+		}
+		return token, nil
+	}
+	token := strings.TrimSpace(o.Token)
+	if token == "" {
+		return "", errors.New("statistics bearer token is empty")
+	}
+	return token, nil
 }
 
 func splitWindows(from, to time.Time, days int) []dateWindow {

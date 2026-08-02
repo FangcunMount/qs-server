@@ -62,6 +62,63 @@ QS_STATISTICS_TOKEN='***' go run ./scripts/oneoff/rebuild_statistics \
   --confirm
 ```
 
+## 长时间运行时自动刷新 IAM Token
+
+只设置 `QS_STATISTICS_TOKEN` 的静态模式保持兼容，适合能够在 Token 到期前结束的短任务。
+跨数小时的历史重建应改用 IAM 密码登录模式。密码不能放在命令行、环境变量或仓库配置中，
+先在 ServerA 创建仅当前执行用户可读的普通文件：
+
+```bash
+sudo install -m 0600 -o root -g root /dev/null \
+  /secure/path/qs-statistics-iam-password
+sudoedit /secure/path/qs-statistics-iam-password
+```
+
+文件内容只写 IAM 密码本身。工具拒绝符号链接、目录以及授予 group/other 权限的文件。
+然后配置 IAM 登录参数：
+
+```bash
+export QS_STATISTICS_IAM_LOGIN_URL='https://iam.fangcunmount.cn/api/v2/authn/login'
+export QS_STATISTICS_IAM_USERNAME='system@fangcunmount.com'
+export QS_STATISTICS_IAM_PASSWORD_FILE='/secure/path/qs-statistics-iam-password'
+
+# system 账号通常不需要显式 tenant_id；需要时只能设置数字 ID。
+unset QS_STATISTICS_IAM_TENANT_ID
+
+# 可选；默认在 JWT 到期前 2 分钟刷新。
+export QS_STATISTICS_IAM_REFRESH_SKEW='2m'
+```
+
+此时可以不再设置静态 Token：
+
+```bash
+unset QS_STATISTICS_TOKEN
+
+go run ./scripts/oneoff/rebuild_statistics \
+  --base-url http://127.0.0.1:8081 \
+  --org-ids 1 \
+  --from 2025-01-01 \
+  --to 2026-08-01 \
+  --resume-from 2025-01-01 \
+  --window-days 7 \
+  --timeout 10m \
+  --reason hist-20250101-20260801-v2 \
+  --mode historical-backfill \
+  --confirm
+```
+
+工具启动时通过 IAM 获取 Token，每次请求前检查 JWT `exp`，在到期窗口内自动重新登录；
+如果 apiserver 返回一次 401，还会强制重新登录并原请求重试一次。403 表示权限/机构作用域问题，
+不会通过刷新掩盖。每次登录都会重新读取密码文件，因此密码轮换后不必把密码暴露给进程环境。
+日志只打印安全的刷新原因和过期时间，不打印 Token、用户名或密码。
+
+也可以同时保留 `QS_STATISTICS_TOKEN` 和上述 IAM 参数：有效期足够的现有 Token 会先使用，
+接近到期或收到 401 后才通过 IAM 刷新。CLI 对应参数为 `--iam-login-url`、`--iam-username`、
+`--iam-password-file`、`--iam-tenant-id` 和 `--iam-refresh-skew`，显式 CLI 参数优先于环境变量。
+
+已经启动的旧版本进程不会动态获得自动刷新能力。它若因 401 停止，使用错误中给出的
+`--resume-from` 日期和相同 `reason` 在新版本上继续；此前成功的窗口不需要重做。
+
 任何一步失败都会停止，错误会给出可恢复的窗口起始日。修复原因后保留原始 `--from/--to`，
 增加错误中给出的日期即可跳过此前成功窗口：
 
@@ -95,7 +152,8 @@ go run ./scripts/oneoff/rebuild_statistics \
 - 工具只补齐/校验 Fact，并原子替换窗口 Daily；不会删除“来源已经不存在”的孤岛 Fact。
   执行前必须完成业务源和三类 `statistics_*_fact` 的孤岛审计与清理。
 - 不要与 nightly publish 或另一个人工 Statistics Run 并发执行。
-- Token 只通过 `QS_STATISTICS_TOKEN` 环境变量注入，不写入脚本、命令历史或文档。
+- 短任务的静态 Token 只通过 `QS_STATISTICS_TOKEN` 注入；长任务使用上述权限为 `0600` 的
+  IAM 密码文件。两种密钥都不得写入脚本、命令历史、日志或仓库文档。
 
 执行前检查未完成 Run：
 
