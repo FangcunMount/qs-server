@@ -48,8 +48,8 @@ jobs:
           flags: unittests
           name: codecov-umbrella
 
-  historical-backfill-e2e:
-    name: Historical Backfill Cross-Store E2E
+  runtime-closure-e2e:
+    name: Seeddata Retirement and Current Runtime E2E
     runs-on: ubuntu-latest
     services:
       mysql:
@@ -86,47 +86,57 @@ jobs:
       - name: Start Mongo Replica Set
         run: |
           docker run --detach --rm \
-            --name qs-historical-e2e-mongo \
+            --name qs-runtime-closure-e2e-mongo \
             --publish 27017:27017 \
             mongo:7.0 --replSet rs0 --bind_ip_all
           for attempt in $(seq 1 30); do
-            if docker exec qs-historical-e2e-mongo mongosh --quiet --eval 'db.adminCommand({ping: 1})' >/dev/null 2>&1; then
+            if docker exec qs-runtime-closure-e2e-mongo mongosh --quiet --eval 'db.adminCommand({ping: 1})' >/dev/null 2>&1; then
               break
             fi
             if [ "$attempt" -eq 30 ]; then
-              docker logs qs-historical-e2e-mongo
+              docker logs qs-runtime-closure-e2e-mongo
               exit 1
             fi
             sleep 2
           done
-          docker exec qs-historical-e2e-mongo mongosh --quiet --eval \
+          docker exec qs-runtime-closure-e2e-mongo mongosh --quiet --eval \
             'rs.initiate({_id: "rs0", members: [{_id: 0, host: "127.0.0.1:27017"}]})'
           for attempt in $(seq 1 30); do
-            if docker exec qs-historical-e2e-mongo mongosh --quiet --eval \
+            if docker exec qs-runtime-closure-e2e-mongo mongosh --quiet --eval \
               'quit(db.hello().isWritablePrimary ? 0 : 1)' >/dev/null 2>&1; then
               exit 0
             fi
             if [ "$attempt" -eq 30 ]; then
-              docker logs qs-historical-e2e-mongo
+              docker logs qs-runtime-closure-e2e-mongo
               exit 1
             fi
             sleep 2
           done
 
-      - name: Run historical backfill production-closure E2E
+      - name: Run seeddata retirement migration integration tests
         env:
           MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true&loc=Asia%2FShanghai
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
-          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_historical_backfill_test
+          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_retire_seeddata_test
+        run: |
+          go test -tags=integration \
+            -run '^TestRetire' \
+            -count=1 -timeout=15m -v ./internal/pkg/migration
+
+      - name: Run current runtime closure E2E
+        env:
+          MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true&loc=Asia%2FShanghai
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_runtime_closure_test
           QS_SERVER_TEST_REDIS_URL: redis://127.0.0.1:6379/15
         run: |
           go test -tags=integration \
-            -run '^TestHistoricalBackfillProductionClosure$' \
-            -count=1 -timeout=10m -v ./internal/apiserver/integration/historicalbackfill
+            -run '^TestCurrentRuntimeClosure$' \
+            -count=1 -timeout=15m -v ./internal/apiserver/integration/runtimeclosure
 
       - name: Stop Mongo Replica Set
         if: always()
-        run: docker stop qs-historical-e2e-mongo || true
+        run: docker stop qs-runtime-closure-e2e-mongo || true
 
   lint:
     name: Lint Code
@@ -199,7 +209,7 @@ jobs:
       - name: Validate deployment shell scripts
         run: bash -n scripts/cd/*.sh
 
-      - name: Validate historical secret deployment contract
+      - name: Validate deployment package contract
         run: bash scripts/cd/test-prepare-package.sh
 
       - name: Validate production Compose
@@ -340,7 +350,7 @@ jobs:
 
   build:
     name: Build Applications
-    needs: [test, historical-backfill-e2e, lint, lint-boundaries, deployment-contracts, tier1-test-policy]
+    needs: [test, runtime-closure-e2e, lint, lint-boundaries, deployment-contracts, tier1-test-policy]
     runs-on: ubuntu-latest
     strategy:
       matrix:

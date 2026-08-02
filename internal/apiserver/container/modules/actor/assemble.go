@@ -20,7 +20,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	actorInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
-	historicalstageinfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/historicalseedstage"
 	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -191,7 +190,7 @@ func New(deps Deps) (*Module, error) {
 		actorReadModel,
 		authzSnapshotReader,
 	)
-	module.AssessmentEntryService = assessmentEntryApp.WithHistoricalStageRecorder(assessmentEntryApp.NewService(
+	module.AssessmentEntryService = assessmentEntryApp.NewService(
 		assessmentEntryRepo,
 		clinicianRepo,
 		relationRepo,
@@ -203,7 +202,7 @@ func New(deps Deps) (*Module, error) {
 		intakeLogWriter,
 		txRunner,
 		actorReadModel,
-	), historicalstageinfra.NewRepository(mysqlDB))
+	)
 
 	return module, nil
 }

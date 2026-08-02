@@ -15,7 +15,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
@@ -132,26 +131,18 @@ func TestExecutorCommitsReportRunGenerationAndEvents(t *testing.T) {
 	}
 }
 
-func TestExecutorSeparatesHistoricalReportTimeFromSystemLifecycle(t *testing.T) {
+func TestExecutorUsesSystemTimeForReportAndLifecycle(t *testing.T) {
 	builder := &executorBuilder{}
 	service, gens, runs, _, _, _ := newExecutorFixture(t, builder)
 	systemAt := time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC)
-	historicalAt := time.Date(2025, 1, 2, 10, 0, 8, 0, time.UTC)
 	service.now = func() time.Time { return systemAt }
 
-	ctx := historicalseed.WithContext(context.Background(), historicalseed.Context{
-		BatchID:    "hist-test",
-		ScenarioID: "2025-01-02/1/submit_answer/scale",
-		OrgID:      1,
-		Version:    historicalseed.Version1,
-		Timeline:   historicalseed.Timeline{ReportGeneratedAt: &historicalAt},
-	})
-	result, err := service.Execute(ctx, executorInput(), "historical")
+	result, err := service.Execute(context.Background(), executorInput(), "current-time")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := result.InterpretReport.GeneratedAt(); !got.Equal(historicalAt) {
-		t.Fatalf("report generated at = %s, want historical %s", got, historicalAt)
+	if got := result.InterpretReport.GeneratedAt(); !got.Equal(systemAt) {
+		t.Fatalf("report generated at = %s, want system %s", got, systemAt)
 	}
 	persistedGeneration, err := gens.FindByKey(context.Background(), result.Generation.Key())
 	if err != nil {

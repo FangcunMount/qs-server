@@ -10,7 +10,6 @@ import (
 
 	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
@@ -327,9 +326,6 @@ func createAssessmentFromAnswerSheet(ctx context.Context, deps *Dependencies, an
 		FillerId:             data.FillerID,
 		TaskId:               data.TaskID,
 		Admission:            assessmentAdmissionFromEvent(data.Admission),
-	}
-	if data.HistoricalContext != nil {
-		assessmentReq.HistoricalContext = historicalseed.ToProto(*data.HistoricalContext)
 	}
 	if data.TaskID == "" {
 		assessmentReq.OriginType = "adhoc"

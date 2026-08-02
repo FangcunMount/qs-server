@@ -37,7 +37,6 @@ type Options struct {
 	Runtime                 *RuntimeOptions                         `json:"runtime" mapstructure:"runtime"`
 	Resilience              *ResilienceOptions                      `json:"resilience" mapstructure:"resilience"`
 	DelegatedSubject        *delegatedsubject.Options               `json:"delegated_subject" mapstructure:"delegated-subject"`
-	HistoricalSeed          *HistoricalSeedOptions                  `json:"historical_seed" mapstructure:"historical_seed"`
 }
 
 type ResilienceOptions struct {
@@ -303,10 +302,9 @@ func NewOptions() *Options {
 			SecretKey:     "your-secret-key-change-in-production",
 			TokenDuration: 24 * 7, // 7 天
 		},
-		IAMOptions:     genericoptions.NewIAMOptions(),
-		Runtime:        NewRuntimeOptions(),
-		Resilience:     &ResilienceOptions{Control: &ResilienceControlOptions{Enabled: true}},
-		HistoricalSeed: NewHistoricalSeedOptions(),
+		IAMOptions: genericoptions.NewIAMOptions(),
+		Runtime:    NewRuntimeOptions(),
+		Resilience: &ResilienceOptions{Control: &ResilienceControlOptions{Enabled: true}},
 	}
 }
 
@@ -434,8 +432,6 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.Runtime.AddFlags(fss.FlagSet("runtime"))
 	o.JWT.AddFlags(fss.FlagSet("jwt"))
 	o.Resilience.Control.AddFlags(fss.FlagSet("resilience.control"))
-	o.HistoricalSeed.AddFlags(fss.FlagSet("historical_seed"))
-
 	return fss
 }
 
@@ -584,12 +580,6 @@ func (o *Options) Validate() []error {
 	if err := o.DelegatedSubject.Validate(); err != nil {
 		errs = append(errs, err)
 	}
-	if o.HistoricalSeed == nil {
-		errs = append(errs, fmt.Errorf("historical_seed cannot be nil"))
-	} else {
-		errs = append(errs, o.HistoricalSeed.Validate()...)
-	}
-
 	return errs
 }
 

@@ -9,17 +9,15 @@ import (
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	stageport "github.com/FangcunMount/qs-server/internal/apiserver/port/historicalseedstage"
 )
 
 // assessmentCreateFinalizer 测评创建最终化器
 type assessmentCreateFinalizer struct {
-	repo          domainAssessment.Repository
-	txRunner      apptransaction.Runner
-	eventStager   EventStager
-	cache         assessmentListCache
-	postCommit    appEventing.PostCommitDispatcher
-	stageRecorder stageport.Recorder
+	repo        domainAssessment.Repository
+	txRunner    apptransaction.Runner
+	eventStager EventStager
+	cache       assessmentListCache
+	postCommit  appEventing.PostCommitDispatcher
 }
 
 // SaveAndStage 保存并阶段测评
@@ -29,13 +27,7 @@ func (f assessmentCreateFinalizer) SaveAndStage(
 	req assessmentCreateSpec,
 	dto CreateCommand,
 ) error {
-	// A new Assessment receives its ID inside repo.Save. Leave ResourceID empty
-	// so the transactional finalizer fills the assigned ID before completing the
-	// historical stage instead of persisting the zero-value string "0".
-	completion := stageport.Completion{Stage: stageport.StageAssessmentCreated, BusinessAt: a.CreatedAt(), ResourceType: "assessment", Payload: struct {
-		AnswerSheetID string `json:"answersheet_id"`
-	}{AnswerSheetID: a.AnswerSheetRef().ID().String()}}
-	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, f.postCommit, f.stageRecorder, completion); err != nil {
+	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, f.postCommit); err != nil {
 		return evalerrors.Database(err, "保存测评失败")
 	}
 	return nil
@@ -48,12 +40,11 @@ func (f assessmentCreateFinalizer) InvalidateCache(ctx context.Context, testeeID
 
 // assessmentSubmitFinalizer 测评提交最终化器
 type assessmentSubmitFinalizer struct {
-	repo          domainAssessment.Repository
-	txRunner      apptransaction.Runner
-	eventStager   EventStager
-	cache         assessmentListCache
-	postCommit    appEventing.PostCommitDispatcher
-	stageRecorder stageport.Recorder
+	repo        domainAssessment.Repository
+	txRunner    apptransaction.Runner
+	eventStager EventStager
+	cache       assessmentListCache
+	postCommit  appEventing.PostCommitDispatcher
 }
 
 // SaveAndStage 保存并阶段测评
@@ -62,10 +53,7 @@ func (f assessmentSubmitFinalizer) SaveAndStage(ctx context.Context, a *domainAs
 	if submittedAt == nil {
 		return evalerrors.AssessmentSubmitFailed(domainAssessment.ErrInvalidArgument, "测评提交时间为空")
 	}
-	completion := stageport.Completion{Stage: stageport.StageAssessmentSubmitted, BusinessAt: *submittedAt, ResourceType: "assessment", ResourceID: a.ID().String(), Payload: struct {
-		AssessmentID string `json:"assessment_id"`
-	}{AssessmentID: a.ID().String()}}
-	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, f.postCommit, f.stageRecorder, completion); err != nil {
+	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, f.postCommit); err != nil {
 		return evalerrors.Database(err, "保存测评失败")
 	}
 	return nil

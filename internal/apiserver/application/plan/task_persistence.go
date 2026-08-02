@@ -6,7 +6,6 @@ import (
 
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainplan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
-	stageport "github.com/FangcunMount/qs-server/internal/apiserver/port/historicalseedstage"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 )
 
@@ -17,13 +16,6 @@ type taskPersistence struct {
 	tasks       domainplan.AssessmentTaskRepository
 	enrollments domainplan.EnrollmentRepository
 	tx          apptransaction.Runner
-	recorder    stageport.Recorder
-}
-
-type historicalTaskStagePayload struct {
-	TaskID       string `json:"task_id"`
-	EnrollmentID string `json:"enrollment_id"`
-	AssessmentID string `json:"assessment_id,omitempty"`
 }
 
 func (p taskPersistence) save(ctx context.Context, task *domainplan.AssessmentTask, checkEnrollment bool) error {
@@ -32,7 +24,7 @@ func (p taskPersistence) save(ctx context.Context, task *domainplan.AssessmentTa
 			return err
 		}
 		if !checkEnrollment || p.enrollments == nil || task.GetEnrollmentID().IsZero() {
-			return p.recordHistorical(ctx, txCtx, task)
+			return nil
 		}
 		closedAt := time.Now()
 		if completedAt := task.GetCompletedAt(); completedAt != nil {
@@ -41,7 +33,7 @@ func (p taskPersistence) save(ctx context.Context, task *domainplan.AssessmentTa
 		if _, err := p.enrollments.CloseIfAllTasksTerminal(txCtx, task.GetEnrollmentID(), closedAt); err != nil {
 			return err
 		}
-		return p.recordHistorical(ctx, txCtx, task)
+		return nil
 	}
 	return p.withinTransaction(ctx, write)
 }
@@ -51,28 +43,4 @@ func (p taskPersistence) withinTransaction(ctx context.Context, write func(conte
 		return write(ctx)
 	}
 	return p.tx.WithinTransaction(ctx, write)
-}
-
-func (p taskPersistence) recordHistorical(_ context.Context, txCtx context.Context, task *domainplan.AssessmentTask) error {
-	if p.recorder == nil || task == nil {
-		return nil
-	}
-	stage := ""
-	businessAt := time.Time{}
-	if completedAt := task.GetCompletedAt(); completedAt != nil {
-		stage, businessAt = stageport.StageTaskComplete, *completedAt
-	} else if openedAt := task.GetOpenAt(); openedAt != nil {
-		stage, businessAt = stageport.StageTaskOpen, *openedAt
-	}
-	if stage == "" {
-		return nil
-	}
-	assessmentID := ""
-	if value := task.GetAssessmentID(); value != nil {
-		assessmentID = value.String()
-	}
-	_, err := stageport.CompleteStage(txCtx, p.recorder, stageport.Completion{Stage: stage, BusinessAt: businessAt, ResourceType: "plan_task", ResourceID: task.GetID().String(), Payload: historicalTaskStagePayload{
-		TaskID: task.GetID().String(), EnrollmentID: task.GetEnrollmentID().String(), AssessmentID: assessmentID,
-	}})
-	return err
 }

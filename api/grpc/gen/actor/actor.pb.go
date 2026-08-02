@@ -7,7 +7,6 @@
 package actor
 
 import (
-	common "github.com/FangcunMount/qs-server/api/grpc/gen/common"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -33,12 +32,11 @@ type CreateTesteeRequest struct {
 	Gender       int32                  `protobuf:"varint,5,opt,name=gender,proto3" json:"gender,omitempty"`                                   // 性别：1-男，2-女，3-其他
 	Birthday     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=birthday,proto3" json:"birthday,omitempty"`                                // 出生日期
 	// Deprecated: Marked as deprecated in actor/actor.proto.
-	Tags              []string                           `protobuf:"bytes,7,rep,name=tags,proto3" json:"tags,omitempty"`                                                     // Deprecated: 受试者 tags 暂不作为产品能力使用
-	Source            string                             `protobuf:"bytes,8,opt,name=source,proto3" json:"source,omitempty"`                                                 // 来源：online_form/plan/imported
-	IsKeyFocus        bool                               `protobuf:"varint,9,opt,name=is_key_focus,json=isKeyFocus,proto3" json:"is_key_focus,omitempty"`                    // 是否重点关注
-	HistoricalContext *common.HistoricalExecutionContext `protobuf:"bytes,10,opt,name=historical_context,json=historicalContext,proto3" json:"historical_context,omitempty"` // 可选历史业务时间上下文
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	Tags          []string `protobuf:"bytes,7,rep,name=tags,proto3" json:"tags,omitempty"`                                  // Deprecated: 受试者 tags 暂不作为产品能力使用
+	Source        string   `protobuf:"bytes,8,opt,name=source,proto3" json:"source,omitempty"`                              // 来源：online_form/plan/imported
+	IsKeyFocus    bool     `protobuf:"varint,9,opt,name=is_key_focus,json=isKeyFocus,proto3" json:"is_key_focus,omitempty"` // 是否重点关注
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateTesteeRequest) Reset() {
@@ -133,13 +131,6 @@ func (x *CreateTesteeRequest) GetIsKeyFocus() bool {
 		return x.IsKeyFocus
 	}
 	return false
-}
-
-func (x *CreateTesteeRequest) GetHistoricalContext() *common.HistoricalExecutionContext {
-	if x != nil {
-		return x.HistoricalContext
-	}
-	return nil
 }
 
 // GetTesteeRequest 获取受试者请求
@@ -885,7 +876,7 @@ var File_actor_actor_proto protoreflect.FileDescriptor
 
 const file_actor_actor_proto_rawDesc = "" +
 	"\n" +
-	"\x11actor/actor.proto\x12\x05actor\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17common/historical.proto\"\xfb\x02\n" +
+	"\x11actor/actor.proto\x12\x05actor\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc2\x02\n" +
 	"\x13CreateTesteeRequest\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\x04R\x05orgId\x12\x1e\n" +
 	"\viam_user_id\x18\x02 \x01(\x04R\tiamUserId\x12$\n" +
@@ -896,9 +887,8 @@ const file_actor_actor_proto_rawDesc = "" +
 	"\x04tags\x18\a \x03(\tB\x02\x18\x01R\x04tags\x12\x16\n" +
 	"\x06source\x18\b \x01(\tR\x06source\x12 \n" +
 	"\fis_key_focus\x18\t \x01(\bR\n" +
-	"isKeyFocus\x12Q\n" +
-	"\x12historical_context\x18\n" +
-	" \x01(\v2\".common.HistoricalExecutionContextR\x11historicalContext\"\"\n" +
+	"isKeyFocusJ\x04\b\n" +
+	"\x10\vR\x12historical_context\"\"\n" +
 	"\x10GetTesteeRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\"\xc3\x01\n" +
 	"\x13UpdateTesteeRequest\x12\x0e\n" +
@@ -981,50 +971,48 @@ func file_actor_actor_proto_rawDescGZIP() []byte {
 
 var file_actor_actor_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_actor_actor_proto_goTypes = []any{
-	(*CreateTesteeRequest)(nil),               // 0: actor.CreateTesteeRequest
-	(*GetTesteeRequest)(nil),                  // 1: actor.GetTesteeRequest
-	(*UpdateTesteeRequest)(nil),               // 2: actor.UpdateTesteeRequest
-	(*TesteeExistsRequest)(nil),               // 3: actor.TesteeExistsRequest
-	(*TesteeExistsResponse)(nil),              // 4: actor.TesteeExistsResponse
-	(*ListTesteesByOrgRequest)(nil),           // 5: actor.ListTesteesByOrgRequest
-	(*ListTesteesByUserRequest)(nil),          // 6: actor.ListTesteesByUserRequest
-	(*TesteeResponse)(nil),                    // 7: actor.TesteeResponse
-	(*AssessmentStats)(nil),                   // 8: actor.AssessmentStats
-	(*TesteeListResponse)(nil),                // 9: actor.TesteeListResponse
-	(*GetTesteeCareContextRequest)(nil),       // 10: actor.GetTesteeCareContextRequest
-	(*TesteeCareContextResponse)(nil),         // 11: actor.TesteeCareContextResponse
-	(*timestamppb.Timestamp)(nil),             // 12: google.protobuf.Timestamp
-	(*common.HistoricalExecutionContext)(nil), // 13: common.HistoricalExecutionContext
+	(*CreateTesteeRequest)(nil),         // 0: actor.CreateTesteeRequest
+	(*GetTesteeRequest)(nil),            // 1: actor.GetTesteeRequest
+	(*UpdateTesteeRequest)(nil),         // 2: actor.UpdateTesteeRequest
+	(*TesteeExistsRequest)(nil),         // 3: actor.TesteeExistsRequest
+	(*TesteeExistsResponse)(nil),        // 4: actor.TesteeExistsResponse
+	(*ListTesteesByOrgRequest)(nil),     // 5: actor.ListTesteesByOrgRequest
+	(*ListTesteesByUserRequest)(nil),    // 6: actor.ListTesteesByUserRequest
+	(*TesteeResponse)(nil),              // 7: actor.TesteeResponse
+	(*AssessmentStats)(nil),             // 8: actor.AssessmentStats
+	(*TesteeListResponse)(nil),          // 9: actor.TesteeListResponse
+	(*GetTesteeCareContextRequest)(nil), // 10: actor.GetTesteeCareContextRequest
+	(*TesteeCareContextResponse)(nil),   // 11: actor.TesteeCareContextResponse
+	(*timestamppb.Timestamp)(nil),       // 12: google.protobuf.Timestamp
 }
 var file_actor_actor_proto_depIdxs = []int32{
 	12, // 0: actor.CreateTesteeRequest.birthday:type_name -> google.protobuf.Timestamp
-	13, // 1: actor.CreateTesteeRequest.historical_context:type_name -> common.HistoricalExecutionContext
-	12, // 2: actor.UpdateTesteeRequest.birthday:type_name -> google.protobuf.Timestamp
-	12, // 3: actor.TesteeResponse.birthday:type_name -> google.protobuf.Timestamp
-	8,  // 4: actor.TesteeResponse.assessment_stats:type_name -> actor.AssessmentStats
-	12, // 5: actor.TesteeResponse.created_at:type_name -> google.protobuf.Timestamp
-	12, // 6: actor.TesteeResponse.updated_at:type_name -> google.protobuf.Timestamp
-	12, // 7: actor.AssessmentStats.last_assessment_at:type_name -> google.protobuf.Timestamp
-	7,  // 8: actor.TesteeListResponse.items:type_name -> actor.TesteeResponse
-	0,  // 9: actor.ActorService.CreateTestee:input_type -> actor.CreateTesteeRequest
-	1,  // 10: actor.ActorService.GetTestee:input_type -> actor.GetTesteeRequest
-	2,  // 11: actor.ActorService.UpdateTestee:input_type -> actor.UpdateTesteeRequest
-	3,  // 12: actor.ActorService.TesteeExists:input_type -> actor.TesteeExistsRequest
-	5,  // 13: actor.ActorService.ListTesteesByOrg:input_type -> actor.ListTesteesByOrgRequest
-	6,  // 14: actor.ActorService.ListTesteesByUser:input_type -> actor.ListTesteesByUserRequest
-	10, // 15: actor.ActorService.GetTesteeCareContext:input_type -> actor.GetTesteeCareContextRequest
-	7,  // 16: actor.ActorService.CreateTestee:output_type -> actor.TesteeResponse
-	7,  // 17: actor.ActorService.GetTestee:output_type -> actor.TesteeResponse
-	7,  // 18: actor.ActorService.UpdateTestee:output_type -> actor.TesteeResponse
-	4,  // 19: actor.ActorService.TesteeExists:output_type -> actor.TesteeExistsResponse
-	9,  // 20: actor.ActorService.ListTesteesByOrg:output_type -> actor.TesteeListResponse
-	9,  // 21: actor.ActorService.ListTesteesByUser:output_type -> actor.TesteeListResponse
-	11, // 22: actor.ActorService.GetTesteeCareContext:output_type -> actor.TesteeCareContextResponse
-	16, // [16:23] is the sub-list for method output_type
-	9,  // [9:16] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	12, // 1: actor.UpdateTesteeRequest.birthday:type_name -> google.protobuf.Timestamp
+	12, // 2: actor.TesteeResponse.birthday:type_name -> google.protobuf.Timestamp
+	8,  // 3: actor.TesteeResponse.assessment_stats:type_name -> actor.AssessmentStats
+	12, // 4: actor.TesteeResponse.created_at:type_name -> google.protobuf.Timestamp
+	12, // 5: actor.TesteeResponse.updated_at:type_name -> google.protobuf.Timestamp
+	12, // 6: actor.AssessmentStats.last_assessment_at:type_name -> google.protobuf.Timestamp
+	7,  // 7: actor.TesteeListResponse.items:type_name -> actor.TesteeResponse
+	0,  // 8: actor.ActorService.CreateTestee:input_type -> actor.CreateTesteeRequest
+	1,  // 9: actor.ActorService.GetTestee:input_type -> actor.GetTesteeRequest
+	2,  // 10: actor.ActorService.UpdateTestee:input_type -> actor.UpdateTesteeRequest
+	3,  // 11: actor.ActorService.TesteeExists:input_type -> actor.TesteeExistsRequest
+	5,  // 12: actor.ActorService.ListTesteesByOrg:input_type -> actor.ListTesteesByOrgRequest
+	6,  // 13: actor.ActorService.ListTesteesByUser:input_type -> actor.ListTesteesByUserRequest
+	10, // 14: actor.ActorService.GetTesteeCareContext:input_type -> actor.GetTesteeCareContextRequest
+	7,  // 15: actor.ActorService.CreateTestee:output_type -> actor.TesteeResponse
+	7,  // 16: actor.ActorService.GetTestee:output_type -> actor.TesteeResponse
+	7,  // 17: actor.ActorService.UpdateTestee:output_type -> actor.TesteeResponse
+	4,  // 18: actor.ActorService.TesteeExists:output_type -> actor.TesteeExistsResponse
+	9,  // 19: actor.ActorService.ListTesteesByOrg:output_type -> actor.TesteeListResponse
+	9,  // 20: actor.ActorService.ListTesteesByUser:output_type -> actor.TesteeListResponse
+	11, // 21: actor.ActorService.GetTesteeCareContext:output_type -> actor.TesteeCareContextResponse
+	15, // [15:22] is the sub-list for method output_type
+	8,  // [8:15] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_actor_actor_proto_init() }

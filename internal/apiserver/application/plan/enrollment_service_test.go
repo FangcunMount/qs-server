@@ -8,7 +8,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/event"
 	testeeDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 )
 
 type enrollmentPlanRepoStub struct {
@@ -213,7 +212,7 @@ func TestEnrollmentServiceDoesNotPublishPlanEventOnEnroll(t *testing.T) {
 	}
 }
 
-func TestEnrollmentServiceUsesHistoricalJoinedAt(t *testing.T) {
+func TestEnrollmentServiceLeavesBusinessCreatedAtEmptyForNewTasks(t *testing.T) {
 	planAggregate, err := domainPlan.NewAssessmentPlan(9, "scale-code", domainPlan.PlanScheduleByDay, 1, 1)
 	if err != nil {
 		t.Fatal(err)
@@ -222,19 +221,16 @@ func TestEnrollmentServiceUsesHistoricalJoinedAt(t *testing.T) {
 	taskRepo := &enrollmentTaskRepoStub{}
 	enrollmentRepo := &enrollmentRepoStub{}
 	service := NewEnrollmentService(&enrollmentPlanRepoStub{plan: planAggregate}, taskRepo, enrollmentRepo, directPlanTxRunner{}, &enrollmentEventPublisherStub{})
-	joinedAt := time.Date(2025, 1, 1, 8, 8, 0, 0, time.UTC)
-	ctx := historicalseed.WithContext(context.Background(), historicalseed.Context{
-		OrgID: 9, Timeline: historicalseed.Timeline{EnrollmentJoinedAt: &joinedAt},
-	})
-	_, err = service.EnrollTestee(ctx, EnrollTesteeDTO{OrgID: 9, PlanID: planAggregate.GetID().String(), TesteeID: "3001", StartDate: "2025-01-01"})
+	startedAt := time.Now()
+	_, err = service.EnrollTestee(context.Background(), EnrollTesteeDTO{OrgID: 9, PlanID: planAggregate.GetID().String(), TesteeID: "3001", StartDate: "2025-01-01"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if enrollmentRepo.active == nil || !enrollmentRepo.active.JoinedAt().Equal(joinedAt) {
-		t.Fatalf("historical joined_at mismatch: %+v", enrollmentRepo.active)
+	if enrollmentRepo.active == nil || enrollmentRepo.active.JoinedAt().Before(startedAt) {
+		t.Fatalf("joined_at was not assigned from the current clock: %+v", enrollmentRepo.active)
 	}
-	if len(taskRepo.savedBatch) != 1 || taskRepo.savedBatch[0].GetBusinessCreatedAt() == nil || !taskRepo.savedBatch[0].GetBusinessCreatedAt().Equal(joinedAt) {
-		t.Fatalf("historical task business_created_at mismatch: %+v", taskRepo.savedBatch)
+	if len(taskRepo.savedBatch) != 1 || taskRepo.savedBatch[0].GetBusinessCreatedAt() != nil {
+		t.Fatalf("new task business_created_at must remain empty: %+v", taskRepo.savedBatch)
 	}
 }
 

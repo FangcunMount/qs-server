@@ -36,7 +36,7 @@ func TestTargetInterpretationQueryAndAuditDebtDoesNotReturn(t *testing.T) {
 		t.Fatal("preview outcome adapter must remain test-only")
 	}
 	checks := map[string][]string{
-		filepath.Join(root, "internal", "apiserver", "infra", "mongo", "interpretation", "artifact_read_model.go"): {"interpret_reports", "mergeCurrentAndArchivedReportRows", "listReportsFromStore", "listArchives("},
+		filepath.Join(root, "internal", "apiserver", "infra", "mongo", "interpretation", "artifact_read_model.go"): {"mergeCurrentAndArchivedReportRows", "listReportsFromStore", "listArchives("},
 		filepath.Join(root, "internal", "apiserver", "application", "interpretation", "operations", "service.go"):  {"Permissions []string", "PermissionAudit"},
 	}
 	for path, forbidden := range checks {
@@ -89,27 +89,6 @@ func TestTargetInterpretationApplicationHasNoActorNeutralFacades(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-	}
-}
-
-func TestTargetProductionDoesNotReferenceLegacyInterpretReports(t *testing.T) {
-	root := repoRoot(t)
-	productionRoot := filepath.Join(root, "internal")
-	err := filepath.WalkDir(productionRoot, func(path string, entry os.DirEntry, err error) error {
-		if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return err
-		}
-		data, readErr := os.ReadFile(path)
-		if readErr != nil {
-			return readErr
-		}
-		if strings.Contains(string(data), "interpret_reports") {
-			t.Fatalf("production legacy report collection reference remains in %s", path)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
 }
 

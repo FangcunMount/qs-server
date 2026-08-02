@@ -1,0 +1,6 @@
+[
+  { "drop": "published_assessment_models" },
+  { "drop": "interpret_reports" },
+  { "drop": "evaluation_rule_sets" },
+  { "drop": "scales" }
+]

@@ -12,9 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
 type ExecuteStatus string
@@ -139,24 +137,12 @@ func (e *executor) buildAndCommit(ctx context.Context, input interpinput.Interpr
 	}
 	executionmetrics.ObserveBuild(builderIdentity, executionmetrics.ResultSuccess, time.Since(buildStartedAt))
 
-	orgID, err := safeconv.Int64ToUint64(input.Association.OrgID)
-	if err != nil {
-		return nil, fmt.Errorf("interpretation org id: %w", err)
-	}
-	// Report.GeneratedAt is a business fact and may intentionally be historical.
-	// Generation/Run completion, leases, retries and post-commit dispatch remain
-	// on the system clock so their lifecycle never moves backwards during a
-	// backfill retry.
 	systemCompletedAt := e.now()
-	generatedAt, err := historicalseed.OccurredAt(ctx, orgID, historicalseed.StageReportGenerated, systemCompletedAt)
-	if err != nil {
-		return nil, fmt.Errorf("historical report generation time: %w", err)
-	}
 	artifact, err := domainreport.NewInterpretReport(domainreport.InterpretReportInput{
 		ID: e.newID(), GenerationID: generationRecord.ID(), OutcomeID: input.OutcomeID, InterpretationRunID: runRecord.ID(),
 		Association: input.Association, ReportType: input.Report.ReportType, TemplateVersion: input.Report.TemplateVersion,
 		BuilderIdentity: builder.BuilderIdentity(), ContentSchemaVersion: builder.ContentSchemaVersion(),
-		Content: draft.Content(), GeneratedAt: generatedAt,
+		Content: draft.Content(), GeneratedAt: systemCompletedAt,
 	})
 	if err != nil {
 		e.logBuildError(ctx, "artifact_validation", err, generationRecord, runRecord, builder)

@@ -608,12 +608,6 @@ func auditMongo(ctx context.Context, uri, database string) ([]finding, error) {
 		items = appendFinding(items, item)
 	}
 
-	rulesetCount, err := db.Collection("evaluation_rule_sets").CountDocuments(ctx, bson.M{})
-	if err != nil {
-		return nil, err
-	}
-	items = appendFinding(items, finding{Source: "evaluation_rule_sets", Rule: "collection.not_empty", Count: rulesetCount})
-
 	normRepo := mongomodelcatalog.NewNormRepository(db)
 	normItems, err := auditNorms(ctx, normRepo)
 	if err != nil {

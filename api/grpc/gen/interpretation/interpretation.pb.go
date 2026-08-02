@@ -7,7 +7,6 @@
 package interpretation
 
 import (
-	common "github.com/FangcunMount/qs-server/api/grpc/gen/common"
 	evaluation "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -860,11 +859,10 @@ func (x *GenerateReportFromAssessmentRequest) GetOutcomeId() string {
 }
 
 type GenerateReportFromOutcomeRequest struct {
-	state             protoimpl.MessageState             `protogen:"open.v1"`
-	OutcomeId         string                             `protobuf:"bytes,1,opt,name=outcome_id,json=outcomeId,proto3" json:"outcome_id,omitempty"`
-	HistoricalContext *common.HistoricalExecutionContext `protobuf:"bytes,2,opt,name=historical_context,json=historicalContext,proto3" json:"historical_context,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OutcomeId     string                 `protobuf:"bytes,1,opt,name=outcome_id,json=outcomeId,proto3" json:"outcome_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GenerateReportFromOutcomeRequest) Reset() {
@@ -902,13 +900,6 @@ func (x *GenerateReportFromOutcomeRequest) GetOutcomeId() string {
 		return x.OutcomeId
 	}
 	return ""
-}
-
-func (x *GenerateReportFromOutcomeRequest) GetHistoricalContext() *common.HistoricalExecutionContext {
-	if x != nil {
-		return x.HistoricalContext
-	}
-	return nil
 }
 
 type GenerateReportFromAssessmentResponse struct {
@@ -1087,7 +1078,7 @@ var File_interpretation_interpretation_proto protoreflect.FileDescriptor
 
 const file_interpretation_interpretation_proto_rawDesc = "" +
 	"\n" +
-	"#interpretation/interpretation.proto\x12\x0einterpretation\x1a\x1bevaluation/evaluation.proto\x1a\x17common/historical.proto\"c\n" +
+	"#interpretation/interpretation.proto\x12\x0einterpretation\x1a\x1bevaluation/evaluation.proto\"c\n" +
 	"\n" +
 	"Suggestion\x12\x1a\n" +
 	"\bcategory\x18\x01 \x01(\tR\bcategory\x12\x18\n" +
@@ -1179,11 +1170,10 @@ const file_interpretation_interpretation_proto_rawDesc = "" +
 	"#GenerateReportFromAssessmentRequest\x12#\n" +
 	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\x12\x1d\n" +
 	"\n" +
-	"outcome_id\x18\x02 \x01(\tR\toutcomeId\"\x94\x01\n" +
+	"outcome_id\x18\x02 \x01(\tR\toutcomeId\"[\n" +
 	" GenerateReportFromOutcomeRequest\x12\x1d\n" +
 	"\n" +
-	"outcome_id\x18\x01 \x01(\tR\toutcomeId\x12Q\n" +
-	"\x12historical_context\x18\x02 \x01(\v2\".common.HistoricalExecutionContextR\x11historicalContext\"\x9e\x05\n" +
+	"outcome_id\x18\x01 \x01(\tR\toutcomeIdJ\x04\b\x02\x10\x03R\x12historical_context\"\x9e\x05\n" +
 	"$GenerateReportFromAssessmentResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x18\n" +
@@ -1240,7 +1230,6 @@ var file_interpretation_interpretation_proto_goTypes = []any{
 	(*evaluation.ScoreValue)(nil),                // 13: evaluation.ScoreValue
 	(*evaluation.ResultLevel)(nil),               // 14: evaluation.ResultLevel
 	(*evaluation.ModelIdentity)(nil),             // 15: evaluation.ModelIdentity
-	(*common.HistoricalExecutionContext)(nil),    // 16: common.HistoricalExecutionContext
 }
 var file_interpretation_interpretation_proto_depIdxs = []int32{
 	13, // 0: interpretation.DimensionInterpret.derived_scores:type_name -> evaluation.ScoreValue
@@ -1255,20 +1244,19 @@ var file_interpretation_interpretation_proto_depIdxs = []int32{
 	14, // 9: interpretation.AssessmentReport.level:type_name -> evaluation.ResultLevel
 	5,  // 10: interpretation.GetAssessmentReportResponse.report:type_name -> interpretation.AssessmentReport
 	5,  // 11: interpretation.ListMyReportsResponse.items:type_name -> interpretation.AssessmentReport
-	16, // 12: interpretation.GenerateReportFromOutcomeRequest.historical_context:type_name -> common.HistoricalExecutionContext
-	6,  // 13: interpretation.ParticipantReportService.GetAssessmentReport:input_type -> interpretation.GetAssessmentReportRequest
-	8,  // 14: interpretation.ParticipantReportService.ListMyReports:input_type -> interpretation.ListMyReportsRequest
-	11, // 15: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:input_type -> interpretation.GenerateReportFromOutcomeRequest
-	10, // 16: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:input_type -> interpretation.GenerateReportFromAssessmentRequest
-	7,  // 17: interpretation.ParticipantReportService.GetAssessmentReport:output_type -> interpretation.GetAssessmentReportResponse
-	9,  // 18: interpretation.ParticipantReportService.ListMyReports:output_type -> interpretation.ListMyReportsResponse
-	12, // 19: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:output_type -> interpretation.GenerateReportFromAssessmentResponse
-	12, // 20: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:output_type -> interpretation.GenerateReportFromAssessmentResponse
-	17, // [17:21] is the sub-list for method output_type
-	13, // [13:17] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	6,  // 12: interpretation.ParticipantReportService.GetAssessmentReport:input_type -> interpretation.GetAssessmentReportRequest
+	8,  // 13: interpretation.ParticipantReportService.ListMyReports:input_type -> interpretation.ListMyReportsRequest
+	11, // 14: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:input_type -> interpretation.GenerateReportFromOutcomeRequest
+	10, // 15: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:input_type -> interpretation.GenerateReportFromAssessmentRequest
+	7,  // 16: interpretation.ParticipantReportService.GetAssessmentReport:output_type -> interpretation.GetAssessmentReportResponse
+	9,  // 17: interpretation.ParticipantReportService.ListMyReports:output_type -> interpretation.ListMyReportsResponse
+	12, // 18: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:output_type -> interpretation.GenerateReportFromAssessmentResponse
+	12, // 19: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:output_type -> interpretation.GenerateReportFromAssessmentResponse
+	16, // [16:20] is the sub-list for method output_type
+	12, // [12:16] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_interpretation_interpretation_proto_init() }

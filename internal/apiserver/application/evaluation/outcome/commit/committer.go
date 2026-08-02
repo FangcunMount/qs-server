@@ -18,8 +18,6 @@ import (
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
-	stageport "github.com/FangcunMount/qs-server/internal/apiserver/port/historicalseedstage"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -53,7 +51,6 @@ type committer struct {
 	eventStager    EventStager
 	postCommit     appEventing.PostCommitDispatcher
 	newID          func() meta.ID
-	stageRecorder  stageport.Recorder
 }
 
 func NewCommitter(
@@ -64,7 +61,6 @@ func NewCommitter(
 	scoreProjector outcomescoring.Projector,
 	eventStager EventStager,
 	postCommit appEventing.PostCommitDispatcher,
-	stageRecorders ...stageport.Recorder,
 ) Committer {
 	result := &committer{
 		txRunner:       txRunner,
@@ -75,9 +71,6 @@ func NewCommitter(
 		eventStager:    eventStager,
 		postCommit:     postCommit,
 		newID:          meta.New,
-	}
-	if len(stageRecorders) > 0 {
-		result.stageRecorder = stageRecorders[0]
 	}
 	return result
 }
@@ -142,23 +135,8 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 	if err := runToCommit.Succeed(request.EvaluatedAt); err != nil {
 		return nil, err
 	}
-	var historical *historicalseed.Context
-	if value, ok := historicalseed.FromContext(ctx); ok {
-		clone := value.Clone()
-		historical = &clone
-	}
-	assessmentToCommit.StageEvaluatedEventWithHistorical(request.EvaluatedAt, record.ID(), runToCommit.ID(), historical)
+	assessmentToCommit.StageEvaluatedEvent(request.EvaluatedAt, record.ID(), runToCommit.ID())
 	eventsToStage := assessmentToCommit.Events()
-	completion := stageport.Completion{Stage: stageport.StageOutcomeCommitted, BusinessAt: request.EvaluatedAt, ResourceType: "evaluation_outcome", ResourceID: record.ID().String(), Payload: struct {
-		OutcomeID    string `json:"outcome_id"`
-		AssessmentID string `json:"assessment_id"`
-		RunID        string `json:"run_id"`
-	}{OutcomeID: record.ID().String(), AssessmentID: assessmentToCommit.ID().String(), RunID: runToCommit.ID().String()}}
-	attemptCtx, handle, err := stageport.BeginStageAttempt(ctx, c.stageRecorder, stageport.Attempt(completion))
-	if err != nil {
-		return nil, err
-	}
-	ctx = attemptCtx
 	err = c.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := c.outcomeRepo.Save(txCtx, record); err != nil {
 			return err
@@ -179,18 +157,9 @@ func (c *committer) Commit(ctx context.Context, request CommitRequest) (*domaino
 				return err
 			}
 		}
-		if c.stageRecorder != nil {
-			if _, err := stageport.CompleteStage(txCtx, c.stageRecorder, completion); err != nil {
-				return err
-			}
-		}
 		return nil
 	})
 	if err != nil {
-		_ = stageport.FailStageAttempt(ctx, c.stageRecorder, handle, stageport.Failure{
-			Stage: completion.Stage, BusinessAt: completion.BusinessAt, ResourceType: completion.ResourceType,
-			ResourceID: completion.ResourceID, Payload: completion.Payload, Err: err,
-		})
 		return nil, err
 	}
 	// Publish the prepared terminal state only after every durable fact and the

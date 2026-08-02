@@ -6,7 +6,6 @@ import (
 
 	evalpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 )
 
 type AssessmentIntakeClient struct {
@@ -39,9 +38,6 @@ func (c *EvaluationWorkerClient) ExecuteEvaluation(ctx context.Context, assessme
 	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
 	defer cancel()
 	req := &evalpb.ExecuteEvaluationRequest{AssessmentId: assessmentID}
-	if historical, ok := historicalseed.FromContext(ctx); ok {
-		req.HistoricalContext = historicalseed.ToProto(historical)
-	}
 	resp, err := c.client.ExecuteEvaluation(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute evaluation: %w", err)
@@ -61,9 +57,6 @@ func (c *InterpretationAutomationClient) GenerateReportFromOutcome(ctx context.C
 	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
 	defer cancel()
 	req := &interpretationpb.GenerateReportFromOutcomeRequest{OutcomeId: outcomeID}
-	if historical, ok := historicalseed.FromContext(ctx); ok {
-		req.HistoricalContext = historicalseed.ToProto(historical)
-	}
 	resp, err := c.client.GenerateReportFromOutcome(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate report from outcome: %w", err)

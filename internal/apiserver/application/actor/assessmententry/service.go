@@ -2,8 +2,6 @@ package assessmententry
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -14,10 +12,8 @@ import (
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
-	stageport "github.com/FangcunMount/qs-server/internal/apiserver/port/historicalseedstage"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -33,16 +29,6 @@ type service struct {
 	resolveLog    ResolveLogWriter
 	intakeLog     IntakeLogWriter
 	uow           apptransaction.Runner
-	stageRecorder stageport.Recorder
-}
-
-// WithHistoricalStageRecorder decorates the concrete service without changing
-// the public interface or ordinary construction path.
-func WithHistoricalStageRecorder(target AssessmentEntryService, recorder stageport.Recorder) AssessmentEntryService {
-	if concrete, ok := target.(*service); ok {
-		concrete.stageRecorder = recorder
-	}
-	return target
 }
 
 type intakeState struct {
@@ -207,77 +193,16 @@ func (s *service) Resolve(ctx context.Context, token string) (*ResolvedAssessmen
 		entry         *domainAssessmentEntry.AssessmentEntry
 		clinicianItem *domainClinician.Clinician
 	)
-	resolveAt := time.Time{}
-	if historical, ok := historicalseed.FromContext(ctx); ok {
-		var err error
-		resolveAt, err = historicalseed.OccurredAt(ctx, historical.OrgID, historicalseed.StageEntryResolved, time.Now())
-		if err != nil {
-			return nil, errors.WithCode(code.ErrInvalidArgument, "%v", err)
-		}
-	}
-	attemptCtx, handle, err := stageport.BeginStageAttempt(ctx, s.stageRecorder, stageport.Attempt{
-		Stage: stageport.StageEntryResolve, BusinessAt: resolveAt, ResourceType: "assessment_entry",
-	})
-	if err != nil {
-		return nil, err
-	}
-	ctx = attemptCtx
-	err = s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		var err error
 		entry, clinicianItem, err = s.resolveEntry(txCtx, token)
 		if err != nil {
 			return err
 		}
-		resolvedAt, err := historicalseed.OccurredAt(txCtx, uint64(entry.OrgID()), historicalseed.StageEntryResolved, time.Now())
-		if err != nil {
-			return errors.WithCode(code.ErrInvalidArgument, "%v", err)
-		}
-		if s.stageRecorder != nil {
-			if reader, ok := s.stageRecorder.(stageport.CurrentReader); ok {
-				existing, lookupErr := reader.FindCurrent(txCtx, stageport.StageEntryResolve)
-				if lookupErr != nil {
-					return lookupErr
-				}
-				if existing != nil {
-					var payload struct {
-						EntryID      string `json:"entry_id"`
-						ResolveLogID uint64 `json:"resolve_log_id"`
-					}
-					if decodeErr := json.Unmarshal(existing.PayloadJSON, &payload); decodeErr != nil {
-						return fmt.Errorf("decode historical entry resolve stage: %w", decodeErr)
-					}
-					if payload.EntryID != entry.ID().String() || !existing.BusinessAt.Equal(resolvedAt) {
-						return fmt.Errorf("%w: entry resolve replay differs from completed stage", stageport.ErrPayloadConflict)
-					}
-					_, completeErr := stageport.CompleteStage(txCtx, s.stageRecorder, stageport.Completion{
-						Stage: stageport.StageEntryResolve, BusinessAt: resolvedAt, ResourceType: "assessment_entry", ResourceID: entry.ID().String(), Payload: payload,
-					})
-					return completeErr
-				}
-			}
-		}
-		resolveLogID, err := s.logResolveSuccess(txCtx, entry, resolvedAt)
-		if err != nil {
-			return err
-		}
-		if s.stageRecorder != nil {
-			completion := stageport.Completion{Stage: stageport.StageEntryResolve, BusinessAt: resolvedAt, ResourceType: "assessment_entry", ResourceID: entry.ID().String(), Payload: struct {
-				EntryID      string `json:"entry_id"`
-				ResolveLogID uint64 `json:"resolve_log_id"`
-			}{EntryID: entry.ID().String(), ResolveLogID: resolveLogID}}
-			_, err = stageport.CompleteStage(txCtx, s.stageRecorder, completion)
-			return err
-		}
-		return nil
+		_, err = s.logResolveSuccess(txCtx, entry, time.Now())
+		return err
 	})
 	if err != nil {
-		resourceID := ""
-		if entry != nil {
-			resourceID = entry.ID().String()
-		}
-		_ = stageport.FailStageAttempt(ctx, s.stageRecorder, handle, stageport.Failure{
-			Stage: stageport.StageEntryResolve, BusinessAt: resolveAt, ResourceType: "assessment_entry", ResourceID: resourceID, Err: err,
-		})
 		return nil, err
 	}
 

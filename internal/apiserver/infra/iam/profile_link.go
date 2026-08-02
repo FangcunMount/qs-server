@@ -52,7 +52,7 @@ func NewProfileLinkService(client *Client) (*ProfileLinkService, error) {
 
 // IsEnabled 检查服务是否启用
 func (s *ProfileLinkService) IsEnabled() bool {
-	return s.enabled
+	return s != nil && s.enabled
 }
 
 // HasActiveProfileLink checks whether a user has an active link to a Profile.

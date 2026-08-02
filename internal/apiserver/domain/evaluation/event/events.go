@@ -7,7 +7,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 )
 
 // ==================== 事件类型常量 ====================
@@ -61,7 +60,6 @@ type RequestedInput struct {
 	AttemptOrigin     string
 	ActionRequestID   string
 	Mode              string
-	HistoricalContext *historicalseed.Context
 }
 
 // NewRequestedEvent 创建测评请求事件
@@ -90,7 +88,6 @@ func newRequestedEvent(eventType string, in RequestedInput) RequestedEvent {
 		AttemptOrigin:     in.AttemptOrigin,
 		ActionRequestID:   in.ActionRequestID,
 		Mode:              in.Mode,
-		HistoricalContext: cloneHistorical(in.HistoricalContext),
 	}
 	if in.EventID == "" {
 		return event.New(eventType, AggregateType, strconv.FormatInt(in.AssessmentID, 10), data)
@@ -128,29 +125,15 @@ func NewOutcomeCommittedEvent(
 	outcomeID string,
 	evaluationRunID string,
 	committedAt time.Time,
-	historical ...*historicalseed.Context,
 ) OutcomeCommittedEvent {
-	var historicalContext *historicalseed.Context
-	if len(historical) > 0 {
-		historicalContext = cloneHistorical(historical[0])
-	}
 	return event.New(TypeOutcomeCommitted, AggregateType, strconv.FormatInt(assessmentID, 10),
 		OutcomeCommittedData{
-			OrgID:             orgID,
-			AssessmentID:      assessmentID,
-			TesteeID:          testeeID,
-			OutcomeID:         outcomeID,
-			EvaluationRunID:   evaluationRunID,
-			CommittedAt:       committedAt,
-			HistoricalContext: historicalContext,
+			OrgID:           orgID,
+			AssessmentID:    assessmentID,
+			TesteeID:        testeeID,
+			OutcomeID:       outcomeID,
+			EvaluationRunID: evaluationRunID,
+			CommittedAt:     committedAt,
 		},
 	)
-}
-
-func cloneHistorical(value *historicalseed.Context) *historicalseed.Context {
-	if value == nil {
-		return nil
-	}
-	clone := value.Clone()
-	return &clone
 }

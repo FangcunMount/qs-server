@@ -1,16 +1,13 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
 	"regexp"
 	"sort"
@@ -40,12 +37,6 @@ type config struct {
 	mongoDB                   string
 	testeeIDsRaw              string
 	testeeIDsFile             string
-	seedBatchID               string
-	seedManifest              string
-	dryRunReceipt             string
-	confirmServicesStopped    bool
-	statisticsBaseURL         string
-	statisticsToken           string
 	testeeCreatedAfter        string
 	allowOldTestees           bool
 	scanEventPayloads         bool
@@ -121,13 +112,9 @@ type scopeSummary struct {
 func main() {
 	cfg := parseFlags()
 	initProgress(cfg.noProgress)
-	var testeeIDs []uint64
-	var err error
-	if cfg.seedBatchID == "" {
-		testeeIDs, err = parseTesteeIDs(cfg.testeeIDsRaw, cfg.testeeIDsFile)
-		if err != nil {
-			log.Fatalf("parse testee ids: %v", err)
-		}
+	testeeIDs, err := parseTesteeIDs(cfg.testeeIDsRaw, cfg.testeeIDsFile)
+	if err != nil {
+		log.Fatalf("parse testee ids: %v", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
@@ -163,26 +150,19 @@ func main() {
 		log.Fatalf("verify mongo read access: %v", err)
 	}
 	prog.Finish("connect databases", "")
-	if cfg.seedBatchID != "" {
-		if err := runHistoricalRollback(ctx, conn, mongoDB, cfg); err != nil {
-			log.Fatalf("historical rollback: %v", err)
-		}
-		return
-	}
-
 	prog.Phase("prepare mysql scope")
 	if err := prepareMySQLScope(ctx, conn, cfg, testeeIDs); err != nil {
 		log.Fatalf("prepare mysql scope: %v", err)
 	}
 	prog.Finish("prepare mysql scope", fmt.Sprintf("testees=%d", len(testeeIDs)))
 
-	ids, err := loadScopeIDs(ctx, conn, cfg)
+	ids, err := loadScopeIDs(ctx, conn)
 	if err != nil {
 		log.Fatalf("load scope ids: %v", err)
 	}
 	mysqlScopedIDs := ids
 	prog.Phase("enrich scope from mongo")
-	ids, err = enrichScopeIDsFromMongo(ctx, mongoDB, ids, cfg.workers, cfg.seedBatchID != "")
+	ids, err = enrichScopeIDsFromMongo(ctx, mongoDB, ids, cfg.workers)
 	if err != nil {
 		log.Fatalf("enrich scope ids from mongo: %v", err)
 	}
@@ -229,7 +209,7 @@ func main() {
 		})
 		countGroup.Go(func() error {
 			var err error
-			mongoCounts, err = countMongoRows(countCtx, mongoDB, mongoScopeIDs(ids, cfg), cfg.workers)
+			mongoCounts, err = countMongoRows(countCtx, mongoDB, ids, cfg.workers)
 			return err
 		})
 		if err := countGroup.Wait(); err != nil {
@@ -258,7 +238,7 @@ func main() {
 		prog.Phase("backup mysql and mongo rows")
 		backupGroup, backupCtx := errgroup.WithContext(ctx)
 		backupGroup.Go(func() error {
-			return backupMongoRows(backupCtx, mongoDB, mongoScopeIDs(ids, cfg), cfg.backupSuffix, cfg.workers)
+			return backupMongoRows(backupCtx, mongoDB, ids, cfg.backupSuffix, cfg.workers)
 		})
 		backupGroup.Go(func() error {
 			return backupMySQLRows(backupCtx, conn, cfg.backupSuffix)
@@ -286,128 +266,14 @@ func main() {
 	prog.Finish("delete mysql rows", "")
 
 	prog.Phase("delete mongo rows")
-	mongoDeleted, err := deleteMongoRows(ctx, mongoDB, mongoScopeIDs(ids, cfg), cfg.workers)
+	mongoDeleted, err := deleteMongoRows(ctx, mongoDB, ids, cfg.workers)
 	if err != nil {
 		log.Fatalf("delete mongo rows: %v", err)
 	}
 	prog.Finish("delete mongo rows", "")
 	printCounts("mysql_deleted", mysqlDeleted)
 	printCounts("mongo_deleted", mongoDeleted)
-	if cfg.seedBatchID != "" && !cfg.mongoOnly {
-		prog.Phase("repair statistics after rollback")
-		if err := repairHistoricalRollbackStatistics(ctx, conn, cfg); err != nil {
-			log.Fatalf("repair statistics after rollback: %v", err)
-		}
-		prog.Finish("repair statistics after rollback", "")
-	}
 	log.Print("cleanup completed")
-}
-
-type rollbackStatisticsWindow struct {
-	orgID    int64
-	from, to time.Time
-}
-
-type rollbackStatisticsRunResult struct {
-	ID       uint64 `json:"id"`
-	Status   string `json:"status"`
-	Stage    string `json:"stage"`
-	AsOfDate string `json:"as_of_date"`
-}
-
-func repairHistoricalRollbackStatistics(ctx context.Context, conn *sql.Conn, cfg config) error {
-	rows, err := conn.QueryContext(ctx, `SELECT org_id, MIN(stat_date), MAX(stat_date) FROM tmp_cleanup_statistics_dates GROUP BY org_id ORDER BY org_id`)
-	if err != nil {
-		return err
-	}
-	var ranges []rollbackStatisticsWindow
-	for rows.Next() {
-		var item rollbackStatisticsWindow
-		if err := rows.Scan(&item.orgID, &item.from, &item.to); err != nil {
-			_ = rows.Close()
-			return err
-		}
-		ranges = append(ranges, item)
-	}
-	if err := rows.Close(); err != nil {
-		return err
-	}
-	if len(ranges) == 0 {
-		return fmt.Errorf("historical rollback resolved no Statistics date ranges")
-	}
-	client := &http.Client{Timeout: 10 * time.Minute}
-	for _, item := range ranges {
-		for start := item.from; !start.After(item.to); {
-			end := start.AddDate(0, 0, 30)
-			if end.After(item.to) {
-				end = item.to
-			}
-			if _, err := executeRollbackStatisticsRun(ctx, client, cfg, item.orgID, "repair", start, end, true); err != nil {
-				return fmt.Errorf("org %d repair %s..%s: %w", item.orgID, start.Format("2006-01-02"), end.Format("2006-01-02"), err)
-			}
-			if _, err := executeRollbackStatisticsRun(ctx, client, cfg, item.orgID, "validate", start, end, false); err != nil {
-				return fmt.Errorf("org %d validate %s..%s: %w", item.orgID, start.Format("2006-01-02"), end.Format("2006-01-02"), err)
-			}
-			start = end.AddDate(0, 0, 1)
-		}
-	}
-	location, err := time.LoadLocation("Asia/Shanghai")
-	if err != nil {
-		return err
-	}
-	now := time.Now().In(location)
-	latestComplete := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, location).AddDate(0, 0, -1)
-	for _, item := range ranges {
-		result, err := executeRollbackStatisticsRun(ctx, client, cfg, item.orgID, "publish", latestComplete, latestComplete, true)
-		if err != nil {
-			return fmt.Errorf("org %d publish %s: %w", item.orgID, latestComplete.Format("2006-01-02"), err)
-		}
-		if result.AsOfDate != latestComplete.Format("2006-01-02") {
-			return fmt.Errorf("org %d publish watermark=%q want=%s", item.orgID, result.AsOfDate, latestComplete.Format("2006-01-02"))
-		}
-	}
-	return nil
-}
-
-func executeRollbackStatisticsRun(ctx context.Context, client *http.Client, cfg config, orgID int64, mode string, from, to time.Time, confirm bool) (rollbackStatisticsRunResult, error) {
-	body, err := json.Marshal(map[string]any{
-		"mode": mode, "from_date": from.Format("2006-01-02"), "to_date": to.Format("2006-01-02"),
-		"reason": "historical_batch_rollback:" + cfg.seedBatchID, "confirm": confirm, "validate_only": mode == "validate",
-	})
-	if err != nil {
-		return rollbackStatisticsRunResult{}, err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(cfg.statisticsBaseURL, "/")+"/internal/v2/statistics/runs", bytes.NewReader(body))
-	if err != nil {
-		return rollbackStatisticsRunResult{}, err
-	}
-	req.Header.Set("Authorization", "Bearer "+cfg.statisticsToken)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Org-ID", strconv.FormatInt(orgID, 10))
-	resp, err := client.Do(req)
-	if err != nil {
-		return rollbackStatisticsRunResult{}, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	responseBody, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	if err != nil {
-		return rollbackStatisticsRunResult{}, err
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return rollbackStatisticsRunResult{}, fmt.Errorf("server returned %s: %s", resp.Status, strings.TrimSpace(string(responseBody)))
-	}
-	var envelope struct {
-		Code    int                         `json:"code"`
-		Message string                      `json:"message"`
-		Data    rollbackStatisticsRunResult `json:"data"`
-	}
-	if err := json.Unmarshal(responseBody, &envelope); err != nil {
-		return rollbackStatisticsRunResult{}, err
-	}
-	if envelope.Code != 0 || envelope.Data.ID == 0 || envelope.Data.Status != "succeeded" {
-		return envelope.Data, fmt.Errorf("run rejected: code=%d message=%s id=%d status=%s stage=%s", envelope.Code, envelope.Message, envelope.Data.ID, envelope.Data.Status, envelope.Data.Stage)
-	}
-	return envelope.Data, nil
 }
 
 func parseFlags() config {
@@ -417,12 +283,6 @@ func parseFlags() config {
 	flag.StringVar(&cfg.mongoDB, "mongo-db", "", "MongoDB database name")
 	flag.StringVar(&cfg.testeeIDsRaw, "testee-ids", "", "comma/space/newline separated testee IDs")
 	flag.StringVar(&cfg.testeeIDsFile, "testee-ids-file", "", "file containing comma/space/newline separated testee IDs")
-	flag.StringVar(&cfg.seedBatchID, "seed-batch-id", "", "scope cleanup from seed_backfill_stage instead of a manual testee list")
-	flag.StringVar(&cfg.seedManifest, "seed-manifest", "", "runner historical manifest used to include create_testee/resolve-only scenarios")
-	flag.StringVar(&cfg.dryRunReceipt, "dry-run-receipt", "", "receipt written by historical dry-run and required unchanged by --apply")
-	flag.BoolVar(&cfg.confirmServicesStopped, "confirm-services-stopped", false, "confirm runner, workers, and relevant schedulers are stopped before batch rollback")
-	flag.StringVar(&cfg.statisticsBaseURL, "statistics-base-url", "", "apiserver base URL used for mandatory post-rollback Statistics repair/validate/publish")
-	flag.StringVar(&cfg.statisticsToken, "statistics-token", os.Getenv("QS_STATISTICS_TOKEN"), "Statistics bearer token (or QS_STATISTICS_TOKEN)")
 	flag.StringVar(&cfg.testeeCreatedAfter, "testee-created-after", "2026-05-01 00:00:00", "safety guard: selected testees must have created_at after this MySQL timestamp")
 	flag.BoolVar(&cfg.allowOldTestees, "allow-old-testees", false, "bypass --testee-created-after guard")
 	flag.BoolVar(&cfg.scanEventPayloads, "scan-event-payloads", false, "also scan MySQL outbox payload_json for testee_id; expensive on large outbox tables")
@@ -452,34 +312,9 @@ func parseFlags() config {
 			log.Fatalf("%s is required", name)
 		}
 	}
-	cfg.seedBatchID = strings.TrimSpace(cfg.seedBatchID)
 	hasManualScope := strings.TrimSpace(cfg.testeeIDsRaw) != "" || strings.TrimSpace(cfg.testeeIDsFile) != ""
-	if (cfg.seedBatchID == "") == !hasManualScope {
-		log.Fatal("provide exactly one scope: --seed-batch-id or --testee-ids/--testee-ids-file")
-	}
-	if cfg.seedBatchID != "" {
-		if !regexp.MustCompile(`^[A-Za-z0-9._:-]{8,96}$`).MatchString(cfg.seedBatchID) {
-			log.Fatal("--seed-batch-id contains unsafe characters")
-		}
-		if strings.TrimSpace(cfg.seedManifest) == "" {
-			log.Fatal("historical batch cleanup requires --seed-manifest so the persisted rollback scope includes every created testee")
-		}
-		if strings.TrimSpace(cfg.dryRunReceipt) == "" {
-			log.Fatal("historical batch cleanup requires --dry-run-receipt; run without --apply first, then reuse the receipt with --apply")
-		}
-		if cfg.apply && !cfg.confirmServicesStopped {
-			log.Fatal("historical batch apply requires --confirm-services-stopped")
-		}
-		if cfg.apply && cfg.skipBackup {
-			log.Fatal("historical batch apply cannot use --skip-backup")
-		}
-		if cfg.mongoOnly {
-			log.Fatal("historical batch cleanup rejects --mongo-only; resume the persisted rollback operation with the original receipt")
-		}
-		if cfg.apply && (strings.TrimSpace(cfg.statisticsBaseURL) == "" || strings.TrimSpace(cfg.statisticsToken) == "") {
-			log.Fatal("historical batch apply requires --statistics-base-url and --statistics-token/QS_STATISTICS_TOKEN")
-		}
-		cfg.scanEventPayloads = true
+	if !hasManualScope {
+		log.Fatal("provide --testee-ids or --testee-ids-file")
 	}
 	if cfg.previewLimit < 0 {
 		log.Fatal("--preview-limit must be >= 0")
@@ -541,79 +376,6 @@ func parseTesteeIDs(raw, file string) ([]uint64, error) {
 	return ids, nil
 }
 
-func loadHistoricalBatchTesteeIDs(ctx context.Context, conn *sql.Conn, batchID string) ([]uint64, error) {
-	var stageCount int64
-	if err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM seed_backfill_stage WHERE batch_id = ?`, batchID).Scan(&stageCount); err != nil {
-		return nil, err
-	}
-	if stageCount == 0 {
-		return nil, fmt.Errorf("seed_backfill_stage has no rows for batch %s", batchID)
-	}
-	rows, err := conn.QueryContext(ctx, `
-SELECT DISTINCT resource_id
-FROM seed_backfill_stage
-WHERE batch_id = ? AND stage = 'entry_intake' AND resource_type = 'testee'
-  AND JSON_EXTRACT(payload_json, '$.testee_created') = TRUE
-ORDER BY resource_id`, batchID)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-	var ids []uint64
-	for rows.Next() {
-		var raw string
-		if err := rows.Scan(&raw); err != nil {
-			return nil, err
-		}
-		id, err := strconv.ParseUint(strings.TrimSpace(raw), 10, 64)
-		if err != nil || id == 0 {
-			return nil, fmt.Errorf("batch %s has invalid testee resource_id %q", batchID, raw)
-		}
-		ids = append(ids, id)
-	}
-	return uniqueUint64(ids), rows.Err()
-}
-
-func loadHistoricalManifestTesteeIDs(path, batchID string) ([]uint64, error) {
-	path = strings.TrimSpace(path)
-	if path == "" {
-		return nil, nil
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var manifest struct {
-		BatchID   string `json:"batch_id"`
-		Scenarios map[string]struct {
-			TesteeID      string `json:"testee_id"`
-			TesteeCreated bool   `json:"testee_created"`
-		} `json:"scenarios"`
-	}
-	if err := json.Unmarshal(data, &manifest); err != nil {
-		return nil, err
-	}
-	if strings.TrimSpace(manifest.BatchID) != batchID {
-		return nil, fmt.Errorf("manifest batch_id %q does not match %q", manifest.BatchID, batchID)
-	}
-	ids := make([]uint64, 0, len(manifest.Scenarios))
-	for scenarioID, scenario := range manifest.Scenarios {
-		if !scenario.TesteeCreated {
-			continue
-		}
-		raw := strings.TrimSpace(scenario.TesteeID)
-		if raw == "" {
-			continue
-		}
-		id, err := strconv.ParseUint(raw, 10, 64)
-		if err != nil || id == 0 {
-			return nil, fmt.Errorf("scenario %s has invalid testee_id %q", scenarioID, raw)
-		}
-		ids = append(ids, id)
-	}
-	return uniqueUint64(ids), nil
-}
-
 func splitIDs(raw string) []string {
 	fields := strings.FieldsFunc(raw, func(r rune) bool {
 		return r == ',' || r == '\n' || r == '\r' || r == '\t' || r == ' '
@@ -655,8 +417,6 @@ func prepareMySQLScope(ctx context.Context, conn *sql.Conn, cfg config, testeeID
 		`CREATE TEMPORARY TABLE tmp_cleanup_resolve_log_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
 		`CREATE TEMPORARY TABLE tmp_cleanup_intake_log_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
 		`CREATE TEMPORARY TABLE tmp_cleanup_relation_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
-		`CREATE TEMPORARY TABLE tmp_cleanup_seed_stage_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
-		`CREATE TEMPORARY TABLE tmp_cleanup_seed_attempt_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
 		`CREATE TEMPORARY TABLE tmp_cleanup_statistics_dates (org_id BIGINT NOT NULL, stat_date DATE NOT NULL, PRIMARY KEY (org_id, stat_date))`,
 	}
 	for i, stmt := range stmts {
@@ -694,31 +454,24 @@ SELECT e.id FROM plan_enrollment e JOIN tmp_cleanup_testee_ids t ON t.id = e.tes
 		namedSQL{"outcome ids from assessment scope", `INSERT IGNORE INTO tmp_cleanup_outcome_ids (id)
 SELECT o.id FROM evaluation_outcome o JOIN tmp_cleanup_assessment_ids a ON a.id = o.assessment_id`},
 	)
-	var populate []namedSQL
-	if cfg.seedBatchID != "" {
-		populate = append(populate, historicalBatchScopeStatements(cfg.seedBatchID)...)
-	} else {
-		populate = append(populate, ordinaryPopulate...)
-	}
-	if cfg.seedBatchID == "" {
-		populate = append(populate, namedSQL{"answersheet ids from statistics facts", `INSERT IGNORE INTO tmp_cleanup_answersheet_ids (id)
+	populate := append([]namedSQL{}, ordinaryPopulate...)
+	populate = append(populate, namedSQL{"answersheet ids from statistics facts", `INSERT IGNORE INTO tmp_cleanup_answersheet_ids (id)
 SELECT DISTINCT f.answersheet_id FROM statistics_assessment_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id WHERE f.answersheet_id IS NOT NULL AND f.answersheet_id <> 0`})
-		populate = append(populate,
-			namedSQL{"report ids from assessment scope", `INSERT IGNORE INTO tmp_cleanup_report_ids (id)
+	populate = append(populate,
+		namedSQL{"report ids from assessment scope", `INSERT IGNORE INTO tmp_cleanup_report_ids (id)
 SELECT id FROM tmp_cleanup_assessment_ids`,
-			},
-		)
-		populate = append(populate,
-			namedSQL{"report ids from statistics facts", `INSERT IGNORE INTO tmp_cleanup_report_ids (id)
+		},
+	)
+	populate = append(populate,
+		namedSQL{"report ids from statistics facts", `INSERT IGNORE INTO tmp_cleanup_report_ids (id)
 SELECT DISTINCT f.report_id FROM statistics_assessment_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id WHERE f.report_id IS NOT NULL AND f.report_id <> 0`},
-			namedSQL{"statistics dates from access facts", `INSERT IGNORE INTO tmp_cleanup_statistics_dates (org_id, stat_date)
+		namedSQL{"statistics dates from access facts", `INSERT IGNORE INTO tmp_cleanup_statistics_dates (org_id, stat_date)
 SELECT DISTINCT f.org_id, f.stat_date FROM statistics_access_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id`},
-			namedSQL{"statistics dates from assessment facts", `INSERT IGNORE INTO tmp_cleanup_statistics_dates (org_id, stat_date)
+		namedSQL{"statistics dates from assessment facts", `INSERT IGNORE INTO tmp_cleanup_statistics_dates (org_id, stat_date)
 SELECT DISTINCT f.org_id, f.stat_date FROM statistics_assessment_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id`},
-			namedSQL{"statistics dates from plan facts", `INSERT IGNORE INTO tmp_cleanup_statistics_dates (org_id, stat_date)
+		namedSQL{"statistics dates from plan facts", `INSERT IGNORE INTO tmp_cleanup_statistics_dates (org_id, stat_date)
 SELECT DISTINCT f.org_id, f.stat_date FROM statistics_plan_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id`},
-		)
-	}
+	)
 	for i, item := range populate {
 		item := item
 		if err := prog.RunStep(item.name, i+1, len(populate), func() error {
@@ -730,35 +483,6 @@ SELECT DISTINCT f.org_id, f.stat_date FROM statistics_plan_fact f JOIN tmp_clean
 			return err
 		}
 	}
-	if cfg.seedBatchID != "" {
-		manifestScope, err := loadHistoricalManifestScope(cfg.seedManifest, cfg.seedBatchID)
-		if err != nil {
-			return fmt.Errorf("load historical manifest resource scope: %w", err)
-		}
-		for _, item := range []struct {
-			table string
-			ids   []uint64
-		}{
-			{"tmp_cleanup_testee_ids", manifestScope.TesteeIDs},
-			{"tmp_cleanup_assessment_ids", manifestScope.AssessmentIDs},
-			{"tmp_cleanup_answersheet_ids", manifestScope.AnswerSheetIDs},
-			{"tmp_cleanup_outcome_ids", manifestScope.OutcomeIDs},
-			{"tmp_cleanup_report_ids", manifestScope.ReportIDs},
-			{"tmp_cleanup_plan_enrollment_ids", manifestScope.EnrollmentIDs},
-			{"tmp_cleanup_assessment_task_ids", manifestScope.TaskIDs},
-		} {
-			if err := bulkInsertUint64IDs(ctx, conn, item.table, item.ids); err != nil {
-				return fmt.Errorf("materialize manifest %s: %w", item.table, err)
-			}
-		}
-		if err := materializeScopedDeleteIDs(ctx, conn, true); err != nil {
-			return err
-		}
-		if err := validateHistoricalForeignReferences(ctx, conn); err != nil {
-			return err
-		}
-	}
-
 	if err := addMySQLOutboxIDsToScope(ctx, conn, cfg); err != nil {
 		return err
 	}
@@ -779,38 +503,6 @@ func addMySQLOutboxIDsToScope(ctx context.Context, conn *sql.Conn, cfg config) e
 		}
 	}
 	return nil
-}
-
-func historicalBatchScopeStatements(batchID string) []namedSQL {
-	// parseFlags restricts batch IDs to a conservative identifier alphabet, so
-	// this literal cannot terminate or alter the generated one-off SQL.
-	batch := "'" + batchID + "'"
-	return []namedSQL{
-		{"historical stage ids", `INSERT IGNORE INTO tmp_cleanup_seed_stage_ids (id) SELECT id FROM seed_backfill_stage WHERE batch_id = ` + batch},
-		{"historical attempt ids", `INSERT IGNORE INTO tmp_cleanup_seed_attempt_ids (id) SELECT id FROM seed_backfill_stage_attempt WHERE batch_id = ` + batch},
-		{"historical assessment ids", `INSERT IGNORE INTO tmp_cleanup_assessment_ids (id) SELECT CAST(resource_id AS UNSIGNED) FROM seed_backfill_stage WHERE batch_id = ` + batch + ` AND stage IN ('assessment_created','assessment_submitted') AND resource_type = 'assessment'`},
-		{"historical answersheet ids", `INSERT IGNORE INTO tmp_cleanup_answersheet_ids (id) SELECT CAST(resource_id AS UNSIGNED) FROM seed_backfill_stage WHERE batch_id = ` + batch + ` AND stage = 'answersheet_submit' AND resource_type = 'answer_sheet'`},
-		{"historical outcome ids", `INSERT IGNORE INTO tmp_cleanup_outcome_ids (id) SELECT CAST(resource_id AS UNSIGNED) FROM seed_backfill_stage WHERE batch_id = ` + batch + ` AND stage = 'outcome_committed' AND resource_type = 'evaluation_outcome'`},
-		{"historical report ids", `INSERT IGNORE INTO tmp_cleanup_report_ids (id) SELECT CAST(resource_id AS UNSIGNED) FROM seed_backfill_stage WHERE batch_id = ` + batch + ` AND stage = 'report_generated' AND resource_type = 'interpretation_report'`},
-		{"historical enrollment ids", `INSERT IGNORE INTO tmp_cleanup_plan_enrollment_ids (id) SELECT CAST(resource_id AS UNSIGNED) FROM seed_backfill_stage WHERE batch_id = ` + batch + ` AND stage = 'plan_enrollment' AND resource_type = 'plan_enrollment'`},
-		{"historical task ids", `INSERT IGNORE INTO tmp_cleanup_assessment_task_ids (id) SELECT CAST(resource_id AS UNSIGNED) FROM seed_backfill_stage WHERE batch_id = ` + batch + ` AND stage IN ('task_open','task_complete') AND resource_type = 'assessment_task'`},
-		{"historical resolve log ids", `INSERT IGNORE INTO tmp_cleanup_resolve_log_ids (id)
-		SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.resolve_log_id')) AS UNSIGNED)
-		FROM seed_backfill_stage WHERE batch_id = ` + batch + ` AND stage = 'entry_resolve'
-		  AND JSON_EXTRACT(payload_json, '$.resolve_log_id') IS NOT NULL`},
-		{"historical intake log ids", `INSERT IGNORE INTO tmp_cleanup_intake_log_ids (id)
-		SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.intake_log_id')) AS UNSIGNED)
-		FROM seed_backfill_stage WHERE batch_id = ` + batch + ` AND stage = 'entry_intake'
-		  AND JSON_EXTRACT(payload_json, '$.intake_log_id') IS NOT NULL`},
-		{"historical relation ids", `INSERT IGNORE INTO tmp_cleanup_relation_ids (id)
-SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.creator_relation_id')) AS UNSIGNED)
-FROM seed_backfill_stage WHERE batch_id = ` + batch + ` AND stage = 'entry_intake' AND JSON_EXTRACT(payload_json, '$.creator_created') = TRUE
-UNION
-SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.assignment_relation_id')) AS UNSIGNED)
-FROM seed_backfill_stage WHERE batch_id = ` + batch + ` AND stage = 'entry_intake' AND JSON_EXTRACT(payload_json, '$.assignment_created') = TRUE`},
-		{"historical statistics dates", `INSERT IGNORE INTO tmp_cleanup_statistics_dates (org_id, stat_date)
-SELECT org_id, DATE(business_at) FROM seed_backfill_stage WHERE batch_id = ` + batch},
-	}
 }
 
 func mysqlOutboxScopeStatements(cfg config) []namedSQL {
@@ -924,35 +616,6 @@ LIMIT 20`, cfg.testeeCreatedAfter)
 	return fmt.Errorf("%d testee(s) violate --testee-created-after=%q; sample=%s; use --allow-old-testees only after manual verification", oldCount, cfg.testeeCreatedAfter, strings.Join(samples, ", "))
 }
 
-func validateHistoricalForeignReferences(ctx context.Context, conn *sql.Conn) error {
-	checks := []mysqlCountItem{
-		{"assessment", `SELECT COUNT(*) FROM assessment a JOIN tmp_cleanup_testee_ids t ON t.id = a.testee_id LEFT JOIN tmp_cleanup_assessment_ids owned ON owned.id = a.id WHERE owned.id IS NULL`},
-		{"plan_enrollment", `SELECT COUNT(*) FROM plan_enrollment e JOIN tmp_cleanup_testee_ids t ON t.id = e.testee_id LEFT JOIN tmp_cleanup_plan_enrollment_ids owned ON owned.id = e.id WHERE owned.id IS NULL`},
-		{"assessment_task", `SELECT COUNT(*) FROM assessment_task task JOIN tmp_cleanup_testee_ids t ON t.id = task.testee_id LEFT JOIN tmp_cleanup_assessment_task_ids owned ON owned.id = task.id WHERE owned.id IS NULL`},
-		{"assessment_score", `SELECT COUNT(*) FROM assessment_score s JOIN tmp_cleanup_testee_ids t ON t.id = s.testee_id LEFT JOIN tmp_cleanup_assessment_score_ids owned ON owned.id = s.id WHERE owned.id IS NULL`},
-		{"evaluation_outcome", `SELECT COUNT(*) FROM evaluation_outcome o JOIN tmp_cleanup_testee_ids t ON t.id = o.testee_id LEFT JOIN tmp_cleanup_outcome_ids owned ON owned.id = o.id WHERE owned.id IS NULL`},
-		{"clinician_relation", `SELECT COUNT(*) FROM clinician_relation r JOIN tmp_cleanup_testee_ids t ON t.id = r.testee_id LEFT JOIN tmp_cleanup_relation_ids owned ON owned.id = r.id WHERE owned.id IS NULL`},
-		{"assessment_entry_intake_log", `SELECT COUNT(*) FROM assessment_entry_intake_log l JOIN tmp_cleanup_testee_ids t ON t.id = l.testee_id LEFT JOIN tmp_cleanup_intake_log_ids owned ON owned.id = l.id WHERE owned.id IS NULL`},
-		{"statistics_access_fact", `SELECT COUNT(*) FROM statistics_access_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_resolve_log_ids r ON f.source_type = 'entry_resolve' AND BINARY f.source_ref = BINARY CAST(r.id AS CHAR) LEFT JOIN tmp_cleanup_intake_log_ids i ON f.source_type = 'entry_intake' AND BINARY f.source_ref = BINARY CAST(i.id AS CHAR) WHERE r.id IS NULL AND i.id IS NULL`},
-		{"statistics_assessment_fact", `SELECT COUNT(*) FROM statistics_assessment_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = f.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = f.report_id WHERE s.id IS NULL AND a.id IS NULL AND r.id IS NULL`},
-		{"statistics_plan_fact", `SELECT COUNT(*) FROM statistics_plan_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_plan_enrollment_ids e ON e.id = f.enrollment_id LEFT JOIN tmp_cleanup_assessment_task_ids task ON task.id = f.task_id WHERE e.id IS NULL AND task.id IS NULL`},
-	}
-	var conflicts []string
-	for _, check := range checks {
-		var count int64
-		if err := conn.QueryRowContext(ctx, check.query).Scan(&count); err != nil {
-			return fmt.Errorf("foreign-reference check %s: %w", check.name, err)
-		}
-		if count > 0 {
-			conflicts = append(conflicts, fmt.Sprintf("%s=%d", check.name, count))
-		}
-	}
-	if len(conflicts) > 0 {
-		return fmt.Errorf("historical batch testee has non-batch references; preserve testee and abort cleanup: %s", strings.Join(conflicts, ", "))
-	}
-	return nil
-}
-
 func verifyMongoReadAccess(ctx context.Context, db *mongo.Database) error {
 	collections := []string{
 		"answersheets",
@@ -997,7 +660,7 @@ type scopeIDs struct {
 	ReportRunIDs   []uint64
 }
 
-func loadScopeIDs(ctx context.Context, conn *sql.Conn, cfg config) (scopeIDs, error) {
+func loadScopeIDs(ctx context.Context, conn *sql.Conn) (scopeIDs, error) {
 	load := func(query string) ([]uint64, error) {
 		rows, err := conn.QueryContext(ctx, query)
 		if err != nil {
@@ -1037,56 +700,10 @@ func loadScopeIDs(ctx context.Context, conn *sql.Conn, cfg config) (scopeIDs, er
 	if err != nil {
 		return scopeIDs{}, err
 	}
-	ids := scopeIDs{TesteeIDs: testeeIDs, AssessmentIDs: assessmentIDs, AnswerSheetIDs: answerSheetIDs, OutcomeIDs: outcomeIDs, ReportIDs: reportIDs}
-	if cfg.seedBatchID != "" {
-		ids.GenerationIDs, err = loadHistoricalPayloadIDs(ctx, conn, cfg.seedBatchID, "generation_id")
-		if err != nil {
-			return scopeIDs{}, err
-		}
-		ids.ReportRunIDs, err = loadHistoricalPayloadIDs(ctx, conn, cfg.seedBatchID, "run_id")
-		if err != nil {
-			return scopeIDs{}, err
-		}
-		manifestScope, err := loadHistoricalManifestScope(cfg.seedManifest, cfg.seedBatchID)
-		if err != nil {
-			return scopeIDs{}, err
-		}
-		ids.GenerationIDs = uniqueUint64(append(ids.GenerationIDs, manifestScope.GenerationIDs...))
-		ids.ReportRunIDs = uniqueUint64(append(ids.ReportRunIDs, manifestScope.ReportRunIDs...))
-	}
-	return ids, nil
+	return scopeIDs{TesteeIDs: testeeIDs, AssessmentIDs: assessmentIDs, AnswerSheetIDs: answerSheetIDs, OutcomeIDs: outcomeIDs, ReportIDs: reportIDs}, nil
 }
 
-func loadHistoricalPayloadIDs(ctx context.Context, conn *sql.Conn, batchID, field string) ([]uint64, error) {
-	if field != "generation_id" && field != "run_id" {
-		return nil, fmt.Errorf("unsupported historical payload id field %q", field)
-	}
-	query := fmt.Sprintf(`SELECT DISTINCT JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.%s'))
-FROM seed_backfill_stage WHERE batch_id = ? AND stage = 'report_generated'`, field)
-	rows, err := conn.QueryContext(ctx, query, batchID)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-	var ids []uint64
-	for rows.Next() {
-		var raw sql.NullString
-		if err := rows.Scan(&raw); err != nil {
-			return nil, err
-		}
-		if !raw.Valid || strings.TrimSpace(raw.String) == "" {
-			continue
-		}
-		id, err := strconv.ParseUint(raw.String, 10, 64)
-		if err != nil || id == 0 {
-			return nil, fmt.Errorf("invalid historical %s %q", field, raw.String)
-		}
-		ids = append(ids, id)
-	}
-	return uniqueUint64(ids), rows.Err()
-}
-
-func enrichScopeIDsFromMongo(ctx context.Context, db *mongo.Database, ids scopeIDs, workers int, exact bool) (scopeIDs, error) {
+func enrichScopeIDsFromMongo(ctx context.Context, db *mongo.Database, ids scopeIDs, workers int) (scopeIDs, error) {
 	type mongoFieldTask struct {
 		coll  string
 		field string
@@ -1102,16 +719,7 @@ func enrichScopeIDsFromMongo(ctx context.Context, db *mongo.Database, ids scopeI
 	for i, task := range tasks {
 		i, task := i, task
 		group.Go(func() error {
-			var filter bson.M
-			if exact {
-				field := "domain_id"
-				if task.coll == "answersheet_submit_idempotency" {
-					field = "answersheet_id"
-				}
-				filter = inUint64(field, ids.AnswerSheetIDs)
-			} else {
-				filter = inUint64("testee_id", ids.TesteeIDs)
-			}
+			filter := inUint64("testee_id", ids.TesteeIDs)
 			out, err := loadMongoUint64Field(groupCtx, db.Collection(task.coll), filter, task.field, task.label)
 			if err != nil {
 				return fmt.Errorf("load %s: %w", task.label, err)
@@ -1141,16 +749,6 @@ func enrichScopeIDsFromMongo(ctx context.Context, db *mongo.Database, ids scopeI
 	}
 	ids.ReportRunIDs = uniqueUint64(append(ids.ReportRunIDs, runIDs...))
 	return ids, nil
-}
-
-func mongoScopeIDs(ids scopeIDs, cfg config) scopeIDs {
-	if cfg.seedBatchID == "" {
-		return ids
-	}
-	// Historical cleanup is resource-led. Testee IDs remain available for the
-	// guarded MySQL deletion but must not widen Mongo collection filters.
-	ids.TesteeIDs = nil
-	return ids
 }
 
 func loadMongoUint64FieldByFilters(ctx context.Context, coll *mongo.Collection, filters []bson.M, field, label string) ([]uint64, error) {
@@ -1475,8 +1073,6 @@ func countMySQLRows(ctx context.Context, conn *sql.Conn) ([]namedCount, error) {
 		{"domain_event_outbox", `SELECT COUNT(*) FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
 		{"runtime_checkpoint", `SELECT COUNT(*) FROM runtime_checkpoint r JOIN tmp_cleanup_assessment_ids a ON a.id = r.assessment_id`},
 		{"retry_event_hold", `SELECT COUNT(*) FROM retry_event_hold h JOIN tmp_cleanup_event_ids e ON BINARY e.event_id = BINARY h.event_id`},
-		{"seed_backfill_stage_attempt", `SELECT COUNT(*) FROM seed_backfill_stage_attempt a JOIN tmp_cleanup_seed_attempt_ids x ON x.id = a.id`},
-		{"seed_backfill_stage", `SELECT COUNT(*) FROM seed_backfill_stage s JOIN tmp_cleanup_seed_stage_ids x ON x.id = s.id`},
 	}
 	out := make([]namedCount, 0, len(items))
 	for i, item := range items {
@@ -1536,8 +1132,6 @@ func backupMySQLRows(ctx context.Context, conn *sql.Conn, suffix string) error {
 		{"domain_event_outbox", `SELECT o.* FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
 		{"runtime_checkpoint", `SELECT r.* FROM runtime_checkpoint r JOIN tmp_cleanup_assessment_ids a ON a.id = r.assessment_id`},
 		{"retry_event_hold", `SELECT h.* FROM retry_event_hold h JOIN tmp_cleanup_event_ids e ON BINARY e.event_id = BINARY h.event_id`},
-		{"seed_backfill_stage_attempt", `SELECT a.* FROM seed_backfill_stage_attempt a JOIN tmp_cleanup_seed_attempt_ids x ON x.id = a.id`},
-		{"seed_backfill_stage", `SELECT s.* FROM seed_backfill_stage s JOIN tmp_cleanup_seed_stage_ids x ON x.id = s.id`},
 	}
 	for i, item := range items {
 		item := item
@@ -1659,13 +1253,11 @@ func mysqlDeleteItems(_ context.Context, _ *sql.Conn) ([]mysqlDeleteItem, error)
 		{"evaluation_outcome", `DELETE o FROM evaluation_outcome o JOIN tmp_cleanup_outcome_ids x ON x.id = o.id`},
 		{"assessment", `DELETE a FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id`},
 		{"testee", `DELETE t FROM testee t JOIN tmp_cleanup_testee_ids x ON x.id = t.id`},
-		{"seed_backfill_stage_attempt", `DELETE a FROM seed_backfill_stage_attempt a JOIN tmp_cleanup_seed_attempt_ids x ON x.id = a.id`},
-		{"seed_backfill_stage", `DELETE s FROM seed_backfill_stage s JOIN tmp_cleanup_seed_stage_ids x ON x.id = s.id`},
 	}
 	return items, nil
 }
 
-func materializeScopedDeleteIDs(ctx context.Context, conn *sql.Conn, exact bool) error {
+func materializeScopedDeleteIDs(ctx context.Context, conn *sql.Conn) error {
 	taskSQL := `INSERT IGNORE INTO tmp_cleanup_assessment_task_ids (id)
 SELECT task.id
 FROM assessment_task task
@@ -1679,14 +1271,6 @@ FROM assessment_score s
 LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id
 LEFT JOIN tmp_cleanup_testee_ids t ON t.id = s.testee_id
 WHERE a.id IS NOT NULL OR t.id IS NOT NULL`
-	if exact {
-		taskSQL = `INSERT IGNORE INTO tmp_cleanup_assessment_task_ids (id)
-SELECT CAST(resource_id AS UNSIGNED) FROM seed_backfill_stage
-WHERE id IN (SELECT id FROM tmp_cleanup_seed_stage_ids)
-  AND stage IN ('task_open','task_complete') AND resource_type = 'assessment_task'`
-		scoreSQL = `INSERT IGNORE INTO tmp_cleanup_assessment_score_ids (id)
-SELECT s.id FROM assessment_score s JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id`
-	}
 	items := []namedSQL{
 		{
 			name: "assessment_task ids",
@@ -1723,13 +1307,8 @@ func deleteMySQLRows(ctx context.Context, conn *sql.Conn, cfg config, lockWaitTi
 		log.Printf("mysql delete: innodb_lock_wait_timeout=%ds per-table commit retries=%d batch_size=%d", lockWaitTimeoutSec, maxRetries, batchSize)
 	}
 
-	if err := materializeScopedDeleteIDs(ctx, conn, cfg.seedBatchID != ""); err != nil {
+	if err := materializeScopedDeleteIDs(ctx, conn); err != nil {
 		return nil, fmt.Errorf("materialize scoped delete ids: %w", err)
-	}
-	if cfg.seedBatchID != "" {
-		if err := validateHistoricalForeignReferences(ctx, conn); err != nil {
-			return nil, fmt.Errorf("pre-delete foreign-reference recheck: %w", err)
-		}
 	}
 
 	items, err := mysqlDeleteItems(ctx, conn)

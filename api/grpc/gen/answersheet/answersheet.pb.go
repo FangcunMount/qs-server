@@ -7,7 +7,6 @@
 package answersheet
 
 import (
-	common "github.com/FangcunMount/qs-server/api/grpc/gen/common"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -359,18 +358,17 @@ func (x *Answer) GetValue() string {
 
 // 保存答卷请求
 type SaveAnswerSheetRequest struct {
-	state                protoimpl.MessageState             `protogen:"open.v1"`
-	QuestionnaireCode    string                             `protobuf:"bytes,1,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
-	QuestionnaireVersion string                             `protobuf:"bytes,2,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
-	IdempotencyKey       string                             `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
-	Title                string                             `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
-	WriterId             uint64                             `protobuf:"varint,5,opt,name=writer_id,json=writerId,proto3" json:"writer_id,omitempty"`
-	TesteeId             uint64                             `protobuf:"varint,6,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
-	Answers              []*Answer                          `protobuf:"bytes,7,rep,name=answers,proto3" json:"answers,omitempty"`
-	OrgId                uint64                             `protobuf:"varint,8,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`             // 机构ID
-	TaskId               string                             `protobuf:"bytes,9,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`           // 计划任务ID（可选）
-	OriginRef            *OriginRef                         `protobuf:"bytes,10,opt,name=origin_ref,json=originRef,proto3" json:"origin_ref,omitempty"` // 受理来源；过渡期可与 task_id 同时提供
-	HistoricalContext    *common.HistoricalExecutionContext `protobuf:"bytes,11,opt,name=historical_context,json=historicalContext,proto3" json:"historical_context,omitempty"`
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	QuestionnaireCode    string                 `protobuf:"bytes,1,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
+	QuestionnaireVersion string                 `protobuf:"bytes,2,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
+	IdempotencyKey       string                 `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	Title                string                 `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
+	WriterId             uint64                 `protobuf:"varint,5,opt,name=writer_id,json=writerId,proto3" json:"writer_id,omitempty"`
+	TesteeId             uint64                 `protobuf:"varint,6,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
+	Answers              []*Answer              `protobuf:"bytes,7,rep,name=answers,proto3" json:"answers,omitempty"`
+	OrgId                uint64                 `protobuf:"varint,8,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`             // 机构ID
+	TaskId               string                 `protobuf:"bytes,9,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`           // 计划任务ID（可选）
+	OriginRef            *OriginRef             `protobuf:"bytes,10,opt,name=origin_ref,json=originRef,proto3" json:"origin_ref,omitempty"` // 受理来源；过渡期可与 task_id 同时提供
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -471,13 +469,6 @@ func (x *SaveAnswerSheetRequest) GetTaskId() string {
 func (x *SaveAnswerSheetRequest) GetOriginRef() *OriginRef {
 	if x != nil {
 		return x.OriginRef
-	}
-	return nil
-}
-
-func (x *SaveAnswerSheetRequest) GetHistoricalContext() *common.HistoricalExecutionContext {
-	if x != nil {
-		return x.HistoricalContext
 	}
 	return nil
 }
@@ -1154,7 +1145,7 @@ var File_answersheet_answersheet_proto protoreflect.FileDescriptor
 
 const file_answersheet_answersheet_proto_rawDesc = "" +
 	"\n" +
-	"\x1danswersheet/answersheet.proto\x12\vanswersheet\x1a\x17common/historical.proto\"\x96\x03\n" +
+	"\x1danswersheet/answersheet.proto\x12\vanswersheet\"\x96\x03\n" +
 	"\vAnswerSheet\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12-\n" +
 	"\x12questionnaire_code\x18\x02 \x01(\tR\x11questionnaireCode\x123\n" +
@@ -1195,7 +1186,7 @@ const file_answersheet_answersheet_proto_rawDesc = "" +
 	"\rquestion_code\x18\x01 \x01(\tR\fquestionCode\x12#\n" +
 	"\rquestion_type\x18\x02 \x01(\tR\fquestionType\x12\x14\n" +
 	"\x05score\x18\x03 \x01(\rR\x05score\x12\x14\n" +
-	"\x05value\x18\x04 \x01(\tR\x05value\"\xde\x03\n" +
+	"\x05value\x18\x04 \x01(\tR\x05value\"\xa5\x03\n" +
 	"\x16SaveAnswerSheetRequest\x12-\n" +
 	"\x12questionnaire_code\x18\x01 \x01(\tR\x11questionnaireCode\x123\n" +
 	"\x15questionnaire_version\x18\x02 \x01(\tR\x14questionnaireVersion\x12'\n" +
@@ -1208,8 +1199,7 @@ const file_answersheet_answersheet_proto_rawDesc = "" +
 	"\atask_id\x18\t \x01(\tR\x06taskId\x125\n" +
 	"\n" +
 	"origin_ref\x18\n" +
-	" \x01(\v2\x16.answersheet.OriginRefR\toriginRef\x12Q\n" +
-	"\x12historical_context\x18\v \x01(\v2\".common.HistoricalExecutionContextR\x11historicalContext\"/\n" +
+	" \x01(\v2\x16.answersheet.OriginRefR\toriginRefJ\x04\b\v\x10\fR\x12historical_context\"/\n" +
 	"\tOriginRef\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\"C\n" +
@@ -1293,33 +1283,31 @@ var file_answersheet_answersheet_proto_goTypes = []any{
 	(*ListAnswerSheetsResponse)(nil),            // 12: answersheet.ListAnswerSheetsResponse
 	(*SaveAnswerSheetScoresRequest)(nil),        // 13: answersheet.SaveAnswerSheetScoresRequest
 	(*SaveAnswerSheetScoresResponse)(nil),       // 14: answersheet.SaveAnswerSheetScoresResponse
-	(*common.HistoricalExecutionContext)(nil),   // 15: common.HistoricalExecutionContext
 }
 var file_answersheet_answersheet_proto_depIdxs = []int32{
 	2,  // 0: answersheet.AnswerSheet.answers:type_name -> answersheet.Answer
 	2,  // 1: answersheet.SaveAnswerSheetRequest.answers:type_name -> answersheet.Answer
 	4,  // 2: answersheet.SaveAnswerSheetRequest.origin_ref:type_name -> answersheet.OriginRef
-	15, // 3: answersheet.SaveAnswerSheetRequest.historical_context:type_name -> common.HistoricalExecutionContext
-	4,  // 4: answersheet.LookupAnswerSheetSubmissionRequest.origin_ref:type_name -> answersheet.OriginRef
-	7,  // 5: answersheet.LookupAnswerSheetSubmissionRequest.answers:type_name -> answersheet.SubmissionIntentAnswer
-	0,  // 6: answersheet.GetAnswerSheetResponse.answer_sheet:type_name -> answersheet.AnswerSheet
-	1,  // 7: answersheet.ListAnswerSheetsResponse.answer_sheets:type_name -> answersheet.AnswerSheetSummary
-	2,  // 8: answersheet.SaveAnswerSheetScoresRequest.answers:type_name -> answersheet.Answer
-	3,  // 9: answersheet.AnswerSheetService.SaveAnswerSheet:input_type -> answersheet.SaveAnswerSheetRequest
-	6,  // 10: answersheet.AnswerSheetService.LookupAnswerSheetSubmission:input_type -> answersheet.LookupAnswerSheetSubmissionRequest
-	9,  // 11: answersheet.AnswerSheetService.GetAnswerSheet:input_type -> answersheet.GetAnswerSheetRequest
-	11, // 12: answersheet.AnswerSheetService.ListAnswerSheets:input_type -> answersheet.ListAnswerSheetsRequest
-	13, // 13: answersheet.AnswerSheetService.SaveAnswerSheetScores:input_type -> answersheet.SaveAnswerSheetScoresRequest
-	5,  // 14: answersheet.AnswerSheetService.SaveAnswerSheet:output_type -> answersheet.SaveAnswerSheetResponse
-	8,  // 15: answersheet.AnswerSheetService.LookupAnswerSheetSubmission:output_type -> answersheet.LookupAnswerSheetSubmissionResponse
-	10, // 16: answersheet.AnswerSheetService.GetAnswerSheet:output_type -> answersheet.GetAnswerSheetResponse
-	12, // 17: answersheet.AnswerSheetService.ListAnswerSheets:output_type -> answersheet.ListAnswerSheetsResponse
-	14, // 18: answersheet.AnswerSheetService.SaveAnswerSheetScores:output_type -> answersheet.SaveAnswerSheetScoresResponse
-	14, // [14:19] is the sub-list for method output_type
-	9,  // [9:14] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	4,  // 3: answersheet.LookupAnswerSheetSubmissionRequest.origin_ref:type_name -> answersheet.OriginRef
+	7,  // 4: answersheet.LookupAnswerSheetSubmissionRequest.answers:type_name -> answersheet.SubmissionIntentAnswer
+	0,  // 5: answersheet.GetAnswerSheetResponse.answer_sheet:type_name -> answersheet.AnswerSheet
+	1,  // 6: answersheet.ListAnswerSheetsResponse.answer_sheets:type_name -> answersheet.AnswerSheetSummary
+	2,  // 7: answersheet.SaveAnswerSheetScoresRequest.answers:type_name -> answersheet.Answer
+	3,  // 8: answersheet.AnswerSheetService.SaveAnswerSheet:input_type -> answersheet.SaveAnswerSheetRequest
+	6,  // 9: answersheet.AnswerSheetService.LookupAnswerSheetSubmission:input_type -> answersheet.LookupAnswerSheetSubmissionRequest
+	9,  // 10: answersheet.AnswerSheetService.GetAnswerSheet:input_type -> answersheet.GetAnswerSheetRequest
+	11, // 11: answersheet.AnswerSheetService.ListAnswerSheets:input_type -> answersheet.ListAnswerSheetsRequest
+	13, // 12: answersheet.AnswerSheetService.SaveAnswerSheetScores:input_type -> answersheet.SaveAnswerSheetScoresRequest
+	5,  // 13: answersheet.AnswerSheetService.SaveAnswerSheet:output_type -> answersheet.SaveAnswerSheetResponse
+	8,  // 14: answersheet.AnswerSheetService.LookupAnswerSheetSubmission:output_type -> answersheet.LookupAnswerSheetSubmissionResponse
+	10, // 15: answersheet.AnswerSheetService.GetAnswerSheet:output_type -> answersheet.GetAnswerSheetResponse
+	12, // 16: answersheet.AnswerSheetService.ListAnswerSheets:output_type -> answersheet.ListAnswerSheetsResponse
+	14, // 17: answersheet.AnswerSheetService.SaveAnswerSheetScores:output_type -> answersheet.SaveAnswerSheetScoresResponse
+	13, // [13:18] is the sub-list for method output_type
+	8,  // [8:13] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_answersheet_answersheet_proto_init() }

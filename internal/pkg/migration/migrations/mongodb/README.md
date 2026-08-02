@@ -19,8 +19,6 @@ mongodb/
 | `questionnaires` | 问卷集合（head/snapshot） | role-based partial unique（见 000013） |
 | `assessment_models` | 测评模型（head/snapshot） | role-based partial unique（见 000013） |
 | `assessment_norms` | 常模表 | `idx_assessment_norms_table_version` unique |
-| `scales` | 量表集合 | domain_id, code, questionnaire |
-| `interpret_reports` | 解读报告集合 | domain_id, testee_id, scale_code |
 | `report_generations` | 报告生成意图（v2） | outcome_id, report_type, template_version |
 | `interpretation_runs` | 报告生成尝试（v2） | generation_id, attempt |
 | `interpret_report_artifacts` | 成功报告成品（v2） | generation_id, assessment_id, testee_id |
@@ -29,6 +27,15 @@ mongodb/
 | `interpretation_attention_projections` | 报告生成后 attention 投影状态（v2） | event_id unique, status+updated_at（见 000016） |
 | `interpretation_report_templates` | Interpretation 报告模板发布资产（v2） | template_id+template_version unique（见 000017） |
 | `interpretation_catalog_repair_plans` | Catalog 修复 dry-run 快照 | dry_run_id unique、expires_at TTL（见 000019） |
+
+## Legacy collections retirement（000020）
+
+`000020_retire_legacy_collections` 删除已退出运行时的 `published_assessment_models`、
+`interpret_reports`、`evaluation_rule_sets` 和 `scales`。这些集合不属于上表中的现行集合，
+运行时 IndexManager 和维护脚本不得重新创建它们。
+
+down migration 只重建 MongoDB 19 的空集合与索引结构，不恢复文档。生产回退不得依赖 down
+migration 恢复数据，必须连同 migration state 使用完整 MongoDB 备份恢复。
 
 ## Interpretation recovery indexes（000019）
 

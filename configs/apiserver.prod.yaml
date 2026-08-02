@@ -643,15 +643,3 @@ log:
     error:
       - stderr                              # ERROR 级别写入标准错误，便于监控采集
       - /data/logs/qs/qs-apiserver-error.log # 额外记录 ERROR（快速定位故障）
-
-# One-off historical business-time channel. Enable only for the controlled
-# backfill window; inject the HMAC key through QS_HISTORICAL_CONTEXT_SECRET.
-historical_seed:
-  enabled: true
-  pause_plan_scheduler: true
-  allowed_org_ids: [1]
-  earliest_date: "2025-01-01"
-  latest_date: "2026-08-01"
-  timezone: "Asia/Shanghai"
-  freshness: 5m
-  secret_env: "QS_HISTORICAL_CONTEXT_SECRET"

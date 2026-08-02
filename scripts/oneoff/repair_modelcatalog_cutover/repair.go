@@ -58,11 +58,6 @@ var (
 		"report_query_catalog", "interpretation_admission_failures",
 		"interpretation_attention_projections", "domain_event_outbox",
 	}
-	retiredReportCollections = []string{
-		"interpret_reports",
-		"cleanup_bak_orphans_archived_reports_orphan_reports_20260712",
-		"cleanup_bak_orphans_interpret_reports_orphan_reports_20260712",
-	}
 	knownZOOQuestionRefs = []string{
 		"7X2uSso2", "BhPDSP3i", "C54P1JBI", "D6BGiI9R", "DYWcJzmg",
 		"JdHFdzgH", "KPijIhCr", "NaYz2zGp", "UZ28oCO9", "WnWSyHbZ",
@@ -280,15 +275,6 @@ WHERE total_assessments <> 0
 		plan.MongoHistory[name] = count
 		if count != 0 {
 			plan.addIssue("mongo_history", name, "collection.not_empty", "historical Mongo data must be empty before catalog repair", count)
-		}
-	}
-	for _, name := range retiredReportCollections {
-		rows, err := db.ListCollectionNames(ctx, bson.M{"name": name})
-		if err != nil {
-			return fmt.Errorf("inspect retired collection %s: %w", name, err)
-		}
-		if len(rows) != 0 {
-			plan.addIssue("mongo_history", name, "retired_collection.present", "retired report collection must be absent before catalog repair", 1)
 		}
 	}
 	return nil

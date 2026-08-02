@@ -8,7 +8,6 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
@@ -41,9 +40,6 @@ func handleEvaluationOutcomeCommitted(deps *Dependencies) HandlerFunc {
 		}
 
 		callCtx := metadata.AppendToOutgoingContext(ctx, "x-event-id", env.ID)
-		if data.HistoricalContext != nil {
-			callCtx = historicalseed.WithContext(callCtx, data.HistoricalContext.Clone())
-		}
 		resp, err := deps.InterpretationAutomationClient.GenerateReportFromOutcome(callCtx, data.OutcomeID)
 		if err != nil {
 			deps.Logger.Error("failed to generate report from assessment",

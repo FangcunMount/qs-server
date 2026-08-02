@@ -119,64 +119,6 @@ func (a *AnswerSheetsIndexes) EnsureIndexes(ctx context.Context) error {
 	return nil
 }
 
-// ScalesIndexes 量表集合索引定义
-type ScalesIndexes struct {
-	collection *mongo.Collection
-}
-
-// NewScalesIndexes 创建量表索引管理器
-func NewScalesIndexes(collection *mongo.Collection) *ScalesIndexes {
-	return &ScalesIndexes{collection: collection}
-}
-
-// EnsureIndexes 确保所有推荐索引已创建
-func (s *ScalesIndexes) EnsureIndexes(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	indexModels := []mongo.IndexModel{
-		{
-			Keys: bson.D{
-				{Key: "code", Value: 1},
-				{Key: "deleted_at", Value: 1},
-			},
-			Options: options.Index().SetName("idx_code_deleted"),
-		},
-		{
-			Keys: bson.D{
-				{Key: "questionnaire_code", Value: 1},
-				{Key: "deleted_at", Value: 1},
-			},
-			Options: options.Index().SetName("idx_question_deleted"),
-		},
-		{
-			Keys: bson.D{
-				{Key: "category", Value: 1},
-				{Key: "status", Value: 1},
-				{Key: "deleted_at", Value: 1},
-			},
-			Options: options.Index().SetName("idx_category_status_deleted"),
-		},
-		{
-			Keys: bson.D{
-				{Key: "questionnaire_code", Value: 1},
-				{Key: "record_role", Value: 1},
-				{Key: "is_active_published", Value: 1},
-				{Key: "status", Value: 1},
-			},
-			Options: options.Index().
-				SetName("idx_scales_published_questionnaire_active").
-				SetPartialFilterExpression(bson.M{"deleted_at": nil}),
-		},
-	}
-
-	if _, err := s.collection.Indexes().CreateMany(ctx, indexModels); err != nil {
-		return fmt.Errorf("create scales indexes: %w", err)
-	}
-
-	return nil
-}
-
 // AssessmentModelsIndexes manages unified assessment_models indexes.
 type AssessmentModelsIndexes struct {
 	collection *mongo.Collection
@@ -341,9 +283,6 @@ func (m *IndexManager) EnsureAllIndexes(ctx context.Context) error {
 	if err := NewAnswerSheetsIndexes(m.db.Collection("answersheets")).EnsureIndexes(ctx); err != nil {
 		return err
 	}
-	if err := NewScalesIndexes(m.db.Collection("scales")).EnsureIndexes(ctx); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -451,99 +390,3 @@ func listIndexNames(ctx context.Context, collection *mongo.Collection) (map[stri
 	}
 	return out, cursor.Err()
 }
-
-// MongoDB Shell 脚本版本 (用于手动创建)
-const MongoDBIndexScript = `
-// ========== Questionnaires 集合 ==========
-db.questionnaires.createIndex(
-    { code: 1, record_role: 1, deleted_at: 1 },
-    { name: "idx_code_record_role_deleted" }
-);
-
-db.questionnaires.createIndex(
-    { code: 1, version: 1, record_role: 1, deleted_at: 1 },
-    { name: "idx_code_version_record_role_deleted" }
-);
-
-db.questionnaires.createIndex(
-    { code: 1, is_active_published: 1, deleted_at: 1 },
-    { name: "idx_code_active_deleted" }
-);
-
-db.questionnaires.createIndex(
-    { status: 1, deleted_at: 1, updated_at: -1 },
-    { name: "idx_status_deleted_updated" }
-);
-
-db.questionnaires.createIndex(
-    { code: 1, record_role: 1 },
-    { name: "idx_questionnaires_head_code", unique: true, partialFilterExpression: { record_role: "head", deleted_at: null } }
-);
-
-db.questionnaires.createIndex(
-    { code: 1, version: 1, record_role: 1 },
-    { name: "idx_questionnaires_snapshot_version", unique: true, partialFilterExpression: { record_role: "published_snapshot", deleted_at: null } }
-);
-
-db.questionnaires.createIndex(
-    { code: 1, record_role: 1, release_status: 1 },
-    { name: "idx_questionnaires_active_code", unique: true, partialFilterExpression: { record_role: "published_snapshot", release_status: "active", deleted_at: null } }
-);
-
-// ========== AnswerSheets 集合 ==========
-db.answersheets.createIndex(
-    { filler_id: 1, deleted_at: 1, filled_at: -1 },
-    { name: "idx_filler_deleted_filled" }
-);
-
-db.answersheets.createIndex(
-    { questionnaire_code: 1, deleted_at: 1, filled_at: -1 },
-    { name: "idx_question_deleted_filled" }
-);
-
-db.answersheets.createIndex(
-    { domain_id: 1, deleted_at: 1 },
-    { name: "idx_domain_deleted" }
-);
-
-// ========== Scales 集合 ==========
-db.scales.createIndex(
-    { code: 1, deleted_at: 1 },
-    { name: "idx_code_deleted" }
-);
-
-db.scales.createIndex(
-    { questionnaire_code: 1, deleted_at: 1 },
-    { name: "idx_question_deleted" }
-);
-
-db.scales.createIndex(
-    { category: 1, status: 1, deleted_at: 1 },
-    { name: "idx_category_status_deleted" }
-);
-
-db.scales.createIndex(
-    { questionnaire_code: 1, record_role: 1, is_active_published: 1, status: 1 },
-    {
-        name: "idx_scales_published_questionnaire_active",
-        partialFilterExpression: { deleted_at: null }
-    }
-);
-
-// ========== Assessment Models / Norms（unified schema，与 migration 000013 同源）==========
-db.assessment_models.createIndex(
-    { code: 1, record_role: 1 },
-    { name: "idx_assessment_models_head_code", unique: true, partialFilterExpression: { record_role: "head", deleted_at: null } }
-);
-db.assessment_norms.createIndex(
-    { table_version: 1 },
-    { name: "idx_assessment_norms_table_version", unique: true, partialFilterExpression: { deleted_at: null } }
-);
-
-// ========== 验证索引 ==========
-db.questionnaires.getIndexes();
-db.answersheets.getIndexes();
-db.scales.getIndexes();
-db.assessment_models.getIndexes();
-db.assessment_norms.getIndexes();
-`

@@ -7,7 +7,6 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/event"
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	stageport "github.com/FangcunMount/qs-server/internal/apiserver/port/historicalseedstage"
 )
 
 type intakeRepoStub struct {
@@ -59,16 +58,9 @@ func (validatorStub) ValidateEvaluationModel(context.Context, domainassessment.E
 	return nil
 }
 
-type stageRecorderStub struct{ completions []stageport.Completion }
-
-func (s *stageRecorderStub) Complete(_ context.Context, completion stageport.Completion) (*stageport.Record, error) {
-	s.completions = append(s.completions, completion)
-	return &stageport.Record{Stage: completion.Stage, ResourceID: completion.ResourceID}, nil
-}
-
 func TestServiceCreatesThenSubmitsAssessmentThroughTransactionalOutbox(t *testing.T) {
-	repo, tx, stager, stages := &intakeRepoStub{}, &txStub{}, &stagerStub{}, &stageRecorderStub{}
-	service := NewService(repo, validatorStub{}, tx, stager, nil, WithHistoricalStageRecorder(stages))
+	repo, tx, stager := &intakeRepoStub{}, &txStub{}, &stagerStub{}
+	service := NewService(repo, validatorStub{}, tx, stager, nil)
 	kind, code, version := "scale", "MODEL-1", "1.0.0"
 	created, err := service.CreateForAnswerSheet(context.Background(), CreateCommand{
 		OrgID: 1, TesteeID: 2, QuestionnaireCode: "Q-001", QuestionnaireVersion: "v1", AnswerSheetID: 3, OriginType: "adhoc",
@@ -79,9 +71,6 @@ func TestServiceCreatesThenSubmitsAssessmentThroughTransactionalOutbox(t *testin
 	}
 	if created.ID != 7001 || created.Status != "pending" {
 		t.Fatalf("created=%#v", created)
-	}
-	if len(stages.completions) != 1 || stages.completions[0].Stage != stageport.StageAssessmentCreated || stages.completions[0].ResourceID != "7001" {
-		t.Fatalf("assessment create completion=%+v, want assigned resource id 7001", stages.completions)
 	}
 	submitted, err := service.SubmitForEvaluation(context.Background(), created.ID)
 	if err != nil {

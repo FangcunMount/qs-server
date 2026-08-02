@@ -10,79 +10,6 @@ import (
 	"time"
 )
 
-func TestHistoricalBackfillWorkflowRepairsValidatesCatchupAndPublishesLatestCompleteDay(t *testing.T) {
-	var requests []runRequest
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var request runRequest
-		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-			t.Fatal(err)
-		}
-		requests = append(requests, request)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"code":0,"data":{"id":1,"status":"succeeded","stage":"completed","as_of_date":"` + request.ToDate + `","fact_counts":{"access.inserted":0,"access.conflict":0,"plan.inserted":0,"plan.conflict":0,"assessment.inserted":0,"assessment.conflict":0}}}`))
-	}))
-	defer server.Close()
-
-	location, _ := time.LoadLocation("Asia/Shanghai")
-	cfg := options{
-		BaseURL: server.URL, Token: "secret", OrgIDs: []int64{7},
-		From:       time.Date(2026, 1, 1, 0, 0, 0, 0, location),
-		To:         time.Date(2026, 1, 5, 0, 0, 0, 0, location),
-		WindowDays: 3, Reason: "historical backfill", Mode: historicalBackfillMode, Confirm: true,
-		Now: func() time.Time { return time.Date(2026, 1, 7, 12, 0, 0, 0, location) },
-	}
-	var output bytes.Buffer
-	if err := executeHistoricalBackfill(server.Client(), cfg, 7, &output); err != nil {
-		t.Fatal(err)
-	}
-	if len(requests) != 7 {
-		t.Fatalf("requests=%d, want 7", len(requests))
-	}
-	want := []struct{ mode, from, to string }{
-		{"repair", "2026-01-01", "2026-01-03"},
-		{"validate", "2026-01-01", "2026-01-03"},
-		{"repair", "2026-01-04", "2026-01-05"},
-		{"validate", "2026-01-04", "2026-01-05"},
-		{"repair", "2026-01-06", "2026-01-06"},
-		{"validate", "2026-01-06", "2026-01-06"},
-		{"publish", "2026-01-06", "2026-01-06"},
-	}
-	for index, expected := range want {
-		got := requests[index]
-		if got.Mode != expected.mode || got.FromDate != expected.from || got.ToDate != expected.to {
-			t.Fatalf("request[%d]=%+v, want %+v", index, got, expected)
-		}
-		if got.Mode == "validate" && (!got.ValidateOnly || got.Confirm) {
-			t.Fatalf("validate request[%d] must be read-only: %+v", index, got)
-		}
-	}
-}
-
-func TestHistoricalBackfillRejectsWhenLatestCompleteDayPrecedesRequestedEnd(t *testing.T) {
-	location, _ := time.LoadLocation("Asia/Shanghai")
-	cfg := options{
-		BaseURL: "http://localhost", Token: "secret", OrgIDs: []int64{7},
-		From: time.Date(2026, 1, 1, 0, 0, 0, 0, location), To: time.Date(2026, 1, 5, 0, 0, 0, 0, location),
-		WindowDays: 3, Reason: "historical backfill", Mode: historicalBackfillMode, Confirm: true,
-		Now: func() time.Time { return time.Date(2026, 1, 5, 12, 0, 0, 0, location) },
-	}
-	if err := executeHistoricalBackfill(http.DefaultClient, cfg, 7, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "before historical backfill end") {
-		t.Fatalf("err=%v", err)
-	}
-}
-
-func TestHistoricalRangeSplitsIntoNineteenWindows(t *testing.T) {
-	from, _ := parseShanghaiDate("2025-01-01")
-	to, _ := parseShanghaiDate("2026-07-27")
-	windows := splitWindows(from, to, 31)
-	if len(windows) != 19 {
-		t.Fatalf("windows=%d, want 19", len(windows))
-	}
-	if windows[len(windows)-1].To.Format(dateLayout) != "2026-07-27" {
-		t.Fatalf("last window=%s", windows[len(windows)-1].To.Format(dateLayout))
-	}
-}
-
 func TestSplitWindowsUsesInclusiveShanghaiDates(t *testing.T) {
 	from, _ := parseShanghaiDate("2026-01-29")
 	to, _ := parseShanghaiDate("2026-02-05")
@@ -115,7 +42,7 @@ func TestOptionsRejectsUnconfirmedWriteAndLargeWindow(t *testing.T) {
 	}
 }
 
-func TestOptionsRejectsInvalidTimeoutAndResumeMode(t *testing.T) {
+func TestOptionsRejectsInvalidTimeoutAndMode(t *testing.T) {
 	location, _ := time.LoadLocation("Asia/Shanghai")
 	base := options{
 		BaseURL: "http://localhost", Token: "secret", OrgIDs: []int64{1},
@@ -127,13 +54,8 @@ func TestOptionsRejectsInvalidTimeoutAndResumeMode(t *testing.T) {
 		t.Fatalf("err=%v", err)
 	}
 	base.RequestTimeout = defaultRequestTimeout
-	base.ResumeFrom = base.From
-	if err := base.validate(); err == nil || !strings.Contains(err.Error(), "historical-backfill") {
-		t.Fatalf("err=%v", err)
-	}
-	base.Mode = historicalBackfillMode
-	base.ResumeFrom = base.From.AddDate(0, 0, -1)
-	if err := base.validate(); err == nil || !strings.Contains(err.Error(), "before from") {
+	base.Mode = "unsupported"
+	if err := base.validate(); err == nil || !strings.Contains(err.Error(), "mode") {
 		t.Fatalf("err=%v", err)
 	}
 }
@@ -238,7 +160,7 @@ func TestExecuteRunWithCacheRecoveryResumesDataCommittedPublish(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 				t.Fatal(err)
 			}
-			if !request.Confirm || request.Reason != "historical repair" {
+			if !request.Confirm || request.Reason != "approved repair" {
 				t.Fatalf("request=%+v", request)
 			}
 			_, _ = w.Write([]byte(`{"code":0,"data":{"id":13,"mode":"publish","status":"succeeded","stage":"completed","as_of_date":"2026-01-01","cache_generation":3}}`))
@@ -250,7 +172,7 @@ func TestExecuteRunWithCacheRecoveryResumesDataCommittedPublish(t *testing.T) {
 
 	location, _ := time.LoadLocation("Asia/Shanghai")
 	result, err := executeRunWithCacheRecovery(server.Client(), options{
-		BaseURL: server.URL, Token: "secret", Mode: "publish", Reason: "historical repair", Confirm: true,
+		BaseURL: server.URL, Token: "secret", Mode: "publish", Reason: "approved repair", Confirm: true,
 	}, 7, dateWindow{
 		From: time.Date(2026, 1, 1, 0, 0, 0, 0, location),
 		To:   time.Date(2026, 1, 1, 0, 0, 0, 0, location),
@@ -264,47 +186,5 @@ func TestExecuteRunWithCacheRecoveryResumesDataCommittedPublish(t *testing.T) {
 	want := []string{"/internal/v2/statistics/runs", "/internal/v2/statistics/runs/13/resume-cache"}
 	if strings.Join(paths, ",") != strings.Join(want, ",") {
 		t.Fatalf("paths=%v want=%v", paths, want)
-	}
-}
-
-func TestHistoricalBackfillResumeFromSkipsCompletedWindows(t *testing.T) {
-	var requests []runRequest
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var request runRequest
-		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-			t.Fatal(err)
-		}
-		requests = append(requests, request)
-		_, _ = w.Write([]byte(`{"code":0,"data":{"id":1,"status":"succeeded","stage":"completed","as_of_date":"` + request.ToDate + `","fact_counts":{"access.inserted":0,"access.conflict":0,"plan.inserted":0,"plan.conflict":0,"assessment.inserted":0,"assessment.conflict":0}}}`))
-	}))
-	defer server.Close()
-
-	location, _ := time.LoadLocation("Asia/Shanghai")
-	cfg := options{
-		BaseURL: server.URL, Token: "secret", OrgIDs: []int64{7},
-		From:       time.Date(2026, 1, 1, 0, 0, 0, 0, location),
-		To:         time.Date(2026, 1, 5, 0, 0, 0, 0, location),
-		ResumeFrom: time.Date(2026, 1, 4, 0, 0, 0, 0, location),
-		WindowDays: 3, Reason: "historical backfill", Mode: historicalBackfillMode, Confirm: true,
-		Now: func() time.Time { return time.Date(2026, 1, 7, 12, 0, 0, 0, location) },
-	}
-	if err := executeHistoricalBackfill(server.Client(), cfg, 7, &bytes.Buffer{}); err != nil {
-		t.Fatal(err)
-	}
-	want := []struct{ mode, from, to string }{
-		{"repair", "2026-01-04", "2026-01-05"},
-		{"validate", "2026-01-04", "2026-01-05"},
-		{"repair", "2026-01-06", "2026-01-06"},
-		{"validate", "2026-01-06", "2026-01-06"},
-		{"publish", "2026-01-06", "2026-01-06"},
-	}
-	if len(requests) != len(want) {
-		t.Fatalf("requests=%d want=%d", len(requests), len(want))
-	}
-	for index, expected := range want {
-		got := requests[index]
-		if got.Mode != expected.mode || got.FromDate != expected.from || got.ToDate != expected.to {
-			t.Fatalf("request[%d]=%+v want=%+v", index, got, expected)
-		}
 	}
 }

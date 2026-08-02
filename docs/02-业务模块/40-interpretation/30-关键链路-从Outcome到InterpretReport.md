@@ -235,7 +235,7 @@ Worker 不直接访问 MongoDB 中的：
 
 - `report_generations`；
 - `interpretation_runs`；
-- `interpret_reports`；
+- `interpret_report_artifacts`；
 - `report_query_catalog`。
 
 它也不会在本地根据 Outcome 选择 Builder。这样可以保证，无论初次事件、自动重试事件还是 lease recovery 进入系统，最终都经过同一个 Automation 和 Executor。

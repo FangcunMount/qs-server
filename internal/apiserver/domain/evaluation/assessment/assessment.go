@@ -6,7 +6,6 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -202,12 +201,11 @@ func ReconstructWithCreatedAt(
 // 前置条件：pending，且 ModelRef / QuestionnaireRef / AnswerSheetRef 完整（EV-R003）
 // 后置条件：状态变为 submitted，发布 evaluation.requested
 func (a *Assessment) Submit() error {
-	return a.SubmitAt(time.Now(), nil)
+	return a.SubmitAt(time.Now())
 }
 
-// SubmitAt applies an explicit business time and optionally carries the
-// verified historical context into evaluation.requested.
-func (a *Assessment) SubmitAt(submittedAt time.Time, historical *historicalseed.Context) error {
+// SubmitAt applies the submission time to the assessment and its event.
+func (a *Assessment) SubmitAt(submittedAt time.Time) error {
 	if !a.status.IsPending() {
 		return NewInvalidStatusError("submit", a.status)
 	}
@@ -230,7 +228,6 @@ func (a *Assessment) SubmitAt(submittedAt time.Time, historical *historicalseed.
 		a.answerSheetRef,
 		a.modelRef,
 		submittedAt,
-		historical,
 	))
 
 	return nil
@@ -286,10 +283,6 @@ func (a *Assessment) PrepareScoringProjection(projection ScoringProjection, eval
 // StageEvaluatedEvent records the durable outcome and run references emitted
 // after scoring completes.
 func (a *Assessment) StageEvaluatedEvent(evaluatedAt time.Time, outcomeID meta.ID, runID evalrun.ID) {
-	a.StageEvaluatedEventWithHistorical(evaluatedAt, outcomeID, runID, nil)
-}
-
-func (a *Assessment) StageEvaluatedEventWithHistorical(evaluatedAt time.Time, outcomeID meta.ID, runID evalrun.ID, historical *historicalseed.Context) {
 	a.addEvent(NewEvaluationOutcomeCommittedEvent(
 		a.orgID,
 		a.id,
@@ -297,7 +290,6 @@ func (a *Assessment) StageEvaluatedEventWithHistorical(evaluatedAt time.Time, ou
 		outcomeID,
 		runID,
 		evaluatedAt,
-		historical,
 	))
 }
 

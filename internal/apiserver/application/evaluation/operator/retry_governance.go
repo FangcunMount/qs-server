@@ -11,7 +11,6 @@ import (
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	evaluationrun "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
@@ -67,12 +66,7 @@ func (s *governedRetryService) Authorize(ctx context.Context, actor Actor, comma
 		return nil, fmt.Errorf("evaluation retry requires a failed assessment")
 	}
 	at := s.now()
-	var historical *historicalseed.Context
-	if value, ok := historicalseed.FromContext(ctx); ok {
-		clone := value.Clone()
-		historical = &clone
-	}
-	retryEvent := domainassessment.NewEvaluationRetryRequestedEvent(assessmentRecord, command.ExpectedAttempt, command.Origin, command.RequestID, at, historical)
+	retryEvent := domainassessment.NewEvaluationRetryRequestedEvent(assessmentRecord, command.ExpectedAttempt, command.Origin, command.RequestID, at)
 	authorizer, ok := s.runs.(evaluationrun.RetryAuthorizer)
 	if !ok {
 		return nil, fmt.Errorf("evaluation run repository does not support retry authorization")

@@ -72,7 +72,6 @@ func NewAnswerSheetSubmittedEvent(sheet *AnswerSheet) AnswerSheetSubmittedEvent 
 			SubmittedAt:          sheet.FilledAt(),
 			Admission:            submissionContext.Admission().ToEventPayload(),
 			Attribution:          attributionPayload,
-			HistoricalContext:    submissionContext.HistoricalContext(),
 		},
 	)
 }

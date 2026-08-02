@@ -15,7 +15,6 @@ import (
 	domainanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
@@ -412,25 +411,18 @@ func (s *service) matchPlan(ctx context.Context, command Command, modelCode *str
 	return nil
 }
 
-// completePlan preserves best-effort behavior for ordinary traffic. Historical
-// backfill must surface the error so the durable worker retries the stage.
+// completePlan preserves best-effort behavior for assessment intake.
 func (s *service) completePlan(ctx context.Context, orgID uint64, task *planapp.TaskAssessmentContext, assessmentID uint64) error {
 	if task == nil || task.Completed || s.planCommands == nil {
 		return nil
 	}
 	orgScope, err := safeconv.Uint64ToInt64(orgID)
 	if err != nil {
-		if _, historical := historicalseed.FromContext(ctx); historical {
-			return err
-		}
 		return nil
 	}
 	_, err = s.planCommands.CompleteTask(ctx, orgScope, task.TaskID, meta.FromUint64(assessmentID).String())
 	if err == nil {
 		return nil
-	}
-	if _, historical := historicalseed.FromContext(ctx); historical {
-		return err
 	}
 	logger.L(ctx).Warnw("Plan task completion failed after assessment intake",
 		"action", "complete_plan_task",

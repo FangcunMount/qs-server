@@ -9,7 +9,6 @@ import (
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	stageport "github.com/FangcunMount/qs-server/internal/apiserver/port/historicalseedstage"
 )
 
 // EventStager 事件阶段器
@@ -29,8 +28,6 @@ func saveAssessmentAndStageEvents(
 	stager EventStager,
 	a *domainAssessment.Assessment,
 	postCommit appEventing.PostCommitDispatcher,
-	recorder stageport.Recorder,
-	completion stageport.Completion,
 ) error {
 	if txRunner == nil || stager == nil {
 		return evalerrors.ModuleNotConfigured("assessment transactional outbox requires transaction runner and event stager")
@@ -38,24 +35,10 @@ func saveAssessmentAndStageEvents(
 	if a == nil {
 		return nil
 	}
-	attemptCtx, handle, err := stageport.BeginStageAttempt(ctx, recorder, stageport.Attempt(completion))
-	if err != nil {
-		return err
-	}
-	ctx = attemptCtx
-
 	var stagedEvents []event.DomainEvent
-	err = txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
+	err := txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := repo.Save(txCtx, a); err != nil {
 			return err
-		}
-		if recorder != nil {
-			if completion.ResourceID == "" {
-				completion.ResourceID = a.ID().String()
-			}
-			if _, err := stageport.CompleteStage(txCtx, recorder, completion); err != nil {
-				return err
-			}
 		}
 		eventsToStage := make([]event.DomainEvent, 0, len(a.Events()))
 		eventsToStage = append(eventsToStage, a.Events()...)
@@ -66,10 +49,6 @@ func saveAssessmentAndStageEvents(
 		return stager.Stage(txCtx, eventsToStage...)
 	})
 	if err != nil {
-		_ = stageport.FailStageAttempt(ctx, recorder, handle, stageport.Failure{
-			Stage: completion.Stage, BusinessAt: completion.BusinessAt, ResourceType: completion.ResourceType,
-			ResourceID: completion.ResourceID, Payload: completion.Payload, Err: err,
-		})
 		return err
 	}
 	if postCommit != nil && len(stagedEvents) > 0 {

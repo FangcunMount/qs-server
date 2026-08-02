@@ -9,8 +9,6 @@ import (
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	stageport "github.com/FangcunMount/qs-server/internal/apiserver/port/historicalseedstage"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
@@ -61,21 +59,17 @@ type EvaluationModelValidator interface {
 	ValidateEvaluationModel(context.Context, domainassessment.EvaluationModelRef, domainassessment.QuestionnaireRef, ModelValidationMode) error
 }
 type service struct {
-	repo          domainassessment.Repository
-	validator     EvaluationModelValidator
-	tx            apptransaction.Runner
-	events        EventStager
-	cache         assessmentListCache
-	postCommit    appEventing.PostCommitDispatcher
-	stageRecorder stageport.Recorder
+	repo       domainassessment.Repository
+	validator  EvaluationModelValidator
+	tx         apptransaction.Runner
+	events     EventStager
+	cache      assessmentListCache
+	postCommit appEventing.PostCommitDispatcher
 }
 type Option func(*service)
 
 func WithPostCommitDispatcher(v appEventing.PostCommitDispatcher) Option {
 	return func(s *service) { s.postCommit = v }
-}
-func WithHistoricalStageRecorder(v stageport.Recorder) Option {
-	return func(s *service) { s.stageRecorder = v }
 }
 func NewService(repo domainassessment.Repository, validator EvaluationModelValidator, tx apptransaction.Runner, events EventStager, cache assessmentListCache, opts ...Option) Service {
 	s := &service{repo: repo, validator: validator, tx: tx, events: events, cache: cache}
@@ -117,12 +111,8 @@ func (s *service) CreateForAnswerSheet(ctx context.Context, command CreateComman
 			return nil, evalerrors.AssessmentCreateFailed(err, "创建测评失败")
 		}
 	}
-	createdAt, err := historicalseed.OccurredAt(ctx, command.OrgID, historicalseed.StageAssessmentCreated, time.Now())
-	if err != nil {
-		return nil, evalerrors.InvalidArgument("invalid assessment creation time: %v", err)
-	}
 	assessmentOptions := make([]domainassessment.AssessmentOption, 0, 2)
-	assessmentOptions = append(assessmentOptions, domainassessment.WithCreatedAt(createdAt))
+	assessmentOptions = append(assessmentOptions, domainassessment.WithCreatedAt(time.Now()))
 	if req.ModelRef != nil {
 		assessmentOptions = append(assessmentOptions, domainassessment.WithEvaluationModel(*req.ModelRef))
 	}
@@ -130,7 +120,7 @@ func (s *service) CreateForAnswerSheet(ctx context.Context, command CreateComman
 	if err != nil {
 		return nil, evalerrors.AssessmentCreateFailed(err, "创建测评失败")
 	}
-	finalizer := assessmentCreateFinalizer{repo: s.repo, txRunner: s.tx, eventStager: s.events, cache: s.cache, postCommit: s.postCommit, stageRecorder: s.stageRecorder}
+	finalizer := assessmentCreateFinalizer{repo: s.repo, txRunner: s.tx, eventStager: s.events, cache: s.cache, postCommit: s.postCommit}
 	if err := finalizer.SaveAndStage(ctx, a, req, command); err != nil {
 		return nil, evalerrors.Database(err, "保存测评失败")
 	}
@@ -142,23 +132,10 @@ func (s *service) SubmitForEvaluation(ctx context.Context, id uint64) (*Assessme
 	if err != nil {
 		return nil, evalerrors.AssessmentNotFound(err, "测评不存在")
 	}
-	orgID, err := safeconv.Int64ToUint64(a.OrgID())
-	if err != nil {
-		return nil, evalerrors.AssessmentSubmitFailed(err, "测评机构ID无效")
-	}
-	submittedAt, err := historicalseed.OccurredAt(ctx, orgID, historicalseed.StageAssessmentSubmitted, time.Now())
-	if err != nil {
-		return nil, evalerrors.InvalidArgument("invalid assessment submission time: %v", err)
-	}
-	var historical *historicalseed.Context
-	if value, ok := historicalseed.FromContext(ctx); ok {
-		clone := value.Clone()
-		historical = &clone
-	}
-	if err := a.SubmitAt(submittedAt, historical); err != nil {
+	if err := a.SubmitAt(time.Now()); err != nil {
 		return nil, evalerrors.AssessmentSubmitFailed(err, "提交测评失败")
 	}
-	finalizer := assessmentSubmitFinalizer{repo: s.repo, txRunner: s.tx, eventStager: s.events, cache: s.cache, postCommit: s.postCommit, stageRecorder: s.stageRecorder}
+	finalizer := assessmentSubmitFinalizer{repo: s.repo, txRunner: s.tx, eventStager: s.events, cache: s.cache, postCommit: s.postCommit}
 	if err := finalizer.SaveAndStage(ctx, a); err != nil {
 		return nil, evalerrors.Database(err, "保存测评失败")
 	}

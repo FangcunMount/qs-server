@@ -13,7 +13,6 @@ import (
 	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
@@ -97,17 +96,13 @@ func boundScaleBinding() bindingStub {
 	}
 }
 
-func TestCompletePlanPreservesOrdinaryBestEffortButFailsHistoricalAttempt(t *testing.T) {
+func TestCompletePlanPreservesBestEffort(t *testing.T) {
 	wantErr := errors.New("task completion failed")
 	commands := planapp.NewCommandService(nil, nil, nil, &failingTaskManagementStub{err: wantErr}, nil, nil)
 	svc := &service{planCommands: commands}
 	task := &planapp.TaskAssessmentContext{TaskID: "task-1", PlanID: "plan-1"}
 	if err := svc.completePlan(context.Background(), 9, task, 91); err != nil {
 		t.Fatalf("ordinary completion must remain best-effort: %v", err)
-	}
-	ctx := historicalseed.WithContext(context.Background(), historicalseed.Context{BatchID: "batch", ScenarioID: "scenario", OrgID: 9, Version: historicalseed.Version1})
-	if err := svc.completePlan(ctx, 9, task, 91); !errors.Is(err, wantErr) {
-		t.Fatalf("historical completion err=%v, want %v", err, wantErr)
 	}
 }
 

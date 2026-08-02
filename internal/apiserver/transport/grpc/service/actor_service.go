@@ -13,7 +13,6 @@ import (
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/actor"
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 )
 
 // ActorService Actor gRPC 服务 - C 端接口
@@ -24,11 +23,6 @@ type ActorService struct {
 	managementService            testeeApp.TesteeManagementService
 	queryService                 testeeApp.TesteeQueryService
 	clinicianRelationshipService clinicianApp.ClinicianRelationshipService
-	historicalVerifier           *historicalseed.Verifier
-}
-
-func (s *ActorService) SetHistoricalSeedVerifier(verifier *historicalseed.Verifier) {
-	s.historicalVerifier = verifier
 }
 
 // NewActorService 创建 Actor gRPC 服务
@@ -70,10 +64,6 @@ func (s *ActorService) CreateTestee(ctx context.Context, req *pb.CreateTesteeReq
 		profileID = &req.IamProfileId
 	}
 	resolvedOrgID, err := requestOrgIDUint64(ctx, req.OrgId)
-	if err != nil {
-		return nil, err
-	}
-	ctx, err = withHistoricalExecutionContext(ctx, req.GetHistoricalContext(), resolvedOrgID, s.historicalVerifier)
 	if err != nil {
 		return nil, err
 	}

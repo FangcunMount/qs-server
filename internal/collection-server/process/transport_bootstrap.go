@@ -16,11 +16,7 @@ func (s *server) initializeTransports(containerOutput containerOutput) (transpor
 		return transportOutput{}, err
 	}
 	if containerOutput.container != nil {
-		historicalVerifier, err := containerOutput.container.HistoricalSeedVerifier()
-		if err != nil {
-			return transportOutput{}, err
-		}
-		resttransport.NewRouter(containerOutput.container, historicalVerifier).RegisterRoutes(httpServer.Engine)
+		resttransport.NewRouter(containerOutput.container).RegisterRoutes(httpServer.Engine)
 	}
 	return transportOutput{httpServer: httpServer}, nil
 }

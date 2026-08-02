@@ -78,15 +78,12 @@ func buildSchedulerManager(cfg *config.Config, deps container.ServerRuntimeDeps)
 	if cfg == nil {
 		return nil
 	}
-	var planRunner runtimescheduler.Runner
-	if cfg.HistoricalSeed == nil || !cfg.HistoricalSeed.PausePlanScheduler {
-		planRunner = runtimescheduler.NewPlanRunner(
-			cfg.PlanScheduler,
-			deps.LockManager,
-			deps.PlanCommandService,
-			deps.LockBuilder,
-		)
-	}
+	planRunner := runtimescheduler.NewPlanRunner(
+		cfg.PlanScheduler,
+		deps.LockManager,
+		deps.PlanCommandService,
+		deps.LockBuilder,
+	)
 	manager := runtimescheduler.NewManager(
 		planRunner,
 		runtimescheduler.NewStatisticsSyncRunner(

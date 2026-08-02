@@ -24,6 +24,18 @@ func TestEvaluationRequestedWireContract(t *testing.T) {
 	}
 }
 
+func TestRetiredHistoricalContextIsIgnoredWhenDecodingStoredEvent(t *testing.T) {
+	t.Parallel()
+
+	var got EvaluationRequestedData
+	if err := json.Unmarshal([]byte(`{"org_id":7,"assessment_id":42,"testee_id":9,"questionnaire_code":"q-1","questionnaire_version":"v2","answersheet_id":"answer-1","requested_at":"2026-07-13T10:30:00Z","historical_context":{"batch_id":"retired"}}`), &got); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	if got.AssessmentID != 42 || got.QuestionnaireCode != "q-1" {
+		t.Fatalf("decoded payload = %+v", got)
+	}
+}
+
 func TestLifecycleActionWireValues(t *testing.T) {
 	t.Parallel()
 

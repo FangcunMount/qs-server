@@ -13,11 +13,8 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
-	stageport "github.com/FangcunMount/qs-server/internal/apiserver/port/historicalseedstage"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/surveyvalidation"
-	"time"
 )
 
 var safeAnswerSheetIdempotencyKey = regexp.MustCompile(`^[A-Za-z0-9._:-]{8,128}$`)
@@ -26,30 +23,19 @@ var safeAnswerSheetIdempotencyKey = regexp.MustCompile(`^[A-Za-z0-9._:-]{8,128}$
 // 提供答卷的提交、查询功能：提交答卷、查看我的答卷列表、查看我的答卷详情
 type AnswerSheetService struct {
 	pb.UnimplementedAnswerSheetServiceServer
-	submissionService  answersheet.AnswerSheetSubmissionService
-	managementService  answersheet.AnswerSheetManagementService
-	stageRecorder      stageport.Recorder
-	historicalVerifier *historicalseed.Verifier
-}
-
-func (s *AnswerSheetService) SetHistoricalSeedVerifier(verifier *historicalseed.Verifier) {
-	s.historicalVerifier = verifier
+	submissionService answersheet.AnswerSheetSubmissionService
+	managementService answersheet.AnswerSheetManagementService
 }
 
 // NewAnswerSheetService 创建答卷 gRPC 服务
 func NewAnswerSheetService(
 	submissionService answersheet.AnswerSheetSubmissionService,
 	managementService answersheet.AnswerSheetManagementService,
-	stageRecorders ...stageport.Recorder,
 ) *AnswerSheetService {
-	result := &AnswerSheetService{
+	return &AnswerSheetService{
 		submissionService: submissionService,
 		managementService: managementService,
 	}
-	if len(stageRecorders) > 0 {
-		result.stageRecorder = stageRecorders[0]
-	}
-	return result
 }
 
 // RegisterService 注册 gRPC 服务
@@ -99,11 +85,6 @@ func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAn
 	if err != nil {
 		return nil, err
 	}
-	ctx, err = withHistoricalExecutionContext(ctx, req.GetHistoricalContext(), orgID, s.historicalVerifier)
-	if err != nil {
-		return nil, err
-	}
-
 	dto := answersheet.SubmitAnswerSheetDTO{
 		QuestionnaireCode: req.QuestionnaireCode,
 		QuestionnaireVer:  questionnaireVer,
@@ -118,40 +99,10 @@ func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAn
 	if req.OriginRef != nil {
 		dto.OriginRef = &answersheet.OriginRefDTO{Type: req.OriginRef.Type, ID: req.OriginRef.Id}
 	}
-	filledAt, occurredErr := historicalseed.OccurredAt(ctx, orgID, historicalseed.StageAnswerSheetFilled, time.Now())
-	if occurredErr != nil {
-		return nil, status.Error(codes.InvalidArgument, occurredErr.Error())
-	}
-	attemptCtx, handle, attemptErr := stageport.BeginStageAttempt(ctx, s.stageRecorder, stageport.Attempt{
-		Stage: stageport.StageAnswerSheetSubmit, BusinessAt: filledAt, ResourceType: "answer_sheet",
-		Payload: struct {
-			IdempotencyKey string `json:"idempotency_key"`
-			TaskID         string `json:"task_id,omitempty"`
-		}{IdempotencyKey: req.IdempotencyKey, TaskID: req.TaskId},
-	})
-	if attemptErr != nil {
-		return nil, toAnswerSheetGRPCError(attemptErr)
-	}
-	ctx = attemptCtx
-
 	// 调用应用服务
 	result, err := s.submissionService.Submit(ctx, dto)
 	if err != nil {
-		_ = stageport.FailStageAttempt(ctx, s.stageRecorder, handle, stageport.Failure{
-			Stage: stageport.StageAnswerSheetSubmit, BusinessAt: filledAt, ResourceType: "answer_sheet", Err: err,
-		})
 		return nil, toAnswerSheetGRPCError(err)
-	}
-	if s.stageRecorder != nil {
-		if _, recordErr := stageport.CompleteStage(ctx, s.stageRecorder, stageport.Completion{Stage: stageport.StageAnswerSheetSubmit, BusinessAt: filledAt, ResourceType: "answer_sheet", ResourceID: fmt.Sprintf("%d", result.ID), Payload: struct {
-			AnswerSheetID uint64 `json:"answersheet_id"`
-			TaskID        string `json:"task_id,omitempty"`
-		}{AnswerSheetID: result.ID, TaskID: req.TaskId}}); recordErr != nil {
-			_ = stageport.FailStageAttempt(ctx, s.stageRecorder, handle, stageport.Failure{
-				Stage: stageport.StageAnswerSheetSubmit, BusinessAt: filledAt, ResourceType: "answer_sheet", ResourceID: fmt.Sprintf("%d", result.ID), Err: recordErr,
-			})
-			return nil, toAnswerSheetGRPCError(recordErr)
-		}
 	}
 
 	// 转换响应

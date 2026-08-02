@@ -11,7 +11,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	collectionmiddleware "github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/middleware"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/httpauth"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
@@ -20,17 +19,12 @@ import (
 
 // Router 集中的路由管理器
 type Router struct {
-	container              *container.Container
-	historicalSeedVerifier *historicalseed.Verifier
+	container *container.Container
 }
 
 // NewRouter 创建路由管理器
-func NewRouter(c *container.Container, verifiers ...*historicalseed.Verifier) *Router {
-	var verifier *historicalseed.Verifier
-	if len(verifiers) > 0 {
-		verifier = verifiers[0]
-	}
-	return &Router{container: c, historicalSeedVerifier: verifier}
+func NewRouter(c *container.Container) *Router {
+	return &Router{container: c}
 }
 
 // RegisterRoutes 注册所有路由
@@ -54,7 +48,6 @@ func (r *Router) RegisterRoutes(engine *gin.Engine) {
 
 // setupGlobalMiddleware 设置全局中间件
 func (r *Router) setupGlobalMiddleware(engine *gin.Engine) {
-	engine.Use(historicalseed.GinMiddleware(r.historicalSeedVerifier))
 	// Recovery 中间件
 	engine.Use(gin.Recovery())
 

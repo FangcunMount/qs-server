@@ -16,7 +16,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
@@ -261,12 +260,7 @@ func (f evaluationFailureFinalizer) Finalize(
 	var retryAt time.Time
 	if decision := runToCommit.RetryDecision(); decision != nil && decision.Disposition == retrygovernance.DispositionAutomatic && decision.NextAttemptAt != nil {
 		retryAt = *decision.NextAttemptAt
-		var historical *historicalseed.Context
-		if value, ok := historicalseed.FromContext(ctx); ok {
-			clone := value.Clone()
-			historical = &clone
-		}
-		retry := assessment.NewEvaluationRetryRequestedEvent(assessmentToCommit, runToCommit.Attempt().Number, retrygovernance.AttemptOriginAutomatic, "", retryAt, historical)
+		retry := assessment.NewEvaluationRetryRequestedEvent(assessmentToCommit, runToCommit.Attempt().Number, retrygovernance.AttemptOriginAutomatic, "", retryAt)
 		if err := runToCommit.AttachRetryEvent(retry.EventID()); err != nil {
 			return err
 		}

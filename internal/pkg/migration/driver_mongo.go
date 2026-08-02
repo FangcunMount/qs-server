@@ -74,10 +74,20 @@ func (d *MongoDriver) PrepareRun(parent context.Context, config *Config, version
 		ctx, cancel := context.WithTimeout(parent, 30*time.Second)
 		defer cancel()
 		_, err := collection.Indexes().DropOne(ctx, scaleSnapshotMergeIndexName)
-		var commandErr mongo.CommandError
-		if errors.As(err, &commandErr) && commandErr.Code == 27 {
+		if isIgnorableMongoIndexCleanupError(err) {
 			return nil
 		}
 		return err
 	}, nil
+}
+
+func isIgnorableMongoIndexCleanupError(err error) bool {
+	if err == nil {
+		return true
+	}
+	var commandErr mongo.CommandError
+	if !errors.As(err, &commandErr) {
+		return false
+	}
+	return commandErr.Code == 26 || commandErr.Code == 27
 }

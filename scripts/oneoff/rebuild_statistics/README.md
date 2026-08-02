@@ -45,27 +45,14 @@ QS_STATISTICS_TOKEN='***' go run ./scripts/oneoff/rebuild_statistics \
   --confirm
 ```
 
-历史批次完成后可使用一次性编排模式。它会把指定范围拆成小窗口，严格按
-`repair -> validate` 顺序执行；如果指定结束日早于执行时最新完整上海自然日，还会对中间日期
-执行 catch-up，最后只 publish 最新完整日：
-
-```bash
-QS_STATISTICS_TOKEN='***' go run ./scripts/oneoff/rebuild_statistics \
-  --base-url http://127.0.0.1:8081 \
-  --org-ids 1 \
-  --from 2025-01-01 \
-  --to 2026-08-01 \
-  --window-days 7 \
-  --timeout 10m \
-  --reason hist-20250101-20260801-v2 \
-  --mode historical-backfill \
-  --confirm
-```
+工具只提供 `validate`、`repair`、`publish` 三种模式。较长日期范围会按 `--window-days`
+拆分；失败后由操作者显式选择新的普通日期范围重跑。
 
 ## 长时间运行时自动刷新 IAM Token
 
 只设置 `QS_STATISTICS_TOKEN` 的静态模式保持兼容，适合能够在 Token 到期前结束的短任务。
-跨数小时的历史重建应改用 IAM 密码登录模式。密码不能放在命令行、环境变量或仓库配置中，
+跨多个普通日期窗口、可能持续数小时的 repair、validate 或 publish 应改用 IAM 密码登录模式。
+密码不能放在命令行、环境变量或仓库配置中，
 先在 ServerA 创建仅当前执行用户可读的普通文件：
 
 ```bash
@@ -97,13 +84,12 @@ unset QS_STATISTICS_TOKEN
 go run ./scripts/oneoff/rebuild_statistics \
   --base-url http://127.0.0.1:8081 \
   --org-ids 1 \
-  --from 2025-01-01 \
+  --from 2026-07-01 \
   --to 2026-08-01 \
-  --resume-from 2025-01-01 \
   --window-days 7 \
   --timeout 10m \
-  --reason hist-20250101-20260801-v2 \
-  --mode historical-backfill \
+  --reason approved_statistics_repair \
+  --mode repair \
   --confirm
 ```
 
@@ -116,28 +102,23 @@ go run ./scripts/oneoff/rebuild_statistics \
 接近到期或收到 401 后才通过 IAM 刷新。CLI 对应参数为 `--iam-login-url`、`--iam-username`、
 `--iam-password-file`、`--iam-tenant-id` 和 `--iam-refresh-skew`，显式 CLI 参数优先于环境变量。
 
-已经启动的旧版本进程不会动态获得自动刷新能力。它若因 401 停止，使用错误中给出的
-`--resume-from` 日期和相同 `reason` 在新版本上继续；此前成功的窗口不需要重做。
-
-任何一步失败都会停止，错误会给出可恢复的窗口起始日。修复原因后保留原始 `--from/--to`，
-增加错误中给出的日期即可跳过此前成功窗口：
+已经启动的旧版本进程不会动态获得自动刷新能力。它若因 401 或其他原因停止，修复原因后由
+操作者显式把 `--from` 调整为首个未完成的普通日期，并保留相同 `reason` 重跑剩余窗口：
 
 ```bash
 go run ./scripts/oneoff/rebuild_statistics \
   --base-url http://127.0.0.1:8081 \
   --org-ids 1 \
-  --from 2025-01-01 \
+  --from 2026-07-15 \
   --to 2026-08-01 \
-  --resume-from 2025-03-05 \
   --window-days 7 \
   --timeout 10m \
-  --reason hist-20250101-20260801-v2 \
-  --mode historical-backfill \
+  --reason approved_statistics_repair \
+  --mode repair \
   --confirm
 ```
 
-`--resume-from` 是包含式上海业务日期，可以位于原始历史范围或自动 catch-up 范围内。
-恢复窗口会重新执行一次幂等 repair，再执行严格 validate。不要改 `reason` 来绕过失败；
+工具不会自动串联 repair、validate 和 publish。每种模式都必须由操作者显式执行并验收；
 `reason` 只用于审计，不参与 Fact 幂等身份。
 
 如果最终 publish 已经提交 MySQL 数据、但缓存发布失败，服务端会返回 `data_committed`。

@@ -19,7 +19,6 @@ generate() {
 generate "${PROTO_PATH}/answersheet/answersheet.proto"
 generate "${PROTO_PATH}/questionnaire/questionnaire.proto"
 generate "${PROTO_PATH}/actor/actor.proto"
-generate "${PROTO_PATH}/common/historical.proto"
 generate "${PROTO_PATH}/evaluation/evaluation.proto"
 generate "${PROTO_PATH}/interpretation/interpretation.proto"
 generate "${PROTO_PATH}/internalapi/internal.proto"

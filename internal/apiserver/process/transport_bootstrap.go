@@ -9,7 +9,6 @@ import (
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/orgscope"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
 )
@@ -22,14 +21,10 @@ type transportStageDeps struct {
 }
 
 func (s *server) initializeTransports(containerOutput containerOutput) (transportOutput, error) {
-	verifier, err := s.config.HistoricalSeed.Verifier()
-	if err != nil {
-		return transportOutput{}, err
-	}
-	return bootstrapTransports(s.buildTransportStageDeps(containerOutput, verifier))
+	return bootstrapTransports(s.buildTransportStageDeps(containerOutput))
 }
 
-func (s *server) buildTransportStageDeps(containerOutput containerOutput, historicalVerifier *historicalseed.Verifier) transportStageDeps {
+func (s *server) buildTransportStageDeps(containerOutput containerOutput) transportStageDeps {
 	if s == nil || s.config == nil || containerOutput.container == nil {
 		return transportStageDeps{}
 	}
@@ -44,12 +39,10 @@ func (s *server) buildTransportStageDeps(containerOutput containerOutput, histor
 		},
 		registerREST: func(httpServer *genericapiserver.GenericAPIServer) {
 			deps := containerOutput.container.BuildRESTDeps(s.config.RateLimit)
-			deps.HistoricalSeedVerifier = historicalVerifier
 			resttransport.NewRouter(deps).RegisterRoutes(httpServer.Engine)
 		},
 		registerGRPC: func(grpcServer *grpcpkg.Server) error {
 			deps := containerOutput.container.BuildGRPCDeps(grpcServer)
-			deps.HistoricalSeedVerifier = historicalVerifier
 			verifier, err := delegatedsubject.NewVerifierFromOptions(s.config.DelegatedSubject)
 			if err != nil {
 				return err

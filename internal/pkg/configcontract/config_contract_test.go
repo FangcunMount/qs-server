@@ -32,7 +32,6 @@ func TestAPIServerDevProdConfigContracts(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			opts := apiserveroptions.NewOptions()
 			loadConfig(t, filepath.Join(repoRoot(t), "configs", name), opts)
-			prepareAPIServerHistoricalSeedContract(t, name, opts.HistoricalSeed)
 			prepareDelegatedSubjectContract(t, name, opts.DelegatedSubject)
 			stubSecureTLSFiles(t, opts.SecureServing)
 			completeAndValidate(t, opts)
@@ -99,7 +98,6 @@ func TestCollectionDevProdConfigContracts(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			opts := collectionoptions.NewOptions()
 			loadConfig(t, filepath.Join(repoRoot(t), "configs", name), opts)
-			prepareCollectionHistoricalSeedContract(t, name, opts.HistoricalSeed)
 			prepareDelegatedSubjectContract(t, name, opts.DelegatedSubject)
 			stubSecureTLSFiles(t, opts.SecureServing)
 			completeAndValidate(t, opts)
@@ -124,52 +122,6 @@ func TestCollectionDevProdConfigContracts(t *testing.T) {
 			assertCollectionGRPCClientIdentityContract(t, name, opts.GRPCClient)
 			assertIAMJWKSURLContract(t, "collection", name, opts.IAMOptions)
 		})
-	}
-}
-
-func prepareAPIServerHistoricalSeedContract(t *testing.T, configName string, opts *apiserveroptions.HistoricalSeedOptions) {
-	t.Helper()
-	if !strings.Contains(configName, ".prod.") {
-		return
-	}
-	if opts == nil {
-		t.Fatalf("%s historical_seed must be present", configName)
-	}
-	assertHistoricalSeedContract(t, configName, opts.Enabled, opts.AllowedOrgIDs, opts.EarliestDate, opts.LatestDate, opts.Timezone, opts.Freshness, opts.SecretEnv)
-	if !opts.PausePlanScheduler {
-		t.Fatalf("%s historical_seed.pause_plan_scheduler must be enabled during backfill", configName)
-	}
-	t.Setenv(opts.SecretEnv, "config-contract-historical-secret")
-}
-
-func prepareCollectionHistoricalSeedContract(t *testing.T, configName string, opts *collectionoptions.HistoricalSeedOptions) {
-	t.Helper()
-	if !strings.Contains(configName, ".prod.") {
-		return
-	}
-	if opts == nil {
-		t.Fatalf("%s historical_seed must be present", configName)
-	}
-	assertHistoricalSeedContract(t, configName, opts.Enabled, opts.AllowedOrgIDs, opts.EarliestDate, opts.LatestDate, opts.Timezone, opts.Freshness, opts.SecretEnv)
-	t.Setenv(opts.SecretEnv, "config-contract-historical-secret")
-}
-
-func assertHistoricalSeedContract(t *testing.T, configName string, enabled bool, allowedOrgIDs []int64, earliestDate, latestDate, timezone string, freshness time.Duration, secretEnv string) {
-	t.Helper()
-	if !enabled {
-		t.Fatalf("%s historical_seed must be enabled during backfill", configName)
-	}
-	if len(allowedOrgIDs) != 1 || allowedOrgIDs[0] != 1 {
-		t.Fatalf("%s historical_seed.allowed_org_ids = %v, want [1]", configName, allowedOrgIDs)
-	}
-	if earliestDate != "2025-01-01" || latestDate != "2026-08-01" {
-		t.Fatalf("%s historical_seed date range = %s..%s, want 2025-01-01..2026-08-01", configName, earliestDate, latestDate)
-	}
-	if timezone != "Asia/Shanghai" || freshness != 5*time.Minute {
-		t.Fatalf("%s historical_seed time contract = %s/%s, want Asia/Shanghai/5m", configName, timezone, freshness)
-	}
-	if secretEnv != apiserveroptions.DefaultHistoricalSeedSecretEnv {
-		t.Fatalf("%s historical_seed.secret_env = %q, want %q", configName, secretEnv, apiserveroptions.DefaultHistoricalSeedSecretEnv)
 	}
 }
 

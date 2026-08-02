@@ -39,6 +39,11 @@ func initGenericAPIServer(s *GenericAPIServer) {
 	// s.GET(path, ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	s.Setup()
+	// The retired historical-seed protocol is rejected before any common or
+	// business route is registered. Gin snapshots the middleware chain when a
+	// route is added, so installing this guard later would leave health,
+	// metrics, profiling and version endpoints unprotected.
+	s.Use(middleware.RejectRetiredHistoricalSeedHeaders())
 	s.InstallMiddlewares()
 	s.InstallAPIs()
 }

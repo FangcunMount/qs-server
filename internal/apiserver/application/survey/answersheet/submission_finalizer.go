@@ -13,7 +13,6 @@ import (
 	attributionport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetattribution"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 )
 
 // createAndSaveAnswerSheet 创建并保存答卷。
@@ -24,10 +23,7 @@ func (s *submissionService) createAndSaveAnswerSheet(
 	qnr *questionnaire.Questionnaire,
 	answers []answersheet.Answer,
 ) (*answersheet.AnswerSheet, error) {
-	filledAt, err := historicalseed.OccurredAt(ctx, dto.OrgID, historicalseed.StageAnswerSheetFilled, time.Now())
-	if err != nil {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "%v", err)
-	}
+	filledAt := time.Now()
 	admission, err := s.resolveAdmission(ctx, dto.QuestionnaireCode, dto.QuestionnaireVer)
 	if err != nil {
 		return nil, err
@@ -48,12 +44,7 @@ func (s *submissionService) createAndSaveAnswerSheet(
 	if err != nil {
 		return nil, err
 	}
-	historical, hasHistorical := historicalseed.FromContext(ctx)
-	var historicalContext *historicalseed.Context
-	if hasHistorical {
-		historicalContext = &historical
-	}
-	sheet, err := createAnswerSheet(l, dto, qnr, answers, admission, attribution, filledAt, historicalContext)
+	sheet, err := createAnswerSheet(l, dto, qnr, answers, admission, attribution, filledAt)
 	if err != nil {
 		return nil, err
 	}
@@ -70,12 +61,7 @@ func (s *submissionService) findExistingSubmissionBeforeAttribution(ctx context.
 		return nil, err
 	}
 	placeholder := answersheet.ReconstructAttributionSnapshot(ref.Type, ref.ID, "", "", "", "", "", filledAt, 1, answersheet.AttributionModeUnknown)
-	historical, hasHistorical := historicalseed.FromContext(ctx)
-	var historicalContext *historicalseed.Context
-	if hasHistorical {
-		historicalContext = &historical
-	}
-	candidate, err := createAnswerSheet(logger.L(ctx), dto, qnr, answers, admission, placeholder, filledAt, historicalContext)
+	candidate, err := createAnswerSheet(logger.L(ctx), dto, qnr, answers, admission, placeholder, filledAt)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +98,6 @@ func createAnswerSheet(
 	admission answersheet.Admission,
 	attribution answersheet.AttributionSnapshot,
 	filledAt time.Time,
-	historical *historicalseed.Context,
 ) (*answersheet.AnswerSheet, error) {
 	questionnaireRef, err := answersheet.NewQuestionnaireRef(
 		dto.QuestionnaireCode,
@@ -157,10 +142,6 @@ func createAnswerSheet(
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "创建答卷提交上下文失败")
 	}
-	if historical != nil {
-		submissionContext = submissionContext.WithHistoricalContext(*historical)
-	}
-
 	l.Debugw("开始创建答卷领域对象", "questionnaire_code", dto.QuestionnaireCode, "filler_id", dto.FillerID, "answer_count", len(answers))
 	sheet, err := answersheet.Submit(answersheet.NewID(), questionnaireRef, submissionContext, answers, filledAt)
 	if err != nil {

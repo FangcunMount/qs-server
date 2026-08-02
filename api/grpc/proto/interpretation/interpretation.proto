@@ -5,7 +5,6 @@ package interpretation;
 option go_package = "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation";
 
 import "evaluation/evaluation.proto";
-import "common/historical.proto";
 
 service ParticipantReportService {
   rpc GetAssessmentReport(GetAssessmentReportRequest) returns (GetAssessmentReportResponse);
@@ -60,8 +59,9 @@ message ListMyReportsResponse {
 }
 message GenerateReportFromAssessmentRequest { uint64 assessment_id = 1; string outcome_id = 2; }
 message GenerateReportFromOutcomeRequest {
+  reserved 2;
+  reserved "historical_context";
   string outcome_id = 1;
-  common.HistoricalExecutionContext historical_context = 2;
 }
 message GenerateReportFromAssessmentResponse {
   bool success = 1; string status = 2; string message = 3; bool retryable = 4;

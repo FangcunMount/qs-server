@@ -279,11 +279,3 @@ jwt:
 resilience:
   control:
     enabled: true
-historical_seed:
-  enabled: false
-  allowed_org_ids: []
-  earliest_date: "2025-01-01"
-  latest_date: "2026-07-27"
-  timezone: Asia/Shanghai
-  freshness: 5m
-  secret_env: QS_HISTORICAL_CONTEXT_SECRET

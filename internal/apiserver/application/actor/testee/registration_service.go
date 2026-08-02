@@ -11,7 +11,6 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 )
 
 // registrationService 受试者注册服务实现
@@ -142,13 +141,6 @@ func (s *registrationService) Register(ctx context.Context, dto RegisterTesteeDT
 
 		// 4. 创建受试者
 		result = domain.NewTestee(dto.OrgID, dto.Name, gender, dto.Birthday)
-		if _, historical := historicalseed.FromContext(txCtx); historical {
-			createdAt, occurredErr := historicalseed.OccurredAt(txCtx, uint64(dto.OrgID), historicalseed.StageTesteeCreated, time.Now())
-			if occurredErr != nil {
-				return occurredErr
-			}
-			result.SetCreatedAt(createdAt)
-		}
 		l.Debugw("创建受试者实体",
 			"testee_id", result.ID().String(),
 			"name", result.Name(),

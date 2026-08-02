@@ -46,14 +46,12 @@ type options struct {
 	OrgIDs          []int64
 	From            time.Time
 	To              time.Time
-	ResumeFrom      time.Time
 	WindowDays      int
 	RequestTimeout  time.Duration
 	Reason          string
 	Mode            string
 	Confirm         bool
 	ValidateOnly    bool
-	Now             func() time.Time
 	IAMLoginURL     string
 	IAMUsername     string
 	IAMPasswordFile string
@@ -61,8 +59,6 @@ type options struct {
 	IAMRefreshSkew  time.Duration
 	TokenSource     bearerTokenSource
 }
-
-const historicalBackfillMode = "historical-backfill"
 
 type runResult struct {
 	ID               uint64           `json:"id"`
@@ -95,7 +91,7 @@ func main() {
 func run(args []string, output io.Writer) error {
 	flags := flag.NewFlagSet("rebuild_statistics", flag.ContinueOnError)
 	flags.SetOutput(output)
-	var rawOrgIDs, from, to, resumeFrom, rawIAMTenantID, rawIAMRefreshSkew string
+	var rawOrgIDs, from, to, rawIAMTenantID, rawIAMRefreshSkew string
 	var cfg options
 	flags.StringVar(&cfg.BaseURL, "base-url", "", "apiserver base URL")
 	flags.StringVar(&cfg.Token, "token", os.Getenv("QS_STATISTICS_TOKEN"), "bearer token (or QS_STATISTICS_TOKEN)")
@@ -107,11 +103,10 @@ func run(args []string, output io.Writer) error {
 	flags.StringVar(&rawOrgIDs, "org-ids", "", "comma-separated organization IDs")
 	flags.StringVar(&from, "from", "", "first Shanghai business date, inclusive")
 	flags.StringVar(&to, "to", "", "last Shanghai business date, inclusive")
-	flags.StringVar(&resumeFrom, "resume-from", "", "historical-backfill date to resume from, inclusive")
 	flags.IntVar(&cfg.WindowDays, "window-days", 7, "dates per run, maximum 31")
 	flags.DurationVar(&cfg.RequestTimeout, "timeout", defaultRequestTimeout, "HTTP timeout for each Statistics run")
 	flags.StringVar(&cfg.Reason, "reason", "statistics_rebuild", "audited run reason")
-	flags.StringVar(&cfg.Mode, "mode", "repair", "run mode: validate, repair, publish, or historical-backfill")
+	flags.StringVar(&cfg.Mode, "mode", "repair", "run mode: validate, repair, or publish")
 	flags.BoolVar(&cfg.Confirm, "confirm", false, "confirm writes")
 	flags.BoolVar(&cfg.ValidateOnly, "validate-only", false, "read, map and validate without writing")
 	if err := flags.Parse(args); err != nil {
@@ -138,12 +133,6 @@ func run(args []string, output io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("to: %w", err)
 	}
-	if strings.TrimSpace(resumeFrom) != "" {
-		cfg.ResumeFrom, err = parseShanghaiDate(resumeFrom)
-		if err != nil {
-			return fmt.Errorf("resume-from: %w", err)
-		}
-	}
 	if err := cfg.validate(); err != nil {
 		return err
 	}
@@ -162,12 +151,6 @@ func run(args []string, output io.Writer) error {
 		cfg.Mode = "validate"
 	}
 	for _, orgID := range cfg.OrgIDs {
-		if cfg.Mode == historicalBackfillMode {
-			if err := executeHistoricalBackfill(client, cfg, orgID, output); err != nil {
-				return fmt.Errorf("org %d historical backfill statistics: %w", orgID, err)
-			}
-			continue
-		}
 		for _, window := range splitWindows(cfg.From, cfg.To, cfg.WindowDays) {
 			_, _ = fmt.Fprintf(output, "org=%d window=%s..%s mode=%s\n", orgID, window.From.Format(dateLayout), window.To.Format(dateLayout), cfg.Mode)
 			result, err := executeRunWithCacheRecovery(client, cfg, orgID, window, output)
@@ -209,19 +192,11 @@ func (o options) validate() error {
 	if o.ValidateOnly {
 		mode = "validate"
 	}
-	if mode != "validate" && mode != "repair" && mode != "publish" && mode != historicalBackfillMode {
-		return errors.New("mode must be validate, repair, publish, or historical-backfill")
+	if mode != "validate" && mode != "repair" && mode != "publish" {
+		return errors.New("mode must be validate, repair, or publish")
 	}
 	if mode != "validate" && !o.Confirm {
 		return errors.New("write mode requires --confirm")
-	}
-	if !o.ResumeFrom.IsZero() {
-		if mode != historicalBackfillMode {
-			return errors.New("resume-from is only supported in historical-backfill mode")
-		}
-		if o.ResumeFrom.Before(o.From) {
-			return errors.New("resume-from cannot be before from")
-		}
 	}
 	if strings.TrimSpace(o.Reason) == "" {
 		return errors.New("reason is required")
@@ -258,85 +233,6 @@ func (o options) validateAuthentication() error {
 	return nil
 }
 
-func executeHistoricalBackfill(client *http.Client, cfg options, orgID int64, output io.Writer) error {
-	latestCompleteDay, err := latestCompleteShanghaiDay(cfg.Now)
-	if err != nil {
-		return err
-	}
-	if latestCompleteDay.Before(cfg.To) {
-		return fmt.Errorf("latest complete Shanghai business day %s is before historical backfill end %s", latestCompleteDay.Format(dateLayout), cfg.To.Format(dateLayout))
-	}
-	resumeFrom := cfg.From
-	if !cfg.ResumeFrom.IsZero() {
-		resumeFrom = cfg.ResumeFrom
-		if resumeFrom.After(latestCompleteDay) {
-			return fmt.Errorf("resume-from %s exceeds latest complete Shanghai business day %s", resumeFrom.Format(dateLayout), latestCompleteDay.Format(dateLayout))
-		}
-		_, _ = fmt.Fprintf(output, "org=%d phase=resume resume_from=%s\n", orgID, resumeFrom.Format(dateLayout))
-	}
-	if !resumeFrom.After(cfg.To) {
-		if err := executeRepairAndValidateWindows(client, cfg, orgID, output, "historical", splitWindows(resumeFrom, cfg.To, cfg.WindowDays)); err != nil {
-			return err
-		}
-	}
-	if latestCompleteDay.After(cfg.To) {
-		catchupFrom := cfg.To.AddDate(0, 0, 1)
-		if resumeFrom.After(catchupFrom) {
-			catchupFrom = resumeFrom
-		}
-		if err := executeRepairAndValidateWindows(client, cfg, orgID, output, "catchup", splitWindows(catchupFrom, latestCompleteDay, cfg.WindowDays)); err != nil {
-			return err
-		}
-	}
-
-	publish := cfg
-	publish.Mode = "publish"
-	publish.ValidateOnly = false
-	finalWindow := dateWindow{From: latestCompleteDay, To: latestCompleteDay}
-	_, _ = fmt.Fprintf(output, "org=%d phase=publish as_of_date=%s\n", orgID, latestCompleteDay.Format(dateLayout))
-	result, err := executeRunWithCacheRecovery(client, publish, orgID, finalWindow, output)
-	if err != nil {
-		return fmt.Errorf("publish as_of_date %s: %w", latestCompleteDay.Format(dateLayout), err)
-	}
-	if strings.TrimSpace(result.AsOfDate) == "" || result.AsOfDate != latestCompleteDay.Format(dateLayout) {
-		return fmt.Errorf("publish watermark %q does not match latest complete Shanghai business day %s", result.AsOfDate, latestCompleteDay.Format(dateLayout))
-	}
-	encoded, _ := json.Marshal(result)
-	_, _ = fmt.Fprintln(output, string(encoded))
-	return nil
-}
-
-func executeRepairAndValidateWindows(client *http.Client, cfg options, orgID int64, output io.Writer, phase string, windows []dateWindow) error {
-	for index, window := range windows {
-		repair := cfg
-		repair.Mode = "repair"
-		repair.ValidateOnly = false
-		_, _ = fmt.Fprintf(output, "org=%d phase=%s_repair window=%s..%s index=%d\n", orgID, phase, window.From.Format(dateLayout), window.To.Format(dateLayout), index+1)
-		result, err := executeRunWithCacheRecovery(client, repair, orgID, window, output)
-		if err != nil {
-			return fmt.Errorf("repair window %s..%s: %w; resume with --resume-from %s", window.From.Format(dateLayout), window.To.Format(dateLayout), err, window.From.Format(dateLayout))
-		}
-		encoded, _ := json.Marshal(result)
-		_, _ = fmt.Fprintln(output, string(encoded))
-
-		validate := cfg
-		validate.Mode = "validate"
-		validate.Confirm = false
-		validate.ValidateOnly = true
-		_, _ = fmt.Fprintf(output, "org=%d phase=%s_validate window=%s..%s index=%d\n", orgID, phase, window.From.Format(dateLayout), window.To.Format(dateLayout), index+1)
-		result, err = executeRunWithCacheRecovery(client, validate, orgID, window, output)
-		if err != nil {
-			return fmt.Errorf("validate window %s..%s: %w; resume with --resume-from %s", window.From.Format(dateLayout), window.To.Format(dateLayout), err, window.From.Format(dateLayout))
-		}
-		if err := validateRunCompleteness(result); err != nil {
-			return fmt.Errorf("validate window %s..%s: %w; resume with --resume-from %s", window.From.Format(dateLayout), window.To.Format(dateLayout), err, window.From.Format(dateLayout))
-		}
-		encoded, _ = json.Marshal(result)
-		_, _ = fmt.Fprintln(output, string(encoded))
-	}
-	return nil
-}
-
 func validateRunCompleteness(result runResult) error {
 	var issues []string
 	for _, collector := range []string{"access", "plan", "assessment"} {
@@ -357,20 +253,6 @@ func validateRunCompleteness(result runResult) error {
 	}
 	sort.Strings(issues)
 	return fmt.Errorf("validation is incomplete: %s", strings.Join(issues, ", "))
-}
-
-func latestCompleteShanghaiDay(nowFn func() time.Time) (time.Time, error) {
-	location, err := time.LoadLocation("Asia/Shanghai")
-	if err != nil {
-		return time.Time{}, fmt.Errorf("load Asia/Shanghai: %w", err)
-	}
-	now := time.Now()
-	if nowFn != nil {
-		now = nowFn()
-	}
-	local := now.In(location)
-	today := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, location)
-	return today.AddDate(0, 0, -1), nil
 }
 
 func executeRun(client *http.Client, cfg options, orgID int64, window dateWindow) (runResult, error) {

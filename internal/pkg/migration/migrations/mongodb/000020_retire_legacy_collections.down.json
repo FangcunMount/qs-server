@@ -1,0 +1,148 @@
+[
+  { "create": "published_assessment_models" },
+  { "create": "interpret_reports" },
+  { "create": "evaluation_rule_sets" },
+  { "create": "scales" },
+  {
+    "createIndexes": "published_assessment_models",
+    "indexes": [
+      {
+        "key": {
+          "model_kind": 1,
+          "model_sub_kind": 1,
+          "model_algorithm": 1,
+          "model_code": 1,
+          "model_version": 1
+        },
+        "name": "idx_published_assessment_models_identity_version",
+        "unique": true,
+        "partialFilterExpression": { "deleted_at": null }
+      },
+      {
+        "key": { "status": 1, "model_kind": 1, "model_code": 1 },
+        "name": "idx_published_assessment_models_status_kind_code"
+      },
+      {
+        "key": { "questionnaire_code": 1, "questionnaire_version": 1, "status": 1 },
+        "name": "idx_published_assessment_models_questionnaire_published",
+        "unique": true,
+        "partialFilterExpression": { "deleted_at": null, "status": "published" }
+      }
+    ]
+  },
+  {
+    "createIndexes": "interpret_reports",
+    "indexes": [
+      {
+        "key": { "domain_id": 1 },
+        "name": "idx_domain_id",
+        "unique": true,
+        "partialFilterExpression": { "domain_id": { "$gt": 0 } }
+      },
+      { "key": { "scale_code": 1 }, "name": "idx_scale_code" },
+      { "key": { "risk_level": 1 }, "name": "idx_risk_level" },
+      {
+        "key": { "testee_id": 1, "scale_code": 1, "created_at": -1 },
+        "name": "idx_testee_scale_created"
+      },
+      {
+        "key": { "deleted_at": 1 },
+        "name": "idx_deleted_at",
+        "partialFilterExpression": { "deleted_at": { "$exists": true } }
+      },
+      { "key": { "created_at": -1 }, "name": "idx_created_at" },
+      {
+        "key": { "testee_id": 1, "created_at": -1 },
+        "name": "idx_reports_testee_active_created",
+        "partialFilterExpression": { "deleted_at": null }
+      }
+    ]
+  },
+  {
+    "createIndexes": "evaluation_rule_sets",
+    "indexes": [
+      {
+        "key": { "ruleset_kind": 1, "ruleset_code": 1, "ruleset_version": 1 },
+        "name": "idx_evaluation_rule_sets_kind_code_version",
+        "unique": true,
+        "partialFilterExpression": { "deleted_at": null }
+      },
+      {
+        "key": { "status": 1, "ruleset_kind": 1, "ruleset_code": 1 },
+        "name": "idx_evaluation_rule_sets_status_kind_code"
+      },
+      {
+        "key": { "questionnaire_code": 1, "questionnaire_version": 1, "status": 1 },
+        "name": "idx_evaluation_rule_sets_questionnaire_published",
+        "unique": true,
+        "partialFilterExpression": { "deleted_at": null, "status": "published" }
+      }
+    ]
+  },
+  {
+    "createIndexes": "scales",
+    "indexes": [
+      {
+        "key": { "domain_id": 1 },
+        "name": "idx_domain_id",
+        "unique": true,
+        "partialFilterExpression": { "domain_id": { "$gt": 0 } }
+      },
+      { "key": { "code": 1 }, "name": "idx_code", "unique": true },
+      {
+        "key": { "questionnaire_code": 1, "questionnaire_version": 1 },
+        "name": "idx_questionnaire"
+      },
+      {
+        "key": { "deleted_at": 1 },
+        "name": "idx_deleted_at",
+        "partialFilterExpression": { "deleted_at": { "$exists": true } }
+      },
+      { "key": { "created_at": -1 }, "name": "idx_created_at" },
+      {
+        "key": { "status": 1, "deleted_at": 1 },
+        "name": "idx_scales_status_deleted"
+      },
+      {
+        "key": { "status": 1 },
+        "name": "idx_scales_status_published",
+        "partialFilterExpression": { "deleted_at": null, "status": "published" }
+      },
+      {
+        "key": { "status": 1, "deleted_at": 1, "created_at": -1 },
+        "name": "idx_scales_status_deleted_created"
+      },
+      {
+        "key": { "questionnaire_code": 1, "deleted_at": 1, "created_at": -1 },
+        "name": "idx_scales_questionnaire_deleted_created"
+      },
+      {
+        "key": { "category": 1, "deleted_at": 1, "created_at": -1 },
+        "name": "idx_scales_category_deleted_created"
+      },
+      {
+        "key": { "code": 1, "scale_version": 1, "deleted_at": 1 },
+        "name": "idx_scales_code_version_deleted"
+      },
+      {
+        "key": { "code": 1, "scale_version": 1, "record_role": 1 },
+        "name": "idx_scales_code_version_role_unique",
+        "unique": true,
+        "partialFilterExpression": { "deleted_at": null }
+      },
+      {
+        "key": { "code": 1, "record_role": 1, "is_active_published": 1, "deleted_at": 1 },
+        "name": "idx_scales_active_published_code"
+      },
+      {
+        "key": { "questionnaire_code": 1, "questionnaire_version": 1, "record_role": 1, "deleted_at": 1 },
+        "name": "idx_scales_questionnaire_version_role"
+      },
+      {
+        "key": { "questionnaire_code": 1, "record_role": 1, "is_active_published": 1, "status": 1 },
+        "name": "idx_scales_published_questionnaire_active",
+        "partialFilterExpression": { "deleted_at": null }
+      }
+    ]
+  }
+]

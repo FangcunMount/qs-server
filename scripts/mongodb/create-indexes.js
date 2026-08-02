@@ -11,7 +11,6 @@ print('创建 domain_id 索引...');
 db.answersheets.createIndex({ "domain_id": 1 }, { unique: true, background: true });
 db.questionnaires.createIndex({ "domain_id": 1 }, { unique: true, background: true });
 db.medical_scales.createIndex({ "domain_id": 1 }, { unique: true, background: true });
-db.interpret_reports.createIndex({ "domain_id": 1 }, { unique: true, background: true });
 
 // 为activity_logs集合创建索引
 print('创建activity_logs索引...');
@@ -164,4 +163,4 @@ db.operation_logs.insertOne({
   }
 });
 
-print('索引创建操作已记录到operation_logs'); 
+print('索引创建操作已记录到operation_logs');

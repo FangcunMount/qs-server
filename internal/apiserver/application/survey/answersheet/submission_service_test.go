@@ -10,7 +10,6 @@ import (
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	attributionport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetattribution"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
-	"github.com/FangcunMount/qs-server/internal/pkg/historicalseed"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
@@ -104,7 +103,7 @@ func TestSubmissionServiceCreateAndSaveAnswerSheetPassesDurableSubmitMeta(t *tes
 	}
 }
 
-func TestSubmissionServiceUsesHistoricalFilledAndCapturedAt(t *testing.T) {
+func TestSubmissionServiceUsesCurrentFilledAndCapturedAt(t *testing.T) {
 	store := &durableStoreCaptureStub{}
 	svc := &submissionService{durableStore: store}
 	qnr, err := domainQuestionnaire.NewQuestionnaire(
@@ -115,18 +114,15 @@ func TestSubmissionServiceUsesHistoricalFilledAndCapturedAt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	filledAt := time.Date(2025, 1, 1, 9, 30, 0, 0, time.UTC)
-	ctx := historicalseed.WithContext(context.Background(), historicalseed.Context{
-		OrgID: 501, Timeline: historicalseed.Timeline{AnswerSheetFilledAt: &filledAt},
-	})
+	ctx := context.Background()
 	result, err := svc.createAndSaveAnswerSheet(ctx, logger.L(ctx), SubmitAnswerSheetDTO{
 		FillerID: 301, TesteeID: 401, OrgID: 501, QuestionnaireCode: "QNR-1", QuestionnaireVer: "1.0.0",
 	}, qnr, mustAnswersForSubmissionTest(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !result.FilledAt().Equal(filledAt) || !result.SubmissionContext().Attribution().CapturedAt().Equal(filledAt) {
-		t.Fatalf("historical answer times mismatch: filled=%v captured=%v", result.FilledAt(), result.SubmissionContext().Attribution().CapturedAt())
+	if result.FilledAt().IsZero() || !result.SubmissionContext().Attribution().CapturedAt().Equal(result.FilledAt()) {
+		t.Fatalf("answer times mismatch: filled=%v captured=%v", result.FilledAt(), result.SubmissionContext().Attribution().CapturedAt())
 	}
 }
 
