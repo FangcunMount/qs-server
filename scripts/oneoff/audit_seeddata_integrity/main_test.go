@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -28,12 +30,29 @@ func validAuditConfig(t *testing.T) config {
 }
 
 func TestAuditConfigRejectsUnsafeReportWorkerCounts(t *testing.T) {
-	for _, workers := range []int{0, 33} {
+	for _, workers := range []int{0, 17} {
 		cfg := validAuditConfig(t)
 		cfg.ReportWorkers = workers
 		if err := cfg.validate(); err == nil || !strings.Contains(err.Error(), "report-workers") {
 			t.Fatalf("workers=%d error=%v", workers, err)
 		}
+	}
+}
+
+func TestReportPageRetryOnlyHandlesLiveContextTimeouts(t *testing.T) {
+	if !retryableReportPageError(context.Background(), context.DeadlineExceeded) {
+		t.Fatal("deadline exceeded should be retryable while the audit context is live")
+	}
+	if retryableReportPageError(context.Background(), errors.New("invalid report identity")) {
+		t.Fatal("data or validation errors must not be retried")
+	}
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if retryableReportPageError(canceled, context.DeadlineExceeded) {
+		t.Fatal("canceled audit context must not retry")
+	}
+	if first, second := reportPageRetryDelay(1, 0), reportPageRetryDelay(2, 0); second <= first {
+		t.Fatalf("retry delay must increase: first=%s second=%s", first, second)
 	}
 }
 

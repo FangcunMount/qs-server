@@ -60,7 +60,11 @@ go run ./scripts/oneoff/audit_seeddata_integrity \
 
 `--report-workers` 默认是 8，按 `seed_backfill_stage.id` 分页后并行检查多个独立页面，并按原始
 页面顺序合并结果；不会按日期重复扫描，也不会改变 deletion plan 的确定性。ServerA 上先使用 8，
-确认 MySQL/Mongo CPU、连接数和延迟稳定后可提高到 16，允许范围是 1–32。降低为 1 可恢复原串行行为。
+确认 MySQL/Mongo CPU、连接数和延迟稳定后可提高到 16，允许范围是 1–16。降低为 1 可恢复原串行行为。
+不要直接使用 16；单节点 Mongo 在并发过高时会发生 socket timeout，并导致驱动清空连接池。
+
+Report 页面遇到瞬时 Mongo network/timeout 错误时最多错峰重试 2 次。数据不一致、SQL 错误、上下文取消
+等非瞬时错误不会重试；重试不会修改任何业务数据。
 
 命令会先打印 storage identity、stage counts 和 12 条 set check 的开始、结束及耗时，然后才进入
 `audit report stages`。set check 会扫描本批次 stage，故意保持串行以避免多个大查询同时冲击 MySQL；

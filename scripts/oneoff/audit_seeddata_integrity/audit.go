@@ -22,7 +22,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const auditReportVersion = 1
+const (
+	auditReportVersion        = 1
+	reportPageMaximumAttempts = 3
+)
 
 type auditReport struct {
 	Version            int               `json:"version"`
@@ -403,7 +406,10 @@ func auditReportStages(ctx context.Context, db *sql.DB, mongoDB *mongo.Database,
 		results := auditReportStagePages(ctx, db, mongoDB, cfg, pages)
 		for index, result := range results {
 			if result.Err != nil {
-				return fmt.Errorf("audit report stage page starting at id %d: %w", pages[index][0].ID, result.Err)
+				return fmt.Errorf("audit report stage page starting at id %d failed after %d attempt(s): %w", pages[index][0].ID, result.Attempts, result.Err)
+			}
+			if result.Attempts > 1 {
+				_, _ = fmt.Fprintf(progress, "audit report stage page: start_id=%d recovered attempts=%d\n", pages[index][0].ID, result.Attempts)
 			}
 			mergeAuditPage(report, result.Report, cfg.MaxFindings)
 			report.ReportStages += int64(len(pages[index]))
@@ -416,8 +422,9 @@ func auditReportStages(ctx context.Context, db *sql.DB, mongoDB *mongo.Database,
 }
 
 type reportStagePageResult struct {
-	Report auditReport
-	Err    error
+	Report   auditReport
+	Err      error
+	Attempts int
 }
 
 func auditReportStagePages(ctx context.Context, db *sql.DB, mongoDB *mongo.Database, cfg config, pages [][]reportStage) []reportStagePageResult {
@@ -427,13 +434,34 @@ func auditReportStagePages(ctx context.Context, db *sql.DB, mongoDB *mongo.Datab
 	for index := range pages {
 		go func() {
 			defer workers.Done()
-			var pageReport auditReport
-			results[index].Err = auditReportStagePage(ctx, db, mongoDB, cfg, &pageReport, pages[index])
-			results[index].Report = pageReport
+			for attempt := 1; attempt <= reportPageMaximumAttempts; attempt++ {
+				var pageReport auditReport
+				err := auditReportStagePage(ctx, db, mongoDB, cfg, &pageReport, pages[index])
+				results[index] = reportStagePageResult{Report: pageReport, Err: err, Attempts: attempt}
+				if err == nil || attempt == reportPageMaximumAttempts || !retryableReportPageError(ctx, err) {
+					return
+				}
+				timer := time.NewTimer(reportPageRetryDelay(attempt, index))
+				select {
+				case <-ctx.Done():
+					timer.Stop()
+					results[index].Err = ctx.Err()
+					return
+				case <-timer.C:
+				}
+			}
 		}()
 	}
 	workers.Wait()
 	return results
+}
+
+func retryableReportPageError(ctx context.Context, err error) bool {
+	return ctx.Err() == nil && (mongo.IsNetworkError(err) || mongo.IsTimeout(err))
+}
+
+func reportPageRetryDelay(attempt, pageIndex int) time.Duration {
+	return time.Duration(attempt)*time.Second + time.Duration(pageIndex%8)*100*time.Millisecond
 }
 
 func mergeAuditPage(report *auditReport, page auditReport, maxFindings int) {
