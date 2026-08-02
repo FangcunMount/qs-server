@@ -505,24 +505,35 @@ tmp/bin/seeddata historical-verify \
 在 qs-server 仓库执行统一编排。Token 从密钥系统注入：
 
 ```bash
-export QS_STATISTICS_TOKEN='<inject-from-secret-manager>'
+test -n "${QS_STATISTICS_TOKEN:-}" || {
+  echo "QS_STATISTICS_TOKEN is missing" >&2
+  exit 1
+}
 go run ./scripts/oneoff/rebuild_statistics \
-  --base-url https://<qs-host> \
-  --org-ids <org-id> \
+  --base-url http://127.0.0.1:8081 \
+  --org-ids 1 \
   --from 2025-01-01 \
-  --to 2026-07-27 \
-  --window-days 31 \
-  --reason hist-20250101-20260727-v1 \
+  --to 2026-08-01 \
+  --window-days 7 \
+  --timeout 10m \
+  --reason hist-20250101-20260801-v2 \
   --mode historical-backfill \
-  --confirm
+  --confirm \
+  2>&1 | tee tmp/statistics-historical-rebuild.log
 ```
+
 
 命令应完成：
 
-1. 将 573 天拆成 19 个不超过 31 天的窗口；
+1. 将 `2025-01-01..2026-08-01` 拆成 83 个不超过 7 天的窗口；
 2. 每个窗口依次执行 `repair -> validate`；
-3. 对 `2026-07-27` 到执行时最新完整上海自然日继续 catch-up；
+3. 如果执行时最新完整上海自然日晚于 `2026-08-01`，对中间日期继续 catch-up；
 4. 仅对最新完整上海自然日 publish，并校验最终水位。
+
+严格 validate 要求 `access/plan/assessment` 的 `inserted` 和 `conflict` 全部为零。
+某个窗口失败时，修复原因后在原命令增加错误中给出的 `--resume-from YYYY-MM-DD`；
+不要更换 reason 或重新发布缓存。Publish 进入 `data_committed` 时工具会自动调用 `resume-cache`。
+完整恢复规则见 [`rebuild_statistics/README.md`](rebuild_statistics/README.md)。
 
 随后与删除后的基线逐日对账：
 
