@@ -19,7 +19,7 @@ func TestHistoricalBackfillWorkflowRepairsValidatesCatchupAndPublishesLatestComp
 		}
 		requests = append(requests, request)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"code":0,"data":{"id":1,"status":"succeeded","stage":"completed","as_of_date":"` + request.ToDate + `"}}`))
+		_, _ = w.Write([]byte(`{"code":0,"data":{"id":1,"status":"succeeded","stage":"completed","as_of_date":"` + request.ToDate + `","fact_counts":{"access.inserted":0,"access.conflict":0,"plan.inserted":0,"plan.conflict":0,"assessment.inserted":0,"assessment.conflict":0}}}`))
 	}))
 	defer server.Close()
 
@@ -104,7 +104,7 @@ func TestSplitWindowsUsesInclusiveShanghaiDates(t *testing.T) {
 
 func TestOptionsRejectsUnconfirmedWriteAndLargeWindow(t *testing.T) {
 	location, _ := time.LoadLocation("Asia/Shanghai")
-	base := options{BaseURL: "http://localhost", Token: "secret", OrgIDs: []int64{1}, From: time.Date(2026, 1, 1, 0, 0, 0, 0, location), To: time.Date(2026, 1, 2, 0, 0, 0, 0, location), WindowDays: 7, Reason: "backfill"}
+	base := options{BaseURL: "http://localhost", Token: "secret", OrgIDs: []int64{1}, From: time.Date(2026, 1, 1, 0, 0, 0, 0, location), To: time.Date(2026, 1, 2, 0, 0, 0, 0, location), WindowDays: 7, RequestTimeout: defaultRequestTimeout, Reason: "backfill"}
 	if err := base.validate(); err == nil {
 		t.Fatal("write mode without confirmation must fail")
 	}
@@ -112,6 +112,29 @@ func TestOptionsRejectsUnconfirmedWriteAndLargeWindow(t *testing.T) {
 	base.WindowDays = 32
 	if err := base.validate(); err == nil {
 		t.Fatal("window larger than 31 days must fail")
+	}
+}
+
+func TestOptionsRejectsInvalidTimeoutAndResumeMode(t *testing.T) {
+	location, _ := time.LoadLocation("Asia/Shanghai")
+	base := options{
+		BaseURL: "http://localhost", Token: "secret", OrgIDs: []int64{1},
+		From: time.Date(2026, 1, 1, 0, 0, 0, 0, location), To: time.Date(2026, 1, 2, 0, 0, 0, 0, location),
+		WindowDays: 7, RequestTimeout: defaultRequestTimeout, Reason: "backfill", Mode: "repair", Confirm: true,
+	}
+	base.RequestTimeout = 0
+	if err := base.validate(); err == nil || !strings.Contains(err.Error(), "timeout") {
+		t.Fatalf("err=%v", err)
+	}
+	base.RequestTimeout = defaultRequestTimeout
+	base.ResumeFrom = base.From
+	if err := base.validate(); err == nil || !strings.Contains(err.Error(), "historical-backfill") {
+		t.Fatalf("err=%v", err)
+	}
+	base.Mode = historicalBackfillMode
+	base.ResumeFrom = base.From.AddDate(0, 0, -1)
+	if err := base.validate(); err == nil || !strings.Contains(err.Error(), "before from") {
+		t.Fatalf("err=%v", err)
 	}
 }
 

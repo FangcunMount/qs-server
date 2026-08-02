@@ -9,12 +9,16 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
 
-const dateLayout = "2006-01-02"
+const (
+	dateLayout            = "2006-01-02"
+	defaultRequestTimeout = 10 * time.Minute
+)
 
 type dateWindow struct {
 	From time.Time
@@ -30,18 +34,25 @@ type runRequest struct {
 	ValidateOnly bool   `json:"validate_only"`
 }
 
+type resumeCacheRequest struct {
+	Reason  string `json:"reason"`
+	Confirm bool   `json:"confirm"`
+}
+
 type options struct {
-	BaseURL      string
-	Token        string
-	OrgIDs       []int64
-	From         time.Time
-	To           time.Time
-	WindowDays   int
-	Reason       string
-	Mode         string
-	Confirm      bool
-	ValidateOnly bool
-	Now          func() time.Time
+	BaseURL        string
+	Token          string
+	OrgIDs         []int64
+	From           time.Time
+	To             time.Time
+	ResumeFrom     time.Time
+	WindowDays     int
+	RequestTimeout time.Duration
+	Reason         string
+	Mode           string
+	Confirm        bool
+	ValidateOnly   bool
+	Now            func() time.Time
 }
 
 const historicalBackfillMode = "historical-backfill"
@@ -77,14 +88,16 @@ func main() {
 func run(args []string, output io.Writer) error {
 	flags := flag.NewFlagSet("rebuild_statistics", flag.ContinueOnError)
 	flags.SetOutput(output)
-	var rawOrgIDs, from, to string
+	var rawOrgIDs, from, to, resumeFrom string
 	var cfg options
 	flags.StringVar(&cfg.BaseURL, "base-url", "", "apiserver base URL")
 	flags.StringVar(&cfg.Token, "token", os.Getenv("QS_STATISTICS_TOKEN"), "bearer token (or QS_STATISTICS_TOKEN)")
 	flags.StringVar(&rawOrgIDs, "org-ids", "", "comma-separated organization IDs")
 	flags.StringVar(&from, "from", "", "first Shanghai business date, inclusive")
 	flags.StringVar(&to, "to", "", "last Shanghai business date, inclusive")
+	flags.StringVar(&resumeFrom, "resume-from", "", "historical-backfill date to resume from, inclusive")
 	flags.IntVar(&cfg.WindowDays, "window-days", 7, "dates per run, maximum 31")
+	flags.DurationVar(&cfg.RequestTimeout, "timeout", defaultRequestTimeout, "HTTP timeout for each Statistics run")
 	flags.StringVar(&cfg.Reason, "reason", "statistics_rebuild", "audited run reason")
 	flags.StringVar(&cfg.Mode, "mode", "repair", "run mode: validate, repair, publish, or historical-backfill")
 	flags.BoolVar(&cfg.Confirm, "confirm", false, "confirm writes")
@@ -105,11 +118,17 @@ func run(args []string, output io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("to: %w", err)
 	}
+	if strings.TrimSpace(resumeFrom) != "" {
+		cfg.ResumeFrom, err = parseShanghaiDate(resumeFrom)
+		if err != nil {
+			return fmt.Errorf("resume-from: %w", err)
+		}
+	}
 	if err := cfg.validate(); err != nil {
 		return err
 	}
 
-	client := &http.Client{Timeout: 10 * time.Minute}
+	client := &http.Client{Timeout: cfg.RequestTimeout}
 	if cfg.ValidateOnly {
 		cfg.Mode = "validate"
 	}
@@ -122,9 +141,14 @@ func run(args []string, output io.Writer) error {
 		}
 		for _, window := range splitWindows(cfg.From, cfg.To, cfg.WindowDays) {
 			_, _ = fmt.Fprintf(output, "org=%d window=%s..%s mode=%s\n", orgID, window.From.Format(dateLayout), window.To.Format(dateLayout), cfg.Mode)
-			result, err := executeRun(client, cfg, orgID, window)
+			result, err := executeRunWithCacheRecovery(client, cfg, orgID, window, output)
 			if err != nil {
 				return fmt.Errorf("org %d window %s..%s: %w", orgID, window.From.Format(dateLayout), window.To.Format(dateLayout), err)
+			}
+			if cfg.Mode == "validate" {
+				if err := validateRunCompleteness(result); err != nil {
+					return fmt.Errorf("org %d window %s..%s: %w", orgID, window.From.Format(dateLayout), window.To.Format(dateLayout), err)
+				}
 			}
 			encoded, _ := json.Marshal(result)
 			_, _ = fmt.Fprintln(output, string(encoded))
@@ -149,6 +173,9 @@ func (o options) validate() error {
 	if o.WindowDays < 1 || o.WindowDays > 31 {
 		return errors.New("window-days must be between 1 and 31")
 	}
+	if o.RequestTimeout <= 0 {
+		return errors.New("timeout must be positive")
+	}
 	mode := strings.TrimSpace(o.Mode)
 	if o.ValidateOnly {
 		mode = "validate"
@@ -158,6 +185,14 @@ func (o options) validate() error {
 	}
 	if mode != "validate" && !o.Confirm {
 		return errors.New("write mode requires --confirm")
+	}
+	if !o.ResumeFrom.IsZero() {
+		if mode != historicalBackfillMode {
+			return errors.New("resume-from is only supported in historical-backfill mode")
+		}
+		if o.ResumeFrom.Before(o.From) {
+			return errors.New("resume-from cannot be before from")
+		}
 	}
 	if strings.TrimSpace(o.Reason) == "" {
 		return errors.New("reason is required")
@@ -176,11 +211,24 @@ func executeHistoricalBackfill(client *http.Client, cfg options, orgID int64, ou
 	if latestCompleteDay.Before(cfg.To) {
 		return fmt.Errorf("latest complete Shanghai business day %s is before historical backfill end %s", latestCompleteDay.Format(dateLayout), cfg.To.Format(dateLayout))
 	}
-	if err := executeRepairAndValidateWindows(client, cfg, orgID, output, "historical", splitWindows(cfg.From, cfg.To, cfg.WindowDays)); err != nil {
-		return err
+	resumeFrom := cfg.From
+	if !cfg.ResumeFrom.IsZero() {
+		resumeFrom = cfg.ResumeFrom
+		if resumeFrom.After(latestCompleteDay) {
+			return fmt.Errorf("resume-from %s exceeds latest complete Shanghai business day %s", resumeFrom.Format(dateLayout), latestCompleteDay.Format(dateLayout))
+		}
+		_, _ = fmt.Fprintf(output, "org=%d phase=resume resume_from=%s\n", orgID, resumeFrom.Format(dateLayout))
+	}
+	if !resumeFrom.After(cfg.To) {
+		if err := executeRepairAndValidateWindows(client, cfg, orgID, output, "historical", splitWindows(resumeFrom, cfg.To, cfg.WindowDays)); err != nil {
+			return err
+		}
 	}
 	if latestCompleteDay.After(cfg.To) {
 		catchupFrom := cfg.To.AddDate(0, 0, 1)
+		if resumeFrom.After(catchupFrom) {
+			catchupFrom = resumeFrom
+		}
 		if err := executeRepairAndValidateWindows(client, cfg, orgID, output, "catchup", splitWindows(catchupFrom, latestCompleteDay, cfg.WindowDays)); err != nil {
 			return err
 		}
@@ -191,7 +239,7 @@ func executeHistoricalBackfill(client *http.Client, cfg options, orgID int64, ou
 	publish.ValidateOnly = false
 	finalWindow := dateWindow{From: latestCompleteDay, To: latestCompleteDay}
 	_, _ = fmt.Fprintf(output, "org=%d phase=publish as_of_date=%s\n", orgID, latestCompleteDay.Format(dateLayout))
-	result, err := executeRun(client, publish, orgID, finalWindow)
+	result, err := executeRunWithCacheRecovery(client, publish, orgID, finalWindow, output)
 	if err != nil {
 		return fmt.Errorf("publish as_of_date %s: %w", latestCompleteDay.Format(dateLayout), err)
 	}
@@ -209,9 +257,9 @@ func executeRepairAndValidateWindows(client *http.Client, cfg options, orgID int
 		repair.Mode = "repair"
 		repair.ValidateOnly = false
 		_, _ = fmt.Fprintf(output, "org=%d phase=%s_repair window=%s..%s index=%d\n", orgID, phase, window.From.Format(dateLayout), window.To.Format(dateLayout), index+1)
-		result, err := executeRun(client, repair, orgID, window)
+		result, err := executeRunWithCacheRecovery(client, repair, orgID, window, output)
 		if err != nil {
-			return fmt.Errorf("repair window %s..%s: %w", window.From.Format(dateLayout), window.To.Format(dateLayout), err)
+			return fmt.Errorf("repair window %s..%s: %w; resume with --resume-from %s", window.From.Format(dateLayout), window.To.Format(dateLayout), err, window.From.Format(dateLayout))
 		}
 		encoded, _ := json.Marshal(result)
 		_, _ = fmt.Fprintln(output, string(encoded))
@@ -221,14 +269,39 @@ func executeRepairAndValidateWindows(client *http.Client, cfg options, orgID int
 		validate.Confirm = false
 		validate.ValidateOnly = true
 		_, _ = fmt.Fprintf(output, "org=%d phase=%s_validate window=%s..%s index=%d\n", orgID, phase, window.From.Format(dateLayout), window.To.Format(dateLayout), index+1)
-		result, err = executeRun(client, validate, orgID, window)
+		result, err = executeRunWithCacheRecovery(client, validate, orgID, window, output)
 		if err != nil {
-			return fmt.Errorf("validate window %s..%s: %w", window.From.Format(dateLayout), window.To.Format(dateLayout), err)
+			return fmt.Errorf("validate window %s..%s: %w; resume with --resume-from %s", window.From.Format(dateLayout), window.To.Format(dateLayout), err, window.From.Format(dateLayout))
+		}
+		if err := validateRunCompleteness(result); err != nil {
+			return fmt.Errorf("validate window %s..%s: %w; resume with --resume-from %s", window.From.Format(dateLayout), window.To.Format(dateLayout), err, window.From.Format(dateLayout))
 		}
 		encoded, _ = json.Marshal(result)
 		_, _ = fmt.Fprintln(output, string(encoded))
 	}
 	return nil
+}
+
+func validateRunCompleteness(result runResult) error {
+	var issues []string
+	for _, collector := range []string{"access", "plan", "assessment"} {
+		for _, metric := range []string{"inserted", "conflict"} {
+			key := collector + "." + metric
+			value, exists := result.FactCounts[key]
+			if !exists {
+				issues = append(issues, key+" is missing")
+				continue
+			}
+			if value != 0 {
+				issues = append(issues, fmt.Sprintf("%s=%d", key, value))
+			}
+		}
+	}
+	if len(issues) == 0 {
+		return nil
+	}
+	sort.Strings(issues)
+	return fmt.Errorf("validation is incomplete: %s", strings.Join(issues, ", "))
 }
 
 func latestCompleteShanghaiDay(nowFn func() time.Time) (time.Time, error) {
@@ -255,6 +328,35 @@ func executeRun(client *http.Client, cfg options, orgID int64, window dateWindow
 		return runResult{}, err
 	}
 	url := strings.TrimRight(cfg.BaseURL, "/") + "/internal/v2/statistics/runs"
+	return executeRunRequest(client, cfg, orgID, url, body)
+}
+
+func executeRunWithCacheRecovery(client *http.Client, cfg options, orgID int64, window dateWindow, output io.Writer) (runResult, error) {
+	result, err := executeRun(client, cfg, orgID, window)
+	if err == nil {
+		return result, nil
+	}
+	if result.ID == 0 || result.Status != "data_committed" {
+		return result, err
+	}
+	_, _ = fmt.Fprintf(output, "org=%d phase=resume_cache run_id=%d\n", orgID, result.ID)
+	resumed, resumeErr := executeResumeCache(client, cfg, orgID, result.ID)
+	if resumeErr != nil {
+		return resumed, fmt.Errorf("run %d is data_committed and cache resume failed: %w", result.ID, resumeErr)
+	}
+	return resumed, nil
+}
+
+func executeResumeCache(client *http.Client, cfg options, orgID int64, runID uint64) (runResult, error) {
+	body, err := json.Marshal(resumeCacheRequest{Reason: cfg.Reason, Confirm: true})
+	if err != nil {
+		return runResult{}, err
+	}
+	url := fmt.Sprintf("%s/internal/v2/statistics/runs/%d/resume-cache", strings.TrimRight(cfg.BaseURL, "/"), runID)
+	return executeRunRequest(client, cfg, orgID, url, body)
+}
+
+func executeRunRequest(client *http.Client, cfg options, orgID int64, url string, body []byte) (runResult, error) {
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return runResult{}, err
