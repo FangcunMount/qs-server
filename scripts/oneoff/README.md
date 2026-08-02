@@ -31,6 +31,7 @@
 | 工具 | 用途 |
 | --- | --- |
 | `cleanup_perf_testee_data` | 按显式 Testee 或 `seed_backfill_stage` + runner manifest 精确备份/回滚压测与历史回填数据 |
+| `audit_seeddata_integrity` | 一次性审计指定历史批次的 Report 链，并在人工确认后备份、精确删除可证明归属的孤岛 |
 | `reset_testee_historical_data` | 全环境删除全部 Testee 历史事实、保留医护主数据，并输出三库执行后断言 |
 | `verify_historical_statistics` | 保存回填前事实基线，并按批次账本资源 ID 逐日验证 Statistics 增量 |
 | `cleanup_orphaned_assessment_documents` | 对账并清理缺少 MySQL Assessment 的 Mongo 报告/答卷 |
