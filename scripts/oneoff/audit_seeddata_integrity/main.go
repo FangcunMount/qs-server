@@ -22,13 +22,14 @@ import (
 )
 
 const (
-	dateLayout              = "2006-01-02"
-	applyConfirmation       = "DELETE_SEEDDATA_ORPHANS"
-	defaultAuditPageSize    = 500
-	defaultReportWorkers    = 8
-	defaultMaxFindings      = 1000
-	defaultMaxCandidates    = 10000
-	defaultOperationTimeout = 12 * time.Hour
+	dateLayout                     = "2006-01-02"
+	applyConfirmation              = "DELETE_SEEDDATA_ORPHANS"
+	applyWithoutBackupConfirmation = "DELETE_SEEDDATA_ORPHANS_WITHOUT_BACKUP"
+	defaultAuditPageSize           = 500
+	defaultReportWorkers           = 8
+	defaultMaxFindings             = 1000
+	defaultMaxCandidates           = 10000
+	defaultOperationTimeout        = 12 * time.Hour
 )
 
 type config struct {
@@ -50,6 +51,7 @@ type config struct {
 	MaxCandidates          int
 	Timeout                time.Duration
 	Apply                  bool
+	SkipBackup             bool
 	ConfirmServicesStopped bool
 }
 
@@ -138,9 +140,10 @@ func parseConfig(args []string, output io.Writer) (config, error) {
 	flags.IntVar(&cfg.MaxCandidates, "max-delete-candidates", defaultMaxCandidates, "safety ceiling for exact orphan deletion candidates")
 	flags.DurationVar(&cfg.Timeout, "timeout", defaultOperationTimeout, "overall timeout; 0 disables")
 	flags.BoolVar(&cfg.Apply, "apply", false, "apply exact deletion candidates from a saved audit report")
+	flags.BoolVar(&cfg.SkipBackup, "skip-backup", false, "delete exact candidates without creating tool-managed backups")
 	flags.StringVar(&cfg.AuditReport, "audit-report", "", "saved audit report required by --apply")
 	flags.StringVar(&cfg.BackupSuffix, "backup-suffix", "", "safe suffix for Mongo backup collections")
-	flags.StringVar(&cfg.Confirm, "confirm", "", "must equal "+applyConfirmation+" with --apply")
+	flags.StringVar(&cfg.Confirm, "confirm", "", "destructive confirmation phrase required by the selected apply mode")
 	flags.BoolVar(&cfg.ConfirmServicesStopped, "confirm-services-stopped", false, "confirm runner, workers and Statistics scheduler are stopped")
 	if err := flags.Parse(args); err != nil {
 		return config{}, err
@@ -192,22 +195,34 @@ func (c *config) validate() error {
 		return errors.New("output is required so the audit/apply result can be retained")
 	}
 	if !c.Apply {
-		if c.AuditReport != "" || c.BackupSuffix != "" || c.Confirm != "" || c.ConfirmServicesStopped {
-			return errors.New("audit-report, backup-suffix, confirm and confirm-services-stopped are apply-only options")
+		if c.AuditReport != "" || c.BackupSuffix != "" || c.Confirm != "" || c.SkipBackup || c.ConfirmServicesStopped {
+			return errors.New("audit-report, backup-suffix, skip-backup, confirm and confirm-services-stopped are apply-only options")
 		}
 		return nil
 	}
-	if c.AuditReport == "" || c.BackupSuffix == "" {
-		return errors.New("apply requires audit-report and backup-suffix")
+	if c.AuditReport == "" {
+		return errors.New("apply requires audit-report")
 	}
-	if c.Confirm != applyConfirmation {
-		return fmt.Errorf("apply requires --confirm=%s", applyConfirmation)
+	if c.SkipBackup {
+		if c.BackupSuffix != "" {
+			return errors.New("skip-backup and backup-suffix are mutually exclusive")
+		}
+		if c.Confirm != applyWithoutBackupConfirmation {
+			return fmt.Errorf("apply with --skip-backup requires --confirm=%s", applyWithoutBackupConfirmation)
+		}
+	} else {
+		if c.BackupSuffix == "" {
+			return errors.New("apply requires backup-suffix unless --skip-backup is set")
+		}
+		if c.Confirm != applyConfirmation {
+			return fmt.Errorf("apply requires --confirm=%s", applyConfirmation)
+		}
+		if !regexp.MustCompile(`^[A-Za-z0-9_]{1,24}$`).MatchString(c.BackupSuffix) {
+			return errors.New("backup-suffix must contain 1-24 letters, digits or underscores")
+		}
 	}
 	if !c.ConfirmServicesStopped {
 		return errors.New("apply requires --confirm-services-stopped")
-	}
-	if !regexp.MustCompile(`^[A-Za-z0-9_]{1,24}$`).MatchString(c.BackupSuffix) {
-		return errors.New("backup-suffix must contain 1-24 letters, digits or underscores")
 	}
 	auditPath, err := filepath.Abs(c.AuditReport)
 	if err != nil {

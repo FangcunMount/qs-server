@@ -34,6 +34,7 @@ type applyResult struct {
 	MySQLOutboxBackedUp  int64            `json:"mysql_outbox_backed_up"`
 	MySQLOutboxDeleted   int64            `json:"mysql_outbox_deleted"`
 	MongoCollections     map[string]int64 `json:"mongo_collections"`
+	BackupSkipped        bool             `json:"backup_skipped"`
 	StageLedgerPreserved bool             `json:"stage_ledger_preserved"`
 	Notes                []string         `json:"notes"`
 }
@@ -96,7 +97,8 @@ func applyAuditReport(ctx context.Context, mysqlDB *sql.DB, mongoDB *mongo.Datab
 	result := applyResult{
 		Version: 1, OrgID: cfg.OrgID, BatchID: cfg.BatchID, From: cfg.From, To: cfg.To,
 		PlanHash: report.PlanHash, BackupSuffix: cfg.BackupSuffix, StartedAt: time.Now().UTC(),
-		Candidates: len(report.DeletionCandidates), MongoCollections: map[string]int64{}, StageLedgerPreserved: true,
+		Candidates: len(report.DeletionCandidates), MongoCollections: map[string]int64{},
+		BackupSkipped: cfg.SkipBackup, StageLedgerPreserved: true,
 	}
 	if len(report.DeletionCandidates) == 0 {
 		result.CompletedAt = time.Now().UTC()
@@ -107,50 +109,52 @@ func applyAuditReport(ctx context.Context, mysqlDB *sql.DB, mongoDB *mongo.Datab
 		return applyResult{}, fmt.Errorf("audit report has %d candidates, exceeding current safety ceiling %d", len(report.DeletionCandidates), cfg.MaxCandidates)
 	}
 
-	ids, err := validateCandidates(ctx, mysqlDB, mongoDB, cfg, report.DeletionCandidates)
+	ids, err := validateCandidates(ctx, mysqlDB, mongoDB, cfg, report.DeletionCandidates, cfg.SkipBackup)
 	if err != nil {
-		return applyResult{}, err
+		return applyResult{}, fmt.Errorf("validate deletion candidates: %w", err)
 	}
 	documents, err := materializeMongoCleanup(ctx, mongoDB, ids)
 	if err != nil {
-		return applyResult{}, err
+		return applyResult{}, fmt.Errorf("materialize Mongo deletion scope: %w", err)
 	}
-	if err := requireFreshBackups(ctx, mysqlDB, mongoDB, cfg, documents); err != nil {
-		return applyResult{}, err
-	}
-	backedUp, perCollection, err := backupMongoDocuments(ctx, mongoDB, cfg.BackupSuffix, documents)
-	if err != nil {
-		return applyResult{}, err
-	}
-	result.MongoBackedUp = backedUp
-	for collection, count := range perCollection {
-		result.MongoCollections[collection] = count
-	}
+	if !cfg.SkipBackup {
+		if err := requireFreshBackups(ctx, mysqlDB, mongoDB, cfg, documents); err != nil {
+			return applyResult{}, fmt.Errorf("validate fresh backup scope: %w", err)
+		}
+		backedUp, perCollection, err := backupMongoDocuments(ctx, mongoDB, cfg.BackupSuffix, documents)
+		if err != nil {
+			return applyResult{}, fmt.Errorf("backup Mongo deletion scope: %w", err)
+		}
+		result.MongoBackedUp = backedUp
+		for collection, count := range perCollection {
+			result.MongoCollections[collection] = count
+		}
 
-	statisticsBackedUp, err := backupStatisticsFacts(ctx, mysqlDB, cfg, report.DeletionCandidates)
-	if err != nil {
-		return applyResult{}, err
+		statisticsBackedUp, err := backupStatisticsFacts(ctx, mysqlDB, cfg, report.DeletionCandidates)
+		if err != nil {
+			return applyResult{}, fmt.Errorf("backup Statistics facts: %w", err)
+		}
+		result.StatisticsBackedUp = statisticsBackedUp
+		outboxBackedUp, err := backupMySQLOutbox(ctx, mysqlDB, cfg, report.DeletionCandidates)
+		if err != nil {
+			return applyResult{}, fmt.Errorf("backup MySQL outcome outbox: %w", err)
+		}
+		result.MySQLOutboxBackedUp = outboxBackedUp
 	}
-	result.StatisticsBackedUp = statisticsBackedUp
-	outboxBackedUp, err := backupMySQLOutbox(ctx, mysqlDB, cfg, report.DeletionCandidates)
-	if err != nil {
-		return applyResult{}, err
-	}
-	result.MySQLOutboxBackedUp = outboxBackedUp
 
 	deleted, err := deleteMongoDocuments(ctx, mongoDB, documents)
 	if err != nil {
-		return applyResult{}, err
+		return applyResult{}, fmt.Errorf("delete Mongo orphan scope: %w", err)
 	}
 	result.MongoDeleted = deleted
-	outboxDeleted, err := deleteMySQLOutbox(ctx, mysqlDB, cfg, report.DeletionCandidates)
+	outboxDeleted, err := deleteMySQLOutbox(ctx, mysqlDB, cfg, report.DeletionCandidates, !cfg.SkipBackup)
 	if err != nil {
-		return applyResult{}, err
+		return applyResult{}, fmt.Errorf("delete MySQL outcome outbox: %w", err)
 	}
 	result.MySQLOutboxDeleted = outboxDeleted
-	statisticsDeleted, err := deleteStatisticsFacts(ctx, mysqlDB, cfg, report.DeletionCandidates)
+	statisticsDeleted, err := deleteStatisticsFacts(ctx, mysqlDB, cfg, report.DeletionCandidates, !cfg.SkipBackup)
 	if err != nil {
-		return applyResult{}, err
+		return applyResult{}, fmt.Errorf("delete Statistics facts: %w", err)
 	}
 	result.StatisticsDeleted = statisticsDeleted
 	result.CompletedAt = time.Now().UTC()
@@ -159,10 +163,13 @@ func applyAuditReport(ctx context.Context, mysqlDB *sql.DB, mongoDB *mongo.Datab
 		"rerun the integrity audit before Statistics repair",
 		"an active batch needs an explicit stage reset plus seeddata --resume; this cleanup does not reset runner progress",
 	}
+	if cfg.SkipBackup {
+		result.Notes = append(result.Notes, "tool-managed backups were explicitly skipped; exact remaining candidates may be retried with the same audit report after a transient failure")
+	}
 	return result, nil
 }
 
-func validateCandidates(ctx context.Context, mysqlDB *sql.DB, mongoDB *mongo.Database, cfg config, candidates []orphanCandidate) (cleanupIDs, error) {
+func validateCandidates(ctx context.Context, mysqlDB *sql.DB, mongoDB *mongo.Database, cfg config, candidates []orphanCandidate, allowMissingArtifacts bool) (cleanupIDs, error) {
 	ids, stageIDs := cleanupIDs{}, make([]uint64, 0, len(candidates))
 	for _, candidate := range candidates {
 		reportID, assessmentID, outcomeID, generationID, runID, err := parseCandidateIDs(candidate)
@@ -231,7 +238,10 @@ func validateCandidates(ctx context.Context, mysqlDB *sql.DB, mongoDB *mongo.Dat
 		}
 		artifact := artifacts[reportID]
 		if artifact == nil {
-			return cleanupIDs{}, fmt.Errorf("report %d is absent from the source collection; this one-time apply cannot be resumed", reportID)
+			if allowMissingArtifacts {
+				continue
+			}
+			return cleanupIDs{}, fmt.Errorf("report %d is absent from the source collection; backed-up apply cannot be resumed", reportID)
 		}
 		objectID, err := primitive.ObjectIDFromHex(candidate.ArtifactObject)
 		if err != nil {
@@ -493,7 +503,7 @@ WHERE f.org_id=?`, cfg.OrgID)
 	return result.RowsAffected()
 }
 
-func deleteStatisticsFacts(ctx context.Context, db *sql.DB, cfg config, candidates []orphanCandidate) (int64, error) {
+func deleteStatisticsFacts(ctx context.Context, db *sql.DB, cfg config, candidates []orphanCandidate, verifyBackup bool) (int64, error) {
 	conn, err := db.Conn(ctx)
 	if err != nil {
 		return 0, err
@@ -502,19 +512,21 @@ func deleteStatisticsFacts(ctx context.Context, db *sql.DB, cfg config, candidat
 	if err := prepareStatisticsFactSourceTempTable(ctx, conn, candidates); err != nil {
 		return 0, err
 	}
-	backupTable := statisticsBackupTable(cfg.BackupSuffix)
-	var backedUp int64
-	if err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM `+backupTable+` `+statisticsFactSourceJoin+`
+	if verifyBackup {
+		backupTable := statisticsBackupTable(cfg.BackupSuffix)
+		var backedUp int64
+		if err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM `+backupTable+` `+statisticsFactSourceJoin+`
 WHERE f.org_id=?`, cfg.OrgID).Scan(&backedUp); err != nil {
-		return 0, fmt.Errorf("verify statistics backup: %w", err)
-	}
-	var source int64
-	if err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM statistics_assessment_fact `+statisticsFactSourceJoin+`
+			return 0, fmt.Errorf("verify statistics backup: %w", err)
+		}
+		var source int64
+		if err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM statistics_assessment_fact `+statisticsFactSourceJoin+`
 WHERE f.org_id=?`, cfg.OrgID).Scan(&source); err != nil {
-		return 0, err
-	}
-	if backedUp != source {
-		return 0, fmt.Errorf("statistics backup does not exactly match source: backed_up=%d source=%d", backedUp, source)
+			return 0, err
+		}
+		if backedUp != source {
+			return 0, fmt.Errorf("statistics backup does not exactly match source: backed_up=%d source=%d", backedUp, source)
+		}
 	}
 	result, err := conn.ExecContext(ctx, `DELETE f FROM statistics_assessment_fact `+statisticsFactSourceJoin+`
 WHERE f.org_id=?`, cfg.OrgID)
@@ -610,7 +622,7 @@ SELECT o.* FROM domain_event_outbox o FORCE INDEX (idx_outbox_aggregate_event_la
 	return result.RowsAffected()
 }
 
-func deleteMySQLOutbox(ctx context.Context, db *sql.DB, cfg config, candidates []orphanCandidate) (int64, error) {
+func deleteMySQLOutbox(ctx context.Context, db *sql.DB, cfg config, candidates []orphanCandidate, verifyBackup bool) (int64, error) {
 	conn, err := db.Conn(ctx)
 	if err != nil {
 		return 0, err
@@ -619,19 +631,21 @@ func deleteMySQLOutbox(ctx context.Context, db *sql.DB, cfg config, candidates [
 	if err := prepareCandidateTempTable(ctx, conn, candidates); err != nil {
 		return 0, err
 	}
-	backupTable := mysqlOutboxBackupTable(cfg.BackupSuffix)
-	countQuery := func(table string) string {
-		return `SELECT COUNT(*) FROM ` + table + ` o FORCE INDEX (idx_outbox_aggregate_event_latest) ` + mysqlOutcomeOutboxCandidateJoin
-	}
-	var backedUp, source int64
-	if err := conn.QueryRowContext(ctx, countQuery(backupTable)).Scan(&backedUp); err != nil {
-		return 0, fmt.Errorf("verify MySQL outbox backup: %w", err)
-	}
-	if err := conn.QueryRowContext(ctx, countQuery("domain_event_outbox")).Scan(&source); err != nil {
-		return 0, fmt.Errorf("count MySQL outcome outbox source: %w", err)
-	}
-	if backedUp != source {
-		return 0, fmt.Errorf("MySQL outbox backup does not exactly match source: backed_up=%d source=%d", backedUp, source)
+	if verifyBackup {
+		backupTable := mysqlOutboxBackupTable(cfg.BackupSuffix)
+		countQuery := func(table string) string {
+			return `SELECT COUNT(*) FROM ` + table + ` o FORCE INDEX (idx_outbox_aggregate_event_latest) ` + mysqlOutcomeOutboxCandidateJoin
+		}
+		var backedUp, source int64
+		if err := conn.QueryRowContext(ctx, countQuery(backupTable)).Scan(&backedUp); err != nil {
+			return 0, fmt.Errorf("verify MySQL outbox backup: %w", err)
+		}
+		if err := conn.QueryRowContext(ctx, countQuery("domain_event_outbox")).Scan(&source); err != nil {
+			return 0, fmt.Errorf("count MySQL outcome outbox source: %w", err)
+		}
+		if backedUp != source {
+			return 0, fmt.Errorf("MySQL outbox backup does not exactly match source: backed_up=%d source=%d", backedUp, source)
+		}
 	}
 	result, err := conn.ExecContext(ctx, `DELETE o FROM domain_event_outbox o FORCE INDEX (idx_outbox_aggregate_event_latest) `+mysqlOutcomeOutboxCandidateJoin)
 	if err != nil {

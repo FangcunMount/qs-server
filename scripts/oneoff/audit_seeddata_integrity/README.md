@@ -130,6 +130,28 @@ seed_orphan_outbox_bak_<backup-suffix>
 不提供自动恢复或重复 apply：如果中途失败，保持所有服务停止，先根据备份人工恢复，再重新审计。
 不要直接换一个 suffix 继续删除。
 
+如果 operator 明确接受不生成工具级备份，可以使用无备份模式。该模式仍然校验 audit report、deployment、
+stage 归属、MySQL 父记录和所有仍存在的 Mongo 资源身份，但不会创建 Mongo/MySQL 备份。它允许同一份
+audit report 在瞬时故障后再次执行：已经不存在的 Artifact 被视为上一次精确删除的结果，脚本只物化并
+删除当前仍存在的精确资源，同时继续清理该报告列出的 Statistics facts 和 MySQL Outcome Outbox。
+
+```bash
+go run ./scripts/oneoff/audit_seeddata_integrity \
+  --org-id 1 \
+  --batch-id hist-20250101-20260727-v1 \
+  --from 2025-01-01 \
+  --to 2026-07-27 \
+  --audit-report /secure/path/hist-20250101-20260727-v1.integrity-audit.json \
+  --skip-backup \
+  --confirm DELETE_SEEDDATA_ORPHANS_WITHOUT_BACKUP \
+  --confirm-services-stopped \
+  --apply \
+  --output /secure/path/hist-20250101-20260727-v1.integrity-apply.json
+```
+
+`--skip-backup` 与 `--backup-suffix` 互斥。无备份模式仍是破坏性操作；执行期间必须继续停止 historical
+runner、QS Worker 和 Statistics scheduler。
+
 ## 4. 删除后的门禁
 
 重新运行只读审计，并使用新的输出文件：

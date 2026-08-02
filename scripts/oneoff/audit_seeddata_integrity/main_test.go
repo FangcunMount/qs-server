@@ -126,6 +126,37 @@ func TestApplyRejectsAuditReportAsOutput(t *testing.T) {
 	}
 }
 
+func TestApplyWithoutBackupRequiresDedicatedConfirmation(t *testing.T) {
+	cfg := validAuditConfig(t)
+	cfg.Apply = true
+	cfg.SkipBackup = true
+	cfg.AuditReport = "/secure/audit.json"
+	if err := cfg.validate(); err == nil || !strings.Contains(err.Error(), applyWithoutBackupConfirmation) {
+		t.Fatalf("missing no-backup confirmation error = %v", err)
+	}
+	cfg.Confirm = applyWithoutBackupConfirmation
+	if err := cfg.validate(); err == nil || !strings.Contains(err.Error(), "services-stopped") {
+		t.Fatalf("missing services-stopped confirmation error = %v", err)
+	}
+	cfg.ConfirmServicesStopped = true
+	if err := cfg.validate(); err != nil {
+		t.Fatalf("validate no-backup apply config: %v", err)
+	}
+}
+
+func TestApplyWithoutBackupRejectsBackupSuffix(t *testing.T) {
+	cfg := validAuditConfig(t)
+	cfg.Apply = true
+	cfg.SkipBackup = true
+	cfg.AuditReport = "/secure/audit.json"
+	cfg.BackupSuffix = "unused"
+	cfg.Confirm = applyWithoutBackupConfirmation
+	cfg.ConfirmServicesStopped = true
+	if err := cfg.validate(); err == nil || !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Fatalf("skip-backup with suffix error = %v", err)
+	}
+}
+
 func TestBusinessWindowIsInclusiveExclusiveShanghaiTime(t *testing.T) {
 	cfg := validAuditConfig(t)
 	from, to, err := cfg.businessWindow()
