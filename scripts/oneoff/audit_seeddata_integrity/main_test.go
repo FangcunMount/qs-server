@@ -157,6 +157,14 @@ func TestApplyWithoutBackupRejectsBackupSuffix(t *testing.T) {
 	}
 }
 
+func TestApplyProgressWritesImmediatelyScannablePhase(t *testing.T) {
+	var output strings.Builder
+	applyProgress(&output, "delete Mongo collection=%s completed documents=%d", "reports", 3)
+	if got, want := output.String(), "apply phase: delete Mongo collection=reports completed documents=3\n"; got != want {
+		t.Fatalf("progress output = %q, want %q", got, want)
+	}
+}
+
 func TestBusinessWindowIsInclusiveExclusiveShanghaiTime(t *testing.T) {
 	cfg := validAuditConfig(t)
 	from, to, err := cfg.businessWindow()
@@ -346,14 +354,21 @@ func TestMySQLOutboxCleanupIdentityMatchesOutcomeCommittedEvent(t *testing.T) {
 	}
 }
 
-func TestMySQLOutboxCleanupUsesCollationIndependentIdentity(t *testing.T) {
+func TestMySQLOutboxCleanupUsesIndexedCollationAlignedIdentity(t *testing.T) {
 	for _, required := range []string{
-		"BINARY o.aggregate_id=BINARY CAST(x.assessment_id AS CHAR)",
-		"BINARY JSON_UNQUOTE(JSON_EXTRACT(o.payload_json,'$.data.outcome_id'))=BINARY CAST(x.outcome_id AS CHAR)",
+		"o.aggregate_id=x.assessment_ref",
+		"BINARY JSON_UNQUOTE(JSON_EXTRACT(o.payload_json,'$.data.outcome_id'))=BINARY x.outcome_ref",
 	} {
-		if !strings.Contains(mysqlOutcomeOutboxCandidateJoin, required) {
-			t.Fatalf("outbox candidate join is missing binary identity predicate %q: %s", required, mysqlOutcomeOutboxCandidateJoin)
+		if !strings.Contains(mysqlOutcomeOutboxCandidateMatch, required) {
+			t.Fatalf("outbox candidate match is missing identity predicate %q: %s", required, mysqlOutcomeOutboxCandidateMatch)
 		}
+	}
+	if strings.Contains(mysqlOutcomeOutboxCandidateMatch, "BINARY o.aggregate_id") || strings.Contains(mysqlOutcomeOutboxCandidateMatch, "CAST(x.assessment_id") {
+		t.Fatalf("indexed aggregate_id must remain a bare collation-aligned equality: %s", mysqlOutcomeOutboxCandidateMatch)
+	}
+	from := mysqlOutcomeOutboxFrom("domain_event_outbox")
+	if !strings.HasPrefix(from, "tmp_seed_orphan_candidate x STRAIGHT_JOIN domain_event_outbox o FORCE INDEX (idx_outbox_aggregate_event_latest)") {
+		t.Fatalf("outbox candidate query must drive the indexed join from the bounded temporary table: %s", from)
 	}
 }
 

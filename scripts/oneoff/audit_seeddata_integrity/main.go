@@ -101,7 +101,7 @@ func run(args []string, output io.Writer) error {
 	mongoDB := mongoClient.Database(cfg.MongoDB)
 
 	if cfg.Apply {
-		result, err := applyAuditReport(ctx, mysqlDB, mongoDB, cfg)
+		result, err := applyAuditReport(ctx, mysqlDB, mongoDB, cfg, output)
 		if err != nil {
 			return err
 		}

@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -57,16 +59,20 @@ const statisticsFactSourceJoin = `f FORCE INDEX (idx_statistics_assessment_fact_
 JOIN tmp_seed_orphan_fact_source x
  ON f.source_type=x.source_type AND f.source_ref=x.source_ref AND f.fact_type=x.fact_type`
 
-// mysqlOutcomeOutboxCandidateJoin deliberately uses binary string comparison.
-// domain_event_outbox and the connection-scoped temporary table may inherit
-// different utf8mb4 collations on installations upgraded across MySQL versions.
-// These values are decimal identifiers, so byte-for-byte comparison is the
-// intended identity rule and is independent of either table's collation.
-const mysqlOutcomeOutboxCandidateJoin = `JOIN tmp_seed_orphan_candidate x
- ON o.aggregate_type='Evaluation'
- AND BINARY o.aggregate_id=BINARY CAST(x.assessment_id AS CHAR)
+// mysqlOutcomeOutboxCandidateMatch keeps aggregate_id as a bare indexed column.
+// prepareCandidateTempTable creates assessment_ref with the exact charset and
+// collation of domain_event_outbox.aggregate_id, avoiding both collation errors
+// and a full outbox scan. The JSON outcome identity is evaluated only after the
+// indexed aggregate match, so binary comparison remains appropriate there.
+const mysqlOutcomeOutboxCandidateMatch = `ON o.aggregate_type='Evaluation'
+ AND o.aggregate_id=x.assessment_ref
 WHERE o.event_type='evaluation.outcome.committed'
- AND BINARY JSON_UNQUOTE(JSON_EXTRACT(o.payload_json,'$.data.outcome_id'))=BINARY CAST(x.outcome_id AS CHAR)`
+ AND BINARY JSON_UNQUOTE(JSON_EXTRACT(o.payload_json,'$.data.outcome_id'))=BINARY x.outcome_ref`
+
+func mysqlOutcomeOutboxFrom(table string) string {
+	return `tmp_seed_orphan_candidate x STRAIGHT_JOIN ` + table +
+		` o FORCE INDEX (idx_outbox_aggregate_event_latest) ` + mysqlOutcomeOutboxCandidateMatch
+}
 
 type collectionCleanup struct {
 	Name   string
@@ -79,7 +85,9 @@ type candidateStageState struct {
 	RunID        uint64
 }
 
-func applyAuditReport(ctx context.Context, mysqlDB *sql.DB, mongoDB *mongo.Database, cfg config) (applyResult, error) {
+func applyAuditReport(ctx context.Context, mysqlDB *sql.DB, mongoDB *mongo.Database, cfg config, output io.Writer) (applyResult, error) {
+	startedAt := time.Now()
+	applyProgress(output, "started batch=%s candidates_report=%s skip_backup=%t", cfg.BatchID, cfg.AuditReport, cfg.SkipBackup)
 	report, err := decodeAuditReport(cfg.AuditReport)
 	if err != nil {
 		return applyResult{}, err
@@ -109,19 +117,28 @@ func applyAuditReport(ctx context.Context, mysqlDB *sql.DB, mongoDB *mongo.Datab
 		return applyResult{}, fmt.Errorf("audit report has %d candidates, exceeding current safety ceiling %d", len(report.DeletionCandidates), cfg.MaxCandidates)
 	}
 
+	phaseStarted := time.Now()
+	applyProgress(output, "validate candidates started candidates=%d", len(report.DeletionCandidates))
 	ids, err := validateCandidates(ctx, mysqlDB, mongoDB, cfg, report.DeletionCandidates, cfg.SkipBackup)
 	if err != nil {
 		return applyResult{}, fmt.Errorf("validate deletion candidates: %w", err)
 	}
-	documents, err := materializeMongoCleanup(ctx, mongoDB, ids)
+	applyProgress(output, "validate candidates completed candidates=%d elapsed=%s", len(report.DeletionCandidates), elapsed(phaseStarted))
+
+	phaseStarted = time.Now()
+	applyProgress(output, "materialize Mongo scope started")
+	documents, err := materializeMongoCleanup(ctx, mongoDB, ids, output)
 	if err != nil {
 		return applyResult{}, fmt.Errorf("materialize Mongo deletion scope: %w", err)
 	}
+	applyProgress(output, "materialize Mongo scope completed documents=%d elapsed=%s", mongoDocumentCount(documents), elapsed(phaseStarted))
 	if !cfg.SkipBackup {
+		phaseStarted = time.Now()
+		applyProgress(output, "backup started documents=%d", mongoDocumentCount(documents))
 		if err := requireFreshBackups(ctx, mysqlDB, mongoDB, cfg, documents); err != nil {
 			return applyResult{}, fmt.Errorf("validate fresh backup scope: %w", err)
 		}
-		backedUp, perCollection, err := backupMongoDocuments(ctx, mongoDB, cfg.BackupSuffix, documents)
+		backedUp, perCollection, err := backupMongoDocuments(ctx, mongoDB, cfg.BackupSuffix, documents, output)
 		if err != nil {
 			return applyResult{}, fmt.Errorf("backup Mongo deletion scope: %w", err)
 		}
@@ -140,23 +157,37 @@ func applyAuditReport(ctx context.Context, mysqlDB *sql.DB, mongoDB *mongo.Datab
 			return applyResult{}, fmt.Errorf("backup MySQL outcome outbox: %w", err)
 		}
 		result.MySQLOutboxBackedUp = outboxBackedUp
+		applyProgress(output, "backup completed mongo=%d statistics=%d mysql_outbox=%d elapsed=%s", backedUp, statisticsBackedUp, outboxBackedUp, elapsed(phaseStarted))
+	} else {
+		applyProgress(output, "backup skipped by explicit operator request")
 	}
 
-	deleted, err := deleteMongoDocuments(ctx, mongoDB, documents)
+	phaseStarted = time.Now()
+	applyProgress(output, "delete Mongo scope started documents=%d", mongoDocumentCount(documents))
+	deleted, err := deleteMongoDocuments(ctx, mongoDB, documents, output)
 	if err != nil {
 		return applyResult{}, fmt.Errorf("delete Mongo orphan scope: %w", err)
 	}
 	result.MongoDeleted = deleted
+	applyProgress(output, "delete Mongo scope completed documents=%d elapsed=%s", deleted, elapsed(phaseStarted))
+
+	phaseStarted = time.Now()
+	applyProgress(output, "delete MySQL outcome outbox started")
 	outboxDeleted, err := deleteMySQLOutbox(ctx, mysqlDB, cfg, report.DeletionCandidates, !cfg.SkipBackup)
 	if err != nil {
 		return applyResult{}, fmt.Errorf("delete MySQL outcome outbox: %w", err)
 	}
 	result.MySQLOutboxDeleted = outboxDeleted
+	applyProgress(output, "delete MySQL outcome outbox completed rows=%d elapsed=%s", outboxDeleted, elapsed(phaseStarted))
+
+	phaseStarted = time.Now()
+	applyProgress(output, "delete Statistics facts started")
 	statisticsDeleted, err := deleteStatisticsFacts(ctx, mysqlDB, cfg, report.DeletionCandidates, !cfg.SkipBackup)
 	if err != nil {
 		return applyResult{}, fmt.Errorf("delete Statistics facts: %w", err)
 	}
 	result.StatisticsDeleted = statisticsDeleted
+	applyProgress(output, "delete Statistics facts completed rows=%d elapsed=%s", statisticsDeleted, elapsed(phaseStarted))
 	result.CompletedAt = time.Now().UTC()
 	result.Notes = []string{
 		"seed_backfill_stage and seed_backfill_stage_attempt were intentionally preserved for audit",
@@ -166,7 +197,27 @@ func applyAuditReport(ctx context.Context, mysqlDB *sql.DB, mongoDB *mongo.Datab
 	if cfg.SkipBackup {
 		result.Notes = append(result.Notes, "tool-managed backups were explicitly skipped; exact remaining candidates may be retried with the same audit report after a transient failure")
 	}
+	applyProgress(output, "completed candidates=%d mongo_deleted=%d mysql_outbox_deleted=%d statistics_deleted=%d elapsed=%s", len(report.DeletionCandidates), deleted, outboxDeleted, statisticsDeleted, elapsed(startedAt))
 	return result, nil
+}
+
+func applyProgress(output io.Writer, format string, args ...any) {
+	if output == nil {
+		return
+	}
+	_, _ = fmt.Fprintf(output, "apply phase: "+format+"\n", args...)
+}
+
+func elapsed(startedAt time.Time) time.Duration {
+	return time.Since(startedAt).Round(time.Millisecond)
+}
+
+func mongoDocumentCount(documents map[string][]bson.M) int {
+	var total int
+	for _, rows := range documents {
+		total += len(rows)
+	}
+	return total
 }
 
 func validateCandidates(ctx context.Context, mysqlDB *sql.DB, mongoDB *mongo.Database, cfg config, candidates []orphanCandidate, allowMissingArtifacts bool) (cleanupIDs, error) {
@@ -348,9 +399,11 @@ func mongoCleanupFilters(ids cleanupIDs) []collectionCleanup {
 	}
 }
 
-func materializeMongoCleanup(ctx context.Context, db *mongo.Database, ids cleanupIDs) (map[string][]bson.M, error) {
+func materializeMongoCleanup(ctx context.Context, db *mongo.Database, ids cleanupIDs, output io.Writer) (map[string][]bson.M, error) {
 	result := make(map[string][]bson.M)
 	for _, item := range mongoCleanupFilters(ids) {
+		startedAt := time.Now()
+		applyProgress(output, "materialize Mongo collection=%s started", item.Name)
 		cursor, err := db.Collection(item.Name).Find(ctx, item.Filter)
 		if err != nil {
 			return nil, fmt.Errorf("materialize %s cleanup: %w", item.Name, err)
@@ -370,6 +423,7 @@ func materializeMongoCleanup(ctx context.Context, db *mongo.Database, ids cleanu
 		if err := cursor.Close(ctx); err != nil {
 			return nil, err
 		}
+		applyProgress(output, "materialize Mongo collection=%s completed documents=%d elapsed=%s", item.Name, len(result[item.Name]), elapsed(startedAt))
 	}
 	return result, nil
 }
@@ -403,7 +457,7 @@ WHERE table_schema=DATABASE() AND table_name IN (?,?)`, tables[0], tables[1]).Sc
 	return nil
 }
 
-func backupMongoDocuments(ctx context.Context, db *mongo.Database, suffix string, documents map[string][]bson.M) (int64, map[string]int64, error) {
+func backupMongoDocuments(ctx context.Context, db *mongo.Database, suffix string, documents map[string][]bson.M, output io.Writer) (int64, map[string]int64, error) {
 	collections := make([]string, 0, len(documents))
 	for collection := range documents {
 		collections = append(collections, collection)
@@ -416,6 +470,8 @@ func backupMongoDocuments(ctx context.Context, db *mongo.Database, suffix string
 		if len(docs) == 0 {
 			continue
 		}
+		startedAt := time.Now()
+		applyProgress(output, "backup Mongo collection=%s started documents=%d", collection, len(docs))
 		backup := db.Collection(backupCollectionName(collection, suffix))
 		for start := 0; start < len(docs); start += 500 {
 			end := start + 500
@@ -446,11 +502,12 @@ func backupMongoDocuments(ctx context.Context, db *mongo.Database, suffix string
 			total += int64(len(ids))
 			perCollection[collection] += int64(len(ids))
 		}
+		applyProgress(output, "backup Mongo collection=%s completed documents=%d elapsed=%s", collection, perCollection[collection], elapsed(startedAt))
 	}
 	return total, perCollection, nil
 }
 
-func deleteMongoDocuments(ctx context.Context, db *mongo.Database, documents map[string][]bson.M) (int64, error) {
+func deleteMongoDocuments(ctx context.Context, db *mongo.Database, documents map[string][]bson.M, output io.Writer) (int64, error) {
 	order := []string{
 		"domain_event_outbox", "interpretation_attention_projections", "interpretation_admission_failures",
 		"report_query_catalog", "archived_reports", "interpret_reports", "interpret_report_artifacts",
@@ -459,6 +516,12 @@ func deleteMongoDocuments(ctx context.Context, db *mongo.Database, documents map
 	var total int64
 	for _, collection := range order {
 		docs := documents[collection]
+		if len(docs) == 0 {
+			continue
+		}
+		startedAt := time.Now()
+		var collectionDeleted int64
+		applyProgress(output, "delete Mongo collection=%s started documents=%d", collection, len(docs))
 		for start := 0; start < len(docs); start += 500 {
 			end := start + 500
 			if end > len(docs) {
@@ -476,7 +539,9 @@ func deleteMongoDocuments(ctx context.Context, db *mongo.Database, documents map
 				return total, fmt.Errorf("delete %s count mismatch: got %d want %d", collection, result.DeletedCount, len(ids))
 			}
 			total += result.DeletedCount
+			collectionDeleted += result.DeletedCount
 		}
+		applyProgress(output, "delete Mongo collection=%s completed documents=%d elapsed=%s", collection, collectionDeleted, elapsed(startedAt))
 	}
 	return total, nil
 }
@@ -615,7 +680,7 @@ func backupMySQLOutbox(ctx context.Context, db *sql.DB, cfg config, candidates [
 		return 0, fmt.Errorf("create MySQL outbox backup table: %w", err)
 	}
 	result, err := conn.ExecContext(ctx, `INSERT INTO `+backupTable+`
-SELECT o.* FROM domain_event_outbox o FORCE INDEX (idx_outbox_aggregate_event_latest) `+mysqlOutcomeOutboxCandidateJoin)
+SELECT o.* FROM `+mysqlOutcomeOutboxFrom("domain_event_outbox"))
 	if err != nil {
 		return 0, fmt.Errorf("backup MySQL outcome outbox: %w", err)
 	}
@@ -634,7 +699,7 @@ func deleteMySQLOutbox(ctx context.Context, db *sql.DB, cfg config, candidates [
 	if verifyBackup {
 		backupTable := mysqlOutboxBackupTable(cfg.BackupSuffix)
 		countQuery := func(table string) string {
-			return `SELECT COUNT(*) FROM ` + table + ` o FORCE INDEX (idx_outbox_aggregate_event_latest) ` + mysqlOutcomeOutboxCandidateJoin
+			return `SELECT COUNT(*) FROM ` + mysqlOutcomeOutboxFrom(table)
 		}
 		var backedUp, source int64
 		if err := conn.QueryRowContext(ctx, countQuery(backupTable)).Scan(&backedUp); err != nil {
@@ -647,7 +712,7 @@ func deleteMySQLOutbox(ctx context.Context, db *sql.DB, cfg config, candidates [
 			return 0, fmt.Errorf("MySQL outbox backup does not exactly match source: backed_up=%d source=%d", backedUp, source)
 		}
 	}
-	result, err := conn.ExecContext(ctx, `DELETE o FROM domain_event_outbox o FORCE INDEX (idx_outbox_aggregate_event_latest) `+mysqlOutcomeOutboxCandidateJoin)
+	result, err := conn.ExecContext(ctx, `DELETE o FROM `+mysqlOutcomeOutboxFrom("domain_event_outbox"))
 	if err != nil {
 		return 0, fmt.Errorf("delete MySQL outcome outbox: %w", err)
 	}
@@ -655,14 +720,28 @@ func deleteMySQLOutbox(ctx context.Context, db *sql.DB, cfg config, candidates [
 }
 
 func prepareCandidateTempTable(ctx context.Context, conn *sql.Conn, candidates []orphanCandidate) error {
+	var characterSet, collation string
+	if err := conn.QueryRowContext(ctx, `SELECT character_set_name,collation_name
+FROM information_schema.columns
+WHERE table_schema=DATABASE() AND table_name='domain_event_outbox' AND column_name='aggregate_id'`).Scan(&characterSet, &collation); err != nil {
+		return fmt.Errorf("load domain_event_outbox aggregate identity collation: %w", err)
+	}
+	identifierPattern := regexp.MustCompile(`^[A-Za-z0-9_]+$`)
+	if !identifierPattern.MatchString(characterSet) || !identifierPattern.MatchString(collation) {
+		return fmt.Errorf("domain_event_outbox aggregate identity has unsafe charset or collation: charset=%q collation=%q", characterSet, collation)
+	}
 	if _, err := conn.ExecContext(ctx, `DROP TEMPORARY TABLE IF EXISTS tmp_seed_orphan_candidate`); err != nil {
 		return err
 	}
-	if _, err := conn.ExecContext(ctx, `CREATE TEMPORARY TABLE tmp_seed_orphan_candidate (
+	createQuery := `CREATE TEMPORARY TABLE tmp_seed_orphan_candidate (
  report_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
  assessment_id BIGINT UNSIGNED NOT NULL,
- outcome_id BIGINT UNSIGNED NOT NULL
-) ENGINE=InnoDB`); err != nil {
+	 outcome_id BIGINT UNSIGNED NOT NULL,
+	 assessment_ref VARCHAR(64) CHARACTER SET ` + characterSet + ` COLLATE ` + collation + ` NOT NULL,
+	 outcome_ref VARCHAR(64) CHARACTER SET ` + characterSet + ` COLLATE ` + collation + ` NOT NULL,
+	 KEY idx_assessment_ref (assessment_ref)
+) ENGINE=InnoDB`
+	if _, err := conn.ExecContext(ctx, createQuery); err != nil {
 		return err
 	}
 	for start := 0; start < len(candidates); start += 500 {
@@ -671,16 +750,16 @@ func prepareCandidateTempTable(ctx context.Context, conn *sql.Conn, candidates [
 			end = len(candidates)
 		}
 		values := make([]string, 0, end-start)
-		args := make([]any, 0, (end-start)*3)
+		args := make([]any, 0, (end-start)*5)
 		for _, candidate := range candidates[start:end] {
 			reportID, assessmentID, outcomeID, _, _, err := parseCandidateIDs(candidate)
 			if err != nil {
 				return err
 			}
-			values = append(values, "(?,?,?)")
-			args = append(args, reportID, assessmentID, outcomeID)
+			values = append(values, "(?,?,?,?,?)")
+			args = append(args, reportID, assessmentID, outcomeID, candidate.AssessmentID, candidate.OutcomeID)
 		}
-		if _, err := conn.ExecContext(ctx, `INSERT INTO tmp_seed_orphan_candidate (report_id,assessment_id,outcome_id) VALUES `+strings.Join(values, ","), args...); err != nil {
+		if _, err := conn.ExecContext(ctx, `INSERT INTO tmp_seed_orphan_candidate (report_id,assessment_id,outcome_id,assessment_ref,outcome_ref) VALUES `+strings.Join(values, ","), args...); err != nil {
 			return err
 		}
 	}
