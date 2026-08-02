@@ -25,6 +25,7 @@ const (
 	dateLayout              = "2006-01-02"
 	applyConfirmation       = "DELETE_SEEDDATA_ORPHANS"
 	defaultAuditPageSize    = 500
+	defaultReportWorkers    = 8
 	defaultMaxFindings      = 1000
 	defaultMaxCandidates    = 10000
 	defaultOperationTimeout = 12 * time.Hour
@@ -44,6 +45,7 @@ type config struct {
 	Timezone               string
 	OrgID                  int64
 	PageSize               int
+	ReportWorkers          int
 	MaxFindings            int
 	MaxCandidates          int
 	Timeout                time.Duration
@@ -79,8 +81,9 @@ func run(args []string, output io.Writer) error {
 		return fmt.Errorf("open mysql: %w", err)
 	}
 	defer func() { _ = mysqlDB.Close() }()
-	mysqlDB.SetMaxOpenConns(8)
-	mysqlDB.SetMaxIdleConns(8)
+	mysqlConnections := max(8, cfg.ReportWorkers)
+	mysqlDB.SetMaxOpenConns(mysqlConnections)
+	mysqlDB.SetMaxIdleConns(mysqlConnections)
 	if err := mysqlDB.PingContext(ctx); err != nil {
 		return fmt.Errorf("connect mysql: %w", err)
 	}
@@ -130,6 +133,7 @@ func parseConfig(args []string, output io.Writer) (config, error) {
 	flags.StringVar(&cfg.Timezone, "timezone", "Asia/Shanghai", "business timezone")
 	flags.StringVar(&cfg.OutputPath, "output", "", "write audit/apply JSON result to this path")
 	flags.IntVar(&cfg.PageSize, "page-size", defaultAuditPageSize, "report stages per audit page")
+	flags.IntVar(&cfg.ReportWorkers, "report-workers", defaultReportWorkers, "concurrent report-stage page workers (1-32)")
 	flags.IntVar(&cfg.MaxFindings, "max-findings", defaultMaxFindings, "maximum detailed non-candidate findings in the report")
 	flags.IntVar(&cfg.MaxCandidates, "max-delete-candidates", defaultMaxCandidates, "safety ceiling for exact orphan deletion candidates")
 	flags.DurationVar(&cfg.Timeout, "timeout", defaultOperationTimeout, "overall timeout; 0 disables")
@@ -181,8 +185,8 @@ func (c *config) validate() error {
 	if err != nil || to.Before(from) {
 		return errors.New("invalid inclusive to date")
 	}
-	if c.PageSize < 1 || c.PageSize > 5000 || c.MaxFindings < 1 || c.MaxFindings > 100000 || c.MaxCandidates < 1 || c.MaxCandidates > 1000000 {
-		return errors.New("page-size, max-findings or max-delete-candidates is outside the safe range")
+	if c.PageSize < 1 || c.PageSize > 5000 || c.ReportWorkers < 1 || c.ReportWorkers > 32 || c.MaxFindings < 1 || c.MaxFindings > 100000 || c.MaxCandidates < 1 || c.MaxCandidates > 1000000 {
+		return errors.New("page-size, report-workers, max-findings or max-delete-candidates is outside the safe range")
 	}
 	if c.OutputPath == "" {
 		return errors.New("output is required so the audit/apply result can be retained")

@@ -54,8 +54,13 @@ go run ./scripts/oneoff/audit_seeddata_integrity \
   --batch-id hist-20250101-20260727-v2 \
   --from 2025-01-01 \
   --to 2026-07-27 \
+  --report-workers 8 \
   --output /secure/path/hist-20250101-20260727-v2.integrity-audit.json
 ```
+
+`--report-workers` 默认是 8，按 `seed_backfill_stage.id` 分页后并行检查多个独立页面，并按原始
+页面顺序合并结果；不会按日期重复扫描，也不会改变 deletion plan 的确定性。ServerA 上先使用 8，
+确认 MySQL/Mongo CPU、连接数和延迟稳定后可提高到 16，允许范围是 1–32。降低为 1 可恢复原串行行为。
 
 发现问题时命令会非零退出，但 JSON 报告仍会写入。先检查摘要和存储身份：
 

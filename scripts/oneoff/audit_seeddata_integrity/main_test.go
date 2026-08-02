@@ -23,7 +23,44 @@ func validAuditConfig(t *testing.T) config {
 		MongoURI: "mongodb://localhost:27017", MongoDB: "qs", OrgID: 1,
 		BatchID: "hist-20250101-20260727-v2", From: "2025-01-01", To: "2026-07-27",
 		Timezone: "Asia/Shanghai", OutputPath: filepath.Join(t.TempDir(), "audit.json"),
-		PageSize: 500, MaxFindings: 1000, MaxCandidates: 10000, Timeout: time.Hour,
+		PageSize: 500, ReportWorkers: 8, MaxFindings: 1000, MaxCandidates: 10000, Timeout: time.Hour,
+	}
+}
+
+func TestAuditConfigRejectsUnsafeReportWorkerCounts(t *testing.T) {
+	for _, workers := range []int{0, 33} {
+		cfg := validAuditConfig(t)
+		cfg.ReportWorkers = workers
+		if err := cfg.validate(); err == nil || !strings.Contains(err.Error(), "report-workers") {
+			t.Fatalf("workers=%d error=%v", workers, err)
+		}
+	}
+}
+
+func TestMergeAuditPagePreservesCountsOrderAndGlobalFindingLimit(t *testing.T) {
+	report := auditReport{
+		ProblemCount: 10,
+		Findings:     []finding{{Code: "existing"}},
+	}
+	page := auditReport{
+		ProblemCount:       2,
+		WarningCount:       1,
+		Findings:           []finding{{Code: "page-first"}, {Code: "page-second"}},
+		DeletionCandidates: []orphanCandidate{{StageID: 9}},
+	}
+	mergeAuditPage(&report, page, 2)
+
+	if report.ProblemCount != 12 || report.WarningCount != 1 {
+		t.Fatalf("counts = problems:%d warnings:%d", report.ProblemCount, report.WarningCount)
+	}
+	if got := []string{report.Findings[0].Code, report.Findings[1].Code}; !reflect.DeepEqual(got, []string{"existing", "page-first"}) {
+		t.Fatalf("finding order = %#v", got)
+	}
+	if !report.FindingDetailsCut {
+		t.Fatal("expected finding details to be marked truncated")
+	}
+	if len(report.DeletionCandidates) != 1 || report.DeletionCandidates[0].StageID != 9 {
+		t.Fatalf("candidates = %#v", report.DeletionCandidates)
 	}
 }
 

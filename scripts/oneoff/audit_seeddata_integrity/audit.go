@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -359,19 +360,75 @@ func auditReportStages(ctx context.Context, db *sql.DB, mongoDB *mongo.Database,
 	}
 	var afterID uint64
 	for {
-		stages, err := loadReportStagePage(ctx, db, cfg, location, afterID)
-		if err != nil {
-			return err
+		pages := make([][]reportStage, 0, cfg.ReportWorkers)
+		for len(pages) < cfg.ReportWorkers {
+			stages, err := loadReportStagePage(ctx, db, cfg, location, afterID)
+			if err != nil {
+				return err
+			}
+			if len(stages) == 0 {
+				break
+			}
+			afterID = stages[len(stages)-1].ID
+			pages = append(pages, stages)
 		}
-		if len(stages) == 0 {
+		if len(pages) == 0 {
 			return nil
 		}
-		afterID = stages[len(stages)-1].ID
-		if err := auditReportStagePage(ctx, db, mongoDB, cfg, report, stages); err != nil {
-			return err
+
+		results := auditReportStagePages(ctx, db, mongoDB, cfg, pages)
+		for index, result := range results {
+			if result.Err != nil {
+				return fmt.Errorf("audit report stage page starting at id %d: %w", pages[index][0].ID, result.Err)
+			}
+			mergeAuditPage(report, result.Report, cfg.MaxFindings)
+			report.ReportStages += int64(len(pages[index]))
+			_, _ = fmt.Fprintf(progress, "audit report stages: %d\n", report.ReportStages)
 		}
-		report.ReportStages += int64(len(stages))
-		_, _ = fmt.Fprintf(progress, "audit report stages: %d\n", report.ReportStages)
+		if len(pages) < cfg.ReportWorkers {
+			return nil
+		}
+	}
+}
+
+type reportStagePageResult struct {
+	Report auditReport
+	Err    error
+}
+
+func auditReportStagePages(ctx context.Context, db *sql.DB, mongoDB *mongo.Database, cfg config, pages [][]reportStage) []reportStagePageResult {
+	results := make([]reportStagePageResult, len(pages))
+	var workers sync.WaitGroup
+	workers.Add(len(pages))
+	for index := range pages {
+		go func() {
+			defer workers.Done()
+			var pageReport auditReport
+			results[index].Err = auditReportStagePage(ctx, db, mongoDB, cfg, &pageReport, pages[index])
+			results[index].Report = pageReport
+		}()
+	}
+	workers.Wait()
+	return results
+}
+
+func mergeAuditPage(report *auditReport, page auditReport, maxFindings int) {
+	report.ProblemCount += page.ProblemCount
+	report.WarningCount += page.WarningCount
+	report.DeletionCandidates = append(report.DeletionCandidates, page.DeletionCandidates...)
+
+	remaining := maxFindings - len(report.Findings)
+	if remaining < 0 {
+		remaining = 0
+	}
+	if len(page.Findings) > remaining {
+		report.Findings = append(report.Findings, page.Findings[:remaining]...)
+		report.FindingDetailsCut = true
+	} else {
+		report.Findings = append(report.Findings, page.Findings...)
+	}
+	if page.FindingDetailsCut {
+		report.FindingDetailsCut = true
 	}
 }
 
