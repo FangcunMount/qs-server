@@ -62,6 +62,10 @@ go run ./scripts/oneoff/audit_seeddata_integrity \
 页面顺序合并结果；不会按日期重复扫描，也不会改变 deletion plan 的确定性。ServerA 上先使用 8，
 确认 MySQL/Mongo CPU、连接数和延迟稳定后可提高到 16，允许范围是 1–32。降低为 1 可恢复原串行行为。
 
+命令会先打印 storage identity、stage counts 和 12 条 set check 的开始、结束及耗时，然后才进入
+`audit report stages`。set check 会扫描本批次 stage，故意保持串行以避免多个大查询同时冲击 MySQL；
+`--report-workers` 只控制后续跨 MySQL/Mongo 的 Report 页面检查。
+
 发现问题时命令会非零退出，但 JSON 报告仍会写入。先检查摘要和存储身份：
 
 ```bash

@@ -170,3 +170,118 @@ func TestExecuteRunStopsAtDataCommittedWithResumeGuidance(t *testing.T) {
 		t.Fatalf("err=%v", err)
 	}
 }
+
+func TestRunValidateFailsWhenFactsWouldStillBeInserted(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"code":0,"data":{"id":12,"mode":"validate","status":"succeeded","stage":"completed","fact_counts":{"access.inserted":0,"access.conflict":0,"plan.inserted":1,"plan.conflict":0,"assessment.inserted":0,"assessment.conflict":0}}}`))
+	}))
+	defer server.Close()
+
+	err := run([]string{
+		"--base-url", server.URL,
+		"--token", "secret",
+		"--org-ids", "7",
+		"--from", "2026-01-01",
+		"--to", "2026-01-01",
+		"--validate-only",
+	}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "plan.inserted=1") {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestValidationCompletenessRequiresCanonicalCollectorCounts(t *testing.T) {
+	err := validateRunCompleteness(runResult{FactCounts: map[string]int64{
+		"access.inserted": 0, "access.conflict": 0,
+		"plan.inserted": 0, "plan.conflict": 0,
+	}})
+	if err == nil || !strings.Contains(err.Error(), "assessment.inserted") {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestExecuteRunWithCacheRecoveryResumesDataCommittedPublish(t *testing.T) {
+	var paths []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		if r.Header.Get("X-Org-ID") != "7" || r.Header.Get("Authorization") != "Bearer secret" {
+			t.Fatalf("org=%s auth=%s", r.Header.Get("X-Org-ID"), r.Header.Get("Authorization"))
+		}
+		switch r.URL.Path {
+		case "/internal/v2/statistics/runs":
+			_, _ = w.Write([]byte(`{"code":0,"data":{"id":13,"mode":"publish","status":"data_committed","stage":"publishing_cache"}}`))
+		case "/internal/v2/statistics/runs/13/resume-cache":
+			var request resumeCacheRequest
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				t.Fatal(err)
+			}
+			if !request.Confirm || request.Reason != "historical repair" {
+				t.Fatalf("request=%+v", request)
+			}
+			_, _ = w.Write([]byte(`{"code":0,"data":{"id":13,"mode":"publish","status":"succeeded","stage":"completed","as_of_date":"2026-01-01","cache_generation":3}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	location, _ := time.LoadLocation("Asia/Shanghai")
+	result, err := executeRunWithCacheRecovery(server.Client(), options{
+		BaseURL: server.URL, Token: "secret", Mode: "publish", Reason: "historical repair", Confirm: true,
+	}, 7, dateWindow{
+		From: time.Date(2026, 1, 1, 0, 0, 0, 0, location),
+		To:   time.Date(2026, 1, 1, 0, 0, 0, 0, location),
+	}, &bytes.Buffer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != "succeeded" || result.CacheGeneration != 3 {
+		t.Fatalf("result=%+v", result)
+	}
+	want := []string{"/internal/v2/statistics/runs", "/internal/v2/statistics/runs/13/resume-cache"}
+	if strings.Join(paths, ",") != strings.Join(want, ",") {
+		t.Fatalf("paths=%v want=%v", paths, want)
+	}
+}
+
+func TestHistoricalBackfillResumeFromSkipsCompletedWindows(t *testing.T) {
+	var requests []runRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request runRequest
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		requests = append(requests, request)
+		_, _ = w.Write([]byte(`{"code":0,"data":{"id":1,"status":"succeeded","stage":"completed","as_of_date":"` + request.ToDate + `","fact_counts":{"access.inserted":0,"access.conflict":0,"plan.inserted":0,"plan.conflict":0,"assessment.inserted":0,"assessment.conflict":0}}}`))
+	}))
+	defer server.Close()
+
+	location, _ := time.LoadLocation("Asia/Shanghai")
+	cfg := options{
+		BaseURL: server.URL, Token: "secret", OrgIDs: []int64{7},
+		From:       time.Date(2026, 1, 1, 0, 0, 0, 0, location),
+		To:         time.Date(2026, 1, 5, 0, 0, 0, 0, location),
+		ResumeFrom: time.Date(2026, 1, 4, 0, 0, 0, 0, location),
+		WindowDays: 3, Reason: "historical backfill", Mode: historicalBackfillMode, Confirm: true,
+		Now: func() time.Time { return time.Date(2026, 1, 7, 12, 0, 0, 0, location) },
+	}
+	if err := executeHistoricalBackfill(server.Client(), cfg, 7, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	want := []struct{ mode, from, to string }{
+		{"repair", "2026-01-04", "2026-01-05"},
+		{"validate", "2026-01-04", "2026-01-05"},
+		{"repair", "2026-01-06", "2026-01-06"},
+		{"validate", "2026-01-06", "2026-01-06"},
+		{"publish", "2026-01-06", "2026-01-06"},
+	}
+	if len(requests) != len(want) {
+		t.Fatalf("requests=%d want=%d", len(requests), len(want))
+	}
+	for index, expected := range want {
+		got := requests[index]
+		if got.Mode != expected.mode || got.FromDate != expected.from || got.ToDate != expected.to {
+			t.Fatalf("request[%d]=%+v want=%+v", index, got, expected)
+		}
+	}
+}

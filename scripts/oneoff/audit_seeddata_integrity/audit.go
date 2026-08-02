@@ -147,11 +147,16 @@ func auditBatch(ctx context.Context, mysqlDB *sql.DB, mongoDB *mongo.Database, c
 		Version: auditReportVersion, OrgID: cfg.OrgID, BatchID: cfg.BatchID,
 		From: cfg.From, To: cfg.To, GeneratedAt: time.Now().UTC(), StageCounts: map[string]int64{},
 	}
+	_, _ = fmt.Fprintln(progress, "audit phase: storage identity started")
 	storage, err := loadStorageIdentity(ctx, mysqlDB, mongoDB)
 	if err != nil {
 		return report, err
 	}
 	report.Storage = storage
+	_, _ = fmt.Fprintln(progress, "audit phase: storage identity completed")
+
+	stageCountStartedAt := time.Now()
+	_, _ = fmt.Fprintln(progress, "audit phase: stage counts started")
 	counts, err := loadStageCounts(ctx, mysqlDB, cfg)
 	if err != nil {
 		return report, err
@@ -160,8 +165,14 @@ func auditBatch(ctx context.Context, mysqlDB *sql.DB, mongoDB *mongo.Database, c
 		return report, fmt.Errorf("seed_backfill_stage has no completed rows for org=%d batch=%s", cfg.OrgID, cfg.BatchID)
 	}
 	report.StageCounts = counts
+	var totalStages int64
+	for _, count := range counts {
+		totalStages += count
+	}
+	_, _ = fmt.Fprintf(progress, "audit phase: stage counts completed total=%d elapsed=%s\n", totalStages, elapsedDuration(stageCountStartedAt))
 
-	checks, err := runSetChecks(ctx, mysqlDB, cfg)
+	_, _ = fmt.Fprintln(progress, "audit phase: set checks started")
+	checks, err := runSetChecks(ctx, mysqlDB, cfg, progress)
 	if err != nil {
 		return report, err
 	}
@@ -173,13 +184,18 @@ func auditBatch(ctx context.Context, mysqlDB *sql.DB, mongoDB *mongo.Database, c
 			report.WarningCount += check.Problems
 		}
 	}
+	_, _ = fmt.Fprintln(progress, "audit phase: set checks completed")
 
+	_, _ = fmt.Fprintf(progress, "audit phase: report stages started workers=%d page_size=%d\n", cfg.ReportWorkers, cfg.PageSize)
 	if err := auditReportStages(ctx, mysqlDB, mongoDB, cfg, &report, progress); err != nil {
 		return report, err
 	}
+	_, _ = fmt.Fprintf(progress, "audit phase: report stages completed total=%d\n", report.ReportStages)
+	_, _ = fmt.Fprintln(progress, "audit phase: answersheet stages started")
 	if err := auditAnswerSheetStages(ctx, mysqlDB, mongoDB, cfg, &report, progress); err != nil {
 		return report, err
 	}
+	_, _ = fmt.Fprintf(progress, "audit phase: answersheet stages completed total=%d\n", report.AnswerSheetStages)
 	if len(report.DeletionCandidates) > cfg.MaxCandidates {
 		addFinding(&report, cfg.MaxFindings, finding{
 			Code: "delete_candidate_limit_exceeded", Severity: "error",
@@ -192,7 +208,12 @@ func auditBatch(ctx context.Context, mysqlDB *sql.DB, mongoDB *mongo.Database, c
 		return report, err
 	}
 	report.Valid = report.ProblemCount == 0
+	_, _ = fmt.Fprintf(progress, "audit phase: completed valid=%t problems=%d warnings=%d delete_candidates=%d\n", report.Valid, report.ProblemCount, report.WarningCount, len(report.DeletionCandidates))
 	return report, nil
+}
+
+func elapsedDuration(startedAt time.Time) time.Duration {
+	return time.Since(startedAt).Round(time.Millisecond)
 }
 
 func loadStageCounts(ctx context.Context, db *sql.DB, cfg config) (map[string]int64, error) {
@@ -224,7 +245,7 @@ type setCheckDefinition struct {
 	Name, Severity, Meaning, Query string
 }
 
-func runSetChecks(ctx context.Context, db *sql.DB, cfg config) ([]integrityCheck, error) {
+func runSetChecks(ctx context.Context, db *sql.DB, cfg config, progress io.Writer) ([]integrityCheck, error) {
 	from, to, err := cfg.businessWindow()
 	if err != nil {
 		return nil, err
@@ -342,13 +363,16 @@ SELECT COUNT(*) FROM ordered WHERE previous_at IS NOT NULL AND business_at<previ
 	}
 
 	checks := make([]integrityCheck, 0, len(definitions))
-	for _, definition := range definitions {
+	for index, definition := range definitions {
+		startedAt := time.Now()
+		_, _ = fmt.Fprintf(progress, "audit set check: %d/%d %s started\n", index+1, len(definitions), definition.Name)
 		args := []any{cfg.OrgID, cfg.BatchID, from, to}
 		var count int64
 		if err := db.QueryRowContext(ctx, definition.Query, args...).Scan(&count); err != nil {
 			return nil, fmt.Errorf("run integrity check %s: %w", definition.Name, err)
 		}
 		checks = append(checks, integrityCheck{Name: definition.Name, Severity: definition.Severity, Problems: count, Meaning: definition.Meaning})
+		_, _ = fmt.Fprintf(progress, "audit set check: %d/%d %s completed problems=%d elapsed=%s\n", index+1, len(definitions), definition.Name, count, elapsedDuration(startedAt))
 	}
 	return checks, nil
 }
