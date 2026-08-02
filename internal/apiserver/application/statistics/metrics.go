@@ -29,6 +29,11 @@ var statisticsProcessedRows = promauto.NewCounterVec(prometheus.CounterOpts{
 	Help: "Rows processed by Statistics collectors and projections.",
 }, []string{"phase", "name", "result"})
 
+var statisticsCollectorDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+	Namespace: "qs", Subsystem: "statistics", Name: "collector_duration_seconds",
+	Help: "Statistics collector duration grouped by collector, mode, and result.", Buckets: prometheus.ExponentialBuckets(0.1, 2, 14),
+}, []string{"collector", "mode", "result"})
+
 var statisticsCachePublishTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 	Namespace: "qs", Subsystem: "statistics", Name: "cache_publish_total",
 	Help: "Statistics cache generation publication attempts.",
@@ -79,6 +84,14 @@ func observeCollectorResult(item statisticsDomain.CollectResult) {
 	statisticsProcessedRows.WithLabelValues("collector", item.Collector, "inserted").Add(float64(item.InsertedCount))
 	statisticsProcessedRows.WithLabelValues("collector", item.Collector, "existing").Add(float64(item.ExistingCount))
 	statisticsProcessedRows.WithLabelValues("collector", item.Collector, "conflict").Add(float64(item.ConflictCount))
+}
+
+func observeCollectorDuration(start time.Time, collector string, mode statisticsDomain.CollectMode, err error) {
+	result := "succeeded"
+	if err != nil {
+		result = "failed"
+	}
+	statisticsCollectorDuration.WithLabelValues(collector, string(mode), result).Observe(time.Since(start).Seconds())
 }
 
 func observeProjectionResult(item statisticsDomain.ProjectionResult) {

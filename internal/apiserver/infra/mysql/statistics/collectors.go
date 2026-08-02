@@ -10,7 +10,6 @@ import (
 	"time"
 
 	statisticsDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
-	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -46,34 +45,6 @@ func scanStableBatches[T any](
 	}
 }
 
-type factWriter struct{ db *gorm.DB }
-
-func (w factWriter) write(ctx context.Context, table string, values map[string]any, validateOnly bool) (inserted, existing, conflict int64, err error) {
-	coreHash := hashCore(values)
-	values["core_hash"] = coreHash
-	var stored struct{ CoreHash string }
-	lookup := w.db.WithContext(ctx).Table(table).Select("core_hash").Where("fact_key = ?", values["fact_key"]).Take(&stored).Error
-	if lookup == nil {
-		if stored.CoreHash == coreHash {
-			return 0, 1, 0, nil
-		}
-		return 0, 0, 1, fmt.Errorf("fact conflict: %s", values["fact_key"])
-	}
-	if lookup != gorm.ErrRecordNotFound {
-		return 0, 0, 0, lookup
-	}
-	if validateOnly {
-		return 1, 0, 0, nil
-	}
-	if err := w.db.WithContext(ctx).Table(table).Create(values).Error; err != nil {
-		if mysql.IsDuplicateError(err) {
-			return w.write(ctx, table, values, true)
-		}
-		return 0, 0, 0, err
-	}
-	return 1, 0, 0, nil
-}
-
 func hashCore(values map[string]any) string {
 	copyValues := make(map[string]any, len(values))
 	for key, value := range values {
@@ -88,13 +59,6 @@ func hashCore(values map[string]any) string {
 
 func baseFact(orgID int64, key, factType string, occurredAt time.Time, sourceType, sourceRef string) map[string]any {
 	return map[string]any{"org_id": orgID, "fact_key": key, "fact_type": factType, "occurred_at": occurredAt, "stat_date": statisticsDomain.BusinessDate(occurredAt), "source_type": sourceType, "source_ref": sourceRef, "schema_version": 1}
-}
-
-func addResult(result *statisticsDomain.CollectResult, factType string, inserted, existing, conflict int64) {
-	result.InsertedCount += inserted
-	result.ExistingCount += existing
-	result.ConflictCount += conflict
-	result.FactTypeCounts[factType]++
 }
 
 type AccessFactCollector struct {
@@ -121,18 +85,14 @@ func (c *AccessFactCollector) Collect(ctx context.Context, req statisticsDomain.
 			Where("(resolved_at>? OR (resolved_at=? AND id>?))", lastAt, lastAt, lastID).
 			Order("resolved_at,id").Limit(collectorBatchSize).Find(&resolves).Error
 	}, func(row resolveRow) (time.Time, uint64) { return row.ResolvedAt, row.ID }, func(batch []resolveRow) error {
+		candidates := make([]factCandidate, 0, len(batch))
 		for _, row := range batch {
-			result.SourceCount++
 			fact := baseFact(req.OrgID, fmt.Sprintf("entry_resolve:%d:entry_opened", row.ID), "entry_opened", row.ResolvedAt, "entry_resolve", strconv.FormatUint(row.ID, 10))
 			fact["clinician_id"] = row.ClinicianID
 			fact["entry_id"] = row.EntryID
-			i, e, x, err := c.writer.write(ctx, "statistics_access_fact", fact, req.Mode == statisticsDomain.CollectModeValidate)
-			addResult(&result, "entry_opened", i, e, x)
-			if err != nil {
-				return err
-			}
+			candidates = append(candidates, factCandidate{SourceID: row.ID, FactType: "entry_opened", Values: fact})
 		}
-		return nil
+		return writeFactCandidates(ctx, c.writer, "statistics_access_fact", candidates, req.Mode == statisticsDomain.CollectModeValidate, &result)
 	}); err != nil {
 		return result, err
 	}
@@ -149,8 +109,8 @@ func (c *AccessFactCollector) Collect(ctx context.Context, req statisticsDomain.
 			Where("(intake_at>? OR (intake_at=? AND id>?))", lastAt, lastAt, lastID).
 			Order("intake_at,id").Limit(collectorBatchSize).Find(&intakes).Error
 	}, func(row intakeRow) (time.Time, uint64) { return row.IntakeAt, row.ID }, func(batch []intakeRow) error {
+		candidates := make([]factCandidate, 0, len(batch)*2)
 		for _, row := range batch {
-			result.SourceCount++
 			types := []string{"intake_confirmed"}
 			if row.TesteeCreated {
 				types = append(types, "testee_created")
@@ -163,14 +123,10 @@ func (c *AccessFactCollector) Collect(ctx context.Context, req statisticsDomain.
 				fact["clinician_id"] = row.ClinicianID
 				fact["entry_id"] = row.EntryID
 				fact["testee_id"] = row.TesteeID
-				i, e, x, err := c.writer.write(ctx, "statistics_access_fact", fact, req.Mode == statisticsDomain.CollectModeValidate)
-				addResult(&result, typ, i, e, x)
-				if err != nil {
-					return err
-				}
+				candidates = append(candidates, factCandidate{SourceID: row.ID, FactType: typ, Values: fact})
 			}
 		}
-		return nil
+		return writeFactCandidates(ctx, c.writer, "statistics_access_fact", candidates, req.Mode == statisticsDomain.CollectModeValidate, &result)
 	}); err != nil {
 		return result, err
 	}
@@ -196,15 +152,14 @@ func (c *AccessFactCollector) Collect(ctx context.Context, req statisticsDomain.
 		if len(transfers) == 0 {
 			break
 		}
+		candidates := make([]factCandidate, 0, len(transfers))
 		for _, row := range transfers {
-			result.SourceCount++
 			fact := baseFact(req.OrgID, fmt.Sprintf("clinician_relation:%d:transferred", row.ID), "care_relationship_transferred", row.BoundAt, "clinician_relation", strconv.FormatUint(row.ID, 10))
 			fact["clinician_id"], fact["source_clinician_id"], fact["testee_id"] = row.ClinicianID, row.SourceClinicianID, row.TesteeID
-			i, e, x, err := c.writer.write(ctx, "statistics_access_fact", fact, req.Mode == statisticsDomain.CollectModeValidate)
-			addResult(&result, "care_relationship_transferred", i, e, x)
-			if err != nil {
-				return result, err
-			}
+			candidates = append(candidates, factCandidate{SourceID: row.ID, FactType: "care_relationship_transferred", Values: fact})
+		}
+		if err := writeFactCandidates(ctx, c.writer, "statistics_access_fact", candidates, req.Mode == statisticsDomain.CollectModeValidate, &result); err != nil {
+			return result, err
 		}
 		last := transfers[len(transfers)-1]
 		lastTransferAt, lastTransferID = last.BoundAt, last.ID
@@ -273,17 +228,13 @@ func (c *PlanFactCollector) Collect(ctx context.Context, req statisticsDomain.Co
 		err := scanLifecycleRows(ctx, c.db, "plan_enrollment", "id,plan_id,testee_id", source.timeField, req, &rows,
 			func(row enrollmentEventRow) (time.Time, uint64) { return row.OccurredAt, row.ID },
 			func(batch []enrollmentEventRow) error {
+				candidates := make([]factCandidate, 0, len(batch))
 				for _, row := range batch {
-					result.SourceCount++
 					fact := baseFact(req.OrgID, fmt.Sprintf("enrollment:%d:%s", row.ID, source.factType), source.factType, row.OccurredAt, "plan_enrollment", strconv.FormatUint(row.ID, 10))
 					fact["plan_id"], fact["enrollment_id"], fact["testee_id"] = row.PlanID, row.ID, row.TesteeID
-					i, e, x, writeErr := c.writer.write(ctx, "statistics_plan_fact", fact, req.Mode == statisticsDomain.CollectModeValidate)
-					addResult(&result, source.factType, i, e, x)
-					if writeErr != nil {
-						return writeErr
-					}
+					candidates = append(candidates, factCandidate{SourceID: row.ID, FactType: source.factType, Values: fact})
 				}
-				return nil
+				return writeFactCandidates(ctx, c.writer, "statistics_plan_fact", candidates, req.Mode == statisticsDomain.CollectModeValidate, &result)
 			})
 		if err != nil {
 			return result, err
@@ -301,20 +252,16 @@ func (c *PlanFactCollector) Collect(ctx context.Context, req statisticsDomain.Co
 		err := scanLifecycleRows(ctx, c.db, "assessment_task", "id,plan_id,enrollment_id,testee_id,seq,scale_code,planned_at,expire_at", source.timeField, req, &rows,
 			func(row taskEventRow) (time.Time, uint64) { return row.OccurredAt, row.ID },
 			func(batch []taskEventRow) error {
+				candidates := make([]factCandidate, 0, len(batch))
 				for _, row := range batch {
-					result.SourceCount++
 					fact := baseFact(req.OrgID, fmt.Sprintf("task:%d:%s", row.ID, source.factType), source.factType, row.OccurredAt, "assessment_task", strconv.FormatUint(row.ID, 10))
 					fact["plan_id"], fact["enrollment_id"], fact["testee_id"] = row.PlanID, row.EnrollmentID, row.TesteeID
 					fact["task_id"], fact["task_seq"], fact["scale_code"] = row.ID, row.Seq, row.ScaleCode
 					fact["planned_at"], fact["due_at"] = row.PlannedAt, row.ExpireAt
 					applyTaskLifecycleFields(fact, source.factType, &row.OccurredAt)
-					i, e, x, writeErr := c.writer.write(ctx, "statistics_plan_fact", fact, req.Mode == statisticsDomain.CollectModeValidate)
-					addResult(&result, source.factType, i, e, x)
-					if writeErr != nil {
-						return writeErr
-					}
+					candidates = append(candidates, factCandidate{SourceID: row.ID, FactType: source.factType, Values: fact})
 				}
-				return nil
+				return writeFactCandidates(ctx, c.writer, "statistics_plan_fact", candidates, req.Mode == statisticsDomain.CollectModeValidate, &result)
 			})
 		if err != nil {
 			return result, err
@@ -339,6 +286,61 @@ type AssessmentFactCollector struct {
 	db     *gorm.DB
 	mongo  *mongo.Database
 	writer factWriter
+}
+
+type assessmentFactParent struct {
+	AnswerSheetID                           uint64
+	QuestionnaireCode, QuestionnaireVersion string
+}
+
+type assessmentCollectionState struct {
+	collector    *AssessmentFactCollector
+	orgID        int64
+	attributions map[uint64]frozenAnswerSheetAttribution
+	assessments  map[uint64]assessmentFactParent
+}
+
+func newAssessmentCollectionState(collector *AssessmentFactCollector, orgID int64) *assessmentCollectionState {
+	return &assessmentCollectionState{
+		collector: collector, orgID: orgID,
+		attributions: make(map[uint64]frozenAnswerSheetAttribution),
+		assessments:  make(map[uint64]assessmentFactParent),
+	}
+}
+
+func (s *assessmentCollectionState) rememberAttribution(answerSheetID uint64, value frozenAnswerSheetAttribution) {
+	s.attributions[answerSheetID] = value
+}
+
+func (s *assessmentCollectionState) loadAttribution(ctx context.Context, answerSheetID uint64) (frozenAnswerSheetAttribution, error) {
+	if value, exists := s.attributions[answerSheetID]; exists {
+		return value, nil
+	}
+	value, err := s.collector.loadAnswerSheetAttribution(ctx, s.orgID, answerSheetID)
+	if err != nil {
+		return frozenAnswerSheetAttribution{}, err
+	}
+	s.rememberAttribution(answerSheetID, value)
+	return value, nil
+}
+
+func (s *assessmentCollectionState) rememberAssessment(assessmentID uint64, value assessmentFactParent) {
+	s.assessments[assessmentID] = value
+}
+
+func (s *assessmentCollectionState) loadAssessment(ctx context.Context, assessmentID uint64) (assessmentFactParent, error) {
+	if value, exists := s.assessments[assessmentID]; exists {
+		return value, nil
+	}
+	var value assessmentFactParent
+	if err := s.collector.db.WithContext(ctx).Table("assessment").
+		Select("answer_sheet_id,questionnaire_code,questionnaire_version").
+		Where("org_id=? AND id=?", s.orgID, assessmentID).
+		Take(&value).Error; err != nil {
+		return assessmentFactParent{}, err
+	}
+	s.rememberAssessment(assessmentID, value)
+	return value, nil
 }
 
 type frozenAnswerSheetAttribution struct {
@@ -428,11 +430,18 @@ func (c *AssessmentFactCollector) Collect(ctx context.Context, req statisticsDom
 	if c.mongo == nil {
 		return result, fmt.Errorf("mongo database is required")
 	}
+	state := newAssessmentCollectionState(c, req.OrgID)
 	cursor, err := c.mongo.Collection("answersheets").Find(ctx, bson.M{"org_id": uint64(req.OrgID), "deleted_at": nil, "filled_at": bson.M{"$gte": req.Window.From, "$lt": req.Window.To}}, options.Find().SetSort(bson.D{{Key: "filled_at", Value: 1}, {Key: "domain_id", Value: 1}}).SetBatchSize(collectorBatchSize))
 	if err != nil {
 		return result, err
 	}
 	defer func() { _ = cursor.Close(ctx) }()
+	candidates := make([]factCandidate, 0, collectorBatchSize)
+	flushCandidates := func() error {
+		err := writeFactCandidates(ctx, c.writer, "statistics_assessment_fact", candidates, req.Mode == statisticsDomain.CollectModeValidate, &result)
+		candidates = candidates[:0]
+		return err
+	}
 	for cursor.Next(ctx) {
 		var row struct {
 			DomainID             uint64    `bson:"domain_id"`
@@ -460,9 +469,11 @@ func (c *AssessmentFactCollector) Collect(ctx context.Context, req statisticsDom
 			} `bson:"attribution"`
 		}
 		if err := cursor.Decode(&row); err != nil {
+			if writeErr := flushCandidates(); writeErr != nil {
+				return result, writeErr
+			}
 			return result, err
 		}
-		result.SourceCount++
 		fact := baseFact(req.OrgID, fmt.Sprintf("answersheet:%d:submitted", row.DomainID), "answersheet_submitted", row.FilledAt, "answersheet", strconv.FormatUint(row.DomainID, 10))
 		fact["answersheet_id"] = row.DomainID
 		fact["testee_id"] = row.TesteeID
@@ -474,7 +485,14 @@ func (c *AssessmentFactCollector) Collect(ctx context.Context, req statisticsDom
 			fact["model_code"] = row.Admission.ModelCode
 			fact["model_version"] = row.Admission.ModelVersion
 		}
+		var attribution frozenAnswerSheetAttribution
 		if row.Attribution != nil {
+			attribution = frozenAnswerSheetAttribution{
+				OriginType: row.Attribution.OriginType, OriginID: row.Attribution.OriginID,
+				ClinicianID: row.Attribution.ClinicianID, EntryID: row.Attribution.EntryID,
+				PlanID: row.Attribution.PlanID, EnrollmentID: row.Attribution.EnrollmentID,
+				TaskID: row.Attribution.TaskID, Mode: row.Attribution.Mode,
+			}
 			fact["origin_type"] = row.Attribution.OriginType
 			fact["origin_id"] = row.Attribution.OriginID
 			fact["clinician_id"] = parseNullableID(row.Attribution.ClinicianID)
@@ -484,34 +502,43 @@ func (c *AssessmentFactCollector) Collect(ctx context.Context, req statisticsDom
 			fact["task_id"] = parseNullableID(row.Attribution.TaskID)
 			fact["attribution_mode"] = row.Attribution.Mode
 		} else {
-			attribution, deriveErr := c.deriveLegacyAttribution(ctx, req.OrgID, row.TaskID)
+			var deriveErr error
+			attribution, deriveErr = c.deriveLegacyAttribution(ctx, req.OrgID, row.TaskID)
 			if deriveErr != nil {
+				if writeErr := flushCandidates(); writeErr != nil {
+					return result, writeErr
+				}
 				return result, deriveErr
 			}
 			applyFrozenAttribution(fact, attribution)
 		}
-		i, e, x, err := c.writer.write(ctx, "statistics_assessment_fact", fact, req.Mode == statisticsDomain.CollectModeValidate)
-		addResult(&result, "answersheet_submitted", i, e, x)
-		if err != nil {
-			return result, err
+		state.rememberAttribution(row.DomainID, attribution)
+		candidates = append(candidates, factCandidate{SourceID: row.DomainID, FactType: "answersheet_submitted", Values: fact})
+		if len(candidates) == collectorBatchSize {
+			if err := flushCandidates(); err != nil {
+				return result, err
+			}
 		}
+	}
+	if err := flushCandidates(); err != nil {
+		return result, err
 	}
 	if err := cursor.Err(); err != nil {
 		return result, err
 	}
-	if err := c.collectAssessmentMySQL(ctx, req, &result); err != nil {
+	if err := c.collectAssessmentMySQL(ctx, req, &result, state); err != nil {
 		return result, err
 	}
-	if err := c.collectReports(ctx, req, &result); err != nil {
+	if err := c.collectReports(ctx, req, &result, state); err != nil {
 		return result, err
 	}
-	if err := c.collectReportFailures(ctx, req, &result); err != nil {
+	if err := c.collectReportFailures(ctx, req, &result, state); err != nil {
 		return result, err
 	}
 	return result, nil
 }
 
-func (c *AssessmentFactCollector) collectAssessmentMySQL(ctx context.Context, req statisticsDomain.CollectRequest, result *statisticsDomain.CollectResult) error {
+func (c *AssessmentFactCollector) collectAssessmentMySQL(ctx context.Context, req statisticsDomain.CollectRequest, result *statisticsDomain.CollectResult, state *assessmentCollectionState) error {
 	type assessmentRow struct {
 		ID, TesteeID, AnswerSheetID                         uint64
 		QuestionnaireCode, QuestionnaireVersion, OriginType string
@@ -526,9 +553,13 @@ func (c *AssessmentFactCollector) collectAssessmentMySQL(ctx context.Context, re
 		err := scanLifecycleRows(ctx, c.db, "assessment", "id,testee_id,answer_sheet_id,questionnaire_code,questionnaire_version,origin_type,origin_id,evaluation_model_kind model_kind,evaluation_model_code model_code,evaluation_model_version model_version", source.timeField, req, &rows,
 			func(row assessmentRow) (time.Time, uint64) { return row.OccurredAt, row.ID },
 			func(batch []assessmentRow) error {
+				candidates := make([]factCandidate, 0, len(batch))
 				for _, row := range batch {
-					result.SourceCount++
-					attribution, loadErr := c.loadAnswerSheetAttribution(ctx, req.OrgID, row.AnswerSheetID)
+					state.rememberAssessment(row.ID, assessmentFactParent{
+						AnswerSheetID: row.AnswerSheetID, QuestionnaireCode: row.QuestionnaireCode,
+						QuestionnaireVersion: row.QuestionnaireVersion,
+					})
+					attribution, loadErr := state.loadAttribution(ctx, row.AnswerSheetID)
 					if loadErr != nil {
 						return loadErr
 					}
@@ -544,13 +575,9 @@ func (c *AssessmentFactCollector) collectAssessmentMySQL(ctx context.Context, re
 					fact["model_code"] = row.ModelCode
 					fact["model_version"] = row.ModelVersion
 					applyFrozenAttribution(fact, attribution)
-					i, e, x, writeErr := c.writer.write(ctx, "statistics_assessment_fact", fact, req.Mode == statisticsDomain.CollectModeValidate)
-					addResult(result, source.factType, i, e, x)
-					if writeErr != nil {
-						return writeErr
-					}
+					candidates = append(candidates, factCandidate{SourceID: row.ID, FactType: source.factType, Values: fact})
 				}
-				return nil
+				return writeFactCandidates(ctx, c.writer, "statistics_assessment_fact", candidates, req.Mode == statisticsDomain.CollectModeValidate, result)
 			})
 		if err != nil {
 			return err
@@ -571,9 +598,13 @@ func (c *AssessmentFactCollector) collectAssessmentMySQL(ctx context.Context, re
 			Where("(o.evaluated_at>? OR (o.evaluated_at=? AND o.id>?))", lastAt, lastAt, lastID).
 			Order("o.evaluated_at,o.id").Limit(collectorBatchSize).Find(&outcomes).Error
 	}, func(row outcomeRow) (time.Time, uint64) { return row.EvaluatedAt, row.ID }, func(batch []outcomeRow) error {
+		candidates := make([]factCandidate, 0, len(batch))
 		for _, row := range batch {
-			result.SourceCount++
-			attribution, err := c.loadAnswerSheetAttribution(ctx, req.OrgID, row.AnswerSheetID)
+			state.rememberAssessment(row.AssessmentID, assessmentFactParent{
+				AnswerSheetID: row.AnswerSheetID, QuestionnaireCode: row.QuestionnaireCode,
+				QuestionnaireVersion: row.QuestionnaireVersion,
+			})
+			attribution, err := state.loadAttribution(ctx, row.AnswerSheetID)
 			if err != nil {
 				return err
 			}
@@ -588,25 +619,27 @@ func (c *AssessmentFactCollector) collectAssessmentMySQL(ctx context.Context, re
 			fact["questionnaire_code"] = row.QuestionnaireCode
 			fact["questionnaire_version"] = row.QuestionnaireVersion
 			applyFrozenAttribution(fact, attribution)
-			i, e, x, err := c.writer.write(ctx, "statistics_assessment_fact", fact, req.Mode == statisticsDomain.CollectModeValidate)
-			addResult(result, "outcome_committed", i, e, x)
-			if err != nil {
-				return err
-			}
+			candidates = append(candidates, factCandidate{SourceID: row.ID, FactType: "outcome_committed", Values: fact})
 		}
-		return nil
+		return writeFactCandidates(ctx, c.writer, "statistics_assessment_fact", candidates, req.Mode == statisticsDomain.CollectModeValidate, result)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *AssessmentFactCollector) collectReports(ctx context.Context, req statisticsDomain.CollectRequest, result *statisticsDomain.CollectResult) error {
+func (c *AssessmentFactCollector) collectReports(ctx context.Context, req statisticsDomain.CollectRequest, result *statisticsDomain.CollectResult, state *assessmentCollectionState) error {
 	cursor, err := c.mongo.Collection("interpret_report_artifacts").Find(ctx, bson.M{"org_id": req.OrgID, "generated_at": bson.M{"$gte": req.Window.From, "$lt": req.Window.To}}, options.Find().SetSort(bson.D{{Key: "generated_at", Value: 1}, {Key: "domain_id", Value: 1}}).SetBatchSize(collectorBatchSize))
 	if err != nil {
 		return err
 	}
 	defer func() { _ = cursor.Close(ctx) }()
+	candidates := make([]factCandidate, 0, collectorBatchSize)
+	flushCandidates := func() error {
+		err := writeFactCandidates(ctx, c.writer, "statistics_assessment_fact", candidates, req.Mode == statisticsDomain.CollectModeValidate, result)
+		candidates = candidates[:0]
+		return err
+	}
 	for cursor.Next(ctx) {
 		var row struct {
 			DomainID     uint64    `bson:"domain_id"`
@@ -621,18 +654,23 @@ func (c *AssessmentFactCollector) collectReports(ctx context.Context, req statis
 			} `bson:"model"`
 		}
 		if err := cursor.Decode(&row); err != nil {
+			if writeErr := flushCandidates(); writeErr != nil {
+				return writeErr
+			}
 			return err
 		}
-		result.SourceCount++
-		var assessment struct {
-			AnswerSheetID                           uint64
-			QuestionnaireCode, QuestionnaireVersion string
-		}
-		if err := c.db.WithContext(ctx).Table("assessment").Select("answer_sheet_id,questionnaire_code,questionnaire_version").Where("org_id=? AND id=?", req.OrgID, row.AssessmentID).Take(&assessment).Error; err != nil {
-			return err
-		}
-		attribution, err := c.loadAnswerSheetAttribution(ctx, req.OrgID, assessment.AnswerSheetID)
+		assessment, err := state.loadAssessment(ctx, row.AssessmentID)
 		if err != nil {
+			if writeErr := flushCandidates(); writeErr != nil {
+				return writeErr
+			}
+			return err
+		}
+		attribution, err := state.loadAttribution(ctx, assessment.AnswerSheetID)
+		if err != nil {
+			if writeErr := flushCandidates(); writeErr != nil {
+				return writeErr
+			}
 			return err
 		}
 		fact := baseFact(req.OrgID, fmt.Sprintf("report:%d:generated", row.DomainID), "report_generated", row.GeneratedAt, "interpret_report", strconv.FormatUint(row.DomainID, 10))
@@ -649,21 +687,31 @@ func (c *AssessmentFactCollector) collectReports(ctx context.Context, req statis
 			fact["model_code"] = row.Model.Code
 			fact["model_version"] = row.Model.Version
 		}
-		i, e, x, err := c.writer.write(ctx, "statistics_assessment_fact", fact, req.Mode == statisticsDomain.CollectModeValidate)
-		addResult(result, "report_generated", i, e, x)
-		if err != nil {
-			return err
+		candidates = append(candidates, factCandidate{SourceID: row.DomainID, FactType: "report_generated", Values: fact})
+		if len(candidates) == collectorBatchSize {
+			if err := flushCandidates(); err != nil {
+				return err
+			}
 		}
+	}
+	if err := flushCandidates(); err != nil {
+		return err
 	}
 	return cursor.Err()
 }
 
-func (c *AssessmentFactCollector) collectReportFailures(ctx context.Context, req statisticsDomain.CollectRequest, result *statisticsDomain.CollectResult) error {
+func (c *AssessmentFactCollector) collectReportFailures(ctx context.Context, req statisticsDomain.CollectRequest, result *statisticsDomain.CollectResult, state *assessmentCollectionState) error {
 	cursor, err := c.mongo.Collection("interpretation_runs").Find(ctx, bson.M{"org_id": req.OrgID, "status": "failed", "finished_at": bson.M{"$gte": req.Window.From, "$lt": req.Window.To}}, options.Find().SetSort(bson.D{{Key: "finished_at", Value: 1}, {Key: "domain_id", Value: 1}}).SetBatchSize(collectorBatchSize))
 	if err != nil {
 		return err
 	}
 	defer func() { _ = cursor.Close(ctx) }()
+	candidates := make([]factCandidate, 0, collectorBatchSize)
+	flushCandidates := func() error {
+		err := writeFactCandidates(ctx, c.writer, "statistics_assessment_fact", candidates, req.Mode == statisticsDomain.CollectModeValidate, result)
+		candidates = candidates[:0]
+		return err
+	}
 	for cursor.Next(ctx) {
 		var run struct {
 			DomainID     uint64     `bson:"domain_id"`
@@ -671,6 +719,9 @@ func (c *AssessmentFactCollector) collectReportFailures(ctx context.Context, req
 			FinishedAt   *time.Time `bson:"finished_at"`
 		}
 		if err := cursor.Decode(&run); err != nil {
+			if writeErr := flushCandidates(); writeErr != nil {
+				return writeErr
+			}
 			return err
 		}
 		if run.FinishedAt == nil {
@@ -680,6 +731,9 @@ func (c *AssessmentFactCollector) collectReportFailures(ctx context.Context, req
 			OutcomeID uint64 `bson:"outcome_id"`
 		}
 		if err := c.mongo.Collection("report_generations").FindOne(ctx, bson.M{"domain_id": run.GenerationID}, options.FindOne().SetProjection(bson.M{"outcome_id": 1})).Decode(&generation); err != nil {
+			if writeErr := flushCandidates(); writeErr != nil {
+				return writeErr
+			}
 			return err
 		}
 		var source struct {
@@ -688,26 +742,39 @@ func (c *AssessmentFactCollector) collectReportFailures(ctx context.Context, req
 			ModelKind, ModelCode, ModelVersion, QuestionnaireCode, QuestionnaireVersion string
 		}
 		if err := c.db.WithContext(ctx).Table("evaluation_outcome o").Select("o.org_id,o.assessment_id,o.testee_id,o.model_kind,o.model_code,o.model_version,a.answer_sheet_id,a.questionnaire_code,a.questionnaire_version").Joins("JOIN assessment a ON a.id=o.assessment_id AND a.org_id=o.org_id").Where("o.id=?", generation.OutcomeID).Take(&source).Error; err != nil {
+			if writeErr := flushCandidates(); writeErr != nil {
+				return writeErr
+			}
 			return err
 		}
 		if source.OrgID != req.OrgID {
 			continue
 		}
-		attribution, err := c.loadAnswerSheetAttribution(ctx, req.OrgID, source.AnswerSheetID)
+		state.rememberAssessment(source.AssessmentID, assessmentFactParent{
+			AnswerSheetID: source.AnswerSheetID, QuestionnaireCode: source.QuestionnaireCode,
+			QuestionnaireVersion: source.QuestionnaireVersion,
+		})
+		attribution, err := state.loadAttribution(ctx, source.AnswerSheetID)
 		if err != nil {
+			if writeErr := flushCandidates(); writeErr != nil {
+				return writeErr
+			}
 			return err
 		}
-		result.SourceCount++
 		fact := baseFact(req.OrgID, fmt.Sprintf("interpretation_run:%d:failed", run.DomainID), "report_failed", *run.FinishedAt, "interpretation_run", strconv.FormatUint(run.DomainID, 10))
 		fact["outcome_id"], fact["assessment_id"], fact["testee_id"], fact["answersheet_id"] = generation.OutcomeID, source.AssessmentID, source.TesteeID, source.AnswerSheetID
 		fact["model_kind"], fact["model_code"], fact["model_version"] = source.ModelKind, source.ModelCode, source.ModelVersion
 		fact["questionnaire_code"], fact["questionnaire_version"] = source.QuestionnaireCode, source.QuestionnaireVersion
 		applyFrozenAttribution(fact, attribution)
-		i, e, x, err := c.writer.write(ctx, "statistics_assessment_fact", fact, req.Mode == statisticsDomain.CollectModeValidate)
-		addResult(result, "report_failed", i, e, x)
-		if err != nil {
-			return err
+		candidates = append(candidates, factCandidate{SourceID: run.DomainID, FactType: "report_failed", Values: fact})
+		if len(candidates) == collectorBatchSize {
+			if err := flushCandidates(); err != nil {
+				return err
+			}
 		}
+	}
+	if err := flushCandidates(); err != nil {
+		return err
 	}
 	return cursor.Err()
 }

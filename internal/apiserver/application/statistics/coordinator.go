@@ -260,9 +260,11 @@ func (c *Coordinator) execute(ctx context.Context, run *Run) error {
 		if err := c.store.UpdateProgress(ctx, run.ID, stage, sources, facts, nil); err != nil {
 			return executionError(stage, "run_progress_failed", err)
 		}
+		collectorStart := time.Now()
 		item, err := collector.Collect(ctx, statisticsDomain.CollectRequest{
 			RunID: run.ID, OrgID: run.OrgID, Window: run.Window, AsOfDate: run.AsOfDate, Mode: collectMode,
 		})
+		observeCollectorDuration(collectorStart, collector.Name(), collectMode, err)
 		mergeCollectorCounts(sources, facts, item)
 		observeCollectorResult(item)
 		if progressErr := c.store.UpdateProgress(ctx, run.ID, stage, sources, facts, nil); progressErr != nil {

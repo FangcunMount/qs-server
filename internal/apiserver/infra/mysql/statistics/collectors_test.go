@@ -1,6 +1,7 @@
 package statistics
 
 import (
+	"context"
 	"sort"
 	"testing"
 	"time"
@@ -60,6 +61,34 @@ func TestScanStableBatchesUsesOccurredAtAndIDCursor(t *testing.T) {
 		if collected[i] != source[i] {
 			t.Fatalf("row %d=%+v want %+v", i, collected[i], source[i])
 		}
+	}
+}
+
+func TestAssessmentCollectionStateReusesFrozenAttribution(t *testing.T) {
+	state := newAssessmentCollectionState(nil, 1)
+	want := frozenAnswerSheetAttribution{OriginType: "plan_task", OriginID: "20", TaskID: "20", Mode: "captured"}
+	state.rememberAttribution(10, want)
+
+	got, err := state.loadAttribution(context.Background(), 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Fatalf("got=%+v want=%+v", got, want)
+	}
+}
+
+func TestAssessmentCollectionStateReusesAssessmentParent(t *testing.T) {
+	state := newAssessmentCollectionState(nil, 1)
+	want := assessmentFactParent{AnswerSheetID: 10, QuestionnaireCode: "Q-1", QuestionnaireVersion: "1"}
+	state.rememberAssessment(20, want)
+
+	got, err := state.loadAssessment(context.Background(), 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Fatalf("got=%+v want=%+v", got, want)
 	}
 }
 
