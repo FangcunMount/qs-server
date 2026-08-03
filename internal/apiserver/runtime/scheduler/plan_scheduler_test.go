@@ -8,6 +8,7 @@ import (
 	"time"
 
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
+	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
@@ -192,7 +193,7 @@ func TestPlanRunnerRunOnceSchedulesEachOrgInOrder(t *testing.T) {
 	}
 }
 
-func TestPlanRunnerRunOncePassesPendingLookbackWindow(t *testing.T) {
+func TestPlanRunnerRunOnceUsesFixedTaskOpenWindow(t *testing.T) {
 	lock := &fakeSchedulerLockManager{}
 	command := &fakePlanCommandService{
 		statsByOrg: map[int64]planApp.TaskScheduleStats{1: {OpenedCount: 1}},
@@ -223,10 +224,25 @@ func TestPlanRunnerRunOncePassesPendingLookbackWindow(t *testing.T) {
 	if len(lowerBounds) != 1 {
 		t.Fatalf("expected scheduler to pass one lower bound, got %+v", lowerBounds)
 	}
-	earliest := startedAt.Add(-opts.PendingLookback)
-	latest := finishedAt.Add(-opts.PendingLookback)
+	earliest := startedAt.Add(-planDomain.TaskOpenWindow)
+	latest := finishedAt.Add(-planDomain.TaskOpenWindow)
 	if lowerBounds[0].Before(earliest) || lowerBounds[0].After(latest) {
 		t.Fatalf("lower bound %s outside expected window [%s, %s]", lowerBounds[0], earliest, latest)
+	}
+}
+
+func TestPlanRunnerTracksConsecutiveMissedBacklogTicks(t *testing.T) {
+	runner := &PlanRunner{missedBacklogTicks: make(map[int64]int)}
+
+	runner.observeMissedBacklog(1, 1)
+	runner.observeMissedBacklog(1, 1)
+	if got := runner.missedBacklogTicks[1]; got != 2 {
+		t.Fatalf("consecutive missed backlog ticks = %d, want 2", got)
+	}
+
+	runner.observeMissedBacklog(1, 0)
+	if _, ok := runner.missedBacklogTicks[1]; ok {
+		t.Fatal("cleared missed backlog should reset consecutive tick state")
 	}
 }
 
@@ -251,8 +267,8 @@ func TestPlanRunnerRunOnceContinuesAfterOrgFailure(t *testing.T) {
 		lock.release,
 	)
 
-	if err := runner.runOnce(context.Background()); err != nil {
-		t.Fatalf("runOnce returned error: %v", err)
+	if err := runner.runOnce(context.Background()); err == nil {
+		t.Fatal("runOnce should return aggregate error when any organization fails")
 	}
 
 	gotCalls := command.callOrder()
@@ -454,6 +470,8 @@ func newTestPlanSchedulerOptions(orgIDs ...int64) *apiserveroptions.PlanSchedule
 		InitialDelay:    0,
 		Interval:        time.Minute,
 		PendingLookback: 24 * time.Hour,
+		BatchSize:       200,
+		MaxTasksPerTick: 2000,
 		LockKey:         "qs:plan-scheduler:test",
 		LockTTL:         30 * time.Second,
 	}

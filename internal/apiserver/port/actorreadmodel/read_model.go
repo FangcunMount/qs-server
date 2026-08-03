@@ -46,6 +46,19 @@ type TesteeHydrator interface {
 	ListTesteesByIDs(ctx context.Context, orgID int64, ids []uint64) ([]TesteeRow, error)
 }
 
+// AssessmentSummary is an Evaluation-owned truth projection for one testee.
+// It deliberately does not mirror the deprecated snapshot columns on testee.
+type AssessmentSummary struct {
+	TesteeID        uint64
+	TotalEvaluated  int
+	LastEvaluatedAt *time.Time
+	RiskLevel       string
+}
+
+type AssessmentSummaryReader interface {
+	ReadAssessmentSummaries(ctx context.Context, orgID int64, testeeIDs []uint64) (map[uint64]AssessmentSummary, error)
+}
+
 type OperatorFilter struct {
 	OrgID      int64
 	UserID     int64

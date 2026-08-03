@@ -19,8 +19,22 @@ type relationshipService struct {
 	testeeRepo     domainTestee.Repository
 	relationReader actorreadmodel.RelationReader
 	entryReader    actorreadmodel.AssessmentEntryReader
+	summaryReader  actorreadmodel.AssessmentSummaryReader
 	assignmentRule domainRelation.AssignmentPolicy
 	uow            apptransaction.Runner
+}
+
+func NewRelationshipServiceWithAssessmentSummary(
+	relationRepo domainRelation.Repository,
+	clinicianRepo domainClinician.Repository,
+	testeeRepo domainTestee.Repository,
+	uow apptransaction.Runner,
+	readModel actorreadmodel.ReadModel,
+	summaryReader actorreadmodel.AssessmentSummaryReader,
+) ClinicianRelationshipService {
+	service := NewRelationshipService(relationRepo, clinicianRepo, testeeRepo, uow, readModel).(*relationshipService)
+	service.summaryReader = summaryReader
+	return service
 }
 
 type relationAssignmentInput struct {
@@ -218,6 +232,9 @@ func (s *relationshipService) ListAssignedTestees(ctx context.Context, dto ListA
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list assigned testees")
 	}
+	if err := s.enrichAssignedRows(ctx, dto.OrgID, rows); err != nil {
+		return nil, errors.Wrap(err, "failed to read assigned testee assessment summaries")
+	}
 	items := make([]*AssignedTesteeResult, 0, len(rows))
 	for i := range rows {
 		items = append(items, toAssignedTesteeResultFromRow(&rows[i]))
@@ -306,6 +323,16 @@ func (s *relationshipService) ListClinicianRelations(ctx context.Context, dto Li
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list clinician relations")
 	}
+	testeeRows := make([]actorreadmodel.TesteeRow, len(rows))
+	for i := range rows {
+		testeeRows[i] = rows[i].Testee
+	}
+	if err := s.enrichAssignedRows(ctx, dto.OrgID, testeeRows); err != nil {
+		return nil, errors.Wrap(err, "failed to read clinician relation assessment summaries")
+	}
+	for i := range rows {
+		rows[i].Testee = testeeRows[i]
+	}
 	items := make([]*ClinicianRelationResult, 0, len(rows))
 	for i := range rows {
 		items = append(items, &ClinicianRelationResult{
@@ -320,6 +347,33 @@ func (s *relationshipService) ListClinicianRelations(ctx context.Context, dto Li
 		Offset:     dto.Offset,
 		Limit:      dto.Limit,
 	}, nil
+}
+
+func (s *relationshipService) enrichAssignedRows(ctx context.Context, orgID int64, rows []actorreadmodel.TesteeRow) error {
+	if s.summaryReader == nil || len(rows) == 0 {
+		return nil
+	}
+	ids := make([]uint64, 0, len(rows))
+	for i := range rows {
+		ids = append(ids, rows[i].ID)
+		rows[i].LastAssessmentAt = nil
+		rows[i].TotalAssessments = 0
+		rows[i].LastRiskLevel = ""
+	}
+	summaries, err := s.summaryReader.ReadAssessmentSummaries(ctx, orgID, ids)
+	if err != nil {
+		return err
+	}
+	for i := range rows {
+		summary, ok := summaries[rows[i].ID]
+		if !ok {
+			continue
+		}
+		rows[i].TotalAssessments = summary.TotalEvaluated
+		rows[i].LastAssessmentAt = summary.LastEvaluatedAt
+		rows[i].LastRiskLevel = summary.RiskLevel
+	}
+	return nil
 }
 
 func (s *relationshipService) GetTesteeCareContext(ctx context.Context, orgID int64, testeeID uint64) (*TesteeCareContextResult, error) {

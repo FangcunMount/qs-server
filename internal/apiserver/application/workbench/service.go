@@ -38,13 +38,14 @@ type testeeReader interface {
 }
 
 type service struct {
-	operatorQuery       operatorByUserQuery
-	clinicianQuery      clinicianByOperatorQuery
-	relationshipService clinicianAssignmentReader
-	assignmentHydrator  assignmentHydrator
-	testeeReader        testeeReader
-	latestRiskReader    workbenchreadmodel.LatestRiskReader
-	followUpQueueReader planreadmodel.FollowUpQueueReader
+	operatorQuery           operatorByUserQuery
+	clinicianQuery          clinicianByOperatorQuery
+	relationshipService     clinicianAssignmentReader
+	assignmentHydrator      assignmentHydrator
+	testeeReader            testeeReader
+	latestRiskReader        workbenchreadmodel.LatestRiskReader
+	followUpQueueReader     planreadmodel.FollowUpQueueReader
+	assessmentSummaryReader actorreadmodel.AssessmentSummaryReader
 }
 
 func NewService(
@@ -55,15 +56,21 @@ func NewService(
 	testeeReader testeeReader,
 	latestRiskReader workbenchreadmodel.LatestRiskReader,
 	followUpQueueReader planreadmodel.FollowUpQueueReader,
+	assessmentSummaryReaders ...actorreadmodel.AssessmentSummaryReader,
 ) Service {
+	var assessmentSummaryReader actorreadmodel.AssessmentSummaryReader
+	if len(assessmentSummaryReaders) > 0 {
+		assessmentSummaryReader = assessmentSummaryReaders[0]
+	}
 	return &service{
-		operatorQuery:       operatorQuery,
-		clinicianQuery:      clinicianQuery,
-		relationshipService: relationshipService,
-		assignmentHydrator:  assignmentHydrator,
-		testeeReader:        testeeReader,
-		latestRiskReader:    latestRiskReader,
-		followUpQueueReader: followUpQueueReader,
+		operatorQuery:           operatorQuery,
+		clinicianQuery:          clinicianQuery,
+		relationshipService:     relationshipService,
+		assignmentHydrator:      assignmentHydrator,
+		testeeReader:            testeeReader,
+		latestRiskReader:        latestRiskReader,
+		followUpQueueReader:     followUpQueueReader,
+		assessmentSummaryReader: assessmentSummaryReader,
 	}
 }
 
@@ -214,6 +221,9 @@ func (s *service) listKeyFocusQueue(ctx context.Context, resolved resolvedScope,
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list key focus queue")
 	}
+	if err := s.enrichTesteeRows(ctx, resolved.OrgID, rows); err != nil {
+		return nil, errors.Wrap(err, "failed to read key focus assessment summaries")
+	}
 	total, err := s.testeeReader.CountTestees(ctx, filter)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to count key focus queue")
@@ -314,11 +324,41 @@ func (s *service) hydrateTestees(ctx context.Context, orgID int64, ids []uint64)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to hydrate queue testees")
 	}
+	if err := s.enrichTesteeRows(ctx, orgID, rows); err != nil {
+		return nil, errors.Wrap(err, "failed to read queue assessment summaries")
+	}
 	result := make(map[uint64]Testee, len(rows))
 	for _, row := range rows {
 		result[row.ID] = testeeFromRow(row)
 	}
 	return result, nil
+}
+
+func (s *service) enrichTesteeRows(ctx context.Context, orgID int64, rows []actorreadmodel.TesteeRow) error {
+	if s.assessmentSummaryReader == nil || len(rows) == 0 {
+		return nil
+	}
+	ids := make([]uint64, 0, len(rows))
+	for i := range rows {
+		ids = append(ids, rows[i].ID)
+		rows[i].LastAssessmentAt = nil
+		rows[i].TotalAssessments = 0
+		rows[i].LastRiskLevel = ""
+	}
+	summaries, err := s.assessmentSummaryReader.ReadAssessmentSummaries(ctx, orgID, ids)
+	if err != nil {
+		return err
+	}
+	for i := range rows {
+		summary, ok := summaries[rows[i].ID]
+		if !ok {
+			continue
+		}
+		rows[i].TotalAssessments = summary.TotalEvaluated
+		rows[i].LastAssessmentAt = summary.LastEvaluatedAt
+		rows[i].LastRiskLevel = summary.RiskLevel
+	}
+	return nil
 }
 
 func (s *service) keyFocusFilter(scope resolvedScope, offset, limit int) actorreadmodel.TesteeFilter {

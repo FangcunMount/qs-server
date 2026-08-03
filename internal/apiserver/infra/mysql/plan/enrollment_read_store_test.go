@@ -43,14 +43,14 @@ func TestEnrollmentReadStoreListsEnrollmentsAndTasks(t *testing.T) {
 			uint64(1001), int64(1), uint64(2001), uint64(42), uint32(1), joinedAt, "active", joinedAt,
 			nil, nil, "", "native",
 		))
-	mock.ExpectQuery("(?s)" + regexp.QuoteMeta("SELECT id,enrollment_id,seq,scale_code,status,planned_at,open_at,expire_at,completed_at,expired_at,canceled_at,assessment_id FROM `assessment_task`") + ".*").
+	mock.ExpectQuery("(?s)" + regexp.QuoteMeta("SELECT id,enrollment_id,seq,scale_code,status,planned_at,due_at,open_at,expire_at,completed_at,expired_at,canceled_at,expiration_reason,assessment_id FROM `assessment_task`") + ".*").
 		WithArgs(uint64(1001)).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "enrollment_id", "seq", "scale_code", "status", "planned_at", "open_at", "expire_at",
-			"completed_at", "expired_at", "canceled_at", "assessment_id",
+			"id", "enrollment_id", "seq", "scale_code", "status", "planned_at", "due_at", "open_at", "expire_at",
+			"completed_at", "expired_at", "canceled_at", "expiration_reason", "assessment_id",
 		}).AddRow(
-			uint64(3001), uint64(1001), 1, "SDS", "completed", plannedAt, plannedAt, nil,
-			completedAt, nil, nil, uint64(4001),
+			uint64(3001), uint64(1001), 1, "SDS", "completed", plannedAt, plannedAt.AddDate(0, 0, 7), plannedAt, nil,
+			completedAt, nil, nil, nil, uint64(4001),
 		))
 
 	items, total, err := NewEnrollmentReadStore(db, nil).ListEnrollments(context.Background(), planapp.EnrollmentQuery{

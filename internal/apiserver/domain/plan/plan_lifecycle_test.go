@@ -76,10 +76,11 @@ func TestPlanLifecycleCancelCancelsOutstandingTasks(t *testing.T) {
 	}
 
 	testeeID := testee.NewID(1001)
-	pendingTask := NewAssessmentTask(p.GetID(), 1, 1, testeeID, "scale-code", time.Now())
-	openedTask := NewAssessmentTask(p.GetID(), 2, 1, testeeID, "scale-code", time.Now().Add(time.Hour))
-	completedTask := NewAssessmentTask(p.GetID(), 3, 1, testeeID, "scale-code", time.Now().Add(2*time.Hour))
-	expiredTask := NewAssessmentTask(p.GetID(), 4, 1, testeeID, "scale-code", time.Now().Add(3*time.Hour))
+	now := time.Now()
+	pendingTask := NewAssessmentTask(p.GetID(), 1, 1, testeeID, "scale-code", now)
+	openedTask := NewAssessmentTask(p.GetID(), 2, 1, testeeID, "scale-code", now)
+	completedTask := NewAssessmentTask(p.GetID(), 3, 1, testeeID, "scale-code", now)
+	expiredTask := NewAssessmentTask(p.GetID(), 4, 1, testeeID, "scale-code", now)
 
 	taskLifecycle := NewTaskLifecycle()
 	if err := taskLifecycle.Open(ctx, openedTask, "open-token", "https://example.com/open", time.Now().Add(6*time.Hour)); err != nil {
@@ -136,9 +137,10 @@ func TestPlanLifecycleFinishFinishesPlanAndCancelsOutstandingTasks(t *testing.T)
 	}
 
 	testeeID := testee.NewID(1011)
-	pendingTask := NewAssessmentTask(p.GetID(), 1, 1, testeeID, "scale-code", time.Now())
-	openedTask := NewAssessmentTask(p.GetID(), 2, 1, testeeID, "scale-code", time.Now().Add(time.Hour))
-	completedTask := NewAssessmentTask(p.GetID(), 3, 1, testeeID, "scale-code", time.Now().Add(2*time.Hour))
+	now := time.Now()
+	pendingTask := NewAssessmentTask(p.GetID(), 1, 1, testeeID, "scale-code", now)
+	openedTask := NewAssessmentTask(p.GetID(), 2, 1, testeeID, "scale-code", now)
+	completedTask := NewAssessmentTask(p.GetID(), 3, 1, testeeID, "scale-code", now)
 
 	taskLifecycle := NewTaskLifecycle()
 	if err := taskLifecycle.Open(ctx, openedTask, "open-token", "https://example.com/open", time.Now().Add(6*time.Hour)); err != nil {
@@ -193,7 +195,7 @@ func TestPlanLifecycleResumeReusesCanceledTasks(t *testing.T) {
 	testeeID := testee.NewID(1002)
 	taskLifecycle := NewTaskLifecycle()
 
-	completedTask := NewAssessmentTask(p.GetID(), 1, 1, testeeID, "scale-code", startDate)
+	completedTask := NewAssessmentTask(p.GetID(), 1, 1, testeeID, "scale-code", time.Now())
 	if err := taskLifecycle.Open(ctx, completedTask, "completed-token", "https://example.com/completed", time.Now().Add(6*time.Hour)); err != nil {
 		t.Fatalf("failed to open completed task: %v", err)
 	}

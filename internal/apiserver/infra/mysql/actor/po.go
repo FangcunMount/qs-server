@@ -24,7 +24,7 @@ type TesteePO struct {
 	Source     string         `gorm:"column:source;size:50;not null;default:unknown"`
 	IsKeyFocus bool           `gorm:"column:is_key_focus;not null;default:false"`
 
-	// 测评统计字段
+	// Deprecated: 仅保留物理列用于旧版回滚；线上读取统一使用 Evaluation AssessmentSummaryReader。
 	TotalAssessments int        `gorm:"column:total_assessments;not null;default:0"`
 	LastAssessmentAt *time.Time `gorm:"column:last_assessment_at"`
 	LastRiskLevel    *string    `gorm:"column:last_risk_level;size:50"`
@@ -61,7 +61,8 @@ func (s *StringSliceCol) Scan(value interface{}) error {
 	return json.Unmarshal(bytes, s)
 }
 
-// AssessmentStatsPO 测评统计持久化对象（嵌入在 TesteePO 中）
+// AssessmentStatsPO 测评统计持久化对象（嵌入在 TesteePO 中）。
+// Deprecated: 仅供旧版回滚兼容，不再作为线上读模型真值。
 type AssessmentStatsPO struct {
 	TotalAssessments int        `gorm:"column:total_assessments"`
 	LastAssessmentAt *time.Time `gorm:"column:last_assessment_at"`

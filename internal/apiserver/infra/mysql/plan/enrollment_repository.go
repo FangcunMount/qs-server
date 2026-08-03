@@ -19,7 +19,7 @@ type enrollmentRepository struct {
 func (r *enrollmentRepository) CloseIfAllTasksTerminal(ctx context.Context, id domainplan.PlanEnrollmentID, closedAt time.Time) (bool, error) {
 	result := r.WithContext(ctx).Exec(`
 		UPDATE plan_enrollment e
-		SET e.status = ?, e.closed_at = ?, e.updated_at = ?
+		SET e.status = ?, e.closed_at = ?, e.updated_at = ?, e.version = e.version + 1
 		WHERE e.id = ? AND e.status = ? AND e.deleted_at IS NULL
 		  AND NOT EXISTS (
 			SELECT 1 FROM assessment_task t
@@ -38,7 +38,7 @@ func (r *enrollmentRepository) TerminateActiveByPlan(ctx context.Context, orgID 
 }
 
 func (r *enrollmentRepository) CloseActiveByPlanIfAllTasksTerminal(ctx context.Context, orgID int64, planID domainplan.AssessmentPlanID, at time.Time) (int64, error) {
-	result := r.WithContext(ctx).Exec(`UPDATE plan_enrollment e SET e.status=?,e.closed_at=?,e.updated_at=?
+	result := r.WithContext(ctx).Exec(`UPDATE plan_enrollment e SET e.status=?,e.closed_at=?,e.updated_at=?,e.version=e.version+1
 		WHERE e.org_id=? AND e.plan_id=? AND e.status=? AND e.deleted_at IS NULL
 		AND NOT EXISTS (SELECT 1 FROM assessment_task t WHERE t.enrollment_id=e.id AND t.deleted_at IS NULL AND t.status NOT IN ('completed','expired','canceled'))`,
 		domainplan.EnrollmentStatusClosed, at, at, orgID, planID.Uint64(), domainplan.EnrollmentStatusActive)

@@ -2,6 +2,7 @@ package workbench
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -147,6 +148,48 @@ func TestServiceListKeyFocusQueueUsesAssignedScope(t *testing.T) {
 	}
 	if testees.lastFilter.Offset != 20 || testees.lastFilter.Limit != 20 {
 		t.Fatalf("offset/limit = %d/%d, want 20/20", testees.lastFilter.Offset, testees.lastFilter.Limit)
+	}
+}
+
+type assessmentSummaryReaderStub struct {
+	calls  int
+	err    error
+	values map[uint64]actorreadmodel.AssessmentSummary
+}
+
+func (s *assessmentSummaryReaderStub) ReadAssessmentSummaries(context.Context, int64, []uint64) (map[uint64]actorreadmodel.AssessmentSummary, error) {
+	s.calls++
+	return s.values, s.err
+}
+
+func TestServiceKeyFocusQueueUsesEvaluationSummaryAndPropagatesFailure(t *testing.T) {
+	stale := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	latest := time.Date(2026, 8, 2, 8, 0, 0, 0, time.UTC)
+	testees := &testeeReaderStub{
+		listRows: []actorreadmodel.TesteeRow{{ID: 2, OrgID: 9, Name: "B", IsKeyFocus: true, TotalAssessments: 99, LastAssessmentAt: &stale, LastRiskLevel: "low"}},
+		count:    1,
+	}
+	summary := &assessmentSummaryReaderStub{values: map[uint64]actorreadmodel.AssessmentSummary{
+		2: {TesteeID: 2, TotalEvaluated: 4, LastEvaluatedAt: &latest, RiskLevel: "severe"},
+	}}
+	svc := NewService(
+		&operatorQueryStub{result: &operatorApp.OperatorResult{ID: 10, OrgID: 9, UserID: 701, IsActive: true}},
+		&clinicianQueryStub{result: &clinicianApp.ClinicianResult{ID: 20, OrgID: 9, IsActive: true}},
+		&assignmentReaderStub{ids: []uint64{2}},
+		&assignmentHydratorStub{}, testees, &latestRiskReaderStub{}, &followUpReaderStub{}, summary,
+	)
+
+	page, err := svc.ListQueue(context.Background(), ListQueueDTO{Scope: Scope{Kind: ScopeKindClinicianMe, OrgID: 9, OperatorUserID: 701}, QueueType: QueueTypeKeyFocus, Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.calls != 1 || page.Items[0].Testee.TotalAssessments != 4 || page.Items[0].Testee.LastAssessmentAt == nil || !page.Items[0].Testee.LastAssessmentAt.Equal(latest) || page.Items[0].Testee.LastRiskLevel != "severe" {
+		t.Fatalf("summary calls=%d item=%+v", summary.calls, page.Items[0].Testee)
+	}
+
+	summary.err = errors.New("summary database unavailable")
+	if _, err := svc.ListQueue(context.Background(), ListQueueDTO{Scope: Scope{Kind: ScopeKindClinicianMe, OrgID: 9, OperatorUserID: 701}, QueueType: QueueTypeKeyFocus, Page: 1, PageSize: 10}); err == nil {
+		t.Fatal("summary query failure must fail the workbench page")
 	}
 }
 

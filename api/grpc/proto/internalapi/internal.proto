@@ -96,6 +96,8 @@ message TaskResultMessage {
   optional string assessment_id = 12;
   string entry_token = 13;
   string entry_url = 14;
+  optional string due_at = 15;
+  optional string expiration_reason = 16;
 }
 
 message EnrollmentResultMessage {
@@ -111,6 +113,8 @@ message TaskScheduleStatsMessage {
   int32 failed_count = 3;
   int32 expired_count = 4;
   int32 expire_failed_count = 5;
+  int32 missed_expired_count = 6;
+  int32 missed_expire_failed_count = 7;
 }
 
 message CreatePlanRequest {

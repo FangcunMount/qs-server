@@ -139,23 +139,25 @@ func (x *PlanResultMessage) GetTriggerTime() string {
 }
 
 type TaskResultMessage struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	PlanId        string                 `protobuf:"bytes,2,opt,name=plan_id,json=planId,proto3" json:"plan_id,omitempty"`
-	Seq           int32                  `protobuf:"varint,3,opt,name=seq,proto3" json:"seq,omitempty"`
-	OrgId         int64                  `protobuf:"varint,4,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`
-	TesteeId      string                 `protobuf:"bytes,5,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
-	ScaleCode     string                 `protobuf:"bytes,6,opt,name=scale_code,json=scaleCode,proto3" json:"scale_code,omitempty"`
-	PlannedAt     string                 `protobuf:"bytes,7,opt,name=planned_at,json=plannedAt,proto3" json:"planned_at,omitempty"`
-	OpenAt        *string                `protobuf:"bytes,8,opt,name=open_at,json=openAt,proto3,oneof" json:"open_at,omitempty"`
-	ExpireAt      *string                `protobuf:"bytes,9,opt,name=expire_at,json=expireAt,proto3,oneof" json:"expire_at,omitempty"`
-	CompletedAt   *string                `protobuf:"bytes,10,opt,name=completed_at,json=completedAt,proto3,oneof" json:"completed_at,omitempty"`
-	Status        string                 `protobuf:"bytes,11,opt,name=status,proto3" json:"status,omitempty"`
-	AssessmentId  *string                `protobuf:"bytes,12,opt,name=assessment_id,json=assessmentId,proto3,oneof" json:"assessment_id,omitempty"`
-	EntryToken    string                 `protobuf:"bytes,13,opt,name=entry_token,json=entryToken,proto3" json:"entry_token,omitempty"`
-	EntryUrl      string                 `protobuf:"bytes,14,opt,name=entry_url,json=entryUrl,proto3" json:"entry_url,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	PlanId           string                 `protobuf:"bytes,2,opt,name=plan_id,json=planId,proto3" json:"plan_id,omitempty"`
+	Seq              int32                  `protobuf:"varint,3,opt,name=seq,proto3" json:"seq,omitempty"`
+	OrgId            int64                  `protobuf:"varint,4,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`
+	TesteeId         string                 `protobuf:"bytes,5,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
+	ScaleCode        string                 `protobuf:"bytes,6,opt,name=scale_code,json=scaleCode,proto3" json:"scale_code,omitempty"`
+	PlannedAt        string                 `protobuf:"bytes,7,opt,name=planned_at,json=plannedAt,proto3" json:"planned_at,omitempty"`
+	OpenAt           *string                `protobuf:"bytes,8,opt,name=open_at,json=openAt,proto3,oneof" json:"open_at,omitempty"`
+	ExpireAt         *string                `protobuf:"bytes,9,opt,name=expire_at,json=expireAt,proto3,oneof" json:"expire_at,omitempty"`
+	CompletedAt      *string                `protobuf:"bytes,10,opt,name=completed_at,json=completedAt,proto3,oneof" json:"completed_at,omitempty"`
+	Status           string                 `protobuf:"bytes,11,opt,name=status,proto3" json:"status,omitempty"`
+	AssessmentId     *string                `protobuf:"bytes,12,opt,name=assessment_id,json=assessmentId,proto3,oneof" json:"assessment_id,omitempty"`
+	EntryToken       string                 `protobuf:"bytes,13,opt,name=entry_token,json=entryToken,proto3" json:"entry_token,omitempty"`
+	EntryUrl         string                 `protobuf:"bytes,14,opt,name=entry_url,json=entryUrl,proto3" json:"entry_url,omitempty"`
+	DueAt            *string                `protobuf:"bytes,15,opt,name=due_at,json=dueAt,proto3,oneof" json:"due_at,omitempty"`
+	ExpirationReason *string                `protobuf:"bytes,16,opt,name=expiration_reason,json=expirationReason,proto3,oneof" json:"expiration_reason,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *TaskResultMessage) Reset() {
@@ -286,6 +288,20 @@ func (x *TaskResultMessage) GetEntryUrl() string {
 	return ""
 }
 
+func (x *TaskResultMessage) GetDueAt() string {
+	if x != nil && x.DueAt != nil {
+		return *x.DueAt
+	}
+	return ""
+}
+
+func (x *TaskResultMessage) GetExpirationReason() string {
+	if x != nil && x.ExpirationReason != nil {
+		return *x.ExpirationReason
+	}
+	return ""
+}
+
 type EnrollmentResultMessage struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	PlanId           string                 `protobuf:"bytes,1,opt,name=plan_id,json=planId,proto3" json:"plan_id,omitempty"`
@@ -355,14 +371,16 @@ func (x *EnrollmentResultMessage) GetCreatedTaskCount() int32 {
 }
 
 type TaskScheduleStatsMessage struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	PendingCount      int32                  `protobuf:"varint,1,opt,name=pending_count,json=pendingCount,proto3" json:"pending_count,omitempty"`
-	OpenedCount       int32                  `protobuf:"varint,2,opt,name=opened_count,json=openedCount,proto3" json:"opened_count,omitempty"`
-	FailedCount       int32                  `protobuf:"varint,3,opt,name=failed_count,json=failedCount,proto3" json:"failed_count,omitempty"`
-	ExpiredCount      int32                  `protobuf:"varint,4,opt,name=expired_count,json=expiredCount,proto3" json:"expired_count,omitempty"`
-	ExpireFailedCount int32                  `protobuf:"varint,5,opt,name=expire_failed_count,json=expireFailedCount,proto3" json:"expire_failed_count,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	PendingCount            int32                  `protobuf:"varint,1,opt,name=pending_count,json=pendingCount,proto3" json:"pending_count,omitempty"`
+	OpenedCount             int32                  `protobuf:"varint,2,opt,name=opened_count,json=openedCount,proto3" json:"opened_count,omitempty"`
+	FailedCount             int32                  `protobuf:"varint,3,opt,name=failed_count,json=failedCount,proto3" json:"failed_count,omitempty"`
+	ExpiredCount            int32                  `protobuf:"varint,4,opt,name=expired_count,json=expiredCount,proto3" json:"expired_count,omitempty"`
+	ExpireFailedCount       int32                  `protobuf:"varint,5,opt,name=expire_failed_count,json=expireFailedCount,proto3" json:"expire_failed_count,omitempty"`
+	MissedExpiredCount      int32                  `protobuf:"varint,6,opt,name=missed_expired_count,json=missedExpiredCount,proto3" json:"missed_expired_count,omitempty"`
+	MissedExpireFailedCount int32                  `protobuf:"varint,7,opt,name=missed_expire_failed_count,json=missedExpireFailedCount,proto3" json:"missed_expire_failed_count,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *TaskScheduleStatsMessage) Reset() {
@@ -426,6 +444,20 @@ func (x *TaskScheduleStatsMessage) GetExpiredCount() int32 {
 func (x *TaskScheduleStatsMessage) GetExpireFailedCount() int32 {
 	if x != nil {
 		return x.ExpireFailedCount
+	}
+	return 0
+}
+
+func (x *TaskScheduleStatsMessage) GetMissedExpiredCount() int32 {
+	if x != nil {
+		return x.MissedExpiredCount
+	}
+	return 0
+}
+
+func (x *TaskScheduleStatsMessage) GetMissedExpireFailedCount() int32 {
+	if x != nil {
+		return x.MissedExpireFailedCount
 	}
 	return 0
 }
@@ -2391,7 +2423,7 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\x0erelative_weeks\x18\b \x03(\x05R\rrelativeWeeks\x12\x16\n" +
 	"\x06status\x18\t \x01(\tR\x06status\x12!\n" +
 	"\ftrigger_time\x18\n" +
-	" \x01(\tR\vtriggerTime\"\xe5\x03\n" +
+	" \x01(\tR\vtriggerTime\"\xd4\x04\n" +
 	"\x11TaskResultMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\aplan_id\x18\x02 \x01(\tR\x06planId\x12\x10\n" +
@@ -2410,26 +2442,32 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\rassessment_id\x18\f \x01(\tH\x03R\fassessmentId\x88\x01\x01\x12\x1f\n" +
 	"\ventry_token\x18\r \x01(\tR\n" +
 	"entryToken\x12\x1b\n" +
-	"\tentry_url\x18\x0e \x01(\tR\bentryUrlB\n" +
+	"\tentry_url\x18\x0e \x01(\tR\bentryUrl\x12\x1a\n" +
+	"\x06due_at\x18\x0f \x01(\tH\x04R\x05dueAt\x88\x01\x01\x120\n" +
+	"\x11expiration_reason\x18\x10 \x01(\tH\x05R\x10expirationReason\x88\x01\x01B\n" +
 	"\n" +
 	"\b_open_atB\f\n" +
 	"\n" +
 	"_expire_atB\x0f\n" +
 	"\r_completed_atB\x10\n" +
-	"\x0e_assessment_id\"\xb6\x01\n" +
+	"\x0e_assessment_idB\t\n" +
+	"\a_due_atB\x14\n" +
+	"\x12_expiration_reason\"\xb6\x01\n" +
 	"\x17EnrollmentResultMessage\x12\x17\n" +
 	"\aplan_id\x18\x01 \x01(\tR\x06planId\x124\n" +
 	"\x05tasks\x18\x02 \x03(\v2\x1e.internalapi.TaskResultMessageR\x05tasks\x12\x1e\n" +
 	"\n" +
 	"idempotent\x18\x03 \x01(\bR\n" +
 	"idempotent\x12,\n" +
-	"\x12created_task_count\x18\x04 \x01(\x05R\x10createdTaskCount\"\xda\x01\n" +
+	"\x12created_task_count\x18\x04 \x01(\x05R\x10createdTaskCount\"\xc9\x02\n" +
 	"\x18TaskScheduleStatsMessage\x12#\n" +
 	"\rpending_count\x18\x01 \x01(\x05R\fpendingCount\x12!\n" +
 	"\fopened_count\x18\x02 \x01(\x05R\vopenedCount\x12!\n" +
 	"\ffailed_count\x18\x03 \x01(\x05R\vfailedCount\x12#\n" +
 	"\rexpired_count\x18\x04 \x01(\x05R\fexpiredCount\x12.\n" +
-	"\x13expire_failed_count\x18\x05 \x01(\x05R\x11expireFailedCount\"\x96\x02\n" +
+	"\x13expire_failed_count\x18\x05 \x01(\x05R\x11expireFailedCount\x120\n" +
+	"\x14missed_expired_count\x18\x06 \x01(\x05R\x12missedExpiredCount\x12;\n" +
+	"\x1amissed_expire_failed_count\x18\a \x01(\x05R\x17missedExpireFailedCount\"\x96\x02\n" +
 	"\x11CreatePlanRequest\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\x03R\x05orgId\x12\x1d\n" +
 	"\n" +

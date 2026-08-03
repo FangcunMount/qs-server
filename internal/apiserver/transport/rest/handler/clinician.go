@@ -1364,7 +1364,7 @@ func toAssignedTesteeResponse(item *clinicianApp.AssignedTesteeResult) *response
 	if item == nil {
 		return nil
 	}
-	return buildTesteeSummaryResponse(
+	result := buildTesteeSummaryResponse(
 		item.ID,
 		item.OrgID,
 		item.ProfileID,
@@ -1374,6 +1374,15 @@ func toAssignedTesteeResponse(item *clinicianApp.AssignedTesteeResult) *response
 		item.Source,
 		item.IsKeyFocus,
 	)
+	if item.LastAssessmentAt != nil || item.TotalAssessments > 0 || item.LastRiskLevel != "" {
+		result.AssessmentStats = &response.AssessmentStatsResponse{
+			TotalCount:         item.TotalAssessments,
+			LastAssessmentAt:   response.FormatDateTimePtr(item.LastAssessmentAt),
+			LastRiskLevel:      item.LastRiskLevel,
+			LastRiskLevelLabel: response.LabelForRiskLevel(item.LastRiskLevel),
+		}
+	}
+	return result
 }
 
 func toTesteeClinicianRelationResponse(item *clinicianApp.TesteeRelationResult) *response.TesteeClinicianRelationResponse {

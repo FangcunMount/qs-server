@@ -79,20 +79,22 @@ type PlanRow struct {
 
 // TaskRow is the read-side projection of an assessment task.
 type TaskRow struct {
-	ID           uint64
-	PlanID       uint64
-	Seq          int
-	OrgID        int64
-	TesteeID     uint64
-	ScaleCode    string
-	PlannedAt    time.Time
-	OpenAt       *time.Time
-	ExpireAt     *time.Time
-	CompletedAt  *time.Time
-	Status       string
-	AssessmentID *uint64
-	EntryToken   string
-	EntryURL     string
+	ID               uint64
+	PlanID           uint64
+	Seq              int
+	OrgID            int64
+	TesteeID         uint64
+	ScaleCode        string
+	PlannedAt        time.Time
+	DueAt            *time.Time
+	OpenAt           *time.Time
+	ExpireAt         *time.Time
+	CompletedAt      *time.Time
+	Status           string
+	ExpirationReason string
+	AssessmentID     *uint64
+	EntryToken       string
+	EntryURL         string
 }
 
 // PlanPage carries paged plan rows.

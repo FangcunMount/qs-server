@@ -14209,6 +14209,10 @@ const docTemplate = `{
                     "description": "完成时间",
                     "type": "string"
                 },
+                "due_at": {
+                    "description": "履约截止时间",
+                    "type": "string"
+                },
                 "entry_token": {
                     "description": "入口令牌",
                     "type": "string"
@@ -14217,8 +14221,12 @@ const docTemplate = `{
                     "description": "入口URL",
                     "type": "string"
                 },
+                "expiration_reason": {
+                    "description": "过期原因",
+                    "type": "string"
+                },
                 "expire_at": {
-                    "description": "截止时间",
+                    "description": "入口失效时间",
                     "type": "string"
                 },
                 "id": {
@@ -14277,6 +14285,12 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "failed_count": {
+                    "type": "integer"
+                },
+                "missed_expire_failed_count": {
+                    "type": "integer"
+                },
+                "missed_expired_count": {
                     "type": "integer"
                 },
                 "opened_count": {

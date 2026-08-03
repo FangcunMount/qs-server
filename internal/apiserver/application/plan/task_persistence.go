@@ -29,6 +29,10 @@ func (p taskPersistence) save(ctx context.Context, task *domainplan.AssessmentTa
 		closedAt := time.Now()
 		if completedAt := task.GetCompletedAt(); completedAt != nil {
 			closedAt = *completedAt
+		} else if expiredAt := task.GetExpiredAt(); expiredAt != nil {
+			closedAt = *expiredAt
+		} else if canceledAt := task.GetCanceledAt(); canceledAt != nil {
+			closedAt = *canceledAt
 		}
 		if _, err := p.enrollments.CloseIfAllTasksTerminal(txCtx, task.GetEnrollmentID(), closedAt); err != nil {
 			return err

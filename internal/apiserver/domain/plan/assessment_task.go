@@ -34,15 +34,17 @@ type AssessmentTask struct {
 	// === 时间点 ===
 	businessCreatedAt *time.Time // 可选业务创建时间；历史回填使用，普通任务为空并回退审计 created_at
 	plannedAt         time.Time  // 计划时间点
+	dueAt             time.Time  // 履约截止时间（planned_at + 7 个上海自然日）
 	openAt            *time.Time // 实际开放时间
-	expireAt          *time.Time // 截止时间
+	expireAt          *time.Time // 入口硬失效时间
 	completedAt       *time.Time // 完成时间
 	expiredAt         *time.Time // 实际过期状态迁移时间
 	canceledAt        *time.Time // 实际取消状态迁移时间
 
 	// === 状态与关联 ===
-	status       TaskStatus
-	assessmentID *assessment.ID
+	status           TaskStatus
+	expirationReason TaskExpirationReason
+	assessmentID     *assessment.ID
 
 	// === 入口信息 ===
 	entryToken string // 入口令牌（用于生成二维码/链接）
@@ -71,6 +73,7 @@ func NewAssessmentTask(
 		testeeID:  testeeID,
 		scaleCode: scaleCode,
 		plannedAt: plannedAt,
+		dueAt:     TaskDueAt(plannedAt),
 		status:    TaskStatusPending,
 		events:    make([]event.DomainEvent, 0),
 	}
@@ -117,6 +120,10 @@ func (t *AssessmentTask) GetPlannedAt() time.Time {
 	return t.plannedAt
 }
 
+// GetDueAt returns the stable fulfillment deadline. It is always defined in
+// the domain; repository restoration derives it for legacy NULL rows.
+func (t *AssessmentTask) GetDueAt() time.Time { return t.dueAt }
+
 func (t *AssessmentTask) GetBusinessCreatedAt() *time.Time { return t.businessCreatedAt }
 
 // SetBusinessCreatedAt only supplies the business occurrence time consumed by
@@ -146,6 +153,8 @@ func (t *AssessmentTask) GetCompletedAt() *time.Time {
 }
 
 func (t *AssessmentTask) GetExpiredAt() *time.Time { return t.expiredAt }
+
+func (t *AssessmentTask) GetExpirationReason() TaskExpirationReason { return t.expirationReason }
 
 func (t *AssessmentTask) GetCanceledAt() *time.Time { return t.canceledAt }
 
@@ -248,13 +257,18 @@ func (t *AssessmentTask) complete(assessmentID assessment.ID, completedAt time.T
 }
 
 // expire 过期任务（包内方法）
-func (t *AssessmentTask) expire(expiredAt time.Time) error {
-	if t.status != TaskStatusOpened {
+func (t *AssessmentTask) expire(expiredAt time.Time, reason TaskExpirationReason) error {
+	if reason == TaskExpirationReasonMissedOpenWindow {
+		if t.status != TaskStatusPending {
+			return ErrTaskNotPending
+		}
+	} else if t.status != TaskStatusOpened {
 		return ErrTaskNotOpened
 	}
 
 	t.status = TaskStatusExpired
 	t.expiredAt = &expiredAt
+	t.expirationReason = reason
 
 	// 发布任务过期事件
 	t.addEvent(NewTaskExpiredEvent(
@@ -262,6 +276,7 @@ func (t *AssessmentTask) expire(expiredAt time.Time) error {
 		t.planID,
 		t.testeeID,
 		expiredAt,
+		reason,
 	))
 
 	return nil
@@ -293,16 +308,29 @@ func (t *AssessmentTask) reschedule(plannedAt time.Time) error {
 	}
 
 	t.plannedAt = plannedAt
+	t.dueAt = TaskDueAt(plannedAt)
 	t.status = TaskStatusPending
 	t.openAt = nil
 	t.expireAt = nil
 	t.completedAt = nil
 	t.expiredAt = nil
 	t.canceledAt = nil
+	t.expirationReason = ""
 	t.assessmentID = nil
 	t.entryToken = ""
 	t.entryURL = ""
 	return nil
+}
+
+// RestoreTimeSemantics restores fields introduced after the original task
+// schema. A nil dueAt is a legacy row and is derived without mutating storage.
+func (t *AssessmentTask) RestoreTimeSemantics(dueAt *time.Time, reason TaskExpirationReason) {
+	if dueAt == nil || dueAt.IsZero() {
+		t.dueAt = TaskDueAt(t.plannedAt)
+	} else {
+		t.dueAt = *dueAt
+	}
+	t.expirationReason = reason
 }
 
 // ==================== 领域事件相关方法 ====================

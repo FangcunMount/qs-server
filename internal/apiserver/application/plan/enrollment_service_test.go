@@ -373,7 +373,7 @@ func TestEnrollmentServiceTerminatePublishesOnlyTaskCanceledEvents(t *testing.T)
 	testeeID := testeeDomain.NewID(3003)
 	taskLifecycle := domainPlan.NewTaskLifecycle()
 	pendingTask := domainPlan.NewAssessmentTask(planAggregate.GetID(), 1, 9, testeeID, "scale-code", time.Now())
-	openedTask := domainPlan.NewAssessmentTask(planAggregate.GetID(), 2, 9, testeeID, "scale-code", time.Now().Add(time.Hour))
+	openedTask := domainPlan.NewAssessmentTask(planAggregate.GetID(), 2, 9, testeeID, "scale-code", time.Now())
 	if err := taskLifecycle.Open(ctx, openedTask, "token", "https://example.com/entry", time.Now().Add(2*time.Hour)); err != nil {
 		t.Fatalf("failed to open task: %v", err)
 	}

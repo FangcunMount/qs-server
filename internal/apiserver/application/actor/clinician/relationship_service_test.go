@@ -2,6 +2,7 @@ package clinician
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -163,6 +164,47 @@ func TestListAssignedTesteesUsesReadModel(t *testing.T) {
 	}
 	if result.Items[0].ID != 21 || result.Items[1].ID != 20 {
 		t.Fatalf("expected relation order to be preserved, got %+v", result.Items)
+	}
+}
+
+type relationshipAssessmentSummaryReader struct {
+	calls  int
+	err    error
+	values map[uint64]actorreadmodel.AssessmentSummary
+}
+
+func (s *relationshipAssessmentSummaryReader) ReadAssessmentSummaries(context.Context, int64, []uint64) (map[uint64]actorreadmodel.AssessmentSummary, error) {
+	s.calls++
+	return s.values, s.err
+}
+
+func TestListAssignedTesteesUsesOneEvaluationSummaryBatch(t *testing.T) {
+	stale := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	latest := time.Date(2026, 8, 2, 10, 0, 0, 0, time.UTC)
+	relationReader := &relationshipServiceRelationReader{
+		assignedRows:  []actorreadmodel.TesteeRow{{ID: 21, OrgID: 1, Name: "testee", TotalAssessments: 99, LastAssessmentAt: &stale, LastRiskLevel: "low"}},
+		assignedTotal: 1,
+	}
+	summary := &relationshipAssessmentSummaryReader{values: map[uint64]actorreadmodel.AssessmentSummary{
+		21: {TesteeID: 21, TotalEvaluated: 3, LastEvaluatedAt: &latest, RiskLevel: "high"},
+	}}
+	svc := &relationshipService{relationReader: relationReader, summaryReader: summary}
+
+	result, err := svc.ListAssignedTestees(context.Background(), ListAssignedTesteeDTO{OrgID: 1, ClinicianID: 10, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.calls != 1 {
+		t.Fatalf("summary calls=%d want=1", summary.calls)
+	}
+	item := result.Items[0]
+	if item.TotalAssessments != 3 || item.LastAssessmentAt == nil || !item.LastAssessmentAt.Equal(latest) || item.LastRiskLevel != "high" {
+		t.Fatalf("assigned testee summary=%+v", item)
+	}
+
+	summary.err = errors.New("summary database unavailable")
+	if _, err := svc.ListAssignedTestees(context.Background(), ListAssignedTesteeDTO{OrgID: 1, ClinicianID: 10, Limit: 10}); err == nil {
+		t.Fatal("summary query failure must fail the page")
 	}
 }
 

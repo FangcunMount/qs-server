@@ -44,6 +44,9 @@ func (l *TaskLifecycle) OpenAt(ctx context.Context, task *AssessmentTask, entryT
 		)
 		return errors.WithCode(code.ErrInvalidArgument, "任务未处于待推送状态，无法开放")
 	}
+	if actionAt.Before(task.GetPlannedAt()) || !actionAt.Before(TaskOpenWindowEndsAt(task.GetPlannedAt())) {
+		return errors.WithCode(code.ErrInvalidArgument, "任务不在开放窗口内")
+	}
 
 	// 2. 验证参数
 	if entryToken == "" {
@@ -52,7 +55,7 @@ func (l *TaskLifecycle) OpenAt(ctx context.Context, task *AssessmentTask, entryT
 	if entryURL == "" {
 		return errors.WithCode(code.ErrInvalidArgument, "入口URL不能为空")
 	}
-	if expireAt.Before(actionAt) {
+	if !expireAt.After(actionAt) {
 		logger.L(ctx).Errorw("Expire time is in the past",
 			"domain_action", "open_task",
 			"task_id", taskID,
@@ -61,7 +64,6 @@ func (l *TaskLifecycle) OpenAt(ctx context.Context, task *AssessmentTask, entryT
 		)
 		return errors.WithCode(code.ErrInvalidArgument, "过期时间必须晚于开放时间")
 	}
-
 	// 3. 调用实体的包内方法（状态变更 + 事件触发）
 	if err := task.open(entryToken, entryURL, actionAt, expireAt); err != nil {
 		logger.L(ctx).Errorw("Failed to open task",
@@ -110,6 +112,9 @@ func (l *TaskLifecycle) CompleteAt(ctx context.Context, task *AssessmentTask, as
 	if assessmentID.IsZero() {
 		return errors.WithCode(code.ErrInvalidArgument, "测评ID不能为空")
 	}
+	if expireAt := task.GetExpireAt(); expireAt == nil || !actionAt.Before(*expireAt) {
+		return errors.WithCode(code.ErrInvalidArgument, "任务入口已失效，无法完成")
+	}
 
 	// 3. 调用实体的包内方法（状态变更 + 事件触发）
 	if err := task.complete(assessmentID, actionAt); err != nil {
@@ -133,13 +138,42 @@ func (l *TaskLifecycle) CompleteAt(ctx context.Context, task *AssessmentTask, as
 // Expire 过期任务
 // 将已推送状态的任务变更为已过期状态
 func (l *TaskLifecycle) Expire(_ context.Context, task *AssessmentTask) error {
-	// 1. 前置状态检查
+	return l.ExpireAt(task, TaskExpirationReasonManual, time.Now())
+}
+
+// ExpireAt applies a reasoned terminal transition at a deterministic business
+// time. Scheduler and repair code use this method to keep event facts stable.
+func (l *TaskLifecycle) ExpireAt(task *AssessmentTask, reason TaskExpirationReason, actionAt time.Time) error {
+	if !reason.IsValid() {
+		return errors.WithCode(code.ErrInvalidArgument, "任务过期原因无效")
+	}
+	if reason == TaskExpirationReasonMissedOpenWindow {
+		if !task.IsPending() {
+			return errors.WithCode(code.ErrInvalidArgument, "任务未处于待推送状态，无法标记错过开放窗口")
+		}
+		if actionAt.Before(TaskOpenWindowEndsAt(task.GetPlannedAt())) {
+			return errors.WithCode(code.ErrInvalidArgument, "任务开放窗口尚未结束")
+		}
+		return task.expire(actionAt, reason)
+	}
 	if !task.IsOpened() {
 		return errors.WithCode(code.ErrInvalidArgument, "任务未处于已推送状态，无法过期")
 	}
+	if reason == TaskExpirationReasonEntryTimeout {
+		expireAt := task.GetExpireAt()
+		if expireAt == nil || actionAt.Before(*expireAt) {
+			return errors.WithCode(code.ErrInvalidArgument, "任务入口尚未失效")
+		}
+	}
+	return task.expire(actionAt, reason)
+}
 
-	// 2. 调用实体的包内方法（状态变更 + 事件触发）
-	return task.expire(time.Now())
+func (l *TaskLifecycle) ExpireMissedOpenWindow(task *AssessmentTask, actionAt time.Time) error {
+	return l.ExpireAt(task, TaskExpirationReasonMissedOpenWindow, actionAt)
+}
+
+func (l *TaskLifecycle) ExpireManually(task *AssessmentTask, actionAt time.Time) error {
+	return l.ExpireAt(task, TaskExpirationReasonManual, actionAt)
 }
 
 // Cancel 取消任务

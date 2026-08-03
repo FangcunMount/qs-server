@@ -156,15 +156,18 @@ type ListClinicianRelationDTO struct {
 
 // AssignedTesteeResult 从业者名下受试者结果。
 type AssignedTesteeResult struct {
-	ID         uint64
-	OrgID      int64
-	ProfileID  *uint64
-	Name       string
-	Gender     int8
-	Birthday   *time.Time
-	Age        int
-	Source     string
-	IsKeyFocus bool
+	ID               uint64
+	OrgID            int64
+	ProfileID        *uint64
+	Name             string
+	Gender           int8
+	Birthday         *time.Time
+	Age              int
+	Source           string
+	IsKeyFocus       bool
+	LastAssessmentAt *time.Time
+	TotalAssessments int
+	LastRiskLevel    string
 }
 
 // AssignedTesteeListResult 从业者名下受试者列表结果。

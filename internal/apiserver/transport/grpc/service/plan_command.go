@@ -369,20 +369,22 @@ func toPBTaskResult(result *planApp.TaskResult) (*pb.TaskResultMessage, error) {
 	}
 
 	return &pb.TaskResultMessage{
-		Id:           result.ID,
-		PlanId:       result.PlanID,
-		Seq:          seq,
-		OrgId:        result.OrgID,
-		TesteeId:     result.TesteeID,
-		ScaleCode:    result.ScaleCode,
-		PlannedAt:    result.PlannedAt,
-		OpenAt:       cloneOptionalString(result.OpenAt),
-		ExpireAt:     cloneOptionalString(result.ExpireAt),
-		CompletedAt:  cloneOptionalString(result.CompletedAt),
-		Status:       result.Status,
-		AssessmentId: cloneOptionalString(result.AssessmentID),
-		EntryToken:   result.EntryToken,
-		EntryUrl:     result.EntryURL,
+		Id:               result.ID,
+		PlanId:           result.PlanID,
+		Seq:              seq,
+		OrgId:            result.OrgID,
+		TesteeId:         result.TesteeID,
+		ScaleCode:        result.ScaleCode,
+		PlannedAt:        result.PlannedAt,
+		OpenAt:           cloneOptionalString(result.OpenAt),
+		ExpireAt:         cloneOptionalString(result.ExpireAt),
+		CompletedAt:      cloneOptionalString(result.CompletedAt),
+		Status:           result.Status,
+		AssessmentId:     cloneOptionalString(result.AssessmentID),
+		EntryToken:       result.EntryToken,
+		EntryUrl:         result.EntryURL,
+		DueAt:            cloneOptionalString(result.DueAt),
+		ExpirationReason: cloneOptionalString(result.ExpirationReason),
 	}, nil
 }
 
@@ -454,13 +456,23 @@ func toPBTaskScheduleStats(stats planApp.TaskScheduleStats) (*pb.TaskScheduleSta
 	if err != nil {
 		return nil, err
 	}
+	missedExpiredCount, err := protoInt32FromInt("missed_expired_count", stats.MissedExpiredCount)
+	if err != nil {
+		return nil, err
+	}
+	missedExpireFailedCount, err := protoInt32FromInt("missed_expire_failed_count", stats.MissedExpireFailedCount)
+	if err != nil {
+		return nil, err
+	}
 
 	return &pb.TaskScheduleStatsMessage{
-		PendingCount:      pendingCount,
-		OpenedCount:       openedCount,
-		FailedCount:       failedCount,
-		ExpiredCount:      expiredCount,
-		ExpireFailedCount: expireFailedCount,
+		PendingCount:            pendingCount,
+		OpenedCount:             openedCount,
+		FailedCount:             failedCount,
+		ExpiredCount:            expiredCount,
+		ExpireFailedCount:       expireFailedCount,
+		MissedExpiredCount:      missedExpiredCount,
+		MissedExpireFailedCount: missedExpireFailedCount,
 	}, nil
 }
 

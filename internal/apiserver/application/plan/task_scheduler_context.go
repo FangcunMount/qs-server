@@ -8,14 +8,78 @@ import (
 type taskScheduleStatsCollectorKey struct{}
 type taskSchedulerScopeKey struct{}
 type taskSchedulerPlannedAtLowerBoundKey struct{}
+type taskSchedulerMissedExpirationEnabledKey struct{}
+type taskSchedulerScanLimitsKey struct{}
+
+const (
+	defaultTaskSchedulerBatchSize       = 200
+	defaultTaskSchedulerMaxTasksPerTick = 2000
+)
+
+type taskSchedulerScanLimits struct {
+	batchSize       int
+	maxTasksPerTick int
+}
 
 // TaskScheduleStats 记录一次任务调度中的统计数据。
 type TaskScheduleStats struct {
-	PendingCount      int
-	OpenedCount       int
-	FailedCount       int
-	ExpiredCount      int
-	ExpireFailedCount int
+	PendingCount            int
+	OpenedCount             int
+	FailedCount             int
+	OpenedOverdueCount      int
+	ExpiredCount            int
+	ExpireFailedCount       int
+	MissedCandidateCount    int
+	MissedExpiredCount      int
+	MissedExpireFailedCount int
+	MissedBacklogCount      int
+	OldestPendingAgeSeconds int64
+	OldestOpenedAgeSeconds  int64
+}
+
+// WithTaskSchedulerMissedExpirationEnabled controls the third scheduler phase.
+// Absence means enabled, which is the steady-state default after one-off repair.
+func WithTaskSchedulerMissedExpirationEnabled(ctx context.Context, enabled bool) context.Context {
+	return context.WithValue(ctx, taskSchedulerMissedExpirationEnabledKey{}, enabled)
+}
+
+func TaskSchedulerMissedExpirationEnabled(ctx context.Context) bool {
+	if ctx == nil {
+		return true
+	}
+	enabled, ok := ctx.Value(taskSchedulerMissedExpirationEnabledKey{}).(bool)
+	if !ok {
+		return true
+	}
+	return enabled
+}
+
+// WithTaskSchedulerScanLimits bounds every scheduler phase for one
+// organization. Invalid values fall back to the safe defaults so non-runner
+// callers retain bounded behavior.
+func WithTaskSchedulerScanLimits(ctx context.Context, batchSize, maxTasksPerTick int) context.Context {
+	if batchSize <= 0 {
+		batchSize = defaultTaskSchedulerBatchSize
+	}
+	if maxTasksPerTick <= 0 {
+		maxTasksPerTick = defaultTaskSchedulerMaxTasksPerTick
+	}
+	if batchSize > maxTasksPerTick {
+		batchSize = maxTasksPerTick
+	}
+	return context.WithValue(ctx, taskSchedulerScanLimitsKey{}, taskSchedulerScanLimits{
+		batchSize:       batchSize,
+		maxTasksPerTick: maxTasksPerTick,
+	})
+}
+
+func taskSchedulerLimitsFromContext(ctx context.Context) (int, int) {
+	if ctx != nil {
+		if limits, ok := ctx.Value(taskSchedulerScanLimitsKey{}).(taskSchedulerScanLimits); ok && limits.batchSize > 0 && limits.maxTasksPerTick > 0 {
+			return limits.batchSize, limits.maxTasksPerTick
+		}
+	}
+	return defaultTaskSchedulerBatchSize, defaultTaskSchedulerMaxTasksPerTick
 }
 
 // TaskSchedulerScope 表示一次调度的可选过滤范围。
@@ -36,9 +100,8 @@ func WithTaskSchedulerScope(ctx context.Context, planID string, testeeIDs []stri
 	return context.WithValue(ctx, taskSchedulerScopeKey{}, scope)
 }
 
-// WithTaskSchedulerPlannedAtLowerBound limits automatic scheduling 到 tasks at。
-// 或 在之后 lowerBound. 它是 intended 用于 内置 scheduler so historical。
-// backfilled 待处理 tasks 是 不 opened immediately。
+// WithTaskSchedulerPlannedAtLowerBound 设置自动调度的开放窗口下界，
+// 防止历史回填的 pending Task 被批量开放。
 func WithTaskSchedulerPlannedAtLowerBound(ctx context.Context, lowerBound time.Time) context.Context {
 	if lowerBound.IsZero() {
 		return ctx
@@ -62,8 +125,7 @@ func taskSchedulerScopeFromContext(ctx context.Context) *TaskSchedulerScope {
 	return scope
 }
 
-// TaskSchedulerPlannedAtLowerBoundFromContext 返回可选 lower bound。
-// 供 automatic scheduling。
+// TaskSchedulerPlannedAtLowerBoundFromContext 返回自动调度的可选窗口下界。
 func TaskSchedulerPlannedAtLowerBoundFromContext(ctx context.Context) (time.Time, bool) {
 	if ctx == nil {
 		return time.Time{}, false
@@ -87,6 +149,17 @@ func CollectTaskScheduleStats(ctx context.Context, stats TaskScheduleStats) {
 	collector.PendingCount += stats.PendingCount
 	collector.OpenedCount += stats.OpenedCount
 	collector.FailedCount += stats.FailedCount
+	collector.OpenedOverdueCount += stats.OpenedOverdueCount
 	collector.ExpiredCount += stats.ExpiredCount
 	collector.ExpireFailedCount += stats.ExpireFailedCount
+	collector.MissedCandidateCount += stats.MissedCandidateCount
+	collector.MissedExpiredCount += stats.MissedExpiredCount
+	collector.MissedExpireFailedCount += stats.MissedExpireFailedCount
+	collector.MissedBacklogCount += stats.MissedBacklogCount
+	if stats.OldestPendingAgeSeconds > collector.OldestPendingAgeSeconds {
+		collector.OldestPendingAgeSeconds = stats.OldestPendingAgeSeconds
+	}
+	if stats.OldestOpenedAgeSeconds > collector.OldestOpenedAgeSeconds {
+		collector.OldestOpenedAgeSeconds = stats.OldestOpenedAgeSeconds
+	}
 }

@@ -38,21 +38,23 @@ type PlanResult struct {
 
 // TaskResult 任务结果
 type TaskResult struct {
-	ID           string  // 任务ID
-	PlanID       string  // 计划ID
-	Seq          int     // 序号
-	OrgID        int64   // 机构ID
-	TesteeID     string  // 受试者ID
-	ScaleCode    string  // 量表编码
-	ScaleTitle   string  // 量表标题
-	PlannedAt    string  // 计划时间点
-	OpenAt       *string // 开放时间
-	ExpireAt     *string // 截止时间
-	CompletedAt  *string // 完成时间
-	Status       string  // 状态
-	AssessmentID *string // 关联的测评ID
-	EntryToken   string  // 入口令牌
-	EntryURL     string  // 入口URL
+	ID               string  // 任务ID
+	PlanID           string  // 计划ID
+	Seq              int     // 序号
+	OrgID            int64   // 机构ID
+	TesteeID         string  // 受试者ID
+	ScaleCode        string  // 量表编码
+	ScaleTitle       string  // 量表标题
+	PlannedAt        string  // 计划时间点
+	DueAt            *string // 履约截止时间
+	OpenAt           *string // 开放时间
+	ExpireAt         *string // 入口失效时间
+	CompletedAt      *string // 完成时间
+	Status           string  // 状态
+	ExpirationReason *string // 过期原因
+	AssessmentID     *string // 关联的测评ID
+	EntryToken       string  // 入口令牌
+	EntryURL         string  // 入口URL
 }
 
 // EnrollmentResult 加入计划结果
@@ -128,7 +130,6 @@ func toPlanResult(p *plan.AssessmentPlan) *PlanResult {
 	for _, date := range p.GetFixedDates() {
 		fixedDates = append(fixedDates, date.Format("2006-01-02"))
 	}
-
 	return &PlanResult{
 		ID:            p.GetID().String(),
 		OrgID:         p.GetOrgID(),
@@ -176,6 +177,12 @@ func toTaskResult(t *plan.AssessmentTask) *TaskResult {
 		EntryToken: t.GetEntryToken(),
 		EntryURL:   t.GetEntryURL(),
 	}
+	dueAtStr := t.GetDueAt().Format("2006-01-02 15:04:05")
+	result.DueAt = &dueAtStr
+	if reason := t.GetExpirationReason(); reason != "" {
+		reasonStr := reason.String()
+		result.ExpirationReason = &reasonStr
+	}
 
 	if openAt := t.GetOpenAt(); openAt != nil {
 		openAtStr := openAt.Format("2006-01-02 15:04:05")
@@ -209,6 +216,17 @@ func toTaskResultFromRow(row planreadmodel.TaskRow) *TaskResult {
 		Status:     row.Status,
 		EntryToken: row.EntryToken,
 		EntryURL:   row.EntryURL,
+	}
+	if row.DueAt != nil {
+		dueAt := row.DueAt.Format("2006-01-02 15:04:05")
+		result.DueAt = &dueAt
+	} else {
+		dueAt := plan.TaskDueAt(row.PlannedAt).Format("2006-01-02 15:04:05")
+		result.DueAt = &dueAt
+	}
+	if row.ExpirationReason != "" {
+		reason := row.ExpirationReason
+		result.ExpirationReason = &reason
 	}
 	if row.OpenAt != nil {
 		openAt := row.OpenAt.Format("2006-01-02 15:04:05")

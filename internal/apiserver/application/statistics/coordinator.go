@@ -289,7 +289,7 @@ func (c *Coordinator) execute(ctx context.Context, run *Run) error {
 
 	resultCounts := map[string]int64{}
 	snapshotAt := c.now()
-	cutoffAt := statisticsDomain.BusinessDate(snapshotAt)
+	cutoffAt := run.AsOfDate.AddDate(0, 0, 1)
 	err := c.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
 		request := statisticsDomain.ProjectionRequest{
 			RunID: run.ID, OrgID: run.OrgID, Window: run.Window,

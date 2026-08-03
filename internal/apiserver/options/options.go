@@ -196,25 +196,31 @@ func NewPlanOptions() *PlanOptions {
 
 // PlanSchedulerOptions 内建 plan 调度器配置。
 type PlanSchedulerOptions struct {
-	Enable          bool          `json:"enable" mapstructure:"enable"`
-	OrgIDs          []int64       `json:"org_ids" mapstructure:"org_ids"`
-	InitialDelay    time.Duration `json:"initial_delay" mapstructure:"initial_delay"`
-	Interval        time.Duration `json:"interval" mapstructure:"interval"`
-	PendingLookback time.Duration `json:"pending_lookback" mapstructure:"pending_lookback"`
-	LockKey         string        `json:"lock_key" mapstructure:"lock_key"`
-	LockTTL         time.Duration `json:"lock_ttl" mapstructure:"lock_ttl"`
+	Enable                  bool          `json:"enable" mapstructure:"enable"`
+	OrgIDs                  []int64       `json:"org_ids" mapstructure:"org_ids"`
+	InitialDelay            time.Duration `json:"initial_delay" mapstructure:"initial_delay"`
+	Interval                time.Duration `json:"interval" mapstructure:"interval"`
+	PendingLookback         time.Duration `json:"pending_lookback" mapstructure:"pending_lookback"`
+	MissedExpirationEnabled bool          `json:"missed_expiration_enabled" mapstructure:"missed_expiration_enabled"`
+	BatchSize               int           `json:"batch_size" mapstructure:"batch_size"`
+	MaxTasksPerTick         int           `json:"max_tasks_per_tick" mapstructure:"max_tasks_per_tick"`
+	LockKey                 string        `json:"lock_key" mapstructure:"lock_key"`
+	LockTTL                 time.Duration `json:"lock_ttl" mapstructure:"lock_ttl"`
 }
 
 // NewPlanSchedulerOptions 创建默认 plan scheduler 配置。
 func NewPlanSchedulerOptions() *PlanSchedulerOptions {
 	return &PlanSchedulerOptions{
-		Enable:          false,
-		OrgIDs:          []int64{1},
-		InitialDelay:    time.Minute,
-		Interval:        time.Minute,
-		PendingLookback: 24 * time.Hour,
-		LockKey:         "qs:plan-scheduler:leader",
-		LockTTL:         50 * time.Second,
+		Enable:                  false,
+		OrgIDs:                  []int64{1},
+		InitialDelay:            time.Minute,
+		Interval:                time.Minute,
+		PendingLookback:         24 * time.Hour,
+		MissedExpirationEnabled: true,
+		BatchSize:               200,
+		MaxTasksPerTick:         2000,
+		LockKey:                 "qs:plan-scheduler:leader",
+		LockTTL:                 50 * time.Second,
 	}
 }
 
@@ -235,7 +241,10 @@ func (p *PlanSchedulerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Int64SliceVar(&p.OrgIDs, "plan_scheduler.org-ids", p.OrgIDs, "Organization IDs included in the built-in plan task scheduler.")
 	fs.DurationVar(&p.InitialDelay, "plan_scheduler.initial-delay", p.InitialDelay, "Initial delay before starting the built-in plan task scheduler.")
 	fs.DurationVar(&p.Interval, "plan_scheduler.interval", p.Interval, "Interval for scanning plan tasks in the built-in scheduler.")
-	fs.DurationVar(&p.PendingLookback, "plan_scheduler.pending-lookback", p.PendingLookback, "How far back the built-in scheduler opens pending tasks.")
+	fs.DurationVar(&p.PendingLookback, "plan_scheduler.pending-lookback", p.PendingLookback, "Open grace window for pending tasks (kept for configuration compatibility).")
+	fs.BoolVar(&p.MissedExpirationEnabled, "plan_scheduler.missed-expiration-enabled", p.MissedExpirationEnabled, "Expire pending tasks that missed their opening window.")
+	fs.IntVar(&p.BatchSize, "plan_scheduler.batch-size", p.BatchSize, "Maximum number of tasks loaded per scheduler page.")
+	fs.IntVar(&p.MaxTasksPerTick, "plan_scheduler.max-tasks-per-tick", p.MaxTasksPerTick, "Maximum number of tasks processed per scheduler phase and organization in one tick.")
 	fs.StringVar(&p.LockKey, "plan_scheduler.lock-key", p.LockKey, "Redis distributed lock key used by the built-in plan scheduler.")
 	fs.DurationVar(&p.LockTTL, "plan_scheduler.lock-ttl", p.LockTTL, "Redis distributed lock TTL used by the built-in plan scheduler.")
 }

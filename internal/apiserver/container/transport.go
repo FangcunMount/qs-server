@@ -459,6 +459,7 @@ func composeRESTWorkbenchDeps(c *Container) resttransport.WorkbenchDeps {
 		c.ActorModule.ReadModel,
 		c.workbenchLatestRiskReader,
 		c.PlanModule.FollowUpQueueReader,
+		c.ActorModule.AssessmentSummaryReader,
 	)
 	return deps
 }

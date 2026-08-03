@@ -19,6 +19,8 @@ import (
 // 行为者：任务管理服务
 type taskManagementService struct {
 	taskRepo       plan.AssessmentTaskRepository
+	planRepo       plan.AssessmentPlanRepository
+	enrollmentRepo plan.EnrollmentRepository
 	taskLifecycle  *plan.TaskLifecycle
 	entryGenerator planentryport.Generator
 	eventPublisher event.EventPublisher
@@ -43,12 +45,15 @@ func NewTaskManagementService(
 
 func NewTaskManagementServiceWithEnrollment(
 	taskRepo plan.AssessmentTaskRepository,
+	planRepo plan.AssessmentPlanRepository,
 	enrollmentRepo plan.EnrollmentRepository,
 	txRunner apptransaction.Runner,
 	entryGenerator planentryport.Generator,
 	eventPublisher event.EventPublisher,
 ) TaskManagementService {
 	service := NewTaskManagementService(taskRepo, entryGenerator, eventPublisher).(*taskManagementService)
+	service.planRepo = planRepo
+	service.enrollmentRepo = enrollmentRepo
 	service.persistence = taskPersistence{tasks: taskRepo, enrollments: enrollmentRepo, tx: txRunner}
 	return service
 }
@@ -67,9 +72,12 @@ func (s *taskManagementService) OpenTask(ctx context.Context, orgID int64, taskI
 		return nil, err
 	}
 	openedAt := time.Now()
+	if err := s.validateOpenAdmission(ctx, task, openedAt); err != nil {
+		return nil, err
+	}
 
 	// 2. 生成入口
-	token, url, expireAt, err := s.entryGenerator.GenerateEntry(ctx, task)
+	token, url, err := s.entryGenerator.GenerateEntry(ctx, task)
 	if err != nil {
 		logger.L(ctx).Errorw("Failed to generate entry",
 			"action", "open_task",
@@ -80,7 +88,7 @@ func (s *taskManagementService) OpenTask(ctx context.Context, orgID int64, taskI
 	}
 
 	// 3. 调用领域服务开放任务
-	if err := s.taskLifecycle.OpenAt(ctx, task, token, url, openedAt, expireAt); err != nil {
+	if err := s.taskLifecycle.OpenAt(ctx, task, token, url, openedAt, plan.TaskEntryExpiresAt(openedAt)); err != nil {
 		logger.L(ctx).Errorw("Failed to open task",
 			"action", "open_task",
 			"task_id", taskID,
@@ -115,6 +123,31 @@ func (s *taskManagementService) OpenTask(ctx context.Context, orgID int64, taskI
 	)
 
 	return toTaskResult(task), nil
+}
+
+func (s *taskManagementService) validateOpenAdmission(ctx context.Context, task *plan.AssessmentTask, actionAt time.Time) error {
+	if actionAt.Before(task.GetPlannedAt()) || !actionAt.Before(plan.TaskOpenWindowEndsAt(task.GetPlannedAt())) {
+		return errors.WithCode(errorCode.ErrInvalidArgument, "任务不在开放窗口内")
+	}
+	if s.planRepo != nil {
+		parent, err := s.planRepo.FindByID(ctx, task.GetPlanID())
+		if err != nil {
+			return errors.WrapC(err, errorCode.ErrDatabase, "查询任务计划失败")
+		}
+		if parent == nil || parent.GetOrgID() != task.GetOrgID() || !parent.IsActive() {
+			return errors.WithCode(errorCode.ErrInvalidArgument, "任务计划未处于 active 状态")
+		}
+	}
+	if s.enrollmentRepo != nil {
+		enrollment, err := s.enrollmentRepo.FindByID(ctx, task.GetEnrollmentID())
+		if err != nil {
+			return errors.WrapC(err, errorCode.ErrDatabase, "查询任务参与轮次失败")
+		}
+		if enrollment == nil || enrollment.OrgID() != task.GetOrgID() || !enrollment.IsActive() {
+			return errors.WithCode(errorCode.ErrInvalidArgument, "任务参与轮次未处于 active 状态")
+		}
+	}
+	return nil
 }
 
 // CompleteTask 完成任务

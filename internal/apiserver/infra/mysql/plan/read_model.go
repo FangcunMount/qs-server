@@ -395,20 +395,22 @@ func taskRowFromPO(po *AssessmentTaskPO) planreadmodel.TaskRow {
 		return planreadmodel.TaskRow{}
 	}
 	return planreadmodel.TaskRow{
-		ID:           po.ID.Uint64(),
-		PlanID:       po.PlanID,
-		Seq:          po.Seq,
-		OrgID:        po.OrgID,
-		TesteeID:     po.TesteeID,
-		ScaleCode:    po.ScaleCode,
-		PlannedAt:    po.PlannedAt,
-		OpenAt:       po.OpenAt,
-		ExpireAt:     po.ExpireAt,
-		CompletedAt:  po.CompletedAt,
-		Status:       po.Status,
-		AssessmentID: po.AssessmentID,
-		EntryToken:   po.EntryToken,
-		EntryURL:     po.EntryURL,
+		ID:               po.ID.Uint64(),
+		PlanID:           po.PlanID,
+		Seq:              po.Seq,
+		OrgID:            po.OrgID,
+		TesteeID:         po.TesteeID,
+		ScaleCode:        po.ScaleCode,
+		PlannedAt:        po.PlannedAt,
+		DueAt:            po.DueAt,
+		OpenAt:           po.OpenAt,
+		ExpireAt:         po.ExpireAt,
+		CompletedAt:      po.CompletedAt,
+		Status:           po.Status,
+		ExpirationReason: stringValue(po.ExpirationReason),
+		AssessmentID:     po.AssessmentID,
+		EntryToken:       po.EntryToken,
+		EntryURL:         po.EntryURL,
 	}
 }
 

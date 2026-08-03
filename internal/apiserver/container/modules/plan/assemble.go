@@ -89,7 +89,7 @@ func New(deps Deps) (*Module, error) {
 	lifecycleService := planApp.NewLifecycleServiceWithEnrollment(planRepo, taskRepo, scaleCatalog, lifecycleEnrollments, txRunner, module.eventPublisher)
 	enrollmentService := planApp.NewEnrollmentService(planRepo, taskRepo, enrollmentRepo, txRunner, module.eventPublisher)
 	taskSchedulerService := planApp.NewTaskSchedulerServiceWithEnrollment(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher)
-	taskManagementService := planApp.NewTaskManagementServiceWithEnrollment(taskRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher)
+	taskManagementService := planApp.NewTaskManagementServiceWithEnrollment(taskRepo, planRepo, enrollmentRepo, txRunner, entryGenerator, module.eventPublisher)
 	module.CommandService = planApp.NewCommandService(
 		lifecycleService,
 		enrollmentService,

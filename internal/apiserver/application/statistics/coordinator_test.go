@@ -29,13 +29,15 @@ func (s *collectorStub) Collect(context.Context, statisticsDomain.CollectRequest
 }
 
 type projectionStub struct {
-	name   string
-	called int
+	name        string
+	called      int
+	lastRequest statisticsDomain.ProjectionRequest
 }
 
 func (s *projectionStub) Name() string { return s.name }
-func (s *projectionStub) Project(context.Context, statisticsDomain.ProjectionRequest) (statisticsDomain.ProjectionResult, error) {
+func (s *projectionStub) Project(_ context.Context, request statisticsDomain.ProjectionRequest) (statisticsDomain.ProjectionResult, error) {
 	s.called++
+	s.lastRequest = request
 	return statisticsDomain.ProjectionResult{Name: s.Name(), Rows: 1}, nil
 }
 
@@ -190,7 +192,7 @@ func TestCoordinatorCacheFailurePreservesDataCommitted(t *testing.T) {
 }
 
 func TestCoordinatorPersistsPublishedCacheGeneration(t *testing.T) {
-	coordinator, _, _, _, _, _ := newCoordinatorForTest(t, cachePublisherStub{generation: 9})
+	coordinator, _, _, global, _, _ := newCoordinatorForTest(t, cachePublisherStub{generation: 9})
 	run, err := coordinator.Run(context.Background(), RunRequest{
 		OrgID: 7, FromDate: time.Date(2026, 7, 21, 0, 0, 0, 0, statisticsDomain.Shanghai),
 		ToDate: time.Date(2026, 7, 21, 0, 0, 0, 0, statisticsDomain.Shanghai), TriggerType: "scheduled", Mode: statisticsDomain.RunModePublish,
@@ -200,6 +202,10 @@ func TestCoordinatorPersistsPublishedCacheGeneration(t *testing.T) {
 	}
 	if run.Status != statisticsDomain.RunStatusSucceeded || run.CacheGeneration != 9 || run.CachePublishedAt == nil {
 		t.Fatalf("run=%+v", run)
+	}
+	wantCutoff := run.AsOfDate.AddDate(0, 0, 1)
+	if !global.lastRequest.CutoffAt.Equal(wantCutoff) {
+		t.Fatalf("publish cutoff=%s want next Shanghai midnight %s", global.lastRequest.CutoffAt, wantCutoff)
 	}
 }
 

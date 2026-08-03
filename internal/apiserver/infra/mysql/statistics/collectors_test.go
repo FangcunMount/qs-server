@@ -109,3 +109,12 @@ func TestTaskFactDoesNotBackfillLaterLifecycleIntoEarlierEvent(t *testing.T) {
 		t.Fatalf("completed fact=%v", completed)
 	}
 }
+
+func TestTaskDueDefinedFactUsesStableAdditiveKey(t *testing.T) {
+	planned := time.Date(2026, 8, 1, 19, 0, 0, 0, time.FixedZone("CST", 8*3600))
+	due := planned.AddDate(0, 0, 7)
+	fact := taskDueDefinedFact(1, taskDueDefinedRow{ID: 42, PlanID: 5, EnrollmentID: 6, TesteeID: 7, Seq: 2, ScaleCode: "S", PlannedAt: planned, DueAt: &due, OccurredAt: planned})
+	if fact["fact_key"] != "task:42:task_due_defined" || fact["fact_type"] != "task_due_defined" || fact["due_at"] != due {
+		t.Fatalf("due fact=%v", fact)
+	}
+}

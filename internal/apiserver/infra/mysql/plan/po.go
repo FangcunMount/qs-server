@@ -78,6 +78,7 @@ type AssessmentTaskPO struct {
 	// 时间点
 	BusinessCreatedAt *time.Time `gorm:"column:business_created_at"`
 	PlannedAt         time.Time  `gorm:"column:planned_at;not null;index:idx_planned_at"`
+	DueAt             *time.Time `gorm:"column:due_at"`
 	OpenAt            *time.Time `gorm:"column:open_at;index:idx_open_at"`
 	ExpireAt          *time.Time `gorm:"column:expire_at"`
 	CompletedAt       *time.Time `gorm:"column:completed_at"`
@@ -85,8 +86,9 @@ type AssessmentTaskPO struct {
 	CanceledAt        *time.Time `gorm:"column:canceled_at"`
 
 	// 状态与关联
-	Status       string  `gorm:"column:status;size:50;not null;default:'pending'"`
-	AssessmentID *uint64 `gorm:"column:assessment_id;index:idx_assessment_id"`
+	Status           string  `gorm:"column:status;size:50;not null;default:'pending'"`
+	ExpirationReason *string `gorm:"column:expiration_reason;size:32"`
+	AssessmentID     *uint64 `gorm:"column:assessment_id;index:idx_assessment_id"`
 
 	// 入口信息
 	EntryToken string `gorm:"column:entry_token;size:255"`

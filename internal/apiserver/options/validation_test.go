@@ -38,6 +38,31 @@ func TestOptionsValidatePlanScheduler(t *testing.T) {
 			},
 			wantErr: "plan_scheduler.org_ids cannot be empty when enabled",
 		},
+		{
+			name: "enabled scheduler keeps fixed opening window",
+			mutate: func(opts *Options) {
+				opts.PlanScheduler.Enable = true
+				opts.PlanScheduler.PendingLookback = 6 * time.Hour
+			},
+			wantErr: "plan_scheduler.pending_lookback must remain 24h",
+		},
+		{
+			name: "enabled scheduler requires positive batch size",
+			mutate: func(opts *Options) {
+				opts.PlanScheduler.Enable = true
+				opts.PlanScheduler.BatchSize = 0
+			},
+			wantErr: "plan_scheduler.batch_size must be greater than 0",
+		},
+		{
+			name: "enabled scheduler caps a phase above one page",
+			mutate: func(opts *Options) {
+				opts.PlanScheduler.Enable = true
+				opts.PlanScheduler.BatchSize = 200
+				opts.PlanScheduler.MaxTasksPerTick = 100
+			},
+			wantErr: "plan_scheduler.batch_size must be less than or equal to plan_scheduler.max_tasks_per_tick",
+		},
 	}
 
 	for _, tt := range tests {

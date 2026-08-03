@@ -89,7 +89,7 @@ func (s *commandService) SchedulePendingTasks(ctx context.Context, orgID int64, 
 	scheduleCtx := WithTaskScheduleStatsCollector(ctx, stats)
 	tasks, err := s.taskScheduler.SchedulePendingTasks(scheduleCtx, orgID, before)
 	if err != nil {
-		return nil, err
+		return &TaskScheduleResult{Tasks: tasks, Stats: *stats}, err
 	}
 	return &TaskScheduleResult{
 		Tasks: tasks,

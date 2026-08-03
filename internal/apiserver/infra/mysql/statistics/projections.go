@@ -3,6 +3,7 @@ package statistics
 import (
 	"context"
 	"fmt"
+	"time"
 
 	statisticsDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
@@ -14,6 +15,48 @@ type AssessmentDailyProjection struct{ db *gorm.DB }
 type PlanActivityProjection struct{ db *gorm.DB }
 type PlanFulfillmentProjection struct{ db *gorm.DB }
 type OrganizationSnapshotProjection struct{ db *gorm.DB }
+
+type fulfillmentContractTask struct {
+	TesteeID    uint64
+	DueAt       time.Time
+	CompletedAt *time.Time
+	Canceled    bool
+}
+
+type fulfillmentContractCounts struct {
+	PlannedTasks, PlannedParticipants, DueTasks           int
+	CompletedOnTime, CompletedOverdue, UncompletedOverdue int
+}
+
+// calculateFulfillmentContract is the executable metric contract mirrored by
+// PlanFulfillmentProjection's SQL. Keeping the boundary matrix explicit makes
+// due/on-time/overdue regressions visible without relying on chart rendering.
+func calculateFulfillmentContract(tasks []fulfillmentContractTask, cutoff time.Time) fulfillmentContractCounts {
+	var result fulfillmentContractCounts
+	participants := map[uint64]struct{}{}
+	for _, task := range tasks {
+		if task.Canceled {
+			continue
+		}
+		result.PlannedTasks++
+		participants[task.TesteeID] = struct{}{}
+		if task.DueAt.IsZero() {
+			continue
+		}
+		result.DueTasks++
+		if task.CompletedAt != nil {
+			if task.CompletedAt.After(task.DueAt) {
+				result.CompletedOverdue++
+			} else {
+				result.CompletedOnTime++
+			}
+		} else if task.DueAt.Before(cutoff) {
+			result.UncompletedOverdue++
+		}
+	}
+	result.PlannedParticipants = len(participants)
+	return result
+}
 
 func NewDailyProjections(db *gorm.DB) []statisticsDomain.Projection {
 	return []statisticsDomain.Projection{
@@ -76,7 +119,9 @@ func (p *PlanActivityProjection) Project(ctx context.Context, r statisticsDomain
 		INSERT INTO statistics_plan_activity_daily (org_id,stat_date,plan_id,enrollment_joined_count,enrollment_closed_count,enrollment_terminated_count,task_created_count,task_opened_count,task_completed_count,task_expired_count,task_canceled_count,participant_count)
 		SELECT org_id,stat_date,plan_id,SUM(fact_type='enrollment_joined'),SUM(fact_type='enrollment_closed'),SUM(fact_type='enrollment_terminated'),
 		SUM(fact_type='task_created'),SUM(fact_type='task_opened'),SUM(fact_type='task_completed'),SUM(fact_type='task_expired'),SUM(fact_type='task_canceled'),COUNT(DISTINCT testee_id)
-		FROM statistics_plan_fact WHERE org_id=? AND stat_date>=? AND stat_date<? GROUP BY org_id,stat_date,plan_id`, r, r.OrgID, r.Window.From, r.Window.To)
+		FROM statistics_plan_fact WHERE org_id=? AND stat_date>=? AND stat_date<?
+		AND fact_type IN ('enrollment_joined','enrollment_closed','enrollment_terminated','task_created','task_opened','task_completed','task_expired','task_canceled')
+		GROUP BY org_id,stat_date,plan_id`, r, r.OrgID, r.Window.From, r.Window.To)
 	return statisticsDomain.ProjectionResult{Name: p.Name(), Rows: rows}, err
 }
 
@@ -89,12 +134,13 @@ func (p *PlanFulfillmentProjection) Project(ctx context.Context, r statisticsDom
 	result := db.Exec(`
 		INSERT INTO statistics_plan_fulfillment_daily (org_id,cohort_date,plan_id,planned_task_count,planned_participant_count,due_task_count,completed_on_time_count,completed_overdue_count,uncompleted_overdue_count)
 		WITH tasks AS (
-		 SELECT c.org_id,c.plan_id,c.task_id,c.testee_id,MAX(c.planned_at) planned_at,MAX(c.due_at) due_at,
+		 SELECT created.org_id,created.plan_id,created.task_id,created.testee_id,MAX(created.planned_at) planned_at,
+		        COALESCE(MAX(CASE WHEN f.fact_type='task_due_defined' THEN f.due_at END),MAX(CASE WHEN f.fact_type<>'task_due_defined' THEN f.due_at END)) due_at,
 		        MAX(CASE WHEN f.fact_type='task_completed' THEN f.completed_at END) completed_at,
 		        MAX(CASE WHEN f.fact_type='task_canceled' THEN 1 ELSE 0 END) canceled
-		 FROM statistics_plan_fact c LEFT JOIN statistics_plan_fact f ON f.org_id=c.org_id AND f.task_id=c.task_id
-		 WHERE c.org_id=? AND EXISTS (SELECT 1 FROM statistics_plan_fact created WHERE created.org_id=c.org_id AND created.task_id=c.task_id AND created.fact_type='task_created')
-		 GROUP BY c.org_id,c.plan_id,c.task_id,c.testee_id
+		 FROM statistics_plan_fact created LEFT JOIN statistics_plan_fact f ON f.org_id=created.org_id AND f.task_id=created.task_id
+		 WHERE created.org_id=? AND created.fact_type='task_created'
+		 GROUP BY created.org_id,created.plan_id,created.task_id,created.testee_id
 		), buckets AS (
 		 SELECT org_id,DATE(planned_at) cohort_date,plan_id,COUNT(*) planned_task_count,COUNT(DISTINCT testee_id) planned_participant_count,0 due_task_count,0 completed_on_time_count,0 completed_overdue_count,0 uncompleted_overdue_count FROM tasks WHERE canceled=0 GROUP BY org_id,DATE(planned_at),plan_id
 		 UNION ALL

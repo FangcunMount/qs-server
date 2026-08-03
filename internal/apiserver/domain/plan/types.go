@@ -1,6 +1,8 @@
 package plan
 
 import (
+	"time"
+
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -155,6 +157,54 @@ func (t PlanScheduleType) IsValid() bool {
 
 // TaskStatus 任务状态
 type TaskStatus string
+
+// TaskExpirationReason records why a task entered the expired terminal state.
+// The value is persisted and included in task.expired events so notification
+// consumers can distinguish a missed opening window from an entry timeout.
+type TaskExpirationReason string
+
+const (
+	TaskExpirationReasonMissedOpenWindow TaskExpirationReason = "missed_open_window"
+	TaskExpirationReasonEntryTimeout     TaskExpirationReason = "entry_timeout"
+	TaskExpirationReasonManual           TaskExpirationReason = "manual"
+
+	TaskOpenWindow        = 24 * time.Hour
+	TaskFulfillmentDays   = 7
+	TaskEntryValidityDays = 7
+)
+
+var taskBusinessLocation = func() *time.Location {
+	location, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		panic(err)
+	}
+	return location
+}()
+
+func (r TaskExpirationReason) String() string { return string(r) }
+
+func (r TaskExpirationReason) IsValid() bool {
+	switch r {
+	case TaskExpirationReasonMissedOpenWindow, TaskExpirationReasonEntryTimeout, TaskExpirationReasonManual:
+		return true
+	default:
+		return false
+	}
+}
+
+// TaskDueAt is the stable fulfillment deadline. The conversion is explicit so
+// callers holding UTC timestamps still receive seven Shanghai calendar days.
+func TaskDueAt(plannedAt time.Time) time.Time {
+	return plannedAt.In(taskBusinessLocation).AddDate(0, 0, TaskFulfillmentDays)
+}
+
+func TaskOpenWindowEndsAt(plannedAt time.Time) time.Time {
+	return plannedAt.Add(TaskOpenWindow)
+}
+
+func TaskEntryExpiresAt(openAt time.Time) time.Time {
+	return openAt.In(taskBusinessLocation).AddDate(0, 0, TaskEntryValidityDays)
+}
 
 const (
 	// TaskStatusPending 待推送：任务已创建，但尚未到计划时间

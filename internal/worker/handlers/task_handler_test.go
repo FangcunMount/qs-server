@@ -103,6 +103,38 @@ func TestTaskExpiredNotifiesWebhookPayloads(t *testing.T) {
 	assertTaskRecipient(t, notifier.expired[0].TaskID, notifier.expired[0].TesteeID, "task-3", "testee-3")
 }
 
+func TestTaskExpiredMissedOpenWindowSuppressesNotification(t *testing.T) {
+	now := time.Date(2026, 4, 2, 11, 0, 0, 0, time.UTC)
+	notifier := runTaskHandler(t, taskHandlerCase{
+		name:  "expired-missed-window",
+		event: "task.expired",
+		data: map[string]any{
+			"task_id": "task-missed", "plan_id": "plan-3", "testee_id": "testee-3",
+			"expired_at": now, "reason": "missed_open_window",
+		},
+		handle: handleTaskExpired,
+	})
+	if len(notifier.expired) != 0 {
+		t.Fatalf("missed opening window must not notify, got %d notifications", len(notifier.expired))
+	}
+}
+
+func TestTaskExpiredEntryTimeoutStillNotifies(t *testing.T) {
+	now := time.Date(2026, 4, 2, 11, 0, 0, 0, time.UTC)
+	notifier := runTaskHandler(t, taskHandlerCase{
+		name:  "expired-entry-timeout",
+		event: "task.expired",
+		data: map[string]any{
+			"task_id": "task-timeout", "plan_id": "plan-3", "testee_id": "testee-3",
+			"expired_at": now, "reason": "entry_timeout",
+		},
+		handle: handleTaskExpired,
+	})
+	if len(notifier.expired) != 1 {
+		t.Fatalf("entry timeout must notify, got %d notifications", len(notifier.expired))
+	}
+}
+
 func TestTaskCanceledNotifiesWebhookPayloads(t *testing.T) {
 	now := time.Date(2026, 4, 2, 11, 0, 0, 0, time.UTC)
 	notifier := runTaskHandler(t, taskHandlerCase{

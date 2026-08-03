@@ -26,6 +26,7 @@ type TaskExpiredData struct {
 	PlanID    string    `json:"plan_id"`
 	TesteeID  string    `json:"testee_id"`
 	ExpiredAt time.Time `json:"expired_at"`
+	Reason    string    `json:"reason,omitempty"`
 }
 
 // TaskCanceledData is the task canceled event body.

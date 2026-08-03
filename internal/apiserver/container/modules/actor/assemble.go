@@ -20,6 +20,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	actorInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
+	evaluationInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -48,6 +49,7 @@ type Module struct {
 	ActiveOperatorChecker         operatorApp.ActiveOperatorChecker
 	OperatorRoleProjectionUpdater operatorApp.OperatorRoleProjectionUpdater
 	ReadModel                     actorreadmodel.ReadModel
+	AssessmentSummaryReader       actorreadmodel.AssessmentSummaryReader
 }
 
 // Deps defines explicit constructor dependencies for the actor module.
@@ -104,7 +106,9 @@ func New(deps Deps) (*Module, error) {
 	relationRepo := actorInfra.NewRelationRepository(mysqlDB, mysqlOptions)
 	assessmentEntryRepo := actorInfra.NewAssessmentEntryRepository(mysqlDB, mysqlOptions)
 	actorReadModel := actorInfra.NewReadModel(mysqlDB, mysqlOptions)
+	assessmentSummaryReader := evaluationInfra.NewAssessmentSummaryReader(mysqlDB)
 	module.ReadModel = actorReadModel
+	module.AssessmentSummaryReader = assessmentSummaryReader
 	activityLogRepo := actorInfra.NewAssessmentEntryActivityLogRepository(mysqlDB, mysqlOptions)
 	resolveLogWriter := actorInfra.NewAssessmentEntryResolveLogger(activityLogRepo)
 	intakeLogWriter := actorInfra.NewAssessmentEntryIntakeLogger(activityLogRepo)
@@ -135,7 +139,7 @@ func New(deps Deps) (*Module, error) {
 		testeeBinder,
 		txRunner,
 	)
-	module.TesteeQueryService = testeeApp.NewQueryService(actorReadModel)
+	module.TesteeQueryService = testeeApp.NewQueryServiceWithAssessmentSummary(actorReadModel, assessmentSummaryReader)
 	module.TesteeAssessmentAttentionService = testeeApp.NewAssessmentAttentionService(
 		testeeRepo,
 		testeeEditor,
@@ -176,12 +180,13 @@ func New(deps Deps) (*Module, error) {
 		txRunner,
 	)
 	module.ClinicianQueryService = clinicianApp.NewQueryService(actorReadModel, actorReadModel, actorReadModel)
-	module.ClinicianRelationshipService = clinicianApp.NewRelationshipService(
+	module.ClinicianRelationshipService = clinicianApp.NewRelationshipServiceWithAssessmentSummary(
 		relationRepo,
 		clinicianRepo,
 		testeeRepo,
 		txRunner,
 		actorReadModel,
+		assessmentSummaryReader,
 	)
 	module.TesteeAccessService = actorAccessApp.NewTesteeAccessService(
 		actorReadModel,

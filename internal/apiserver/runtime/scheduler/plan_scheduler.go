@@ -2,10 +2,13 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
+	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
@@ -16,11 +19,22 @@ type planCommandService interface {
 	SchedulePendingTasks(ctx context.Context, orgID int64, before string) (*planApp.TaskScheduleResult, error)
 }
 
+var planSchedulerBusinessLocation = func() *time.Location {
+	location, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		panic(err)
+	}
+	return location
+}()
+
 // PlanRunner executes built-in plan scheduling inside apiserver.
 type PlanRunner struct {
 	opts    *apiserveroptions.PlanSchedulerOptions
 	command planCommandService
 	leader  leaderLeaseRunner
+
+	backlogMu          sync.Mutex
+	missedBacklogTicks map[int64]int
 }
 
 // NewPlanRunner creates the apiserver plan scheduler runner.
@@ -71,8 +85,9 @@ func newPlanRunnerWithHooks(
 	}
 
 	return &PlanRunner{
-		opts:    opts,
-		command: command,
+		opts:               opts,
+		command:            command,
+		missedBacklogTicks: make(map[int64]int),
 		leader: newLeaderLock(
 			workloadSpec(locklease.WorkloadPlanSchedulerLeader),
 			opts.LockKey,
@@ -97,8 +112,8 @@ func (r *PlanRunner) Start(ctx context.Context) {
 	}
 
 	lockKey := r.lockKey()
-	log.Infof("apiserver plan scheduler started (org_ids=%v, interval=%s, initial_delay=%s, lock_key=%s, lock_ttl=%s)",
-		r.opts.OrgIDs, r.opts.Interval, r.opts.InitialDelay, lockKey, r.opts.LockTTL)
+	log.Infof("apiserver plan scheduler started (org_ids=%v, interval=%s, initial_delay=%s, batch_size=%d, max_tasks_per_tick=%d, missed_expiration_enabled=%t, lock_key=%s, lock_ttl=%s)",
+		r.opts.OrgIDs, r.opts.Interval, r.opts.InitialDelay, r.opts.BatchSize, r.opts.MaxTasksPerTick, r.opts.MissedExpirationEnabled, lockKey, r.opts.LockTTL)
 
 	go func() {
 		if !WaitDelay(ctx, r.opts.InitialDelay) {
@@ -142,27 +157,54 @@ func (r *PlanRunner) runOnce(ctx context.Context) error {
 		failedOrgs := 0
 
 		for _, orgID := range r.opts.OrgIDs {
-			before := time.Now()
-			lowerBound := before.Add(-r.opts.PendingLookback)
+			before := time.Now().In(planSchedulerBusinessLocation)
+			lowerBound := before.Add(-planDomain.TaskOpenWindow)
 			scheduleCtx := planApp.WithTaskSchedulerPlannedAtLowerBound(ctx, lowerBound)
+			scheduleCtx = planApp.WithTaskSchedulerMissedExpirationEnabled(scheduleCtx, r.opts.MissedExpirationEnabled)
+			scheduleCtx = planApp.WithTaskSchedulerScanLimits(scheduleCtx, r.opts.BatchSize, r.opts.MaxTasksPerTick)
 			result, err := r.command.SchedulePendingTasks(scheduleCtx, orgID, before.Format("2006-01-02 15:04:05"))
+			if result != nil {
+				observePlanSchedulerStats(orgID, result.Stats)
+				r.observeMissedBacklog(orgID, result.Stats.MissedBacklogCount)
+			}
 			if err != nil {
 				failedOrgs++
+				observePlanSchedulerOrganization("error")
 				log.Warnf("apiserver plan scheduler tick failed for org (org_id=%d, lock_key=%s): %v", orgID, lockKey, err)
 				continue
 			}
+			observePlanSchedulerOrganization("success")
 			if result == nil {
 				continue
 			}
 			totalOpened += result.Stats.OpenedCount
-			totalExpired += result.Stats.ExpiredCount
+			totalExpired += result.Stats.ExpiredCount + result.Stats.MissedExpiredCount
 		}
 
 		log.Infof("apiserver plan scheduler tick completed (lock_key=%s, org_ids=%v, opened_count=%d, expired_count=%d, failed_org_count=%d)",
 			lockKey, r.opts.OrgIDs, totalOpened, totalExpired, failedOrgs)
 
+		if failedOrgs > 0 {
+			return fmt.Errorf("plan scheduler failed for %d organization(s)", failedOrgs)
+		}
 		return nil
 	})
+}
+
+func (r *PlanRunner) observeMissedBacklog(orgID int64, backlogCount int) {
+	if r == nil {
+		return
+	}
+	r.backlogMu.Lock()
+	defer r.backlogMu.Unlock()
+	if backlogCount <= 0 {
+		delete(r.missedBacklogTicks, orgID)
+		return
+	}
+	r.missedBacklogTicks[orgID]++
+	if r.missedBacklogTicks[orgID] >= 2 {
+		log.Warnf("apiserver plan scheduler missed backlog alert (org_id=%d, consecutive_ticks=%d, backlog_present=true)", orgID, r.missedBacklogTicks[orgID])
+	}
 }
 
 func (r *PlanRunner) lockKey() string {

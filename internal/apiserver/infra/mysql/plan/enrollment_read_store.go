@@ -96,20 +96,21 @@ func (s *EnrollmentReadStore) ListEnrollments(ctx context.Context, query planapp
 		index[items[i].ID] = i
 	}
 	type taskRow struct {
-		ID, EnrollmentID                                     uint64
-		Seq                                                  int
-		ScaleCode, Status                                    string
-		PlannedAt                                            time.Time
-		OpenAt, ExpireAt, CompletedAt, ExpiredAt, CanceledAt *time.Time
-		AssessmentID                                         *uint64
+		ID, EnrollmentID                                            uint64
+		Seq                                                         int
+		ScaleCode, Status                                           string
+		PlannedAt                                                   time.Time
+		DueAt, OpenAt, ExpireAt, CompletedAt, ExpiredAt, CanceledAt *time.Time
+		ExpirationReason                                            *string
+		AssessmentID                                                *uint64
 	}
 	var tasks []taskRow
-	if err := s.db.WithContext(ctx).Table("assessment_task").Select("id,enrollment_id,seq,scale_code,status,planned_at,open_at,expire_at,completed_at,expired_at,canceled_at,assessment_id").Where("enrollment_id IN ? AND deleted_at IS NULL", ids).Order("enrollment_id,seq").Scan(&tasks).Error; err != nil {
+	if err := s.db.WithContext(ctx).Table("assessment_task").Select("id,enrollment_id,seq,scale_code,status,planned_at,due_at,open_at,expire_at,completed_at,expired_at,canceled_at,expiration_reason,assessment_id").Where("enrollment_id IN ? AND deleted_at IS NULL", ids).Order("enrollment_id,seq").Scan(&tasks).Error; err != nil {
 		return nil, 0, err
 	}
 	for _, task := range tasks {
 		if position, ok := index[task.EnrollmentID]; ok {
-			value := planapp.EnrollmentTaskItem{ID: task.ID, Seq: task.Seq, ScaleCode: task.ScaleCode, Status: task.Status, PlannedAt: task.PlannedAt, OpenAt: task.OpenAt, ExpireAt: task.ExpireAt, CompletedAt: task.CompletedAt, ExpiredAt: task.ExpiredAt, CanceledAt: task.CanceledAt}
+			value := planapp.EnrollmentTaskItem{ID: task.ID, Seq: task.Seq, ScaleCode: task.ScaleCode, Status: task.Status, PlannedAt: task.PlannedAt, DueAt: task.DueAt, OpenAt: task.OpenAt, ExpireAt: task.ExpireAt, CompletedAt: task.CompletedAt, ExpiredAt: task.ExpiredAt, CanceledAt: task.CanceledAt, ExpirationReason: task.ExpirationReason}
 			if task.AssessmentID != nil {
 				text := strconv.FormatUint(*task.AssessmentID, 10)
 				value.AssessmentID = &text

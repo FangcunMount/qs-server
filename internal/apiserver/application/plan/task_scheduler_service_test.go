@@ -109,9 +109,9 @@ type entryGeneratorStub struct {
 	calls int
 }
 
-func (g *entryGeneratorStub) GenerateEntry(context.Context, *domainPlan.AssessmentTask) (string, string, time.Time, error) {
+func (g *entryGeneratorStub) GenerateEntry(context.Context, *domainPlan.AssessmentTask) (string, string, error) {
 	g.calls++
-	return "token", "https://example.com/entry", time.Now().Add(time.Hour), nil
+	return "token", "https://example.com/entry", nil
 }
 
 func TestTaskSchedulerServiceCancelsPendingTaskForInactivePlan(t *testing.T) {
@@ -223,7 +223,7 @@ func TestTaskSchedulerServiceSkipsPendingTasksBeforeLowerBound(t *testing.T) {
 		t.Fatalf("NewAssessmentPlan returned error: %v", err)
 	}
 
-	before := time.Date(2026, 4, 25, 10, 0, 0, 0, planBusinessLocation)
+	before := time.Now().In(planBusinessLocation)
 	oldTask := domainPlan.NewAssessmentTask(
 		p.GetID(),
 		1,
@@ -260,8 +260,49 @@ func TestTaskSchedulerServiceSkipsPendingTasksBeforeLowerBound(t *testing.T) {
 	if results[0].ID != recentTask.GetID().String() {
 		t.Fatalf("expected recent task %s to open, got %s", recentTask.GetID().String(), results[0].ID)
 	}
-	if oldTask.IsOpened() {
-		t.Fatalf("expected old task before lower bound to remain pending")
+	if !oldTask.IsExpired() || oldTask.GetExpirationReason() != domainPlan.TaskExpirationReasonMissedOpenWindow {
+		t.Fatalf("expected old task before lower bound to expire as missed, status=%s reason=%s", oldTask.GetStatus(), oldTask.GetExpirationReason())
+	}
+}
+
+func TestTaskSchedulerCanDeferMissedExpirationDuringInitialRollout(t *testing.T) {
+	p, err := domainPlan.NewAssessmentPlan(1, "scale-code", domainPlan.PlanScheduleByWeek, 1, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := time.Now().In(planBusinessLocation)
+	stale := domainPlan.NewAssessmentTask(p.GetID(), 1, 1, testee.NewID(4103), "scale-code", before.Add(-48*time.Hour))
+	repo := &schedulerTaskRepoStub{pendingTasks: []*domainPlan.AssessmentTask{stale}}
+	service := NewTaskSchedulerService(repo, &schedulerPlanRepoByIDStub{plan: p}, &entryGeneratorStub{}, event.NewNopEventPublisher())
+	ctx := WithTaskSchedulerMissedExpirationEnabled(context.Background(), false)
+	stats := &TaskScheduleStats{}
+	ctx = WithTaskScheduleStatsCollector(ctx, stats)
+	if _, err := service.SchedulePendingTasks(ctx, 1, before.Format("2006-01-02 15:04:05")); err != nil {
+		t.Fatal(err)
+	}
+	if !stale.IsPending() || stats.MissedBacklogCount == 0 || stats.MissedCandidateCount != 1 {
+		t.Fatalf("disabled missed expiration should preserve and expose backlog: status=%s stats=%+v", stale.GetStatus(), *stats)
+	}
+}
+
+func TestTaskSchedulerPageScanIsBounded(t *testing.T) {
+	calls := 0
+	planned := time.Now()
+	const batchSize = 17
+	const maxTasksPerTick = 51
+	tasks, err := scanTaskPages(func(time.Time, uint64, int) ([]*domainPlan.AssessmentTask, error) {
+		calls++
+		page := make([]*domainPlan.AssessmentTask, batchSize)
+		for i := range page {
+			page[i] = domainPlan.NewAssessmentTask(domainPlan.NewAssessmentPlanID(), i+1, 1, testee.NewID(uint64(i+1)), "scale", planned.Add(time.Duration(calls)*time.Second))
+		}
+		return page, nil
+	}, func(task *domainPlan.AssessmentTask) time.Time { return task.GetPlannedAt() }, batchSize, maxTasksPerTick)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tasks) != maxTasksPerTick || calls != maxTasksPerTick/batchSize {
+		t.Fatalf("bounded scan tasks=%d calls=%d", len(tasks), calls)
 	}
 }
 
@@ -280,16 +321,17 @@ func TestTaskSchedulerServiceAlwaysExpiresOverdueTasks(t *testing.T) {
 		"scale-code",
 		now.Add(-time.Minute),
 	)
+	openedAt := now.AddDate(0, 0, -8)
 	expiredTask := domainPlan.NewAssessmentTask(
 		p.GetID(),
 		2,
 		1,
 		testee.NewID(4002),
 		"scale-code",
-		now.Add(-2*time.Hour),
+		openedAt,
 	)
 	taskLifecycle := domainPlan.NewTaskLifecycle()
-	if err := taskLifecycle.Open(context.Background(), expiredTask, "token", "https://example.com/entry", now.Add(time.Hour)); err != nil {
+	if err := taskLifecycle.OpenAt(context.Background(), expiredTask, "token", "https://example.com/entry", openedAt, domainPlan.TaskEntryExpiresAt(openedAt)); err != nil {
 		t.Fatalf("open expiredTask returned error: %v", err)
 	}
 

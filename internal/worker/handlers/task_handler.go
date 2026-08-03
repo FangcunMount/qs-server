@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
+	workerobservability "github.com/FangcunMount/qs-server/internal/worker/observability"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
 )
 
@@ -125,17 +126,38 @@ func handleTaskCompleted(deps *Dependencies) HandlerFunc {
 }
 
 func handleTaskExpired(deps *Dependencies) HandlerFunc {
-	return handleTimedTaskNotificationHandler(deps, taskTimedNotificationCallbacks[eventpayload.TaskExpiredData]{
-		parseErrorLabel:  "task expired event",
-		logMessage:       "processing task expired",
-		timeFieldName:    "expired_at",
-		taskID:           taskExpiredID,
-		planID:           taskExpiredPlanID,
-		testeeID:         taskExpiredTesteeID,
-		timestamp:        taskExpiredAt,
-		notify:           notifyTaskExpired,
-		notifyFailureLog: "failed to notify task expired",
-	})
+	return func(ctx context.Context, _ string, raw []byte) error {
+		var data eventpayload.TaskExpiredData
+		env, err := ParseEventData(raw, &data)
+		if err != nil {
+			return fmt.Errorf("failed to parse task expired event: %w", err)
+		}
+		deps.Logger.Info("processing task expired",
+			slog.String("event_id", env.ID),
+			slog.String("task_id", data.TaskID),
+			slog.String("plan_id", data.PlanID),
+			slog.String("testee_id", data.TesteeID),
+			slog.Time("expired_at", data.ExpiredAt),
+			slog.String("expiration_reason", data.Reason),
+		)
+		if data.Reason == "missed_open_window" {
+			workerobservability.ObserveTaskExpirationNotification(data.Reason, "suppressed")
+			// Historical events have no reason and deliberately retain timeout notification.
+			deps.Logger.Info("task expired notification suppressed",
+				slog.String("task_id", data.TaskID),
+				slog.String("expiration_reason", data.Reason),
+				slog.Bool("notification_suppressed", true),
+			)
+			return nil
+		}
+		if deps.Notifier == nil {
+			return nil
+		}
+		if err := notifyTaskExpired(ctx, deps.Notifier, notificationMetaFromEnvelope(env), &data); err != nil {
+			deps.Logger.Warn("failed to notify task expired", slog.String("task_id", data.TaskID), slog.String("testee_id", data.TesteeID), slog.String("error", err.Error()))
+		}
+		return nil
+	}
 }
 
 func handleTaskCanceled(deps *Dependencies) HandlerFunc {

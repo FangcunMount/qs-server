@@ -2,6 +2,7 @@ package testee
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -50,6 +51,45 @@ func TestListTesteesUsesUnifiedFilterForUnrestrictedQueries(t *testing.T) {
 	}
 	if result.TotalCount != 7 || len(result.Items) != 1 || result.Items[0].ID != 21 {
 		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
+type assessmentSummaryReaderStub struct {
+	calls  int
+	err    error
+	values map[uint64]actorreadmodel.AssessmentSummary
+}
+
+func (s *assessmentSummaryReaderStub) ReadAssessmentSummaries(context.Context, int64, []uint64) (map[uint64]actorreadmodel.AssessmentSummary, error) {
+	s.calls++
+	return s.values, s.err
+}
+
+func TestListTesteesReadsAssessmentSummaryOnceAndIgnoresSnapshots(t *testing.T) {
+	stale := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	latest := time.Date(2026, 8, 2, 9, 0, 0, 0, time.UTC)
+	repo := &queryServiceRepoStub{listItems: []actorreadmodel.TesteeRow{{ID: 21, OrgID: 1, Name: "testee", LastAssessmentAt: &stale, TotalAssessments: 99, LastRiskLevel: "low"}}, countValue: 1}
+	summaries := &assessmentSummaryReaderStub{values: map[uint64]actorreadmodel.AssessmentSummary{21: {TesteeID: 21, TotalEvaluated: 2, LastEvaluatedAt: &latest, RiskLevel: "high"}}}
+	service := NewQueryServiceWithAssessmentSummary(repo, summaries)
+	result, err := service.ListTestees(context.Background(), ListTesteeDTO{OrgID: 1, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summaries.calls != 1 {
+		t.Fatalf("summary calls=%d want=1", summaries.calls)
+	}
+	item := result.Items[0]
+	if item.TotalAssessments != 2 || item.LastAssessmentAt == nil || !item.LastAssessmentAt.Equal(latest) || item.LastRiskLevel != "high" {
+		t.Fatalf("item=%+v", item)
+	}
+}
+
+func TestListTesteesPropagatesAssessmentSummaryFailure(t *testing.T) {
+	repo := &queryServiceRepoStub{listItems: []actorreadmodel.TesteeRow{makeQueryServiceTesteeRow(21, time.Now())}, countValue: 1}
+	summaries := &assessmentSummaryReaderStub{err: errors.New("summary database unavailable")}
+	service := NewQueryServiceWithAssessmentSummary(repo, summaries)
+	if _, err := service.ListTestees(context.Background(), ListTesteeDTO{OrgID: 1, Limit: 10}); err == nil {
+		t.Fatal("summary failure must fail the page")
 	}
 }
 

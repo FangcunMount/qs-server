@@ -194,6 +194,14 @@ type taskEventRow struct {
 	OccurredAt                         time.Time
 }
 
+type taskDueDefinedRow struct {
+	ID, PlanID, EnrollmentID, TesteeID uint64
+	Seq                                int
+	ScaleCode                          string
+	PlannedAt, OccurredAt              time.Time
+	DueAt                              *time.Time
+}
+
 type lifecycleSource struct {
 	factType  string
 	timeField string
@@ -267,7 +275,35 @@ func (c *PlanFactCollector) Collect(ctx context.Context, req statisticsDomain.Co
 			return result, err
 		}
 	}
+
+	// due_at is an additive immutable fact. Existing lifecycle fact shapes stay
+	// untouched, preventing core-hash conflicts when historical source rows are
+	// backfilled with the new stable fulfillment deadline.
+	var dueRows []taskDueDefinedRow
+	if err := scanLifecycleRows(ctx, c.db, "assessment_task", "id,plan_id,enrollment_id,testee_id,seq,scale_code,planned_at,due_at", "COALESCE(business_created_at,created_at)", req, &dueRows,
+		func(row taskDueDefinedRow) (time.Time, uint64) { return row.OccurredAt, row.ID },
+		func(batch []taskDueDefinedRow) error {
+			candidates := make([]factCandidate, 0, len(batch))
+			for _, row := range batch {
+				if row.DueAt == nil || row.DueAt.IsZero() {
+					continue
+				}
+				fact := taskDueDefinedFact(req.OrgID, row)
+				candidates = append(candidates, factCandidate{SourceID: row.ID, FactType: "task_due_defined", Values: fact})
+			}
+			return writeFactCandidates(ctx, c.writer, "statistics_plan_fact", candidates, req.Mode == statisticsDomain.CollectModeValidate, &result)
+		}); err != nil {
+		return result, err
+	}
 	return result, nil
+}
+
+func taskDueDefinedFact(orgID int64, row taskDueDefinedRow) map[string]any {
+	fact := baseFact(orgID, fmt.Sprintf("task:%d:task_due_defined", row.ID), "task_due_defined", row.OccurredAt, "assessment_task", strconv.FormatUint(row.ID, 10))
+	fact["plan_id"], fact["enrollment_id"], fact["testee_id"] = row.PlanID, row.EnrollmentID, row.TesteeID
+	fact["task_id"], fact["task_seq"], fact["scale_code"] = row.ID, row.Seq, row.ScaleCode
+	fact["planned_at"], fact["due_at"] = row.PlannedAt, *row.DueAt
+	return fact
 }
 
 func applyTaskLifecycleFields(fact map[string]any, eventType string, eventAt *time.Time) {

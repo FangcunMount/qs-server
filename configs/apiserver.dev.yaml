@@ -320,6 +320,9 @@ plan_scheduler:
   initial_delay: "1m"
   interval: "1m"
   pending_lookback: "24h"
+  missed_expiration_enabled: true
+  batch_size: 200
+  max_tasks_per_tick: 2000
   lock_key: "qs:plan-scheduler:leader"
   lock_ttl: "50s"
 

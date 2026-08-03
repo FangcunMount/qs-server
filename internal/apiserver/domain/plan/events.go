@@ -110,6 +110,7 @@ func NewTaskExpiredEvent(
 	planID AssessmentPlanID,
 	testeeID testee.ID,
 	expiredAt time.Time,
+	reason TaskExpirationReason,
 ) TaskExpiredEvent {
 	return event.New(
 		EventTypeTaskExpired,
@@ -120,6 +121,7 @@ func NewTaskExpiredEvent(
 			PlanID:    planID.String(),
 			TesteeID:  testeeID.String(),
 			ExpiredAt: expiredAt,
+			Reason:    reason.String(),
 		},
 	)
 }

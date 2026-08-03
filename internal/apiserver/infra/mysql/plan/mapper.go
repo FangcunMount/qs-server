@@ -147,6 +147,13 @@ func (m *PlanMapper) SyncID(po *AssessmentPlanPO, domain *domainPlan.AssessmentP
 // TaskMapper 任务映射器
 type TaskMapper struct{}
 
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
 // NewTaskMapper 创建任务映射器
 func NewTaskMapper() *TaskMapper {
 	return &TaskMapper{}
@@ -170,6 +177,11 @@ func (m *TaskMapper) ToPO(domain *domainPlan.AssessmentTask) *AssessmentTaskPO {
 		Status:            string(domain.GetStatus()),
 		EntryToken:        domain.GetEntryToken(),
 		EntryURL:          domain.GetEntryURL(),
+	}
+	dueAt := domain.GetDueAt()
+	po.DueAt = &dueAt
+	if reason := domain.GetExpirationReason().String(); reason != "" {
+		po.ExpirationReason = &reason
 	}
 
 	// 设置ID（如果已存在）
@@ -234,6 +246,7 @@ func (m *TaskMapper) ToDomain(po *AssessmentTaskPO) *domainPlan.AssessmentTask {
 		po.EntryToken,
 		po.EntryURL,
 	)
+	task.RestoreTimeSemantics(po.DueAt, domainPlan.TaskExpirationReason(stringValue(po.ExpirationReason)))
 	if po.BusinessCreatedAt != nil {
 		task.SetBusinessCreatedAt(*po.BusinessCreatedAt)
 	}
@@ -278,6 +291,7 @@ func (m *TaskMapper) SyncID(po *AssessmentTaskPO, domain *domainPlan.AssessmentT
 			po.EntryToken,
 			po.EntryURL,
 		)
+		domain.RestoreTimeSemantics(po.DueAt, domainPlan.TaskExpirationReason(stringValue(po.ExpirationReason)))
 		if po.BusinessCreatedAt != nil {
 			domain.SetBusinessCreatedAt(*po.BusinessCreatedAt)
 		}

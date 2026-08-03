@@ -46,6 +46,22 @@ type AssessmentTaskRepository interface {
 	SaveBatch(ctx context.Context, tasks []*AssessmentTask) error
 }
 
+// AssessmentTaskSchedulerRepository is the bounded, organization-scoped scan
+// contract used by the runtime scheduler. Cursors are exclusive and ordered by
+// (business time, id), so every phase can resume without OFFSET drift.
+type AssessmentTaskSchedulerRepository interface {
+	FindOpenEligibleTaskPage(ctx context.Context, orgID int64, plannedAfter, plannedThrough, cursorAt time.Time, cursorID uint64, limit int) ([]*AssessmentTask, error)
+	FindMissedPendingTaskPage(ctx context.Context, orgID int64, plannedThrough, cursorAt time.Time, cursorID uint64, limit int) ([]*AssessmentTask, error)
+	FindEntryExpiredTaskPage(ctx context.Context, orgID int64, expireThrough, cursorAt time.Time, cursorID uint64, limit int) ([]*AssessmentTask, error)
+}
+
+// AssessmentTaskScopedSchedulerRepository keeps targeted internal scheduling
+// on the same organization-scoped, keyset-paged query contract.
+type AssessmentTaskScopedSchedulerRepository interface {
+	FindScopedOpenEligibleTaskPage(ctx context.Context, orgID int64, planID AssessmentPlanID, testeeIDs []testee.ID, plannedAfter, plannedThrough, cursorAt time.Time, cursorID uint64, limit int) ([]*AssessmentTask, error)
+	FindScopedMissedPendingTaskPage(ctx context.Context, orgID int64, planID AssessmentPlanID, testeeIDs []testee.ID, plannedThrough, cursorAt time.Time, cursorID uint64, limit int) ([]*AssessmentTask, error)
+}
+
 type EnrollmentTaskRepository interface {
 	FindByEnrollmentID(ctx context.Context, enrollmentID PlanEnrollmentID) ([]*AssessmentTask, error)
 }

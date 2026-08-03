@@ -69,15 +69,18 @@ func toAssignedTesteeResultFromRow(row *actorreadmodel.TesteeRow) *AssignedTeste
 		return nil
 	}
 	return &AssignedTesteeResult{
-		ID:         row.ID,
-		OrgID:      row.OrgID,
-		ProfileID:  row.ProfileID,
-		Name:       row.Name,
-		Gender:     row.Gender,
-		Birthday:   row.Birthday,
-		Age:        ageFromBirthday(row.Birthday),
-		Source:     row.Source,
-		IsKeyFocus: row.IsKeyFocus,
+		ID:               row.ID,
+		OrgID:            row.OrgID,
+		ProfileID:        row.ProfileID,
+		Name:             row.Name,
+		Gender:           row.Gender,
+		Birthday:         row.Birthday,
+		Age:              ageFromBirthday(row.Birthday),
+		Source:           row.Source,
+		IsKeyFocus:       row.IsKeyFocus,
+		LastAssessmentAt: row.LastAssessmentAt,
+		TotalAssessments: row.TotalAssessments,
+		LastRiskLevel:    row.LastRiskLevel,
 	}
 }
 

@@ -170,6 +170,92 @@ func (r *taskRepository) FindExpiredTasks(ctx context.Context) ([]*domainPlan.As
 	return r.mapper.ToDomainList(pos), nil
 }
 
+func (r *taskRepository) FindOpenEligibleTaskPage(ctx context.Context, orgID int64, plannedAfter, plannedThrough, cursorAt time.Time, cursorID uint64, limit int) ([]*domainPlan.AssessmentTask, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	var pos []*AssessmentTaskPO
+	query := r.WithContext(ctx).
+		Where("org_id = ? AND status = ? AND planned_at > ? AND planned_at <= ? AND deleted_at IS NULL", orgID, domainPlan.TaskStatusPending.String(), plannedAfter, plannedThrough)
+	if !cursorAt.IsZero() {
+		query = query.Where("(planned_at > ?) OR (planned_at = ? AND id > ?)", cursorAt, cursorAt, cursorID)
+	}
+	if err := query.Order("planned_at ASC").Order("id ASC").Limit(limit).Find(&pos).Error; err != nil {
+		return nil, err
+	}
+	return r.mapper.ToDomainList(pos), nil
+}
+
+func (r *taskRepository) FindMissedPendingTaskPage(ctx context.Context, orgID int64, plannedThrough, cursorAt time.Time, cursorID uint64, limit int) ([]*domainPlan.AssessmentTask, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	var pos []*AssessmentTaskPO
+	query := r.WithContext(ctx).
+		Where("org_id = ? AND status = ? AND planned_at <= ? AND deleted_at IS NULL", orgID, domainPlan.TaskStatusPending.String(), plannedThrough)
+	if !cursorAt.IsZero() {
+		query = query.Where("(planned_at > ?) OR (planned_at = ? AND id > ?)", cursorAt, cursorAt, cursorID)
+	}
+	if err := query.Order("planned_at ASC").Order("id ASC").Limit(limit).Find(&pos).Error; err != nil {
+		return nil, err
+	}
+	return r.mapper.ToDomainList(pos), nil
+}
+
+func (r *taskRepository) FindEntryExpiredTaskPage(ctx context.Context, orgID int64, expireThrough, cursorAt time.Time, cursorID uint64, limit int) ([]*domainPlan.AssessmentTask, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	var pos []*AssessmentTaskPO
+	query := r.WithContext(ctx).
+		Where("org_id = ? AND status = ? AND expire_at IS NOT NULL AND expire_at <= ? AND deleted_at IS NULL", orgID, domainPlan.TaskStatusOpened.String(), expireThrough)
+	if !cursorAt.IsZero() {
+		query = query.Where("(expire_at > ?) OR (expire_at = ? AND id > ?)", cursorAt, cursorAt, cursorID)
+	}
+	if err := query.Order("expire_at ASC").Order("id ASC").Limit(limit).Find(&pos).Error; err != nil {
+		return nil, err
+	}
+	return r.mapper.ToDomainList(pos), nil
+}
+
+func (r *taskRepository) FindScopedOpenEligibleTaskPage(ctx context.Context, orgID int64, planID domainPlan.AssessmentPlanID, testeeIDs []testee.ID, plannedAfter, plannedThrough, cursorAt time.Time, cursorID uint64, limit int) ([]*domainPlan.AssessmentTask, error) {
+	query := r.scopedPendingSchedulerQuery(ctx, orgID, planID, testeeIDs).
+		Where("planned_at > ? AND planned_at <= ?", plannedAfter, plannedThrough)
+	return r.findPendingSchedulerPage(query, cursorAt, cursorID, limit)
+}
+
+func (r *taskRepository) FindScopedMissedPendingTaskPage(ctx context.Context, orgID int64, planID domainPlan.AssessmentPlanID, testeeIDs []testee.ID, plannedThrough, cursorAt time.Time, cursorID uint64, limit int) ([]*domainPlan.AssessmentTask, error) {
+	query := r.scopedPendingSchedulerQuery(ctx, orgID, planID, testeeIDs).
+		Where("planned_at <= ?", plannedThrough)
+	return r.findPendingSchedulerPage(query, cursorAt, cursorID, limit)
+}
+
+func (r *taskRepository) scopedPendingSchedulerQuery(ctx context.Context, orgID int64, planID domainPlan.AssessmentPlanID, testeeIDs []testee.ID) *gorm.DB {
+	query := r.WithContext(ctx).Where("org_id = ? AND plan_id = ? AND status = ? AND deleted_at IS NULL", orgID, planID.Uint64(), domainPlan.TaskStatusPending.String())
+	if len(testeeIDs) == 0 {
+		return query
+	}
+	rawIDs := make([]uint64, 0, len(testeeIDs))
+	for _, id := range testeeIDs {
+		rawIDs = append(rawIDs, id.Uint64())
+	}
+	return query.Where("testee_id IN ?", rawIDs)
+}
+
+func (r *taskRepository) findPendingSchedulerPage(query *gorm.DB, cursorAt time.Time, cursorID uint64, limit int) ([]*domainPlan.AssessmentTask, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	if !cursorAt.IsZero() {
+		query = query.Where("(planned_at > ?) OR (planned_at = ? AND id > ?)", cursorAt, cursorAt, cursorID)
+	}
+	var pos []*AssessmentTaskPO
+	if err := query.Order("planned_at ASC").Order("id ASC").Limit(limit).Find(&pos).Error; err != nil {
+		return nil, err
+	}
+	return r.mapper.ToDomainList(pos), nil
+}
+
 // Save 保存任务（新增或更新）
 func (r *taskRepository) Save(ctx context.Context, task *domainPlan.AssessmentTask) error {
 	po := r.mapper.ToPO(task)

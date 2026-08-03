@@ -15,17 +15,19 @@ type EnrollmentQuery struct {
 }
 
 type EnrollmentTaskItem struct {
-	ID           uint64     `json:"id"`
-	Seq          int        `json:"seq"`
-	ScaleCode    string     `json:"scale_code"`
-	Status       string     `json:"status"`
-	PlannedAt    time.Time  `json:"planned_at"`
-	OpenAt       *time.Time `json:"open_at,omitempty"`
-	ExpireAt     *time.Time `json:"expire_at,omitempty"`
-	CompletedAt  *time.Time `json:"completed_at,omitempty"`
-	ExpiredAt    *time.Time `json:"expired_at,omitempty"`
-	CanceledAt   *time.Time `json:"canceled_at,omitempty"`
-	AssessmentID *string    `json:"assessment_id,omitempty"`
+	ID               uint64     `json:"id"`
+	Seq              int        `json:"seq"`
+	ScaleCode        string     `json:"scale_code"`
+	Status           string     `json:"status"`
+	PlannedAt        time.Time  `json:"planned_at"`
+	DueAt            *time.Time `json:"due_at,omitempty"`
+	OpenAt           *time.Time `json:"open_at,omitempty"`
+	ExpireAt         *time.Time `json:"expire_at,omitempty"`
+	CompletedAt      *time.Time `json:"completed_at,omitempty"`
+	ExpiredAt        *time.Time `json:"expired_at,omitempty"`
+	ExpirationReason *string    `json:"expiration_reason,omitempty"`
+	CanceledAt       *time.Time `json:"canceled_at,omitempty"`
+	AssessmentID     *string    `json:"assessment_id,omitempty"`
 }
 
 type EnrollmentItem struct {

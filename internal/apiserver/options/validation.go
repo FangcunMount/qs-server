@@ -229,6 +229,16 @@ func validatePlanScheduler(opts *PlanSchedulerOptions) []error {
 	}
 	if opts.PendingLookback <= 0 {
 		errs = append(errs, fmt.Errorf("plan_scheduler.pending_lookback must be greater than 0"))
+	} else if opts.PendingLookback != 24*time.Hour {
+		errs = append(errs, fmt.Errorf("plan_scheduler.pending_lookback must remain 24h for task opening-window compatibility"))
+	}
+	if opts.BatchSize <= 0 {
+		errs = append(errs, fmt.Errorf("plan_scheduler.batch_size must be greater than 0"))
+	}
+	if opts.MaxTasksPerTick <= 0 {
+		errs = append(errs, fmt.Errorf("plan_scheduler.max_tasks_per_tick must be greater than 0"))
+	} else if opts.BatchSize > opts.MaxTasksPerTick {
+		errs = append(errs, fmt.Errorf("plan_scheduler.batch_size must be less than or equal to plan_scheduler.max_tasks_per_tick"))
 	}
 	if opts.LockKey == "" {
 		errs = append(errs, fmt.Errorf("plan_scheduler.lock_key cannot be empty when enabled"))

@@ -31,14 +31,6 @@ func toTesteeResult(testee *domain.Testee) *TesteeResult {
 		result.Birthday = testee.Birthday()
 	}
 
-	// 统计信息
-	if stats := testee.AssessmentStats(); stats != nil {
-		result.TotalAssessments = stats.TotalCount()
-		lastAt := stats.LastAssessmentAt()
-		result.LastAssessmentAt = &lastAt
-		result.LastRiskLevel = stats.LastRiskLevel()
-	}
-
 	return result
 }
 

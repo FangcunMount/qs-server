@@ -26,22 +26,24 @@ type PlanResponse struct {
 
 // TaskResponse 任务响应
 type TaskResponse struct {
-	ID           string  `json:"id"`                      // 任务ID
-	PlanID       string  `json:"plan_id"`                 // 计划ID
-	Seq          int     `json:"seq"`                     // 序号（计划内的第N次测评）
-	OrgID        int64   `json:"org_id"`                  // 机构ID
-	TesteeID     string  `json:"testee_id"`               // 受试者ID
-	ScaleCode    string  `json:"scale_code"`              // 量表编码（如 "3adyDE"）
-	ScaleTitle   string  `json:"scale_title,omitempty"`   // 量表标题
-	PlannedAt    string  `json:"planned_at"`              // 计划时间点
-	OpenAt       *string `json:"open_at,omitempty"`       // 实际开放时间
-	ExpireAt     *string `json:"expire_at,omitempty"`     // 截止时间
-	CompletedAt  *string `json:"completed_at,omitempty"`  // 完成时间
-	Status       string  `json:"status"`                  // 状态：pending/opened/completed/expired/canceled
-	StatusLabel  string  `json:"status_label,omitempty"`  // 状态中文
-	AssessmentID *string `json:"assessment_id,omitempty"` // 关联的测评ID
-	EntryToken   string  `json:"entry_token,omitempty"`   // 入口令牌
-	EntryURL     string  `json:"entry_url,omitempty"`     // 入口URL
+	ID               string  `json:"id"`                          // 任务ID
+	PlanID           string  `json:"plan_id"`                     // 计划ID
+	Seq              int     `json:"seq"`                         // 序号（计划内的第N次测评）
+	OrgID            int64   `json:"org_id"`                      // 机构ID
+	TesteeID         string  `json:"testee_id"`                   // 受试者ID
+	ScaleCode        string  `json:"scale_code"`                  // 量表编码（如 "3adyDE"）
+	ScaleTitle       string  `json:"scale_title,omitempty"`       // 量表标题
+	PlannedAt        string  `json:"planned_at"`                  // 计划时间点
+	DueAt            *string `json:"due_at,omitempty"`            // 履约截止时间
+	OpenAt           *string `json:"open_at,omitempty"`           // 实际开放时间
+	ExpireAt         *string `json:"expire_at,omitempty"`         // 入口失效时间
+	CompletedAt      *string `json:"completed_at,omitempty"`      // 完成时间
+	Status           string  `json:"status"`                      // 状态：pending/opened/completed/expired/canceled
+	ExpirationReason *string `json:"expiration_reason,omitempty"` // 过期原因
+	StatusLabel      string  `json:"status_label,omitempty"`      // 状态中文
+	AssessmentID     *string `json:"assessment_id,omitempty"`     // 关联的测评ID
+	EntryToken       string  `json:"entry_token,omitempty"`       // 入口令牌
+	EntryURL         string  `json:"entry_url,omitempty"`         // 入口URL
 }
 
 // EnrollmentResponse 加入计划响应
@@ -81,11 +83,13 @@ type TaskWindowResponse struct {
 
 // TaskScheduleStatsResponse 调度统计响应
 type TaskScheduleStatsResponse struct {
-	PendingCount      int `json:"pending_count"`
-	OpenedCount       int `json:"opened_count"`
-	FailedCount       int `json:"failed_count"`
-	ExpiredCount      int `json:"expired_count"`
-	ExpireFailedCount int `json:"expire_failed_count"`
+	PendingCount            int `json:"pending_count"`
+	OpenedCount             int `json:"opened_count"`
+	FailedCount             int `json:"failed_count"`
+	ExpiredCount            int `json:"expired_count"`
+	ExpireFailedCount       int `json:"expire_failed_count"`
+	MissedExpiredCount      int `json:"missed_expired_count"`
+	MissedExpireFailedCount int `json:"missed_expire_failed_count"`
 }
 
 // ============= Converters =============
@@ -120,22 +124,24 @@ func NewTaskResponse(result *plan.TaskResult) *TaskResponse {
 	}
 
 	return &TaskResponse{
-		ID:           result.ID,
-		PlanID:       result.PlanID,
-		Seq:          result.Seq,
-		OrgID:        result.OrgID,
-		TesteeID:     result.TesteeID,
-		ScaleCode:    result.ScaleCode,
-		ScaleTitle:   result.ScaleTitle,
-		PlannedAt:    result.PlannedAt,
-		OpenAt:       result.OpenAt,
-		ExpireAt:     result.ExpireAt,
-		CompletedAt:  result.CompletedAt,
-		Status:       result.Status,
-		StatusLabel:  domainPlan.TaskStatus(result.Status).DisplayName(),
-		AssessmentID: result.AssessmentID,
-		EntryToken:   result.EntryToken,
-		EntryURL:     result.EntryURL,
+		ID:               result.ID,
+		PlanID:           result.PlanID,
+		Seq:              result.Seq,
+		OrgID:            result.OrgID,
+		TesteeID:         result.TesteeID,
+		ScaleCode:        result.ScaleCode,
+		ScaleTitle:       result.ScaleTitle,
+		PlannedAt:        result.PlannedAt,
+		DueAt:            result.DueAt,
+		OpenAt:           result.OpenAt,
+		ExpireAt:         result.ExpireAt,
+		CompletedAt:      result.CompletedAt,
+		Status:           result.Status,
+		ExpirationReason: result.ExpirationReason,
+		StatusLabel:      domainPlan.TaskStatus(result.Status).DisplayName(),
+		AssessmentID:     result.AssessmentID,
+		EntryToken:       result.EntryToken,
+		EntryURL:         result.EntryURL,
 	}
 }
 
@@ -237,11 +243,13 @@ func NewTaskScheduleResponse(result *plan.TaskScheduleResult) *TaskListResponse 
 	}
 	resp := NewTaskListResponseFromSlice(result.Tasks)
 	resp.Stats = &TaskScheduleStatsResponse{
-		PendingCount:      result.Stats.PendingCount,
-		OpenedCount:       result.Stats.OpenedCount,
-		FailedCount:       result.Stats.FailedCount,
-		ExpiredCount:      result.Stats.ExpiredCount,
-		ExpireFailedCount: result.Stats.ExpireFailedCount,
+		PendingCount:            result.Stats.PendingCount,
+		OpenedCount:             result.Stats.OpenedCount,
+		FailedCount:             result.Stats.FailedCount,
+		ExpiredCount:            result.Stats.ExpiredCount,
+		ExpireFailedCount:       result.Stats.ExpireFailedCount,
+		MissedExpiredCount:      result.Stats.MissedExpiredCount,
+		MissedExpireFailedCount: result.Stats.MissedExpireFailedCount,
 	}
 	return resp
 }
