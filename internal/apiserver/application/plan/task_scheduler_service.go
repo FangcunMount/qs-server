@@ -177,7 +177,7 @@ func (s *taskSchedulerService) SchedulePendingTasks(ctx context.Context, orgID i
 
 		// 开放任务
 		openedAt := time.Now()
-		if err := s.taskLifecycle.OpenAt(ctx, task, token, url, openedAt, plan.TaskEntryExpiresAt(openedAt)); err != nil {
+		if err := s.taskLifecycle.OpenAt(ctx, task, token, url, openedAt); err != nil {
 			logger.L(ctx).Errorw("Failed to open task",
 				"action", "schedule_pending_tasks",
 				"task_id", task.GetID().String(),

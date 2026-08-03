@@ -123,6 +123,26 @@ func TestFactWriterBatchPreservesExistingAndConflictSemantics(t *testing.T) {
 	}
 }
 
+func TestFactWriterLegacyBatchTreatsExistingKeyAsImmutableWithoutRehashingMutableSource(t *testing.T) {
+	writer, mock := newFactWriterTestDB(t)
+	fact := testAccessFact("task:42:task_created", time.Date(2026, 7, 1, 8, 0, 0, 0, time.UTC))
+	fact["planned_at"] = time.Date(2026, 8, 1, 8, 0, 0, 0, time.UTC)
+	mock.ExpectQuery("SELECT .*fact_key.* FROM .*statistics_plan_fact.*fact_key IN \\(\\?\\)").
+		WithArgs("task:42:task_created").
+		WillReturnRows(sqlmock.NewRows([]string{"fact_key"}).AddRow("task:42:task_created"))
+
+	dispositions, err := writer.writeBatchByKey(context.Background(), "statistics_plan_fact", []map[string]any{fact}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dispositions) != 1 || dispositions[0] != factWriteExisting {
+		t.Fatalf("dispositions=%v", dispositions)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestWriteFactCandidatesCountsEachSourceOnce(t *testing.T) {
 	writer, mock := newFactWriterTestDB(t)
 	at := time.Date(2026, 7, 1, 8, 0, 0, 0, time.UTC)

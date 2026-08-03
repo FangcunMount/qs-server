@@ -453,7 +453,8 @@ func (s *service) ensureConfigured() error {
 		s.assignmentHydrator == nil ||
 		s.testeeReader == nil ||
 		s.latestRiskReader == nil ||
-		s.followUpQueueReader == nil {
+		s.followUpQueueReader == nil ||
+		s.assessmentSummaryReader == nil {
 		return errors.WithCode(code.ErrInternalServerError, "clinician workbench service is not configured")
 	}
 	return nil

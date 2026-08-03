@@ -21,11 +21,12 @@ func NewTaskLifecycle() *TaskLifecycle {
 
 // Open 开放任务（生成入口）
 // 将待推送状态的任务变更为已推送状态，并设置入口信息
-func (l *TaskLifecycle) Open(ctx context.Context, task *AssessmentTask, entryToken string, entryURL string, expireAt time.Time) error {
-	return l.OpenAt(ctx, task, entryToken, entryURL, time.Now(), expireAt)
+func (l *TaskLifecycle) Open(ctx context.Context, task *AssessmentTask, entryToken string, entryURL string) error {
+	return l.OpenAt(ctx, task, entryToken, entryURL, time.Now())
 }
 
-func (l *TaskLifecycle) OpenAt(ctx context.Context, task *AssessmentTask, entryToken string, entryURL string, actionAt, expireAt time.Time) error {
+func (l *TaskLifecycle) OpenAt(ctx context.Context, task *AssessmentTask, entryToken string, entryURL string, actionAt time.Time) error {
+	expireAt := TaskEntryExpiresAt(actionAt)
 	taskID := task.GetID().String()
 	logger.L(ctx).Infow("Opening task in domain service",
 		"domain_action", "open_task",
@@ -191,6 +192,10 @@ func (l *TaskLifecycle) Cancel(_ context.Context, task *AssessmentTask) error {
 
 // Reschedule 复用既有任务，将其重置为待推送状态。
 func (l *TaskLifecycle) Reschedule(ctx context.Context, task *AssessmentTask, plannedAt time.Time) error {
+	return l.RescheduleAt(ctx, task, plannedAt, time.Now())
+}
+
+func (l *TaskLifecycle) RescheduleAt(ctx context.Context, task *AssessmentTask, plannedAt, actionAt time.Time) error {
 	taskID := task.GetID().String()
 	logger.L(ctx).Infow("Rescheduling task in domain service",
 		"domain_action", "reschedule_task",
@@ -199,14 +204,14 @@ func (l *TaskLifecycle) Reschedule(ctx context.Context, task *AssessmentTask, pl
 		"planned_at", plannedAt,
 	)
 
-	if plannedAt.IsZero() {
+	if plannedAt.IsZero() || actionAt.IsZero() {
 		return errors.WithCode(code.ErrInvalidArgument, "计划时间不能为空")
 	}
 	if task.IsCompleted() {
 		return errors.WithCode(code.ErrInvalidArgument, "已完成任务不能重新调度")
 	}
 
-	if err := task.reschedule(plannedAt); err != nil {
+	if err := task.reschedule(plannedAt, actionAt); err != nil {
 		logger.L(ctx).Errorw("Failed to reschedule task",
 			"domain_action", "reschedule_task",
 			"task_id", taskID,

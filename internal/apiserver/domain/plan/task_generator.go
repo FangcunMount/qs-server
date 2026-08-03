@@ -25,6 +25,13 @@ func NewTaskGenerator() *TaskGenerator {
 //   - testeeID: 受试者ID
 //   - startDate: 基准日期，所有相对时间都基于此日期计算
 func (g *TaskGenerator) GenerateTasks(plan *AssessmentPlan, testeeID testee.ID, startDate time.Time) []*AssessmentTask {
+	return g.GenerateTasksAt(plan, testeeID, startDate, time.Now())
+}
+
+// GenerateTasksAt defines every task in the generated schedule at one business
+// instant. Resume uses this deterministic seam so reused and newly missing
+// tasks belong to the same atomic schedule definition.
+func (g *TaskGenerator) GenerateTasksAt(plan *AssessmentPlan, testeeID testee.ID, startDate, scheduleDefinedAt time.Time) []*AssessmentTask {
 	var tasks []*AssessmentTask
 
 	switch plan.GetScheduleType() {
@@ -32,13 +39,14 @@ func (g *TaskGenerator) GenerateTasks(plan *AssessmentPlan, testeeID testee.ID, 
 		// 每 N 周一次
 		for i := 0; i < plan.GetTotalTimes(); i++ {
 			plannedAt := normalizeTaskPlannedAt(plan, startDate.AddDate(0, 0, i*plan.GetInterval()*7))
-			task := NewAssessmentTask(
+			task := NewAssessmentTaskAt(
 				plan.GetID(),
 				i+1,
 				plan.GetOrgID(),
 				testeeID,
 				plan.GetScaleCode(),
 				plannedAt,
+				scheduleDefinedAt,
 			)
 			tasks = append(tasks, task)
 		}
@@ -47,13 +55,14 @@ func (g *TaskGenerator) GenerateTasks(plan *AssessmentPlan, testeeID testee.ID, 
 		// 每 N 天一次
 		for i := 0; i < plan.GetTotalTimes(); i++ {
 			plannedAt := normalizeTaskPlannedAt(plan, startDate.AddDate(0, 0, i*plan.GetInterval()))
-			task := NewAssessmentTask(
+			task := NewAssessmentTaskAt(
 				plan.GetID(),
 				i+1,
 				plan.GetOrgID(),
 				testeeID,
 				plan.GetScaleCode(),
 				plannedAt,
+				scheduleDefinedAt,
 			)
 			tasks = append(tasks, task)
 		}
@@ -64,13 +73,14 @@ func (g *TaskGenerator) GenerateTasks(plan *AssessmentPlan, testeeID testee.ID, 
 		relativeWeeks := plan.GetRelativeWeeks()
 		for i, week := range relativeWeeks {
 			plannedAt := normalizeTaskPlannedAt(plan, startDate.AddDate(0, 0, week*7))
-			task := NewAssessmentTask(
+			task := NewAssessmentTaskAt(
 				plan.GetID(),
 				i+1,
 				plan.GetOrgID(),
 				testeeID,
 				plan.GetScaleCode(),
 				plannedAt,
+				scheduleDefinedAt,
 			)
 			tasks = append(tasks, task)
 		}
@@ -79,13 +89,14 @@ func (g *TaskGenerator) GenerateTasks(plan *AssessmentPlan, testeeID testee.ID, 
 		// 固定日期列表
 		fixedDates := plan.GetFixedDates()
 		for i, date := range fixedDates {
-			task := NewAssessmentTask(
+			task := NewAssessmentTaskAt(
 				plan.GetID(),
 				i+1,
 				plan.GetOrgID(),
 				testeeID,
 				plan.GetScaleCode(),
 				normalizeTaskPlannedAt(plan, date),
+				scheduleDefinedAt,
 			)
 			tasks = append(tasks, task)
 		}

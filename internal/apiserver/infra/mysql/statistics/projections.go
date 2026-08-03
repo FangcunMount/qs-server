@@ -133,20 +133,47 @@ func (p *PlanFulfillmentProjection) Project(ctx context.Context, r statisticsDom
 	}
 	result := db.Exec(`
 		INSERT INTO statistics_plan_fulfillment_daily (org_id,cohort_date,plan_id,planned_task_count,planned_participant_count,due_task_count,completed_on_time_count,completed_overdue_count,uncompleted_overdue_count)
-		WITH tasks AS (
+		WITH schedule_ranked AS (
+		 SELECT org_id,plan_id,testee_id,task_id,schedule_revision,schedule_planned_at,schedule_due_at,
+		        ROW_NUMBER() OVER (PARTITION BY org_id,task_id ORDER BY schedule_revision DESC,id DESC) schedule_rank
+		 FROM statistics_plan_fact
+		 WHERE org_id=? AND fact_type='task_schedule_defined'
+		), latest_schedule AS (
+		 SELECT org_id,plan_id,testee_id,task_id,schedule_revision,schedule_planned_at,schedule_due_at
+		 FROM schedule_ranked WHERE schedule_rank=1
+		), latest_terminal AS (
+		 SELECT terminal.org_id,terminal.task_id,terminal.task_status,terminal.completed_at
+		 FROM statistics_plan_fact terminal
+		 JOIN latest_schedule schedule ON schedule.org_id=terminal.org_id AND schedule.task_id=terminal.task_id AND schedule.schedule_revision=terminal.schedule_revision
+		 WHERE terminal.fact_type='task_schedule_terminal'
+		), schedule_tasks AS (
+		 SELECT schedule.org_id,schedule.plan_id,schedule.task_id,schedule.testee_id,
+		        schedule.schedule_planned_at planned_at,schedule.schedule_due_at due_at,
+		        CASE WHEN terminal.task_status='completed' THEN terminal.completed_at END completed_at,
+		        CASE WHEN terminal.task_status='canceled' THEN 1 ELSE 0 END canceled
+		 FROM latest_schedule schedule
+		 LEFT JOIN latest_terminal terminal ON terminal.org_id=schedule.org_id AND terminal.task_id=schedule.task_id
+		), legacy_tasks AS (
 		 SELECT created.org_id,created.plan_id,created.task_id,created.testee_id,MAX(created.planned_at) planned_at,
-		        COALESCE(MAX(CASE WHEN f.fact_type='task_due_defined' THEN f.due_at END),MAX(CASE WHEN f.fact_type<>'task_due_defined' THEN f.due_at END)) due_at,
-		        MAX(CASE WHEN f.fact_type='task_completed' THEN f.completed_at END) completed_at,
-		        MAX(CASE WHEN f.fact_type='task_canceled' THEN 1 ELSE 0 END) canceled
-		 FROM statistics_plan_fact created LEFT JOIN statistics_plan_fact f ON f.org_id=created.org_id AND f.task_id=created.task_id
-		 WHERE created.org_id=? AND created.fact_type='task_created'
+		        COALESCE(MAX(CASE WHEN legacy.fact_type='task_due_defined' THEN legacy.due_at END),MAX(CASE WHEN legacy.fact_type<>'task_due_defined' THEN legacy.due_at END)) due_at,
+		        MAX(CASE WHEN legacy.fact_type='task_completed' THEN legacy.completed_at END) completed_at,
+		        MAX(CASE WHEN legacy.fact_type='task_canceled' THEN 1 ELSE 0 END) canceled
+		 FROM statistics_plan_fact created
+		 LEFT JOIN statistics_plan_fact legacy ON legacy.org_id=created.org_id AND legacy.task_id=created.task_id
+		  AND legacy.fact_type IN ('task_created','task_opened','task_completed','task_expired','task_canceled','task_due_defined')
+		 LEFT JOIN latest_schedule schedule ON schedule.org_id=created.org_id AND schedule.task_id=created.task_id
+		 WHERE created.org_id=? AND created.fact_type='task_created' AND schedule.task_id IS NULL
 		 GROUP BY created.org_id,created.plan_id,created.task_id,created.testee_id
+		), tasks AS (
+		 SELECT * FROM schedule_tasks
+		 UNION ALL
+		 SELECT * FROM legacy_tasks
 		), buckets AS (
 		 SELECT org_id,DATE(planned_at) cohort_date,plan_id,COUNT(*) planned_task_count,COUNT(DISTINCT testee_id) planned_participant_count,0 due_task_count,0 completed_on_time_count,0 completed_overdue_count,0 uncompleted_overdue_count FROM tasks WHERE canceled=0 GROUP BY org_id,DATE(planned_at),plan_id
 		 UNION ALL
 		 SELECT org_id,DATE(due_at),plan_id,0,0,COUNT(*),SUM(completed_at IS NOT NULL AND completed_at<=due_at),SUM(completed_at>due_at),SUM(completed_at IS NULL AND due_at<?) FROM tasks WHERE due_at IS NOT NULL AND canceled=0 GROUP BY org_id,DATE(due_at),plan_id
 		)
-		SELECT org_id,cohort_date,plan_id,SUM(planned_task_count),SUM(planned_participant_count),SUM(due_task_count),SUM(completed_on_time_count),SUM(completed_overdue_count),SUM(uncompleted_overdue_count) FROM buckets GROUP BY org_id,cohort_date,plan_id`, r.OrgID, r.CutoffAt)
+		SELECT org_id,cohort_date,plan_id,SUM(planned_task_count),SUM(planned_participant_count),SUM(due_task_count),SUM(completed_on_time_count),SUM(completed_overdue_count),SUM(uncompleted_overdue_count) FROM buckets GROUP BY org_id,cohort_date,plan_id`, r.OrgID, r.OrgID, r.CutoffAt)
 	return statisticsDomain.ProjectionResult{Name: p.Name(), Rows: result.RowsAffected}, result.Error
 }
 

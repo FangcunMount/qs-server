@@ -202,6 +202,7 @@ func TestServiceGetSummaryReturnsEmptyWhenOperatorIsNotBoundToClinician(t *testi
 		&testeeReaderStub{},
 		&latestRiskReaderStub{},
 		&followUpReaderStub{},
+		&assessmentSummaryReaderStub{},
 	)
 
 	summary, err := svc.GetSummary(context.Background(), Scope{Kind: ScopeKindClinicianMe, OrgID: 9, OperatorUserID: 701})
@@ -284,6 +285,7 @@ func TestServiceListOrgAdminQueueWithClinicianFilterUsesAssignedScope(t *testing
 		testees,
 		&latestRiskReaderStub{},
 		&followUpReaderStub{},
+		&assessmentSummaryReaderStub{},
 	)
 	clinicianID := uint64(20)
 
@@ -318,6 +320,7 @@ func newTestService(
 		testees,
 		latestRisks,
 		followUps,
+		&assessmentSummaryReaderStub{},
 	)
 }
 

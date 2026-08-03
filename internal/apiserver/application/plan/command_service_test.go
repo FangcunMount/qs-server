@@ -219,10 +219,10 @@ func TestCommandServiceCancelPlanCountsAffectedTasks(t *testing.T) {
 	openedTask := domainplan.NewAssessmentTask(planAggregate.GetID(), 2, 7, testeeID, "scale-code", now)
 	completedTask := domainplan.NewAssessmentTask(planAggregate.GetID(), 3, 7, testeeID, "scale-code", now)
 
-	if err := taskLifecycle.Open(context.Background(), openedTask, "token-open", "https://example.com/open", time.Now().Add(4*time.Hour)); err != nil {
+	if err := taskLifecycle.Open(context.Background(), openedTask, "token-open", "https://example.com/open"); err != nil {
 		t.Fatalf("failed to open task: %v", err)
 	}
-	if err := taskLifecycle.Open(context.Background(), completedTask, "token-complete", "https://example.com/complete", time.Now().Add(4*time.Hour)); err != nil {
+	if err := taskLifecycle.Open(context.Background(), completedTask, "token-complete", "https://example.com/complete"); err != nil {
 		t.Fatalf("failed to open completed task: %v", err)
 	}
 	if err := taskLifecycle.Complete(context.Background(), completedTask, 9001); err != nil {

@@ -73,6 +73,16 @@ func (r *taskRepository) FindByPlanID(ctx context.Context, planID domainPlan.Ass
 	return r.mapper.ToDomainList(pos), nil
 }
 
+func (r *taskRepository) FindByPlanIDForUpdate(ctx context.Context, planID domainPlan.AssessmentPlanID) ([]*domainPlan.AssessmentTask, error) {
+	var pos []*AssessmentTaskPO
+	if err := r.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("plan_id = ? AND deleted_at IS NULL", planID.Uint64()).
+		Order("id ASC").Find(&pos).Error; err != nil {
+		return nil, err
+	}
+	return r.mapper.ToDomainList(pos), nil
+}
+
 // FindByPlanIDAndTesteeIDs 查询某个计划下指定受试者集合的任务。
 func (r *taskRepository) FindByPlanIDAndTesteeIDs(ctx context.Context, planID domainPlan.AssessmentPlanID, testeeIDs []testee.ID) ([]*domainPlan.AssessmentTask, error) {
 	if len(testeeIDs) == 0 {
@@ -280,6 +290,42 @@ func (r *taskRepository) updateAndSyncTask(ctx context.Context, po *AssessmentTa
 	return r.UpdateAndSync(ctx, po, func(saved *AssessmentTaskPO) {
 		syncTaskPO(saved, task, r.mapper)
 	})
+}
+
+// SaveRescheduled persists a complete schedule reset with an expected-revision
+// CAS. A generic struct update cannot be used here because GORM omits nil and
+// zero fields, which would leave the previous schedule's terminal timestamps,
+// assessment link, or entry credentials behind.
+func (r *taskRepository) SaveRescheduled(ctx context.Context, task *domainPlan.AssessmentTask, expectedRevision uint32) error {
+	po := r.mapper.ToPO(task)
+	updates := map[string]any{
+		"planned_at":          po.PlannedAt,
+		"due_at":              po.DueAt,
+		"schedule_revision":   po.ScheduleRevision,
+		"schedule_defined_at": po.ScheduleDefinedAt,
+		"status":              po.Status,
+		"open_at":             po.OpenAt,
+		"expire_at":           po.ExpireAt,
+		"completed_at":        po.CompletedAt,
+		"expired_at":          po.ExpiredAt,
+		"canceled_at":         po.CanceledAt,
+		"expiration_reason":   po.ExpirationReason,
+		"assessment_id":       po.AssessmentID,
+		"entry_token":         po.EntryToken,
+		"entry_url":           po.EntryURL,
+		"updated_at":          time.Now().UTC(),
+		"version":             gorm.Expr("version + 1"),
+	}
+	result := r.WithContext(ctx).Model(&AssessmentTaskPO{}).
+		Where("id = ? AND org_id = ? AND schedule_revision = ? AND deleted_at IS NULL", task.GetID().Uint64(), task.GetOrgID(), expectedRevision).
+		Updates(updates)
+	if result.Error != nil {
+		return translateTaskError(result.Error)
+	}
+	if result.RowsAffected != 1 {
+		return errors.WithCode(code.ErrConflict, "task schedule revision conflict: task=%d expected=%d", task.GetID().Uint64(), expectedRevision)
+	}
+	return nil
 }
 
 // SaveBatch 批量保存任务

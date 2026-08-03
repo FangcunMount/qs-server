@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -88,21 +89,67 @@ func TestRollbackTaskSkipsDurableAuditRecordWhoseTransactionDidNotCommit(t *test
 	}
 	t.Cleanup(func() { _ = db.Close() })
 	planned := time.Date(2026, 8, 1, 19, 0, 0, 0, shanghai)
-	before := taskState{ID: 10, Version: 3, Status: "pending", PlannedAt: planned}
+	definedAt := planned.Add(-time.Hour)
+	before := taskState{ID: 10, Version: 3, Status: "pending", PlannedAt: planned, ScheduleRevision: 1, ScheduleDefinedAt: &definedAt}
 	due := planned.AddDate(0, 0, 7)
 	after := before
 	after.Version = 4
 	after.DueAt = &due
 
 	mock.ExpectExec(regexp.QuoteMeta("UPDATE assessment_task SET")).WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT id,version,status,planned_at,due_at,open_at,expire_at,completed_at,expired_at,canceled_at,expiration_reason,assessment_id,COALESCE(entry_token,''),COALESCE(entry_url,'') FROM assessment_task WHERE org_id=? AND id=? AND deleted_at IS NULL")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id,version,status,planned_at,due_at,schedule_revision,schedule_defined_at,open_at,expire_at,completed_at,expired_at,canceled_at,expiration_reason,assessment_id,COALESCE(entry_token,''),COALESCE(entry_url,'') FROM assessment_task WHERE org_id=? AND id=? AND deleted_at IS NULL")).
 		WithArgs(int64(1), uint64(10)).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "version", "status", "planned_at", "due_at", "open_at", "expire_at", "completed_at", "expired_at", "canceled_at", "expiration_reason", "assessment_id", "entry_token", "entry_url"}).
-			AddRow(10, 3, "pending", planned, nil, nil, nil, nil, nil, nil, nil, nil, "", ""))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "version", "status", "planned_at", "due_at", "schedule_revision", "schedule_defined_at", "open_at", "expire_at", "completed_at", "expired_at", "canceled_at", "expiration_reason", "assessment_id", "entry_token", "entry_url"}).
+			AddRow(10, 3, "pending", planned, nil, 1, definedAt, nil, nil, nil, nil, nil, nil, nil, "", ""))
 
 	changed, err := rollbackTask(context.Background(), db, config{orgID: 1}, before, after)
 	if err != nil || changed {
 		t.Fatalf("uncommitted audited row should be skipped: changed=%v err=%v", changed, err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRollbackTaskScheduleStopsWhenRowChangedAfterRepair(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	definedAt := time.Date(2026, 8, 1, 10, 0, 0, 0, shanghai)
+	before := taskScheduleState{ID: 10, Version: 3, ScheduleRevision: 1}
+	after := taskScheduleState{ID: 10, Version: 4, ScheduleRevision: 2, ScheduleDefinedAt: &definedAt}
+
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE assessment_task SET schedule_revision=?,schedule_defined_at=?,version=?")).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id,version,schedule_revision,schedule_defined_at FROM assessment_task WHERE org_id=? AND id=? AND deleted_at IS NULL")).
+		WithArgs(int64(1), uint64(10)).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "version", "schedule_revision", "schedule_defined_at"}).AddRow(10, 5, 3, definedAt.Add(time.Hour)))
+
+	changed, err := rollbackTaskSchedule(context.Background(), db, config{orgID: 1}, before, after)
+	if err == nil || changed || !strings.Contains(err.Error(), "changed after repair") {
+		t.Fatalf("changed=%v err=%v", changed, err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRollbackPreflightRefusesPublishedImmutableScheduleFacts(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	records := []auditRecord{{Kind: "task_schedule", After: json.RawMessage(`{"id":10}`)}}
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) FROM statistics_plan_fact WHERE org_id=? AND task_id IN (?) AND fact_type IN ('task_schedule_defined','task_schedule_terminal')")).
+		WithArgs(int64(1), uint64(10)).
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
+	err = ensureScheduleFactsNotPublished(context.Background(), db, 1, records)
+	if err == nil || !strings.Contains(err.Error(), "rollback refused") {
+		t.Fatalf("err=%v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

@@ -83,16 +83,16 @@ func TestPlanLifecycleCancelCancelsOutstandingTasks(t *testing.T) {
 	expiredTask := NewAssessmentTask(p.GetID(), 4, 1, testeeID, "scale-code", now)
 
 	taskLifecycle := NewTaskLifecycle()
-	if err := taskLifecycle.Open(ctx, openedTask, "open-token", "https://example.com/open", time.Now().Add(6*time.Hour)); err != nil {
+	if err := taskLifecycle.Open(ctx, openedTask, "open-token", "https://example.com/open"); err != nil {
 		t.Fatalf("failed to open task: %v", err)
 	}
-	if err := taskLifecycle.Open(ctx, completedTask, "completed-token", "https://example.com/completed", time.Now().Add(6*time.Hour)); err != nil {
+	if err := taskLifecycle.Open(ctx, completedTask, "completed-token", "https://example.com/completed"); err != nil {
 		t.Fatalf("failed to open task: %v", err)
 	}
 	if err := taskLifecycle.Complete(ctx, completedTask, assessment.NewID(9001)); err != nil {
 		t.Fatalf("failed to complete task: %v", err)
 	}
-	if err := taskLifecycle.Open(ctx, expiredTask, "expired-token", "https://example.com/expired", time.Now().Add(2*time.Hour)); err != nil {
+	if err := taskLifecycle.Open(ctx, expiredTask, "expired-token", "https://example.com/expired"); err != nil {
 		t.Fatalf("failed to open task: %v", err)
 	}
 	if err := taskLifecycle.Expire(ctx, expiredTask); err != nil {
@@ -143,10 +143,10 @@ func TestPlanLifecycleFinishFinishesPlanAndCancelsOutstandingTasks(t *testing.T)
 	completedTask := NewAssessmentTask(p.GetID(), 3, 1, testeeID, "scale-code", now)
 
 	taskLifecycle := NewTaskLifecycle()
-	if err := taskLifecycle.Open(ctx, openedTask, "open-token", "https://example.com/open", time.Now().Add(6*time.Hour)); err != nil {
+	if err := taskLifecycle.Open(ctx, openedTask, "open-token", "https://example.com/open"); err != nil {
 		t.Fatalf("failed to open task: %v", err)
 	}
-	if err := taskLifecycle.Open(ctx, completedTask, "completed-token", "https://example.com/completed", time.Now().Add(6*time.Hour)); err != nil {
+	if err := taskLifecycle.Open(ctx, completedTask, "completed-token", "https://example.com/completed"); err != nil {
 		t.Fatalf("failed to open task: %v", err)
 	}
 	if err := taskLifecycle.Complete(ctx, completedTask, assessment.NewID(9011)); err != nil {
@@ -196,7 +196,7 @@ func TestPlanLifecycleResumeReusesCanceledTasks(t *testing.T) {
 	taskLifecycle := NewTaskLifecycle()
 
 	completedTask := NewAssessmentTask(p.GetID(), 1, 1, testeeID, "scale-code", time.Now())
-	if err := taskLifecycle.Open(ctx, completedTask, "completed-token", "https://example.com/completed", time.Now().Add(6*time.Hour)); err != nil {
+	if err := taskLifecycle.Open(ctx, completedTask, "completed-token", "https://example.com/completed"); err != nil {
 		t.Fatalf("failed to open completed task: %v", err)
 	}
 	if err := taskLifecycle.Complete(ctx, completedTask, assessment.NewID(9101)); err != nil {

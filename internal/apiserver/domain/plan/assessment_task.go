@@ -35,6 +35,8 @@ type AssessmentTask struct {
 	businessCreatedAt *time.Time // 可选业务创建时间；历史回填使用，普通任务为空并回退审计 created_at
 	plannedAt         time.Time  // 计划时间点
 	dueAt             time.Time  // 履约截止时间（planned_at + 7 个上海自然日）
+	scheduleRevision  uint32     // 同一 Task 的调度轮次；初始为 1，每次重排递增
+	scheduleDefinedAt time.Time  // 当前调度轮次被定义的业务时间
 	openAt            *time.Time // 实际开放时间
 	expireAt          *time.Time // 入口硬失效时间
 	completedAt       *time.Time // 完成时间
@@ -65,17 +67,34 @@ func NewAssessmentTask(
 	scaleCode string,
 	plannedAt time.Time,
 ) *AssessmentTask {
+	return NewAssessmentTaskAt(planID, seq, orgID, testeeID, scaleCode, plannedAt, time.Now())
+}
+
+// NewAssessmentTaskAt creates a task with a deterministic schedule-definition
+// timestamp. Production callers normally use NewAssessmentTask; repair and
+// contract tests use this constructor to keep immutable facts reproducible.
+func NewAssessmentTaskAt(
+	planID AssessmentPlanID,
+	seq int,
+	orgID int64,
+	testeeID testee.ID,
+	scaleCode string,
+	plannedAt time.Time,
+	scheduleDefinedAt time.Time,
+) *AssessmentTask {
 	return &AssessmentTask{
-		id:        NewAssessmentTaskID(),
-		planID:    planID,
-		seq:       seq,
-		orgID:     orgID,
-		testeeID:  testeeID,
-		scaleCode: scaleCode,
-		plannedAt: plannedAt,
-		dueAt:     TaskDueAt(plannedAt),
-		status:    TaskStatusPending,
-		events:    make([]event.DomainEvent, 0),
+		id:                NewAssessmentTaskID(),
+		planID:            planID,
+		seq:               seq,
+		orgID:             orgID,
+		testeeID:          testeeID,
+		scaleCode:         scaleCode,
+		plannedAt:         plannedAt,
+		dueAt:             TaskDueAt(plannedAt),
+		scheduleRevision:  1,
+		scheduleDefinedAt: scheduleDefinedAt,
+		status:            TaskStatusPending,
+		events:            make([]event.DomainEvent, 0),
 	}
 }
 
@@ -123,6 +142,10 @@ func (t *AssessmentTask) GetPlannedAt() time.Time {
 // GetDueAt returns the stable fulfillment deadline. It is always defined in
 // the domain; repository restoration derives it for legacy NULL rows.
 func (t *AssessmentTask) GetDueAt() time.Time { return t.dueAt }
+
+func (t *AssessmentTask) GetScheduleRevision() uint32 { return t.scheduleRevision }
+
+func (t *AssessmentTask) GetScheduleDefinedAt() time.Time { return t.scheduleDefinedAt }
 
 func (t *AssessmentTask) GetBusinessCreatedAt() *time.Time { return t.businessCreatedAt }
 
@@ -299,8 +322,11 @@ func (t *AssessmentTask) cancel(canceledAt time.Time) {
 }
 
 // reschedule 复用既有任务并将其重置为待推送状态。
-func (t *AssessmentTask) reschedule(plannedAt time.Time) error {
+func (t *AssessmentTask) reschedule(plannedAt, actionAt time.Time) error {
 	if plannedAt.IsZero() {
+		return ErrInvalidPlannedAt
+	}
+	if actionAt.IsZero() {
 		return ErrInvalidPlannedAt
 	}
 	if t.status == TaskStatusCompleted {
@@ -309,6 +335,11 @@ func (t *AssessmentTask) reschedule(plannedAt time.Time) error {
 
 	t.plannedAt = plannedAt
 	t.dueAt = TaskDueAt(plannedAt)
+	t.scheduleRevision++
+	if t.scheduleRevision == 0 {
+		t.scheduleRevision = 1
+	}
+	t.scheduleDefinedAt = actionAt
 	t.status = TaskStatusPending
 	t.openAt = nil
 	t.expireAt = nil
@@ -331,6 +362,21 @@ func (t *AssessmentTask) RestoreTimeSemantics(dueAt *time.Time, reason TaskExpir
 		t.dueAt = *dueAt
 	}
 	t.expirationReason = reason
+}
+
+// RestoreScheduleSemantics restores the current scheduling epoch. Legacy rows
+// use revision 1 and their immutable business creation time as the definition
+// timestamp until the one-off repair persists the explicit columns.
+func (t *AssessmentTask) RestoreScheduleSemantics(revision uint32, definedAt *time.Time, fallback time.Time) {
+	if revision == 0 {
+		revision = 1
+	}
+	t.scheduleRevision = revision
+	if definedAt != nil && !definedAt.IsZero() {
+		t.scheduleDefinedAt = *definedAt
+		return
+	}
+	t.scheduleDefinedAt = fallback
 }
 
 // ==================== 领域事件相关方法 ====================

@@ -110,11 +110,25 @@ func TestTaskFactDoesNotBackfillLaterLifecycleIntoEarlierEvent(t *testing.T) {
 	}
 }
 
-func TestTaskDueDefinedFactUsesStableAdditiveKey(t *testing.T) {
+func TestTaskScheduleDefinedFactUsesRevisionKeyAndOnlyScheduleColumns(t *testing.T) {
 	planned := time.Date(2026, 8, 1, 19, 0, 0, 0, time.FixedZone("CST", 8*3600))
 	due := planned.AddDate(0, 0, 7)
-	fact := taskDueDefinedFact(1, taskDueDefinedRow{ID: 42, PlanID: 5, EnrollmentID: 6, TesteeID: 7, Seq: 2, ScaleCode: "S", PlannedAt: planned, DueAt: &due, OccurredAt: planned})
-	if fact["fact_key"] != "task:42:task_due_defined" || fact["fact_type"] != "task_due_defined" || fact["due_at"] != due {
-		t.Fatalf("due fact=%v", fact)
+	fact := taskScheduleDefinedFact(1, taskScheduleDefinedRow{ID: 42, PlanID: 5, EnrollmentID: 6, TesteeID: 7, Seq: 2, ScaleCode: "S", PlannedAt: planned, DueAt: &due, OccurredAt: planned, ScheduleRevision: 2})
+	if fact["fact_key"] != "task:42:schedule:2:defined" || fact["fact_type"] != "task_schedule_defined" || fact["schedule_due_at"] != due || fact["schedule_planned_at"] != planned {
+		t.Fatalf("schedule fact=%v", fact)
+	}
+	if _, exists := fact["planned_at"]; exists {
+		t.Fatalf("schedule fact must leave legacy planned_at empty: %v", fact)
+	}
+	if _, exists := fact["due_at"]; exists {
+		t.Fatalf("schedule fact must leave legacy due_at empty: %v", fact)
+	}
+}
+
+func TestTaskScheduleTerminalFactIsRevisionScoped(t *testing.T) {
+	completedAt := time.Date(2026, 8, 10, 9, 0, 0, 0, time.FixedZone("CST", 8*3600))
+	fact := taskScheduleTerminalFact(1, "completed", taskScheduleTerminalRow{ID: 42, PlanID: 5, EnrollmentID: 6, TesteeID: 7, Seq: 2, ScaleCode: "S", OccurredAt: completedAt, ScheduleRevision: 3})
+	if fact["fact_key"] != "task:42:schedule:3:terminal" || fact["fact_type"] != "task_schedule_terminal" || fact["task_status"] != "completed" || fact["completed_at"] != completedAt {
+		t.Fatalf("terminal fact=%v", fact)
 	}
 }

@@ -194,12 +194,21 @@ type taskEventRow struct {
 	OccurredAt                         time.Time
 }
 
-type taskDueDefinedRow struct {
+type taskScheduleDefinedRow struct {
 	ID, PlanID, EnrollmentID, TesteeID uint64
 	Seq                                int
 	ScaleCode                          string
 	PlannedAt, OccurredAt              time.Time
 	DueAt                              *time.Time
+	ScheduleRevision                   uint32
+}
+
+type taskScheduleTerminalRow struct {
+	ID, PlanID, EnrollmentID, TesteeID uint64
+	Seq                                int
+	ScaleCode                          string
+	OccurredAt                         time.Time
+	ScheduleRevision                   uint32
 }
 
 type lifecycleSource struct {
@@ -216,12 +225,27 @@ func scanLifecycleRows[T any](
 	cursor func(T) (time.Time, uint64),
 	handle func([]T) error,
 ) error {
+	return scanLifecycleRowsWhere(ctx, db, table, selectColumns, timeField, "", req, rows, cursor, handle)
+}
+
+func scanLifecycleRowsWhere[T any](
+	ctx context.Context,
+	db *gorm.DB,
+	table, selectColumns, timeField, extraPredicate string,
+	req statisticsDomain.CollectRequest,
+	rows *[]T,
+	cursor func(T) (time.Time, uint64),
+	handle func([]T) error,
+) error {
 	return scanStableBatches(req.Window.From, rows, func(lastAt time.Time, lastID uint64) error {
-		return db.WithContext(ctx).Table(table).
+		query := db.WithContext(ctx).Table(table).
 			Select(selectColumns+", "+timeField+" AS occurred_at").
 			Where("org_id=? AND deleted_at IS NULL AND "+timeField+">=? AND "+timeField+"<?", req.OrgID, req.Window.From, req.Window.To).
-			Where("("+timeField+">? OR ("+timeField+"=? AND id>?))", lastAt, lastAt, lastID).
-			Order(timeField + ",id").Limit(collectorBatchSize).Find(rows).Error
+			Where("("+timeField+">? OR ("+timeField+"=? AND id>?))", lastAt, lastAt, lastID)
+		if extraPredicate != "" {
+			query = query.Where(extraPredicate)
+		}
+		return query.Order(timeField + ",id").Limit(collectorBatchSize).Find(rows).Error
 	}, cursor, handle)
 }
 
@@ -269,40 +293,77 @@ func (c *PlanFactCollector) Collect(ctx context.Context, req statisticsDomain.Co
 					applyTaskLifecycleFields(fact, source.factType, &row.OccurredAt)
 					candidates = append(candidates, factCandidate{SourceID: row.ID, FactType: source.factType, Values: fact})
 				}
-				return writeFactCandidates(ctx, c.writer, "statistics_plan_fact", candidates, req.Mode == statisticsDomain.CollectModeValidate, &result)
+				return writeLegacyFactCandidates(ctx, c.writer, "statistics_plan_fact", candidates, req.Mode == statisticsDomain.CollectModeValidate, &result)
 			})
 		if err != nil {
 			return result, err
 		}
 	}
 
-	// due_at is an additive immutable fact. Existing lifecycle fact shapes stay
-	// untouched, preventing core-hash conflicts when historical source rows are
-	// backfilled with the new stable fulfillment deadline.
-	var dueRows []taskDueDefinedRow
-	if err := scanLifecycleRows(ctx, c.db, "assessment_task", "id,plan_id,enrollment_id,testee_id,seq,scale_code,planned_at,due_at", "COALESCE(business_created_at,created_at)", req, &dueRows,
-		func(row taskDueDefinedRow) (time.Time, uint64) { return row.OccurredAt, row.ID },
-		func(batch []taskDueDefinedRow) error {
+	// Schedule facts are revision-scoped and strictly immutable. Unlike the
+	// legacy lifecycle facts, they never copy planned/due values into the generic
+	// columns, so an older projection safely ignores them after an application
+	// rollback.
+	var scheduleRows []taskScheduleDefinedRow
+	if err := scanLifecycleRows(ctx, c.db, "assessment_task", "id,plan_id,enrollment_id,testee_id,seq,scale_code,planned_at,due_at,schedule_revision", "schedule_defined_at", req, &scheduleRows,
+		func(row taskScheduleDefinedRow) (time.Time, uint64) { return row.OccurredAt, row.ID },
+		func(batch []taskScheduleDefinedRow) error {
 			candidates := make([]factCandidate, 0, len(batch))
 			for _, row := range batch {
-				if row.DueAt == nil || row.DueAt.IsZero() {
+				if row.ScheduleRevision < 1 || row.DueAt == nil || row.DueAt.IsZero() {
 					continue
 				}
-				fact := taskDueDefinedFact(req.OrgID, row)
-				candidates = append(candidates, factCandidate{SourceID: row.ID, FactType: "task_due_defined", Values: fact})
+				fact := taskScheduleDefinedFact(req.OrgID, row)
+				candidates = append(candidates, factCandidate{SourceID: row.ID, FactType: "task_schedule_defined", Values: fact})
 			}
 			return writeFactCandidates(ctx, c.writer, "statistics_plan_fact", candidates, req.Mode == statisticsDomain.CollectModeValidate, &result)
 		}); err != nil {
 		return result, err
 	}
+
+	for _, source := range []lifecycleSource{
+		{factType: "completed", timeField: "completed_at"},
+		{factType: "expired", timeField: "expired_at"},
+		{factType: "canceled", timeField: "canceled_at"},
+	} {
+		var rows []taskScheduleTerminalRow
+		err := scanLifecycleRowsWhere(ctx, c.db, "assessment_task", "id,plan_id,enrollment_id,testee_id,seq,scale_code,schedule_revision", source.timeField, "schedule_defined_at IS NOT NULL AND due_at IS NOT NULL", req, &rows,
+			func(row taskScheduleTerminalRow) (time.Time, uint64) { return row.OccurredAt, row.ID },
+			func(batch []taskScheduleTerminalRow) error {
+				candidates := make([]factCandidate, 0, len(batch))
+				for _, row := range batch {
+					if row.ScheduleRevision < 1 {
+						continue
+					}
+					fact := taskScheduleTerminalFact(req.OrgID, source.factType, row)
+					candidates = append(candidates, factCandidate{SourceID: row.ID, FactType: "task_schedule_terminal", Values: fact})
+				}
+				return writeFactCandidates(ctx, c.writer, "statistics_plan_fact", candidates, req.Mode == statisticsDomain.CollectModeValidate, &result)
+			})
+		if err != nil {
+			return result, err
+		}
+	}
 	return result, nil
 }
 
-func taskDueDefinedFact(orgID int64, row taskDueDefinedRow) map[string]any {
-	fact := baseFact(orgID, fmt.Sprintf("task:%d:task_due_defined", row.ID), "task_due_defined", row.OccurredAt, "assessment_task", strconv.FormatUint(row.ID, 10))
+func taskScheduleDefinedFact(orgID int64, row taskScheduleDefinedRow) map[string]any {
+	fact := baseFact(orgID, fmt.Sprintf("task:%d:schedule:%d:defined", row.ID, row.ScheduleRevision), "task_schedule_defined", row.OccurredAt, "assessment_task", strconv.FormatUint(row.ID, 10))
 	fact["plan_id"], fact["enrollment_id"], fact["testee_id"] = row.PlanID, row.EnrollmentID, row.TesteeID
 	fact["task_id"], fact["task_seq"], fact["scale_code"] = row.ID, row.Seq, row.ScaleCode
-	fact["planned_at"], fact["due_at"] = row.PlannedAt, *row.DueAt
+	fact["schedule_revision"] = row.ScheduleRevision
+	fact["schedule_planned_at"], fact["schedule_due_at"] = row.PlannedAt, *row.DueAt
+	return fact
+}
+
+func taskScheduleTerminalFact(orgID int64, status string, row taskScheduleTerminalRow) map[string]any {
+	fact := baseFact(orgID, fmt.Sprintf("task:%d:schedule:%d:terminal", row.ID, row.ScheduleRevision), "task_schedule_terminal", row.OccurredAt, "assessment_task", strconv.FormatUint(row.ID, 10))
+	fact["plan_id"], fact["enrollment_id"], fact["testee_id"] = row.PlanID, row.EnrollmentID, row.TesteeID
+	fact["task_id"], fact["task_seq"], fact["scale_code"] = row.ID, row.Seq, row.ScaleCode
+	fact["schedule_revision"], fact["task_status"] = row.ScheduleRevision, status
+	if status == "completed" {
+		fact["completed_at"] = row.OccurredAt
+	}
 	return fact
 }
 

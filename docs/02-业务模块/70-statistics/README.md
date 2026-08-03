@@ -55,7 +55,7 @@ Statistics 不在业务请求内实时维护计数器，而是每天以上海时
 
 ### 4.3 Plan Fact
 
-分开记录 Enrollment joined/closed/terminated 与 Task created/opened/completed/expired/canceled。`PlanEnrollment` 是持久化业务概念，一轮参与是统计履约的最小上下文。
+分开记录 Enrollment joined/closed/terminated 与 Task created/opened/completed/expired/canceled。Task 活动 Fact 保持“每个 Task、每类生命周期最多一次”；履约另使用 revision-scoped 的 `task_schedule_defined` 和 `task_schedule_terminal`，避免 Plan 恢复后旧 canceled Fact 永久排除同一 Task。`PlanEnrollment` 是持久化业务概念，一轮参与是统计履约的最小上下文。
 
 ## 5. 物理数据模型
 

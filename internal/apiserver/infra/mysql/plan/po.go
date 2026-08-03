@@ -79,6 +79,8 @@ type AssessmentTaskPO struct {
 	BusinessCreatedAt *time.Time `gorm:"column:business_created_at"`
 	PlannedAt         time.Time  `gorm:"column:planned_at;not null;index:idx_planned_at"`
 	DueAt             *time.Time `gorm:"column:due_at"`
+	ScheduleRevision  uint32     `gorm:"column:schedule_revision;not null;default:1"`
+	ScheduleDefinedAt *time.Time `gorm:"column:schedule_defined_at"`
 	OpenAt            *time.Time `gorm:"column:open_at;index:idx_open_at"`
 	ExpireAt          *time.Time `gorm:"column:expire_at"`
 	CompletedAt       *time.Time `gorm:"column:completed_at"`

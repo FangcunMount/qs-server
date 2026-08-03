@@ -8,12 +8,24 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // planRepository 计划仓储实现
 type planRepository struct {
 	mysql.BaseRepository[*AssessmentPlanPO]
 	mapper *PlanMapper
+}
+
+func (r *planRepository) FindByIDForUpdate(ctx context.Context, id domainPlan.AssessmentPlanID) (*domainPlan.AssessmentPlan, error) {
+	var po AssessmentPlanPO
+	if err := r.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", id.Uint64()).First(&po).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.WithCode(code.ErrPageNotFound, "plan not found")
+		}
+		return nil, err
+	}
+	return r.mapper.ToDomain(&po), nil
 }
 
 // NewPlanRepository 创建计划仓储

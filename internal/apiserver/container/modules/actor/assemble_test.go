@@ -34,7 +34,7 @@ func TestNewAcceptsRedisConfiguredTesteeCache(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	if module.TesteeRegistrationService == nil || module.TesteeQueryService == nil {
+	if module.TesteeRegistrationService == nil || module.TesteeQueryService == nil || module.AssessmentSummaryReader == nil {
 		t.Fatalf("actor module services were not initialized")
 	}
 }

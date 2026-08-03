@@ -40,7 +40,7 @@ func TestAssessmentTaskRecordsTerminalTransitionTimes(t *testing.T) {
 	now := time.Now()
 	task := NewAssessmentTask(NewAssessmentPlanID(), 1, 9, testee.NewID(1003), "S-1", now)
 	lifecycle := NewTaskLifecycle()
-	if err := lifecycle.Open(t.Context(), task, "token", "https://example.test", now.Add(time.Hour)); err != nil {
+	if err := lifecycle.Open(t.Context(), task, "token", "https://example.test"); err != nil {
 		t.Fatal(err)
 	}
 	if err := lifecycle.Expire(t.Context(), task); err != nil {

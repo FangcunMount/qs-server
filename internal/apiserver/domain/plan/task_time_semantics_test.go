@@ -15,24 +15,48 @@ func TestAssessmentTaskDueAndRescheduleUseCalendarDays(t *testing.T) {
 	}
 	planned := time.Date(2026, 3, 1, 19, 0, 0, 0, loc)
 	task := NewAssessmentTask(NewAssessmentPlanID(), 1, 1, testee.NewID(1), "scale", planned)
+	if task.GetScheduleRevision() != 1 || task.GetScheduleDefinedAt().IsZero() {
+		t.Fatalf("initial schedule semantics revision=%d defined_at=%s", task.GetScheduleRevision(), task.GetScheduleDefinedAt())
+	}
 	if want := planned.AddDate(0, 0, 7); !task.GetDueAt().Equal(want) {
 		t.Fatalf("due_at=%s want=%s", task.GetDueAt(), want)
 	}
 
 	lifecycle := NewTaskLifecycle()
 	openAt := planned
-	if err := lifecycle.OpenAt(t.Context(), task, "token", "url", openAt, TaskEntryExpiresAt(openAt)); err != nil {
+	if err := lifecycle.OpenAt(t.Context(), task, "token", "url", openAt); err != nil {
 		t.Fatal(err)
 	}
 	if err := lifecycle.ExpireManually(task, openAt.Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	rescheduled := planned.AddDate(0, 1, 0)
-	if err := lifecycle.Reschedule(t.Context(), task, rescheduled); err != nil {
+	rescheduledAt := planned.AddDate(0, 0, -1)
+	if err := lifecycle.RescheduleAt(t.Context(), task, rescheduled, rescheduledAt); err != nil {
 		t.Fatal(err)
+	}
+	if task.GetScheduleRevision() != 2 || !task.GetScheduleDefinedAt().Equal(rescheduledAt) {
+		t.Fatalf("rescheduled schedule semantics revision=%d defined_at=%s", task.GetScheduleRevision(), task.GetScheduleDefinedAt())
 	}
 	if !task.GetDueAt().Equal(rescheduled.AddDate(0, 0, 7)) || task.GetOpenAt() != nil || task.GetExpireAt() != nil || task.GetExpirationReason() != "" {
 		t.Fatalf("reschedule did not reset time semantics: due=%s open=%v expire=%v reason=%q", task.GetDueAt(), task.GetOpenAt(), task.GetExpireAt(), task.GetExpirationReason())
+	}
+}
+
+func TestTaskGeneratorDefinesOneAtomicScheduleInstant(t *testing.T) {
+	plan, err := NewAssessmentPlan(1, "scale", PlanScheduleByDay, 1, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	definedAt := time.Date(2026, 8, 3, 9, 30, 0, 0, taskBusinessLocation)
+	tasks := NewTaskGenerator().GenerateTasksAt(plan, testee.NewID(1), definedAt, definedAt)
+	if len(tasks) != 3 {
+		t.Fatalf("tasks=%d want=3", len(tasks))
+	}
+	for _, task := range tasks {
+		if task.GetScheduleRevision() != 1 || !task.GetScheduleDefinedAt().Equal(definedAt) {
+			t.Fatalf("task=%s revision=%d defined_at=%s", task.GetID(), task.GetScheduleRevision(), task.GetScheduleDefinedAt())
+		}
 	}
 }
 
@@ -54,9 +78,11 @@ func TestTaskCompletionAllowsOverdueBeforeEntryExpiry(t *testing.T) {
 	task := NewAssessmentTask(NewAssessmentPlanID(), 1, 1, testee.NewID(1), "scale", planned)
 	lifecycle := NewTaskLifecycle()
 	openAt := planned.Add(23 * time.Hour)
-	expireAt := TaskEntryExpiresAt(openAt)
-	if err := lifecycle.OpenAt(t.Context(), task, "token", "url", openAt, expireAt); err != nil {
+	if err := lifecycle.OpenAt(t.Context(), task, "token", "url", openAt); err != nil {
 		t.Fatal(err)
+	}
+	if task.GetExpireAt() == nil || !task.GetExpireAt().Equal(TaskEntryExpiresAt(openAt)) {
+		t.Fatalf("expire_at=%v want=%s", task.GetExpireAt(), TaskEntryExpiresAt(openAt))
 	}
 	completedAt := planned.AddDate(0, 0, 7).Add(time.Hour)
 	if !completedAt.After(task.GetDueAt()) {
@@ -72,7 +98,7 @@ func TestTaskCompletionRejectsEntryExpiryBoundary(t *testing.T) {
 	task := NewAssessmentTask(NewAssessmentPlanID(), 1, 1, testee.NewID(1), "scale", planned)
 	lifecycle := NewTaskLifecycle()
 	expireAt := TaskEntryExpiresAt(planned)
-	if err := lifecycle.OpenAt(t.Context(), task, "token", "url", planned, expireAt); err != nil {
+	if err := lifecycle.OpenAt(t.Context(), task, "token", "url", planned); err != nil {
 		t.Fatal(err)
 	}
 	if err := lifecycle.CompleteAt(t.Context(), task, assessment.ID(9), expireAt); err == nil {
@@ -98,19 +124,19 @@ func TestTaskOpenWindowBoundaries(t *testing.T) {
 	lifecycle := NewTaskLifecycle()
 
 	tooEarly := NewAssessmentTask(NewAssessmentPlanID(), 1, 1, testee.NewID(1), "scale", planned)
-	if err := lifecycle.OpenAt(t.Context(), tooEarly, "token", "url", planned.Add(-time.Nanosecond), TaskEntryExpiresAt(planned.Add(-time.Nanosecond))); err == nil {
+	if err := lifecycle.OpenAt(t.Context(), tooEarly, "token", "url", planned.Add(-time.Nanosecond)); err == nil {
 		t.Fatal("opening before planned_at must fail")
 	}
 
 	atBoundary := NewAssessmentTask(NewAssessmentPlanID(), 2, 1, testee.NewID(1), "scale", planned)
 	windowEnd := TaskOpenWindowEndsAt(planned)
-	if err := lifecycle.OpenAt(t.Context(), atBoundary, "token", "url", windowEnd, TaskEntryExpiresAt(windowEnd)); err == nil {
+	if err := lifecycle.OpenAt(t.Context(), atBoundary, "token", "url", windowEnd); err == nil {
 		t.Fatal("opening at planned_at+24h must fail")
 	}
 
 	inside := NewAssessmentTask(NewAssessmentPlanID(), 3, 1, testee.NewID(1), "scale", planned)
 	openAt := windowEnd.Add(-time.Nanosecond)
-	if err := lifecycle.OpenAt(t.Context(), inside, "token", "url", openAt, TaskEntryExpiresAt(openAt)); err != nil {
+	if err := lifecycle.OpenAt(t.Context(), inside, "token", "url", openAt); err != nil {
 		t.Fatalf("opening immediately before window end should succeed: %v", err)
 	}
 }
@@ -128,7 +154,7 @@ func TestTaskLifecycleRejectsIllegalExpirationTransitions(t *testing.T) {
 
 	opened := NewAssessmentTask(NewAssessmentPlanID(), 2, 1, testee.NewID(1), "scale", planned)
 	openAt := planned
-	if err := lifecycle.OpenAt(t.Context(), opened, "token", "url", openAt, TaskEntryExpiresAt(openAt)); err != nil {
+	if err := lifecycle.OpenAt(t.Context(), opened, "token", "url", openAt); err != nil {
 		t.Fatal(err)
 	}
 	if err := lifecycle.ExpireMissedOpenWindow(opened, TaskOpenWindowEndsAt(planned)); err == nil {

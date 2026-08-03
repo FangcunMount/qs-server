@@ -34,6 +34,10 @@ type storedFactHash struct {
 	CoreHash string `gorm:"column:core_hash"`
 }
 
+type storedFactKey struct {
+	FactKey string `gorm:"column:fact_key"`
+}
+
 type pendingFact struct {
 	index  int
 	values map[string]any
@@ -133,6 +137,62 @@ func (w factWriter) writeBatch(ctx context.Context, table string, facts []map[st
 		}
 	}
 	return dispositions, conflictErr
+}
+
+// writeBatchByKey preserves legacy lifecycle facts once their immutable key has
+// been collected. Those facts predate schedule revisions and were originally
+// built from the mutable assessment_task row, so recomputing their core hash
+// after a reschedule would turn a harmless repair into a permanent conflict.
+// Missing facts still use the strict writer and retain the original shape.
+func (w factWriter) writeBatchByKey(ctx context.Context, table string, facts []map[string]any, validateOnly bool) ([]factWriteDisposition, error) {
+	dispositions := make([]factWriteDisposition, len(facts))
+	if len(facts) == 0 {
+		return dispositions, nil
+	}
+	if !isFactTable(table) {
+		dispositions[0] = factWriteFailed
+		return dispositions, fmt.Errorf("unsupported statistics fact table %q", table)
+	}
+
+	keys := make([]string, 0, len(facts))
+	uniqueKeys := make(map[string]struct{}, len(facts))
+	for index, values := range facts {
+		key, ok := values["fact_key"].(string)
+		if !ok || strings.TrimSpace(key) == "" {
+			dispositions[index] = factWriteFailed
+			return dispositions, fmt.Errorf("statistics fact key is required")
+		}
+		if _, exists := uniqueKeys[key]; !exists {
+			uniqueKeys[key] = struct{}{}
+			keys = append(keys, key)
+		}
+	}
+
+	var storedRows []storedFactKey
+	if err := w.db.WithContext(ctx).Table(table).Select("fact_key").Where("fact_key IN ?", keys).Find(&storedRows).Error; err != nil {
+		dispositions[0] = factWriteFailed
+		return dispositions, err
+	}
+	stored := make(map[string]struct{}, len(storedRows))
+	for _, row := range storedRows {
+		stored[row.FactKey] = struct{}{}
+	}
+
+	missingFacts := make([]map[string]any, 0, len(facts))
+	missingIndexes := make([]int, 0, len(facts))
+	for index, values := range facts {
+		if _, exists := stored[values["fact_key"].(string)]; exists {
+			dispositions[index] = factWriteExisting
+			continue
+		}
+		missingFacts = append(missingFacts, values)
+		missingIndexes = append(missingIndexes, index)
+	}
+	missingDispositions, err := w.writeBatch(ctx, table, missingFacts, validateOnly)
+	for offset, disposition := range missingDispositions {
+		dispositions[missingIndexes[offset]] = disposition
+	}
+	return dispositions, err
 }
 
 func (w factWriter) insertPending(ctx context.Context, table string, pending []pendingFact, dispositions []factWriteDisposition) error {
@@ -272,6 +332,30 @@ func writeFactCandidates(
 	validateOnly bool,
 	result *statisticsDomain.CollectResult,
 ) error {
+	return writeFactCandidatesWith(ctx, writer.writeBatch, table, candidates, validateOnly, result)
+}
+
+func writeLegacyFactCandidates(
+	ctx context.Context,
+	writer factWriter,
+	table string,
+	candidates []factCandidate,
+	validateOnly bool,
+	result *statisticsDomain.CollectResult,
+) error {
+	return writeFactCandidatesWith(ctx, writer.writeBatchByKey, table, candidates, validateOnly, result)
+}
+
+type factBatchWriteFunc func(context.Context, string, []map[string]any, bool) ([]factWriteDisposition, error)
+
+func writeFactCandidatesWith(
+	ctx context.Context,
+	writeBatch factBatchWriteFunc,
+	table string,
+	candidates []factCandidate,
+	validateOnly bool,
+	result *statisticsDomain.CollectResult,
+) error {
 	seenSources := make(map[uint64]struct{}, len(candidates))
 	for start := 0; start < len(candidates); {
 		end := start + collectorBatchSize
@@ -285,7 +369,7 @@ func writeFactCandidates(
 		for index := start; index < end; index++ {
 			values[index-start] = candidates[index].Values
 		}
-		dispositions, err := writer.writeBatch(ctx, table, values, validateOnly)
+		dispositions, err := writeBatch(ctx, table, values, validateOnly)
 		for offset, disposition := range dispositions {
 			if disposition == factWriteUnprocessed {
 				continue

@@ -331,7 +331,7 @@ func TestTaskSchedulerServiceAlwaysExpiresOverdueTasks(t *testing.T) {
 		openedAt,
 	)
 	taskLifecycle := domainPlan.NewTaskLifecycle()
-	if err := taskLifecycle.OpenAt(context.Background(), expiredTask, "token", "https://example.com/entry", openedAt, domainPlan.TaskEntryExpiresAt(openedAt)); err != nil {
+	if err := taskLifecycle.OpenAt(context.Background(), expiredTask, "token", "https://example.com/entry", openedAt); err != nil {
 		t.Fatalf("open expiredTask returned error: %v", err)
 	}
 

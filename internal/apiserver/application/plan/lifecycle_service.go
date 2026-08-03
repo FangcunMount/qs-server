@@ -18,6 +18,7 @@ import (
 type lifecycleService struct {
 	planRepo           plan.AssessmentPlanRepository
 	taskRepo           plan.AssessmentTaskRepository
+	tx                 apptransaction.Runner
 	lifecycle          *plan.PlanLifecycle
 	createWorkflow     *planCreateWorkflow
 	transitionWorkflow *planTransitionWorkflow
@@ -58,6 +59,7 @@ func NewLifecycleServiceWithEnrollment(
 	return &lifecycleService{
 		planRepo:           planRepo,
 		taskRepo:           taskRepo,
+		tx:                 tx,
 		lifecycle:          lifecycle,
 		createWorkflow:     newPlanCreateWorkflow(planRepo, scaleCatalog, plan.NewPlanValidator()),
 		transitionWorkflow: newPlanTransitionWorkflow(planRepo, taskRepo, enrollments, tx, eventPublisher),
@@ -101,12 +103,6 @@ func (s *lifecycleService) ResumePlan(ctx context.Context, orgID int64, planID s
 		"testee_count", len(testeeStartDates),
 	)
 
-	// 1. 查询并校验计划
-	p, err := loadPlanInOrg(ctx, s.planRepo, orgID, planID, "resume_plan")
-	if err != nil {
-		return nil, err
-	}
-
 	// 转换 testeeStartDates
 	testeeStartDateMap := make(map[testee.ID]time.Time)
 	for testeeIDStr, dateStr := range testeeStartDates {
@@ -121,47 +117,49 @@ func (s *lifecycleService) ResumePlan(ctx context.Context, orgID int64, planID s
 		testeeStartDateMap[testeeID] = date
 	}
 
-	// 2. 调用领域服务恢复计划
-	resumeResult, err := s.lifecycle.Resume(ctx, p, testeeStartDateMap)
+	parsedPlanID, err := plan.ParseAssessmentPlanID(planID)
 	if err != nil {
-		logger.L(ctx).Errorw("Failed to resume plan",
-			"action", "resume_plan",
-			"plan_id", planID,
-			"error", err.Error(),
-		)
+		return nil, invalidArgumentErr("无效的计划ID: %v", err)
+	}
+	if s.tx == nil {
+		return nil, errors.WithCode(errorCode.ErrInternalServerError, "恢复计划事务组件未配置")
+	}
+	var resumedPlan *plan.AssessmentPlan
+	var resumeResult *plan.ResumeTasksResult
+	actionAt := time.Now()
+	resume := func(txCtx context.Context) error {
+		p, loadErr := s.loadPlanForResume(txCtx, orgID, parsedPlanID)
+		if loadErr != nil {
+			return loadErr
+		}
+		tasks, loadErr := s.loadTasksForResume(txCtx, parsedPlanID)
+		if loadErr != nil {
+			return loadErr
+		}
+		result, lifecycleErr := s.lifecycle.ResumeWithTasksAt(txCtx, p, tasks, testeeStartDateMap, actionAt)
+		if lifecycleErr != nil {
+			return lifecycleErr
+		}
+		if saveErr := s.planRepo.Save(txCtx, p); saveErr != nil {
+			return errors.WrapC(saveErr, errorCode.ErrDatabase, "保存计划失败")
+		}
+		for _, task := range result.TasksToSave {
+			if saveErr := s.saveResumedTask(txCtx, task); saveErr != nil {
+				if errors.IsCode(saveErr, errorCode.ErrConflict) {
+					return saveErr
+				}
+				return errors.WrapC(saveErr, errorCode.ErrDatabase, "保存任务失败")
+			}
+		}
+		resumedPlan, resumeResult = p, result
+		return nil
+	}
+	err = s.tx.WithinTransaction(ctx, resume)
+	if err != nil {
+		logger.L(ctx).Errorw("Failed to resume plan", "action", "resume_plan", "plan_id", planID, "error", err.Error())
 		return nil, err
 	}
-
-	logger.L(ctx).Infow("Plan resumed, preparing outstanding tasks",
-		"action", "resume_plan",
-		"plan_id", planID,
-		"tasks_to_save_count", len(resumeResult.TasksToSave),
-	)
-
-	// 3. 持久化计划
-	if err := s.planRepo.Save(ctx, p); err != nil {
-		logger.L(ctx).Errorw("Failed to save resumed plan",
-			"action", "resume_plan",
-			"plan_id", planID,
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存计划失败")
-	}
-
-	// 4. 持久化恢复后的任务（包含新生成任务和复用重置任务）
-	savedTaskCount := 0
-	for _, task := range resumeResult.TasksToSave {
-		if err := s.taskRepo.Save(ctx, task); err != nil {
-			logger.L(ctx).Errorw("Failed to save resumed task",
-				"action", "resume_plan",
-				"plan_id", planID,
-				"task_id", task.GetID().String(),
-				"error", err.Error(),
-			)
-			return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存任务失败")
-		}
-		savedTaskCount++
-	}
+	savedTaskCount := len(resumeResult.TasksToSave)
 
 	logger.L(ctx).Infow("Plan resumed successfully",
 		"action", "resume_plan",
@@ -170,7 +168,50 @@ func (s *lifecycleService) ResumePlan(ctx context.Context, orgID int64, planID s
 		"saved_tasks_count", savedTaskCount,
 	)
 
-	return toPlanResult(p), nil
+	return toPlanResult(resumedPlan), nil
+}
+
+type resumeTaskRevisionRepository interface {
+	SaveRescheduled(context.Context, *plan.AssessmentTask, uint32) error
+}
+
+func (s *lifecycleService) saveResumedTask(ctx context.Context, task *plan.AssessmentTask) error {
+	if task.GetID().IsZero() || task.GetScheduleRevision() <= 1 {
+		return s.taskRepo.Save(ctx, task)
+	}
+	if repository, ok := s.taskRepo.(resumeTaskRevisionRepository); ok {
+		return repository.SaveRescheduled(ctx, task, task.GetScheduleRevision()-1)
+	}
+	return s.taskRepo.Save(ctx, task)
+}
+
+type resumePlanLockingRepository interface {
+	FindByIDForUpdate(context.Context, plan.AssessmentPlanID) (*plan.AssessmentPlan, error)
+}
+
+type resumeTaskLockingRepository interface {
+	FindByPlanIDForUpdate(context.Context, plan.AssessmentPlanID) ([]*plan.AssessmentTask, error)
+}
+
+func (s *lifecycleService) loadPlanForResume(ctx context.Context, orgID int64, id plan.AssessmentPlanID) (*plan.AssessmentPlan, error) {
+	if locking, ok := s.planRepo.(resumePlanLockingRepository); ok {
+		p, err := locking.FindByIDForUpdate(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if p.GetOrgID() != orgID {
+			return nil, errors.WithCode(errorCode.ErrPageNotFound, "plan not found")
+		}
+		return p, nil
+	}
+	return loadPlanInOrg(ctx, s.planRepo, orgID, id.String(), "resume_plan")
+}
+
+func (s *lifecycleService) loadTasksForResume(ctx context.Context, id plan.AssessmentPlanID) ([]*plan.AssessmentTask, error) {
+	if locking, ok := s.taskRepo.(resumeTaskLockingRepository); ok {
+		return locking.FindByPlanIDForUpdate(ctx, id)
+	}
+	return s.taskRepo.FindByPlanID(ctx, id)
 }
 
 // FinishPlan 手动结束计划

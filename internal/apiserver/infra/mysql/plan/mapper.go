@@ -174,12 +174,17 @@ func (m *TaskMapper) ToPO(domain *domainPlan.AssessmentTask) *AssessmentTaskPO {
 		ScaleCode:         domain.GetScaleCode(),
 		PlannedAt:         domain.GetPlannedAt(),
 		BusinessCreatedAt: domain.GetBusinessCreatedAt(),
+		ScheduleRevision:  domain.GetScheduleRevision(),
 		Status:            string(domain.GetStatus()),
 		EntryToken:        domain.GetEntryToken(),
 		EntryURL:          domain.GetEntryURL(),
 	}
 	dueAt := domain.GetDueAt()
 	po.DueAt = &dueAt
+	scheduleDefinedAt := domain.GetScheduleDefinedAt()
+	if !scheduleDefinedAt.IsZero() {
+		po.ScheduleDefinedAt = &scheduleDefinedAt
+	}
 	if reason := domain.GetExpirationReason().String(); reason != "" {
 		po.ExpirationReason = &reason
 	}
@@ -247,6 +252,11 @@ func (m *TaskMapper) ToDomain(po *AssessmentTaskPO) *domainPlan.AssessmentTask {
 		po.EntryURL,
 	)
 	task.RestoreTimeSemantics(po.DueAt, domainPlan.TaskExpirationReason(stringValue(po.ExpirationReason)))
+	fallbackScheduleAt := po.CreatedAt
+	if po.BusinessCreatedAt != nil {
+		fallbackScheduleAt = *po.BusinessCreatedAt
+	}
+	task.RestoreScheduleSemantics(po.ScheduleRevision, po.ScheduleDefinedAt, fallbackScheduleAt)
 	if po.BusinessCreatedAt != nil {
 		task.SetBusinessCreatedAt(*po.BusinessCreatedAt)
 	}

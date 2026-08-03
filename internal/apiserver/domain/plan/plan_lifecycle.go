@@ -109,6 +109,23 @@ func (l *PlanLifecycle) Resume(
 	plan *AssessmentPlan,
 	testeeStartDates map[testee.ID]time.Time,
 ) (*ResumeTasksResult, error) {
+	allTasks, err := l.findResumeTasks(ctx, plan.GetID().String(), plan)
+	if err != nil {
+		return nil, err
+	}
+	return l.ResumeWithTasksAt(ctx, plan, allTasks, testeeStartDates, time.Now())
+}
+
+// ResumeWithTasksAt prepares a resumed plan from a caller-supplied, locked task
+// snapshot. The application layer uses this seam to keep the Plan state and all
+// schedule revisions inside one database transaction.
+func (l *PlanLifecycle) ResumeWithTasksAt(
+	ctx context.Context,
+	plan *AssessmentPlan,
+	allTasks []*AssessmentTask,
+	testeeStartDates map[testee.ID]time.Time,
+	actionAt time.Time,
+) (*ResumeTasksResult, error) {
 	planID := plan.GetID().String()
 	logger.L(ctx).Infow("Resuming plan in domain service",
 		"domain_action", "resume_plan",
@@ -120,15 +137,13 @@ func (l *PlanLifecycle) Resume(
 	if err := validatePlanResume(plan); err != nil {
 		return nil, err
 	}
-
-	allTasks, err := l.findResumeTasks(ctx, planID, plan)
-	if err != nil {
-		return nil, err
+	if actionAt.IsZero() {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "恢复时间不能为空")
 	}
 
 	state := buildResumeTaskState(allTasks)
 	startDateMap := resolveResumeStartDates(plan, state.firstTask, testeeStartDates)
-	result, err := l.prepareResumeTasks(ctx, planID, plan, state, startDateMap)
+	result, err := l.prepareResumeTasks(ctx, planID, plan, state, startDateMap, actionAt)
 	if err != nil {
 		return nil, err
 	}
@@ -221,10 +236,11 @@ func (l *PlanLifecycle) prepareResumeTasks(
 	plan *AssessmentPlan,
 	state *resumeTaskState,
 	startDates map[testee.ID]time.Time,
+	actionAt time.Time,
 ) (*ResumeTasksResult, error) {
 	result := &ResumeTasksResult{TasksToSave: make([]*AssessmentTask, 0)}
 	for testeeID, startDate := range startDates {
-		tasks, err := l.prepareResumeTasksForTestee(ctx, planID, plan, state, testeeID, startDate)
+		tasks, err := l.prepareResumeTasksForTestee(ctx, planID, plan, state, testeeID, startDate, actionAt)
 		if err != nil {
 			return nil, err
 		}
@@ -247,6 +263,7 @@ func (l *PlanLifecycle) prepareResumeTasksForTestee(
 	state *resumeTaskState,
 	testeeID testee.ID,
 	startDate time.Time,
+	actionAt time.Time,
 ) ([]*AssessmentTask, error) {
 	if startDate.IsZero() {
 		logger.L(ctx).Warnw("Skipping testee with zero start date",
@@ -257,7 +274,7 @@ func (l *PlanLifecycle) prepareResumeTasksForTestee(
 		return nil, nil
 	}
 
-	allGeneratedTasks := l.taskGenerator.GenerateTasks(plan, testeeID, startDate)
+	allGeneratedTasks := l.taskGenerator.GenerateTasksAt(plan, testeeID, startDate, actionAt)
 	existingBySeq := groupTasksBySeq(state.tasksByTestee[testeeID])
 	maxCompletedSeq := state.maxCompletedSeq[testeeID]
 	tasksToSave := make([]*AssessmentTask, 0, len(allGeneratedTasks))
@@ -273,7 +290,7 @@ func (l *PlanLifecycle) prepareResumeTasksForTestee(
 			continue
 		}
 
-		if err := l.taskLifecycle.Reschedule(ctx, reusable, task.GetPlannedAt()); err != nil {
+		if err := l.taskLifecycle.RescheduleAt(ctx, reusable, task.GetPlannedAt(), actionAt); err != nil {
 			logger.L(ctx).Errorw("Failed to reschedule existing task for resumed plan",
 				"domain_action", "resume_plan",
 				"plan_id", planID,
