@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -67,7 +68,6 @@ func loadScheduleCandidatesPage(ctx context.Context, db *sql.DB, orgID int64, la
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	batch := make([]scheduleCandidate, 0, batchSize)
 	for rows.Next() {
 		var item scheduleCandidate
@@ -79,7 +79,7 @@ func loadScheduleCandidatesPage(ctx context.Context, db *sql.DB, orgID int64, la
 			&item.SourceCreatedAt, &item.CreatedAt, &item.UpdatedAt,
 			&legacyPlanned, &legacyCompleted, &legacyExpired, &legacyCanceled,
 		); err != nil {
-			return nil, err
+			return nil, errors.Join(err, rows.Close())
 		}
 		item.OpenAt = nullTime(openAt)
 		item.CompletedAt = nullTime(completedAt)
@@ -91,7 +91,7 @@ func loadScheduleCandidatesPage(ctx context.Context, db *sql.DB, orgID int64, la
 		item.LegacyCanceled = nullTime(legacyCanceled)
 		batch = append(batch, item)
 	}
-	return batch, rows.Err()
+	return batch, errors.Join(rows.Err(), rows.Close())
 }
 
 func inferSchedule(candidate scheduleCandidate) scheduleInference {

@@ -85,8 +85,9 @@ func TestRetireSeedBackfillControlColdStart(t *testing.T) {
 	db, databaseName := openStatisticsMigrationDatabase(t, dsn)
 	migrator := NewMigrator(db, &Config{Enabled: true, Database: databaseName})
 	version, changed, err := migrator.Run()
-	if err != nil || !changed || version != 64 {
-		t.Fatalf("migrate MySQL 0 -> 64: version=%d changed=%v err=%v", version, changed, err)
+	wantVersion := latestEmbeddedMySQLMigrationVersion(t)
+	if err != nil || !changed || version != wantVersion {
+		t.Fatalf("migrate MySQL 0 -> latest: version=%d changed=%v err=%v want_version=%d", version, changed, err, wantVersion)
 	}
 	for _, table := range retiredMySQLControlTables {
 		assertMySQLTable(t, db, databaseName, table, false)

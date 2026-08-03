@@ -121,7 +121,7 @@ func main() {
 	}
 }
 
-func run(args []string, out io.Writer) error {
+func run(args []string, out io.Writer) (runErr error) {
 	cfg, err := parseConfig(args, out)
 	if err != nil {
 		return err
@@ -136,7 +136,9 @@ func run(args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func() {
+		runErr = errors.Join(runErr, db.Close())
+	}()
 	db.SetMaxOpenConns(1)
 	if _, err := db.ExecContext(ctx, "SET time_zone = '+08:00'"); err != nil {
 		return fmt.Errorf("set Shanghai session timezone: %w", err)
@@ -153,7 +155,9 @@ func run(args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	defer writer.Close()
+	defer func() {
+		runErr = errors.Join(runErr, writer.Close())
+	}()
 
 	switch cfg.mode {
 	case "audit":
@@ -515,23 +519,19 @@ func backfillSchedule(ctx context.Context, db *sql.DB, cfg config, cp *checkpoin
 			after := taskScheduleState{ID: candidate.ID, Version: candidate.Version + 1, ScheduleRevision: inference.Revision, ScheduleDefinedAt: &definedAt}
 			res, err := tx.ExecContext(ctx, `UPDATE assessment_task SET schedule_revision=?,schedule_defined_at=?,version=version+1 WHERE org_id=? AND id=? AND version=? AND schedule_revision=? AND schedule_defined_at IS NULL AND status=? AND planned_at=? AND open_at <=> ? AND completed_at <=> ? AND expired_at <=> ? AND canceled_at <=> ? AND deleted_at IS NULL`, inference.Revision, definedAt, cfg.orgID, candidate.ID, candidate.Version, candidate.ScheduleRevision, candidate.Status, candidate.PlannedAt, nullableValue(candidate.OpenAt), nullableValue(candidate.CompletedAt), nullableValue(candidate.ExpiredAt), nullableValue(candidate.CanceledAt))
 			if err != nil {
-				tx.Rollback()
-				return err
+				return rollbackWithCause(tx, err)
 			}
 			if changed, _ := res.RowsAffected(); changed != 1 {
-				tx.Rollback()
-				return fmt.Errorf("backfill_schedule CAS conflict task=%d", candidate.ID)
+				return rollbackWithCause(tx, fmt.Errorf("backfill_schedule CAS conflict task=%d", candidate.ID))
 			}
 			beforeJSON, _ := json.Marshal(before)
 			afterJSON, _ := json.Marshal(after)
 			if err := writer.Write(baseAudit(cfg, cp, "task_schedule", "backfill_schedule", candidate.ID, beforeJSON, afterJSON, inference)); err != nil {
-				tx.Rollback()
-				return err
+				return rollbackWithCause(tx, err)
 			}
 		}
 		if err := writer.Sync(); err != nil {
-			tx.Rollback()
-			return err
+			return rollbackWithCause(tx, err)
 		}
 		if err := tx.Commit(); err != nil {
 			return err
@@ -540,7 +540,9 @@ func backfillSchedule(ctx context.Context, db *sql.DB, cfg config, cp *checkpoin
 		if err := saveCheckpoint(cfg.checkpointFile, cp); err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "phase=backfill_schedule checkpoint=%d updated=%d\n", cp.LastID, len(batch))
+		if _, err := fmt.Fprintf(out, "phase=backfill_schedule checkpoint=%d updated=%d\n", cp.LastID, len(batch)); err != nil {
+			return err
+		}
 	}
 }
 
@@ -554,8 +556,7 @@ func backfillDue(ctx context.Context, db *sql.DB, cfg config, cp *checkpoint, wr
 		for rows.Next() {
 			item, err := scanTaskState(rows)
 			if err != nil {
-				rows.Close()
-				return err
+				return errors.Join(err, rows.Close())
 			}
 			batch = append(batch, item)
 		}
@@ -576,21 +577,17 @@ func backfillDue(ctx context.Context, db *sql.DB, cfg config, cp *checkpoint, wr
 			after.DueAt = &due
 			res, err := tx.ExecContext(ctx, `UPDATE assessment_task SET due_at=?,version=version+1,updated_at=updated_at WHERE org_id=? AND id=? AND version=? AND due_at IS NULL AND status=? AND planned_at=? AND schedule_revision=? AND schedule_defined_at <=> ? AND deleted_at IS NULL`, due, cfg.orgID, before.ID, before.Version, before.Status, before.PlannedAt, before.ScheduleRevision, nullableValue(before.ScheduleDefinedAt))
 			if err != nil {
-				tx.Rollback()
-				return err
+				return rollbackWithCause(tx, err)
 			}
 			if n, _ := res.RowsAffected(); n != 1 {
-				tx.Rollback()
-				return fmt.Errorf("backfill_due CAS conflict task=%d", before.ID)
+				return rollbackWithCause(tx, fmt.Errorf("backfill_due CAS conflict task=%d", before.ID))
 			}
 			if err := writeStateAudit(writer, cfg, cp, "task", "backfill_due", before.ID, before, after); err != nil {
-				tx.Rollback()
-				return err
+				return rollbackWithCause(tx, err)
 			}
 		}
 		if err := writer.Sync(); err != nil {
-			tx.Rollback()
-			return err
+			return rollbackWithCause(tx, err)
 		}
 		if err := tx.Commit(); err != nil {
 			return err
@@ -599,7 +596,9 @@ func backfillDue(ctx context.Context, db *sql.DB, cfg config, cp *checkpoint, wr
 		if err := saveCheckpoint(cfg.checkpointFile, cp); err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "phase=backfill_due checkpoint=%d updated=%d\n", cp.LastID, len(batch))
+		if _, err := fmt.Fprintf(out, "phase=backfill_due checkpoint=%d updated=%d\n", cp.LastID, len(batch)); err != nil {
+			return err
+		}
 	}
 }
 
@@ -615,8 +614,7 @@ func expireMissed(ctx context.Context, db *sql.DB, cfg config, cp *checkpoint, w
 		for rows.Next() {
 			state, err := scanTaskState(rows)
 			if err != nil {
-				rows.Close()
-				return err
+				return errors.Join(err, rows.Close())
 			}
 			batch = append(batch, state)
 		}
@@ -640,21 +638,17 @@ func expireMissed(ctx context.Context, db *sql.DB, cfg config, cp *checkpoint, w
 			after.ExpirationReason = &reason
 			res, err := tx.ExecContext(ctx, `UPDATE assessment_task SET status='expired',expiration_reason='missed_open_window',expired_at=?,version=version+1 WHERE org_id=? AND id=? AND version=? AND status='pending' AND planned_at=? AND due_at <=> ? AND schedule_revision=? AND schedule_defined_at <=> ? AND open_at IS NULL AND expire_at IS NULL AND completed_at IS NULL AND expired_at IS NULL AND canceled_at IS NULL AND assessment_id IS NULL AND COALESCE(entry_token,'')='' AND COALESCE(entry_url,'')='' AND COALESCE(expiration_reason,'')='' AND deleted_at IS NULL`, expiredAt, cfg.orgID, before.ID, before.Version, before.PlannedAt, nullableValue(before.DueAt), before.ScheduleRevision, nullableValue(before.ScheduleDefinedAt))
 			if err != nil {
-				tx.Rollback()
-				return err
+				return rollbackWithCause(tx, err)
 			}
 			if n, _ := res.RowsAffected(); n != 1 {
-				tx.Rollback()
-				return fmt.Errorf("expire_missed CAS conflict task=%d", before.ID)
+				return rollbackWithCause(tx, fmt.Errorf("expire_missed CAS conflict task=%d", before.ID))
 			}
 			if err := writeStateAudit(writer, cfg, cp, "task", "expire_missed", before.ID, before, after); err != nil {
-				tx.Rollback()
-				return err
+				return rollbackWithCause(tx, err)
 			}
 		}
 		if err := writer.Sync(); err != nil {
-			tx.Rollback()
-			return err
+			return rollbackWithCause(tx, err)
 		}
 		if err := tx.Commit(); err != nil {
 			return err
@@ -663,7 +657,9 @@ func expireMissed(ctx context.Context, db *sql.DB, cfg config, cp *checkpoint, w
 		if err := saveCheckpoint(cfg.checkpointFile, cp); err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "phase=expire_missed checkpoint=%d updated=%d\n", cp.LastID, len(batch))
+		if _, err := fmt.Fprintf(out, "phase=expire_missed checkpoint=%d updated=%d\n", cp.LastID, len(batch)); err != nil {
+			return err
+		}
 	}
 }
 
@@ -702,6 +698,13 @@ func nullTime(value sql.NullTime) *time.Time {
 	return &v
 }
 
+func rollbackWithCause(tx *sql.Tx, cause error) error {
+	if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
+		return errors.Join(cause, fmt.Errorf("rollback transaction: %w", err))
+	}
+	return cause
+}
+
 func closeEnrollments(ctx context.Context, db *sql.DB, cfg config, cp *checkpoint, writer *auditWriter, out io.Writer) error {
 	rows, err := db.QueryContext(ctx, `SELECT e.id,e.version,e.status,e.closed_at,MAX(CASE WHEN t.status='completed' THEN t.completed_at WHEN t.status='expired' THEN t.expired_at WHEN t.status='canceled' THEN t.canceled_at END) terminal_at FROM plan_enrollment e JOIN assessment_task t ON t.enrollment_id=e.id AND t.org_id=e.org_id AND t.deleted_at IS NULL WHERE e.org_id=? AND e.status='active' AND e.deleted_at IS NULL AND e.id>? GROUP BY e.id,e.version,e.status,e.closed_at HAVING SUM(t.status NOT IN ('completed','expired','canceled'))=0 AND SUM(CASE WHEN t.status='completed' AND t.completed_at IS NULL THEN 1 WHEN t.status='expired' AND t.expired_at IS NULL THEN 1 WHEN t.status='canceled' AND t.canceled_at IS NULL THEN 1 ELSE 0 END)=0 ORDER BY e.id LIMIT ?`, cfg.orgID, cp.LastID, batchSize)
 	if err != nil {
@@ -716,12 +719,10 @@ func closeEnrollments(ctx context.Context, db *sql.DB, cfg config, cp *checkpoin
 		var c candidate
 		var closed, terminal sql.NullTime
 		if err := rows.Scan(&c.before.ID, &c.before.Version, &c.before.Status, &closed, &terminal); err != nil {
-			rows.Close()
-			return err
+			return errors.Join(err, rows.Close())
 		}
 		if !terminal.Valid {
-			rows.Close()
-			return fmt.Errorf("enrollment %d has terminal tasks without terminal timestamps", c.before.ID)
+			return errors.Join(fmt.Errorf("enrollment %d has terminal tasks without terminal timestamps", c.before.ID), rows.Close())
 		}
 		c.terminal = terminal.Time
 		c.before.ClosedAt = nullTime(closed)
@@ -744,21 +745,17 @@ func closeEnrollments(ctx context.Context, db *sql.DB, cfg config, cp *checkpoin
 		after.ClosedAt = &c.terminal
 		res, err := tx.ExecContext(ctx, `UPDATE plan_enrollment SET status='closed',closed_at=?,version=version+1 WHERE org_id=? AND id=? AND version=? AND status='active' AND deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM assessment_task t WHERE t.enrollment_id=plan_enrollment.id AND t.org_id=plan_enrollment.org_id AND t.deleted_at IS NULL AND t.status NOT IN ('completed','expired','canceled'))`, c.terminal, cfg.orgID, c.before.ID, c.before.Version)
 		if err != nil {
-			tx.Rollback()
-			return err
+			return rollbackWithCause(tx, err)
 		}
 		if n, _ := res.RowsAffected(); n != 1 {
-			tx.Rollback()
-			return fmt.Errorf("close enrollment CAS conflict id=%d", c.before.ID)
+			return rollbackWithCause(tx, fmt.Errorf("close enrollment CAS conflict id=%d", c.before.ID))
 		}
 		if err := writeStateAudit(writer, cfg, cp, "enrollment", "close_enrollment", c.before.ID, c.before, after); err != nil {
-			tx.Rollback()
-			return err
+			return rollbackWithCause(tx, err)
 		}
 	}
 	if err := writer.Sync(); err != nil {
-		tx.Rollback()
-		return err
+		return rollbackWithCause(tx, err)
 	}
 	if err := tx.Commit(); err != nil {
 		return err
@@ -767,7 +764,9 @@ func closeEnrollments(ctx context.Context, db *sql.DB, cfg config, cp *checkpoin
 	if err := saveCheckpoint(cfg.checkpointFile, cp); err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "phase=close_enrollments checkpoint=%d updated=%d\n", cp.LastID, len(batch))
+	if _, err := fmt.Fprintf(out, "phase=close_enrollments checkpoint=%d updated=%d\n", cp.LastID, len(batch)); err != nil {
+		return err
+	}
 	return closeEnrollments(ctx, db, cfg, cp, writer, out)
 }
 
@@ -807,7 +806,9 @@ func runRollback(ctx context.Context, db *sql.DB, cfg config, cp *checkpoint, wr
 				return fmt.Errorf("rollback stopped at task %d: %w", before.ID, err)
 			}
 			if !changed {
-				fmt.Fprintf(out, "rollback skipped_unapplied kind=task id=%d phase=%s\n", record.EntityID, record.Phase)
+				if _, err := fmt.Fprintf(out, "rollback skipped_unapplied kind=task id=%d phase=%s\n", record.EntityID, record.Phase); err != nil {
+					return err
+				}
 				continue
 			}
 		case "task_schedule":
@@ -823,7 +824,9 @@ func runRollback(ctx context.Context, db *sql.DB, cfg config, cp *checkpoint, wr
 				return fmt.Errorf("rollback stopped at task schedule %d: %w", before.ID, err)
 			}
 			if !changed {
-				fmt.Fprintf(out, "rollback skipped_unapplied kind=task_schedule id=%d phase=%s\n", record.EntityID, record.Phase)
+				if _, err := fmt.Fprintf(out, "rollback skipped_unapplied kind=task_schedule id=%d phase=%s\n", record.EntityID, record.Phase); err != nil {
+					return err
+				}
 				continue
 			}
 		case "enrollment":
@@ -839,7 +842,9 @@ func runRollback(ctx context.Context, db *sql.DB, cfg config, cp *checkpoint, wr
 				return fmt.Errorf("rollback stopped at enrollment %d: %w", before.ID, err)
 			}
 			if !changed {
-				fmt.Fprintf(out, "rollback skipped_unapplied kind=enrollment id=%d phase=%s\n", record.EntityID, record.Phase)
+				if _, err := fmt.Fprintf(out, "rollback skipped_unapplied kind=enrollment id=%d phase=%s\n", record.EntityID, record.Phase); err != nil {
+					return err
+				}
 				continue
 			}
 		default:
@@ -848,7 +853,9 @@ func runRollback(ctx context.Context, db *sql.DB, cfg config, cp *checkpoint, wr
 		if err := writer.Write(baseAudit(cfg, cp, "rollback", record.Phase, record.EntityID, nil, nil, map[string]any{"restored_kind": record.Kind})); err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "rollback kind=%s id=%d phase=%s\n", record.Kind, record.EntityID, record.Phase)
+		if _, err := fmt.Fprintf(out, "rollback kind=%s id=%d phase=%s\n", record.Kind, record.EntityID, record.Phase); err != nil {
+			return err
+		}
 	}
 	if err := writer.Sync(); err != nil {
 		return err
@@ -902,20 +909,23 @@ func ensureScheduleFactsNotPublished(ctx context.Context, db *sql.DB, orgID int6
 	return nil
 }
 
-func readAuditRecords(path, runID string) ([]auditRecord, error) {
+func readAuditRecords(path, runID string) (records []auditRecord, readErr error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		readErr = errors.Join(readErr, file.Close())
+	}()
 	gz, err := gzip.NewReader(file)
 	if err != nil {
 		return nil, err
 	}
-	defer gz.Close()
+	defer func() {
+		readErr = errors.Join(readErr, gz.Close())
+	}()
 	gz.Multistream(true)
 	decoder := json.NewDecoder(gz)
-	var records []auditRecord
 	for {
 		var record auditRecord
 		err := decoder.Decode(&record)

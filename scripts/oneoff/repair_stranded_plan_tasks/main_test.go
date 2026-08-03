@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -12,6 +13,30 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 )
+
+func TestRollbackWithCausePreservesPrimaryAndRollbackErrors(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	mock.ExpectBegin()
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	primaryErr := errors.New("write failed")
+	rollbackErr := errors.New("rollback failed")
+	mock.ExpectRollback().WillReturnError(rollbackErr)
+
+	got := rollbackWithCause(tx, primaryErr)
+	if !errors.Is(got, primaryErr) || !errors.Is(got, rollbackErr) {
+		t.Fatalf("rollback error=%v", got)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func requiredArgs(mode string) []string {
 	return []string{"--mode", mode, "--mysql-dsn", "user:pass@tcp(localhost:3306)/qs?parseTime=true&loc=Asia%2FShanghai", "--org-id", "1", "--cutoff-at", "2026-08-03T00:00:00+08:00", "--checkpoint-file", filepath.Join("tmp", "checkpoint.json"), "--audit-file", filepath.Join("tmp", "audit.jsonl.gz")}
