@@ -50,6 +50,11 @@ export REPAIR_DIR="$(mktemp -d)"
 3. 用 version CAS 将干净、active/active 的 stale pending 置为
 `expired/missed_open_window`，最后关闭全部 Task 已终态的 Enrollment。
 
+每个阶段按 500 条进行有界事务处理。批内使用一条 `CASE` 批量更新，但仍逐条保存
+before/after、version 和校验和；批量影响行数必须与候选数完全一致，否则整批回滚。
+审计文件落盘成功后才提交数据库事务，提交成功后才推进 checkpoint。因此批量化不会放宽
+CAS、断点续跑或安全 rollback 契约，也不会形成全表长事务。
+
 历史 planned 时间与 `task_created` Fact 不同，或旧 canceled/expired Fact 已不再代表当前终态时，
 当前轮次记为 revision 2；多次历史恢复折叠为 revision 2 并记录
 `inference_reason=collapsed_legacy_revisions`。存在完成后恢复、脏生命周期字段或无法形成合法毫秒边界时，

@@ -512,18 +512,14 @@ func backfillSchedule(ctx context.Context, db *sql.DB, cfg config, cp *checkpoin
 		if err != nil {
 			return err
 		}
+		if err := updateScheduleBatch(ctx, tx, cfg, batch, inferences); err != nil {
+			return rollbackWithCause(tx, err)
+		}
 		for index, candidate := range batch {
 			inference := inferences[index]
 			before := taskScheduleState{ID: candidate.ID, Version: candidate.Version, ScheduleRevision: candidate.ScheduleRevision}
 			definedAt := inference.DefinedAt
 			after := taskScheduleState{ID: candidate.ID, Version: candidate.Version + 1, ScheduleRevision: inference.Revision, ScheduleDefinedAt: &definedAt}
-			res, err := tx.ExecContext(ctx, `UPDATE assessment_task SET schedule_revision=?,schedule_defined_at=?,version=version+1 WHERE org_id=? AND id=? AND version=? AND schedule_revision=? AND schedule_defined_at IS NULL AND status=? AND planned_at=? AND open_at <=> ? AND completed_at <=> ? AND expired_at <=> ? AND canceled_at <=> ? AND deleted_at IS NULL`, inference.Revision, definedAt, cfg.orgID, candidate.ID, candidate.Version, candidate.ScheduleRevision, candidate.Status, candidate.PlannedAt, nullableValue(candidate.OpenAt), nullableValue(candidate.CompletedAt), nullableValue(candidate.ExpiredAt), nullableValue(candidate.CanceledAt))
-			if err != nil {
-				return rollbackWithCause(tx, err)
-			}
-			if changed, _ := res.RowsAffected(); changed != 1 {
-				return rollbackWithCause(tx, fmt.Errorf("backfill_schedule CAS conflict task=%d", candidate.ID))
-			}
 			beforeJSON, _ := json.Marshal(before)
 			afterJSON, _ := json.Marshal(after)
 			if err := writer.Write(baseAudit(cfg, cp, "task_schedule", "backfill_schedule", candidate.ID, beforeJSON, afterJSON, inference)); err != nil {
@@ -570,18 +566,14 @@ func backfillDue(ctx context.Context, db *sql.DB, cfg config, cp *checkpoint, wr
 		if err != nil {
 			return err
 		}
+		if err := updateDueBatch(ctx, tx, cfg, batch); err != nil {
+			return rollbackWithCause(tx, err)
+		}
 		for _, before := range batch {
 			due := before.PlannedAt.In(shanghai).AddDate(0, 0, 7)
 			after := before
 			after.Version++
 			after.DueAt = &due
-			res, err := tx.ExecContext(ctx, `UPDATE assessment_task SET due_at=?,version=version+1,updated_at=updated_at WHERE org_id=? AND id=? AND version=? AND due_at IS NULL AND status=? AND planned_at=? AND schedule_revision=? AND schedule_defined_at <=> ? AND deleted_at IS NULL`, due, cfg.orgID, before.ID, before.Version, before.Status, before.PlannedAt, before.ScheduleRevision, nullableValue(before.ScheduleDefinedAt))
-			if err != nil {
-				return rollbackWithCause(tx, err)
-			}
-			if n, _ := res.RowsAffected(); n != 1 {
-				return rollbackWithCause(tx, fmt.Errorf("backfill_due CAS conflict task=%d", before.ID))
-			}
 			if err := writeStateAudit(writer, cfg, cp, "task", "backfill_due", before.ID, before, after); err != nil {
 				return rollbackWithCause(tx, err)
 			}
@@ -628,6 +620,9 @@ func expireMissed(ctx context.Context, db *sql.DB, cfg config, cp *checkpoint, w
 		if err != nil {
 			return err
 		}
+		if err := updateMissedBatch(ctx, tx, cfg, batch); err != nil {
+			return rollbackWithCause(tx, err)
+		}
 		for _, before := range batch {
 			expiredAt := before.PlannedAt.In(shanghai).Add(openWindow)
 			reason := "missed_open_window"
@@ -636,13 +631,6 @@ func expireMissed(ctx context.Context, db *sql.DB, cfg config, cp *checkpoint, w
 			after.Status = "expired"
 			after.ExpiredAt = &expiredAt
 			after.ExpirationReason = &reason
-			res, err := tx.ExecContext(ctx, `UPDATE assessment_task SET status='expired',expiration_reason='missed_open_window',expired_at=?,version=version+1 WHERE org_id=? AND id=? AND version=? AND status='pending' AND planned_at=? AND due_at <=> ? AND schedule_revision=? AND schedule_defined_at <=> ? AND open_at IS NULL AND expire_at IS NULL AND completed_at IS NULL AND expired_at IS NULL AND canceled_at IS NULL AND assessment_id IS NULL AND COALESCE(entry_token,'')='' AND COALESCE(entry_url,'')='' AND COALESCE(expiration_reason,'')='' AND deleted_at IS NULL`, expiredAt, cfg.orgID, before.ID, before.Version, before.PlannedAt, nullableValue(before.DueAt), before.ScheduleRevision, nullableValue(before.ScheduleDefinedAt))
-			if err != nil {
-				return rollbackWithCause(tx, err)
-			}
-			if n, _ := res.RowsAffected(); n != 1 {
-				return rollbackWithCause(tx, fmt.Errorf("expire_missed CAS conflict task=%d", before.ID))
-			}
 			if err := writeStateAudit(writer, cfg, cp, "task", "expire_missed", before.ID, before, after); err != nil {
 				return rollbackWithCause(tx, err)
 			}
@@ -710,13 +698,9 @@ func closeEnrollments(ctx context.Context, db *sql.DB, cfg config, cp *checkpoin
 	if err != nil {
 		return err
 	}
-	type candidate struct {
-		before   enrollmentState
-		terminal time.Time
-	}
-	var batch []candidate
+	var batch []enrollmentCloseCandidate
 	for rows.Next() {
-		var c candidate
+		var c enrollmentCloseCandidate
 		var closed, terminal sql.NullTime
 		if err := rows.Scan(&c.before.ID, &c.before.Version, &c.before.Status, &closed, &terminal); err != nil {
 			return errors.Join(err, rows.Close())
@@ -738,18 +722,14 @@ func closeEnrollments(ctx context.Context, db *sql.DB, cfg config, cp *checkpoin
 	if err != nil {
 		return err
 	}
+	if err := updateEnrollmentBatch(ctx, tx, cfg, batch); err != nil {
+		return rollbackWithCause(tx, err)
+	}
 	for _, c := range batch {
 		after := c.before
 		after.Version++
 		after.Status = "closed"
 		after.ClosedAt = &c.terminal
-		res, err := tx.ExecContext(ctx, `UPDATE plan_enrollment SET status='closed',closed_at=?,version=version+1 WHERE org_id=? AND id=? AND version=? AND status='active' AND deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM assessment_task t WHERE t.enrollment_id=plan_enrollment.id AND t.org_id=plan_enrollment.org_id AND t.deleted_at IS NULL AND t.status NOT IN ('completed','expired','canceled'))`, c.terminal, cfg.orgID, c.before.ID, c.before.Version)
-		if err != nil {
-			return rollbackWithCause(tx, err)
-		}
-		if n, _ := res.RowsAffected(); n != 1 {
-			return rollbackWithCause(tx, fmt.Errorf("close enrollment CAS conflict id=%d", c.before.ID))
-		}
 		if err := writeStateAudit(writer, cfg, cp, "enrollment", "close_enrollment", c.before.ID, c.before, after); err != nil {
 			return rollbackWithCause(tx, err)
 		}

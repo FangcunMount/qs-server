@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"path/filepath"
@@ -32,6 +33,162 @@ func TestRollbackWithCausePreservesPrimaryAndRollbackErrors(t *testing.T) {
 	got := rollbackWithCause(tx, primaryErr)
 	if !errors.Is(got, primaryErr) || !errors.Is(got, rollbackErr) {
 		t.Fatalf("rollback error=%v", got)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBatchUpdatesUseOneStatementPerPhase(t *testing.T) {
+	plannedAt := time.Date(2026, 8, 1, 19, 0, 0, 0, shanghai)
+	definedAt := plannedAt.Add(-time.Hour)
+	dueAt := plannedAt.AddDate(0, 0, 7)
+	tasks := []taskState{
+		{ID: 10, Version: 3, Status: "pending", PlannedAt: plannedAt, ScheduleRevision: 1, ScheduleDefinedAt: &definedAt},
+		{ID: 11, Version: 5, Status: "pending", PlannedAt: plannedAt.AddDate(0, 0, 1), ScheduleRevision: 2, ScheduleDefinedAt: &definedAt},
+	}
+	scheduleCandidates := []scheduleCandidate{
+		{ID: 10, Version: 3, ScheduleRevision: 1, Status: "pending", PlannedAt: plannedAt},
+		{ID: 11, Version: 5, ScheduleRevision: 1, Status: "pending", PlannedAt: plannedAt.AddDate(0, 0, 1)},
+	}
+	scheduleInferences := []scheduleInference{
+		{Revision: 1, DefinedAt: definedAt},
+		{Revision: 2, DefinedAt: definedAt.Add(time.Hour)},
+	}
+	enrollments := []enrollmentCloseCandidate{
+		{before: enrollmentState{ID: 20, Version: 2, Status: "active"}, terminal: dueAt},
+		{before: enrollmentState{ID: 21, Version: 4, Status: "active"}, terminal: dueAt.Add(time.Hour)},
+	}
+
+	tests := []struct {
+		name    string
+		pattern string
+		run     func(context.Context, *sql.Tx) error
+	}{
+		{
+			name:    "backfill schedule",
+			pattern: `UPDATE assessment_task SET schedule_revision=CASE id.*schedule_defined_at IS NULL.*open_at <=> \?.*canceled_at <=> \?`,
+			run: func(ctx context.Context, tx *sql.Tx) error {
+				return updateScheduleBatch(ctx, tx, config{orgID: 1}, scheduleCandidates, scheduleInferences)
+			},
+		},
+		{
+			name:    "backfill due",
+			pattern: `UPDATE assessment_task SET due_at=CASE id.*due_at IS NULL.*schedule_defined_at <=> \?`,
+			run: func(ctx context.Context, tx *sql.Tx) error {
+				return updateDueBatch(ctx, tx, config{orgID: 1}, tasks)
+			},
+		},
+		{
+			name:    "expire missed",
+			pattern: `UPDATE assessment_task SET status='expired',expiration_reason='missed_open_window',expired_at=CASE id.*status='pending'.*assessment_id IS NULL.*schedule_defined_at <=> \?`,
+			run: func(ctx context.Context, tx *sql.Tx) error {
+				return updateMissedBatch(ctx, tx, config{orgID: 1}, tasks)
+			},
+		},
+		{
+			name:    "close enrollments",
+			pattern: `UPDATE plan_enrollment SET status='closed',closed_at=CASE id.*status='active'.*NOT EXISTS`,
+			run: func(ctx context.Context, tx *sql.Tx) error {
+				return updateEnrollmentBatch(ctx, tx, config{orgID: 1}, enrollments)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = db.Close() })
+			mock.ExpectBegin()
+			tx, err := db.Begin()
+			if err != nil {
+				t.Fatal(err)
+			}
+			mock.ExpectExec(tt.pattern).WillReturnResult(sqlmock.NewResult(0, 2))
+			mock.ExpectCommit()
+			if err := tt.run(context.Background(), tx); err != nil {
+				t.Fatal(err)
+			}
+			if err := tx.Commit(); err != nil {
+				t.Fatal(err)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestDueBatchSupportsConfiguredBatchSize(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	mock.ExpectBegin()
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	plannedAt := time.Date(2026, 8, 1, 19, 0, 0, 0, shanghai)
+	batch := make([]taskState, batchSize)
+	for index := range batch {
+		batch[index] = taskState{
+			ID:               uint64(index + 1),
+			Version:          uint64(index + 1),
+			Status:           "pending",
+			PlannedAt:        plannedAt.AddDate(0, 0, index),
+			ScheduleRevision: 1,
+		}
+	}
+	mock.ExpectExec(`UPDATE assessment_task SET due_at=CASE id`).WillReturnResult(sqlmock.NewResult(0, batchSize))
+	mock.ExpectCommit()
+	if err := updateDueBatch(context.Background(), tx, config{orgID: 1}, batch); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestScheduleBatchRejectsMismatchedInferenceCount(t *testing.T) {
+	err := updateScheduleBatch(context.Background(), nil, config{orgID: 1}, []scheduleCandidate{{ID: 1}}, nil)
+	if err == nil || !strings.Contains(err.Error(), "candidates=1 inferences=0") {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestBatchUpdateRejectsPartialCAS(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	mock.ExpectBegin()
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	plannedAt := time.Date(2026, 8, 1, 19, 0, 0, 0, shanghai)
+	batch := []taskState{
+		{ID: 10, Version: 3, Status: "pending", PlannedAt: plannedAt, ScheduleRevision: 1},
+		{ID: 11, Version: 5, Status: "pending", PlannedAt: plannedAt.AddDate(0, 0, 1), ScheduleRevision: 1},
+	}
+	mock.ExpectExec(`UPDATE assessment_task SET due_at=CASE id`).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectRollback()
+
+	err = updateDueBatch(context.Background(), tx, config{orgID: 1}, batch)
+	if err == nil || !strings.Contains(err.Error(), "backfill_due CAS conflict: expected=2 changed=1") {
+		t.Fatalf("err=%v", err)
+	}
+	if rollbackErr := tx.Rollback(); rollbackErr != nil {
+		t.Fatal(rollbackErr)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
