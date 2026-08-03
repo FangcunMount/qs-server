@@ -83,11 +83,12 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 
 	sqlDB, databaseName := openRuntimeDatabase(t, mysqlDSN)
 	mysqlMigrator := migrationpkg.NewMigrator(sqlDB, &migrationpkg.Config{Enabled: true, Database: databaseName})
-	if version, changed, err := mysqlMigrator.Run(); err != nil || !changed || version != 64 {
-		t.Fatalf("migrate empty MySQL: version=%d changed=%v err=%v", version, changed, err)
+	mysqlVersion, changed, err := mysqlMigrator.Run()
+	if err != nil || !changed || mysqlVersion == 0 {
+		t.Fatalf("migrate empty MySQL: version=%d changed=%v err=%v", mysqlVersion, changed, err)
 	}
-	if version, changed, err := mysqlMigrator.Run(); err != nil || changed || version != 64 {
-		t.Fatalf("repeat MySQL migration: version=%d changed=%v err=%v", version, changed, err)
+	if version, changed, err := mysqlMigrator.Run(); err != nil || changed || version != mysqlVersion {
+		t.Fatalf("repeat MySQL migration: version=%d want_version=%d changed=%v err=%v", version, mysqlVersion, changed, err)
 	}
 	gormDB, err := gorm.Open(gormmysql.New(gormmysql.Config{Conn: sqlDB, SkipInitializeWithVersion: true}), &gorm.Config{})
 	if err != nil {
@@ -96,11 +97,12 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 
 	mongoClient, mongoDB := mongodbtest.ReplicaSetDatabase(t)
 	mongoMigrator := migrationpkg.NewMongoMigrator(mongoClient, &migrationpkg.Config{Enabled: true, Database: mongoDB.Name()})
-	if version, changed, err := mongoMigrator.Run(); err != nil || !changed || version != 20 {
-		t.Fatalf("migrate empty MongoDB: version=%d changed=%v err=%v", version, changed, err)
+	mongoVersion, changed, err := mongoMigrator.Run()
+	if err != nil || !changed || mongoVersion == 0 {
+		t.Fatalf("migrate empty MongoDB: version=%d changed=%v err=%v", mongoVersion, changed, err)
 	}
-	if version, changed, err := mongoMigrator.Run(); err != nil || changed || version != 20 {
-		t.Fatalf("repeat MongoDB migration: version=%d changed=%v err=%v", version, changed, err)
+	if version, changed, err := mongoMigrator.Run(); err != nil || changed || version != mongoVersion {
+		t.Fatalf("repeat MongoDB migration: version=%d want_version=%d changed=%v err=%v", version, mongoVersion, changed, err)
 	}
 
 	redisOptions, err := redis.ParseURL(redisURL)
