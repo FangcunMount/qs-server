@@ -49,14 +49,14 @@ var BusinessPackages = []PackageName{
 // AllPackages includes business modules and integration packages.
 var AllPackages = append(append([]PackageName{}, BusinessPackages...), PackagePlatform, PackageIAM)
 
-// LegacyInitStep documents one Initialize() business-module phase.
-type LegacyInitStep struct {
+// InitializationStep documents one Initialize() business-module phase.
+type InitializationStep struct {
 	InitMethod    string
 	RegisterNames []string
 }
 
-// LegacyInitializeSequence is the current Container.Initialize business-module order.
-var LegacyInitializeSequence = []LegacyInitStep{
+// BusinessInitializationSequence is the current Container.Initialize business-module order.
+var BusinessInitializationSequence = []InitializationStep{
 	{InitMethod: "initSurveyModule", RegisterNames: []string{"survey"}},
 	{InitMethod: "initReportModule", RegisterNames: []string{"interpretation"}},
 	{InitMethod: "initModelCatalogModule", RegisterNames: []string{"modelcatalog"}},
@@ -66,32 +66,17 @@ var LegacyInitializeSequence = []LegacyInitStep{
 	{InitMethod: "initStatisticsModule", RegisterNames: []string{"statistics"}},
 }
 
-// LegacyRegisteredModuleOrder flattens registerModule keys from LegacyInitializeSequence.
-func LegacyRegisteredModuleOrder() []string {
+// RegisteredBusinessModuleOrder flattens registerModule keys from BusinessInitializationSequence.
+func RegisteredBusinessModuleOrder() []string {
 	names := make([]string, 0)
-	for _, step := range LegacyInitializeSequence {
+	for _, step := range BusinessInitializationSequence {
 		names = append(names, step.RegisterNames...)
 	}
 	return names
 }
 
-// LegacyBootstrapFiles are flat bootstrap_*.go files allowed at container root.
-// Platform bootstrap lives under modules/platform/bootstrap_*.go.
-var LegacyBootstrapFiles = []string{}
-
-// MigratedModulePackages host assembly logic under modules/.
-var MigratedModulePackages = []PackageName{
-	PackageSurvey,
-	PackageModelCatalog,
-	PackageEvaluation,
-	PackageInterpretation,
-	PackageActor,
-	PackagePlan,
-	PackageStatistics,
-}
-
-// MigratedModuleAssembleFiles lists assembly entry files for migrated packages.
-var MigratedModuleAssembleFiles = map[PackageName][]string{
+// ModuleAssemblyFiles lists assembly entry files for business module packages.
+var ModuleAssemblyFiles = map[PackageName][]string{
 	PackageSurvey:         {"assemble.go", "survey_runtime_infra.go", "wire.go", "install.go"},
 	PackageModelCatalog:   {"module_aggregate.go", "module_ports.go", "assemble_hot_rank.go", "catalog_deps.go", "wire.go", "install.go"},
 	PackageActor:          {"assemble.go", "wire.go", "install.go"},
@@ -101,9 +86,9 @@ var MigratedModuleAssembleFiles = map[PackageName][]string{
 	PackageInterpretation: {"assemble.go", "wire.go", "install.go"},
 }
 
-// MigratedModuleBootstrapFiles lists bootstrap entry files for migrated packages.
+// ModuleBootstrapFiles lists bootstrap entry files for business module packages.
 // Container module_init.go calls Wire() to keep integration inputs separate from module Deps.
-var MigratedModuleBootstrapFiles = map[PackageName]string{
+var ModuleBootstrapFiles = map[PackageName]string{
 	PackageSurvey:         "bootstrap.go",
 	PackageModelCatalog:   "bootstrap.go",
 	PackageEvaluation:     "bootstrap.go",
@@ -113,8 +98,8 @@ var MigratedModuleBootstrapFiles = map[PackageName]string{
 	PackageStatistics:     "bootstrap.go",
 }
 
-// MigratedModuleTransportExportFiles lists transport export entry files per package.
-var MigratedModuleTransportExportFiles = map[PackageName][]string{
+// ModuleTransportExportFiles lists transport export entry files per package.
+var ModuleTransportExportFiles = map[PackageName][]string{
 	PackageSurvey:       {"exports_rest.go", "exports_grpc.go"},
 	PackageModelCatalog: {"exports_rest.go", "exports_grpc.go"},
 	PackageActor:        {"exports_rest.go", "exports_grpc.go"},

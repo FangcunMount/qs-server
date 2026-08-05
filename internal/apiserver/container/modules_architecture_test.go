@@ -13,25 +13,25 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 )
 
-func TestMigratedModulePackagesHaveAssembleFile(t *testing.T) {
+func TestBusinessModulePackagesHaveAssemblyFiles(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	for _, pkg := range modules.MigratedModulePackages {
-		for _, fileName := range modules.MigratedModuleAssembleFiles[pkg] {
+	for _, pkg := range modules.BusinessPackages {
+		for _, fileName := range modules.ModuleAssemblyFiles[pkg] {
 			path := filepath.Join(root, "internal", "apiserver", "container", "modules", string(pkg), fileName)
 			if _, err := os.Stat(path); err != nil {
-				t.Fatalf("migrated module %s missing %s: %v", pkg, fileName, err)
+				t.Fatalf("business module %s missing %s: %v", pkg, fileName, err)
 			}
 		}
 	}
 }
 
-func TestMigratedModulePackagesHaveTransportExportFiles(t *testing.T) {
+func TestModulePackagesHaveTransportExportFiles(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	for pkg, files := range modules.MigratedModuleTransportExportFiles {
+	for pkg, files := range modules.ModuleTransportExportFiles {
 		for _, fileName := range files {
 			path := filepath.Join(root, "internal", "apiserver", "container", "modules", string(pkg), fileName)
 			if _, err := os.Stat(path); err != nil {
@@ -53,16 +53,11 @@ func TestModulePackageSkeletonExists(t *testing.T) {
 	}
 }
 
-func TestLegacyBootstrapFilesAreFrozen(t *testing.T) {
+func TestFlatBusinessBootstrapFilesAreForbidden(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
 	containerRoot := filepath.Join(root, "internal", "apiserver", "container")
-	allowed := make(map[string]struct{}, len(modules.LegacyBootstrapFiles))
-	for _, name := range modules.LegacyBootstrapFiles {
-		allowed[name] = struct{}{}
-	}
-
 	entries, err := os.ReadDir(containerRoot)
 	if err != nil {
 		t.Fatal(err)
@@ -74,22 +69,15 @@ func TestLegacyBootstrapFilesAreFrozen(t *testing.T) {
 		if strings.HasSuffix(entry.Name(), "_test.go") {
 			continue
 		}
-		if _, ok := allowed[entry.Name()]; !ok {
-			t.Fatalf("%s is a new flat bootstrap file; add business bootstrap under container/modules/ instead", entry.Name())
-		}
-	}
-	for name := range allowed {
-		if _, err := os.Stat(filepath.Join(containerRoot, name)); err != nil {
-			t.Fatalf("allowlisted bootstrap file %s no longer exists; update modules.LegacyBootstrapFiles", name)
-		}
+		t.Fatalf("%s is a flat bootstrap file; add business bootstrap under container/modules/ instead", entry.Name())
 	}
 }
 
-func TestMigratedModulePackagesHaveBootstrapFile(t *testing.T) {
+func TestBusinessModulePackagesHaveBootstrapFile(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	for pkg, fileName := range modules.MigratedModuleBootstrapFiles {
+	for pkg, fileName := range modules.ModuleBootstrapFiles {
 		path := filepath.Join(root, "internal", "apiserver", "container", "modules", string(pkg), fileName)
 		if _, err := os.Stat(path); err != nil {
 			t.Fatalf("module %s missing bootstrap file %s: %v", pkg, fileName, err)
@@ -153,9 +141,9 @@ func TestContainerInitializeSequenceMatchesRegistry(t *testing.T) {
 		t.Fatal("Container.Initialize not found")
 	}
 
-	wantInitMethods := make([]string, 0, len(modules.LegacyInitializeSequence))
-	allowed := make(map[string]struct{}, len(modules.LegacyInitializeSequence))
-	for _, step := range modules.LegacyInitializeSequence {
+	wantInitMethods := make([]string, 0, len(modules.BusinessInitializationSequence))
+	allowed := make(map[string]struct{}, len(modules.BusinessInitializationSequence))
+	for _, step := range modules.BusinessInitializationSequence {
 		wantInitMethods = append(wantInitMethods, step.InitMethod)
 		allowed[step.InitMethod] = struct{}{}
 	}
@@ -165,7 +153,7 @@ func TestContainerInitializeSequenceMatchesRegistry(t *testing.T) {
 		gotInitMethods = append(gotInitMethods, initMethodsFromStmt(stmt, allowed)...)
 	}
 	if !reflect.DeepEqual(gotInitMethods, wantInitMethods) {
-		t.Fatalf("Initialize init methods = %v, want %v; update modules.LegacyInitializeSequence when changing init order", gotInitMethods, wantInitMethods)
+		t.Fatalf("Initialize init methods = %v, want %v; update modules.BusinessInitializationSequence when changing init order", gotInitMethods, wantInitMethods)
 	}
 }
 
@@ -211,9 +199,9 @@ func TestRegisterModuleCallsMatchRegistry(t *testing.T) {
 
 	root := repoRoot(t)
 	containerRoot := filepath.Join(root, "internal", "apiserver", "container")
-	got := make([]string, 0, len(modules.LegacyRegisteredModuleOrder()))
+	got := make([]string, 0, len(modules.RegisteredBusinessModuleOrder()))
 
-	for _, step := range modules.LegacyInitializeSequence {
+	for _, step := range modules.BusinessInitializationSequence {
 		names := extractRegisterModuleNames(t, containerRoot, step)
 		if !reflect.DeepEqual(names, step.RegisterNames) {
 			t.Fatalf("%s registerModule names = %v, want %v", step.InitMethod, names, step.RegisterNames)
@@ -221,13 +209,13 @@ func TestRegisterModuleCallsMatchRegistry(t *testing.T) {
 		got = append(got, names...)
 	}
 
-	want := modules.LegacyRegisteredModuleOrder()
+	want := modules.RegisteredBusinessModuleOrder()
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("registerModule order = %v, want %v; update modules.LegacyInitializeSequence when changing registration", got, want)
+		t.Fatalf("registerModule order = %v, want %v; update modules.BusinessInitializationSequence when changing registration", got, want)
 	}
 }
 
-func extractRegisterModuleNames(t *testing.T, containerRoot string, step modules.LegacyInitStep) []string {
+func extractRegisterModuleNames(t *testing.T, containerRoot string, step modules.InitializationStep) []string {
 	t.Helper()
 
 	switch step.InitMethod {
@@ -310,7 +298,7 @@ func collectRegisterModuleNames(body ast.Node) []string {
 func TestAssessmentModelDoesNotRegisterLegacyModuleNames(t *testing.T) {
 	t.Parallel()
 
-	for _, step := range modules.LegacyInitializeSequence {
+	for _, step := range modules.BusinessInitializationSequence {
 		if step.InitMethod != "initModelCatalogModule" {
 			continue
 		}
@@ -326,7 +314,7 @@ func TestModelCatalogRegistersAggregateName(t *testing.T) {
 	t.Parallel()
 
 	found := false
-	for _, step := range modules.LegacyInitializeSequence {
+	for _, step := range modules.BusinessInitializationSequence {
 		if step.InitMethod != "initModelCatalogModule" {
 			continue
 		}
