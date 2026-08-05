@@ -100,6 +100,11 @@ func isRetiredSeeddataScanSource(rel string) bool {
 }
 
 func isAllowedRetiredSeeddataResidue(rel, needle string) bool {
+	if rel == ".github/workflows/db-ops.yml" {
+		// Production status only checks whether retired tables still exist; it
+		// must retain their exact names without reintroducing executable paths.
+		return needle == "seed_backfill_"
+	}
 	if rel == "internal/pkg/configcontract/retired_seeddata_residue_test.go" ||
 		rel == "internal/pkg/middleware/retired_historical_seed.go" ||
 		rel == "internal/pkg/middleware/retired_historical_seed_test.go" ||
