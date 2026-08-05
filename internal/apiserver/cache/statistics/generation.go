@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -12,29 +13,29 @@ import (
 // organization after result data has committed. Query keys include the value
 // returned by Generation, so publication never needs wildcard deletion.
 type GenerationPublisher struct {
-	client redis.UniversalClient
+	client     redis.UniversalClient
+	keyBuilder *keyspace.Builder
 }
 
-func NewGenerationPublisher(client redis.UniversalClient) *GenerationPublisher {
-	return &GenerationPublisher{client: client}
-}
-
-func GenerationKey(orgID int64) string {
-	return fmt.Sprintf("query:version:statistics:org:%d", orgID)
+func NewGenerationPublisher(client redis.UniversalClient, keyBuilder *keyspace.Builder) *GenerationPublisher {
+	if client != nil && keyBuilder == nil {
+		panic("statistics query key builder is required")
+	}
+	return &GenerationPublisher{client: client, keyBuilder: keyBuilder}
 }
 
 func (p *GenerationPublisher) Publish(ctx context.Context, orgID int64, _ time.Time) (int64, error) {
 	if p == nil || p.client == nil {
 		return 0, fmt.Errorf("statistics generation cache is unavailable")
 	}
-	return p.client.Incr(ctx, GenerationKey(orgID)).Result()
+	return p.client.Incr(ctx, p.keyBuilder.BuildStatisticsGenerationKey(orgID)).Result()
 }
 
 func (p *GenerationPublisher) Generation(ctx context.Context, orgID int64) (int64, error) {
 	if p == nil || p.client == nil {
 		return 0, fmt.Errorf("statistics generation cache is unavailable")
 	}
-	value, err := p.client.Get(ctx, GenerationKey(orgID)).Int64()
+	value, err := p.client.Get(ctx, p.keyBuilder.BuildStatisticsGenerationKey(orgID)).Int64()
 	if err == redis.Nil {
 		return 0, nil
 	}

@@ -23,6 +23,7 @@ func InstallFrom(host InstallHost) error {
 		MySQLDB:      host.MySQLDB(),
 		MongoDB:      host.MongoDB(),
 		RedisClient:  queryRedis,
+		QueryBuilder: host.CacheBuilder(redisruntime.FamilyQuery),
 		LockRunner:   host.LockRunner(),
 		MySQLLimiter: host.MySQLLimiter(),
 		QueryTTL:     binding.Policy.TTLOr(26 * time.Hour),

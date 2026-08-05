@@ -11,6 +11,7 @@ import (
 	statisticsDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 	redis "github.com/redis/go-redis/v9"
@@ -28,6 +29,7 @@ type Deps struct {
 	MySQLDB      *gorm.DB
 	MongoDB      *mongo.Database
 	RedisClient  redis.UniversalClient
+	QueryBuilder *keyspace.Builder
 	LockRunner   locklease.Runner
 	MySQLLimiter backpressure.Acquirer
 	QueryTTL     time.Duration
@@ -42,6 +44,9 @@ func New(deps Deps) (*Module, error) {
 	}
 	if deps.LockRunner == nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "lock runner is nil")
+	}
+	if deps.RedisClient != nil && deps.QueryBuilder == nil {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "statistics query key builder is required when cache is enabled")
 	}
 
 	collectors, err := statisticsDomain.NewCollectorSet(
@@ -64,7 +69,7 @@ func New(deps Deps) (*Module, error) {
 	module := &Module{RunStore: statisticsInfra.NewRunStore(deps.MySQLDB)}
 	module.ReadService = statisticsApp.NewReadService(
 		statisticsInfra.NewReadStore(deps.MySQLDB, deps.MySQLLimiter),
-		statisticsCache.NewQueryCache(deps.RedisClient, deps.QueryTTL),
+		statisticsCache.NewQueryCache(deps.RedisClient, deps.QueryBuilder, deps.QueryTTL),
 	)
 	module.Coordinator = statisticsApp.NewCoordinator(
 		collectors,
@@ -74,7 +79,7 @@ func New(deps Deps) (*Module, error) {
 		modtx.NewMySQLRunner(deps.MySQLDB),
 		deps.LockRunner,
 		statisticsCache.NewPublisher(
-			statisticsCache.NewGenerationPublisher(deps.RedisClient),
+			statisticsCache.NewGenerationPublisher(deps.RedisClient, deps.QueryBuilder),
 			module.ReadService,
 		),
 	)

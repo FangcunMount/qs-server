@@ -9,6 +9,7 @@ import (
 )
 
 const assessmentListCacheKind = "assessment:list:v2"
+const statisticsCacheKind = "statistics:v2"
 
 // CacheKeyspace builds cache payload and version-token keys.
 type CacheKeyspace struct {
@@ -83,6 +84,20 @@ func (k CacheKeyspace) AssessmentListVersion(userID uint64) string {
 
 func (k CacheKeyspace) AssessmentListVersioned(userID, version uint64, hash string) string {
 	return k.VersionedQuery(assessmentListCacheKind, strconv.FormatUint(userID, 10), version, hash)
+}
+
+func (k CacheKeyspace) StatisticsGeneration(orgID int64) string {
+	return k.QueryVersion(statisticsCacheKind, "org:"+strconv.FormatInt(orgID, 10))
+}
+
+func (k CacheKeyspace) StatisticsData(orgID, generation int64, hash string) string {
+	return k.keyspace.Prefix(fmt.Sprintf(
+		"query:data:%s:org:%d:g:%d:%s",
+		statisticsCacheKind,
+		orgID,
+		generation,
+		hash,
+	))
 }
 
 func (k CacheKeyspace) TesteeInfo(id uint64) string {

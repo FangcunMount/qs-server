@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -11,7 +12,7 @@ import (
 func TestQueryCacheUsesGenerationAndFallsBackToL1Stale(t *testing.T) {
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
-	cache := NewQueryCache(client)
+	cache := NewQueryCache(client, keyspace.NewBuilderWithNamespace("cache:query"))
 	type payload struct {
 		Value int `json:"value"`
 	}

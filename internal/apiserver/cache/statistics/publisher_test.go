@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -24,7 +25,7 @@ func TestPublisherSwitchesGenerationBeforeWarmup(t *testing.T) {
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	warmer := &warmerStub{err: errors.New("warm failed")}
-	publisher := NewPublisher(NewGenerationPublisher(client), warmer)
+	publisher := NewPublisher(NewGenerationPublisher(client, keyspace.NewBuilderWithNamespace("cache:query")), warmer)
 	generation, err := publisher.Publish(context.Background(), 9, time.Now())
 	if err == nil {
 		t.Fatal("warmup failure must be returned")
@@ -35,7 +36,7 @@ func TestPublisherSwitchesGenerationBeforeWarmup(t *testing.T) {
 	if !warmer.called {
 		t.Fatal("warmer was not called")
 	}
-	value, err := client.Get(context.Background(), GenerationKey(9)).Int64()
+	value, err := client.Get(context.Background(), keyspace.NewBuilderWithNamespace("cache:query").BuildStatisticsGenerationKey(9)).Int64()
 	if err != nil || value != 1 {
 		t.Fatalf("generation=%d err=%v", value, err)
 	}

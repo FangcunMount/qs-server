@@ -75,6 +75,14 @@ func (b *Builder) BuildAssessmentListVersionedKey(userID, version uint64, hash s
 	return NewCacheKeyspace(b.namespace()).AssessmentListVersioned(userID, version, hash)
 }
 
+func (b *Builder) BuildStatisticsGenerationKey(orgID int64) string {
+	return NewCacheKeyspace(b.namespace()).StatisticsGeneration(orgID)
+}
+
+func (b *Builder) BuildStatisticsDataKey(orgID, generation int64, hash string) string {
+	return NewCacheKeyspace(b.namespace()).StatisticsData(orgID, generation, hash)
+}
+
 func (b *Builder) BuildTesteeInfoKey(id uint64) string {
 	return NewCacheKeyspace(b.namespace()).TesteeInfo(id)
 }

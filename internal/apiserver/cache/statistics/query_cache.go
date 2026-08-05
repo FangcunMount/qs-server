@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -24,24 +25,28 @@ type l1Entry struct {
 type QueryCache struct {
 	client        redis.UniversalClient
 	gen           *GenerationPublisher
+	keyBuilder    *keyspace.Builder
 	ttl, staleTTL time.Duration
 	mu            sync.Mutex
 	l1            map[string]l1Entry
 	now           func() time.Time
 }
 
-func NewQueryCache(client redis.UniversalClient, configuredTTL ...time.Duration) *QueryCache {
+func NewQueryCache(client redis.UniversalClient, keyBuilder *keyspace.Builder, configuredTTL ...time.Duration) *QueryCache {
+	if client != nil && keyBuilder == nil {
+		panic("statistics query key builder is required")
+	}
 	ttl := 26 * time.Hour
 	if len(configuredTTL) > 0 && configuredTTL[0] > 0 {
 		ttl = configuredTTL[0]
 	}
-	return &QueryCache{client: client, gen: NewGenerationPublisher(client), ttl: ttl, staleTTL: 72 * time.Hour, l1: map[string]l1Entry{}, now: time.Now}
+	return &QueryCache{client: client, gen: NewGenerationPublisher(client, keyBuilder), keyBuilder: keyBuilder, ttl: ttl, staleTTL: 72 * time.Hour, l1: map[string]l1Entry{}, now: time.Now}
 }
 
 func logicalL1Key(orgID int64, logical string) string { return fmt.Sprintf("%d:%s", orgID, logical) }
-func redisDataKey(orgID, generation int64, logical string) string {
+func redisDataKey(keyBuilder *keyspace.Builder, orgID, generation int64, logical string) string {
 	sum := sha256.Sum256([]byte(logical))
-	return fmt.Sprintf("query:data:statistics:org:%d:g:%d:%s", orgID, generation, hex.EncodeToString(sum[:]))
+	return keyBuilder.BuildStatisticsDataKey(orgID, generation, hex.EncodeToString(sum[:]))
 }
 
 func (c *QueryCache) Get(ctx context.Context, orgID int64, logical string, out any) (bool, bool) {
@@ -50,7 +55,7 @@ func (c *QueryCache) Get(ctx context.Context, orgID int64, logical string, out a
 	}
 	generation, generationErr := c.gen.Generation(ctx, orgID)
 	if generationErr == nil {
-		payload, err := c.client.Get(ctx, redisDataKey(orgID, generation, logical)).Bytes()
+		payload, err := c.client.Get(ctx, redisDataKey(c.keyBuilder, orgID, generation, logical)).Bytes()
 		if err == nil && json.Unmarshal(payload, out) == nil {
 			c.putL1(orgID, logical, payload, generation)
 			return true, false
@@ -76,7 +81,7 @@ func (c *QueryCache) Set(ctx context.Context, orgID int64, logical string, value
 	}
 	generation, err := c.gen.Generation(ctx, orgID)
 	if err == nil {
-		_ = c.client.Set(ctx, redisDataKey(orgID, generation, logical), payload, c.ttl).Err()
+		_ = c.client.Set(ctx, redisDataKey(c.keyBuilder, orgID, generation, logical), payload, c.ttl).Err()
 	}
 	c.putL1(orgID, logical, payload, generation)
 }

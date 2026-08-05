@@ -611,12 +611,15 @@ func TestDBOpsRedisStatusIsReadOnlyAndDoesNotExposeKeys(t *testing.T) {
 		"counts only; key names and values are never printed",
 		"redis:7-alpine redis-cli",
 		`REDIS_CLI_ARGS=(-h "$REDIS_HOST" -p "$REDIS_PORT"`,
+		`4:cache:query:query:version:statistics:v2:org:*|4:cache:query:query:data:statistics:v2:org:*`,
 		`4:query:version:statistics:org:*|4:query:data:statistics:org:*`,
 		`4:cache:query:query:assessment:list:v2:*`,
 		`7:cache:query:query:version:assessment:list:*`,
 		`0:ops:runtime:*|1:ops:runtime:*`,
 		"current_assessment_list_version_compat",
+		"current_statistics_compat",
 		"legacy_assessment_list_data_candidate",
+		"legacy_statistics_data_candidate",
 		"command_timeout: 25m",
 	} {
 		if !strings.Contains(content, required) {

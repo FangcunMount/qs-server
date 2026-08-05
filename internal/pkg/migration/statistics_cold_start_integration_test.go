@@ -33,6 +33,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/mongodbtest"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 	redis "github.com/redis/go-redis/v9"
@@ -95,9 +96,10 @@ func TestStatisticsColdStartPublishIdempotencyAndRedisFailure(t *testing.T) {
 	t.Cleanup(func() { _ = controlRedis.Close() })
 	runtimeRedis := redis.NewClient(redisOptions)
 	t.Cleanup(func() { _ = runtimeRedis.Close() })
+	queryBuilder := keyspace.NewBuilderWithNamespace("cache:query")
 
 	orgID := int64(700000 + time.Now().UnixNano()%100000)
-	t.Cleanup(func() { deleteStatisticsColdStartRedisKeys(t, controlRedis, orgID) })
+	t.Cleanup(func() { deleteStatisticsColdStartRedisKeys(t, controlRedis, queryBuilder, orgID) })
 	latestCompleteDay := statisticsDomain.BusinessDate(time.Now()).AddDate(0, 0, -1)
 	eventAt := latestCompleteDay.Add(10 * time.Hour)
 
@@ -105,7 +107,7 @@ func TestStatisticsColdStartPublishIdempotencyAndRedisFailure(t *testing.T) {
 	assertStatisticsAnswerSheetSource(t, mongoDB, orgID, fixture.answerSheetID, eventAt.Add(4*time.Minute))
 	module, err := statisticsModule.New(statisticsModule.Deps{
 		MySQLDB: gormDB, MongoDB: mongoDB, RedisClient: runtimeRedis,
-		LockRunner: coldStartLockRunner{}, QueryTTL: time.Hour,
+		QueryBuilder: queryBuilder, LockRunner: coldStartLockRunner{}, QueryTTL: time.Hour,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -160,7 +162,7 @@ func TestStatisticsColdStartPublishIdempotencyAndRedisFailure(t *testing.T) {
 	}
 	overloadedModule, err := statisticsModule.New(statisticsModule.Deps{
 		MySQLDB: gormDB, MongoDB: mongoDB, RedisClient: runtimeRedis,
-		LockRunner: coldStartLockRunner{}, MySQLLimiter: overloadedReadLimiter{}, QueryTTL: time.Hour,
+		QueryBuilder: queryBuilder, LockRunner: coldStartLockRunner{}, MySQLLimiter: overloadedReadLimiter{}, QueryTTL: time.Hour,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -337,9 +339,9 @@ func seedStatisticsColdStartBusinessFacts(t *testing.T, db *gorm.DB, mongoDB *mo
 	return statisticsColdStartFixture{answerSheets: answerSheets, outcomes: outcomes, answerSheetID: answerSheetID, outcomeID: outcomeID}
 }
 
-func deleteStatisticsColdStartRedisKeys(t *testing.T, client *redis.Client, orgID int64) {
+func deleteStatisticsColdStartRedisKeys(t *testing.T, client *redis.Client, builder *keyspace.Builder, orgID int64) {
 	t.Helper()
-	pattern := "query:*:statistics:org:" + strconv.FormatInt(orgID, 10) + "*"
+	pattern := keyspace.ComposeNamespace(builder.Namespace(), "query:*:statistics:v2:org:"+strconv.FormatInt(orgID, 10)+"*")
 	var cursor uint64
 	for {
 		keys, next, err := client.Scan(context.Background(), cursor, pattern, 100).Result()

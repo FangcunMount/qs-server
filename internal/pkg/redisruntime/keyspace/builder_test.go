@@ -45,3 +45,14 @@ func TestAssessmentListBuildersUseV2SchemaAndSeparateFamilies(t *testing.T) {
 		t.Fatalf("unexpected assessment list data key: %s", got)
 	}
 }
+
+func TestStatisticsBuilderUsesNamespacedV2Schema(t *testing.T) {
+	builder := NewBuilderWithNamespace("cache:query")
+
+	if got := builder.BuildStatisticsGenerationKey(42); got != "cache:query:query:version:statistics:v2:org:42" {
+		t.Fatalf("unexpected Statistics generation key: %s", got)
+	}
+	if got := builder.BuildStatisticsDataKey(42, 3, "abcdef01"); got != "cache:query:query:data:statistics:v2:org:42:g:3:abcdef01" {
+		t.Fatalf("unexpected Statistics data key: %s", got)
+	}
+}
