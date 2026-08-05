@@ -163,8 +163,8 @@ var (
 
 	AlgorithmFamilyFromDecisionKind   = identitypkg.AlgorithmFamilyFromDecisionKind
 	ResolveLegacyRuntime              = identitypkg.ResolveLegacyRuntime
-	DecisionKindForIdentity           = binding.DecisionKindForIdentity
-	AlgorithmFamilyFromIdentity       = binding.AlgorithmFamilyFromIdentity
+	DecisionKindForIdentity           = identitypkg.DecisionKindForIdentity
+	AlgorithmFamilyFromIdentity       = identitypkg.AlgorithmFamilyFromIdentity
 	CompatibleAlgorithmBinding        = identitypkg.CompatibleAlgorithmBinding
 	CompatibleIdentity                = identitypkg.CompatibleIdentity
 	AllAlgorithmFamilies              = identitypkg.AllAlgorithmFamilies

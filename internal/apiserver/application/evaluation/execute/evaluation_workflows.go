@@ -122,7 +122,7 @@ func mapInputResolveError(err error) error {
 	case evaluationinput.FailureKindModelNotFound, evaluationinput.FailureKindUnsupportedModel:
 		return evalerrors.InvalidArgument("评估模型不可用")
 	case evaluationinput.FailureKindScaleNotFound:
-		return mapScaleInputResolveError(err)
+		return mapScaleNotFoundError(err)
 	case evaluationinput.FailureKindAnswerSheetNotFound:
 		return evalerrors.AnswerSheetNotFound(err, "答卷不存在")
 	case evaluationinput.FailureKindQuestionnaireNotFound:

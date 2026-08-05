@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-// inputRefFromAssessment 从评估数据中获取评估输入引用
+// inputRefFromAssessment builds the immutable input lookup reference for an assessment.
 func inputRefFromAssessment(a *assessment.Assessment, assessmentID uint64) evaluationinput.InputRef {
 	modelRef := modelRefFromAssessment(a)
 	ref := evaluationinput.InputRef{
@@ -23,7 +23,6 @@ func inputRefFromAssessment(a *assessment.Assessment, assessmentID uint64) evalu
 	return ref
 }
 
-// modelRefFromAssessment 从评估数据中获取评估模型引用
 func modelRefFromAssessment(a *assessment.Assessment) evaluationinput.ModelRef {
 	if a == nil || a.EvaluationModelRef() == nil {
 		return evaluationinput.ModelRef{}
@@ -38,7 +37,6 @@ func modelRefFromAssessment(a *assessment.Assessment) evaluationinput.ModelRef {
 	}
 }
 
-// mapScaleInputResolveError 映射量表输入解析错误
-func mapScaleInputResolveError(err error) error {
+func mapScaleNotFoundError(err error) error {
 	return evalerrors.MedicalScaleNotFound(err, "量表不存在")
 }
