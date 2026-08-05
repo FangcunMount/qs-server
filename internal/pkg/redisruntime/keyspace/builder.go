@@ -2,19 +2,6 @@ package keyspace
 
 import rediskit "github.com/FangcunMount/component-base/pkg/redis"
 
-var namespace string
-
-// ApplyNamespace 设置全局 Redis key 命名空间（可选）。
-// 传入空字符串表示不使用命名空间。
-func ApplyNamespace(ns string) {
-	namespace = rediskit.NormalizeNamespace(ns)
-}
-
-// AddNamespace 在 key 前增加命名空间（如果设置了）。
-func AddNamespace(key string) string {
-	return rediskit.NewKeyspace(namespace).Prefix(key)
-}
-
 // ComposeNamespace 组合根 namespace 与子 suffix。
 func ComposeNamespace(root, child string) string {
 	root = rediskit.NormalizeNamespace(root)
@@ -36,7 +23,7 @@ type Builder struct {
 
 // NewBuilder 创建统一 Redis key 构建器。
 func NewBuilder() *Builder {
-	return NewBuilderWithNamespace(namespace)
+	return NewBuilderWithNamespace("")
 }
 
 // NewBuilderWithNamespace 创建绑定到指定 namespace 的 Redis key 构建器。
@@ -176,16 +163,9 @@ func (b *Builder) BuildGovernanceAuditReplayKey(orgID, requestID string) string 
 	return NewOpsKeyspace(b.namespace()).GovernanceAuditReplay(orgID, requestID)
 }
 
-// func (b *Builder) prefix(key string) string {
-// 	if b == nil {
-// 		return AddNamespace(key)
-// 	}
-// 	return b.keyspace.Prefix(key)
-// }
-
 func (b *Builder) namespace() string {
 	if b == nil {
-		return namespace
+		return ""
 	}
 	return b.keyspace.Namespace().String()
 }
