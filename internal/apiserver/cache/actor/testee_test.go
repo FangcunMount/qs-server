@@ -15,7 +15,7 @@ import (
 )
 
 func TestCachedTesteeRepositoryUsesExplicitBuilderNamespace(t *testing.T) {
-	repo := NewCachedTesteeRepositoryWithBuilderAndProvider(nil, nil, keyspace.NewBuilderWithNamespace("prod:cache:object"), testeePolicyProvider(sharedcache.Policy{}))
+	repo := NewCachedTesteeRepositoryWithBuilderProviderAndObserver(nil, nil, keyspace.NewBuilderWithNamespace("prod:cache:object"), testeePolicyProvider(sharedcache.Policy{}), nil)
 	cached, ok := repo.(*CachedTesteeRepository)
 	if !ok {
 		t.Fatalf("unexpected repository type %T", repo)
@@ -36,7 +36,7 @@ func TestCachedTesteeRepositoryCachesNegativeResult(t *testing.T) {
 	})
 
 	repo := &testeeNegativeRepo{}
-	cached := NewCachedTesteeRepositoryWithBuilderAndProvider(
+	cached := NewCachedTesteeRepositoryWithBuilderProviderAndObserver(
 		repo,
 		client,
 		keyspace.NewBuilderWithNamespace("test-ns"),
@@ -44,6 +44,7 @@ func TestCachedTesteeRepositoryCachesNegativeResult(t *testing.T) {
 			Negative:    cachepolicy.PolicySwitchEnabled,
 			NegativeTTL: time.Minute,
 		}),
+		nil,
 	).(*CachedTesteeRepository)
 
 	ctx := context.Background()

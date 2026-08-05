@@ -272,9 +272,9 @@ func TestCachedQuestionnaireRepositorySupportsExplicitBuilderNamespace(t *testin
 		},
 	}
 
-	cachedRepo := NewCachedQuestionnaireRepositoryWithBuilderAndProvider(repo, client, keyspace.NewBuilderWithNamespace("prod:cache:static"), questionnairePolicies(cachepolicy.CachePolicy{
+	cachedRepo := NewCachedQuestionnaireRepositoryWithBuilderProviderAndObserver(repo, client, keyspace.NewBuilderWithNamespace("prod:cache:static"), questionnairePolicies(cachepolicy.CachePolicy{
 		Negative: cachepolicy.PolicySwitchEnabled,
-	})).(*CachedQuestionnaireRepository)
+	}), nil).(*CachedQuestionnaireRepository)
 	if _, err := cachedRepo.FindPublishedByCode(context.Background(), "Q-001"); err != nil {
 		t.Fatalf("FindPublishedByCode() error = %v", err)
 	}
@@ -309,9 +309,9 @@ func newQuestionnaireCacheTestRepoWithNamespace(t *testing.T, namespace string) 
 			"Q-001:1.0.2": head,
 		},
 	}
-	cachedRepo := NewCachedQuestionnaireRepositoryWithBuilderAndProvider(repo, client, keyspace.NewBuilderWithNamespace(namespace), questionnairePolicies(cachepolicy.CachePolicy{
+	cachedRepo := NewCachedQuestionnaireRepositoryWithBuilderProviderAndObserver(repo, client, keyspace.NewBuilderWithNamespace(namespace), questionnairePolicies(cachepolicy.CachePolicy{
 		Negative: cachepolicy.PolicySwitchEnabled,
-	})).(*CachedQuestionnaireRepository)
+	}), nil).(*CachedQuestionnaireRepository)
 
 	cleanup := func() {
 		_ = client.Close()

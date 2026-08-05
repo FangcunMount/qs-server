@@ -24,11 +24,6 @@ type CachedTesteeRepository struct {
 	store    *adapterkit.ObjectCacheStore[testee.Testee]
 }
 
-// NewCachedTesteeRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的受试者缓存 Repository。
-func NewCachedTesteeRepositoryWithBuilderAndProvider(repo testee.Repository, client redis.UniversalClient, builder *keyspace.Builder, policies sharedcache.PolicyProvider) testee.Repository {
-	return NewCachedTesteeRepositoryWithBuilderProviderAndObserver(repo, client, builder, policies, nil)
-}
-
 func NewCachedTesteeRepositoryWithBuilderProviderAndObserver(repo testee.Repository, client redis.UniversalClient, builder *keyspace.Builder, policies sharedcache.PolicyProvider, observer *observability.ComponentObserver) testee.Repository {
 	if builder == nil {
 		panic("redis builder is required")

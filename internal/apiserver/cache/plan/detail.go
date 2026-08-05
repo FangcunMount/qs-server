@@ -24,11 +24,6 @@ type CachedPlanRepository struct {
 	store    *adapterkit.ObjectCacheStore[plan.AssessmentPlan]
 }
 
-// NewCachedPlanRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的计划缓存 Repository。
-func NewCachedPlanRepositoryWithBuilderAndProvider(repo plan.AssessmentPlanRepository, client redis.UniversalClient, builder *keyspace.Builder, policies sharedcache.PolicyProvider) plan.AssessmentPlanRepository {
-	return NewCachedPlanRepositoryWithBuilderProviderAndObserver(repo, client, builder, policies, nil)
-}
-
 func NewCachedPlanRepositoryWithBuilderProviderAndObserver(repo plan.AssessmentPlanRepository, client redis.UniversalClient, builder *keyspace.Builder, policies sharedcache.PolicyProvider, observer *observability.ComponentObserver) plan.AssessmentPlanRepository {
 	if builder == nil {
 		panic("redis builder is required")

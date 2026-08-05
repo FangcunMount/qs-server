@@ -26,10 +26,6 @@ type CachedQuestionnaireRepository struct {
 	store    *adapterkit.ObjectCacheStore[domainQuestionnaire.Questionnaire]
 }
 
-func NewCachedQuestionnaireRepositoryWithBuilderAndProvider(repo domainQuestionnaire.Repository, client redis.UniversalClient, builder *keyspace.Builder, policies sharedcache.PolicyProvider) domainQuestionnaire.Repository {
-	return NewCachedQuestionnaireRepositoryWithBuilderProviderAndObserver(repo, client, builder, policies, nil)
-}
-
 func NewCachedQuestionnaireRepositoryWithBuilderProviderAndObserver(repo domainQuestionnaire.Repository, client redis.UniversalClient, builder *keyspace.Builder, policies sharedcache.PolicyProvider, observer *observability.ComponentObserver) domainQuestionnaire.Repository {
 	if builder == nil {
 		panic("redis builder is required")

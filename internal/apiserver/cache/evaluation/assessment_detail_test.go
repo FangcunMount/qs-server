@@ -11,7 +11,7 @@ import (
 )
 
 func TestCachedAssessmentRepositoryUsesExplicitBuilderNamespace(t *testing.T) {
-	repo := NewCachedAssessmentRepositoryWithBuilderAndProvider(nil, nil, keyspace.NewBuilderWithNamespace("prod:cache:object"), sharedcache.NewRegistry(sharedcache.EffectiveCapability{Capability: cachepolicy.CapabilityEvaluationAssessmentDetail}))
+	repo := NewCachedAssessmentRepositoryWithBuilderProviderAndObserver(nil, nil, keyspace.NewBuilderWithNamespace("prod:cache:object"), sharedcache.NewRegistry(sharedcache.EffectiveCapability{Capability: cachepolicy.CapabilityEvaluationAssessmentDetail}), nil)
 	cached, ok := repo.(*CachedAssessmentRepository)
 	if !ok {
 		t.Fatalf("unexpected repository type %T", repo)

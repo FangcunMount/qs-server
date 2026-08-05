@@ -24,11 +24,6 @@ type CachedAssessmentRepository struct {
 	store    *adapterkit.ObjectCacheStore[assessment.Assessment]
 }
 
-// NewCachedAssessmentRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的测评缓存 Repository。
-func NewCachedAssessmentRepositoryWithBuilderAndProvider(repo assessment.Repository, client redis.UniversalClient, builder *keyspace.Builder, policies sharedcache.PolicyProvider) assessment.Repository {
-	return NewCachedAssessmentRepositoryWithBuilderProviderAndObserver(repo, client, builder, policies, nil)
-}
-
 func NewCachedAssessmentRepositoryWithBuilderProviderAndObserver(repo assessment.Repository, client redis.UniversalClient, builder *keyspace.Builder, policies sharedcache.PolicyProvider, observer *observability.ComponentObserver) assessment.Repository {
 	if builder == nil {
 		panic("redis builder is required")
