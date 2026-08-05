@@ -387,6 +387,8 @@ func TestRemoteDeployCleansOwnedBackupDirectoryWithoutSudo(t *testing.T) {
 		`chown "$(id -u):$(id -g)" "$BACKUP_DIR"`,
 		`old_backups="$(ls -t "$BACKUP_DIR"/backup_*.tar.gz 2>/dev/null || true)"`,
 		`rm -f "$backup_file"`,
+		`retained_count="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'backup_*.tar.gz' -print | wc -l | tr -d ' ')"`,
+		`Backup retention verified: ${retained_count} archive(s) retained`,
 	} {
 		if !strings.Contains(content, required) {
 			t.Errorf("remote deploy backup retention must contain %q", required)
@@ -395,6 +397,7 @@ func TestRemoteDeployCleansOwnedBackupDirectoryWithoutSudo(t *testing.T) {
 	for _, forbidden := range []string{
 		`$SUDO ls -t "$BACKUP_DIR"`,
 		`$SUDO rm -f "$backup_file"`,
+		`$SUDO find "$BACKUP_DIR"`,
 	} {
 		if strings.Contains(content, forbidden) {
 			t.Errorf("remote deploy backup retention must not contain %q", forbidden)

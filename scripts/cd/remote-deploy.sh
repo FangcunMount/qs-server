@@ -367,7 +367,7 @@ select_image() {
 }
 
 cleanup_old_backups() {
-  local old_backups backup_file
+  local old_backups backup_file retained_count
   # prepare_dirs_and_backup transfers this directory to the deployment user.
   # Keep retention work unprivileged so a command-specific sudo policy does
   # not turn successful deployments into password-prompt warnings.
@@ -379,6 +379,12 @@ cleanup_old_backups() {
       rm -f "$backup_file"
     done
   fi
+  retained_count="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'backup_*.tar.gz' -print | wc -l | tr -d ' ')"
+  if [ "$retained_count" -gt 5 ]; then
+    echo "Backup retention failed: ${retained_count} archives remain in ${BACKUP_DIR}, want at most 5" >&2
+    exit 1
+  fi
+  echo "Backup retention verified: ${retained_count} archive(s) retained in ${BACKUP_DIR}"
 }
 
 stop_single_container() {
