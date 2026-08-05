@@ -109,7 +109,7 @@ flowchart LR
 | 状态 | 结论及影响 |
 | --- | --- |
 | `已实现` | collection submit 在 Redis rate backend 缺失或运行期 degraded-open 时使用每实例 30/10 QPS 本地保守预算；集群聚合量仍随实例数变化。 |
-| `已实现` | resilience control 保留 queue controller 协议，但生产没有注册 queue，action registry 也未暴露 queue action。 |
+| `已退役` | 无生产注册和 action descriptor 的 queue controller/control 协议已删除；SubmitCoalescer 不是进程内队列。 |
 | `当前接线缺口` | Mongo Outbox 接入共享 Mongo Backpressure；MySQL Outbox 未接入共享 MySQL limiter，因此现有指标不是全部 MySQL 并发。 |
 | `待补证据` | 真实实例数、负载偏斜、依赖放大系数、Redis 故障拐点和长任务失租行为。 |
 | `规划改造` | 连续失败判定、Circuit Breaker、半开/渐进恢复、自适应并发和强互斥 workload fencing。 |

@@ -148,12 +148,6 @@ func (e *ActionExecutor) Run(
 	case "resilience.tune_rate_limit":
 		result, err := e.runTuneRateLimit(ctx, orgID, req.Input)
 		return finalizeActionRun(requestID, actionID, startedAt, result, err)
-	case "resilience.drain_queue":
-		result, err := e.runQueueState(ctx, orgID, requestID, req.Input, control.QueueStatePaused)
-		return finalizeActionRun(requestID, actionID, startedAt, result, err)
-	case "resilience.resume_queue":
-		result, err := e.runQueueState(ctx, orgID, requestID, req.Input, control.QueueStateActive)
-		return finalizeActionRun(requestID, actionID, startedAt, result, err)
 	case "resilience.release_lock":
 		result, err := e.runReleaseLock(ctx, orgID, requestID, req.Input)
 		return finalizeActionRun(requestID, actionID, startedAt, result, err)
@@ -312,20 +306,6 @@ func (e *ActionExecutor) runTuneRateLimit(ctx context.Context, orgID int64, inpu
 		return nil, err
 	}
 	result, err := e.resilience.TuneRateLimit(ctx, actionActor(ctx, orgID), change)
-	return actionResultMap(result), normalizeResilienceError(err)
-}
-
-func (e *ActionExecutor) runQueueState(ctx context.Context, orgID int64, requestID string, input map[string]interface{}, desired control.QueueState) (map[string]interface{}, error) {
-	if e == nil || e.resilience == nil {
-		return nil, errors.WithCode(code.ErrInternalServerError, "resilience governance unavailable")
-	}
-	var change control.QueueChange
-	if err := decodeActionInput(input, &change); err != nil {
-		return nil, err
-	}
-	change.DesiredState = desired
-	change.RequestID = requestID
-	result, err := e.resilience.SetQueueState(ctx, actionActor(ctx, orgID), change)
 	return actionResultMap(result), normalizeResilienceError(err)
 }
 

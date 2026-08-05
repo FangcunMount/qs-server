@@ -1,6 +1,6 @@
 // Package control defines the transport-neutral control contract for
 // process-owned resilience subsystems. It deliberately does not implement data
-// plane rate limiting, queues, backpressure, or leases.
+// plane rate limiting, backpressure, or leases.
 package control
 
 import (
@@ -102,31 +102,6 @@ type CommandStore interface {
 	ListInstances(context.Context, string) ([]InstanceIdentity, error)
 }
 
-type QueueState string
-
-const (
-	QueueStateActive   QueueState = "active"
-	QueueStateDraining QueueState = "draining"
-	QueueStatePaused   QueueState = "paused"
-)
-
-type DrainOptions struct {
-	Timeout time.Duration
-}
-
-type DrainResult struct {
-	State      QueueState `json:"state"`
-	Version    uint64     `json:"version"`
-	Depth      int        `json:"depth"`
-	InFlight   int        `json:"in_flight"`
-	FinishedAt time.Time  `json:"finished_at"`
-}
-
-type QueueController interface {
-	Drain(context.Context, DrainOptions) (DrainResult, error)
-	Resume(context.Context) error
-}
-
 type RatePolicy struct {
 	RatePerSecond float64 `json:"rate_per_second"`
 	Burst         int     `json:"burst"`
@@ -153,25 +128,6 @@ type RateLimitChangeResult struct {
 	ExpiresAt time.Time     `json:"expires_at,omitempty"`
 }
 
-type QueueChange struct {
-	RequestID      string     `json:"request_id,omitempty"`
-	StateVersion   uint64     `json:"state_version,omitempty"`
-	Component      string     `json:"component"`
-	Queue          string     `json:"queue"`
-	Target         string     `json:"target"`
-	DesiredState   QueueState `json:"desired_state"`
-	TimeoutSeconds int        `json:"timeout_seconds"`
-}
-
-type QueueChangeResult struct {
-	Status    CommandStatus   `json:"status"`
-	Component string          `json:"component"`
-	Queue     string          `json:"queue"`
-	State     QueueState      `json:"state"`
-	Version   uint64          `json:"version"`
-	Instances []CommandResult `json:"instances,omitempty"`
-}
-
 type LeaderChange struct {
 	RequestID       string `json:"-"`
 	Component       string `json:"component"`
@@ -183,6 +139,5 @@ type LeaderChange struct {
 
 type Governor interface {
 	TuneRateLimit(context.Context, ActionActor, RateLimitChange) (RateLimitChangeResult, error)
-	SetQueueState(context.Context, ActionActor, QueueChange) (QueueChangeResult, error)
 	RelinquishLeader(context.Context, ActionActor, LeaderChange) (any, error)
 }

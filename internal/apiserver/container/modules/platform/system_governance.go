@@ -89,8 +89,6 @@ func resilienceActionFlags(opts *options.SystemGovernanceOptions) map[string]boo
 	}
 	if opts.Resilience != nil {
 		flags["resilience.tune_rate_limit"] = opts.Resilience.TuneRateLimit
-		flags["resilience.drain_queue"] = opts.Resilience.DrainQueue
-		flags["resilience.resume_queue"] = opts.Resilience.ResumeQueue
 		flags["resilience.release_lock"] = opts.Resilience.ReleaseLock
 	}
 	if opts.Retry != nil {

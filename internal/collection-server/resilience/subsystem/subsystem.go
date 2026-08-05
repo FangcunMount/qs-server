@@ -4,7 +4,6 @@ package subsystem
 import (
 	"context"
 	"encoding/json"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -44,11 +43,6 @@ type Options struct {
 	ControlEnabled *bool
 }
 
-type queueRegistration struct {
-	controller control.QueueController
-	snapshot   func(time.Time) resilience.QueueSnapshot
-}
-
 type Subsystem struct {
 	identity         control.InstanceIdentity
 	rateEnabled      bool
@@ -58,10 +52,6 @@ type Subsystem struct {
 	opsAvailable     bool
 	stateStore       control.StateStore
 	appliedRate      map[ratelimit.BudgetID]uint64
-	queueMu          sync.RWMutex
-	queues           map[string]queueRegistration
-	commandMu        sync.Mutex
-	activeCommands   map[string]struct{}
 	controlReady     atomic.Bool
 	grpcInflightWait time.Duration
 	controlEnabled   bool
@@ -86,8 +76,6 @@ func New(opts Options) (*Subsystem, error) {
 		rateEnabled: rateCfg.Enabled, budgets: make(map[ratelimit.BudgetID]*ratelimit.Budget),
 		gates: make(map[string]*concurrency.Gate), locks: opts.Locks, opsAvailable: opts.OpsAvailable, stateStore: opts.StateStore,
 		appliedRate:    make(map[ratelimit.BudgetID]uint64),
-		queues:         make(map[string]queueRegistration),
-		activeCommands: make(map[string]struct{}),
 		controlEnabled: controlEnabled,
 		submitFallback: rateCfg.ResolvedSubmitDegradedLocal(),
 	}
@@ -117,9 +105,6 @@ func (s *Subsystem) Sync(ctx context.Context) error {
 	}
 	if s.stateStore == nil || !s.opsAvailable {
 		return control.ErrUnavailable
-	}
-	if err := s.syncRegisteredQueues(ctx, true); err != nil {
-		return err
 	}
 	s.controlReady.Store(true)
 	return nil
@@ -203,76 +188,6 @@ func (s *Subsystem) reconcile(ctx context.Context) {
 		if _, err := budget.Reconcile(state.Version, current, "governance", state.ExpiresAt); err == nil {
 			s.appliedRate[id] = state.Version
 		}
-	}
-	if !s.processCommands(ctx) {
-		_ = s.syncRegisteredQueues(ctx, false)
-	}
-}
-
-func (s *Subsystem) syncRegisteredQueues(ctx context.Context, requireSettled bool) error {
-	s.queueMu.RLock()
-	names := make([]string, 0, len(s.queues))
-	for name := range s.queues {
-		names = append(names, name)
-	}
-	s.queueMu.RUnlock()
-	for _, name := range names {
-		state, exists, err := s.stateStore.Load(ctx, "queue:collection-server:"+name)
-		if err != nil {
-			return err
-		}
-		if err := s.applyQueueDesiredState(ctx, state, exists, requireSettled); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *Subsystem) applyQueueDesiredState(ctx context.Context, state control.VersionedState, exists, requireSettled bool) error {
-	if !exists {
-		return nil
-	}
-	var change control.QueueChange
-	if err := json.Unmarshal(state.Payload, &change); err != nil {
-		return err
-	}
-	if change.Target != "" && change.Target != "all" && change.Target != s.identity.InstanceID {
-		return nil
-	}
-	s.queueMu.RLock()
-	queue, ok := s.queues[change.Queue]
-	s.queueMu.RUnlock()
-	if !ok {
-		return control.ErrUnavailable
-	}
-	snapshot := queue.snapshot(time.Now())
-	switch change.DesiredState {
-	case control.QueueStatePaused:
-		if snapshot.State == string(control.QueueStatePaused) {
-			return nil
-		}
-		timeout := time.Duration(change.TimeoutSeconds) * time.Second
-		if timeout <= 0 {
-			timeout = time.Minute
-		}
-		result, err := queue.controller.Drain(ctx, control.DrainOptions{Timeout: timeout})
-		if err != nil {
-			return err
-		}
-		if requireSettled && result.State != control.QueueStatePaused {
-			return control.ErrInvalidState
-		}
-		return nil
-	case control.QueueStateActive:
-		if snapshot.State == string(control.QueueStateActive) {
-			return nil
-		}
-		if snapshot.State == string(control.QueueStatePaused) {
-			return queue.controller.Resume(ctx)
-		}
-		return control.ErrInvalidState
-	default:
-		return control.ErrInvalidState
 	}
 }
 
@@ -383,25 +298,6 @@ func (s *Subsystem) Gate(name string) *concurrency.Gate {
 	return s.gates[name]
 }
 
-func (s *Subsystem) RegisterQueue(name string, controller control.QueueController, snapshot func(time.Time) resilience.QueueSnapshot) {
-	if s == nil || name == "" || controller == nil || snapshot == nil {
-		return
-	}
-	s.queueMu.Lock()
-	s.queues[name] = queueRegistration{controller: controller, snapshot: snapshot}
-	s.queueMu.Unlock()
-}
-
-func (s *Subsystem) Queue(name string) (control.QueueController, bool) {
-	if s == nil {
-		return nil, false
-	}
-	s.queueMu.RLock()
-	defer s.queueMu.RUnlock()
-	registration, ok := s.queues[name]
-	return registration.controller, ok
-}
-
 func (s *Subsystem) Snapshot(now time.Time) resilience.RuntimeSnapshot {
 	if now.IsZero() {
 		now = time.Now()
@@ -424,11 +320,6 @@ func (s *Subsystem) Snapshot(now time.Time) resilience.RuntimeSnapshot {
 			user,
 		)
 	}
-	s.queueMu.RLock()
-	for _, queue := range s.queues {
-		snapshot.Queues = append(snapshot.Queues, queue.snapshot(now))
-	}
-	s.queueMu.RUnlock()
 	if s.locks != nil {
 		snapshot.Locks = s.locks.Snapshots()
 	}

@@ -102,6 +102,39 @@ func TestResilienceControlDoesNotImportDataPlanePackages(t *testing.T) {
 	})
 }
 
+func TestRetiredQueueControlProtocolDoesNotReturn(t *testing.T) {
+	root := repoRoot(t)
+	retiredTokens := []string{
+		"QueueController",
+		"QueueChange",
+		"SetQueueState(",
+		"RegisterQueue(",
+		"resilience.drain_queue",
+		"resilience.resume_queue",
+	}
+	walkGoFiles(t, filepath.Join(root, "internal"), func(path, text string) {
+		if strings.HasSuffix(path, "_test.go") {
+			return
+		}
+		for _, token := range retiredTokens {
+			if strings.Contains(text, token) {
+				t.Fatalf("%s reintroduces retired queue control token %q", mustRel(t, root, path), token)
+			}
+		}
+	})
+	for _, rel := range []string{"configs/apiserver.dev.yaml", "configs/apiserver.prod.yaml"} {
+		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, key := range []string{"drain_queue:", "resume_queue:"} {
+			if strings.Contains(string(content), key) {
+				t.Fatalf("%s reintroduces retired queue control setting %q", rel, key)
+			}
+		}
+	}
+}
+
 func TestTransportsDoNotConstructRateLimiters(t *testing.T) {
 	root := repoRoot(t)
 	for _, rel := range []string{

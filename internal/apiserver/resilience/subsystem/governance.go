@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
@@ -145,120 +144,8 @@ func overridePolicy(current ratelimit.RateLimitPolicy, change control.RatePolicy
 
 func rateStateName(component, budget string) string { return "rate:" + component + ":" + budget }
 
-func queueStateName(component, queue string) string { return "queue:" + component + ":" + queue }
-
 func leaderStateName(component, instanceID, workload string) string {
 	return "leader:" + component + ":" + instanceID + ":" + workload
-}
-
-func (s *Subsystem) SetQueueState(ctx context.Context, actor control.ActionActor, change control.QueueChange) (control.QueueChangeResult, error) {
-	result := control.QueueChangeResult{Status: control.CommandStatusOK, Component: change.Component, Queue: change.Queue, State: change.DesiredState}
-	if s == nil || s.stateStore == nil {
-		return result, control.ErrUnavailable
-	}
-	commands, ok := s.stateStore.(control.CommandStore)
-	if !ok || change.RequestID == "" {
-		return result, control.ErrUnavailable
-	}
-	if change.Component != "collection-server" || change.Queue != "answersheet_submit" {
-		return result, invalidArgument("unsupported queue target %s/%s", change.Component, change.Queue)
-	}
-	if change.Target == "" {
-		change.Target = "all"
-	}
-	if change.DesiredState != control.QueueStatePaused && change.DesiredState != control.QueueStateActive {
-		return result, invalidArgument("queue desired state must be paused or active")
-	}
-	name := queueStateName(change.Component, change.Queue)
-	current, exists, err := s.stateStore.Load(ctx, name)
-	if err != nil {
-		return result, err
-	}
-	expected := uint64(0)
-	if exists {
-		expected = current.Version
-	}
-	expectedInstances, err := commandTargetInstances(ctx, commands, change.Component, change.Target)
-	if err != nil {
-		return result, err
-	}
-	if exists && queueChangeMatches(current.Payload, change) {
-		result.Status, result.Version = control.CommandStatusNoop, current.Version
-		return result, nil
-	}
-	change.StateVersion = expected + 1
-	payload, err := json.Marshal(change)
-	if err != nil {
-		return result, err
-	}
-	command := control.Command{
-		RequestID: change.RequestID, ActionID: queueActionID(change.DesiredState),
-		Target:  control.Target{Component: change.Component, InstanceID: change.Target},
-		Payload: payload, Actor: actor, IssuedAt: time.Now(),
-	}
-	timeout := time.Duration(change.TimeoutSeconds) * time.Second
-	if timeout <= 0 {
-		timeout = time.Minute
-	}
-	command.ExpiresAt = time.Now().Add(timeout + time.Minute)
-	if len(expectedInstances) == 0 {
-		published, publishErr := s.stateStore.CompareAndSwap(ctx, name, expected, control.VersionedState{Payload: payload, Actor: actor}, 0)
-		if publishErr != nil {
-			resilience.ObserveControlOperation("apiserver", "queue_state_commit", "failed")
-			return result, publishErr
-		}
-		resilience.ObserveControlOperation("apiserver", "queue_state_commit", "ok")
-		result.Version = published.Version
-		result.Status = control.CommandStatusNoop
-		return result, nil
-	}
-	if err := commands.PublishCommand(ctx, command, timeout+time.Minute); err != nil {
-		resilience.ObserveControlOperation("apiserver", "queue_command_publish", "failed")
-		return result, err
-	}
-	resilience.ObserveControlOperation("apiserver", "queue_command_publish", "ok")
-	published, err := s.stateStore.CompareAndSwap(ctx, name, expected, control.VersionedState{Payload: payload, Actor: actor}, 0)
-	if err != nil {
-		resilience.ObserveControlOperation("apiserver", "queue_state_commit", "failed")
-		return result, err
-	}
-	resilience.ObserveControlOperation("apiserver", "queue_state_commit", "ok")
-	result.Version = published.Version
-	results, status, err := waitCommandResults(ctx, commands, actor.OrgID, change.RequestID, expectedInstances, timeout)
-	result.Instances, result.Status = results, status
-	if change.DesiredState == control.QueueStateActive && status != control.CommandStatusOK && status != control.CommandStatusNoop {
-		rollback := change
-		rollback.DesiredState = control.QueueStatePaused
-		rollback.StateVersion = published.Version + 1
-		rollbackPayload, _ := json.Marshal(rollback)
-		if restored, restoreErr := s.stateStore.CompareAndSwap(ctx, name, published.Version, control.VersionedState{Payload: rollbackPayload, Actor: actor}, 0); restoreErr == nil {
-			result.Version = restored.Version
-		}
-	}
-	return result, err
-}
-
-func queueChangeMatches(payload []byte, expected control.QueueChange) bool {
-	var current control.QueueChange
-	if json.Unmarshal(payload, &current) != nil {
-		return false
-	}
-	currentTarget, expectedTarget := current.Target, expected.Target
-	if currentTarget == "" {
-		currentTarget = "all"
-	}
-	if expectedTarget == "" {
-		expectedTarget = "all"
-	}
-	return current.Component == expected.Component && current.Queue == expected.Queue &&
-		currentTarget == expectedTarget && current.DesiredState == expected.DesiredState
-}
-
-func queueActionID(state control.QueueState) string {
-	if state == control.QueueStateActive {
-		return "resilience.resume_queue"
-	}
-	return "resilience.drain_queue"
 }
 
 func (s *Subsystem) RelinquishLeader(ctx context.Context, actor control.ActionActor, change control.LeaderChange) (any, error) {

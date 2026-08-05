@@ -50,7 +50,7 @@ func TestStoreCommandClaimAndPerInstanceResults(t *testing.T) {
 	t.Cleanup(func() { _ = client.Close() })
 	store := NewStore(client, keyspace.NewBuilderWithNamespace("ops:runtime"))
 	ctx := context.Background()
-	identity, err := control.ResolveInstanceIdentity("collection-server", "collection-0")
+	identity, err := control.ResolveInstanceIdentity("apiserver", "api-0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,12 +67,12 @@ func TestStoreCommandClaimAndPerInstanceResults(t *testing.T) {
 	if count, err := client.Exists(ctx, firstKey, secondKey).Result(); err != nil || count != 2 {
 		t.Fatalf("generation heartbeat keys count=%d err=%v", count, err)
 	}
-	command := control.Command{RequestID: "request-1", ActionID: "resilience.drain_queue",
-		Target: control.Target{Component: "collection-server", InstanceID: "all"}, Actor: control.ActionActor{OrgID: 9}, ExpiresAt: time.Now().Add(time.Minute)}
+	command := control.Command{RequestID: "request-1", ActionID: "resilience.release_lock",
+		Target: control.Target{Component: "apiserver", InstanceID: "all"}, Actor: control.ActionActor{OrgID: 9}, ExpiresAt: time.Now().Add(time.Minute)}
 	if err := store.PublishCommand(ctx, command, time.Minute); err != nil {
 		t.Fatal(err)
 	}
-	commands, err := store.ListCommands(ctx, "collection-server", "collection-0")
+	commands, err := store.ListCommands(ctx, "apiserver", "api-0")
 	if err != nil || len(commands) != 1 {
 		t.Fatalf("ListCommands() = %+v, %v", commands, err)
 	}

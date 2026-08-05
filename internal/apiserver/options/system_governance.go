@@ -89,8 +89,6 @@ type RetryPolicyOptions struct {
 
 type ResilienceGovernanceOptions struct {
 	TuneRateLimit bool `json:"tune_rate_limit" mapstructure:"tune_rate_limit"`
-	DrainQueue    bool `json:"drain_queue" mapstructure:"drain_queue"`
-	ResumeQueue   bool `json:"resume_queue" mapstructure:"resume_queue"`
 	ReleaseLock   bool `json:"release_lock" mapstructure:"release_lock"`
 }
 

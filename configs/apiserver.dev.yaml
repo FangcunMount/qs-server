@@ -427,8 +427,6 @@ system_governance:
   # 高风险韧性动作默认关闭，开发环境按动作显式启用。
   resilience:
     tune_rate_limit: false
-    drain_queue: false
-    resume_queue: false
     release_lock: false
   prometheus:
     # infra/components/prometheus 在 infra-network 内提供 Prometheus Query API。

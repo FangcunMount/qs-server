@@ -20,9 +20,9 @@ func TestActionAuditFallbackPersistsOnlyTerminalReplayWithoutTTL(t *testing.T) {
 	store := NewActionAuditFallbackStore(client, builder)
 	finishedAt := time.Now().UTC().Truncate(time.Millisecond)
 	record := app.ActionAuditRecord{
-		OrgID: 9, RequestID: "request-1", ActionID: "resilience.resume_queue", Status: "ok", FinishedAt: finishedAt,
+		OrgID: 9, RequestID: "request-1", ActionID: "resilience.release_lock", Status: "ok", FinishedAt: finishedAt,
 		ActorUserID: 77, Input: map[string]interface{}{"token": "must-not-be-stored"},
-		Result: &app.ActionRunResult{RequestID: "request-1", ActionID: "resilience.resume_queue", Status: "ok"},
+		Result: &app.ActionRunResult{RequestID: "request-1", ActionID: "resilience.release_lock", Status: "ok"},
 	}
 	if err := store.Put(context.Background(), record); err != nil {
 		t.Fatalf("Put() error=%v", err)
