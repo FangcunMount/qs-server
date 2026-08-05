@@ -72,7 +72,7 @@ CD 本地入口：
 - `cd-image` 默认使用 GHCR registry cache：`ghcr.io/fangcunmount/<image>:buildcache`。
 - 生产部署默认走 **tarball 直传（阿里云 ACR 模式）**：`docker` job 构建推 GHCR/Docker Hub 后 **同步 push ACR**；ServerD 从 **国内 ACR** `docker pull`（秒级～分钟级）→ `save | gzip` → SCP → 目标机 `docker load`。GHCR/Docker Hub 仍作备份。
 - 手动部署或未上传 tarball 时，`DEPLOY_IMAGE_SOURCE=auto|registry` 会 fallback 到 registry pull；此时默认优先 Docker Hub（`DEPLOY_PULL_REGISTRY=dockerhub`），再回退 GHCR。
-- 自动触发时，CD 脚本、workflow、文档、测试等非运行时变更不会触发生产服务发布；手动触发仍按输入选择 `all/apiserver/collection/worker`。
+- 自动触发只接受当前 `main` HEAD；为避免三个进程出现版本错位，当前策略会全量发布 `apiserver/collection/worker`，包括仅修改 CD、workflow、文档或测试的提交。过期 SHA 会跳过；手动触发仍按输入选择 `all/apiserver/collection/worker`。
 - 远端若本地已有同 tag 镜像，或已从 tarball load，则跳过 registry pull。
 
 Secrets 传递规则：
@@ -225,7 +225,7 @@ done
 
 **Environment 放行**：各仓库 **Settings → Environments → `production`** → 允许 self-hosted runner（否则 deploy job 会 Pending）。
 
-`ping-runner.yml` 的 `ping-worker-host` job 使用 `QS_DEPLOY_RUNNER`（默认 `serverd`）巡检 **ServerD worker 主机**（Docker / worker 容器 / 到 A·B SSH），不再承担 CD deploy runner 职责；CD deploy 已迁到 Mac mini `qlume`。
+`ping-runner.yml` 的 `ping-worker-host` job 使用 `QS_DEPLOY_RUNNER`（默认 `serverd`）巡检 **ServerD worker 主机**（Docker / worker 容器 / 到 A·B SSH），不再承担 CD deploy runner 职责；CD deploy 已迁到 Mac mini `qlume`。该 job 直接使用 Actions `vars` 与 runner 本地 `.env` 解析代理，按提交 SHA 下载网络脚本；下载具有连接、单次传输和总重试时限，GitHub SSH 探测也具有连接时限，避免网络抖动占满整个巡检窗口。
 
 自托管 runner 上 **不用** `appleboy/ssh-action`；生产 SSH/SCP 走原生 `setup-runner-ssh.sh`，GitHub 拉代码走 **SSH + Mihomo 代理**（`setup-runner-network.sh`）。
 

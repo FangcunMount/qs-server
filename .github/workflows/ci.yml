@@ -248,6 +248,9 @@ jobs:
       - name: Validate deployment shell scripts
         run: bash -n scripts/cd/*.sh
 
+      - name: Validate runner network contract
+        run: bash scripts/cd/test-setup-runner-network.sh
+
       - name: Validate deployment package contract
         run: bash scripts/cd/test-prepare-package.sh
 

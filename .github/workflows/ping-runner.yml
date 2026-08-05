@@ -254,16 +254,12 @@ jobs:
     steps:
       - name: Configure runner network (proxy + GitHub SSH)
         env:
-          GH_TOKEN: ${{ github.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
           NETWORK_SCRIPT_REF: ${{ github.sha }}
+          CONFIGURED_HTTP_PROXY: ${{ vars.QS_DEPLOY_HTTP_PROXY }}
+          CONFIGURED_HTTPS_PROXY: ${{ vars.QS_DEPLOY_HTTPS_PROXY }}
+          CONFIGURED_ALL_PROXY: ${{ vars.QS_DEPLOY_ALL_PROXY }}
+          CONFIGURED_NO_PROXY: ${{ vars.QS_DEPLOY_NO_PROXY }}
         run: |
-          org="${GITHUB_REPOSITORY%%/*}"
-          get_var() {
-            gh variable get "$1" --repo "$GITHUB_REPOSITORY" 2>/dev/null \
-              || gh variable get "$1" --org "$org" 2>/dev/null \
-              || true
-          }
           for env_file in \
             "${HOME}/.env" \
             "/opt/actions-runner/runner1/.env" \
@@ -277,18 +273,28 @@ jobs:
               break
             fi
           done
-          HTTP_PROXY="${HTTP_PROXY:-$(get_var QS_DEPLOY_HTTP_PROXY)}"
+          HTTP_PROXY="${HTTP_PROXY:-${CONFIGURED_HTTP_PROXY:-}}"
           HTTP_PROXY="${HTTP_PROXY:-http://127.0.0.1:7890}"
-          HTTPS_PROXY="${HTTPS_PROXY:-$(get_var QS_DEPLOY_HTTPS_PROXY)}"
+          HTTPS_PROXY="${HTTPS_PROXY:-${CONFIGURED_HTTPS_PROXY:-}}"
           HTTPS_PROXY="${HTTPS_PROXY:-$HTTP_PROXY}"
-          ALL_PROXY="${ALL_PROXY:-$(get_var QS_DEPLOY_ALL_PROXY)}"
+          ALL_PROXY="${ALL_PROXY:-${CONFIGURED_ALL_PROXY:-}}"
           ALL_PROXY="${ALL_PROXY:-socks5://127.0.0.1:7891}"
-          NO_PROXY="${NO_PROXY:-$(get_var QS_DEPLOY_NO_PROXY)}"
+          NO_PROXY="${NO_PROXY:-${CONFIGURED_NO_PROXY:-}}"
           NO_PROXY="${NO_PROXY:-127.0.0.1,localhost}"
           export HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY
-          curl -fsSL --proxy "${HTTP_PROXY}" \
+          network_script="$(mktemp)"
+          trap 'rm -f "$network_script"' EXIT
+          curl --fail --show-error --silent --location \
+            --connect-timeout 10 \
+            --max-time 30 \
+            --retry 2 \
+            --retry-delay 2 \
+            --retry-all-errors \
+            --retry-max-time 90 \
+            --proxy "${HTTP_PROXY}" \
+            --output "$network_script" \
             "https://raw.githubusercontent.com/FangcunMount/qs-server/${NETWORK_SCRIPT_REF}/scripts/cd/setup-runner-network.sh" \
-            | bash
+          bash "$network_script"
 
       - name: Runner and host info
         run: |

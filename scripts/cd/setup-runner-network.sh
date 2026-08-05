@@ -68,6 +68,17 @@ echo "  HTTP_PROXY=${HTTP_PROXY}"
 echo "  GitHub SSH: git@github.com -> ssh.github.com:443 via ${proxy_host}:${proxy_port}"
 
 if [ "${RUNNER_NETWORK_TEST_GITHUB_SSH:-1}" = "1" ]; then
+  ssh_connect_timeout="${RUNNER_NETWORK_SSH_CONNECT_TIMEOUT_SECONDS:-10}"
+  case "$ssh_connect_timeout" in
+    ''|*[!0-9]*|0)
+      echo "RUNNER_NETWORK_SSH_CONNECT_TIMEOUT_SECONDS must be a positive integer" >&2
+      exit 1
+      ;;
+  esac
   echo "Testing GitHub SSH..."
-  ssh -T git@github.com 2>&1 | head -5 || true
+  ssh \
+    -o BatchMode=yes \
+    -o "ConnectTimeout=${ssh_connect_timeout}" \
+    -o ConnectionAttempts=1 \
+    -T git@github.com 2>&1 | head -5 || true
 fi
