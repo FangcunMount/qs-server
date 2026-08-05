@@ -14,7 +14,7 @@ type CreateTesteeRequest struct {
 	Birthday     *meta.Birthday `json:"birthday"`                  // 出生日期（格式：YYYY-MM-DD）
 	IDCardNumber string         `json:"id_card_number"`            // 身份证号（可选）
 	Relation     string         `json:"relation"`                  // 与当前用户关系：self/parent/grandparent/other，默认 parent
-	Tags         []string       `json:"tags"`                      // 标签列表
+	Tags         []string       `json:"tags"`                      // 旧客户端兼容字段；服务端接受但不再向内部传递
 	Source       string         `json:"source"`                    // 来源：online_form/plan/imported
 	IsKeyFocus   bool           `json:"is_key_focus"`              // 是否重点关注
 }
@@ -24,7 +24,7 @@ type UpdateTesteeRequest struct {
 	Name       string         `json:"name"`         // 姓名
 	Gender     int32          `json:"gender"`       // 性别
 	Birthday   *meta.Birthday `json:"birthday"`     // 出生日期（格式：YYYY-MM-DD）
-	Tags       []string       `json:"tags"`         // 标签列表
+	Tags       []string       `json:"tags"`         // 旧客户端兼容字段；服务端接受但不再向内部传递
 	IsKeyFocus bool           `json:"is_key_focus"` // 是否重点关注
 }
 
@@ -38,7 +38,7 @@ type TesteeResponse struct {
 	Name             string        `json:"name"`                          // 姓名
 	Gender           int32         `json:"gender"`                        // 性别
 	Birthday         meta.Birthday `json:"birthday"`                      // 出生日期（格式：YYYY-MM-DD）
-	Tags             []string      `json:"tags"`                          // 标签列表
+	Tags             []string      `json:"tags"`                          // 旧响应兼容字段；当前固定返回空数组
 	Source           string        `json:"source"`                        // 来源
 	IsKeyFocus       bool          `json:"is_key_focus"`                  // 是否重点关注
 

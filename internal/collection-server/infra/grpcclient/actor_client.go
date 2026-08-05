@@ -33,7 +33,6 @@ type CreateTesteeRequest struct {
 	Name         string     // 姓名
 	Gender       int32      // 性别：1-男，2-女，3-其他
 	Birthday     *time.Time // 出生日期
-	Tags         []string   // 标签列表
 	Source       string     // 来源：online_form/plan/imported
 	IsKeyFocus   bool       // 是否重点关注
 }
@@ -104,7 +103,6 @@ func (c *ActorClient) CreateTestee(ctx context.Context, req *CreateTesteeRequest
 		IamProfileId: iamProfileID,
 		Name:         req.Name,
 		Gender:       req.Gender,
-		Tags:         req.Tags,
 		Source:       req.Source,
 		IsKeyFocus:   req.IsKeyFocus,
 	}
@@ -162,7 +160,6 @@ type UpdateTesteeRequest struct {
 	Name       string     // 姓名
 	Gender     int32      // 性别
 	Birthday   *time.Time // 出生日期
-	Tags       []string   // 标签列表
 	IsKeyFocus bool       // 是否重点关注
 }
 
@@ -175,7 +172,6 @@ func (c *ActorClient) UpdateTestee(ctx context.Context, req *UpdateTesteeRequest
 		Id:         req.ID,
 		Name:       req.Name,
 		Gender:     req.Gender,
-		Tags:       req.Tags,
 		IsKeyFocus: req.IsKeyFocus,
 	}
 

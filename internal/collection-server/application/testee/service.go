@@ -86,7 +86,6 @@ func (s *Service) CreateTestee(ctx context.Context, userID uint64, req *CreateTe
 		Name:         req.Name,
 		Gender:       req.Gender,
 		Birthday:     req.Birthday,
-		Tags:         req.Tags,
 		Source:       req.Source,
 		IsKeyFocus:   req.IsKeyFocus,
 	})
@@ -193,7 +192,13 @@ func (s *Service) UpdateTestee(ctx context.Context, testeeID uint64, req *Update
 		"name", req.Name,
 	)
 
-	result, err := s.actorClient.UpdateTestee(ctx, testeeID, req)
+	result, err := s.actorClient.UpdateTestee(ctx, UpdateTesteeInput{
+		TesteeID:   testeeID,
+		Name:       req.Name,
+		Gender:     req.Gender,
+		Birthday:   req.Birthday,
+		IsKeyFocus: req.IsKeyFocus,
+	})
 	if err != nil {
 		log.Errorf("Failed to update testee via gRPC: %v", err)
 		l.Errorw("更新受试者失败",

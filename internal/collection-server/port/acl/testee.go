@@ -53,7 +53,6 @@ func (a *TesteeActorAdapter) CreateTestee(ctx context.Context, input testee.Crea
 		Name:         input.Name,
 		Gender:       input.Gender,
 		Birthday:     birthdayToTimePtr(input.Birthday),
-		Tags:         input.Tags,
 		Source:       input.Source,
 		IsKeyFocus:   input.IsKeyFocus,
 	})
@@ -88,17 +87,16 @@ func (a *TesteeActorAdapter) GetTesteeCareContext(ctx context.Context, testeeID 
 	}, nil
 }
 
-func (a *TesteeActorAdapter) UpdateTestee(ctx context.Context, testeeID uint64, req *testee.UpdateTesteeRequest) (*testee.TesteeResponse, error) {
+func (a *TesteeActorAdapter) UpdateTestee(ctx context.Context, input testee.UpdateTesteeInput) (*testee.TesteeResponse, error) {
 	if a == nil || a.inner == nil {
 		return nil, nil
 	}
 	out, err := a.inner.UpdateTestee(ctx, &grpcbridge.UpdateTesteeRequest{
-		ID:         testeeID,
-		Name:       req.Name,
-		Gender:     req.Gender,
-		Birthday:   birthdayToTimePtr(req.Birthday),
-		Tags:       req.Tags,
-		IsKeyFocus: req.IsKeyFocus,
+		ID:         input.TesteeID,
+		Name:       input.Name,
+		Gender:     input.Gender,
+		Birthday:   birthdayToTimePtr(input.Birthday),
+		IsKeyFocus: input.IsKeyFocus,
 	})
 	if err != nil {
 		return nil, err

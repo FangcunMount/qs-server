@@ -22,7 +22,7 @@ func (s *testeeActorContractStub) CreateTestee(_ context.Context, input CreateTe
 func (s *testeeActorContractStub) GetTesteeCareContext(context.Context, uint64) (*TesteeCareContextResponse, error) {
 	return nil, nil
 }
-func (s *testeeActorContractStub) UpdateTestee(context.Context, uint64, *UpdateTesteeRequest) (*TesteeResponse, error) {
+func (s *testeeActorContractStub) UpdateTestee(context.Context, UpdateTesteeInput) (*TesteeResponse, error) {
 	return nil, nil
 }
 func (s *testeeActorContractStub) ListTesteesByUser(context.Context, []uint64, int32, int32) ([]*TesteeResponse, int64, error) {
