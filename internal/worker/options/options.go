@@ -89,8 +89,6 @@ type RetryPolicyOptions struct {
 type WorkerOptions struct {
 	// Concurrency 并发处理数
 	Concurrency int `json:"concurrency" mapstructure:"concurrency"`
-	// MaxRetries 最大重试次数
-	MaxRetries int `json:"max_retries" mapstructure:"max-retries"`
 	// ServiceName 服务名称（用于消息队列 channel）
 	ServiceName string `json:"service_name" mapstructure:"service-name"`
 	// EventConfigPath 事件配置文件路径
@@ -149,7 +147,6 @@ func NewOptions() *Options {
 		},
 		Worker: &WorkerOptions{
 			Concurrency:                        10,
-			MaxRetries:                         0,
 			ServiceName:                        "qs-worker",
 			AttentionProjectionReconcileDryRun: true,
 		},
@@ -259,8 +256,6 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	workerFS := fss.FlagSet("worker")
 	workerFS.IntVar(&o.Worker.Concurrency, "worker.concurrency", o.Worker.Concurrency,
 		"Maximum number of concurrent handlers")
-	workerFS.IntVar(&o.Worker.MaxRetries, "worker.max-retries", o.Worker.MaxRetries,
-		"Maximum retry attempts for failed messages")
 	workerFS.StringVar(&o.Worker.ServiceName, "worker.service-name", o.Worker.ServiceName,
 		"Service name for message queue channel")
 	workerFS.BoolVar(&o.Worker.AttentionProjectionReconcileEnabled, "worker.attention-projection-reconcile-enabled", o.Worker.AttentionProjectionReconcileEnabled,

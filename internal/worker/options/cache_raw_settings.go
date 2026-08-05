@@ -1,8 +1,15 @@
 package options
 
-import genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+import (
+	"fmt"
+
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
+)
 
 func (o *Options) ValidateRawSettings(settings map[string]any) error {
+	if hasNestedSetting(settings, "worker", "max-retries") || hasNestedSetting(settings, "worker", "max_retries") {
+		return fmt.Errorf("worker.max-retries has been removed; use messaging.delivery.max-attempts")
+	}
 	o.deliveryConfigured = hasNestedSetting(settings, "messaging", "delivery")
 	leaf := genericoptions.FieldSchema(nil)
 	return genericoptions.ValidateRawSection(settings, "cache", genericoptions.FieldSchema{

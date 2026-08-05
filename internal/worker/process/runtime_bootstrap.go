@@ -123,11 +123,6 @@ func (s *server) workerMaxDeliveryAttempts() int {
 			return min(s.config.Messaging.Delivery.MaxAttempts, 8)
 		}
 	}
-	if s.config != nil && s.config.Worker != nil && s.config.Worker.MaxRetries > 0 {
-		s.logger.Warn("worker.max-retries is deprecated; use messaging.delivery.max-attempts",
-			slog.Int("configured", s.config.Worker.MaxRetries), slog.Int("effective_max", 8))
-		return min(s.config.Worker.MaxRetries, 8)
-	}
 	return 8
 }
 

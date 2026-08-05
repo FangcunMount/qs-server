@@ -55,6 +55,20 @@ func TestOptionsValidateDeliveryHardCap(t *testing.T) {
 	}
 }
 
+func TestOptionsRejectRemovedWorkerMaxRetries(t *testing.T) {
+	for _, key := range []string{"max-retries", "max_retries"} {
+		t.Run(key, func(t *testing.T) {
+			opts := NewOptions()
+			err := opts.ValidateRawSettings(map[string]any{
+				"worker": map[string]any{key: 6},
+			})
+			if err == nil || !strings.Contains(err.Error(), "worker.max-retries has been removed") {
+				t.Fatalf("expected removed worker.max-retries error, got %v", err)
+			}
+		})
+	}
+}
+
 func TestOptionsValidateHoldReplayHardCap(t *testing.T) {
 	opts := NewOptions()
 	opts.RetryGovernance.HoldReplay.MaxAttempts = 31
