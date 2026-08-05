@@ -100,13 +100,12 @@ type SurveyDeps struct {
 }
 
 type AssessmentModelDeps struct {
-	Management  assessmentModelApp.CatalogManagementService
-	Definition  assessmentModelApp.DefinitionAuthoringService
-	Publication assessmentModelApp.PublicationService
-	Release     assessmentModelApp.AssessmentReleaseService
-	Query       assessmentModelApp.CatalogQueryService
-	NormTables  assessmentModelApp.NormTableService
-	Assets      assessmentModelApp.OutcomeImageService
+	Management assessmentModelApp.CatalogManagementService
+	Definition assessmentModelApp.DefinitionAuthoringService
+	Release    assessmentModelApp.AssessmentReleaseService
+	Query      assessmentModelApp.CatalogQueryService
+	NormTables assessmentModelApp.NormTableService
+	Assets     assessmentModelApp.OutcomeImageService
 }
 
 type ActorDeps struct {

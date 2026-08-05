@@ -17,11 +17,9 @@ func (r *Router) registerAssessmentModelProtectedRoutes(apiV1 *gin.RouterGroup) 
 	{
 		manage := models.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityManageAssessmentModels))
 		definition := models.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityEditAssessmentModelDefinitions))
-		publication := models.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityPublishAssessmentModels))
 		read := models.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityReadAssessmentModels))
 		registerRouteSpecs(manage, assessmentModelManageRoutes(handler))
 		registerRouteSpecs(definition, assessmentModelDefinitionRoutes(handler))
-		registerRouteSpecs(publication, assessmentModelPublicationRoutes(handler))
 		registerRouteSpecs(read, assessmentModelReadRoutes(handler))
 		releaseHandler := codesHandler.NewAssessmentReleaseHandler(r.deps.AssessmentModel.Release, r.deps.AssessmentModel.Query)
 		releaseLifecycle := apiV1.Group("/assessment-releases", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityPublishAssessmentModels))
@@ -50,8 +48,6 @@ func assessmentModelDefinitionRoutes(handler *codesHandler.AssessmentModelHandle
 		{method: http.MethodPost, path: "/:code/outcomes/:outcome_code/image", handlers: []gin.HandlerFunc{handler.UploadOutcomeImage}},
 	}
 }
-
-func assessmentModelPublicationRoutes(*codesHandler.AssessmentModelHandler) []routeSpec { return nil }
 
 func assessmentReleaseLifecycleRoutes(handler *codesHandler.AssessmentReleaseHandler) []routeSpec {
 	return []routeSpec{

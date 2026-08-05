@@ -49,12 +49,6 @@ type OutcomeImageUploadResult struct {
 	Size        int64  `json:"size"`
 }
 
-// PublicationService 拥有发布状态过渡和快照创建
-type PublicationService interface {
-	Publish(ctx context.Context, actor ActorContext, code string) (*ModelSummary, error)
-	Unpublish(ctx context.Context, actor ActorContext, code string) (*ModelSummary, error)
-}
-
 // AssessmentReleaseService owns the atomic lifecycle of a questionnaire and
 // assessment model pair. Standalone publication is intentionally absent.
 type AssessmentReleaseService interface {

@@ -28,7 +28,6 @@ func (m *Module) ExportRESTDeps(
 		m.Authoring.Codes = codesService
 	}
 	deps.AssessmentModel.Definition = m.Authoring
-	deps.AssessmentModel.Publication = m.Publication
 	deps.AssessmentModel.Release = m.Release
 	deps.AssessmentModel.NormTables = m.NormTables
 	deps.AssessmentModel.Query = appquery.NewService(appquery.Dependencies{

@@ -6,7 +6,6 @@ import (
 	appevolution "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/evolution"
 	appmanagement "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/management"
 	appnormtable "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/normtable"
-	apppublication "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
 	appquery "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/query"
 	apprelease "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/release"
 	modelcatalogRuntime "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/runtime"
@@ -25,7 +24,6 @@ type Module struct {
 	PublishedWarmer  cachetarget.PublishedModelWarmer
 	Management       assessmentModelApp.CatalogManagementService
 	Authoring        *appauthoring.Service
-	Publication      assessmentModelApp.PublicationService
 	Release          assessmentModelApp.AssessmentReleaseService
 	Query            assessmentModelApp.CatalogQueryService
 	NormTables       assessmentModelApp.NormTableService
@@ -65,17 +63,6 @@ func New(deps Deps) (*Module, error) {
 		Authorizer: assessmentModelApp.SnapshotAuthorizer{},
 		Registry:   registry,
 	}
-	// 发布服务
-	publication := &apppublication.Service{
-		Transactions: deps.Catalog.Transactions,
-		ModelRepo:    deps.Catalog.ModelRepo,
-		Published:    deps.Catalog.PublishedRepo,
-		Authorizer:   assessmentModelApp.SnapshotAuthorizer{},
-		Registry:     registry,
-		Bindings:     bindings,
-		Evolution:    evolutionPolicy,
-		Effects:      effects,
-	}
 	release := apprelease.Service{
 		Transactions: deps.Catalog.Transactions,
 		Models:       deps.Catalog.ModelRepo, Published: deps.Catalog.PublishedRepo,
@@ -103,7 +90,6 @@ func New(deps Deps) (*Module, error) {
 		PublishedWarmer:  deps.Catalog.PublishedWarmer,
 		Management:       management,
 		Authoring:        authoring,
-		Publication:      publication,
 		Release:          release,
 		Query:            query,
 		NormTables:       normTables,
