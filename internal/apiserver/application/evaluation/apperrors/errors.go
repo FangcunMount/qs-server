@@ -78,7 +78,3 @@ func PermissionDenied(format string, args ...interface{}) error {
 func Forbidden(format string, args ...interface{}) error {
 	return cberrors.WithCode(errorCode.ErrForbidden, format, args...)
 }
-
-func UnsupportedOperation(format string, args ...interface{}) error {
-	return cberrors.WithCode(errorCode.ErrUnsupportedOperation, format, args...)
-}

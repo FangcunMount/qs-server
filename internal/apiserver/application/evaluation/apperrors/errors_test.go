@@ -25,7 +25,6 @@ func TestApplicationErrorMapperPreservesAPICodes(t *testing.T) {
 		{name: "questionnaire not found", err: QuestionnaireNotFound(errors.New("missing"), "questionnaire missing"), code: errorCode.ErrQuestionnaireNotFound},
 		{name: "assessment invalid status", err: AssessmentInvalidStatus("invalid status"), code: errorCode.ErrAssessmentInvalidStatus},
 		{name: "assessment scoring failed", err: AssessmentScoringFailed(errors.New("failed"), "scoring failed"), code: errorCode.ErrAssessmentInterpretFailed},
-		{name: "unsupported", err: UnsupportedOperation("unsupported"), code: errorCode.ErrUnsupportedOperation},
 	}
 	for _, tc := range cases {
 		tc := tc
