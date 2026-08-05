@@ -12,7 +12,7 @@
 
 用法示例：
   python scripts/generate_rest_from_swagger.py \\
-    --swagger api/apiserver/swagger.json \\
+    --swagger internal/apiserver/docs/swagger.json \\
     --output  api/rest/apiserver.yaml \\
     --server http://localhost:8081 \\
     --server https://api.example.com
