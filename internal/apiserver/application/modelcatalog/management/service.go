@@ -137,26 +137,6 @@ func (s Service) BindQuestionnaire(ctx context.Context, actor modelcatalog.Actor
 	return &modelcatalog.QuestionnaireBindingResult{QuestionnaireCode: binding.QuestionnaireCode, QuestionnaireVersion: binding.QuestionnaireVersion}, nil
 }
 
-func (s Service) Archive(ctx context.Context, actor modelcatalog.ActorContext, modelCode string) (*modelcatalog.ModelSummary, error) {
-	model, err := s.loadAndAuthorize(ctx, actor, modelCode)
-	if err != nil {
-		return nil, err
-	}
-	// The working head may already be draft while an older release remains
-	// active. Archive the active snapshot independently of the head status.
-	if err := s.Published.DeletePublished(ctx, model.Kind, model.Code); err != nil {
-		return nil, err
-	}
-	if err := model.MarkArchived(s.now()); err != nil {
-		return nil, err
-	}
-	if err := s.ModelRepo.Update(ctx, model); err != nil {
-		return nil, modelcatalog.MapDraftWriteError(err)
-	}
-	s.Effects.AfterTransition(ctx, model, lifecycle.ActionArchived)
-	return modelcatalog.ModelSummaryFromAssessmentModel(model), nil
-}
-
 func (s Service) Delete(ctx context.Context, actor modelcatalog.ActorContext, modelCode string) error {
 	model, err := s.loadAndAuthorize(ctx, actor, modelCode)
 	if err != nil {

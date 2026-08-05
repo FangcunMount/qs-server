@@ -13,7 +13,6 @@ type CatalogManagementService interface {
 	Create(ctx context.Context, actor ActorContext, input CreateModelDTO) (*ModelSummary, error)
 	UpdateBasicInfo(ctx context.Context, actor ActorContext, input UpdateBasicInfoDTO) (*ModelSummary, error)
 	BindQuestionnaire(ctx context.Context, actor ActorContext, input BindQuestionnaireDTO) (*QuestionnaireBindingResult, error)
-	Archive(ctx context.Context, actor ActorContext, code string) (*ModelSummary, error)
 	Delete(ctx context.Context, actor ActorContext, code string) error
 	SynchronizeQuestionnaireVersion(ctx context.Context, actor ActorContext, questionnaireCode, questionnaireVersion string) error
 }
