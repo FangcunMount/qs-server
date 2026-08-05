@@ -94,7 +94,7 @@ func openAttentionProjectionMongo(t *testing.T) *mongo.Database {
 	if base == "" {
 		base = "qs_server_contract_test"
 	}
-	db := client.Database(fmt.Sprintf("%s_attention_projection_%d", base, time.Now().UnixNano()))
+	db := client.Database(fmt.Sprintf("%s_%d", base, time.Now().UnixNano()))
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cleanupCancel()
