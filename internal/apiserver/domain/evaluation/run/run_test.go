@@ -26,6 +26,32 @@ func TestNextEvaluationRunIncrementsAttempt(t *testing.T) {
 	}
 }
 
+func TestEvaluationRunIdentityIsCanonicalForAssessmentAttempt(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		assessmentID uint64
+		attemptNo    int
+		wantID       ID
+		wantAttempt  int
+	}{
+		{name: "first attempt", assessmentID: 42, attemptNo: 1, wantID: "42:1", wantAttempt: 1},
+		{name: "later attempt", assessmentID: 42, attemptNo: 3, wantID: "42:3", wantAttempt: 3},
+		{name: "invalid attempt normalizes to first", assessmentID: 42, attemptNo: 0, wantID: "42:1", wantAttempt: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			run := NewEvaluationRunWithAttempt(tt.assessmentID, tt.attemptNo)
+			if run.ID() != tt.wantID || run.AssessmentID() != tt.assessmentID || run.Attempt().Number != tt.wantAttempt {
+				t.Fatalf("identity = (%s, %d, %d), want (%s, %d, %d)", run.ID(), run.AssessmentID(), run.Attempt().Number, tt.wantID, tt.assessmentID, tt.wantAttempt)
+			}
+		})
+	}
+}
+
 func TestEvaluationRunLifecycle(t *testing.T) {
 	t.Parallel()
 

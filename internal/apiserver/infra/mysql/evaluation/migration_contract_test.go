@@ -90,6 +90,7 @@ func TestRuntimeCheckpointMigrationMergesLegacyTables(t *testing.T) {
 		"`scope`",
 		"`resource_id`",
 		"`attempt_no`",
+		"UNIQUE KEY `uk_runtime_checkpoint_scope_resource_attempt` (`scope`, `resource_id`, `attempt_no`)",
 		"INSERT INTO `runtime_checkpoint`",
 		"FROM `evaluation_run`",
 		"FROM `analytics_projector_checkpoint`",

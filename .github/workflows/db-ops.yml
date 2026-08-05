@@ -1052,6 +1052,20 @@ jobs:
                   GROUP BY assessment_id, attempt_no
                   HAVING COUNT(*) > 1
                   ORDER BY assessment_id, attempt_no;
+                  SELECT COUNT(*) AS noncanonical_evaluation_run_identities
+                  FROM runtime_checkpoint
+                  WHERE scope = 'evaluation_run'
+                    AND assessment_id IS NOT NULL
+                    AND deleted_at IS NULL
+                    AND resource_id <> CONCAT(CAST(assessment_id AS CHAR), ':', CAST(attempt_no AS CHAR));
+                  SELECT id, assessment_id, attempt_no, resource_id
+                  FROM runtime_checkpoint
+                  WHERE scope = 'evaluation_run'
+                    AND assessment_id IS NOT NULL
+                    AND deleted_at IS NULL
+                    AND resource_id <> CONCAT(CAST(assessment_id AS CHAR), ':', CAST(attempt_no AS CHAR))
+                  ORDER BY id
+                  LIMIT 20;
                   SELECT index_name, non_unique,
                          GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') AS index_columns
                   FROM information_schema.statistics

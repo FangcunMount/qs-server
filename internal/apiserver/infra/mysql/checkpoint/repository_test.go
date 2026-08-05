@@ -73,3 +73,13 @@ func TestRunCheckpointPORoundTrip(t *testing.T) {
 		t.Fatalf("round-trip authorization = origin:%q action_request_id:%q", roundTrip.Origin(), roundTrip.ActionRequestID())
 	}
 }
+
+func TestNewRunCheckpointUsesCanonicalUniqueIdentity(t *testing.T) {
+	t.Parallel()
+
+	run := evalrun.NewEvaluationRunWithAttempt(42, 3)
+	po := checkpoint.RunToPOForTest(run)
+	if po.Scope != "evaluation_run" || po.ResourceID != "42:3" || po.AttemptNo != 3 || po.AssessmentID == nil || *po.AssessmentID != 42 {
+		t.Fatalf("checkpoint identity = %+v, want evaluation_run/42:3/3/42", po)
+	}
+}
