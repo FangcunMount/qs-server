@@ -1113,7 +1113,8 @@ jobs:
               local database="$1"
               local db_size scan_total current_questionnaire current_models
               local current_assessment current_testee current_plan current_stats
-              local current_assess_list current_version current_hotset current_family_other
+              local current_assess_list current_version current_assessment_list_version_compat
+              local current_hotset current_family_other
               local legacy_unnamespaced_candidate other key scan_dir scan_pid
               scan_total=0
               current_questionnaire=0
@@ -1124,6 +1125,7 @@ jobs:
               current_stats=0
               current_assess_list=0
               current_version=0
+              current_assessment_list_version_compat=0
               current_hotset=0
               current_family_other=0
               legacy_unnamespaced_candidate=0
@@ -1148,8 +1150,11 @@ jobs:
                     ;;
                   4:cache:query:assess:list:*) current_assess_list=$((current_assess_list + 1)) ;;
                   7:cache:meta:query:version:*) current_version=$((current_version + 1)) ;;
+                  7:cache:query:query:version:assessment:list:*)
+                    current_assessment_list_version_compat=$((current_assessment_list_version_compat + 1))
+                    ;;
                   7:cache:meta:warmup:hot:*) current_hotset=$((current_hotset + 1)) ;;
-                  0:ops:runtime:*|2:cache:static:*|3:cache:object:*|4:cache:query:*|5:cache:sdk:*|6:cache:lock:*|7:cache:meta:*|8:cache:rank:*)
+                  0:ops:runtime:*|1:ops:runtime:*|2:cache:static:*|3:cache:object:*|4:cache:query:*|5:cache:sdk:*|6:cache:lock:*|7:cache:meta:*|8:cache:rank:*)
                     current_family_other=$((current_family_other + 1))
                     ;;
                   *:questionnaire:*|*:scale:*|*:assessment_model:*|*:assessment:*|*:assess:*|*:stats:*|*:testee:*|*:plan:*|*:query:*|*:warmup:*|*:answersheet:*)
@@ -1171,7 +1176,8 @@ jobs:
               echo "  current_questionnaire=${current_questionnaire} current_models=${current_models}"
               echo "  current_assessment=${current_assessment} current_testee=${current_testee} current_plan=${current_plan}"
               echo "  current_stats=${current_stats} current_assess_list=${current_assess_list}"
-              echo "  current_version=${current_version} current_hotset=${current_hotset} current_family_other=${current_family_other}"
+              echo "  current_version=${current_version} current_assessment_list_version_compat=${current_assessment_list_version_compat}"
+              echo "  current_hotset=${current_hotset} current_family_other=${current_family_other}"
               echo "  legacy_unnamespaced_candidate=${legacy_unnamespaced_candidate} other=${other}"
               if [ "$scan_total" != "$db_size" ]; then
                 echo "  note=DBSIZE and SCAN differ because keys may expire during the read-only audit"
