@@ -402,6 +402,24 @@ func TestRemoteDeployCleansOwnedBackupDirectoryWithoutSudo(t *testing.T) {
 	}
 }
 
+func TestCIRunsModelCatalogMongoCASContract(t *testing.T) {
+	t.Parallel()
+
+	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatalf("read CI workflow: %v", err)
+	}
+	content := string(workflow)
+	for _, required := range []string{
+		"TestDraftRepositoryConcurrentWritersUseRevisionCAS",
+		"./internal/apiserver/infra/mongo/modelcatalog",
+	} {
+		if !strings.Contains(content, required) {
+			t.Errorf("CI ModelCatalog Mongo contract must contain %q", required)
+		}
+	}
+}
+
 func TestReportStatusTTLContractMatchesAcrossProcesses(t *testing.T) {
 	t.Parallel()
 
