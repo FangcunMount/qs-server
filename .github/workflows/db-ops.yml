@@ -350,11 +350,28 @@ jobs:
                 --authenticationDatabase admin \
                 --quiet <<'MONGOJS'
             const targetDB = db.getSiblingDB(process.env.MONGODB_DBNAME)
+            const collectionNames = targetDB.getCollectionNames().sort()
             print(`MongoDB version: ${db.version()}`)
             print("Database statistics:")
             printjson(targetDB.stats())
             print("Collections:")
-            printjson(targetDB.getCollectionNames().sort())
+            printjson(collectionNames)
+            print("Retirement candidate collection statistics:")
+            printjson(collectionNames
+              .filter(name => name === "answersheet_submit_idempotency" ||
+                name.includes("_legacy_") ||
+                name.includes("__seed_orphan_backup_hist_v1"))
+              .map(name => {
+                const stats = targetDB.runCommand({collStats: name})
+                return {
+                  name,
+                  count: stats.count,
+                  size: stats.size,
+                  storage_size: stats.storageSize,
+                  total_index_size: stats.totalIndexSize,
+                  indexes: stats.nindexes
+                }
+              }))
             print("Attention projection status counts:")
             printjson(targetDB.getCollection("interpretation_attention_projections").aggregate([
               {$group: {_id: "$status", count: {$sum: 1}}},
@@ -463,6 +480,32 @@ jobs:
                 --batch --raw \
                 --execute="
                   SELECT VERSION() AS mysql_version;
+                  SELECT version AS schema_migration_version, dirty AS schema_migration_dirty
+                  FROM schema_migrations
+                  LIMIT 1;
+                  SELECT table_name, engine, table_rows, data_length, index_length
+                  FROM information_schema.tables
+                  WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'
+                  ORDER BY table_name;
+                  SELECT table_name AS retired_table_still_present
+                  FROM information_schema.tables
+                  WHERE table_schema = DATABASE()
+                    AND table_name IN (
+                      'analytics_projector_checkpoint',
+                      'evaluation_run',
+                      'behavior_footprint',
+                      'assessment_episode',
+                      'analytics_pending_event',
+                      'statistics_journey_daily',
+                      'statistics_content_daily',
+                      'statistics_plan_daily',
+                      'seed_backfill_stage',
+                      'seed_backfill_stage_attempt',
+                      'seed_backfill_rollback_operation',
+                      'seed_backfill_rollback_resource',
+                      'seed_backfill_rollback_phase_attempt'
+                    )
+                  ORDER BY table_name;
                   SELECT retry_disposition, COUNT(*) AS records,
                          MIN(failed_at) AS first_failed_at, MAX(failed_at) AS last_failed_at
                   FROM event_delivery_dead_letter
