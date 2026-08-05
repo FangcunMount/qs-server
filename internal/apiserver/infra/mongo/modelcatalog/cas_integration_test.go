@@ -19,7 +19,7 @@ func TestDraftRepositoryConcurrentWritersUseRevisionCAS(t *testing.T) {
 	now := time.Now().UTC()
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
 		Code: "MODEL-CAS", Kind: domain.KindScale, Algorithm: domain.AlgorithmScaleDefault,
-		ProductChannel: domain.ProductChannelMedicalScale, Title: "Initial", Now: now,
+		Title: "Initial", Now: now,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -35,10 +35,10 @@ func TestDraftRepositoryConcurrentWritersUseRevisionCAS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := left.UpdateBasicInfo("Left", "", left.SubKind, left.Algorithm, left.ProductChannel, "", nil, now.Add(time.Second)); err != nil {
+	if err := left.UpdateBasicInfo("Left", "", left.Algorithm, "", nil, now.Add(time.Second)); err != nil {
 		t.Fatal(err)
 	}
-	if err := right.UpdateBasicInfo("Right", "", right.SubKind, right.Algorithm, right.ProductChannel, "", nil, now.Add(time.Second)); err != nil {
+	if err := right.UpdateBasicInfo("Right", "", right.Algorithm, "", nil, now.Add(time.Second)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -79,7 +79,7 @@ func TestDraftRepositoryConcurrentWritersUseRevisionCAS(t *testing.T) {
 	if refreshed.Revision() != 2 {
 		t.Fatalf("revision = %d, want 2", refreshed.Revision())
 	}
-	if err := refreshed.UpdateBasicInfo("Retry", "", refreshed.SubKind, refreshed.Algorithm, refreshed.ProductChannel, "", nil, now.Add(2*time.Second)); err != nil {
+	if err := refreshed.UpdateBasicInfo("Retry", "", refreshed.Algorithm, "", nil, now.Add(2*time.Second)); err != nil {
 		t.Fatal(err)
 	}
 	if err := repo.Update(t.Context(), refreshed); err != nil {

@@ -123,7 +123,7 @@ jobs:
             -run '^TestRetire' \
             -count=1 -timeout=15m -v ./internal/pkg/migration
 
-      - name: Run Survey Mongo integration contracts
+      - name: Run Survey and ModelCatalog Mongo integration contracts
         env:
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
           QS_SERVER_TEST_MONGO_DB: qs_survey_ci_test
@@ -133,7 +133,8 @@ jobs:
             -run '^(TestDurableSubmissionTransactionAgainstMongoReplicaSet|TestRepositoryConcurrentWritersUseRevisionCAS|TestStandaloneQuestionnaireLifecycleRollsBackOnPartialFailure)$' \
             -count=1 -timeout=10m -v \
             ./internal/apiserver/infra/mongo/answersheet \
-            ./internal/apiserver/infra/mongo/questionnaire
+            ./internal/apiserver/infra/mongo/questionnaire \
+            ./internal/apiserver/infra/mongo/modelcatalog
 
       - name: Run attention projection Mongo integration contract
         env:
