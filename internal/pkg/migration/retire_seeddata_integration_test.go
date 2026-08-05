@@ -7,6 +7,8 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/mongodbtest"
@@ -148,9 +150,10 @@ func TestRetireLegacyMongoCollectionsFrom19AndDown(t *testing.T) {
 func TestRetireLegacyMongoCollectionsColdStart(t *testing.T) {
 	client, db := mongodbtest.ReplicaSetDatabase(t)
 	migrator := NewMongoMigrator(client, &Config{Enabled: true, Database: db.Name()})
+	wantVersion := latestEmbeddedMongoMigrationVersion(t)
 	version, changed, err := migrator.Run()
-	if err != nil || !changed || version != 20 {
-		t.Fatalf("migrate MongoDB 0 -> 20: version=%d changed=%v err=%v", version, changed, err)
+	if err != nil || !changed || version != wantVersion {
+		t.Fatalf("migrate MongoDB 0 -> %d: version=%d changed=%v err=%v", wantVersion, version, changed, err)
 	}
 	for _, name := range retiredMongoCollections {
 		if containsString(mongoCollectionNames(t, db), name) {
@@ -299,6 +302,36 @@ func assertExactRemovedNames(t *testing.T, before, after, want []string) {
 			t.Fatalf("removed=%v want=%v", removed, want)
 		}
 	}
+}
+
+func latestEmbeddedMongoMigrationVersion(t *testing.T) uint {
+	t.Helper()
+	entries, err := migrations.ReadDir("migrations/mongodb")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var latest uint64
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".up.json") {
+			continue
+		}
+		prefix, _, ok := strings.Cut(name, "_")
+		if !ok {
+			continue
+		}
+		version, parseErr := strconv.ParseUint(prefix, 10, 64)
+		if parseErr != nil {
+			t.Fatalf("parse migration version from %s: %v", name, parseErr)
+		}
+		if version > latest {
+			latest = version
+		}
+	}
+	if latest == 0 {
+		t.Fatal("no embedded MongoDB migrations found")
+	}
+	return uint(latest)
 }
 
 func containsString(values []string, want string) bool {

@@ -34,7 +34,7 @@ func (f *fakeAuditStore) SaveAuditCheckpoint(_ context.Context, expected int64, 
 	if f.saveErr != nil {
 		return f.saveErr
 	}
-	if f.checkpoint.Revision != expected && !(f.missing && expected == 0) {
+	if f.checkpoint.Revision != expected && (!f.missing || expected != 0) {
 		return ErrAuditCheckpointCAS
 	}
 	f.missing = false

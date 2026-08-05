@@ -447,7 +447,7 @@ func (s *CatalogReconcileStore) loadAuditSourceAssociations(ctx context.Context,
 	}
 	sources := make(map[uint64]CatalogSourceAssociation, len(ids))
 	collection := ""
-	projection := bson.M{}
+	var projection bson.M
 	switch sourceKind {
 	case ReportCatalogSourceArtifact:
 		collection = (InterpretReportPO{}).CollectionName()
