@@ -496,6 +496,24 @@ func TestDBOpsInventoriesLegacyBackupTablesExactly(t *testing.T) {
 	}
 }
 
+func TestDBOpsInventoriesOwnerlessAnalyticsWatermarkExactly(t *testing.T) {
+	t.Parallel()
+
+	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "db-ops.yml"))
+	if err != nil {
+		t.Fatalf("read db ops workflow: %v", err)
+	}
+	content := string(workflow)
+	for _, required := range []string{
+		"'analytics_scan_watermarks' AS retirement_candidate_table",
+		"FROM analytics_scan_watermarks",
+	} {
+		if !strings.Contains(content, required) {
+			t.Errorf("DB ops ownerless analytics watermark inventory must contain %q", required)
+		}
+	}
+}
+
 func TestDBOpsInventoriesStatisticsCanonicalAndCompatibilityState(t *testing.T) {
 	t.Parallel()
 

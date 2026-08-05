@@ -866,6 +866,9 @@ jobs:
                   PREPARE legacy_backup_count_stmt FROM @legacy_backup_count_sql;
                   EXECUTE legacy_backup_count_stmt;
                   DEALLOCATE PREPARE legacy_backup_count_stmt;
+                  SELECT 'analytics_scan_watermarks' AS retirement_candidate_table,
+                         COUNT(*) AS exact_rows
+                  FROM analytics_scan_watermarks;
                   SELECT table_name AS retired_table_still_present
                   FROM information_schema.tables
                   WHERE table_schema = DATABASE()
