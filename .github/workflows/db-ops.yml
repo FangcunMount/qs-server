@@ -551,6 +551,87 @@ jobs:
               unique: index.unique === true,
               partial_filter: index.partialFilterExpression || null
             })))
+            const questionnaires = targetDB.getCollection("questionnaires")
+            const questionnaireHeads = {
+              deleted_at: null,
+              $or: [
+                {record_role: "head"},
+                {record_role: {$exists: false}},
+                {record_role: ""}
+              ]
+            }
+            const questionnaireActiveSnapshots = {
+              record_role: "published_snapshot",
+              deleted_at: null,
+              $or: [
+                {release_status: "active"},
+                {release_status: {$exists: false}, is_active_published: true}
+              ]
+            }
+            const questionnaireFallbackCount = pipeline =>
+              questionnaires.aggregate([...pipeline, {$count: "count"}], {allowDiskUse: true}).toArray()[0]?.count || 0
+            print("Questionnaire compatibility inventory:")
+            printjson({
+              total: questionnaires.countDocuments({}),
+              heads: questionnaires.countDocuments(questionnaireHeads),
+              snapshots: questionnaires.countDocuments({record_role: "published_snapshot", deleted_at: null}),
+              active_snapshots: questionnaires.countDocuments(questionnaireActiveSnapshots),
+              heads_missing_record_role: questionnaires.countDocuments({deleted_at: null, $or: [
+                {record_role: {$exists: false}},
+                {record_role: ""}
+              ]}),
+              snapshots_missing_release_status: questionnaires.countDocuments({
+                record_role: "published_snapshot",
+                deleted_at: null,
+                $or: [{release_status: {$exists: false}}, {release_status: ""}]
+              }),
+              published_heads_without_active_snapshot: questionnaireFallbackCount([
+                {$match: {...questionnaireHeads, status: "published"}},
+                {$lookup: {
+                  from: "questionnaires",
+                  let: {head_code: "$code"},
+                  pipeline: [
+                    {$match: {$expr: {$and: [
+                      {$eq: ["$code", "$$head_code"]},
+                      {$eq: ["$record_role", "published_snapshot"]},
+                      {$eq: ["$deleted_at", null]},
+                      {$or: [
+                        {$eq: ["$release_status", "active"]},
+                        {$and: [
+                          {$eq: [{$type: "$release_status"}, "missing"]},
+                          {$eq: ["$is_active_published", true]}
+                        ]}
+                      ]}
+                    ]}}}
+                  ],
+                  as: "active_snapshot"
+                }},
+                {$match: {active_snapshot: {$size: 0}}}
+              ]),
+              head_versions_without_snapshot: questionnaireFallbackCount([
+                {$match: questionnaireHeads},
+                {$lookup: {
+                  from: "questionnaires",
+                  let: {head_code: "$code", head_version: "$version"},
+                  pipeline: [
+                    {$match: {$expr: {$and: [
+                      {$eq: ["$code", "$$head_code"]},
+                      {$eq: ["$version", "$$head_version"]},
+                      {$eq: ["$record_role", "published_snapshot"]},
+                      {$eq: ["$deleted_at", null]}
+                    ]}}}
+                  ],
+                  as: "exact_snapshot"
+                }},
+                {$match: {exact_snapshot: {$size: 0}}}
+              ]),
+              active_snapshot_duplicates: questionnaires.aggregate([
+                {$match: questionnaireActiveSnapshots},
+                {$group: {_id: "$code", count: {$sum: 1}}},
+                {$match: {count: {$gt: 1}}},
+                {$count: "groups"}
+              ]).toArray()[0]?.groups || 0
+            })
             const assessmentNorms = targetDB.getCollection("assessment_norms")
             print("ModelCatalog norm inventory:")
             printjson({
