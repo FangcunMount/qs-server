@@ -42,6 +42,11 @@ func (s Service) Create(ctx context.Context, actor modelcatalog.ActorContext, in
 	if err != nil {
 		return nil, err
 	}
+	if _, retained, err := s.Evolution.ResolveFrozenIdentity(ctx, codeValue); err != nil {
+		return nil, err
+	} else if retained {
+		return nil, errors.WithCode(code.ErrConflict, "assessment model code cannot be reused after its first release")
+	}
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
 		Code:        codeValue,
 		Kind:        kind,

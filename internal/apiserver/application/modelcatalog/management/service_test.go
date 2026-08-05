@@ -118,6 +118,29 @@ func TestUpdateBasicInfoRejectsFrozenAlgorithmChange(t *testing.T) {
 	}
 }
 
+func TestCreateRejectsCodeWithRetainedReleaseHistory(t *testing.T) {
+	t.Parallel()
+
+	repo := &revisionCheckingModelRepo{}
+	service := Service{
+		ModelRepo:  repo,
+		Authorizer: allowManagementAuthorizer{},
+		Evolution: evolution.Policy{History: managementHistoryStub{items: []*modelcatalogport.PublishedModel{
+			{Code: "MBTI-RETIRED", Algorithm: domain.AlgorithmPersonalityTypology, QuestionnaireCode: "Q-MBTI"},
+		}}},
+	}
+
+	_, err := service.Create(context.Background(), modelcatalog.ActorContext{}, modelcatalog.CreateModelDTO{
+		Code: "MBTI-RETIRED", Kind: string(domain.KindTypology), Algorithm: string(domain.AlgorithmPersonalityTypology), Title: "New MBTI",
+	})
+	if err == nil {
+		t.Fatal("Create() error = nil, want retained release code conflict")
+	}
+	if repo.createCalls != 0 {
+		t.Fatalf("repository create calls = %d, want 0", repo.createCalls)
+	}
+}
+
 type managementHistoryStub struct {
 	items []*modelcatalogport.PublishedModel
 }
@@ -135,9 +158,13 @@ func (allowManagementAuthorizer) Authorize(context.Context, modelcatalog.ActorCo
 type revisionCheckingModelRepo struct {
 	model             *domain.AssessmentModel
 	persistedRevision int64
+	createCalls       int
 }
 
-func (*revisionCheckingModelRepo) Create(context.Context, *domain.AssessmentModel) error { return nil }
+func (r *revisionCheckingModelRepo) Create(context.Context, *domain.AssessmentModel) error {
+	r.createCalls++
+	return nil
+}
 
 func (r *revisionCheckingModelRepo) Update(_ context.Context, model *domain.AssessmentModel) error {
 	if got, want := model.Revision(), r.persistedRevision+1; got != want {
