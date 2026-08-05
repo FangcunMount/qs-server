@@ -375,6 +375,33 @@ func TestRemoteDeployChecksCanonicalGRPCCertificateIdentities(t *testing.T) {
 	}
 }
 
+func TestRemoteDeployCleansOwnedBackupDirectoryWithoutSudo(t *testing.T) {
+	t.Parallel()
+
+	script, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "cd", "remote-deploy.sh"))
+	if err != nil {
+		t.Fatalf("read remote deploy script: %v", err)
+	}
+	content := string(script)
+	for _, required := range []string{
+		`chown "$(id -u):$(id -g)" "$BACKUP_DIR"`,
+		`old_backups="$(ls -t "$BACKUP_DIR"/backup_*.tar.gz 2>/dev/null || true)"`,
+		`rm -f "$backup_file"`,
+	} {
+		if !strings.Contains(content, required) {
+			t.Errorf("remote deploy backup retention must contain %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		`$SUDO ls -t "$BACKUP_DIR"`,
+		`$SUDO rm -f "$backup_file"`,
+	} {
+		if strings.Contains(content, forbidden) {
+			t.Errorf("remote deploy backup retention must not contain %q", forbidden)
+		}
+	}
+}
+
 func TestReportStatusTTLContractMatchesAcrossProcesses(t *testing.T) {
 	t.Parallel()
 

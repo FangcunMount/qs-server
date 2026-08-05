@@ -368,12 +368,15 @@ select_image() {
 
 cleanup_old_backups() {
   local old_backups backup_file
-  old_backups="$($SUDO ls -t "$BACKUP_DIR"/backup_*.tar.gz 2>/dev/null || true)"
+  # prepare_dirs_and_backup transfers this directory to the deployment user.
+  # Keep retention work unprivileged so a command-specific sudo policy does
+  # not turn successful deployments into password-prompt warnings.
+  old_backups="$(ls -t "$BACKUP_DIR"/backup_*.tar.gz 2>/dev/null || true)"
   old_backups="$(printf '%s\n' "$old_backups" | tail -n +6 || true)"
   if [ -n "$old_backups" ]; then
     printf '%s\n' "$old_backups" | while IFS= read -r backup_file; do
       [ -z "$backup_file" ] && continue
-      $SUDO rm -f "$backup_file" || true
+      rm -f "$backup_file"
     done
   fi
 }
