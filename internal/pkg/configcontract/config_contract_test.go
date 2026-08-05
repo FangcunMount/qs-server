@@ -556,6 +556,42 @@ func TestDBOpsMongoStatusRunsAsFailFastScript(t *testing.T) {
 	}
 }
 
+func TestDBOpsMongoBackupIsBoundedAndOwned(t *testing.T) {
+	t.Parallel()
+
+	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "db-ops.yml"))
+	if err != nil {
+		t.Fatalf("read db ops workflow: %v", err)
+	}
+	content := string(workflow)
+	for _, required := range []string{
+		`BACKUP_CONTAINER_NAME="qs-server-mongodb-backup"`,
+		`--name "$BACKUP_CONTAINER_NAME"`,
+		`com.fangcunmount.qs-server.operation=mongodb-backup`,
+		`com.fangcunmount.qs-server.github-run-id=${{ github.run_id }}`,
+		`Another MongoDB utility container is already running`,
+		`cleanup_backup_container`,
+		`command_timeout: 350m`,
+		`mongo:7.0 345m /bin/bash`,
+		`--numParallelCollections=4`,
+		`--archive="/backup/$PARTIAL_FILE"`,
+		`mongo:7.0 110m mongorestore`,
+	} {
+		if !strings.Contains(content, required) {
+			t.Errorf("DB ops bounded Mongo backup contract must contain %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		`mongo:7.0 115m`,
+		`for ATTEMPT in 1 2 3`,
+		`--archive | gzip`,
+	} {
+		if strings.Contains(content, forbidden) {
+			t.Errorf("DB ops bounded Mongo backup must not contain %q", forbidden)
+		}
+	}
+}
+
 func TestReportStatusTTLContractMatchesAcrossProcesses(t *testing.T) {
 	t.Parallel()
 

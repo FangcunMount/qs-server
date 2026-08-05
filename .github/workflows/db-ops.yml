@@ -50,6 +50,7 @@ jobs:
     runs-on:
       group: qlume
       labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 360
     # MONGODB_* 等敏感项在 production Environment；缺此行会导致 secrets 为空、备份静默失败。
     environment: production
     steps:
@@ -74,7 +75,7 @@ jobs:
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          command_timeout: 2h
+          command_timeout: 350m
           envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
           script: |
             set -Eeuo pipefail
@@ -94,10 +95,27 @@ jobs:
             TIMESTAMP=$(date +%Y%m%d_%H%M%S)
             BACKUP_FILE="qs_mongodb_backup_${TIMESTAMP}.archive.gz"
             PARTIAL_FILE="${BACKUP_FILE}.partial"
+            BACKUP_CONTAINER_NAME="qs-server-mongodb-backup"
             MONGODB_PORT="${MONGODB_PORT:-27017}"
             MONGODB_URI="mongodb://${MONGODB_HOST}:${MONGODB_PORT}/?connectTimeoutMS=30000&socketTimeoutMS=0"
 
             sudo install -d -m 0750 "$BACKUP_DIR"
+
+            mapfile -t RUNNING_MONGO_UTILITIES < <(
+              sudo docker ps --filter ancestor=mongo:7.0 --format '{{.ID}}'
+            )
+            if (( ${#RUNNING_MONGO_UTILITIES[@]} > 0 )); then
+              echo "❌ Another MongoDB utility container is already running; refusing concurrent backup" >&2
+              sudo docker ps --no-trunc \
+                --filter ancestor=mongo:7.0 \
+                --format '{{.ID}}\t{{.Names}}\t{{.CreatedAt}}\t{{.Status}}\t{{.Labels}}\t{{.Command}}' >&2
+              exit 1
+            fi
+
+            cleanup_backup_container() {
+              sudo docker rm -f "$BACKUP_CONTAINER_NAME" >/dev/null 2>&1 || true
+            }
+            trap cleanup_backup_container EXIT
 
             echo "Starting MongoDB backup..."
             echo "Database: $MONGODB_DBNAME"
@@ -105,6 +123,9 @@ jobs:
             echo "Timestamp: $TIMESTAMP"
 
             sudo docker run --rm --network infra-network \
+              --name "$BACKUP_CONTAINER_NAME" \
+              --label "com.fangcunmount.qs-server.operation=mongodb-backup" \
+              --label "com.fangcunmount.qs-server.github-run-id=${{ github.run_id }}" \
               -v "$BACKUP_DIR:/backup" \
               -e MONGODB_HOST="$MONGODB_HOST" \
               -e MONGODB_PORT="$MONGODB_PORT" \
@@ -115,31 +136,22 @@ jobs:
               -e BACKUP_FILE="$BACKUP_FILE" \
               -e PARTIAL_FILE="$PARTIAL_FILE" \
               --entrypoint /usr/bin/timeout \
-              mongo:7.0 115m /bin/bash -Eeuo pipefail -c '
+              mongo:7.0 345m /bin/bash -Eeuo pipefail -c '
                 cleanup_partial() {
                   rm -f -- "/backup/$PARTIAL_FILE"
                 }
                 trap cleanup_partial EXIT
 
-                for ATTEMPT in 1 2 3; do
-                  rm -f -- "/backup/$PARTIAL_FILE"
-                  if mongodump \
-                    --uri="$MONGODB_URI" \
-                    --username="$MONGODB_USERNAME" \
-                    --password="$MONGODB_PASSWORD" \
-                    --authenticationDatabase=admin \
-                    --db="$MONGODB_DBNAME" \
-                    --numParallelCollections=1 \
-                    --archive | gzip -1 > "/backup/$PARTIAL_FILE"; then
-                    break
-                  fi
-                  if (( ATTEMPT == 3 )); then
-                    echo "❌ MongoDB backup failed after $ATTEMPT attempts" >&2
-                    exit 1
-                  fi
-                  echo "⚠️ MongoDB backup attempt $ATTEMPT failed; retrying in 15 seconds" >&2
-                  sleep 15
-                done
+                rm -f -- "/backup/$PARTIAL_FILE"
+                mongodump \
+                  --uri="$MONGODB_URI" \
+                  --username="$MONGODB_USERNAME" \
+                  --password="$MONGODB_PASSWORD" \
+                  --authenticationDatabase=admin \
+                  --db="$MONGODB_DBNAME" \
+                  --numParallelCollections=4 \
+                  --gzip \
+                  --archive="/backup/$PARTIAL_FILE"
 
                 if [ ! -s "/backup/$PARTIAL_FILE" ]; then
                   echo "❌ MongoDB backup archive is empty" >&2
@@ -166,6 +178,7 @@ jobs:
                 BACKUPS=(/backup/qs_mongodb_backup_*.archive.gz)
                 ls -lht -- "${BACKUPS[@]}" | head -6
               '
+            trap - EXIT
         env:
           MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
           MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
@@ -179,6 +192,7 @@ jobs:
     runs-on:
       group: qlume
       labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 120
     environment: production
     steps:
       - name: Validate SSH configuration
@@ -202,7 +216,7 @@ jobs:
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          command_timeout: 30m
+          command_timeout: 115m
           envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,BACKUP_FILE_INPUT
           script: |
             set -Eeuo pipefail
@@ -236,7 +250,7 @@ jobs:
             sudo docker run --rm --network infra-network \
               -v "$BACKUP_DIR:/backup:ro" \
               --entrypoint /usr/bin/timeout \
-              mongo:7.0 25m mongorestore \
+              mongo:7.0 110m mongorestore \
                 --host="$MONGODB_HOST" \
                 --port="${MONGODB_PORT:-27017}" \
                 --username="$MONGODB_USERNAME" \
@@ -262,6 +276,7 @@ jobs:
     runs-on:
       group: qlume
       labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 360
     environment: production
     steps:
       - name: Validate SSH configuration
@@ -285,7 +300,7 @@ jobs:
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          command_timeout: 2h
+          command_timeout: 350m
           envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,BACKUP_FILE_INPUT
           script: |
             set -Eeuo pipefail
@@ -352,7 +367,7 @@ jobs:
             sudo docker run --rm --network infra-network \
               -v "$BACKUP_DIR:/backup:ro" \
               --entrypoint /usr/bin/timeout \
-              mongo:7.0 115m mongorestore \
+              mongo:7.0 345m mongorestore \
                 --host="$MONGODB_HOST" \
                 --port="${MONGODB_PORT:-27017}" \
                 --username="$MONGODB_USERNAME" \
@@ -728,8 +743,9 @@ jobs:
             echo ""
             echo "Running MongoDB utility containers:"
             sudo docker ps \
+              --no-trunc \
               --filter ancestor=mongo:7.0 \
-              --format '{{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Command}}'
+              --format '{{.ID}}\t{{.Names}}\t{{.CreatedAt}}\t{{.Status}}\t{{.Labels}}\t{{.Command}}'
 
             echo ""
             echo "Available backups:"
