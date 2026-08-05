@@ -69,6 +69,9 @@ func TestRemovedEventCompatibilitySymbolsDoNotReturn(t *testing.T) {
 		"internal/apiserver/application/eventing/post_commit.go": {
 			"NewReadyIndexPostCommitDispatcher", "readyIndexPostCommitDispatcher",
 		},
+		"internal/worker/integration/messaging/runtime.go": {
+			"type MessageEventExtractor =", "type MessageSettlementPolicy =", "func SubscribeHandlers(",
+		},
 	}
 	for rel, forbidden := range checks {
 		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))

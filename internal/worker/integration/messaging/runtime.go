@@ -29,9 +29,6 @@ type SubscriptionRuntime interface {
 	EventDispatcher
 }
 
-type MessageEventExtractor = eventruntime.MessageEventExtractor
-type MessageSettlementPolicy = eventruntime.MessageSettlementPolicy
-
 func CreatePublisher(cfg *config.MessagingConfig) (basemessaging.Publisher, error) {
 	switch cfg.Provider {
 	case "rabbitmq":
@@ -58,15 +55,6 @@ func EnsureTopics(cfg *config.MessagingConfig, logger *slog.Logger, source Topic
 
 	creator := cbnsq.NewTopicCreator(cfg.NSQAddr, logger)
 	return creator.EnsureTopics(topics)
-}
-
-func SubscribeHandlers(serviceName string, logger *slog.Logger, runtime SubscriptionRuntime, subscriber basemessaging.Subscriber) error {
-	return SubscribeHandlersWithOptions(SubscribeHandlersOptions{
-		ServiceName: serviceName,
-		Logger:      logger,
-		Runtime:     runtime,
-		Subscriber:  subscriber,
-	})
 }
 
 type SubscribeHandlersOptions struct {
@@ -119,7 +107,7 @@ func createDispatchHandlerWithObserver(logger *slog.Logger, dispatcher EventDisp
 }
 
 func createDispatchHandlerWithObserverAndHold(logger *slog.Logger, dispatcher EventDispatcher, topicName, serviceName string, observer eventobservability.Observer, holdRecorder RetryEventHoldRecorder) basemessaging.Handler {
-	extractor := MessageEventExtractor{}
+	extractor := eventruntime.MessageEventExtractor{}
 	if logger == nil {
 		logger = slog.Default()
 	}

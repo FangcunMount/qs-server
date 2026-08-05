@@ -136,7 +136,7 @@ func TestMessageEventExtractorUsesMetadataBeforePayload(t *testing.T) {
 	msg := basemessaging.NewMessage("msg-1", []byte("not-json"))
 	msg.Metadata["event_type"] = "metadata.event"
 
-	eventType, err := (MessageEventExtractor{}).Extract(msg)
+	eventType, err := (eventruntime.MessageEventExtractor{}).Extract(msg)
 	if err != nil {
 		t.Fatalf("Extract: %v", err)
 	}
@@ -174,8 +174,13 @@ func TestSubscribeHandlersUsesNarrowSubscriptionRuntime(t *testing.T) {
 	}
 	subscriber := &fakeSubscriber{}
 
-	if err := SubscribeHandlers("worker-channel", testLogger(), runtime, subscriber); err != nil {
-		t.Fatalf("SubscribeHandlers: %v", err)
+	if err := SubscribeHandlersWithOptions(SubscribeHandlersOptions{
+		ServiceName: "worker-channel",
+		Logger:      testLogger(),
+		Runtime:     runtime,
+		Subscriber:  subscriber,
+	}); err != nil {
+		t.Fatalf("SubscribeHandlersWithOptions: %v", err)
 	}
 	if subscriber.topic != "sample.topic" {
 		t.Fatalf("topic = %q, want sample.topic", subscriber.topic)
