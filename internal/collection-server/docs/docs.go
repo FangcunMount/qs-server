@@ -3889,7 +3889,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "tags": {
-                    "description": "标签列表",
+                    "description": "旧客户端兼容字段；服务端接受但不再向内部传递",
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -4011,7 +4011,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "tags": {
-                    "description": "标签列表",
+                    "description": "旧响应兼容字段；当前固定返回空数组",
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -4047,7 +4047,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "tags": {
-                    "description": "标签列表",
+                    "description": "旧客户端兼容字段；服务端接受但不再向内部传递",
                     "type": "array",
                     "items": {
                         "type": "string"

@@ -3206,7 +3206,7 @@ components:
           description: 来源：online_form/plan/imported
           type: string
         tags:
-          description: 标签列表
+          description: 旧客户端兼容字段；服务端接受但不再向内部传递
           type: array
           items:
             type: string
@@ -3290,7 +3290,7 @@ components:
           description: 来源
           type: string
         tags:
-          description: 标签列表
+          description: 旧响应兼容字段；当前固定返回空数组
           type: array
           items:
             type: string
@@ -3314,7 +3314,7 @@ components:
           description: 姓名
           type: string
         tags:
-          description: 标签列表
+          description: 旧客户端兼容字段；服务端接受但不再向内部传递
           type: array
           items:
             type: string
