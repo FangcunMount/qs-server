@@ -22,16 +22,6 @@ func NewBaseHandler() *BaseHandler {
 	}
 }
 
-// GetUserID 从上下文获取当前用户ID（需要认证中间件设置）
-// 返回 string 类型的 UserID（兼容旧代码）
-func (h *BaseHandler) GetUserID(c *gin.Context) (string, bool) {
-	userID := middleware.GetUserIDStr(c)
-	if userID == "" {
-		return "", false
-	}
-	return userID, true
-}
-
 // GetUserIDUint64 从上下文获取当前用户ID（uint64 类型）
 func (h *BaseHandler) GetUserIDUint64(c *gin.Context) (uint64, bool) {
 	userID := middleware.GetUserID(c)
