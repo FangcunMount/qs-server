@@ -11,7 +11,6 @@ import (
 	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/serviceauth"
 	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
 	pkgserviceauth "github.com/FangcunMount/qs-server/internal/pkg/serviceauth"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
@@ -86,22 +85,6 @@ func (h *ServiceAuthHelper) GetToken(ctx context.Context) (string, error) {
 	return h.helper.GetToken(ctx)
 }
 
-// NewAuthenticatedContext 创建带认证信息的 Context
-func (h *ServiceAuthHelper) NewAuthenticatedContext(ctx context.Context) (context.Context, error) {
-	if h.helper == nil {
-		return nil, fmt.Errorf("service auth helper not initialized")
-	}
-	return h.helper.NewAuthenticatedContext(ctx)
-}
-
-// CallWithAuth 使用认证信息执行调用
-func (h *ServiceAuthHelper) CallWithAuth(ctx context.Context, fn func(ctx context.Context) error) error {
-	if h.helper == nil {
-		return fmt.Errorf("service auth helper not initialized")
-	}
-	return h.helper.CallWithAuth(ctx, fn)
-}
-
 // GetRequestMetadata 实现 credentials.PerRPCCredentials 接口
 // 用于 gRPC WithPerRPCCredentials
 func (h *ServiceAuthHelper) GetRequestMetadata(_ context.Context, _ ...string) (map[string]string, error) {
@@ -139,23 +122,3 @@ func (h *ServiceAuthHelper) Stop() {
 
 // 确保实现 PerRPCCredentials 接口
 var _ credentials.PerRPCCredentials = (*ServiceAuthHelper)(nil)
-
-// DialWithServiceAuth 创建带服务认证的 gRPC 连接
-// 使用示例：
-//
-//	conn, err := DialWithServiceAuth(authHelper, "qs-apiserver:8081", opts...)
-func DialWithServiceAuth(authHelper *ServiceAuthHelper, target string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
-	if authHelper == nil {
-		return nil, fmt.Errorf("service auth helper is nil")
-	}
-
-	// 添加 PerRPCCredentials 到 dial options
-	opts = append(opts, grpc.WithPerRPCCredentials(authHelper))
-
-	conn, err := grpc.NewClient(target, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to dial %s: %w", target, err)
-	}
-
-	return conn, nil
-}

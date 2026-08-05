@@ -83,11 +83,6 @@ type ClientRuntimeOptions struct {
 	Limiter backpressure.Acquirer
 }
 
-// NewClient 创建 IAM 客户端
-func NewClient(ctx context.Context, opts *IAMOptions) (*Client, error) {
-	return NewClientWithRuntimeOptions(ctx, opts, ClientRuntimeOptions{})
-}
-
 func NewClientWithRuntimeOptions(ctx context.Context, opts *IAMOptions, runtime ClientRuntimeOptions) (*Client, error) {
 	l := logger.L(ctx)
 

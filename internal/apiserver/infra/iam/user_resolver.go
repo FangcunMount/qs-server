@@ -47,16 +47,3 @@ func ResolveUserNames(ctx context.Context, identitySvc *IdentityService, ids []m
 
 	return userNames
 }
-
-// DisplayName returns nickname when present; otherwise returns the ID string.
-func DisplayName(id meta.ID, userNames map[string]string) string {
-	if id.IsZero() {
-		return ""
-	}
-	if userNames != nil {
-		if name, ok := userNames[id.String()]; ok && name != "" {
-			return name
-		}
-	}
-	return id.String()
-}
