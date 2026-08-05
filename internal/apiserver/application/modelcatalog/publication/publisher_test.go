@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/publication"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -70,6 +71,24 @@ func TestPublisherAllowsNonBlockingValidationWarnings(t *testing.T) {
 	}
 }
 
+func TestPublisherReturnsCanonicalValidationError(t *testing.T) {
+	t.Parallel()
+
+	model := newPublishedTestModel(t)
+	publisher := publication.Publisher{
+		Registry:  definition.NewRegistry(invalidSnapshotHandler{}),
+		ModelRepo: &publishedModelRepo{}, Repo: &publishedRepo{},
+	}
+	_, err := publisher.Publish(context.Background(), model, publication.PublishOptions{})
+	validation, ok := modelcatalog.ValidationFailedFrom(err)
+	if !ok {
+		t.Fatalf("error = %T %v, want *modelcatalog.ValidationFailedError", err, err)
+	}
+	if validation.Result.Passed || validation.Result.Issues[0].Code != "definition.invalid" {
+		t.Fatalf("result = %#v", validation.Result)
+	}
+}
+
 func TestPublisherPublishAttachesDefinitionHash(t *testing.T) {
 	t.Parallel()
 	model := newPublishedTestModel(t)
@@ -98,8 +117,14 @@ type snapshotHandler struct{}
 
 type warningSnapshotHandler struct{ snapshotHandler }
 
+type invalidSnapshotHandler struct{ snapshotHandler }
+
 func (warningSnapshotHandler) ValidateForPublish(context.Context, *domain.AssessmentModel) []domain.DomainValidationIssue {
 	return []domain.DomainValidationIssue{{Code: "question_contribution.legacy_implicit", Message: "legacy", Level: domain.ValidationLevelWarning}}
+}
+
+func (invalidSnapshotHandler) ValidateForPublish(context.Context, *domain.AssessmentModel) []domain.DomainValidationIssue {
+	return []domain.DomainValidationIssue{{Code: "definition.invalid", Message: "definition invalid", Level: domain.ValidationLevelError}}
 }
 
 func (snapshotHandler) Supports(identity domain.Identity) bool {

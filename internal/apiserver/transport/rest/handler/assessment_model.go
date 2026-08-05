@@ -264,6 +264,7 @@ func (h *AssessmentModelHandler) GetDefinition(c *gin.Context) {
 // @Param code path string true "模型编码"
 // @Param request body response.DefinitionV2Wire true "DefinitionV2"
 // @Success 200 {object} core.Response{data=response.DefinitionV2Wire}
+// @Failure 400 {object} core.Response{data=response.AssessmentModelValidationResponse}
 // @Router /api/v1/assessment-models/{code}/definition [put]
 func (h *AssessmentModelHandler) UpdateDefinition(c *gin.Context) {
 	var req request.UpdateAssessmentModelDefinitionRequest
@@ -279,6 +280,9 @@ func (h *AssessmentModelHandler) UpdateDefinition(c *gin.Context) {
 	definition := domain.Definition(req)
 	result, err := h.definition.SaveDefinition(c.Request.Context(), actor, h.modelCode(c), &definition)
 	if err != nil {
+		if writeAssessmentModelValidationError(c, err) {
+			return
+		}
 		h.Error(c, err)
 		return
 	}
@@ -414,6 +418,7 @@ func (h *AssessmentModelHandler) Validate(c *gin.Context) {
 // @Param code path string true "模型编码"
 // @Param request body response.PreviewReportRequestWire true "预览输入"
 // @Success 200 {object} core.Response{data=response.PreviewReportWire}
+// @Failure 400 {object} core.Response{data=response.AssessmentModelValidationResponse}
 // @Router /api/v1/assessment-models/{code}/preview-report [post]
 func (h *AssessmentModelHandler) PreviewReport(c *gin.Context) {
 	var req request.PreviewAssessmentModelReportRequest
@@ -429,8 +434,7 @@ func (h *AssessmentModelHandler) PreviewReport(c *gin.Context) {
 	}
 	result, err := h.definition.PreviewReport(c.Request.Context(), actor, h.modelCode(c), payload)
 	if err != nil {
-		if vf, ok := modelcatalog.ValidationFailedFrom(err); ok {
-			c.AbortWithStatusJSON(http.StatusBadRequest, core.Response{Code: code.ErrAssessmentModelValidationFailed, Message: "模型校验失败", Data: (*response.AssessmentModelValidationResponse)(vf.Result)})
+		if writeAssessmentModelValidationError(c, err) {
 			return
 		}
 		h.Error(c, err)
@@ -563,6 +567,19 @@ func (h *AssessmentModelHandler) bindAndValidate(c *gin.Context, req interface{}
 }
 
 func (h *AssessmentModelHandler) modelCode(c *gin.Context) string { return c.Param("code") }
+
+func writeAssessmentModelValidationError(c *gin.Context, err error) bool {
+	validation, ok := modelcatalog.ValidationFailedFrom(err)
+	if !ok {
+		return false
+	}
+	c.AbortWithStatusJSON(http.StatusBadRequest, core.Response{
+		Code:    code.ErrAssessmentModelValidationFailed,
+		Message: "模型校验失败",
+		Data:    (*response.AssessmentModelValidationResponse)(validation.Result),
+	})
+	return true
+}
 
 func modelListInput(c *gin.Context) (modelcatalog.ListModelsDTO, error) {
 	page, err := queryPositiveInt(c, "page", 1)

@@ -48,6 +48,26 @@ func TestSaveDefinitionMaterializesDefinitionV2(t *testing.T) {
 	}
 }
 
+func TestSaveDefinitionReturnsCanonicalValidationError(t *testing.T) {
+	t.Parallel()
+
+	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
+		Code: "INVALID-DEFINITION", Kind: domain.KindScale, Algorithm: domain.AlgorithmScaleDefault, Title: "Scale", Now: time.Now(),
+	})
+	if err != nil {
+		t.Fatalf("NewAssessmentModel: %v", err)
+	}
+	service := Service{ModelRepo: &authoringModelRepo{model: model}, Authorizer: allowDefinitionAuthorizer{}}
+	_, err = service.SaveDefinition(context.Background(), modelcatalog.ActorContext{}, model.Code, nil)
+	validation, ok := modelcatalog.ValidationFailedFrom(err)
+	if !ok {
+		t.Fatalf("error = %T %v, want *modelcatalog.ValidationFailedError", err, err)
+	}
+	if validation.Result.Passed || len(validation.Result.Issues) != 1 || validation.Result.Issues[0].Code != "definition_v2.required" {
+		t.Fatalf("result = %#v", validation.Result)
+	}
+}
+
 func TestSaveDefinitionForksPublishedModelToDraft(t *testing.T) {
 	t.Parallel()
 

@@ -28,6 +28,7 @@ func NewAssessmentReleaseHandler(service modelcatalog.AssessmentReleaseService, 
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param code path string true "模型编码"
 // @Success 200 {object} core.Response{data=modelcatalog.AssessmentRelease}
+// @Failure 400 {object} core.Response{data=response.AssessmentModelValidationResponse}
 // @Router /api/v1/assessment-releases/{code}/publish [post]
 func (h *AssessmentReleaseHandler) Publish(c *gin.Context) {
 	actor, err := assessmentModelActorContext(c)
@@ -37,6 +38,9 @@ func (h *AssessmentReleaseHandler) Publish(c *gin.Context) {
 	}
 	result, err := h.service.PublishRelease(c.Request.Context(), actor, c.Param("code"))
 	if err != nil {
+		if writeAssessmentModelValidationError(c, err) {
+			return
+		}
 		h.Error(c, err)
 		return
 	}

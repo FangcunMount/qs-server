@@ -122,24 +122,3 @@ func (r Registry) PreviewReport(ctx context.Context, model *domain.AssessmentMod
 	}
 	return preview.PreviewReport(ctx, model, input)
 }
-
-// ValidationError 保持结构化验证问题可见于应用编排边界
-type ValidationError struct {
-	Issues []domain.DomainValidationIssue // 问题
-}
-
-// NewValidationError 创建验证错误
-func NewValidationError(issues []domain.DomainValidationIssue) error {
-	if len(issues) == 0 {
-		return nil
-	}
-	return &ValidationError{Issues: append([]domain.DomainValidationIssue(nil), issues...)}
-}
-
-// Error 返回验证错误信息
-func (e *ValidationError) Error() string {
-	if e == nil || len(e.Issues) == 0 {
-		return "validation failed"
-	}
-	return e.Issues[0].Message
-}

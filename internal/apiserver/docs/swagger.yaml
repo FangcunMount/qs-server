@@ -5471,6 +5471,15 @@ paths:
                 data:
                   $ref: '#/definitions/response.DefinitionV2Wire'
               type: object
+        "400":
+          description: Bad Request
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentModelValidationResponse'
+              type: object
       summary: 更新测评模型定义
       tags:
       - AssessmentModel
@@ -5546,6 +5555,15 @@ paths:
             - properties:
                 data:
                   $ref: '#/definitions/response.PreviewReportWire'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentModelValidationResponse'
               type: object
       summary: 预览测评模型报告
       tags:
@@ -5858,6 +5876,15 @@ paths:
             - properties:
                 data:
                   $ref: '#/definitions/modelcatalog.AssessmentRelease'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentModelValidationResponse'
               type: object
       summary: 发布测评版本
       tags:

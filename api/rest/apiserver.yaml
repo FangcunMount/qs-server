@@ -1194,6 +1194,17 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.DefinitionV2Wire'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.AssessmentModelValidationResponse'
         '401':
           description: 认证失败或访问令牌无效
           content:
@@ -1314,6 +1325,17 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/response.PreviewReportWire'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.AssessmentModelValidationResponse'
         '401':
           description: 认证失败或访问令牌无效
           content:
@@ -1607,6 +1629,17 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/modelcatalog.AssessmentRelease'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.AssessmentModelValidationResponse'
         '401':
           description: 认证失败或访问令牌无效
           content:

@@ -43,7 +43,7 @@ func (s Service) SaveDefinition(ctx context.Context, actor modelcatalog.ActorCon
 		return nil, err
 	}
 	if issues := appdefinition.ValidateDefinitionV2(value); len(issues) > 0 {
-		return nil, appdefinition.NewValidationError(issues)
+		return nil, modelcatalog.NewValidationFailedError(issues)
 	}
 	modeldefinition.MaterializeLayers(value)
 	if err := model.ForkDraftFromPublished(s.now()); err != nil {

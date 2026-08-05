@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
@@ -49,12 +50,12 @@ func TestTypologyPreviewUsesPublishValidationForReportMap(t *testing.T) {
 		}}
 	}}
 	_, err := service.PreviewReport(context.Background(), &domain.AssessmentModel{}, json.RawMessage(`[{"question_code":"q1","value":"A"}]`))
-	validationErr, ok := err.(*ValidationError)
+	validationErr, ok := modelcatalog.ValidationFailedFrom(err)
 	if !ok {
-		t.Fatalf("error = %T %v, want *ValidationError", err, err)
+		t.Fatalf("error = %T %v, want *modelcatalog.ValidationFailedError", err, err)
 	}
-	if len(validationErr.Issues) != 1 || validationErr.Issues[0].Code != "report_section.source_ref.not_found" {
-		t.Fatalf("issues = %#v", validationErr.Issues)
+	if len(validationErr.Result.Issues) != 1 || validationErr.Result.Issues[0].Code != "report_section.source_ref.not_found" {
+		t.Fatalf("issues = %#v", validationErr.Result.Issues)
 	}
 }
 

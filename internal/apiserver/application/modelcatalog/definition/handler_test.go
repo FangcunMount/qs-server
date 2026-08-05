@@ -83,24 +83,3 @@ func TestRegistryResolvesAllCanonicalDefinitionStrategies(t *testing.T) {
 		}
 	}
 }
-
-func TestValidationErrorPreservesIssues(t *testing.T) {
-	t.Parallel()
-
-	err := NewValidationError([]domain.DomainValidationIssue{{
-		Field: "definition.payload", Message: "payload invalid", Code: "definition.payload.invalid", Level: domain.ValidationLevelError,
-	}})
-	if err == nil {
-		t.Fatal("NewValidationError() returned nil")
-	}
-	validationErr, ok := err.(*ValidationError)
-	if !ok {
-		t.Fatalf("error type = %T, want *ValidationError", err)
-	}
-	if validationErr.Error() != "payload invalid" {
-		t.Fatalf("Error() = %q", validationErr.Error())
-	}
-	if validationErr.Issues[0].Code != "definition.payload.invalid" {
-		t.Fatalf("issue = %#v", validationErr.Issues[0])
-	}
-}

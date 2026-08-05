@@ -20,10 +20,14 @@ type assessmentReleaseStub struct {
 	publishCalled   bool
 	unpublishCalled bool
 	archiveCalled   bool
+	publishErr      error
 }
 
 func (s *assessmentReleaseStub) PublishRelease(_ context.Context, _ modelcatalog.ActorContext, code string) (*modelcatalog.AssessmentRelease, error) {
 	s.publishCalled = true
+	if s.publishErr != nil {
+		return nil, s.publishErr
+	}
 	return &modelcatalog.AssessmentRelease{ModelCode: code, ModelStatus: "published", QuestionnaireCode: "q1", QuestionnaireVersion: "1.0.0", QuestionnaireStatus: "published"}, nil
 }
 
@@ -40,13 +44,14 @@ func (s *assessmentReleaseStub) UnpublishRelease(_ context.Context, _ modelcatal
 type assessmentModelDefinitionStub struct {
 	previewResult *modelcatalog.PreviewReportResult
 	previewErr    error
+	saveErr       error
 }
 
 func (*assessmentModelDefinitionStub) GetDefinition(context.Context, modelcatalog.ActorContext, string) (*domain.Definition, error) {
 	return nil, nil
 }
-func (*assessmentModelDefinitionStub) SaveDefinition(context.Context, modelcatalog.ActorContext, string, *domain.Definition) (*domain.Definition, error) {
-	return nil, nil
+func (s *assessmentModelDefinitionStub) SaveDefinition(context.Context, modelcatalog.ActorContext, string, *domain.Definition) (*domain.Definition, error) {
+	return nil, s.saveErr
 }
 func (*assessmentModelDefinitionStub) ValidateDefinition(context.Context, modelcatalog.ActorContext, string) (*modelcatalog.ValidationResult, error) {
 	return nil, nil
@@ -131,14 +136,7 @@ func TestAssessmentModelPreviewReportReturnsValidationResultWhenInvalid(t *testi
 	gin.SetMode(gin.TestMode)
 
 	svc := &assessmentModelDefinitionStub{
-		previewErr: modelcatalog.NewValidationFailedError([]modelcatalog.ValidationIssue{
-			{
-				Field:   "answers[0].question_code",
-				Message: `question_code "UNKNOWN" 不存在于绑定问卷`,
-				Code:    "question_code.not_found",
-				Level:   "error",
-			},
-		}),
+		previewErr: assessmentModelValidationError(),
 	}
 	handler := NewAssessmentModelHandler(nil, svc, nil)
 
@@ -155,6 +153,51 @@ func TestAssessmentModelPreviewReportReturnsValidationResultWhenInvalid(t *testi
 
 	handler.PreviewReport(c)
 
+	assertAssessmentModelValidationResponse(t, rec)
+}
+
+func TestAssessmentModelUpdateDefinitionReturnsValidationResultWhenInvalid(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := NewAssessmentModelHandler(nil, &assessmentModelDefinitionStub{saveErr: assessmentModelValidationError()}, nil)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPut, "/api/v1/assessment-models/model_bad/definition", strings.NewReader(`{}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Params = gin.Params{{Key: "code", Value: "model_bad"}}
+	setAssessmentModelActor(c)
+
+	handler.UpdateDefinition(c)
+
+	assertAssessmentModelValidationResponse(t, rec)
+}
+
+func TestAssessmentReleasePublishReturnsValidationResultWhenInvalid(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := NewAssessmentReleaseHandler(&assessmentReleaseStub{publishErr: assessmentModelValidationError()})
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/assessment-releases/model_bad/publish", nil)
+	c.Params = gin.Params{{Key: "code", Value: "model_bad"}}
+	setAssessmentModelActor(c)
+
+	handler.Publish(c)
+
+	assertAssessmentModelValidationResponse(t, rec)
+}
+
+func assessmentModelValidationError() error {
+	return modelcatalog.NewValidationFailedError([]domain.DomainValidationIssue{{
+		Field:   "answers[0].question_code",
+		Message: `question_code "UNKNOWN" 不存在于绑定问卷`,
+		Code:    "question_code.not_found",
+		Level:   domain.ValidationLevelError,
+	}})
+}
+
+func assertAssessmentModelValidationResponse(t *testing.T, rec *httptest.ResponseRecorder) {
+	t.Helper()
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected status 400, got %d: %s", rec.Code, rec.Body.String())
 	}

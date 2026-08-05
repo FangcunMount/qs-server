@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	modelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -39,7 +40,7 @@ func (s TypologyPreviewService) PreviewReport(ctx context.Context, model *domain
 	}
 	if s.ValidateForPublish != nil {
 		if issues := s.ValidateForPublish(ctx, model); domain.HasValidationErrors(issues) {
-			return nil, NewValidationError(issues)
+			return nil, modelcatalog.NewValidationFailedError(issues)
 		}
 	}
 	questionnaire, err := s.previewQuestionnaire(ctx, model)
@@ -47,7 +48,7 @@ func (s TypologyPreviewService) PreviewReport(ctx context.Context, model *domain
 		return nil, err
 	}
 	if issues := validateTypologyPreviewAnswers(input.Answers, questionnaire); len(issues) > 0 {
-		return nil, NewValidationError(issues)
+		return nil, modelcatalog.NewValidationFailedError(issues)
 	}
 	payload, err := (RuntimeMaterializer{}).MaterializeTypologyRuntime(model, string(domain.ModelStatusPublished))
 	if err != nil {

@@ -69,7 +69,7 @@ func (p Publisher) Publish(ctx context.Context, model *domain.AssessmentModel, o
 		return nil, err
 	}
 	if issues := handler.ValidateForPublish(ctx, model); domain.HasValidationErrors(issues) {
-		return nil, definition.NewValidationError(issues)
+		return nil, modelcatalog.NewValidationFailedError(issues)
 	}
 	if model.DefinitionV2 != nil {
 		modeldefinition.MaterializeLayers(model.DefinitionV2)

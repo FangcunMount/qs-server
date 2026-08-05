@@ -19,8 +19,20 @@ func (e *ValidationFailedError) Error() string {
 	return "模型校验失败"
 }
 
-func NewValidationFailedError(issues []ValidationIssue) error {
-	return &ValidationFailedError{Result: NewValidationResult(issues)}
+func NewValidationFailedError(issues []domain.DomainValidationIssue) error {
+	if len(issues) == 0 {
+		return nil
+	}
+	mapped := make([]ValidationIssue, 0, len(issues))
+	for _, issue := range issues {
+		mapped = append(mapped, ValidationIssue{
+			Field:   issue.Field,
+			Message: issue.Message,
+			Code:    issue.Code,
+			Level:   string(issue.Level),
+		})
+	}
+	return &ValidationFailedError{Result: NewValidationResult(mapped)}
 }
 
 func ValidationFailedFrom(err error) (*ValidationFailedError, bool) {
