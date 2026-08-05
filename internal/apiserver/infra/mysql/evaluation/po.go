@@ -1,8 +1,6 @@
 package evaluation
 
 import (
-	"database/sql/driver"
-	"encoding/json"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
@@ -122,32 +120,4 @@ func (p *AssessmentScorePO) BeforeCreate(_ *gorm.DB) error {
 		p.Version = mysql.InitialVersion
 	}
 	return nil
-}
-
-// ==================== 辅助类型 ====================
-
-// StringSlice 字符串切片列，用于 JSON 存储
-type StringSlice []string
-
-// Value 实现 driver.Valuer 接口
-func (s StringSlice) Value() (driver.Value, error) {
-	if s == nil {
-		return nil, nil
-	}
-	return json.Marshal(s)
-}
-
-// Scan 实现 sql.Scanner 接口
-func (s *StringSlice) Scan(value interface{}) error {
-	if value == nil {
-		*s = nil
-		return nil
-	}
-
-	bytes, ok := value.([]byte)
-	if !ok {
-		return nil
-	}
-
-	return json.Unmarshal(bytes, s)
 }
