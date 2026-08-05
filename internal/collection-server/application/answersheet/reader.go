@@ -4,7 +4,7 @@ import "context"
 
 // AnswerSheetReader 答卷读端口（application-owned DTO）。
 type AnswerSheetReader interface {
-	GetAnswerSheet(ctx context.Context, id uint64) (*AnswerSheetResponse, error)
+	GetAnswerSheet(ctx context.Context, writerID, id uint64) (*AnswerSheetResponse, error)
 }
 
 // ActorLookup 受试者查询端口（提交链路权限校验）。

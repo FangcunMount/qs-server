@@ -145,15 +145,12 @@ func (r *Registry) RegisterServices() error {
 }
 
 func (r *Registry) registerAnswerSheetService() error {
-	if r.deps.Survey.AnswerSheetSubmissionService == nil || r.deps.Survey.AnswerSheetManagementService == nil {
+	if r.deps.Survey.AnswerSheetSubmissionService == nil {
 		log.Warn("SurveyModule is not initialized, skipping answersheet service registration")
 		return nil
 	}
 
-	answerSheetService := service.NewAnswerSheetService(
-		r.deps.Survey.AnswerSheetSubmissionService,
-		r.deps.Survey.AnswerSheetManagementService,
-	)
+	answerSheetService := service.NewAnswerSheetService(r.deps.Survey.AnswerSheetSubmissionService)
 	r.server.RegisterService(answerSheetService)
 	log.Info("   📋 AnswerSheet service registered")
 	return nil
@@ -274,8 +271,11 @@ func (r *Registry) registerPlanCommandService() error {
 func (r *Registry) GetRegisteredServices() []string {
 	services := make([]string, 0)
 
-	if r.deps.Survey.AnswerSheetSubmissionService != nil && r.deps.Survey.AnswerSheetManagementService != nil {
-		services = append(services, "AnswerSheetService", "QuestionnaireService")
+	if r.deps.Survey.AnswerSheetSubmissionService != nil {
+		services = append(services, "AnswerSheetService")
+	}
+	if r.deps.Survey.QuestionnaireQueryService != nil {
+		services = append(services, "QuestionnaireService")
 	}
 	if r.deps.AssessmentModelCatalog.QueryService != nil {
 		services = append(services, "AssessmentModelCatalogService")

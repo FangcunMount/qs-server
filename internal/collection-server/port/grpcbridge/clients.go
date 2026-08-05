@@ -43,5 +43,5 @@ type ActorWriter interface {
 type AnswerSheetWriter interface {
 	SaveAnswerSheet(ctx context.Context, input *SaveAnswerSheetInput) (*SaveAnswerSheetOutput, error)
 	LookupAnswerSheetSubmission(ctx context.Context, input *LookupAnswerSheetSubmissionInput) (*LookupAnswerSheetSubmissionOutput, error)
-	GetAnswerSheet(ctx context.Context, id uint64) (*AnswerSheetOutput, error)
+	GetAnswerSheet(ctx context.Context, writerID, id uint64) (*AnswerSheetOutput, error)
 }

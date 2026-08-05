@@ -120,12 +120,12 @@ func (r *AnswerSheetDurableResultReader) LookupAcceptedSubmission(
 	)
 }
 
-func (r *AnswerSheetBFFReader) GetAnswerSheet(ctx context.Context, id uint64) (*answersheet.AnswerSheetResponse, error) {
+func (r *AnswerSheetBFFReader) GetAnswerSheet(ctx context.Context, writerID, id uint64) (*answersheet.AnswerSheetResponse, error) {
 	if r == nil {
 		return nil, nil
 	}
 	return grpcbridge.CallBridge(r.inner,
-		func() (*grpcbridge.AnswerSheetOutput, error) { return r.inner.GetAnswerSheet(ctx, id) },
+		func() (*grpcbridge.AnswerSheetOutput, error) { return r.inner.GetAnswerSheet(ctx, writerID, id) },
 		toAnswerSheetResponse,
 	)
 }

@@ -176,7 +176,7 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 		t.Fatalf("open Plan task: result=%+v err=%v", opened, err)
 	}
 
-	answerService := grpcservice.NewAnswerSheetService(grpcDeps.Survey.AnswerSheetSubmissionService, grpcDeps.Survey.AnswerSheetManagementService)
+	answerService := grpcservice.NewAnswerSheetService(grpcDeps.Survey.AnswerSheetSubmissionService)
 	journey := assessmentintakejourney.NewService(
 		grpcDeps.Survey.AnswerSheetScoringService,
 		rulesetInfra.NewAssessmentBindingResolver(grpcDeps.PublishedModelCatalog),

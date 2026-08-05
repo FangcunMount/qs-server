@@ -42,6 +42,9 @@ type AnswerSheetManagementService interface {
 	// GetByID 根据ID获取答卷详情
 	// 场景：管理员查看答卷的完整信息
 	GetByID(ctx context.Context, id uint64) (*AnswerSheetResult, error)
+	// GetByIDInOrg 获取机构范围内的答卷详情。
+	// 场景：受保护的管理端入口按当前 org scope 查看完整答卷。
+	GetByIDInOrg(ctx context.Context, orgID, id uint64) (*AnswerSheetResult, error)
 
 	// List 查询答卷摘要列表
 	// 场景：管理员查询答卷列表（摘要信息，不含答案详情），支持按问卷、填写人、时间等条件筛选

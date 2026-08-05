@@ -381,12 +381,14 @@ func (s *SubmissionService) GetAssessmentReadiness(ctx context.Context, writerID
 	if writerID == 0 || requestedTesteeID == 0 {
 		return nil, status.Error(codes.InvalidArgument, "writer_id and testee_id are required")
 	}
-	sheet, err := s.Get(ctx, answerSheetID)
+	sheet, err := s.Get(ctx, writerID, answerSheetID)
 	if err != nil {
-		if status.Code(err) == codes.NotFound {
+		switch status.Code(err) {
+		case codes.InvalidArgument, codes.Unauthenticated, codes.PermissionDenied, codes.NotFound:
 			return nil, err
+		default:
+			return nil, status.Error(codes.Unavailable, "answer sheet readiness dependency is unavailable")
 		}
-		return nil, status.Error(codes.Unavailable, "answer sheet readiness dependency is unavailable")
 	}
 	if sheet == nil {
 		return nil, status.Error(codes.NotFound, "answer sheet not found")
@@ -396,11 +398,6 @@ func (s *SubmissionService) GetAssessmentReadiness(ctx context.Context, writerID
 		return nil, status.Error(codes.Unavailable, "answer sheet ownership is unavailable")
 	}
 	if actualTesteeID != requestedTesteeID {
-		return nil, status.Error(codes.PermissionDenied, "answer sheet does not belong to testee")
-	}
-	if _, resolvedID, err := s.profileAccess.Resolve(ctx, writerID, requestedTesteeID); err != nil {
-		return nil, err
-	} else if resolvedID != actualTesteeID {
 		return nil, status.Error(codes.PermissionDenied, "answer sheet does not belong to testee")
 	}
 	if s.assessmentResolver == nil {
@@ -489,9 +486,15 @@ func (s *SubmissionService) validateWriter(ctx context.Context, writerID uint64)
 	return nil
 }
 
-func (s *SubmissionService) Get(ctx context.Context, id uint64) (*AnswerSheetResponse, error) {
+func (s *SubmissionService) Get(ctx context.Context, writerID, id uint64) (*AnswerSheetResponse, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
+	if writerID == 0 {
+		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+	}
+	if id == 0 {
+		return nil, status.Error(codes.InvalidArgument, "answer sheet id is required")
+	}
 
 	log.Infof("Getting answer sheet: id=%d", id)
 
@@ -501,9 +504,9 @@ func (s *SubmissionService) Get(ctx context.Context, id uint64) (*AnswerSheetRes
 	)
 
 	if s.answerSheetReader == nil {
-		return nil, fmt.Errorf("answer sheet reader is not configured")
+		return nil, status.Error(codes.Unavailable, "answer sheet reader is not configured")
 	}
-	result, err := s.answerSheetReader.GetAnswerSheet(ctx, id)
+	result, err := s.answerSheetReader.GetAnswerSheet(ctx, writerID, id)
 	if err != nil {
 		log.Errorf("Failed to get answer sheet via gRPC: %v", err)
 		l.Errorw("获取答卷失败",
@@ -515,15 +518,31 @@ func (s *SubmissionService) Get(ctx context.Context, id uint64) (*AnswerSheetRes
 		return nil, err
 	}
 
-	duration := time.Since(startTime)
-	if result != nil {
-		l.Debugw("获取答卷成功",
-			"action", "get_answersheet",
-			"answersheet_id", id,
-			"questionnaire_code", result.QuestionnaireCode,
-			"answer_count", len(result.Answers),
-			"duration_ms", duration.Milliseconds(),
-		)
+	if result == nil {
+		return nil, status.Error(codes.NotFound, "answer sheet not found")
 	}
+	actualTesteeID, err := strconv.ParseUint(result.TesteeID, 10, 64)
+	if err != nil || actualTesteeID == 0 {
+		return nil, status.Error(codes.Unavailable, "answer sheet ownership is unavailable")
+	}
+	if s.profileAccess == nil {
+		return nil, status.Error(codes.Unavailable, "profile access authorization is unavailable")
+	}
+	if _, resolvedID, accessErr := s.profileAccess.Resolve(ctx, writerID, actualTesteeID); accessErr != nil {
+		return nil, accessErr
+	} else if resolvedID != actualTesteeID {
+		return nil, status.Error(codes.PermissionDenied, "answer sheet does not belong to testee")
+	}
+
+	duration := time.Since(startTime)
+	l.Debugw("获取答卷成功",
+		"action", "get_answersheet",
+		"answersheet_id", id,
+		"writer_id", writerID,
+		"testee_id", actualTesteeID,
+		"questionnaire_code", result.QuestionnaireCode,
+		"answer_count", len(result.Answers),
+		"duration_ms", duration.Milliseconds(),
+	)
 	return result, nil
 }

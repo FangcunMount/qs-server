@@ -51,6 +51,7 @@ type QuestionnaireReader interface {
 
 // AnswerSheetFilter contains typed filters for answer-sheet list queries.
 type AnswerSheetFilter struct {
+	OrgID             uint64
 	QuestionnaireCode string
 	FillerID          *uint64
 	StartTime         *time.Time

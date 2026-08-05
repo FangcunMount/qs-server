@@ -116,6 +116,7 @@ message LookupAnswerSheetSubmissionResponse {
 // 获取答卷请求
 message GetAnswerSheetRequest {
   uint64 id = 1;
+  uint64 writer_id = 2; // 当前认证填写人；服务端按持久化 filler_id 校验归属
 }
 
 // 获取答卷响应

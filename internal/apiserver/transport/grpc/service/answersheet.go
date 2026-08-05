@@ -24,17 +24,14 @@ var safeAnswerSheetIdempotencyKey = regexp.MustCompile(`^[A-Za-z0-9._:-]{8,128}$
 type AnswerSheetService struct {
 	pb.UnimplementedAnswerSheetServiceServer
 	submissionService answersheet.AnswerSheetSubmissionService
-	managementService answersheet.AnswerSheetManagementService
 }
 
 // NewAnswerSheetService 创建答卷 gRPC 服务
 func NewAnswerSheetService(
 	submissionService answersheet.AnswerSheetSubmissionService,
-	managementService answersheet.AnswerSheetManagementService,
 ) *AnswerSheetService {
 	return &AnswerSheetService{
 		submissionService: submissionService,
-		managementService: managementService,
 	}
 }
 
@@ -180,19 +177,16 @@ func (s *AnswerSheetService) LookupAnswerSheetSubmission(
 	return &pb.LookupAnswerSheetSubmissionResponse{Found: true, Id: result.ID}, nil
 }
 
-// GetAnswerSheet 获取答卷详情（C端）
+// GetAnswerSheet 获取答卷详情（C端）。
 // @Description C端用户查看自己提交的答卷详情
-// Note: gRPC 内部调用，不进行权限验证
 func (s *AnswerSheetService) GetAnswerSheet(ctx context.Context, req *pb.GetAnswerSheetRequest) (*pb.GetAnswerSheetResponse, error) {
-	// 参数校验
-	if req.Id == 0 {
-		return nil, status.Error(codes.InvalidArgument, "id 不能为空")
+	if req == nil || req.Id == 0 || req.WriterId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "id 和 writer_id 不能为空")
 	}
 
-	// 直接获取答卷（不验证权限）
-	result, err := s.managementService.GetByID(ctx, req.Id)
+	result, err := s.submissionService.GetMyAnswerSheet(ctx, req.WriterId, req.Id)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, toAnswerSheetGRPCError(err)
 	}
 
 	if result == nil {

@@ -175,12 +175,12 @@ func (c *AnswerSheetClient) LookupAnswerSheetSubmission(
 	}, nil
 }
 
-// GetAnswerSheet 获取答卷详情
-func (c *AnswerSheetClient) GetAnswerSheet(ctx context.Context, id uint64) (*AnswerSheetOutput, error) {
+// GetAnswerSheet 获取当前填写人的答卷详情。
+func (c *AnswerSheetClient) GetAnswerSheet(ctx context.Context, writerID, id uint64) (*AnswerSheetOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
-	req := &pb.GetAnswerSheetRequest{Id: id}
+	req := &pb.GetAnswerSheetRequest{Id: id, WriterId: writerID}
 	resp, err := c.grpcClient.GetAnswerSheet(ctx, req)
 	if err != nil {
 		return nil, err

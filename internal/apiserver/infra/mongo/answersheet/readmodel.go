@@ -58,6 +58,7 @@ func answerSheetListPipeline(filter surveyreadmodel.AnswerSheetFilter, page surv
 
 func answerSheetListFilterToBSON(filter surveyreadmodel.AnswerSheetFilter) (bson.M, error) {
 	query := bson.M{
+		"org_id":             filter.OrgID,
 		"questionnaire_code": filter.QuestionnaireCode,
 		"deleted_at":         nil,
 	}
@@ -67,6 +68,7 @@ func answerSheetListFilterToBSON(filter surveyreadmodel.AnswerSheetFilter) (bson
 			return nil, err
 		}
 		query = bson.M{
+			"org_id":     filter.OrgID,
 			"filler_id":  fillerID,
 			"deleted_at": nil,
 		}
@@ -88,7 +90,7 @@ func answerSheetSummaryProjection() bson.M {
 }
 
 func answerSheetFilterToBSON(filter surveyreadmodel.AnswerSheetFilter) bson.M {
-	query := bson.M{}
+	query := bson.M{"org_id": filter.OrgID}
 	if filter.QuestionnaireCode != "" {
 		query["questionnaire_code"] = filter.QuestionnaireCode
 	}

@@ -22,7 +22,7 @@ func (s *grpcAnswerSheetWriterStub) SaveAnswerSheet(_ context.Context, input *gr
 	return s.output, s.err
 }
 
-func (s *grpcAnswerSheetWriterStub) GetAnswerSheet(context.Context, uint64) (*grpcbridge.AnswerSheetOutput, error) {
+func (s *grpcAnswerSheetWriterStub) GetAnswerSheet(context.Context, uint64, uint64) (*grpcbridge.AnswerSheetOutput, error) {
 	return nil, nil
 }
 

@@ -17,11 +17,15 @@ func TestAnswerSheetFilterToBSONMapsTypedFilter(t *testing.T) {
 	start := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	end := start.Add(time.Hour)
 	query := answerSheetFilterToBSON(surveyreadmodel.AnswerSheetFilter{
+		OrgID:             88,
 		QuestionnaireCode: "Q_A",
 		FillerID:          &fillerID,
 		StartTime:         &start,
 		EndTime:           &end,
 	})
+	if got := query["org_id"]; got != uint64(88) {
+		t.Fatalf("org_id = %#v, want 88", got)
+	}
 
 	if got := query["questionnaire_code"]; got != "Q_A" {
 		t.Fatalf("questionnaire_code = %#v, want Q_A", got)
@@ -45,6 +49,7 @@ func TestAnswerSheetListPipelinePreservesListQuerySemantics(t *testing.T) {
 
 	fillerID := uint64(1001)
 	pipeline, err := answerSheetListPipeline(surveyreadmodel.AnswerSheetFilter{
+		OrgID:             88,
 		QuestionnaireCode: "Q_A",
 		FillerID:          &fillerID,
 	}, surveyreadmodel.PageRequest{Page: 3, PageSize: 20})
@@ -56,7 +61,7 @@ func TestAnswerSheetListPipelinePreservesListQuerySemantics(t *testing.T) {
 	}
 
 	match := pipeline[0]["$match"]
-	if !reflect.DeepEqual(match, mapAsBSONM(map[string]any{"filler_id": int64(1001), "deleted_at": nil})) {
+	if !reflect.DeepEqual(match, mapAsBSONM(map[string]any{"org_id": uint64(88), "filler_id": int64(1001), "deleted_at": nil})) {
 		t.Fatalf("match = %#v, want filler_id int64 query without questionnaire_code", match)
 	}
 	if !reflect.DeepEqual(pipeline[1]["$sort"], mapAsBSONM(map[string]any{"filled_at": -1})) {
@@ -81,6 +86,7 @@ func TestAnswerSheetListPipelineUsesQuestionnaireCodeWhenFillerAbsent(t *testing
 	t.Parallel()
 
 	pipeline, err := answerSheetListPipeline(surveyreadmodel.AnswerSheetFilter{
+		OrgID:             88,
 		QuestionnaireCode: "Q_A",
 	}, surveyreadmodel.PageRequest{Page: 1, PageSize: 10})
 	if err != nil {
@@ -88,7 +94,7 @@ func TestAnswerSheetListPipelineUsesQuestionnaireCodeWhenFillerAbsent(t *testing
 	}
 
 	match := pipeline[0]["$match"]
-	if !reflect.DeepEqual(match, mapAsBSONM(map[string]any{"questionnaire_code": "Q_A", "deleted_at": nil})) {
+	if !reflect.DeepEqual(match, mapAsBSONM(map[string]any{"org_id": uint64(88), "questionnaire_code": "Q_A", "deleted_at": nil})) {
 		t.Fatalf("match = %#v, want questionnaire_code query", match)
 	}
 }

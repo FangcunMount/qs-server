@@ -13,6 +13,7 @@ import (
 // AnswerSheetResult 答卷结果
 type AnswerSheetResult struct {
 	ID                 uint64         // 答卷ID
+	OrgID              uint64         // 组织ID
 	QuestionnaireCode  string         // 问卷编码
 	QuestionnaireVer   string         // 问卷版本
 	QuestionnaireTitle string         // 问卷标题
@@ -78,8 +79,12 @@ func toAnswerSheetResult(as *answersheet.AnswerSheet) *AnswerSheetResult {
 		Score:              as.Score(),
 		Answers:            make([]AnswerResult, 0),
 	}
-	if submissionContext := as.SubmissionContext(); !submissionContext.TesteeID().IsZero() {
+	submissionContext := as.SubmissionContext()
+	if !submissionContext.TesteeID().IsZero() {
 		result.TesteeID = submissionContext.TesteeID().Uint64()
+	}
+	if !submissionContext.OrgID().IsZero() {
+		result.OrgID = submissionContext.OrgID().Uint64()
 	}
 	if admission := as.SubmissionContext().Admission(); !admission.IsZero() {
 		result.AdmissionPurpose = string(admission.Purpose())

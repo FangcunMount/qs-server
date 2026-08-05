@@ -44,6 +44,9 @@ type resolveSheetStub struct {
 func (s resolveSheetStub) GetByID(context.Context, uint64) (*appanswersheet.AnswerSheetResult, error) {
 	return s.sheet, s.err
 }
+func (s resolveSheetStub) GetByIDInOrg(context.Context, uint64, uint64) (*appanswersheet.AnswerSheetResult, error) {
+	return s.sheet, s.err
+}
 func (s resolveSheetStub) List(context.Context, appanswersheet.ListAnswerSheetsDTO) (*appanswersheet.AnswerSheetSummaryListResult, error) {
 	return nil, nil
 }

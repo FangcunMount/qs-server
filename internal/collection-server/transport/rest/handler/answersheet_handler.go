@@ -18,7 +18,7 @@ import (
 type answerSheetSubmissionService interface {
 	AcceptDurably(ctx context.Context, requestID string, writerID uint64, req *answersheet.SubmitAnswerSheetRequest) (*answersheet.SubmitAnswerSheetResponse, error)
 	GetAssessmentReadiness(ctx context.Context, writerID, answerSheetID, testeeID uint64) (*answersheet.AssessmentReadinessResponse, error)
-	Get(ctx context.Context, id uint64) (*answersheet.AnswerSheetResponse, error)
+	Get(ctx context.Context, writerID, id uint64) (*answersheet.AnswerSheetResponse, error)
 }
 
 // AnswerSheetHandler 答卷处理器
@@ -185,28 +185,35 @@ func (h *AnswerSheetHandler) AssessmentReadiness(c *gin.Context) {
 
 // Get 获取答卷详情
 // @Summary 获取答卷详情
-// @Description 根据ID获取答卷详情
+// @Description 仅返回当前填写人提交且当前仍有 active ProfileLink 代表权的答卷详情。
 // @Tags 答卷
 // @Produce json
 // @Param id path int true "答卷ID"
 // @Success 200 {object} core.Response{data=answersheet.AnswerSheetResponse}
 // @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
+// @Failure 401 {object} core.ErrResponse
+// @Failure 403 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
-// @Failure 500 {object} core.ErrResponse
+// @Failure 503 {object} core.ErrResponse
 // @Security BearerAuth
 // @Router /api/v1/answersheets/{id} [get]
 func (h *AnswerSheetHandler) Get(c *gin.Context) {
 	idStr := h.GetPathParam(c, "id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil {
+	if err != nil || id == 0 {
 		h.BadRequestResponse(c, "invalid id format", err)
 		return
 	}
+	writerID := h.GetUserID(c)
+	if writerID == 0 {
+		h.UnauthorizedResponse(c, "user not authenticated")
+		return
+	}
 
-	result, err := h.submissionService.Get(c.Request.Context(), id)
+	result, err := h.submissionService.Get(c.Request.Context(), writerID, id)
 	if err != nil {
-		h.InternalErrorResponse(c, "get answer sheet failed", err)
+		h.respondSubmitError(c, err)
 		return
 	}
 

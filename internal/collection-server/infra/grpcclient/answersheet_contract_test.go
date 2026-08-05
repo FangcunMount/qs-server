@@ -17,7 +17,9 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-type contractSubmissionService struct{}
+type contractSubmissionService struct {
+	answerSheet *appanswersheet.AnswerSheetResult
+}
 
 func (contractSubmissionService) Submit(context.Context, appanswersheet.SubmitAnswerSheetDTO) (*appanswersheet.AnswerSheetResult, error) {
 	return nil, nil
@@ -25,24 +27,12 @@ func (contractSubmissionService) Submit(context.Context, appanswersheet.SubmitAn
 func (contractSubmissionService) LookupAcceptedSubmission(context.Context, appanswersheet.LookupSubmissionDTO) (*appanswersheet.AnswerSheetResult, bool, error) {
 	return &appanswersheet.AnswerSheetResult{ID: 88}, true, nil
 }
-func (contractSubmissionService) GetMyAnswerSheet(context.Context, uint64, uint64) (*appanswersheet.AnswerSheetResult, error) {
-	return nil, nil
+func (s contractSubmissionService) GetMyAnswerSheet(context.Context, uint64, uint64) (*appanswersheet.AnswerSheetResult, error) {
+	return s.answerSheet, nil
 }
 func (contractSubmissionService) ListMyAnswerSheets(context.Context, appanswersheet.ListMyAnswerSheetsDTO) (*appanswersheet.AnswerSheetSummaryListResult, error) {
 	return nil, nil
 }
-
-type contractManagementService struct {
-	result *appanswersheet.AnswerSheetResult
-}
-
-func (s contractManagementService) GetByID(context.Context, uint64) (*appanswersheet.AnswerSheetResult, error) {
-	return s.result, nil
-}
-func (contractManagementService) List(context.Context, appanswersheet.ListAnswerSheetsDTO) (*appanswersheet.AnswerSheetSummaryListResult, error) {
-	return nil, nil
-}
-func (contractManagementService) Delete(context.Context, uint64) error { return nil }
 
 type contractActorLookup struct{}
 
@@ -75,7 +65,7 @@ func (r contractAssessmentResolver) ResolveAssessmentByAnswerSheetID(context.Con
 func TestAnswerSheetOwnershipSurvivesRealGRPCContract(t *testing.T) {
 	listener := bufconn.Listen(1024 * 1024)
 	server := grpc.NewServer()
-	grpcservice.NewAnswerSheetService(contractSubmissionService{}, contractManagementService{result: &appanswersheet.AnswerSheetResult{
+	grpcservice.NewAnswerSheetService(contractSubmissionService{answerSheet: &appanswersheet.AnswerSheetResult{
 		ID: 42, QuestionnaireCode: "Q", QuestionnaireVer: "1.2.3", TesteeID: 77, FilledAt: time.Date(2026, 7, 18, 12, 0, 0, 0, time.Local),
 	}}).RegisterService(server)
 	go func() { _ = server.Serve(listener) }()
@@ -100,7 +90,7 @@ func TestAnswerSheetOwnershipSurvivesRealGRPCContract(t *testing.T) {
 	if err != nil || lookup == nil || !lookup.Found || lookup.ID != 88 {
 		t.Fatalf("LookupAnswerSheetSubmission() = (%#v, %v)", lookup, err)
 	}
-	got, err := grpcClient.GetAnswerSheet(t.Context(), 42)
+	got, err := grpcClient.GetAnswerSheet(t.Context(), 11, 42)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -795,6 +795,7 @@ func (x *LookupAnswerSheetSubmissionResponse) GetId() uint64 {
 type GetAnswerSheetRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	WriterId      uint64                 `protobuf:"varint,2,opt,name=writer_id,json=writerId,proto3" json:"writer_id,omitempty"` // 当前认证填写人；服务端按持久化 filler_id 校验归属
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -832,6 +833,13 @@ func (*GetAnswerSheetRequest) Descriptor() ([]byte, []int) {
 func (x *GetAnswerSheetRequest) GetId() uint64 {
 	if x != nil {
 		return x.Id
+	}
+	return 0
+}
+
+func (x *GetAnswerSheetRequest) GetWriterId() uint64 {
+	if x != nil {
+		return x.WriterId
 	}
 	return 0
 }
@@ -1222,9 +1230,10 @@ const file_answersheet_answersheet_proto_rawDesc = "" +
 	"\x05value\x18\x03 \x01(\tR\x05value\"K\n" +
 	"#LookupAnswerSheetSubmissionResponse\x12\x14\n" +
 	"\x05found\x18\x01 \x01(\bR\x05found\x12\x0e\n" +
-	"\x02id\x18\x02 \x01(\x04R\x02id\"'\n" +
+	"\x02id\x18\x02 \x01(\x04R\x02id\"D\n" +
 	"\x15GetAnswerSheetRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\x04R\x02id\"U\n" +
+	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x1b\n" +
+	"\twriter_id\x18\x02 \x01(\x04R\bwriterId\"U\n" +
 	"\x16GetAnswerSheetResponse\x12;\n" +
 	"\fanswer_sheet\x18\x01 \x01(\v2\x18.answersheet.AnswerSheetR\vanswerSheet\"\xe8\x01\n" +
 	"\x17ListAnswerSheetsRequest\x12-\n" +

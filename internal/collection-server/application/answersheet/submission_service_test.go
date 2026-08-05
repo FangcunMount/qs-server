@@ -57,6 +57,19 @@ type submissionReaderStub struct {
 	err   error
 }
 
+type capturingSubmissionReaderStub struct {
+	sheet    *AnswerSheetResponse
+	err      error
+	writerID uint64
+	id       uint64
+}
+
+func (s *capturingSubmissionReaderStub) GetAnswerSheet(_ context.Context, writerID, id uint64) (*AnswerSheetResponse, error) {
+	s.writerID = writerID
+	s.id = id
+	return s.sheet, s.err
+}
+
 type submissionDurableResultReaderStub struct {
 	output *LookupAcceptedSubmissionOutput
 	err    error
@@ -70,7 +83,7 @@ func (s *submissionDurableResultReaderStub) LookupAcceptedSubmission(_ context.C
 	return s.output, s.err
 }
 
-func (s submissionReaderStub) GetAnswerSheet(context.Context, uint64) (*AnswerSheetResponse, error) {
+func (s submissionReaderStub) GetAnswerSheet(context.Context, uint64, uint64) (*AnswerSheetResponse, error) {
 	return s.sheet, s.err
 }
 
@@ -421,6 +434,62 @@ func TestAcceptDurablyFailsClosedWhenQuestionnaireUnavailable(t *testing.T) {
 		submissionQuestionnaireStub{err: status.Error(codes.Unavailable, "down")}, time.Second)
 	if _, err := service.AcceptDurably(t.Context(), "request-1", 11, validSubmitRequest()); status.Code(err) != codes.Unavailable {
 		t.Fatalf("AcceptDurably() error = %v, want Unavailable", err)
+	}
+}
+
+func TestGetAnswerSheetForwardsWriterAndRevalidatesProfileLink(t *testing.T) {
+	reader := &capturingSubmissionReaderStub{sheet: &AnswerSheetResponse{ID: "42", WriterID: "11", TesteeID: "7"}}
+	service := newAcceptService(nil, reader, nil)
+
+	got, err := service.Get(t.Context(), 11, 42)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if got == nil || got.ID != "42" {
+		t.Fatalf("Get() = %#v", got)
+	}
+	if reader.writerID != 11 || reader.id != 42 {
+		t.Fatalf("reader input = writer:%d id:%d, want 11/42", reader.writerID, reader.id)
+	}
+}
+
+func TestGetAnswerSheetRejectsForeignWriter(t *testing.T) {
+	reader := &capturingSubmissionReaderStub{err: status.Error(codes.PermissionDenied, "foreign writer")}
+	service := newAcceptService(nil, reader, nil)
+
+	if _, err := service.Get(t.Context(), 12, 42); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("Get() error = %v, want PermissionDenied", err)
+	}
+}
+
+func TestGetAnswerSheetRejectsMissingActiveProfileLink(t *testing.T) {
+	reader := &capturingSubmissionReaderStub{sheet: &AnswerSheetResponse{ID: "42", WriterID: "11", TesteeID: "7"}}
+	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9, IAMProfileID: "profile-7"}}
+	service := NewSubmissionService(nil, nil, reader, actor,
+		submissionProfileLinkStub{enabled: true, allowed: false}, nil, nil, nil, time.Second)
+
+	if _, err := service.Get(t.Context(), 11, 42); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("Get() error = %v, want PermissionDenied", err)
+	}
+}
+
+func TestGetAnswerSheetFailsClosedWhenProfileLinkUnavailable(t *testing.T) {
+	reader := &capturingSubmissionReaderStub{sheet: &AnswerSheetResponse{ID: "42", WriterID: "11", TesteeID: "7"}}
+	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9, IAMProfileID: "profile-7"}}
+	service := NewSubmissionService(nil, nil, reader, actor,
+		submissionProfileLinkStub{enabled: true, err: context.DeadlineExceeded}, nil, nil, nil, time.Second)
+
+	if _, err := service.Get(t.Context(), 11, 42); status.Code(err) != codes.Unavailable {
+		t.Fatalf("Get() error = %v, want Unavailable", err)
+	}
+}
+
+func TestAssessmentReadinessPreservesOwnershipDenial(t *testing.T) {
+	reader := &capturingSubmissionReaderStub{err: status.Error(codes.PermissionDenied, "foreign writer")}
+	service := newAcceptService(nil, reader, assessmentResolverStub{})
+
+	if _, err := service.GetAssessmentReadiness(t.Context(), 12, 42, 7); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("GetAssessmentReadiness() error = %v, want PermissionDenied", err)
 	}
 }
 

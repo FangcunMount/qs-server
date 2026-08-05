@@ -56,6 +56,7 @@ type ListMyAnswerSheetsDTO struct {
 
 // ListAnswerSheetsDTO 查询答卷列表 DTO（管理员用）
 type ListAnswerSheetsDTO struct {
+	OrgID             uint64            // 当前受保护路由的组织范围（必填）
 	QuestionnaireCode string            // 问卷编码（可选）
 	FillerID          *uint64           // 填写人ID（可选）
 	StartTime         *time.Time        // 开始时间（可选）

@@ -19,6 +19,7 @@ import (
 type fakeAnswerSheetSubmissionService struct {
 	accept    func(context.Context, string, uint64, *answersheet.SubmitAnswerSheetRequest) (*answersheet.SubmitAnswerSheetResponse, error)
 	readiness func(context.Context, uint64, uint64, uint64) (*answersheet.AssessmentReadinessResponse, error)
+	get       func(context.Context, uint64, uint64) (*answersheet.AnswerSheetResponse, error)
 }
 
 func (f *fakeAnswerSheetSubmissionService) AcceptDurably(ctx context.Context, requestID string, writerID uint64, req *answersheet.SubmitAnswerSheetRequest) (*answersheet.SubmitAnswerSheetResponse, error) {
@@ -29,8 +30,11 @@ func (f *fakeAnswerSheetSubmissionService) GetAssessmentReadiness(ctx context.Co
 	return f.readiness(ctx, writerID, answerSheetID, testeeID)
 }
 
-func (*fakeAnswerSheetSubmissionService) Get(context.Context, uint64) (*answersheet.AnswerSheetResponse, error) {
-	return nil, nil
+func (f *fakeAnswerSheetSubmissionService) Get(ctx context.Context, writerID, id uint64) (*answersheet.AnswerSheetResponse, error) {
+	if f.get == nil {
+		return nil, nil
+	}
+	return f.get(ctx, writerID, id)
 }
 
 func TestAnswerSheetHandlerReturnsAcceptedOnlyWithDurableID(t *testing.T) {
@@ -124,6 +128,61 @@ func TestAnswerSheetHandlerAssessmentReadiness(t *testing.T) {
 	c.Set(collectionmiddleware.UserIDKey, uint64(99))
 	handler.AssessmentReadiness(c)
 	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestAnswerSheetHandlerGetForwardsAuthenticatedWriter(t *testing.T) {
+	service := &fakeAnswerSheetSubmissionService{get: func(_ context.Context, writerID, id uint64) (*answersheet.AnswerSheetResponse, error) {
+		if writerID != 99 || id != 42 {
+			t.Fatalf("unexpected get input: writer=%d id=%d", writerID, id)
+		}
+		return &answersheet.AnswerSheetResponse{ID: "42", WriterID: "99", TesteeID: "7"}, nil
+	}}
+	handler := NewAnswerSheetHandler(service)
+	recorder, c := newAnswerSheetTestContext(http.MethodGet, "/api/v1/answersheets/42", "")
+	c.Params = append(c.Params, gin.Param{Key: "id", Value: "42"})
+	c.Set(collectionmiddleware.UserIDKey, uint64(99))
+
+	handler.Get(c)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestAnswerSheetHandlerGetRejectsUnauthenticatedRequestBeforeService(t *testing.T) {
+	called := false
+	service := &fakeAnswerSheetSubmissionService{get: func(context.Context, uint64, uint64) (*answersheet.AnswerSheetResponse, error) {
+		called = true
+		return nil, nil
+	}}
+	handler := NewAnswerSheetHandler(service)
+	recorder, c := newAnswerSheetTestContext(http.MethodGet, "/api/v1/answersheets/42", "")
+	c.Params = append(c.Params, gin.Param{Key: "id", Value: "42"})
+
+	handler.Get(c)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if called {
+		t.Fatal("submission service must not be called without an authenticated writer")
+	}
+}
+
+func TestAnswerSheetHandlerGetMapsOwnershipDenialToForbidden(t *testing.T) {
+	service := &fakeAnswerSheetSubmissionService{get: func(context.Context, uint64, uint64) (*answersheet.AnswerSheetResponse, error) {
+		return nil, status.Error(codes.PermissionDenied, "answer sheet does not belong to writer")
+	}}
+	handler := NewAnswerSheetHandler(service)
+	recorder, c := newAnswerSheetTestContext(http.MethodGet, "/api/v1/answersheets/42", "")
+	c.Params = append(c.Params, gin.Param{Key: "id", Value: "42"})
+	c.Set(collectionmiddleware.UserIDKey, uint64(99))
+
+	handler.Get(c)
+
+	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
 	}
 }

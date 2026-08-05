@@ -46,15 +46,24 @@ func TestValidateManagementListDTORejectsInvalidPaging(t *testing.T) {
 	t.Parallel()
 
 	cases := []ListAnswerSheetsDTO{
-		{Page: 0, PageSize: 10},
-		{Page: 1, PageSize: 0},
-		{Page: 1, PageSize: 101},
+		{OrgID: 1, Page: 0, PageSize: 10},
+		{OrgID: 1, Page: 1, PageSize: 0},
+		{OrgID: 1, Page: 1, PageSize: 101},
 	}
 
 	for _, dto := range cases {
 		if err := validateManagementListDTO(dto); err == nil {
 			t.Fatalf("validateManagementListDTO(%+v) expected error", dto)
 		}
+	}
+}
+
+func TestValidateManagementListDTORejectsMissingOrgScope(t *testing.T) {
+	t.Parallel()
+
+	err := validateManagementListDTO(ListAnswerSheetsDTO{Page: 1, PageSize: 10})
+	if err == nil || errors.ParseCoder(err).Code() != errorCode.ErrPermissionDenied {
+		t.Fatalf("validateManagementListDTO() error = %v, want permission denied", err)
 	}
 }
 
@@ -65,11 +74,15 @@ func TestBuildListConditionsIncludesOptionalFilters(t *testing.T) {
 	startTime := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	endTime := startTime.Add(24 * time.Hour)
 	filter := buildListFilter(ListAnswerSheetsDTO{
+		OrgID:             88,
 		QuestionnaireCode: "QNR-001",
 		FillerID:          &fillerID,
 		StartTime:         &startTime,
 		EndTime:           &endTime,
 	})
+	if filter.OrgID != 88 {
+		t.Fatalf("org_id = %d, want 88", filter.OrgID)
+	}
 
 	if got := filter.QuestionnaireCode; got != "QNR-001" {
 		t.Fatalf("questionnaire_code = %v, want QNR-001", got)
@@ -97,6 +110,7 @@ func TestManagementServiceListUsesReadModelFilter(t *testing.T) {
 	}
 
 	_, err := service.List(context.Background(), ListAnswerSheetsDTO{
+		OrgID:             88,
 		QuestionnaireCode: "QNR-009",
 		FillerID:          &fillerID,
 		StartTime:         &startTime,
@@ -105,6 +119,9 @@ func TestManagementServiceListUsesReadModelFilter(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)
+	}
+	if reader.listFilter.OrgID != 88 || reader.countFilter.OrgID != 88 {
+		t.Fatalf("captured org filters = list:%d count:%d, want 88", reader.listFilter.OrgID, reader.countFilter.OrgID)
 	}
 	if reader.listFilter.QuestionnaireCode != "QNR-009" || reader.listFilter.FillerID == nil || *reader.listFilter.FillerID != fillerID {
 		t.Fatalf("captured list filter = %#v", reader.listFilter)
@@ -173,11 +190,23 @@ func TestManagementServiceGetByIDReturnsConvertedAnswerSheet(t *testing.T) {
 	if result.ID != 12 || result.QuestionnaireCode != "QNR-001" || result.QuestionnaireVer != "v1" {
 		t.Fatalf("unexpected identity fields: %+v", result)
 	}
+	if result.OrgID != 1 {
+		t.Fatalf("OrgID = %d, want 1", result.OrgID)
+	}
 	if result.FillerID != 7 || len(result.Answers) != 2 {
 		t.Fatalf("unexpected filler/answers: %+v", result)
 	}
 	if result.Answers[0].QuestionCode != "q1" || result.Answers[1].QuestionCode != "q2" {
 		t.Fatalf("unexpected answers: %+v", result.Answers)
+	}
+	if _, err := service.GetByIDInOrg(context.Background(), 1, 12); err != nil {
+		t.Fatalf("GetByIDInOrg same org returned error: %v", err)
+	}
+	if _, err := service.GetByIDInOrg(context.Background(), 2, 12); errors.ParseCoder(err).Code() != errorCode.ErrAnswerSheetNotFound {
+		t.Fatalf("GetByIDInOrg cross org error = %v, want not found", err)
+	}
+	if _, err := service.GetByIDInOrg(context.Background(), 0, 12); errors.ParseCoder(err).Code() != errorCode.ErrPermissionDenied {
+		t.Fatalf("GetByIDInOrg missing org error = %v, want permission denied", err)
 	}
 }
 

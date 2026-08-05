@@ -110,7 +110,7 @@ paths:
       tags:
       - 答卷
       summary: 获取答卷详情
-      description: 根据ID获取答卷详情
+      description: 仅返回当前填写人提交且当前仍有 active ProfileLink 代表权的答卷详情。
       security:
       - BearerAuth: []
       operationId: 获取答卷详情
@@ -138,6 +138,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '404':
           description: Not Found
           content:
@@ -150,20 +162,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '500':
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '401':
-          description: 认证失败或访问令牌无效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-        '403':
-          description: 无权访问该资源
+          description: 服务内部错误
           content:
             application/json:
               schema:

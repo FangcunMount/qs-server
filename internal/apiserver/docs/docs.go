@@ -77,7 +77,7 @@ const docTemplate = `{
         },
         "/api/v1/answersheets": {
             "get": {
-                "description": "管理员查询答卷列表，支持多维度筛选",
+                "description": "管理员查询当前组织范围内的答卷列表，支持多维度筛选。",
                 "consumes": [
                     "application/json"
                 ],
@@ -154,8 +154,32 @@ const docTemplate = `{
                             ]
                         }
                     },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
                     "429": {
                         "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/core.ErrResponse"
                         }
@@ -260,7 +284,7 @@ const docTemplate = `{
         },
         "/api/v1/answersheets/{id}": {
             "get": {
-                "description": "管理员查看答卷的完整信息",
+                "description": "管理员仅可查看当前组织范围内的答卷完整信息；跨组织 ID 按不存在处理。",
                 "consumes": [
                     "application/json"
                 ],
@@ -306,8 +330,38 @@ const docTemplate = `{
                             ]
                         }
                     },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
                     "429": {
                         "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/core.ErrResponse"
                         }

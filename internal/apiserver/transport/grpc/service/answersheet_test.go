@@ -19,7 +19,7 @@ func TestAnswerSheetServiceMapsOwnershipFieldsToProto(t *testing.T) {
 
 	svc := NewAnswerSheetService(&submissionServiceStub{submitFunc: func(context.Context, appanswersheet.SubmitAnswerSheetDTO) (*appanswersheet.AnswerSheetResult, error) {
 		return nil, nil
-	}}, &managementServiceStub{})
+	}})
 	filledAt := time.Date(2026, 7, 18, 12, 34, 56, 0, time.Local)
 	got := svc.toProtoAnswerSheet(&appanswersheet.AnswerSheetResult{
 		ID: 42, QuestionnaireCode: "Q", QuestionnaireVer: "1.2.3", TesteeID: 77, FilledAt: filledAt,
@@ -36,6 +36,7 @@ func TestAnswerSheetServiceMapsOwnershipFieldsToProto(t *testing.T) {
 type submissionServiceStub struct {
 	submitFunc func(context.Context, appanswersheet.SubmitAnswerSheetDTO) (*appanswersheet.AnswerSheetResult, error)
 	lookupFunc func(context.Context, appanswersheet.LookupSubmissionDTO) (*appanswersheet.AnswerSheetResult, bool, error)
+	getMyFunc  func(context.Context, uint64, uint64) (*appanswersheet.AnswerSheetResult, error)
 }
 
 func (s *submissionServiceStub) Submit(ctx context.Context, dto appanswersheet.SubmitAnswerSheetDTO) (*appanswersheet.AnswerSheetResult, error) {
@@ -49,26 +50,50 @@ func (s *submissionServiceStub) LookupAcceptedSubmission(ctx context.Context, dt
 	return s.lookupFunc(ctx, dto)
 }
 
-func (s *submissionServiceStub) GetMyAnswerSheet(context.Context, uint64, uint64) (*appanswersheet.AnswerSheetResult, error) {
-	return nil, nil
+func (s *submissionServiceStub) GetMyAnswerSheet(ctx context.Context, writerID, answerSheetID uint64) (*appanswersheet.AnswerSheetResult, error) {
+	if s.getMyFunc == nil {
+		return nil, nil
+	}
+	return s.getMyFunc(ctx, writerID, answerSheetID)
 }
 
 func (s *submissionServiceStub) ListMyAnswerSheets(context.Context, appanswersheet.ListMyAnswerSheetsDTO) (*appanswersheet.AnswerSheetSummaryListResult, error) {
 	return nil, nil
 }
 
-type managementServiceStub struct{}
+func TestAnswerSheetServiceGetAnswerSheetUsesOwnedApplicationPort(t *testing.T) {
+	t.Parallel()
 
-func (s *managementServiceStub) GetByID(context.Context, uint64) (*appanswersheet.AnswerSheetResult, error) {
-	return nil, nil
+	var gotWriterID, gotAnswerSheetID uint64
+	svc := NewAnswerSheetService(&submissionServiceStub{getMyFunc: func(_ context.Context, writerID, answerSheetID uint64) (*appanswersheet.AnswerSheetResult, error) {
+		gotWriterID, gotAnswerSheetID = writerID, answerSheetID
+		return &appanswersheet.AnswerSheetResult{ID: answerSheetID, FillerID: writerID, TesteeID: 77}, nil
+	}})
+
+	response, err := svc.GetAnswerSheet(t.Context(), &pb.GetAnswerSheetRequest{Id: 42, WriterId: 11})
+	if err != nil {
+		t.Fatalf("GetAnswerSheet() error = %v", err)
+	}
+	if gotWriterID != 11 || gotAnswerSheetID != 42 {
+		t.Fatalf("owned application query = writer:%d sheet:%d, want 11/42", gotWriterID, gotAnswerSheetID)
+	}
+	if response.GetAnswerSheet().GetId() != 42 || response.GetAnswerSheet().GetWriterId() != 11 {
+		t.Fatalf("GetAnswerSheet() response = %#v", response.GetAnswerSheet())
+	}
 }
 
-func (s *managementServiceStub) List(context.Context, appanswersheet.ListAnswerSheetsDTO) (*appanswersheet.AnswerSheetSummaryListResult, error) {
-	return nil, nil
-}
+func TestAnswerSheetServiceGetAnswerSheetRejectsMissingOrForeignWriter(t *testing.T) {
+	t.Parallel()
 
-func (s *managementServiceStub) Delete(context.Context, uint64) error {
-	return nil
+	svc := NewAnswerSheetService(&submissionServiceStub{getMyFunc: func(context.Context, uint64, uint64) (*appanswersheet.AnswerSheetResult, error) {
+		return nil, pkgerrors.WithCode(errorCode.ErrPermissionDenied, "无权查看此答卷")
+	}})
+	if _, err := svc.GetAnswerSheet(t.Context(), &pb.GetAnswerSheetRequest{Id: 42}); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("missing writer status = %s, want InvalidArgument", status.Code(err))
+	}
+	if _, err := svc.GetAnswerSheet(t.Context(), &pb.GetAnswerSheetRequest{Id: 42, WriterId: 12}); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("foreign writer status = %s, want PermissionDenied", status.Code(err))
+	}
 }
 
 func TestAnswerSheetServiceSaveAnswerSheetDecodesStructuredValues(t *testing.T) {
@@ -80,7 +105,7 @@ func TestAnswerSheetServiceSaveAnswerSheetDecodesStructuredValues(t *testing.T) 
 			captured = dto
 			return &appanswersheet.AnswerSheetResult{ID: 42}, nil
 		},
-	}, &managementServiceStub{})
+	})
 
 	ctx := context.WithValue(context.Background(), basegrpc.RequestIDContextKey, "request-propagated")
 	_, err := svc.SaveAnswerSheet(ctx, &pb.SaveAnswerSheetRequest{
@@ -131,7 +156,7 @@ func TestAnswerSheetServiceSaveAnswerSheetMapsInvalidDomainError(t *testing.T) {
 		submitFunc: func(context.Context, appanswersheet.SubmitAnswerSheetDTO) (*appanswersheet.AnswerSheetResult, error) {
 			return nil, pkgerrors.WithCode(errorCode.ErrAnswerSheetInvalid, "答案验证失败")
 		},
-	}, &managementServiceStub{})
+	})
 
 	_, err := svc.SaveAnswerSheet(context.Background(), &pb.SaveAnswerSheetRequest{
 		QuestionnaireCode: "QNR-001",
@@ -158,7 +183,7 @@ func TestAnswerSheetServiceSaveAnswerSheetRequiresSafeIdempotencyKey(t *testing.
 			t.Fatal("submission service must not be called")
 			return nil, nil
 		},
-	}, &managementServiceStub{})
+	})
 
 	_, err := svc.SaveAnswerSheet(context.Background(), &pb.SaveAnswerSheetRequest{
 		QuestionnaireCode: "QNR-001",
@@ -178,7 +203,7 @@ func TestAnswerSheetServiceSaveAnswerSheetMapsIdempotencyConflict(t *testing.T) 
 		submitFunc: func(context.Context, appanswersheet.SubmitAnswerSheetDTO) (*appanswersheet.AnswerSheetResult, error) {
 			return nil, pkgerrors.WithCode(errorCode.ErrConflict, "idempotency conflict")
 		},
-	}, &managementServiceStub{})
+	})
 
 	_, err := svc.SaveAnswerSheet(context.Background(), &pb.SaveAnswerSheetRequest{
 		QuestionnaireCode: "QNR-001",
@@ -206,7 +231,7 @@ func TestAnswerSheetServiceLookupAnswerSheetSubmissionReturnsDurableHit(t *testi
 			captured = dto
 			return &appanswersheet.AnswerSheetResult{ID: 42}, true, nil
 		},
-	}, &managementServiceStub{})
+	})
 
 	response, err := svc.LookupAnswerSheetSubmission(t.Context(), &pb.LookupAnswerSheetSubmissionRequest{
 		WriterId:             101,
@@ -237,7 +262,7 @@ func TestAnswerSheetServiceLookupAnswerSheetSubmissionReturnsExplicitMiss(t *tes
 		lookupFunc: func(context.Context, appanswersheet.LookupSubmissionDTO) (*appanswersheet.AnswerSheetResult, bool, error) {
 			return nil, false, nil
 		},
-	}, &managementServiceStub{})
+	})
 
 	response, err := svc.LookupAnswerSheetSubmission(t.Context(), validLookupSubmissionRequest())
 	if err != nil || response == nil || response.Found || response.Id != 0 {
@@ -255,7 +280,7 @@ func TestAnswerSheetServiceLookupAnswerSheetSubmissionMapsConflict(t *testing.T)
 		lookupFunc: func(context.Context, appanswersheet.LookupSubmissionDTO) (*appanswersheet.AnswerSheetResult, bool, error) {
 			return nil, false, pkgerrors.WithCode(errorCode.ErrConflict, "idempotency conflict")
 		},
-	}, &managementServiceStub{})
+	})
 
 	_, err := svc.LookupAnswerSheetSubmission(t.Context(), validLookupSubmissionRequest())
 	if status.Code(err) != codes.AlreadyExists {
@@ -270,7 +295,7 @@ func TestAnswerSheetServiceLookupAnswerSheetSubmissionMapsReadErrorToUnavailable
 		lookupFunc: func(context.Context, appanswersheet.LookupSubmissionDTO) (*appanswersheet.AnswerSheetResult, bool, error) {
 			return nil, false, pkgerrors.WithCode(errorCode.ErrDatabase, "mongo unavailable")
 		},
-	}, &managementServiceStub{})
+	})
 
 	_, err := svc.LookupAnswerSheetSubmission(t.Context(), validLookupSubmissionRequest())
 	if status.Code(err) != codes.Unavailable {
@@ -287,7 +312,7 @@ func TestAnswerSheetServiceLookupAnswerSheetSubmissionPreservesCancellation(t *t
 		lookupFunc: func(context.Context, appanswersheet.LookupSubmissionDTO) (*appanswersheet.AnswerSheetResult, bool, error) {
 			return nil, false, context.Canceled
 		},
-	}, &managementServiceStub{})
+	})
 
 	_, err := svc.LookupAnswerSheetSubmission(ctx, validLookupSubmissionRequest())
 	if status.Code(err) != codes.Canceled {
@@ -302,7 +327,7 @@ func TestAnswerSheetServiceLookupAnswerSheetSubmissionRejectsFoundWithoutID(t *t
 		lookupFunc: func(context.Context, appanswersheet.LookupSubmissionDTO) (*appanswersheet.AnswerSheetResult, bool, error) {
 			return &appanswersheet.AnswerSheetResult{}, true, nil
 		},
-	}, &managementServiceStub{})
+	})
 
 	_, err := svc.LookupAnswerSheetSubmission(t.Context(), validLookupSubmissionRequest())
 	if status.Code(err) != codes.Unavailable {

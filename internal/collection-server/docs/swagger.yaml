@@ -1401,7 +1401,7 @@ paths:
       - 答卷
   /api/v1/answersheets/{id}:
     get:
-      description: 根据ID获取答卷详情
+      description: 仅返回当前填写人提交且当前仍有 active ProfileLink 代表权的答卷详情。
       parameters:
       - description: 答卷ID
         in: path
@@ -1424,6 +1424,14 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
         "404":
           description: Not Found
           schema:
@@ -1432,8 +1440,8 @@ paths:
           description: Too Many Requests
           schema:
             $ref: '#/definitions/core.ErrResponse'
-        "500":
-          description: Internal Server Error
+        "503":
+          description: Service Unavailable
           schema:
             $ref: '#/definitions/core.ErrResponse'
       security:

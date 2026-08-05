@@ -47,6 +47,22 @@ func (s *managementService) GetByID(ctx context.Context, id uint64) (*AnswerShee
 	return toAnswerSheetResult(sheet), nil
 }
 
+// GetByIDInOrg enforces tenant ownership for protected management reads.
+// A mismatch is reported as not found so callers cannot probe another org's IDs.
+func (s *managementService) GetByIDInOrg(ctx context.Context, orgID, id uint64) (*AnswerSheetResult, error) {
+	if orgID == 0 {
+		return nil, errors.WithCode(errorCode.ErrPermissionDenied, "机构范围不能为空")
+	}
+	result, err := s.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if result == nil || result.OrgID != orgID {
+		return nil, errors.WithCode(errorCode.ErrAnswerSheetNotFound, "答卷不存在")
+	}
+	return result, nil
+}
+
 // List 查询答卷列表
 func (s *managementService) List(ctx context.Context, dto ListAnswerSheetsDTO) (*AnswerSheetSummaryListResult, error) {
 	if err := validateManagementListDTO(dto); err != nil {
@@ -70,6 +86,9 @@ func (s *managementService) List(ctx context.Context, dto ListAnswerSheetsDTO) (
 }
 
 func validateManagementListDTO(dto ListAnswerSheetsDTO) error {
+	if dto.OrgID == 0 {
+		return errors.WithCode(errorCode.ErrPermissionDenied, "机构范围不能为空")
+	}
 	if dto.Page <= 0 {
 		return errors.WithCode(errorCode.ErrAnswerSheetInvalid, "页码必须大于0")
 	}
@@ -84,6 +103,7 @@ func validateManagementListDTO(dto ListAnswerSheetsDTO) error {
 
 func buildListFilter(dto ListAnswerSheetsDTO) surveyreadmodel.AnswerSheetFilter {
 	return surveyreadmodel.AnswerSheetFilter{
+		OrgID:             dto.OrgID,
 		QuestionnaireCode: dto.QuestionnaireCode,
 		FillerID:          dto.FillerID,
 		StartTime:         dto.StartTime,

@@ -21,13 +21,14 @@ func NewAnswerSheetClient(manager *Manager) *AnswerSheetClient {
 	}
 }
 
-// GetAnswerSheet 获取答卷详情
-func (c *AnswerSheetClient) GetAnswerSheet(ctx context.Context, id uint64) (*pb.GetAnswerSheetResponse, error) {
+// GetAnswerSheet 获取当前填写人拥有的答卷详情。
+func (c *AnswerSheetClient) GetAnswerSheet(ctx context.Context, writerID, id uint64) (*pb.GetAnswerSheetResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
 	defer cancel()
 
 	resp, err := c.client.GetAnswerSheet(ctx, &pb.GetAnswerSheetRequest{
-		Id: id,
+		Id:       id,
+		WriterId: writerID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get answer sheet: %w", err)

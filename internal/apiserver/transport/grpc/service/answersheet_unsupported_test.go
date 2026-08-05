@@ -10,7 +10,7 @@ import (
 )
 
 func TestAnswerSheetServiceSaveAnswerSheetScoresReturnsUnimplemented(t *testing.T) {
-	svc := NewAnswerSheetService(nil, nil)
+	svc := NewAnswerSheetService(nil)
 
 	_, err := svc.SaveAnswerSheetScores(context.Background(), &pb.SaveAnswerSheetScoresRequest{})
 	if err == nil {

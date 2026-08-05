@@ -45,14 +45,19 @@ func NewAnswerSheetHandler(
 
 // GetByID 根据ID获取答卷详情
 // @Summary 获取答卷详情
-// @Description 管理员查看答卷的完整信息
+// @Description 管理员仅可查看当前组织范围内的答卷完整信息；跨组织 ID 按不存在处理。
 // @Tags AnswerSheet-Management
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param id path string true "答卷ID"
 // @Success 200 {object} core.Response{data=response.AnswerSheetResponse}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 401 {object} core.ErrResponse
+// @Failure 403 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
 // @Failure 429 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
 // @Router /api/v1/answersheets/{id} [get]
 func (h *AnswerSheetHandler) GetByID(c *gin.Context) {
 	answerSheetID, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -61,7 +66,17 @@ func (h *AnswerSheetHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	result, err := h.managementService.GetByID(c.Request.Context(), answerSheetID)
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	orgScope, err := safeconv.Int64ToUint64(orgID)
+	if err != nil {
+		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "org scope exceeds uint64"))
+		return
+	}
+	result, err := h.managementService.GetByIDInOrg(c.Request.Context(), orgScope, answerSheetID)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -72,7 +87,7 @@ func (h *AnswerSheetHandler) GetByID(c *gin.Context) {
 
 // List 查询答卷列表
 // @Summary 查询答卷列表
-// @Description 管理员查询答卷列表，支持多维度筛选
+// @Description 管理员查询当前组织范围内的答卷列表，支持多维度筛选。
 // @Tags AnswerSheet-Management
 // @Accept json
 // @Produce json
@@ -84,12 +99,26 @@ func (h *AnswerSheetHandler) GetByID(c *gin.Context) {
 // @Param start_time query string false "开始时间"
 // @Param end_time query string false "结束时间"
 // @Success 200 {object} core.Response{data=response.AnswerSheetListResponse}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 401 {object} core.ErrResponse
+// @Failure 403 {object} core.ErrResponse
 // @Failure 429 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
 // @Router /api/v1/answersheets [get]
 func (h *AnswerSheetHandler) List(c *gin.Context) {
 	dto, err := buildAnswerSheetListDTO(c)
 	if err != nil {
 		h.Error(c, err)
+		return
+	}
+	orgID, err := h.RequireProtectedOrgID(c)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	dto.OrgID, err = safeconv.Int64ToUint64(orgID)
+	if err != nil {
+		h.Error(c, errors.WithCode(code.ErrPermissionDenied, "org scope exceeds uint64"))
 		return
 	}
 

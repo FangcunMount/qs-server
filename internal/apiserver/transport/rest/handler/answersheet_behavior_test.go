@@ -16,8 +16,9 @@ import (
 )
 
 type stubAnswerSheetManagementService struct {
-	lastGetByID uint64
-	lastListDTO answersheetapp.ListAnswerSheetsDTO
+	lastGetByID  uint64
+	lastGetOrgID uint64
+	lastListDTO  answersheetapp.ListAnswerSheetsDTO
 
 	getByIDResult *answersheetapp.AnswerSheetResult
 	getByIDErr    error
@@ -26,6 +27,12 @@ type stubAnswerSheetManagementService struct {
 }
 
 func (s *stubAnswerSheetManagementService) GetByID(_ context.Context, id uint64) (*answersheetapp.AnswerSheetResult, error) {
+	s.lastGetByID = id
+	return s.getByIDResult, s.getByIDErr
+}
+
+func (s *stubAnswerSheetManagementService) GetByIDInOrg(_ context.Context, orgID, id uint64) (*answersheetapp.AnswerSheetResult, error) {
+	s.lastGetOrgID = orgID
 	s.lastGetByID = id
 	return s.getByIDResult, s.getByIDErr
 }
@@ -104,14 +111,15 @@ func TestAnswerSheetHandlerGetByIDSuccess(t *testing.T) {
 
 	c, rec := newHandlerTestContext(http.MethodGet, "/api/v1/answersheets/42", bytes.NewReader(nil))
 	c.Params = gin.Params{{Key: "id", Value: "42"}}
+	c.Set(middleware.OrgIDKey, uint64(88))
 
 	handler.GetByID(c)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
-	if management.lastGetByID != 42 {
-		t.Fatalf("lastGetByID = %d, want 42", management.lastGetByID)
+	if management.lastGetOrgID != 88 || management.lastGetByID != 42 {
+		t.Fatalf("GetByIDInOrg scope/id = %d/%d, want 88/42", management.lastGetOrgID, management.lastGetByID)
 	}
 
 	var payload struct {
@@ -143,6 +151,24 @@ func TestAnswerSheetHandlerGetByIDSuccess(t *testing.T) {
 	}
 }
 
+func TestAnswerSheetHandlerGetByIDRejectsMissingOrgScopeBeforeLookup(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	management := &stubAnswerSheetManagementService{getByIDResult: &answersheetapp.AnswerSheetResult{ID: 42}}
+	handler := newAnswerSheetHandlerForTest(management, &stubAnswerSheetSubmissionService{})
+	c, rec := newHandlerTestContext(http.MethodGet, "/api/v1/answersheets/42", bytes.NewReader(nil))
+	c.Params = gin.Params{{Key: "id", Value: "42"}}
+
+	handler.GetByID(c)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+	if management.lastGetByID != 0 || management.lastGetOrgID != 0 {
+		t.Fatalf("management lookup must not run without org scope: org=%d id=%d", management.lastGetOrgID, management.lastGetByID)
+	}
+}
+
 func TestAnswerSheetHandlerListSuccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -165,6 +191,7 @@ func TestAnswerSheetHandlerListSuccess(t *testing.T) {
 	handler := newAnswerSheetHandlerForTest(management, &stubAnswerSheetSubmissionService{})
 
 	c, rec := newHandlerTestContext(http.MethodGet, "/api/v1/answersheets?page=2&page_size=20&questionnaire_code=QNR-LIST&filler_id=303&start_time=2026-04-01&end_time=2026-04-02", bytes.NewReader(nil))
+	c.Set(middleware.OrgIDKey, uint64(88))
 
 	handler.List(c)
 
@@ -173,6 +200,9 @@ func TestAnswerSheetHandlerListSuccess(t *testing.T) {
 	}
 	if management.lastListDTO.Page != 2 || management.lastListDTO.PageSize != 20 {
 		t.Fatalf("unexpected pagination dto: %+v", management.lastListDTO)
+	}
+	if management.lastListDTO.OrgID != 88 {
+		t.Fatalf("org_id = %d, want 88", management.lastListDTO.OrgID)
 	}
 	if management.lastListDTO.QuestionnaireCode != "QNR-LIST" {
 		t.Fatalf("questionnaire_code = %q, want QNR-LIST", management.lastListDTO.QuestionnaireCode)
@@ -200,6 +230,23 @@ func TestAnswerSheetHandlerListSuccess(t *testing.T) {
 	}
 	if payload.Data.Items[0].ID != "77" || payload.Data.Items[0].FillerID != "303" {
 		t.Fatalf("unexpected list item: %+v", payload.Data.Items[0])
+	}
+}
+
+func TestAnswerSheetHandlerListRejectsMissingOrgScopeBeforeQuery(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	management := &stubAnswerSheetManagementService{}
+	handler := newAnswerSheetHandlerForTest(management, &stubAnswerSheetSubmissionService{})
+	c, rec := newHandlerTestContext(http.MethodGet, "/api/v1/answersheets?page=1&page_size=20", bytes.NewReader(nil))
+
+	handler.List(c)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+	if management.lastListDTO.Page != 0 || management.lastListDTO.OrgID != 0 {
+		t.Fatalf("management list must not run without org scope: %+v", management.lastListDTO)
 	}
 }
 
