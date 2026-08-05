@@ -2,7 +2,6 @@ package app
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"strings"
 
@@ -188,10 +187,6 @@ func (a *App) runCommand(cmd *cobra.Command, _ []string) error {
 		envPrefix := buildEnvPrefix(a.basename)
 		printViperConfig(envPrefix)
 
-		// 兼容 CICD 传入的 NSQ 主机/端口环境变量
-		applyLegacyNSQEnvOverrides(envPrefix)
-		// 兼容 REDIS_DB 环境变量（映射到 redis.database）
-		applyLegacyRedisEnvOverrides(envPrefix)
 		if validator, ok := a.options.(RawSettingsValidatable); ok {
 			if err := validator.ValidateRawSettings(viper.AllSettings()); err != nil {
 				return err
@@ -302,13 +297,11 @@ func printViperConfig(envPrefix string) {
 		"REDIS_PORT",
 		"REDIS_USERNAME",
 		"REDIS_PASSWORD",
-		"REDIS_DB",
+		"REDIS_DATABASE",
 		"JWT_SECRET",
 		"IDP_ENCRYPTION_KEY",
-		"NSQ_NSQD_HOST",
-		"NSQ_NSQD_PORT",
-		"NSQ_LOOKUPD_HOST",
-		"NSQ_LOOKUPD_PORT",
+		"MESSAGING_NSQ_ADDR",
+		"MESSAGING_NSQ_LOOKUPD_ADDR",
 		"OSS_ACCESS_KEY_ID",
 		"OSS_ACCESS_KEY_SECRET",
 	}
@@ -321,43 +314,4 @@ func printViperConfig(envPrefix string) {
 // buildEnvPrefix 根据 basename 生成环境变量前缀
 func buildEnvPrefix(basename string) string {
 	return strings.ReplaceAll(strings.ToUpper(basename), "-", "_")
-}
-
-// applyLegacyNSQEnvOverrides 兼容 CICD 使用的 NSQ 主机/端口环境变量，自动拼接为 nsq-addr/nsq-lookupd-addr
-func applyLegacyNSQEnvOverrides(envPrefix string) {
-	nsqdHost := os.Getenv(envPrefix + "_NSQ_NSQD_HOST")
-	nsqdPort := os.Getenv(envPrefix + "_NSQ_NSQD_PORT")
-	lookupHost := os.Getenv(envPrefix + "_NSQ_LOOKUPD_HOST")
-	lookupPort := os.Getenv(envPrefix + "_NSQ_LOOKUPD_PORT")
-
-	nsqdAddr := buildAddr(nsqdHost, nsqdPort, "4150")
-	lookupAddr := buildAddr(lookupHost, lookupPort, "4161")
-
-	if nsqdAddr != "" {
-		viper.Set("messaging.nsq-addr", nsqdAddr)
-	}
-	if lookupAddr != "" {
-		viper.Set("messaging.nsq-lookupd-addr", lookupAddr)
-	}
-}
-
-// applyLegacyRedisEnvOverrides 兼容 REDIS_DB 写法，映射到 redis.database
-func applyLegacyRedisEnvOverrides(envPrefix string) {
-	if db := os.Getenv(envPrefix + "_REDIS_DB"); db != "" {
-		viper.Set("redis.database", db)
-	}
-}
-
-// buildAddr 组装 host:port，允许 host 已包含端口
-func buildAddr(host, port, defaultPort string) string {
-	if host == "" {
-		return ""
-	}
-	if strings.Contains(host, ":") {
-		return host
-	}
-	if port == "" {
-		port = defaultPort
-	}
-	return net.JoinHostPort(host, port)
 }

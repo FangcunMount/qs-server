@@ -39,6 +39,30 @@ func TestRawSettingsSourcePrecedenceFileEnvExplicitFlag(t *testing.T) {
 	}
 }
 
+func TestRawSettingsSourceUsesCanonicalDeploymentEnvironmentKeys(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "apiserver.yaml")
+	if err := os.WriteFile(path, []byte("redis:\n  database: 0\nmessaging:\n  nsq-addr: config-nsqd:4150\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	source := newRawSettingsSource(path, "QS_APISERVER", nil)
+
+	t.Setenv("QS_APISERVER_REDIS_DATABASE", "6")
+	t.Setenv("QS_APISERVER_MESSAGING_NSQ_ADDR", "nsqd:4150")
+	t.Setenv("QS_APISERVER_REDIS_DB", "9")
+	t.Setenv("QS_APISERVER_NSQ_NSQD_HOST", "legacy-nsqd")
+
+	settings, err := source.Read(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := nestedString(t, settings.Values, "redis", "database"); got != "6" {
+		t.Fatalf("redis.database = %q, want canonical env value 6", got)
+	}
+	if got := nestedString(t, settings.Values, "messaging", "nsq-addr"); got != "nsqd:4150" {
+		t.Fatalf("messaging.nsq-addr = %q, want canonical env value", got)
+	}
+}
+
 func nestedFloat(t *testing.T, values map[string]any, path ...string) float64 {
 	t.Helper()
 	var current any = values
@@ -62,4 +86,17 @@ func nestedFloat(t *testing.T, values map[string]any, path ...string) float64 {
 		t.Fatalf("value is %T", current)
 		return 0
 	}
+}
+
+func nestedString(t *testing.T, values map[string]any, path ...string) string {
+	t.Helper()
+	var current any = values
+	for _, key := range path {
+		mapping, ok := current.(map[string]any)
+		if !ok {
+			t.Fatalf("%s is %T, want map", key, current)
+		}
+		current = mapping[key]
+	}
+	return fmt.Sprint(current)
 }
