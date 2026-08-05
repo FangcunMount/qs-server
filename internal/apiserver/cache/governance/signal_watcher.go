@@ -2,6 +2,7 @@ package cachegovernance
 
 import (
 	"context"
+	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
@@ -22,7 +23,7 @@ func StartCacheSignalWatcher(
 	if questionnaireSignaler != nil {
 		go func() {
 			err := questionnaireSignaler.Watch(ctx, func(msgCtx context.Context, signal cachesignal.QuestionnaireCacheChangedSignal) {
-				if signal.Code == "" {
+				if signal.Code == "" || !shouldWarmPublishedSignal(signal.Action) {
 					return
 				}
 				if err := coordinator.HandleQuestionnairePublished(msgCtx, signal.Code, signal.Version); err != nil {
@@ -41,7 +42,7 @@ func StartCacheSignalWatcher(
 	if scaleSignaler != nil {
 		go func() {
 			err := scaleSignaler.Watch(ctx, func(msgCtx context.Context, signal cachesignal.ScaleCacheChangedSignal) {
-				if signal.Code == "" {
+				if signal.Code == "" || !shouldWarmPublishedSignal(signal.Action) {
 					return
 				}
 				if err := coordinator.HandleScalePublished(msgCtx, signal.Code); err != nil {
@@ -59,7 +60,7 @@ func StartCacheSignalWatcher(
 	if typologySignaler != nil {
 		go func() {
 			err := typologySignaler.Watch(ctx, func(msgCtx context.Context, signal cachesignal.TypologyModelCacheChangedSignal) {
-				if signal.Code == "" {
+				if signal.Code == "" || !shouldWarmPublishedSignal(signal.Action) {
 					return
 				}
 				if err := coordinator.HandleTypologyModelPublished(msgCtx, signal.Code); err != nil {
@@ -74,4 +75,8 @@ func StartCacheSignalWatcher(
 			}
 		}()
 	}
+}
+
+func shouldWarmPublishedSignal(action string) bool {
+	return strings.EqualFold(strings.TrimSpace(action), "published")
 }
