@@ -71,54 +71,6 @@ func (q *QuestionnairesIndexes) EnsureIndexes(ctx context.Context) error {
 	return nil
 }
 
-// AnswerSheetsIndexes 答卷集合索引定义
-type AnswerSheetsIndexes struct {
-	collection *mongo.Collection
-}
-
-// NewAnswerSheetsIndexes 创建答卷索引管理器
-func NewAnswerSheetsIndexes(collection *mongo.Collection) *AnswerSheetsIndexes {
-	return &AnswerSheetsIndexes{collection: collection}
-}
-
-// EnsureIndexes 确保所有推荐索引已创建
-func (a *AnswerSheetsIndexes) EnsureIndexes(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	indexModels := []mongo.IndexModel{
-		{
-			Keys: bson.D{
-				{Key: "filler_id", Value: 1},
-				{Key: "deleted_at", Value: 1},
-				{Key: "filled_at", Value: -1},
-			},
-			Options: options.Index().SetName("idx_filler_deleted_filled"),
-		},
-		{
-			Keys: bson.D{
-				{Key: "questionnaire_code", Value: 1},
-				{Key: "deleted_at", Value: 1},
-				{Key: "filled_at", Value: -1},
-			},
-			Options: options.Index().SetName("idx_question_deleted_filled"),
-		},
-		{
-			Keys: bson.D{
-				{Key: "domain_id", Value: 1},
-				{Key: "deleted_at", Value: 1},
-			},
-			Options: options.Index().SetName("idx_domain_deleted"),
-		},
-	}
-
-	if _, err := a.collection.Indexes().CreateMany(ctx, indexModels); err != nil {
-		return fmt.Errorf("create answersheets indexes: %w", err)
-	}
-
-	return nil
-}
-
 // AssessmentModelsIndexes manages unified assessment_models indexes.
 type AssessmentModelsIndexes struct {
 	collection *mongo.Collection
@@ -272,18 +224,6 @@ type IndexManager struct {
 // NewIndexManager 创建索引管理器
 func NewIndexManager(db *mongo.Database) *IndexManager {
 	return &IndexManager{db: db}
-}
-
-// EnsureAllIndexes 确保所有集合的索引都已创建
-func (m *IndexManager) EnsureAllIndexes(ctx context.Context) error {
-	// Reconcile covers assessment_models / assessment_norms / questionnaires (incl. unified).
-	if err := m.ReconcileUnifiedModelCatalogIndexes(ctx); err != nil {
-		return err
-	}
-	if err := NewAnswerSheetsIndexes(m.db.Collection("answersheets")).EnsureIndexes(ctx); err != nil {
-		return err
-	}
-	return nil
 }
 
 // ReconcileUnifiedModelCatalogIndexes drops conflicting legacy unique indexes
