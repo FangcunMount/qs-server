@@ -42,7 +42,7 @@ func TestEvaluateConcurrentWorkersExecuteEvaluatorOnce(t *testing.T) {
 		capture,
 		withTestEvaluator(evaluator),
 		WithRunRepository(repo),
-		WithRunLease(time.Minute),
+		withTestRunLease(time.Minute),
 	)
 
 	firstDone := make(chan error, 1)
@@ -66,5 +66,13 @@ func TestEvaluateConcurrentWorkersExecuteEvaluatorOnce(t *testing.T) {
 	}
 	if calls := evaluator.calls.Load(); calls != 1 {
 		t.Fatalf("evaluator calls after completion = %d, want 1", calls)
+	}
+}
+
+func withTestRunLease(lease time.Duration) EngineOption {
+	return func(s *service) {
+		if lease > 0 {
+			s.runLease = lease
+		}
 	}
 }

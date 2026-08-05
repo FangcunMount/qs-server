@@ -78,17 +78,6 @@ func WithRunRepository(repo evaluationrun.Repository) EngineOption {
 	}
 }
 
-// WithRunLease configures how long one worker owns an EvaluationRun claim.
-// It is primarily exposed for deterministic tests and unusually long-running
-// deployments; production uses a conservative default.
-func WithRunLease(lease time.Duration) EngineOption {
-	return func(s *service) {
-		if lease > 0 {
-			s.runLease = lease
-		}
-	}
-}
-
 // WithEvaluationCommitter configures the canonical Evaluation success boundary.
 func WithEvaluationCommitter(committer outcomecommit.Committer) EngineOption {
 	return func(s *service) {
