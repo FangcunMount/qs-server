@@ -362,10 +362,6 @@ func (h *AssessmentEntryHandler) IntakeAssessmentEntry(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "扫码建档成功", toAssessmentEntryIntakeResponse(result))
 }
 
-func (h *AssessmentEntryHandler) SetQRCodeService(qrCodeService qrcodeApp.QRCodeService) {
-	h.qrCodeService = qrCodeService
-}
-
 func (h *AssessmentEntryHandler) generateAssessmentEntryQRCodeURL(ctx context.Context, token string) string {
 	if h.qrCodeService == nil {
 		return ""

@@ -233,26 +233,6 @@ func NewProjectedAssessmentResponse(result *reportquery.AssessmentProjection) *A
 	return resp
 }
 
-// NewAssessmentListResponse 从应用层 Result 创建列表响应
-func NewAssessmentListResponse(result *evaluationoperator.AssessmentList) *AssessmentListResponse {
-	if result == nil {
-		return nil
-	}
-
-	items := make([]*AssessmentResponse, 0, len(result.Items))
-	for _, item := range result.Items {
-		items = append(items, NewAssessmentResponse(item))
-	}
-
-	return &AssessmentListResponse{
-		Items:      items,
-		Total:      result.Total,
-		Page:       result.Page,
-		PageSize:   result.PageSize,
-		TotalPages: result.TotalPages,
-	}
-}
-
 func NewProjectedAssessmentListResponse(result *reportquery.AssessmentListProjection) *AssessmentListResponse {
 	if result == nil {
 		return nil

@@ -9,7 +9,6 @@ import (
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 )
 
 const (
@@ -18,12 +17,6 @@ const (
 )
 
 var (
-	periodicTaskStatusLabelMap = map[string]string{
-		"completed": "已完成",
-		"pending":   "待开放",
-		"overdue":   "已逾期",
-		"canceled":  "已取消",
-	}
 	riskLevelLabelMap = map[string]string{
 		"normal": "正常",
 		"none":   "正常",
@@ -54,13 +47,6 @@ func fallbackValue(value string, fallback string) string {
 		return value
 	}
 	return fallback
-}
-
-func FormatDateValue(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-	return t.Format(dateLayout)
 }
 
 func FormatDateTimeValue(t time.Time) string {
@@ -179,21 +165,6 @@ func LabelForAssessmentStatus(value string) string {
 	default:
 		return domainAssessment.Status(normalized).DisplayName()
 	}
-}
-
-func LabelForPeriodicTaskStatus(value string) string {
-	normalized := normalizeLookupValue(value)
-	if normalized == "" {
-		return "-"
-	}
-	if normalized == "overdue" {
-		return "已逾期"
-	}
-	label := domainPlan.TaskStatus(normalized).DisplayName()
-	if label != normalized {
-		return label
-	}
-	return formatMappedLabel(value, periodicTaskStatusLabelMap, "-")
 }
 
 func LabelForKeyFocus(isKeyFocus bool) string {
