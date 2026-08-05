@@ -260,10 +260,37 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 		}
 	}
 
+	attentionAuditWorkflow := readDeploymentContractFile(t, ".github", "workflows", "attention-reconcile-audit.yml")
+	for _, required := range []string{
+		"Attention Reconcile Dry-run Audit",
+		"EXPECTED_DEPLOY_SHA",
+		"MIN_SUCCESSFUL_ROUNDS",
+		"MIN_MISSING",
+		"audit-attention-reconcile-dry-run.sh",
+	} {
+		if !strings.Contains(attentionAuditWorkflow, required) {
+			t.Errorf("Attention reconcile audit workflow must contain %q", required)
+		}
+	}
+
+	attentionAudit := readDeploymentContractFile(t, "scripts", "cd", "audit-attention-reconcile-dry-run.sh")
+	for _, required := range []string{
+		"attention-projection-reconcile-enabled",
+		"attention-projection-reconcile-dry-run",
+		"attention_fact_reconcile_rounds_total",
+		"attention_fact_reconcile_consecutive_failures",
+		"Dry-run reported created=",
+	} {
+		if !strings.Contains(attentionAudit, required) {
+			t.Errorf("Attention reconcile audit must contain %q", required)
+		}
+	}
+
 	ci := readDeploymentContractFile(t, ".github", "workflows", "ci.yml")
 	for _, required := range []string{
 		"github.com/rhysd/actionlint/cmd/actionlint@v1.7.7",
 		"bash -n scripts/cd/*.sh",
+		"bash scripts/cd/test-attention-reconcile-audit.sh",
 		"docker compose -f build/docker/docker-compose.prod.yml -f - config -q",
 		"'  server:'",
 		"'  runtime:'",

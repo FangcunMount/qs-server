@@ -1,0 +1,74 @@
+name: Attention Reconcile Dry-run Audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: 'Expected deployed worker SHA; empty means workflow HEAD'
+        required: false
+        type: string
+        default: ''
+      minimum_successful_rounds:
+        description: 'Minimum successful dry-run rounds across all worker replicas'
+        required: true
+        type: string
+        default: '1'
+      minimum_missing:
+        description: 'Minimum latest missing projection count expected during rehearsal'
+        required: true
+        type: string
+        default: '1'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Audit Production Worker Dry-run Metrics
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    environment:
+      name: production
+    timeout-minutes: 5
+    env:
+      EXPECTED_WORKER_REPLICAS: ${{ vars.QS_WORKER_REPLICAS || '3' }}
+      EXPECTED_DEPLOY_SHA: ${{ inputs.expected_sha || github.sha }}
+      MIN_SUCCESSFUL_ROUNDS: ${{ inputs.minimum_successful_rounds }}
+      MIN_MISSING: ${{ inputs.minimum_missing }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup worker audit SSH
+        env:
+          RUNNER_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          RUNNER_SSH_HOST: ${{ vars.SVRD_PUBLIC_HOST || secrets.SVRD_PUBLIC_HOST || vars.SVRD_HOST }}
+          RUNNER_SSH_USER: ${{ vars.SVRD_USERNAME || vars.SVRA_USERNAME }}
+          RUNNER_SSH_PORT: ${{ vars.SVRD_SSH_PORT || vars.SVRA_SSH_PORT || 22 }}
+          RUNNER_SSH_ALIAS: audit-attention-worker
+          DEPLOY_NODE_HOSTNAME: serverD
+        run: bash scripts/cd/setup-runner-ssh.sh
+
+      - name: Audit Attention reconcile dry-run metrics
+        env:
+          RUNNER_SSH_ALIAS: audit-attention-worker
+        run: |
+          set -Eeuo pipefail
+          if ! [[ "${EXPECTED_DEPLOY_SHA}" =~ ^[0-9a-f]{7,40}$ ]]; then
+            echo "Invalid EXPECTED_DEPLOY_SHA=${EXPECTED_DEPLOY_SHA}" >&2
+            exit 1
+          fi
+          for value in "${EXPECTED_WORKER_REPLICAS}" "${MIN_SUCCESSFUL_ROUNDS}" "${MIN_MISSING}"; do
+            if ! [[ "${value}" =~ ^[0-9]+$ ]]; then
+              echo "Invalid numeric audit input=${value}" >&2
+              exit 1
+            fi
+          done
+          ssh -F "${RUNNER_SSH_CONFIG}" "${RUNNER_SSH_ALIAS}" \
+            "EXPECTED_WORKER_REPLICAS=${EXPECTED_WORKER_REPLICAS} EXPECTED_DEPLOY_SHA=${EXPECTED_DEPLOY_SHA} MIN_SUCCESSFUL_ROUNDS=${MIN_SUCCESSFUL_ROUNDS} MIN_MISSING=${MIN_MISSING} PRIVILEGE_RUNNER=sudo bash -s" \
+            < scripts/cd/audit-attention-reconcile-dry-run.sh
+
+      - name: Cleanup worker audit SSH
+        if: always()
+        run: rm -f "${RUNNER_SSH_KEY_FILE:-}" "${RUNNER_SSH_CONFIG:-}" 2>/dev/null || true
