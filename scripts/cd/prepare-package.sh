@@ -49,6 +49,7 @@ cp \
   scripts/cd/image-metadata.sh \
   scripts/cd/remote-deploy.sh \
   scripts/cd/verify-collection-nginx.sh \
+  scripts/cd/verify-worker-governance.sh \
   "${PACKAGE_DIR}/scripts/cd/"
 
 case "$SERVICE" in

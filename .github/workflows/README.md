@@ -41,12 +41,16 @@
 
 `deploy-collection` 与 `deploy-apiserver` 均 SSH 到 `SVRA_*`；访问 serverB 上的 `iam-apiserver:9090` 依赖 Swarm overlay `infra-network` 跨机 DNS，**不要** `extra_hosts` 到宿主机 Tailscale IP（serverB 宿主机 9090 常被 mihomo 占用）。
 
-collection 副本不发布固定宿主机 `8082/6060` 端口。Nginx 与 apiserver governance 通过外部 Docker 网络上的稳定服务别名 `qs-collection-server` 访问；worker 同样保留稳定网络别名 `qs-worker`。这些 DNS 别名与用于生成可读容器名的短 service key 分离。Prometheus 依靠每个容器的 scrape labels 分别发现 target。部署和 runner 自检通过 Compose label 枚举并逐容器执行 `/serve-readyz`；它要求首次 control sync 已完成，但允许 Redis 运行期降级。可靠提交/K6 仍检查严格 `/readyz`。多副本日志只写 stdout/stderr，由 Docker 为每个容器独立轮转，禁止多个进程写同一个宿主机日志文件。
+collection 副本不发布固定宿主机 `8082/6060` 端口。Nginx 与 apiserver governance 通过外部 Docker 网络上的稳定服务别名 `qs-collection-server` 访问。worker 保留兼容别名 `qs-worker`，并只在 Swarm overlay `infra-network` 上发布治理专用别名 `qs-worker-governance`；专用别名不得出现在各宿主机互不相通的本地 `qs-network` bridge 上。这些 DNS 别名与用于生成可读容器名的短 service key 分离。Prometheus 依靠每个容器的 scrape labels 分别发现 target。部署和 runner 自检通过 Compose label 枚举并逐容器执行 `/serve-readyz`；它要求首次 control sync 已完成，但允许 Redis 运行期降级。可靠提交/K6 仍检查严格 `/readyz`。多副本日志只写 stdout/stderr，由 Docker 为每个容器独立轮转，禁止多个进程写同一个宿主机日志文件。
 
 apiserver 生产配置对 collection governance 使用 `discovery: dns` 和
 `minimum_instances: 2`，对 Docker DNS 返回的两个 IPv4 并发读取
 `/governance/resilience` 与 `/governance/redis`。一个副本不可达时返回 partial，
-不会把存活副本误报 unavailable；worker governance 暂时仍是 single。
+不会把存活副本误报 unavailable。worker governance 使用独立的
+`qs-worker-governance`、`discovery: dns` 和 `minimum_instances: 3`。worker 或
+apiserver 发布完成后，CD 会从 serverA 的 `qs-apiserver` 容器反向校验 DNS
+恰好返回三个 IPv4、两个治理端点均可达且返回三个不同的 `instance_id`；定时
+`ping-runner` 重复同一验收。多出陈旧地址、少副本、端点超时或实例重复都会失败。
 
 collection 发布要求 Nginx `>= 1.27.3`。`collect-api` upstream 在块内使用 Docker resolver 和 `server qs-collection-server:8080 resolve`，保持默认轮询，不设置 `ip_hash`、固定权重或主备关系。CD 会备份并原子安装 `/data/apps/nginx-configs/collect.conf`，通过 `nginx -t` 后 reload，再用 `nginx -T`、Docker DNS 地址集合和两个副本的 `/health` 请求指标完成切流验收；失败时恢复原配置并重启暂时停用的旧 collection service。
 

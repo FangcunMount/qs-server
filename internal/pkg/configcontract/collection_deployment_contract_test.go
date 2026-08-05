@@ -114,6 +114,12 @@ func TestWorkerComposeUsesReadableScalableNameAndStableDNS(t *testing.T) {
 			t.Errorf("worker network %s aliases = %v, want stable qs-worker DNS", network, service.Networks[network].Aliases)
 		}
 	}
+	if !slices.Contains(service.Networks["infra-network"].Aliases, "qs-worker-governance") {
+		t.Errorf("worker infra-network aliases = %v, want isolated qs-worker-governance DNS", service.Networks["infra-network"].Aliases)
+	}
+	if slices.Contains(service.Networks["qs-network"].Aliases, "qs-worker-governance") {
+		t.Errorf("worker local qs-network aliases = %v, must not publish cross-host governance DNS", service.Networks["qs-network"].Aliases)
+	}
 }
 
 func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T) {
@@ -176,6 +182,8 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 		"nginx -T",
 		"1.27.3",
 		"getent ahostsv4 qs-collection-server",
+		"qs-worker-governance",
+		"EXPECTED_WORKER_REPLICAS",
 	} {
 		if !strings.Contains(ping, required) {
 			t.Errorf("runner health workflow must contain %q", required)
@@ -198,6 +206,9 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 	if !strings.Contains(preparePackage, "verify-collection-nginx.sh") {
 		t.Error("deployment package must include verify-collection-nginx.sh")
 	}
+	if !strings.Contains(preparePackage, "verify-worker-governance.sh") {
+		t.Error("deployment package must include verify-worker-governance.sh")
+	}
 	verifier := readDeploymentContractFile(t, "scripts", "cd", "verify-collection-nginx.sh")
 	for _, required := range []string{
 		`NGINX_MIN_VERSION="${NGINX_MIN_VERSION:-1.27.3}"`,
@@ -217,6 +228,31 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 	} {
 		if strings.Contains(remote, forbidden) || strings.Contains(verifier, forbidden) {
 			t.Errorf("collection Nginx deployment must not contain privileged script execution %q", forbidden)
+		}
+	}
+
+	workerVerifier := readDeploymentContractFile(t, "scripts", "cd", "verify-worker-governance.sh")
+	for _, required := range []string{
+		`WORKER_DNS_NAME="${WORKER_DNS_NAME:-qs-worker-governance}"`,
+		`EXPECTED_WORKER_REPLICAS="${EXPECTED_WORKER_REPLICAS:-3}"`,
+		`getent ahostsv4 "$WORKER_DNS_NAME"`,
+		`/governance/redis`,
+		`/governance/resilience`,
+		`"ready":true`,
+	} {
+		if !strings.Contains(workerVerifier, required) {
+			t.Errorf("worker governance verifier must contain %q", required)
+		}
+	}
+
+	cdWorkflow := readDeploymentContractFile(t, ".github", "workflows", "cd.yml")
+	for _, required := range []string{
+		"verify-worker-governance:",
+		"Verify Worker Governance From Apiserver",
+		"verify-worker-governance.sh",
+	} {
+		if !strings.Contains(cdWorkflow, required) {
+			t.Errorf("CD workflow must contain worker governance post-deploy gate %q", required)
 		}
 	}
 
@@ -391,6 +427,81 @@ esac
 		if !strings.Contains(logText, required) {
 			t.Errorf("privileged command log must contain %q, got:\n%s", required, logText)
 		}
+	}
+}
+
+func TestWorkerGovernanceVerifierChecksEveryResolvedInstance(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	runnerPath := filepath.Join(tempDir, "privilege-runner")
+	runner := `#!/usr/bin/env bash
+set -Eeuo pipefail
+case "$*" in
+  "docker inspect qs-apiserver --format {{.State.Running}}")
+    printf '%s\n' true
+    ;;
+  "docker exec qs-apiserver getent ahostsv4 qs-worker-governance")
+    printf '%s\n' \
+      '172.20.0.5 STREAM qs-worker-governance' \
+      '172.20.0.10 STREAM qs-worker-governance' \
+      '172.20.0.12 STREAM qs-worker-governance'
+    if [ "${FAKE_EXTRA_IP:-false}" = "true" ]; then
+      printf '%s\n' '172.20.0.101 STREAM qs-worker-governance'
+    fi
+    ;;
+  docker\ exec\ qs-apiserver\ wget*)
+    url="${*: -1}"
+    case "$url" in
+      http://172.20.0.5:9092/*) instance=worker-1 ;;
+      http://172.20.0.10:9092/*) instance=worker-2 ;;
+      http://172.20.0.12:9092/*) instance=worker-3 ;;
+      *) printf 'unexpected URL: %s\n' "$url" >&2; exit 97 ;;
+    esac
+    if [[ "$url" == */governance/redis ]]; then
+      printf '{"instance_id":"%s","summary":{"ready":true}}\n' "$instance"
+    else
+      printf '{"instance_id":"%s"}\n' "$instance"
+    fi
+    ;;
+  *)
+    printf 'unexpected privileged command: %s\n' "$*" >&2
+    exit 97
+    ;;
+esac
+`
+	if err := os.WriteFile(runnerPath, []byte(runner), 0o700); err != nil {
+		t.Fatalf("write fake privilege runner: %v", err)
+	}
+
+	script := filepath.Join(repoRoot(t), "scripts", "cd", "verify-worker-governance.sh")
+	cmd := exec.Command("bash", script, "verify")
+	cmd.Env = append(os.Environ(),
+		"PRIVILEGE_RUNNER="+runnerPath,
+		"DNS_RETRY_ATTEMPTS=1",
+	)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("verify worker governance endpoints: %v\n%s", err, output)
+	}
+	for _, required := range []string{"worker-1 ready", "worker-2 ready", "worker-3 ready", "reverse verification passed"} {
+		if !strings.Contains(string(output), required) {
+			t.Errorf("worker verifier output must contain %q, got:\n%s", required, output)
+		}
+	}
+
+	cmd = exec.Command("bash", script, "verify")
+	cmd.Env = append(os.Environ(),
+		"PRIVILEGE_RUNNER="+runnerPath,
+		"DNS_RETRY_ATTEMPTS=1",
+		"FAKE_EXTRA_IP=true",
+	)
+	output, err = cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("worker verifier must reject an extra stale DNS address, output:\n%s", output)
+	}
+	if !strings.Contains(string(output), "returned 4 unique IPv4 addresses, want 3") {
+		t.Fatalf("worker verifier must explain stale DNS cardinality, got:\n%s", output)
 	}
 }
 

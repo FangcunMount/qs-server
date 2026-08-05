@@ -531,9 +531,64 @@ jobs:
           rm -rf "${DOCKER_CONFIG:-}" 2>/dev/null || true
           docker image prune -f >/dev/null 2>&1 || true
 
+  verify-worker-governance:
+    name: Verify Worker Governance From Apiserver
+    needs: [plan, deploy-apiserver, deploy-worker]
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64]
+    environment:
+      name: production
+    permissions:
+      contents: read
+    if: |
+      always() &&
+      needs.plan.result == 'success' &&
+      (needs.plan.outputs.apiserver == 'true' || needs.plan.outputs.worker == 'true') &&
+      (needs.plan.outputs.apiserver != 'true' || needs.deploy-apiserver.result == 'success') &&
+      (needs.plan.outputs.worker != 'true' || needs.deploy-worker.result == 'success')
+    env:
+      EXPECTED_WORKER_REPLICAS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.worker_replicas || vars.QS_WORKER_REPLICAS || '3' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+          fetch-depth: 1
+
+      - name: Setup verification SSH
+        env:
+          RUNNER_SSH_KEY: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          RUNNER_SSH_HOST: ${{ vars.SVRA_PUBLIC_HOST || secrets.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
+          RUNNER_SSH_USER: ${{ vars.SVRA_USERNAME }}
+          RUNNER_SSH_PORT: ${{ vars.SVRA_SSH_PORT || 22 }}
+          RUNNER_SSH_ALIAS: verify-worker-governance
+          DEPLOY_NODE_HOSTNAME: serverA
+        run: bash scripts/cd/setup-runner-ssh.sh
+
+      - name: Verify dedicated worker governance DNS and endpoints
+        env:
+          RUNNER_SSH_ALIAS: verify-worker-governance
+        run: |
+          set -Eeuo pipefail
+          case "${EXPECTED_WORKER_REPLICAS}" in
+            ''|*[!0-9]*|0)
+              echo "Invalid EXPECTED_WORKER_REPLICAS=${EXPECTED_WORKER_REPLICAS}" >&2
+              exit 1
+              ;;
+          esac
+          ssh -F "${RUNNER_SSH_CONFIG}" "${RUNNER_SSH_ALIAS}" \
+            "EXPECTED_WORKER_REPLICAS=${EXPECTED_WORKER_REPLICAS} PRIVILEGE_RUNNER=sudo bash -s -- verify" \
+            < scripts/cd/verify-worker-governance.sh
+
+      - name: Cleanup verification SSH
+        if: always()
+        run: |
+          rm -f "${RUNNER_SSH_KEY_FILE:-}" "${RUNNER_SSH_CONFIG:-}" 2>/dev/null || true
+
   notify:
     name: Send Notification
-    needs: [plan, docker, deploy-apiserver, deploy-collection, deploy-worker]
+    needs: [plan, docker, deploy-apiserver, deploy-collection, deploy-worker, verify-worker-governance]
     runs-on: ubuntu-latest
     if: |
       always() && (
@@ -554,6 +609,7 @@ jobs:
           echo "API Server: ${{ needs.deploy-apiserver.result }}"
           echo "Collection Server: ${{ needs.deploy-collection.result }}"
           echo "Worker: ${{ needs.deploy-worker.result }}"
+          echo "Worker governance reverse verification: ${{ needs.verify-worker-governance.result }}"
 
           if [ "${{ needs.plan.result }}" != "success" ]; then
             echo "Deploy planning failed"
@@ -576,7 +632,8 @@ jobs:
 
           if ok "${{ needs.deploy-apiserver.result }}" &&
              ok "${{ needs.deploy-collection.result }}" &&
-             ok "${{ needs.deploy-worker.result }}"; then
+             ok "${{ needs.deploy-worker.result }}" &&
+             ok "${{ needs.verify-worker-governance.result }}"; then
             echo "All deployments succeeded or were skipped by design"
           else
             echo "Some deployments failed"

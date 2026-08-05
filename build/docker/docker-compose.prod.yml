@@ -93,6 +93,9 @@ services:
       infra-network:
         aliases:
           - qs-worker
+          # Dedicated governance alias. Keep it isolated from the local bridge so
+          # apiserver observes only the cross-host overlay endpoints.
+          - qs-worker-governance
     labels:
       - "prometheus.scrape=true"
       - "prometheus.job=qs-worker"

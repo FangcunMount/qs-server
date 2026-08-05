@@ -15,6 +15,9 @@ jobs:
     timeout-minutes: 5
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
       - name: Validate SSH configuration
         env:
           SVRA_HOST: ${{ vars.SVRA_HOST }}
@@ -227,6 +230,20 @@ jobs:
               exit 1
             fi
             echo "=========================================="
+
+      - name: Worker Governance Reverse Check
+        env:
+          EXPECTED_WORKER_REPLICAS: ${{ vars.QS_WORKER_REPLICAS || '3' }}
+          WORKER_DNS_NAME: qs-worker-governance
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          envs: EXPECTED_WORKER_REPLICAS,WORKER_DNS_NAME
+          script_path: scripts/cd/verify-worker-governance.sh
 
   # ServerD 仍跑 qs-worker；CD deploy 已迁到 Mac mini（qlume），此处只做 worker 主机巡检。
   ping-worker-host:

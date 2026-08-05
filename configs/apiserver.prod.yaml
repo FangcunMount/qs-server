@@ -454,9 +454,10 @@ system_governance:
       cache_url: "http://qs-collection-server:8080/governance/redis"
       timeout: 3s
     worker:
-      discovery: single
-      resilience_url: "http://qs-worker:9092/governance/resilience"
-      cache_url: "http://qs-worker:9092/governance/redis"
+      discovery: dns
+      minimum_instances: 3
+      resilience_url: "http://qs-worker-governance:9092/governance/resilience"
+      cache_url: "http://qs-worker-governance:9092/governance/redis"
       timeout: 3s
 
 # ----------------------------------------------------------------------------

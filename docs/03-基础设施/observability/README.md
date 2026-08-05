@@ -202,12 +202,15 @@ collection CD/LB 与周期 runner 使用 `/serve-readyz`；可靠提交与 K6 �
 
 Prometheus 查询默认 3 秒 timeout；远程 component fetch 默认 3 秒 timeout、响应上限 1 MiB。失败会保留 `available=false` 与原因，而不是生成虚假零值。
 
-生产 collection component 使用 Docker DNS fan-out：聚合响应保留兼容
+生产 collection 和 worker component 使用 Docker DNS fan-out：聚合响应保留兼容
 `snapshot`，并新增以 `instance_id` 为 key 的 `instances`、
 `discovered_instance_count`、`available_instance_count`、`partial` 和
 `target_errors`。Redis 与 resilience snapshot 都携带 `instance_id/generation`；
 family、queue、backpressure、capability 行也携带实例维度，避免两个副本的同名
-数据互相覆盖。worker 仍按单 endpoint 读取。
+数据互相覆盖。collection 期望 2 个实例；worker 通过只发布在 `infra-network` 的
+专用别名 `qs-worker-governance` 期望 3 个实例。CD 发布后和定时巡检都会从
+serverA 的 apiserver 容器反向验证 worker DNS 地址数、两个治理端点和唯一
+`instance_id` 数；这项应用侧隔离不会删除 Swarm NetworkDB 中已有的陈旧记录。
 
 System Governance internal routes走组织管理员 capability，但各 component 的 `/governance/redis`、`/governance/resilience` 当前是公开 handler，依赖网络边界保护。聚合结果还可能是不同时间点的快照，因此用于诊断和操作决策，不作为事务真值。
 
