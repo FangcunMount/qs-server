@@ -318,7 +318,7 @@ plan_scheduler:
   initial_delay: "1m"           # 启动后首次调度延迟，避免与其他服务启动冲突
   interval: "60m"               # 2C4G 临时降配阶段回到保守扫描频率
   pending_lookback: "24h"       # 只自动开放最近 24 小时内到期的 pending 任务，避免历史补录任务被立即开放
-  missed_expiration_enabled: false # 首次部署保持关闭；机构历史修复并 verify 后再开启
+  missed_expiration_enabled: true # 机构历史修复并 verify 后再开启
   batch_size: 200                # 每次分页最多读取 200 条，控制事务外内存与数据库压力
   max_tasks_per_tick: 2000       # 每个机构、每个阶段、每个 tick 最多处理 2000 条
   lock_key: "qs:plan-scheduler:leader" # 分布式锁键，确保单实例执行
