@@ -49,15 +49,3 @@ type ReorderQuestionsRequest struct {
 type BatchUpdateQuestionsRequest struct {
 	Questions []viewmodel.QuestionDTO `json:"questions" valid:"required"`
 }
-
-// QueryQuestionnaireRequest 问卷ID请求
-type QueryQuestionnaireRequest struct {
-	Code string `json:"code" valid:"required"`
-}
-
-// QueryQuestionnaireListRequest 问卷列表请求
-type QueryQuestionnaireListRequest struct {
-	Page       int               `json:"page" valid:"required"`
-	PageSize   int               `json:"page_size" valid:"required"`
-	Conditions map[string]string `json:"conditions"`
-}
