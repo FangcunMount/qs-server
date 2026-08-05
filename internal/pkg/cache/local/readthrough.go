@@ -56,8 +56,8 @@ func readThroughCoalescer[T any](
 			return cached, nil
 		}
 	}
-	// Coalescer 合同：ctx 取消不传播；singleflight 合并以 key 为粒度。
-	value, err := coalescer.Do(context.TODO(), key, func() (any, error) {
+	// Coalescer 合同：单个请求的取消不传播到共享回源；singleflight 合并以 key 为粒度。
+	value, err := coalescer.Do(context.Background(), key, func() (any, error) {
 		if get != nil {
 			if cached, ok := get(); ok {
 				return cached, nil
