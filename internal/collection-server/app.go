@@ -53,7 +53,9 @@ func run(opts *options.Options) app.RunFunc {
 
 		// 打印安全与并发配置
 		log.Infof("TLS cert: %s, key: %s", opts.SecureServing.TLS.CertFile, opts.SecureServing.TLS.KeyFile)
-		log.Infof("Concurrency: max=%d, JWT expiry(h): %d", opts.Concurrency.MaxConcurrency, opts.JWT.TokenDuration)
+		log.Infof("Concurrency: query=%d, catalog=%d, submit=%d, JWT expiry(h): %d",
+			opts.Concurrency.ResolvedQueryConcurrency(), opts.Concurrency.ResolvedCatalogConcurrency(),
+			opts.Concurrency.ResolvedSubmitConcurrency(), opts.JWT.TokenDuration)
 
 		// 根据 options 创建 app 配置
 		cfg, err := config.CreateConfigFromOptions(opts)

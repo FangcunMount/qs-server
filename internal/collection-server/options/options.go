@@ -78,7 +78,6 @@ func (g *GRPCClientOptions) ResolvedInflightWait() time.Duration {
 
 // ConcurrencyOptions 并发处理配置
 type ConcurrencyOptions struct {
-	MaxConcurrency        int `json:"max_concurrency" mapstructure:"max_concurrency"`                 // 兼容：未配置 max_query_concurrency 时作为读池上限
 	MaxCatalogConcurrency int `json:"max_catalog_concurrency" mapstructure:"max_catalog_concurrency"` // catalog L1 读路径（与 heavy query 分池）
 	MaxQueryConcurrency   int `json:"max_query_concurrency" mapstructure:"max_query_concurrency"`     // 非 catalog 读（assessment/stats 等）
 	MaxSubmitConcurrency  int `json:"max_submit_concurrency" mapstructure:"max_submit_concurrency"`   // 答卷提交等写路径
@@ -94,7 +93,7 @@ func (c *ConcurrencyOptions) ResolvedCatalogConcurrency() int {
 	if c.MaxCatalogConcurrency > 0 {
 		return c.MaxCatalogConcurrency
 	}
-	// 未显式配置时与读池同上限（兼容旧配置）。
+	// 未显式拆分时与读池同上限。
 	return c.ResolvedQueryConcurrency()
 }
 
@@ -106,7 +105,7 @@ func (c *ConcurrencyOptions) ResolvedQueryConcurrency() int {
 	if c.MaxQueryConcurrency > 0 {
 		return c.MaxQueryConcurrency
 	}
-	return c.MaxConcurrency
+	return 0
 }
 
 // ResolvedCatalogMaxWait 返回 catalog miss 时槽位排队上限。
@@ -290,7 +289,7 @@ func NewOptions() *Options {
 		RedisRuntime:  defaultRedisRuntimeOptions(),
 		LockLease:     genericoptions.NewLockLeaseOptions(),
 		Concurrency: &ConcurrencyOptions{
-			MaxConcurrency: 10, // 默认最大并发数
+			MaxQueryConcurrency: 10, // 默认非 catalog 读并发数
 		},
 		RateLimit:    NewRateLimitOptions(),
 		WaitReport:   NewWaitReportOptions(),
@@ -455,8 +454,6 @@ func (g *GRPCClientOptions) AddFlags(fs *pflag.FlagSet) {
 
 // AddFlags 添加并发处理相关的命令行参数
 func (c *ConcurrencyOptions) AddFlags(fs *pflag.FlagSet) {
-	fs.IntVar(&c.MaxConcurrency, "concurrency.max-concurrency", c.MaxConcurrency,
-		"Deprecated: use max-query-concurrency; fallback when max-query-concurrency is unset.")
 	fs.IntVar(&c.MaxQueryConcurrency, "concurrency.max-query-concurrency", c.MaxQueryConcurrency,
 		"Maximum concurrent HTTP handlers for non-catalog read paths (assessment, stats, etc.).")
 	fs.IntVar(&c.MaxCatalogConcurrency, "concurrency.max-catalog-concurrency", c.MaxCatalogConcurrency,
@@ -652,7 +649,7 @@ func validateCollectionConcurrency(opts *ConcurrencyOptions) []error {
 	var errs []error
 	maxQuery := opts.ResolvedQueryConcurrency()
 	if maxQuery <= 0 {
-		errs = append(errs, fmt.Errorf("concurrency.max-query-concurrency (or max-concurrency) must be greater than 0"))
+		errs = append(errs, fmt.Errorf("concurrency.max-query-concurrency must be greater than 0"))
 	}
 	if maxQuery > 512 {
 		errs = append(errs, fmt.Errorf("concurrency.max-query-concurrency cannot be greater than 512"))

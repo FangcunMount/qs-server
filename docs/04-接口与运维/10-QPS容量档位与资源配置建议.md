@@ -73,7 +73,7 @@
 | 900 | 900 | 1350 | 360 | 压测定标 | 50ms |
 | 1000 | 1000 | 1500 | 400 | 压测定标 | 50ms |
 
-注意：单实例 `concurrency.max-concurrency` 不应无限提高，QPS 700+ 应靠多实例。
+注意：单实例 `concurrency.max-query-concurrency` 不应无限提高，QPS 700+ 应靠多实例。
 
 ### 2.2 apiserver
 
