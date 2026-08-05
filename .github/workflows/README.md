@@ -160,7 +160,9 @@ docker pull crpi-xxx.cn-beijing.personal.cr.aliyuncs.com/fangcunmount/qs-apiserv
 目录建议 `/opt/actions-runner/runner{1,2,3}/`，标签均为 `serverd`（deploy job 并行）：
 
 ```bash
-RUNNER_VER=2.334.0
+# 定档时点（2026-08-06）的 GitHub Actions Runner 正式版；新安装前仍须在
+# https://github.com/actions/runner/releases/latest 复核，不要长期照抄旧版本号。
+RUNNER_VER=2.336.0
 TARBALL=/tmp/actions-runner-linux-x64-${RUNNER_VER}.tar.gz
 curl -fsSL -o "$TARBALL" -L \
   "https://github.com/actions/runner/releases/download/v${RUNNER_VER}/actions-runner-linux-x64-${RUNNER_VER}.tar.gz"
@@ -182,6 +184,19 @@ install_runner serverD-runner3 runner3 <TOKEN3>
 ```
 
 注意 `--url` 是 **组织地址** `https://github.com/fangcunmount`；`svc.sh` 须在各自目录内执行：`cd /opt/actions-runner/runner1 && sudo ./svc.sh status`。
+
+不要在 `config.sh` 中使用 `--disableupdate`。既有实例必须逐个滚动升级：一次只停止一个 runner，确认其版本、systemd 状态和组织端 `Idle` 后再处理下一个，始终至少保留两个实例接单。版本与服务状态只读核验：
+
+```bash
+for dir in runner1 runner2 runner3; do
+  printf '%s\t' "$dir"
+  "/opt/actions-runner/$dir/bin/Runner.Listener" --version
+  cd "/opt/actions-runner/$dir"
+  sudo ./svc.sh status
+done
+```
+
+升级完成后必须手动运行 `Ping Runner`，确认 ServerD 三个 `Runner.Listener`、Docker、到 ServerA/ServerB 的 SSH 以及三个 worker 容器全部通过。2026-08-06 的生产巡检仍观测到 `2.334.0`，且 GitHub 明确提示其将在 2026-08-10 停止接单，因此升级到不低于 `2.336.0` 是当前定档 P1，而不是可忽略的文档建议。
 
 成功后，组织 **Settings → Actions → Runners** 应出现 3 个带 `serverd` 标签的 runner（Idle）。
 
