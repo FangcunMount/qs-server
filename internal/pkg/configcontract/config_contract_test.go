@@ -691,9 +691,8 @@ func assertRenewalMode(t *testing.T, configName string, opts *genericoptions.Loc
 	if opts == nil {
 		t.Fatal("lock_lease config must be explicit in dev/prod config")
 	}
-	wantEnabled := strings.Contains(configName, ".dev.")
-	if opts.RenewalEnabled != wantEnabled {
-		t.Fatalf("lock_lease.renewal_enabled = %v, want %v for %s", opts.RenewalEnabled, wantEnabled, configName)
+	if !opts.RenewalEnabled {
+		t.Fatalf("lock_lease.renewal_enabled = false, want automatic renewal for %s", configName)
 	}
 }
 

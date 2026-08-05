@@ -28,9 +28,7 @@ LockLease 回答的是“在一段有限时间内，哪个实例有资格执行�
 | apiserver | `evaluation_consistency_reconcile` | leader | 30s | 一致性 reconcile leader |
 | collection-server | `collection_submit` | duplicate suppression | 5m | 跨实例提交 owner lease |
 
-catalog 中的 renewal mode 是 `auto` 能力描述；进程配置 `lock_lease.renewal_enabled` 决定运行时是否真正启动续租。当前三个 production 配置均为 `false`，dev 配置为 `true`。
-
-这意味着生产环境里的长任务必须特别关注 TTL 是否覆盖执行时间。catalog 声明支持续租，不代表生产实际正在续租。
+catalog 中的 renewal mode 是 `auto` 能力描述；三个进程的 dev/prod 配置均启用 `lock_lease.renewal_enabled`。该开关只保留为显式运维回退，不得作为常态关闭续租。
 
 ## 3. Lease 生命周期
 
@@ -189,15 +187,15 @@ qs_locklease_operation_total{
 - contention 是否突增；
 - body 是否在 cancellation 后仍未退出；
 - release error 是否导致长时间假占用；
-- production 是否错误关闭了需要续租的长任务。
+- 运行配置是否错误关闭了需要续租的长任务。
 
 ## 11. 当前限制与验证
 
 | 状态 | 内容 |
 | --- | --- |
-| `已实现` | 六个 workload 的统一 catalog、token-safe acquire/renew/release、active run 和 cooldown。 |
+| `已实现` | 七个 workload 的统一 catalog、token-safe acquire/renew/release、active run 和 cooldown。 |
 | `已实现` | renewal failure/loss 取消 body，并对不合作 body 告警。 |
-| `待补证据` | production renewal 全部关闭是否符合每个任务的最大执行时长，需要运行数据验证。 |
+| `待运行证据` | production 自动续租已启用；仍需按 workload 观察 renew error/lost 与 cancellation 后 body 退出时间。 |
 | `待补证据` | 需要逐 workload 证明持久化副作用具备幂等、CAS 或 fencing 边界。 |
 | `规划改造` | 对确需强互斥的写路径引入持久化 fencing token。 |
 
@@ -210,5 +208,5 @@ qs_locklease_operation_total{
 ## 12. 学习问题
 
 1. 为什么 TTL 设得很长不能从根本上解决旧持有者问题？
-2. production 关闭 renewal 后，30 分钟 statistics task lock 最危险的两种情况是什么？
+2. 如果错误关闭 renewal，30 分钟 statistics task lock 最危险的两种情况是什么？
 3. worker 在 Redis 故障时继续消费，为什么要求 handler 本身仍然幂等？
