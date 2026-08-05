@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
 TEST_ROOT=$(mktemp -d)
 trap 'rm -rf "$TEST_ROOT"' EXIT
 
@@ -46,5 +47,14 @@ grep -Fxq 'HTTP_PROXY=http://127.0.0.1:7890' "$GITHUB_ENV_FILE"
 if RUNNER_NETWORK_SSH_CONNECT_TIMEOUT_SECONDS=invalid \
   "$SCRIPT_DIR/setup-runner-network.sh" >/dev/null 2>&1; then
   echo "invalid SSH connect timeout unexpectedly succeeded" >&2
+  exit 1
+fi
+
+PING_WORKFLOW="$REPO_ROOT/.github/workflows/ping-runner.yml"
+grep -Fq -- '- name: Load runner network environment' "$PING_WORKFLOW"
+grep -Fq 'CONFIGURED_HTTP_PROXY: ${{ vars.QS_DEPLOY_HTTP_PROXY }}' "$PING_WORKFLOW"
+grep -Fq '} >>"$GITHUB_ENV"' "$PING_WORKFLOW"
+if grep -Fq 'raw.githubusercontent.com' "$PING_WORKFLOW"; then
+  echo "Ping Runner must not depend on raw.githubusercontent.com" >&2
   exit 1
 fi

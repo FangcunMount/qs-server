@@ -225,7 +225,7 @@ done
 
 **Environment 放行**：各仓库 **Settings → Environments → `production`** → 允许 self-hosted runner（否则 deploy job 会 Pending）。
 
-`ping-runner.yml` 的 `ping-worker-host` job 使用 `QS_DEPLOY_RUNNER`（默认 `serverd`）巡检 **ServerD worker 主机**（Docker / worker 容器 / 到 A·B SSH），不再承担 CD deploy runner 职责；CD deploy 已迁到 Mac mini `qlume`。该 job 直接使用 Actions `vars` 与 runner 本地 `.env` 解析代理，按提交 SHA 下载网络脚本；下载具有连接、单次传输和总重试时限，GitHub SSH 探测也具有连接时限，避免网络抖动占满整个巡检窗口。
+`ping-runner.yml` 的 `ping-worker-host` job 使用 `QS_DEPLOY_RUNNER`（默认 `serverd`）巡检 **ServerD worker 主机**（Docker / worker 容器 / 到 A·B SSH），不再承担 CD deploy runner 职责；CD deploy 已迁到 Mac mini `qlume`。该 job 直接使用 Actions `vars` 与 runner 本地 `.env` 解析代理并写入 `GITHUB_ENV`；它既不 checkout，也不访问 GitHub SSH，因此不再从 `raw.githubusercontent.com` 下载网络脚本，避免把无关外网可用性变成生产主机巡检的前置条件。独立 `setup-runner-network.sh` 仍用于真实 runner 配置场景，其 GitHub SSH 探测具有连接时限。
 
 自托管 runner 上 **不用** `appleboy/ssh-action`；生产 SSH/SCP 走原生 `setup-runner-ssh.sh`，GitHub 拉代码走 **SSH + Mihomo 代理**（`setup-runner-network.sh`）。
 
