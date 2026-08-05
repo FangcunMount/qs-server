@@ -19,13 +19,6 @@ func NewQueryServiceWithAssessmentSummary(reader actorreadmodel.TesteeReader, su
 	return &queryService{reader: reader, summaryReader: summaryReader}
 }
 
-// NewQueryService 创建受试者查询服务
-func NewQueryService(reader actorreadmodel.TesteeReader) TesteeQueryService {
-	return &queryService{
-		reader: reader,
-	}
-}
-
 // GetByID 根据ID查询受试者
 func (s *queryService) GetByID(ctx context.Context, testeeID uint64) (*TesteeResult, error) {
 	resolvedID, err := testeeIDFromUint64("testee_id", testeeID)

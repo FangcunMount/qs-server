@@ -14,7 +14,7 @@ func TestListTesteesUsesUnifiedFilterForUnrestrictedQueries(t *testing.T) {
 		listItems:  []actorreadmodel.TesteeRow{makeQueryServiceTesteeRow(21, time.Date(2026, 4, 17, 10, 0, 0, 0, time.UTC))},
 		countValue: 7,
 	}
-	service := NewQueryService(repo)
+	service := NewQueryServiceWithAssessmentSummary(repo, nil)
 	keyFocus := false
 	start := time.Date(2026, 4, 1, 0, 0, 0, 0, time.Local)
 	end := time.Date(2026, 4, 10, 0, 0, 0, 0, time.Local)
@@ -98,7 +98,7 @@ func TestListTesteesUsesUnifiedFilterForRestrictedQueries(t *testing.T) {
 		listItems:  []actorreadmodel.TesteeRow{makeQueryServiceTesteeRow(31, time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC))},
 		countValue: 1,
 	}
-	service := NewQueryService(repo)
+	service := NewQueryServiceWithAssessmentSummary(repo, nil)
 	keyFocus := true
 
 	result, err := service.ListTestees(context.Background(), ListTesteeDTO{
@@ -131,7 +131,7 @@ func TestListKeyFocusDelegatesToUnifiedListFlow(t *testing.T) {
 		listItems:  []actorreadmodel.TesteeRow{makeQueryServiceTesteeRow(41, time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC))},
 		countValue: 3,
 	}
-	service := NewQueryService(repo)
+	service := NewQueryServiceWithAssessmentSummary(repo, nil)
 
 	result, err := service.ListKeyFocus(context.Background(), 1, 0, 10)
 	if err != nil {
