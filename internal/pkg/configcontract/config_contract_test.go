@@ -610,6 +610,8 @@ func TestDBOpsRedisStatusIsReadOnlyAndDoesNotExposeKeys(t *testing.T) {
 		"legacy_unnamespaced_candidate",
 		"counts only; key names and values are never printed",
 		"redis:7-alpine redis-cli",
+		`REDIS_CLI_ARGS=(-h "$REDIS_HOST" -p "$REDIS_PORT"`,
+		`4:query:version:statistics:org:*|4:query:data:statistics:org:*`,
 		"command_timeout: 25m",
 	} {
 		if !strings.Contains(content, required) {
@@ -619,6 +621,7 @@ func TestDBOpsRedisStatusIsReadOnlyAndDoesNotExposeKeys(t *testing.T) {
 	for _, forbidden := range []string{
 		" KEYS ",
 		"--pattern '*' | tee",
+		`REDIS_CLI_ARGS=(--host`,
 	} {
 		if strings.Contains(content, forbidden) {
 			t.Errorf("DB ops Redis status must not expose or block on key inventory form %q", forbidden)
