@@ -1008,6 +1008,49 @@ jobs:
                       'seed_backfill_rollback_phase_attempt'
                     )
                   ORDER BY table_name;
+                  SELECT table_name, column_name AS retired_column_still_present
+                  FROM information_schema.columns
+                  WHERE table_schema = DATABASE()
+                    AND (
+                      (table_name = 'assessment' AND column_name IN (
+                        'questionnaire_id',
+                        'medical_scale_id',
+                        'medical_scale_code',
+                        'medical_scale_name',
+                        'interpreted_at',
+                        'current_run_id'
+                      ))
+                      OR (table_name = 'assessment_score' AND column_name IN (
+                        'medical_scale_id',
+                        'medical_scale_code',
+                        'conclusion',
+                        'suggestion'
+                      ))
+                      OR (table_name = 'evaluation_outcome' AND column_name IN (
+                        'payload_format',
+                        'algorithm_family'
+                      ))
+                      OR (table_name IN ('assessment_plan', 'assessment_task') AND column_name = 'scale_id')
+                    )
+                  ORDER BY table_name, column_name;
+                  SELECT table_name, index_name AS retired_index_still_present
+                  FROM information_schema.statistics
+                  WHERE table_schema = DATABASE()
+                    AND (
+                      (table_name = 'assessment' AND index_name IN (
+                        'idx_questionnaire_id',
+                        'idx_assessment_current_run_id',
+                        'idx_assessment_testee_scale_deleted_id',
+                        'idx_medical_scale_id'
+                      ))
+                      OR (table_name = 'assessment_score' AND index_name IN (
+                        'idx_score_testee_scale_deleted_id',
+                        'idx_medical_scale_id'
+                      ))
+                      OR (table_name IN ('assessment_plan', 'assessment_task') AND index_name = 'idx_scale_id')
+                    )
+                  GROUP BY table_name, index_name
+                  ORDER BY table_name, index_name;
                   SELECT expected.table_name AS canonical_statistics_table_missing
                   FROM (
                     SELECT 'statistics_access_fact' AS table_name
