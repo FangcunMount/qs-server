@@ -44,10 +44,10 @@ func TestCacheWarmupProjectionBuildsRowsKindsHotsetsAndScopedMetrics(t *testing.
 		},
 	}, nil)
 
-	projection := NewCacheWarmupEvaluator(metrics).Evaluate(context.Background(), map[string]ComponentCache{
+	projection := NewCacheWarmupEvaluator(metrics).EvaluateWithLatestRun(context.Background(), map[string]ComponentCache{
 		"apiserver":         {Available: true, Snapshot: &runtime},
 		"collection-server": {Available: false, Reason: "connection refused"},
-	}, []CacheHotsetView{hotset}, "5m", now)
+	}, []CacheHotsetView{hotset}, nil, "5m", now)
 
 	if len(projection.FamilyRows) != 1 || projection.FamilyRows[0].Severity != SeverityWarning {
 		t.Fatalf("family rows = %#v, want one warning row", projection.FamilyRows)
@@ -76,9 +76,9 @@ func TestCacheWarmupProjectionBuildsRowsKindsHotsetsAndScopedMetrics(t *testing.
 }
 
 func TestCacheWarmupProjectionMarksHotsetDegraded(t *testing.T) {
-	projection := NewCacheWarmupEvaluator(nil).Evaluate(context.Background(), nil, []CacheHotsetView{
+	projection := NewCacheWarmupEvaluator(nil).EvaluateWithLatestRun(context.Background(), nil, []CacheHotsetView{
 		CacheHotsetViewFromResponse(cachetarget.WarmupKindStaticScale, nil, nil),
-	}, "5m", time.Now())
+	}, nil, "5m", time.Now())
 	if len(projection.Signals) != 1 || projection.Signals[0].Status != "hotset_degraded" {
 		t.Fatalf("signals = %#v, want hotset degraded signal", projection.Signals)
 	}
@@ -132,7 +132,7 @@ func TestCacheProjectionKeepsDNSInstancesSeparate(t *testing.T) {
 		}
 	}
 
-	projection := NewCacheWarmupEvaluator(nil).Evaluate(context.Background(), map[string]ComponentCache{
+	projection := NewCacheWarmupEvaluator(nil).EvaluateWithLatestRun(context.Background(), map[string]ComponentCache{
 		"collection-server": {
 			Available: true,
 			Instances: map[string]*observability.RuntimeSnapshot{
@@ -140,7 +140,7 @@ func TestCacheProjectionKeepsDNSInstancesSeparate(t *testing.T) {
 				"collection-a": newSnapshot("collection-a"),
 			},
 		},
-	}, nil, "5m", now)
+	}, nil, nil, "5m", now)
 
 	if len(projection.FamilyRows) != 2 ||
 		projection.FamilyRows[0].InstanceID != "collection-a" ||

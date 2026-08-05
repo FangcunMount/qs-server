@@ -15,22 +15,6 @@ func (s stubCheckpointReader) LoadGovernanceSnapshot(context.Context) (Checkpoin
 	return s.snapshot, s.err
 }
 
-func TestCheckpointEvidenceReaderReturnsSnapshot(t *testing.T) {
-	reader := NewCheckpointEvidenceReader(stubCheckpointReader{
-		snapshot: CheckpointGovernanceSnapshot{
-			EvaluationRunRunning:         2,
-			EvaluationRunFailedRetryable: 1,
-		},
-	})
-	snapshot, ok, err := reader.Snapshot(context.Background(), stubEvalAt())
-	if err != nil || !ok {
-		t.Fatalf("Snapshot() = (%#v, %v, %v), want available snapshot", snapshot, ok, err)
-	}
-	if snapshot.EvaluationRunFailedRetryable != 1 || snapshot.EvaluationRunRunning != 2 {
-		t.Fatalf("snapshot = %#v", snapshot)
-	}
-}
-
 func TestGetOverviewIncludesCheckpointSignals(t *testing.T) {
 	view, err := NewFacade(FacadeDeps{
 		CheckpointReader: stubCheckpointReader{

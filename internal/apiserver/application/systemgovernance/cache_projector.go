@@ -33,16 +33,6 @@ func NewCacheWarmupEvaluator(metrics MetricsReader) *CacheWarmupEvaluator {
 	return &CacheWarmupEvaluator{evidence: NewMetricEvidenceReader(metrics)}
 }
 
-func (e *CacheWarmupEvaluator) Evaluate(
-	ctx context.Context,
-	components map[string]ComponentCache,
-	hotsets []CacheHotsetView,
-	window string,
-	evalAt time.Time,
-) CacheWarmupProjection {
-	return e.evaluate(ctx, components, hotsets, nil, window, evalAt)
-}
-
 func (e *CacheWarmupEvaluator) EvaluateWithLatestRun(
 	ctx context.Context,
 	components map[string]ComponentCache,

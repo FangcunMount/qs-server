@@ -45,14 +45,6 @@ func (p Publisher) BuildSnapshot(ctx context.Context, model *domain.AssessmentMo
 	return snapshotFromModel(model, result), nil
 }
 
-// Save 保存评估模型快照
-func (p Publisher) Save(ctx context.Context, snapshot *port.AssessmentSnapshot) error {
-	if p.Repo == nil {
-		return fmt.Errorf("已发布模型存储库为空")
-	}
-	return p.Repo.Save(ctx, snapshot)
-}
-
 // Publish 发布评估模型
 func (p Publisher) Publish(ctx context.Context, model *domain.AssessmentModel, options PublishOptions) (*port.AssessmentSnapshot, error) {
 	if model == nil {
