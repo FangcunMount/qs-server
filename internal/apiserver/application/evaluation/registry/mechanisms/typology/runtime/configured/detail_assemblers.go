@@ -72,24 +72,6 @@ func assembleTraitProfileDetail(input DetailInput) (any, error) {
 	}, nil
 }
 
-// AssemblePersonalityTypeDetail 暴露机制中性人格类型明细组装。
-func AssemblePersonalityTypeDetail(input DetailInput) (outcometypology.PersonalityTypeDetail, error) {
-	generic, err := assemblePersonalityTypeDetail(input)
-	if err != nil {
-		return outcometypology.PersonalityTypeDetail{}, err
-	}
-	return generic.(outcometypology.PersonalityTypeDetail), nil
-}
-
-// AssembleTraitProfileDetail 暴露机制中性特质画像明细组装。
-func AssembleTraitProfileDetail(input DetailInput) (outcometypology.TraitProfileDetail, error) {
-	generic, err := assembleTraitProfileDetail(input)
-	if err != nil {
-		return outcometypology.TraitProfileDetail{}, err
-	}
-	return generic.(outcometypology.TraitProfileDetail), nil
-}
-
 func buildPersonalityDimensions(input DetailInput) ([]outcometypology.PersonalityDimensionResult, error) {
 	if input.Decision.Kind == calcclassification.DecisionKindPoleComposition || len(input.Decision.Poles) > 0 {
 		return buildPolePersonalityDimensions(input)
