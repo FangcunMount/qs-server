@@ -142,9 +142,6 @@ func TestDecisionKindForIdentityRequiresExplicitTypologyDecision(t *testing.T) {
 func TestIdentityRoutingStringHelpers(t *testing.T) {
 	t.Parallel()
 
-	if got := binding.ProductChannelForIdentity(binding.KindCognitive, string(binding.ProductChannelBehaviorAbility)); got != string(binding.ProductChannelBehaviorAbility) {
-		t.Fatalf("ProductChannelForIdentity() = %q, want behavior_ability", got)
-	}
 	if got := identity.AlgorithmFamilyStringFromIdentity(binding.KindCognitive, binding.SubKindEmpty, binding.AlgorithmSPM); got != string(identity.AlgorithmFamilyTaskPerformance) {
 		t.Fatalf("AlgorithmFamilyStringFromIdentity() = %q, want task_performance", got)
 	}

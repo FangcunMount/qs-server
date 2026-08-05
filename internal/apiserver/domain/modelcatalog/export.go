@@ -20,7 +20,6 @@ type (
 	Algorithm      = identitypkg.Algorithm
 	DecisionKind   = identitypkg.DecisionKind
 	ProductChannel = binding.ProductChannel
-	Product        = binding.Product
 	Identity       = identitypkg.Identity
 	Family         = identitypkg.Family
 
@@ -124,10 +123,6 @@ const (
 	ProductChannelTypology        = binding.ProductChannelTypology
 	ProductChannelBehaviorAbility = binding.ProductChannelBehaviorAbility
 
-	ProductMedicalScale    = binding.ProductMedicalScale
-	ProductTypology        = binding.ProductTypology
-	ProductBehaviorAbility = binding.ProductBehaviorAbility
-
 	FamilyFactorScoring        = identitypkg.FamilyFactorScoring
 	FamilyFactorClassification = identitypkg.FamilyFactorClassification
 	FamilyFactorNorm           = identitypkg.FamilyFactorNorm
@@ -158,18 +153,14 @@ const (
 )
 
 var (
-	ErrLegacyRuntimeIdentity  = identitypkg.ErrLegacyRuntimeIdentity
-	DefaultProductChannelFor  = binding.DefaultProductChannelFor
-	CanonicalSubKindFor       = binding.CanonicalSubKindFor
-	ResolveProductChannel     = binding.ResolveProductChannel
-	CompleteProductChannel    = binding.CompleteProductChannel
-	ValidateNewProductChannel = binding.ValidateNewProductChannel
-	HasValidationErrors       = binding.HasValidationErrors
-	AllProductChannels        = binding.AllProductChannels
-	ProductFromChannel        = binding.ProductFromChannel
-	NewIdentity               = identitypkg.New
-	FamilyFromDecisionKind    = identitypkg.FamilyFromDecisionKind
-	FamilyFromIdentity        = identitypkg.FamilyFromIdentity
+	ErrLegacyRuntimeIdentity = identitypkg.ErrLegacyRuntimeIdentity
+	DefaultProductChannelFor = binding.DefaultProductChannelFor
+	CanonicalSubKindFor      = binding.CanonicalSubKindFor
+	ResolveProductChannel    = binding.ResolveProductChannel
+	HasValidationErrors      = binding.HasValidationErrors
+	NewIdentity              = identitypkg.New
+	FamilyFromDecisionKind   = identitypkg.FamilyFromDecisionKind
+	FamilyFromIdentity       = identitypkg.FamilyFromIdentity
 
 	AlgorithmFamilyFromDecisionKind   = identitypkg.AlgorithmFamilyFromDecisionKind
 	ResolveLegacyRuntime              = identitypkg.ResolveLegacyRuntime

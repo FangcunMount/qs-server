@@ -26,7 +26,7 @@
 //
 // 根包仅保留 doc.go、errors.go、export.go。业务类型通过子包实现，根包 re-export：
 //
-//   - identity/: Product、Identity、Family
+//   - identity/: Identity、Family
 //   - assessmentmodel/: AssessmentModel 聚合
 //   - definition/: Definition、MeasureSpec、Calibration、ReportMap
 //   - factor/: Factor 和共享因子图元数据
