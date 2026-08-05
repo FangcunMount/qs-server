@@ -452,6 +452,33 @@ func TestDBOpsInventoriesEvaluationRunAndOutcomeConsistency(t *testing.T) {
 	}
 }
 
+func TestDBOpsInventoriesStatisticsCanonicalAndCompatibilityState(t *testing.T) {
+	t.Parallel()
+
+	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "db-ops.yml"))
+	if err != nil {
+		t.Fatalf("read db ops workflow: %v", err)
+	}
+	content := string(workflow)
+	for _, required := range []string{
+		"statistics_daily",
+		"statistics_accumulated",
+		"statistics_plan",
+		"statistics_v2_org_snapshot",
+		"canonical_statistics_table_missing",
+		"FROM statistics_sync_run",
+		"status = 'data_committed'",
+		"tasks_using_legacy_fulfillment_fallback",
+		"tasks_with_revisioned_schedule_fact",
+		"FROM statistics_assessment_fact",
+		"GROUP BY attribution_mode",
+	} {
+		if !strings.Contains(content, required) {
+			t.Errorf("DB ops Statistics inventory must contain %q", required)
+		}
+	}
+}
+
 func TestReportStatusTTLContractMatchesAcrossProcesses(t *testing.T) {
 	t.Parallel()
 

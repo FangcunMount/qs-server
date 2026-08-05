@@ -773,9 +773,13 @@ jobs:
                       'behavior_footprint',
                       'assessment_episode',
                       'analytics_pending_event',
+                      'statistics_daily',
+                      'statistics_accumulated',
+                      'statistics_plan',
                       'statistics_journey_daily',
                       'statistics_content_daily',
                       'statistics_plan_daily',
+                      'statistics_v2_org_snapshot',
                       'seed_backfill_stage',
                       'seed_backfill_stage_attempt',
                       'seed_backfill_rollback_operation',
@@ -783,6 +787,91 @@ jobs:
                       'seed_backfill_rollback_phase_attempt'
                     )
                   ORDER BY table_name;
+                  SELECT expected.table_name AS canonical_statistics_table_missing
+                  FROM (
+                    SELECT 'statistics_access_fact' AS table_name
+                    UNION ALL SELECT 'statistics_assessment_fact'
+                    UNION ALL SELECT 'statistics_plan_fact'
+                    UNION ALL SELECT 'statistics_access_daily'
+                    UNION ALL SELECT 'statistics_assessment_daily'
+                    UNION ALL SELECT 'statistics_plan_activity_daily'
+                    UNION ALL SELECT 'statistics_plan_fulfillment_daily'
+                    UNION ALL SELECT 'statistics_org_snapshot'
+                    UNION ALL SELECT 'statistics_sync_run'
+                  ) AS expected
+                  LEFT JOIN information_schema.tables AS actual
+                    ON actual.table_schema = DATABASE()
+                   AND actual.table_name = expected.table_name
+                   AND actual.table_type = 'BASE TABLE'
+                  WHERE actual.table_name IS NULL
+                  ORDER BY expected.table_name;
+                  SELECT run_mode, status, stage, COUNT(*) AS runs,
+                         MIN(started_at) AS first_started_at,
+                         MAX(started_at) AS last_started_at
+                  FROM statistics_sync_run
+                  GROUP BY run_mode, status, stage
+                  ORDER BY run_mode, status, stage;
+                  WITH latest_publish AS (
+                    SELECT org_id, id, as_of_date, status, stage, cache_generation,
+                           cache_published_at, started_at, finished_at,
+                           ROW_NUMBER() OVER (PARTITION BY org_id ORDER BY id DESC) AS row_num
+                    FROM statistics_sync_run
+                    WHERE run_mode = 'publish'
+                  )
+                  SELECT publish.org_id, publish.id AS latest_publish_run_id,
+                         publish.as_of_date, publish.status, publish.stage,
+                         publish.cache_generation, publish.cache_published_at,
+                         publish.started_at, publish.finished_at,
+                         snapshot.as_of_date AS snapshot_as_of_date,
+                         snapshot.snapshot_at
+                  FROM latest_publish AS publish
+                  LEFT JOIN statistics_org_snapshot AS snapshot
+                    ON snapshot.org_id = publish.org_id
+                  WHERE publish.row_num = 1
+                  ORDER BY publish.org_id;
+                  SELECT id, org_id, run_mode, status, stage, as_of_date,
+                         cache_generation, cache_published_at, started_at,
+                         data_committed_at, finished_at, error_code
+                  FROM statistics_sync_run
+                  WHERE (status = 'running' AND started_at < NOW(3) - INTERVAL 30 MINUTE)
+                     OR status = 'data_committed'
+                  ORDER BY started_at, id;
+                  SELECT fact_family, fact_type, COUNT(*) AS records,
+                         MIN(occurred_at) AS first_occurred_at,
+                         MAX(occurred_at) AS last_occurred_at
+                  FROM (
+                    SELECT 'access' AS fact_family, fact_type, occurred_at FROM statistics_access_fact
+                    UNION ALL
+                    SELECT 'assessment' AS fact_family, fact_type, occurred_at FROM statistics_assessment_fact
+                    UNION ALL
+                    SELECT 'plan' AS fact_family, fact_type, occurred_at FROM statistics_plan_fact
+                  ) AS facts
+                  GROUP BY fact_family, fact_type
+                  ORDER BY fact_family, fact_type;
+                  SELECT attribution_mode, COUNT(*) AS records,
+                         MIN(occurred_at) AS first_occurred_at,
+                         MAX(occurred_at) AS last_occurred_at
+                  FROM statistics_assessment_fact
+                  GROUP BY attribution_mode
+                  ORDER BY attribution_mode;
+                  SELECT created.org_id,
+                         COUNT(DISTINCT created.task_id) AS task_created_facts,
+                         COUNT(DISTINCT CASE WHEN schedule.task_id IS NULL THEN created.task_id END)
+                           AS tasks_using_legacy_fulfillment_fallback,
+                         COUNT(DISTINCT CASE WHEN schedule.task_id IS NOT NULL THEN created.task_id END)
+                           AS tasks_with_revisioned_schedule_fact
+                  FROM statistics_plan_fact AS created
+                  LEFT JOIN (
+                    SELECT org_id, task_id
+                    FROM statistics_plan_fact
+                    WHERE fact_type = 'task_schedule_defined' AND task_id IS NOT NULL
+                    GROUP BY org_id, task_id
+                  ) AS schedule
+                    ON schedule.org_id = created.org_id
+                   AND schedule.task_id = created.task_id
+                  WHERE created.fact_type = 'task_created' AND created.task_id IS NOT NULL
+                  GROUP BY created.org_id
+                  ORDER BY created.org_id;
                   SELECT retry_disposition, COUNT(*) AS records,
                          MIN(failed_at) AS first_failed_at, MAX(failed_at) AS last_failed_at
                   FROM event_delivery_dead_letter
