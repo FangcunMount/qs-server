@@ -36,6 +36,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 	redis "github.com/redis/go-redis/v9"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -101,6 +102,7 @@ func TestStatisticsColdStartPublishIdempotencyAndRedisFailure(t *testing.T) {
 	eventAt := latestCompleteDay.Add(10 * time.Hour)
 
 	fixture := seedStatisticsColdStartBusinessFacts(t, gormDB, mongoDB, orgID, eventAt)
+	assertStatisticsAnswerSheetSource(t, mongoDB, orgID, fixture.answerSheetID, eventAt.Add(4*time.Minute))
 	module, err := statisticsModule.New(statisticsModule.Deps{
 		MySQLDB: gormDB, MongoDB: mongoDB, RedisClient: runtimeRedis,
 		LockRunner: coldStartLockRunner{}, QueryTTL: time.Hour,
@@ -172,6 +174,24 @@ func TestStatisticsColdStartPublishIdempotencyAndRedisFailure(t *testing.T) {
 	}
 	if stored, err := fixture.outcomes.FindByID(t.Context(), fixture.outcomeID); err != nil || stored == nil {
 		t.Fatalf("Outcome changed by Statistics failure: stored=%v err=%v", stored != nil, err)
+	}
+}
+
+func assertStatisticsAnswerSheetSource(t *testing.T, db *mongo.Database, orgID int64, answerSheetID meta.ID, filledAt time.Time) {
+	t.Helper()
+	filter := bson.M{
+		"org_id":     uint64(orgID),
+		"deleted_at": nil,
+		"filled_at":  bson.M{"$gte": statisticsDomain.BusinessDate(filledAt), "$lt": statisticsDomain.BusinessDate(filledAt).AddDate(0, 0, 1)},
+	}
+	count, err := db.Collection("answersheets").CountDocuments(t.Context(), filter)
+	if err != nil {
+		t.Fatalf("count Statistics AnswerSheet source: %v", err)
+	}
+	if count != 1 {
+		var stored bson.M
+		findErr := db.Collection("answersheets").FindOne(t.Context(), bson.M{"domain_id": answerSheetID.Uint64()}).Decode(&stored)
+		t.Fatalf("Statistics AnswerSheet source count=%d want 1; stored=%v find_err=%v filter=%v", count, stored, findErr, filter)
 	}
 }
 
