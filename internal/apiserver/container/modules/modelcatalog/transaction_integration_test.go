@@ -44,7 +44,7 @@ func TestMongoReleasePairRollsBackEveryFailureBoundary(t *testing.T) {
 			}
 			model, err := domainmodel.NewAssessmentModel(domainmodel.NewAssessmentModelInput{
 				Code: code, Kind: domainmodel.KindScale, Algorithm: domainmodel.AlgorithmScaleDefault,
-				ProductChannel: domainmodel.ProductChannelMedicalScale, Title: "Contract", Now: time.Now().UTC(),
+				Title: "Contract", Now: time.Now().UTC(),
 			})
 			if err != nil {
 				t.Fatal(err)
