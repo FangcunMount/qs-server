@@ -469,7 +469,7 @@ Plan Task                    -> plan Assessment
 
 Assessment 创建或复用后，Journey best-effort 调用 PlanCommand 完成 Task。Plan 更新失败不回滚 Assessment，因为 Plan Task 生命周期不是 Assessment 成立的强一致前提。
 
-但 best-effort 不等于可以忽略失败：它仍需要日志、巡检或补偿。尤其在当前 unbound Assessment 偏差下，还要避免“只创建了不可执行的 pending Assessment，却把 Plan Task 标记完成”。
+但 best-effort 不等于可以忽略失败：它仍需要日志、巡检或补偿。当前实现只在确认需要创建 Assessment 后匹配和完成 Plan Task；独立问卷不会进入这一副作用链路。
 
 ---
 
@@ -695,8 +695,10 @@ collection-server 会：
 | Redis 不可用 | AnswerSheet | degraded-open | MySQL unique index 保证唯一 |
 | 基础计分失败 | AnswerSheet | handler error，NACK | 重放后重新计分 |
 | Binding 查询返回错误 | AnswerSheet，基础分可能已写 | handler error，NACK | 再次解析 Binding |
-| Binding 明确缺失 | AnswerSheet | 当前创建 unbound pending 并 ACK | 目标按提交意图分流 |
-| Assessment 查询暂时失败 | AnswerSheet | 当前可能继续 Create | 目标直接失败并重投 |
+| 冻结独立问卷 Admission | AnswerSheet + frozen Admission | 基础计分后正常结束 | readiness=`no_assessment_required` |
+| 冻结测评 Admission 不完整 | AnswerSheet + frozen Admission | fail closed，handler error | 修正准入事实后重放 |
+| 历史事件无 Admission 且 live binding 缺失 | AnswerSheet | `legacy_unclassified`，handler error | 治理历史事件或恢复 binding 后重放 |
+| Assessment 查询暂时失败 | AnswerSheet | handler error，不继续 Create | 重放后重新查询 |
 | 并发 Create duplicate | 一个胜出 Assessment | duplicate then read | 复用胜出记录 |
 | Assessment 已创建，Submit 失败 | pending Assessment | handler error，NACK | 重放后再次 Submit |
 | Submit 成功，Worker ACK 丢失 | submitted + MySQL Outbox | 消息重投 | 非 pending，不重复 Submit |
@@ -754,39 +756,31 @@ at-least-once delivery
 
 两步动作暴露了一个有意义的恢复点：pending Assessment。只要 pending 具有完整 ModelRef，它就表示“测评实例已建立，但执行请求尚未可靠提交”，Worker 可以安全补提交。
 
-问题不在 pending 本身，而在当前允许没有模型身份的 pending Assessment 长期存在。
+问题不在 pending 本身。当前新链路不会创建无模型 pending Assessment；历史数据中已有的空壳记录仍需通过生产只读盘点确认数量和状态，再决定备份、删除或重建。
 
 ---
 
-## 19. 当前设计问题与重构边界
+## 19. 当前兼容面与验收边界
 
-### 19.1 独立问卷仍创建 Assessment
+### 19.1 无 Admission 的历史事件仍使用 live binding
 
-这是最高优先级业务边界偏差。应在 Binding/提交意图分流后、调用 Evaluation Intake 前结束独立问卷链路。
+新提交已在可靠受理事务中冻结 purpose 与 exact release。只有历史 `answersheet.submitted` 没有 Admission 时才查询当前 active binding；查不到时明确返回 `legacy_unclassified`，不再把它当成独立问卷，也不创建 unbound Assessment。移除该入口前必须证明历史事件已经排空，并完成跨仓消费者核对。
 
-### 19.2 测评提交没有在 202 时冻结 Assessment release
+### 19.2 历史空壳 Assessment 仍可能被幂等查询命中
 
-Worker 延迟解析 Binding 会留下发布状态竞态。目标不是把完整 Assessment 创建重新塞回 HTTP，而是在可靠受理事实中冻结足以恢复同一 Assessment release 的精确引用。
+新链路不会创建无模型 Assessment，`Assessment.SubmitAt` 也会用完整 ModelRef、QuestionnaireRef 和 AnswerSheetRef 作为领域前置条件。但历史空壳行仍可能被 `FindByAnswerSheetID` 命中；是否存在、处于何种状态以及能否删除，需要生产只读盘点和备份证据，不能仅凭静态代码判断。
 
-### 19.3 `bound=false` 混合三种含义
+### 19.3 readiness 仍保留旧服务返回值兼容
 
-合法独立问卷、Binding 缺失和 resolver 未装配必须成为不同结果。否则系统无法选择 ACK、NACK、人工补偿或正常结束。
+canonical readiness 已区分 `pending`、`ready`、`no_assessment_required` 和 `failed`。collection-server 对没有 `readiness_phase` 的旧响应仍按“有 ID 即 ready、无 ID 即 pending”解释；移除前需要客户端与服务版本覆盖证据。
 
-### 19.4 FindByAnswerSheetID 未严格区分 NotFound
+### 19.4 Plan 完成仍是跨模块 best-effort
 
-只有明确 NotFound 才应该 Create；数据库错误应直接返回。这样既减少无意义写入，也让可观测性与重试原因更准确。
+独立问卷已不会完成 Plan Task，也不会写 queued report-status。完整测评创建后的 Plan 完成失败仍不回滚 Assessment，因此日志、巡检与补偿证据仍是定档验收的一部分。
 
-### 19.5 Assessment.Submit 的领域前置条件还不够强
+### 19.5 生产数据退出需要单独证据
 
-Journey 当前只对 `bound + pending` 调用 Submit，但 Assessment 聚合的 `Submit()` 本身没有强制 `HasEvaluationModel()`。目标领域约束应防止任何调用方提交 unbound Assessment，而不只依赖 Journey 的 if 条件。
-
-### 19.6 readiness 把“存在”当成“就绪”
-
-当前查询只要按 AnswerSheet ID 找到 Assessment 就返回 ready，没有要求 status 至少为 submitted，也没有区分 independent questionnaire。后续应根据客户端真正需要的阶段定义更准确的 readiness contract。
-
-### 19.7 Plan 与 report-status 可能继承错误分流
-
-当前新建 unbound Assessment 后仍可能 best-effort 完成 Plan Task，并写入 queued report-status。修复独立问卷分流时必须一并调整这些下游副作用，不能只停止自动 Submit。
+代码已关闭 EV-R001、EV-R002、EV-R003、EV-R006 和 EV-R007 对应的结构性问题，但这不等于历史行已经清零。生产验收仍需核对 unbound Assessment、pending 空壳、冻结 Admission 覆盖率和 `legacy_unclassified` 命中量，再决定是否执行数据退役。
 
 这些问题已按优先级和验收边界进入 [设计问题与重构清单](./90-设计问题与重构清单.md)。
 

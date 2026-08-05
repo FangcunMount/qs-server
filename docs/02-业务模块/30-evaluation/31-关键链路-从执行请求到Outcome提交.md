@@ -180,15 +180,15 @@ assessment -> authoritative execution identity
 event payload -> reconstruct full assessment
 ```
 
-### 4.3 当前 NeedsEvaluation 前置门禁
+### 4.3 当前 payload 分类门禁
 
-Worker handler 当前先调用 `EvaluationRequestedData.NeedsEvaluation()`。只要事件 payload 没有 `model_code` 或 legacy `scale_code`，handler 就直接成功返回，不调用 apiserver。
+Worker handler 使用 `EvaluationRequestedData.ClassifyPayloadGate()` 把事件分为：
 
-这为历史 questionnaire-only 事件提供兼容跳过，但也意味着 handler 在进入 canonical Assessment 之前信任了一次 payload 判断。目标系统不再创建和提交 unbound Assessment 后，这一兼容门禁应重新评估：
+- `complete`：payload 带当前 model identity 或 legacy scale code，正常转发；
+- `legacy_incomplete`：有合法 Assessment ID，但 payload 缺少模型身份，记录指标和告警后仍调用 apiserver；
+- `invalid`：Assessment ID 不合法，返回错误并进入消息失败治理。
 
-- 正常 `evaluation.requested` 是否应强制要求完整 Model identity；
-- payload 缺失是可 ACK 的旧事件，还是应进入无效事件治理；
-- 是否应回读 Assessment 后再决定跳过。
+`legacy_incomplete` 不再被静默 ACK。是否需要执行最终由 apiserver 回读 canonical Assessment 后调用 `Assessment.NeedsEvaluation()` 决定，事件 payload 只负责唤醒和兼容分类。该兼容分支在 `qs_worker_evaluation_payload_gate_total{class="legacy_incomplete"}` 连续 14 天为零且有正常流量后才可移除。
 
 ---
 
@@ -337,11 +337,11 @@ canonical evaluation outcome is missing
 | --- | --- |
 | evaluated | 幂等跳过，Worker Service 稍后读回已有 Outcome |
 | submitted + 有 ModelRef | 进入 Run Claim |
-| submitted + 无 ModelRef | questionnaire-only 兼容跳过 |
+| submitted + 无 ModelRef | 历史空壳兼容跳过，不执行计算 |
 | failed | 交给后续持久化 retry/lease 条件判断 |
 | pending 或其它状态 | 返回 invalid status |
 
-正常新链路只应把“submitted + 完整 ModelRef”交给 Engine。questionnaire-only 跳过属于当前 unbound Assessment 兼容逻辑，目标业务应在 Assessment 创建前分流。
+正常新链路只会把“submitted + 完整 ModelRef”交给 Engine；独立问卷已在 Assessment 创建前分流。这里的无 ModelRef skip 只保护历史空壳记录，退出前需要生产数据盘点。
 
 ### 7.2 为什么先加载 Assessment，再 Claim
 
@@ -938,18 +938,13 @@ sequenceDiagram
 
 ## 21. 当前设计限制与后续治理
 
-### 21.1 Worker 在回读 Assessment 前使用 NeedsEvaluation
+### 21.1 Worker 仍保留 legacy_incomplete 事件兼容
 
-事件 payload 缺少 model code 会被直接 ACK。随着 unbound Assessment 退出目标模型，应考虑把缺失模型身份定义为明确的 legacy、invalid 或治理状态，而不是静默跳过。
+Worker 已不再使用 `NeedsEvaluation()` 作为 ACK 门禁：缺少 model code 的合法事件会标记为 `legacy_incomplete` 并继续回读 Assessment。该分支仍是中间态兼容代码，只有连续 14 天零命中且 `complete` 流量非零，才能将缺失模型身份收紧为 invalid。
 
-### 21.2 输入错误统一为非重试 validation
+### 21.2 输入失败已经区分语义错误与依赖错误
 
-模型或问卷确实不存在时 terminal 合理；但 Repository timeout、MongoDB 暂时不可用等基础设施错误不应自动等同于不可重试配置错误。需要让 resolver failure 同时表达：
-
-- semantic kind；
-- retryability；
-- safe message；
-- underlying dependency category。
+resolver failure 当前同时表达 semantic kind、retryability、safe message 和 dependency category。模型、问卷或版本确实不存在时进入 terminal validation；ModelCatalog、Survey、Actor 等依赖暂时不可用时映射为 retryable dependency failure。剩余工作是用生产指标证明分类分布合理，而不是继续保留“统一非重试”的旧判断。
 
 ### 21.3 默认 Lease 没有执行中续租
 
@@ -957,14 +952,9 @@ sequenceDiagram
 
 应由真实执行耗时分布决定：延长 Lease、增加续租，或拆分长任务。
 
-### 21.4 InputSnapshotRef 只是可读引用
+### 21.4 InputSnapshotRef 已收敛为 isn:v2 内容身份
 
-`model:code@version` 便于排查，但不等于内容寻址快照。若未来需要更强审计，可引入：
-
-- published snapshot ID；
-- release digest；
-- model/questionnaire/norm content hash；
-- 可验证的 composite input reference。
+当前执行只接受 `isn:v2:<sha256>` composite identity；它覆盖模型、问卷、答卷、常模与受试者快照等白名单语义字段，Run 与 Outcome 持有同一引用，跨 attempt 漂移会被拒绝。旧 `model:`、`answersheet:`、v1 或畸形引用不再作为当前执行输入；历史数据是否仍含旧引用由生产盘点决定。
 
 ### 21.5 gRPC 错误码仍较粗
 

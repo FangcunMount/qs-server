@@ -100,7 +100,7 @@ flowchart TD
 1. AnswerSheet 已经是 Survey 认可的最终作答事实；
 2. 问卷已经绑定一个可执行的已发布 AssessmentModel。
 
-没有绑定模型的独立 Questionnaire 仍然可以收集 AnswerSheet，但其业务链路应在 Survey 结束，不应进入 Evaluation。当前实现仍可能为这类答卷创建无模型的 pending Assessment，这是已识别的设计债务，不是目标业务语义。
+没有绑定模型的独立 Questionnaire 仍然可以收集 AnswerSheet，但其业务链路在 Survey 基础计分后结束，不进入 Evaluation，也不创建 Assessment。新提交通过冻结 Admission 区分独立问卷和完整测评；只有无 Admission 的历史事件仍保留 live binding 兼容入口。
 
 ## 4. Evaluation 负责什么
 
