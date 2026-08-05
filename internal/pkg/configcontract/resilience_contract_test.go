@@ -41,9 +41,3 @@ func TestProdYAMLRateLimitAndCacheTTLContract(t *testing.T) {
 		})
 	}
 }
-
-func TestMaxOutboxPublishWorkersContract(t *testing.T) {
-	if got := MaxOutboxPublishWorkers(100, 0.8); got != 80 {
-		t.Fatalf("max workers = %d, want 80", got)
-	}
-}

@@ -69,14 +69,3 @@ func ValidateConcurrencyPoolProfile(name string, p ConcurrencyPoolProfile) []err
 	}
 	return errs
 }
-
-// MaxOutboxPublishWorkers 按 MySQL max_open 计算 outbox publish_workers 上限。
-func MaxOutboxPublishWorkers(mysqlMaxOpen int, ratio float64) int {
-	if mysqlMaxOpen <= 0 {
-		return 0
-	}
-	if ratio <= 0 {
-		ratio = 0.8
-	}
-	return int(float64(mysqlMaxOpen) * ratio)
-}
