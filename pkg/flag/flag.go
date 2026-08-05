@@ -24,18 +24,6 @@ func WordSepNormalizeFunc(_ *pflag.FlagSet, name string) pflag.NormalizedName {
 	return pflag.NormalizedName(name)
 }
 
-// WarnWordSepNormalizeFunc 警告包含 "_" 分隔符的标志
-// 当命令行参数中带有 "_" 时输出警告，并自动转换为 "-"
-func WarnWordSepNormalizeFunc(_ *pflag.FlagSet, name string) pflag.NormalizedName {
-	if strings.Contains(name, "_") {
-		nname := strings.ReplaceAll(name, "_", "-")
-		log.Warnf("%s is DEPRECATED and will be removed in a future version. Use %s instead.", name, nname)
-
-		return pflag.NormalizedName(nname)
-	}
-	return pflag.NormalizedName(name)
-}
-
 // PrintFlags 打印标志
 // 可以打印所有的命令行参数
 func PrintFlags(flags *pflag.FlagSet) {
