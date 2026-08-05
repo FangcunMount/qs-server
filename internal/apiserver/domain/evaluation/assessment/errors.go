@@ -17,9 +17,6 @@ var (
 	// ErrInvalidArgument 无效参数错误
 	ErrInvalidArgument = errors.New("invalid argument")
 
-	// ErrNoScale 无量表错误
-	ErrNoScale = errors.New("assessment has no medical scale bound")
-
 	// ErrNoEvaluationModel 未绑定评估模型。
 	ErrNoEvaluationModel = errors.New("assessment has no evaluation model bound")
 
@@ -29,38 +26,11 @@ var (
 	// ErrNotFound 未找到错误
 	ErrNotFound = errors.New("assessment not found")
 
-	// ErrDuplicate 重复错误
-	ErrDuplicate = errors.New("assessment already exists")
-
-	// ErrTesteeNotFound 受试者未找到
-	ErrTesteeNotFound = errors.New("testee not found")
-
-	// ErrQuestionnaireNotFound 问卷未找到
-	ErrQuestionnaireNotFound = errors.New("questionnaire not found")
-
-	// ErrQuestionnaireNotPublished 问卷未发布
-	ErrQuestionnaireNotPublished = errors.New("questionnaire is not published")
-
-	// ErrAnswerSheetNotFound 答卷未找到
-	ErrAnswerSheetNotFound = errors.New("answer sheet not found")
-
-	// ErrAnswerSheetMismatch 答卷不匹配
-	ErrAnswerSheetMismatch = errors.New("answer sheet does not belong to questionnaire")
-
-	// ErrScaleNotFound 量表未找到
-	ErrScaleNotFound = errors.New("medical scale not found")
-
-	// ErrScaleNotLinked 量表未关联
-	ErrScaleNotLinked = errors.New("medical scale is not linked to questionnaire")
-
 	// ErrEvaluationModelNotPublished 评估模型未发布或不存在。
 	ErrEvaluationModelNotPublished = errors.New("evaluation model is not published")
 
 	// ErrEvaluationModelQuestionnaireMismatch 评估模型与问卷不匹配。
 	ErrEvaluationModelQuestionnaireMismatch = errors.New("evaluation model is not linked to questionnaire")
-
-	// ErrScoreNotFound 得分未找到
-	ErrScoreNotFound = errors.New("assessment score not found")
 )
 
 // ==================== 错误工厂方法 ====================
