@@ -78,8 +78,9 @@ func TestStatisticsColdStartPublishIdempotencyAndRedisFailure(t *testing.T) {
 
 	mongoClient, mongoDB := mongodbtest.ReplicaSetDatabase(t)
 	mongoVersion, _, err := NewMongoMigrator(mongoClient, &Config{Enabled: true, Database: mongoDB.Name()}).Run()
-	if err != nil || mongoVersion != 20 {
-		t.Fatalf("migrate empty MongoDB: version=%d err=%v", mongoVersion, err)
+	wantMongoVersion := latestEmbeddedMongoMigrationVersion(t)
+	if err != nil || mongoVersion != wantMongoVersion {
+		t.Fatalf("migrate empty MongoDB: version=%d want=%d err=%v", mongoVersion, wantMongoVersion, err)
 	}
 
 	redisOptions, err := redis.ParseURL(redisURL)
