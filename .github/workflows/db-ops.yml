@@ -512,6 +512,131 @@ jobs:
                 {algorithm: {$exists: false}}, {algorithm: ""}
               ]})
             })
+            const interpretationCollections = [
+              "report_generations",
+              "interpretation_runs",
+              "interpret_report_artifacts",
+              "archived_reports",
+              "report_query_catalog",
+              "interpretation_admission_failures",
+              "interpretation_attention_projections",
+              "interpretation_report_templates",
+              "interpretation_catalog_repair_plans",
+              "interpretation_catalog_audit_checkpoints"
+            ]
+            const retiredInterpretationCollections = [
+              "interpret_reports",
+              "published_assessment_models",
+              "evaluation_rule_sets",
+              "scales"
+            ]
+            print("Interpretation collection inventory:")
+            printjson(interpretationCollections.map(name => ({
+              name,
+              present: collectionNames.includes(name),
+              documents: collectionNames.includes(name) ? targetDB.getCollection(name).countDocuments({}) : null
+            })))
+            print("Retired Interpretation/ModelCatalog collections still present:")
+            printjson(retiredInterpretationCollections.filter(name => collectionNames.includes(name)))
+
+            const generations = targetDB.getCollection("report_generations")
+            const runs = targetDB.getCollection("interpretation_runs")
+            const artifacts = targetDB.getCollection("interpret_report_artifacts")
+            const archives = targetDB.getCollection("archived_reports")
+            const reportCatalog = targetDB.getCollection("report_query_catalog")
+            const reportTemplates = targetDB.getCollection("interpretation_report_templates")
+            const admissionFailures = targetDB.getCollection("interpretation_admission_failures")
+            const aggregateCount = (collection, pipeline) =>
+              collection.aggregate([...pipeline, {$count: "count"}], {allowDiskUse: true}).toArray()[0]?.count || 0
+
+            print("Interpretation lifecycle status counts:")
+            printjson({
+              generations: generations.aggregate([
+                {$group: {_id: "$status", count: {$sum: 1}}},
+                {$sort: {_id: 1}}
+              ]).toArray(),
+              runs: runs.aggregate([
+                {$group: {_id: "$status", count: {$sum: 1}}},
+                {$sort: {_id: 1}}
+              ]).toArray(),
+              expired_running_runs: runs.countDocuments({status: "running", lease_expires_at: {$lte: new Date()}}),
+              running_without_lease: runs.countDocuments({status: "running", $or: [
+                {lease_expires_at: {$exists: false}},
+                {lease_expires_at: null}
+              ]})
+            })
+            print("Interpretation lifecycle consistency inventory:")
+            printjson({
+              generated_without_report_id: generations.countDocuments({status: "generated", $or: [
+                {report_id: {$exists: false}},
+                {report_id: 0}
+              ]}),
+              generated_without_artifact: aggregateCount(generations, [
+                {$match: {status: "generated"}},
+                {$lookup: {from: "interpret_report_artifacts", localField: "domain_id", foreignField: "generation_id", as: "artifact"}},
+                {$match: {artifact: {$size: 0}}}
+              ]),
+              artifacts_without_generation: aggregateCount(artifacts, [
+                {$match: {deleted_at: null}},
+                {$lookup: {from: "report_generations", localField: "generation_id", foreignField: "domain_id", as: "generation"}},
+                {$match: {generation: {$size: 0}}}
+              ]),
+              artifact_catalog_sources_missing: aggregateCount(reportCatalog, [
+                {$match: {source_kind: "artifact"}},
+                {$lookup: {from: "interpret_report_artifacts", localField: "source_id", foreignField: "domain_id", as: "source"}},
+                {$match: {source: {$size: 0}}}
+              ]),
+              archive_catalog_sources_missing: aggregateCount(reportCatalog, [
+                {$match: {source_kind: "archive"}},
+                {$lookup: {from: "archived_reports", localField: "source_id", foreignField: "domain_id", as: "source"}},
+                {$match: {source: {$size: 0}}}
+              ])
+            })
+            print("Interpretation current artifact provenance inventory:")
+            printjson({
+              active_artifacts: artifacts.countDocuments({deleted_at: null}),
+              missing_builder_identity: artifacts.countDocuments({deleted_at: null, $or: [
+                {builder_identity: {$exists: false}}, {builder_identity: ""}
+              ]}),
+              missing_content_schema_version: artifacts.countDocuments({deleted_at: null, $or: [
+                {content_schema_version: {$exists: false}}, {content_schema_version: ""}
+              ]}),
+              missing_presentation_profile: artifacts.countDocuments({deleted_at: null, $or: [
+                {presentation_profile: {$exists: false}}, {presentation_profile: null}
+              ]})
+            })
+            print("Interpretation archived report compatibility inventory:")
+            printjson({
+              active_archives: archives.countDocuments({deleted_at: null}),
+              missing_org_id: archives.countDocuments({deleted_at: null, $or: [
+                {org_id: {$exists: false}}, {org_id: null}
+              ]}),
+              missing_outcome_id: archives.countDocuments({deleted_at: null, $or: [
+                {outcome_id: {$exists: false}}, {outcome_id: 0}
+              ]}),
+              missing_model_identity: archives.countDocuments({deleted_at: null, $or: [
+                {"model.code": {$exists: false}}, {"model.code": ""},
+                {"model.version": {$exists: false}}, {"model.version": ""}
+              ]}),
+              missing_presentation_profile: archives.countDocuments({deleted_at: null, $or: [
+                {presentation_profile: {$exists: false}}, {presentation_profile: null}
+              ]})
+            })
+            print("Interpretation template and admission inventory:")
+            printjson({
+              templates: reportTemplates.aggregate([
+                {$group: {_id: {status: "$status", version: "$template_version"}, count: {$sum: 1}}},
+                {$sort: {"_id.status": 1, "_id.version": 1}}
+              ]).toArray(),
+              admission_failures: admissionFailures.aggregate([
+                {$group: {_id: {kind: "$kind", decision: "$decision"}, count: {$sum: 1}, last_occurred_at: {$max: "$occurred_at"}}},
+                {$sort: {"_id.kind": 1, "_id.decision": 1}}
+              ]).toArray(),
+              catalog_audit_checkpoint: targetDB.getCollection("interpretation_catalog_audit_checkpoints").findOne(
+                {_id: "report_catalog"},
+                {projection: {_id: 0, schema_version: 1, revision: 1, phase: 1, updated_at: 1, last_completed: 1}}
+              )
+            })
             print("Attention projection status counts:")
             printjson(targetDB.getCollection("interpretation_attention_projections").aggregate([
               {$group: {_id: "$status", count: {$sum: 1}}},
