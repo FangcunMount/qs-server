@@ -427,6 +427,28 @@ func TestCIRunsModelCatalogMongoContracts(t *testing.T) {
 	}
 }
 
+func TestCIRunsStatisticsMigrationAndColdStartContracts(t *testing.T) {
+	t.Parallel()
+
+	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatalf("read CI workflow: %v", err)
+	}
+	content := string(workflow)
+	for _, required := range []string{
+		"Run Statistics migration and cold-start integration contracts",
+		"TestStatisticsCanonicalSchemaFromEmptyDatabaseAndRetirementRollback",
+		"TestStatisticsAuditMigrationReplaysAfterInitialSchema",
+		"TestStatisticsMongoCollectorIndexesUpDown",
+		"TestStatisticsColdStartPublishIdempotencyAndRedisFailure",
+		"QS_SERVER_TEST_REDIS_URL: redis://127.0.0.1:6379/14",
+	} {
+		if !strings.Contains(content, required) {
+			t.Errorf("CI Statistics integration contract must contain %q", required)
+		}
+	}
+}
+
 func TestDBOpsInventoriesEvaluationRunAndOutcomeConsistency(t *testing.T) {
 	t.Parallel()
 

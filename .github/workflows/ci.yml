@@ -127,6 +127,17 @@ jobs:
             -run '^TestRetire' \
             -count=1 -timeout=15m -v ./internal/pkg/migration
 
+      - name: Run Statistics migration and cold-start integration contracts
+        env:
+          MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true&loc=Asia%2FShanghai
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_statistics_ci_test
+          QS_SERVER_TEST_REDIS_URL: redis://127.0.0.1:6379/14
+        run: |
+          go test -tags=integration \
+            -run '^(TestStatisticsCanonicalSchemaFromEmptyDatabaseAndRetirementRollback|TestStatisticsAuditMigrationReplaysAfterInitialSchema|TestStatisticsMongoCollectorIndexesUpDown|TestStatisticsColdStartPublishIdempotencyAndRedisFailure)$' \
+            -count=1 -timeout=15m -v ./internal/pkg/migration
+
       - name: Run Survey and ModelCatalog Mongo integration contracts
         env:
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
