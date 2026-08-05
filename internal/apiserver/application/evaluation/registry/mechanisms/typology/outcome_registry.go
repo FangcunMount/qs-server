@@ -16,13 +16,8 @@ type OutcomeAdapterRegistry struct {
 	adapters map[modeltypology.DetailAdapterKey]outcomeAdapterFunc
 }
 
-// 默认OutcomeAdapterRegistry 返回内置 通用 和 旧版 结果 adapters。
+// DefaultOutcomeAdapterRegistry 返回内置的机制级结果 adapters。
 func DefaultOutcomeAdapterRegistry() OutcomeAdapterRegistry {
-	return NewOutcomeAdapterRegistry()
-}
-
-// NewOutcomeAdapterRegistry 返回内置 通用 和 旧版 结果 adapters。
-func NewOutcomeAdapterRegistry() OutcomeAdapterRegistry {
 	return OutcomeAdapterRegistry{
 		adapters: map[modeltypology.DetailAdapterKey]outcomeAdapterFunc{
 			modeltypology.DetailAdapterPersonalityType: assembleGenericPersonalityTypeOutcome,
