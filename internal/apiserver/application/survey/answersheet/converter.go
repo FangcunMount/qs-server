@@ -35,12 +35,6 @@ type AnswerResult struct {
 	Score        float64     // 得分
 }
 
-// AnswerSheetListResult 答卷列表结果
-type AnswerSheetListResult struct {
-	Items []*AnswerSheetResult // 答卷列表
-	Total int64                // 总数
-}
-
 // AnswerSheetSummaryResult 答卷摘要结果（不包含答案详情，用于列表展示）
 type AnswerSheetSummaryResult struct {
 	ID                 uint64    // 答卷ID

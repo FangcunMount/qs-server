@@ -5356,7 +5356,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/response.QuestionnaireListResponse"
+                                            "$ref": "#/definitions/response.QuestionnaireSummaryListResponse"
                                         }
                                     }
                                 }
@@ -5511,7 +5511,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/response.QuestionnaireListResponse"
+                                            "$ref": "#/definitions/response.QuestionnaireSummaryListResponse"
                                         }
                                     }
                                 }
@@ -5613,7 +5613,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/response.QuestionnaireListResponse"
+                                            "$ref": "#/definitions/response.QuestionnaireSummaryListResponse"
                                         }
                                     }
                                 }
@@ -13878,26 +13878,6 @@ const docTemplate = `{
                 }
             }
         },
-        "response.QuestionnaireListResponse": {
-            "type": "object",
-            "properties": {
-                "page": {
-                    "type": "integer"
-                },
-                "page_size": {
-                    "type": "integer"
-                },
-                "questionnaires": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/response.QuestionnaireResponse"
-                    }
-                },
-                "total_count": {
-                    "type": "integer"
-                }
-            }
-        },
         "response.QuestionnaireReleaseStateResponse": {
             "type": "object",
             "properties": {
@@ -13946,6 +13926,63 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "type": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.QuestionnaireSummaryListResponse": {
+            "type": "object",
+            "properties": {
+                "questionnaires": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.QuestionnaireSummaryResponse"
+                    }
+                },
+                "total_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "response.QuestionnaireSummaryResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "description": "创建人",
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "img_url": {
+                    "type": "string"
+                },
+                "release_state": {
+                    "$ref": "#/definitions/response.QuestionnaireReleaseStateResponse"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "description": "更新人",
                     "type": "string"
                 },
                 "version": {

@@ -3228,19 +3228,6 @@ definitions:
         description: 二维码 URL
         type: string
     type: object
-  response.QuestionnaireListResponse:
-    properties:
-      page:
-        type: integer
-      page_size:
-        type: integer
-      questionnaires:
-        items:
-          $ref: '#/definitions/response.QuestionnaireResponse'
-        type: array
-      total_count:
-        type: integer
-    type: object
   response.QuestionnaireReleaseStateResponse:
     properties:
       active_version:
@@ -3273,6 +3260,44 @@ definitions:
       title:
         type: string
       type:
+        type: string
+      version:
+        type: string
+    type: object
+  response.QuestionnaireSummaryListResponse:
+    properties:
+      questionnaires:
+        items:
+          $ref: '#/definitions/response.QuestionnaireSummaryResponse'
+        type: array
+      total_count:
+        type: integer
+    type: object
+  response.QuestionnaireSummaryResponse:
+    properties:
+      code:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        description: 创建人
+        type: string
+      description:
+        type: string
+      img_url:
+        type: string
+      release_state:
+        $ref: '#/definitions/response.QuestionnaireReleaseStateResponse'
+      status:
+        type: string
+      title:
+        type: string
+      type:
+        type: string
+      updated_at:
+        type: string
+      updated_by:
+        description: 更新人
         type: string
       version:
         type: string
@@ -8234,7 +8259,7 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/response.QuestionnaireListResponse'
+                  $ref: '#/definitions/response.QuestionnaireSummaryListResponse'
               type: object
       summary: 查询已发布问卷列表
       tags:
@@ -8331,7 +8356,7 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/response.QuestionnaireListResponse'
+                  $ref: '#/definitions/response.QuestionnaireSummaryListResponse'
               type: object
       summary: 查询问卷列表
       tags:
@@ -8856,7 +8881,7 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/response.QuestionnaireListResponse'
+                  $ref: '#/definitions/response.QuestionnaireSummaryListResponse'
               type: object
       summary: 查询已发布问卷列表
       tags:

@@ -26,14 +26,6 @@ type QuestionnaireReleaseStateResponse struct {
 	HasUnpublishedChanges bool   `json:"has_unpublished_changes"`
 }
 
-// QuestionnaireListResponse 问卷列表响应
-type QuestionnaireListResponse struct {
-	Questionnaires []QuestionnaireResponse `json:"questionnaires"`
-	TotalCount     int64                   `json:"total_count"`
-	Page           int                     `json:"page"`
-	PageSize       int                     `json:"page_size"`
-}
-
 // QuestionnaireSummaryResponse 问卷摘要响应（不包含问题详情）
 type QuestionnaireSummaryResponse struct {
 	Code         string                            `json:"code"`
@@ -109,28 +101,6 @@ func NewQuestionnaireResponseFromResult(result *questionnaire.QuestionnaireResul
 		Type:         result.Type,
 		Questions:    questions,
 		ReleaseState: questionnaireReleaseStateResponse(result.ReleaseState),
-	}
-}
-
-// NewQuestionnaireListResponseFromResult 从应用层 ListResult 创建列表响应
-func NewQuestionnaireListResponseFromResult(result *questionnaire.QuestionnaireListResult) *QuestionnaireListResponse {
-	if result == nil {
-		return &QuestionnaireListResponse{
-			Questionnaires: []QuestionnaireResponse{},
-			TotalCount:     0,
-		}
-	}
-
-	questionnaires := make([]QuestionnaireResponse, 0, len(result.Items))
-	for _, item := range result.Items {
-		if resp := NewQuestionnaireResponseFromResult(item); resp != nil {
-			questionnaires = append(questionnaires, *resp)
-		}
-	}
-
-	return &QuestionnaireListResponse{
-		Questionnaires: questionnaires,
-		TotalCount:     result.Total,
 	}
 }
 

@@ -81,12 +81,6 @@ type OptionResult struct {
 	Score int    // 选项分数
 }
 
-// QuestionnaireListResult 问卷列表结果
-type QuestionnaireListResult struct {
-	Items []*QuestionnaireResult // 问卷列表
-	Total int64                  // 总数
-}
-
 // QuestionnaireSummaryResult 问卷摘要结果（轻量级，不包含问题详情）
 type QuestionnaireSummaryResult struct {
 	Code          string    // 问卷编码

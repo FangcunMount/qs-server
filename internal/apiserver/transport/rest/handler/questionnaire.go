@@ -580,7 +580,7 @@ func (h *QuestionnaireHandler) ListVersions(c *gin.Context) {
 // @Param page_size query int false "每页数量" default(10)
 // @Param status query string false "状态筛选（draft/published/archived）"
 // @Param title query string false "标题筛选"
-// @Success 200 {object} core.Response{data=response.QuestionnaireListResponse}
+// @Success 200 {object} core.Response{data=response.QuestionnaireSummaryListResponse}
 // @Router /api/v1/questionnaires [get]
 func (h *QuestionnaireHandler) List(c *gin.Context) {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -652,7 +652,7 @@ func (h *QuestionnaireHandler) GetPublishedByCode(c *gin.Context) {
 // @Produce json
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(10)
-// @Success 200 {object} core.Response{data=response.QuestionnaireListResponse}
+// @Success 200 {object} core.Response{data=response.QuestionnaireSummaryListResponse}
 // @Router /api/v1/public/questionnaires [get]
 // @Router /api/v1/questionnaires/published [get]
 func (h *QuestionnaireHandler) ListPublished(c *gin.Context) {

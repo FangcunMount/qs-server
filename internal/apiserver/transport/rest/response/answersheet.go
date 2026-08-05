@@ -73,34 +73,6 @@ func NewAnswerSheetResponse(result *answersheet.AnswerSheetResult) *AnswerSheetR
 	}
 }
 
-// NewAnswerSheetListResponse 从应用层 Result 创建列表响应
-func NewAnswerSheetListResponse(result *answersheet.AnswerSheetListResult) *AnswerSheetListResponse {
-	if result == nil {
-		return &AnswerSheetListResponse{
-			Total: 0,
-			Items: []AnswerSheetSummaryItem{},
-		}
-	}
-
-	items := make([]AnswerSheetSummaryItem, 0, len(result.Items))
-	for _, item := range result.Items {
-		items = append(items, AnswerSheetSummaryItem{
-			ID:                mustMetaIDFromUint64(item.ID),
-			QuestionnaireCode: item.QuestionnaireCode,
-			QuestionnaireVer:  item.QuestionnaireVer,
-			Title:             item.QuestionnaireTitle,
-			Score:             item.Score,
-			FillerID:          mustMetaIDFromUint64(item.FillerID),
-			FilledAt:          item.FilledAt.Format("2006-01-02 15:04:05"),
-		})
-	}
-
-	return &AnswerSheetListResponse{
-		Total: result.Total,
-		Items: items,
-	}
-}
-
 // NewAnswerSheetSummaryListResponse 从应用层 SummaryListResult 创建摘要列表响应
 func NewAnswerSheetSummaryListResponse(result *answersheet.AnswerSheetSummaryListResult) *AnswerSheetListResponse {
 	if result == nil {
