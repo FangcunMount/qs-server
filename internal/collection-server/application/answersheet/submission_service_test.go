@@ -149,6 +149,33 @@ func validSubmitRequest() *SubmitAnswerSheetRequest {
 	}
 }
 
+func TestValidatePublishedSubmissionRejectsHiddenQuestionAnswer(t *testing.T) {
+	questionnaire := &collectionquestionnaire.QuestionnaireResponse{
+		Code: "Q", Version: "1", Status: "published",
+		Questions: []collectionquestionnaire.QuestionResponse{
+			{Code: "trigger", Type: "Radio", Options: []collectionquestionnaire.OptionResponse{{Code: "yes"}, {Code: "no"}}},
+			{
+				Code: "follow", Type: "Text",
+				ShowController: &collectionquestionnaire.ShowControllerResponse{
+					Rule:       "and",
+					Conditions: []collectionquestionnaire.ShowControllerConditionResponse{{QuestionCode: "trigger", OptionCodes: []string{"yes"}}},
+				},
+			},
+		},
+	}
+	service := &SubmissionService{questionnaire: submissionQuestionnaireStub{questionnaire: questionnaire}}
+	err := service.validatePublishedSubmission(t.Context(), &SubmitAnswerSheetRequest{
+		QuestionnaireCode: "Q", QuestionnaireVersion: "1",
+		Answers: []Answer{
+			{QuestionCode: "trigger", QuestionType: "Radio", Value: `"no"`},
+			{QuestionCode: "follow", QuestionType: "Text", Value: `"must not persist"`},
+		},
+	})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("validatePublishedSubmission() error = %v, want InvalidArgument", err)
+	}
+}
+
 func newAcceptService(writer AnswerSheetWriter, reader AnswerSheetReader, resolver AssessmentResolver) *SubmissionService {
 	actor := submissionActorStub{testee: &ActorTestee{OrgID: 9, IAMProfileID: "profile-7", Name: "testee"}}
 	return NewSubmissionService(

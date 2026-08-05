@@ -18,6 +18,39 @@ func TestValidateAppliesPublishedSpecAndRules(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsAnswerForQuestionHiddenByFinalSubmission(t *testing.T) {
+	spec := Spec{Questions: []Question{
+		{Code: "trigger", Type: QuestionTypeRadio, OptionCodes: []string{"yes", "no"}},
+		{Code: "follow", Type: QuestionTypeText, ShowController: &ShowController{Rule: "and", Conditions: []ShowCondition{{QuestionCode: "trigger", OptionCodes: []string{"yes"}}}}},
+	}}
+
+	_, err := spec.Validate([]Answer{
+		{QuestionCode: "trigger", QuestionType: QuestionTypeRadio, Value: "no"},
+		{QuestionCode: "follow", QuestionType: QuestionTypeText, Value: "must not persist"},
+	})
+	if err == nil {
+		t.Fatal("Validate() error = nil, want hidden answer rejection")
+	}
+	validationErr, ok := err.(*Error)
+	if !ok || validationErr.Kind != ErrorInvalidInput {
+		t.Fatalf("Validate() error = %#v, want invalid input", err)
+	}
+}
+
+func TestValidateAcceptsAnswerForQuestionVisibleByFinalSubmission(t *testing.T) {
+	spec := Spec{Questions: []Question{
+		{Code: "trigger", Type: QuestionTypeRadio, OptionCodes: []string{"yes", "no"}},
+		{Code: "follow", Type: QuestionTypeText, ShowController: &ShowController{Rule: "and", Conditions: []ShowCondition{{QuestionCode: "trigger", OptionCodes: []string{"yes"}}}}},
+	}}
+
+	if _, err := spec.Validate([]Answer{
+		{QuestionCode: "trigger", QuestionType: QuestionTypeRadio, Value: "yes"},
+		{QuestionCode: "follow", QuestionType: QuestionTypeText, Value: "accepted"},
+	}); err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+}
+
 func TestValidateRejectsUnsupportedRule(t *testing.T) {
 	_, err := (Spec{Questions: []Question{{Code: "q", Type: QuestionTypeText, Rules: []Rule{{Type: "custom"}}}}}).Validate(nil)
 	if err == nil {

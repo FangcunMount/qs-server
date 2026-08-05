@@ -195,6 +195,13 @@ func (s Spec) Validate(rawAnswers []Answer) ([]PreparedAnswer, error) {
 		prepared = append(prepared, PreparedAnswer{QuestionCode: question.Code, QuestionType: question.Type, Value: raw.Value, Rules: append([]Rule(nil), question.Rules...)})
 	}
 
+	for _, answer := range prepared {
+		question := questions[answer.QuestionCode]
+		if !isVisible(question, values) {
+			return nil, invalid("question %s is not visible for this submission", answer.QuestionCode)
+		}
+	}
+
 	for _, question := range questions {
 		if question.Type == QuestionTypeSection || !isVisible(question, values) || !hasRequiredRule(question.Rules) {
 			continue

@@ -143,6 +143,58 @@ func TestSubmissionSpecPrepareAnswersRequiresVisibleRequiredQuestion(t *testing.
 	}
 }
 
+func TestSubmissionSpecPrepareAnswersRejectsHiddenQuestionAnswer(t *testing.T) {
+	t.Parallel()
+
+	qnr, err := NewQuestionnaire(meta.NewCode("QNR-4"), "Questionnaire", WithVersion(Version("1.0.0")), WithStatus(STATUS_PUBLISHED))
+	if err != nil {
+		t.Fatalf("NewQuestionnaire() error = %v", err)
+	}
+	triggerOptionYes, err := NewOptionWithStringCode("YES", "yes", 1)
+	if err != nil {
+		t.Fatalf("NewOption() error = %v", err)
+	}
+	triggerOptionNo, err := NewOptionWithStringCode("NO", "no", 0)
+	if err != nil {
+		t.Fatalf("NewOption() error = %v", err)
+	}
+	trigger, err := NewQuestion(
+		WithCode(meta.NewCode("Q_TRIGGER")),
+		WithStem("Trigger"),
+		WithQuestionType(TypeRadio),
+		WithOptions([]Option{triggerOptionYes, triggerOptionNo}),
+	)
+	if err != nil {
+		t.Fatalf("NewQuestion() error = %v", err)
+	}
+	followUp, err := NewQuestion(
+		WithCode(meta.NewCode("Q_FOLLOW")),
+		WithStem("Follow up"),
+		WithQuestionType(TypeText),
+		WithShowController(NewShowController("and", []ShowControllerCondition{
+			NewShowControllerCondition(meta.NewCode("Q_TRIGGER"), []meta.Code{meta.NewCode("YES")}),
+		})),
+	)
+	if err != nil {
+		t.Fatalf("NewQuestion() error = %v", err)
+	}
+	for _, item := range []Question{trigger, followUp} {
+		if err := qnr.AddQuestion(item); err != nil {
+			t.Fatalf("AddQuestion() error = %v", err)
+		}
+	}
+	spec, err := qnr.BuildSubmissionSpec()
+	if err != nil {
+		t.Fatalf("BuildSubmissionSpec() error = %v", err)
+	}
+	if _, err := spec.PrepareAnswers([]RawSubmissionAnswer{
+		{QuestionCode: "Q_TRIGGER", QuestionType: TypeRadio.Value(), Value: "NO"},
+		{QuestionCode: "Q_FOLLOW", QuestionType: TypeText.Value(), Value: "must not persist"},
+	}); err == nil {
+		t.Fatal("PrepareAnswers() error = nil, want hidden answer rejection")
+	}
+}
+
 func mustSubmissionSpec(t *testing.T) SubmissionSpec {
 	t.Helper()
 	qnr := mustSubmissionSpecQuestionnaire(t, WithStatus(STATUS_PUBLISHED))
