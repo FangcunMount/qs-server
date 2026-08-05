@@ -215,6 +215,8 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 		`run_privileged docker exec "$NGINX_CONTAINER" nginx -T`,
 		`getent ahostsv4 "$COLLECTION_DNS_NAME"`,
 		`ROUTING_PROBE_REQUESTS="${ROUTING_PROBE_REQUESTS:-40}"`,
+		`ROUTING_PROBE_ATTEMPTS="${ROUTING_PROBE_ATTEMPTS:-3}"`,
+		`Collection routing probe ${request_number}/${ROUTING_PROBE_REQUESTS} exhausted retries`,
 		`/^gin_requests_total\{/`,
 		`rollback_config()`,
 	} {

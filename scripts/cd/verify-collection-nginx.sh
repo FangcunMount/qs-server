@@ -14,6 +14,7 @@ EXPECTED_COLLECTION_REPLICAS="${EXPECTED_COLLECTION_REPLICAS:-2}"
 PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://collect.fangcunmount.cn/health}"
 PUBLIC_HEALTH_RESOLVE="${PUBLIC_HEALTH_RESOLVE:-collect.fangcunmount.cn:443:127.0.0.1}"
 ROUTING_PROBE_REQUESTS="${ROUTING_PROBE_REQUESTS:-40}"
+ROUTING_PROBE_ATTEMPTS="${ROUTING_PROBE_ATTEMPTS:-3}"
 PRIVILEGE_RUNNER="${PRIVILEGE_RUNNER:-sudo}"
 
 require_privilege_runner() {
@@ -77,6 +78,7 @@ preflight() {
   require_privilege_runner
   require_positive_integer EXPECTED_COLLECTION_REPLICAS "$EXPECTED_COLLECTION_REPLICAS"
   require_positive_integer ROUTING_PROBE_REQUESTS "$ROUTING_PROBE_REQUESTS"
+  require_positive_integer ROUTING_PROBE_ATTEMPTS "$ROUTING_PROBE_ATTEMPTS"
 
   if [ "$(run_privileged docker inspect "$NGINX_CONTAINER" --format '{{.State.Running}}' 2>/dev/null || true)" != "true" ]; then
     echo "Nginx container $NGINX_CONTAINER is not running" >&2
@@ -211,7 +213,8 @@ health_request_metric() {
 }
 
 verify_request_distribution() {
-  local container_ids container_id container_name before_value after_value delta total_delta request_number
+  local container_ids container_id container_name before_value after_value delta total_delta
+  local request_number request_attempt probe_ok
   local -A before=()
 
   container_ids="$(collection_container_ids)"
@@ -221,12 +224,26 @@ verify_request_distribution() {
   done <<<"$container_ids"
 
   for request_number in $(seq 1 "$ROUTING_PROBE_REQUESTS"); do
-    curl --fail --silent --show-error \
-      --connect-timeout 5 \
-      --max-time 10 \
-      --noproxy '*' \
-      --resolve "$PUBLIC_HEALTH_RESOLVE" \
-      "$PUBLIC_HEALTH_URL" >/dev/null
+    probe_ok=false
+    for request_attempt in $(seq 1 "$ROUTING_PROBE_ATTEMPTS"); do
+      if curl --fail --silent --show-error \
+        --connect-timeout 5 \
+        --max-time 10 \
+        --noproxy '*' \
+        --resolve "$PUBLIC_HEALTH_RESOLVE" \
+        "$PUBLIC_HEALTH_URL" >/dev/null; then
+        probe_ok=true
+        break
+      fi
+      echo "Collection routing probe ${request_number}/${ROUTING_PROBE_REQUESTS} failed, attempt ${request_attempt}/${ROUTING_PROBE_ATTEMPTS}" >&2
+      if [ "$request_attempt" -lt "$ROUTING_PROBE_ATTEMPTS" ]; then
+        sleep 1
+      fi
+    done
+    if [ "$probe_ok" != true ]; then
+      echo "Collection routing probe ${request_number}/${ROUTING_PROBE_REQUESTS} exhausted retries" >&2
+      return 1
+    fi
   done
 
   total_delta=0
