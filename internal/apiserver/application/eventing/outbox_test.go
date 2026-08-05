@@ -59,8 +59,8 @@ func (o *outboxObserver) statusScrapeCount() int {
 }
 
 type fakeOutboxStore struct {
-	pending          []PendingOutboxEvent
-	claimByIDs       map[string]PendingOutboxEvent
+	pending          []outboxport.PendingEvent
+	claimByIDs       map[string]outboxport.PendingEvent
 	claimByIDsCalls  [][]string
 	claimErr         error
 	markPublishedErr error
@@ -134,7 +134,7 @@ func (p *durableFakePublisher) IsMQBacked() bool {
 	return p.mqBacked
 }
 
-func (s *fakeOutboxStore) ClaimDueEvents(_ context.Context, limit int, _ time.Time) ([]PendingOutboxEvent, error) {
+func (s *fakeOutboxStore) ClaimDueEvents(_ context.Context, limit int, _ time.Time) ([]outboxport.PendingEvent, error) {
 	s.lastLimit = limit
 	if s.claimErr != nil {
 		return nil, s.claimErr
@@ -142,9 +142,9 @@ func (s *fakeOutboxStore) ClaimDueEvents(_ context.Context, limit int, _ time.Ti
 	return s.pending, nil
 }
 
-func (s *fakeOutboxStore) ClaimEventsByIDs(_ context.Context, eventIDs []string, _ time.Time) ([]PendingOutboxEvent, error) {
+func (s *fakeOutboxStore) ClaimEventsByIDs(_ context.Context, eventIDs []string, _ time.Time) ([]outboxport.PendingEvent, error) {
 	s.claimByIDsCalls = append(s.claimByIDsCalls, append([]string(nil), eventIDs...))
-	claimed := make([]PendingOutboxEvent, 0, len(eventIDs))
+	claimed := make([]outboxport.PendingEvent, 0, len(eventIDs))
 	for _, eventID := range eventIDs {
 		if pending, ok := s.claimByIDs[eventID]; ok {
 			claimed = append(claimed, pending)
@@ -191,7 +191,7 @@ func TestOutboxRelayObservesClaimFailed(t *testing.T) {
 func TestOutboxRelayObservesPublished(t *testing.T) {
 	observer := &outboxObserver{}
 	store := &fakeOutboxStore{
-		pending: []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.EvaluationRequested)},
+		pending: []outboxport.PendingEvent{pendingEvent("evt-1", eventcatalog.EvaluationRequested)},
 		statusSnapshot: outboxport.StatusSnapshot{
 			Store: "test-relay",
 			Buckets: []outboxport.StatusBucket{
@@ -235,7 +235,7 @@ func TestOutboxRelayUsesConfiguredBatchSize(t *testing.T) {
 
 func TestOutboxRelayPerEventGoroutineBaseline(t *testing.T) {
 	store := &fakeOutboxStore{
-		pending: []PendingOutboxEvent{
+		pending: []outboxport.PendingEvent{
 			pendingEvent("evt-1", eventcatalog.EvaluationRequested),
 			pendingEvent("evt-2", eventcatalog.InterpretationReportGenerated),
 			pendingEvent("evt-3", eventcatalog.AnswerSheetSubmitted),
@@ -267,7 +267,7 @@ func TestOutboxRelayPerEventGoroutineBaseline(t *testing.T) {
 
 func TestOutboxRelayUsesConfiguredPublishWorkers(t *testing.T) {
 	store := &fakeOutboxStore{
-		pending: []PendingOutboxEvent{
+		pending: []outboxport.PendingEvent{
 			pendingEvent("evt-1", eventcatalog.EvaluationRequested),
 			pendingEvent("evt-2", eventcatalog.InterpretationReportGenerated),
 			pendingEvent("evt-3", eventcatalog.AnswerSheetSubmitted),
@@ -294,7 +294,7 @@ func TestOutboxRelayUsesConfiguredPublishWorkers(t *testing.T) {
 }
 
 func TestOutboxRelayMarksPublishedBeforeWholeClaimedBatchCompletes(t *testing.T) {
-	store := newBlockingMarkStore([]PendingOutboxEvent{
+	store := newBlockingMarkStore([]outboxport.PendingEvent{
 		pendingEvent("evt-1", eventcatalog.EvaluationRequested),
 		pendingEvent("evt-2", eventcatalog.InterpretationReportGenerated),
 		pendingEvent("evt-3", eventcatalog.AnswerSheetSubmitted),
@@ -347,7 +347,7 @@ func TestOutboxRelayMarksPublishedBeforeWholeClaimedBatchCompletes(t *testing.T)
 
 func TestOutboxRelayObservesBatchMarkPublishedFailed(t *testing.T) {
 	observer := &outboxObserver{}
-	store := newBlockingMarkStore([]PendingOutboxEvent{
+	store := newBlockingMarkStore([]outboxport.PendingEvent{
 		pendingEvent("evt-1", eventcatalog.EvaluationRequested),
 	})
 	store.markPublishedErr = errors.New("batch mark failed")
@@ -370,7 +370,7 @@ func TestOutboxRelayObservesBatchMarkPublishedFailed(t *testing.T) {
 func TestOutboxRelayObservesPublishFailureAndContinues(t *testing.T) {
 	observer := &outboxObserver{}
 	store := &fakeOutboxStore{
-		pending: []PendingOutboxEvent{
+		pending: []outboxport.PendingEvent{
 			pendingEvent("evt-1", eventcatalog.EvaluationRequested),
 			pendingEvent("evt-2", eventcatalog.InterpretationReportGenerated),
 		},
@@ -402,7 +402,7 @@ func TestOutboxRelayObservesPublishFailureAndContinues(t *testing.T) {
 func TestOutboxRelayObservesMarkFailedFailed(t *testing.T) {
 	observer := &outboxObserver{}
 	store := &fakeOutboxStore{
-		pending:       []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.EvaluationRequested)},
+		pending:       []outboxport.PendingEvent{pendingEvent("evt-1", eventcatalog.EvaluationRequested)},
 		markFailedErr: errors.New("mark failed"),
 	}
 	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
@@ -424,7 +424,7 @@ func TestOutboxRelayObservesMarkPublishedFailed(t *testing.T) {
 	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
 		Name: "test-relay",
 		Store: &fakeOutboxStore{
-			pending:          []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.EvaluationRequested)},
+			pending:          []outboxport.PendingEvent{pendingEvent("evt-1", eventcatalog.EvaluationRequested)},
 			markPublishedErr: errors.New("mark published failed"),
 		},
 		Publisher: &fakePublisher{},
@@ -440,7 +440,7 @@ func TestOutboxRelayObservesMarkPublishedFailed(t *testing.T) {
 func TestOutboxRelayStatusReporterFailureDoesNotChangeDispatchResult(t *testing.T) {
 	observer := &outboxObserver{}
 	store := &fakeOutboxStore{
-		pending:   []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.EvaluationRequested)},
+		pending:   []outboxport.PendingEvent{pendingEvent("evt-1", eventcatalog.EvaluationRequested)},
 		statusErr: errors.New("status failed"),
 	}
 	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
@@ -501,7 +501,7 @@ func TestOutboxStatusReporterThrottlesStatusScrapes(t *testing.T) {
 
 func TestDurableOutboxRelayRejectsNonMQBackedPublisher(t *testing.T) {
 	store := &fakeOutboxStore{
-		pending: []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.EvaluationRequested)},
+		pending: []outboxport.PendingEvent{pendingEvent("evt-1", eventcatalog.EvaluationRequested)},
 	}
 	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
 		Name:                    "durable-relay",
@@ -519,7 +519,7 @@ func TestDurableOutboxRelayRejectsNonMQBackedPublisher(t *testing.T) {
 
 func TestDurableOutboxRelayAcceptsMQBackedPublisher(t *testing.T) {
 	store := &fakeOutboxStore{
-		pending: []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.EvaluationRequested)},
+		pending: []outboxport.PendingEvent{pendingEvent("evt-1", eventcatalog.EvaluationRequested)},
 	}
 	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
 		Name:                    "durable-relay",
@@ -545,7 +545,7 @@ func TestOutboxRelayClaimsFromReadyIndexFirst(t *testing.T) {
 		},
 	}
 	store := &fakeOutboxStore{
-		claimByIDs: map[string]PendingOutboxEvent{
+		claimByIDs: map[string]outboxport.PendingEvent{
 			"evt-zset": pendingEvent("evt-zset", eventcatalog.AnswerSheetSubmitted),
 		},
 	}
@@ -574,7 +574,7 @@ func TestOutboxRelayClaimsFromReadyIndexFirst(t *testing.T) {
 func TestOutboxRelayFailureReenqueuesCorrectReadyBucket(t *testing.T) {
 	ready := &fakeReadyIndex{buckets: map[string][]string{}}
 	store := &fakeOutboxStore{
-		pending: []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.EvaluationRequested)},
+		pending: []outboxport.PendingEvent{pendingEvent("evt-1", eventcatalog.EvaluationRequested)},
 	}
 	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
 		Name:       "test-relay",
@@ -667,7 +667,7 @@ type blockingMarkStore struct {
 	publishedBatches [][]string
 }
 
-func newBlockingMarkStore(pending []PendingOutboxEvent) *blockingMarkStore {
+func newBlockingMarkStore(pending []outboxport.PendingEvent) *blockingMarkStore {
 	return &blockingMarkStore{
 		fakeOutboxStore: fakeOutboxStore{pending: pending},
 		marked:          make(chan struct{}, 1),
@@ -692,8 +692,8 @@ func (s *blockingMarkStore) MarkEventsFailed(_ context.Context, failures []outbo
 	return s.markFailedErr
 }
 
-func pendingEvent(eventID, eventType string) PendingOutboxEvent {
-	return PendingOutboxEvent{
+func pendingEvent(eventID, eventType string) outboxport.PendingEvent {
+	return outboxport.PendingEvent{
 		EventID: eventID,
 		Event:   event.New(eventType, "Sample", eventID, struct{}{}),
 	}

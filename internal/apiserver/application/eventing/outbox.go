@@ -21,15 +21,6 @@ const (
 	maxPublishedMarkBatchSize    = 100
 )
 
-// PendingOutboxEvent 保留application-facing 别名 用于 共享 outbox 契约。
-type PendingOutboxEvent = outboxport.PendingEvent
-
-// OutboxStore 保留application-facing 别名 用于 共享 outbox 契约。
-type OutboxStore = outboxport.Store
-
-// OutboxStatusReader 保留application-facing 别名 用于 只读 outbox 状态。
-type OutboxStatusReader = outboxport.StatusReader
-
 type OutboxStatusReporter interface {
 	ReportOutboxStatus(ctx context.Context)
 }
@@ -41,7 +32,7 @@ type OutboxRelay interface {
 
 type outboxRelay struct {
 	name           string
-	store          OutboxStore
+	store          outboxport.Store
 	batchPublisher outboxport.BatchPublisher
 	publisher      event.EventPublisher
 	observer       eventobservability.Observer
@@ -54,14 +45,14 @@ type outboxRelay struct {
 }
 
 type relayPublishResult struct {
-	pending   PendingOutboxEvent
+	pending   outboxport.PendingEvent
 	published bool
 	err       error
 }
 
 type OutboxRelayOptions struct {
 	Name                    string
-	Store                   OutboxStore
+	Store                   outboxport.Store
 	Publisher               event.EventPublisher
 	Observer                eventobservability.Observer
 	Status                  OutboxStatusReporter
@@ -90,7 +81,7 @@ func NewOutboxRelayWithOptions(opts OutboxRelayOptions) OutboxRelay {
 		opts.Observer = eventobservability.DefaultObserver()
 	}
 	if opts.Status == nil {
-		if reader, ok := opts.Store.(OutboxStatusReader); ok {
+		if reader, ok := opts.Store.(outboxport.StatusReader); ok {
 			opts.Status = NewOutboxStatusReporter(opts.Name, reader, opts.Observer)
 		}
 	}
@@ -109,7 +100,7 @@ func NewOutboxRelayWithOptions(opts OutboxRelayOptions) OutboxRelay {
 	}
 }
 
-func batchPublisherOf(store OutboxStore) outboxport.BatchPublisher {
+func batchPublisherOf(store outboxport.Store) outboxport.BatchPublisher {
 	if store == nil {
 		return nil
 	}
@@ -201,7 +192,7 @@ func (r *outboxRelay) DispatchDue(ctx context.Context) error {
 	return nil
 }
 
-func (r *outboxRelay) publishDueEvents(ctx context.Context, l *logger.RequestLogger, pendingEvents []PendingOutboxEvent) <-chan relayPublishResult {
+func (r *outboxRelay) publishDueEvents(ctx context.Context, l *logger.RequestLogger, pendingEvents []outboxport.PendingEvent) <-chan relayPublishResult {
 	workers := r.publishWorkers
 	if workers <= 0 {
 		workers = 1
@@ -212,7 +203,7 @@ func (r *outboxRelay) publishDueEvents(ctx context.Context, l *logger.RequestLog
 		return results
 	}
 
-	jobs := make(chan PendingOutboxEvent, len(pendingEvents))
+	jobs := make(chan outboxport.PendingEvent, len(pendingEvents))
 	for _, pending := range pendingEvents {
 		jobs <- pending
 	}
@@ -244,7 +235,7 @@ type publishedMarker struct {
 	ctx     context.Context
 	log     *logger.RequestLogger
 	relay   *outboxRelay
-	pending []PendingOutboxEvent
+	pending []outboxport.PendingEvent
 	limit   int
 }
 
@@ -264,7 +255,7 @@ func newPublishedMarker(ctx context.Context, l *logger.RequestLogger, relay *out
 	}
 }
 
-func (m *publishedMarker) add(pending PendingOutboxEvent) {
+func (m *publishedMarker) add(pending outboxport.PendingEvent) {
 	m.pending = append(m.pending, pending)
 	if len(m.pending) >= m.limit {
 		m.flush()
@@ -285,7 +276,7 @@ func (m *publishedMarker) flush() {
 	m.markOneByOne(batch, now)
 }
 
-func (m *publishedMarker) markBatch(batch []PendingOutboxEvent, now time.Time) {
+func (m *publishedMarker) markBatch(batch []outboxport.PendingEvent, now time.Time) {
 	eventIDs := make([]string, 0, len(batch))
 	for _, pending := range batch {
 		eventIDs = append(eventIDs, pending.EventID)
@@ -306,7 +297,7 @@ func (m *publishedMarker) markBatch(batch []PendingOutboxEvent, now time.Time) {
 	}
 }
 
-func (m *publishedMarker) markOneByOne(batch []PendingOutboxEvent, now time.Time) {
+func (m *publishedMarker) markOneByOne(batch []outboxport.PendingEvent, now time.Time) {
 	for _, pending := range batch {
 		if err := m.relay.store.MarkEventPublished(m.ctx, pending.EventID, now); err != nil {
 			m.relay.observe(m.ctx, "", eventTypeOf(pending), eventobservability.OutboxOutcomeMarkPublishedFailed)
@@ -317,9 +308,9 @@ func (m *publishedMarker) markOneByOne(batch []PendingOutboxEvent, now time.Time
 	}
 }
 
-func (r *outboxRelay) claimDueEvents(ctx context.Context, now time.Time) ([]PendingOutboxEvent, error) {
+func (r *outboxRelay) claimDueEvents(ctx context.Context, now time.Time) ([]outboxport.PendingEvent, error) {
 	limit := r.batchSize
-	claimed := make([]PendingOutboxEvent, 0, limit)
+	claimed := make([]outboxport.PendingEvent, 0, limit)
 
 	if r.readyIndex != nil {
 		if byIDClaimer, ok := r.store.(outboxport.EventIDClaimer); ok {
@@ -366,15 +357,15 @@ func (r *outboxRelay) claimDueEvents(ctx context.Context, now time.Time) ([]Pend
 	return fallback, nil
 }
 
-func pendingEventForFailure(failure outboxport.FailedMark) PendingOutboxEvent {
-	pending := PendingOutboxEvent{EventID: failure.EventID}
+func pendingEventForFailure(failure outboxport.FailedMark) outboxport.PendingEvent {
+	pending := outboxport.PendingEvent{EventID: failure.EventID}
 	if failure.EventType != "" {
 		pending.Event = event.New(failure.EventType, "", failure.EventID, struct{}{})
 	}
 	return pending
 }
 
-func (r *outboxRelay) publishOne(ctx context.Context, l *logger.RequestLogger, pending PendingOutboxEvent) relayPublishResult {
+func (r *outboxRelay) publishOne(ctx context.Context, l *logger.RequestLogger, pending outboxport.PendingEvent) relayPublishResult {
 	if err := r.publisher.Publish(ctx, pending.Event); err != nil {
 		l.Warnw("outbox publish failed",
 			"relay", r.name,
@@ -387,7 +378,7 @@ func (r *outboxRelay) publishOne(ctx context.Context, l *logger.RequestLogger, p
 	return relayPublishResult{pending: pending, published: true}
 }
 
-func (r *outboxRelay) markEventFailed(ctx context.Context, l *logger.RequestLogger, pending PendingOutboxEvent, cause error) {
+func (r *outboxRelay) markEventFailed(ctx context.Context, l *logger.RequestLogger, pending outboxport.PendingEvent, cause error) {
 	eventType := eventTypeOf(pending)
 	if markErr := r.store.MarkEventFailed(ctx, pending.EventID, cause.Error(), time.Now().Add(r.retryDelay)); markErr != nil {
 		r.observe(ctx, "", eventType, eventobservability.OutboxOutcomeMarkFailedFailed)
@@ -407,7 +398,7 @@ func (r *outboxRelay) markEventFailed(ctx context.Context, l *logger.RequestLogg
 	}
 }
 
-func eventTypeOf(pending PendingOutboxEvent) string {
+func eventTypeOf(pending outboxport.PendingEvent) string {
 	if pending.Event == nil {
 		return ""
 	}

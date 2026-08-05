@@ -19,7 +19,7 @@ const (
 // ImmediateDispatcher best-effort 发布 暂存的 outbox 事件 事务提交后立即。
 type ImmediateDispatcher struct {
 	name                string
-	store               OutboxStore
+	store               outboxport.Store
 	reader              outboxport.ImmediatePublishReader
 	publisher           event.EventPublisher
 	observer            eventobservability.Observer
@@ -36,7 +36,7 @@ type ImmediateDispatcher struct {
 
 type ImmediateDispatcherOptions struct {
 	Name      string
-	Store     OutboxStore
+	Store     outboxport.Store
 	Publisher event.EventPublisher
 	Observer  eventobservability.Observer
 	Enabled   bool

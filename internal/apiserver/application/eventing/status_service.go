@@ -41,7 +41,7 @@ type ConsumerRuntimeStatus struct {
 
 type NamedOutboxStatusReader struct {
 	Name   string
-	Reader OutboxStatusReader
+	Reader outboxport.StatusReader
 }
 
 type StatusSnapshot struct {

@@ -13,7 +13,7 @@ const defaultOutboxStatusReportInterval = 30 * time.Second
 
 type outboxStatusReporter struct {
 	name          string
-	reader        OutboxStatusReader
+	reader        outboxport.StatusReader
 	observer      eventobservability.Observer
 	now           func() time.Time
 	minInterval   time.Duration
@@ -22,15 +22,15 @@ type outboxStatusReporter struct {
 }
 
 // NewOutboxStatusReporter 创建best-effort 指标桥接器 用于 一个outbox 存储。
-func NewOutboxStatusReporter(name string, reader OutboxStatusReader, observer eventobservability.Observer) OutboxStatusReporter {
+func NewOutboxStatusReporter(name string, reader outboxport.StatusReader, observer eventobservability.Observer) OutboxStatusReporter {
 	return newOutboxStatusReporter(name, reader, observer, time.Now)
 }
 
-func newOutboxStatusReporter(name string, reader OutboxStatusReader, observer eventobservability.Observer, now func() time.Time) OutboxStatusReporter {
+func newOutboxStatusReporter(name string, reader outboxport.StatusReader, observer eventobservability.Observer, now func() time.Time) OutboxStatusReporter {
 	return newOutboxStatusReporterWithInterval(name, reader, observer, now, defaultOutboxStatusReportInterval)
 }
 
-func newOutboxStatusReporterWithInterval(name string, reader OutboxStatusReader, observer eventobservability.Observer, now func() time.Time, minInterval time.Duration) OutboxStatusReporter {
+func newOutboxStatusReporterWithInterval(name string, reader outboxport.StatusReader, observer eventobservability.Observer, now func() time.Time, minInterval time.Duration) OutboxStatusReporter {
 	if now == nil {
 		now = time.Now
 	}

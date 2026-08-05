@@ -64,6 +64,7 @@ func TestRemovedEventCompatibilitySymbolsDoNotReturn(t *testing.T) {
 		},
 		"internal/apiserver/application/eventing/outbox.go": {
 			"func NewOutboxRelay(", "func NewDurableOutboxRelay(",
+			"type PendingOutboxEvent =", "type OutboxStore =", "type OutboxStatusReader =",
 		},
 		"internal/apiserver/application/eventing/post_commit.go": {
 			"NewReadyIndexPostCommitDispatcher", "readyIndexPostCommitDispatcher",
