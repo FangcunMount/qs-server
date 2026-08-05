@@ -194,12 +194,39 @@ func TestRouterRegisterRoutesIncludesKeyPaths(t *testing.T) {
 	assertRoutePresent(t, routes, http.MethodPost, "/internal/v1/plans/tasks/window")
 	assertRoutePresent(t, routes, http.MethodPost, "/internal/v2/statistics/runs")
 	assertRouteAbsent(t, routes, http.MethodPost, "/internal/v1/statistics/sync/daily")
-	assertRouteAbsent(t, routes, http.MethodGet, "/internal/v1/cache/governance/status")
 	assertRoutePresent(t, routes, http.MethodGet, "/internal/v1/events/status")
 	assertRoutePresent(t, routes, http.MethodGet, "/internal/v1/resilience/status")
 	assertRoutePresent(t, routes, http.MethodGet, "/internal/v1/system-governance/overview")
 	assertRoutePresent(t, routes, http.MethodGet, "/internal/v1/system-governance/actions")
 	assertRoutePresent(t, routes, http.MethodPost, "/internal/v1/system-governance/actions/:action_id/runs")
+}
+
+func TestRetiredCacheGovernanceRoutesAreAbsent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	resttransport.NewRouter(newRouterTestDeps()).RegisterRoutes(engine)
+
+	retiredPaths := []string{
+		"/internal/v1/cache/governance/status",
+		"/internal/v1/cache/governance/hotset",
+		"/internal/v1/cache/governance/warmup-targets",
+	}
+	for _, path := range retiredPaths {
+		t.Run(path, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			engine.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+			if response.Code != http.StatusNotFound {
+				t.Fatalf("GET %s status = %d, want %d", path, response.Code, http.StatusNotFound)
+			}
+		})
+	}
+
+	spec := loadRouterMatrixOpenAPI(t, "../../api/rest/apiserver.yaml")
+	for _, path := range retiredPaths {
+		if _, present := spec.Paths[path]; present {
+			t.Fatalf("retired OpenAPI path %s is still present", path)
+		}
+	}
 }
 
 func TestHistoricalSeedRoutesAreRetiredAtRouterLevel(t *testing.T) {
