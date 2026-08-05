@@ -73,7 +73,7 @@ jobs:
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          command_timeout: 60m
+          command_timeout: 2h
           envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
           script: |
             set -Eeuo pipefail
@@ -94,6 +94,7 @@ jobs:
             BACKUP_FILE="qs_mongodb_backup_${TIMESTAMP}.archive.gz"
             PARTIAL_FILE="${BACKUP_FILE}.partial"
             MONGODB_PORT="${MONGODB_PORT:-27017}"
+            MONGODB_URI="mongodb://${MONGODB_HOST}:${MONGODB_PORT}/?connectTimeoutMS=30000&socketTimeoutMS=0"
 
             sudo install -d -m 0750 "$BACKUP_DIR"
 
@@ -109,23 +110,35 @@ jobs:
               -e MONGODB_USERNAME="$MONGODB_USERNAME" \
               -e MONGODB_PASSWORD="$MONGODB_PASSWORD" \
               -e MONGODB_DBNAME="$MONGODB_DBNAME" \
+              -e MONGODB_URI="$MONGODB_URI" \
               -e BACKUP_FILE="$BACKUP_FILE" \
               -e PARTIAL_FILE="$PARTIAL_FILE" \
               --entrypoint /usr/bin/timeout \
-              mongo:7.0 55m /bin/bash -Eeuo pipefail -c '
+              mongo:7.0 115m /bin/bash -Eeuo pipefail -c '
                 cleanup_partial() {
                   rm -f -- "/backup/$PARTIAL_FILE"
                 }
                 trap cleanup_partial EXIT
 
-                mongodump \
-                  --host="$MONGODB_HOST" \
-                  --port="$MONGODB_PORT" \
-                  --username="$MONGODB_USERNAME" \
-                  --password="$MONGODB_PASSWORD" \
-                  --authenticationDatabase=admin \
-                  --db="$MONGODB_DBNAME" \
-                  --archive | gzip -1 > "/backup/$PARTIAL_FILE"
+                for ATTEMPT in 1 2 3; do
+                  rm -f -- "/backup/$PARTIAL_FILE"
+                  if mongodump \
+                    --uri="$MONGODB_URI" \
+                    --username="$MONGODB_USERNAME" \
+                    --password="$MONGODB_PASSWORD" \
+                    --authenticationDatabase=admin \
+                    --db="$MONGODB_DBNAME" \
+                    --numParallelCollections=1 \
+                    --archive | gzip -1 > "/backup/$PARTIAL_FILE"; then
+                    break
+                  fi
+                  if (( ATTEMPT == 3 )); then
+                    echo "❌ MongoDB backup failed after $ATTEMPT attempts" >&2
+                    exit 1
+                  fi
+                  echo "⚠️ MongoDB backup attempt $ATTEMPT failed; retrying in 15 seconds" >&2
+                  sleep 15
+                done
 
                 if [ ! -s "/backup/$PARTIAL_FILE" ]; then
                   echo "❌ MongoDB backup archive is empty" >&2
