@@ -159,6 +159,7 @@ func createDraftQuestionnaire(t *testing.T, repo domainquestionnaire.Repository,
 		"Standalone lifecycle transaction",
 		domainquestionnaire.WithType(domainquestionnaire.TypeSurvey),
 		domainquestionnaire.WithVersion(domainquestionnaire.Version("1.0.0")),
+		domainquestionnaire.WithStatus(domainquestionnaire.STATUS_DRAFT),
 	)
 	if err != nil {
 		t.Fatalf("NewQuestionnaire(): %v", err)

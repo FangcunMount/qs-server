@@ -385,7 +385,7 @@ func newRouterTestContainer() *container.Container {
 	clinicianQuery := &routerClinicianQueryStub{}
 	surveyModule := &surveymod.Module{
 		Questionnaire: &surveymod.QuestionnaireSubModule{
-			LifecycleService: questionnaireApp.NewLifecycleService(nil, nil, domainQuestionnaire.Validator{}, domainQuestionnaire.NewLifecycle(), nil),
+			LifecycleService: questionnaireApp.NewLifecycleService(nil, nil, domainQuestionnaire.Validator{}, domainQuestionnaire.NewLifecycle(), nil, nil),
 			ContentService:   questionnaireApp.NewContentService(nil),
 			QueryService:     questionnaireApp.NewQueryService(nil, nil, nil, nil),
 		},
