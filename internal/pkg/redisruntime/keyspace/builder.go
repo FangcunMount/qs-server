@@ -31,26 +31,6 @@ func NewBuilderWithNamespace(ns string) *Builder {
 	return &Builder{keyspace: rediskit.NewKeyspace(ns)}
 }
 
-func (b *Builder) BuildScaleKey(code string) string {
-	return NewCacheKeyspace(b.namespace()).Scale(code)
-}
-
-func (b *Builder) BuildScaleVersionKey(code, version string) string {
-	return NewCacheKeyspace(b.namespace()).ScaleVersion(code, version)
-}
-
-func (b *Builder) BuildPublishedScaleKey(code string) string {
-	return NewCacheKeyspace(b.namespace()).PublishedScale(code)
-}
-
-func (b *Builder) BuildPublishedScaleByQuestionnaireKey(questionnaireCode string) string {
-	return NewCacheKeyspace(b.namespace()).PublishedScaleByQuestionnaire(questionnaireCode)
-}
-
-func (b *Builder) BuildScaleHotListKey(limit, windowDays int) string {
-	return NewCacheKeyspace(b.namespace()).ScaleHotList(limit, windowDays)
-}
-
 func (b *Builder) BuildScaleHotDailyKey(day string) string {
 	return NewCacheKeyspace(b.namespace()).ScaleHotDaily(day)
 }
@@ -71,10 +51,6 @@ func (b *Builder) BuildPublishedQuestionnaireKey(code string) string {
 	return NewCacheKeyspace(b.namespace()).PublishedQuestionnaire(code)
 }
 
-func (b *Builder) BuildPublishedAssessmentModelByQuestionnaireKey(questionnaireCode, questionnaireVersion string) string {
-	return NewCacheKeyspace(b.namespace()).PublishedAssessmentModelByQuestionnaire(questionnaireCode, questionnaireVersion)
-}
-
 func (b *Builder) BuildPublishedAssessmentModelByRefKey(kind, subKind, algorithm, code, version string) string {
 	return NewCacheKeyspace(b.namespace()).PublishedAssessmentModelByRef(kind, subKind, algorithm, code, version)
 }
@@ -87,16 +63,8 @@ func (b *Builder) BuildAssessmentDetailKey(id uint64) string {
 	return NewCacheKeyspace(b.namespace()).AssessmentDetail(id)
 }
 
-func (b *Builder) BuildAssessmentListKey(userID uint64, suffix string) string {
-	return NewCacheKeyspace(b.namespace()).AssessmentList(userID, suffix)
-}
-
 func (b *Builder) BuildQueryVersionKey(kind, scope string) string {
 	return NewCacheKeyspace(b.namespace()).QueryVersion(kind, scope)
-}
-
-func (b *Builder) BuildVersionedQueryKey(kind, scope string, version uint64, hash string) string {
-	return NewCacheKeyspace(b.namespace()).VersionedQuery(kind, scope, version, hash)
 }
 
 func (b *Builder) BuildAssessmentListVersionKey(userID uint64) string {
@@ -113,14 +81,6 @@ func (b *Builder) BuildTesteeInfoKey(id uint64) string {
 
 func (b *Builder) BuildPlanInfoKey(id uint64) string {
 	return NewCacheKeyspace(b.namespace()).PlanInfo(id)
-}
-
-func (b *Builder) BuildStatsQueryKey(cacheKey string) string {
-	return NewCacheKeyspace(b.namespace()).StatsQuery(cacheKey)
-}
-
-func (b *Builder) BuildWarmupHotsetKey(family, kind string) string {
-	return NewGovernanceKeyspace(b.namespace()).WarmupHotset(family, kind)
 }
 
 func (b *Builder) BuildAnswerSheetProcessingLockKey(answerSheetID uint64) string {

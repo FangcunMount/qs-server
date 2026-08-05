@@ -17,29 +17,6 @@ func NewCacheKeyspace(ns string) CacheKeyspace {
 	return CacheKeyspace{keyspace: rediskit.NewKeyspace(ns)}
 }
 
-func (k CacheKeyspace) Scale(code string) string {
-	return k.keyspace.Prefix("scale:" + code)
-}
-
-func (k CacheKeyspace) ScaleVersion(code, version string) string {
-	if version == "" {
-		return k.Scale(code)
-	}
-	return k.keyspace.Prefix("scale:" + code + ":" + version)
-}
-
-func (k CacheKeyspace) PublishedScale(code string) string {
-	return k.keyspace.Prefix("scale:published:" + code)
-}
-
-func (k CacheKeyspace) PublishedScaleByQuestionnaire(questionnaireCode string) string {
-	return k.keyspace.Prefix("scale:published:questionnaire:" + questionnaireCode)
-}
-
-func (k CacheKeyspace) ScaleHotList(limit, windowDays int) string {
-	return k.keyspace.Prefix(fmt.Sprintf("scale:hot:list:v1:%d:%d", limit, windowDays))
-}
-
 func (k CacheKeyspace) ScaleHotDaily(day string) string {
 	return k.keyspace.Prefix("scale:hot:{rank}:daily:" + day)
 }
@@ -63,14 +40,6 @@ func (k CacheKeyspace) PublishedQuestionnaire(code string) string {
 	return k.keyspace.Prefix("questionnaire:published:" + code)
 }
 
-func (k CacheKeyspace) PublishedAssessmentModelByQuestionnaire(questionnaireCode, questionnaireVersion string) string {
-	code := strings.ToLower(questionnaireCode)
-	if questionnaireVersion == "" {
-		return k.keyspace.Prefix("assessment_model:published:questionnaire:" + code)
-	}
-	return k.keyspace.Prefix("assessment_model:published:questionnaire:" + code + ":" + strings.ToLower(questionnaireVersion))
-}
-
 func (k CacheKeyspace) PublishedAssessmentModelByRef(kind, subKind, algorithm, code, version string) string {
 	return k.keyspace.Prefix(fmt.Sprintf(
 		"assessment_model:published:ref:%s:%s:%s:%s:%s",
@@ -92,14 +61,6 @@ func (k CacheKeyspace) PublishedAssessmentModelLatestByCode(kind, code string) s
 
 func (k CacheKeyspace) AssessmentDetail(id uint64) string {
 	return k.keyspace.Prefix(fmt.Sprintf("assessment:detail:%d", id))
-}
-
-func (k CacheKeyspace) AssessmentList(userID uint64, suffix string) string {
-	key := fmt.Sprintf("assess:list:%d:v1", userID)
-	if suffix != "" {
-		key += suffix
-	}
-	return k.keyspace.Prefix(key)
 }
 
 func (k CacheKeyspace) QueryVersion(kind, scope string) string {
@@ -128,10 +89,6 @@ func (k CacheKeyspace) TesteeInfo(id uint64) string {
 
 func (k CacheKeyspace) PlanInfo(id uint64) string {
 	return k.keyspace.Prefix(fmt.Sprintf("plan:info:%d", id))
-}
-
-func (k CacheKeyspace) StatsQuery(cacheKey string) string {
-	return k.keyspace.Prefix("stats:query:" + cacheKey)
 }
 
 func (k CacheKeyspace) WeChatSDK(key string) string {

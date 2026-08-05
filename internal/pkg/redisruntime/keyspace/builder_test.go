@@ -4,9 +4,6 @@ import "testing"
 
 func TestBuilderWithoutNamespace(t *testing.T) {
 	builder := NewBuilder()
-	if got := builder.BuildStatsQueryKey("system:1"); got != "stats:query:system:1" {
-		t.Fatalf("unexpected stats query key: %s", got)
-	}
 	if got := builder.BuildAnswerSheetProcessingLockKey(42); got != "answersheet:processing:42" {
 		t.Fatalf("unexpected answersheet lock key: %s", got)
 	}
@@ -19,9 +16,6 @@ func TestBuilderWithoutNamespace(t *testing.T) {
 	if got := builder.BuildQueryVersionKey("assessment:list", "42"); got != "query:version:assessment:list:42" {
 		t.Fatalf("unexpected query version key: %s", got)
 	}
-	if got := builder.BuildVersionedQueryKey("assessment:list", "42", 3, "deadbeef"); got != "query:assessment:list:42:v3:deadbeef" {
-		t.Fatalf("unexpected versioned query key: %s", got)
-	}
 	if got := builder.BuildScaleHotDailyKey("20260501"); got != "scale:hot:{rank}:daily:20260501" {
 		t.Fatalf("unexpected scale hot daily key: %s", got)
 	}
@@ -32,23 +26,8 @@ func TestBuilderWithoutNamespace(t *testing.T) {
 
 func TestBuilderWithNamespace(t *testing.T) {
 	builder := NewBuilderWithNamespace("prod:cache:query")
-	if got := builder.BuildStatsQueryKey("system:1"); got != "prod:cache:query:stats:query:system:1" {
-		t.Fatalf("unexpected explicit namespaced stats query key: %s", got)
-	}
-	if got := builder.BuildScaleKey("SDS"); got != "prod:cache:query:scale:SDS" {
-		t.Fatalf("unexpected explicit namespaced scale key: %s", got)
-	}
-	if got := builder.BuildPublishedScaleKey("s-001"); got != "prod:cache:query:scale:published:s-001" {
-		t.Fatalf("unexpected published scale key: %s", got)
-	}
-	if got := builder.BuildPublishedScaleByQuestionnaireKey("q-001"); got != "prod:cache:query:scale:published:questionnaire:q-001" {
-		t.Fatalf("unexpected published scale questionnaire key: %s", got)
-	}
 	if got := builder.BuildPublishedAssessmentModelLatestByCodeKey("Typology", "MBTI"); got != "prod:cache:query:assessment_model:published:latest:typology:mbti" {
 		t.Fatalf("unexpected published model latest-by-code key: %s", got)
-	}
-	if got := builder.BuildScaleHotListKey(5, 30); got != "prod:cache:query:scale:hot:list:v1:5:30" {
-		t.Fatalf("unexpected hot list key: %s", got)
 	}
 	if got := builder.BuildScaleHotWindowKey("20260501:30"); got != "prod:cache:query:scale:hot:{rank}:window:20260501:30" {
 		t.Fatalf("unexpected explicit namespaced scale hot window key: %s", got)
