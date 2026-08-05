@@ -93,7 +93,7 @@ func maxOptionScore(optionScores map[string]float64) float64 {
 
 // ScaleFactorScorer executes scale factor scoring through infrastructure strategies.
 // The public surface is capability.PathScaleDescriptor × UsageQuestionAggregation
-// (sum/avg/cnt + aliases) — not the historical full StrategyType registry.
+// (sum/avg/cnt + aliases).
 type ScaleFactorScorer struct {
 	strategies scoringStrategies
 }
