@@ -7,6 +7,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 	locksubsystem "github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease/subsystem"
 )
 
@@ -66,7 +67,7 @@ func (s *Subsystem) Snapshot(now time.Time) resilience.RuntimeSnapshot {
 	if s.locks != nil {
 		snapshot.Locks = s.locks.Snapshots()
 	}
-	configured := len(snapshot.Locks) == 1 && snapshot.Locks[0].Configured && !snapshot.Locks[0].Degraded
+	configured := healthyLockCapability(snapshot.Locks, string(locklease.WorkloadAnswersheetProcessing))
 	reason := ""
 	if !configured {
 		reason = "worker duplicate suppression lock manager unavailable"
@@ -76,4 +77,13 @@ func (s *Subsystem) Snapshot(now time.Time) resilience.RuntimeSnapshot {
 		Configured: configured, Degraded: !configured, Reason: reason,
 	}}
 	return resilience.FinalizeRuntimeSnapshot(snapshot)
+}
+
+func healthyLockCapability(locks []resilience.CapabilitySnapshot, name string) bool {
+	for _, capability := range locks {
+		if capability.Name == name {
+			return capability.Configured && !capability.Degraded
+		}
+	}
+	return false
 }
