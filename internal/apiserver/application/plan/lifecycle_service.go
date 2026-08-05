@@ -24,26 +24,6 @@ type lifecycleService struct {
 	transitionWorkflow *planTransitionWorkflow
 }
 
-// NewLifecycleService 创建计划生命周期服务。
-func NewLifecycleService(
-	planRepo plan.AssessmentPlanRepository,
-	taskRepo plan.AssessmentTaskRepository,
-	scaleCatalog ScaleCatalog,
-	eventPublisher event.EventPublisher,
-) PlanLifecycleService {
-	return NewLifecycleServiceWithScaleCatalog(planRepo, taskRepo, scaleCatalog, eventPublisher)
-}
-
-// NewLifecycleServiceWithScaleCatalog 创建使用 scale catalog 防腐接口的计划生命周期服务。
-func NewLifecycleServiceWithScaleCatalog(
-	planRepo plan.AssessmentPlanRepository,
-	taskRepo plan.AssessmentTaskRepository,
-	scaleCatalog ScaleCatalog,
-	eventPublisher event.EventPublisher,
-) PlanLifecycleService {
-	return NewLifecycleServiceWithEnrollment(planRepo, taskRepo, scaleCatalog, nil, nil, eventPublisher)
-}
-
 func NewLifecycleServiceWithEnrollment(
 	planRepo plan.AssessmentPlanRepository,
 	taskRepo plan.AssessmentTaskRepository,
