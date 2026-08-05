@@ -474,6 +474,28 @@ func TestDBOpsInventoriesEvaluationRunAndOutcomeConsistency(t *testing.T) {
 	}
 }
 
+func TestDBOpsInventoriesLegacyBackupTablesExactly(t *testing.T) {
+	t.Parallel()
+
+	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "db-ops.yml"))
+	if err != nil {
+		t.Fatalf("read db ops workflow: %v", err)
+	}
+	content := string(workflow)
+	for _, required := range []string{
+		"legacy_backup_table",
+		"COUNT(*) AS exact_rows",
+		"^seed_orphan_(outbox|stats)_bak_hist_v1",
+		"PREPARE legacy_backup_count_stmt",
+		"EXECUTE legacy_backup_count_stmt",
+		"DEALLOCATE PREPARE legacy_backup_count_stmt",
+	} {
+		if !strings.Contains(content, required) {
+			t.Errorf("DB ops legacy backup inventory must contain %q", required)
+		}
+	}
+}
+
 func TestDBOpsInventoriesStatisticsCanonicalAndCompatibilityState(t *testing.T) {
 	t.Parallel()
 
