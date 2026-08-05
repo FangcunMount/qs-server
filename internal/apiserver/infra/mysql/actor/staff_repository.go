@@ -27,11 +27,6 @@ func NewOperatorRepository(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) dom
 	return repo
 }
 
-// NewStaffRepository 兼容旧构造函数，内部委托到 NewOperatorRepository。
-func NewStaffRepository(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) domain.Repository {
-	return NewOperatorRepository(db, opts...)
-}
-
 // Save 保存操作者
 func (r *operatorRepository) Save(ctx context.Context, item *domain.Operator) error {
 	po := r.mapper.ToPO(item)

@@ -1,8 +1,6 @@
 package actor
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 )
 
@@ -42,60 +40,4 @@ func (r *TesteeRef) TesteeID() testee.ID {
 // ProfileID 获取用户档案ID
 func (r *TesteeRef) ProfileID() *uint64 {
 	return r.profileID
-}
-
-// OperatorRef 后台操作者引用（值对象）
-// 用于在其他聚合根中引用机构内操作者。
-type OperatorRef struct {
-	operatorID operator.ID // 操作者ID
-	userID     int64       // 用户ID（必须）
-	name       string      // 姓名
-}
-
-// NewOperatorRef 创建后台操作者引用
-func NewOperatorRef(operatorID operator.ID, userID int64, name string) *OperatorRef {
-	return &OperatorRef{
-		operatorID: operatorID,
-		userID:     userID,
-		name:       name,
-	}
-}
-
-// OperatorID 获取操作者ID
-func (r *OperatorRef) OperatorID() operator.ID {
-	return r.operatorID
-}
-
-// UserID 获取用户ID
-func (r *OperatorRef) UserID() int64 {
-	return r.userID
-}
-
-// Name 获取姓名
-func (r *OperatorRef) Name() string {
-	return r.name
-}
-
-// ClinicianRef 从业者引用（值对象）。
-type ClinicianRef struct {
-	clinicianID clinician.ID
-	name        string
-}
-
-// NewClinicianRef 创建从业者引用。
-func NewClinicianRef(clinicianID clinician.ID, name string) *ClinicianRef {
-	return &ClinicianRef{
-		clinicianID: clinicianID,
-		name:        name,
-	}
-}
-
-// ClinicianID 获取从业者ID。
-func (r *ClinicianRef) ClinicianID() clinician.ID {
-	return r.clinicianID
-}
-
-// Name 获取从业者姓名。
-func (r *ClinicianRef) Name() string {
-	return r.name
 }

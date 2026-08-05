@@ -5,11 +5,6 @@ import "github.com/FangcunMount/qs-server/internal/pkg/meta"
 // ID 关系ID类型。
 type ID = meta.ID
 
-// NewID 创建关系ID。
-func NewID(id uint64) ID {
-	return meta.FromUint64(id)
-}
-
 // RelationType 从业者与受试者关系类型。
 type RelationType string
 
@@ -82,36 +77,15 @@ var accessGrantRelationTypes = []RelationType{
 	RelationTypeCollaborator,
 }
 
-var careRelationTypes = []RelationType{
-	RelationTypePrimary,
-	RelationTypeAttending,
-	RelationTypeCollaborator,
-}
-
 // AccessGrantRelationTypes 返回授予访问权的关系类型。
 func AccessGrantRelationTypes() []RelationType {
 	return append([]RelationType(nil), accessGrantRelationTypes...)
-}
-
-// CareRelationTypes 返回正式照护关系类型。
-func CareRelationTypes() []RelationType {
-	return append([]RelationType(nil), careRelationTypes...)
 }
 
 // GrantsAccess 判断关系类型是否授予访问权。
 func GrantsAccess(relationType RelationType) bool {
 	switch relationType {
 	case RelationTypeAssigned, RelationTypePrimary, RelationTypeAttending, RelationTypeCollaborator:
-		return true
-	default:
-		return false
-	}
-}
-
-// IsCareRelationType 判断关系类型是否为正式照护关系。
-func IsCareRelationType(relationType RelationType) bool {
-	switch relationType {
-	case RelationTypePrimary, RelationTypeAttending, RelationTypeCollaborator:
 		return true
 	default:
 		return false

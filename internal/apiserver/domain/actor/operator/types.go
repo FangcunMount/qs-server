@@ -5,11 +5,6 @@ import "github.com/FangcunMount/qs-server/internal/pkg/meta"
 // ID 员工ID类型
 type ID = meta.ID
 
-// NewID 创建员工ID
-func NewID(id uint64) ID {
-	return meta.FromUint64(id)
-}
-
 // Role 员工角色类型
 type Role string
 
