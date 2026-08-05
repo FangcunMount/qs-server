@@ -13,11 +13,6 @@ type OutcomeAssembler struct {
 	registry OutcomeAdapterRegistry
 }
 
-// NewOutcomeAssembler 返回默认 类型学 结果组装器。
-func NewOutcomeAssembler() OutcomeAssembler {
-	return NewOutcomeAssemblerWithRegistry(DefaultOutcomeAdapterRegistry())
-}
-
 // NewOutcomeAssemblerWithRegistry 返回结果组装器 bound 到 特定 adapter 注册表。
 func NewOutcomeAssemblerWithRegistry(registry OutcomeAdapterRegistry) OutcomeAssembler {
 	return OutcomeAssembler{registry: registry}

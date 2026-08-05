@@ -30,22 +30,3 @@ func AnswerValueKey(raw any) string {
 		return strings.TrimSpace(fmt.Sprint(raw))
 	}
 }
-
-// StringSet 构建case-insensitive lookup set 从 string values。
-func StringSet(values []string) map[string]bool {
-	set := make(map[string]bool, len(values)*2)
-	for _, value := range values {
-		trimmed := strings.TrimSpace(value)
-		set[trimmed] = true
-		set[strings.ToUpper(trimmed)] = true
-	}
-	return set
-}
-
-// AbsInt 返回absolute value of integer。
-func AbsInt(value int) int {
-	if value < 0 {
-		return -value
-	}
-	return value
-}

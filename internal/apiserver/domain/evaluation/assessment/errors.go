@@ -70,44 +70,9 @@ func NewInvalidStatusError(operation string, currentStatus Status) error {
 	return fmt.Errorf("%w: cannot %s in status %s", ErrInvalidStatus, operation, currentStatus)
 }
 
-// NewNotFoundError 创建未找到错误
-func NewNotFoundError(entityType string, id interface{}) error {
-	return fmt.Errorf("%w: %s with id %v", ErrNotFound, entityType, id)
-}
-
-// NewDuplicateError 创建重复错误
-func NewDuplicateError(entityType string, field string, value interface{}) error {
-	return fmt.Errorf("%w: %s with %s=%v", ErrDuplicate, entityType, field, value)
-}
-
 // ==================== 错误判断方法 ====================
-
-// IsInvalidStatusError 判断是否为无效状态错误
-func IsInvalidStatusError(err error) bool {
-	return errors.Is(err, ErrInvalidStatus)
-}
 
 // IsNotFoundError 判断是否为未找到错误
 func IsNotFoundError(err error) bool {
 	return errors.Is(err, ErrNotFound)
-}
-
-// IsDuplicateError 判断是否为重复错误
-func IsDuplicateError(err error) bool {
-	return errors.Is(err, ErrDuplicate)
-}
-
-// IsTesteeNotFoundError 判断是否为受试者未找到错误
-func IsTesteeNotFoundError(err error) bool {
-	return errors.Is(err, ErrTesteeNotFound)
-}
-
-// IsQuestionnaireNotFoundError 判断是否为问卷未找到错误
-func IsQuestionnaireNotFoundError(err error) bool {
-	return errors.Is(err, ErrQuestionnaireNotFound)
-}
-
-// IsScaleNotFoundError 判断是否为量表未找到错误
-func IsScaleNotFoundError(err error) bool {
-	return errors.Is(err, ErrScaleNotFound)
 }

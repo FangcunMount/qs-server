@@ -71,14 +71,6 @@ func WithRuntimeDescriptorRegistry(registry *evalpipeline.RuntimeDescriptorRegis
 	}
 }
 
-// WithDescriptorExecutor replaces descriptor execution. Production uses the
-// native descriptor pipeline; the option is kept as a narrow testing seam.
-func WithDescriptorExecutor(executor evalpipeline.DescriptorExecutor) EngineOption {
-	return func(s *service) {
-		s.descriptorExecutor = executor
-	}
-}
-
 // WithRunRepository 配置评估执行 持久化。
 func WithRunRepository(repo evaluationrun.Repository) EngineOption {
 	return func(s *service) {
