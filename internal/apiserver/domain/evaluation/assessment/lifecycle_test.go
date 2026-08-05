@@ -290,7 +290,7 @@ func TestSubmitAndRetryRejectUnboundAssessment(t *testing.T) {
 			run: func(t *testing.T, a *Assessment) {
 				// Reconstruct a historical questionnaire-only Assessment that reached failed
 				// without going through the new Submit invariant.
-				failed := Reconstruct(
+				failed := ReconstructWithCreatedAt(
 					a.ID(),
 					a.OrgID(),
 					a.TesteeID(),
@@ -300,6 +300,7 @@ func TestSubmitAndRetryRejectUnboundAssessment(t *testing.T) {
 					StatusFailed,
 					nil,
 					nil,
+					time.Time{},
 					nil,
 					nil,
 					ptrTime(time.Unix(50, 0)),

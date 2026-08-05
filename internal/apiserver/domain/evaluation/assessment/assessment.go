@@ -127,26 +127,6 @@ func WithCreatedAt(createdAt time.Time) AssessmentOption {
 
 // ==================== 重建方法（仓储层使用）====================
 
-// Reconstruct 从持久化数据重建测评对象。旧调用没有独立业务创建时间。
-func Reconstruct(
-	id ID,
-	orgID int64,
-	testeeID testee.ID,
-	questionnaireRef QuestionnaireRef,
-	answerSheetRef AnswerSheetRef,
-	origin Origin,
-	status Status,
-	totalScore *float64,
-	riskLevel *RiskLevel,
-	submittedAt *time.Time,
-	evaluatedAt *time.Time,
-	failedAt *time.Time,
-	failureReason *string,
-	modelRefs ...*EvaluationModelRef,
-) *Assessment {
-	return ReconstructWithCreatedAt(id, orgID, testeeID, questionnaireRef, answerSheetRef, origin, status, totalScore, riskLevel, time.Time{}, submittedAt, evaluatedAt, failedAt, failureReason, modelRefs...)
-}
-
 // ReconstructWithCreatedAt restores the explicit persisted assessment
 // creation time used by historical statistics.
 func ReconstructWithCreatedAt(

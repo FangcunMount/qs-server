@@ -88,10 +88,10 @@ func TestExecuteBuildsEvaluatedReceiptFromCanonicalOutcome(t *testing.T) {
 	now := time.Unix(20, 0)
 	total, projectionTotal := 999.0, 42.0
 	projectionRisk := domainassessment.RiskLevelLow
-	a := domainassessment.Reconstruct(
+	a := domainassessment.ReconstructWithCreatedAt(
 		meta.FromUint64(1), 9, domaintestee.NewID(7),
 		domainassessment.NewQuestionnaireRefByCode(meta.NewCode("Q"), "1"), domainassessment.NewAnswerSheetRef(meta.FromUint64(3)),
-		domainassessment.NewAdhocOrigin(), domainassessment.StatusEvaluated, &total, &projectionRisk, &now, &now, nil, nil,
+		domainassessment.NewAdhocOrigin(), domainassessment.StatusEvaluated, &total, &projectionRisk, time.Time{}, &now, &now, nil, nil,
 	)
 	execution := &domainoutcome.Execution{
 		ModelRef: domainoutcome.ModelRef{ModelKind: modelcatalog.KindScale, ModelCode: "S", ModelVersion: "1", ModelTitle: "Canonical"},
@@ -132,10 +132,10 @@ func TestExecuteBuildsEvaluatedReceiptFromCanonicalOutcome(t *testing.T) {
 
 func TestExecuteRejectsEvaluatedAssessmentWithoutCanonicalOutcome(t *testing.T) {
 	now := time.Unix(20, 0)
-	a := domainassessment.Reconstruct(
+	a := domainassessment.ReconstructWithCreatedAt(
 		meta.FromUint64(1), 9, domaintestee.NewID(7),
 		domainassessment.NewQuestionnaireRefByCode(meta.NewCode("Q"), "1"), domainassessment.NewAnswerSheetRef(meta.FromUint64(3)),
-		domainassessment.NewAdhocOrigin(), domainassessment.StatusEvaluated, nil, nil, &now, &now, nil, nil,
+		domainassessment.NewAdhocOrigin(), domainassessment.StatusEvaluated, nil, nil, time.Time{}, &now, &now, nil, nil,
 	)
 	svc := NewService(engineStub{}, assessmentRepoStub{value: a}, outcomeRepoStub{}, runRepoStub{})
 	if _, err := svc.Execute(context.Background(), Command{AssessmentID: 1}); err == nil {

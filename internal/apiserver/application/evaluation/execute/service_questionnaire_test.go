@@ -87,7 +87,7 @@ func (r *fakeAssessmentRepo) FindByAnswerSheetID(_ context.Context, _ domainAsse
 
 func TestEvaluateFailsWhenQuestionnaireVersionDoesNotResolveCurrentQuestionnaire(t *testing.T) {
 	aRepo := &fakeAssessmentRepo{
-		assessment: domainAssessment.Reconstruct(
+		assessment: domainAssessment.ReconstructWithCreatedAt(
 			meta.FromUint64(101),
 			1,
 			testee.NewID(202),
@@ -97,6 +97,7 @@ func TestEvaluateFailsWhenQuestionnaireVersionDoesNotResolveCurrentQuestionnaire
 			domainAssessment.StatusSubmitted,
 			nil,
 			nil,
+			time.Time{},
 			nil,
 			nil,
 			nil,
@@ -367,7 +368,7 @@ func TestFailureFinalizerTransactionErrorsDoNotPolluteCallerState(t *testing.T) 
 
 func engineAssessmentForOutboxTest(t *testing.T) *domainAssessment.Assessment {
 	t.Helper()
-	return domainAssessment.Reconstruct(
+	return domainAssessment.ReconstructWithCreatedAt(
 		meta.FromUint64(9901),
 		1,
 		testee.NewID(202),
@@ -377,6 +378,7 @@ func engineAssessmentForOutboxTest(t *testing.T) *domainAssessment.Assessment {
 		domainAssessment.StatusSubmitted,
 		nil,
 		nil,
+		time.Time{},
 		nil,
 		nil,
 		nil,
@@ -419,7 +421,7 @@ func (e inputFailure) FailureReason() string {
 
 func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 	aRepo := &fakeAssessmentRepo{
-		assessment: domainAssessment.Reconstruct(
+		assessment: domainAssessment.ReconstructWithCreatedAt(
 			meta.FromUint64(101),
 			1,
 			testee.NewID(202),
@@ -429,6 +431,7 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 			domainAssessment.StatusSubmitted,
 			nil,
 			nil,
+			time.Time{},
 			nil,
 			nil,
 			nil,
@@ -509,7 +512,7 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 		"Fake Model",
 	)
 	aRepo := &fakeAssessmentRepo{
-		assessment: domainAssessment.Reconstruct(
+		assessment: domainAssessment.ReconstructWithCreatedAt(
 			meta.FromUint64(103),
 			1,
 			testee.NewID(202),
@@ -519,6 +522,7 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 			domainAssessment.StatusSubmitted,
 			nil,
 			nil,
+			time.Time{},
 			nil,
 			nil,
 			nil,
@@ -576,7 +580,7 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 func TestEvaluateUnknownRuleSetKindMarksAssessmentFailed(t *testing.T) {
 	modelRef := domainAssessment.NewEvaluationModelRefByCode(domainAssessment.EvaluationModelKindTypology, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
 	aRepo := &fakeAssessmentRepo{
-		assessment: domainAssessment.Reconstruct(
+		assessment: domainAssessment.ReconstructWithCreatedAt(
 			meta.FromUint64(102),
 			1,
 			testee.NewID(202),
@@ -586,6 +590,7 @@ func TestEvaluateUnknownRuleSetKindMarksAssessmentFailed(t *testing.T) {
 			domainAssessment.StatusSubmitted,
 			nil,
 			nil,
+			time.Time{},
 			nil,
 			nil,
 			nil,
