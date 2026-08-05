@@ -49,7 +49,7 @@ func questionIndexFromResult(questionnaire *questionnaireapp.QuestionnaireResult
 	}
 	questions := make([]questionnaireref.Question, 0, len(questionnaire.Questions))
 	for _, question := range questionnaire.Questions {
-		item := questionnaireref.Question{Code: question.Code, Type: question.Type, OptionCodes: make([]string, 0, len(question.Options))}
+		item := questionnaireref.Question{Code: question.Code, OptionCodes: make([]string, 0, len(question.Options))}
 		for _, option := range question.Options {
 			item.OptionCodes = append(item.OptionCodes, option.Value)
 		}

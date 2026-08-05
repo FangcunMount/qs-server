@@ -15,17 +15,3 @@ func RefFromPublished(model *PublishedModel) Ref {
 		Title:     model.Title,
 	}
 }
-
-// RefMatchesPublished reports whether a runtime reference selects this exact
-// immutable published model.
-func RefMatchesPublished(ref Ref, model *PublishedModel) bool {
-	if model == nil || ref.Code == "" || ref.Version == "" {
-		return false
-	}
-	got := RefFromPublished(model)
-	return ref.Kind == got.Kind &&
-		ref.SubKind == got.SubKind &&
-		ref.Algorithm == got.Algorithm &&
-		ref.Code == got.Code &&
-		ref.Version == got.Version
-}

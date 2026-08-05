@@ -3,7 +3,6 @@ package systemgovernance
 import (
 	"context"
 	"testing"
-	"time"
 )
 
 type stubCheckpointReader struct {
@@ -36,8 +35,4 @@ func TestGetOverviewIncludesCheckpointSignals(t *testing.T) {
 	if !found {
 		t.Fatalf("signals = %#v, want retryable failed checkpoint signal", view.Signals)
 	}
-}
-
-func stubEvalAt() time.Time {
-	return time.Date(2026, 7, 8, 12, 0, 0, 0, time.UTC)
 }

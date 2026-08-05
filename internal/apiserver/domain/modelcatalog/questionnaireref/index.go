@@ -9,21 +9,18 @@ import (
 // Question is the minimal questionnaire question surface needed for publish ref checks.
 type Question struct {
 	Code        string
-	Type        string
 	OptionCodes []string
 }
 
 // Index maps question codes to option codes for existence checks.
 type Index struct {
 	questions map[string]map[string]struct{}
-	types     map[string]string
 }
 
 // NewIndex builds an index from published questionnaire questions.
 func NewIndex(questions []Question) Index {
 	idx := Index{
 		questions: make(map[string]map[string]struct{}, len(questions)),
-		types:     make(map[string]string, len(questions)),
 	}
 	for _, question := range questions {
 		if question.Code == "" {
@@ -36,20 +33,8 @@ func NewIndex(questions []Question) Index {
 			}
 		}
 		idx.questions[question.Code] = options
-		idx.types[question.Code] = question.Type
 	}
 	return idx
-}
-
-// Len returns the number of indexed questions.
-func (idx Index) Len() int {
-	return len(idx.questions)
-}
-
-// QuestionType returns the stored question type when present.
-func (idx Index) QuestionType(questionCode string) (string, bool) {
-	value, ok := idx.types[questionCode]
-	return value, ok
 }
 
 // Ref is one publish-time reference from DefinitionV2 into a questionnaire version.

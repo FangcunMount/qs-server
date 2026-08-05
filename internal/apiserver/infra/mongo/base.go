@@ -2,7 +2,6 @@ package mongo
 
 import (
 	"context"
-	"strconv"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -244,26 +243,4 @@ func (d *BaseDocument) SetUpdatedBy(userID uint64) {
 // SetDeletedBy 设置删除者
 func (d *BaseDocument) SetDeletedBy(userID uint64) {
 	d.DeletedBy = userID
-}
-
-// ObjectIDToUint64 将 ObjectID 转换为 uint64
-func ObjectIDToUint64(id primitive.ObjectID) uint64 {
-	// 使用 ObjectID 的前8个字节转换为 uint64
-	return uint64(id[0])<<56 | uint64(id[1])<<48 | uint64(id[2])<<40 | uint64(id[3])<<32 |
-		uint64(id[4])<<24 | uint64(id[5])<<16 | uint64(id[6])<<8 | uint64(id[7])
-}
-
-// Uint64ToObjectID 将 uint64 转换为 ObjectID
-func Uint64ToObjectID(id uint64) (primitive.ObjectID, error) {
-	// 将 uint64 转换为十六进制字符串，然后转换为 ObjectID
-	hexStr := strconv.FormatUint(id, 16)
-	// 补齐到24位
-	for len(hexStr) < 24 {
-		hexStr = "0" + hexStr
-	}
-	if len(hexStr) > 24 {
-		hexStr = hexStr[:24]
-	}
-
-	return primitive.ObjectIDFromHex(hexStr)
 }

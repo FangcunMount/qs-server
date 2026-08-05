@@ -47,28 +47,6 @@ type ReportInputFreezeOptions struct {
 	Norming         *NormingFreeze
 }
 
-// FactorCatalogFromScale builds minimal factor metadata from a scale snapshot.
-func FactorCatalogFromScale(scale *scalesnapshot.ScaleSnapshot) []FactorCatalogEntry {
-	if scale == nil {
-		return nil
-	}
-	out := make([]FactorCatalogEntry, 0, len(scale.Factors))
-	for _, factor := range scale.Factors {
-		out = append(out, FactorCatalogEntry{
-			Code: factor.Code, Title: factor.Title, MaxScore: factor.MaxScore, IsTotalScore: factor.IsTotalScore,
-		})
-	}
-	return out
-}
-
-// FactorCatalogFromBehavioral builds minimal factor metadata from a behavioral snapshot.
-func FactorCatalogFromBehavioral(snapshot *behavioralsnapshot.Snapshot) []FactorCatalogEntry {
-	if snapshot == nil {
-		return nil
-	}
-	return FactorCatalogFromScale(snapshot.ToScaleSnapshot())
-}
-
 // CanFreezeMinimalReportInput reports whether schema v3 (assets + catalog, no payload)
 // is sufficient for Interpretation replay on this family.
 func CanFreezeMinimalReportInput(opts ReportInputFreezeOptions) bool {

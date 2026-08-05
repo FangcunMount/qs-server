@@ -11,7 +11,7 @@ func TestValidateRefsRequiresExistingQuestionAndOption(t *testing.T) {
 	t.Parallel()
 
 	idx := questionnaireref.NewIndex([]questionnaireref.Question{{
-		Code: "Q1", Type: "single_choice", OptionCodes: []string{"A", "B"},
+		Code: "Q1", OptionCodes: []string{"A", "B"},
 	}})
 
 	issues := idx.ValidateRefs([]questionnaireref.Ref{

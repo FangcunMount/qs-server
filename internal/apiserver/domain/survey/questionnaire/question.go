@@ -61,15 +61,6 @@ type QuestionCore struct {
 	showController *ShowController
 }
 
-// NewQuestionCore 创建题型核心字段
-func NewQuestionCore(code meta.Code, stem string, typ QuestionType) QuestionCore {
-	return QuestionCore{
-		code: code,
-		stem: stem,
-		typ:  typ,
-	}
-}
-
 // Get*** 方法实现
 func (q *QuestionCore) GetCode() meta.Code     { return q.code }
 func (q *QuestionCore) GetStem() string        { return q.stem }
@@ -314,7 +305,6 @@ type QuestionParams struct {
 	options         []Option
 	validationRules []validation.ValidationRule
 	calculationRule *calculation.CalculationRule
-	showController  *ShowController
 }
 
 // NewQuestionParams 创建参数容器并应用选项
@@ -354,7 +344,6 @@ func (b *QuestionParams) GetPlaceholder() string                           { ret
 func (b *QuestionParams) GetOptions() []Option                             { return b.options }
 func (b *QuestionParams) GetValidationRules() []validation.ValidationRule  { return b.validationRules }
 func (b *QuestionParams) GetCalculationRule() *calculation.CalculationRule { return b.calculationRule }
-func (b *QuestionParams) GetShowController() *ShowController               { return b.showController }
 
 // 核心字段配置
 func WithCode(code meta.Code) QuestionParamsOption {
@@ -413,7 +402,6 @@ func WithCalculationRule(formula calculation.FormulaType) QuestionParamsOption {
 }
 func WithShowController(showController *ShowController) QuestionParamsOption {
 	return func(b *QuestionParams) {
-		b.showController = showController
 		b.core.showController = showController
 	}
 }

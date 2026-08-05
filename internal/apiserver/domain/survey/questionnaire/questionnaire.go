@@ -82,11 +82,9 @@ func NewQuestionnaire(c meta.Code, t string, opts ...QuestionnaireOption) (*Ques
 }
 
 // With*** 构造选项
-func WithID(id meta.ID) QuestionnaireOption      { return func(q *Questionnaire) { q.id = id } }
-func WithTitle(title string) QuestionnaireOption { return func(q *Questionnaire) { q.title = title } }
-func WithDesc(d string) QuestionnaireOption      { return func(q *Questionnaire) { q.desc = d } }
-func WithImgUrl(url string) QuestionnaireOption  { return func(q *Questionnaire) { q.imgUrl = url } }
-func WithVersion(v Version) QuestionnaireOption  { return func(q *Questionnaire) { q.version = v } }
+func WithDesc(d string) QuestionnaireOption     { return func(q *Questionnaire) { q.desc = d } }
+func WithImgUrl(url string) QuestionnaireOption { return func(q *Questionnaire) { q.imgUrl = url } }
+func WithVersion(v Version) QuestionnaireOption { return func(q *Questionnaire) { q.version = v } }
 func WithRevision(revision int64) QuestionnaireOption {
 	return func(q *Questionnaire) { q.revision = revision }
 }
