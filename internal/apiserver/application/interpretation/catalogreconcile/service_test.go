@@ -7,16 +7,11 @@ import (
 )
 
 type fakeStore struct {
-	counts    DriftCounts
 	err       error
 	plan      RepairPlan
 	recovered string
 	pages     []DriftPage
 	listCalls int
-}
-
-func (f *fakeStore) CountDrifts(context.Context, Filter) (DriftCounts, error) {
-	return f.counts, f.err
 }
 
 func (f *fakeStore) ListDrifts(context.Context, Filter, string, int) (DriftPage, error) {
@@ -51,28 +46,6 @@ func (f *fakeStore) ApplyRepair(context.Context, RepairPlan) (string, error) {
 	return "repaired", f.err
 }
 
-func TestReconcileOnceDetectsFourDriftClasses(t *testing.T) {
-	t.Parallel()
-
-	store := &fakeStore{counts: DriftCounts{
-		Missing:             1,
-		Dangling:            2,
-		AssociationMismatch: 3,
-		WrongWinner:         4,
-	}}
-	service := NewService(store)
-	got, err := service.ReconcileOnce(context.Background(), Filter{})
-	if err != nil {
-		t.Fatalf("ReconcileOnce: %v", err)
-	}
-	if got != store.counts {
-		t.Fatalf("counts = %#v, want %#v", got, store.counts)
-	}
-	if got.Total() != 10 {
-		t.Fatalf("total = %d, want 10", got.Total())
-	}
-}
-
 func TestListDriftsRequiresStableKind(t *testing.T) {
 	t.Parallel()
 	service := NewService(&fakeStore{})
@@ -85,15 +58,6 @@ func TestListDriftsRequiresStableKind(t *testing.T) {
 	}
 	if len(page.Items) != 1 || page.Items[0].Kind != DriftDangling {
 		t.Fatalf("page = %#v", page)
-	}
-}
-
-func TestReconcileOnceRejectsMissingStore(t *testing.T) {
-	t.Parallel()
-
-	service := NewService(nil)
-	if _, err := service.ReconcileOnce(context.Background(), Filter{}); err == nil {
-		t.Fatal("expected missing store error")
 	}
 }
 

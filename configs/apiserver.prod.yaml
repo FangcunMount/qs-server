@@ -329,10 +329,20 @@ plan_scheduler:
 # ----------------------------------------------------------------------------
 evaluation_consistency_reconcile:
   enable: true                  # 启用评估 outcome 与 assessment 状态一致性审计
-  interval: "10m"               # 扫描间隔
+  interval: "10s"               # 租约恢复与 assessment 一致性审计间隔
   batch_limit: 100              # 每轮最多扫描的 assessment 数量
   lock_key: "qs:evaluation-consistency-reconcile:leader" # 分布式锁键，确保单实例执行
-  lock_ttl: "5m"               # 锁过期时间
+  lock_ttl: "30s"              # 续租租约；覆盖单轮执行并允许快速接管
+
+report_catalog_audit:
+  enable: true
+  initial_delay: 15m
+  tick_interval: 5s
+  cycle_interval: 24h
+  batch_size: 200
+  batch_timeout: 3s
+  lock_key: "qs:report-catalog-audit:leader"
+  lock_ttl: 30s
 
 # ----------------------------------------------------------------------------
 # 3.6.5 事件出库重投任务
@@ -531,6 +541,9 @@ iam:
     address: "iam-apiserver:9090"       # IAM 在 serverB；经 Swarm overlay infra-network 解析（勿映射到宿主机 9090）
     timeout: 5s                         # 请求超时时间: 5s (生产环境建议调高)
     retry-max: 3                        # 最大重试次数: 3 (生产环境建议调高)
+    keepalive-time: 5m                  # 与 IAM server enforcement MinTime 对齐
+    keepalive-timeout: 20s
+    keepalive-permit-without-stream: false
 
     # mTLS 证书配置（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
     tls:

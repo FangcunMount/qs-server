@@ -40,6 +40,7 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateBackpressureOptions(o.Backpressure)...)
 	errs = append(errs, validatePlanScheduler(o.PlanScheduler)...)
 	errs = append(errs, validateEvaluationConsistencyReconcile(o.EvaluationConsistencyReconcile)...)
+	errs = append(errs, validateReportCatalogAudit(o.ReportCatalogAudit)...)
 	errs = append(errs, validateOutboxRelay(o.OutboxRelay, o.MySQLOptions.MaxOpenConnections)...)
 	errs = append(errs, validateStatisticsSync(o.StatisticsSync)...)
 	errs = append(errs, validateCacheOptions(o.Cache)...)
@@ -269,6 +270,35 @@ func validateEvaluationConsistencyReconcile(opts *EvaluationConsistencyReconcile
 	}
 	if opts.LockTTL <= 0 {
 		errs = append(errs, fmt.Errorf("evaluation_consistency_reconcile.lock_ttl must be greater than 0"))
+	}
+	return errs
+}
+
+func validateReportCatalogAudit(opts *ReportCatalogAuditOptions) []error {
+	if opts == nil || !opts.Enable {
+		return nil
+	}
+	var errs []error
+	if opts.InitialDelay < 0 {
+		errs = append(errs, fmt.Errorf("report_catalog_audit.initial_delay cannot be negative"))
+	}
+	if opts.TickInterval <= 0 {
+		errs = append(errs, fmt.Errorf("report_catalog_audit.tick_interval must be greater than 0"))
+	}
+	if opts.CycleInterval <= 0 {
+		errs = append(errs, fmt.Errorf("report_catalog_audit.cycle_interval must be greater than 0"))
+	}
+	if opts.BatchSize <= 0 || opts.BatchSize > 500 {
+		errs = append(errs, fmt.Errorf("report_catalog_audit.batch_size must be between 1 and 500"))
+	}
+	if opts.BatchTimeout <= 0 {
+		errs = append(errs, fmt.Errorf("report_catalog_audit.batch_timeout must be greater than 0"))
+	}
+	if opts.LockKey == "" {
+		errs = append(errs, fmt.Errorf("report_catalog_audit.lock_key cannot be empty when enabled"))
+	}
+	if opts.LockTTL <= 0 {
+		errs = append(errs, fmt.Errorf("report_catalog_audit.lock_ttl must be greater than 0"))
 	}
 	return errs
 }

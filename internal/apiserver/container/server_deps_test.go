@@ -3,6 +3,7 @@ package container
 import (
 	"context"
 	"testing"
+	"time"
 
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
@@ -85,6 +86,38 @@ func TestContainerBuildServerRuntimeDeps(t *testing.T) {
 	}
 }
 
+func TestComposeEvaluationConsistencyServiceRunsAssessmentAuditAndBothLeaseRecoverers(t *testing.T) {
+	t.Parallel()
+
+	base := &evaluationConsistencyReconcileServiceStub{count: 1}
+	evaluationRecoverer := &leaseRecovererStub{count: 2}
+	interpretationRecoverer := &leaseRecovererStub{count: 3}
+	service := composeEvaluationConsistencyService(base, evaluationRecoverer, interpretationRecoverer, true)
+
+	count, err := service.AuditOnce(context.Background(), 100)
+	if err != nil {
+		t.Fatalf("AuditOnce() error = %v", err)
+	}
+	if count != 6 {
+		t.Fatalf("AuditOnce() count = %d, want 6", count)
+	}
+	if base.calls != 1 || evaluationRecoverer.calls != 1 || interpretationRecoverer.calls != 1 {
+		t.Fatalf("calls = base:%d evaluation:%d interpretation:%d, want 1 each", base.calls, evaluationRecoverer.calls, interpretationRecoverer.calls)
+	}
+}
+
+func TestComposeEvaluationConsistencyServiceDisablesOnlyLeaseRecovery(t *testing.T) {
+	t.Parallel()
+
+	base := &evaluationConsistencyReconcileServiceStub{count: 1}
+	recoverer := &leaseRecovererStub{count: 2}
+	service := composeEvaluationConsistencyService(base, recoverer, recoverer, false)
+
+	if service != base {
+		t.Fatalf("service = %#v, want base service", service)
+	}
+}
+
 type fakeOperatorRepo struct{}
 
 func (*fakeOperatorRepo) Save(context.Context, *domainoperator.Operator) error   { return nil }
@@ -143,10 +176,24 @@ func (*planCommandServiceStub) CancelTask(context.Context, int64, string) (*plan
 	return nil, nil
 }
 
-type evaluationConsistencyReconcileServiceStub struct{}
+type evaluationConsistencyReconcileServiceStub struct {
+	count int
+	calls int
+}
 
-func (*evaluationConsistencyReconcileServiceStub) AuditOnce(context.Context, int) (int, error) {
-	return 0, nil
+func (s *evaluationConsistencyReconcileServiceStub) AuditOnce(context.Context, int) (int, error) {
+	s.calls++
+	return s.count, nil
+}
+
+type leaseRecovererStub struct {
+	count int
+	calls int
+}
+
+func (s *leaseRecovererStub) RecoverExpiredLeases(context.Context, time.Time, int) (int, error) {
+	s.calls++
+	return s.count, nil
 }
 
 var _ domainoperator.Repository = (*fakeOperatorRepo)(nil)

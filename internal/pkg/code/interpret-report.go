@@ -22,6 +22,9 @@ const (
 
 	// ErrInterpretReportConsistency - 500: Report catalog and immutable source disagree.
 	ErrInterpretReportConsistency
+
+	// ErrInterpretCatalogAuditNotReady - 503: no complete catalog audit snapshot exists.
+	ErrInterpretCatalogAuditNotReady
 )
 
 func init() {
@@ -32,4 +35,5 @@ func init() {
 	register(ErrInterpretItemNotFound, 404, "Interpret item not found")
 	register(ErrInterpretItemInvalid, 400, "Interpret item is invalid")
 	register(ErrInterpretReportConsistency, 500, "report temporarily unavailable")
+	register(ErrInterpretCatalogAuditNotReady, 503, "catalog_audit_not_ready")
 }

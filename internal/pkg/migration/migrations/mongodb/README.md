@@ -27,6 +27,16 @@ mongodb/
 | `interpretation_attention_projections` | 报告生成后 attention 投影状态（v2） | event_id unique, status+updated_at（见 000016） |
 | `interpretation_report_templates` | Interpretation 报告模板发布资产（v2） | template_id+template_version unique（见 000017） |
 | `interpretation_catalog_repair_plans` | Catalog 修复 dry-run 快照 | dry_run_id unique、expires_at TTL（见 000019） |
+| `interpretation_catalog_audit_checkpoints` | Catalog 有界审计进度与最近完整快照 | `_id=report_catalog` 单例、revision CAS（见 000021） |
+
+## Report catalog bounded audit（000021）
+
+`000021_add_report_catalog_audit_checkpoint` 创建只保存运维进度/计数的 checkpoint 集合，并为
+active artifact winner 扫描与已知机构 archive keyset 扫描增加专用索引。应用只读校验这些索引，
+不会在启动时创建它们；任一索引缺失时审计 runner 保持 degraded 且不推进 checkpoint。
+
+down migration 只删除本版本拥有的两个扫描索引和 checkpoint 集合。生产回滚应优先关闭
+`report_catalog_audit.enable` 并保留 checkpoint，不应依赖 down migration。
 
 ## Legacy collections retirement（000020）
 

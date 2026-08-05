@@ -9830,12 +9830,12 @@ paths:
         name: kind
         required: true
         type: string
-      - description: 稳定游标
+      - description: 稳定候选集游标；必须以 next_cursor 是否为空判断结束，items 可为空
         in: query
         name: cursor
         type: string
       - default: 500
-        description: 批量
+        description: 每页最多扫描的候选数，而非保证返回的漂移数
         in: query
         name: limit
         type: integer
@@ -9856,6 +9856,13 @@ paths:
       responses:
         "200":
           description: OK
+          headers:
+            X-QS-Catalog-Audit-Completed-At:
+              description: 最近完成时间（RFC3339Nano）
+              type: string
+            X-QS-Catalog-Audit-Cycle-ID:
+              description: 最近完成周期 ID
+              type: string
           schema:
             allOf:
             - $ref: '#/definitions/core.Response'
@@ -9863,7 +9870,11 @@ paths:
                 data:
                   $ref: '#/definitions/catalogreconcile.DriftCounts'
               type: object
-      summary: 只读检查当前组织的 Interpretation Catalog 漂移
+        "503":
+          description: catalog_audit_not_ready
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 读取当前组织最近完成的 Interpretation Catalog 审计快照
       tags:
       - Interpretation-Operations
   /internal/v1/interpretation/outcomes/{outcome_id}/admission-failures:

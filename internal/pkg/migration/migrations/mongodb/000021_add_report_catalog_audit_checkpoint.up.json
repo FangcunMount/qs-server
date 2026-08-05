@@ -1,0 +1,21 @@
+[
+  { "create": "interpretation_catalog_audit_checkpoints" },
+  {
+    "createIndexes": "interpret_report_artifacts",
+    "indexes": [
+      {
+        "key": { "deleted_at": 1, "assessment_id": 1, "generated_at": -1, "domain_id": -1 },
+        "name": "idx_interpret_report_audit_active_assessment_winner"
+      }
+    ]
+  },
+  {
+    "createIndexes": "archived_reports",
+    "indexes": [
+      {
+        "key": { "deleted_at": 1, "domain_id": 1, "org_id": 1 },
+        "name": "idx_archived_report_audit_active_org_domain"
+      }
+    ]
+  }
+]

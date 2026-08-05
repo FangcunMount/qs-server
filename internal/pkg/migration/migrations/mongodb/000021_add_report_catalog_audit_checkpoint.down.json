@@ -1,0 +1,5 @@
+[
+  { "dropIndexes": "interpret_report_artifacts", "index": "idx_interpret_report_audit_active_assessment_winner" },
+  { "dropIndexes": "archived_reports", "index": "idx_archived_report_audit_active_org_domain" },
+  { "drop": "interpretation_catalog_audit_checkpoints" }
+]

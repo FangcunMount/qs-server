@@ -333,6 +333,16 @@ evaluation_consistency_reconcile:
   lock_key: "qs:evaluation-consistency-reconcile:leader"
   lock_ttl: "30s"
 
+report_catalog_audit:
+  enable: true
+  initial_delay: 15m
+  tick_interval: 5s
+  cycle_interval: 24h
+  batch_size: 200
+  batch_timeout: 3s
+  lock_key: "qs:report-catalog-audit:leader"
+  lock_ttl: 30s
+
 # durable event 始终先写本地 Outbox；logging/nop 模式不会把 immediate 标记为 published。
 outbox_relay:
   mongo:
@@ -521,6 +531,9 @@ iam:
     address: "iam-apiserver:9090"  # IAM gRPC 服务地址（需修正为 9090）
     timeout: 5s                   # 请求超时时间
     retry-max: 3                  # 最大重试次数
+    keepalive-time: 5m
+    keepalive-timeout: 20s
+    keepalive-permit-without-stream: false
     
     # mTLS 证书配置（开发环境可测试）
     tls:

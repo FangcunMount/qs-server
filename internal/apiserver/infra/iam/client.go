@@ -33,10 +33,13 @@ type IAMOptions struct {
 }
 
 type GRPCOptions struct {
-	Address  string
-	Timeout  time.Duration
-	RetryMax int
-	TLS      *TLSOptions
+	Address                      string
+	Timeout                      time.Duration
+	RetryMax                     int
+	KeepaliveTime                time.Duration
+	KeepaliveTimeout             time.Duration
+	KeepalivePermitWithoutStream bool
+	TLS                          *TLSOptions
 }
 
 type TLSOptions struct {
@@ -104,37 +107,7 @@ func NewClientWithRuntimeOptions(ctx context.Context, opts *IAMOptions, runtime 
 		"address", opts.GRPC.Address,
 	)
 
-	// 构建 SDK 配置
-	sdkConfig := &sdk.Config{
-		Endpoint: opts.GRPC.Address,
-		Timeout:  opts.GRPC.Timeout,
-	}
-
-	// 配置可观测性
-	if opts.EnableTracing || opts.EnableMetrics {
-		sdkConfig.Observability = &sdkconfig.ObservabilityConfig{
-			EnableTracing: opts.EnableTracing,
-			EnableMetrics: opts.EnableMetrics,
-			ServiceName:   "qs-apiserver",
-		}
-	}
-
-	// 配置 mTLS
-	if opts.GRPC.TLS != nil && opts.GRPC.TLS.Enabled {
-		sdkConfig.TLS = &sdk.TLSConfig{
-			Enabled:    true,
-			CACert:     opts.GRPC.TLS.CAFile,
-			ClientCert: opts.GRPC.TLS.CertFile,
-			ClientKey:  opts.GRPC.TLS.KeyFile,
-		}
-	}
-
-	// 配置重试策略
-	if opts.GRPC.RetryMax > 0 {
-		sdkConfig.Retry = &sdk.RetryConfig{
-			MaxAttempts: opts.GRPC.RetryMax,
-		}
-	}
+	sdkConfig := buildSDKConfig(opts)
 
 	// 创建 SDK 客户端
 	client, err := sdk.NewClient(ctx, sdkConfig)
@@ -154,6 +127,37 @@ func NewClientWithRuntimeOptions(ctx context.Context, opts *IAMOptions, runtime 
 		enabled: true,
 		limiter: runtime.Limiter,
 	}, nil
+}
+
+func buildSDKConfig(opts *IAMOptions) *sdk.Config {
+	config := &sdk.Config{
+		Endpoint: opts.GRPC.Address,
+		Timeout:  opts.GRPC.Timeout,
+		Keepalive: &sdk.KeepaliveConfig{
+			Time:                opts.GRPC.KeepaliveTime,
+			Timeout:             opts.GRPC.KeepaliveTimeout,
+			PermitWithoutStream: opts.GRPC.KeepalivePermitWithoutStream,
+		},
+	}
+	if opts.EnableTracing || opts.EnableMetrics {
+		config.Observability = &sdkconfig.ObservabilityConfig{
+			EnableTracing: opts.EnableTracing,
+			EnableMetrics: opts.EnableMetrics,
+			ServiceName:   "qs-apiserver",
+		}
+	}
+	if opts.GRPC.TLS != nil && opts.GRPC.TLS.Enabled {
+		config.TLS = &sdk.TLSConfig{
+			Enabled:    true,
+			CACert:     opts.GRPC.TLS.CAFile,
+			ClientCert: opts.GRPC.TLS.CertFile,
+			ClientKey:  opts.GRPC.TLS.KeyFile,
+		}
+	}
+	if opts.GRPC.RetryMax > 0 {
+		config.Retry = &sdk.RetryConfig{MaxAttempts: opts.GRPC.RetryMax}
+	}
+	return config
 }
 
 func (c *Client) Limiter() backpressure.Acquirer {

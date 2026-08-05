@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
 
+	baseerrors "github.com/FangcunMount/component-base/pkg/errors"
 	interpretationcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/catalogreconcile"
 	interpretationclinician "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/clinician"
 	interpretationoperations "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/operations"
@@ -13,6 +15,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/gin-gonic/gin"
 )
@@ -127,10 +130,13 @@ func NewInterpretationCatalogReconcileHandler(s interpretationcatalog.Service) *
 }
 
 // Reconcile godoc
-// @Summary 只读检查当前组织的 Interpretation Catalog 漂移
+// @Summary 读取当前组织最近完成的 Interpretation Catalog 审计快照
 // @Tags Interpretation-Operations
 // @Produce json
 // @Success 200 {object} core.Response{data=interpretationcatalog.DriftCounts}
+// @Header 200 {string} X-QS-Catalog-Audit-Cycle-ID "最近完成周期 ID"
+// @Header 200 {string} X-QS-Catalog-Audit-Completed-At "最近完成时间（RFC3339Nano）"
+// @Failure 503 {object} core.ErrResponse "catalog_audit_not_ready"
 // @Router /internal/v1/interpretation/catalog/reconcile [get]
 func (h *InterpretationCatalogReconcileHandler) Reconcile(c *gin.Context) {
 	orgID, _, err := h.RequireProtectedScope(c)
@@ -138,12 +144,18 @@ func (h *InterpretationCatalogReconcileHandler) Reconcile(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	result, err := h.service.ReconcileOnce(c.Request.Context(), interpretationcatalog.Filter{OrgID: &orgID})
+	result, err := h.service.LatestAuditSnapshot(c.Request.Context(), orgID)
 	if err != nil {
+		if errors.Is(err, interpretationcatalog.ErrAuditNotReady) {
+			h.Error(c, baseerrors.WithCode(code.ErrInterpretCatalogAuditNotReady, "catalog_audit_not_ready"))
+			return
+		}
 		h.Error(c, err)
 		return
 	}
-	h.Success(c, result)
+	c.Header("X-QS-Catalog-Audit-Cycle-ID", result.CycleID)
+	c.Header("X-QS-Catalog-Audit-Completed-At", result.CompletedAt.UTC().Format(time.RFC3339Nano))
+	h.Success(c, result.Counts)
 }
 
 // ListDrifts godoc
@@ -151,8 +163,8 @@ func (h *InterpretationCatalogReconcileHandler) Reconcile(c *gin.Context) {
 // @Tags Interpretation-Operations
 // @Produce json
 // @Param kind query string true "missing|dangling|association_mismatch|wrong_winner"
-// @Param cursor query string false "稳定游标"
-// @Param limit query int false "批量" default(500)
+// @Param cursor query string false "稳定候选集游标；必须以 next_cursor 是否为空判断结束，items 可为空"
+// @Param limit query int false "每页最多扫描的候选数，而非保证返回的漂移数" default(500)
 // @Param assessment_id query string false "测评ID"
 // @Router /internal/v1/interpretation/catalog/drifts [get]
 func (h *InterpretationCatalogReconcileHandler) ListDrifts(c *gin.Context) {

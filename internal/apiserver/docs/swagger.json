@@ -7966,14 +7966,14 @@
                     },
                     {
                         "type": "string",
-                        "description": "稳定游标",
+                        "description": "稳定候选集游标；必须以 next_cursor 是否为空判断结束，items 可为空",
                         "name": "cursor",
                         "in": "query"
                     },
                     {
                         "type": "integer",
                         "default": 500,
-                        "description": "批量",
+                        "description": "每页最多扫描的候选数，而非保证返回的漂移数",
                         "name": "limit",
                         "in": "query"
                     },
@@ -7995,7 +7995,7 @@
                 "tags": [
                     "Interpretation-Operations"
                 ],
-                "summary": "只读检查当前组织的 Interpretation Catalog 漂移",
+                "summary": "读取当前组织最近完成的 Interpretation Catalog 审计快照",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -8013,6 +8013,22 @@
                                     }
                                 }
                             ]
+                        },
+                        "headers": {
+                            "X-QS-Catalog-Audit-Completed-At": {
+                                "type": "string",
+                                "description": "最近完成时间（RFC3339Nano）"
+                            },
+                            "X-QS-Catalog-Audit-Cycle-ID": {
+                                "type": "string",
+                                "description": "最近完成周期 ID"
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "catalog_audit_not_ready",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
                         }
                     }
                 }

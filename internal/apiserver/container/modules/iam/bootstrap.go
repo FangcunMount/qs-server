@@ -291,9 +291,12 @@ func convertIAMOptions(opts *options.IAMOptions) *iam.IAMOptions {
 	// GRPC 配置
 	if opts.GRPC != nil {
 		iamOpts.GRPC = &iam.GRPCOptions{
-			Address:  opts.GRPC.Address,
-			Timeout:  opts.GRPC.Timeout,
-			RetryMax: opts.GRPC.RetryMax,
+			Address:                      opts.GRPC.Address,
+			Timeout:                      opts.GRPC.Timeout,
+			RetryMax:                     opts.GRPC.RetryMax,
+			KeepaliveTime:                opts.GRPC.KeepaliveTime,
+			KeepaliveTimeout:             opts.GRPC.KeepaliveTimeout,
+			KeepalivePermitWithoutStream: opts.GRPC.KeepalivePermitWithoutStream,
 		}
 
 		// TLS 配置

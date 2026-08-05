@@ -46,10 +46,13 @@ type IAMOptions struct {
 
 // IAMGRPCOptions IAM gRPC 连接配置
 type IAMGRPCOptions struct {
-	Address  string         `json:"address"    mapstructure:"address"`
-	Timeout  time.Duration  `json:"timeout"    mapstructure:"timeout"`
-	RetryMax int            `json:"retry-max"  mapstructure:"retry-max"`
-	TLS      *IAMTLSOptions `json:"tls"        mapstructure:"tls"`
+	Address                      string         `json:"address"                         mapstructure:"address"`
+	Timeout                      time.Duration  `json:"timeout"                         mapstructure:"timeout"`
+	RetryMax                     int            `json:"retry-max"                       mapstructure:"retry-max"`
+	KeepaliveTime                time.Duration  `json:"keepalive-time"                  mapstructure:"keepalive-time"`
+	KeepaliveTimeout             time.Duration  `json:"keepalive-timeout"               mapstructure:"keepalive-timeout"`
+	KeepalivePermitWithoutStream bool           `json:"keepalive-permit-without-stream" mapstructure:"keepalive-permit-without-stream"`
+	TLS                          *IAMTLSOptions `json:"tls"                             mapstructure:"tls"`
 }
 
 // IAMTLSOptions mTLS 证书配置
@@ -105,9 +108,11 @@ func NewIAMOptions() *IAMOptions {
 		EnableMetrics: true, // 默认启用 Prometheus 指标
 
 		GRPC: &IAMGRPCOptions{
-			Address:  "127.0.0.1:9090",
-			Timeout:  5 * time.Second,
-			RetryMax: 3,
+			Address:          "127.0.0.1:9090",
+			Timeout:          5 * time.Second,
+			RetryMax:         3,
+			KeepaliveTime:    5 * time.Minute,
+			KeepaliveTimeout: 20 * time.Second,
 			TLS: &IAMTLSOptions{
 				Enabled:  true,
 				CAFile:   "./configs/cert/grpc/ca-chain.crt",
@@ -232,6 +237,12 @@ func (o *IAMOptions) AddFlags(fs *pflag.FlagSet) {
 		"IAM gRPC request timeout")
 	fs.IntVar(&o.GRPC.RetryMax, "iam.grpc.retry-max", o.GRPC.RetryMax,
 		"IAM gRPC max retry count")
+	fs.DurationVar(&o.GRPC.KeepaliveTime, "iam.grpc.keepalive-time", o.GRPC.KeepaliveTime,
+		"IAM gRPC keepalive ping interval")
+	fs.DurationVar(&o.GRPC.KeepaliveTimeout, "iam.grpc.keepalive-timeout", o.GRPC.KeepaliveTimeout,
+		"IAM gRPC keepalive response timeout")
+	fs.BoolVar(&o.GRPC.KeepalivePermitWithoutStream, "iam.grpc.keepalive-permit-without-stream", o.GRPC.KeepalivePermitWithoutStream,
+		"Allow IAM gRPC keepalive pings without an active stream")
 
 	// mTLS 配置
 	fs.BoolVar(&o.GRPC.TLS.Enabled, "iam.grpc.tls.enabled", o.GRPC.TLS.Enabled,

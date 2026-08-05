@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -79,7 +78,6 @@ func (c DriftCounts) Total() int64 {
 
 // Store performs read-only catalog drift detection.
 type Store interface {
-	CountDrifts(context.Context, Filter) (DriftCounts, error)
 	ListDrifts(context.Context, Filter, string, int) (DriftPage, error)
 	SaveRepairPlan(context.Context, RepairPlan) error
 	FindRepairPlan(context.Context, string) (RepairPlan, error)
@@ -103,15 +101,16 @@ type ArchiveAuthority interface {
 
 // Service runs read-only catalog reconcile. Repair is intentionally separate.
 type Service interface {
-	ReconcileOnce(context.Context, Filter) (DriftCounts, error)
+	LatestAuditSnapshot(context.Context, int64) (AuditSnapshot, error)
 	ListDrifts(context.Context, Filter, string, int) (DriftPage, error)
 	CreateRepairPlan(context.Context, int64, Filter) (RepairPlan, error)
 	Repair(context.Context, RepairCommand) (RepairResult, error)
 	BindArchiveAuthority(ArchiveAuthority)
 }
 
-type AuditService interface {
-	ReconcileOnce(context.Context, Filter) (DriftCounts, error)
+type CatalogService interface {
+	Service
+	RunnerService
 }
 
 func (s *service) ListDrifts(ctx context.Context, filter Filter, cursor string, limit int) (DriftPage, error) {
@@ -129,15 +128,22 @@ func (s *service) ListDrifts(ctx context.Context, filter Filter, cursor string, 
 }
 
 type service struct {
-	store     Store
-	now       func() time.Time
-	newID     func() string
-	mu        sync.RWMutex
-	authority ArchiveAuthority
+	store             Store
+	audit             AuditStore
+	auditIndexMu      sync.Mutex
+	auditIndexesReady bool
+	now               func() time.Time
+	newID             func() string
+	mu                sync.RWMutex
+	authority         ArchiveAuthority
 }
 
-func NewService(store Store) Service {
-	return &service{store: store, now: time.Now, newID: func() string { return meta.New().String() }}
+func NewService(store Store, audit ...AuditStore) CatalogService {
+	var auditStore AuditStore
+	if len(audit) > 0 {
+		auditStore = audit[0]
+	}
+	return &service{store: store, audit: auditStore, now: time.Now, newID: func() string { return meta.New().String() }}
 }
 
 func (s *service) BindArchiveAuthority(authority ArchiveAuthority) {
@@ -244,76 +250,4 @@ func containsField(fields []string, target string) bool {
 		}
 	}
 	return false
-}
-
-// ScheduledAuditor adapts read-only catalog reconciliation to the shared
-// HA consistency scheduler without running on every fast lease-recovery tick.
-type ScheduledAuditor struct {
-	service     AuditService
-	minInterval time.Duration
-	mu          sync.Mutex
-	nextRunAt   time.Time
-	now         func() time.Time
-}
-
-func NewScheduledAuditor(service AuditService, minInterval time.Duration) *ScheduledAuditor {
-	return newScheduledAuditor(service, minInterval, time.Now)
-}
-
-func newScheduledAuditor(service AuditService, minInterval time.Duration, now func() time.Time) *ScheduledAuditor {
-	if minInterval <= 0 {
-		minInterval = 10 * time.Minute
-	}
-	if now == nil {
-		now = time.Now
-	}
-	// A catalog drift count scans the complete report history. Defer the first
-	// scheduled audit so application startup does not immediately load MongoDB.
-	return &ScheduledAuditor{
-		service: service, minInterval: minInterval,
-		nextRunAt: now().Add(minInterval), now: now,
-	}
-}
-
-// AuditOnce implements the Evaluation scheduler consistency-auditor contract.
-// The scheduler's limit applies to repairable assessment rows; catalog drift is
-// count-only and uses its own fixed Mongo batch size.
-func (a *ScheduledAuditor) AuditOnce(ctx context.Context, _ int) (int, error) {
-	if a == nil || a.service == nil {
-		return 0, fmt.Errorf("catalog reconcile auditor is not configured")
-	}
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	now := a.now()
-	if now.Before(a.nextRunAt) {
-		return 0, nil
-	}
-	counts, err := a.service.ReconcileOnce(ctx, Filter{})
-	if err != nil {
-		return 0, err
-	}
-	a.nextRunAt = now.Add(a.minInterval)
-	return int(counts.Total()), nil
-}
-
-// ReconcileOnce is dry-run by design: it only counts drift and emits metrics.
-func (s *service) ReconcileOnce(ctx context.Context, filter Filter) (DriftCounts, error) {
-	if s == nil || s.store == nil {
-		return DriftCounts{}, fmt.Errorf("catalog reconcile service is not configured")
-	}
-	counts, err := s.store.CountDrifts(ctx, filter)
-	if err != nil {
-		return DriftCounts{}, err
-	}
-	observeDrift(DriftMissing, counts.Missing)
-	observeDrift(DriftDangling, counts.Dangling)
-	observeDrift(DriftAssociationMismatch, counts.AssociationMismatch)
-	observeDrift(DriftWrongWinner, counts.WrongWinner)
-	if counts.Total() > 0 {
-		log.Warnf(
-			"report catalog drift detected (missing=%d dangling=%d association_mismatch=%d wrong_winner=%d)",
-			counts.Missing, counts.Dangling, counts.AssociationMismatch, counts.WrongWinner,
-		)
-	}
-	return counts, nil
 }

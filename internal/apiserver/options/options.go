@@ -35,6 +35,7 @@ type Options struct {
 	Plan                           *PlanOptions                            `json:"plan"      mapstructure:"plan"`
 	PlanScheduler                  *PlanSchedulerOptions                   `json:"plan_scheduler" mapstructure:"plan_scheduler"`
 	EvaluationConsistencyReconcile *EvaluationConsistencyReconcileOptions  `json:"evaluation_consistency_reconcile" mapstructure:"evaluation_consistency_reconcile"`
+	ReportCatalogAudit             *ReportCatalogAuditOptions              `json:"report_catalog_audit" mapstructure:"report_catalog_audit"`
 	OutboxRelay                    *OutboxRelayOptions                     `json:"outbox_relay" mapstructure:"outbox_relay"`
 	Eventing                       *EventingOptions                        `json:"eventing" mapstructure:"eventing"`
 	RateLimit                      *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
@@ -83,6 +84,7 @@ func NewOptions() *Options {
 		Plan:                           NewPlanOptions(),
 		PlanScheduler:                  NewPlanSchedulerOptions(),
 		EvaluationConsistencyReconcile: NewEvaluationConsistencyReconcileOptions(),
+		ReportCatalogAudit:             NewReportCatalogAuditOptions(),
 		OutboxRelay:                    NewOutboxRelayOptions(),
 		Eventing:                       NewEventingOptions(),
 		RateLimit:                      NewRateLimitOptions(),
@@ -281,6 +283,39 @@ func (e *EvaluationConsistencyReconcileOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&e.LockTTL, "evaluation_consistency_reconcile.lock-ttl", e.LockTTL, "Redis distributed lock TTL used by the evaluation consistency reconcile scheduler.")
 }
 
+type ReportCatalogAuditOptions struct {
+	Enable        bool          `json:"enable" mapstructure:"enable"`
+	InitialDelay  time.Duration `json:"initial_delay" mapstructure:"initial_delay"`
+	TickInterval  time.Duration `json:"tick_interval" mapstructure:"tick_interval"`
+	CycleInterval time.Duration `json:"cycle_interval" mapstructure:"cycle_interval"`
+	BatchSize     int           `json:"batch_size" mapstructure:"batch_size"`
+	BatchTimeout  time.Duration `json:"batch_timeout" mapstructure:"batch_timeout"`
+	LockKey       string        `json:"lock_key" mapstructure:"lock_key"`
+	LockTTL       time.Duration `json:"lock_ttl" mapstructure:"lock_ttl"`
+}
+
+func NewReportCatalogAuditOptions() *ReportCatalogAuditOptions {
+	return &ReportCatalogAuditOptions{
+		Enable: true, InitialDelay: 15 * time.Minute, TickInterval: 5 * time.Second,
+		CycleInterval: 24 * time.Hour, BatchSize: 200, BatchTimeout: 3 * time.Second,
+		LockKey: "qs:report-catalog-audit:leader", LockTTL: 30 * time.Second,
+	}
+}
+
+func (o *ReportCatalogAuditOptions) AddFlags(fs *pflag.FlagSet) {
+	if o == nil {
+		return
+	}
+	fs.BoolVar(&o.Enable, "report_catalog_audit.enable", o.Enable, "Enable the bounded report catalog audit runner.")
+	fs.DurationVar(&o.InitialDelay, "report_catalog_audit.initial-delay", o.InitialDelay, "Delay before the first report catalog audit tick.")
+	fs.DurationVar(&o.TickInterval, "report_catalog_audit.tick-interval", o.TickInterval, "Interval between bounded report catalog audit ticks.")
+	fs.DurationVar(&o.CycleInterval, "report_catalog_audit.cycle-interval", o.CycleInterval, "Interval between complete report catalog audit cycles.")
+	fs.IntVar(&o.BatchSize, "report_catalog_audit.batch-size", o.BatchSize, "Maximum candidate assessments scanned per report catalog audit tick.")
+	fs.DurationVar(&o.BatchTimeout, "report_catalog_audit.batch-timeout", o.BatchTimeout, "Mongo deadline and maxTimeMS for one report catalog audit batch.")
+	fs.StringVar(&o.LockKey, "report_catalog_audit.lock-key", o.LockKey, "Redis leader lock key for report catalog audit.")
+	fs.DurationVar(&o.LockTTL, "report_catalog_audit.lock-ttl", o.LockTTL, "Renewed Redis leader lease TTL for report catalog audit.")
+}
+
 // OutboxRelayOptions controls durable outbox relay loops inside qs-apiserver.
 type OutboxRelayOptions struct {
 	Mongo      *OutboxRelayStoreOptions `json:"mongo" mapstructure:"mongo"`
@@ -420,6 +455,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.Plan.AddFlags(fss.FlagSet("plan"))
 	o.PlanScheduler.AddFlags(fss.FlagSet("plan_scheduler"))
 	o.EvaluationConsistencyReconcile.AddFlags(fss.FlagSet("evaluation_consistency_reconcile"))
+	o.ReportCatalogAudit.AddFlags(fss.FlagSet("report_catalog_audit"))
 	o.OutboxRelay.AddFlags(fss.FlagSet("outbox_relay"))
 	o.Eventing.AddFlags(fss.FlagSet("eventing"))
 	o.RateLimit.AddFlags(fss.FlagSet("rate_limit"))

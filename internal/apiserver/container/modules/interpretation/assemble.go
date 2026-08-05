@@ -54,7 +54,7 @@ type Module struct {
 	clinicianService      interpretationclinician.Service
 	operationsService     interpretationoperations.Service
 	catalogReconcile      interpretationcatalog.Service
-	catalogAuditor        *interpretationcatalog.ScheduledAuditor
+	catalogAudit          interpretationcatalog.RunnerService
 	governedRetryService  interpretationautomation.GovernedRetryService
 	readmissionService    interpretationreadmission.Service
 	leaseRecoverer        interpretationautomation.LeaseRecoverer
@@ -91,10 +91,10 @@ func New(deps Deps) (*Module, error) {
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report catalog reconcile store: %v", err)
 	}
-	module.catalogReconcile = interpretationcatalog.NewService(catalogReconcileStoreAdapter{
-		store: catalogReconcileStore,
-	})
-	module.catalogAuditor = interpretationcatalog.NewScheduledAuditor(module.catalogReconcile, 10*time.Minute)
+	catalogStoreAdapter := catalogReconcileStoreAdapter{store: catalogReconcileStore}
+	catalogService := interpretationcatalog.NewService(catalogStoreAdapter, catalogStoreAdapter)
+	module.catalogReconcile = catalogService
+	module.catalogAudit = catalogService
 	generationRepo, err := mongoEval.NewGenerationRepository(deps.MongoDB, mongoOptions)
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report generation repository: %v", err)
@@ -216,34 +216,15 @@ func (m *Module) CatalogReconcileService() interpretationcatalog.Service {
 	return m.catalogReconcile
 }
 
-func (m *Module) CatalogReconcileAuditor() *interpretationcatalog.ScheduledAuditor {
+func (m *Module) CatalogAuditService() interpretationcatalog.RunnerService {
 	if m == nil {
 		return nil
 	}
-	return m.catalogAuditor
+	return m.catalogAudit
 }
 
 type catalogReconcileStoreAdapter struct {
 	store *mongoEval.CatalogReconcileStore
-}
-
-func (a catalogReconcileStoreAdapter) CountDrifts(
-	ctx context.Context,
-	filter interpretationcatalog.Filter,
-) (interpretationcatalog.DriftCounts, error) {
-	if a.store == nil {
-		return interpretationcatalog.DriftCounts{}, fmt.Errorf("catalog reconcile store is not configured")
-	}
-	counts, err := a.store.CountDrifts(ctx, mongoEval.CatalogReconcileFilter{
-		OrgID: filter.OrgID, SortAtAfter: filter.SortAtAfter, SortAtBefore: filter.SortAtBefore,
-	})
-	if err != nil {
-		return interpretationcatalog.DriftCounts{}, err
-	}
-	return interpretationcatalog.DriftCounts{
-		Missing: counts.Missing, Dangling: counts.Dangling,
-		AssociationMismatch: counts.AssociationMismatch, WrongWinner: counts.WrongWinner,
-	}, nil
 }
 
 func (a catalogReconcileStoreAdapter) ListDrifts(
@@ -271,6 +252,107 @@ func (a catalogReconcileStoreAdapter) ListDrifts(
 		})
 	}
 	return interpretationcatalog.DriftPage{Items: items, NextCursor: page.NextCursor}, nil
+}
+
+func (a catalogReconcileStoreAdapter) VerifyAuditIndexes(ctx context.Context) error {
+	if a.store == nil {
+		return fmt.Errorf("catalog audit store is not configured")
+	}
+	return a.store.VerifyAuditIndexes(ctx)
+}
+
+func (a catalogReconcileStoreAdapter) LoadAuditCheckpoint(ctx context.Context) (interpretationcatalog.AuditCheckpoint, error) {
+	checkpoint, err := a.store.LoadAuditCheckpoint(ctx)
+	if err == mongoEval.ErrCatalogAuditCheckpointMissing {
+		return interpretationcatalog.AuditCheckpoint{}, interpretationcatalog.ErrAuditCheckpointMissing
+	}
+	if err != nil {
+		return interpretationcatalog.AuditCheckpoint{}, err
+	}
+	return auditCheckpointFromMongo(checkpoint), nil
+}
+
+func (a catalogReconcileStoreAdapter) SaveAuditCheckpoint(ctx context.Context, expectedRevision int64, checkpoint interpretationcatalog.AuditCheckpoint) error {
+	err := a.store.SaveAuditCheckpoint(ctx, expectedRevision, auditCheckpointToMongo(checkpoint))
+	if err == mongoEval.ErrCatalogAuditCheckpointCAS {
+		return interpretationcatalog.ErrAuditCheckpointCAS
+	}
+	return err
+}
+
+func (a catalogReconcileStoreAdapter) LoadAuditUpperBounds(ctx context.Context, maxTime time.Duration) (interpretationcatalog.AuditUpperBounds, error) {
+	bounds, err := a.store.LoadAuditUpperBounds(ctx, maxTime)
+	return interpretationcatalog.AuditUpperBounds{SourceAssessmentID: bounds.SourceAssessmentID, CatalogAssessmentID: bounds.CatalogAssessmentID}, err
+}
+
+func (a catalogReconcileStoreAdapter) ScanAuditBatch(ctx context.Context, request interpretationcatalog.AuditBatchRequest) (interpretationcatalog.AuditBatchResult, error) {
+	result, err := a.store.ScanAuditBatch(ctx, mongoEval.CatalogAuditBatchRequest{
+		Phase: request.Phase, AfterAssessmentID: request.AfterAssessmentID,
+		UpperAssessmentID: request.UpperAssessmentID, Limit: request.Limit, MaxTime: request.MaxTime,
+	})
+	if err != nil {
+		return interpretationcatalog.AuditBatchResult{}, err
+	}
+	return interpretationcatalog.AuditBatchResult{
+		NextAssessmentID: result.NextAssessmentID, Scanned: result.Scanned, Exhausted: result.Exhausted,
+		Counts: driftCountsFromMongo(result.Counts), OrgCounts: orgDriftCountsFromMongo(result.OrgCounts),
+	}, nil
+}
+
+func auditCheckpointFromMongo(source mongoEval.CatalogAuditCheckpoint) interpretationcatalog.AuditCheckpoint {
+	checkpoint := interpretationcatalog.AuditCheckpoint{
+		SchemaVersion: source.SchemaVersion, Revision: source.Revision, CycleID: source.CycleID, Phase: source.Phase,
+		AfterAssessmentID: source.AfterAssessmentID, SourceUpperAssessmentID: source.SourceUpperAssessmentID,
+		CatalogUpperAssessmentID: source.CatalogUpperAssessmentID, WorkingCounts: driftCountsFromMongo(source.WorkingCounts),
+		WorkingOrgCounts: orgDriftCountsFromMongo(source.WorkingOrgCounts), NextCycleAt: source.NextCycleAt, UpdatedAt: source.UpdatedAt,
+	}
+	if source.LastCompleted != nil {
+		checkpoint.LastCompleted = &interpretationcatalog.CompletedAuditSnapshot{
+			CycleID: source.LastCompleted.CycleID, CompletedAt: source.LastCompleted.CompletedAt,
+			Counts: driftCountsFromMongo(source.LastCompleted.Counts), OrgCounts: orgDriftCountsFromMongo(source.LastCompleted.OrgCounts),
+		}
+	}
+	return checkpoint
+}
+
+func auditCheckpointToMongo(source interpretationcatalog.AuditCheckpoint) mongoEval.CatalogAuditCheckpoint {
+	checkpoint := mongoEval.CatalogAuditCheckpoint{
+		SchemaVersion: source.SchemaVersion, Revision: source.Revision, CycleID: source.CycleID, Phase: source.Phase,
+		AfterAssessmentID: source.AfterAssessmentID, SourceUpperAssessmentID: source.SourceUpperAssessmentID,
+		CatalogUpperAssessmentID: source.CatalogUpperAssessmentID, WorkingCounts: driftCountsToMongo(source.WorkingCounts),
+		WorkingOrgCounts: orgDriftCountsToMongo(source.WorkingOrgCounts), NextCycleAt: source.NextCycleAt, UpdatedAt: source.UpdatedAt,
+	}
+	if source.LastCompleted != nil {
+		checkpoint.LastCompleted = &mongoEval.CatalogCompletedAuditSnapshot{
+			CycleID: source.LastCompleted.CycleID, CompletedAt: source.LastCompleted.CompletedAt,
+			Counts: driftCountsToMongo(source.LastCompleted.Counts), OrgCounts: orgDriftCountsToMongo(source.LastCompleted.OrgCounts),
+		}
+	}
+	return checkpoint
+}
+
+func driftCountsFromMongo(source mongoEval.CatalogDriftCounts) interpretationcatalog.DriftCounts {
+	return interpretationcatalog.DriftCounts{Missing: source.Missing, Dangling: source.Dangling, AssociationMismatch: source.AssociationMismatch, WrongWinner: source.WrongWinner}
+}
+
+func driftCountsToMongo(source interpretationcatalog.DriftCounts) mongoEval.CatalogDriftCounts {
+	return mongoEval.CatalogDriftCounts{Missing: source.Missing, Dangling: source.Dangling, AssociationMismatch: source.AssociationMismatch, WrongWinner: source.WrongWinner}
+}
+
+func orgDriftCountsFromMongo(source map[int64]mongoEval.CatalogDriftCounts) map[int64]interpretationcatalog.DriftCounts {
+	result := make(map[int64]interpretationcatalog.DriftCounts, len(source))
+	for orgID, counts := range source {
+		result[orgID] = driftCountsFromMongo(counts)
+	}
+	return result
+}
+
+func orgDriftCountsToMongo(source map[int64]interpretationcatalog.DriftCounts) map[int64]mongoEval.CatalogDriftCounts {
+	result := make(map[int64]mongoEval.CatalogDriftCounts, len(source))
+	for orgID, counts := range source {
+		result[orgID] = driftCountsToMongo(counts)
+	}
+	return result
 }
 
 func (a catalogReconcileStoreAdapter) SaveRepairPlan(ctx context.Context, plan interpretationcatalog.RepairPlan) error {

@@ -98,6 +98,12 @@ func buildSchedulerManager(cfg *config.Config, deps container.ServerRuntimeDeps)
 			deps.LockManager,
 			deps.LockBuilder,
 		),
+		runtimescheduler.NewReportCatalogAuditRunner(
+			cfg.ReportCatalogAudit,
+			deps.ReportCatalogAuditService,
+			deps.LockManager,
+			deps.LockBuilder,
+		),
 	)
 	if manager.Len() == 0 {
 		return nil

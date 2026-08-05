@@ -483,6 +483,7 @@ type ServerRuntimeDeps struct {
 	PlanCommandService                    planApp.PlanCommandService
 	StatisticsCoordinator                 *statisticsApp.Coordinator
 	EvaluationConsistencyReconcileService evaluationScheduler.Service
+	ReportCatalogAuditService             interpretationcatalog.RunnerService
 }
 
 func (c *Container) BuildServerGRPCBootstrapDeps() ServerGRPCBootstrapDeps {
@@ -519,25 +520,34 @@ func (c *Container) BuildServerRuntimeDeps() ServerRuntimeDeps {
 	if c.StatisticsModule != nil {
 		deps.StatisticsCoordinator = c.StatisticsModule.Coordinator
 	}
+	if c.ReportModule != nil {
+		deps.ReportCatalogAuditService = c.ReportModule.CatalogAuditService()
+	}
 	if c.EvaluationModule != nil {
-		recoverers := []evaluationScheduler.LeaseRecoverer{}
-		auditors := []evaluationScheduler.ConsistencyAuditor{}
 		leaseRecoveryEnabled := c.systemGovernanceOptions == nil || c.systemGovernanceOptions.Retry == nil || c.systemGovernanceOptions.Retry.LeaseReconcileEnabled
-		if leaseRecoveryEnabled && c.EvaluationModule.LeaseRecoverer != nil {
-			recoverers = append(recoverers, c.EvaluationModule.LeaseRecoverer)
+		var interpretationRecoverer evaluationScheduler.LeaseRecoverer
+		if c.ReportModule != nil {
+			interpretationRecoverer = c.ReportModule.LeaseRecoverer()
 		}
-		if leaseRecoveryEnabled && c.ReportModule != nil && c.ReportModule.LeaseRecoverer() != nil {
-			recoverers = append(recoverers, c.ReportModule.LeaseRecoverer())
-		}
-		if c.ReportModule != nil && c.ReportModule.CatalogReconcileAuditor() != nil {
-			auditors = append(auditors, c.ReportModule.CatalogReconcileAuditor())
-		}
-		deps.EvaluationConsistencyReconcileService = evaluationScheduler.NewGovernedServiceWithAuditors(
+		deps.EvaluationConsistencyReconcileService = composeEvaluationConsistencyService(
 			c.EvaluationModule.SchedulerService,
-			auditors,
-			recoverers...,
+			c.EvaluationModule.LeaseRecoverer,
+			interpretationRecoverer,
+			leaseRecoveryEnabled,
 		)
 	}
 
 	return deps
+}
+
+func composeEvaluationConsistencyService(
+	base evaluationScheduler.Service,
+	evaluationRecoverer evaluationScheduler.LeaseRecoverer,
+	interpretationRecoverer evaluationScheduler.LeaseRecoverer,
+	leaseRecoveryEnabled bool,
+) evaluationScheduler.Service {
+	if !leaseRecoveryEnabled {
+		return base
+	}
+	return evaluationScheduler.NewGovernedService(base, evaluationRecoverer, interpretationRecoverer)
 }
