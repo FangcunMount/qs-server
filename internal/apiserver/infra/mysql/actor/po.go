@@ -61,14 +61,6 @@ func (s *StringSliceCol) Scan(value interface{}) error {
 	return json.Unmarshal(bytes, s)
 }
 
-// AssessmentStatsPO 测评统计持久化对象（嵌入在 TesteePO 中）。
-// Deprecated: 仅供旧版回滚兼容，不再作为线上读模型真值。
-type AssessmentStatsPO struct {
-	TotalAssessments int        `gorm:"column:total_assessments"`
-	LastAssessmentAt *time.Time `gorm:"column:last_assessment_at"`
-	LastRiskLevel    *string    `gorm:"column:last_risk_level"`
-}
-
 // OperatorPO 后台操作者持久化对象
 // 兼容说明：底层表名仍为 `staff`，后续迁移前先保持存储结构稳定。
 type OperatorPO struct {
