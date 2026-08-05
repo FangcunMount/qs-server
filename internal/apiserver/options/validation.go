@@ -400,7 +400,7 @@ func validateCacheOptions(opts *CacheOptions) []error {
 		return nil
 	}
 	if opts.Defaults.TTLJitterRatio < 0 || opts.Defaults.TTLJitterRatio > 1 {
-		errs = append(errs, fmt.Errorf("cache.ttl_jitter_ratio must be between 0 and 1"))
+		errs = append(errs, fmt.Errorf("cache.defaults.ttl_jitter_ratio must be between 0 and 1"))
 	}
 	for _, family := range []struct {
 		name string
@@ -432,10 +432,10 @@ func validateCacheOptions(opts *CacheOptions) []error {
 	}
 	if warmup != nil && warmup.Hotset != nil && warmup.Hotset.Enable {
 		if warmup.Hotset.TopN <= 0 {
-			errs = append(errs, fmt.Errorf("cache.warmup.hotset.top_n must be greater than 0 when enabled"))
+			errs = append(errs, fmt.Errorf("cache.governance.warmup.hotset.top_n must be greater than 0 when enabled"))
 		}
 		if warmup.Hotset.MaxItemsPerKind <= 0 {
-			errs = append(errs, fmt.Errorf("cache.warmup.hotset.max_items_per_kind must be greater than 0 when enabled"))
+			errs = append(errs, fmt.Errorf("cache.governance.warmup.hotset.max_items_per_kind must be greater than 0 when enabled"))
 		}
 	}
 	return errs

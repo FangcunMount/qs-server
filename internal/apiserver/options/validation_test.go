@@ -361,7 +361,7 @@ func TestOptionsValidateStatisticsSync(t *testing.T) {
 	}
 }
 
-func TestOptionsValidateCacheRoutes(t *testing.T) {
+func TestOptionsValidateCacheConfiguration(t *testing.T) {
 	tests := []struct {
 		name    string
 		mutate  func(*Options)
@@ -372,7 +372,7 @@ func TestOptionsValidateCacheRoutes(t *testing.T) {
 			mutate: func(opts *Options) {
 				opts.Cache.Defaults.TTLJitterRatio = 2
 			},
-			wantErr: "cache.ttl_jitter_ratio must be between 0 and 1",
+			wantErr: "cache.defaults.ttl_jitter_ratio must be between 0 and 1",
 		},
 		{
 			name: "rejects missing named profile when profiles declared",
@@ -388,7 +388,14 @@ func TestOptionsValidateCacheRoutes(t *testing.T) {
 			mutate: func(opts *Options) {
 				opts.Cache.Governance.Warmup.Hotset.TopN = 0
 			},
-			wantErr: "cache.warmup.hotset.top_n must be greater than 0",
+			wantErr: "cache.governance.warmup.hotset.top_n must be greater than 0",
+		},
+		{
+			name: "rejects invalid hotset retention cap",
+			mutate: func(opts *Options) {
+				opts.Cache.Governance.Warmup.Hotset.MaxItemsPerKind = 0
+			},
+			wantErr: "cache.governance.warmup.hotset.max_items_per_kind must be greater than 0",
 		},
 	}
 
