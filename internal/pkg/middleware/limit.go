@@ -27,16 +27,6 @@ func LimitDegradedOpen(opts LimitOptions) gin.HandlerFunc {
 	return LimitWithLimiter(ratelimit.NewDistributedLimiter(nil, policy), nil, opts)
 }
 
-// Limit 如果达到限制，则丢弃（HTTP 状态 429）请求
-func Limit(maxEventsPerSec float64, maxBurstSize int) gin.HandlerFunc {
-	return LimitWithOptions(maxEventsPerSec, maxBurstSize, LimitOptions{
-		Component: "http",
-		Scope:     "global",
-		Resource:  "request",
-		Strategy:  "local",
-	})
-}
-
 func LimitWithOptions(maxEventsPerSec float64, maxBurstSize int, opts LimitOptions) gin.HandlerFunc {
 	policy := rateLimitPolicy(opts, "local", maxEventsPerSec, maxBurstSize)
 	return LimitWithLimiter(ratelimit.NewLocalLimiter(policy), nil, opts)
@@ -66,16 +56,6 @@ func LimitWithLimiter(limiter ratelimit.RateLimiter, keyFn func(*gin.Context) st
 		ratelimit.ApplyRetryAfterHeader(c.Writer.Header(), decision)
 		c.AbortWithStatus(http.StatusTooManyRequests)
 	}
-}
-
-// LimitByKey 为不同 key 维护独立的限流器。
-func LimitByKey(maxEventsPerSec float64, maxBurstSize int, keyFn func(*gin.Context) string) gin.HandlerFunc {
-	return LimitByKeyWithOptions(maxEventsPerSec, maxBurstSize, keyFn, LimitOptions{
-		Component: "http",
-		Scope:     "per_key",
-		Resource:  "request",
-		Strategy:  "local_key",
-	})
 }
 
 func LimitByKeyWithOptions(maxEventsPerSec float64, maxBurstSize int, keyFn func(*gin.Context) string, opts LimitOptions) gin.HandlerFunc {

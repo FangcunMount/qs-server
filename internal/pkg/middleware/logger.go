@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"time"
 
@@ -40,22 +39,6 @@ var defaultLogFormatter = func(param gin.LogFormatterParams) string {
 // 默认 gin.DefaultWriter = os.Stdout
 func Logger() gin.HandlerFunc {
 	return LoggerWithConfig(GetLoggerConfig(nil, nil, nil))
-}
-
-// LoggerWithFormatter 实例化一个带有指定日志格式函数的 Logger 中间件
-func LoggerWithFormatter(f gin.LogFormatter) gin.HandlerFunc {
-	return LoggerWithConfig(gin.LoggerConfig{
-		Formatter: f,
-	})
-}
-
-// LoggerWithWriter 实例化一个带有指定写入器缓冲区的 Logger 中间件
-// 示例：os.Stdout, 一个以写入模式打开的文件, 一个套接字...
-func LoggerWithWriter(out io.Writer, notlogged ...string) gin.HandlerFunc {
-	return LoggerWithConfig(gin.LoggerConfig{
-		Output:    out,
-		SkipPaths: notlogged,
-	})
 }
 
 // LoggerWithConfig 实例化一个带有配置的 Logger 中间件
