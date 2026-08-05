@@ -1,5 +1,7 @@
 //go:build integration
 
+// The Mongo transaction acceptance test belongs to the infrastructure adapter
+// so the application layer remains dependent on ports only.
 package questionnaire_test
 
 import (
