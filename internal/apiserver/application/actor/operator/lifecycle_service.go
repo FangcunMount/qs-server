@@ -65,7 +65,7 @@ func (s *lifecycleService) Register(ctx context.Context, dto RegisterOperatorDTO
 			return err
 		}
 
-		// 2. 解析或创建用户（先按手机号查，查不到再创建）
+		// 2. 解析已有用户或通过 IAM 注册完整运营账号。
 		userID, err := s.resolveOrCreateUser(ctx, dto)
 		if err != nil {
 			return err
@@ -255,7 +255,8 @@ func (s *lifecycleService) validateRegisterDTO(dto RegisterOperatorDTO) error {
 	return nil
 }
 
-// resolveOrCreateUser: 优先通过 IAM 注册运营账号（可同时创建 user/account/credential），否则回退到 legacy user-only 创建。
+// resolveOrCreateUser resolves an existing user or registers the complete IAM
+// operation account required for a new operator.
 func (s *lifecycleService) resolveOrCreateUser(ctx context.Context, dto RegisterOperatorDTO) (int64, error) {
 	if strings.TrimSpace(dto.Password) != "" {
 		if s.accountSvc == nil || !s.accountSvc.IsEnabled() {
@@ -284,26 +285,7 @@ func (s *lifecycleService) resolveOrCreateUser(ctx context.Context, dto Register
 		return result.UserID, nil
 	}
 
-	userID := dto.UserID
-	if userID != 0 {
-		return userID, nil
-	}
-	return s.findOrCreateUserByPhone(ctx, dto)
-}
-
-func (s *lifecycleService) findOrCreateUserByPhone(ctx context.Context, dto RegisterOperatorDTO) (int64, error) {
-	if s.identitySvc == nil || !s.identitySvc.IsEnabled() {
-		return 0, errors.WithCode(code.ErrValidation, "user_id is required or IAM must be enabled to create user")
-	}
-
-	if userID, found, err := s.findExistingUserByPhone(ctx, dto.Phone); err != nil {
-		return 0, err
-	} else if found {
-		return userID, nil
-	}
-
-	// 未找到则创建
-	return s.identitySvc.CreateUser(ctx, dto.Name, dto.Email, dto.Phone)
+	return dto.UserID, nil
 }
 
 func (s *lifecycleService) findExistingUserByPhone(ctx context.Context, phone string) (int64, bool, error) {

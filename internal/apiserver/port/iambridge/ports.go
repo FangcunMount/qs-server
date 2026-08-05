@@ -24,7 +24,6 @@ type IdentityResolver interface {
 type UserDirectory interface {
 	IsEnabled() bool
 	FindUserIDByPhone(ctx context.Context, phone string) (int64, bool, error)
-	CreateUser(ctx context.Context, name, email, phone string) (int64, error)
 }
 
 type OperationAccountRegistration struct {

@@ -3,7 +3,6 @@ package iam
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	identityv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/identity/v2"
@@ -93,45 +92,6 @@ func (s *IdentityService) SearchUsers(ctx context.Context, req *identityv2.Searc
 // Raw 返回原始 SDK 客户端（用于高级用法）
 func (s *IdentityService) Raw() *identity.Client {
 	return s.client
-}
-
-// CreateUser 创建用户的简化封装
-// 返回新建用户的 numeric ID（int64）或错误
-func (s *IdentityService) CreateUser(ctx context.Context, name, email, phone string) (int64, error) {
-	if !s.enabled {
-		return 0, fmt.Errorf("identity service not enabled")
-	}
-	ctx, release, err := s.acquire(ctx)
-	if err != nil {
-		return 0, err
-	}
-	defer release()
-	// 构建 SDK 的 CreateUserRequest
-	req := &identityv2.CreateUserRequest{
-		Nickname: name,
-		Email:    email,
-		Phone:    phone,
-	}
-
-	resp, err := s.client.CreateUser(ctx, req)
-	if err != nil {
-		return 0, fmt.Errorf("failed to create user in IAM: %w", err)
-	}
-
-	if resp == nil || resp.User == nil {
-		return 0, fmt.Errorf("empty response or missing user from IAM CreateUser")
-	}
-
-	// SDK 返回的 User 对象的 ID 字段名为 `Id`（string），尝试解析为 int64
-	uidStr := resp.User.Id
-	if uidStr == "" {
-		return 0, fmt.Errorf("empty user id returned from IAM")
-	}
-	uid, err := strconv.ParseInt(uidStr, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse user id from IAM: %w", err)
-	}
-	return uid, nil
 }
 
 func (s *IdentityService) acquire(ctx context.Context) (context.Context, func(), error) {

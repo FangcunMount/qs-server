@@ -67,13 +67,6 @@ func (d *userDirectory) FindUserIDByPhone(ctx context.Context, phone string) (in
 	return uid, true, nil
 }
 
-func (d *userDirectory) CreateUser(ctx context.Context, name, email, phone string) (int64, error) {
-	if !d.IsEnabled() {
-		return 0, fmt.Errorf("identity service not enabled")
-	}
-	return d.svc.CreateUser(ctx, name, email, phone)
-}
-
 type operationAccountRegistrar struct {
 	svc *OperationAccountService
 }

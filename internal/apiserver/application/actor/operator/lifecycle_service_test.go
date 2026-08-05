@@ -83,6 +83,19 @@ func TestCreateAndSaveOperator_ReusesExistingOperatorByUserID(t *testing.T) {
 	}
 }
 
+func TestValidateRegisterDTORequiresPasswordForNewIAMAccount(t *testing.T) {
+	service := newTestLifecycleService(newFakeOperatorRepo())
+	err := service.validateRegisterDTO(RegisterOperatorDTO{
+		OrgID: 1,
+		Name:  "章依文",
+		Phone: "+8617700000001",
+		Roles: []string{"qs:staff"},
+	})
+	if err == nil || !errors.IsCode(err, code.ErrValidation) {
+		t.Fatalf("validateRegisterDTO() error = %v, want validation error", err)
+	}
+}
+
 func newTestLifecycleService(repo domain.Repository) *lifecycleService {
 	validator := domain.NewValidator()
 	roleAllocator := domain.NewRoleAllocator(validator)
