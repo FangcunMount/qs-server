@@ -68,12 +68,6 @@ func NewGlobalProjections(db *gorm.DB) []statisticsDomain.Projection {
 	return []statisticsDomain.Projection{&PlanFulfillmentProjection{db}, &OrganizationSnapshotProjection{db}}
 }
 
-// NewProjections is retained for callers that only need the complete ordered
-// registry. Runtime assembly uses the explicit daily/global sets.
-func NewProjections(db *gorm.DB) []statisticsDomain.Projection {
-	return append(NewDailyProjections(db), NewGlobalProjections(db)...)
-}
-
 func projectionDB(ctx context.Context, db *gorm.DB) *gorm.DB {
 	if tx, ok := mysql.TxFromContext(ctx); ok {
 		return tx.WithContext(ctx)
