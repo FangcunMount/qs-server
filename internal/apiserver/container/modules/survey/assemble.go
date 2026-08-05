@@ -9,6 +9,7 @@ import (
 	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	asApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
@@ -83,6 +84,7 @@ func New(deps Deps) (*Module, error) {
 
 	module.eventPublisher = normalized.EventPublisher
 	if err := module.initQuestionnaireSubModule(
+		modtx.NewMongoRunner(normalized.MongoDB),
 		normalized.IdentityService,
 		normalized.HotsetRecorder,
 		module.bindingSyncer,
@@ -120,7 +122,7 @@ func normalizeDeps(deps Deps) (Deps, error) {
 	return deps, nil
 }
 
-func (m *Module) initQuestionnaireSubModule(identitySvc *iam.IdentityService, hotset cachetarget.HotsetRecorder, bindingSyncer quesApp.QuestionnaireBindingVersionSyncer, repo questionnaire.Repository, reader surveyreadmodel.QuestionnaireReader, cacheSignalNotifier quesApp.CacheSignalNotifier) error {
+func (m *Module) initQuestionnaireSubModule(transactionRunner apptransaction.Runner, identitySvc *iam.IdentityService, hotset cachetarget.HotsetRecorder, bindingSyncer quesApp.QuestionnaireBindingVersionSyncer, repo questionnaire.Repository, reader surveyreadmodel.QuestionnaireReader, cacheSignalNotifier quesApp.CacheSignalNotifier) error {
 	sub := m.Questionnaire
 
 	validator := questionnaire.Validator{}
@@ -132,6 +134,7 @@ func (m *Module) initQuestionnaireSubModule(identitySvc *iam.IdentityService, ho
 		validator,
 		lifecycle,
 		m.eventPublisher,
+		transactionRunner,
 		quesApp.WithCacheSignalNotifier(cacheSignalNotifier),
 	)
 	sub.ContentService = quesApp.NewContentService(repo)

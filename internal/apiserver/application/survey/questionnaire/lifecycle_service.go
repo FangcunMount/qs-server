@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/event"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -25,6 +26,7 @@ type lifecycleService struct {
 	validator           questionnaire.Validator
 	lifecycle           questionnaire.Lifecycle
 	eventPublisher      event.EventPublisher
+	transactions        apptransaction.Runner
 	cacheSignalNotifier CacheSignalNotifier
 }
 
@@ -45,6 +47,7 @@ func NewLifecycleService(
 	validator questionnaire.Validator,
 	lifecycle questionnaire.Lifecycle,
 	eventPublisher event.EventPublisher,
+	transactions apptransaction.Runner,
 	opts ...LifecycleServiceOption,
 ) QuestionnaireLifecycleService {
 	s := &lifecycleService{
@@ -53,6 +56,7 @@ func NewLifecycleService(
 		validator:      validator,
 		lifecycle:      lifecycle,
 		eventPublisher: eventPublisher,
+		transactions:   transactions,
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -127,39 +131,41 @@ func (s *lifecycleService) Publish(ctx context.Context, code string) (*Questionn
 	if err := s.validateCode(ctx, code, "publish"); err != nil {
 		return nil, err
 	}
-	if err := s.rejectBoundStandaloneLifecycle(ctx, code); err != nil {
+
+	var q *questionnaire.Questionnaire
+	if err := s.withStandaloneLifecycleTransaction(ctx, func(txCtx context.Context) error {
+		if err := s.rejectBoundStandaloneLifecycle(txCtx, code); err != nil {
+			return err
+		}
+		var err error
+		q, err = s.findQuestionnaireByCode(txCtx, code, "publish")
+		if err != nil {
+			return err
+		}
+		if err := s.checkArchivedStatus(txCtx, q, code, "publish", "发布"); err != nil {
+			return err
+		}
+		if q.IsPublished() {
+			l.Warnw("问卷已发布，不能重复发布",
+				"action", "publish",
+				"code", code,
+				"status", q.GetStatus().String(),
+				"result", "invalid_status",
+			)
+			return errors.WithCode(errorCode.ErrQuestionnaireInvalidStatus, "问卷已发布，不能重复发布")
+		}
+		return s.publishQuestionnaireVersion(txCtx, l, q, code)
+	}); err != nil {
 		return nil, err
 	}
 
-	// 2. 获取问卷
-	q, err := s.findQuestionnaireByCode(ctx, code, "publish")
-	if err != nil {
-		return nil, err
-	}
-
-	// 3. 检查问卷状态
-	if err := s.checkArchivedStatus(ctx, q, code, "publish", "发布"); err != nil {
-		return nil, err
-	}
-	if q.IsPublished() {
-		l.Warnw("问卷已发布，不能重复发布",
-			"action", "publish",
-			"code", code,
-			"status", q.GetStatus().String(),
-			"result", "invalid_status",
-		)
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidStatus, "问卷已发布，不能重复发布")
-	}
-
-	if err := s.publishQuestionnaireVersion(ctx, l, q, code); err != nil {
-		return nil, err
-	}
-	if err := s.syncQuestionnaireBindingVersion(ctx, code, q.GetVersion().String()); err != nil {
-		return nil, err
-	}
-
+	syncErr := s.syncQuestionnaireBindingVersion(ctx, code, q.GetVersion().String())
 	s.publishEvents(ctx, q)
+	s.InvalidateReleaseCache(ctx, code)
 	s.notifyCacheChanged(ctx, q, "published")
+	if syncErr != nil {
+		return nil, syncErr
+	}
 
 	s.logSuccess(ctx, "publish", code, startTime,
 		"version", q.GetVersion().String(),
@@ -167,6 +173,13 @@ func (s *lifecycleService) Publish(ctx context.Context, code string) (*Questionn
 	)
 
 	return toQuestionnaireResult(q), nil
+}
+
+func (s *lifecycleService) withStandaloneLifecycleTransaction(ctx context.Context, fn func(context.Context) error) error {
+	if s == nil || s.transactions == nil {
+		return errors.WithCode(errorCode.ErrModuleInitializationFailed, "questionnaire transaction runner is required")
+	}
+	return s.transactions.WithinTransaction(ctx, fn)
 }
 
 func (s *lifecycleService) rejectBoundStandaloneLifecycle(ctx context.Context, questionnaireCode string) error {

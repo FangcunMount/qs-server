@@ -130,8 +130,9 @@ jobs:
           QS_SERVER_TEST_MONGO_DB_PREFIX: qs_survey_ci_test
         run: |
           go test -tags=integration \
-            -run '^(TestDurableSubmissionTransactionAgainstMongoReplicaSet|TestRepositoryConcurrentWritersUseRevisionCAS)$' \
+            -run '^(TestDurableSubmissionTransactionAgainstMongoReplicaSet|TestRepositoryConcurrentWritersUseRevisionCAS|TestStandaloneQuestionnaireLifecycleRollsBackOnPartialFailure)$' \
             -count=1 -timeout=10m -v \
+            ./internal/apiserver/application/survey/questionnaire \
             ./internal/apiserver/infra/mongo/answersheet \
             ./internal/apiserver/infra/mongo/questionnaire
 

@@ -19,39 +19,48 @@ func (s *lifecycleService) Unpublish(ctx context.Context, code string) (*Questio
 		"action", "unpublish",
 		"code", code,
 	)
-	if err := s.rejectBoundStandaloneLifecycle(ctx, code); err != nil {
-		return nil, err
-	}
 
-	q, err := s.loadUnpublishTarget(ctx, l, code)
-	if err != nil {
-		return nil, err
-	}
+	var q *domainQuestionnaire.Questionnaire
+	if err := s.withStandaloneLifecycleTransaction(ctx, func(txCtx context.Context) error {
+		if err := s.rejectBoundStandaloneLifecycle(txCtx, code); err != nil {
+			return err
+		}
+		var err error
+		q, err = s.loadUnpublishTarget(txCtx, l, code)
+		if err != nil {
+			return err
+		}
 
-	l.Debugw("执行下架流程",
-		"action", "unpublish",
-		"code", code,
-		"current_status", q.GetStatus().String(),
-	)
-	if q.IsPublished() {
-		if err := s.lifecycle.Unpublish(ctx, q); err != nil {
-			l.Errorw("下架问卷失败",
-				"action", "unpublish",
-				"code", code,
-				"result", "failed",
-				"error", err.Error(),
-			)
-			return nil, wrapQuestionnaireDomainError(err, errorCode.ErrQuestionnaireInvalidStatus, "下架问卷失败")
+		l.Debugw("执行下架流程",
+			"action", "unpublish",
+			"code", code,
+			"current_status", q.GetStatus().String(),
+		)
+		if q.IsPublished() {
+			if err := s.lifecycle.Unpublish(txCtx, q); err != nil {
+				l.Errorw("下架问卷失败",
+					"action", "unpublish",
+					"code", code,
+					"result", "failed",
+					"error", err.Error(),
+				)
+				return wrapQuestionnaireDomainError(err, errorCode.ErrQuestionnaireInvalidStatus, "下架问卷失败")
+			}
+			if err := s.persistQuestionnaire(txCtx, q, code, "unpublish", "状态"); err != nil {
+				return err
+			}
 		}
-		if err := s.persistQuestionnaire(ctx, q, code, "unpublish", "状态"); err != nil {
-			return nil, err
+		if err := s.repo.ClearActivePublishedVersion(txCtx, code); err != nil {
+			return errors.WrapC(err, errorCode.ErrDatabase, "清理发布快照失败")
 		}
-	}
-	if err := s.repo.ClearActivePublishedVersion(ctx, code); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "清理发布快照失败")
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
 	s.publishEvents(ctx, q)
+	s.InvalidateReleaseCache(ctx, code)
+	s.notifyCacheChanged(ctx, q, "unpublished")
 
 	s.logSuccess(ctx, "unpublish", code, startTime,
 		"status", q.GetStatus().String(),
@@ -91,51 +100,59 @@ func (s *lifecycleService) Archive(ctx context.Context, code string) (*Questionn
 		"action", "archive",
 		"code", code,
 	)
-	if err := s.rejectBoundStandaloneLifecycle(ctx, code); err != nil {
-		return nil, err
-	}
-
 	if err := s.validateCode(ctx, code, "archive"); err != nil {
 		return nil, err
 	}
 
-	q, err := s.findQuestionnaireByCode(ctx, code, "archive")
-	if err != nil {
-		return nil, err
-	}
-	if q.IsArchived() {
-		l.Warnw("问卷已归档，不能重复归档",
+	var q *domainQuestionnaire.Questionnaire
+	if err := s.withStandaloneLifecycleTransaction(ctx, func(txCtx context.Context) error {
+		if err := s.rejectBoundStandaloneLifecycle(txCtx, code); err != nil {
+			return err
+		}
+		var err error
+		q, err = s.findQuestionnaireByCode(txCtx, code, "archive")
+		if err != nil {
+			return err
+		}
+		if q.IsArchived() {
+			l.Warnw("问卷已归档，不能重复归档",
+				"action", "archive",
+				"code", code,
+				"status", q.GetStatus().String(),
+				"result", "invalid_status",
+			)
+			return errors.WithCode(errorCode.ErrQuestionnaireInvalidStatus, "问卷已归档，不能重复归档")
+		}
+
+		l.Debugw("执行归档流程",
 			"action", "archive",
 			"code", code,
-			"status", q.GetStatus().String(),
-			"result", "invalid_status",
+			"current_status", q.GetStatus().String(),
 		)
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidStatus, "问卷已归档，不能重复归档")
-	}
+		if err := s.lifecycle.Archive(txCtx, q); err != nil {
+			l.Errorw("归档问卷失败",
+				"action", "archive",
+				"code", code,
+				"result", "failed",
+				"error", err.Error(),
+			)
+			return wrapQuestionnaireDomainError(err, errorCode.ErrQuestionnaireInvalidStatus, "归档问卷失败")
+		}
 
-	l.Debugw("执行归档流程",
-		"action", "archive",
-		"code", code,
-		"current_status", q.GetStatus().String(),
-	)
-	if err := s.lifecycle.Archive(ctx, q); err != nil {
-		l.Errorw("归档问卷失败",
-			"action", "archive",
-			"code", code,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, wrapQuestionnaireDomainError(err, errorCode.ErrQuestionnaireInvalidStatus, "归档问卷失败")
-	}
-
-	if err := s.persistQuestionnaire(ctx, q, code, "archive", "状态"); err != nil {
+		if err := s.persistQuestionnaire(txCtx, q, code, "archive", "状态"); err != nil {
+			return err
+		}
+		if err := s.repo.ClearActivePublishedVersion(txCtx, code); err != nil {
+			return errors.WrapC(err, errorCode.ErrDatabase, "清理发布快照失败")
+		}
+		return nil
+	}); err != nil {
 		return nil, err
-	}
-	if err := s.repo.ClearActivePublishedVersion(ctx, code); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "清理发布快照失败")
 	}
 
 	s.publishEvents(ctx, q)
+	s.InvalidateReleaseCache(ctx, code)
+	s.notifyCacheChanged(ctx, q, "archived")
 
 	s.logSuccess(ctx, "archive", code, startTime,
 		"status", q.GetStatus().String(),
