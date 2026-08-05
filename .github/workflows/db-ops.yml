@@ -409,7 +409,18 @@ jobs:
 
             echo ""
             echo "Available backups:"
-            ls -lht /opt/backups/qs-server/mongodb/ 2>/dev/null | head -11 || echo "No backups found"
+            sudo docker run --rm \
+              -v /opt/backups/qs-server/mongodb:/backup:ro \
+              --entrypoint /bin/bash \
+              mongo:7.0 -Eeuo pipefail -c '
+                shopt -s nullglob
+                FILES=(/backup/qs_mongodb_backup_*.archive.gz /backup/qs_mongodb_backup_*.partial)
+                if (( ${#FILES[@]} == 0 )); then
+                  echo "No backups or partial archives found"
+                else
+                  ls -lht -- "${FILES[@]}" | head -10
+                fi
+              '
         env:
           MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
           MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
