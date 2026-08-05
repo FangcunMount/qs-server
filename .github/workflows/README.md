@@ -10,6 +10,8 @@
 | `ping-runner.yml` | ServerA 生产巡检 + ServerD worker 主机巡检 | 每 6 小时 / `workflow_dispatch` |
 | `db-ops.yml` | MongoDB 备份 / 恢复、MySQL/MongoDB 状态及 Redis 只读键空间盘点（读 `production` Environment secrets） | 每日定时备份 / `workflow_dispatch` |
 
+JavaScript Action 必须使用原生 Node 24 主版本：制品上传使用 `actions/upload-artifact@v7`，镜像构建使用 `docker/setup-buildx-action@v4` 与 `docker/login-action@v4`。`scripts/cd/test-github-action-runtimes.sh` 在 CI 中阻止回退到由 GitHub 强制转译运行的 Node 20 主版本。
+
 已移除的 workflow（冗余或失效）：
 
 - `build.yml`：已更名为 `sonar.yml`（原名易与 CI Build 混淆）

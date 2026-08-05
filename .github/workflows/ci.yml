@@ -245,6 +245,9 @@ jobs:
           go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
           "$(go env GOPATH)/bin/actionlint"
 
+      - name: Validate GitHub Action runtime contract
+        run: bash scripts/cd/test-github-action-runtimes.sh
+
       - name: Validate deployment shell scripts
         run: bash -n scripts/cd/*.sh
 
@@ -306,7 +309,7 @@ jobs:
 
       - name: Upload security reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: security-reports
           path: tmp/security/
@@ -342,7 +345,7 @@ jobs:
 
       - name: Upload maintainability reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: maintainability-reports
           path: tmp/maintainability/
@@ -419,7 +422,7 @@ jobs:
           make build-${{ matrix.service }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: qs-${{ matrix.service }}
           path: bin/*
