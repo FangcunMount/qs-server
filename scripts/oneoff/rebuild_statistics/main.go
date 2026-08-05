@@ -27,12 +27,11 @@ type dateWindow struct {
 }
 
 type runRequest struct {
-	Mode         string `json:"mode"`
-	FromDate     string `json:"from_date"`
-	ToDate       string `json:"to_date"`
-	Reason       string `json:"reason"`
-	Confirm      bool   `json:"confirm"`
-	ValidateOnly bool   `json:"validate_only"`
+	Mode     string `json:"mode"`
+	FromDate string `json:"from_date"`
+	ToDate   string `json:"to_date"`
+	Reason   string `json:"reason"`
+	Confirm  bool   `json:"confirm"`
 }
 
 type resumeCacheRequest struct {
@@ -259,7 +258,7 @@ func executeRun(client *http.Client, cfg options, orgID int64, window dateWindow
 	body, err := json.Marshal(runRequest{
 		Mode:     cfg.Mode,
 		FromDate: window.From.Format(dateLayout), ToDate: window.To.Format(dateLayout),
-		Reason: cfg.Reason, Confirm: cfg.Confirm, ValidateOnly: cfg.ValidateOnly,
+		Reason: cfg.Reason, Confirm: cfg.Confirm,
 	})
 	if err != nil {
 		return runResult{}, err

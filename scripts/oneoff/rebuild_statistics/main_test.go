@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -75,12 +76,21 @@ func TestExecuteRunSendsScopedRepairRequestAndParsesCounts(t *testing.T) {
 		if r.URL.Path != "/internal/v2/statistics/runs" || r.Header.Get("X-Org-ID") != "7" || r.Header.Get("Authorization") != "Bearer secret" {
 			t.Fatalf("path=%s org=%s auth=%s", r.URL.Path, r.Header.Get("X-Org-ID"), r.Header.Get("Authorization"))
 		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
 		var request runRequest
-		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		if err := json.Unmarshal(body, &request); err != nil {
 			t.Fatal(err)
 		}
 		if request.Mode != "repair" || request.FromDate != "2026-01-01" || request.ToDate != "2026-01-07" || !request.Confirm {
 			t.Fatalf("request=%+v", request)
+		}
+		var wire map[string]any
+		_ = json.Unmarshal(body, &wire)
+		if _, exists := wire["validate_only"]; exists {
+			t.Fatalf("canonical request must not send validate_only: %v", wire)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"code":0,"data":{"id":9,"mode":"repair","status":"succeeded","stage":"completed","fact_counts":{"assessment.inserted":3}}}`))

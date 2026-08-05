@@ -176,7 +176,7 @@ func newCoordinatorForTest(t *testing.T, cache CachePublisher) (*Coordinator, *c
 
 func TestCoordinatorCacheFailurePreservesDataCommitted(t *testing.T) {
 	coordinator, _, _, _, store, _ := newCoordinatorForTest(t, cachePublisherStub{generation: 8, err: errors.New("warmup unavailable")})
-	run, err := coordinator.Run(context.Background(), RunRequest{OrgID: 7, FromDate: time.Date(2026, 7, 21, 0, 0, 0, 0, statisticsDomain.Shanghai), ToDate: time.Date(2026, 7, 21, 0, 0, 0, 0, statisticsDomain.Shanghai), TriggerType: "manual"})
+	run, err := coordinator.Run(context.Background(), RunRequest{OrgID: 7, FromDate: time.Date(2026, 7, 21, 0, 0, 0, 0, statisticsDomain.Shanghai), ToDate: time.Date(2026, 7, 21, 0, 0, 0, 0, statisticsDomain.Shanghai), TriggerType: "manual", Mode: statisticsDomain.RunModePublish})
 	if err == nil {
 		t.Fatal("expected cache publication error")
 	}
@@ -209,14 +209,28 @@ func TestCoordinatorPersistsPublishedCacheGeneration(t *testing.T) {
 	}
 }
 
-func TestCoordinatorValidateOnlyDoesNotProjectOrOpenResultTransaction(t *testing.T) {
+func TestCoordinatorValidateModeDoesNotProjectOrOpenResultTransaction(t *testing.T) {
 	coordinator, collector, projection, global, store, txCalls := newCoordinatorForTest(t, nil)
-	run, err := coordinator.Run(context.Background(), RunRequest{OrgID: 7, FromDate: time.Date(2026, 7, 21, 0, 0, 0, 0, statisticsDomain.Shanghai), ToDate: time.Date(2026, 7, 21, 0, 0, 0, 0, statisticsDomain.Shanghai), TriggerType: "manual", ValidateOnly: true})
+	run, err := coordinator.Run(context.Background(), RunRequest{OrgID: 7, FromDate: time.Date(2026, 7, 21, 0, 0, 0, 0, statisticsDomain.Shanghai), ToDate: time.Date(2026, 7, 21, 0, 0, 0, 0, statisticsDomain.Shanghai), TriggerType: "manual", Mode: statisticsDomain.RunModeValidate})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if run.Status != statisticsDomain.RunStatusSucceeded || collector.called != 1 || projection.called != 0 || global.called != 0 || *txCalls != 0 || store.committed != 0 {
 		t.Fatalf("run=%+v collector=%d projection=%d global=%d tx=%d committed=%d", run, collector.called, projection.called, global.called, *txCalls, store.committed)
+	}
+}
+
+func TestCoordinatorRejectsEmptyModeBeforeCreatingRun(t *testing.T) {
+	coordinator, collector, daily, global, store, txCalls := newCoordinatorForTest(t, nil)
+	run, err := coordinator.Run(context.Background(), RunRequest{
+		OrgID: 7, FromDate: time.Date(2026, 7, 21, 0, 0, 0, 0, statisticsDomain.Shanghai),
+		ToDate: time.Date(2026, 7, 21, 0, 0, 0, 0, statisticsDomain.Shanghai), TriggerType: "manual",
+	})
+	if err == nil || !IsInvalidRunRequest(err) || run != nil {
+		t.Fatalf("run=%+v err=%v", run, err)
+	}
+	if store.run.ID != 0 || collector.called != 0 || daily.called != 0 || global.called != 0 || *txCalls != 0 {
+		t.Fatalf("run_id=%d collector=%d daily=%d global=%d tx=%d", store.run.ID, collector.called, daily.called, global.called, *txCalls)
 	}
 }
 

@@ -76,9 +76,6 @@ type RunRequest struct {
 	Reason, TriggerType string
 	OperatorID          uint64
 	Mode                statisticsDomain.RunMode
-	// ValidateOnly is the compatibility input for the original internal API.
-	// New callers must set Mode explicitly.
-	ValidateOnly bool
 }
 
 type runExecutionError struct {
@@ -143,9 +140,9 @@ func (c *Coordinator) Run(ctx context.Context, request RunRequest) (resultRun *R
 	if utf8.RuneCountInString(request.Reason) > maxRunReasonRunes {
 		return nil, invalidRunRequest("reason exceeds %d characters", maxRunReasonRunes)
 	}
-	mode, err := normalizeRunMode(request.Mode, request.ValidateOnly)
-	if err != nil {
-		return nil, err
+	mode := request.Mode
+	if err := mode.Validate(); err != nil {
+		return nil, invalidRunRequest("%s", err)
 	}
 	metricStart := time.Now()
 	defer func() { observeStatisticsRun(metricStart, mode, request.TriggerType, resultRun, resultErr) }()
@@ -222,23 +219,6 @@ func (c *Coordinator) Run(ctx context.Context, request RunRequest) (resultRun *R
 		return latest, runErr
 	}
 	return c.store.Get(ctx, run.ID)
-}
-
-func normalizeRunMode(mode statisticsDomain.RunMode, validateOnly bool) (statisticsDomain.RunMode, error) {
-	if mode == "" {
-		if validateOnly {
-			return statisticsDomain.RunModeValidate, nil
-		}
-		// Compatibility for the scheduler and the original internal endpoint.
-		return statisticsDomain.RunModePublish, nil
-	}
-	if validateOnly && mode != statisticsDomain.RunModeValidate {
-		return "", invalidRunRequest("validate_only conflicts with mode %q", mode)
-	}
-	if err := mode.Validate(); err != nil {
-		return "", invalidRunRequest("%s", err)
-	}
-	return mode, nil
 }
 
 func daysBetween(from, to time.Time) int {

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -11,7 +12,16 @@ import (
 	statisticsDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
+
+var deprecatedStatisticsValidateOnlyTotal = promauto.NewCounter(prometheus.CounterOpts{
+	Namespace: "qs",
+	Subsystem: "statistics",
+	Name:      "deprecated_validate_only_total",
+	Help:      "Calls to the Statistics run endpoint using the deprecated validate_only input.",
+})
 
 type StatisticsHandler struct {
 	*BaseHandler
@@ -374,8 +384,15 @@ func (h *StatisticsHandler) CreateRun(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid request body"))
 		return
 	}
-	mode := statisticsDomain.RunMode(strings.TrimSpace(request.Mode))
-	isValidate := request.ValidateOnly || mode == statisticsDomain.RunModeValidate
+	if request.ValidateOnly {
+		deprecatedStatisticsValidateOnlyTotal.Inc()
+	}
+	mode, err := normalizeStatisticsRunMode(request.Mode, request.ValidateOnly)
+	if err != nil {
+		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "%s", err.Error()))
+		return
+	}
+	isValidate := mode == statisticsDomain.RunModeValidate
 	if !isValidate && !request.Confirm {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "confirm=true is required"))
 		return
@@ -398,7 +415,7 @@ func (h *StatisticsHandler) CreateRun(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "invalid to_date"))
 		return
 	}
-	run, runErr := h.coordinator.Run(c.Request.Context(), statisticsApp.RunRequest{OrgID: orgID, FromDate: from, ToDate: to, Reason: strings.TrimSpace(request.Reason), TriggerType: "manual", OperatorID: uint64(userID), Mode: mode, ValidateOnly: request.ValidateOnly})
+	run, runErr := h.coordinator.Run(c.Request.Context(), statisticsApp.RunRequest{OrgID: orgID, FromDate: from, ToDate: to, Reason: strings.TrimSpace(request.Reason), TriggerType: "manual", OperatorID: uint64(userID), Mode: mode})
 	if statisticsApp.IsInvalidRunRequest(runErr) {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "%s", runErr.Error()))
 		return
@@ -408,6 +425,23 @@ func (h *StatisticsHandler) CreateRun(c *gin.Context) {
 		return
 	}
 	h.Success(c, run)
+}
+
+func normalizeStatisticsRunMode(raw string, validateOnly bool) (statisticsDomain.RunMode, error) {
+	mode := statisticsDomain.RunMode(strings.TrimSpace(raw))
+	if validateOnly {
+		if mode != "" && mode != statisticsDomain.RunModeValidate {
+			return "", fmt.Errorf("validate_only conflicts with mode %q", mode)
+		}
+		return statisticsDomain.RunModeValidate, nil
+	}
+	if mode == "" {
+		return statisticsDomain.RunModePublish, nil
+	}
+	if err := mode.Validate(); err != nil {
+		return "", err
+	}
+	return mode, nil
 }
 
 // ListRuns godoc
