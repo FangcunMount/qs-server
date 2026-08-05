@@ -103,13 +103,13 @@ jobs:
 
             sudo docker run --rm --network infra-network \
               -v "$BACKUP_DIR:/backup" \
-              -e MONGODB_HOST \
-              -e MONGODB_PORT \
-              -e MONGODB_USERNAME \
-              -e MONGODB_PASSWORD \
-              -e MONGODB_DBNAME \
-              -e BACKUP_FILE \
-              -e PARTIAL_FILE \
+              -e MONGODB_HOST="$MONGODB_HOST" \
+              -e MONGODB_PORT="$MONGODB_PORT" \
+              -e MONGODB_USERNAME="$MONGODB_USERNAME" \
+              -e MONGODB_PASSWORD="$MONGODB_PASSWORD" \
+              -e MONGODB_DBNAME="$MONGODB_DBNAME" \
+              -e BACKUP_FILE="$BACKUP_FILE" \
+              -e PARTIAL_FILE="$PARTIAL_FILE" \
               --entrypoint /bin/bash \
               mongo:7.0 -Eeuo pipefail -c '
                 cleanup_partial() {
