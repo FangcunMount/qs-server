@@ -4884,45 +4884,6 @@ info:
   title: QS API Server
   version: "1.0"
 paths:
-  /api/v1/admin/logs:
-    get:
-      produces:
-      - application/json
-      responses:
-        "501":
-          description: Not Implemented
-          schema:
-            additionalProperties: true
-            type: object
-      summary: 管理员接口（未实现）
-      tags:
-      - Admin
-  /api/v1/admin/statistics:
-    get:
-      produces:
-      - application/json
-      responses:
-        "501":
-          description: Not Implemented
-          schema:
-            additionalProperties: true
-            type: object
-      summary: 管理员接口（未实现）
-      tags:
-      - Admin
-  /api/v1/admin/users:
-    get:
-      produces:
-      - application/json
-      responses:
-        "501":
-          description: Not Implemented
-          schema:
-            additionalProperties: true
-            type: object
-      summary: 管理员接口（未实现）
-      tags:
-      - Admin
   /api/v1/answersheets:
     get:
       consumes:

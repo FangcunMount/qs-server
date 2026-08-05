@@ -254,23 +254,6 @@ func requestLimitKey(c *gin.Context) string {
 	return "ip:" + c.ClientIP()
 }
 
-// unsupportedFeature 明确标识当前保留但未支持的入口。
-// @Summary 管理员接口（未实现）
-// @Tags Admin
-// @Produce json
-// @Success 501 {object} map[string]interface{}
-// @Router /api/v1/admin/users [get]
-// @Router /api/v1/admin/statistics [get]
-// @Router /api/v1/admin/logs [get]
-func (r *Router) unsupportedFeature(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{
-		"code":    501,
-		"message": "功能当前不支持",
-		"path":    c.Request.URL.Path,
-		"method":  c.Request.Method,
-	})
-}
-
 // healthCheck 健康检查处理函数。
 // @Summary 健康检查
 // @Description 返回 apiserver 健康状态

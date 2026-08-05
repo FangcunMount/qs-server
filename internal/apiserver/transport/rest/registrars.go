@@ -71,7 +71,6 @@ func (registrar protectedRouteRegistrar) register(engine *gin.Engine) {
 	apiV1 := engine.Group("/api/v1")
 	r.applyProtectedGroupMiddlewares(apiV1, "/api/v1")
 
-	r.registerUserProtectedRoutes(apiV1)
 	r.registerQuestionnaireProtectedRoutes(apiV1)
 	r.registerAssessmentModelProtectedRoutes(apiV1)
 	r.registerNormTableProtectedRoutes(apiV1)
@@ -81,7 +80,6 @@ func (registrar protectedRouteRegistrar) register(engine *gin.Engine) {
 	r.registerActorProtectedRoutes(apiV1)
 	r.registerPlanProtectedRoutes(apiV1)
 	r.registerCodesRoutes(apiV1)
-	r.registerAdminRoutes(apiV1)
 
 	apiV2 := engine.Group("/api/v2")
 	r.applyProtectedGroupMiddlewares(apiV2, "/api/v2")

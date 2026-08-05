@@ -229,6 +229,34 @@ func TestRetiredCacheGovernanceRoutesAreAbsent(t *testing.T) {
 	}
 }
 
+func TestUnsupportedAdminPlaceholderRoutesAreAbsent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	resttransport.NewRouter(newRouterTestDeps()).RegisterRoutes(engine)
+
+	retiredPaths := []string{
+		"/api/v1/admin/users",
+		"/api/v1/admin/statistics",
+		"/api/v1/admin/logs",
+	}
+	for _, path := range retiredPaths {
+		t.Run(path, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			engine.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+			if response.Code != http.StatusNotFound {
+				t.Fatalf("GET %s status = %d, want %d", path, response.Code, http.StatusNotFound)
+			}
+		})
+	}
+
+	spec := loadRouterMatrixOpenAPI(t, "../../api/rest/apiserver.yaml")
+	for _, path := range retiredPaths {
+		if _, present := spec.Paths[path]; present {
+			t.Fatalf("retired OpenAPI path %s is still present", path)
+		}
+	}
+}
+
 func TestHistoricalSeedRoutesAreRetiredAtRouterLevel(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
