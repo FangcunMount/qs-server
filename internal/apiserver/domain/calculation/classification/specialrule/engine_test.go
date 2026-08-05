@@ -10,8 +10,9 @@ import (
 func TestEngineApplyBeforeScoreMatchesDrinkTrigger(t *testing.T) {
 	rules := []specialrule.Rule{
 		{
-			Code: "DRUNK",
-			Kind: specialrule.RuleKindAnswerMatch,
+			Code:  "DRUNK",
+			Kind:  specialrule.RuleKindAnswerMatch,
+			Phase: specialrule.RuleBeforeScore,
 			Condition: specialrule.Condition{
 				QuestionCodes: []string{"drink_gate_q2"},
 				OptionValues:  []string{"C"},

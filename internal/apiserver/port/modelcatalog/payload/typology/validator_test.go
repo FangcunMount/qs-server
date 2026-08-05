@@ -172,6 +172,22 @@ func TestValidateRuntimeSpecForPublishValidatesFallbackAndSpecialOutcomeRefs(t *
 	}
 }
 
+func TestValidateRuntimeSpecForPublishRequiresExplicitSpecialRulePhase(t *testing.T) {
+	spec := validRuntimeSpec()
+	spec.SpecialRules = []typology.SpecialRuleSpec{{
+		Code: "SPECIAL", Kind: typology.SpecialRuleKindAnswerMatch,
+		Condition: typology.SpecialRuleCondition{QuestionCodes: []string{"q1"}, OptionValues: []string{"A"}},
+	}}
+
+	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
+		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
+		Outcomes:  []typology.Outcome{{Code: "SPECIAL", Name: "Special"}},
+	})
+	if !hasIssueCode(issues, "special_rule.phase.required") {
+		t.Fatalf("issues = %#v, want special_rule.phase.required", issues)
+	}
+}
+
 func TestValidateRuntimeSpecForPublishValidatesDecisionAndLevelRule(t *testing.T) {
 	spec := validRuntimeSpec()
 	spec.Decision.Kind = modelcatalog.DecisionKindNearestPattern

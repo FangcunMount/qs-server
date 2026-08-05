@@ -359,7 +359,9 @@ func (v *runtimeSpecValidator) validateOutcomeMapping(mapping OutcomeMappingSpec
 func (v *runtimeSpecValidator) validateSpecialRules(rules []SpecialRuleSpec) {
 	for _, rule := range rules {
 		switch rule.Phase {
-		case "", SpecialRuleBeforeScore, SpecialRuleAfterDecision:
+		case SpecialRuleBeforeScore, SpecialRuleAfterDecision:
+		case "":
+			v.add("special_rules."+rule.Code+".phase", "special_rule.phase.required", "special rule phase 必须显式声明")
 		case SpecialRuleBeforeDecision:
 			v.add("special_rules."+rule.Code+".phase", "special_rule.phase.unsupported", fmt.Sprintf("special rule phase %s 暂不支持", rule.Phase))
 		default:

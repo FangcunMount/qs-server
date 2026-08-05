@@ -102,8 +102,6 @@ func specialRulesForCalculation(rules []modeltypology.SpecialRuleSpec) []calcspe
 				QuestionCodes: append([]string(nil), rule.Condition.QuestionCodes...),
 				OptionValues:  append([]string(nil), rule.Condition.OptionValues...),
 			},
-			QuestionCodes: append([]string(nil), rule.Condition.QuestionCodes...),
-			OptionValues:  append([]string(nil), rule.Condition.OptionValues...),
 		})
 	}
 	return converted

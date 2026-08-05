@@ -36,49 +36,17 @@ const (
 
 // Rule 描述配置urable special 结果 rule。
 type Rule struct {
-	Code          string
-	Kind          RuleKind
-	Phase         RulePhase
-	OutcomeCode   string
-	Condition     Condition
-	QuestionCodes []string
-	OptionValues  []string
+	Code        string
+	Kind        RuleKind
+	Phase       RulePhase
+	OutcomeCode string
+	Condition   Condition
 }
 
 // Condition 携带类型-特定 match parameters。
 type Condition struct {
 	QuestionCodes []string
 	OptionValues  []string
-}
-
-// ResolvedKind 返回配置化 类型, deriving 从 旧版 字段 when needed。
-func (r Rule) ResolvedKind() RuleKind {
-	if r.Kind != "" {
-		return r.Kind
-	}
-	if len(r.ResolvedQuestionCodes()) > 0 {
-		return RuleKindAnswerMatch
-	}
-	if r.Phase == RuleAfterDecision {
-		return RuleKindFallbackThreshold
-	}
-	return ""
-}
-
-// ResolvedQuestionCodes 返回question 编码 从 condition 或 旧版 flat 字段。
-func (r Rule) ResolvedQuestionCodes() []string {
-	if len(r.Condition.QuestionCodes) > 0 {
-		return append([]string(nil), r.Condition.QuestionCodes...)
-	}
-	return append([]string(nil), r.QuestionCodes...)
-}
-
-// ResolvedOptionValues 返回选项 values 从 condition 或 旧版 flat 字段。
-func (r Rule) ResolvedOptionValues() []string {
-	if len(r.Condition.OptionValues) > 0 {
-		return append([]string(nil), r.Condition.OptionValues...)
-	}
-	return append([]string(nil), r.OptionValues...)
 }
 
 // Decision contains the small part of typology decision state used by special rules.
@@ -169,7 +137,7 @@ func (e Engine) applyPhase(
 		if !ruleMatchesPhase(rule, phase) {
 			continue
 		}
-		strategy, ok := strategies.Resolve(rule.ResolvedKind())
+		strategy, ok := strategies.Resolve(rule.Kind)
 		if !ok {
 			continue
 		}
@@ -190,17 +158,7 @@ func (r StrategyRegistry) Len() int {
 }
 
 func ruleMatchesPhase(rule Rule, phase RulePhase) bool {
-	if rule.Phase != "" {
-		return rule.Phase == phase
-	}
-	switch rule.ResolvedKind() {
-	case RuleKindAnswerMatch:
-		return phase == RuleBeforeScore
-	case RuleKindFallbackThreshold:
-		return phase == RuleAfterDecision
-	default:
-		return false
-	}
+	return rule.Phase == phase
 }
 
 func applyAnswerMatchRule(rule Rule, ctx EvaluationContext) (MatchResult, bool) {
@@ -270,8 +228,8 @@ func findOutcome(outcomes []Outcome, code string) (Outcome, bool) {
 }
 
 func matchesAnswerTrigger(rule Rule, answers []classification.Answer) bool {
-	questionCodes := rule.ResolvedQuestionCodes()
-	optionValues := rule.ResolvedOptionValues()
+	questionCodes := rule.Condition.QuestionCodes
+	optionValues := rule.Condition.OptionValues
 	if len(questionCodes) == 0 || len(optionValues) == 0 {
 		return false
 	}

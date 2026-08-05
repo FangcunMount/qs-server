@@ -51,7 +51,9 @@ func validateRuntimeSpec(spec *RuntimeSpec) error {
 
 func validateSpecialRuleSpec(rule SpecialRuleSpec) error {
 	switch rule.Phase {
-	case "", SpecialRuleBeforeScore, SpecialRuleAfterDecision:
+	case SpecialRuleBeforeScore, SpecialRuleAfterDecision:
+	case "":
+		return fmt.Errorf("runtime special rule phase is required")
 	case SpecialRuleBeforeDecision:
 		return fmt.Errorf("runtime special rule phase %s is not implemented", rule.Phase)
 	default:

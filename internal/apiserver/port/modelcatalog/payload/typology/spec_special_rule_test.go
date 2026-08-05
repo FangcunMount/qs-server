@@ -43,3 +43,10 @@ func TestSpecialRuleSpecResolvedKind(t *testing.T) {
 		}
 	})
 }
+
+func TestValidateSpecialRuleSpecRequiresExplicitPhase(t *testing.T) {
+	rule := SpecialRuleSpec{Kind: SpecialRuleKindAnswerMatch}
+	if err := validateSpecialRuleSpec(rule); err == nil {
+		t.Fatal("validateSpecialRuleSpec() error = nil, want explicit phase failure")
+	}
+}
