@@ -427,6 +427,31 @@ func TestCIRunsModelCatalogMongoContracts(t *testing.T) {
 	}
 }
 
+func TestDBOpsInventoriesEvaluationRunAndOutcomeConsistency(t *testing.T) {
+	t.Parallel()
+
+	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "db-ops.yml"))
+	if err != nil {
+		t.Fatalf("read db ops workflow: %v", err)
+	}
+	content := string(workflow)
+	for _, required := range []string{
+		"@@transaction_isolation AS transaction_isolation",
+		"GROUP BY assessment_id, attempt_no",
+		"HAVING COUNT(*) > 1",
+		"table_name = 'runtime_checkpoint'",
+		"evaluated_assessments_without_outcome",
+		"outcomes_without_evaluated_assessment",
+		"score_rows_without_outcome",
+		"outcomes_with_legacy_sub_kind",
+		"outcomes_missing_decision_kind",
+	} {
+		if !strings.Contains(content, required) {
+			t.Errorf("DB ops Evaluation inventory must contain %q", required)
+		}
+	}
+}
+
 func TestReportStatusTTLContractMatchesAcrossProcesses(t *testing.T) {
 	t.Parallel()
 

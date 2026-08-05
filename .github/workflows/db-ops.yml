@@ -631,6 +631,7 @@ jobs:
                 --batch --raw \
                 --execute="
                   SELECT VERSION() AS mysql_version;
+                  SELECT @@transaction_isolation AS transaction_isolation;
                   SELECT version AS schema_migration_version, dirty AS schema_migration_dirty
                   FROM schema_migrations
                   LIMIT 1;
@@ -667,6 +668,45 @@ jobs:
                   FROM event_delivery_dead_letter
                   WHERE last_error LIKE '%would create a conflict%' ${audit_clause}
                   ORDER BY failed_at, id;
+                  SELECT assessment_id, attempt_no, COUNT(*) AS duplicate_records,
+                         GROUP_CONCAT(resource_id ORDER BY id SEPARATOR ',') AS run_ids
+                  FROM runtime_checkpoint
+                  WHERE scope = 'evaluation_run'
+                    AND assessment_id IS NOT NULL
+                    AND deleted_at IS NULL
+                  GROUP BY assessment_id, attempt_no
+                  HAVING COUNT(*) > 1
+                  ORDER BY assessment_id, attempt_no;
+                  SELECT index_name, non_unique,
+                         GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') AS index_columns
+                  FROM information_schema.statistics
+                  WHERE table_schema = DATABASE()
+                    AND table_name = 'runtime_checkpoint'
+                  GROUP BY index_name, non_unique
+                  ORDER BY index_name;
+                  SELECT
+                    (SELECT COUNT(*)
+                     FROM assessment AS a
+                     LEFT JOIN evaluation_outcome AS o ON o.assessment_id = a.id
+                     WHERE a.status = 'evaluated' AND a.deleted_at IS NULL AND o.id IS NULL)
+                      AS evaluated_assessments_without_outcome,
+                    (SELECT COUNT(*)
+                     FROM evaluation_outcome AS o
+                     LEFT JOIN assessment AS a ON a.id = o.assessment_id AND a.deleted_at IS NULL
+                     WHERE a.id IS NULL OR a.status <> 'evaluated')
+                      AS outcomes_without_evaluated_assessment,
+                    (SELECT COUNT(*)
+                     FROM assessment_score
+                     WHERE deleted_at IS NULL AND evaluation_outcome_id IS NULL)
+                      AS score_rows_without_outcome,
+                    (SELECT COUNT(*)
+                     FROM evaluation_outcome
+                     WHERE model_sub_kind IS NOT NULL AND model_sub_kind <> '')
+                      AS outcomes_with_legacy_sub_kind,
+                    (SELECT COUNT(*)
+                     FROM evaluation_outcome
+                     WHERE decision_kind IS NULL OR decision_kind = '')
+                      AS outcomes_missing_decision_kind;
                 "
             echo "✅ MySQL connection and read-only recovery audit OK"
         env:
