@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
 	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
@@ -13,7 +12,7 @@ import (
 func TestConfiguredEvaluatorMatchesBigFiveTraitProfile(t *testing.T) {
 	payload := bigFivePayload()
 	sheet := bigFiveSheet()
-	evaluator := configured.NewEvaluator()
+	evaluator := defaultEvaluator()
 
 	got, err := evaluator.Score(payload, canonicalDefinitionFixture(t, payload), sheet)
 	if err != nil {

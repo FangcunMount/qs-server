@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
 	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
@@ -13,7 +12,7 @@ func TestEvaluatorScoresExplicitRuntimeWithoutAlgorithm(t *testing.T) {
 	payload := explicitPoleCompositionPayload()
 	payload.Algorithm = ""
 
-	got, err := configured.NewEvaluator().Score(payload, canonicalDefinitionFixture(t, payload), explicitPoleCompositionSheet())
+	got, err := defaultEvaluator().Score(payload, canonicalDefinitionFixture(t, payload), explicitPoleCompositionSheet())
 	if err != nil {
 		t.Fatalf("Score: %v", err)
 	}
@@ -28,7 +27,7 @@ func TestEvaluatorScoresExplicitRuntimeWithoutAlgorithm(t *testing.T) {
 
 func TestEvaluatorAppliesGenericFallbackSpecialRule(t *testing.T) {
 	payload := explicitNearestPatternPayload()
-	got, err := configured.NewEvaluator().Score(payload, canonicalDefinitionFixture(t, payload), explicitNearestPatternLowSheet())
+	got, err := defaultEvaluator().Score(payload, canonicalDefinitionFixture(t, payload), explicitNearestPatternLowSheet())
 	if err != nil {
 		t.Fatalf("Score: %v", err)
 	}
@@ -50,7 +49,7 @@ func TestEvaluatorRejectsImplicitNearestPatternBoundaries(t *testing.T) {
 	t.Run("missing level rule", func(t *testing.T) {
 		payload := explicitNearestPatternPayload()
 		payload.Runtime.Decision.LevelRule = nil
-		if _, err := configured.NewEvaluator().Score(payload, canonicalDefinitionFixture(t, payload), explicitNearestPatternLowSheet()); err == nil {
+		if _, err := defaultEvaluator().Score(payload, canonicalDefinitionFixture(t, payload), explicitNearestPatternLowSheet()); err == nil {
 			t.Fatal("Score error = nil, want explicit level rule failure")
 		}
 	})
@@ -58,7 +57,7 @@ func TestEvaluatorRejectsImplicitNearestPatternBoundaries(t *testing.T) {
 	t.Run("missing fallback threshold", func(t *testing.T) {
 		payload := explicitNearestPatternPayload()
 		payload.Runtime.Decision.FallbackSimilarityThreshold = 0
-		if _, err := configured.NewEvaluator().Score(payload, canonicalDefinitionFixture(t, payload), explicitNearestPatternLowSheet()); err == nil {
+		if _, err := defaultEvaluator().Score(payload, canonicalDefinitionFixture(t, payload), explicitNearestPatternLowSheet()); err == nil {
 			t.Fatal("Score error = nil, want explicit fallback threshold failure")
 		}
 	})

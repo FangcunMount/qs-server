@@ -4,11 +4,16 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 	modeldefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
 )
+
+func defaultEvaluator() configured.Evaluator {
+	return configured.NewEvaluatorWithDetails(configured.DefaultDetailAssemblerRegistry())
+}
 
 // canonicalDefinitionFixture turns an explicit test graph into the canonical
 // DefinitionV2 supplied to production scoring. It intentionally rejects the

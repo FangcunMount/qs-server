@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	outcometypology "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome/typology"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology/runtime/configured"
 	evalinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/input"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/typology"
@@ -12,7 +11,7 @@ import (
 
 func TestEvaluatorCompositeFactorAggregatesBeforePoleDecision(t *testing.T) {
 	payload := compositePolePayload()
-	got, err := configured.NewEvaluator().Score(payload, canonicalDefinitionFixture(t, payload), compositePoleSheet())
+	got, err := defaultEvaluator().Score(payload, canonicalDefinitionFixture(t, payload), compositePoleSheet())
 	if err != nil {
 		t.Fatalf("Score: %v", err)
 	}
@@ -32,11 +31,11 @@ func TestEvaluatorCompositeFactorMatchesFlatTraitProfileScores(t *testing.T) {
 	explicit := compositeTraitPayload()
 	leaf := leafTraitPayload()
 
-	explicitResult, err := configured.NewEvaluator().Score(explicit, canonicalDefinitionFixture(t, explicit), compositeTraitSheet())
+	explicitResult, err := defaultEvaluator().Score(explicit, canonicalDefinitionFixture(t, explicit), compositeTraitSheet())
 	if err != nil {
 		t.Fatalf("explicit Score: %v", err)
 	}
-	flatResult, err := configured.NewEvaluator().Score(leaf, canonicalDefinitionFixture(t, leaf), compositeTraitSheet())
+	flatResult, err := defaultEvaluator().Score(leaf, canonicalDefinitionFixture(t, leaf), compositeTraitSheet())
 	if err != nil {
 		t.Fatalf("flat Score: %v", err)
 	}

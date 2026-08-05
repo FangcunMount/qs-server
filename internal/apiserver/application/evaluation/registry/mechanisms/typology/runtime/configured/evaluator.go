@@ -17,11 +17,6 @@ type Evaluator struct {
 	details DetailAssemblerRegistry
 }
 
-// NewEvaluator 返回配置化人格评估器 使用 内置 明细组装器。
-func NewEvaluator() Evaluator {
-	return NewEvaluatorWithDetails(DefaultDetailAssemblerRegistry())
-}
-
 // NewEvaluatorWithDetails 返回配置化 evaluator that resolves 明细组装 通过 注册表。
 func NewEvaluatorWithDetails(details DetailAssemblerRegistry) Evaluator {
 	return Evaluator{
