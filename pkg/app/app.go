@@ -34,7 +34,6 @@ type App struct {
 	options     CliOptions
 	cmd         *cobra.Command
 	args        cobra.PositionalArgs
-	commands    []*Command
 	runFunc     RunFunc
 }
 
@@ -62,13 +61,6 @@ func WithOptions(opt CliOptions) Option {
 func WithRunFunc(run RunFunc) Option {
 	return func(a *App) {
 		a.runFunc = run
-	}
-}
-
-// WithValidArgs 设置 args
-func WithValidArgs(args cobra.PositionalArgs) Option {
-	return func(a *App) {
-		a.args = args
 	}
 }
 
@@ -127,16 +119,6 @@ func (a *App) buildCommand() {
 
 	// 初始化命令行参数
 	cliflag.InitFlags(cmd.Flags())
-
-	// 如果命令不为空，则添加命令
-	if len(a.commands) > 0 {
-		// 添加命令
-		for _, command := range a.commands {
-			cmd.AddCommand(command.cobraCommand())
-		}
-		// 设置帮助命令
-		cmd.SetHelpCommand(helpCommand(FormatBaseName(a.basename)))
-	}
 
 	// 如果启动回调函数不为空，则设置启动回调函数
 	if a.runFunc != nil {
