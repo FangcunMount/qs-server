@@ -1,3 +1,3 @@
-// Legacy assessment-code adapters delegate to mechanism_assembler.
-// Prefer BuildPersonalityTypeContent / BuildTraitProfileContent for new wiring.
+// Package patterns owns the built-in typology report templates and their
+// mechanism-neutral content assemblers.
 package patterns

@@ -40,7 +40,7 @@ type runPreparer interface {
 	PrepareRun(context.Context, *Config, uint) (func(context.Context) error, error)
 }
 
-// NewMigrator 创建 MySQL 迁移器（保持向后兼容）
+// NewMigrator 创建 MySQL 迁移器。
 func NewMigrator(db *sql.DB, config *Config) *Migrator {
 	return &Migrator{
 		driver: NewMySQLDriver(db),
@@ -48,7 +48,7 @@ func NewMigrator(db *sql.DB, config *Config) *Migrator {
 	}
 }
 
-// NewMongoMigrator 创建 MongoDB 迁移器（保持向后兼容）
+// NewMongoMigrator 创建 MongoDB 迁移器。
 func NewMongoMigrator(client *mongo.Client, config *Config) *Migrator {
 	return &Migrator{
 		driver: NewMongoDriver(client),

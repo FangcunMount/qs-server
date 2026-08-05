@@ -29,11 +29,6 @@ func GenerateCode() (Code, error) {
 	return Code(code), nil
 }
 
-// GenerateNewCode 生成新的业务编码（别名，保持兼容）
-func GenerateNewCode() (Code, error) {
-	return GenerateCode()
-}
-
 // GenerateCodeWithPrefix 生成带前缀的业务编码
 func GenerateCodeWithPrefix(prefix string) (Code, error) {
 	// 首先尝试使用 sonyflake 生成有序的 64-bit ID 并用 base62 编码
