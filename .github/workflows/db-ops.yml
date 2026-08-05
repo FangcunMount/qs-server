@@ -83,43 +83,63 @@ jobs:
             : "${MONGODB_USERNAME:?MONGODB_USERNAME is empty}"
             : "${MONGODB_PASSWORD:?MONGODB_PASSWORD is empty}"
 
-            if ! command -v mongodump >/dev/null 2>&1; then
-              echo "❌ mongodump not found on PATH=$PATH" >&2
-              exit 127
+            if ! sudo docker network inspect infra-network >/dev/null 2>&1; then
+              echo "❌ infra-network is unavailable" >&2
+              exit 1
             fi
 
             BACKUP_DIR="/opt/backups/qs-server/mongodb"
             TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-            BACKUP_FILE="qs_mongodb_backup_${TIMESTAMP}"
+            BACKUP_FILE="qs_mongodb_backup_${TIMESTAMP}.archive.gz"
+            PARTIAL_FILE="${BACKUP_FILE}.partial"
 
-            sudo mkdir -p "$BACKUP_DIR"
+            sudo install -d -m 0750 "$BACKUP_DIR"
+            cleanup_partial() {
+              sudo rm -f -- "$BACKUP_DIR/$PARTIAL_FILE"
+            }
+            trap cleanup_partial EXIT
 
             echo "Starting MongoDB backup..."
             echo "Database: $MONGODB_DBNAME"
             echo "Host: $MONGODB_HOST:${MONGODB_PORT:-27017}"
             echo "Timestamp: $TIMESTAMP"
 
-            mongodump --host="$MONGODB_HOST" \
-                      --port="${MONGODB_PORT:-27017}" \
-                      --username="$MONGODB_USERNAME" \
-                      --password="$MONGODB_PASSWORD" \
-                      --db="$MONGODB_DBNAME" \
-                      --out="$BACKUP_DIR/$BACKUP_FILE" \
-                      --authenticationDatabase=admin
+            sudo docker run --rm --network infra-network \
+              -v "$BACKUP_DIR:/backup" \
+              mongo:7.0 mongodump \
+                --host="$MONGODB_HOST" \
+                --port="${MONGODB_PORT:-27017}" \
+                --username="$MONGODB_USERNAME" \
+                --password="$MONGODB_PASSWORD" \
+                --authenticationDatabase=admin \
+                --db="$MONGODB_DBNAME" \
+                --archive="/backup/$PARTIAL_FILE" \
+                --gzip
 
-            cd "$BACKUP_DIR"
-            tar -czf "${BACKUP_FILE}.tar.gz" "$BACKUP_FILE"
-            rm -rf "$BACKUP_FILE"
-            BACKUP_SIZE=$(du -h "${BACKUP_FILE}.tar.gz" | cut -f1)
-            echo "✅ Backup completed: ${BACKUP_FILE}.tar.gz"
+            if ! sudo test -s "$BACKUP_DIR/$PARTIAL_FILE"; then
+              echo "❌ MongoDB backup archive is empty" >&2
+              exit 1
+            fi
+            sudo mv -- "$BACKUP_DIR/$PARTIAL_FILE" "$BACKUP_DIR/$BACKUP_FILE"
+            sudo chmod 0640 "$BACKUP_DIR/$BACKUP_FILE"
+            trap - EXIT
+
+            BACKUP_SIZE=$(sudo du -h "$BACKUP_DIR/$BACKUP_FILE" | cut -f1)
+            echo "✅ Backup completed: $BACKUP_FILE"
             echo "Size: $BACKUP_SIZE"
 
             echo "Cleaning old backups (keeping last 5)..."
-            ls -t qs_mongodb_backup_*.tar.gz | tail -n +6 | xargs -r rm -f
+            OLD_BACKUPS=$(sudo ls -1t "$BACKUP_DIR"/qs_mongodb_backup_*.archive.gz 2>/dev/null | tail -n +6 || true)
+            if [ -n "$OLD_BACKUPS" ]; then
+              printf '%s\n' "$OLD_BACKUPS" | while IFS= read -r OLD_BACKUP; do
+                [ -z "$OLD_BACKUP" ] && continue
+                sudo rm -f -- "$OLD_BACKUP"
+              done
+            fi
 
             echo ""
             echo "Current backups:"
-            ls -lht qs_mongodb_backup_*.tar.gz 2>/dev/null | head -6
+            sudo ls -lht "$BACKUP_DIR"/qs_mongodb_backup_*.archive.gz 2>/dev/null | head -6
         env:
           MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
           MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
@@ -166,9 +186,9 @@ jobs:
             : "${MONGODB_USERNAME:?MONGODB_USERNAME is empty}"
             : "${MONGODB_PASSWORD:?MONGODB_PASSWORD is empty}"
 
-            if ! command -v mongorestore >/dev/null 2>&1; then
-              echo "❌ mongorestore not found on PATH=$PATH" >&2
-              exit 127
+            if ! sudo docker network inspect infra-network >/dev/null 2>&1; then
+              echo "❌ infra-network is unavailable" >&2
+              exit 1
             fi
 
             BACKUP_DIR="/opt/backups/qs-server/mongodb"
@@ -182,11 +202,16 @@ jobs:
               exit 1
             fi
 
-            if [ ! -f "$BACKUP_DIR/$BACKUP_FILE" ]; then
+            if ! [[ "$BACKUP_FILE" =~ ^qs_mongodb_backup_[0-9]{8}_[0-9]{6}\.archive\.gz$ ]]; then
+              echo "❌ Invalid backup name: $BACKUP_FILE" >&2
+              exit 1
+            fi
+
+            if ! sudo test -f "$BACKUP_DIR/$BACKUP_FILE"; then
               echo "❌ Backup file not found: $BACKUP_FILE"
               echo ""
               echo "Available backups:"
-              ls -lht "$BACKUP_DIR" | head -11
+              sudo ls -lht "$BACKUP_DIR" | head -11
               exit 1
             fi
 
@@ -197,21 +222,20 @@ jobs:
             sleep 5
 
             echo "Restoring database..."
-            cd "$BACKUP_DIR"
-            tar -xzf "$BACKUP_FILE"
-            EXTRACT_DIR=$(basename "$BACKUP_FILE" .tar.gz)
-
-            mongorestore --host="$MONGODB_HOST" \
-                        --port="${MONGODB_PORT:-27017}" \
-                        --username="$MONGODB_USERNAME" \
-                        --password="$MONGODB_PASSWORD" \
-                        --db="$MONGODB_DBNAME" \
-                        --authenticationDatabase=admin \
-                        --drop \
-                        "$EXTRACT_DIR/$MONGODB_DBNAME"
+            sudo docker run --rm --network infra-network \
+              -v "$BACKUP_DIR:/backup:ro" \
+              mongo:7.0 mongorestore \
+                --host="$MONGODB_HOST" \
+                --port="${MONGODB_PORT:-27017}" \
+                --username="$MONGODB_USERNAME" \
+                --password="$MONGODB_PASSWORD" \
+                --authenticationDatabase=admin \
+                --archive="/backup/$BACKUP_FILE" \
+                --gzip \
+                --drop \
+                --nsInclude="$MONGODB_DBNAME.*"
 
             echo "✅ Database restored successfully from $BACKUP_FILE"
-            rm -rf "$EXTRACT_DIR"
         env:
           MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
           MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
