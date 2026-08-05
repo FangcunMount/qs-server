@@ -34,11 +34,6 @@ func profileSource(configured bool, profile domainreport.PresentationProfile) st
 	return string(profile.Source)
 }
 
-// FromRow keeps the historical call shape for tests that do not need legacy fallback.
-func FromRow(row interpretationreadmodel.ReportRow, audience policy.Audience) (*Report, error) {
-	return Mapper{}.FromRow(context.Background(), row, audience)
-}
-
 func fromProjectedRow(row interpretationreadmodel.ReportRow, dimensions []interpretationreadmodel.ReportDimensionRow, audience policy.Audience, presentationSource string) (*Report, error) {
 	projected := make([]Dimension, 0, len(dimensions))
 	for _, dimension := range dimensions {

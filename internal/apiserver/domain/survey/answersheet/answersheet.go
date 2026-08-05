@@ -31,37 +31,6 @@ type AnswerSheet struct {
 	events []event.DomainEvent
 }
 
-// NewAnswerSheet 创建答卷（兼容旧调用方，不产生提交事件）。
-//
-// Deprecated: 新提交必须使用 Submit，让提交上下文和 SubmittedEvent 同时入模。
-func NewAnswerSheet(
-	questionnaireRef QuestionnaireRef,
-	filler *actor.FillerRef,
-	answers []Answer,
-	filledAt time.Time,
-) (*AnswerSheet, error) {
-	if err := questionnaireRef.Validate(); err != nil {
-		return nil, err
-	}
-	if filler == nil {
-		return nil, fmt.Errorf("filler is required")
-	}
-	if err := validateAnswers(answers); err != nil {
-		return nil, err
-	}
-
-	sheet := &AnswerSheet{
-		questionnaireRef:  questionnaireRef,
-		submissionContext: ReconstructSubmissionContext(filler, nil, meta.ZeroID, ""),
-		answers:           answers,
-		filledAt:          filledAt,
-		score:             0, // 初始分数为0，需要通过 CalculateScore 计算
-		events:            make([]event.DomainEvent, 0),
-	}
-
-	return sheet, nil
-}
-
 // Submit 创建完整的答卷提交事实，并立即产生 AnswerSheetSubmittedEvent。
 func Submit(
 	id meta.ID,
