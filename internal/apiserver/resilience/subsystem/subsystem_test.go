@@ -50,6 +50,13 @@ func TestRateOverrideReconcilesAcrossInstancesAndResetRestoresConfig(t *testing.
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() { _ = client.Close() })
+	// Production clients are connected by NamedRedisRegistry before they are
+	// injected into the resilience subsystem. Mirror that readiness contract so
+	// go-redis does not perform its first-connection option negotiation while
+	// SUBSCRIBE and WATCH start concurrently.
+	if err := client.Ping(t.Context()).Err(); err != nil {
+		t.Fatalf("initialize redis client: %v", err)
+	}
 	store := controlredis.NewStore(client, keyspace.NewBuilderWithNamespace("ops:runtime"))
 	cfg := options.NewRateLimitOptions()
 	left := mustNewSubsystem(t, Options{InstanceID: "api-0", RateLimit: cfg, StateStore: store})
