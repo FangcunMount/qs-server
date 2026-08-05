@@ -123,3 +123,25 @@ func TestContentBatchUsesPublishedAsOfDate(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestOverviewMapsAnswerSheetCountsExplicitly(t *testing.T) {
+	store, mock := newReadStoreTestDB(t)
+	from := time.Date(2026, 7, 21, 0, 0, 0, 0, time.UTC)
+	to := from.AddDate(0, 0, 1)
+	mock.ExpectQuery("answersheet_submission_count AS answer_sheet_submission_count.*window_answer_sheet_submitted_count").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"answer_sheet_submission_count",
+			"window_answer_sheet_submitted_count",
+		}).AddRow(12, 3))
+
+	metrics, err := store.Overview(context.Background(), 7, from, to)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if metrics.AnswerSheetSubmissionCount != 12 || metrics.WindowAnswerSheetSubmittedCount != 3 {
+		t.Fatalf("AnswerSheet counts=%d/%d, want 12/3", metrics.AnswerSheetSubmissionCount, metrics.WindowAnswerSheetSubmittedCount)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}

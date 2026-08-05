@@ -100,11 +100,11 @@ func (s *ReadStore) Overview(ctx context.Context, orgID int64, from, to time.Tim
 	var value statisticsApp.OverviewMetrics
 	err = s.db.WithContext(ctx).Raw(`
 		SELECT o.testee_count,o.clinician_count,o.active_clinician_count,o.entry_count,o.active_entry_count,o.active_enrollment_count,
-		 o.answersheet_submission_count,o.assessment_count,o.report_count,o.content_count,
+		 o.answersheet_submission_count AS answer_sheet_submission_count,o.assessment_count,o.report_count,o.content_count,
 		 COALESCE(a.entry_opened_count,0) entry_opened_count,COALESCE(a.intake_confirmed_count,0) intake_confirmed_count,
 		 COALESCE(a.testee_created_count,0) testee_created_count,COALESCE(a.care_relationship_established_count,0) care_relationship_established_count,
 		 COALESCE(a.care_relationship_transferred_count,0) care_relationship_transferred_count,
-		 COALESCE(e.answersheet_submitted_count,0) window_answersheet_submitted_count,COALESCE(e.assessment_created_count,0) window_assessment_created_count,
+		 COALESCE(e.answersheet_submitted_count,0) window_answer_sheet_submitted_count,COALESCE(e.assessment_created_count,0) window_assessment_created_count,
 		 COALESCE(e.outcome_committed_count,0) window_outcome_committed_count,COALESCE(e.assessment_failed_count,0) window_assessment_failed_count,
 		 COALESCE(e.report_generated_count,0) window_report_generated_count,COALESCE(e.report_failed_count,0) window_report_failed_count,
 		 COALESCE(p.task_created_count,0) task_created_count,COALESCE(p.task_opened_count,0) task_opened_count,
