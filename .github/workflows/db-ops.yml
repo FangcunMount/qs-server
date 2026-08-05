@@ -73,6 +73,7 @@ jobs:
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          command_timeout: 60m
           envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
           script: |
             set -Eeuo pipefail
@@ -110,8 +111,8 @@ jobs:
               -e MONGODB_DBNAME="$MONGODB_DBNAME" \
               -e BACKUP_FILE="$BACKUP_FILE" \
               -e PARTIAL_FILE="$PARTIAL_FILE" \
-              --entrypoint /bin/bash \
-              mongo:7.0 -Eeuo pipefail -c '
+              --entrypoint /usr/bin/timeout \
+              mongo:7.0 55m /bin/bash -Eeuo pipefail -c '
                 cleanup_partial() {
                   rm -f -- "/backup/$PARTIAL_FILE"
                 }
@@ -124,8 +125,7 @@ jobs:
                   --password="$MONGODB_PASSWORD" \
                   --authenticationDatabase=admin \
                   --db="$MONGODB_DBNAME" \
-                  --archive="/backup/$PARTIAL_FILE" \
-                  --gzip
+                  --archive | gzip -1 > "/backup/$PARTIAL_FILE"
 
                 if [ ! -s "/backup/$PARTIAL_FILE" ]; then
                   echo "❌ MongoDB backup archive is empty" >&2
@@ -188,6 +188,7 @@ jobs:
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          command_timeout: 2h
           envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,BACKUP_FILE_INPUT
           script: |
             set -Eeuo pipefail
@@ -253,8 +254,8 @@ jobs:
             echo "Restoring database..."
             sudo docker run --rm --network infra-network \
               -v "$BACKUP_DIR:/backup:ro" \
-              --entrypoint mongorestore \
-              mongo:7.0 \
+              --entrypoint /usr/bin/timeout \
+              mongo:7.0 115m mongorestore \
                 --host="$MONGODB_HOST" \
                 --port="${MONGODB_PORT:-27017}" \
                 --username="$MONGODB_USERNAME" \
