@@ -135,6 +135,16 @@ jobs:
             ./internal/apiserver/infra/mongo/answersheet \
             ./internal/apiserver/infra/mongo/questionnaire
 
+      - name: Run attention projection Mongo integration contract
+        env:
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          QS_SERVER_TEST_MONGO_DB: qs_attention_projection_ci_test
+        run: |
+          go test \
+            -run '^TestMongoStoreProjectorUpsertAndDuplicateEvent$' \
+            -count=1 -timeout=5m -v \
+            ./internal/pkg/attentionprojection
+
       - name: Run current runtime closure E2E
         env:
           MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true&loc=Asia%2FShanghai

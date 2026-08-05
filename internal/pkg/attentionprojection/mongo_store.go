@@ -67,15 +67,10 @@ func (s *MongoStore) EnsurePending(ctx context.Context, input PendingInput) (boo
 		bson.M{"event_id": input.EventID},
 		bson.M{
 			"$setOnInsert": bson.M{
-				"event_id":       input.EventID,
-				"report_id":      input.ReportID,
-				"assessment_id":  input.AssessmentID,
-				"testee_id":      input.TesteeID,
-				"risk_level":     input.RiskLevel,
-				"mark_key_focus": input.MarkKeyFocus,
-				"status":         StatusPending,
-				"attempt":        0,
-				"created_at":     now,
+				"event_id":   input.EventID,
+				"status":     StatusPending,
+				"attempt":    0,
+				"created_at": now,
 			},
 			"$set": bson.M{
 				"report_id":      input.ReportID,
