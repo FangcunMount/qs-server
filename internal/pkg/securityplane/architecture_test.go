@@ -87,23 +87,6 @@ func TestBusinessHandlersDoNotAuthorizeWithJWTRoles(t *testing.T) {
 	}
 }
 
-func TestProductionCodeDoesNotBypassCapabilityDecision(t *testing.T) {
-	t.Parallel()
-
-	root := repoRoot(t)
-	allowed := map[string]bool{
-		filepath.Join(root, "internal/apiserver/application/authz/capability.go"): true,
-	}
-	scanGoSourceFiles(t, filepath.Join(root, "internal"), func(path string, content string) {
-		if allowed[path] {
-			return
-		}
-		if strings.Contains(content, "SnapshotSatisfiesCapability(") {
-			t.Fatalf("%s calls SnapshotSatisfiesCapability; runtime paths must use DecideCapability/DecideAnyCapability", path)
-		}
-	})
-}
-
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()

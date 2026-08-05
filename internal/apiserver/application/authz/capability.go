@@ -35,27 +35,6 @@ func hasAnyResourceAction(s *Snapshot, resource string, actions []string) bool {
 	return false
 }
 
-// SnapshotViewFromSnapshot 投影请求 authz 快照 为 安全控制平面模型。
-func SnapshotViewFromSnapshot(s *Snapshot) securityplane.AuthzSnapshotView {
-	if s == nil {
-		return securityplane.AuthzSnapshotView{}
-	}
-	permissions := make([]securityplane.AuthzPermissionView, 0, len(s.Permissions))
-	for _, p := range s.Permissions {
-		permissions = append(permissions, securityplane.AuthzPermissionView{
-			Resource: p.Resource,
-			Action:   p.Action,
-		})
-	}
-	return securityplane.AuthzSnapshotView{
-		Roles:        append([]string(nil), s.Roles...),
-		Permissions:  permissions,
-		AuthzVersion: s.AuthzVersion,
-		CasbinDomain: s.CasbinDomain,
-		IAMAppName:   s.IAMAppName,
-	}
-}
-
 // DecideCapability explains 是否 IAM 快照 satisfies 一个能力。
 func DecideCapability(s *Snapshot, c Capability) securityplane.CapabilityDecision {
 	if s == nil {
@@ -124,11 +103,6 @@ func DecideAnyCapability(s *Snapshot, capabilities ...Capability) securityplane.
 		Outcome:    securityplane.CapabilityOutcomeDenied,
 		Reason:     fmt.Sprintf("capabilities %v denied by IAM authorization", capabilities),
 	}
-}
-
-// SnapshotSatisfiesCapability 判断 IAM 快照是否满足动作级能力（不依赖 JWT roles）。
-func SnapshotSatisfiesCapability(s *Snapshot, c Capability) bool {
-	return DecideCapability(s, c).Allowed
 }
 
 func isKnownCapability(c Capability) bool {

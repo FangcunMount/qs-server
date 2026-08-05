@@ -65,31 +65,6 @@ func NewOrgScope(tenantDomain string, orgID uint64, hasOrg bool, casbinDomain st
 	}
 }
 
-// AuthzPermissionView is the transport-agnostic view of one IAM resource/action permission.
-type AuthzPermissionView struct {
-	Resource string
-	Action   string
-}
-
-// AuthzSnapshotView is a read-only projection of the IAM authorization snapshot.
-type AuthzSnapshotView struct {
-	Roles        []string
-	Permissions  []AuthzPermissionView
-	AuthzVersion int64
-	CasbinDomain string
-	IAMAppName   string
-}
-
-// RoleNames returns a defensive copy of snapshot roles.
-func (s AuthzSnapshotView) RoleNames() []string {
-	return append([]string(nil), s.Roles...)
-}
-
-// PermissionViews returns a defensive copy of snapshot permissions.
-func (s AuthzSnapshotView) PermissionViews() []AuthzPermissionView {
-	return append([]AuthzPermissionView(nil), s.Permissions...)
-}
-
 // CapabilityOutcome is a bounded capability decision result.
 type CapabilityOutcome string
 
