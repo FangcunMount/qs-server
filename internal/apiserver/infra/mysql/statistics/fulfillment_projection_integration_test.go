@@ -104,6 +104,14 @@ func TestFulfillmentProjectionExecutesLatestRevisionMatrixAgainstMySQL(t *testin
 	if totals != want {
 		t.Fatalf("totals=%+v want=%+v", totals, want)
 	}
+	var completedOverdue, uncompletedOverdue int
+	if err := db.Raw(`SELECT completed_overdue_count,uncompleted_overdue_count FROM statistics_plan_fulfillment_daily WHERE org_id=1 AND plan_id=10 AND cohort_date='2026-08-14'`).
+		Row().Scan(&completedOverdue, &uncompletedOverdue); err != nil {
+		t.Fatal(err)
+	}
+	if completedOverdue != 0 || uncompletedOverdue != 1 {
+		t.Fatalf("unfinished-only due cohort completed_overdue=%d uncompleted_overdue=%d want 0,1", completedOverdue, uncompletedOverdue)
+	}
 	var earlierDueCount int
 	if err := db.Raw(`SELECT due_task_count FROM statistics_plan_fulfillment_daily WHERE org_id=1 AND plan_id=10 AND cohort_date='2026-08-10'`).Scan(&earlierDueCount).Error; err != nil {
 		t.Fatal(err)

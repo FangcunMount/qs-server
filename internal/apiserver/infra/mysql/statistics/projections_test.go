@@ -42,7 +42,7 @@ func TestFulfillmentProjectionSelectsLatestScheduleRevisionAndKeepsLegacyFallbac
 	cutoff := time.Date(2026, 8, 3, 0, 0, 0, 0, time.UTC)
 	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM statistics_plan_fulfillment_daily WHERE org_id=?")).
 		WithArgs(int64(1)).WillReturnResult(sqlmock.NewResult(0, 3))
-	mock.ExpectExec("(?s)INSERT INTO statistics_plan_fulfillment_daily.*ROW_NUMBER\\(\\) OVER \\(PARTITION BY org_id,task_id ORDER BY schedule_revision DESC,id DESC\\).*task_schedule_terminal.*task_due_defined").
+	mock.ExpectExec("(?s)INSERT INTO statistics_plan_fulfillment_daily.*ROW_NUMBER\\(\\) OVER \\(PARTITION BY org_id,task_id ORDER BY schedule_revision DESC,id DESC\\).*task_schedule_terminal.*task_due_defined.*"+regexp.QuoteMeta("SUM(CASE WHEN completed_at>due_at THEN 1 ELSE 0 END)")).
 		WithArgs(int64(1), int64(1), cutoff).WillReturnResult(sqlmock.NewResult(0, 5))
 
 	result, err := (&PlanFulfillmentProjection{db: writer.db}).Project(context.Background(), statisticsDomain.ProjectionRequest{OrgID: 1, CutoffAt: cutoff})

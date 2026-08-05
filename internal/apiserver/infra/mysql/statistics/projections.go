@@ -171,7 +171,7 @@ func (p *PlanFulfillmentProjection) Project(ctx context.Context, r statisticsDom
 		), buckets AS (
 		 SELECT org_id,DATE(planned_at) cohort_date,plan_id,COUNT(*) planned_task_count,COUNT(DISTINCT testee_id) planned_participant_count,0 due_task_count,0 completed_on_time_count,0 completed_overdue_count,0 uncompleted_overdue_count FROM tasks WHERE canceled=0 GROUP BY org_id,DATE(planned_at),plan_id
 		 UNION ALL
-		 SELECT org_id,DATE(due_at),plan_id,0,0,COUNT(*),SUM(completed_at IS NOT NULL AND completed_at<=due_at),SUM(completed_at>due_at),SUM(completed_at IS NULL AND due_at<?) FROM tasks WHERE due_at IS NOT NULL AND canceled=0 GROUP BY org_id,DATE(due_at),plan_id
+		 SELECT org_id,DATE(due_at),plan_id,0,0,COUNT(*),SUM(completed_at IS NOT NULL AND completed_at<=due_at),SUM(CASE WHEN completed_at>due_at THEN 1 ELSE 0 END),SUM(completed_at IS NULL AND due_at<?) FROM tasks WHERE due_at IS NOT NULL AND canceled=0 GROUP BY org_id,DATE(due_at),plan_id
 		)
 		SELECT org_id,cohort_date,plan_id,SUM(planned_task_count),SUM(planned_participant_count),SUM(due_task_count),SUM(completed_on_time_count),SUM(completed_overdue_count),SUM(uncompleted_overdue_count) FROM buckets GROUP BY org_id,cohort_date,plan_id`, r.OrgID, r.OrgID, r.CutoffAt)
 	return statisticsDomain.ProjectionResult{Name: p.Name(), Rows: result.RowsAffected}, result.Error
