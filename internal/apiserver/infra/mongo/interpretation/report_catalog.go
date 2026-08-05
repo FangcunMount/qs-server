@@ -25,13 +25,6 @@ func NewReportCatalogProjector(db *mongo.Database, opts ...base.BaseRepositoryOp
 	return p, nil
 }
 
-// ReportCatalogIndexModels returns the canonical report_query_catalog indexes.
-// Mongo migration 000015 is the deployment source of truth; runtime CreateMany
-// reuses this list as a defensive reconcile only.
-func ReportCatalogIndexModels() []mongo.IndexModel {
-	return reportCatalogIndexModels()
-}
-
 func reportCatalogIndexModels() []mongo.IndexModel {
 	return []mongo.IndexModel{
 		{Keys: bson.D{{Key: "assessment_id", Value: 1}}, Options: options.Index().SetName("uk_report_catalog_assessment").SetUnique(true)},

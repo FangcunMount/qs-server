@@ -22,20 +22,6 @@ func Versioned(inner Builder, version policy.TemplateVersion) Builder {
 	return versionedBuilder{inner: inner, version: version}
 }
 
-// ExpandTemplateVersions clones builders for each requested release.
-func ExpandTemplateVersions(builders []Builder, versions ...policy.TemplateVersion) []Builder {
-	if len(versions) == 0 {
-		return builders
-	}
-	out := make([]Builder, 0, len(builders)*len(versions))
-	for _, version := range versions {
-		for _, builder := range builders {
-			out = append(out, Versioned(builder, version))
-		}
-	}
-	return out
-}
-
 func (b versionedBuilder) ReportType() policy.ReportType { return b.inner.ReportType() }
 func (b versionedBuilder) TemplateVersion() policy.TemplateVersion {
 	return b.version

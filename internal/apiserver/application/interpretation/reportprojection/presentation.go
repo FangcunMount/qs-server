@@ -1,44 +1,9 @@
 package reportprojection
 
 import (
-	"context"
-
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
-	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
-
-// ModelCatalogLegacyVisibility resolves current published factor visibility for
-// artifacts that predate frozen presentation profiles.
-type ModelCatalogLegacyVisibility struct {
-	Lister modelcatalogport.PublishedModelLister
-}
-
-func NewModelCatalogLegacyVisibility(lister modelcatalogport.PublishedModelLister) ModelCatalogLegacyVisibility {
-	return ModelCatalogLegacyVisibility{Lister: lister}
-}
-
-func (a ModelCatalogLegacyVisibility) VisibleFactorCodes(ctx context.Context, model domainreport.ModelIdentity) (map[string]bool, bool, error) {
-	if a.Lister == nil || model.Code == "" {
-		return nil, false, nil
-	}
-	published, err := a.Lister.FindPublishedModelByCode(ctx, modelcatalog.Kind(model.Kind), model.Code)
-	if err != nil || published == nil || published.DefinitionV2 == nil {
-		return nil, false, err
-	}
-	codes, configured := published.DefinitionV2.ReportMap.FactorScoreSources()
-	if !configured {
-		return nil, false, nil
-	}
-	visible := make(map[string]bool, len(codes))
-	for _, code := range codes {
-		if code != "" {
-			visible[code] = true
-		}
-	}
-	return visible, true, nil
-}
 
 func presentationProfileFromRow(row *interpretationreadmodel.ReportRow) *domainreport.PresentationProfile {
 	if row == nil || row.PresentationProfile == nil || row.PresentationProfile.Source == "" {

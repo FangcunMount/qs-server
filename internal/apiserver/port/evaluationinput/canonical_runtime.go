@@ -97,15 +97,3 @@ func AuditInputIdentity(input *InputSnapshot) []ReportInputAuditIssue {
 	}
 	return out
 }
-
-// HasReportInputFreezeMaterial reports whether commit can freeze current report input.
-func HasReportInputFreezeMaterial(input *InputSnapshot) bool {
-	if input == nil {
-		return false
-	}
-	if def, ok := DefinitionV2FromSnapshot(input); ok {
-		assets := def.ResolvedInterpretationAssets()
-		return assets.IsMaterialized()
-	}
-	return false
-}
