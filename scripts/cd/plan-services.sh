@@ -72,80 +72,14 @@ emit_outputs() {
   fi
 }
 
-previous_successful_deploy_sha() {
-  if [ -z "${GITHUB_TOKEN:-}" ] || [ -z "${GITHUB_REPOSITORY:-}" ] || ! command -v gh >/dev/null 2>&1; then
-    return 0
-  fi
-
-  GH_TOKEN="$GITHUB_TOKEN" gh api --method GET \
-    "repos/${GITHUB_REPOSITORY}/actions/workflows/cd.yml/runs" \
-    -f branch=main \
-    -f event=workflow_run \
-    -f status=success \
-    -f per_page=10 \
-    --jq '.workflow_runs[].head_sha' 2>/dev/null \
-    | awk -v head="$DEPLOY_SHA" '$0 != head { print; exit }'
-}
-
-resolve_base_sha() {
-  local previous_sha
-  previous_sha="$(previous_successful_deploy_sha || true)"
-  if [ -n "$previous_sha" ] && git cat-file -e "${previous_sha}^{commit}" 2>/dev/null; then
-    printf '%s\n' "$previous_sha"
-    return 0
-  fi
-
-  if [ -n "$DEPLOY_SHA" ] && git rev-parse --verify "${DEPLOY_SHA}^" >/dev/null 2>&1; then
-    git rev-parse "${DEPLOY_SHA}^"
-  fi
-}
-
-classify_path() {
-  local path="$1"
-
-  case "$path" in
-    ""|*.md|Makefile|docs/*|MONGODB_*.md|.github/*|scripts/perf/*|scripts/oneoff/*|scripts/cert/*)
+current_main_sha() {
+  local ref
+  for ref in refs/remotes/origin/main refs/heads/main; do
+    if git rev-parse --verify "${ref}^{commit}" >/dev/null 2>&1; then
+      git rev-parse "${ref}^{commit}"
       return 0
-      ;;
-    scripts/cd/plan-services.sh|scripts/cd/image-metadata.sh|scripts/cd/prepare-package.sh|scripts/cd/export-image.sh|scripts/cd/setup-runner-*.sh|scripts/cd/runner-dotenv.example)
-      return 0
-      ;;
-    scripts/cd/runner-upload-and-deploy.sh|scripts/cd/remote-deploy.sh|scripts/cd/deploy-target.sh|scripts/cd/setup-runner-ssh.sh)
-      add_service all
-      return 0
-      ;;
-    scripts/cd/*)
-      return 0
-      ;;
-    *_test.go)
-      return 0
-      ;;
-    go.mod|go.sum|go.work|go.work.sum|configs/events.yaml|build/docker/docker-compose.prod.yml|internal/pkg/*|pkg/*)
-      add_service all
-      return 0
-      ;;
-    cmd/qs-apiserver/*|internal/apiserver/*|configs/apiserver.*|build/docker/Dockerfile.qs-apiserver|api/rest/apiserver.yaml)
-      add_service apiserver
-      return 0
-      ;;
-    cmd/collection-server/*|internal/collection-server/*|configs/collection-server.*|build/docker/Dockerfile.collection-server|api/rest/collection.yaml)
-      add_service collection
-      return 0
-      ;;
-    cmd/qs-worker/*|internal/worker/*|configs/worker.*|build/docker/Dockerfile.qs-worker)
-      add_service worker
-      return 0
-      ;;
-    web/swagger-ui/*)
-      add_service apiserver
-      add_service collection
-      return 0
-      ;;
-    *.go|*.proto|cmd/*|internal/*|pkg/*|configs/*|build/docker/*)
-      add_service all
-      return 0
-      ;;
-  esac
+    fi
+  done
 }
 
 if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
@@ -159,31 +93,18 @@ if [ -z "$DEPLOY_SHA" ]; then
   exit 1
 fi
 
-base_sha="$(resolve_base_sha || true)"
-if [ -z "$base_sha" ]; then
-  echo "No comparable base deploy found; deploying all services."
-  add_service all
+main_sha="$(current_main_sha || true)"
+if [ -z "$main_sha" ]; then
+  echo "Cannot resolve the current main SHA; refusing automatic deployment." >&2
+  exit 1
+fi
+
+if [ "$DEPLOY_SHA" != "$main_sha" ]; then
+  echo "Skipping stale automatic deploy target: target=${DEPLOY_SHA} current_main=${main_sha}"
   emit_outputs
   exit 0
 fi
 
-echo "Planning deploy range: ${base_sha}..${DEPLOY_SHA}"
-changed_files="$(git diff --name-only "$base_sha" "$DEPLOY_SHA")"
-if [ -z "$changed_files" ]; then
-  echo "No file changes detected in deploy range."
-  emit_outputs
-  exit 0
-fi
-
-echo "Changed files:"
-printf '%s\n' "$changed_files" | sed 's/^/  - /'
-
-while IFS= read -r changed_file; do
-  classify_path "$changed_file"
-done <<<"$changed_files"
-
-if [ "$(services_json)" = "[]" ]; then
-  echo "No deployable service changes detected; production deploy will be skipped."
-fi
-
+echo "Automatic deploy target is the current main HEAD; deploying all services: ${DEPLOY_SHA}"
+add_service all
 emit_outputs
