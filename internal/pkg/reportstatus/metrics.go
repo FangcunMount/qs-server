@@ -20,10 +20,6 @@ var (
 		Name: "signaling_watch_received_total",
 		Help: "Total report status signals received by watcher.",
 	}, []string{"signal_name", "service"})
-	signalingWatchDecodeFailedTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "signaling_watch_decode_failed_total",
-		Help: "Total report status signal decode failures in watcher.",
-	}, []string{"signal_name", "service"})
 	signalingWatchReconnectTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "signaling_watch_reconnect_total",
 		Help: "Total report status signal watcher reconnect attempts.",
@@ -120,10 +116,6 @@ func IncNotifyFailed(signalName, service string) {
 
 func IncWatchReceived(signalName, service string) {
 	signalingWatchReceivedTotal.WithLabelValues(signalName, service).Inc()
-}
-
-func IncWatchDecodeFailed(signalName, service string) {
-	signalingWatchDecodeFailedTotal.WithLabelValues(signalName, service).Inc()
 }
 
 func IncWatchReconnect(signalName, service string) {
