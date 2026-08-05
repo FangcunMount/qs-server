@@ -23,7 +23,6 @@ const (
 	AnswerSheetService_LookupAnswerSheetSubmission_FullMethodName = "/answersheet.AnswerSheetService/LookupAnswerSheetSubmission"
 	AnswerSheetService_GetAnswerSheet_FullMethodName              = "/answersheet.AnswerSheetService/GetAnswerSheet"
 	AnswerSheetService_ListAnswerSheets_FullMethodName            = "/answersheet.AnswerSheetService/ListAnswerSheets"
-	AnswerSheetService_SaveAnswerSheetScores_FullMethodName       = "/answersheet.AnswerSheetService/SaveAnswerSheetScores"
 )
 
 // AnswerSheetServiceClient is the client API for AnswerSheetService service.
@@ -40,8 +39,6 @@ type AnswerSheetServiceClient interface {
 	GetAnswerSheet(ctx context.Context, in *GetAnswerSheetRequest, opts ...grpc.CallOption) (*GetAnswerSheetResponse, error)
 	// 获取答卷列表
 	ListAnswerSheets(ctx context.Context, in *ListAnswerSheetsRequest, opts ...grpc.CallOption) (*ListAnswerSheetsResponse, error)
-	// 保存答卷答案和分数
-	SaveAnswerSheetScores(ctx context.Context, in *SaveAnswerSheetScoresRequest, opts ...grpc.CallOption) (*SaveAnswerSheetScoresResponse, error)
 }
 
 type answerSheetServiceClient struct {
@@ -92,16 +89,6 @@ func (c *answerSheetServiceClient) ListAnswerSheets(ctx context.Context, in *Lis
 	return out, nil
 }
 
-func (c *answerSheetServiceClient) SaveAnswerSheetScores(ctx context.Context, in *SaveAnswerSheetScoresRequest, opts ...grpc.CallOption) (*SaveAnswerSheetScoresResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(SaveAnswerSheetScoresResponse)
-	err := c.cc.Invoke(ctx, AnswerSheetService_SaveAnswerSheetScores_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // AnswerSheetServiceServer is the server API for AnswerSheetService service.
 // All implementations must embed UnimplementedAnswerSheetServiceServer
 // for forward compatibility.
@@ -116,8 +103,6 @@ type AnswerSheetServiceServer interface {
 	GetAnswerSheet(context.Context, *GetAnswerSheetRequest) (*GetAnswerSheetResponse, error)
 	// 获取答卷列表
 	ListAnswerSheets(context.Context, *ListAnswerSheetsRequest) (*ListAnswerSheetsResponse, error)
-	// 保存答卷答案和分数
-	SaveAnswerSheetScores(context.Context, *SaveAnswerSheetScoresRequest) (*SaveAnswerSheetScoresResponse, error)
 	mustEmbedUnimplementedAnswerSheetServiceServer()
 }
 
@@ -139,9 +124,6 @@ func (UnimplementedAnswerSheetServiceServer) GetAnswerSheet(context.Context, *Ge
 }
 func (UnimplementedAnswerSheetServiceServer) ListAnswerSheets(context.Context, *ListAnswerSheetsRequest) (*ListAnswerSheetsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListAnswerSheets not implemented")
-}
-func (UnimplementedAnswerSheetServiceServer) SaveAnswerSheetScores(context.Context, *SaveAnswerSheetScoresRequest) (*SaveAnswerSheetScoresResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method SaveAnswerSheetScores not implemented")
 }
 func (UnimplementedAnswerSheetServiceServer) mustEmbedUnimplementedAnswerSheetServiceServer() {}
 func (UnimplementedAnswerSheetServiceServer) testEmbeddedByValue()                            {}
@@ -236,24 +218,6 @@ func _AnswerSheetService_ListAnswerSheets_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AnswerSheetService_SaveAnswerSheetScores_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SaveAnswerSheetScoresRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AnswerSheetServiceServer).SaveAnswerSheetScores(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AnswerSheetService_SaveAnswerSheetScores_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AnswerSheetServiceServer).SaveAnswerSheetScores(ctx, req.(*SaveAnswerSheetScoresRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // AnswerSheetService_ServiceDesc is the grpc.ServiceDesc for AnswerSheetService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -276,10 +240,6 @@ var AnswerSheetService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListAnswerSheets",
 			Handler:    _AnswerSheetService_ListAnswerSheets_Handler,
-		},
-		{
-			MethodName: "SaveAnswerSheetScores",
-			Handler:    _AnswerSheetService_SaveAnswerSheetScores_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -49,17 +49,3 @@ func (c *AnswerSheetClient) ListAnswerSheets(ctx context.Context, req *pb.ListAn
 
 	return resp, nil
 }
-
-// SaveAnswerSheetScores 调用保留的答卷分数回写接口。
-// 当前服务端会返回 Unimplemented，仅保留客户端占位以避免接口断裂。
-func (c *AnswerSheetClient) SaveAnswerSheetScores(ctx context.Context, req *pb.SaveAnswerSheetScoresRequest) (*pb.SaveAnswerSheetScoresResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
-	defer cancel()
-
-	resp, err := c.client.SaveAnswerSheetScores(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to save answer sheet scores: %w", err)
-	}
-
-	return resp, nil
-}

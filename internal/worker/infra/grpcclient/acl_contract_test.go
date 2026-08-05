@@ -28,8 +28,8 @@ func TestWorkerACLContract(t *testing.T) {
 	assertUniqueWorkerMethods(t, allowed)
 
 	outbound := discoverWorkerOutboundRPCMethods(t)
-	if len(outbound) != 13 {
-		t.Fatalf("worker outbound RPC surface count = %d, want 13", len(outbound))
+	if len(outbound) != 12 {
+		t.Fatalf("worker outbound RPC surface count = %d, want 12", len(outbound))
 	}
 	assertExactWorkerMethods(t, discoverWorkerRuntimeRPCMethods(t, outbound), allowed)
 
@@ -43,7 +43,6 @@ func TestWorkerACLContract(t *testing.T) {
 	assertExactWorkerMethods(t, denied, []string{
 		answersheetpb.AnswerSheetService_GetAnswerSheet_FullMethodName,
 		answersheetpb.AnswerSheetService_ListAnswerSheets_FullMethodName,
-		answersheetpb.AnswerSheetService_SaveAnswerSheetScores_FullMethodName,
 		internalpb.InternalService_GenerateQuestionnaireQRCode_FullMethodName,
 		internalpb.InternalService_GenerateScaleQRCode_FullMethodName,
 		internalpb.PlanCommandService_SchedulePendingTasks_FullMethodName,
@@ -115,7 +114,7 @@ func discoverWorkerOutboundRPCMethods(t *testing.T) []string {
 	parsedFiles := parseWorkerNonTestGoFiles(t, packageDir)
 	serviceByStructField := discoverWorkerGeneratedClientFields(t, parsedFiles, servicePrefixByClientType)
 
-	methodSet := make(map[string]struct{}, 13)
+	methodSet := make(map[string]struct{}, 12)
 	for _, parsed := range parsedFiles {
 		for _, declaration := range parsed.Decls {
 			function, ok := declaration.(*ast.FuncDecl)

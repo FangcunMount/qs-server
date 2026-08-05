@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	basegrpc "github.com/FangcunMount/component-base/pkg/grpc/interceptors"
-	answersheetpb "github.com/FangcunMount/qs-server/api/grpc/gen/answersheet"
 	evaluationpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	interpretationpb "github.com/FangcunMount/qs-server/api/grpc/gen/interpretation"
 	"github.com/FangcunMount/qs-server/internal/pkg/serviceidentity"
@@ -48,7 +47,6 @@ func TestCollectionServerACLContract(t *testing.T) {
 			}
 
 			for _, denied := range []string{
-				answersheetpb.AnswerSheetService_SaveAnswerSheetScores_FullMethodName,
 				evaluationpb.AssessmentIntakeService_EnsureAssessment_FullMethodName,
 				interpretationpb.ParticipantReportService_ListMyReports_FullMethodName,
 				interpretationpb.InterpretationAutomationService_GenerateReportFromOutcome_FullMethodName,
