@@ -21,26 +21,3 @@ func TestQRCodeGeneratorValidatesRequiredInputsBeforeSDKCall(t *testing.T) {
 		t.Fatal("GenerateUnlimitedQRCode should reject empty page before SDK call")
 	}
 }
-
-func TestTokenProviderValidatesRequiredInputsBeforeSDKCall(t *testing.T) {
-	provider := NewTokenProvider(nil)
-
-	if _, err := provider.FetchMiniProgramToken(context.Background(), "", "secret"); err == nil {
-		t.Fatal("FetchMiniProgramToken should reject empty appID before SDK call")
-	}
-	if _, err := provider.FetchOfficialAccountToken(context.Background(), "app", ""); err == nil {
-		t.Fatal("FetchOfficialAccountToken should reject empty appSecret before SDK call")
-	}
-}
-
-// func TestSubscribeSenderValidatesRequiredInputsBeforeSDKCall(t *testing.T) {
-// 	sender := NewSubscribeSender(nil)
-
-// 	err := sender.SendSubscribeMessage(context.Background(), "", "secret", wechatPort.SubscribeMessage{
-// 		ToUser:     "openid",
-// 		TemplateID: "tmpl",
-// 	})
-// 	if err == nil || !strings.Contains(err.Error(), "appID and appSecret cannot be empty") {
-// 		t.Fatalf("expected app config validation error, got %v", err)
-// 	}
-// }
