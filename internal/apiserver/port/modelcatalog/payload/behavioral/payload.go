@@ -6,7 +6,6 @@ import (
 	catalognorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
 	portmodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/scale"
-	sharedpayload "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/shared"
 )
 
 // Snapshot is a transient behavioral_rating runtime projection of DefinitionV2.
@@ -55,12 +54,9 @@ type FactorSnapshot struct {
 	ScoringStrategy string
 	ScoringParams   *factor.ScoringParams
 	MaxScore        *float64
-	InterpretRules  []InterpretRuleSnapshot
 	Norm            *catalognorm.Ref
 	ChildrenPolicy  *factor.ChildrenPolicy
 }
-
-type InterpretRuleSnapshot = sharedpayload.ScoreRangeRule
 
 func (f FactorSnapshot) ResolvedRole() factor.FactorRole {
 	if f.Role != "" {
@@ -130,18 +126,6 @@ func cloneWeights(weights map[string]float64) map[string]float64 {
 }
 
 func scaleFactorSnapshotFromBehavioral(item FactorSnapshot) scalesnapshot.FactorSnapshot {
-	rules := make([]scalesnapshot.InterpretRuleSnapshot, 0, len(item.InterpretRules))
-	for _, rule := range item.InterpretRules {
-		rules = append(rules, scalesnapshot.InterpretRuleSnapshot{
-			Min:          rule.MinScore,
-			Max:          rule.MaxScore,
-			MaxInclusive: rule.MaxInclusive,
-			UnboundedMax: rule.UnboundedMax,
-			RiskLevel:    rule.Level,
-			Conclusion:   rule.Conclusion,
-			Suggestion:   rule.Suggestion,
-		})
-	}
 	var params scalesnapshot.ScoringParamsSnapshot
 	if item.ScoringParams != nil {
 		params.CntOptionContents = append([]string(nil), item.ScoringParams.CntOptionContents...)
@@ -154,6 +138,5 @@ func scaleFactorSnapshotFromBehavioral(item FactorSnapshot) scalesnapshot.Factor
 		ScoringStrategy: item.ScoringStrategy,
 		ScoringParams:   params,
 		MaxScore:        item.MaxScore,
-		InterpretRules:  rules,
 	}
 }
