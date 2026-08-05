@@ -3,7 +3,6 @@ package binding
 // ModelFamilyCapability 记录领域 execution 和 lifecycle 守卫 用于 模型家族。
 type ModelFamilyCapability struct {
 	Kind                      Kind
-	Role                      CapabilityRole
 	CreateSupported           bool
 	ListSupported             bool
 	PublishSupported          bool
@@ -20,10 +19,6 @@ func (c ModelFamilyCapability) CanExecute() bool {
 	return c.RuntimeExecutable
 }
 
-func (c ModelFamilyCapability) IsProductChannel() bool {
-	return c.Role == CapabilityRoleProductChannel
-}
-
 func (c ModelFamilyCapability) AllowsNewDraft() bool {
 	return c.CreateSupported
 }
@@ -31,7 +26,6 @@ func (c ModelFamilyCapability) AllowsNewDraft() bool {
 var defaultFamilyCapabilities = []ModelFamilyCapability{
 	{
 		Kind:                      KindTypology,
-		Role:                      CapabilityRoleModelFamily,
 		CreateSupported:           true,
 		ListSupported:             true,
 		PublishSupported:          true,
@@ -42,7 +36,6 @@ var defaultFamilyCapabilities = []ModelFamilyCapability{
 	},
 	{
 		Kind:                      KindBehavioralRating,
-		Role:                      CapabilityRoleModelFamily,
 		CreateSupported:           true,
 		ListSupported:             true,
 		PublishSupported:          true,
@@ -53,14 +46,12 @@ var defaultFamilyCapabilities = []ModelFamilyCapability{
 	},
 	{
 		Kind:              KindScale,
-		Role:              CapabilityRoleModelFamily,
 		ListSupported:     false,
 		RuntimeExecutable: true,
 		ExecutionPath:     ExecutionPathScaleDescriptor,
 	},
 	{
 		Kind:                      KindCognitive,
-		Role:                      CapabilityRoleModelFamily,
 		CreateSupported:           true,
 		ListSupported:             true,
 		PublishSupported:          true,

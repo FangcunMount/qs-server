@@ -5,11 +5,10 @@
 // v2 使用 Kind/SubKind/Algorithm 身份与 DefinitionV2 作为模型语义来源。
 // published payload 是 port/modelcatalog/payload 下的编解码契约，不属于本领域包。
 //
-// KindCapability.Role 把产品通道和可执行模型家族分开。
 // AssessmentModel.ProductChannel 是面向产品分类的 taxonomy 字段，不得驱动运行时执行路径选择。
 // 可执行模型家族的约束应使用 ModelFamilyCapability。
 //
-//   - behavioral_rating / cognitive（CapabilityRoleModelFamily）：可执行家族；
+//   - behavioral_rating / cognitive：可执行家族；
 //     Brief-2 落在 behavioral_rating+AlgorithmBrief2，Raven SPM 落在
 //     cognitive+AlgorithmSPM；感觉统合 SPM 落在
 //     behavioral_rating+AlgorithmSPMSensory。

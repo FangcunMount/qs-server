@@ -32,7 +32,6 @@ type (
 
 	KindCapability        = binding.KindCapability
 	ModelFamilyCapability = binding.ModelFamilyCapability
-	CapabilityRole        = binding.CapabilityRole
 
 	QuestionnaireBinding = binding.QuestionnaireBinding
 
@@ -144,9 +143,6 @@ const (
 	ExecutionPathTypologyDescriptor         = binding.ExecutionPathTypologyDescriptor
 	ExecutionPathBehavioralRatingDescriptor = binding.ExecutionPathBehavioralRatingDescriptor
 	ExecutionPathCognitiveDescriptor        = binding.ExecutionPathCognitiveDescriptor
-
-	CapabilityRoleProductChannel = binding.CapabilityRoleProductChannel
-	CapabilityRoleModelFamily    = binding.CapabilityRoleModelFamily
 
 	// SchemaVersionV2 is the only persisted Definition schema.
 	SchemaVersionV2 = "2"
