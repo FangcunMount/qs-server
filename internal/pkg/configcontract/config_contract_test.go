@@ -299,6 +299,19 @@ func TestWorkerDevProdConfigContracts(t *testing.T) {
 			if cfg.Worker == nil || cfg.Worker.Concurrency <= 0 {
 				t.Fatal("worker runtime config must define positive concurrency")
 			}
+			if name == "worker.prod.yaml" {
+				if !cfg.Worker.AttentionProjectionReconcileEnabled {
+					t.Fatal("production attention projection reconcile rehearsal must be enabled")
+				}
+				if cfg.Worker.AttentionProjectionReconcileFrom != "2026-08-05T00:00:00Z" {
+					t.Fatalf("production attention projection reconcile cutover = %q", cfg.Worker.AttentionProjectionReconcileFrom)
+				}
+				if !cfg.Worker.AttentionProjectionReconcileDryRun {
+					t.Fatal("production attention projection reconcile must remain dry-run until apply approval")
+				}
+			} else if cfg.Worker.AttentionProjectionReconcileEnabled {
+				t.Fatal("development attention projection reconcile must remain opt-in")
+			}
 			assertWorkerGRPCClientIdentityContract(t, name, opts.GRPC)
 			if workerEventConfigPath(cfg.Worker) != "configs/events.yaml" {
 				t.Fatalf("worker event config fallback = %q, want configs/events.yaml", workerEventConfigPath(cfg.Worker))
