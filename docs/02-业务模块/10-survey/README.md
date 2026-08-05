@@ -1,6 +1,6 @@
 # Survey 模块
 
-> 状态：主体已实现；“独立问卷提交后不创建 Assessment”、“严格拒绝不可见题答案”和“受理幂等元数据收入 AnswerSheet document”仍是规划改造。本文只做模块边界和阅读地图，详细规则以下方 canonical 文档为准。
+> 状态：主体已实现，受理幂等元数据已收入 AnswerSheet document，独立问卷终止边界已进入当前代码；但“答卷详情资源归属授权”和“严格拒绝不可见题答案”是当前定档 P0，独立发布事务、计分状态与遗留兼容退出仍未完成。当前结论见[当前版本定档验收台账](../../00-总览/09-当前版本定档验收台账.md)。本文只做模块边界和阅读地图，详细规则以下方 canonical 文档为准。
 
 ## 1. 30 秒结论
 
@@ -39,9 +39,11 @@ AnswerSheet 只表示一次正式、最终提交，系统不定义客户端与�
 - 答卷提交成功不等于 Assessment、Evaluation 或报告已完成。
 - 跨 Survey、ModelCatalog、Plan 和 Evaluation 的编排属于 `application/journey/assessmentintake`。
 
-> **已实现待验收：独立问卷终止边界。** 未找到 AssessmentModel binding 时，`assessmentintake.Service.Ensure` 在 AnswerSheet 与基础题分完成后正常结束，不再创建 Assessment（见 `MC-R001` / `EV-R002`）。存量空壳 Assessment 审计与 `bound=false` 细粒度分流仍待后续。
+> **已实现、生产补证：独立问卷终止边界。** 新提交未找到 AssessmentModel binding 时会冻结 `independent_questionnaire` admission；`assessmentintake.Service.Ensure` 在基础计分后正常结束，不创建 Assessment。历史无 admission 事件仍走 live binding，生产存量与兼容命中率尚待盘点。
 >
-> **规划改造：不可见题答案严格拒绝。** 服务端应使用同一份最终提交中的控制题答案重新计算 ShowController。只要提交包含当前不可见问题的答案，就应拒绝整份提交，而不是忽略隐藏答案或部分接收。当前共享校验器只在 required 检查时使用可见性，尚未保护该契约。
+> **定档 P0：答卷详情资源归属授权。** collection 的 `GET /api/v1/answersheets/{id}` 当前只校验登录，不校验当前 writer、testee 或 active ProfileLink 是否拥有该 AnswerSheet；apiserver gRPC 详情读取也不做资源权限验证。修复前不能把 Survey 标记为通过。
+>
+> **定档 P0：不可见题答案严格拒绝。** 服务端应使用同一份最终提交中的控制题答案重新计算 ShowController。只要提交包含当前不可见问题的答案，就应拒绝整份提交，而不是忽略隐藏答案或部分接收。当前共享校验器只在 required 检查时使用可见性，尚未保护该契约。
 >
 > **当前不足：基础计分状态不可区分。** AnswerSheet 当前以 `score=0` 创建，异步计分后再写回单题分和总分，但没有独立 scoring status 或 scored timestamp。因此无法仅凭 `score=0` 判断“尚未计分”还是“已计分且真实结果为零”。具体状态模型留待代码改造时确定。
 
