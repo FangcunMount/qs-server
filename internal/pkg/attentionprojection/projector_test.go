@@ -85,8 +85,13 @@ func TestProjectorConvergesAfterReconcileRetry(t *testing.T) {
 		t.Fatalf("Project: %v", err)
 	}
 	client.err = nil
-	reconciler := NewReconciler(projector, 0, 10, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	reconciler.runOnce(context.Background())
+	reconciler, err := NewReconciler(projector, &reconcileRunnerStub{acquired: true}, 0, 10, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if acquired, err := reconciler.RunOnce(context.Background()); err != nil || !acquired {
+		t.Fatalf("RunOnce() acquired=%v error=%v", acquired, err)
+	}
 
 	rec, err := store.GetByEventID(context.Background(), input.EventID)
 	if err != nil {

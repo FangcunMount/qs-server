@@ -26,9 +26,10 @@ func TestFactReconcilerDryRunDoesNotCreateProjection(t *testing.T) {
 	store := NewMemoryStore()
 	client := &syncClientStub{}
 	projector := NewProjector(store, client, DefaultMaxAttempts, nil)
+	runner := &reconcileRunnerStub{acquired: true}
 	reconciler, err := NewFactReconciler(
 		factSourceStub{facts: []ReportFact{{ReportID: "1", AssessmentID: "2", TesteeID: 3, RiskLevel: "high", MarkKeyFocus: true}}},
-		store, projector, time.Now().Add(-time.Hour), true, 0, 500, nil,
+		store, projector, runner, time.Now().Add(-time.Hour), true, 0, 500, nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -47,9 +48,10 @@ func TestFactReconcilerCreatesOnlyMissingProjection(t *testing.T) {
 	store := NewMemoryStore()
 	client := &syncClientStub{}
 	projector := NewProjector(store, client, DefaultMaxAttempts, nil)
+	runner := &reconcileRunnerStub{acquired: true}
 	reconciler, err := NewFactReconciler(
 		factSourceStub{facts: []ReportFact{{ReportID: "1", AssessmentID: "2", TesteeID: 3, RiskLevel: "severe", MarkKeyFocus: true}}},
-		store, projector, time.Now().Add(-time.Hour), false, 0, 500, nil,
+		store, projector, runner, time.Now().Add(-time.Hour), false, 0, 500, nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -64,5 +66,31 @@ func TestFactReconcilerCreatesOnlyMissingProjection(t *testing.T) {
 	record, err := store.FindByReportID(context.Background(), "1")
 	if err != nil || record.Status != StatusSucceeded {
 		t.Fatalf("record=%#v err=%v", record, err)
+	}
+}
+
+func TestFactReconcilerSkipsWhenAnotherWorkerIsLeader(t *testing.T) {
+	t.Parallel()
+
+	store := NewMemoryStore()
+	client := &syncClientStub{}
+	projector := NewProjector(store, client, DefaultMaxAttempts, nil)
+	runner := &reconcileRunnerStub{}
+	reconciler, err := NewFactReconciler(
+		factSourceStub{facts: []ReportFact{{ReportID: "1", AssessmentID: "2", TesteeID: 3, RiskLevel: "severe", MarkKeyFocus: true}}},
+		store, projector, runner, time.Now().Add(-time.Hour), false, 0, 500, nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := reconciler.RunOnce(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != (FactReconcileResult{}) || client.calls != 0 {
+		t.Fatalf("contention result=%#v calls=%d, want skipped", result, client.calls)
+	}
+	if runner.workload != "attention_projection_reconcile" || runner.key != reconcileLeaseKey {
+		t.Fatalf("lease identity = %q/%q", runner.workload, runner.key)
 	}
 }

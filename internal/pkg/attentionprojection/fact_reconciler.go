@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 )
 
 type FactReconcileResult struct {
@@ -22,6 +24,7 @@ type FactReconciler struct {
 	source    FactSource
 	store     Store
 	projector *Projector
+	runner    locklease.Runner
 	from      time.Time
 	dryRun    bool
 	interval  time.Duration
@@ -36,8 +39,8 @@ type FactReconciler struct {
 	wg                  sync.WaitGroup
 }
 
-func NewFactReconciler(source FactSource, store Store, projector *Projector, from time.Time, dryRun bool, interval time.Duration, batchSize int, logger *slog.Logger) (*FactReconciler, error) {
-	if source == nil || store == nil || projector == nil {
+func NewFactReconciler(source FactSource, store Store, projector *Projector, runner locklease.Runner, from time.Time, dryRun bool, interval time.Duration, batchSize int, logger *slog.Logger) (*FactReconciler, error) {
+	if source == nil || store == nil || projector == nil || runner == nil {
 		return nil, fmt.Errorf("attention fact reconciler dependencies are required")
 	}
 	if from.IsZero() {
@@ -49,13 +52,29 @@ func NewFactReconciler(source FactSource, store Store, projector *Projector, fro
 	if batchSize <= 0 || batchSize > 500 {
 		batchSize = 500
 	}
-	return &FactReconciler{source: source, store: store, projector: projector, from: from.UTC(), dryRun: dryRun, interval: interval, batchSize: batchSize, logger: logger}, nil
+	return &FactReconciler{source: source, store: store, projector: projector, runner: runner, from: from.UTC(), dryRun: dryRun, interval: interval, batchSize: batchSize, logger: logger}, nil
 }
 
+// RunOnce executes one fact-recovery round only while this worker owns the
+// shared Attention reconciliation leader lease. Contention is a normal skip.
 func (r *FactReconciler) RunOnce(ctx context.Context) (result FactReconcileResult, err error) {
-	if r == nil {
+	if r == nil || r.runner == nil {
 		return FactReconcileResult{}, fmt.Errorf("attention fact reconciler is not configured")
 	}
+	leaseResult, err := r.runner.Run(ctx, locklease.WorkloadAttentionProjectionReconcile, reconcileLeaseKey, 0, func(leaseCtx context.Context) error {
+		result, err = r.runOnce(leaseCtx)
+		return err
+	})
+	if err != nil {
+		return result, err
+	}
+	if !leaseResult.Acquired {
+		return FactReconcileResult{}, nil
+	}
+	return result, nil
+}
+
+func (r *FactReconciler) runOnce(ctx context.Context) (result FactReconcileResult, err error) {
 	startedAt := time.Now()
 	dryRunLabel := fmt.Sprintf("%t", r.dryRun)
 	defer func() {

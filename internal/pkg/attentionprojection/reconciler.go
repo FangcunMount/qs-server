@@ -2,16 +2,21 @@ package attentionprojection
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 )
 
 const defaultReconcileInterval = 30 * time.Second
+const reconcileLeaseKey = "global"
 
 // Reconciler retries pending/failed attention projections on a schedule.
 type Reconciler struct {
 	projector *Projector
+	runner    locklease.Runner
 	interval  time.Duration
 	batchSize int
 	logger    *slog.Logger
@@ -22,7 +27,10 @@ type Reconciler struct {
 	wg      sync.WaitGroup
 }
 
-func NewReconciler(projector *Projector, interval time.Duration, batchSize int, logger *slog.Logger) *Reconciler {
+func NewReconciler(projector *Projector, runner locklease.Runner, interval time.Duration, batchSize int, logger *slog.Logger) (*Reconciler, error) {
+	if projector == nil || runner == nil {
+		return nil, fmt.Errorf("attention projection reconciler dependencies are required")
+	}
 	if interval <= 0 {
 		interval = defaultReconcileInterval
 	}
@@ -31,14 +39,15 @@ func NewReconciler(projector *Projector, interval time.Duration, batchSize int, 
 	}
 	return &Reconciler{
 		projector: projector,
+		runner:    runner,
 		interval:  interval,
 		batchSize: batchSize,
 		logger:    logger,
-	}
+	}, nil
 }
 
 func (r *Reconciler) Start(parent context.Context) {
-	if r == nil || r.projector == nil || r.projector.store == nil {
+	if r == nil || r.projector == nil || r.projector.store == nil || r.runner == nil {
 		return
 	}
 	r.mu.Lock()
@@ -61,7 +70,9 @@ func (r *Reconciler) Start(parent context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				r.runOnce(ctx)
+				if _, err := r.RunOnce(ctx); err != nil && r.logger != nil {
+					r.logger.Warn("attention projection reconcile lease round failed", slog.String("error", err.Error()))
+				}
 			}
 		}
 	}()
@@ -80,13 +91,20 @@ func (r *Reconciler) Close() {
 	r.wg.Wait()
 }
 
-func (r *Reconciler) runOnce(ctx context.Context) {
+// RunOnce executes one retry round only while this worker owns the shared
+// Attention reconciliation leader lease. Contention is a normal skipped round.
+func (r *Reconciler) RunOnce(ctx context.Context) (bool, error) {
+	if r == nil || r.runner == nil {
+		return false, fmt.Errorf("attention projection reconciler is not configured")
+	}
+	result, err := r.runner.Run(ctx, locklease.WorkloadAttentionProjectionReconcile, reconcileLeaseKey, 0, r.runOnce)
+	return result.Acquired, err
+}
+
+func (r *Reconciler) runOnce(ctx context.Context) error {
 	records, err := r.projector.store.ListRetryable(ctx, r.projector.maxAttempts, r.batchSize)
 	if err != nil {
-		if r.logger != nil {
-			r.logger.Warn("attention projection reconcile scan failed", slog.String("error", err.Error()))
-		}
-		return
+		return fmt.Errorf("scan retryable attention projections: %w", err)
 	}
 	for _, rec := range records {
 		if err := r.projector.syncOnce(ctx, pendingInputFromRecord(rec)); err != nil && r.logger != nil {
@@ -96,4 +114,5 @@ func (r *Reconciler) runOnce(ctx context.Context) {
 			)
 		}
 	}
+	return nil
 }

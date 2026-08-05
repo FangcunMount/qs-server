@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	redisobserve "github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
@@ -747,14 +748,19 @@ func TestSnapshotsDeriveCatalogBindingsAndFamilyHealth(t *testing.T) {
 	})
 
 	snapshots := s.Snapshots()
-	if len(snapshots) != 1 {
-		t.Fatalf("len(Snapshots()) = %d, want 1", len(snapshots))
+	if len(snapshots) != 2 {
+		t.Fatalf("len(Snapshots()) = %d, want 2", len(snapshots))
 	}
-	got := snapshots[0]
-	if got.Name != string(locklease.WorkloadAnswersheetProcessing) || !got.Configured || got.Degraded {
-		t.Fatalf("snapshot = %+v, want healthy worker capability", got)
+	byName := make(map[string]resilience.CapabilitySnapshot, len(snapshots))
+	for _, snapshot := range snapshots {
+		byName[snapshot.Name] = snapshot
 	}
-	if got.TTLSeconds != 300 || got.RenewalMode != "auto" || got.RenewEverySeconds != 100 {
-		t.Fatalf("renewal projection = %+v", got)
+	processing := byName[string(locklease.WorkloadAnswersheetProcessing)]
+	if !processing.Configured || processing.Degraded || processing.TTLSeconds != 300 || processing.RenewalMode != "auto" || processing.RenewEverySeconds != 100 {
+		t.Fatalf("answersheet snapshot = %+v, want healthy renewable capability", processing)
+	}
+	reconcile := byName[string(locklease.WorkloadAttentionProjectionReconcile)]
+	if !reconcile.Configured || reconcile.Degraded || reconcile.TTLSeconds != 1800 || reconcile.RenewalMode != "auto" || reconcile.RenewEverySeconds != 600 {
+		t.Fatalf("attention snapshot = %+v, want healthy renewable leader capability", reconcile)
 	}
 }

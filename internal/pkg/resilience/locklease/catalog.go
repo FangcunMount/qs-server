@@ -16,6 +16,7 @@ const (
 	WorkloadStatisticsSync                 WorkloadID = "statistics_sync"
 	WorkloadEvaluationConsistencyReconcile WorkloadID = "evaluation_consistency_reconcile"
 	WorkloadReportCatalogAudit             WorkloadID = "report_catalog_audit"
+	WorkloadAttentionProjectionReconcile   WorkloadID = "attention_projection_reconcile"
 	WorkloadCollectionSubmit               WorkloadID = "collection_submit"
 )
 
@@ -52,6 +53,7 @@ var capabilities = [...]Capability{
 	{WorkloadStatisticsSync, "apiserver", KindTaskLock, Spec{Name: string(WorkloadStatisticsSync), Description: "用于 apiserver 统计同步任务串行化执行的分布式锁。", DefaultTTL: 30 * time.Minute}, RenewalModeAuto},
 	{WorkloadEvaluationConsistencyReconcile, "apiserver", KindLeader, Spec{Name: string(WorkloadEvaluationConsistencyReconcile), Description: "用于 apiserver evaluation consistency reconcile 多实例串行化执行的分布式锁。", DefaultTTL: 30 * time.Second}, RenewalModeAuto},
 	{WorkloadReportCatalogAudit, "apiserver", KindLeader, Spec{Name: string(WorkloadReportCatalogAudit), Description: "用于 apiserver 有界报告目录审计多实例 leader 选举与自动续租。", DefaultTTL: 30 * time.Second}, RenewalModeAuto},
+	{WorkloadAttentionProjectionReconcile, "worker", KindLeader, Spec{Name: string(WorkloadAttentionProjectionReconcile), Description: "用于 worker Attention 失败重试与历史事实恢复的多实例 leader 选举。", DefaultTTL: 30 * time.Minute}, RenewalModeAuto},
 	{WorkloadCollectionSubmit, "collection-server", KindDuplicateSuppression, Spec{Name: string(WorkloadCollectionSubmit), Description: "用于 collection-server 跨实例合并相同答卷提交的建议性 lease；最终幂等由 Mongo 裁决。", DefaultTTL: 5 * time.Minute}, RenewalModeAuto},
 }
 

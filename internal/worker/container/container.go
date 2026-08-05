@@ -116,7 +116,10 @@ func (c *Container) initAttentionProjection() error {
 		attentionprojection.DefaultMaxAttempts,
 		c.logger,
 	)
-	c.attentionReconciler = attentionprojection.NewReconciler(c.attentionProjector, 0, 100, c.logger)
+	c.attentionReconciler, err = attentionprojection.NewReconciler(c.attentionProjector, c.locks, 0, 100, c.logger)
+	if err != nil {
+		return fmt.Errorf("initialize attention projection reconciler: %w", err)
+	}
 	if c.opts != nil && c.opts.Worker != nil && c.opts.Worker.AttentionProjectionReconcileEnabled {
 		from, err := time.Parse(time.RFC3339, c.opts.Worker.AttentionProjectionReconcileFrom)
 		if err != nil {
@@ -127,7 +130,7 @@ func (c *Container) initAttentionProjection() error {
 			return err
 		}
 		c.attentionFactReconciler, err = attentionprojection.NewFactReconciler(
-			source, store, c.attentionProjector, from,
+			source, store, c.attentionProjector, c.locks, from,
 			c.opts.Worker.AttentionProjectionReconcileDryRun, 0, 500, c.logger,
 		)
 		if err != nil {
