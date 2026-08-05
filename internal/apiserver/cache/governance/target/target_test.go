@@ -7,16 +7,20 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 )
 
-func TestWarmupTargetFactoriesNormalizeScopes(t *testing.T) {
+func TestWarmupTargetFactoriesTrimScopesWithoutChangingCodeCase(t *testing.T) {
 	t.Parallel()
 
 	scale := NewStaticScaleWarmupTarget(" S-001 ")
-	if scale.Family != cachemodel.FamilyStatic || scale.Kind != WarmupKindStaticScale || scale.Scope != "scale:s-001" {
+	if scale.Family != cachemodel.FamilyStatic || scale.Kind != WarmupKindStaticScale || scale.Scope != "scale:S-001" {
 		t.Fatalf("scale target = %#v", scale)
 	}
 	questionnaire := NewStaticQuestionnaireWarmupTarget(" Q-001 ")
-	if questionnaire.Scope != "questionnaire:q-001" {
+	if questionnaire.Scope != "questionnaire:Q-001" {
 		t.Fatalf("questionnaire scope = %q", questionnaire.Scope)
+	}
+	typology := NewStaticTypologyModelWarmupTarget(" MBTI-Pro ")
+	if typology.Scope != "typology_model:MBTI-Pro" {
+		t.Fatalf("typology model scope = %q", typology.Scope)
 	}
 	if got := NewQueryStatsOverviewWarmupTarget(9, " 30D "); got.Scope != "org:9:preset:30d" {
 		t.Fatalf("overview scope = %q, want org:9:preset:30d", got.Scope)
@@ -80,8 +84,9 @@ func TestParseWarmupTarget(t *testing.T) {
 		scope string
 		want  WarmupTarget
 	}{
-		{name: "static scale", kind: WarmupKindStaticScale, scope: " scale:S-001 ", want: NewStaticScaleWarmupTarget("s-001")},
-		{name: "static questionnaire", kind: WarmupKindStaticQuestionnaire, scope: " questionnaire:Q-001 ", want: NewStaticQuestionnaireWarmupTarget("q-001")},
+		{name: "static scale", kind: WarmupKindStaticScale, scope: " scale:S-001 ", want: NewStaticScaleWarmupTarget("S-001")},
+		{name: "static questionnaire", kind: WarmupKindStaticQuestionnaire, scope: " questionnaire:Q-001 ", want: NewStaticQuestionnaireWarmupTarget("Q-001")},
+		{name: "static typology model", kind: WarmupKindStaticTypologyModel, scope: " typology_model:MBTI-Pro ", want: NewStaticTypologyModelWarmupTarget("MBTI-Pro")},
 		{name: "query stats overview", kind: WarmupKindQueryStatsOverview, scope: " org:7:preset:30D ", want: NewQueryStatsOverviewWarmupTarget(7, "30d")},
 	}
 	for _, tt := range tests {

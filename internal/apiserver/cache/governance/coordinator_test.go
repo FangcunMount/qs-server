@@ -57,8 +57,8 @@ func TestCoordinatorHandleManualWarmupReturnsStructuredResultAndRecordsRun(t *te
 			t.Fatalf("unexpected item statuses: %+v", result.Items)
 		}
 	}
-	if len(scaleCalls) != 1 || scaleCalls[0] != "s-001" {
-		t.Fatalf("scale warmup calls = %v, want [s-001]", scaleCalls)
+	if len(scaleCalls) != 1 || scaleCalls[0] != "S-001" {
+		t.Fatalf("scale warmup calls = %v, want [S-001]", scaleCalls)
 	}
 	if len(overviewCalls) != 1 || overviewCalls[0] != "2:30d" {
 		t.Fatalf("overview warmup calls = %v, want [2:30d]", overviewCalls)
@@ -142,6 +142,41 @@ func TestCoordinatorWarmStartupUsesStatisticsSeedsWhenWarmOnStartup(t *testing.T
 	}
 	if len(overviewCalls) != 1 || overviewCalls[0] != "1:7d" {
 		t.Fatalf("overview warmup calls = %v, want [1:7d]", overviewCalls)
+	}
+}
+
+func TestCoordinatorWarmStartupPreservesCatalogCodeCase(t *testing.T) {
+	var scaleCalls []string
+	var questionnaireCalls []string
+
+	coord := NewCoordinator(Config{Enable: true, StartupStatic: true}, Dependencies{
+		Runtime: NewFamilyRuntime(map[cachemodel.Family]bool{
+			cachemodel.FamilyStatic: true,
+		}),
+		ListPublishedScaleCodes: func(context.Context) ([]string, error) {
+			return []string{"3adyDE"}, nil
+		},
+		ListPublishedQuestionnaireCodes: func(context.Context) ([]string, error) {
+			return []string{"QnAbC"}, nil
+		},
+		WarmScale: func(_ context.Context, code string) error {
+			scaleCalls = append(scaleCalls, code)
+			return nil
+		},
+		WarmQuestionnaire: func(_ context.Context, code string) error {
+			questionnaireCalls = append(questionnaireCalls, code)
+			return nil
+		},
+	})
+
+	if err := coord.WarmStartup(context.Background()); err != nil {
+		t.Fatalf("WarmStartup() error = %v", err)
+	}
+	if len(scaleCalls) != 1 || scaleCalls[0] != "3adyDE" {
+		t.Fatalf("scale warmup calls = %v, want [3adyDE]", scaleCalls)
+	}
+	if len(questionnaireCalls) != 1 || questionnaireCalls[0] != "QnAbC" {
+		t.Fatalf("questionnaire warmup calls = %v, want [QnAbC]", questionnaireCalls)
 	}
 }
 

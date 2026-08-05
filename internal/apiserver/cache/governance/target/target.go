@@ -83,8 +83,11 @@ func FamilyForKind(kind WarmupKind) cachemodel.Family {
 	}
 }
 
-func normalizeCodeScope(prefix, code string) string {
-	return prefix + ":" + strings.ToLower(strings.TrimSpace(code))
+func codeScope(prefix, code string) string {
+	// Catalog repositories resolve codes with exact matches. Keep the source
+	// identifier intact here; individual cache key builders may normalize their
+	// own storage keys after the source record has been resolved.
+	return prefix + ":" + strings.TrimSpace(code)
 }
 
 // NewStaticScaleWarmupTarget 创建量表静态缓存预热目标。
@@ -92,7 +95,7 @@ func NewStaticScaleWarmupTarget(code string) WarmupTarget {
 	return WarmupTarget{
 		Family: cachemodel.FamilyStatic,
 		Kind:   WarmupKindStaticScale,
-		Scope:  normalizeCodeScope("scale", code),
+		Scope:  codeScope("scale", code),
 	}
 }
 
@@ -101,7 +104,7 @@ func NewStaticQuestionnaireWarmupTarget(code string) WarmupTarget {
 	return WarmupTarget{
 		Family: cachemodel.FamilyStatic,
 		Kind:   WarmupKindStaticQuestionnaire,
-		Scope:  normalizeCodeScope("questionnaire", code),
+		Scope:  codeScope("questionnaire", code),
 	}
 }
 
@@ -110,7 +113,7 @@ func NewStaticTypologyModelWarmupTarget(code string) WarmupTarget {
 	return WarmupTarget{
 		Family: cachemodel.FamilyStatic,
 		Kind:   WarmupKindStaticTypologyModel,
-		Scope:  normalizeCodeScope("typology_model", code),
+		Scope:  codeScope("typology_model", code),
 	}
 }
 

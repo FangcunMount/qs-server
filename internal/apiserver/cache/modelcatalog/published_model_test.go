@@ -24,6 +24,8 @@ type publishedModelStoreStub struct {
 	findByQuestionnaireCalls int
 	getByRefCalls            int
 	findByCodeCalls          int
+	findByCodeKind           domain.Kind
+	findByCodeCode           string
 	findByQuestionnaire      *port.PublishedModel
 	getByRef                 *port.PublishedModel
 	findByCode               *port.PublishedModel
@@ -50,8 +52,10 @@ func (s *publishedModelStoreStub) FindPublishedModelByQuestionnaire(ctx context.
 	return nil, domain.ErrNotFound
 }
 
-func (s *publishedModelStoreStub) FindPublishedModelByCode(context.Context, domain.Kind, string) (*port.PublishedModel, error) {
+func (s *publishedModelStoreStub) FindPublishedModelByCode(_ context.Context, kind domain.Kind, code string) (*port.PublishedModel, error) {
 	s.findByCodeCalls++
+	s.findByCodeKind = kind
+	s.findByCodeCode = code
 	if s.findByCode != nil {
 		return s.findByCode, nil
 	}
@@ -367,19 +371,22 @@ func TestCachedPublishedModelStoreWarmByCodeSynchronouslyPublishesVisibleEntry(t
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() { _ = client.Close() })
-	inner := &publishedModelStoreStub{findByCode: &port.PublishedModel{Kind: domain.KindScale, Code: "SDS", Version: "1"}}
+	inner := &publishedModelStoreStub{findByCode: &port.PublishedModel{Kind: domain.KindScale, Code: "3adyDE", Version: "1"}}
 	cached := NewCachedPublishedModelStore(inner, client, keyspace.NewBuilderWithNamespace("static"),
 		publishedModelPolicies(sharedcache.Policy{TTL: time.Hour}), nil)
 
-	if err := cached.WarmByCode(context.Background(), cachetarget.WarmupKindStaticScale, "SDS"); err != nil {
+	if err := cached.WarmByCode(context.Background(), cachetarget.WarmupKindStaticScale, "3adyDE"); err != nil {
 		t.Fatalf("WarmByCode() error = %v", err)
 	}
-	key := "static:assessment_model:published:latest:scale:sds"
+	key := "static:assessment_model:published:latest:scale:3adyde"
 	if !mr.Exists(key) {
 		t.Fatalf("warmup returned ok before %q existed", key)
 	}
 	if inner.findByCodeCalls != 1 {
 		t.Fatalf("source calls = %d, want 1", inner.findByCodeCalls)
+	}
+	if inner.findByCodeKind != domain.KindScale || inner.findByCodeCode != "3adyDE" {
+		t.Fatalf("source lookup = (%q, %q), want (%q, %q)", inner.findByCodeKind, inner.findByCodeCode, domain.KindScale, "3adyDE")
 	}
 }
 
