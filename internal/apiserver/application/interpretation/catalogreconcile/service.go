@@ -252,15 +252,27 @@ type ScheduledAuditor struct {
 	service     AuditService
 	minInterval time.Duration
 	mu          sync.Mutex
-	lastRun     time.Time
+	nextRunAt   time.Time
 	now         func() time.Time
 }
 
 func NewScheduledAuditor(service AuditService, minInterval time.Duration) *ScheduledAuditor {
+	return newScheduledAuditor(service, minInterval, time.Now)
+}
+
+func newScheduledAuditor(service AuditService, minInterval time.Duration, now func() time.Time) *ScheduledAuditor {
 	if minInterval <= 0 {
 		minInterval = 10 * time.Minute
 	}
-	return &ScheduledAuditor{service: service, minInterval: minInterval, now: time.Now}
+	if now == nil {
+		now = time.Now
+	}
+	// A catalog drift count scans the complete report history. Defer the first
+	// scheduled audit so application startup does not immediately load MongoDB.
+	return &ScheduledAuditor{
+		service: service, minInterval: minInterval,
+		nextRunAt: now().Add(minInterval), now: now,
+	}
 }
 
 // AuditOnce implements the Evaluation scheduler consistency-auditor contract.
@@ -273,14 +285,14 @@ func (a *ScheduledAuditor) AuditOnce(ctx context.Context, _ int) (int, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	now := a.now()
-	if !a.lastRun.IsZero() && now.Sub(a.lastRun) < a.minInterval {
+	if now.Before(a.nextRunAt) {
 		return 0, nil
 	}
 	counts, err := a.service.ReconcileOnce(ctx, Filter{})
 	if err != nil {
 		return 0, err
 	}
-	a.lastRun = now
+	a.nextRunAt = now.Add(a.minInterval)
 	return int(counts.Total()), nil
 }
 
