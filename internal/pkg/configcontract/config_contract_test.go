@@ -485,7 +485,7 @@ func TestDBOpsInventoriesLegacyBackupTablesExactly(t *testing.T) {
 	for _, required := range []string{
 		"legacy_backup_table",
 		"COUNT(*) AS exact_rows",
-		"^seed_orphan_(outbox|stats)_bak_hist_v1",
+		"^seed_orphan_(outbox|stats)_bak_hist_v1[0-9A-Za-z_]*$",
 		"PREPARE legacy_backup_count_stmt",
 		"EXECUTE legacy_backup_count_stmt",
 		"DEALLOCATE PREPARE legacy_backup_count_stmt",
