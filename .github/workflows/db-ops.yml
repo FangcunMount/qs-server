@@ -869,6 +869,37 @@ jobs:
                   SELECT 'analytics_scan_watermarks' AS retirement_candidate_table,
                          COUNT(*) AS exact_rows
                   FROM analytics_scan_watermarks;
+                  WITH ranked_assessments AS (
+                    SELECT assessment.testee_id,
+                           COUNT(*) OVER (PARTITION BY assessment.testee_id) AS total_evaluated,
+                           assessment.evaluated_at AS last_evaluated_at,
+                           COALESCE(assessment.risk_level, '') AS risk_level,
+                           ROW_NUMBER() OVER (
+                             PARTITION BY assessment.testee_id
+                             ORDER BY assessment.evaluated_at DESC, assessment.id DESC
+                           ) AS row_num
+                    FROM assessment FORCE INDEX (idx_assessment_org_testee_evaluated_summary)
+                    WHERE assessment.status = 'evaluated'
+                      AND assessment.deleted_at IS NULL
+                  ), canonical_assessment_summary AS (
+                    SELECT testee_id, total_evaluated, last_evaluated_at, risk_level
+                    FROM ranked_assessments
+                    WHERE row_num = 1
+                  )
+                  SELECT COUNT(*) AS active_testees,
+                         SUM(testee.total_assessments <> 0) AS legacy_total_non_default,
+                         SUM(testee.last_assessment_at IS NOT NULL) AS legacy_last_at_non_default,
+                         SUM(COALESCE(testee.last_risk_level, '') <> '') AS legacy_risk_non_default,
+                         SUM(testee.total_assessments <> COALESCE(canonical.total_evaluated, 0))
+                           AS legacy_total_mismatches,
+                         SUM(NOT (testee.last_assessment_at <=> canonical.last_evaluated_at))
+                           AS legacy_last_at_mismatches,
+                         SUM(COALESCE(testee.last_risk_level, '') <> COALESCE(canonical.risk_level, ''))
+                           AS legacy_risk_mismatches
+                  FROM testee
+                  LEFT JOIN canonical_assessment_summary AS canonical
+                    ON canonical.testee_id = testee.id
+                  WHERE testee.deleted_at IS NULL;
                   SELECT table_name AS retired_table_still_present
                   FROM information_schema.tables
                   WHERE table_schema = DATABASE()
