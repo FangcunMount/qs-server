@@ -21,7 +21,12 @@ on:
         type: choice
         options:
           - mongodb
+          - mysql
           - all
+      audit_from:
+        description: 'Optional RFC3339 UTC lower bound for read-only recovery audit'
+        required: false
+        type: string
 
   schedule:
     - cron: '0 17 * * *'  # 每天 17:00 UTC (北京时间凌晨 01:00) 自动备份
@@ -244,50 +249,78 @@ jobs:
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
+          envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,AUDIT_FROM
           script: |
             set -Eeuo pipefail
             export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
 
             : "${MONGODB_HOST:?MONGODB_HOST is empty (check production Environment secrets)}"
             : "${MONGODB_DBNAME:?MONGODB_DBNAME is empty}"
+            : "${MONGODB_USERNAME:?MONGODB_USERNAME is empty}"
+            : "${MONGODB_PASSWORD:?MONGODB_PASSWORD is empty}"
 
             echo "=== MongoDB Status ==="
 
-            if ! command -v mongosh >/dev/null 2>&1; then
-              echo "❌ mongosh not found on PATH=$PATH" >&2
-              exit 127
-            fi
-
-            if mongosh --host "$MONGODB_HOST" \
-                  --port "${MONGODB_PORT:-27017}" \
-                  --username "$MONGODB_USERNAME" \
-                  --password "$MONGODB_PASSWORD" \
-                  --authenticationDatabase admin \
-                  --eval "db.version()" 2>/dev/null; then
-              echo "✅ MongoDB connection OK"
-            else
-              echo "❌ MongoDB connection failed"
+            if ! sudo docker network inspect infra-network >/dev/null 2>&1; then
+              echo "❌ infra-network is unavailable" >&2
               exit 1
             fi
 
-            echo ""
-            echo "Database statistics:"
-            mongosh --host "$MONGODB_HOST" \
-                  --port "${MONGODB_PORT:-27017}" \
-                  --username "$MONGODB_USERNAME" \
-                  --password "$MONGODB_PASSWORD" \
-                  --authenticationDatabase admin \
-                  --eval "use $MONGODB_DBNAME; db.stats()" 2>/dev/null
+            if [ -n "${AUDIT_FROM:-}" ] && ! [[ "$AUDIT_FROM" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
+              echo "❌ audit_from must use YYYY-MM-DDTHH:MM:SSZ" >&2
+              exit 1
+            fi
 
-            echo ""
-            echo "Collections:"
-            mongosh --host "$MONGODB_HOST" \
-                  --port "${MONGODB_PORT:-27017}" \
-                  --username "$MONGODB_USERNAME" \
-                  --password "$MONGODB_PASSWORD" \
-                  --authenticationDatabase admin \
-                  --eval "use $MONGODB_DBNAME; db.getCollectionNames()" 2>/dev/null
+            sudo docker run --rm -i --network infra-network \
+              -e MONGODB_DBNAME="$MONGODB_DBNAME" \
+              -e AUDIT_FROM="${AUDIT_FROM:-}" \
+              mongo:7.0 mongosh \
+                --host "$MONGODB_HOST" \
+                --port "${MONGODB_PORT:-27017}" \
+                --username "$MONGODB_USERNAME" \
+                --password "$MONGODB_PASSWORD" \
+                --authenticationDatabase admin \
+                --quiet <<'MONGOJS'
+            const targetDB = db.getSiblingDB(process.env.MONGODB_DBNAME)
+            print(`MongoDB version: ${db.version()}`)
+            print("Database statistics:")
+            printjson(targetDB.stats())
+            print("Collections:")
+            printjson(targetDB.getCollectionNames().sort())
+            print("Attention projection status counts:")
+            printjson(targetDB.getCollection("interpretation_attention_projections").aggregate([
+              {$group: {_id: "$status", count: {$sum: 1}}},
+              {$sort: {_id: 1}}
+            ]).toArray())
+            if (process.env.AUDIT_FROM) {
+              const from = new Date(process.env.AUDIT_FROM)
+              if (Number.isNaN(from.getTime())) {
+                throw new Error("invalid AUDIT_FROM")
+              }
+              print(`Report artifact attention coverage since ${process.env.AUDIT_FROM}:`)
+              printjson(targetDB.getCollection("interpret_report_artifacts").aggregate([
+                {$match: {deleted_at: null, generated_at: {$gte: from}}},
+                {$project: {
+                  report_id: {$toString: "$domain_id"},
+                  risk_level: {$ifNull: ["$risk_level", ""]}
+                }},
+                {$lookup: {
+                  from: "interpretation_attention_projections",
+                  localField: "report_id",
+                  foreignField: "report_id",
+                  as: "projection"
+                }},
+                {$group: {
+                  _id: "$risk_level",
+                  artifacts: {$sum: 1},
+                  missing: {$sum: {$cond: [{$eq: [{$size: "$projection"}, 0]}, 1, 0]}}
+                }},
+                {$sort: {_id: 1}}
+              ], {allowDiskUse: true}).toArray())
+            }
+            MONGOJS
+
+            echo "✅ MongoDB connection and read-only audit OK"
 
             echo ""
             echo "Available backups:"
@@ -298,3 +331,86 @@ jobs:
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
           MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
+          AUDIT_FROM: ${{ github.event.inputs.audit_from }}
+
+  mysql-status:
+    name: MySQL Status
+    if: github.event.inputs.operation == 'status' && (github.event.inputs.database == 'mysql' || github.event.inputs.database == 'all')
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    environment: production
+    steps:
+      - name: Validate SSH configuration
+        env:
+          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
+          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+        run: |
+          set -Eeuo pipefail
+          : "${SVRA_HOST:?SVRA_HOST is empty}"
+          : "${SVRA_USERNAME:?SVRA_USERNAME is empty}"
+          : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
+          : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
+
+      - name: Check MySQL recovery status
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          envs: MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,AUDIT_FROM
+          script: |
+            set -Eeuo pipefail
+            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+
+            : "${MYSQL_HOST:?MYSQL_HOST is empty}"
+            : "${MYSQL_USERNAME:?MYSQL_USERNAME is empty}"
+            : "${MYSQL_PASSWORD:?MYSQL_PASSWORD is empty}"
+            : "${MYSQL_DATABASE:?MYSQL_DATABASE is empty}"
+
+            if ! sudo docker network inspect infra-network >/dev/null 2>&1; then
+              echo "❌ infra-network is unavailable" >&2
+              exit 1
+            fi
+            if [ -n "${AUDIT_FROM:-}" ] && ! [[ "$AUDIT_FROM" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
+              echo "❌ audit_from must use YYYY-MM-DDTHH:MM:SSZ" >&2
+              exit 1
+            fi
+
+            audit_clause=""
+            if [ -n "${AUDIT_FROM:-}" ]; then
+              audit_clause="AND failed_at >= '${AUDIT_FROM%Z}'"
+            fi
+            sudo docker run --rm --network infra-network \
+              -e MYSQL_PWD="$MYSQL_PASSWORD" \
+              mysql:8.0 mysql --protocol=tcp \
+                --host="$MYSQL_HOST" \
+                --port="${MYSQL_PORT:-3306}" \
+                --user="$MYSQL_USERNAME" \
+                --database="$MYSQL_DATABASE" \
+                --batch --raw \
+                --execute="
+                  SELECT VERSION() AS mysql_version;
+                  SELECT retry_disposition, COUNT(*) AS records,
+                         MIN(failed_at) AS first_failed_at, MAX(failed_at) AS last_failed_at
+                  FROM event_delivery_dead_letter
+                  WHERE 1 = 1 ${audit_clause}
+                  GROUP BY retry_disposition
+                  ORDER BY retry_disposition;
+                  SELECT id, event_id, org_id, delivery_attempts, retry_disposition, failed_at
+                  FROM event_delivery_dead_letter
+                  WHERE last_error LIKE '%would create a conflict%' ${audit_clause}
+                  ORDER BY failed_at, id;
+                "
+            echo "✅ MySQL connection and read-only recovery audit OK"
+        env:
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
+          AUDIT_FROM: ${{ github.event.inputs.audit_from }}
