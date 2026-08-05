@@ -1,8 +1,6 @@
 package actor
 
 import (
-	"time"
-
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -42,17 +40,6 @@ func (m *TesteeMapper) ToPO(domain *testee.Testee) *TesteePO {
 		po.CreatedAt = createdAt
 	}
 
-	// 映射测评统计
-	if stats := domain.AssessmentStats(); stats != nil {
-		po.TotalAssessments = stats.TotalCount()
-		lastAt := stats.LastAssessmentAt()
-		po.LastAssessmentAt = &lastAt
-		level := stats.LastRiskLevel()
-		if level != "" {
-			po.LastRiskLevel = &level
-		}
-	}
-
 	return po
 }
 
@@ -71,27 +58,11 @@ func (m *TesteeMapper) ToDomain(po *TesteePO) *testee.Testee {
 	// 设置来源
 	domain.SetSource(po.Source)
 
-	// 构建测评统计
-	var stats *testee.AssessmentStats
-	if po.TotalAssessments > 0 || po.LastAssessmentAt != nil {
-		lastRiskLevel := ""
-		if po.LastRiskLevel != nil {
-			lastRiskLevel = *po.LastRiskLevel
-		}
-		lastAt := time.Time{}
-		if po.LastAssessmentAt != nil {
-			lastAt = *po.LastAssessmentAt
-		}
-		// NewAssessmentStats(lastAssessmentAt time.Time, totalCount int, lastRiskLevel string)
-		stats = testee.NewAssessmentStats(lastAt, po.TotalAssessments, lastRiskLevel)
-	}
-
 	// 从仓储恢复状态
 	domain.RestoreFromRepository(
 		po.ProfileID,
 		po.Tags,
 		po.IsKeyFocus,
-		stats,
 	)
 	domain.SetCreatedAt(po.CreatedAt)
 	domain.SetUpdatedAt(po.UpdatedAt)

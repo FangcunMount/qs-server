@@ -27,10 +27,6 @@ type Testee struct {
 	tags       []Tag  // 历史兼容字段；当前产品不展示、不筛选
 	source     Source // 数据来源
 	isKeyFocus bool   // 是否重点关注对象
-
-	// === 测评统计快照（读模型优化）===
-	// 注意：这些快照数据通过领域事件异步更新，不应直接修改
-	assessmentStats *AssessmentStats
 }
 
 // NewTestee 创建新的受试者
@@ -153,18 +149,6 @@ func (t *Testee) Source() string {
 	return t.source.String()
 }
 
-// === 测评统计查询（只读）===
-
-// AssessmentStats 获取测评统计快照
-func (t *Testee) AssessmentStats() *AssessmentStats {
-	return t.assessmentStats
-}
-
-// HasAssessmentHistory 是否有测评历史
-func (t *Testee) HasAssessmentHistory() bool {
-	return t.assessmentStats != nil && t.assessmentStats.TotalCount() > 0
-}
-
 // === 仓储层需要的方法（用于重建聚合根）===
 
 // SetID 设置ID（仅用于从数据库加载）
@@ -210,10 +194,8 @@ func (t *Testee) RestoreFromRepository(
 	profileID *uint64,
 	tags []string,
 	isKeyFocus bool,
-	assessmentStats *AssessmentStats,
 ) {
 	t.profileID = profileID
 	t.SetTagsFromStrings(tags)
 	t.SetKeyFocus(isKeyFocus)
-	t.assessmentStats = assessmentStats
 }

@@ -23,11 +23,6 @@ type TesteePO struct {
 	Tags       StringSliceCol `gorm:"column:tags;type:json"`
 	Source     string         `gorm:"column:source;size:50;not null;default:unknown"`
 	IsKeyFocus bool           `gorm:"column:is_key_focus;not null;default:false"`
-
-	// Deprecated: 仅保留物理列用于旧版回滚；线上读取统一使用 Evaluation AssessmentSummaryReader。
-	TotalAssessments int        `gorm:"column:total_assessments;not null;default:0"`
-	LastAssessmentAt *time.Time `gorm:"column:last_assessment_at"`
-	LastRiskLevel    *string    `gorm:"column:last_risk_level;size:50"`
 }
 
 // TableName 指定表名

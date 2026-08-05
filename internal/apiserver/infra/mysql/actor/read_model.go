@@ -541,21 +541,16 @@ func (r *readModel) loadClinicianRowsByID(ctx context.Context, ids []uint64) (ma
 
 func testeeRowFromPO(po *TesteePO) actorreadmodel.TesteeRow {
 	row := actorreadmodel.TesteeRow{
-		ID:               uint64(po.ID),
-		OrgID:            po.OrgID,
-		ProfileID:        po.ProfileID,
-		Name:             po.Name,
-		Gender:           po.Gender,
-		Birthday:         po.Birthday,
-		CreatedAt:        po.CreatedAt,
-		UpdatedAt:        po.UpdatedAt,
-		Source:           po.Source,
-		IsKeyFocus:       po.IsKeyFocus,
-		LastAssessmentAt: po.LastAssessmentAt,
-		TotalAssessments: po.TotalAssessments,
-	}
-	if po.LastRiskLevel != nil {
-		row.LastRiskLevel = *po.LastRiskLevel
+		ID:         uint64(po.ID),
+		OrgID:      po.OrgID,
+		ProfileID:  po.ProfileID,
+		Name:       po.Name,
+		Gender:     po.Gender,
+		Birthday:   po.Birthday,
+		CreatedAt:  po.CreatedAt,
+		UpdatedAt:  po.UpdatedAt,
+		Source:     po.Source,
+		IsKeyFocus: po.IsKeyFocus,
 	}
 	return row
 }
