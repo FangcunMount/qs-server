@@ -565,6 +565,24 @@ func TestDBOpsInventoriesEventDeliveryAndRecoveryState(t *testing.T) {
 	}
 }
 
+func TestDBOpsAttentionRecoveryAuditOnlyCountsHighRiskSideEffects(t *testing.T) {
+	t.Parallel()
+
+	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "db-ops.yml"))
+	if err != nil {
+		t.Fatalf("read db ops workflow: %v", err)
+	}
+	content := string(workflow)
+	for _, required := range []string{
+		"High-risk report artifact attention coverage since",
+		`risk_level: {$in: ["high", "severe"]}`,
+	} {
+		if !strings.Contains(content, required) {
+			t.Errorf("DB ops Attention recovery audit must contain %q", required)
+		}
+	}
+}
+
 func TestDBOpsMongoStatusRunsAsFailFastScript(t *testing.T) {
 	t.Parallel()
 

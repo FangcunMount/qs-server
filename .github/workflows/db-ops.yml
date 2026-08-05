@@ -699,9 +699,13 @@ jobs:
               if (Number.isNaN(from.getTime())) {
                 throw new Error("invalid AUDIT_FROM")
               }
-              print(`Report artifact attention coverage since ${process.env.AUDIT_FROM}:`)
+              print(`High-risk report artifact attention coverage since ${process.env.AUDIT_FROM}:`)
               printjson(targetDB.getCollection("interpret_report_artifacts").aggregate([
-                {$match: {deleted_at: null, generated_at: {$gte: from}}},
+                {$match: {
+                  deleted_at: null,
+                  generated_at: {$gte: from},
+                  risk_level: {$in: ["high", "severe"]}
+                }},
                 {$project: {
                   report_id: {$toString: "$domain_id"},
                   risk_level: {$ifNull: ["$risk_level", ""]}
