@@ -423,16 +423,15 @@ jobs:
               exit 1
             fi
 
-            sudo docker run --rm -i --network infra-network \
-              -e MONGODB_DBNAME="$MONGODB_DBNAME" \
-              -e AUDIT_FROM="${AUDIT_FROM:-}" \
-              mongo:7.0 mongosh \
-                --host "$MONGODB_HOST" \
-                --port "${MONGODB_PORT:-27017}" \
-                --username "$MONGODB_USERNAME" \
-                --password "$MONGODB_PASSWORD" \
-                --authenticationDatabase admin \
-                --quiet <<'MONGOJS'
+            MONGO_STATUS_DIR=$(mktemp -d /tmp/qs-mongodb-status.XXXXXX)
+            MONGO_STATUS_SCRIPT="$MONGO_STATUS_DIR/status.js"
+            cleanup_mongo_status_script() {
+              rm -f -- "$MONGO_STATUS_SCRIPT"
+              rmdir -- "$MONGO_STATUS_DIR"
+            }
+            trap cleanup_mongo_status_script EXIT
+
+            cat > "$MONGO_STATUS_SCRIPT" <<'MONGOJS'
             const targetDB = db.getSiblingDB(process.env.MONGODB_DBNAME)
             const collectionNames = targetDB.getCollectionNames().sort()
             const auditFrom = process.env.AUDIT_FROM ? new Date(process.env.AUDIT_FROM) : null
@@ -440,7 +439,7 @@ jobs:
             print("Database statistics:")
             printjson(targetDB.stats())
             print("Schema migration state:")
-            printjson(targetDB.getCollection("schema_migrations").findOne({}, {projection: {_id: 0, version: 1, dirty: 1}}))
+            printjson(targetDB.getCollection("schema_migrations").findOne({}, {_id: 0, version: 1, dirty: 1}))
             print("Collections:")
             printjson(collectionNames)
             const mongoOutbox = targetDB.getCollection("domain_event_outbox")
@@ -671,7 +670,7 @@ jobs:
               ]).toArray(),
               catalog_audit_checkpoint: targetDB.getCollection("interpretation_catalog_audit_checkpoints").findOne(
                 {_id: "report_catalog"},
-                {projection: {_id: 0, schema_version: 1, revision: 1, phase: 1, updated_at: 1, last_completed: 1}}
+                {_id: 0, schema_version: 1, revision: 1, phase: 1, updated_at: 1, last_completed: 1}
               )
             })
             print("Attention projection status counts:")
@@ -707,7 +706,30 @@ jobs:
             }
             MONGOJS
 
+            chmod 0755 "$MONGO_STATUS_DIR"
+            chmod 0644 "$MONGO_STATUS_SCRIPT"
+            sudo docker run --rm --network infra-network \
+              -v "$MONGO_STATUS_SCRIPT:/audit/status.js:ro" \
+              -e MONGODB_DBNAME="$MONGODB_DBNAME" \
+              -e AUDIT_FROM="${AUDIT_FROM:-}" \
+              mongo:7.0 mongosh \
+                --host "$MONGODB_HOST" \
+                --port "${MONGODB_PORT:-27017}" \
+                --username "$MONGODB_USERNAME" \
+                --password="$MONGODB_PASSWORD" \
+                --authenticationDatabase admin \
+                --quiet \
+                --file /audit/status.js
+            cleanup_mongo_status_script
+            trap - EXIT
+
             echo "✅ MongoDB connection and read-only audit OK"
+
+            echo ""
+            echo "Running MongoDB utility containers:"
+            sudo docker ps \
+              --filter ancestor=mongo:7.0 \
+              --format '{{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Command}}'
 
             echo ""
             echo "Available backups:"

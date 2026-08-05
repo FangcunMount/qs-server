@@ -525,6 +525,37 @@ func TestDBOpsInventoriesEventDeliveryAndRecoveryState(t *testing.T) {
 	}
 }
 
+func TestDBOpsMongoStatusRunsAsFailFastScript(t *testing.T) {
+	t.Parallel()
+
+	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "db-ops.yml"))
+	if err != nil {
+		t.Fatalf("read db ops workflow: %v", err)
+	}
+	content := string(workflow)
+	for _, required := range []string{
+		`MONGO_STATUS_DIR=$(mktemp -d /tmp/qs-mongodb-status.XXXXXX)`,
+		`cat > "$MONGO_STATUS_SCRIPT" <<'MONGOJS'`,
+		`-v "$MONGO_STATUS_SCRIPT:/audit/status.js:ro"`,
+		"--file /audit/status.js",
+		`findOne({}, {_id: 0, version: 1, dirty: 1})`,
+		"Running MongoDB utility containers:",
+		"--filter ancestor=mongo:7.0",
+	} {
+		if !strings.Contains(content, required) {
+			t.Errorf("DB ops Mongo status fail-fast contract must contain %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		`findOne({}, {projection: {_id: 0, version: 1, dirty: 1}})`,
+		`{projection: {_id: 0, schema_version: 1, revision: 1, phase: 1, updated_at: 1, last_completed: 1}}`,
+	} {
+		if strings.Contains(content, forbidden) {
+			t.Errorf("DB ops Mongo status must not contain interactive-only projection form %q", forbidden)
+		}
+	}
+}
+
 func TestReportStatusTTLContractMatchesAcrossProcesses(t *testing.T) {
 	t.Parallel()
 
