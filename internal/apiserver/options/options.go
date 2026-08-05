@@ -575,7 +575,7 @@ func NewCacheOptions() *CacheOptions {
 	return &CacheOptions{
 		Capabilities: &CacheCapabilityOptions{
 			Survey:       &SurveyCacheCapabilities{Questionnaire: &CapabilityPolicyOptions{Enabled: true, TTL: 12 * time.Hour, Negative: cacheBoolPtr(true)}},
-			ModelCatalog: &ModelCatalogCacheCapabilities{PublishedModel: &CapabilityPolicyOptions{Enabled: true, TTL: 24 * time.Hour, Negative: cacheBoolPtr(true)}},
+			ModelCatalog: &ModelCatalogCacheCapabilities{PublishedModel: &CapabilityPolicyOptions{Enabled: true, TTL: 24 * time.Hour, Negative: cacheBoolPtr(false)}},
 			Evaluation: &EvaluationCacheCapabilities{
 				AssessmentDetail: &CapabilityPolicyOptions{Enabled: true, TTL: 2 * time.Hour, Singleflight: cacheBoolPtr(true)},
 				AssessmentList:   &CapabilityPolicyOptions{Enabled: true, TTL: 10 * time.Minute, Singleflight: cacheBoolPtr(false)},

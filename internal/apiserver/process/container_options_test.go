@@ -90,6 +90,9 @@ func TestAPIServerBuildContainerCacheOptions(t *testing.T) {
 		got.Capabilities[cachepolicy.CapabilityActorTestee].Policy.TTL != 6*time.Minute {
 		t.Fatalf("capability TTL mapping mismatch: %+v", got.Capabilities)
 	}
+	if got.Capabilities[cachepolicy.CapabilityModelCatalogPublished].Policy.NegativeEnabled(true) {
+		t.Fatal("modelcatalog published_model must not advertise negative caching before its read path implements it")
+	}
 	if got.Capabilities[cachepolicy.CapabilityReportStatus].Policy.TTL != 48*time.Hour {
 		t.Fatalf("report_status TTL = %v, want 48h", got.Capabilities[cachepolicy.CapabilityReportStatus].Policy.TTL)
 	}
