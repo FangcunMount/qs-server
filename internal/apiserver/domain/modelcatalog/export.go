@@ -29,7 +29,6 @@ type (
 
 	AlgorithmWritePolicy = identitypkg.AlgorithmWritePolicy
 
-	KindCapability        = binding.KindCapability
 	ModelFamilyCapability = binding.ModelFamilyCapability
 
 	QuestionnaireBinding = binding.QuestionnaireBinding

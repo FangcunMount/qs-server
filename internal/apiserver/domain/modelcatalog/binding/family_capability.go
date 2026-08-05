@@ -12,9 +12,6 @@ type ModelFamilyCapability struct {
 	ExecutionPath             ExecutionPath
 }
 
-// KindCapability is the mechanism-oriented alias for model-family capability guards.
-type KindCapability = ModelFamilyCapability
-
 func (c ModelFamilyCapability) CanExecute() bool {
 	return c.RuntimeExecutable
 }

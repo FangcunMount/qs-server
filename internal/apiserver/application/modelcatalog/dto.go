@@ -10,11 +10,6 @@ const (
 	KindTypology         = string(domain.KindTypology)
 	KindBehavioralRating = string(domain.KindBehavioralRating)
 	KindCognitive        = string(domain.KindCognitive)
-	SubKindTypology      = "typology"
-	SubKindScale         = "scale"
-	StatusDraft          = "draft"
-	StatusPublished      = "published"
-	StatusArchived       = "archived"
 )
 
 type Option struct {
