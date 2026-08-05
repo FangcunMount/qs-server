@@ -9,9 +9,31 @@ import (
 	"testing"
 	"time"
 
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	"github.com/FangcunMount/qs-server/internal/pkg/attentionprojection"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 )
+
+type attentionSyncClientStub struct {
+	client InternalClient
+}
+
+func (c *attentionSyncClientStub) SyncAssessmentAttention(
+	ctx context.Context,
+	testeeID uint64,
+	riskLevel string,
+	markKeyFocus bool,
+) error {
+	if c == nil || c.client == nil {
+		return errors.New("internal attention client is not configured")
+	}
+	_, err := c.client.SyncAssessmentAttention(ctx, &pb.SyncAssessmentAttentionRequest{
+		TesteeId:     testeeID,
+		RiskLevel:    riskLevel,
+		MarkKeyFocus: markKeyFocus,
+	})
+	return err
+}
 
 type reportStatusWriterStub struct {
 	completedAssessmentID        string
@@ -68,7 +90,7 @@ func TestHandleInterpretationReportGeneratedPersistsAttentionFailureWithoutFaili
 	client := &fakeWorkerInternalClient{syncAssessmentAttentionErr: errors.New("rpc unavailable")}
 	projector := attentionprojection.NewProjector(
 		store,
-		&internalAttentionSyncClient{client: client},
+		&attentionSyncClientStub{client: client},
 		attentionprojection.DefaultMaxAttempts,
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 	)
@@ -100,7 +122,7 @@ func TestHandleInterpretationReportGeneratedAttentionProjectionIsIdempotent(t *t
 	client := &fakeWorkerInternalClient{}
 	projector := attentionprojection.NewProjector(
 		store,
-		&internalAttentionSyncClient{client: client},
+		&attentionSyncClientStub{client: client},
 		attentionprojection.DefaultMaxAttempts,
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 	)
