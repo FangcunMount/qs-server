@@ -1,6 +1,7 @@
 package answersheet
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
@@ -87,9 +88,8 @@ func toAnswerSheetResult(as *answersheet.AnswerSheet) *AnswerSheetResult {
 	// 填写人信息
 	if filler := as.Filler(); filler != nil {
 		result.FillerID = mustUint64FromInt64("answersheet.filler_id", filler.UserID())
-		// FillerRef 没有 Name 方法，需要从其他地方获取或省略
-		// TODO: 如果需要显示姓名，需要根据 UserID 查询
-		result.FillerName = "" // 暂时留空
+		// IAM 不可用时仍返回稳定的可显示身份；管理查询会在可用时替换为昵称。
+		result.FillerName = strconv.FormatInt(filler.UserID(), 10)
 	}
 
 	// 转换答案列表

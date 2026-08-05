@@ -98,6 +98,7 @@ func New(deps Deps) (*Module, error) {
 	if err := module.initAnswerSheetSubModule(
 		normalized.MongoDB,
 		normalized.MySQLDB,
+		normalized.IdentityService,
 		normalized.AnswerSheetRepo,
 		normalized.AnswerSheetReader,
 		normalized.QuestionnaireRepo,
@@ -162,7 +163,7 @@ func (m *Module) SetAssessmentBindingResolver(binding rulesetport.AssessmentBind
 	}
 }
 
-func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, mysqlDB *gorm.DB, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, profile appEventing.ProfileBinding) error {
+func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, mysqlDB *gorm.DB, identitySvc *iam.IdentityService, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, profile appEventing.ProfileBinding) error {
 	sub := m.AnswerSheet
 
 	answerScorer := ruleengineInfra.NewAnswerScorer()
@@ -177,7 +178,7 @@ func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, mysqlDB *gorm
 		// Resolver reads authoritative Actor/Plan facts before the Mongo durable transaction.
 		injector.SetAttributionResolver(attributioninfra.NewResolver(mysqlDB))
 	}
-	sub.ManagementService = asApp.NewManagementService(repo, reader)
+	sub.ManagementService = asApp.NewManagementService(repo, reader, identitySvc)
 	sub.ScoringService = asApp.NewAnswerSheetScoringService(repo, questionnaireRepo, answerScorer)
 	return nil
 }

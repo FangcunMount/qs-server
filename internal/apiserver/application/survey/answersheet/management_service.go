@@ -5,25 +5,34 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // managementService 答卷管理服务实现
 // 行为者：管理员
 type managementService struct {
-	repo   answersheet.Repository
-	reader surveyreadmodel.AnswerSheetReader
+	repo             answersheet.Repository
+	reader           surveyreadmodel.AnswerSheetReader
+	identityResolver iambridge.IdentityResolver
 }
 
 // NewManagementService 创建答卷管理服务
 func NewManagementService(
 	repo answersheet.Repository,
 	reader surveyreadmodel.AnswerSheetReader,
+	identityResolvers ...iambridge.IdentityResolver,
 ) AnswerSheetManagementService {
+	var identityResolver iambridge.IdentityResolver
+	if len(identityResolvers) > 0 {
+		identityResolver = identityResolvers[0]
+	}
 	return &managementService{
-		repo:   repo,
-		reader: reader,
+		repo:             repo,
+		reader:           reader,
+		identityResolver: identityResolver,
 	}
 }
 
@@ -44,7 +53,20 @@ func (s *managementService) GetByID(ctx context.Context, id uint64) (*AnswerShee
 		return nil, errors.WrapC(err, errorCode.ErrAnswerSheetNotFound, "获取答卷失败")
 	}
 
-	return toAnswerSheetResult(sheet), nil
+	result := toAnswerSheetResult(sheet)
+	s.resolveFillerName(ctx, result)
+	return result, nil
+}
+
+func (s *managementService) resolveFillerName(ctx context.Context, result *AnswerSheetResult) {
+	if result == nil || result.FillerID == 0 || s.identityResolver == nil || !s.identityResolver.IsEnabled() {
+		return
+	}
+
+	id := meta.FromUint64(result.FillerID)
+	if name := s.identityResolver.ResolveUserNames(ctx, []meta.ID{id})[id.String()]; name != "" {
+		result.FillerName = name
+	}
 }
 
 // GetByIDInOrg enforces tenant ownership for protected management reads.

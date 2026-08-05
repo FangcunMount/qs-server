@@ -136,6 +136,16 @@ type answerSheetReaderStub struct {
 	countFilter surveyreadmodel.AnswerSheetFilter
 }
 
+type answerSheetIdentityResolverStub struct {
+	names map[string]string
+}
+
+func (s answerSheetIdentityResolverStub) IsEnabled() bool { return true }
+
+func (s answerSheetIdentityResolverStub) ResolveUserNames(_ context.Context, _ []meta.ID) map[string]string {
+	return s.names
+}
+
 func (s *answerSheetReaderStub) ListAnswerSheets(_ context.Context, filter surveyreadmodel.AnswerSheetFilter, _ surveyreadmodel.PageRequest) ([]surveyreadmodel.AnswerSheetSummaryRow, error) {
 	s.listFilter = filter
 	return []surveyreadmodel.AnswerSheetSummaryRow{}, nil
@@ -181,6 +191,7 @@ func TestManagementServiceGetByIDReturnsConvertedAnswerSheet(t *testing.T) {
 				return sheet, nil
 			},
 		},
+		identityResolver: answerSheetIdentityResolverStub{names: map[string]string{"7": "填写人七号"}},
 	}
 
 	result, err := service.GetByID(context.Background(), 12)
@@ -195,6 +206,9 @@ func TestManagementServiceGetByIDReturnsConvertedAnswerSheet(t *testing.T) {
 	}
 	if result.FillerID != 7 || len(result.Answers) != 2 {
 		t.Fatalf("unexpected filler/answers: %+v", result)
+	}
+	if result.FillerName != "填写人七号" {
+		t.Fatalf("FillerName = %q, want IAM nickname", result.FillerName)
 	}
 	if result.Answers[0].QuestionCode != "q1" || result.Answers[1].QuestionCode != "q2" {
 		t.Fatalf("unexpected answers: %+v", result.Answers)
