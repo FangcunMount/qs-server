@@ -71,6 +71,7 @@ type Deps struct {
 	CachePolicies              sharedcache.PolicyProvider
 	QueryRedisClient           redis.UniversalClient
 	QueryCacheBuilder          *keyspace.Builder
+	MetaCacheBuilder           *keyspace.Builder
 	VersionStore               querycache.VersionTokenStore
 	Observer                   *observability.ComponentObserver
 	MySQLLimiter               backpressure.Acquirer
@@ -199,10 +200,11 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 		)
 	}
 	if normalized.QueryRedisClient != nil && normalized.VersionStore != nil {
-		listCache := evaluationcache.NewMyAssessmentListCacheWithBuilderProviderAndObserver(
+		listCache := evaluationcache.NewMyAssessmentListCacheWithBuildersProviderAndObserver(
 			redisstore.NewStore(normalized.QueryRedisClient),
 			normalized.VersionStore,
 			normalized.QueryCacheBuilder,
+			normalized.MetaCacheBuilder,
 			normalized.CachePolicies,
 			normalized.Observer,
 		)
@@ -252,6 +254,17 @@ func normalizeDeps(deps Deps) (Deps, error) {
 	if deps.InputResolver != nil {
 		if len(deps.ExecutionPaths) == 0 {
 			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "execution paths are required when input resolver is configured")
+		}
+	}
+	if deps.QueryRedisClient != nil {
+		if deps.VersionStore == nil {
+			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "assessment list version store is required when query cache is enabled")
+		}
+		if deps.QueryCacheBuilder == nil {
+			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "assessment list query key builder is required when query cache is enabled")
+		}
+		if deps.MetaCacheBuilder == nil {
+			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "assessment list meta key builder is required when query cache is enabled")
 		}
 	}
 	return deps, nil

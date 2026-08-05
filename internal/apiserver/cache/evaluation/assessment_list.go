@@ -25,23 +25,27 @@ func NewVersionTokenStore(client redis.UniversalClient, health cacheobserve.Fami
 // MyAssessmentListCache caches "my assessment list" queries.
 // It uses version tokens and versioned keys so the hot path does not need pattern deletion.
 type MyAssessmentListCache struct {
-	query      *querycache.Versioned
-	keyBuilder *keyspace.Builder
+	query             *querycache.Versioned
+	dataKeyBuilder    *keyspace.Builder
+	versionKeyBuilder *keyspace.Builder
 }
 
-func NewMyAssessmentListCacheWithBuilderAndProvider(c sharedcache.Store, versionStore querycache.VersionTokenStore, keyBuilder *keyspace.Builder, policies sharedcache.PolicyProvider) *MyAssessmentListCache {
-	return NewMyAssessmentListCacheWithBuilderProviderAndObserver(c, versionStore, keyBuilder, policies, nil)
+func NewMyAssessmentListCacheWithBuildersAndProvider(c sharedcache.Store, versionStore querycache.VersionTokenStore, dataKeyBuilder, versionKeyBuilder *keyspace.Builder, policies sharedcache.PolicyProvider) *MyAssessmentListCache {
+	return NewMyAssessmentListCacheWithBuildersProviderAndObserver(c, versionStore, dataKeyBuilder, versionKeyBuilder, policies, nil)
 }
 
-func NewMyAssessmentListCacheWithBuilderProviderAndObserver(c sharedcache.Store, versionStore querycache.VersionTokenStore, keyBuilder *keyspace.Builder, policies sharedcache.PolicyProvider, observer cacheobserve.FamilyObserver) *MyAssessmentListCache {
+func NewMyAssessmentListCacheWithBuildersProviderAndObserver(c sharedcache.Store, versionStore querycache.VersionTokenStore, dataKeyBuilder, versionKeyBuilder *keyspace.Builder, policies sharedcache.PolicyProvider, observer cacheobserve.FamilyObserver) *MyAssessmentListCache {
 	if c == nil {
 		return nil
 	}
 	if versionStore == nil {
 		panic("version token store is required")
 	}
-	if keyBuilder == nil {
-		panic("cache key builder is required")
+	if dataKeyBuilder == nil {
+		panic("assessment list data key builder is required")
+	}
+	if versionKeyBuilder == nil {
+		panic("assessment list version key builder is required")
 	}
 	return &MyAssessmentListCache{
 		query: querycache.NewVersioned(querycache.VersionedOptions{
@@ -52,7 +56,8 @@ func NewMyAssessmentListCacheWithBuilderProviderAndObserver(c sharedcache.Store,
 			Memory:     querycache.NewLocalHotCache[[]byte](30*time.Second, defaultAssessmentListLocalMaxEntries),
 			Observer:   adapterkit.NewCapabilityObserver(cachepolicy.CapabilityEvaluationAssessmentList, observer),
 		}),
-		keyBuilder: keyBuilder,
+		dataKeyBuilder:    dataKeyBuilder,
+		versionKeyBuilder: versionKeyBuilder,
 	}
 }
 
@@ -124,9 +129,9 @@ func (c *MyAssessmentListCache) buildDataKey(
 		pageSize,
 	)
 	hash := sha256.Sum256([]byte(raw))
-	return c.keyBuilder.BuildAssessmentListVersionedKey(userID, version, hex.EncodeToString(hash[:])[:8])
+	return c.dataKeyBuilder.BuildAssessmentListVersionedKey(userID, version, hex.EncodeToString(hash[:])[:8])
 }
 
 func (c *MyAssessmentListCache) buildVersionKey(userID uint64) string {
-	return c.keyBuilder.BuildAssessmentListVersionKey(userID)
+	return c.versionKeyBuilder.BuildAssessmentListVersionKey(userID)
 }

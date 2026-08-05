@@ -33,3 +33,15 @@ func TestBuilderWithNamespace(t *testing.T) {
 		t.Fatalf("unexpected explicit namespaced scale hot window key: %s", got)
 	}
 }
+
+func TestAssessmentListBuildersUseV2SchemaAndSeparateFamilies(t *testing.T) {
+	queryBuilder := NewBuilderWithNamespace("cache:query")
+	metaBuilder := NewBuilderWithNamespace("cache:meta")
+
+	if got := metaBuilder.BuildAssessmentListVersionKey(42); got != "cache:meta:query:version:assessment:list:v2:42" {
+		t.Fatalf("unexpected assessment list version key: %s", got)
+	}
+	if got := queryBuilder.BuildAssessmentListVersionedKey(42, 3, "abcdef01"); got != "cache:query:query:assessment:list:v2:42:v3:abcdef01" {
+		t.Fatalf("unexpected assessment list data key: %s", got)
+	}
+}

@@ -30,6 +30,7 @@ type BootstrapInput struct {
 	CachePolicies              sharedcache.PolicyProvider
 	QueryRedisClient           redis.UniversalClient
 	QueryCacheBuilder          *keyspace.Builder
+	MetaCacheBuilder           *keyspace.Builder
 	VersionStore               querycache.VersionTokenStore
 	Observer                   *observability.ComponentObserver
 	MySQLLimiter               backpressure.Acquirer

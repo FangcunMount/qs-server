@@ -43,6 +43,7 @@ func InstallFrom(host InstallHost) error {
 		QueryRedisClient:          queryRedis,
 		QueryCacheBuilder:         host.CacheBuilder(redisruntime.FamilyQuery),
 		MetaRedisClient:           host.CacheClient(redisruntime.FamilyMeta),
+		MetaCacheBuilder:          host.CacheBuilder(redisruntime.FamilyMeta),
 		CachePolicies:             provider,
 		Observer:                  host.CacheObserver(),
 		MySQLLimiter:              host.MySQLLimiter(),

@@ -30,8 +30,9 @@ func TestMyAssessmentListCacheUsesVersionTokenInvalidation(t *testing.T) {
 
 	queryCache := redisstore.NewStore(queryClient)
 	versionStore := querycache.NewRedisVersionTokenStore(metaClient, nil)
-	keyBuilder := keyspace.NewBuilderWithNamespace("cache:query")
-	listCache := NewMyAssessmentListCacheWithBuilderAndProvider(queryCache, versionStore, keyBuilder, assessmentListPolicies(cachepolicy.CachePolicy{
+	dataKeyBuilder := keyspace.NewBuilderWithNamespace("cache:query")
+	versionKeyBuilder := keyspace.NewBuilderWithNamespace("cache:meta")
+	listCache := NewMyAssessmentListCacheWithBuildersAndProvider(queryCache, versionStore, dataKeyBuilder, versionKeyBuilder, assessmentListPolicies(cachepolicy.CachePolicy{
 		TTL:         time.Minute,
 		JitterRatio: 0,
 	}))
@@ -57,11 +58,18 @@ func TestMyAssessmentListCacheUsesVersionTokenInvalidation(t *testing.T) {
 	if err := listCache.Invalidate(ctx, 42); err != nil {
 		t.Fatalf("Invalidate() error = %v", err)
 	}
+	versionKey := listCache.buildVersionKey(42)
+	if versionKey != "cache:meta:query:version:assessment:list:v2:42" {
+		t.Fatalf("version key = %q, want canonical meta v2 key", versionKey)
+	}
+	if exists, err := queryClient.Exists(ctx, versionKey).Result(); err != nil || exists != 0 {
+		t.Fatalf("version token leaked into query Redis, exists=%d err=%v", exists, err)
+	}
 	if exists, err := queryClient.Exists(ctx, version0Key).Result(); err != nil || exists != 1 {
 		t.Fatalf("expected old versioned key %q to remain until TTL, exists=%d err=%v", version0Key, exists, err)
 	}
 
-	gotVersion, err := metaClient.Get(ctx, listCache.buildVersionKey(42)).Result()
+	gotVersion, err := metaClient.Get(ctx, versionKey).Result()
 	if err != nil {
 		t.Fatalf("read version token failed: %v", err)
 	}
@@ -106,8 +114,9 @@ func TestMyAssessmentListCacheDegradesVersionReadFailureToMiss(t *testing.T) {
 	})
 
 	queryCache := redisstore.NewStore(queryClient)
-	keyBuilder := keyspace.NewBuilderWithNamespace("cache:query")
-	listCache := NewMyAssessmentListCacheWithBuilderAndProvider(queryCache, failingVersionStore{}, keyBuilder, assessmentListPolicies(cachepolicy.CachePolicy{
+	dataKeyBuilder := keyspace.NewBuilderWithNamespace("cache:query")
+	versionKeyBuilder := keyspace.NewBuilderWithNamespace("cache:meta")
+	listCache := NewMyAssessmentListCacheWithBuildersAndProvider(queryCache, failingVersionStore{}, dataKeyBuilder, versionKeyBuilder, assessmentListPolicies(cachepolicy.CachePolicy{
 		TTL:         time.Minute,
 		JitterRatio: 0,
 	}))

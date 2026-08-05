@@ -8,6 +8,8 @@ import (
 	rediskit "github.com/FangcunMount/component-base/pkg/redis"
 )
 
+const assessmentListCacheKind = "assessment:list:v2"
+
 // CacheKeyspace builds cache payload and version-token keys.
 type CacheKeyspace struct {
 	keyspace rediskit.Keyspace
@@ -76,11 +78,11 @@ func (k CacheKeyspace) VersionedQuery(kind, scope string, version uint64, hash s
 }
 
 func (k CacheKeyspace) AssessmentListVersion(userID uint64) string {
-	return k.QueryVersion("assessment:list", strconv.FormatUint(userID, 10))
+	return k.QueryVersion(assessmentListCacheKind, strconv.FormatUint(userID, 10))
 }
 
 func (k CacheKeyspace) AssessmentListVersioned(userID, version uint64, hash string) string {
-	return k.VersionedQuery("assessment:list", strconv.FormatUint(userID, 10), version, hash)
+	return k.VersionedQuery(assessmentListCacheKind, strconv.FormatUint(userID, 10), version, hash)
 }
 
 func (k CacheKeyspace) TesteeInfo(id uint64) string {

@@ -36,6 +36,7 @@ type WireInput struct {
 	QueryRedisClient          redis.UniversalClient
 	QueryCacheBuilder         *keyspace.Builder
 	MetaRedisClient           redis.UniversalClient
+	MetaCacheBuilder          *keyspace.Builder
 	CachePolicies             sharedcache.PolicyProvider
 	Observer                  *observability.ComponentObserver
 	MySQLLimiter              backpressure.Acquirer
@@ -86,6 +87,9 @@ func Wire(in WireInput) (WireResult, error) {
 
 	var versionStore querycache.VersionTokenStore
 	if in.QueryRedisClient != nil {
+		if in.MetaRedisClient == nil {
+			return WireResult{}, fmt.Errorf("evaluation assessment list meta Redis client is required when query cache is enabled")
+		}
 		versionStore = evaluationcache.NewVersionTokenStore(in.MetaRedisClient, in.Observer)
 	}
 
@@ -108,6 +112,7 @@ func Wire(in WireInput) (WireResult, error) {
 		CachePolicies:              in.CachePolicies,
 		QueryRedisClient:           in.QueryRedisClient,
 		QueryCacheBuilder:          in.QueryCacheBuilder,
+		MetaCacheBuilder:           in.MetaCacheBuilder,
 		VersionStore:               versionStore,
 		Observer:                   in.Observer,
 		MySQLLimiter:               in.MySQLLimiter,
