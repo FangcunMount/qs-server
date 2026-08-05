@@ -195,6 +195,38 @@ func TestOptionsValidateOutboxRelay(t *testing.T) {
 			wantErr: "outbox_relay.mongo.publish_workers must be greater than 0",
 		},
 		{
+			name: "mongo relay workers are capped by mongo backpressure",
+			mutate: func(opts *Options) {
+				opts.Backpressure.Mongo.MaxInflight = 10
+				opts.OutboxRelay.Mongo.PublishWorkers = 9
+			},
+			wantErr: "outbox_relay.mongo.publish_workers (9) must be <= backpressure.mongo.max_inflight * 0.8 (8)",
+		},
+		{
+			name: "mysql pool does not cap mongo relay workers",
+			mutate: func(opts *Options) {
+				opts.MySQLOptions.MaxOpenConnections = 10
+				opts.OutboxRelay.Assessment.PublishWorkers = 8
+				opts.Backpressure.Mongo.MaxInflight = 100
+				opts.OutboxRelay.Mongo.PublishWorkers = 20
+			},
+		},
+		{
+			name: "disabled mongo backpressure does not impose a worker cap",
+			mutate: func(opts *Options) {
+				opts.Backpressure.Mongo.Enabled = false
+				opts.Backpressure.Mongo.MaxInflight = 1
+				opts.OutboxRelay.Mongo.PublishWorkers = 64
+			},
+		},
+		{
+			name: "nil backpressure does not impose a mongo worker cap",
+			mutate: func(opts *Options) {
+				opts.Backpressure = nil
+				opts.OutboxRelay.Mongo.PublishWorkers = 64
+			},
+		},
+		{
 			name: "assessment relay requires positive interval",
 			mutate: func(opts *Options) {
 				opts.OutboxRelay.Assessment.Interval = 0
@@ -214,6 +246,14 @@ func TestOptionsValidateOutboxRelay(t *testing.T) {
 				opts.OutboxRelay.Assessment.PublishWorkers = 0
 			},
 			wantErr: "outbox_relay.assessment.publish_workers must be greater than 0",
+		},
+		{
+			name: "assessment relay workers are capped by mysql pool",
+			mutate: func(opts *Options) {
+				opts.MySQLOptions.MaxOpenConnections = 10
+				opts.OutboxRelay.Assessment.PublishWorkers = 9
+			},
+			wantErr: "outbox_relay.assessment.publish_workers (9) must be <= mysql max_open * 0.8 (8)",
 		},
 	}
 

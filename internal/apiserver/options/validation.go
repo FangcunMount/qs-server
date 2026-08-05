@@ -41,7 +41,7 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validatePlanScheduler(o.PlanScheduler)...)
 	errs = append(errs, validateEvaluationConsistencyReconcile(o.EvaluationConsistencyReconcile)...)
 	errs = append(errs, validateReportCatalogAudit(o.ReportCatalogAudit)...)
-	errs = append(errs, validateOutboxRelay(o.OutboxRelay, o.MySQLOptions.MaxOpenConnections)...)
+	errs = append(errs, validateOutboxRelay(o.OutboxRelay, o.MySQLOptions.MaxOpenConnections, o.Backpressure)...)
 	errs = append(errs, validateStatisticsSync(o.StatisticsSync)...)
 	errs = append(errs, validateCacheOptions(o.Cache)...)
 	errs = append(errs, validateSystemGovernance(o.SystemGovernance)...)
@@ -303,19 +303,34 @@ func validateReportCatalogAudit(opts *ReportCatalogAuditOptions) []error {
 	return errs
 }
 
-func validateOutboxRelay(opts *OutboxRelayOptions, mysqlMaxOpen int) []error {
+func validateOutboxRelay(opts *OutboxRelayOptions, mysqlMaxOpen int, backpressure *BackpressureOptions) []error {
 	if opts == nil {
 		return nil
 	}
 
 	var errs []error
-	maxWorkers := maxOutboxPublishWorkers(mysqlMaxOpen, 0.8)
+	mongoMaxInflight := 0
+	if backpressure != nil && backpressure.Mongo != nil && backpressure.Mongo.Enabled {
+		mongoMaxInflight = backpressure.Mongo.MaxInflight
+	}
 	for _, relay := range []struct {
-		name string
-		opt  *OutboxRelayStoreOptions
+		name          string
+		opt           *OutboxRelayStoreOptions
+		maxWorkers    int
+		capacityLabel string
 	}{
-		{name: "mongo", opt: opts.Mongo},
-		{name: "assessment", opt: opts.Assessment},
+		{
+			name:          "mongo",
+			opt:           opts.Mongo,
+			maxWorkers:    maxDependencyPublishWorkers(mongoMaxInflight, 0.8),
+			capacityLabel: "backpressure.mongo.max_inflight",
+		},
+		{
+			name:          "assessment",
+			opt:           opts.Assessment,
+			maxWorkers:    maxDependencyPublishWorkers(mysqlMaxOpen, 0.8),
+			capacityLabel: "mysql max_open",
+		},
 	} {
 		if relay.opt == nil {
 			continue
@@ -329,21 +344,27 @@ func validateOutboxRelay(opts *OutboxRelayOptions, mysqlMaxOpen int) []error {
 		if relay.opt.PublishWorkers <= 0 {
 			errs = append(errs, fmt.Errorf("outbox_relay.%s.publish_workers must be greater than 0", relay.name))
 		}
-		if maxWorkers > 0 && relay.opt.PublishWorkers > maxWorkers {
-			errs = append(errs, fmt.Errorf("outbox_relay.%s.publish_workers (%d) must be <= mysql max_open * 0.8 (%d)", relay.name, relay.opt.PublishWorkers, maxWorkers))
+		if relay.maxWorkers > 0 && relay.opt.PublishWorkers > relay.maxWorkers {
+			errs = append(errs, fmt.Errorf(
+				"outbox_relay.%s.publish_workers (%d) must be <= %s * 0.8 (%d)",
+				relay.name,
+				relay.opt.PublishWorkers,
+				relay.capacityLabel,
+				relay.maxWorkers,
+			))
 		}
 	}
 	return errs
 }
 
-func maxOutboxPublishWorkers(mysqlMaxOpen int, ratio float64) int {
-	if mysqlMaxOpen <= 0 {
+func maxDependencyPublishWorkers(capacity int, ratio float64) int {
+	if capacity <= 0 {
 		return 0
 	}
 	if ratio <= 0 {
 		ratio = 0.8
 	}
-	return int(float64(mysqlMaxOpen) * ratio)
+	return int(float64(capacity) * ratio)
 }
 
 func validateStatisticsSync(opts *StatisticsSyncOptions) []error {
