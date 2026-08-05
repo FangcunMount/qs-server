@@ -116,6 +116,7 @@ func (r *Repository) findByIdempotencyKey(ctx context.Context, metaInfo submitpo
 // submissions never write this collection; it can be archived after the
 // compatibility window and an explicit data migration.
 func (r *Repository) findLegacyIdempotentSubmission(ctx context.Context, metaInfo submitport.DurableSubmitMeta) (*submitport.CompletedSubmission, error) {
+	legacyIdempotencyFallbackLookupTotal.Inc()
 	if r.idempotencyColl == nil {
 		return nil, nil
 	}
@@ -126,6 +127,7 @@ func (r *Repository) findLegacyIdempotentSubmission(ctx context.Context, metaInf
 		}
 		return nil, err
 	}
+	legacyIdempotencyFallbackHitTotal.Inc()
 	sheet, err := r.FindByID(ctx, meta.MustFromUint64(po.AnswerSheetID))
 	if err != nil {
 		return nil, err

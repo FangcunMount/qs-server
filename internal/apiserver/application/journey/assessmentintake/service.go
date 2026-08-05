@@ -364,13 +364,16 @@ func applyFrozenAdmission(admission *Admission, dto *evaluationintake.CreateComm
 // applyBinding 应用绑定
 func (s *service) applyBinding(ctx context.Context, command Command, dto *evaluationintake.CreateCommand) (bool, string, error) {
 	if s.binding == nil {
+		observeLegacyBinding(legacyBindingUnavailable)
 		return false, "legacy_binding", errors.WithCode(code.ErrModuleInitializationFailed, "assessment binding resolver is not configured for legacy admission")
 	}
 	binding, ok, err := s.binding.ResolveAssessmentBinding(ctx, command.QuestionnaireCode, command.QuestionnaireVersion)
 	if err != nil {
+		observeLegacyBinding(legacyBindingDependencyErr)
 		return false, "legacy_binding", err
 	}
 	if !ok {
+		observeLegacyBinding(legacyBindingNotFound)
 		return false, "legacy_unclassified", errors.WithCode(
 			code.ErrAssessmentModelValidationFailed,
 			"legacy_unclassified: answer sheet has no frozen admission and live binding is unavailable",
@@ -390,6 +393,7 @@ func (s *service) applyBinding(ctx context.Context, command Command, dto *evalua
 	dto.ModelVersion = &binding.Ref.Version
 	dto.ModelTitle = &binding.Ref.Title
 	dto.ModelValidationMode = evaluationintake.ModelValidationModeActiveRelease
+	observeLegacyBinding(legacyBindingResolved)
 	return true, "legacy_binding", nil
 }
 

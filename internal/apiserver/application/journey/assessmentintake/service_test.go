@@ -214,6 +214,33 @@ func TestEnsureBoundAnswerSheetCreatesAndAutoSubmits(t *testing.T) {
 	}
 }
 
+func TestLegacyBindingFallbackMetricsClassifyResults(t *testing.T) {
+	tests := []struct {
+		name    string
+		binding rulesetport.AssessmentBindingResolver
+		result  string
+	}{
+		{name: "unavailable", result: legacyBindingUnavailable},
+		{name: "not found", binding: bindingStub{}, result: legacyBindingNotFound},
+		{name: "dependency error", binding: bindingStub{err: errors.New("catalog unavailable")}, result: legacyBindingDependencyErr},
+		{name: "resolved", binding: boundScaleBinding(), result: legacyBindingResolved},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			before := testutil.ToFloat64(assessmentIntakeLegacyBindingTotal.WithLabelValues(tt.result))
+			impl := &service{binding: tt.binding}
+			_, _, _ = impl.applyAdmissionOrBinding(
+				context.Background(),
+				Command{QuestionnaireCode: "Q", QuestionnaireVersion: "1"},
+				&evaluationintake.CreateCommand{},
+			)
+			if delta := testutil.ToFloat64(assessmentIntakeLegacyBindingTotal.WithLabelValues(tt.result)) - before; delta != 1 {
+				t.Fatalf("metric delta=%v, want 1", delta)
+			}
+		})
+	}
+}
+
 func TestEnsureTreatsScoringFailureAsHardFailure(t *testing.T) {
 	calls := []string{}
 	svc := NewService(scoringStub{calls: &calls, err: errors.New("score failed")}, nil, nil, nil, &intakeStub{calls: &calls}, nil)
