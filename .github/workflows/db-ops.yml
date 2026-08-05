@@ -458,6 +458,60 @@ jobs:
                   indexes: stats.nindexes
                 }
               }))
+            const assessmentModels = targetDB.getCollection("assessment_models")
+            print("ModelCatalog compatibility inventory:")
+            printjson({
+              total: assessmentModels.countDocuments({}),
+              heads: assessmentModels.countDocuments({record_role: "head", deleted_at: null}),
+              snapshots: assessmentModels.countDocuments({record_role: "published_snapshot", deleted_at: null}),
+              missing_record_role: assessmentModels.countDocuments({record_role: {$exists: false}}),
+              unknown_record_role: assessmentModels.countDocuments({record_role: {$exists: true, $nin: ["head", "published_snapshot"]}}),
+              persisted_legacy_identity_fields: assessmentModels.countDocuments({$or: [
+                {sub_kind: {$exists: true}},
+                {product_channel: {$exists: true}},
+                {algorithm_family: {$exists: true}}
+              ]}),
+              active_snapshots: assessmentModels.countDocuments({record_role: "published_snapshot", release_status: "active", deleted_at: null}),
+              archived_snapshots: assessmentModels.countDocuments({record_role: "published_snapshot", release_status: "archived", deleted_at: null}),
+              snapshots_missing_release_status: assessmentModels.countDocuments({record_role: "published_snapshot", deleted_at: null, $or: [
+                {release_status: {$exists: false}},
+                {release_status: ""}
+              ]}),
+              snapshots_missing_canonical_identity: assessmentModels.countDocuments({record_role: "published_snapshot", deleted_at: null, $or: [
+                {kind: {$exists: false}}, {kind: ""},
+                {algorithm: {$exists: false}}, {algorithm: ""},
+                {code: {$exists: false}}, {code: ""},
+                {release_version: {$exists: false}}, {release_version: ""},
+                {decision_kind: {$exists: false}}, {decision_kind: ""}
+              ]}),
+              snapshots_missing_definition_v2: assessmentModels.countDocuments({record_role: "published_snapshot", deleted_at: null, definition_v2: {$exists: false}}),
+              active_identity_duplicates: assessmentModels.aggregate([
+                {$match: {record_role: "published_snapshot", release_status: "active", deleted_at: null}},
+                {$group: {_id: {kind: "$kind", algorithm: "$algorithm", code: "$code"}, count: {$sum: 1}}},
+                {$match: {count: {$gt: 1}}},
+                {$count: "groups"}
+              ]).toArray()[0]?.groups || 0
+            })
+            print("ModelCatalog index inventory:")
+            printjson(assessmentModels.getIndexes().map(index => ({
+              name: index.name,
+              key: index.key,
+              unique: index.unique === true,
+              partial_filter: index.partialFilterExpression || null
+            })))
+            const assessmentNorms = targetDB.getCollection("assessment_norms")
+            print("ModelCatalog norm inventory:")
+            printjson({
+              total: assessmentNorms.countDocuments({deleted_at: null}),
+              missing_table_version: assessmentNorms.countDocuments({deleted_at: null, $or: [
+                {table_version: {$exists: false}},
+                {table_version: ""}
+              ]}),
+              missing_runtime_identity: assessmentNorms.countDocuments({deleted_at: null, $or: [
+                {kind: {$exists: false}}, {kind: ""},
+                {algorithm: {$exists: false}}, {algorithm: ""}
+              ]})
+            })
             print("Attention projection status counts:")
             printjson(targetDB.getCollection("interpretation_attention_projections").aggregate([
               {$group: {_id: "$status", count: {$sum: 1}}},
