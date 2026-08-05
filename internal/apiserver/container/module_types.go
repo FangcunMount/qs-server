@@ -35,11 +35,6 @@ type (
 	IAMModuleRuntimeOptions = iammod.RuntimeOptions
 )
 
-// NewIAMModule creates the IAM integration module.
-func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, error) {
-	return iammod.New(ctx, opts)
-}
-
 // NewIAMModuleWithRuntimeOptions creates the IAM integration module with runtime limiters.
 func NewIAMModuleWithRuntimeOptions(ctx context.Context, opts *options.IAMOptions, runtime IAMModuleRuntimeOptions) (*IAMModule, error) {
 	return iammod.NewWithRuntimeOptions(ctx, opts, runtime)

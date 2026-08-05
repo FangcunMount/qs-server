@@ -29,11 +29,6 @@ type RuntimeOptions struct {
 	Limiter backpressure.Acquirer
 }
 
-// New 创建 IAM 模块
-func New(ctx context.Context, opts *options.IAMOptions) (*Module, error) {
-	return NewWithRuntimeOptions(ctx, opts, RuntimeOptions{})
-}
-
 func NewWithRuntimeOptions(ctx context.Context, opts *options.IAMOptions, runtime RuntimeOptions) (*Module, error) {
 	if opts == nil || !opts.Enabled {
 		logger.L(context.Background()).Infow("IAM integration is disabled",
