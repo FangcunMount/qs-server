@@ -40,11 +40,6 @@ func normalizeVerifyOptions(opts *auth.VerifyOptions) *auth.VerifyOptions {
 	return &merged
 }
 
-// JWTAuthMiddleware JWT 认证中间件（使用 SDK TokenVerifier 本地 JWKS 验签）
-func JWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
-	return JWTAuthMiddlewareWithOptions(verifier, nil)
-}
-
 // JWTAuthMiddlewareWithOptions JWT 认证中间件（显式控制 VerifyOptions）。
 func JWTAuthMiddlewareWithOptions(verifier *auth.TokenVerifier, opts *auth.VerifyOptions) gin.HandlerFunc {
 	verifyOpts := normalizeVerifyOptions(opts)
@@ -123,116 +118,6 @@ func JWTAuthMiddlewareWithOptions(verifier *auth.TokenVerifier, opts *auth.Verif
 	}
 }
 
-// OptionalJWTAuthMiddleware 可选的 JWT 认证中间件（使用 SDK TokenVerifier）
-func OptionalJWTAuthMiddleware(verifier *auth.TokenVerifier) gin.HandlerFunc {
-	return OptionalJWTAuthMiddlewareWithOptions(verifier, nil)
-}
-
-// OptionalJWTAuthMiddlewareWithOptions 可选的 JWT 认证中间件（显式控制 VerifyOptions）。
-func OptionalJWTAuthMiddlewareWithOptions(verifier *auth.TokenVerifier, opts *auth.VerifyOptions) gin.HandlerFunc {
-	verifyOpts := normalizeVerifyOptions(opts)
-	return func(c *gin.Context) {
-		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware started", "path", c.Request.URL.Path, "method", c.Request.Method)
-		// 提取 Token
-		token := extractToken(c)
-		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware token extracted", "has_token", token != "", "token_length", len(token))
-		if token == "" {
-			logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware token is empty", "path", c.Request.URL.Path, "method", c.Request.Method)
-			// Token 缺失，继续执行但不设置用户信息
-			c.Next()
-			return
-		}
-
-		// 检查 verifier 是否可用
-		if verifier == nil {
-			logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware verifier is nil", "path", c.Request.URL.Path, "method", c.Request.Method)
-			c.Next()
-			return
-		}
-
-		// 使用 SDK TokenVerifier 验证
-		result, err := verifier.Verify(c.Request.Context(), token, verifyOpts)
-		logger.L(c.Request.Context()).Debugw("OptionalJWTAuthMiddleware result", "result", result)
-		logger.L(c.Request.Context()).Debugw("OptionalJWTAuthMiddleware err", "err", err)
-		if err != nil || !result.Valid {
-			// Token 无效，继续执行但不设置用户信息
-			c.Next()
-			return
-		}
-
-		// 将用户信息存入上下文
-		tokenClaims := result.Claims
-		logger.L(c.Request.Context()).Debugw("OptionalJWTAuthMiddleware tokenClaims", "tokenClaims", tokenClaims)
-		if tokenClaims == nil {
-			// Token 无效，继续执行但不设置用户信息
-			c.Next()
-			return
-		}
-
-		claims := buildUserClaims(result)
-		logJWTClaimMapping(c, tokenClaims, claims)
-
-		c.Set("user_claims", claims)
-		if claims.Metadata != nil {
-			c.Set("token_metadata", claims.Metadata)
-		}
-		ctx := context.WithValue(c.Request.Context(), UserClaimsContextKey{}, claims)
-		c.Request = c.Request.WithContext(ctx)
-
-		c.Next()
-	}
-}
-
-// RequireRole 要求特定角色的中间件
-func RequireRole(role string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		claims := GetUserClaims(c)
-		if claims == nil {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "authentication required",
-			})
-			c.Abort()
-			return
-		}
-
-		if !hasRole(claims.Roles, role) {
-			c.JSON(http.StatusForbidden, gin.H{
-				"error": fmt.Sprintf("role '%s' required", role),
-			})
-			c.Abort()
-			return
-		}
-
-		c.Next()
-	}
-}
-
-// RequireAnyRole 要求任意一个角色的中间件
-func RequireAnyRole(roles ...string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		claims := GetUserClaims(c)
-		if claims == nil {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "authentication required",
-			})
-			c.Abort()
-			return
-		}
-
-		for _, role := range roles {
-			if hasRole(claims.Roles, role) {
-				c.Next()
-				return
-			}
-		}
-
-		c.JSON(http.StatusForbidden, gin.H{
-			"error": fmt.Sprintf("one of roles %v required", roles),
-		})
-		c.Abort()
-	}
-}
-
 // 辅助函数
 
 // extractToken 从请求中提取 Token
@@ -294,70 +179,6 @@ func GetUserID(c *gin.Context) string {
 		return claims.UserID
 	}
 	return ""
-}
-
-// GetTenantDomain 从上下文获取 IAM 授权域。
-func GetTenantDomain(c *gin.Context) string {
-	claims := GetUserClaims(c)
-	if claims == nil {
-		return ""
-	}
-	return strings.TrimSpace(claims.TenantDomain)
-}
-
-// GetAccountID 从上下文获取账户 ID
-func GetAccountID(c *gin.Context) string {
-	claims := GetUserClaims(c)
-	if claims != nil {
-		return claims.AccountID
-	}
-	return ""
-}
-
-// GetSessionID 从上下文获取会话 ID
-func GetSessionID(c *gin.Context) string {
-	claims := GetUserClaims(c)
-	if claims != nil {
-		return claims.SessionID
-	}
-	return ""
-}
-
-// GetTokenID 从上下文获取令牌 ID
-func GetTokenID(c *gin.Context) string {
-	claims := GetUserClaims(c)
-	if claims != nil {
-		return claims.TokenID
-	}
-	return ""
-}
-
-// GetRoles 从上下文获取角色列表
-func GetRoles(c *gin.Context) []string {
-	claims := GetUserClaims(c)
-	if claims != nil {
-		return claims.Roles
-	}
-	return nil
-}
-
-// HasRole 检查用户是否拥有特定角色
-func HasRole(c *gin.Context, role string) bool {
-	claims := GetUserClaims(c)
-	if claims == nil {
-		return false
-	}
-	return hasRole(claims.Roles, role)
-}
-
-// hasRole 检查角色列表中是否包含指定角色
-func hasRole(roles []string, role string) bool {
-	for _, r := range roles {
-		if r == role {
-			return true
-		}
-	}
-	return false
 }
 
 // resolveTenantDomain 优先使用 SDK 授权域，缺失时从 Extra 的 tenant_id 兼容。
