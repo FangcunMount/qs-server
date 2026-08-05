@@ -16,8 +16,10 @@ import (
 	reportscore "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/conclusion"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norm"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog/payload/behavioral"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -102,6 +104,7 @@ func TestBehavioralOutcomeCodeSurvivesDefinitionToInterpretation(t *testing.T) {
 				}},
 			}
 			def := &definition.Definition{
+				Measure:     definition.MeasureSpec{Factors: []factor.Factor{{Code: factorCode, Title: "总分", Role: factor.FactorRoleTotal}}},
 				Calibration: definition.Calibration{NormRefs: []norm.Ref{{FactorCode: factorCode, NormTableVersion: tableVersion}}},
 				Conclusions: []conclusion.Conclusion{conclusion.NormConclusion{
 					FactorCode: factorCode,
@@ -128,16 +131,16 @@ func TestBehavioralOutcomeCodeSurvivesDefinitionToInterpretation(t *testing.T) {
 				t.Fatalf("runtime outcome code = %q, want %q (legacy Level=%q)", got, outcomeCode, legacyLevel)
 			}
 
-			execution, err := factornorm.ApplyNormProjection(&domainoutcome.Execution{
+			execution, err := factornorm.ApplyFactorProjectionsForInput(&domainoutcome.Execution{
 				Dimensions: []domainoutcome.DimensionResult{{
 					Code:  factorCode,
 					Name:  "总分",
 					Kind:  domainoutcome.DimensionKindFactor,
 					Score: &domainoutcome.ScoreValue{Kind: domainoutcome.ScoreKindRawTotal, Value: 5},
 				}},
-			}, snapshot, calcnorm.Subject{})
+			}, &evaluationinput.InputSnapshot{DefinitionV2: def}, snapshot, calcnorm.Subject{})
 			if err != nil {
-				t.Fatalf("ApplyNormProjection: %v", err)
+				t.Fatalf("ApplyFactorProjectionsForInput: %v", err)
 			}
 			if execution.Level == nil || execution.Level.Code != outcomeCode || execution.Dimensions[0].Level == nil || execution.Dimensions[0].Level.Code != outcomeCode {
 				t.Fatalf("outcome levels = result:%#v dimension:%#v, want %q", execution.Level, execution.Dimensions[0].Level, outcomeCode)
