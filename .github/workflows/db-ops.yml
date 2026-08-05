@@ -9,6 +9,7 @@ on:
         type: choice
         options:
           - backup
+          - validate
           - restore
           - status
       backup_name:
@@ -171,6 +172,89 @@ jobs:
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
           MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
+
+  mongodb-backup-validate:
+    name: MongoDB Backup Validate
+    if: github.event.inputs.operation == 'validate' && github.event.inputs.database == 'mongodb'
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    environment: production
+    steps:
+      - name: Validate SSH configuration
+        env:
+          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
+          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+        run: |
+          set -Eeuo pipefail
+          : "${SVRA_HOST:?SVRA_HOST is empty}"
+          : "${SVRA_USERNAME:?SVRA_USERNAME is empty}"
+          : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
+          : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
+
+      - name: Validate MongoDB backup archive
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          command_timeout: 30m
+          envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,BACKUP_FILE_INPUT
+          script: |
+            set -Eeuo pipefail
+            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+
+            : "${MONGODB_HOST:?MONGODB_HOST is empty (check production Environment secrets)}"
+            : "${MONGODB_DBNAME:?MONGODB_DBNAME is empty}"
+            : "${MONGODB_USERNAME:?MONGODB_USERNAME is empty}"
+            : "${MONGODB_PASSWORD:?MONGODB_PASSWORD is empty}"
+
+            if ! sudo docker network inspect infra-network >/dev/null 2>&1; then
+              echo "❌ infra-network is unavailable" >&2
+              exit 1
+            fi
+
+            BACKUP_DIR="/opt/backups/qs-server/mongodb"
+            BACKUP_FILE="$BACKUP_FILE_INPUT"
+            if ! [[ "$BACKUP_FILE" =~ ^qs_mongodb_backup_[0-9]{8}_[0-9]{6}\.archive\.gz$ ]]; then
+              echo "❌ Invalid backup name: $BACKUP_FILE" >&2
+              exit 1
+            fi
+            if ! sudo docker run --rm \
+              -v "$BACKUP_DIR:/backup:ro" \
+              --entrypoint test \
+              mongo:7.0 -s "/backup/$BACKUP_FILE"; then
+              echo "❌ Backup archive is missing or empty: $BACKUP_FILE" >&2
+              exit 1
+            fi
+
+            echo "Validating MongoDB backup archive without importing data..."
+            sudo docker run --rm --network infra-network \
+              -v "$BACKUP_DIR:/backup:ro" \
+              --entrypoint /usr/bin/timeout \
+              mongo:7.0 25m mongorestore \
+                --host="$MONGODB_HOST" \
+                --port="${MONGODB_PORT:-27017}" \
+                --username="$MONGODB_USERNAME" \
+                --password="$MONGODB_PASSWORD" \
+                --authenticationDatabase=admin \
+                --archive="/backup/$BACKUP_FILE" \
+                --gzip \
+                --nsInclude="$MONGODB_DBNAME.*" \
+                --dryRun \
+                --verbose
+            echo "✅ MongoDB backup archive dry-run validation succeeded: $BACKUP_FILE"
+        env:
+          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
+          MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
+          BACKUP_FILE_INPUT: ${{ github.event.inputs.backup_name }}
 
   mongodb-restore:
     name: MongoDB Restore
