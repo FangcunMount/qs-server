@@ -17,12 +17,13 @@ on:
         required: false
         type: string
       database:
-        description: 'Database to operate on'
+        description: 'Data store to operate on (Redis supports status only)'
         required: true
         type: choice
         options:
           - mongodb
           - mysql
+          - redis
           - all
       audit_from:
         description: 'Optional RFC3339 UTC lower bound for read-only recovery audit'
@@ -1035,3 +1036,165 @@ jobs:
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
           AUDIT_FROM: ${{ github.event.inputs.audit_from }}
+
+  redis-status:
+    name: Redis Keyspace Status
+    if: github.event.inputs.operation == 'status' && (github.event.inputs.database == 'redis' || github.event.inputs.database == 'all')
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 30
+    environment: production
+    steps:
+      - name: Validate SSH configuration
+        env:
+          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
+          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+        run: |
+          set -Eeuo pipefail
+          : "${SVRA_HOST:?SVRA_HOST is empty}"
+          : "${SVRA_USERNAME:?SVRA_USERNAME is empty}"
+          : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
+          : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
+
+      - name: Inventory Redis keyspaces without exposing keys
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          command_timeout: 25m
+          envs: REDIS_HOST,REDIS_PORT,REDIS_USERNAME,REDIS_PASSWORD,REDIS_USE_SSL,REDIS_SSL_INSECURE_SKIP_VERIFY
+          script: |
+            set -Eeuo pipefail
+            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+
+            : "${REDIS_HOST:?REDIS_HOST is empty}"
+            REDIS_PORT="${REDIS_PORT:-6379}"
+            REDIS_AUDIT_CONTAINER="qs-server-redis-keyspace-audit"
+
+            if ! sudo docker network inspect infra-network >/dev/null 2>&1; then
+              echo "❌ infra-network is unavailable" >&2
+              exit 1
+            fi
+
+            cleanup_redis_audit_container() {
+              sudo docker rm -f "$REDIS_AUDIT_CONTAINER" >/dev/null 2>&1 || true
+            }
+            trap cleanup_redis_audit_container EXIT
+
+            REDIS_CLI_ARGS=(--host "$REDIS_HOST" --port "$REDIS_PORT" --no-auth-warning --raw)
+            if [ -n "${REDIS_USERNAME:-}" ]; then
+              REDIS_CLI_ARGS+=(--user "$REDIS_USERNAME")
+            fi
+            if [ "${REDIS_USE_SSL:-false}" = "true" ]; then
+              REDIS_CLI_ARGS+=(--tls)
+              if [ "${REDIS_SSL_INSECURE_SKIP_VERIFY:-false}" = "true" ]; then
+                REDIS_CLI_ARGS+=(--insecure)
+              fi
+            fi
+
+            redis_cli() {
+              local database="$1"
+              shift
+              sudo docker run --rm --network infra-network \
+                --name "$REDIS_AUDIT_CONTAINER" \
+                --label "com.fangcunmount.qs-server.operation=redis-keyspace-audit" \
+                --label "com.fangcunmount.qs-server.github-run-id=${{ github.run_id }}" \
+                -e REDISCLI_AUTH="${REDIS_PASSWORD:-}" \
+                redis:7-alpine redis-cli "${REDIS_CLI_ARGS[@]}" -n "$database" "$@"
+            }
+
+            scan_database() {
+              local database="$1"
+              local db_size scan_total current_questionnaire current_models
+              local current_assessment current_testee current_plan current_stats
+              local current_assess_list current_version current_hotset current_family_other
+              local legacy_unnamespaced_candidate other key scan_dir scan_pid
+              scan_total=0
+              current_questionnaire=0
+              current_models=0
+              current_assessment=0
+              current_testee=0
+              current_plan=0
+              current_stats=0
+              current_assess_list=0
+              current_version=0
+              current_hotset=0
+              current_family_other=0
+              legacy_unnamespaced_candidate=0
+              other=0
+
+              db_size=$(redis_cli "$database" DBSIZE | tr -d '\r')
+              scan_dir=$(mktemp -d /tmp/qs-redis-scan.XXXXXX)
+              mkfifo "$scan_dir/keys"
+              redis_cli "$database" --scan --count 1000 >"$scan_dir/keys" &
+              scan_pid=$!
+              while IFS= read -r key; do
+                [ -n "$key" ] || continue
+                scan_total=$((scan_total + 1))
+                case "$database:$key" in
+                  2:cache:static:questionnaire:*) current_questionnaire=$((current_questionnaire + 1)) ;;
+                  2:cache:static:assessment_model:published:*) current_models=$((current_models + 1)) ;;
+                  3:cache:object:assessment:detail:*) current_assessment=$((current_assessment + 1)) ;;
+                  3:cache:object:testee:info:*) current_testee=$((current_testee + 1)) ;;
+                  3:cache:object:plan:info:*) current_plan=$((current_plan + 1)) ;;
+                  4:cache:query:stats:query:*) current_stats=$((current_stats + 1)) ;;
+                  4:cache:query:assess:list:*) current_assess_list=$((current_assess_list + 1)) ;;
+                  7:cache:meta:query:version:*) current_version=$((current_version + 1)) ;;
+                  7:cache:meta:warmup:hot:*) current_hotset=$((current_hotset + 1)) ;;
+                  0:ops:runtime:*|2:cache:static:*|3:cache:object:*|4:cache:query:*|5:cache:sdk:*|6:cache:lock:*|7:cache:meta:*|8:cache:rank:*)
+                    current_family_other=$((current_family_other + 1))
+                    ;;
+                  *:questionnaire:*|*:scale:*|*:assessment_model:*|*:assessment:*|*:assess:*|*:stats:*|*:testee:*|*:plan:*|*:query:*|*:warmup:*|*:answersheet:*)
+                    legacy_unnamespaced_candidate=$((legacy_unnamespaced_candidate + 1))
+                    ;;
+                  *) other=$((other + 1)) ;;
+                esac
+              done <"$scan_dir/keys"
+              if ! wait "$scan_pid"; then
+                rm -f -- "$scan_dir/keys"
+                rmdir -- "$scan_dir"
+                echo "❌ Redis SCAN failed for DB ${database}" >&2
+                return 1
+              fi
+              rm -f -- "$scan_dir/keys"
+              rmdir -- "$scan_dir"
+
+              echo "redis_db=${database} dbsize=${db_size} scanned=${scan_total}"
+              echo "  current_questionnaire=${current_questionnaire} current_models=${current_models}"
+              echo "  current_assessment=${current_assessment} current_testee=${current_testee} current_plan=${current_plan}"
+              echo "  current_stats=${current_stats} current_assess_list=${current_assess_list}"
+              echo "  current_version=${current_version} current_hotset=${current_hotset} current_family_other=${current_family_other}"
+              echo "  legacy_unnamespaced_candidate=${legacy_unnamespaced_candidate} other=${other}"
+              if [ "$scan_total" != "$db_size" ]; then
+                echo "  note=DBSIZE and SCAN differ because keys may expire during the read-only audit"
+              fi
+            }
+
+            redis_cli 0 PING >/dev/null
+            echo "✅ Redis connection OK"
+            echo "Redis server summary:"
+            redis_cli 0 INFO server | grep -E '^(redis_version|redis_mode|os|arch_bits):'
+            redis_cli 0 INFO memory | grep -E '^(used_memory_human|maxmemory_human|maxmemory_policy|mem_fragmentation_ratio):'
+
+            echo ""
+            echo "Redis keyspace inventory (counts only; key names and values are never printed):"
+            for database in 0 1 2 3 4 5 6 7 8; do
+              scan_database "$database"
+            done
+
+            cleanup_redis_audit_container
+            trap - EXIT
+            echo "✅ Redis read-only keyspace audit OK"
+        env:
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT || 6379 }}
+          REDIS_USERNAME: ${{ secrets.REDIS_USERNAME }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          REDIS_USE_SSL: ${{ secrets.REDIS_USE_SSL }}
+          REDIS_SSL_INSECURE_SKIP_VERIFY: ${{ secrets.REDIS_SSL_INSECURE_SKIP_VERIFY }}

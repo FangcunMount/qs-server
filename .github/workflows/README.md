@@ -8,7 +8,7 @@
 | `cd.yml` | 生产发布（`workflow_run` 或手动） | `CI` 成功后 / `workflow_dispatch` |
 | `sonar.yml` | Mac mini 本地 SonarQube 扫描（不阻断 CD） | `push` → `main` |
 | `ping-runner.yml` | ServerA 生产巡检 + ServerD worker 主机巡检 | 每 6 小时 / `workflow_dispatch` |
-| `db-ops.yml` | MongoDB 备份 / 恢复 / 状态（读 `production` Environment secrets） | 每日定时备份 / `workflow_dispatch` |
+| `db-ops.yml` | MongoDB 备份 / 恢复、MySQL/MongoDB 状态及 Redis 只读键空间盘点（读 `production` Environment secrets） | 每日定时备份 / `workflow_dispatch` |
 
 已移除的 workflow（冗余或失效）：
 

@@ -592,6 +592,40 @@ func TestDBOpsMongoBackupIsBoundedAndOwned(t *testing.T) {
 	}
 }
 
+func TestDBOpsRedisStatusIsReadOnlyAndDoesNotExposeKeys(t *testing.T) {
+	t.Parallel()
+
+	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "db-ops.yml"))
+	if err != nil {
+		t.Fatalf("read db ops workflow: %v", err)
+	}
+	content := string(workflow)
+	for _, required := range []string{
+		"redis-status:",
+		"Redis Keyspace Status",
+		"Inventory Redis keyspaces without exposing keys",
+		`redis_cli "$database" --scan --count 1000`,
+		`mkfifo "$scan_dir/keys"`,
+		`wait "$scan_pid"`,
+		"legacy_unnamespaced_candidate",
+		"counts only; key names and values are never printed",
+		"redis:7-alpine redis-cli",
+		"command_timeout: 25m",
+	} {
+		if !strings.Contains(content, required) {
+			t.Errorf("DB ops Redis status contract must contain %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		" KEYS ",
+		"--pattern '*' | tee",
+	} {
+		if strings.Contains(content, forbidden) {
+			t.Errorf("DB ops Redis status must not expose or block on key inventory form %q", forbidden)
+		}
+	}
+}
+
 func TestReportStatusTTLContractMatchesAcrossProcesses(t *testing.T) {
 	t.Parallel()
 
