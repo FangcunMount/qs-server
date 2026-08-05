@@ -1996,16 +1996,6 @@ func (p *progressReporter) Indeterminate(label string) {
 	p.Step(label, 0, 0)
 }
 
-func (p *progressReporter) Add(delta int64) {
-	if !p.enabled {
-		return
-	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.current += delta
-	p.renderLocked()
-}
-
 func (p *progressReporter) Finish(label string, detail string) {
 	if !p.enabled {
 		msg := label

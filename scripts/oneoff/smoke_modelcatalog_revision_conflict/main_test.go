@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -265,10 +264,4 @@ func writeTestEnvelope(w http.ResponseWriter, status int, message string, data a
 		code = status
 	}
 	_ = json.NewEncoder(w).Encode(map[string]any{"code": code, "message": message, "data": data})
-}
-
-func (s *conflictServerState) String() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return fmt.Sprintf("model=%s questionnaire=%s", s.model.Title, s.questionnaire.Title)
 }
