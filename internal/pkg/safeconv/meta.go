@@ -14,13 +14,6 @@ func Uint64ToMetaID(value uint64) (meta.ID, error) {
 	return meta.ID(int64(value)), nil
 }
 
-func Int64ToMetaID(value int64) (meta.ID, error) {
-	if value < 0 {
-		return 0, fmt.Errorf("%d is negative", value)
-	}
-	return meta.ID(value), nil
-}
-
 func MetaIDToUint64(value meta.ID) (uint64, error) {
 	if value.Int64() < 0 {
 		return 0, fmt.Errorf("%d is negative", value.Int64())
