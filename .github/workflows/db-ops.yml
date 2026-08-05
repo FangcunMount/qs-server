@@ -1279,6 +1279,28 @@ jobs:
               scan_database "$database"
             done
 
+            echo ""
+            echo "Statistics stale-run recovery preflight (read-only):"
+            statistics_task_lock_ttl="$(redis_cli 6 TTL 'cache:lock:statistics:1' | tr -d '\r')"
+            if ! [[ "$statistics_task_lock_ttl" =~ ^-?[0-9]+$ ]]; then
+              echo "❌ Unexpected TTL response for the Statistics task lock" >&2
+              exit 1
+            fi
+            statistics_task_lock_absent=false
+            if [ "$statistics_task_lock_ttl" = "-2" ]; then
+              statistics_task_lock_absent=true
+            fi
+            statistics_rebuild_host_processes="$(
+              ps -eo comm= | awk '$1 ~ /^rebuild_statist/ { count++ } END { print count + 0 }'
+            )"
+            statistics_rebuild_containers="$(
+              sudo docker ps --format '{{.Names}}\t{{.Image}}' |
+                awk 'tolower($0) ~ /rebuild[-_]?statistics|statistics[-_]?rebuild/ { count++ } END { print count + 0 }'
+            )"
+            echo "  task_lock_database=6 task_lock_ttl_seconds=${statistics_task_lock_ttl} task_lock_absent=${statistics_task_lock_absent}"
+            echo "  standard_host_rebuild_processes=${statistics_rebuild_host_processes} matching_running_containers=${statistics_rebuild_containers}"
+            echo "  evidence_boundary=process audit covers standard rebuild_statistics executable names and matching ServerA container names/images"
+
             cleanup_redis_audit_container
             trap - EXIT
             echo "✅ Redis read-only keyspace audit OK"
