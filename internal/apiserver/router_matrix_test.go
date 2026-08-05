@@ -291,6 +291,34 @@ func TestRouterPublicBusinessRoutesAreCoveredByOpenAPI(t *testing.T) {
 	}
 }
 
+func TestPractitionerCompatibilityRoutesStayOutsideCurrentOpenAPI(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	engine := gin.New()
+	router := resttransport.NewRouter(newRouterTestDeps())
+	router.RegisterRoutes(engine)
+
+	compatibilityRoutes := 0
+	for _, route := range engine.Routes() {
+		if route.Path == "/api/v1/practitioners" || strings.HasPrefix(route.Path, "/api/v1/practitioners/") {
+			compatibilityRoutes++
+			if routeMustBeDocumented(route) {
+				t.Fatalf("compatibility route %s %s must stay outside the current OpenAPI", route.Method, route.Path)
+			}
+		}
+	}
+	if compatibilityRoutes == 0 {
+		t.Fatal("expected deprecated practitioner compatibility routes to remain registered during the observation window")
+	}
+
+	spec := loadRouterMatrixOpenAPI(t, "../../api/rest/apiserver.yaml")
+	for path := range spec.Paths {
+		if path == "/api/v1/practitioners" || strings.HasPrefix(path, "/api/v1/practitioners/") {
+			t.Fatalf("deprecated practitioner route is still published in current OpenAPI: %s", path)
+		}
+	}
+}
+
 func TestRouterProtectedClinicianRouteRequiresCapabilitySnapshot(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -512,6 +540,8 @@ func routeMustBeDocumented(route gin.RouteInfo) bool {
 		return false
 	}
 	switch {
+	case route.Path == "/api/v1/practitioners" || strings.HasPrefix(route.Path, "/api/v1/practitioners/"):
+		return false
 	case strings.HasPrefix(route.Path, "/api/rest/"):
 		return false
 	case strings.HasPrefix(route.Path, "/swagger-ui/"):

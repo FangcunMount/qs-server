@@ -329,7 +329,6 @@ func (h *OperatorClinicianHandler) ListStaff(c *gin.Context) {
 // @Param request body request.CreateClinicianRequest true "创建从业者请求"
 // @Success 200 {object} core.Response
 // @Router /api/v1/clinicians [post]
-// @Router /api/v1/practitioners [post]
 func (h *OperatorClinicianHandler) CreateClinician(c *gin.Context) {
 	var req request.CreateClinicianRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -370,7 +369,6 @@ func (h *OperatorClinicianHandler) CreateClinician(c *gin.Context) {
 // @Param request body request.UpdateClinicianRequest true "更新从业者请求"
 // @Success 200 {object} core.Response
 // @Router /api/v1/clinicians/{id} [put]
-// @Router /api/v1/practitioners/{id} [put]
 func (h *OperatorClinicianHandler) UpdateClinician(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -417,7 +415,6 @@ func (h *OperatorClinicianHandler) UpdateClinician(c *gin.Context) {
 // @Param id path int true "从业者ID"
 // @Success 200 {object} core.Response
 // @Router /api/v1/clinicians/{id}/activate [post]
-// @Router /api/v1/practitioners/{id}/activate [post]
 func (h *OperatorClinicianHandler) ActivateClinician(c *gin.Context) {
 	result, err := h.changeClinicianState(c, "activate_clinician", "Clinician activated", h.clinicianLifecycleService.Activate)
 	if err != nil {
@@ -435,7 +432,6 @@ func (h *OperatorClinicianHandler) ActivateClinician(c *gin.Context) {
 // @Param id path int true "从业者ID"
 // @Success 200 {object} core.Response
 // @Router /api/v1/clinicians/{id}/deactivate [post]
-// @Router /api/v1/practitioners/{id}/deactivate [post]
 func (h *OperatorClinicianHandler) DeactivateClinician(c *gin.Context) {
 	result, err := h.changeClinicianState(c, "deactivate_clinician", "Clinician deactivated", h.clinicianLifecycleService.Deactivate)
 	if err != nil {
@@ -455,7 +451,6 @@ func (h *OperatorClinicianHandler) DeactivateClinician(c *gin.Context) {
 // @Param request body request.BindClinicianOperatorRequest true "绑定操作员请求"
 // @Success 200 {object} core.Response
 // @Router /api/v1/clinicians/{id}/bind-operator [post]
-// @Router /api/v1/practitioners/{id}/bind-operator [post]
 func (h *OperatorClinicianHandler) BindClinicianOperator(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -506,7 +501,6 @@ func (h *OperatorClinicianHandler) BindClinicianOperator(c *gin.Context) {
 // @Param id path int true "从业者ID"
 // @Success 200 {object} core.Response
 // @Router /api/v1/clinicians/{id}/unbind-operator [post]
-// @Router /api/v1/practitioners/{id}/unbind-operator [post]
 func (h *OperatorClinicianHandler) UnbindClinicianOperator(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -539,7 +533,6 @@ func (h *OperatorClinicianHandler) UnbindClinicianOperator(c *gin.Context) {
 // @Param id path int true "从业者ID"
 // @Success 200 {object} core.Response
 // @Router /api/v1/clinicians/{id} [get]
-// @Router /api/v1/practitioners/{id} [get]
 func (h *OperatorClinicianHandler) GetClinician(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -573,7 +566,6 @@ func (h *OperatorClinicianHandler) GetClinician(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Success 200 {object} core.Response
 // @Router /api/v1/clinicians [get]
-// @Router /api/v1/practitioners [get]
 func (h *OperatorClinicianHandler) ListClinicians(c *gin.Context) {
 	req := request.ListClinicianRequest{Page: 1, PageSize: 20}
 	if orgIDParam := c.Query("org_id"); orgIDParam != "" {
@@ -629,7 +621,6 @@ func (h *OperatorClinicianHandler) ListClinicians(c *gin.Context) {
 // @Param id path int true "从业者ID"
 // @Success 200 {object} core.Response
 // @Router /api/v1/clinicians/{id}/testees [get]
-// @Router /api/v1/practitioners/{id}/testees [get]
 func (h *OperatorClinicianHandler) ListClinicianTestees(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -683,7 +674,6 @@ func (h *OperatorClinicianHandler) ListClinicianTestees(c *gin.Context) {
 // @Param id path int true "从业者ID"
 // @Success 200 {object} core.Response
 // @Router /api/v1/clinicians/{id}/relations [get]
-// @Router /api/v1/practitioners/{id}/relations [get]
 func (h *OperatorClinicianHandler) ListClinicianRelations(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -710,7 +700,6 @@ func (h *OperatorClinicianHandler) ListClinicianRelations(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Success 200 {object} core.Response
 // @Router /api/v1/clinicians/me [get]
-// @Router /api/v1/practitioners/me [get]
 func (h *OperatorClinicianHandler) GetMyClinician(c *gin.Context) {
 	clinicianItem, err := h.currentClinician(c)
 	if err != nil {
@@ -732,7 +721,6 @@ func (h *OperatorClinicianHandler) GetMyClinician(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Success 200 {object} core.Response
 // @Router /api/v1/clinicians/me/testees [get]
-// @Router /api/v1/practitioners/me/testees [get]
 func (h *OperatorClinicianHandler) ListMyClinicianTestees(c *gin.Context) {
 	clinicianItem, err := h.currentClinician(c)
 	if err != nil {
@@ -774,7 +762,6 @@ func (h *OperatorClinicianHandler) ListMyClinicianTestees(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Success 200 {object} core.Response
 // @Router /api/v1/clinicians/me/relations [get]
-// @Router /api/v1/practitioners/me/relations [get]
 func (h *OperatorClinicianHandler) ListMyClinicianRelations(c *gin.Context) {
 	clinicianItem, err := h.currentClinician(c)
 	if err != nil {

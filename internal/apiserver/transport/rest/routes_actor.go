@@ -145,6 +145,7 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 	registerClinicianRoutes(clinicians)
 
 	practitioners := apiV1.Group("/practitioners")
+	practitioners.Use(observeDeprecatedPractitionerRoute)
 	registerClinicianRoutes(practitioners)
 
 	if operatorClinicianHandler != nil {

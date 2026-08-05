@@ -30,7 +30,6 @@ func NewClinicianWorkbenchHandler(service workbenchApp.Service) *ClinicianWorkbe
 // @Produce json
 // @Success 200 {object} response.ClinicianWorkbenchQueueSummaryResponse
 // @Router /api/v1/clinicians/me/workbench/queues/summary [get]
-// @Router /api/v1/practitioners/me/workbench/queues/summary [get]
 func (h *ClinicianWorkbenchHandler) GetMyClinicianWorkbenchQueueSummary(c *gin.Context) {
 	orgID, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
@@ -60,7 +59,6 @@ func (h *ClinicianWorkbenchHandler) GetMyClinicianWorkbenchQueueSummary(c *gin.C
 // @Param page_size query int false "每页数量，默认 20，最大 100"
 // @Success 200 {object} response.ClinicianWorkbenchQueueResponse
 // @Router /api/v1/clinicians/me/workbench/queues/{queue_type} [get]
-// @Router /api/v1/practitioners/me/workbench/queues/{queue_type} [get]
 func (h *ClinicianWorkbenchHandler) ListMyClinicianWorkbenchQueue(c *gin.Context) {
 	orgID, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {

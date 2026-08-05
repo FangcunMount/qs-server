@@ -50,7 +50,6 @@ func NewAssessmentEntryHandler(
 // @Param request body request.CreateAssessmentEntryRequest true "创建测评入口请求"
 // @Success 200 {object} core.Response
 // @Router /api/v1/clinicians/{id}/assessment-entries [post]
-// @Router /api/v1/practitioners/{id}/assessment-entries [post]
 func (h *AssessmentEntryHandler) CreateClinicianAssessmentEntry(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -98,7 +97,6 @@ func (h *AssessmentEntryHandler) CreateClinicianAssessmentEntry(c *gin.Context) 
 // @Param id path int true "从业者ID"
 // @Success 200 {object} core.Response
 // @Router /api/v1/clinicians/{id}/assessment-entries [get]
-// @Router /api/v1/practitioners/{id}/assessment-entries [get]
 func (h *AssessmentEntryHandler) ListClinicianAssessmentEntries(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -138,7 +136,6 @@ func (h *AssessmentEntryHandler) ListClinicianAssessmentEntries(c *gin.Context) 
 // @Param request body request.CreateAssessmentEntryRequest true "创建测评入口请求"
 // @Success 200 {object} core.Response
 // @Router /api/v1/clinicians/me/assessment-entries [post]
-// @Router /api/v1/practitioners/me/assessment-entries [post]
 func (h *AssessmentEntryHandler) CreateMyAssessmentEntry(c *gin.Context) {
 	clinicianItem, err := h.currentClinician(c)
 	if err != nil {
@@ -176,7 +173,6 @@ func (h *AssessmentEntryHandler) CreateMyAssessmentEntry(c *gin.Context) {
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Success 200 {object} core.Response
 // @Router /api/v1/clinicians/me/assessment-entries [get]
-// @Router /api/v1/practitioners/me/assessment-entries [get]
 func (h *AssessmentEntryHandler) ListMyAssessmentEntries(c *gin.Context) {
 	clinicianItem, err := h.currentClinician(c)
 	if err != nil {
@@ -207,7 +203,6 @@ func (h *AssessmentEntryHandler) ListMyAssessmentEntries(c *gin.Context) {
 // @Param id path int true "测评入口ID"
 // @Success 200 {object} core.Response
 // @Router /api/v1/clinicians/me/assessment-entries/{id} [get]
-// @Router /api/v1/practitioners/me/assessment-entries/{id} [get]
 func (h *AssessmentEntryHandler) GetMyAssessmentEntry(c *gin.Context) {
 	clinicianItem, err := h.currentClinician(c)
 	if err != nil {
@@ -297,7 +292,6 @@ func (h *AssessmentEntryHandler) ReactivateAssessmentEntry(c *gin.Context) {
 // @Param id path int true "测评入口ID"
 // @Success 200 {object} core.Response
 // @Router /api/v1/clinicians/me/assessment-entries/{id}/deactivate [post]
-// @Router /api/v1/practitioners/me/assessment-entries/{id}/deactivate [post]
 func (h *AssessmentEntryHandler) DeactivateMyAssessmentEntry(c *gin.Context) {
 	h.setMyAssessmentEntryActive(c, false)
 }
@@ -310,7 +304,6 @@ func (h *AssessmentEntryHandler) DeactivateMyAssessmentEntry(c *gin.Context) {
 // @Param id path int true "测评入口ID"
 // @Success 200 {object} core.Response
 // @Router /api/v1/clinicians/me/assessment-entries/{id}/reactivate [post]
-// @Router /api/v1/practitioners/me/assessment-entries/{id}/reactivate [post]
 func (h *AssessmentEntryHandler) ReactivateMyAssessmentEntry(c *gin.Context) {
 	h.setMyAssessmentEntryActive(c, true)
 }
