@@ -19,7 +19,6 @@ const (
 	UserIDStrKey       = httpauth.UserIDStrKey
 	OrgIDKey           = httpauth.OrgIDKey
 	TenantDomainKey    = httpauth.TenantDomainKey
-	RolesKey           = httpauth.RolesKey
 	CurrentOperatorKey = "current_operator"
 	PrincipalKey       = httpauth.PrincipalKey
 	OrgScopeKey        = httpauth.OrgScopeKey
@@ -27,10 +26,6 @@ const (
 
 func UserIdentityMiddleware() gin.HandlerFunc {
 	return httpauth.UserIdentityMiddleware()
-}
-
-func OptionalUserIdentityMiddleware() gin.HandlerFunc {
-	return httpauth.OptionalUserIdentityMiddleware()
 }
 
 func RequireTenantDomainMiddleware() gin.HandlerFunc {
@@ -95,46 +90,6 @@ func RequireActiveOperatorMiddleware(checker operatorapp.ActiveOperatorChecker) 
 	}
 }
 
-func RequireRoleMiddleware(requiredRole string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		roles := GetRoles(c)
-		if len(roles) == 0 {
-			c.JSON(http.StatusForbidden, gin.H{"error": "no roles found"})
-			c.Abort()
-			return
-		}
-		for _, role := range roles {
-			if role == requiredRole {
-				c.Next()
-				return
-			}
-		}
-		c.JSON(http.StatusForbidden, gin.H{"error": fmt.Sprintf("role '%s' required", requiredRole)})
-		c.Abort()
-	}
-}
-
-func RequireAnyRoleMiddleware(requiredRoles ...string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		roles := GetRoles(c)
-		if len(roles) == 0 {
-			c.JSON(http.StatusForbidden, gin.H{"error": "no roles found"})
-			c.Abort()
-			return
-		}
-		for _, role := range roles {
-			for _, required := range requiredRoles {
-				if role == required {
-					c.Next()
-					return
-				}
-			}
-		}
-		c.JSON(http.StatusForbidden, gin.H{"error": fmt.Sprintf("one of roles %v required", requiredRoles)})
-		c.Abort()
-	}
-}
-
 func GetUserID(c *gin.Context) uint64       { return httpauth.GetUserID(c) }
 func GetUserIDStr(c *gin.Context) string    { return httpauth.GetUserIDStr(c) }
 func GetOrgID(c *gin.Context) uint64        { return httpauth.GetOrgID(c) }
@@ -146,13 +101,6 @@ func GetOrgScope(c *gin.Context) (securityplane.OrgScope, bool) {
 	return httpauth.GetOrgScope(c)
 }
 
-func GetRoles(c *gin.Context) []string {
-	if snap := GetAuthzSnapshot(c); snap != nil && len(snap.Roles) > 0 {
-		return snap.Roles
-	}
-	return httpauth.GetRoles(c)
-}
-
 func GetCurrentOperator(c *gin.Context) *operatorapp.OperatorResult {
 	v, ok := c.Get(CurrentOperatorKey)
 	if !ok {
@@ -160,13 +108,4 @@ func GetCurrentOperator(c *gin.Context) *operatorapp.OperatorResult {
 	}
 	op, _ := v.(*operatorapp.OperatorResult)
 	return op
-}
-
-func HasRole(c *gin.Context, role string) bool {
-	for _, r := range GetRoles(c) {
-		if r == role {
-			return true
-		}
-	}
-	return false
 }

@@ -17,7 +17,6 @@ const (
 	UserIDStrKey    = "user_id_str"
 	OrgIDKey        = "org_id"
 	TenantDomainKey = "tenant_domain"
-	RolesKey        = "roles"
 	PrincipalKey    = "security_principal"
 	OrgScopeKey     = "security_org_scope"
 )
@@ -43,29 +42,6 @@ func UserIdentityMiddleware() gin.HandlerFunc {
 			c.Set(UserIDKey, userID)
 		}
 
-		projectIdentityContext(c, claims)
-		c.Next()
-	}
-}
-
-// OptionalUserIdentityMiddleware projects IAM claims when present.
-func OptionalUserIdentityMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		claims := pkgmiddleware.GetUserClaims(c)
-		if claims == nil {
-			c.Next()
-			return
-		}
-
-		c.Set(UserIDStrKey, claims.UserID)
-		if claims.UserID != "" {
-			if userID, err := strconv.ParseUint(claims.UserID, 10, 64); err == nil {
-				c.Set(UserIDKey, userID)
-			}
-		}
-		if len(claims.Roles) > 0 {
-			c.Set(RolesKey, claims.Roles)
-		}
 		projectIdentityContext(c, claims)
 		c.Next()
 	}
@@ -135,15 +111,6 @@ func GetTenantDomain(c *gin.Context) string {
 	return id
 }
 
-func GetRoles(c *gin.Context) []string {
-	val, exists := c.Get(RolesKey)
-	if !exists {
-		return nil
-	}
-	roles, _ := val.([]string)
-	return roles
-}
-
 // GetPrincipal returns the Security Control Plane principal projection.
 func GetPrincipal(c *gin.Context) (securityplane.Principal, bool) {
 	val, exists := c.Get(PrincipalKey)
@@ -168,9 +135,6 @@ func projectIdentityContext(c *gin.Context, claims *pkgmiddleware.UserClaims) {
 	tenantDomain := tenantDomainFromClaims(claims)
 	c.Set(TenantDomainKey, tenantDomain)
 
-	if len(claims.Roles) > 0 {
-		c.Set(RolesKey, claims.Roles)
-	}
 	setSecurityProjection(c, claims, tenantDomain, 0, false)
 }
 

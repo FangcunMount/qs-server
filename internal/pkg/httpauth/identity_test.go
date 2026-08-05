@@ -34,15 +34,15 @@ func TestUserIdentityMiddlewareProjectsClaimsToGinContext(t *testing.T) {
 		if got := GetOrgID(c); got != 0 {
 			t.Fatalf("org_id = %d, want 0 before QS org resolver", got)
 		}
-		if got := GetRoles(c); len(got) != 1 || got[0] != "operator" {
-			t.Fatalf("roles = %#v, want [operator]", got)
-		}
 		principal, ok := GetPrincipal(c)
 		if !ok {
 			t.Fatal("expected security principal projection")
 		}
 		if principal.UserID != "42" || principal.TenantDomain != "fangcun" || principal.HasOrgID {
 			t.Fatalf("principal = %#v, want user 42 domain fangcun without org", principal)
+		}
+		if got := principal.RoleNames(); len(got) != 1 || got[0] != "operator" {
+			t.Fatalf("principal roles = %#v, want [operator]", got)
 		}
 		c.Status(http.StatusNoContent)
 	})
