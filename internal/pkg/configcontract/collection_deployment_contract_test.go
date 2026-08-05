@@ -241,6 +241,8 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 		`/governance/redis`,
 		`/governance/resilience`,
 		`"ready":true`,
+		`attention_projection_reconcile`,
+		`answersheet_processing`,
 	} {
 		if !strings.Contains(workerVerifier, required) {
 			t.Errorf("worker governance verifier must contain %q", required)
@@ -463,7 +465,12 @@ case "$*" in
     if [[ "$url" == */governance/redis ]]; then
       printf '{"instance_id":"%s","summary":{"ready":true}}\n' "$instance"
     else
-      printf '{"instance_id":"%s"}\n' "$instance"
+      if [ "${FAKE_DEGRADED_ATTENTION:-false}" = "true" ]; then
+        attention='{"name":"attention_projection_reconcile","kind":"leader","strategy":"redis_lease","configured":true,"degraded":true,"ttl_seconds":1800,"renewal_mode":"auto","renew_every_seconds":600}'
+      else
+        attention='{"name":"attention_projection_reconcile","kind":"leader","strategy":"redis_lease","configured":true,"degraded":false,"ttl_seconds":1800,"renewal_mode":"auto","renew_every_seconds":600}'
+      fi
+      printf '{"instance_id":"%s","summary":{"ready":true},"locks":[{"name":"answersheet_processing","kind":"duplicate_suppression","strategy":"redis_lease","configured":true,"degraded":false,"ttl_seconds":300,"renewal_mode":"auto","renew_every_seconds":100},%s]}\n' "$instance" "$attention"
     fi
     ;;
   *)
@@ -504,6 +511,20 @@ esac
 	}
 	if !strings.Contains(string(output), "returned 4 unique IPv4 addresses, want 3") {
 		t.Fatalf("worker verifier must explain stale DNS cardinality, got:\n%s", output)
+	}
+
+	cmd = exec.Command("bash", script, "verify")
+	cmd.Env = append(os.Environ(),
+		"PRIVILEGE_RUNNER="+runnerPath,
+		"DNS_RETRY_ATTEMPTS=1",
+		"FAKE_DEGRADED_ATTENTION=true",
+	)
+	output, err = cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("worker verifier must reject a degraded Attention leader, output:\n%s", output)
+	}
+	if !strings.Contains(string(output), "attention_projection_reconcile is not healthy") {
+		t.Fatalf("worker verifier must explain degraded Attention leader, got:\n%s", output)
 	}
 }
 

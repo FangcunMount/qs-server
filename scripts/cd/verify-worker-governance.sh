@@ -49,6 +49,39 @@ fetch_snapshot() {
     "http://${ip}:${WORKER_GOVERNANCE_PORT}${path}"
 }
 
+assert_resilience_lock_capability() {
+  local snapshot="$1"
+  local name="$2"
+  local kind="$3"
+  local ttl_seconds="$4"
+  local renew_every_seconds="$5"
+  local capability
+  capability="$(
+    printf '%s' "$snapshot" |
+      tr -d '\n' |
+      grep -o "\"name\":\"${name}\"[^}]*" |
+      head -n 1 || true
+  )"
+  if [ -z "$capability" ]; then
+    echo "Worker resilience snapshot is missing lock capability ${name}" >&2
+    return 1
+  fi
+  local expected
+  for expected in \
+    "\"kind\":\"${kind}\"" \
+    '"strategy":"redis_lease"' \
+    '"configured":true' \
+    '"degraded":false' \
+    "\"ttl_seconds\":${ttl_seconds}" \
+    '"renewal_mode":"auto"' \
+    "\"renew_every_seconds\":${renew_every_seconds}"; do
+    if ! grep -Fq "$expected" <<<"$capability"; then
+      echo "Worker lock capability ${name} is not healthy: missing ${expected}" >&2
+      return 1
+    fi
+  done
+}
+
 verify_worker_snapshots() {
   local resolved_ips="$1"
   local ip redis_snapshot resilience_snapshot redis_instance resilience_instance
@@ -75,11 +108,17 @@ verify_worker_snapshots() {
       echo "Worker ${ip} resilience governance snapshot is unreachable" >&2
       return 1
     fi
+    if ! grep -Fq '"summary":{"ready":true' <<<"$resilience_snapshot"; then
+      echo "Worker ${ip} resilience governance snapshot is not ready" >&2
+      return 1
+    fi
     resilience_instance="$(printf '%s' "$resilience_snapshot" | json_string_field instance_id)"
     if [ -z "$resilience_instance" ] || [ "$resilience_instance" != "$redis_instance" ]; then
       echo "Worker ${ip} governance instance_id mismatch" >&2
       return 1
     fi
+    assert_resilience_lock_capability "$resilience_snapshot" answersheet_processing duplicate_suppression 300 100
+    assert_resilience_lock_capability "$resilience_snapshot" attention_projection_reconcile leader 1800 600
 
     printf 'Worker governance endpoint %s instance=%s ready\n' "$ip" "$redis_instance"
     instance_ids="${instance_ids}${redis_instance}"$'\n'
