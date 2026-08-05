@@ -354,6 +354,8 @@ jobs:
             print(`MongoDB version: ${db.version()}`)
             print("Database statistics:")
             printjson(targetDB.stats())
+            print("Schema migration state:")
+            printjson(targetDB.getCollection("schema_migrations").findOne({}, {projection: {_id: 0, version: 1, dirty: 1}}))
             print("Collections:")
             printjson(collectionNames)
             print("Retirement candidate collection statistics:")
