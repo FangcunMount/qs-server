@@ -12,8 +12,7 @@ type Lifecycler interface {
 	Activate(staff *Operator) error
 
 	// Deactivate 停用员工
-	// reason: 停用原因（用于审计）
-	Deactivate(staff *Operator, reason string) error
+	Deactivate(staff *Operator) error
 }
 
 // lifecycler 生命周期管理器实现
@@ -43,14 +42,11 @@ func (lc *lifecycler) Activate(staff *Operator) error {
 	// 3. 执行激活
 	staff.activate()
 
-	// TODO: 发布领域事件
-	// 后续可在这里发布 NewStaffActivatedEvent。
-
 	return nil
 }
 
 // Deactivate 停用员工
-func (lc *lifecycler) Deactivate(staff *Operator, _ string) error {
+func (lc *lifecycler) Deactivate(staff *Operator) error {
 	// 1. 检查是否已停用（幂等）
 	if !staff.IsActive() {
 		return nil
@@ -65,9 +61,6 @@ func (lc *lifecycler) Deactivate(staff *Operator, _ string) error {
 
 	// 3. 执行停用
 	staff.deactivate()
-
-	// TODO: 发布领域事件
-	// 后续可在这里发布 NewStaffDeactivatedEvent。
 
 	return nil
 }

@@ -352,7 +352,7 @@ func (s *lifecycleService) syncOperatorProjection(st *domain.Operator, dto Regis
 			return err
 		}
 	} else {
-		if err := s.lifecycler.Deactivate(st, "synced as inactive"); err != nil {
+		if err := s.lifecycler.Deactivate(st); err != nil {
 			return err
 		}
 	}

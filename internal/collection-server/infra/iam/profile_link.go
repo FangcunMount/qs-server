@@ -126,8 +126,7 @@ func (s *ProfileLinkService) ImportProfileLinks(ctx context.Context, req *identi
 }
 
 // GetDefaultOrgID 获取默认机构ID
-// 在单租户场景下，返回固定的机构ID
-// TODO: 未来如果需要多租户支持，可以通过 IAM SDK 获取用户所属机构
+// 当前部署采用 org=1 的单租户契约；多租户切换必须先引入显式机构解析端口，不能在此处隐式猜测。
 func (s *ProfileLinkService) GetDefaultOrgID() uint64 {
 	return 1
 }

@@ -160,7 +160,7 @@ func (s *authorizationService) Deactivate(ctx context.Context, operatorID uint64
 		if err != nil {
 			return errors.Wrap(err, "failed to find operator")
 		}
-		if err := s.lifecycler.Deactivate(st, "deactivated by admin"); err != nil {
+		if err := s.lifecycler.Deactivate(st); err != nil {
 			return err
 		}
 		return s.repo.Update(txCtx, st)

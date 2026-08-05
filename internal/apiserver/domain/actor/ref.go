@@ -6,8 +6,7 @@ import (
 
 // 设计说明：
 // 本文件定义的值对象用于跨聚合根引用，遵循 DDD 最佳实践。
-// 当前状态：已设计完成，等待 AnswerSheet/Assessment 等聚合根重构后使用。
-// 参考文档：docs/v2/11-01-问卷&量表BC领域模型总览-v2.md
+// 当前由 AnswerSheet.SubmissionContext 持有，并通过归因快照连接 Assessment。
 
 // TesteeRef 受试者引用（值对象）
 // 用于在其他聚合根（如 AnswerSheet、Assessment）中引用受试者

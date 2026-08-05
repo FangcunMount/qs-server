@@ -6,8 +6,7 @@ package actor
 //   - 儿童测评：家长/老师代填
 //   - 认知障碍：护理人员代填
 //   - 自测场景：受试者本人填写
-// 当前状态：已设计完成，等待 AnswerSheet 聚合根重构后使用。
-// 参考文档：docs/v2/11-03-Testee和Staff用户模型设计-v2.md 第8章
+// 当前由 AnswerSheet.SubmissionContext 持有并随答卷持久化。
 
 // FillerType 填写动作的角色类型
 type FillerType string
