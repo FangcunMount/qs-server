@@ -174,11 +174,6 @@ func handleTaskCanceled(deps *Dependencies) HandlerFunc {
 	})
 }
 
-func taskExpiredID(data *eventpayload.TaskExpiredData) string       { return data.TaskID }
-func taskExpiredPlanID(data *eventpayload.TaskExpiredData) string   { return data.PlanID }
-func taskExpiredTesteeID(data *eventpayload.TaskExpiredData) string { return data.TesteeID }
-func taskExpiredAt(data *eventpayload.TaskExpiredData) time.Time    { return data.ExpiredAt }
-
 func notifyTaskExpired(
 	ctx context.Context,
 	notifier port.TaskNotifier,
