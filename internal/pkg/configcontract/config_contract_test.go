@@ -501,6 +501,30 @@ func TestDBOpsInventoriesStatisticsCanonicalAndCompatibilityState(t *testing.T) 
 	}
 }
 
+func TestDBOpsInventoriesEventDeliveryAndRecoveryState(t *testing.T) {
+	t.Parallel()
+
+	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "db-ops.yml"))
+	if err != nil {
+		t.Fatalf("read db ops workflow: %v", err)
+	}
+	content := string(workflow)
+	for _, required := range []string{
+		"Mongo Outbox active/recent state",
+		"unexpected_active_event_types",
+		"unfinished_missing_org_id",
+		"FROM domain_event_outbox",
+		"unexpected_active_event_type",
+		"FROM retry_event_hold",
+		"FROM event_delivery_dead_letter",
+		"CONVERT_TZ('${AUDIT_FROM%Z}', '+00:00', '+08:00')",
+	} {
+		if !strings.Contains(content, required) {
+			t.Errorf("DB ops Event inventory must contain %q", required)
+		}
+	}
+}
+
 func TestReportStatusTTLContractMatchesAcrossProcesses(t *testing.T) {
 	t.Parallel()
 

@@ -435,6 +435,7 @@ jobs:
                 --quiet <<'MONGOJS'
             const targetDB = db.getSiblingDB(process.env.MONGODB_DBNAME)
             const collectionNames = targetDB.getCollectionNames().sort()
+            const auditFrom = process.env.AUDIT_FROM ? new Date(process.env.AUDIT_FROM) : null
             print(`MongoDB version: ${db.version()}`)
             print("Database statistics:")
             printjson(targetDB.stats())
@@ -442,6 +443,42 @@ jobs:
             printjson(targetDB.getCollection("schema_migrations").findOne({}, {projection: {_id: 0, version: 1, dirty: 1}}))
             print("Collections:")
             printjson(collectionNames)
+            const mongoOutbox = targetDB.getCollection("domain_event_outbox")
+            const mongoOutboxFilter = auditFrom
+              ? {$or: [
+                  {status: {$in: ["pending", "publishing", "failed"]}},
+                  {status: "published", created_at: {$gte: auditFrom}}
+                ]}
+              : {status: {$in: ["pending", "publishing", "failed"]}}
+            const mongoOutboxRows = mongoOutbox.aggregate([
+              {$match: mongoOutboxFilter},
+              {$group: {
+                _id: {event_type: "$event_type", status: "$status", retry_disposition: "$retry_disposition"},
+                records: {$sum: 1},
+                oldest_created_at: {$min: "$created_at"},
+                latest_updated_at: {$max: "$updated_at"},
+                max_attempt_count: {$max: "$attempt_count"}
+              }},
+              {$sort: {"_id.event_type": 1, "_id.status": 1, "_id.retry_disposition": 1}}
+            ]).toArray()
+            const mongoOutboxKnownTypes = [
+              "answersheet.submitted",
+              "interpretation.report.generated",
+              "interpretation.report.failed",
+              "interpretation.retry.requested"
+            ]
+            print("Mongo Outbox active/recent state:")
+            printjson({
+              audit_from: auditFrom,
+              rows: mongoOutboxRows,
+              unexpected_active_event_types: mongoOutbox.distinct("event_type", {
+                $and: [mongoOutboxFilter, {event_type: {$nin: mongoOutboxKnownTypes}}]
+              }).sort(),
+              unfinished_missing_org_id: mongoOutbox.countDocuments({
+                status: {$in: ["pending", "publishing", "failed"]},
+                $or: [{org_id: {$exists: false}}, {org_id: null}]
+              })
+            })
             print("Retirement candidate collection statistics:")
             printjson(collectionNames
               .filter(name => name === "answersheet_submit_idempotency" ||
@@ -743,8 +780,13 @@ jobs:
             fi
 
             audit_clause=""
+            event_audit_clause=""
+            hold_audit_clause=""
             if [ -n "${AUDIT_FROM:-}" ]; then
-              audit_clause="AND failed_at >= '${AUDIT_FROM%Z}'"
+              audit_from_mysql="CONVERT_TZ('${AUDIT_FROM%Z}', '+00:00', '+08:00')"
+              audit_clause="AND failed_at >= ${audit_from_mysql}"
+              event_audit_clause="OR (status = 'published' AND created_at >= ${audit_from_mysql})"
+              hold_audit_clause="OR (status = 'replayed' AND updated_at >= ${audit_from_mysql})"
             fi
             sudo docker run --rm --network infra-network \
               -e MYSQL_PWD="$MYSQL_PASSWORD" \
@@ -805,6 +847,31 @@ jobs:
                    AND actual.table_type = 'BASE TABLE'
                   WHERE actual.table_name IS NULL
                   ORDER BY expected.table_name;
+                  SELECT event_type, status, COALESCE(retry_disposition, '') AS retry_disposition,
+                         COUNT(*) AS records, MIN(created_at) AS oldest_created_at,
+                         MAX(updated_at) AS latest_updated_at, MAX(attempt_count) AS max_attempt_count
+                  FROM domain_event_outbox
+                  WHERE status <> 'published' ${event_audit_clause}
+                  GROUP BY event_type, status, retry_disposition
+                  ORDER BY event_type, status, retry_disposition;
+                  SELECT DISTINCT event_type AS unexpected_active_event_type
+                  FROM domain_event_outbox
+                  WHERE (status <> 'published' ${event_audit_clause})
+                    AND event_type NOT IN (
+                      'evaluation.requested',
+                      'evaluation.retry.requested',
+                      'evaluation.outcome.committed',
+                      'evaluation.failed'
+                    )
+                  ORDER BY event_type;
+                  SELECT status, COALESCE(retry_disposition, '') AS retry_disposition,
+                         COUNT(*) AS records, MIN(blocked_at) AS oldest_blocked_at,
+                         MAX(updated_at) AS latest_updated_at,
+                         MAX(replay_attempt_count) AS max_replay_attempt_count
+                  FROM retry_event_hold
+                  WHERE status <> 'replayed' ${hold_audit_clause}
+                  GROUP BY status, retry_disposition
+                  ORDER BY status, retry_disposition;
                   SELECT run_mode, status, stage, COUNT(*) AS runs,
                          MIN(started_at) AS first_started_at,
                          MAX(started_at) AS last_started_at
