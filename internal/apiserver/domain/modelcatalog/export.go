@@ -165,8 +165,6 @@ var (
 	ErrLegacyRuntimeIdentity  = identitypkg.ErrLegacyRuntimeIdentity
 	DefaultProductChannelFor  = binding.DefaultProductChannelFor
 	CanonicalSubKindFor       = binding.CanonicalSubKindFor
-	IsCanonicalProductChannel = binding.IsCanonicalProductChannel
-	IsCanonicalSubKind        = binding.IsCanonicalSubKind
 	ResolveProductChannel     = binding.ResolveProductChannel
 	CompleteProductChannel    = binding.CompleteProductChannel
 	ValidateNewProductChannel = binding.ValidateNewProductChannel
