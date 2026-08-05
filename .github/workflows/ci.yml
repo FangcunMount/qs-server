@@ -37,6 +37,10 @@ jobs:
         run: |
           go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
 
+      - name: Compile all integration-tag contracts
+        run: |
+          go test -tags=integration -run '^$' ./...
+
       - name: Generate coverage report
         run: |
           go tool cover -func=coverage.out

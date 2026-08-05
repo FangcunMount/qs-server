@@ -411,6 +411,8 @@ func TestCIRunsModelCatalogMongoContracts(t *testing.T) {
 	}
 	content := string(workflow)
 	for _, required := range []string{
+		"Compile all integration-tag contracts",
+		"go test -tags=integration -run '^$' ./...",
 		"TestDraftRepositoryConcurrentWritersUseRevisionCAS",
 		"TestMongoReleasePairRollsBackEveryFailureBoundary",
 		"./internal/apiserver/infra/mongo/modelcatalog",
