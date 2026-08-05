@@ -25,7 +25,3 @@ func IsNotFound(err error) bool {
 func IsRevisionConflict(err error) bool {
 	return stderrors.Is(err, ErrRevisionConflict)
 }
-
-func IsVersionRequired(err error) bool {
-	return stderrors.Is(err, ErrVersionRequired)
-}

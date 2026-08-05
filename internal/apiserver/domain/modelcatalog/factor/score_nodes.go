@@ -1,9 +1,6 @@
 package factor
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 )
 
@@ -42,20 +39,6 @@ func CalculationScoreNodesFromMeasureParts(factors []Factor, graph FactorGraph, 
 		nodes = append(nodes, node)
 	}
 	return nodes
-}
-
-// ValidateCalculationScoreNodesFromMeasureParts validates the score graph derived from measure-layer parts.
-func ValidateCalculationScoreNodesFromMeasureParts(factors []Factor, graph FactorGraph, scoring []Scoring) error {
-	nodes := CalculationScoreNodesFromMeasureParts(factors, graph, scoring)
-	issues := calculation.ValidateScoreNodes(nodes)
-	if len(issues) == 0 {
-		return nil
-	}
-	msgs := make([]string, 0, len(issues))
-	for _, issue := range issues {
-		msgs = append(msgs, issue.Message)
-	}
-	return fmt.Errorf("invalid score node graph: %s", strings.Join(msgs, "; "))
 }
 
 func scoringSourceCodes(sources []ScoringSource) []string {

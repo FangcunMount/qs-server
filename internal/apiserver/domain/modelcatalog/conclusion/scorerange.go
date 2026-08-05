@@ -15,16 +15,6 @@ func (r ScoreRangeOutcome) Bound() ScoreRangeBound {
 	}
 }
 
-// HasExplicitEndpointSemantics is true when any rule declares MaxInclusive or UnboundedMax.
-func HasExplicitEndpointSemantics(rules []ScoreRangeOutcome) bool {
-	for _, rule := range rules {
-		if rule.MaxInclusive || rule.UnboundedMax {
-			return true
-		}
-	}
-	return false
-}
-
 // MatchScoreRangeOutcomes returns the first matching rule using the shared endpoint contract.
 func MatchScoreRangeOutcomes(score float64, rules []ScoreRangeOutcome) (ScoreRangeOutcome, bool) {
 	if len(rules) == 0 {

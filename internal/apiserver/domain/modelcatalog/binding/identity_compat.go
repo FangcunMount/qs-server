@@ -11,9 +11,3 @@ func DecisionKindForIdentity(kind Kind, subKind SubKind, algorithm Algorithm) (D
 func AlgorithmFamilyFromIdentity(kind Kind, subKind SubKind, algorithm Algorithm) (identitypkg.AlgorithmFamily, bool) {
 	return identitypkg.AlgorithmFamilyFromIdentity(kind, subKind, algorithm)
 }
-
-// CompatibleAlgorithmBinding reports whether Kind/SubKind/Algorithm form a
-// known ModelIdentity ↔ AlgorithmBinding matrix entry.
-func CompatibleAlgorithmBinding(kind Kind, subKind SubKind, algorithm Algorithm) bool {
-	return identitypkg.CompatibleAlgorithmBinding(kind, subKind, algorithm)
-}
