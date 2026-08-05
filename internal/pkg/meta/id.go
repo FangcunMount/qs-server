@@ -41,14 +41,6 @@ func MustFromUint64(v uint64) ID { return FromUint64(v) }
 
 // ===== 边界有错构造（只在解析 URL/JSON/表单时用） =====
 
-// FromInt64 从 int64 解析，负数报错
-func FromInt64(v int64) (ID, error) {
-	if v < 0 {
-		return 0, errors.New("meta.FromInt64: negative")
-	}
-	return ID(v), nil
-}
-
 // ParseID 解析字符串形式的 ID
 func ParseID(s string) (ID, error) {
 	s = strings.TrimSpace(s)

@@ -17,9 +17,6 @@ const (
 // Driver defines the interface for database migration drivers.
 // Each database type (MySQL, MongoDB, etc.) should implement this interface.
 type Driver interface {
-	// Backend returns the backend type of this driver.
-	Backend() Backend
-
 	// SourcePath returns the path to migration files within the embedded FS.
 	SourcePath() string
 

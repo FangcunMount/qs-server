@@ -76,10 +76,6 @@ var (
 
 type PrometheusObserver struct{}
 
-func NewPrometheusObserver() *PrometheusObserver {
-	return &PrometheusObserver{}
-}
-
 func (PrometheusObserver) ObservePublish(_ context.Context, evt PublishEvent) {
 	eventPublishTotal.WithLabelValues(evt.Source, evt.Mode, evt.Topic, evt.EventType, evt.Outcome.String()).Inc()
 }

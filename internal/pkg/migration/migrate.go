@@ -56,20 +56,6 @@ func NewMongoMigrator(client *mongo.Client, config *Config) *Migrator {
 	}
 }
 
-// NewMigratorWithDriver 使用自定义驱动创建迁移器
-// 这是推荐的创建方式，支持任意实现 Driver 接口的数据库
-func NewMigratorWithDriver(driver Driver, config *Config) *Migrator {
-	return &Migrator{
-		driver: driver,
-		config: ensureConfigDefaults(config),
-	}
-}
-
-// Backend 返回当前使用的后端类型
-func (m *Migrator) Backend() Backend {
-	return m.driver.Backend()
-}
-
 // Run 执行数据库迁移并返回最新版本以及是否执行了迁移
 //
 // 工作流程:
@@ -147,45 +133,6 @@ func (m *Migrator) Run() (uint, bool, error) {
 	}
 
 	return newVersion, true, nil
-}
-
-// Rollback 回滚最近的一次迁移
-func (m *Migrator) Rollback() error {
-	if err := m.validate(); err != nil {
-		return err
-	}
-
-	instance, err := m.driver.CreateInstance(migrations, m.config)
-	if err != nil {
-		return err
-	}
-	// 注意：不关闭 migrate 实例，避免关闭数据库连接
-
-	if err := instance.Steps(-1); err != nil {
-		return fmt.Errorf("rollback failed: %w", err)
-	}
-
-	return nil
-}
-
-// Version 获取当前数据库版本
-func (m *Migrator) Version() (uint, bool, error) {
-	if err := m.validate(); err != nil {
-		return 0, false, err
-	}
-
-	instance, err := m.driver.CreateInstance(migrations, m.config)
-	if err != nil {
-		return 0, false, err
-	}
-	// 注意：不关闭 migrate 实例，避免关闭数据库连接
-
-	version, dirty, err := instance.Version()
-	if err != nil {
-		return 0, false, err
-	}
-
-	return version, dirty, nil
 }
 
 // validate 验证迁移器配置

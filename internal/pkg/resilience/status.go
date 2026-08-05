@@ -9,12 +9,6 @@ type StatusService interface {
 	GetStatus(context.Context) (*RuntimeSnapshot, error)
 }
 
-type StatusServiceFunc func(context.Context) (*RuntimeSnapshot, error)
-
-func (f StatusServiceFunc) GetStatus(ctx context.Context) (*RuntimeSnapshot, error) {
-	return f(ctx)
-}
-
 // RuntimeSnapshot is the component-level resilience status document.
 type RuntimeSnapshot struct {
 	GeneratedAt          time.Time              `json:"generated_at"`

@@ -114,19 +114,7 @@ var workerEvaluationPayloadGateTotal = promauto.NewCounterVec(prometheus.Counter
 	Help: "evaluation.requested payload gate classifications before Execute (EV-R015).",
 }, []string{"class"})
 
-var resilienceControlOperationTotal = promauto.NewCounterVec(
-	prometheus.CounterOpts{
-		Name: "resilience_control_operation_total",
-		Help: "Total resilience control-plane operations.",
-	},
-	[]string{"component", "operation", "outcome"},
-)
-
 type PrometheusObserver struct{}
-
-func NewPrometheusObserver() *PrometheusObserver {
-	return &PrometheusObserver{}
-}
 
 func (PrometheusObserver) ObserveDecision(_ context.Context, decision Decision) {
 	subject := normalizeSubject(decision.Subject)
@@ -284,17 +272,4 @@ func ObserveSubmitToAssessmentReady(duration time.Duration) {
 	if duration >= 0 {
 		collectionSubmitToAssessmentReadyDuration.Observe(duration.Seconds())
 	}
-}
-
-func ObserveControlOperation(component, operation, outcome string) {
-	if component == "" {
-		component = "unknown"
-	}
-	if operation == "" {
-		operation = "unknown"
-	}
-	if outcome == "" {
-		outcome = "unknown"
-	}
-	resilienceControlOperationTotal.WithLabelValues(component, operation, outcome).Inc()
 }

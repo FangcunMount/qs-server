@@ -6,24 +6,10 @@ package server
 
 import (
 	"net"
-	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/spf13/viper"
-
-	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/component-base/pkg/util/homedir"
-)
-
-const (
-	// RecommendedHomeDir 定义了所有服务配置的默认目录
-	RecommendedHomeDir = ".questionnaire-scale"
-
-	// RecommendedEnvPrefix 定义了所有服务的 ENV 前缀
-	RecommendedEnvPrefix = "QS"
 )
 
 // Config 是用于配置 GenericAPIServer 的结构体
@@ -125,27 +111,4 @@ func (c CompletedConfig) New() (*GenericAPIServer, error) {
 	initGenericAPIServer(s)
 
 	return s, nil
-}
-
-// LoadConfig 读取配置文件和环境变量
-func LoadConfig(cfg string, defaultName string) {
-	if cfg != "" {
-		viper.SetConfigFile(cfg)
-	} else {
-		viper.AddConfigPath(".")
-		viper.AddConfigPath(filepath.Join(homedir.HomeDir(), RecommendedHomeDir))
-		viper.AddConfigPath("/etc/qs")
-		viper.SetConfigName(defaultName)
-	}
-
-	// 设置配置文件类型为yaml
-	viper.SetConfigType("yaml")              // 设置配置文件类型
-	viper.AutomaticEnv()                     // 读取环境变量
-	viper.SetEnvPrefix(RecommendedEnvPrefix) // 设置环境变量的前缀
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
-
-	// 如果配置文件存在，则读取配置文件
-	if err := viper.ReadInConfig(); err != nil {
-		log.Warnf("WARNING: viper failed to discover and load the configuration file: %s", err.Error())
-	}
 }

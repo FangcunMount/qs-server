@@ -23,10 +23,6 @@ func newEmbeddedMigrationDriver(backend Backend, sourcePath, prefix string) embe
 	}
 }
 
-func (d embeddedMigrationDriver) Backend() Backend {
-	return d.backend
-}
-
 func (d embeddedMigrationDriver) SourcePath() string {
 	return d.sourcePath
 }

@@ -30,7 +30,3 @@ func TxFromContext(ctx context.Context) (*gorm.DB, bool) {
 func RequireTx(ctx context.Context) (*gorm.DB, error) {
 	return gormuow.RequireTx(ctx)
 }
-
-func AfterCommit(ctx context.Context, hook func(context.Context) error) error {
-	return gormuow.AfterCommit(ctx, hook)
-}

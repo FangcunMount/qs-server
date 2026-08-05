@@ -18,10 +18,6 @@ func FromBuilder(builder *basekeyspace.Builder) Keyspace {
 	return New(builder.Namespace())
 }
 
-func (k Keyspace) AnswerSheetProcessing(answerSheetID uint64) string {
-	return k.base.AnswerSheetProcessing(answerSheetID)
-}
-
 func (k Keyspace) Lock(raw string) string {
 	return k.base.Lock(raw)
 }

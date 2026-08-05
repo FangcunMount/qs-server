@@ -40,12 +40,3 @@ func AuthzSnapshotMiddleware(loader *iamauth.SnapshotLoader) gin.HandlerFunc {
 		c.Next()
 	}
 }
-
-func GetAuthzSnapshot(c *gin.Context) *authz.Snapshot {
-	v, ok := c.Get(AuthzSnapshotKey)
-	if !ok {
-		return nil
-	}
-	s, _ := v.(*authz.Snapshot)
-	return s
-}
