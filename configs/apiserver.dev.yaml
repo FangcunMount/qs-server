@@ -554,7 +554,6 @@ iam:
     grpc-endpoint: "iam-apiserver:9090"                    # 修正为 9090 端口
     refresh-interval: 5m                               # 定时刷新间隔
     cache-ttl: 30m                                     # 缓存有效期
-    fetch-strategies: ["http", "grpc", "cache"]        # 降级策略：HTTP → gRPC → 缓存
   
   # 服务间认证配置（可选）
   service-auth:

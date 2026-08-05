@@ -79,8 +79,6 @@ type IAMJWKSOptions struct {
 	GRPCEndpoint    string        `json:"grpc-endpoint"     mapstructure:"grpc-endpoint"` // gRPC 降级端点（HTTP 失败时使用）
 	RefreshInterval time.Duration `json:"refresh-interval"  mapstructure:"refresh-interval"`
 	CacheTTL        time.Duration `json:"cache-ttl"         mapstructure:"cache-ttl"`
-	// Deprecated: FetchStrategies 已弃用，SDK 会根据 URL 和 GRPCEndpoint 自动构建策略链
-	FetchStrategies []string `json:"fetch-strategies,omitempty" mapstructure:"fetch-strategies"`
 }
 
 // IAMServiceAuthOptions 服务间认证配置

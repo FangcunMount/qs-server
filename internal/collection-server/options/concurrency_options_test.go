@@ -61,6 +61,23 @@ func TestOptionsRejectRemovedMaxConcurrency(t *testing.T) {
 	}
 }
 
+func TestOptionsRejectRemovedIAMFetchStrategies(t *testing.T) {
+	t.Parallel()
+
+	for _, key := range []string{"fetch-strategies", "fetch_strategies"} {
+		key := key
+		t.Run(key, func(t *testing.T) {
+			t.Parallel()
+			err := NewOptions().ValidateRawSettings(map[string]any{
+				"iam": map[string]any{"jwks": map[string]any{key: []string{"http", "grpc", "cache"}}},
+			})
+			if err == nil || err.Error() != "iam.jwks.fetch-strategies has been removed; configure iam.jwks.url and iam.jwks.grpc-endpoint" {
+				t.Fatalf("expected removed fetch-strategies error, got %v", err)
+			}
+		})
+	}
+}
+
 func TestConcurrencyFlagsExposeOnlySplitPools(t *testing.T) {
 	t.Parallel()
 

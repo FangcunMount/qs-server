@@ -236,7 +236,6 @@ iam:
     grpc-endpoint: "iam-apiserver:9090"                    # gRPC 降级端点（HTTP 失败时使用，端口 9090）
     refresh-interval: 1h
     cache-ttl: 24h
-    fetch-strategies: ["http", "grpc", "cache"]  # 降级策略：HTTP → gRPC → 缓存
   
   # 用户信息缓存
   user-cache:

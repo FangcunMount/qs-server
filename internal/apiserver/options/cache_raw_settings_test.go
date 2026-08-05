@@ -62,3 +62,16 @@ func TestCacheRawSettingsRejectLegacySchema(t *testing.T) {
 		})
 	}
 }
+
+func TestIAMRawSettingsRejectRemovedFetchStrategies(t *testing.T) {
+	for _, key := range []string{"fetch-strategies", "fetch_strategies"} {
+		t.Run(key, func(t *testing.T) {
+			err := NewOptions().ValidateRawSettings(map[string]any{
+				"iam": map[string]any{"jwks": map[string]any{key: []string{"http", "grpc", "cache"}}},
+			})
+			if err == nil || !strings.Contains(err.Error(), "iam.jwks.fetch-strategies has been removed") {
+				t.Fatalf("expected removed fetch-strategies error, got %v", err)
+			}
+		})
+	}
+}
