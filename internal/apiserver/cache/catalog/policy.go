@@ -7,7 +7,6 @@ import sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 type PolicySwitch = sharedcache.PolicySwitch
 
 const (
-	PolicySwitchInherit  = sharedcache.PolicySwitchInherit
 	PolicySwitchEnabled  = sharedcache.PolicySwitchEnabled
 	PolicySwitchDisabled = sharedcache.PolicySwitchDisabled
 )
