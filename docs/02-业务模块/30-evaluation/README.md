@@ -185,7 +185,7 @@ Assessment 固化 Questionnaire 与 AssessmentModel 的发布版本。运营发�
 | 22 | [核心设计：Outcome 事实与解释边界](./22-核心设计-Outcome事实与解释边界.md) | 已重写 | Outcome、查询投影、Decision 和 Interpretation 如何分工 |
 | 30 | [关键链路：从 AnswerSheet 到 Assessment](./30-关键链路-从AnswerSheet到Assessment.md) | 已重写 | 哪些答卷进入 Evaluation，Assessment 如何幂等受理 |
 | 31 | [关键链路：从执行请求到 Outcome 提交](./31-关键链路-从执行请求到Outcome提交.md) | 已重写 | Worker 如何执行并形成可靠 Outcome |
-| 90 | [设计问题与重构清单](./90-设计问题与重构清单.md) | 已编写 | 已确认的实现偏差、优先级和后续验收边界 |
+| 90 | [设计问题与重构清单](./90-设计问题与重构清单.md) | 当前版本有条件通过 | 模块风险编号、历史实施记录与兼容/运行后续治理 |
 
 后续改造应从 `90-设计问题与重构清单.md` 的稳定编号进入；代码、机器契约、配置和 migration 仍然是更高优先级事实源。
 
