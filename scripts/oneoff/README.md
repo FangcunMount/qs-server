@@ -35,6 +35,7 @@
 | `repair_stranded_plan_tasks` | 审计、修复、验证及 CAS 回滚历史 stale pending 与 Task due_at |
 | `enroll_testees_after_date.py` | 按时间范围补录受试者关系 |
 | `govern_interpretation_presentation_profiles` | 以不可变 Artifact dimensions 和受保护 manifest 治理历史 presentation profile |
+| `govern_interpretation_template_releases` | 为历史 ReportTemplate release 物化 Builder/schema manifest 并补齐 Enneagram 发布身份 |
 
 具体参数以各命令的 `--help`、相邻 README 和测试为准。
 
