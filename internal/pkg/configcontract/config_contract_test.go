@@ -589,9 +589,33 @@ func TestDBOpsAttentionRecoveryAuditOnlyCountsHighRiskSideEffects(t *testing.T) 
 	for _, required := range []string{
 		"High-risk report artifact attention coverage since",
 		`risk_level: {$in: ["high", "severe"]}`,
+		"Attention projection identity integrity",
+		"duplicate_report_groups",
+		"generated_within_30m_safety_lag",
+		"Attention gap cross-store classification (aggregate counts only)",
+		"affected_testees",
+		"already_key_focus_testees",
+		"needs_key_focus_testees",
+		"missing_testee_refs",
+		"missing_assessment_refs",
+		"assessment_testee_mismatches",
+		"testee_org_mismatches",
+		`docker run --rm --interactive --network infra-network`,
+		`sudo chown "$(id -u):$(id -g)" "$ATTENTION_GAP_TSV"`,
+		`chmod 0600 "$ATTENTION_GAP_TSV"`,
+		`chmod 0600 "$ATTENTION_GAP_SQL"`,
 	} {
 		if !strings.Contains(content, required) {
 			t.Errorf("DB ops Attention recovery audit must contain %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		`cat "$ATTENTION_GAP_TSV"`,
+		"CREATE TEMPORARY TABLE attention_gap",
+		"INSERT INTO attention_gap",
+	} {
+		if strings.Contains(content, forbidden) {
+			t.Errorf("DB ops Attention recovery audit must not contain %q", forbidden)
 		}
 	}
 }
@@ -607,7 +631,7 @@ func TestDBOpsMongoStatusRunsAsFailFastScript(t *testing.T) {
 	for _, required := range []string{
 		`MONGO_STATUS_DIR=$(mktemp -d /tmp/qs-mongodb-status.XXXXXX)`,
 		`cat > "$MONGO_STATUS_SCRIPT" <<'MONGOJS'`,
-		`-v "$MONGO_STATUS_SCRIPT:/audit/status.js:ro"`,
+		`-v "$MONGO_STATUS_DIR:/audit"`,
 		"--file /audit/status.js",
 		`findOne({}, {_id: 0, version: 1, dirty: 1})`,
 		"Running MongoDB utility containers:",

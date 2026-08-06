@@ -417,7 +417,7 @@ jobs:
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,AUDIT_FROM
+          envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,AUDIT_FROM
           script: |
             set -Eeuo pipefail
             export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
@@ -438,11 +438,19 @@ jobs:
               echo "❌ audit_from must use YYYY-MM-DDTHH:MM:SSZ" >&2
               exit 1
             fi
+            if [ -n "${AUDIT_FROM:-}" ]; then
+              : "${MYSQL_HOST:?MYSQL_HOST is required for Attention cross-store audit}"
+              : "${MYSQL_USERNAME:?MYSQL_USERNAME is required for Attention cross-store audit}"
+              : "${MYSQL_PASSWORD:?MYSQL_PASSWORD is required for Attention cross-store audit}"
+              : "${MYSQL_DATABASE:?MYSQL_DATABASE is required for Attention cross-store audit}"
+            fi
 
             MONGO_STATUS_DIR=$(mktemp -d /tmp/qs-mongodb-status.XXXXXX)
             MONGO_STATUS_SCRIPT="$MONGO_STATUS_DIR/status.js"
+            ATTENTION_GAP_TSV="$MONGO_STATUS_DIR/attention-gaps.tsv"
+            ATTENTION_GAP_SQL="$MONGO_STATUS_DIR/attention-gaps.sql"
             cleanup_mongo_status_script() {
-              rm -f -- "$MONGO_STATUS_SCRIPT"
+              rm -f -- "$MONGO_STATUS_SCRIPT" "$ATTENTION_GAP_TSV" "$ATTENTION_GAP_SQL"
               rmdir -- "$MONGO_STATUS_DIR"
             }
             trap cleanup_mongo_status_script EXIT
@@ -770,18 +778,31 @@ jobs:
                 {_id: 0, schema_version: 1, revision: 1, phase: 1, updated_at: 1, last_completed: 1}
               )
             })
+            const attentionProjections = targetDB.getCollection("interpretation_attention_projections")
+            const duplicateProjectionReports = attentionProjections.aggregate([
+              {$match: {report_id: {$type: "string"}}},
+              {$group: {_id: "$report_id", records: {$sum: 1}}},
+              {$match: {records: {$gt: 1}}}
+            ]).toArray()
             print("Attention projection status counts:")
-            printjson(targetDB.getCollection("interpretation_attention_projections").aggregate([
+            printjson(attentionProjections.aggregate([
               {$group: {_id: "$status", count: {$sum: 1}}},
               {$sort: {_id: 1}}
             ]).toArray())
+            print("Attention projection identity integrity:")
+            printjson({
+              missing_report_id: attentionProjections.countDocuments({$or: [
+                {report_id: {$exists: false}}, {report_id: ""}, {report_id: null}
+              ]}),
+              duplicate_report_groups: duplicateProjectionReports.length,
+              duplicate_report_records: duplicateProjectionReports.reduce((total, row) => total + row.records, 0)
+            })
             if (process.env.AUDIT_FROM) {
               const from = new Date(process.env.AUDIT_FROM)
               if (Number.isNaN(from.getTime())) {
                 throw new Error("invalid AUDIT_FROM")
               }
-              print(`High-risk report artifact attention coverage since ${process.env.AUDIT_FROM}:`)
-              printjson(targetDB.getCollection("interpret_report_artifacts").aggregate([
+              const gaps = targetDB.getCollection("interpret_report_artifacts").aggregate([
                 {$match: {
                   deleted_at: null,
                   generated_at: {$gte: from},
@@ -789,7 +810,11 @@ jobs:
                 }},
                 {$project: {
                   report_id: {$toString: "$domain_id"},
-                  risk_level: {$ifNull: ["$risk_level", ""]}
+                  assessment_id: {$toString: "$assessment_id"},
+                  testee_id: {$toString: "$testee_id"},
+                  org_id: {$toString: "$org_id"},
+                  risk_level: {$ifNull: ["$risk_level", ""]},
+                  generated_at: 1
                 }},
                 {$lookup: {
                   from: "interpretation_attention_projections",
@@ -797,22 +822,60 @@ jobs:
                   foreignField: "report_id",
                   as: "projection"
                 }},
-                {$group: {
-                  _id: "$risk_level",
-                  artifacts: {$sum: 1},
-                  missing: {$sum: {$cond: [{$eq: [{$size: "$projection"}, 0]}, 1, 0]}}
-                }},
-                {$sort: {_id: 1}}
-              ], {allowDiskUse: true}).toArray())
+                {$match: {projection: {$size: 0}}},
+                {$project: {projection: 0}},
+                {$sort: {generated_at: 1, report_id: 1}}
+              ], {allowDiskUse: true}).toArray()
+              const numericID = /^[1-9][0-9]*$/
+              for (const gap of gaps) {
+                for (const field of ["report_id", "assessment_id", "testee_id", "org_id"]) {
+                  if (!numericID.test(gap[field] || "")) {
+                    throw new Error(`invalid ${field} in Attention gap audit`)
+                  }
+                }
+              }
+              const gapCountsByRisk = Object.entries(gaps.reduce((counts, gap) => {
+                counts[gap.risk_level] = (counts[gap.risk_level] || 0) + 1
+                return counts
+              }, {})).sort(([left], [right]) => left.localeCompare(right)).map(([risk_level, count]) => ({risk_level, count}))
+              const reportsPerTestee = gaps.reduce((counts, gap) => {
+                counts[gap.testee_id] = (counts[gap.testee_id] || 0) + 1
+                return counts
+              }, {})
+              const safetyCutoff = new Date(Date.now() - 30 * 60 * 1000)
+              print(`High-risk report artifact attention coverage since ${process.env.AUDIT_FROM}:`)
+              printjson({
+                artifacts: targetDB.getCollection("interpret_report_artifacts").countDocuments({
+                  deleted_at: null,
+                  generated_at: {$gte: from},
+                  risk_level: {$in: ["high", "severe"]}
+                }),
+                missing: gaps.length,
+                distinct_assessments: new Set(gaps.map(gap => gap.assessment_id)).size,
+                distinct_testees: Object.keys(reportsPerTestee).length,
+                duplicate_testee_groups: Object.values(reportsPerTestee).filter(count => count > 1).length,
+                max_gap_reports_per_testee: Math.max(0, ...Object.values(reportsPerTestee)),
+                generated_within_30m_safety_lag: gaps.filter(gap => gap.generated_at >= safetyCutoff).length,
+                oldest_generated_at: gaps.length > 0 ? gaps[0].generated_at : null,
+                newest_generated_at: gaps.length > 0 ? gaps[gaps.length - 1].generated_at : null,
+                by_risk: gapCountsByRisk
+              })
+              const fs = require("fs")
+              fs.writeFileSync(
+                process.env.ATTENTION_GAP_EXPORT_PATH,
+                gaps.map(gap => [gap.report_id, gap.assessment_id, gap.testee_id, gap.org_id].join("\t")).join("\n") + (gaps.length > 0 ? "\n" : ""),
+                {encoding: "utf8", mode: 0o600}
+              )
             }
             MONGOJS
 
             chmod 0755 "$MONGO_STATUS_DIR"
             chmod 0644 "$MONGO_STATUS_SCRIPT"
             sudo docker run --rm --network infra-network \
-              -v "$MONGO_STATUS_SCRIPT:/audit/status.js:ro" \
+              -v "$MONGO_STATUS_DIR:/audit" \
               -e MONGODB_DBNAME="$MONGODB_DBNAME" \
               -e AUDIT_FROM="${AUDIT_FROM:-}" \
+              -e ATTENTION_GAP_EXPORT_PATH=/audit/attention-gaps.tsv \
               mongo:7.0 mongosh \
                 --host "$MONGODB_HOST" \
                 --port "${MONGODB_PORT:-27017}" \
@@ -821,6 +884,86 @@ jobs:
                 --authenticationDatabase admin \
                 --quiet \
                 --file /audit/status.js
+
+            if [ -n "${AUDIT_FROM:-}" ]; then
+              sudo chown "$(id -u):$(id -g)" "$ATTENTION_GAP_TSV"
+              chmod 0600 "$ATTENTION_GAP_TSV"
+              emit_attention_gap_cte() {
+                printf 'WITH attention_gap (report_id, assessment_id, testee_id, org_id) AS (\n'
+                row_count=0
+                while IFS=$'\t' read -r report_id assessment_id testee_id org_id; do
+                  [ -z "$report_id" ] && continue
+                  for value in "$report_id" "$assessment_id" "$testee_id" "$org_id"; do
+                    if ! [[ "$value" =~ ^[1-9][0-9]*$ ]]; then
+                      echo "Invalid numeric identifier in private Attention gap export" >&2
+                      return 1
+                    fi
+                  done
+                  if [ "$row_count" -gt 0 ]; then
+                    printf ' UNION ALL\n'
+                  fi
+                  printf ' SELECT %s, %s, %s, %s' "$report_id" "$assessment_id" "$testee_id" "$org_id"
+                  row_count=$((row_count + 1))
+                done < "$ATTENTION_GAP_TSV"
+                if [ "$row_count" -eq 0 ]; then
+                  printf ' SELECT CAST(NULL AS UNSIGNED), CAST(NULL AS UNSIGNED), CAST(NULL AS UNSIGNED), CAST(NULL AS UNSIGNED) WHERE FALSE'
+                fi
+                printf '\n)\n'
+              }
+
+              {
+                emit_attention_gap_cte
+                cat <<'MYSQL_TESTEE_AUDIT'
+                , per_testee AS (
+                  SELECT testee_id, MIN(org_id) AS org_id, COUNT(*) AS gap_reports,
+                         COUNT(DISTINCT org_id) AS org_count
+                  FROM attention_gap
+                  GROUP BY testee_id
+                )
+                SELECT
+                  (SELECT COUNT(*) FROM attention_gap) AS gap_reports,
+                  COUNT(*) AS affected_testees,
+                  COALESCE(SUM(testee.id IS NULL), 0) AS missing_testee_refs,
+                  COALESCE(SUM(testee.id IS NOT NULL AND testee.deleted_at IS NOT NULL), 0) AS deleted_testee_refs,
+                  COALESCE(SUM(testee.id IS NOT NULL AND testee.deleted_at IS NULL AND testee.is_key_focus = 1), 0)
+                    AS already_key_focus_testees,
+                  COALESCE(SUM(testee.id IS NOT NULL AND testee.deleted_at IS NULL AND testee.is_key_focus = 0), 0)
+                    AS needs_key_focus_testees,
+                  COALESCE(SUM(per_testee.org_count <> 1), 0) AS cross_org_gap_groups,
+                  COALESCE(SUM(testee.id IS NOT NULL AND testee.org_id <> per_testee.org_id), 0)
+                    AS testee_org_mismatches
+                FROM per_testee
+                LEFT JOIN testee ON testee.id = per_testee.testee_id;
+            MYSQL_TESTEE_AUDIT
+                emit_attention_gap_cte
+                cat <<'MYSQL_ASSESSMENT_AUDIT'
+                SELECT
+                  COUNT(*) AS gap_reports,
+                  COALESCE(SUM(assessment.id IS NULL), 0) AS missing_assessment_refs,
+                  COALESCE(SUM(assessment.id IS NOT NULL AND assessment.deleted_at IS NOT NULL), 0)
+                    AS deleted_assessment_refs,
+                  COALESCE(SUM(assessment.id IS NOT NULL AND assessment.testee_id <> attention_gap.testee_id), 0)
+                    AS assessment_testee_mismatches,
+                  COALESCE(SUM(assessment.id IS NOT NULL AND assessment.org_id <> attention_gap.org_id), 0)
+                    AS assessment_org_mismatches
+                FROM attention_gap
+                LEFT JOIN assessment ON assessment.id = attention_gap.assessment_id;
+            MYSQL_ASSESSMENT_AUDIT
+              } > "$ATTENTION_GAP_SQL"
+              chmod 0600 "$ATTENTION_GAP_SQL"
+
+              echo "Attention gap cross-store classification (aggregate counts only):"
+              sudo docker run --rm --interactive --network infra-network \
+                -v "$ATTENTION_GAP_SQL:/audit/attention-gaps.sql:ro" \
+                -e MYSQL_PWD="$MYSQL_PASSWORD" \
+                mysql:8.0 mysql --protocol=tcp \
+                  --host="$MYSQL_HOST" \
+                  --port="${MYSQL_PORT:-3306}" \
+                  --user="$MYSQL_USERNAME" \
+                  --database="$MYSQL_DATABASE" \
+                  --batch --raw \
+                  < "$ATTENTION_GAP_SQL"
+            fi
             cleanup_mongo_status_script
             trap - EXIT
 
@@ -853,6 +996,11 @@ jobs:
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
           MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
           AUDIT_FROM: ${{ github.event.inputs.audit_from }}
 
   mysql-status:
