@@ -1079,30 +1079,18 @@ jobs:
                   FROM information_schema.tables
                   WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'
                   ORDER BY table_name;
-                  SET SESSION group_concat_max_len = 1048576;
-                  SET @legacy_backup_count_sql = (
-                    SELECT COALESCE(
-                      GROUP_CONCAT(
-                        CONCAT(
-                          'SELECT ', QUOTE(table_name),
-                          ' AS legacy_backup_table, COUNT(*) AS exact_rows FROM ',
-                          table_name
-                        )
-                        ORDER BY table_name SEPARATOR ' UNION ALL '
-                      ),
-                      'SELECT NULL AS legacy_backup_table, NULL AS exact_rows WHERE 1 = 0'
+                  SELECT table_name AS unexpected_retirement_table
+                  FROM information_schema.tables
+                  WHERE table_schema = DATABASE()
+                    AND table_type = 'BASE TABLE'
+                    AND table_name IN (
+                      'analytics_scan_watermarks',
+                      'seed_orphan_outbox_bak_hist_v1_20260802_r1',
+                      'seed_orphan_outbox_bak_hist_v1_orphans_20260802',
+                      'seed_orphan_stats_bak_hist_v1_20260802_r1',
+                      'seed_orphan_stats_bak_hist_v1_orphans_20260802'
                     )
-                    FROM information_schema.tables
-                    WHERE table_schema = DATABASE()
-                      AND table_type = 'BASE TABLE'
-                      AND table_name REGEXP '^seed_orphan_(outbox|stats)_bak_hist_v1[0-9A-Za-z_]*$'
-                  );
-                  PREPARE legacy_backup_count_stmt FROM @legacy_backup_count_sql;
-                  EXECUTE legacy_backup_count_stmt;
-                  DEALLOCATE PREPARE legacy_backup_count_stmt;
-                  SELECT 'analytics_scan_watermarks' AS retirement_candidate_table,
-                         COUNT(*) AS exact_rows
-                  FROM analytics_scan_watermarks;
+                  ORDER BY table_name;
                   WITH ranked_assessments AS (
                     SELECT assessment.testee_id,
                            COUNT(*) OVER (PARTITION BY assessment.testee_id) AS total_evaluated,

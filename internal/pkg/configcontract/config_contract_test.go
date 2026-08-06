@@ -487,7 +487,7 @@ func TestDBOpsInventoriesEvaluationRunAndOutcomeConsistency(t *testing.T) {
 	}
 }
 
-func TestDBOpsInventoriesLegacyBackupTablesExactly(t *testing.T) {
+func TestDBOpsRatchetsRetiredMySQLObjectsAbsent(t *testing.T) {
 	t.Parallel()
 
 	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "db-ops.yml"))
@@ -496,33 +496,23 @@ func TestDBOpsInventoriesLegacyBackupTablesExactly(t *testing.T) {
 	}
 	content := string(workflow)
 	for _, required := range []string{
-		"legacy_backup_table",
-		"COUNT(*) AS exact_rows",
-		"^seed_orphan_(outbox|stats)_bak_hist_v1[0-9A-Za-z_]*$",
-		"PREPARE legacy_backup_count_stmt",
-		"EXECUTE legacy_backup_count_stmt",
-		"DEALLOCATE PREPARE legacy_backup_count_stmt",
+		"unexpected_retirement_table",
+		"'analytics_scan_watermarks'",
+		"'seed_orphan_outbox_bak_hist_v1_20260802_r1'",
+		"'seed_orphan_outbox_bak_hist_v1_orphans_20260802'",
+		"'seed_orphan_stats_bak_hist_v1_20260802_r1'",
+		"'seed_orphan_stats_bak_hist_v1_orphans_20260802'",
 	} {
 		if !strings.Contains(content, required) {
-			t.Errorf("DB ops legacy backup inventory must contain %q", required)
+			t.Errorf("DB ops retired MySQL object ratchet must contain %q", required)
 		}
 	}
-}
-
-func TestDBOpsInventoriesOwnerlessAnalyticsWatermarkExactly(t *testing.T) {
-	t.Parallel()
-
-	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "db-ops.yml"))
-	if err != nil {
-		t.Fatalf("read db ops workflow: %v", err)
-	}
-	content := string(workflow)
-	for _, required := range []string{
-		"'analytics_scan_watermarks' AS retirement_candidate_table",
+	for _, forbidden := range []string{
+		"PREPARE legacy_backup_count_stmt",
 		"FROM analytics_scan_watermarks",
 	} {
-		if !strings.Contains(content, required) {
-			t.Errorf("DB ops ownerless analytics watermark inventory must contain %q", required)
+		if strings.Contains(content, forbidden) {
+			t.Errorf("DB ops must not query retired MySQL objects through %q", forbidden)
 		}
 	}
 }

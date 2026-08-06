@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestLegacyDatabaseRetirementWorkflowStartsReadOnly(t *testing.T) {
+func TestLegacyDatabaseRetirementWorkflowProtectsDestructiveApply(t *testing.T) {
 	t.Parallel()
 
 	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "legacy-database-retirement.yml"))
@@ -19,7 +19,12 @@ func TestLegacyDatabaseRetirementWorkflowStartsReadOnly(t *testing.T) {
 	for _, required := range []string{
 		"preflight",
 		"backup",
+		"apply",
+		"verify",
 		"legacy-db-retirement-20260806-v1",
+		"source_run_id=31070267072",
+		"DROP-LEGACY-DB-OBJECTS-20260806-V1",
+		"apply requires the exact retirement confirmation",
 		"expected exactly 5 MySQL retirement targets",
 		"expected exactly 11 MongoDB retirement targets",
 		"mysqldump --protocol=tcp",
@@ -32,25 +37,21 @@ func TestLegacyDatabaseRetirementWorkflowStartsReadOnly(t *testing.T) {
 		"MongoDB retirement preflight failed after $ATTEMPT attempts",
 		"MongoDB backup failed after $ATTEMPT attempts",
 		"MongoDB backup validation failed after $ATTEMPT attempts",
+		"MongoDB backup revalidation failed after $ATTEMPT attempts",
 		"--user 0:0",
 		"--entrypoint /usr/bin/mongodump",
 		"--entrypoint /usr/bin/mongorestore",
 		"/backup/.legacy-db-retirement-20260806-v1.partial",
 		"/backup/legacy-db-retirement-20260806-v1",
 		"retirement preflight completed; no data was changed",
+		"verified retirement backup is restorable",
+		"DROP TABLE IF EXISTS analytics_scan_watermarks",
+		"targetDB.getCollection(name).drop()",
+		"remaining_retirement_targets",
+		"remaining_mysql_retirement_targets",
 	} {
 		if !strings.Contains(content, required) {
-			t.Errorf("read-only retirement workflow must contain %q", required)
-		}
-	}
-
-	for _, forbidden := range []string{
-		"DROP TABLE",
-		"dropCollection",
-		".drop()",
-	} {
-		if strings.Contains(content, forbidden) {
-			t.Errorf("read-only retirement workflow must not contain %q", forbidden)
+			t.Errorf("protected retirement workflow must contain %q", required)
 		}
 	}
 }
