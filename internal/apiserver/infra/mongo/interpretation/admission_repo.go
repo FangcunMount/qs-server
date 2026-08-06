@@ -76,19 +76,13 @@ func (r *AdmissionFailureRepository) UpsertByFingerprint(ctx context.Context, fa
 		return false, fmt.Errorf("admission failure is required")
 	}
 	po := admissionFailureToPO(failure)
-	insert := *po
-	insert.Attempt = 0
-	insert.LastFailedAt = time.Time{}
+	update, err := admissionFailureUpsertDocument(po)
+	if err != nil {
+		return false, fmt.Errorf("build admission failure upsert: %w", err)
+	}
 	res, err := r.Collection().UpdateOne(ctx,
 		bson.M{"fingerprint": po.Fingerprint},
-		bson.M{
-			"$setOnInsert": insert,
-			"$inc":         bson.M{"attempt": 1},
-			"$set": bson.M{
-				"last_failed_at": po.LastFailedAt,
-				"trace_id":       po.TraceID,
-			},
-		},
+		update,
 		options.Update().SetUpsert(true),
 	)
 	if err != nil {
@@ -98,6 +92,33 @@ func (r *AdmissionFailureRepository) UpsertByFingerprint(ctx context.Context, fa
 		return false, fmt.Errorf("upsert admission failure: %w", err)
 	}
 	return res.UpsertedCount > 0, nil
+}
+
+func admissionFailureUpsertDocument(po *AdmissionFailurePO) (bson.M, error) {
+	if po == nil {
+		return nil, fmt.Errorf("admission failure persistence object is required")
+	}
+	raw, err := bson.Marshal(po)
+	if err != nil {
+		return nil, err
+	}
+	insert := bson.M{}
+	if err := bson.Unmarshal(raw, &insert); err != nil {
+		return nil, err
+	}
+	// MongoDB rejects one path appearing in multiple update operators. These
+	// mutable fields are initialized by $inc/$set for both insert and retry.
+	delete(insert, "attempt")
+	delete(insert, "last_failed_at")
+	delete(insert, "trace_id")
+	return bson.M{
+		"$setOnInsert": insert,
+		"$inc":         bson.M{"attempt": 1},
+		"$set": bson.M{
+			"last_failed_at": po.LastFailedAt,
+			"trace_id":       po.TraceID,
+		},
+	}, nil
 }
 
 func (r *AdmissionFailureRepository) FindByFingerprint(ctx context.Context, fingerprint string) (*admission.Failure, error) {

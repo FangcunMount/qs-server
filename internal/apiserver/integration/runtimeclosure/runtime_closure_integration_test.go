@@ -29,6 +29,7 @@ import (
 	statisticsapp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	cachebootstrap "github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
+	interpretationpolicy "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	modelDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modelDefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	modelFactor "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
@@ -499,6 +500,7 @@ func seedRuntimeCatalog(t *testing.T, db *mongo.Database) {
 			Conclusions: []modelDomain.Conclusion{modelDomain.RiskConclusion{FactorCode: "TOTAL", Rules: []modelDomain.ScoreRangeOutcome{{MinScore: 0, MaxScore: 10, MaxInclusive: true, OutcomeCode: "low", Level: "low"}}}},
 			ReportMap: modelDomain.ReportMap{Sections: []modelDomain.ReportSection{{
 				Code: modelDefinition.ReportSectionKindFactorScores, Kind: modelDefinition.ReportSectionKindFactorScores, SourceRefs: []string{"TOTAL"},
+				TemplateID: "standard", TemplateVersion: interpretationpolicy.TemplateVersionCurrent.String(),
 			}}},
 		},
 	}
