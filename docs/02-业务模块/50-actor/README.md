@@ -101,7 +101,7 @@ flowchart LR
     S --> V["Evaluation 生成 Outcome"]
     V --> P["Interpretation 生成报告"]
     P --> A["Actor 校验医生访问范围"]
-    P --> K["高风险结果 best-effort 标记重点关注"]
+    P --> K["高风险结果经 durable projection 标记重点关注"]
 ```
 
 Actor 参与首尾两段：前段把公开入口变成确定的业务参与者上下文，后段为报告和测评查询提供访问范围；中间的问卷、执行和报告状态机仍由相应模块拥有。
@@ -117,7 +117,7 @@ Actor 参与首尾两段：前段把公开入口变成确定的业务参与者�
 | 照护关系与访问范围 | 已实现 | admin 机构范围；非 admin 必须绑定 Clinician 并具有有效访问型关系 |
 | AssessmentEntry 解析与 Intake | 已实现 | token 解析、建档、creator/attending 关系和统计日志在事务内编排 |
 | 入口始终使用最新发布版本 | 设计已确认、实现未完全收敛 | 当前仍存在可选 `target_version`，记录在重构清单 |
-| 高风险重点关注投影 | 部分实现 | Worker 在报告生成后 best-effort 调用；失败无持久补偿，且只自动标记不自动取消 |
+| 高风险重点关注投影 | 已实现，生产数据待闭环 | Worker 为报告事件持久化 projection ledger，失败自动重试并以 Artifact fact reconcile 发现漏建记录；只自动标记、不自动取消。生产仍有 33 个历史缺口处于 dry-run 审计阶段，apply 需显式批准 |
 
 ## 7. 文档地图
 
