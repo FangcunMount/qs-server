@@ -198,6 +198,13 @@ function classifyRelease(document, expected, ejson) {
     (document.adapter_key || "") !== expected.adapter_key) {
     return "blocked"
   }
+  if (!(document.created_at instanceof Date) || !(document.updated_at instanceof Date) ||
+    !(document.published_at instanceof Date) || typeof document.published_by !== "string" ||
+    document.published_by.trim() === "" || document.updated_at < document.created_at ||
+    document.published_at < document.created_at || document.disabled_at != null ||
+    (document.disabled_by || "") !== "") {
+    return "blocked"
+  }
   const fields = [document.report_type, document.manifest, document.manifest_fingerprint]
   const missing = fields.every(value => value == null)
   if (missing) {

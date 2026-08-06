@@ -21,7 +21,11 @@ test("expected releases match the Go manifest fingerprints", () => {
 
 test("classifyRelease only accepts exact published release metadata", () => {
   const expected = governance.expectedReleases[0]
-  const base = {status: "published", builder_identity: "factor-scoring"}
+  const at = new Date("2026-08-06T00:00:00.000Z")
+  const base = {
+    status: "published", builder_identity: "factor-scoring",
+    created_at: at, updated_at: at, published_at: at, published_by: "user:1"
+  }
   assert.equal(governance.classifyRelease(base, expected), "update")
   assert.equal(governance.classifyRelease({
     ...base,
@@ -30,6 +34,7 @@ test("classifyRelease only accepts exact published release metadata", () => {
     manifest_fingerprint: expected.manifest_fingerprint
   }, expected), "noop")
   assert.equal(governance.classifyRelease({...base, status: "draft"}, expected), "blocked")
+  assert.equal(governance.classifyRelease({...base, published_by: ""}, expected), "blocked")
   assert.equal(governance.classifyRelease({...base, manifest: {}}, expected), "blocked")
   assert.equal(governance.classifyRelease(null, expected), "blocked")
   assert.equal(governance.classifyRelease(null, governance.expectedReleases[4]), "insert")
