@@ -2,6 +2,8 @@
 
 const test = require("node:test")
 const assert = require("node:assert/strict")
+const {execFileSync} = require("node:child_process")
+const path = require("node:path")
 
 const governance = require("./govern.js")
 
@@ -74,4 +76,31 @@ test("governance manifest fingerprint rejects tampering", () => {
   governance.validateGovernanceManifest(manifest)
   manifest.records[0].action = "noop"
   assert.throws(() => governance.validateGovernanceManifest(manifest), /fingerprint mismatch/)
+})
+
+test("current release catalog uses the immutable current version and insert-only bootstrap", () => {
+  const script = `
+    const governance = require(${JSON.stringify(path.join(__dirname, "govern.js"))});
+    const at = new Date("2026-08-06T00:00:00.000Z");
+    process.stdout.write(JSON.stringify({
+      version: governance.templateVersion,
+      confirmation: governance.applyConfirmation,
+      fingerprints: Object.fromEntries(governance.expectedReleases.map(release => [release.template_id, release.manifest_fingerprint])),
+      missing: governance.expectedReleases.map(release => governance.classifyRelease(null, release))
+    }));
+  `
+  const result = JSON.parse(execFileSync(process.execPath, ["-e", script], {
+    encoding: "utf8",
+    env: {...process.env, TEMPLATE_RELEASE_TARGET_VERSION: "2026-08-v1"}
+  }))
+  assert.equal(result.version, "2026-08-v1")
+  assert.equal(result.confirmation, "publish-interpretation-template-2026-08-v1")
+  assert.deepEqual(result.missing, ["insert", "insert", "insert", "insert", "insert"])
+  assert.deepEqual(result.fingerprints, {
+    standard: "5af751626b4ac71552feb7abe1513ca8b2cb2bb78a570d87f76562efa27d5068",
+    mbti: "3456b5d0aa2a767e0875b679bf37019a3f6a0229b65e2514d34f4d8dca744ffb",
+    sbti: "d9d4ed92fcd6bfcd7cc9f3c11145627232bd73a3a6e7b0a4f6a1fbd9b1ee9d54",
+    bigfive: "6b893f75f2a90c853da9493e0d7e75c8acd253c7cbb95ad829308766374e229a",
+    enneagram: "b490c2a8317c674b45468be5bb4ea109c4b58f8bce0eb1cc1d3050526fa134d4"
+  })
 })

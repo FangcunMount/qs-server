@@ -6,10 +6,19 @@ const crypto = require("crypto")
 
 const governanceSchemaVersion = "interpretation-template-release-governance/v1"
 const releaseManifestSchemaVersion = "interpretation-report-template-manifest/v1"
-const templateVersion = "legacy-v1"
+const legacyTemplateVersion = "legacy-v1"
+const currentTemplateVersion = "2026-08-v1"
+const templateVersion = process.env.TEMPLATE_RELEASE_TARGET_VERSION || legacyTemplateVersion
+if (![legacyTemplateVersion, currentTemplateVersion].includes(templateVersion)) {
+  throw new Error(`unsupported TEMPLATE_RELEASE_TARGET_VERSION: ${templateVersion}`)
+}
 const reportType = "standard"
-const applyConfirmation = "materialize-interpretation-template-manifest-v1"
-const rollbackConfirmation = "rollback-interpretation-template-manifest-v1"
+const applyConfirmation = templateVersion === legacyTemplateVersion
+  ? "materialize-interpretation-template-manifest-v1"
+  : "publish-interpretation-template-2026-08-v1"
+const rollbackConfirmation = templateVersion === legacyTemplateVersion
+  ? "rollback-interpretation-template-manifest-v1"
+  : "rollback-interpretation-template-2026-08-v1"
 
 function releaseManifest(templateID, routes) {
   return {
@@ -192,7 +201,7 @@ function validateGovernanceManifest(manifest) {
 
 function classifyRelease(document, expected, ejson) {
   if (document == null) {
-    return expected.template_id === "enneagram" ? "insert" : "blocked"
+    return templateVersion === currentTemplateVersion || expected.template_id === "enneagram" ? "insert" : "blocked"
   }
   if (document.status !== "published" || document.builder_identity !== expected.builder_identity ||
     (document.adapter_key || "") !== expected.adapter_key) {
@@ -480,6 +489,9 @@ if (typeof module !== "undefined") {
   module.exports = {
     governanceSchemaVersion,
     releaseManifestSchemaVersion,
+    legacyTemplateVersion,
+    currentTemplateVersion,
+    templateVersion,
     applyConfirmation,
     rollbackConfirmation,
     expectedReleases,
