@@ -746,6 +746,98 @@ jobs:
                 {presentation_profile: {$exists: false}}, {presentation_profile: null}
               ]})
             })
+            const missingPresentationProfile = {$or: [
+              {presentation_profile: {$exists: false}},
+              {presentation_profile: null}
+            ]}
+            const presentationGovernanceInventory = (collection, timeField) => {
+              const now = new Date()
+              const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+              const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+              const timeValue = `$${timeField}`
+              return collection.aggregate([
+                {$match: {deleted_at: null, ...missingPresentationProfile}},
+                {$project: {
+                  model_kind: {$ifNull: ["$model.kind", ""]},
+                  decision_kind: {$ifNull: ["$model.decision_kind", ""]},
+                  template_version: {$ifNull: ["$template_version", ""]},
+                  builder_identity: {$ifNull: ["$builder_identity", ""]},
+                  dimensions_are_array: {$isArray: "$dimensions"},
+                  dimensions: {$cond: [{$isArray: "$dimensions"}, "$dimensions", []]},
+                  occurred_at: timeValue
+                }},
+                {$project: {
+                  model_kind: 1,
+                  decision_kind: 1,
+                  template_version: 1,
+                  builder_identity: 1,
+                  dimensions_are_array: 1,
+                  dimension_count: {$size: "$dimensions"},
+                  non_empty_factor_codes: {$size: {$setUnion: [
+                    {$filter: {
+                      input: {$map: {
+                        input: "$dimensions",
+                        as: "dimension",
+                        in: {$trim: {input: {$convert: {
+                          input: "$$dimension.factor_code",
+                          to: "string",
+                          onError: "",
+                          onNull: ""
+                        }}}}
+                      }},
+                      as: "factor_code",
+                      cond: {$ne: ["$$factor_code", ""]}
+                    }},
+                    []
+                  ]}},
+                  occurred_at: 1
+                }},
+                {$facet: {
+                  summary: [
+                    {$group: {
+                      _id: null,
+                      missing_total: {$sum: 1},
+                      repairable_from_dimensions: {$sum: {$cond: [{$gt: ["$dimension_count", 0]}, 1, 0]}},
+                      no_dimensions: {$sum: {$cond: [{$eq: ["$dimension_count", 0]}, 1, 0]}},
+                      invalid_dimensions_shape: {$sum: {$cond: ["$dimensions_are_array", 0, 1]}},
+                      nonempty_dimensions_without_factor_code: {$sum: {$cond: [{$and: [
+                        {$gt: ["$dimension_count", 0]},
+                        {$eq: ["$non_empty_factor_codes", 0]}
+                      ]}, 1, 0]}},
+                      missing_last_24h: {$sum: {$cond: [{$gte: ["$occurred_at", oneDayAgo]}, 1, 0]}},
+                      missing_last_7d: {$sum: {$cond: [{$gte: ["$occurred_at", sevenDaysAgo]}, 1, 0]}},
+                      latest_missing_at: {$max: "$occurred_at"}
+                    }},
+                    {$project: {_id: 0}}
+                  ],
+                  by_runtime: [
+                    {$group: {
+                      _id: {
+                        model_kind: "$model_kind",
+                        decision_kind: "$decision_kind",
+                        template_version: "$template_version",
+                        builder_identity: "$builder_identity"
+                      },
+                      missing: {$sum: 1},
+                      repairable: {$sum: {$cond: [{$gt: ["$dimension_count", 0]}, 1, 0]}}
+                    }},
+                    {$sort: {missing: -1, "_id.model_kind": 1, "_id.template_version": 1}}
+                  ]
+                }}
+              ], {allowDiskUse: true}).toArray()[0]
+            }
+            const presentationSourceInventory = collection => collection.aggregate([
+              {$match: {deleted_at: null, presentation_profile: {$exists: true, $ne: null}}},
+              {$group: {_id: {$ifNull: ["$presentation_profile.source", ""]}, count: {$sum: 1}}},
+              {$sort: {count: -1, _id: 1}}
+            ]).toArray()
+            print("Interpretation presentation governance inventory:")
+            printjson({
+              artifacts: presentationGovernanceInventory(artifacts, "generated_at"),
+              archives: presentationGovernanceInventory(archives, "created_at"),
+              artifact_profile_sources: presentationSourceInventory(artifacts),
+              archive_profile_sources: presentationSourceInventory(archives)
+            })
             print("Interpretation archived report compatibility inventory:")
             printjson({
               active_archives: archives.countDocuments({deleted_at: null}),
@@ -777,6 +869,45 @@ jobs:
                 {_id: "report_catalog"},
                 {_id: 0, schema_version: 1, revision: 1, phase: 1, updated_at: 1, last_completed: 1}
               )
+            })
+            print("Interpretation template governance matrix:")
+            printjson({
+              releases: reportTemplates.find({}, {
+                _id: 0,
+                template_id: 1,
+                template_version: 1,
+                builder_identity: 1,
+                adapter_key: 1,
+                status: 1,
+                published_at: 1,
+                published_by: 1
+              }).sort({template_id: 1, template_version: 1}).toArray(),
+              generations_by_version: generations.aggregate([
+                {$group: {_id: {$ifNull: ["$template_version", ""]}, count: {$sum: 1}}},
+                {$sort: {count: -1, _id: 1}}
+              ]).toArray(),
+              artifacts_by_provenance: artifacts.aggregate([
+                {$match: {deleted_at: null}},
+                {$group: {_id: {
+                  template_version: {$ifNull: ["$template_version", ""]},
+                  builder_identity: {$ifNull: ["$builder_identity", ""]},
+                  content_schema_version: {$ifNull: ["$content_schema_version", ""]}
+                }, count: {$sum: 1}}},
+                {$sort: {count: -1, "_id.template_version": 1, "_id.builder_identity": 1}}
+              ], {allowDiskUse: true}).toArray(),
+              published_model_report_refs: assessmentModels.aggregate([
+                {$match: {record_role: "published_snapshot", deleted_at: null}},
+                {$unwind: {path: "$definition_v2.report_map.sections", preserveNullAndEmptyArrays: true}},
+                {$group: {_id: {
+                  release_status: {$ifNull: ["$release_status", ""]},
+                  model_kind: {$ifNull: ["$kind", ""]},
+                  decision_kind: {$ifNull: ["$decision_kind", ""]},
+                  template_id: {$ifNull: ["$definition_v2.report_map.sections.template_id", ""]},
+                  template_version: {$ifNull: ["$definition_v2.report_map.sections.template_version", ""]},
+                  adapter_key: {$ifNull: ["$definition_v2.report_map.sections.adapter_key", ""]}
+                }, count: {$sum: 1}}},
+                {$sort: {count: -1, "_id.model_kind": 1, "_id.template_id": 1, "_id.template_version": 1}}
+              ], {allowDiskUse: true}).toArray()
             })
             const attentionProjections = targetDB.getCollection("interpretation_attention_projections")
             const duplicateProjectionReports = attentionProjections.aggregate([
