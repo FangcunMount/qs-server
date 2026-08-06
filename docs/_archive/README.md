@@ -13,6 +13,7 @@
 
 当前归档批次：
 
+- `2026-08-06-interpretation-history-governance/`：已签署的 Interpretation 历史 Presentation、Template、ModelCatalog 与 Outcome 路由治理专项台账。
 - `2026-07-18-pre-truth-layer-rebuild/`：本轮退出 truth layer 的集中快照；包含被替换的旧总览、运行时、业务支撑模块、基础设施浅模板、接口说明、专题分析、宣讲和系统设计稿。继续留在现行层的核心模块、cache/event 与执行指南不在此重复保存。
 
 - `2026-07-06-business-module-redesign/`：`docs/02-业务模块` 旧未编号模块目录迁移归档。

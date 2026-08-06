@@ -1,6 +1,6 @@
 # Interpretation 模块
 
-> 状态：本篇已按当前源码重写。Interpretation 的生成生命周期、重试治理和查询模型已落地；报告模板版本的发布管理等能力仍存在明确的设计缺口，本文会区分当前事实与目标边界。
+> 状态：本篇已按当前源码重写。Interpretation 的生成生命周期、重试治理、查询模型与报告模板版本发布均已落地；历史路由已完成显式冻结，运行时对缺失身份执行 fail-closed。
 
 ## 1. 30 秒结论
 
@@ -220,7 +220,7 @@ Model code 标识具体业务资产；AlgorithmFamily、DecisionKind、ReportPro
 
 运营后续发布新模型、新解释文案或新报告模板时，已生成 InterpretReport 不应被覆盖。新 TemplateVersion 应当产生新的 ReportGeneration 和新报告成品。
 
-当前 `TemplateVersion` 已进入 Generation 身份与 Report 身份，但生产适配器仍统一填充 `legacy-v1`，ModelCatalog 还没有正式发布报告模板版本。因此这是“已建立版本身份骨架，尚未完成资产发布”，不能写成已完整实现。
+`TemplateVersion` 已进入 Generation、Report 与 Outcome 身份。生产目录同时保留真实历史版本 `legacy-v1` 和当前版本 `2026-08-v1`；24 个 active ModelCatalog snapshot 均显式冻结 TemplateID/TemplateVersion。运行时不再补默认版本，也不根据当前 ModelCatalog 猜测历史路由。
 
 ### 8.5 授权先于正文查询
 
@@ -237,8 +237,8 @@ AssessmentID、TesteeID 和 OrgID 是报告关联事实，不是授权凭据。�
 | 成功/失败可靠提交 | 已实现 | Generation、Run、Report、Catalog 和 Outbox 使用 MongoDB 事务提交 |
 | 四类报告 Builder | 已实现 | factor scoring、norm profile、task performance、typology |
 | 多行为人查询 | 已实现 | participant、clinician、administration、operations |
-| 报告模板版本发布 | 规划改造 | 当前使用代码固定的 `legacy-v1` |
-| 成品自包含 Builder 与 ContentSchema 来源 | 规划改造 | 当前两者进入生成事件，未固化到 InterpretReport |
+| 报告模板版本发布 | 已实现 | 5 个 TemplateID 的历史版与当前版共 10 个 release；ModelCatalog、Outcome 和 Artifact 路由已显式冻结 |
+| 成品自包含 Builder 与 ContentSchema 来源 | 已实现 | Artifact 持久化精确来源，提交器校验与实际 Builder 一致；历史成品已完成等价补齐 |
 | 多 ReportType 并存查询 | 待明确 | 当前 catalog 以 AssessmentID 作为唯一当前报告键 |
 
 ## 10. 文档地图
@@ -256,7 +256,6 @@ AssessmentID、TesteeID 和 OrgID 是报告关联事实，不是授权凭据。�
 | 30 | [关键链路：从 Outcome 到 InterpretReport](./30-关键链路-从Outcome到InterpretReport.md) | 已重写 | Worker 如何从 Outcome 事件走到可靠报告提交 |
 | 31 | [关键链路：从报告查询到组合状态](./31-关键链路-从报告查询到组合状态.md) | 已重写 | 报告查询、Audience 投影和客户端完成状态如何组合 |
 | 90 | [设计问题与重构清单](./90-设计问题与重构清单.md) | 已编写 | 已确认的安全、语义、可靠性、版本与查询问题，以及实施顺序和验收门槛 |
-| 92 | [历史 Presentation 与 Template 治理台账](./92-历史Presentation与Template治理台账.md) | 执行中 | 历史 profile 回填、Template 发布收敛及生产验收证据 |
 
 ## 11. 事实源与验证
 
