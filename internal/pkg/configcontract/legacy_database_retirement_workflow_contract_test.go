@@ -28,6 +28,9 @@ func TestLegacyDatabaseRetirementWorkflowStartsReadOnly(t *testing.T) {
 		"mongorestore",
 		"--dryRun",
 		"--file=/tmp/retirement-preflight.js",
+		"MongoDB retirement preflight failed after $ATTEMPT attempts",
+		"MongoDB backup failed after $ATTEMPT attempts",
+		"MongoDB backup validation failed after $ATTEMPT attempts",
 		"retirement preflight completed; no data was changed",
 	} {
 		if !strings.Contains(content, required) {

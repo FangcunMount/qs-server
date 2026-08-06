@@ -154,17 +154,28 @@ jobs:
             MONGOJS
 
             echo "=== MongoDB retirement preflight ==="
-            MONGO_COUNTS=$(sudo docker run --rm --network infra-network \
-              -v "$MONGO_CHECK_SCRIPT:/tmp/retirement-preflight.js:ro" \
-              -e MONGODB_DBNAME="$MONGODB_DBNAME" \
-              mongo:7.0 mongosh \
-                --host="$MONGODB_HOST" \
-                --port="$MONGODB_PORT" \
-                --username="$MONGODB_USERNAME" \
-                --password="$MONGODB_PASSWORD" \
-                --authenticationDatabase=admin \
-                --quiet \
-                --file=/tmp/retirement-preflight.js)
+            MONGO_COUNTS=""
+            for ATTEMPT in 1 2 3; do
+              if MONGO_COUNTS=$(sudo docker run --rm --network infra-network \
+                -v "$MONGO_CHECK_SCRIPT:/tmp/retirement-preflight.js:ro" \
+                -e MONGODB_DBNAME="$MONGODB_DBNAME" \
+                mongo:7.0 mongosh \
+                  --host="$MONGODB_HOST" \
+                  --port="$MONGODB_PORT" \
+                  --username="$MONGODB_USERNAME" \
+                  --password="$MONGODB_PASSWORD" \
+                  --authenticationDatabase=admin \
+                  --quiet \
+                  --file=/tmp/retirement-preflight.js); then
+                break
+              fi
+              if (( ATTEMPT == 3 )); then
+                echo "MongoDB retirement preflight failed after $ATTEMPT attempts" >&2
+                exit 1
+              fi
+              echo "MongoDB retirement preflight attempt $ATTEMPT failed; retrying" >&2
+              sleep $((ATTEMPT * 5))
+            done
             printf '%s\n' "$MONGO_COUNTS"
             if [[ $(printf '%s\n' "$MONGO_COUNTS" | awk 'NF {count++} END {print count+0}') -ne 11 ]]; then
               echo "expected exactly 11 MongoDB retirement targets" >&2
@@ -230,30 +241,51 @@ jobs:
             )
             echo "=== Back up and validate MongoDB retirement collections ==="
             for COLLECTION in "${MONGO_TARGETS[@]}"; do
-              sudo docker run --rm --network infra-network \
-                -v "$PARTIAL_DIR/mongodb:/backup" \
-                mongo:7.0 mongodump \
-                  --host="$MONGODB_HOST" \
-                  --port="$MONGODB_PORT" \
-                  --username="$MONGODB_USERNAME" \
-                  --password="$MONGODB_PASSWORD" \
-                  --authenticationDatabase=admin \
-                  --db="$MONGODB_DBNAME" \
-                  --collection="$COLLECTION" \
-                  --gzip \
-                  --archive="/backup/$COLLECTION.archive.gz"
+              for ATTEMPT in 1 2 3; do
+                if sudo docker run --rm --network infra-network \
+                  -v "$PARTIAL_DIR/mongodb:/backup" \
+                  mongo:7.0 mongodump \
+                    --host="$MONGODB_HOST" \
+                    --port="$MONGODB_PORT" \
+                    --username="$MONGODB_USERNAME" \
+                    --password="$MONGODB_PASSWORD" \
+                    --authenticationDatabase=admin \
+                    --db="$MONGODB_DBNAME" \
+                    --collection="$COLLECTION" \
+                    --gzip \
+                    --archive="/backup/$COLLECTION.archive.gz"; then
+                  break
+                fi
+                sudo rm -f -- "$PARTIAL_DIR/mongodb/$COLLECTION.archive.gz"
+                if (( ATTEMPT == 3 )); then
+                  echo "MongoDB backup failed after $ATTEMPT attempts: $COLLECTION" >&2
+                  exit 1
+                fi
+                echo "MongoDB backup attempt $ATTEMPT failed; retrying: $COLLECTION" >&2
+                sleep $((ATTEMPT * 5))
+              done
               sudo test -s "$PARTIAL_DIR/mongodb/$COLLECTION.archive.gz"
-              sudo docker run --rm --network infra-network \
-                -v "$PARTIAL_DIR/mongodb:/backup:ro" \
-                mongo:7.0 mongorestore \
-                  --host="$MONGODB_HOST" \
-                  --port="$MONGODB_PORT" \
-                  --username="$MONGODB_USERNAME" \
-                  --password="$MONGODB_PASSWORD" \
-                  --authenticationDatabase=admin \
-                  --gzip \
-                  --archive="/backup/$COLLECTION.archive.gz" \
-                  --dryRun
+              for ATTEMPT in 1 2 3; do
+                if sudo docker run --rm --network infra-network \
+                  -v "$PARTIAL_DIR/mongodb:/backup:ro" \
+                  mongo:7.0 mongorestore \
+                    --host="$MONGODB_HOST" \
+                    --port="$MONGODB_PORT" \
+                    --username="$MONGODB_USERNAME" \
+                    --password="$MONGODB_PASSWORD" \
+                    --authenticationDatabase=admin \
+                    --gzip \
+                    --archive="/backup/$COLLECTION.archive.gz" \
+                    --dryRun; then
+                  break
+                fi
+                if (( ATTEMPT == 3 )); then
+                  echo "MongoDB backup validation failed after $ATTEMPT attempts: $COLLECTION" >&2
+                  exit 1
+                fi
+                echo "MongoDB backup validation attempt $ATTEMPT failed; retrying: $COLLECTION" >&2
+                sleep $((ATTEMPT * 5))
+              done
             done
 
             {
