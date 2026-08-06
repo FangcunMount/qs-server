@@ -1686,7 +1686,10 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-          cache: true
+          # This short-lived operations job only builds two tiny helpers. Saving
+          # the repository-wide Go cache can hold the serialized DB-ops queue
+          # for minutes after the database step has already completed.
+          cache: false
 
       - name: Build canonical DefinitionV2 hash helpers
         env:
