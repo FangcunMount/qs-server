@@ -30,23 +30,23 @@ func NewInterpretationReportTemplateHandler(service interpretationreporttemplate
 }
 
 type reportTemplateWire struct {
-	TemplateID      string     `json:"template_id"`
-	TemplateVersion string     `json:"template_version"`
-	BuilderIdentity string     `json:"builder_identity"`
-	AdapterKey      string     `json:"adapter_key,omitempty"`
-	Status          string     `json:"status"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
-	PublishedAt     *time.Time `json:"published_at,omitempty"`
-	PublishedBy     string     `json:"published_by,omitempty"`
-	DisabledAt      *time.Time `json:"disabled_at,omitempty"`
-	DisabledBy      string     `json:"disabled_by,omitempty"`
+	TemplateID          string                               `json:"template_id"`
+	TemplateVersion     string                               `json:"template_version"`
+	Manifest            domainreporttemplate.ReleaseManifest `json:"manifest"`
+	ManifestFingerprint string                               `json:"manifest_fingerprint"`
+	Status              string                               `json:"status"`
+	CreatedAt           time.Time                            `json:"created_at"`
+	UpdatedAt           time.Time                            `json:"updated_at"`
+	PublishedAt         *time.Time                           `json:"published_at,omitempty"`
+	PublishedBy         string                               `json:"published_by,omitempty"`
+	DisabledAt          *time.Time                           `json:"disabled_at,omitempty"`
+	DisabledBy          string                               `json:"disabled_by,omitempty"`
 }
 
 func reportTemplateResponse(item *domainreporttemplate.ReportTemplate) reportTemplateWire {
 	return reportTemplateWire{
 		TemplateID: item.TemplateID(), TemplateVersion: item.TemplateVersion().String(),
-		BuilderIdentity: item.BuilderIdentity(), AdapterKey: item.AdapterKey(), Status: string(item.Status()),
+		Manifest: item.Manifest(), ManifestFingerprint: item.ManifestFingerprint(), Status: string(item.Status()),
 		CreatedAt: item.CreatedAt(), UpdatedAt: item.UpdatedAt(), PublishedAt: item.PublishedAt(),
 		PublishedBy: item.PublishedBy(), DisabledAt: item.DisabledAt(), DisabledBy: item.DisabledBy(),
 	}
@@ -96,8 +96,6 @@ func (h *InterpretationReportTemplateHandler) CreateDraft(c *gin.Context) {
 	var request struct {
 		TemplateID      string `json:"template_id"`
 		TemplateVersion string `json:"template_version"`
-		BuilderIdentity string `json:"builder_identity"`
-		AdapterKey      string `json:"adapter_key"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		h.Error(c, err)
@@ -106,7 +104,6 @@ func (h *InterpretationReportTemplateHandler) CreateDraft(c *gin.Context) {
 	item, err := h.service.CreateDraft(c.Request.Context(), interpretationreporttemplate.CreateDraftCommand{
 		Actor:      interpretationreporttemplate.Actor{OperatorUserID: userID},
 		TemplateID: request.TemplateID, TemplateVersion: policy.TemplateVersion(request.TemplateVersion),
-		BuilderIdentity: request.BuilderIdentity, AdapterKey: request.AdapterKey,
 	})
 	if err != nil {
 		h.Error(c, err)

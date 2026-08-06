@@ -32,28 +32,23 @@ func (s Status) IsValid() bool {
 
 // ReportTemplate is one published-or-draft release of report-producing assets.
 type ReportTemplate struct {
-	id              meta.ID
-	templateID      string
-	templateVersion policy.TemplateVersion
-	builderIdentity string
-	adapterKey      string
-	status          Status
-	createdAt       time.Time
-	updatedAt       time.Time
-	publishedAt     *time.Time
-	publishedBy     string
-	disabledAt      *time.Time
-	disabledBy      string
+	id                  meta.ID
+	manifest            ReleaseManifest
+	manifestFingerprint string
+	status              Status
+	createdAt           time.Time
+	updatedAt           time.Time
+	publishedAt         *time.Time
+	publishedBy         string
+	disabledAt          *time.Time
+	disabledBy          string
 }
 
 // CreateInput constructs a draft template release.
 type CreateInput struct {
-	ID              meta.ID
-	TemplateID      string
-	TemplateVersion policy.TemplateVersion
-	BuilderIdentity string
-	AdapterKey      string
-	CreatedAt       time.Time
+	ID        meta.ID
+	Manifest  ReleaseManifest
+	CreatedAt time.Time
 }
 
 // NewDraft validates and creates a draft template release.
@@ -61,39 +56,42 @@ func NewDraft(input CreateInput) (*ReportTemplate, error) {
 	if input.ID.IsZero() {
 		return nil, fmt.Errorf("report template id is required")
 	}
-	templateID, err := normalizeTemplateID(input.TemplateID)
-	if err != nil {
+	manifest := input.Manifest.Clone()
+	if err := manifest.Validate(); err != nil {
 		return nil, err
 	}
-	version, err := normalizeTemplateVersion(input.TemplateVersion)
+	fingerprint, err := manifest.Fingerprint()
 	if err != nil {
 		return nil, err
-	}
-	if strings.TrimSpace(input.BuilderIdentity) == "" {
-		return nil, fmt.Errorf("report template builder identity is required")
 	}
 	if input.CreatedAt.IsZero() {
 		return nil, fmt.Errorf("report template created_at is required")
 	}
 	return &ReportTemplate{
-		id: input.ID, templateID: templateID, templateVersion: version,
-		builderIdentity: strings.TrimSpace(input.BuilderIdentity),
-		adapterKey:      strings.TrimSpace(input.AdapterKey),
-		status:          StatusDraft, createdAt: input.CreatedAt, updatedAt: input.CreatedAt,
+		id: input.ID, manifest: manifest, manifestFingerprint: fingerprint,
+		status: StatusDraft, createdAt: input.CreatedAt, updatedAt: input.CreatedAt,
 	}, nil
 }
 
 // Rehydrate restores a persisted template release.
 func Rehydrate(input PersistedInput) (*ReportTemplate, error) {
 	draft, err := NewDraft(CreateInput{
-		ID: input.ID, TemplateID: input.TemplateID, TemplateVersion: input.TemplateVersion,
-		BuilderIdentity: input.BuilderIdentity, AdapterKey: input.AdapterKey, CreatedAt: input.CreatedAt,
+		ID: input.ID, Manifest: input.Manifest, CreatedAt: input.CreatedAt,
 	})
 	if err != nil {
 		return nil, err
 	}
 	if !input.Status.IsValid() {
 		return nil, fmt.Errorf("report template status is invalid")
+	}
+	if input.ManifestFingerprint != draft.manifestFingerprint {
+		return nil, fmt.Errorf("report template manifest fingerprint mismatch")
+	}
+	if input.UpdatedAt.IsZero() || input.UpdatedAt.Before(input.CreatedAt) {
+		return nil, fmt.Errorf("report template updated_at is invalid")
+	}
+	if err := validatePersistedLifecycle(input); err != nil {
+		return nil, err
 	}
 	draft.status = input.Status
 	draft.updatedAt = input.UpdatedAt
@@ -104,27 +102,45 @@ func Rehydrate(input PersistedInput) (*ReportTemplate, error) {
 	return draft, nil
 }
 
+func validatePersistedLifecycle(input PersistedInput) error {
+	published := input.PublishedAt != nil && !input.PublishedAt.IsZero() && strings.TrimSpace(input.PublishedBy) != ""
+	disabled := input.DisabledAt != nil && !input.DisabledAt.IsZero() && strings.TrimSpace(input.DisabledBy) != ""
+	switch input.Status {
+	case StatusDraft:
+		if published || disabled || input.PublishedAt != nil || input.PublishedBy != "" || input.DisabledAt != nil || input.DisabledBy != "" {
+			return fmt.Errorf("draft report template must not contain publish or disable audit fields")
+		}
+	case StatusPublished:
+		if !published || disabled || input.DisabledAt != nil || input.DisabledBy != "" {
+			return fmt.Errorf("published report template lifecycle audit is invalid")
+		}
+	case StatusDisabled:
+		if !published || !disabled || input.DisabledAt.Before(*input.PublishedAt) {
+			return fmt.Errorf("disabled report template lifecycle audit is invalid")
+		}
+	}
+	return nil
+}
+
 // PersistedInput is the storage shape for ReportTemplate.
 type PersistedInput struct {
-	ID              meta.ID
-	TemplateID      string
-	TemplateVersion policy.TemplateVersion
-	BuilderIdentity string
-	AdapterKey      string
-	Status          Status
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	PublishedAt     *time.Time
-	PublishedBy     string
-	DisabledAt      *time.Time
-	DisabledBy      string
+	ID                  meta.ID
+	Manifest            ReleaseManifest
+	ManifestFingerprint string
+	Status              Status
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	PublishedAt         *time.Time
+	PublishedBy         string
+	DisabledAt          *time.Time
+	DisabledBy          string
 }
 
 func (t *ReportTemplate) ID() meta.ID                             { return t.id }
-func (t *ReportTemplate) TemplateID() string                      { return t.templateID }
-func (t *ReportTemplate) TemplateVersion() policy.TemplateVersion { return t.templateVersion }
-func (t *ReportTemplate) BuilderIdentity() string                 { return t.builderIdentity }
-func (t *ReportTemplate) AdapterKey() string                      { return t.adapterKey }
+func (t *ReportTemplate) TemplateID() string                      { return t.manifest.TemplateID }
+func (t *ReportTemplate) TemplateVersion() policy.TemplateVersion { return t.manifest.TemplateVersion }
+func (t *ReportTemplate) Manifest() ReleaseManifest               { return t.manifest.Clone() }
+func (t *ReportTemplate) ManifestFingerprint() string             { return t.manifestFingerprint }
 func (t *ReportTemplate) Status() Status                          { return t.status }
 func (t *ReportTemplate) CreatedAt() time.Time                    { return t.createdAt }
 func (t *ReportTemplate) UpdatedAt() time.Time                    { return t.updatedAt }
@@ -177,22 +193,6 @@ func (t *ReportTemplate) Disable(actor string, at time.Time) error {
 	t.disabledAt = &disabledAt
 	t.disabledBy = strings.TrimSpace(actor)
 	return nil
-}
-
-func normalizeTemplateID(value string) (string, error) {
-	id := strings.TrimSpace(value)
-	if id == "" {
-		return "", fmt.Errorf("report template id is required")
-	}
-	return id, nil
-}
-
-func normalizeTemplateVersion(value policy.TemplateVersion) (policy.TemplateVersion, error) {
-	version := policy.TemplateVersion(strings.TrimSpace(value.String()))
-	if version.IsEmpty() {
-		return "", fmt.Errorf("report template version is required")
-	}
-	return version, nil
 }
 
 func cloneTime(value *time.Time) *time.Time {

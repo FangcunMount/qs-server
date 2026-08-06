@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -19,8 +18,6 @@ type CreateDraftCommand struct {
 	Actor           Actor
 	TemplateID      string
 	TemplateVersion policy.TemplateVersion
-	BuilderIdentity string
-	AdapterKey      string
 }
 
 type PublishCommand struct {
@@ -58,13 +55,14 @@ func (s *service) Get(ctx context.Context, templateID string, version policy.Tem
 }
 
 type service struct {
-	repo  domainreporttemplate.Repository
-	now   func() time.Time
-	newID func() meta.ID
+	repo      domainreporttemplate.Repository
+	manifests domainreporttemplate.ManifestCatalog
+	now       func() time.Time
+	newID     func() meta.ID
 }
 
-func NewService(repo domainreporttemplate.Repository) Service {
-	return &service{repo: repo, now: time.Now, newID: meta.New}
+func NewService(repo domainreporttemplate.Repository, manifests domainreporttemplate.ManifestCatalog) Service {
+	return &service{repo: repo, manifests: manifests, now: time.Now, newID: meta.New}
 }
 
 func (s *service) CreateDraft(ctx context.Context, command CreateDraftCommand) (*domainreporttemplate.ReportTemplate, error) {
@@ -74,10 +72,16 @@ func (s *service) CreateDraft(ctx context.Context, command CreateDraftCommand) (
 	if command.Actor.OperatorUserID == 0 {
 		return nil, fmt.Errorf("operator identity is required")
 	}
+	if s.manifests == nil {
+		return nil, fmt.Errorf("report template manifest catalog is not configured")
+	}
+	manifest, ok := s.manifests.ResolveManifest(command.TemplateID, command.TemplateVersion)
+	if !ok {
+		return nil, fmt.Errorf("report template release is not registered in the current binary: %s@%s", command.TemplateID, command.TemplateVersion)
+	}
 	now := s.now()
 	tmpl, err := domainreporttemplate.NewDraft(domainreporttemplate.CreateInput{
-		ID: s.newID(), TemplateID: command.TemplateID, TemplateVersion: command.TemplateVersion,
-		BuilderIdentity: command.BuilderIdentity, AdapterKey: command.AdapterKey, CreatedAt: now,
+		ID: s.newID(), Manifest: manifest, CreatedAt: now,
 	})
 	if err != nil {
 		return nil, err
@@ -105,7 +109,7 @@ func (s *service) Publish(ctx context.Context, command PublishCommand) (*domainr
 	if err != nil {
 		return nil, err
 	}
-	if err := validateReleaseMetadata(tmpl); err != nil {
+	if err := validateReleaseMetadata(tmpl, s.manifests); err != nil {
 		return nil, err
 	}
 	if err := tmpl.Publish(actor, s.now()); err != nil {
@@ -117,23 +121,23 @@ func (s *service) Publish(ctx context.Context, command PublishCommand) (*domainr
 	return tmpl, nil
 }
 
-func validateReleaseMetadata(tmpl *domainreporttemplate.ReportTemplate) error {
+func validateReleaseMetadata(tmpl *domainreporttemplate.ReportTemplate, manifests domainreporttemplate.ManifestCatalog) error {
 	if tmpl == nil {
 		return fmt.Errorf("report template is required")
 	}
-	switch tmpl.BuilderIdentity() {
-	case report.BuilderIdentityFactorScoring, report.BuilderIdentityNormProfile, report.BuilderIdentityTaskPerformance:
-		if tmpl.AdapterKey() != "" {
-			return fmt.Errorf("report template adapter %q is incompatible with builder %s", tmpl.AdapterKey(), tmpl.BuilderIdentity())
-		}
-	case report.BuilderIdentityTypology:
-		switch tmpl.AdapterKey() {
-		case "personality_type", "trait_profile":
-		default:
-			return fmt.Errorf("report template adapter %q is not registered for typology", tmpl.AdapterKey())
-		}
-	default:
-		return fmt.Errorf("report template builder identity %q is not registered", tmpl.BuilderIdentity())
+	if manifests == nil {
+		return fmt.Errorf("report template manifest catalog is not configured")
+	}
+	expected, ok := manifests.ResolveManifest(tmpl.TemplateID(), tmpl.TemplateVersion())
+	if !ok {
+		return fmt.Errorf("report template release is not registered in the current binary: %s@%s", tmpl.TemplateID(), tmpl.TemplateVersion())
+	}
+	expectedFingerprint, err := expected.Fingerprint()
+	if err != nil {
+		return err
+	}
+	if tmpl.ManifestFingerprint() != expectedFingerprint {
+		return fmt.Errorf("report template release manifest does not match the current binary: %s@%s", tmpl.TemplateID(), tmpl.TemplateVersion())
 	}
 	return nil
 }
@@ -168,8 +172,9 @@ func actorLabel(actor Actor) string {
 
 // BootstrapDrafts are canonical report-template releases seeded on repository init.
 var BootstrapDrafts = []CreateDraftCommand{
-	{TemplateID: "standard", TemplateVersion: policy.TemplateVersionV1, BuilderIdentity: report.BuilderIdentityFactorScoring},
-	{TemplateID: "mbti", TemplateVersion: policy.TemplateVersionV1, BuilderIdentity: report.BuilderIdentityTypology, AdapterKey: "personality_type"},
-	{TemplateID: "sbti", TemplateVersion: policy.TemplateVersionV1, BuilderIdentity: report.BuilderIdentityTypology, AdapterKey: "personality_type"},
-	{TemplateID: "bigfive", TemplateVersion: policy.TemplateVersionV1, BuilderIdentity: report.BuilderIdentityTypology, AdapterKey: "trait_profile"},
+	{TemplateID: "standard", TemplateVersion: policy.TemplateVersionV1},
+	{TemplateID: "mbti", TemplateVersion: policy.TemplateVersionV1},
+	{TemplateID: "sbti", TemplateVersion: policy.TemplateVersionV1},
+	{TemplateID: "bigfive", TemplateVersion: policy.TemplateVersionV1},
+	{TemplateID: "enneagram", TemplateVersion: policy.TemplateVersionV1},
 }

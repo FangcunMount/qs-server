@@ -21,18 +21,19 @@ const reportTemplateCollection = "interpretation_report_templates"
 
 // ReportTemplatePO is the Mongo document for one template release asset.
 type ReportTemplatePO struct {
-	DomainID        uint64     `bson:"domain_id"`
-	TemplateID      string     `bson:"template_id"`
-	TemplateVersion string     `bson:"template_version"`
-	BuilderIdentity string     `bson:"builder_identity"`
-	AdapterKey      string     `bson:"adapter_key,omitempty"`
-	Status          string     `bson:"status"`
-	CreatedAt       time.Time  `bson:"created_at"`
-	UpdatedAt       time.Time  `bson:"updated_at"`
-	PublishedAt     *time.Time `bson:"published_at,omitempty"`
-	PublishedBy     string     `bson:"published_by,omitempty"`
-	DisabledAt      *time.Time `bson:"disabled_at,omitempty"`
-	DisabledBy      string     `bson:"disabled_by,omitempty"`
+	DomainID            uint64                               `bson:"domain_id"`
+	TemplateID          string                               `bson:"template_id"`
+	TemplateVersion     string                               `bson:"template_version"`
+	ReportType          string                               `bson:"report_type"`
+	Manifest            domainreporttemplate.ReleaseManifest `bson:"manifest"`
+	ManifestFingerprint string                               `bson:"manifest_fingerprint"`
+	Status              string                               `bson:"status"`
+	CreatedAt           time.Time                            `bson:"created_at"`
+	UpdatedAt           time.Time                            `bson:"updated_at"`
+	PublishedAt         *time.Time                           `bson:"published_at,omitempty"`
+	PublishedBy         string                               `bson:"published_by,omitempty"`
+	DisabledAt          *time.Time                           `bson:"disabled_at,omitempty"`
+	DisabledBy          string                               `bson:"disabled_by,omitempty"`
 }
 
 func (ReportTemplatePO) CollectionName() string { return reportTemplateCollection }
@@ -40,14 +41,21 @@ func (ReportTemplatePO) CollectionName() string { return reportTemplateCollectio
 // ReportTemplateRepository persists ReportTemplate release assets.
 type ReportTemplateRepository struct {
 	base.BaseRepository
+	manifests domainreporttemplate.ManifestCatalog
 }
 
-func NewReportTemplateRepository(db *mongo.Database, opts ...base.BaseRepositoryOptions) (*ReportTemplateRepository, error) {
-	repo := &ReportTemplateRepository{BaseRepository: base.NewBaseRepository(db, reportTemplateCollection, opts...)}
+func NewReportTemplateRepository(db *mongo.Database, manifests domainreporttemplate.ManifestCatalog, opts ...base.BaseRepositoryOptions) (*ReportTemplateRepository, error) {
+	if manifests == nil {
+		return nil, fmt.Errorf("interpretation report template manifest catalog is required")
+	}
+	repo := &ReportTemplateRepository{
+		BaseRepository: base.NewBaseRepository(db, reportTemplateCollection, opts...),
+		manifests:      manifests,
+	}
 	if _, err := repo.Collection().Indexes().CreateMany(context.Background(), reportTemplateIndexModels()); err != nil {
 		return nil, fmt.Errorf("create interpretation report template indexes: %w", err)
 	}
-	if err := repo.ensureBootstrap(context.Background()); err != nil {
+	if err := repo.ensureBootstrap(context.Background(), manifests); err != nil {
 		return nil, err
 	}
 	return repo, nil
@@ -66,6 +74,9 @@ var _ domainreporttemplate.Repository = (*ReportTemplateRepository)(nil)
 func (r *ReportTemplateRepository) Save(ctx context.Context, template *domainreporttemplate.ReportTemplate) error {
 	if template == nil {
 		return fmt.Errorf("report template is required")
+	}
+	if err := validateRegisteredReportTemplate(template, r.manifests); err != nil {
+		return err
 	}
 	po := reportTemplateToPO(template)
 	filter := bson.M{"template_id": po.TemplateID, "template_version": po.TemplateVersion}
@@ -103,7 +114,7 @@ func (r *ReportTemplateRepository) FindByKey(ctx context.Context, templateID str
 		}
 		return nil, fmt.Errorf("find report template: %w", err)
 	}
-	return reportTemplateToDomain(&po)
+	return r.toDomain(&po)
 }
 
 func (r *ReportTemplateRepository) FindPublished(ctx context.Context, templateID string, version policy.TemplateVersion) (*domainreporttemplate.ReportTemplate, error) {
@@ -116,7 +127,7 @@ func (r *ReportTemplateRepository) FindPublished(ctx context.Context, templateID
 		}
 		return nil, fmt.Errorf("find published report template: %w", err)
 	}
-	return reportTemplateToDomain(&po)
+	return r.toDomain(&po)
 }
 
 func (r *ReportTemplateRepository) ListByTemplateID(ctx context.Context, templateID string, limit int) ([]*domainreporttemplate.ReportTemplate, error) {
@@ -137,7 +148,7 @@ func (r *ReportTemplateRepository) ListByTemplateID(ctx context.Context, templat
 		if err := cur.Decode(&po); err != nil {
 			return nil, err
 		}
-		item, err := reportTemplateToDomain(&po)
+		item, err := r.toDomain(&po)
 		if err != nil {
 			return nil, err
 		}
@@ -151,19 +162,46 @@ func (r *ReportTemplateRepository) IsPublished(templateID string, version string
 	return err == nil
 }
 
-func (r *ReportTemplateRepository) ensureBootstrap(ctx context.Context) error {
-	svc := appreporttemplate.NewService(r)
-	now := time.Now().UTC()
+func (r *ReportTemplateRepository) toDomain(po *ReportTemplatePO) (*domainreporttemplate.ReportTemplate, error) {
+	template, err := reportTemplateToDomain(po)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateRegisteredReportTemplate(template, r.manifests); err != nil {
+		return nil, err
+	}
+	return template, nil
+}
+
+func validateRegisteredReportTemplate(template *domainreporttemplate.ReportTemplate, manifests domainreporttemplate.ManifestCatalog) error {
+	if template == nil || manifests == nil {
+		return fmt.Errorf("report template and manifest catalog are required")
+	}
+	expected, ok := manifests.ResolveManifest(template.TemplateID(), template.TemplateVersion())
+	if !ok {
+		return fmt.Errorf("report template release is not registered in the current binary: %s@%s", template.TemplateID(), template.TemplateVersion())
+	}
+	fingerprint, err := expected.Fingerprint()
+	if err != nil {
+		return err
+	}
+	if template.ManifestFingerprint() != fingerprint {
+		return fmt.Errorf("report template release manifest does not match the current binary: %s@%s", template.TemplateID(), template.TemplateVersion())
+	}
+	return nil
+}
+
+func (r *ReportTemplateRepository) ensureBootstrap(ctx context.Context, manifests domainreporttemplate.ManifestCatalog) error {
+	svc := appreporttemplate.NewService(r, manifests)
 	for _, seed := range appreporttemplate.BootstrapDrafts {
 		if _, err := r.FindByKey(ctx, seed.TemplateID, seed.TemplateVersion); err == nil {
 			continue
 		} else if !errors.Is(err, domainreporttemplate.ErrNotFound) {
-			return err
+			return fmt.Errorf("validate bootstrap report template %s@%s: %w", seed.TemplateID, seed.TemplateVersion, err)
 		}
 		draft, err := svc.CreateDraft(ctx, appreporttemplate.CreateDraftCommand{
 			Actor:      appreporttemplate.Actor{OperatorUserID: 1},
 			TemplateID: seed.TemplateID, TemplateVersion: seed.TemplateVersion,
-			BuilderIdentity: seed.BuilderIdentity, AdapterKey: seed.AdapterKey,
 		})
 		if err != nil {
 			return err
@@ -174,24 +212,30 @@ func (r *ReportTemplateRepository) ensureBootstrap(ctx context.Context) error {
 		}); err != nil {
 			return err
 		}
-		_ = now
 	}
 	return nil
 }
 
 func reportTemplateToPO(template *domainreporttemplate.ReportTemplate) *ReportTemplatePO {
+	manifest := template.Manifest()
 	return &ReportTemplatePO{
 		DomainID: template.ID().Uint64(), TemplateID: template.TemplateID(), TemplateVersion: template.TemplateVersion().String(),
-		BuilderIdentity: template.BuilderIdentity(), AdapterKey: template.AdapterKey(), Status: string(template.Status()),
+		ReportType: manifest.ReportType.String(), Manifest: manifest, ManifestFingerprint: template.ManifestFingerprint(), Status: string(template.Status()),
 		CreatedAt: template.CreatedAt(), UpdatedAt: template.UpdatedAt(), PublishedAt: template.PublishedAt(),
 		PublishedBy: template.PublishedBy(), DisabledAt: template.DisabledAt(), DisabledBy: template.DisabledBy(),
 	}
 }
 
 func reportTemplateToDomain(po *ReportTemplatePO) (*domainreporttemplate.ReportTemplate, error) {
+	if po == nil {
+		return nil, fmt.Errorf("report template persistence object is required")
+	}
+	if po.TemplateID != po.Manifest.TemplateID || po.TemplateVersion != po.Manifest.TemplateVersion.String() || po.ReportType != po.Manifest.ReportType.String() {
+		return nil, fmt.Errorf("report template persistence identity does not match manifest")
+	}
 	return domainreporttemplate.Rehydrate(domainreporttemplate.PersistedInput{
-		ID: meta.FromUint64(po.DomainID), TemplateID: po.TemplateID, TemplateVersion: policy.TemplateVersion(po.TemplateVersion),
-		BuilderIdentity: po.BuilderIdentity, AdapterKey: po.AdapterKey, Status: domainreporttemplate.Status(po.Status),
+		ID: meta.FromUint64(po.DomainID), Manifest: po.Manifest, ManifestFingerprint: po.ManifestFingerprint,
+		Status:    domainreporttemplate.Status(po.Status),
 		CreatedAt: po.CreatedAt, UpdatedAt: po.UpdatedAt, PublishedAt: po.PublishedAt, PublishedBy: po.PublishedBy,
 		DisabledAt: po.DisabledAt, DisabledBy: po.DisabledBy,
 	})

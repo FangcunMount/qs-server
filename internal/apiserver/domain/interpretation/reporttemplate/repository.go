@@ -18,3 +18,9 @@ type Repository interface {
 type Catalog interface {
 	IsPublished(templateID string, version string) bool
 }
+
+// ManifestCatalog resolves only template releases whose executable Builder and
+// content schema are registered in the current binary.
+type ManifestCatalog interface {
+	ResolveManifest(templateID string, version policy.TemplateVersion) (ReleaseManifest, bool)
+}

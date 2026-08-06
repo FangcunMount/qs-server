@@ -115,12 +115,16 @@ func New(deps Deps) (*Module, error) {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation admission failure repository: %v", err)
 	}
 	module.admissionRepo = admissionRepo
-	reportTemplateRepo, err := mongoEval.NewReportTemplateRepository(deps.MongoDB, mongoOptions)
+	reportTemplateManifests, err := rendering.NewBuiltinReleaseManifestCatalog()
+	if err != nil {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report template manifest catalog: %v", err)
+	}
+	reportTemplateRepo, err := mongoEval.NewReportTemplateRepository(deps.MongoDB, reportTemplateManifests, mongoOptions)
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report template repository: %v", err)
 	}
 	module.reportTemplateRepo = reportTemplateRepo
-	module.reportTemplateService = appreporttemplate.NewService(reportTemplateRepo)
+	module.reportTemplateService = appreporttemplate.NewService(reportTemplateRepo, reportTemplateManifests)
 	catalogProjector, err := mongoEval.NewReportCatalogProjector(deps.MongoDB, mongoOptions)
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report catalog projector: %v", err)

@@ -7,11 +7,23 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 type memoryRepo struct {
 	items map[string]*domainreporttemplate.ReportTemplate
+}
+
+type memoryManifestCatalog struct {
+	manifest domainreporttemplate.ReleaseManifest
+}
+
+func (c memoryManifestCatalog) ResolveManifest(templateID string, version policy.TemplateVersion) (domainreporttemplate.ReleaseManifest, bool) {
+	if c.manifest.TemplateID != templateID || c.manifest.TemplateVersion != version {
+		return domainreporttemplate.ReleaseManifest{}, false
+	}
+	return c.manifest.Clone(), true
 }
 
 func (r *memoryRepo) key(templateID string, version policy.TemplateVersion) string {
@@ -62,7 +74,14 @@ func (r *memoryRepo) IsPublished(templateID string, version string) bool {
 
 func TestServicePublishAndDisableAreAudited(t *testing.T) {
 	repo := &memoryRepo{items: map[string]*domainreporttemplate.ReportTemplate{}}
-	svc := NewService(repo)
+	manifest, err := domainreporttemplate.NewReleaseManifest("mbti", "custom-v2", policy.ReportTypeStandard, []domainreporttemplate.ManifestRoute{{
+		DecisionKind: modelcatalog.DecisionKindPoleComposition, BuilderIdentity: "typology",
+		ContentSchemaVersion: "report-content/v2", AdapterKey: "personality_type",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := NewService(repo, memoryManifestCatalog{manifest: manifest})
 	now := time.Date(2026, 7, 21, 12, 0, 0, 0, time.UTC)
 	svcImpl := svc.(*service)
 	svcImpl.now = func() time.Time { return now }
@@ -70,7 +89,6 @@ func TestServicePublishAndDisableAreAudited(t *testing.T) {
 
 	draft, err := svc.CreateDraft(context.Background(), CreateDraftCommand{
 		Actor: Actor{OperatorUserID: 1}, TemplateID: "mbti", TemplateVersion: "custom-v2",
-		BuilderIdentity: "typology", AdapterKey: "personality_type",
 	})
 	if err != nil {
 		t.Fatal(err)

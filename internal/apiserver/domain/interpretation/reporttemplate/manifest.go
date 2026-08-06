@@ -125,6 +125,12 @@ func (m ReleaseManifest) RouteFor(decisionKind modelcatalog.DecisionKind) (Manif
 	return ManifestRoute{}, false
 }
 
+func (m ReleaseManifest) Clone() ReleaseManifest {
+	cloned := m
+	cloned.Routes = append([]ManifestRoute(nil), m.Routes...)
+	return cloned
+}
+
 func (m *ReleaseManifest) normalizeRoutes() {
 	if m == nil {
 		return
