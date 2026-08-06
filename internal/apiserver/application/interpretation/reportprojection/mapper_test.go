@@ -9,7 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 )
 
-func TestMapperFromRowUsesFrozenProfileDespiteLegacyResolver(t *testing.T) {
+func TestMapperFromRowUsesFrozenProfile(t *testing.T) {
 	t.Parallel()
 
 	row := interpretationreadmodel.ReportRow{
@@ -25,8 +25,7 @@ func TestMapperFromRowUsesFrozenProfileDespiteLegacyResolver(t *testing.T) {
 			Source:             string(domainreport.PresentationProfileSourceFrozen),
 		},
 	}
-	mapper := Mapper{Legacy: stubLegacyVisibility{visible: map[string]bool{"f1": true}, configured: true}}
-	got, err := mapper.FromRow(context.Background(), row, policy.AudienceParticipant)
+	got, err := (Mapper{}).FromRow(context.Background(), row, policy.AudienceParticipant)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,6 +34,19 @@ func TestMapperFromRowUsesFrozenProfileDespiteLegacyResolver(t *testing.T) {
 	}
 	if got.PresentationSource != string(domainreport.PresentationProfileSourceFrozen) {
 		t.Fatalf("presentation source = %q", got.PresentationSource)
+	}
+}
+
+func TestMapperFromRowRejectsMissingFrozenProfile(t *testing.T) {
+	t.Parallel()
+
+	row := interpretationreadmodel.ReportRow{
+		AssessmentID: 42,
+		Model:        interpretationreadmodel.ModelIdentityRow{Kind: "scale", Code: "scl-1", Version: "1.0.0", Title: "Scale"},
+		Dimensions:   []interpretationreadmodel.ReportDimensionRow{{FactorCode: "f1"}},
+	}
+	if _, err := (Mapper{}).FromRow(context.Background(), row, policy.AudienceParticipant); err == nil {
+		t.Fatal("missing frozen presentation profile must fail closed")
 	}
 }
 
@@ -54,13 +66,4 @@ func TestMapperFromRowAppliesAudienceAfterFrozenVisibility(t *testing.T) {
 	if got.ModelExtra != nil {
 		t.Fatal("clinician audience must hide model extra after projection")
 	}
-}
-
-type stubLegacyVisibility struct {
-	visible    map[string]bool
-	configured bool
-}
-
-func (s stubLegacyVisibility) VisibleFactorCodes(context.Context, domainreport.ModelIdentity) (map[string]bool, bool, error) {
-	return s.visible, s.configured, nil
 }

@@ -20,9 +20,12 @@ const (
 	ReportAdapterTraitProfile    ReportAdapterKey = "trait_profile"
 )
 
-// ErrUnknownTemplateID marks a non-empty TemplateID that is not registered.
-// Empty TemplateID may still fall back to AdapterKey defaults.
-var ErrUnknownTemplateID = errors.New("unknown_template_id")
+var (
+	// ErrTemplateIDRequired marks a missing persisted template route.
+	ErrTemplateIDRequired = errors.New("template_id_required")
+	// ErrUnknownTemplateID marks a TemplateID that is not registered.
+	ErrUnknownTemplateID = errors.New("unknown_template_id")
+)
 
 // PersonalityTypeTemplateByID resolves a personality-type report template factory by TemplateID.
 func PersonalityTypeTemplateByID(templateID string) (PersonalityTypeReportTemplate, bool) {
@@ -60,28 +63,24 @@ func IsRegisteredTemplateID(templateID string) bool {
 	return ok
 }
 
-// PersonalityTypeTemplateForSpec resolves templates from report spec.
-// Empty TemplateID may fall back to AdapterKey defaults; a non-empty unknown
-// TemplateID fails closed with ErrUnknownTemplateID.
+// PersonalityTypeTemplateForSpec resolves one explicitly selected template.
 func PersonalityTypeTemplateForSpec(spec ReportSpec) (PersonalityTypeReportTemplate, error) {
-	if spec.TemplateID != "" {
-		if tmpl, ok := PersonalityTypeTemplateByID(spec.TemplateID); ok {
-			return tmpl, nil
-		}
-		return PersonalityTypeReportTemplate{}, fmt.Errorf("%w: %s", ErrUnknownTemplateID, spec.TemplateID)
+	if spec.TemplateID == "" {
+		return PersonalityTypeReportTemplate{}, ErrTemplateIDRequired
 	}
-	return PersonalityTypeReportTemplate{}, nil
+	if tmpl, ok := PersonalityTypeTemplateByID(spec.TemplateID); ok {
+		return tmpl, nil
+	}
+	return PersonalityTypeReportTemplate{}, fmt.Errorf("%w: %s", ErrUnknownTemplateID, spec.TemplateID)
 }
 
-// TraitProfileTemplateForSpec resolves templates from report spec.
-// Empty TemplateID may fall back to AdapterKey defaults; a non-empty unknown
-// TemplateID fails closed with ErrUnknownTemplateID.
+// TraitProfileTemplateForSpec resolves one explicitly selected template.
 func TraitProfileTemplateForSpec(spec ReportSpec) (TraitProfileReportTemplate, error) {
-	if spec.TemplateID != "" {
-		if tmpl, ok := TraitProfileTemplateByID(spec.TemplateID); ok {
-			return tmpl, nil
-		}
-		return TraitProfileReportTemplate{}, fmt.Errorf("%w: %s", ErrUnknownTemplateID, spec.TemplateID)
+	if spec.TemplateID == "" {
+		return TraitProfileReportTemplate{}, ErrTemplateIDRequired
 	}
-	return TraitProfileReportTemplate{}, nil
+	if tmpl, ok := TraitProfileTemplateByID(spec.TemplateID); ok {
+		return tmpl, nil
+	}
+	return TraitProfileReportTemplate{}, fmt.Errorf("%w: %s", ErrUnknownTemplateID, spec.TemplateID)
 }

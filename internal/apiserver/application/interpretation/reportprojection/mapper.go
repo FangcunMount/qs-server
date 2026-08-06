@@ -2,6 +2,7 @@ package reportprojection
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/presentation"
@@ -10,15 +11,18 @@ import (
 )
 
 // Mapper projects read-model rows into audience-aware report DTOs.
-type Mapper struct {
-	Legacy domainreport.LegacyDimensionVisibilityResolver
-}
+type Mapper struct{}
 
-func (m Mapper) FromRow(ctx context.Context, row interpretationreadmodel.ReportRow, audience policy.Audience) (*Report, error) {
+func (Mapper) FromRow(_ context.Context, row interpretationreadmodel.ReportRow, audience policy.Audience) (*Report, error) {
 	model := modelIdentityFromRow(row)
-	profile, configured, err := domainreport.ResolvePresentationProfile(ctx, model, presentationProfileFromRow(&row), m.Legacy)
-	if err != nil {
-		return nil, err
+	storedProfile := presentationProfileFromRow(&row)
+	configured := storedProfile != nil && storedProfile.Configured()
+	if domainreport.UsesFactorScoreVisibility(model) && !configured {
+		return nil, fmt.Errorf("frozen presentation profile is required for %s@%s", model.Code, model.Version)
+	}
+	profile := domainreport.PresentationProfile{}
+	if configured {
+		profile = *storedProfile
 	}
 	dimensions := row.Dimensions
 	if configured {

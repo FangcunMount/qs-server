@@ -101,3 +101,26 @@ func TestRegistryRejectsDuplicateKeyAndSupportsMultiKey(t *testing.T) {
 		t.Fatal("duplicate key registration succeeded")
 	}
 }
+
+func TestRegistryRejectsIncompleteRuntimeRoute(t *testing.T) {
+	key := registryKey(modelcatalog.DecisionKindPoleComposition)
+	registry, err := NewRegistry(registryBuilder{key: key, keys: []Key{key}, name: "strict"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	missingVersion := key
+	missingVersion.TemplateVersion = ""
+	if _, err := registry.ResolveByMechanism(missingVersion); err == nil {
+		t.Fatal("missing runtime template version was defaulted")
+	}
+	missingType := key
+	missingType.ReportType = ""
+	if _, err := registry.ResolveByMechanism(missingType); err == nil {
+		t.Fatal("missing runtime report type was defaulted")
+	}
+
+	input := interpinput.InterpretationInput{Runtime: interpinput.RuntimeIdentity{DecisionKind: key.DecisionKind}}
+	if _, ok := RoutingContextFromInput(input); ok {
+		t.Fatal("incomplete runtime input produced a routing context")
+	}
+}

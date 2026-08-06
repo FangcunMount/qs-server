@@ -7,15 +7,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/typology/patterns"
 )
 
-func TestPersonalityTypeTemplateForSpec_EmptyUsesGenericTemplate(t *testing.T) {
+func TestPersonalityTypeTemplateForSpec_RejectsEmptyTemplateID(t *testing.T) {
 	t.Parallel()
 
-	tmpl, err := patterns.PersonalityTypeTemplateForSpec(patterns.ReportSpec{AdapterKey: patterns.ReportAdapterPersonalityType})
-	if err != nil {
-		t.Fatalf("err = %v", err)
-	}
-	if tmpl.Kind != "" {
-		t.Fatalf("Kind = %q, want generic", tmpl.Kind)
+	_, err := patterns.PersonalityTypeTemplateForSpec(patterns.ReportSpec{AdapterKey: patterns.ReportAdapterPersonalityType})
+	if !errors.Is(err, patterns.ErrTemplateIDRequired) {
+		t.Fatalf("err = %v, want ErrTemplateIDRequired", err)
 	}
 }
 

@@ -44,6 +44,9 @@ func TestFromOutcomeRecordPreservesDimensionlessSpecialTypologyFact(t *testing.T
 	assets := &interpretationassets.Assets{
 		Outcomes: []interpretationassets.OutcomePresentation{{OutcomeCode: "DRUNK", Title: "饮酒特殊结果", Summary: "冻结特殊结果摘要"}},
 		Profiles: []interpretationassets.TypeProfilePresentation{{OutcomeCode: "DRUNK", Commentary: "冻结特殊结果摘要"}},
+		ReportSpec: interpretationassets.ReportSpec{Sections: []interpretationassets.ReportSection{{
+			Code: "personality", Kind: "personality_type", AdapterKey: "personality_type", TemplateID: "sbti", TemplateVersion: "legacy-v1",
+		}}},
 	}
 	reportInput, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
 		Assets: assets,
@@ -87,7 +90,7 @@ func TestFromOutcomeRecordPreservesDimensionlessSpecialTypologyFact(t *testing.T
 
 func TestFromOutcomeRecordRestoresTraitProfileNamesFromFrozenFactorCatalog(t *testing.T) {
 	assets := &interpretationassets.Assets{ReportSpec: interpretationassets.ReportSpec{Sections: []interpretationassets.ReportSection{{
-		Code: "trait_profile", Kind: "trait_profile", AdapterKey: "trait_profile", TemplateID: "enneagram",
+		Code: "trait_profile", Kind: "trait_profile", AdapterKey: "trait_profile", TemplateID: "enneagram", TemplateVersion: "legacy-v1",
 	}}}}
 	reportInput, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
 		Assets: assets,
@@ -99,7 +102,7 @@ func TestFromOutcomeRecordRestoresTraitProfileNamesFromFrozenFactorCatalog(t *te
 		FactorCatalog: []evaluationinput.FactorCatalogEntry{{Code: "type_1", Title: "完美型"}},
 		TypologyRouting: &evaluationinput.TypologyRoutingFreeze{
 			DecisionKind: string(modelcatalog.DecisionKindTraitProfile), ReportKind: string(modeltypology.ReportKindTraitProfile),
-			AdapterKey: string(modeltypology.ReportAdapterTraitProfile), TemplateID: "enneagram",
+			AdapterKey: string(modeltypology.ReportAdapterTraitProfile), TemplateID: "enneagram", TemplateVersion: "legacy-v1",
 		},
 	})
 	if err != nil {
@@ -138,7 +141,7 @@ func TestSPMSensoryReportInputHidesHelperFactorFromInterpretation(t *testing.T) 
 	assets := &interpretationassets.Assets{
 		Outcomes: []interpretationassets.OutcomePresentation{{OutcomeCode: "normal", Title: "与同龄儿童相似"}},
 		ReportSpec: interpretationassets.ReportSpec{Sections: []interpretationassets.ReportSection{{
-			Code: "spm_sensory_scores", Kind: "factor_scores", SourceRefs: []string{"visible", "total"},
+			Code: "spm_sensory_scores", Kind: "factor_scores", SourceRefs: []string{"visible", "total"}, TemplateID: "standard", TemplateVersion: "legacy-v1",
 		}}},
 	}
 	modelRef := evaluationinput.ModelRef{
@@ -189,6 +192,9 @@ func TestSPMSensoryReportInputHidesHelperFactorFromInterpretation(t *testing.T) 
 	}
 	if input.PresentationProfile == nil || !input.PresentationProfile.Configured() {
 		t.Fatalf("presentation profile = %#v, want frozen visibility", input.PresentationProfile)
+	}
+	if input.Report.TemplateID != "standard" || input.Report.TemplateVersion != "legacy-v1" {
+		t.Fatalf("frozen template route = %s@%s", input.Report.TemplateID, input.Report.TemplateVersion)
 	}
 	visible := input.PresentationProfile.VisibleSet()
 	if !visible["visible"] || !visible["total"] || visible["wcgKM7uV"] {
@@ -256,6 +262,10 @@ func currentTypologyReportInput(t *testing.T, routing *evaluationinput.TypologyR
 	assets := &interpretationassets.Assets{
 		Outcomes: []interpretationassets.OutcomePresentation{{OutcomeCode: "INTJ", Title: "建筑师", Summary: "冻结摘要"}},
 		Profiles: []interpretationassets.TypeProfilePresentation{{OutcomeCode: "INTJ", Commentary: "冻结摘要", Strengths: []string{"系统思考"}}},
+		ReportSpec: interpretationassets.ReportSpec{Sections: []interpretationassets.ReportSection{{
+			Code: "personality", Kind: routing.ReportKind, AdapterKey: routing.AdapterKey,
+			TemplateID: routing.TemplateID, TemplateVersion: routing.TemplateVersion,
+		}}},
 	}
 	raw, err := evaluationinput.MarshalReportInput(evaluationinput.ReportInputFreezeOptions{
 		Assets:          assets,

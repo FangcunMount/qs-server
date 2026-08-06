@@ -12,10 +12,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-// DefaultTemplateVersion freezes the current compatible interpretation assets
-// until model-catalog publishes an explicit report-template version.
-const DefaultTemplateVersion policy.TemplateVersion = policy.TemplateVersionV1
-
 // FromOutcomeRecord builds the Interpretation-owned input directly from the
 // immutable EvaluationOutcome. It intentionally does not reconstruct an
 // Assessment or create application/evaluation/outcome.Outcome.
@@ -43,8 +39,8 @@ func FromOutcomeRecord(record *domainoutcome.Record) (interpinput.Interpretation
 		},
 		Result: interpinput.ResultFacts{Primary: primary(execution), Level: level(execution)},
 		Report: interpinput.ReportSpec{
-			ReportType: policy.ReportTypeStandard, TemplateVersion: DefaultTemplateVersion,
-			Algorithm: modelcatalog.Algorithm(model.Algorithm),
+			ReportType: policy.ReportTypeStandard,
+			Algorithm:  modelcatalog.Algorithm(model.Algorithm),
 		},
 	}
 	family, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(in.Runtime.DecisionKind)
@@ -57,7 +53,14 @@ func FromOutcomeRecord(record *domainoutcome.Record) (interpinput.Interpretation
 		in.PresentationProfile = &profile
 	}
 	if materialized, ok := evaluationinput.InterpretationAssetsFromSnapshot(assets); ok {
-		in.Report.TemplateVersion = domainreporttemplate.ResolveFromAssets(materialized)
+		route, err := domainreporttemplate.ResolveFromAssets(materialized)
+		if err != nil {
+			return interpinput.InterpretationInput{}, classify(admission.KindArtifactContractInvalid, err, "resolve frozen report template route")
+		}
+		in.Report.TemplateID = route.TemplateID
+		in.Report.TemplateVersion = route.TemplateVersion
+	} else {
+		return interpinput.InterpretationInput{}, classify(admission.KindArtifactContractInvalid, nil, "frozen interpretation assets are required")
 	}
 
 	switch family {
@@ -76,10 +79,16 @@ func FromOutcomeRecord(record *domainoutcome.Record) (interpinput.Interpretation
 		if !ok {
 			return interpinput.InterpretationInput{}, classify(admission.KindCatalogIncompatible, nil, "report input typology routing is required")
 		}
-		in.Report.TemplateID = routing.TemplateID
+		if routing.TemplateID != in.Report.TemplateID {
+			return interpinput.InterpretationInput{}, classify(admission.KindArtifactContractInvalid, nil, "typology template id conflicts with frozen report sections")
+		}
 		in.Report.AdapterKey = string(routing.AdapterKey)
-		if version := policy.TemplateVersion(routing.TemplateVersion); !version.IsEmpty() {
-			in.Report.TemplateVersion = version
+		version := policy.TemplateVersion(routing.TemplateVersion)
+		if version.IsEmpty() {
+			return interpinput.InterpretationInput{}, classify(admission.KindArtifactContractInvalid, nil, "typology template version is required")
+		}
+		if version != in.Report.TemplateVersion {
+			return interpinput.InterpretationInput{}, classify(admission.KindArtifactContractInvalid, nil, "typology template version conflicts with frozen report sections")
 		}
 	}
 	return in, nil

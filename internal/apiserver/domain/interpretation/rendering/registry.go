@@ -125,11 +125,8 @@ func (r *registry) ResolveByMechanism(key Key) (Builder, error) {
 	if r == nil {
 		return nil, fmt.Errorf("interpretation report builder registry is not configured")
 	}
-	if key.ReportType == "" {
-		key.ReportType = policy.ReportTypeStandard
-	}
-	if key.TemplateVersion.IsEmpty() {
-		key.TemplateVersion = policy.TemplateVersionV1
+	if key.ReportType.IsEmpty() || key.TemplateVersion.IsEmpty() {
+		return nil, fmt.Errorf("interpretation report type and template version are required")
 	}
 	for _, candidate := range fallbackCandidates(key) {
 		registryKey, err := toBuilderIndexKey(candidate)
@@ -159,12 +156,6 @@ func RoutingContextFromInput(input interpinput.InterpretationInput) (RoutingCont
 		Algorithm:       input.Report.Algorithm,
 		ReportProfile:   input.Report.ReportProfile,
 	}
-	if value.ReportType == "" {
-		value.ReportType = policy.ReportTypeStandard
-	}
-	if value.TemplateVersion.IsEmpty() {
-		value.TemplateVersion = policy.TemplateVersionV1
-	}
 	_, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(value.DecisionKind)
 	if !ok {
 		return RoutingContext{}, false
@@ -172,7 +163,7 @@ func RoutingContextFromInput(input interpinput.InterpretationInput) (RoutingCont
 	if value.ReportProfile == "" {
 		value.ReportProfile = policy.ReportProfileForDecisionKind(value.DecisionKind)
 	}
-	if value.DecisionKind == "" {
+	if value.DecisionKind == "" || value.ReportType.IsEmpty() || value.TemplateVersion.IsEmpty() {
 		return RoutingContext{}, false
 	}
 	return value, true

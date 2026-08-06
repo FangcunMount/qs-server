@@ -1,24 +1,43 @@
 package reporttemplate
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/interpretationassets"
 )
 
-// ResolveVersion returns the explicit version or the compatibility default.
-func ResolveVersion(explicit policy.TemplateVersion) policy.TemplateVersion {
-	if explicit.IsEmpty() {
-		return policy.TemplateVersionV1
-	}
-	return explicit
+// FrozenRoute is the immutable report-template selection stored on an Outcome.
+type FrozenRoute struct {
+	TemplateID      string
+	TemplateVersion policy.TemplateVersion
 }
 
-// ResolveFromAssets reads the first explicit version from frozen interpretation assets.
-func ResolveFromAssets(assets interpretationassets.Assets) policy.TemplateVersion {
-	for _, section := range assets.ReportSpec.Sections {
-		if version := policy.TemplateVersion(section.TemplateVersion); !version.IsEmpty() {
-			return version
-		}
+// ResolveFromAssets requires one explicit, consistent route across every frozen
+// report section. Historical outcomes are governed before this boundary;
+// runtime reconstruction never guesses a compatibility release.
+func ResolveFromAssets(assets interpretationassets.Assets) (FrozenRoute, error) {
+	if len(assets.ReportSpec.Sections) == 0 {
+		return FrozenRoute{}, fmt.Errorf("frozen report sections are required")
 	}
-	return policy.TemplateVersionV1
+	var resolved FrozenRoute
+	for index, section := range assets.ReportSpec.Sections {
+		templateID := strings.TrimSpace(section.TemplateID)
+		if templateID == "" {
+			return FrozenRoute{}, fmt.Errorf("frozen report section %d template id is required", index)
+		}
+		version := policy.TemplateVersion(section.TemplateVersion)
+		if version.IsEmpty() {
+			return FrozenRoute{}, fmt.Errorf("frozen report section %d template version is required", index)
+		}
+		if resolved.TemplateID != "" && resolved.TemplateID != templateID {
+			return FrozenRoute{}, fmt.Errorf("frozen report section template ids conflict: %s != %s", resolved.TemplateID, templateID)
+		}
+		if !resolved.TemplateVersion.IsEmpty() && resolved.TemplateVersion != version {
+			return FrozenRoute{}, fmt.Errorf("frozen report section template versions conflict: %s != %s", resolved.TemplateVersion, version)
+		}
+		resolved = FrozenRoute{TemplateID: templateID, TemplateVersion: version}
+	}
+	return resolved, nil
 }

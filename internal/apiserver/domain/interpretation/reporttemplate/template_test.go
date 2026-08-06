@@ -48,15 +48,6 @@ func TestReportTemplateRehydrateRejectsManifestFingerprintMismatch(t *testing.T)
 	}
 }
 
-func TestResolveVersionDefaultsToLegacyV1(t *testing.T) {
-	if got := ResolveVersion(""); got != policy.TemplateVersionV1 {
-		t.Fatalf("ResolveVersion() = %q", got)
-	}
-	if got := ResolveVersion("custom-v2"); got != policy.TemplateVersion("custom-v2") {
-		t.Fatalf("ResolveVersion() = %q", got)
-	}
-}
-
 func testReleaseManifest(t *testing.T, templateID string, version policy.TemplateVersion) ReleaseManifest {
 	t.Helper()
 	manifest, err := NewReleaseManifest(templateID, version, policy.ReportTypeStandard, []ManifestRoute{{

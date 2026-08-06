@@ -29,8 +29,8 @@ func previewInterpretationInput(req modelpreview.Request, outcome *domainoutcome
 		Model:       model,
 		Runtime:     interpinput.RuntimeIdentity{},
 		Report: interpinput.ReportSpec{
-			ReportType: policy.ReportTypeStandard, TemplateVersion: policy.TemplateVersionV1,
-			Algorithm: modelcatalog.Algorithm(model.Algorithm),
+			ReportType: policy.ReportTypeStandard,
+			Algorithm:  modelcatalog.Algorithm(model.Algorithm),
 		},
 	}
 	if outcome.Primary != nil {
@@ -49,6 +49,7 @@ func previewInterpretationInput(req modelpreview.Request, outcome *domainoutcome
 		in.Report.ReportProfile = policy.ReportProfileForDecisionKind(routing.DecisionKind)
 	}
 	in.Report.TemplateID = routing.TemplateID
+	in.Report.TemplateVersion = policy.TemplateVersion(routing.TemplateVersion)
 	in.Report.AdapterKey = string(routing.AdapterKey)
 	if detail, ok := codec.PersonalityTypeDetailFromPayload(outcome.Detail.Payload); ok {
 		in.PersonalityType = &interpinput.PersonalityTypeFacts{Detail: personalityDetail(detail)}
