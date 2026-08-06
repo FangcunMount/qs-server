@@ -1,426 +1,200 @@
 # 数据库迁移
 
-本目录包含数据库迁移文件和迁移工具。
+> 状态：当前有效
+>
+> 适用范围：`internal/pkg/migration` 的 MySQL 与 MongoDB schema migration
+>
+> 事实来源：`migrate.go`、`driver.go`、`internal/apiserver/bootstrap/database.go` 与嵌入式迁移文件
 
-## ⚠️ 重要说明：迁移不会覆盖数据
+## 结论
 
-**常见误解：每次启动都执行迁移，会不会覆盖线上数据？**
+qs-server 在 apiserver 启动阶段按配置执行 MySQL 与 MongoDB 向上迁移。迁移文件嵌入二进制，不依赖运行目录挂载 SQL 或 JSON 文件。
 
-**答案：不会！** 迁移使用 **版本控制机制**：
+迁移版本机制只保证同一版本不会被正常重复执行，不保证迁移无损。仓库中存在 `DROP`、结构替换、数据清理和遗留对象退役迁移；任何生产迁移都必须按迁移内容评估风险、备份和验收。
 
-```text
-┌─────────────────────────────────────────┐
-│  schema_migrations 表（自动创建）        │
-├─────────────────────────────────────────┤
-│  version  │  dirty                      │
-│  1        │  false   ← 已执行版本       │
-└─────────────────────────────────────────┘
+当前实现的运行时入口只暴露 `Run()` 向上迁移：
 
-第 1 次启动 → 执行 v1 迁移 → 记录 version=1 ✅
-第 2 次启动 → 检查 version=1 → 跳过（0 SQL 执行）✅
-第 3 次启动 → 检查 version=1 → 跳过（0 SQL 执行）✅
-新版本发布 → 检查 version=1 → 仅执行 v2 → 记录 version=2 ✅
-```
+- MySQL：`NewMigrator(db, config)`；
+- MongoDB：`NewMongoMigrator(client, config)`；
+- dirty 状态会阻断继续迁移；
+- 当前目录末端版本为 MySQL `67`、MongoDB `21`。生产实际版本以数据库只读查询和[当前版本定档验收台账](../../../docs/00-总览/09-当前版本定档验收台账.md)为准。
 
-**关键点**：
-
-- ✅ 迁移是**增量的**，不是全量的
-- ✅ 每个版本只执行**一次**
-- ✅ 后续启动会**跳过**已执行的版本
-- ✅ 不会删除或覆盖现有数据
-
-## 📁 目录结构
+## 目录与职责
 
 ```text
-migration/
-├── migrate.go              # 迁移器核心实现
-├── driver.go               # Driver 接口定义
-├── driver_mysql.go         # MySQL 驱动实现
-├── driver_mongo.go         # MongoDB 驱动实现
-├── migrations/             # 迁移文件（嵌入到二进制）
-│   ├── mysql/              # MySQL 迁移文件（独立版本号）
-│   │   ├── 000001_init_actor_schema.up.sql
-│   │   └── 000001_init_actor_schema.down.sql
-│   └── mongodb/            # MongoDB 迁移文件（独立版本号）
-│       ├── 000001_init_collections.up.json
-│       └── 000001_init_collections.down.json
-└── README.md               # 本文件
+internal/pkg/migration/
+├── migrate.go
+├── driver.go
+├── mysql_driver.go
+├── mongodb_driver.go
+└── migrations/
+    ├── mysql/
+    │   ├── 000001_*.up.sql
+    │   └── 000001_*.down.sql
+    └── mongodb/
+        ├── 000001_*.up.json
+        └── 000001_*.down.json
 ```
 
-> ⚠️ **注意**: MySQL 和 MongoDB 的迁移版本号是**独立**的！
-> `mysql/000003_xxx` 和 `mongodb/000001_xxx` 可以同时存在，互不影响。
+MySQL 和 MongoDB 各自维护独立的 `schema_migrations` 状态，版本号只在同一种后端内连续，不要求两个后端同步。
 
-## 🏗️ 架构设计
+## 启动时序
 
-采用 **驱动模式** 设计，通过 `Driver` 接口抽象不同数据库的迁移逻辑：
+apiserver 的数据库 bootstrap 执行顺序为：
 
-```go
-// Driver 定义数据库迁移驱动接口
-type Driver interface {
-    Backend() Backend
-    SourcePath() string
-    CreateInstance(fs embed.FS, config *Config) (*migrate.Migrate, error)
-}
-```
+1. 建立数据库连接；
+2. `migration.enabled=true` 时执行 MySQL migration；
+3. 配置了 MongoDB 时执行 MongoDB migration；
+4. MongoDB migration 完成后协调并验证 ModelCatalog 与报告目录索引；
+5. 任一步失败都会中止启动，不应带着部分完成状态继续提供服务。
 
-### 支持的数据库
-
-| 数据库 | 驱动类型 | 迁移文件格式 |
-| -------- | ---------- | -------------- |
-| MySQL  | MySQLDriver | `.sql` |
-| MongoDB | MongoDriver | `.json` |
-
-### 扩展新数据库
-
-只需实现 `Driver` 接口即可添加新的数据库支持：
-
-```go
-type PostgresDriver struct {
-    db *sql.DB
-}
-
-func (d *PostgresDriver) Backend() Backend { return "postgres" }
-func (d *PostgresDriver) SourcePath() string { return "migrations/postgres" }
-func (d *PostgresDriver) CreateInstance(fs embed.FS, config *Config) (*migrate.Migrate, error) {
-    // 实现创建逻辑...
-}
-```
-
-## 🚀 快速开始
-
-### 1. 安装依赖
+正常开发启动：
 
 ```bash
-# 添加 golang-migrate 依赖
-go get -u github.com/golang-migrate/migrate/v4
-go get -u github.com/golang-migrate/migrate/v4/database/mysql
-go get -u github.com/golang-migrate/migrate/v4/database/mongodb
-go get -u github.com/golang-migrate/migrate/v4/source/iofs
-
-# （可选）安装 CLI 工具，用于创建迁移文件
-go install -tags 'mysql mongodb' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+make run-apiserver
 ```
 
-### 2. 在应用中使用
-
-#### MySQL 迁移
-
-```go
-package main
-
-import (
-    "database/sql"
-    "fmt"
-    
-    "github.com/fangcun-mount/qs-server/internal/pkg/migration"
-    _ "github.com/go-sql-driver/mysql"
-)
-
-func main() {
-    // 1. 连接数据库
-    db, err := sql.Open("mysql", "user:pass@tcp(localhost:3306)/mydb")
-    if err != nil {
-        panic(err)
-    }
-    defer db.Close()
-
-    // 2. 配置迁移器
-    cfg := &migration.Config{
-        Enabled:  true,
-        AutoSeed: false,
-        Database: "mydb",
-    }
-
-    // 3. 创建迁移器并执行
-    migrator := migration.NewMigrator(db, cfg)
-    if version, applied, err := migrator.Run(); err != nil {
-        panic(err)
-    } else if applied {
-        fmt.Printf("migrated to version %d\n", version)
-    } else {
-        fmt.Printf("database already up to date (version %d)\n", version)
-    }
-}
-```
-
-#### MongoDB 迁移
-
-```go
-package main
-
-import (
-    "context"
-    "fmt"
-    
-    "github.com/fangcun-mount/qs-server/internal/pkg/migration"
-    "go.mongodb.org/mongo-driver/mongo"
-    "go.mongodb.org/mongo-driver/mongo/options"
-)
-
-func main() {
-    // 1. 连接 MongoDB
-    client, err := mongo.Connect(context.Background(), options.Client().ApplyURI("mongodb://localhost:27017"))
-    if err != nil {
-        panic(err)
-    }
-    defer client.Disconnect(context.Background())
-
-    // 2. 配置迁移器
-    cfg := &migration.Config{
-        Enabled:              true,
-        Database:             "mydb",
-        MigrationsCollection: "schema_migrations",
-    }
-
-    // 3. 创建迁移器并执行
-    migrator := migration.NewMongoMigrator(client, cfg)
-    if version, applied, err := migrator.Run(); err != nil {
-        panic(err)
-    } else if applied {
-        fmt.Printf("migrated to version %d\n", version)
-    } else {
-        fmt.Printf("database already up to date (version %d)\n", version)
-    }
-}
-```
-
-#### 使用自定义驱动
-
-```go
-// 创建自定义驱动
-driver := migration.NewMySQLDriver(db)
-
-// 使用驱动创建迁移器
-migrator := migration.NewMigratorWithDriver(driver, cfg)
-```
-
-### 3. 创建新的迁移
+或显式运行二进制：
 
 ```bash
-# 使用 migrate CLI 创建迁移文件
-migrate create -ext sql -dir internal/pkg/migration/migrations -seq add_new_feature
-
-# 生成的文件:
-# - 000003_add_new_feature.up.sql   (升级脚本)
-# - 000003_add_new_feature.down.sql (回滚脚本)
+./bin/qs-apiserver --config=configs/apiserver.dev.yaml
 ```
 
-编辑生成的文件：
+当前仓库没有独立的 `make migrate-up`、`make migrate-down` 或 migration CLI。不要在文档、脚本或操作手册中假设这些命令存在。
 
-**000003_add_new_feature.up.sql**:
+## 配置
 
-```sql
--- 添加新功能
-ALTER TABLE iam_users ADD COLUMN nickname VARCHAR(64) COMMENT '昵称';
-```
-
-**000003_add_new_feature.down.sql**:
-
-```sql
--- 回滚新功能
-ALTER TABLE iam_users DROP COLUMN nickname;
-```
-
-## 🔧 高级用法
-
-### 手动控制迁移
-
-```go
-// 获取当前版本
-version, dirty, err := migrator.Version()
-
-// 回滚最近的一次迁移
-err = migrator.Rollback()
-```
-
-### 环境变量配置
+apiserver YAML 中的配置为：
 
 ```yaml
-# configs/apiserver.dev.yaml
-mysql:
-  host: ${MYSQL_HOST:127.0.0.1}
-  port: ${MYSQL_PORT:3306}
-  database: ${MYSQL_DATABASE:iam}
-  username: ${MYSQL_USER:root}
-  password: ${MYSQL_PASSWORD:}
-
 migration:
-  enabled: ${MIGRATION_ENABLED:true}
-  auto-seed: ${MIGRATION_AUTO_SEED:false}
+  enabled: true
+  autoseed: false
+  database: qs
 ```
 
-### Docker 部署
+默认值由应用 options 提供：`enabled=true`、`autoseed=false`。环境变量覆盖必须使用 apiserver 前缀，例如：
 
-```dockerfile
-# Dockerfile
-FROM golang:1.21-alpine AS builder
-
-WORKDIR /app
-COPY . .
-
-# 构建（迁移文件会被嵌入）
-RUN go build -o /apiserver ./cmd/apiserver
-
-# 运行阶段
-FROM alpine:latest
-COPY --from=builder /apiserver .
-CMD ["./apiserver"]
+```bash
+QS_APISERVER_MIGRATION_ENABLED=false make run-apiserver
 ```
 
-容器启动时会自动执行迁移，无需手动操作。
+无前缀的 `MIGRATION_ENABLED` 不会按当前配置加载规则覆盖该字段。关闭迁移只用于明确的开发或运维场景，不能作为绕过 dirty 状态或失败迁移的恢复手段。
 
-## 📊 迁移版本管理
+## 新增迁移
 
-### 独立版本控制
+### MySQL
 
-MySQL 和 MongoDB 的迁移版本是**完全独立**的，各自在自己的数据库中维护版本记录：
-
-| 数据库 | 版本存储位置 | 迁移文件目录 |
-| -------- | ------------- | ------------- |
-| MySQL | MySQL 的 `schema_migrations` 表 | `migrations/mysql/` |
-| MongoDB | MongoDB 的 `schema_migrations` 集合 | `migrations/mongodb/` |
-
-**示例场景**：
+在 `migrations/mysql/` 下增加同版本号的一对文件：
 
 ```text
-MySQL (schema_migrations 表):          MongoDB (schema_migrations 集合):
-┌─────────┬───────┐                    ┌─────────┬───────┐
-│ version │ dirty │                    │ version │ dirty │
-├─────────┼───────┤                    ├─────────┼───────┤
-│    3    │   0   │ ← MySQL v3         │    1    │   0   │ ← MongoDB v1
-└─────────┴───────┘                    └─────────┴───────┘
+000068_change_name.up.sql
+000068_change_name.down.sql
 ```
 
-这意味着：
+要求：
 
-- ✅ MySQL 可以有 10 个迁移版本，MongoDB 只有 2 个，互不影响
-- ✅ 可以只更新 MySQL 迁移，不触发 MongoDB 迁移
-- ✅ 各自独立回滚，互不干扰
+- 版本号使用当前 MySQL 最大版本的下一个值；
+- `up` 只承担一个清晰的 schema 或数据治理目标；
+- `down` 明确可恢复到什么程度；若数据不可逆，不能声称可以完整回滚；
+- DDL、DML、索引和约束变更都要评估锁表、耗时与线上数据分布；
+- 对关键迁移增加空库建库、历史版本升级或专用集成测试。
 
-### MySQL 迁移表
+### MongoDB
 
-`golang-migrate` 会自动创建 `schema_migrations` 表：
+在 `migrations/mongodb/` 下增加同版本号的一对 JSON 文件：
 
-```sql
-mysql> SELECT * FROM schema_migrations;
-+---------+-------+
-| version | dirty |
-+---------+-------+
-|       2 |     0 |
-+---------+-------+
+```text
+000022_change_name.up.json
+000022_change_name.down.json
 ```
 
-### MongoDB 迁移集合
+文件内容是操作数组，例如：
 
-MongoDB 中会自动创建 `schema_migrations` 集合：
-
-```javascript
-db.schema_migrations.find()
-// { "version": 1, "dirty": false }
+```json
+[
+  {
+    "createIndexes": "example_collection",
+    "indexes": [
+      {
+        "key": { "org_id": 1, "created_at": -1 },
+        "name": "idx_example_org_created"
+      }
+    ]
+  }
+]
 ```
 
-- `version`: 当前数据库版本号
-- `dirty`: 是否处于中间状态（0=正常，1=异常需手动修复）
+支持的操作和约束以 `mongodb_driver.go` 及 [MongoDB migration 说明](migrations/mongodb/README.md)为准，不要凭借 Mongo Shell 语法推断 JSON driver 一定支持。
 
-## 🔐 安全注意事项
+## 风险分级
 
-### 生产环境
+| 类型 | 例子 | 最低验收要求 |
+|---|---|---|
+| 增量变更 | 新表、新集合、新索引、可空字段 | 空库与升级路径测试、性能影响检查 |
+| 数据改写 | backfill、状态归一化、唯一键收敛 | 只读盘点、影响行数、幂等性、失败恢复方案 |
+| 破坏性退役 | `DROP TABLE`、`drop` 集合、删除字段或历史数据 | 调用与查询依赖清零、备份、恢复演练、明确授权、执行后盘点 |
 
-1. **备份优先**
+破坏性迁移至少需要：
 
-   ```bash
-   # 迁移前自动备份
-   mysqldump iam > backup_$(date +%Y%m%d_%H%M%S).sql
-   ```
+1. 扫描当前代码、脚本、定时任务、接口与跨仓消费者；
+2. 对目标对象做生产只读盘点，确认行数、集合数、索引和近期读写；
+3. 明确备份位置、保留期和恢复验证方式；
+4. 在维护窗口执行，并记录迁移前后版本、耗时和影响量；
+5. 运行应用健康检查、关键业务烟测与数据完整性查询；
+6. 将结果回填到版本验收台账。
 
-2. **权限分离**
-   - 应用账号：只需 SELECT, INSERT, UPDATE, DELETE
-   - 迁移账号：需要 CREATE, DROP, ALTER 等 DDL 权限
+迁移文件存在 `down` 不代表数据可恢复。很多退役迁移的 `down` 只能重建空结构，无法复原已删除的数据。
 
-3. **测试迁移**
-   - 在测试环境先验证
-   - 确保 down 脚本能正确回滚
+## dirty 状态处理
 
-4. **金丝雀发布**
-   - 先在一个实例上执行
-   - 验证成功后再推广
+当 `schema_migrations` 标记为 dirty 时，`Run()` 会返回错误并中止启动。处理顺序：
 
-### 开发环境
+1. 保留现场，确认后端、版本、失败日志和已执行的语句或操作；
+2. 检查目标 schema 与数据处于“未执行、部分执行、已执行但未结算”的哪一种状态；
+3. 根据该版本的 `up/down` 和备份制定恢复或补偿方案；
+4. 在测试环境复现并验证方案；
+5. 经明确审批后，才可以修正版本状态或使用外部 migration 工具的 force 能力；
+6. 重新启动并完成 schema、数据和业务验收。
+
+不要把直接修改 `schema_migrations.dirty` 作为首选操作。仅清除 dirty 标记可能导致版本记录与真实 schema 永久分叉。
+
+## 回滚边界
+
+应用内 `Migrator` 当前没有 `Rollback()` 方法，正常启动路径也不执行 down migration。`.down.sql` 与 `.down.json` 用于迁移契约、受控测试和经审批的外部恢复流程。
+
+生产回滚优先级通常是：
+
+1. 停止继续放大影响；
+2. 回退应用版本或关闭受影响入口；
+3. 根据迁移性质选择前向修复、受控 down 或备份恢复；
+4. 重新验证版本状态和业务数据。
+
+对于已经删除的数据，应用回退和 down migration 都不能替代备份恢复。
+
+## 验证
+
+提交 migration 变更前至少运行：
 
 ```bash
-# 重置数据库到初始状态
-cd scripts/sql
-./reset-db.sh
-
-# 应用会在启动时自动执行迁移
-go run cmd/apiserver/apiserver.go
+go test ./internal/pkg/migration
+git diff --check
+make docs-hygiene
 ```
 
-## 📚 参考文档
+涉及真实 MySQL/MongoDB 的集成测试需要明确授权的测试实例。测试跳过、空库通过或本地编译成功，都不能单独证明生产迁移成功。
 
-- [golang-migrate 官方文档](https://github.com/golang-migrate/migrate)
-- [数据访问与迁移边界](../../../docs/03-基础设施/data-access/README.md)
-- [MySQL Migration](./migrations/mysql/)
+生产验收应记录：
 
-## ❓ 常见问题
+- MySQL 与 MongoDB 的版本和 dirty 状态；
+- 迁移执行耗时与错误日志；
+- 目标表、集合、索引和数据量；
+- 三个进程的实际构建 SHA、健康状态与关键链路烟测；
+- 备份和恢复证据。
 
-### Q: 为什么要使用迁移工具？
+## 相关文档
 
-A: 在容器化环境中，应用只打包二进制文件。使用 `embed.FS` 可以将 SQL 文件嵌入到二进制中，启动时自动执行，无需挂载外部文件。
-
-### Q: 如何处理 dirty 状态？
-
-A: Dirty 状态表示迁移中途失败。需要：
-
-1. 检查日志确定失败原因
-2. 手动修复数据库到一致状态
-3. 更新 `schema_migrations` 的 dirty 字段为 false
-
-```sql
--- MySQL
-UPDATE schema_migrations SET dirty = 0 WHERE version = X;
-```
-
-```javascript
-// MongoDB
-db.schema_migrations.find()
-// 确认索引与数据已一致后：
-db.schema_migrations.updateOne({}, { $set: { version: NumberLong(X), dirty: false } })
-```
-
-#### Mongo 000013（unified model-catalog）dirty@13
-
-常见原因：已 cutover 环境对不存在的 legacy 索引执行 `dropIndexes` → IndexNotFound → dirty。
-
-修复原则：**先核验索引，再清 dirty**。
-
-1. `db.schema_migrations.find()` 确认 `version: 13, dirty: true`
-2. 检查 `assessment_models` / `questionnaires` / `assessment_norms` 的 `getIndexes()`：
-   - required：见 `RequiredUnifiedIndexNames()`（如 `idx_assessment_models_head_code` 等）
-   - 不应存在：`idx_assessment_models_code`、`idx_code_version`
-3. 若 required 齐全且无 legacy → 执行上面的 `updateOne` 清 dirty，再重启 apiserver
-4. 若缺 required → 手工 `createIndexes` 补齐，或将 version 回退到 `12, dirty:false` 后部署含「create-only 000013 + Go reconcile」的版本再启
-5. 不要在未核验前盲目 force
-
-当前代码：JSON up 只做 `createIndexes`；legacy 删除在 `ReconcileUnifiedModelCatalogIndexes`（忽略 IndexNotFound）。
-
-### Q: 生产环境如何禁用自动迁移？
-
-A: 设置环境变量：
-
-```bash
-export MIGRATION_ENABLED=false
-```
-
-### Q: 如何在 Kubernetes 中使用？
-
-A: 使用 Init Container：
-
-```yaml
-initContainers:
-- name: migrate
-  image: your-app:latest
-  command: ["/app/migrate-only"]  # 特殊命令只执行迁移
-```
-
-或者让应用启动时自动执行（推荐）。
+- [当前版本定档验收台账](../../../docs/00-总览/09-当前版本定档验收台账.md)
+- [本地开发与配置约定](../../../docs/00-总览/06-本地开发与配置约定.md)
+- [配置与环境变量](../../../docs/04-接口与运维/05-配置与环境变量.md)
+- [部署与端口](../../../docs/04-接口与运维/06-部署与端口.md)
