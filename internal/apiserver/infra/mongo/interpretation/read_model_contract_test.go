@@ -90,7 +90,7 @@ func TestReportPOToReadRowToleratesNilLegacySlices(t *testing.T) {
 	}
 }
 
-func TestReportPOToReadRowSynthesizesLegacyPresentationProfileFromArtifactDimensions(t *testing.T) {
+func TestReportPOToReadRowDoesNotSynthesizeMissingPresentationProfile(t *testing.T) {
 	row := projectArchivedReportRow(&ArchivedReportPO{
 		BaseDocument: base.BaseDocument{DomainID: meta.FromUint64(7001)},
 		Dimensions: []DimensionInterpretPO{
@@ -101,15 +101,8 @@ func TestReportPOToReadRowSynthesizesLegacyPresentationProfileFromArtifactDimens
 		},
 	})
 
-	if row.PresentationProfile == nil {
-		t.Fatal("legacy dimensions must synthesize a presentation profile")
-	}
-	if row.PresentationProfile.Source != "legacy_artifact_dimensions/v1" {
-		t.Fatalf("presentation source = %q", row.PresentationProfile.Source)
-	}
-	want := []string{"B", "A"}
-	if !reflect.DeepEqual(row.PresentationProfile.VisibleFactorCodes, want) {
-		t.Fatalf("visible factor codes = %#v, want %#v", row.PresentationProfile.VisibleFactorCodes, want)
+	if row.PresentationProfile != nil {
+		t.Fatalf("missing profile must remain explicit after governance: %#v", row.PresentationProfile)
 	}
 }
 

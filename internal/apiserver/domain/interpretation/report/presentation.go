@@ -6,13 +6,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// PresentationProfileSource records whether dimension visibility came from the
-// report artifact or a one-time legacy read-path fallback.
+// PresentationProfileSource records the immutable origin of dimension
+// visibility persisted with the report artifact.
 type PresentationProfileSource string
 
 const (
 	PresentationProfileSourceFrozen         PresentationProfileSource = "frozen"
-	PresentationProfileSourceLegacy         PresentationProfileSource = "legacy"
 	PresentationProfileSourceLegacyArtifact PresentationProfileSource = "legacy_artifact_dimensions/v1"
 )
 
@@ -31,7 +30,6 @@ func NewFrozenPresentationProfile(codes []string) PresentationProfile {
 
 func (p PresentationProfile) Configured() bool {
 	return p.Source == PresentationProfileSourceFrozen ||
-		p.Source == PresentationProfileSourceLegacy ||
 		p.Source == PresentationProfileSourceLegacyArtifact
 }
 
@@ -56,45 +54,6 @@ func UsesFactorScoreVisibility(model ModelIdentity) bool {
 	default:
 		return model.Code != ""
 	}
-}
-
-// LegacyDimensionVisibilityResolver resolves current published factor visibility
-// for artifacts that predate frozen presentation profiles.
-type LegacyDimensionVisibilityResolver interface {
-	VisibleFactorCodes(ctx context.Context, model ModelIdentity) (map[string]bool, bool, error)
-}
-
-// ResolvePresentationProfile returns the visibility profile for read projection.
-// Frozen artifacts always win; legacy artifacts fall back once through resolver.
-func ResolvePresentationProfile(
-	ctx context.Context,
-	model ModelIdentity,
-	stored *PresentationProfile,
-	resolver LegacyDimensionVisibilityResolver,
-) (PresentationProfile, bool, error) {
-	if stored != nil && stored.Configured() {
-		return *stored, true, nil
-	}
-	if !UsesFactorScoreVisibility(model) {
-		return PresentationProfile{}, false, nil
-	}
-	if resolver == nil {
-		return PresentationProfile{}, false, nil
-	}
-	visible, configured, err := resolver.VisibleFactorCodes(ctx, model)
-	if err != nil {
-		return PresentationProfile{}, false, err
-	}
-	if !configured {
-		return PresentationProfile{}, false, nil
-	}
-	codes := make([]string, 0, len(visible))
-	for code, ok := range visible {
-		if ok && code != "" {
-			codes = append(codes, code)
-		}
-	}
-	return PresentationProfile{VisibleFactorCodes: codes, Source: PresentationProfileSourceLegacy}, true, nil
 }
 
 func FilterDimensionInterprets(dimensions []DimensionInterpret, visible map[string]bool) []DimensionInterpret {
