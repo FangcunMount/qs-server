@@ -724,6 +724,36 @@ func TestDBOpsMongoBackupIsBoundedAndOwned(t *testing.T) {
 	}
 }
 
+func TestDBOpsGovernanceChecksumsUseAllowedDockerPrivilege(t *testing.T) {
+	t.Parallel()
+
+	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "db-ops.yml"))
+	if err != nil {
+		t.Fatalf("read db ops workflow: %v", err)
+	}
+	content := string(workflow)
+	verifyCommand := `mongo:7.0 -c 'cd /work && sha256sum --check "$1.sha256"' sh "$MANIFEST_NAME"`
+	writeCommand := `mongo:7.0 -c 'cd /work && sha256sum "$1" > "$1.sha256" && chmod 0440 "$1" "$1.sha256"' sh "$MANIFEST_NAME"`
+	if got := strings.Count(content, verifyCommand); got != 4 {
+		t.Fatalf("governance checksum verify command count = %d, want 4", got)
+	}
+	if got := strings.Count(content, writeCommand); got != 4 {
+		t.Fatalf("governance checksum write command count = %d, want 4", got)
+	}
+	for _, required := range []string{
+		`sudo docker run --rm --network none`,
+		`-v "$MANIFEST_DIR:/work:ro"`,
+		`-v "$MANIFEST_DIR:/work"`,
+	} {
+		if !strings.Contains(content, required) {
+			t.Errorf("DB ops governance checksum contract must contain %q", required)
+		}
+	}
+	if strings.Contains(content, "sudo sh -c") {
+		t.Error("DB ops governance checksum must not require unrestricted passwordless sudo shell access")
+	}
+}
+
 func TestDBOpsRedisStatusIsReadOnlyAndDoesNotExposeKeys(t *testing.T) {
 	t.Parallel()
 

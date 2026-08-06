@@ -1330,7 +1330,10 @@ jobs:
                 echo "❌ Presentation manifest or checksum is missing: $MANIFEST_NAME" >&2
                 exit 1
               fi
-              sudo sh -c 'cd "$1" && sha256sum --check "$2.sha256"' sh "$MANIFEST_DIR" "$MANIFEST_NAME"
+              sudo docker run --rm --network none \
+                -v "$MANIFEST_DIR:/work:ro" \
+                --entrypoint /bin/sh \
+                mongo:7.0 -c 'cd /work && sha256sum --check "$1.sha256"' sh "$MANIFEST_NAME"
               MANIFEST_MOUNT="$MANIFEST_DIR:/work:ro"
             fi
 
@@ -1379,7 +1382,10 @@ jobs:
                 echo "❌ Audit did not create a non-empty manifest" >&2
                 exit 1
               fi
-              sudo sh -c 'cd "$1" && sha256sum "$2" > "$2.sha256" && chmod 0440 "$2" "$2.sha256"' sh "$MANIFEST_DIR" "$MANIFEST_NAME"
+              sudo docker run --rm --network none \
+                -v "$MANIFEST_DIR:/work" \
+                --entrypoint /bin/sh \
+                mongo:7.0 -c 'cd /work && sha256sum "$1" > "$1.sha256" && chmod 0440 "$1" "$1.sha256"' sh "$MANIFEST_NAME"
               echo "✅ Immutable audit manifest: $MANIFEST_NAME"
             fi
             echo "✅ Presentation governance operation completed"
@@ -1548,7 +1554,10 @@ jobs:
                 echo "❌ Template release manifest or checksum is missing: $MANIFEST_NAME" >&2
                 exit 1
               fi
-              sudo sh -c 'cd "$1" && sha256sum --check "$2.sha256"' sh "$MANIFEST_DIR" "$MANIFEST_NAME"
+              sudo docker run --rm --network none \
+                -v "$MANIFEST_DIR:/work:ro" \
+                --entrypoint /bin/sh \
+                mongo:7.0 -c 'cd /work && sha256sum --check "$1.sha256"' sh "$MANIFEST_NAME"
               MANIFEST_MOUNT="$MANIFEST_DIR:/work:ro"
             fi
 
@@ -1592,7 +1601,10 @@ jobs:
                 echo "❌ Audit did not create a non-empty template release manifest" >&2
                 exit 1
               fi
-              sudo sh -c 'cd "$1" && sha256sum "$2" > "$2.sha256" && chmod 0440 "$2" "$2.sha256"' sh "$MANIFEST_DIR" "$MANIFEST_NAME"
+              sudo docker run --rm --network none \
+                -v "$MANIFEST_DIR:/work" \
+                --entrypoint /bin/sh \
+                mongo:7.0 -c 'cd /work && sha256sum "$1" > "$1.sha256" && chmod 0440 "$1" "$1.sha256"' sh "$MANIFEST_NAME"
               echo "✅ Immutable template release manifest: $MANIFEST_NAME"
             fi
             echo "✅ Template release governance operation completed"
@@ -1829,7 +1841,10 @@ jobs:
                 echo "❌ Model template route manifest or checksum is missing: $MANIFEST_NAME" >&2
                 exit 1
               fi
-              sudo sh -c 'cd "$1" && sha256sum --check "$2.sha256"' sh "$MANIFEST_DIR" "$MANIFEST_NAME"
+              sudo docker run --rm --network none \
+                -v "$MANIFEST_DIR:/work:ro" \
+                --entrypoint /bin/sh \
+                mongo:7.0 -c 'cd /work && sha256sum --check "$1.sha256"' sh "$MANIFEST_NAME"
               MANIFEST_MOUNT="$MANIFEST_DIR:/work:ro"
             fi
 
@@ -1888,7 +1903,10 @@ jobs:
                 echo "❌ Audit did not create a non-empty model template route manifest" >&2
                 exit 1
               fi
-              sudo sh -c 'cd "$1" && sha256sum "$2" > "$2.sha256" && chmod 0440 "$2" "$2.sha256"' sh "$MANIFEST_DIR" "$MANIFEST_NAME"
+              sudo docker run --rm --network none \
+                -v "$MANIFEST_DIR:/work" \
+                --entrypoint /bin/sh \
+                mongo:7.0 -c 'cd /work && sha256sum "$1" > "$1.sha256" && chmod 0440 "$1" "$1.sha256"' sh "$MANIFEST_NAME"
               echo "✅ Immutable model template route manifest: $MANIFEST_NAME"
             fi
             echo "✅ Model template route governance operation completed"
@@ -2552,7 +2570,10 @@ jobs:
                 echo "❌ EvaluationOutcome governance manifest or checksum is missing: $MANIFEST_NAME" >&2
                 exit 1
               fi
-              sudo sh -c 'cd "$1" && sha256sum --check "$2.sha256"' sh "$MANIFEST_DIR" "$MANIFEST_NAME"
+              sudo docker run --rm --network none \
+                -v "$MANIFEST_DIR:/work:ro" \
+                --entrypoint /bin/sh \
+                mongo:7.0 -c 'cd /work && sha256sum --check "$1.sha256"' sh "$MANIFEST_NAME"
               MANIFEST_MOUNT="$MANIFEST_DIR:/work:ro"
             fi
 
@@ -2586,7 +2607,10 @@ jobs:
                 echo "❌ Audit did not create a non-empty EvaluationOutcome governance manifest" >&2
                 exit 1
               fi
-              sudo sh -c 'cd "$1" && sha256sum "$2" > "$2.sha256" && chmod 0440 "$2" "$2.sha256"' sh "$MANIFEST_DIR" "$MANIFEST_NAME"
+              sudo docker run --rm --network none \
+                -v "$MANIFEST_DIR:/work" \
+                --entrypoint /bin/sh \
+                mongo:7.0 -c 'cd /work && sha256sum "$1" > "$1.sha256" && chmod 0440 "$1" "$1.sha256"' sh "$MANIFEST_NAME"
               echo "✅ Immutable EvaluationOutcome governance manifest: $MANIFEST_NAME"
             fi
             echo "✅ EvaluationOutcome template route governance completed"
