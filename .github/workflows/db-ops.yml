@@ -908,6 +908,45 @@ jobs:
                 {_id: 0, schema_version: 1, revision: 1, phase: 1, updated_at: 1, last_completed: 1}
               )
             })
+            const activeFactorModelFilter = {
+              record_role: "published_snapshot",
+              release_status: "active",
+              status: "published",
+              deleted_at: null,
+              decision_kind: {$in: ["score_range", "norm_lookup", "ability_level"]}
+            }
+            const invalidFactorPresentationModels = assessmentModels.aggregate([
+              {$match: activeFactorModelFilter},
+              {$project: {
+                _id: 0,
+                code: {$ifNull: ["$code", ""]},
+                release_version: {$ifNull: ["$release_version", ""]},
+                decision_kind: {$ifNull: ["$decision_kind", ""]},
+                factor_score_sections: {$filter: {
+                  input: {$cond: [
+                    {$isArray: "$definition_v2.report_map.sections"},
+                    "$definition_v2.report_map.sections",
+                    []
+                  ]},
+                  as: "section",
+                  cond: {$eq: ["$$section.kind", "factor_scores"]}
+                }}
+              }},
+              {$match: {$expr: {$ne: [{$size: "$factor_score_sections"}, 1]}}},
+              {$project: {
+                code: 1,
+                release_version: 1,
+                decision_kind: 1,
+                factor_score_section_count: {$size: "$factor_score_sections"}
+              }},
+              {$sort: {decision_kind: 1, code: 1, release_version: 1}}
+            ], {allowDiskUse: true}).toArray()
+            print("Interpretation active factor-model presentation contract:")
+            printjson({
+              active_models: assessmentModels.countDocuments(activeFactorModelFilter),
+              invalid_models: invalidFactorPresentationModels.length,
+              invalid_model_details: invalidFactorPresentationModels
+            })
             print("Interpretation template governance matrix:")
             printjson({
               releases: reportTemplates.find({}, {

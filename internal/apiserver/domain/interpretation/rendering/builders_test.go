@@ -48,6 +48,36 @@ func TestNormProfileBuilderCarriesFrozenVisibilityWithoutInterpretingHiddenFacto
 	}
 }
 
+func TestFactorScoringBuilderRejectsMissingOrGovernedLegacyPresentationProfile(t *testing.T) {
+	t.Parallel()
+
+	legacy := report.PresentationProfile{
+		VisibleFactorCodes: []string{"TOTAL"},
+		Source:             report.PresentationProfileSourceLegacyArtifact,
+	}
+	tests := []struct {
+		name    string
+		profile *report.PresentationProfile
+	}{
+		{name: "missing"},
+		{name: "governed legacy artifact", profile: &legacy},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := rendering.NewFactorScoringBuilder(builder.NewDefaultReportBuilder()).Build(
+				context.Background(),
+				interpinput.InterpretationInput{
+					PresentationProfile: tt.profile,
+					FactorScoring:       &interpinput.FactorScoringFacts{},
+				},
+			)
+			if err == nil {
+				t.Fatal("factor-scoring generation without a frozen presentation profile must fail closed")
+			}
+		})
+	}
+}
+
 func TestTypologyBuilderUnknownTemplateIDFailClosed(t *testing.T) {
 	t.Parallel()
 

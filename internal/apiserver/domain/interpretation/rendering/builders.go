@@ -36,6 +36,9 @@ func (b FactorScoringBuilder) Build(_ context.Context, input interpinput.Interpr
 	if input.FactorScoring == nil {
 		return nil, fmt.Errorf("factor_scoring interpretation facts are required")
 	}
+	if input.PresentationProfile == nil || input.PresentationProfile.Source != report.PresentationProfileSourceFrozen {
+		return nil, fmt.Errorf("factor_scoring frozen presentation profile is required")
+	}
 	draft, err := reportscore.BuildFactorScoringDraft(b.composer, reportscore.FactorScoringReportInput{
 		AssessmentID: report.ID(input.Association.AssessmentID), PresentationProfile: input.PresentationProfile,
 		Scale: input.FactorScoring.Model, TotalScore: primaryValue(input), RiskLevel: riskLevel(input), FactorScores: input.FactorScoring.Factors,

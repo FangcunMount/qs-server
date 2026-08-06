@@ -496,6 +496,9 @@ func seedRuntimeCatalog(t *testing.T, db *mongo.Database) {
 			Measure:     modelDomain.MeasureSpec{Factors: []modelDomain.Factor{{Code: "TOTAL", Title: "Total", Role: modelFactor.FactorRoleTotal}}, Scoring: []modelDomain.Scoring{{FactorCode: "TOTAL", Strategy: modelFactor.ScoringStrategySum, Sources: []modelDomain.ScoringSource{{Kind: modelDomain.ScoringSourceQuestion, Code: "Q1"}}}}},
 			Outcomes:    []modelDomain.Outcome{{Code: "low", Title: "Low"}},
 			Conclusions: []modelDomain.Conclusion{modelDomain.RiskConclusion{FactorCode: "TOTAL", Rules: []modelDomain.ScoreRangeOutcome{{MinScore: 0, MaxScore: 10, MaxInclusive: true, OutcomeCode: "low", Level: "low"}}}},
+			ReportMap: modelDomain.ReportMap{Sections: []modelDomain.ReportSection{{
+				Code: modelDomain.ReportSectionKindFactorScores, Kind: modelDomain.ReportSectionKindFactorScores, SourceRefs: []string{"TOTAL"},
+			}}},
 		},
 	}
 	if err := mongoModelCatalog.NewRepository(db).UpsertPublishedModel(t.Context(), model); err != nil {
