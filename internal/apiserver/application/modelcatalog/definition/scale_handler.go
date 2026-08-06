@@ -11,6 +11,7 @@ import (
 // ScaleDefinitionHandler composes shared validators with scale payload projection.
 type ScaleDefinitionHandler struct {
 	QuestionnaireQuery questionnaireapp.QuestionnaireQueryService
+	PublishedTemplates PublishedReportTemplateLookup
 }
 
 // Supports 支持特定评估模型身份
@@ -22,6 +23,7 @@ func (ScaleDefinitionHandler) Supports(identity domain.Identity) bool {
 func (h ScaleDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	issues := ComposePublishValidation(ctx, model, PublicationComposerOptions{
 		QuestionnaireQuery:     h.QuestionnaireQuery,
+		PublishedTemplates:     h.PublishedTemplates,
 		StrategyCapabilityPath: capability.PathScaleDescriptor,
 	})
 	if model == nil || model.DefinitionV2 == nil {

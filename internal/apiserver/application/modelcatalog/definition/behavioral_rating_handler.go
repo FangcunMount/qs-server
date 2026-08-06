@@ -15,6 +15,7 @@ import (
 type BehavioralRatingDefinitionHandler struct {
 	NormRepo           port.NormRepository
 	QuestionnaireQuery questionnaireapp.QuestionnaireQueryService
+	PublishedTemplates PublishedReportTemplateLookup
 }
 
 // Supports 支持
@@ -27,6 +28,7 @@ func (h BehavioralRatingDefinitionHandler) ValidateForPublish(ctx context.Contex
 	return ComposePublishValidation(ctx, model, PublicationComposerOptions{
 		NormRepo:                  h.NormRepo,
 		QuestionnaireQuery:        h.QuestionnaireQuery,
+		PublishedTemplates:        h.PublishedTemplates,
 		IncludeBehavioralSemantic: true,
 		IncludeAlgorithmBinding:   true,
 		StrategyCapabilityPath:    capability.PathBehavioralRatingDescriptor,

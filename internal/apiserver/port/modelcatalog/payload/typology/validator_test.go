@@ -16,7 +16,7 @@ func TestExplicitQuestionScoreContributionDoesNotRequireOptionScores(t *testing.
 		QuestionCode: "q1", ScoringMode: typology.QuestionScoringModeQuestionScore, Sign: -1, Weight: 0.5,
 	}}
 	spec.FactorGraph.Factors["EI"] = factorSpec
-	issues := typology.ValidateRuntimeSpecForPublish(spec, validQuestionnaire())
+	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), validRuntimeContext())
 	if modelcatalog.HasValidationErrors(issues) {
 		t.Fatalf("issues = %#v", issues)
 	}
@@ -112,7 +112,8 @@ func TestValidateRuntimeSpecForPublishValidatesOutcomeDefinitions(t *testing.T) 
 	spec := validRuntimeSpec()
 
 	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
-		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
+		Algorithm:          modelcatalog.AlgorithmPersonalityTypology,
+		PublishedTemplates: publishedTemplateLookup{"mbti|2026-08-v1": {}},
 		Outcomes: []typology.Outcome{
 			{Code: "INTJ", Name: "建筑师"},
 			{Code: "INTJ", Name: "重复建筑师"},
@@ -131,7 +132,8 @@ func TestValidateRuntimeSpecForPublishValidatesOutcomeDefinitions(t *testing.T) 
 func TestValidateRuntimeSpecForPublishAllowsOptionalCanonicalOutcomeImages(t *testing.T) {
 	spec := validRuntimeSpec()
 	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
-		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
+		Algorithm:          modelcatalog.AlgorithmPersonalityTypology,
+		PublishedTemplates: publishedTemplateLookup{"mbti|2026-08-v1": {}},
 		Outcomes: []typology.Outcome{
 			{Code: "INTJ", Name: "建筑师", ImageURL: "https://qs.example/INTJ.png"},
 			{Code: "ENFP", Name: "竞选者"},
@@ -215,10 +217,9 @@ func TestValidateRuntimeSpecForPublishRequiresExplicitNearestPatternBoundaries(t
 		return spec
 	}
 	validate := func(spec *typology.RuntimeSpec) []modelcatalog.DomainValidationIssue {
-		return typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
-			Algorithm: modelcatalog.AlgorithmPersonalityTypology,
-			Outcomes:  []typology.Outcome{{Code: "HIGH", Name: "High", Pattern: "H"}, {Code: "LOW_MATCH", Name: "Low Match", IsSpecial: true}},
-		})
+		ctx := validRuntimeContext()
+		ctx.Outcomes = []typology.Outcome{{Code: "HIGH", Name: "High", Pattern: "H"}, {Code: "LOW_MATCH", Name: "Low Match", IsSpecial: true}}
+		return typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), ctx)
 	}
 
 	t.Run("level rule required", func(t *testing.T) {
@@ -277,8 +278,9 @@ func TestValidateRuntimeSpecForPublishRequiresDecisionKind(t *testing.T) {
 	spec.Decision.Kind = ""
 
 	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
-		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
-		Outcomes:  []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
+		Algorithm:          modelcatalog.AlgorithmPersonalityTypology,
+		Outcomes:           []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
+		PublishedTemplates: publishedTemplateLookup{"mbti|2026-08-v1": {}},
 	})
 
 	if !hasIssueCode(issues, "decision.kind.required") {
@@ -321,10 +323,12 @@ func TestValidateRuntimeSpecForPublishAllowsDecisionSpecificCanonicalAdapters(t 
 	spec := validRuntimeSpec()
 	spec.OutcomeMapping.DetailAdapterKey = typology.DetailAdapterTraitProfile
 	spec.Report.AdapterKey = typology.ReportAdapterTraitProfile
+	spec.Report.TemplateID = "bigfive"
 
 	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
-		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
-		Outcomes:  []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
+		Algorithm:          modelcatalog.AlgorithmPersonalityTypology,
+		Outcomes:           []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
+		PublishedTemplates: publishedTemplateLookup{"bigfive|2026-08-v1": {}},
 	})
 
 	if modelcatalog.HasValidationErrors(issues) {
@@ -420,9 +424,16 @@ func validRuntimeSpec() *typology.RuntimeSpec {
 			DetailAdapterKey: typology.DetailAdapterPersonalityType,
 		},
 		Report: typology.ReportSpec{
-			Kind:       typology.ReportKindPersonalityType,
-			AdapterKey: typology.ReportAdapterPersonalityType,
+			Kind: typology.ReportKindPersonalityType, AdapterKey: typology.ReportAdapterPersonalityType,
+			TemplateID: "mbti", TemplateVersion: "2026-08-v1",
 		},
+	}
+}
+
+func validRuntimeContext() typology.RuntimeSpecValidationContext {
+	return typology.RuntimeSpecValidationContext{
+		Algorithm:          modelcatalog.AlgorithmPersonalityTypology,
+		PublishedTemplates: publishedTemplateLookup{"mbti|2026-08-v1": {}},
 	}
 }
 

@@ -17,7 +17,7 @@ func TestCognitiveValidateForPublishRejectsMissingAbilityDecision(t *testing.T) 
 	model.DefinitionV2 = cognitiveDefinitionWithoutAbility()
 	handler := CognitiveDefinitionHandler{QuestionnaireQuery: publishedQuestionnaireStub("Q", "1",
 		questionnaireapp.QuestionResult{Code: "Q1", Options: []questionnaireapp.OptionResult{{Value: "A"}}},
-	)}
+	), PublishedTemplates: publishedReportTemplateStub{"standard@2026-08-v1": {}}}
 	issues := handler.ValidateForPublish(context.Background(), model)
 	if !hasIssueCode(issues, "definition_v2.decision.invalid") {
 		t.Fatalf("issues = %#v, want definition_v2.decision.invalid", issues)
@@ -30,7 +30,7 @@ func TestCognitiveValidateForPublishAcceptsAbilityDecision(t *testing.T) {
 	model.DefinitionV2 = cognitiveDefinitionWithAbility()
 	handler := CognitiveDefinitionHandler{QuestionnaireQuery: publishedQuestionnaireStub("Q", "1",
 		questionnaireapp.QuestionResult{Code: "Q1", Options: []questionnaireapp.OptionResult{{Value: "A"}}},
-	)}
+	), PublishedTemplates: publishedReportTemplateStub{"standard@2026-08-v1": {}}}
 	issues := handler.ValidateForPublish(context.Background(), model)
 	if domain.HasValidationErrors(issues) {
 		t.Fatalf("ValidateForPublish issues = %#v", issues)
@@ -154,5 +154,9 @@ func cognitiveDefinitionWithAbility() *modeldefinition.Definition {
 		FactorCode: "TOTAL", ScoreBasis: conclusion.ScoreBasisRaw, Primary: true,
 		Rules: []conclusion.ScoreRangeOutcome{{MinScore: 0, MaxScore: 10, OutcomeCode: "average", MaxInclusive: true}},
 	}}
+	def.ReportMap = modeldefinition.ReportMap{Sections: []modeldefinition.ReportSection{{
+		Code: "report", Kind: modeldefinition.ReportSectionKindFactorScores, SourceRefs: []string{"TOTAL"},
+		TemplateID: "standard", TemplateVersion: "2026-08-v1",
+	}}}
 	return def
 }

@@ -110,7 +110,8 @@ func TestPublishedBehavioralRatingRetainedReleaseReplaysExactNormToOutcome(t *te
 			}
 
 			handler := appdefinition.BehavioralRatingDefinitionHandler{
-				NormRepo: stubNormRepository{tables: []*norm.Norm{v1Table, v2Table}},
+				NormRepo:           stubNormRepository{tables: []*norm.Norm{v1Table, v2Table}},
+				PublishedTemplates: publishedTemplateCatalogStub{},
 				QuestionnaireQuery: behavioralContractQuestionnaireQuery{result: &questionnaireapp.QuestionnaireResult{
 					Code: "Q-BEH", Version: "1", Status: "published",
 					Questions: []questionnaireapp.QuestionResult{{Code: "q1", Type: "number"}},
@@ -220,7 +221,7 @@ func TestPublishedBehavioralRatingMissingNormSubjectProducesNoPartialOutcome(t *
 	if err := norm.ValidateImport(table); err != nil {
 		t.Fatalf("ValidateImport: %v", err)
 	}
-	handler := appdefinition.BehavioralRatingDefinitionHandler{NormRepo: stubNormRepository{tables: []*norm.Norm{table}}}
+	handler := appdefinition.BehavioralRatingDefinitionHandler{NormRepo: stubNormRepository{tables: []*norm.Norm{table}}, PublishedTemplates: publishedTemplateCatalogStub{}}
 	publisher := publication.Publisher{Registry: appdefinition.NewRegistry(handler)}
 	published, err := publisher.BuildSnapshot(context.Background(), retainedBehavioralModel(domain.AlgorithmBrief2, 1, table.TableVersion))
 	if err != nil {
@@ -364,6 +365,7 @@ func runBehavioralNormContract(
 	handler := appdefinition.BehavioralRatingDefinitionHandler{
 		NormRepo:           stubNormRepository{tables: []*norm.Norm{table}},
 		QuestionnaireQuery: behavioralContractQuestionnaireQuery{result: questionnaire},
+		PublishedTemplates: publishedTemplateCatalogStub{},
 	}
 	model := retainedBehavioralModel(domain.AlgorithmBrief2, 1, table.TableVersion)
 	if issues := handler.ValidateForPublish(context.Background(), model); domain.HasValidationErrors(issues) {
@@ -480,8 +482,18 @@ func retainedBehavioralModel(algorithm domain.Algorithm, revision int64, normVer
 					{MinScore: 60, MaxScore: 100, MaxInclusive: true, OutcomeCode: "elevated", Level: "elevated"},
 				},
 			}},
+			ReportMap: modeldefinition.ReportMap{Sections: []modeldefinition.ReportSection{{
+				Code: "report", Kind: modeldefinition.ReportSectionKindFactorScores, SourceRefs: []string{"total"},
+				TemplateID: "standard", TemplateVersion: "2026-08-v1",
+			}}},
 		},
 	}
+}
+
+type publishedTemplateCatalogStub struct{}
+
+func (publishedTemplateCatalogStub) IsPublished(templateID, version string) bool {
+	return templateID == "standard" && version == "2026-08-v1"
 }
 
 func retainedSnapshotKey(snapshot *rulesetport.PublishedModel) string {

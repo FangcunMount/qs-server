@@ -29,6 +29,7 @@ func (TypologyDefinitionHandler) Supports(identity domain.Identity) bool {
 func (h TypologyDefinitionHandler) ValidateForPublish(ctx context.Context, model *domain.AssessmentModel) []domain.DomainValidationIssue {
 	return ComposePublishValidation(ctx, model, PublicationComposerOptions{
 		QuestionnaireQuery:          h.QuestionnaireQuery,
+		PublishedTemplates:          h.PublishedTemplates,
 		StrategyCapabilityPath:      capability.PathTypologyDescriptor,
 		SkipQuestionnaireOnDefError: true,
 		OmitSharedTail:              true,

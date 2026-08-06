@@ -10,9 +10,9 @@ import (
 // 命令服务必须接收这个注册表，而不是构造家族本地注册表
 func definitionRegistry(deps Deps) appdefinition.Registry {
 	return appdefinition.NewRegistry(
-		appdefinition.ScaleDefinitionHandler{QuestionnaireQuery: deps.Catalog.QuestionnaireQuery},
-		appdefinition.BehavioralRatingDefinitionHandler{NormRepo: deps.Catalog.NormRepo, QuestionnaireQuery: deps.Catalog.QuestionnaireQuery},
-		appdefinition.CognitiveDefinitionHandler{NormRepo: deps.Catalog.NormRepo, QuestionnaireQuery: deps.Catalog.QuestionnaireQuery},
+		appdefinition.ScaleDefinitionHandler{QuestionnaireQuery: deps.Catalog.QuestionnaireQuery, PublishedTemplates: deps.Catalog.PublishedTemplates},
+		appdefinition.BehavioralRatingDefinitionHandler{NormRepo: deps.Catalog.NormRepo, QuestionnaireQuery: deps.Catalog.QuestionnaireQuery, PublishedTemplates: deps.Catalog.PublishedTemplates},
+		appdefinition.CognitiveDefinitionHandler{NormRepo: deps.Catalog.NormRepo, QuestionnaireQuery: deps.Catalog.QuestionnaireQuery, PublishedTemplates: deps.Catalog.PublishedTemplates},
 		appdefinition.TypologyDefinitionHandler{
 			QuestionnaireQuery: deps.Catalog.QuestionnaireQuery,
 			ReportPreviewer:    previewadapter.NewPreviewer(),

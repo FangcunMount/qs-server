@@ -402,13 +402,15 @@ func (v *runtimeSpecValidator) validateReport(report ReportSpec, mapping Outcome
 	if report.Kind == "" {
 		v.add("report.kind", "report.kind.required", "report kind 不能为空")
 	}
-	if report.TemplateID != "" && !IsRegisteredReportTemplateID(report.TemplateID) {
+	if report.TemplateID == "" {
+		v.add("report.template_id", "report.template_id.required", "report template_id 不能为空")
+	} else if !IsRegisteredReportTemplateID(report.TemplateID) {
 		v.add("report.template_id", "report.template_id.unknown", fmt.Sprintf("report template_id %s 未注册", report.TemplateID))
 	}
-	if report.TemplateVersion != "" {
-		if report.TemplateID == "" {
-			v.add("report.template_id", "report.template_id.required", "template_version 需要同时声明 template_id")
-		} else if v.publishedTemplates == nil {
+	if report.TemplateVersion == "" {
+		v.add("report.template_version", "report.template_version.required", "report template_version 不能为空")
+	} else if report.TemplateID != "" {
+		if v.publishedTemplates == nil {
 			v.add("report.template_version", "report.template_catalog.unavailable", "report template publish catalog 未配置")
 		} else if !v.publishedTemplates.IsPublished(report.TemplateID, report.TemplateVersion) {
 			v.add("report.template_version", "report.template_version.unpublished", fmt.Sprintf("report template %s@%s 未发布", report.TemplateID, report.TemplateVersion))

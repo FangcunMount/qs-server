@@ -114,6 +114,7 @@ func TestPublishedCognitiveSPMImportToOutcomeUsesFrozenNormAndIdentity(t *testin
 	handler := appdefinition.CognitiveDefinitionHandler{
 		NormRepo:           stubNormRepository{tables: []*norm.Norm{table}},
 		QuestionnaireQuery: cognitiveQuestionnaireQuery{result: questionnaire},
+		PublishedTemplates: publishedTemplateCatalogStub{},
 	}
 	if issues := handler.ValidateForPublish(context.Background(), model); domain.HasValidationErrors(issues) {
 		t.Fatalf("ValidateForPublish issues = %#v", issues)
@@ -245,6 +246,10 @@ func cognitiveSPMModel(normVersion string) *domain.AssessmentModel {
 					OutcomeCode: "above_average", Level: "above_average",
 				}},
 			}},
+			ReportMap: modeldefinition.ReportMap{Sections: []modeldefinition.ReportSection{{
+				Code: "report", Kind: modeldefinition.ReportSectionKindFactorScores, SourceRefs: []string{"total"},
+				TemplateID: "standard", TemplateVersion: "2026-08-v1",
+			}}},
 		},
 	}
 }

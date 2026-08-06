@@ -48,7 +48,7 @@ func TestScaleValidateForPublishAcceptsRiskDecision(t *testing.T) {
 	model.DefinitionV2 = completeScaleDefinition()
 	handler := ScaleDefinitionHandler{QuestionnaireQuery: publishedQuestionnaireStub("Q", "1",
 		questionnaireapp.QuestionResult{Code: "Q1", Type: "single_choice", Options: []questionnaireapp.OptionResult{{Value: "A"}, {Value: "B"}}},
-	)}
+	), PublishedTemplates: publishedReportTemplateStub{"standard@2026-08-v1": {}}}
 	issues := handler.ValidateForPublish(context.Background(), model)
 	if domain.HasValidationErrors(issues) {
 		t.Fatalf("ValidateForPublish issues = %#v", issues)
@@ -131,6 +131,10 @@ func completeScaleDefinition() *modeldefinition.Definition {
 			FactorCode: "TOTAL",
 			Rules:      []conclusion.ScoreRangeOutcome{{MinScore: 0, MaxScore: 10, OutcomeCode: "low", MaxInclusive: true}},
 		}},
+		ReportMap: modeldefinition.ReportMap{Sections: []modeldefinition.ReportSection{{
+			Code: "report", Kind: modeldefinition.ReportSectionKindFactorScores, SourceRefs: []string{"TOTAL"},
+			TemplateID: "standard", TemplateVersion: "2026-08-v1",
+		}}},
 	}
 }
 

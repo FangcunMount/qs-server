@@ -39,7 +39,11 @@ func ResolveTypologyReportRouting(payload *Payload) (TypologyReportRouting, erro
 	if err != nil {
 		return TypologyReportRouting{}, fmt.Errorf("%w: %v", ErrRuntimeSpecInvalid, err)
 	}
-	return routingFromSpec(ReportRoutingDefinitionV2, spec), nil
+	routing := routingFromSpec(ReportRoutingDefinitionV2, spec)
+	if routing.TemplateID == "" || routing.TemplateVersion == "" {
+		return TypologyReportRouting{}, fmt.Errorf("%w: explicit report template id and version are required", ErrRuntimeSpecInvalid)
+	}
+	return routing, nil
 }
 
 func routingFromSpec(source ReportRoutingSource, spec *RuntimeSpec) TypologyReportRouting {

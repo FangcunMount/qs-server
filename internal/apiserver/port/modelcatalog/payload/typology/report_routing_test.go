@@ -31,9 +31,10 @@ func TestResolveTypologyReportRouting_ExplicitValid(t *testing.T) {
 			Decision:       typology.PersonalityDecisionSpec{Kind: binding.DecisionKindPoleComposition},
 			OutcomeMapping: typology.OutcomeMappingSpec{DetailKind: typology.OutcomeDetailPersonalityType},
 			Report: typology.ReportSpec{
-				Kind:       typology.ReportKindTemplate,
-				AdapterKey: typology.ReportAdapterPersonalityType,
-				TemplateID: "mbti",
+				Kind:            typology.ReportKindTemplate,
+				AdapterKey:      typology.ReportAdapterPersonalityType,
+				TemplateID:      "mbti",
+				TemplateVersion: "2026-08-v1",
 			},
 		},
 	}
@@ -48,11 +49,37 @@ func TestResolveTypologyReportRouting_ExplicitValid(t *testing.T) {
 	if routing.TemplateID != "mbti" {
 		t.Fatalf("TemplateID = %q, want mbti", routing.TemplateID)
 	}
+	if routing.TemplateVersion != "2026-08-v1" {
+		t.Fatalf("TemplateVersion = %q, want 2026-08-v1", routing.TemplateVersion)
+	}
 	if routing.AdapterKey != typology.ReportAdapterPersonalityType {
 		t.Fatalf("AdapterKey = %s, want personality_type", routing.AdapterKey)
 	}
 	if routing.DecisionKind != binding.DecisionKindPoleComposition {
 		t.Fatalf("DecisionKind = %s, want pole_composition", routing.DecisionKind)
+	}
+}
+
+func TestResolveTypologyReportRouting_RejectsMissingTemplateRoute(t *testing.T) {
+	t.Parallel()
+
+	payload := &typology.Payload{Runtime: &typology.RuntimeSpec{
+		FactorGraph: typology.FactorGraphSpec{
+			Factors: map[string]typology.FactorSpec{
+				"EI": {ID: "EI", Code: "EI", Name: "EI", Kind: typology.FactorSpecKindLeaf, Contributions: []typology.FactorContributionSpec{{QuestionCode: "q1", ScoringMode: typology.QuestionScoringModeQuestionScore, Sign: 1, Weight: 1}}},
+			},
+			Roots:      []string{"EI"},
+			Dimensions: map[string]typology.Dimension{"EI": {Code: "EI", Name: "EI", LeftPole: "I", RightPole: "E"}},
+		},
+		Decision:       typology.PersonalityDecisionSpec{Kind: binding.DecisionKindPoleComposition},
+		OutcomeMapping: typology.OutcomeMappingSpec{DetailKind: typology.OutcomeDetailPersonalityType},
+		Report: typology.ReportSpec{
+			Kind: typology.ReportKindTemplate, AdapterKey: typology.ReportAdapterPersonalityType,
+		},
+	}}
+
+	if _, err := typology.ResolveTypologyReportRouting(payload); !errors.Is(err, typology.ErrRuntimeSpecInvalid) {
+		t.Fatalf("err = %v, want ErrRuntimeSpecInvalid", err)
 	}
 }
 

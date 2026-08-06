@@ -14,6 +14,7 @@ import (
 type PublicationComposerOptions struct {
 	NormRepo                  port.NormRepository
 	QuestionnaireQuery        questionnaireapp.QuestionnaireQueryService
+	PublishedTemplates        PublishedReportTemplateLookup
 	IncludeBehavioralSemantic bool
 	IncludeAlgorithmBinding   bool
 	// StrategyCapabilityPath enables MC-R014 Scoring.Strategy checks against the
@@ -39,6 +40,7 @@ func ComposePublishValidation(
 	}
 	issues := model.ValidateForPublish().Issues
 	issues = append(issues, ValidateDefinitionForPublish(ctx, model, opts.NormRepo)...)
+	issues = append(issues, ValidateReportTemplateRoutes(model, opts.PublishedTemplates)...)
 	issues = append(issues, ValidateDerivedConclusionNormRefs(model)...)
 	if opts.IncludeBehavioralSemantic {
 		issues = append(issues, ValidateBehavioralSemantic(model)...)

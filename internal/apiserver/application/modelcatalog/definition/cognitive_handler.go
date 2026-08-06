@@ -13,6 +13,7 @@ import (
 type CognitiveDefinitionHandler struct {
 	NormRepo           port.NormRepository
 	QuestionnaireQuery questionnaireapp.QuestionnaireQueryService
+	PublishedTemplates PublishedReportTemplateLookup
 }
 
 // Supports 支持特定评估模型身份
@@ -25,6 +26,7 @@ func (h CognitiveDefinitionHandler) ValidateForPublish(ctx context.Context, mode
 	return ComposePublishValidation(ctx, model, PublicationComposerOptions{
 		NormRepo:                h.NormRepo,
 		QuestionnaireQuery:      h.QuestionnaireQuery,
+		PublishedTemplates:      h.PublishedTemplates,
 		IncludeAlgorithmBinding: true,
 		StrategyCapabilityPath:  capability.PathCognitiveDescriptor,
 	})

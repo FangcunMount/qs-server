@@ -22,7 +22,8 @@ func behavioralPublishHandler(table *norm.Norm) appdefinition.BehavioralRatingDe
 		}
 	}
 	return appdefinition.BehavioralRatingDefinitionHandler{
-		NormRepo: behavioralNormRepoStub{table: table},
+		NormRepo:           behavioralNormRepoStub{table: table},
+		PublishedTemplates: behavioralPublishedTemplateStub{"standard@2026-08-v1": {}},
 		QuestionnaireQuery: behavioralQuestionnaireStub{result: &questionnaireapp.QuestionnaireResult{
 			Code: "Q", Version: "1", Status: "published",
 			Questions: []questionnaireapp.QuestionResult{
@@ -155,8 +156,19 @@ func validBehavioralDraft() *domain.AssessmentModel {
 				},
 			},
 			Execution: modeldefinition.ExecutionSpec{Brief2: &modeldefinition.Brief2Spec{PrimaryFactorCode: "bri"}},
+			ReportMap: modeldefinition.ReportMap{Sections: []modeldefinition.ReportSection{{
+				Code: "report", Kind: modeldefinition.ReportSectionKindFactorScores, SourceRefs: []string{"bri"},
+				TemplateID: "standard", TemplateVersion: "2026-08-v1",
+			}}},
 		},
 	}
+}
+
+type behavioralPublishedTemplateStub map[string]struct{}
+
+func (s behavioralPublishedTemplateStub) IsPublished(templateID, version string) bool {
+	_, ok := s[templateID+"@"+version]
+	return ok
 }
 
 func hasIssueCode(issues []domain.DomainValidationIssue, code string) bool {
