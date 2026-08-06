@@ -263,6 +263,7 @@ jobs:
               for ATTEMPT in 1 2 3; do
                 if sudo docker run --rm --network infra-network \
                   -v "$PARTIAL_DIR/mongodb:/backup" \
+                  --user 0:0 \
                   mongo:7.0 mongodump \
                     --host="$MONGODB_HOST" \
                     --port="$MONGODB_PORT" \
@@ -278,6 +279,7 @@ jobs:
                 sudo docker run --rm \
                   -v "$PARTIAL_DIR/mongodb:/backup" \
                   -e COLLECTION="$COLLECTION" \
+                  --user 0:0 \
                   mongo:7.0 /bin/bash -Eeuo pipefail -c \
                   'rm -f -- "/backup/$COLLECTION.archive.gz"'
                 if (( ATTEMPT == 3 )); then
@@ -290,11 +292,13 @@ jobs:
               sudo docker run --rm \
                 -v "$PARTIAL_DIR/mongodb:/backup:ro" \
                 -e COLLECTION="$COLLECTION" \
+                --user 0:0 \
                 mongo:7.0 /bin/bash -Eeuo pipefail -c \
                 'test -s "/backup/$COLLECTION.archive.gz"'
               for ATTEMPT in 1 2 3; do
                 if sudo docker run --rm --network infra-network \
                   -v "$PARTIAL_DIR/mongodb:/backup:ro" \
+                  --user 0:0 \
                   mongo:7.0 mongorestore \
                     --host="$MONGODB_HOST" \
                     --port="$MONGODB_PORT" \
