@@ -2527,6 +2527,28 @@ jobs:
             exit 1
           fi
 
+          SERVER_ARCH=$(ssh \
+            -i "$KEY_FILE" \
+            -p "$SVRA_SSH_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
+            "${SVRA_USERNAME}@${SVRA_HOST}" uname -m)
+          case "$SERVER_ARCH" in
+            x86_64|amd64)
+              LOCAL_TOOL="$RUNNER_TEMP/outcome-template-route-linux-amd64"
+              REMOTE_TOOL="$REMOTE_AMD64"
+              ;;
+            aarch64|arm64)
+              LOCAL_TOOL="$RUNNER_TEMP/outcome-template-route-linux-arm64"
+              REMOTE_TOOL="$REMOTE_ARM64"
+              ;;
+            *)
+              echo "❌ Unsupported ServerA architecture: $SERVER_ARCH" >&2
+              exit 1
+              ;;
+          esac
           scp -q \
             -i "$KEY_FILE" \
             -P "$SVRA_SSH_PORT" \
@@ -2534,17 +2556,8 @@ jobs:
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
-            "$RUNNER_TEMP/outcome-template-route-linux-amd64" \
-            "${SVRA_USERNAME}@${SVRA_HOST}:${REMOTE_AMD64}"
-          scp -q \
-            -i "$KEY_FILE" \
-            -P "$SVRA_SSH_PORT" \
-            -o BatchMode=yes \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
-            "$RUNNER_TEMP/outcome-template-route-linux-arm64" \
-            "${SVRA_USERNAME}@${SVRA_HOST}:${REMOTE_ARM64}"
+            "$LOCAL_TOOL" \
+            "${SVRA_USERNAME}@${SVRA_HOST}:${REMOTE_TOOL}"
           ssh \
             -i "$KEY_FILE" \
             -p "$SVRA_SSH_PORT" \
@@ -2553,8 +2566,8 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
             "${SVRA_USERNAME}@${SVRA_HOST}" \
-            chmod 0700 "$REMOTE_AMD64" "$REMOTE_ARM64"
-          echo "✅ EvaluationOutcome governance tools transferred for run ${GOVERNANCE_RUN_TOKEN}"
+            chmod 0700 "$REMOTE_TOOL"
+          echo "✅ EvaluationOutcome governance tool transferred for ${SERVER_ARCH} run ${GOVERNANCE_RUN_TOKEN}"
 
       - name: Execute manifest-driven EvaluationOutcome template route governance
         uses: appleboy/ssh-action@v1.2.2
