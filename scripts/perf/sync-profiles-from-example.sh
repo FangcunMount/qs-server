@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 将 qs-perf.config.example.json 中新增的 qpsProfiles / paths 合并进本地配置（本地已有键优先，不覆盖 token/URL）。
+# 用 example 中唯一受支持的主线 qpsProfiles 覆盖本地 profiles；URL、token 与其他环境配置保持不变。
 set -euo pipefail
 
 LOCAL="${1:-tmp/perf/qs-perf.config.json}"
@@ -54,10 +54,10 @@ migrate_runtime_paths() {
 }
 
 before="$(jq -c . "$LOCAL")"
-before_profile_keys="$(jq -c '.qpsProfiles // {} | keys' "$LOCAL")"
 before_path_keys="$(jq -c '.paths // {} | keys' "$LOCAL")"
 next="$(jq -c --slurpfile ex "$EXAMPLE" '
-  .qpsProfiles = (($ex[0].qpsProfiles // {}) + (.qpsProfiles // {}))
+  .qpsProfile = ($ex[0].qpsProfile // "smoke_4")
+  | .qpsProfiles = ($ex[0].qpsProfiles // {})
   | .paths = (($ex[0].paths // {}) + (.paths // {}))
 ' "$LOCAL" | migrate_runtime_paths)"
 
@@ -82,10 +82,6 @@ migrated_paths="$(jq -r -n --argjson before "$before" --argjson after "$next" '
   | join(", ")
 ')"
 
-added_profiles="$(jq -r -n --argjson before "$before_profile_keys" --argjson after "$(jq -c '.qpsProfiles // {} | keys' <<<"$next")" '
-  [$after[] | select(. as $k | ($before | index($k) | not))]
-  | if length > 0 then join(", ") else empty end
-')"
 added_paths="$(jq -r -n --argjson before "$before_path_keys" --argjson after "$(jq -c '.paths // {} | keys' <<<"$next")" '
   [$after[] | select(. as $k | ($before | index($k) | not))]
   | if length > 0 then join(", ") else empty end
@@ -94,16 +90,14 @@ added_paths="$(jq -r -n --argjson before "$before_path_keys" --argjson after "$(
 jq . <<<"$next" > "${LOCAL}.tmp"
 mv "${LOCAL}.tmp" "$LOCAL"
 
-echo "merged qpsProfiles/paths from example -> $LOCAL"
+echo "synchronized official qpsProfiles/paths from example -> $LOCAL"
+echo "  profiles: $(jq -r '.qpsProfiles | keys | join(", ")' <<<"$next")"
 if [[ -n "$migrated_paths" ]]; then
   echo "  $migrated_paths"
-fi
-if [[ -n "$added_profiles" ]]; then
-  echo "  new profiles: $added_profiles"
 fi
 if [[ -n "$added_paths" ]]; then
   echo "  new paths: $added_paths"
 fi
-if [[ -z "$added_profiles" && -z "$added_paths" ]]; then
+if [[ -z "$added_paths" ]]; then
   echo "  (no new keys; normalized JSON / paths fill-in only)"
 fi

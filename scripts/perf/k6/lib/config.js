@@ -147,6 +147,7 @@ export function configAliasesForEnv(name) {
     PERSONALITY_SUBMIT_RPS: ['qps.personalitySubmit', 'qps.personality_submit', 'personalitySubmitRps', 'personality_submit_rps'],
     REPORT_RPS: ['qps.report', 'reportRps', 'report_rps'],
     MEDICAL_REPORT_RPS: ['qps.medicalReport', 'qps.medical_report', 'medicalReportRps', 'medical_report_rps', 'qps.medicalWaitReport', 'qps.medical_wait_report'],
+    BEHAVIOR_REPORT_RPS: ['qps.behaviorReport', 'qps.behavior_report', 'behaviorReportRps', 'behavior_report_rps', 'qps.behaviorWaitReport', 'qps.behavior_wait_report'],
     PERSONALITY_REPORT_RPS: ['qps.personalityReport', 'qps.personality_report', 'personalityReportRps', 'personality_report_rps', 'qps.personalityWaitReport', 'qps.personality_wait_report'],
     STATS_RPS: ['qps.stats', 'statsRps', 'stats_rps'],
     CHAIN_PROBE_RPS: ['qps.chainProbe', 'qps.chain_probe', 'chainProbeRps', 'chain_probe_rps'],
@@ -179,6 +180,7 @@ export function configAliasesForEnv(name) {
     REPORT_WS_HOLD_SECONDS: ['reportWsHoldSeconds', 'report_ws_hold_seconds', 'reportSizing.websocket.holdSeconds', 'report_sizing.websocket.hold_seconds'],
     REPORT_MODE: ['reportMode', 'report_mode'],
     STRICT_THRESHOLDS: ['strictThresholds', 'strict_thresholds'],
+    THRESHOLD_TIER: ['thresholdTier', 'threshold_tier'],
     CHAIN_PROBE_TIMEOUT_SECONDS: ['chainProbeTimeoutSeconds', 'chain_probe_timeout_seconds'],
     CHAIN_PROBE_POLL_SECONDS: ['chainProbePollSeconds', 'chain_probe_poll_seconds'],
     NO_CONNECTION_REUSE: ['noConnectionReuse', 'no_connection_reuse'],
@@ -238,10 +240,13 @@ export function hasGranularQueryQps() {
 export function hasGranularReportQps() {
   return hasConfigOrEnvQps([
     'MEDICAL_REPORT_RPS',
+    'BEHAVIOR_REPORT_RPS',
     'PERSONALITY_REPORT_RPS',
     'qps.medicalReport',
+    'qps.behaviorReport',
     'qps.personalityReport',
     'qps.medicalWaitReport',
+    'qps.behaviorWaitReport',
     'qps.personalityWaitReport',
   ]);
 }
@@ -344,7 +349,7 @@ export function debugSetupState() {
   if (!DEBUG_SETUP) {
     return;
   }
-  console.log(`[setup-debug] config=${PERF_CONFIG_PATH || '<none>'} profile=${QPS_PROFILE || '<none>'}`);
+  console.log(`[setup-debug] config=${PERF_CONFIG_PATH || '<none>'} profile=${QPS_PROFILE || '<none>'} thresholdTier=${THRESHOLD_TIER}`);
   console.log(`[setup-debug] collectionBaseUrl=${COLLECTION_BASE_URL} apiserverBaseUrl=${APISERVER_BASE_URL}`);
   console.log(`[setup-debug] tokenFileLoads=${JSON.stringify(TOKEN_FILE_LOADS)}`);
   console.log(`[setup-debug] tokenFileIssues=${JSON.stringify(TOKEN_FILE_READ_ISSUES)}`);
@@ -440,6 +445,7 @@ export const PERSONALITY_SUBMIT_RPS = USE_SPLIT_SUBMIT_SCENARIOS ? intEnv('PERSO
 export const LEGACY_SUBMIT_RPS = USE_SPLIT_SUBMIT_SCENARIOS ? 0 : SUBMIT_RPS;
 
 export const MEDICAL_REPORT_RPS = USE_SPLIT_REPORT_SCENARIOS ? intEnv('MEDICAL_REPORT_RPS', 0) : 0;
+export const BEHAVIOR_REPORT_RPS = USE_SPLIT_REPORT_SCENARIOS ? intEnv('BEHAVIOR_REPORT_RPS', 0) : 0;
 export const PERSONALITY_REPORT_RPS = USE_SPLIT_REPORT_SCENARIOS ? intEnv('PERSONALITY_REPORT_RPS', 0) : 0;
 export const LEGACY_REPORT_RPS = USE_SPLIT_REPORT_SCENARIOS ? 0 : REPORT_RPS;
 
@@ -612,10 +618,43 @@ export const DISCOVER_ASSESSMENT_LIMIT = intEnv('DISCOVER_ASSESSMENT_LIMIT', 100
 export const RUN_ID = envOrConfigString('RUN_ID', ['runId', 'run_id'], `${Date.now()}`);
 export const IDEMPOTENCY_PREFIX = envOrConfigString('IDEMPOTENCY_PREFIX', ['idempotencyPrefix', 'idempotency_prefix'], `k6-300qps-${RUN_ID}`);
 export const STRICT_THRESHOLDS = boolEnv('STRICT_THRESHOLDS', false);
+export const THRESHOLD_TIER = resolveThresholdTier();
 export const CHAIN_PROBE_TIMEOUT_SECONDS = intEnv('CHAIN_PROBE_TIMEOUT_SECONDS', 120);
 export const CHAIN_PROBE_POLL_SECONDS = numberEnv('CHAIN_PROBE_POLL_SECONDS', 1);
 export const HTTP_TIMEOUT = envOrConfigString('HTTP_TIMEOUT', ['httpTimeout', 'http_timeout'], '30s');
 export const USER_AGENT = envOrConfigString('USER_AGENT', ['userAgent', 'user_agent'], 'qs-server-k6-300qps/1.0');
+
+export function resolveThresholdTier() {
+  const envValue = __ENV.THRESHOLD_TIER;
+  if (envValue !== undefined && envValue !== '') {
+    return normalizeThresholdTier(envValue);
+  }
+  const configured = configFirstValue(['thresholdTier', 'threshold_tier']);
+  if (configured !== undefined && configured !== null && configured !== '' && String(configured).toLowerCase() !== 'none') {
+    return normalizeThresholdTier(configured);
+  }
+  if (STRICT_THRESHOLDS) {
+    return 'protection';
+  }
+  return normalizeThresholdTier(configured || 'none');
+}
+
+export function normalizeThresholdTier(raw) {
+  const normalized = String(raw || '').trim().toLowerCase();
+  if (normalized === '' || normalized === 'default') {
+    return 'none';
+  }
+  if (normalized === 'off' || normalized === 'disabled') {
+    return 'none';
+  }
+  if (normalized === 'strict') {
+    return 'protection';
+  }
+  if (['none', 'experience', 'protection'].indexOf(normalized) >= 0) {
+    return normalized;
+  }
+  throw new Error(`THRESHOLD_TIER=${raw} is invalid; use none, experience, or protection.`);
+}
 
 export function resolveReportVuserDefaults(reportRps, options = {}) {
   const rps = Math.max(0, Number(reportRps) || 0);
@@ -641,5 +680,32 @@ export function resolveReportVuserDefaults(reportRps, options = {}) {
   return { preAllocated: Math.min(Math.max(20, Math.ceil(max * 0.6)), max), max };
 }
 
-export const TOTAL_REPORT_RPS = LEGACY_REPORT_RPS + MEDICAL_REPORT_RPS + PERSONALITY_REPORT_RPS;
+export function resolveArrivalVuserDefaults(rate, options = {}) {
+  const rps = Math.max(0, Number(rate) || 0);
+  const expectedLatencySeconds = Math.max(0.001, Number(options.expectedLatencySeconds) || 0.5);
+  const timeoutSeconds = Math.max(expectedLatencySeconds, Number(options.timeoutSeconds) || durationSeconds(HTTP_TIMEOUT, 30));
+  const configuredHeadroom = Number(configFirstValue(['vuserSizing.headroom', 'vuser_sizing.headroom']));
+  const headroom = Math.max(1, Number(options.headroom) || configuredHeadroom || 1.25);
+  const minPreAllocated = Math.max(1, Number(options.minPreAllocated) || 2);
+  const minMax = Math.max(minPreAllocated, Number(options.minMax) || 10);
+  if (rps <= 0) {
+    return { preAllocated: minPreAllocated, max: minMax };
+  }
+  const preAllocated = Math.max(minPreAllocated, Math.ceil(rps * expectedLatencySeconds * headroom));
+  const max = Math.max(minMax, preAllocated, Math.ceil(rps * timeoutSeconds * headroom));
+  return { preAllocated, max };
+}
+
+export function durationSeconds(raw, fallback) {
+  const value = String(raw || '').trim().toLowerCase();
+  const matched = value.match(/^(\d+(?:\.\d+)?)(ms|s|m|h)$/);
+  if (!matched) {
+    return fallback;
+  }
+  const amount = Number(matched[1]);
+  const factors = { ms: 0.001, s: 1, m: 60, h: 3600 };
+  return amount * factors[matched[2]];
+}
+
+export const TOTAL_REPORT_RPS = LEGACY_REPORT_RPS + MEDICAL_REPORT_RPS + BEHAVIOR_REPORT_RPS + PERSONALITY_REPORT_RPS;
 export const REPORT_VUSER_DEFAULTS = resolveReportVuserDefaults(TOTAL_REPORT_RPS);

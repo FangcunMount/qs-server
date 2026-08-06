@@ -12,6 +12,8 @@ import {
   chainProbeFailed, submitToAssessmentLatency, assessmentToReportLatency,
   reportGeneratedLatency, medicalReportGeneratedLatency, personalityReportGeneratedLatency, chainProbeTerminal,
   personalityReportFetchDuration, personalityReportFetchSuccessRate,
+  chainProbeStarted, chainProbeAccepted, chainProbeCompleted, chainProbeFinalFailed,
+  chainProbeTimeout, chainProbePollRequests,
 } from '../lib/metrics.js';
 
 
@@ -29,6 +31,7 @@ export function asyncChainProbe(data) {
 
 export function runAsyncChainProbe(ctx, modelType) {
   const start = Date.now();
+  chainProbeStarted.add(1, { model_type: modelType });
   let payload = null;
   let collectionTokenIndex;
   if (modelType === 'personality') {
@@ -57,15 +60,18 @@ export function runAsyncChainProbe(ctx, modelType) {
     service: 'collection-server',
     model_type: modelType,
   });
+  recordHTTPStatus(submitRes, null, 'chain_probe_submit');
 
   const accepted = responseData(submitRes);
   if (submitRes.status !== 202 || accepted.status !== 'accepted' || !accepted.answersheet_id) {
     chainProbeFailed.add(1, { reason: 'submit_not_accepted', model_type: modelType });
     return;
   }
+  chainProbeAccepted.add(1, { model_type: modelType });
 
   const assessmentID = waitAssessmentReadiness(accepted.answersheet_id, payload.testee_id, modelType, token);
   if (!assessmentID) {
+    chainProbeTimeout.add(1, { stage: 'assessment_readiness', model_type: modelType });
     chainProbeFailed.add(1, { reason: 'assessment_readiness_timeout', model_type: modelType });
     return;
   }
@@ -77,6 +83,7 @@ export function runAsyncChainProbe(ctx, modelType) {
   const assessmentStart = Date.now();
   const terminalStatus = waitReportTerminal(assessmentID, payload.testee_id, ctx, reportPathTemplate, modelType === 'personality' ? 'chain_probe_personality_report_status' : 'chain_probe_report_status', token);
   if (!terminalStatus) {
+    chainProbeTimeout.add(1, { stage: 'report_terminal', model_type: modelType });
     chainProbeFailed.add(1, { reason: 'report_timeout', model_type: modelType });
     return;
   }
@@ -102,7 +109,7 @@ export function runAsyncChainProbe(ctx, modelType) {
         service: 'collection-server',
         model_type: modelType,
       });
-      recordHTTPStatus(reportRes, chainProbeFailed, 'chain_probe_personality_report');
+      recordHTTPStatus(reportRes, null, 'chain_probe_personality_report');
       const reportOk = check(reportRes, { 'personality report fetch status is 200': (r) => r.status === 200 });
       personalityReportFetchSuccessRate.add(reportOk, { model_type: modelType });
       personalityReportFetchDuration.add(reportRes.timings.duration, { model_type: modelType });
@@ -113,6 +120,11 @@ export function runAsyncChainProbe(ctx, modelType) {
     }
   } else if (modelType === 'medical') {
     medicalReportGeneratedLatency.add(totalLatency, latencyTags);
+  }
+  if (terminalStatus === 'interpreted') {
+    chainProbeCompleted.add(1, { model_type: modelType });
+  } else {
+    chainProbeFinalFailed.add(1, { model_type: modelType });
   }
   chainProbeTerminal.add(1, { assessment_status: terminalStatus, model_type: modelType });
 }
@@ -129,6 +141,8 @@ export function waitAssessmentReadiness(answerSheetID, testeeID, modelType, toke
       service: 'collection-server',
       model_type: modelType,
     });
+    recordHTTPStatus(res, null, 'chain_probe_assessment_readiness');
+    chainProbePollRequests.add(1, { stage: 'assessment_readiness', model_type: modelType });
     if (res.status === 200) {
       const data = responseData(res);
       if (data.status === 'ready' && data.assessment_id) {
@@ -154,6 +168,8 @@ export function waitReportTerminal(assessmentID, testeeID, data, pathTemplate, e
       endpoint: endpoint || 'chain_probe_report_status',
       service: 'collection-server',
     });
+    recordHTTPStatus(res, null, endpoint || 'chain_probe_report_status');
+    chainProbePollRequests.add(1, { stage: 'report_terminal' });
     if (res.status === 200) {
       const status = responseData(res).status || '';
       if (status === 'interpreted' || status === 'failed') {

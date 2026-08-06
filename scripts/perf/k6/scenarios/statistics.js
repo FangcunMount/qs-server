@@ -3,7 +3,10 @@ import { pick, is2xx } from '../lib/util.js';
 import { scenarioData, renderPath } from '../lib/data.js';
 import { timedRequest, authHeaders, jsonHeaders, apiserverToken, recordHTTPStatus } from '../lib/http.js';
 import { APISERVER_BASE_URL, STATS_PATHS, STATS_CONTENT_BATCH_PATH } from '../lib/config.js';
-import { statisticsDuration, statisticsFailed } from '../lib/metrics.js';
+import {
+  statisticsDuration, statisticsOverviewDuration, statisticsContentBatchDuration,
+  statisticsFailed, statisticsOverviewSuccessRate, statisticsContentBatchSuccessRate,
+} from '../lib/metrics.js';
 
 function contentBatchPayload(ctx) {
   const items = [];
@@ -36,6 +39,10 @@ export function statisticsQuery(data) {
   });
 
   statisticsDuration.add(res.timings.duration, res.tags);
+  const operationDuration = endpoint === 'statistics_content_batch' ? statisticsContentBatchDuration : statisticsOverviewDuration;
+  const operationSuccessRate = endpoint === 'statistics_content_batch' ? statisticsContentBatchSuccessRate : statisticsOverviewSuccessRate;
+  operationDuration.add(res.timings.duration, res.tags);
+  operationSuccessRate.add(is2xx(res.status), res.tags);
   recordHTTPStatus(res, statisticsFailed, endpoint);
   check(res, {
     'statistics request status is 2xx': (r) => is2xx(r.status),

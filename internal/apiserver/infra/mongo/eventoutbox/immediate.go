@@ -40,7 +40,7 @@ func (s *Store) GetPublishableEvent(ctx context.Context, eventID string, now tim
 		_ = s.markPermanentFailure(ctx, po.EventID, "decode outbox payload: "+err.Error(), "encoding", now)
 		return outboxport.PendingEvent{}, false, err
 	}
-	return pending, true, nil
+	return outboxport.PendingEvent{EventID: pending.EventID, Event: pending.Event, AttemptCount: po.AttemptCount}, true, nil
 }
 
 func (s *Store) markPermanentFailure(ctx context.Context, eventID, lastError, errorKind string, failedAt time.Time) error {

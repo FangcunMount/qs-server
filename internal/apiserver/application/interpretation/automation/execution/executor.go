@@ -13,6 +13,7 @@ import (
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/report"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/retryobservability"
 )
 
 type ExecuteStatus string
@@ -113,6 +114,7 @@ func (e *executor) buildAndCommit(ctx context.Context, input interpinput.Interpr
 	runResult := executionmetrics.ResultError
 	defer func() {
 		executionmetrics.ObserveRun(builderIdentity, runResult, time.Since(runStartedAt))
+		retryobservability.ObserveBusiness("interpretation", string(runRecord.Origin()), runResult)
 	}()
 
 	key, ok := rendering.KeyFromInput(input)

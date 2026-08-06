@@ -27,6 +27,7 @@ import {
   MEDICAL_SUBMIT_RPS,
   APISERVER_BASE_URL,
   MEDICAL_REPORT_RPS,
+  BEHAVIOR_REPORT_RPS,
   SCRIPT_INIT_AT_MS,
   COLLECTION_TOKENS,
   MEDICAL_QUERY_RPS,
@@ -87,7 +88,7 @@ export function scenarioData(data) {
 
 export function validateScenarioData(data) {
   const submitRps = LEGACY_SUBMIT_RPS + MEDICAL_SUBMIT_RPS + PERSONALITY_SUBMIT_RPS;
-  const reportRps = LEGACY_REPORT_RPS + MEDICAL_REPORT_RPS + PERSONALITY_REPORT_RPS;
+  const reportRps = LEGACY_REPORT_RPS + MEDICAL_REPORT_RPS + BEHAVIOR_REPORT_RPS + PERSONALITY_REPORT_RPS;
   const chainProbeRps = CHAIN_PROBE_MEDICAL_RPS + CHAIN_PROBE_PERSONALITY_RPS;
   if ((submitRps > 0 || chainProbeRps > 0) && COLLECTION_TOKENS.length === 0) {
     throw new Error(`TOKEN, TOKENS, TOKENS_FILE, COLLECTION_TOKEN, COLLECTION_TOKENS or a valid collectionTokensFile is required for answersheet submit.${tokenFileIssueMessage()}`);
@@ -121,6 +122,9 @@ export function validateScenarioData(data) {
   }
   if (MEDICAL_REPORT_RPS > 0 && availability.medical === 0) {
     missingReportSampleKinds.push('medical');
+  }
+  if (BEHAVIOR_REPORT_RPS > 0 && availability.behavior === 0) {
+    missingReportSampleKinds.push('behavior');
   }
   if (PERSONALITY_REPORT_RPS > 0 && availability.personality === 0) {
     missingReportSampleKinds.push('personality');
@@ -1051,6 +1055,7 @@ export function buildRunTiming() {
   const setupStartAtMs = Date.now();
   const reportRps = LEGACY_REPORT_RPS;
   const medicalReportRps = MEDICAL_REPORT_RPS;
+  const behaviorReportRps = BEHAVIOR_REPORT_RPS;
   const personalityReportRps = PERSONALITY_REPORT_RPS;
   return {
     runId: RUN_ID,
@@ -1072,9 +1077,11 @@ export function buildRunTiming() {
       personality_submit: PERSONALITY_SUBMIT_RPS,
       report_status_query: REPORT_WEBSOCKET ? 0 : reportRps,
       medical_report_status_query: REPORT_WEBSOCKET ? 0 : medicalReportRps,
+      behavior_report_status_query: REPORT_WEBSOCKET ? 0 : behaviorReportRps,
       personality_report_status_query: REPORT_WEBSOCKET ? 0 : personalityReportRps,
       report_ws_query: REPORT_WEBSOCKET ? reportRps : 0,
       medical_report_ws_query: REPORT_WEBSOCKET ? medicalReportRps : 0,
+      behavior_report_ws_query: REPORT_WEBSOCKET ? behaviorReportRps : 0,
       personality_report_ws_query: REPORT_WEBSOCKET ? personalityReportRps : 0,
       statistics_query: STATS_RPS,
       async_chain_probe_medical: CHAIN_PROBE_MEDICAL_RPS,

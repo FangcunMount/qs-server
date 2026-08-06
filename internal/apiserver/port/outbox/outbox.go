@@ -13,8 +13,17 @@ type ScheduledStager interface {
 	StageAt(ctx context.Context, dueAt time.Time, events ...event.DomainEvent) error
 }
 
-type PendingEvent = base.PendingEvent
-type Store = base.Store
+type PendingEvent struct {
+	EventID      string
+	Event        event.DomainEvent
+	AttemptCount int
+}
+
+type Store interface {
+	ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([]PendingEvent, error)
+	MarkEventPublished(ctx context.Context, eventID string, publishedAt time.Time) error
+	MarkEventFailed(ctx context.Context, eventID, lastError string, nextAttemptAt time.Time) error
+}
 type StatusBucket = base.StatusBucket
 type StatusSnapshot = base.StatusSnapshot
 type StatusReader = base.StatusReader

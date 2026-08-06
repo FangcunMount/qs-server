@@ -53,6 +53,6 @@ IAM User -> active ProfileLink -> Testee
 ## 剩余验收
 
 - 预发验证合法订阅、越权负例与 HTTP fallback。
-- 保存改造前后 observability snapshot，执行 `perf-mixed280-models` 与 `perf-special-report-short-poll`，验证既有阈值及新增授权 p95/p99。
+- 保存改造前后 observability snapshot，执行 `make perf-run PLAN=baseline` 与 `make perf-run PLAN=admission`，验证体验线、保护线及新增授权 P95/P99。
 - 小流量发布后至少观察 24 小时授权延迟、拒绝分类、依赖错误、连接池和 5xx。
 - 历史日志若未同时记录 JWT User 与订阅 Testee，标记为不可追溯，不据此宣称历史无越权。

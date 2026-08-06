@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
+	"github.com/FangcunMount/qs-server/internal/pkg/retryobservability"
 )
 
 const (
@@ -165,7 +166,7 @@ func (d *ImmediateDispatcher) dispatchOne(ctx context.Context, eventID, eventTyp
 	}
 	l := logger.L(ctx)
 	if err := d.publisher.Publish(ctx, pending.Event); err != nil {
-		d.observeImmediate(ctx, eventType, "publish_failed")
+		d.observeImmediate(ctx, eventType, "publish_failed", retryobservability.AttemptClassForAttempt(pending.AttemptCount+1))
 		l.Warnw("immediate outbox publish failed",
 			"dispatcher", d.name,
 			"event_id", eventID,
@@ -174,7 +175,7 @@ func (d *ImmediateDispatcher) dispatchOne(ctx context.Context, eventID, eventTyp
 		return
 	}
 	if err := d.store.MarkEventPublished(ctx, eventID, now); err != nil {
-		d.observeImmediate(ctx, eventType, "mark_failed")
+		d.observeImmediate(ctx, eventType, "mark_failed", retryobservability.AttemptClassForAttempt(pending.AttemptCount+1))
 		l.Warnw("immediate outbox mark published failed",
 			"dispatcher", d.name,
 			"event_id", eventID,
@@ -185,10 +186,10 @@ func (d *ImmediateDispatcher) dispatchOne(ctx context.Context, eventID, eventTyp
 	if d.readyIndex != nil {
 		_ = d.readyIndex.Remove(ctx, eventType, eventID)
 	}
-	d.observeImmediate(ctx, eventType, "published")
+	d.observeImmediate(ctx, eventType, "published", retryobservability.AttemptClassForAttempt(pending.AttemptCount+1))
 }
 
-func (d *ImmediateDispatcher) observeImmediate(ctx context.Context, eventType, outcome string) {
+func (d *ImmediateDispatcher) observeImmediate(ctx context.Context, eventType, outcome string, attemptClass ...string) {
 	if d == nil || d.observer == nil {
 		return
 	}
@@ -204,10 +205,18 @@ func (d *ImmediateDispatcher) observeImmediate(ctx context.Context, eventType, o
 		mapped = eventobservability.OutboxOutcomeImmediateSkipped
 	}
 	d.observer.ObserveOutbox(ctx, eventobservability.OutboxEvent{
-		Relay:     d.name + ":immediate",
-		EventType: eventType,
-		Outcome:   mapped,
+		Relay:        d.name + ":immediate",
+		EventType:    eventType,
+		Outcome:      mapped,
+		AttemptClass: firstString(attemptClass),
 	})
+}
+
+func firstString(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	return values[0]
 }
 
 func eventTypeSet(eventTypes []string) map[string]struct{} {

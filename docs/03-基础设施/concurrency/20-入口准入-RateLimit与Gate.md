@@ -183,7 +183,7 @@ Redis 下一次调用恢复
 - fail-open：`internal/collection-server/transport/rest/rate_limit_test.go`
 - budget 版本与保守切换：`internal/pkg/resilience/ratelimit/budget_test.go`
 - 配置校验：`internal/collection-server/options/options_test.go`
-- 压测：`make perf-reliable-submit24`、`make perf-reliable-submit48-burst`、`make perf-reliable-submit96-boundary`
+- 压测：`make perf-run PLAN=baseline`、`make perf-run PLAN=admission`；故障与幂等专项使用 `PLAN=diagnose CASE=...`
 
 ## 10. 学习问题
 

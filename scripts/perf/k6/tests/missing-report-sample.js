@@ -3,11 +3,13 @@ import { validateScenarioData } from '../lib/data.js';
 import {
   reportStatusQuery,
   medicalReportStatusQuery,
+  behaviorReportStatusQuery,
   personalityReportStatusQuery,
 } from '../scenarios/report.js';
 import {
   reportWsQuery,
   medicalReportWsQuery,
+  behaviorReportWsQuery,
   personalityReportWsQuery,
 } from '../scenarios/report-ws.js';
 
@@ -16,7 +18,7 @@ export const options = {
   iterations: 1,
   thresholds: {
     checks: ['rate==1'],
-    report_sample_skipped: ['count==6'],
+    report_sample_skipped: ['count==8'],
   },
 };
 
@@ -52,8 +54,10 @@ export default function () {
 
   reportStatusQuery(data);
   medicalReportStatusQuery(data);
+  behaviorReportStatusQuery(data);
   personalityReportStatusQuery(data);
   reportWsQuery(data);
   medicalReportWsQuery(data);
+  behaviorReportWsQuery(data);
   personalityReportWsQuery(data);
 }

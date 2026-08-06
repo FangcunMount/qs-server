@@ -9,20 +9,29 @@ snapshot_url() {
   local name="$1"
   local url="$2"
   local output="$out_dir/${label}-${name}"
+  local http_code=""
   if [[ -z "$url" ]]; then
     return
   fi
-  if ! curl -fsS "$url" -o "$output"; then
+  if ! http_code="$(curl -sS "$url" -o "$output" -w '%{http_code}')"; then
     echo "failed to snapshot $name from $url" >"$output.err"
+    return
+  fi
+  echo "$http_code" >"$output.http-status"
+  if [[ ! "$http_code" =~ ^2[0-9][0-9]$ ]]; then
+    echo "snapshot $name returned HTTP $http_code from $url" >"$output.err"
   fi
 }
 
 snapshot_url "collection-metrics.txt" "${COLLECTION_METRICS_URL:-http://127.0.0.1:18083/metrics}"
+snapshot_url "collection-readyz.json" "${COLLECTION_READYZ_URL:-http://127.0.0.1:18083/readyz}"
 snapshot_url "collection-resilience.json" "${COLLECTION_RESILIENCE_URL:-http://127.0.0.1:18083/governance/resilience}"
 snapshot_url "collection-redis.json" "${COLLECTION_REDIS_URL:-http://127.0.0.1:18083/governance/redis}"
 
 snapshot_url "apiserver-metrics.txt" "${APISERVER_METRICS_URL:-http://127.0.0.1:18082/metrics}"
+snapshot_url "apiserver-readyz.json" "${APISERVER_READYZ_URL:-http://127.0.0.1:18082/readyz}"
 snapshot_url "worker-metrics.txt" "${WORKER_METRICS_URL:-http://127.0.0.1:9092/metrics}"
+snapshot_url "worker-readyz.json" "${WORKER_READYZ_URL:-http://127.0.0.1:9092/readyz}"
 snapshot_url "worker-resilience.json" "${WORKER_RESILIENCE_URL:-http://127.0.0.1:9092/governance/resilience}"
 snapshot_url "worker-redis.json" "${WORKER_REDIS_URL:-http://127.0.0.1:9092/governance/redis}"
 

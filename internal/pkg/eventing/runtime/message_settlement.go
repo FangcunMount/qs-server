@@ -125,7 +125,11 @@ func (p MessageSettlementPolicy) observe(msg *messaging.Message, eventType strin
 	if p.observer == nil {
 		return
 	}
-	p.observer.ObserveConsume(context.Background(), eventobservability.ConsumeEvent{Service: p.service, Topic: p.topic, EventType: eventType, Outcome: outcome})
+	attempts := 1
+	if msg != nil && msg.Attempts > 0 {
+		attempts = int(msg.Attempts)
+	}
+	p.observer.ObserveConsume(context.Background(), eventobservability.ConsumeEvent{Service: p.service, Topic: p.topic, EventType: eventType, Outcome: outcome, Attempts: attempts})
 }
 
 func eventTypeFromMessage(msg *messaging.Message) string {

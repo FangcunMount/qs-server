@@ -44,7 +44,8 @@ PERF_DIR := tmp/perf
 PERF_SCRIPT_DIR := scripts/perf
 PERF_CONFIG_FILE := $(CURDIR)/$(PERF_DIR)/qs-perf.config.json
 PERF_K6_SCRIPT := $(PERF_SCRIPT_DIR)/k6/mixed.js
-QPS_PROFILE ?= pretest_60
+PERF_RUN_ROOT := $(CURDIR)/$(PERF_DIR)/runs
+PERF_CTL_BIN := $(CURDIR)/$(PERF_DIR)/bin/perfctl
 
 GOSEC_BASE_ARGS := -exclude-generated \
 	-exclude-dir=internal/apiserver/docs \
@@ -112,11 +113,7 @@ COLOR_RED := \033[31m
 .PHONY: docs-swagger docs-rest docs-hygiene docs-facts docs-verify
 .PHONY: cd-image cd-package cd-remote-deploy cd-validate cd-plan cd-export-image
 .PHONY: perf-init perf-ensure-config perf-tokens perf-tokens-collection perf-tokens-apiserver
-.PHONY: perf-preflight perf-check-k6 perf-k6 perf-smoke perf-pretest60 perf-pretest120 perf-pretest120-submit-only perf-pretest120-balanced perf-reliable-submit24 perf-reliable-submit48-burst perf-reliable-submit96-boundary
-.PHONY: perf-mixed140 perf-mixed140-submit24 perf-mixed160 perf-mixed180 perf-mixed200 perf-mixed220 perf-mixed240 perf-mixed240-models perf-mixed280 perf-mixed280-models perf-mixed280-models-short-report perf-mixed280-models-ws perf-special-report-short-poll perf-special-report-long-poll perf-mixed300 perf-mixed300-http perf-mixed300-http-query perf-mixed300-http-query-nostats perf-stats-isolate29 perf-stats-warmup perf-mixed300probe
-.PHONY: perf-model-smoke perf-outbox120 perf-personality60 perf-mixed300-models perf-submit-coalescing100 perf-submit-coalescing-conflict perf-submit-coalescing-redis-lock-failure perf-submit-coalescing-redis-signal-failure perf-submit-coalescing-redis-unavailable perf-submit-redis-degraded-low perf-submit-redis-degraded-global-overload perf-submit-redis-degraded-user-overload
-.PHONY: perf-collection-runtime-status perf-collection-runtime-healthy-smoke perf-collection-runtime-healthy perf-collection-runtime-degraded-low perf-collection-runtime-degraded-global perf-collection-runtime-degraded-user perf-collection-runtime-recovery
-.PHONY: perf-diag-report120 perf-diag-query120 perf-diag-submit120 perf-diag-query-submit120 perf-sync-profiles perf-sync-vusers perf-verify
+.PHONY: perf-preflight perf-check-k6 perf-run perf-sync-profiles perf-verify
 
 # ============================================================================
 # 帮助信息
@@ -202,17 +199,12 @@ perf-ensure-config:
 		mv $(PERF_DIR)/qs-perf.config.json.tmp $(PERF_DIR)/qs-perf.config.json; \
 		echo "$(COLOR_GREEN)✅ 已补全 apiserverTokensFile$(COLOR_RESET)"; \
 	fi
-	@$(PERF_SCRIPT_DIR)/sync-profiles-from-example.sh $(PERF_DIR)/qs-perf.config.json $(PERF_SCRIPT_DIR)/qs-perf.config.example.json 2>/dev/null || true
+	@$(PERF_SCRIPT_DIR)/sync-profiles-from-example.sh $(PERF_DIR)/qs-perf.config.json $(PERF_SCRIPT_DIR)/qs-perf.config.example.json
 
-perf-sync-profiles: ## 从 example 合并缺失的 qpsProfiles/paths（本地已有键保留）
+perf-sync-profiles: ## 同步唯一受支持的主线 profiles（保留本地 URL/token）
 	@command -v jq >/dev/null 2>&1 || { echo "$(COLOR_RED)❌ 需要 jq: brew install jq$(COLOR_RESET)" >&2; exit 1; }
 	@test -f $(PERF_DIR)/qs-perf.config.json || { echo "$(COLOR_RED)❌ 先执行: make perf-init$(COLOR_RESET)" >&2; exit 1; }
 	@$(PERF_SCRIPT_DIR)/sync-profiles-from-example.sh $(PERF_DIR)/qs-perf.config.json $(PERF_SCRIPT_DIR)/qs-perf.config.example.json
-
-perf-sync-vusers: ## 用 example 覆盖本地各 profile 的 vusers/reportMode（WS 切换后执行）
-	@command -v jq >/dev/null 2>&1 || { echo "$(COLOR_RED)❌ 需要 jq: brew install jq$(COLOR_RESET)" >&2; exit 1; }
-	@test -f $(PERF_DIR)/qs-perf.config.json || { echo "$(COLOR_RED)❌ 先执行: make perf-init$(COLOR_RESET)" >&2; exit 1; }
-	@bash $(PERF_SCRIPT_DIR)/sync-vusers-from-example.sh $(PERF_DIR)/qs-perf.config.json $(PERF_SCRIPT_DIR)/qs-perf.config.example.json
 
 perf-tokens-collection: perf-ensure-config ## 用 collection_users 刷新 tokens.json
 	@test -f $(PERF_DIR)/iam-users.json || { echo "$(COLOR_RED)❌ 缺少 $(PERF_DIR)/iam-users.json$(COLOR_RESET)" >&2; exit 1; }
@@ -236,210 +228,23 @@ perf-preflight: perf-ensure-config ## Token 预检（k6 前必跑）
 perf-check-k6:
 	@command -v k6 >/dev/null 2>&1 || { echo "$(COLOR_RED)❌ 需要 k6: brew install k6$(COLOR_RESET)" >&2; exit 1; }
 
-perf-k6: perf-check-k6 ## 运行 k6 混合压测 (QPS_PROFILE=smoke_4|mixed_240_models|mixed_300|mixed_300_models|…)
-	$(if $(SUMMARY_EXPORT),@mkdir -p $(dir $(SUMMARY_EXPORT)),)
-	k6 run -e PERF_CONFIG_FILE="$(PERF_CONFIG_FILE)" -e PERF_ROOT_DIR="$(CURDIR)" \
-		-e QPS_PROFILE="$(QPS_PROFILE)" \
-		$(if $(SUMMARY_EXPORT),--summary-export $(SUMMARY_EXPORT),) \
-		$(PERF_K6_SCRIPT)
+perf-run: perf-ensure-config ## 统一压测入口（PLAN=quick|baseline|admission|diagnose）
+	@test -n "$(PLAN)" || { echo "$(COLOR_RED)❌ 缺少 PLAN；使用 quick、baseline、admission 或 diagnose$(COLOR_RESET)" >&2; exit 1; }
+	@if [ "$(DRY_RUN)" != "1" ] && [ "$(DRY_RUN)" != "true" ] && [ "$(PLAN)" != "diagnose" ]; then \
+		$(MAKE) perf-preflight; \
+		$(MAKE) perf-check-k6; \
+	fi
+	@mkdir -p "$(dir $(PERF_CTL_BIN))"
+	$(GO) build -o "$(PERF_CTL_BIN)" ./scripts/perf/perfctl
+	"$(PERF_CTL_BIN)" \
+		-plan "$(PLAN)" \
+		-case "$(CASE)" \
+		-config "$(PERF_CONFIG_FILE)" \
+		-output "$(PERF_RUN_ROOT)" \
+		-script "$(CURDIR)/$(PERF_K6_SCRIPT)" \
+		$(if $(filter 1 true yes,$(DRY_RUN)),-dry-run,)
 
-perf-smoke: perf-preflight ## k6 smoke_4 全链路连通 (~30s)
-	$(MAKE) perf-k6 QPS_PROFILE=smoke_4
-
-perf-pretest60: perf-preflight ## k6 pretest_60 预压 (3min)
-	@mkdir -p $(PERF_DIR)/pretest60
-	$(MAKE) perf-k6 QPS_PROFILE=pretest_60 SUMMARY_EXPORT=$(PERF_DIR)/pretest60/k6-summary.json
-
-perf-pretest120: perf-preflight ## k6 pretest_120 中档 (5min)
-	@mkdir -p $(PERF_DIR)/pretest120
-	$(MAKE) perf-k6 QPS_PROFILE=pretest_120 SUMMARY_EXPORT=$(PERF_DIR)/pretest120/k6-summary.json
-
-perf-pretest120-submit-only: perf-preflight ## k6 pretest_120 隔离：仅 submit=19QPS (5min)
-	@mkdir -p $(PERF_DIR)/pretest120-submit-only
-	$(MAKE) perf-k6 QPS_PROFILE=pretest_120_submit_only SUMMARY_EXPORT=$(PERF_DIR)/pretest120-submit-only/k6-summary.json
-
-perf-reliable-submit24: perf-preflight ## 可靠受理稳态24/s（10min）
-	@mkdir -p $(PERF_DIR)/reliable-submit24
-	$(MAKE) perf-k6 QPS_PROFILE=reliable_submit_24 STRICT_THRESHOLDS=true SUMMARY_EXPORT=$(PERF_DIR)/reliable-submit24/k6-summary.json
-
-perf-reliable-submit48-burst: perf-preflight ## 可靠受理突发48/s（2min）
-	@mkdir -p $(PERF_DIR)/reliable-submit48-burst
-	$(MAKE) perf-k6 QPS_PROFILE=reliable_submit_48_burst STRICT_THRESHOLDS=true SUMMARY_EXPORT=$(PERF_DIR)/reliable-submit48-burst/k6-summary.json
-
-perf-reliable-submit96-boundary: perf-preflight ## 可靠受理准入边界96/s（5min）
-	@mkdir -p $(PERF_DIR)/reliable-submit96-boundary
-	$(MAKE) perf-k6 QPS_PROFILE=reliable_submit_96_boundary STRICT_THRESHOLDS=true SUMMARY_EXPORT=$(PERF_DIR)/reliable-submit96-boundary/k6-summary.json
-
-perf-pretest120-balanced: perf-preflight ## k6 pretest_120 混合降读压：34/19/26/13 (5min)
-	@mkdir -p $(PERF_DIR)/pretest120-balanced
-	$(MAKE) perf-k6 QPS_PROFILE=pretest_120_balanced SUMMARY_EXPORT=$(PERF_DIR)/pretest120-balanced/k6-summary.json
-
-perf-mixed140: perf-preflight ## k6 mixed_140 升档 (5min)
-	@mkdir -p $(PERF_DIR)/mixed140
-	$(MAKE) perf-k6 QPS_PROFILE=mixed_140 SUMMARY_EXPORT=$(PERF_DIR)/mixed140/k6-summary.json
-
-perf-mixed140-submit24: perf-preflight ## k6 mixed_140 读压升档 + submit=19 (5min)
-	@mkdir -p $(PERF_DIR)/mixed140-submit24
-	$(MAKE) perf-k6 QPS_PROFILE=mixed_140_submit24 SUMMARY_EXPORT=$(PERF_DIR)/mixed140-submit24/k6-summary.json
-
-perf-mixed160: perf-preflight ## k6 mixed_160 升档 (5min)
-	@mkdir -p $(PERF_DIR)/mixed160
-	$(MAKE) perf-k6 QPS_PROFILE=mixed_160 SUMMARY_EXPORT=$(PERF_DIR)/mixed160/k6-summary.json
-
-perf-mixed180: perf-preflight ## k6 mixed_180 升档 (5min)
-	@mkdir -p $(PERF_DIR)/mixed180
-	$(MAKE) perf-k6 QPS_PROFILE=mixed_180 SUMMARY_EXPORT=$(PERF_DIR)/mixed180/k6-summary.json
-
-perf-mixed200: perf-preflight ## k6 mixed_200 升档 (5min)
-	@mkdir -p $(PERF_DIR)/mixed200
-	$(MAKE) perf-k6 QPS_PROFILE=mixed_200 SUMMARY_EXPORT=$(PERF_DIR)/mixed200/k6-summary.json
-
-perf-mixed220: perf-preflight ## k6 mixed_220 升档 (5min)
-	@mkdir -p $(PERF_DIR)/mixed220
-	$(MAKE) perf-k6 QPS_PROFILE=mixed_220 SUMMARY_EXPORT=$(PERF_DIR)/mixed220/k6-summary.json
-
-perf-mixed240: perf-preflight ## k6 mixed_240 升档 (8min, legacy 问卷单桶 query)
-	@mkdir -p $(PERF_DIR)/mixed240
-	$(MAKE) perf-k6 QPS_PROFILE=mixed_240 SUMMARY_EXPORT=$(PERF_DIR)/mixed240/k6-summary.json
-
-perf-mixed240-models: perf-preflight ## k6 mixed_240_models 三域 L1 验收 (8min, 拆分 query)
-	@mkdir -p $(PERF_DIR)/mixed240-models
-	$(MAKE) perf-k6 QPS_PROFILE=mixed_240_models SUMMARY_EXPORT=$(PERF_DIR)/mixed240-models/k6-summary.json
-
-perf-mixed280: perf-preflight ## k6 mixed_280 升档 (8min, legacy 问卷单桶 query)
-	@mkdir -p $(PERF_DIR)/mixed280
-	$(MAKE) perf-k6 QPS_PROFILE=mixed_280 SUMMARY_EXPORT=$(PERF_DIR)/mixed280/k6-summary.json
-
-perf-mixed280-models: perf-preflight ## k6 mixed_280_models 三域 L1 升档 (8min, WebSocket report-events)
-	@mkdir -p $(PERF_DIR)/mixed280-models
-	$(MAKE) perf-k6 QPS_PROFILE=mixed_280_models SUMMARY_EXPORT=$(PERF_DIR)/mixed280-models/k6-summary.json
-
-perf-mixed280-models-long-poll: perf-special-report-long-poll ## 兼容旧 Makefile 名 → special_report_long_poll
-
-perf-special-report-long-poll: perf-preflight ## k6 专项：wait-report 长轮询（非常规升档，生产已弃用）
-	@mkdir -p $(PERF_DIR)/special-report-long-poll
-	$(MAKE) perf-k6 QPS_PROFILE=special_report_long_poll SUMMARY_EXPORT=$(PERF_DIR)/special-report-long-poll/k6-summary.json
-
-perf-special-report-short-poll: perf-preflight ## k6 专项：HTTP report-status 降级路径（不进升档链）
-	@mkdir -p $(PERF_DIR)/special-report-short-poll
-	$(MAKE) perf-k6 QPS_PROFILE=special_report_short_poll SUMMARY_EXPORT=$(PERF_DIR)/special-report-short-poll/k6-summary.json
-
-perf-mixed280-models-short-report: perf-special-report-short-poll ## 兼容旧 Makefile 名 → special_report_short_poll
-
-perf-mixed280-models-ws: perf-mixed280-models ## 兼容旧 Makefile 名（现与 mixed_280_models 相同）
-
-perf-mixed300: perf-preflight ## k6 mixed_300 目标档 (10min, 含 chainProbe) + 前后 snapshot
-	@mkdir -p $(PERF_DIR)/300qps
-	OUT_DIR=$(PERF_DIR)/300qps $(PERF_SCRIPT_DIR)/snapshot-observability.sh before
-	$(MAKE) perf-k6 QPS_PROFILE=mixed_300 SUMMARY_EXPORT=$(PERF_DIR)/300qps/k6-summary.json
-	OUT_DIR=$(PERF_DIR)/300qps $(PERF_SCRIPT_DIR)/snapshot-observability.sh after
-
-perf-mixed300-http: perf-preflight ## k6 mixed_300_http Step1 (10min, 280 读压+10m, 无 probe)
-	@mkdir -p $(PERF_DIR)/300qps-http
-	$(MAKE) perf-k6 QPS_PROFILE=mixed_300_http SUMMARY_EXPORT=$(PERF_DIR)/300qps-http/k6-summary.json
-
-perf-mixed300-http-query: perf-preflight ## k6 mixed_300_http_query Step2 (10min, 300 query+report 96)
-	@mkdir -p $(PERF_DIR)/300qps-http-query
-	$(MAKE) perf-k6 QPS_PROFILE=mixed_300_http_query SUMMARY_EXPORT=$(PERF_DIR)/300qps-http-query/k6-summary.json
-
-perf-mixed300-http-query-nostats: perf-preflight ## k6 线A：Step2 同读压+report，stats=0 (10min)
-	@mkdir -p $(PERF_DIR)/300qps-http-query-nostats
-	$(MAKE) perf-k6 QPS_PROFILE=mixed_300_http_query_nostats SUMMARY_EXPORT=$(PERF_DIR)/300qps-http-query-nostats/k6-summary.json
-
-perf-stats-isolate29: perf-preflight ## k6 线A：仅 statistics 29/s overview+system (10min)
-	@mkdir -p $(PERF_DIR)/stats-isolate29
-	$(MAKE) perf-k6 QPS_PROFILE=stats_isolate_29 SUMMARY_EXPORT=$(PERF_DIR)/stats-isolate29/k6-summary.json
-
-perf-stats-warmup: perf-preflight ## k6 线A：Step2 前 stats 预热 1min（overview+system @29/s）
-	@mkdir -p $(PERF_DIR)/stats-warmup
-	$(MAKE) perf-k6 QPS_PROFILE=stats_warmup_1m SUMMARY_EXPORT=$(PERF_DIR)/stats-warmup/k6-summary.json
-
-perf-mixed300probe: perf-preflight ## k6 mixed_300_probe 目标档 + chainProbe (10min) + 前后 snapshot
-	@mkdir -p $(PERF_DIR)/300qps-probe
-	OUT_DIR=$(PERF_DIR)/300qps-probe $(PERF_SCRIPT_DIR)/snapshot-observability.sh before
-	$(MAKE) perf-k6 QPS_PROFILE=mixed_300_probe SUMMARY_EXPORT=$(PERF_DIR)/300qps-probe/k6-summary.json
-	OUT_DIR=$(PERF_DIR)/300qps-probe $(PERF_SCRIPT_DIR)/snapshot-observability.sh after
-
-perf-model-smoke: perf-preflight ## k6 smoke_4 多 model 路径连通 (~30s)
-	$(MAKE) perf-k6 QPS_PROFILE=smoke_4
-
-perf-outbox120: perf-preflight ## k6 outbox_120 专测 outbox 排水 (10min) + 前后 snapshot
-	@mkdir -p $(PERF_DIR)/outbox120
-	OUT_DIR=$(PERF_DIR)/outbox120 $(PERF_SCRIPT_DIR)/snapshot-observability.sh before
-	$(MAKE) perf-k6 QPS_PROFILE=outbox_120 SUMMARY_EXPORT=$(PERF_DIR)/outbox120/k6-summary.json
-	OUT_DIR=$(PERF_DIR)/outbox120 $(PERF_SCRIPT_DIR)/snapshot-observability.sh after
-
-perf-personality60: perf-preflight ## k6 personality_60 人格 session/submit/wait-report (5min)
-	@mkdir -p $(PERF_DIR)/personality60
-	$(MAKE) perf-k6 QPS_PROFILE=personality_60 SUMMARY_EXPORT=$(PERF_DIR)/personality60/k6-summary.json
-
-perf-mixed300-models: perf-preflight ## k6 mixed_300_models 医学+人格混合 (~290QPS, 10min) + 前后 snapshot
-	@mkdir -p $(PERF_DIR)/300qps-models
-	OUT_DIR=$(PERF_DIR)/300qps-models $(PERF_SCRIPT_DIR)/snapshot-observability.sh before
-	$(MAKE) perf-k6 QPS_PROFILE=mixed_300_models SUMMARY_EXPORT=$(PERF_DIR)/300qps-models/k6-summary.json
-	OUT_DIR=$(PERF_DIR)/300qps-models $(PERF_SCRIPT_DIR)/snapshot-observability.sh after
-
-perf-diag-report120: perf-preflight ## 诊断 pretest_120：仅 report_status_query=36QPS
-	QUERY_RPS=0 SUBMIT_RPS=0 REPORT_RPS=36 STATS_RPS=0 \
-		$(MAKE) perf-k6 QPS_PROFILE=pretest_120 SUMMARY_EXPORT=$(PERF_DIR)/diag-report-only/k6-summary.json
-
-perf-diag-query120: perf-preflight ## 诊断 pretest_120：仅 questionnaire_query=48QPS
-	QUERY_RPS=48 SUBMIT_RPS=0 REPORT_RPS=0 STATS_RPS=0 \
-		$(MAKE) perf-k6 QPS_PROFILE=pretest_120 SUMMARY_EXPORT=$(PERF_DIR)/diag-query-only/k6-summary.json
-
-perf-diag-submit120: perf-preflight ## 诊断 pretest_120：仅 answersheet_submit=24QPS（等同 perf-pretest120-submit-only）
-	@$(MAKE) perf-pretest120-submit-only SUMMARY_EXPORT=$(PERF_DIR)/diag-submit-only/k6-summary.json
-
-perf-diag-query-submit120: perf-preflight ## 诊断 pretest_120：query=48QPS + submit=24QPS
-	QUERY_RPS=48 SUBMIT_RPS=24 REPORT_RPS=0 STATS_RPS=0 \
-		$(MAKE) perf-k6 QPS_PROFILE=pretest_120 SUMMARY_EXPORT=$(PERF_DIR)/diag-query-submit/k6-summary.json
-
-perf-submit-coalescing100: ## 两个以上 collection-server 实例处理 100 个相同提交
-	COALESCING_SCENARIO=healthy $(PERF_SCRIPT_DIR)/run-submit-coalescing.sh
-
-perf-submit-coalescing-conflict: ## 两个以上 collection-server 实例并发处理相同 key、不同 fingerprint
-	COALESCING_SCENARIO=conflict $(PERF_SCRIPT_DIR)/run-submit-coalescing.sh
-
-perf-submit-coalescing-redis-lock-failure: ## Redis lease acquire 故障下验证 Mongo 收敛
-	COALESCING_SCENARIO=redis_lock_failure $(PERF_SCRIPT_DIR)/run-submit-coalescing.sh
-
-perf-submit-coalescing-redis-signal-failure: ## Redis completion signal 故障下验证 durable success
-	COALESCING_SCENARIO=redis_signal_failure $(PERF_SCRIPT_DIR)/run-submit-coalescing.sh
-
-perf-submit-coalescing-redis-unavailable: ## Redis 完全不可用时低流量验证 Mongo 收敛
-	COALESCING_SCENARIO=redis_unavailable $(PERF_SCRIPT_DIR)/run-submit-coalescing.sh
-
-perf-submit-redis-degraded-low: ## Redis rate 故障时验证 20QPS 多 writer 保守准入
-	DEGRADED_SUBMIT_MODE=low $(PERF_SCRIPT_DIR)/run-submit-redis-degraded.sh
-
-perf-submit-redis-degraded-global-overload: ## Redis rate 故障时验证双实例 global fallback 过载
-	DEGRADED_SUBMIT_MODE=global_overload $(PERF_SCRIPT_DIR)/run-submit-redis-degraded.sh
-
-perf-submit-redis-degraded-user-overload: ## Redis rate 故障时验证单 writer fallback 过载
-	DEGRADED_SUBMIT_MODE=user_overload $(PERF_SCRIPT_DIR)/run-submit-redis-degraded.sh
-
-perf-collection-runtime-status: ## 输出两个 collection 副本的严格/服务就绪状态
-	$(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh status
-
-perf-collection-runtime-healthy-smoke: perf-preflight ## 已上线环境 HTTP 行为烟测（不做全局指标精确验收）
-	$(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh healthy-smoke
-
-perf-collection-runtime-healthy: perf-preflight ## 隔离/静默窗口健康 Redis 完整基线验收
-	$(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh healthy
-
-perf-collection-runtime-degraded-low: perf-preflight ## 隔离环境 Redis 故障 20QPS 低流量验收
-	$(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh degraded-low
-
-perf-collection-runtime-degraded-global: perf-preflight ## 隔离环境 Redis 故障 global fallback 稳态上限验收
-	$(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh degraded-global
-
-perf-collection-runtime-degraded-user: perf-preflight ## 隔离环境 Redis 故障 user fallback 稳态上限验收
-	$(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh degraded-user
-
-perf-collection-runtime-recovery: perf-preflight ## 隔离环境 Redis 恢复后的严格 readiness 与分布式限流验收
-	$(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh recovery
-
-perf-verify: perf-check-k6 ## 校验压测脚本与 k6 场景
+perf-verify: perf-check-k6 ## 校验统一编排器、报告契约与 k6 场景
 	bash -n $(PERF_SCRIPT_DIR)/check-token-preflight.sh
 	bash -n $(PERF_SCRIPT_DIR)/fetch-iam-tokens.sh
 	bash -n $(PERF_SCRIPT_DIR)/run-submit-coalescing.sh
@@ -447,28 +252,15 @@ perf-verify: perf-check-k6 ## 校验压测脚本与 k6 场景
 	bash -n $(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh
 	bash -n $(PERF_SCRIPT_DIR)/snapshot-observability.sh
 	bash -n $(PERF_SCRIPT_DIR)/sync-profiles-from-example.sh
-	bash -n $(PERF_SCRIPT_DIR)/sync-vusers-from-example.sh
-	k6 inspect $(PERF_K6_SCRIPT)
-	k6 inspect $(PERF_SCRIPT_DIR)/k6/mixed.js
+	$(GO) test ./scripts/perf/perfctl ./internal/pkg/retryobservability
+	jq -e '.qpsProfile == "smoke_4" and (.qpsProfiles | keys) == ["admission_300", "experience_60", "smoke_4"]' $(PERF_SCRIPT_DIR)/qs-perf.config.example.json >/dev/null
 	k6 run --quiet -e QUERY_RPS=0 -e SUBMIT_RPS=0 -e REPORT_RPS=1 -e STATS_RPS=0 -e CHAIN_PROBE_RPS=0 -e TOKENS=contract-test-token $(PERF_SCRIPT_DIR)/k6/tests/missing-report-sample.js
 	k6 run --quiet -e QUERY_RPS=0 -e SUBMIT_RPS=0 -e REPORT_RPS=0 -e STATS_RPS=0 -e CHAIN_PROBE_RPS=0 -e COLLECTION_TOKENS=token-1,token-2 $(PERF_SCRIPT_DIR)/k6/tests/submit-subject-pairing.js
-	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e PERF_ROOT_DIR="$(CURDIR)" -e TESTEE_IDS=618855887087350318 $(PERF_SCRIPT_DIR)/k6-submit-coalescing.js
-	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e PERF_ROOT_DIR="$(CURDIR)" -e TESTEE_IDS=1,2 -e DEGRADED_SUBMIT_MODE=low -e COLLECTION_BASE_URLS=http://127.0.0.1:18083,http://127.0.0.1:28083 $(PERF_SCRIPT_DIR)/k6-submit-redis-degraded.js
-	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e PERF_ROOT_DIR="$(CURDIR)" -e TESTEE_IDS=1,2,3,4,5,6 -e DEGRADED_SUBMIT_MODE=global_overload -e COLLECTION_BASE_URLS=http://127.0.0.1:18083,http://127.0.0.1:28083 $(PERF_SCRIPT_DIR)/k6-submit-redis-degraded.js
-	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e PERF_ROOT_DIR="$(CURDIR)" -e TESTEE_IDS=1 -e DEGRADED_SUBMIT_MODE=user_overload -e COLLECTION_BASE_URLS=http://127.0.0.1:18083,http://127.0.0.1:28083 $(PERF_SCRIPT_DIR)/k6-submit-redis-degraded.js
-	k6 inspect $(PERF_SCRIPT_DIR)/k6-answersheet-submit.js
-	k6 inspect $(PERF_SCRIPT_DIR)/k6-collection-questionnaires.js
-	k6 inspect $(PERF_SCRIPT_DIR)/k6-collection-assessments.js
-	k6 inspect $(PERF_SCRIPT_DIR)/k6-collection-assessment-models.js
-	k6 inspect $(PERF_SCRIPT_DIR)/k6-collection.js
-	k6 inspect $(PERF_SCRIPT_DIR)/k6-qs.js
-	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e QPS_PROFILE=mixed_300 $(PERF_K6_SCRIPT) | grep -q report_ws_query
-	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e QPS_PROFILE=mixed_240_models $(PERF_K6_SCRIPT) | grep -q medical_model_query
-	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e QPS_PROFILE=mixed_280_models $(PERF_K6_SCRIPT) | grep -q medical_model_query
-	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e QPS_PROFILE=mixed_300_http $(PERF_K6_SCRIPT) | grep -q report_ws_query
-	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e QPS_PROFILE=mixed_300_http_query $(PERF_K6_SCRIPT) | grep -q personality_questionnaire_query
-	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e QPS_PROFILE=personality_60 $(PERF_K6_SCRIPT) | grep -q personality_report_ws_query
-	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e QPS_PROFILE=special_report_short_poll $(PERF_K6_SCRIPT) | grep -q report_status_query
+	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e PERF_ROOT_DIR="$(CURDIR)" -e QPS_PROFILE=smoke_4 $(PERF_K6_SCRIPT) >/dev/null
+	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e PERF_ROOT_DIR="$(CURDIR)" -e QPS_PROFILE=experience_60 $(PERF_K6_SCRIPT) | jq -e '.thresholds.medical_model_query_duration == ["p(95)<200", "p(99)<500"] and .thresholds.medical_answer_submit_duration == ["p(95)<300", "p(99)<800"] and .thresholds.report_ws_first_message_latency == ["p(95)<300", "p(99)<800"]' >/dev/null
+	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e PERF_ROOT_DIR="$(CURDIR)" -e QPS_PROFILE=admission_300 $(PERF_K6_SCRIPT) | jq -e '.scenarios.behavior_report_ws_query.rate == 10 and .thresholds.medical_model_query_duration == ["p(95)<500", "p(99)<1200"] and .thresholds.statistics_overview_duration == ["p(95)<1000", "p(99)<2000"] and .thresholds.http_timeout_rate == ["rate<0.001"] and .thresholds.dropped_iterations == ["count==0"]' >/dev/null
+	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e PERF_ROOT_DIR="$(CURDIR)" -e TESTEE_IDS=618855887087350318 $(PERF_SCRIPT_DIR)/k6-submit-coalescing.js >/dev/null
+	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e PERF_ROOT_DIR="$(CURDIR)" -e TESTEE_IDS=1,2 -e DEGRADED_SUBMIT_MODE=low -e COLLECTION_BASE_URLS=http://127.0.0.1:18083,http://127.0.0.1:28083 $(PERF_SCRIPT_DIR)/k6-submit-redis-degraded.js >/dev/null
 
 # ============================================================================
 # CD 发布入口

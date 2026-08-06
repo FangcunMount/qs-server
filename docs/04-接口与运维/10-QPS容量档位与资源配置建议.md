@@ -21,7 +21,7 @@
 
 **单机实测（2026-07）**：8C/16G 下 `mixed_280_models` / `mixed_300` 全绿；4C/8G 下 **`mixed_200`～`mixed_240_models` 全绿**，**280 边际 + Step2 过、全量 300 未过**（§2.4、SOP §3.8.3）。
 
-> 上述数据是旧提交链历史基线，不能直接作为可靠受理新链的容量承诺。直接切换后必须重跑 `perf-reliable-submit24`、`perf-reliable-submit48-burst`、`perf-reliable-submit96-boundary` 和 8C/16G `perf-mixed300`。
+> 上述数据是旧提交链和已删除 profile 的历史基线，不能直接作为可靠受理新链的容量承诺。当前版本必须重新执行 `make perf-run PLAN=baseline` 与 `make perf-run PLAN=admission`。
 
 核心原则：
 
@@ -35,7 +35,7 @@
 
 ## 1. 当前配置基线
 
-当前生产配置已按 `mixed_300` 目标和 serverA 8C/16G 单 apiserver 架构调整：
+当前生产配置曾按历史 300 QPS 目标和 serverA 8C/16G 单 apiserver 架构调整；当前验收事实源改为 `admission_300`：
 
 | 位置 | 关键值 | 含义 |
 | ---- | ------ | ---- |
@@ -123,7 +123,7 @@ submit 稳态由 Submit Gate、gRPC inflight、Mongo 事务与 Outbox Stage 能�
 
 ### 2.4 serverA 4C/8G 榨干档（2026-07）
 
-针对 `mixed_280_models` / `mixed_300` 攻关，在 **不升配机器** 前提下对齐 inflight 与 k6 VU：
+以下是 2026-07 旧 profiles 的历史攻关记录，用于解释配置来源，不是当前执行入口：
 
 | 位置 | 关键值 | 说明 |
 | ---- | ------ | ---- |
@@ -136,11 +136,11 @@ submit 稳态由 Submit Gate、gRPC inflight、Mongo 事务与 Outbox Stage 能�
 | apiserver `backpressure.mongo.max_inflight` | **120** | submit+outbox 主瓶颈（原 80） |
 | apiserver `backpressure.mysql.max_inflight` | **150** | 对齐 mysql pool |
 | apiserver backpressure `timeout_ms` | **4000～5000** | 应用内排队，避免 k6 30s 雪崩 |
-| k6 `mixed_280_models` | report max **380**，全场景 max **<700** | `rps×p95×1.05`；压低 VU 防螺旋 |
+| k6 历史手工 VU | report max **380**，全场景 max **<700** | 当前已替换为按到达率、典型耗时、超时和 headroom 自动计算 |
 
-**部署**：改 `configs/*.prod.yaml` 后 **重启** `qs-apiserver` + `qs-collection-server`；本地 `make perf-sync-vusers` 同步 k6 VU；压测前冷却 ≥30min、网络稳定。
+**部署**：改 `configs/*.prod.yaml` 后 **重启** `qs-apiserver` + `qs-collection-server`；压测前确保网络稳定，并由统一编排器自动生成阶段 VU。
 
-**验收顺序**：`make perf-sync-vusers` → `mixed_280_models` 边际 → `perf-mixed300-http-query` → `perf-mixed300`（全量）。
+**当前验收顺序**：`make perf-run PLAN=baseline` → `make perf-run PLAN=admission`。历史分步 profile 不再可执行。
 
 **4C/8G 实测结论**（2026-07-02 晚，WS + 分池 + VU 收紧）：
 
@@ -245,19 +245,19 @@ make perf-preflight
 PERF_ISOLATED_ENV=true \
 REDIS_FAILURE_CONFIRMED=true \
 TESTEE_IDS='<at-least-six-token-aligned-testee-ids>' \
-make perf-collection-runtime-degraded-low
+make perf-run PLAN=diagnose CASE=collection-runtime-degraded-low
 ```
 
 脚本默认读取 `SNAP-VI` 问卷并按题型生成 answers；low、global、user 分别使用
 前 2、6、1 组 collection token 与 `TESTEE_IDS`。只有需要完全控制测试意图时才
 提供 `SUBMIT_CASES_JSON` 覆盖自动生成结果。
 
-过载验收分别使用 `perf-collection-runtime-degraded-global` 与
-`perf-collection-runtime-degraded-user`。脚本以 15 秒 warmup 排除初始 burst，
+过载验收分别使用 `PLAN=diagnose CASE=collection-runtime-degraded-global` 与
+`PLAN=diagnose CASE=collection-runtime-degraded-user`。脚本以 15 秒 warmup 排除初始 burst，
 再在默认 60 秒 steady 窗口自动验证双实例 global 成功准入不超过 63 QPS、单
 writer 成功准入不超过 21 QPS。脚本只验证已经注入的故障，不负责停止 Redis；
 验收完成后恢复 Redis，并设置 `REDIS_RECOVERY_CONFIRMED=true` 执行
-`make perf-collection-runtime-recovery`，验证两个 readiness 均为 200、本地 fallback
+`make perf-run PLAN=diagnose CASE=collection-runtime-recovery`，验证两个 readiness 均为 200、本地 fallback
 停止增长且 Redis 分布式策略恢复。
 
 观测：

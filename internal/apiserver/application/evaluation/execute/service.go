@@ -19,6 +19,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
+	"github.com/FangcunMount/qs-server/internal/pkg/retryobservability"
 	"github.com/google/uuid"
 )
 
@@ -175,6 +176,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	runResult := "failed"
 	defer func() {
 		observeEvaluationRunDuration(algorithmFamily, runResult, time.Since(startTime), s.runLease)
+		retryobservability.ObserveBusiness("evaluation", string(evaluationRun.Origin()), runResult)
 	}()
 	if a.Status().IsFailed() {
 		if err := a.ResumeForExecutionRetry(); err != nil {

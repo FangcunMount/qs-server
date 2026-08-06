@@ -280,7 +280,7 @@ func (r *RetryEventHoldReplayer) observe(ctx context.Context, item *heldEvent, o
 	if envelope, err := eventcodec.DecodeEnvelope(item.Payload); err == nil {
 		eventType = envelope.EventType
 	}
-	r.observer.ObserveConsume(ctx, eventobservability.ConsumeEvent{Service: "retry-hold-replayer", Topic: item.Topic, EventType: eventType, Outcome: outcome})
+	r.observer.ObserveConsume(ctx, eventobservability.ConsumeEvent{Service: "retry-hold-replayer", Topic: item.Topic, EventType: eventType, Outcome: outcome, Attempts: item.ReplayAttemptCount + 1})
 }
 
 func (r *RetryEventHoldReplayer) Stop() {

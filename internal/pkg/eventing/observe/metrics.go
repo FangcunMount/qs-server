@@ -3,6 +3,7 @@ package eventobservability
 import (
 	"context"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/retryobservability"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -82,10 +83,23 @@ func (PrometheusObserver) ObservePublish(_ context.Context, evt PublishEvent) {
 
 func (PrometheusObserver) ObserveOutbox(_ context.Context, evt OutboxEvent) {
 	eventOutboxTotal.WithLabelValues(evt.Relay, evt.Topic, evt.EventType, evt.Outcome.String()).Inc()
+	if evt.AttemptClass != "" {
+		retryobservability.Observe(retryobservability.LayerOutbox, evt.Relay, evt.AttemptClass, "na", evt.Outcome.String())
+	}
 }
 
 func (PrometheusObserver) ObserveConsume(_ context.Context, evt ConsumeEvent) {
 	eventConsumeTotal.WithLabelValues(evt.Service, evt.Topic, evt.EventType, evt.Outcome.String()).Inc()
+	if evt.Service == "retry-hold-replayer" {
+		retryobservability.Observe(retryobservability.LayerHold, "retry_hold", retryobservability.AttemptRetry, "na", evt.Outcome.String())
+		return
+	}
+	if evt.Attempts > 0 {
+		retryobservability.Observe(retryobservability.LayerTransport, evt.Service, retryobservability.AttemptClassForAttempt(evt.Attempts), "na", evt.Outcome.String())
+	}
+	if evt.Outcome == ConsumeOutcomeHeld || evt.Outcome == ConsumeOutcomeHoldFailed {
+		retryobservability.Observe(retryobservability.LayerHold, "retry_hold", retryobservability.AttemptInitial, "na", evt.Outcome.String())
+	}
 }
 
 func (PrometheusObserver) ObserveConsumeDuration(_ context.Context, evt ConsumeDurationEvent) {

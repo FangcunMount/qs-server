@@ -73,7 +73,7 @@ func TerminalFailedMessageHandler(logger *slog.Logger, component string) basemes
 			slog.String("topic", failed.Topic), slog.String("channel", failed.Channel),
 			slog.String("message_id", messageID), slog.Int("attempts", failed.Attempts), slog.String("error", cause))
 		eventobservability.DefaultObserver().ObserveConsume(ctx, eventobservability.ConsumeEvent{
-			Service: component, Topic: failed.Topic, Outcome: eventobservability.ConsumeOutcomeTransportTerminal,
+			Service: component, Topic: failed.Topic, Outcome: eventobservability.ConsumeOutcomeTransportTerminal, Attempts: failed.Attempts,
 		})
 		return nil
 	}

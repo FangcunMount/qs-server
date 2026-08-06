@@ -5,30 +5,24 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 )
 
-func TestPerfProfilesMatchSOPCapacityContract(t *testing.T) {
+func TestPerfProfilesMatchAdmissionContract(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "scripts/perf/qs-perf.config.example.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var config struct {
+		QPSProfile string `json:"qpsProfile"`
 		ReportMode string `json:"reportMode"`
 		Profiles   map[string]struct {
-			ReportMode string `json:"reportMode"`
-			QPS        struct {
-				MedicalModelQuery             float64 `json:"medicalQuery"`
-				PersonalityModelQuery         float64 `json:"personalityQuery"`
-				QuestionnaireQuery            float64 `json:"questionnaireQuery"`
-				PersonalityQuestionnaireQuery float64 `json:"personalityQuestionnaireQuery"`
-				Submit                        float64 `json:"submit"`
-				Report                        float64 `json:"report"`
-				Statistics                    float64 `json:"stats"`
-				AsyncChainProbe               float64 `json:"chainProbe"`
-			} `json:"qps"`
+			QPS    map[string]float64 `json:"qps"`
+			VUsers json.RawMessage    `json:"vusers"`
 		} `json:"qpsProfiles"`
 	}
 	if err := json.Unmarshal(raw, &config); err != nil {
@@ -37,66 +31,30 @@ func TestPerfProfilesMatchSOPCapacityContract(t *testing.T) {
 	if config.ReportMode != "websocket" {
 		t.Fatalf("default reportMode = %q, want websocket", config.ReportMode)
 	}
-
-	assertProfile := func(name string, want struct {
-		reportMode                    string
-		medicalModelQuery             float64
-		personalityModelQuery         float64
-		questionnaireQuery            float64
-		personalityQuestionnaireQuery float64
-		submit                        float64
-		report                        float64
-		statistics                    float64
-		asyncChainProbe               float64
-	}) {
-		t.Helper()
-		got, ok := config.Profiles[name]
-		if !ok {
-			t.Fatalf("missing qps profile %q", name)
-		}
-		if got.ReportMode != want.reportMode ||
-			got.QPS.MedicalModelQuery != want.medicalModelQuery ||
-			got.QPS.PersonalityModelQuery != want.personalityModelQuery ||
-			got.QPS.QuestionnaireQuery != want.questionnaireQuery ||
-			got.QPS.PersonalityQuestionnaireQuery != want.personalityQuestionnaireQuery ||
-			got.QPS.Submit != want.submit ||
-			got.QPS.Report != want.report ||
-			got.QPS.Statistics != want.statistics ||
-			got.QPS.AsyncChainProbe != want.asyncChainProbe {
-			t.Fatalf("profile %s mismatch: got %+v want %+v", name, got, want)
+	if config.QPSProfile != "smoke_4" {
+		t.Fatalf("default qpsProfile = %q, want smoke_4", config.QPSProfile)
+	}
+	wantProfiles := []string{"admission_300", "experience_60", "smoke_4"}
+	gotProfiles := make([]string, 0, len(config.Profiles))
+	for name, profile := range config.Profiles {
+		gotProfiles = append(gotProfiles, name)
+		if len(profile.VUsers) != 0 {
+			t.Fatalf("profile %s still maintains manual vusers", name)
 		}
 	}
-
-	assertProfile("mixed_300", struct {
-		reportMode                    string
-		medicalModelQuery             float64
-		personalityModelQuery         float64
-		questionnaireQuery            float64
-		personalityQuestionnaireQuery float64
-		submit                        float64
-		report                        float64
-		statistics                    float64
-		asyncChainProbe               float64
-	}{
-		reportMode: "websocket", medicalModelQuery: 80, personalityModelQuery: 40,
-		questionnaireQuery: 13, personalityQuestionnaireQuery: 13, submit: 24,
-		report: 100, statistics: 29, asyncChainProbe: 1,
-	})
-	assertProfile("mixed_300_http_query", struct {
-		reportMode                    string
-		medicalModelQuery             float64
-		personalityModelQuery         float64
-		questionnaireQuery            float64
-		personalityQuestionnaireQuery float64
-		submit                        float64
-		report                        float64
-		statistics                    float64
-		asyncChainProbe               float64
-	}{
-		reportMode: "websocket", medicalModelQuery: 80, personalityModelQuery: 40,
-		questionnaireQuery: 13, personalityQuestionnaireQuery: 13, submit: 24,
-		report: 96, statistics: 29, asyncChainProbe: 0,
-	})
+	sort.Strings(gotProfiles)
+	if !reflect.DeepEqual(gotProfiles, wantProfiles) {
+		t.Fatalf("profile keys = %v, want %v", gotProfiles, wantProfiles)
+	}
+	wantAdmission := map[string]float64{
+		"medicalQuery": 80, "personalityQuery": 40, "questionnaireQuery": 13,
+		"personalityQuestionnaireQuery": 13, "medicalSubmit": 19, "personalitySubmit": 5,
+		"medicalWaitReport": 70, "behaviorWaitReport": 10, "personalityWaitReport": 20,
+		"stats": 29, "chainProbe": 1,
+	}
+	if !reflect.DeepEqual(config.Profiles["admission_300"].QPS, wantAdmission) {
+		t.Fatalf("admission_300 qps = %#v, want %#v", config.Profiles["admission_300"].QPS, wantAdmission)
+	}
 
 	sopRaw, err := os.ReadFile(filepath.Join(root, "docs/04-接口与运维/11-300QPS混合场景压测SOP.md"))
 	if err != nil {
@@ -104,17 +62,144 @@ func TestPerfProfilesMatchSOPCapacityContract(t *testing.T) {
 	}
 	sop := string(sopRaw)
 	for _, want := range []string{
-		"4C/8G**：`mixed_280_models` **边际通过",
-		"`mixed_300_http_query` **通过",
-		"`mixed_300` 全量 **未过",
-		"8C/16G 全量已通过；4C/8G 未承诺",
+		"make perf-run PLAN=admission",
+		"capacity 120 QPS",
+		"恢复证据门",
+		"受理 TPS",
+		"P50/P95/P99/max",
 	} {
 		if !strings.Contains(sop, want) {
 			t.Fatalf("SOP missing capacity contract fragment %q", want)
 		}
 	}
-	if strings.Contains(sop, "`perf-mixed300`（**全量验收，已通过**）") {
-		t.Fatal("SOP still describes perf-mixed300 as unqualified full-pass")
+	for _, retired := range []string{"make perf-mixed", "make perf-pretest", "make perf-sync-vusers"} {
+		if strings.Contains(sop, retired) {
+			t.Fatalf("SOP still contains retired command %q", retired)
+		}
+	}
+}
+
+func TestPerfThresholdTiersAndOperationMetrics(t *testing.T) {
+	root := repoRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "scripts/perf/qs-perf.config.example.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var config struct {
+		ThresholdTier string `json:"thresholdTier"`
+		Profiles      map[string]struct {
+			ThresholdTier string             `json:"thresholdTier"`
+			QPS           map[string]float64 `json:"qps"`
+		} `json:"qpsProfiles"`
+	}
+	if err := json.Unmarshal(raw, &config); err != nil {
+		t.Fatal(err)
+	}
+	if config.ThresholdTier != "none" {
+		t.Fatalf("default thresholdTier = %q, want none", config.ThresholdTier)
+	}
+	experience := config.Profiles["experience_60"]
+	if experience.ThresholdTier != "experience" {
+		t.Fatalf("experience_60 thresholdTier = %q, want experience", experience.ThresholdTier)
+	}
+	var experienceQPS float64
+	for _, qps := range experience.QPS {
+		experienceQPS += qps
+	}
+	if experienceQPS != 60 {
+		t.Fatalf("experience_60 total qps = %v, want 60", experienceQPS)
+	}
+	admission := config.Profiles["admission_300"]
+	if admission.ThresholdTier != "protection" {
+		t.Fatalf("admission_300 thresholdTier = %q, want protection", admission.ThresholdTier)
+	}
+	var admissionQPS float64
+	for _, qps := range admission.QPS {
+		admissionQPS += qps
+	}
+	if admissionQPS != 300 {
+		t.Fatalf("admission_300 total qps = %v, want 300", admissionQPS)
+	}
+	for _, key := range []string{"medicalSubmit", "personalitySubmit", "medicalWaitReport", "behaviorWaitReport", "personalityWaitReport"} {
+		if admission.QPS[key] <= 0 {
+			t.Fatalf("admission_300 missing split qps %q", key)
+		}
+	}
+
+	files := []struct {
+		path  string
+		wants []string
+	}{
+		{
+			path: "scripts/perf/k6/lib/metrics.js",
+			wants: []string{
+				"medical_answer_submit_duration",
+				"personality_answer_submit_success_rate",
+				"statistics_overview_duration",
+				"statistics_content_batch_duration",
+				"report_ws_connect_duration",
+				"report_ws_first_message_latency",
+				"experience: {",
+				"query: [200, 500]",
+				"statistics: [700, 1500]",
+				"protection: {",
+				"query: [500, 1200]",
+			},
+		},
+		{
+			path:  "scripts/perf/k6/lib/http.js",
+			wants: []string{"X-Request-ID", "X-Perf-Run-ID"},
+		},
+		{
+			path:  "scripts/perf/k6/mixed.js",
+			wants: []string{"'med'", "'p(95)'", "'p(99)'", "'max'"},
+		},
+		{
+			path:  "scripts/perf/k6/lib/config.js",
+			wants: []string{"resolveArrivalVuserDefaults", "expectedLatencySeconds", "timeoutSeconds", "headroom"},
+		},
+		{
+			path: "scripts/perf/perfctl/types.go",
+			wants: []string{
+				"qs-perf-report/v1", "accepted_tps_by_model", "completed_tps_by_model",
+				"p50", "p95", "p99", "max", "success_rate", "error_rate", "timeout_rate",
+			},
+		},
+		{
+			path:  "internal/pkg/retryobservability/metrics.go",
+			wants: []string{"qs_retry_layer_attempt_total", "layer", "component", "attempt_class", "origin", "outcome"},
+		},
+	}
+	for _, file := range files {
+		content, err := os.ReadFile(filepath.Join(root, file.path))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range file.wants {
+			if !strings.Contains(string(content), want) {
+				t.Fatalf("%s missing redesigned perf contract fragment %q", file.path, want)
+			}
+		}
+	}
+}
+
+func TestPerfMakefileHasSingleMainEntry(t *testing.T) {
+	root := repoRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "Makefile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(raw)
+	if !strings.Contains(text, "perf-run: perf-ensure-config") {
+		t.Fatal("Makefile is missing the unified perf-run entry")
+	}
+	for _, retired := range []string{
+		"perf-k6:", "perf-smoke:", "perf-pretest60:", "perf-mixed140:",
+		"perf-mixed280-models:", "perf-admission300:", "perf-sync-vusers:",
+	} {
+		if strings.Contains(text, retired) {
+			t.Fatalf("Makefile still contains retired perf entry %q", retired)
+		}
 	}
 }
 
@@ -215,6 +300,9 @@ func TestPerfSyncMigratesRetiredRuntimePaths(t *testing.T) {
       "paths": {
         "questionnaireQuery": ["/api/v1/scales/{scale_code}"]
       }
+    },
+    "pretest_60": {
+      "qps": {"query": 60}
     }
   }
 }`
@@ -249,4 +337,23 @@ func TestPerfSyncMigratesRetiredRuntimePaths(t *testing.T) {
 			t.Fatalf("synced config missing current path %q", current)
 		}
 	}
+	var synced struct {
+		QPSProfile string                     `json:"qpsProfile"`
+		Profiles   map[string]json.RawMessage `json:"qpsProfiles"`
+	}
+	if err := json.Unmarshal(raw, &synced); err != nil {
+		t.Fatal(err)
+	}
+	if synced.QPSProfile != "smoke_4" || len(synced.Profiles) != 3 || synced.Profiles["pretest_60"] != nil {
+		t.Fatalf("sync did not retire old profiles: default=%q keys=%v", synced.QPSProfile, mapsKeys(synced.Profiles))
+	}
+}
+
+func mapsKeys(values map[string]json.RawMessage) []string {
+	result := make([]string, 0, len(values))
+	for key := range values {
+		result = append(result, key)
+	}
+	sort.Strings(result)
+	return result
 }

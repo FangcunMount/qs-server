@@ -1,9 +1,13 @@
 import ws from 'k6/ws';
 import { check } from 'k6';
 import { scenarioData, pickReportSample, flattenReportSamples } from '../lib/data.js';
-import { authHeaders, collectionTokenAt } from '../lib/http.js';
+import { authHeaders, collectionTokenAt, correlatedHeaders } from '../lib/http.js';
 import { COLLECTION_BASE_URL, REPORT_EVENTS_PATH, REPORT_WS_HOLD_SECONDS } from '../lib/config.js';
-import { reportStatusDuration, reportStatusFailed, reportStatusSuccessRate, reportSampleSkipped } from '../lib/metrics.js';
+import {
+  reportStatusFailed, reportSampleSkipped,
+  reportWsConnectDuration, reportWsFirstMessageLatency, reportWsSessionDuration,
+  reportWsConnectSuccessRate, reportWsMessageSuccessRate, reportWsTimeoutTotal,
+} from '../lib/metrics.js';
 
 function wsBaseURL(httpBase) {
   if (httpBase.startsWith('https://')) {
@@ -22,11 +26,17 @@ function runReportWsQuery(ctx, sample, kind, endpoint) {
     return;
   }
   const url = `${wsBaseURL(COLLECTION_BASE_URL)}${REPORT_EVENTS_PATH}`;
-  const headers = authHeaders(collectionTokenAt(sample.collection_token_index));
+  const headers = correlatedHeaders(authHeaders(collectionTokenAt(sample.collection_token_index)), tags);
   const started = Date.now();
+  let opened = false;
+  let firstStatusReceived = false;
+  let protocolError = false;
+  let timedOut = false;
   const res = ws.connect(url, { headers }, (socket) => {
     let terminal = false;
     socket.on('open', () => {
+      opened = true;
+      reportWsConnectDuration.add(Date.now() - started, tags);
       socket.send(JSON.stringify({
         op: 'subscribe',
         assessment_id: String(sample.assessment_id),
@@ -38,6 +48,10 @@ function runReportWsQuery(ctx, sample, kind, endpoint) {
       try {
         const frame = JSON.parse(data);
         if (frame.op === 'status' && frame.data) {
+          if (!firstStatusReceived) {
+            firstStatusReceived = true;
+            reportWsFirstMessageLatency.add(Date.now() - started, tags);
+          }
           const status = frame.data.status || '';
           if (status === 'interpreted' || status === 'failed') {
             terminal = true;
@@ -45,27 +59,46 @@ function runReportWsQuery(ctx, sample, kind, endpoint) {
           }
         }
         if (frame.op === 'error') {
+          protocolError = true;
           reportStatusFailed.add(1, { ...tags, reason: frame.code || 'ws_error' });
           socket.close();
         }
       } catch (_err) {
+        protocolError = true;
         reportStatusFailed.add(1, { ...tags, reason: 'ws_decode_error' });
         socket.close();
       }
     });
+    socket.on('error', () => {
+      protocolError = true;
+      reportStatusFailed.add(1, { ...tags, reason: 'ws_transport_error' });
+    });
     socket.setTimeout(() => {
       if (!terminal) {
+        if (!firstStatusReceived) {
+          timedOut = true;
+        }
         socket.close();
       }
     }, Math.max(1000, Math.floor(REPORT_WS_HOLD_SECONDS * 1000)));
   });
-  reportStatusDuration.add(Date.now() - started, tags);
-  const ok = !!(res && res.status === 101);
-  reportStatusSuccessRate.add(ok, tags);
-  if (!ok) {
-    reportStatusFailed.add(1, { ...tags, reason: 'ws_connect_status' });
+  reportWsSessionDuration.add(Date.now() - started, tags);
+  const connected = !!(res && res.status === 101 && opened);
+  const messageReceived = connected && firstStatusReceived && !protocolError;
+  reportWsConnectSuccessRate.add(connected, tags);
+  reportWsMessageSuccessRate.add(messageReceived, tags);
+  if (timedOut) {
+    reportWsTimeoutTotal.add(1, tags);
   }
-  check(res, { 'ws connect status 101': (r) => r && r.status === 101 });
+  if (!connected) {
+    reportStatusFailed.add(1, { ...tags, reason: 'ws_connect_status' });
+  } else if (!messageReceived) {
+    reportStatusFailed.add(1, { ...tags, reason: 'ws_status_message_missing' });
+  }
+  check(res, {
+    'ws connect status 101': (r) => r && r.status === 101,
+    'ws initial status message received': () => messageReceived,
+  });
 }
 
 export function reportWsQuery(data) {
@@ -78,6 +111,11 @@ export function reportWsQuery(data) {
 export function medicalReportWsQuery(data) {
   const ctx = scenarioData(data);
   runReportWsQuery(ctx, pickReportSample(ctx.reportSamples.medical), 'medical', 'medical_report_ws_query');
+}
+
+export function behaviorReportWsQuery(data) {
+  const ctx = scenarioData(data);
+  runReportWsQuery(ctx, pickReportSample(ctx.reportSamples.behavior), 'behavior', 'behavior_report_ws_query');
 }
 
 export function personalityReportWsQuery(data) {

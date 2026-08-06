@@ -73,10 +73,11 @@ type PublishEvent struct {
 }
 
 type OutboxEvent struct {
-	Relay     string
-	Topic     string
-	EventType string
-	Outcome   OutboxOutcome
+	Relay        string
+	Topic        string
+	EventType    string
+	Outcome      OutboxOutcome
+	AttemptClass string
 }
 
 type ConsumeEvent struct {
@@ -84,6 +85,7 @@ type ConsumeEvent struct {
 	Topic     string
 	EventType string
 	Outcome   ConsumeOutcome
+	Attempts  int
 }
 
 type ConsumeDurationEvent struct {

@@ -2,7 +2,11 @@ import { check } from 'k6';
 import { scenarioData, weightedPickModelType, buildMedicalSubmitRequest, buildPersonalitySubmitRequest } from '../lib/data.js';
 import { timedRequest, jsonHeaders, collectionTokenAt, recordHTTPStatus, responseData } from '../lib/http.js';
 import { COLLECTION_BASE_URL, SUBMIT_PATH, SUBMIT_MIX, IDEMPOTENCY_PREFIX } from '../lib/config.js';
-import { answerSubmitDuration, answerSubmitAccepted, answerSubmitFailed, answerSubmitSuccessRate } from '../lib/metrics.js';
+import {
+  answerSubmitDuration, medicalAnswerSubmitDuration, personalityAnswerSubmitDuration,
+  answerSubmitAccepted, answerSubmitFailed,
+  answerSubmitSuccessRate, medicalAnswerSubmitSuccessRate, personalityAnswerSubmitSuccessRate,
+} from '../lib/metrics.js';
 
 
 export function answerSubmit(data) {
@@ -27,10 +31,13 @@ export function submitAnswerSheet(ctx, modelType) {
     request = buildMedicalSubmitRequest(ctx);
     modelType = request.modelType;
   }
+  const modelDuration = modelType === 'personality' ? personalityAnswerSubmitDuration : medicalAnswerSubmitDuration;
+  const modelSuccessRate = modelType === 'personality' ? personalityAnswerSubmitSuccessRate : medicalAnswerSubmitSuccessRate;
   const payload = request.payload;
   if (!payload) {
     answerSubmitFailed.add(1, { reason: 'missing_submit_payload', model_type: modelType });
     answerSubmitSuccessRate.add(false, { model_type: modelType });
+    modelSuccessRate.add(false, { model_type: modelType });
     return;
   }
   const requestID = payload.idempotency_key || `${IDEMPOTENCY_PREFIX}-req-${__VU}-${__ITER}-${Date.now()}`;
@@ -43,6 +50,7 @@ export function submitAnswerSheet(ctx, modelType) {
   });
 
   answerSubmitDuration.add(res.timings.duration, res.tags);
+  modelDuration.add(res.timings.duration, res.tags);
   const data = responseData(res);
   const accepted = res.status === 202 && data.status === 'accepted' && Boolean(data.answersheet_id);
   if (accepted) {
@@ -50,6 +58,7 @@ export function submitAnswerSheet(ctx, modelType) {
   }
   recordHTTPStatus(res, answerSubmitFailed, endpoint);
   answerSubmitSuccessRate.add(accepted, res.tags);
+  modelSuccessRate.add(accepted, res.tags);
   check(res, {
     'answersheet submit status is 202': (r) => r.status === 202,
     'answersheet submit is durably accepted': () => accepted,

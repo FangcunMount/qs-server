@@ -9,7 +9,7 @@ if ! command -v ghz >/dev/null 2>&1; then
   exit 127
 fi
 
-case_name="${CASE:-collection-submit}"
+case_name="${GRPC_CASE:-collection-submit}"
 target="${GRPC_TARGET:-127.0.0.1:9090}"
 rps="${RPS:-60}"
 duration="${DURATION:-300s}"

@@ -54,7 +54,11 @@ func BuildStatusSnapshot(store string, now time.Time, observations []StatusObser
 }
 
 func DecodePendingEvent(eventID, payloadJSON string) (outboxport.PendingEvent, error) {
-	return base.DecodePendingEvent(eventID, payloadJSON)
+	pending, err := base.DecodePendingEvent(eventID, payloadJSON)
+	if err != nil {
+		return outboxport.PendingEvent{}, err
+	}
+	return outboxport.PendingEvent{EventID: pending.EventID, Event: pending.Event}, nil
 }
 
 func NewPublishedTransition(publishedAt time.Time) PublishedTransition {

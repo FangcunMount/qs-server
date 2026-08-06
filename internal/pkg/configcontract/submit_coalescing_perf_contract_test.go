@@ -78,21 +78,26 @@ func TestSubmitCoalescingPerfContract(t *testing.T) {
 	for _, required := range []string{
 		"run-submit-coalescing.sh",
 		"bash -n $(PERF_SCRIPT_DIR)/run-submit-coalescing.sh",
-		"k6 inspect $(PERF_SCRIPT_DIR)/k6-answersheet-submit.js",
 	} {
 		if !strings.Contains(makefile, required) {
 			t.Errorf("Makefile perf contract must contain %q", required)
+		}
+	}
+	orchestrator := readContractFile(t, filepath.Join(root, "scripts", "perf", "perfctl", "runner.go"))
+	for _, required := range []string{"submit-coalescing-healthy", "submit-coalescing-conflict", "submit-coalescing-redis-lock-failure", "submit-coalescing-redis-signal-failure", "submit-coalescing-redis-unavailable"} {
+		if !strings.Contains(orchestrator, required) {
+			t.Errorf("diagnose registry must contain %q", required)
 		}
 	}
 
 	doc := readContractFile(t, filepath.Join(root, "docs", "03-基础设施", "concurrency", "70-可观测性-压测与验收.md"))
 	for _, required := range []string{
 		"run-submit-coalescing.sh",
-		"COALESCING_SCENARIO=healthy",
-		"COALESCING_SCENARIO=conflict",
-		"COALESCING_SCENARIO=redis_lock_failure",
-		"COALESCING_SCENARIO=redis_signal_failure",
-		"COALESCING_SCENARIO=redis_unavailable",
+		"PLAN=diagnose CASE=submit-coalescing-healthy",
+		"PLAN=diagnose CASE=submit-coalescing-conflict",
+		"PLAN=diagnose CASE=submit-coalescing-redis-lock-failure",
+		"PLAN=diagnose CASE=submit-coalescing-redis-signal-failure",
+		"PLAN=diagnose CASE=submit-coalescing-redis-unavailable",
 	} {
 		if !strings.Contains(doc, required) {
 			t.Errorf("SubmitCoalescer perf documentation must contain %q", required)
@@ -129,20 +134,21 @@ func TestCollectionRuntimeAcceptanceEntryContract(t *testing.T) {
 
 	makefile := readContractFile(t, filepath.Join(root, "Makefile"))
 	for _, required := range []string{
-		"perf-collection-runtime-healthy-smoke",
-		"perf-collection-runtime-healthy",
-		"perf-collection-runtime-degraded-low",
-		"perf-collection-runtime-degraded-global",
-		"perf-collection-runtime-degraded-user",
-		"perf-collection-runtime-recovery",
-		"perf-collection-runtime-healthy-smoke: perf-preflight",
-		"perf-collection-runtime-degraded-low: perf-preflight",
 		"bash -n $(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh",
 		`-e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json"`,
 		`-e TESTEE_IDS=618855887087350318`,
 	} {
 		if !strings.Contains(makefile, required) {
 			t.Errorf("Makefile runtime acceptance contract must contain %q", required)
+		}
+	}
+	orchestrator := readContractFile(t, filepath.Join(root, "scripts", "perf", "perfctl", "runner.go"))
+	for _, required := range []string{
+		"collection-runtime-healthy-smoke", "collection-runtime-healthy", "collection-runtime-degraded-low",
+		"collection-runtime-degraded-global", "collection-runtime-degraded-user", "collection-runtime-recovery",
+	} {
+		if !strings.Contains(orchestrator, required) {
+			t.Errorf("diagnose registry must contain %q", required)
 		}
 	}
 }

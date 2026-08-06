@@ -12,6 +12,7 @@ import (
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
+	"github.com/FangcunMount/qs-server/internal/pkg/retryobservability"
 )
 
 const (
@@ -147,6 +148,7 @@ func (r *outboxRelay) DispatchDue(ctx context.Context) error {
 			continue
 		}
 		if result.err != nil {
+			r.observeAttempt(ctx, "", result.pending, eventobservability.OutboxOutcomePublishFailed)
 			failures = append(failures, outboxport.FailedMark{
 				EventID:   result.pending.EventID,
 				EventType: eventTypeOf(result.pending),
@@ -163,9 +165,6 @@ func (r *outboxRelay) DispatchDue(ctx context.Context) error {
 		if markErr != nil {
 			return markErr
 		}
-		for _, failure := range failures {
-			r.observe(ctx, "", failure.EventType, eventobservability.OutboxOutcomePublishFailed)
-		}
 		if r.readyIndex != nil {
 			for _, result := range marked {
 				if result.Disposition != retrygovernance.DispositionAutomatic || result.NextAttemptAt == nil {
@@ -178,7 +177,6 @@ func (r *outboxRelay) DispatchDue(ctx context.Context) error {
 	} else if r.batchPublisher != nil && len(failures) > 0 {
 		_ = r.batchPublisher.MarkEventsFailed(ctx, failures, retryAt)
 		for _, failure := range failures {
-			r.observe(ctx, "", "", eventobservability.OutboxOutcomePublishFailed)
 			if r.readyIndex != nil {
 				_ = r.readyIndex.Enqueue(ctx, failure.EventType, failure.EventID, retryAt, retryAt)
 			}
@@ -283,7 +281,7 @@ func (m *publishedMarker) markBatch(batch []outboxport.PendingEvent, now time.Ti
 	}
 	if err := m.relay.batchPublisher.MarkEventsPublished(m.ctx, eventIDs, now); err != nil {
 		for _, pending := range batch {
-			m.relay.observe(m.ctx, "", eventTypeOf(pending), eventobservability.OutboxOutcomeMarkPublishedFailed)
+			m.relay.observeAttempt(m.ctx, "", pending, eventobservability.OutboxOutcomeMarkPublishedFailed)
 			m.log.Errorw("outbox batch mark published failed",
 				"relay", m.relay.name,
 				"event_id", pending.EventID,
@@ -293,18 +291,18 @@ func (m *publishedMarker) markBatch(batch []outboxport.PendingEvent, now time.Ti
 		return
 	}
 	for _, pending := range batch {
-		m.relay.observe(m.ctx, "", eventTypeOf(pending), eventobservability.OutboxOutcomePublished)
+		m.relay.observeAttempt(m.ctx, "", pending, eventobservability.OutboxOutcomePublished)
 	}
 }
 
 func (m *publishedMarker) markOneByOne(batch []outboxport.PendingEvent, now time.Time) {
 	for _, pending := range batch {
 		if err := m.relay.store.MarkEventPublished(m.ctx, pending.EventID, now); err != nil {
-			m.relay.observe(m.ctx, "", eventTypeOf(pending), eventobservability.OutboxOutcomeMarkPublishedFailed)
+			m.relay.observeAttempt(m.ctx, "", pending, eventobservability.OutboxOutcomeMarkPublishedFailed)
 			m.log.Errorw("outbox mark published failed", "relay", m.relay.name, "event_id", pending.EventID, "error", err.Error())
 			continue
 		}
-		m.relay.observe(m.ctx, "", eventTypeOf(pending), eventobservability.OutboxOutcomePublished)
+		m.relay.observeAttempt(m.ctx, "", pending, eventobservability.OutboxOutcomePublished)
 	}
 }
 
@@ -388,7 +386,6 @@ func (r *outboxRelay) markEventFailed(ctx context.Context, l *logger.RequestLogg
 			"error", markErr.Error(),
 		)
 	}
-	r.observe(ctx, "", eventType, eventobservability.OutboxOutcomePublishFailed)
 	if r.readyIndex != nil {
 		createdAt := time.Now()
 		if pending.Event != nil && !pending.Event.OccurredAt().IsZero() {
@@ -421,5 +418,15 @@ func (r *outboxRelay) observe(ctx context.Context, topicName, eventType string, 
 		Topic:     topicName,
 		EventType: eventType,
 		Outcome:   outcome,
+	})
+}
+
+func (r *outboxRelay) observeAttempt(ctx context.Context, topicName string, pending outboxport.PendingEvent, outcome eventobservability.OutboxOutcome) {
+	if r == nil || r.observer == nil {
+		return
+	}
+	r.observer.ObserveOutbox(ctx, eventobservability.OutboxEvent{
+		Relay: r.name, Topic: topicName, EventType: eventTypeOf(pending), Outcome: outcome,
+		AttemptClass: retryobservability.AttemptClassForAttempt(pending.AttemptCount + 1),
 	})
 }

@@ -4,6 +4,7 @@ import {
   DURATION,
   HTTP_TIMEOUT,
   REPORT_TIMEOUT,
+  THRESHOLD_TIER,
   RUN_ID,
   SCRIPT_INIT_AT_MS,
   QUESTIONNAIRE_CODES,
@@ -41,6 +42,7 @@ export const options = {
   thresholds: buildThresholds(),
   noConnectionReuse: boolEnv('NO_CONNECTION_REUSE', false),
   userAgent: USER_AGENT,
+  summaryTrendStats: ['avg', 'min', 'med', 'p(90)', 'p(95)', 'p(99)', 'max'],
 };
 
 export function setup() {
@@ -53,6 +55,7 @@ export function setup() {
     http_timeout: HTTP_TIMEOUT,
     report_timeout_seconds: REPORT_TIMEOUT,
     report_mode: runTiming.report_mode,
+    threshold_tier: THRESHOLD_TIER,
     report_vuser_defaults: runTiming.report_vuser_defaults,
     qps: runTiming.qps,
     base_urls: runTiming.baseUrls,

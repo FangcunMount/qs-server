@@ -108,7 +108,7 @@ func (s *Store) pendingFromDocuments(ctx context.Context, docs []OutboxPO) ([]ou
 			_ = s.markPermanentFailure(ctx, po.EventID, transition.LastError, "encoding", time.Now())
 			continue
 		}
-		claimed = append(claimed, pending)
+		claimed = append(claimed, outboxport.PendingEvent{EventID: pending.EventID, Event: pending.Event, AttemptCount: po.AttemptCount})
 	}
 	return claimed, nil
 }

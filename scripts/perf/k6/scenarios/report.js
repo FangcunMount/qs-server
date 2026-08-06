@@ -7,8 +7,10 @@ import {
 } from '../lib/config.js';
 import {
   reportStatusDuration, reportStatusFailed, medicalReportStatusDuration, medicalReportStatusFailed,
+  behaviorReportStatusDuration, behaviorReportStatusFailed,
   personalityReportStatusDuration, personalityReportStatusFailed,
-  reportStatusSuccessRate, reportStatusTerminal, reportStatusPending, reportSampleSkipped,
+  reportStatusSuccessRate, medicalReportStatusSuccessRate, behaviorReportStatusSuccessRate, personalityReportStatusSuccessRate,
+  reportStatusTerminal, reportStatusPending, reportSampleSkipped,
 } from '../lib/metrics.js';
 
 
@@ -16,7 +18,7 @@ export function reportStatusQuery(data) {
   const ctx = scenarioData(data);
   const sample = pickReportSample(flattenReportSamples(ctx.reportSamples));
   const pathTemplate = reportStatusPathForSample(sample);
-  runReportStatusQuery(ctx, sample, pathTemplate, 'report_status_query', reportStatusDuration, reportStatusFailed);
+  runReportStatusQuery(ctx, sample, pathTemplate, 'report_status_query', reportStatusDuration, reportStatusFailed, null);
 }
 
 export function reportStatusPathForSample(sample) {
@@ -31,7 +33,12 @@ export function reportStatusPathForSample(sample) {
 
 export function medicalReportStatusQuery(data) {
   const ctx = scenarioData(data);
-  runReportStatusQuery(ctx, pickReportSample(ctx.reportSamples.medical), REPORT_STATUS_PATH, 'medical_report_status_query', medicalReportStatusDuration, medicalReportStatusFailed);
+  runReportStatusQuery(ctx, pickReportSample(ctx.reportSamples.medical), REPORT_STATUS_PATH, 'medical_report_status_query', medicalReportStatusDuration, medicalReportStatusFailed, medicalReportStatusSuccessRate);
+}
+
+export function behaviorReportStatusQuery(data) {
+  const ctx = scenarioData(data);
+  runReportStatusQuery(ctx, pickReportSample(ctx.reportSamples.behavior), BEHAVIOR_REPORT_STATUS_PATH, 'behavior_report_status_query', behaviorReportStatusDuration, behaviorReportStatusFailed, behaviorReportStatusSuccessRate);
 }
 
 export function personalityReportStatusQuery(data) {
@@ -42,11 +49,12 @@ export function personalityReportStatusQuery(data) {
     PERSONALITY_REPORT_STATUS_PATH,
     'personality_report_status_query',
     personalityReportStatusDuration,
-    personalityReportStatusFailed
+    personalityReportStatusFailed,
+    personalityReportStatusSuccessRate
   );
 }
 
-export function runReportStatusQuery(ctx, sample, pathTemplate, endpoint, durationTrend, failedCounter) {
+export function runReportStatusQuery(ctx, sample, pathTemplate, endpoint, durationTrend, failedCounter, modelSuccessRate) {
   if (!sample) {
     reportSampleSkipped.add(1, {
       endpoint,
@@ -66,10 +74,16 @@ export function runReportStatusQuery(ctx, sample, pathTemplate, endpoint, durati
     model_type: sample.model_type || 'medical',
   });
 
-  durationTrend.add(res.timings.duration, res.tags);
+  reportStatusDuration.add(res.timings.duration, res.tags);
+  if (durationTrend !== reportStatusDuration) {
+    durationTrend.add(res.timings.duration, res.tags);
+  }
   const ok = res.status === 200;
   recordHTTPStatus(res, failedCounter, endpoint);
   reportStatusSuccessRate.add(ok, res.tags);
+  if (modelSuccessRate) {
+    modelSuccessRate.add(ok, res.tags);
+  }
   if (ok) {
     const status = responseData(res).status || '';
     if (status === 'interpreted' || status === 'failed') {

@@ -1,6 +1,6 @@
 import http from 'k6/http';
 import { pick, is2xx } from './util.js';
-import { endpointFailureCounters, setupDiscoveryFailed, http429Total, http401Total, http403Total, http4xxTotal, http5xxTotal, httpTransportErrorTotal, httpTimeoutTotal } from './metrics.js';
+import { endpointFailureCounters, setupDiscoveryFailed, http429Total, http401Total, http403Total, http4xxTotal, http5xxTotal, httpTransportErrorTotal, httpTimeoutTotal, httpTimeoutRate } from './metrics.js';
 import {
   COLLECTION_BASE_URL,
   APISERVER_BASE_URL,
@@ -8,14 +8,25 @@ import {
   debugSetupRequest,
   APISERVER_TOKENS,
   HTTP_TIMEOUT,
+  RUN_ID,
 } from './config.js';
 
 export function timedRequest(method, baseURL, path, body, headers, tags) {
   return http.request(method, `${baseURL}${path}`, body, {
-    headers,
+    headers: correlatedHeaders(headers, tags),
     tags,
     timeout: HTTP_TIMEOUT,
   });
+}
+
+export function correlatedHeaders(headers, tags) {
+  const result = Object.assign({}, headers || {});
+  const endpoint = tags && tags.endpoint ? String(tags.endpoint) : 'request';
+  if (!result['X-Request-ID']) {
+    result['X-Request-ID'] = `k6-${RUN_ID}-${endpoint}-${__VU}-${__ITER}-${Date.now()}`;
+  }
+  result['X-Perf-Run-ID'] = String(RUN_ID);
+  return result;
 }
 
 export function collectionToken() {
@@ -35,10 +46,14 @@ export function apiserverToken() {
 }
 
 export function recordHTTPStatus(res, endpointFailedCounter, endpoint) {
+  const timedOut = res.status === 0 && isTimeoutResponse(res);
+  httpTimeoutRate.add(timedOut, res.tags);
   if (is2xx(res.status)) {
     return;
   }
-  endpointFailedCounter.add(1, res.tags);
+  if (endpointFailedCounter) {
+    endpointFailedCounter.add(1, res.tags);
+  }
   recordEndpointFailureDetail(res, endpoint);
   if (res.status === 429) {
     http429Total.add(1, res.tags);
@@ -57,7 +72,7 @@ export function recordHTTPStatus(res, endpointFailedCounter, endpoint) {
   }
   if (res.status === 0) {
     httpTransportErrorTotal.add(1, res.tags);
-    if (isTimeoutResponse(res)) {
+    if (timedOut) {
       httpTimeoutTotal.add(1, res.tags);
     }
   }

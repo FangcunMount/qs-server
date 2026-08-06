@@ -217,7 +217,7 @@ func (s *Store) pendingFromRows(ctx context.Context, rows []*OutboxPO) ([]outbox
 			_ = s.markPermanentFailure(ctx, row.EventID, transition.LastError, "encoding", time.Now())
 			continue
 		}
-		claimed = append(claimed, pending)
+		claimed = append(claimed, outboxport.PendingEvent{EventID: pending.EventID, Event: pending.Event, AttemptCount: row.AttemptCount})
 	}
 	return claimed, nil
 }
