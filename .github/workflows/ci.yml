@@ -258,6 +258,9 @@ jobs:
       - name: Validate deployment package contract
         run: bash scripts/cd/test-prepare-package.sh
 
+      - name: Validate deployment image export contract
+        run: bash scripts/cd/test-export-image.sh
+
       - name: Validate deployment planning contract
         run: bash scripts/cd/test-plan-services.sh
 

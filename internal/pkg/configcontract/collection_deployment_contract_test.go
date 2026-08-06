@@ -304,6 +304,7 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 		"github.com/rhysd/actionlint/cmd/actionlint@v1.7.7",
 		"bash -n scripts/cd/*.sh",
 		"bash scripts/cd/test-attention-reconcile-audit.sh",
+		"bash scripts/cd/test-export-image.sh",
 		"docker compose -f build/docker/docker-compose.prod.yml -f - config -q",
 		"'  server:'",
 		"'  runtime:'",
