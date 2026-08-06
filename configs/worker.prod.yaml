@@ -27,10 +27,10 @@ metrics:
 # 1.2 Worker 配置
 # -------------------------------------------------------
 worker:
-  # Governed dry-run for the immutable 2026-08-06 Attention recovery manifest.
+  # Governed apply for the immutable 2026-08-06 Attention recovery manifest.
   attention-projection-reconcile-enabled: true
   attention-projection-reconcile-from: "2026-08-01T00:00:00Z"
-  attention-projection-reconcile-dry-run: true
+  attention-projection-reconcile-dry-run: false
   attention-projection-reconcile-report-ids:
     - "630989972320563758"
     - "630989972404449838"

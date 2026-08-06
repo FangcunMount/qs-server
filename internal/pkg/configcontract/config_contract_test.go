@@ -301,13 +301,13 @@ func TestWorkerDevProdConfigContracts(t *testing.T) {
 			}
 			if name == "worker.prod.yaml" {
 				if !cfg.Worker.AttentionProjectionReconcileEnabled {
-					t.Fatal("production attention projection governed dry-run must be enabled")
+					t.Fatal("production attention projection governed apply must be enabled")
 				}
 				if cfg.Worker.AttentionProjectionReconcileFrom != "2026-08-01T00:00:00Z" {
 					t.Fatalf("production attention projection reconcile cutover = %q", cfg.Worker.AttentionProjectionReconcileFrom)
 				}
-				if !cfg.Worker.AttentionProjectionReconcileDryRun {
-					t.Fatal("production attention projection reconcile must remain dry-run before apply")
+				if cfg.Worker.AttentionProjectionReconcileDryRun {
+					t.Fatal("production attention projection apply must disable dry-run")
 				}
 				if len(cfg.Worker.AttentionProjectionReconcileReportIDs) != 91 {
 					t.Fatalf("production attention projection target reports = %d, want 91", len(cfg.Worker.AttentionProjectionReconcileReportIDs))
