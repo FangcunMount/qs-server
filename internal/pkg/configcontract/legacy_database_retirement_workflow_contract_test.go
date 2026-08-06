@@ -27,6 +27,7 @@ func TestLegacyDatabaseRetirementWorkflowStartsReadOnly(t *testing.T) {
 		"mongodump",
 		"mongorestore",
 		"--dryRun",
+		"--file=/tmp/retirement-preflight.js",
 		"retirement preflight completed; no data was changed",
 	} {
 		if !strings.Contains(content, required) {

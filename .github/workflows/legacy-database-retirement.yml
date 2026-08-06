@@ -155,7 +155,7 @@ jobs:
 
             echo "=== MongoDB retirement preflight ==="
             MONGO_COUNTS=$(sudo docker run --rm --network infra-network \
-              -i \
+              -v "$MONGO_CHECK_SCRIPT:/tmp/retirement-preflight.js:ro" \
               -e MONGODB_DBNAME="$MONGODB_DBNAME" \
               mongo:7.0 mongosh \
                 --host="$MONGODB_HOST" \
@@ -163,7 +163,8 @@ jobs:
                 --username="$MONGODB_USERNAME" \
                 --password="$MONGODB_PASSWORD" \
                 --authenticationDatabase=admin \
-                --quiet < "$MONGO_CHECK_SCRIPT")
+                --quiet \
+                --file=/tmp/retirement-preflight.js)
             printf '%s\n' "$MONGO_COUNTS"
             if [[ $(printf '%s\n' "$MONGO_COUNTS" | awk 'NF {count++} END {print count+0}') -ne 11 ]]; then
               echo "expected exactly 11 MongoDB retirement targets" >&2
