@@ -667,53 +667,6 @@ func TestCompatibilityObservationWorkflowIsReadOnlyAndFailClosed(t *testing.T) {
 	}
 }
 
-func TestStatisticsStaleRunSettlementWorkflowIsExactAndFailClosed(t *testing.T) {
-	t.Parallel()
-
-	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "statistics-stale-run-settlement.yml"))
-	if err != nil {
-		t.Fatalf("read Statistics settlement workflow: %v", err)
-	}
-	script, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "cd", "settle-statistics-stale-runs.sh"))
-	if err != nil {
-		t.Fatalf("read Statistics settlement script: %v", err)
-	}
-	content := string(workflow) + "\n" + string(script)
-	for _, required := range []string{
-		"SETTLE-6-STATISTICS-RUNS",
-		"qs-server-db-ops-production",
-		"cache:lock:statistics:1",
-		"START TRANSACTION",
-		"FOR UPDATE",
-		"@eligible_count = 6",
-		"SET @affected_rows = ROW_COUNT()",
-		"SETTLEMENT_RESULT|6|6|6|",
-		"POSTCHECK|6|6|6|6|6",
-		"stale_run_reconciled",
-	} {
-		if !strings.Contains(content, required) {
-			t.Errorf("Statistics settlement contract must contain %q", required)
-		}
-	}
-	for _, id := range []string{
-		"631012088902332974",
-		"631034496552022574",
-		"631349010061341230",
-		"631362645156442670",
-		"631363406154183214",
-		"631444782798877230",
-	} {
-		if !strings.Contains(content, id) {
-			t.Errorf("Statistics settlement contract must contain target %s", id)
-		}
-	}
-	for _, forbidden := range []string{"DELETE FROM", "DROP TABLE", "TRUNCATE TABLE"} {
-		if strings.Contains(content, forbidden) {
-			t.Errorf("Statistics settlement contract must not contain %q", forbidden)
-		}
-	}
-}
-
 func TestDBOpsMongoStatusRunsAsFailFastScript(t *testing.T) {
 	t.Parallel()
 

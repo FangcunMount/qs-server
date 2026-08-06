@@ -42,7 +42,6 @@
 | 工具 | 用途 | 生命周期 |
 | --- | --- | --- |
 | `repair_modelcatalog_cutover` | 以当前 Handler 和 active snapshot 规范化 Model runtime；不覆盖 draft head | 严格关闭并保存证据后删除 |
-| `settle_statistics_stale_runs.sql` | 在交互式 MySQL 事务中将六条已确认无需继续、未提交数据的 stale Run 结算为 `failed`；默认不 `COMMIT` | 完成生产结算、对账并保存证据后删除 |
 
 ### 仅限全新环境初始化
 

@@ -267,9 +267,6 @@ jobs:
       - name: Validate compatibility observation contract
         run: bash scripts/cd/test-compatibility-observation.sh
 
-      - name: Validate Statistics stale-run settlement contract
-        run: bash scripts/cd/test-settle-statistics-stale-runs.sh
-
       - name: Validate production Compose
         run: |
           printf '%s\n' \
