@@ -1,0 +1,272 @@
+name: Legacy Database Retirement
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'Read-only preflight or create a verified retirement backup'
+        required: true
+        type: choice
+        options:
+          - preflight
+          - backup
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qs-server-db-ops-production
+  cancel-in-progress: false
+
+jobs:
+  preflight-or-backup:
+    name: Preflight or Backup Legacy Database Objects
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 60
+    environment: production
+    steps:
+      - name: Validate SSH configuration
+        env:
+          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
+          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+        run: |
+          set -Eeuo pipefail
+          : "${SVRA_HOST:?SVRA_HOST is empty}"
+          : "${SVRA_USERNAME:?SVRA_USERNAME is empty}"
+          : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
+          : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
+
+      - name: Preflight or create verified backup
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          RETIREMENT_OPERATION: ${{ inputs.operation }}
+          RETIREMENT_RUN_ID: ${{ github.run_id }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
+          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
+          MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          command_timeout: 55m
+          envs: RETIREMENT_OPERATION,RETIREMENT_RUN_ID,MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
+          script: |
+            set -Eeuo pipefail
+            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+
+            : "${RETIREMENT_OPERATION:?RETIREMENT_OPERATION is empty}"
+            : "${RETIREMENT_RUN_ID:?RETIREMENT_RUN_ID is empty}"
+            : "${MYSQL_HOST:?MYSQL_HOST is empty}"
+            : "${MYSQL_USERNAME:?MYSQL_USERNAME is empty}"
+            : "${MYSQL_PASSWORD:?MYSQL_PASSWORD is empty}"
+            : "${MYSQL_DATABASE:?MYSQL_DATABASE is empty}"
+            : "${MONGODB_HOST:?MONGODB_HOST is empty}"
+            : "${MONGODB_USERNAME:?MONGODB_USERNAME is empty}"
+            : "${MONGODB_PASSWORD:?MONGODB_PASSWORD is empty}"
+            : "${MONGODB_DBNAME:?MONGODB_DBNAME is empty}"
+
+            if [[ "$RETIREMENT_OPERATION" != "preflight" && "$RETIREMENT_OPERATION" != "backup" ]]; then
+              echo "unsupported retirement operation: $RETIREMENT_OPERATION" >&2
+              exit 1
+            fi
+
+            MYSQL_PORT="${MYSQL_PORT:-3306}"
+            MONGODB_PORT="${MONGODB_PORT:-27017}"
+            BACKUP_ROOT="/opt/backups/qs-server/legacy-database-retirement"
+            BACKUP_SET="legacy-db-retirement-20260806-v1"
+            BACKUP_DIR="$BACKUP_ROOT/$BACKUP_SET"
+            PARTIAL_DIR="$BACKUP_ROOT/.${BACKUP_SET}.partial"
+            MONGO_CHECK_SCRIPT=$(mktemp /tmp/qs-legacy-db-preflight.XXXXXX.js)
+
+            cleanup() {
+              rm -f -- "$MONGO_CHECK_SCRIPT"
+              if [[ "$RETIREMENT_OPERATION" == "backup" && -d "$PARTIAL_DIR" ]]; then
+                sudo rm -rf -- "$PARTIAL_DIR"
+              fi
+            }
+            trap cleanup EXIT
+
+            echo "=== MySQL retirement preflight ==="
+            MYSQL_COUNTS=$(sudo docker run --rm --network infra-network \
+              -e MYSQL_PWD="$MYSQL_PASSWORD" \
+              mysql:8.0 mysql --protocol=tcp \
+                --host="$MYSQL_HOST" \
+                --port="$MYSQL_PORT" \
+                --user="$MYSQL_USERNAME" \
+                --database="$MYSQL_DATABASE" \
+                --batch --raw --skip-column-names \
+                --execute="
+                  SELECT 'analytics_scan_watermarks', COUNT(*) FROM analytics_scan_watermarks
+                  UNION ALL
+                  SELECT 'seed_orphan_outbox_bak_hist_v1_20260802_r1', COUNT(*) FROM seed_orphan_outbox_bak_hist_v1_20260802_r1
+                  UNION ALL
+                  SELECT 'seed_orphan_outbox_bak_hist_v1_orphans_20260802', COUNT(*) FROM seed_orphan_outbox_bak_hist_v1_orphans_20260802
+                  UNION ALL
+                  SELECT 'seed_orphan_stats_bak_hist_v1_20260802_r1', COUNT(*) FROM seed_orphan_stats_bak_hist_v1_20260802_r1
+                  UNION ALL
+                  SELECT 'seed_orphan_stats_bak_hist_v1_orphans_20260802', COUNT(*) FROM seed_orphan_stats_bak_hist_v1_orphans_20260802;")
+            printf '%s\n' "$MYSQL_COUNTS"
+            if [[ $(printf '%s\n' "$MYSQL_COUNTS" | awk 'NF {count++} END {print count+0}') -ne 5 ]]; then
+              echo "expected exactly 5 MySQL retirement targets" >&2
+              exit 1
+            fi
+            if ! printf '%s\n' "$MYSQL_COUNTS" | awk -F '\t' 'NF && $2 != 0 {exit 1}'; then
+              echo "MySQL retirement target is no longer empty" >&2
+              exit 1
+            fi
+
+            cat > "$MONGO_CHECK_SCRIPT" <<'MONGOJS'
+            const targetDB = db.getSiblingDB(process.env.MONGODB_DBNAME)
+            const targets = [
+              "assessment_models_legacy_20260717_084636",
+              "domain_event_outbox__seed_orphan_backup_hist_v1_20260802_r1",
+              "domain_event_outbox__seed_orphan_backup_hist_v1_orphans_20260802",
+              "interpret_report_artifacts__seed_orphan_backup_hist_v1_20260802_r1",
+              "interpret_report_artifacts__seed_orphan_backup_hist_v1_orphans_20260802",
+              "interpretation_runs__seed_orphan_backup_hist_v1_20260802_r1",
+              "interpretation_runs__seed_orphan_backup_hist_v1_orphans_20260802",
+              "report_generations__seed_orphan_backup_hist_v1_20260802_r1",
+              "report_generations__seed_orphan_backup_hist_v1_orphans_20260802",
+              "report_query_catalog__seed_orphan_backup_hist_v1_20260802_r1",
+              "report_query_catalog__seed_orphan_backup_hist_v1_orphans_20260802"
+            ]
+            const existing = new Set(targetDB.getCollectionNames())
+            const missing = targets.filter(name => !existing.has(name))
+            if (missing.length !== 0) {
+              throw new Error(`missing MongoDB retirement targets: ${missing.join(",")}`)
+            }
+            for (const name of targets) {
+              print(`${name}\t${targetDB.getCollection(name).countDocuments({})}`)
+            }
+            MONGOJS
+
+            echo "=== MongoDB retirement preflight ==="
+            MONGO_COUNTS=$(sudo docker run --rm --network infra-network \
+              -i \
+              -e MONGODB_DBNAME="$MONGODB_DBNAME" \
+              mongo:7.0 mongosh \
+                --host="$MONGODB_HOST" \
+                --port="$MONGODB_PORT" \
+                --username="$MONGODB_USERNAME" \
+                --password="$MONGODB_PASSWORD" \
+                --authenticationDatabase=admin \
+                --quiet < "$MONGO_CHECK_SCRIPT")
+            printf '%s\n' "$MONGO_COUNTS"
+            if [[ $(printf '%s\n' "$MONGO_COUNTS" | awk 'NF {count++} END {print count+0}') -ne 11 ]]; then
+              echo "expected exactly 11 MongoDB retirement targets" >&2
+              exit 1
+            fi
+
+            if [[ "$RETIREMENT_OPERATION" == "preflight" ]]; then
+              echo "retirement preflight completed; no data was changed"
+              exit 0
+            fi
+
+            if [[ -e "$BACKUP_DIR" || -e "$PARTIAL_DIR" ]]; then
+              echo "backup set already exists or is incomplete: $BACKUP_SET" >&2
+              exit 1
+            fi
+            sudo install -d -m 0750 "$BACKUP_ROOT"
+            sudo install -d -m 0750 "$PARTIAL_DIR/mysql" "$PARTIAL_DIR/mongodb"
+
+            echo "=== Back up MySQL retirement DDL ==="
+            sudo docker run --rm --network infra-network \
+              -v "$PARTIAL_DIR/mysql:/backup" \
+              -e MYSQL_PWD="$MYSQL_PASSWORD" \
+              -e MYSQL_HOST="$MYSQL_HOST" \
+              -e MYSQL_PORT="$MYSQL_PORT" \
+              -e MYSQL_USERNAME="$MYSQL_USERNAME" \
+              -e MYSQL_DATABASE="$MYSQL_DATABASE" \
+              --entrypoint /bin/bash \
+              mysql:8.0 -Eeuo pipefail -c '
+                mysqldump --protocol=tcp \
+                  --host="$MYSQL_HOST" \
+                  --port="$MYSQL_PORT" \
+                  --user="$MYSQL_USERNAME" \
+                  --set-gtid-purged=OFF \
+                  --skip-lock-tables \
+                  --no-data \
+                  "$MYSQL_DATABASE" \
+                  analytics_scan_watermarks \
+                  seed_orphan_outbox_bak_hist_v1_20260802_r1 \
+                  seed_orphan_outbox_bak_hist_v1_orphans_20260802 \
+                  seed_orphan_stats_bak_hist_v1_20260802_r1 \
+                  seed_orphan_stats_bak_hist_v1_orphans_20260802 \
+                  > /backup/retirement-targets.sql
+              '
+            sudo gzip -9 "$PARTIAL_DIR/mysql/retirement-targets.sql"
+            sudo gzip -t "$PARTIAL_DIR/mysql/retirement-targets.sql.gz"
+            if [[ $(sudo zgrep -c '^CREATE TABLE' "$PARTIAL_DIR/mysql/retirement-targets.sql.gz") -ne 5 ]]; then
+              echo "MySQL retirement backup does not contain exactly 5 CREATE TABLE statements" >&2
+              exit 1
+            fi
+
+            MONGO_TARGETS=(
+              assessment_models_legacy_20260717_084636
+              domain_event_outbox__seed_orphan_backup_hist_v1_20260802_r1
+              domain_event_outbox__seed_orphan_backup_hist_v1_orphans_20260802
+              interpret_report_artifacts__seed_orphan_backup_hist_v1_20260802_r1
+              interpret_report_artifacts__seed_orphan_backup_hist_v1_orphans_20260802
+              interpretation_runs__seed_orphan_backup_hist_v1_20260802_r1
+              interpretation_runs__seed_orphan_backup_hist_v1_orphans_20260802
+              report_generations__seed_orphan_backup_hist_v1_20260802_r1
+              report_generations__seed_orphan_backup_hist_v1_orphans_20260802
+              report_query_catalog__seed_orphan_backup_hist_v1_20260802_r1
+              report_query_catalog__seed_orphan_backup_hist_v1_orphans_20260802
+            )
+            echo "=== Back up and validate MongoDB retirement collections ==="
+            for COLLECTION in "${MONGO_TARGETS[@]}"; do
+              sudo docker run --rm --network infra-network \
+                -v "$PARTIAL_DIR/mongodb:/backup" \
+                mongo:7.0 mongodump \
+                  --host="$MONGODB_HOST" \
+                  --port="$MONGODB_PORT" \
+                  --username="$MONGODB_USERNAME" \
+                  --password="$MONGODB_PASSWORD" \
+                  --authenticationDatabase=admin \
+                  --db="$MONGODB_DBNAME" \
+                  --collection="$COLLECTION" \
+                  --gzip \
+                  --archive="/backup/$COLLECTION.archive.gz"
+              sudo test -s "$PARTIAL_DIR/mongodb/$COLLECTION.archive.gz"
+              sudo docker run --rm --network infra-network \
+                -v "$PARTIAL_DIR/mongodb:/backup:ro" \
+                mongo:7.0 mongorestore \
+                  --host="$MONGODB_HOST" \
+                  --port="$MONGODB_PORT" \
+                  --username="$MONGODB_USERNAME" \
+                  --password="$MONGODB_PASSWORD" \
+                  --authenticationDatabase=admin \
+                  --gzip \
+                  --archive="/backup/$COLLECTION.archive.gz" \
+                  --dryRun
+            done
+
+            {
+              echo "backup_set=$BACKUP_SET"
+              echo "source_run_id=$RETIREMENT_RUN_ID"
+              echo "created_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              echo "mysql_targets=5"
+              echo "mongodb_targets=11"
+              printf 'mysql_count\t%s\n' "$MYSQL_COUNTS"
+              printf 'mongodb_count\t%s\n' "$MONGO_COUNTS"
+            } | sudo tee "$PARTIAL_DIR/manifest.txt" >/dev/null
+            sudo chmod -R o-rwx "$PARTIAL_DIR"
+            sudo mv "$PARTIAL_DIR" "$BACKUP_DIR"
+            trap - EXIT
+            rm -f -- "$MONGO_CHECK_SCRIPT"
+
+            echo "verified retirement backup created: $BACKUP_DIR"
