@@ -256,6 +256,7 @@ AssessmentID、TesteeID 和 OrgID 是报告关联事实，不是授权凭据。�
 | 30 | [关键链路：从 Outcome 到 InterpretReport](./30-关键链路-从Outcome到InterpretReport.md) | 已重写 | Worker 如何从 Outcome 事件走到可靠报告提交 |
 | 31 | [关键链路：从报告查询到组合状态](./31-关键链路-从报告查询到组合状态.md) | 已重写 | 报告查询、Audience 投影和客户端完成状态如何组合 |
 | 90 | [设计问题与重构清单](./90-设计问题与重构清单.md) | 已编写 | 已确认的安全、语义、可靠性、版本与查询问题，以及实施顺序和验收门槛 |
+| 92 | [历史 Presentation 与 Template 治理台账](./92-历史Presentation与Template治理台账.md) | 执行中 | 历史 profile 回填、Template 发布收敛及生产验收证据 |
 
 ## 11. 事实源与验证
 
