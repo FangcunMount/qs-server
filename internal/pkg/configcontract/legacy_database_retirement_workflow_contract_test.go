@@ -32,6 +32,8 @@ func TestLegacyDatabaseRetirementWorkflowStartsReadOnly(t *testing.T) {
 		"MongoDB retirement preflight failed after $ATTEMPT attempts",
 		"MongoDB backup failed after $ATTEMPT attempts",
 		"MongoDB backup validation failed after $ATTEMPT attempts",
+		"/backup/.legacy-db-retirement-20260806-v1.partial",
+		"/backup/legacy-db-retirement-20260806-v1",
 		"retirement preflight completed; no data was changed",
 	} {
 		if !strings.Contains(content, required) {
