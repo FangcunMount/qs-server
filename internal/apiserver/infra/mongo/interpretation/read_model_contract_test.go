@@ -1,6 +1,7 @@
 package interpretation
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -83,5 +84,47 @@ func TestReportPOToReadRowToleratesNilLegacySlices(t *testing.T) {
 	}
 	if row.Suggestions == nil {
 		t.Fatalf("suggestions should be an empty slice for stable response mapping")
+	}
+	if row.PresentationProfile != nil {
+		t.Fatalf("empty legacy dimensions must not synthesize a presentation profile: %#v", row.PresentationProfile)
+	}
+}
+
+func TestReportPOToReadRowSynthesizesLegacyPresentationProfileFromArtifactDimensions(t *testing.T) {
+	row := projectArchivedReportRow(&ArchivedReportPO{
+		BaseDocument: base.BaseDocument{DomainID: meta.FromUint64(7001)},
+		Dimensions: []DimensionInterpretPO{
+			{FactorCode: "B"},
+			{FactorCode: ""},
+			{FactorCode: "A"},
+			{FactorCode: "B"},
+		},
+	})
+
+	if row.PresentationProfile == nil {
+		t.Fatal("legacy dimensions must synthesize a presentation profile")
+	}
+	if row.PresentationProfile.Source != "legacy_artifact_dimensions/v1" {
+		t.Fatalf("presentation source = %q", row.PresentationProfile.Source)
+	}
+	want := []string{"B", "A"}
+	if !reflect.DeepEqual(row.PresentationProfile.VisibleFactorCodes, want) {
+		t.Fatalf("visible factor codes = %#v, want %#v", row.PresentationProfile.VisibleFactorCodes, want)
+	}
+}
+
+func TestReportPOToReadRowPrefersStoredPresentationProfile(t *testing.T) {
+	row := projectArchivedReportRow(&ArchivedReportPO{
+		BaseDocument: base.BaseDocument{DomainID: meta.FromUint64(7001)},
+		Dimensions:   []DimensionInterpretPO{{FactorCode: "artifact"}},
+		PresentationProfile: &PresentationProfilePO{
+			VisibleFactorCodes: []string{"frozen"},
+			Source:             "frozen",
+		},
+	})
+
+	if row.PresentationProfile == nil || row.PresentationProfile.Source != "frozen" ||
+		!reflect.DeepEqual(row.PresentationProfile.VisibleFactorCodes, []string{"frozen"}) {
+		t.Fatalf("stored presentation profile was not preserved: %#v", row.PresentationProfile)
 	}
 }
