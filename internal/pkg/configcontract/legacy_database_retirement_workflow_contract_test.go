@@ -28,6 +28,7 @@ func TestLegacyDatabaseRetirementWorkflowStartsReadOnly(t *testing.T) {
 		"mongorestore",
 		"--dryRun",
 		"--file=/tmp/retirement-preflight.js",
+		"chmod 0444 \"$MONGO_CHECK_SCRIPT\"",
 		"MongoDB retirement preflight failed after $ATTEMPT attempts",
 		"MongoDB backup failed after $ATTEMPT attempts",
 		"MongoDB backup validation failed after $ATTEMPT attempts",

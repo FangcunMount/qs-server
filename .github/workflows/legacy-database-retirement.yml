@@ -152,6 +152,7 @@ jobs:
               print(`${name}\t${targetDB.getCollection(name).countDocuments({})}`)
             }
             MONGOJS
+            chmod 0444 "$MONGO_CHECK_SCRIPT"
 
             echo "=== MongoDB retirement preflight ==="
             MONGO_COUNTS=""
