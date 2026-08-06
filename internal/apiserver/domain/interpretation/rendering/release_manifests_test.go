@@ -15,6 +15,13 @@ func TestBuiltinReleaseManifestsMatchRegisteredBuilders(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantIDs := []string{"standard", "mbti", "sbti", "bigfive", "enneagram"}
+	wantFingerprints := map[string]string{
+		"standard":  "c5d758a0901ed1e0c77aec5aa6606dd47b12a98e914e619fb41f1271f571fa76",
+		"mbti":      "38976e0b0c2a6d9b4ddb5250a9411011c294bc497e17f171ebe87db8a66349fb",
+		"sbti":      "0e407ca505e837054ff273d2dabd1fc7d1d31a05593a73b0d6c87510988a8706",
+		"bigfive":   "9b98c564a3d71b836f7099399ff0139132259696499a166de09ef395fd2c8cba",
+		"enneagram": "86bf584f4ea271b4f53bf7c0c237febf714215035074ae4da58543552294dbcd",
+	}
 	if len(manifests) != len(wantIDs) {
 		t.Fatalf("manifest count = %d, want %d", len(manifests), len(wantIDs))
 	}
@@ -33,6 +40,9 @@ func TestBuiltinReleaseManifestsMatchRegisteredBuilders(t *testing.T) {
 		}
 		if _, duplicate := fingerprints[fingerprint]; duplicate {
 			t.Fatalf("manifest %s has a duplicate fingerprint", manifest.TemplateID)
+		}
+		if fingerprint != wantFingerprints[manifest.TemplateID] {
+			t.Fatalf("manifest %s fingerprint = %s, want %s", manifest.TemplateID, fingerprint, wantFingerprints[manifest.TemplateID])
 		}
 		fingerprints[fingerprint] = struct{}{}
 		for _, route := range manifest.Routes {
