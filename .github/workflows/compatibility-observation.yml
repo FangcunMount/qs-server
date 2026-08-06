@@ -1,0 +1,58 @@
+name: Compatibility Observation
+
+on:
+  workflow_dispatch:
+    inputs:
+      window_days:
+        description: 'Prometheus lookback in days (1-90)'
+        required: true
+        type: string
+        default: '30'
+  schedule:
+    - cron: '0 18 * * *' # Beijing 02:00, after the scheduled database backup window starts.
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qs-server-compatibility-observation-production
+  cancel-in-progress: false
+
+jobs:
+  public-contracts:
+    name: Public Compatibility Metrics
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate SSH configuration
+        env:
+          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
+          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+        run: |
+          set -Eeuo pipefail
+          : "${SVRA_HOST:?SVRA_HOST is empty}"
+          : "${SVRA_USERNAME:?SVRA_USERNAME is empty}"
+          : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
+          : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
+
+      - name: Audit public compatibility observation window
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          WINDOW_DAYS: ${{ github.event.inputs.window_days || '30' }}
+          PRIVILEGE_RUNNER: sudo
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          envs: WINDOW_DAYS,PRIVILEGE_RUNNER
+          script_path: scripts/cd/audit-compatibility-observation.sh

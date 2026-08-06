@@ -9,6 +9,7 @@
 | `sonar.yml` | Mac mini 本地 SonarQube 扫描（不阻断 CD） | `push` → `main` |
 | `ping-runner.yml` | ServerA 生产巡检 + ServerD worker 主机巡检 | 每 6 小时 / `workflow_dispatch` |
 | `db-ops.yml` | MongoDB 备份 / 恢复、MySQL/MongoDB 状态及 Redis 只读键空间盘点（读 `production` Environment secrets）；传入 `audit_from` 时还会对 Attention 缺口做私密跨 Mongo/MySQL 只读分类，日志只输出汇总计数 | 每日定时备份 / `workflow_dispatch` |
+| `compatibility-observation.yml` | 只读查询生产 Prometheus，分类 `/practitioners`、Statistics `validate_only` 和 `GenerateReportFromAssessment` 的活跃命中、完整零窗口或历史覆盖不足；零命中仍须调用方确认后才能删除 | 每日 / `workflow_dispatch` |
 
 JavaScript Action 必须使用原生 Node 24 主版本：测试覆盖率、扫描报告和三个应用制品统一使用 `actions/upload-artifact@v7`，镜像构建使用 `docker/setup-buildx-action@v4` 与 `docker/login-action@v4`。覆盖率仍由 `go test` 与 `go tool cover` 生成，`coverage.out` 作为保留 14 天的 workflow artifact 上传，缺失时阻断；仓库未启用且长期静默失败的 Codecov 外部上传已退出。`scripts/cd/test-github-action-runtimes.sh` 在 CI 中阻止回退到由 GitHub 强制转译运行的 Node 20 主版本，并阻止重新引入未配置的 Codecov Action。
 

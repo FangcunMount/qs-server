@@ -623,6 +623,47 @@ func TestDBOpsAttentionRecoveryAuditOnlyCountsHighRiskSideEffects(t *testing.T) 
 	}
 }
 
+func TestCompatibilityObservationWorkflowIsReadOnlyAndFailClosed(t *testing.T) {
+	t.Parallel()
+
+	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "compatibility-observation.yml"))
+	if err != nil {
+		t.Fatalf("read compatibility observation workflow: %v", err)
+	}
+	script, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "cd", "audit-compatibility-observation.sh"))
+	if err != nil {
+		t.Fatalf("read compatibility observation script: %v", err)
+	}
+	content := string(workflow) + "\n" + string(script)
+	for _, required := range []string{
+		"schedule:",
+		"Public Compatibility Metrics",
+		"scripts/cd/audit-compatibility-observation.sh",
+		"http://prometheus:9090",
+		"qs_actor_deprecated_practitioner_route_total",
+		"qs_statistics_deprecated_validate_only_total",
+		"qs_interpretation_deprecated_generate_report_from_assessment_total",
+		"observation_window_incomplete",
+		"zero_window_candidate",
+		"still requires caller confirmation before removal",
+	} {
+		if !strings.Contains(content, required) {
+			t.Errorf("compatibility observation contract must contain %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		"docker restart",
+		"docker rm",
+		"DELETE FROM",
+		"UPDATE ",
+		"DROP ",
+	} {
+		if strings.Contains(content, forbidden) {
+			t.Errorf("compatibility observation must not contain %q", forbidden)
+		}
+	}
+}
+
 func TestDBOpsMongoStatusRunsAsFailFastScript(t *testing.T) {
 	t.Parallel()
 

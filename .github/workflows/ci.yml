@@ -264,6 +264,9 @@ jobs:
       - name: Validate Attention reconcile dry-run audit contract
         run: bash scripts/cd/test-attention-reconcile-audit.sh
 
+      - name: Validate compatibility observation contract
+        run: bash scripts/cd/test-compatibility-observation.sh
+
       - name: Validate production Compose
         run: |
           printf '%s\n' \
