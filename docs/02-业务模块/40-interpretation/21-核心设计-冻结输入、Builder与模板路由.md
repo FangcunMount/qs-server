@@ -343,7 +343,7 @@ TemplateVersion 标识一代不可变的报告生成语义。当前定义希望�
 
 它参与 Generation 幂等键：同一 Outcome、同一 ReportType、同一 TemplateVersion 只对应一个生成意图；新版本应产生新 Generation 和新 Report，而不是覆盖旧成品。
 
-当前生产适配器固定使用 `legacy-v1`，ModelCatalog 尚未发布或绑定明确的报告模板版本。因此目前只是建立了版本身份骨架，还没有完成真正的模板资产版本治理。
+当前发布目录同时保留 `legacy-v1` 与 `2026-08-v1`。ModelCatalog active snapshot 显式冻结 TemplateID/TemplateVersion，Outcome 继续冻结同一组路由身份；运行时只解析已发布 release，缺失或未知版本会 fail-closed。
 
 ### 7.5 Algorithm、ProductChannel 与 ReportProfile
 
@@ -363,11 +363,11 @@ TemplateVersion 标识一代不可变的报告生成语义。当前定义希望�
 
 | 概念 | 示例 | 回答的问题 | 当前落点 |
 | --- | --- | --- | --- |
-| `TemplateVersion` | `legacy-v1` | 使用哪一代不可变报告生成语义？ | Input、Registry、Generation、Report |
+| `TemplateVersion` | `legacy-v1`、`2026-08-v1` | 使用哪一代不可变报告生成语义？ | ModelCatalog snapshot、Outcome Input、Registry、Generation、Report、release manifest |
 | `TemplateID` | `mbti`、`sbti`、`bigfive` | typology Builder 内选择哪个具体内容模板？ | 冻结 ReportInput -> Input.Report |
 | `AdapterKey` | `personality_type`、`trait_profile`、`mbti` | 将 typology facts 交给哪种内置适配方式？ | 冻结 ReportInput -> Input.Report |
-| `BuilderIdentity` | `factor-scoring`、`typology` | 实际是哪一个 Builder 实现生成的？ | Builder、生成事件、日志 |
-| `ContentSchemaVersion` | `report-content/v1` | Draft/Report Content 使用什么结构？ | Builder、生成事件 |
+| `BuilderIdentity` | `factor-scoring`、`typology` | 实际是哪一个 Builder 实现生成的？ | Builder、Artifact、生成事件、日志 |
+| `ContentSchemaVersion` | `report-content/v1` | Draft/Report Content 使用什么结构？ | Builder、Artifact、生成事件 |
 
 ### 8.1 TemplateVersion 不是 TemplateID
 
@@ -390,13 +390,13 @@ Algorithm 描述模型如何计算；AdapterKey 描述 Interpretation 怎样选�
 
 Registry 根据机制 Key 选择 Builder，而不是根据 `BuilderIdentity` 反查。BuilderIdentity 是执行证据，用来回答“最终是哪段实现生成了内容”。
 
-当前它已经进入 `interpretation.report.generated` 事件和执行日志，但没有固化进 InterpretReport artifact。若事件丢失或仅持有 Report 正文，无法从成品自身确认具体 Builder；这是后续成品可追溯性需要补强的地方。
+当前它已经进入 InterpretReport artifact、Mongo 持久化、`interpretation.report.generated` 事件和执行日志。Committer 会校验 Artifact 与本次 Builder 声明一致；历史缺失字段恢复为显式 unknown，而不是伪装成当前 Builder。
 
 ### 8.4 ContentSchemaVersion 不是 TemplateVersion
 
 同一 Content schema 可以被多个 Builder 或 TemplateVersion 复用；反过来，升级 Content schema 也通常需要评估是否发布新 TemplateVersion。
 
-当前所有默认 Builder 都返回 `report-content/v1`。这个值进入生成事件，但同样没有保存在 Report 成品中。
+当前所有默认 Builder 都返回 `report-content/v1`。这个值同时保存在 Report 成品与生成事件中，并在成功提交时做一致性校验。
 
 ## 9. Registry 注册契约
 
@@ -441,16 +441,16 @@ DefaultBuilders
 
 ## 10. Registry 解析与回落
 
-### 10.1 先补齐最小默认值
+### 10.1 核心路由身份必须显式存在
 
 从 InterpretationInput 构造 RoutingContext 时，当前实现会：
 
-- ReportType 为空 -> `standard`；
-- TemplateVersion 为空 -> `legacy-v1`；
-- DecisionKind 为空 -> 按 AlgorithmFamily 取兼容默认值；
+- ReportType 为空 -> 拒绝；
+- TemplateVersion 为空 -> 拒绝；
+- DecisionKind 为空或不能映射 AlgorithmFamily -> 拒绝；
 - ReportProfile 为空 -> 按 DecisionKind 推导。
 
-如果 AlgorithmFamily 或最终 DecisionKind 仍为空，路由上下文无效，执行器会将其归类为不支持的机制，而不是随便选择一个 Builder。
+ReportProfile 是可派生的呈现细分键；ReportType、TemplateVersion 与 DecisionKind 是不可猜测的核心身份。路由上下文无效时，执行器会明确归类失败，不会选择默认版本或任意 Builder。
 
 ### 10.2 从最具体键回落到通用键
 
@@ -535,16 +535,11 @@ TemplateID 的当前解析策略是：
 ```text
 TemplateID 精确命中
   -> 使用对应模板
-未命中
-  -> 根据 AdapterKey 回落
-仍未命中
-  -> 使用通用模板
+TemplateID 缺失或未命中
+  -> 拒绝路由，不生成报告
 ```
 
-这里存在一个值得治理的隐患：未知且非空的 TemplateID 与“未指定 TemplateID”目前没有区别，都会静默回落。运营配置拼写错误可能不会阻止发布或生成，只会产生通用报告。更稳妥的契约是：
-
-- TemplateID 为空：允许按 AdapterKey 选择默认模板；
-- TemplateID 非空但不存在：明确失败，不能静默回落。
+AdapterKey 只用于已发布 manifest 内的精确适配，不再承担“缺模板时猜测一个通用报告”的职责。ModelCatalog 发布校验与 Interpretation 运行时共同保护这条 fail-closed 契约。
 
 ## 12. Builder 的纯函数边界
 
@@ -578,7 +573,7 @@ Build(frozen InterpretationInput, fixed builder/template code)
 - 修改 TemplateID 对应模板；
 - 修改 Content 的组装顺序或字段语义。
 
-所以真正的重放契约是“冻结输入 + 可定位的不可变 Builder/模板语义”，而不只是“Builder 不查数据库”。TemplateVersion 正是为后半部分建立身份，但当前代码还没有保留多代 Builder 实现，也没有从发布模型解析版本，能力尚未闭环。
+所以真正的重放契约是“冻结输入 + 可定位的不可变 Builder/模板语义”，而不只是“Builder 不查数据库”。当前二进制保留两代 release manifest 和对应版本化 Builder 包装，发布模型显式冻结版本；未来再发布新版本时，仍必须保留需要重放的旧 manifest 与实现，不能只改动当前版本常量。
 
 ## 13. 生产生成与运营 Preview
 
@@ -600,7 +595,7 @@ ModelCatalog 的 typology 预览会：
 
 这个边界是正确的：运营预览未发布模型时，不应制造正式测评和正式报告事实。
 
-但当前 Preview 直接构造 TypologyBuilder，生产路径通过 Registry 解析，两条路径的 Builder 选择可能随未来扩展发生漂移。更合理的演进方向是共享一个“无持久化的 Builder resolver / renderer”，而不是让 Preview 调用生产 Executor 或生命周期服务。
+当前 Preview 与生产路径都使用默认 Builder Registry 和 `ResolveByMechanism`，新增特化路由不会再因直接构造 TypologyBuilder 而漂移。Preview 仍不调用生产 Executor 或生命周期服务，只共享纯 Builder resolver 与内容构建机制。
 
 ## 14. 新增报告能力时怎样判断扩展点
 
@@ -663,60 +658,43 @@ ModelCatalog 的 typology 预览会：
 
 因此它不是“再注册一个模板”这么简单，必须连同生命周期和查询模型一起设计。
 
-## 15. 当前设计问题与后续改进
+## 15. 已收敛边界与剩余改进
 
-本篇发现的问题已在 [设计问题与重构清单](./90-设计问题与重构清单.md) 汇总。这里先说明与输入和路由直接相关的项目。
+本篇早期识别的发布路由、成品来源与未知模板回落已经关闭。这里区分已成立事实和仍需继续跟踪的边界。
 
-### 15.1 TemplateVersion 尚未成为发布资产
+### 15.1 TemplateVersion 发布路由已关闭
 
-当前生产适配器统一写入 `legacy-v1`，ModelCatalog 没有在模型发布时明确绑定报告模板版本。结果是：
+当前 5 个 TemplateID 各有 `legacy-v1` 与 `2026-08-v1` 两个 release，ModelCatalog active snapshot 显式冻结 TemplateID/TemplateVersion，Outcome 继续冻结该身份。发布、运行时路由与二进制 manifest 会互相校验。
 
-- Generation 虽然具备版本身份，但业务发布不能选择它；
-- 修改 Builder 或模板代码时，没有旧版本实现可供历史重放；
-- `legacy-v1` 容易变成一个长期不变的名字，内部行为却持续变化。
+后续发布新版本仍要遵守：新建 manifest、保留仍需重放的历史 manifest、冻结模型路由、跑 manifest 覆盖与 checksum 门禁，不能原地修改旧 release。
 
-目标是让发布版本明确冻结报告生成语义，并能保留至少仍需重放的历史版本实现。
+### 15.2 Report 成品来源自证已关闭
 
-### 15.2 Report 成品缺少生成实现自证
+BuilderIdentity 与 ContentSchemaVersion 已固化到 Artifact，并与 generated event 一致提交。历史无来源字段只映射为 legacy/unknown，不借当前 Builder 猜测历史来源。
 
-BuilderIdentity 与 ContentSchemaVersion 已进入 generated event，但 InterpretReport 本身没有保存它们。建议将二者固化到成品元数据，使单独读取 Report 也能回答：
+### 15.3 路由严格性已关闭
 
-- 哪个 Builder 生成；
-- 使用什么内容 schema；
-- 与 TemplateVersion 是否匹配。
+缺失 TemplateID/TemplateVersion、未知 release、非法 runtime spec 和不匹配的模型类型会在发布或生成阶段失败；运行时不再使用默认版本、目录猜测或未知 TemplateID 的通用回落。
 
-### 15.3 typology runtime spec 解码错误被忽略
+### 15.4 仍需关注：Catalog 粒度
 
-适配器当前只在 `ToRuntimeSpec()` 成功时写入 TemplateID 和 AdapterKey，失败时继续生成。这样可能把有问题的冻结配置降级为算法默认 Adapter。
+当前只运营 `standard` ReportType，`report_query_catalog` 仍以 Assessment 为一行当前来源。如果未来让多个 ReportType 或多个版本同时成为可查询成品，必须先扩展 Catalog 业务身份和查询契约。
 
-目标契约应区分：
+### 15.5 仍需关注：旧 release 的长期保留
 
-- 历史输入确实没有 runtime spec：走明确兼容分支；
-- 输入声明存在 spec 但格式非法：报告生成失败，并留下可治理错误。
+双版本目录使当前历史 Outcome 可重放，但未来代码清理不能仅根据“新写入只用当前版本”删除 `legacy-v1`。退出旧 release 需要先证明没有重放、恢复或历史补算需求，并取得单项数据治理决策。
 
-### 15.4 未知 TemplateID 静默回落
+### 15.6 仍需关注：解释规则区间契约
 
-非空错误 TemplateID 应被视为配置或冻结输入错误，不应与空值使用相同默认逻辑。
+解释规则的完整性应继续由发布期验证和运行期明确失败保护，避免区间缺口、重叠或无序规则被内容回落掩盖。
 
-### 15.5 解释规则区间缺口被最后一条规则掩盖
+### 15.7 仍需关注：Preview 与生产解析一致性
 
-`findInterpretRuleWithRangeFallback` 在无命中时使用最后一条规则。这会让缺口、重叠或无序规则难以暴露。优先改进方向是发布期验证区间完整性，运行期无命中时明确失败或使用有业务定义的默认规则。
+Preview 继续保持无持久化、无 Generation/Run，但新增 release 或特化路由时必须同时验证 Preview 与生产 resolver，不得形成两套内容选择规则。
 
-### 15.6 常模映射可能补写结果等级
+### 15.8 仍需关注：多 ReportType
 
-Interpretation 当前可能根据冻结常模和 T 分数补 Level。这与“Outcome 决定结果，Interpretation 只组织解释”的目标边界存在张力。应把缺失的 Level 修正到 Evaluation 事实，而不是长期由报告层兜底。
-
-### 15.7 输入解码失败缺少 Generation / Run 证据
-
-FromOutcomeRecord 在 Starter 之前执行。若 Payload 或 ReportInput 解码失败，没有 InterpretationRun 记录当前停在哪一步。后续应考虑建立可审计的准入失败事实，同时避免为明显非法或不存在的 Outcome 制造错误 Generation。
-
-### 15.8 family-only fallback 可能误接新机制
-
-Registry 应增加测试或注册约束，防止未来新增 DecisionKind 被过宽 Builder 静默承接。
-
-### 15.9 Preview 与生产解析可能漂移
-
-Preview 应继续保持无持久化、无生产生命周期，但可以与生产共享纯 Builder resolver 和输入校验规则。
+新增 ReportType 会改变 Generation 身份、Artifact、Catalog 和客户端契约；不能只注册一份模板就宣称完成。当前单一 `standard` 是明确的产品边界。
 
 ## 16. 必须保护的不变量
 

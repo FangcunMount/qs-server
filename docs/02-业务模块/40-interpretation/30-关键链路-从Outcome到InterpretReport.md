@@ -104,7 +104,7 @@ sequenceDiagram
     EC->>MO: commit Outcome + evaluated Assessment + succeeded Run + event
     MO-->>MQ: evaluation.outcome.committed
     MQ->>W: deliver event
-    W->>RPC: GenerateReportFromAssessment(outcome_id)<br/>metadata: x-event-id
+    W->>RPC: GenerateReportFromOutcome(outcome_id)<br/>metadata: x-event-id
     RPC->>A: Generate(TrustedServiceActor, OutcomeID, TraceID)
     A->>O: FindByID(OutcomeID)
     O-->>A: immutable Outcome Record
@@ -140,7 +140,7 @@ sequenceDiagram
     end
 ```
 
-注意图中的 gRPC 方法仍叫 `GenerateReportFromAssessment`，但生产调用真正传递和校验的是 `outcome_id`。`assessment_id` 是 proto 中保留的兼容字段，Worker 当前不会填充它。
+`GenerateReportFromOutcome` 是当前 canonical gRPC 方法，只接受 `outcome_id`。旧 `GenerateReportFromAssessment` 已标记 deprecated，仅保留兼容观察；Worker 不再调用旧方法，也不会填充其中的 `assessment_id`。
 
 ## 5. 阶段一：Evaluation 可靠提交报告准入事实
 
@@ -247,9 +247,8 @@ Worker 不直接访问 MongoDB 中的：
 当前 proto 是：
 
 ```text
-GenerateReportFromAssessmentRequest
-  assessment_id   兼容字段，当前生产 Worker 不填
-  outcome_id      必填，实际准入身份
+GenerateReportFromOutcomeRequest
+  outcome_id      必填，唯一准入身份
 
 GenerateReportFromAssessmentResponse
   success / status / message
@@ -259,9 +258,12 @@ GenerateReportFromAssessmentResponse
   current_attempt / max_automatic_attempts
   remaining_automatic_attempts / next_attempt_at
   retry_event_id / action_request_id
+
+deprecated GenerateReportFromAssessment
+  仅服务观察期旧调用方；新调用不得接入
 ```
 
-方法名仍使用 Assessment 语言，是历史契约名称；当前实现已经是 `GenerateReportFromOutcome` 语义。文档和新调用方都不应把 `assessment_id` 当成执行输入。
+响应消息名仍保留旧命名，但执行 RPC 与请求身份已切换为 Outcome。旧方法是否删除取决于具名兼容指标完成观察窗并取得单项授权，不能从“Worker 已迁移”直接推导为可删。
 
 ### 7.2 Transport 只做边界工作
 
@@ -349,7 +351,7 @@ DecodeExecution(record.Payload, record.SchemaVersion)
 | `task_performance` | Task dimensions + performance facts |
 | `factor_classification` | PersonalityType 或 TraitProfile facts |
 
-兼容旧数据时，它可以补齐旧 scale 或 typology 的默认 algorithm、推导 AlgorithmFamily 和 DecisionKind；这些兼容规则不代表新 Outcome 可以省略运行时身份。
+当前适配器不会为缺失的 TemplateID/TemplateVersion、DecisionKind 或冻结 Interpretation assets 补默认值。AlgorithmFamily 只由显式 DecisionKind 推导；历史 Outcome 必须已具备经治理冻结的路由身份，否则进入 fail-closed 准入失败。
 
 ### 8.4 这一阶段发生在 Generation 创建之前
 
@@ -368,12 +370,12 @@ Find Outcome
 
 结果是：
 
-- 错误会作为未分类内部失败返回；
-- Worker 会 NACK 当前消息；
-- 运维人员无法在 Interpretation 生命周期查询中看到一条对应失败 Run；
-- 恢复依赖消息重投和外部事件治理，而不是业务 RetryDecision。
+- 不会制造错误的 Generation 或 Run；
+- 系统幂等写入独立 AdmissionFailure，保存稳定 kind、safe code/message、decision 与 fingerprint；
+- Operations API 可以按组织或 Outcome 查询这类生命周期前证据；
+- Worker 是否重试由准入失败分类决定，不依赖解析错误文本。
 
-这是当前实现明确存在的“生命周期前失败”可观测性缺口，不能在文档中假装所有失败都有 Run。
+因此不能说“所有失败都有 Run”，但也不能再说“Starter 前失败只有日志”：AdmissionFailure 是准入层事实，Run Failure 是执行层事实。
 
 ### 8.5 ExecuteOutcome 防止错配事实
 
@@ -395,10 +397,13 @@ Executor 根据 InterpretationInput 构造：
 Generation Key = OutcomeID + ReportType + TemplateVersion
 ```
 
-当前生产适配器使用：
+当前生产输入使用：
 
 - `ReportType = standard`；
-- `TemplateVersion = legacy-v1`。
+- 新发布模型冻结 `TemplateVersion = 2026-08-v1`；
+- 历史 Outcome 保留其显式冻结的 `legacy-v1`。
+
+缺失 TemplateID/TemplateVersion、未知 release 或不匹配路由会在生成前 fail-closed，不再补默认版本或动态猜测模板。
 
 Audience、ModelCode 和 Worker EventID 都不进入 Key。Audience 是读取投影；模型身份已经冻结在 Outcome；EventID 只表示一次消息投递与 trace。
 
@@ -412,7 +417,7 @@ Audience、ModelCode 和 Worker EventID 都不进入 Key。Audience 是读取投
 4. 将 Generation 置为 generating 并引用 LatestRunID；
 5. 同时写入两个文档。
 
-当前 module 装配的 lease duration 是固定的 5 分钟。
+Run lease duration 来自统一 `system_governance.retry.lease.run_duration`，默认 5 分钟；恢复扫描周期和 jitter 位于同一 governance block，可计算进程崩溃后的最坏恢复窗口。
 
 Starter 在事务提交后立即返回，Builder 不在 MongoDB 事务中运行。这样避免报告内容构建长期占用事务和数据库连接。
 
@@ -874,7 +879,7 @@ Starter 使用 RunRepository 的原子 `ReclaimExpiredLease`：
 1. 事件在 lease 过期后再次调用 Automation；
 2. apiserver 的 Evaluation consistency reconcile 调度器扫描 Interpretation 过期 lease，并根据 Generation 中的 OutcomeID 再次调用 Automation。
 
-当前生产配置启用 `lease_reconcile_enabled`，一致性调和任务按配置周期执行；Interpretation module 中 lease duration 当前固定为 5 分钟。
+当前生产配置启用 `lease_reconcile_enabled`，一致性调和任务按 `system_governance.retry.lease` 的 interval/jitter 执行；Run duration 也由同一配置块提供，默认 5 分钟。
 
 ### 17.5 Mongo 终态事务失败时的具体表现
 
@@ -978,8 +983,8 @@ Builder 可能执行较长时间，也可能失败。如果从 claim 到内容�
 | EventID | 哪次事件投递或重试授权 | Domain Event | Envelope、Run trace 或 RetryDecision |
 | TraceID | 哪次执行调用 | 初次 EventID 或 recovery trace | InterpretationRun |
 | TemplateVersion | 使用哪套报告生成语义 | InterpretationInput | Generation Key、Artifact、事件 |
-| BuilderIdentity | 哪个构建器实际执行 | Registry 结果 | generated event；当前未固化到 Artifact |
-| ContentSchemaVersion | 报告内容 schema | Builder | generated event；当前未固化到 Artifact |
+| BuilderIdentity | 哪个构建器实际执行 | Registry 结果 | Artifact、Mongo、generated event、日志 |
+| ContentSchemaVersion | 报告内容 schema | Builder | Artifact、Mongo、generated event |
 
 排查一份报告时，推荐从 OutcomeID 或 AssessmentID 找到 Generation，再展开所有 Run 和最终 Report。不要只根据 ReportID 看成品，因为失败发生时 ReportID 根本不存在。
 
@@ -1097,41 +1102,43 @@ retry event delivered
 14. generated event 只能在 Artifact 和 Catalog 已提交后发布。
 15. Redis report status、唤醒 signal 和 attention projection 都是可重建的后置投影，不是报告事实源。
 
-## 23. 当前实现中的明确问题
+## 23. 已收敛边界与剩余观察
 
-这些问题不是本文建议立即修改的方案，而是从链路还原中确认的当前边界，已经进入 [设计问题与重构清单](./90-设计问题与重构清单.md)。
+早期链路分析发现的准入审计、RPC 语义、模板发布、成品来源、失败投影、lease 配置和 Attention 补偿已经逐项收敛。这里记录当前事实与仍需观察的边界。
 
-### 23.1 生命周期前失败没有 Generation / Run
+### 23.1 准入失败已有独立持久化证据
 
-Outcome 不存在、解码失败、冻结输入无效和 FromOutcomeRecord 映射失败都发生在 Starter 前。它们只能通过 Worker 日志、消息指标和 NACK 观察，不能通过 Interpretation Operations API 查询。
+Outcome 解码、冻结身份、Catalog 路由和成品契约等 Starter 前失败不会伪造 Generation/Run，而是幂等写入 `interpretation_admission_failures`。Operations API 可按组织或 Outcome 查询，记录稳定 kind、safe code/message、重试属性、decision、时间和 fingerprint。
 
-目标上应为“每个已准入的 Outcome 都能解释当前停在哪一步”；当前实现尚未覆盖准入适配失败。
+这使“业务生命周期尚未准入”与“Generation 已开始但执行失败”保持两个明确事实层。
 
-### 23.2 RPC 名称与真实输入已经漂移
+### 23.2 canonical RPC 已切换，旧入口进入观察
 
-`GenerateReportFromAssessment` 和 request 中保留的 `assessment_id` 会误导读者和新调用方。当前真实契约已经是 Outcome 驱动，后续应考虑版本化迁移为明确的 `GenerateReportFromOutcome`。
+`GenerateReportFromOutcome` 是新调用的唯一入口；旧 `GenerateReportFromAssessment` 已 deprecated 并有兼容命中指标。观察至 2026-09-05 且取得单项删除授权前，旧入口仍是具名兼容而非可立即删除的死代码。
 
-### 23.3 TemplateVersion 仍由适配器固定为 legacy-v1
+### 23.3 模板发布与严格路由已关闭
 
-Generation Key、Artifact 和 Registry 已支持 TemplateVersion，但 ModelCatalog 还没有正式发布报告模板版本。当前所有生产输入使用同一个默认值，版本骨架尚未完成资产化闭环。
+内置目录已有 5 个 TemplateID × 两个版本共 10 个 release；ModelCatalog active snapshot 与 Outcome 显式冻结路由。新写入使用 `2026-08-v1`，历史 `legacy-v1` 保留；缺失或未知身份 fail-closed。
 
-### 23.4 BuilderIdentity 和 ContentSchemaVersion 没有固化到 Artifact
+### 23.4 Artifact 来源自证已关闭
 
-两者进入 generated event，却不在 InterpretReport 中。事件丢失或归档后，仅靠 Artifact 无法完整回答“这份报告由哪个 Builder、哪个内容 schema 生成”。
+BuilderIdentity 和 ContentSchemaVersion 已固化到 Artifact/Mongo，并与 generated event 一致提交。历史缺失字段只恢复为显式 legacy/unknown 标记。
 
-### 23.5 manual_required 没有进入 ReportFailedPayload
+### 23.5 failed 投影已区分三种处置
 
-failed event 只携带 `retryable`，没有 RetryDisposition。Worker 只有 `retryable=false` 时才把 Redis report status 标成 failed。
+failed event 携带完整 RetryDecision。Worker 对 `automatic` 保持进行中，对 `manual_required` 投影为 `waiting_manual_action` 的临时不可用，对 `terminal` 投影为失败；不会再仅凭 retryable 猜测状态。
 
-因此，自动次数耗尽但 `retryable=true, manual_required` 的报告可能继续对等待端表现为 processing/evaluated，而不是明确的“需要人工处理”。持久化 Generation/Run 是正确事实，但客户端等待投影尚未完整表达它。
+Redis 状态仍是可重建投影，Generation/Run/RetryDecision 才是治理事实源。
 
-### 23.6 lease duration 固定在装配代码中
+### 23.6 lease 治理已统一
 
-Interpretation lease 当前固定为 5 分钟，而恢复扫描周期来自配置。二者共同决定最坏恢复延迟，却不在一个配置或运维视图中表达。
+Run duration、reconcile interval 与 jitter 统一位于 `system_governance.retry.lease`，并提供过期后、进程崩溃后的最坏恢复窗口计算。默认 run duration 仍为 5 分钟，但不再硬编码在业务装配中。
 
-### 23.7 post-generated 投影缺少统一补偿闭环
+### 23.7 Attention 投影具备持久补偿，当前治理入口关闭
 
-Redis report status 和 attention sync 是 best-effort。报告查询可以从 MongoDB 恢复，但 attention 同步失败目前主要依赖日志，没有在本链路中形成独立、持久化的补偿任务。
+Attention 使用持久化 projection ledger、幂等 Projector 和失败 Reconciler；历史事实恢复还具备默认关闭、清单与 SHA-256 指纹双重保护的 FactReconciler。已授权的 33 + 91 个缺口完成精确恢复和独立对账，固定清单与一次性入口已退役。
+
+Redis report status 仍是 best-effort 可重建投影；它不参与 Artifact 成立，也不能替代 Mongo 生命周期事实。
 
 ## 24. 面试追问与回答边界
 

@@ -152,7 +152,7 @@ flowchart TD
     Catalog --> Query
 ```
 
-这条链路的准入事实不是 Assessment ID，也不是 Calculation 的内存返回值，而是已经持久化的 EvaluationOutcome。当前 gRPC 方法名仍为 `GenerateReportFromAssessment`，但生产调用传递和校验的是 `outcome_id`。
+这条链路的准入事实不是 Assessment ID，也不是 Calculation 的内存返回值，而是已经持久化的 EvaluationOutcome。`GenerateReportFromOutcome` 是当前 canonical gRPC 方法；旧 `GenerateReportFromAssessment` 仅作为 deprecated 兼容入口观察命中，新调用不再接入。
 
 ## 7. 三类复杂度
 
