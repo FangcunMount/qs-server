@@ -107,6 +107,7 @@ type EvidenceCheck struct {
 type PhaseEvidence struct {
 	Complete                   bool               `json:"complete"`
 	TrafficIsolated            *bool              `json:"traffic_isolated"`
+	CompletionWindow           Measurement        `json:"completion_window"`
 	Checks                     []EvidenceCheck    `json:"checks"`
 	CompletedCountDelta        *float64           `json:"completed_count_delta"`
 	FailedCountDelta           *float64           `json:"failed_count_delta"`

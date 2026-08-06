@@ -152,15 +152,16 @@ func (s *Subsystem) buildMongoProfile(opts Options) error {
 		return err
 	}
 	ready := outboxready.NewIndexWithRegistry(opts.OpsRedis, outboxready.StoreMongoDomainEvents, s.registry)
+	attemptTracker := appEventing.NewOutboxAttemptTracker()
 	immediate := appEventing.NewImmediateDispatcher(appEventing.ImmediateDispatcherOptions{
 		Name: "mongo-domain-events", Store: store, Publisher: s.publisher, Observer: s.observer,
 		Enabled: true, RequireDurablePublisher: true, MaxConcurrent: opts.Mongo.ImmediateMaxConcurrent,
-		ReadyIndex: ready, ImmediateEventTypes: s.registry.ImmediateTypes(eventcatalog.OutboxProfileMongoDomain),
+		ReadyIndex: ready, ImmediateEventTypes: s.registry.ImmediateTypes(eventcatalog.OutboxProfileMongoDomain), AttemptTracker: attemptTracker,
 	})
 	relay := appEventing.NewOutboxRelayWithOptions(appEventing.OutboxRelayOptions{
 		Name: "mongo-domain-events", Store: store, Publisher: s.publisher, Observer: s.observer,
 		BatchSize: opts.Mongo.BatchSize, PublishWorkers: opts.Mongo.PublishWorkers,
-		RequireDurablePublisher: true, ReadyIndex: ready, ReadyBuckets: s.registry.ReadyIndexBuckets(),
+		RequireDurablePublisher: true, ReadyIndex: ready, ReadyBuckets: s.registry.ReadyIndexBuckets(), AttemptTracker: attemptTracker,
 	})
 	s.profiles[eventcatalog.OutboxProfileMongoDomain] = &profileRuntime{
 		name: "mongo-domain-events", binding: appEventing.ProfileBinding{Stager: store, PostCommit: immediate},
@@ -178,15 +179,16 @@ func (s *Subsystem) buildAssessmentProfile(opts Options) error {
 	store := mysqlEventOutbox.NewStoreWithTopicResolver(opts.MySQLDB, s.catalog,
 		mysqlEventOutbox.WithPriorityTiers(s.registry.PriorityTiers(eventcatalog.OutboxProfileAssessmentMySQL)))
 	ready := outboxready.NewIndexWithRegistry(opts.OpsRedis, outboxready.StoreAssessmentMySQLOutbox, s.registry)
+	attemptTracker := appEventing.NewOutboxAttemptTracker()
 	immediate := appEventing.NewImmediateDispatcher(appEventing.ImmediateDispatcherOptions{
 		Name: "assessment-mysql-outbox", Store: store, Publisher: s.publisher, Observer: s.observer,
 		Enabled: true, RequireDurablePublisher: true, MaxConcurrent: opts.Assessment.ImmediateMaxConcurrent,
-		ReadyIndex: ready, ImmediateEventTypes: s.registry.ImmediateTypes(eventcatalog.OutboxProfileAssessmentMySQL),
+		ReadyIndex: ready, ImmediateEventTypes: s.registry.ImmediateTypes(eventcatalog.OutboxProfileAssessmentMySQL), AttemptTracker: attemptTracker,
 	})
 	relay := appEventing.NewOutboxRelayWithOptions(appEventing.OutboxRelayOptions{
 		Name: "assessment-mysql-outbox", Store: store, Publisher: s.publisher, Observer: s.observer,
 		BatchSize: opts.Assessment.BatchSize, PublishWorkers: opts.Assessment.PublishWorkers,
-		RequireDurablePublisher: true, ReadyIndex: ready, ReadyBuckets: s.registry.ReadyIndexBuckets(),
+		RequireDurablePublisher: true, ReadyIndex: ready, ReadyBuckets: s.registry.ReadyIndexBuckets(), AttemptTracker: attemptTracker,
 	})
 	s.profiles[eventcatalog.OutboxProfileAssessmentMySQL] = &profileRuntime{
 		name: "assessment-mysql-outbox", binding: appEventing.ProfileBinding{Stager: store, PostCommit: immediate},

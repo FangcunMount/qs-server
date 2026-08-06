@@ -148,12 +148,14 @@ Verdict 与退出码：
 - `dropped_iterations == 0`；
 - 实际 business QPS 至少达到目标的 99%；
 - 对应 tier 的 P95/P99 全部通过；
-- 280 后 collection、apiserver、worker、Outbox 和 NSQ 恢复证据通过，才允许进入 300；
+- 进入 300 前，smoke、60、120、200、240、280 必须全部为 `PASS`，且 collection、apiserver、worker、Outbox 和 NSQ 恢复证据通过；
 - 300 后必须完成最终排空与恢复验收。
 
 服务端证据缺失会产生 `INCOMPLETE`。在无法隔离并发业务流量的环境中，完成 TPS 与最终完成率不可作为正式准入证据。
 
-受控窗口应显式设置 `PERF_ISOLATED_ENV=true`；若声明为非隔离环境，报告会保留观测值但将服务端证据标记为不完整。
+受控窗口必须显式设置 `PERF_ISOLATED_ENV=true`；未声明或声明为非隔离环境时，报告会保留观测值但将服务端证据标记为 `INCOMPLETE`。完成 TPS 使用 Interpretation 成功计数在两次 Prometheus 快照之间的增量，并以实际快照时间窗作为分母，不使用计划时长代替观测窗口。
+
+NSQD 报告优先按 channel depth 统计待消费工作；没有 channel 时才使用 topic depth，避免 topic 与 channel 重复累计。共享 NSQD 可设置 `PERF_NSQ_TOPICS=topic-a,topic-b`，将恢复证据限定到本次压测相关 topic；配置后没有匹配 topic 会标记为证据缺失。
 
 ## 专项注册表
 

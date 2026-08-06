@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type metricSample struct {
@@ -28,21 +29,19 @@ func collectPhaseEvidence(dir string) PhaseEvidence {
 		checkFile(dir, "after-worker-metrics.txt", "worker metrics"),
 		checkJSONFile(dir, "after-nsqd-stats.json", "NSQD stats"),
 	}
-	var trafficIsolated *bool
-	if isolated, declared := os.LookupEnv("PERF_ISOLATED_ENV"); declared {
-		if strings.EqualFold(strings.TrimSpace(isolated), "true") {
-			value := true
-			trafficIsolated = &value
-			checks = append(checks, EvidenceCheck{Name: "traffic isolation", Status: "PASS", Source: "env:PERF_ISOLATED_ENV"})
-		} else {
-			value := false
-			trafficIsolated = &value
-			checks = append(checks, EvidenceCheck{Name: "traffic isolation", Status: "MISSING", Source: "env:PERF_ISOLATED_ENV", Message: "concurrent business traffic cannot be isolated; completed TPS is not admission evidence"})
-		}
-	}
+	trafficIsolated, isolationCheck := trafficIsolationEvidence()
+	checks = append(checks, isolationCheck)
 	before := readMetricSnapshots(dir, "before")
 	after := readMetricSnapshots(dir, "after")
 	completedDelta, failedDelta, completedByModel, hasCompletionEvidence := interpretationDeltas(before, after)
+	completionWindow := naMeasurement("seconds", "prometheus:snapshot_window", "completion metric capture window unavailable")
+	windowSeconds, hasCompletionWindow := prometheusObservationWindow(dir, "before", dir, "after")
+	if hasCompletionWindow {
+		completionWindow = measured(&windowSeconds, "seconds", "prometheus:snapshot_file_mtime")
+		checks = append(checks, EvidenceCheck{Name: "completion observation window", Status: "PASS", Source: "before/after Prometheus snapshot timestamps"})
+	} else {
+		checks = append(checks, EvidenceCheck{Name: "completion observation window", Status: "MISSING", Source: "before/after Prometheus snapshot timestamps", Message: "cannot calculate completed TPS denominator"})
+	}
 	if hasCompletionEvidence {
 		checks = append(checks, EvidenceCheck{Name: "completed transaction metric", Status: "PASS", Source: "qs_interpretation_run_duration_seconds_count"})
 	} else {
@@ -61,14 +60,14 @@ func collectPhaseEvidence(dir string) PhaseEvidence {
 	if hasOldest {
 		queueWait = append(queueWait, QueueWaitMetric{Layer: "outbox_oldest_pending", Wait: measured(&outboxOldest, "seconds", "prometheus:qs_event_outbox_oldest_age_seconds")})
 	}
-	complete := retryComplete && hasCompletionEvidence && hasOutbox && hasOldest && hasNSQ
+	complete := retryComplete && hasCompletionEvidence && hasCompletionWindow && hasOutbox && hasOldest && hasNSQ
 	for _, check := range checks {
 		if check.Status != "PASS" {
 			complete = false
 		}
 	}
 	evidence := PhaseEvidence{
-		Complete: complete, TrafficIsolated: trafficIsolated, Checks: checks, CompletedCountDelta: completedDelta, FailedCountDelta: failedDelta,
+		Complete: complete, TrafficIsolated: trafficIsolated, CompletionWindow: completionWindow, Checks: checks, CompletedCountDelta: completedDelta, FailedCountDelta: failedDelta,
 		CompletedCountDeltaByModel: completedByModel, Retry: retry, QueueWait: queueWait,
 	}
 	if hasOutbox {
@@ -81,6 +80,60 @@ func collectPhaseEvidence(dir string) PhaseEvidence {
 		evidence.NSQDepth = &nsqDepth
 	}
 	return evidence
+}
+
+func trafficIsolationEvidence() (*bool, EvidenceCheck) {
+	raw, declared := os.LookupEnv("PERF_ISOLATED_ENV")
+	normalized := strings.ToLower(strings.TrimSpace(raw))
+	if declared && normalized == "true" {
+		value := true
+		return &value, EvidenceCheck{Name: "traffic isolation", Status: "PASS", Source: "env:PERF_ISOLATED_ENV"}
+	}
+	if declared && normalized != "" {
+		value := false
+		return &value, EvidenceCheck{Name: "traffic isolation", Status: "MISSING", Source: "env:PERF_ISOLATED_ENV", Message: "concurrent business traffic cannot be isolated; completed TPS is not admission evidence"}
+	}
+	return nil, EvidenceCheck{Name: "traffic isolation", Status: "MISSING", Source: "env:PERF_ISOLATED_ENV", Message: "traffic isolation was not declared; set PERF_ISOLATED_ENV=true only for a controlled window"}
+}
+
+func prometheusObservationWindow(startDir, startLabel, endDir, endLabel string) (float64, bool) {
+	var earliest time.Time
+	var latest time.Time
+	for _, component := range []string{"collection", "apiserver", "worker"} {
+		startPath := filepath.Join(startDir, fmt.Sprintf("%s-%s-metrics.txt", startLabel, component))
+		endPath := filepath.Join(endDir, fmt.Sprintf("%s-%s-metrics.txt", endLabel, component))
+		if !metricFileContains(startPath, "qs_interpretation_run_duration_seconds_count") || !metricFileContains(endPath, "qs_interpretation_run_duration_seconds_count") {
+			continue
+		}
+		startInfo, startErr := os.Stat(startPath)
+		endInfo, endErr := os.Stat(endPath)
+		if startErr != nil || endErr != nil {
+			continue
+		}
+		if earliest.IsZero() || startInfo.ModTime().Before(earliest) {
+			earliest = startInfo.ModTime()
+		}
+		if latest.IsZero() || endInfo.ModTime().After(latest) {
+			latest = endInfo.ModTime()
+		}
+	}
+	if earliest.IsZero() || latest.IsZero() || !latest.After(earliest) {
+		return 0, false
+	}
+	return latest.Sub(earliest).Seconds(), true
+}
+
+func metricFileContains(path, name string) bool {
+	samples, err := parsePrometheusFile(path)
+	if err != nil {
+		return false
+	}
+	for _, sample := range samples {
+		if sample.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func interpretationDeltas(before, after []metricSample) (*float64, *float64, map[string]float64, bool) {
@@ -312,35 +365,68 @@ func readNSQDepth(path string) (float64, bool) {
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		return 0, false
 	}
-	total, count := sumJSONKey(payload, "depth")
-	return total, count > 0
+	topics := nsqTopics(payload)
+	if len(topics) == 0 {
+		return 0, false
+	}
+	allowed := configuredNSQTopics()
+	total := 0.0
+	matched := 0
+	for _, value := range topics {
+		topic, ok := value.(map[string]any)
+		if !ok {
+			continue
+		}
+		name, _ := topic["topic_name"].(string)
+		if name == "" {
+			name, _ = topic["name"].(string)
+		}
+		if len(allowed) > 0 {
+			if _, ok := allowed[name]; !ok {
+				continue
+			}
+		}
+		matched++
+		channels, _ := topic["channels"].([]any)
+		if len(channels) == 0 {
+			total += jsonNumber(topic["depth"])
+			continue
+		}
+		for _, channelValue := range channels {
+			channel, _ := channelValue.(map[string]any)
+			total += jsonNumber(channel["depth"])
+		}
+	}
+	return total, matched > 0
 }
 
-func sumJSONKey(value any, key string) (float64, int) {
-	switch typed := value.(type) {
-	case map[string]any:
-		total, count := 0.0, 0
-		for childKey, childValue := range typed {
-			if childKey == key {
-				if number, ok := childValue.(float64); ok {
-					total += number
-					count++
-				}
-			}
-			childTotal, childCount := sumJSONKey(childValue, key)
-			total, count = total+childTotal, count+childCount
-		}
-		return total, count
-	case []any:
-		total, count := 0.0, 0
-		for _, child := range typed {
-			childTotal, childCount := sumJSONKey(child, key)
-			total, count = total+childTotal, count+childCount
-		}
-		return total, count
-	default:
-		return 0, 0
+func nsqTopics(payload any) []any {
+	root, ok := payload.(map[string]any)
+	if !ok {
+		return nil
 	}
+	if topics, ok := root["topics"].([]any); ok {
+		return topics
+	}
+	data, _ := root["data"].(map[string]any)
+	topics, _ := data["topics"].([]any)
+	return topics
+}
+
+func configuredNSQTopics() map[string]struct{} {
+	result := map[string]struct{}{}
+	for _, value := range strings.Split(os.Getenv("PERF_NSQ_TOPICS"), ",") {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			result[value] = struct{}{}
+		}
+	}
+	return result
+}
+
+func jsonNumber(value any) float64 {
+	number, _ := value.(float64)
+	return number
 }
 
 func nonNegativeDelta(before, after float64) float64 {

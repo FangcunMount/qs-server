@@ -10,29 +10,34 @@ import (
 
 func TestPhaseReportIncludesThreeDimensions(t *testing.T) {
 	raw := rawSummary{Metrics: map[string]map[string]any{
-		"iterations":                         {"count": float64(100), "rate": float64(10)},
-		"http_reqs":                          {"count": float64(120), "rate": float64(12)},
-		"dropped_iterations":                 {"count": float64(0), "rate": float64(0), "thresholds": map[string]any{"count==0": false}},
-		"answer_submit_accepted":             {"count": float64(100), "rate": float64(10)},
-		"medical_answer_submit_success_rate": {"passes": float64(99), "fails": float64(1), "value": float64(0.99)},
-		"medical_answer_submit_duration":     {"med": float64(20), "p(95)": float64(40), "p(99)": float64(70), "max": float64(90), "avg": float64(25)},
-		"answer_submit_timeout":              {"count": float64(1), "rate": float64(0.1)},
-		"http_timeout_total":                 {"count": float64(1), "rate": float64(0.1)},
+		"iterations":                                {"count": float64(100), "rate": float64(10)},
+		"http_reqs":                                 {"count": float64(120), "rate": float64(12)},
+		"dropped_iterations":                        {"count": float64(0), "rate": float64(0), "thresholds": map[string]any{"count==0": false}},
+		"answer_submit_accepted":                    {"count": float64(100), "rate": float64(10)},
+		"chain_probe_accepted":                      {"count": float64(10), "rate": float64(1)},
+		"medical_answer_submit_success_rate":        {"passes": float64(99), "fails": float64(1), "value": float64(0.99)},
+		"medical_answer_submit_duration":            {"med": float64(20), "p(95)": float64(40), "p(99)": float64(70), "max": float64(90), "avg": float64(25)},
+		"answer_submit_timeout":                     {"count": float64(1), "rate": float64(0.1)},
+		"answer_submit_timeout{model_type:medical}": {"count": float64(1), "rate": float64(0.1)},
+		"http_timeout_total":                        {"count": float64(1), "rate": float64(0.1)},
 	}}
 	completed := 100.0
-	evidence := PhaseEvidence{Complete: true, CompletedCountDelta: &completed, CompletedCountDeltaByModel: map[string]float64{"medical": 100}}
+	evidence := PhaseEvidence{
+		Complete: true, CompletionWindow: measured(floatPtr(20), "seconds", "test"),
+		CompletedCountDelta: &completed, CompletedCountDeltaByModel: map[string]float64{"medical": 100},
+	}
 	spec := phaseSpec{ID: "test", Profile: "test", TargetQPS: 10, Duration: "10s", ThresholdTier: "none"}
 	phase := buildPhaseSummary(spec, map[string]float64{"medicalSubmit": 10}, raw, evidence, time.Now(), time.Now(), 0)
-	if phase.Throughput.AcceptedTPS.Value == nil || *phase.Throughput.AcceptedTPS.Value != 10 {
+	if phase.Throughput.AcceptedTPS.Value == nil || *phase.Throughput.AcceptedTPS.Value != 11 {
 		t.Fatalf("accepted TPS = %#v", phase.Throughput.AcceptedTPS)
 	}
-	if phase.Throughput.CompletedTPS.Value == nil || *phase.Throughput.CompletedTPS.Value != 10 {
+	if phase.Throughput.CompletedTPS.Value == nil || *phase.Throughput.CompletedTPS.Value != 5 {
 		t.Fatalf("completed TPS = %#v", phase.Throughput.CompletedTPS)
 	}
 	if value := phase.Throughput.AcceptedTPSByModel["medical"].Value; value == nil || *value != 9.9 {
 		t.Fatalf("medical accepted TPS = %#v", phase.Throughput.AcceptedTPSByModel)
 	}
-	if value := phase.Throughput.CompletedTPSByModel["medical"].Value; value == nil || *value != 10 {
+	if value := phase.Throughput.CompletedTPSByModel["medical"].Value; value == nil || *value != 5 {
 		t.Fatalf("medical completed TPS = %#v", phase.Throughput.CompletedTPSByModel)
 	}
 	if len(phase.Latency) != 1 || phase.Latency[0].P50.Value == nil || *phase.Latency[0].P50.Value != 20 || *phase.Latency[0].Max.Value != 90 {
@@ -126,5 +131,34 @@ func TestMissingDroppedIterationsMetricMeansZeroWhenIterationsExist(t *testing.T
 	}
 	if phase.Verdict.Status != VerdictPass {
 		t.Fatalf("verdict = %#v, want PASS", phase.Verdict)
+	}
+}
+
+func TestOperationResultsIncludeGlobalHTTPTimeoutAndErrorRates(t *testing.T) {
+	raw := rawSummary{Metrics: map[string]map[string]any{
+		"http_reqs":          {"count": float64(100), "rate": float64(10)},
+		"http_req_failed":    {"passes": float64(2), "fails": float64(98), "value": float64(0.02)},
+		"http_timeout_total": {"count": float64(1)},
+	}}
+
+	_, correctness := operationResults(map[string]float64{}, raw)
+	if len(correctness) != 1 || correctness[0].Operation != "global_http" {
+		t.Fatalf("correctness = %#v, want global_http", correctness)
+	}
+	global := correctness[0]
+	if global.SuccessRate.Value == nil || *global.SuccessRate.Value != 0.98 || global.ErrorRate.Value == nil || *global.ErrorRate.Value != 0.02 {
+		t.Fatalf("global correctness = %#v", global)
+	}
+	if global.TimeoutCount == nil || *global.TimeoutCount != 1 || global.TimeoutRate.Value == nil || *global.TimeoutRate.Value != 0.01 {
+		t.Fatalf("global timeout = %#v", global)
+	}
+}
+
+func TestTaggedMetricLookupDoesNotFallbackToGlobalMetric(t *testing.T) {
+	raw := rawSummary{Metrics: map[string]map[string]any{
+		"report_ws_message_success_rate": {"passes": float64(100), "fails": float64(0), "value": float64(1)},
+	}}
+	if metric := findMetric(raw, "report_ws_message_success_rate", []string{"model_type:medical"}); metric != nil {
+		t.Fatalf("tagged metric = %#v, want nil when the tagged evidence is missing", metric)
 	}
 }

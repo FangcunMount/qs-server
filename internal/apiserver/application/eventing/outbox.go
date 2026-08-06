@@ -43,6 +43,7 @@ type outboxRelay struct {
 	retryDelay     time.Duration
 	readyIndex     ReadyIndex
 	readyBuckets   []string
+	attemptTracker *OutboxAttemptTracker
 }
 
 type relayPublishResult struct {
@@ -63,6 +64,7 @@ type OutboxRelayOptions struct {
 	RequireDurablePublisher bool
 	ReadyIndex              ReadyIndex
 	ReadyBuckets            []string
+	AttemptTracker          *OutboxAttemptTracker
 }
 
 func NewOutboxRelayWithOptions(opts OutboxRelayOptions) OutboxRelay {
@@ -98,6 +100,7 @@ func NewOutboxRelayWithOptions(opts OutboxRelayOptions) OutboxRelay {
 		retryDelay:     opts.RetryDelay,
 		readyIndex:     opts.ReadyIndex,
 		readyBuckets:   append([]string(nil), opts.ReadyBuckets...),
+		attemptTracker: opts.AttemptTracker,
 	}
 }
 
@@ -427,6 +430,13 @@ func (r *outboxRelay) observeAttempt(ctx context.Context, topicName string, pend
 	}
 	r.observer.ObserveOutbox(ctx, eventobservability.OutboxEvent{
 		Relay: r.name, Topic: topicName, EventType: eventTypeOf(pending), Outcome: outcome,
-		AttemptClass: retryobservability.AttemptClassForAttempt(pending.AttemptCount + 1),
+		AttemptClass: relayAttemptClass(pending, r.attemptTracker),
 	})
+}
+
+func relayAttemptClass(pending outboxport.PendingEvent, tracker *OutboxAttemptTracker) string {
+	if pending.AttemptCount <= 0 && tracker.Consume(pending.EventID) {
+		return retryobservability.AttemptRetry
+	}
+	return retryobservability.AttemptClassForAttempt(pending.AttemptCount + 1)
 }

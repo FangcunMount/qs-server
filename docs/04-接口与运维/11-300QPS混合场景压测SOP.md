@@ -51,9 +51,13 @@ export WORKER_METRICS_URL=http://worker-host/metrics
 export WORKER_READYZ_URL=http://worker-host/readyz
 export NSQD_STATS_URL=http://nsqd-host:4151/stats?format=json
 export PERF_ISOLATED_ENV=true
+# 共享 NSQD 时建议限定本次链路涉及的 topic
+# export PERF_NSQ_TOPICS='<topic-a>,<topic-b>'
 ```
 
-只有确认窗口内的完成量可归因于本次压测时，才设置 `PERF_ISOLATED_ENV=true`；显式设为其他值会把证据标记为 `INCOMPLETE`。
+只有确认窗口内的完成量可归因于本次压测时，才设置 `PERF_ISOLATED_ENV=true`；未设置或显式设为其他值都会把证据标记为 `INCOMPLETE`。完成 TPS 使用阶段前后 Interpretation Prometheus 计数增量，并以这两次指标快照的实际时间窗为分母，不以配置中的计划时长代替服务端观测窗口。
+
+NSQD depth 按 channel 待消费工作求和；topic 没有 channel 时才使用 topic depth，避免重复累计。共享 NSQD 必须通过 `PERF_NSQ_TOPICS` 限定可解释的 topic 范围，配置后没有匹配 topic 会视为证据缺失。
 
 恢复门默认最多等待 5 分钟、每 10 秒检查一次。确有环境依据时可设置：
 
@@ -191,6 +195,8 @@ make perf-run PLAN=diagnose CASE=submit-coalescing-healthy
 - 环境混有无法隔离的业务流量，完成 TPS 无法归因。
 
 重试率本版不做硬门禁。至少积累三次相同环境、相同计划的有效 admission 结果后，再单独评审阈值。
+
+进入 300 时会再次核对 smoke、60、120、200、240、280 六个前置阶段；任一阶段不是 `PASS` 或没有实际执行，即使 280 后的即时恢复快照已经健康，也不得执行 300。
 
 ## 五、报告与归档
 

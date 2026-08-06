@@ -162,7 +162,7 @@ func TestPerfThresholdTiersAndOperationMetrics(t *testing.T) {
 			path: "scripts/perf/perfctl/types.go",
 			wants: []string{
 				"qs-perf-report/v1", "accepted_tps_by_model", "completed_tps_by_model",
-				"p50", "p95", "p99", "max", "success_rate", "error_rate", "timeout_rate",
+				"completion_window", "p50", "p95", "p99", "max", "success_rate", "error_rate", "timeout_rate",
 			},
 		},
 		{

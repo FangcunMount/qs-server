@@ -106,11 +106,20 @@ func execute(ctx context.Context, opts runOptions) (RunSummary, int, error) {
 	baselineEvidence := collectPhaseEvidence(rootEvidenceDir)
 	rawByPhase := map[string]any{}
 	stop := false
-	for _, spec := range phases {
+	for phaseIndex, spec := range phases {
 		if stop {
 			break
 		}
 		if spec.ID == "admission_300" {
+			prerequisite := admissionPrerequisiteVerdict(phases[:phaseIndex], summary.Phases)
+			if prerequisite.Status != VerdictPass {
+				now := time.Now()
+				summary.Recovery = append(summary.Recovery, RecoverySummary{
+					ID: "pre-admission-300", Verdict: prerequisite, StartedAt: now, FinishedAt: now,
+				})
+				fmt.Fprintf(opts.Stdout, "\nadmission_300 skipped: %s\n", strings.Join(prerequisite.Reasons, "; "))
+				break
+			}
 			recovery := waitForRecovery(ctx, opts, runDir, "pre-admission-300", baselineEvidence, filepath.Join(runDir, "capacity_280"))
 			summary.Recovery = append(summary.Recovery, recovery)
 			if recovery.Verdict.Status != VerdictPass {
@@ -177,6 +186,32 @@ func execute(ctx context.Context, opts runOptions) (RunSummary, int, error) {
 	}
 	fmt.Fprintf(opts.Stdout, "\nK6 admission result: %s\nreport: %s\n", summary.Verdict.Status, filepath.Join(runDir, "report.md"))
 	return summary, exitCodeForVerdict(summary.Verdict.Status), nil
+}
+
+func admissionPrerequisiteVerdict(expected []phaseSpec, actual []PhaseSummary) Verdict {
+	byID := make(map[string]PhaseSummary, len(actual))
+	for _, phase := range actual {
+		byID[phase.ID] = phase
+	}
+	status := VerdictPass
+	reasons := make([]string, 0)
+	for _, spec := range expected {
+		phase, found := byID[spec.ID]
+		if !found {
+			status = worseVerdict(status, VerdictIncomplete)
+			reasons = append(reasons, spec.ID+" was not executed")
+			continue
+		}
+		if phase.Verdict.Status == VerdictPass {
+			continue
+		}
+		status = worseVerdict(status, phase.Verdict.Status)
+		reasons = append(reasons, fmt.Sprintf("%s verdict is %s", spec.ID, phase.Verdict.Status))
+	}
+	if len(reasons) == 0 {
+		return Verdict{Status: VerdictPass, Reasons: []string{"all pre-admission phases passed"}}
+	}
+	return Verdict{Status: status, Reasons: uniqueStrings(reasons)}
 }
 
 func finishSetupError(opts runOptions, runDir, runID, gitSHA string, gitDirty bool, startedAt time.Time, configFile, environment, k6Version string, cause error) (RunSummary, int, error) {
@@ -317,6 +352,12 @@ func waitForRecovery(ctx context.Context, opts runOptions, runDir, id string, ba
 				current.CompletedCountDelta = completed
 				current.FailedCountDelta = failed
 				current.CompletedCountDeltaByModel = byModel
+				if seconds, windowOK := prometheusObservationWindow(drainStartDir, "after", attemptDir, "after"); windowOK {
+					current.CompletionWindow = measured(&seconds, "seconds", "prometheus:snapshot_file_mtime")
+				} else {
+					current.Complete = false
+					current.Checks = append(current.Checks, EvidenceCheck{Name: "drain completion observation window", Status: "MISSING", Source: "after/after Prometheus snapshot timestamps", Message: "cannot calculate drain-window duration"})
+				}
 			} else {
 				current.Complete = false
 				current.Checks = append(current.Checks, EvidenceCheck{Name: "drain completion metric", Status: "MISSING", Source: "qs_interpretation_run_duration_seconds_count", Message: "cannot calculate drain-window completion delta"})

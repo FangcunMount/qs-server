@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestParsePrometheusAndRetryRateCanExceedOne(t *testing.T) {
@@ -83,5 +85,86 @@ func TestEvidenceClassificationSeparatesUnhealthyFromMissing(t *testing.T) {
 	missing := PhaseEvidence{Checks: []EvidenceCheck{{Name: "worker metrics", Status: "MISSING"}}}
 	if verdict := classifyEvidence(missing, "service evidence"); verdict.Status != VerdictIncomplete {
 		t.Fatalf("missing verdict = %#v, want INCOMPLETE", verdict)
+	}
+}
+
+func TestTrafficIsolationEvidenceIsFailClosed(t *testing.T) {
+	t.Setenv("PERF_ISOLATED_ENV", "")
+	isolated, check := trafficIsolationEvidence()
+	if isolated != nil || check.Status != "MISSING" {
+		t.Fatalf("isolation = %v, check = %#v, want unknown/MISSING", isolated, check)
+	}
+
+	t.Setenv("PERF_ISOLATED_ENV", "true")
+	isolated, check = trafficIsolationEvidence()
+	if isolated == nil || !*isolated || check.Status != "PASS" {
+		t.Fatalf("isolation = %v, check = %#v, want true/PASS", isolated, check)
+	}
+}
+
+func TestPrometheusObservationWindowUsesMetricCaptureTimes(t *testing.T) {
+	dir := t.TempDir()
+	before := filepath.Join(dir, "before-apiserver-metrics.txt")
+	after := filepath.Join(dir, "after-apiserver-metrics.txt")
+	metric := []byte("qs_interpretation_run_duration_seconds_count{result=\"success\"} 1\n")
+	if err := os.WriteFile(before, metric, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(after, metric, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	started := time.Unix(1_700_000_000, 0)
+	if err := os.Chtimes(before, started, started); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(after, started.Add(12*time.Second), started.Add(12*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+
+	window, ok := prometheusObservationWindow(dir, "before", dir, "after")
+	if !ok || window != 12 {
+		t.Fatalf("window = %v, %v, want 12s", window, ok)
+	}
+}
+
+func TestNSQDepthUsesChannelWorkWithoutDoubleCountingTopicDepth(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "nsqd.json")
+	payload := map[string]any{"topics": []any{
+		map[string]any{
+			"topic_name": "assessment-events", "depth": 10.0,
+			"channels": []any{
+				map[string]any{"channel_name": "worker", "depth": 3.0},
+				map[string]any{"channel_name": "projection", "depth": 2.0},
+			},
+		},
+		map[string]any{"topic_name": "unbound-events", "depth": 4.0, "channels": []any{}},
+	}}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	depth, ok := readNSQDepth(path)
+	if !ok || depth != 9 {
+		t.Fatalf("depth = %v, %v, want channel depths 3+2 plus unbound topic depth 4", depth, ok)
+	}
+}
+
+func TestNSQDepthCanBeScopedToPerfTopics(t *testing.T) {
+	t.Setenv("PERF_NSQ_TOPICS", "assessment-events")
+	dir := t.TempDir()
+	path := filepath.Join(dir, "nsqd.json")
+	payload := `{"topics":[{"topic_name":"assessment-events","depth":2,"channels":[]},{"topic_name":"other","depth":7,"channels":[]}]}`
+	if err := os.WriteFile(path, []byte(payload), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	depth, ok := readNSQDepth(path)
+	if !ok || depth != 2 {
+		t.Fatalf("depth = %v, %v, want scoped depth 2", depth, ok)
 	}
 }

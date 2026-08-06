@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -51,5 +52,36 @@ func TestInvalidPlanStillWritesErrorArtifacts(t *testing.T) {
 		if _, statErr := os.Stat(filepath.Join(runDir, name)); statErr != nil {
 			t.Fatalf("%s was not written: %v", name, statErr)
 		}
+	}
+}
+
+func TestAdmissionPrerequisitesRequireEveryPriorPhaseToPass(t *testing.T) {
+	expected := []phaseSpec{
+		{ID: "smoke"},
+		{ID: "experience_60"},
+		{ID: "capacity_120"},
+	}
+	actual := []PhaseSummary{
+		{ID: "smoke", Verdict: Verdict{Status: VerdictPass}},
+		{ID: "experience_60", Verdict: Verdict{Status: VerdictIncomplete}},
+		{ID: "capacity_120", Verdict: Verdict{Status: VerdictPass}},
+	}
+
+	verdict := admissionPrerequisiteVerdict(expected, actual)
+	if verdict.Status != VerdictIncomplete {
+		t.Fatalf("verdict = %#v, want INCOMPLETE", verdict)
+	}
+	if !strings.Contains(strings.Join(verdict.Reasons, "\n"), "experience_60") {
+		t.Fatalf("reasons = %#v, want incomplete phase id", verdict.Reasons)
+	}
+}
+
+func TestAdmissionPrerequisitesRejectMissingPhase(t *testing.T) {
+	expected := []phaseSpec{{ID: "smoke"}, {ID: "capacity_280"}}
+	actual := []PhaseSummary{{ID: "smoke", Verdict: Verdict{Status: VerdictPass}}}
+
+	verdict := admissionPrerequisiteVerdict(expected, actual)
+	if verdict.Status != VerdictIncomplete {
+		t.Fatalf("verdict = %#v, want INCOMPLETE", verdict)
 	}
 }

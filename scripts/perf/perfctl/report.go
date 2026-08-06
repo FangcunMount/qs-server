@@ -18,27 +18,29 @@ type operationSpec struct {
 	SuccessMetric string
 	ErrorMetric   string
 	TimeoutMetric string
-	Tags          []string
+	TrendTags     []string
+	ResultTags    []string
+	TimeoutTags   []string
 }
 
 var operationSpecs = []operationSpec{
-	{ID: "catalog_query", QPSKey: "query", TrendMetric: "questionnaire_query_duration", ErrorMetric: "http_req_failed", TimeoutMetric: "questionnaire_query_timeout", Tags: []string{"endpoint:questionnaire_query"}},
-	{ID: "medical_model_query", QPSKey: "medicalQuery", TrendMetric: "medical_model_query_duration", ErrorMetric: "http_req_failed", TimeoutMetric: "medical_model_query_timeout", Tags: []string{"endpoint:medical_model_query"}},
-	{ID: "personality_model_query", QPSKey: "personalityQuery", TrendMetric: "personality_model_query_duration", ErrorMetric: "http_req_failed", TimeoutMetric: "personality_model_query_timeout", Tags: []string{"endpoint:personality_model_query"}},
-	{ID: "questionnaire_query", QPSKey: "questionnaireQuery", TrendMetric: "questionnaire_query_duration", ErrorMetric: "http_req_failed", TimeoutMetric: "questionnaire_query_timeout", Tags: []string{"endpoint:questionnaire_query"}},
-	{ID: "personality_questionnaire_query", QPSKey: "personalityQuestionnaireQuery", TrendMetric: "personality_questionnaire_query_duration", ErrorMetric: "http_req_failed", TimeoutMetric: "personality_questionnaire_query_timeout", Tags: []string{"endpoint:personality_questionnaire_query"}},
-	{ID: "personality_session", QPSKey: "personalitySession", TrendMetric: "personality_session_duration", ErrorMetric: "http_req_failed", TimeoutMetric: "personality_session_timeout", Tags: []string{"endpoint:personality_session"}},
+	{ID: "catalog_query", QPSKey: "query", TrendMetric: "questionnaire_query_duration", ErrorMetric: "http_req_failed", TimeoutMetric: "questionnaire_query_timeout", ResultTags: []string{"endpoint:questionnaire_query"}},
+	{ID: "medical_model_query", QPSKey: "medicalQuery", TrendMetric: "medical_model_query_duration", ErrorMetric: "http_req_failed", TimeoutMetric: "medical_model_query_timeout", ResultTags: []string{"endpoint:medical_model_query"}},
+	{ID: "personality_model_query", QPSKey: "personalityQuery", TrendMetric: "personality_model_query_duration", ErrorMetric: "http_req_failed", TimeoutMetric: "personality_model_query_timeout", ResultTags: []string{"endpoint:personality_model_query"}},
+	{ID: "questionnaire_query", QPSKey: "questionnaireQuery", TrendMetric: "questionnaire_query_duration", ErrorMetric: "http_req_failed", TimeoutMetric: "questionnaire_query_timeout", ResultTags: []string{"endpoint:questionnaire_query"}},
+	{ID: "personality_questionnaire_query", QPSKey: "personalityQuestionnaireQuery", TrendMetric: "personality_questionnaire_query_duration", ErrorMetric: "http_req_failed", TimeoutMetric: "personality_questionnaire_query_timeout", ResultTags: []string{"endpoint:personality_questionnaire_query"}},
+	{ID: "personality_session", QPSKey: "personalitySession", TrendMetric: "personality_session_duration", ErrorMetric: "http_req_failed", TimeoutMetric: "personality_session_timeout", ResultTags: []string{"endpoint:personality_session"}},
 	{ID: "answersheet_submit", QPSKey: "submit", TrendMetric: "answer_submit_duration", SuccessMetric: "answer_submit_success_rate", TimeoutMetric: "answer_submit_timeout"},
-	{ID: "medical_submit", QPSKey: "medicalSubmit", TrendMetric: "medical_answer_submit_duration", SuccessMetric: "medical_answer_submit_success_rate", TimeoutMetric: "answer_submit_timeout", Tags: []string{"model_type:medical"}},
-	{ID: "personality_submit", QPSKey: "personalitySubmit", TrendMetric: "personality_answer_submit_duration", SuccessMetric: "personality_answer_submit_success_rate", TimeoutMetric: "answer_submit_timeout", Tags: []string{"model_type:personality"}},
+	{ID: "medical_submit", QPSKey: "medicalSubmit", TrendMetric: "medical_answer_submit_duration", SuccessMetric: "medical_answer_submit_success_rate", TimeoutMetric: "answer_submit_timeout", TimeoutTags: []string{"model_type:medical"}},
+	{ID: "personality_submit", QPSKey: "personalitySubmit", TrendMetric: "personality_answer_submit_duration", SuccessMetric: "personality_answer_submit_success_rate", TimeoutMetric: "answer_submit_timeout", TimeoutTags: []string{"model_type:personality"}},
 	{ID: "report_ws_connect", QPSKey: "report", TrendMetric: "report_ws_connect_duration", SuccessMetric: "report_ws_connect_success_rate", TimeoutMetric: "report_ws_timeout_total"},
 	{ID: "report_ws_message", QPSKey: "report", TrendMetric: "report_ws_first_message_latency", SuccessMetric: "report_ws_message_success_rate", TimeoutMetric: "report_ws_timeout_total"},
-	{ID: "medical_report_ws_connect", QPSKey: "medicalWaitReport", TrendMetric: "report_ws_connect_duration", SuccessMetric: "report_ws_connect_success_rate", TimeoutMetric: "report_ws_timeout_total", Tags: []string{"model_type:medical"}},
-	{ID: "medical_report_ws_message", QPSKey: "medicalWaitReport", TrendMetric: "report_ws_first_message_latency", SuccessMetric: "report_ws_message_success_rate", TimeoutMetric: "report_ws_timeout_total", Tags: []string{"model_type:medical"}},
-	{ID: "behavior_report_ws_connect", QPSKey: "behaviorWaitReport", TrendMetric: "report_ws_connect_duration", SuccessMetric: "report_ws_connect_success_rate", TimeoutMetric: "report_ws_timeout_total", Tags: []string{"model_type:behavior"}},
-	{ID: "behavior_report_ws_message", QPSKey: "behaviorWaitReport", TrendMetric: "report_ws_first_message_latency", SuccessMetric: "report_ws_message_success_rate", TimeoutMetric: "report_ws_timeout_total", Tags: []string{"model_type:behavior"}},
-	{ID: "personality_report_ws_connect", QPSKey: "personalityWaitReport", TrendMetric: "report_ws_connect_duration", SuccessMetric: "report_ws_connect_success_rate", TimeoutMetric: "report_ws_timeout_total", Tags: []string{"model_type:personality"}},
-	{ID: "personality_report_ws_message", QPSKey: "personalityWaitReport", TrendMetric: "report_ws_first_message_latency", SuccessMetric: "report_ws_message_success_rate", TimeoutMetric: "report_ws_timeout_total", Tags: []string{"model_type:personality"}},
+	{ID: "medical_report_ws_connect", QPSKey: "medicalWaitReport", TrendMetric: "report_ws_connect_duration", SuccessMetric: "report_ws_connect_success_rate", TimeoutMetric: "report_ws_timeout_total", TrendTags: []string{"model_type:medical"}, ResultTags: []string{"model_type:medical"}, TimeoutTags: []string{"model_type:medical"}},
+	{ID: "medical_report_ws_message", QPSKey: "medicalWaitReport", TrendMetric: "report_ws_first_message_latency", SuccessMetric: "report_ws_message_success_rate", TimeoutMetric: "report_ws_timeout_total", TrendTags: []string{"model_type:medical"}, ResultTags: []string{"model_type:medical"}, TimeoutTags: []string{"model_type:medical"}},
+	{ID: "behavior_report_ws_connect", QPSKey: "behaviorWaitReport", TrendMetric: "report_ws_connect_duration", SuccessMetric: "report_ws_connect_success_rate", TimeoutMetric: "report_ws_timeout_total", TrendTags: []string{"model_type:behavior"}, ResultTags: []string{"model_type:behavior"}, TimeoutTags: []string{"model_type:behavior"}},
+	{ID: "behavior_report_ws_message", QPSKey: "behaviorWaitReport", TrendMetric: "report_ws_first_message_latency", SuccessMetric: "report_ws_message_success_rate", TimeoutMetric: "report_ws_timeout_total", TrendTags: []string{"model_type:behavior"}, ResultTags: []string{"model_type:behavior"}, TimeoutTags: []string{"model_type:behavior"}},
+	{ID: "personality_report_ws_connect", QPSKey: "personalityWaitReport", TrendMetric: "report_ws_connect_duration", SuccessMetric: "report_ws_connect_success_rate", TimeoutMetric: "report_ws_timeout_total", TrendTags: []string{"model_type:personality"}, ResultTags: []string{"model_type:personality"}, TimeoutTags: []string{"model_type:personality"}},
+	{ID: "personality_report_ws_message", QPSKey: "personalityWaitReport", TrendMetric: "report_ws_first_message_latency", SuccessMetric: "report_ws_message_success_rate", TimeoutMetric: "report_ws_timeout_total", TrendTags: []string{"model_type:personality"}, ResultTags: []string{"model_type:personality"}, TimeoutTags: []string{"model_type:personality"}},
 	{ID: "statistics_overview", QPSKey: "stats", TrendMetric: "statistics_overview_duration", SuccessMetric: "statistics_overview_success_rate", TimeoutMetric: "statistics_overview_timeout"},
 	{ID: "statistics_content_batch", QPSKey: "stats", TrendMetric: "statistics_content_batch_duration", SuccessMetric: "statistics_content_batch_success_rate", TimeoutMetric: "statistics_content_batch_timeout"},
 }
@@ -84,17 +86,22 @@ func buildPhaseSummary(spec phaseSpec, qps map[string]float64, raw rawSummary, e
 }
 
 func throughputResults(spec phaseSpec, raw rawSummary, evidence PhaseEvidence) Throughput {
-	seconds := durationSeconds(spec.Duration)
 	iterations := findMetric(raw, "iterations", nil)
+	loadWindowSeconds := metricWindowSeconds(iterations)
 	httpReqs := findMetric(raw, "http_reqs", nil)
 	wsSessions := findMetric(raw, "ws_sessions", nil)
 	accepted := findMetric(raw, "answer_submit_accepted", nil)
+	chainAccepted := findMetric(raw, "chain_probe_accepted", nil)
 	chainStarted := findMetric(raw, "chain_probe_started", nil)
 	chainPolls := findMetric(raw, "chain_probe_poll_requests", nil)
 	dropped := findMetric(raw, "dropped_iterations", nil)
 	actualQPS := metricNumberPtr(iterations, "rate")
 	httpRPS := metricNumberPtr(httpReqs, "rate")
-	acceptedTPS := metricNumberPtr(accepted, "rate")
+	acceptedCount := metricInt64(accepted, "count") + metricInt64(chainAccepted, "count")
+	var acceptedTPS *float64
+	if loadWindowSeconds > 0 {
+		acceptedTPS = floatPtr(float64(acceptedCount) / loadWindowSeconds)
+	}
 	droppedCount := metricNumberPtr(dropped, "count")
 	droppedNote := ""
 	if droppedCount == nil && iterations != nil {
@@ -110,15 +117,15 @@ func throughputResults(spec phaseSpec, raw rawSummary, evidence PhaseEvidence) T
 		},
 		HTTPRPS:             Measurement{Value: httpRPS, Unit: "rps", Samples: metricInt64(httpReqs, "count"), Source: "k6:http_reqs"},
 		WSSessionsPerSecond: Measurement{Value: metricNumberPtr(wsSessions, "rate"), Unit: "sessions/s", Samples: metricInt64(wsSessions, "count"), Source: "k6:ws_sessions"},
-		AcceptedTPS:         Measurement{Value: acceptedTPS, Unit: "tps", Samples: metricInt64(accepted, "count"), Source: "k6:answer_submit_accepted"},
+		AcceptedTPS:         Measurement{Value: acceptedTPS, Unit: "tps", Samples: acceptedCount, Source: "derived:(answer_submit_accepted+chain_probe_accepted)/k6_metric_window"},
 		AcceptedTPSByModel:  map[string]Measurement{},
 		CompletedTPSByModel: map[string]Measurement{},
 	}
 	for _, model := range []string{"medical", "personality"} {
 		metric := findMetric(raw, model+"_answer_submit_success_rate", nil)
-		acceptedCount := metricInt64(metric, "passes")
-		if metric != nil && seconds > 0 {
-			result.AcceptedTPSByModel[model] = Measurement{Value: floatPtr(float64(acceptedCount) / seconds), Unit: "tps", Samples: acceptedCount, Source: "k6:" + model + "_answer_submit_success_rate.passes"}
+		modelAcceptedCount := metricInt64(metric, "passes")
+		if metric != nil && loadWindowSeconds > 0 {
+			result.AcceptedTPSByModel[model] = Measurement{Value: floatPtr(float64(modelAcceptedCount) / loadWindowSeconds), Unit: "tps", Samples: modelAcceptedCount, Source: "k6:" + model + "_answer_submit_success_rate.passes"}
 		} else {
 			result.AcceptedTPSByModel[model] = naMeasurement("tps", "k6:"+model+"_answer_submit_success_rate.passes", "model submit evidence unavailable")
 		}
@@ -140,25 +147,38 @@ func throughputResults(spec phaseSpec, raw rawSummary, evidence PhaseEvidence) T
 	} else {
 		result.PollingAmplification = naMeasurement("ratio", "derived:chain_probe_poll_requests/chain_probe_started", "chain probe is inactive")
 	}
-	if evidence.CompletedCountDelta != nil && seconds > 0 {
-		result.CompletedTPS = measured(floatPtr(*evidence.CompletedCountDelta/seconds), "tps", "prometheus:qs_interpretation_run_duration_seconds_count")
-		if evidence.TrafficIsolated != nil && !*evidence.TrafficIsolated {
+	completionWindowSeconds := 0.0
+	if evidence.CompletionWindow.Value != nil {
+		completionWindowSeconds = *evidence.CompletionWindow.Value
+	}
+	if evidence.CompletedCountDelta != nil && completionWindowSeconds > 0 {
+		result.CompletedTPS = Measurement{
+			Value: floatPtr(*evidence.CompletedCountDelta / completionWindowSeconds), Unit: "tps",
+			Samples: int64(math.Round(*evidence.CompletedCountDelta)), Source: "prometheus:qs_interpretation_run_duration_seconds_count/snapshot_window",
+		}
+		if evidence.TrafficIsolated == nil {
+			result.CompletedTPS.Note = "traffic isolation was not declared; not valid admission evidence"
+		} else if !*evidence.TrafficIsolated {
 			result.CompletedTPS.Note = "contains non-isolated concurrent traffic; not valid admission evidence"
 		}
 	} else {
 		result.CompletedTPS = naMeasurement("tps", "prometheus:qs_interpretation_run_duration_seconds_count", "server completion evidence unavailable")
 	}
 	for _, model := range []string{"medical", "personality", "behavior"} {
-		if count, ok := evidence.CompletedCountDeltaByModel[model]; ok && seconds > 0 {
-			result.CompletedTPSByModel[model] = measured(floatPtr(count/seconds), "tps", "prometheus:qs_interpretation_run_duration_seconds_count{builder_identity}")
+		if count, ok := evidence.CompletedCountDeltaByModel[model]; ok && completionWindowSeconds > 0 {
+			result.CompletedTPSByModel[model] = Measurement{
+				Value: floatPtr(count / completionWindowSeconds), Unit: "tps", Samples: int64(math.Round(count)),
+				Source: "prometheus:qs_interpretation_run_duration_seconds_count{builder_identity}/snapshot_window",
+			}
 		} else {
 			result.CompletedTPSByModel[model] = naMeasurement("tps", "prometheus:qs_interpretation_run_duration_seconds_count{builder_identity}", "model completion evidence unavailable")
 		}
 	}
-	acceptedCount := float64(metricInt64(accepted, "count"))
 	if evidence.CompletedCountDelta != nil && acceptedCount > 0 {
-		result.FinalCompletionRate = measured(floatPtr(*evidence.CompletedCountDelta/acceptedCount), "ratio", "derived:completed/accepted")
-		if evidence.TrafficIsolated != nil && !*evidence.TrafficIsolated {
+		result.FinalCompletionRate = measured(floatPtr(*evidence.CompletedCountDelta/float64(acceptedCount)), "ratio", "derived:completed/accepted")
+		if evidence.TrafficIsolated == nil {
+			result.FinalCompletionRate.Note = "traffic isolation was not declared; not valid admission evidence"
+		} else if !*evidence.TrafficIsolated {
 			result.FinalCompletionRate.Note = "contains non-isolated concurrent traffic; not valid admission evidence"
 		}
 		if *result.FinalCompletionRate.Value > 1 {
@@ -170,6 +190,15 @@ func throughputResults(spec phaseSpec, raw rawSummary, evidence PhaseEvidence) T
 	return result
 }
 
+func metricWindowSeconds(metric map[string]any) float64 {
+	count := metricNumber(metric, "count")
+	rate := metricNumber(metric, "rate")
+	if count <= 0 || rate <= 0 {
+		return 0
+	}
+	return count / rate
+}
+
 func operationResults(qps map[string]float64, raw rawSummary) ([]LatencyMetric, []CorrectnessMetric) {
 	latencies := make([]LatencyMetric, 0)
 	correctness := make([]CorrectnessMetric, 0)
@@ -177,12 +206,12 @@ func operationResults(qps map[string]float64, raw rawSummary) ([]LatencyMetric, 
 		if qps[spec.QPSKey] <= 0 {
 			continue
 		}
-		trend := findMetric(raw, spec.TrendMetric, spec.Tags)
+		trend := findMetric(raw, spec.TrendMetric, spec.TrendTags)
 		rateMetricName := spec.SuccessMetric
 		if rateMetricName == "" {
 			rateMetricName = spec.ErrorMetric
 		}
-		rateMetric := findMetric(raw, rateMetricName, appendEndpointTag(spec))
+		rateMetric := findMetric(raw, rateMetricName, spec.ResultTags)
 		attempts := metricInt64(rateMetric, "passes") + metricInt64(rateMetric, "fails")
 		latencies = append(latencies, LatencyMetric{
 			Operation: spec.ID,
@@ -213,9 +242,29 @@ func operationResults(qps map[string]float64, raw rawSummary) ([]LatencyMetric, 
 			Average: trendMeasurement(trend, "avg", "report_generated_latency"),
 		})
 	}
+	if global := globalHTTPCorrectness(raw); global != nil {
+		correctness = append(correctness, *global)
+	}
 	sort.Slice(latencies, func(i, j int) bool { return latencies[i].Operation < latencies[j].Operation })
 	sort.Slice(correctness, func(i, j int) bool { return correctness[i].Operation < correctness[j].Operation })
 	return latencies, correctness
+}
+
+func globalHTTPCorrectness(raw rawSummary) *CorrectnessMetric {
+	httpReqs := findMetric(raw, "http_reqs", nil)
+	failed := findMetric(raw, "http_req_failed", nil)
+	if httpReqs == nil || failed == nil {
+		return nil
+	}
+	attempts := metricInt64(httpReqs, "count")
+	errors := metricInt64(failed, "passes")
+	if errors == 0 && metricNumber(failed, "value") > 0 {
+		errors = int64(math.Round(metricNumber(failed, "value") * float64(attempts)))
+	}
+	timeouts := metricInt64(findMetric(raw, "http_timeout_total", nil), "count")
+	result := correctnessFromCounts("global_http", attempts, attempts-errors, errors, timeouts, 0, "k6:http_req_failed+http_timeout_total")
+	result.FinalFailRate = naMeasurement("ratio", "not_applicable", "not an asynchronous terminal operation")
+	return &result
 }
 
 func correctnessForOperation(spec operationSpec, attempts int64, rateMetric map[string]any, raw rawSummary) CorrectnessMetric {
@@ -236,7 +285,7 @@ func correctnessForOperation(spec operationSpec, attempts int64, rateMetric map[
 		errorRate = value
 		successRate = 1 - value
 	}
-	timeoutMetric := findMetric(raw, spec.TimeoutMetric, spec.Tags)
+	timeoutMetric := findMetric(raw, spec.TimeoutMetric, spec.TimeoutTags)
 	timeoutCount := metricInt64(timeoutMetric, "count")
 	errorCount := int64(math.Round(errorRate * float64(attempts)))
 	successCount := attempts - errorCount
@@ -374,14 +423,7 @@ func findMetric(raw rawSummary, base string, tags []string) map[string]any {
 			return metric
 		}
 	}
-	return raw.Metrics[base]
-}
-
-func appendEndpointTag(spec operationSpec) []string {
-	if spec.ErrorMetric == "http_req_failed" {
-		return spec.Tags
-	}
-	return spec.Tags
+	return nil
 }
 
 func metricNumber(metric map[string]any, key string) float64 {
@@ -515,6 +557,7 @@ func renderRunMarkdown(summary RunSummary) string {
 		fmt.Fprintln(&output)
 		fmt.Fprintln(&output, "| 项目 | 状态 / 数值 | 来源 |")
 		fmt.Fprintln(&output, "| --- | --- | --- |")
+		fmt.Fprintf(&output, "| 完成 TPS 观测窗口 | %s | %s |\n", formatMeasurement(phase.Evidence.CompletionWindow), phase.Evidence.CompletionWindow.Source)
 		for _, item := range phase.QueueWait {
 			fmt.Fprintf(&output, "| %s | %s | %s |\n", item.Layer, formatMeasurement(item.Wait), item.Wait.Source)
 		}

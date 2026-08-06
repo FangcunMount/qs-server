@@ -30,6 +30,7 @@ type ImmediateDispatcher struct {
 	readyIndex          ReadyIndex
 	readyIndexer        *PostCommitReadyIndexer
 	immediateEventTypes map[string]struct{}
+	attemptTracker      *OutboxAttemptTracker
 	lifecycleMu         sync.Mutex
 	closed              bool
 	wg                  sync.WaitGroup
@@ -48,6 +49,7 @@ type ImmediateDispatcherOptions struct {
 	MaxConcurrent           int
 	ReadyIndex              ReadyIndex
 	ImmediateEventTypes     []string
+	AttemptTracker          *OutboxAttemptTracker
 }
 
 func NewImmediateDispatcher(opts ImmediateDispatcherOptions) *ImmediateDispatcher {
@@ -78,6 +80,7 @@ func NewImmediateDispatcher(opts ImmediateDispatcherOptions) *ImmediateDispatche
 		readyIndex:          opts.ReadyIndex,
 		readyIndexer:        NewPostCommitReadyIndexer(opts.ReadyIndex),
 		immediateEventTypes: eventTypeSet(opts.ImmediateEventTypes),
+		attemptTracker:      opts.AttemptTracker,
 	}
 }
 
@@ -165,6 +168,7 @@ func (d *ImmediateDispatcher) dispatchOne(ctx context.Context, eventID, eventTyp
 		return
 	}
 	l := logger.L(ctx)
+	d.attemptTracker.Mark(eventID)
 	if err := d.publisher.Publish(ctx, pending.Event); err != nil {
 		d.observeImmediate(ctx, eventType, "publish_failed", retryobservability.AttemptClassForAttempt(pending.AttemptCount+1))
 		l.Warnw("immediate outbox publish failed",
@@ -186,6 +190,7 @@ func (d *ImmediateDispatcher) dispatchOne(ctx context.Context, eventID, eventTyp
 	if d.readyIndex != nil {
 		_ = d.readyIndex.Remove(ctx, eventType, eventID)
 	}
+	d.attemptTracker.Forget(eventID)
 	d.observeImmediate(ctx, eventType, "published", retryobservability.AttemptClassForAttempt(pending.AttemptCount+1))
 }
 
