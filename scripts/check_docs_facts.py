@@ -78,6 +78,53 @@ STALE_PATTERNS = {
     "unqualified report.generated event": re.compile(r"(?<!interpretation\.)(?<![\w.])report\.generated(?![\w.])"),
 }
 
+# High-risk sidecar and design facts that previously drifted away from the
+# current configuration/migration/storage implementation. These are narrow
+# ratchets: if the implementation intentionally changes, update the source,
+# documentation and this contract in the same change.
+CURRENT_FACT_SNIPPETS = {
+    ROOT / "configs/env/README.md": {
+        "required": (
+            "`Makefile` 不会自动读取本目录下的 `.env` 文件",
+            "`QS_APISERVER_`",
+            "`COLLECTION_SERVER_`",
+            "`QS_WORKER_`",
+        ),
+        "forbidden": (
+            "Makefile 已配置自动加载环境变量",
+            "go get github.com/joho/godotenv",
+            "make config-check",
+        ),
+    },
+    ROOT / "internal/pkg/migration/README.md": {
+        "required": (
+            "迁移版本机制只保证同一版本不会被正常重复执行，不保证迁移无损",
+            "应用内 `Migrator` 当前没有 `Rollback()` 方法",
+            "dirty 状态会阻断继续迁移",
+        ),
+        "forbidden": (
+            "NewMigratorWithDriver",
+            "migrator.Rollback()",
+            "迁移不会覆盖数据",
+            "不会删除或覆盖现有数据",
+        ),
+    },
+    DOCS / "02-业务模块/20-model-catalog/26-核心设计-数据存储与一致性.md": {
+        "required": (
+            "| Questionnaire head CAS | 已实现 |",
+            "| 标准 migration 对齐 unified schema | 已实现 |",
+            "| 服务启动关键索引验证 | 已实现 |",
+            "| Norm table_version unique index | 已实现 |",
+        ),
+        "forbidden": (
+            "Questionnaire 并发编辑当前是 last-write-wins",
+            "| Questionnaire head CAS | 未实现 |",
+            "| 标准 migration 对齐 unified schema | **未完成** |",
+            "生产 dirty@13 恢复（当前阻塞）",
+        ),
+    },
+}
+
 ARCHIVE_LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]*_archive[^)]*)\)")
 ARCHIVE_LINK_ALLOWLIST = {DOCS / "README.md"}
 
@@ -192,6 +239,28 @@ def main() -> int:
                     Issue(
                         "stale-contract-name",
                         f"{path.relative_to(ROOT)}:{line_for_offset(text, match.start())}: {label}",
+                    )
+                )
+
+    for path, contract in CURRENT_FACT_SNIPPETS.items():
+        if not path.exists():
+            issues.append(Issue("missing-current-fact-doc", str(path.relative_to(ROOT))))
+            continue
+        text = path.read_text(encoding="utf-8")
+        for snippet in contract["required"]:
+            if snippet not in text:
+                issues.append(
+                    Issue(
+                        "missing-current-fact",
+                        f"{path.relative_to(ROOT)}: {snippet}",
+                    )
+                )
+        for snippet in contract["forbidden"]:
+            if snippet in text:
+                issues.append(
+                    Issue(
+                        "stale-current-fact",
+                        f"{path.relative_to(ROOT)}: {snippet}",
                     )
                 )
 
