@@ -30,6 +30,7 @@ import (
 	cachebootstrap "github.com/FangcunMount/qs-server/internal/apiserver/cache/subsystem"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	modelDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modelDefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/definition"
 	modelFactor "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	statisticsDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	questionnaireDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
@@ -497,7 +498,7 @@ func seedRuntimeCatalog(t *testing.T, db *mongo.Database) {
 			Outcomes:    []modelDomain.Outcome{{Code: "low", Title: "Low"}},
 			Conclusions: []modelDomain.Conclusion{modelDomain.RiskConclusion{FactorCode: "TOTAL", Rules: []modelDomain.ScoreRangeOutcome{{MinScore: 0, MaxScore: 10, MaxInclusive: true, OutcomeCode: "low", Level: "low"}}}},
 			ReportMap: modelDomain.ReportMap{Sections: []modelDomain.ReportSection{{
-				Code: modelDomain.ReportSectionKindFactorScores, Kind: modelDomain.ReportSectionKindFactorScores, SourceRefs: []string{"TOTAL"},
+				Code: modelDefinition.ReportSectionKindFactorScores, Kind: modelDefinition.ReportSectionKindFactorScores, SourceRefs: []string{"TOTAL"},
 			}}},
 		},
 	}
