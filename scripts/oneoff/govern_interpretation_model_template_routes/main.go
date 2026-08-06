@@ -155,6 +155,12 @@ func validateManifest(manifest governanceManifest, requireHashes bool) error {
 		if _, err := recordObjectID(record, "source_id"); err != nil {
 			return fmt.Errorf("records[%d]: %w", index, err)
 		}
+		if _, ok := record["factor_score_section_added"].(bool); !ok {
+			return fmt.Errorf("records[%d]: factor_score_section_added is required", index)
+		}
+		if _, err := recordStrings(record, "factor_source_refs"); err != nil {
+			return fmt.Errorf("records[%d]: %w", index, err)
+		}
 		if requireHashes && (!isSHA256(recordString(record, "source_definition_hash")) || !isSHA256(recordString(record, "target_definition_hash"))) {
 			return fmt.Errorf("records[%d]: canonical definition hashes are required", index)
 		}
@@ -191,7 +197,7 @@ func attachCanonicalHashes(record map[string]any, po *mongomodelcatalog.Publishe
 	if po == nil || po.DefinitionV2 == nil {
 		return errors.New("source DefinitionV2 is required")
 	}
-	if po.Code != recordString(record, "code") || po.ReleaseVersion != recordString(record, "source_release_version") {
+	if po.Kind != recordString(record, "kind") || po.Code != recordString(record, "code") || po.ReleaseVersion != recordString(record, "source_release_version") {
 		return errors.New("source snapshot identity changed")
 	}
 	model := mongomodelcatalog.NewMapper().ToPublished(po)
@@ -207,8 +213,20 @@ func attachCanonicalHashes(record map[string]any, po *mongomodelcatalog.Publishe
 		return err
 	}
 	templateID := recordString(record, "template_id")
-	if templateID == "" || len(target.ReportMap.Sections) == 0 {
+	if templateID == "" {
 		return errors.New("target template route is incomplete")
+	}
+	added, sourceRefs, err := materializeFactorScoreSection(target, po.Kind)
+	if err != nil {
+		return err
+	}
+	manifestAdded, _ := record["factor_score_section_added"].(bool)
+	manifestRefs, err := recordStrings(record, "factor_source_refs")
+	if err != nil {
+		return err
+	}
+	if manifestAdded != added || !equalStrings(manifestRefs, sourceRefs) {
+		return errors.New("factor score governance plan does not match source DefinitionV2")
 	}
 	for index := range target.ReportMap.Sections {
 		target.ReportMap.Sections[index].TemplateID = templateID
@@ -225,6 +243,70 @@ func attachCanonicalHashes(record map[string]any, po *mongomodelcatalog.Publishe
 	record["source_definition_hash"] = sourceHash
 	record["target_definition_hash"] = targetHash
 	return nil
+}
+
+func materializeFactorScoreSection(target *modeldefinition.Definition, kind string) (bool, []string, error) {
+	if target == nil {
+		return false, nil, errors.New("target DefinitionV2 is required")
+	}
+	if kind == "typology" {
+		if len(target.ReportMap.Sections) == 0 {
+			return false, nil, errors.New("typology target report_map.sections are required")
+		}
+		return false, []string{}, nil
+	}
+	if kind != "scale" && kind != "behavioral_rating" && kind != "cognitive" {
+		return false, nil, fmt.Errorf("unsupported published snapshot kind: %s", kind)
+	}
+	if len(target.Measure.Factors) == 0 {
+		return false, nil, errors.New("factor model measure.factors are required")
+	}
+	factorCodes := make([]string, 0, len(target.Measure.Factors))
+	knownCodes := make(map[string]struct{}, len(target.Measure.Factors))
+	for _, factor := range target.Measure.Factors {
+		code := factor.Code
+		if code == "" || code != strings.TrimSpace(code) {
+			return false, nil, errors.New("factor model measure factor code must be non-blank and normalized")
+		}
+		if _, duplicate := knownCodes[code]; duplicate {
+			return false, nil, fmt.Errorf("factor model measure factor code is duplicated: %s", code)
+		}
+		knownCodes[code] = struct{}{}
+		factorCodes = append(factorCodes, code)
+	}
+	factorSection := -1
+	for index := range target.ReportMap.Sections {
+		if target.ReportMap.Sections[index].Kind != modeldefinition.ReportSectionKindFactorScores {
+			continue
+		}
+		if factorSection >= 0 {
+			return false, nil, errors.New("factor model may contain only one factor_scores report section")
+		}
+		factorSection = index
+	}
+	if factorSection < 0 {
+		target.ReportMap.Sections = append(target.ReportMap.Sections, modeldefinition.ReportSection{
+			Code:       modeldefinition.ReportSectionKindFactorScores,
+			Kind:       modeldefinition.ReportSectionKindFactorScores,
+			SourceRefs: append([]string(nil), factorCodes...),
+		})
+		return true, factorCodes, nil
+	}
+	refs := append([]string(nil), target.ReportMap.Sections[factorSection].SourceRefs...)
+	seen := make(map[string]struct{}, len(refs))
+	for _, ref := range refs {
+		if ref == "" || ref != strings.TrimSpace(ref) {
+			return false, nil, errors.New("factor_scores source_ref must be non-blank and normalized")
+		}
+		if _, duplicate := seen[ref]; duplicate {
+			return false, nil, fmt.Errorf("factor_scores source_ref is duplicated: %s", ref)
+		}
+		if _, exists := knownCodes[ref]; !exists {
+			return false, nil, fmt.Errorf("factor_scores source_ref is not a measure factor: %s", ref)
+		}
+		seen[ref] = struct{}{}
+	}
+	return false, refs, nil
 }
 
 func cloneDefinition(source *modeldefinition.Definition) (*modeldefinition.Definition, error) {
@@ -254,6 +336,34 @@ func recordObjectID(record map[string]any, field string) (primitive.ObjectID, er
 func recordString(record map[string]any, field string) string {
 	value, _ := record[field].(string)
 	return strings.TrimSpace(value)
+}
+
+func recordStrings(record map[string]any, field string) ([]string, error) {
+	values, ok := record[field].([]any)
+	if !ok {
+		return nil, fmt.Errorf("%s is required", field)
+	}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		item, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("%s must contain only strings", field)
+		}
+		result = append(result, item)
+	}
+	return result, nil
+}
+
+func equalStrings(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
 }
 
 func isSHA256(value string) bool {

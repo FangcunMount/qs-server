@@ -16,6 +16,8 @@ const activeSnapshotFilter = {
   deleted_at: null
 }
 const typologyTemplateIDs = new Set(["mbti", "sbti", "bigfive", "enneagram"])
+const factorModelKinds = new Set(["scale", "behavioral_rating", "cognitive"])
+const factorScoreSectionKind = "factor_scores"
 
 function isPlainObject(value) {
   if (value == null || typeof value !== "object" || Array.isArray(value)) return false
@@ -70,15 +72,73 @@ function snapshotContentHash(document, ejson) {
   return sha256JSON(protectedDocument, ejson)
 }
 
+function factorScorePlan(definition, kind, ejson) {
+  if (!factorModelKinds.has(kind)) {
+    if (kind !== "typology") throw new Error(`unsupported published snapshot kind: ${kind || "unknown"}`)
+    const sections = definition?.report_map?.sections
+    if (!Array.isArray(sections) || sections.length === 0) {
+      throw new Error("typology definition_v2.report_map.sections are required")
+    }
+    return {sections: deepClone(sections, ejson), added: false, sourceRefs: []}
+  }
+
+  const factors = definition?.measure?.factors
+  if (!Array.isArray(factors) || factors.length === 0) {
+    throw new Error("factor model definition_v2.measure.factors are required")
+  }
+  const factorCodes = []
+  const knownCodes = new Set()
+  for (const factor of factors) {
+    const code = typeof factor?.code === "string" ? factor.code : ""
+    if (code === "" || code !== code.trim()) {
+      throw new Error("factor model measure factor code must be non-blank and normalized")
+    }
+    if (knownCodes.has(code)) throw new Error(`factor model measure factor code is duplicated: ${code}`)
+    knownCodes.add(code)
+    factorCodes.push(code)
+  }
+
+  const existing = definition?.report_map?.sections
+  const sections = Array.isArray(existing) ? deepClone(existing, ejson) : []
+  const factorSections = sections.filter(section => section?.kind === factorScoreSectionKind)
+  if (factorSections.length > 1) {
+    throw new Error("factor model may contain only one factor_scores report section")
+  }
+  if (factorSections.length === 1) {
+    const refs = factorSections[0].source_refs
+    const sourceRefs = Array.isArray(refs) ? [...refs] : []
+    const seen = new Set()
+    for (const ref of sourceRefs) {
+      if (typeof ref !== "string" || ref === "" || ref !== ref.trim()) {
+        throw new Error("factor_scores source_ref must be non-blank and normalized")
+      }
+      if (seen.has(ref)) throw new Error(`factor_scores source_ref is duplicated: ${ref}`)
+      if (!knownCodes.has(ref)) throw new Error(`factor_scores source_ref is not a measure factor: ${ref}`)
+      seen.add(ref)
+    }
+    return {sections, added: false, sourceRefs}
+  }
+
+  sections.push({
+    code: factorScoreSectionKind,
+    kind: factorScoreSectionKind,
+    source_refs: factorCodes
+  })
+  return {sections, added: true, sourceRefs: factorCodes}
+}
+
 function resolveTemplateID(document) {
   if (document == null || typeof document.kind !== "string") {
     throw new Error("published snapshot kind is required")
   }
-  const sections = document.definition_v2?.report_map?.sections
-  if (!Array.isArray(sections) || sections.length === 0) {
-    throw new Error(`published snapshot report_map.sections are required: ${document.code || "unknown"}`)
+  if (factorModelKinds.has(document.kind)) {
+    factorScorePlan(document.definition_v2, document.kind)
+    return "standard"
   }
-  if (document.kind !== "typology") return "standard"
+  if (document.kind !== "typology") {
+    throw new Error(`unsupported published snapshot kind: ${document.kind}`)
+  }
+  const sections = factorScorePlan(document.definition_v2, document.kind).sections
   const ids = [...new Set(sections.map(section => (section.template_id || "").trim()).filter(Boolean))]
   if (ids.length !== 1 || !typologyTemplateIDs.has(ids[0])) {
     throw new Error(`typology snapshot must resolve one registered template_id: ${document.code || "unknown"}`)
@@ -86,18 +146,16 @@ function resolveTemplateID(document) {
   return ids[0]
 }
 
-function materializeDefinition(definition, templateID, ejson) {
+function materializeDefinition(definition, templateID, kind, ejson) {
   if (!isObjectRecord(definition)) throw new Error("definition_v2 is required")
   const result = deepClone(definition, ejson)
-  const sections = result.report_map?.sections
-  if (!Array.isArray(sections) || sections.length === 0) {
-    throw new Error("definition_v2.report_map.sections are required")
-  }
-  const governedSections = sections.map(section => ({
+  const plan = factorScorePlan(result, kind, ejson)
+  const governedSections = plan.sections.map(section => ({
     ...section,
     template_id: templateID,
     template_version: targetTemplateVersion
   }))
+  if (!isObjectRecord(result.report_map)) result.report_map = {}
   result.report_map.sections = governedSections
   if (!isObjectRecord(result.interpretation_assets)) result.interpretation_assets = {}
   if (!isObjectRecord(result.interpretation_assets.report_spec)) result.interpretation_assets.report_spec = {}
@@ -108,7 +166,7 @@ function materializeDefinition(definition, templateID, ejson) {
 function hasTargetRoute(document, ejson) {
   try {
     const templateID = resolveTemplateID(document)
-    const expected = materializeDefinition(document.definition_v2, templateID, ejson)
+    const expected = materializeDefinition(document.definition_v2, templateID, document.kind, ejson)
     return valuesEqual(document.definition_v2, expected, ejson)
   } catch (_) {
     return false
@@ -161,7 +219,7 @@ function desiredClone(source, record, status, ejson) {
   clone._id = ObjectId.createFromHexString(record.clone_id)
   clone.release_version = record.target_release_version
   clone.release_status = status
-  clone.definition_v2 = materializeDefinition(source.definition_v2, record.template_id, ejson)
+  clone.definition_v2 = materializeDefinition(source.definition_v2, record.template_id, source.kind, ejson)
   const governedAt = new Date(record.governed_at)
   clone.created_at = governedAt
   clone.updated_at = governedAt
@@ -224,6 +282,8 @@ function validateGovernanceManifest(manifest) {
         !/^[a-f0-9]{64}$/.test(record.source_definition_hash || "") ||
         !/^[a-f0-9]{64}$/.test(record.target_definition_hash || "") ||
         typeof record.template_id !== "string" || typeof record.source_release_version !== "string" ||
+        typeof record.factor_score_section_added !== "boolean" ||
+        !Array.isArray(record.factor_source_refs) || record.factor_source_refs.some(ref => typeof ref !== "string") ||
         record.target_release_version !== targetReleaseVersion(record.source_release_version) || !record.governed_at) {
       throw new Error(`invalid model template route governance record: ${record.code || "unknown"}`)
     }
@@ -255,6 +315,7 @@ function loadManifest(fs, path) {
 function audit(collection, templates, config, fs) {
   const records = []
   let alreadyCurrent = 0
+  let factorScoreSectionsAdded = 0
   const governedAt = new Date().toISOString()
   const cursor = collection.find(activeSnapshotFilter).sort({_id: 1})
   while (cursor.hasNext()) {
@@ -265,6 +326,8 @@ function audit(collection, templates, config, fs) {
       continue
     }
     const templateID = resolveTemplateID(document)
+    const routePlan = factorScorePlan(document.definition_v2, document.kind, EJSON)
+    if (routePlan.added) factorScoreSectionsAdded += 1
     validateTemplateRelease(templates, templateID, document.decision_kind)
     const targetVersion = targetReleaseVersion(document.release_version)
     if (collection.countDocuments({
@@ -285,6 +348,8 @@ function audit(collection, templates, config, fs) {
       code: document.code,
       decision_kind: document.decision_kind,
       template_id: templateID,
+      factor_score_section_added: routePlan.added,
+      factor_source_refs: routePlan.sourceRefs,
       source_release_version: document.release_version,
       target_release_version: targetVersion,
       source_updated_at: document.updated_at.toISOString(),
@@ -302,7 +367,14 @@ function audit(collection, templates, config, fs) {
     records_fingerprint: sha256JSON(records)
   }
   writeManifest(fs, config.manifestPath, manifest)
-  printSummary({operation: "audit", records: records.length, already_current: alreadyCurrent, manifest_path: config.manifestPath, records_fingerprint: manifest.records_fingerprint})
+  printSummary({
+    operation: "audit",
+    records: records.length,
+    already_current: alreadyCurrent,
+    factor_score_sections_added: factorScoreSectionsAdded,
+    manifest_path: config.manifestPath,
+    records_fingerprint: manifest.records_fingerprint
+  })
 }
 
 function findByID(collection, id) {
@@ -483,6 +555,7 @@ if (typeof module !== "undefined") {
     sha256JSON,
     snapshotContentHash,
     resolveTemplateID,
+    factorScorePlan,
     materializeDefinition,
     hasTargetRoute,
     targetReleaseVersion,
