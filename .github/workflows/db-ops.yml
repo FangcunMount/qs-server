@@ -2454,7 +2454,10 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-          cache: true
+          # This serialized operations job builds a small one-off binary. Cache
+          # upload would keep the production DB-ops queue occupied after the
+          # governance command has already finished.
+          cache: false
 
       - name: Build EvaluationOutcome governance tools
         env:
