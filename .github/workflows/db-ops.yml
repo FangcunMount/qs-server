@@ -869,10 +869,12 @@ jobs:
             }
             MONGOJS
 
-            chmod 0755 "$MONGO_STATUS_DIR"
-            chmod 0644 "$MONGO_STATUS_SCRIPT"
+            chmod 0700 "$MONGO_STATUS_DIR"
+            chmod 0600 "$MONGO_STATUS_SCRIPT"
             sudo docker run --rm --network infra-network \
+              --user "$(id -u):$(id -g)" \
               -v "$MONGO_STATUS_DIR:/audit" \
+              -e HOME=/tmp \
               -e MONGODB_DBNAME="$MONGODB_DBNAME" \
               -e AUDIT_FROM="${AUDIT_FROM:-}" \
               -e ATTENTION_GAP_EXPORT_PATH=/audit/attention-gaps.tsv \
@@ -886,7 +888,6 @@ jobs:
                 --file /audit/status.js
 
             if [ -n "${AUDIT_FROM:-}" ]; then
-              sudo chown "$(id -u):$(id -g)" "$ATTENTION_GAP_TSV"
               chmod 0600 "$ATTENTION_GAP_TSV"
               emit_attention_gap_cte() {
                 printf 'WITH attention_gap (report_id, assessment_id, testee_id, org_id) AS (\n'

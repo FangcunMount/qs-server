@@ -601,7 +601,10 @@ func TestDBOpsAttentionRecoveryAuditOnlyCountsHighRiskSideEffects(t *testing.T) 
 		"assessment_testee_mismatches",
 		"testee_org_mismatches",
 		`docker run --rm --interactive --network infra-network`,
-		`sudo chown "$(id -u):$(id -g)" "$ATTENTION_GAP_TSV"`,
+		`chmod 0700 "$MONGO_STATUS_DIR"`,
+		`chmod 0600 "$MONGO_STATUS_SCRIPT"`,
+		`--user "$(id -u):$(id -g)"`,
+		`-e HOME=/tmp`,
 		`chmod 0600 "$ATTENTION_GAP_TSV"`,
 		`chmod 0600 "$ATTENTION_GAP_SQL"`,
 	} {
