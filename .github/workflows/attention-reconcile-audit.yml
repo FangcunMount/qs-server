@@ -13,11 +13,16 @@ on:
         required: true
         type: string
         default: '1'
-      minimum_missing:
-        description: 'Minimum latest missing projection count expected during rehearsal'
+      expected_missing:
+        description: 'Exact incomplete projection count for the immutable target manifest'
         required: true
         type: string
-        default: '1'
+        default: '91'
+      expected_target_fingerprint:
+        description: 'Expected lowercase SHA-256 target manifest fingerprint'
+        required: true
+        type: string
+        default: '75bc40d269404a337ccd3fabae57fec2768424fc660e1e9b76796bb3a3404a09'
 
 permissions:
   contents: read
@@ -35,7 +40,11 @@ jobs:
       EXPECTED_WORKER_REPLICAS: ${{ vars.QS_WORKER_REPLICAS || '3' }}
       EXPECTED_DEPLOY_SHA: ${{ inputs.expected_sha || github.sha }}
       MIN_SUCCESSFUL_ROUNDS: ${{ inputs.minimum_successful_rounds }}
-      MIN_MISSING: ${{ inputs.minimum_missing }}
+      MIN_MISSING: '0'
+      EXPECTED_MISSING: ${{ inputs.expected_missing }}
+      EXPECTED_RECONCILE_FROM: '2026-08-01T00:00:00Z'
+      EXPECTED_TARGET_COUNT: '91'
+      EXPECTED_TARGET_FINGERPRINT: ${{ inputs.expected_target_fingerprint }}
       EXPECTED_DRY_RUN: 'true'
       EXPECTED_CREATED: '0'
     steps:
@@ -61,14 +70,14 @@ jobs:
             echo "Invalid EXPECTED_DEPLOY_SHA=${EXPECTED_DEPLOY_SHA}" >&2
             exit 1
           fi
-          for value in "${EXPECTED_WORKER_REPLICAS}" "${MIN_SUCCESSFUL_ROUNDS}" "${MIN_MISSING}" "${EXPECTED_CREATED}"; do
+          for value in "${EXPECTED_WORKER_REPLICAS}" "${MIN_SUCCESSFUL_ROUNDS}" "${MIN_MISSING}" "${EXPECTED_MISSING}" "${EXPECTED_TARGET_COUNT}" "${EXPECTED_CREATED}"; do
             if ! [[ "${value}" =~ ^[0-9]+$ ]]; then
               echo "Invalid numeric audit input=${value}" >&2
               exit 1
             fi
           done
           ssh -F "${RUNNER_SSH_CONFIG}" "${RUNNER_SSH_ALIAS}" \
-            "EXPECTED_WORKER_REPLICAS=${EXPECTED_WORKER_REPLICAS} EXPECTED_DEPLOY_SHA=${EXPECTED_DEPLOY_SHA} MIN_SUCCESSFUL_ROUNDS=${MIN_SUCCESSFUL_ROUNDS} MIN_MISSING=${MIN_MISSING} EXPECTED_DRY_RUN=${EXPECTED_DRY_RUN} EXPECTED_CREATED=${EXPECTED_CREATED} PRIVILEGE_RUNNER=sudo bash -s" \
+            "EXPECTED_WORKER_REPLICAS=${EXPECTED_WORKER_REPLICAS} EXPECTED_DEPLOY_SHA=${EXPECTED_DEPLOY_SHA} MIN_SUCCESSFUL_ROUNDS=${MIN_SUCCESSFUL_ROUNDS} MIN_MISSING=${MIN_MISSING} EXPECTED_MISSING=${EXPECTED_MISSING} EXPECTED_DRY_RUN=${EXPECTED_DRY_RUN} EXPECTED_CREATED=${EXPECTED_CREATED} EXPECTED_RECONCILE_FROM=${EXPECTED_RECONCILE_FROM} EXPECTED_TARGET_COUNT=${EXPECTED_TARGET_COUNT} EXPECTED_TARGET_FINGERPRINT=${EXPECTED_TARGET_FINGERPRINT} PRIVILEGE_RUNNER=sudo bash -s" \
             < scripts/cd/audit-attention-reconcile-dry-run.sh
 
       - name: Cleanup worker audit SSH

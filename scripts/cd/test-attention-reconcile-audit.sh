@@ -23,6 +23,10 @@ case "${1:-}" in
     if [ "$command_name" = "grep" ]; then
       exit 0
     fi
+    if [ "$command_name" = "awk" ]; then
+      printf '%s\n' "${FAKE_TARGET_COUNT:-91}"
+      exit 0
+    fi
     if [ "$command_name" != "wget" ]; then
       echo "unexpected fake docker exec command: $command_name" >&2
       exit 2
@@ -50,6 +54,9 @@ COMMON_ENV=(
   EXPECTED_DEPLOY_SHA=0123456789abcdef0123456789abcdef01234567
   MIN_SUCCESSFUL_ROUNDS=1
   MIN_MISSING=1
+  EXPECTED_MISSING=33
+  EXPECTED_TARGET_COUNT=91
+  EXPECTED_TARGET_FINGERPRINT=75bc40d269404a337ccd3fabae57fec2768424fc660e1e9b76796bb3a3404a09
   PRIVILEGE_RUNNER=
   DOCKER_BIN="$FAKE_DOCKER"
 )
@@ -59,6 +66,12 @@ env "${COMMON_ENV[@]}" "$SCRIPT_DIR/audit-attention-reconcile-dry-run.sh" >/dev/
 if env "${COMMON_ENV[@]}" FAKE_CREATED=1 \
   "$SCRIPT_DIR/audit-attention-reconcile-dry-run.sh" >/dev/null 2>&1; then
   echo "audit accepted a dry-run that reported created records" >&2
+  exit 1
+fi
+
+if env "${COMMON_ENV[@]}" FAKE_TARGET_COUNT=90 \
+  "$SCRIPT_DIR/audit-attention-reconcile-dry-run.sh" >/dev/null 2>&1; then
+  echo "audit accepted the wrong target report count" >&2
   exit 1
 fi
 

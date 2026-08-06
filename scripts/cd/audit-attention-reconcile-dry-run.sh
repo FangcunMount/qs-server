@@ -5,8 +5,12 @@ EXPECTED_WORKER_REPLICAS="${EXPECTED_WORKER_REPLICAS:-3}"
 EXPECTED_DEPLOY_SHA="${EXPECTED_DEPLOY_SHA:-}"
 MIN_SUCCESSFUL_ROUNDS="${MIN_SUCCESSFUL_ROUNDS:-1}"
 MIN_MISSING="${MIN_MISSING:-1}"
+EXPECTED_MISSING="${EXPECTED_MISSING:-}"
 EXPECTED_DRY_RUN="${EXPECTED_DRY_RUN:-true}"
 EXPECTED_CREATED="${EXPECTED_CREATED:-0}"
+EXPECTED_RECONCILE_FROM="${EXPECTED_RECONCILE_FROM:-2026-08-01T00:00:00Z}"
+EXPECTED_TARGET_COUNT="${EXPECTED_TARGET_COUNT:-0}"
+EXPECTED_TARGET_FINGERPRINT="${EXPECTED_TARGET_FINGERPRINT:-}"
 WORKER_METRICS_PORT="${WORKER_METRICS_PORT:-9092}"
 PRIVILEGE_RUNNER="${PRIVILEGE_RUNNER-sudo}"
 DOCKER_BIN="${DOCKER_BIN:-docker}"
@@ -63,7 +67,11 @@ add_numbers() {
 require_positive_integer EXPECTED_WORKER_REPLICAS "$EXPECTED_WORKER_REPLICAS"
 require_positive_integer MIN_SUCCESSFUL_ROUNDS "$MIN_SUCCESSFUL_ROUNDS"
 require_non_negative_integer MIN_MISSING "$MIN_MISSING"
+if [ -n "$EXPECTED_MISSING" ]; then
+  require_non_negative_integer EXPECTED_MISSING "$EXPECTED_MISSING"
+fi
 require_non_negative_integer EXPECTED_CREATED "$EXPECTED_CREATED"
+require_non_negative_integer EXPECTED_TARGET_COUNT "$EXPECTED_TARGET_COUNT"
 require_positive_integer WORKER_METRICS_PORT "$WORKER_METRICS_PORT"
 if [ "$EXPECTED_DRY_RUN" != "true" ] && [ "$EXPECTED_DRY_RUN" != "false" ]; then
   echo "EXPECTED_DRY_RUN must be true or false, got: $EXPECTED_DRY_RUN" >&2
@@ -72,6 +80,12 @@ fi
 if ! [[ "$EXPECTED_DEPLOY_SHA" =~ ^[0-9a-f]{7,40}$ ]]; then
   echo "EXPECTED_DEPLOY_SHA must be a 7-40 character lowercase Git SHA" >&2
   exit 1
+fi
+if [ "$EXPECTED_TARGET_COUNT" -gt 0 ]; then
+  if ! [[ "$EXPECTED_TARGET_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "EXPECTED_TARGET_FINGERPRINT must be lowercase SHA-256" >&2
+    exit 1
+  fi
 fi
 if [ -n "$PRIVILEGE_RUNNER" ] && ! command -v "$PRIVILEGE_RUNNER" >/dev/null 2>&1; then
   echo "Privilege runner is unavailable: $PRIVILEGE_RUNNER" >&2
@@ -113,7 +127,8 @@ while IFS= read -r container_id; do
 
   for expected_config in \
     'attention-projection-reconcile-enabled:[[:space:]]*true' \
-    'attention-projection-reconcile-from:[[:space:]]*"2026-08-05T00:00:00Z"' \
+    "attention-projection-reconcile-from:[[:space:]]*\"${EXPECTED_RECONCILE_FROM}\"" \
+    "attention-projection-reconcile-fingerprint:[[:space:]]*\"${EXPECTED_TARGET_FINGERPRINT}\"" \
     "attention-projection-reconcile-dry-run:[[:space:]]*${EXPECTED_DRY_RUN}"; do
     if ! run_privileged "$DOCKER_BIN" exec "$container_id" \
       grep -Eq "^[[:space:]]*${expected_config}[[:space:]]*(#.*)?$" /app/configs/worker.prod.yaml; then
@@ -121,6 +136,16 @@ while IFS= read -r container_id; do
       exit 1
     fi
   done
+  configured_target_count="$(run_privileged "$DOCKER_BIN" exec "$container_id" awk '
+    /^[[:space:]]*attention-projection-reconcile-report-ids:/ { inside = 1; next }
+    inside && /^[[:space:]]*attention-projection-reconcile-fingerprint:/ { inside = 0 }
+    inside && /^[[:space:]]*-[[:space:]]*"[0-9]+"[[:space:]]*$/ { count++ }
+    END { print count + 0 }
+  ' /app/configs/worker.prod.yaml)"
+  if [ "$configured_target_count" -ne "$EXPECTED_TARGET_COUNT" ]; then
+    echo "Worker ${container_id} target report IDs=${configured_target_count}, want ${EXPECTED_TARGET_COUNT}" >&2
+    exit 1
+  fi
 
   metrics="$(run_privileged "$DOCKER_BIN" exec "$container_id" \
     wget -qO- -T 5 "http://127.0.0.1:${WORKER_METRICS_PORT}/metrics")"
@@ -180,6 +205,10 @@ if [ "$total_mismatched" -ne 0 ]; then
 fi
 if [ "$latest_missing_max" -lt "$MIN_MISSING" ]; then
   echo "Latest missing maximum=${latest_missing_max}, want at least ${MIN_MISSING}" >&2
+  exit 1
+fi
+if [ -n "$EXPECTED_MISSING" ] && [ "$latest_missing_max" -ne "$EXPECTED_MISSING" ]; then
+  echo "Latest missing maximum=${latest_missing_max}, want exactly ${EXPECTED_MISSING}" >&2
   exit 1
 fi
 

@@ -300,14 +300,20 @@ func TestWorkerDevProdConfigContracts(t *testing.T) {
 				t.Fatal("worker runtime config must define positive concurrency")
 			}
 			if name == "worker.prod.yaml" {
-				if cfg.Worker.AttentionProjectionReconcileEnabled {
-					t.Fatal("production attention projection fact recovery must remain disabled after convergence")
+				if !cfg.Worker.AttentionProjectionReconcileEnabled {
+					t.Fatal("production attention projection governed dry-run must be enabled")
 				}
-				if cfg.Worker.AttentionProjectionReconcileFrom != "" {
-					t.Fatalf("disabled production attention projection reconcile cutover = %q, want empty", cfg.Worker.AttentionProjectionReconcileFrom)
+				if cfg.Worker.AttentionProjectionReconcileFrom != "2026-08-01T00:00:00Z" {
+					t.Fatalf("production attention projection reconcile cutover = %q", cfg.Worker.AttentionProjectionReconcileFrom)
 				}
 				if !cfg.Worker.AttentionProjectionReconcileDryRun {
-					t.Fatal("disabled production attention projection reconcile must keep the dry-run safety default")
+					t.Fatal("production attention projection reconcile must remain dry-run before apply")
+				}
+				if len(cfg.Worker.AttentionProjectionReconcileReportIDs) != 91 {
+					t.Fatalf("production attention projection target reports = %d, want 91", len(cfg.Worker.AttentionProjectionReconcileReportIDs))
+				}
+				if cfg.Worker.AttentionProjectionReconcileFingerprint != "75bc40d269404a337ccd3fabae57fec2768424fc660e1e9b76796bb3a3404a09" {
+					t.Fatalf("production attention projection fingerprint = %q", cfg.Worker.AttentionProjectionReconcileFingerprint)
 				}
 			} else if cfg.Worker.AttentionProjectionReconcileEnabled {
 				t.Fatal("development attention projection reconcile must remain opt-in")

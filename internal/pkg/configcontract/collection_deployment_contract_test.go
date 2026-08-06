@@ -265,7 +265,8 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 		"Attention Reconcile Dry-run Audit",
 		"EXPECTED_DEPLOY_SHA",
 		"MIN_SUCCESSFUL_ROUNDS",
-		"MIN_MISSING",
+		"EXPECTED_MISSING",
+		"EXPECTED_TARGET_FINGERPRINT",
 		"audit-attention-reconcile-dry-run.sh",
 	} {
 		if !strings.Contains(attentionAuditWorkflow, required) {
@@ -277,6 +278,8 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 	for _, required := range []string{
 		"attention-projection-reconcile-enabled",
 		"attention-projection-reconcile-dry-run",
+		"EXPECTED_TARGET_COUNT",
+		"EXPECTED_TARGET_FINGERPRINT",
 		"attention_fact_reconcile_rounds_total",
 		"attention_fact_reconcile_consecutive_failures",
 		"Attention reconcile created=",
