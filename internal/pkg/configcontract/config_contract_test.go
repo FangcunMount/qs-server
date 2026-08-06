@@ -300,14 +300,14 @@ func TestWorkerDevProdConfigContracts(t *testing.T) {
 				t.Fatal("worker runtime config must define positive concurrency")
 			}
 			if name == "worker.prod.yaml" {
-				if !cfg.Worker.AttentionProjectionReconcileEnabled {
-					t.Fatal("production attention projection reconcile rehearsal must be enabled")
+				if cfg.Worker.AttentionProjectionReconcileEnabled {
+					t.Fatal("production attention projection fact recovery must remain disabled after convergence")
 				}
-				if cfg.Worker.AttentionProjectionReconcileFrom != "2026-08-05T00:00:00Z" {
-					t.Fatalf("production attention projection reconcile cutover = %q", cfg.Worker.AttentionProjectionReconcileFrom)
+				if cfg.Worker.AttentionProjectionReconcileFrom != "" {
+					t.Fatalf("disabled production attention projection reconcile cutover = %q, want empty", cfg.Worker.AttentionProjectionReconcileFrom)
 				}
-				if cfg.Worker.AttentionProjectionReconcileDryRun {
-					t.Fatal("production attention projection reconcile apply approval must disable dry-run")
+				if !cfg.Worker.AttentionProjectionReconcileDryRun {
+					t.Fatal("disabled production attention projection reconcile must keep the dry-run safety default")
 				}
 			} else if cfg.Worker.AttentionProjectionReconcileEnabled {
 				t.Fatal("development attention projection reconcile must remain opt-in")

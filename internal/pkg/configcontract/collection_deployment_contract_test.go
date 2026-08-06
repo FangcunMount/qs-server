@@ -287,18 +287,6 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 		}
 	}
 
-	attentionApplyAuditWorkflow := readDeploymentContractFile(t, ".github", "workflows", "attention-reconcile-apply-audit.yml")
-	for _, required := range []string{
-		"Attention Reconcile Apply Audit",
-		"EXPECTED_DRY_RUN: 'false'",
-		"EXPECTED_CREATED",
-		"audit-attention-reconcile-dry-run.sh",
-	} {
-		if !strings.Contains(attentionApplyAuditWorkflow, required) {
-			t.Errorf("Attention reconcile apply audit workflow must contain %q", required)
-		}
-	}
-
 	ci := readDeploymentContractFile(t, ".github", "workflows", "ci.yml")
 	for _, required := range []string{
 		"github.com/rhysd/actionlint/cmd/actionlint@v1.7.7",
