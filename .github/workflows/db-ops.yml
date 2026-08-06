@@ -1621,6 +1621,25 @@ jobs:
       - name: Checkout immutable governance tool
         uses: actions/checkout@v6
 
+      - name: Set up Go for canonical DefinitionV2 hashing
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build canonical DefinitionV2 hash helpers
+        env:
+          TOOL_PACKAGE: ./scripts/oneoff/govern_interpretation_model_template_routes
+        run: |
+          set -Eeuo pipefail
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' \
+            -o "$RUNNER_TEMP/model-template-route-hash-linux-amd64" "$TOOL_PACKAGE"
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags='-s -w' \
+            -o "$RUNNER_TEMP/model-template-route-hash-linux-arm64" "$TOOL_PACKAGE"
+          chmod 0700 \
+            "$RUNNER_TEMP/model-template-route-hash-linux-amd64" \
+            "$RUNNER_TEMP/model-template-route-hash-linux-arm64"
+
       - name: Validate SSH configuration
         env:
           SVRA_HOST: ${{ vars.SVRA_HOST }}
@@ -1657,6 +1676,8 @@ jobs:
           KEY_FILE="${RUNNER_TEMP}/qs-svra-model-template-${GOVERNANCE_RUN_TOKEN}.key"
           KNOWN_HOSTS_FILE="${RUNNER_TEMP}/qs-svra-model-template-${GOVERNANCE_RUN_TOKEN}.known_hosts"
           REMOTE_TOOL="/tmp/qs-server-model-template-route-governance-${GOVERNANCE_RUN_TOKEN}.js"
+          REMOTE_HASH_AMD64="/tmp/qs-server-model-template-route-hash-${GOVERNANCE_RUN_TOKEN}-amd64"
+          REMOTE_HASH_ARM64="/tmp/qs-server-model-template-route-hash-${GOVERNANCE_RUN_TOKEN}-arm64"
           cleanup_local_credentials() {
             rm -f -- "$KEY_FILE" "$KNOWN_HOSTS_FILE"
           }
@@ -1685,6 +1706,33 @@ jobs:
             -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
             scripts/oneoff/govern_interpretation_model_template_routes/govern.js \
             "${SVRA_USERNAME}@${SVRA_HOST}:${REMOTE_TOOL}"
+          scp -q \
+            -i "$KEY_FILE" \
+            -P "$SVRA_SSH_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
+            "$RUNNER_TEMP/model-template-route-hash-linux-amd64" \
+            "${SVRA_USERNAME}@${SVRA_HOST}:${REMOTE_HASH_AMD64}"
+          scp -q \
+            -i "$KEY_FILE" \
+            -P "$SVRA_SSH_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
+            "$RUNNER_TEMP/model-template-route-hash-linux-arm64" \
+            "${SVRA_USERNAME}@${SVRA_HOST}:${REMOTE_HASH_ARM64}"
+          ssh \
+            -i "$KEY_FILE" \
+            -p "$SVRA_SSH_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
+            "${SVRA_USERNAME}@${SVRA_HOST}" \
+            chmod 0700 "$REMOTE_HASH_AMD64" "$REMOTE_HASH_ARM64"
           echo "✅ Model template route governance tool transferred for run ${GOVERNANCE_RUN_TOKEN}"
 
       - name: Execute manifest-driven model template route governance
@@ -1739,16 +1787,26 @@ jobs:
 
             GOVERNANCE_RUN_TOKEN="${GITHUB_RUN_ID_INPUT}-${GITHUB_RUN_ATTEMPT_INPUT}"
             TOOL_FILE="/tmp/qs-server-model-template-route-governance-${GOVERNANCE_RUN_TOKEN}.js"
+            HASH_TOOL_AMD64="/tmp/qs-server-model-template-route-hash-${GOVERNANCE_RUN_TOKEN}-amd64"
+            HASH_TOOL_ARM64="/tmp/qs-server-model-template-route-hash-${GOVERNANCE_RUN_TOKEN}-arm64"
+            case "$(uname -m)" in
+              x86_64|amd64) HASH_TOOL_FILE="$HASH_TOOL_AMD64" ;;
+              aarch64|arm64) HASH_TOOL_FILE="$HASH_TOOL_ARM64" ;;
+              *)
+                echo "❌ Unsupported ServerA architecture: $(uname -m)" >&2
+                exit 1
+                ;;
+            esac
             MANIFEST_DIR="/opt/backups/qs-server/interpretation-model-template-route"
             MONGO_BACKUP_DIR="/opt/backups/qs-server/mongodb"
             CONTAINER_NAME="qs-server-model-template-route-${GOVERNANCE_RUN_TOKEN}"
             cleanup_governance() {
               sudo docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
-              rm -f -- "$TOOL_FILE"
+              rm -f -- "$TOOL_FILE" "$HASH_TOOL_AMD64" "$HASH_TOOL_ARM64"
             }
             trap cleanup_governance EXIT
-            if [ ! -s "$TOOL_FILE" ]; then
-              echo "❌ Transferred model template route governance tool is missing or empty" >&2
+            if [ ! -s "$TOOL_FILE" ] || [ ! -s "$HASH_TOOL_FILE" ] || [ ! -x "$HASH_TOOL_FILE" ]; then
+              echo "❌ Transferred model template route governance tools are missing or invalid" >&2
               exit 1
             fi
 
@@ -1797,7 +1855,14 @@ jobs:
               --label "com.fangcunmount.qs-server.operation=interpretation-model-template-route-governance" \
               --label "com.fangcunmount.qs-server.github-run-id=$GITHUB_RUN_ID_INPUT" \
               -v "$TOOL_FILE:/tool/govern.js:ro" \
+              -v "$HASH_TOOL_FILE:/tool/enrich-manifest:ro" \
               -v "$MANIFEST_MOUNT" \
+              -e MONGODB_HOST="$MONGODB_HOST" \
+              -e MONGODB_PORT="$MONGODB_PORT" \
+              -e MONGODB_USERNAME="$MONGODB_USERNAME" \
+              -e MONGODB_PASSWORD="$MONGODB_PASSWORD" \
+              -e MONGODB_DBNAME="$MONGODB_DBNAME" \
+              -e MONGODB_URI="$MONGODB_URI" \
               -e MODEL_TEMPLATE_ROUTE_OPERATION="$MODEL_TEMPLATE_ROUTE_OPERATION_INPUT" \
               -e MODEL_TEMPLATE_ROUTE_MANIFEST_PATH="/work/$MANIFEST_NAME" \
               -e MODEL_TEMPLATE_ROUTE_AFTER_ID="$MODEL_TEMPLATE_ROUTE_AFTER_ID_INPUT" \
@@ -1805,12 +1870,17 @@ jobs:
               -e MODEL_TEMPLATE_ROUTE_REQUIRE_COMPLETE="$MODEL_TEMPLATE_ROUTE_REQUIRE_COMPLETE_INPUT" \
               -e MODEL_TEMPLATE_ROUTE_CONFIRM="$MODEL_TEMPLATE_ROUTE_CONFIRM_INPUT" \
               --entrypoint /usr/bin/timeout \
-              mongo:7.0 80m mongosh "$MONGODB_URI" \
-                --username="$MONGODB_USERNAME" \
-                --password="$MONGODB_PASSWORD" \
-                --authenticationDatabase=admin \
-                --quiet \
-                --file=/tool/govern.js
+              mongo:7.0 80m /bin/bash -Eeuo pipefail -c '
+                mongosh "$MONGODB_URI" \
+                  --username="$MONGODB_USERNAME" \
+                  --password="$MONGODB_PASSWORD" \
+                  --authenticationDatabase=admin \
+                  --quiet \
+                  --file=/tool/govern.js
+                if [ "$MODEL_TEMPLATE_ROUTE_OPERATION" = "audit" ]; then
+                  /tool/enrich-manifest
+                fi
+              '
 
             if [ "$MODEL_TEMPLATE_ROUTE_OPERATION_INPUT" = "audit" ]; then
               if ! sudo test -s "$MANIFEST_DIR/$MANIFEST_NAME"; then

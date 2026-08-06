@@ -173,8 +173,12 @@ function desiredClone(source, record, status, ejson) {
     schema_version: governanceSchemaVersion,
     template_version: targetTemplateVersion,
     source_release_version: record.source_release_version,
+    source_definition_hash: record.source_definition_hash,
+    target_definition_hash: record.target_definition_hash,
     governed_at: record.governed_at
   }
+  clone.source.definition_content_hash = record.target_definition_hash
+  clone.source.definition_hash_schema = "definition-v2/v1"
   if (ejson != null) return ejson.deserialize(ejson.serialize(clone, {relaxed: false}))
   return clone
 }
@@ -217,6 +221,8 @@ function validateGovernanceManifest(manifest) {
     if (!/^[a-f0-9]{24}$/.test(record.source_id || "") || !/^[a-f0-9]{24}$/.test(record.clone_id || "") ||
         sourceIDs.has(record.source_id) || cloneIDs.has(record.clone_id) ||
         !/^[a-f0-9]{64}$/.test(record.source_content_hash || "") ||
+        !/^[a-f0-9]{64}$/.test(record.source_definition_hash || "") ||
+        !/^[a-f0-9]{64}$/.test(record.target_definition_hash || "") ||
         typeof record.template_id !== "string" || typeof record.source_release_version !== "string" ||
         record.target_release_version !== targetReleaseVersion(record.source_release_version) || !record.governed_at) {
       throw new Error(`invalid model template route governance record: ${record.code || "unknown"}`)
@@ -482,7 +488,8 @@ if (typeof module !== "undefined") {
     targetReleaseVersion,
     readConfig,
     validateGovernanceManifest,
-    selectedRecords
+    selectedRecords,
+    desiredClone
   }
 }
 

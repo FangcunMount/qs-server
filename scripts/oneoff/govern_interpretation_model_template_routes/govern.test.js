@@ -75,7 +75,9 @@ test("governance manifest fingerprint rejects tampering", () => {
     source_release_version: "v3",
     target_release_version: "v3-report-202608-v1",
     governed_at: "2026-08-06T00:00:00.000Z",
-    source_content_hash: "a".repeat(64)
+    source_content_hash: "a".repeat(64),
+    source_definition_hash: "b".repeat(64),
+    target_definition_hash: "c".repeat(64)
   }]
   const manifest = {
     schema_version: governance.governanceSchemaVersion,
@@ -86,4 +88,28 @@ test("governance manifest fingerprint rejects tampering", () => {
   governance.validateGovernanceManifest(manifest)
   records[0].template_id = "mbti"
   assert.throws(() => governance.validateGovernanceManifest(manifest), /fingerprint mismatch/)
+})
+
+test("governed clone persists the canonical target definition hash", () => {
+  global.ObjectId = {createFromHexString: value => value}
+  try {
+    const record = {
+      clone_id: "000000000000000000000002",
+      source_release_version: "v3",
+      target_release_version: "v3-report-202608-v1",
+      template_id: "standard",
+      governed_at: "2026-08-06T00:00:00.000Z",
+      source_definition_hash: "b".repeat(64),
+      target_definition_hash: "c".repeat(64)
+    }
+    const clone = governance.desiredClone({
+      definition_v2: snapshot().definition_v2,
+      source: {definition_content_hash: "b".repeat(64)}
+    }, record, "active")
+    assert.equal(clone.source.definition_content_hash, "c".repeat(64))
+    assert.equal(clone.source.definition_hash_schema, "definition-v2/v1")
+    assert.equal(clone.source.interpretation_template_route_governance.source_definition_hash, "b".repeat(64))
+  } finally {
+    delete global.ObjectId
+  }
 })
