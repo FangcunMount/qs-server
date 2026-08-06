@@ -117,7 +117,7 @@ Actor 参与首尾两段：前段把公开入口变成确定的业务参与者�
 | 照护关系与访问范围 | 已实现 | admin 机构范围；非 admin 必须绑定 Clinician 并具有有效访问型关系 |
 | AssessmentEntry 解析与 Intake | 已实现 | token 解析、建档、creator/attending 关系和统计日志在事务内编排 |
 | 入口始终使用最新发布版本 | 设计已确认、实现未完全收敛 | 当前仍存在可选 `target_version`，记录在重构清单 |
-| 高风险重点关注投影 | 已实现并完成生产闭环 | Worker 为报告事件持久化 projection ledger，失败自动重试并以 Artifact fact reconcile 发现漏建记录；只自动标记、不自动取消。2026-08-06 已精确收敛 33 个历史缺口，对账确认 184 条 projection 全成功、high/severe 缺口与重复均为 0，生产临时 fact reconcile 已关闭 |
+| 高风险重点关注投影 | 已实现并完成生产闭环 | Worker 为报告事件持久化 projection ledger，失败自动重试并以 Artifact fact reconcile 发现漏建记录；只自动标记、不自动取消。2026-08-06 前后两批 33+91 个历史缺口均已按独立清单精确收敛；入口退役后对账确认 projection 仅有 succeeded、168 份 high/severe 缺口与重复均为 0，生产 fact reconcile 已关闭且固定清单为空 |
 
 ## 7. 文档地图
 
