@@ -1683,6 +1683,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set up Go for canonical DefinitionV2 hashing
+        if: github.event.inputs.governance_operation == 'audit'
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
@@ -1692,6 +1693,7 @@ jobs:
           cache: false
 
       - name: Build canonical DefinitionV2 hash helpers
+        if: github.event.inputs.governance_operation == 'audit'
         env:
           TOOL_PACKAGE: ./scripts/oneoff/govern_interpretation_model_template_routes
         run: |
@@ -1730,6 +1732,7 @@ jobs:
           SVRA_SSH_PORT: ${{ vars.SVRA_SSH_PORT || 22 }}
           SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
           GOVERNANCE_RUN_TOKEN: ${{ github.run_id }}-${{ github.run_attempt }}
+          MODEL_TEMPLATE_ROUTE_OPERATION_INPUT: ${{ github.event.inputs.governance_operation }}
         run: |
           set -Eeuo pipefail
           if ! [[ "$GOVERNANCE_RUN_TOKEN" =~ ^[0-9]+-[0-9]+$ ]]; then
@@ -1770,33 +1773,35 @@ jobs:
             -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
             scripts/oneoff/govern_interpretation_model_template_routes/govern.js \
             "${SVRA_USERNAME}@${SVRA_HOST}:${REMOTE_TOOL}"
-          scp -q \
-            -i "$KEY_FILE" \
-            -P "$SVRA_SSH_PORT" \
-            -o BatchMode=yes \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
-            "$RUNNER_TEMP/model-template-route-hash-linux-amd64" \
-            "${SVRA_USERNAME}@${SVRA_HOST}:${REMOTE_HASH_AMD64}"
-          scp -q \
-            -i "$KEY_FILE" \
-            -P "$SVRA_SSH_PORT" \
-            -o BatchMode=yes \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
-            "$RUNNER_TEMP/model-template-route-hash-linux-arm64" \
-            "${SVRA_USERNAME}@${SVRA_HOST}:${REMOTE_HASH_ARM64}"
-          ssh \
-            -i "$KEY_FILE" \
-            -p "$SVRA_SSH_PORT" \
-            -o BatchMode=yes \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
-            "${SVRA_USERNAME}@${SVRA_HOST}" \
-            chmod 0700 "$REMOTE_HASH_AMD64" "$REMOTE_HASH_ARM64"
+          if [ "$MODEL_TEMPLATE_ROUTE_OPERATION_INPUT" = "audit" ]; then
+            scp -q \
+              -i "$KEY_FILE" \
+              -P "$SVRA_SSH_PORT" \
+              -o BatchMode=yes \
+              -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
+              "$RUNNER_TEMP/model-template-route-hash-linux-amd64" \
+              "${SVRA_USERNAME}@${SVRA_HOST}:${REMOTE_HASH_AMD64}"
+            scp -q \
+              -i "$KEY_FILE" \
+              -P "$SVRA_SSH_PORT" \
+              -o BatchMode=yes \
+              -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
+              "$RUNNER_TEMP/model-template-route-hash-linux-arm64" \
+              "${SVRA_USERNAME}@${SVRA_HOST}:${REMOTE_HASH_ARM64}"
+            ssh \
+              -i "$KEY_FILE" \
+              -p "$SVRA_SSH_PORT" \
+              -o BatchMode=yes \
+              -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
+              "${SVRA_USERNAME}@${SVRA_HOST}" \
+              chmod 0700 "$REMOTE_HASH_AMD64" "$REMOTE_HASH_ARM64"
+          fi
           echo "✅ Model template route governance tool transferred for run ${GOVERNANCE_RUN_TOKEN}"
 
       - name: Execute manifest-driven model template route governance
@@ -1855,14 +1860,20 @@ jobs:
             TOOL_FILE="/tmp/qs-server-model-template-route-governance-${GOVERNANCE_RUN_TOKEN}.js"
             HASH_TOOL_AMD64="/tmp/qs-server-model-template-route-hash-${GOVERNANCE_RUN_TOKEN}-amd64"
             HASH_TOOL_ARM64="/tmp/qs-server-model-template-route-hash-${GOVERNANCE_RUN_TOKEN}-arm64"
-            case "$(uname -m)" in
-              x86_64|amd64) HASH_TOOL_FILE="$HASH_TOOL_AMD64" ;;
-              aarch64|arm64) HASH_TOOL_FILE="$HASH_TOOL_ARM64" ;;
-              *)
-                echo "❌ Unsupported ServerA architecture: $(uname -m)" >&2
-                exit 1
-                ;;
-            esac
+            if [ "$MODEL_TEMPLATE_ROUTE_OPERATION_INPUT" = "audit" ]; then
+              case "$(uname -m)" in
+                x86_64|amd64) HASH_TOOL_FILE="$HASH_TOOL_AMD64" ;;
+                aarch64|arm64) HASH_TOOL_FILE="$HASH_TOOL_ARM64" ;;
+                *)
+                  echo "❌ Unsupported ServerA architecture: $(uname -m)" >&2
+                  exit 1
+                  ;;
+              esac
+            else
+              # Non-audit operations consume the immutable enriched manifest
+              # and never execute the canonical hash helper.
+              HASH_TOOL_FILE="$TOOL_FILE"
+            fi
             MANIFEST_DIR="/opt/backups/qs-server/interpretation-model-template-route"
             MONGO_BACKUP_DIR="/opt/backups/qs-server/mongodb"
             CONTAINER_NAME="qs-server-model-template-route-${GOVERNANCE_RUN_TOKEN}"
@@ -1871,9 +1882,15 @@ jobs:
               rm -f -- "$TOOL_FILE" "$HASH_TOOL_AMD64" "$HASH_TOOL_ARM64"
             }
             trap cleanup_governance EXIT
-            if [ ! -s "$TOOL_FILE" ] || [ ! -s "$HASH_TOOL_FILE" ] || [ ! -x "$HASH_TOOL_FILE" ]; then
-              echo "❌ Transferred model template route governance tools are missing or invalid" >&2
+            if [ ! -s "$TOOL_FILE" ]; then
+              echo "❌ Transferred model template route governance tool is missing or invalid" >&2
               exit 1
+            fi
+            if [ "$MODEL_TEMPLATE_ROUTE_OPERATION_INPUT" = "audit" ]; then
+              if [ ! -s "$HASH_TOOL_FILE" ] || [ ! -x "$HASH_TOOL_FILE" ]; then
+                echo "❌ Transferred canonical hash helper is missing or invalid" >&2
+                exit 1
+              fi
             fi
 
             sudo install -d -m 0750 "$MANIFEST_DIR"
