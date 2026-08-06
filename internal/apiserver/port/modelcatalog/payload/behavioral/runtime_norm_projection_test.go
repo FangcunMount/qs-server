@@ -106,6 +106,9 @@ func TestBehavioralOutcomeCodeSurvivesDefinitionToInterpretation(t *testing.T) {
 			def := &definition.Definition{
 				Measure:     definition.MeasureSpec{Factors: []factor.Factor{{Code: factorCode, Title: "总分", Role: factor.FactorRoleTotal}}},
 				Calibration: definition.Calibration{NormRefs: []norm.Ref{{FactorCode: factorCode, NormTableVersion: tableVersion}}},
+				ReportMap: definition.ReportMap{Sections: []definition.ReportSection{{
+					Code: definition.ReportSectionKindFactorScores, Kind: definition.ReportSectionKindFactorScores, SourceRefs: []string{factorCode},
+				}}},
 				Conclusions: []conclusion.Conclusion{conclusion.NormConclusion{
 					FactorCode: factorCode,
 					ScoreBasis: conclusion.ScoreBasisTScore,
@@ -148,6 +151,7 @@ func TestBehavioralOutcomeCodeSurvivesDefinitionToInterpretation(t *testing.T) {
 
 			dimension := execution.Dimensions[0]
 			reportLevel := &report.ResultLevel{Code: dimension.Level.Code}
+			profile := report.NewFrozenPresentationProfile([]string{factorCode})
 			reference := &report.NormReference{
 				ScoreKind: string(dimension.NormReference.ScoreKind), Benchmark: dimension.NormReference.Benchmark,
 				TableVersion: dimension.NormReference.TableVersion, FormVariant: dimension.NormReference.FormVariant,
@@ -160,9 +164,10 @@ func TestBehavioralOutcomeCodeSurvivesDefinitionToInterpretation(t *testing.T) {
 				Model: report.ModelIdentity{
 					Kind: string(identity.KindBehavioralRating), Algorithm: string(algorithm), Code: "BEHAVIORAL", Version: "v1", Title: "行为测评",
 				},
-				Runtime: interpinput.RuntimeIdentity{DecisionKind: identity.DecisionKindNormLookup},
-				Result:  interpinput.ResultFacts{Primary: report.NewRawTotalScore(5, nil), Level: reportLevel},
-				Report:  interpinput.ReportSpec{ReportType: policy.ReportTypeStandard, TemplateVersion: policy.TemplateVersionV1},
+				Runtime:             interpinput.RuntimeIdentity{DecisionKind: identity.DecisionKindNormLookup},
+				Result:              interpinput.ResultFacts{Primary: report.NewRawTotalScore(5, nil), Level: reportLevel},
+				Report:              interpinput.ReportSpec{ReportType: policy.ReportTypeStandard, TemplateVersion: policy.TemplateVersionV1},
+				PresentationProfile: &profile,
 				FactorScoring: &interpinput.FactorScoringFacts{
 					Model:   &reportscore.ReportModel{Code: "BEHAVIORAL", Title: "行为测评", Assets: &assets, Factors: []reportscore.FactorReportModel{{Code: factorCode, Title: "总分", IsTotalScore: true}}},
 					Factors: []reportscore.FactorReportScore{{FactorCode: factorCode, FactorName: "总分", RawScore: 5, Level: reportLevel, NormReference: reference, IsTotalScore: true}},
