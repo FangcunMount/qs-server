@@ -118,7 +118,7 @@ func run(ctx context.Context, getenv func(string) string, stdout io.Writer) erro
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	switch cfg.Operation {
 	case "audit":
@@ -205,7 +205,7 @@ func openDatabase(ctx context.Context, cfg mysqldriver.Config) (*sql.DB, error) 
 	pingCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	if err := db.PingContext(pingCtx); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("ping MySQL: %w", err)
 	}
 	return db, nil
@@ -264,7 +264,7 @@ ORDER BY id`)
 	if err != nil {
 		return inventory{}, fmt.Errorf("query evaluation outcomes: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	state := inventory{}
 	for rows.Next() {
 		var row outcomeRow
@@ -482,12 +482,12 @@ func mutateBatch(ctx context.Context, tx *sql.Tx, records []record, operation st
 	if err != nil {
 		return 0, 0, err
 	}
-	defer selectStmt.Close()
+	defer func() { _ = selectStmt.Close() }()
 	updateStmt, err := tx.PrepareContext(ctx, `UPDATE evaluation_outcome SET report_input_json = ? WHERE id = ? AND report_input_json = ?`)
 	if err != nil {
 		return 0, 0, err
 	}
-	defer updateStmt.Close()
+	defer func() { _ = updateStmt.Close() }()
 	updated, already := 0, 0
 	for _, item := range records {
 		var raw string
