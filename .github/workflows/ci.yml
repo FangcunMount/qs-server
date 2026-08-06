@@ -261,7 +261,7 @@ jobs:
       - name: Validate deployment planning contract
         run: bash scripts/cd/test-plan-services.sh
 
-      - name: Validate Attention reconcile dry-run audit contract
+      - name: Validate Attention reconcile dry-run/apply audit contract
         run: bash scripts/cd/test-attention-reconcile-audit.sh
 
       - name: Validate compatibility observation contract

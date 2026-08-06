@@ -5,6 +5,8 @@ EXPECTED_WORKER_REPLICAS="${EXPECTED_WORKER_REPLICAS:-3}"
 EXPECTED_DEPLOY_SHA="${EXPECTED_DEPLOY_SHA:-}"
 MIN_SUCCESSFUL_ROUNDS="${MIN_SUCCESSFUL_ROUNDS:-1}"
 MIN_MISSING="${MIN_MISSING:-1}"
+EXPECTED_DRY_RUN="${EXPECTED_DRY_RUN:-true}"
+EXPECTED_CREATED="${EXPECTED_CREATED:-0}"
 WORKER_METRICS_PORT="${WORKER_METRICS_PORT:-9092}"
 PRIVILEGE_RUNNER="${PRIVILEGE_RUNNER-sudo}"
 DOCKER_BIN="${DOCKER_BIN:-docker}"
@@ -61,7 +63,12 @@ add_numbers() {
 require_positive_integer EXPECTED_WORKER_REPLICAS "$EXPECTED_WORKER_REPLICAS"
 require_positive_integer MIN_SUCCESSFUL_ROUNDS "$MIN_SUCCESSFUL_ROUNDS"
 require_non_negative_integer MIN_MISSING "$MIN_MISSING"
+require_non_negative_integer EXPECTED_CREATED "$EXPECTED_CREATED"
 require_positive_integer WORKER_METRICS_PORT "$WORKER_METRICS_PORT"
+if [ "$EXPECTED_DRY_RUN" != "true" ] && [ "$EXPECTED_DRY_RUN" != "false" ]; then
+  echo "EXPECTED_DRY_RUN must be true or false, got: $EXPECTED_DRY_RUN" >&2
+  exit 1
+fi
 if ! [[ "$EXPECTED_DEPLOY_SHA" =~ ^[0-9a-f]{7,40}$ ]]; then
   echo "EXPECTED_DEPLOY_SHA must be a 7-40 character lowercase Git SHA" >&2
   exit 1
@@ -87,7 +94,9 @@ if [ "$container_count" -ne "$EXPECTED_WORKER_REPLICAS" ]; then
 fi
 
 total_successful_rounds=0
+total_error_rounds=0
 total_created=0
+total_mismatched=0
 latest_missing_max=0
 
 while IFS= read -r container_id; do
@@ -105,7 +114,7 @@ while IFS= read -r container_id; do
   for expected_config in \
     'attention-projection-reconcile-enabled:[[:space:]]*true' \
     'attention-projection-reconcile-from:[[:space:]]*"2026-08-05T00:00:00Z"' \
-    'attention-projection-reconcile-dry-run:[[:space:]]*true'; do
+    "attention-projection-reconcile-dry-run:[[:space:]]*${EXPECTED_DRY_RUN}"; do
     if ! run_privileged "$DOCKER_BIN" exec "$container_id" \
       grep -Eq "^[[:space:]]*${expected_config}[[:space:]]*(#.*)?$" /app/configs/worker.prod.yaml; then
       echo "Worker ${container_id} is missing effective config: ${expected_config}" >&2
@@ -120,14 +129,21 @@ while IFS= read -r container_id; do
     echo "Worker ${container_id} exposes no Attention reconcile metrics" >&2
     exit 1
   fi
-  if printf '%s\n' "$attention_metrics" | grep -Eq 'dry_run="false"'; then
-    echo "Worker ${container_id} exposed a non-dry-run Attention reconcile metric" >&2
+  unexpected_dry_run="true"
+  if [ "$EXPECTED_DRY_RUN" = "true" ]; then
+    unexpected_dry_run="false"
+  fi
+  if grep -Fq "dry_run=\"${unexpected_dry_run}\"" <<<"$attention_metrics"; then
+    echo "Worker ${container_id} exposed unexpected dry_run=${unexpected_dry_run} Attention reconcile metrics" >&2
     exit 1
   fi
 
-  successful_rounds="$(metric_sum "$attention_metrics" attention_fact_reconcile_rounds_total 'dry_run="true"' 'result="success"')"
-  created="$(metric_sum "$attention_metrics" attention_fact_reconcile_total 'dry_run="true"' 'result="created"')"
-  latest_missing="$(metric_sum "$attention_metrics" attention_fact_reconcile_missing 'dry_run="true"')"
+  dry_run_label="dry_run=\"${EXPECTED_DRY_RUN}\""
+  successful_rounds="$(metric_sum "$attention_metrics" attention_fact_reconcile_rounds_total "$dry_run_label" 'result="success"')"
+  error_rounds="$(metric_sum "$attention_metrics" attention_fact_reconcile_rounds_total "$dry_run_label" 'result="error"')"
+  created="$(metric_sum "$attention_metrics" attention_fact_reconcile_total "$dry_run_label" 'result="created"')"
+  mismatched="$(metric_sum "$attention_metrics" attention_fact_reconcile_total "$dry_run_label" 'result="mismatched"')"
+  latest_missing="$(metric_sum "$attention_metrics" attention_fact_reconcile_missing "$dry_run_label")"
   consecutive_failures="$(metric_sum "$attention_metrics" attention_fact_reconcile_consecutive_failures)"
   if [ "$consecutive_failures" -ne 0 ]; then
     echo "Worker ${container_id} has ${consecutive_failures} consecutive Attention reconcile failures" >&2
@@ -135,21 +151,31 @@ while IFS= read -r container_id; do
   fi
 
   total_successful_rounds="$(add_numbers "$total_successful_rounds" "$successful_rounds")"
+  total_error_rounds="$(add_numbers "$total_error_rounds" "$error_rounds")"
   total_created="$(add_numbers "$total_created" "$created")"
+  total_mismatched="$(add_numbers "$total_mismatched" "$mismatched")"
   if [ "$latest_missing" -gt "$latest_missing_max" ]; then
     latest_missing_max="$latest_missing"
   fi
 
-  echo "Worker ${container_id} image=${image_ref} successful_rounds=${successful_rounds} latest_missing=${latest_missing} created=${created} consecutive_failures=${consecutive_failures}"
+  echo "Worker ${container_id} image=${image_ref} dry_run=${EXPECTED_DRY_RUN} successful_rounds=${successful_rounds} error_rounds=${error_rounds} latest_missing=${latest_missing} created=${created} mismatched=${mismatched} consecutive_failures=${consecutive_failures}"
   printf '%s\n' "$attention_metrics" | sort
 done <<<"$container_ids"
 
 if [ "$total_successful_rounds" -lt "$MIN_SUCCESSFUL_ROUNDS" ]; then
-  echo "Successful dry-run rounds=${total_successful_rounds}, want at least ${MIN_SUCCESSFUL_ROUNDS}" >&2
+  echo "Successful Attention reconcile rounds=${total_successful_rounds}, want at least ${MIN_SUCCESSFUL_ROUNDS}" >&2
   exit 1
 fi
-if [ "$total_created" -ne 0 ]; then
-  echo "Dry-run reported created=${total_created}, want 0" >&2
+if [ "$total_error_rounds" -ne 0 ]; then
+  echo "Attention reconcile error rounds=${total_error_rounds}, want 0" >&2
+  exit 1
+fi
+if [ "$total_created" -ne "$EXPECTED_CREATED" ]; then
+  echo "Attention reconcile created=${total_created}, want ${EXPECTED_CREATED}" >&2
+  exit 1
+fi
+if [ "$total_mismatched" -ne 0 ]; then
+  echo "Attention reconcile mismatched=${total_mismatched}, want 0" >&2
   exit 1
 fi
 if [ "$latest_missing_max" -lt "$MIN_MISSING" ]; then
@@ -157,4 +183,4 @@ if [ "$latest_missing_max" -lt "$MIN_MISSING" ]; then
   exit 1
 fi
 
-echo "Attention reconcile dry-run audit passed: replicas=${container_count} successful_rounds=${total_successful_rounds} latest_missing_max=${latest_missing_max} created=${total_created}"
+echo "Attention reconcile audit passed: replicas=${container_count} dry_run=${EXPECTED_DRY_RUN} successful_rounds=${total_successful_rounds} error_rounds=${total_error_rounds} latest_missing_max=${latest_missing_max} created=${total_created} mismatched=${total_mismatched}"

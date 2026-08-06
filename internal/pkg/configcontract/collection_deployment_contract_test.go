@@ -279,10 +279,23 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 		"attention-projection-reconcile-dry-run",
 		"attention_fact_reconcile_rounds_total",
 		"attention_fact_reconcile_consecutive_failures",
-		"Dry-run reported created=",
+		"Attention reconcile created=",
+		"Attention reconcile mismatched=",
 	} {
 		if !strings.Contains(attentionAudit, required) {
 			t.Errorf("Attention reconcile audit must contain %q", required)
+		}
+	}
+
+	attentionApplyAuditWorkflow := readDeploymentContractFile(t, ".github", "workflows", "attention-reconcile-apply-audit.yml")
+	for _, required := range []string{
+		"Attention Reconcile Apply Audit",
+		"EXPECTED_DRY_RUN: 'false'",
+		"EXPECTED_CREATED",
+		"audit-attention-reconcile-dry-run.sh",
+	} {
+		if !strings.Contains(attentionApplyAuditWorkflow, required) {
+			t.Errorf("Attention reconcile apply audit workflow must contain %q", required)
 		}
 	}
 

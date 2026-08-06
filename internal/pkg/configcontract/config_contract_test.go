@@ -306,8 +306,8 @@ func TestWorkerDevProdConfigContracts(t *testing.T) {
 				if cfg.Worker.AttentionProjectionReconcileFrom != "2026-08-05T00:00:00Z" {
 					t.Fatalf("production attention projection reconcile cutover = %q", cfg.Worker.AttentionProjectionReconcileFrom)
 				}
-				if !cfg.Worker.AttentionProjectionReconcileDryRun {
-					t.Fatal("production attention projection reconcile must remain dry-run until apply approval")
+				if cfg.Worker.AttentionProjectionReconcileDryRun {
+					t.Fatal("production attention projection reconcile apply approval must disable dry-run")
 				}
 			} else if cfg.Worker.AttentionProjectionReconcileEnabled {
 				t.Fatal("development attention projection reconcile must remain opt-in")

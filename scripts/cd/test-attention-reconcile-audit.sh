@@ -31,9 +31,10 @@ case "${1:-}" in
     printf '# TYPE attention_fact_reconcile_consecutive_failures gauge\n'
     printf 'attention_fact_reconcile_consecutive_failures 0\n'
     if [ "$container_id" = "worker-1" ]; then
-      printf 'attention_fact_reconcile_rounds_total{dry_run="true",result="success"} 1\n'
-      printf 'attention_fact_reconcile_total{dry_run="true",result="created"} %s\n' "${FAKE_CREATED:-0}"
-      printf 'attention_fact_reconcile_missing{dry_run="true"} 33\n'
+      printf 'attention_fact_reconcile_rounds_total{dry_run="%s",result="success"} 1\n' "${FAKE_DRY_RUN:-true}"
+      printf 'attention_fact_reconcile_total{dry_run="%s",result="created"} %s\n' "${FAKE_DRY_RUN:-true}" "${FAKE_CREATED:-0}"
+      printf 'attention_fact_reconcile_total{dry_run="%s",result="mismatched"} %s\n' "${FAKE_DRY_RUN:-true}" "${FAKE_MISMATCHED:-0}"
+      printf 'attention_fact_reconcile_missing{dry_run="%s"} 33\n' "${FAKE_DRY_RUN:-true}"
     fi
     ;;
   *)
@@ -61,4 +62,15 @@ if env "${COMMON_ENV[@]}" FAKE_CREATED=1 \
   exit 1
 fi
 
-echo "attention reconcile dry-run audit contract passed"
+env "${COMMON_ENV[@]}" EXPECTED_DRY_RUN=false EXPECTED_CREATED=33 \
+  FAKE_DRY_RUN=false FAKE_CREATED=33 \
+  "$SCRIPT_DIR/audit-attention-reconcile-dry-run.sh" >/dev/null
+
+if env "${COMMON_ENV[@]}" EXPECTED_DRY_RUN=false EXPECTED_CREATED=33 \
+  FAKE_DRY_RUN=false FAKE_CREATED=33 FAKE_MISMATCHED=1 \
+  "$SCRIPT_DIR/audit-attention-reconcile-dry-run.sh" >/dev/null 2>&1; then
+  echo "audit accepted an apply run with mismatched projections" >&2
+  exit 1
+fi
+
+echo "attention reconcile dry-run/apply audit contract passed"

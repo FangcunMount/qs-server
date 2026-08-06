@@ -1,30 +1,29 @@
-name: Attention Reconcile Dry-run Audit
+name: Attention Reconcile Apply Audit
 
 on:
   workflow_dispatch:
     inputs:
       expected_sha:
-        description: 'Expected deployed worker SHA; empty means workflow HEAD'
-        required: false
+        description: 'Expected deployed worker SHA'
+        required: true
         type: string
-        default: ''
       minimum_successful_rounds:
-        description: 'Minimum successful dry-run rounds across all worker replicas'
+        description: 'Minimum successful apply rounds across all worker replicas'
         required: true
         type: string
         default: '1'
-      minimum_missing:
-        description: 'Minimum latest missing projection count expected during rehearsal'
+      expected_created:
+        description: 'Exact projection records created by this apply deployment'
         required: true
         type: string
-        default: '1'
+        default: '33'
 
 permissions:
   contents: read
 
 jobs:
   audit:
-    name: Audit Production Worker Dry-run Metrics
+    name: Audit Production Worker Apply Metrics
     runs-on:
       group: qlume
       labels: [self-hosted, macOS, ARM64, ops]
@@ -33,11 +32,11 @@ jobs:
     timeout-minutes: 5
     env:
       EXPECTED_WORKER_REPLICAS: ${{ vars.QS_WORKER_REPLICAS || '3' }}
-      EXPECTED_DEPLOY_SHA: ${{ inputs.expected_sha || github.sha }}
+      EXPECTED_DEPLOY_SHA: ${{ inputs.expected_sha }}
       MIN_SUCCESSFUL_ROUNDS: ${{ inputs.minimum_successful_rounds }}
-      MIN_MISSING: ${{ inputs.minimum_missing }}
-      EXPECTED_DRY_RUN: 'true'
-      EXPECTED_CREATED: '0'
+      MIN_MISSING: '0'
+      EXPECTED_DRY_RUN: 'false'
+      EXPECTED_CREATED: ${{ inputs.expected_created }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -52,7 +51,7 @@ jobs:
           DEPLOY_NODE_HOSTNAME: serverD
         run: bash scripts/cd/setup-runner-ssh.sh
 
-      - name: Audit Attention reconcile dry-run metrics
+      - name: Audit Attention reconcile apply metrics
         env:
           RUNNER_SSH_ALIAS: audit-attention-worker
         run: |
