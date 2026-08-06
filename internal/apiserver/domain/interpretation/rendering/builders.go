@@ -154,7 +154,13 @@ func (b TypologyBuilder) Build(_ context.Context, input interpinput.Interpretati
 }
 
 func DefaultBuilders(composer report.DraftBuilder) []Builder {
-	return []Builder{NewFactorScoringBuilder(composer), NewTypologyBuilder(), NewNormProfileBuilder(composer), NewTaskPerformanceBuilder(composer)}
+	legacy := []Builder{NewFactorScoringBuilder(composer), NewTypologyBuilder(), NewNormProfileBuilder(composer), NewTaskPerformanceBuilder(composer)}
+	builders := make([]Builder, 0, len(legacy)*2)
+	builders = append(builders, legacy...)
+	for _, builder := range legacy {
+		builders = append(builders, Versioned(builder, policy.TemplateVersionCurrent))
+	}
+	return builders
 }
 
 func withInputSummary(input interpinput.InterpretationInput, draft *report.Draft) *report.Draft {

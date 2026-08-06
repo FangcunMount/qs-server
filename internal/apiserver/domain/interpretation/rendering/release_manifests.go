@@ -15,9 +15,9 @@ func BuiltinReleaseManifests() ([]domainreporttemplate.ReleaseManifest, error) {
 	if err != nil {
 		return nil, err
 	}
-	route := func(decisionKind modelcatalog.DecisionKind, adapterKey string) (domainreporttemplate.ManifestRoute, error) {
+	route := func(version policy.TemplateVersion, decisionKind modelcatalog.DecisionKind, adapterKey string) (domainreporttemplate.ManifestRoute, error) {
 		builder, err := registry.ResolveByMechanism(Key{
-			DecisionKind: decisionKind, ReportType: policy.ReportTypeStandard, TemplateVersion: policy.TemplateVersionV1,
+			DecisionKind: decisionKind, ReportType: policy.ReportTypeStandard, TemplateVersion: version,
 		})
 		if err != nil {
 			return domainreporttemplate.ManifestRoute{}, err
@@ -27,10 +27,10 @@ func BuiltinReleaseManifests() ([]domainreporttemplate.ReleaseManifest, error) {
 			ContentSchemaVersion: builder.ContentSchemaVersion(), AdapterKey: adapterKey,
 		}, nil
 	}
-	routes := func(adapterKey string, decisionKinds ...modelcatalog.DecisionKind) ([]domainreporttemplate.ManifestRoute, error) {
+	routes := func(version policy.TemplateVersion, adapterKey string, decisionKinds ...modelcatalog.DecisionKind) ([]domainreporttemplate.ManifestRoute, error) {
 		result := make([]domainreporttemplate.ManifestRoute, 0, len(decisionKinds))
 		for _, decisionKind := range decisionKinds {
-			item, err := route(decisionKind, adapterKey)
+			item, err := route(version, decisionKind, adapterKey)
 			if err != nil {
 				return nil, err
 			}
@@ -68,19 +68,22 @@ func BuiltinReleaseManifests() ([]domainreporttemplate.ReleaseManifest, error) {
 		}},
 	}
 
-	manifests := make([]domainreporttemplate.ReleaseManifest, 0, len(specs))
-	for _, spec := range specs {
-		manifestRoutes, err := routes(spec.adapterKey, spec.decisionKind...)
-		if err != nil {
-			return nil, fmt.Errorf("resolve report template manifest %s: %w", spec.templateID, err)
+	versions := []policy.TemplateVersion{policy.TemplateVersionV1, policy.TemplateVersionCurrent}
+	manifests := make([]domainreporttemplate.ReleaseManifest, 0, len(specs)*len(versions))
+	for _, version := range versions {
+		for _, spec := range specs {
+			manifestRoutes, err := routes(version, spec.adapterKey, spec.decisionKind...)
+			if err != nil {
+				return nil, fmt.Errorf("resolve report template manifest %s@%s: %w", spec.templateID, version, err)
+			}
+			manifest, err := domainreporttemplate.NewReleaseManifest(
+				spec.templateID, version, policy.ReportTypeStandard, manifestRoutes,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("build report template manifest %s@%s: %w", spec.templateID, version, err)
+			}
+			manifests = append(manifests, manifest)
 		}
-		manifest, err := domainreporttemplate.NewReleaseManifest(
-			spec.templateID, policy.TemplateVersionV1, policy.ReportTypeStandard, manifestRoutes,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("build report template manifest %s: %w", spec.templateID, err)
-		}
-		manifests = append(manifests, manifest)
 	}
 	return manifests, nil
 }

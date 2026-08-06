@@ -25,4 +25,7 @@ func TestBuiltinReleaseManifestCatalogReturnsDefensiveCopies(t *testing.T) {
 	if _, ok := catalog.ResolveManifest("unknown", policy.TemplateVersionV1); ok {
 		t.Fatal("unknown template release must not resolve")
 	}
+	if _, ok := catalog.ResolveManifest("standard", policy.TemplateVersionCurrent); !ok {
+		t.Fatal("standard@2026-08-v1 manifest is missing")
+	}
 }
