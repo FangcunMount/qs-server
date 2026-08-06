@@ -1,6 +1,8 @@
 package options
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -95,9 +97,11 @@ type WorkerOptions struct {
 	EventConfigPath string `json:"event_config_path" mapstructure:"event-config-path"`
 	// Attention fact reconciliation is opt-in. Production must set an explicit
 	// immutable cutover before enabling it.
-	AttentionProjectionReconcileEnabled bool   `json:"attention_projection_reconcile_enabled" mapstructure:"attention-projection-reconcile-enabled"`
-	AttentionProjectionReconcileFrom    string `json:"attention_projection_reconcile_from" mapstructure:"attention-projection-reconcile-from"`
-	AttentionProjectionReconcileDryRun  bool   `json:"attention_projection_reconcile_dry_run" mapstructure:"attention-projection-reconcile-dry-run"`
+	AttentionProjectionReconcileEnabled     bool     `json:"attention_projection_reconcile_enabled" mapstructure:"attention-projection-reconcile-enabled"`
+	AttentionProjectionReconcileFrom        string   `json:"attention_projection_reconcile_from" mapstructure:"attention-projection-reconcile-from"`
+	AttentionProjectionReconcileDryRun      bool     `json:"attention_projection_reconcile_dry_run" mapstructure:"attention-projection-reconcile-dry-run"`
+	AttentionProjectionReconcileReportIDs   []string `json:"attention_projection_reconcile_report_ids" mapstructure:"attention-projection-reconcile-report-ids"`
+	AttentionProjectionReconcileFingerprint string   `json:"attention_projection_reconcile_fingerprint" mapstructure:"attention-projection-reconcile-fingerprint"`
 }
 
 // NotificationOptions 通知配置。
@@ -264,6 +268,10 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 		"RFC3339 cutover timestamp for attention projection fact reconciliation")
 	workerFS.BoolVar(&o.Worker.AttentionProjectionReconcileDryRun, "worker.attention-projection-reconcile-dry-run", o.Worker.AttentionProjectionReconcileDryRun,
 		"Detect missing attention projections without creating them")
+	workerFS.StringSliceVar(&o.Worker.AttentionProjectionReconcileReportIDs, "worker.attention-projection-reconcile-report-ids", o.Worker.AttentionProjectionReconcileReportIDs,
+		"Immutable report ID allowlist for a governed attention projection recovery")
+	workerFS.StringVar(&o.Worker.AttentionProjectionReconcileFingerprint, "worker.attention-projection-reconcile-fingerprint", o.Worker.AttentionProjectionReconcileFingerprint,
+		"Lowercase SHA-256 fingerprint of the governed attention fact manifest")
 
 	notificationFS := fss.FlagSet("notification")
 	notificationFS.StringVar(&o.Notification.GatewayURL, "notification.gateway-url", o.Notification.GatewayURL,
@@ -328,6 +336,17 @@ func (o *Options) Validate() []error {
 			errs = append(errs, fmt.Errorf("worker.attention_projection_reconcile_from is required when attention projection reconcile is enabled"))
 		} else if _, err := time.Parse(time.RFC3339, o.Worker.AttentionProjectionReconcileFrom); err != nil {
 			errs = append(errs, fmt.Errorf("worker.attention_projection_reconcile_from must be RFC3339"))
+		}
+		hasReportIDs := len(o.Worker.AttentionProjectionReconcileReportIDs) > 0
+		hasFingerprint := strings.TrimSpace(o.Worker.AttentionProjectionReconcileFingerprint) != ""
+		if hasReportIDs != hasFingerprint {
+			errs = append(errs, fmt.Errorf("worker attention projection report IDs and SHA-256 fingerprint must be configured together"))
+		}
+		if hasFingerprint {
+			decoded, err := hex.DecodeString(o.Worker.AttentionProjectionReconcileFingerprint)
+			if err != nil || len(decoded) != sha256.Size || len(o.Worker.AttentionProjectionReconcileFingerprint) != sha256.Size*2 || o.Worker.AttentionProjectionReconcileFingerprint != strings.ToLower(o.Worker.AttentionProjectionReconcileFingerprint) {
+				errs = append(errs, fmt.Errorf("worker attention projection reconcile fingerprint must be lowercase SHA-256"))
+			}
 		}
 	}
 	if len(o.Redis.Addrs) == 0 && o.Redis.Port <= 0 {

@@ -1051,6 +1051,13 @@ jobs:
                 return counts
               }, {})
               const safetyCutoff = new Date(Date.now() - 30 * 60 * 1000)
+              const crypto = require("crypto")
+              const manifestLines = gaps.map(gap => [
+                gap.report_id, gap.assessment_id, gap.testee_id, gap.risk_level, "true"
+              ].join("\t")).sort()
+              const manifestFingerprint = crypto.createHash("sha256")
+                .update(manifestLines.join("\n") + "\n")
+                .digest("hex")
               print(`High-risk report artifact attention coverage since ${process.env.AUDIT_FROM}:`)
               printjson({
                 artifacts: targetDB.getCollection("interpret_report_artifacts").countDocuments({
@@ -1066,7 +1073,12 @@ jobs:
                 generated_within_30m_safety_lag: gaps.filter(gap => gap.generated_at >= safetyCutoff).length,
                 oldest_generated_at: gaps.length > 0 ? gaps[0].generated_at : null,
                 newest_generated_at: gaps.length > 0 ? gaps[gaps.length - 1].generated_at : null,
-                by_risk: gapCountsByRisk
+                by_risk: gapCountsByRisk,
+                target_manifest: {
+                  count: gaps.length,
+                  fingerprint: manifestFingerprint,
+                  report_ids: gaps.map(gap => gap.report_id).sort()
+                }
               })
               const fs = require("fs")
               fs.writeFileSync(

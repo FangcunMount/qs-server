@@ -80,6 +80,43 @@ func TestOptionsValidateHoldReplayHardCap(t *testing.T) {
 	t.Fatal("expected hold replay hard-cap validation error")
 }
 
+func TestOptionsValidateAttentionManifestGuard(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		reportIDs   []string
+		fingerprint string
+		wantError   string
+	}{
+		{name: "missing fingerprint", reportIDs: []string{"11"}, wantError: "configured together"},
+		{name: "missing report IDs", fingerprint: strings.Repeat("a", 64), wantError: "configured together"},
+		{name: "invalid fingerprint", reportIDs: []string{"11"}, fingerprint: "invalid", wantError: "lowercase SHA-256"},
+		{name: "valid", reportIDs: []string{"11"}, fingerprint: strings.Repeat("a", 64)},
+	}
+	for _, testCase := range tests {
+		testCase := testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			opts := NewOptions()
+			opts.Worker.AttentionProjectionReconcileEnabled = true
+			opts.Worker.AttentionProjectionReconcileFrom = "2026-08-01T00:00:00Z"
+			opts.Worker.AttentionProjectionReconcileReportIDs = testCase.reportIDs
+			opts.Worker.AttentionProjectionReconcileFingerprint = testCase.fingerprint
+			errs := opts.Validate()
+			if testCase.wantError == "" {
+				if containsWorkerValidationError(errs, "attention projection") {
+					t.Fatalf("Validate() errors = %v, want no Attention manifest error", errs)
+				}
+				return
+			}
+			if !containsWorkerValidationError(errs, testCase.wantError) {
+				t.Fatalf("Validate() errors = %v, want substring %q", errs, testCase.wantError)
+			}
+		})
+	}
+}
+
 func TestOptionsValidateSecureGRPCRequiresCompleteMTLSIdentity(t *testing.T) {
 	t.Parallel()
 

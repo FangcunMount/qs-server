@@ -33,6 +33,8 @@ worker:
   attention-projection-reconcile-enabled: false
   attention-projection-reconcile-from: ""
   attention-projection-reconcile-dry-run: true
+  attention-projection-reconcile-report-ids: []
+  attention-projection-reconcile-fingerprint: ""
   service-name: "qs-worker"   # 服务名称（用于日志和监控）
   concurrency: 5              # 并发处理数（开发环境适度）
 

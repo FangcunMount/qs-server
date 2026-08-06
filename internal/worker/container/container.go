@@ -131,13 +131,24 @@ func (c *Container) initAttentionProjection() error {
 		}
 		c.attentionFactReconciler, err = attentionprojection.NewFactReconciler(
 			source, store, c.attentionProjector, c.locks, from,
-			c.opts.Worker.AttentionProjectionReconcileDryRun, 0, 500, c.logger,
+			c.opts.Worker.AttentionProjectionReconcileDryRun, targetedReconcileInterval(c.opts.Worker), 500,
+			attentionprojection.FactManifestGuard{
+				ReportIDs:   c.opts.Worker.AttentionProjectionReconcileReportIDs,
+				Fingerprint: c.opts.Worker.AttentionProjectionReconcileFingerprint,
+			}, c.logger,
 		)
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func targetedReconcileInterval(opts *options.WorkerOptions) time.Duration {
+	if opts != nil && len(opts.AttentionProjectionReconcileReportIDs) > 0 {
+		return time.Minute
+	}
+	return 0
 }
 
 func (c *Container) buildReportStatusReporter() *reportstatus.Reporter {
