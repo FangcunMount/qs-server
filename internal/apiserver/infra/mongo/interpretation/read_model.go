@@ -115,6 +115,20 @@ func normalizeArchivedReportRow(row *evaluationreadmodel.ReportRow) {
 	if row.PrimaryScore == nil && (row.TotalScore != 0 || row.RiskLevel != "") {
 		row.PrimaryScore = &evaluationreadmodel.ScoreValueRow{Kind: "raw_total", Value: row.TotalScore}
 	}
+	if row.PresentationProfile == nil && len(row.Dimensions) > 0 {
+		codes := make([]string, 0, len(row.Dimensions))
+		seen := make(map[string]bool, len(row.Dimensions))
+		for _, dimension := range row.Dimensions {
+			if dimension.FactorCode != "" && !seen[dimension.FactorCode] {
+				seen[dimension.FactorCode] = true
+				codes = append(codes, dimension.FactorCode)
+			}
+		}
+		row.PresentationProfile = &evaluationreadmodel.PresentationProfileRow{
+			VisibleFactorCodes: codes,
+			Source:             "legacy_artifact_dimensions/v1",
+		}
+	}
 	if row.Level != nil {
 		return
 	}

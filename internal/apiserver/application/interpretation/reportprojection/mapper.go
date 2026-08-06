@@ -2,7 +2,6 @@ package reportprojection
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/policy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/presentation"
@@ -11,27 +10,25 @@ import (
 )
 
 // Mapper projects read-model rows into audience-aware report DTOs.
-type Mapper struct{}
+type Mapper struct {
+	Legacy domainreport.LegacyDimensionVisibilityResolver
+}
 
-func (Mapper) FromRow(ctx context.Context, row interpretationreadmodel.ReportRow, audience policy.Audience) (*Report, error) {
+func (m Mapper) FromRow(ctx context.Context, row interpretationreadmodel.ReportRow, audience policy.Audience) (*Report, error) {
 	model := modelIdentityFromRow(row)
-	profile := presentationProfileFromRow(&row)
-	configured := profile != nil
-	if configured && !profile.Configured() {
-		return nil, fmt.Errorf("unsupported interpretation presentation profile source: %s", profile.Source)
-	}
-	if !configured && domainreport.UsesFactorScoreVisibility(model) {
-		return nil, fmt.Errorf("interpretation presentation profile is required for factor-score report %s", model.Code)
+	profile, configured, err := domainreport.ResolvePresentationProfile(ctx, model, presentationProfileFromRow(&row), m.Legacy)
+	if err != nil {
+		return nil, err
 	}
 	dimensions := row.Dimensions
 	if configured {
 		dimensions = filterDimensionRows(row.Dimensions, profile.VisibleSet())
 	}
-	return fromProjectedRow(row, dimensions, audience, profileSource(profile))
+	return fromProjectedRow(row, dimensions, audience, profileSource(configured, profile))
 }
 
-func profileSource(profile *domainreport.PresentationProfile) string {
-	if profile == nil {
+func profileSource(configured bool, profile domainreport.PresentationProfile) string {
+	if !configured {
 		return ""
 	}
 	return string(profile.Source)
