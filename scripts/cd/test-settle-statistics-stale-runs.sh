@@ -9,6 +9,7 @@ for required in \
   "TTL 'cache:lock:statistics:1'" \
   'rebuild[-_]?statistics' \
   'START TRANSACTION' \
+  'run --rm --interactive --network infra-network' \
   'FOR UPDATE' \
   'SET @eligible_count' \
   'AND @eligible_count = 6' \

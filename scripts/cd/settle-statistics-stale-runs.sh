@@ -85,7 +85,7 @@ fi
 echo "Statistics stale-run preflight passed: task_lock_absent=true host_rebuild_processes=0 matching_rebuild_containers=0"
 
 settlement_output="$(
-  run_privileged "$DOCKER_BIN" run --rm --network infra-network \
+  run_privileged "$DOCKER_BIN" run --rm --interactive --network infra-network \
     --label "com.fangcunmount.qs-server.operation=statistics-stale-run-settlement" \
     -e MYSQL_PWD="$MYSQL_PASSWORD" \
     mysql:8.0 mysql --protocol=tcp \
