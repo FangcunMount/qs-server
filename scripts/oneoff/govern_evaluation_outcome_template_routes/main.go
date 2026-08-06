@@ -17,22 +17,28 @@ import (
 	"time"
 
 	mysqldriver "github.com/go-sql-driver/mysql"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
 const (
-	governanceSchemaVersion = "evaluation-outcome-template-route-governance/v1"
+	governanceSchemaVersion = "evaluation-outcome-template-route-governance/v2"
 	targetLegacyVersion     = "legacy-v1"
 	targetCurrentVersion    = "2026-08-v1"
 	applyConfirmation       = "materialize-outcome-template-route-legacy-v1"
 	rollbackConfirmation    = "rollback-outcome-template-route-legacy-v1"
 	transactionBatchSize    = 200
+	artifactCollection      = "interpret_report_artifacts"
 )
 
 var knownTemplateIDs = map[string]struct{}{
 	"standard": {}, "mbti": {}, "sbti": {}, "bigfive": {}, "enneagram": {},
 }
+
+var errReportSectionsRequired = errors.New("InterpretationAssets.ReportSpec.Sections is required")
 
 type config struct {
 	Operation       string
@@ -42,6 +48,15 @@ type config struct {
 	RequireComplete bool
 	Confirm         string
 	MySQL           mysqldriver.Config
+	Mongo           mongoConfig
+}
+
+type mongoConfig struct {
+	Host     string
+	Port     string
+	Username string
+	Password string
+	Database string
 }
 
 type manifest struct {
@@ -50,23 +65,56 @@ type manifest struct {
 	Table              string   `json:"table"`
 	GeneratedAt        string   `json:"generated_at"`
 	TargetLegacy       string   `json:"target_legacy_version"`
+	MongoDatabase      string   `json:"mongo_database"`
+	ArtifactCollection string   `json:"artifact_collection"`
 	Records            []record `json:"records"`
 	RecordsFingerprint string   `json:"records_fingerprint"`
 }
 
 type record struct {
-	OutcomeID          uint64         `json:"outcome_id"`
-	ModelKind          string         `json:"model_kind"`
-	ModelCode          string         `json:"model_code"`
-	ModelVersion       string         `json:"model_version"`
-	EvaluatedAt        string         `json:"evaluated_at"`
-	TemplateID         string         `json:"template_id"`
-	TemplateVersion    string         `json:"template_version"`
-	SourceRawHash      string         `json:"source_raw_hash"`
-	SourceSemanticHash string         `json:"source_semantic_hash"`
-	TargetSemanticHash string         `json:"target_semantic_hash"`
-	Sections           []sectionDelta `json:"sections"`
-	TypologyRouting    *routeDelta    `json:"typology_routing,omitempty"`
+	OutcomeID          uint64                     `json:"outcome_id"`
+	ModelKind          string                     `json:"model_kind"`
+	ModelCode          string                     `json:"model_code"`
+	ModelVersion       string                     `json:"model_version"`
+	EvaluatedAt        string                     `json:"evaluated_at"`
+	TemplateID         string                     `json:"template_id"`
+	TemplateVersion    string                     `json:"template_version"`
+	SourceRawHash      string                     `json:"source_raw_hash"`
+	SourceSemanticHash string                     `json:"source_semantic_hash"`
+	TargetSemanticHash string                     `json:"target_semantic_hash"`
+	Sections           []sectionDelta             `json:"sections"`
+	TypologyRouting    *routeDelta                `json:"typology_routing,omitempty"`
+	Materialization    *reportSpecMaterialization `json:"report_spec_materialization,omitempty"`
+}
+
+type reportSpecMaterialization struct {
+	OriginalSectionsState string           `json:"original_sections_state"`
+	Section               frozenSection    `json:"section"`
+	Artifact              artifactEvidence `json:"artifact"`
+}
+
+type frozenSection struct {
+	Code            string   `json:"Code"`
+	Title           string   `json:"Title,omitempty"`
+	SourceRefs      []string `json:"SourceRefs"`
+	Kind            string   `json:"Kind"`
+	AdapterKey      string   `json:"AdapterKey,omitempty"`
+	TemplateID      string   `json:"TemplateID"`
+	TemplateVersion string   `json:"TemplateVersion"`
+	CategoryLabel   string   `json:"CategoryLabel,omitempty"`
+}
+
+type artifactEvidence struct {
+	ArtifactID           uint64 `json:"artifact_id"`
+	OutcomeID            uint64 `json:"outcome_id"`
+	TemplateVersion      string `json:"template_version"`
+	BuilderIdentity      string `json:"builder_identity"`
+	ContentSchemaVersion string `json:"content_schema_version"`
+	ModelKind            string `json:"model_kind"`
+	ModelCode            string `json:"model_code"`
+	ModelVersion         string `json:"model_version"`
+	PresentationSource   string `json:"presentation_source"`
+	Fingerprint          string `json:"fingerprint"`
 }
 
 type fieldState struct {
@@ -94,12 +142,14 @@ type reportPlan struct {
 	TargetJSON         string
 	Sections           []sectionDelta
 	TypologyRouting    *routeDelta
+	Materialization    *reportSpecMaterialization
 }
 
 type inventory struct {
-	Total      int64 `json:"total"`
-	Explicit   int64 `json:"explicit"`
-	Candidates int64 `json:"candidates"`
+	Total                int64 `json:"total"`
+	Explicit             int64 `json:"explicit"`
+	Candidates           int64 `json:"candidates"`
+	MaterializedSections int64 `json:"materialized_sections"`
 }
 
 func main() {
@@ -119,21 +169,38 @@ func run(ctx context.Context, getenv func(string) string, stdout io.Writer) erro
 		return err
 	}
 	defer func() { _ = db.Close() }()
+	mongoClient, mongoDatabase, err := openMongoDatabase(ctx, cfg.Mongo)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = mongoClient.Disconnect(context.Background()) }()
 
 	switch cfg.Operation {
 	case "audit":
-		return audit(ctx, db, cfg, stdout)
+		return audit(ctx, db, mongoDatabase, cfg, stdout)
 	case "apply", "rollback", "verify":
 		governance, err := readManifest(cfg.ManifestPath)
 		if err != nil {
 			return err
 		}
-		if err := validateManifest(governance, cfg.MySQL.DBName); err != nil {
+		if err := validateManifest(governance, cfg.MySQL.DBName, cfg.Mongo.Database); err != nil {
 			return err
 		}
 		records := selectedRecords(governance.Records, cfg)
+		var artifacts map[uint64]artifactCandidate
+		if cfg.Operation != "rollback" {
+			if hasReportSpecMaterialization(governance.Records) {
+				artifacts, _, err = loadArtifactIndex(ctx, mongoDatabase)
+				if err != nil {
+					return err
+				}
+				if err := validateArtifactEvidence(records, artifacts); err != nil {
+					return err
+				}
+			}
+		}
 		if cfg.Operation == "verify" {
-			return verify(ctx, db, records, cfg.RequireComplete, stdout)
+			return verify(ctx, db, records, artifacts, cfg.RequireComplete, stdout)
 		}
 		return mutate(ctx, db, records, cfg.Operation, stdout)
 	default:
@@ -192,6 +259,17 @@ func readConfig(getenv func(string) string) (config, error) {
 	if host == "" || cfg.MySQL.User == "" || cfg.MySQL.Passwd == "" || cfg.MySQL.DBName == "" {
 		return config{}, errors.New("MYSQL_HOST, MYSQL_USERNAME, MYSQL_PASSWORD and MYSQL_DATABASE are required")
 	}
+	cfg.Mongo = mongoConfig{
+		Host: strings.TrimSpace(getenv("MONGODB_HOST")), Port: strings.TrimSpace(getenv("MONGODB_PORT")),
+		Username: strings.TrimSpace(getenv("MONGODB_USERNAME")), Password: getenv("MONGODB_PASSWORD"),
+		Database: strings.TrimSpace(getenv("MONGODB_DBNAME")),
+	}
+	if cfg.Mongo.Port == "" {
+		cfg.Mongo.Port = "27017"
+	}
+	if cfg.Mongo.Host == "" || cfg.Mongo.Username == "" || cfg.Mongo.Password == "" || cfg.Mongo.Database == "" {
+		return config{}, errors.New("MONGODB_HOST, MONGODB_USERNAME, MONGODB_PASSWORD and MONGODB_DBNAME are required")
+	}
 	return cfg, nil
 }
 
@@ -211,10 +289,44 @@ func openDatabase(ctx context.Context, cfg mysqldriver.Config) (*sql.DB, error) 
 	return db, nil
 }
 
-func audit(ctx context.Context, db *sql.DB, cfg config, stdout io.Writer) error {
+func openMongoDatabase(ctx context.Context, cfg mongoConfig) (*mongo.Client, *mongo.Database, error) {
+	uri := "mongodb://" + net.JoinHostPort(cfg.Host, cfg.Port)
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri).SetAuth(options.Credential{
+		AuthSource: "admin", Username: cfg.Username, Password: cfg.Password,
+	}).SetConnectTimeout(30*time.Second).SetServerSelectionTimeout(30*time.Second))
+	if err != nil {
+		return nil, nil, fmt.Errorf("connect MongoDB: %w", err)
+	}
+	pingCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	if err := client.Ping(pingCtx, nil); err != nil {
+		_ = client.Disconnect(context.Background())
+		return nil, nil, fmt.Errorf("ping MongoDB: %w", err)
+	}
+	return client, client.Database(cfg.Database), nil
+}
+
+func audit(ctx context.Context, db *sql.DB, mongoDatabase *mongo.Database, cfg config, stdout io.Writer) error {
 	generatedAt := time.Now().UTC()
+	artifacts, artifactInventory, err := loadArtifactIndex(ctx, mongoDatabase)
+	if err != nil {
+		return err
+	}
 	records := make([]record, 0)
-	state, err := scanOutcomes(ctx, db, func(row outcomeRow, plan reportPlan) error {
+	state, err := scanOutcomesWithPlanner(ctx, db, func(row outcomeRow) (reportPlan, error) {
+		plan, planErr := planReportInput(row.ReportInput, row.ModelKind)
+		if planErr == nil {
+			return plan, nil
+		}
+		if !errors.Is(planErr, errReportSectionsRequired) {
+			return reportPlan{}, planErr
+		}
+		materialization, materializeErr := materializationFromArtifact(row, artifacts[row.ID])
+		if materializeErr != nil {
+			return reportPlan{}, materializeErr
+		}
+		return planReportInputWithMaterialization(row.ReportInput, row.ModelKind, materialization)
+	}, func(row outcomeRow, plan reportPlan) error {
 		if !plan.Changed {
 			return nil
 		}
@@ -223,6 +335,7 @@ func audit(ctx context.Context, db *sql.DB, cfg config, stdout io.Writer) error 
 			EvaluatedAt: row.EvaluatedAt.UTC().Format(time.RFC3339Nano), TemplateID: plan.TemplateID, TemplateVersion: plan.TemplateVersion,
 			SourceRawHash: hashString(row.ReportInput), SourceSemanticHash: plan.SourceSemanticHash,
 			TargetSemanticHash: plan.TargetSemanticHash, Sections: plan.Sections, TypologyRouting: plan.TypologyRouting,
+			Materialization: plan.Materialization,
 		})
 		return nil
 	})
@@ -236,6 +349,7 @@ func audit(ctx context.Context, db *sql.DB, cfg config, stdout io.Writer) error 
 	governance := manifest{
 		SchemaVersion: governanceSchemaVersion, Database: cfg.MySQL.DBName, Table: "evaluation_outcome",
 		GeneratedAt: generatedAt.Format(time.RFC3339Nano), TargetLegacy: targetLegacyVersion,
+		MongoDatabase: cfg.Mongo.Database, ArtifactCollection: artifactCollection,
 		Records: records, RecordsFingerprint: fingerprint,
 	}
 	if err := writeManifest(cfg.ManifestPath, governance); err != nil {
@@ -243,7 +357,8 @@ func audit(ctx context.Context, db *sql.DB, cfg config, stdout io.Writer) error 
 	}
 	return writeResult(stdout, map[string]any{
 		"operation": "audit", "inventory": state, "records": len(records),
-		"manifest_path": cfg.ManifestPath, "records_fingerprint": fingerprint,
+		"artifact_inventory": artifactInventory,
+		"manifest_path":      cfg.ManifestPath, "records_fingerprint": fingerprint,
 	})
 }
 
@@ -256,7 +371,215 @@ type outcomeRow struct {
 	ReportInput  string
 }
 
+type artifactDocument struct {
+	DomainID             int64                 `bson:"domain_id"`
+	OutcomeID            int64                 `bson:"outcome_id"`
+	TemplateVersion      string                `bson:"template_version"`
+	BuilderIdentity      string                `bson:"builder_identity"`
+	ContentSchemaVersion string                `bson:"content_schema_version"`
+	Model                *artifactModel        `bson:"model"`
+	PresentationProfile  *artifactPresentation `bson:"presentation_profile"`
+}
+
+type artifactModel struct {
+	Kind    string `bson:"kind"`
+	Code    string `bson:"code"`
+	Version string `bson:"version"`
+}
+
+type artifactPresentation struct {
+	VisibleFactorCodes []string `bson:"visible_factor_codes"`
+	Source             string   `bson:"source"`
+}
+
+type artifactCandidate struct {
+	Document artifactDocument
+	Count    int
+}
+
+type artifactInventory struct {
+	Scanned           int64 `json:"scanned"`
+	Indexed           int64 `json:"indexed"`
+	DuplicateOutcomes int64 `json:"duplicate_outcomes"`
+}
+
+func loadArtifactIndex(ctx context.Context, database *mongo.Database) (map[uint64]artifactCandidate, artifactInventory, error) {
+	if database == nil {
+		return nil, artifactInventory{}, errors.New("MongoDB artifact database is required")
+	}
+	cursor, err := database.Collection(artifactCollection).Find(ctx, bson.M{
+		"deleted_at": nil, "template_version": targetLegacyVersion,
+	}, options.Find().SetProjection(bson.M{
+		"_id": 0, "domain_id": 1, "outcome_id": 1, "template_version": 1,
+		"builder_identity": 1, "content_schema_version": 1, "model": 1, "presentation_profile": 1,
+	}).SetBatchSize(2000))
+	if err != nil {
+		return nil, artifactInventory{}, fmt.Errorf("query legacy Interpretation artifacts: %w", err)
+	}
+	defer func() { _ = cursor.Close(context.Background()) }()
+	index := make(map[uint64]artifactCandidate)
+	state := artifactInventory{}
+	for cursor.Next(ctx) {
+		var document artifactDocument
+		if err := cursor.Decode(&document); err != nil {
+			return nil, state, fmt.Errorf("decode legacy Interpretation artifact: %w", err)
+		}
+		state.Scanned++
+		if document.DomainID <= 0 || document.OutcomeID <= 0 {
+			return nil, state, errors.New("legacy Interpretation artifact identity is invalid")
+		}
+		outcomeID := uint64(document.OutcomeID)
+		candidate, exists := index[outcomeID]
+		if !exists {
+			index[outcomeID] = artifactCandidate{Document: document, Count: 1}
+			state.Indexed++
+			continue
+		}
+		if candidate.Count == 1 {
+			state.DuplicateOutcomes++
+		}
+		candidate.Count++
+		index[outcomeID] = candidate
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, state, fmt.Errorf("scan legacy Interpretation artifacts: %w", err)
+	}
+	return index, state, nil
+}
+
+func materializationFromArtifact(row outcomeRow, candidate artifactCandidate) (*reportSpecMaterialization, error) {
+	evidence, codes, err := artifactEvidenceFor(row, candidate)
+	if err != nil {
+		return nil, err
+	}
+	root, _, err := decodeCanonicalJSON(row.ReportInput)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateArtifactCodes(root, codes); err != nil {
+		return nil, err
+	}
+	assets, err := objectField(root, "InterpretationAssets")
+	if err != nil {
+		return nil, err
+	}
+	reportSpec, err := objectField(assets, "ReportSpec")
+	if err != nil {
+		return nil, err
+	}
+	state, err := emptySectionsState(reportSpec)
+	if err != nil {
+		return nil, err
+	}
+	return &reportSpecMaterialization{
+		OriginalSectionsState: state,
+		Section: frozenSection{
+			Code: "factor_scores", SourceRefs: append([]string(nil), codes...), Kind: "factor_scores",
+			TemplateID: "standard", TemplateVersion: targetLegacyVersion,
+		},
+		Artifact: evidence,
+	}, nil
+}
+
+func artifactEvidenceFor(row outcomeRow, candidate artifactCandidate) (artifactEvidence, []string, error) {
+	if candidate.Count != 1 {
+		return artifactEvidence{}, nil, fmt.Errorf("outcome %d must have exactly one active legacy artifact, found %d", row.ID, candidate.Count)
+	}
+	document := candidate.Document
+	if document.OutcomeID <= 0 || uint64(document.OutcomeID) != row.ID || document.DomainID <= 0 {
+		return artifactEvidence{}, nil, fmt.Errorf("outcome %d artifact association is invalid", row.ID)
+	}
+	if document.TemplateVersion != targetLegacyVersion || document.ContentSchemaVersion != "report-content/v1" {
+		return artifactEvidence{}, nil, fmt.Errorf("outcome %d artifact release identity is invalid", row.ID)
+	}
+	wantBuilder, ok := map[string]string{"scale": "factor-scoring", "behavioral_rating": "norm-profile", "cognitive": "task-performance"}[row.ModelKind]
+	if !ok || document.BuilderIdentity != wantBuilder {
+		return artifactEvidence{}, nil, fmt.Errorf("outcome %d artifact builder %q is incompatible with model kind %q", row.ID, document.BuilderIdentity, row.ModelKind)
+	}
+	if document.Model == nil || document.Model.Kind != row.ModelKind || document.Model.Code != row.ModelCode || document.Model.Version != row.ModelVersion {
+		return artifactEvidence{}, nil, fmt.Errorf("outcome %d artifact model identity does not match frozen outcome", row.ID)
+	}
+	if document.PresentationProfile == nil || !oneOf(document.PresentationProfile.Source, "frozen", "legacy_artifact_dimensions/v1") {
+		return artifactEvidence{}, nil, fmt.Errorf("outcome %d artifact presentation profile is not frozen", row.ID)
+	}
+	codes := append([]string(nil), document.PresentationProfile.VisibleFactorCodes...)
+	seen := make(map[string]struct{}, len(codes))
+	for _, code := range codes {
+		if code == "" || code != strings.TrimSpace(code) {
+			return artifactEvidence{}, nil, fmt.Errorf("outcome %d artifact presentation contains an invalid factor code", row.ID)
+		}
+		if _, duplicate := seen[code]; duplicate {
+			return artifactEvidence{}, nil, fmt.Errorf("outcome %d artifact presentation contains duplicate factor code %s", row.ID, code)
+		}
+		seen[code] = struct{}{}
+	}
+	evidence := artifactEvidence{
+		ArtifactID: uint64(document.DomainID), OutcomeID: row.ID, TemplateVersion: document.TemplateVersion,
+		BuilderIdentity: document.BuilderIdentity, ContentSchemaVersion: document.ContentSchemaVersion,
+		ModelKind: document.Model.Kind, ModelCode: document.Model.Code, ModelVersion: document.Model.Version,
+		PresentationSource: document.PresentationProfile.Source,
+	}
+	payload, err := json.Marshal(struct {
+		Evidence artifactEvidence `json:"evidence"`
+		Codes    []string         `json:"visible_factor_codes"`
+	}{Evidence: evidence, Codes: codes})
+	if err != nil {
+		return artifactEvidence{}, nil, err
+	}
+	evidence.Fingerprint = hashBytes(payload)
+	return evidence, codes, nil
+}
+
+func validateArtifactCodes(root map[string]any, codes []string) error {
+	catalog, err := arrayField(root, "factor_catalog")
+	if err != nil || len(catalog) == 0 {
+		return errors.New("frozen factor_catalog is required to validate artifact presentation")
+	}
+	known := make(map[string]struct{}, len(catalog))
+	for index, item := range catalog {
+		entry, ok := item.(map[string]any)
+		if !ok {
+			return fmt.Errorf("factor_catalog[%d] must be an object", index)
+		}
+		code, ok := entry["code"].(string)
+		if !ok || code == "" || code != strings.TrimSpace(code) {
+			return fmt.Errorf("factor_catalog[%d].code is invalid", index)
+		}
+		known[code] = struct{}{}
+	}
+	for _, code := range codes {
+		if _, ok := known[code]; !ok {
+			return fmt.Errorf("artifact presentation factor %s is absent from frozen factor_catalog", code)
+		}
+	}
+	return nil
+}
+
+func emptySectionsState(reportSpec map[string]any) (string, error) {
+	value, present := reportSpec["Sections"]
+	if !present {
+		return "missing", nil
+	}
+	if value == nil {
+		return "null", nil
+	}
+	sections, ok := value.([]any)
+	if !ok {
+		return "", errors.New("InterpretationAssets.ReportSpec.Sections must be an array, null or missing")
+	}
+	if len(sections) != 0 {
+		return "", errors.New("InterpretationAssets.ReportSpec.Sections is not empty")
+	}
+	return "empty_array", nil
+}
+
 func scanOutcomes(ctx context.Context, db *sql.DB, visit func(outcomeRow, reportPlan) error) (inventory, error) {
+	return scanOutcomesWithPlanner(ctx, db, func(row outcomeRow) (reportPlan, error) {
+		return planReportInput(row.ReportInput, row.ModelKind)
+	}, visit)
+}
+
+func scanOutcomesWithPlanner(ctx context.Context, db *sql.DB, planner func(outcomeRow) (reportPlan, error), visit func(outcomeRow, reportPlan) error) (inventory, error) {
 	rows, err := db.QueryContext(ctx, `
 SELECT id, model_kind, model_code, model_version, evaluated_at, COALESCE(report_input_json, '')
 FROM evaluation_outcome
@@ -272,12 +595,15 @@ ORDER BY id`)
 			return state, fmt.Errorf("scan evaluation outcome: %w", err)
 		}
 		state.Total++
-		plan, err := planReportInput(row.ReportInput, row.ModelKind)
+		plan, err := planner(row)
 		if err != nil {
 			return state, fmt.Errorf("outcome %d %s@%s: %w", row.ID, row.ModelCode, row.ModelVersion, err)
 		}
 		if plan.Changed {
 			state.Candidates++
+			if plan.Materialization != nil {
+				state.MaterializedSections++
+			}
 		} else {
 			state.Explicit++
 		}
@@ -294,6 +620,10 @@ ORDER BY id`)
 }
 
 func planReportInput(raw, modelKind string) (reportPlan, error) {
+	return planReportInputWithMaterialization(raw, modelKind, nil)
+}
+
+func planReportInputWithMaterialization(raw, modelKind string, materialization *reportSpecMaterialization) (reportPlan, error) {
 	root, canonical, err := decodeCanonicalJSON(raw)
 	if err != nil {
 		return reportPlan{}, err
@@ -311,7 +641,28 @@ func planReportInput(raw, modelKind string) (reportPlan, error) {
 	}
 	sections, err := arrayField(reportSpec, "Sections")
 	if err != nil || len(sections) == 0 {
-		return reportPlan{}, errors.New("InterpretationAssets.ReportSpec.Sections is required")
+		if materialization == nil {
+			return reportPlan{}, errReportSectionsRequired
+		}
+		state, stateErr := emptySectionsState(reportSpec)
+		if stateErr != nil {
+			return reportPlan{}, stateErr
+		}
+		if state != materialization.OriginalSectionsState {
+			return reportPlan{}, errors.New("InterpretationAssets.ReportSpec.Sections state changed")
+		}
+		encodedSection, marshalErr := json.Marshal(materialization.Section)
+		if marshalErr != nil {
+			return reportPlan{}, marshalErr
+		}
+		var section map[string]any
+		if unmarshalErr := json.Unmarshal(encodedSection, &section); unmarshalErr != nil {
+			return reportPlan{}, unmarshalErr
+		}
+		sections = []any{section}
+		reportSpec["Sections"] = sections
+	} else if materialization != nil {
+		return reportPlan{}, errors.New("report section materialization is no longer applicable")
 	}
 
 	templateIDs, versions := map[string]struct{}{}, map[string]struct{}{}
@@ -372,7 +723,7 @@ func planReportInput(raw, modelKind string) (reportPlan, error) {
 	if err != nil {
 		return reportPlan{}, err
 	}
-	changed := false
+	changed := materialization != nil
 	for _, section := range sectionObjects {
 		if value, _ := section["TemplateID"].(string); value != templateID {
 			section["TemplateID"] = templateID
@@ -403,7 +754,7 @@ func planReportInput(raw, modelKind string) (reportPlan, error) {
 	return reportPlan{
 		Changed: changed, TemplateID: templateID, TemplateVersion: templateVersion,
 		SourceSemanticHash: hashBytes(canonical), TargetSemanticHash: hashBytes(targetJSON), TargetJSON: string(targetJSON),
-		Sections: deltas, TypologyRouting: typologyDelta,
+		Sections: deltas, TypologyRouting: typologyDelta, Materialization: materialization,
 	}, nil
 }
 
@@ -508,7 +859,7 @@ func mutateBatch(ctx context.Context, tx *sql.Tx, records []record, operation st
 			if currentHash != item.SourceSemanticHash {
 				return updated, already, fmt.Errorf("outcome %d source changed", item.OutcomeID)
 			}
-			plan, err := planReportInput(raw, item.ModelKind)
+			plan, err := planReportInputWithMaterialization(raw, item.ModelKind, item.Materialization)
 			if err != nil || !plan.Changed || plan.TargetSemanticHash != item.TargetSemanticHash || plan.TemplateID != item.TemplateID || plan.TemplateVersion != item.TemplateVersion {
 				return updated, already, fmt.Errorf("outcome %d no longer matches governance manifest", item.OutcomeID)
 			}
@@ -567,6 +918,18 @@ func restoreReportInput(raw string, item record) (string, error) {
 		restoreStringField(section, "TemplateID", delta.OriginalTemplateID)
 		restoreStringField(section, "TemplateVersion", delta.OriginalTemplateVersion)
 	}
+	if item.Materialization != nil {
+		switch item.Materialization.OriginalSectionsState {
+		case "missing":
+			delete(reportSpec, "Sections")
+		case "null":
+			reportSpec["Sections"] = nil
+		case "empty_array":
+			reportSpec["Sections"] = []any{}
+		default:
+			return "", errors.New("unsupported original report sections state")
+		}
+	}
 	if item.TypologyRouting != nil {
 		route, err := objectField(root, "typology_routing")
 		if err != nil {
@@ -585,27 +948,75 @@ func restoreReportInput(raw string, item record) (string, error) {
 	return string(desired), nil
 }
 
-func verify(ctx context.Context, db *sql.DB, records []record, requireComplete bool, stdout io.Writer) error {
+func verify(ctx context.Context, db *sql.DB, records []record, artifacts map[uint64]artifactCandidate, requireComplete bool, stdout io.Writer) error {
+	expected := make(map[uint64]string, len(records))
 	for _, item := range records {
-		var raw string
-		if err := db.QueryRowContext(ctx, `SELECT COALESCE(report_input_json, '') FROM evaluation_outcome WHERE id = ?`, item.OutcomeID).Scan(&raw); err != nil {
-			return fmt.Errorf("load outcome %d: %w", item.OutcomeID, err)
-		}
-		canonical, err := canonicalJSON(raw)
-		if err != nil || hashBytes(canonical) != item.TargetSemanticHash {
-			return fmt.Errorf("outcome %d target verification failed", item.OutcomeID)
-		}
+		expected[item.OutcomeID] = item.TargetSemanticHash
 	}
-	state, err := scanOutcomes(ctx, db, nil)
+	verified := 0
+	state, err := scanOutcomesWithPlanner(ctx, db, func(row outcomeRow) (reportPlan, error) {
+		plan, planErr := planReportInput(row.ReportInput, row.ModelKind)
+		if planErr == nil {
+			return plan, nil
+		}
+		if !errors.Is(planErr, errReportSectionsRequired) || artifacts == nil {
+			return reportPlan{}, planErr
+		}
+		materialization, materializeErr := materializationFromArtifact(row, artifacts[row.ID])
+		if materializeErr != nil {
+			return reportPlan{}, materializeErr
+		}
+		return planReportInputWithMaterialization(row.ReportInput, row.ModelKind, materialization)
+	}, func(row outcomeRow, _ reportPlan) error {
+		want, ok := expected[row.ID]
+		if !ok {
+			return nil
+		}
+		canonical, err := canonicalJSON(row.ReportInput)
+		if err != nil || hashBytes(canonical) != want {
+			return fmt.Errorf("outcome %d target verification failed", row.ID)
+		}
+		verified++
+		return nil
+	})
 	if err != nil {
 		return err
+	}
+	if verified != len(records) {
+		return fmt.Errorf("verified %d of %d selected outcomes", verified, len(records))
 	}
 	if requireComplete && state.Candidates != 0 {
 		return fmt.Errorf("outcome template routes are incomplete: %d candidates remain", state.Candidates)
 	}
 	return writeResult(stdout, map[string]any{
-		"operation": "verify", "verified": len(records), "inventory": state, "require_complete": requireComplete,
+		"operation": "verify", "verified": verified, "inventory": state, "require_complete": requireComplete,
 	})
+}
+
+func validateArtifactEvidence(records []record, artifacts map[uint64]artifactCandidate) error {
+	for _, item := range records {
+		if item.Materialization == nil {
+			continue
+		}
+		row := outcomeRow{ID: item.OutcomeID, ModelKind: item.ModelKind, ModelCode: item.ModelCode, ModelVersion: item.ModelVersion}
+		evidence, codes, err := artifactEvidenceFor(row, artifacts[item.OutcomeID])
+		if err != nil {
+			return err
+		}
+		if evidence != item.Materialization.Artifact || !equalStrings(codes, item.Materialization.Section.SourceRefs) {
+			return fmt.Errorf("outcome %d artifact evidence changed after audit", item.OutcomeID)
+		}
+	}
+	return nil
+}
+
+func hasReportSpecMaterialization(records []record) bool {
+	for _, item := range records {
+		if item.Materialization != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func selectedRecords(records []record, cfg config) []record {
@@ -622,8 +1033,9 @@ func selectedRecords(records []record, cfg config) []record {
 	return selected
 }
 
-func validateManifest(value manifest, database string) error {
-	if value.SchemaVersion != governanceSchemaVersion || value.Database != database || value.Table != "evaluation_outcome" || value.TargetLegacy != targetLegacyVersion {
+func validateManifest(value manifest, database, mongoDatabase string) error {
+	if value.SchemaVersion != governanceSchemaVersion || value.Database != database || value.Table != "evaluation_outcome" || value.TargetLegacy != targetLegacyVersion ||
+		value.MongoDatabase != mongoDatabase || value.ArtifactCollection != artifactCollection {
 		return errors.New("outcome template route governance target mismatch")
 	}
 	fingerprint, err := recordsFingerprint(value.Records)
@@ -648,6 +1060,18 @@ func validateManifest(value manifest, database string) error {
 		}
 		if item.ModelKind != "typology" && (item.TemplateID != "standard" || item.TypologyRouting != nil) {
 			return fmt.Errorf("invalid non-typology governance route at index %d", index)
+		}
+		if item.Materialization != nil {
+			materialization := item.Materialization
+			if !oneOf(materialization.OriginalSectionsState, "missing", "null", "empty_array") ||
+				materialization.Section.Code != "factor_scores" || materialization.Section.Kind != "factor_scores" ||
+				materialization.Section.TemplateID != item.TemplateID || materialization.Section.TemplateVersion != item.TemplateVersion ||
+				materialization.Artifact.OutcomeID != item.OutcomeID || materialization.Artifact.ArtifactID == 0 ||
+				!isSHA256(materialization.Artifact.Fingerprint) || materialization.Artifact.TemplateVersion != targetLegacyVersion ||
+				materialization.Artifact.ModelKind != item.ModelKind || materialization.Artifact.ModelCode != item.ModelCode ||
+				materialization.Artifact.ModelVersion != item.ModelVersion {
+				return fmt.Errorf("invalid report section materialization at index %d", index)
+			}
 		}
 		previousSection := -1
 		for _, section := range item.Sections {
@@ -807,6 +1231,18 @@ func oneOf(value string, choices ...string) bool {
 		}
 	}
 	return false
+}
+
+func equalStrings(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
 }
 
 func writeResult(output io.Writer, value any) error {

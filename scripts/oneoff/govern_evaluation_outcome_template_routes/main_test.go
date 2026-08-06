@@ -80,6 +80,42 @@ func TestPlanReportInputLeavesExplicitCurrentRouteUnchanged(t *testing.T) {
 	}
 }
 
+func TestPlanReportInputMaterializesFrozenSectionFromMatchingArtifact(t *testing.T) {
+	raw := reportInputWithoutSections(t, factorReportInput(t, "standard", targetLegacyVersion), "null")
+	row := outcomeRow{ID: 99, ModelKind: "scale", ModelCode: "SCALE", ModelVersion: "v1", ReportInput: raw}
+	candidate := artifactCandidate{Count: 1, Document: artifactDocument{
+		DomainID: 501, OutcomeID: 99, TemplateVersion: targetLegacyVersion,
+		BuilderIdentity: "factor-scoring", ContentSchemaVersion: "report-content/v1",
+		Model:               &artifactModel{Kind: "scale", Code: "SCALE", Version: "v1"},
+		PresentationProfile: &artifactPresentation{VisibleFactorCodes: []string{"total"}, Source: "legacy_artifact_dimensions/v1"},
+	}}
+	materialization, err := materializationFromArtifact(row, candidate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := planReportInputWithMaterialization(raw, row.ModelKind, materialization)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !plan.Changed || plan.Materialization == nil || plan.Materialization.OriginalSectionsState != "null" {
+		t.Fatalf("plan = %#v", plan)
+	}
+	section := firstSection(t, plan.TargetJSON)
+	if section["TemplateID"] != "standard" || section["TemplateVersion"] != targetLegacyVersion || section["Kind"] != "factor_scores" {
+		t.Fatalf("section = %#v", section)
+	}
+	restored, err := restoreReportInput(plan.TargetJSON, record{
+		SourceSemanticHash: plan.SourceSemanticHash, Sections: plan.Sections, Materialization: plan.Materialization,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	canonical, _ := canonicalJSON(restored)
+	if hashBytes(canonical) != plan.SourceSemanticHash {
+		t.Fatal("materialized report section rollback did not restore source semantics")
+	}
+}
+
 func TestPlanReportInputRejectsConflictingTypologyTemplate(t *testing.T) {
 	_, err := planReportInput(typologyReportInput(t, "mbti", "", "sbti", ""), "typology")
 	if err == nil || !strings.Contains(err.Error(), "resolve exactly once") {
@@ -91,6 +127,7 @@ func TestReadConfigRequiresExactWriteConfirmation(t *testing.T) {
 	env := map[string]string{
 		"OUTCOME_TEMPLATE_ROUTE_OPERATION": "apply", "OUTCOME_TEMPLATE_ROUTE_MANIFEST_PATH": "/work/manifest.json",
 		"MYSQL_HOST": "mysql", "MYSQL_USERNAME": "user", "MYSQL_PASSWORD": "secret", "MYSQL_DATABASE": "qs",
+		"MONGODB_HOST": "mongo", "MONGODB_USERNAME": "user", "MONGODB_PASSWORD": "secret", "MONGODB_DBNAME": "qs",
 	}
 	_, err := readConfig(func(key string) string { return env[key] })
 	if err == nil || !strings.Contains(err.Error(), applyConfirmation) {
@@ -118,13 +155,14 @@ func TestManifestFingerprintRejectsTampering(t *testing.T) {
 	}
 	value := manifest{
 		SchemaVersion: governanceSchemaVersion, Database: "qs", Table: "evaluation_outcome", TargetLegacy: targetLegacyVersion,
+		MongoDatabase: "qs", ArtifactCollection: artifactCollection,
 		Records: records, RecordsFingerprint: fingerprint,
 	}
-	if err := validateManifest(value, "qs"); err != nil {
+	if err := validateManifest(value, "qs", "qs"); err != nil {
 		t.Fatal(err)
 	}
 	value.Records[0].TemplateID = "mbti"
-	if err := validateManifest(value, "qs"); err == nil {
+	if err := validateManifest(value, "qs", "qs"); err == nil {
 		t.Fatal("tampered manifest was accepted")
 	}
 }
@@ -189,4 +227,28 @@ func firstSection(t *testing.T, raw string) map[string]any {
 	assets := root["InterpretationAssets"].(map[string]any)
 	report := assets["ReportSpec"].(map[string]any)
 	return report["Sections"].([]any)[0].(map[string]any)
+}
+
+func reportInputWithoutSections(t *testing.T, raw, state string) string {
+	t.Helper()
+	var root map[string]any
+	if err := json.Unmarshal([]byte(raw), &root); err != nil {
+		t.Fatal(err)
+	}
+	report := root["InterpretationAssets"].(map[string]any)["ReportSpec"].(map[string]any)
+	switch state {
+	case "missing":
+		delete(report, "Sections")
+	case "null":
+		report["Sections"] = nil
+	case "empty_array":
+		report["Sections"] = []any{}
+	default:
+		t.Fatalf("unsupported state %q", state)
+	}
+	data, err := json.Marshal(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
 }

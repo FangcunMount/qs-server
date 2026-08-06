@@ -2578,7 +2578,7 @@ jobs:
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           command_timeout: 175m
-          envs: MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,GITHUB_RUN_ID_INPUT,GITHUB_RUN_ATTEMPT_INPUT,OUTCOME_TEMPLATE_ROUTE_OPERATION_INPUT,OUTCOME_TEMPLATE_ROUTE_MANIFEST_INPUT,OUTCOME_TEMPLATE_ROUTE_AFTER_ID_INPUT,OUTCOME_TEMPLATE_ROUTE_MAX_RECORDS_INPUT,OUTCOME_TEMPLATE_ROUTE_REQUIRE_COMPLETE_INPUT,OUTCOME_TEMPLATE_ROUTE_CONFIRM_INPUT
+          envs: MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,GITHUB_RUN_ID_INPUT,GITHUB_RUN_ATTEMPT_INPUT,OUTCOME_TEMPLATE_ROUTE_OPERATION_INPUT,OUTCOME_TEMPLATE_ROUTE_MANIFEST_INPUT,OUTCOME_TEMPLATE_ROUTE_AFTER_ID_INPUT,OUTCOME_TEMPLATE_ROUTE_MAX_RECORDS_INPUT,OUTCOME_TEMPLATE_ROUTE_REQUIRE_COMPLETE_INPUT,OUTCOME_TEMPLATE_ROUTE_CONFIRM_INPUT
           script: |
             set -Eeuo pipefail
             export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
@@ -2587,6 +2587,10 @@ jobs:
             : "${MYSQL_USERNAME:?MYSQL_USERNAME is empty}"
             : "${MYSQL_PASSWORD:?MYSQL_PASSWORD is empty}"
             : "${MYSQL_DATABASE:?MYSQL_DATABASE is empty}"
+            : "${MONGODB_HOST:?MONGODB_HOST is empty (check production Environment secrets)}"
+            : "${MONGODB_USERNAME:?MONGODB_USERNAME is empty}"
+            : "${MONGODB_PASSWORD:?MONGODB_PASSWORD is empty}"
+            : "${MONGODB_DBNAME:?MONGODB_DBNAME is empty}"
             if ! [[ "$MYSQL_DATABASE" =~ ^[A-Za-z0-9_-]+$ ]]; then
               echo "❌ MYSQL_DATABASE contains unsupported characters" >&2
               exit 1
@@ -2664,6 +2668,7 @@ jobs:
             fi
 
             MYSQL_PORT="${MYSQL_PORT:-3306}"
+            MONGODB_PORT="${MONGODB_PORT:-27017}"
             echo "EvaluationOutcome template route operation: $OUTCOME_TEMPLATE_ROUTE_OPERATION_INPUT"
             echo "Table: evaluation_outcome"
             echo "Manifest: $MANIFEST_NAME"
@@ -2679,6 +2684,11 @@ jobs:
               -e MYSQL_USERNAME="$MYSQL_USERNAME" \
               -e MYSQL_PASSWORD="$MYSQL_PASSWORD" \
               -e MYSQL_DATABASE="$MYSQL_DATABASE" \
+              -e MONGODB_HOST="$MONGODB_HOST" \
+              -e MONGODB_PORT="$MONGODB_PORT" \
+              -e MONGODB_USERNAME="$MONGODB_USERNAME" \
+              -e MONGODB_PASSWORD="$MONGODB_PASSWORD" \
+              -e MONGODB_DBNAME="$MONGODB_DBNAME" \
               -e OUTCOME_TEMPLATE_ROUTE_OPERATION="$OUTCOME_TEMPLATE_ROUTE_OPERATION_INPUT" \
               -e OUTCOME_TEMPLATE_ROUTE_MANIFEST_PATH="/work/$MANIFEST_NAME" \
               -e OUTCOME_TEMPLATE_ROUTE_AFTER_ID="$OUTCOME_TEMPLATE_ROUTE_AFTER_ID_INPUT" \
@@ -2706,6 +2716,11 @@ jobs:
           MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
+          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
+          MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
           GITHUB_RUN_ID_INPUT: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT_INPUT: ${{ github.run_attempt }}
           OUTCOME_TEMPLATE_ROUTE_OPERATION_INPUT: ${{ github.event.inputs.governance_operation }}
