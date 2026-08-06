@@ -264,7 +264,8 @@ jobs:
                 if sudo docker run --rm --network infra-network \
                   -v "$PARTIAL_DIR/mongodb:/backup" \
                   --user 0:0 \
-                  mongo:7.0 mongodump \
+                  --entrypoint /usr/bin/mongodump \
+                  mongo:7.0 \
                     --host="$MONGODB_HOST" \
                     --port="$MONGODB_PORT" \
                     --username="$MONGODB_USERNAME" \
@@ -280,7 +281,8 @@ jobs:
                   -v "$PARTIAL_DIR/mongodb:/backup" \
                   -e COLLECTION="$COLLECTION" \
                   --user 0:0 \
-                  mongo:7.0 /bin/bash -Eeuo pipefail -c \
+                  --entrypoint /bin/bash \
+                  mongo:7.0 -Eeuo pipefail -c \
                   'rm -f -- "/backup/$COLLECTION.archive.gz"'
                 if (( ATTEMPT == 3 )); then
                   echo "MongoDB backup failed after $ATTEMPT attempts: $COLLECTION" >&2
@@ -293,13 +295,15 @@ jobs:
                 -v "$PARTIAL_DIR/mongodb:/backup:ro" \
                 -e COLLECTION="$COLLECTION" \
                 --user 0:0 \
-                mongo:7.0 /bin/bash -Eeuo pipefail -c \
+                --entrypoint /bin/bash \
+                mongo:7.0 -Eeuo pipefail -c \
                 'test -s "/backup/$COLLECTION.archive.gz"'
               for ATTEMPT in 1 2 3; do
                 if sudo docker run --rm --network infra-network \
                   -v "$PARTIAL_DIR/mongodb:/backup:ro" \
                   --user 0:0 \
-                  mongo:7.0 mongorestore \
+                  --entrypoint /usr/bin/mongorestore \
+                  mongo:7.0 \
                     --host="$MONGODB_HOST" \
                     --port="$MONGODB_PORT" \
                     --username="$MONGODB_USERNAME" \

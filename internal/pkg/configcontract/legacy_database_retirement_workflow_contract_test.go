@@ -33,6 +33,8 @@ func TestLegacyDatabaseRetirementWorkflowStartsReadOnly(t *testing.T) {
 		"MongoDB backup failed after $ATTEMPT attempts",
 		"MongoDB backup validation failed after $ATTEMPT attempts",
 		"--user 0:0",
+		"--entrypoint /usr/bin/mongodump",
+		"--entrypoint /usr/bin/mongorestore",
 		"/backup/.legacy-db-retirement-20260806-v1.partial",
 		"/backup/legacy-db-retirement-20260806-v1",
 		"retirement preflight completed; no data was changed",
