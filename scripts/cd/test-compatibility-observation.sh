@@ -57,8 +57,8 @@ COMMON_ENV=(
 )
 
 zero_output="$(env "${COMMON_ENV[@]}" "$SCRIPT_DIR/audit-compatibility-observation.sh")"
-if [ "$(printf '%s\n' "$zero_output" | awk -F '\t' '$6 == "zero_window_candidate" {count++} END {print count + 0}')" -ne 3 ]; then
-  echo "zero-window observation did not classify all public compatibility metrics" >&2
+if [ "$(printf '%s\n' "$zero_output" | awk -F '\t' '$6 == "zero_window_candidate" {count++} END {print count + 0}')" -ne 6 ]; then
+  echo "zero-window observation did not classify all compatibility metrics" >&2
   exit 1
 fi
 
@@ -69,7 +69,7 @@ if ! printf '%s\n' "$active_output" | grep -Fq $'actor_practitioners\t1\t1\t2\ta
 fi
 
 incomplete_output="$(env "${COMMON_ENV[@]}" FAKE_ANCHOR_SERIES=0 "$SCRIPT_DIR/audit-compatibility-observation.sh")"
-if [ "$(printf '%s\n' "$incomplete_output" | awk -F '\t' '$6 == "observation_window_incomplete" {count++} END {print count + 0}')" -ne 3 ]; then
+if [ "$(printf '%s\n' "$incomplete_output" | awk -F '\t' '$6 == "observation_window_incomplete" {count++} END {print count + 0}')" -ne 6 ]; then
   echo "incomplete history was not distinguished from a zero window" >&2
   exit 1
 fi

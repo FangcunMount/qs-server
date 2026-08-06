@@ -94,9 +94,12 @@ metrics=(
   "actor_practitioners|qs_actor_deprecated_practitioner_route_total"
   "statistics_validate_only|qs_statistics_deprecated_validate_only_total"
   "interpretation_generate_from_assessment|qs_interpretation_deprecated_generate_report_from_assessment_total"
+  "survey_legacy_idempotency_lookup|qs_answersheet_legacy_idempotency_fallback_lookup_total"
+  "survey_legacy_idempotency_hit|qs_answersheet_legacy_idempotency_fallback_hit_total"
+  "evaluation_legacy_binding|qs_evaluation_assessment_intake_legacy_binding_total"
 )
 
-echo "Public compatibility observation (Prometheus read-only):"
+echo "Compatibility observation (Prometheus read-only):"
 printf 'window_days\tmetric\tcurrent_series\tanchor_series\twindow_increase\tclassification\n'
 for item in "${metrics[@]}"; do
   IFS='|' read -r name metric <<<"$item"
@@ -123,4 +126,4 @@ for item in "${metrics[@]}"; do
     "$WINDOW_DAYS" "$name" "$current_series" "$anchor_series" "$increase" "$classification"
 done
 
-echo "Compatibility observation completed; zero_window_candidate still requires caller confirmation before removal."
+echo "Compatibility observation completed; counter semantics and caller/data-owner confirmation are still required before removal."

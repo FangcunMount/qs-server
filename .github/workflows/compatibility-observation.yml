@@ -19,8 +19,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  public-contracts:
-    name: Public Compatibility Metrics
+  compatibility-metrics:
+    name: Compatibility Metrics
     runs-on:
       group: qlume
       labels: [self-hosted, macOS, ARM64, ops]
@@ -43,7 +43,7 @@ jobs:
           : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
           : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
 
-      - name: Audit public compatibility observation window
+      - name: Audit compatibility observation window
         uses: appleboy/ssh-action@v1.2.2
         env:
           WINDOW_DAYS: ${{ github.event.inputs.window_days || '30' }}
