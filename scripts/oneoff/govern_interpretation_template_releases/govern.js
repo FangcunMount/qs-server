@@ -164,7 +164,8 @@ function validateExpectedReleases(releases) {
 }
 
 function validateGovernanceManifest(manifest) {
-  if (manifest == null || manifest.schema_version !== governanceSchemaVersion) {
+  if (manifest == null || manifest.schema_version !== governanceSchemaVersion ||
+      manifest.template_version !== templateVersion) {
     throw new Error("unsupported template release governance manifest")
   }
   if (!Array.isArray(manifest.records) || manifest.records.length !== expectedReleases.length) {

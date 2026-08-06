@@ -70,12 +70,23 @@ test("governance manifest fingerprint rejects tampering", () => {
   }))
   const manifest = {
     schema_version: governance.governanceSchemaVersion,
+    template_version: governance.templateVersion,
     records,
     records_fingerprint: governance.sha256JSON(records)
   }
   governance.validateGovernanceManifest(manifest)
   manifest.records[0].action = "noop"
   assert.throws(() => governance.validateGovernanceManifest(manifest), /fingerprint mismatch/)
+})
+
+test("governance manifest cannot cross template versions", () => {
+  const manifest = {
+    schema_version: governance.governanceSchemaVersion,
+    template_version: governance.currentTemplateVersion,
+    records: [],
+    records_fingerprint: governance.sha256JSON([])
+  }
+  assert.throws(() => governance.validateGovernanceManifest(manifest), /unsupported template release governance manifest/)
 })
 
 test("current release catalog uses the immutable current version and insert-only bootstrap", () => {

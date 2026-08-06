@@ -1555,6 +1555,13 @@ jobs:
                 exit 1
                 ;;
             esac
+            case "$TEMPLATE_RELEASE_TARGET_VERSION" in
+              legacy-v1|2026-08-v1) ;;
+              *)
+                echo "❌ Unsupported template release target version: $TEMPLATE_RELEASE_TARGET_VERSION" >&2
+                exit 1
+                ;;
+            esac
             if ! sudo docker network inspect infra-network >/dev/null 2>&1; then
               echo "❌ infra-network is unavailable" >&2
               exit 1
@@ -1615,6 +1622,7 @@ jobs:
             MONGODB_PORT="${MONGODB_PORT:-27017}"
             MONGODB_URI="mongodb://${MONGODB_HOST}:${MONGODB_PORT}/${MONGODB_DBNAME}?connectTimeoutMS=30000&socketTimeoutMS=0"
             echo "Template release governance operation: $TEMPLATE_RELEASE_OPERATION_INPUT"
+            echo "Template release target version: $TEMPLATE_RELEASE_TARGET_VERSION"
             echo "Collection: interpretation_report_templates"
             echo "Manifest: $MANIFEST_NAME"
 
@@ -1625,6 +1633,7 @@ jobs:
               -v "$TOOL_FILE:/tool/govern.js:ro" \
               -v "$MANIFEST_MOUNT" \
               -e TEMPLATE_RELEASE_OPERATION="$TEMPLATE_RELEASE_OPERATION_INPUT" \
+              -e TEMPLATE_RELEASE_TARGET_VERSION="$TEMPLATE_RELEASE_TARGET_VERSION" \
               -e TEMPLATE_RELEASE_MANIFEST_PATH="/work/$MANIFEST_NAME" \
               -e TEMPLATE_RELEASE_CONFIRM="$TEMPLATE_RELEASE_CONFIRM_INPUT" \
               --entrypoint /usr/bin/timeout \
