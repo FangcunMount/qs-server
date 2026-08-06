@@ -16,6 +16,7 @@ on:
           - govern-template-release
           - govern-template-release-current
           - govern-model-template-route
+          - govern-outcome-template-route
       backup_name:
         description: 'Backup name (for restore operation)'
         required: false
@@ -2348,6 +2349,261 @@ jobs:
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
           AUDIT_FROM: ${{ github.event.inputs.audit_from }}
+
+  mysql-outcome-template-route-governance:
+    name: MySQL EvaluationOutcome Template Route Governance
+    if: github.event.inputs.operation == 'govern-outcome-template-route' && github.event.inputs.database == 'mysql'
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 180
+    environment: production
+    steps:
+      - name: Checkout immutable governance tool
+        uses: actions/checkout@v6
+
+      - name: Set up Go for EvaluationOutcome governance
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build EvaluationOutcome governance tools
+        env:
+          TOOL_PACKAGE: ./scripts/oneoff/govern_evaluation_outcome_template_routes
+        run: |
+          set -Eeuo pipefail
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' \
+            -o "$RUNNER_TEMP/outcome-template-route-linux-amd64" "$TOOL_PACKAGE"
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags='-s -w' \
+            -o "$RUNNER_TEMP/outcome-template-route-linux-arm64" "$TOOL_PACKAGE"
+          chmod 0700 \
+            "$RUNNER_TEMP/outcome-template-route-linux-amd64" \
+            "$RUNNER_TEMP/outcome-template-route-linux-arm64"
+
+      - name: Validate SSH configuration
+        env:
+          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
+          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_PORT: ${{ vars.SVRA_SSH_PORT || 22 }}
+          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+        run: |
+          set -Eeuo pipefail
+          : "${SVRA_HOST:?SVRA_HOST is empty}"
+          : "${SVRA_USERNAME:?SVRA_USERNAME is empty}"
+          : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
+          : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
+          if ! [[ "$SVRA_SSH_PORT" =~ ^[0-9]+$ ]] || (( SVRA_SSH_PORT < 1 || SVRA_SSH_PORT > 65535 )); then
+            echo "❌ SVRA_SSH_PORT is invalid" >&2
+            exit 1
+          fi
+
+      - name: Transfer EvaluationOutcome governance tools with pinned host identity
+        env:
+          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
+          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_PORT: ${{ vars.SVRA_SSH_PORT || 22 }}
+          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          GOVERNANCE_RUN_TOKEN: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -Eeuo pipefail
+          if ! [[ "$GOVERNANCE_RUN_TOKEN" =~ ^[0-9]+-[0-9]+$ ]]; then
+            echo "❌ Invalid governance run token" >&2
+            exit 1
+          fi
+          KEY_FILE="${RUNNER_TEMP}/qs-svra-outcome-template-${GOVERNANCE_RUN_TOKEN}.key"
+          KNOWN_HOSTS_FILE="${RUNNER_TEMP}/qs-svra-outcome-template-${GOVERNANCE_RUN_TOKEN}.known_hosts"
+          REMOTE_AMD64="/tmp/qs-server-outcome-template-route-${GOVERNANCE_RUN_TOKEN}-amd64"
+          REMOTE_ARM64="/tmp/qs-server-outcome-template-route-${GOVERNANCE_RUN_TOKEN}-arm64"
+          cleanup_local_credentials() {
+            rm -f -- "$KEY_FILE" "$KNOWN_HOSTS_FILE"
+          }
+          trap cleanup_local_credentials EXIT
+
+          umask 077
+          printf '%s\n' "$SVRA_SSH_KEY" > "$KEY_FILE"
+          ssh-keyscan -T 10 -p "$SVRA_SSH_PORT" "$SVRA_HOST" 2>/dev/null > "$KNOWN_HOSTS_FILE"
+          if [ ! -s "$KNOWN_HOSTS_FILE" ]; then
+            echo "❌ Unable to obtain ServerA SSH host keys" >&2
+            exit 1
+          fi
+          if ! ssh-keygen -lf "$KNOWN_HOSTS_FILE" -E sha256 |
+            awk '{print $2}' |
+            grep -Fqx -- "$SVRA_SSH_FINGERPRINT"; then
+            echo "❌ ServerA SSH fingerprint mismatch" >&2
+            exit 1
+          fi
+
+          scp -q \
+            -i "$KEY_FILE" \
+            -P "$SVRA_SSH_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
+            "$RUNNER_TEMP/outcome-template-route-linux-amd64" \
+            "${SVRA_USERNAME}@${SVRA_HOST}:${REMOTE_AMD64}"
+          scp -q \
+            -i "$KEY_FILE" \
+            -P "$SVRA_SSH_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
+            "$RUNNER_TEMP/outcome-template-route-linux-arm64" \
+            "${SVRA_USERNAME}@${SVRA_HOST}:${REMOTE_ARM64}"
+          ssh \
+            -i "$KEY_FILE" \
+            -p "$SVRA_SSH_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
+            "${SVRA_USERNAME}@${SVRA_HOST}" \
+            chmod 0700 "$REMOTE_AMD64" "$REMOTE_ARM64"
+          echo "✅ EvaluationOutcome governance tools transferred for run ${GOVERNANCE_RUN_TOKEN}"
+
+      - name: Execute manifest-driven EvaluationOutcome template route governance
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          command_timeout: 175m
+          envs: MYSQL_HOST,MYSQL_PORT,MYSQL_USERNAME,MYSQL_PASSWORD,MYSQL_DATABASE,GITHUB_RUN_ID_INPUT,GITHUB_RUN_ATTEMPT_INPUT,OUTCOME_TEMPLATE_ROUTE_OPERATION_INPUT,OUTCOME_TEMPLATE_ROUTE_MANIFEST_INPUT,OUTCOME_TEMPLATE_ROUTE_AFTER_ID_INPUT,OUTCOME_TEMPLATE_ROUTE_MAX_RECORDS_INPUT,OUTCOME_TEMPLATE_ROUTE_REQUIRE_COMPLETE_INPUT,OUTCOME_TEMPLATE_ROUTE_CONFIRM_INPUT
+          script: |
+            set -Eeuo pipefail
+            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+
+            : "${MYSQL_HOST:?MYSQL_HOST is empty (check production Environment secrets)}"
+            : "${MYSQL_USERNAME:?MYSQL_USERNAME is empty}"
+            : "${MYSQL_PASSWORD:?MYSQL_PASSWORD is empty}"
+            : "${MYSQL_DATABASE:?MYSQL_DATABASE is empty}"
+            if ! [[ "$MYSQL_DATABASE" =~ ^[A-Za-z0-9_-]+$ ]]; then
+              echo "❌ MYSQL_DATABASE contains unsupported characters" >&2
+              exit 1
+            fi
+            if ! [[ "$GITHUB_RUN_ID_INPUT" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT_INPUT" =~ ^[0-9]+$ ]]; then
+              echo "❌ Invalid GitHub run identity" >&2
+              exit 1
+            fi
+            case "$OUTCOME_TEMPLATE_ROUTE_OPERATION_INPUT" in
+              audit|apply|verify|rollback) ;;
+              *)
+                echo "❌ Unsupported outcome template route operation: $OUTCOME_TEMPLATE_ROUTE_OPERATION_INPUT" >&2
+                exit 1
+                ;;
+            esac
+            if ! [[ "$OUTCOME_TEMPLATE_ROUTE_AFTER_ID_INPUT" =~ ^[0-9]+$ && "$OUTCOME_TEMPLATE_ROUTE_MAX_RECORDS_INPUT" =~ ^[0-9]+$ ]]; then
+              echo "❌ Invalid outcome template route selection" >&2
+              exit 1
+            fi
+            if ! [[ "$OUTCOME_TEMPLATE_ROUTE_REQUIRE_COMPLETE_INPUT" =~ ^(true|false)$ ]]; then
+              echo "❌ Invalid outcome template route require_complete" >&2
+              exit 1
+            fi
+            if ! sudo docker network inspect infra-network >/dev/null 2>&1; then
+              echo "❌ infra-network is unavailable" >&2
+              exit 1
+            fi
+
+            GOVERNANCE_RUN_TOKEN="${GITHUB_RUN_ID_INPUT}-${GITHUB_RUN_ATTEMPT_INPUT}"
+            TOOL_AMD64="/tmp/qs-server-outcome-template-route-${GOVERNANCE_RUN_TOKEN}-amd64"
+            TOOL_ARM64="/tmp/qs-server-outcome-template-route-${GOVERNANCE_RUN_TOKEN}-arm64"
+            case "$(uname -m)" in
+              x86_64|amd64) TOOL_FILE="$TOOL_AMD64" ;;
+              aarch64|arm64) TOOL_FILE="$TOOL_ARM64" ;;
+              *)
+                echo "❌ Unsupported ServerA architecture: $(uname -m)" >&2
+                exit 1
+                ;;
+            esac
+            MANIFEST_DIR="/opt/backups/qs-server/evaluation-outcome-template-route"
+            CONTAINER_NAME="qs-server-outcome-template-route-${GOVERNANCE_RUN_TOKEN}"
+            cleanup_governance() {
+              sudo docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+              rm -f -- "$TOOL_AMD64" "$TOOL_ARM64"
+            }
+            trap cleanup_governance EXIT
+            if [ ! -s "$TOOL_FILE" ] || [ ! -x "$TOOL_FILE" ]; then
+              echo "❌ Transferred EvaluationOutcome governance tool is missing or invalid" >&2
+              exit 1
+            fi
+
+            sudo install -d -m 0750 "$MANIFEST_DIR"
+            if [ "$OUTCOME_TEMPLATE_ROUTE_OPERATION_INPUT" = "audit" ]; then
+              MANIFEST_NAME="evaluation-outcome-template-route-${GOVERNANCE_RUN_TOKEN}.json"
+              if sudo test -e "$MANIFEST_DIR/$MANIFEST_NAME" || sudo test -e "$MANIFEST_DIR/$MANIFEST_NAME.partial"; then
+                echo "❌ Refusing to overwrite an existing EvaluationOutcome governance manifest: $MANIFEST_NAME" >&2
+                exit 1
+              fi
+              MANIFEST_MOUNT="$MANIFEST_DIR:/work"
+            else
+              MANIFEST_NAME="$OUTCOME_TEMPLATE_ROUTE_MANIFEST_INPUT"
+              if ! [[ "$MANIFEST_NAME" =~ ^evaluation-outcome-template-route-[0-9]+-[0-9]+\.json$ ]]; then
+                echo "❌ Invalid or missing EvaluationOutcome governance manifest name" >&2
+                exit 1
+              fi
+              if ! sudo test -s "$MANIFEST_DIR/$MANIFEST_NAME" || ! sudo test -s "$MANIFEST_DIR/$MANIFEST_NAME.sha256"; then
+                echo "❌ EvaluationOutcome governance manifest or checksum is missing: $MANIFEST_NAME" >&2
+                exit 1
+              fi
+              sudo sh -c 'cd "$1" && sha256sum --check "$2.sha256"' sh "$MANIFEST_DIR" "$MANIFEST_NAME"
+              MANIFEST_MOUNT="$MANIFEST_DIR:/work:ro"
+            fi
+
+            MYSQL_PORT="${MYSQL_PORT:-3306}"
+            echo "EvaluationOutcome template route operation: $OUTCOME_TEMPLATE_ROUTE_OPERATION_INPUT"
+            echo "Table: evaluation_outcome"
+            echo "Manifest: $MANIFEST_NAME"
+
+            sudo docker run --rm --network infra-network \
+              --name "$CONTAINER_NAME" \
+              --label "com.fangcunmount.qs-server.operation=evaluation-outcome-template-route-governance" \
+              --label "com.fangcunmount.qs-server.github-run-id=$GITHUB_RUN_ID_INPUT" \
+              -v "$TOOL_FILE:/tool/govern:ro" \
+              -v "$MANIFEST_MOUNT" \
+              -e MYSQL_HOST="$MYSQL_HOST" \
+              -e MYSQL_PORT="$MYSQL_PORT" \
+              -e MYSQL_USERNAME="$MYSQL_USERNAME" \
+              -e MYSQL_PASSWORD="$MYSQL_PASSWORD" \
+              -e MYSQL_DATABASE="$MYSQL_DATABASE" \
+              -e OUTCOME_TEMPLATE_ROUTE_OPERATION="$OUTCOME_TEMPLATE_ROUTE_OPERATION_INPUT" \
+              -e OUTCOME_TEMPLATE_ROUTE_MANIFEST_PATH="/work/$MANIFEST_NAME" \
+              -e OUTCOME_TEMPLATE_ROUTE_AFTER_ID="$OUTCOME_TEMPLATE_ROUTE_AFTER_ID_INPUT" \
+              -e OUTCOME_TEMPLATE_ROUTE_MAX_RECORDS="$OUTCOME_TEMPLATE_ROUTE_MAX_RECORDS_INPUT" \
+              -e OUTCOME_TEMPLATE_ROUTE_REQUIRE_COMPLETE="$OUTCOME_TEMPLATE_ROUTE_REQUIRE_COMPLETE_INPUT" \
+              -e OUTCOME_TEMPLATE_ROUTE_CONFIRM="$OUTCOME_TEMPLATE_ROUTE_CONFIRM_INPUT" \
+              --entrypoint /usr/bin/timeout \
+              mysql:8.0 170m /tool/govern
+
+            if [ "$OUTCOME_TEMPLATE_ROUTE_OPERATION_INPUT" = "audit" ]; then
+              if ! sudo test -s "$MANIFEST_DIR/$MANIFEST_NAME"; then
+                echo "❌ Audit did not create a non-empty EvaluationOutcome governance manifest" >&2
+                exit 1
+              fi
+              sudo sh -c 'cd "$1" && sha256sum "$2" > "$2.sha256" && chmod 0440 "$2" "$2.sha256"' sh "$MANIFEST_DIR" "$MANIFEST_NAME"
+              echo "✅ Immutable EvaluationOutcome governance manifest: $MANIFEST_NAME"
+            fi
+            echo "✅ EvaluationOutcome template route governance completed"
+        env:
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
+          GITHUB_RUN_ID_INPUT: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT_INPUT: ${{ github.run_attempt }}
+          OUTCOME_TEMPLATE_ROUTE_OPERATION_INPUT: ${{ github.event.inputs.governance_operation }}
+          OUTCOME_TEMPLATE_ROUTE_MANIFEST_INPUT: ${{ github.event.inputs.governance_manifest }}
+          OUTCOME_TEMPLATE_ROUTE_AFTER_ID_INPUT: ${{ github.event.inputs.presentation_after_id }}
+          OUTCOME_TEMPLATE_ROUTE_MAX_RECORDS_INPUT: ${{ github.event.inputs.presentation_max_records }}
+          OUTCOME_TEMPLATE_ROUTE_REQUIRE_COMPLETE_INPUT: ${{ github.event.inputs.presentation_require_complete }}
+          OUTCOME_TEMPLATE_ROUTE_CONFIRM_INPUT: ${{ github.event.inputs.governance_confirm }}
 
   redis-status:
     name: Redis Keyspace Status

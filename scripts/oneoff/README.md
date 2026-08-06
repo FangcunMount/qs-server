@@ -36,6 +36,8 @@
 | `enroll_testees_after_date.py` | 按时间范围补录受试者关系 |
 | `govern_interpretation_presentation_profiles` | 以不可变 Artifact dimensions 和受保护 manifest 治理历史 presentation profile |
 | `govern_interpretation_template_releases` | 为历史 ReportTemplate release 物化 Builder/schema manifest 并补齐 Enneagram 发布身份 |
+| `govern_interpretation_model_template_routes` | 以新不可变 ModelCatalog release 切换显式 TemplateID/TemplateVersion，并固化新旧 DefinitionV2 哈希 |
+| `govern_evaluation_outcome_template_routes` | 以可回滚 manifest 显式化历史 EvaluationOutcome 冻结输入中的模板路由 |
 
 具体参数以各命令的 `--help`、相邻 README 和测试为准。
 
