@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Check hygiene for current docs/ markdown files.
+Check hygiene for maintained repository markdown files.
 
-Default scope excludes docs/_archive because archive files are transitional
+Default scope covers repository markdown, including root and colocated README
+files, and excludes docs/_archive because archive files are historical
 reference material and are expected to age out.
 
 Checks:
@@ -25,6 +26,7 @@ from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parent.parent
 DOCS_ROOT = ROOT / "docs"
+IGNORED_DIR_NAMES = {".git", "node_modules", "vendor"}
 MARKDOWN_LINK_RE = re.compile(r"(?<!\!)\[[^\]]+\]\(([^)]+)\)")
 NUMBERED_H2_RE = re.compile(r"^##\s+(\d+)\.\s+")
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*$")
@@ -39,8 +41,11 @@ class Issue:
 
 
 def iter_docs(include_archive: bool) -> Iterable[Path]:
-    for path in sorted(DOCS_ROOT.rglob("*.md")):
-        if not include_archive and "_archive" in path.parts:
+    for path in sorted(ROOT.rglob("*.md")):
+        relative = path.relative_to(ROOT)
+        if any(part in IGNORED_DIR_NAMES for part in relative.parts):
+            continue
+        if not include_archive and DOCS_ROOT / "_archive" in path.parents:
             continue
         yield path
 
@@ -184,7 +189,7 @@ def check_numbered_h2(file_path: Path) -> List[Issue]:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Check docs hygiene for current markdown files")
+    parser = argparse.ArgumentParser(description="Check hygiene for maintained repository markdown files")
     parser.add_argument(
         "--include-archive",
         action="store_true",
@@ -206,7 +211,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"[{issue.kind}] {rel}:{issue.line_no}: {issue.detail}")
         return 1
 
-    scope = "including docs/_archive" if args.include_archive else "excluding docs/_archive"
+    scope = "including docs/_archive" if args.include_archive else "repository markdown excluding docs/_archive"
     print(f"docs hygiene OK: scanned {len(files)} markdown files ({scope})")
     return 0
 

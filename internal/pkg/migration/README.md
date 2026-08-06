@@ -359,8 +359,8 @@ go run cmd/apiserver/apiserver.go
 ## 📚 参考文档
 
 - [golang-migrate 官方文档](https://github.com/golang-migrate/migrate)
-- [数据库迁移指南](../../../docs/DATABASE_MIGRATION_GUIDE.md)
-- [Schema 定义](../../../configs/mysql/schema.sql)
+- [数据访问与迁移边界](../../../docs/03-基础设施/data-access/README.md)
+- [MySQL Migration](./migrations/mysql/)
 
 ## ❓ 常见问题
 

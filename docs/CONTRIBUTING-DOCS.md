@@ -122,6 +122,8 @@ make docs-facts
 git diff --check
 ```
 
+`docs-hygiene` 覆盖仓库根 README 及代码、配置、脚本旁的现行 Markdown，默认只排除 `docs/_archive`；`docs-facts` 专门验证 `docs/` 事实层的目录预算、模块入口与关键契约名称。
+
 涉及 REST 生成契约时再执行：
 
 ```bash
