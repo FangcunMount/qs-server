@@ -1820,7 +1820,9 @@ jobs:
                 exit 1
                 ;;
             esac
-            if [ -n "$MODEL_TEMPLATE_ROUTE_AFTER_ID_INPUT" ] && ! [[ "$MODEL_TEMPLATE_ROUTE_AFTER_ID_INPUT" =~ ^[a-f0-9]{24}$ ]]; then
+            if [ "$MODEL_TEMPLATE_ROUTE_AFTER_ID_INPUT" = "0" ]; then
+              MODEL_TEMPLATE_ROUTE_AFTER_ID_INPUT=""
+            elif [ -n "$MODEL_TEMPLATE_ROUTE_AFTER_ID_INPUT" ] && ! [[ "$MODEL_TEMPLATE_ROUTE_AFTER_ID_INPUT" =~ ^[a-f0-9]{24}$ ]]; then
               echo "❌ Invalid model template route after_id" >&2
               exit 1
             fi

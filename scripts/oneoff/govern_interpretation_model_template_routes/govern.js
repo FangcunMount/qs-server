@@ -248,7 +248,8 @@ function readConfig(env) {
   }
   const manifestPath = env.MODEL_TEMPLATE_ROUTE_MANIFEST_PATH || ""
   if (manifestPath === "") throw new Error("MODEL_TEMPLATE_ROUTE_MANIFEST_PATH is required")
-  const afterID = env.MODEL_TEMPLATE_ROUTE_AFTER_ID || ""
+  const rawAfterID = env.MODEL_TEMPLATE_ROUTE_AFTER_ID || ""
+  const afterID = rawAfterID === "0" ? "" : rawAfterID
   if (afterID !== "" && !/^[a-f0-9]{24}$/.test(afterID)) {
     throw new Error("MODEL_TEMPLATE_ROUTE_AFTER_ID must be a lowercase ObjectId hex string")
   }

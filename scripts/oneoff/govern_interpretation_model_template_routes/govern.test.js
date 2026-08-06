@@ -103,6 +103,13 @@ test("write operations require exact confirmations and selection is stable", () 
     {source_id: "000000000000000000000003"}
   ]}, config)
   assert.deepEqual(selected.map(record => record.source_id), ["000000000000000000000002"])
+
+  const defaultCursor = governance.readConfig({
+    MODEL_TEMPLATE_ROUTE_OPERATION: "audit",
+    MODEL_TEMPLATE_ROUTE_MANIFEST_PATH: "/tmp/manifest.json",
+    MODEL_TEMPLATE_ROUTE_AFTER_ID: "0"
+  })
+  assert.equal(defaultCursor.afterID, "")
 })
 
 test("governance manifest fingerprint rejects tampering", () => {
