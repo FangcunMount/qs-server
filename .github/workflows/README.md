@@ -8,7 +8,7 @@
 | `cd.yml` | 生产发布（`workflow_run` 或手动） | `CI` 成功后 / `workflow_dispatch` |
 | `sonar.yml` | Mac mini 本地 SonarQube 扫描（不阻断 CD） | `push` → `main` |
 | `ping-runner.yml` | ServerA 生产巡检 + ServerD worker 主机巡检 | 每 6 小时 / `workflow_dispatch` |
-| `db-ops.yml` | MongoDB 备份 / 恢复、MySQL/MongoDB 状态及 Redis 只读键空间盘点（读 `production` Environment secrets）；传入 `audit_from` 时还会对 Attention 缺口做私密跨 Mongo/MySQL 只读分类；`govern-scale-metadata` 以不可变 manifest 和新 release 治理医学量表分类 | 每日定时备份 / `workflow_dispatch` |
+| `db-ops.yml` | MongoDB 备份 / 恢复、MySQL/MongoDB 状态及 Redis 只读键空间盘点（读 `production` Environment secrets）；传入 `audit_from` 时还会对 Attention 缺口做私密跨 Mongo/MySQL 只读分类 | 每日定时备份 / `workflow_dispatch` |
 | `attention-reconcile-audit.yml` | 对三副本 Attention dry-run 指标做只读验收；仅在形成新治理清单并获得授权后临时启用生产扫描 | `workflow_dispatch` |
 | `compatibility-observation.yml` | 只读查询生产 Prometheus，分类三个公开兼容接口、AnswerSheet 旧幂等 lookup/hit 和 Evaluation 无冻结 admission 回退的活跃命中、完整零窗口或历史覆盖不足；零命中仍须结合指标语义与调用方/数据 Owner 确认 | 每日 / `workflow_dispatch` |
 
@@ -22,6 +22,7 @@ JavaScript Action 必须使用原生 Node 24 主版本：测试覆盖率、扫�
 - `seeddata-runner.yml`：指向不存在的 `tools/seeddata-runner/`（seeddata 为独立仓库）
 - `statistics-stale-run-settlement.yml`：一次性精确结算已由 31063053544 完成，31063110773 独立只读对账通过后关闭入口
 - `attention-reconcile-apply-audit.yml`：91 条精确清单已由 31113670701 验收，31113758030 独立对账归零后关闭入口
+- `db-ops.yml / govern-scale-metadata`：15 个量表目录元数据目标已由 31156236560 应用，31156323262 独立验证通过，31156574498 精确失效目录缓存后关闭入口
 
 本仓库生产部署直接以仓库内配置文件为准，不再额外注入“升配/降配档位”。流程要点：
 
