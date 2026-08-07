@@ -679,6 +679,11 @@ func TestDBOpsMongoStatusRunsAsFailFastScript(t *testing.T) {
 		`findOne({}, {_id: 0, version: 1, dirty: 1})`,
 		"Running MongoDB utility containers:",
 		"--filter ancestor=mongo:7.0",
+		"Active medical scale category inventory:",
+		`canonicalScaleCategories = ["adhd", "td", "asd", "pressure", "sii", "efn", "emt", "slp"]`,
+		"active_missing_or_invalid",
+		"head_missing_or_invalid",
+		"head_revision",
 	} {
 		if !strings.Contains(content, required) {
 			t.Errorf("DB ops Mongo status fail-fast contract must contain %q", required)

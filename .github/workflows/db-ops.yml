@@ -590,6 +590,58 @@ jobs:
                 {$count: "groups"}
               ]).toArray()[0]?.groups || 0
             })
+            const canonicalScaleCategories = ["adhd", "td", "asd", "pressure", "sii", "efn", "emt", "slp"]
+            const activeScaleSnapshots = {
+              record_role: "published_snapshot",
+              release_status: "active",
+              deleted_at: null,
+              kind: "scale"
+            }
+            const scaleCategoryInventory = assessmentModels.aggregate([
+              {$match: activeScaleSnapshots},
+              {$group: {_id: {$ifNull: ["$category", "<missing>"]}, count: {$sum: 1}}},
+              {$sort: {_id: 1}}
+            ]).toArray()
+            const activeScaleMetadata = assessmentModels.aggregate([
+              {$match: activeScaleSnapshots},
+              {$lookup: {
+                from: "assessment_models",
+                let: {model_code: "$code"},
+                pipeline: [
+                  {$match: {$expr: {$and: [
+                    {$eq: ["$code", "$$model_code"]},
+                    {$eq: ["$record_role", "head"]},
+                    {$eq: ["$deleted_at", null]}
+                  ]}}},
+                  {$project: {_id: 0, category: 1, tags: 1, revision: 1}}
+                ],
+                as: "heads"
+              }},
+              {$project: {
+                _id: 0,
+                code: 1,
+                title: 1,
+                category: {$ifNull: ["$category", null]},
+                tags: {$ifNull: ["$tags", []]},
+                release_version: 1,
+                head_category: {$ifNull: [{$arrayElemAt: ["$heads.category", 0]}, null]},
+                head_tags: {$ifNull: [{$arrayElemAt: ["$heads.tags", 0]}, []]},
+                head_revision: {$ifNull: [{$arrayElemAt: ["$heads.revision", 0]}, null]}
+              }},
+              {$sort: {code: 1}}
+            ]).toArray()
+            print("Active medical scale category inventory:")
+            printjson({
+              canonical_categories: canonicalScaleCategories,
+              counts: scaleCategoryInventory,
+              active_missing_or_invalid: activeScaleMetadata.filter(model =>
+                !canonicalScaleCategories.includes(model.category)
+              ).length,
+              head_missing_or_invalid: activeScaleMetadata.filter(model =>
+                !canonicalScaleCategories.includes(model.head_category)
+              ).length,
+              models: activeScaleMetadata
+            })
             print("ModelCatalog index inventory:")
             printjson(assessmentModels.getIndexes().map(index => ({
               name: index.name,
