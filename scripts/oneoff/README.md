@@ -41,12 +41,6 @@
 
 具体参数以各命令的 `--help`、相邻 README 和测试为准。
 
-### 当前维护窗口专用
-
-| 工具 | 用途 | 生命周期 |
-| --- | --- | --- |
-| `repair_modelcatalog_cutover` | 以当前 Handler 和 active snapshot 规范化 Model runtime；不覆盖 draft head | 严格关闭并保存证据后删除 |
-
 ### 仅限全新环境初始化
 
 | 工具 | 限制 |
