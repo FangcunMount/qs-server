@@ -21,12 +21,12 @@ import (
 type QRCodeHandler struct {
 	BaseHandler
 	storageDir      string
-	objectStore     objectstorageport.PublicObjectStore
+	objectStore     objectstorageport.ObjectStore
 	objectKeyPrefix string
 }
 
 // NewQRCodeHandler 创建二维码图片处理器
-func NewQRCodeHandler(objectStore objectstorageport.PublicObjectStore, objectKeyPrefix string) *QRCodeHandler {
+func NewQRCodeHandler(objectStore objectstorageport.ObjectStore, objectKeyPrefix string) *QRCodeHandler {
 	return &QRCodeHandler{
 		storageDir:      qrcode.QRCodeStorageDir,
 		objectStore:     objectStore,

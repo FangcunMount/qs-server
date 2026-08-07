@@ -82,7 +82,6 @@ func TestResolveOperatorOrgScopeMiddlewareInjectsScopeAndCurrentOperator(t *test
 	router.Use(UserIdentityMiddleware())
 	router.Use(ResolveOperatorOrgScopeMiddleware(checker))
 	router.Use(RequireOrgScopeMiddleware())
-	router.Use(RequireActiveOperatorMiddleware(checker))
 	router.GET("/", func(c *gin.Context) {
 		if got := GetOrgID(c); got != 88 {
 			t.Fatalf("org_id = %d, want 88", got)

@@ -22,7 +22,3 @@ type ObjectStore interface {
 	Put(ctx context.Context, key string, contentType string, body []byte) error
 	Get(ctx context.Context, key string) (*ObjectReader, error)
 }
-
-// PublicObjectStore is retained for the QR-code integration compatibility seam.
-// New application code should depend on ObjectStore.
-type PublicObjectStore = ObjectStore

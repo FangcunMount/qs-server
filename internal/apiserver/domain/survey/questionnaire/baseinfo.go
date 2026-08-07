@@ -22,21 +22,6 @@ func (BaseInfo) UpdateTitle(q *Questionnaire, newTitle string) error {
 	return q.updateBasicInfo(newTitle, q.desc, q.imgUrl)
 }
 
-// UpdateDescription 更新问卷描述
-func (BaseInfo) UpdateDescription(q *Questionnaire, newDescription string) error {
-	if len(newDescription) > 500 {
-		return newError(ErrorKindInvalidInput, "描述长度不能超过 500 字符")
-	}
-
-	return q.updateBasicInfo(q.title, newDescription, q.imgUrl)
-}
-
-// UpdateCoverImage 更新问卷封面图
-func (BaseInfo) UpdateCoverImage(q *Questionnaire, newImgUrl string) error {
-	// 封面图URL可以为空，不做验证
-	return q.updateBasicInfo(q.title, q.desc, newImgUrl)
-}
-
 // UpdateAll 批量更新基础信息
 func (BaseInfo) UpdateAll(q *Questionnaire, title, description, imgUrl string, typ QuestionnaireType) error {
 	title = strings.TrimSpace(title)

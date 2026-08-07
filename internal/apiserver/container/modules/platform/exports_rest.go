@@ -13,7 +13,7 @@ import (
 // RESTIntegrationDeps are platform/integration surfaces wired into REST transport.
 type RESTIntegrationDeps struct {
 	CodesService            codesapp.CodesService
-	QRCodeObjectStore       objectstorageport.PublicObjectStore
+	QRCodeObjectStore       objectstorageport.ObjectStore
 	QRCodeObjectKeyPrefix   string
 	GovernanceStatusService cachegovernance.StatusReader
 	EventStatusService      appEventing.StatusService

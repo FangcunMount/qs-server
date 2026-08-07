@@ -79,7 +79,7 @@ type Deps struct {
 	Workbench       WorkbenchDeps
 
 	CodesService             codesapp.CodesService
-	QRCodeObjectStore        objectstorageport.PublicObjectStore
+	QRCodeObjectStore        objectstorageport.ObjectStore
 	QRCodeObjectKeyPrefix    string
 	AssessmentAssetStore     objectstorageport.ObjectStore
 	AssessmentAssetKeyPrefix string

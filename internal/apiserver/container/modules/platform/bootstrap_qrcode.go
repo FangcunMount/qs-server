@@ -48,19 +48,19 @@ func BuildWeChatSDKCache(access QRCodeCacheAccess) cache.Cache {
 
 // QRCodeObjectStoreResult holds object-store wiring for QR assets.
 type QRCodeObjectStoreResult struct {
-	Store     objectstorageport.PublicObjectStore
+	Store     objectstorageport.ObjectStore
 	KeyPrefix string
 }
 
 // InitQRCodeObjectStore configures optional OSS-backed QR asset storage.
-func InitQRCodeObjectStore(existing objectstorageport.PublicObjectStore, ossOptions *options.OSSOptions) (QRCodeObjectStoreResult, error) {
+func InitQRCodeObjectStore(existing objectstorageport.ObjectStore, ossOptions *options.OSSOptions) (QRCodeObjectStoreResult, error) {
 	if ossOptions == nil || !ossOptions.Enabled {
 		return QRCodeObjectStoreResult{}, nil
 	}
 	if existing != nil {
 		return QRCodeObjectStoreResult{Store: existing, KeyPrefix: ossOptions.ObjectKeyPrefix}, nil
 	}
-	store, err := aliyunoss.NewPublicObjectStore(ossOptions)
+	store, err := aliyunoss.NewObjectStore(ossOptions)
 	if err != nil {
 		return QRCodeObjectStoreResult{}, fmt.Errorf("initialize qrcode object store: %w", err)
 	}
@@ -94,7 +94,7 @@ func BuildQRCodeServiceConfig(wechatOptions *options.WeChatOptions, ossOptions *
 type QRCodeServiceInput struct {
 	Generator        wechatmini.QRCodeGenerator
 	WeChatAppService *iam.WeChatAppService
-	ObjectStore      objectstorageport.PublicObjectStore
+	ObjectStore      objectstorageport.ObjectStore
 	WeChatOptions    *options.WeChatOptions
 	OSSOptions       *options.OSSOptions
 }
@@ -102,7 +102,7 @@ type QRCodeServiceInput struct {
 // QRCodeServiceInitResult is the outcome of optional QR code service initialization.
 type QRCodeServiceInitResult struct {
 	Service           qrcodeApp.QRCodeService
-	ObjectStore       objectstorageport.PublicObjectStore
+	ObjectStore       objectstorageport.ObjectStore
 	ObjectKeyPrefix   string
 	SkipReason        string
 	ObjectStoreBucket string

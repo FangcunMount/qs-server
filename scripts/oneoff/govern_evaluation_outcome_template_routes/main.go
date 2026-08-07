@@ -573,12 +573,6 @@ func emptySectionsState(reportSpec map[string]any) (string, error) {
 	return "empty_array", nil
 }
 
-func scanOutcomes(ctx context.Context, db *sql.DB, visit func(outcomeRow, reportPlan) error) (inventory, error) {
-	return scanOutcomesWithPlanner(ctx, db, func(row outcomeRow) (reportPlan, error) {
-		return planReportInput(row.ReportInput, row.ModelKind)
-	}, visit)
-}
-
 func scanOutcomesWithPlanner(ctx context.Context, db *sql.DB, planner func(outcomeRow) (reportPlan, error), visit func(outcomeRow, reportPlan) error) (inventory, error) {
 	rows, err := db.QueryContext(ctx, `
 SELECT id, model_kind, model_code, model_version, evaluated_at, COALESCE(report_input_json, '')

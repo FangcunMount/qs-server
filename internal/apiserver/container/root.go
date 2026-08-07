@@ -71,7 +71,7 @@ type Container struct {
 	// 基础设施服务
 	QRCodeGenerator          wechatmini.QRCodeGenerator            // 小程序码生成器（可选）
 	SubscribeSender          wechatmini.MiniProgramSubscribeSender // 小程序订阅消息发送器（可选）
-	QRCodeObjectStore        objectstorageport.PublicObjectStore   // 二维码对象存储（可选）
+	QRCodeObjectStore        objectstorageport.ObjectStore         // 二维码对象存储（可选）
 	QRCodeObjectKeyPrefix    string                                // 二维码对象 key 前缀
 	AssessmentAssetStore     objectstorageport.ObjectStore         // 测评人物图片对象存储（可选）
 	AssessmentAssetKeyPrefix string                                // 测评人物图片对象 key 前缀

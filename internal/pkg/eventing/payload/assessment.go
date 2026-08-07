@@ -56,12 +56,6 @@ func (d EvaluationRequestedData) ClassifyPayloadGate() PayloadGateClass {
 	return PayloadGateLegacyIncomplete
 }
 
-// NeedsEvaluation is retained for log fields and older call sites. Prefer
-// ClassifyPayloadGate / HasModelIdentity; Worker must not use this as an ACK gate.
-func (d EvaluationRequestedData) NeedsEvaluation() bool {
-	return d.HasModelIdentity()
-}
-
 // EvaluationFailedData is the evaluation failed event body.
 type EvaluationFailedData struct {
 	OrgID        int64     `json:"org_id"`

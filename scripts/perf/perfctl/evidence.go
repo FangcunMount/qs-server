@@ -7,7 +7,6 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -489,8 +488,4 @@ func classifyEvidence(evidence PhaseEvidence, subject string) Verdict {
 		return Verdict{Status: VerdictIncomplete, Reasons: []string{subject + " is incomplete"}}
 	}
 	return Verdict{Status: VerdictPass, Reasons: []string{subject + " is complete"}}
-}
-
-func sortChecks(checks []EvidenceCheck) {
-	sort.Slice(checks, func(i, j int) bool { return checks[i].Name < checks[j].Name })
 }

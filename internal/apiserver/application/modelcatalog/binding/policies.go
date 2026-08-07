@@ -70,31 +70,3 @@ func (r Policies) resolve(model *domain.AssessmentModel) Policy {
 	}
 	return nil
 }
-
-// PolicyFunc 策略函数
-type PolicyFunc struct {
-	Match             func(domain.Identity) bool
-	ValidateFunc      func(context.Context, *domain.AssessmentModel, domain.QuestionnaireBinding) (domain.QuestionnaireBinding, error)
-	BeforePublishFunc func(context.Context, *domain.AssessmentModel) error
-}
-
-// Supports 支持
-func (f PolicyFunc) Supports(identity domain.Identity) bool {
-	return f.Match != nil && f.Match(identity)
-}
-
-// Validate 验证
-func (f PolicyFunc) Validate(ctx context.Context, model *domain.AssessmentModel, binding domain.QuestionnaireBinding) (domain.QuestionnaireBinding, error) {
-	if f.ValidateFunc == nil {
-		return binding, nil
-	}
-	return f.ValidateFunc(ctx, model, binding)
-}
-
-// BeforePublish 发布前
-func (f PolicyFunc) BeforePublish(ctx context.Context, model *domain.AssessmentModel) error {
-	if f.BeforePublishFunc == nil {
-		return nil
-	}
-	return f.BeforePublishFunc(ctx, model)
-}

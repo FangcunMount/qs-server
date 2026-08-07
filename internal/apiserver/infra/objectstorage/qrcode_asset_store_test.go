@@ -73,4 +73,4 @@ func TestQRCodeAssetStoreFallsBackToLocalFile(t *testing.T) {
 	}
 }
 
-var _ objectstorageport.PublicObjectStore = (*publicObjectStoreStub)(nil)
+var _ objectstorageport.ObjectStore = (*publicObjectStoreStub)(nil)

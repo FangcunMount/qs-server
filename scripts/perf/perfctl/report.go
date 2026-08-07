@@ -463,14 +463,6 @@ func metricNameForSource(spec operationSpec) string {
 	return spec.ErrorMetric
 }
 
-func durationSeconds(value string) float64 {
-	duration, err := time.ParseDuration(value)
-	if err != nil {
-		return 0
-	}
-	return duration.Seconds()
-}
-
 func maxInt64(left, right int64) int64 {
 	if left > right {
 		return left

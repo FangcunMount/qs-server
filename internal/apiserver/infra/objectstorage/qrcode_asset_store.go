@@ -19,14 +19,14 @@ const (
 )
 
 type QRCodeAssetStoreOptions struct {
-	ObjectStore     objectstorageport.PublicObjectStore
+	ObjectStore     objectstorageport.ObjectStore
 	ObjectKeyPrefix string
 	PublicURLPrefix string
 	LocalStorageDir string
 }
 
 type qrCodeAssetStore struct {
-	objectStore     objectstorageport.PublicObjectStore
+	objectStore     objectstorageport.ObjectStore
 	objectKeyPrefix string
 	publicURLPrefix string
 	localStorageDir string

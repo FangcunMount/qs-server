@@ -23,7 +23,7 @@ type IntegrationState struct {
 	CodesService                       codesapp.CodesService
 	QRCodeGenerator                    wechatmini.QRCodeGenerator
 	SubscribeSender                    wechatmini.MiniProgramSubscribeSender
-	QRCodeObjectStore                  objectstorageport.PublicObjectStore
+	QRCodeObjectStore                  objectstorageport.ObjectStore
 	QRCodeObjectKeyPrefix              string
 	QRCodeService                      qrcodeApp.QRCodeService
 	MiniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService

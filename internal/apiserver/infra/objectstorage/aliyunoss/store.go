@@ -65,11 +65,6 @@ func NewObjectStore(opts *options.OSSOptions) (objectstorageport.ObjectStore, er
 	}, nil
 }
 
-// NewPublicObjectStore is retained for QR-code wiring compatibility.
-func NewPublicObjectStore(opts *options.OSSOptions) (objectstorageport.PublicObjectStore, error) {
-	return NewObjectStore(opts)
-}
-
 func buildCredentialsProvider(opts *options.OSSOptions) (credentials.CredentialsProvider, error) {
 	if opts.AccessKeyID != "" && opts.AccessKeySecret != "" {
 		if opts.SessionToken != "" {
