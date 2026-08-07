@@ -284,6 +284,12 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "type": "string",
+                        "description": "模型主类；医学量表使用 canonical category code",
+                        "name": "category",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
                         "description": "页码",
                         "name": "page",

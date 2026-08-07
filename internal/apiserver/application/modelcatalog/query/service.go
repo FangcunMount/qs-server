@@ -418,7 +418,22 @@ func normalizeHotWindow(value int) int {
 }
 
 func scaleCategoryOptions() []modelcatalog.Option {
-	return []modelcatalog.Option{{Value: "adhd", Label: "多动"}, {Value: "td", Label: "抽动"}, {Value: "asd", Label: "自闭"}, {Value: "pressure", Label: "压力"}, {Value: "sii", Label: "感觉统合"}, {Value: "efn", Label: "执行功能"}, {Value: "emt", Label: "情绪"}, {Value: "slp", Label: "睡眠"}, {Value: "personality", Label: "人格"}}
+	labels := map[string]string{
+		domain.ScaleCategoryADHD:               "多动",
+		domain.ScaleCategoryTicDisorder:        "抽动",
+		domain.ScaleCategoryAutismSpectrum:     "自闭",
+		domain.ScaleCategoryPressure:           "压力",
+		domain.ScaleCategorySensoryIntegration: "感觉统合",
+		domain.ScaleCategoryExecutiveFunction:  "执行功能",
+		domain.ScaleCategoryEmotion:            "情绪",
+		domain.ScaleCategorySleep:              "睡眠",
+	}
+	values := domain.MedicalScaleCategories()
+	result := make([]modelcatalog.Option, 0, len(values))
+	for _, value := range values {
+		result = append(result, modelcatalog.Option{Value: value, Label: labels[value]})
+	}
+	return result
 }
 
 func scaleStageOptions() []modelcatalog.Option {

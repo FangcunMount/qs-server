@@ -80,3 +80,46 @@ func TestAssessmentModelRejectsMissingDefinitionV2(t *testing.T) {
 		t.Fatalf("issue = %#v", result.Issues[0])
 	}
 }
+
+func TestScalePublishRequiresCanonicalCategory(t *testing.T) {
+	t.Parallel()
+
+	model, err := assessmentmodel.New(assessmentmodel.NewInput{
+		Code: "SCALE_A", Kind: binding.KindScale, Algorithm: binding.AlgorithmScaleDefault, Title: "Scale A",
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	_ = model.BindQuestionnaire(binding.QuestionnaireBinding{QuestionnaireCode: "Q_A", QuestionnaireVersion: "v1"}, time.Now())
+	_ = model.UpdateDefinition(&definition.Definition{}, time.Now())
+	result := model.ValidateForPublish()
+	if result.Passed() {
+		t.Fatal("ValidateForPublish() should reject an empty scale category")
+	}
+	found := false
+	for _, issue := range result.Issues {
+		if issue.Code == "category.required" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("ValidateForPublish() issues = %#v, want category.required", result.Issues)
+	}
+
+	if err := model.UpdateScaleBasicInfo("Scale A", "", binding.AlgorithmScaleDefault, assessmentmodel.ScaleCategoryADHD, nil, nil, nil, nil, time.Now()); err != nil {
+		t.Fatalf("UpdateScaleBasicInfo() error = %v", err)
+	}
+	if result := model.ValidateForPublish(); !result.Passed() {
+		t.Fatalf("ValidateForPublish() issues = %#v", result.Issues)
+	}
+}
+
+func TestScaleMetadataRejectsCompatibilityCategory(t *testing.T) {
+	t.Parallel()
+
+	if _, err := assessmentmodel.New(assessmentmodel.NewInput{
+		Code: "SCALE_PERSONALITY", Kind: binding.KindScale, Algorithm: binding.AlgorithmScaleDefault, Title: "Scale", Category: "personality",
+	}); err == nil {
+		t.Fatal("New() error = nil, want legacy personality category rejected for scale")
+	}
+}

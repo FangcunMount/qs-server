@@ -114,6 +114,7 @@ func publishableScaleShell() *domain.AssessmentModel {
 	return &domain.AssessmentModel{
 		Kind:      domain.KindScale,
 		Algorithm: domain.AlgorithmScaleDefault,
+		Category:  domain.ScaleCategoryADHD,
 		Code:      "SCALE_SHELL",
 		Title:     "Scale",
 		Binding:   domain.QuestionnaireBinding{QuestionnaireCode: "Q", QuestionnaireVersion: "1"},

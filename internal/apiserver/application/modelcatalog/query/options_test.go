@@ -27,6 +27,21 @@ func TestCatalogOptionsFilterAlgorithmsByCanonicalKind(t *testing.T) {
 	}
 }
 
+func TestScaleCatalogOptionsExposeOnlyCanonicalWritableCategories(t *testing.T) {
+	t.Parallel()
+
+	options := catalogOptionsForKind(modelcatalog.KindScale)
+	want := domain.MedicalScaleCategories()
+	if len(options.Categories) != len(want) {
+		t.Fatalf("scale categories = %#v, want %d canonical values", options.Categories, len(want))
+	}
+	for index, value := range want {
+		if options.Categories[index].Value != value {
+			t.Fatalf("scale categories[%d] = %#v, want %q", index, options.Categories[index], value)
+		}
+	}
+}
+
 func TestCatalogOptionsExposeScoringStrategiesFromCapability(t *testing.T) {
 	t.Parallel()
 	scale := catalogOptionsForKind(modelcatalog.KindScale)

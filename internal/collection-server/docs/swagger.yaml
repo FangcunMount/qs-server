@@ -1507,6 +1507,10 @@ paths:
         in: query
         name: kinds
         type: string
+      - description: 模型主类；医学量表使用 canonical category code
+        in: query
+        name: category
+        type: string
       - description: 页码
         in: query
         name: page

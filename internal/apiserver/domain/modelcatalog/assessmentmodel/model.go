@@ -2,6 +2,7 @@ package assessmentmodel
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/binding"
@@ -73,6 +74,10 @@ func New(input NewInput) (*AssessmentModel, error) {
 	}
 	if !input.Kind.IsValid() {
 		return nil, fmt.Errorf("%w: kind is invalid", ErrInvalidArgument)
+	}
+	input.Category = strings.TrimSpace(input.Category)
+	if input.Kind == binding.KindScale && input.Category != "" && !IsMedicalScaleCategory(input.Category) {
+		return nil, fmt.Errorf("%w: scale category is invalid", ErrInvalidArgument)
 	}
 	now := input.Now
 	if now.IsZero() {
@@ -149,6 +154,10 @@ func (m *AssessmentModel) UpdateBasicInfo(title, description string, algorithm b
 func (m *AssessmentModel) UpdateScaleBasicInfo(title, description string, algorithm binding.Algorithm, category string, tags, stages, applicableAges, reporters []string, now time.Time) error {
 	if m == nil || m.Kind != binding.KindScale {
 		return fmt.Errorf("%w: scale metadata is only supported by scale models", ErrInvalidArgument)
+	}
+	category = strings.TrimSpace(category)
+	if category != "" && !IsMedicalScaleCategory(category) {
+		return fmt.Errorf("%w: scale category is invalid", ErrInvalidArgument)
 	}
 	if err := m.updateBasicInfo(title, description, algorithm, category, tags); err != nil {
 		return err

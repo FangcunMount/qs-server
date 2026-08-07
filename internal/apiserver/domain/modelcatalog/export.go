@@ -147,6 +147,15 @@ const (
 	ReleaseStatusActive   = assessmentmodelpkg.ReleaseStatusActive
 	ReleaseStatusArchived = assessmentmodelpkg.ReleaseStatusArchived
 
+	ScaleCategoryADHD               = assessmentmodelpkg.ScaleCategoryADHD
+	ScaleCategoryTicDisorder        = assessmentmodelpkg.ScaleCategoryTicDisorder
+	ScaleCategoryAutismSpectrum     = assessmentmodelpkg.ScaleCategoryAutismSpectrum
+	ScaleCategoryPressure           = assessmentmodelpkg.ScaleCategoryPressure
+	ScaleCategorySensoryIntegration = assessmentmodelpkg.ScaleCategorySensoryIntegration
+	ScaleCategoryExecutiveFunction  = assessmentmodelpkg.ScaleCategoryExecutiveFunction
+	ScaleCategoryEmotion            = assessmentmodelpkg.ScaleCategoryEmotion
+	ScaleCategorySleep              = assessmentmodelpkg.ScaleCategorySleep
+
 	ValidationLevelError   = assessmentmodelpkg.ValidationLevelError
 	ValidationLevelWarning = assessmentmodelpkg.ValidationLevelWarning
 )
@@ -157,6 +166,8 @@ var (
 	CanonicalSubKindFor      = binding.CanonicalSubKindFor
 	ResolveProductChannel    = binding.ResolveProductChannel
 	HasValidationErrors      = binding.HasValidationErrors
+	MedicalScaleCategories   = assessmentmodelpkg.MedicalScaleCategories
+	IsMedicalScaleCategory   = assessmentmodelpkg.IsMedicalScaleCategory
 	NewIdentity              = identitypkg.New
 	FamilyFromDecisionKind   = identitypkg.FamilyFromDecisionKind
 	FamilyFromIdentity       = identitypkg.FamilyFromIdentity
