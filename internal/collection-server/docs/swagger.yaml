@@ -638,10 +638,6 @@ definitions:
         type: string
       decision_kind:
         type: string
-      definition:
-        items:
-          type: integer
-        type: array
       description:
         type: string
       heat_score:
@@ -688,11 +684,11 @@ definitions:
       window_days:
         type: integer
     type: object
-  modelcatalog.ListResponse:
+  modelcatalog.ListSummaryResponse:
     properties:
       models:
         items:
-          $ref: '#/definitions/modelcatalog.ModelResponse'
+          $ref: '#/definitions/modelcatalog.ModelSummaryResponse'
         type: array
       page:
         type: integer
@@ -719,6 +715,47 @@ definitions:
         items:
           type: integer
         type: array
+      description:
+        type: string
+      kind:
+        type: string
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      reporters:
+        items:
+          type: string
+        type: array
+      stages:
+        items:
+          type: string
+        type: array
+      status:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      version:
+        type: string
+    type: object
+  modelcatalog.ModelSummaryResponse:
+    properties:
+      algorithm:
+        type: string
+      applicable_ages:
+        items:
+          type: string
+        type: array
+      category:
+        type: string
+      code:
+        type: string
+      decision_kind:
+        type: string
       description:
         type: string
       kind:
@@ -1529,7 +1566,7 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/modelcatalog.ListResponse'
+                  $ref: '#/definitions/modelcatalog.ListSummaryResponse'
               type: object
       summary: 获取已发布测评模型列表
       tags:

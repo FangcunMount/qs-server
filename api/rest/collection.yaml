@@ -282,7 +282,7 @@ paths:
                 - type: object
                   properties:
                     data:
-                      $ref: '#/components/schemas/modelcatalog.ListResponse'
+                      $ref: '#/components/schemas/modelcatalog.ListSummaryResponse'
         '500':
           description: 服务内部错误
           content:
@@ -2932,10 +2932,6 @@ components:
           type: string
         decision_kind:
           type: string
-        definition:
-          type: array
-          items:
-            type: integer
         description:
           type: string
         heat_score:
@@ -2981,13 +2977,13 @@ components:
           type: integer
         window_days:
           type: integer
-    modelcatalog.ListResponse:
+    modelcatalog.ListSummaryResponse:
       type: object
       properties:
         models:
           type: array
           items:
-            $ref: '#/components/schemas/modelcatalog.ModelResponse'
+            $ref: '#/components/schemas/modelcatalog.ModelSummaryResponse'
         page:
           type: integer
         page_size:
@@ -3013,6 +3009,47 @@ components:
           type: array
           items:
             type: integer
+        description:
+          type: string
+        kind:
+          type: string
+        questionnaire_code:
+          type: string
+        questionnaire_version:
+          type: string
+        reporters:
+          type: array
+          items:
+            type: string
+        stages:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        title:
+          type: string
+        version:
+          type: string
+    modelcatalog.ModelSummaryResponse:
+      type: object
+      properties:
+        algorithm:
+          type: string
+        applicable_ages:
+          type: array
+          items:
+            type: string
+        category:
+          type: string
+        code:
+          type: string
+        decision_kind:
+          type: string
         description:
           type: string
         kind:

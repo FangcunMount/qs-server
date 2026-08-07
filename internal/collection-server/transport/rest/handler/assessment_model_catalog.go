@@ -45,7 +45,7 @@ func (h *AssessmentModelCatalogHandler) Get(c *gin.Context) {
 // @Param category query string false "模型主类；医学量表使用 canonical category code"
 // @Param page query int false "页码"
 // @Param page_size query int false "每页数量"
-// @Success 200 {object} core.Response{data=modelcatalog.ListResponse}
+// @Success 200 {object} core.Response{data=modelcatalog.ListSummaryResponse}
 // @Router /api/v1/assessment-models [get]
 func (h *AssessmentModelCatalogHandler) List(c *gin.Context) {
 	var request modelcatalog.ListRequest
@@ -57,7 +57,7 @@ func (h *AssessmentModelCatalogHandler) List(c *gin.Context) {
 		h.InternalErrorResponse(c, "list assessment models failed", err)
 		return
 	}
-	h.Success(c, result)
+	h.Success(c, result.Summary())
 }
 
 // ListHot returns the scale hot-rank projection through the generic catalogue.

@@ -74,23 +74,26 @@ type CatalogOptions struct {
 	Kinds, Algorithms, Categories, Stages, ApplicableAges, Reporters []CatalogOption
 }
 
+type ModelSummaryResponse struct {
+	Code                 string   `json:"code"`
+	Kind                 string   `json:"kind"`
+	Algorithm            string   `json:"algorithm,omitempty"`
+	DecisionKind         string   `json:"decision_kind,omitempty"`
+	Version              string   `json:"version,omitempty"`
+	Title                string   `json:"title"`
+	Description          string   `json:"description,omitempty"`
+	Status               string   `json:"status"`
+	Category             string   `json:"category,omitempty"`
+	Stages               []string `json:"stages,omitempty"`
+	ApplicableAges       []string `json:"applicable_ages,omitempty"`
+	Reporters            []string `json:"reporters,omitempty"`
+	Tags                 []string `json:"tags,omitempty"`
+	QuestionnaireCode    string   `json:"questionnaire_code,omitempty"`
+	QuestionnaireVersion string   `json:"questionnaire_version,omitempty"`
+}
 type ModelResponse struct {
-	Code                 string          `json:"code"`
-	Kind                 string          `json:"kind"`
-	Algorithm            string          `json:"algorithm,omitempty"`
-	DecisionKind         string          `json:"decision_kind,omitempty"`
-	Version              string          `json:"version,omitempty"`
-	Title                string          `json:"title"`
-	Description          string          `json:"description,omitempty"`
-	Status               string          `json:"status"`
-	Category             string          `json:"category,omitempty"`
-	Stages               []string        `json:"stages,omitempty"`
-	ApplicableAges       []string        `json:"applicable_ages,omitempty"`
-	Reporters            []string        `json:"reporters,omitempty"`
-	Tags                 []string        `json:"tags,omitempty"`
-	QuestionnaireCode    string          `json:"questionnaire_code,omitempty"`
-	QuestionnaireVersion string          `json:"questionnaire_version,omitempty"`
-	Definition           json.RawMessage `json:"definition,omitempty"`
+	ModelSummaryResponse
+	Definition json.RawMessage `json:"definition,omitempty"`
 }
 type ListRequest struct {
 	Kind                 string `form:"kind"`
@@ -110,6 +113,12 @@ type ListResponse struct {
 	Page     int32           `json:"page"`
 	PageSize int32           `json:"page_size"`
 }
+type ListSummaryResponse struct {
+	Models   []ModelSummaryResponse `json:"models"`
+	Total    int64                  `json:"total"`
+	Page     int32                  `json:"page"`
+	PageSize int32                  `json:"page_size"`
+}
 type HotRequest struct {
 	Kind       string `form:"kind"`
 	Limit      int32  `form:"limit"`
@@ -122,7 +131,7 @@ type HotResponse struct {
 	WindowDays int32              `json:"window_days"`
 }
 type HotModelResponse struct {
-	ModelResponse
+	ModelSummaryResponse
 	Rank            int32 `json:"rank"`
 	SubmissionCount int64 `json:"submission_count"`
 	HeatScore       int64 `json:"heat_score"`
@@ -171,6 +180,19 @@ func (s *QueryService) List(ctx context.Context, request *ListRequest) (*ListRes
 	}
 	return result, nil
 }
+
+// Summary removes DefinitionV2 from the public catalogue list while retaining
+// the internal full list used by compatibility projectors.
+func (response *ListResponse) Summary() *ListSummaryResponse {
+	if response == nil {
+		return nil
+	}
+	result := &ListSummaryResponse{Models: make([]ModelSummaryResponse, 0, len(response.Models)), Total: response.Total, Page: response.Page, PageSize: response.PageSize}
+	for index := range response.Models {
+		result.Models = append(result.Models, response.Models[index].ModelSummaryResponse)
+	}
+	return result
+}
 func (s *QueryService) ListHot(ctx context.Context, request *HotRequest) (*HotResponse, error) {
 	if request == nil {
 		request = &HotRequest{}
@@ -193,7 +215,7 @@ func (s *QueryService) ListHot(ctx context.Context, request *HotRequest) (*HotRe
 	}
 	result := &HotResponse{Models: make([]HotModelResponse, 0, len(value.Models)), Total: value.Total, Limit: value.Limit, WindowDays: value.WindowDays}
 	for _, item := range value.Models {
-		result.Models = append(result.Models, HotModelResponse{ModelResponse: *s.modelResponse(&item.Model), Rank: item.Rank, SubmissionCount: item.SubmissionCount, HeatScore: item.HeatScore})
+		result.Models = append(result.Models, HotModelResponse{ModelSummaryResponse: *s.modelSummaryResponse(&item.Model), Rank: item.Rank, SubmissionCount: item.SubmissionCount, HeatScore: item.HeatScore})
 	}
 	return result, nil
 }
@@ -248,13 +270,18 @@ func (s *QueryService) modelResponse(value *CatalogModel) *ModelResponse {
 	if value == nil {
 		return nil
 	}
-	return &ModelResponse{
+	return &ModelResponse{ModelSummaryResponse: *s.modelSummaryResponse(value), Definition: append(json.RawMessage(nil), value.Definition...)}
+}
+func (s *QueryService) modelSummaryResponse(value *CatalogModel) *ModelSummaryResponse {
+	if value == nil {
+		return nil
+	}
+	return &ModelSummaryResponse{
 		Code: value.Code, Kind: value.Kind, Algorithm: value.Algorithm, DecisionKind: value.DecisionKind,
 		Version: value.Version, Title: value.Title, Description: value.Description, Status: value.Status, Category: value.Category,
 		Stages: append([]string(nil), value.Stages...), ApplicableAges: append([]string(nil), value.ApplicableAges...),
 		Reporters: append([]string(nil), value.Reporters...), Tags: append([]string(nil), value.Tags...),
 		QuestionnaireCode: value.QuestionnaireCode, QuestionnaireVersion: value.QuestionnaireVersion,
-		Definition: append(json.RawMessage(nil), value.Definition...),
 	}
 }
 func options(values []CatalogOption) []OptionResponse {

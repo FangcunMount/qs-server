@@ -314,7 +314,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/modelcatalog.ListResponse"
+                                            "$ref": "#/definitions/modelcatalog.ListSummaryResponse"
                                         }
                                     }
                                 }
@@ -3476,12 +3476,6 @@ const docTemplate = `{
                 "decision_kind": {
                     "type": "string"
                 },
-                "definition": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
                 "description": {
                     "type": "string"
                 },
@@ -3552,13 +3546,13 @@ const docTemplate = `{
                 }
             }
         },
-        "modelcatalog.ListResponse": {
+        "modelcatalog.ListSummaryResponse": {
             "type": "object",
             "properties": {
                 "models": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/modelcatalog.ModelResponse"
+                        "$ref": "#/definitions/modelcatalog.ModelSummaryResponse"
                     }
                 },
                 "page": {
@@ -3598,6 +3592,68 @@ const docTemplate = `{
                     "items": {
                         "type": "integer"
                     }
+                },
+                "description": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "reporters": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "stages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "modelcatalog.ModelSummaryResponse": {
+            "type": "object",
+            "properties": {
+                "algorithm": {
+                    "type": "string"
+                },
+                "applicable_ages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "category": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "decision_kind": {
+                    "type": "string"
                 },
                 "description": {
                     "type": "string"
