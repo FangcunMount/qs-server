@@ -1731,6 +1731,64 @@ jobs:
           SCALE_CONFIRM_INPUT: ${{ github.event.inputs.governance_confirm }}
           BACKUP_FILE_INPUT: ${{ github.event.inputs.backup_name }}
 
+      - name: Invalidate scale catalogue list cache after committed write
+        if: github.event.inputs.governance_operation == 'apply' || github.event.inputs.governance_operation == 'rollback'
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          command_timeout: 5m
+          envs: REDIS_HOST,REDIS_PORT,REDIS_USERNAME,REDIS_PASSWORD,REDIS_USE_SSL,REDIS_SSL_INSECURE_SKIP_VERIFY
+          script: |
+            set -Eeuo pipefail
+            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+
+            : "${REDIS_HOST:?REDIS_HOST is empty}"
+            REDIS_PORT="${REDIS_PORT:-6379}"
+            CACHE_VERSION_KEY="cache:static:query:version:modelcatalog:published:list:global"
+            REDIS_CONTAINER="qs-server-scale-catalog-cache-invalidate-${{ github.run_id }}-${{ github.run_attempt }}"
+            cleanup_cache_invalidator() {
+              sudo docker rm -f "$REDIS_CONTAINER" >/dev/null 2>&1 || true
+            }
+            trap cleanup_cache_invalidator EXIT
+
+            REDIS_CLI_ARGS=(-h "$REDIS_HOST" -p "$REDIS_PORT" --no-auth-warning --raw)
+            if [ -n "${REDIS_USERNAME:-}" ]; then
+              REDIS_CLI_ARGS+=(--user "$REDIS_USERNAME")
+            fi
+            if [ "${REDIS_USE_SSL:-false}" = "true" ]; then
+              REDIS_CLI_ARGS+=(--tls)
+              if [ "${REDIS_SSL_INSECURE_SKIP_VERIFY:-false}" = "true" ]; then
+                REDIS_CLI_ARGS+=(--insecure)
+              fi
+            fi
+            if ! sudo docker network inspect infra-network >/dev/null 2>&1; then
+              echo "❌ infra-network is unavailable" >&2
+              exit 1
+            fi
+
+            new_version=$(sudo docker run --rm --network infra-network \
+              --name "$REDIS_CONTAINER" \
+              --label "com.fangcunmount.qs-server.operation=scale-catalog-cache-invalidate" \
+              --label "com.fangcunmount.qs-server.github-run-id=${{ github.run_id }}" \
+              -e REDISCLI_AUTH="${REDIS_PASSWORD:-}" \
+              redis:7-alpine redis-cli "${REDIS_CLI_ARGS[@]}" -n 2 INCR "$CACHE_VERSION_KEY" | tr -d '\r')
+            if ! [[ "$new_version" =~ ^[0-9]+$ ]]; then
+              echo "❌ Scale catalogue cache version bump failed" >&2
+              exit 1
+            fi
+            echo "✅ Scale catalogue list cache version advanced to ${new_version}"
+        env:
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT || 6379 }}
+          REDIS_USERNAME: ${{ secrets.REDIS_USERNAME }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          REDIS_USE_SSL: ${{ secrets.REDIS_USE_SSL }}
+          REDIS_SSL_INSECURE_SKIP_VERIFY: ${{ secrets.REDIS_SSL_INSECURE_SKIP_VERIFY }}
+
   mongodb-template-release-governance:
     name: MongoDB Interpretation Template Release Governance
     if: (github.event.inputs.operation == 'govern-template-release' || github.event.inputs.operation == 'govern-template-release-current') && github.event.inputs.database == 'mongodb'

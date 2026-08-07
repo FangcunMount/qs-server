@@ -716,6 +716,9 @@ func TestDBOpsScaleCatalogMetadataGovernanceIsManifestDriven(t *testing.T) {
 		"sha256sum --check",
 		"--network infra-network",
 		"SCALE_CATALOG_REQUIRE_COMPLETE",
+		"Invalidate scale catalogue list cache after committed write",
+		"cache:static:query:version:modelcatalog:published:list:global",
+		`-n 2 INCR "$CACHE_VERSION_KEY"`,
 	} {
 		if !strings.Contains(content, required) {
 			t.Errorf("DB ops scale catalogue governance contract must contain %q", required)
