@@ -5,7 +5,9 @@
 const crypto = require("crypto")
 
 const schemaVersion = "scale-catalog-metadata-governance/v1"
-const releaseVersionSuffix = "-catalog-202608-v1"
+// v1 was rolled back after its BSON source metadata was found incomplete.
+// Keep the archived v1 releases immutable and mint v2 instead of reusing an indexed identity.
+const releaseVersionSuffix = "-catalog-202608-v2"
 const applyConfirmation = "activate-scale-catalog-metadata-2026-08-v1"
 const rollbackConfirmation = "rollback-scale-catalog-metadata-2026-08-v1"
 const canonicalCategories = Object.freeze(["adhd", "td", "asd", "pressure", "sii", "efn", "emt", "slp"])

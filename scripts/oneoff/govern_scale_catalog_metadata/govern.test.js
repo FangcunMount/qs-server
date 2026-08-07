@@ -72,7 +72,7 @@ test("write operations require exact confirmation", () => {
 test("manifest fingerprint and release derivation are immutable", () => {
   const records = [{
     code: "ISI7", source_id: "a".repeat(24), clone_id: "b".repeat(24),
-    source_release_version: "1.0.0", target_release_version: "1.0.0-catalog-202608-v1",
+    source_release_version: "1.0.0", target_release_version: "1.0.0-catalog-202608-v2",
     protected_snapshot_hash: "c".repeat(64), head_id: "d".repeat(24), head_revision: "4",
     desired_category: "slp", desired_tags: ["睡眠"], source_tags: [],
     head_source_tags: ["睡眠"], update_head: false, governed_at: "2026-08-07T00:00:00.000Z"
@@ -89,6 +89,6 @@ test("manifest fingerprint and release derivation are immutable", () => {
   const tampered = JSON.parse(JSON.stringify(manifest))
   tampered.records[0].desired_category = "emt"
   assert.throws(() => governance.validateManifest(tampered), /fingerprint mismatch/)
-  assert.equal(governance.targetReleaseVersion("v1-catalog-202608-v1"), "v1-catalog-202608-v1")
+  assert.equal(governance.targetReleaseVersion("v1-catalog-202608-v2"), "v1-catalog-202608-v2")
   assert.equal(governance.nextRevision("9223372036854775800", 1), "9223372036854775801")
 })
