@@ -31,6 +31,10 @@ function isPlainObject(value) {
   return prototype === Object.prototype || prototype === null
 }
 
+function isObjectRecord(value) {
+  return value != null && typeof value === "object" && !Array.isArray(value) && !(value instanceof Date)
+}
+
 function cloneValue(value) {
   if (Array.isArray(value)) return value.map(cloneValue)
   if (value instanceof Date) return new Date(value.getTime())
@@ -102,17 +106,29 @@ function targetReleaseVersion(sourceVersion) {
   return normalized.endsWith(releaseVersionSuffix) ? normalized : normalized + releaseVersionSuffix
 }
 
-function protectedSnapshotHash(document, ejson) {
+function protectedSnapshotDocument(document, ejson) {
   const protectedDocument = deepClone(document, ejson)
   for (const field of [
     "_id", "release_version", "release_status", "release_archived_at",
     "created_at", "updated_at", "published_at", "category", "tags"
   ]) delete protectedDocument[field]
-  if (isPlainObject(protectedDocument.source)) {
+  if (isObjectRecord(protectedDocument.source)) {
     delete protectedDocument.source.scale_catalog_metadata_governance
     if (Object.keys(protectedDocument.source).length === 0) delete protectedDocument.source
   }
-  return sha256JSON(protectedDocument, ejson)
+  return protectedDocument
+}
+
+function protectedSnapshotHash(document, ejson) {
+  return sha256JSON(protectedSnapshotDocument(document, ejson), ejson)
+}
+
+function protectedSnapshotDriftFields(source, clone, ejson) {
+  const left = protectedSnapshotDocument(source, ejson)
+  const right = protectedSnapshotDocument(clone, ejson)
+  return [...new Set([...Object.keys(left), ...Object.keys(right)])]
+    .filter(field => !valuesEqual(left[field], right[field], ejson))
+    .sort()
 }
 
 function readConfig(env) {
@@ -276,7 +292,7 @@ function desiredClone(source, record, status, ejson) {
   clone.published_at = governedAt
   if (status === "active") delete clone.release_archived_at
   else clone.release_archived_at = governedAt
-  clone.source = isPlainObject(clone.source) ? clone.source : {}
+  clone.source = isObjectRecord(clone.source) ? clone.source : {}
   clone.source.scale_catalog_metadata_governance = {
     schema_version: schemaVersion,
     source_release_version: record.source_release_version,
@@ -299,11 +315,20 @@ function assertSource(source, record) {
 }
 
 function assertClone(clone, source, record) {
+  const driftFields = clone == null ? ["missing"] : protectedSnapshotDriftFields(source, clone, EJSON)
   if (clone == null || clone.code !== record.code || clone.release_version !== record.target_release_version ||
-      protectedSnapshotHash(clone, EJSON) !== record.protected_snapshot_hash ||
+      protectedSnapshotHash(clone, EJSON) !== record.protected_snapshot_hash || driftFields.length !== 0 ||
       clone.category !== record.desired_category || !valuesEqual(normalizeTags(clone.tags), record.desired_tags, EJSON) ||
       clone.source?.scale_catalog_metadata_governance?.source_release_version !== record.source_release_version) {
-    throw new Error(`governed scale snapshot drifted: ${record.code}`)
+    throw new Error(`governed scale snapshot drifted: ${record.code} fields=${driftFields.join(",") || "metadata"}`)
+  }
+}
+
+function assertCloneIdentity(clone, record) {
+  if (clone == null || clone._id.toHexString() !== record.clone_id || clone.code !== record.code ||
+      clone.release_version !== record.target_release_version || clone.record_role !== "published_snapshot" ||
+      clone.source?.scale_catalog_metadata_governance?.source_release_version !== record.source_release_version) {
+    throw new Error(`governed scale snapshot identity drifted: ${record.code}`)
   }
 }
 
@@ -451,7 +476,7 @@ async function rollback(collection, manifest) {
         alreadyRolledBack += 1
         continue
       }
-      assertClone(clone, source, record)
+      assertCloneIdentity(clone, record)
       if (source.release_status !== "archived" || clone.release_status !== "active") {
         throw new Error(`scale catalogue metadata release is not rollback-safe: ${record.code}`)
       }
@@ -502,10 +527,12 @@ if (typeof module !== "undefined") {
     rollbackConfirmation,
     canonicalCategories,
     metadataOverrides,
+    isObjectRecord,
     normalizeTags,
     desiredMetadata,
     targetReleaseVersion,
     protectedSnapshotHash,
+    protectedSnapshotDriftFields,
     readConfig,
     recordFingerprint,
     validateManifest,

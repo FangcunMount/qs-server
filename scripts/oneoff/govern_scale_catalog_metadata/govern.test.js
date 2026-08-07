@@ -43,6 +43,16 @@ test("protected snapshot hash ignores only governed catalogue and release fields
   assert.notEqual(governance.protectedSnapshotHash(source), governance.protectedSnapshotHash({
     ...governed, definition_v2: {schema_version: 3, measure: {factors: [{code: "changed"}]}}
   }))
+  assert.deepEqual(governance.protectedSnapshotDriftFields(source, governed), [])
+  assert.deepEqual(governance.protectedSnapshotDriftFields(source, {
+    ...governed, source: {scale_catalog_metadata_governance: {source_release_version: "v1"}}
+  }), ["source"])
+})
+
+test("BSON-like source documents are retained even with a custom prototype", () => {
+  const source = Object.create({bsonDocument: true})
+  source.definition_content_hash = "stable"
+  assert.equal(governance.isObjectRecord(source), true)
 })
 
 test("write operations require exact confirmation", () => {
