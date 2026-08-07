@@ -699,6 +699,30 @@ func TestDBOpsMongoStatusRunsAsFailFastScript(t *testing.T) {
 	}
 }
 
+func TestDBOpsScaleCatalogMetadataGovernanceIsManifestDriven(t *testing.T) {
+	t.Parallel()
+
+	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "db-ops.yml"))
+	if err != nil {
+		t.Fatalf("read db ops workflow: %v", err)
+	}
+	content := string(workflow)
+	for _, required := range []string{
+		"govern-scale-metadata",
+		"scripts/oneoff/govern_scale_catalog_metadata/govern.js",
+		"scale-catalog-metadata-${GOVERNANCE_RUN_TOKEN}.json",
+		`SCALE_CATALOG_CONFIRM="$SCALE_CONFIRM_INPUT"`,
+		"A valid MongoDB backup name is required for write operations",
+		"sha256sum --check",
+		"--network infra-network",
+		"SCALE_CATALOG_REQUIRE_COMPLETE",
+	} {
+		if !strings.Contains(content, required) {
+			t.Errorf("DB ops scale catalogue governance contract must contain %q", required)
+		}
+	}
+}
+
 func TestDBOpsMongoBackupIsBoundedAndOwned(t *testing.T) {
 	t.Parallel()
 
@@ -745,11 +769,11 @@ func TestDBOpsGovernanceChecksumsUseAllowedDockerPrivilege(t *testing.T) {
 	content := string(workflow)
 	verifyCommand := `mongo:7.0 -c 'cd /work && sha256sum --check "$1.sha256"' sh "$MANIFEST_NAME"`
 	writeCommand := `mongo:7.0 -c 'cd /work && sha256sum "$1" > "$1.sha256" && chmod 0440 "$1" "$1.sha256"' sh "$MANIFEST_NAME"`
-	if got := strings.Count(content, verifyCommand); got != 4 {
-		t.Fatalf("governance checksum verify command count = %d, want 4", got)
+	if got := strings.Count(content, verifyCommand); got != 5 {
+		t.Fatalf("governance checksum verify command count = %d, want 5", got)
 	}
-	if got := strings.Count(content, writeCommand); got != 4 {
-		t.Fatalf("governance checksum write command count = %d, want 4", got)
+	if got := strings.Count(content, writeCommand); got != 5 {
+		t.Fatalf("governance checksum write command count = %d, want 5", got)
 	}
 	for _, required := range []string{
 		`sudo docker run --rm --network none`,
