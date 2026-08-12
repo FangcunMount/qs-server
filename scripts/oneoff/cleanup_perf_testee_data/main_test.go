@@ -49,14 +49,14 @@ func TestBackupMySQLTableOmitsGeneratedColumnsFromInsert(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	ctx := context.Background()
 	conn, err := db.Conn(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	item := mysqlBackupItem{
 		table:     "plan_enrollment",

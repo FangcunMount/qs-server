@@ -106,7 +106,7 @@ func (p *selectorProgress) printLocked(detail string) {
 		percent = float64(completed) * 100 / float64(p.total)
 	}
 	bar := strings.Repeat("#", filled) + strings.Repeat("-", selectorProgressBarWidth-filled)
-	fmt.Fprintf(
+	_, _ = fmt.Fprintf(
 		p.out,
 		"[selector] [%s] %d/%d %5.1f%% rows=%d elapsed=%s %s\n",
 		bar,

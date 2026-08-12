@@ -1435,7 +1435,7 @@ func loadMySQLBackupColumns(ctx context.Context, conn *sql.Conn, table string) (
 	if err != nil {
 		return mysqlBackupColumns{}, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var columns mysqlBackupColumns
 	for rows.Next() {
