@@ -9,7 +9,7 @@ import (
 	"time"
 
 	baseerrors "github.com/FangcunMount/component-base/pkg/errors"
-	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/verifier"
+	auth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/verifier"
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"

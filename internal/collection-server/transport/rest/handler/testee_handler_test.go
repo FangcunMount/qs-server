@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	identityv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/identity/v2"
+	identityv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/identity/v2"
 )
 
 type userProfileReaderStub struct {

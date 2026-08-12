@@ -1,7 +1,7 @@
 package platform
 
 import (
-	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/verifier"
+	auth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/verifier"
 	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"

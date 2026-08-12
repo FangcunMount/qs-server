@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	authnv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/authn/v2"
-	sdk "github.com/FangcunMount/iam/v2/pkg/sdk"
-	sdkconfig "github.com/FangcunMount/iam/v2/pkg/sdk/config"
+	authnv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/authn/v2"
+	sdk "github.com/FangcunMount/iam/v3/pkg/sdk"
+	sdkconfig "github.com/FangcunMount/iam/v3/pkg/sdk/config"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 )
 

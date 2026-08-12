@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/verifier"
+	auth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/verifier"
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	assessmentEntryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/assessmententry"
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"

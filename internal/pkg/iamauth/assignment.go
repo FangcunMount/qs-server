@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	authzv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/authz/v2"
+	authzv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/authz/v2"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 )
 

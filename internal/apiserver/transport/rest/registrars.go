@@ -3,7 +3,7 @@ package rest
 import (
 	"fmt"
 
-	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/verifier"
+	auth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/verifier"
 	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"

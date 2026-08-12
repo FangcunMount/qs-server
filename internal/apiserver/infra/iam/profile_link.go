@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	identityv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/identity/v2"
-	"github.com/FangcunMount/iam/v2/pkg/sdk/identity"
+	identityv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/identity/v2"
+	"github.com/FangcunMount/iam/v3/pkg/sdk/identity"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 )
 

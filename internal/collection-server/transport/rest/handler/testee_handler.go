@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	identityv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/identity/v2"
+	identityv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/identity/v2"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/testee"
 	"github.com/gin-gonic/gin"
 )

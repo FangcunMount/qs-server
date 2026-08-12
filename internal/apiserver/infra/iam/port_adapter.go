@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	identityv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/identity/v2"
+	identityv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/identity/v2"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
