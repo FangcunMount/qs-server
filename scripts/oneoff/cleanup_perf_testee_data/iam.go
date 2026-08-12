@@ -172,12 +172,12 @@ func countIAMRows(ctx context.Context, conn *sql.Conn) ([]namedCount, error) {
 }
 
 func backupIAMRows(ctx context.Context, conn *sql.Conn, suffix string, expected int) error {
-	items := []mysqlBackupItem{
-		{table: "profiles", selectSQL: `SELECT p.* FROM profiles p JOIN tmp_cleanup_profile_ids x ON x.id = p.id`},
-		{table: "profile_links", selectSQL: `SELECT l.* FROM profile_links l JOIN tmp_cleanup_profile_ids x ON x.id = l.profile_id`},
-	}
+	items := iamBackupItems()
 	for _, item := range items {
-		backupTable := fmt.Sprintf("cleanup_bak_perf_testee_%s_%s", item.table, suffix)
+		backupTable, err := mysqlBackupTableName(item.table, suffix)
+		if err != nil {
+			return err
+		}
 		if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s` LIKE `%s`", backupTable, item.table)); err != nil {
 			return fmt.Errorf("create IAM backup table %s: %w", backupTable, err)
 		}
@@ -193,6 +193,13 @@ func backupIAMRows(ctx context.Context, conn *sql.Conn, suffix string, expected 
 		}
 	}
 	return nil
+}
+
+func iamBackupItems() []mysqlBackupItem {
+	return []mysqlBackupItem{
+		{table: "profiles", selectSQL: `SELECT p.* FROM profiles p JOIN tmp_cleanup_profile_ids x ON x.id = p.id`},
+		{table: "profile_links", selectSQL: `SELECT l.* FROM profile_links l JOIN tmp_cleanup_profile_ids x ON x.id = l.profile_id`},
+	}
 }
 
 func deleteIAMRows(ctx context.Context, conn *sql.Conn, lockWaitTimeoutSec, maxRetries, batchSize int, allowMissing bool) ([]namedCount, error) {

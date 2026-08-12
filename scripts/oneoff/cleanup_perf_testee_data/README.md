@@ -41,6 +41,9 @@ go run ./scripts/oneoff/cleanup_perf_testee_data \
 游标和 `--mysql-outbox-scan-batch-size` 分批读取，每条 JSON payload 最多解码一次；非法 JSON
 会中止操作。默认关闭，不会执行无界的 Testee-ID × Outbox `REGEXP` 联接。
 
+内置 MySQL 备份表使用短前缀 `cbpt_`；工具在创建任何备份对象前，会根据 MySQL 64 字符
+标识符上限校验 `--backup-suffix`，避免并发备份启动后才因表名过长留下部分备份。
+
 IAM 删除发生在 QS/MySQL 和 Mongo 成功之后。若中途已删 QS 但尚未删 IAM，可用同一份
 Testee/Profile 清单、同一备份后缀，加 `--mongo-only --allow-missing-testees` 恢复执行。
 

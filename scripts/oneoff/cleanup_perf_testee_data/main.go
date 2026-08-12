@@ -32,6 +32,8 @@ const defaultMySQLDeleteBatchSize = 5000
 const defaultMySQLOutboxScanBatchSize = 500
 const defaultIAMDeleteBatchSize = 500
 const progressBarWidth = 32
+const mysqlIdentifierMaxLength = 64
+const mysqlBackupTablePrefix = "cbpt_"
 
 var prog progressReporter
 
@@ -1378,7 +1380,30 @@ func countMongoRows(ctx context.Context, db *mongo.Database, ids scopeIDs, worke
 }
 
 func backupMySQLRows(ctx context.Context, conn *sql.Conn, suffix string) error {
-	items := []mysqlBackupItem{
+	items := mysqlBackupItems()
+	for i, item := range items {
+		item := item
+		if err := prog.RunStep("backup mysql "+item.table, i+1, len(items), func() error {
+			backupTable, err := mysqlBackupTableName(item.table, suffix)
+			if err != nil {
+				return err
+			}
+			if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s` LIKE `%s`", backupTable, item.table)); err != nil {
+				return fmt.Errorf("create backup table %s: %w", backupTable, err)
+			}
+			if _, err := conn.ExecContext(ctx, fmt.Sprintf("INSERT IGNORE INTO `%s` %s", backupTable, item.selectSQL)); err != nil {
+				return fmt.Errorf("insert backup table %s: %w", backupTable, err)
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func mysqlBackupItems() []mysqlBackupItem {
+	return []mysqlBackupItem{
 		{"testee", `SELECT t.* FROM testee t JOIN tmp_cleanup_testee_ids x ON x.id = t.id`},
 		{"assessment", `SELECT a.* FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id`},
 		{"evaluation_outcome", `SELECT o.* FROM evaluation_outcome o JOIN tmp_cleanup_outcome_ids x ON x.id = o.id`},
@@ -1400,22 +1425,6 @@ func backupMySQLRows(ctx context.Context, conn *sql.Conn, suffix string) error {
 		{"runtime_checkpoint", `SELECT r.* FROM runtime_checkpoint r JOIN tmp_cleanup_assessment_ids a ON a.id = r.assessment_id`},
 		{"retry_event_hold", `SELECT h.* FROM retry_event_hold h JOIN tmp_cleanup_event_ids e ON BINARY e.event_id = BINARY h.event_id`},
 	}
-	for i, item := range items {
-		item := item
-		if err := prog.RunStep("backup mysql "+item.table, i+1, len(items), func() error {
-			backupTable := fmt.Sprintf("cleanup_bak_perf_testee_%s_%s", item.table, suffix)
-			if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s` LIKE `%s`", backupTable, item.table)); err != nil {
-				return fmt.Errorf("create backup table %s: %w", backupTable, err)
-			}
-			if _, err := conn.ExecContext(ctx, fmt.Sprintf("INSERT IGNORE INTO `%s` %s", backupTable, item.selectSQL)); err != nil {
-				return fmt.Errorf("insert backup table %s: %w", backupTable, err)
-			}
-			return nil
-		}); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func backupMongoRows(ctx context.Context, db *mongo.Database, ids scopeIDs, suffix string, workers int) error {
@@ -2152,7 +2161,21 @@ func validateBackupSuffix(suffix string) error {
 	if !ok {
 		return fmt.Errorf("suffix %q must contain only letters, digits, and underscore", suffix)
 	}
+	items := append(mysqlBackupItems(), iamBackupItems()...)
+	for _, item := range items {
+		if _, err := mysqlBackupTableName(item.table, suffix); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func mysqlBackupTableName(sourceTable, suffix string) (string, error) {
+	name := mysqlBackupTablePrefix + sourceTable + "_" + suffix
+	if len(name) > mysqlIdentifierMaxLength {
+		return "", fmt.Errorf("backup table name %q exceeds MySQL identifier limit %d; shorten --backup-suffix", name, mysqlIdentifierMaxLength)
+	}
+	return name, nil
 }
 
 func printScopeSummary(summary scopeSummary, cfg config) {

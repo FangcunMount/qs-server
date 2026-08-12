@@ -24,6 +24,24 @@ func TestCleanupPreservesStatisticsRunAuditLedger(t *testing.T) {
 	}
 }
 
+func TestValidateBackupSuffixChecksGeneratedMySQLIdentifiers(t *testing.T) {
+	if err := validateBackupSuffix("seeddata_dup_20260812_v1"); err != nil {
+		t.Fatalf("documented backup suffix should be valid: %v", err)
+	}
+	if err := validateBackupSuffix(strings.Repeat("x", mysqlIdentifierMaxLength)); err == nil || !strings.Contains(err.Error(), "exceeds MySQL identifier limit") {
+		t.Fatalf("oversized backup suffix error = %v, want MySQL identifier limit error", err)
+	}
+	for _, item := range append(mysqlBackupItems(), iamBackupItems()...) {
+		name, err := mysqlBackupTableName(item.table, "seeddata_dup_20260812_v1")
+		if err != nil {
+			t.Fatalf("backup table name for %s: %v", item.table, err)
+		}
+		if len(name) > mysqlIdentifierMaxLength {
+			t.Fatalf("backup table name %q length=%d, want <=%d", name, len(name), mysqlIdentifierMaxLength)
+		}
+	}
+}
+
 func TestIsMongoUnauthorized(t *testing.T) {
 	tests := []struct {
 		name string
