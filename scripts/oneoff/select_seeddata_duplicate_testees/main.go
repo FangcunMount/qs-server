@@ -18,22 +18,42 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"golang.org/x/sync/errgroup"
 )
 
 const duplicateSelectionOrder = `e.outcome_count DESC, e.evaluated_count DESC, e.completed_tasks DESC,
            e.submitted_count DESC, e.assessment_count DESC, e.intake_count DESC,
            e.enrollment_count DESC, e.created_at, e.testee_id`
 
+const defaultSelectorWorkers = 2
+const maxSelectorWorkers = 4
+const defaultProgressInterval = 5 * time.Second
+
 type config struct {
-	mysqlDSN     string
-	iamSchema    string
-	clinicianID  uint64
-	source       string
-	createdFrom  string
-	createdUntil string
-	outputDir    string
-	timeout      time.Duration
+	mysqlDSN      string
+	iamSchema     string
+	clinicianID   uint64
+	source        string
+	createdFrom   string
+	createdUntil  string
+	outputDir     string
+	timeout       time.Duration
+	workers       int
+	progressEvery time.Duration
+	noProgress    bool
 }
+
+type dateShard struct {
+	date  string
+	from  string
+	until string
+}
+
+type shardResult struct {
+	rows []duplicateRow
+}
+
+type shardLoader func(context.Context, *sql.DB, config, dateShard) ([]duplicateRow, error)
 
 type duplicateRow struct {
 	TesteeID                 uint64
@@ -80,38 +100,27 @@ func main() {
 		log.Fatalf("open mysql: %v", err)
 	}
 	defer func() { _ = db.Close() }()
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
+	db.SetMaxOpenConns(cfg.workers)
+	db.SetMaxIdleConns(cfg.workers)
+	if err := db.PingContext(ctx); err != nil {
+		log.Fatalf("ping mysql: %v", err)
+	}
 
-	tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	shards, err := buildDateShards(cfg.createdFrom, cfg.createdUntil)
 	if err != nil {
-		log.Fatalf("begin read-only transaction: %v", err)
+		log.Fatalf("build date shards: %v", err)
 	}
-	defer func() { _ = tx.Rollback() }()
-
-	anomalies, err := loadScopeAnomalies(ctx, tx, cfg)
-	if err != nil {
-		log.Fatalf("validate source scope: %v", err)
-	}
-	if len(anomalies) > 0 {
-		log.Fatalf("source scope contains unsafe testee/profile/link rows; sample=%s", strings.Join(anomalies, "; "))
-	}
-	rows, err := loadDuplicateRows(ctx, tx, cfg)
+	progress := newSelectorProgress(len(shards), cfg.noProgress)
+	rows, err := loadDuplicateShards(ctx, db, cfg, shards, loadDateShard, progress)
 	if err != nil {
 		log.Fatalf("select duplicate scope: %v", err)
 	}
 	if len(rows) == 0 {
-		if err := tx.Commit(); err != nil {
-			log.Fatalf("commit empty read-only transaction: %v", err)
-		}
 		log.Print("no duplicate rows matched the explicit scope")
 		return
 	}
 	if err := validateDuplicateRows(rows); err != nil {
 		log.Fatalf("validate duplicate rows: %v", err)
-	}
-	if err := tx.Commit(); err != nil {
-		log.Fatalf("commit read-only transaction: %v", err)
 	}
 	if err := writeScopeFiles(cfg, rows); err != nil {
 		log.Fatalf("write scope files: %v", err)
@@ -135,6 +144,9 @@ func parseFlags() (config, error) {
 	flag.StringVar(&cfg.createdUntil, "created-through", "", "required inclusive date, YYYY-MM-DD")
 	flag.StringVar(&cfg.outputDir, "output-dir", "", "required output directory for manifest and explicit ID files")
 	flag.DurationVar(&cfg.timeout, "timeout", 10*time.Minute, "read-only selection timeout")
+	flag.IntVar(&cfg.workers, "workers", defaultSelectorWorkers, "concurrent daily read-only shards (1-4)")
+	flag.DurationVar(&cfg.progressEvery, "progress-interval", defaultProgressInterval, "interval for active shard progress output")
+	flag.BoolVar(&cfg.noProgress, "no-progress", false, "disable progress output")
 	flag.Parse()
 
 	if strings.TrimSpace(cfg.mysqlDSN) == "" {
@@ -178,11 +190,161 @@ func parseFlags() (config, error) {
 	if cfg.timeout <= 0 {
 		return cfg, errors.New("--timeout must be positive")
 	}
+	if cfg.workers < 1 || cfg.workers > maxSelectorWorkers {
+		return cfg, fmt.Errorf("--workers must be between 1 and %d", maxSelectorWorkers)
+	}
+	if cfg.progressEvery <= 0 {
+		return cfg, errors.New("--progress-interval must be positive")
+	}
 	return cfg, nil
 }
 
-func loadScopeAnomalies(ctx context.Context, tx *sql.Tx, cfg config) ([]string, error) {
-	rows, err := tx.QueryContext(ctx, scopeAnomaliesQuery(cfg.iamSchema), cfg.source, cfg.createdFrom, cfg.createdUntil, cfg.clinicianID)
+func buildDateShards(createdFrom, createdUntil string) ([]dateShard, error) {
+	from, err := time.Parse("2006-01-02 15:04:05", createdFrom)
+	if err != nil {
+		return nil, fmt.Errorf("parse created from: %w", err)
+	}
+	until, err := time.Parse("2006-01-02 15:04:05", createdUntil)
+	if err != nil {
+		return nil, fmt.Errorf("parse created until: %w", err)
+	}
+	if !from.Before(until) {
+		return nil, errors.New("created from must be before created until")
+	}
+	var shards []dateShard
+	for cursor := from; cursor.Before(until); cursor = cursor.AddDate(0, 0, 1) {
+		next := cursor.AddDate(0, 0, 1)
+		if next.After(until) {
+			next = until
+		}
+		shards = append(shards, dateShard{
+			date:  cursor.Format("2006-01-02"),
+			from:  cursor.Format("2006-01-02 15:04:05"),
+			until: next.Format("2006-01-02 15:04:05"),
+		})
+	}
+	return shards, nil
+}
+
+func loadDuplicateShards(
+	ctx context.Context,
+	db *sql.DB,
+	cfg config,
+	shards []dateShard,
+	loader shardLoader,
+	progress *selectorProgress,
+) ([]duplicateRow, error) {
+	if len(shards) == 0 {
+		return nil, errors.New("date shard scope is empty")
+	}
+	workers := cfg.workers
+	if workers > len(shards) {
+		workers = len(shards)
+	}
+	group, groupCtx := errgroup.WithContext(ctx)
+	jobs := make(chan dateShard, len(shards))
+	results := make(chan shardResult, len(shards))
+	for _, shard := range shards {
+		jobs <- shard
+	}
+	close(jobs)
+
+	for worker := 0; worker < workers; worker++ {
+		group.Go(func() error {
+			for shard := range jobs {
+				started := time.Now()
+				progress.Start(shard.date)
+				rows, err := loader(groupCtx, db, cfg, shard)
+				duration := time.Since(started)
+				if err != nil {
+					progress.Fail(shard.date, duration)
+					return fmt.Errorf("date=%s: %w", shard.date, err)
+				}
+				progress.Finish(shard.date, len(rows), duration)
+				select {
+				case results <- shardResult{rows: rows}:
+				case <-groupCtx.Done():
+					return groupCtx.Err()
+				}
+			}
+			return nil
+		})
+	}
+
+	wait := make(chan error, 1)
+	go func() {
+		wait <- group.Wait()
+		close(results)
+	}()
+
+	ticker := time.NewTicker(cfg.progressEvery)
+	defer ticker.Stop()
+	allRows := make([]duplicateRow, 0)
+	for results != nil {
+		select {
+		case result, ok := <-results:
+			if !ok {
+				results = nil
+				continue
+			}
+			allRows = append(allRows, result.rows...)
+		case <-ticker.C:
+			progress.Snapshot()
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	if err := <-wait; err != nil {
+		return nil, err
+	}
+	sortDuplicateRows(allRows)
+	return allRows, nil
+}
+
+func loadDateShard(ctx context.Context, db *sql.DB, cfg config, shard dateShard) ([]duplicateRow, error) {
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead})
+	if err != nil {
+		return nil, fmt.Errorf("begin read-only transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	anomalies, err := loadScopeAnomalies(ctx, tx, cfg, shard)
+	if err != nil {
+		return nil, fmt.Errorf("validate source scope: %w", err)
+	}
+	if len(anomalies) > 0 {
+		return nil, fmt.Errorf("source scope contains unsafe testee/profile/link rows; sample=%s", strings.Join(anomalies, "; "))
+	}
+	rows, err := loadDuplicateRows(ctx, tx, cfg, shard)
+	if err != nil {
+		return nil, fmt.Errorf("load duplicate rows: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit read-only transaction: %w", err)
+	}
+	return rows, nil
+}
+
+func sortDuplicateRows(rows []duplicateRow) {
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].CreatedDate != rows[j].CreatedDate {
+			return rows[i].CreatedDate < rows[j].CreatedDate
+		}
+		if rows[i].UserID != rows[j].UserID {
+			return rows[i].UserID < rows[j].UserID
+		}
+		if rows[i].Name != rows[j].Name {
+			return rows[i].Name < rows[j].Name
+		}
+		if rows[i].DuplicateOrdinal != rows[j].DuplicateOrdinal {
+			return rows[i].DuplicateOrdinal < rows[j].DuplicateOrdinal
+		}
+		return rows[i].TesteeID < rows[j].TesteeID
+	})
+}
+
+func loadScopeAnomalies(ctx context.Context, tx *sql.Tx, cfg config, shard dateShard) ([]string, error) {
+	rows, err := tx.QueryContext(ctx, scopeAnomaliesQuery(cfg.iamSchema), cfg.clinicianID, cfg.source, shard.from, shard.until)
 	if err != nil {
 		return nil, err
 	}
@@ -200,30 +362,32 @@ func loadScopeAnomalies(ctx context.Context, tx *sql.Tx, cfg config) ([]string, 
 }
 
 func scopeAnomaliesQuery(iamSchema string) string {
-	return fmt.Sprintf(`WITH source_scope AS (
+	return fmt.Sprintf(`WITH relation_scope AS (
+  SELECT DISTINCT r.testee_id
+  FROM clinician_relation r
+  WHERE r.clinician_id = ?
+    AND r.is_active = 1
+    AND r.deleted_at IS NULL
+), source_scope AS (
   SELECT t.*
-  FROM testee t
+  FROM relation_scope relation
+  STRAIGHT_JOIN testee t ON t.id = relation.testee_id
   WHERE t.deleted_at IS NULL
     AND t.source = ?
     AND t.created_at >= ?
     AND t.created_at < ?
-    AND EXISTS (
-      SELECT 1 FROM clinician_relation r
-      WHERE r.testee_id = t.id AND r.clinician_id = ?
-        AND r.is_active = 1 AND r.deleted_at IS NULL
-    )
 ), link_scope AS (
   SELECT links.profile_id,
-	         MIN(id) AS profile_link_id,
-	         MIN(user_id) AS user_id,
+	         MIN(links.id) AS profile_link_id,
+	         MIN(links.user_id) AS user_id,
 	         COUNT(*) AS total_link_count,
-	         SUM(CASE WHEN revoked_at IS NULL AND deleted_at IS NULL THEN 1 ELSE 0 END) AS active_link_count,
-	         SUM(CASE WHEN type = 'relation' THEN 1 ELSE 0 END) AS relation_link_count
-  FROM %s.profile_links links
-  JOIN (SELECT DISTINCT profile_id FROM source_scope) target ON target.profile_id = links.profile_id
+	         SUM(CASE WHEN links.revoked_at IS NULL AND links.deleted_at IS NULL THEN 1 ELSE 0 END) AS active_link_count,
+	         SUM(CASE WHEN links.type = 'relation' THEN 1 ELSE 0 END) AS relation_link_count
+  FROM (SELECT DISTINCT profile_id FROM source_scope) target
+  STRAIGHT_JOIN %s.profile_links links ON links.profile_id = target.profile_id
   GROUP BY links.profile_id
-	)
-	SELECT t.id,
+)
+SELECT t.id,
        CONCAT_WS(',',
          IF(p.id IS NULL, 'missing_profile', NULL),
          IF(p.deleted_at IS NOT NULL, 'deleted_profile', NULL),
@@ -252,8 +416,8 @@ WHERE
 	LIMIT 20`, iamSchema, iamSchema, iamSchema)
 }
 
-func loadDuplicateRows(ctx context.Context, tx *sql.Tx, cfg config) ([]duplicateRow, error) {
-	rows, err := tx.QueryContext(ctx, duplicateRowsQuery(cfg.iamSchema), cfg.source, cfg.createdFrom, cfg.createdUntil, cfg.clinicianID)
+func loadDuplicateRows(ctx context.Context, tx *sql.Tx, cfg config, shard dateShard) ([]duplicateRow, error) {
+	rows, err := tx.QueryContext(ctx, duplicateRowsQuery(cfg.iamSchema), cfg.clinicianID, cfg.source, shard.from, shard.until)
 	if err != nil {
 		return nil, err
 	}
@@ -279,22 +443,24 @@ func loadDuplicateRows(ctx context.Context, tx *sql.Tx, cfg config) ([]duplicate
 }
 
 func duplicateRowsQuery(iamSchema string) string {
-	return fmt.Sprintf(`WITH source_scope AS (
+	return fmt.Sprintf(`WITH relation_scope AS (
+  SELECT DISTINCT r.testee_id
+  FROM clinician_relation r
+  WHERE r.clinician_id = ?
+    AND r.is_active = 1
+    AND r.deleted_at IS NULL
+), source_scope AS (
   SELECT t.*
-  FROM testee t
+  FROM relation_scope relation
+  STRAIGHT_JOIN testee t ON t.id = relation.testee_id
   WHERE t.deleted_at IS NULL
     AND t.source = ?
     AND t.created_at >= ?
     AND t.created_at < ?
-    AND EXISTS (
-      SELECT 1 FROM clinician_relation r
-      WHERE r.testee_id = t.id AND r.clinician_id = ?
-        AND r.is_active = 1 AND r.deleted_at IS NULL
-    )
 ), link_scope AS (
   SELECT links.profile_id, MIN(links.id) AS profile_link_id, MIN(links.user_id) AS user_id
-  FROM %s.profile_links links
-  JOIN (SELECT DISTINCT profile_id FROM source_scope) target ON target.profile_id = links.profile_id
+  FROM (SELECT DISTINCT profile_id FROM source_scope) target
+  STRAIGHT_JOIN %s.profile_links links ON links.profile_id = target.profile_id
   GROUP BY links.profile_id
 ), base AS (
   SELECT t.id AS testee_id, t.profile_id, ls.profile_link_id, ls.user_id,
@@ -309,37 +475,39 @@ func duplicateRowsQuery(iamSchema string) string {
     AND p.gender <=> t.gender
     AND p.birthday <=> DATE_FORMAT(t.birthday, '%%Y-%%m-%%d')
 ), outcome_progress AS (
-  SELECT o.testee_id, COUNT(*) AS outcome_count
-  FROM evaluation_outcome o
-  JOIN base b ON b.testee_id = o.testee_id
-  GROUP BY o.testee_id
+  SELECT b.testee_id, COUNT(o.id) AS outcome_count
+  FROM base b
+  STRAIGHT_JOIN evaluation_outcome o ON o.testee_id = b.testee_id
+  GROUP BY b.testee_id
 ), assessment_progress AS (
-  SELECT a.testee_id,
+  SELECT b.testee_id,
          SUM(a.status = 'evaluated') AS evaluated_count,
          SUM(a.status = 'submitted') AS submitted_count,
          COUNT(*) AS assessment_count
-  FROM assessment a
-  JOIN base b ON b.testee_id = a.testee_id
+  FROM base b
+  STRAIGHT_JOIN assessment a ON a.testee_id = b.testee_id AND a.org_id = b.org_id
   WHERE a.deleted_at IS NULL
-  GROUP BY a.testee_id
+  GROUP BY b.testee_id
 ), task_progress AS (
-  SELECT task.testee_id, COUNT(*) AS completed_tasks
-  FROM assessment_task task
-  JOIN base b ON b.testee_id = task.testee_id
+  SELECT b.testee_id, COUNT(*) AS completed_tasks
+  FROM base b
+  STRAIGHT_JOIN assessment_task task ON task.testee_id = b.testee_id AND task.org_id = b.org_id
   WHERE task.status = 'completed' AND task.deleted_at IS NULL
-  GROUP BY task.testee_id
+  GROUP BY b.testee_id
 ), intake_progress AS (
-  SELECT intake.testee_id, COUNT(*) AS intake_count
-  FROM assessment_entry_intake_log intake
-  JOIN base b ON b.testee_id = intake.testee_id
+  SELECT b.testee_id, COUNT(*) AS intake_count
+  FROM base b
+  STRAIGHT_JOIN assessment_entry_intake_log intake
+    ON intake.org_id = b.org_id AND intake.testee_id = b.testee_id
   WHERE intake.deleted_at IS NULL
-  GROUP BY intake.testee_id
+  GROUP BY b.testee_id
 ), enrollment_progress AS (
-  SELECT enrollment.testee_id, COUNT(*) AS enrollment_count
-  FROM plan_enrollment enrollment
-  JOIN base b ON b.testee_id = enrollment.testee_id
+  SELECT b.testee_id, COUNT(*) AS enrollment_count
+  FROM base b
+  STRAIGHT_JOIN plan_enrollment enrollment
+    ON enrollment.org_id = b.org_id AND enrollment.testee_id = b.testee_id
   WHERE enrollment.deleted_at IS NULL
-  GROUP BY enrollment.testee_id
+  GROUP BY b.testee_id
 ), eligible AS (
   SELECT b.*,
          COALESCE(o.outcome_count, 0) AS outcome_count,

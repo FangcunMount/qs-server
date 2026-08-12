@@ -20,8 +20,18 @@ go run ./scripts/oneoff/select_seeddata_duplicate_testees \
   --clinician-id 614995509882401326 \
   --created-from 2026-08-05 \
   --created-through 2026-08-12 \
-  --output-dir /secure/path/seeddata-duplicates-20260812
+  --output-dir /secure/path/seeddata-duplicates-20260812 \
+  --workers 2 \
+  --progress-interval 5s \
+  --timeout 30m
 ```
+
+selector 按上海自然日拆分查询；重复键本身包含创建日期，因此日期分片不会拆散重复组。每个
+分片使用独立的 `REPEATABLE READ` 只读事务，并发数默认 `2`、上限 `4`。查询从 clinician
+关系索引缩小 Testee 范围，再以 `org_id + testee_id` 命中 Intake/Enrollment 联合索引。
+进度输出会持续显示已完成日期、当前活动日期、累计重复行数和耗时；通过 `tee` 保存日志时
+仍然是一行一条记录，不依赖交互式终端控制字符。生产首次执行建议保持 `--workers 2`，确认
+数据库负载正常后才提高到 `4`。
 
 输出文件权限为 `0600`，且不会覆盖已有文件：
 
