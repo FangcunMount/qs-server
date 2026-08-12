@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	authnv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/authn/v2"
-	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/verifier"
+	authnv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/authn/v2"
+	auth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
 )
 
