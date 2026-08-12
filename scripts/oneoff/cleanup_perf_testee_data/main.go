@@ -129,6 +129,16 @@ type scopeSummary struct {
 	MaxTouchedDate sql.NullString
 }
 
+const scopeTouchedDateSQL = `
+SELECT CAST(MIN(d) AS CHAR), CAST(MAX(d) AS CHAR)
+FROM (
+  SELECT DATE(a.created_at) AS d FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id
+  UNION ALL
+  SELECT x.stat_date AS d FROM tmp_cleanup_statistics_dates x
+  UNION ALL
+  SELECT DATE(l.intake_at) AS d FROM assessment_entry_intake_log l JOIN tmp_cleanup_testee_ids t ON t.id = l.testee_id
+) touched`
+
 func main() {
 	cfg := parseFlags()
 	initProgress(cfg.noProgress)
@@ -1277,19 +1287,7 @@ func loadScopeSummary(ctx context.Context, conn *sql.Conn) (scopeSummary, error)
 		return s, err
 	}
 
-	err = conn.QueryRowContext(ctx, `
-SELECT CAST(MIN(d) AS CHAR), CAST(MAX(d) AS CHAR)
-FROM (
-  SELECT DATE(a.created_at) AS d FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id
-  UNION ALL
-  SELECT f.stat_date AS d FROM statistics_access_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id
-  UNION ALL
-  SELECT f.stat_date AS d FROM statistics_assessment_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id
-  UNION ALL
-  SELECT f.stat_date AS d FROM statistics_plan_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id
-  UNION ALL
-  SELECT DATE(l.intake_at) AS d FROM assessment_entry_intake_log l JOIN tmp_cleanup_testee_ids t ON t.id = l.testee_id
-) touched`).Scan(&s.MinTouchedDate, &s.MaxTouchedDate)
+	err = conn.QueryRowContext(ctx, scopeTouchedDateSQL).Scan(&s.MinTouchedDate, &s.MaxTouchedDate)
 	return s, err
 }
 

@@ -263,6 +263,27 @@ func TestScopeIDsEqualNormalizesOrderDuplicatesAndZero(t *testing.T) {
 	}
 }
 
+func TestScopeTouchedDateSQLDoesNotReopenTemporaryTables(t *testing.T) {
+	for _, table := range []string{
+		"tmp_cleanup_assessment_ids",
+		"tmp_cleanup_statistics_dates",
+		"tmp_cleanup_testee_ids",
+	} {
+		if got := strings.Count(scopeTouchedDateSQL, table); got != 1 {
+			t.Fatalf("scope touched-date SQL references %s %d times, want exactly once; MySQL cannot reopen a temporary table in one statement", table, got)
+		}
+	}
+	for _, table := range []string{
+		"statistics_access_fact",
+		"statistics_assessment_fact",
+		"statistics_plan_fact",
+	} {
+		if strings.Contains(scopeTouchedDateSQL, table) {
+			t.Fatalf("scope touched-date SQL should reuse tmp_cleanup_statistics_dates instead of rescanning %s", table)
+		}
+	}
+}
+
 func makeUint64Range(start uint64, count int) []uint64 {
 	out := make([]uint64, count)
 	for i := range out {
