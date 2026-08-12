@@ -62,11 +62,39 @@ func TestAPIServerDevProdConfigContracts(t *testing.T) {
 				t.Fatal("apiserver IAM service auth config must be traceable")
 			}
 			assertSystemGovernanceConfig(t, name, opts.SystemGovernance)
+			assertEvaluationAuditRecoverySplit(t, name, opts)
 			assertStatisticsCacheContract(t, name, opts.Cache)
 			assertIAMJWKSURLContract(t, "apiserver", name, opts.IAMOptions)
 			assertAPIServerGRPCTrustContract(t, name, opts)
 			assertEventCatalogLoads(t)
 		})
+	}
+}
+
+func assertEvaluationAuditRecoverySplit(t *testing.T, configName string, opts *apiserveroptions.Options) {
+	t.Helper()
+	if opts.EvaluationConsistencyAudit == nil || opts.EvaluationLeaseRecovery == nil || opts.InterpretationLeaseRecovery == nil {
+		t.Fatalf("%s must configure independent Evaluation audit and lease recovery runners", configName)
+	}
+	if opts.EvaluationConsistencyAudit.CycleInterval < 6*time.Hour || opts.EvaluationConsistencyAudit.CycleInterval > 24*time.Hour {
+		t.Fatalf("%s evaluation audit cycle interval = %s, want 6h..24h", configName, opts.EvaluationConsistencyAudit.CycleInterval)
+	}
+	for name, recovery := range map[string]*apiserveroptions.LeaseRecoveryOptions{
+		"evaluation": opts.EvaluationLeaseRecovery, "interpretation": opts.InterpretationLeaseRecovery,
+	} {
+		if recovery.Interval < 10*time.Second || recovery.Interval > 30*time.Second {
+			t.Fatalf("%s %s lease recovery interval = %s, want 10s..30s", configName, name, recovery.Interval)
+		}
+	}
+	keys := map[string]struct{}{}
+	for _, key := range []string{opts.EvaluationConsistencyAudit.LockKey, opts.EvaluationLeaseRecovery.LockKey, opts.InterpretationLeaseRecovery.LockKey} {
+		if key == "" {
+			t.Fatalf("%s audit/recovery lock key cannot be empty", configName)
+		}
+		if _, exists := keys[key]; exists {
+			t.Fatalf("%s audit/recovery lock keys must be independent: %s", configName, key)
+		}
+		keys[key] = struct{}{}
 	}
 }
 

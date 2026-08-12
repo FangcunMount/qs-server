@@ -15,37 +15,39 @@ import (
 
 // Options 包含所有配置项
 type Options struct {
-	Log                            *log.Options                            `json:"log"       mapstructure:"log"`
-	GenericServerRunOptions        *genericoptions.ServerRunOptions        `json:"server"    mapstructure:"server"`
-	GRPCOptions                    *genericoptions.GRPCOptions             `json:"grpc"      mapstructure:"grpc"`
-	InsecureServing                *genericoptions.InsecureServingOptions  `json:"insecure"  mapstructure:"insecure"`
-	SecureServing                  *genericoptions.SecureServingOptions    `json:"secure"    mapstructure:"secure"`
-	MySQLOptions                   *genericoptions.MySQLOptions            `json:"mysql"     mapstructure:"mysql"`
-	MigrationOptions               *genericoptions.MigrationOptions        `json:"migration" mapstructure:"migration"`
-	RedisOptions                   *genericoptions.RedisOptions            `json:"redis"     mapstructure:"redis"`
-	RedisProfiles                  map[string]*genericoptions.RedisOptions `json:"redis_profiles" mapstructure:"redis_profiles"`
-	RedisRuntime                   *genericoptions.RedisRuntimeOptions     `json:"redis_runtime" mapstructure:"redis_runtime"`
-	LockLease                      *genericoptions.LockLeaseOptions        `json:"lock_lease" mapstructure:"lock_lease"`
-	MongoDBOptions                 *genericoptions.MongoDBOptions          `json:"mongodb"   mapstructure:"mongodb"`
-	MessagingOptions               *genericoptions.MessagingOptions        `json:"messaging" mapstructure:"messaging"`
-	IAMOptions                     *genericoptions.IAMOptions              `json:"iam"       mapstructure:"iam"`
-	OSSOptions                     *genericoptions.OSSOptions              `json:"oss"       mapstructure:"oss"`
-	AssessmentAssets               *AssessmentAssetsOptions                `json:"assessment_assets" mapstructure:"assessment_assets"`
-	WeChatOptions                  *genericoptions.WeChatOptions           `json:"wechat"    mapstructure:"wechat"`
-	Plan                           *PlanOptions                            `json:"plan"      mapstructure:"plan"`
-	PlanScheduler                  *PlanSchedulerOptions                   `json:"plan_scheduler" mapstructure:"plan_scheduler"`
-	EvaluationConsistencyReconcile *EvaluationConsistencyReconcileOptions  `json:"evaluation_consistency_reconcile" mapstructure:"evaluation_consistency_reconcile"`
-	ReportCatalogAudit             *ReportCatalogAuditOptions              `json:"report_catalog_audit" mapstructure:"report_catalog_audit"`
-	OutboxRelay                    *OutboxRelayOptions                     `json:"outbox_relay" mapstructure:"outbox_relay"`
-	Eventing                       *EventingOptions                        `json:"eventing" mapstructure:"eventing"`
-	RateLimit                      *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
-	Backpressure                   *BackpressureOptions                    `json:"backpressure" mapstructure:"backpressure"`
-	Cache                          *CacheOptions                           `json:"cache"     mapstructure:"cache"`
-	StatisticsSync                 *StatisticsSyncOptions                  `json:"statistics_sync" mapstructure:"statistics_sync"`
-	Signaling                      *genericoptions.SignalingOptions        `json:"signaling" mapstructure:"signaling"`
-	SystemGovernance               *SystemGovernanceOptions                `json:"system_governance" mapstructure:"system_governance"`
-	DelegatedSubject               *delegatedsubject.Options               `json:"delegated_subject" mapstructure:"delegated-subject"`
-	rawSettingsSource              app.RawSettingsSource
+	Log                         *log.Options                            `json:"log"       mapstructure:"log"`
+	GenericServerRunOptions     *genericoptions.ServerRunOptions        `json:"server"    mapstructure:"server"`
+	GRPCOptions                 *genericoptions.GRPCOptions             `json:"grpc"      mapstructure:"grpc"`
+	InsecureServing             *genericoptions.InsecureServingOptions  `json:"insecure"  mapstructure:"insecure"`
+	SecureServing               *genericoptions.SecureServingOptions    `json:"secure"    mapstructure:"secure"`
+	MySQLOptions                *genericoptions.MySQLOptions            `json:"mysql"     mapstructure:"mysql"`
+	MigrationOptions            *genericoptions.MigrationOptions        `json:"migration" mapstructure:"migration"`
+	RedisOptions                *genericoptions.RedisOptions            `json:"redis"     mapstructure:"redis"`
+	RedisProfiles               map[string]*genericoptions.RedisOptions `json:"redis_profiles" mapstructure:"redis_profiles"`
+	RedisRuntime                *genericoptions.RedisRuntimeOptions     `json:"redis_runtime" mapstructure:"redis_runtime"`
+	LockLease                   *genericoptions.LockLeaseOptions        `json:"lock_lease" mapstructure:"lock_lease"`
+	MongoDBOptions              *genericoptions.MongoDBOptions          `json:"mongodb"   mapstructure:"mongodb"`
+	MessagingOptions            *genericoptions.MessagingOptions        `json:"messaging" mapstructure:"messaging"`
+	IAMOptions                  *genericoptions.IAMOptions              `json:"iam"       mapstructure:"iam"`
+	OSSOptions                  *genericoptions.OSSOptions              `json:"oss"       mapstructure:"oss"`
+	AssessmentAssets            *AssessmentAssetsOptions                `json:"assessment_assets" mapstructure:"assessment_assets"`
+	WeChatOptions               *genericoptions.WeChatOptions           `json:"wechat"    mapstructure:"wechat"`
+	Plan                        *PlanOptions                            `json:"plan"      mapstructure:"plan"`
+	PlanScheduler               *PlanSchedulerOptions                   `json:"plan_scheduler" mapstructure:"plan_scheduler"`
+	EvaluationConsistencyAudit  *EvaluationConsistencyAuditOptions      `json:"evaluation_consistency_audit" mapstructure:"evaluation_consistency_audit"`
+	EvaluationLeaseRecovery     *LeaseRecoveryOptions                   `json:"evaluation_lease_recovery" mapstructure:"evaluation_lease_recovery"`
+	InterpretationLeaseRecovery *LeaseRecoveryOptions                   `json:"interpretation_lease_recovery" mapstructure:"interpretation_lease_recovery"`
+	ReportCatalogAudit          *ReportCatalogAuditOptions              `json:"report_catalog_audit" mapstructure:"report_catalog_audit"`
+	OutboxRelay                 *OutboxRelayOptions                     `json:"outbox_relay" mapstructure:"outbox_relay"`
+	Eventing                    *EventingOptions                        `json:"eventing" mapstructure:"eventing"`
+	RateLimit                   *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
+	Backpressure                *BackpressureOptions                    `json:"backpressure" mapstructure:"backpressure"`
+	Cache                       *CacheOptions                           `json:"cache"     mapstructure:"cache"`
+	StatisticsSync              *StatisticsSyncOptions                  `json:"statistics_sync" mapstructure:"statistics_sync"`
+	Signaling                   *genericoptions.SignalingOptions        `json:"signaling" mapstructure:"signaling"`
+	SystemGovernance            *SystemGovernanceOptions                `json:"system_governance" mapstructure:"system_governance"`
+	DelegatedSubject            *delegatedsubject.Options               `json:"delegated_subject" mapstructure:"delegated-subject"`
+	rawSettingsSource           app.RawSettingsSource
 }
 
 func (o *Options) SetRawSettingsSource(source app.RawSettingsSource) {
@@ -64,35 +66,37 @@ func (o *Options) RawSettingsSource() app.RawSettingsSource {
 // NewOptions 创建一个 Options 对象，包含默认参数
 func NewOptions() *Options {
 	return &Options{
-		Log:                            log.NewOptions(),
-		GenericServerRunOptions:        genericoptions.NewServerRunOptions(),
-		GRPCOptions:                    genericoptions.NewGRPCOptions(),
-		InsecureServing:                genericoptions.NewInsecureServingOptions(),
-		SecureServing:                  genericoptions.NewSecureServingOptions(),
-		MySQLOptions:                   genericoptions.NewMySQLOptions(),
-		MigrationOptions:               genericoptions.NewMigrationOptions(),
-		RedisOptions:                   genericoptions.NewRedisOptions(),
-		RedisProfiles:                  map[string]*genericoptions.RedisOptions{},
-		RedisRuntime:                   defaultRedisRuntimeOptions(),
-		LockLease:                      genericoptions.NewLockLeaseOptions(),
-		MongoDBOptions:                 genericoptions.NewMongoDBOptions(),
-		MessagingOptions:               genericoptions.NewMessagingOptions(),
-		IAMOptions:                     genericoptions.NewIAMOptions(),
-		OSSOptions:                     genericoptions.NewOSSOptions(),
-		AssessmentAssets:               NewAssessmentAssetsOptions(),
-		WeChatOptions:                  genericoptions.NewWeChatOptions(),
-		Plan:                           NewPlanOptions(),
-		PlanScheduler:                  NewPlanSchedulerOptions(),
-		EvaluationConsistencyReconcile: NewEvaluationConsistencyReconcileOptions(),
-		ReportCatalogAudit:             NewReportCatalogAuditOptions(),
-		OutboxRelay:                    NewOutboxRelayOptions(),
-		Eventing:                       NewEventingOptions(),
-		RateLimit:                      NewRateLimitOptions(),
-		Backpressure:                   NewBackpressureOptions(),
-		Cache:                          NewCacheOptions(),
-		StatisticsSync:                 NewStatisticsSyncOptions(),
-		Signaling:                      genericoptions.NewSignalingOptions(),
-		SystemGovernance:               NewSystemGovernanceOptions(),
+		Log:                         log.NewOptions(),
+		GenericServerRunOptions:     genericoptions.NewServerRunOptions(),
+		GRPCOptions:                 genericoptions.NewGRPCOptions(),
+		InsecureServing:             genericoptions.NewInsecureServingOptions(),
+		SecureServing:               genericoptions.NewSecureServingOptions(),
+		MySQLOptions:                genericoptions.NewMySQLOptions(),
+		MigrationOptions:            genericoptions.NewMigrationOptions(),
+		RedisOptions:                genericoptions.NewRedisOptions(),
+		RedisProfiles:               map[string]*genericoptions.RedisOptions{},
+		RedisRuntime:                defaultRedisRuntimeOptions(),
+		LockLease:                   genericoptions.NewLockLeaseOptions(),
+		MongoDBOptions:              genericoptions.NewMongoDBOptions(),
+		MessagingOptions:            genericoptions.NewMessagingOptions(),
+		IAMOptions:                  genericoptions.NewIAMOptions(),
+		OSSOptions:                  genericoptions.NewOSSOptions(),
+		AssessmentAssets:            NewAssessmentAssetsOptions(),
+		WeChatOptions:               genericoptions.NewWeChatOptions(),
+		Plan:                        NewPlanOptions(),
+		PlanScheduler:               NewPlanSchedulerOptions(),
+		EvaluationConsistencyAudit:  NewEvaluationConsistencyAuditOptions(),
+		EvaluationLeaseRecovery:     NewEvaluationLeaseRecoveryOptions(),
+		InterpretationLeaseRecovery: NewInterpretationLeaseRecoveryOptions(),
+		ReportCatalogAudit:          NewReportCatalogAuditOptions(),
+		OutboxRelay:                 NewOutboxRelayOptions(),
+		Eventing:                    NewEventingOptions(),
+		RateLimit:                   NewRateLimitOptions(),
+		Backpressure:                NewBackpressureOptions(),
+		Cache:                       NewCacheOptions(),
+		StatisticsSync:              NewStatisticsSyncOptions(),
+		Signaling:                   genericoptions.NewSignalingOptions(),
+		SystemGovernance:            NewSystemGovernanceOptions(),
 	}
 }
 
@@ -251,8 +255,40 @@ func (p *PlanSchedulerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&p.LockTTL, "plan_scheduler.lock-ttl", p.LockTTL, "Redis distributed lock TTL used by the built-in plan scheduler.")
 }
 
-// EvaluationConsistencyReconcileOptions 控制 scoring/reporting 跨库终态对账补偿任务。
-type EvaluationConsistencyReconcileOptions struct {
+type EvaluationConsistencyAuditOptions struct {
+	Enable        bool          `json:"enable" mapstructure:"enable"`
+	InitialDelay  time.Duration `json:"initial_delay" mapstructure:"initial_delay"`
+	BatchInterval time.Duration `json:"batch_interval" mapstructure:"batch_interval"`
+	CycleInterval time.Duration `json:"cycle_interval" mapstructure:"cycle_interval"`
+	BatchSize     int           `json:"batch_size" mapstructure:"batch_size"`
+	BatchTimeout  time.Duration `json:"batch_timeout" mapstructure:"batch_timeout"`
+	LockKey       string        `json:"lock_key" mapstructure:"lock_key"`
+	LockTTL       time.Duration `json:"lock_ttl" mapstructure:"lock_ttl"`
+}
+
+func NewEvaluationConsistencyAuditOptions() *EvaluationConsistencyAuditOptions {
+	return &EvaluationConsistencyAuditOptions{
+		Enable: true, InitialDelay: 10 * time.Minute, BatchInterval: time.Second,
+		CycleInterval: 24 * time.Hour, BatchSize: 100, BatchTimeout: 10 * time.Second,
+		LockKey: "qs:evaluation-consistency-audit:leader", LockTTL: 30 * time.Second,
+	}
+}
+
+func (o *EvaluationConsistencyAuditOptions) AddFlags(fs *pflag.FlagSet) {
+	if o == nil {
+		return
+	}
+	fs.BoolVar(&o.Enable, "evaluation_consistency_audit.enable", o.Enable, "Enable the bounded Evaluation consistency audit.")
+	fs.DurationVar(&o.InitialDelay, "evaluation_consistency_audit.initial-delay", o.InitialDelay, "Delay before the first Evaluation consistency audit cycle.")
+	fs.DurationVar(&o.BatchInterval, "evaluation_consistency_audit.batch-interval", o.BatchInterval, "Delay between bounded audit batches within one cycle.")
+	fs.DurationVar(&o.CycleInterval, "evaluation_consistency_audit.cycle-interval", o.CycleInterval, "Target start-to-start interval for complete Evaluation consistency audit cycles.")
+	fs.IntVar(&o.BatchSize, "evaluation_consistency_audit.batch-size", o.BatchSize, "Maximum assessment evidence rows per audit batch.")
+	fs.DurationVar(&o.BatchTimeout, "evaluation_consistency_audit.batch-timeout", o.BatchTimeout, "Deadline for one audit batch.")
+	fs.StringVar(&o.LockKey, "evaluation_consistency_audit.lock-key", o.LockKey, "Redis leader lock key for the Evaluation consistency audit.")
+	fs.DurationVar(&o.LockTTL, "evaluation_consistency_audit.lock-ttl", o.LockTTL, "Renewed Redis leader lock TTL for the Evaluation consistency audit.")
+}
+
+type LeaseRecoveryOptions struct {
 	Enable     bool          `json:"enable" mapstructure:"enable"`
 	Interval   time.Duration `json:"interval" mapstructure:"interval"`
 	BatchLimit int           `json:"batch_limit" mapstructure:"batch_limit"`
@@ -260,27 +296,29 @@ type EvaluationConsistencyReconcileOptions struct {
 	LockTTL    time.Duration `json:"lock_ttl" mapstructure:"lock_ttl"`
 }
 
-// NewEvaluationConsistencyReconcileOptions 创建默认 evaluation consistency reconcile 配置。
-func NewEvaluationConsistencyReconcileOptions() *EvaluationConsistencyReconcileOptions {
-	return &EvaluationConsistencyReconcileOptions{
-		Enable:     true,
-		Interval:   10 * time.Second,
-		BatchLimit: 100,
-		LockKey:    "qs:evaluation-consistency-reconcile:leader",
-		LockTTL:    30 * time.Second,
+func NewEvaluationLeaseRecoveryOptions() *LeaseRecoveryOptions {
+	return &LeaseRecoveryOptions{
+		Enable: true, Interval: 10 * time.Second, BatchLimit: 100,
+		LockKey: "qs:evaluation-lease-recovery:leader", LockTTL: 30 * time.Second,
 	}
 }
 
-// AddFlags 注册 evaluation consistency reconcile 相关参数。
-func (e *EvaluationConsistencyReconcileOptions) AddFlags(fs *pflag.FlagSet) {
-	if e == nil {
+func NewInterpretationLeaseRecoveryOptions() *LeaseRecoveryOptions {
+	return &LeaseRecoveryOptions{
+		Enable: true, Interval: 10 * time.Second, BatchLimit: 100,
+		LockKey: "qs:interpretation-lease-recovery:leader", LockTTL: 30 * time.Second,
+	}
+}
+
+func (o *LeaseRecoveryOptions) AddFlags(fs *pflag.FlagSet, prefix string) {
+	if o == nil {
 		return
 	}
-	fs.BoolVar(&e.Enable, "evaluation_consistency_reconcile.enable", e.Enable, "Enable scheduled evaluation cross-store consistency reconcile.")
-	fs.DurationVar(&e.Interval, "evaluation_consistency_reconcile.interval", e.Interval, "Interval for scanning evaluation consistency drift.")
-	fs.IntVar(&e.BatchLimit, "evaluation_consistency_reconcile.batch-limit", e.BatchLimit, "Maximum assessments to scan in one evaluation consistency reconcile tick.")
-	fs.StringVar(&e.LockKey, "evaluation_consistency_reconcile.lock-key", e.LockKey, "Redis distributed lock key used by the evaluation consistency reconcile scheduler.")
-	fs.DurationVar(&e.LockTTL, "evaluation_consistency_reconcile.lock-ttl", e.LockTTL, "Redis distributed lock TTL used by the evaluation consistency reconcile scheduler.")
+	fs.BoolVar(&o.Enable, prefix+".enable", o.Enable, "Enable bounded expired-lease recovery.")
+	fs.DurationVar(&o.Interval, prefix+".interval", o.Interval, "Interval for expired-lease recovery.")
+	fs.IntVar(&o.BatchLimit, prefix+".batch-limit", o.BatchLimit, "Maximum expired leases recovered per tick.")
+	fs.StringVar(&o.LockKey, prefix+".lock-key", o.LockKey, "Redis leader lock key for expired-lease recovery.")
+	fs.DurationVar(&o.LockTTL, prefix+".lock-ttl", o.LockTTL, "Renewed Redis leader lock TTL for expired-lease recovery.")
 }
 
 type ReportCatalogAuditOptions struct {
@@ -454,7 +492,9 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.WeChatOptions.AddFlags(fss.FlagSet("wechat"))
 	o.Plan.AddFlags(fss.FlagSet("plan"))
 	o.PlanScheduler.AddFlags(fss.FlagSet("plan_scheduler"))
-	o.EvaluationConsistencyReconcile.AddFlags(fss.FlagSet("evaluation_consistency_reconcile"))
+	o.EvaluationConsistencyAudit.AddFlags(fss.FlagSet("evaluation_consistency_audit"))
+	o.EvaluationLeaseRecovery.AddFlags(fss.FlagSet("evaluation_lease_recovery"), "evaluation_lease_recovery")
+	o.InterpretationLeaseRecovery.AddFlags(fss.FlagSet("interpretation_lease_recovery"), "interpretation_lease_recovery")
 	o.ReportCatalogAudit.AddFlags(fss.FlagSet("report_catalog_audit"))
 	o.OutboxRelay.AddFlags(fss.FlagSet("outbox_relay"))
 	o.Eventing.AddFlags(fss.FlagSet("eventing"))

@@ -25,7 +25,11 @@ LockLease 回答的是“在一段有限时间内，哪个实例有资格执行�
 | apiserver | `plan_scheduler_leader` | leader | 50s | 计划调度器 leader |
 | apiserver | `statistics_sync_leader` | leader | 30m | 统计同步调度 leader |
 | apiserver | `statistics_sync` | task lock | 30m | 统计任务串行化 |
-| apiserver | `evaluation_consistency_reconcile` | leader | 30s | 一致性 reconcile leader |
+| apiserver | `evaluation_consistency_audit` | leader | 30s | Evaluation 全周期一致性审计 leader |
+| apiserver | `evaluation_lease_recovery` | leader | 30s | Evaluation 过期执行租约恢复 leader |
+| apiserver | `interpretation_lease_recovery` | leader | 30s | Interpretation 过期执行租约恢复 leader |
+| apiserver | `report_catalog_audit` | leader | 30s | 报告目录审计 leader |
+| worker | `attention_projection_reconcile` | leader | 30m | Attention 投影恢复 leader |
 | collection-server | `collection_submit` | duplicate suppression | 5m | 跨实例提交 owner lease |
 
 catalog 中的 renewal mode 是 `auto` 能力描述；三个进程的 dev/prod 配置均启用 `lock_lease.renewal_enabled`。该开关只保留为显式运维回退，不得作为常态关闭续租。

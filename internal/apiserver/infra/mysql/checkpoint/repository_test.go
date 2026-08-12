@@ -1,13 +1,49 @@
 package checkpoint_test
 
 import (
+	"context"
+	"regexp"
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/checkpoint"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
+	mysqlDriver "gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
+
+func TestListExpiredLeasesUsesBoundedClaimIndexPredicate(t *testing.T) {
+	t.Parallel()
+
+	sqlDB, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	db, err := gorm.Open(mysqlDriver.New(mysqlDriver.Config{
+		Conn: sqlDB, SkipInitializeWithVersion: true,
+	}), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 8, 12, 9, 0, 0, 0, time.UTC)
+	mock.ExpectQuery("(?s)"+regexp.QuoteMeta("FROM `runtime_checkpoint` WHERE scope = ? AND status = ? AND lease_expires_at IS NOT NULL AND lease_expires_at <= ? AND deleted_at IS NULL ORDER BY lease_expires_at ASC, id ASC LIMIT ?")).
+		WithArgs("evaluation_run", "running", now, 100).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+
+	items, err := checkpoint.NewRepository(db).ListExpiredLeases(context.Background(), now, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("expired leases = %v, want none", items)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestRunCheckpointPORoundTrip(t *testing.T) {
 	t.Parallel()

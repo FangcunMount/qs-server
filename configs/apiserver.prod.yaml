@@ -325,14 +325,31 @@ plan_scheduler:
   lock_ttl: "2m"                # 锁过期时间，略长于调度间隔，避免死锁
 
 # ----------------------------------------------------------------------------
-# 3.6.2 评估一致性审计任务
+# 3.6.2 Evaluation 审计与租约恢复
 # ----------------------------------------------------------------------------
-evaluation_consistency_reconcile:
-  enable: true                  # 启用评估 outcome 与 assessment 状态一致性审计
-  interval: "10s"               # 租约恢复与 assessment 一致性审计间隔
-  batch_limit: 100              # 每轮最多扫描的 assessment 数量
-  lock_key: "qs:evaluation-consistency-reconcile:leader" # 分布式锁键，确保单实例执行
-  lock_ttl: "30s"              # 续租租约；覆盖单轮执行并允许快速接管
+evaluation_consistency_audit:
+  enable: true
+  initial_delay: "10m"
+  batch_interval: "1s"
+  cycle_interval: "24h"
+  batch_size: 100
+  batch_timeout: "10s"
+  lock_key: "qs:evaluation-consistency-audit:leader"
+  lock_ttl: "30s"
+
+evaluation_lease_recovery:
+  enable: true
+  interval: "10s"
+  batch_limit: 100
+  lock_key: "qs:evaluation-lease-recovery:leader"
+  lock_ttl: "30s"
+
+interpretation_lease_recovery:
+  enable: true
+  interval: "10s"
+  batch_limit: 100
+  lock_key: "qs:interpretation-lease-recovery:leader"
+  lock_ttl: "30s"
 
 report_catalog_audit:
   enable: true
@@ -420,11 +437,8 @@ backpressure:
 system_governance:
   retry:
     manual_actions_enabled: true
-    lease_reconcile_enabled: true
     lease:
       run_duration: 5m
-      reconcile_interval: 10s
-      reconcile_jitter_fraction: 0
     business:
       max_automatic_attempts: 3
       base_delay: 30s

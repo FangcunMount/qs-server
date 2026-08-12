@@ -92,9 +92,21 @@ func buildSchedulerManager(cfg *config.Config, deps container.ServerRuntimeDeps)
 			deps.LockManager,
 			deps.LockBuilder,
 		),
-		runtimescheduler.NewEvaluationConsistencyReconcileRunner(
-			cfg.EvaluationConsistencyReconcile,
-			deps.EvaluationConsistencyReconcileService,
+		runtimescheduler.NewEvaluationConsistencyAuditRunner(
+			cfg.EvaluationConsistencyAudit,
+			deps.EvaluationConsistencyAuditService,
+			deps.LockManager,
+			deps.LockBuilder,
+		),
+		runtimescheduler.NewEvaluationLeaseRecoveryRunner(
+			cfg.EvaluationLeaseRecovery,
+			deps.EvaluationLeaseRecoverer,
+			deps.LockManager,
+			deps.LockBuilder,
+		),
+		runtimescheduler.NewInterpretationLeaseRecoveryRunner(
+			cfg.InterpretationLeaseRecovery,
+			deps.InterpretationLeaseRecoverer,
 			deps.LockManager,
 			deps.LockBuilder,
 		),

@@ -7,6 +7,7 @@ import (
 
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
+	evaluationScheduler "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scheduler"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance"
@@ -55,14 +56,16 @@ func TestContainerBuildServerRuntimeDeps(t *testing.T) {
 
 	planCommand := &planCommandServiceStub{}
 	statisticsCoordinator := &statisticsApp.Coordinator{}
-	consistencyReconcile := &evaluationConsistencyReconcileServiceStub{}
+	consistencyAudit := &evaluationConsistencyAuditServiceStub{}
+	evaluationRecoverer := &leaseRecovererStub{}
 
 	c.PlanModule = &PlanModule{CommandService: planCommand}
 	c.StatisticsModule = &StatisticsModule{
 		Coordinator: statisticsCoordinator,
 	}
 	c.EvaluationModule = &EvaluationModule{
-		SchedulerService: consistencyReconcile,
+		ConsistencyAuditService:  consistencyAudit,
+		EvaluationLeaseRecoverer: evaluationRecoverer,
 	}
 
 	deps := c.BuildServerRuntimeDeps()
@@ -81,40 +84,11 @@ func TestContainerBuildServerRuntimeDeps(t *testing.T) {
 	if deps.StatisticsCoordinator != statisticsCoordinator {
 		t.Fatalf("StatisticsCoordinator = %#v, want %#v", deps.StatisticsCoordinator, statisticsCoordinator)
 	}
-	if deps.EvaluationConsistencyReconcileService != consistencyReconcile {
-		t.Fatalf("EvaluationConsistencyReconcileService = %#v, want %#v", deps.EvaluationConsistencyReconcileService, consistencyReconcile)
+	if deps.EvaluationConsistencyAuditService != consistencyAudit {
+		t.Fatalf("EvaluationConsistencyAuditService = %#v, want %#v", deps.EvaluationConsistencyAuditService, consistencyAudit)
 	}
-}
-
-func TestComposeEvaluationConsistencyServiceRunsAssessmentAuditAndBothLeaseRecoverers(t *testing.T) {
-	t.Parallel()
-
-	base := &evaluationConsistencyReconcileServiceStub{count: 1}
-	evaluationRecoverer := &leaseRecovererStub{count: 2}
-	interpretationRecoverer := &leaseRecovererStub{count: 3}
-	service := composeEvaluationConsistencyService(base, evaluationRecoverer, interpretationRecoverer, true)
-
-	count, err := service.AuditOnce(context.Background(), 100)
-	if err != nil {
-		t.Fatalf("AuditOnce() error = %v", err)
-	}
-	if count != 6 {
-		t.Fatalf("AuditOnce() count = %d, want 6", count)
-	}
-	if base.calls != 1 || evaluationRecoverer.calls != 1 || interpretationRecoverer.calls != 1 {
-		t.Fatalf("calls = base:%d evaluation:%d interpretation:%d, want 1 each", base.calls, evaluationRecoverer.calls, interpretationRecoverer.calls)
-	}
-}
-
-func TestComposeEvaluationConsistencyServiceDisablesOnlyLeaseRecovery(t *testing.T) {
-	t.Parallel()
-
-	base := &evaluationConsistencyReconcileServiceStub{count: 1}
-	recoverer := &leaseRecovererStub{count: 2}
-	service := composeEvaluationConsistencyService(base, recoverer, recoverer, false)
-
-	if service != base {
-		t.Fatalf("service = %#v, want base service", service)
+	if deps.EvaluationLeaseRecoverer != evaluationRecoverer {
+		t.Fatalf("EvaluationLeaseRecoverer = %#v, want %#v", deps.EvaluationLeaseRecoverer, evaluationRecoverer)
 	}
 }
 
@@ -176,14 +150,13 @@ func (*planCommandServiceStub) CancelTask(context.Context, int64, string) (*plan
 	return nil, nil
 }
 
-type evaluationConsistencyReconcileServiceStub struct {
-	count int
+type evaluationConsistencyAuditServiceStub struct {
 	calls int
 }
 
-func (s *evaluationConsistencyReconcileServiceStub) AuditOnce(context.Context, int) (int, error) {
+func (s *evaluationConsistencyAuditServiceStub) AuditBatch(context.Context, uint64, int) (evaluationScheduler.AuditBatchResult, error) {
 	s.calls++
-	return s.count, nil
+	return evaluationScheduler.AuditBatchResult{CycleComplete: true}, nil
 }
 
 type leaseRecovererStub struct {

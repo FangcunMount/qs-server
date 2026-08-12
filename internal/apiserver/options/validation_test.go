@@ -90,49 +90,33 @@ func TestOptionsValidatePlanScheduler(t *testing.T) {
 	}
 }
 
-func TestOptionsValidateEvaluationConsistencyReconcile(t *testing.T) {
+func TestOptionsValidateEvaluationConsistencyAudit(t *testing.T) {
 	tests := []struct {
 		name    string
 		mutate  func(*Options)
 		wantErr string
 	}{
 		{
-			name: "disabled reconcile skips validation",
+			name: "disabled audit skips validation",
 			mutate: func(opts *Options) {
-				opts.EvaluationConsistencyReconcile.Enable = false
-				opts.EvaluationConsistencyReconcile.Interval = 0
-				opts.EvaluationConsistencyReconcile.BatchLimit = 0
-				opts.EvaluationConsistencyReconcile.LockKey = ""
-				opts.EvaluationConsistencyReconcile.LockTTL = 0
+				opts.EvaluationConsistencyAudit.Enable = false
+				opts.EvaluationConsistencyAudit.CycleInterval = 0
+				opts.EvaluationConsistencyAudit.BatchSize = 0
 			},
 		},
 		{
-			name: "enabled reconcile requires positive interval",
+			name: "audit cycle is bounded to governance window",
 			mutate: func(opts *Options) {
-				opts.EvaluationConsistencyReconcile.Interval = 0
+				opts.EvaluationConsistencyAudit.CycleInterval = time.Hour
 			},
-			wantErr: "evaluation_consistency_reconcile.interval must be greater than 0",
+			wantErr: "evaluation_consistency_audit.cycle_interval must be between 6h and 24h",
 		},
 		{
-			name: "enabled reconcile requires positive batch limit",
+			name: "audit requires positive batch size",
 			mutate: func(opts *Options) {
-				opts.EvaluationConsistencyReconcile.BatchLimit = 0
+				opts.EvaluationConsistencyAudit.BatchSize = 0
 			},
-			wantErr: "evaluation_consistency_reconcile.batch_limit must be greater than 0",
-		},
-		{
-			name: "enabled reconcile requires lock key",
-			mutate: func(opts *Options) {
-				opts.EvaluationConsistencyReconcile.LockKey = ""
-			},
-			wantErr: "evaluation_consistency_reconcile.lock_key cannot be empty when enabled",
-		},
-		{
-			name: "enabled reconcile requires positive lock ttl",
-			mutate: func(opts *Options) {
-				opts.EvaluationConsistencyReconcile.LockTTL = 0
-			},
-			wantErr: "evaluation_consistency_reconcile.lock_ttl must be greater than 0",
+			wantErr: "evaluation_consistency_audit.batch_size must be greater than 0",
 		},
 	}
 
@@ -144,8 +128,8 @@ func TestOptionsValidateEvaluationConsistencyReconcile(t *testing.T) {
 			errs := opts.Validate()
 			if tt.wantErr == "" {
 				for _, err := range errs {
-					if strings.Contains(err.Error(), "evaluation_consistency_reconcile.") {
-						t.Fatalf("unexpected evaluation consistency reconcile validation error: %v", err)
+					if strings.Contains(err.Error(), "evaluation_consistency_audit.") {
+						t.Fatalf("unexpected evaluation consistency audit validation error: %v", err)
 					}
 				}
 				return
@@ -159,6 +143,41 @@ func TestOptionsValidateEvaluationConsistencyReconcile(t *testing.T) {
 			t.Fatalf("expected validation error containing %q, got %v", tt.wantErr, errs)
 		})
 	}
+}
+
+func TestOptionsValidateLeaseRecoveryCadence(t *testing.T) {
+	for _, name := range []string{"evaluation_lease_recovery", "interpretation_lease_recovery"} {
+		t.Run(name, func(t *testing.T) {
+			opts := NewOptions()
+			var target *LeaseRecoveryOptions
+			if name == "evaluation_lease_recovery" {
+				target = opts.EvaluationLeaseRecovery
+			} else {
+				target = opts.InterpretationLeaseRecovery
+			}
+			target.Interval = 31 * time.Second
+			errs := opts.Validate()
+			for _, err := range errs {
+				if strings.Contains(err.Error(), name+".interval must be between 10s and 30s") {
+					return
+				}
+			}
+			t.Fatalf("expected %s interval validation error, got %v", name, errs)
+		})
+	}
+}
+
+func TestOptionsValidateEvaluationMaintenanceLockIsolation(t *testing.T) {
+	opts := NewOptions()
+	opts.InterpretationLeaseRecovery.LockKey = opts.EvaluationLeaseRecovery.LockKey
+
+	errs := opts.Validate()
+	for _, err := range errs {
+		if strings.Contains(err.Error(), "interpretation_lease_recovery.lock_key must be independent from evaluation_lease_recovery.lock_key") {
+			return
+		}
+	}
+	t.Fatalf("expected independent maintenance lock validation error, got %v", errs)
 }
 
 func TestOptionsValidateOutboxRelay(t *testing.T) {

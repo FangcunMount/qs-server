@@ -53,8 +53,8 @@ type Module struct {
 	ScaleAnalysis            evaluationoperator.ScaleAnalysisService
 	WorkerService            evaluationworker.Service
 	OperatorExecutionService evaluationoperator.BatchExecutionService
-	SchedulerService         evaluationscheduler.Service
-	LeaseRecoverer           evaluationscheduler.LeaseRecoverer
+	ConsistencyAuditService  evaluationscheduler.Service
+	EvaluationLeaseRecoverer evaluationscheduler.LeaseRecoverer
 
 	outcomeRepository         domainoutcome.Repository
 	workbenchLatestRiskReader workbenchreadmodel.LatestRiskReader
@@ -105,18 +105,17 @@ func New(deps Deps) (*Module, error) {
 }
 
 type evaluationInfra struct {
-	assessmentRepo           assessment.Repository
-	runRepo                  evaluationrun.Repository
-	outcomeRepo              domainoutcome.Repository
-	scoreRepo                assessment.ScoreRepository
-	assessmentReader         evaluationreadmodel.AssessmentReader
-	submittedCandidateReader evaluationscheduler.SubmittedCandidateReader
-	latestRiskReader         workbenchreadmodel.LatestRiskReader
-	scoreProjectionReader    evaluationreadmodel.ScoreProjectionReader
-	consistencyReader        evaluationconsistency.Reader
-	assessmentOutboxStore    appEventing.EventStager
-	txRunner                 apptransaction.Runner
-	postCommit               appEventing.PostCommitDispatcher
+	assessmentRepo        assessment.Repository
+	runRepo               evaluationrun.Repository
+	outcomeRepo           domainoutcome.Repository
+	scoreRepo             assessment.ScoreRepository
+	assessmentReader      evaluationreadmodel.AssessmentReader
+	latestRiskReader      workbenchreadmodel.LatestRiskReader
+	scoreProjectionReader evaluationreadmodel.ScoreProjectionReader
+	consistencyReader     evaluationconsistency.Reader
+	assessmentOutboxStore appEventing.EventStager
+	txRunner              apptransaction.Runner
+	postCommit            appEventing.PostCommitDispatcher
 }
 
 func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
@@ -131,7 +130,6 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 
 	assessmentReadModel := mysqlEval.NewAssessmentReadModel(normalized.MySQLDB, mysqlOptions)
 	infra.assessmentReader = assessmentReadModel
-	infra.submittedCandidateReader = assessmentReadModel
 	infra.latestRiskReader = assessmentReadModel
 	infra.scoreRepo = mysqlEval.NewScoreRepository(normalized.MySQLDB, mysqlOptions)
 	infra.scoreProjectionReader = mysqlEval.NewScoreProjectionReadModel(normalized.MySQLDB, mysqlOptions)
@@ -182,7 +180,7 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		)
 		m.WorkerService = evaluationworker.NewService(engine, infra.assessmentRepo, infra.outcomeRepo, infra.runRepo)
 		if reader, ok := infra.runRepo.(evaluationrun.ExpiredLeaseReader); ok {
-			m.LeaseRecoverer = evaluationscheduler.NewLeaseRecoverer(reader, m.WorkerService)
+			m.EvaluationLeaseRecoverer = evaluationscheduler.NewLeaseRecoverer(reader, m.WorkerService)
 		}
 		m.OperatorExecutionService = evaluationoperator.NewBatchExecutionService(infra.assessmentRepo, engine, normalized.TesteeAccessChecker)
 	}
@@ -235,13 +233,7 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 }
 
 func (m *Module) wireScheduler(infra *evaluationInfra) {
-	m.SchedulerService = evaluationscheduler.NewService(
-		infra.assessmentRepo,
-		infra.outcomeRepo,
-		infra.submittedCandidateReader,
-		infra.runRepo,
-		infra.consistencyReader,
-	)
+	m.ConsistencyAuditService = evaluationscheduler.NewService(infra.consistencyReader)
 }
 
 func normalizeDeps(deps Deps) (Deps, error) {

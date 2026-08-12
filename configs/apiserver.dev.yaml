@@ -326,11 +326,28 @@ plan_scheduler:
   lock_key: "qs:plan-scheduler:leader"
   lock_ttl: "50s"
 
-evaluation_consistency_reconcile:
+evaluation_consistency_audit:
+  enable: true
+  initial_delay: "10m"
+  batch_interval: "1s"
+  cycle_interval: "24h"
+  batch_size: 100
+  batch_timeout: "10s"
+  lock_key: "qs:evaluation-consistency-audit:leader"
+  lock_ttl: "30s"
+
+evaluation_lease_recovery:
   enable: true
   interval: "10s"
   batch_limit: 100
-  lock_key: "qs:evaluation-consistency-reconcile:leader"
+  lock_key: "qs:evaluation-lease-recovery:leader"
+  lock_ttl: "30s"
+
+interpretation_lease_recovery:
+  enable: true
+  interval: "10s"
+  batch_limit: 100
+  lock_key: "qs:interpretation-lease-recovery:leader"
   lock_ttl: "30s"
 
 report_catalog_audit:
@@ -409,11 +426,8 @@ backpressure:
 system_governance:
   retry:
     manual_actions_enabled: true
-    lease_reconcile_enabled: true
     lease:
       run_duration: 5m
-      reconcile_interval: 10s
-      reconcile_jitter_fraction: 0
     business:
       max_automatic_attempts: 3
       base_delay: 30s

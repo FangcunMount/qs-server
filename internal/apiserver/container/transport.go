@@ -477,13 +477,15 @@ type ServerGRPCBootstrapDeps struct {
 // ServerRuntimeDeps describes the narrow container-owned dependencies needed by
 // background runtimes started from the apiserver process.
 type ServerRuntimeDeps struct {
-	LockBuilder                           *keyspace.Builder
-	LockManager                           locklease.Manager
-	WarmupCoordinator                     cachegovernance.WarmupCoordinator
-	PlanCommandService                    planApp.PlanCommandService
-	StatisticsCoordinator                 *statisticsApp.Coordinator
-	EvaluationConsistencyReconcileService evaluationScheduler.Service
-	ReportCatalogAuditService             interpretationcatalog.RunnerService
+	LockBuilder                       *keyspace.Builder
+	LockManager                       locklease.Manager
+	WarmupCoordinator                 cachegovernance.WarmupCoordinator
+	PlanCommandService                planApp.PlanCommandService
+	StatisticsCoordinator             *statisticsApp.Coordinator
+	EvaluationConsistencyAuditService evaluationScheduler.Service
+	EvaluationLeaseRecoverer          evaluationScheduler.LeaseRecoverer
+	InterpretationLeaseRecoverer      evaluationScheduler.LeaseRecoverer
+	ReportCatalogAuditService         interpretationcatalog.RunnerService
 }
 
 func (c *Container) BuildServerGRPCBootstrapDeps() ServerGRPCBootstrapDeps {
@@ -522,32 +524,12 @@ func (c *Container) BuildServerRuntimeDeps() ServerRuntimeDeps {
 	}
 	if c.ReportModule != nil {
 		deps.ReportCatalogAuditService = c.ReportModule.CatalogAuditService()
+		deps.InterpretationLeaseRecoverer = c.ReportModule.LeaseRecoverer()
 	}
 	if c.EvaluationModule != nil {
-		leaseRecoveryEnabled := c.systemGovernanceOptions == nil || c.systemGovernanceOptions.Retry == nil || c.systemGovernanceOptions.Retry.LeaseReconcileEnabled
-		var interpretationRecoverer evaluationScheduler.LeaseRecoverer
-		if c.ReportModule != nil {
-			interpretationRecoverer = c.ReportModule.LeaseRecoverer()
-		}
-		deps.EvaluationConsistencyReconcileService = composeEvaluationConsistencyService(
-			c.EvaluationModule.SchedulerService,
-			c.EvaluationModule.LeaseRecoverer,
-			interpretationRecoverer,
-			leaseRecoveryEnabled,
-		)
+		deps.EvaluationConsistencyAuditService = c.EvaluationModule.ConsistencyAuditService
+		deps.EvaluationLeaseRecoverer = c.EvaluationModule.EvaluationLeaseRecoverer
 	}
 
 	return deps
-}
-
-func composeEvaluationConsistencyService(
-	base evaluationScheduler.Service,
-	evaluationRecoverer evaluationScheduler.LeaseRecoverer,
-	interpretationRecoverer evaluationScheduler.LeaseRecoverer,
-	leaseRecoveryEnabled bool,
-) evaluationScheduler.Service {
-	if !leaseRecoveryEnabled {
-		return base
-	}
-	return evaluationScheduler.NewGovernedService(base, evaluationRecoverer, interpretationRecoverer)
 }

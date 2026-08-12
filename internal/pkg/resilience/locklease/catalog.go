@@ -10,14 +10,16 @@ import (
 type WorkloadID string
 
 const (
-	WorkloadAnswersheetProcessing          WorkloadID = "answersheet_processing"
-	WorkloadPlanSchedulerLeader            WorkloadID = "plan_scheduler_leader"
-	WorkloadStatisticsSyncLeader           WorkloadID = "statistics_sync_leader"
-	WorkloadStatisticsSync                 WorkloadID = "statistics_sync"
-	WorkloadEvaluationConsistencyReconcile WorkloadID = "evaluation_consistency_reconcile"
-	WorkloadReportCatalogAudit             WorkloadID = "report_catalog_audit"
-	WorkloadAttentionProjectionReconcile   WorkloadID = "attention_projection_reconcile"
-	WorkloadCollectionSubmit               WorkloadID = "collection_submit"
+	WorkloadAnswersheetProcessing        WorkloadID = "answersheet_processing"
+	WorkloadPlanSchedulerLeader          WorkloadID = "plan_scheduler_leader"
+	WorkloadStatisticsSyncLeader         WorkloadID = "statistics_sync_leader"
+	WorkloadStatisticsSync               WorkloadID = "statistics_sync"
+	WorkloadEvaluationConsistencyAudit   WorkloadID = "evaluation_consistency_audit"
+	WorkloadEvaluationLeaseRecovery      WorkloadID = "evaluation_lease_recovery"
+	WorkloadInterpretationLeaseRecovery  WorkloadID = "interpretation_lease_recovery"
+	WorkloadReportCatalogAudit           WorkloadID = "report_catalog_audit"
+	WorkloadAttentionProjectionReconcile WorkloadID = "attention_projection_reconcile"
+	WorkloadCollectionSubmit             WorkloadID = "collection_submit"
 )
 
 // Kind classifies the business semantics of a lease workload.
@@ -51,7 +53,9 @@ var capabilities = [...]Capability{
 	{WorkloadPlanSchedulerLeader, "apiserver", KindLeader, Spec{Name: string(WorkloadPlanSchedulerLeader), Description: "用于 apiserver 计划调度器多实例抢占 leader 的分布式锁。", DefaultTTL: 50 * time.Second}, RenewalModeAuto},
 	{WorkloadStatisticsSyncLeader, "apiserver", KindLeader, Spec{Name: string(WorkloadStatisticsSyncLeader), Description: "用于 apiserver 统计同步调度器多实例抢占 leader 的分布式锁。", DefaultTTL: 30 * time.Minute}, RenewalModeAuto},
 	{WorkloadStatisticsSync, "apiserver", KindTaskLock, Spec{Name: string(WorkloadStatisticsSync), Description: "用于 apiserver 统计同步任务串行化执行的分布式锁。", DefaultTTL: 30 * time.Minute}, RenewalModeAuto},
-	{WorkloadEvaluationConsistencyReconcile, "apiserver", KindLeader, Spec{Name: string(WorkloadEvaluationConsistencyReconcile), Description: "用于 apiserver evaluation consistency reconcile 多实例串行化执行的分布式锁。", DefaultTTL: 30 * time.Second}, RenewalModeAuto},
+	{WorkloadEvaluationConsistencyAudit, "apiserver", KindLeader, Spec{Name: string(WorkloadEvaluationConsistencyAudit), Description: "用于 apiserver Evaluation 一致性审计周期的单 leader 执行。", DefaultTTL: 30 * time.Second}, RenewalModeAuto},
+	{WorkloadEvaluationLeaseRecovery, "apiserver", KindLeader, Spec{Name: string(WorkloadEvaluationLeaseRecovery), Description: "用于 apiserver Evaluation 过期运行租约恢复的单 leader 执行。", DefaultTTL: 30 * time.Second}, RenewalModeAuto},
+	{WorkloadInterpretationLeaseRecovery, "apiserver", KindLeader, Spec{Name: string(WorkloadInterpretationLeaseRecovery), Description: "用于 apiserver Interpretation 过期运行租约恢复的单 leader 执行。", DefaultTTL: 30 * time.Second}, RenewalModeAuto},
 	{WorkloadReportCatalogAudit, "apiserver", KindLeader, Spec{Name: string(WorkloadReportCatalogAudit), Description: "用于 apiserver 有界报告目录审计多实例 leader 选举与自动续租。", DefaultTTL: 30 * time.Second}, RenewalModeAuto},
 	{WorkloadAttentionProjectionReconcile, "worker", KindLeader, Spec{Name: string(WorkloadAttentionProjectionReconcile), Description: "用于 worker Attention 失败重试与历史事实恢复的多实例 leader 选举。", DefaultTTL: 30 * time.Minute}, RenewalModeAuto},
 	{WorkloadCollectionSubmit, "collection-server", KindDuplicateSuppression, Spec{Name: string(WorkloadCollectionSubmit), Description: "用于 collection-server 跨实例合并相同答卷提交的建议性 lease；最终幂等由 Mongo 裁决。", DefaultTTL: 5 * time.Minute}, RenewalModeAuto},

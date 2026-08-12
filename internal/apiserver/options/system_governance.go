@@ -11,34 +11,21 @@ type SystemGovernanceOptions struct {
 }
 
 type RetryGovernanceOptions struct {
-	ManualActionsEnabled  bool                                  `json:"manual_actions_enabled" mapstructure:"manual_actions_enabled"`
-	LeaseReconcileEnabled bool                                  `json:"lease_reconcile_enabled" mapstructure:"lease_reconcile_enabled"`
-	Lease                 *InterpretationLeaseGovernanceOptions `json:"lease" mapstructure:"lease"`
-	Business              *RetryPolicyOptions                   `json:"business" mapstructure:"business"`
-	Outbox                *RetryPolicyOptions                   `json:"outbox" mapstructure:"outbox"`
+	ManualActionsEnabled bool                                  `json:"manual_actions_enabled" mapstructure:"manual_actions_enabled"`
+	Lease                *InterpretationLeaseGovernanceOptions `json:"lease" mapstructure:"lease"`
+	Business             *RetryPolicyOptions                   `json:"business" mapstructure:"business"`
+	Outbox               *RetryPolicyOptions                   `json:"outbox" mapstructure:"outbox"`
 }
 
-// InterpretationLeaseGovernanceOptions keeps Interpretation Run lease duration and
-// the HA lease-recovery scan cadence in one governance block (IR-R011).
-//
-// Worst-case recovery after a worker crash (immediate post-claim crash):
-//
-//	run_duration + reconcile_interval + reconcile_interval*reconcile_jitter_fraction
-//
-// run_duration bounds how long a dead worker keeps the attempt; after expiry the
-// evaluation_consistency_reconcile scheduler may wait up to one scan period
-// (plus jitter) before reclaiming the same attempt number.
+// InterpretationLeaseGovernanceOptions owns the Interpretation Run lease
+// duration. Recovery cadence belongs to interpretation_lease_recovery.
 type InterpretationLeaseGovernanceOptions struct {
-	RunDuration             time.Duration `json:"run_duration" mapstructure:"run_duration"`
-	ReconcileInterval       time.Duration `json:"reconcile_interval" mapstructure:"reconcile_interval"`
-	ReconcileJitterFraction float64       `json:"reconcile_jitter_fraction" mapstructure:"reconcile_jitter_fraction"`
+	RunDuration time.Duration `json:"run_duration" mapstructure:"run_duration"`
 }
 
 func NewInterpretationLeaseGovernanceOptions() *InterpretationLeaseGovernanceOptions {
 	return &InterpretationLeaseGovernanceOptions{
-		RunDuration:             5 * time.Minute,
-		ReconcileInterval:       10 * time.Second,
-		ReconcileJitterFraction: 0,
+		RunDuration: 5 * time.Minute,
 	}
 }
 
@@ -51,33 +38,12 @@ func (o *InterpretationLeaseGovernanceOptions) normalized() *InterpretationLease
 	if normalized.RunDuration <= 0 {
 		normalized.RunDuration = defaults.RunDuration
 	}
-	if normalized.ReconcileInterval <= 0 {
-		normalized.ReconcileInterval = defaults.ReconcileInterval
-	}
-	if normalized.ReconcileJitterFraction < 0 {
-		normalized.ReconcileJitterFraction = defaults.ReconcileJitterFraction
-	}
 	return &normalized
 }
 
 // RunLeaseDuration returns the configured Interpretation Run lease, defaulting to 5m.
 func (o *InterpretationLeaseGovernanceOptions) RunLeaseDuration() time.Duration {
 	return o.normalized().RunDuration
-}
-
-// WorstCaseRecoveryWindowAfterExpiry upper-bounds the delay from lease expiry to
-// the next scheduled lease-recovery reclaim.
-func (o *InterpretationLeaseGovernanceOptions) WorstCaseRecoveryWindowAfterExpiry() time.Duration {
-	normalized := o.normalized()
-	jitter := time.Duration(float64(normalized.ReconcileInterval) * normalized.ReconcileJitterFraction)
-	return normalized.ReconcileInterval + jitter
-}
-
-// WorstCaseRecoveryWindowAfterCrash upper-bounds crash-to-reclaim when the worker
-// dies immediately after claiming the attempt.
-func (o *InterpretationLeaseGovernanceOptions) WorstCaseRecoveryWindowAfterCrash() time.Duration {
-	normalized := o.normalized()
-	return normalized.RunDuration + normalized.WorstCaseRecoveryWindowAfterExpiry()
 }
 
 type RetryPolicyOptions struct {
@@ -133,9 +99,8 @@ func NewSystemGovernanceOptions() *SystemGovernanceOptions {
 		Components: map[string]*GovernanceComponentOptions{},
 		Resilience: &ResilienceGovernanceOptions{},
 		Retry: &RetryGovernanceOptions{
-			ManualActionsEnabled:  true,
-			LeaseReconcileEnabled: true,
-			Lease:                 NewInterpretationLeaseGovernanceOptions(),
+			ManualActionsEnabled: true,
+			Lease:                NewInterpretationLeaseGovernanceOptions(),
 			Business: &RetryPolicyOptions{
 				MaxAutomaticAttempts: 3,
 				BaseDelay:            30 * time.Second,

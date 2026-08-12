@@ -4,17 +4,13 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	domainassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/outcome"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationconsistency"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -54,77 +50,55 @@ type mismatch struct {
 	DetectedAt        time.Time
 }
 
+type AuditBatchResult struct {
+	Scanned       int
+	Detected      int
+	NextCursor    uint64
+	CycleComplete bool
+}
+
 type Service interface {
-	AuditOnce(context.Context, int) (int, error)
-}
-
-// SubmittedCandidateReader is the scheduler-specific keyset scan port. It has
-// no user-facing pagination semantics.
-type SubmittedCandidateReader interface {
-	ListSubmittedAssessmentIDsAfter(context.Context, uint64, int) ([]uint64, error)
-}
-
-// LatestRunReader is optional; when nil, AuditOnce classifies without Run evidence.
-type LatestRunReader interface {
-	FindLatestByAssessmentID(ctx context.Context, assessmentID uint64) (*evalrun.EvaluationRun, error)
+	AuditBatch(context.Context, uint64, int) (AuditBatchResult, error)
 }
 
 type service struct {
-	assessments domainassessment.Repository
-	outcomes    domainoutcome.Repository
-	runs        LatestRunReader
 	consistency evaluationconsistency.Reader
-	reader      SubmittedCandidateReader
-	mu          sync.Mutex
-	cursor      uint64
 	now         func() time.Time
 }
 
 // NewService wires the complete read-only EV-R011 consistency matrix.
-func NewService(
-	assessments domainassessment.Repository,
-	outcomes domainoutcome.Repository,
-	reader SubmittedCandidateReader,
-	runs LatestRunReader,
-	consistency evaluationconsistency.Reader,
-) Service {
+func NewService(consistency evaluationconsistency.Reader) Service {
 	return &service{
-		assessments: assessments,
-		outcomes:    outcomes,
-		runs:        runs,
 		consistency: consistency,
-		reader:      reader,
 		now:         time.Now,
 	}
 }
 
-func (s *service) AuditOnce(ctx context.Context, limit int) (int, error) {
-	if s == nil || s.assessments == nil || s.outcomes == nil || s.reader == nil || s.runs == nil || s.consistency == nil {
-		return 0, fmt.Errorf("evaluation consistency audit is not configured: assessment, run, outcome, projection, outbox and candidate readers are required")
+func (s *service) AuditBatch(ctx context.Context, afterID uint64, limit int) (AuditBatchResult, error) {
+	if s == nil || s.consistency == nil {
+		return AuditBatchResult{}, fmt.Errorf("evaluation consistency audit is not configured: batch evidence reader is required")
 	}
 	if limit <= 0 {
-		return 0, nil
+		return AuditBatchResult{CycleComplete: true}, nil
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	ids, err := s.reader.ListSubmittedAssessmentIDsAfter(ctx, s.cursor, limit)
+	batch, err := s.consistency.ReadBatch(ctx, afterID, limit)
 	if err != nil {
-		return 0, err
-	}
-	if len(ids) == 0 {
-		s.cursor = 0
-		return 0, nil
+		return AuditBatchResult{}, err
 	}
 	detected := 0
-	for _, assessmentID := range ids {
-		if assessmentID == 0 {
+	for _, evidence := range batch.Items {
+		if evidence.AssessmentID == 0 {
 			continue
 		}
-		items, scanErr := s.scanOne(ctx, assessmentID)
-		if scanErr != nil {
-			return 0, scanErr
-		}
+		items := classifyDrifts(consistencyEvidence{
+			status:     domainassessment.Status(evidence.Status),
+			outcome:    evidence.Outcome,
+			run:        evidence.Run,
+			projection: evidence.Projection,
+			outbox:     evidence.Outbox,
+		}, s.now())
 		for _, item := range items {
+			item.AssessmentID = evidence.AssessmentID
 			observeMismatch(item.Kind)
 			observeDisposition(item.Kind, "deferred")
 			log.Warnf(
@@ -134,48 +108,15 @@ func (s *service) AuditOnce(ctx context.Context, limit int) (int, error) {
 			detected++
 		}
 	}
-	s.cursor = ids[len(ids)-1]
-	return detected, nil
-}
-
-func (s *service) scanOne(ctx context.Context, assessmentID uint64) ([]*mismatch, error) {
-	a, err := s.assessments.FindByID(ctx, domainassessment.NewID(assessmentID))
-	if err != nil || a == nil {
-		return nil, err
-	}
-	record, err := s.outcomes.FindByAssessmentID(ctx, meta.FromUint64(assessmentID))
-	if err != nil {
-		return nil, err
-	}
-	run, err := s.runs.FindLatestByAssessmentID(ctx, assessmentID)
-	if err != nil {
-		return nil, err
-	}
-	projection, err := s.consistency.FindProjectionEvidence(ctx, assessmentID)
-	if err != nil {
-		return nil, err
-	}
-	outbox, err := s.consistency.FindCommittedOutboxEvidence(ctx, assessmentID)
-	if err != nil {
-		return nil, err
-	}
-	items := classifyDrifts(consistencyEvidence{
-		status:     a.Status(),
-		outcome:    record,
-		run:        run,
-		projection: projection,
-		outbox:     outbox,
-	}, s.now())
-	for _, item := range items {
-		item.AssessmentID = assessmentID
-	}
-	return items, nil
+	return AuditBatchResult{
+		Scanned: len(batch.Items), Detected: detected, NextCursor: batch.NextCursor, CycleComplete: batch.CycleComplete,
+	}, nil
 }
 
 type consistencyEvidence struct {
 	status     domainassessment.Status
-	outcome    *domainoutcome.Record
-	run        *evalrun.EvaluationRun
+	outcome    *evaluationconsistency.OutcomeEvidence
+	run        *evaluationconsistency.RunEvidence
 	projection *evaluationconsistency.ProjectionEvidence
 	outbox     *evaluationconsistency.CommittedOutboxEvidence
 }
@@ -193,9 +134,9 @@ func classifyDrifts(evidence consistencyEvidence, now time.Time) []*mismatch {
 	runStatus := evalrun.Status("")
 	leaseExpired := false
 	if evidence.run != nil {
-		runStatus = evidence.run.Attempt().Status
+		runStatus = evalrun.Status(evidence.run.Status)
 		if runStatus == evalrun.StatusRunning {
-			if lease := evidence.run.LeaseExpiresAt(); lease != nil && !lease.After(now) {
+			if lease := evidence.run.LeaseExpiresAt; lease != nil && !lease.After(now) {
 				leaseExpired = true
 			}
 		}
@@ -209,8 +150,8 @@ func classifyDrifts(evidence consistencyEvidence, now time.Time) []*mismatch {
 			add(mismatchCommittedOutboxWithoutOutcome, severityHigh, "quarantine committed event and investigate missing canonical outcome")
 		}
 	} else {
-		outcomeID := evidence.outcome.ID().String()
-		if evidence.outcome.Model().Kind == modelcatalog.KindScale {
+		outcomeID := evidence.outcome.ID
+		if evidence.outcome.ModelKind == string(modelcatalog.KindScale) {
 			switch {
 			case evidence.projection == nil || evidence.projection.RowCount == 0:
 				add(mismatchProjectionMissing, severityMedium, "rebuild scale projection from the canonical outcome in an audited maintenance window")
@@ -228,11 +169,11 @@ func classifyDrifts(evidence consistencyEvidence, now time.Time) []*mismatch {
 			add(mismatchCommittedOutboxMissing, severityHigh, "stage a governed replay only after verifying the committed outcome")
 		case evidence.outbox.RowCount != 1 ||
 			evidence.outbox.OutcomeID != outcomeID ||
-			evidence.outbox.RunID != evidence.outcome.RunID():
+			evidence.outbox.RunID != evidence.outcome.RunID:
 			add(mismatchCommittedOutboxMismatch, severityHigh, "quarantine conflicting outbox evidence and require operator decision")
 		}
 
-		if evidence.run == nil || evidence.run.ID().String() != evidence.outcome.RunID() {
+		if evidence.run == nil || evidence.run.ID != evidence.outcome.RunID {
 			add(mismatchRunOutcomeReferenceMismatch, severityHigh, "locate the exact run referenced by the canonical outcome")
 		}
 	}
@@ -265,6 +206,3 @@ func observeMismatch(kind mismatchKind) {
 func observeDisposition(kind mismatchKind, disposition string) {
 	evaluationConsistencyDispositionTotal.WithLabelValues(string(kind), disposition).Inc()
 }
-
-// Ensure evaluationrun.Repository satisfies LatestRunReader when wired.
-var _ LatestRunReader = evaluationrun.Repository(nil)

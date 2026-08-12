@@ -877,9 +877,9 @@ Starter 使用 RunRepository 的原子 `ReclaimExpiredLease`：
 两种入口都可以触发过期 lease 恢复：
 
 1. 事件在 lease 过期后再次调用 Automation；
-2. apiserver 的 Evaluation consistency reconcile 调度器扫描 Interpretation 过期 lease，并根据 Generation 中的 OutcomeID 再次调用 Automation。
+2. apiserver 的 `InterpretationLeaseRecoveryRunner` 扫描 Interpretation 过期 lease，并根据 Generation 中的 OutcomeID 再次调用 Automation。
 
-当前生产配置启用 `lease_reconcile_enabled`，一致性调和任务按 `system_governance.retry.lease` 的 interval/jitter 执行；Run duration 也由同一配置块提供，默认 5 分钟。
+当前生产配置通过独立的 `interpretation_lease_recovery` 配置块每 10 秒执行一次、每批最多处理 100 条，并使用专属 leader lock；配置校验允许 10～30 秒。Run duration 仍由 `system_governance.retry.lease.run_duration` 提供，默认 5 分钟，但不再与恢复调度周期和锁混在同一个治理对象中。
 
 ### 17.5 Mongo 终态事务失败时的具体表现
 
@@ -1130,9 +1130,9 @@ failed event 携带完整 RetryDecision。Worker 对 `automatic` 保持进行中
 
 Redis 状态仍是可重建投影，Generation/Run/RetryDecision 才是治理事实源。
 
-### 23.6 lease 治理已统一
+### 23.6 lease 时长与恢复调度已解耦
 
-Run duration、reconcile interval 与 jitter 统一位于 `system_governance.retry.lease`，并提供过期后、进程崩溃后的最坏恢复窗口计算。默认 run duration 仍为 5 分钟，但不再硬编码在业务装配中。
+Run duration 位于 `system_governance.retry.lease.run_duration`，默认 5 分钟；恢复调度位于独立的 `interpretation_lease_recovery` 配置块，默认 10 秒、每批 100 条，并使用专属 leader lock。这样执行权时长仍由业务治理，而短周期恢复的频率、批量和 HA 失败边界由 runtime 单独治理。
 
 ### 23.7 Attention 投影具备持久补偿，当前治理入口关闭
 

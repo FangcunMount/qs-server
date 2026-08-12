@@ -39,7 +39,10 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateRateLimit(o.RateLimit)...)
 	errs = append(errs, validateBackpressureOptions(o.Backpressure)...)
 	errs = append(errs, validatePlanScheduler(o.PlanScheduler)...)
-	errs = append(errs, validateEvaluationConsistencyReconcile(o.EvaluationConsistencyReconcile)...)
+	errs = append(errs, validateEvaluationConsistencyAudit(o.EvaluationConsistencyAudit)...)
+	errs = append(errs, validateLeaseRecovery("evaluation_lease_recovery", o.EvaluationLeaseRecovery)...)
+	errs = append(errs, validateLeaseRecovery("interpretation_lease_recovery", o.InterpretationLeaseRecovery)...)
+	errs = append(errs, validateEvaluationMaintenanceLockIsolation(o)...)
 	errs = append(errs, validateReportCatalogAudit(o.ReportCatalogAudit)...)
 	errs = append(errs, validateOutboxRelay(o.OutboxRelay, o.MySQLOptions.MaxOpenConnections, o.Backpressure)...)
 	errs = append(errs, validateStatisticsSync(o.StatisticsSync)...)
@@ -142,12 +145,6 @@ func validateRetryGovernance(opts *SystemGovernanceOptions) []error {
 	if lease := opts.Retry.Lease; lease != nil {
 		if lease.RunDuration <= 0 {
 			errs = append(errs, fmt.Errorf("system_governance.retry.lease.run_duration must be greater than 0"))
-		}
-		if lease.ReconcileInterval <= 0 {
-			errs = append(errs, fmt.Errorf("system_governance.retry.lease.reconcile_interval must be greater than 0"))
-		}
-		if lease.ReconcileJitterFraction < 0 || lease.ReconcileJitterFraction > 1 {
-			errs = append(errs, fmt.Errorf("system_governance.retry.lease.reconcile_jitter_fraction must be between 0 and 1"))
 		}
 	}
 	return errs
@@ -253,25 +250,90 @@ func validatePlanScheduler(opts *PlanSchedulerOptions) []error {
 	return errs
 }
 
-func validateEvaluationConsistencyReconcile(opts *EvaluationConsistencyReconcileOptions) []error {
+func validateEvaluationConsistencyAudit(opts *EvaluationConsistencyAuditOptions) []error {
 	if opts == nil || !opts.Enable {
+		return nil
+	}
+	var errs []error
+	if opts.InitialDelay < 0 {
+		errs = append(errs, fmt.Errorf("evaluation_consistency_audit.initial_delay cannot be negative"))
+	}
+	if opts.BatchInterval <= 0 {
+		errs = append(errs, fmt.Errorf("evaluation_consistency_audit.batch_interval must be greater than 0"))
+	}
+	if opts.CycleInterval < 6*time.Hour || opts.CycleInterval > 24*time.Hour {
+		errs = append(errs, fmt.Errorf("evaluation_consistency_audit.cycle_interval must be between 6h and 24h"))
+	}
+	if opts.BatchSize <= 0 {
+		errs = append(errs, fmt.Errorf("evaluation_consistency_audit.batch_size must be greater than 0"))
+	}
+	if opts.BatchTimeout <= 0 {
+		errs = append(errs, fmt.Errorf("evaluation_consistency_audit.batch_timeout must be greater than 0"))
+	}
+	if opts.LockKey == "" {
+		errs = append(errs, fmt.Errorf("evaluation_consistency_audit.lock_key cannot be empty when enabled"))
+	}
+	if opts.LockTTL <= 0 {
+		errs = append(errs, fmt.Errorf("evaluation_consistency_audit.lock_ttl must be greater than 0"))
+	}
+	return errs
+}
+
+func validateLeaseRecovery(name string, opts *LeaseRecoveryOptions) []error {
+	if opts == nil || !opts.Enable {
+		return nil
+	}
+	var errs []error
+	if opts.Interval < 10*time.Second || opts.Interval > 30*time.Second {
+		errs = append(errs, fmt.Errorf("%s.interval must be between 10s and 30s", name))
+	}
+	if opts.BatchLimit <= 0 {
+		errs = append(errs, fmt.Errorf("%s.batch_limit must be greater than 0", name))
+	}
+	if opts.LockKey == "" {
+		errs = append(errs, fmt.Errorf("%s.lock_key cannot be empty when enabled", name))
+	}
+	if opts.LockTTL <= 0 {
+		errs = append(errs, fmt.Errorf("%s.lock_ttl must be greater than 0", name))
+	}
+	return errs
+}
+
+func validateEvaluationMaintenanceLockIsolation(opts *Options) []error {
+	if opts == nil {
+		return nil
+	}
+	keys := make(map[string]string, 3)
+	add := func(name, key string, enabled bool) []error {
+		if !enabled || strings.TrimSpace(key) == "" {
+			return nil
+		}
+		if owner, exists := keys[key]; exists {
+			return []error{fmt.Errorf("%s.lock_key must be independent from %s.lock_key", name, owner)}
+		}
+		keys[key] = name
 		return nil
 	}
 
 	var errs []error
-	if opts.Interval <= 0 {
-		errs = append(errs, fmt.Errorf("evaluation_consistency_reconcile.interval must be greater than 0"))
-	}
-	if opts.BatchLimit <= 0 {
-		errs = append(errs, fmt.Errorf("evaluation_consistency_reconcile.batch_limit must be greater than 0"))
-	}
-	if opts.LockKey == "" {
-		errs = append(errs, fmt.Errorf("evaluation_consistency_reconcile.lock_key cannot be empty when enabled"))
-	}
-	if opts.LockTTL <= 0 {
-		errs = append(errs, fmt.Errorf("evaluation_consistency_reconcile.lock_ttl must be greater than 0"))
-	}
+	errs = append(errs, add("evaluation_consistency_audit", optionLockKey(opts.EvaluationConsistencyAudit), opts.EvaluationConsistencyAudit != nil && opts.EvaluationConsistencyAudit.Enable)...)
+	errs = append(errs, add("evaluation_lease_recovery", leaseRecoveryLockKey(opts.EvaluationLeaseRecovery), opts.EvaluationLeaseRecovery != nil && opts.EvaluationLeaseRecovery.Enable)...)
+	errs = append(errs, add("interpretation_lease_recovery", leaseRecoveryLockKey(opts.InterpretationLeaseRecovery), opts.InterpretationLeaseRecovery != nil && opts.InterpretationLeaseRecovery.Enable)...)
 	return errs
+}
+
+func optionLockKey(opts *EvaluationConsistencyAuditOptions) string {
+	if opts == nil {
+		return ""
+	}
+	return opts.LockKey
+}
+
+func leaseRecoveryLockKey(opts *LeaseRecoveryOptions) string {
+	if opts == nil {
+		return ""
+	}
+	return opts.LockKey
 }
 
 func validateReportCatalogAudit(opts *ReportCatalogAuditOptions) []error {

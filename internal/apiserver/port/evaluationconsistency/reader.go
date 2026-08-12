@@ -2,7 +2,40 @@
 // Evaluation consistency scheduler. It intentionally exposes no repair ports.
 package evaluationconsistency
 
-import "context"
+import (
+	"context"
+	"time"
+)
+
+// OutcomeEvidence is the minimal canonical Outcome identity needed by the
+// consistency audit. Large report_input_json and payload_json values are
+// deliberately excluded from this read model.
+type OutcomeEvidence struct {
+	ID        string
+	RunID     string
+	ModelKind string
+}
+
+type RunEvidence struct {
+	ID             string
+	Status         string
+	LeaseExpiresAt *time.Time
+}
+
+type AssessmentEvidence struct {
+	AssessmentID uint64
+	Status       string
+	Outcome      *OutcomeEvidence
+	Run          *RunEvidence
+	Projection   *ProjectionEvidence
+	Outbox       *CommittedOutboxEvidence
+}
+
+type Batch struct {
+	Items         []AssessmentEvidence
+	NextCursor    uint64
+	CycleComplete bool
+}
 
 type ProjectionEvidence struct {
 	RowCount             int64
@@ -19,6 +52,5 @@ type CommittedOutboxEvidence struct {
 }
 
 type Reader interface {
-	FindProjectionEvidence(context.Context, uint64) (*ProjectionEvidence, error)
-	FindCommittedOutboxEvidence(context.Context, uint64) (*CommittedOutboxEvidence, error)
+	ReadBatch(context.Context, uint64, int) (Batch, error)
 }
