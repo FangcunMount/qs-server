@@ -84,9 +84,9 @@ func execute(ctx context.Context, opts runOptions) (RunSummary, int, error) {
 		return finishSetupError(opts, runDir, runID, gitSHA, gitDirty, startedAt, effectiveConfig, environmentLabel(config), k6Version, err)
 	}
 	if opts.DryRun {
-		fmt.Fprintf(opts.Stdout, "run_id=%s plan=%s output=%s\n", runID, opts.Plan, runDir)
+		_, _ = fmt.Fprintf(opts.Stdout, "run_id=%s plan=%s output=%s\n", runID, opts.Plan, runDir)
 		for _, phase := range phases {
-			fmt.Fprintf(opts.Stdout, "%s profile=%s target=%d duration=%s tier=%s\n", phase.ID, phase.Profile, phase.TargetQPS, phase.Duration, phase.ThresholdTier)
+			_, _ = fmt.Fprintf(opts.Stdout, "%s profile=%s target=%d duration=%s tier=%s\n", phase.ID, phase.Profile, phase.TargetQPS, phase.Duration, phase.ThresholdTier)
 		}
 		return RunSummary{SchemaVersion: reportSchemaVersion, Run: RunMetadata{ID: runID, Plan: opts.Plan, GitSHA: gitSHA, GitDirty: gitDirty, K6Version: k6Version, StartedAt: startedAt, FinishedAt: time.Now(), ConfigFile: effectiveConfig}}, 0, nil
 	}
@@ -117,7 +117,7 @@ func execute(ctx context.Context, opts runOptions) (RunSummary, int, error) {
 				summary.Recovery = append(summary.Recovery, RecoverySummary{
 					ID: "pre-admission-300", Verdict: prerequisite, StartedAt: now, FinishedAt: now,
 				})
-				fmt.Fprintf(opts.Stdout, "\nadmission_300 skipped: %s\n", strings.Join(prerequisite.Reasons, "; "))
+				_, _ = fmt.Fprintf(opts.Stdout, "\nadmission_300 skipped: %s\n", strings.Join(prerequisite.Reasons, "; "))
 				break
 			}
 			recovery := waitForRecovery(ctx, opts, runDir, "pre-admission-300", baselineEvidence, filepath.Join(runDir, "capacity_280"))
@@ -169,7 +169,7 @@ func execute(ctx context.Context, opts runOptions) (RunSummary, int, error) {
 				rawByPhase[spec.ID] = decoded
 			}
 		}
-		fmt.Fprint(opts.Stdout, renderPhaseConsole(phase))
+		_, _ = fmt.Fprint(opts.Stdout, renderPhaseConsole(phase))
 		if phase.Verdict.Status == VerdictFail || phase.Verdict.Status == VerdictError {
 			stop = true
 		}
@@ -184,7 +184,7 @@ func execute(ctx context.Context, opts runOptions) (RunSummary, int, error) {
 	if err := writeRunArtifacts(runDir, summary, rawByPhase, baselineEvidence); err != nil {
 		return summary, 4, err
 	}
-	fmt.Fprintf(opts.Stdout, "\nK6 admission result: %s\nreport: %s\n", summary.Verdict.Status, filepath.Join(runDir, "report.md"))
+	_, _ = fmt.Fprintf(opts.Stdout, "\nK6 admission result: %s\nreport: %s\n", summary.Verdict.Status, filepath.Join(runDir, "report.md"))
 	return summary, exitCodeForVerdict(summary.Verdict.Status), nil
 }
 
@@ -230,7 +230,7 @@ func finishSetupError(opts runOptions, runDir, runID, gitSHA string, gitDirty bo
 	if err := writeRunArtifacts(runDir, summary, map[string]any{}, PhaseEvidence{}); err != nil {
 		return summary, 4, errors.Join(cause, err)
 	}
-	fmt.Fprintf(opts.Stdout, "\nK6 admission result: %s\nreport: %s\n", summary.Verdict.Status, filepath.Join(runDir, "report.md"))
+	_, _ = fmt.Fprintf(opts.Stdout, "\nK6 admission result: %s\nreport: %s\n", summary.Verdict.Status, filepath.Join(runDir, "report.md"))
 	return summary, 4, cause
 }
 
@@ -316,7 +316,7 @@ func runK6(ctx context.Context, opts runOptions, configFile, runID string, spec 
 	if errors.As(err, &exitErr) {
 		return exitErr.ExitCode()
 	}
-	fmt.Fprintf(opts.Stderr, "k6 execution error: %v\n", err)
+	_, _ = fmt.Fprintf(opts.Stderr, "k6 execution error: %v\n", err)
 	return 127
 }
 
@@ -460,11 +460,11 @@ func runDiagnostic(ctx context.Context, opts runOptions) (RunSummary, int, error
 			keys = append(keys, key)
 		}
 		sort.Strings(keys)
-		fmt.Fprintf(opts.Stderr, "CASE must be one of:\n  %s\n", strings.Join(keys, "\n  "))
+		_, _ = fmt.Fprintf(opts.Stderr, "CASE must be one of:\n  %s\n", strings.Join(keys, "\n  "))
 		return RunSummary{}, 4, nil
 	}
 	if opts.DryRun {
-		fmt.Fprintf(opts.Stdout, "%s %s %s\n", strings.Join(caseSpec.Env, " "), caseSpec.Command, strings.Join(caseSpec.Args, " "))
+		_, _ = fmt.Fprintf(opts.Stdout, "%s %s %s\n", strings.Join(caseSpec.Env, " "), caseSpec.Command, strings.Join(caseSpec.Args, " "))
 		return RunSummary{}, 0, nil
 	}
 	startedAt := time.Now()
@@ -478,7 +478,7 @@ func runDiagnostic(ctx context.Context, opts runOptions) (RunSummary, int, error
 	if err != nil {
 		return RunSummary{}, 4, err
 	}
-	defer logFile.Close()
+	defer func() { _ = logFile.Close() }()
 	command := exec.CommandContext(ctx, filepath.Join(opts.Root, caseSpec.Command), caseSpec.Args...)
 	command.Dir = opts.Root
 	command.Env = append(os.Environ(), caseSpec.Env...)
@@ -505,7 +505,7 @@ func runDiagnostic(ctx context.Context, opts runOptions) (RunSummary, int, error
 	if err := writeRunArtifacts(runDir, summary, raw, PhaseEvidence{}); err != nil {
 		return summary, 4, err
 	}
-	fmt.Fprintf(opts.Stdout, "\nK6 diagnostic result: %s\nreport: %s\n", summary.Verdict.Status, filepath.Join(runDir, "report.md"))
+	_, _ = fmt.Fprintf(opts.Stdout, "\nK6 diagnostic result: %s\nreport: %s\n", summary.Verdict.Status, filepath.Join(runDir, "report.md"))
 	return summary, exitCodeForVerdict(summary.Verdict.Status), nil
 }
 

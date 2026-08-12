@@ -10,7 +10,7 @@ import (
 )
 
 // ErrLimitExceeded 定义了限制超出错误
-var ErrLimitExceeded = errors.New("Limit exceeded")
+var ErrLimitExceeded = errors.New("limit exceeded")
 
 type LimitOptions struct {
 	Component string

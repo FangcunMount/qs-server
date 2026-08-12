@@ -273,7 +273,7 @@ func parsePrometheusFile(path string) ([]metricSample, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	result := make([]metricSample, 0)
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
