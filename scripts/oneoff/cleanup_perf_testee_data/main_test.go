@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"errors"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -39,6 +41,54 @@ func TestValidateBackupSuffixChecksGeneratedMySQLIdentifiers(t *testing.T) {
 		if len(name) > mysqlIdentifierMaxLength {
 			t.Fatalf("backup table name %q length=%d, want <=%d", name, len(name), mysqlIdentifierMaxLength)
 		}
+	}
+}
+
+func TestBackupMySQLTableOmitsGeneratedColumnsFromInsert(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	ctx := context.Background()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	item := mysqlBackupItem{
+		table:     "plan_enrollment",
+		selectSQL: `SELECT e.* FROM plan_enrollment e`,
+	}
+	backupTable := "cbpt_plan_enrollment_s812v3"
+	mock.ExpectExec(regexp.QuoteMeta("CREATE TABLE IF NOT EXISTS `cbpt_plan_enrollment_s812v3` LIKE `plan_enrollment`")).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectQuery(regexp.QuoteMeta(mysqlBackupColumnsQuery)).
+		WithArgs("plan_enrollment").
+		WillReturnRows(sqlmock.NewRows([]string{"column_name", "generation_expression"}).
+			AddRow("id", "").
+			AddRow("status", "").
+			AddRow("active_slot", "case when (`status` = _utf8mb4'active') then 1 else NULL end"))
+	mock.ExpectExec(regexp.QuoteMeta(
+		"INSERT IGNORE INTO `cbpt_plan_enrollment_s812v3` (`id`, `status`) " +
+			"SELECT `backup_source`.`id`, `backup_source`.`status` " +
+			"FROM (SELECT e.* FROM plan_enrollment e) AS `backup_source`",
+	)).WillReturnResult(sqlmock.NewResult(0, 1))
+
+	if err := backupMySQLTable(ctx, conn, item, backupTable); err != nil {
+		t.Fatal(err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMySQLBackupInsertSQLRejectsUnsafeColumnName(t *testing.T) {
+	_, err := mysqlBackupInsertSQL("cbpt_testee_s812v3", "SELECT t.* FROM testee t", []string{"id`, active_slot"})
+	if err == nil || !strings.Contains(err.Error(), "unsafe MySQL identifier") {
+		t.Fatalf("error = %v, want unsafe identifier error", err)
 	}
 }
 

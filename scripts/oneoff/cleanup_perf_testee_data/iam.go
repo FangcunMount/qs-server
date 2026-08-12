@@ -178,11 +178,8 @@ func backupIAMRows(ctx context.Context, conn *sql.Conn, suffix string, expected 
 		if err != nil {
 			return err
 		}
-		if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s` LIKE `%s`", backupTable, item.table)); err != nil {
-			return fmt.Errorf("create IAM backup table %s: %w", backupTable, err)
-		}
-		if _, err := conn.ExecContext(ctx, fmt.Sprintf("INSERT IGNORE INTO `%s` %s", backupTable, item.selectSQL)); err != nil {
-			return fmt.Errorf("insert IAM backup table %s: %w", backupTable, err)
+		if err := backupMySQLTable(ctx, conn, item, backupTable); err != nil {
+			return fmt.Errorf("backup IAM table %s: %w", item.table, err)
 		}
 		var count int
 		if err := conn.QueryRowContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM `%s`", backupTable)).Scan(&count); err != nil {

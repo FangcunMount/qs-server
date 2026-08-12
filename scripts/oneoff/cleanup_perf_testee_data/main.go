@@ -87,6 +87,11 @@ type mysqlBackupItem struct {
 	selectSQL string
 }
 
+type mysqlBackupColumns struct {
+	insertable []string
+	generated  []string
+}
+
 type mysqlDeleteItem struct {
 	name string
 	stmt string
@@ -1388,18 +1393,104 @@ func backupMySQLRows(ctx context.Context, conn *sql.Conn, suffix string) error {
 			if err != nil {
 				return err
 			}
-			if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s` LIKE `%s`", backupTable, item.table)); err != nil {
-				return fmt.Errorf("create backup table %s: %w", backupTable, err)
-			}
-			if _, err := conn.ExecContext(ctx, fmt.Sprintf("INSERT IGNORE INTO `%s` %s", backupTable, item.selectSQL)); err != nil {
-				return fmt.Errorf("insert backup table %s: %w", backupTable, err)
-			}
-			return nil
+			return backupMySQLTable(ctx, conn, item, backupTable)
 		}); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+const mysqlBackupColumnsQuery = `
+SELECT column_name, generation_expression
+FROM information_schema.columns
+WHERE table_schema = DATABASE()
+  AND table_name = ?
+ORDER BY ordinal_position`
+
+func backupMySQLTable(ctx context.Context, conn *sql.Conn, item mysqlBackupItem, backupTable string) error {
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s` LIKE `%s`", backupTable, item.table)); err != nil {
+		return fmt.Errorf("create backup table %s: %w", backupTable, err)
+	}
+	columns, err := loadMySQLBackupColumns(ctx, conn, item.table)
+	if err != nil {
+		return fmt.Errorf("load backup columns for %s: %w", item.table, err)
+	}
+	insertSQL, err := mysqlBackupInsertSQL(backupTable, item.selectSQL, columns.insertable)
+	if err != nil {
+		return fmt.Errorf("build backup insert for %s: %w", item.table, err)
+	}
+	if _, err := conn.ExecContext(ctx, insertSQL); err != nil {
+		return fmt.Errorf("insert backup table %s: %w", backupTable, err)
+	}
+	if len(columns.generated) > 0 {
+		log.Printf("mysql backup: source=%s backup=%s generated_columns_recomputed=%s",
+			item.table, backupTable, strings.Join(columns.generated, ","))
+	}
+	return nil
+}
+
+func loadMySQLBackupColumns(ctx context.Context, conn *sql.Conn, table string) (mysqlBackupColumns, error) {
+	rows, err := conn.QueryContext(ctx, mysqlBackupColumnsQuery, table)
+	if err != nil {
+		return mysqlBackupColumns{}, err
+	}
+	defer rows.Close()
+
+	var columns mysqlBackupColumns
+	for rows.Next() {
+		var name string
+		var generationExpression sql.NullString
+		if err := rows.Scan(&name, &generationExpression); err != nil {
+			return mysqlBackupColumns{}, err
+		}
+		if generationExpression.Valid && strings.TrimSpace(generationExpression.String) != "" {
+			columns.generated = append(columns.generated, name)
+			continue
+		}
+		columns.insertable = append(columns.insertable, name)
+	}
+	if err := rows.Err(); err != nil {
+		return mysqlBackupColumns{}, err
+	}
+	if len(columns.insertable) == 0 {
+		return mysqlBackupColumns{}, fmt.Errorf("table %s has no insertable columns", table)
+	}
+	return columns, nil
+}
+
+func mysqlBackupInsertSQL(backupTable, selectSQL string, columns []string) (string, error) {
+	if len(columns) == 0 {
+		return "", errors.New("empty insertable column list")
+	}
+	destinationColumns := make([]string, 0, len(columns))
+	sourceColumns := make([]string, 0, len(columns))
+	for _, column := range columns {
+		quoted, err := quoteMySQLIdentifier(column)
+		if err != nil {
+			return "", err
+		}
+		destinationColumns = append(destinationColumns, quoted)
+		sourceColumns = append(sourceColumns, "`backup_source`."+quoted)
+	}
+	return fmt.Sprintf(
+		"INSERT IGNORE INTO `%s` (%s) SELECT %s FROM (%s) AS `backup_source`",
+		backupTable,
+		strings.Join(destinationColumns, ", "),
+		strings.Join(sourceColumns, ", "),
+		selectSQL,
+	), nil
+}
+
+func quoteMySQLIdentifier(name string) (string, error) {
+	ok, err := regexp.MatchString(`^[A-Za-z0-9_]+$`, name)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		return "", fmt.Errorf("unsafe MySQL identifier %q", name)
+	}
+	return "`" + name + "`", nil
 }
 
 func mysqlBackupItems() []mysqlBackupItem {

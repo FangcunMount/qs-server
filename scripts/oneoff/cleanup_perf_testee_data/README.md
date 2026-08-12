@@ -43,6 +43,8 @@ go run ./scripts/oneoff/cleanup_perf_testee_data \
 
 内置 MySQL 备份表使用短前缀 `cbpt_`；工具在创建任何备份对象前，会根据 MySQL 64 字符
 标识符上限校验 `--backup-suffix`，避免并发备份启动后才因表名过长留下部分备份。
+备份插入会从 `information_schema.columns` 读取源表列，显式排除生成列；备份表通过
+`CREATE TABLE ... LIKE` 保留生成列表达式，由 MySQL 根据普通列重新计算其值。
 
 IAM 删除发生在 QS/MySQL 和 Mongo 成功之后。若中途已删 QS 但尚未删 IAM，可用同一份
 Testee/Profile 清单、同一备份后缀，加 `--mongo-only --allow-missing-testees` 恢复执行。
