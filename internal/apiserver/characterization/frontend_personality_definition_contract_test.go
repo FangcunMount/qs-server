@@ -45,7 +45,9 @@ func TestFrontendDefinitionV2ContractValidatesBuildsAndExecutes(t *testing.T) {
 		{Code: "q_care", Type: "Radio", OptionCodes: []string{"low", "high"}},
 	}}
 	if issues := modeltypology.ValidateRuntimeSpecForPublishWithContext(payload.Runtime, questionnaire, modeltypology.RuntimeSpecValidationContext{
-		Algorithm: payload.Algorithm, Outcomes: payload.Outcomes,
+		Algorithm:          payload.Algorithm,
+		Outcomes:           payload.Outcomes,
+		PublishedTemplates: frontendPublishedTemplates(),
 	}); modelcatalog.HasValidationErrors(issues) {
 		t.Fatalf("server publish validation issues: %#v", issues)
 	}
@@ -87,7 +89,11 @@ func TestFrontendOptionOverrideContractExecutesWithSignAndWeight(t *testing.T) {
 	}
 	payload := frontendRuntimePayload(t, definition, "FRONTEND_OVERRIDE")
 	questionnaire := modeltypology.QuestionnaireSnapshot{Questions: []modeltypology.QuestionSnapshot{{Code: "q_override", Type: "Radio", OptionCodes: []string{"A", "B"}}}}
-	if issues := modeltypology.ValidateRuntimeSpecForPublishWithContext(payload.Runtime, questionnaire, modeltypology.RuntimeSpecValidationContext{Algorithm: payload.Algorithm, Outcomes: payload.Outcomes}); modelcatalog.HasValidationErrors(issues) {
+	if issues := modeltypology.ValidateRuntimeSpecForPublishWithContext(payload.Runtime, questionnaire, modeltypology.RuntimeSpecValidationContext{
+		Algorithm:          payload.Algorithm,
+		Outcomes:           payload.Outcomes,
+		PublishedTemplates: frontendPublishedTemplates(),
+	}); modelcatalog.HasValidationErrors(issues) {
 		t.Fatalf("publish validation issues: %#v", issues)
 	}
 	result, err := frontendContractEvaluator().Score(payload, definition, &evalinput.AnswerSheet{Answers: []evalinput.Answer{{QuestionCode: "q_override", Value: "A", Score: 99}}})
@@ -109,7 +115,11 @@ func TestFrontendImplicitScoringContractIsRejected(t *testing.T) {
 	}
 	payload := frontendRuntimePayload(t, definition, "FRONTEND_LEGACY")
 	questionnaire := modeltypology.QuestionnaireSnapshot{Questions: []modeltypology.QuestionSnapshot{{Code: "q_legacy", Type: "Radio", OptionCodes: []string{"A", "B"}}}}
-	issues := modeltypology.ValidateRuntimeSpecForPublishWithContext(payload.Runtime, questionnaire, modeltypology.RuntimeSpecValidationContext{Algorithm: payload.Algorithm, Outcomes: payload.Outcomes})
+	issues := modeltypology.ValidateRuntimeSpecForPublishWithContext(payload.Runtime, questionnaire, modeltypology.RuntimeSpecValidationContext{
+		Algorithm:          payload.Algorithm,
+		Outcomes:           payload.Outcomes,
+		PublishedTemplates: frontendPublishedTemplates(),
+	})
 	if !modelcatalog.HasValidationErrors(issues) || !hasIssueCode(issues, "scoring_mode.required") {
 		t.Fatalf("issues = %#v, want blocking scoring_mode.required", issues)
 	}
@@ -120,6 +130,17 @@ func TestFrontendImplicitScoringContractIsRejected(t *testing.T) {
 
 func frontendContractEvaluator() configured.Evaluator {
 	return configured.NewEvaluatorWithDetails(configured.DefaultDetailAssemblerRegistry())
+}
+
+type frontendPublishedTemplateLookup map[string]struct{}
+
+func (l frontendPublishedTemplateLookup) IsPublished(templateID, version string) bool {
+	_, ok := l[templateID+"|"+version]
+	return ok
+}
+
+func frontendPublishedTemplates() modeltypology.PublishedTemplateLookup {
+	return frontendPublishedTemplateLookup{"mbti|2026-08-v1": {}}
 }
 
 func loadFrontendDefinition(t *testing.T, name string) (*modeldefinition.Definition, bool) {
