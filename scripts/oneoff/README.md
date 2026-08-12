@@ -30,6 +30,7 @@
 | 工具 | 用途 |
 | --- | --- |
 | `cleanup_perf_testee_data` | 按显式 Testee ID dry-run、备份并清理压测数据 |
+| `select_seeddata_duplicate_testees` | 只读识别 seeddata 重试产生的重复 Testee，并生成显式 Testee/Profile 清单 |
 | `cleanup_orphaned_assessment_documents` | 对账并清理缺少 MySQL Assessment 的 Mongo 报告/答卷 |
 | `rebuild_statistics` | 通过受保护 Run API 执行 validate、repair 或 publish |
 | `repair_stranded_plan_tasks` | 审计、修复、验证及 CAS 回滚历史 stale pending 与 Task due_at |

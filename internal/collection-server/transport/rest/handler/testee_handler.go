@@ -1,23 +1,30 @@
 package handler
 
 import (
+	"context"
+	"fmt"
 	"strconv"
+	"strings"
 
-	"github.com/FangcunMount/component-base/pkg/log"
+	identityv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/identity/v2"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/testee"
-	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	"github.com/gin-gonic/gin"
 )
+
+type userProfileReader interface {
+	IsEnabled() bool
+	GetUserProfiles(ctx context.Context, userID string) (*identityv2.ListProfilesResponse, error)
+}
 
 // TesteeHandler 受试者处理器
 type TesteeHandler struct {
 	*BaseHandler
 	testeeService      *testee.Service
-	profileLinkService *iam.ProfileLinkService
+	profileLinkService userProfileReader
 }
 
 // NewTesteeHandler 创建受试者处理器
-func NewTesteeHandler(testeeService *testee.Service, profileLinkService *iam.ProfileLinkService) *TesteeHandler {
+func NewTesteeHandler(testeeService *testee.Service, profileLinkService userProfileReader) *TesteeHandler {
 	return &TesteeHandler{
 		BaseHandler:        NewBaseHandler(),
 		testeeService:      testeeService,
@@ -187,23 +194,10 @@ func (h *TesteeHandler) List(c *gin.Context) {
 		return
 	}
 
-	// 从 IAM SDK 获取当前用户的所有 ProfileID 列表
-	profileIDs := []uint64{}
-	if h.profileLinkService != nil && h.profileLinkService.IsEnabled() {
-		userIDStr := strconv.FormatUint(userID, 10)
-		profilesResp, err := h.profileLinkService.GetUserProfiles(c.Request.Context(), userIDStr)
-		if err != nil {
-			log.Warnf("Failed to get user profiles from IAM: %v, will return empty list", err)
-			// 不返回错误，允许继续查询（返回空列表）
-		} else if profilesResp != nil && len(profilesResp.Items) > 0 {
-			for _, edge := range profilesResp.Items {
-				if edge.Profile != nil && edge.Profile.Id != "" {
-					if profileID, err := strconv.ParseUint(edge.Profile.Id, 10, 64); err == nil {
-						profileIDs = append(profileIDs, profileID)
-					}
-				}
-			}
-		}
+	profileIDs, err := loadUserProfileIDs(c.Request.Context(), h.profileLinkService, userID)
+	if err != nil {
+		h.InternalErrorResponse(c, "get user profiles from IAM failed", err)
+		return
 	}
 
 	result, err := h.testeeService.ListMyTestees(c.Request.Context(), profileIDs, &req)
@@ -213,6 +207,36 @@ func (h *TesteeHandler) List(c *gin.Context) {
 	}
 
 	h.Success(c, result)
+}
+
+func loadUserProfileIDs(ctx context.Context, reader userProfileReader, userID uint64) ([]uint64, error) {
+	if reader == nil || !reader.IsEnabled() {
+		return []uint64{}, nil
+	}
+	resp, err := reader.GetUserProfiles(ctx, strconv.FormatUint(userID, 10))
+	if err != nil {
+		return nil, fmt.Errorf("get user %d profiles: %w", userID, err)
+	}
+	if resp == nil {
+		return nil, fmt.Errorf("get user %d profiles: IAM returned nil response", userID)
+	}
+	if resp.Total < 0 || int(resp.Total) != len(resp.Items) {
+		return nil, fmt.Errorf("get user %d profiles: incomplete IAM response total=%d items=%d", userID, resp.Total, len(resp.Items))
+	}
+
+	profileIDs := make([]uint64, 0, len(resp.Items))
+	for index, edge := range resp.Items {
+		if edge == nil || edge.Profile == nil {
+			return nil, fmt.Errorf("get user %d profiles: item %d is missing profile", userID, index)
+		}
+		rawID := strings.TrimSpace(edge.Profile.Id)
+		profileID, parseErr := strconv.ParseUint(rawID, 10, 64)
+		if parseErr != nil || profileID == 0 {
+			return nil, fmt.Errorf("get user %d profiles: item %d has invalid profile id %q", userID, index, rawID)
+		}
+		profileIDs = append(profileIDs, profileID)
+	}
+	return profileIDs, nil
 }
 
 // Exists 检查受试者是否存在

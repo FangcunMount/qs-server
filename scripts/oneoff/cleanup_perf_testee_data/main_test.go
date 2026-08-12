@@ -84,7 +84,7 @@ func TestMongoOutboxFiltersAreChunked(t *testing.T) {
 }
 
 func TestMySQLOutboxScopeStatementsConstrainAggregateType(t *testing.T) {
-	statements := mysqlOutboxScopeStatements(config{})
+	statements := mysqlOutboxScopeStatements()
 	required := map[string]string{
 		"mysql outbox ids from assessment aggregate":  "o.aggregate_type = 'Assessment'",
 		"mysql outbox ids from report aggregate":      "o.aggregate_type = 'Report'",
@@ -112,21 +112,42 @@ func TestMySQLOutboxScopeStatementsConstrainAggregateType(t *testing.T) {
 	}
 }
 
-func TestMySQLOutboxScopePayloadScanIsExplicitOptIn(t *testing.T) {
-	defaultStatements := mysqlOutboxScopeStatements(config{})
-	for _, statement := range defaultStatements {
-		if strings.Contains(statement.name, "payload_json") {
-			t.Fatalf("payload_json statement %q should not be enabled by default", statement.name)
+func TestMySQLOutboxScopeNeverUsesPerTesteePayloadRegexpJoin(t *testing.T) {
+	for _, statement := range mysqlOutboxScopeStatements() {
+		if strings.Contains(statement.sql, "payload_json") || strings.Contains(statement.sql, "REGEXP") {
+			t.Fatalf("outbox scope statement %q must not scan payload_json in SQL: %s", statement.name, statement.sql)
 		}
 	}
+}
 
-	optInStatements := mysqlOutboxScopeStatements(config{scanEventPayloads: true})
-	var outboxPayload bool
-	for _, statement := range optInStatements {
-		outboxPayload = outboxPayload || statement.name == "mysql outbox ids from payload_json"
+func TestPayloadContainsTesteeID(t *testing.T) {
+	targets := map[uint64]struct{}{631727129519731246: {}}
+	tests := []struct {
+		name    string
+		payload string
+		want    bool
+	}{
+		{name: "numeric nested", payload: `{"data":{"testee_id":631727129519731246}}`, want: true},
+		{name: "string nested in array", payload: `{"items":[{"testee_id":"631727129519731246"}]}`, want: true},
+		{name: "other testee", payload: `{"testee_id":631727129519731247}`},
+		{name: "similar key", payload: `{"canonical_testee_id":631727129519731246}`},
 	}
-	if !outboxPayload {
-		t.Fatal("scanEventPayloads should add the outbox payload_json statement")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := payloadContainsTesteeID([]byte(tt.payload), targets)
+			if err != nil {
+				t.Fatalf("payloadContainsTesteeID() error = %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("payloadContainsTesteeID() = %t, want %t", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPayloadContainsTesteeIDFailsClosedOnInvalidJSON(t *testing.T) {
+	if _, err := payloadContainsTesteeID([]byte(`{"testee_id":`), map[uint64]struct{}{1: {}}); err == nil {
+		t.Fatal("payloadContainsTesteeID() error = nil, want invalid JSON error")
 	}
 }
 

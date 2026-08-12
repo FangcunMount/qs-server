@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -27,16 +29,21 @@ import (
 const mongoIDChunkSize = 1000
 const mysqlInsertChunkSize = 1000
 const defaultMySQLDeleteBatchSize = 5000
+const defaultMySQLOutboxScanBatchSize = 500
+const defaultIAMDeleteBatchSize = 500
 const progressBarWidth = 32
 
 var prog progressReporter
 
 type config struct {
 	mysqlDSN                  string
+	iamMySQLDSN               string
 	mongoURI                  string
 	mongoDB                   string
 	testeeIDsRaw              string
 	testeeIDsFile             string
+	profileIDsRaw             string
+	profileIDsFile            string
 	testeeCreatedAfter        string
 	allowOldTestees           bool
 	scanEventPayloads         bool
@@ -53,6 +60,8 @@ type config struct {
 	mysqlLockWaitTimeout      int
 	mysqlDeleteRetries        int
 	mysqlDeleteBatchSize      int
+	mysqlOutboxScanBatchSize  int
+	iamDeleteBatchSize        int
 	workers                   int
 }
 
@@ -90,6 +99,17 @@ type mysqlChunkedDeleteSpec struct {
 	pruneStagingTable string
 }
 
+type mysqlOutboxPayloadRow struct {
+	ID      uint64
+	EventID string
+	Payload []byte
+}
+
+type mysqlOutboxPayloadScanSummary struct {
+	Scanned int64
+	Matched int64
+}
+
 type testeePreview struct {
 	ID            uint64
 	Name          string
@@ -116,6 +136,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("parse testee ids: %v", err)
 	}
+	var profileIDs []uint64
+	if cfg.iamEnabled() {
+		profileIDs, err = parseTesteeIDs(cfg.profileIDsRaw, cfg.profileIDsFile)
+		if err != nil {
+			log.Fatalf("parse profile ids: %v", err)
+		}
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
 	defer cancel()
@@ -137,6 +164,16 @@ func main() {
 	if _, err := conn.ExecContext(ctx, "SET NAMES utf8mb4"); err != nil {
 		log.Fatalf("set mysql names: %v", err)
 	}
+	var iamDB *sql.DB
+	var iamConn *sql.Conn
+	if cfg.iamEnabled() {
+		iamDB, iamConn, err = openIAMMySQL(ctx, cfg.iamMySQLDSN)
+		if err != nil {
+			log.Fatalf("connect iam mysql: %v", err)
+		}
+		defer func() { _ = iamConn.Close() }()
+		defer func() { _ = iamDB.Close() }()
+	}
 	mongoClient, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.mongoURI))
 	if err != nil {
 		log.Fatalf("connect mongo: %v", err)
@@ -153,6 +190,17 @@ func main() {
 	prog.Phase("prepare mysql scope")
 	if err := prepareMySQLScope(ctx, conn, cfg, testeeIDs); err != nil {
 		log.Fatalf("prepare mysql scope: %v", err)
+	}
+	if cfg.iamEnabled() {
+		if err := prepareQSProfileScope(ctx, conn, profileIDs); err != nil {
+			log.Fatalf("prepare qs profile scope: %v", err)
+		}
+		if err := validateQSProfileScope(ctx, conn, cfg.allowMissingTestees, cfg.mongoOnly, len(testeeIDs), len(profileIDs)); err != nil {
+			log.Fatalf("validate qs/profile scope: %v", err)
+		}
+		if err := prepareIAMScope(ctx, iamConn, profileIDs, cfg.mongoOnly); err != nil {
+			log.Fatalf("prepare iam scope: %v", err)
+		}
 	}
 	prog.Finish("prepare mysql scope", fmt.Sprintf("testees=%d", len(testeeIDs)))
 
@@ -177,7 +225,7 @@ func main() {
 	if !scopeIDsEqual(mysqlScopedIDs, ids) {
 		log.Print("refresh mysql outbox scope after mongo id enrichment")
 		prog.Phase("refresh mysql outbox scope")
-		if err := addMySQLOutboxIDsToScope(ctx, conn, cfg); err != nil {
+		if err := addMySQLOutboxIDsToScope(ctx, conn); err != nil {
 			log.Fatalf("refresh mysql outbox scope after mongo id enrichment: %v", err)
 		}
 		prog.Finish("refresh mysql outbox scope", "")
@@ -200,7 +248,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("load scope summary: %v", err)
 		}
-		var mysqlCounts, mongoCounts []namedCount
+		var mysqlCounts, mongoCounts, iamCounts []namedCount
 		countGroup, countCtx := errgroup.WithContext(ctx)
 		countGroup.Go(func() error {
 			var err error
@@ -212,6 +260,13 @@ func main() {
 			mongoCounts, err = countMongoRows(countCtx, mongoDB, ids, cfg.workers)
 			return err
 		})
+		if cfg.iamEnabled() {
+			countGroup.Go(func() error {
+				var err error
+				iamCounts, err = countIAMRows(countCtx, iamConn)
+				return err
+			})
+		}
 		if err := countGroup.Wait(); err != nil {
 			log.Fatalf("count scoped rows: %v", err)
 		}
@@ -220,6 +275,7 @@ func main() {
 		printScopeSummary(summary, cfg)
 		printCounts("mysql", mysqlCounts)
 		printCounts("mongo", mongoCounts)
+		printCounts("iam", iamCounts)
 	}
 
 	previews, err := loadTesteePreview(ctx, conn, cfg.previewLimit)
@@ -235,7 +291,7 @@ func main() {
 		if err := validateBackupSuffix(cfg.backupSuffix); err != nil {
 			log.Fatalf("invalid backup suffix: %v", err)
 		}
-		prog.Phase("backup mysql and mongo rows")
+		prog.Phase("backup mysql, mongo and iam rows")
 		backupGroup, backupCtx := errgroup.WithContext(ctx)
 		backupGroup.Go(func() error {
 			return backupMongoRows(backupCtx, mongoDB, ids, cfg.backupSuffix, cfg.workers)
@@ -243,10 +299,15 @@ func main() {
 		backupGroup.Go(func() error {
 			return backupMySQLRows(backupCtx, conn, cfg.backupSuffix)
 		})
+		if cfg.iamEnabled() {
+			backupGroup.Go(func() error {
+				return backupIAMRows(backupCtx, iamConn, cfg.backupSuffix, len(profileIDs))
+			})
+		}
 		if err := backupGroup.Wait(); err != nil {
 			log.Fatalf("backup rows: %v", err)
 		}
-		prog.Finish("backup mysql and mongo rows", "suffix="+cfg.backupSuffix)
+		prog.Finish("backup mysql, mongo and iam rows", "suffix="+cfg.backupSuffix)
 		log.Printf("backup completed: suffix=%s", cfg.backupSuffix)
 	} else {
 		log.Print("backup skipped by --skip-backup")
@@ -271,21 +332,40 @@ func main() {
 		log.Fatalf("delete mongo rows: %v", err)
 	}
 	prog.Finish("delete mongo rows", "")
+	var iamDeleted []namedCount
+	if cfg.iamEnabled() {
+		prog.Phase("revalidate qs profile scope before iam delete")
+		if err := validateQSProfileScope(ctx, conn, true, true, len(testeeIDs), len(profileIDs)); err != nil {
+			log.Fatalf("revalidate qs/profile scope before iam delete: %v", err)
+		}
+		prog.Finish("revalidate qs profile scope before iam delete", "zero qs references")
+
+		prog.Phase("delete iam rows")
+		iamDeleted, err = deleteIAMRows(ctx, iamConn, cfg.mysqlLockWaitTimeout, cfg.mysqlDeleteRetries, cfg.iamDeleteBatchSize, cfg.mongoOnly)
+		if err != nil {
+			log.Fatalf("delete iam rows: %v", err)
+		}
+		prog.Finish("delete iam rows", "")
+	}
 	printCounts("mysql_deleted", mysqlDeleted)
 	printCounts("mongo_deleted", mongoDeleted)
+	printCounts("iam_deleted", iamDeleted)
 	log.Print("cleanup completed")
 }
 
 func parseFlags() config {
 	cfg := config{}
 	flag.StringVar(&cfg.mysqlDSN, "mysql-dsn", "", "MySQL DSN, for example user:pass@tcp(host:3306)/qs?parseTime=true")
+	flag.StringVar(&cfg.iamMySQLDSN, "iam-mysql-dsn", "", "optional IAM MySQL DSN; requires explicit profile IDs")
 	flag.StringVar(&cfg.mongoURI, "mongo-uri", "", "MongoDB URI")
 	flag.StringVar(&cfg.mongoDB, "mongo-db", "", "MongoDB database name")
 	flag.StringVar(&cfg.testeeIDsRaw, "testee-ids", "", "comma/space/newline separated testee IDs")
 	flag.StringVar(&cfg.testeeIDsFile, "testee-ids-file", "", "file containing comma/space/newline separated testee IDs")
+	flag.StringVar(&cfg.profileIDsRaw, "profile-ids", "", "comma/space/newline separated IAM profile IDs; requires --iam-mysql-dsn")
+	flag.StringVar(&cfg.profileIDsFile, "profile-ids-file", "", "file containing IAM profile IDs; requires --iam-mysql-dsn")
 	flag.StringVar(&cfg.testeeCreatedAfter, "testee-created-after", "2026-05-01 00:00:00", "safety guard: selected testees must have created_at after this MySQL timestamp")
 	flag.BoolVar(&cfg.allowOldTestees, "allow-old-testees", false, "bypass --testee-created-after guard")
-	flag.BoolVar(&cfg.scanEventPayloads, "scan-event-payloads", false, "also scan MySQL outbox payload_json for testee_id; expensive on large outbox tables")
+	flag.BoolVar(&cfg.scanEventPayloads, "scan-event-payloads", false, "also decode MySQL outbox payload_json in bounded ID batches and match testee_id")
 	flag.BoolVar(&cfg.skipCounts, "skip-counts", false, "skip expensive row counts and affected source date window; useful when an external backup already protects an apply run")
 	flag.BoolVar(&cfg.skipMongoOutboxEventScope, "skip-mongo-outbox-event-scope", false, "skip loading Mongo outbox event_id values into MySQL temp scope; Mongo outbox documents are still deleted by aggregate filters")
 	flag.BoolVar(&cfg.mongoOnly, "mongo-only", false, "skip MySQL delete; allow testee IDs already removed from MySQL (resume interrupted mongo cleanup)")
@@ -293,12 +373,14 @@ func parseFlags() config {
 	flag.StringVar(&cfg.backupSuffix, "backup-suffix", time.Now().Format("20060102150405"), "backup table/collection suffix")
 	flag.DurationVar(&cfg.timeout, "timeout", 2*time.Hour, "overall timeout, for example 30m or 2h")
 	flag.BoolVar(&cfg.apply, "apply", false, "apply deletes; default is dry-run")
-	flag.BoolVar(&cfg.skipBackup, "skip-backup", false, "skip built-in MySQL/Mongo backups before deleting")
+	flag.BoolVar(&cfg.skipBackup, "skip-backup", false, "skip built-in QS MySQL, Mongo and optional IAM MySQL backups before deleting")
 	flag.IntVar(&cfg.previewLimit, "preview-limit", 20, "number of scoped testees to preview")
 	flag.BoolVar(&cfg.noProgress, "no-progress", false, "disable terminal progress output")
 	flag.IntVar(&cfg.mysqlLockWaitTimeout, "mysql-lock-wait-timeout", 300, "MySQL SESSION innodb_lock_wait_timeout seconds during delete; 0 keeps server default")
 	flag.IntVar(&cfg.mysqlDeleteRetries, "mysql-delete-retries", 5, "retries per table when MySQL delete hits lock wait timeout or deadlock")
 	flag.IntVar(&cfg.mysqlDeleteBatchSize, "mysql-delete-batch-size", defaultMySQLDeleteBatchSize, "rows per transaction for chunked MySQL deletes")
+	flag.IntVar(&cfg.mysqlOutboxScanBatchSize, "mysql-outbox-scan-batch-size", defaultMySQLOutboxScanBatchSize, "rows per query for --scan-event-payloads; each eligible outbox row is decoded at most once")
+	flag.IntVar(&cfg.iamDeleteBatchSize, "iam-delete-batch-size", defaultIAMDeleteBatchSize, "profiles per IAM delete transaction")
 	flag.IntVar(&cfg.workers, "workers", 4, "parallel workers for independent Mongo scans and cross-store backup/count")
 	flag.Parse()
 
@@ -316,6 +398,11 @@ func parseFlags() config {
 	if !hasManualScope {
 		log.Fatal("provide --testee-ids or --testee-ids-file")
 	}
+	hasIAMDSN := strings.TrimSpace(cfg.iamMySQLDSN) != ""
+	hasProfileScope := strings.TrimSpace(cfg.profileIDsRaw) != "" || strings.TrimSpace(cfg.profileIDsFile) != ""
+	if hasIAMDSN != hasProfileScope {
+		log.Fatal("--iam-mysql-dsn and --profile-ids/--profile-ids-file must be configured together")
+	}
 	if cfg.previewLimit < 0 {
 		log.Fatal("--preview-limit must be >= 0")
 	}
@@ -324,6 +411,15 @@ func parseFlags() config {
 	}
 	if cfg.mysqlDeleteRetries < 1 {
 		log.Fatal("--mysql-delete-retries must be >= 1")
+	}
+	if cfg.mysqlDeleteBatchSize < 1 {
+		log.Fatal("--mysql-delete-batch-size must be >= 1")
+	}
+	if cfg.mysqlOutboxScanBatchSize < 1 {
+		log.Fatal("--mysql-outbox-scan-batch-size must be >= 1")
+	}
+	if cfg.iamDeleteBatchSize < 1 {
+		log.Fatal("--iam-delete-batch-size must be >= 1")
 	}
 	if cfg.workers < 1 {
 		log.Fatal("--workers must be >= 1")
@@ -338,6 +434,10 @@ func parseFlags() config {
 		log.Print("--skip-backup has no effect in dry-run mode")
 	}
 	return cfg
+}
+
+func (cfg config) iamEnabled() bool {
+	return strings.TrimSpace(cfg.iamMySQLDSN) != ""
 }
 
 func parseTesteeIDs(raw, file string) ([]uint64, error) {
@@ -483,14 +583,23 @@ SELECT DISTINCT f.org_id, f.stat_date FROM statistics_plan_fact f JOIN tmp_clean
 			return err
 		}
 	}
-	if err := addMySQLOutboxIDsToScope(ctx, conn, cfg); err != nil {
+	if err := addMySQLOutboxIDsToScope(ctx, conn); err != nil {
 		return err
+	}
+	if cfg.scanEventPayloads && !cfg.mongoOnly {
+		summary, err := scanMySQLOutboxPayloads(ctx, conn, testeeIDs, cfg.mysqlOutboxScanBatchSize)
+		if err != nil {
+			return fmt.Errorf("scan mysql outbox payloads: %w", err)
+		}
+		log.Printf("mysql outbox payload scan completed: batch_size=%d scanned=%d matched=%d", cfg.mysqlOutboxScanBatchSize, summary.Scanned, summary.Matched)
+	} else if cfg.scanEventPayloads {
+		log.Print("skip mysql outbox payload scan in --mongo-only recovery mode")
 	}
 	return nil
 }
 
-func addMySQLOutboxIDsToScope(ctx context.Context, conn *sql.Conn, cfg config) error {
-	statements := mysqlOutboxScopeStatements(cfg)
+func addMySQLOutboxIDsToScope(ctx context.Context, conn *sql.Conn) error {
+	statements := mysqlOutboxScopeStatements()
 	for i, item := range statements {
 		item := item
 		if err := prog.RunStep(item.name, i+1, len(statements), func() error {
@@ -505,7 +614,7 @@ func addMySQLOutboxIDsToScope(ctx context.Context, conn *sql.Conn, cfg config) e
 	return nil
 }
 
-func mysqlOutboxScopeStatements(cfg config) []namedSQL {
+func mysqlOutboxScopeStatements() []namedSQL {
 	outboxStmts := []namedSQL{
 		{"mysql outbox ids from assessment aggregate", `INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
 SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_assessment_ids a ON BINARY o.aggregate_id = BINARY CAST(a.id AS CHAR) WHERE o.aggregate_type = 'Assessment'`,
@@ -517,17 +626,177 @@ SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_report_ids r
 SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_answersheet_ids s ON BINARY o.aggregate_id = BINARY CAST(s.id AS CHAR) WHERE o.aggregate_type = 'AnswerSheet'`,
 		},
 	}
-	if cfg.scanEventPayloads {
-		outboxStmts = append(outboxStmts,
-			namedSQL{"mysql outbox ids from payload_json", `INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
-SELECT o.id, o.event_id
-FROM domain_event_outbox o
-JOIN tmp_cleanup_testee_ids t
-  ON o.payload_json REGEXP CONCAT('"testee_id"[[:space:]]*:[[:space:]]*"?', t.id, '"?([,}[:space:]]|$)')`})
-	}
 	outboxStmts = append(outboxStmts, namedSQL{"event ids from mysql outbox", `INSERT IGNORE INTO tmp_cleanup_event_ids (event_id)
 SELECT event_id FROM tmp_cleanup_mysql_outbox_ids`})
 	return outboxStmts
+}
+
+func scanMySQLOutboxPayloads(ctx context.Context, conn *sql.Conn, testeeIDs []uint64, batchSize int) (mysqlOutboxPayloadScanSummary, error) {
+	var summary mysqlOutboxPayloadScanSummary
+	if len(testeeIDs) == 0 {
+		return summary, errors.New("testee ids are required")
+	}
+	if batchSize <= 0 {
+		return summary, errors.New("batch size must be positive")
+	}
+
+	var minTesteeCreatedAt sql.NullTime
+	if err := conn.QueryRowContext(ctx, `SELECT MIN(t.created_at)
+FROM testee t
+JOIN tmp_cleanup_testee_ids target ON target.id = t.id`).Scan(&minTesteeCreatedAt); err != nil {
+		return summary, err
+	}
+	if !minTesteeCreatedAt.Valid {
+		return summary, errors.New("selected testees have no minimum created_at")
+	}
+
+	var maxOutboxID uint64
+	if err := conn.QueryRowContext(ctx, `SELECT COALESCE(MAX(id), 0) FROM domain_event_outbox`).Scan(&maxOutboxID); err != nil {
+		return summary, err
+	}
+	if maxOutboxID == 0 {
+		return summary, nil
+	}
+
+	targets := make(map[uint64]struct{}, len(testeeIDs))
+	for _, id := range testeeIDs {
+		targets[id] = struct{}{}
+	}
+
+	var cursor uint64
+	for cursor < maxOutboxID {
+		rows, err := conn.QueryContext(ctx, `SELECT id, event_id, payload_json
+FROM domain_event_outbox
+WHERE id > ? AND id <= ? AND created_at >= ?
+ORDER BY id
+LIMIT ?`, cursor, maxOutboxID, minTesteeCreatedAt.Time, batchSize)
+		if err != nil {
+			return summary, err
+		}
+
+		batch := make([]mysqlOutboxPayloadRow, 0, batchSize)
+		for rows.Next() {
+			var row mysqlOutboxPayloadRow
+			if err := rows.Scan(&row.ID, &row.EventID, &row.Payload); err != nil {
+				_ = rows.Close()
+				return summary, err
+			}
+			batch = append(batch, row)
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return summary, err
+		}
+		if err := rows.Close(); err != nil {
+			return summary, err
+		}
+		if len(batch) == 0 {
+			break
+		}
+		cursor = batch[len(batch)-1].ID
+		summary.Scanned += int64(len(batch))
+
+		matches := make([]mysqlOutboxPayloadRow, 0)
+		for _, row := range batch {
+			matched, err := payloadContainsTesteeID(row.Payload, targets)
+			if err != nil {
+				return summary, fmt.Errorf("decode outbox id %d payload: %w", row.ID, err)
+			}
+			if matched {
+				matches = append(matches, row)
+			}
+		}
+		if err := insertMySQLOutboxPayloadMatches(ctx, conn, matches); err != nil {
+			return summary, err
+		}
+		summary.Matched += int64(len(matches))
+	}
+
+	if _, err := conn.ExecContext(ctx, `INSERT IGNORE INTO tmp_cleanup_event_ids (event_id)
+SELECT event_id FROM tmp_cleanup_mysql_outbox_ids`); err != nil {
+		return summary, err
+	}
+	return summary, nil
+}
+
+func insertMySQLOutboxPayloadMatches(ctx context.Context, conn *sql.Conn, rows []mysqlOutboxPayloadRow) error {
+	if len(rows) == 0 {
+		return nil
+	}
+	placeholders := make([]string, 0, len(rows))
+	args := make([]any, 0, len(rows)*2)
+	for _, row := range rows {
+		placeholders = append(placeholders, "(?, ?)")
+		args = append(args, row.ID, row.EventID)
+	}
+	query := `INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id) VALUES ` + strings.Join(placeholders, ",")
+	if _, err := conn.ExecContext(ctx, query, args...); err != nil {
+		return fmt.Errorf("insert payload-matched mysql outbox ids: %w", err)
+	}
+	return nil
+}
+
+func payloadContainsTesteeID(raw []byte, targets map[uint64]struct{}) (bool, error) {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	var payload any
+	if err := decoder.Decode(&payload); err != nil {
+		return false, err
+	}
+	if err := ensureJSONEOF(decoder); err != nil {
+		return false, err
+	}
+	return jsonValueContainsTesteeID(payload, targets), nil
+}
+
+func ensureJSONEOF(decoder *json.Decoder) error {
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return errors.New("payload contains multiple JSON values")
+		}
+		return err
+	}
+	return nil
+}
+
+func jsonValueContainsTesteeID(value any, targets map[uint64]struct{}) bool {
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, child := range typed {
+			if key == "testee_id" {
+				if id, ok := jsonUint64(child); ok {
+					if _, exists := targets[id]; exists {
+						return true
+					}
+				}
+			}
+			if jsonValueContainsTesteeID(child, targets) {
+				return true
+			}
+		}
+	case []any:
+		for _, child := range typed {
+			if jsonValueContainsTesteeID(child, targets) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func jsonUint64(value any) (uint64, bool) {
+	var raw string
+	switch typed := value.(type) {
+	case json.Number:
+		raw = typed.String()
+	case string:
+		raw = strings.TrimSpace(typed)
+	default:
+		return 0, false
+	}
+	id, err := strconv.ParseUint(raw, 10, 64)
+	return id, err == nil && id != 0
 }
 
 func loadEventIDCollation(ctx context.Context, conn *sql.Conn) (string, error) {
