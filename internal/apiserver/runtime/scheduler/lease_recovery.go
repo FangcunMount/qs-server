@@ -116,7 +116,7 @@ var (
 	}, []string{"workload"})
 	leaseRecoveryDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: "qs", Subsystem: "lease_recovery", Name: "duration_seconds",
-		Help: "Wall time of one lease recovery tick.",
+		Help:    "Wall time of one lease recovery tick.",
 		Buckets: prometheus.DefBuckets,
 	}, []string{"workload"})
 )

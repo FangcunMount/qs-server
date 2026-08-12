@@ -181,7 +181,7 @@ var (
 	}, []string{"result"})
 	evaluationConsistencyAuditCycleDuration = promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: "qs", Subsystem: "evaluation_consistency_audit", Name: "cycle_duration_seconds",
-		Help: "Wall time of one complete Evaluation consistency audit cycle.",
+		Help:    "Wall time of one complete Evaluation consistency audit cycle.",
 		Buckets: prometheus.ExponentialBuckets(1, 2, 12),
 	})
 	evaluationConsistencyAuditWatermark = promauto.NewGauge(prometheus.GaugeOpts{

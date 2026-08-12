@@ -27,7 +27,7 @@ func (f *fakeEvaluationConsistencyAuditService) AuditBatch(_ context.Context, af
 
 func TestEvaluationConsistencyAuditExecutesOneCompleteWatermarkedCycle(t *testing.T) {
 	service := &fakeEvaluationConsistencyAuditService{results: map[uint64]evaluationscheduler.AuditBatchResult{
-		0:  {Scanned: 100, NextCursor: 100},
+		0:   {Scanned: 100, NextCursor: 100},
 		100: {Scanned: 20, NextCursor: 120, CycleComplete: true},
 	}}
 	opts := newTestEvaluationConsistencyAuditOptions()
@@ -75,9 +75,9 @@ func TestEvaluationConsistencyAuditCompletesAfterExactSizeBatch(t *testing.T) {
 
 func TestEvaluationConsistencyAuditPropagatesBatchFailure(t *testing.T) {
 	runner := &EvaluationConsistencyAuditRunner{
-		opts: newTestEvaluationConsistencyAuditOptions(),
+		opts:    newTestEvaluationConsistencyAuditOptions(),
 		service: &fakeEvaluationConsistencyAuditService{err: errors.New("read failed")},
-		now: time.Now,
+		now:     time.Now,
 	}
 	if err := runner.executeCycle(context.Background()); err == nil {
 		t.Fatal("expected batch failure")
