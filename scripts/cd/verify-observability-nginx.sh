@@ -10,6 +10,8 @@ PUBLIC_COLLECTION_READY_URL="${PUBLIC_COLLECTION_READY_URL:-https://collect.fang
 PUBLIC_WORKER_METRICS_URL="${PUBLIC_WORKER_METRICS_URL:-https://worker.fangcunmount.cn/metrics}"
 PUBLIC_WORKER_READY_URL="${PUBLIC_WORKER_READY_URL:-https://worker.fangcunmount.cn/readyz}"
 PUBLIC_NSQD_STATS_URL="${PUBLIC_NSQD_STATS_URL:-https://nsqd.fangcunmount.cn/stats}"
+EXPECTED_COLLECTION_REPLICAS="${EXPECTED_COLLECTION_REPLICAS:-2}"
+EXPECTED_WORKER_REPLICAS="${EXPECTED_WORKER_REPLICAS:-3}"
 VERIFY_PUBLIC_ROUTES="${VERIFY_PUBLIC_ROUTES:-true}"
 PRIVILEGE_RUNNER="${PRIVILEGE_RUNNER:-sudo}"
 
@@ -87,11 +89,40 @@ probe_url() {
   rm -f "$body"
 }
 
+probe_ready_replicas() {
+  local url="$1"
+  local host="$2"
+  local expected="$3"
+  local body ready
+  body="$(mktemp)"
+  if ! curl --fail --silent --show-error \
+    --connect-timeout 5 \
+    --max-time 15 \
+    --noproxy '*' \
+    --resolve "${host}:443:127.0.0.1" \
+    "$url" >"$body"; then
+    rm -f "$body"
+    return 1
+  fi
+  ready="$(sed -n 's/.*"value":\[[^,]*,"\([0-9][0-9]*\)"\].*/\1/p' "$body" | head -n 1)"
+  rm -f "$body"
+  if [ "$ready" != "$expected" ]; then
+    echo "Observability probe ${url} reported ready replicas=${ready:-invalid}, expected=${expected}" >&2
+    return 1
+  fi
+}
+
 verify_public_routes() {
+  case "$EXPECTED_COLLECTION_REPLICAS:$EXPECTED_WORKER_REPLICAS" in
+    *[!0-9:]*|0:*|*:0|:*|*:)
+      echo "Expected replica counts must be positive integers" >&2
+      return 1
+      ;;
+  esac
   probe_url "$PUBLIC_COLLECTION_METRICS_URL" collect.fangcunmount.cn 'qs_runtime_component_ready'
-  probe_url "$PUBLIC_COLLECTION_READY_URL" collect.fangcunmount.cn '"status":"success"'
+  probe_ready_replicas "$PUBLIC_COLLECTION_READY_URL" collect.fangcunmount.cn "$EXPECTED_COLLECTION_REPLICAS"
   probe_url "$PUBLIC_WORKER_METRICS_URL" worker.fangcunmount.cn 'qs_runtime_component_ready'
-  probe_url "$PUBLIC_WORKER_READY_URL" worker.fangcunmount.cn '"status":"success"'
+  probe_ready_replicas "$PUBLIC_WORKER_READY_URL" worker.fangcunmount.cn "$EXPECTED_WORKER_REPLICAS"
   probe_url "$PUBLIC_NSQD_STATS_URL" nsqd.fangcunmount.cn '"topics"'
   echo "Public K6 observability route probes passed"
 }

@@ -121,6 +121,34 @@ func TestFederatedMetricsEvidenceRequiresEveryReplicaReady(t *testing.T) {
 	}
 }
 
+func TestFederatedMetricsEvidencePrefersDockerDiscoveredSamples(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "worker-metrics.txt")
+	metrics := "qs_runtime_component_ready{component=\"qs-worker\",exported_component=\"worker\",instance=\"qs-worker-runtime-1\",job=\"qs-worker\"} 1 1776030000000\n" +
+		"qs_runtime_component_ready{component=\"qs-worker\",exported_component=\"worker\",instance=\"qs-worker-runtime-2\",job=\"qs-worker\"} 1 1776030000000\n" +
+		"qs_runtime_component_ready{component=\"qs-worker\",exported_component=\"worker\",instance=\"qs-worker-runtime-3\",job=\"qs-worker\"} 1 1776030000000\n" +
+		"qs_runtime_component_ready{component=\"worker\",instance=\"qs-worker:9092\",job=\"qs-worker\"} 1 1776030000000\n"
+	if err := os.WriteFile(path, []byte(metrics), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if check := checkFederatedMetricsReady(dir, "worker-metrics.txt", "worker metrics replicas", "worker", "EXPECTED_WORKER_REPLICAS", 3); check.Status != "PASS" {
+		t.Fatalf("Docker-discovered worker metrics check = %#v, want PASS", check)
+	}
+}
+
+func TestInterpretationDeltasTreatNewCounterAsStartingAtZero(t *testing.T) {
+	after := []metricSample{
+		{Name: "qs_interpretation_run_duration_seconds_count", Labels: map[string]string{"result": "success", "builder_identity": "factor-scoring"}, Value: 4},
+	}
+	completed, failed, byModel, ok := interpretationDeltas(nil, after)
+	if !ok || completed == nil || *completed != 4 || failed == nil || *failed != 0 {
+		t.Fatalf("interpretation deltas = completed=%v failed=%v ok=%v", completed, failed, ok)
+	}
+	if byModel["medical"] != 4 {
+		t.Fatalf("completed model deltas = %#v, want medical=4", byModel)
+	}
+}
+
 func TestEvidenceClassificationSeparatesUnhealthyFromMissing(t *testing.T) {
 	unhealthy := PhaseEvidence{Checks: []EvidenceCheck{{Name: "worker readyz", Status: "FAIL"}}}
 	if verdict := classifyEvidence(unhealthy, "service evidence"); verdict.Status != VerdictFail {
@@ -150,11 +178,10 @@ func TestPrometheusObservationWindowUsesMetricCaptureTimes(t *testing.T) {
 	dir := t.TempDir()
 	before := filepath.Join(dir, "before-apiserver-metrics.txt")
 	after := filepath.Join(dir, "after-apiserver-metrics.txt")
-	metric := []byte("qs_interpretation_run_duration_seconds_count{result=\"success\"} 1\n")
-	if err := os.WriteFile(before, metric, 0o600); err != nil {
+	if err := os.WriteFile(before, []byte("qs_runtime_component_ready{component=\"apiserver\"} 1\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(after, metric, 0o600); err != nil {
+	if err := os.WriteFile(after, []byte("qs_interpretation_run_duration_seconds_count{result=\"success\"} 1\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	started := time.Unix(1_700_000_000, 0)

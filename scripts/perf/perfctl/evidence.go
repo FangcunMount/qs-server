@@ -101,7 +101,10 @@ func prometheusObservationWindow(startDir, startLabel, endDir, endLabel string) 
 	for _, component := range []string{"collection", "apiserver", "worker"} {
 		startPath := filepath.Join(startDir, fmt.Sprintf("%s-%s-metrics.txt", startLabel, component))
 		endPath := filepath.Join(endDir, fmt.Sprintf("%s-%s-metrics.txt", endLabel, component))
-		if !metricFileContains(startPath, "qs_interpretation_run_duration_seconds_count") || !metricFileContains(endPath, "qs_interpretation_run_duration_seconds_count") {
+		// A Prometheus counter may not exist until its first observation. The
+		// before snapshot still defines the start of the measurement window when
+		// it is a valid metrics document and the counter appears after the run.
+		if !metricFileHasSamples(startPath) || !metricFileContains(endPath, "qs_interpretation_run_duration_seconds_count") {
 			continue
 		}
 		startInfo, startErr := os.Stat(startPath)
@@ -122,6 +125,11 @@ func prometheusObservationWindow(startDir, startLabel, endDir, endLabel string) 
 	return latest.Sub(earliest).Seconds(), true
 }
 
+func metricFileHasSamples(path string) bool {
+	samples, err := parsePrometheusFile(path)
+	return err == nil && len(samples) > 0
+}
+
 func metricFileContains(path, name string) bool {
 	samples, err := parsePrometheusFile(path)
 	if err != nil {
@@ -136,9 +144,9 @@ func metricFileContains(path, name string) bool {
 }
 
 func interpretationDeltas(before, after []metricSample) (*float64, *float64, map[string]float64, bool) {
-	completedBefore, hasCompletedBefore := sumMetric(before, "qs_interpretation_run_duration_seconds_count", map[string]string{"result": "success"})
+	completedBefore, _ := sumMetric(before, "qs_interpretation_run_duration_seconds_count", map[string]string{"result": "success"})
 	completedAfter, hasCompletedAfter := sumMetric(after, "qs_interpretation_run_duration_seconds_count", map[string]string{"result": "success"})
-	if !hasCompletedBefore || !hasCompletedAfter {
+	if !hasCompletedAfter {
 		return nil, nil, map[string]float64{}, false
 	}
 	completed := nonNegativeDelta(completedBefore, completedAfter)
@@ -171,7 +179,7 @@ func completedModelDeltas(before, after []metricSample) map[string]float64 {
 			afterValue += value
 			afterFound = afterFound || found
 		}
-		if beforeFound && afterFound {
+		if afterFound {
 			result[model] = nonNegativeDelta(beforeValue, afterValue)
 		}
 	}
@@ -299,9 +307,16 @@ func checkFederatedMetricsReady(dir, name, label, component, expectedEnv string,
 	if err != nil {
 		return EvidenceCheck{Name: label, Status: "MISSING", Source: path, Message: err.Error()}
 	}
-	instances := map[string]float64{}
+	discoveredInstances := map[string]float64{}
+	fallbackInstances := map[string]float64{}
 	for _, sample := range samples {
-		if sample.Name != "qs_runtime_component_ready" || sample.Labels["component"] != component {
+		if sample.Name != "qs_runtime_component_ready" {
+			continue
+		}
+		instances := fallbackInstances
+		if sample.Labels["exported_component"] == component {
+			instances = discoveredInstances
+		} else if sample.Labels["component"] != component {
 			continue
 		}
 		instance := strings.TrimSpace(sample.Labels["instance"])
@@ -315,6 +330,10 @@ func checkFederatedMetricsReady(dir, name, label, component, expectedEnv string,
 			return EvidenceCheck{Name: label, Status: "INVALID", Source: path, Message: "conflicting readiness samples for instance " + instance}
 		}
 		instances[instance] = sample.Value
+	}
+	instances := discoveredInstances
+	if len(instances) == 0 {
+		instances = fallbackInstances
 	}
 	if len(instances) != expected {
 		return EvidenceCheck{Name: label, Status: "FAIL", Source: path, Message: fmt.Sprintf("observed replicas=%d, expected=%d", len(instances), expected)}

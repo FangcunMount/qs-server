@@ -412,7 +412,8 @@ func TestPerfObservabilityNginxUsesAggregateReadOnlyRoutes(t *testing.T) {
 		"location = /stats",
 		"location = /nodes",
 		`job%3D%22qs-worker%22`,
-		`component%3D%22worker%22`,
+		`component%3D%22qs-worker%22`,
+		`exported_component%3D%22worker%22`,
 		"http://prometheus:9090",
 		"http://nsqd:4151",
 		"http://nsqlookupd:4161",
@@ -441,7 +442,11 @@ func TestPerfObservabilityNginxUsesAggregateReadOnlyRoutes(t *testing.T) {
 	verifier := readDeploymentContractFile(t, "scripts", "cd", "verify-observability-nginx.sh")
 	for _, required := range []string{
 		`VERIFY_PUBLIC_ROUTES="${VERIFY_PUBLIC_ROUTES:-true}"`,
+		`EXPECTED_COLLECTION_REPLICAS="${EXPECTED_COLLECTION_REPLICAS:-2}"`,
+		`EXPECTED_WORKER_REPLICAS="${EXPECTED_WORKER_REPLICAS:-3}"`,
 		`getent ahostsv4 "$name"`,
+		`probe_ready_replicas`,
+		`reported ready replicas=`,
 		`verify_public_routes`,
 		`rollback_config()`,
 		`verify-only`,

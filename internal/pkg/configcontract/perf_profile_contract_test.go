@@ -193,6 +193,9 @@ func TestPerfMakefileHasSingleMainEntry(t *testing.T) {
 	if !strings.Contains(text, "perf-run: perf-ensure-config") {
 		t.Fatal("Makefile is missing the unified perf-run entry")
 	}
+	if !strings.Contains(text, "$(MAKE) perf-preflight && \\") {
+		t.Fatal("perf-run must stop when perf-preflight fails")
+	}
 	for _, retired := range []string{
 		"perf-k6:", "perf-smoke:", "perf-pretest60:", "perf-mixed140:",
 		"perf-mixed280-models:", "perf-admission300:", "perf-sync-vusers:",

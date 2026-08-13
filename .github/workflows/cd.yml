@@ -549,6 +549,7 @@ jobs:
       (needs.plan.outputs.collection != 'true' || needs.deploy-collection.result == 'success') &&
       (needs.plan.outputs.worker != 'true' || needs.deploy-worker.result == 'success')
     env:
+      EXPECTED_COLLECTION_REPLICAS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.collection_replicas || vars.QS_COLLECTION_REPLICAS || '2' }}
       EXPECTED_WORKER_REPLICAS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.worker_replicas || vars.QS_WORKER_REPLICAS || '3' }}
     steps:
       - name: Checkout
@@ -588,7 +589,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           ssh -F "${RUNNER_SSH_CONFIG}" "${RUNNER_SSH_ALIAS}" \
-            "PRIVILEGE_RUNNER=sudo bash -s -- verify-only" \
+            "EXPECTED_COLLECTION_REPLICAS=${EXPECTED_COLLECTION_REPLICAS} EXPECTED_WORKER_REPLICAS=${EXPECTED_WORKER_REPLICAS} PRIVILEGE_RUNNER=sudo bash -s -- verify-only" \
             < scripts/cd/verify-observability-nginx.sh
 
       - name: Cleanup verification SSH

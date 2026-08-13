@@ -246,6 +246,9 @@ jobs:
           script_path: scripts/cd/verify-worker-governance.sh
 
       - name: K6 Observability Reverse Check
+        env:
+          EXPECTED_COLLECTION_REPLICAS: ${{ vars.QS_COLLECTION_REPLICAS || '2' }}
+          EXPECTED_WORKER_REPLICAS: ${{ vars.QS_WORKER_REPLICAS || '3' }}
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ vars.SVRA_HOST }}
@@ -253,6 +256,7 @@ jobs:
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          envs: EXPECTED_COLLECTION_REPLICAS,EXPECTED_WORKER_REPLICAS
           script_path: scripts/cd/verify-observability-nginx.sh
 
   # ServerD 仍跑 qs-worker；CD deploy 已迁到 Mac mini（qlume），此处只做 worker 主机巡检。
