@@ -34,13 +34,13 @@ collection-server 的 Registry 是静态 snapshot，能力由 [`internal/collect
 | `catalog.questionnaire` | L1 | `local` | TTL 180s、max 256、singleflight、signal evict | apiserver questionnaire gRPC |
 | `catalog.published_model` | L1 | `local` | 生产已启用；TTL 180s、jitter 0.2、每 bucket max 64、singleflight、signal evict | apiserver published-model L2 |
 | `catalog.typology` | L1 | `local` | TTL 180s、max 256、singleflight、signal evict | assessment-model catalog gRPC |
-| `evaluation.assessment_access` | L1 | `local` | 生产第二批保持关闭；TTL 60s、jitter 0.2、max 1024、singleflight；仅正向 ownership token | apiserver assessment-access L2 |
-| `evaluation.assessment_detail` | L1 | `local` | 生产第二批保持关闭；TTL 180s、jitter 0.2、max 256、singleflight；仅 `evaluated` DTO | apiserver assessment-detail L2 |
+| `evaluation.assessment_access` | L1 | `local` | 生产已启用；TTL 60s、jitter 0.2、max 1024、singleflight；仅正向 ownership token | apiserver assessment-access L2 |
+| `evaluation.assessment_detail` | L1 | `local` | 生产已启用；TTL 180s、jitter 0.2、max 256、singleflight；仅 `evaluated` DTO | apiserver assessment-detail L2 |
 | `report_status` | runtime | `ops_runtime` | TTL 172800s | report workflow |
 
 collection catalog capability 使用 consumer-owned `catalog.*` ID；evaluation 两个意图保持业务名称一致。即使 ID 相同，collection L1 与 apiserver L2 仍是不同进程 Registry 里的独立 entry、policy 和生命周期。
 
-published-model 在 dev/prod policy 中已启用。evaluation access/detail L1 在 dev 中启用，在生产第二批中保持关闭，第三批再通过 policy 开启；主配置只引用独立 policy：
+published-model 与 evaluation access/detail L1 在 dev/prod policy 中均已启用；主配置只引用独立 policy：
 
 ```yaml
 cache:
