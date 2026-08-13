@@ -52,18 +52,19 @@ Domain 不依赖 Cache。Cache-Aside 位于 Repository decorator、application q
 
 ## 3. 当前能力范围
 
-apiserver 登记六个普通 cache capability：
+apiserver 登记七个普通 cache capability：
 
 ```text
 survey.questionnaire
 modelcatalog.published_model
+evaluation.assessment_access
 evaluation.assessment_detail
 actor.testee
 plan.detail
 statistics.query
 ```
 
-`evaluation.assessment_list` 的历史实现未接入实际读取路径，已连同 version bump 和配置入口退役；assessment list 继续直接读取既有 read model。`report_status` 同样出现在 Registry 和三进程配置中，但它的 `kind` 是 `operational_state`，不是普通 Cache-Aside。collection-server 另有独立静态 L1 capability：`catalog.questionnaire`、`catalog.published_model` 与 `catalog.typology`。
+`evaluation.assessment_list` 的历史实现未接入实际读取路径，已连同 version bump 和配置入口退役；assessment list 继续直接读取既有 read model。`report_status` 同样出现在 Registry 和三进程配置中，但它的 `kind` 是 `operational_state`，不是普通 Cache-Aside。collection-server 另有独立 L1 capability：`catalog.questionnaire`、`catalog.published_model`、`catalog.typology`、`evaluation.assessment_access` 与 `evaluation.assessment_detail`。
 
 IAM/JWKS/ProfileLink、WeChat SDK token 等私有缓存继续由各自 integration owner 维护，不纳入上述业务 Registry。
 
