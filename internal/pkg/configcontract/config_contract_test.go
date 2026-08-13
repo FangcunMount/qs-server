@@ -957,6 +957,13 @@ func assertSystemGovernanceConfig(t *testing.T, configName string, opts *apiserv
 	if len(opts.Components) == 0 {
 		t.Fatalf("%s system_governance.components must configure remote governance components", configName)
 	}
+	for _, component := range []string{"qs-apiserver", "collection-server"} {
+		cfg := opts.Components[component]
+		if cfg == nil {
+			t.Fatalf("%s system_governance.components.%s must be present", configName, component)
+		}
+		assertURLPath(t, configName, component, "cache_governance_url", cfg.CacheGovernanceURL, "/governance/cache")
+	}
 	for _, component := range []string{"collection-server", "worker"} {
 		cfg := opts.Components[component]
 		if cfg == nil {

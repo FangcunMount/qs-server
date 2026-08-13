@@ -74,6 +74,7 @@ func (r *Router) registerPublicRoutes(engine *gin.Engine) {
 	engine.GET("/readyz", healthHandler.Ready)
 	engine.GET("/serve-readyz", healthHandler.ServeReady)
 	engine.GET("/governance/redis", healthHandler.RedisFamilies)
+	engine.GET("/governance/cache", healthHandler.CacheGovernance)
 	engine.GET("/governance/resilience", healthHandler.Resilience)
 	engine.GET("/ping", healthHandler.Ping)
 

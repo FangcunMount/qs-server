@@ -10,14 +10,17 @@ import (
 // Spec is the single source of identity, ownership, routing and observability
 // metadata for one apiserver cache capability.
 type Spec struct {
-	ID          sharedcache.Capability
-	Owner       string
-	Kind        sharedcache.CapabilityKind
-	Layer       sharedcache.Layer
-	Family      cachemodel.Family
-	ConfigPath  string
-	MetricLabel string
-	Defaults    sharedcache.Policy
+	ID            sharedcache.Capability
+	Owner         string
+	Kind          sharedcache.CapabilityKind
+	Layer         sharedcache.Layer
+	Family        cachemodel.Family
+	ConfigPath    string
+	MetricLabel   string
+	TopologyGroup string
+	TopologyOrder int
+	ReadModel     string
+	Defaults      sharedcache.Policy
 }
 
 type Binding struct {
@@ -26,10 +29,10 @@ type Binding struct {
 }
 
 var specs = []Spec{
-	{ID: CapabilitySurveyQuestionnaire, Owner: "survey", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2, Family: cachemodel.FamilyStatic, ConfigPath: "cache.capabilities.survey.questionnaire", MetricLabel: "questionnaire", Defaults: sharedcache.Policy{TTL: 12 * time.Hour, Negative: sharedcache.PolicySwitchEnabled}},
-	{ID: CapabilityModelCatalogPublished, Owner: "modelcatalog", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2, Family: cachemodel.FamilyStatic, ConfigPath: "cache.capabilities.modelcatalog.published_model", MetricLabel: "published_model", Defaults: sharedcache.Policy{TTL: 24 * time.Hour, Negative: sharedcache.PolicySwitchDisabled}},
-	{ID: CapabilityEvaluationAssessmentDetail, Owner: "evaluation", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2, Family: cachemodel.FamilyObject, ConfigPath: "cache.capabilities.evaluation.assessment_detail", MetricLabel: "assessment_detail", Defaults: sharedcache.Policy{TTL: 2 * time.Hour, Singleflight: sharedcache.PolicySwitchEnabled}},
-	{ID: CapabilityEvaluationAssessmentAccess, Owner: "evaluation", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2, Family: cachemodel.FamilyObject, ConfigPath: "cache.capabilities.evaluation.assessment_access", MetricLabel: "assessment_access", Defaults: sharedcache.Policy{TTL: 5 * time.Minute, Singleflight: sharedcache.PolicySwitchEnabled}},
+	{ID: CapabilitySurveyQuestionnaire, Owner: "survey", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2, Family: cachemodel.FamilyStatic, ConfigPath: "cache.capabilities.survey.questionnaire", MetricLabel: "questionnaire", TopologyGroup: "questionnaire", TopologyOrder: 20, ReadModel: "questionnaire published Mongo read model", Defaults: sharedcache.Policy{TTL: 12 * time.Hour, Negative: sharedcache.PolicySwitchEnabled}},
+	{ID: CapabilityModelCatalogPublished, Owner: "modelcatalog", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2, Family: cachemodel.FamilyStatic, ConfigPath: "cache.capabilities.modelcatalog.published_model", MetricLabel: "published_model", TopologyGroup: "published-model", TopologyOrder: 20, ReadModel: "published-model Mongo snapshot", Defaults: sharedcache.Policy{TTL: 24 * time.Hour, Negative: sharedcache.PolicySwitchDisabled}},
+	{ID: CapabilityEvaluationAssessmentDetail, Owner: "evaluation", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2, Family: cachemodel.FamilyObject, ConfigPath: "cache.capabilities.evaluation.assessment_detail", MetricLabel: "assessment_detail", TopologyGroup: "assessment-detail", TopologyOrder: 20, ReadModel: "MySQL evaluation assessment read model", Defaults: sharedcache.Policy{TTL: 2 * time.Hour, Singleflight: sharedcache.PolicySwitchEnabled}},
+	{ID: CapabilityEvaluationAssessmentAccess, Owner: "evaluation", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2, Family: cachemodel.FamilyObject, ConfigPath: "cache.capabilities.evaluation.assessment_access", MetricLabel: "assessment_access", TopologyGroup: "assessment-access", TopologyOrder: 20, ReadModel: "MySQL assessment ownership lookup", Defaults: sharedcache.Policy{TTL: 5 * time.Minute, Singleflight: sharedcache.PolicySwitchEnabled}},
 	{ID: CapabilityActorTestee, Owner: "actor", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2, Family: cachemodel.FamilyObject, ConfigPath: "cache.capabilities.actor.testee", MetricLabel: "testee", Defaults: sharedcache.Policy{TTL: 30 * time.Minute, Negative: sharedcache.PolicySwitchEnabled}},
 	{ID: CapabilityPlanDetail, Owner: "plan", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2, Family: cachemodel.FamilyObject, ConfigPath: "cache.capabilities.plan.detail", MetricLabel: "plan", Defaults: sharedcache.Policy{TTL: 2 * time.Hour, Singleflight: sharedcache.PolicySwitchEnabled}},
 	{ID: CapabilityStatisticsQuery, Owner: "statistics", Kind: sharedcache.KindCache, Layer: sharedcache.LayerL2, Family: cachemodel.FamilyQuery, ConfigPath: "cache.capabilities.statistics.query", MetricLabel: "stats_query", Defaults: sharedcache.Policy{TTL: 26 * time.Hour, Singleflight: sharedcache.PolicySwitchDisabled}},
@@ -106,6 +109,7 @@ func (c *PolicyCatalog) Effective(id sharedcache.Capability) (sharedcache.Effect
 	return sharedcache.EffectiveCapability{
 		Capability: spec.ID, Owner: spec.Owner, Kind: spec.Kind, Layer: spec.Layer,
 		Family: string(spec.Family), Enabled: binding.Enabled, Layers: layers, Policy: binding.Policy,
-		Source: spec.ConfigPath, CatalogVersion: "v2", MetricLabel: spec.MetricLabel,
+		Source: spec.ConfigPath, CatalogVersion: "v3", MetricLabel: spec.MetricLabel,
+		TopologyGroup: spec.TopologyGroup, TopologyOrder: spec.TopologyOrder, ReadModel: spec.ReadModel,
 	}, true
 }

@@ -59,6 +59,26 @@ func TestCacheMaxEntriesEviction(t *testing.T) {
 	if _, ok := cache.Get("k3"); !ok {
 		t.Fatal("expected k3 to remain")
 	}
+	snapshot := cache.RuntimeSnapshot()
+	if snapshot.Entries != 2 || snapshot.MaxEntries != 2 || snapshot.FIFOEvictions != 1 {
+		t.Fatalf("runtime snapshot = %#v", snapshot)
+	}
+}
+
+func TestCacheRuntimeTracksExpirationAndDeletionReasons(t *testing.T) {
+	cache := New(Options{TTL: 5 * time.Millisecond, MaxEntries: 4}, func(v string) string { return v })
+	cache.Set("ttl", "value")
+	time.Sleep(8 * time.Millisecond)
+	_, _ = cache.Get("ttl")
+	cache.Set("explicit", "value")
+	cache.Delete("explicit")
+	cache.Set("signal", "value")
+	cache.DeleteWithReason("signal", EvictionReasonSignal)
+
+	snapshot := cache.RuntimeSnapshot()
+	if snapshot.Entries != 0 || snapshot.TTLExpirations != 1 || snapshot.ExplicitDeletions != 1 || snapshot.SignalDeletions != 1 {
+		t.Fatalf("runtime snapshot = %#v", snapshot)
+	}
 }
 
 func TestCacheDeletePrefix(t *testing.T) {

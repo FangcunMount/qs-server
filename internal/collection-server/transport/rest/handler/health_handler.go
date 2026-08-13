@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"time"
 
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
+	sharedgovernance "github.com/FangcunMount/qs-server/internal/pkg/cache/governance"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/FangcunMount/qs-server/pkg/core"
@@ -12,11 +14,27 @@ import (
 
 // HealthHandler 健康检查处理器
 type HealthHandler struct {
-	serviceName  string
-	version      string
-	status       *observability.FamilyStatusRegistry
-	resilience   func() resilience.RuntimeSnapshot
-	controlReady func() bool
+	serviceName   string
+	version       string
+	status        *observability.FamilyStatusRegistry
+	resilience    func() resilience.RuntimeSnapshot
+	controlReady  func() bool
+	cacheRegistry *sharedcache.Registry
+	l1Runtime     func() []sharedgovernance.L1CapabilityRuntime
+}
+
+func (h *HealthHandler) BindL1Runtime(reporter func() []sharedgovernance.L1CapabilityRuntime) {
+	if h != nil {
+		h.l1Runtime = reporter
+	}
+}
+
+// BindCacheRegistry supplies the immutable process Registry used by the
+// read-only governance endpoint. It does not enable reload or mutation.
+func (h *HealthHandler) BindCacheRegistry(registry *sharedcache.Registry) {
+	if h != nil {
+		h.cacheRegistry = registry
+	}
 }
 
 // NewHealthHandler 创建健康检查处理器
@@ -42,7 +60,7 @@ func NewHealthHandlerWithResilience(serviceName, version string, status *observa
 // @Description 检查服务健康状态
 // @Tags 系统
 // @Produce json
-// @Success 200 {object} core.Response
+// @Success 200 {object} governance.ComponentCacheGovernanceSnapshot
 // @Router /health [get]
 func (h *HealthHandler) Health(c *gin.Context) {
 	core.WriteResponse(c, nil, gin.H{
@@ -153,6 +171,37 @@ func (h *HealthHandler) redisSnapshot() observability.RuntimeSnapshot {
 // @Router /governance/redis [get]
 func (h *HealthHandler) RedisFamilies(c *gin.Context) {
 	core.WriteResponse(c, nil, h.redisSnapshot())
+}
+
+// CacheGovernance returns this collection-server instance's L1 Registry and
+// Redis runtime without rereading policy files or business storage.
+// @Summary Cache 治理状态
+// @Description 返回 collection-server 当前实例的只读 Cache Registry 与 Redis runtime。
+// @Tags 系统
+// @Produce json
+// @Success 200 {object} core.Response
+// @Router /governance/cache [get]
+func (h *HealthHandler) CacheGovernance(c *gin.Context) {
+	runtime := h.redisSnapshot()
+	component := "collection-server"
+	var cacheRegistry *sharedcache.Registry
+	var l1Runtime func() []sharedgovernance.L1CapabilityRuntime
+	if h != nil {
+		if h.serviceName != "" {
+			component = h.serviceName
+		}
+		cacheRegistry = h.cacheRegistry
+		l1Runtime = h.l1Runtime
+	}
+	registry := sharedgovernance.ProjectRegistry(cacheRegistry, sharedgovernance.PolicyReloadStatus{})
+	result := sharedgovernance.ComponentCacheGovernanceSnapshot{
+		GeneratedAt: time.Now(), Component: component, InstanceID: runtime.InstanceID,
+		Generation: runtime.Generation, RedisRuntime: runtime, EffectiveRegistry: registry,
+	}
+	if l1Runtime != nil {
+		result.L1Runtime = l1Runtime()
+	}
+	c.JSON(http.StatusOK, result)
 }
 
 // Resilience 返回 collection-server 高并发治理只读快照。

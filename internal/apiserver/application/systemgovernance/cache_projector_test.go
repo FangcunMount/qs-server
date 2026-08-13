@@ -104,11 +104,11 @@ func TestCacheCapabilityRowsProjectCanonicalCapabilitiesAndLegacyMetricLabels(t 
 	if row.Capability != "statistics.query" || row.MetricLabel != "stats_query" || row.Family != "query_result" {
 		t.Fatalf("capability row = %#v, want canonical capability and legacy metric labels", row)
 	}
-	if row.Workload.HitRate == nil || row.Workload.ErrorCount == nil || row.Workload.GetLatencyP95 == nil {
-		t.Fatalf("workload = %#v, want three metric evidences", row.Workload)
+	if row.Workload.HitRate == nil || row.Workload.Samples == nil || row.Workload.ErrorCount == nil || row.Workload.GetLatencyP95 == nil {
+		t.Fatalf("workload = %#v, want four metric evidences", row.Workload)
 	}
-	if len(metrics.specs) != 3 {
-		t.Fatalf("metric specs = %#v, want three workload queries", metrics.specs)
+	if len(metrics.specs) != 4 {
+		t.Fatalf("metric specs = %#v, want four workload queries", metrics.specs)
 	}
 	for _, spec := range metrics.specs {
 		if !strings.Contains(spec.Query, `family="query_result"`) || !strings.Contains(spec.Query, `policy="stats_query"`) {

@@ -26,18 +26,23 @@ type LocalCatalogCacheOptions struct {
 	TTLJitterRatio float64
 	OnHit          func()
 	OnMiss         func()
+	OnEntries      func(int)
+	OnEviction     func(localcache.EvictionReason)
+	BucketOptions  *localcache.MultiOptions
 }
 
 // NewLocalCatalogCache 创建类型学模型目录 L1 缓存。
 func NewLocalCatalogCache(opts LocalCatalogCacheOptions) *LocalCatalogCache {
+	base := localcache.Options{
+		TTL: opts.TTL, MaxEntries: opts.MaxEntries, TTLJitterRatio: opts.TTLJitterRatio,
+		OnHit: opts.OnHit, OnMiss: opts.OnMiss, OnEntries: opts.OnEntries, OnEviction: opts.OnEviction,
+	}
+	buckets := localcache.MultiOptions{Detail: base, List: base, Categories: base, Hot: base}
+	if opts.BucketOptions != nil {
+		buckets = *opts.BucketOptions
+	}
 	return &LocalCatalogCache{
-		inner: localcache.NewMultiCache(localcache.Options{
-			TTL:            opts.TTL,
-			MaxEntries:     opts.MaxEntries,
-			TTLJitterRatio: opts.TTLJitterRatio,
-			OnHit:          opts.OnHit,
-			OnMiss:         opts.OnMiss,
-		}, localcache.MultiHooks[*TypologyModelResponse, *ListTypologyModelsResponse, *TypologyModelCategoriesResponse, struct{}]{
+		inner: localcache.NewMultiCacheWithOptions(buckets, localcache.MultiHooks[*TypologyModelResponse, *ListTypologyModelsResponse, *TypologyModelCategoriesResponse, struct{}]{
 			DetailKey:       detailCacheKey,
 			ListKey:         func(req any) string { return listCacheKey(req.(*ListTypologyModelsRequest)) },
 			CategoriesKey:   cacheKeyCategories,
@@ -121,4 +126,11 @@ func (c *LocalCatalogCache) Stats() (hits, misses uint64) {
 		return 0, 0
 	}
 	return c.inner.Stats()
+}
+
+func (c *LocalCatalogCache) RuntimeBuckets() []localcache.BucketSnapshot {
+	if c == nil || c.inner == nil {
+		return nil
+	}
+	return c.inner.RuntimeBuckets()
 }

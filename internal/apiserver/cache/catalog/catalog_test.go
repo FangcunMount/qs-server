@@ -65,8 +65,11 @@ func TestEffectiveRegistryUsesCanonicalIDsAndLegacyMetricLabels(t *testing.T) {
 		t.Fatal("retired evaluation.assessment_list capability is still registered")
 	}
 	questionnaire, ok := registry.Resolve(CapabilitySurveyQuestionnaire)
-	if !ok || questionnaire.Owner != "survey" || questionnaire.Source != "cache.capabilities.survey.questionnaire" || questionnaire.MetricLabel != "questionnaire" || questionnaire.CatalogVersion != "v2" {
+	if !ok || questionnaire.Owner != "survey" || questionnaire.Source != "cache.capabilities.survey.questionnaire" || questionnaire.MetricLabel != "questionnaire" || questionnaire.CatalogVersion != "v3" {
 		t.Fatalf("questionnaire entry = %#v", questionnaire)
+	}
+	if questionnaire.TopologyGroup != "questionnaire" || questionnaire.TopologyOrder != 20 || questionnaire.ReadModel == "" {
+		t.Fatalf("questionnaire topology = %#v", questionnaire)
 	}
 	reportStatus, ok := registry.Resolve(CapabilityReportStatus)
 	if !ok || reportStatus.Kind != sharedcache.KindOperationalState || reportStatus.Layer != sharedcache.LayerRuntime {
@@ -74,5 +77,20 @@ func TestEffectiveRegistryUsesCanonicalIDsAndLegacyMetricLabels(t *testing.T) {
 	}
 	if reportStatus.Policy.TTL != 48*time.Hour {
 		t.Fatalf("report status TTL = %v, want 48h", reportStatus.Policy.TTL)
+	}
+}
+
+func TestFixedTopologySpecsMatchL2Catalog(t *testing.T) {
+	want := map[sharedcache.Capability]string{
+		CapabilitySurveyQuestionnaire:        "questionnaire",
+		CapabilityModelCatalogPublished:      "published-model",
+		CapabilityEvaluationAssessmentDetail: "assessment-detail",
+		CapabilityEvaluationAssessmentAccess: "assessment-access",
+	}
+	for capability, group := range want {
+		spec, ok := Lookup(capability)
+		if !ok || spec.TopologyGroup != group || spec.TopologyOrder != 20 || spec.ReadModel == "" || spec.Layer != sharedcache.LayerL2 {
+			t.Fatalf("L2 topology spec %q = %#v, found=%v", capability, spec, ok)
+		}
 	}
 }

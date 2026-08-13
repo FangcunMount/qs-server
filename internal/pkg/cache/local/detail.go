@@ -60,7 +60,25 @@ func (c *DetailCache[T]) Delete(code, version string) {
 }
 
 func (c *DetailCache[T]) EvictOnSignal(code, version string) {
-	c.Delete(code, version)
+	if c == nil || c.inner == nil {
+		return
+	}
+	code = strings.ToLower(strings.TrimSpace(code))
+	version = strings.TrimSpace(version)
+	if c.hooks.Prefix != "" && version == "" {
+		c.inner.DeletePrefixWithReason(c.hooks.Prefix+code, EvictionReasonSignal)
+		return
+	}
+	if c.hooks.KeyFn != nil {
+		c.inner.DeleteWithReason(c.hooks.KeyFn(code, version), EvictionReasonSignal)
+	}
+}
+
+func (c *DetailCache[T]) RuntimeSnapshot() StatsSnapshot {
+	if c == nil || c.inner == nil {
+		return StatsSnapshot{}
+	}
+	return c.inner.RuntimeSnapshot()
 }
 
 func (c *DetailCache[T]) Stats() (hits, misses uint64) {

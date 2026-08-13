@@ -59,6 +59,12 @@ func TestSubsystemBuildsConfiguredTypedCaches(t *testing.T) {
 	if len(entries) != 6 || entries[0].Capability != "catalog.published_model" || entries[1].Capability != "catalog.questionnaire" || entries[2].Capability != "catalog.typology" || entries[3].Capability != "evaluation.assessment_access" || entries[4].Capability != "evaluation.assessment_detail" || entries[5].Kind != "operational_state" {
 		t.Fatalf("effective registry = %#v", entries)
 	}
+	if entries[0].CatalogVersion != "v3" || entries[0].TopologyGroup != "published-model" || entries[0].TopologyOrder != 10 {
+		t.Fatalf("published-model topology = %#v", entries[0])
+	}
+	if entries[2].TopologyGroup != "" {
+		t.Fatalf("typology must remain outside fixed topology: %#v", entries[2])
+	}
 }
 
 func TestSubsystemDisabledCachesStayNil(t *testing.T) {
@@ -76,6 +82,15 @@ func TestSubsystemDisabledCachesStayNil(t *testing.T) {
 	published, ok := s.EffectiveRegistry().Resolve("catalog.published_model")
 	if !ok || published.Enabled || published.Layer != sharedcache.LayerL1 {
 		t.Fatalf("disabled published-model registry entry = %#v, found=%v", published, ok)
+	}
+	runtime := s.L1Runtime()
+	if len(runtime) != 5 {
+		t.Fatalf("disabled L1 runtime rows = %#v, want all five capabilities", runtime)
+	}
+	for _, row := range runtime {
+		if row.Enabled || len(row.Buckets) != 0 || row.SignalWatcher.Status != "disabled_by_policy" {
+			t.Fatalf("disabled L1 runtime row = %#v", row)
+		}
 	}
 }
 
@@ -140,6 +155,21 @@ func TestPublishedModelSignalEvictsExactDetailAndAllDerivedBuckets(t *testing.T)
 	if _, ok := cache.GetOptions(""); ok {
 		t.Fatal("published-model options remained cached")
 	}
+	for _, row := range s.L1Runtime() {
+		if row.Capability != "catalog.published_model" {
+			continue
+		}
+		if len(row.Buckets) != 3 {
+			t.Fatalf("published-model buckets = %#v", row.Buckets)
+		}
+		for _, bucket := range row.Buckets {
+			if bucket.SignalDeletions != 1 {
+				t.Fatalf("bucket %q signal deletions = %d, want 1", bucket.Bucket, bucket.SignalDeletions)
+			}
+		}
+		return
+	}
+	t.Fatal("published-model L1 runtime row not found")
 }
 
 func TestSignalOptionsRedisOptions(t *testing.T) {

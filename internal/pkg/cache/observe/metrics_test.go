@@ -1,23 +1,20 @@
-package catalogcache
+package observe
 
 import (
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func TestL1RuntimeMetricLabelsStayLowCardinality(t *testing.T) {
-	RecordEntries("catalog.questionnaire", "detail", 1)
-	RecordEviction("catalog.questionnaire", "detail", "ttl")
-	RecordRequest("catalog.questionnaire", "detail", "hit")
-
-	assertMetricLabels(t, "collection_l1_cache_entries", []string{"bucket", "capability"})
-	assertMetricLabels(t, "collection_l1_cache_evictions_total", []string{"bucket", "capability", "reason"})
-	assertMetricLabels(t, "collection_l1_cache_requests_total", []string{"bucket", "capability", "result"})
+func TestComponentFamilyOperationMetricLabelsStayBounded(t *testing.T) {
+	ObserveComponentCacheOperation("qs-apiserver", "static_meta", "get", time.Millisecond, true)
+	assertObservedMetricLabels(t, "qs_cache_family_operation_duration_seconds", []string{"component", "family", "op"})
+	assertObservedMetricLabels(t, "qs_cache_family_operation_errors_total", []string{"component", "family", "op"})
 }
 
-func assertMetricLabels(t *testing.T, name string, want []string) {
+func assertObservedMetricLabels(t *testing.T, name string, want []string) {
 	t.Helper()
 	families, err := prometheus.DefaultGatherer.Gather()
 	if err != nil {

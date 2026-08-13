@@ -622,6 +622,165 @@ definitions:
       total:
         type: integer
     type: object
+  governance.CapabilityPolicyView:
+    properties:
+      capability:
+        type: string
+      effective:
+        $ref: '#/definitions/governance.PolicyView'
+      enabled:
+        type: boolean
+      family:
+        type: string
+      family_default:
+        $ref: '#/definitions/governance.PolicyView'
+      global_default:
+        $ref: '#/definitions/governance.PolicyView'
+      kind:
+        type: string
+      layer:
+        type: string
+      metric_label:
+        type: string
+      override:
+        $ref: '#/definitions/governance.PolicyView'
+      owner:
+        type: string
+      read_model:
+        type: string
+      source:
+        type: string
+      spec_default:
+        $ref: '#/definitions/governance.PolicyView'
+      topology_group:
+        type: string
+      topology_order:
+        type: integer
+    type: object
+  governance.ComponentCacheGovernanceSnapshot:
+    properties:
+      component:
+        type: string
+      effective_registry:
+        $ref: '#/definitions/governance.EffectiveRegistrySnapshot'
+      generated_at:
+        type: string
+      generation:
+        type: string
+      instance_id:
+        type: string
+      l1_runtime:
+        items:
+          $ref: '#/definitions/governance.L1CapabilityRuntime'
+        type: array
+      redis_runtime:
+        $ref: '#/definitions/observability.RuntimeSnapshot'
+    type: object
+  governance.EffectiveRegistrySnapshot:
+    properties:
+      capabilities:
+        items:
+          $ref: '#/definitions/governance.CapabilityPolicyView'
+        type: array
+      catalog_version:
+        type: string
+      generated_at:
+        type: string
+      policy_source:
+        $ref: '#/definitions/governance.PolicySourceView'
+      reload:
+        $ref: '#/definitions/governance.PolicyReloadStatus'
+      snapshot_version:
+        type: integer
+    type: object
+  governance.L1BucketRuntime:
+    properties:
+      bucket:
+        type: string
+      entries:
+        type: integer
+      explicit_deletions:
+        type: integer
+      fifo_evictions:
+        type: integer
+      hits:
+        type: integer
+      max_entries:
+        type: integer
+      misses:
+        type: integer
+      signal_deletions:
+        type: integer
+      ttl_expirations:
+        type: integer
+    type: object
+  governance.L1CapabilityRuntime:
+    properties:
+      buckets:
+        items:
+          $ref: '#/definitions/governance.L1BucketRuntime'
+        type: array
+      capability:
+        type: string
+      enabled:
+        type: boolean
+      signal_watcher:
+        $ref: '#/definitions/governance.SignalWatcherStatus'
+    type: object
+  governance.PolicyReloadStatus:
+    properties:
+      last_attempt_at:
+        type: string
+      last_error:
+        type: string
+      last_failure_at:
+        type: string
+      last_success_at:
+        type: string
+    type: object
+  governance.PolicySourceView:
+    properties:
+      component:
+        type: string
+      path:
+        type: string
+      policy_sha256:
+        type: string
+      schema_version:
+        type: string
+    type: object
+  governance.PolicyView:
+    properties:
+      compress:
+        type: string
+      negative:
+        type: string
+      negative_ttl:
+        type: string
+      singleflight:
+        type: string
+      ttl:
+        type: string
+      ttl_jitter_ratio:
+        type: number
+    type: object
+  governance.SignalWatcherStatus:
+    properties:
+      configured:
+        type: boolean
+      last_error:
+        type: string
+      last_error_at:
+        type: string
+      last_eviction_at:
+        type: string
+      last_signal_at:
+        type: string
+      reconnect_count:
+        type: integer
+      status:
+        type: string
+    type: object
   meta.Birthday:
     type: object
   modelcatalog.HotModelResponse:
@@ -818,6 +977,67 @@ definitions:
         items:
           $ref: '#/definitions/modelcatalog.OptionResponse'
         type: array
+    type: object
+  observability.FamilyStatus:
+    properties:
+      allow_warmup:
+        type: boolean
+      available:
+        type: boolean
+      component:
+        type: string
+      configured:
+        type: boolean
+      consecutive_failures:
+        type: integer
+      degraded:
+        type: boolean
+      family:
+        type: string
+      last_error:
+        type: string
+      last_failure_at:
+        type: string
+      last_success_at:
+        type: string
+      mode:
+        type: string
+      namespace:
+        type: string
+      profile:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  observability.RuntimeSnapshot:
+    properties:
+      component:
+        type: string
+      families:
+        items:
+          $ref: '#/definitions/observability.FamilyStatus'
+        type: array
+      generated_at:
+        type: string
+      generation:
+        type: string
+      instance_id:
+        type: string
+      summary:
+        $ref: '#/definitions/observability.RuntimeSummary'
+    type: object
+  observability.RuntimeSummary:
+    properties:
+      available_count:
+        type: integer
+      degraded_count:
+        type: integer
+      family_total:
+        type: integer
+      ready:
+        type: boolean
+      unavailable_count:
+        type: integer
     type: object
   questionnaire.CalculationRuleResponse:
     properties:
@@ -2834,6 +3054,19 @@ paths:
       summary: 获取类型学模型分类
       tags:
       - 类型学模型
+  /governance/cache:
+    get:
+      description: 返回 collection-server 当前实例的只读 Cache Registry 与 Redis runtime。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: Cache 治理状态
+      tags:
+      - 系统
   /governance/redis:
     get:
       description: 返回 collection-server Redis family 的运行状态。
@@ -2869,7 +3102,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/core.Response'
+            $ref: '#/definitions/governance.ComponentCacheGovernanceSnapshot'
       summary: 健康检查
       tags:
       - 系统

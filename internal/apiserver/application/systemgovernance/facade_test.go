@@ -98,7 +98,7 @@ func TestGetCacheIncludesCanonicalCapabilityWorkloadRows(t *testing.T) {
 	if row.Capability != "statistics.query" || row.MetricLabel != "stats_query" {
 		t.Fatalf("capability row = %#v", row)
 	}
-	if row.Workload.HitRate == nil || row.Workload.ErrorCount == nil || row.Workload.GetLatencyP95 == nil {
+	if row.Workload.HitRate == nil || row.Workload.Samples == nil || row.Workload.ErrorCount == nil || row.Workload.GetLatencyP95 == nil {
 		t.Fatalf("workload = %#v, want all metric evidences", row.Workload)
 	}
 }
@@ -150,7 +150,8 @@ func (c *countingMetricsClient) Probe(context.Context, time.Time) govprom.Summar
 }
 
 func (c *countingMetricsClient) Query(_ context.Context, spec govprom.QuerySpec, _ time.Time) govprom.MetricResult {
-	return govprom.MetricResult{Name: spec.Name, Window: spec.Window, Unit: spec.Unit, Available: true}
+	value := 1.0
+	return govprom.MetricResult{Name: spec.Name, Window: spec.Window, Unit: spec.Unit, Available: true, Value: &value}
 }
 
 type cacheGovernanceForFacade struct {

@@ -2,6 +2,7 @@ package systemgovernance
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -138,11 +139,13 @@ func TestMetricEvidenceReaderBuildsCanonicalCapabilityWorkloadQueries(t *testing
 	now := time.Date(2026, 7, 4, 12, 0, 0, 0, time.UTC)
 
 	reader.CacheCapabilityHitRate(context.Background(), "statistics.query", "query_result", "stats_query", "5m", now)
+	reader.CacheCapabilitySamples(context.Background(), "statistics.query", "query_result", "stats_query", "5m", now)
 	reader.CacheCapabilityErrorCount(context.Background(), "statistics.query", "query_result", "stats_query", "5m", now)
 	reader.CacheCapabilityGetP95(context.Background(), "statistics.query", "query_result", "stats_query", "5m", now)
 
 	want := []string{
 		`(sum(increase(qs_cache_get_total{family="query_result",policy="stats_query",result="hit"}[5m]))) / clamp_min((sum(increase(qs_cache_get_total{family="query_result",policy="stats_query",result="hit"}[5m])) + sum(increase(qs_cache_get_total{family="query_result",policy="stats_query",result="miss"}[5m]))), 1)`,
+		`sum(increase(qs_cache_get_total{family="query_result",policy="stats_query",result="hit"}[5m])) + sum(increase(qs_cache_get_total{family="query_result",policy="stats_query",result="miss"}[5m]))`,
 		`sum(increase(qs_cache_get_total{family="query_result",policy="stats_query",result="error"}[5m])) + sum(increase(qs_cache_write_total{family="query_result",policy="stats_query",result="error"}[5m]))`,
 		`histogram_quantile(0.95, sum by (le) (rate(qs_cache_operation_duration_seconds_bucket{family="query_result",op="get",policy="stats_query"}[5m])))`,
 	}
@@ -157,11 +160,35 @@ func TestMetricEvidenceReaderBuildsCanonicalCapabilityWorkloadQueries(t *testing
 	if metrics.specs[0].Name != "cache_hit_rate_statistics_query" || metrics.specs[0].Unit != "ratio" {
 		t.Fatalf("hit rate spec = %#v", metrics.specs[0])
 	}
-	if metrics.specs[1].Name != "cache_error_count_statistics_query" || metrics.specs[1].Unit != "count" {
-		t.Fatalf("error count spec = %#v", metrics.specs[1])
+	if metrics.specs[1].Name != "cache_samples_statistics_query" || metrics.specs[1].Unit != "count" {
+		t.Fatalf("samples spec = %#v", metrics.specs[1])
 	}
-	if metrics.specs[2].Name != "cache_get_p95_statistics_query" || metrics.specs[2].Unit != "seconds" {
-		t.Fatalf("latency spec = %#v", metrics.specs[2])
+	if metrics.specs[2].Name != "cache_error_count_statistics_query" || metrics.specs[2].Unit != "count" {
+		t.Fatalf("error count spec = %#v", metrics.specs[2])
+	}
+	if metrics.specs[3].Name != "cache_get_p95_statistics_query" || metrics.specs[3].Unit != "seconds" {
+		t.Fatalf("latency spec = %#v", metrics.specs[3])
+	}
+}
+
+func TestMetricEvidenceReaderBuildsComponentFamilyOperationQueries(t *testing.T) {
+	metrics := &recordingMetricsReader{}
+	reader := NewMetricEvidenceReader(metrics)
+	now := time.Date(2026, 8, 13, 12, 0, 0, 0, time.UTC)
+
+	reader.CacheFamilyOperationP95(context.Background(), "apiserver", "static_meta", "5m", now)
+	reader.CacheFamilyOperationErrors(context.Background(), "apiserver", "static_meta", "5m", now)
+
+	if len(metrics.specs) != 2 {
+		t.Fatalf("metric specs = %#v", metrics.specs)
+	}
+	for _, spec := range metrics.specs {
+		if !strings.Contains(spec.Query, `component="qs-apiserver"`) || !strings.Contains(spec.Query, `family="static_meta"`) {
+			t.Fatalf("query = %q, want canonical component/family labels", spec.Query)
+		}
+	}
+	if metrics.specs[0].Unit != "seconds" || metrics.specs[1].Unit != "count" {
+		t.Fatalf("metric specs = %#v, want seconds/count", metrics.specs)
 	}
 }
 

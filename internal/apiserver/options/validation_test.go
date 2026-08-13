@@ -510,15 +510,17 @@ func TestOptionsValidateSystemGovernanceComponentDiscovery(t *testing.T) {
 func TestOptionsValidateSystemGovernanceSingleAndDNSDiscovery(t *testing.T) {
 	for _, config := range []*GovernanceComponentOptions{
 		{
-			ResilienceURL: "http://127.0.0.1:18083/governance/resilience",
-			CacheURL:      "http://127.0.0.1:18083/governance/redis",
-			Timeout:       time.Second,
+			ResilienceURL:      "http://127.0.0.1:18083/governance/resilience",
+			CacheURL:           "http://127.0.0.1:18083/governance/redis",
+			CacheGovernanceURL: "http://127.0.0.1:18083/governance/cache",
+			Timeout:            time.Second,
 		},
 		{
 			Discovery: "dns", MinimumInstances: 2,
-			ResilienceURL: "http://qs-collection-server:8080/governance/resilience",
-			CacheURL:      "http://qs-collection-server:8080/governance/redis",
-			Timeout:       time.Second,
+			ResilienceURL:      "http://qs-collection-server:8080/governance/resilience",
+			CacheURL:           "http://qs-collection-server:8080/governance/redis",
+			CacheGovernanceURL: "http://qs-collection-server:8080/governance/cache",
+			Timeout:            time.Second,
 		},
 	} {
 		opts := NewOptions()

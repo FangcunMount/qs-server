@@ -49,10 +49,35 @@ definitions:
         $ref: '#/definitions/cachemodel.PolicyView'
       owner:
         type: string
+      read_model:
+        type: string
       source:
         type: string
       spec_default:
         $ref: '#/definitions/cachemodel.PolicyView'
+      topology_group:
+        type: string
+      topology_order:
+        type: integer
+    type: object
+  cachemodel.ComponentCacheGovernanceSnapshot:
+    properties:
+      component:
+        type: string
+      effective_registry:
+        $ref: '#/definitions/cachemodel.EffectiveRegistrySnapshot'
+      generated_at:
+        type: string
+      generation:
+        type: string
+      instance_id:
+        type: string
+      l1_runtime:
+        items:
+          $ref: '#/definitions/cachemodel.L1CapabilityRuntime'
+        type: array
+      redis_runtime:
+        $ref: '#/definitions/cachemodel.RuntimeSnapshot'
     type: object
   cachemodel.EffectiveRegistrySnapshot:
     properties:
@@ -124,6 +149,40 @@ definitions:
       updated_at:
         type: string
     type: object
+  cachemodel.L1BucketRuntime:
+    properties:
+      bucket:
+        type: string
+      entries:
+        type: integer
+      explicit_deletions:
+        type: integer
+      fifo_evictions:
+        type: integer
+      hits:
+        type: integer
+      max_entries:
+        type: integer
+      misses:
+        type: integer
+      signal_deletions:
+        type: integer
+      ttl_expirations:
+        type: integer
+    type: object
+  cachemodel.L1CapabilityRuntime:
+    properties:
+      buckets:
+        items:
+          $ref: '#/definitions/cachemodel.L1BucketRuntime'
+        type: array
+      capability:
+        type: string
+      enabled:
+        type: boolean
+      signal_watcher:
+        $ref: '#/definitions/cachemodel.SignalWatcherStatus'
+    type: object
   cachemodel.PolicyReloadStatus:
     properties:
       last_attempt_at:
@@ -190,6 +249,23 @@ definitions:
         type: boolean
       unavailable_count:
         type: integer
+    type: object
+  cachemodel.SignalWatcherStatus:
+    properties:
+      configured:
+        type: boolean
+      last_error:
+        type: string
+      last_error_at:
+        type: string
+      last_eviction_at:
+        type: string
+      last_signal_at:
+        type: string
+      reconnect_count:
+        type: integer
+      status:
+        type: string
     type: object
   cachemodel.StatusSnapshot:
     properties:
@@ -4323,6 +4399,39 @@ definitions:
         $ref: '#/definitions/systemgovernance.MetricEvidence'
       hit_rate:
         $ref: '#/definitions/systemgovernance.MetricEvidence'
+      samples:
+        $ref: '#/definitions/systemgovernance.MetricEvidence'
+    type: object
+  systemgovernance.CacheFamilyGroup:
+    properties:
+      component:
+        type: string
+      degraded_instance_count:
+        type: integer
+      discovered_instance_count:
+        type: integer
+      family:
+        type: string
+      healthy_instance_count:
+        type: integer
+      last_error:
+        type: string
+      metric_evidence:
+        items:
+          $ref: '#/definitions/systemgovernance.MetricEvidence'
+        type: array
+      namespace:
+        type: string
+      operation_errors:
+        $ref: '#/definitions/systemgovernance.MetricEvidence'
+      operation_p95:
+        $ref: '#/definitions/systemgovernance.MetricEvidence'
+      profile:
+        type: string
+      severity:
+        $ref: '#/definitions/systemgovernance.Severity'
+      unavailable_instance_count:
+        type: integer
     type: object
   systemgovernance.CacheFamilyRow:
     properties:
@@ -4339,6 +4448,8 @@ definitions:
       degraded:
         type: boolean
       family:
+        type: string
+      generation:
         type: string
       instance_id:
         type: string
@@ -4399,6 +4510,153 @@ definitions:
           $ref: '#/definitions/systemgovernance.MetricEvidence'
         type: array
     type: object
+  systemgovernance.CacheL1CapabilityRuntimeRow:
+    properties:
+      buckets:
+        items:
+          $ref: '#/definitions/cachemodel.L1BucketRuntime'
+        type: array
+      capability:
+        type: string
+      component:
+        type: string
+      enabled:
+        type: boolean
+      generation:
+        type: string
+      hit_rate:
+        $ref: '#/definitions/systemgovernance.MetricEvidence'
+      instance_id:
+        type: string
+      samples:
+        $ref: '#/definitions/systemgovernance.MetricEvidence'
+      signal_watcher:
+        $ref: '#/definitions/cachemodel.SignalWatcherStatus'
+    type: object
+  systemgovernance.CacheRegistryView:
+    properties:
+      capability_rows:
+        items:
+          $ref: '#/definitions/systemgovernance.RegistryCapabilityRow'
+        type: array
+      component_registries:
+        items:
+          $ref: '#/definitions/systemgovernance.ComponentRegistryRow'
+        type: array
+      registry_drift:
+        items:
+          $ref: '#/definitions/systemgovernance.RegistryDrift'
+        type: array
+    type: object
+  systemgovernance.CacheRuntimeSummary:
+    properties:
+      abnormal_family_group_count:
+        type: integer
+      abnormal_l1_capability_count:
+        type: integer
+      component_total:
+        type: integer
+      discovered_instance_count:
+        type: integer
+      family_group_count:
+        type: integer
+      healthy_component_count:
+        type: integer
+      healthy_instance_count:
+        type: integer
+      ready:
+        type: boolean
+    type: object
+  systemgovernance.CacheRuntimeView:
+    properties:
+      family_groups:
+        items:
+          $ref: '#/definitions/systemgovernance.CacheFamilyGroup'
+        type: array
+      instance_rows:
+        items:
+          $ref: '#/definitions/systemgovernance.CacheFamilyRow'
+        type: array
+      l1_capability_runtime:
+        items:
+          $ref: '#/definitions/systemgovernance.CacheL1CapabilityRuntimeRow'
+        type: array
+      summary:
+        $ref: '#/definitions/systemgovernance.CacheRuntimeSummary'
+    type: object
+  systemgovernance.CacheTopology:
+    properties:
+      edges:
+        items:
+          $ref: '#/definitions/systemgovernance.CacheTopologyEdge'
+        type: array
+      nodes:
+        items:
+          $ref: '#/definitions/systemgovernance.CacheTopologyNode'
+        type: array
+      read_model:
+        type: string
+      source:
+        $ref: '#/definitions/systemgovernance.CacheTopologySource'
+      status:
+        type: string
+      topology_group:
+        type: string
+      window_evidence:
+        additionalProperties:
+          $ref: '#/definitions/systemgovernance.MetricEvidence'
+        type: object
+    type: object
+  systemgovernance.CacheTopologyEdge:
+    properties:
+      from:
+        type: string
+      kind:
+        type: string
+      to:
+        type: string
+    type: object
+  systemgovernance.CacheTopologyNode:
+    properties:
+      capability:
+        type: string
+      component:
+        type: string
+      enabled:
+        type: boolean
+      hit_rate:
+        $ref: '#/definitions/systemgovernance.MetricEvidence'
+      id:
+        type: string
+      layer:
+        type: string
+      order:
+        type: integer
+      policy_source:
+        type: string
+      registry_consistent:
+        type: boolean
+      runtime_health:
+        type: string
+      samples:
+        $ref: '#/definitions/systemgovernance.MetricEvidence'
+    type: object
+  systemgovernance.CacheTopologySource:
+    properties:
+      id:
+        type: string
+      read_model:
+        type: string
+      source_kind:
+        type: string
+    type: object
+  systemgovernance.CacheTopologyView:
+    properties:
+      topologies:
+        items:
+          $ref: '#/definitions/systemgovernance.CacheTopology'
+        type: array
+    type: object
   systemgovernance.CacheView:
     properties:
       capability_rows:
@@ -4421,12 +4679,18 @@ definitions:
         type: array
       metrics:
         $ref: '#/definitions/systemgovernance.MetricsSummary'
+      registry_view:
+        $ref: '#/definitions/systemgovernance.CacheRegistryView'
+      runtime_view:
+        $ref: '#/definitions/systemgovernance.CacheRuntimeView'
       signals:
         items:
           $ref: '#/definitions/systemgovernance.Signal'
         type: array
       snapshot:
         $ref: '#/definitions/cachemodel.StatusSnapshot'
+      topology_view:
+        $ref: '#/definitions/systemgovernance.CacheTopologyView'
       warmup_kinds:
         items:
           $ref: '#/definitions/systemgovernance.CacheWarmupKind'
@@ -4493,6 +4757,33 @@ definitions:
         additionalProperties:
           type: string
         type: object
+    type: object
+  systemgovernance.ComponentRegistryRow:
+    properties:
+      available:
+        type: boolean
+      capabilities:
+        items:
+          $ref: '#/definitions/cachemodel.CapabilityPolicyView'
+        type: array
+      catalog_version:
+        type: string
+      component:
+        type: string
+      generation:
+        type: string
+      instance_id:
+        type: string
+      l1_runtime:
+        items:
+          $ref: '#/definitions/cachemodel.L1CapabilityRuntime'
+        type: array
+      policy_source:
+        $ref: '#/definitions/cachemodel.PolicySourceView'
+      reason:
+        type: string
+      snapshot_version:
+        type: integer
     type: object
   systemgovernance.ComponentResilience:
     properties:
@@ -4580,6 +4871,93 @@ definitions:
         type: array
       window:
         type: string
+    type: object
+  systemgovernance.RegistryCapabilityRow:
+    properties:
+      capability:
+        type: string
+      component:
+        type: string
+      consistent:
+        type: boolean
+      effective_policy:
+        $ref: '#/definitions/cachemodel.PolicyView'
+      enabled:
+        type: boolean
+      family:
+        type: string
+      instance_ids:
+        items:
+          type: string
+        type: array
+      kind:
+        type: string
+      layer:
+        type: string
+      metric_label:
+        type: string
+      owner:
+        type: string
+      policy_sha256:
+        type: string
+      read_model:
+        type: string
+      topology_group:
+        type: string
+      topology_order:
+        type: integer
+      variants:
+        items:
+          $ref: '#/definitions/systemgovernance.RegistryCapabilityVariant'
+        type: array
+    type: object
+  systemgovernance.RegistryCapabilityVariant:
+    properties:
+      effective_policy:
+        $ref: '#/definitions/cachemodel.PolicyView'
+      enabled:
+        type: boolean
+      family:
+        type: string
+      instance_ids:
+        items:
+          type: string
+        type: array
+      kind:
+        type: string
+      layer:
+        type: string
+      metric_label:
+        type: string
+      owner:
+        type: string
+      policy_sha256:
+        type: string
+      read_model:
+        type: string
+      topology_group:
+        type: string
+      topology_order:
+        type: integer
+    type: object
+  systemgovernance.RegistryDrift:
+    properties:
+      component:
+        type: string
+      instance_ids:
+        items:
+          type: string
+        type: array
+      kind:
+        type: string
+      message:
+        type: string
+      values:
+        additionalProperties:
+          items:
+            type: string
+          type: array
+        type: object
     type: object
   systemgovernance.ResilienceBackpressureRow:
     properties:
@@ -9246,6 +9624,19 @@ paths:
       summary: 查询 Statistics 机构总览
       tags:
       - Statistics
+  /governance/cache:
+    get:
+      description: 返回 qs-apiserver 当前实例的只读 Cache Registry 与 Redis runtime。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/cachemodel.ComponentCacheGovernanceSnapshot'
+      summary: Cache 治理状态
+      tags:
+      - health
   /governance/redis:
     get:
       description: 返回 apiserver Redis family 的运行状态。

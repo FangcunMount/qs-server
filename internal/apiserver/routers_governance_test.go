@@ -104,6 +104,40 @@ func TestRouterGovernanceEndpointReturnsRuntimeSnapshotOnly(t *testing.T) {
 	}
 }
 
+func TestRouterCacheGovernanceReturnsCanonicalComponentAndRegistry(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	router := resttransport.NewRouter(newGovernanceTestContainer(
+		observability.FamilyStatus{Component: "apiserver", Family: "query_result", Available: true},
+	).BuildRESTDeps(nil))
+	router.RegisterRoutes(engine)
+
+	req := httptest.NewRequest(http.MethodGet, "/governance/cache", nil)
+	rec := httptest.NewRecorder()
+	engine.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	var payload struct {
+		Component string `json:"component"`
+		Runtime   struct {
+			Component string `json:"component"`
+		} `json:"redis_runtime"`
+		Registry struct {
+			SnapshotVersion uint64 `json:"snapshot_version"`
+		} `json:"effective_registry"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Component != "qs-apiserver" || payload.Runtime.Component != "apiserver" {
+		t.Fatalf("component identity = %+v", payload)
+	}
+	if payload.Registry.SnapshotVersion != 1 {
+		t.Fatalf("snapshot version = %d, want 1", payload.Registry.SnapshotVersion)
+	}
+}
+
 func TestRouterGovernanceEndpointsRemainPublicWhenGovernanceServiceUnavailable(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -111,7 +145,7 @@ func TestRouterGovernanceEndpointsRemainPublicWhenGovernanceServiceUnavailable(t
 	router := resttransport.NewRouter(container.NewContainer(nil, nil, nil).BuildRESTDeps(nil))
 	router.RegisterRoutes(engine)
 
-	for _, path := range []string{"/readyz", "/governance/redis"} {
+	for _, path := range []string{"/readyz", "/governance/redis", "/governance/cache"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		rec := httptest.NewRecorder()
 		engine.ServeHTTP(rec, req)

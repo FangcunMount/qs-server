@@ -214,7 +214,7 @@ Cache governance status 在原有 runtime/warmup 字段外提供：
 {
   "effective_registry": {
     "snapshot_version": 2,
-    "catalog_version": "v2",
+    "catalog_version": "v3",
     "generated_at": "...",
     "policy_source": {
       "component": "qs-apiserver",

@@ -409,11 +409,17 @@ system_governance:
     base_url: "http://prometheus:9090"
     timeout: 3s
   components:
+    qs-apiserver:
+      discovery: dns
+      minimum_instances: 1
+      cache_governance_url: "http://qs-apiserver:8080/governance/cache"
+      timeout: 3s
     collection-server:
       discovery: dns
       minimum_instances: 2
       resilience_url: "http://qs-collection-server:8080/governance/resilience"
       cache_url: "http://qs-collection-server:8080/governance/redis"
+      cache_governance_url: "http://qs-collection-server:8080/governance/cache"
       timeout: 3s
     worker:
       discovery: dns

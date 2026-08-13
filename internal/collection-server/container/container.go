@@ -348,6 +348,10 @@ func (c *Container) initHandlers() {
 	c.typologyAssessmentSessionHandler = handler.NewTypologyAssessmentSessionHandler(c.typologySessionService)
 	c.testeeHandler = handler.NewTesteeHandler(c.testeeService, profileLinkService)
 	c.healthHandler = handler.NewHealthHandlerWithResilience("collection-server", "2.0.0", c.familyStatus, c.ResilienceSnapshot, c.resilience.ControlSynchronized)
+	if c.cacheSubsystem != nil {
+		c.healthHandler.BindCacheRegistry(c.cacheSubsystem.EffectiveRegistry())
+		c.healthHandler.BindL1Runtime(c.cacheSubsystem.L1Runtime)
+	}
 
 	log.Info("✅ REST handlers initialized")
 }

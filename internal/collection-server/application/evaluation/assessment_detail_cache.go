@@ -37,6 +37,13 @@ func (c *LocalAssessmentAccessCache) Set(testeeID, assessmentID uint64) {
 	c.entries.Set(assessmentDetailCacheKey(testeeID, assessmentID), true)
 }
 
+func (c *LocalAssessmentAccessCache) RuntimeBuckets() []localcache.BucketSnapshot {
+	if c == nil || c.entries == nil {
+		return nil
+	}
+	return []localcache.BucketSnapshot{{Bucket: "access", Stats: c.entries.RuntimeSnapshot()}}
+}
+
 // AssessmentDetailCache is owned by collection's evaluation query boundary.
 // It stores only final collection DTOs, never domain aggregates or gRPC DTOs.
 type AssessmentDetailCache interface {
@@ -64,6 +71,13 @@ func (c *LocalAssessmentDetailCache) Set(testeeID, assessmentID uint64, value *A
 		return
 	}
 	c.entries.Set(assessmentDetailCacheKey(testeeID, assessmentID), value)
+}
+
+func (c *LocalAssessmentDetailCache) RuntimeBuckets() []localcache.BucketSnapshot {
+	if c == nil || c.entries == nil {
+		return nil
+	}
+	return []localcache.BucketSnapshot{{Bucket: "detail", Stats: c.entries.RuntimeSnapshot()}}
 }
 
 func assessmentDetailCacheKey(testeeID, assessmentID uint64) string {

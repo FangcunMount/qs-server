@@ -7010,6 +7010,26 @@ const docTemplate = `{
                 }
             }
         },
+        "/governance/cache": {
+            "get": {
+                "description": "返回 qs-apiserver 当前实例的只读 Cache Registry 与 Redis runtime。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Cache 治理状态",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/cachemodel.ComponentCacheGovernanceSnapshot"
+                        }
+                    }
+                }
+            }
+        },
         "/governance/redis": {
             "get": {
                 "description": "返回 apiserver Redis family 的运行状态。",
@@ -8353,11 +8373,49 @@ const docTemplate = `{
                 "owner": {
                     "type": "string"
                 },
+                "read_model": {
+                    "type": "string"
+                },
                 "source": {
                     "type": "string"
                 },
                 "spec_default": {
                     "$ref": "#/definitions/cachemodel.PolicyView"
+                },
+                "topology_group": {
+                    "type": "string"
+                },
+                "topology_order": {
+                    "type": "integer"
+                }
+            }
+        },
+        "cachemodel.ComponentCacheGovernanceSnapshot": {
+            "type": "object",
+            "properties": {
+                "component": {
+                    "type": "string"
+                },
+                "effective_registry": {
+                    "$ref": "#/definitions/cachemodel.EffectiveRegistrySnapshot"
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "generation": {
+                    "type": "string"
+                },
+                "instance_id": {
+                    "type": "string"
+                },
+                "l1_runtime": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/cachemodel.L1CapabilityRuntime"
+                    }
+                },
+                "redis_runtime": {
+                    "$ref": "#/definitions/cachemodel.RuntimeSnapshot"
                 }
             }
         },
@@ -8456,6 +8514,58 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
+                }
+            }
+        },
+        "cachemodel.L1BucketRuntime": {
+            "type": "object",
+            "properties": {
+                "bucket": {
+                    "type": "string"
+                },
+                "entries": {
+                    "type": "integer"
+                },
+                "explicit_deletions": {
+                    "type": "integer"
+                },
+                "fifo_evictions": {
+                    "type": "integer"
+                },
+                "hits": {
+                    "type": "integer"
+                },
+                "max_entries": {
+                    "type": "integer"
+                },
+                "misses": {
+                    "type": "integer"
+                },
+                "signal_deletions": {
+                    "type": "integer"
+                },
+                "ttl_expirations": {
+                    "type": "integer"
+                }
+            }
+        },
+        "cachemodel.L1CapabilityRuntime": {
+            "type": "object",
+            "properties": {
+                "buckets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/cachemodel.L1BucketRuntime"
+                    }
+                },
+                "capability": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "signal_watcher": {
+                    "$ref": "#/definitions/cachemodel.SignalWatcherStatus"
                 }
             }
         },
@@ -8559,6 +8669,32 @@ const docTemplate = `{
                 },
                 "unavailable_count": {
                     "type": "integer"
+                }
+            }
+        },
+        "cachemodel.SignalWatcherStatus": {
+            "type": "object",
+            "properties": {
+                "configured": {
+                    "type": "boolean"
+                },
+                "last_error": {
+                    "type": "string"
+                },
+                "last_error_at": {
+                    "type": "string"
+                },
+                "last_eviction_at": {
+                    "type": "string"
+                },
+                "last_signal_at": {
+                    "type": "string"
+                },
+                "reconnect_count": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
                 }
             }
         },
@@ -14730,6 +14866,56 @@ const docTemplate = `{
                 },
                 "hit_rate": {
                     "$ref": "#/definitions/systemgovernance.MetricEvidence"
+                },
+                "samples": {
+                    "$ref": "#/definitions/systemgovernance.MetricEvidence"
+                }
+            }
+        },
+        "systemgovernance.CacheFamilyGroup": {
+            "type": "object",
+            "properties": {
+                "component": {
+                    "type": "string"
+                },
+                "degraded_instance_count": {
+                    "type": "integer"
+                },
+                "discovered_instance_count": {
+                    "type": "integer"
+                },
+                "family": {
+                    "type": "string"
+                },
+                "healthy_instance_count": {
+                    "type": "integer"
+                },
+                "last_error": {
+                    "type": "string"
+                },
+                "metric_evidence": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.MetricEvidence"
+                    }
+                },
+                "namespace": {
+                    "type": "string"
+                },
+                "operation_errors": {
+                    "$ref": "#/definitions/systemgovernance.MetricEvidence"
+                },
+                "operation_p95": {
+                    "$ref": "#/definitions/systemgovernance.MetricEvidence"
+                },
+                "profile": {
+                    "type": "string"
+                },
+                "severity": {
+                    "$ref": "#/definitions/systemgovernance.Severity"
+                },
+                "unavailable_instance_count": {
+                    "type": "integer"
                 }
             }
         },
@@ -14755,6 +14941,9 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "family": {
+                    "type": "string"
+                },
+                "generation": {
                     "type": "string"
                 },
                 "instance_id": {
@@ -14847,6 +15036,231 @@ const docTemplate = `{
                 }
             }
         },
+        "systemgovernance.CacheL1CapabilityRuntimeRow": {
+            "type": "object",
+            "properties": {
+                "buckets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/cachemodel.L1BucketRuntime"
+                    }
+                },
+                "capability": {
+                    "type": "string"
+                },
+                "component": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "generation": {
+                    "type": "string"
+                },
+                "hit_rate": {
+                    "$ref": "#/definitions/systemgovernance.MetricEvidence"
+                },
+                "instance_id": {
+                    "type": "string"
+                },
+                "samples": {
+                    "$ref": "#/definitions/systemgovernance.MetricEvidence"
+                },
+                "signal_watcher": {
+                    "$ref": "#/definitions/cachemodel.SignalWatcherStatus"
+                }
+            }
+        },
+        "systemgovernance.CacheRegistryView": {
+            "type": "object",
+            "properties": {
+                "capability_rows": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.RegistryCapabilityRow"
+                    }
+                },
+                "component_registries": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.ComponentRegistryRow"
+                    }
+                },
+                "registry_drift": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.RegistryDrift"
+                    }
+                }
+            }
+        },
+        "systemgovernance.CacheRuntimeSummary": {
+            "type": "object",
+            "properties": {
+                "abnormal_family_group_count": {
+                    "type": "integer"
+                },
+                "abnormal_l1_capability_count": {
+                    "type": "integer"
+                },
+                "component_total": {
+                    "type": "integer"
+                },
+                "discovered_instance_count": {
+                    "type": "integer"
+                },
+                "family_group_count": {
+                    "type": "integer"
+                },
+                "healthy_component_count": {
+                    "type": "integer"
+                },
+                "healthy_instance_count": {
+                    "type": "integer"
+                },
+                "ready": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "systemgovernance.CacheRuntimeView": {
+            "type": "object",
+            "properties": {
+                "family_groups": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.CacheFamilyGroup"
+                    }
+                },
+                "instance_rows": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.CacheFamilyRow"
+                    }
+                },
+                "l1_capability_runtime": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.CacheL1CapabilityRuntimeRow"
+                    }
+                },
+                "summary": {
+                    "$ref": "#/definitions/systemgovernance.CacheRuntimeSummary"
+                }
+            }
+        },
+        "systemgovernance.CacheTopology": {
+            "type": "object",
+            "properties": {
+                "edges": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.CacheTopologyEdge"
+                    }
+                },
+                "nodes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.CacheTopologyNode"
+                    }
+                },
+                "read_model": {
+                    "type": "string"
+                },
+                "source": {
+                    "$ref": "#/definitions/systemgovernance.CacheTopologySource"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "topology_group": {
+                    "type": "string"
+                },
+                "window_evidence": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/systemgovernance.MetricEvidence"
+                    }
+                }
+            }
+        },
+        "systemgovernance.CacheTopologyEdge": {
+            "type": "object",
+            "properties": {
+                "from": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "to": {
+                    "type": "string"
+                }
+            }
+        },
+        "systemgovernance.CacheTopologyNode": {
+            "type": "object",
+            "properties": {
+                "capability": {
+                    "type": "string"
+                },
+                "component": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "hit_rate": {
+                    "$ref": "#/definitions/systemgovernance.MetricEvidence"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "layer": {
+                    "type": "string"
+                },
+                "order": {
+                    "type": "integer"
+                },
+                "policy_source": {
+                    "type": "string"
+                },
+                "registry_consistent": {
+                    "type": "boolean"
+                },
+                "runtime_health": {
+                    "type": "string"
+                },
+                "samples": {
+                    "$ref": "#/definitions/systemgovernance.MetricEvidence"
+                }
+            }
+        },
+        "systemgovernance.CacheTopologySource": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "read_model": {
+                    "type": "string"
+                },
+                "source_kind": {
+                    "type": "string"
+                }
+            }
+        },
+        "systemgovernance.CacheTopologyView": {
+            "type": "object",
+            "properties": {
+                "topologies": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.CacheTopology"
+                    }
+                }
+            }
+        },
         "systemgovernance.CacheView": {
             "type": "object",
             "properties": {
@@ -14880,6 +15294,12 @@ const docTemplate = `{
                 "metrics": {
                     "$ref": "#/definitions/systemgovernance.MetricsSummary"
                 },
+                "registry_view": {
+                    "$ref": "#/definitions/systemgovernance.CacheRegistryView"
+                },
+                "runtime_view": {
+                    "$ref": "#/definitions/systemgovernance.CacheRuntimeView"
+                },
                 "signals": {
                     "type": "array",
                     "items": {
@@ -14888,6 +15308,9 @@ const docTemplate = `{
                 },
                 "snapshot": {
                     "$ref": "#/definitions/cachemodel.StatusSnapshot"
+                },
+                "topology_view": {
+                    "$ref": "#/definitions/systemgovernance.CacheTopologyView"
                 },
                 "warmup_kinds": {
                     "type": "array",
@@ -14989,6 +15412,47 @@ const docTemplate = `{
                     "additionalProperties": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "systemgovernance.ComponentRegistryRow": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "boolean"
+                },
+                "capabilities": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/cachemodel.CapabilityPolicyView"
+                    }
+                },
+                "catalog_version": {
+                    "type": "string"
+                },
+                "component": {
+                    "type": "string"
+                },
+                "generation": {
+                    "type": "string"
+                },
+                "instance_id": {
+                    "type": "string"
+                },
+                "l1_runtime": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/cachemodel.L1CapabilityRuntime"
+                    }
+                },
+                "policy_source": {
+                    "$ref": "#/definitions/cachemodel.PolicySourceView"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "snapshot_version": {
+                    "type": "integer"
                 }
             }
         },
@@ -15118,6 +15582,138 @@ const docTemplate = `{
                 },
                 "window": {
                     "type": "string"
+                }
+            }
+        },
+        "systemgovernance.RegistryCapabilityRow": {
+            "type": "object",
+            "properties": {
+                "capability": {
+                    "type": "string"
+                },
+                "component": {
+                    "type": "string"
+                },
+                "consistent": {
+                    "type": "boolean"
+                },
+                "effective_policy": {
+                    "$ref": "#/definitions/cachemodel.PolicyView"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "family": {
+                    "type": "string"
+                },
+                "instance_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "layer": {
+                    "type": "string"
+                },
+                "metric_label": {
+                    "type": "string"
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "policy_sha256": {
+                    "type": "string"
+                },
+                "read_model": {
+                    "type": "string"
+                },
+                "topology_group": {
+                    "type": "string"
+                },
+                "topology_order": {
+                    "type": "integer"
+                },
+                "variants": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.RegistryCapabilityVariant"
+                    }
+                }
+            }
+        },
+        "systemgovernance.RegistryCapabilityVariant": {
+            "type": "object",
+            "properties": {
+                "effective_policy": {
+                    "$ref": "#/definitions/cachemodel.PolicyView"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "family": {
+                    "type": "string"
+                },
+                "instance_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "layer": {
+                    "type": "string"
+                },
+                "metric_label": {
+                    "type": "string"
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "policy_sha256": {
+                    "type": "string"
+                },
+                "read_model": {
+                    "type": "string"
+                },
+                "topology_group": {
+                    "type": "string"
+                },
+                "topology_order": {
+                    "type": "integer"
+                }
+            }
+        },
+        "systemgovernance.RegistryDrift": {
+            "type": "object",
+            "properties": {
+                "component": {
+                    "type": "string"
+                },
+                "instance_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "values": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
                 }
             }
         },
