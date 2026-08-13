@@ -73,14 +73,31 @@ func (c *LocalPublishedModelCache) EvictOnSignal(code string) {
 		return
 	}
 	if c.detail != nil && normalizedModelCode(code) != "" {
-		c.detail.Delete(publishedModelDetailCacheKey(code))
+		c.detail.DeleteWithReason(publishedModelDetailCacheKey(code), localcache.EvictionReasonSignal)
 	}
 	if c.list != nil {
-		c.list.DeletePrefix(publishedModelListKeyPrefix)
+		c.list.DeletePrefixWithReason(publishedModelListKeyPrefix, localcache.EvictionReasonSignal)
 	}
 	if c.options != nil {
-		c.options.DeletePrefix(publishedModelOptionsKeyPrefix)
+		c.options.DeletePrefixWithReason(publishedModelOptionsKeyPrefix, localcache.EvictionReasonSignal)
 	}
+}
+
+func (c *LocalPublishedModelCache) RuntimeBuckets() []localcache.BucketSnapshot {
+	if c == nil {
+		return nil
+	}
+	result := make([]localcache.BucketSnapshot, 0, 3)
+	if c.detail != nil {
+		result = append(result, localcache.BucketSnapshot{Bucket: "detail", Stats: c.detail.RuntimeSnapshot()})
+	}
+	if c.list != nil {
+		result = append(result, localcache.BucketSnapshot{Bucket: "list", Stats: c.list.RuntimeSnapshot()})
+	}
+	if c.options != nil {
+		result = append(result, localcache.BucketSnapshot{Bucket: "options", Stats: c.options.RuntimeSnapshot()})
+	}
+	return result
 }
 
 var _ PublishedModelCache = (*LocalPublishedModelCache)(nil)

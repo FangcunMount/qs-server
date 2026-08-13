@@ -33,7 +33,9 @@ import (
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
+	sharedgovernance "github.com/FangcunMount/qs-server/internal/pkg/cache/governance"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
+	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
 	"github.com/gin-gonic/gin"
@@ -327,6 +329,61 @@ func (r *Router) readyCheck(c *gin.Context) {
 // @Router /governance/redis [get]
 func (r *Router) redisGovernance(c *gin.Context) {
 	c.JSON(http.StatusOK, r.runtimeSnapshot(c))
+}
+
+// cacheGovernance returns the immutable process policy and Redis runtime.
+// @Summary Cache 治理状态
+// @Description 返回 qs-apiserver 当前实例的只读 Cache Registry 与 Redis runtime。
+// @Tags health
+// @Produce json
+// @Success 200 {object} cachemodel.ComponentCacheGovernanceSnapshot
+// @Router /governance/cache [get]
+func (r *Router) cacheGovernance(c *gin.Context) {
+	var status *cachemodel.StatusSnapshot
+	if r != nil && r.deps.GovernanceStatusService != nil {
+		status, _ = r.deps.GovernanceStatusService.GetStatus(c.Request.Context())
+	}
+	if status == nil {
+		status = &cachemodel.StatusSnapshot{RuntimeSnapshot: r.runtimeSnapshot(c)}
+	}
+	runtime := projectComponentRedisRuntime(status.RuntimeSnapshot)
+	if r.deps.ResilienceSnapshot != nil {
+		identity := r.deps.ResilienceSnapshot()
+		runtime.InstanceID = identity.InstanceID
+		runtime.Generation = identity.Generation
+	}
+	result := sharedgovernance.ComponentCacheGovernanceSnapshot{
+		GeneratedAt:  time.Now(),
+		Component:    "qs-apiserver",
+		InstanceID:   runtime.InstanceID,
+		Generation:   runtime.Generation,
+		RedisRuntime: runtime,
+	}
+	if status.EffectiveRegistry != nil {
+		result.EffectiveRegistry = status.EffectiveRegistry.Shared()
+	}
+	c.JSON(http.StatusOK, result)
+}
+
+func projectComponentRedisRuntime(in cachemodel.RuntimeSnapshot) observability.RuntimeSnapshot {
+	out := observability.RuntimeSnapshot{
+		GeneratedAt: in.GeneratedAt, Component: in.Component, InstanceID: in.InstanceID, Generation: in.Generation,
+		Summary: observability.RuntimeSummary{
+			FamilyTotal: in.Summary.FamilyTotal, AvailableCount: in.Summary.AvailableCount,
+			DegradedCount: in.Summary.DegradedCount, UnavailableCount: in.Summary.UnavailableCount, Ready: in.Summary.Ready,
+		},
+		Families: make([]observability.FamilyStatus, 0, len(in.Families)),
+	}
+	for _, family := range in.Families {
+		out.Families = append(out.Families, observability.FamilyStatus{
+			Component: family.Component, Family: family.Family, Profile: family.Profile, Namespace: family.Namespace,
+			AllowWarmup: family.AllowWarmup, Configured: family.Configured, Available: family.Available,
+			Degraded: family.Degraded, Mode: family.Mode, LastError: family.LastError,
+			LastSuccessAt: family.LastSuccessAt, LastFailureAt: family.LastFailureAt,
+			ConsecutiveFailures: family.ConsecutiveFailures, UpdatedAt: family.UpdatedAt,
+		})
+	}
+	return out
 }
 
 func (r *Router) runtimeSnapshot(c *gin.Context) cachemodel.RuntimeSnapshot {

@@ -11,7 +11,7 @@ import (
 )
 
 func NewCapabilityObserver(policyKey sharedcache.Capability, health cacheobserve.FamilyObserver) sharedcache.Observer {
-	return cacheobserve.NewPrometheus(string(cachepolicy.Family(policyKey)), cachepolicy.MetricLabel(policyKey), health)
+	return cacheobserve.NewComponentPrometheus("qs-apiserver", string(cachepolicy.Family(policyKey)), cachepolicy.MetricLabel(policyKey), health)
 }
 
 func NewRedisStoreIfAvailable(client redis.UniversalClient) sharedcache.Store {

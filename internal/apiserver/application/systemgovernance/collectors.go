@@ -66,6 +66,10 @@ func (c cacheGovernanceCollector) Collect(ctx context.Context, evalCtx evaluatio
 		}
 	}
 	components := c.collectComponents(ctx, snapshot)
+	registryComponents := map[string]govcomponent.CacheGovernanceResult{}
+	if c.components != nil {
+		registryComponents = c.components.FetchCacheGovernance(ctx)
+	}
 	var hotsets []CacheHotsetView
 	if includeHotsets {
 		hotsets = c.collectHotsets(ctx)
@@ -76,6 +80,11 @@ func (c cacheGovernanceCollector) Collect(ctx context.Context, evalCtx evaluatio
 	if snapshot != nil {
 		capabilityRows = evaluator.CapabilityRows(ctx, snapshot.EffectiveRegistry, evalCtx.windowLabel, evalCtx.evalAt)
 	}
+	registryView := BuildCacheRegistryView(registryComponents)
+	runtimeView := BuildCacheRuntimeView(components, projection.FamilyRows, registryComponents)
+	AttachCacheL1WindowEvidence(ctx, &runtimeView, evaluator.evidence, evalCtx.windowLabel, evalCtx.evalAt)
+	AttachCacheL2OperationEvidence(ctx, &runtimeView, evaluator.evidence, evalCtx.windowLabel, evalCtx.evalAt)
+	topologyView := BuildCacheTopologyView(registryView, runtimeView, capabilityRows)
 	return &CacheView{
 		GeneratedAt:    evalCtx.evalAt,
 		Window:         evalCtx.windowLabel,
@@ -87,8 +96,15 @@ func (c cacheGovernanceCollector) Collect(ctx context.Context, evalCtx evaluatio
 		CapabilityRows: capabilityRows,
 		WarmupKinds:    projection.WarmupKinds,
 		Hotsets:        projection.Hotsets,
+		RegistryView:   cacheRegistryViewPointer(registryView),
+		RuntimeView:    cacheRuntimeViewPointer(runtimeView),
+		TopologyView:   cacheTopologyViewPointer(topologyView),
 	}, nil
 }
+
+func cacheRegistryViewPointer(view CacheRegistryView) *CacheRegistryView { return &view }
+func cacheRuntimeViewPointer(view CacheRuntimeView) *CacheRuntimeView    { return &view }
+func cacheTopologyViewPointer(view CacheTopologyView) *CacheTopologyView { return &view }
 
 func (c cacheGovernanceCollector) collectComponents(ctx context.Context, snapshot *cachemodel.StatusSnapshot) map[string]ComponentCache {
 	components := map[string]ComponentCache{}

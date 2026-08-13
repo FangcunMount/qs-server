@@ -13,6 +13,8 @@ type LocalCacheOptions struct {
 	TTLJitterRatio float64
 	OnHit          func()
 	OnMiss         func()
+	OnEntries      func(int)
+	OnEviction     func(localcache.EvictionReason)
 }
 
 // LocalCache 已发布问卷 REST DTO 的进程内 TTL 缓存。
@@ -29,6 +31,8 @@ func NewLocalCache(opts LocalCacheOptions) *LocalCache {
 			TTLJitterRatio: opts.TTLJitterRatio,
 			OnHit:          opts.OnHit,
 			OnMiss:         opts.OnMiss,
+			OnEntries:      opts.OnEntries,
+			OnEviction:     opts.OnEviction,
 		}, localcache.DetailHooks[*QuestionnaireResponse]{
 			KeyFn:  cacheKey,
 			Clone:  cloneResponse,
@@ -63,4 +67,17 @@ func (c *LocalCache) Stats() (hits, misses uint64) {
 		return 0, 0
 	}
 	return c.inner.Stats()
+}
+
+func (c *LocalCache) EvictOnSignal(code, version string) {
+	if c != nil && c.inner != nil {
+		c.inner.EvictOnSignal(code, version)
+	}
+}
+
+func (c *LocalCache) RuntimeBuckets() []localcache.BucketSnapshot {
+	if c == nil || c.inner == nil {
+		return nil
+	}
+	return []localcache.BucketSnapshot{{Bucket: "detail", Stats: c.inner.RuntimeSnapshot()}}
 }

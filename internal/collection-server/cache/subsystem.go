@@ -3,6 +3,7 @@ package cache
 
 import (
 	"context"
+	"sort"
 	"sync"
 	"time"
 
@@ -16,6 +17,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
+	sharedgovernance "github.com/FangcunMount/qs-server/internal/pkg/cache/governance"
+	localcache "github.com/FangcunMount/qs-server/internal/pkg/cache/local"
 	"github.com/FangcunMount/qs-server/internal/pkg/cache/signal"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	redis "github.com/redis/go-redis/v9"
@@ -36,6 +39,9 @@ type Subsystem struct {
 	typology         typologymodel.CatalogCache
 	warmup           *typologymodel.QueryService
 	effective        *sharedcache.Registry
+
+	runtimeMu      sync.RWMutex
+	watcherRuntime map[sharedcache.Capability]sharedgovernance.SignalWatcherStatus
 
 	mu      sync.Mutex
 	started bool
@@ -87,36 +93,46 @@ func (o SignalOptions) redisOptions() signalredis.Options {
 }
 
 func NewSubsystem(config Config, opsHandle *redisruntime.Handle) *Subsystem {
-	s := &Subsystem{config: config, opsHandle: opsHandle}
+	s := &Subsystem{config: config, opsHandle: opsHandle, watcherRuntime: map[sharedcache.Capability]sharedgovernance.SignalWatcherStatus{}}
+	for _, binding := range []CatalogBinding{config.Questionnaire, config.PublishedModel, config.Typology, config.AssessmentDetail, config.AssessmentAccess} {
+		status := sharedgovernance.SignalWatcherStatus{Configured: binding.Enabled && binding.SignalEvict && config.Signaling.Enabled, Status: "disabled_by_policy"}
+		if status.Configured {
+			status.Status = "configured"
+		}
+		s.watcherRuntime[binding.Capability] = status
+	}
 	if cfg := config.Questionnaire; cfg.Enabled {
-		base := catalogcache.LocalTTLCacheOptions("questionnaire", cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio)
+		base := catalogcache.LocalTTLCacheOptionsWithRuntime("questionnaire", string(cfg.Capability), "detail", cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio)
 		s.questionnaire = questionnaire.NewLocalCache(questionnaire.LocalCacheOptions{
 			TTL: base.TTL, MaxEntries: base.MaxEntries, TTLJitterRatio: base.TTLJitterRatio,
-			OnHit: base.OnHit, OnMiss: base.OnMiss,
+			OnHit: base.OnHit, OnMiss: base.OnMiss, OnEntries: base.OnEntries, OnEviction: base.OnEviction,
 		})
 	}
 	if cfg := config.Typology; cfg.Enabled {
-		base := catalogcache.LocalTTLCacheOptions("typology", cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio)
+		buckets := localcache.MultiOptions{
+			Detail:     catalogcache.LocalTTLCacheOptionsWithRuntime("typology", string(cfg.Capability), "detail", cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio),
+			List:       catalogcache.LocalTTLCacheOptionsWithRuntime("typology", string(cfg.Capability), "list", cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio),
+			Categories: catalogcache.LocalTTLCacheOptionsWithRuntime("typology", string(cfg.Capability), "categories", cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio),
+		}
 		s.typology = typologymodel.NewLocalCatalogCache(typologymodel.LocalCatalogCacheOptions{
-			TTL: base.TTL, MaxEntries: base.MaxEntries, TTLJitterRatio: base.TTLJitterRatio,
-			OnHit: base.OnHit, OnMiss: base.OnMiss,
+			BucketOptions: &buckets,
 		})
 	}
 	if cfg := config.PublishedModel; cfg.Enabled {
 		s.publishedModel = appmodelcatalog.NewLocalPublishedModelCache(
-			catalogcache.LocalTTLCacheOptions(catalogcache.KindPublishedModelDetail, cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio),
-			catalogcache.LocalTTLCacheOptions(catalogcache.KindPublishedModelList, cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio),
-			catalogcache.LocalTTLCacheOptions(catalogcache.KindPublishedModelOptions, cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio),
+			catalogcache.LocalTTLCacheOptionsWithRuntime(catalogcache.KindPublishedModelDetail, string(cfg.Capability), "detail", cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio),
+			catalogcache.LocalTTLCacheOptionsWithRuntime(catalogcache.KindPublishedModelList, string(cfg.Capability), "list", cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio),
+			catalogcache.LocalTTLCacheOptionsWithRuntime(catalogcache.KindPublishedModelOptions, string(cfg.Capability), "options", cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio),
 		)
 	}
 	if cfg := config.AssessmentDetail; cfg.Enabled {
 		s.assessmentDetail = appevaluation.NewLocalAssessmentDetailCache(
-			catalogcache.LocalTTLCacheOptions(catalogcache.KindAssessmentDetail, cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio),
+			catalogcache.LocalTTLCacheOptionsWithRuntime(catalogcache.KindAssessmentDetail, string(cfg.Capability), "detail", cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio),
 		)
 	}
 	if cfg := config.AssessmentAccess; cfg.Enabled {
 		s.assessmentAccess = appevaluation.NewLocalAssessmentAccessCache(
-			catalogcache.LocalTTLCacheOptions(catalogcache.KindAssessmentAccess, cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio),
+			catalogcache.LocalTTLCacheOptionsWithRuntime(catalogcache.KindAssessmentAccess, string(cfg.Capability), "access", cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio),
 		)
 	}
 	s.effective = buildEffectiveRegistry(config)
@@ -185,6 +201,103 @@ func (s *Subsystem) EffectiveRegistry() *sharedcache.Registry {
 	return s.effective
 }
 
+type runtimeBucketReporter interface {
+	RuntimeBuckets() []localcache.BucketSnapshot
+}
+
+// L1Runtime returns a point-in-time, read-only view of every collection L1
+// capability. Disabled capabilities remain visible with no buckets.
+func (s *Subsystem) L1Runtime() []sharedgovernance.L1CapabilityRuntime {
+	if s == nil {
+		return nil
+	}
+	items := []struct {
+		binding CatalogBinding
+		cache   any
+	}{
+		{s.config.Questionnaire, s.questionnaire},
+		{s.config.PublishedModel, s.publishedModel},
+		{s.config.Typology, s.typology},
+		{s.config.AssessmentDetail, s.assessmentDetail},
+		{s.config.AssessmentAccess, s.assessmentAccess},
+	}
+	result := make([]sharedgovernance.L1CapabilityRuntime, 0, len(items))
+	for _, item := range items {
+		runtime := sharedgovernance.L1CapabilityRuntime{
+			Capability: string(item.binding.Capability), Enabled: item.binding.Enabled,
+			Buckets: []sharedgovernance.L1BucketRuntime{}, SignalWatcher: s.signalWatcherSnapshot(item.binding.Capability),
+		}
+		if reporter, ok := item.cache.(runtimeBucketReporter); ok && reporter != nil {
+			for _, bucket := range reporter.RuntimeBuckets() {
+				stats := bucket.Stats
+				runtime.Buckets = append(runtime.Buckets, sharedgovernance.L1BucketRuntime{
+					Bucket: bucket.Bucket, Entries: stats.Entries, MaxEntries: stats.MaxEntries,
+					Hits: stats.Hits, Misses: stats.Misses, FIFOEvictions: stats.FIFOEvictions,
+					TTLExpirations: stats.TTLExpirations, ExplicitDeletions: stats.ExplicitDeletions,
+					SignalDeletions: stats.SignalDeletions,
+				})
+			}
+		}
+		result = append(result, runtime)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Capability < result[j].Capability })
+	return result
+}
+
+func (s *Subsystem) signalWatcherSnapshot(capability sharedcache.Capability) sharedgovernance.SignalWatcherStatus {
+	s.runtimeMu.RLock()
+	defer s.runtimeMu.RUnlock()
+	return s.watcherRuntime[capability]
+}
+
+func (s *Subsystem) markWatcherRunning(capability sharedcache.Capability) {
+	if s == nil || capability == "" {
+		return
+	}
+	s.runtimeMu.Lock()
+	status := s.watcherRuntime[capability]
+	status.Configured = true
+	status.Status = "running"
+	status.LastError = ""
+	s.watcherRuntime[capability] = status
+	s.runtimeMu.Unlock()
+	catalogcache.SetSignalWatcherUp(string(capability), true)
+}
+
+func (s *Subsystem) markSignalEviction(capability sharedcache.Capability) {
+	if s == nil || capability == "" {
+		return
+	}
+	now := time.Now()
+	s.runtimeMu.Lock()
+	status := s.watcherRuntime[capability]
+	status.LastSignalAt = now
+	status.LastEvictionAt = now
+	s.watcherRuntime[capability] = status
+	s.runtimeMu.Unlock()
+	catalogcache.RecordSignalEviction(string(capability))
+}
+
+func (s *Subsystem) markWatcherError(capability sharedcache.Capability, message string) {
+	if s == nil || capability == "" {
+		return
+	}
+	s.runtimeMu.Lock()
+	status := s.watcherRuntime[capability]
+	if !status.Configured {
+		s.runtimeMu.Unlock()
+		return
+	}
+	status.Status = "reconnecting"
+	status.LastErrorAt = time.Now()
+	status.LastError = message
+	status.ReconnectCount++
+	s.watcherRuntime[capability] = status
+	s.runtimeMu.Unlock()
+	catalogcache.SetSignalWatcherUp(string(capability), false)
+	catalogcache.RecordSignalWatcherError(string(capability))
+}
+
 func (s *Subsystem) BindWarmup(service *typologymodel.QueryService) {
 	if s == nil {
 		return
@@ -245,11 +358,23 @@ func (s *Subsystem) startQuestionnaireWatcher(ctx context.Context) {
 	}
 	client, signaling, ok := s.signaling()
 	if !ok {
+		s.markWatcherError(cfg.Capability, "signal transport unavailable")
 		return
 	}
+	s.markWatcherRunning(cfg.Capability)
 	signaler := signalredis.NewSignaler[cachesignal.QuestionnaireCacheChangedSignal](client, signaling)
 	watchSignals(ctx, signaler, func(signal cachesignal.QuestionnaireCacheChangedSignal) {
 		if signal.Code == "" {
+			return
+		}
+		if cache, ok := s.questionnaire.(interface{ EvictOnSignal(string, string) }); ok {
+			if signal.Version == "" {
+				cache.EvictOnSignal(signal.Code, "")
+			} else {
+				cache.EvictOnSignal(signal.Code, signal.Version)
+				cache.EvictOnSignal(signal.Code, "")
+			}
+			s.markSignalEviction(cfg.Capability)
 			return
 		}
 		if signal.Version == "" {
@@ -258,7 +383,8 @@ func (s *Subsystem) startQuestionnaireWatcher(ctx context.Context) {
 			s.questionnaire.Delete(signal.Code, signal.Version)
 			s.questionnaire.Delete(signal.Code, "")
 		}
-	}, "questionnaire cache signal evicted")
+		s.markSignalEviction(cfg.Capability)
+	}, "questionnaire cache signal evicted", func() { s.markWatcherRunning(cfg.Capability) }, func(err error) { s.markWatcherError(cfg.Capability, err.Error()) })
 }
 
 func (s *Subsystem) startTypologyWatcher(ctx context.Context) {
@@ -268,14 +394,17 @@ func (s *Subsystem) startTypologyWatcher(ctx context.Context) {
 	}
 	client, signaling, ok := s.signaling()
 	if !ok {
+		s.markWatcherError(cfg.Capability, "signal transport unavailable")
 		return
 	}
+	s.markWatcherRunning(cfg.Capability)
 	signaler := signalredis.NewSignaler[cachesignal.TypologyModelCacheChangedSignal](client, signaling)
 	watchSignals(ctx, signaler, func(signal cachesignal.TypologyModelCacheChangedSignal) {
 		if signal.Code != "" {
 			s.typology.EvictOnSignal(signal.Code)
+			s.markSignalEviction(cfg.Capability)
 		}
-	}, "typology model cache signal evicted")
+	}, "typology model cache signal evicted", func() { s.markWatcherRunning(cfg.Capability) }, func(err error) { s.markWatcherError(cfg.Capability, err.Error()) })
 }
 
 func (s *Subsystem) startPublishedModelWatcher(ctx context.Context) {
@@ -285,10 +414,18 @@ func (s *Subsystem) startPublishedModelWatcher(ctx context.Context) {
 	}
 	client, signaling, ok := s.signaling()
 	if !ok {
+		s.markWatcherError(cfg.Capability, "signal transport unavailable")
 		return
 	}
+	s.markWatcherRunning(cfg.Capability)
 	signaler := signalredis.NewSignaler[cachesignal.AssessmentModelCacheChangedSignal](client, signaling)
-	watchSignals(ctx, signaler, s.evictPublishedModelOnSignal, "published model cache signal evicted")
+	watchSignals(ctx, signaler, func(changed cachesignal.AssessmentModelCacheChangedSignal) {
+		if changed.Code == "" {
+			return
+		}
+		s.evictPublishedModelOnSignal(changed)
+		s.markSignalEviction(cfg.Capability)
+	}, "published model cache signal evicted", func() { s.markWatcherRunning(cfg.Capability) }, func(err error) { s.markWatcherError(cfg.Capability, err.Error()) })
 }
 
 func (s *Subsystem) evictPublishedModelOnSignal(changed cachesignal.AssessmentModelCacheChangedSignal) {
@@ -322,11 +459,16 @@ func buildEffectiveRegistry(config Config) *sharedcache.Registry {
 	configuredCapabilities := []CatalogBinding{config.Questionnaire, config.PublishedModel, config.Typology, config.AssessmentAccess, config.AssessmentDetail}
 	entries := make([]sharedcache.EffectiveCapability, 0, len(configuredCapabilities)+1)
 	for _, item := range configuredCapabilities {
+		spec, ok := lookupCatalogSpec(item.Capability)
+		if !ok {
+			continue
+		}
 		entries = append(entries, sharedcache.EffectiveCapability{
-			Capability: item.Capability, Owner: capabilityOwner(item.Capability), Kind: sharedcache.KindCache,
-			Layer: sharedcache.LayerL1, Family: "local", Enabled: item.Enabled, Policy: item.Policy,
+			Capability: item.Capability, Owner: spec.Owner, Kind: sharedcache.KindCache,
+			Layer: spec.Layer, Family: "local", Enabled: item.Enabled, Policy: item.Policy,
 			Layers: sharedcache.PolicyLayers{Override: item.Policy},
-			Source: item.Source, CatalogVersion: "v2", MetricLabel: string(item.Capability),
+			Source: item.Source, CatalogVersion: "v3", MetricLabel: spec.MetricLabel,
+			TopologyGroup: spec.TopologyGroup, TopologyOrder: spec.TopologyOrder, ReadModel: spec.ReadModel,
 		})
 	}
 	if config.ReportStatusTTL > 0 {
@@ -334,7 +476,7 @@ func buildEffectiveRegistry(config Config) *sharedcache.Registry {
 			Capability: "report_status", Owner: "interpretation", Kind: sharedcache.KindOperationalState,
 			Layer: sharedcache.LayerRuntime, Family: "ops_runtime", Enabled: true,
 			Policy: sharedcache.Policy{TTL: config.ReportStatusTTL},
-			Source: "runtime_state.report_status", CatalogVersion: "v2", MetricLabel: "report_status",
+			Source: "runtime_state.report_status", CatalogVersion: "v3", MetricLabel: "report_status",
 		})
 	}
 	if config.PolicySource.Component != "" {
@@ -343,25 +485,24 @@ func buildEffectiveRegistry(config Config) *sharedcache.Registry {
 	return sharedcache.NewRegistry(entries...)
 }
 
-func capabilityOwner(capability sharedcache.Capability) string {
-	if capability == "evaluation.assessment_detail" || capability == "evaluation.assessment_access" {
-		return "evaluation"
-	}
-	return "collection"
-}
-
-func watchSignals[T signaling.Signal](ctx context.Context, signaler *signalredis.Signaler[T], evict func(T), label string) {
+func watchSignals[T signaling.Signal](ctx context.Context, signaler *signalredis.Signaler[T], evict func(T), label string, onRunning func(), onError func(error)) {
 	if signaler == nil || evict == nil {
 		return
 	}
 	go func() {
 		for {
+			if onRunning != nil {
+				onRunning()
+			}
 			err := signaler.Watch(ctx, func(msgCtx context.Context, signal T) {
 				evict(signal)
 				logger.L(msgCtx).Debugw(label)
 			})
 			if ctx.Err() != nil {
 				return
+			}
+			if onError != nil && err != nil {
+				onError(err)
 			}
 			logger.L(ctx).Errorw(label+" watcher stopped", "error", err)
 			timer := time.NewTimer(time.Second)

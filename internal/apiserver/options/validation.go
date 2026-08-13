@@ -105,8 +105,9 @@ func validateSystemGovernance(opts *SystemGovernanceOptions) []error {
 				errs = append(errs, fmt.Errorf("system_governance.components.%s.minimum_instances must be between 1 and 16 for dns discovery", name))
 			}
 			for endpointName, endpoint := range map[string]string{
-				"resilience_url": component.ResilienceURL,
-				"cache_url":      component.CacheURL,
+				"resilience_url":       component.ResilienceURL,
+				"cache_url":            component.CacheURL,
+				"cache_governance_url": component.CacheGovernanceURL,
 			} {
 				if strings.TrimSpace(endpoint) == "" {
 					continue

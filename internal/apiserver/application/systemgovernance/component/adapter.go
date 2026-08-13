@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
+	sharedgovernance "github.com/FangcunMount/qs-server/internal/pkg/cache/governance"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 )
@@ -49,6 +50,18 @@ type CacheResult struct {
 	AvailableInstanceCount  int                                       `json:"available_instance_count,omitempty"`
 	Partial                 bool                                      `json:"partial,omitempty"`
 	TargetErrors            map[string]string                         `json:"target_errors,omitempty"`
+}
+
+// CacheGovernanceResult carries process Registry snapshots and fanout metadata.
+type CacheGovernanceResult struct {
+	Available               bool                                                          `json:"available"`
+	Reason                  string                                                        `json:"reason,omitempty"`
+	Snapshot                *sharedgovernance.ComponentCacheGovernanceSnapshot            `json:"snapshot,omitempty"`
+	Instances               map[string]*sharedgovernance.ComponentCacheGovernanceSnapshot `json:"instances,omitempty"`
+	DiscoveredInstanceCount int                                                           `json:"discovered_instance_count,omitempty"`
+	AvailableInstanceCount  int                                                           `json:"available_instance_count,omitempty"`
+	Partial                 bool                                                          `json:"partial,omitempty"`
+	TargetErrors            map[string]string                                             `json:"target_errors,omitempty"`
 }
 
 // Adapter fetches remote 组件 governance 快照。
@@ -142,6 +155,36 @@ func (a *Adapter) FetchCache(ctx context.Context) map[string]CacheResult {
 	return result
 }
 
+// FetchCacheGovernance loads the component-neutral process Registry contract.
+func (a *Adapter) FetchCacheGovernance(ctx context.Context) map[string]CacheGovernanceResult {
+	result := make(map[string]CacheGovernanceResult)
+	if a == nil {
+		return result
+	}
+	for name, cfg := range a.components {
+		if cfg == nil || strings.TrimSpace(cfg.CacheGovernanceURL) == "" {
+			continue
+		}
+		if cfg.DiscoveryMode() == "dns" {
+			result[name] = a.fetchDNSCacheGovernance(ctx, name, cfg)
+			continue
+		}
+		snapshot, err := a.fetchCacheGovernance(ctx, requestTarget{URL: cfg.CacheGovernanceURL}, componentTimeout(cfg))
+		if err == nil {
+			err = validateCacheGovernanceIdentity(name, snapshot, nil)
+		}
+		if err != nil {
+			result[name] = CacheGovernanceResult{Available: false, Reason: err.Error()}
+			continue
+		}
+		result[name] = CacheGovernanceResult{
+			Available: true, Snapshot: snapshot, Instances: map[string]*sharedgovernance.ComponentCacheGovernanceSnapshot{snapshot.InstanceID: snapshot},
+			DiscoveredInstanceCount: 1, AvailableInstanceCount: 1,
+		}
+	}
+	return result
+}
+
 type requestTarget struct {
 	Address    string
 	URL        string
@@ -186,6 +229,27 @@ func (a *Adapter) fetchCache(ctx context.Context, target requestTarget, timeout 
 	}
 	if wrapped.Data.Component == "" {
 		return nil, fmt.Errorf("empty cache snapshot from %s", target.URL)
+	}
+	return &wrapped.Data, nil
+}
+
+func (a *Adapter) fetchCacheGovernance(ctx context.Context, target requestTarget, timeout time.Duration) (*sharedgovernance.ComponentCacheGovernanceSnapshot, error) {
+	body, err := a.getJSON(ctx, target, timeout)
+	if err != nil {
+		return nil, err
+	}
+	var direct sharedgovernance.ComponentCacheGovernanceSnapshot
+	if err := json.Unmarshal(body, &direct); err == nil && direct.Component != "" {
+		return &direct, nil
+	}
+	var wrapped struct {
+		Data sharedgovernance.ComponentCacheGovernanceSnapshot `json:"data"`
+	}
+	if err := json.Unmarshal(body, &wrapped); err != nil {
+		return nil, err
+	}
+	if wrapped.Data.Component == "" {
+		return nil, fmt.Errorf("empty cache governance snapshot from %s", target.URL)
 	}
 	return &wrapped.Data, nil
 }
@@ -300,6 +364,54 @@ func (a *Adapter) fetchDNSCache(ctx context.Context, cfg *options.GovernanceComp
 	return result
 }
 
+func (a *Adapter) fetchDNSCacheGovernance(ctx context.Context, component string, cfg *options.GovernanceComponentOptions) CacheGovernanceResult {
+	targets, err := a.resolveTargets(ctx, cfg.CacheGovernanceURL)
+	if err != nil {
+		return CacheGovernanceResult{Available: false, Reason: err.Error(), TargetErrors: map[string]string{"dns": err.Error()}}
+	}
+	responses := fetchTargets(ctx, targets, func(ctx context.Context, target requestTarget) (*sharedgovernance.ComponentCacheGovernanceSnapshot, error) {
+		return a.fetchCacheGovernance(ctx, target, componentTimeout(cfg))
+	})
+	instances := make(map[string]*sharedgovernance.ComponentCacheGovernanceSnapshot)
+	targetErrors := make(map[string]string)
+	for _, item := range responses {
+		if item.err != nil {
+			targetErrors[item.target.Address] = item.err.Error()
+			continue
+		}
+		if err := validateCacheGovernanceIdentity(component, item.snapshot, instances); err != nil {
+			targetErrors[item.target.Address] = err.Error()
+			continue
+		}
+		instances[item.snapshot.InstanceID] = item.snapshot
+	}
+	result := CacheGovernanceResult{
+		Available: len(instances) > 0, Instances: instances, DiscoveredInstanceCount: len(targets),
+		AvailableInstanceCount: len(instances), TargetErrors: targetErrors,
+	}
+	result.Snapshot = representativeCacheGovernanceSnapshot(instances)
+	result.Partial = len(targetErrors) > 0 || len(instances) < cfg.RequiredInstances()
+	result.Reason = dnsResultReason(result.Available, result.Partial, len(instances), cfg.RequiredInstances())
+	return result
+}
+
+func validateCacheGovernanceIdentity(component string, snapshot *sharedgovernance.ComponentCacheGovernanceSnapshot, existing map[string]*sharedgovernance.ComponentCacheGovernanceSnapshot) error {
+	if snapshot == nil {
+		return fmt.Errorf("empty cache governance snapshot")
+	}
+	if strings.TrimSpace(snapshot.Component) != component {
+		return fmt.Errorf("component mismatch: got %q want %q", snapshot.Component, component)
+	}
+	instanceID := strings.TrimSpace(snapshot.InstanceID)
+	if instanceID == "" {
+		return fmt.Errorf("empty instance_id")
+	}
+	if _, exists := existing[instanceID]; exists {
+		return fmt.Errorf("duplicate instance_id: %s", instanceID)
+	}
+	return nil
+}
+
 type targetResponse[T any] struct {
 	target   requestTarget
 	snapshot *T
@@ -393,6 +505,13 @@ func representativeResilienceSnapshot(instances map[string]*resilience.RuntimeSn
 }
 
 func representativeCacheSnapshot(instances map[string]*observability.RuntimeSnapshot) *observability.RuntimeSnapshot {
+	for _, instanceID := range sortedKeys(instances) {
+		return instances[instanceID]
+	}
+	return nil
+}
+
+func representativeCacheGovernanceSnapshot(instances map[string]*sharedgovernance.ComponentCacheGovernanceSnapshot) *sharedgovernance.ComponentCacheGovernanceSnapshot {
 	for _, instanceID := range sortedKeys(instances) {
 		return instances[instanceID]
 	}

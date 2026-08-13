@@ -20,3 +20,23 @@ func LocalTTLCacheOptions(kind string, ttl time.Duration, maxEntries int, jitter
 		},
 	}
 }
+
+// LocalTTLCacheOptionsWithRuntime keeps the legacy low-cardinality hit/miss
+// label while adding code-owned capability and bucket labels for runtime data.
+func LocalTTLCacheOptionsWithRuntime(kind, capability, bucket string, ttl time.Duration, maxEntries int, jitterRatio float64) localcache.Options {
+	opts := LocalTTLCacheOptions(kind, ttl, maxEntries, jitterRatio)
+	legacyHit, legacyMiss := opts.OnHit, opts.OnMiss
+	opts.OnHit = func() {
+		legacyHit()
+		RecordRequest(capability, bucket, "hit")
+	}
+	opts.OnMiss = func() {
+		legacyMiss()
+		RecordRequest(capability, bucket, "miss")
+	}
+	RecordEntries(capability, bucket, 0)
+	RecordMaxEntries(capability, bucket, maxEntries)
+	opts.OnEntries = func(entries int) { RecordEntries(capability, bucket, entries) }
+	opts.OnEviction = func(reason localcache.EvictionReason) { RecordEviction(capability, bucket, string(reason)) }
+	return opts
+}

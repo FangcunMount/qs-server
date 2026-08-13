@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/model"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
+	sharedgovernance "github.com/FangcunMount/qs-server/internal/pkg/cache/governance"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 )
 
@@ -91,50 +92,16 @@ func (s *governanceStatusService) GetStatus(ctx context.Context) (*cachemodel.St
 func projectEffectiveRegistry(registry *sharedcache.Registry, reloader interface {
 	ReloadStatus() cachemodel.PolicyReloadStatus
 }) *cachemodel.EffectiveRegistrySnapshot {
-	snapshot := registry.Snapshot()
-	result := &cachemodel.EffectiveRegistrySnapshot{
-		SnapshotVersion: snapshot.Version, GeneratedAt: snapshot.GeneratedAt,
-		Capabilities: make([]cachemodel.CapabilityPolicyView, 0, len(snapshot.Capabilities)),
-	}
-	if snapshot.PolicySource != nil {
-		result.PolicySource = &cachemodel.PolicySourceView{
-			Component: snapshot.PolicySource.Component, SchemaVersion: snapshot.PolicySource.SchemaVersion,
-			Path: snapshot.PolicySource.Path, PolicySHA256: snapshot.PolicySource.PolicySHA256,
-		}
-	}
+	reload := cachemodel.PolicyReloadStatus{}
 	if reloader != nil {
-		result.Reload = reloader.ReloadStatus()
+		reload = reloader.ReloadStatus()
 	}
-	for _, item := range snapshot.Capabilities {
-		if result.CatalogVersion == "" {
-			result.CatalogVersion = item.CatalogVersion
-		}
-		result.Capabilities = append(result.Capabilities, cachemodel.CapabilityPolicyView{
-			Capability: string(item.Capability), Owner: item.Owner, Kind: string(item.Kind), Layer: string(item.Layer),
-			Family: item.Family, Enabled: item.Enabled, SpecDefault: policyView(item.Layers.SpecDefault),
-			GlobalDefault: policyView(item.Layers.GlobalDefault), FamilyDefault: policyView(item.Layers.FamilyDefault),
-			Override: policyView(item.Layers.Override), Effective: policyView(item.Policy), Source: item.Source, MetricLabel: item.MetricLabel,
-		})
-	}
-	return result
-}
-
-func policyView(policy sharedcache.Policy) cachemodel.PolicyView {
-	return cachemodel.PolicyView{
-		TTL: policy.TTL.String(), NegativeTTL: policy.NegativeTTL.String(), TTLJitterRatio: policy.JitterRatio,
-		Compress: policySwitchView(policy.Compress), Singleflight: policySwitchView(policy.Singleflight), Negative: policySwitchView(policy.Negative),
-	}
-}
-
-func policySwitchView(value sharedcache.PolicySwitch) string {
-	switch value {
-	case sharedcache.PolicySwitchEnabled:
-		return "enabled"
-	case sharedcache.PolicySwitchDisabled:
-		return "disabled"
-	default:
-		return "inherit"
-	}
+	result := sharedgovernance.ProjectRegistry(registry, sharedgovernance.PolicyReloadStatus{
+		LastAttemptAt: reload.LastAttemptAt, LastSuccessAt: reload.LastSuccessAt,
+		LastFailureAt: reload.LastFailureAt, LastError: reload.LastError,
+	})
+	projected := cachemodel.FromSharedEffectiveRegistry(result)
+	return &projected
 }
 
 func (s *governanceStatusService) GetHotset(ctx context.Context, kind cachetarget.WarmupKind, limit int64) (*cachetarget.HotsetSnapshot, error) {

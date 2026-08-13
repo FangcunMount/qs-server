@@ -20,6 +20,156 @@ type CacheView struct {
 	CapabilityRows []CacheCapabilityRow       `json:"capability_rows,omitempty"`
 	WarmupKinds    []CacheWarmupKind          `json:"warmup_kinds,omitempty"`
 	Hotsets        []CacheHotsetView          `json:"hotsets,omitempty"`
+	RegistryView   *CacheRegistryView         `json:"registry_view,omitempty"`
+	RuntimeView    *CacheRuntimeView          `json:"runtime_view,omitempty"`
+	TopologyView   *CacheTopologyView         `json:"topology_view,omitempty"`
+}
+
+type CacheRegistryView struct {
+	ComponentRegistries []ComponentRegistryRow  `json:"component_registries"`
+	CapabilityRows      []RegistryCapabilityRow `json:"capability_rows"`
+	RegistryDrift       []RegistryDrift         `json:"registry_drift"`
+}
+
+type ComponentRegistryRow struct {
+	Component       string                            `json:"component"`
+	InstanceID      string                            `json:"instance_id,omitempty"`
+	Generation      string                            `json:"generation,omitempty"`
+	Available       bool                              `json:"available"`
+	Reason          string                            `json:"reason,omitempty"`
+	SnapshotVersion uint64                            `json:"snapshot_version,omitempty"`
+	CatalogVersion  string                            `json:"catalog_version,omitempty"`
+	PolicySource    *cachemodel.PolicySourceView      `json:"policy_source,omitempty"`
+	Capabilities    []cachemodel.CapabilityPolicyView `json:"capabilities,omitempty"`
+	L1Runtime       []cachemodel.L1CapabilityRuntime  `json:"l1_runtime,omitempty"`
+}
+
+type RegistryCapabilityRow struct {
+	Component     string                      `json:"component"`
+	Capability    string                      `json:"capability"`
+	Layer         string                      `json:"layer"`
+	Consistent    bool                        `json:"consistent"`
+	InstanceIDs   []string                    `json:"instance_ids"`
+	PolicySHA256  string                      `json:"policy_sha256,omitempty"`
+	Owner         string                      `json:"owner,omitempty"`
+	Kind          string                      `json:"kind,omitempty"`
+	Family        string                      `json:"family,omitempty"`
+	Enabled       *bool                       `json:"enabled,omitempty"`
+	MetricLabel   string                      `json:"metric_label,omitempty"`
+	Effective     *cachemodel.PolicyView      `json:"effective_policy,omitempty"`
+	Variants      []RegistryCapabilityVariant `json:"variants,omitempty"`
+	TopologyGroup string                      `json:"topology_group,omitempty"`
+	TopologyOrder int                         `json:"topology_order,omitempty"`
+	ReadModel     string                      `json:"read_model,omitempty"`
+}
+
+type RegistryCapabilityVariant struct {
+	PolicySHA256  string                `json:"policy_sha256,omitempty"`
+	InstanceIDs   []string              `json:"instance_ids"`
+	Owner         string                `json:"owner"`
+	Kind          string                `json:"kind"`
+	Layer         string                `json:"layer"`
+	Family        string                `json:"family"`
+	Enabled       bool                  `json:"enabled"`
+	MetricLabel   string                `json:"metric_label"`
+	Effective     cachemodel.PolicyView `json:"effective_policy"`
+	TopologyGroup string                `json:"topology_group,omitempty"`
+	TopologyOrder int                   `json:"topology_order,omitempty"`
+	ReadModel     string                `json:"read_model,omitempty"`
+}
+
+type RegistryDrift struct {
+	Component   string              `json:"component"`
+	Kind        string              `json:"kind"`
+	Message     string              `json:"message"`
+	InstanceIDs []string            `json:"instance_ids,omitempty"`
+	Values      map[string][]string `json:"values,omitempty"`
+}
+
+type CacheRuntimeView struct {
+	Summary             CacheRuntimeSummary           `json:"summary"`
+	L1CapabilityRuntime []CacheL1CapabilityRuntimeRow `json:"l1_capability_runtime"`
+	FamilyGroups        []CacheFamilyGroup            `json:"family_groups"`
+	InstanceRows        []CacheFamilyRow              `json:"instance_rows"`
+}
+
+type CacheL1CapabilityRuntimeRow struct {
+	Component     string                         `json:"component"`
+	InstanceID    string                         `json:"instance_id"`
+	Generation    string                         `json:"generation,omitempty"`
+	Capability    string                         `json:"capability"`
+	Enabled       bool                           `json:"enabled"`
+	Buckets       []cachemodel.L1BucketRuntime   `json:"buckets"`
+	SignalWatcher cachemodel.SignalWatcherStatus `json:"signal_watcher"`
+	HitRate       *MetricEvidence                `json:"hit_rate,omitempty"`
+	Samples       *MetricEvidence                `json:"samples,omitempty"`
+}
+
+type CacheRuntimeSummary struct {
+	Ready                     bool `json:"ready"`
+	ComponentTotal            int  `json:"component_total"`
+	HealthyComponentCount     int  `json:"healthy_component_count"`
+	DiscoveredInstanceCount   int  `json:"discovered_instance_count"`
+	HealthyInstanceCount      int  `json:"healthy_instance_count"`
+	FamilyGroupCount          int  `json:"family_group_count"`
+	AbnormalFamilyGroupCount  int  `json:"abnormal_family_group_count"`
+	AbnormalL1CapabilityCount int  `json:"abnormal_l1_capability_count"`
+}
+
+type CacheFamilyGroup struct {
+	Component                string           `json:"component"`
+	Family                   string           `json:"family"`
+	Profile                  string           `json:"profile"`
+	Namespace                string           `json:"namespace"`
+	HealthyInstanceCount     int              `json:"healthy_instance_count"`
+	DiscoveredInstanceCount  int              `json:"discovered_instance_count"`
+	DegradedInstanceCount    int              `json:"degraded_instance_count"`
+	UnavailableInstanceCount int              `json:"unavailable_instance_count"`
+	Severity                 Severity         `json:"severity"`
+	LastError                string           `json:"last_error,omitempty"`
+	MetricEvidence           []MetricEvidence `json:"metric_evidence,omitempty"`
+	OperationP95             *MetricEvidence  `json:"operation_p95,omitempty"`
+	OperationErrors          *MetricEvidence  `json:"operation_errors,omitempty"`
+}
+
+type CacheTopologyView struct {
+	Topologies []CacheTopology `json:"topologies"`
+}
+
+type CacheTopology struct {
+	TopologyGroup  string                     `json:"topology_group"`
+	ReadModel      string                     `json:"read_model"`
+	Status         string                     `json:"status"`
+	Nodes          []CacheTopologyNode        `json:"nodes"`
+	Edges          []CacheTopologyEdge        `json:"edges"`
+	Source         CacheTopologySource        `json:"source"`
+	WindowEvidence map[string]*MetricEvidence `json:"window_evidence"`
+}
+
+type CacheTopologyNode struct {
+	ID                 string          `json:"id"`
+	Component          string          `json:"component"`
+	Capability         string          `json:"capability"`
+	Layer              string          `json:"layer"`
+	Enabled            *bool           `json:"enabled,omitempty"`
+	RegistryConsistent bool            `json:"registry_consistent"`
+	RuntimeHealth      string          `json:"runtime_health"`
+	PolicySource       string          `json:"policy_source,omitempty"`
+	HitRate            *MetricEvidence `json:"hit_rate,omitempty"`
+	Samples            *MetricEvidence `json:"samples,omitempty"`
+	Order              int             `json:"order"`
+}
+
+type CacheTopologyEdge struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+	Kind string `json:"kind"`
+}
+
+type CacheTopologySource struct {
+	ID         string `json:"id"`
+	ReadModel  string `json:"read_model"`
+	SourceKind string `json:"source_kind"`
 }
 
 // CacheCapabilityRow is the operator-facing workload projection for one
@@ -34,6 +184,7 @@ type CacheCapabilityRow struct {
 
 type CacheCapabilityWorkload struct {
 	HitRate       *MetricEvidence `json:"hit_rate,omitempty"`
+	Samples       *MetricEvidence `json:"samples,omitempty"`
 	ErrorCount    *MetricEvidence `json:"error_count,omitempty"`
 	GetLatencyP95 *MetricEvidence `json:"get_latency_p95,omitempty"`
 }
@@ -54,6 +205,7 @@ type ComponentCache struct {
 type CacheFamilyRow struct {
 	Component           string           `json:"component"`
 	InstanceID          string           `json:"instance_id,omitempty"`
+	Generation          string           `json:"generation,omitempty"`
 	Family              string           `json:"family"`
 	Profile             string           `json:"profile"`
 	Namespace           string           `json:"namespace"`

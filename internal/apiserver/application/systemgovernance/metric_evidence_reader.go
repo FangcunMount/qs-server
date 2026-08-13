@@ -121,6 +121,15 @@ func (r MetricEvidenceReader) CacheCapabilityHitRate(ctx context.Context, capabi
 	), evalAt)
 }
 
+func (r MetricEvidenceReader) CacheCapabilitySamples(ctx context.Context, capability, family, metricLabel, window string, evalAt time.Time) (MetricEvidence, bool) {
+	labels := map[string]string{"family": family, "policy": metricLabel}
+	return r.query(ctx, govprom.CounterIncreaseSumQuery(
+		"cache_samples_"+metricNamePart(capability), window, "count",
+		govprom.CounterIncreaseTerm{Metric: "qs_cache_get_total", Labels: cloneMetricLabels(labels, "result", "hit")},
+		govprom.CounterIncreaseTerm{Metric: "qs_cache_get_total", Labels: cloneMetricLabels(labels, "result", "miss")},
+	), evalAt)
+}
+
 func (r MetricEvidenceReader) CacheCapabilityErrorCount(ctx context.Context, capability, family, metricLabel, window string, evalAt time.Time) (MetricEvidence, bool) {
 	labels := cloneMetricLabels(map[string]string{"family": family, "policy": metricLabel}, "result", "error")
 	return r.query(ctx, govprom.CounterIncreaseSumQuery(
@@ -134,6 +143,49 @@ func (r MetricEvidenceReader) CacheCapabilityGetP95(ctx context.Context, capabil
 	return r.query(ctx, govprom.HistogramQuantileQuery(
 		"cache_get_p95_"+metricNamePart(capability), "qs_cache_operation_duration_seconds", window, "seconds", 0.95,
 		map[string]string{"family": family, "policy": metricLabel, "op": "get"},
+	), evalAt)
+}
+
+func (r MetricEvidenceReader) CollectionL1HitRate(ctx context.Context, capability, window string, evalAt time.Time) (MetricEvidence, bool) {
+	labels := map[string]string{"capability": capability}
+	return r.query(ctx, govprom.CounterIncreaseRatioQuery(
+		"collection_l1_hit_rate_"+metricNamePart(capability), window,
+		[]govprom.CounterIncreaseTerm{{Metric: "collection_l1_cache_requests_total", Labels: cloneMetricLabels(labels, "result", "hit")}},
+		[]govprom.CounterIncreaseTerm{
+			{Metric: "collection_l1_cache_requests_total", Labels: cloneMetricLabels(labels, "result", "hit")},
+			{Metric: "collection_l1_cache_requests_total", Labels: cloneMetricLabels(labels, "result", "miss")},
+		},
+	), evalAt)
+}
+
+func (r MetricEvidenceReader) CollectionL1Samples(ctx context.Context, capability, window string, evalAt time.Time) (MetricEvidence, bool) {
+	labels := map[string]string{"capability": capability}
+	return r.query(ctx, govprom.CounterIncreaseSumQuery(
+		"collection_l1_samples_"+metricNamePart(capability), window, "count",
+		govprom.CounterIncreaseTerm{Metric: "collection_l1_cache_requests_total", Labels: cloneMetricLabels(labels, "result", "hit")},
+		govprom.CounterIncreaseTerm{Metric: "collection_l1_cache_requests_total", Labels: cloneMetricLabels(labels, "result", "miss")},
+	), evalAt)
+}
+
+func (r MetricEvidenceReader) CacheFamilyOperationP95(ctx context.Context, component, family, window string, evalAt time.Time) (MetricEvidence, bool) {
+	if component == "apiserver" {
+		component = "qs-apiserver"
+	}
+	return r.query(ctx, govprom.HistogramQuantileQuery(
+		"cache_family_operation_p95_"+metricNamePart(component)+"_"+metricNamePart(family),
+		"qs_cache_family_operation_duration_seconds", window, "seconds", 0.95,
+		map[string]string{"component": component, "family": family},
+	), evalAt)
+}
+
+func (r MetricEvidenceReader) CacheFamilyOperationErrors(ctx context.Context, component, family, window string, evalAt time.Time) (MetricEvidence, bool) {
+	if component == "apiserver" {
+		component = "qs-apiserver"
+	}
+	return r.query(ctx, govprom.CounterIncreaseQuery(
+		"cache_family_operation_errors_"+metricNamePart(component)+"_"+metricNamePart(family),
+		"qs_cache_family_operation_errors_total", window,
+		map[string]string{"component": component, "family": family},
 	), evalAt)
 }
 

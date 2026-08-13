@@ -77,6 +77,45 @@ func TestFetchCacheUsesConfiguredTimeout(t *testing.T) {
 	}
 }
 
+func TestFetchCacheGovernanceLoadsWrappedComponentContract(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/governance/cache" {
+			t.Fatalf("path = %q", r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`{"data":{"component":"collection-server","instance_id":"collection-a","generation":"g1","redis_runtime":{"component":"collection-server","summary":{"ready":true},"families":[]},"effective_registry":{"snapshot_version":1,"catalog_version":"v2","capabilities":[],"reload":{}}}}`))
+	}))
+	defer server.Close()
+	adapter := NewAdapter(map[string]*options.GovernanceComponentOptions{
+		"collection-server": {CacheGovernanceURL: server.URL + "/governance/cache", Timeout: time.Second},
+	})
+	result := adapter.FetchCacheGovernance(context.Background())["collection-server"]
+	if !result.Available || result.Snapshot == nil || result.Snapshot.InstanceID != "collection-a" {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestDNSCacheGovernanceRejectsDuplicateAndEmptyInstanceIdentity(t *testing.T) {
+	adapter := NewAdapter(map[string]*options.GovernanceComponentOptions{
+		"collection-server": {
+			Discovery: "dns", MinimumInstances: 3, CacheGovernanceURL: "http://collection.test:8080/governance/cache", Timeout: time.Second,
+		},
+	})
+	adapter.resolver = staticResolver{addresses: []net.IPAddr{
+		{IP: net.ParseIP("10.0.0.1")}, {IP: net.ParseIP("10.0.0.2")}, {IP: net.ParseIP("10.0.0.3")},
+	}}
+	adapter.http = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		instanceID := "collection-a"
+		if req.URL.Hostname() == "10.0.0.3" {
+			instanceID = ""
+		}
+		return jsonResponse(http.StatusOK, `{"component":"collection-server","instance_id":"`+instanceID+`","effective_registry":{"capabilities":[]}}`), nil
+	})}
+	result := adapter.FetchCacheGovernance(context.Background())["collection-server"]
+	if !result.Available || !result.Partial || result.AvailableInstanceCount != 1 || len(result.TargetErrors) != 2 {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
 func TestDNSDiscoveryFetchesEveryUniqueIPv4AndSelectsStableSnapshot(t *testing.T) {
 	adapter := NewAdapter(map[string]*options.GovernanceComponentOptions{
 		"collection-server": {

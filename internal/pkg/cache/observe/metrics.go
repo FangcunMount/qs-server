@@ -21,6 +21,15 @@ var (
 		Help:    "Latency distribution for cache governance operations grouped by family, policy and operation.",
 		Buckets: prometheus.DefBuckets,
 	}, []string{"family", "policy", "op"})
+	cacheFamilyOperationDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "qs_cache_family_operation_duration_seconds",
+		Help:    "Latency distribution for cache operations grouped by canonical component, family and operation.",
+		Buckets: prometheus.DefBuckets,
+	}, []string{"component", "family", "op"})
+	cacheFamilyOperationErrors = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "qs_cache_family_operation_errors_total",
+		Help: "Total cache operation errors grouped by canonical component, family and operation.",
+	}, []string{"component", "family", "op"})
 	cachePayloadBytes = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "qs_cache_payload_bytes",
 		Help:    "Payload size distribution for cache objects grouped by family, policy and stage.",
@@ -49,6 +58,15 @@ func ObserveCacheWrite(family, policy, op, result string) {
 }
 func ObserveCacheOperationDuration(family, policy, op string, d time.Duration) {
 	cacheOperationDuration.WithLabelValues(family, policy, op).Observe(d.Seconds())
+}
+func ObserveComponentCacheOperation(component, family, op string, d time.Duration, failed bool) {
+	if component == "" || family == "" || op == "" {
+		return
+	}
+	cacheFamilyOperationDuration.WithLabelValues(component, family, op).Observe(d.Seconds())
+	if failed {
+		cacheFamilyOperationErrors.WithLabelValues(component, family, op).Inc()
+	}
 }
 func ObserveCachePayloadBytes(family, policy, stage string, size int) {
 	if size >= 0 {

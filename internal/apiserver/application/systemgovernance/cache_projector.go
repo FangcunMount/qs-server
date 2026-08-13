@@ -106,6 +106,11 @@ func (e *CacheWarmupEvaluator) evaluate(
 		}
 		e.projectRuntime(ctx, &projection, component.Snapshot.InstanceID, component.Snapshot, window, evalAt)
 	}
+	sortCacheFamilyRows(projection.FamilyRows)
+	e.attachFamilyMetricEvidence(ctx, projection.FamilyRows, window, evalAt)
+	for _, row := range projection.FamilyRows {
+		projection.Signals = append(projection.Signals, cacheFamilySignals(row)...)
+	}
 	for _, hotset := range projection.Hotsets {
 		if hotset.Degraded {
 			projection.Signals = append(projection.Signals, Signal{
@@ -128,7 +133,6 @@ func (e *CacheWarmupEvaluator) evaluate(
 	if latest != nil {
 		projection.Signals = append(projection.Signals, e.WarmupSignals(ctx, *latest, window, evalAt)...)
 	}
-	sortCacheFamilyRows(projection.FamilyRows)
 	sortCacheHotsets(projection.Hotsets)
 	projection.Signals = SortSignals(projection.Signals)
 	return projection
@@ -162,15 +166,14 @@ func (e *CacheWarmupEvaluator) projectRuntime(
 		})
 	}
 	for _, family := range snapshot.Families {
-		row := e.projectFamilyRow(ctx, instanceID, family, window, evalAt)
+		row := e.projectFamilyRow(instanceID, snapshot.Generation, family)
 		projection.FamilyRows = append(projection.FamilyRows, row)
-		projection.Signals = append(projection.Signals, cacheFamilySignals(row)...)
 	}
 }
 
 // CapabilityRows projects bounded near-window workload evidence for canonical
 // cache capabilities. Queries are concurrency-limited because every row has
-// three independent Prometheus expressions.
+// four independent Prometheus expressions.
 func (e *CacheWarmupEvaluator) CapabilityRows(
 	ctx context.Context,
 	registry *cachemodel.EffectiveRegistrySnapshot,
@@ -212,6 +215,12 @@ func (e *CacheWarmupEvaluator) capabilityRow(ctx context.Context, capability cac
 	if item, ok := e.evidence.CacheCapabilityHitRate(ctx, row.Capability, row.Family, row.MetricLabel, window, evalAt); ok {
 		row.Workload.HitRate = &item
 	}
+	if item, ok := e.evidence.CacheCapabilitySamples(ctx, row.Capability, row.Family, row.MetricLabel, window, evalAt); ok {
+		row.Workload.Samples = &item
+	}
+	if !hasWindowSamples(row.Workload.Samples) {
+		row.Workload.HitRate = nil
+	}
 	if item, ok := e.evidence.CacheCapabilityErrorCount(ctx, row.Capability, row.Family, row.MetricLabel, window, evalAt); ok {
 		row.Workload.ErrorCount = &item
 	}
@@ -222,15 +231,14 @@ func (e *CacheWarmupEvaluator) capabilityRow(ctx context.Context, capability cac
 }
 
 func (e *CacheWarmupEvaluator) projectFamilyRow(
-	ctx context.Context,
 	instanceID string,
+	generation string,
 	family observability.FamilyStatus,
-	window string,
-	evalAt time.Time,
 ) CacheFamilyRow {
 	row := CacheFamilyRow{
 		Component:           family.Component,
 		InstanceID:          instanceID,
+		Generation:          generation,
 		Family:              family.Family,
 		Profile:             family.Profile,
 		Namespace:           family.Namespace,
@@ -246,7 +254,6 @@ func (e *CacheWarmupEvaluator) projectFamilyRow(
 		UpdatedAt:           family.UpdatedAt,
 		Severity:            SeverityHealthy,
 		Reason:              family.LastError,
-		MetricEvidence:      e.familyMetricEvidence(ctx, family, window, evalAt),
 	}
 	switch {
 	case !family.Available:
@@ -255,6 +262,29 @@ func (e *CacheWarmupEvaluator) projectFamilyRow(
 		row.Severity = SeverityWarning
 	}
 	return row
+}
+
+// attachFamilyMetricEvidence queries Prometheus once for each formal family
+// group and stores the evidence on one representative legacy row. runtime_view
+// then owns the group-level projection without repeating evidence per instance.
+func (e *CacheWarmupEvaluator) attachFamilyMetricEvidence(
+	ctx context.Context,
+	rows []CacheFamilyRow,
+	window string,
+	evalAt time.Time,
+) {
+	seen := map[string]struct{}{}
+	for index := range rows {
+		row := &rows[index]
+		key := strings.Join([]string{row.Component, row.Family, row.Profile, row.Namespace}, "\x00")
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		row.MetricEvidence = e.familyMetricEvidence(ctx, observability.FamilyStatus{
+			Component: row.Component, Family: row.Family, Profile: row.Profile, Namespace: row.Namespace,
+		}, window, evalAt)
+	}
 }
 
 func (e *CacheWarmupEvaluator) familyMetricEvidence(

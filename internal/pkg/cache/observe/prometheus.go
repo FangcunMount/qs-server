@@ -14,13 +14,18 @@ type FamilyObserver interface {
 // Prometheus preserves the existing metric names and label values for one
 // family/capability pair.
 type Prometheus struct {
-	family string
-	policy string
-	health FamilyObserver
+	component string
+	family    string
+	policy    string
+	health    FamilyObserver
 }
 
 func NewPrometheus(family, policy string, health FamilyObserver) *Prometheus {
 	return &Prometheus{family: family, policy: policy, health: health}
+}
+
+func NewComponentPrometheus(component, family, policy string, health FamilyObserver) *Prometheus {
+	return &Prometheus{component: component, family: family, policy: policy, health: health}
 }
 
 func (o *Prometheus) Observe(event sharedcache.Event) {
@@ -42,6 +47,16 @@ func (o *Prometheus) Observe(event sharedcache.Event) {
 		ObserveCachePayloadBytes(o.family, o.policy, "raw", event.Size)
 	case sharedcache.OperationPayloadSet:
 		ObserveCachePayloadBytes(o.family, o.policy, "stored", event.Size)
+	}
+	if o.component != "" {
+		op := string(event.Operation)
+		switch event.Operation {
+		case sharedcache.OperationPayloadRaw, sharedcache.OperationPayloadSet:
+			op = ""
+		}
+		if op != "" {
+			ObserveComponentCacheOperation(o.component, o.family, op, event.Duration, event.Err != nil)
+		}
 	}
 	if event.Err != nil {
 		if o.health != nil {

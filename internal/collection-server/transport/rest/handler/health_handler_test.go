@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/gin-gonic/gin"
@@ -229,6 +230,48 @@ func TestHealthHandlerRedisFamiliesIncludesInstanceIdentity(t *testing.T) {
 	}
 	if payload.Data.InstanceID != "collection-a" || payload.Data.Generation != "generation-a" {
 		t.Fatalf("identity = %+v", payload.Data)
+	}
+}
+
+func TestHealthHandlerCacheGovernanceReturnsRegistryAndIdentity(t *testing.T) {
+	handler := NewHealthHandlerWithResilience(
+		"collection-server", "2.0.0", nil,
+		func() resilience.RuntimeSnapshot {
+			snapshot := resilience.NewRuntimeSnapshot("collection-server", time.Now())
+			snapshot.InstanceID = "collection-a"
+			snapshot.Generation = "generation-a"
+			return snapshot
+		},
+	)
+	handler.BindCacheRegistry(sharedcache.NewRegistry(sharedcache.EffectiveCapability{
+		Capability: "catalog.questionnaire", Layer: sharedcache.LayerL1, Kind: sharedcache.KindCache,
+		CatalogVersion: "v3", Enabled: true,
+	}))
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/governance/cache", nil)
+
+	handler.CacheGovernance(c)
+
+	var payload struct {
+		Component  string `json:"component"`
+		InstanceID string `json:"instance_id"`
+		Generation string `json:"generation"`
+		Registry   struct {
+			CatalogVersion string `json:"catalog_version"`
+			Capabilities   []struct {
+				Capability string `json:"capability"`
+			} `json:"capabilities"`
+		} `json:"effective_registry"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Component != "collection-server" || payload.InstanceID != "collection-a" || payload.Generation != "generation-a" {
+		t.Fatalf("identity = %+v", payload)
+	}
+	if payload.Registry.CatalogVersion != "v3" || len(payload.Registry.Capabilities) != 1 {
+		t.Fatalf("registry = %+v", payload.Registry)
 	}
 }
 

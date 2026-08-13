@@ -49,6 +49,7 @@ func (registrar publicRouteRegistrar) register(engine *gin.Engine) {
 	engine.GET("/readyz", r.readyCheck)
 	engine.GET("/ping", r.ping)
 	engine.GET("/governance/redis", r.redisGovernance)
+	engine.GET("/governance/cache", r.cacheGovernance)
 
 	publicAPI := engine.Group("/api/v1/public")
 	{

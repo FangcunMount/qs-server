@@ -15,6 +15,33 @@ type Options struct {
 	TTLJitterRatio float64
 	OnHit          func()
 	OnMiss         func()
+	OnEntries      func(int)
+	OnEviction     func(EvictionReason)
+}
+
+type EvictionReason string
+
+const (
+	EvictionReasonFIFO     EvictionReason = "fifo"
+	EvictionReasonTTL      EvictionReason = "ttl"
+	EvictionReasonExplicit EvictionReason = "explicit"
+	EvictionReasonSignal   EvictionReason = "signal"
+)
+
+type StatsSnapshot struct {
+	Entries           int    `json:"entries"`
+	MaxEntries        int    `json:"max_entries"`
+	Hits              uint64 `json:"hits"`
+	Misses            uint64 `json:"misses"`
+	FIFOEvictions     uint64 `json:"fifo_evictions"`
+	TTLExpirations    uint64 `json:"ttl_expirations"`
+	ExplicitDeletions uint64 `json:"explicit_deletions"`
+	SignalDeletions   uint64 `json:"signal_deletions"`
+}
+
+type BucketSnapshot struct {
+	Bucket string        `json:"bucket"`
+	Stats  StatsSnapshot `json:"stats"`
 }
 
 func (o Options) withDefaults(defaultTTL time.Duration, defaultEntries int) Options {
@@ -34,13 +61,17 @@ type cacheEntry[T any] struct {
 
 // Cache 泛型进程内 TTL 缓存（FIFO 淘汰）。
 type Cache[T any] struct {
-	mu     sync.RWMutex
-	opts   Options
-	clone  func(T) T
-	items  map[string]cacheEntry[T]
-	order  []string
-	hits   uint64
-	misses uint64
+	mu                sync.RWMutex
+	opts              Options
+	clone             func(T) T
+	items             map[string]cacheEntry[T]
+	order             []string
+	hits              uint64
+	misses            uint64
+	fifoEvictions     uint64
+	ttlExpirations    uint64
+	explicitDeletions uint64
+	signalDeletions   uint64
 }
 
 // New 创建进程内 TTL 缓存；clone 在 Get/Set 时隔离调用方修改。
@@ -88,6 +119,8 @@ func (c *Cache[T]) Get(key string) (T, bool) {
 		if !entry.expiresAt.After(now) {
 			delete(c.items, key)
 			c.removeOrderKey(key)
+			c.recordEvictionLocked(EvictionReasonTTL)
+			c.recordEntriesLocked()
 			c.mu.Unlock()
 			c.recordMiss()
 			return zero, false
@@ -121,9 +154,14 @@ func (c *Cache[T]) Set(key string, value T) {
 	}
 	c.items[key] = entry
 	c.evictIfNeeded()
+	c.recordEntriesLocked()
 }
 
 func (c *Cache[T]) Delete(key string) {
+	c.DeleteWithReason(key, EvictionReasonExplicit)
+}
+
+func (c *Cache[T]) DeleteWithReason(key string, reason EvictionReason) {
 	key = strings.TrimSpace(key)
 	if c == nil || key == "" {
 		return
@@ -131,12 +169,21 @@ func (c *Cache[T]) Delete(key string) {
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if _, exists := c.items[key]; !exists {
+		return
+	}
 	delete(c.items, key)
 	c.removeOrderKey(key)
+	c.recordEvictionLocked(reason)
+	c.recordEntriesLocked()
 }
 
 // DeletePrefix 删除 key 等于 prefix 或以 prefix 为前缀的全部条目。
 func (c *Cache[T]) DeletePrefix(prefix string) {
+	c.DeletePrefixWithReason(prefix, EvictionReasonExplicit)
+}
+
+func (c *Cache[T]) DeletePrefixWithReason(prefix string, reason EvictionReason) {
 	prefix = strings.TrimSpace(prefix)
 	if c == nil || prefix == "" {
 		return
@@ -148,8 +195,10 @@ func (c *Cache[T]) DeletePrefix(prefix string) {
 		if key == prefix || strings.HasPrefix(key, prefix) {
 			delete(c.items, key)
 			c.removeOrderKey(key)
+			c.recordEvictionLocked(reason)
 		}
 	}
+	c.recordEntriesLocked()
 }
 
 func (c *Cache[T]) Stats() (hits, misses uint64) {
@@ -159,6 +208,19 @@ func (c *Cache[T]) Stats() (hits, misses uint64) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.hits, c.misses
+}
+
+func (c *Cache[T]) RuntimeSnapshot() StatsSnapshot {
+	if c == nil {
+		return StatsSnapshot{}
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return StatsSnapshot{
+		Entries: len(c.items), MaxEntries: c.opts.MaxEntries, Hits: c.hits, Misses: c.misses,
+		FIFOEvictions: c.fifoEvictions, TTLExpirations: c.ttlExpirations,
+		ExplicitDeletions: c.explicitDeletions, SignalDeletions: c.signalDeletions,
+	}
 }
 
 func (c *Cache[T]) recordHit() {
@@ -184,6 +246,29 @@ func (c *Cache[T]) evictIfNeeded() {
 		oldest := c.order[0]
 		c.order = c.order[1:]
 		delete(c.items, oldest)
+		c.recordEvictionLocked(EvictionReasonFIFO)
+	}
+}
+
+func (c *Cache[T]) recordEvictionLocked(reason EvictionReason) {
+	switch reason {
+	case EvictionReasonFIFO:
+		c.fifoEvictions++
+	case EvictionReasonTTL:
+		c.ttlExpirations++
+	case EvictionReasonSignal:
+		c.signalDeletions++
+	default:
+		c.explicitDeletions++
+	}
+	if c.opts.OnEviction != nil {
+		c.opts.OnEviction(reason)
+	}
+}
+
+func (c *Cache[T]) recordEntriesLocked() {
+	if c.opts.OnEntries != nil {
+		c.opts.OnEntries(len(c.items))
 	}
 }
 

@@ -31,21 +31,35 @@ type MultiCache[TDetail, TList, TCategories, THot any] struct {
 	hot        *Cache[THot]
 }
 
+type MultiOptions struct {
+	Detail     Options
+	List       Options
+	Categories Options
+	Hot        Options
+}
+
 // NewMultiCache 创建多桶 catalog L1。
 func NewMultiCache[TDetail, TList, TCategories, THot any](opts Options, hooks MultiHooks[TDetail, TList, TCategories, THot]) *MultiCache[TDetail, TList, TCategories, THot] {
-	opts = opts.withDefaults(defaultTTL, 256)
+	return NewMultiCacheWithOptions(MultiOptions{Detail: opts, List: opts, Categories: opts, Hot: opts}, hooks)
+}
+
+func NewMultiCacheWithOptions[TDetail, TList, TCategories, THot any](opts MultiOptions, hooks MultiHooks[TDetail, TList, TCategories, THot]) *MultiCache[TDetail, TList, TCategories, THot] {
+	opts.Detail = opts.Detail.withDefaults(defaultTTL, 256)
+	opts.List = opts.List.withDefaults(defaultTTL, 256)
+	opts.Categories = opts.Categories.withDefaults(defaultTTL, 256)
+	opts.Hot = opts.Hot.withDefaults(defaultTTL, 256)
 	c := &MultiCache[TDetail, TList, TCategories, THot]{hooks: hooks}
 	if hooks.CloneDetail != nil {
-		c.detail = New(opts, hooks.CloneDetail)
+		c.detail = New(opts.Detail, hooks.CloneDetail)
 	}
 	if hooks.CloneList != nil {
-		c.list = New(opts, hooks.CloneList)
+		c.list = New(opts.List, hooks.CloneList)
 	}
 	if hooks.CloneCategories != nil {
-		c.categories = New(opts, hooks.CloneCategories)
+		c.categories = New(opts.Categories, hooks.CloneCategories)
 	}
 	if hooks.CloneHot != nil {
-		c.hot = New(opts, hooks.CloneHot)
+		c.hot = New(opts.Hot, hooks.CloneHot)
 	}
 	return c
 }
@@ -146,17 +160,37 @@ func (c *MultiCache[TDetail, TList, TCategories, THot]) EvictOnSignal(code strin
 	}
 	code = strings.ToLower(strings.TrimSpace(code))
 	if code != "" && c.detail != nil && c.hooks.DetailKey != nil {
-		c.detail.Delete(c.hooks.DetailKey(code))
+		c.detail.DeleteWithReason(c.hooks.DetailKey(code), EvictionReasonSignal)
 	}
 	if c.list != nil && c.hooks.ListPrefix != "" {
-		c.list.DeletePrefix(c.hooks.ListPrefix)
+		c.list.DeletePrefixWithReason(c.hooks.ListPrefix, EvictionReasonSignal)
 	}
 	if c.categories != nil && c.hooks.CategoriesKey != "" {
-		c.categories.Delete(c.hooks.CategoriesKey)
+		c.categories.DeleteWithReason(c.hooks.CategoriesKey, EvictionReasonSignal)
 	}
 	if c.hot != nil && c.hooks.HotPrefix != "" {
-		c.hot.DeletePrefix(c.hooks.HotPrefix)
+		c.hot.DeletePrefixWithReason(c.hooks.HotPrefix, EvictionReasonSignal)
 	}
+}
+
+func (c *MultiCache[TDetail, TList, TCategories, THot]) RuntimeBuckets() []BucketSnapshot {
+	if c == nil {
+		return nil
+	}
+	result := make([]BucketSnapshot, 0, 4)
+	if c.detail != nil {
+		result = append(result, BucketSnapshot{Bucket: "detail", Stats: c.detail.RuntimeSnapshot()})
+	}
+	if c.list != nil {
+		result = append(result, BucketSnapshot{Bucket: "list", Stats: c.list.RuntimeSnapshot()})
+	}
+	if c.categories != nil {
+		result = append(result, BucketSnapshot{Bucket: "categories", Stats: c.categories.RuntimeSnapshot()})
+	}
+	if c.hot != nil {
+		result = append(result, BucketSnapshot{Bucket: "hot", Stats: c.hot.RuntimeSnapshot()})
+	}
+	return result
 }
 
 func (c *MultiCache[TDetail, TList, TCategories, THot]) Stats() (hits, misses uint64) {
