@@ -7,6 +7,7 @@ capabilities:
   modelcatalog:
     published_model: {enabled: true, ttl: "2h", negative: false}
   evaluation:
+    assessment_access: {enabled: true, ttl: "5m", singleflight: true}
     assessment_detail: {enabled: true, ttl: "1h", singleflight: true}
   actor:
     testee: {enabled: true, ttl: "30m", negative: true}

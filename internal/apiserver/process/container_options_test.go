@@ -20,6 +20,7 @@ func TestAPIServerBuildContainerCacheOptions(t *testing.T) {
 	opts.Cache.Capabilities.ModelCatalog.PublishedModel.TTL = time.Minute
 	opts.Cache.Capabilities.Evaluation.AssessmentDetail.Enabled = false
 	opts.Cache.Capabilities.Evaluation.AssessmentDetail.TTL = 4 * time.Minute
+	opts.Cache.Capabilities.Evaluation.AssessmentAccess.TTL = 5 * time.Minute
 	opts.Cache.Capabilities.Actor.Testee.TTL = 6 * time.Minute
 	opts.Cache.Capabilities.Plan.Detail.TTL = 7 * time.Minute
 	opts.Cache.Capabilities.Statistics.Query.Enabled = false
@@ -79,9 +80,13 @@ func TestAPIServerBuildContainerCacheOptions(t *testing.T) {
 	got := server.buildContainerCacheOptions()
 
 	detail := got.Capabilities[cachepolicy.CapabilityEvaluationAssessmentDetail]
+	access := got.Capabilities[cachepolicy.CapabilityEvaluationAssessmentAccess]
 	statistics := got.Capabilities[cachepolicy.CapabilityStatisticsQuery]
 	if detail.Enabled || statistics.Enabled {
 		t.Fatalf("disabled capability mapping mismatch: detail=%+v statistics=%+v", detail, statistics)
+	}
+	if !access.Enabled || access.Policy.TTL != 5*time.Minute {
+		t.Fatalf("assessment access mapping mismatch: %+v", access)
 	}
 	if _, exists := got.Capabilities["evaluation.assessment_list"]; exists {
 		t.Fatal("retired evaluation.assessment_list capability is still projected")

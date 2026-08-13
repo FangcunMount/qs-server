@@ -19,6 +19,7 @@ type ReadThroughOptions[T any] struct {
 	Coalescer        loadguard.Coalescer
 	Store            *Store[T]
 	Load             func(context.Context) (*T, error)
+	ShouldCache      func(*T) bool
 	CacheNegative    bool
 	AsyncSetCached   bool
 	AsyncSetNegative bool
@@ -89,6 +90,9 @@ func ReadThrough[T any](ctx context.Context, opts ReadThroughOptions[T]) (*T, er
 			})
 		}
 		return nil, nil
+	}
+	if opts.ShouldCache != nil && !opts.ShouldCache(value) {
+		return value, nil
 	}
 
 	write(ctx, opts.Observer, opts.AsyncSetCached, func(writeCtx context.Context) error {

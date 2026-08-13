@@ -486,6 +486,7 @@ func validateCacheOptions(opts *CacheOptions) []error {
 			"survey.questionnaire":         opts.Capabilities.Survey.Questionnaire,
 			"modelcatalog.published_model": opts.Capabilities.ModelCatalog.PublishedModel,
 			"evaluation.assessment_detail": opts.Capabilities.Evaluation.AssessmentDetail,
+			"evaluation.assessment_access": opts.Capabilities.Evaluation.AssessmentAccess,
 			"actor.testee":                 opts.Capabilities.Actor.Testee,
 			"plan.detail":                  opts.Capabilities.Plan.Detail,
 			"statistics.query":             opts.Capabilities.Statistics.Query,

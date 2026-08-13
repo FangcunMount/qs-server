@@ -25,8 +25,9 @@ func InstallFrom(host InstallHost) error {
 	}
 	provider := host.CachePolicyProvider()
 	detail := compose.ResolveCacheCapability(provider, cachepolicy.CapabilityEvaluationAssessmentDetail)
+	access := compose.ResolveCacheCapability(provider, cachepolicy.CapabilityEvaluationAssessmentAccess)
 	objectRedis := host.CacheClient(redisruntime.FamilyObject)
-	if !detail.Enabled {
+	if !detail.Enabled && !access.Enabled {
 		objectRedis = nil
 	}
 	result, err := Wire(WireInput{

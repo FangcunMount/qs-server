@@ -16,10 +16,16 @@ type service struct {
 	assessments domainassessment.Repository
 	reader      evaluationreadmodel.AssessmentReader
 	scores      evaloutcome.ScoreFactReader
+	accessCache AssessmentAccessCache
+	detailCache AssessmentDetailCache
 }
 
 func NewService(assessments domainassessment.Repository, reader evaluationreadmodel.AssessmentReader, scores evaloutcome.ScoreFactReader) Service {
 	return &service{assessments: assessments, reader: reader, scores: scores}
+}
+
+func NewServiceWithCaches(assessments domainassessment.Repository, reader evaluationreadmodel.AssessmentReader, scores evaloutcome.ScoreFactReader, accessCache AssessmentAccessCache, detailCache AssessmentDetailCache) Service {
+	return &service{assessments: assessments, reader: reader, scores: scores, accessCache: accessCache, detailCache: detailCache}
 }
 
 func (s *service) AuthorizeAssessment(ctx context.Context, actor Actor, id uint64) error {
@@ -29,11 +35,24 @@ func (s *service) AuthorizeAssessment(ctx context.Context, actor Actor, id uint6
 	if s.assessments == nil {
 		return evalerrors.ModuleNotConfigured("assessment repository is not configured")
 	}
-	a, err := s.assessments.FindByID(ctx, meta.FromUint64(id))
-	if err != nil {
-		return evalerrors.AssessmentNotFound(err, "测评不存在")
+	loadOwner := func(loadCtx context.Context) (uint64, error) {
+		a, err := s.assessments.FindByID(loadCtx, meta.FromUint64(id))
+		if err != nil {
+			return 0, evalerrors.AssessmentNotFound(err, "测评不存在")
+		}
+		return a.TesteeID().Uint64(), nil
 	}
-	if a.TesteeID().Uint64() != actor.TesteeID {
+	var owner uint64
+	var err error
+	if s.accessCache != nil {
+		owner, err = s.accessCache.ReadOwner(ctx, id, loadOwner)
+	} else {
+		owner, err = loadOwner(ctx)
+	}
+	if err != nil {
+		return err
+	}
+	if owner != actor.TesteeID {
 		return evalerrors.Forbidden("无权访问此测评")
 	}
 	return nil
@@ -45,11 +64,54 @@ func (s *service) GetAssessment(ctx context.Context, actor Actor, id uint64) (*A
 	if s.reader == nil {
 		return nil, evalerrors.ModuleNotConfigured("assessment read model is not configured")
 	}
-	row, err := s.reader.GetAssessment(ctx, id)
-	if err != nil {
-		return nil, err
+	loadDetail := func(loadCtx context.Context) (*Assessment, error) {
+		row, err := s.reader.GetAssessment(loadCtx, id)
+		if err != nil {
+			return nil, err
+		}
+		return assessmentFromRow(*row)
 	}
-	return assessmentFromRow(*row)
+	if s.detailCache == nil {
+		return loadDetail(ctx)
+	}
+	result, err := s.detailCache.ReadDetail(ctx, id, loadDetail)
+	return cloneAssessment(result), err
+}
+
+func cloneAssessment(value *Assessment) *Assessment {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	if value.PrimaryScore != nil {
+		primary := *value.PrimaryScore
+		if value.PrimaryScore.Max != nil {
+			max := *value.PrimaryScore.Max
+			primary.Max = &max
+		}
+		cloned.PrimaryScore = &primary
+	}
+	if value.Level != nil {
+		level := *value.Level
+		cloned.Level = &level
+	}
+	if value.OriginID != nil {
+		originID := *value.OriginID
+		cloned.OriginID = &originID
+	}
+	if value.SubmittedAt != nil {
+		submittedAt := *value.SubmittedAt
+		cloned.SubmittedAt = &submittedAt
+	}
+	if value.FailedAt != nil {
+		failedAt := *value.FailedAt
+		cloned.FailedAt = &failedAt
+	}
+	if value.FailureReason != nil {
+		reason := *value.FailureReason
+		cloned.FailureReason = &reason
+	}
+	return &cloned
 }
 func (s *service) ListAssessments(ctx context.Context, actor Actor, q ListQuery) (*AssessmentList, error) {
 	if actor.TesteeID == 0 {

@@ -595,6 +595,7 @@ type ModelCatalogCacheCapabilities struct {
 	PublishedModel *CapabilityPolicyOptions `json:"published_model" mapstructure:"published_model"`
 }
 type EvaluationCacheCapabilities struct {
+	AssessmentAccess *CapabilityPolicyOptions `json:"assessment_access" mapstructure:"assessment_access"`
 	AssessmentDetail *CapabilityPolicyOptions `json:"assessment_detail" mapstructure:"assessment_detail"`
 }
 type ActorCacheCapabilities struct {
@@ -637,6 +638,7 @@ func NewCacheOptions() *CacheOptions {
 			Survey:       &SurveyCacheCapabilities{Questionnaire: &CapabilityPolicyOptions{Enabled: true, TTL: 12 * time.Hour, Negative: cacheBoolPtr(true)}},
 			ModelCatalog: &ModelCatalogCacheCapabilities{PublishedModel: &CapabilityPolicyOptions{Enabled: true, TTL: 24 * time.Hour, Negative: cacheBoolPtr(false)}},
 			Evaluation: &EvaluationCacheCapabilities{
+				AssessmentAccess: &CapabilityPolicyOptions{Enabled: true, TTL: 5 * time.Minute, Singleflight: cacheBoolPtr(true)},
 				AssessmentDetail: &CapabilityPolicyOptions{Enabled: true, TTL: 2 * time.Hour, Singleflight: cacheBoolPtr(true)},
 			},
 			Actor:      &ActorCacheCapabilities{Testee: &CapabilityPolicyOptions{Enabled: true, TTL: 30 * time.Minute, Negative: cacheBoolPtr(true)}},
@@ -693,6 +695,7 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 	addCapabilityFlags(fs, "cache.capabilities.survey.questionnaire", c.Capabilities.Survey.Questionnaire)
 	addCapabilityFlags(fs, "cache.capabilities.modelcatalog.published_model", c.Capabilities.ModelCatalog.PublishedModel)
 	addCapabilityFlags(fs, "cache.capabilities.evaluation.assessment_detail", c.Capabilities.Evaluation.AssessmentDetail)
+	addCapabilityFlags(fs, "cache.capabilities.evaluation.assessment_access", c.Capabilities.Evaluation.AssessmentAccess)
 	addCapabilityFlags(fs, "cache.capabilities.actor.testee", c.Capabilities.Actor.Testee)
 	addCapabilityFlags(fs, "cache.capabilities.plan.detail", c.Capabilities.Plan.Detail)
 	addCapabilityFlags(fs, "cache.capabilities.statistics.query", c.Capabilities.Statistics.Query)
@@ -766,6 +769,9 @@ func ensureCacheCapabilities(c *CacheCapabilityOptions) {
 	}
 	if c.Evaluation.AssessmentDetail == nil {
 		c.Evaluation.AssessmentDetail = defaults.Evaluation.AssessmentDetail
+	}
+	if c.Evaluation.AssessmentAccess == nil {
+		c.Evaluation.AssessmentAccess = defaults.Evaluation.AssessmentAccess
 	}
 	if c.Actor == nil {
 		c.Actor = defaults.Actor

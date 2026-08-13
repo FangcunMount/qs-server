@@ -20,6 +20,7 @@ import (
 	evaluationworker "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/worker"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	evaluationcache "github.com/FangcunMount/qs-server/internal/apiserver/cache/evaluation"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
@@ -110,6 +111,8 @@ type evaluationInfra struct {
 	assessmentOutboxStore appEventing.EventStager
 	txRunner              apptransaction.Runner
 	postCommit            appEventing.PostCommitDispatcher
+	assessmentAccessCache evaluationtestee.AssessmentAccessCache
+	assessmentDetailCache evaluationtestee.AssessmentDetailCache
 }
 
 func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
@@ -117,7 +120,14 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 	mysqlOptions := mysql.BaseRepositoryOptions{Limiter: normalized.MySQLLimiter}
 	baseAssessmentRepo := mysqlEval.NewAssessmentRepository(normalized.MySQLDB, mysqlOptions)
 	if normalized.RedisClient != nil {
-		infra.assessmentRepo = evaluationcache.NewCachedAssessmentRepositoryWithBuilderProviderAndObserver(baseAssessmentRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.CachePolicies, normalized.Observer)
+		caches := evaluationcache.NewAssessmentCaches(normalized.RedisClient, normalized.CacheBuilder, normalized.CachePolicies, normalized.Observer)
+		infra.assessmentRepo = evaluationcache.NewInvalidatingAssessmentRepository(baseAssessmentRepo, caches)
+		if capabilityEnabled(normalized.CachePolicies, cachepolicy.CapabilityEvaluationAssessmentAccess) {
+			infra.assessmentAccessCache = caches
+		}
+		if capabilityEnabled(normalized.CachePolicies, cachepolicy.CapabilityEvaluationAssessmentDetail) {
+			infra.assessmentDetailCache = caches
+		}
 	} else {
 		infra.assessmentRepo = baseAssessmentRepo
 	}
@@ -199,11 +209,19 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 		evaluationintake.WithPostCommitDispatcher(infra.postCommit),
 	)
 	scoreFacts := evaluationoutcome.NewScoreFactReader(infra.outcomeRepo, infra.scoreProjectionReader)
-	m.TesteeService = evaluationtestee.NewService(infra.assessmentRepo, infra.assessmentReader, scoreFacts)
+	m.TesteeService = evaluationtestee.NewServiceWithCaches(infra.assessmentRepo, infra.assessmentReader, scoreFacts, infra.assessmentAccessCache, infra.assessmentDetailCache)
 	m.OperatorQuery = evaluationoperator.NewQueryService(infra.assessmentRepo, infra.assessmentReader, normalized.TesteeAccessChecker, scoreFacts, infra.runRepo)
 	m.GovernedRetry = evaluationoperator.NewGovernedRetryService(infra.assessmentRepo, infra.runRepo, infra.txRunner, infra.assessmentOutboxStore, normalized.TesteeAccessChecker)
 	m.ScaleAnalysis = evaluationoperator.NewScaleAnalysisService(m.OperatorQuery)
 	m.workbenchLatestRiskReader = infra.latestRiskReader
+}
+
+func capabilityEnabled(provider sharedcache.PolicyProvider, capability sharedcache.Capability) bool {
+	if provider == nil {
+		return false
+	}
+	effective, ok := provider.Resolve(capability)
+	return ok && effective.Enabled
 }
 
 func (m *Module) wireScheduler(infra *evaluationInfra) {

@@ -30,9 +30,13 @@ func TestParseDate(t *testing.T) {
 type assessmentRepoStub struct {
 	domainassessment.Repository
 	value *domainassessment.Assessment
+	calls *int
 }
 
 func (s assessmentRepoStub) FindByID(context.Context, domainassessment.ID) (*domainassessment.Assessment, error) {
+	if s.calls != nil {
+		*s.calls++
+	}
 	return s.value, nil
 }
 
@@ -41,6 +45,95 @@ type scoreStub struct{ called bool }
 func (s *scoreStub) Get(context.Context, uint64) (*evaloutcome.ScoreFact, error) {
 	s.called = true
 	return &evaloutcome.ScoreFact{AssessmentID: 1}, nil
+}
+
+type testAssessmentCaches struct {
+	owner       uint64
+	ownerFound  bool
+	detail      *Assessment
+	detailFound bool
+	setDetails  int
+}
+
+func (c *testAssessmentCaches) ReadOwner(ctx context.Context, _ uint64, load func(context.Context) (uint64, error)) (uint64, error) {
+	if c.ownerFound {
+		return c.owner, nil
+	}
+	owner, err := load(ctx)
+	if err == nil {
+		c.owner, c.ownerFound = owner, true
+	}
+	return owner, err
+}
+func (c *testAssessmentCaches) ReadDetail(ctx context.Context, _ uint64, load func(context.Context) (*Assessment, error)) (*Assessment, error) {
+	if c.detailFound {
+		return cloneAssessment(c.detail), nil
+	}
+	value, err := load(ctx)
+	if err == nil && value != nil && value.Status == "evaluated" {
+		c.detail, c.detailFound = cloneAssessment(value), true
+		c.setDetails++
+	}
+	return value, err
+}
+
+type detailReaderStub struct {
+	assessmentReaderStub
+	row   evaluationreadmodel.AssessmentRow
+	calls int
+}
+
+func (r *detailReaderStub) GetAssessment(context.Context, uint64) (*evaluationreadmodel.AssessmentRow, error) {
+	r.calls++
+	row := r.row
+	return &row, nil
+}
+
+func TestAssessmentAccessCacheStoresOnlyOwnerProjection(t *testing.T) {
+	var repoCalls int
+	value, err := domainassessment.NewAssessment(9, domaintestee.NewID(7), domainassessment.NewQuestionnaireRefByCode(meta.NewCode("Q"), "1"), domainassessment.NewAnswerSheetRef(meta.FromUint64(2)), domainassessment.NewAdhocOrigin(), domainassessment.WithID(meta.FromUint64(1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	caches := &testAssessmentCaches{}
+	svc := NewServiceWithCaches(assessmentRepoStub{value: value, calls: &repoCalls}, nil, nil, caches, nil)
+	for range 2 {
+		if err := svc.AuthorizeAssessment(context.Background(), Actor{TesteeID: 7}, 1); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if repoCalls != 1 || !caches.ownerFound || caches.owner != 7 {
+		t.Fatalf("repo calls=%d owner=%d found=%v", repoCalls, caches.owner, caches.ownerFound)
+	}
+	if err := svc.AuthorizeAssessment(context.Background(), Actor{TesteeID: 8}, 1); err == nil {
+		t.Fatal("cached owner allowed a foreign testee")
+	}
+}
+
+func TestAssessmentDetailCacheAdmitsOnlyEvaluatedOutcome(t *testing.T) {
+	value, err := domainassessment.NewAssessment(9, domaintestee.NewID(7), domainassessment.NewQuestionnaireRefByCode(meta.NewCode("Q"), "1"), domainassessment.NewAnswerSheetRef(meta.FromUint64(2)), domainassessment.NewAdhocOrigin(), domainassessment.WithID(meta.FromUint64(1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, status := range []string{"pending", "submitted", "failed", "evaluated"} {
+		t.Run(status, func(t *testing.T) {
+			caches := &testAssessmentCaches{owner: 7, ownerFound: true}
+			reader := &detailReaderStub{row: evaluationreadmodel.AssessmentRow{ID: 1, OrgID: 9, TesteeID: 7, Status: status}}
+			svc := NewServiceWithCaches(assessmentRepoStub{value: value}, reader, nil, caches, caches)
+			for range 2 {
+				if _, err := svc.GetAssessment(context.Background(), Actor{TesteeID: 7}, 1); err != nil {
+					t.Fatal(err)
+				}
+			}
+			wantReads, wantSets := 2, 0
+			if status == "evaluated" {
+				wantReads, wantSets = 1, 1
+			}
+			if reader.calls != wantReads || caches.setDetails != wantSets {
+				t.Fatalf("reader calls=%d sets=%d, want %d/%d", reader.calls, caches.setDetails, wantReads, wantSets)
+			}
+		})
+	}
 }
 func (*scoreStub) Trend(context.Context, uint64, string, int) (*evaloutcome.FactorTrendFact, error) {
 	return nil, nil
