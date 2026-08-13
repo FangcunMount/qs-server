@@ -272,7 +272,9 @@ func renderPhaseConsole(phase PhaseSummary) string {
 func renderK6NativeDiagnostics(phase PhaseSummary, raw rawSummary) string {
 	var output strings.Builder
 	fmt.Fprintln(&output, "\n  K6 原生运行诊断")
-	fmt.Fprintln(&output, "  WEBSOCKET")
+	writeNativeOperationDiagnostics(&output, phase, raw)
+
+	fmt.Fprintln(&output, "  WEBSOCKET / K6 内置")
 	writeNativeTrend(&output, "ws_connecting", findMetric(raw, "ws_connecting", nil))
 	writeNativeCounter(&output, "ws_msgs_received", findMetric(raw, "ws_msgs_received", nil))
 	writeNativeCounter(&output, "ws_msgs_sent", findMetric(raw, "ws_msgs_sent", nil))
@@ -316,23 +318,192 @@ func renderK6NativeDiagnostics(phase PhaseSummary, raw rawSummary) string {
 	return output.String()
 }
 
-func writeNativeTrend(output *strings.Builder, name string, metric map[string]any) {
-	if metric == nil {
-		fmt.Fprintf(output, "  %-58s: N/A\n", nativeLeader(name, 58))
+var nativeOperationGroupOrder = []string{
+	"QUERY / 查询",
+	"SUBMIT / 提交",
+	"SESSION / 会话",
+	"WEBSOCKET / 报告订阅",
+	"STATISTICS / 统计",
+	"ASYNC CHAIN / 异步链路",
+}
+
+func writeNativeOperationDiagnostics(output *strings.Builder, phase PhaseSummary, raw rawSummary) {
+	groups := make(map[string][]LatencyMetric)
+	for _, latency := range phase.Latency {
+		group := nativeOperationGroupFor(latency.Operation)
+		if group == "" {
+			continue
+		}
+		groups[group] = append(groups[group], latency)
+	}
+	correctness := make(map[string]CorrectnessMetric, len(phase.Correctness))
+	for _, item := range phase.Correctness {
+		correctness[item.Operation] = item
+	}
+
+	for _, title := range nativeOperationGroupOrder {
+		operations := groups[title]
+		if len(operations) == 0 {
+			continue
+		}
+		fmt.Fprintf(output, "  %s\n", title)
+		for _, latency := range operations {
+			writeNativeOperation(output, phase, raw, latency, correctness)
+		}
+		fmt.Fprintln(output)
+	}
+}
+
+func nativeOperationGroupFor(operation string) string {
+	switch {
+	case operation == "async_chain_probe":
+		return "ASYNC CHAIN / 异步链路"
+	case strings.Contains(operation, "report_ws_"):
+		return "WEBSOCKET / 报告订阅"
+	case strings.Contains(operation, "submit"):
+		return "SUBMIT / 提交"
+	case operation == "personality_session":
+		return "SESSION / 会话"
+	case strings.HasPrefix(operation, "statistics_"):
+		return "STATISTICS / 统计"
+	case strings.Contains(operation, "query"):
+		return "QUERY / 查询"
+	default:
+		return ""
+	}
+}
+
+func writeNativeOperation(output *strings.Builder, phase PhaseSummary, raw rawSummary, latency LatencyMetric, correctness map[string]CorrectnessMetric) {
+	fmt.Fprintf(output, "    %s\n", latency.Operation)
+	if latency.Operation == "async_chain_probe" {
+		writeNativeTrendWithIndent(output, "      ", "report_generated_latency", findMetric(raw, "report_generated_latency", nil))
+		writeNativeSamples(output, "      ", latency.Samples, phase.Duration)
+		if item, ok := correctness[latency.Operation]; ok {
+			writeNativeOutcome(output, "      ", item)
+		}
+		writeNativeChainCounters(output, raw)
 		return
 	}
-	fmt.Fprintf(output, "  %-58s: avg=%s min=%s med=%s p(90)=%s p(95)=%s p(99)=%s max=%s\n",
+
+	spec, ok := nativeOperationSpec(latency.Operation)
+	if !ok {
+		writeNativeTrendFromLatency(output, "      ", latency.Operation+"_duration", latency)
+		writeNativeSamples(output, "      ", latency.Samples, phase.Duration)
+		if item, found := correctness[latency.Operation]; found {
+			writeNativeOutcome(output, "      ", item)
+		}
+		return
+	}
+	metricName := nativeTaggedMetricName(spec.TrendMetric, spec.TrendTags)
+	writeNativeTrendWithIndent(output, "      ", metricName, findMetric(raw, spec.TrendMetric, spec.TrendTags))
+	writeNativeSamples(output, "      ", latency.Samples, phase.Duration)
+	if item, found := correctness[latency.Operation]; found {
+		writeNativeOutcome(output, "      ", item)
+		writeNativeFailureBreakdown(output, raw, spec)
+	}
+}
+
+func nativeOperationSpec(operation string) (operationSpec, bool) {
+	for _, spec := range operationSpecs {
+		if spec.ID == operation {
+			return spec, true
+		}
+	}
+	return operationSpec{}, false
+}
+
+func nativeTaggedMetricName(name string, tags []string) string {
+	if len(tags) == 0 {
+		return name
+	}
+	return name + "{" + strings.Join(tags, ",") + "}"
+}
+
+func writeNativeSamples(output *strings.Builder, indent string, samples int64, plannedDuration string) {
+	rate := "N/A"
+	if duration, err := time.ParseDuration(strings.TrimSpace(plannedDuration)); err == nil && duration > 0 {
+		rate = fmt.Sprintf("%.6f/s", float64(samples)/duration.Seconds())
+	}
+	fmt.Fprintf(output, "%s%-58s: %d  %s\n", indent, nativeLeader("samples", 58), samples, rate)
+}
+
+func writeNativeOutcome(output *strings.Builder, indent string, item CorrectnessMetric) {
+	fmt.Fprintf(output, "%s%-58s: success=%s error=%s timeout=%s | success_rate=%s error_rate=%s timeout_rate=%s\n",
+		indent, nativeLeader("outcome", 58), formatNativeCount(item.SuccessCount), formatNativeCount(item.ErrorCount),
+		formatNativeCount(item.TimeoutCount), formatPercent(item.SuccessRate), formatPercent(item.ErrorRate), formatPercent(item.TimeoutRate))
+}
+
+func writeNativeFailureBreakdown(output *strings.Builder, raw rawSummary, spec operationSpec) {
+	if !strings.HasSuffix(spec.TimeoutMetric, "_timeout") {
+		return
+	}
+	prefix := strings.TrimSuffix(spec.TimeoutMetric, "_timeout")
+	status4xx := findMetric(raw, prefix+"_4xx", spec.TimeoutTags)
+	status5xx := findMetric(raw, prefix+"_5xx", spec.TimeoutTags)
+	transport := findMetric(raw, prefix+"_transport_error", spec.TimeoutTags)
+	if status4xx == nil && status5xx == nil && transport == nil {
+		return
+	}
+	fmt.Fprintf(output, "      %-58s: 4xx=%s 5xx=%s transport=%s\n", nativeLeader("failure_breakdown", 58),
+		formatNativeInteger(metricNumber(status4xx, "count")), formatNativeInteger(metricNumber(status5xx, "count")),
+		formatNativeInteger(metricNumber(transport, "count")))
+}
+
+func writeNativeChainCounters(output *strings.Builder, raw rawSummary) {
+	names := []string{
+		"chain_probe_started", "chain_probe_accepted", "chain_probe_completed", "chain_probe_failed",
+		"chain_probe_timeout", "chain_probe_final_failed", "chain_probe_poll_requests",
+	}
+	for _, name := range names {
+		writeNativeCounterWithIndent(output, "      ", name, findMetric(raw, name, nil))
+	}
+}
+
+func writeNativeTrendFromLatency(output *strings.Builder, indent, name string, latency LatencyMetric) {
+	metric := map[string]any{}
+	for key, measurement := range map[string]Measurement{
+		"avg": latency.Average, "med": latency.P50, "p(90)": latency.P90,
+		"p(95)": latency.P95, "p(99)": latency.P99, "max": latency.Max,
+	} {
+		if measurement.Value != nil {
+			metric[key] = *measurement.Value
+		}
+	}
+	writeNativeTrendWithIndent(output, indent, name, metric)
+}
+
+func formatNativeCount(value *int64) string {
+	if value == nil {
+		return "N/A"
+	}
+	return strconv.FormatInt(*value, 10)
+}
+
+func writeNativeTrend(output *strings.Builder, name string, metric map[string]any) {
+	writeNativeTrendWithIndent(output, "  ", name, metric)
+}
+
+func writeNativeTrendWithIndent(output *strings.Builder, indent, name string, metric map[string]any) {
+	if metric == nil {
+		fmt.Fprintf(output, "%s%-58s: N/A\n", indent, nativeLeader(name, 58))
+		return
+	}
+	fmt.Fprintf(output, "%s%-58s: avg=%s min=%s med=%s p(90)=%s p(95)=%s p(99)=%s max=%s\n", indent,
 		nativeLeader(name, 58), formatNativeMS(metric, "avg"), formatNativeMS(metric, "min"),
 		formatNativeMS(metric, "med"), formatNativeMS(metric, "p(90)"), formatNativeMS(metric, "p(95)"),
 		formatNativeMS(metric, "p(99)"), formatNativeMS(metric, "max"))
 }
 
 func writeNativeCounter(output *strings.Builder, name string, metric map[string]any) {
+	writeNativeCounterWithIndent(output, "  ", name, metric)
+}
+
+func writeNativeCounterWithIndent(output *strings.Builder, indent, name string, metric map[string]any) {
 	if metric == nil {
-		fmt.Fprintf(output, "  %-58s: N/A\n", nativeLeader(name, 58))
+		fmt.Fprintf(output, "%s%-58s: N/A\n", indent, nativeLeader(name, 58))
 		return
 	}
-	fmt.Fprintf(output, "  %-58s: %s  %.6f/s\n", nativeLeader(name, 58),
+	fmt.Fprintf(output, "%s%-58s: %s  %.6f/s\n", indent, nativeLeader(name, 58),
 		formatNativeInteger(metricNumber(metric, "count")), metricNumber(metric, "rate"))
 }
 

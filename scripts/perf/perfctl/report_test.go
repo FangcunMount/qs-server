@@ -154,6 +154,86 @@ func TestNativeDiagnosticsAppendWebSocketExecutionAndScenarios(t *testing.T) {
 	}
 }
 
+func TestNativeDiagnosticsGroupEachActiveInterface(t *testing.T) {
+	latency := func(operation string, samples int64) LatencyMetric {
+		return LatencyMetric{Operation: operation, Samples: samples}
+	}
+	correctness := func(operation string, attempts, success, failures, timeouts int64) CorrectnessMetric {
+		return CorrectnessMetric{
+			Operation: operation, Attempts: attempts,
+			SuccessCount: int64Ptr(success), ErrorCount: int64Ptr(failures), TimeoutCount: int64Ptr(timeouts),
+			SuccessRate: measured(floatPtr(float64(success)/float64(attempts)), "ratio", "test"),
+			ErrorRate:   measured(floatPtr(float64(failures)/float64(attempts)), "ratio", "test"),
+			TimeoutRate: measured(floatPtr(float64(timeouts)/float64(attempts)), "ratio", "test"),
+		}
+	}
+	trend := func(median float64) map[string]any {
+		return map[string]any{
+			"avg": median + 1, "min": median - 1, "med": median, "p(90)": median + 2,
+			"p(95)": median + 3, "p(99)": median + 4, "max": median + 5,
+		}
+	}
+	phase := PhaseSummary{
+		Duration: "6s",
+		Latency: []LatencyMetric{
+			latency("medical_model_query", 12),
+			latency("medical_submit", 6),
+			latency("personality_session", 3),
+			latency("medical_report_ws_connect", 5),
+			latency("statistics_overview", 4),
+			latency("async_chain_probe", 1),
+		},
+		Correctness: []CorrectnessMetric{
+			correctness("medical_model_query", 12, 11, 1, 0),
+			correctness("medical_submit", 6, 6, 0, 0),
+			correctness("personality_session", 3, 3, 0, 0),
+			correctness("medical_report_ws_connect", 5, 5, 0, 0),
+			correctness("statistics_overview", 4, 4, 0, 0),
+			correctness("async_chain_probe", 1, 1, 0, 0),
+		},
+	}
+	raw := rawSummary{Metrics: map[string]map[string]any{
+		"medical_model_query_duration":                   trend(20),
+		"medical_model_query_5xx":                        {"count": float64(1), "rate": float64(1.0 / 6)},
+		"medical_answer_submit_duration":                 trend(30),
+		"personality_session_duration":                   trend(40),
+		"report_ws_connect_duration{model_type:medical}": trend(50),
+		"statistics_overview_duration":                   trend(60),
+		"report_generated_latency":                       trend(70),
+		"chain_probe_started":                            {"count": float64(1), "rate": float64(1.0 / 6)},
+		"chain_probe_accepted":                           {"count": float64(1), "rate": float64(1.0 / 6)},
+		"chain_probe_completed":                          {"count": float64(1), "rate": float64(1.0 / 6)},
+		"chain_probe_failed":                             {"count": float64(0), "rate": float64(0)},
+		"chain_probe_timeout":                            {"count": float64(0), "rate": float64(0)},
+		"chain_probe_final_failed":                       {"count": float64(0), "rate": float64(0)},
+		"chain_probe_poll_requests":                      {"count": float64(2), "rate": float64(2.0 / 6)},
+	}}
+
+	console := renderK6NativeDiagnostics(phase, raw)
+	ordered := []string{
+		"QUERY / 查询", "SUBMIT / 提交", "SESSION / 会话", "WEBSOCKET / 报告订阅",
+		"STATISTICS / 统计", "ASYNC CHAIN / 异步链路", "WEBSOCKET / K6 内置", "EXECUTION",
+	}
+	last := -1
+	for _, title := range ordered {
+		index := strings.Index(console, title)
+		if index <= last {
+			t.Fatalf("section %q is missing or out of order:\n%s", title, console)
+		}
+		last = index
+	}
+	for _, want := range []string{
+		"medical_model_query_duration", "12  2.000000/s", "success=11 error=1 timeout=0",
+		"failure_breakdown", "4xx=0 5xx=1 transport=0", "medical_answer_submit_duration",
+		"report_ws_connect_duration{model_type:medical}", "statistics_overview_duration",
+		"report_generated_latency", "chain_probe_poll_requests", "2  0.333333/s",
+	} {
+		if !strings.Contains(console, want) {
+			t.Fatalf("interface diagnostics missing %q:\n%s", want, console)
+		}
+	}
+}
+
 func TestRetryRateIsNAWhenInitialDenominatorIsZero(t *testing.T) {
 	before := []metricSample{
 		{Name: "qs_retry_layer_attempt_total", Labels: map[string]string{"layer": "business", "attempt_class": "initial"}, Value: 0},

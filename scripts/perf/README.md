@@ -132,7 +132,7 @@ qs_retry_layer_attempt_total{
 
 `report.md` 顶部先按三个维度给出跨阶段总览，随后按阶段展开同一结构。排队、服务端证据和原始阈值放在附录，不与三类业务结果并列。`summary.json` 继续保存完整机器证据和来源。
 
-K6 原生尾部的完整指标全集不再重复打印到终端；`handleSummary()` 将其标准化后写入阶段的 `raw-k6-summary.json`。K6 运行进度仍可见，阶段结束后由 `perfctl` 先输出三维结果，再在底部追加精简的“原生运行诊断”：WebSocket 原生指标、总运行时长/当前与峰值 VU/迭代/dropped 状态，以及按场景列出的 pre/max VU、持续时间、目标速率和 dropped。该区块是运行诊断附录，不新增第四个验收维度；`handleSummary()` 未提供的 interrupted iterations 明确显示为 `N/A`。
+K6 原生尾部的完整指标全集不再重复打印到终端；`handleSummary()` 将其标准化后写入阶段的 `raw-k6-summary.json`。K6 运行进度仍可见，阶段结束后由 `perfctl` 先输出三维结果，再在底部追加精简的“原生运行诊断”。诊断先按 `QUERY / 查询`、`SUBMIT / 提交`、`SESSION / 会话`、`WEBSOCKET / 报告订阅`、`STATISTICS / 统计` 和 `ASYNC CHAIN / 异步链路` 展示每个活动接口的原始时延、样本速率、成功/错误/超时及可用的失败类型；随后展示 K6 WebSocket 内置指标、总运行时长/当前与峰值 VU/迭代/dropped 状态，以及按场景列出的 pre/max VU、持续时间、目标速率和 dropped。该区块是运行诊断附录，不新增第四个验收维度；`handleSummary()` 未提供的 interrupted iterations 明确显示为 `N/A`。
 
 ## 报告契约
 
