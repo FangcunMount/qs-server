@@ -10,20 +10,19 @@ Capability 是 Cache 的最小治理单位。apiserver 的 [`catalog.Spec`](../.
 
 ### 2.1 apiserver
 
-下表的“代码默认 TTL”来自 `Spec.Defaults`，“生产 TTL”来自 [`configs/apiserver.prod.yaml`](../../../configs/apiserver.prod.yaml)。生产配置是 override，并不改变代码默认值。
+下表的“代码默认 TTL”来自 `Spec.Defaults`，“生产 TTL”来自 [`configs/cache/apiserver.prod.yaml`](../../../configs/cache/apiserver.prod.yaml)。生产 policy 是 override，并不改变代码默认值。
 
 | Capability | Owner | Kind | Layer | Family | 代码默认 TTL | 生产 TTL | Metric label |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `survey.questionnaire` | survey | cache | L2 | `static_meta` | 12h | 2h | `questionnaire` |
 | `modelcatalog.published_model` | modelcatalog | cache | L2 | `static_meta` | 24h | 2h | `published_model` |
 | `evaluation.assessment_detail` | evaluation | cache | L2 | `object_view` | 2h | 1h | `assessment_detail` |
-| `evaluation.assessment_list` | evaluation | cache | L1+L2 | `query_result` | 10m | 10m | `assessment_list` |
 | `actor.testee` | actor | cache | L2 | `object_view` | 30m | 30m | `testee` |
 | `plan.detail` | plan | cache | L2 | `object_view` | 2h | 12h | `plan` |
 | `statistics.query` | statistics | cache | L2 + bounded L1 stale | `query_result` | 26h | 26h | `stats_query` |
 | `report_status` | interpretation | operational_state | runtime | `ops_runtime` | 48h | 48h | `report_status` |
 
-`evaluation.assessment_list` 和 `statistics.query` 的 version token 使用 `meta_hotset`，但 capability family 仍分别投影为 `query_result`；version token 是查询缓存的支撑元数据，不是第二个业务 capability。
+`statistics.query` 的 generation/hotset 元数据使用 `meta_hotset`，但 capability family 仍投影为 `query_result`；支撑元数据不是第二个业务 capability。`evaluation.assessment_list` 因读路径从未接入缓存而已退役，system-governance 不保留虚假的 disabled row。
 
 ### 2.2 collection-server
 
@@ -32,10 +31,22 @@ collection-server 的 Registry 是静态 snapshot，能力由 [`internal/collect
 | Capability | Layer | Family | 生产配置 | 回源 |
 | --- | --- | --- | --- | --- |
 | `catalog.questionnaire` | L1 | `local` | TTL 180s、max 256、singleflight、signal evict | apiserver questionnaire gRPC |
+| `catalog.published_model` | L1 | `local` | 第一版生产关闭；启用后 TTL 180s、jitter 0.2、每 bucket max 64、singleflight、signal evict | apiserver published-model L2 |
 | `catalog.typology` | L1 | `local` | TTL 180s、max 256、singleflight、signal evict | assessment-model catalog gRPC |
 | `report_status` | runtime | `ops_runtime` | TTL 172800s | report workflow |
 
 collection 的 capability ID 不跟随 apiserver 的业务前缀重命名，因为它们描述的是 BFF 自己持有的 DTO L1 和生命周期。
+
+发布一保持生产关闭，开发环境开启；主配置只引用独立 policy：
+
+```yaml
+cache:
+  policy_file: cache/collection-server.prod.yaml
+```
+
+实际 capability 值位于 [`configs/cache/collection-server.prod.yaml`](../../../configs/cache/collection-server.prod.yaml)。
+
+启用或回滚 `enabled` 都需要滚动重启 collection-server；当前不支持动态重接线。
 
 ## 3. Spec 是什么
 
@@ -103,6 +114,7 @@ effective := override.MergeWith(
 - `Resolve/All/Snapshot` 返回值或 slice 副本；
 - publisher 以 `expected_version` 做 CAS；
 - candidate 与当前内容完全相同时 `changed=false`，version 不增加；
+- snapshot 同时原子保存 capability 集合与 `PolicySource(component/schema_version/path/policy_sha256)`；
 - 发布成功且确有变化时 version 加一；
 - version conflict 或 candidate 校验失败时保留完整旧 snapshot。
 
@@ -110,34 +122,27 @@ effective := override.MergeWith(
 
 ## 6. 配置合同
 
-### 6.1 apiserver
+### 6.1 主配置与 policy 文件
 
 ```yaml
 cache:
-  capabilities:
-    survey:
-      questionnaire: {}
-    modelcatalog:
-      published_model: {}
-    evaluation:
-      assessment_detail: {}
-      assessment_list: {}
-    actor:
-      testee: {}
-    plan:
-      detail: {}
-    statistics:
-      query: {}
-    report_status:
-      ttl_seconds: 172800
-  defaults:
-    compress_payload: false
-    ttl_jitter_ratio: 0.2
-    static: {}
-    object: {}
-    query: {}
-  governance: {}
+  policy_file: cache/apiserver.prod.yaml
+
+runtime_state:
+  report_status:
+    ttl_seconds: 172800
 ```
+
+apiserver 与 collection-server 各自维护 dev/prod policy：
+
+```text
+configs/cache/apiserver.{dev,prod}.yaml
+configs/cache/collection-server.{dev,prod}.yaml
+```
+
+policy envelope 固定为 `version: "1.0"`，`component` 必须与进程匹配；capability 集合必须完整、不得包含未知项，每个 capability 必须显式提供 `enabled`。collection policy 还必须显式提供 TTL、容量、singleflight 和 Signal eviction。路径相对主配置文件目录解析，不依赖进程工作目录。
+
+优先级固定为：代码默认值 `<` policy 文件 `<` 环境变量 `<` 显式 CLI。未显式传入的 flag default 不覆盖 policy。完成 schema 校验和全部覆盖后，规范化 effective policy JSON 生成 SHA-256；注释、YAML 键顺序和格式变化不会改变 hash。
 
 普通 capability 可配置：
 
@@ -151,12 +156,14 @@ singleflight
 negative
 ```
 
-`redis_runtime` 只配置 family → Redis profile/namespace/fallback/availability；它不能出现 TTL、negative、compression 或 singleflight。`report_status` 只使用 operational-state TTL，不继承普通 cache policy。
+`redis_runtime` 只配置 family → Redis profile/namespace/fallback/availability；它不能出现 TTL、negative、compression 或 singleflight。`report_status` 位于 `runtime_state.report_status`，只使用 operational-state TTL，不继承普通 cache policy，也不参与 cache policy reload。
+
+发布时，cache policy 独立化与 `report_status` 归位作为同一个原子配置/镜像切换直接迁移，不设置额外观察窗口；回滚同样必须同时恢复匹配的配置与镜像。
 
 ### 6.2 collection-server 与 worker
 
-- collection-server 使用 `cache.capabilities.catalog.questionnaire`、`catalog.typology` 和 `report_status`；
-- worker 只消费 `cache.capabilities.report_status`；
+- collection-server 的 policy 使用 `capabilities.catalog.questionnaire`、`catalog.published_model` 与 `catalog.typology`；`catalog.published_model` 的启停是启动时接线，修改后必须滚动重启；
+- worker 没有 `CacheOptions` 或 `cache:` 配置段，只消费 `runtime_state.report_status`；
 - 三进程 production `report_status.ttl_seconds` 都是 `172800`，由 config contract test 防止漂移；
 - signal 的 prefix/channel/buffer 属于 `signaling.redis`，不与 report status TTL 混放。
 
@@ -179,18 +186,18 @@ POST /internal/v1/system-governance/actions/cache.reload_policy/runs
 }
 ```
 
-动作只允许 `qs:admin`，要求显式确认和正整数 `expected_version`。process 使用新的 Viper 实例重读启动配置源，执行 unknown-field 和 typed validation，再构造完整 candidate Registry；它不会修改当前 Options 或全局 Viper。
+动作只允许 `qs:admin`，要求显式确认和正整数 `expected_version`。process 只重读启动时已经固定真实路径的 apiserver cache policy 文件，再按启动时相同的默认值、环境变量和显式 CLI 合并链构造 candidate；它不会重读主配置、切换 policy 文件、修改当前 Options 或全局 Viper。
 
 可 reload：
 
-- 七个普通 capability 的 `ttl/negative_ttl/ttl_jitter_ratio/compress/singleflight/negative`；
+- 六个普通 capability 的 `ttl/negative_ttl/ttl_jitter_ratio/compress/singleflight/negative`；
 - global 与 static/object/query family defaults 中相同的 Policy 维度。
 
 不可 reload：
 
 - `enabled`；
 - capability `family/layer/kind/owner/source/metric label`；
-- `cache.governance`；
+- policy 文件中的 `governance`；
 - `report_status`；
 - collection-server Registry。
 
@@ -206,6 +213,12 @@ Cache governance status 在原有 runtime/warmup 字段外提供：
     "snapshot_version": 2,
     "catalog_version": "v2",
     "generated_at": "...",
+    "policy_source": {
+      "component": "qs-apiserver",
+      "schema_version": "1.0",
+      "path": "/app/configs/cache/apiserver.prod.yaml",
+      "policy_sha256": "..."
+    },
     "capabilities": [],
     "reload": {
       "last_attempt_at": "...",

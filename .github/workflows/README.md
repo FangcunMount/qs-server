@@ -35,8 +35,9 @@ JavaScript Action 必须使用原生 Node 24 主版本：测试覆盖率、扫�
    - worker 使用固定 Compose project `qs-worker`、service key `runtime` 和 `--scale` 启动全部副本，容器名为 `qs-worker-runtime-N`。
 4. 资源配额：直接维护在 `build/docker/docker-compose.prod.yml`（serverA 4C/8G：apiserver + collection x2 同机；collection 两副本共享原总预算）。
 5. 服务内部并发/连接池：直接维护在 `configs/apiserver.prod.yaml`、`configs/collection-server.prod.yaml`、`configs/worker.prod.yaml`。
-6. Collection 副本数：workflow_dispatch 可填写 `collection_replicas`，留空时读取仓库变量 `QS_COLLECTION_REPLICAS`，缺失时默认 `2`。
-7. Worker 副本数：workflow_dispatch 可填写 `worker_replicas`，留空时读取仓库变量 `QS_WORKER_REPLICAS`，缺失时默认 `3`。
+6. Cache policy：apiserver 与 collection-server 分别维护 `configs/cache/<component>.prod.yaml`，并与引用它的主配置、镜像作为同一原子发布单元；`report_status` 在本次切换中直接迁移到三进程主配置的 `runtime_state`，不设置额外观察窗口。
+7. Collection 副本数：workflow_dispatch 可填写 `collection_replicas`，留空时读取仓库变量 `QS_COLLECTION_REPLICAS`，缺失时默认 `2`。
+8. Worker 副本数：workflow_dispatch 可填写 `worker_replicas`，留空时读取仓库变量 `QS_WORKER_REPLICAS`，缺失时默认 `3`。
 
 生产拓扑（2026-06）：
 
