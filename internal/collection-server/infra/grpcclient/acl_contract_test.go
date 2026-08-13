@@ -22,8 +22,8 @@ func TestCollectionServerACLContract(t *testing.T) {
 	t.Parallel()
 
 	allowed := ACLAllowedMethods()
-	if len(allowed) != 24 {
-		t.Fatalf("ACLAllowedMethods() count = %d, want 24", len(allowed))
+	if len(allowed) != 25 {
+		t.Fatalf("ACLAllowedMethods() count = %d, want 25", len(allowed))
 	}
 	assertUniqueMethods(t, allowed)
 	assertExactMethods(t, allowed, discoverOutboundRPCMethods(t))
@@ -86,7 +86,7 @@ func discoverOutboundRPCMethods(t *testing.T) []string {
 	parsedFiles := parseNonTestGoFiles(t, packageDir)
 	serviceByStructField := discoverGeneratedClientFields(t, parsedFiles, servicePrefixByClientType)
 
-	methodSet := make(map[string]struct{}, 24)
+	methodSet := make(map[string]struct{}, 25)
 	for _, parsed := range parsedFiles {
 		for _, declaration := range parsed.Decls {
 			function, ok := declaration.(*ast.FuncDecl)

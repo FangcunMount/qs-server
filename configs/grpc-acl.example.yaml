@@ -21,6 +21,7 @@ services:
       - /answersheet.AnswerSheetService/ListAnswerSheets
       - /questionnaire.QuestionnaireService/GetQuestionnaire
       - /questionnaire.QuestionnaireService/ListQuestionnaires
+      - /evaluation.TesteeEvaluationService/AuthorizeAssessment
       - /evaluation.TesteeEvaluationService/GetMyAssessment
       - /evaluation.TesteeEvaluationService/ListMyAssessments
       - /evaluation.TesteeEvaluationService/GetAssessmentScores

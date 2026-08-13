@@ -19,6 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	TesteeEvaluationService_AuthorizeAssessment_FullMethodName = "/evaluation.TesteeEvaluationService/AuthorizeAssessment"
 	TesteeEvaluationService_GetMyAssessment_FullMethodName     = "/evaluation.TesteeEvaluationService/GetMyAssessment"
 	TesteeEvaluationService_ListMyAssessments_FullMethodName   = "/evaluation.TesteeEvaluationService/ListMyAssessments"
 	TesteeEvaluationService_GetAssessmentScores_FullMethodName = "/evaluation.TesteeEvaluationService/GetAssessmentScores"
@@ -32,6 +33,8 @@ const (
 //
 // 受试者测评查询。
 type TesteeEvaluationServiceClient interface {
+	// 仅校验 testee/assessment ownership，不返回测评详情。
+	AuthorizeAssessment(ctx context.Context, in *AuthorizeAssessmentRequest, opts ...grpc.CallOption) (*AuthorizeAssessmentResponse, error)
 	// 获取我的测评详情（含 model/primary_score/level outcome 投影）
 	GetMyAssessment(ctx context.Context, in *GetMyAssessmentRequest, opts ...grpc.CallOption) (*GetMyAssessmentResponse, error)
 	// 获取我的测评列表（含 outcome 投影）
@@ -47,6 +50,16 @@ type testeeEvaluationServiceClient struct {
 
 func NewTesteeEvaluationServiceClient(cc grpc.ClientConnInterface) TesteeEvaluationServiceClient {
 	return &testeeEvaluationServiceClient{cc}
+}
+
+func (c *testeeEvaluationServiceClient) AuthorizeAssessment(ctx context.Context, in *AuthorizeAssessmentRequest, opts ...grpc.CallOption) (*AuthorizeAssessmentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AuthorizeAssessmentResponse)
+	err := c.cc.Invoke(ctx, TesteeEvaluationService_AuthorizeAssessment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *testeeEvaluationServiceClient) GetMyAssessment(ctx context.Context, in *GetMyAssessmentRequest, opts ...grpc.CallOption) (*GetMyAssessmentResponse, error) {
@@ -105,6 +118,8 @@ func (c *testeeEvaluationServiceClient) GetHighRiskFactors(ctx context.Context, 
 //
 // 受试者测评查询。
 type TesteeEvaluationServiceServer interface {
+	// 仅校验 testee/assessment ownership，不返回测评详情。
+	AuthorizeAssessment(context.Context, *AuthorizeAssessmentRequest) (*AuthorizeAssessmentResponse, error)
 	// 获取我的测评详情（含 model/primary_score/level outcome 投影）
 	GetMyAssessment(context.Context, *GetMyAssessmentRequest) (*GetMyAssessmentResponse, error)
 	// 获取我的测评列表（含 outcome 投影）
@@ -122,6 +137,9 @@ type TesteeEvaluationServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedTesteeEvaluationServiceServer struct{}
 
+func (UnimplementedTesteeEvaluationServiceServer) AuthorizeAssessment(context.Context, *AuthorizeAssessmentRequest) (*AuthorizeAssessmentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AuthorizeAssessment not implemented")
+}
 func (UnimplementedTesteeEvaluationServiceServer) GetMyAssessment(context.Context, *GetMyAssessmentRequest) (*GetMyAssessmentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMyAssessment not implemented")
 }
@@ -157,6 +175,24 @@ func RegisterTesteeEvaluationServiceServer(s grpc.ServiceRegistrar, srv TesteeEv
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&TesteeEvaluationService_ServiceDesc, srv)
+}
+
+func _TesteeEvaluationService_AuthorizeAssessment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AuthorizeAssessmentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TesteeEvaluationServiceServer).AuthorizeAssessment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TesteeEvaluationService_AuthorizeAssessment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TesteeEvaluationServiceServer).AuthorizeAssessment(ctx, req.(*AuthorizeAssessmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _TesteeEvaluationService_GetMyAssessment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -256,6 +292,10 @@ var TesteeEvaluationService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "evaluation.TesteeEvaluationService",
 	HandlerType: (*TesteeEvaluationServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "AuthorizeAssessment",
+			Handler:    _TesteeEvaluationService_AuthorizeAssessment_Handler,
+		},
 		{
 			MethodName: "GetMyAssessment",
 			Handler:    _TesteeEvaluationService_GetMyAssessment_Handler,

@@ -30,6 +30,17 @@ func (s *TesteeEvaluationService) RegisterService(server *grpc.Server) {
 
 // ==================== 测评查询接口 ====================
 
+// AuthorizeAssessment 仅校验测评归属，不读取 outcome 详情。
+func (s *TesteeEvaluationService) AuthorizeAssessment(ctx context.Context, req *pb.AuthorizeAssessmentRequest) (*pb.AuthorizeAssessmentResponse, error) {
+	if req.TesteeId == 0 || req.AssessmentId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "testee_id 和 assessment_id 不能为空")
+	}
+	if err := s.testeeService.AuthorizeAssessment(ctx, evaluationtestee.Actor{TesteeID: req.TesteeId}, req.AssessmentId); err != nil {
+		return nil, toAssessmentQueryGRPCError(err)
+	}
+	return &pb.AuthorizeAssessmentResponse{}, nil
+}
+
 // GetMyAssessment 获取我的测评详情（含 outcome 投影）
 func (s *TesteeEvaluationService) GetMyAssessment(ctx context.Context, req *pb.GetMyAssessmentRequest) (*pb.GetMyAssessmentResponse, error) {
 	if req.TesteeId == 0 || req.AssessmentId == 0 {

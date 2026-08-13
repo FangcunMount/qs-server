@@ -14,6 +14,9 @@ import (
 )
 
 type testeeEvaluationServiceStub struct {
+	authorizeErr     error
+	authorizeActor   *evaluationtestee.Actor
+	authorizeID      *uint64
 	getAssessmentErr error
 	listResult       *evaluationtestee.AssessmentList
 	listErr          error
@@ -21,8 +24,32 @@ type testeeEvaluationServiceStub struct {
 	listQuery        *evaluationtestee.ListQuery
 }
 
-func (s testeeEvaluationServiceStub) AuthorizeAssessment(context.Context, evaluationtestee.Actor, uint64) error {
-	return nil
+func (s testeeEvaluationServiceStub) AuthorizeAssessment(_ context.Context, actor evaluationtestee.Actor, id uint64) error {
+	if s.authorizeActor != nil {
+		*s.authorizeActor = actor
+	}
+	if s.authorizeID != nil {
+		*s.authorizeID = id
+	}
+	return s.authorizeErr
+}
+
+func TestAuthorizeAssessmentUsesNarrowOwnershipContract(t *testing.T) {
+	var actor evaluationtestee.Actor
+	var assessmentID uint64
+	svc := NewTesteeEvaluationService(testeeEvaluationServiceStub{authorizeActor: &actor, authorizeID: &assessmentID})
+	result, err := svc.AuthorizeAssessment(context.Background(), &pb.AuthorizeAssessmentRequest{TesteeId: 7, AssessmentId: 42})
+	if err != nil || result == nil {
+		t.Fatalf("AuthorizeAssessment() = %#v, %v", result, err)
+	}
+	if actor.TesteeID != 7 || assessmentID != 42 {
+		t.Fatalf("ownership tuple = actor:%#v assessment:%d", actor, assessmentID)
+	}
+
+	denied := NewTesteeEvaluationService(testeeEvaluationServiceStub{authorizeErr: pkgerrors.WithCode(errorCode.ErrPermissionDenied, "foreign")})
+	if _, err := denied.AuthorizeAssessment(context.Background(), &pb.AuthorizeAssessmentRequest{TesteeId: 7, AssessmentId: 42}); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("denied status = %s, want PermissionDenied", status.Code(err))
+	}
 }
 func (s testeeEvaluationServiceStub) GetAssessment(context.Context, evaluationtestee.Actor, uint64) (*evaluationtestee.Assessment, error) {
 	return nil, s.getAssessmentErr
