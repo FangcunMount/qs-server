@@ -140,7 +140,7 @@ func TestPerfThresholdTiersAndOperationMetrics(t *testing.T) {
 				"report_ws_connect_duration",
 				"report_ws_first_message_latency",
 				"experience: {",
-				"query: [200, 500]",
+				"query: [300, 500]",
 				"statistics: [700, 1500]",
 				"protection: {",
 				"query: [500, 1200]",
