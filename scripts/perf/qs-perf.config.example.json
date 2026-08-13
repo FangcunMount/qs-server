@@ -43,7 +43,8 @@
   },
   "vuserSizing": {
     "note": "各 scenario 按到达率、典型耗时、请求超时和 headroom 自动计算 preAllocatedVUs/maxVUs；只允许通过环境变量做有证据的临时覆盖。",
-    "headroom": 1.25
+    "headroom": 1.25,
+    "startupBuffer": 1
   },
   "planIds": [
     "614333603412718126",

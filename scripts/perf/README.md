@@ -42,7 +42,7 @@ Admission 的容量阶段持续时间固定为：
 
 300 QPS 的正式配比是：医疗模型查询 80、人格模型查询 40、两类问卷各 13、医疗/人格提交 19/5、医疗/行为/人格报告 70/10/20、Statistics 29、链路探针 1。
 
-120～280 不保存独立 profile。编排器固定链路探针为 1 QPS，其余流量按 300 配比使用最大余数法整数缩放，确保总量精确。VU 按到达率、典型耗时、超时和 headroom 计算；环境变量仍可显式覆盖。
+120～280 不保存独立 profile。编排器固定链路探针为 1 QPS，其余流量按 300 配比使用最大余数法整数缩放，确保总量精确。VU 按到达率、典型耗时、超时和 headroom 计算，并为 HTTP 到达率场景预留 `startupBuffer` 个冷启动 VU；环境变量仍可显式覆盖。
 
 ## 三维指标契约
 
@@ -64,6 +64,8 @@ Admission 的容量阶段持续时间固定为：
 异步场景必须区分受理 TPS、应完成受理量与完成 TPS。缺少服务端完成证据或 assessment intake outcome 证据时，最终完成率是 `N/A`，不得用全部受理量或链路探针估算。
 
 WebSocket 同时记录端到端 `report_ws_first_message_latency` 与握手后 `report_ws_subscribe_to_first_message_latency`。后者从客户端发送 subscribe 帧起计时，只用于定位首帧慢在公网握手还是服务端状态读取，不单独改变验收阈值。
+
+按模型展示 subscribe-to-message 时延使用三个独立的诊断 Trend，避免 K6 对无阈值 tagged submetric 不导出而产生伪 `N/A`。
 
 `dropped_iterations` 保留全局 `count==0` 硬门，同时为每个活动 scenario 生成相同的带 `scenario` 标签子阈值。任何一次丢迭代仍会让阶段失败，子阈值只负责指出发生在哪条流量链路。
 
@@ -130,7 +132,7 @@ qs_retry_layer_attempt_total{
 
 `report.md` 顶部先按三个维度给出跨阶段总览，随后按阶段展开同一结构。排队、服务端证据和原始阈值放在附录，不与三类业务结果并列。`summary.json` 继续保存完整机器证据和来源。
 
-K6 原生尾部汇总不再重复打印到终端；`handleSummary()` 将其标准化后写入阶段的 `raw-k6-summary.json`。K6 运行进度仍可见，阶段结束后由 `perfctl` 输出三维结果，避免原生指标块与正式报告同时刷屏。
+K6 原生尾部的完整指标全集不再重复打印到终端；`handleSummary()` 将其标准化后写入阶段的 `raw-k6-summary.json`。K6 运行进度仍可见，阶段结束后由 `perfctl` 先输出三维结果，再在底部追加精简的“原生运行诊断”：WebSocket 原生指标、总运行时长/当前与峰值 VU/迭代/dropped 状态，以及按场景列出的 pre/max VU、持续时间、目标速率和 dropped。该区块是运行诊断附录，不新增第四个验收维度；`handleSummary()` 未提供的 interrupted iterations 明确显示为 `N/A`。
 
 ## 报告契约
 

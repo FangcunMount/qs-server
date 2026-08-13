@@ -6,8 +6,16 @@ import { COLLECTION_BASE_URL, REPORT_EVENTS_PATH, REPORT_WS_HOLD_SECONDS } from 
 import {
   reportStatusFailed, reportSampleSkipped,
   reportWsConnectDuration, reportWsFirstMessageLatency, reportWsSubscribeToFirstMessageLatency, reportWsSessionDuration,
+  medicalReportWsSubscribeToFirstMessageLatency, behaviorReportWsSubscribeToFirstMessageLatency,
+  personalityReportWsSubscribeToFirstMessageLatency,
   reportWsConnectSuccessRate, reportWsMessageSuccessRate, reportWsTimeoutTotal,
 } from '../lib/metrics.js';
+
+const subscribeLatencyByModel = {
+  medical: medicalReportWsSubscribeToFirstMessageLatency,
+  behavior: behaviorReportWsSubscribeToFirstMessageLatency,
+  personality: personalityReportWsSubscribeToFirstMessageLatency,
+};
 
 function wsBaseURL(httpBase) {
   if (httpBase.startsWith('https://')) {
@@ -54,7 +62,9 @@ function runReportWsQuery(ctx, sample, kind, endpoint) {
             firstStatusReceived = true;
             reportWsFirstMessageLatency.add(Date.now() - started, tags);
             if (subscribedAt > 0) {
-              reportWsSubscribeToFirstMessageLatency.add(Date.now() - subscribedAt, tags);
+              const subscribeLatency = Date.now() - subscribedAt;
+              reportWsSubscribeToFirstMessageLatency.add(subscribeLatency, tags);
+              subscribeLatencyByModel[kind].add(subscribeLatency, tags);
             }
           }
           const status = frame.data.status || '';

@@ -9,7 +9,7 @@ function legacyThresholds(thresholds) {
 // k6 handleSummary() exposes metric values under `values`, while the existing
 // perfctl contract consumes the legacy --summary-export shape. Normalize the
 // in-memory summary so perfctl can own the human-readable terminal output.
-export function buildPerfRawSummary(data) {
+export function buildPerfRawSummary(data, metadata = {}) {
   const metrics = {};
   for (const [name, metric] of Object.entries((data && data.metrics) || {})) {
     const normalized = { ...((metric && metric.values) || {}) };
@@ -30,11 +30,17 @@ export function buildPerfRawSummary(data) {
   if (data && data.setup_data !== undefined) {
     result.setup_data = data.setup_data;
   }
+  if (data && data.state !== undefined) {
+    result.state = data.state;
+  }
+  if (metadata.scenarios !== undefined) {
+    result.scenarios = metadata.scenarios;
+  }
   return result;
 }
 
-export function structuredSummaryOutput(data, outputPath) {
-  const encoded = `${JSON.stringify(buildPerfRawSummary(data), null, 2)}\n`;
+export function structuredSummaryOutput(data, outputPath, metadata = {}) {
+  const encoded = `${JSON.stringify(buildPerfRawSummary(data, metadata), null, 2)}\n`;
   if (!outputPath) {
     return { stdout: encoded };
   }

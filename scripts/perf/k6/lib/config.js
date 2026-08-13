@@ -685,13 +685,19 @@ export function resolveArrivalVuserDefaults(rate, options = {}) {
   const expectedLatencySeconds = Math.max(0.001, Number(options.expectedLatencySeconds) || 0.5);
   const timeoutSeconds = Math.max(expectedLatencySeconds, Number(options.timeoutSeconds) || durationSeconds(HTTP_TIMEOUT, 30));
   const configuredHeadroom = Number(configFirstValue(['vuserSizing.headroom', 'vuser_sizing.headroom']));
+  const configuredStartupBuffer = Number(configFirstValue(['vuserSizing.startupBuffer', 'vuser_sizing.startup_buffer']));
   const headroom = Math.max(1, Number(options.headroom) || configuredHeadroom || 1.25);
+  const requestedStartupBuffer = options.startupBuffer !== undefined ? Number(options.startupBuffer) : configuredStartupBuffer;
+  const startupBuffer = Math.max(0, Math.ceil(Number.isFinite(requestedStartupBuffer) ? requestedStartupBuffer : 1));
   const minPreAllocated = Math.max(1, Number(options.minPreAllocated) || 2);
   const minMax = Math.max(minPreAllocated, Number(options.minMax) || 10);
   if (rps <= 0) {
     return { preAllocated: minPreAllocated, max: minMax };
   }
-  const preAllocated = Math.max(minPreAllocated, Math.ceil(rps * expectedLatencySeconds * headroom));
+  // arrival-rate executors drop the iteration that first triggers dynamic VU
+  // allocation. Keep one warm VU beyond steady-state sizing for TLS/connection
+  // cold starts instead of treating load-generator startup as server saturation.
+  const preAllocated = Math.max(minPreAllocated, Math.ceil(rps * expectedLatencySeconds * headroom) + startupBuffer);
   const max = Math.max(minMax, preAllocated, Math.ceil(rps * timeoutSeconds * headroom));
   return { preAllocated, max };
 }

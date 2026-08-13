@@ -170,6 +170,7 @@ func execute(ctx context.Context, opts runOptions) (RunSummary, int, error) {
 			}
 		}
 		_, _ = fmt.Fprint(opts.Stdout, renderPhaseConsole(phase))
+		_, _ = fmt.Fprint(opts.Stdout, renderK6NativeDiagnostics(phase, raw))
 		if phase.Verdict.Status == VerdictFail || phase.Verdict.Status == VerdictError {
 			stop = true
 		}
@@ -237,6 +238,9 @@ func finishSetupError(opts runOptions, runDir, runID, gitSHA string, gitDirty bo
 func renderPhaseConsole(phase PhaseSummary) string {
 	var output strings.Builder
 	fmt.Fprintf(&output, "\n[%s] %s\n", phase.ID, phase.Verdict.Status)
+	for _, reason := range phase.Verdict.Reasons {
+		fmt.Fprintf(&output, "  结论依据: %s\n", reason)
+	}
 	fmt.Fprintln(&output, "  1. 吞吐与处理能力")
 	fmt.Fprintf(&output, "     QPS  目标 %s | 实际 %s | 达成率 %s | Dropped %s\n",
 		formatMeasurement(phase.Throughput.BusinessQPS.Target), formatMeasurement(phase.Throughput.BusinessQPS.Actual),
@@ -263,6 +267,121 @@ func renderPhaseConsole(phase PhaseSummary) string {
 		fmt.Fprintf(&output, "     %s | %d | %d | %s\n", item.Layer, item.InitialAttempts, item.RetryAttempts, formatPercent(item.RetryRate))
 	}
 	return output.String()
+}
+
+func renderK6NativeDiagnostics(phase PhaseSummary, raw rawSummary) string {
+	var output strings.Builder
+	fmt.Fprintln(&output, "\n  K6 原生运行诊断")
+	fmt.Fprintln(&output, "  WEBSOCKET")
+	writeNativeTrend(&output, "ws_connecting", findMetric(raw, "ws_connecting", nil))
+	writeNativeCounter(&output, "ws_msgs_received", findMetric(raw, "ws_msgs_received", nil))
+	writeNativeCounter(&output, "ws_msgs_sent", findMetric(raw, "ws_msgs_sent", nil))
+	writeNativeTrend(&output, "ws_session_duration", findMetric(raw, "ws_session_duration", nil))
+	writeNativeCounter(&output, "ws_sessions", findMetric(raw, "ws_sessions", nil))
+
+	fmt.Fprintln(&output, "\n  EXECUTION")
+	duration := phase.ActualDuration.Value
+	if raw.State != nil && raw.State.TestRunDurationMS > 0 {
+		duration = floatPtr(raw.State.TestRunDurationMS / 1000)
+	}
+	vus := findMetric(raw, "vus", nil)
+	currentVUs := metricNumber(vus, "value")
+	observedVUs := metricNumber(vus, "max")
+	configuredVUs := metricNumber(findMetric(raw, "vus_max", nil), "max")
+	iterations := metricNumber(findMetric(raw, "iterations", nil), "count")
+	dropped := metricNumber(findMetric(raw, "dropped_iterations", nil), "count")
+	fmt.Fprintf(&output, "  running (%s), %s/%s VUs (peak=%s), %s complete, %s dropped, interrupted=N/A\n",
+		formatNativeDuration(duration), formatNativeInteger(currentVUs), formatNativeInteger(configuredVUs), formatNativeInteger(observedVUs),
+		formatNativeInteger(iterations), formatNativeInteger(dropped))
+
+	names := make([]string, 0, len(raw.Scenarios))
+	for name := range raw.Scenarios {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	globalDroppedKnown := findMetric(raw, "dropped_iterations", nil) != nil
+	for _, name := range names {
+		scenario := raw.Scenarios[name]
+		scenarioDropped := findMetric(raw, "dropped_iterations", []string{"scenario:" + name})
+		droppedText := "N/A"
+		if scenarioDropped != nil {
+			droppedText = formatNativeInteger(metricNumber(scenarioDropped, "count"))
+		} else if globalDroppedKnown && dropped == 0 {
+			droppedText = "0"
+		}
+		fmt.Fprintf(&output, "  %-34s ✓ [======================================] pre/max VUs=%s/%s  %s  %s  dropped=%s\n",
+			truncateNativeName(name, 34), formatNativeInteger(float64(scenario.PreAllocatedVUs)), formatNativeInteger(float64(scenario.MaxVUs)),
+			scenario.Duration, formatScenarioRate(scenario), droppedText)
+	}
+	return output.String()
+}
+
+func writeNativeTrend(output *strings.Builder, name string, metric map[string]any) {
+	if metric == nil {
+		fmt.Fprintf(output, "  %-58s: N/A\n", nativeLeader(name, 58))
+		return
+	}
+	fmt.Fprintf(output, "  %-58s: avg=%s min=%s med=%s p(90)=%s p(95)=%s p(99)=%s max=%s\n",
+		nativeLeader(name, 58), formatNativeMS(metric, "avg"), formatNativeMS(metric, "min"),
+		formatNativeMS(metric, "med"), formatNativeMS(metric, "p(90)"), formatNativeMS(metric, "p(95)"),
+		formatNativeMS(metric, "p(99)"), formatNativeMS(metric, "max"))
+}
+
+func writeNativeCounter(output *strings.Builder, name string, metric map[string]any) {
+	if metric == nil {
+		fmt.Fprintf(output, "  %-58s: N/A\n", nativeLeader(name, 58))
+		return
+	}
+	fmt.Fprintf(output, "  %-58s: %s  %.6f/s\n", nativeLeader(name, 58),
+		formatNativeInteger(metricNumber(metric, "count")), metricNumber(metric, "rate"))
+}
+
+func nativeLeader(name string, width int) string {
+	if len(name) >= width {
+		return name
+	}
+	return name + strings.Repeat(".", width-len(name))
+}
+
+func formatNativeMS(metric map[string]any, key string) string {
+	value := metricNumberPtr(metric, key)
+	if value == nil {
+		return "N/A"
+	}
+	return fmt.Sprintf("%.2fms", *value)
+}
+
+func formatNativeInteger(value float64) string {
+	return strconv.FormatInt(int64(value+0.5), 10)
+}
+
+func formatNativeDuration(seconds *float64) string {
+	if seconds == nil || *seconds <= 0 {
+		return "N/A"
+	}
+	return (time.Duration(*seconds * float64(time.Second))).Round(100 * time.Millisecond).String()
+}
+
+func formatScenarioRate(scenario rawScenario) string {
+	unit := strings.TrimSpace(scenario.TimeUnit)
+	if unit == "" {
+		unit = "1s"
+	}
+	parsed, err := time.ParseDuration(unit)
+	if err != nil || parsed <= 0 {
+		return fmt.Sprintf("%.2f iters/%s", scenario.Rate, unit)
+	}
+	return fmt.Sprintf("%.2f iters/s", scenario.Rate/parsed.Seconds())
+}
+
+func truncateNativeName(value string, width int) string {
+	if len(value) <= width {
+		return value
+	}
+	if width <= 3 {
+		return value[:width]
+	}
+	return value[:width-3] + "..."
 }
 
 func latencyExtreme(items []LatencyMetric, selectValue func(LatencyMetric) Measurement) (string, Measurement) {

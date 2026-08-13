@@ -99,7 +99,7 @@ func TestRawFixtureKeepsConsoleMarkdownAndJSONConsistent(t *testing.T) {
 	}
 	markdown := renderRunMarkdown(run)
 	console := renderPhaseConsole(phase)
-	for _, want := range []string{"1. 吞吐与处理能力", "QPS", "TPS", "2. 时延与响应体验", "P50", "P90", "P95", "P99", "3. 可靠性与正确性", "成功率", "错误率", "超时率", "重试率"} {
+	for _, want := range []string{"结论依据", "1. 吞吐与处理能力", "QPS", "TPS", "2. 时延与响应体验", "P50", "P90", "P95", "P99", "3. 可靠性与正确性", "成功率", "错误率", "超时率", "重试率"} {
 		if !strings.Contains(console, want) {
 			t.Fatalf("console missing %q: %s", want, console)
 		}
@@ -111,6 +111,45 @@ func TestRawFixtureKeepsConsoleMarkdownAndJSONConsistent(t *testing.T) {
 		}
 		if !strings.Contains(output, want) {
 			t.Fatalf("%s output is missing actual 10 QPS: %s", label, output)
+		}
+	}
+}
+
+func TestNativeDiagnosticsAppendWebSocketExecutionAndScenarios(t *testing.T) {
+	raw := rawSummary{
+		Metrics: map[string]map[string]any{
+			"ws_connecting": {
+				"avg": float64(164.11), "min": float64(81.41), "med": float64(147.72),
+				"p(90)": float64(219.26), "p(95)": float64(236.98), "p(99)": float64(390.09), "max": float64(757.02),
+			},
+			"ws_msgs_received": {"count": float64(5403), "rate": float64(17.492972)},
+			"ws_msgs_sent":     {"count": float64(2702), "rate": float64(8.748105)},
+			"ws_session_duration": {
+				"avg": float64(243.43), "min": float64(137.24), "med": float64(236.06),
+				"p(90)": float64(302.65), "p(95)": float64(327.12), "p(99)": float64(479.22), "max": float64(832.62),
+			},
+			"ws_sessions":        {"count": float64(2702), "rate": float64(8.748105)},
+			"iterations":         {"count": float64(18005), "rate": float64(58.29)},
+			"dropped_iterations": {"count": float64(1)},
+			"dropped_iterations{scenario:medical_model_query}":     {"count": float64(1)},
+			"dropped_iterations{scenario:medical_report_ws_query}": {"count": float64(0)},
+			"vus":     {"value": float64(0), "max": float64(42)},
+			"vus_max": {"max": float64(106)},
+		},
+		State: &rawSummaryState{TestRunDurationMS: 308900},
+		Scenarios: map[string]rawScenario{
+			"medical_model_query":     {Executor: "constant-arrival-rate", Rate: 12, TimeUnit: "1s", Duration: "5m0s", PreAllocatedVUs: 9, MaxVUs: 450},
+			"medical_report_ws_query": {Executor: "constant-arrival-rate", Rate: 5, TimeUnit: "1s", Duration: "5m0s", PreAllocatedVUs: 20, MaxVUs: 200},
+		},
+	}
+	console := renderK6NativeDiagnostics(PhaseSummary{}, raw)
+	for _, want := range []string{
+		"K6 原生运行诊断", "WEBSOCKET", "ws_connecting", "avg=164.11ms", "p(99)=390.09ms",
+		"ws_msgs_received", "5403  17.492972/s", "running (5m8.9s)", "0/106 VUs (peak=42)",
+		"18005 complete", "1 dropped", "interrupted=N/A", "medical_model_query", "pre/max VUs=9/450", "12.00 iters/s", "dropped=1",
+	} {
+		if !strings.Contains(console, want) {
+			t.Fatalf("native diagnostics missing %q:\n%s", want, console)
 		}
 	}
 }
@@ -217,6 +256,30 @@ func TestWebSocketSubscribeLatencyIsDiagnosticOnly(t *testing.T) {
 	for _, item := range correctness {
 		if item.Operation == "report_ws_subscribe_to_message" {
 			t.Fatalf("diagnostic-only WS stage unexpectedly emitted correctness row: %#v", item)
+		}
+	}
+}
+
+func TestModelWebSocketSubscribeLatencyUsesDedicatedSummaryMetric(t *testing.T) {
+	raw := rawSummary{Metrics: map[string]map[string]any{
+		"medical_report_ws_subscribe_to_first_message_latency": {"med": float64(70), "p(90)": float64(90), "p(95)": float64(110), "p(99)": float64(140)},
+		"report_ws_message_success_rate{model_type:medical}":   {"passes": float64(10), "fails": float64(0), "value": float64(1)},
+	}}
+
+	latencies, correctness := operationResults(map[string]float64{"medicalWaitReport": 1}, raw)
+	var found *LatencyMetric
+	for index := range latencies {
+		if latencies[index].Operation == "medical_report_ws_subscribe_to_message" {
+			found = &latencies[index]
+			break
+		}
+	}
+	if found == nil || found.P95.Value == nil || *found.P95.Value != 110 {
+		t.Fatalf("medical subscribe latency = %#v, want dedicated model metric", found)
+	}
+	for _, item := range correctness {
+		if item.Operation == "medical_report_ws_subscribe_to_message" {
+			t.Fatalf("diagnostic model latency unexpectedly emitted correctness row: %#v", item)
 		}
 	}
 }

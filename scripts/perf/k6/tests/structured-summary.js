@@ -1,9 +1,18 @@
 import { check } from 'k6';
 import { structuredSummaryOutput } from '../lib/summary.js';
 
+const scenarios = {
+  structured_summary: {
+    executor: 'shared-iterations',
+    exec: 'default',
+    vus: 1,
+    iterations: 1,
+    maxDuration: '10s',
+  },
+};
+
 export const options = {
-  vus: 1,
-  iterations: 1,
+  scenarios,
   thresholds: {
     checks: ['rate==1'],
   },
@@ -14,5 +23,5 @@ export default function () {
 }
 
 export function handleSummary(data) {
-  return structuredSummaryOutput(data, __ENV.PERF_RAW_SUMMARY_FILE);
+  return structuredSummaryOutput(data, __ENV.PERF_RAW_SUMMARY_FILE, { scenarios });
 }

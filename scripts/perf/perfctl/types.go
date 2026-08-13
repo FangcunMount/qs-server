@@ -174,6 +174,22 @@ type rawSummary struct {
 	Metrics   map[string]map[string]any `json:"metrics"`
 	RootGroup json.RawMessage           `json:"root_group,omitempty"`
 	SetupData json.RawMessage           `json:"setup_data,omitempty"`
+	State     *rawSummaryState          `json:"state,omitempty"`
+	Scenarios map[string]rawScenario    `json:"scenarios,omitempty"`
+}
+
+type rawSummaryState struct {
+	TestRunDurationMS float64 `json:"testRunDurationMs"`
+}
+
+type rawScenario struct {
+	Executor        string  `json:"executor"`
+	Exec            string  `json:"exec"`
+	Rate            float64 `json:"rate"`
+	TimeUnit        string  `json:"timeUnit"`
+	Duration        string  `json:"duration"`
+	PreAllocatedVUs int     `json:"preAllocatedVUs"`
+	MaxVUs          int     `json:"maxVUs"`
 }
 
 func floatPtr(value float64) *float64 { return &value }

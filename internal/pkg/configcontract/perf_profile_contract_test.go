@@ -140,6 +140,9 @@ func TestPerfThresholdTiersAndOperationMetrics(t *testing.T) {
 				"report_ws_connect_duration",
 				"report_ws_first_message_latency",
 				"report_ws_subscribe_to_first_message_latency",
+				"medical_report_ws_subscribe_to_first_message_latency",
+				"behavior_report_ws_subscribe_to_first_message_latency",
+				"personality_report_ws_subscribe_to_first_message_latency",
 				"dropped_iterations{scenario:",
 				"experience: {",
 				"query: [300, 500]",
@@ -158,7 +161,7 @@ func TestPerfThresholdTiersAndOperationMetrics(t *testing.T) {
 		},
 		{
 			path:  "scripts/perf/k6/lib/config.js",
-			wants: []string{"resolveArrivalVuserDefaults", "expectedLatencySeconds", "timeoutSeconds", "headroom"},
+			wants: []string{"resolveArrivalVuserDefaults", "expectedLatencySeconds", "timeoutSeconds", "headroom", "startupBuffer"},
 		},
 		{
 			path: "scripts/perf/perfctl/types.go",

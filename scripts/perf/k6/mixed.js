@@ -47,7 +47,7 @@ export const options = {
 };
 
 export function handleSummary(data) {
-  return structuredSummaryOutput(data, __ENV.PERF_RAW_SUMMARY_FILE);
+  return structuredSummaryOutput(data, __ENV.PERF_RAW_SUMMARY_FILE, { scenarios });
 }
 
 export function setup() {
