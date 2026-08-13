@@ -416,15 +416,15 @@ rate_limit:
 # ----------------------------------------------------------------------------
 backpressure:
   # 4C/8G 榨干档（serverA）：抬高 inflight、延长槽位等待，减少 k6 30s transport timeout。
-  # mongo max_inflight 与驱动连接池共享预算（outbox+业务经 MongoLimiter 合并计数）。
+  # mongo max_inflight 必须小于驱动 max-pool-size；为健康检查和连接恢复预留连接。
   mysql:
     enabled: true                  # 启用 MySQL 背压: true
     max_inflight: 150              # 4C/8G mixed_280+（原 180；对齐连接池 150）
     timeout_ms: 5000               # 槽位满时多等一会儿，避免过早失败放大 k6 VU 螺旋
   mongo:
     enabled: true                  # 启用 Mongo 背压: true
-    max_inflight: 120              # 4C/8G mixed_280+（原 80，submit+outbox 主瓶颈）
-    timeout_ms: 5000               # 与 mysql 对齐，优先在应用内排队
+    max_inflight: 60               # 单 apiserver 64 连接池预留 4 条；可靠提交整笔事务占一个槽位
+    timeout_ms: 1500               # 必须短于 collection 2s 可靠受理总预算，避免无效长排队
   iam:
     enabled: true                  # 启用 IAM 背压: true
     max_inflight: 100              # 4C/8G：略抬跨机 IAM gRPC 并发
@@ -489,6 +489,10 @@ mongodb:
   database: "qs"                   # MongoDB 数据库: qs
   replica-set: ""                  # 副本集名称（如 rs0）；使用分离字段或完整 url 都会生效
   direct-connection: false         # 单节点副本集可设为 true；使用分离字段或完整 url 都会生效
+  min-pool-size: 16                # 预热突发提交所需连接，避免默认 0 冷池
+  max-pool-size: 64                # 单 apiserver 预算；与 mongo max_inflight=60 对齐并留恢复余量
+  max-connecting: 8                # 默认 2 建连过慢；限制为 8，避免恢复期连接风暴
+  max-conn-idle-time: 10m          # 平峰回收连接，同时避免几秒级连接抖动
   use-ssl: false                   # 是否启用 SSL: false
   ssl-insecure-skip-verify: false  # 是否跳过 SSL 证书验证: false
   ssl-allow-invalid-hostnames: false # 是否允许无效主机名: false

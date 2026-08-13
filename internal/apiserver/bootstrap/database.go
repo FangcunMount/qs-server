@@ -15,6 +15,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	mongo_interpretation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 	"github.com/FangcunMount/qs-server/internal/pkg/migration"
+	"github.com/FangcunMount/qs-server/internal/pkg/mongoconfig"
 	mongo_indexes "github.com/FangcunMount/qs-server/internal/pkg/mongodb"
 	options "github.com/FangcunMount/qs-server/internal/pkg/options"
 )
@@ -173,24 +174,9 @@ func (dm *DatabaseManager) initMongoDB(ctx context.Context) error {
 		return nil
 	}
 
-	mongoConfig := &database.MongoConfig{
-		URL:                      opts.URL,
-		Host:                     opts.Host,
-		Username:                 opts.Username,
-		Password:                 opts.Password,
-		Database:                 opts.Database,
-		ReplicaSet:               opts.ReplicaSet,
-		DirectConnection:         opts.DirectConnection,
-		UseSSL:                   opts.UseSSL,
-		SSLInsecureSkipVerify:    opts.SSLInsecureSkipVerify,
-		SSLAllowInvalidHostnames: opts.SSLAllowInvalidHostnames,
-		SSLCAFile:                opts.SSLCAFile,
-		SSLPEMKeyfile:            opts.SSLPEMKeyfile,
-		EnableLogger:             opts.EnableLogger,
-		SlowThreshold:            opts.SlowThreshold,
-		LogCommandDetail:         opts.LogCommandDetail,
-		LogReplyDetail:           opts.LogReplyDetail,
-		LogStarted:               opts.LogStarted,
+	mongoConfig, err := mongoconfig.Build(opts)
+	if err != nil {
+		return fmt.Errorf("build MongoDB connection config: %w", err)
 	}
 	mongoConn := database.NewMongoDBConnection(mongoConfig)
 	return dm.registry.Register(database.MongoDB, mongoConfig, mongoConn)

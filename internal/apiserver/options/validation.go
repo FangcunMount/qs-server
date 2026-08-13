@@ -22,6 +22,11 @@ func (o *Options) Validate() []error {
 		errs = append(errs, o.GRPCOptions.Validate()...)
 	}
 	errs = append(errs, o.MySQLOptions.Validate()...)
+	if o.MongoDBOptions == nil {
+		errs = append(errs, fmt.Errorf("mongodb is required"))
+	} else {
+		errs = append(errs, o.MongoDBOptions.Validate()...)
+	}
 	errs = append(errs, o.Log.Validate()...)
 	errs = append(errs, o.OSSOptions.Validate()...)
 	errs = append(errs, o.AssessmentAssets.Validate()...)

@@ -58,6 +58,7 @@ func TestAPIServerDevProdConfigContracts(t *testing.T) {
 			if opts.Backpressure == nil || opts.Backpressure.MySQL == nil || opts.Backpressure.Mongo == nil || opts.Backpressure.IAM == nil {
 				t.Fatal("apiserver backpressure config must include mysql, mongo, and iam")
 			}
+			assertMongoPoolBudget(t, "apiserver", name, opts.MongoDBOptions, opts.Backpressure.Mongo.MaxInflight)
 			if opts.IAMOptions == nil || opts.IAMOptions.ServiceAuth == nil {
 				t.Fatal("apiserver IAM service auth config must be traceable")
 			}
@@ -327,6 +328,7 @@ func TestWorkerDevProdConfigContracts(t *testing.T) {
 			if cfg.Worker == nil || cfg.Worker.Concurrency <= 0 {
 				t.Fatal("worker runtime config must define positive concurrency")
 			}
+			assertMongoPoolBudget(t, "worker", name, opts.MongoDB, 0)
 			if name == "worker.prod.yaml" {
 				if cfg.Worker.AttentionProjectionReconcileEnabled {
 					t.Fatal("production attention projection fact recovery must remain disabled after convergence")
@@ -352,6 +354,25 @@ func TestWorkerDevProdConfigContracts(t *testing.T) {
 			}
 			assertEventCatalogLoads(t)
 		})
+	}
+}
+
+func assertMongoPoolBudget(t *testing.T, component, configName string, opts *genericoptions.MongoDBOptions, maxInflight int) {
+	t.Helper()
+	if opts == nil {
+		t.Fatalf("%s %s MongoDB options must be traceable", component, configName)
+	}
+	if !strings.Contains(configName, ".prod.") {
+		return
+	}
+	if opts.MinPoolSize == 0 || opts.MaxPoolSize == 0 || opts.MaxConnecting == 0 || opts.MaxConnIdleTime <= 0 {
+		t.Fatalf("%s %s must define a complete MongoDB pool budget", component, configName)
+	}
+	if opts.MinPoolSize > opts.MaxPoolSize || opts.MaxConnecting > opts.MaxPoolSize {
+		t.Fatalf("%s %s invalid MongoDB pool budget: min=%d max=%d connecting=%d", component, configName, opts.MinPoolSize, opts.MaxPoolSize, opts.MaxConnecting)
+	}
+	if maxInflight > 0 && uint64(maxInflight) >= opts.MaxPoolSize {
+		t.Fatalf("%s %s MongoDB max_inflight=%d must remain below max-pool-size=%d", component, configName, maxInflight, opts.MaxPoolSize)
 	}
 }
 

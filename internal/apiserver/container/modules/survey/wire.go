@@ -6,6 +6,7 @@ import (
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 )
@@ -20,6 +21,7 @@ type WireInput struct {
 	CacheSignalNotifier quesApp.CacheSignalNotifier
 	SurveyRuntimeInfra  *SurveyRuntimeInfra
 	OutboxProfile       appEventing.ProfileBinding
+	MongoLimiter        backpressure.Acquirer
 }
 
 // Wire builds and bootstraps the survey module from composition inputs.
@@ -32,6 +34,7 @@ func Wire(in WireInput) (*Module, error) {
 		HotsetRecorder:      in.HotsetRecorder,
 		CacheSignalNotifier: in.CacheSignalNotifier,
 		OutboxProfile:       in.OutboxProfile,
+		MongoLimiter:        in.MongoLimiter,
 	}
 	if infra := in.SurveyRuntimeInfra; infra != nil {
 		bootstrap.QuestionnaireRepo = infra.QuestionnaireRepo

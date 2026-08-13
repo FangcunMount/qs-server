@@ -6,6 +6,7 @@ import (
 
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readconcern"
@@ -24,12 +25,28 @@ func NewMySQLRunner(db *gorm.DB) apptransaction.Runner {
 
 // NewMongoRunner returns a Mongo session transaction runner.
 func NewMongoRunner(db *mongo.Database) apptransaction.Runner {
+	return NewMongoRunnerWithLimiter(db, nil)
+}
+
+// NewMongoRunnerWithLimiter holds one Mongo backpressure slot for the entire
+// transaction. Transactional repositories must not acquire the same limiter
+// again from inside fn, otherwise a saturated limiter can self-deadlock.
+func NewMongoRunnerWithLimiter(db *mongo.Database, limiter backpressure.Acquirer) apptransaction.Runner {
 	return apptransaction.RunnerFunc(func(ctx context.Context, fn func(context.Context) error) error {
 		if db == nil {
 			return fmt.Errorf("mongo database is nil")
 		}
 		if fn == nil {
 			return nil
+		}
+		if limiter != nil {
+			var release func()
+			var err error
+			ctx, release, err = limiter.Acquire(ctx)
+			if err != nil {
+				return err
+			}
+			defer release()
 		}
 
 		session, err := db.Client().StartSession()

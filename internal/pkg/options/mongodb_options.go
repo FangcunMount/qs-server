@@ -1,6 +1,7 @@
 package options
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -21,6 +22,12 @@ type MongoDBOptions struct {
 	// 事务 / 拓扑配置
 	ReplicaSet       string `json:"replica-set,omitempty"      mapstructure:"replica-set"`
 	DirectConnection bool   `json:"direct-connection,omitempty" mapstructure:"direct-connection"`
+
+	// 连接池配置。0 表示保留 MongoDB Go Driver 默认值，便于直接 URL 继续自行携带参数。
+	MinPoolSize     uint64        `json:"min-pool-size,omitempty"     mapstructure:"min-pool-size"`
+	MaxPoolSize     uint64        `json:"max-pool-size,omitempty"     mapstructure:"max-pool-size"`
+	MaxConnecting   uint64        `json:"max-connecting,omitempty"    mapstructure:"max-connecting"`
+	MaxConnIdleTime time.Duration `json:"max-conn-idle-time,omitempty" mapstructure:"max-conn-idle-time"`
 
 	// SSL 配置
 	UseSSL                   bool   `json:"use-ssl,omitempty"                  mapstructure:"use-ssl"`
@@ -49,6 +56,10 @@ func NewMongoDBOptions() *MongoDBOptions {
 		Database:                 "",
 		ReplicaSet:               "",
 		DirectConnection:         false,
+		MinPoolSize:              0,
+		MaxPoolSize:              0,
+		MaxConnecting:            0,
+		MaxConnIdleTime:          0,
 		UseSSL:                   false,
 		SSLInsecureSkipVerify:    false,
 		SSLAllowInvalidHostnames: false,
@@ -66,6 +77,24 @@ func NewMongoDBOptions() *MongoDBOptions {
 // Validate verifies flags passed to MongoDBOptions.
 func (o *MongoDBOptions) Validate() []error {
 	errs := []error{}
+	if o == nil {
+		return errs
+	}
+	if o.MaxPoolSize > 0 && o.MinPoolSize > o.MaxPoolSize {
+		errs = append(errs, fmt.Errorf("mongodb.min-pool-size (%d) must be <= max-pool-size (%d)", o.MinPoolSize, o.MaxPoolSize))
+	}
+	if o.MaxPoolSize > 0 && o.MaxConnecting > o.MaxPoolSize {
+		errs = append(errs, fmt.Errorf("mongodb.max-connecting (%d) must be <= max-pool-size (%d)", o.MaxConnecting, o.MaxPoolSize))
+	}
+	if o.MaxConnecting > 100 {
+		errs = append(errs, fmt.Errorf("mongodb.max-connecting (%d) must be <= 100", o.MaxConnecting))
+	}
+	if o.MaxConnIdleTime < 0 {
+		errs = append(errs, fmt.Errorf("mongodb.max-conn-idle-time must not be negative"))
+	}
+	if o.MaxConnIdleTime > 0 && o.MaxConnIdleTime < time.Millisecond {
+		errs = append(errs, fmt.Errorf("mongodb.max-conn-idle-time must be at least 1ms when configured"))
+	}
 
 	return errs
 }
@@ -94,6 +123,14 @@ func addMongoDBConnectionFlags(fs *pflag.FlagSet, o *MongoDBOptions) {
 	})
 	addBoolFlag(fs, &o.DirectConnection, "mongodb.direct-connection", o.DirectConnection, ""+
 		"Force directConnection=true for single-node replica set deployments.")
+	fs.Uint64Var(&o.MinPoolSize, "mongodb.min-pool-size", o.MinPoolSize,
+		"Minimum MongoDB connections maintained per server. Zero keeps the driver default.")
+	fs.Uint64Var(&o.MaxPoolSize, "mongodb.max-pool-size", o.MaxPoolSize,
+		"Maximum MongoDB connections per server. Zero keeps the driver default.")
+	fs.Uint64Var(&o.MaxConnecting, "mongodb.max-connecting", o.MaxConnecting,
+		"Maximum MongoDB connections established concurrently. Zero keeps the driver default.")
+	addDurationFlag(fs, &o.MaxConnIdleTime, "mongodb.max-conn-idle-time", o.MaxConnIdleTime,
+		"Maximum idle time for a pooled MongoDB connection. Zero keeps the driver default.")
 }
 
 func addMongoDBTLSFlags(fs *pflag.FlagSet, o *MongoDBOptions) {

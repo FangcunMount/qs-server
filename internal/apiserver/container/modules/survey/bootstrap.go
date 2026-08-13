@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 )
 
 // BootstrapInput carries container integration inputs for survey module bootstrap.
@@ -26,6 +27,7 @@ type BootstrapInput struct {
 	AnswerSheetReader   surveyreadmodel.AnswerSheetReader
 	CacheSignalNotifier quesApp.CacheSignalNotifier
 	OutboxProfile       appEventing.ProfileBinding
+	MongoLimiter        backpressure.Acquirer
 }
 
 // Bootstrap assembles the survey module from container integration inputs.

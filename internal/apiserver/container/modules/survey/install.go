@@ -27,6 +27,7 @@ func InstallFrom(host InstallHost) error {
 		CacheSignalNotifier: host.CacheSignalNotifier(),
 		SurveyRuntimeInfra:  infra,
 		OutboxProfile:       host.EventProfile(eventcatalog.OutboxProfileMongoDomain),
+		MongoLimiter:        host.MongoLimiter(),
 	})
 	if err != nil {
 		return err

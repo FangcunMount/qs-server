@@ -7,6 +7,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/database"
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/qs-server/internal/pkg/mongoconfig"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
 	redis "github.com/redis/go-redis/v9"
@@ -240,24 +241,9 @@ func (m *DatabaseManager) initMongoDB() error {
 		log.Warn("MongoDB database not configured, skipping")
 		return nil
 	}
-	mongoConfig := &database.MongoConfig{
-		URL:                      opts.URL,
-		Host:                     opts.Host,
-		Username:                 opts.Username,
-		Password:                 opts.Password,
-		Database:                 opts.Database,
-		ReplicaSet:               opts.ReplicaSet,
-		DirectConnection:         opts.DirectConnection,
-		UseSSL:                   opts.UseSSL,
-		SSLInsecureSkipVerify:    opts.SSLInsecureSkipVerify,
-		SSLAllowInvalidHostnames: opts.SSLAllowInvalidHostnames,
-		SSLCAFile:                opts.SSLCAFile,
-		SSLPEMKeyfile:            opts.SSLPEMKeyfile,
-		EnableLogger:             opts.EnableLogger,
-		SlowThreshold:            opts.SlowThreshold,
-		LogCommandDetail:         opts.LogCommandDetail,
-		LogReplyDetail:           opts.LogReplyDetail,
-		LogStarted:               opts.LogStarted,
+	mongoConfig, err := mongoconfig.Build(opts)
+	if err != nil {
+		return fmt.Errorf("build MongoDB connection config: %w", err)
 	}
 	if err := m.registry.Register(database.MongoDB, mongoConfig, database.NewMongoDBConnection(mongoConfig)); err != nil {
 		return err

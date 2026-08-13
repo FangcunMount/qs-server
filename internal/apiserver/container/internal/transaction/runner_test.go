@@ -1,10 +1,48 @@
 package transaction
 
 import (
+	"context"
+	"errors"
 	"testing"
 
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
+
+type transactionLimiterSpy struct {
+	acquired int
+	released int
+	err      error
+}
+
+func (s *transactionLimiterSpy) Acquire(ctx context.Context) (context.Context, func(), error) {
+	s.acquired++
+	if s.err != nil {
+		return ctx, func() {}, s.err
+	}
+	return ctx, func() { s.released++ }, nil
+}
+
+func TestMongoRunnerWithLimiterRejectsBeforeStartingSession(t *testing.T) {
+	wantErr := errors.New("mongo saturated")
+	limiter := &transactionLimiterSpy{err: wantErr}
+	client, err := mongo.NewClient()
+	if err != nil {
+		t.Fatalf("mongo.NewClient() error = %v", err)
+	}
+	runner := NewMongoRunnerWithLimiter(client.Database("test"), limiter)
+
+	err = runner.WithinTransaction(t.Context(), func(context.Context) error {
+		t.Fatal("transaction callback must not run when limiter rejects")
+		return nil
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("WithinTransaction() error = %v, want %v", err, wantErr)
+	}
+	if limiter.acquired != 1 || limiter.released != 0 {
+		t.Fatalf("limiter counts = acquired:%d released:%d, want 1/0", limiter.acquired, limiter.released)
+	}
+}
 
 func TestMongoTransactionOptionsFreezePublishDurability(t *testing.T) {
 	t.Parallel()

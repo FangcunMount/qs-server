@@ -70,7 +70,7 @@ func (s *publishedModelStoreStub) ListPublishedAlgorithms(context.Context) ([]do
 	return nil, nil
 }
 
-func TestCachedPublishedModelStoreFindPublishedModelByQuestionnaireDelegatesToInner(t *testing.T) {
+func TestCachedPublishedModelStoreFindPublishedModelByQuestionnaireCachesUntilCatalogVersionChanges(t *testing.T) {
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() {
@@ -112,8 +112,17 @@ func TestCachedPublishedModelStoreFindPublishedModelByQuestionnaireDelegatesToIn
 	if got == nil || got.Code != "scale-001" {
 		t.Fatalf("second FindPublishedModelByQuestionnaire() = %#v", got)
 	}
+	if inner.findByQuestionnaireCalls != 1 {
+		t.Fatalf("source calls after second read = %d, want 1", inner.findByQuestionnaireCalls)
+	}
+
+	cached.invalidateCatalogListCaches(context.Background())
+	got, err = cached.FindPublishedModelByQuestionnaire(context.Background(), "q-001", "1.0.0")
+	if err != nil || got == nil {
+		t.Fatalf("read after catalog invalidation = %#v, %v", got, err)
+	}
 	if inner.findByQuestionnaireCalls != 2 {
-		t.Fatalf("source calls after second read = %d, want 2", inner.findByQuestionnaireCalls)
+		t.Fatalf("source calls after catalog invalidation = %d, want 2", inner.findByQuestionnaireCalls)
 	}
 }
 

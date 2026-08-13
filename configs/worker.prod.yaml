@@ -101,6 +101,10 @@ mongodb:
   password: ""
   database: "questionnaire_scale"
   # url: ""  # 可选，如果设置则优先使用
+  min-pool-size: 4                 # 每个 worker 保留少量热连接
+  max-pool-size: 32                # 3 worker 共 96 条连接预算
+  max-connecting: 4                # 加快冷池恢复但限制同时握手
+  max-conn-idle-time: 10m
   use-ssl: false
   ssl-insecure-skip-verify: false
   ssl-allow-invalid-hostnames: false

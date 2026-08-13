@@ -91,11 +91,11 @@ func (r *Repository) findByIdempotencyKey(ctx context.Context, metaInfo submitpo
 	}
 
 	var sheetPO AnswerSheetPO
-	if err := r.Collection().FindOne(ctx, bson.M{
+	if err := r.FindOne(ctx, bson.M{
 		"submit_meta.writer_id":       metaInfo.WriterID,
 		"submit_meta.idempotency_key": metaInfo.IdempotencyKey,
 		"deleted_at":                  nil,
-	}).Decode(&sheetPO); err != nil {
+	}, &sheetPO); err != nil {
 		if stderrors.Is(err, mongo.ErrNoDocuments) {
 			return r.findLegacyIdempotentSubmission(ctx, metaInfo)
 		}

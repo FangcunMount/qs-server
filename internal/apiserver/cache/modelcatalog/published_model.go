@@ -39,6 +39,7 @@ type CachedPublishedModelStore struct {
 	catalogAlgorithms  *adapterkit.ObjectCacheStore[publishedModelCatalogAlgorithms]
 	latestByCode       *adapterkit.ObjectCacheStore[port.PublishedModel]
 	exactByRef         *adapterkit.ObjectCacheStore[port.PublishedModel]
+	byQuestionnaire    *adapterkit.ObjectCacheStore[port.PublishedModel]
 }
 
 const publishedModelCatalogListVersionKind = "modelcatalog:published:list"
@@ -89,6 +90,10 @@ func NewCachedPublishedModelStore(
 			Codec: publishedModelCodec(),
 		}),
 		exactByRef: adapterkit.NewObjectCacheStore(adapterkit.ObjectCacheStoreOptions[port.PublishedModel]{
+			Cache: redisCache, PolicyKey: cachepolicy.CapabilityModelCatalogPublished,
+			Codec: publishedModelCodec(),
+		}),
+		byQuestionnaire: adapterkit.NewObjectCacheStore(adapterkit.ObjectCacheStoreOptions[port.PublishedModel]{
 			Cache: redisCache, PolicyKey: cachepolicy.CapabilityModelCatalogPublished,
 			Codec: publishedModelCodec(),
 		}),
@@ -184,7 +189,25 @@ func (c *CachedPublishedModelStore) FindPublishedModelByQuestionnaire(
 	if c == nil || c.inner == nil {
 		return nil, domain.ErrNotFound
 	}
-	return c.inner.FindPublishedModelByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
+	if c.byQuestionnaire == nil || !c.byQuestionnaire.Available() || c.catalogListVersion == nil {
+		return c.inner.FindPublishedModelByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
+	}
+	catalogVersion, err := c.catalogListVersion.Current(ctx, c.catalogListVersionKey())
+	if err != nil {
+		return c.inner.FindPublishedModelByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
+	}
+	return adapterkit.ReadThroughObject(ctx, adapterkit.ObjectReadThroughOptions[port.PublishedModel]{
+		PolicyKey:      cachepolicy.CapabilityModelCatalogPublished,
+		CacheKey:       c.questionnaireCacheKey(questionnaireCode, questionnaireVersion, catalogVersion),
+		PolicyProvider: c.policies,
+		Observer:       c.observer,
+		Store:          c.byQuestionnaire,
+		CacheNegative:  false,
+		AsyncSetCached: false,
+		Load: func(loadCtx context.Context) (*port.PublishedModel, error) {
+			return c.inner.FindPublishedModelByQuestionnaire(loadCtx, questionnaireCode, questionnaireVersion)
+		},
+	})
 }
 
 func (c *CachedPublishedModelStore) ListPublishedReleaseHistory(ctx context.Context, code string) ([]*port.PublishedModel, error) {
@@ -268,6 +291,15 @@ func publishedModelKindForWarmup(kind cachetarget.WarmupKind) (domain.Kind, bool
 
 func (c *CachedPublishedModelStore) latestByCodeCacheKey(kind domain.Kind, code string) string {
 	return c.keys.BuildPublishedAssessmentModelLatestByCodeKey(string(kind), strings.ToLower(strings.TrimSpace(code)))
+}
+
+func (c *CachedPublishedModelStore) questionnaireCacheKey(questionnaireCode, questionnaireVersion string, catalogVersion uint64) string {
+	raw := strings.ToLower(strings.TrimSpace(questionnaireCode)) + "\x00" + strings.ToLower(strings.TrimSpace(questionnaireVersion))
+	hash := sha256.Sum256([]byte(raw))
+	return c.refCacheKey(port.Ref{
+		Code:    fmt.Sprintf("questionnaire-%x", hash[:8]),
+		Version: fmt.Sprintf("catalog-v%d", catalogVersion),
+	})
 }
 
 func (c *CachedPublishedModelStore) ListPublishedModels(ctx context.Context, filter port.ListPublishedFilter) ([]*port.PublishedModel, int64, error) {

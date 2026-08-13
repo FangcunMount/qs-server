@@ -21,6 +21,7 @@ import (
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 	"gorm.io/gorm"
 )
 
@@ -46,6 +47,7 @@ type Deps struct {
 	AnswerSheetReader   surveyreadmodel.AnswerSheetReader
 	CacheSignalNotifier quesApp.CacheSignalNotifier
 	OutboxProfile       appEventing.ProfileBinding
+	MongoLimiter        backpressure.Acquirer
 }
 
 // AnswerSheetStore exposes answer-sheet persistence only; Outbox capability is
@@ -97,6 +99,7 @@ func New(deps Deps) (*Module, error) {
 
 	if err := module.initAnswerSheetSubModule(
 		normalized.MongoDB,
+		normalized.MongoLimiter,
 		normalized.MySQLDB,
 		normalized.IdentityService,
 		normalized.AnswerSheetRepo,
@@ -163,12 +166,12 @@ func (m *Module) SetAssessmentBindingResolver(binding rulesetport.AssessmentBind
 	}
 }
 
-func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, mysqlDB *gorm.DB, identitySvc *iam.IdentityService, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, profile appEventing.ProfileBinding) error {
+func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, mongoLimiter backpressure.Acquirer, mysqlDB *gorm.DB, identitySvc *iam.IdentityService, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, profile appEventing.ProfileBinding) error {
 	sub := m.AnswerSheet
 
 	answerScorer := ruleengineInfra.NewAnswerScorer()
 
-	mongoTxRunner := modtx.NewMongoRunner(mongoDB)
+	mongoTxRunner := modtx.NewMongoRunnerWithLimiter(mongoDB, mongoLimiter)
 	if profile.Stager == nil || profile.PostCommit == nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "mongo domain event profile is required")
 	}
