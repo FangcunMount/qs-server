@@ -173,6 +173,7 @@ func buildContainerCacheOptions(cacheCfg *apiserveroptions.CacheOptions, runtime
 		capabilities[cachepolicy.CapabilitySurveyQuestionnaire] = buildCapabilityBinding(c.Survey.Questionnaire)
 		capabilities[cachepolicy.CapabilityModelCatalogPublished] = buildCapabilityBinding(c.ModelCatalog.PublishedModel)
 		capabilities[cachepolicy.CapabilityEvaluationAssessmentDetail] = buildCapabilityBinding(c.Evaluation.AssessmentDetail)
+		capabilities[cachepolicy.CapabilityEvaluationAssessmentAccess] = buildCapabilityBinding(c.Evaluation.AssessmentAccess)
 		capabilities[cachepolicy.CapabilityActorTestee] = buildCapabilityBinding(c.Actor.Testee)
 		capabilities[cachepolicy.CapabilityPlanDetail] = buildCapabilityBinding(c.Plan.Detail)
 		capabilities[cachepolicy.CapabilityStatisticsQuery] = buildCapabilityBinding(c.Statistics.Query)

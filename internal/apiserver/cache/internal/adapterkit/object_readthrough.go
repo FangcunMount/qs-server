@@ -15,6 +15,7 @@ type ObjectReadThroughOptions[T any] struct {
 	Observer         *observability.ComponentObserver
 	Store            *objectcache.Store[T]
 	Load             func(context.Context) (*T, error)
+	ShouldCache      func(*T) bool
 	CacheNegative    bool
 	AsyncSetCached   bool
 	AsyncSetNegative bool
@@ -28,6 +29,7 @@ func ReadThroughObject[T any](ctx context.Context, opts ObjectReadThroughOptions
 		Observer:         NewCapabilityObserver(opts.PolicyKey, opts.Observer),
 		Store:            opts.Store,
 		Load:             opts.Load,
+		ShouldCache:      opts.ShouldCache,
 		CacheNegative:    opts.CacheNegative,
 		AsyncSetCached:   opts.AsyncSetCached,
 		AsyncSetNegative: opts.AsyncSetNegative,

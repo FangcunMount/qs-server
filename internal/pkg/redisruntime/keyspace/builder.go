@@ -59,8 +59,12 @@ func (b *Builder) BuildPublishedAssessmentModelLatestByCodeKey(kind, code string
 	return NewCacheKeyspace(b.namespace()).PublishedAssessmentModelLatestByCode(kind, code)
 }
 
-func (b *Builder) BuildAssessmentDetailKey(id uint64) string {
-	return NewCacheKeyspace(b.namespace()).AssessmentDetail(id)
+func (b *Builder) BuildAssessmentAccessKey(id uint64) string {
+	return NewCacheKeyspace(b.namespace()).AssessmentAccess(id)
+}
+
+func (b *Builder) BuildAssessmentOutcomeDetailKey(id uint64) string {
+	return NewCacheKeyspace(b.namespace()).AssessmentOutcomeDetail(id)
 }
 
 func (b *Builder) BuildQueryVersionKey(kind, scope string) string {

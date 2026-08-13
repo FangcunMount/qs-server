@@ -17,6 +17,7 @@ var apiserverCacheCapabilityPaths = [][]string{
 	{"survey", "questionnaire"},
 	{"modelcatalog", "published_model"},
 	{"evaluation", "assessment_detail"},
+	{"evaluation", "assessment_access"},
 	{"actor", "testee"},
 	{"plan", "detail"},
 	{"statistics", "query"},
@@ -84,7 +85,7 @@ func apiserverCachePolicySchema() genericoptions.FieldSchema {
 		"capabilities": {
 			"survey":       {"questionnaire": policy},
 			"modelcatalog": {"published_model": policy},
-			"evaluation":   {"assessment_detail": policy},
+			"evaluation":   {"assessment_access": policy, "assessment_detail": policy},
 			"actor":        {"testee": policy},
 			"plan":         {"detail": policy},
 			"statistics":   {"query": policy},

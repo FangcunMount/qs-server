@@ -119,6 +119,25 @@ func TestReadThroughFailsOpenOnStoreError(t *testing.T) {
 	}
 }
 
+func TestReadThroughReturnsValueWithoutCachingWhenAdmissionRejects(t *testing.T) {
+	policy := sharedcache.Policy{TTL: time.Minute}
+	store, _, cleanup := newContractStore(t, policy)
+	defer cleanup()
+	policies := sharedcache.NewRegistry(sharedcache.EffectiveCapability{Capability: "assessment_detail", Policy: policy})
+
+	got, err := ReadThrough(context.Background(), ReadThroughOptions[contractValue]{
+		Capability: "assessment_detail", CacheKey: "object:mutable", PolicyProvider: policies, Store: store,
+		Load:        func(context.Context) (*contractValue, error) { return &contractValue{ID: 1, Name: "pending"}, nil },
+		ShouldCache: func(value *contractValue) bool { return value.Name == "evaluated" },
+	})
+	if err != nil || got == nil || got.Name != "pending" {
+		t.Fatalf("ReadThrough = %#v, %v", got, err)
+	}
+	if _, err := store.Get(context.Background(), "object:mutable"); !errors.Is(err, sharedcache.ErrMiss) {
+		t.Fatalf("rejected value cache lookup = %v, want ErrMiss", err)
+	}
+}
+
 func TestReadThroughRequiresInjectedCoalescerWhenPolicyEnablesSingleflight(t *testing.T) {
 	store := NewStore(StoreOptions[contractValue]{Codec: contractCodec})
 	policies := sharedcache.NewRegistry(sharedcache.EffectiveCapability{

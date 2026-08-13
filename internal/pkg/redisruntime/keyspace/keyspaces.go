@@ -61,8 +61,12 @@ func (k CacheKeyspace) PublishedAssessmentModelLatestByCode(kind, code string) s
 	))
 }
 
-func (k CacheKeyspace) AssessmentDetail(id uint64) string {
-	return k.keyspace.Prefix(fmt.Sprintf("assessment:detail:%d", id))
+func (k CacheKeyspace) AssessmentAccess(id uint64) string {
+	return k.keyspace.Prefix(fmt.Sprintf("assessment:access:v1:%d", id))
+}
+
+func (k CacheKeyspace) AssessmentOutcomeDetail(id uint64) string {
+	return k.keyspace.Prefix(fmt.Sprintf("assessment:outcome:v1:%d", id))
 }
 
 func (k CacheKeyspace) QueryVersion(kind, scope string) string {
