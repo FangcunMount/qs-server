@@ -43,6 +43,9 @@ type EffectiveCapability struct {
 	Source         string         `json:"source"`
 	CatalogVersion string         `json:"catalog_version"`
 	MetricLabel    string         `json:"metric_label"`
+	TopologyGroup  string         `json:"topology_group,omitempty"`
+	TopologyOrder  int            `json:"topology_order,omitempty"`
+	ReadModel      string         `json:"read_model,omitempty"`
 }
 
 // PolicySource identifies the normalized policy document used to build one
