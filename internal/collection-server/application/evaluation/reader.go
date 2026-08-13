@@ -12,3 +12,9 @@ type BFFReader interface {
 	GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentReportResponse, error)
 	ResolveAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (testeeID, assessmentID uint64, err error)
 }
+
+// AssessmentAccessReader checks only the ownership tuple. It deliberately does
+// not return assessment detail so report-status authorization stays cheap.
+type AssessmentAccessReader interface {
+	AuthorizeAssessment(ctx context.Context, testeeID, assessmentID uint64) error
+}

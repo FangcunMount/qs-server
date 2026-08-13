@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // EvaluationBFFReader 将 infra gRPC 输出转换为 evaluation application DTO。
@@ -16,6 +18,19 @@ type EvaluationBFFReader struct {
 // NewEvaluationBFFReader 构造测评 BFF ACL 适配器。
 func NewEvaluationBFFReader(evaluation EvaluationReader, reports ParticipantReportReader, intake AssessmentIntakeReader) *EvaluationBFFReader {
 	return &EvaluationBFFReader{evaluation: evaluation, reports: reports, intake: intake}
+}
+
+func (r *EvaluationBFFReader) AuthorizeAssessment(ctx context.Context, testeeID, assessmentID uint64) error {
+	if r == nil || r.evaluation == nil {
+		return nil
+	}
+	err := r.evaluation.AuthorizeAssessment(ctx, testeeID, assessmentID)
+	if status.Code(err) != codes.Unimplemented {
+		return err
+	}
+	assessmentAuthorizationFallbackTotal.Inc()
+	_, err = r.evaluation.GetMyAssessment(ctx, testeeID, assessmentID)
+	return err
 }
 
 func (r *EvaluationBFFReader) GetAssessmentScores(ctx context.Context, testeeID, assessmentID uint64) ([]evaluation.FactorScoreResponse, error) {

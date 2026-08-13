@@ -10,6 +10,7 @@ type QuestionnaireReader interface {
 
 // EvaluationReader 测评读端口（collection BFF 使用的方法集合）。
 type EvaluationReader interface {
+	AuthorizeAssessment(ctx context.Context, testeeID, assessmentID uint64) error
 	GetAssessmentScores(ctx context.Context, testeeID, assessmentID uint64) ([]FactorScoreOutput, error)
 	GetFactorTrend(ctx context.Context, testeeID uint64, factorCode string, limit int32) ([]TrendPointOutput, error)
 	GetHighRiskFactors(ctx context.Context, testeeID, assessmentID uint64) ([]FactorScoreOutput, error)

@@ -269,6 +269,15 @@ type ListAssessmentsOutput struct {
 	TotalPages int32
 }
 
+func (c *TesteeEvaluationClient) AuthorizeAssessment(ctx context.Context, testeeID, assessmentID uint64) error {
+	ctx, cancel := c.client.ContextWithTimeout(ctx)
+	defer cancel()
+	_, err := c.grpcClient.AuthorizeAssessment(ctx, &pb.AuthorizeAssessmentRequest{
+		TesteeId: testeeID, AssessmentId: assessmentID,
+	})
+	return err
+}
+
 func (c *TesteeEvaluationClient) GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentDetailOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()

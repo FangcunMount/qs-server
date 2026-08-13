@@ -7,6 +7,9 @@ option go_package = "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation";
 
 // 受试者测评查询。
 service TesteeEvaluationService {
+  // 仅校验 testee/assessment ownership，不返回测评详情。
+  rpc AuthorizeAssessment(AuthorizeAssessmentRequest) returns (AuthorizeAssessmentResponse);
+
   // 获取我的测评详情（含 model/primary_score/level outcome 投影）
   rpc GetMyAssessment(GetMyAssessmentRequest) returns (GetMyAssessmentResponse);
 
@@ -118,6 +121,13 @@ message TrendPoint {
 }
 
 // ==================== 测评查询 ====================
+
+message AuthorizeAssessmentRequest {
+  uint64 testee_id = 1;
+  uint64 assessment_id = 2;
+}
+
+message AuthorizeAssessmentResponse {}
 
 message GetMyAssessmentRequest {
   uint64 testee_id = 1;
