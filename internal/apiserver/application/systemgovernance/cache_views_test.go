@@ -150,7 +150,7 @@ func TestBuildCacheRuntimeViewCountsAbnormalL1Capability(t *testing.T) {
 	snapshot := registrySnapshot("collection-a", "same", true)
 	snapshot.L1Runtime = []sharedgovernance.L1CapabilityRuntime{{
 		Capability: "catalog.questionnaire", Enabled: true,
-		Buckets: []sharedgovernance.L1BucketRuntime{{Bucket: "detail", MaxEntries: 64}},
+		Buckets:       []sharedgovernance.L1BucketRuntime{{Bucket: "detail", MaxEntries: 64}},
 		SignalWatcher: sharedgovernance.SignalWatcherStatus{Configured: true, Status: "reconnecting", LastError: "pubsub timeout"},
 	}}
 	ready := &observability.RuntimeSnapshot{Summary: observability.RuntimeSummary{Ready: true}}

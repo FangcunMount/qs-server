@@ -8,10 +8,10 @@ import (
 
 func TestCollectionCatalogOwnsFixedL1TopologyMetadata(t *testing.T) {
 	want := map[sharedcache.Capability]string{
-		"catalog.questionnaire":         "questionnaire",
-		"catalog.published_model":       "published-model",
-		"evaluation.assessment_detail":  "assessment-detail",
-		"evaluation.assessment_access":  "assessment-access",
+		"catalog.questionnaire":        "questionnaire",
+		"catalog.published_model":      "published-model",
+		"evaluation.assessment_detail": "assessment-detail",
+		"evaluation.assessment_access": "assessment-access",
 	}
 	for capability, group := range want {
 		spec, ok := lookupCatalogSpec(capability)
