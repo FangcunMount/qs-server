@@ -18,6 +18,8 @@ type metricSample struct {
 	Value  float64
 }
 
+const snapshotComponentLabel = "__snapshot_component"
+
 func collectPhaseEvidence(dir string) PhaseEvidence {
 	checks := []EvidenceCheck{
 		checkReplicaReadyFile(dir, "after-collection-readyz.json", "collection readyz", "EXPECTED_COLLECTION_REPLICAS", 2),
@@ -28,10 +30,10 @@ func collectPhaseEvidence(dir string) PhaseEvidence {
 		checkFederatedMetricsReady(dir, "after-worker-metrics.txt", "worker metrics replicas", "worker", "EXPECTED_WORKER_REPLICAS", 3),
 		checkJSONFile(dir, "after-nsqd-stats.json", "NSQD stats"),
 	}
-	trafficIsolated, isolationCheck := trafficIsolationEvidence()
-	checks = append(checks, isolationCheck)
 	before := readMetricSnapshots(dir, "before")
 	after := readMetricSnapshots(dir, "after")
+	trafficIsolated, isolationCheck := trafficIsolationEvidence(before, after)
+	checks = append(checks, isolationCheck)
 	completedDelta, failedDelta, completedByModel, hasCompletionEvidence := interpretationDeltas(before, after)
 	expectedCompletionDelta, noAssessmentRequiredDelta, hasIntakeOutcomeEvidence := assessmentIntakeOutcomeDeltas(before, after)
 	completionWindow := naMeasurement("seconds", "prometheus:snapshot_window", "completion metric capture window unavailable")
@@ -102,18 +104,47 @@ func assessmentIntakeOutcomeDeltas(before, after []metricSample) (*float64, *flo
 	return &expected, &noAssessment, true
 }
 
-func trafficIsolationEvidence() (*bool, EvidenceCheck) {
+func trafficIsolationEvidence(before, after []metricSample) (*bool, EvidenceCheck) {
 	raw, declared := os.LookupEnv("PERF_ISOLATED_ENV")
 	normalized := strings.ToLower(strings.TrimSpace(raw))
-	if declared && normalized == "true" {
-		value := true
-		return &value, EvidenceCheck{Name: "traffic isolation", Status: "PASS", Source: "env:PERF_ISOLATED_ENV"}
+	if !declared || normalized == "" {
+		return nil, EvidenceCheck{Name: "traffic isolation", Status: "MISSING", Source: "env:PERF_ISOLATED_ENV", Message: "traffic isolation was not declared; set PERF_ISOLATED_ENV=true only for a controlled window"}
 	}
-	if declared && normalized != "" {
+	if normalized != "true" {
 		value := false
 		return &value, EvidenceCheck{Name: "traffic isolation", Status: "MISSING", Source: "env:PERF_ISOLATED_ENV", Message: "concurrent business traffic cannot be isolated; completed TPS is not admission evidence"}
 	}
-	return nil, EvidenceCheck{Name: "traffic isolation", Status: "MISSING", Source: "env:PERF_ISOLATED_ENV", Message: "traffic isolation was not declared; set PERF_ISOLATED_ENV=true only for a controlled window"}
+
+	const metric = "qs_perf_traffic_requests_total"
+	source := "env:PERF_ISOLATED_ENV+prometheus:" + metric + `{origin="other"}`
+	delta := 0.0
+	for _, component := range []string{"collection", "apiserver"} {
+		labels := map[string]string{"origin": "other", snapshotComponentLabel: component}
+		otherBefore, hasBefore := sumMetric(before, metric, labels)
+		otherAfter, hasAfter := sumMetric(after, metric, labels)
+		if !hasBefore || !hasAfter {
+			return nil, EvidenceCheck{
+				Name: "traffic isolation", Status: "MISSING", Source: source,
+				Message: fmt.Sprintf("PERF_ISOLATED_ENV=true was declared but %s does not expose bounded perf/other traffic evidence", component),
+			}
+		}
+		if otherAfter < otherBefore {
+			return nil, EvidenceCheck{
+				Name: "traffic isolation", Status: "INVALID", Source: source,
+				Message: fmt.Sprintf("%s other-traffic counter decreased from %.0f to %.0f; a process restart or counter reset invalidated the window", component, otherBefore, otherAfter),
+			}
+		}
+		delta += otherAfter - otherBefore
+	}
+	if delta > 0 {
+		value := false
+		return &value, EvidenceCheck{
+			Name: "traffic isolation", Status: "FAIL", Source: source,
+			Message: fmt.Sprintf("observed %.0f business requests without X-Perf-Run-ID during the declared isolated window", delta),
+		}
+	}
+	value := true
+	return &value, EvidenceCheck{Name: "traffic isolation", Status: "PASS", Source: source, Message: "observed other business requests=0"}
 }
 
 func prometheusObservationWindow(startDir, startLabel, endDir, endLabel string) (float64, bool) {
@@ -415,6 +446,12 @@ func readMetricSnapshots(dir, label string) []metricSample {
 		path := filepath.Join(dir, fmt.Sprintf("%s-%s-metrics.txt", label, component))
 		samples, err := parsePrometheusFile(path)
 		if err == nil {
+			for index := range samples {
+				if samples[index].Labels == nil {
+					samples[index].Labels = map[string]string{}
+				}
+				samples[index].Labels[snapshotComponentLabel] = component
+			}
 			result = append(result, samples...)
 		}
 	}

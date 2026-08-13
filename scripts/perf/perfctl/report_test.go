@@ -128,9 +128,11 @@ func TestNativeDiagnosticsAppendWebSocketExecutionAndScenarios(t *testing.T) {
 				"avg": float64(243.43), "min": float64(137.24), "med": float64(236.06),
 				"p(90)": float64(302.65), "p(95)": float64(327.12), "p(99)": float64(479.22), "max": float64(832.62),
 			},
-			"ws_sessions":        {"count": float64(2702), "rate": float64(8.748105)},
-			"iterations":         {"count": float64(18005), "rate": float64(58.29)},
-			"dropped_iterations": {"count": float64(1)},
+			"ws_sessions":                       {"count": float64(2702), "rate": float64(8.748105)},
+			"report_status_failed":              {"count": float64(9), "rate": float64(0.03)},
+			"report_ws_capacity_rejected_total": {"count": float64(9), "rate": float64(0.03)},
+			"iterations":                        {"count": float64(18005), "rate": float64(58.29)},
+			"dropped_iterations":                {"count": float64(1)},
 			"dropped_iterations{scenario:medical_model_query}":     {"count": float64(1)},
 			"dropped_iterations{scenario:medical_report_ws_query}": {"count": float64(0)},
 			"vus":     {"value": float64(0), "max": float64(42)},
@@ -145,6 +147,7 @@ func TestNativeDiagnosticsAppendWebSocketExecutionAndScenarios(t *testing.T) {
 	console := renderK6NativeDiagnostics(PhaseSummary{}, raw)
 	for _, want := range []string{
 		"K6 原生运行诊断", "WEBSOCKET", "ws_connecting", "avg=164.11ms", "p(99)=390.09ms",
+		"WEBSOCKET / 失败分类", "report_status_failed", "report_ws_capacity_rejected_total",
 		"ws_msgs_received", "5403  17.492972/s", "running (5m8.9s)", "0/106 VUs (peak=42)",
 		"18005 complete", "1 dropped", "interrupted=N/A", "medical_model_query", "pre/max VUs=9/450", "12.00 iters/s", "dropped=1",
 	} {

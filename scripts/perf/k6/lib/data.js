@@ -324,6 +324,50 @@ export function pickReportSample(samples) {
   return pick(samples);
 }
 
+function stableReportLane(testeeID, laneCount) {
+  let hash = 0;
+  const value = String(testeeID || '');
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash * 31) + value.charCodeAt(index)) >>> 0;
+  }
+  return laneCount > 0 ? hash % laneCount : 0;
+}
+
+export function reportSamplesForLane(samples, lane, activeLanes) {
+  const lanes = uniqueList(activeLanes);
+  const laneIndex = lanes.indexOf(String(lane || ''));
+  if (!samples || samples.length === 0 || laneIndex < 0) {
+    return [];
+  }
+
+  const seenTestees = {};
+  const candidates = [];
+  samples.forEach((sample) => {
+    const testeeID = String((sample && sample.testee_id) || '').trim();
+    if (!testeeID || seenTestees[testeeID]) {
+      return;
+    }
+    seenTestees[testeeID] = true;
+    if (stableReportLane(testeeID, lanes.length) === laneIndex) {
+      candidates.push(sample);
+    }
+  });
+  return candidates;
+}
+
+// Each active WebSocket scenario owns a deterministic, disjoint set of
+// testees. iterationInTest then walks that set round-robin, so concurrent model
+// scenarios cannot randomly consume the same testee capacity.
+export function pickReportSampleForIteration(samples, iteration, lane, activeLanes) {
+  const candidates = reportSamplesForLane(samples, lane, activeLanes);
+  if (candidates.length === 0) {
+    return null;
+  }
+  const rawIndex = Number(iteration);
+  const normalizedIndex = Number.isFinite(rawIndex) ? Math.max(0, Math.floor(rawIndex)) : 0;
+  return candidates[normalizedIndex % candidates.length];
+}
+
 export function flattenReportSamples(reportSamples) {
   const normalized = normalizeReportSamples(reportSamples);
   return normalized.medical.concat(normalized.behavior).concat(normalized.personality);

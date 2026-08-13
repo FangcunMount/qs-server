@@ -173,7 +173,9 @@ Verdict 与退出码：
 
 服务端证据缺失会产生 `INCOMPLETE`。在无法隔离并发业务流量的环境中，完成 TPS 与最终完成率不可作为正式准入证据。
 
-受控窗口必须显式设置 `PERF_ISOLATED_ENV=true`；未声明或声明为非隔离环境时，报告会保留观测值但将服务端证据标记为 `INCOMPLETE`。完成 TPS 使用 Interpretation 成功计数在两次 Prometheus 快照之间的增量，并以实际快照时间窗作为分母，不使用计划时长代替观测窗口。
+受控窗口必须显式设置 `PERF_ISOLATED_ENV=true`，但该变量只代表操作者声明，不能单独形成通过证据。collection-server 与 qs-apiserver 通过 `qs_perf_traffic_requests_total{origin="perf|other"}` 对业务请求做有界分类：携带 `X-Perf-Run-ID` 的 k6 请求属于 `perf`，其余业务请求属于 `other`；健康检查、readyz、metrics、ping、version 与 pprof 不计入。编排器比较阶段前后 `origin="other"` 增量，只有声明为隔离且增量为 0 才判定隔离通过；增量大于 0 判定失败，运行版本尚未暴露该指标则判定 `INCOMPLETE`。完成 TPS 使用 Interpretation 成功计数在两次 Prometheus 快照之间的增量，并以实际快照时间窗作为分母，不使用计划时长代替观测窗口。
+
+WebSocket 报告场景不再随机争抢报告样本。所有活动 WS scenario 按 testee ID 稳定分片，每个 testee 只归属一个活动 scenario；scenario 内再按 `iterationInTest` 轮转，避免医疗、行为和人格报告并发复用同一 testee 而误触 `max_per_testee`。实际失败会话只增加一次 `report_status_failed`，并在原生诊断中按容量拒绝、限流、协议、传输、握手、缺少消息和服务端拒绝分类。
 
 NSQD 报告优先按 channel depth 统计待消费工作；没有 channel 时才使用 topic depth，避免 topic 与 channel 重复累计。共享 NSQD 可设置 `PERF_NSQ_TOPICS=topic-a,topic-b`，将恢复证据限定到本次压测相关 topic；配置后没有匹配 topic 会标记为证据缺失。
 

@@ -87,6 +87,9 @@ func (s *GenericAPIServer) InstallMiddlewares() {
 	s.Use(middleware.RequestID())
 	// 上下文中间件
 	s.Use(middleware.Context())
+	// 压测流量证据必须独立于可选日志中间件，才能在阶段快照中
+	// 区分带 X-Perf-Run-ID 的 k6 请求和并发业务流量。
+	s.Use(middleware.PerfTrafficEvidence())
 
 	// 安装自定义中间件
 	for _, m := range s.middlewares {

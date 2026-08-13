@@ -53,6 +53,8 @@ func (r *Router) setupGlobalMiddleware(engine *gin.Engine) {
 
 	// RequestID 中间件
 	engine.Use(pkgmiddleware.RequestID())
+	// 为压测阶段提供可验证的 perf/other 请求增量。
+	engine.Use(pkgmiddleware.PerfTrafficEvidence())
 
 	// 基础日志中间件
 	engine.Use(pkgmiddleware.Logger())

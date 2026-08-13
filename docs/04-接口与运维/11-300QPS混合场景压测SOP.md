@@ -68,7 +68,9 @@ export PERF_ISOLATED_ENV=true
 worker、NSQD 域名须解析到 serverA Nginx；NSQ 公网入口只允许读取
 `/stats`、`/ping`、`/nodes`，不得开放 topic/channel 管理接口。
 
-只有确认窗口内的完成量可归因于本次压测时，才设置 `PERF_ISOLATED_ENV=true`；未设置或显式设为其他值都会把证据标记为 `INCOMPLETE`。完成 TPS 使用阶段前后 Interpretation Prometheus 计数增量，并以这两次指标快照的实际时间窗为分母，不以配置中的计划时长代替服务端观测窗口。
+只有确认窗口内的完成量可归因于本次压测时，才设置 `PERF_ISOLATED_ENV=true`；未设置或显式设为其他值都会把证据标记为 `INCOMPLETE`。该变量现在只是操作者声明，perfctl 还会比较阶段前后 `qs_perf_traffic_requests_total{origin="other"}`：携带 `X-Perf-Run-ID` 的 K6 业务请求归为 `perf`，其他业务请求归为 `other`，只有 `other` 增量为 0 才通过隔离门；大于 0 直接失败，运行版本未暴露指标则为 `INCOMPLETE`。健康、readyz、metrics、ping、version 和 pprof 不计入该指标。完成 TPS 使用阶段前后 Interpretation Prometheus 计数增量，并以这两次指标快照的实际时间窗为分母，不以配置中的计划时长代替服务端观测窗口。
+
+WebSocket 场景按 testee ID 将样本稳定分配给活动 scenario，并在各 scenario 内按 `iterationInTest` 轮转；不要改回随机选择，否则医疗、行为和人格连接可能并发占用同一 testee 并误触 `report_events.max_per_testee`。`report_status_failed` 必须与真实失败会话一一对应，具体原因在原生诊断的 `WEBSOCKET / 失败分类` 中查看。
 
 NSQD depth 按 channel 待消费工作求和；topic 没有 channel 时才使用 topic depth，避免重复累计。共享 NSQD 必须通过 `PERF_NSQ_TOPICS` 限定可解释的 topic 范围，配置后没有匹配 topic 会视为证据缺失。
 

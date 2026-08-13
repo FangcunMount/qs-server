@@ -1,21 +1,59 @@
 import ws from 'k6/ws';
 import { check } from 'k6';
-import { scenarioData, pickReportSample, flattenReportSamples } from '../lib/data.js';
+import exec from 'k6/execution';
+import { scenarioData, pickReportSampleForIteration, flattenReportSamples } from '../lib/data.js';
 import { authHeaders, collectionTokenAt, correlatedHeaders } from '../lib/http.js';
-import { COLLECTION_BASE_URL, REPORT_EVENTS_PATH, REPORT_WS_HOLD_SECONDS } from '../lib/config.js';
+import {
+  COLLECTION_BASE_URL, REPORT_EVENTS_PATH, REPORT_WS_HOLD_SECONDS,
+  LEGACY_REPORT_RPS, MEDICAL_REPORT_RPS, BEHAVIOR_REPORT_RPS, PERSONALITY_REPORT_RPS,
+} from '../lib/config.js';
 import {
   reportStatusFailed, reportSampleSkipped,
   reportWsConnectDuration, reportWsFirstMessageLatency, reportWsSubscribeToFirstMessageLatency, reportWsSessionDuration,
   medicalReportWsSubscribeToFirstMessageLatency, behaviorReportWsSubscribeToFirstMessageLatency,
   personalityReportWsSubscribeToFirstMessageLatency,
   reportWsConnectSuccessRate, reportWsMessageSuccessRate, reportWsTimeoutTotal,
+  reportWsCapacityRejectedTotal, reportWsRateLimitedTotal, reportWsProtocolErrorTotal,
+  reportWsTransportErrorTotal, reportWsConnectFailedTotal, reportWsMessageMissingTotal,
+  reportWsServerRejectedTotal,
 } from '../lib/metrics.js';
+import { firstReportWsFailure, reportWsFailureCategory } from '../lib/ws-failure.js';
 
 const subscribeLatencyByModel = {
   medical: medicalReportWsSubscribeToFirstMessageLatency,
   behavior: behaviorReportWsSubscribeToFirstMessageLatency,
   personality: personalityReportWsSubscribeToFirstMessageLatency,
 };
+
+const activeReportSampleLanes = [
+  ['report_ws_query', LEGACY_REPORT_RPS],
+  ['medical_report_ws_query', MEDICAL_REPORT_RPS],
+  ['behavior_report_ws_query', BEHAVIOR_REPORT_RPS],
+  ['personality_report_ws_query', PERSONALITY_REPORT_RPS],
+].filter((item) => item[1] > 0).map((item) => item[0]);
+
+const failureCounterByCategory = {
+  capacity_rejected: reportWsCapacityRejectedTotal,
+  rate_limited: reportWsRateLimitedTotal,
+  protocol_error: reportWsProtocolErrorTotal,
+  transport_error: reportWsTransportErrorTotal,
+  connect_failed: reportWsConnectFailedTotal,
+  message_missing: reportWsMessageMissingTotal,
+  server_rejected: reportWsServerRejectedTotal,
+};
+
+function reportSampleForScenario(samples, lane) {
+  return pickReportSampleForIteration(samples, exec.scenario.iterationInTest, lane, activeReportSampleLanes);
+}
+
+function recordReportWsFailure(reason, tags) {
+  const category = reportWsFailureCategory(reason);
+  reportStatusFailed.add(1, { ...tags, reason, failure_category: category });
+  const counter = failureCounterByCategory[category];
+  if (counter) {
+    counter.add(1, { ...tags, reason });
+  }
+}
 
 function wsBaseURL(httpBase) {
   if (httpBase.startsWith('https://')) {
@@ -39,8 +77,11 @@ function runReportWsQuery(ctx, sample, kind, endpoint) {
   let opened = false;
   let firstStatusReceived = false;
   let subscribedAt = 0;
-  let protocolError = false;
+  let failureReason = '';
   let timedOut = false;
+  const markFailure = (reason) => {
+    failureReason = firstReportWsFailure(failureReason, reason);
+  };
   const res = ws.connect(url, { headers }, (socket) => {
     let terminal = false;
     socket.on('open', () => {
@@ -74,24 +115,24 @@ function runReportWsQuery(ctx, sample, kind, endpoint) {
           }
         }
         if (frame.op === 'error') {
-          protocolError = true;
-          reportStatusFailed.add(1, { ...tags, reason: frame.code || 'ws_error' });
+          markFailure(frame.code || 'ws_error');
           socket.close();
         }
       } catch (_err) {
-        protocolError = true;
-        reportStatusFailed.add(1, { ...tags, reason: 'ws_decode_error' });
+        markFailure('ws_decode_error');
         socket.close();
       }
     });
     socket.on('error', () => {
-      protocolError = true;
-      reportStatusFailed.add(1, { ...tags, reason: 'ws_transport_error' });
+      if (!firstStatusReceived) {
+        markFailure('ws_transport_error');
+      }
     });
     socket.setTimeout(() => {
       if (!terminal) {
         if (!firstStatusReceived) {
           timedOut = true;
+          markFailure('ws_timeout');
         }
         socket.close();
       }
@@ -99,16 +140,19 @@ function runReportWsQuery(ctx, sample, kind, endpoint) {
   });
   reportWsSessionDuration.add(Date.now() - started, tags);
   const connected = !!(res && res.status === 101 && opened);
-  const messageReceived = connected && firstStatusReceived && !protocolError;
+  const messageReceived = connected && firstStatusReceived;
   reportWsConnectSuccessRate.add(connected, tags);
   reportWsMessageSuccessRate.add(messageReceived, tags);
   if (timedOut) {
     reportWsTimeoutTotal.add(1, tags);
   }
   if (!connected) {
-    reportStatusFailed.add(1, { ...tags, reason: 'ws_connect_status' });
+    markFailure('ws_connect_status');
   } else if (!messageReceived) {
-    reportStatusFailed.add(1, { ...tags, reason: 'ws_status_message_missing' });
+    markFailure('ws_status_message_missing');
+  }
+  if (failureReason) {
+    recordReportWsFailure(failureReason, tags);
   }
   check(res, {
     'ws connect status 101': (r) => r && r.status === 101,
@@ -118,22 +162,22 @@ function runReportWsQuery(ctx, sample, kind, endpoint) {
 
 export function reportWsQuery(data) {
   const ctx = scenarioData(data);
-  const sample = pickReportSample(flattenReportSamples(ctx.reportSamples));
+  const sample = reportSampleForScenario(flattenReportSamples(ctx.reportSamples), 'report_ws_query');
   const kind = sample && (sample.model_type === 'personality' || sample.model_type === 'behavior') ? sample.model_type : 'medical';
   runReportWsQuery(ctx, sample, kind, 'report_ws_query');
 }
 
 export function medicalReportWsQuery(data) {
   const ctx = scenarioData(data);
-  runReportWsQuery(ctx, pickReportSample(ctx.reportSamples.medical), 'medical', 'medical_report_ws_query');
+  runReportWsQuery(ctx, reportSampleForScenario(ctx.reportSamples.medical, 'medical_report_ws_query'), 'medical', 'medical_report_ws_query');
 }
 
 export function behaviorReportWsQuery(data) {
   const ctx = scenarioData(data);
-  runReportWsQuery(ctx, pickReportSample(ctx.reportSamples.behavior), 'behavior', 'behavior_report_ws_query');
+  runReportWsQuery(ctx, reportSampleForScenario(ctx.reportSamples.behavior, 'behavior_report_ws_query'), 'behavior', 'behavior_report_ws_query');
 }
 
 export function personalityReportWsQuery(data) {
   const ctx = scenarioData(data);
-  runReportWsQuery(ctx, pickReportSample(ctx.reportSamples.personality), 'personality', 'personality_report_ws_query');
+  runReportWsQuery(ctx, reportSampleForScenario(ctx.reportSamples.personality, 'personality_report_ws_query'), 'personality', 'personality_report_ws_query');
 }

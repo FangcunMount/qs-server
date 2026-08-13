@@ -92,6 +92,13 @@ export const http5xxTotal = new Counter('http_5xx_total');
 export const httpTransportErrorTotal = new Counter('http_transport_error_total');
 export const httpTimeoutTotal = new Counter('http_timeout_total');
 export const reportWsTimeoutTotal = new Counter('report_ws_timeout_total');
+export const reportWsCapacityRejectedTotal = new Counter('report_ws_capacity_rejected_total');
+export const reportWsRateLimitedTotal = new Counter('report_ws_rate_limited_total');
+export const reportWsProtocolErrorTotal = new Counter('report_ws_protocol_error_total');
+export const reportWsTransportErrorTotal = new Counter('report_ws_transport_error_total');
+export const reportWsConnectFailedTotal = new Counter('report_ws_connect_failed_total');
+export const reportWsMessageMissingTotal = new Counter('report_ws_message_missing_total');
+export const reportWsServerRejectedTotal = new Counter('report_ws_server_rejected_total');
 
 export const endpointFailureCounters = {
   questionnaire_query: buildEndpointFailureCounters('questionnaire_query'),

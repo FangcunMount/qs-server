@@ -273,6 +273,7 @@ func renderK6NativeDiagnostics(phase PhaseSummary, raw rawSummary) string {
 	var output strings.Builder
 	fmt.Fprintln(&output, "\n  K6 原生运行诊断")
 	writeNativeOperationDiagnostics(&output, phase, raw)
+	writeNativeWebSocketFailureBreakdown(&output, raw)
 
 	fmt.Fprintln(&output, "  WEBSOCKET / K6 内置")
 	writeNativeTrend(&output, "ws_connecting", findMetric(raw, "ws_connecting", nil))
@@ -316,6 +317,37 @@ func renderK6NativeDiagnostics(phase PhaseSummary, raw rawSummary) string {
 			scenario.Duration, formatScenarioRate(scenario), droppedText)
 	}
 	return output.String()
+}
+
+func writeNativeWebSocketFailureBreakdown(output *strings.Builder, raw rawSummary) {
+	names := []string{
+		"report_status_failed",
+		"report_ws_capacity_rejected_total",
+		"report_ws_rate_limited_total",
+		"report_ws_protocol_error_total",
+		"report_ws_transport_error_total",
+		"report_ws_connect_failed_total",
+		"report_ws_message_missing_total",
+		"report_ws_server_rejected_total",
+		"report_ws_timeout_total",
+	}
+	found := false
+	for _, name := range names {
+		if findMetric(raw, name, nil) != nil {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return
+	}
+	fmt.Fprintln(output, "  WEBSOCKET / 失败分类")
+	for _, name := range names {
+		if metric := findMetric(raw, name, nil); metric != nil {
+			writeNativeCounterWithIndent(output, "    ", name, metric)
+		}
+	}
+	fmt.Fprintln(output)
 }
 
 var nativeOperationGroupOrder = []string{

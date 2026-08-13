@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -186,15 +187,54 @@ func TestEvidenceClassificationSeparatesUnhealthyFromMissing(t *testing.T) {
 
 func TestTrafficIsolationEvidenceIsFailClosed(t *testing.T) {
 	t.Setenv("PERF_ISOLATED_ENV", "")
-	isolated, check := trafficIsolationEvidence()
+	isolated, check := trafficIsolationEvidence(nil, nil)
 	if isolated != nil || check.Status != "MISSING" {
 		t.Fatalf("isolation = %v, check = %#v, want unknown/MISSING", isolated, check)
 	}
 
 	t.Setenv("PERF_ISOLATED_ENV", "true")
-	isolated, check = trafficIsolationEvidence()
+	before := trafficOriginSamples(10, 20)
+	after := trafficOriginSamples(10, 20)
+	isolated, check = trafficIsolationEvidence(before, after)
 	if isolated == nil || !*isolated || check.Status != "PASS" {
 		t.Fatalf("isolation = %v, check = %#v, want true/PASS", isolated, check)
+	}
+}
+
+func TestTrafficIsolationEvidenceRejectsConcurrentBusinessTraffic(t *testing.T) {
+	t.Setenv("PERF_ISOLATED_ENV", "true")
+	before := trafficOriginSamples(10, 20)
+	after := trafficOriginSamples(12, 21)
+
+	isolated, check := trafficIsolationEvidence(before, after)
+	if isolated == nil || *isolated || check.Status != "FAIL" || !strings.Contains(check.Message, "3 business requests") {
+		t.Fatalf("isolation = %v, check = %#v, want false/FAIL with delta", isolated, check)
+	}
+}
+
+func TestTrafficIsolationEvidenceRequiresBothHTTPComponents(t *testing.T) {
+	t.Setenv("PERF_ISOLATED_ENV", "true")
+	before := trafficOriginSamples(10, 20)[:1]
+	after := trafficOriginSamples(10, 20)[:1]
+
+	isolated, check := trafficIsolationEvidence(before, after)
+	if isolated != nil || check.Status != "MISSING" || !strings.Contains(check.Message, "apiserver") {
+		t.Fatalf("isolation = %v, check = %#v, want apiserver MISSING", isolated, check)
+	}
+}
+
+func TestTrafficIsolationEvidenceRequiresRuntimeMetric(t *testing.T) {
+	t.Setenv("PERF_ISOLATED_ENV", "true")
+	isolated, check := trafficIsolationEvidence(nil, nil)
+	if isolated != nil || check.Status != "MISSING" {
+		t.Fatalf("isolation = %v, check = %#v, want unknown/MISSING", isolated, check)
+	}
+}
+
+func trafficOriginSamples(collection, apiserver float64) []metricSample {
+	return []metricSample{
+		{Name: "qs_perf_traffic_requests_total", Labels: map[string]string{"origin": "other", snapshotComponentLabel: "collection"}, Value: collection},
+		{Name: "qs_perf_traffic_requests_total", Labels: map[string]string{"origin": "other", snapshotComponentLabel: "apiserver"}, Value: apiserver},
 	}
 }
 
