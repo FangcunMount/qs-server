@@ -190,24 +190,31 @@ func collectionCacheConfig(opts *options.Options) collectioncache.Config {
 		return config
 	}
 	capabilities := opts.Cache.Capabilities
-	if capabilities.Catalog == nil {
-		return config
-	}
 	var questionnaireOptions *options.CatalogL1CacheOptions
-	if capabilities.Catalog.Questionnaire != nil {
+	if capabilities.Catalog != nil && capabilities.Catalog.Questionnaire != nil {
 		questionnaireOptions = &capabilities.Catalog.Questionnaire.CatalogL1CacheOptions
 	}
 	var publishedModelOptions *options.CatalogL1CacheOptions
-	if capabilities.Catalog.PublishedModel != nil {
+	if capabilities.Catalog != nil && capabilities.Catalog.PublishedModel != nil {
 		publishedModelOptions = &capabilities.Catalog.PublishedModel.CatalogL1CacheOptions
 	}
 	var typologyOptions *options.CatalogL1CacheOptions
-	if capabilities.Catalog.Typology != nil {
+	if capabilities.Catalog != nil && capabilities.Catalog.Typology != nil {
 		typologyOptions = &capabilities.Catalog.Typology.CatalogL1CacheOptions
 	}
 	config.Questionnaire = catalogBinding("catalog.questionnaire", "cache.capabilities.catalog.questionnaire", questionnaireOptions)
 	config.PublishedModel = catalogBinding("catalog.published_model", "cache.capabilities.catalog.published_model", publishedModelOptions)
 	config.Typology = catalogBinding("catalog.typology", "cache.capabilities.catalog.typology", typologyOptions)
+	var assessmentDetailOptions *options.CatalogL1CacheOptions
+	if capabilities.Evaluation != nil && capabilities.Evaluation.AssessmentDetail != nil {
+		assessmentDetailOptions = &capabilities.Evaluation.AssessmentDetail.CatalogL1CacheOptions
+	}
+	config.AssessmentDetail = catalogBinding("evaluation.assessment_detail", "cache.capabilities.evaluation.assessment_detail", assessmentDetailOptions)
+	var assessmentAccessOptions *options.CatalogL1CacheOptions
+	if capabilities.Evaluation != nil && capabilities.Evaluation.AssessmentAccess != nil {
+		assessmentAccessOptions = &capabilities.Evaluation.AssessmentAccess.CatalogL1CacheOptions
+	}
+	config.AssessmentAccess = catalogBinding("evaluation.assessment_access", "cache.capabilities.evaluation.assessment_access", assessmentAccessOptions)
 	return config
 }
 
@@ -282,8 +289,22 @@ func (c *Container) initApplicationServices() {
 
 	submitRuntime := c.buildSubmitRuntime(profileLinkService, c.questionnaireQueryService)
 	c.submissionService = submitRuntime.submission
+	evaluationReader := grpcbridge.NewEvaluationBFFReader(c.testeeEvaluationClient, c.participantReportClient, c.assessmentIntakeClient)
+	var assessmentDetailCache evaluation.AssessmentDetailCache
+	var assessmentDetailSingleflight bool
+	var assessmentAccessCache evaluation.AssessmentAccessCache
+	var assessmentAccessSingleflight bool
+	if c.cacheSubsystem != nil {
+		assessmentDetailCache = c.cacheSubsystem.AssessmentDetail()
+		assessmentDetailSingleflight = c.cacheSubsystem.AssessmentDetailSingleflight()
+		assessmentAccessCache = c.cacheSubsystem.AssessmentAccess()
+		assessmentAccessSingleflight = c.cacheSubsystem.AssessmentAccessSingleflight()
+	}
 	c.evaluationQueryService = evaluation.NewQueryService(
-		grpcbridge.NewEvaluationBFFReader(c.testeeEvaluationClient, c.participantReportClient, c.assessmentIntakeClient),
+		evaluationReader,
+		evaluation.WithAssessmentAccessReader(evaluationReader),
+		evaluation.WithAssessmentAccessCache(assessmentAccessCache, assessmentAccessSingleflight),
+		evaluation.WithAssessmentDetailCache(assessmentDetailCache, assessmentDetailSingleflight),
 	)
 	reportRuntime := c.buildReportRuntime(c.evaluationQueryService)
 	c.reportStatusReporter = reportRuntime.reporter
@@ -292,11 +313,11 @@ func (c *Container) initApplicationServices() {
 	c.waitWatcherCancel = reportRuntime.waitWatcherCancel
 
 	c.typologyAssessmentQueryService = typologyassessment.NewQueryService(
-		grpcbridge.NewEvaluationBFFReader(c.testeeEvaluationClient, c.participantReportClient, c.assessmentIntakeClient),
+		c.evaluationQueryService,
 		c.waitReportService,
 	)
 	c.behaviorAssessmentQueryService = behaviorassessment.NewQueryService(
-		grpcbridge.NewEvaluationBFFReader(c.testeeEvaluationClient, c.participantReportClient, c.assessmentIntakeClient),
+		c.evaluationQueryService,
 		c.waitReportService,
 	)
 	c.typologySessionService = typologysession.NewService(c.typologyModelQueryService, c.questionnaireQueryService)

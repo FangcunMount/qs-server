@@ -46,6 +46,16 @@ type fakeAssessmentQuery struct {
 	getCalls  int
 }
 
+func (f *fakeAssessmentQuery) AuthorizeAssessment(context.Context, uint64, uint64) error {
+	if f.err != nil {
+		return f.err
+	}
+	if f.result == nil {
+		return status.Error(codes.PermissionDenied, "assessment access denied")
+	}
+	return nil
+}
+
 func (f *fakeAssessmentQuery) GetMyAssessment(context.Context, uint64, uint64) (*evaluation.AssessmentDetailResponse, error) {
 	f.getCalls++
 	return f.result, f.err
@@ -63,9 +73,10 @@ func TestToPublicAssessmentStatusMapsCompletedToInterpreted(t *testing.T) {
 }
 
 func TestGetStatusRedisHitTerminal(t *testing.T) {
-	svc := NewService(&fakeAssessmentQuery{
+	query := &fakeAssessmentQuery{
 		result: &evaluation.AssessmentDetailResponse{ID: "42"},
-	}, &fakeStatusCache{
+	}
+	svc := NewService(query, &fakeStatusCache{
 		snapshots: map[string]*reportstatus.Snapshot{
 			"42": {
 				AssessmentID: "42",
@@ -83,6 +94,9 @@ func TestGetStatusRedisHitTerminal(t *testing.T) {
 	}
 	if resp.Status != "completed" {
 		t.Fatalf("expected internal completed, got %s", resp.Status)
+	}
+	if query.getCalls != 0 {
+		t.Fatalf("GetMyAssessment calls = %d, want 0 on status-cache hit", query.getCalls)
 	}
 }
 
@@ -156,7 +170,7 @@ func TestGetStatusRedisMissDBFallbackInterpreted(t *testing.T) {
 	}
 }
 
-func TestWaitFirstRedisMissReusesAuthorizedAssessment(t *testing.T) {
+func TestWaitFirstRedisMissLoadsDetailOnceAfterNarrowAuthorization(t *testing.T) {
 	query := &fakeAssessmentQuery{
 		result: &evaluation.AssessmentDetailResponse{Status: "interpreted"},
 	}

@@ -70,6 +70,29 @@ func TestCatalogRuntimeSharesPublishedModelQueryServiceWithTypologyProjector(t *
 	}
 }
 
+func TestEvaluationRoutesShareOneCachedQueryService(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(repoRoot(t), "internal", "collection-server", "container", "container.go")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(raw)
+	if strings.Count(text, "grpcbridge.NewEvaluationBFFReader(") != 1 {
+		t.Fatal("collection container must construct exactly one evaluation BFF reader")
+	}
+	for _, required := range []string{
+		"evaluation.WithAssessmentAccessCache(assessmentAccessCache, assessmentAccessSingleflight)",
+		"evaluation.WithAssessmentDetailCache(assessmentDetailCache, assessmentDetailSingleflight)",
+		"typologyassessment.NewQueryService(\n\t\tc.evaluationQueryService",
+		"behaviorassessment.NewQueryService(\n\t\tc.evaluationQueryService",
+	} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("evaluation runtime does not share cached QueryService; missing %q", required)
+		}
+	}
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)

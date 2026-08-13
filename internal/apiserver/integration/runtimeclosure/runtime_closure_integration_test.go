@@ -296,6 +296,10 @@ type runtimeReportQuery struct {
 	reports     interpretationparticipantapp.Service
 }
 
+func (q runtimeReportQuery) AuthorizeAssessment(ctx context.Context, testeeID, assessmentID uint64) error {
+	return q.assessments.AuthorizeAssessment(ctx, evaluationtesteeapp.Actor{TesteeID: testeeID}, assessmentID)
+}
+
 func (q runtimeReportQuery) GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*collectionevaluation.AssessmentDetailResponse, error) {
 	result, err := q.assessments.GetAssessment(ctx, evaluationtesteeapp.Actor{TesteeID: testeeID}, assessmentID)
 	if err != nil {

@@ -20,6 +20,7 @@ const (
 )
 
 type QueryService interface {
+	AuthorizeAssessment(ctx context.Context, testeeID, assessmentID uint64) error
 	GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentDetailResponse, error)
 	GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentReportResponse, error)
 }
@@ -109,12 +110,11 @@ func (s *Service) GetStatus(ctx context.Context, testeeID, assessmentID uint64) 
 	if s == nil {
 		return pendingResponse("queued", "报告排队生成中", 3000), nil
 	}
-	authorizedAssessment, err := s.authorize(ctx, testeeID, assessmentID)
-	if err != nil {
+	if err := s.authorize(ctx, testeeID, assessmentID); err != nil {
 		return nil, err
 	}
 	assessmentKey := fmt.Sprintf("%d", assessmentID)
-	resp, _, err := s.checkCurrentStatus(ctx, testeeID, assessmentID, assessmentKey, authorizedAssessment)
+	resp, _, err := s.checkCurrentStatus(ctx, testeeID, assessmentID, assessmentKey)
 	if err != nil {
 		return nil, err
 	}
@@ -132,8 +132,7 @@ func (s *Service) Wait(ctx context.Context, testeeID, assessmentID uint64, timeo
 	if s == nil {
 		return pendingResponse("pending", "报告生成中", 3000), nil
 	}
-	authorizedAssessment, err := s.authorize(ctx, testeeID, assessmentID)
-	if err != nil {
+	if err := s.authorize(ctx, testeeID, assessmentID); err != nil {
 		return nil, err
 	}
 	if timeout <= 0 {
@@ -141,7 +140,7 @@ func (s *Service) Wait(ctx context.Context, testeeID, assessmentID uint64, timeo
 	}
 
 	assessmentKey := fmt.Sprintf("%d", assessmentID)
-	if result, done, err := s.checkCurrentStatus(ctx, testeeID, assessmentID, assessmentKey, authorizedAssessment); err != nil {
+	if result, done, err := s.checkCurrentStatus(ctx, testeeID, assessmentID, assessmentKey); err != nil {
 		return nil, err
 	} else if done {
 		return result, nil
@@ -158,7 +157,7 @@ func (s *Service) Wait(ctx context.Context, testeeID, assessmentID uint64, timeo
 	waitCh, unsubscribe := s.notifier.Subscribe(assessmentKey)
 	defer unsubscribe()
 
-	if result, done, err := s.checkCurrentStatus(ctx, testeeID, assessmentID, assessmentKey, nil); err != nil {
+	if result, done, err := s.checkCurrentStatus(ctx, testeeID, assessmentID, assessmentKey); err != nil {
 		return nil, err
 	} else if done {
 		return result, nil
@@ -184,7 +183,7 @@ func (s *Service) Wait(ctx context.Context, testeeID, assessmentID uint64, timeo
 			if signal.Status != "completed" && signal.Status != "failed" && signal.Status != "temporarily_unavailable" {
 				continue
 			}
-			result, done, err := s.checkCurrentStatus(ctx, testeeID, assessmentID, assessmentKey, nil)
+			result, done, err := s.checkCurrentStatus(ctx, testeeID, assessmentID, assessmentKey)
 			if err != nil {
 				return nil, err
 			}
@@ -195,28 +194,24 @@ func (s *Service) Wait(ctx context.Context, testeeID, assessmentID uint64, timeo
 	}
 }
 
-func (s *Service) authorize(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentDetailResponse, error) {
+func (s *Service) authorize(ctx context.Context, testeeID, assessmentID uint64) error {
 	started := time.Now()
 	if s.query == nil {
 		reportstatus.ObserveAssessmentOwnership("misconfigured", time.Since(started))
-		return nil, fmt.Errorf("assessment query service is not configured")
+		return fmt.Errorf("assessment query service is not configured")
 	}
-	result, err := s.query.GetMyAssessment(ctx, testeeID, assessmentID)
+	err := s.query.AuthorizeAssessment(ctx, testeeID, assessmentID)
 	if err != nil {
 		switch status.Code(err) {
 		case codes.NotFound, codes.PermissionDenied:
 			reportstatus.ObserveAssessmentOwnership("denied", time.Since(started))
-			return nil, appreportstatus.ErrAssessmentAccess
+			return appreportstatus.ErrAssessmentAccess
 		}
 		reportstatus.ObserveAssessmentOwnership("error", time.Since(started))
-		return nil, err
-	}
-	if result == nil {
-		reportstatus.ObserveAssessmentOwnership("denied", time.Since(started))
-		return nil, appreportstatus.ErrAssessmentAccess
+		return err
 	}
 	reportstatus.ObserveAssessmentOwnership("allowed", time.Since(started))
-	return result, nil
+	return nil
 }
 
 func (s *Service) waitByPolling(
@@ -230,7 +225,7 @@ func (s *Service) waitByPolling(
 	defer ticker.Stop()
 
 	for {
-		if result, done, err := s.checkCurrentStatus(ctx, testeeID, assessmentID, assessmentKey, nil); err != nil {
+		if result, done, err := s.checkCurrentStatus(ctx, testeeID, assessmentID, assessmentKey); err != nil {
 			return nil, err
 		} else if done {
 			return result, nil
@@ -253,7 +248,6 @@ func (s *Service) checkCurrentStatus(
 	ctx context.Context,
 	testeeID, assessmentID uint64,
 	assessmentKey string,
-	authorizedAssessment *evaluation.AssessmentDetailResponse,
 ) (*evaluation.AssessmentStatusResponse, bool, error) {
 	if s.cache != nil {
 		snapshot, err := s.cache.Get(ctx, assessmentKey)
@@ -275,25 +269,20 @@ func (s *Service) checkCurrentStatus(
 		}
 	}
 	reportstatus.IncWaitReportDBFallback()
-	return s.loadStatusFromDB(ctx, testeeID, assessmentID, assessmentKey, authorizedAssessment)
+	return s.loadStatusFromDB(ctx, testeeID, assessmentID, assessmentKey)
 }
 
 func (s *Service) loadStatusFromDB(
 	ctx context.Context,
 	testeeID, assessmentID uint64,
 	assessmentKey string,
-	authorizedAssessment *evaluation.AssessmentDetailResponse,
 ) (*evaluation.AssessmentStatusResponse, bool, error) {
 	if s.query == nil {
 		return pendingResponse("queued", "报告排队生成中", 3000), false, nil
 	}
-	result := authorizedAssessment
-	if result == nil {
-		var err error
-		result, err = s.query.GetMyAssessment(ctx, testeeID, assessmentID)
-		if err != nil {
-			return nil, false, err
-		}
+	result, err := s.query.GetMyAssessment(ctx, testeeID, assessmentID)
+	if err != nil {
+		return nil, false, err
 	}
 	if result == nil {
 		return pendingResponse("queued", "报告排队生成中", 3000), false, nil

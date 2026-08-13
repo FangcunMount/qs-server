@@ -19,6 +19,10 @@ func TestCollectionPolicyFilesPreserveDevProdEnablement(t *testing.T) {
 		{name: "dev", capability: "published_model", wantEnabled: true},
 		{name: "prod", capability: "published_model", wantEnabled: true},
 		{name: "prod", capability: "questionnaire", wantEnabled: true},
+		{name: "dev", capability: "assessment_detail", wantEnabled: true},
+		{name: "dev", capability: "assessment_access", wantEnabled: true},
+		{name: "prod", capability: "assessment_detail", wantEnabled: false},
+		{name: "prod", capability: "assessment_access", wantEnabled: false},
 	} {
 		t.Run(test.name+"_"+test.capability, func(t *testing.T) {
 			mainPath := filepath.Join(root, "configs", "collection-server."+test.name+".yaml")
@@ -32,6 +36,10 @@ func TestCollectionPolicyFilesPreserveDevProdEnablement(t *testing.T) {
 				enabled = policy.Capabilities.Catalog.Questionnaire.Enabled
 			case "published_model":
 				enabled = policy.Capabilities.Catalog.PublishedModel.Enabled
+			case "assessment_detail":
+				enabled = policy.Capabilities.Evaluation.AssessmentDetail.Enabled
+			case "assessment_access":
+				enabled = policy.Capabilities.Evaluation.AssessmentAccess.Enabled
 			}
 			if enabled != test.wantEnabled || len(metadata.PolicySHA256) != 64 || !filepath.IsAbs(metadata.Path) {
 				t.Fatalf("enabled=%v metadata=%#v", enabled, metadata)
@@ -63,10 +71,6 @@ func TestCollectionPolicyRejectsInvalidValuesWhileCapabilityDisabled(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	disabled := strings.Replace(string(original), "published_model: {enabled: true,", "published_model: {enabled: false,", 1)
-	if disabled == string(original) {
-		t.Fatal("test fixture did not disable published_model")
-	}
 
 	tests := []struct {
 		name        string
@@ -76,19 +80,19 @@ func TestCollectionPolicyRejectsInvalidValuesWhileCapabilityDisabled(t *testing.
 	}{
 		{
 			name:        "ttl",
-			old:         "published_model: {enabled: false, ttl_seconds: 180",
+			old:         "published_model: {enabled: true, ttl_seconds: 180",
 			replacement: "published_model: {enabled: false, ttl_seconds: 0",
 			wantError:   "published_model_cache.ttl_seconds must be greater than 0",
 		},
 		{
 			name:        "jitter",
-			old:         "published_model: {enabled: false, ttl_seconds: 180, ttl_jitter_ratio: 0.2",
+			old:         "published_model: {enabled: true, ttl_seconds: 180, ttl_jitter_ratio: 0.2",
 			replacement: "published_model: {enabled: false, ttl_seconds: 180, ttl_jitter_ratio: 1.1",
 			wantError:   "published_model_cache.ttl_jitter_ratio must be between 0 and 1",
 		},
 		{
 			name:        "capacity",
-			old:         "published_model: {enabled: false, ttl_seconds: 180, ttl_jitter_ratio: 0.2, max_entries: 64",
+			old:         "published_model: {enabled: true, ttl_seconds: 180, ttl_jitter_ratio: 0.2, max_entries: 64",
 			replacement: "published_model: {enabled: false, ttl_seconds: 180, ttl_jitter_ratio: 0.2, max_entries: 0",
 			wantError:   "published_model_cache.max_entries must be greater than 0",
 		},
@@ -96,8 +100,8 @@ func TestCollectionPolicyRejectsInvalidValuesWhileCapabilityDisabled(t *testing.
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			body := strings.Replace(disabled, test.old, test.replacement, 1)
-			if body == disabled {
+			body := strings.Replace(string(original), test.old, test.replacement, 1)
+			if body == string(original) {
 				t.Fatalf("test fixture did not replace %q", test.old)
 			}
 			path := filepath.Join(t.TempDir(), "policy.yaml")

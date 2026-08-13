@@ -16,6 +16,10 @@ type fakeEvaluationQueryService struct {
 	getAssessmentReport func(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentReportResponse, error)
 }
 
+func (f *fakeEvaluationQueryService) AuthorizeAssessment(context.Context, uint64, uint64) error {
+	return nil
+}
+
 func (f *fakeEvaluationQueryService) ListMyAssessments(ctx context.Context, testeeID uint64, req *evaluation.ListAssessmentsRequest) (*evaluation.ListAssessmentsResponse, error) {
 	if f.listMyAssessments == nil {
 		panic("unexpected ListMyAssessments call")

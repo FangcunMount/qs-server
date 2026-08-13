@@ -421,6 +421,8 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.Cache.Capabilities.Catalog.Questionnaire.AddFlags(fss.FlagSet("cache.capabilities.catalog.questionnaire"))
 	o.Cache.Capabilities.Catalog.PublishedModel.AddFlags(fss.FlagSet("cache.capabilities.catalog.published_model"))
 	o.Cache.Capabilities.Catalog.Typology.AddFlags(fss.FlagSet("cache.capabilities.catalog.typology"))
+	o.Cache.Capabilities.Evaluation.AssessmentDetail.AddFlags(fss.FlagSet("cache.capabilities.evaluation.assessment_detail"))
+	o.Cache.Capabilities.Evaluation.AssessmentAccess.AddFlags(fss.FlagSet("cache.capabilities.evaluation.assessment_access"))
 	o.Runtime.AddFlags(fss.FlagSet("runtime"))
 	o.JWT.AddFlags(fss.FlagSet("jwt"))
 	o.Resilience.Control.AddFlags(fss.FlagSet("resilience.control"))
@@ -574,6 +576,10 @@ func (o *Options) Validate() []error {
 		errs = append(errs, validateQuestionnaireCacheOptions(o.Cache.Capabilities.Catalog.Questionnaire)...)
 		errs = append(errs, validatePublishedModelCacheOptions(o.Cache.Capabilities.Catalog.PublishedModel)...)
 		errs = append(errs, validateTypologyCacheOptions(o.Cache.Capabilities.Catalog.Typology)...)
+	}
+	if o.Cache != nil && o.Cache.Capabilities != nil && o.Cache.Capabilities.Evaluation != nil {
+		errs = append(errs, validateAssessmentDetailCacheOptions(o.Cache.Capabilities.Evaluation.AssessmentDetail)...)
+		errs = append(errs, validateAssessmentAccessCacheOptions(o.Cache.Capabilities.Evaluation.AssessmentAccess)...)
 	}
 	errs = append(errs, o.RuntimeState.Validate("runtime_state")...)
 	errs = append(errs, validateCollectionRateLimit(o.RateLimit)...)
