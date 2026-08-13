@@ -231,7 +231,7 @@ perf-check-k6:
 perf-run: perf-ensure-config ## 统一压测入口（PLAN=quick|baseline|admission|diagnose）
 	@test -n "$(PLAN)" || { echo "$(COLOR_RED)❌ 缺少 PLAN；使用 quick、baseline、admission 或 diagnose$(COLOR_RESET)" >&2; exit 1; }
 	@if [ "$(DRY_RUN)" != "1" ] && [ "$(DRY_RUN)" != "true" ] && [ "$(PLAN)" != "diagnose" ]; then \
-		$(MAKE) perf-preflight; \
+		$(MAKE) perf-preflight && \
 		$(MAKE) perf-check-k6; \
 	fi
 	@mkdir -p "$(dir $(PERF_CTL_BIN))"
