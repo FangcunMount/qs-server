@@ -114,6 +114,23 @@ var workerEvaluationPayloadGateTotal = promauto.NewCounterVec(prometheus.Counter
 	Help: "evaluation.requested payload gate classifications before Execute (EV-R015).",
 }, []string{"class"})
 
+const (
+	perfTrafficOriginPerf  = "perf"
+	perfTrafficOriginOther = "other"
+)
+
+var perfTrafficRequestsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "qs_perf_traffic_requests_total",
+	Help: "Business HTTP and WebSocket requests classified as k6 perf traffic or other concurrent traffic.",
+}, []string{"origin"})
+
+func init() {
+	// Export explicit zero-valued samples so an isolated observation window can
+	// distinguish no unrelated traffic from a missing metric.
+	perfTrafficRequestsTotal.WithLabelValues(perfTrafficOriginPerf)
+	perfTrafficRequestsTotal.WithLabelValues(perfTrafficOriginOther)
+}
+
 type PrometheusObserver struct{}
 
 func (PrometheusObserver) ObserveDecision(_ context.Context, decision Decision) {
@@ -266,6 +283,15 @@ func ObserveEvaluationPayloadGate(class string) {
 		class = "invalid"
 	}
 	workerEvaluationPayloadGateTotal.WithLabelValues(class).Inc()
+}
+
+// ObservePerfTrafficRequest keeps the public metric label bounded even when a
+// caller supplies an unexpected origin classification.
+func ObservePerfTrafficRequest(origin string) {
+	if origin != perfTrafficOriginPerf {
+		origin = perfTrafficOriginOther
+	}
+	perfTrafficRequestsTotal.WithLabelValues(origin).Inc()
 }
 
 func ObserveSubmitToAssessmentReady(duration time.Duration) {

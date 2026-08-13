@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	dto "github.com/prometheus/client_model/go"
 )
 
@@ -32,5 +33,19 @@ func TestCollectionAdmissionHistogramsKeepPublicContract(t *testing.T) {
 				t.Fatalf("%s bucket[%d] = %v, want %v", name, index, bucket.GetUpperBound(), want)
 			}
 		}
+	}
+}
+
+func TestObservePerfTrafficRequestKeepsOriginBounded(t *testing.T) {
+	perfBefore := testutil.ToFloat64(perfTrafficRequestsTotal.WithLabelValues(perfTrafficOriginPerf))
+	otherBefore := testutil.ToFloat64(perfTrafficRequestsTotal.WithLabelValues(perfTrafficOriginOther))
+
+	ObservePerfTrafficRequest(perfTrafficOriginPerf)
+	ObservePerfTrafficRequest("unexpected-origin")
+
+	perfAfter := testutil.ToFloat64(perfTrafficRequestsTotal.WithLabelValues(perfTrafficOriginPerf))
+	otherAfter := testutil.ToFloat64(perfTrafficRequestsTotal.WithLabelValues(perfTrafficOriginOther))
+	if perfAfter-perfBefore != 1 || otherAfter-otherBefore != 1 {
+		t.Fatalf("traffic deltas = perf %.0f other %.0f, want 1/1", perfAfter-perfBefore, otherAfter-otherBefore)
 	}
 }

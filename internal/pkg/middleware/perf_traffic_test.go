@@ -3,10 +3,10 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 func TestClassifyPerfTrafficOrigin(t *testing.T) {
@@ -33,13 +33,13 @@ func TestPerfTrafficEvidenceExcludesOnlyObservabilityRoutes(t *testing.T) {
 
 func TestPerfTrafficEvidenceCountsPerfAndOtherRequests(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	var observed []string
 	engine := gin.New()
-	engine.Use(PerfTrafficEvidence())
+	engine.Use(perfTrafficEvidence(func(origin string) {
+		observed = append(observed, origin)
+	}))
 	engine.GET("/api/v1/test", func(c *gin.Context) { c.Status(http.StatusNoContent) })
 	engine.GET("/readyz", func(c *gin.Context) { c.Status(http.StatusOK) })
-
-	perfBefore := testutil.ToFloat64(perfTrafficRequestsTotal.WithLabelValues(trafficOriginPerf))
-	otherBefore := testutil.ToFloat64(perfTrafficRequestsTotal.WithLabelValues(trafficOriginOther))
 
 	perfRequest := httptest.NewRequest(http.MethodGet, "/api/v1/test", nil)
 	perfRequest.Header.Set(perfRunIDHeader, "run-1")
@@ -47,9 +47,7 @@ func TestPerfTrafficEvidenceCountsPerfAndOtherRequests(t *testing.T) {
 	engine.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/v1/test", nil))
 	engine.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/readyz", nil))
 
-	perfAfter := testutil.ToFloat64(perfTrafficRequestsTotal.WithLabelValues(trafficOriginPerf))
-	otherAfter := testutil.ToFloat64(perfTrafficRequestsTotal.WithLabelValues(trafficOriginOther))
-	if perfAfter-perfBefore != 1 || otherAfter-otherBefore != 1 {
-		t.Fatalf("traffic deltas = perf %.0f other %.0f, want 1/1", perfAfter-perfBefore, otherAfter-otherBefore)
+	if want := []string{trafficOriginPerf, trafficOriginOther}; !reflect.DeepEqual(observed, want) {
+		t.Fatalf("observed origins = %v, want %v", observed, want)
 	}
 }
