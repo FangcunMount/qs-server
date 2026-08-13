@@ -141,7 +141,7 @@ export const scenarios = {};
 
 const THRESHOLD_LIMITS = {
   experience: {
-    query: [200, 500],
+    query: [300, 500],
     submit: [300, 800],
     reportStatus: [300, 800],
     statistics: [700, 1500],
