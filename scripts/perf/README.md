@@ -55,15 +55,21 @@ Admission 的容量阶段持续时间固定为：
 | `ws_sessions_per_second` | WebSocket 新建会话速率，不混入 HTTP RPS |
 | `accepted_tps` | 每秒被可靠受理的答卷数，按总量和模型类型展示 |
 | `completed_tps` | 服务端成功 Interpretation Run 增量除以阶段时长，按总量和模型类型展示 |
-| `final_completion_rate` | 服务端完成增量除以受理量 |
+| `expected_completions` | assessment intake 在观测窗口内新建的 Assessment 数；排除独立问卷和幂等重放 |
+| `no_assessment_required` | assessment intake 正常结束且无需创建 Assessment 的独立问卷受理量 |
+| `final_completion_rate` | 服务端完成增量除以 `expected_completions`，不得使用全部受理量作为分母 |
 | `request_amplification` | HTTP RPS ÷ business QPS |
 | `polling_amplification` | 报告轮询请求数 ÷ 链路探针初始数，不计作重试 |
 
-异步场景必须区分受理 TPS 与完成 TPS。缺少服务端完成证据时，完成 TPS 是 `N/A`，不得用链路探针估算。
+异步场景必须区分受理 TPS、应完成受理量与完成 TPS。缺少服务端完成证据或 assessment intake outcome 证据时，最终完成率是 `N/A`，不得用全部受理量或链路探针估算。
+
+WebSocket 同时记录端到端 `report_ws_first_message_latency` 与握手后 `report_ws_subscribe_to_first_message_latency`。后者从客户端发送 subscribe 帧起计时，只用于定位首帧慢在公网握手还是服务端状态读取，不单独改变验收阈值。
+
+`dropped_iterations` 保留全局 `count==0` 硬门，同时为每个活动 scenario 生成相同的带 `scenario` 标签子阈值。任何一次丢迭代仍会让阶段失败，子阈值只负责指出发生在哪条流量链路。
 
 ### 时延与响应体验
 
-每个活动关键操作和端到端探针统一输出：样本数、P50、P95、P99、最大耗时和平均耗时。
+每个活动关键操作和端到端探针在终端和 Markdown 主表统一输出：样本数、P50、P90、P95、P99。最大耗时和平均耗时继续保留在 `summary.json`，用于诊断而不挤占主结果表。
 
 `experience` 体验线：
 
@@ -83,7 +89,7 @@ Admission 的容量阶段持续时间固定为：
 | WS 握手与首帧 | < 500ms | < 1.2s |
 | Statistics | < 1s | < 2s |
 
-P50、平均值和最大耗时当前是观察指标；P95/P99 是体验或保护门禁。最大耗时达到请求超时后，由超时门禁判定。
+P50/P90 是体验分布观察指标；P95/P99 是体验或保护门禁。最大耗时达到请求超时后，由超时门禁判定。
 
 ### 可靠性与正确性
 
@@ -96,7 +102,7 @@ P50、平均值和最大耗时当前是观察指标；P95/P99 是体验或保护
 
 报告同时输出成功、错误、超时的数量和比例。最终成功但经历服务端重试的事务仍计为成功，重试成本单列。
 
-## 分层重试
+#### 分层重试
 
 服务端增量暴露：
 
@@ -113,6 +119,18 @@ qs_retry_layer_attempt_total{
 `layer` 只允许 `business | outbox | hold | transport`；`attempt_class` 只允许 `initial | retry`。业务 origin 使用 `initial | automatic | manual | force | lease_recovery`，其他层固定为 `na`。
 
 报告分别展示 k6 客户端、业务、Outbox、retry-hold 和 MQ transport 重试。`retry_rate = retry attempts / initial attempts`，允许超过 100%；初始尝试为 0 时显示 `N/A`。本版本只记录基线，不设置重试硬阈值。
+
+## 结果展示契约
+
+终端阶段摘要和 `report.md` 使用相同的三个一级维度，不再把重试拆成第四个维度：
+
+1. 吞吐与处理能力：目标/实际 QPS、达成率、dropped iterations、HTTP/WS 速率、受理/完成 TPS；
+2. 时延与响应体验：各操作样本数与 P50/P90/P95/P99；
+3. 可靠性与正确性：各操作成功率、错误率、超时率，以及按层级统计的重试率。
+
+`report.md` 顶部先按三个维度给出跨阶段总览，随后按阶段展开同一结构。排队、服务端证据和原始阈值放在附录，不与三类业务结果并列。`summary.json` 继续保存完整机器证据和来源。
+
+K6 原生尾部汇总不再重复打印到终端；`handleSummary()` 将其标准化后写入阶段的 `raw-k6-summary.json`。K6 运行进度仍可见，阶段结束后由 `perfctl` 输出三维结果，避免原生指标块与正式报告同时刷屏。
 
 ## 报告契约
 

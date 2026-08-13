@@ -16,6 +16,7 @@ import {
 } from './lib/config.js';
 import { buildThresholds } from './lib/metrics.js';
 import { scenarios } from './lib/options.js';
+import { structuredSummaryOutput } from './lib/summary.js';
 import {
   discoverTesteeIDs,
   discoverSubmitSubjects,
@@ -44,6 +45,10 @@ export const options = {
   userAgent: USER_AGENT,
   summaryTrendStats: ['avg', 'min', 'med', 'p(90)', 'p(95)', 'p(99)', 'max'],
 };
+
+export function handleSummary(data) {
+  return structuredSummaryOutput(data, __ENV.PERF_RAW_SUMMARY_FILE);
+}
 
 export function setup() {
   hydrateStaticFixtures();

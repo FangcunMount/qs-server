@@ -56,6 +56,8 @@ type Throughput struct {
 	AcceptedTPSByModel   map[string]Measurement `json:"accepted_tps_by_model"`
 	CompletedTPS         Measurement            `json:"completed_tps"`
 	CompletedTPSByModel  map[string]Measurement `json:"completed_tps_by_model"`
+	ExpectedCompletions  Measurement            `json:"expected_completions"`
+	NoAssessmentRequired Measurement            `json:"no_assessment_required"`
 	FinalCompletionRate  Measurement            `json:"final_completion_rate"`
 	RequestAmplification Measurement            `json:"request_amplification"`
 	PollingAmplification Measurement            `json:"polling_amplification"`
@@ -65,6 +67,7 @@ type LatencyMetric struct {
 	Operation string      `json:"operation"`
 	Samples   int64       `json:"samples"`
 	P50       Measurement `json:"p50"`
+	P90       Measurement `json:"p90"`
 	P95       Measurement `json:"p95"`
 	P99       Measurement `json:"p99"`
 	Max       Measurement `json:"max"`
@@ -105,18 +108,20 @@ type EvidenceCheck struct {
 }
 
 type PhaseEvidence struct {
-	Complete                   bool               `json:"complete"`
-	TrafficIsolated            *bool              `json:"traffic_isolated"`
-	CompletionWindow           Measurement        `json:"completion_window"`
-	Checks                     []EvidenceCheck    `json:"checks"`
-	CompletedCountDelta        *float64           `json:"completed_count_delta"`
-	FailedCountDelta           *float64           `json:"failed_count_delta"`
-	CompletedCountDeltaByModel map[string]float64 `json:"completed_count_delta_by_model"`
-	Retry                      []RetryMetric      `json:"retry"`
-	QueueWait                  []QueueWaitMetric  `json:"queue_wait"`
-	OutboxBacklog              *float64           `json:"outbox_backlog"`
-	OutboxOldestAge            *float64           `json:"outbox_oldest_age_seconds"`
-	NSQDepth                   *float64           `json:"nsq_depth"`
+	Complete                       bool               `json:"complete"`
+	TrafficIsolated                *bool              `json:"traffic_isolated"`
+	CompletionWindow               Measurement        `json:"completion_window"`
+	Checks                         []EvidenceCheck    `json:"checks"`
+	CompletedCountDelta            *float64           `json:"completed_count_delta"`
+	FailedCountDelta               *float64           `json:"failed_count_delta"`
+	CompletedCountDeltaByModel     map[string]float64 `json:"completed_count_delta_by_model"`
+	ExpectedCompletionCountDelta   *float64           `json:"expected_completion_count_delta"`
+	NoAssessmentRequiredCountDelta *float64           `json:"no_assessment_required_count_delta"`
+	Retry                          []RetryMetric      `json:"retry"`
+	QueueWait                      []QueueWaitMetric  `json:"queue_wait"`
+	OutboxBacklog                  *float64           `json:"outbox_backlog"`
+	OutboxOldestAge                *float64           `json:"outbox_oldest_age_seconds"`
+	NSQDepth                       *float64           `json:"nsq_depth"`
 }
 
 type ThresholdResult struct {

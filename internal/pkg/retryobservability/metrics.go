@@ -141,7 +141,7 @@ func normalizeOrigin(layer, origin, attemptClass string) string {
 
 func normalizeOutcome(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "success", "succeeded", "published", "acked", "held", "hold_replayed":
+	case "success", "succeeded", "published", "acked", "unknown_acked", "held", "hold_replayed":
 		return OutcomeSuccess
 	default:
 		return OutcomeFailure

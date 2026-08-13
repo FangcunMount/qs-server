@@ -235,25 +235,43 @@ func finishSetupError(opts runOptions, runDir, runID, gitSHA string, gitDirty bo
 }
 
 func renderPhaseConsole(phase PhaseSummary) string {
-	worstP95Operation, worstP95 := worstLatencyP95(phase.Latency)
-	minSuccessOperation, minSuccess := correctnessExtreme(phase.Correctness, func(item CorrectnessMetric) Measurement { return item.SuccessRate }, false)
-	maxErrorOperation, maxError := correctnessExtreme(phase.Correctness, func(item CorrectnessMetric) Measurement { return item.ErrorRate }, true)
-	maxTimeoutOperation, maxTimeout := correctnessExtreme(phase.Correctness, func(item CorrectnessMetric) Measurement { return item.TimeoutRate }, true)
-	maxRetryLayer, maxRetry := retryExtreme(phase.Retry)
-	return fmt.Sprintf("\n[%s] %s\n  throughput: target=%d actual=%s http=%s accepted=%s completed=%s\n  latency: worst_p95=%s:%s\n  correctness: min_success=%s:%s max_error=%s:%s max_timeout=%s:%s\n  retry: max_amplification=%s:%s\n",
-		phase.ID, phase.Verdict.Status, phase.TargetQPS,
-		formatMeasurement(phase.Throughput.BusinessQPS.Actual), formatMeasurement(phase.Throughput.HTTPRPS), formatMeasurement(phase.Throughput.AcceptedTPS), formatMeasurement(phase.Throughput.CompletedTPS),
-		worstP95Operation, formatMeasurement(worstP95),
-		minSuccessOperation, formatPercent(minSuccess), maxErrorOperation, formatPercent(maxError), maxTimeoutOperation, formatPercent(maxTimeout),
-		maxRetryLayer, formatPercent(maxRetry))
+	var output strings.Builder
+	fmt.Fprintf(&output, "\n[%s] %s\n", phase.ID, phase.Verdict.Status)
+	fmt.Fprintln(&output, "  1. 吞吐与处理能力")
+	fmt.Fprintf(&output, "     QPS  目标 %s | 实际 %s | 达成率 %s | Dropped %s\n",
+		formatMeasurement(phase.Throughput.BusinessQPS.Target), formatMeasurement(phase.Throughput.BusinessQPS.Actual),
+		formatPercent(phase.Throughput.BusinessQPS.TargetAttainment), formatMeasurement(phase.Throughput.BusinessQPS.Dropped))
+	fmt.Fprintf(&output, "     TPS  受理 %s | 完成 %s | 最终完成率 %s\n",
+		formatMeasurement(phase.Throughput.AcceptedTPS), formatMeasurement(phase.Throughput.CompletedTPS), formatPercent(phase.Throughput.FinalCompletionRate))
+	fmt.Fprintf(&output, "     请求 HTTP %s | WebSocket %s\n", formatMeasurement(phase.Throughput.HTTPRPS), formatMeasurement(phase.Throughput.WSSessionsPerSecond))
+
+	fmt.Fprintln(&output, "  2. 时延与响应体验")
+	fmt.Fprintln(&output, "     操作 | 样本 | P50 | P90 | P95 | P99")
+	for _, item := range phase.Latency {
+		fmt.Fprintf(&output, "     %s | %d | %s | %s | %s | %s\n", item.Operation, item.Samples,
+			formatMeasurement(item.P50), formatMeasurement(item.P90), formatMeasurement(item.P95), formatMeasurement(item.P99))
+	}
+
+	fmt.Fprintln(&output, "  3. 可靠性与正确性")
+	fmt.Fprintln(&output, "     操作 | 初始操作 | 成功率 | 错误率 | 超时率")
+	for _, item := range phase.Correctness {
+		fmt.Fprintf(&output, "     %s | %d | %s | %s | %s\n", item.Operation, item.Attempts,
+			formatPercent(item.SuccessRate), formatPercent(item.ErrorRate), formatPercent(item.TimeoutRate))
+	}
+	fmt.Fprintln(&output, "     重试层级 | 初始尝试 | 重试尝试 | 重试率")
+	for _, item := range phase.Retry {
+		fmt.Fprintf(&output, "     %s | %d | %d | %s\n", item.Layer, item.InitialAttempts, item.RetryAttempts, formatPercent(item.RetryRate))
+	}
+	return output.String()
 }
 
-func worstLatencyP95(items []LatencyMetric) (string, Measurement) {
+func latencyExtreme(items []LatencyMetric, selectValue func(LatencyMetric) Measurement) (string, Measurement) {
 	name := "N/A"
 	result := naMeasurement("ms", "console", "no latency samples")
 	for _, item := range items {
-		if item.P95.Value != nil && (result.Value == nil || *item.P95.Value > *result.Value) {
-			name, result = item.Operation, item.P95
+		value := selectValue(item)
+		if value.Value != nil && (result.Value == nil || *value.Value > *result.Value) {
+			name, result = item.Operation, value
 		}
 	}
 	return name, result
@@ -297,9 +315,10 @@ func populateRunViews(summary *RunSummary) {
 }
 
 func runK6(ctx context.Context, opts runOptions, configFile, runID string, spec phaseSpec, rawPath string) int {
-	args := []string{"run", "--summary-export", rawPath,
+	args := []string{"run",
 		"-e", "PERF_CONFIG_FILE=" + configFile,
 		"-e", "PERF_ROOT_DIR=" + opts.Root,
+		"-e", "PERF_RAW_SUMMARY_FILE=" + rawPath,
 		"-e", "QPS_PROFILE=" + spec.Profile,
 		"-e", "RUN_ID=" + runID + "-" + spec.ID,
 		opts.K6Script,

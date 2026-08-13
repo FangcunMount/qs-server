@@ -6,14 +6,16 @@ import (
 )
 
 const (
-	intakeLookupFound           = "found"
-	intakeLookupNotFound        = "not_found"
-	intakeLookupDependencyError = "dependency_error"
-	intakeLookupDuplicateHit    = "duplicate_hit"
-	legacyBindingResolved       = "resolved"
-	legacyBindingNotFound       = "not_found"
-	legacyBindingDependencyErr  = "dependency_error"
-	legacyBindingUnavailable    = "unavailable"
+	intakeLookupFound                 = "found"
+	intakeLookupNotFound              = "not_found"
+	intakeLookupDependencyError       = "dependency_error"
+	intakeLookupDuplicateHit          = "duplicate_hit"
+	legacyBindingResolved             = "resolved"
+	legacyBindingNotFound             = "not_found"
+	legacyBindingDependencyErr        = "dependency_error"
+	legacyBindingUnavailable          = "unavailable"
+	intakeOutcomeAssessmentCreated    = "assessment_created"
+	intakeOutcomeNoAssessmentRequired = "no_assessment_required"
 )
 
 var assessmentIntakeLookupTotal = promauto.NewCounterVec(prometheus.CounterOpts{
@@ -24,6 +26,11 @@ var assessmentIntakeLookupTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 var assessmentIntakeLegacyBindingTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 	Name: "qs_evaluation_assessment_intake_legacy_binding_total",
 	Help: "Legacy AnswerSheet events without frozen admission classified by live-binding fallback result.",
+}, []string{"result"})
+
+var assessmentIntakeOutcomeTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "qs_evaluation_assessment_intake_outcome_total",
+	Help: "Successful assessment intake outcomes used to distinguish newly created Assessments from independent questionnaires.",
 }, []string{"result"})
 
 func init() {
@@ -43,6 +50,12 @@ func init() {
 	} {
 		assessmentIntakeLegacyBindingTotal.WithLabelValues(result)
 	}
+	for _, result := range []string{
+		intakeOutcomeAssessmentCreated,
+		intakeOutcomeNoAssessmentRequired,
+	} {
+		assessmentIntakeOutcomeTotal.WithLabelValues(result)
+	}
 }
 
 func observeAssessmentIntakeLookup(result string) {
@@ -51,4 +64,8 @@ func observeAssessmentIntakeLookup(result string) {
 
 func observeLegacyBinding(result string) {
 	assessmentIntakeLegacyBindingTotal.WithLabelValues(result).Inc()
+}
+
+func observeAssessmentIntakeOutcome(result string) {
+	assessmentIntakeOutcomeTotal.WithLabelValues(result).Inc()
 }

@@ -55,15 +55,21 @@ func TestEncodeStatusFrame(t *testing.T) {
 }
 
 func TestConnectionManagerLimits(t *testing.T) {
-	mgr := newConnectionManager(1, 1)
-	if !mgr.TryAcquire("1") {
+	mgr := newConnectionManager(2, 1)
+	if acquired, reason := mgr.TryAcquire("1"); !acquired || reason != "" {
 		t.Fatal("expected first acquire to succeed")
 	}
-	if mgr.TryAcquire("1") {
-		t.Fatal("expected per-testee limit to reject")
+	if acquired, reason := mgr.TryAcquire("1"); acquired || reason != subscribeDeniedTesteeCapacity {
+		t.Fatalf("per-testee acquire = (%v, %q), want rejection reason %q", acquired, reason, subscribeDeniedTesteeCapacity)
+	}
+	if acquired, reason := mgr.TryAcquire("2"); !acquired || reason != "" {
+		t.Fatal("expected second testee acquire to succeed")
+	}
+	if acquired, reason := mgr.TryAcquire("3"); acquired || reason != subscribeDeniedTotalCapacity {
+		t.Fatalf("global acquire = (%v, %q), want rejection reason %q", acquired, reason, subscribeDeniedTotalCapacity)
 	}
 	mgr.Release("1")
-	if !mgr.TryAcquire("2") {
+	if acquired, reason := mgr.TryAcquire("3"); !acquired || reason != "" {
 		t.Fatal("expected acquire after release")
 	}
 }

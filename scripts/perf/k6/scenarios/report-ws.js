@@ -5,7 +5,7 @@ import { authHeaders, collectionTokenAt, correlatedHeaders } from '../lib/http.j
 import { COLLECTION_BASE_URL, REPORT_EVENTS_PATH, REPORT_WS_HOLD_SECONDS } from '../lib/config.js';
 import {
   reportStatusFailed, reportSampleSkipped,
-  reportWsConnectDuration, reportWsFirstMessageLatency, reportWsSessionDuration,
+  reportWsConnectDuration, reportWsFirstMessageLatency, reportWsSubscribeToFirstMessageLatency, reportWsSessionDuration,
   reportWsConnectSuccessRate, reportWsMessageSuccessRate, reportWsTimeoutTotal,
 } from '../lib/metrics.js';
 
@@ -30,6 +30,7 @@ function runReportWsQuery(ctx, sample, kind, endpoint) {
   const started = Date.now();
   let opened = false;
   let firstStatusReceived = false;
+  let subscribedAt = 0;
   let protocolError = false;
   let timedOut = false;
   const res = ws.connect(url, { headers }, (socket) => {
@@ -37,6 +38,7 @@ function runReportWsQuery(ctx, sample, kind, endpoint) {
     socket.on('open', () => {
       opened = true;
       reportWsConnectDuration.add(Date.now() - started, tags);
+      subscribedAt = Date.now();
       socket.send(JSON.stringify({
         op: 'subscribe',
         assessment_id: String(sample.assessment_id),
@@ -51,6 +53,9 @@ function runReportWsQuery(ctx, sample, kind, endpoint) {
           if (!firstStatusReceived) {
             firstStatusReceived = true;
             reportWsFirstMessageLatency.add(Date.now() - started, tags);
+            if (subscribedAt > 0) {
+              reportWsSubscribeToFirstMessageLatency.add(Date.now() - subscribedAt, tags);
+            }
           }
           const status = frame.data.status || '';
           if (status === 'interpreted' || status === 'failed') {

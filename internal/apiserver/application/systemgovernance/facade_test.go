@@ -124,6 +124,7 @@ func TestGetResilienceIncludesSummaryRowsAndRemoteDegradation(t *testing.T) {
 		},
 		Components: govcomponent.NewAdapter(map[string]*options.GovernanceComponentOptions{
 			"collection-server": {ResilienceURL: remote.URL},
+			"qs-apiserver":      {CacheGovernanceURL: "http://qs-apiserver:8080/governance/cache"},
 		}),
 	}).GetResilience(context.Background(), "5m")
 	if err != nil {
@@ -137,6 +138,9 @@ func TestGetResilienceIncludesSummaryRowsAndRemoteDegradation(t *testing.T) {
 	}
 	if view.Components["collection-server"].Available {
 		t.Fatalf("remote component = %#v, want unavailable", view.Components["collection-server"])
+	}
+	if _, exists := view.Components["qs-apiserver"]; exists {
+		t.Fatalf("qs-apiserver = %#v, want component without resilience capability omitted", view.Components["qs-apiserver"])
 	}
 }
 

@@ -21,6 +21,7 @@ type operationSpec struct {
 	TrendTags     []string
 	ResultTags    []string
 	TimeoutTags   []string
+	LatencyOnly   bool
 }
 
 var operationSpecs = []operationSpec{
@@ -35,12 +36,16 @@ var operationSpecs = []operationSpec{
 	{ID: "personality_submit", QPSKey: "personalitySubmit", TrendMetric: "personality_answer_submit_duration", SuccessMetric: "personality_answer_submit_success_rate", TimeoutMetric: "answer_submit_timeout", TimeoutTags: []string{"model_type:personality"}},
 	{ID: "report_ws_connect", QPSKey: "report", TrendMetric: "report_ws_connect_duration", SuccessMetric: "report_ws_connect_success_rate", TimeoutMetric: "report_ws_timeout_total"},
 	{ID: "report_ws_message", QPSKey: "report", TrendMetric: "report_ws_first_message_latency", SuccessMetric: "report_ws_message_success_rate", TimeoutMetric: "report_ws_timeout_total"},
+	{ID: "report_ws_subscribe_to_message", QPSKey: "report", TrendMetric: "report_ws_subscribe_to_first_message_latency", SuccessMetric: "report_ws_message_success_rate", LatencyOnly: true},
 	{ID: "medical_report_ws_connect", QPSKey: "medicalWaitReport", TrendMetric: "report_ws_connect_duration", SuccessMetric: "report_ws_connect_success_rate", TimeoutMetric: "report_ws_timeout_total", TrendTags: []string{"model_type:medical"}, ResultTags: []string{"model_type:medical"}, TimeoutTags: []string{"model_type:medical"}},
 	{ID: "medical_report_ws_message", QPSKey: "medicalWaitReport", TrendMetric: "report_ws_first_message_latency", SuccessMetric: "report_ws_message_success_rate", TimeoutMetric: "report_ws_timeout_total", TrendTags: []string{"model_type:medical"}, ResultTags: []string{"model_type:medical"}, TimeoutTags: []string{"model_type:medical"}},
+	{ID: "medical_report_ws_subscribe_to_message", QPSKey: "medicalWaitReport", TrendMetric: "report_ws_subscribe_to_first_message_latency", SuccessMetric: "report_ws_message_success_rate", TrendTags: []string{"model_type:medical"}, ResultTags: []string{"model_type:medical"}, LatencyOnly: true},
 	{ID: "behavior_report_ws_connect", QPSKey: "behaviorWaitReport", TrendMetric: "report_ws_connect_duration", SuccessMetric: "report_ws_connect_success_rate", TimeoutMetric: "report_ws_timeout_total", TrendTags: []string{"model_type:behavior"}, ResultTags: []string{"model_type:behavior"}, TimeoutTags: []string{"model_type:behavior"}},
 	{ID: "behavior_report_ws_message", QPSKey: "behaviorWaitReport", TrendMetric: "report_ws_first_message_latency", SuccessMetric: "report_ws_message_success_rate", TimeoutMetric: "report_ws_timeout_total", TrendTags: []string{"model_type:behavior"}, ResultTags: []string{"model_type:behavior"}, TimeoutTags: []string{"model_type:behavior"}},
+	{ID: "behavior_report_ws_subscribe_to_message", QPSKey: "behaviorWaitReport", TrendMetric: "report_ws_subscribe_to_first_message_latency", SuccessMetric: "report_ws_message_success_rate", TrendTags: []string{"model_type:behavior"}, ResultTags: []string{"model_type:behavior"}, LatencyOnly: true},
 	{ID: "personality_report_ws_connect", QPSKey: "personalityWaitReport", TrendMetric: "report_ws_connect_duration", SuccessMetric: "report_ws_connect_success_rate", TimeoutMetric: "report_ws_timeout_total", TrendTags: []string{"model_type:personality"}, ResultTags: []string{"model_type:personality"}, TimeoutTags: []string{"model_type:personality"}},
 	{ID: "personality_report_ws_message", QPSKey: "personalityWaitReport", TrendMetric: "report_ws_first_message_latency", SuccessMetric: "report_ws_message_success_rate", TimeoutMetric: "report_ws_timeout_total", TrendTags: []string{"model_type:personality"}, ResultTags: []string{"model_type:personality"}, TimeoutTags: []string{"model_type:personality"}},
+	{ID: "personality_report_ws_subscribe_to_message", QPSKey: "personalityWaitReport", TrendMetric: "report_ws_subscribe_to_first_message_latency", SuccessMetric: "report_ws_message_success_rate", TrendTags: []string{"model_type:personality"}, ResultTags: []string{"model_type:personality"}, LatencyOnly: true},
 	{ID: "statistics_overview", QPSKey: "stats", TrendMetric: "statistics_overview_duration", SuccessMetric: "statistics_overview_success_rate", TimeoutMetric: "statistics_overview_timeout"},
 	{ID: "statistics_content_batch", QPSKey: "stats", TrendMetric: "statistics_content_batch_duration", SuccessMetric: "statistics_content_batch_success_rate", TimeoutMetric: "statistics_content_batch_timeout"},
 }
@@ -121,6 +126,16 @@ func throughputResults(spec phaseSpec, raw rawSummary, evidence PhaseEvidence) T
 		AcceptedTPSByModel:  map[string]Measurement{},
 		CompletedTPSByModel: map[string]Measurement{},
 	}
+	if evidence.ExpectedCompletionCountDelta != nil {
+		result.ExpectedCompletions = measured(evidence.ExpectedCompletionCountDelta, "submissions", "prometheus:qs_evaluation_assessment_intake_outcome_total{result=assessment_created}")
+	} else {
+		result.ExpectedCompletions = naMeasurement("submissions", "prometheus:qs_evaluation_assessment_intake_outcome_total{result=assessment_created}", "assessment-created intake evidence unavailable")
+	}
+	if evidence.NoAssessmentRequiredCountDelta != nil {
+		result.NoAssessmentRequired = measured(evidence.NoAssessmentRequiredCountDelta, "submissions", "prometheus:qs_evaluation_assessment_intake_outcome_total{result=no_assessment_required}")
+	} else {
+		result.NoAssessmentRequired = naMeasurement("submissions", "prometheus:qs_evaluation_assessment_intake_outcome_total{result=no_assessment_required}", "independent-questionnaire intake evidence unavailable")
+	}
 	for _, model := range []string{"medical", "personality"} {
 		metric := findMetric(raw, model+"_answer_submit_success_rate", nil)
 		modelAcceptedCount := metricInt64(metric, "passes")
@@ -174,18 +189,18 @@ func throughputResults(spec phaseSpec, raw rawSummary, evidence PhaseEvidence) T
 			result.CompletedTPSByModel[model] = naMeasurement("tps", "prometheus:qs_interpretation_run_duration_seconds_count{builder_identity}", "model completion evidence unavailable")
 		}
 	}
-	if evidence.CompletedCountDelta != nil && acceptedCount > 0 {
-		result.FinalCompletionRate = measured(floatPtr(*evidence.CompletedCountDelta/float64(acceptedCount)), "ratio", "derived:completed/accepted")
+	if evidence.CompletedCountDelta != nil && evidence.ExpectedCompletionCountDelta != nil && *evidence.ExpectedCompletionCountDelta > 0 {
+		result.FinalCompletionRate = measured(floatPtr(*evidence.CompletedCountDelta / *evidence.ExpectedCompletionCountDelta), "ratio", "derived:completed/assessment_created")
 		if evidence.TrafficIsolated == nil {
 			result.FinalCompletionRate.Note = "traffic isolation was not declared; not valid admission evidence"
 		} else if !*evidence.TrafficIsolated {
 			result.FinalCompletionRate.Note = "contains non-isolated concurrent traffic; not valid admission evidence"
 		}
 		if *result.FinalCompletionRate.Value > 1 {
-			result.FinalCompletionRate.Note = "完成量包含窗口边界任务或并发流量；共享环境不得据此验收"
+			result.FinalCompletionRate.Note = "完成量包含窗口边界任务、重复消费或并发流量；不得据此验收"
 		}
 	} else {
-		result.FinalCompletionRate = naMeasurement("ratio", "derived:completed/accepted", "accepted or completed count unavailable")
+		result.FinalCompletionRate = naMeasurement("ratio", "derived:completed/assessment_created", "assessment-created or completed count unavailable")
 	}
 	return result
 }
@@ -231,12 +246,15 @@ func operationResults(qps map[string]float64, raw rawSummary) ([]LatencyMetric, 
 			Operation: spec.ID,
 			Samples:   attempts,
 			P50:       trendMeasurement(trend, "med", spec.TrendMetric),
+			P90:       trendMeasurement(trend, "p(90)", spec.TrendMetric),
 			P95:       trendMeasurement(trend, "p(95)", spec.TrendMetric),
 			P99:       trendMeasurement(trend, "p(99)", spec.TrendMetric),
 			Max:       trendMeasurement(trend, "max", spec.TrendMetric),
 			Average:   trendMeasurement(trend, "avg", spec.TrendMetric),
 		})
-		correctness = append(correctness, correctnessForOperation(spec, attempts, rateMetric, raw))
+		if !spec.LatencyOnly {
+			correctness = append(correctness, correctnessForOperation(spec, attempts, rateMetric, raw))
+		}
 	}
 	if started := findMetric(raw, "chain_probe_started", nil); started != nil {
 		attempts := metricInt64(started, "count")
@@ -250,6 +268,7 @@ func operationResults(qps map[string]float64, raw rawSummary) ([]LatencyMetric, 
 		latencies = append(latencies, LatencyMetric{
 			Operation: "async_chain_probe", Samples: attempts,
 			P50:     trendMeasurement(trend, "med", "report_generated_latency"),
+			P90:     trendMeasurement(trend, "p(90)", "report_generated_latency"),
 			P95:     trendMeasurement(trend, "p(95)", "report_generated_latency"),
 			P99:     trendMeasurement(trend, "p(99)", "report_generated_latency"),
 			Max:     trendMeasurement(trend, "max", "report_generated_latency"),
@@ -514,52 +533,90 @@ func renderRunMarkdown(summary RunSummary) string {
 		fmt.Fprintf(&output, "- %s\n", reason)
 	}
 	fmt.Fprintf(&output, "\n## 运行信息\n\n- Plan: `%s`\n- Git SHA: `%s`\n- k6: `%s`\n- 时间: %s ～ %s\n\n", summary.Run.Plan, summary.Run.GitSHA, summary.Run.K6Version, summary.Run.StartedAt.Format(time.RFC3339), summary.Run.FinishedAt.Format(time.RFC3339))
-	fmt.Fprintln(&output, "## 阶段结论")
+	fmt.Fprintln(&output, "## 三维结果总览")
 	fmt.Fprintln(&output)
-	fmt.Fprintln(&output, "| 阶段 | 结论 | 目标时长 | 实际时长 | 目标 QPS | 实际 QPS | HTTP RPS | 受理 TPS | 完成 TPS |")
-	fmt.Fprintln(&output, "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+	fmt.Fprintln(&output, "### 1. 吞吐与处理能力")
+	fmt.Fprintln(&output)
+	fmt.Fprintln(&output, "| 阶段 | 结论 | 目标 / 实际 QPS | QPS 达成率 | Dropped | 受理 / 完成 TPS |")
+	fmt.Fprintln(&output, "| --- | --- | ---: | ---: | ---: | ---: |")
 	for _, phase := range summary.Phases {
-		fmt.Fprintf(&output, "| %s | %s | %s | %s | %d | %s | %s | %s | %s |\n", phase.ID, phase.Verdict.Status, phase.Duration, formatMeasurement(phase.ActualDuration), phase.TargetQPS,
-			formatMeasurement(phase.Throughput.BusinessQPS.Actual), formatMeasurement(phase.Throughput.HTTPRPS), formatMeasurement(phase.Throughput.AcceptedTPS), formatMeasurement(phase.Throughput.CompletedTPS))
+		fmt.Fprintf(&output, "| %s | %s | %s / %s | %s | %s | %s / %s |\n", phase.ID, phase.Verdict.Status,
+			formatMeasurement(phase.Throughput.BusinessQPS.Target), formatMeasurement(phase.Throughput.BusinessQPS.Actual), formatPercent(phase.Throughput.BusinessQPS.TargetAttainment),
+			formatMeasurement(phase.Throughput.BusinessQPS.Dropped), formatMeasurement(phase.Throughput.AcceptedTPS), formatMeasurement(phase.Throughput.CompletedTPS))
+	}
+	fmt.Fprintln(&output, "\n### 2. 时延与响应体验")
+	fmt.Fprintln(&output)
+	fmt.Fprintln(&output, "| 阶段 | 最慢 P50 | 最慢 P90 | 最慢 P95 | 最慢 P99 |")
+	fmt.Fprintln(&output, "| --- | ---: | ---: | ---: | ---: |")
+	for _, phase := range summary.Phases {
+		p50Operation, p50 := latencyExtreme(phase.Latency, func(item LatencyMetric) Measurement { return item.P50 })
+		p90Operation, p90 := latencyExtreme(phase.Latency, func(item LatencyMetric) Measurement { return item.P90 })
+		p95Operation, p95 := latencyExtreme(phase.Latency, func(item LatencyMetric) Measurement { return item.P95 })
+		p99Operation, p99 := latencyExtreme(phase.Latency, func(item LatencyMetric) Measurement { return item.P99 })
+		fmt.Fprintf(&output, "| %s | %s | %s | %s | %s |\n", phase.ID, formatNamedMeasurement(p50Operation, p50), formatNamedMeasurement(p90Operation, p90), formatNamedMeasurement(p95Operation, p95), formatNamedMeasurement(p99Operation, p99))
+	}
+	fmt.Fprintln(&output, "\n### 3. 可靠性与正确性")
+	fmt.Fprintln(&output)
+	fmt.Fprintln(&output, "| 阶段 | 最低成功率 | 最高错误率 | 最高超时率 | 最高重试率 |")
+	fmt.Fprintln(&output, "| --- | ---: | ---: | ---: | ---: |")
+	for _, phase := range summary.Phases {
+		minSuccessOperation, minSuccess := correctnessExtreme(phase.Correctness, func(item CorrectnessMetric) Measurement { return item.SuccessRate }, false)
+		maxErrorOperation, maxError := correctnessExtreme(phase.Correctness, func(item CorrectnessMetric) Measurement { return item.ErrorRate }, true)
+		maxTimeoutOperation, maxTimeout := correctnessExtreme(phase.Correctness, func(item CorrectnessMetric) Measurement { return item.TimeoutRate }, true)
+		maxRetryLayer, maxRetry := retryExtreme(phase.Retry)
+		fmt.Fprintf(&output, "| %s | %s | %s | %s | %s |\n", phase.ID, formatNamedPercent(minSuccessOperation, minSuccess), formatNamedPercent(maxErrorOperation, maxError), formatNamedPercent(maxTimeoutOperation, maxTimeout), formatNamedPercent(maxRetryLayer, maxRetry))
 	}
 	for _, phase := range summary.Phases {
 		fmt.Fprintf(&output, "\n## %s\n\n", phase.ID)
-		fmt.Fprintf(&output, "结论：**%s**\n\n", phase.Verdict.Status)
+		fmt.Fprintf(&output, "结论：**%s**（目标 %d QPS，计划 %s，实测 %s）\n\n", phase.Verdict.Status, phase.TargetQPS, phase.Duration, formatMeasurement(phase.ActualDuration))
 		for _, reason := range phase.Verdict.Reasons {
 			fmt.Fprintf(&output, "- %s\n", reason)
 		}
-		fmt.Fprintln(&output, "### 吞吐与处理能力")
+		fmt.Fprintln(&output, "\n### 1. 吞吐与处理能力")
 		fmt.Fprintln(&output)
-		fmt.Fprintf(&output, "- QPS 达成率：%s\n- HTTP RPS：%s\n- WebSocket 会话率：%s\n- 受理 TPS：%s\n- 完成 TPS：%s\n- 最终完成率：%s\n- 请求放大率：%s\n- 轮询放大率：%s\n",
-			formatPercent(phase.Throughput.BusinessQPS.TargetAttainment), formatMeasurement(phase.Throughput.HTTPRPS), formatMeasurement(phase.Throughput.WSSessionsPerSecond),
-			formatMeasurement(phase.Throughput.AcceptedTPS), formatMeasurement(phase.Throughput.CompletedTPS), formatPercent(phase.Throughput.FinalCompletionRate), formatRatio(phase.Throughput.RequestAmplification), formatRatio(phase.Throughput.PollingAmplification))
+		fmt.Fprintln(&output, "| 指标 | 结果 | 说明 |")
+		fmt.Fprintln(&output, "| --- | ---: | --- |")
+		fmt.Fprintf(&output, "| 目标 QPS | %s | 计划业务到达率 |\n", formatMeasurement(phase.Throughput.BusinessQPS.Target))
+		fmt.Fprintf(&output, "| 实际 QPS | %s | business iterations / 负载窗口 |\n", formatMeasurement(phase.Throughput.BusinessQPS.Actual))
+		fmt.Fprintf(&output, "| QPS 达成率 | %s | 实际 QPS / 目标 QPS |\n", formatPercent(phase.Throughput.BusinessQPS.TargetAttainment))
+		fmt.Fprintf(&output, "| Dropped iterations | %s | 未能按计划发出的业务迭代 |\n", formatMeasurement(phase.Throughput.BusinessQPS.Dropped))
+		fmt.Fprintf(&output, "| HTTP RPS | %s | 实际 HTTP 请求速率 |\n", formatMeasurement(phase.Throughput.HTTPRPS))
+		fmt.Fprintf(&output, "| WebSocket sessions/s | %s | 新建 WS 会话速率 |\n", formatMeasurement(phase.Throughput.WSSessionsPerSecond))
+		fmt.Fprintf(&output, "| 受理 TPS | %s | 每秒可靠受理答卷数 |\n", formatMeasurement(phase.Throughput.AcceptedTPS))
+		fmt.Fprintf(&output, "| 完成 TPS | %s | 服务端每秒成功完成数 |\n", formatMeasurement(phase.Throughput.CompletedTPS))
+		fmt.Fprintf(&output, "| 最终完成率 | %s | 完成数 / 应完成 Assessment 数 |\n", formatPercent(phase.Throughput.FinalCompletionRate))
+		fmt.Fprintf(&output, "| 应完成 Assessment 数 | %s | intake 创建 Assessment 的数量 |\n", formatMeasurement(phase.Throughput.ExpectedCompletions))
+		fmt.Fprintf(&output, "| 无需评估受理量 | %s | 正常受理但无需创建 Assessment |\n", formatMeasurement(phase.Throughput.NoAssessmentRequired))
+		fmt.Fprintf(&output, "| 请求放大率 | %s | HTTP RPS / business QPS |\n", formatRatio(phase.Throughput.RequestAmplification))
+		fmt.Fprintf(&output, "| 轮询放大率 | %s | 报告轮询请求 / 链路探针 |\n", formatRatio(phase.Throughput.PollingAmplification))
 		fmt.Fprintln(&output, "\n| 模型类型 | 受理 TPS | 完成 TPS |")
 		fmt.Fprintln(&output, "| --- | ---: | ---: |")
 		for _, model := range []string{"medical", "personality", "behavior"} {
 			fmt.Fprintf(&output, "| %s | %s | %s |\n", model, formatMeasurement(phase.Throughput.AcceptedTPSByModel[model]), formatMeasurement(phase.Throughput.CompletedTPSByModel[model]))
 		}
-		fmt.Fprintln(&output, "\n### 时延与响应体验")
+		fmt.Fprintln(&output, "\n### 2. 时延与响应体验")
 		fmt.Fprintln(&output)
-		fmt.Fprintln(&output, "| 操作 | 样本 | P50 | P95 | P99 | 最大耗时 | 平均耗时 |")
-		fmt.Fprintln(&output, "| --- | ---: | ---: | ---: | ---: | ---: | ---: |")
+		fmt.Fprintln(&output, "| 操作 | 样本 | P50 | P90 | P95 | P99 |")
+		fmt.Fprintln(&output, "| --- | ---: | ---: | ---: | ---: | ---: |")
 		for _, item := range phase.Latency {
-			fmt.Fprintf(&output, "| %s | %d | %s | %s | %s | %s | %s |\n", item.Operation, item.Samples, formatMeasurement(item.P50), formatMeasurement(item.P95), formatMeasurement(item.P99), formatMeasurement(item.Max), formatMeasurement(item.Average))
+			fmt.Fprintf(&output, "| %s | %d | %s | %s | %s | %s |\n", item.Operation, item.Samples, formatMeasurement(item.P50), formatMeasurement(item.P90), formatMeasurement(item.P95), formatMeasurement(item.P99))
 		}
-		fmt.Fprintln(&output, "\n### 可靠性与正确性")
+		fmt.Fprintln(&output, "\n> 最大耗时和平均耗时保留在 `summary.json`，主表聚焦 P50/P90/P95/P99。")
+		fmt.Fprintln(&output, "\n### 3. 可靠性与正确性")
 		fmt.Fprintln(&output)
-		fmt.Fprintln(&output, "| 操作 | 初始操作 | 成功数 | 错误数 | 超时数 | 成功率 | 错误率 | 超时率 | 最终失败率 | 幂等成功率 |")
-		fmt.Fprintln(&output, "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+		fmt.Fprintln(&output, "| 操作 | 初始操作 | 成功（数量 / 比例） | 错误（数量 / 比例） | 超时（数量 / 比例） | 最终失败率 | 幂等成功率 |")
+		fmt.Fprintln(&output, "| --- | ---: | ---: | ---: | ---: | ---: | ---: |")
 		for _, item := range phase.Correctness {
-			fmt.Fprintf(&output, "| %s | %d | %s | %s | %s | %s | %s | %s | %s | %s |\n", item.Operation, item.Attempts, formatCount(item.SuccessCount), formatCount(item.ErrorCount), formatCount(item.TimeoutCount), formatPercent(item.SuccessRate), formatPercent(item.ErrorRate), formatPercent(item.TimeoutRate), formatPercent(item.FinalFailRate), formatPercent(item.Idempotency))
+			fmt.Fprintf(&output, "| %s | %d | %s | %s | %s | %s | %s |\n", item.Operation, item.Attempts, formatCountAndPercent(item.SuccessCount, item.SuccessRate), formatCountAndPercent(item.ErrorCount, item.ErrorRate), formatCountAndPercent(item.TimeoutCount, item.TimeoutRate), formatPercent(item.FinalFailRate), formatPercent(item.Idempotency))
 		}
-		fmt.Fprintln(&output, "\n### 分层重试")
+		fmt.Fprintln(&output, "\n#### 重试率（按层级）")
 		fmt.Fprintln(&output)
 		fmt.Fprintln(&output, "| 层级 | 初始尝试 | 重试尝试 | 重试率 |")
 		fmt.Fprintln(&output, "| --- | ---: | ---: | ---: |")
 		for _, item := range phase.Retry {
 			fmt.Fprintf(&output, "| %s | %d | %d | %s |\n", item.Layer, item.InitialAttempts, item.RetryAttempts, formatPercent(item.RetryRate))
 		}
-		fmt.Fprintln(&output, "\n### 排队与服务端证据")
+		fmt.Fprintln(&output, "\n### 附录：排队与服务端证据")
 		fmt.Fprintln(&output)
 		fmt.Fprintln(&output, "| 项目 | 状态 / 数值 | 来源 |")
 		fmt.Fprintln(&output, "| --- | --- | --- |")
@@ -570,7 +627,7 @@ func renderRunMarkdown(summary RunSummary) string {
 		for _, check := range phase.Evidence.Checks {
 			fmt.Fprintf(&output, "| %s | %s | %s |\n", check.Name, check.Status, check.Source)
 		}
-		fmt.Fprintln(&output, "\n### 阈值结果")
+		fmt.Fprintln(&output, "\n### 附录：阈值结果")
 		fmt.Fprintln(&output)
 		fmt.Fprintln(&output, "| 指标 | 表达式 | 结果 |")
 		fmt.Fprintln(&output, "| --- | --- | --- |")
@@ -600,6 +657,27 @@ func formatCount(value *int64) string {
 		return "N/A"
 	}
 	return fmt.Sprintf("%d", *value)
+}
+
+func formatCountAndPercent(count *int64, rate Measurement) string {
+	if count == nil && rate.Value == nil {
+		return "N/A"
+	}
+	return fmt.Sprintf("%s / %s", formatCount(count), formatPercent(rate))
+}
+
+func formatNamedMeasurement(name string, value Measurement) string {
+	if value.Value == nil {
+		return "N/A"
+	}
+	return fmt.Sprintf("%s: %s", name, formatMeasurement(value))
+}
+
+func formatNamedPercent(name string, value Measurement) string {
+	if value.Value == nil {
+		return "N/A"
+	}
+	return fmt.Sprintf("%s: %s", name, formatPercent(value))
 }
 
 func formatFloatCount(value *float64) string {
@@ -632,6 +710,10 @@ func formatMeasurement(value Measurement) string {
 		return fmt.Sprintf("%.2f ms", *value.Value)
 	case "tps", "qps", "rps", "sessions/s":
 		return fmt.Sprintf("%.2f %s", *value.Value, value.Unit)
+	case "iterations", "submissions":
+		return fmt.Sprintf("%.0f", *value.Value)
+	case "seconds":
+		return fmt.Sprintf("%.2f s", *value.Value)
 	default:
 		return fmt.Sprintf("%.4f", *value.Value)
 	}

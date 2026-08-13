@@ -15,6 +15,34 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 )
 
+func TestFetchResilienceSkipsUnconfiguredCapabilityAndKeepsFetchFailures(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "remote unavailable", http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+
+	adapter := NewAdapter(map[string]*options.GovernanceComponentOptions{
+		"qs-apiserver": {
+			CacheGovernanceURL: "http://qs-apiserver:8080/governance/cache",
+		},
+		"collection-server": {
+			ResilienceURL: server.URL,
+		},
+	})
+
+	results := adapter.FetchResilience(context.Background())
+	if _, exists := results["qs-apiserver"]; exists {
+		t.Fatalf("qs-apiserver result = %#v, want component without resilience capability omitted", results["qs-apiserver"])
+	}
+	collection, exists := results["collection-server"]
+	if !exists {
+		t.Fatal("collection-server result missing")
+	}
+	if collection.Available || !strings.Contains(collection.Reason, "status=503") {
+		t.Fatalf("collection-server result = %#v, want configured fetch failure preserved", collection)
+	}
+}
+
 func TestFetchCacheLoadsConfiguredGovernanceRedisEndpoint(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/governance/redis" {

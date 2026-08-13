@@ -238,7 +238,7 @@ tmp/perf/runs/<run-id>/
 - run ID、Git SHA、环境与机器规格；
 - 最终 verdict 及所有 reason；
 - 各阶段目标/实际 QPS、HTTP RPS、双 TPS；
-- 各关键操作 P50/P95/P99/max；
+- 各关键操作 P50/P90/P95/P99；
 - 成功率、错误率、超时率、最终失败率；
 - 分层重试率；
 - 280 后和 300 后的恢复耗时、Outbox 与 NSQ 残留。
@@ -261,6 +261,6 @@ tmp/perf/runs/<run-id>/
 
 ## 七、最终结论模板
 
-> 在 `<环境/Git SHA>` 上执行 `<run-id>` admission。系统实际达到 `<QPS>`，dropped iterations 为 `<数量>`；HTTP RPS 为 `<值>`，受理/完成 TPS 为 `<值>/<值>`。各关键操作 P50/P95/P99/max `<是否达标>`，成功率、错误率和超时率 `<是否达标>`。压测结束后 Outbox/NSQ 于 `<时间>` 内回落至基线，分层重试 `<摘要>`。最终 verdict 为 `<PASS/FAIL/INCOMPLETE/ERROR>`。
+> 在 `<环境/Git SHA>` 上执行 `<run-id>` admission。系统实际达到 `<QPS>`，dropped iterations 为 `<数量>`；HTTP RPS 为 `<值>`，受理/完成 TPS 为 `<值>/<值>`。各关键操作 P50/P90/P95/P99 `<是否达标>`，成功率、错误率、超时率和分层重试率 `<是否达标>`。压测结束后 Outbox/NSQ 于 `<时间>` 内回落至基线。最终 verdict 为 `<PASS/FAIL/INCOMPLETE/ERROR>`。
 
 只有吞吐、时延、正确性和恢复证据同时满足，才能写“系统在目标负载下稳定完成业务交付”。

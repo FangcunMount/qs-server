@@ -99,10 +99,6 @@ func (a *Adapter) FetchResilience(ctx context.Context) map[string]ResilienceResu
 	}
 	for name, cfg := range a.components {
 		if cfg == nil || strings.TrimSpace(cfg.ResilienceURL) == "" {
-			result[name] = ResilienceResult{
-				Available: false,
-				Reason:    "resilience_url not configured",
-			}
 			continue
 		}
 		if cfg.DiscoveryMode() == "dns" {

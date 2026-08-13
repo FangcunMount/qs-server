@@ -33,6 +33,7 @@ func collectPhaseEvidence(dir string) PhaseEvidence {
 	before := readMetricSnapshots(dir, "before")
 	after := readMetricSnapshots(dir, "after")
 	completedDelta, failedDelta, completedByModel, hasCompletionEvidence := interpretationDeltas(before, after)
+	expectedCompletionDelta, noAssessmentRequiredDelta, hasIntakeOutcomeEvidence := assessmentIntakeOutcomeDeltas(before, after)
 	completionWindow := naMeasurement("seconds", "prometheus:snapshot_window", "completion metric capture window unavailable")
 	windowSeconds, hasCompletionWindow := prometheusObservationWindow(dir, "before", dir, "after")
 	if hasCompletionWindow {
@@ -45,6 +46,11 @@ func collectPhaseEvidence(dir string) PhaseEvidence {
 		checks = append(checks, EvidenceCheck{Name: "completed transaction metric", Status: "PASS", Source: "qs_interpretation_run_duration_seconds_count"})
 	} else {
 		checks = append(checks, EvidenceCheck{Name: "completed transaction metric", Status: "MISSING", Source: "qs_interpretation_run_duration_seconds_count", Message: "cannot calculate completed TPS"})
+	}
+	if hasIntakeOutcomeEvidence {
+		checks = append(checks, EvidenceCheck{Name: "assessment intake outcome metric", Status: "PASS", Source: "qs_evaluation_assessment_intake_outcome_total"})
+	} else {
+		checks = append(checks, EvidenceCheck{Name: "assessment intake outcome metric", Status: "MISSING", Source: "qs_evaluation_assessment_intake_outcome_total", Message: "cannot distinguish newly created Assessments from independent questionnaires"})
 	}
 	retry, retryComplete := retryEvidence(before, after)
 	if retryComplete {
@@ -59,7 +65,7 @@ func collectPhaseEvidence(dir string) PhaseEvidence {
 	if hasOldest {
 		queueWait = append(queueWait, QueueWaitMetric{Layer: "outbox_oldest_pending", Wait: measured(&outboxOldest, "seconds", "prometheus:qs_event_outbox_oldest_age_seconds")})
 	}
-	complete := retryComplete && hasCompletionEvidence && hasCompletionWindow && hasOutbox && hasOldest && hasNSQ
+	complete := retryComplete && hasCompletionEvidence && hasIntakeOutcomeEvidence && hasCompletionWindow && hasOutbox && hasOldest && hasNSQ
 	for _, check := range checks {
 		if check.Status != "PASS" {
 			complete = false
@@ -67,7 +73,8 @@ func collectPhaseEvidence(dir string) PhaseEvidence {
 	}
 	evidence := PhaseEvidence{
 		Complete: complete, TrafficIsolated: trafficIsolated, CompletionWindow: completionWindow, Checks: checks, CompletedCountDelta: completedDelta, FailedCountDelta: failedDelta,
-		CompletedCountDeltaByModel: completedByModel, Retry: retry, QueueWait: queueWait,
+		CompletedCountDeltaByModel: completedByModel, ExpectedCompletionCountDelta: expectedCompletionDelta, NoAssessmentRequiredCountDelta: noAssessmentRequiredDelta,
+		Retry: retry, QueueWait: queueWait,
 	}
 	if hasOutbox {
 		evidence.OutboxBacklog = &outboxBacklog
@@ -79,6 +86,20 @@ func collectPhaseEvidence(dir string) PhaseEvidence {
 		evidence.NSQDepth = &nsqDepth
 	}
 	return evidence
+}
+
+func assessmentIntakeOutcomeDeltas(before, after []metricSample) (*float64, *float64, bool) {
+	const metric = "qs_evaluation_assessment_intake_outcome_total"
+	expectedBefore, _ := sumMetric(before, metric, map[string]string{"result": "assessment_created"})
+	expectedAfter, hasExpectedAfter := sumMetric(after, metric, map[string]string{"result": "assessment_created"})
+	noAssessmentBefore, _ := sumMetric(before, metric, map[string]string{"result": "no_assessment_required"})
+	noAssessmentAfter, hasNoAssessmentAfter := sumMetric(after, metric, map[string]string{"result": "no_assessment_required"})
+	if !hasExpectedAfter || !hasNoAssessmentAfter {
+		return nil, nil, false
+	}
+	expected := nonNegativeDelta(expectedBefore, expectedAfter)
+	noAssessment := nonNegativeDelta(noAssessmentBefore, noAssessmentAfter)
+	return &expected, &noAssessment, true
 }
 
 func trafficIsolationEvidence() (*bool, EvidenceCheck) {

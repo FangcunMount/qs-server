@@ -66,7 +66,7 @@ func TestPerfProfilesMatchAdmissionContract(t *testing.T) {
 		"capacity 120 QPS",
 		"恢复证据门",
 		"受理 TPS",
-		"P50/P95/P99/max",
+		"P50/P90/P95/P99",
 	} {
 		if !strings.Contains(sop, want) {
 			t.Fatalf("SOP missing capacity contract fragment %q", want)
@@ -139,6 +139,8 @@ func TestPerfThresholdTiersAndOperationMetrics(t *testing.T) {
 				"statistics_content_batch_duration",
 				"report_ws_connect_duration",
 				"report_ws_first_message_latency",
+				"report_ws_subscribe_to_first_message_latency",
+				"dropped_iterations{scenario:",
 				"experience: {",
 				"query: [300, 500]",
 				"statistics: [700, 1500]",
@@ -162,7 +164,7 @@ func TestPerfThresholdTiersAndOperationMetrics(t *testing.T) {
 			path: "scripts/perf/perfctl/types.go",
 			wants: []string{
 				"qs-perf-report/v1", "accepted_tps_by_model", "completed_tps_by_model",
-				"completion_window", "p50", "p95", "p99", "max", "success_rate", "error_rate", "timeout_rate",
+				"completion_window", "p50", "p90", "p95", "p99", "max", "success_rate", "error_rate", "timeout_rate",
 			},
 		},
 		{

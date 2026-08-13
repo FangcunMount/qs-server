@@ -211,6 +211,7 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 			"duration_ms", time.Since(startedAt).Milliseconds(),
 			"result", "no_assessment_required",
 		)
+		observeAssessmentIntakeOutcome(intakeOutcomeNoAssessmentRequired)
 		return &Result{}, nil
 	}
 
@@ -250,6 +251,7 @@ func (s *service) Ensure(ctx context.Context, command Command) (*Result, error) 
 		}
 		return nil, err
 	}
+	observeAssessmentIntakeOutcome(intakeOutcomeAssessmentCreated)
 
 	// 创建结果
 	result := &Result{AssessmentID: created.ID, Created: true}

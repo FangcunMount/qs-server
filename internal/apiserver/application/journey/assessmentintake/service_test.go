@@ -107,6 +107,7 @@ func TestCompletePlanPreservesBestEffort(t *testing.T) {
 }
 
 func TestEnsureUnboundAnswerSheetEndsWithoutCreatingAssessment(t *testing.T) {
+	before := testutil.ToFloat64(assessmentIntakeOutcomeTotal.WithLabelValues(intakeOutcomeNoAssessmentRequired))
 	calls := []string{}
 	intake := &intakeStub{calls: &calls, created: &evaluationintake.Assessment{ID: 91}}
 	svc := NewService(scoringStub{calls: &calls}, nil, nil, nil, intake, nil)
@@ -122,6 +123,9 @@ func TestEnsureUnboundAnswerSheetEndsWithoutCreatingAssessment(t *testing.T) {
 	}
 	if !reflect.DeepEqual(calls, []string{"score", "find"}) {
 		t.Fatalf("calls = %v", calls)
+	}
+	if delta := testutil.ToFloat64(assessmentIntakeOutcomeTotal.WithLabelValues(intakeOutcomeNoAssessmentRequired)) - before; delta != 1 {
+		t.Fatalf("no_assessment_required outcome delta = %v, want 1", delta)
 	}
 }
 
@@ -274,6 +278,7 @@ func TestEnsureReturnsAutoSubmitFailureAfterCreation(t *testing.T) {
 }
 
 func TestEnsureWorkerReplaySubmitsExistingBoundPendingAssessment(t *testing.T) {
+	beforeOutcome := testutil.ToFloat64(assessmentIntakeOutcomeTotal.WithLabelValues(intakeOutcomeAssessmentCreated))
 	calls := []string{}
 	intake := &intakeStub{
 		calls:    &calls,
@@ -290,6 +295,9 @@ func TestEnsureWorkerReplaySubmitsExistingBoundPendingAssessment(t *testing.T) {
 	}
 	if !reflect.DeepEqual(calls, []string{"score", "find", "submit"}) {
 		t.Fatalf("calls = %v", calls)
+	}
+	if delta := testutil.ToFloat64(assessmentIntakeOutcomeTotal.WithLabelValues(intakeOutcomeAssessmentCreated)) - beforeOutcome; delta != 0 {
+		t.Fatalf("replay assessment_created outcome delta = %v, want 0", delta)
 	}
 }
 
@@ -385,6 +393,7 @@ func TestEnsureFindDependencyErrorDoesNotCreate(t *testing.T) {
 
 func TestEnsureNotFoundCreatesBoundAssessment(t *testing.T) {
 	before := testutil.ToFloat64(assessmentIntakeLookupTotal.WithLabelValues(intakeLookupNotFound))
+	beforeOutcome := testutil.ToFloat64(assessmentIntakeOutcomeTotal.WithLabelValues(intakeOutcomeAssessmentCreated))
 	calls := []string{}
 	intake := &intakeStub{
 		calls:   &calls,
@@ -404,6 +413,9 @@ func TestEnsureNotFoundCreatesBoundAssessment(t *testing.T) {
 	}
 	if delta := testutil.ToFloat64(assessmentIntakeLookupTotal.WithLabelValues(intakeLookupNotFound)) - before; delta != 1 {
 		t.Fatalf("not_found metric delta = %v, want 1", delta)
+	}
+	if delta := testutil.ToFloat64(assessmentIntakeOutcomeTotal.WithLabelValues(intakeOutcomeAssessmentCreated)) - beforeOutcome; delta != 1 {
+		t.Fatalf("assessment_created outcome delta = %v, want 1", delta)
 	}
 }
 

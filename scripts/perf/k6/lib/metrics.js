@@ -48,6 +48,7 @@ export const statisticsOverviewDuration = new Trend('statistics_overview_duratio
 export const statisticsContentBatchDuration = new Trend('statistics_content_batch_duration', true);
 export const reportWsConnectDuration = new Trend('report_ws_connect_duration', true);
 export const reportWsFirstMessageLatency = new Trend('report_ws_first_message_latency', true);
+export const reportWsSubscribeToFirstMessageLatency = new Trend('report_ws_subscribe_to_first_message_latency', true);
 export const reportWsSessionDuration = new Trend('report_ws_session_duration', true);
 export const reportGeneratedLatency = new Trend('report_generated_latency', true);
 export const medicalReportGeneratedLatency = new Trend('medical_report_generated_latency', true);
@@ -268,6 +269,9 @@ export function buildThresholds() {
     return thresholds;
   }
   thresholds.dropped_iterations = ['count==0'];
+  Object.keys(scenarios).forEach((scenarioName) => {
+    thresholds[`dropped_iterations{scenario:${scenarioName}}`] = ['count==0'];
+  });
   thresholds.http_timeout_rate = ['rate<0.001'];
   if (submitRps > 0) {
     thresholds.answer_submit_timeout = ['count==0'];

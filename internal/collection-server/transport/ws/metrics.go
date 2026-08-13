@@ -22,6 +22,11 @@ var (
 	}, []string{"reason"})
 )
 
+const (
+	subscribeDeniedTotalCapacity  = "total_capacity_exhausted"
+	subscribeDeniedTesteeCapacity = "per_testee_capacity_exhausted"
+)
+
 func incSubscribeDenied(reason string) {
 	reportEventsSubscribeDeniedTotal.WithLabelValues(reason).Inc()
 }
@@ -52,21 +57,21 @@ func newConnectionManager(maxTotal, maxPerTestee int) *connectionManager {
 	}
 }
 
-func (m *connectionManager) TryAcquire(testeeID string) bool {
+func (m *connectionManager) TryAcquire(testeeID string) (bool, string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.total >= m.maxTotal {
-		incSubscribeDenied("capacity_exhausted")
-		return false
+		incSubscribeDenied(subscribeDeniedTotalCapacity)
+		return false, subscribeDeniedTotalCapacity
 	}
 	if m.perTestee[testeeID] >= m.maxPerTestee {
-		incSubscribeDenied("capacity_exhausted")
-		return false
+		incSubscribeDenied(subscribeDeniedTesteeCapacity)
+		return false, subscribeDeniedTesteeCapacity
 	}
 	m.total++
 	m.perTestee[testeeID]++
 	reportEventsActiveConnections.Set(float64(m.total))
-	return true
+	return true, ""
 }
 
 func (m *connectionManager) Release(testeeID string) {

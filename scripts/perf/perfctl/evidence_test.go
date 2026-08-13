@@ -149,6 +149,30 @@ func TestInterpretationDeltasTreatNewCounterAsStartingAtZero(t *testing.T) {
 	}
 }
 
+func TestAssessmentIntakeOutcomeDeltasSeparateExpectedCompletions(t *testing.T) {
+	before := []metricSample{
+		{Name: "qs_evaluation_assessment_intake_outcome_total", Labels: map[string]string{"result": "assessment_created"}, Value: 10},
+		{Name: "qs_evaluation_assessment_intake_outcome_total", Labels: map[string]string{"result": "no_assessment_required"}, Value: 2},
+	}
+	after := []metricSample{
+		{Name: "qs_evaluation_assessment_intake_outcome_total", Labels: map[string]string{"result": "assessment_created"}, Value: 110},
+		{Name: "qs_evaluation_assessment_intake_outcome_total", Labels: map[string]string{"result": "no_assessment_required"}, Value: 12},
+	}
+	expected, noAssessment, ok := assessmentIntakeOutcomeDeltas(before, after)
+	if !ok || expected == nil || *expected != 100 || noAssessment == nil || *noAssessment != 10 {
+		t.Fatalf("assessment intake deltas = expected=%v no_assessment=%v ok=%v", expected, noAssessment, ok)
+	}
+}
+
+func TestAssessmentIntakeOutcomeDeltasRequireBothBoundedResults(t *testing.T) {
+	after := []metricSample{
+		{Name: "qs_evaluation_assessment_intake_outcome_total", Labels: map[string]string{"result": "assessment_created"}, Value: 1},
+	}
+	if expected, noAssessment, ok := assessmentIntakeOutcomeDeltas(nil, after); ok || expected != nil || noAssessment != nil {
+		t.Fatalf("incomplete outcome evidence = expected=%v no_assessment=%v ok=%v", expected, noAssessment, ok)
+	}
+}
+
 func TestEvidenceClassificationSeparatesUnhealthyFromMissing(t *testing.T) {
 	unhealthy := PhaseEvidence{Checks: []EvidenceCheck{{Name: "worker readyz", Status: "FAIL"}}}
 	if verdict := classifyEvidence(unhealthy, "service evidence"); verdict.Status != VerdictFail {

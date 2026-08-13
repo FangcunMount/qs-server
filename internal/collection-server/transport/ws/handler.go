@@ -252,7 +252,7 @@ func (h *ReportEventsHandler) ServeHTTP(c *gin.Context) {
 					continue
 				}
 			}
-			if !h.connMgr.TryAcquire(frame.TesteeID) {
+			if acquired, _ := h.connMgr.TryAcquire(frame.TesteeID); !acquired {
 				_ = writer.write(ctx, outboundFrame{Op: OpError, Code: "capacity_exhausted", Message: "connection capacity exhausted"})
 				continue
 			}
