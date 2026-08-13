@@ -18,11 +18,17 @@ const typologyModelKind = "typology"
 var errNotTypologyAssessment = errors.New("assessment is not a typology evaluation")
 
 type QueryService struct {
-	evaluationClient evaluationapp.BFFReader
+	evaluationClient queryReader
 	waitReport       *reportwait.Service
 }
 
-func NewQueryService(evaluationClient evaluationapp.BFFReader, waitReport *reportwait.Service) *QueryService {
+type queryReader interface {
+	ListAssessmentsByModelKind(ctx context.Context, testeeID uint64, status, modelKind string, page, pageSize int32) (*evaluationapp.ListAssessmentsResponse, error)
+	GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*evaluationapp.AssessmentDetailResponse, error)
+	GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*evaluationapp.AssessmentReportResponse, error)
+}
+
+func NewQueryService(evaluationClient queryReader, waitReport *reportwait.Service) *QueryService {
 	return &QueryService{
 		evaluationClient: evaluationClient,
 		waitReport:       waitReport,
@@ -31,7 +37,7 @@ func NewQueryService(evaluationClient evaluationapp.BFFReader, waitReport *repor
 
 func (s *QueryService) List(ctx context.Context, testeeID uint64, req *ListAssessmentsRequest) (*ListAssessmentsResponse, error) {
 	page, pageSize := evaluationapp.NormalizeListPage(req.Page, req.PageSize, evaluationapp.AssessmentListPageDefault)
-	result, err := s.evaluationClient.ListMyAssessments(ctx, testeeID, req.Status, "", "", "", "", typologyModelKind, page, pageSize)
+	result, err := s.evaluationClient.ListAssessmentsByModelKind(ctx, testeeID, req.Status, typologyModelKind, page, pageSize)
 	if err != nil {
 		logTypologyAssessmentError("list typology assessments failed", err)
 		return nil, err

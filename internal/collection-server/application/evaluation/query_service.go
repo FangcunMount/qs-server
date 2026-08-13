@@ -2,11 +2,13 @@ package evaluation
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
 )
 
 // QueryService 测评查询服务
@@ -15,22 +17,120 @@ import (
 // 2. 转换 gRPC 响应到 REST DTO
 type QueryService struct {
 	evaluationClient BFFReader
+	accessReader     AssessmentAccessReader
+	accessCache      AssessmentAccessCache
+	accessCoalescer  loadguard.Coalescer
+	detailCache      AssessmentDetailCache
+	detailCoalescer  loadguard.Coalescer
+}
+
+type QueryOption func(*QueryService)
+
+func WithAssessmentAccessReader(reader AssessmentAccessReader) QueryOption {
+	return func(service *QueryService) { service.accessReader = reader }
+}
+
+func WithAssessmentAccessCache(cache AssessmentAccessCache, singleflight bool) QueryOption {
+	return func(service *QueryService) {
+		service.accessCache = cache
+		service.accessCoalescer = loadguard.NewCoalescer(singleflight)
+	}
+}
+
+func WithAssessmentDetailCache(cache AssessmentDetailCache, singleflight bool) QueryOption {
+	return func(service *QueryService) {
+		service.detailCache = cache
+		service.detailCoalescer = loadguard.NewCoalescer(singleflight)
+	}
 }
 
 // NewQueryService 创建测评查询服务
 func NewQueryService(
 	evaluationClient BFFReader,
+	options ...QueryOption,
 ) *QueryService {
-	return &QueryService{
+	service := &QueryService{
 		evaluationClient: evaluationClient,
+		accessCoalescer:  loadguard.NewCoalescer(false),
+		detailCoalescer:  loadguard.NewCoalescer(false),
 	}
+	for _, option := range options {
+		if option != nil {
+			option(service)
+		}
+	}
+	return service
+}
+
+// AuthorizeAssessment checks only testee/assessment ownership.
+func (s *QueryService) AuthorizeAssessment(ctx context.Context, testeeID, assessmentID uint64) error {
+	if s == nil || s.accessReader == nil {
+		return fmt.Errorf("assessment access reader is not configured")
+	}
+	if s.accessCache != nil && s.accessCache.Has(testeeID, assessmentID) {
+		return nil
+	}
+	key := assessmentDetailCacheKey(testeeID, assessmentID)
+	_, err := s.accessCoalescer.Do(ctx, "evaluation.assessment_access:"+key, func() (any, error) {
+		if s.accessCache != nil && s.accessCache.Has(testeeID, assessmentID) {
+			return true, nil
+		}
+		if err := s.accessReader.AuthorizeAssessment(ctx, testeeID, assessmentID); err != nil {
+			return nil, err
+		}
+		if s.accessCache != nil {
+			s.accessCache.Set(testeeID, assessmentID)
+		}
+		return true, nil
+	})
+	return err
 }
 
 // GetMyAssessment 获取测评详情（outcome 投影）。
 func (s *QueryService) GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentDetailResponse, error) {
-	return queryDetail(ctx, "get_my_assessment", func() (*AssessmentDetailResponse, error) {
-		return s.evaluationClient.GetMyAssessment(ctx, testeeID, assessmentID)
-	}, "testee_id", testeeID, "assessment_id", assessmentID)
+	if s == nil {
+		return nil, nil
+	}
+	if s.detailCache != nil {
+		if cached, ok := s.detailCache.Get(testeeID, assessmentID); ok {
+			return cached, nil
+		}
+	}
+	key := assessmentDetailCacheKey(testeeID, assessmentID)
+	loaded, err := s.detailCoalescer.Do(ctx, "evaluation.assessment_detail:"+key, func() (any, error) {
+		if s.detailCache != nil {
+			if cached, ok := s.detailCache.Get(testeeID, assessmentID); ok {
+				return cached, nil
+			}
+		}
+		result, loadErr := queryDetail(ctx, "get_my_assessment", func() (*AssessmentDetailResponse, error) {
+			if s.evaluationClient == nil {
+				return nil, nil
+			}
+			return s.evaluationClient.GetMyAssessment(ctx, testeeID, assessmentID)
+		}, "testee_id", testeeID, "assessment_id", assessmentID)
+		if loadErr == nil && isCacheableAssessmentDetail(result) && s.detailCache != nil {
+			s.detailCache.Set(testeeID, assessmentID, result)
+		}
+		return result, loadErr
+	})
+	if err != nil || loaded == nil {
+		return nil, err
+	}
+	result, _ := loaded.(*AssessmentDetailResponse)
+	return cloneAssessmentDetailResponse(result), nil
+}
+
+// ListMyAssessmentsByModelKinds supports product projections that aggregate
+// several model kinds while sharing this service's detail cache.
+func (s *QueryService) ListMyAssessmentsByModelKinds(ctx context.Context, testeeID uint64, status string, modelKinds []string, page, pageSize int32) (*ListAssessmentsResponse, error) {
+	reader, ok := s.evaluationClient.(interface {
+		ListMyAssessmentsByModelKinds(context.Context, uint64, string, []string, int32, int32) (*ListAssessmentsResponse, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("assessment model-kinds reader is not configured")
+	}
+	return reader.ListMyAssessmentsByModelKinds(ctx, testeeID, status, modelKinds, page, pageSize)
 }
 
 // ListMyAssessments 获取测评列表（outcome 投影）。
@@ -69,6 +169,15 @@ func (s *QueryService) ListMyAssessments(ctx context.Context, testeeID uint64, r
 		"duration_ms", time.Since(startTime).Milliseconds(),
 	)
 	return result, nil
+}
+
+// ListAssessmentsByModelKind is the shared product-projection seam used by
+// typology routes without exposing the infra reader directly.
+func (s *QueryService) ListAssessmentsByModelKind(ctx context.Context, testeeID uint64, status, modelKind string, page, pageSize int32) (*ListAssessmentsResponse, error) {
+	if s == nil || s.evaluationClient == nil {
+		return nil, nil
+	}
+	return s.evaluationClient.ListMyAssessments(ctx, testeeID, status, "", "", "", "", modelKind, page, pageSize)
 }
 
 // GetAssessmentScores 获取测评得分详情

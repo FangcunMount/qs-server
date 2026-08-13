@@ -19,6 +19,10 @@ func TestSubsystemBuildsConfiguredTypedCaches(t *testing.T) {
 	opts.Cache.Capabilities.Catalog.PublishedModel.Singleflight = true
 	opts.Cache.Capabilities.Catalog.Typology.Enabled = true
 	opts.Cache.Capabilities.Catalog.Typology.Singleflight = true
+	opts.Cache.Capabilities.Evaluation.AssessmentDetail.Enabled = true
+	opts.Cache.Capabilities.Evaluation.AssessmentDetail.Singleflight = true
+	opts.Cache.Capabilities.Evaluation.AssessmentAccess.Enabled = true
+	opts.Cache.Capabilities.Evaluation.AssessmentAccess.Singleflight = true
 
 	s := NewSubsystem(testConfig(opts), nil)
 	if s.Questionnaire() == nil {
@@ -30,6 +34,12 @@ func TestSubsystemBuildsConfiguredTypedCaches(t *testing.T) {
 	if s.PublishedModel() == nil {
 		t.Fatal("published model cache = nil, want configured cache")
 	}
+	if s.AssessmentDetail() == nil {
+		t.Fatal("assessment detail cache = nil, want configured cache")
+	}
+	if s.AssessmentAccess() == nil {
+		t.Fatal("assessment access cache = nil, want configured cache")
+	}
 	if s.QuestionnaireSingleflight() {
 		t.Fatal("questionnaire singleflight = true, want false")
 	}
@@ -39,8 +49,14 @@ func TestSubsystemBuildsConfiguredTypedCaches(t *testing.T) {
 	if !s.PublishedModelSingleflight() {
 		t.Fatal("published model singleflight = false, want true")
 	}
+	if !s.AssessmentDetailSingleflight() {
+		t.Fatal("assessment detail singleflight = false, want true")
+	}
+	if !s.AssessmentAccessSingleflight() {
+		t.Fatal("assessment access singleflight = false, want true")
+	}
 	entries := s.EffectiveRegistry().All()
-	if len(entries) != 4 || entries[0].Capability != "catalog.published_model" || entries[1].Capability != "catalog.questionnaire" || entries[2].Capability != "catalog.typology" || entries[3].Kind != "operational_state" {
+	if len(entries) != 6 || entries[0].Capability != "catalog.published_model" || entries[1].Capability != "catalog.questionnaire" || entries[2].Capability != "catalog.typology" || entries[3].Capability != "evaluation.assessment_access" || entries[4].Capability != "evaluation.assessment_detail" || entries[5].Kind != "operational_state" {
 		t.Fatalf("effective registry = %#v", entries)
 	}
 }
@@ -50,9 +66,11 @@ func TestSubsystemDisabledCachesStayNil(t *testing.T) {
 	opts.Cache.Capabilities.Catalog.Questionnaire.Enabled = false
 	opts.Cache.Capabilities.Catalog.PublishedModel.Enabled = false
 	opts.Cache.Capabilities.Catalog.Typology.Enabled = false
+	opts.Cache.Capabilities.Evaluation.AssessmentDetail.Enabled = false
+	opts.Cache.Capabilities.Evaluation.AssessmentAccess.Enabled = false
 
 	s := NewSubsystem(testConfig(opts), nil)
-	if s.Questionnaire() != nil || s.PublishedModel() != nil || s.Typology() != nil {
+	if s.Questionnaire() != nil || s.PublishedModel() != nil || s.Typology() != nil || s.AssessmentDetail() != nil || s.AssessmentAccess() != nil {
 		t.Fatal("disabled cache was constructed")
 	}
 	published, ok := s.EffectiveRegistry().Resolve("catalog.published_model")
@@ -152,6 +170,9 @@ func testConfig(opts *options.Options) Config {
 	config.Questionnaire = testBinding("catalog.questionnaire", &catalog.Questionnaire.CatalogL1CacheOptions)
 	config.PublishedModel = testBinding("catalog.published_model", &catalog.PublishedModel.CatalogL1CacheOptions)
 	config.Typology = testBinding("catalog.typology", &catalog.Typology.CatalogL1CacheOptions)
+	evaluation := opts.Cache.Capabilities.Evaluation
+	config.AssessmentDetail = testBinding("evaluation.assessment_detail", &evaluation.AssessmentDetail.CatalogL1CacheOptions)
+	config.AssessmentAccess = testBinding("evaluation.assessment_access", &evaluation.AssessmentAccess.CatalogL1CacheOptions)
 	config.ReportStatusTTL = opts.RuntimeState.ReportStatus.TTL()
 	return config
 }

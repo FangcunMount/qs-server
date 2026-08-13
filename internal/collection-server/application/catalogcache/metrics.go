@@ -9,6 +9,8 @@ const (
 	KindPublishedModelDetail  = "published_model_detail"
 	KindPublishedModelList    = "published_model_list"
 	KindPublishedModelOptions = "published_model_options"
+	KindAssessmentDetail      = "assessment_detail"
+	KindAssessmentAccess      = "assessment_access"
 )
 
 var l1CacheHits = promauto.NewCounterVec(prometheus.CounterOpts{

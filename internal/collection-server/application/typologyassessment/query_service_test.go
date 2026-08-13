@@ -10,6 +10,8 @@ import (
 	appreportstatus "github.com/FangcunMount/qs-server/internal/collection-server/application/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type fakeEvaluationReader struct {
@@ -18,6 +20,16 @@ type fakeEvaluationReader struct {
 	list          *evaluationapp.ListAssessmentsResponse
 	err           error
 	listModelKind string
+}
+
+func (f *fakeEvaluationReader) AuthorizeAssessment(context.Context, uint64, uint64) error {
+	if f.err != nil {
+		return f.err
+	}
+	if f.detail == nil {
+		return status.Error(codes.PermissionDenied, "assessment access denied")
+	}
+	return nil
 }
 
 func (f *fakeEvaluationReader) GetMyAssessment(context.Context, uint64, uint64) (*evaluationapp.AssessmentDetailResponse, error) {
@@ -34,6 +46,11 @@ func (f *fakeEvaluationReader) GetHighRiskFactors(context.Context, uint64, uint6
 	return nil, nil
 }
 func (f *fakeEvaluationReader) ListMyAssessments(_ context.Context, _ uint64, _ string, _ string, _ string, _ string, _ string, modelKind string, _ int32, _ int32) (*evaluationapp.ListAssessmentsResponse, error) {
+	f.listModelKind = modelKind
+	return f.list, f.err
+}
+
+func (f *fakeEvaluationReader) ListAssessmentsByModelKind(_ context.Context, _ uint64, _ string, modelKind string, _ int32, _ int32) (*evaluationapp.ListAssessmentsResponse, error) {
 	f.listModelKind = modelKind
 	return f.list, f.err
 }

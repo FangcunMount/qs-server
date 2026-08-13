@@ -31,19 +31,34 @@ type PublishedModelCacheOptions struct {
 	CatalogL1CacheOptions `mapstructure:",squash"`
 }
 
+// AssessmentDetailCacheOptions 测评终态详情 BFF 进程内 L1 缓存。
+type AssessmentDetailCacheOptions struct {
+	CatalogL1CacheOptions `mapstructure:",squash"`
+}
+
+type AssessmentAccessCacheOptions struct {
+	CatalogL1CacheOptions `mapstructure:",squash"`
+}
+
 type CacheOptions struct {
 	PolicyFile   string             `json:"policy_file" mapstructure:"policy_file"`
 	Capabilities *CacheCapabilities `json:"capabilities" mapstructure:"capabilities"`
 }
 
 type CacheCapabilities struct {
-	Catalog *CatalogCacheCapabilities `json:"catalog" mapstructure:"catalog"`
+	Catalog    *CatalogCacheCapabilities    `json:"catalog" mapstructure:"catalog"`
+	Evaluation *EvaluationCacheCapabilities `json:"evaluation" mapstructure:"evaluation"`
 }
 
 type CatalogCacheCapabilities struct {
 	Questionnaire  *QuestionnaireCacheOptions  `json:"questionnaire" mapstructure:"questionnaire"`
 	PublishedModel *PublishedModelCacheOptions `json:"published_model" mapstructure:"published_model"`
 	Typology       *TypologyCacheOptions       `json:"typology" mapstructure:"typology"`
+}
+
+type EvaluationCacheCapabilities struct {
+	AssessmentAccess *AssessmentAccessCacheOptions `json:"assessment_access" mapstructure:"assessment_access"`
+	AssessmentDetail *AssessmentDetailCacheOptions `json:"assessment_detail" mapstructure:"assessment_detail"`
 }
 
 func NewCacheOptions() *CacheOptions {
@@ -53,6 +68,7 @@ func NewCacheOptions() *CacheOptions {
 			PublishedModel: NewPublishedModelCacheOptions(),
 			Typology:       NewTypologyCacheOptions(),
 		},
+		Evaluation: &EvaluationCacheCapabilities{AssessmentAccess: NewAssessmentAccessCacheOptions(), AssessmentDetail: NewAssessmentDetailCacheOptions()},
 	}}
 }
 
@@ -85,6 +101,23 @@ func NewPublishedModelCacheOptions() *PublishedModelCacheOptions {
 	return &PublishedModelCacheOptions{CatalogL1CacheOptions: opts}
 }
 
+func NewAssessmentDetailCacheOptions() *AssessmentDetailCacheOptions {
+	opts := NewCatalogL1CacheOptions()
+	opts.TTLJitterRatio = 0.2
+	opts.MaxEntries = 256
+	opts.SignalEvictEnabled = false
+	return &AssessmentDetailCacheOptions{CatalogL1CacheOptions: opts}
+}
+
+func NewAssessmentAccessCacheOptions() *AssessmentAccessCacheOptions {
+	opts := NewCatalogL1CacheOptions()
+	opts.TTLSeconds = 60
+	opts.TTLJitterRatio = 0.2
+	opts.MaxEntries = 1024
+	opts.SignalEvictEnabled = false
+	return &AssessmentAccessCacheOptions{CatalogL1CacheOptions: opts}
+}
+
 func (o *CatalogL1CacheOptions) addFlags(fs *pflag.FlagSet, prefix, label string) {
 	if o == nil || fs == nil {
 		return
@@ -107,6 +140,14 @@ func (p *TypologyCacheOptions) AddFlags(fs *pflag.FlagSet) {
 
 func (p *PublishedModelCacheOptions) AddFlags(fs *pflag.FlagSet) {
 	p.addFlags(fs, "cache.capabilities.catalog.published_model", "published assessment-model catalog reads")
+}
+
+func (a *AssessmentDetailCacheOptions) AddFlags(fs *pflag.FlagSet) {
+	a.addFlags(fs, "cache.capabilities.evaluation.assessment_detail", "evaluated assessment detail")
+}
+
+func (a *AssessmentAccessCacheOptions) AddFlags(fs *pflag.FlagSet) {
+	a.addFlags(fs, "cache.capabilities.evaluation.assessment_access", "assessment ownership")
 }
 
 func validateCatalogL1CacheOptions(opts *CatalogL1CacheOptions, name string) []error {
@@ -145,4 +186,18 @@ func validatePublishedModelCacheOptions(opts *PublishedModelCacheOptions) []erro
 		return nil
 	}
 	return validateCatalogL1CacheOptions(&opts.CatalogL1CacheOptions, "published_model_cache")
+}
+
+func validateAssessmentDetailCacheOptions(opts *AssessmentDetailCacheOptions) []error {
+	if opts == nil {
+		return nil
+	}
+	return validateCatalogL1CacheOptions(&opts.CatalogL1CacheOptions, "assessment_detail_cache")
+}
+
+func validateAssessmentAccessCacheOptions(opts *AssessmentAccessCacheOptions) []error {
+	if opts == nil {
+		return nil
+	}
+	return validateCatalogL1CacheOptions(&opts.CatalogL1CacheOptions, "assessment_access_cache")
 }

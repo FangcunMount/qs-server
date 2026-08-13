@@ -1,4 +1,4 @@
-// Package cache owns collection-server's process-local catalog cache lifecycle.
+// Package cache owns collection-server's process-local L1 cache lifecycle.
 package cache
 
 import (
@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/signaling"
 	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogcache"
+	appevaluation "github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	appmodelcatalog "github.com/FangcunMount/qs-server/internal/collection-server/application/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
@@ -28,11 +29,13 @@ type Subsystem struct {
 	config    Config
 	opsHandle *redisruntime.Handle
 
-	questionnaire  questionnaire.PublishedDetailCache
-	publishedModel appmodelcatalog.PublishedModelCache
-	typology       typologymodel.CatalogCache
-	warmup         *typologymodel.QueryService
-	effective      *sharedcache.Registry
+	questionnaire    questionnaire.PublishedDetailCache
+	publishedModel   appmodelcatalog.PublishedModelCache
+	assessmentDetail appevaluation.AssessmentDetailCache
+	assessmentAccess appevaluation.AssessmentAccessCache
+	typology         typologymodel.CatalogCache
+	warmup           *typologymodel.QueryService
+	effective        *sharedcache.Registry
 
 	mu      sync.Mutex
 	started bool
@@ -50,12 +53,14 @@ type CatalogBinding struct {
 }
 
 type Config struct {
-	Questionnaire   CatalogBinding
-	PublishedModel  CatalogBinding
-	Typology        CatalogBinding
-	ReportStatusTTL time.Duration
-	Signaling       SignalOptions
-	PolicySource    sharedcache.PolicySource
+	Questionnaire    CatalogBinding
+	PublishedModel   CatalogBinding
+	Typology         CatalogBinding
+	AssessmentDetail CatalogBinding
+	AssessmentAccess CatalogBinding
+	ReportStatusTTL  time.Duration
+	Signaling        SignalOptions
+	PolicySource     sharedcache.PolicySource
 }
 
 // SignalOptions controls collection-server's Redis Pub/Sub cache watchers.
@@ -104,6 +109,16 @@ func NewSubsystem(config Config, opsHandle *redisruntime.Handle) *Subsystem {
 			catalogcache.LocalTTLCacheOptions(catalogcache.KindPublishedModelOptions, cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio),
 		)
 	}
+	if cfg := config.AssessmentDetail; cfg.Enabled {
+		s.assessmentDetail = appevaluation.NewLocalAssessmentDetailCache(
+			catalogcache.LocalTTLCacheOptions(catalogcache.KindAssessmentDetail, cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio),
+		)
+	}
+	if cfg := config.AssessmentAccess; cfg.Enabled {
+		s.assessmentAccess = appevaluation.NewLocalAssessmentAccessCache(
+			catalogcache.LocalTTLCacheOptions(catalogcache.KindAssessmentAccess, cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio),
+		)
+	}
 	s.effective = buildEffectiveRegistry(config)
 	return s
 }
@@ -129,6 +144,20 @@ func (s *Subsystem) PublishedModel() appmodelcatalog.PublishedModelCache {
 	return s.publishedModel
 }
 
+func (s *Subsystem) AssessmentDetail() appevaluation.AssessmentDetailCache {
+	if s == nil {
+		return nil
+	}
+	return s.assessmentDetail
+}
+
+func (s *Subsystem) AssessmentAccess() appevaluation.AssessmentAccessCache {
+	if s == nil {
+		return nil
+	}
+	return s.assessmentAccess
+}
+
 func (s *Subsystem) QuestionnaireSingleflight() bool {
 	return s != nil && s.config.Questionnaire.Singleflight
 }
@@ -139,6 +168,14 @@ func (s *Subsystem) TypologySingleflight() bool {
 
 func (s *Subsystem) PublishedModelSingleflight() bool {
 	return s != nil && s.config.PublishedModel.Singleflight
+}
+
+func (s *Subsystem) AssessmentDetailSingleflight() bool {
+	return s != nil && s.config.AssessmentDetail.Singleflight
+}
+
+func (s *Subsystem) AssessmentAccessSingleflight() bool {
+	return s != nil && s.config.AssessmentAccess.Singleflight
 }
 
 func (s *Subsystem) EffectiveRegistry() *sharedcache.Registry {
@@ -282,11 +319,11 @@ func warmCatalog(ctx context.Context, service *typologymodel.QueryService) {
 }
 
 func buildEffectiveRegistry(config Config) *sharedcache.Registry {
-	configuredCapabilities := []CatalogBinding{config.Questionnaire, config.PublishedModel, config.Typology}
+	configuredCapabilities := []CatalogBinding{config.Questionnaire, config.PublishedModel, config.Typology, config.AssessmentAccess, config.AssessmentDetail}
 	entries := make([]sharedcache.EffectiveCapability, 0, len(configuredCapabilities)+1)
 	for _, item := range configuredCapabilities {
 		entries = append(entries, sharedcache.EffectiveCapability{
-			Capability: item.Capability, Owner: "collection", Kind: sharedcache.KindCache,
+			Capability: item.Capability, Owner: capabilityOwner(item.Capability), Kind: sharedcache.KindCache,
 			Layer: sharedcache.LayerL1, Family: "local", Enabled: item.Enabled, Policy: item.Policy,
 			Layers: sharedcache.PolicyLayers{Override: item.Policy},
 			Source: item.Source, CatalogVersion: "v2", MetricLabel: string(item.Capability),
@@ -304,6 +341,13 @@ func buildEffectiveRegistry(config Config) *sharedcache.Registry {
 		return sharedcache.NewRegistryWithSource(config.PolicySource, entries...)
 	}
 	return sharedcache.NewRegistry(entries...)
+}
+
+func capabilityOwner(capability sharedcache.Capability) string {
+	if capability == "evaluation.assessment_detail" || capability == "evaluation.assessment_access" {
+		return "evaluation"
+	}
+	return "collection"
 }
 
 func watchSignals[T signaling.Signal](ctx context.Context, signaler *signalredis.Signaler[T], evict func(T), label string) {

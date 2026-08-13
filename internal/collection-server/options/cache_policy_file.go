@@ -36,6 +36,8 @@ func loadCollectionCachePolicy(ctx context.Context, configuredPath string, runti
 	errs = append(errs, validateQuestionnaireCacheOptions(candidate.Capabilities.Catalog.Questionnaire)...)
 	errs = append(errs, validatePublishedModelCacheOptions(candidate.Capabilities.Catalog.PublishedModel)...)
 	errs = append(errs, validateTypologyCacheOptions(candidate.Capabilities.Catalog.Typology)...)
+	errs = append(errs, validateAssessmentDetailCacheOptions(candidate.Capabilities.Evaluation.AssessmentDetail)...)
+	errs = append(errs, validateAssessmentAccessCacheOptions(candidate.Capabilities.Evaluation.AssessmentAccess)...)
 	if len(errs) > 0 {
 		messages := make([]string, 0, len(errs))
 		for _, validationErr := range errs {
@@ -60,7 +62,7 @@ func collectionCachePolicySchema() genericoptions.FieldSchema {
 	return genericoptions.FieldSchema{
 		"capabilities": {"catalog": {
 			"questionnaire": catalog, "published_model": catalog, "typology": catalog,
-		}},
+		}, "evaluation": {"assessment_access": catalog, "assessment_detail": catalog}},
 	}
 }
 
@@ -73,6 +75,17 @@ func validateCollectionPolicyDocument(settings map[string]any) error {
 		for _, field := range []string{"enabled", "ttl_seconds", "ttl_jitter_ratio", "max_entries", "singleflight", "signal_evict_enabled"} {
 			if _, ok := lookupCollectionPolicyValue(capability, field); !ok {
 				return fmt.Errorf("capabilities.catalog.%s.%s is required", name, field)
+			}
+		}
+	}
+	for _, name := range []string{"assessment_access", "assessment_detail"} {
+		capability, ok := nestedCollectionPolicyMap(settings, "capabilities", "evaluation", name)
+		if !ok {
+			return fmt.Errorf("capabilities.evaluation.%s is required", name)
+		}
+		for _, field := range []string{"enabled", "ttl_seconds", "ttl_jitter_ratio", "max_entries", "singleflight", "signal_evict_enabled"} {
+			if _, ok := lookupCollectionPolicyValue(capability, field); !ok {
+				return fmt.Errorf("capabilities.evaluation.%s.%s is required", name, field)
 			}
 		}
 	}
@@ -95,6 +108,15 @@ func ensureCollectionCacheCapabilities(cache *CacheOptions) {
 	}
 	if cache.Capabilities.Catalog.Typology == nil {
 		cache.Capabilities.Catalog.Typology = defaults.Capabilities.Catalog.Typology
+	}
+	if cache.Capabilities.Evaluation == nil {
+		cache.Capabilities.Evaluation = defaults.Capabilities.Evaluation
+	}
+	if cache.Capabilities.Evaluation.AssessmentDetail == nil {
+		cache.Capabilities.Evaluation.AssessmentDetail = defaults.Capabilities.Evaluation.AssessmentDetail
+	}
+	if cache.Capabilities.Evaluation.AssessmentAccess == nil {
+		cache.Capabilities.Evaluation.AssessmentAccess = defaults.Capabilities.Evaluation.AssessmentAccess
 	}
 }
 
