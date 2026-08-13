@@ -155,8 +155,8 @@ func TestCollectionDevProdConfigContracts(t *testing.T) {
 			if published == nil || published.TTLSeconds != 180 || published.TTLJitterRatio != 0.2 || published.MaxEntries != 64 || !published.Singleflight || !published.SignalEvictEnabled {
 				t.Fatalf("%s published-model L1 config = %#v", name, published)
 			}
-			if !published.Enabled {
-				t.Fatalf("%s published-model must be enabled", name)
+			if wantEnabled := name == "collection-server.dev.yaml"; published.Enabled != wantEnabled {
+				t.Fatalf("%s published-model enabled = %v, want %v", name, published.Enabled, wantEnabled)
 			}
 		})
 	}

@@ -31,13 +31,13 @@ collection-server 的 Registry 是静态 snapshot，能力由 [`internal/collect
 | Capability | Layer | Family | 生产配置 | 回源 |
 | --- | --- | --- | --- | --- |
 | `catalog.questionnaire` | L1 | `local` | TTL 180s、max 256、singleflight、signal evict | apiserver questionnaire gRPC |
-| `catalog.published_model` | L1 | `local` | TTL 180s、jitter 0.2、每 bucket max 64、singleflight、signal evict | apiserver published-model L2 |
+| `catalog.published_model` | L1 | `local` | 当前生产关闭；启用后 TTL 180s、jitter 0.2、每 bucket max 64、singleflight、signal evict | apiserver published-model L2 |
 | `catalog.typology` | L1 | `local` | TTL 180s、max 256、singleflight、signal evict | assessment-model catalog gRPC |
 | `report_status` | runtime | `ops_runtime` | TTL 172800s | report workflow |
 
 collection 的 capability ID 不跟随 apiserver 的业务前缀重命名，因为它们描述的是 BFF 自己持有的 DTO L1 和生命周期。
 
-published-model L1 已在生产启用；主配置只引用独立 policy：
+published-model L1 当前在开发环境启用、生产关闭；主配置只引用独立 policy：
 
 ```yaml
 cache:

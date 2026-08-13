@@ -17,7 +17,7 @@ func TestCollectionPolicyFilesPreserveDevProdEnablement(t *testing.T) {
 		wantEnabled      bool
 	}{
 		{name: "dev", capability: "published_model", wantEnabled: true},
-		{name: "prod", capability: "published_model", wantEnabled: true},
+		{name: "prod", capability: "published_model", wantEnabled: false},
 		{name: "prod", capability: "questionnaire", wantEnabled: true},
 	} {
 		t.Run(test.name+"_"+test.capability, func(t *testing.T) {
@@ -63,11 +63,6 @@ func TestCollectionPolicyRejectsInvalidValuesWhileCapabilityDisabled(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	disabled := strings.Replace(string(original), "published_model: {enabled: true,", "published_model: {enabled: false,", 1)
-	if disabled == string(original) {
-		t.Fatal("test fixture did not disable published_model")
-	}
-
 	tests := []struct {
 		name        string
 		old         string
@@ -96,8 +91,8 @@ func TestCollectionPolicyRejectsInvalidValuesWhileCapabilityDisabled(t *testing.
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			body := strings.Replace(disabled, test.old, test.replacement, 1)
-			if body == disabled {
+			body := strings.Replace(string(original), test.old, test.replacement, 1)
+			if body == string(original) {
 				t.Fatalf("test fixture did not replace %q", test.old)
 			}
 			path := filepath.Join(t.TempDir(), "policy.yaml")
