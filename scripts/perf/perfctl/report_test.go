@@ -99,7 +99,7 @@ func TestRawFixtureKeepsConsoleMarkdownAndJSONConsistent(t *testing.T) {
 	}
 	markdown := renderRunMarkdown(run)
 	console := renderPhaseConsole(phase)
-	for _, want := range []string{"结论依据", "1. 吞吐与处理能力", "QPS", "TPS", "2. 时延与响应体验", "P50", "P90", "P95", "P99", "3. 可靠性与正确性", "成功率", "错误率", "超时率", "重试率"} {
+	for _, want := range []string{"结论依据", "1. 吞吐与处理能力", "| 类别", "QPS", "TPS", "2. 时延与响应体验", "| 操作", "P50", "P90", "P95", "P99", "3. 可靠性与正确性", "成功率", "错误率", "超时率", "| 重试层级", "重试率"} {
 		if !strings.Contains(console, want) {
 			t.Fatalf("console missing %q: %s", want, console)
 		}
@@ -112,6 +112,28 @@ func TestRawFixtureKeepsConsoleMarkdownAndJSONConsistent(t *testing.T) {
 		if !strings.Contains(output, want) {
 			t.Fatalf("%s output is missing actual 10 QPS: %s", label, output)
 		}
+	}
+}
+
+func TestConsoleTableAlignsChineseHeadersAndNumericColumns(t *testing.T) {
+	var output strings.Builder
+	writeConsoleTable(&output, "  ",
+		[]string{"操作", "样本", "成功率"},
+		[][]string{{"medical_submit", "1797", "100.00%"}, {"人格报告", "9", "99.67%"}},
+		[]bool{false, true, true},
+	)
+	lines := strings.Split(strings.TrimSuffix(output.String(), "\n"), "\n")
+	if len(lines) != 6 {
+		t.Fatalf("table lines = %d, want 6:\n%s", len(lines), output.String())
+	}
+	wantWidth := consoleDisplayWidth(lines[0])
+	for _, line := range lines[1:] {
+		if got := consoleDisplayWidth(line); got != wantWidth {
+			t.Fatalf("table width = %d, want %d for %q:\n%s", got, wantWidth, line, output.String())
+		}
+	}
+	if !strings.Contains(output.String(), "| 操作") || !strings.Contains(output.String(), "|    9 |  99.67% |") {
+		t.Fatalf("table is not readable or right-aligned:\n%s", output.String())
 	}
 }
 

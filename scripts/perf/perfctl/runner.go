@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 type runOptions struct {
@@ -242,31 +243,127 @@ func renderPhaseConsole(phase PhaseSummary) string {
 		fmt.Fprintf(&output, "  结论依据: %s\n", reason)
 	}
 	fmt.Fprintln(&output, "  1. 吞吐与处理能力")
-	fmt.Fprintf(&output, "     QPS  目标 %s | 实际 %s | 达成率 %s | Dropped %s\n",
-		formatMeasurement(phase.Throughput.BusinessQPS.Target), formatMeasurement(phase.Throughput.BusinessQPS.Actual),
-		formatPercent(phase.Throughput.BusinessQPS.TargetAttainment), formatMeasurement(phase.Throughput.BusinessQPS.Dropped))
-	fmt.Fprintf(&output, "     TPS  受理 %s | 完成 %s | 最终完成率 %s\n",
-		formatMeasurement(phase.Throughput.AcceptedTPS), formatMeasurement(phase.Throughput.CompletedTPS), formatPercent(phase.Throughput.FinalCompletionRate))
-	fmt.Fprintf(&output, "     请求 HTTP %s | WebSocket %s\n", formatMeasurement(phase.Throughput.HTTPRPS), formatMeasurement(phase.Throughput.WSSessionsPerSecond))
+	writeConsoleTable(&output, "     ",
+		[]string{"类别", "目标", "主要值", "次要值", "比率", "补充"},
+		[][]string{
+			{"QPS", formatMeasurement(phase.Throughput.BusinessQPS.Target), "实际 " + formatMeasurement(phase.Throughput.BusinessQPS.Actual), "N/A", "达成率 " + formatPercent(phase.Throughput.BusinessQPS.TargetAttainment), "Dropped " + formatMeasurement(phase.Throughput.BusinessQPS.Dropped)},
+			{"TPS", "N/A", "受理 " + formatMeasurement(phase.Throughput.AcceptedTPS), "完成 " + formatMeasurement(phase.Throughput.CompletedTPS), "完成率 " + formatPercent(phase.Throughput.FinalCompletionRate), "N/A"},
+			{"请求", "N/A", "HTTP " + formatMeasurement(phase.Throughput.HTTPRPS), "WebSocket " + formatMeasurement(phase.Throughput.WSSessionsPerSecond), "N/A", "N/A"},
+		},
+		[]bool{false, true, true, true, true, true},
+	)
 
-	fmt.Fprintln(&output, "  2. 时延与响应体验")
-	fmt.Fprintln(&output, "     操作 | 样本 | P50 | P90 | P95 | P99")
+	fmt.Fprintln(&output, "\n  2. 时延与响应体验")
+	latencyRows := make([][]string, 0, len(phase.Latency))
 	for _, item := range phase.Latency {
-		fmt.Fprintf(&output, "     %s | %d | %s | %s | %s | %s\n", item.Operation, item.Samples,
-			formatMeasurement(item.P50), formatMeasurement(item.P90), formatMeasurement(item.P95), formatMeasurement(item.P99))
+		latencyRows = append(latencyRows, []string{
+			item.Operation, strconv.FormatInt(item.Samples, 10),
+			formatMeasurement(item.P50), formatMeasurement(item.P90), formatMeasurement(item.P95), formatMeasurement(item.P99),
+		})
+	}
+	writeConsoleTable(&output, "     ",
+		[]string{"操作", "样本", "P50", "P90", "P95", "P99"}, latencyRows,
+		[]bool{false, true, true, true, true, true},
+	)
+
+	fmt.Fprintln(&output, "\n  3. 可靠性与正确性")
+	correctnessRows := make([][]string, 0, len(phase.Correctness))
+	for _, item := range phase.Correctness {
+		correctnessRows = append(correctnessRows, []string{
+			item.Operation, strconv.FormatInt(item.Attempts, 10),
+			formatPercent(item.SuccessRate), formatPercent(item.ErrorRate), formatPercent(item.TimeoutRate),
+		})
+	}
+	writeConsoleTable(&output, "     ",
+		[]string{"操作", "初始操作", "成功率", "错误率", "超时率"}, correctnessRows,
+		[]bool{false, true, true, true, true},
+	)
+
+	fmt.Fprintln(&output, "\n     重试")
+	retryRows := make([][]string, 0, len(phase.Retry))
+	for _, item := range phase.Retry {
+		retryRows = append(retryRows, []string{
+			item.Layer, strconv.FormatInt(item.InitialAttempts, 10), strconv.FormatInt(item.RetryAttempts, 10), formatPercent(item.RetryRate),
+		})
+	}
+	writeConsoleTable(&output, "     ",
+		[]string{"重试层级", "初始尝试", "重试尝试", "重试率"}, retryRows,
+		[]bool{false, true, true, true},
+	)
+	return output.String()
+}
+
+func writeConsoleTable(output *strings.Builder, indent string, headers []string, rows [][]string, rightAlign []bool) {
+	if len(headers) == 0 {
+		return
+	}
+	widths := make([]int, len(headers))
+	for index, header := range headers {
+		widths[index] = consoleDisplayWidth(header)
+	}
+	for _, row := range rows {
+		for index := 0; index < len(headers) && index < len(row); index++ {
+			if width := consoleDisplayWidth(row[index]); width > widths[index] {
+				widths[index] = width
+			}
+		}
 	}
 
-	fmt.Fprintln(&output, "  3. 可靠性与正确性")
-	fmt.Fprintln(&output, "     操作 | 初始操作 | 成功率 | 错误率 | 超时率")
-	for _, item := range phase.Correctness {
-		fmt.Fprintf(&output, "     %s | %d | %s | %s | %s\n", item.Operation, item.Attempts,
-			formatPercent(item.SuccessRate), formatPercent(item.ErrorRate), formatPercent(item.TimeoutRate))
+	writeConsoleBorder(output, indent, widths)
+	writeConsoleRow(output, indent, headers, widths, nil)
+	writeConsoleBorder(output, indent, widths)
+	for _, row := range rows {
+		writeConsoleRow(output, indent, row, widths, rightAlign)
 	}
-	fmt.Fprintln(&output, "     重试层级 | 初始尝试 | 重试尝试 | 重试率")
-	for _, item := range phase.Retry {
-		fmt.Fprintf(&output, "     %s | %d | %d | %s\n", item.Layer, item.InitialAttempts, item.RetryAttempts, formatPercent(item.RetryRate))
+	writeConsoleBorder(output, indent, widths)
+}
+
+func writeConsoleBorder(output *strings.Builder, indent string, widths []int) {
+	output.WriteString(indent)
+	output.WriteByte('+')
+	for _, width := range widths {
+		output.WriteString(strings.Repeat("-", width+2))
+		output.WriteByte('+')
 	}
-	return output.String()
+	output.WriteByte('\n')
+}
+
+func writeConsoleRow(output *strings.Builder, indent string, row []string, widths []int, rightAlign []bool) {
+	output.WriteString(indent)
+	output.WriteByte('|')
+	for index, width := range widths {
+		value := ""
+		if index < len(row) {
+			value = strings.ReplaceAll(row[index], "\n", " ")
+		}
+		paddingWidth := width - consoleDisplayWidth(value)
+		if paddingWidth < 0 {
+			paddingWidth = 0
+		}
+		padding := strings.Repeat(" ", paddingWidth)
+		alignRight := index < len(rightAlign) && rightAlign[index]
+		if alignRight {
+			fmt.Fprintf(output, " %s%s |", padding, value)
+		} else {
+			fmt.Fprintf(output, " %s%s |", value, padding)
+		}
+	}
+	output.WriteByte('\n')
+}
+
+func consoleDisplayWidth(value string) int {
+	width := 0
+	for _, char := range value {
+		switch {
+		case unicode.Is(unicode.Mn, char), unicode.Is(unicode.Me, char), unicode.IsControl(char):
+			continue
+		case char > unicode.MaxASCII:
+			width += 2
+		default:
+			width++
+		}
+	}
+	return width
 }
 
 func renderK6NativeDiagnostics(phase PhaseSummary, raw rawSummary) string {
