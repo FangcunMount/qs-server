@@ -2388,6 +2388,26 @@
                 }
             }
         },
+        "/governance/cache": {
+            "get": {
+                "description": "返回 collection-server 当前实例的只读 Cache Registry 与 Redis runtime。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统"
+                ],
+                "summary": "Cache 治理状态",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/governance/redis": {
             "get": {
                 "description": "返回 collection-server Redis family 的运行状态。",
@@ -2442,7 +2462,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/core.Response"
+                            "$ref": "#/definitions/governance.ComponentCacheGovernanceSnapshot"
                         }
                     }
                 }
@@ -3449,6 +3469,249 @@
                 }
             }
         },
+        "governance.CapabilityPolicyView": {
+            "type": "object",
+            "properties": {
+                "capability": {
+                    "type": "string"
+                },
+                "effective": {
+                    "$ref": "#/definitions/governance.PolicyView"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "family": {
+                    "type": "string"
+                },
+                "family_default": {
+                    "$ref": "#/definitions/governance.PolicyView"
+                },
+                "global_default": {
+                    "$ref": "#/definitions/governance.PolicyView"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "layer": {
+                    "type": "string"
+                },
+                "metric_label": {
+                    "type": "string"
+                },
+                "override": {
+                    "$ref": "#/definitions/governance.PolicyView"
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "read_model": {
+                    "type": "string"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "spec_default": {
+                    "$ref": "#/definitions/governance.PolicyView"
+                },
+                "topology_group": {
+                    "type": "string"
+                },
+                "topology_order": {
+                    "type": "integer"
+                }
+            }
+        },
+        "governance.ComponentCacheGovernanceSnapshot": {
+            "type": "object",
+            "properties": {
+                "component": {
+                    "type": "string"
+                },
+                "effective_registry": {
+                    "$ref": "#/definitions/governance.EffectiveRegistrySnapshot"
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "generation": {
+                    "type": "string"
+                },
+                "instance_id": {
+                    "type": "string"
+                },
+                "l1_runtime": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/governance.L1CapabilityRuntime"
+                    }
+                },
+                "redis_runtime": {
+                    "$ref": "#/definitions/observability.RuntimeSnapshot"
+                }
+            }
+        },
+        "governance.EffectiveRegistrySnapshot": {
+            "type": "object",
+            "properties": {
+                "capabilities": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/governance.CapabilityPolicyView"
+                    }
+                },
+                "catalog_version": {
+                    "type": "string"
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "policy_source": {
+                    "$ref": "#/definitions/governance.PolicySourceView"
+                },
+                "reload": {
+                    "$ref": "#/definitions/governance.PolicyReloadStatus"
+                },
+                "snapshot_version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "governance.L1BucketRuntime": {
+            "type": "object",
+            "properties": {
+                "bucket": {
+                    "type": "string"
+                },
+                "entries": {
+                    "type": "integer"
+                },
+                "explicit_deletions": {
+                    "type": "integer"
+                },
+                "fifo_evictions": {
+                    "type": "integer"
+                },
+                "hits": {
+                    "type": "integer"
+                },
+                "max_entries": {
+                    "type": "integer"
+                },
+                "misses": {
+                    "type": "integer"
+                },
+                "signal_deletions": {
+                    "type": "integer"
+                },
+                "ttl_expirations": {
+                    "type": "integer"
+                }
+            }
+        },
+        "governance.L1CapabilityRuntime": {
+            "type": "object",
+            "properties": {
+                "buckets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/governance.L1BucketRuntime"
+                    }
+                },
+                "capability": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "signal_watcher": {
+                    "$ref": "#/definitions/governance.SignalWatcherStatus"
+                }
+            }
+        },
+        "governance.PolicyReloadStatus": {
+            "type": "object",
+            "properties": {
+                "last_attempt_at": {
+                    "type": "string"
+                },
+                "last_error": {
+                    "type": "string"
+                },
+                "last_failure_at": {
+                    "type": "string"
+                },
+                "last_success_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "governance.PolicySourceView": {
+            "type": "object",
+            "properties": {
+                "component": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "policy_sha256": {
+                    "type": "string"
+                },
+                "schema_version": {
+                    "type": "string"
+                }
+            }
+        },
+        "governance.PolicyView": {
+            "type": "object",
+            "properties": {
+                "compress": {
+                    "type": "string"
+                },
+                "negative": {
+                    "type": "string"
+                },
+                "negative_ttl": {
+                    "type": "string"
+                },
+                "singleflight": {
+                    "type": "string"
+                },
+                "ttl": {
+                    "type": "string"
+                },
+                "ttl_jitter_ratio": {
+                    "type": "number"
+                }
+            }
+        },
+        "governance.SignalWatcherStatus": {
+            "type": "object",
+            "properties": {
+                "configured": {
+                    "type": "boolean"
+                },
+                "last_error": {
+                    "type": "string"
+                },
+                "last_error_at": {
+                    "type": "string"
+                },
+                "last_eviction_at": {
+                    "type": "string"
+                },
+                "last_signal_at": {
+                    "type": "string"
+                },
+                "reconnect_count": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
         "meta.Birthday": {
             "type": "object"
         },
@@ -3745,6 +4008,99 @@
                     "items": {
                         "$ref": "#/definitions/modelcatalog.OptionResponse"
                     }
+                }
+            }
+        },
+        "observability.FamilyStatus": {
+            "type": "object",
+            "properties": {
+                "allow_warmup": {
+                    "type": "boolean"
+                },
+                "available": {
+                    "type": "boolean"
+                },
+                "component": {
+                    "type": "string"
+                },
+                "configured": {
+                    "type": "boolean"
+                },
+                "consecutive_failures": {
+                    "type": "integer"
+                },
+                "degraded": {
+                    "type": "boolean"
+                },
+                "family": {
+                    "type": "string"
+                },
+                "last_error": {
+                    "type": "string"
+                },
+                "last_failure_at": {
+                    "type": "string"
+                },
+                "last_success_at": {
+                    "type": "string"
+                },
+                "mode": {
+                    "type": "string"
+                },
+                "namespace": {
+                    "type": "string"
+                },
+                "profile": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "observability.RuntimeSnapshot": {
+            "type": "object",
+            "properties": {
+                "component": {
+                    "type": "string"
+                },
+                "families": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/observability.FamilyStatus"
+                    }
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "generation": {
+                    "type": "string"
+                },
+                "instance_id": {
+                    "type": "string"
+                },
+                "summary": {
+                    "$ref": "#/definitions/observability.RuntimeSummary"
+                }
+            }
+        },
+        "observability.RuntimeSummary": {
+            "type": "object",
+            "properties": {
+                "available_count": {
+                    "type": "integer"
+                },
+                "degraded_count": {
+                    "type": "integer"
+                },
+                "family_total": {
+                    "type": "integer"
+                },
+                "ready": {
+                    "type": "boolean"
+                },
+                "unavailable_count": {
+                    "type": "integer"
                 }
             }
         },
