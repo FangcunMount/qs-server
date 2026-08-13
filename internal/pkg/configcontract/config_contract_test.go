@@ -158,13 +158,12 @@ func TestCollectionDevProdConfigContracts(t *testing.T) {
 			if !published.Enabled {
 				t.Fatalf("%s published-model must be enabled", name)
 			}
-			wantAssessmentEnabled := name == "collection-server.dev.yaml"
 			access := opts.Cache.Capabilities.Evaluation.AssessmentAccess
-			if access == nil || access.Enabled != wantAssessmentEnabled || access.TTLSeconds != 60 || access.MaxEntries != 1024 || !access.Singleflight || access.SignalEvictEnabled {
+			if access == nil || !access.Enabled || access.TTLSeconds != 60 || access.MaxEntries != 1024 || !access.Singleflight || access.SignalEvictEnabled {
 				t.Fatalf("%s assessment-access L1 config = %#v", name, access)
 			}
 			detail := opts.Cache.Capabilities.Evaluation.AssessmentDetail
-			if detail == nil || detail.Enabled != wantAssessmentEnabled || detail.TTLSeconds != 180 || detail.MaxEntries != 256 || !detail.Singleflight || detail.SignalEvictEnabled {
+			if detail == nil || !detail.Enabled || detail.TTLSeconds != 180 || detail.MaxEntries != 256 || !detail.Singleflight || detail.SignalEvictEnabled {
 				t.Fatalf("%s assessment-detail L1 config = %#v", name, detail)
 			}
 		})

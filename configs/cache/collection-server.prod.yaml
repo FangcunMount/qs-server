@@ -7,5 +7,5 @@ capabilities:
     published_model: {enabled: true, ttl_seconds: 180, ttl_jitter_ratio: 0.2, max_entries: 64, singleflight: true, signal_evict_enabled: true}
     typology: {enabled: true, ttl_seconds: 180, ttl_jitter_ratio: 0.2, max_entries: 256, singleflight: true, signal_evict_enabled: true}
   evaluation:
-    assessment_access: {enabled: false, ttl_seconds: 60, ttl_jitter_ratio: 0.2, max_entries: 1024, singleflight: true, signal_evict_enabled: false}
-    assessment_detail: {enabled: false, ttl_seconds: 180, ttl_jitter_ratio: 0.2, max_entries: 256, singleflight: true, signal_evict_enabled: false}
+    assessment_access: {enabled: true, ttl_seconds: 60, ttl_jitter_ratio: 0.2, max_entries: 1024, singleflight: true, signal_evict_enabled: false}
+    assessment_detail: {enabled: true, ttl_seconds: 180, ttl_jitter_ratio: 0.2, max_entries: 256, singleflight: true, signal_evict_enabled: false}

@@ -21,8 +21,8 @@ func TestCollectionPolicyFilesPreserveDevProdEnablement(t *testing.T) {
 		{name: "prod", capability: "questionnaire", wantEnabled: true},
 		{name: "dev", capability: "assessment_detail", wantEnabled: true},
 		{name: "dev", capability: "assessment_access", wantEnabled: true},
-		{name: "prod", capability: "assessment_detail", wantEnabled: false},
-		{name: "prod", capability: "assessment_access", wantEnabled: false},
+		{name: "prod", capability: "assessment_detail", wantEnabled: true},
+		{name: "prod", capability: "assessment_access", wantEnabled: true},
 	} {
 		t.Run(test.name+"_"+test.capability, func(t *testing.T) {
 			mainPath := filepath.Join(root, "configs", "collection-server."+test.name+".yaml")
