@@ -245,6 +245,16 @@ jobs:
           envs: EXPECTED_WORKER_REPLICAS,WORKER_DNS_NAME
           script_path: scripts/cd/verify-worker-governance.sh
 
+      - name: K6 Observability Reverse Check
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          script_path: scripts/cd/verify-observability-nginx.sh
+
   # ServerD 仍跑 qs-worker；CD deploy 已迁到 Mac mini（qlume），此处只做 worker 主机巡检。
   ping-worker-host:
     name: ServerD Worker Host Check

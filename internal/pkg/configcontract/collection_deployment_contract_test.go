@@ -252,8 +252,9 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 	cdWorkflow := readDeploymentContractFile(t, ".github", "workflows", "cd.yml")
 	for _, required := range []string{
 		"verify-worker-governance:",
-		"Verify Worker Governance From Apiserver",
+		"Verify Worker Governance and K6 Observability",
 		"verify-worker-governance.sh",
+		"verify-observability-nginx.sh",
 	} {
 		if !strings.Contains(cdWorkflow, required) {
 			t.Errorf("CD workflow must contain worker governance post-deploy gate %q", required)
@@ -379,8 +380,81 @@ func TestCollectionNginxUsesDynamicDockerDNSInsideUpstream(t *testing.T) {
 	if count := strings.Count(config, "upstream collect-api"); count != 1 {
 		t.Fatalf("upstream collect-api count = %d, want 1", count)
 	}
-	if count := strings.Count(config, "resolver 127.0.0.11"); count != 1 {
-		t.Fatalf("Docker resolver count = %d, want exactly one inside collect-api", count)
+	if count := strings.Count(upstream, "resolver 127.0.0.11"); count != 1 {
+		t.Fatalf("collect-api Docker resolver count = %d, want exactly one inside collect-api", count)
+	}
+	if count := strings.Count(config, "resolver 127.0.0.11"); count != 2 {
+		t.Fatalf("Docker resolver count = %d, want collect-api plus perf observability resolver", count)
+	}
+}
+
+func TestPerfObservabilityNginxUsesAggregateReadOnlyRoutes(t *testing.T) {
+	t.Parallel()
+
+	collection := readDeploymentContractFile(t, "configs", "nginx", "conf.d", "collect.fangcunmount.cn.conf")
+	for _, required := range []string{
+		"location = /perf/metrics",
+		"location = /perf/readyz",
+		`job%3D%22qs-collection-server%22`,
+		`component%3D%22collection-server%22`,
+	} {
+		if !strings.Contains(collection, required) {
+			t.Errorf("collection Nginx perf observability route must contain %q", required)
+		}
+	}
+
+	observability := readDeploymentContractFile(t, "configs", "nginx", "conf.d", "perf-observability.fangcunmount.cn.conf")
+	for _, required := range []string{
+		"server_name worker.fangcunmount.cn;",
+		"server_name nsqd.fangcunmount.cn;",
+		"location = /metrics",
+		"location = /readyz",
+		"location = /stats",
+		"location = /nodes",
+		`job%3D%22qs-worker%22`,
+		`component%3D%22worker%22`,
+		"http://prometheus:9090",
+		"http://nsqd:4151",
+		"http://nsqlookupd:4161",
+		"limit_except GET",
+	} {
+		if !strings.Contains(observability, required) {
+			t.Errorf("perf observability Nginx config must contain %q", required)
+		}
+	}
+	for _, forbidden := range []string{"/topic/create", "/topic/delete", "/channel/create", "/channel/delete"} {
+		if strings.Contains(observability, forbidden) {
+			t.Errorf("public NSQ observability config must not expose mutation route %q", forbidden)
+		}
+	}
+
+	preparePackage := readDeploymentContractFile(t, "scripts", "cd", "prepare-package.sh")
+	if !strings.Contains(preparePackage, "verify-observability-nginx.sh") {
+		t.Error("deployment package must include verify-observability-nginx.sh")
+	}
+	remote := readDeploymentContractFile(t, "scripts", "cd", "remote-deploy.sh")
+	for _, required := range []string{"verify_observability_nginx preflight", "verify_observability_nginx install-and-verify"} {
+		if !strings.Contains(remote, required) {
+			t.Errorf("remote deploy must contain %q", required)
+		}
+	}
+	verifier := readDeploymentContractFile(t, "scripts", "cd", "verify-observability-nginx.sh")
+	for _, required := range []string{
+		`VERIFY_PUBLIC_ROUTES="${VERIFY_PUBLIC_ROUTES:-true}"`,
+		`getent ahostsv4 "$name"`,
+		`verify_public_routes`,
+		`rollback_config()`,
+		`verify-only`,
+	} {
+		if !strings.Contains(verifier, required) {
+			t.Errorf("observability Nginx verifier must contain %q", required)
+		}
+	}
+	ping := readDeploymentContractFile(t, ".github", "workflows", "ping-runner.yml")
+	for _, required := range []string{"K6 Observability Reverse Check", "verify-observability-nginx.sh"} {
+		if !strings.Contains(ping, required) {
+			t.Errorf("scheduled production verification must contain %q", required)
+		}
 	}
 }
 

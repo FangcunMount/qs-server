@@ -532,8 +532,8 @@ jobs:
           docker image prune -f >/dev/null 2>&1 || true
 
   verify-worker-governance:
-    name: Verify Worker Governance From Apiserver
-    needs: [plan, deploy-apiserver, deploy-worker]
+    name: Verify Worker Governance and K6 Observability
+    needs: [plan, deploy-apiserver, deploy-collection, deploy-worker]
     runs-on:
       group: qlume
       labels: [self-hosted, macOS, ARM64]
@@ -544,8 +544,9 @@ jobs:
     if: |
       always() &&
       needs.plan.result == 'success' &&
-      (needs.plan.outputs.apiserver == 'true' || needs.plan.outputs.worker == 'true') &&
+      (needs.plan.outputs.apiserver == 'true' || needs.plan.outputs.collection == 'true' || needs.plan.outputs.worker == 'true') &&
       (needs.plan.outputs.apiserver != 'true' || needs.deploy-apiserver.result == 'success') &&
+      (needs.plan.outputs.collection != 'true' || needs.deploy-collection.result == 'success') &&
       (needs.plan.outputs.worker != 'true' || needs.deploy-worker.result == 'success')
     env:
       EXPECTED_WORKER_REPLICAS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.worker_replicas || vars.QS_WORKER_REPLICAS || '3' }}
@@ -580,6 +581,15 @@ jobs:
           ssh -F "${RUNNER_SSH_CONFIG}" "${RUNNER_SSH_ALIAS}" \
             "EXPECTED_WORKER_REPLICAS=${EXPECTED_WORKER_REPLICAS} PRIVILEGE_RUNNER=sudo bash -s -- verify" \
             < scripts/cd/verify-worker-governance.sh
+
+      - name: Verify public K6 observability routes
+        env:
+          RUNNER_SSH_ALIAS: verify-worker-governance
+        run: |
+          set -Eeuo pipefail
+          ssh -F "${RUNNER_SSH_CONFIG}" "${RUNNER_SSH_ALIAS}" \
+            "PRIVILEGE_RUNNER=sudo bash -s -- verify-only" \
+            < scripts/cd/verify-observability-nginx.sh
 
       - name: Cleanup verification SSH
         if: always()

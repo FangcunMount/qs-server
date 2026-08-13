@@ -476,6 +476,21 @@ verify_collection_nginx() {
     bash "$verifier" "$mode"
 }
 
+verify_observability_nginx() {
+  local mode="$1"
+  local verifier="$DEPLOY_TMP/scripts/cd/verify-observability-nginx.sh"
+  if [ ! -x "$verifier" ]; then
+    echo "Observability Nginx verifier is missing or not executable: $verifier" >&2
+    return 1
+  fi
+
+  PRIVILEGE_RUNNER="$SUDO" \
+    NGINX_CONFIG_SOURCE="$DEPLOY_TMP/configs/nginx/conf.d/perf-observability.fangcunmount.cn.conf" \
+    NGINX_CONFIG_BACKUP_DIR="$BACKUP_DIR" \
+    VERIFY_PUBLIC_ROUTES=false \
+    bash "$verifier" "$mode"
+}
+
 docker_compose_pull_supports_quiet() {
   $SUDO docker compose pull --help 2>/dev/null | grep -q -- '--quiet'
 }
@@ -667,6 +682,10 @@ deploy_collection() {
         restore_legacy_collection_service
         return 1
       fi
+      if ! verify_observability_nginx install-and-verify; then
+        restore_legacy_collection_service
+        return 1
+      fi
       remove_legacy_compose_service "$COLLECTION_COMPOSE_PROJECT" "qs-collection-server"
       docker_compose \
         -p "$COLLECTION_COMPOSE_PROJECT" \
@@ -785,6 +804,7 @@ case "$SERVICE" in
     echo "Deploy target: serverA (co-located with qs-apiserver). Stop legacy qs-collection-server on serverB after cutover."
     setup_grpc_certs qs-collection-server qs-collection-server.svc
     verify_collection_nginx preflight
+    verify_observability_nginx preflight
     select_image
     deploy_collection
     ;;

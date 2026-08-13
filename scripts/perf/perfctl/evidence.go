@@ -20,12 +20,12 @@ type metricSample struct {
 
 func collectPhaseEvidence(dir string) PhaseEvidence {
 	checks := []EvidenceCheck{
-		checkReadyFile(dir, "after-collection-readyz.json", "collection readyz"),
+		checkReplicaReadyFile(dir, "after-collection-readyz.json", "collection readyz", "EXPECTED_COLLECTION_REPLICAS", 2),
 		checkReadyFile(dir, "after-apiserver-readyz.json", "apiserver readyz"),
-		checkReadyFile(dir, "after-worker-readyz.json", "worker readyz"),
-		checkFile(dir, "after-collection-metrics.txt", "collection metrics"),
+		checkReplicaReadyFile(dir, "after-worker-readyz.json", "worker readyz", "EXPECTED_WORKER_REPLICAS", 3),
+		checkFederatedMetricsReady(dir, "after-collection-metrics.txt", "collection metrics replicas", "collection-server", "EXPECTED_COLLECTION_REPLICAS", 2),
 		checkFile(dir, "after-apiserver-metrics.txt", "apiserver metrics"),
-		checkFile(dir, "after-worker-metrics.txt", "worker metrics"),
+		checkFederatedMetricsReady(dir, "after-worker-metrics.txt", "worker metrics replicas", "worker", "EXPECTED_WORKER_REPLICAS", 3),
 		checkJSONFile(dir, "after-nsqd-stats.json", "NSQD stats"),
 	}
 	trafficIsolated, isolationCheck := trafficIsolationEvidence()
@@ -226,6 +226,119 @@ func checkReadyFile(dir, name, label string) EvidenceCheck {
 	return EvidenceCheck{Name: label, Status: "PASS", Source: path}
 }
 
+func checkReplicaReadyFile(dir, name, label, expectedEnv string, defaultExpected int) EvidenceCheck {
+	path := filepath.Join(dir, name)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return EvidenceCheck{Name: label, Status: "MISSING", Source: path, Message: err.Error()}
+	}
+	expected, err := expectedReplicaCount(expectedEnv, defaultExpected)
+	if err != nil {
+		return EvidenceCheck{Name: label, Status: "INVALID", Source: path, Message: err.Error()}
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return EvidenceCheck{Name: label, Status: "INVALID", Source: path, Message: err.Error()}
+	}
+	if count, ok := prometheusReadyCount(payload); ok {
+		if count != float64(expected) {
+			return EvidenceCheck{Name: label, Status: "FAIL", Source: path, Message: fmt.Sprintf("ready replicas=%.0f, expected=%d", count, expected)}
+		}
+		return EvidenceCheck{Name: label, Status: "PASS", Source: path, Message: fmt.Sprintf("ready replicas=%d", expected)}
+	}
+	status, _ := payload["status"].(string)
+	if status == "" {
+		if data, ok := payload["data"].(map[string]any); ok {
+			status, _ = data["status"].(string)
+		}
+	}
+	if status != "ready" {
+		return EvidenceCheck{Name: label, Status: "FAIL", Source: path, Message: fmt.Sprintf("status=%q", status)}
+	}
+	if expected > 1 {
+		return EvidenceCheck{
+			Name: label, Status: "INVALID", Source: path,
+			Message: fmt.Sprintf("single load-balanced readyz response cannot prove %d replicas; use the aggregate Prometheus readiness endpoint", expected),
+		}
+	}
+	return EvidenceCheck{Name: label, Status: "PASS", Source: path}
+}
+
+func prometheusReadyCount(payload map[string]any) (float64, bool) {
+	if status, _ := payload["status"].(string); status != "success" {
+		return 0, false
+	}
+	data, _ := payload["data"].(map[string]any)
+	results, _ := data["result"].([]any)
+	if len(results) != 1 {
+		return 0, true
+	}
+	result, _ := results[0].(map[string]any)
+	value, _ := result["value"].([]any)
+	if len(value) != 2 {
+		return 0, true
+	}
+	switch raw := value[1].(type) {
+	case string:
+		parsed, err := strconv.ParseFloat(raw, 64)
+		return parsed, err == nil
+	case float64:
+		return raw, true
+	default:
+		return 0, true
+	}
+}
+
+func checkFederatedMetricsReady(dir, name, label, component, expectedEnv string, defaultExpected int) EvidenceCheck {
+	path := filepath.Join(dir, name)
+	expected, err := expectedReplicaCount(expectedEnv, defaultExpected)
+	if err != nil {
+		return EvidenceCheck{Name: label, Status: "INVALID", Source: path, Message: err.Error()}
+	}
+	samples, err := parsePrometheusFile(path)
+	if err != nil {
+		return EvidenceCheck{Name: label, Status: "MISSING", Source: path, Message: err.Error()}
+	}
+	instances := map[string]float64{}
+	for _, sample := range samples {
+		if sample.Name != "qs_runtime_component_ready" || sample.Labels["component"] != component {
+			continue
+		}
+		instance := strings.TrimSpace(sample.Labels["instance"])
+		if instance == "" {
+			return EvidenceCheck{
+				Name: label, Status: "INVALID", Source: path,
+				Message: "metrics have no instance label; a direct load-balanced /metrics endpoint is not valid multi-replica evidence",
+			}
+		}
+		if previous, exists := instances[instance]; exists && previous != sample.Value {
+			return EvidenceCheck{Name: label, Status: "INVALID", Source: path, Message: "conflicting readiness samples for instance " + instance}
+		}
+		instances[instance] = sample.Value
+	}
+	if len(instances) != expected {
+		return EvidenceCheck{Name: label, Status: "FAIL", Source: path, Message: fmt.Sprintf("observed replicas=%d, expected=%d", len(instances), expected)}
+	}
+	for instance, ready := range instances {
+		if ready != 1 {
+			return EvidenceCheck{Name: label, Status: "FAIL", Source: path, Message: fmt.Sprintf("instance %s runtime ready=%g", instance, ready)}
+		}
+	}
+	return EvidenceCheck{Name: label, Status: "PASS", Source: path, Message: fmt.Sprintf("ready replicas=%d", expected)}
+}
+
+func expectedReplicaCount(envName string, fallback int) (int, error) {
+	raw := strings.TrimSpace(os.Getenv(envName))
+	if raw == "" {
+		return fallback, nil
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 1 {
+		return 0, fmt.Errorf("%s must be a positive integer, got %q", envName, raw)
+	}
+	return value, nil
+}
+
 func checkFile(dir, name, label string) EvidenceCheck {
 	path := filepath.Join(dir, name)
 	info, err := os.Stat(path)
@@ -281,15 +394,10 @@ func parsePrometheusFile(path string) ([]metricSample, error) {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		lastSpace := strings.LastIndexAny(line, " \t")
-		if lastSpace < 0 {
+		identity, value, ok := parsePrometheusSampleLine(line)
+		if !ok {
 			continue
 		}
-		value, err := strconv.ParseFloat(strings.TrimSpace(line[lastSpace+1:]), 64)
-		if err != nil {
-			continue
-		}
-		identity := strings.TrimSpace(line[:lastSpace])
 		name := identity
 		labels := map[string]string{}
 		if brace := strings.IndexByte(identity, '{'); brace >= 0 && strings.HasSuffix(identity, "}") {
@@ -299,6 +407,29 @@ func parsePrometheusFile(path string) ([]metricSample, error) {
 		result = append(result, metricSample{Name: name, Labels: labels, Value: value})
 	}
 	return result, scanner.Err()
+}
+
+func parsePrometheusSampleLine(line string) (string, float64, bool) {
+	lastSpace := strings.LastIndexAny(line, " \t")
+	if lastSpace < 0 {
+		return "", 0, false
+	}
+	lastValue, err := strconv.ParseFloat(strings.TrimSpace(line[lastSpace+1:]), 64)
+	if err != nil {
+		return "", 0, false
+	}
+	identity := strings.TrimSpace(line[:lastSpace])
+	value := lastValue
+	// Prometheus federation appends a millisecond timestamp after the sample
+	// value. Direct /metrics output has no timestamp. Detect the optional
+	// penultimate numeric field without breaking label values that contain spaces.
+	if valueSpace := strings.LastIndexAny(identity, " \t"); valueSpace >= 0 {
+		if sampleValue, parseErr := strconv.ParseFloat(strings.TrimSpace(identity[valueSpace+1:]), 64); parseErr == nil {
+			identity = strings.TrimSpace(identity[:valueSpace])
+			value = sampleValue
+		}
+	}
+	return identity, value, identity != ""
 }
 
 func parseLabels(raw string) map[string]string {

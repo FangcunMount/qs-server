@@ -25,18 +25,18 @@ snapshot_url() {
 
 snapshot_url "collection-metrics.txt" "${COLLECTION_METRICS_URL:-http://127.0.0.1:18083/metrics}"
 snapshot_url "collection-readyz.json" "${COLLECTION_READYZ_URL:-http://127.0.0.1:18083/readyz}"
-snapshot_url "collection-resilience.json" "${COLLECTION_RESILIENCE_URL:-http://127.0.0.1:18083/governance/resilience}"
-snapshot_url "collection-redis.json" "${COLLECTION_REDIS_URL:-http://127.0.0.1:18083/governance/redis}"
+snapshot_url "collection-resilience.json" "${COLLECTION_RESILIENCE_URL:-}"
+snapshot_url "collection-redis.json" "${COLLECTION_REDIS_URL:-}"
 
 snapshot_url "apiserver-metrics.txt" "${APISERVER_METRICS_URL:-http://127.0.0.1:18082/metrics}"
 snapshot_url "apiserver-readyz.json" "${APISERVER_READYZ_URL:-http://127.0.0.1:18082/readyz}"
 snapshot_url "worker-metrics.txt" "${WORKER_METRICS_URL:-http://127.0.0.1:9092/metrics}"
 snapshot_url "worker-readyz.json" "${WORKER_READYZ_URL:-http://127.0.0.1:9092/readyz}"
-snapshot_url "worker-resilience.json" "${WORKER_RESILIENCE_URL:-http://127.0.0.1:9092/governance/resilience}"
-snapshot_url "worker-redis.json" "${WORKER_REDIS_URL:-http://127.0.0.1:9092/governance/redis}"
+snapshot_url "worker-resilience.json" "${WORKER_RESILIENCE_URL:-}"
+snapshot_url "worker-redis.json" "${WORKER_REDIS_URL:-}"
 
 snapshot_url "nsqd-stats.json" "${NSQD_STATS_URL:-http://127.0.0.1:4151/stats?format=json}"
-snapshot_url "nsqlookupd-nodes.json" "${NSQLOOKUPD_NODES_URL:-http://127.0.0.1:4161/nodes}"
+snapshot_url "nsqlookupd-nodes.json" "${NSQLOOKUPD_NODES_URL:-}"
 
 if [[ -n "${DOCKER_STATS_CONTAINERS:-}" ]] && command -v docker >/dev/null 2>&1; then
   # shellcheck disable=SC2086

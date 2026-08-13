@@ -23,7 +23,8 @@ make perf-run PLAN=diagnose CASE=<专项场景>
 - 安装 Go、jq、curl；
 - 压测只在允许写入测试数据的受控非生产环境执行；
 - `tmp/perf/qs-perf.config.json` 中 URL、token 文件、组织与模型配置指向本次环境；
-- collection、apiserver、worker 的 `/readyz` 与 `/metrics` 可从编排机访问；
+- collection、worker 的聚合 readiness 与 Prometheus federation 指标可从编排机访问；
+- apiserver 的 `/readyz` 与 `/metrics` 可从编排机访问；
 - NSQD `/stats?format=json` 可访问；
 - 环境中没有无法区分的并发业务流量，否则完成 TPS 证据不具备准入效力。
 
@@ -40,20 +41,32 @@ make perf-verify
 
 ### 2. 观测地址
 
-本机默认地址如下；远端环境通过环境变量覆盖：
+本机默认地址如下；生产环境必须使用聚合端点，不能把多副本服务的普通
+Nginx 轮询 `/metrics`、`/readyz` 当成全体副本证据：
 
 ```bash
-export COLLECTION_METRICS_URL=http://collection-host/metrics
-export COLLECTION_READYZ_URL=http://collection-host/readyz
-export APISERVER_METRICS_URL=http://apiserver-host/metrics
-export APISERVER_READYZ_URL=http://apiserver-host/readyz
-export WORKER_METRICS_URL=http://worker-host/metrics
-export WORKER_READYZ_URL=http://worker-host/readyz
-export NSQD_STATS_URL=http://nsqd-host:4151/stats?format=json
+export COLLECTION_METRICS_URL=https://collect.fangcunmount.cn/perf/metrics
+export COLLECTION_READYZ_URL=https://collect.fangcunmount.cn/perf/readyz
+export APISERVER_METRICS_URL=https://qs.fangcunmount.cn/metrics
+export APISERVER_READYZ_URL=https://qs.fangcunmount.cn/readyz
+export WORKER_METRICS_URL=https://worker.fangcunmount.cn/metrics
+export WORKER_READYZ_URL=https://worker.fangcunmount.cn/readyz
+export NSQD_STATS_URL=https://nsqd.fangcunmount.cn/stats
+export EXPECTED_COLLECTION_REPLICAS=2
+export EXPECTED_WORKER_REPLICAS=3
 export PERF_ISOLATED_ENV=true
 # 共享 NSQD 时建议限定本次链路涉及的 topic
 # export PERF_NSQ_TOPICS='<topic-a>,<topic-b>'
+# 可选诊断，不参与正式证据完整性门禁
+# export NSQLOOKUPD_NODES_URL=https://nsqd.fangcunmount.cn/nodes
 ```
+
+`/perf/metrics` 与 worker `/metrics` 由 Prometheus federation 返回所有目标并保留
+`job`、`instance` 标签；对应 ready 端点返回同时满足 Prometheus `up` 和
+`qs_runtime_component_ready=1` 的实例数量。perfctl 会将数量与两个
+`EXPECTED_*_REPLICAS` 变量比较，并拒绝没有 `instance` 标签的普通直连指标。
+worker、NSQD 域名须解析到 serverA Nginx；NSQ 公网入口只允许读取
+`/stats`、`/ping`、`/nodes`，不得开放 topic/channel 管理接口。
 
 只有确认窗口内的完成量可归因于本次压测时，才设置 `PERF_ISOLATED_ENV=true`；未设置或显式设为其他值都会把证据标记为 `INCOMPLETE`。完成 TPS 使用阶段前后 Interpretation Prometheus 计数增量，并以这两次指标快照的实际时间窗为分母，不以配置中的计划时长代替服务端观测窗口。
 

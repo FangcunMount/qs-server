@@ -77,6 +77,50 @@ func TestReadyEvidenceAcceptsDirectAndCollectionEnvelope(t *testing.T) {
 	}
 }
 
+func TestReplicaReadyEvidenceRequiresAggregatePrometheusResult(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "direct.json"), []byte(`{"code":0,"data":{"status":"ready"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if check := checkReplicaReadyFile(dir, "direct.json", "collection readyz", "EXPECTED_COLLECTION_REPLICAS", 2); check.Status != "INVALID" {
+		t.Fatalf("direct load-balanced readyz check = %#v, want INVALID", check)
+	}
+
+	prometheusReady := `{"status":"success","data":{"resultType":"vector","result":[{"metric":{},"value":[1776030000,"2"]}]}}`
+	if err := os.WriteFile(filepath.Join(dir, "aggregate.json"), []byte(prometheusReady), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if check := checkReplicaReadyFile(dir, "aggregate.json", "collection readyz", "EXPECTED_COLLECTION_REPLICAS", 2); check.Status != "PASS" {
+		t.Fatalf("aggregate readyz check = %#v, want PASS", check)
+	}
+
+	t.Setenv("EXPECTED_COLLECTION_REPLICAS", "3")
+	if check := checkReplicaReadyFile(dir, "aggregate.json", "collection readyz", "EXPECTED_COLLECTION_REPLICAS", 2); check.Status != "FAIL" {
+		t.Fatalf("replica mismatch check = %#v, want FAIL", check)
+	}
+}
+
+func TestFederatedMetricsEvidenceRequiresEveryReplicaReady(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "collection-metrics.txt")
+	metrics := "qs_runtime_component_ready{component=\"collection-server\",instance=\"collection-1:8080\",job=\"qs-collection-server\"} 1 1776030000000\n" +
+		"qs_runtime_component_ready{component=\"collection-server\",instance=\"collection-2:8080\",job=\"qs-collection-server\"} 1 1776030000000\n"
+	if err := os.WriteFile(path, []byte(metrics), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if check := checkFederatedMetricsReady(dir, "collection-metrics.txt", "collection metrics replicas", "collection-server", "EXPECTED_COLLECTION_REPLICAS", 2); check.Status != "PASS" {
+		t.Fatalf("federated metrics check = %#v, want PASS", check)
+	}
+
+	direct := `qs_runtime_component_ready{component="collection-server"} 1` + "\n"
+	if err := os.WriteFile(path, []byte(direct), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if check := checkFederatedMetricsReady(dir, "collection-metrics.txt", "collection metrics replicas", "collection-server", "EXPECTED_COLLECTION_REPLICAS", 2); check.Status != "INVALID" {
+		t.Fatalf("direct metrics check = %#v, want INVALID", check)
+	}
+}
+
 func TestEvidenceClassificationSeparatesUnhealthyFromMissing(t *testing.T) {
 	unhealthy := PhaseEvidence{Checks: []EvidenceCheck{{Name: "worker readyz", Status: "FAIL"}}}
 	if verdict := classifyEvidence(unhealthy, "service evidence"); verdict.Status != VerdictFail {
