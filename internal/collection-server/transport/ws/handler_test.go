@@ -286,6 +286,32 @@ func TestReportEventsRejectsMissingJWTBeforeUpgrade(t *testing.T) {
 	}
 }
 
+func TestReportEventsWorksThroughAPILoggerResponseWriter(t *testing.T) {
+	handler := newWSTestHandler(&wsTesteeAccess{}, reportnotify.NewInMemoryNotifier(), nil)
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	engine.Use(pkgmiddleware.APILoggerWithConfig(pkgmiddleware.APILoggerConfig{
+		LogRequestHeaders:  false,
+		LogRequestBody:     false,
+		LogResponseHeaders: false,
+		LogResponseBody:    false,
+		MaskSensitiveData:  true,
+	}))
+	engine.GET("/api/v1/report-events", func(c *gin.Context) {
+		c.Set("user_claims", &pkgmiddleware.UserClaims{UserID: "user-7"})
+		handler.ServeHTTP(c)
+	})
+	server := httptest.NewServer(engine)
+	defer server.Close()
+
+	conn := dialWSTest(t, server)
+	defer func() { _ = conn.CloseNow() }()
+	writeWSFrame(t, conn, inboundFrame{Op: OpPing})
+	if frame := readWSFrame(t, conn); frame.Op != OpPong {
+		t.Fatalf("pong frame = %+v", frame)
+	}
+}
+
 func TestReportEventsDeniesAccessWithoutSubscriptionOrDetailLeak(t *testing.T) {
 	tests := []struct {
 		name       string

@@ -11,6 +11,8 @@ import {
   RUN_ID,
 } from './config.js';
 
+let requestSequence = 0;
+
 export function timedRequest(method, baseURL, path, body, headers, tags) {
   return http.request(method, `${baseURL}${path}`, body, {
     headers: correlatedHeaders(headers, tags),
@@ -23,7 +25,10 @@ export function correlatedHeaders(headers, tags) {
   const result = Object.assign({}, headers || {});
   const endpoint = tags && tags.endpoint ? String(tags.endpoint) : 'request';
   if (!result['X-Request-ID']) {
-    result['X-Request-ID'] = `k6-${RUN_ID}-${endpoint}-${__VU}-${__ITER}-${Date.now()}`;
+    const vu = typeof __VU === 'undefined' ? 0 : __VU;
+    const iter = typeof __ITER === 'undefined' ? 0 : __ITER;
+    requestSequence += 1;
+    result['X-Request-ID'] = `k6-${RUN_ID}-${endpoint}-${vu}-${iter}-${requestSequence}-${Date.now()}`;
   }
   result['X-Perf-Run-ID'] = String(RUN_ID);
   return result;

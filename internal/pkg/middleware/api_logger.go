@@ -142,6 +142,10 @@ type bodyCaptureWriter struct {
 	capture    bool
 }
 
+func (w *bodyCaptureWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
 func newBodyCaptureWriter(w gin.ResponseWriter, capture bool, limit int64) *bodyCaptureWriter {
 	var buffer *bytes.Buffer
 	if capture {

@@ -87,7 +87,7 @@ func buildPhaseSummary(spec phaseSpec, qps map[string]float64, raw rawSummary, e
 
 func throughputResults(spec phaseSpec, raw rawSummary, evidence PhaseEvidence) Throughput {
 	iterations := findMetric(raw, "iterations", nil)
-	loadWindowSeconds := metricWindowSeconds(iterations)
+	loadWindowSeconds, loadWindowSource := trafficWindowSeconds(spec.Duration, iterations)
 	httpReqs := findMetric(raw, "http_reqs", nil)
 	wsSessions := findMetric(raw, "ws_sessions", nil)
 	accepted := findMetric(raw, "answer_submit_accepted", nil)
@@ -95,7 +95,7 @@ func throughputResults(spec phaseSpec, raw rawSummary, evidence PhaseEvidence) T
 	chainStarted := findMetric(raw, "chain_probe_started", nil)
 	chainPolls := findMetric(raw, "chain_probe_poll_requests", nil)
 	dropped := findMetric(raw, "dropped_iterations", nil)
-	actualQPS := metricNumberPtr(iterations, "rate")
+	actualQPS := metricRateOverWindow(iterations, loadWindowSeconds)
 	httpRPS := metricNumberPtr(httpReqs, "rate")
 	acceptedCount := metricInt64(accepted, "count") + metricInt64(chainAccepted, "count")
 	var acceptedTPS *float64
@@ -112,12 +112,12 @@ func throughputResults(spec phaseSpec, raw rawSummary, evidence PhaseEvidence) T
 	result := Throughput{
 		BusinessQPS: BusinessQPS{
 			Target:  measured(&target, "qps", "plan"),
-			Actual:  Measurement{Value: actualQPS, Unit: "qps", Samples: metricInt64(iterations, "count"), Source: "k6:iterations"},
+			Actual:  Measurement{Value: actualQPS, Unit: "qps", Samples: metricInt64(iterations, "count"), Source: "derived:iterations/" + loadWindowSource},
 			Dropped: Measurement{Value: droppedCount, Unit: "iterations", Samples: metricInt64(dropped, "count"), Source: "k6:dropped_iterations", Note: droppedNote},
 		},
 		HTTPRPS:             Measurement{Value: httpRPS, Unit: "rps", Samples: metricInt64(httpReqs, "count"), Source: "k6:http_reqs"},
-		WSSessionsPerSecond: Measurement{Value: metricNumberPtr(wsSessions, "rate"), Unit: "sessions/s", Samples: metricInt64(wsSessions, "count"), Source: "k6:ws_sessions"},
-		AcceptedTPS:         Measurement{Value: acceptedTPS, Unit: "tps", Samples: acceptedCount, Source: "derived:(answer_submit_accepted+chain_probe_accepted)/k6_metric_window"},
+		WSSessionsPerSecond: Measurement{Value: metricRateOverWindow(wsSessions, loadWindowSeconds), Unit: "sessions/s", Samples: metricInt64(wsSessions, "count"), Source: "derived:ws_sessions/" + loadWindowSource},
+		AcceptedTPS:         Measurement{Value: acceptedTPS, Unit: "tps", Samples: acceptedCount, Source: "derived:(answer_submit_accepted+chain_probe_accepted)/" + loadWindowSource},
 		AcceptedTPSByModel:  map[string]Measurement{},
 		CompletedTPSByModel: map[string]Measurement{},
 	}
@@ -125,7 +125,7 @@ func throughputResults(spec phaseSpec, raw rawSummary, evidence PhaseEvidence) T
 		metric := findMetric(raw, model+"_answer_submit_success_rate", nil)
 		modelAcceptedCount := metricInt64(metric, "passes")
 		if metric != nil && loadWindowSeconds > 0 {
-			result.AcceptedTPSByModel[model] = Measurement{Value: floatPtr(float64(modelAcceptedCount) / loadWindowSeconds), Unit: "tps", Samples: modelAcceptedCount, Source: "k6:" + model + "_answer_submit_success_rate.passes"}
+			result.AcceptedTPSByModel[model] = Measurement{Value: floatPtr(float64(modelAcceptedCount) / loadWindowSeconds), Unit: "tps", Samples: modelAcceptedCount, Source: "derived:" + model + "_answer_submit_success_rate.passes/" + loadWindowSource}
 		} else {
 			result.AcceptedTPSByModel[model] = naMeasurement("tps", "k6:"+model+"_answer_submit_success_rate.passes", "model submit evidence unavailable")
 		}
@@ -188,6 +188,20 @@ func throughputResults(spec phaseSpec, raw rawSummary, evidence PhaseEvidence) T
 		result.FinalCompletionRate = naMeasurement("ratio", "derived:completed/accepted", "accepted or completed count unavailable")
 	}
 	return result
+}
+
+func trafficWindowSeconds(plannedDuration string, iterations map[string]any) (float64, string) {
+	if duration, err := time.ParseDuration(strings.TrimSpace(plannedDuration)); err == nil && duration > 0 {
+		return duration.Seconds(), "plan_duration"
+	}
+	return metricWindowSeconds(iterations), "k6_metric_window"
+}
+
+func metricRateOverWindow(metric map[string]any, windowSeconds float64) *float64 {
+	if metric == nil || windowSeconds <= 0 {
+		return nil
+	}
+	return floatPtr(metricNumber(metric, "count") / windowSeconds)
 }
 
 func metricWindowSeconds(metric map[string]any) float64 {

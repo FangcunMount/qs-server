@@ -57,6 +57,20 @@ func (w *ginWebsocketResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, erro
 	return hijacker.Hijack()
 }
 
+func unwrapResponseWriter(writer http.ResponseWriter) http.ResponseWriter {
+	for {
+		unwrapper, ok := writer.(interface{ Unwrap() http.ResponseWriter })
+		if !ok {
+			return writer
+		}
+		next := unwrapper.Unwrap()
+		if next == nil || next == writer {
+			return writer
+		}
+		writer = next
+	}
+}
+
 type subscribeLimiter struct {
 	global ratelimit.RateLimiter
 	user   ratelimit.RateLimiter
@@ -139,10 +153,11 @@ func (h *ReportEventsHandler) ServeHTTP(c *gin.Context) {
 		return
 	}
 	responseWriter := http.ResponseWriter(c.Writer)
-	if unwrapper, ok := responseWriter.(interface{ Unwrap() http.ResponseWriter }); ok {
+	underlying := unwrapResponseWriter(responseWriter)
+	if underlying != responseWriter {
 		responseWriter = &ginWebsocketResponseWriter{
 			ResponseWriter: c.Writer,
-			underlying:     unwrapper.Unwrap(),
+			underlying:     underlying,
 		}
 	}
 	conn, err := websocket.Accept(responseWriter, c.Request, &websocket.AcceptOptions{

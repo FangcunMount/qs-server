@@ -134,6 +134,35 @@ func TestMissingDroppedIterationsMetricMeansZeroWhenIterationsExist(t *testing.T
 	}
 }
 
+func TestThroughputUsesPlannedTrafficWindowInsteadOfSetupInclusiveK6Rate(t *testing.T) {
+	raw := rawSummary{Metrics: map[string]map[string]any{
+		// The k6 rate covers a 60s process lifetime: 30s setup + 30s traffic.
+		// Throughput must instead use the 30s planned traffic window.
+		"iterations":             {"count": float64(120), "rate": float64(2)},
+		"ws_sessions":            {"count": float64(30), "rate": float64(0.5)},
+		"answer_submit_accepted": {"count": float64(30), "rate": float64(0.5)},
+	}}
+
+	throughput := throughputResults(
+		phaseSpec{TargetQPS: 4, Duration: "30s"},
+		raw,
+		PhaseEvidence{},
+	)
+
+	if got := throughput.BusinessQPS.Actual.Value; got == nil || *got != 4 {
+		t.Fatalf("actual QPS = %#v, want 4", throughput.BusinessQPS.Actual)
+	}
+	if got := throughput.BusinessQPS.TargetAttainment.Value; got == nil || *got != 1 {
+		t.Fatalf("target attainment = %#v, want 1", throughput.BusinessQPS.TargetAttainment)
+	}
+	if got := throughput.WSSessionsPerSecond.Value; got == nil || *got != 1 {
+		t.Fatalf("WS sessions/s = %#v, want 1", throughput.WSSessionsPerSecond)
+	}
+	if got := throughput.AcceptedTPS.Value; got == nil || *got != 1 {
+		t.Fatalf("accepted TPS = %#v, want 1", throughput.AcceptedTPS)
+	}
+}
+
 func TestOperationResultsIncludeGlobalHTTPTimeoutAndErrorRates(t *testing.T) {
 	raw := rawSummary{Metrics: map[string]map[string]any{
 		"http_reqs":          {"count": float64(100), "rate": float64(10)},

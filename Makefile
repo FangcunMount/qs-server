@@ -254,6 +254,7 @@ perf-verify: perf-check-k6 ## 校验统一编排器、报告契约与 k6 场景
 	bash -n $(PERF_SCRIPT_DIR)/sync-profiles-from-example.sh
 	$(GO) test ./scripts/perf/perfctl ./internal/pkg/retryobservability
 	jq -e '.qpsProfile == "smoke_4" and (.qpsProfiles | keys) == ["admission_300", "experience_60", "smoke_4"]' $(PERF_SCRIPT_DIR)/qs-perf.config.example.json >/dev/null
+	k6 run --quiet $(PERF_SCRIPT_DIR)/k6/tests/setup-correlated-headers.js
 	k6 run --quiet -e QUERY_RPS=0 -e SUBMIT_RPS=0 -e REPORT_RPS=1 -e STATS_RPS=0 -e CHAIN_PROBE_RPS=0 -e TOKENS=contract-test-token $(PERF_SCRIPT_DIR)/k6/tests/missing-report-sample.js
 	k6 run --quiet -e QUERY_RPS=0 -e SUBMIT_RPS=0 -e REPORT_RPS=0 -e STATS_RPS=0 -e CHAIN_PROBE_RPS=0 -e COLLECTION_TOKENS=token-1,token-2 $(PERF_SCRIPT_DIR)/k6/tests/submit-subject-pairing.js
 	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e PERF_ROOT_DIR="$(CURDIR)" -e QPS_PROFILE=smoke_4 $(PERF_K6_SCRIPT) >/dev/null
