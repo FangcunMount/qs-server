@@ -7,9 +7,10 @@ import (
 )
 
 const (
-	SignalNameQuestionnaireCacheChanged = signalcatalog.QuestionnaireCacheChanged
-	SignalNameScaleCacheChanged         = signalcatalog.ScaleCacheChanged
-	SignalNameTypologyModelCacheChanged = signalcatalog.TypologyModelCacheChanged
+	SignalNameQuestionnaireCacheChanged   = signalcatalog.QuestionnaireCacheChanged
+	SignalNameAssessmentModelCacheChanged = signalcatalog.AssessmentModelCacheChanged
+	SignalNameScaleCacheChanged           = signalcatalog.ScaleCacheChanged
+	SignalNameTypologyModelCacheChanged   = signalcatalog.TypologyModelCacheChanged
 )
 
 // QuestionnaireCacheChangedSignal 问卷缓存失效唤醒信号（best-effort，非业务事实）。
@@ -18,6 +19,23 @@ type QuestionnaireCacheChangedSignal struct {
 	Version    string    `json:"version,omitempty"`
 	Action     string    `json:"action,omitempty"`
 	OccurredAt time.Time `json:"occurred_at"`
+}
+
+// AssessmentModelCacheChangedSignal 已发布测评模型目录缓存失效唤醒信号
+// （best-effort，非业务事实）。
+type AssessmentModelCacheChangedSignal struct {
+	Kind       string    `json:"kind"`
+	Code       string    `json:"code"`
+	Action     string    `json:"action"`
+	OccurredAt time.Time `json:"occurred_at"`
+}
+
+func (s AssessmentModelCacheChangedSignal) SignalName() string {
+	return SignalNameAssessmentModelCacheChanged
+}
+
+func (s AssessmentModelCacheChangedSignal) SignalKey() string {
+	return s.Kind + ":" + s.Code
 }
 
 func (s QuestionnaireCacheChangedSignal) SignalName() string {

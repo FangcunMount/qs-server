@@ -40,18 +40,10 @@ type Options struct {
 	// 共享 Redis family runtime 路由
 	RedisRuntime *genericoptions.RedisRuntimeOptions `json:"redis_runtime" mapstructure:"redis_runtime"`
 	LockLease    *genericoptions.LockLeaseOptions    `json:"lock_lease" mapstructure:"lock_lease"`
-	Cache        *CacheOptions                       `json:"cache" mapstructure:"cache"`
+	RuntimeState *genericoptions.RuntimeStateOptions `json:"runtime_state" mapstructure:"runtime_state"`
 	// report_status 与 signaling
 	Signaling          *genericoptions.SignalingOptions `json:"signaling" mapstructure:"signaling"`
 	deliveryConfigured bool
-}
-
-type CacheOptions struct {
-	Capabilities *CacheCapabilities `json:"capabilities" mapstructure:"capabilities"`
-}
-
-type CacheCapabilities struct {
-	ReportStatus *genericoptions.ReportStatusOptions `json:"report_status" mapstructure:"report_status"`
 }
 
 // MetricsOptions worker 观测端口配置。
@@ -161,10 +153,8 @@ func NewOptions() *Options {
 		RedisProfiles: map[string]*genericoptions.RedisOptions{},
 		RedisRuntime:  defaultRedisRuntimeOptions(),
 		LockLease:     genericoptions.NewLockLeaseOptions(),
-		Cache: &CacheOptions{Capabilities: &CacheCapabilities{
-			ReportStatus: genericoptions.NewReportStatusOptions(),
-		}},
-		Signaling: genericoptions.NewSignalingOptions(),
+		RuntimeState:  genericoptions.NewRuntimeStateOptions(),
+		Signaling:     genericoptions.NewSignalingOptions(),
 	}
 }
 
@@ -358,6 +348,7 @@ func (o *Options) Validate() []error {
 		o.RedisProfiles,
 		"redis_runtime",
 	)...)
+	errs = append(errs, o.RuntimeState.Validate("runtime_state")...)
 
 	return errs
 }

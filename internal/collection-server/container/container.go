@@ -171,6 +171,7 @@ func collectionCacheConfig(opts *options.Options) collectioncache.Config {
 	if opts == nil {
 		return config
 	}
+	config.PolicySource = opts.CachePolicyMetadata()
 	if opts.Signaling != nil && opts.Signaling.Redis != nil {
 		redis := opts.Signaling.Redis
 		config.Signaling.Enabled = redis.Enabled
@@ -182,13 +183,13 @@ func collectionCacheConfig(opts *options.Options) collectioncache.Config {
 			config.Signaling.BufferSize = redis.BufferSize
 		}
 	}
+	if opts.RuntimeState != nil && opts.RuntimeState.ReportStatus != nil {
+		config.ReportStatusTTL = opts.RuntimeState.ReportStatus.TTL()
+	}
 	if opts.Cache == nil || opts.Cache.Capabilities == nil {
 		return config
 	}
 	capabilities := opts.Cache.Capabilities
-	if capabilities.ReportStatus != nil {
-		config.ReportStatusTTL = time.Duration(capabilities.ReportStatus.TTLSeconds) * time.Second
-	}
 	if capabilities.Catalog == nil {
 		return config
 	}
@@ -196,11 +197,16 @@ func collectionCacheConfig(opts *options.Options) collectioncache.Config {
 	if capabilities.Catalog.Questionnaire != nil {
 		questionnaireOptions = &capabilities.Catalog.Questionnaire.CatalogL1CacheOptions
 	}
+	var publishedModelOptions *options.CatalogL1CacheOptions
+	if capabilities.Catalog.PublishedModel != nil {
+		publishedModelOptions = &capabilities.Catalog.PublishedModel.CatalogL1CacheOptions
+	}
 	var typologyOptions *options.CatalogL1CacheOptions
 	if capabilities.Catalog.Typology != nil {
 		typologyOptions = &capabilities.Catalog.Typology.CatalogL1CacheOptions
 	}
 	config.Questionnaire = catalogBinding("catalog.questionnaire", "cache.capabilities.catalog.questionnaire", questionnaireOptions)
+	config.PublishedModel = catalogBinding("catalog.published_model", "cache.capabilities.catalog.published_model", publishedModelOptions)
 	config.Typology = catalogBinding("catalog.typology", "cache.capabilities.catalog.typology", typologyOptions)
 	return config
 }

@@ -3,7 +3,44 @@ package options
 import (
 	"strings"
 	"testing"
+	"time"
 )
+
+func TestPublishedModelCacheDefaultsAreBoundedAndDisabled(t *testing.T) {
+	opts := NewOptions().Cache.Capabilities.Catalog.PublishedModel
+	if opts == nil || opts.Enabled || opts.TTLSeconds != 180 || opts.TTLJitterRatio != 0.2 || opts.MaxEntries != 64 || !opts.Singleflight || !opts.SignalEvictEnabled {
+		t.Fatalf("published-model cache defaults = %#v", opts)
+	}
+	if got := time.Duration(opts.TTLSeconds) * time.Second; got != 3*time.Minute {
+		t.Fatalf("published-model TTL = %s", got)
+	}
+}
+
+func TestPublishedModelCacheRawSettingsAndValidation(t *testing.T) {
+	settings := map[string]any{
+		"cache":         map[string]any{"policy_file": "cache/collection-server.dev.yaml"},
+		"runtime_state": map[string]any{"report_status": map[string]any{"ttl_seconds": 172800}},
+	}
+	if err := NewOptions().ValidateRawSettings(settings); err != nil {
+		t.Fatalf("ValidateRawSettings() error = %v", err)
+	}
+
+	opts := NewOptions()
+	opts.Cache.Capabilities.Catalog.PublishedModel.Enabled = true
+	opts.Cache.Capabilities.Catalog.PublishedModel.MaxEntries = 0
+	if !containsCollectionValidationError(opts.Validate(), "published_model_cache.max_entries must be greater than 0") {
+		t.Fatalf("Validate() errors = %v", opts.Validate())
+	}
+}
+
+func TestCollectionRejectsInlineCachePolicy(t *testing.T) {
+	err := NewOptions().ValidateRawSettings(map[string]any{"cache": map[string]any{
+		"capabilities": map[string]any{"catalog": map[string]any{}},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "unknown configuration field cache.capabilities") {
+		t.Fatalf("ValidateRawSettings() error = %v", err)
+	}
+}
 
 func TestResilienceControlDefaultsEnabled(t *testing.T) {
 	opts := NewOptions()

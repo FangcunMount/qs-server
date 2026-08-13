@@ -8376,6 +8376,9 @@ const docTemplate = `{
                 "generated_at": {
                     "type": "string"
                 },
+                "policy_source": {
+                    "$ref": "#/definitions/cachemodel.PolicySourceView"
+                },
                 "reload": {
                     "$ref": "#/definitions/cachemodel.PolicyReloadStatus"
                 },
@@ -8469,6 +8472,23 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "last_success_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "cachemodel.PolicySourceView": {
+            "type": "object",
+            "properties": {
+                "component": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "policy_sha256": {
+                    "type": "string"
+                },
+                "schema_version": {
                     "type": "string"
                 }
             }

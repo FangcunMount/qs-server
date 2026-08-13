@@ -60,7 +60,7 @@ func (validatorStub) ValidateEvaluationModel(context.Context, domainassessment.E
 
 func TestServiceCreatesThenSubmitsAssessmentThroughTransactionalOutbox(t *testing.T) {
 	repo, tx, stager := &intakeRepoStub{}, &txStub{}, &stagerStub{}
-	service := NewService(repo, validatorStub{}, tx, stager, nil)
+	service := NewService(repo, validatorStub{}, tx, stager)
 	kind, code, version := "scale", "MODEL-1", "1.0.0"
 	created, err := service.CreateForAnswerSheet(context.Background(), CreateCommand{
 		OrgID: 1, TesteeID: 2, QuestionnaireCode: "Q-001", QuestionnaireVersion: "v1", AnswerSheetID: 3, OriginType: "adhoc",
@@ -92,7 +92,7 @@ func TestServiceCreatesThenSubmitsAssessmentThroughTransactionalOutbox(t *testin
 
 func TestServiceRejectsSubmitForEvaluationWithoutModel(t *testing.T) {
 	repo, tx, stager := &intakeRepoStub{}, &txStub{}, &stagerStub{}
-	service := NewService(repo, nil, tx, stager, nil)
+	service := NewService(repo, nil, tx, stager)
 	created, err := service.CreateForAnswerSheet(context.Background(), CreateCommand{
 		OrgID: 1, TesteeID: 2, QuestionnaireCode: "Q-001", QuestionnaireVersion: "v1", AnswerSheetID: 3, OriginType: "adhoc",
 	})
@@ -110,7 +110,7 @@ func TestServiceRejectsSubmitForEvaluationWithoutModel(t *testing.T) {
 func TestServiceRejectsBoundModelWhenValidatorIsMissing(t *testing.T) {
 	repo, tx, stager := &intakeRepoStub{}, &txStub{}, &stagerStub{}
 	modelCode := "MODEL-1"
-	service := NewService(repo, nil, tx, stager, nil)
+	service := NewService(repo, nil, tx, stager)
 	if _, err := service.CreateForAnswerSheet(context.Background(), CreateCommand{
 		OrgID: 1, TesteeID: 2, QuestionnaireCode: "Q-001", QuestionnaireVersion: "v1", AnswerSheetID: 3,
 		ModelCode: &modelCode, OriginType: "adhoc",

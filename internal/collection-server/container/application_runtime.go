@@ -77,43 +77,47 @@ func (c *Container) buildSubmitRuntime(profileLinkService *iam.ProfileLinkServic
 func (c *Container) buildCatalogRuntime() catalogRuntime {
 	// catalog 读路径不经 acl：grpcbridge catalog reader 直接产出 application DTO。
 	var questionnaireCache questionnaire.PublishedDetailCache
+	var publishedModelCache appmodelcatalog.PublishedModelCache
 	var typologyCache typologymodel.CatalogCache
-	var questionnaireSingleflight, typologySingleflight bool
+	var questionnaireSingleflight, publishedModelSingleflight, typologySingleflight bool
 	if c.cacheSubsystem != nil {
 		questionnaireCache = c.cacheSubsystem.Questionnaire()
+		publishedModelCache = c.cacheSubsystem.PublishedModel()
 		typologyCache = c.cacheSubsystem.Typology()
 		questionnaireSingleflight = c.cacheSubsystem.QuestionnaireSingleflight()
+		publishedModelSingleflight = c.cacheSubsystem.PublishedModelSingleflight()
 		typologySingleflight = c.cacheSubsystem.TypologySingleflight()
 	}
+	assessmentModels := newAssessmentModelQueryService(c.assessmentModelCatalogClient, publishedModelCache, publishedModelSingleflight)
 	rt := catalogRuntime{
 		questionnaire: questionnaire.NewQueryService(
 			grpcbridge.NewQuestionnaireCatalogReader(c.questionnaireClient),
 			questionnaireCache,
 			questionnaireSingleflight,
 		),
-		assessmentModels: newAssessmentModelQueryService(c.assessmentModelCatalogClient),
+		assessmentModels: assessmentModels,
 		typology: typologymodel.NewQueryService(
-			grpcbridge.NewTypologyCatalogProjector(newAssessmentModelQueryService(c.assessmentModelCatalogClient)),
+			grpcbridge.NewTypologyCatalogProjector(assessmentModels),
 			typologyCache,
 			typologySingleflight,
 		),
 	}
 	c.l1PeekRegistry = catalogpeek.NewRegistry()
-	catalogpeek.RegisterCatalogL1(c.l1PeekRegistry, rt.typology, rt.questionnaire)
+	catalogpeek.RegisterCatalogL1(c.l1PeekRegistry, rt.assessmentModels, rt.typology, rt.questionnaire)
 	return rt
 }
 
-func newAssessmentModelQueryService(client *grpcclient.AssessmentModelCatalogClient) *appmodelcatalog.QueryService {
+func newAssessmentModelQueryService(client *grpcclient.AssessmentModelCatalogClient, cache appmodelcatalog.PublishedModelCache, useSingleflight bool) *appmodelcatalog.QueryService {
 	reader := grpcbridge.NewAssessmentModelCatalogReader(client)
-	return appmodelcatalog.NewQueryService(reader)
+	return appmodelcatalog.NewQueryService(reader, cache, useSingleflight)
 }
 
 func (c *Container) buildReportRuntime(evaluationQuery *evaluation.QueryService) reportRuntime {
 	var reportOpts *genericoptions.ReportStatusOptions
 	var sigOpts *genericoptions.SignalingOptions
 	if c.opts != nil {
-		if c.opts.Cache != nil && c.opts.Cache.Capabilities != nil {
-			reportOpts = c.opts.Cache.Capabilities.ReportStatus
+		if c.opts.RuntimeState != nil {
+			reportOpts = c.opts.RuntimeState.ReportStatus
 		}
 		sigOpts = c.opts.Signaling
 	}

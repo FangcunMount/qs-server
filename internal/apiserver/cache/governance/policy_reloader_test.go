@@ -17,8 +17,9 @@ func TestPolicyReloaderPublishesCASAndPreservesSnapshotOnFailure(t *testing.T) {
 	registry := sharedcache.NewRegistry(current)
 	candidate := current
 	candidate.Policy.TTL = 2 * time.Minute
-	reloader := NewPolicyReloader("test", registry, func(context.Context) ([]sharedcache.EffectiveCapability, string, error) {
-		return []sharedcache.EffectiveCapability{candidate}, "/tmp/apiserver.yaml", nil
+	source := sharedcache.PolicySource{Component: "qs-apiserver", SchemaVersion: "1.0", Path: "/tmp/cache.yaml", PolicySHA256: "hash-2"}
+	reloader := NewPolicyReloader("test", registry, func(context.Context) ([]sharedcache.EffectiveCapability, sharedcache.PolicySource, error) {
+		return []sharedcache.EffectiveCapability{candidate}, source, nil
 	})
 
 	result, err := reloader.ReloadPolicy(context.Background(), 7, cachemodel.CachePolicyReloadRequest{ExpectedVersion: 1})
@@ -47,8 +48,10 @@ func TestPolicyReloaderPublishesCASAndPreservesSnapshotOnFailure(t *testing.T) {
 func TestPolicyReloaderNoopAndLoaderFailureDoNotBumpVersion(t *testing.T) {
 	entry := sharedcache.EffectiveCapability{Capability: "plan.detail", Enabled: true, Policy: sharedcache.Policy{TTL: time.Hour}}
 	registry := sharedcache.NewRegistry(entry)
-	reloader := NewPolicyReloader("test", registry, func(context.Context) ([]sharedcache.EffectiveCapability, string, error) {
-		return []sharedcache.EffectiveCapability{entry}, "config.yaml", nil
+	source := sharedcache.PolicySource{Component: "qs-apiserver", SchemaVersion: "1.0", Path: "config.yaml", PolicySHA256: "hash"}
+	registry = sharedcache.NewRegistryWithSource(source, entry)
+	reloader := NewPolicyReloader("test", registry, func(context.Context) ([]sharedcache.EffectiveCapability, sharedcache.PolicySource, error) {
+		return []sharedcache.EffectiveCapability{entry}, source, nil
 	})
 	result, err := reloader.ReloadPolicy(context.Background(), 1, cachemodel.CachePolicyReloadRequest{ExpectedVersion: 1})
 	if err != nil || result.Changed || registry.Version() != 1 {
@@ -56,7 +59,9 @@ func TestPolicyReloaderNoopAndLoaderFailureDoNotBumpVersion(t *testing.T) {
 	}
 
 	loadErr := errors.New("cannot read config")
-	reloader.loader = func(context.Context) ([]sharedcache.EffectiveCapability, string, error) { return nil, "", loadErr }
+	reloader.loader = func(context.Context) ([]sharedcache.EffectiveCapability, sharedcache.PolicySource, error) {
+		return nil, sharedcache.PolicySource{}, loadErr
+	}
 	if _, err := reloader.ReloadPolicy(context.Background(), 1, cachemodel.CachePolicyReloadRequest{ExpectedVersion: 1}); !errors.Is(err, loadErr) {
 		t.Fatalf("loader failure = %v", err)
 	}
@@ -76,7 +81,8 @@ func TestStatusServiceProjectsEffectiveRegistryLayers(t *testing.T) {
 		Layers: sharedcache.PolicyLayers{SpecDefault: sharedcache.Policy{TTL: time.Hour}, Override: sharedcache.Policy{TTL: 2 * time.Hour}},
 		Policy: sharedcache.Policy{TTL: 2 * time.Hour, Compress: sharedcache.PolicySwitchDisabled, Singleflight: sharedcache.PolicySwitchEnabled, Negative: sharedcache.PolicySwitchDisabled},
 	}
-	registry := sharedcache.NewRegistry(entry)
+	source := sharedcache.PolicySource{Component: "qs-apiserver", SchemaVersion: "1.0", Path: "/app/configs/cache/apiserver.prod.yaml", PolicySHA256: "abc"}
+	registry := sharedcache.NewRegistryWithSource(source, entry)
 	service := NewStatusService("apiserver", nil, nil, nil, registry)
 	status, err := service.GetStatus(context.Background())
 	if err != nil {
@@ -84,6 +90,9 @@ func TestStatusServiceProjectsEffectiveRegistryLayers(t *testing.T) {
 	}
 	if status.EffectiveRegistry == nil || status.EffectiveRegistry.SnapshotVersion != 1 || status.EffectiveRegistry.CatalogVersion != "v2" {
 		t.Fatalf("effective registry = %#v", status.EffectiveRegistry)
+	}
+	if status.EffectiveRegistry.PolicySource == nil || status.EffectiveRegistry.PolicySource.PolicySHA256 != "abc" {
+		t.Fatalf("policy source = %#v", status.EffectiveRegistry.PolicySource)
 	}
 	capability := status.EffectiveRegistry.Capabilities[0]
 	if capability.Override.TTL != "2h0m0s" || capability.Effective.Singleflight != "enabled" {

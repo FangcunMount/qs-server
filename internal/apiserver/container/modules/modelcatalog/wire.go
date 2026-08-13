@@ -28,7 +28,7 @@ type WireInput struct {
 	EventPublisher         event.EventPublisher
 	RankRedisClient        redis.UniversalClient
 	RankCacheBuilder       *keyspace.Builder
-	CacheSignalNotifier    ScaleCacheSignalNotifier
+	CacheSignalNotifier    AssessmentModelCacheSignalNotifier
 	SurveyRuntimeInfra     *surveymod.SurveyRuntimeInfra
 	QuestionnairePublisher quesApp.QuestionnaireLifecycleService
 	QuestionnaireQuery     quesApp.QuestionnaireQueryService

@@ -106,12 +106,20 @@ type PolicyReloadStatus struct {
 	LastError     string    `json:"last_error,omitempty"`
 }
 
+type PolicySourceView struct {
+	Component     string `json:"component"`
+	SchemaVersion string `json:"schema_version"`
+	Path          string `json:"path"`
+	PolicySHA256  string `json:"policy_sha256"`
+}
+
 type EffectiveRegistrySnapshot struct {
 	SnapshotVersion uint64                 `json:"snapshot_version"`
 	CatalogVersion  string                 `json:"catalog_version"`
 	GeneratedAt     time.Time              `json:"generated_at"`
 	Capabilities    []CapabilityPolicyView `json:"capabilities"`
 	Reload          PolicyReloadStatus     `json:"reload"`
+	PolicySource    *PolicySourceView      `json:"policy_source,omitempty"`
 }
 
 type CachePolicyReloadRequest struct {

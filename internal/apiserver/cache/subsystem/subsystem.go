@@ -93,7 +93,12 @@ func NewSubsystemFromRuntime(runtimeBundle *cacheplanebootstrap.RuntimeBundle, c
 		handles:        handles,
 		observer:       observability.NewComponentObserver(component, statusRegistry),
 	}
-	s.effective = cachepolicy.NewEffectiveRegistry(newPolicyCatalog(cacheConfig))
+	effective := cachepolicy.NewEffectiveRegistry(newPolicyCatalog(cacheConfig))
+	if cacheConfig.PolicySource.Component != "" {
+		s.effective = sharedcache.NewRegistryWithSource(cacheConfig.PolicySource, effective.All()...)
+	} else {
+		s.effective = effective
+	}
 	s.hotsetRecorder = cachehotset.NewRedisStoreWithObserver(
 		s.Client(redisruntime.FamilyMeta),
 		s.Builder(redisruntime.FamilyMeta),

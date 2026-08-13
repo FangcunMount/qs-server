@@ -5,6 +5,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
+const (
+	KindPublishedModelDetail  = "published_model_detail"
+	KindPublishedModelList    = "published_model_list"
+	KindPublishedModelOptions = "published_model_options"
+)
+
 var l1CacheHits = promauto.NewCounterVec(prometheus.CounterOpts{
 	Name: "collection_l1_cache_hits_total",
 	Help: "Total collection-server in-process L1 cache hits.",

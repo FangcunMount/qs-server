@@ -32,6 +32,14 @@ signals:
       - apiserver
       - collection-server
 
+  assessment_model_cache_changed:
+    delivery: ephemeral_signal
+    transport: redis_pubsub
+    description: "已发布测评模型目录 L1 失效唤醒"
+    publisher: apiserver
+    subscribers:
+      - collection-server
+
   scale_cache_changed:
     delivery: ephemeral_signal
     transport: redis_pubsub

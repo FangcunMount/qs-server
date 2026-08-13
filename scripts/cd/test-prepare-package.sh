@@ -86,11 +86,13 @@ assert_package_contract() {
       assert_line "$env_file" "QS_APISERVER_MONGODB_MAX_POOL_SIZE=64"
       assert_line "$env_file" "QS_APISERVER_MONGODB_MAX_CONNECTING=8"
       assert_line "$env_file" "QS_APISERVER_MONGODB_MAX_CONN_IDLE_TIME=10m"
+      test -s "$package_dir/configs/cache/apiserver.prod.yaml"
       assert_line "$env_file" "QS_APISERVER_REDIS_DATABASE=0"
       assert_line "$env_file" "QS_APISERVER_MESSAGING_NSQ_ADDR=nsqd:4150"
       assert_absent "$env_file" "QS_APISERVER_NSQ_NSQD_"
       ;;
     collection)
+      test -s "$package_dir/configs/cache/collection-server.prod.yaml"
       assert_line "$env_file" "COLLECTION_SERVER_REDIS_DATABASE=0"
       ;;
     worker)

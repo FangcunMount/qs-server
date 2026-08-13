@@ -11,10 +11,10 @@ func (o *Options) ValidateRawSettings(settings map[string]any) error {
 		return fmt.Errorf("worker.max-retries has been removed; use messaging.delivery.max-attempts")
 	}
 	o.deliveryConfigured = hasNestedSetting(settings, "messaging", "delivery")
-	leaf := genericoptions.FieldSchema(nil)
-	return genericoptions.ValidateRawSection(settings, "cache", genericoptions.FieldSchema{
-		"capabilities": {"report_status": {"ttl_seconds": leaf}},
-	})
+	if err := genericoptions.ValidateRawSection(settings, "cache", genericoptions.FieldSchema{}); err != nil {
+		return err
+	}
+	return genericoptions.ValidateRawSection(settings, "runtime_state", genericoptions.RuntimeStateRawSchema())
 }
 
 func hasNestedSetting(settings map[string]any, path ...string) bool {

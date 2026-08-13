@@ -52,9 +52,6 @@ type Service interface {
 	FindByAnswerSheetID(context.Context, uint64) (*Assessment, error)
 }
 
-type assessmentListCache interface {
-	Invalidate(context.Context, uint64) error
-}
 type EvaluationModelValidator interface {
 	ValidateEvaluationModel(context.Context, domainassessment.EvaluationModelRef, domainassessment.QuestionnaireRef, ModelValidationMode) error
 }
@@ -63,7 +60,6 @@ type service struct {
 	validator  EvaluationModelValidator
 	tx         apptransaction.Runner
 	events     EventStager
-	cache      assessmentListCache
 	postCommit appEventing.PostCommitDispatcher
 }
 type Option func(*service)
@@ -71,8 +67,8 @@ type Option func(*service)
 func WithPostCommitDispatcher(v appEventing.PostCommitDispatcher) Option {
 	return func(s *service) { s.postCommit = v }
 }
-func NewService(repo domainassessment.Repository, validator EvaluationModelValidator, tx apptransaction.Runner, events EventStager, cache assessmentListCache, opts ...Option) Service {
-	s := &service{repo: repo, validator: validator, tx: tx, events: events, cache: cache}
+func NewService(repo domainassessment.Repository, validator EvaluationModelValidator, tx apptransaction.Runner, events EventStager, opts ...Option) Service {
+	s := &service{repo: repo, validator: validator, tx: tx, events: events}
 	for _, opt := range opts {
 		if opt != nil {
 			opt(s)
@@ -120,11 +116,10 @@ func (s *service) CreateForAnswerSheet(ctx context.Context, command CreateComman
 	if err != nil {
 		return nil, evalerrors.AssessmentCreateFailed(err, "创建测评失败")
 	}
-	finalizer := assessmentCreateFinalizer{repo: s.repo, txRunner: s.tx, eventStager: s.events, cache: s.cache, postCommit: s.postCommit}
+	finalizer := assessmentCreateFinalizer{repo: s.repo, txRunner: s.tx, eventStager: s.events, postCommit: s.postCommit}
 	if err := finalizer.SaveAndStage(ctx, a, req, command); err != nil {
 		return nil, evalerrors.Database(err, "保存测评失败")
 	}
-	finalizer.InvalidateCache(ctx, command.TesteeID)
 	return resultFromDomain(a)
 }
 func (s *service) SubmitForEvaluation(ctx context.Context, id uint64) (*Assessment, error) {
@@ -135,11 +130,10 @@ func (s *service) SubmitForEvaluation(ctx context.Context, id uint64) (*Assessme
 	if err := a.SubmitAt(time.Now()); err != nil {
 		return nil, evalerrors.AssessmentSubmitFailed(err, "提交测评失败")
 	}
-	finalizer := assessmentSubmitFinalizer{repo: s.repo, txRunner: s.tx, eventStager: s.events, cache: s.cache, postCommit: s.postCommit}
+	finalizer := assessmentSubmitFinalizer{repo: s.repo, txRunner: s.tx, eventStager: s.events, postCommit: s.postCommit}
 	if err := finalizer.SaveAndStage(ctx, a); err != nil {
 		return nil, evalerrors.Database(err, "保存测评失败")
 	}
-	finalizer.InvalidateCache(ctx, a.TesteeID().Uint64())
 	return resultFromDomain(a)
 }
 func (s *service) FindByAnswerSheetID(ctx context.Context, id uint64) (*Assessment, error) {

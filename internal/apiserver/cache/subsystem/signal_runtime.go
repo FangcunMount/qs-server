@@ -14,10 +14,11 @@ import (
 )
 
 type signalRuntime struct {
-	questionnaire *signalredis.Signaler[cachesignal.QuestionnaireCacheChangedSignal]
-	scale         *signalredis.Signaler[cachesignal.ScaleCacheChangedSignal]
-	typology      *signalredis.Signaler[cachesignal.TypologyModelCacheChangedSignal]
-	service       string
+	questionnaire   *signalredis.Signaler[cachesignal.QuestionnaireCacheChangedSignal]
+	assessmentModel *signalredis.Signaler[cachesignal.AssessmentModelCacheChangedSignal]
+	scale           *signalredis.Signaler[cachesignal.ScaleCacheChangedSignal]
+	typology        *signalredis.Signaler[cachesignal.TypologyModelCacheChangedSignal]
+	service         string
 }
 
 func newSignalRuntime(client redis.UniversalClient, opts SignalOptions, service string) *signalRuntime {
@@ -27,9 +28,25 @@ func newSignalRuntime(client redis.UniversalClient, opts SignalOptions, service 
 	}
 	redisOptions := opts.redisOptions()
 	runtime.questionnaire = signalredis.NewSignaler[cachesignal.QuestionnaireCacheChangedSignal](client, redisOptions)
+	runtime.assessmentModel = signalredis.NewSignaler[cachesignal.AssessmentModelCacheChangedSignal](client, redisOptions)
 	runtime.scale = signalredis.NewSignaler[cachesignal.ScaleCacheChangedSignal](client, redisOptions)
 	runtime.typology = signalredis.NewSignaler[cachesignal.TypologyModelCacheChangedSignal](client, redisOptions)
 	return runtime
+}
+
+func (r *signalRuntime) NotifyAssessmentModelCacheChanged(ctx context.Context, kind, code, action string) {
+	if r == nil || r.assessmentModel == nil || kind == "" || code == "" {
+		return
+	}
+	signal := cachesignal.AssessmentModelCacheChangedSignal{
+		Kind: kind, Code: code, Action: action, OccurredAt: time.Now().UTC(),
+	}
+	cacheobserve.IncSignalNotify(signal.SignalName(), r.service)
+	if err := r.assessmentModel.Notify(ctx, signal); err != nil {
+		cacheobserve.IncSignalNotifyFailed(signal.SignalName(), r.service)
+		logger.L(ctx).Warnw("assessment model cache signal notify failed",
+			"kind", kind, "code", code, "action", action, "error", err.Error())
+	}
 }
 
 func (o SignalOptions) redisOptions() signalredis.Options {

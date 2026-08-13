@@ -54,8 +54,11 @@ func TestSpecsHaveUniqueModuleOwnedIdentity(t *testing.T) {
 func TestEffectiveRegistryUsesCanonicalIDsAndLegacyMetricLabels(t *testing.T) {
 	registry := NewEffectiveRegistry(NewPolicyCatalog(sharedcache.Policy{}, nil, nil))
 	entries := registry.All()
-	if len(entries) != 8 {
-		t.Fatalf("registry entries = %d, want 8", len(entries))
+	if len(entries) != 7 {
+		t.Fatalf("registry entries = %d, want 7", len(entries))
+	}
+	if _, ok := registry.Resolve(sharedcache.Capability("evaluation.assessment_list")); ok {
+		t.Fatal("retired evaluation.assessment_list capability is still registered")
 	}
 	questionnaire, ok := registry.Resolve(CapabilitySurveyQuestionnaire)
 	if !ok || questionnaire.Owner != "survey" || questionnaire.Source != "cache.capabilities.survey.questionnaire" || questionnaire.MetricLabel != "questionnaire" || questionnaire.CatalogVersion != "v2" {

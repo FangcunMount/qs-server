@@ -22,7 +22,6 @@ const (
 	CapabilitySurveyQuestionnaire        sharedcache.Capability = "survey.questionnaire"
 	CapabilityModelCatalogPublished      sharedcache.Capability = "modelcatalog.published_model"
 	CapabilityEvaluationAssessmentDetail sharedcache.Capability = "evaluation.assessment_detail"
-	CapabilityEvaluationAssessmentList   sharedcache.Capability = "evaluation.assessment_list"
 	CapabilityActorTestee                sharedcache.Capability = "actor.testee"
 	CapabilityPlanDetail                 sharedcache.Capability = "plan.detail"
 	CapabilityStatisticsQuery            sharedcache.Capability = "statistics.query"

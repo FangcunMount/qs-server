@@ -71,3 +71,30 @@ func TestRegistryConcurrentReadersSeeWholeSnapshots(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestRegistryPublishesCapabilitiesAndPolicySourceAtomically(t *testing.T) {
+	entry := EffectiveCapability{Capability: "demo", Enabled: true, Policy: Policy{TTL: time.Minute}}
+	source := PolicySource{Component: "qs-apiserver", SchemaVersion: "1.0", Path: "/cache/one.yaml", PolicySHA256: "one"}
+	registry := NewRegistryWithSource(source, entry)
+
+	next := entry
+	next.Policy.TTL = 2 * time.Minute
+	nextSource := source
+	nextSource.PolicySHA256 = "two"
+	result, err := registry.PublishWithSource(1, []EffectiveCapability{next}, nextSource, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Changed || result.CurrentVersion != 2 {
+		t.Fatalf("PublishWithSource() = %#v", result)
+	}
+	snapshot := registry.Snapshot()
+	if snapshot.PolicySource == nil || snapshot.PolicySource.PolicySHA256 != "two" || snapshot.Capabilities[0].Policy.TTL != 2*time.Minute {
+		t.Fatalf("atomic snapshot = %#v", snapshot)
+	}
+
+	result, err = registry.PublishWithSource(2, []EffectiveCapability{next}, nextSource, time.Now())
+	if err != nil || result.Changed || registry.Version() != 2 {
+		t.Fatalf("no-op publish = %#v, err=%v, version=%d", result, err, registry.Version())
+	}
+}

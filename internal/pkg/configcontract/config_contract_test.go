@@ -23,6 +23,7 @@ import (
 	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
 	workergrpcclient "github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	workeroptions "github.com/FangcunMount/qs-server/internal/worker/options"
+	"github.com/FangcunMount/qs-server/pkg/app"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 )
@@ -150,6 +151,13 @@ func TestCollectionDevProdConfigContracts(t *testing.T) {
 			}
 			assertCollectionGRPCClientIdentityContract(t, name, opts.GRPCClient)
 			assertIAMJWKSURLContract(t, "collection", name, opts.IAMOptions)
+			published := opts.Cache.Capabilities.Catalog.PublishedModel
+			if published == nil || published.TTLSeconds != 180 || published.TTLJitterRatio != 0.2 || published.MaxEntries != 64 || !published.Singleflight || !published.SignalEvictEnabled {
+				t.Fatalf("%s published-model L1 config = %#v", name, published)
+			}
+			if wantEnabled := name == "collection-server.dev.yaml"; published.Enabled != wantEnabled {
+				t.Fatalf("%s published-model enabled = %v, want %v", name, published.Enabled, wantEnabled)
+			}
 		})
 	}
 }
@@ -836,11 +844,12 @@ func TestDBOpsRedisStatusIsReadOnlyAndDoesNotExposeKeys(t *testing.T) {
 		`4:cache:query:query:version:statistics:v2:org:*|4:cache:query:query:data:statistics:v2:org:*`,
 		`4:query:version:statistics:org:*|4:query:data:statistics:org:*`,
 		`4:cache:query:query:assessment:list:v2:*`,
+		`7:cache:meta:query:version:assessment:list:v2:*`,
 		`7:cache:query:query:version:assessment:list:*`,
 		`0:ops:runtime:*|1:ops:runtime:*`,
-		"current_assessment_list_version_compat",
+		"retired_assessment_list_version_candidate",
 		"current_statistics_compat",
-		"legacy_assessment_list_data_candidate",
+		"retired_assessment_list_data_candidate",
 		"legacy_statistics_data_candidate",
 		"command_timeout: 25m",
 	} {
@@ -870,9 +879,9 @@ func TestReportStatusTTLContractMatchesAcrossProcesses(t *testing.T) {
 		worker := workeroptions.NewOptions()
 		loadConfig(t, filepath.Join(repoRoot(t), "configs", "worker."+suffix+".yaml"), worker)
 
-		want := api.Cache.Capabilities.ReportStatus.TTLSeconds
-		collectionTTL := collection.Cache.Capabilities.ReportStatus.TTLSeconds
-		workerTTL := worker.Cache.Capabilities.ReportStatus.TTLSeconds
+		want := api.RuntimeState.ReportStatus.TTLSeconds
+		collectionTTL := collection.RuntimeState.ReportStatus.TTLSeconds
+		workerTTL := worker.RuntimeState.ReportStatus.TTLSeconds
 		if collectionTTL != want || workerTTL != want {
 			t.Fatalf("%s report status TTL mismatch: api=%d collection=%d worker=%d", suffix, want, collectionTTL, workerTTL)
 		}
@@ -894,6 +903,9 @@ func loadConfig(t *testing.T, path string, target any) {
 	}
 	if err := v.Unmarshal(target); err != nil {
 		t.Fatalf("Unmarshal(%s) error = %v", path, err)
+	}
+	if aware, ok := target.(app.RuntimeConfigContextAware); ok {
+		aware.SetRuntimeConfigContext(app.RuntimeConfigContext{MainConfigFile: path})
 	}
 }
 

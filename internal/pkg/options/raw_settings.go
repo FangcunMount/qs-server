@@ -9,6 +9,28 @@ import (
 // FieldSchema describes known nested fields. A nil child marks a leaf.
 type FieldSchema map[string]FieldSchema
 
+// LeafPaths returns canonical dotted leaf paths in deterministic order.
+func (s FieldSchema) LeafPaths() []string {
+	var paths []string
+	collectLeafPaths("", s, &paths)
+	sort.Strings(paths)
+	return paths
+}
+
+func collectLeafPaths(prefix string, schema FieldSchema, paths *[]string) {
+	for key, child := range schema {
+		path := key
+		if prefix != "" {
+			path = prefix + "." + key
+		}
+		if child == nil {
+			*paths = append(*paths, path)
+			continue
+		}
+		collectLeafPaths(path, child, paths)
+	}
+}
+
 // ValidateRawSection rejects unknown fields in one optional top-level section.
 func ValidateRawSection(settings map[string]any, section string, schema FieldSchema) error {
 	raw, ok := settings[section]

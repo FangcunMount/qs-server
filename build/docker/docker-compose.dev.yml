@@ -22,6 +22,7 @@ services:
       - "8444:8443"
     volumes:
       - ../../configs/apiserver.prod.yaml:/app/configs/apiserver.prod.yaml:ro
+      - ../../configs/cache:/app/configs/cache:ro
       - ../../configs/cert:/app/configs/cert:ro
       - apiserver-logs:/app/logs
       # gRPC mTLS 证书挂载（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
@@ -64,6 +65,7 @@ services:
       - "8445:8443"
     volumes:
       - ../../configs/collection-server.prod.yaml:/app/configs/collection-server.prod.yaml:ro
+      - ../../configs/cache:/app/configs/cache:ro
       - ../../configs/cert:/app/configs/cert:ro
       - collection-logs:/app/logs
       # gRPC mTLS 证书挂载（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）

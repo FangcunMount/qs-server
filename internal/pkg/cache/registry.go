@@ -45,10 +45,21 @@ type EffectiveCapability struct {
 	MetricLabel    string         `json:"metric_label"`
 }
 
+// PolicySource identifies the normalized policy document used to build one
+// immutable registry snapshot. PolicySHA256 is a digest of effective policy
+// input, not of the raw YAML bytes.
+type PolicySource struct {
+	Component     string `json:"component"`
+	SchemaVersion string `json:"schema_version"`
+	Path          string `json:"path"`
+	PolicySHA256  string `json:"policy_sha256"`
+}
+
 type RegistrySnapshot struct {
 	Version      uint64                `json:"version"`
 	GeneratedAt  time.Time             `json:"generated_at"`
 	Capabilities []EffectiveCapability `json:"capabilities"`
+	PolicySource *PolicySource         `json:"policy_source,omitempty"`
 }
 
 type PolicyProvider interface {
@@ -74,7 +85,13 @@ type Registry struct {
 
 func NewRegistry(entries ...EffectiveCapability) *Registry {
 	r := &Registry{}
-	r.snapshot.Store(newRegistrySnapshot(1, time.Now(), entries))
+	r.snapshot.Store(newRegistrySnapshot(1, time.Now(), nil, entries))
+	return r
+}
+
+func NewRegistryWithSource(source PolicySource, entries ...EffectiveCapability) *Registry {
+	r := &Registry{}
+	r.snapshot.Store(newRegistrySnapshot(1, time.Now(), &source, entries))
 	return r
 }
 
@@ -116,11 +133,21 @@ func (r *Registry) Snapshot() RegistrySnapshot {
 	snapshot := r.snapshot.Load()
 	return RegistrySnapshot{
 		Version: snapshot.Version, GeneratedAt: snapshot.GeneratedAt,
-		Capabilities: append([]EffectiveCapability(nil), snapshot.Capabilities...),
+		Capabilities: append([]EffectiveCapability(nil), snapshot.Capabilities...), PolicySource: clonePolicySource(snapshot.PolicySource),
 	}
 }
 
 func (r *Registry) Publish(expectedVersion uint64, capabilities []EffectiveCapability, generatedAt time.Time) (PublishResult, error) {
+	return r.publish(expectedVersion, capabilities, nil, false, generatedAt)
+}
+
+// PublishWithSource atomically publishes capabilities and their normalized
+// policy source. A source-only semantic change advances the snapshot version.
+func (r *Registry) PublishWithSource(expectedVersion uint64, capabilities []EffectiveCapability, source PolicySource, generatedAt time.Time) (PublishResult, error) {
+	return r.publish(expectedVersion, capabilities, &source, true, generatedAt)
+}
+
+func (r *Registry) publish(expectedVersion uint64, capabilities []EffectiveCapability, source *PolicySource, replaceSource bool, generatedAt time.Time) (PublishResult, error) {
 	if r == nil {
 		return PublishResult{}, ErrRegistryVersionConflict
 	}
@@ -130,8 +157,12 @@ func (r *Registry) Publish(expectedVersion uint64, capabilities []EffectiveCapab
 			return PublishResult{}, ErrRegistryVersionConflict
 		}
 		nextCapabilities := normalizeCapabilities(capabilities)
+		nextSource := current.PolicySource
+		if replaceSource {
+			nextSource = source
+		}
 		result := PublishResult{PreviousVersion: current.Version, CurrentVersion: current.Version}
-		if reflect.DeepEqual(current.Capabilities, nextCapabilities) {
+		if reflect.DeepEqual(current.Capabilities, nextCapabilities) && reflect.DeepEqual(current.PolicySource, nextSource) {
 			return result, nil
 		}
 		if generatedAt.IsZero() {
@@ -139,7 +170,7 @@ func (r *Registry) Publish(expectedVersion uint64, capabilities []EffectiveCapab
 		}
 		next := &RegistrySnapshot{
 			Version: current.Version + 1, GeneratedAt: generatedAt,
-			Capabilities: nextCapabilities,
+			Capabilities: nextCapabilities, PolicySource: clonePolicySource(nextSource),
 		}
 		if r.snapshot.CompareAndSwap(current, next) {
 			result.CurrentVersion = next.Version
@@ -149,11 +180,19 @@ func (r *Registry) Publish(expectedVersion uint64, capabilities []EffectiveCapab
 	}
 }
 
-func newRegistrySnapshot(version uint64, generatedAt time.Time, capabilities []EffectiveCapability) *RegistrySnapshot {
+func newRegistrySnapshot(version uint64, generatedAt time.Time, source *PolicySource, capabilities []EffectiveCapability) *RegistrySnapshot {
 	if generatedAt.IsZero() {
 		generatedAt = time.Now()
 	}
-	return &RegistrySnapshot{Version: version, GeneratedAt: generatedAt, Capabilities: normalizeCapabilities(capabilities)}
+	return &RegistrySnapshot{Version: version, GeneratedAt: generatedAt, Capabilities: normalizeCapabilities(capabilities), PolicySource: clonePolicySource(source)}
+}
+
+func clonePolicySource(source *PolicySource) *PolicySource {
+	if source == nil {
+		return nil
+	}
+	cloned := *source
+	return &cloned
 }
 
 func normalizeCapabilities(capabilities []EffectiveCapability) []EffectiveCapability {

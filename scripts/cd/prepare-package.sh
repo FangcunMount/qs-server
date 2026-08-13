@@ -55,6 +55,26 @@ cp \
 
 case "$SERVICE" in
   apiserver)
+    REQUIRED_CACHE_POLICY="${PACKAGE_DIR}/configs/cache/apiserver.prod.yaml"
+    ;;
+  collection)
+    REQUIRED_CACHE_POLICY="${PACKAGE_DIR}/configs/cache/collection-server.prod.yaml"
+    ;;
+  worker)
+    REQUIRED_CACHE_POLICY=""
+    ;;
+  *)
+    echo "Unsupported SERVICE: $SERVICE" >&2
+    exit 1
+    ;;
+esac
+if [ -n "$REQUIRED_CACHE_POLICY" ] && [ ! -r "$REQUIRED_CACHE_POLICY" ]; then
+  echo "Missing required cache policy: $REQUIRED_CACHE_POLICY" >&2
+  exit 1
+fi
+
+case "$SERVICE" in
+  apiserver)
     MONGODB_PORT="${MONGODB_PORT:-27017}"
     MYSQL_PORT="${MYSQL_PORT:-3306}"
     REDIS_PORT="${REDIS_PORT:-6379}"

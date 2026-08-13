@@ -1,24 +1,20 @@
 package app
 
-import (
-	"context"
+import cliflag "github.com/FangcunMount/qs-server/pkg/flag"
 
-	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
-)
-
-type RawSettings struct {
-	Values map[string]any
-	Source string
+// RuntimeConfigContext is the immutable startup context required by secondary
+// configuration loaders. ExplicitFlags contains only flags supplied by the
+// caller; flag defaults are deliberately excluded.
+type RuntimeConfigContext struct {
+	MainConfigFile string
+	EnvPrefix      string
+	ExplicitFlags  map[string]string
 }
 
-// RawSettingsSource re-reads the startup configuration without mutating the
-// process-global Viper instance or the already-decoded Options value.
-type RawSettingsSource interface {
-	Read(context.Context) (RawSettings, error)
-}
-
-type RawSettingsSourceAware interface {
-	SetRawSettingsSource(RawSettingsSource)
+// RuntimeConfigContextAware receives the startup configuration context after
+// the main file has been decoded and before Complete/Validate run.
+type RuntimeConfigContextAware interface {
+	SetRuntimeConfigContext(RuntimeConfigContext)
 }
 
 // CliOptions 命令行选项

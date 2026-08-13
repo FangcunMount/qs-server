@@ -1,14 +1,17 @@
 package options
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
+	"github.com/FangcunMount/qs-server/pkg/app"
 	"github.com/FangcunMount/qs-server/pkg/configmask"
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
 	"github.com/spf13/pflag"
@@ -32,11 +35,27 @@ type Options struct {
 	Signaling               *genericoptions.SignalingOptions        `json:"signaling" mapstructure:"signaling"`
 	Submit                  *SubmitOptions                          `json:"submit" mapstructure:"submit"`
 	Cache                   *CacheOptions                           `json:"cache" mapstructure:"cache"`
+	RuntimeState            *genericoptions.RuntimeStateOptions     `json:"runtime_state" mapstructure:"runtime_state"`
 	JWT                     *JWTOptions                             `json:"jwt" mapstructure:"jwt"`
 	IAMOptions              *genericoptions.IAMOptions              `json:"iam" mapstructure:"iam"`
 	Runtime                 *RuntimeOptions                         `json:"runtime" mapstructure:"runtime"`
 	Resilience              *ResilienceOptions                      `json:"resilience" mapstructure:"resilience"`
 	DelegatedSubject        *delegatedsubject.Options               `json:"delegated_subject" mapstructure:"delegated-subject"`
+	runtimeConfigContext    app.RuntimeConfigContext
+	cachePolicyMetadata     sharedcache.PolicySource
+}
+
+func (o *Options) SetRuntimeConfigContext(runtime app.RuntimeConfigContext) {
+	if o != nil {
+		o.runtimeConfigContext = runtime
+	}
+}
+
+func (o *Options) CachePolicyMetadata() sharedcache.PolicySource {
+	if o == nil {
+		return sharedcache.PolicySource{}
+	}
+	return o.cachePolicyMetadata
 }
 
 type ResilienceOptions struct {
@@ -268,6 +287,7 @@ func NewOptions() *Options {
 		Signaling:    genericoptions.NewSignalingOptions(),
 		Submit:       NewSubmitOptions(),
 		Cache:        NewCacheOptions(),
+		RuntimeState: genericoptions.NewRuntimeStateOptions(),
 		JWT: &JWTOptions{
 			SecretKey:     "your-secret-key-change-in-production",
 			TokenDuration: 24 * 7, // 7 天
@@ -397,7 +417,9 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.WaitReport.AddFlags(fss.FlagSet("wait_report"))
 	o.ReportEvents.AddFlags(fss.FlagSet("report_events"))
 	o.Submit.AddFlags(fss.FlagSet("submit"))
+	fss.FlagSet("cache").StringVar(&o.Cache.PolicyFile, "cache.policy_file", o.Cache.PolicyFile, "Read cache policy from the specified file.")
 	o.Cache.Capabilities.Catalog.Questionnaire.AddFlags(fss.FlagSet("cache.capabilities.catalog.questionnaire"))
+	o.Cache.Capabilities.Catalog.PublishedModel.AddFlags(fss.FlagSet("cache.capabilities.catalog.published_model"))
 	o.Cache.Capabilities.Catalog.Typology.AddFlags(fss.FlagSet("cache.capabilities.catalog.typology"))
 	o.Runtime.AddFlags(fss.FlagSet("runtime"))
 	o.JWT.AddFlags(fss.FlagSet("jwt"))
@@ -513,7 +535,24 @@ func (j *JWTOptions) AddFlags(fs *pflag.FlagSet) {
 
 // Complete 完成配置选项
 func (o *Options) Complete() error {
-	return o.SecureServing.Complete()
+	if err := o.SecureServing.Complete(); err != nil {
+		return err
+	}
+	if o.Cache == nil {
+		o.Cache = NewCacheOptions()
+	}
+	if o.Cache.PolicyFile == "" && o.runtimeConfigContext.MainConfigFile == "" {
+		return nil
+	}
+	candidate, metadata, err := loadCollectionCachePolicy(context.Background(), o.Cache.PolicyFile, o.runtimeConfigContext)
+	if err != nil {
+		return err
+	}
+	ensureCollectionCacheCapabilities(candidate)
+	o.Cache = candidate
+	o.cachePolicyMetadata = metadata
+	log.Infof("Cache policy loaded: component=%s schema_version=%s path=%s policy_sha256=%s", metadata.Component, metadata.SchemaVersion, metadata.Path, metadata.PolicySHA256)
+	return nil
 }
 
 // String 返回配置的字符串表示
@@ -533,8 +572,10 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateCollectionSubmit(o.Submit)...)
 	if o.Cache != nil && o.Cache.Capabilities != nil && o.Cache.Capabilities.Catalog != nil {
 		errs = append(errs, validateQuestionnaireCacheOptions(o.Cache.Capabilities.Catalog.Questionnaire)...)
+		errs = append(errs, validatePublishedModelCacheOptions(o.Cache.Capabilities.Catalog.PublishedModel)...)
 		errs = append(errs, validateTypologyCacheOptions(o.Cache.Capabilities.Catalog.Typology)...)
 	}
+	errs = append(errs, o.RuntimeState.Validate("runtime_state")...)
 	errs = append(errs, validateCollectionRateLimit(o.RateLimit)...)
 	errs = append(errs, validateWaitReportOptions(o.WaitReport)...)
 	errs = append(errs, validateReportEventsOptions(o.ReportEvents)...)

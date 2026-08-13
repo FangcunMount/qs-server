@@ -158,8 +158,8 @@ func (c *Container) buildReportStatusReporter() *reportstatus.Reporter {
 	reportStatusOpts := genericoptions.NewReportStatusOptions()
 	signalingOpts := genericoptions.NewSignalingOptions()
 	if c.opts != nil {
-		if c.opts.Cache != nil && c.opts.Cache.Capabilities != nil && c.opts.Cache.Capabilities.ReportStatus != nil {
-			reportStatusOpts = c.opts.Cache.Capabilities.ReportStatus
+		if c.opts.RuntimeState != nil && c.opts.RuntimeState.ReportStatus != nil {
+			reportStatusOpts = c.opts.RuntimeState.ReportStatus
 		}
 		if c.opts.Signaling != nil {
 			signalingOpts = c.opts.Signaling

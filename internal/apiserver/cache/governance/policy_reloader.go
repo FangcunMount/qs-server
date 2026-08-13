@@ -31,9 +31,9 @@ var (
 	}, []string{"component"})
 )
 
-// PolicyCandidateLoader re-reads and validates process configuration, then
-// returns a complete candidate registry. It must not mutate live Options.
-type PolicyCandidateLoader func(context.Context) ([]sharedcache.EffectiveCapability, string, error)
+// PolicyCandidateLoader re-reads and validates the cache policy document, then
+// returns a complete candidate registry and its normalized source metadata.
+type PolicyCandidateLoader func(context.Context) ([]sharedcache.EffectiveCapability, sharedcache.PolicySource, error)
 
 type PolicyReloader struct {
 	component string
@@ -81,13 +81,13 @@ func (r *PolicyReloader) ReloadPolicy(ctx context.Context, orgID int64, request 
 		return nil, err
 	}
 	candidate, loadedSource, err := r.loader(ctx)
-	source = loadedSource
+	source = loadedSource.Path
 	if err != nil {
 		r.recordFailure(err)
 		return nil, err
 	}
 	changedCapabilities := changedCapabilityIDs(r.registry.All(), candidate)
-	published, err := r.registry.Publish(request.ExpectedVersion, candidate, time.Now())
+	published, err := r.registry.PublishWithSource(request.ExpectedVersion, candidate, loadedSource, time.Now())
 	if errors.Is(err, sharedcache.ErrRegistryVersionConflict) {
 		err = componenterrors.WithCode(code.ErrConflict, "cache policy snapshot version conflict")
 	}
@@ -102,6 +102,7 @@ func (r *PolicyReloader) ReloadPolicy(ctx context.Context, orgID int64, request 
 	policySnapshotVersion.WithLabelValues(r.component).Set(float64(published.CurrentVersion))
 	logger.L(ctx).Infow("Cache policy reload completed",
 		"component", r.component, "actor_user_id", request.ActorUserID, "org_id", orgID, "source", source,
+		"schema_version", loadedSource.SchemaVersion, "policy_sha256", loadedSource.PolicySHA256,
 		"previous_version", published.PreviousVersion, "current_version", published.CurrentVersion,
 		"changed", published.Changed, "changed_capabilities", changedCapabilities,
 	)

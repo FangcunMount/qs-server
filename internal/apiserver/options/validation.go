@@ -52,6 +52,7 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateOutboxRelay(o.OutboxRelay, o.MySQLOptions.MaxOpenConnections, o.Backpressure)...)
 	errs = append(errs, validateStatisticsSync(o.StatisticsSync)...)
 	errs = append(errs, validateCacheOptions(o.Cache)...)
+	errs = append(errs, o.RuntimeState.Validate("runtime_state")...)
 	errs = append(errs, validateSystemGovernance(o.SystemGovernance)...)
 	if err := o.DelegatedSubject.Validate(); err != nil {
 		errs = append(errs, err)
@@ -485,7 +486,6 @@ func validateCacheOptions(opts *CacheOptions) []error {
 			"survey.questionnaire":         opts.Capabilities.Survey.Questionnaire,
 			"modelcatalog.published_model": opts.Capabilities.ModelCatalog.PublishedModel,
 			"evaluation.assessment_detail": opts.Capabilities.Evaluation.AssessmentDetail,
-			"evaluation.assessment_list":   opts.Capabilities.Evaluation.AssessmentList,
 			"actor.testee":                 opts.Capabilities.Actor.Testee,
 			"plan.detail":                  opts.Capabilities.Plan.Detail,
 			"statistics.query":             opts.Capabilities.Statistics.Query,

@@ -3,6 +3,7 @@ package catalogpeek
 import (
 	"strings"
 
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 	"github.com/gin-gonic/gin"
@@ -11,12 +12,40 @@ import (
 // RegisterCatalogL1 注册 catalog 目录读的 L1 peek 规则。
 func RegisterCatalogL1(
 	registry *Registry,
+	publishedModelSvc *modelcatalog.QueryService,
 	personalitySvc *typologymodel.QueryService,
 	questionnaireSvc *questionnaire.QueryService,
 ) {
 	if registry == nil {
 		return
 	}
+	registry.Register(Entry{
+		RouteMatch: func(route string) bool { return strings.HasSuffix(route, "/assessment-models/:code") },
+		HasCached: func(c *gin.Context) bool {
+			return publishedModelSvc != nil && publishedModelSvc.HasCachedDetail(c.Param("code"))
+		},
+	})
+	registry.Register(Entry{
+		RouteMatch: func(route string) bool {
+			return route == "/api/v1/assessment-models" || strings.HasSuffix(route, "/assessment-models")
+		},
+		HasCached: func(c *gin.Context) bool {
+			if publishedModelSvc == nil {
+				return false
+			}
+			var request modelcatalog.ListRequest
+			if err := c.ShouldBindQuery(&request); err != nil {
+				return false
+			}
+			return publishedModelSvc.HasCachedList(&request)
+		},
+	})
+	registry.Register(Entry{
+		RouteMatch: func(route string) bool { return strings.HasSuffix(route, "/assessment-models/options") },
+		HasCached: func(c *gin.Context) bool {
+			return publishedModelSvc != nil && publishedModelSvc.HasCachedOptions(c.Query("kind"))
+		},
+	})
 	registry.Register(Entry{
 		RouteMatch: func(route string) bool { return strings.HasSuffix(route, "/typology-models/:code") },
 		HasCached: func(c *gin.Context) bool {

@@ -11,6 +11,7 @@ import (
 
 // CacheOptions 描述 apiserver cache 子系统的运行时配置。
 type CacheOptions struct {
+	PolicySource     sharedcache.PolicySource
 	Capabilities     map[sharedcache.Capability]cachepolicy.Binding
 	TTLJitterRatio   float64
 	StatisticsWarmup *cachegov.StatisticsWarmupConfig
@@ -33,6 +34,7 @@ type SignalOptions struct {
 // SignalNotifier is the narrow cache-signal port exposed to business modules.
 type SignalNotifier interface {
 	NotifyQuestionnaireCacheChanged(context.Context, string, string, string)
+	NotifyAssessmentModelCacheChanged(context.Context, string, string, string)
 	NotifyScaleCacheChanged(context.Context, string, string)
 	NotifyTypologyModelCacheChanged(context.Context, string, string)
 }

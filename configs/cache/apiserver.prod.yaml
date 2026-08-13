@@ -1,0 +1,34 @@
+version: "1.0"
+component: qs-apiserver
+
+capabilities:
+  survey:
+    questionnaire: {enabled: true, ttl: "2h", negative: true}
+  modelcatalog:
+    published_model: {enabled: true, ttl: "2h", negative: false}
+  evaluation:
+    assessment_detail: {enabled: true, ttl: "1h", singleflight: true}
+  actor:
+    testee: {enabled: true, ttl: "30m", negative: true}
+  plan:
+    detail: {enabled: true, ttl: "12h", singleflight: true}
+  statistics:
+    query: {enabled: true, ttl: "26h", singleflight: false}
+
+defaults:
+  compress_payload: false
+  static: {negative_ttl: "5m", compress: false, singleflight: true, negative: false}
+  object: {negative_ttl: "5m", compress: false, singleflight: true, negative: false}
+  query: {negative_ttl: "5m", compress: false, singleflight: true, negative: false}
+  ttl_jitter_ratio: 0.2
+
+governance:
+  statistics_warmup:
+    enable: true
+    warm_on_startup: true
+    org_ids: [1]
+    overview_presets: ["latest_complete_day", "7d", "30d"]
+  warmup:
+    enable: true
+    startup: {static: true, query: false}
+    hotset: {enable: true, top_n: 20, max_items_per_kind: 200}

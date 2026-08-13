@@ -20,12 +20,11 @@ func TestAPIServerBuildContainerCacheOptions(t *testing.T) {
 	opts.Cache.Capabilities.ModelCatalog.PublishedModel.TTL = time.Minute
 	opts.Cache.Capabilities.Evaluation.AssessmentDetail.Enabled = false
 	opts.Cache.Capabilities.Evaluation.AssessmentDetail.TTL = 4 * time.Minute
-	opts.Cache.Capabilities.Evaluation.AssessmentList.Enabled = false
-	opts.Cache.Capabilities.Evaluation.AssessmentList.TTL = 5 * time.Minute
 	opts.Cache.Capabilities.Actor.Testee.TTL = 6 * time.Minute
 	opts.Cache.Capabilities.Plan.Detail.TTL = 7 * time.Minute
 	opts.Cache.Capabilities.Statistics.Query.Enabled = false
 	opts.Cache.Capabilities.Statistics.Query.TTL = 30 * time.Second
+	opts.RuntimeState.ReportStatus.TTLSeconds = int((48 * time.Hour) / time.Second)
 	opts.Cache.Defaults.TTLJitterRatio = 0.25
 	opts.Cache.Defaults.CompressPayload = true
 	opts.Cache.Governance.StatisticsWarmup = &apiserveroptions.StatisticsWarmupOptions{
@@ -80,10 +79,12 @@ func TestAPIServerBuildContainerCacheOptions(t *testing.T) {
 	got := server.buildContainerCacheOptions()
 
 	detail := got.Capabilities[cachepolicy.CapabilityEvaluationAssessmentDetail]
-	list := got.Capabilities[cachepolicy.CapabilityEvaluationAssessmentList]
 	statistics := got.Capabilities[cachepolicy.CapabilityStatisticsQuery]
-	if detail.Enabled || list.Enabled || statistics.Enabled {
-		t.Fatalf("disabled capability mapping mismatch: detail=%+v list=%+v statistics=%+v", detail, list, statistics)
+	if detail.Enabled || statistics.Enabled {
+		t.Fatalf("disabled capability mapping mismatch: detail=%+v statistics=%+v", detail, statistics)
+	}
+	if _, exists := got.Capabilities["evaluation.assessment_list"]; exists {
+		t.Fatal("retired evaluation.assessment_list capability is still projected")
 	}
 	if got.Capabilities[cachepolicy.CapabilityModelCatalogPublished].Policy.TTL != time.Minute ||
 		got.Capabilities[cachepolicy.CapabilityPlanDetail].Policy.TTL != 7*time.Minute ||

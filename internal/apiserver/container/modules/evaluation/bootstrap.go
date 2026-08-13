@@ -13,7 +13,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
-	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
@@ -28,10 +27,6 @@ type BootstrapInput struct {
 	RedisClient                redis.UniversalClient
 	CacheBuilder               *keyspace.Builder
 	CachePolicies              sharedcache.PolicyProvider
-	QueryRedisClient           redis.UniversalClient
-	QueryCacheBuilder          *keyspace.Builder
-	MetaCacheBuilder           *keyspace.Builder
-	VersionStore               querycache.VersionTokenStore
 	Observer                   *observability.ComponentObserver
 	MySQLLimiter               backpressure.Acquirer
 	TesteeAccessChecker        evaluationoperator.AccessChecker

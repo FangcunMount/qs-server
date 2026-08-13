@@ -35,8 +35,6 @@ import (
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
-	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
-	redisstore "github.com/FangcunMount/qs-server/internal/pkg/cache/redis"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
@@ -69,10 +67,6 @@ type Deps struct {
 	RedisClient                redis.UniversalClient
 	CacheBuilder               *keyspace.Builder
 	CachePolicies              sharedcache.PolicyProvider
-	QueryRedisClient           redis.UniversalClient
-	QueryCacheBuilder          *keyspace.Builder
-	MetaCacheBuilder           *keyspace.Builder
-	VersionStore               querycache.VersionTokenStore
 	Observer                   *observability.ComponentObserver
 	MySQLLimiter               backpressure.Acquirer
 	TesteeAccessChecker        evaluationoperator.AccessChecker
@@ -197,33 +191,13 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 			),
 		)
 	}
-	if normalized.QueryRedisClient != nil && normalized.VersionStore != nil {
-		listCache := evaluationcache.NewMyAssessmentListCacheWithBuildersProviderAndObserver(
-			redisstore.NewStore(normalized.QueryRedisClient),
-			normalized.VersionStore,
-			normalized.QueryCacheBuilder,
-			normalized.MetaCacheBuilder,
-			normalized.CachePolicies,
-			normalized.Observer,
-		)
-		m.IntakeService = evaluationintake.NewService(
-			infra.assessmentRepo,
-			modelValidator,
-			infra.txRunner,
-			infra.assessmentOutboxStore,
-			listCache,
-			evaluationintake.WithPostCommitDispatcher(infra.postCommit),
-		)
-	} else {
-		m.IntakeService = evaluationintake.NewService(
-			infra.assessmentRepo,
-			modelValidator,
-			infra.txRunner,
-			infra.assessmentOutboxStore,
-			nil,
-			evaluationintake.WithPostCommitDispatcher(infra.postCommit),
-		)
-	}
+	m.IntakeService = evaluationintake.NewService(
+		infra.assessmentRepo,
+		modelValidator,
+		infra.txRunner,
+		infra.assessmentOutboxStore,
+		evaluationintake.WithPostCommitDispatcher(infra.postCommit),
+	)
 	scoreFacts := evaluationoutcome.NewScoreFactReader(infra.outcomeRepo, infra.scoreProjectionReader)
 	m.TesteeService = evaluationtestee.NewService(infra.assessmentRepo, infra.assessmentReader, scoreFacts)
 	m.OperatorQuery = evaluationoperator.NewQueryService(infra.assessmentRepo, infra.assessmentReader, normalized.TesteeAccessChecker, scoreFacts, infra.runRepo)
@@ -246,17 +220,6 @@ func normalizeDeps(deps Deps) (Deps, error) {
 	if deps.InputResolver != nil {
 		if len(deps.ExecutionPaths) == 0 {
 			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "execution paths are required when input resolver is configured")
-		}
-	}
-	if deps.QueryRedisClient != nil {
-		if deps.VersionStore == nil {
-			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "assessment list version store is required when query cache is enabled")
-		}
-		if deps.QueryCacheBuilder == nil {
-			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "assessment list query key builder is required when query cache is enabled")
-		}
-		if deps.MetaCacheBuilder == nil {
-			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "assessment list meta key builder is required when query cache is enabled")
 		}
 	}
 	return deps, nil

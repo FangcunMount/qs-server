@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/signaling"
 	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogcache"
+	appmodelcatalog "github.com/FangcunMount/qs-server/internal/collection-server/application/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
@@ -27,10 +28,11 @@ type Subsystem struct {
 	config    Config
 	opsHandle *redisruntime.Handle
 
-	questionnaire questionnaire.PublishedDetailCache
-	typology      typologymodel.CatalogCache
-	warmup        *typologymodel.QueryService
-	effective     *sharedcache.Registry
+	questionnaire  questionnaire.PublishedDetailCache
+	publishedModel appmodelcatalog.PublishedModelCache
+	typology       typologymodel.CatalogCache
+	warmup         *typologymodel.QueryService
+	effective      *sharedcache.Registry
 
 	mu      sync.Mutex
 	started bool
@@ -49,9 +51,11 @@ type CatalogBinding struct {
 
 type Config struct {
 	Questionnaire   CatalogBinding
+	PublishedModel  CatalogBinding
 	Typology        CatalogBinding
 	ReportStatusTTL time.Duration
 	Signaling       SignalOptions
+	PolicySource    sharedcache.PolicySource
 }
 
 // SignalOptions controls collection-server's Redis Pub/Sub cache watchers.
@@ -93,6 +97,13 @@ func NewSubsystem(config Config, opsHandle *redisruntime.Handle) *Subsystem {
 			OnHit: base.OnHit, OnMiss: base.OnMiss,
 		})
 	}
+	if cfg := config.PublishedModel; cfg.Enabled {
+		s.publishedModel = appmodelcatalog.NewLocalPublishedModelCache(
+			catalogcache.LocalTTLCacheOptions(catalogcache.KindPublishedModelDetail, cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio),
+			catalogcache.LocalTTLCacheOptions(catalogcache.KindPublishedModelList, cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio),
+			catalogcache.LocalTTLCacheOptions(catalogcache.KindPublishedModelOptions, cfg.Policy.TTL, cfg.MaxEntries, cfg.Policy.JitterRatio),
+		)
+	}
 	s.effective = buildEffectiveRegistry(config)
 	return s
 }
@@ -111,12 +122,23 @@ func (s *Subsystem) Typology() typologymodel.CatalogCache {
 	return s.typology
 }
 
+func (s *Subsystem) PublishedModel() appmodelcatalog.PublishedModelCache {
+	if s == nil {
+		return nil
+	}
+	return s.publishedModel
+}
+
 func (s *Subsystem) QuestionnaireSingleflight() bool {
 	return s != nil && s.config.Questionnaire.Singleflight
 }
 
 func (s *Subsystem) TypologySingleflight() bool {
 	return s != nil && s.config.Typology.Singleflight
+}
+
+func (s *Subsystem) PublishedModelSingleflight() bool {
+	return s != nil && s.config.PublishedModel.Singleflight
 }
 
 func (s *Subsystem) EffectiveRegistry() *sharedcache.Registry {
@@ -155,6 +177,7 @@ func (s *Subsystem) Start(ctx context.Context) error {
 	s.mu.Unlock()
 
 	s.startQuestionnaireWatcher(runCtx)
+	s.startPublishedModelWatcher(runCtx)
 	s.startTypologyWatcher(runCtx)
 	if warmup != nil {
 		go warmCatalog(runCtx, warmup)
@@ -218,6 +241,26 @@ func (s *Subsystem) startTypologyWatcher(ctx context.Context) {
 	}, "typology model cache signal evicted")
 }
 
+func (s *Subsystem) startPublishedModelWatcher(ctx context.Context) {
+	cfg := s.config.PublishedModel
+	if s.publishedModel == nil || !cfg.Enabled || !cfg.SignalEvict {
+		return
+	}
+	client, signaling, ok := s.signaling()
+	if !ok {
+		return
+	}
+	signaler := signalredis.NewSignaler[cachesignal.AssessmentModelCacheChangedSignal](client, signaling)
+	watchSignals(ctx, signaler, s.evictPublishedModelOnSignal, "published model cache signal evicted")
+}
+
+func (s *Subsystem) evictPublishedModelOnSignal(changed cachesignal.AssessmentModelCacheChangedSignal) {
+	if s == nil || s.publishedModel == nil || changed.Code == "" {
+		return
+	}
+	s.publishedModel.EvictOnSignal(changed.Code)
+}
+
 func (s *Subsystem) signaling() (redis.UniversalClient, signalredis.Options, bool) {
 	cfg := s.config.Signaling
 	if !cfg.Enabled || s.opsHandle == nil || s.opsHandle.Client == nil {
@@ -239,7 +282,7 @@ func warmCatalog(ctx context.Context, service *typologymodel.QueryService) {
 }
 
 func buildEffectiveRegistry(config Config) *sharedcache.Registry {
-	configuredCapabilities := []CatalogBinding{config.Questionnaire, config.Typology}
+	configuredCapabilities := []CatalogBinding{config.Questionnaire, config.PublishedModel, config.Typology}
 	entries := make([]sharedcache.EffectiveCapability, 0, len(configuredCapabilities)+1)
 	for _, item := range configuredCapabilities {
 		entries = append(entries, sharedcache.EffectiveCapability{
@@ -254,8 +297,11 @@ func buildEffectiveRegistry(config Config) *sharedcache.Registry {
 			Capability: "report_status", Owner: "interpretation", Kind: sharedcache.KindOperationalState,
 			Layer: sharedcache.LayerRuntime, Family: "ops_runtime", Enabled: true,
 			Policy: sharedcache.Policy{TTL: config.ReportStatusTTL},
-			Source: "cache.capabilities.report_status", CatalogVersion: "v2", MetricLabel: "report_status",
+			Source: "runtime_state.report_status", CatalogVersion: "v2", MetricLabel: "report_status",
 		})
+	}
+	if config.PolicySource.Component != "" {
+		return sharedcache.NewRegistryWithSource(config.PolicySource, entries...)
 	}
 	return sharedcache.NewRegistry(entries...)
 }

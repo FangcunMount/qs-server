@@ -8,11 +8,13 @@ import (
 	"testing"
 	"time"
 
+	pkgerrors "github.com/FangcunMount/component-base/pkg/errors"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	reportqueryjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
 	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
 	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -26,6 +28,9 @@ type operatorQueryStub struct {
 	runList    *evaluationoperator.RunList
 	failedRuns *evaluationoperator.RetryableFailedRunList
 	latestRun  *evaluationoperator.Run
+	listResult *evaluationoperator.AssessmentList
+	listErr    error
+	lastList   evaluationoperator.ListQuery
 }
 
 func (s *operatorQueryStub) GetAssessment(_ context.Context, actor evaluationoperator.Actor, id uint64) (*evaluationoperator.Assessment, error) {
@@ -38,8 +43,12 @@ func (*operatorQueryStub) ValidateTesteeAccess(context.Context, evaluationoperat
 func (*operatorQueryStub) ScopeTesteeList(context.Context, evaluationoperator.Actor, uint64) (evaluationoperator.TesteeListScope, error) {
 	return evaluationoperator.TesteeListScope{}, nil
 }
-func (*operatorQueryStub) ListAssessments(context.Context, evaluationoperator.Actor, evaluationoperator.ListQuery) (*evaluationoperator.AssessmentList, error) {
-	return &evaluationoperator.AssessmentList{}, nil
+func (s *operatorQueryStub) ListAssessments(_ context.Context, _ evaluationoperator.Actor, query evaluationoperator.ListQuery) (*evaluationoperator.AssessmentList, error) {
+	s.lastList = query
+	if s.listResult == nil && s.listErr == nil {
+		return &evaluationoperator.AssessmentList{}, nil
+	}
+	return s.listResult, s.listErr
 }
 func (*operatorQueryStub) GetAssessmentOutcome(context.Context, evaluationoperator.Actor, uint64) (*evaluationoperator.OutcomeAssessment, error) {
 	return nil, nil
@@ -155,6 +164,55 @@ func TestEvaluationHandlerGetAssessmentSuccess(t *testing.T) {
 	h.GetAssessment(c)
 	if rec.Code != http.StatusOK || query.lastActor != (evaluationoperator.Actor{OrgID: 12, OperatorUserID: 34}) || query.lastID != 301 {
 		t.Fatalf("response/query=%d %#v", rec.Code, query)
+	}
+}
+
+func TestEvaluationHandlerListAssessmentsPreservesHTTPContract(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	query := &operatorQueryStub{listResult: &evaluationoperator.AssessmentList{
+		Items: []*evaluationoperator.Assessment{}, Total: 0, Page: 2, PageSize: 25, TotalPages: 0,
+	}}
+	h := NewAssessmentReportJourneyHandler(reportqueryjourney.NewAdministrationService(nil, nil, query), nil)
+	c, rec := protectedContext(http.MethodGet, "/api/v1/evaluations/assessments?page=2&page_size=25&status=evaluated&testee_id=77")
+	h.ListAssessments(c)
+
+	var payload struct {
+		Code int `json:"code"`
+		Data struct {
+			Items      []json.RawMessage `json:"items"`
+			Total      int               `json:"total"`
+			Page       int               `json:"page"`
+			PageSize   int               `json:"page_size"`
+			TotalPages int               `json:"total_pages"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if rec.Code != http.StatusOK || payload.Code != 0 || payload.Data.Items == nil || len(payload.Data.Items) != 0 ||
+		payload.Data.Total != 0 || payload.Data.Page != 2 || payload.Data.PageSize != 25 || payload.Data.TotalPages != 0 {
+		t.Fatalf("response=%d payload=%#v body=%s", rec.Code, payload, rec.Body.String())
+	}
+	if query.lastList.Page != 2 || query.lastList.PageSize != 25 || query.lastList.Status != "evaluated" || query.lastList.TesteeID == nil || *query.lastList.TesteeID != 77 {
+		t.Fatalf("list query=%#v", query.lastList)
+	}
+}
+
+func TestEvaluationHandlerListAssessmentsPreservesErrorMapping(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	query := &operatorQueryStub{listErr: pkgerrors.WithCode(code.ErrAssessmentListFailed, "list failed")}
+	h := NewAssessmentReportJourneyHandler(reportqueryjourney.NewAdministrationService(nil, nil, query), nil)
+	c, rec := protectedContext(http.MethodGet, "/api/v1/evaluations/assessments?page=1&page_size=10")
+	h.ListAssessments(c)
+
+	var payload struct {
+		Code int `json:"code"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if rec.Code != http.StatusInternalServerError || payload.Code != code.ErrAssessmentListFailed {
+		t.Fatalf("response=%d code=%d body=%s", rec.Code, payload.Code, rec.Body.String())
 	}
 }
 

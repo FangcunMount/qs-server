@@ -69,6 +69,21 @@ func TestOptionsRejectRemovedWorkerMaxRetries(t *testing.T) {
 	}
 }
 
+func TestWorkerRuntimeStateReplacesCacheOptions(t *testing.T) {
+	opts := NewOptions()
+	if err := opts.ValidateRawSettings(map[string]any{"runtime_state": map[string]any{
+		"report_status": map[string]any{"ttl_seconds": 172800},
+	}}); err != nil {
+		t.Fatalf("runtime_state validation error = %v", err)
+	}
+	err := opts.ValidateRawSettings(map[string]any{"cache": map[string]any{
+		"capabilities": map[string]any{"report_status": map[string]any{"ttl_seconds": 172800}},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "unknown configuration field cache.capabilities") {
+		t.Fatalf("legacy cache validation error = %v", err)
+	}
+}
+
 func TestOptionsValidateHoldReplayHardCap(t *testing.T) {
 	opts := NewOptions()
 	opts.RetryGovernance.HoldReplay.MaxAttempts = 31

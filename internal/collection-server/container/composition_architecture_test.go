@@ -47,6 +47,29 @@ func TestCollectionContainerDoesNotImportApiserverRuntime(t *testing.T) {
 	}
 }
 
+func TestCatalogRuntimeSharesPublishedModelQueryServiceWithTypologyProjector(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(repoRoot(t), "internal", "collection-server", "container", "application_runtime.go")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(raw)
+	for _, required := range []string{
+		"assessmentModels := newAssessmentModelQueryService(",
+		"assessmentModels: assessmentModels",
+		"grpcbridge.NewTypologyCatalogProjector(assessmentModels)",
+	} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("catalog runtime must share one published-model QueryService; missing %q", required)
+		}
+	}
+	if strings.Count(text, "newAssessmentModelQueryService(c.assessmentModelCatalogClient") != 1 {
+		t.Fatal("catalog runtime constructed more than one published-model QueryService")
+	}
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)

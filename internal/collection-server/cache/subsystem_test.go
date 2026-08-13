@@ -5,14 +5,18 @@ import (
 	"testing"
 	"time"
 
+	appmodelcatalog "github.com/FangcunMount/qs-server/internal/collection-server/application/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
+	cachesignal "github.com/FangcunMount/qs-server/internal/pkg/cache/signal"
 )
 
 func TestSubsystemBuildsConfiguredTypedCaches(t *testing.T) {
 	opts := options.NewOptions()
 	opts.Cache.Capabilities.Catalog.Questionnaire.Enabled = true
 	opts.Cache.Capabilities.Catalog.Questionnaire.Singleflight = false
+	opts.Cache.Capabilities.Catalog.PublishedModel.Enabled = true
+	opts.Cache.Capabilities.Catalog.PublishedModel.Singleflight = true
 	opts.Cache.Capabilities.Catalog.Typology.Enabled = true
 	opts.Cache.Capabilities.Catalog.Typology.Singleflight = true
 
@@ -23,14 +27,20 @@ func TestSubsystemBuildsConfiguredTypedCaches(t *testing.T) {
 	if s.Typology() == nil {
 		t.Fatal("typology cache = nil, want configured cache")
 	}
+	if s.PublishedModel() == nil {
+		t.Fatal("published model cache = nil, want configured cache")
+	}
 	if s.QuestionnaireSingleflight() {
 		t.Fatal("questionnaire singleflight = true, want false")
 	}
 	if !s.TypologySingleflight() {
 		t.Fatal("typology singleflight = false, want true")
 	}
+	if !s.PublishedModelSingleflight() {
+		t.Fatal("published model singleflight = false, want true")
+	}
 	entries := s.EffectiveRegistry().All()
-	if len(entries) != 3 || entries[0].Capability != "catalog.questionnaire" || entries[1].Capability != "catalog.typology" || entries[2].Kind != "operational_state" {
+	if len(entries) != 4 || entries[0].Capability != "catalog.published_model" || entries[1].Capability != "catalog.questionnaire" || entries[2].Capability != "catalog.typology" || entries[3].Kind != "operational_state" {
 		t.Fatalf("effective registry = %#v", entries)
 	}
 }
@@ -38,11 +48,16 @@ func TestSubsystemBuildsConfiguredTypedCaches(t *testing.T) {
 func TestSubsystemDisabledCachesStayNil(t *testing.T) {
 	opts := options.NewOptions()
 	opts.Cache.Capabilities.Catalog.Questionnaire.Enabled = false
+	opts.Cache.Capabilities.Catalog.PublishedModel.Enabled = false
 	opts.Cache.Capabilities.Catalog.Typology.Enabled = false
 
 	s := NewSubsystem(testConfig(opts), nil)
-	if s.Questionnaire() != nil || s.Typology() != nil {
+	if s.Questionnaire() != nil || s.PublishedModel() != nil || s.Typology() != nil {
 		t.Fatal("disabled cache was constructed")
+	}
+	published, ok := s.EffectiveRegistry().Resolve("catalog.published_model")
+	if !ok || published.Enabled || published.Layer != sharedcache.LayerL1 {
+		t.Fatalf("disabled published-model registry entry = %#v, found=%v", published, ok)
 	}
 }
 
@@ -84,6 +99,31 @@ func TestSignalEvictRequiresEnabledCache(t *testing.T) {
 	}
 }
 
+func TestPublishedModelSignalEvictsExactDetailAndAllDerivedBuckets(t *testing.T) {
+	opts := options.NewOptions()
+	opts.Cache.Capabilities.Catalog.PublishedModel.Enabled = true
+	s := NewSubsystem(testConfig(opts), nil)
+	cache := s.PublishedModel()
+	cache.SetDetail("scale-a", &appmodelcatalog.ModelResponse{ModelSummaryResponse: appmodelcatalog.ModelSummaryResponse{Code: "scale-a"}})
+	cache.SetDetail("scale-b", &appmodelcatalog.ModelResponse{ModelSummaryResponse: appmodelcatalog.ModelSummaryResponse{Code: "scale-b"}})
+	cache.SetListByRequest(&appmodelcatalog.ListRequest{}, &appmodelcatalog.ListResponse{})
+	cache.SetOptions("", &appmodelcatalog.OptionsResponse{})
+
+	s.evictPublishedModelOnSignal(cachesignal.AssessmentModelCacheChangedSignal{Kind: "scale", Code: "SCALE-A", Action: "publish"})
+	if _, ok := cache.GetDetail("scale-a"); ok {
+		t.Fatal("changed detail remained cached")
+	}
+	if _, ok := cache.GetDetail("scale-b"); !ok {
+		t.Fatal("unrelated detail was evicted")
+	}
+	if _, ok := cache.GetListByRequest(&appmodelcatalog.ListRequest{}); ok {
+		t.Fatal("published-model list remained cached")
+	}
+	if _, ok := cache.GetOptions(""); ok {
+		t.Fatal("published-model options remained cached")
+	}
+}
+
 func TestSignalOptionsRedisOptions(t *testing.T) {
 	defaults := (SignalOptions{}).redisOptions()
 	if defaults.Prefix != "qs:signal" || defaults.BufferSize != 100 || defaults.Channel != "" {
@@ -110,8 +150,9 @@ func testConfig(opts *options.Options) Config {
 	}
 	catalog := opts.Cache.Capabilities.Catalog
 	config.Questionnaire = testBinding("catalog.questionnaire", &catalog.Questionnaire.CatalogL1CacheOptions)
+	config.PublishedModel = testBinding("catalog.published_model", &catalog.PublishedModel.CatalogL1CacheOptions)
 	config.Typology = testBinding("catalog.typology", &catalog.Typology.CatalogL1CacheOptions)
-	config.ReportStatusTTL = time.Duration(opts.Cache.Capabilities.ReportStatus.TTLSeconds) * time.Second
+	config.ReportStatusTTL = opts.RuntimeState.ReportStatus.TTL()
 	return config
 }
 

@@ -15,6 +15,10 @@ import (
 
 type testeeEvaluationServiceStub struct {
 	getAssessmentErr error
+	listResult       *evaluationtestee.AssessmentList
+	listErr          error
+	listActor        *evaluationtestee.Actor
+	listQuery        *evaluationtestee.ListQuery
 }
 
 func (s testeeEvaluationServiceStub) AuthorizeAssessment(context.Context, evaluationtestee.Actor, uint64) error {
@@ -23,8 +27,14 @@ func (s testeeEvaluationServiceStub) AuthorizeAssessment(context.Context, evalua
 func (s testeeEvaluationServiceStub) GetAssessment(context.Context, evaluationtestee.Actor, uint64) (*evaluationtestee.Assessment, error) {
 	return nil, s.getAssessmentErr
 }
-func (s testeeEvaluationServiceStub) ListAssessments(context.Context, evaluationtestee.Actor, evaluationtestee.ListQuery) (*evaluationtestee.AssessmentList, error) {
-	return nil, nil
+func (s testeeEvaluationServiceStub) ListAssessments(_ context.Context, actor evaluationtestee.Actor, query evaluationtestee.ListQuery) (*evaluationtestee.AssessmentList, error) {
+	if s.listActor != nil {
+		*s.listActor = actor
+	}
+	if s.listQuery != nil {
+		*s.listQuery = query
+	}
+	return s.listResult, s.listErr
 }
 func (s testeeEvaluationServiceStub) GetScore(context.Context, evaluationtestee.Actor, uint64) (*evaluationtestee.Score, error) {
 	return nil, nil
@@ -116,6 +126,59 @@ func TestGetMyAssessmentUsesAssessmentQueryGRPCErrorContract(t *testing.T) {
 				t.Fatalf("status = %s, want %s; err=%v", status.Code(err), tt.code, err)
 			}
 			if tt.code == codes.Internal && status.Convert(err).Message() != "internal error" {
+				t.Fatalf("internal detail leaked: %q", status.Convert(err).Message())
+			}
+		})
+	}
+}
+
+func TestListMyAssessmentsPreservesPaginationFiltersAndEmptyItems(t *testing.T) {
+	t.Parallel()
+
+	var actor evaluationtestee.Actor
+	var query evaluationtestee.ListQuery
+	svc := NewTesteeEvaluationService(testeeEvaluationServiceStub{
+		listResult: &evaluationtestee.AssessmentList{Items: []*evaluationtestee.Assessment{}, Total: 0, Page: 1, PageSize: 10, TotalPages: 0},
+		listActor:  &actor,
+		listQuery:  &query,
+	})
+	result, err := svc.ListMyAssessments(context.Background(), &pb.ListMyAssessmentsRequest{
+		TesteeId: 42, Status: "done", ScaleCode: "scale-a", RiskLevel: "high",
+		ModelKinds: []string{"scale", "typology", "scale"}, ModelCode: "model-a",
+		DateFrom: "2026-08-01", DateTo: "2026-08-02",
+	})
+	if err != nil {
+		t.Fatalf("ListMyAssessments() error = %v", err)
+	}
+	if result == nil || result.Items == nil || len(result.Items) != 0 || result.Page != 1 || result.PageSize != 10 || result.Total != 0 || result.TotalPages != 0 {
+		t.Fatalf("ListMyAssessments() result = %#v", result)
+	}
+	if actor.TesteeID != 42 || query.Page != 1 || query.PageSize != 10 || query.Status != "done" || query.ScaleCode != "scale-a" || query.RiskLevel != "high" ||
+		len(query.ModelKinds) != 2 || query.ModelKinds[0] != "scale" || query.ModelKinds[1] != "typology" || query.ModelCode != "model-a" ||
+		query.DateFrom != "2026-08-01" || query.DateTo != "2026-08-02" {
+		t.Fatalf("ListMyAssessments() actor/query = %#v %#v", actor, query)
+	}
+}
+
+func TestListMyAssessmentsPreservesErrorMapping(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		err  error
+		want codes.Code
+	}{
+		{name: "permission denied", err: pkgerrors.WithCode(errorCode.ErrPermissionDenied, "foreign list"), want: codes.PermissionDenied},
+		{name: "dependency failure", err: errors.New("database endpoint"), want: codes.Internal},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := NewTesteeEvaluationService(testeeEvaluationServiceStub{listErr: tt.err})
+			_, err := svc.ListMyAssessments(context.Background(), &pb.ListMyAssessmentsRequest{TesteeId: 42})
+			if status.Code(err) != tt.want {
+				t.Fatalf("status = %s, want %s; err=%v", status.Code(err), tt.want, err)
+			}
+			if tt.want == codes.Internal && status.Convert(err).Message() != "internal error" {
 				t.Fatalf("internal detail leaked: %q", status.Convert(err).Message())
 			}
 		})

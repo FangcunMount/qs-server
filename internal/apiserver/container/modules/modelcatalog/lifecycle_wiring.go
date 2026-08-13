@@ -16,9 +16,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 )
 
-// ScaleCacheSignalNotifier 发布最佳努力无效通知
-// 在成功的时间生命周期过渡后发布最佳努力无效通知
-type ScaleCacheSignalNotifier interface {
+// AssessmentModelCacheSignalNotifier 在成功的模型生命周期过渡后发布
+// generic published-model 与现有 scale 的最佳努力失效通知。
+type AssessmentModelCacheSignalNotifier interface {
+	NotifyAssessmentModelCacheChanged(context.Context, string, string, string)
 	NotifyScaleCacheChanged(context.Context, string, string)
 }
 
@@ -28,7 +29,7 @@ type LifecycleDeps struct {
 	QuestionnaireCatalog   questionnairecatalog.Catalog
 	QuestionnairePublisher quesApp.QuestionnaireLifecycleService
 	EventPublisher         event.EventPublisher
-	CacheSignalNotifier    ScaleCacheSignalNotifier
+	CacheSignalNotifier    AssessmentModelCacheSignalNotifier
 }
 
 // questionnaireBindingPolicies 问卷绑定策略
@@ -84,6 +85,9 @@ func publishAssessmentModelLifecycleEffect(ctx context.Context, deps Deps, model
 	}
 	if deps.Catalog.CacheInvalidator != nil {
 		deps.Catalog.CacheInvalidator.InvalidatePublishedModel(ctx, model.Kind, model.Code)
+	}
+	if deps.Lifecycle.CacheSignalNotifier != nil {
+		deps.Lifecycle.CacheSignalNotifier.NotifyAssessmentModelCacheChanged(ctx, string(model.Kind), model.Code, string(action))
 	}
 	if deps.Lifecycle.EventPublisher != nil {
 		if changeAction, ok := assessmentModelChangeAction(action); ok {

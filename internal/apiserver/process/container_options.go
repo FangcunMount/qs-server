@@ -1,8 +1,6 @@
 package process
 
 import (
-	"time"
-
 	"github.com/FangcunMount/component-base/pkg/log"
 	systemgov "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
@@ -48,7 +46,7 @@ func (s *server) buildContainerOptions(input containerOptionsInput) container.Co
 		Resilience:                 resilience,
 		PlanEntryBaseURL:           s.config.Plan.EntryBaseURL,
 		StatisticsRepairWindowDays: statisticsRepairWindowDays(s.config),
-		ReportStatus:               s.config.Cache.Capabilities.ReportStatus,
+		ReportStatus:               s.config.RuntimeState.ReportStatus,
 		Signaling:                  s.config.Signaling,
 		SystemGovernance:           s.config.SystemGovernance,
 		ActionAuditStore:           input.actionAuditStore,
@@ -143,7 +141,8 @@ func (s *server) buildContainerCacheOptions() container.ContainerCacheOptions {
 	if s == nil || s.config == nil {
 		return container.ContainerCacheOptions{}
 	}
-	options := buildContainerCacheOptions(s.config.Cache)
+	options := buildContainerCacheOptions(s.config.Cache, s.config.RuntimeState)
+	options.PolicySource = s.config.CachePolicyMetadata()
 	options.Signal = buildCacheSignalOptions(s.config.Signaling)
 	return options
 }
@@ -165,7 +164,7 @@ func buildCacheSignalOptions(signaling *genericoptions.SignalingOptions) cachebo
 	return options
 }
 
-func buildContainerCacheOptions(cacheCfg *apiserveroptions.CacheOptions) container.ContainerCacheOptions {
+func buildContainerCacheOptions(cacheCfg *apiserveroptions.CacheOptions, runtimeState *genericoptions.RuntimeStateOptions) container.ContainerCacheOptions {
 	if cacheCfg == nil {
 		return container.ContainerCacheOptions{}
 	}
@@ -174,16 +173,15 @@ func buildContainerCacheOptions(cacheCfg *apiserveroptions.CacheOptions) contain
 		capabilities[cachepolicy.CapabilitySurveyQuestionnaire] = buildCapabilityBinding(c.Survey.Questionnaire)
 		capabilities[cachepolicy.CapabilityModelCatalogPublished] = buildCapabilityBinding(c.ModelCatalog.PublishedModel)
 		capabilities[cachepolicy.CapabilityEvaluationAssessmentDetail] = buildCapabilityBinding(c.Evaluation.AssessmentDetail)
-		capabilities[cachepolicy.CapabilityEvaluationAssessmentList] = buildCapabilityBinding(c.Evaluation.AssessmentList)
 		capabilities[cachepolicy.CapabilityActorTestee] = buildCapabilityBinding(c.Actor.Testee)
 		capabilities[cachepolicy.CapabilityPlanDetail] = buildCapabilityBinding(c.Plan.Detail)
 		capabilities[cachepolicy.CapabilityStatisticsQuery] = buildCapabilityBinding(c.Statistics.Query)
-		reportStatus := cachepolicy.Binding{Enabled: true}
-		if c.ReportStatus != nil {
-			reportStatus.Policy.TTL = time.Duration(c.ReportStatus.TTLSeconds) * time.Second
-		}
-		capabilities[cachepolicy.CapabilityReportStatus] = reportStatus
 	}
+	reportStatus := cachepolicy.Binding{Enabled: true}
+	if runtimeState != nil && runtimeState.ReportStatus != nil {
+		reportStatus.Policy.TTL = runtimeState.ReportStatus.TTL()
+	}
+	capabilities[cachepolicy.CapabilityReportStatus] = reportStatus
 	defaults := cacheCfg.Defaults
 	return container.ContainerCacheOptions{
 		Capabilities:     capabilities,

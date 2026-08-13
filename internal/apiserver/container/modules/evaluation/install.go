@@ -25,14 +25,9 @@ func InstallFrom(host InstallHost) error {
 	}
 	provider := host.CachePolicyProvider()
 	detail := compose.ResolveCacheCapability(provider, cachepolicy.CapabilityEvaluationAssessmentDetail)
-	list := compose.ResolveCacheCapability(provider, cachepolicy.CapabilityEvaluationAssessmentList)
 	objectRedis := host.CacheClient(redisruntime.FamilyObject)
-	queryRedis := host.CacheClient(redisruntime.FamilyQuery)
 	if !detail.Enabled {
 		objectRedis = nil
-	}
-	if !list.Enabled {
-		queryRedis = nil
 	}
 	result, err := Wire(WireInput{
 		MySQLDB:                   host.MySQLDB(),
@@ -40,10 +35,6 @@ func InstallFrom(host InstallHost) error {
 		EventPublisher:            host.EventPublisher(),
 		RedisClient:               objectRedis,
 		CacheBuilder:              host.CacheBuilder(redisruntime.FamilyObject),
-		QueryRedisClient:          queryRedis,
-		QueryCacheBuilder:         host.CacheBuilder(redisruntime.FamilyQuery),
-		MetaRedisClient:           host.CacheClient(redisruntime.FamilyMeta),
-		MetaCacheBuilder:          host.CacheBuilder(redisruntime.FamilyMeta),
 		CachePolicies:             provider,
 		Observer:                  host.CacheObserver(),
 		MySQLLimiter:              host.MySQLLimiter(),

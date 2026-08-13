@@ -169,10 +169,9 @@ redis_runtime:
       namespace_suffix: "ops:runtime"
       allow_fallback_default: true
 
-cache:
-  capabilities:
-    report_status:
-      ttl_seconds: 172800
+runtime_state:
+  report_status:
+    ttl_seconds: 172800
 
 signaling:
   redis:

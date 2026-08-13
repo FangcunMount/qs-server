@@ -96,6 +96,12 @@ func projectEffectiveRegistry(registry *sharedcache.Registry, reloader interface
 		SnapshotVersion: snapshot.Version, GeneratedAt: snapshot.GeneratedAt,
 		Capabilities: make([]cachemodel.CapabilityPolicyView, 0, len(snapshot.Capabilities)),
 	}
+	if snapshot.PolicySource != nil {
+		result.PolicySource = &cachemodel.PolicySourceView{
+			Component: snapshot.PolicySource.Component, SchemaVersion: snapshot.PolicySource.SchemaVersion,
+			Path: snapshot.PolicySource.Path, PolicySHA256: snapshot.PolicySource.PolicySHA256,
+		}
+	}
 	if reloader != nil {
 		result.Reload = reloader.ReloadStatus()
 	}

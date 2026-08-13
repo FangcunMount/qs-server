@@ -8638,6 +8638,8 @@ components:
           type: string
         generated_at:
           type: string
+        policy_source:
+          $ref: '#/components/schemas/cachemodel.PolicySourceView'
         reload:
           $ref: '#/components/schemas/cachemodel.PolicyReloadStatus'
         snapshot_version:
@@ -8705,6 +8707,17 @@ components:
         last_failure_at:
           type: string
         last_success_at:
+          type: string
+    cachemodel.PolicySourceView:
+      type: object
+      properties:
+        component:
+          type: string
+        path:
+          type: string
+        policy_sha256:
+          type: string
+        schema_version:
           type: string
     cachemodel.PolicyView:
       type: object

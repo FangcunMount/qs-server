@@ -51,3 +51,17 @@ func TestValidateRawSectionAcceptsHyphenatedFlagKeys(t *testing.T) {
 		t.Fatalf("hyphenated flag keys error = %v", err)
 	}
 }
+
+func TestFieldSchemaLeafPathsAreCanonicalAndSorted(t *testing.T) {
+	schema := FieldSchema{"z": {"last": nil}, "a": {"second": nil, "first": nil}}
+	got := schema.LeafPaths()
+	want := []string{"a.first", "a.second", "z.last"}
+	if len(got) != len(want) {
+		t.Fatalf("LeafPaths() = %v", got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("LeafPaths() = %v, want %v", got, want)
+		}
+	}
+}

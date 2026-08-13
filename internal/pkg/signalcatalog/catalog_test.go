@@ -51,10 +51,11 @@ func TestSignalsManifestAndCodeConstantsStayInSync(t *testing.T) {
 		publishers  []string
 		subscribers []string
 	}{
-		ReportStatusChanged:       {publishers: []string{"apiserver", "worker"}, subscribers: []string{"collection-server"}},
-		QuestionnaireCacheChanged: {publishers: []string{"apiserver"}, subscribers: []string{"apiserver", "collection-server"}},
-		ScaleCacheChanged:         {publishers: []string{"apiserver"}, subscribers: []string{"apiserver"}},
-		TypologyModelCacheChanged: {publishers: []string{"apiserver"}, subscribers: []string{"apiserver", "collection-server"}},
+		ReportStatusChanged:         {publishers: []string{"apiserver", "worker"}, subscribers: []string{"collection-server"}},
+		QuestionnaireCacheChanged:   {publishers: []string{"apiserver"}, subscribers: []string{"apiserver", "collection-server"}},
+		AssessmentModelCacheChanged: {publishers: []string{"apiserver"}, subscribers: []string{"collection-server"}},
+		ScaleCacheChanged:           {publishers: []string{"apiserver"}, subscribers: []string{"apiserver"}},
+		TypologyModelCacheChanged:   {publishers: []string{"apiserver"}, subscribers: []string{"apiserver", "collection-server"}},
 	}
 	for signalName, want := range wantTopology {
 		signal := cfg.Signals[signalName]

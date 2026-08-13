@@ -143,24 +143,11 @@ submit:
   coalescing_signal_ttl_seconds: 300 # 完成信号仅作唤醒提示，不作为成功事实
 
 cache:
-  capabilities:
-    catalog:
-      questionnaire:
-        enabled: true
-        ttl_seconds: 180
-        ttl_jitter_ratio: 0.2
-        max_entries: 256
-        singleflight: true
-        signal_evict_enabled: true
-      typology:
-        enabled: true
-        ttl_seconds: 180
-        ttl_jitter_ratio: 0.2
-        max_entries: 256
-        singleflight: true
-        signal_evict_enabled: true
-    report_status:
-      ttl_seconds: 172800
+  policy_file: "cache/collection-server.prod.yaml"
+
+runtime_state:
+  report_status:
+    ttl_seconds: 172800
 
 wait_report:                        # 报告等待 HTTP 轮询接口配置
   default_timeout_seconds: 20       # 默认等待超时时间 20s

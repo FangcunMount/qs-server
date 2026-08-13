@@ -8,21 +8,40 @@ import (
 	"github.com/spf13/pflag"
 )
 
-func TestCacheRawSettingsAcceptCanonicalModuleCapabilities(t *testing.T) {
+func TestCacheRawSettingsAcceptPolicyReferenceAndRuntimeState(t *testing.T) {
 	settings := map[string]any{"cache": map[string]any{
-		"defaults": map[string]any{"compress_payload": false, "static": map[string]any{"negative_ttl": "5m"}},
-		"capabilities": map[string]any{
-			"survey":        map[string]any{"questionnaire": map[string]any{"enabled": true, "ttl": "2h"}},
-			"modelcatalog":  map[string]any{"published_model": map[string]any{"enabled": true, "ttl": "2h"}},
-			"evaluation":    map[string]any{"assessment_detail": map[string]any{"enabled": true}, "assessment_list": map[string]any{"enabled": true}},
-			"actor":         map[string]any{"testee": map[string]any{"enabled": true}},
-			"plan":          map[string]any{"detail": map[string]any{"enabled": true}},
-			"statistics":    map[string]any{"query": map[string]any{"enabled": true}},
-			"report_status": map[string]any{"ttl_seconds": 172800},
-		},
-	}}
+		"policy_file": "cache/apiserver.dev.yaml",
+	}, "runtime_state": map[string]any{"report_status": map[string]any{"ttl_seconds": 172800}}}
 	if err := NewOptions().ValidateRawSettings(settings); err != nil {
 		t.Fatalf("ValidateRawSettings() error = %v", err)
+	}
+}
+
+func TestCacheRawSettingsRejectRetiredAssessmentListCapability(t *testing.T) {
+	err := NewOptions().ValidateRawSettings(map[string]any{"cache": map[string]any{
+		"capabilities": map[string]any{"evaluation": map[string]any{
+			"assessment_list": map[string]any{"enabled": true},
+		}},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "unknown configuration field") {
+		t.Fatalf("ValidateRawSettings() error = %v, want unknown field", err)
+	}
+}
+
+func TestCacheRawSettingsRejectInlinePolicy(t *testing.T) {
+	err := NewOptions().ValidateRawSettings(map[string]any{"cache": map[string]any{
+		"defaults": map[string]any{"compress_payload": false},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "unknown configuration field cache.defaults") {
+		t.Fatalf("ValidateRawSettings() error = %v, want inline policy rejection", err)
+	}
+}
+
+func TestCapabilityFlagsDoNotExposeRetiredAssessmentList(t *testing.T) {
+	flags := pflag.NewFlagSet("cache", pflag.ContinueOnError)
+	NewCacheOptions().AddFlags(flags)
+	if flags.Lookup("cache.capabilities.evaluation.assessment_list.enabled") != nil {
+		t.Fatal("retired assessment-list CLI flag is still registered")
 	}
 }
 

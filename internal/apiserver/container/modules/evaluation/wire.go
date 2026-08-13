@@ -2,13 +2,13 @@ package evaluation
 
 import (
 	"fmt"
+
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 
 	"github.com/FangcunMount/component-base/pkg/event"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime/descriptor"
-	evaluationcache "github.com/FangcunMount/qs-server/internal/apiserver/cache/evaluation"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
@@ -17,7 +17,6 @@ import (
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
-	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
@@ -33,10 +32,6 @@ type WireInput struct {
 	EventPublisher            event.EventPublisher
 	RedisClient               redis.UniversalClient
 	CacheBuilder              *keyspace.Builder
-	QueryRedisClient          redis.UniversalClient
-	QueryCacheBuilder         *keyspace.Builder
-	MetaRedisClient           redis.UniversalClient
-	MetaCacheBuilder          *keyspace.Builder
 	CachePolicies             sharedcache.PolicyProvider
 	Observer                  *observability.ComponentObserver
 	MySQLLimiter              backpressure.Acquirer
@@ -85,14 +80,6 @@ func Wire(in WireInput) (WireResult, error) {
 		scaleCatalog = resolver
 	}
 
-	var versionStore querycache.VersionTokenStore
-	if in.QueryRedisClient != nil {
-		if in.MetaRedisClient == nil {
-			return WireResult{}, fmt.Errorf("evaluation assessment list meta Redis client is required when query cache is enabled")
-		}
-		versionStore = evaluationcache.NewVersionTokenStore(in.MetaRedisClient, in.Observer)
-	}
-
 	var publishedModelReader rulesetport.PublishedModelReader
 	if reader, ok := catalog.(rulesetport.PublishedModelReader); ok {
 		publishedModelReader = reader
@@ -110,10 +97,6 @@ func Wire(in WireInput) (WireResult, error) {
 		RedisClient:                in.RedisClient,
 		CacheBuilder:               in.CacheBuilder,
 		CachePolicies:              in.CachePolicies,
-		QueryRedisClient:           in.QueryRedisClient,
-		QueryCacheBuilder:          in.QueryCacheBuilder,
-		MetaCacheBuilder:           in.MetaCacheBuilder,
-		VersionStore:               versionStore,
 		Observer:                   in.Observer,
 		MySQLLimiter:               in.MySQLLimiter,
 		TesteeAccessChecker:        in.TesteeAccessChecker,

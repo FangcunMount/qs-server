@@ -67,14 +67,6 @@ func (b *Builder) BuildQueryVersionKey(kind, scope string) string {
 	return NewCacheKeyspace(b.namespace()).QueryVersion(kind, scope)
 }
 
-func (b *Builder) BuildAssessmentListVersionKey(userID uint64) string {
-	return NewCacheKeyspace(b.namespace()).AssessmentListVersion(userID)
-}
-
-func (b *Builder) BuildAssessmentListVersionedKey(userID, version uint64, hash string) string {
-	return NewCacheKeyspace(b.namespace()).AssessmentListVersioned(userID, version, hash)
-}
-
 func (b *Builder) BuildStatisticsGenerationKey(orgID int64) string {
 	return NewCacheKeyspace(b.namespace()).StatisticsGeneration(orgID)
 }

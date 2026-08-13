@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
 )
 
 // CatalogReader is the published-model contract consumed by collection-server
@@ -17,10 +20,19 @@ type CatalogReader interface {
 }
 
 type QueryService struct {
-	client CatalogReader
+	client          CatalogReader
+	cache           PublishedModelCache
+	coalescer       loadguard.Coalescer
+	useSingleflight bool
 }
 
-func NewQueryService(client CatalogReader) *QueryService { return &QueryService{client: client} }
+func NewQueryService(client CatalogReader, cache PublishedModelCache, useSingleflight bool) *QueryService {
+	service := &QueryService{client: client, cache: cache, useSingleflight: useSingleflight}
+	if useSingleflight {
+		service.coalescer = loadguard.NewCoalescer(true)
+	}
+	return service
+}
 
 // CatalogModel is the application-owned published-model DTO returned by the
 // collection catalogue port. It contains canonical DefinitionV2 JSON only.
@@ -151,34 +163,43 @@ type OptionsResponse struct {
 }
 
 func (s *QueryService) Get(ctx context.Context, code string) (*ModelResponse, error) {
-	if s == nil || s.client == nil {
+	if s == nil {
 		return nil, nil
 	}
-	value, err := s.client.GetPublishedModel(ctx, code, "")
-	if err != nil || value == nil {
-		return nil, err
-	}
-	return s.modelResponse(value), nil
+	code = strings.TrimSpace(code)
+	return s.readThroughDetail(code, func() (*ModelResponse, error) {
+		if s.client == nil {
+			return nil, nil
+		}
+		value, err := s.client.GetPublishedModel(ctx, code, "")
+		if err != nil || value == nil {
+			return nil, err
+		}
+		return s.modelResponse(value), nil
+	})
 }
 func (s *QueryService) List(ctx context.Context, request *ListRequest) (*ListResponse, error) {
-	if request == nil {
-		request = &ListRequest{}
-	}
-	if err := normalizeList(request); err != nil {
+	normalized, err := normalizedListRequest(request)
+	if err != nil {
 		return nil, err
 	}
-	if s == nil || s.client == nil {
+	if s == nil {
 		return nil, nil
 	}
-	value, err := s.client.ListPublishedModels(ctx, request.Kind, request.kinds, request.Algorithm, request.Category, request.Keyword, request.QuestionnaireCode, request.QuestionnaireVersion, request.Page, request.PageSize)
-	if err != nil || value == nil {
-		return nil, err
-	}
-	result := &ListResponse{Models: make([]ModelResponse, 0, len(value.Models)), Total: value.Total, Page: value.Page, PageSize: value.PageSize}
-	for index := range value.Models {
-		result.Models = append(result.Models, *s.modelResponse(&value.Models[index]))
-	}
-	return result, nil
+	return s.readThroughList(normalized, func() (*ListResponse, error) {
+		if s.client == nil {
+			return nil, nil
+		}
+		value, err := s.client.ListPublishedModels(ctx, normalized.Kind, normalized.kinds, normalized.Algorithm, normalized.Category, normalized.Keyword, normalized.QuestionnaireCode, normalized.QuestionnaireVersion, normalized.Page, normalized.PageSize)
+		if err != nil || value == nil {
+			return nil, err
+		}
+		result := &ListResponse{Models: make([]ModelResponse, 0, len(value.Models)), Total: value.Total, Page: value.Page, PageSize: value.PageSize}
+		for index := range value.Models {
+			result.Models = append(result.Models, *s.modelResponse(&value.Models[index]))
+		}
+		return result, nil
+	})
 }
 
 // Summary removes DefinitionV2 from the public catalogue list while retaining
@@ -220,14 +241,48 @@ func (s *QueryService) ListHot(ctx context.Context, request *HotRequest) (*HotRe
 	return result, nil
 }
 func (s *QueryService) Options(ctx context.Context, kind string) (*OptionsResponse, error) {
-	if s == nil || s.client == nil {
+	if s == nil {
 		return nil, nil
 	}
-	value, err := s.client.GetCatalogOptions(ctx, kind)
-	if err != nil || value == nil {
-		return nil, err
+	kind = strings.TrimSpace(kind)
+	return s.readThroughOptions(kind, func() (*OptionsResponse, error) {
+		if s.client == nil {
+			return nil, nil
+		}
+		value, err := s.client.GetCatalogOptions(ctx, kind)
+		if err != nil || value == nil {
+			return nil, err
+		}
+		return &OptionsResponse{Kinds: options(value.Kinds), Algorithms: options(value.Algorithms), Categories: options(value.Categories), Stages: options(value.Stages), ApplicableAges: options(value.ApplicableAges), Reporters: options(value.Reporters)}, nil
+	})
+}
+
+func (s *QueryService) HasCachedDetail(code string) bool {
+	if s == nil || s.cache == nil || normalizedModelCode(code) == "" {
+		return false
 	}
-	return &OptionsResponse{Kinds: options(value.Kinds), Algorithms: options(value.Algorithms), Categories: options(value.Categories), Stages: options(value.Stages), ApplicableAges: options(value.ApplicableAges), Reporters: options(value.Reporters)}, nil
+	_, ok := s.cache.GetDetail(code)
+	return ok
+}
+
+func (s *QueryService) HasCachedList(request *ListRequest) bool {
+	if s == nil || s.cache == nil {
+		return false
+	}
+	normalized, err := normalizedListRequest(request)
+	if err != nil {
+		return false
+	}
+	_, ok := s.cache.GetListByRequest(normalized)
+	return ok
+}
+
+func (s *QueryService) HasCachedOptions(kind string) bool {
+	if s == nil || s.cache == nil {
+		return false
+	}
+	_, ok := s.cache.GetOptions(strings.TrimSpace(kind))
+	return ok
 }
 
 // VisibleFactorCodes resolves the factor-score report mapping from canonical
@@ -240,10 +295,23 @@ func (s *QueryService) VisibleFactorCodes(ctx context.Context, code string) (map
 	}
 	return visibleFactorCodesFromDefinition(model.Definition)
 }
+func normalizedListRequest(request *ListRequest) (*ListRequest, error) {
+	if request == nil {
+		request = &ListRequest{}
+	}
+	normalized := *request
+	normalized.kinds = nil
+	if err := normalizeList(&normalized); err != nil {
+		return nil, err
+	}
+	return &normalized, nil
+}
+
 func normalizeList(request *ListRequest) error {
 	if request.Kind != "" && strings.TrimSpace(request.Kinds) != "" {
 		return fmt.Errorf("kind and kinds cannot be used together")
 	}
+	request.kinds = request.kinds[:0]
 	if request.Kinds != "" {
 		seen := make(map[string]struct{})
 		for _, raw := range strings.Split(request.Kinds, ",") {
@@ -257,6 +325,7 @@ func normalizeList(request *ListRequest) error {
 			seen[kind] = struct{}{}
 			request.kinds = append(request.kinds, kind)
 		}
+		sort.Strings(request.kinds)
 	}
 	if request.Page <= 0 {
 		request.Page = 1

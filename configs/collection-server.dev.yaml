@@ -144,22 +144,11 @@ submit:
   coalescing_signal_ttl_seconds: 300
 
 cache:
-  capabilities:
-    catalog:
-      questionnaire:
-        enabled: false
-        ttl_seconds: 180
-        max_entries: 256
-        singleflight: true
-        signal_evict_enabled: true
-      typology:
-        enabled: false
-        ttl_seconds: 180
-        max_entries: 256
-        singleflight: true
-        signal_evict_enabled: true
-    report_status:
-      ttl_seconds: 172800
+  policy_file: "cache/collection-server.dev.yaml"
+
+runtime_state:
+  report_status:
+    ttl_seconds: 172800
 
 wait_report:
   default_timeout_seconds: 20

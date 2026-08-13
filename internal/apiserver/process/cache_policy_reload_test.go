@@ -3,6 +3,7 @@ package process
 import (
 	"context"
 	"testing"
+	"time"
 
 	componenterrors "github.com/FangcunMount/component-base/pkg/errors"
 	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
@@ -11,30 +12,32 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/pkg/app"
 )
 
-type rawSettingsSourceStub struct {
-	settings app.RawSettings
+type cachePolicySourceStub struct {
+	policy *options.CacheOptions
+	source sharedcache.PolicySource
 }
 
-func (s rawSettingsSourceStub) Read(context.Context) (app.RawSettings, error) { return s.settings, nil }
+func (s cachePolicySourceStub) Read(context.Context) (*options.CacheOptions, sharedcache.PolicySource, error) {
+	return s.policy, s.source, nil
+}
 
 func TestCachePolicyCandidateLoaderAllowsPolicyAndRejectsEnabled(t *testing.T) {
 	startup := options.NewOptions()
 	server := &server{config: &config.Config{Options: startup}}
-	registry := sharedcache.NewRegistry(cachebootstrap.BuildEffectiveCapabilities(buildContainerCacheOptions(startup.Cache))...)
+	registry := sharedcache.NewRegistry(cachebootstrap.BuildEffectiveCapabilities(buildContainerCacheOptions(startup.Cache, startup.RuntimeState))...)
 
-	startup.SetRawSettingsSource(rawSettingsSourceStub{settings: app.RawSettings{
-		Source: "apiserver.yaml",
-		Values: cachePolicySettings(map[string]any{"ttl": "9m"}),
-	}})
+	candidatePolicy := options.NewCacheOptions()
+	candidatePolicy.Capabilities.Statistics.Query.TTL = 9 * time.Minute
+	metadata := sharedcache.PolicySource{Component: "qs-apiserver", SchemaVersion: "1.0", Path: "cache/apiserver.yaml", PolicySHA256: "hash-1"}
+	startup.SetCachePolicySource(cachePolicySourceStub{policy: candidatePolicy, source: metadata})
 	candidate, source, err := server.cachePolicyCandidateLoader(registry)(context.Background())
 	if err != nil {
 		t.Fatalf("candidate loader error = %v", err)
 	}
-	if source != "apiserver.yaml" {
-		t.Fatalf("source = %q", source)
+	if source != metadata {
+		t.Fatalf("source = %#v", source)
 	}
 	var stats sharedcache.EffectiveCapability
 	for _, item := range candidate {
@@ -46,21 +49,10 @@ func TestCachePolicyCandidateLoaderAllowsPolicyAndRejectsEnabled(t *testing.T) {
 		t.Fatalf("statistics.query TTL = %s", stats.Policy.TTL)
 	}
 
-	startup.SetRawSettingsSource(rawSettingsSourceStub{settings: app.RawSettings{
-		Source: "apiserver.yaml",
-		Values: cachePolicySettings(map[string]any{"enabled": false}),
-	}})
+	candidatePolicy = options.NewCacheOptions()
+	candidatePolicy.Capabilities.Statistics.Query.Enabled = false
+	startup.SetCachePolicySource(cachePolicySourceStub{policy: candidatePolicy, source: metadata})
 	if _, _, err := server.cachePolicyCandidateLoader(registry)(context.Background()); err == nil || !componenterrors.IsCode(err, code.ErrInvalidArgument) {
 		t.Fatalf("enabled change error = %v, want invalid argument", err)
-	}
-}
-
-func cachePolicySettings(query map[string]any) map[string]any {
-	return map[string]any{
-		"cache": map[string]any{
-			"capabilities": map[string]any{
-				"statistics": map[string]any{"query": query},
-			},
-		},
 	}
 }

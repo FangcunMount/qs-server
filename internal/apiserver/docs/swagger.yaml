@@ -64,6 +64,8 @@ definitions:
         type: string
       generated_at:
         type: string
+      policy_source:
+        $ref: '#/definitions/cachemodel.PolicySourceView'
       reload:
         $ref: '#/definitions/cachemodel.PolicyReloadStatus'
       snapshot_version:
@@ -131,6 +133,17 @@ definitions:
       last_failure_at:
         type: string
       last_success_at:
+        type: string
+    type: object
+  cachemodel.PolicySourceView:
+    properties:
+      component:
+        type: string
+      path:
+        type: string
+      policy_sha256:
+        type: string
+      schema_version:
         type: string
     type: object
   cachemodel.PolicyView:

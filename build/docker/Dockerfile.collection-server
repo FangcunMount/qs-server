@@ -59,6 +59,7 @@ COPY --from=builder --chown=www:www /build/bin/collection-server /app/collection
 # 注意：证书文件由 docker-compose 从宿主机挂载，不打包到镜像中
 COPY --chown=www:www configs/collection-server.dev.yaml /app/configs/collection-server.dev.yaml
 COPY --chown=www:www configs/collection-server.prod.yaml /app/configs/collection-server.prod.yaml
+COPY --chown=www:www configs/cache /app/configs/cache
 COPY --chown=www:www configs/events.yaml /app/configs/events.yaml
 COPY --chown=www:www api/rest /app/api/rest
 COPY --chown=www:www web/swagger-ui/swagger-ui-dist /app/web/swagger-ui/swagger-ui-dist

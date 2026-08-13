@@ -6,9 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/typologymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/catalogpeek"
+	localcache "github.com/FangcunMount/qs-server/internal/pkg/cache/local"
 	"github.com/gin-gonic/gin"
 )
 
@@ -22,15 +24,25 @@ func TestRegistryPeekRouteMatrix(t *testing.T) {
 	questionnaireCache := questionnaire.NewLocalCache(questionnaire.LocalCacheOptions{TTL: time.Minute, MaxEntries: 16})
 	questionnaireCache.Set("Q1", "v1", &questionnaire.QuestionnaireResponse{Code: "Q1", Version: "v1"})
 	questionnaireSvc := questionnaire.NewQueryService(nil, questionnaireCache, false)
+	publishedOptions := localcache.Options{TTL: time.Minute, MaxEntries: 16}
+	publishedCache := modelcatalog.NewLocalPublishedModelCache(publishedOptions, publishedOptions, publishedOptions)
+	publishedCache.SetDetail("M1", &modelcatalog.ModelResponse{ModelSummaryResponse: modelcatalog.ModelSummaryResponse{Code: "M1"}})
+	publishedCache.SetListByRequest(&modelcatalog.ListRequest{Kinds: "scale,typology"}, &modelcatalog.ListResponse{})
+	publishedCache.SetOptions("scale", &modelcatalog.OptionsResponse{})
+	publishedSvc := modelcatalog.NewQueryService(nil, publishedCache, false)
 
 	registry := catalogpeek.NewRegistry()
-	catalogpeek.RegisterCatalogL1(registry, personalitySvc, questionnaireSvc)
+	catalogpeek.RegisterCatalogL1(registry, publishedSvc, personalitySvc, questionnaireSvc)
 
 	peekViaRoute := func(method, path string) bool {
 		var got bool
 		engine := gin.New()
 		engine.GET("/api/v1/typology-models/:code", func(c *gin.Context) { got = registry.Peek(c) })
 		engine.GET("/api/v1/questionnaires/:code", func(c *gin.Context) { got = registry.Peek(c) })
+		engine.GET("/api/v1/assessment-models/:code", func(c *gin.Context) { got = registry.Peek(c) })
+		engine.GET("/api/v1/assessment-models", func(c *gin.Context) { got = registry.Peek(c) })
+		engine.GET("/api/v1/assessment-models/options", func(c *gin.Context) { got = registry.Peek(c) })
+		engine.GET("/api/v1/assessment-models/hot", func(c *gin.Context) { got = registry.Peek(c) })
 		recorder := httptest.NewRecorder()
 		engine.ServeHTTP(recorder, httptest.NewRequest(method, path, nil))
 		return got
@@ -45,6 +57,10 @@ func TestRegistryPeekRouteMatrix(t *testing.T) {
 		{name: "personality_detail_hit", method: http.MethodGet, path: "/api/v1/typology-models/PM1", want: true},
 		{name: "questionnaire_detail_hit", method: http.MethodGet, path: "/api/v1/questionnaires/Q1?version=v1", want: true},
 		{name: "questionnaire_detail_version_miss", method: http.MethodGet, path: "/api/v1/questionnaires/Q1?version=other", want: false},
+		{name: "published_model_detail_hit", method: http.MethodGet, path: "/api/v1/assessment-models/m1", want: true},
+		{name: "published_model_list_normalized_hit", method: http.MethodGet, path: "/api/v1/assessment-models?kinds=typology,scale,scale&page=1&page_size=20", want: true},
+		{name: "published_model_options_trimmed_hit", method: http.MethodGet, path: "/api/v1/assessment-models/options?kind=%20scale%20", want: true},
+		{name: "published_model_hot_never_peeks", method: http.MethodGet, path: "/api/v1/assessment-models/hot", want: false},
 		{name: "non_get", method: http.MethodPost, path: "/api/v1/typology-models/PM1", want: false},
 	}
 

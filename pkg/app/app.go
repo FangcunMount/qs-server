@@ -3,10 +3,12 @@ package app
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -176,6 +178,15 @@ func (a *App) runCommand(cmd *cobra.Command, _ []string) error {
 
 	// 如果配置标志不为空，则绑定命令行标志
 	if !a.noConfig {
+		// Validate the main file before binding flags. Bound flag defaults are
+		// runtime override inputs, not inline configuration fields, and must not
+		// make an external-policy main file look like legacy inline cache YAML.
+		if validator, ok := a.options.(RawSettingsValidatable); ok {
+			if err := validator.ValidateRawSettings(viper.AllSettings()); err != nil {
+				return err
+			}
+		}
+
 		// 绑定命令行标志
 		if err := viper.BindPFlags(cmd.Flags()); err != nil {
 			return err
@@ -187,20 +198,25 @@ func (a *App) runCommand(cmd *cobra.Command, _ []string) error {
 		envPrefix := buildEnvPrefix(a.basename)
 		printViperConfig(envPrefix)
 
-		if validator, ok := a.options.(RawSettingsValidatable); ok {
-			if err := validator.ValidateRawSettings(viper.AllSettings()); err != nil {
-				return err
-			}
-		}
-
 		// 如果选项不为空，则反序列化选项
 		if err := viper.Unmarshal(a.options); err != nil {
 			return err
 		}
-		if aware, ok := a.options.(RawSettingsSourceAware); ok {
-			aware.SetRawSettingsSource(newRawSettingsSource(viper.ConfigFileUsed(), envPrefix, cmd.Flags()))
+		if aware, ok := a.options.(RuntimeConfigContextAware); ok {
+			mainConfigFile := viper.ConfigFileUsed()
+			if absolute, err := filepath.Abs(mainConfigFile); err == nil {
+				mainConfigFile = absolute
+			}
+			explicitFlags := make(map[string]string)
+			cmd.Flags().Visit(func(flag *pflag.Flag) {
+				explicitFlags[flag.Name] = flag.Value.String()
+			})
+			aware.SetRuntimeConfigContext(RuntimeConfigContext{
+				MainConfigFile: mainConfigFile,
+				EnvPrefix:      envPrefix,
+				ExplicitFlags:  explicitFlags,
+			})
 		}
-
 		// 打印选项信息
 		fmt.Printf("Options: %s\n", configmask.String(a.options))
 

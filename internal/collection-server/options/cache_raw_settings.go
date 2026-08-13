@@ -14,16 +14,10 @@ func (o *Options) ValidateRawSettings(settings map[string]any) error {
 		return fmt.Errorf("iam.jwks.fetch-strategies has been removed; configure iam.jwks.url and iam.jwks.grpc-endpoint")
 	}
 	leaf := genericoptions.FieldSchema(nil)
-	catalog := genericoptions.FieldSchema{
-		"enabled": leaf, "ttl_seconds": leaf, "ttl_jitter_ratio": leaf,
-		"max_entries": leaf, "singleflight": leaf, "signal_evict_enabled": leaf,
+	if err := genericoptions.ValidateRawSection(settings, "cache", genericoptions.FieldSchema{"policy_file": leaf}); err != nil {
+		return err
 	}
-	return genericoptions.ValidateRawSection(settings, "cache", genericoptions.FieldSchema{
-		"capabilities": {
-			"catalog":       {"questionnaire": catalog, "typology": catalog},
-			"report_status": {"ttl_seconds": leaf},
-		},
-	})
+	return genericoptions.ValidateRawSection(settings, "runtime_state", genericoptions.RuntimeStateRawSchema())
 }
 
 func hasNestedSetting(settings map[string]any, path ...string) bool {

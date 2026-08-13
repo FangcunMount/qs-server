@@ -30,7 +30,7 @@ func TestDisabledSignalRuntimeDoesNotCreateSignallers(t *testing.T) {
 	if runtime == nil {
 		t.Fatal("disabled signal runtime = nil, want no-op runtime")
 	}
-	if runtime.questionnaire != nil || runtime.scale != nil || runtime.typology != nil {
+	if runtime.questionnaire != nil || runtime.assessmentModel != nil || runtime.scale != nil || runtime.typology != nil {
 		t.Fatal("disabled signal runtime created Redis signallers")
 	}
 
@@ -52,6 +52,9 @@ func TestSignalRuntimePublishesConfiguredChannelBestEffort(t *testing.T) {
 	}
 
 	runtime := newSignalRuntime(client, SignalOptions{Enabled: true, Channel: "cache-events"}, "apiserver")
+	if runtime.assessmentModel == nil {
+		t.Fatal("enabled signal runtime did not create assessment-model signaler")
+	}
 	runtime.NotifyQuestionnaireCacheChanged(ctx, "q-1", "v2", "published")
 
 	select {

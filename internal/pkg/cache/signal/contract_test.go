@@ -28,6 +28,13 @@ func TestCacheSignalWireContract(t *testing.T) {
 			wantJSON: `{"code":"q-1","version":"v2","action":"published","occurred_at":"2026-07-13T10:30:00Z"}`,
 		},
 		{
+			name: "assessment model", signal: AssessmentModelCacheChangedSignal{
+				Kind: "cognitive", Code: "spm", Action: "unpublish", OccurredAt: occurredAt,
+			},
+			wantName: SignalNameAssessmentModelCacheChanged, wantKey: "cognitive:spm",
+			wantJSON: `{"kind":"cognitive","code":"spm","action":"unpublish","occurred_at":"2026-07-13T10:30:00Z"}`,
+		},
+		{
 			name: "scale", signal: ScaleCacheChangedSignal{
 				Code: "scale-1", Action: "archived", OccurredAt: occurredAt,
 			},

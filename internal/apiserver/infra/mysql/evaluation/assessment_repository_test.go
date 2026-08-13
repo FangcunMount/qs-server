@@ -36,7 +36,7 @@ func (acceptingModelValidator) ValidateEvaluationModel(context.Context, domainas
 
 func TestCreateForAnswerSheetThenSubmitForEvaluationWithConcreteRepository(t *testing.T) {
 	repo := &persistedAssessmentRepository{Repository: NewAssessmentRepository(newDryRunAssessmentDB(t))}
-	service := evaluationintake.NewService(repo, acceptingModelValidator{}, immediateTransactionRunner{}, discardEventStager{}, nil)
+	service := evaluationintake.NewService(repo, acceptingModelValidator{}, immediateTransactionRunner{}, discardEventStager{})
 
 	kind, code, version := "scale", "MODEL-1", "1.0.0"
 	created, err := service.CreateForAnswerSheet(context.Background(), evaluationintake.CreateCommand{

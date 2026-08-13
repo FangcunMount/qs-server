@@ -1,10 +1,12 @@
 package options
 
 import (
+	"context"
 	"strconv"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
 	"github.com/FangcunMount/qs-server/internal/pkg/delegatedsubject"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/pkg/app"
@@ -43,24 +45,42 @@ type Options struct {
 	RateLimit                   *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
 	Backpressure                *BackpressureOptions                    `json:"backpressure" mapstructure:"backpressure"`
 	Cache                       *CacheOptions                           `json:"cache"     mapstructure:"cache"`
+	RuntimeState                *genericoptions.RuntimeStateOptions     `json:"runtime_state" mapstructure:"runtime_state"`
 	StatisticsSync              *StatisticsSyncOptions                  `json:"statistics_sync" mapstructure:"statistics_sync"`
 	Signaling                   *genericoptions.SignalingOptions        `json:"signaling" mapstructure:"signaling"`
 	SystemGovernance            *SystemGovernanceOptions                `json:"system_governance" mapstructure:"system_governance"`
 	DelegatedSubject            *delegatedsubject.Options               `json:"delegated_subject" mapstructure:"delegated-subject"`
-	rawSettingsSource           app.RawSettingsSource
+	runtimeConfigContext        app.RuntimeConfigContext
+	cachePolicySource           CachePolicySource
+	cachePolicyMetadata         sharedcache.PolicySource
 }
 
-func (o *Options) SetRawSettingsSource(source app.RawSettingsSource) {
+func (o *Options) SetRuntimeConfigContext(runtime app.RuntimeConfigContext) {
 	if o != nil {
-		o.rawSettingsSource = source
+		o.runtimeConfigContext = runtime
 	}
 }
 
-func (o *Options) RawSettingsSource() app.RawSettingsSource {
+func (o *Options) CachePolicySource() CachePolicySource {
 	if o == nil {
 		return nil
 	}
-	return o.rawSettingsSource
+	return o.cachePolicySource
+}
+
+// SetCachePolicySource replaces the immutable policy reader. It is primarily
+// used by process-level tests; production sets the reader during Complete.
+func (o *Options) SetCachePolicySource(source CachePolicySource) {
+	if o != nil {
+		o.cachePolicySource = source
+	}
+}
+
+func (o *Options) CachePolicyMetadata() sharedcache.PolicySource {
+	if o == nil {
+		return sharedcache.PolicySource{}
+	}
+	return o.cachePolicyMetadata
 }
 
 // NewOptions 创建一个 Options 对象，包含默认参数
@@ -94,6 +114,7 @@ func NewOptions() *Options {
 		RateLimit:                   NewRateLimitOptions(),
 		Backpressure:                NewBackpressureOptions(),
 		Cache:                       NewCacheOptions(),
+		RuntimeState:                genericoptions.NewRuntimeStateOptions(),
 		StatisticsSync:              NewStatisticsSyncOptions(),
 		Signaling:                   genericoptions.NewSignalingOptions(),
 		SystemGovernance:            NewSystemGovernanceOptions(),
@@ -552,19 +573,19 @@ func (b *BackpressureOptions) AddFlags(fs *pflag.FlagSet) {
 
 // CacheOptions 缓存控制配置
 type CacheOptions struct {
+	PolicyFile   string                  `json:"policy_file" mapstructure:"policy_file"`
 	Capabilities *CacheCapabilityOptions `json:"capabilities" mapstructure:"capabilities"`
 	Defaults     *CacheDefaultsOptions   `json:"defaults" mapstructure:"defaults"`
 	Governance   *CacheGovernanceOptions `json:"governance" mapstructure:"governance"`
 }
 
 type CacheCapabilityOptions struct {
-	Survey       *SurveyCacheCapabilities            `json:"survey" mapstructure:"survey"`
-	ModelCatalog *ModelCatalogCacheCapabilities      `json:"modelcatalog" mapstructure:"modelcatalog"`
-	Evaluation   *EvaluationCacheCapabilities        `json:"evaluation" mapstructure:"evaluation"`
-	Actor        *ActorCacheCapabilities             `json:"actor" mapstructure:"actor"`
-	Plan         *PlanCacheCapabilities              `json:"plan" mapstructure:"plan"`
-	Statistics   *StatisticsCacheCapabilities        `json:"statistics" mapstructure:"statistics"`
-	ReportStatus *genericoptions.ReportStatusOptions `json:"report_status" mapstructure:"report_status"`
+	Survey       *SurveyCacheCapabilities       `json:"survey" mapstructure:"survey"`
+	ModelCatalog *ModelCatalogCacheCapabilities `json:"modelcatalog" mapstructure:"modelcatalog"`
+	Evaluation   *EvaluationCacheCapabilities   `json:"evaluation" mapstructure:"evaluation"`
+	Actor        *ActorCacheCapabilities        `json:"actor" mapstructure:"actor"`
+	Plan         *PlanCacheCapabilities         `json:"plan" mapstructure:"plan"`
+	Statistics   *StatisticsCacheCapabilities   `json:"statistics" mapstructure:"statistics"`
 }
 
 type SurveyCacheCapabilities struct {
@@ -575,7 +596,6 @@ type ModelCatalogCacheCapabilities struct {
 }
 type EvaluationCacheCapabilities struct {
 	AssessmentDetail *CapabilityPolicyOptions `json:"assessment_detail" mapstructure:"assessment_detail"`
-	AssessmentList   *CapabilityPolicyOptions `json:"assessment_list" mapstructure:"assessment_list"`
 }
 type ActorCacheCapabilities struct {
 	Testee *CapabilityPolicyOptions `json:"testee" mapstructure:"testee"`
@@ -618,12 +638,10 @@ func NewCacheOptions() *CacheOptions {
 			ModelCatalog: &ModelCatalogCacheCapabilities{PublishedModel: &CapabilityPolicyOptions{Enabled: true, TTL: 24 * time.Hour, Negative: cacheBoolPtr(false)}},
 			Evaluation: &EvaluationCacheCapabilities{
 				AssessmentDetail: &CapabilityPolicyOptions{Enabled: true, TTL: 2 * time.Hour, Singleflight: cacheBoolPtr(true)},
-				AssessmentList:   &CapabilityPolicyOptions{Enabled: true, TTL: 10 * time.Minute, Singleflight: cacheBoolPtr(false)},
 			},
-			Actor:        &ActorCacheCapabilities{Testee: &CapabilityPolicyOptions{Enabled: true, TTL: 30 * time.Minute, Negative: cacheBoolPtr(true)}},
-			Plan:         &PlanCacheCapabilities{Detail: &CapabilityPolicyOptions{Enabled: true, TTL: 2 * time.Hour, Singleflight: cacheBoolPtr(true)}},
-			Statistics:   &StatisticsCacheCapabilities{Query: &CapabilityPolicyOptions{Enabled: true, TTL: 26 * time.Hour, Singleflight: cacheBoolPtr(false)}},
-			ReportStatus: genericoptions.NewReportStatusOptions(),
+			Actor:      &ActorCacheCapabilities{Testee: &CapabilityPolicyOptions{Enabled: true, TTL: 30 * time.Minute, Negative: cacheBoolPtr(true)}},
+			Plan:       &PlanCacheCapabilities{Detail: &CapabilityPolicyOptions{Enabled: true, TTL: 2 * time.Hour, Singleflight: cacheBoolPtr(true)}},
+			Statistics: &StatisticsCacheCapabilities{Query: &CapabilityPolicyOptions{Enabled: true, TTL: 26 * time.Hour, Singleflight: cacheBoolPtr(false)}},
 		},
 		Defaults: &CacheDefaultsOptions{
 			TTLJitterRatio: 0.1,
@@ -671,10 +689,10 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 		c.Governance = &CacheGovernanceOptions{}
 	}
 	ensureCacheCapabilities(c.Capabilities)
+	fs.StringVar(&c.PolicyFile, "cache.policy_file", c.PolicyFile, "Read cache policy from the specified file.")
 	addCapabilityFlags(fs, "cache.capabilities.survey.questionnaire", c.Capabilities.Survey.Questionnaire)
 	addCapabilityFlags(fs, "cache.capabilities.modelcatalog.published_model", c.Capabilities.ModelCatalog.PublishedModel)
 	addCapabilityFlags(fs, "cache.capabilities.evaluation.assessment_detail", c.Capabilities.Evaluation.AssessmentDetail)
-	addCapabilityFlags(fs, "cache.capabilities.evaluation.assessment_list", c.Capabilities.Evaluation.AssessmentList)
 	addCapabilityFlags(fs, "cache.capabilities.actor.testee", c.Capabilities.Actor.Testee)
 	addCapabilityFlags(fs, "cache.capabilities.plan.detail", c.Capabilities.Plan.Detail)
 	addCapabilityFlags(fs, "cache.capabilities.statistics.query", c.Capabilities.Statistics.Query)
@@ -749,9 +767,6 @@ func ensureCacheCapabilities(c *CacheCapabilityOptions) {
 	if c.Evaluation.AssessmentDetail == nil {
 		c.Evaluation.AssessmentDetail = defaults.Evaluation.AssessmentDetail
 	}
-	if c.Evaluation.AssessmentList == nil {
-		c.Evaluation.AssessmentList = defaults.Evaluation.AssessmentList
-	}
 	if c.Actor == nil {
 		c.Actor = defaults.Actor
 	}
@@ -769,9 +784,6 @@ func ensureCacheCapabilities(c *CacheCapabilityOptions) {
 	}
 	if c.Statistics.Query == nil {
 		c.Statistics.Query = defaults.Statistics.Query
-	}
-	if c.ReportStatus == nil {
-		c.ReportStatus = defaults.ReportStatus
 	}
 }
 
@@ -882,7 +894,29 @@ func (s *StatisticsSyncOptions) AddFlags(fs *pflag.FlagSet) {
 
 // Complete 完成配置选项
 func (o *Options) Complete() error {
-	return o.SecureServing.Complete()
+	if err := o.SecureServing.Complete(); err != nil {
+		return err
+	}
+	if o.Cache == nil {
+		o.Cache = NewCacheOptions()
+	}
+	if o.Cache.PolicyFile == "" && o.runtimeConfigContext.MainConfigFile == "" {
+		return nil
+	}
+	source, err := newCachePolicySource(o.Cache.PolicyFile, o.runtimeConfigContext)
+	if err != nil {
+		return err
+	}
+	candidate, metadata, err := source.Read(context.Background())
+	if err != nil {
+		return err
+	}
+	ensureCacheCapabilities(candidate.Capabilities)
+	o.Cache = candidate
+	o.cachePolicySource = source
+	o.cachePolicyMetadata = metadata
+	log.Infof("Cache policy loaded: component=%s schema_version=%s path=%s policy_sha256=%s", metadata.Component, metadata.SchemaVersion, metadata.Path, metadata.PolicySHA256)
+	return nil
 }
 
 // String 返回配置的字符串表示
