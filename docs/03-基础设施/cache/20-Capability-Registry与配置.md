@@ -16,6 +16,7 @@ Capability 是 Cache 的最小治理单位。apiserver 的 [`catalog.Spec`](../.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `survey.questionnaire` | survey | cache | L2 | `static_meta` | 12h | 2h | `questionnaire` |
 | `modelcatalog.published_model` | modelcatalog | cache | L2 | `static_meta` | 24h | 2h | `published_model` |
+| `evaluation.assessment_access` | evaluation | cache | L2 | `object_view` | 5m | 5m | `assessment_access` |
 | `evaluation.assessment_detail` | evaluation | cache | L2 | `object_view` | 2h | 1h | `assessment_detail` |
 | `actor.testee` | actor | cache | L2 | `object_view` | 30m | 30m | `testee` |
 | `plan.detail` | plan | cache | L2 | `object_view` | 2h | 12h | `plan` |
@@ -31,13 +32,15 @@ collection-server 的 Registry 是静态 snapshot，能力由 [`internal/collect
 | Capability | Layer | Family | 生产配置 | 回源 |
 | --- | --- | --- | --- | --- |
 | `catalog.questionnaire` | L1 | `local` | TTL 180s、max 256、singleflight、signal evict | apiserver questionnaire gRPC |
-| `catalog.published_model` | L1 | `local` | TTL 180s、jitter 0.2、每 bucket max 64、singleflight、signal evict | apiserver published-model L2 |
+| `catalog.published_model` | L1 | `local` | 生产已启用；TTL 180s、jitter 0.2、每 bucket max 64、singleflight、signal evict | apiserver published-model L2 |
 | `catalog.typology` | L1 | `local` | TTL 180s、max 256、singleflight、signal evict | assessment-model catalog gRPC |
+| `evaluation.assessment_access` | L1 | `local` | 生产第二批保持关闭；TTL 60s、jitter 0.2、max 1024、singleflight；仅正向 ownership token | apiserver assessment-access L2 |
+| `evaluation.assessment_detail` | L1 | `local` | 生产第二批保持关闭；TTL 180s、jitter 0.2、max 256、singleflight；仅 `evaluated` DTO | apiserver assessment-detail L2 |
 | `report_status` | runtime | `ops_runtime` | TTL 172800s | report workflow |
 
-collection 的 capability ID 不跟随 apiserver 的业务前缀重命名，因为它们描述的是 BFF 自己持有的 DTO L1 和生命周期。
+collection catalog capability 使用 consumer-owned `catalog.*` ID；evaluation 两个意图保持业务名称一致。即使 ID 相同，collection L1 与 apiserver L2 仍是不同进程 Registry 里的独立 entry、policy 和生命周期。
 
-published-model L1 已在生产启用；主配置只引用独立 policy：
+published-model 在 dev/prod policy 中已启用。evaluation access/detail L1 在 dev 中启用，在生产第二批中保持关闭，第三批再通过 policy 开启；主配置只引用独立 policy：
 
 ```yaml
 cache:
@@ -190,7 +193,7 @@ POST /internal/v1/system-governance/actions/cache.reload_policy/runs
 
 可 reload：
 
-- 六个普通 capability 的 `ttl/negative_ttl/ttl_jitter_ratio/compress/singleflight/negative`；
+- 七个普通 capability 的 `ttl/negative_ttl/ttl_jitter_ratio/compress/singleflight/negative`；
 - global 与 static/object/query family defaults 中相同的 Policy 维度。
 
 不可 reload：
