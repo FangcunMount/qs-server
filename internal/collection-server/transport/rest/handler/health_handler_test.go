@@ -275,6 +275,31 @@ func TestHealthHandlerCacheGovernanceReturnsRegistryAndIdentity(t *testing.T) {
 	}
 }
 
+func TestHealthHandlerCacheGovernanceHandlesNilReceiver(t *testing.T) {
+	var handler *HealthHandler
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/governance/cache", nil)
+
+	handler.CacheGovernance(c)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", recorder.Code)
+	}
+	var payload struct {
+		Component string `json:"component"`
+		Registry  struct {
+			Capabilities []json.RawMessage `json:"capabilities"`
+		} `json:"effective_registry"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Component != "collection-server" || len(payload.Registry.Capabilities) != 0 {
+		t.Fatalf("payload = %+v", payload)
+	}
+}
+
 func TestHealthHandlerResilienceReturnsSnapshot(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	handler := NewHealthHandlerWithResilience(

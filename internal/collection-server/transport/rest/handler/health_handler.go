@@ -184,16 +184,22 @@ func (h *HealthHandler) RedisFamilies(c *gin.Context) {
 func (h *HealthHandler) CacheGovernance(c *gin.Context) {
 	runtime := h.redisSnapshot()
 	component := "collection-server"
-	if h != nil && h.serviceName != "" {
-		component = h.serviceName
+	var cacheRegistry *sharedcache.Registry
+	var l1Runtime func() []sharedgovernance.L1CapabilityRuntime
+	if h != nil {
+		if h.serviceName != "" {
+			component = h.serviceName
+		}
+		cacheRegistry = h.cacheRegistry
+		l1Runtime = h.l1Runtime
 	}
-	registry := sharedgovernance.ProjectRegistry(h.cacheRegistry, sharedgovernance.PolicyReloadStatus{})
+	registry := sharedgovernance.ProjectRegistry(cacheRegistry, sharedgovernance.PolicyReloadStatus{})
 	result := sharedgovernance.ComponentCacheGovernanceSnapshot{
 		GeneratedAt: time.Now(), Component: component, InstanceID: runtime.InstanceID,
 		Generation: runtime.Generation, RedisRuntime: runtime, EffectiveRegistry: registry,
 	}
-	if h != nil && h.l1Runtime != nil {
-		result.L1Runtime = h.l1Runtime()
+	if l1Runtime != nil {
+		result.L1Runtime = l1Runtime()
 	}
 	c.JSON(http.StatusOK, result)
 }
