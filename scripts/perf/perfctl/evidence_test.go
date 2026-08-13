@@ -199,6 +199,7 @@ func TestPrometheusObservationWindowUsesMetricCaptureTimes(t *testing.T) {
 }
 
 func TestNSQDepthUsesChannelWorkWithoutDoubleCountingTopicDepth(t *testing.T) {
+	t.Setenv("PERF_NSQ_TOPICS", "")
 	dir := t.TempDir()
 	path := filepath.Join(dir, "nsqd.json")
 	payload := map[string]any{"topics": []any{

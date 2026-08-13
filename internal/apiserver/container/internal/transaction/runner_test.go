@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
@@ -26,10 +27,11 @@ func (s *transactionLimiterSpy) Acquire(ctx context.Context) (context.Context, f
 func TestMongoRunnerWithLimiterRejectsBeforeStartingSession(t *testing.T) {
 	wantErr := errors.New("mongo saturated")
 	limiter := &transactionLimiterSpy{err: wantErr}
-	client, err := mongo.NewClient()
+	client, err := mongo.Connect(t.Context(), options.Client())
 	if err != nil {
-		t.Fatalf("mongo.NewClient() error = %v", err)
+		t.Fatalf("mongo.Connect() error = %v", err)
 	}
+	t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
 	runner := NewMongoRunnerWithLimiter(client.Database("test"), limiter)
 
 	err = runner.WithinTransaction(t.Context(), func(context.Context) error {
