@@ -449,6 +449,8 @@ mongodb:
   max-pool-size: 64                # 单 apiserver 预算；mongo max_inflight=48，固定保留 25%
   max-connecting: 8                # 默认 2 建连过慢；限制为 8，避免恢复期连接风暴
   max-conn-idle-time: 10m          # 平峰回收连接，同时避免几秒级连接抖动
+  compressors: ["zstd", "snappy"] # 跨云链路优先压缩；服务端不支持 zstd 时回退 snappy
+  zstd-compression-level: 1        # 优先降低网络体积，同时控制客户端 CPU 开销
   use-ssl: false                   # 是否启用 SSL: false
   ssl-insecure-skip-verify: false  # 是否跳过 SSL 证书验证: false
   ssl-allow-invalid-hostnames: false # 是否允许无效主机名: false

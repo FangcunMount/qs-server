@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 
 	componentdatabase "github.com/FangcunMount/component-base/pkg/database"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
@@ -48,7 +49,7 @@ func Build(opts *genericoptions.MongoDBOptions) (*componentdatabase.MongoConfig,
 }
 
 func applyPoolOptions(rawURL string, opts *genericoptions.MongoDBOptions) (string, error) {
-	if opts == nil || (opts.MinPoolSize == 0 && opts.MaxPoolSize == 0 && opts.MaxConnecting == 0 && opts.MaxConnIdleTime == 0) {
+	if opts == nil || (opts.MinPoolSize == 0 && opts.MaxPoolSize == 0 && opts.MaxConnecting == 0 && opts.MaxConnIdleTime == 0 && len(opts.Compressors) == 0 && opts.ZstdCompressionLevel == 0) {
 		return rawURL, nil
 	}
 	parsed, err := url.Parse(rawURL)
@@ -71,6 +72,12 @@ func applyPoolOptions(rawURL string, opts *genericoptions.MongoDBOptions) (strin
 	}
 	if opts.MaxConnIdleTime > 0 {
 		query.Set("maxIdleTimeMS", strconv.FormatInt(opts.MaxConnIdleTime.Milliseconds(), 10))
+	}
+	if len(opts.Compressors) > 0 {
+		query.Set("compressors", strings.Join(opts.Compressors, ","))
+	}
+	if opts.ZstdCompressionLevel > 0 {
+		query.Set("zstdCompressionLevel", strconv.Itoa(opts.ZstdCompressionLevel))
 	}
 	parsed.RawQuery = query.Encode()
 	return parsed.String(), nil

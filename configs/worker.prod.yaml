@@ -105,6 +105,8 @@ mongodb:
   max-pool-size: 32                # 3 worker 共 96 条连接预算
   max-connecting: 4                # 加快冷池恢复但限制同时握手
   max-conn-idle-time: 10m
+  compressors: ["zstd", "snappy"] # 跨云链路优先压缩；服务端不支持 zstd 时回退 snappy
+  zstd-compression-level: 1
   use-ssl: false
   ssl-insecure-skip-verify: false
   ssl-allow-invalid-hostnames: false

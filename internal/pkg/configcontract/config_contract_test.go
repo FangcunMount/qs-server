@@ -384,6 +384,15 @@ func assertMongoPoolBudget(t *testing.T, component, configName string, opts *gen
 	if opts.MinPoolSize == 0 || opts.MaxPoolSize == 0 || opts.MaxConnecting == 0 || opts.MaxConnIdleTime <= 0 {
 		t.Fatalf("%s %s must define a complete MongoDB pool budget", component, configName)
 	}
+	if len(opts.Compressors) == 0 || opts.Compressors[0] != "zstd" || opts.ZstdCompressionLevel != 1 {
+		t.Fatalf(
+			"%s %s must enable low-CPU zstd MongoDB wire compression first: compressors=%v level=%d",
+			component,
+			configName,
+			opts.Compressors,
+			opts.ZstdCompressionLevel,
+		)
+	}
 	if opts.MinPoolSize > opts.MaxPoolSize || opts.MaxConnecting > opts.MaxPoolSize {
 		t.Fatalf("%s %s invalid MongoDB pool budget: min=%d max=%d connecting=%d", component, configName, opts.MinPoolSize, opts.MaxPoolSize, opts.MaxConnecting)
 	}

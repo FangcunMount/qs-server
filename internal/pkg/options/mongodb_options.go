@@ -2,6 +2,7 @@ package options
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -28,6 +29,11 @@ type MongoDBOptions struct {
 	MaxPoolSize     uint64        `json:"max-pool-size,omitempty"     mapstructure:"max-pool-size"`
 	MaxConnecting   uint64        `json:"max-connecting,omitempty"    mapstructure:"max-connecting"`
 	MaxConnIdleTime time.Duration `json:"max-conn-idle-time,omitempty" mapstructure:"max-conn-idle-time"`
+
+	// Wire compression reduces cross-host MongoDB traffic. The first
+	// mutually supported compressor is selected by the client and server.
+	Compressors          []string `json:"compressors,omitempty"            mapstructure:"compressors"`
+	ZstdCompressionLevel int      `json:"zstd-compression-level,omitempty" mapstructure:"zstd-compression-level"`
 
 	// SSL 配置
 	UseSSL                   bool   `json:"use-ssl,omitempty"                  mapstructure:"use-ssl"`
@@ -60,6 +66,8 @@ func NewMongoDBOptions() *MongoDBOptions {
 		MaxPoolSize:              0,
 		MaxConnecting:            0,
 		MaxConnIdleTime:          0,
+		Compressors:              nil,
+		ZstdCompressionLevel:     0,
 		UseSSL:                   false,
 		SSLInsecureSkipVerify:    false,
 		SSLAllowInvalidHostnames: false,
@@ -94,6 +102,37 @@ func (o *MongoDBOptions) Validate() []error {
 	}
 	if o.MaxConnIdleTime > 0 && o.MaxConnIdleTime < time.Millisecond {
 		errs = append(errs, fmt.Errorf("mongodb.max-conn-idle-time must be at least 1ms when configured"))
+	}
+	allowedCompressors := map[string]struct{}{
+		"snappy": {},
+		"zlib":   {},
+		"zstd":   {},
+	}
+	seenCompressors := make(map[string]struct{}, len(o.Compressors))
+	for _, compressor := range o.Compressors {
+		normalized := strings.TrimSpace(compressor)
+		if normalized != compressor {
+			errs = append(errs, fmt.Errorf("mongodb compressor %q must not contain surrounding whitespace", compressor))
+			continue
+		}
+		compressor = normalized
+		if _, ok := allowedCompressors[compressor]; !ok {
+			errs = append(errs, fmt.Errorf("mongodb compressor %q must be one of snappy, zlib, zstd", compressor))
+			continue
+		}
+		if _, duplicate := seenCompressors[compressor]; duplicate {
+			errs = append(errs, fmt.Errorf("mongodb compressor %q must not be duplicated", compressor))
+			continue
+		}
+		seenCompressors[compressor] = struct{}{}
+	}
+	if o.ZstdCompressionLevel < 0 || o.ZstdCompressionLevel > 20 {
+		errs = append(errs, fmt.Errorf("mongodb.zstd-compression-level (%d) must be between 1 and 20 when configured", o.ZstdCompressionLevel))
+	}
+	if o.ZstdCompressionLevel > 0 {
+		if _, enabled := seenCompressors["zstd"]; !enabled {
+			errs = append(errs, fmt.Errorf("mongodb.zstd-compression-level requires zstd in mongodb.compressors"))
+		}
 	}
 
 	return errs
@@ -131,6 +170,10 @@ func addMongoDBConnectionFlags(fs *pflag.FlagSet, o *MongoDBOptions) {
 		"Maximum MongoDB connections established concurrently. Zero keeps the driver default.")
 	addDurationFlag(fs, &o.MaxConnIdleTime, "mongodb.max-conn-idle-time", o.MaxConnIdleTime,
 		"Maximum idle time for a pooled MongoDB connection. Zero keeps the driver default.")
+	fs.StringSliceVar(&o.Compressors, "mongodb.compressors", o.Compressors,
+		"Ordered MongoDB wire compressors (snappy, zlib, zstd). Empty disables compression.")
+	fs.IntVar(&o.ZstdCompressionLevel, "mongodb.zstd-compression-level", o.ZstdCompressionLevel,
+		"Zstd wire compression level from 1 (fastest) to 20 (smallest); zero keeps the driver default.")
 }
 
 func addMongoDBTLSFlags(fs *pflag.FlagSet, o *MongoDBOptions) {
