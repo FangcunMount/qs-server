@@ -2,6 +2,41 @@
 set -euo pipefail
 
 CONFIG_FILE="${PERF_CONFIG_FILE:-tmp/perf/qs-perf.config.json}"
+PERF_PREFLIGHT_RUN_ID="${PERF_PREFLIGHT_RUN_ID:-${RUN_ID:-preflight-$(date -u +%Y%m%dT%H%M%SZ)-$$-${RANDOM}}}"
+
+if [[ ! "$PERF_PREFLIGHT_RUN_ID" =~ ^[A-Za-z0-9._:-]{1,128}$ ]]; then
+  echo "PERF_PREFLIGHT_RUN_ID must contain only letters, numbers, '.', '_', ':', or '-' (max 128 characters)" >&2
+  exit 1
+fi
+
+perf_curl() {
+  curl -H "X-Perf-Run-ID: $PERF_PREFLIGHT_RUN_ID" "$@"
+}
+
+preflight_header_self_test() {
+  local output
+  PERF_PREFLIGHT_RUN_ID="perf-preflight-contract"
+  curl() {
+    printf '<%s>\n' "$@"
+  }
+
+  output="$(perf_curl -sS https://example.invalid/preflight)"
+  [[ "$(grep -Fxc '<X-Perf-Run-ID: perf-preflight-contract>' <<<"$output")" == "1" ]]
+  [[ "$(grep -Fxc '<https://example.invalid/preflight>' <<<"$output")" == "1" ]]
+  echo "[OK] token preflight requests carry X-Perf-Run-ID"
+}
+
+case "${1:-}" in
+  --self-test)
+    preflight_header_self_test
+    exit 0
+    ;;
+  "") ;;
+  *)
+    echo "usage: $0 [--self-test]" >&2
+    exit 2
+    ;;
+esac
 
 if [[ ! -f "$CONFIG_FILE" ]]; then
   echo "config file not found: $CONFIG_FILE" >&2
@@ -107,7 +142,7 @@ http_status() {
     return 1
   fi
   local status
-  status="$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $token" "$url")"
+  status="$(perf_curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $token" "$url")"
   echo "$label: $status"
   [[ "$status" =~ ^2[0-9][0-9]$ ]]
 }
@@ -122,7 +157,7 @@ http_json_status() {
     return 1
   fi
   local status
-  status="$(curl -sS -o /dev/null -w '%{http_code}' \
+  status="$(perf_curl -sS -o /dev/null -w '%{http_code}' \
     -X POST \
     -H "Authorization: Bearer $token" \
     -H 'Content-Type: application/json' \
@@ -172,7 +207,7 @@ collection_token="$(first_token "$collection_effective_file")"
 apiserver_token="$(first_token "$apiserver_effective_file")"
 
 if [[ -z "$questionnaire_code" && -n "$collection_token" && -n "$scale_code" ]]; then
-  questionnaire_code="$(curl -sS -H "Authorization: Bearer $collection_token" \
+  questionnaire_code="$(perf_curl -sS -H "Authorization: Bearer $collection_token" \
     "${collection_base_url%/}/api/v1/assessment-models/${scale_code}" 2>/dev/null | jq -r '.questionnaire_code // .data.questionnaire_code // empty' 2>/dev/null || true)"
 fi
 

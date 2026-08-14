@@ -15,6 +15,40 @@ IAM_LOGIN_INTERVAL="${IAM_LOGIN_INTERVAL:-0.15}"
 TOKENS_OUTPUT_FILE="${TOKENS_OUTPUT_FILE:-}"
 selected_users_group="$IAM_USERS_GROUP"
 
+curl_json_post() {
+  local payload="$1"
+  shift
+  curl --data-binary @- "$@" <<<"$payload"
+}
+
+iam_request_body_self_test() {
+  local output secret='contract-secret'
+  curl() {
+    local stdin
+    stdin="$(cat)"
+    printf 'arg=<%s>\n' "$@"
+    printf 'stdin=<%s>\n' "$stdin"
+  }
+
+  output="$(curl_json_post "{\"password\":\"$secret\"}" -X POST https://example.invalid/login)"
+  [[ "$(grep -Fxc 'arg=<@->' <<<"$output")" == "1" ]]
+  [[ "$output" == *"stdin=<{\"password\":\"$secret\"}>"* ]]
+  ! grep -F '^arg=' <<<"$output" | grep -Fq "$secret"
+  echo "[OK] IAM login JSON is passed through stdin"
+}
+
+case "${1:-}" in
+  --self-test)
+    iam_request_body_self_test
+    exit 0
+    ;;
+  "") ;;
+  *)
+    echo "usage: $0 [--self-test]" >&2
+    exit 2
+    ;;
+esac
+
 iam_login() {
   local payload="$1"
   local attempt delay err_file
@@ -24,13 +58,12 @@ iam_login() {
   for ((attempt = 1; attempt <= IAM_LOGIN_RETRIES; attempt++)); do
     : >"$err_file"
     if response="$(
-      curl -fsS \
+      curl_json_post "$payload" -fsS \
         --connect-timeout 15 \
         --max-time 30 \
         -H 'Accept: application/json' \
         -H 'Content-Type: application/json' \
-        -X POST "$IAM_LOGIN_URL" \
-        -d "$payload" 2>"$err_file"
+        -X POST "$IAM_LOGIN_URL" 2>"$err_file"
     )"; then
       printf '%s' "$response"
       return 0

@@ -246,7 +246,10 @@ perf-run: perf-ensure-config ## 统一压测入口（PLAN=quick|baseline|admissi
 
 perf-verify: perf-check-k6 ## 校验统一编排器、报告契约与 k6 场景
 	bash -n $(PERF_SCRIPT_DIR)/check-token-preflight.sh
+	$(PERF_SCRIPT_DIR)/check-token-preflight.sh --self-test
+	bash -n $(PERF_SCRIPT_DIR)/fetch-iam-token.sh
 	bash -n $(PERF_SCRIPT_DIR)/fetch-iam-tokens.sh
+	$(PERF_SCRIPT_DIR)/fetch-iam-tokens.sh --self-test
 	bash -n $(PERF_SCRIPT_DIR)/run-submit-coalescing.sh
 	bash -n $(PERF_SCRIPT_DIR)/run-submit-redis-degraded.sh
 	bash -n $(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh

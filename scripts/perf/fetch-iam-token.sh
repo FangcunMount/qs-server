@@ -40,9 +40,8 @@ payload="$(
     } | if $tenant_id != "" then .method_payload.tenant_id = ($tenant_id | tonumber) else . end'
 )"
 
-curl -fsS \
+curl --data-binary @- -fsS \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
-  -X POST "$IAM_LOGIN_URL" \
-  -d "$payload" |
+  -X POST "$IAM_LOGIN_URL" <<<"$payload" |
   jq -r '.data.access_token // .access_token // empty'
