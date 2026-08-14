@@ -87,7 +87,7 @@ export function runAsyncChainProbe(ctx, modelType) {
     ? PERSONALITY_REPORT_STATUS_PATH
     : (modelType === 'behavior' ? BEHAVIOR_REPORT_STATUS_PATH : REPORT_STATUS_PATH);
   const assessmentStart = Date.now();
-  const terminalStatus = waitReportTerminal(assessmentID, payload.testee_id, ctx, reportPathTemplate, modelType === 'personality' ? 'chain_probe_personality_report_status' : 'chain_probe_report_status', token);
+  const terminalStatus = waitReportTerminal(assessmentID, payload.testee_id, ctx, reportPathTemplate, modelType === 'personality' ? 'chain_probe_personality_report_status' : 'chain_probe_report_status', token, modelType);
   if (!terminalStatus) {
     chainProbeTimeout.add(1, { stage: 'report_terminal', model_type: modelType });
     chainProbeFailed.add(1, { reason: 'report_timeout', model_type: modelType });
@@ -178,9 +178,12 @@ export function classifyAssessmentReadiness(data) {
   return { status: 'pending', assessmentID: '' };
 }
 
-export function waitReportTerminal(assessmentID, testeeID, data, pathTemplate, endpoint, token) {
-  const deadline = Date.now() + CHAIN_PROBE_TIMEOUT_SECONDS * 1000;
+export function waitReportTerminal(assessmentID, testeeID, data, pathTemplate, endpoint, token, modelType = '') {
+  const startedAt = Date.now();
+  const deadline = startedAt + CHAIN_PROBE_TIMEOUT_SECONDS * 1000;
   let pollAttempt = 0;
+  let lastHTTPStatus = 0;
+  let lastReportStatus = '';
   while (Date.now() < deadline) {
     const path = renderPath(pathTemplate || REPORT_STATUS_PATH, {
       assessment_id: assessmentID,
@@ -190,22 +193,35 @@ export function waitReportTerminal(assessmentID, testeeID, data, pathTemplate, e
     const res = timedRequest('GET', COLLECTION_BASE_URL, path, null, authHeaders(token), {
       endpoint: endpoint || 'chain_probe_report_status',
       service: 'collection-server',
+      model_type: modelType,
     });
     recordHTTPStatus(res, null, endpoint || 'chain_probe_report_status');
-    chainProbePollRequests.add(1, { stage: 'report_terminal' });
+    chainProbePollRequests.add(1, { stage: 'report_terminal', model_type: modelType });
+    lastHTTPStatus = res.status;
     let nextPollAfterMS = 0;
     if (res.status === 200) {
       const response = responseData(res);
-      const status = response.status || '';
-      if (status === 'interpreted' || status === 'failed') {
-        return status;
+      const classified = classifyReportStatus(response);
+      lastReportStatus = classified.status;
+      if (classified.terminal) {
+        return classified.status;
       }
-      nextPollAfterMS = response.next_poll_after_ms || 0;
+      nextPollAfterMS = classified.nextPollAfterMS;
     }
     sleepBeforeNextChainProbePoll(deadline, pollAttempt, nextPollAfterMS);
     pollAttempt += 1;
   }
+  console.error(`chain_probe_timeout stage=report_terminal model_type=${modelType || 'unknown'} assessment_id=${assessmentID} testee_id=${testeeID} polls=${pollAttempt} last_http_status=${lastHTTPStatus} last_report_status=${lastReportStatus || 'unknown'} elapsed_ms=${Date.now() - startedAt}`);
   return '';
+}
+
+export function classifyReportStatus(data) {
+  const status = String((data && data.status) || '').trim().toLowerCase();
+  return {
+    status,
+    terminal: status === 'interpreted' || status === 'failed',
+    nextPollAfterMS: Number((data && data.next_poll_after_ms) || 0),
+  };
 }
 
 export function chainProbePollDelaySeconds(

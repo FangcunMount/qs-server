@@ -588,6 +588,12 @@ func writeNativeChainCounters(output *strings.Builder, raw rawSummary) {
 	for _, name := range names {
 		writeNativeCounterWithIndent(output, "      ", name, findMetric(raw, name, nil))
 	}
+	for _, modelType := range []string{"medical", "behavior", "personality"} {
+		for _, stage := range []string{"assessment_readiness", "report_terminal"} {
+			name := fmt.Sprintf("chain_probe_timeout{stage:%s,model_type:%s}", stage, modelType)
+			writeNativeCounterWithIndent(output, "      ", name, findMetric(raw, name, nil))
+		}
+	}
 }
 
 func writeNativeTrendFromLatency(output *strings.Builder, indent, name string, latency LatencyMetric) {

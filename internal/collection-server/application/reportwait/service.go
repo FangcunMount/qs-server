@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	defaultPollInterval = 500 * time.Millisecond
+	defaultPollInterval               = 500 * time.Millisecond
+	defaultNonTerminalRefreshInterval = 3 * time.Second
 )
 
 type QueryService interface {
@@ -42,18 +43,23 @@ type Config struct {
 	MaxActiveWaiters   int
 	SignalingEnabled   bool
 	RedisMissRetryWait time.Duration
+	// NonTerminalRefreshInterval bounds how long an in-flight Redis snapshot may
+	// hide a terminal report that is already durable in the read model. Terminal
+	// snapshots remain cache-only.
+	NonTerminalRefreshInterval time.Duration
 }
 
 func DefaultConfig() Config {
 	return Config{
-		PollInterval:       defaultPollInterval,
-		StatusTTL:          reportstatus.DefaultTTL,
-		DefaultTimeout:     20 * time.Second,
-		MinTimeout:         1 * time.Second,
-		MaxTimeout:         25 * time.Second,
-		MaxActiveWaiters:   3000,
-		SignalingEnabled:   false,
-		RedisMissRetryWait: defaultPollInterval,
+		PollInterval:               defaultPollInterval,
+		StatusTTL:                  reportstatus.DefaultTTL,
+		DefaultTimeout:             20 * time.Second,
+		MinTimeout:                 1 * time.Second,
+		MaxTimeout:                 25 * time.Second,
+		MaxActiveWaiters:           3000,
+		SignalingEnabled:           false,
+		RedisMissRetryWait:         defaultPollInterval,
+		NonTerminalRefreshInterval: defaultNonTerminalRefreshInterval,
 	}
 }
 
@@ -263,13 +269,38 @@ func (s *Service) checkCurrentStatus(
 				recordTerminalResponse(resp)
 				return resp, true, nil
 			}
-			return resp, false, nil
+			if !s.shouldRefreshNonTerminal(snapshot) {
+				return resp, false, nil
+			}
+			// A terminal cache write is best-effort. Periodically reconcile an
+			// in-flight snapshot with the durable read model so one missed Redis
+			// update cannot leave report-status processing for the full cache TTL.
+			reportstatus.IncWaitReportDBFallback()
+			return s.loadStatusFromDB(ctx, testeeID, assessmentID, assessmentKey)
 		} else {
 			reportstatus.IncWaitReportRedisMiss()
 		}
 	}
 	reportstatus.IncWaitReportDBFallback()
 	return s.loadStatusFromDB(ctx, testeeID, assessmentID, assessmentKey)
+}
+
+func (s *Service) shouldRefreshNonTerminal(snapshot *reportstatus.Snapshot) bool {
+	if snapshot == nil || snapshot.UpdatedAt.IsZero() {
+		return true
+	}
+	interval := s.cfg.NonTerminalRefreshInterval
+	if interval <= 0 {
+		interval = defaultNonTerminalRefreshInterval
+	}
+	now := time.Now()
+	// A timestamp materially ahead of this process indicates clock skew or a
+	// malformed snapshot; fail open to the durable read model instead of
+	// suppressing reconciliation indefinitely.
+	if snapshot.UpdatedAt.After(now.Add(interval)) {
+		return true
+	}
+	return now.Sub(snapshot.UpdatedAt) >= interval
 }
 
 func (s *Service) loadStatusFromDB(

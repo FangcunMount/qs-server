@@ -296,6 +296,10 @@ export function buildThresholds() {
     thresholds.chain_probe_timeout = ['count==0'];
     thresholds['chain_probe_timeout{stage:assessment_readiness}'] = ['count==0'];
     thresholds['chain_probe_timeout{stage:report_terminal}'] = ['count==0'];
+    for (const modelType of ['medical', 'behavior', 'personality']) {
+      thresholds[`chain_probe_timeout{stage:assessment_readiness,model_type:${modelType}}`] = ['count==0'];
+      thresholds[`chain_probe_timeout{stage:report_terminal,model_type:${modelType}}`] = ['count==0'];
+    }
     thresholds['chain_probe_failed{reason:assessment_no_assessment_required}'] = ['count==0'];
     thresholds['chain_probe_failed{reason:assessment_failed}'] = ['count==0'];
   }

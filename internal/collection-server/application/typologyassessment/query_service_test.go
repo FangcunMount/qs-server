@@ -146,7 +146,7 @@ func TestQueryServiceGetReportStatus(t *testing.T) {
 	}
 	wait := reportwait.NewService(reader, &fakeStatusCache{
 		snapshots: map[string]*reportstatus.Snapshot{
-			"2": {Status: "processing", Stage: "scoring", UpdatedAt: time.Unix(99, 0).UTC()},
+			"2": {Status: "processing", Stage: "scoring", UpdatedAt: time.Now().UTC()},
 		},
 	}, nil, nil, reportwait.DefaultConfig())
 	svc := NewQueryService(reader, wait)
@@ -217,7 +217,7 @@ func TestQueryServiceGetReportStatusInterpretedEnrichesModel(t *testing.T) {
 	}
 	wait := reportwait.NewService(reader, &fakeStatusCache{
 		snapshots: map[string]*reportstatus.Snapshot{
-			"42": {Status: "interpreted", Stage: "done", UpdatedAt: time.Unix(1, 0).UTC()},
+			"42": {Status: "completed", Stage: "completed", UpdatedAt: time.Now().UTC()},
 		},
 	}, nil, nil, reportwait.DefaultConfig())
 	svc := NewQueryService(reader, wait)

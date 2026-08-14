@@ -17,6 +17,7 @@ type fakeStatusCache struct {
 	snapshots map[string]*reportstatus.Snapshot
 	getErr    error
 	getCalls  int
+	setCalls  int
 }
 
 func (f *fakeStatusCache) Get(_ context.Context, assessmentID string) (*reportstatus.Snapshot, error) {
@@ -30,12 +31,17 @@ func (f *fakeStatusCache) Get(_ context.Context, assessmentID string) (*reportst
 	return f.snapshots[assessmentID], nil
 }
 
-func (f *fakeStatusCache) Set(context.Context, *reportstatus.Snapshot, time.Duration) error {
+func (f *fakeStatusCache) Set(_ context.Context, snapshot *reportstatus.Snapshot, _ time.Duration) error {
+	f.setCalls++
+	if f.snapshots == nil {
+		f.snapshots = map[string]*reportstatus.Snapshot{}
+	}
+	f.snapshots[snapshot.AssessmentID] = snapshot
 	return nil
 }
 
-func (f *fakeStatusCache) SetIfHigherPriority(context.Context, *reportstatus.Snapshot, time.Duration) error {
-	return nil
+func (f *fakeStatusCache) SetIfHigherPriority(ctx context.Context, snapshot *reportstatus.Snapshot, ttl time.Duration) error {
+	return f.Set(ctx, snapshot, ttl)
 }
 
 type fakeAssessmentQuery struct {
@@ -97,6 +103,63 @@ func TestGetStatusRedisHitTerminal(t *testing.T) {
 	}
 	if query.getCalls != 0 {
 		t.Fatalf("GetMyAssessment calls = %d, want 0 on status-cache hit", query.getCalls)
+	}
+}
+
+func TestGetStatusFreshProcessingCacheAvoidsDBFallback(t *testing.T) {
+	query := &fakeAssessmentQuery{
+		result: &evaluation.AssessmentDetailResponse{Status: "evaluated"},
+		report: &evaluation.AssessmentReportResponse{AssessmentID: "42"},
+	}
+	cache := &fakeStatusCache{snapshots: map[string]*reportstatus.Snapshot{
+		"42": {
+			AssessmentID: "42",
+			Status:       "processing",
+			Stage:        "processing",
+			UpdatedAt:    time.Now(),
+		},
+	}}
+	svc := NewService(query, cache, nil, nil, DefaultConfig())
+
+	resp, err := svc.GetStatus(context.Background(), 1, 42)
+	if err != nil {
+		t.Fatalf("GetStatus: %v", err)
+	}
+	if resp.Status != "processing" {
+		t.Fatalf("status = %q, want processing", resp.Status)
+	}
+	if query.getCalls != 0 {
+		t.Fatalf("GetMyAssessment calls = %d, want 0 for a fresh cache hit", query.getCalls)
+	}
+}
+
+func TestGetStatusStaleProcessingCacheReconcilesCompletedReport(t *testing.T) {
+	query := &fakeAssessmentQuery{
+		result: &evaluation.AssessmentDetailResponse{Status: "evaluated"},
+		report: &evaluation.AssessmentReportResponse{AssessmentID: "42"},
+	}
+	cache := &fakeStatusCache{snapshots: map[string]*reportstatus.Snapshot{
+		"42": {
+			AssessmentID: "42",
+			Status:       "processing",
+			Stage:        "processing",
+			UpdatedAt:    time.Now().Add(-time.Minute),
+		},
+	}}
+	svc := NewService(query, cache, nil, nil, DefaultConfig())
+
+	resp, err := svc.GetStatus(context.Background(), 1, 42)
+	if err != nil {
+		t.Fatalf("GetStatus: %v", err)
+	}
+	if resp.Status != "completed" || resp.Stage != "completed" {
+		t.Fatalf("response = %#v, want completed", resp)
+	}
+	if query.getCalls != 1 {
+		t.Fatalf("GetMyAssessment calls = %d, want 1 stale-cache reconciliation", query.getCalls)
+	}
+	if cache.setCalls != 1 || cache.snapshots["42"].Status != "completed" {
+		t.Fatalf("cache was not healed to completed: calls=%d snapshot=%#v", cache.setCalls, cache.snapshots["42"])
 	}
 }
 
