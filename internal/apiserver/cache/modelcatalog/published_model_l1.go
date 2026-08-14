@@ -12,9 +12,13 @@ import (
 )
 
 const (
-	publishedModelExactL1TTL        = 15 * time.Minute
-	publishedModelExactL1MaxEntries = 512
-	publishedModelExactL1Bucket     = "exact_by_ref"
+	publishedModelL1FallbackTTL               = 15 * time.Minute
+	publishedModelExactL1MaxEntries           = 512
+	publishedModelCatalogListL1MaxEntries     = 256
+	publishedModelByQuestionnaireL1MaxEntries = 512
+	publishedModelExactL1Bucket               = "exact_by_ref"
+	publishedModelCatalogListL1Bucket         = "catalog_list_versioned"
+	publishedModelByQuestionnaireL1Bucket     = "by_questionnaire_versioned"
 )
 
 var (
@@ -37,34 +41,62 @@ var (
 )
 
 func newPublishedModelExactL1(policies sharedcache.PolicyProvider) *localcache.Cache[*port.PublishedModel] {
-	policy := publishedModelPolicy(policies)
-	ttl := policy.TTLOr(publishedModelExactL1TTL)
-	capability := string(cachepolicy.CapabilityModelCatalogPublished)
-	publishedModelL1Entries.WithLabelValues(capability, publishedModelExactL1Bucket).Set(0)
-	publishedModelL1MaxEntries.WithLabelValues(capability, publishedModelExactL1Bucket).Set(publishedModelExactL1MaxEntries)
-	return localcache.New(localcache.Options{
-		TTL: ttl,
-		TTLProvider: func() time.Duration {
-			return publishedModelPolicy(policies).TTLOr(publishedModelExactL1TTL)
-		},
-		MaxEntries: publishedModelExactL1MaxEntries, TTLJitterRatio: policy.JitterRatio,
-		OnHit: func() {
-			publishedModelL1Requests.WithLabelValues(capability, publishedModelExactL1Bucket, "hit").Inc()
-		},
-		OnMiss: func() {
-			publishedModelL1Requests.WithLabelValues(capability, publishedModelExactL1Bucket, "miss").Inc()
-		},
-		OnEntries: func(entries int) {
-			publishedModelL1Entries.WithLabelValues(capability, publishedModelExactL1Bucket).Set(float64(entries))
-		},
-		OnEviction: func(reason localcache.EvictionReason) {
-			publishedModelL1Evictions.WithLabelValues(capability, publishedModelExactL1Bucket, string(reason)).Inc()
-		},
-	}, func(model *port.PublishedModel) *port.PublishedModel {
+	return newPublishedModelL1(policies, publishedModelExactL1Bucket, publishedModelExactL1MaxEntries, func(model *port.PublishedModel) *port.PublishedModel {
 		// PublishedModel is an immutable runtime snapshot by port contract. Sharing
 		// the pointer avoids turning an L1 hit back into a deep-copy/JSON hot path.
 		return model
 	})
+}
+
+func newPublishedModelByQuestionnaireL1(policies sharedcache.PolicyProvider) *localcache.Cache[*port.PublishedModel] {
+	return newPublishedModelL1(policies, publishedModelByQuestionnaireL1Bucket, publishedModelByQuestionnaireL1MaxEntries, func(model *port.PublishedModel) *port.PublishedModel {
+		// The key contains the global catalog version, so a publish invalidation
+		// makes every older entry unreachable across apiserver instances.
+		return model
+	})
+}
+
+func newPublishedModelCatalogListL1(policies sharedcache.PolicyProvider) *localcache.Cache[*publishedModelCatalogListPage] {
+	return newPublishedModelL1(policies, publishedModelCatalogListL1Bucket, publishedModelCatalogListL1MaxEntries, func(page *publishedModelCatalogListPage) *publishedModelCatalogListPage {
+		if page == nil {
+			return nil
+		}
+		cloned := *page
+		cloned.Models = append([]*port.PublishedModel(nil), page.Models...)
+		return &cloned
+	})
+}
+
+func newPublishedModelL1[T any](
+	policies sharedcache.PolicyProvider,
+	bucket string,
+	maxEntries int,
+	clone func(T) T,
+) *localcache.Cache[T] {
+	policy := publishedModelPolicy(policies)
+	ttl := policy.TTLOr(publishedModelL1FallbackTTL)
+	capability := string(cachepolicy.CapabilityModelCatalogPublished)
+	publishedModelL1Entries.WithLabelValues(capability, bucket).Set(0)
+	publishedModelL1MaxEntries.WithLabelValues(capability, bucket).Set(float64(maxEntries))
+	return localcache.New(localcache.Options{
+		TTL: ttl,
+		TTLProvider: func() time.Duration {
+			return publishedModelPolicy(policies).TTLOr(publishedModelL1FallbackTTL)
+		},
+		MaxEntries: maxEntries, TTLJitterRatio: policy.JitterRatio,
+		OnHit: func() {
+			publishedModelL1Requests.WithLabelValues(capability, bucket, "hit").Inc()
+		},
+		OnMiss: func() {
+			publishedModelL1Requests.WithLabelValues(capability, bucket, "miss").Inc()
+		},
+		OnEntries: func(entries int) {
+			publishedModelL1Entries.WithLabelValues(capability, bucket).Set(float64(entries))
+		},
+		OnEviction: func(reason localcache.EvictionReason) {
+			publishedModelL1Evictions.WithLabelValues(capability, bucket, string(reason)).Inc()
+		},
+	}, clone)
 }
 
 func publishedModelPolicy(policies sharedcache.PolicyProvider) sharedcache.Policy {

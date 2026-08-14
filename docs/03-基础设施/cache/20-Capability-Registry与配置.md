@@ -23,7 +23,7 @@ Capability 是 Cache 的最小治理单位。apiserver 的 [`catalog.Spec`](../.
 | `statistics.query` | statistics | cache | L2 + bounded L1 stale | `query_result` | 26h | 26h | `stats_query` |
 | `report_status` | interpretation | operational_state | runtime | `ops_runtime` | 48h | 48h | `report_status` |
 
-`modelcatalog.published_model` 只有不可变的 `exact_by_ref` 运行快照进入 apiserver 进程内 L1，命中后直接复用已解码的 `DefinitionV2`；latest-by-code、questionnaire/list/algorithms 等可变目录桶仍使用 L2。Active admission 继续绕过两级缓存读取 Mongo，以重新校验 release status。L1 有界为 512 条，TTL 沿用 capability 的 effective TTL，并通过 `qs_apiserver_l1_cache_*` 指标暴露 hit/miss、entries 与 eviction。
+`modelcatalog.published_model` 的不可变 `exact_by_ref` 运行快照，以及 key 包含全局 catalog version 的 `catalog_list_versioned` / `by_questionnaire_versioned` 进入 apiserver 进程内 L1，命中后直接复用已解码的 `DefinitionV2`。发布会 bump 全局版本，使旧目录 key 跨实例不可达；latest-by-code、algorithms 等非版本化可变目录仍使用 L2。Active admission 继续绕过两级缓存读取 Mongo，以重新校验 release status。三个 L1 bucket 上限分别为 512/256/512 条，TTL 沿用 capability 的 effective TTL，并通过 `qs_apiserver_l1_cache_*` 指标暴露 hit/miss、entries 与 eviction。
 
 `statistics.query` 的 generation/hotset 元数据使用 `meta_hotset`，但 capability family 仍投影为 `query_result`；支撑元数据不是第二个业务 capability。`evaluation.assessment_list` 因读路径从未接入缓存而已退役，system-governance 不保留虚假的 disabled row。
 

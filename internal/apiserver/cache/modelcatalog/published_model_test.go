@@ -29,6 +29,9 @@ type publishedModelStoreStub struct {
 	findByQuestionnaire      *port.PublishedModel
 	getByRef                 *port.PublishedModel
 	findByCode               *port.PublishedModel
+	listPublishedCalls       int
+	listPublished            []*port.PublishedModel
+	listPublishedTotal       int64
 	upsertErr                error
 }
 
@@ -63,7 +66,8 @@ func (s *publishedModelStoreStub) FindPublishedModelByCode(_ context.Context, ki
 }
 
 func (s *publishedModelStoreStub) ListPublishedModels(context.Context, port.ListPublishedFilter) ([]*port.PublishedModel, int64, error) {
-	return nil, 0, nil
+	s.listPublishedCalls++
+	return s.listPublished, s.listPublishedTotal, nil
 }
 
 func (s *publishedModelStoreStub) ListPublishedAlgorithms(context.Context) ([]domain.Algorithm, error) {
@@ -104,6 +108,14 @@ func TestCachedPublishedModelStoreFindPublishedModelByQuestionnaireCachesUntilCa
 	if inner.findByQuestionnaireCalls != 1 {
 		t.Fatalf("source calls after first read = %d, want 1", inner.findByQuestionnaireCalls)
 	}
+	version, err := cached.catalogListVersion.Current(context.Background(), cached.catalogListVersionKey())
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := cached.questionnaireCacheKey("q-001", "1.0.0", version)
+	if err := mr.Set(key, "not-json"); err != nil {
+		t.Fatal(err)
+	}
 
 	got, err = cached.FindPublishedModelByQuestionnaire(context.Background(), "q-001", "1.0.0")
 	if err != nil {
@@ -123,6 +135,48 @@ func TestCachedPublishedModelStoreFindPublishedModelByQuestionnaireCachesUntilCa
 	}
 	if inner.findByQuestionnaireCalls != 2 {
 		t.Fatalf("source calls after catalog invalidation = %d, want 2", inner.findByQuestionnaireCalls)
+	}
+}
+
+func TestCachedPublishedModelStoreVersionedCatalogListL1AvoidsRedisDecodeAndInvalidatesByVersion(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = client.Close() })
+	snapshot := &port.PublishedModel{Kind: domain.KindScale, Code: "scale-001", Version: "1.0.0"}
+	inner := &publishedModelStoreStub{listPublished: []*port.PublishedModel{snapshot}, listPublishedTotal: 1}
+	cached := NewCachedPublishedModelStore(inner, client, keyspace.NewBuilderWithNamespace("test-ns"), publishedModelPolicies(sharedcache.Policy{TTL: time.Hour}), nil)
+	filter := port.ListPublishedFilter{Kind: domain.KindScale, Page: 1, PageSize: 20}
+
+	first, total, err := cached.ListPublishedModels(context.Background(), filter)
+	if err != nil || total != 1 || len(first) != 1 || first[0] != snapshot {
+		t.Fatalf("first ListPublishedModels() = %#v, %d, %v", first, total, err)
+	}
+	key, err := cached.listCatalogCacheKey(context.Background(), filter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := mr.Set(key, "not-json"); err != nil {
+		t.Fatal(err)
+	}
+	second, total, err := cached.ListPublishedModels(context.Background(), filter)
+	if err != nil || total != 1 || len(second) != 1 || second[0] != snapshot {
+		t.Fatalf("L1 ListPublishedModels() = %#v, %d, %v", second, total, err)
+	}
+	if inner.listPublishedCalls != 1 {
+		t.Fatalf("source calls before invalidation = %d, want 1", inner.listPublishedCalls)
+	}
+
+	cached.invalidateCatalogListCaches(context.Background())
+	third, total, err := cached.ListPublishedModels(context.Background(), filter)
+	if err != nil || total != 1 || len(third) != 1 || third[0] != snapshot {
+		t.Fatalf("versioned ListPublishedModels() = %#v, %d, %v", third, total, err)
+	}
+	if inner.listPublishedCalls != 2 {
+		t.Fatalf("source calls after invalidation = %d, want 2", inner.listPublishedCalls)
+	}
+	hits, misses := cached.catalogListL1.Stats()
+	if hits != 1 || misses != 2 {
+		t.Fatalf("catalog L1 stats = hits %d misses %d, want 1/2", hits, misses)
 	}
 }
 

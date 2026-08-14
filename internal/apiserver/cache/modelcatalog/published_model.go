@@ -36,12 +36,14 @@ type CachedPublishedModelStore struct {
 	policies           sharedcache.PolicyProvider
 	observer           *observability.ComponentObserver
 	catalogList        *adapterkit.ObjectCacheStore[publishedModelCatalogListPage]
+	catalogListL1      *localcache.Cache[*publishedModelCatalogListPage]
 	catalogListVersion querycache.VersionTokenStore
 	catalogAlgorithms  *adapterkit.ObjectCacheStore[publishedModelCatalogAlgorithms]
 	latestByCode       *adapterkit.ObjectCacheStore[port.PublishedModel]
 	exactByRef         *adapterkit.ObjectCacheStore[port.PublishedModel]
 	exactByRefL1       *localcache.Cache[*port.PublishedModel]
 	byQuestionnaire    *adapterkit.ObjectCacheStore[port.PublishedModel]
+	byQuestionnaireL1  *localcache.Cache[*port.PublishedModel]
 }
 
 const publishedModelCatalogListVersionKind = "modelcatalog:published:list"
@@ -81,6 +83,7 @@ func NewCachedPublishedModelStore(
 			PolicyKey: cachepolicy.CapabilityModelCatalogPublished,
 			Codec:     newPublishedModelCatalogListCodec(),
 		}),
+		catalogListL1:      newPublishedModelCatalogListL1(policies),
 		catalogListVersion: catalogListVersion,
 		catalogAlgorithms: adapterkit.NewObjectCacheStore(adapterkit.ObjectCacheStoreOptions[publishedModelCatalogAlgorithms]{
 			Cache:     redisCache,
@@ -100,6 +103,7 @@ func NewCachedPublishedModelStore(
 			Cache: redisCache, PolicyKey: cachepolicy.CapabilityModelCatalogPublished,
 			Codec: publishedModelCodec(),
 		}),
+		byQuestionnaireL1: newPublishedModelByQuestionnaireL1(policies),
 	}
 }
 
@@ -221,9 +225,15 @@ func (c *CachedPublishedModelStore) FindPublishedModelByQuestionnaire(
 	if err != nil {
 		return c.inner.FindPublishedModelByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
 	}
-	return adapterkit.ReadThroughObject(ctx, adapterkit.ObjectReadThroughOptions[port.PublishedModel]{
+	cacheKey := c.questionnaireCacheKey(questionnaireCode, questionnaireVersion, catalogVersion)
+	if c.byQuestionnaireL1 != nil && c.cacheEnabled() {
+		if cached, ok := c.byQuestionnaireL1.Get(cacheKey); ok {
+			return cached, nil
+		}
+	}
+	loaded, err := adapterkit.ReadThroughObject(ctx, adapterkit.ObjectReadThroughOptions[port.PublishedModel]{
 		PolicyKey:      cachepolicy.CapabilityModelCatalogPublished,
-		CacheKey:       c.questionnaireCacheKey(questionnaireCode, questionnaireVersion, catalogVersion),
+		CacheKey:       cacheKey,
 		PolicyProvider: c.policies,
 		Observer:       c.observer,
 		Store:          c.byQuestionnaire,
@@ -233,6 +243,10 @@ func (c *CachedPublishedModelStore) FindPublishedModelByQuestionnaire(
 			return c.inner.FindPublishedModelByQuestionnaire(loadCtx, questionnaireCode, questionnaireVersion)
 		},
 	})
+	if err == nil && loaded != nil && c.byQuestionnaireL1 != nil && c.cacheEnabled() {
+		c.byQuestionnaireL1.Set(cacheKey, loaded)
+	}
+	return loaded, err
 }
 
 func (c *CachedPublishedModelStore) ListPublishedReleaseHistory(ctx context.Context, code string) ([]*port.PublishedModel, error) {
@@ -340,6 +354,11 @@ func (c *CachedPublishedModelStore) ListPublishedModels(ctx context.Context, fil
 		// than make a catalogue read unavailable.
 		return c.inner.ListPublishedModels(ctx, filter)
 	}
+	if c.catalogListL1 != nil && c.cacheEnabled() {
+		if cached, ok := c.catalogListL1.Get(cacheKey); ok {
+			return cached.Models, cached.Total, nil
+		}
+	}
 	page, err := adapterkit.ReadThroughObject(ctx, adapterkit.ObjectReadThroughOptions[publishedModelCatalogListPage]{
 		PolicyKey:      cachepolicy.CapabilityModelCatalogPublished,
 		CacheKey:       cacheKey,
@@ -361,6 +380,9 @@ func (c *CachedPublishedModelStore) ListPublishedModels(ctx context.Context, fil
 	}
 	if page == nil {
 		return nil, 0, nil
+	}
+	if c.catalogListL1 != nil && c.cacheEnabled() {
+		c.catalogListL1.Set(cacheKey, page)
 	}
 	return page.Models, page.Total, nil
 }
