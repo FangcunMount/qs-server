@@ -381,12 +381,51 @@ export function reportSampleAvailability(reportSamples) {
   const medical = normalized.medical.length;
   const behavior = normalized.behavior.length;
   const personality = normalized.personality.length;
+  const uniqueTestees = (samples) => uniqueList(samples.map((sample) => sample.testee_id)).length;
   return {
     medical,
     behavior,
     personality,
     total: medical + behavior + personality,
+    medical_unique_testees: uniqueTestees(normalized.medical),
+    behavior_unique_testees: uniqueTestees(normalized.behavior),
+    personality_unique_testees: uniqueTestees(normalized.personality),
   };
+}
+
+// Discovery endpoints return multiple assessments for one testee at a time.
+// Keep the final pool broad by taking one sample from every testee before
+// taking a second sample from any testee. Otherwise the discovery limit is
+// exhausted by the first few testees and concurrent WebSocket scenarios trip
+// the intentional per-testee connection guard instead of measuring capacity.
+export function spreadReportSamplesByTestee(samples, limit = DISCOVER_ASSESSMENT_LIMIT) {
+  const buckets = {};
+  const orderedTestees = [];
+  uniqueReportSamples(samples).forEach((sample) => {
+    const testeeID = String(sample.testee_id || '').trim();
+    if (!buckets[testeeID]) {
+      buckets[testeeID] = [];
+      orderedTestees.push(testeeID);
+    }
+    buckets[testeeID].push(sample);
+  });
+
+  const boundedLimit = Math.max(0, Math.floor(Number(limit) || 0));
+  const out = [];
+  for (let depth = 0; out.length < boundedLimit; depth += 1) {
+    let appended = false;
+    for (let index = 0; index < orderedTestees.length && out.length < boundedLimit; index += 1) {
+      const bucket = buckets[orderedTestees[index]];
+      if (depth < bucket.length) {
+        out.push(bucket[depth]);
+        appended = true;
+      }
+    }
+    if (!appended) {
+      break;
+    }
+  }
+  return out;
 }
 export function assessmentBoundMedicalCases(cases) {
   return (Array.isArray(cases) ? cases : []).filter((item) =>
@@ -1063,9 +1102,6 @@ export function discoverMedicalReportSamples(testeeIDs, submitSubjects) {
   const out = [];
   const subjects = reportDiscoverySubjects(testeeIDs, submitSubjects);
   subjects.slice(0, Math.min(subjects.length, DISCOVER_TESTEE_LIMIT)).forEach((subject) => {
-    if (out.length >= DISCOVER_ASSESSMENT_LIMIT) {
-      return;
-    }
     const testeeID = subject.testee_id;
     const data = getApiserverData(`/api/v1/evaluations/assessments?testee_id=${encodeURIComponent(testeeID)}&page=1&page_size=20`, 'discover_assessments');
     responseItems(data).forEach((item) => {
@@ -1085,7 +1121,7 @@ export function discoverMedicalReportSamples(testeeIDs, submitSubjects) {
       }
     });
   });
-  return uniqueReportSamples(out).slice(0, DISCOVER_ASSESSMENT_LIMIT);
+  return spreadReportSamplesByTestee(out);
 }
 
 export function discoverBehaviorReportSamples(testeeIDs, submitSubjects) {
@@ -1095,9 +1131,6 @@ export function discoverBehaviorReportSamples(testeeIDs, submitSubjects) {
   }
   const subjects = reportDiscoverySubjects(testeeIDs, submitSubjects);
   subjects.slice(0, Math.min(subjects.length, DISCOVER_TESTEE_LIMIT)).forEach((subject) => {
-    if (out.length >= DISCOVER_ASSESSMENT_LIMIT) {
-      return;
-    }
     const testeeID = subject.testee_id;
     const token = collectionTokenAt(subject.collection_token_index);
     const data = getCollectionDataWithToken(`/api/v1/behavior-assessments?testee_id=${encodeURIComponent(testeeID)}&page=1&page_size=20`, 'discover_behavior_assessments', token);
@@ -1114,7 +1147,7 @@ export function discoverBehaviorReportSamples(testeeIDs, submitSubjects) {
       }
     });
   });
-  return uniqueReportSamples(out).slice(0, DISCOVER_ASSESSMENT_LIMIT);
+  return spreadReportSamplesByTestee(out);
 }
 
 export function discoverPersonalityReportSamples(testeeIDs, submitSubjects) {
@@ -1124,9 +1157,6 @@ export function discoverPersonalityReportSamples(testeeIDs, submitSubjects) {
   }
   const subjects = reportDiscoverySubjects(testeeIDs, submitSubjects);
   subjects.slice(0, Math.min(subjects.length, DISCOVER_TESTEE_LIMIT)).forEach((subject) => {
-    if (out.length >= DISCOVER_ASSESSMENT_LIMIT) {
-      return;
-    }
     const testeeID = subject.testee_id;
     const token = collectionTokenAt(subject.collection_token_index);
     const data = getCollectionDataWithToken(`/api/v1/typology-assessments?testee_id=${encodeURIComponent(testeeID)}&page=1&page_size=20`, 'discover_personality_assessments', token);
@@ -1143,7 +1173,7 @@ export function discoverPersonalityReportSamples(testeeIDs, submitSubjects) {
       }
     });
   });
-  return uniqueReportSamples(out).slice(0, DISCOVER_ASSESSMENT_LIMIT);
+  return spreadReportSamplesByTestee(out);
 }
 
 export function buildRunTiming() {
