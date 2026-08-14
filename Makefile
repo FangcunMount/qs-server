@@ -255,6 +255,13 @@ perf-verify: perf-check-k6 ## 校验统一编排器、报告契约与 k6 场景
 	bash -n $(PERF_SCRIPT_DIR)/run-collection-runtime-acceptance.sh
 	bash -n $(PERF_SCRIPT_DIR)/snapshot-observability.sh
 	bash -n $(PERF_SCRIPT_DIR)/sync-profiles-from-example.sh
+	@config_file=$$(mktemp); \
+	trap 'rm -f "$$config_file"' EXIT; \
+	cp $(PERF_SCRIPT_DIR)/qs-perf.config.example.json "$$config_file"; \
+	chmod 0644 "$$config_file"; \
+	$(PERF_SCRIPT_DIR)/sync-profiles-from-example.sh "$$config_file" $(PERF_SCRIPT_DIR)/qs-perf.config.example.json >/dev/null; \
+	if mode=$$(stat -f '%Lp' "$$config_file" 2>/dev/null); then :; else mode=$$(stat -c '%a' "$$config_file"); fi; \
+	test "$$mode" = 600
 	$(GO) test ./scripts/perf/perfctl ./internal/pkg/retryobservability
 	jq -e '.qpsProfile == "smoke_4" and (.qpsProfiles | keys) == ["admission_300", "experience_60", "smoke_4"]' $(PERF_SCRIPT_DIR)/qs-perf.config.example.json >/dev/null
 	k6 run --quiet $(PERF_SCRIPT_DIR)/k6/tests/setup-correlated-headers.js

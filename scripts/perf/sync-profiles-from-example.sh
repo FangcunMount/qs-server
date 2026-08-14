@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 用 example 中唯一受支持的主线 qpsProfiles 覆盖本地 profiles；URL、token 与其他环境配置保持不变。
 set -euo pipefail
+umask 077
 
 LOCAL="${1:-tmp/perf/qs-perf.config.json}"
 EXAMPLE="${2:-scripts/perf/qs-perf.config.example.json}"
@@ -17,6 +18,10 @@ if ! command -v jq >/dev/null 2>&1; then
   echo "jq is required" >&2
   exit 1
 fi
+
+# The runtime config can reference local credential and token material. Keep it
+# private even when no profile migration is needed or a temporary file replaces it.
+chmod 0600 "$LOCAL"
 
 migrate_runtime_paths() {
   jq --slurpfile ex "$EXAMPLE" '
