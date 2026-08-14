@@ -2,11 +2,12 @@
 
 ## 结论
 
-K6 主线只有一个入口和四种计划：
+K6 主线只有一个入口和五种计划：
 
 ```bash
 make perf-run PLAN=quick
 make perf-run PLAN=baseline
+make perf-run PLAN=ceiling-120
 make perf-run PLAN=admission
 make perf-run PLAN=diagnose CASE=<专项场景>
 ```
@@ -27,6 +28,7 @@ make perf-run PLAN=diagnose CASE=<专项场景>
 | --- | --- | --- |
 | `quick` | smoke 4 QPS × 30s | 配置、鉴权与全链路连通性 |
 | `baseline` | smoke + experience 60 QPS × 5min | 正常负载体验基线 |
+| `ceiling-120` | 110 → 恢复门 → 120 QPS，各 2min | 当前硬件 120 QPS 上限复验；到 120 自动停止，不进入更高档 |
 | `admission` | smoke → 60 → 80 → 100 → 110 → 120 → 200 → 240 → 280 → 恢复门 → 300 → 最终恢复门 | 正式容量准入 |
 | `diagnose` | 一个注册专项 | 故障、降级、幂等或 gRPC 专项 |
 
@@ -45,7 +47,7 @@ Admission 的容量阶段持续时间固定为：
 
 300 QPS 的正式配比是：医疗模型查询 80、人格模型查询 40、两类问卷各 13、医疗/人格提交 19/5、医疗/行为/人格报告 70/10/20、Statistics 29、链路探针 1。
 
-80～280 不保存独立 profile。编排器固定链路探针为 1 QPS，其余流量按 300 配比使用最大余数法整数缩放，确保总量精确。VU 按到达率、典型耗时、超时和 headroom 计算，并为 HTTP 到达率场景预留 `startupBuffer` 个冷启动 VU；环境变量仍可显式覆盖。80/100/110 三档用于定位 60 到 120 QPS 之间的容量拐点，不允许用跳档方式掩盖首个失败阶段。
+80～280 不保存独立 profile。编排器固定链路探针为 1 QPS，其余流量按 300 配比使用最大余数法整数缩放，确保总量精确。VU 按到达率、典型耗时、超时和 headroom 计算，并为 HTTP 到达率场景预留 `startupBuffer` 个冷启动 VU；环境变量仍可显式覆盖。完整 `admission` 中的 80/100/110 三档用于定位 60 到 120 QPS 之间的容量拐点，不允许用跳档方式掩盖首个失败阶段。已存在可信的低档证据、只需复验当前硬件上限时，使用 `ceiling-120`；该计划只执行 110 和 120，且永远不会继续升到 200 QPS。
 
 医疗链路探针只使用 `SCALE_CODES` 对应的已发布模型绑定，并按模型声明的 `questionnaire_version` 获取精确题版。普通问卷产生的 `no_assessment_required` 是合法业务终态，但不能作为 submit → Assessment → report 端到端探针样本；若探针收到该终态会立即失败，不再把它误记为 120 秒 readiness 超时。
 
@@ -206,6 +208,7 @@ make perf-run PLAN=diagnose CASE=grpc
 
 ```bash
 make perf-verify
+make perf-run PLAN=ceiling-120 DRY_RUN=1
 make perf-run PLAN=admission DRY_RUN=1
 ```
 

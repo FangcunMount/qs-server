@@ -53,6 +53,30 @@ func TestRecoveryBaselineDoesNotRequireLoadWindowCounters(t *testing.T) {
 	}
 }
 
+func TestProcessContinuityRejectsServiceRestart(t *testing.T) {
+	before := processSamples(100, 200, 300)
+	after := processSamples(100, 201, 300)
+	check := processContinuityEvidence(before, after)
+	if check.Status != "INVALID" || !strings.Contains(check.Message, "apiserver/direct") {
+		t.Fatalf("process continuity = %#v, want apiserver restart INVALID", check)
+	}
+}
+
+func TestProcessContinuityAcceptsStableReplicaSet(t *testing.T) {
+	check := processContinuityEvidence(processSamples(100, 200, 300), processSamples(100, 200, 300))
+	if check.Status != "PASS" {
+		t.Fatalf("process continuity = %#v, want PASS", check)
+	}
+}
+
+func processSamples(collection, apiserver, worker float64) []metricSample {
+	return []metricSample{
+		{Name: "process_start_time_seconds", Labels: map[string]string{snapshotComponentLabel: "collection", "instance": "collection-1:8080"}, Value: collection},
+		{Name: "process_start_time_seconds", Labels: map[string]string{snapshotComponentLabel: "apiserver"}, Value: apiserver},
+		{Name: "process_start_time_seconds", Labels: map[string]string{snapshotComponentLabel: "worker", "instance": "worker-1:9092"}, Value: worker},
+	}
+}
+
 func completeRecoveryEvidence(outbox, nsq float64) PhaseEvidence {
 	oldest := 0.0
 	checks := make([]EvidenceCheck, 0, len(recoveryEvidenceChecks))

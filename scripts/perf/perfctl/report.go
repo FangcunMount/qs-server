@@ -84,8 +84,11 @@ func buildPhaseSummary(spec phaseSpec, qps map[string]float64, raw rawSummary, e
 		})
 	}
 	phase.Verdict = evaluatePhase(spec, phase, raw, k6Exit)
-	if phase.Verdict.Status == VerdictPass && !evidence.Complete {
-		phase.Verdict = classifyEvidence(evidence, "service evidence")
+	evidenceVerdict := classifyEvidence(evidence, "service evidence")
+	if phase.Verdict.Status != VerdictError {
+		if evidenceVerdict.Status == VerdictIncomplete || phase.Verdict.Status == VerdictPass && evidenceVerdict.Status != VerdictPass {
+			phase.Verdict = evidenceVerdict
+		}
 	}
 	return phase
 }

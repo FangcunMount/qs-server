@@ -32,6 +32,7 @@ func collectPhaseEvidence(dir string) PhaseEvidence {
 	}
 	before := readMetricSnapshots(dir, "before")
 	after := readMetricSnapshots(dir, "after")
+	checks = append(checks, processContinuityEvidence(before, after))
 	trafficIsolated, isolationCheck := trafficIsolationEvidence(before, after)
 	checks = append(checks, isolationCheck)
 	completedDelta, failedDelta, completedByModel, hasCompletionEvidence := interpretationDeltas(before, after)
@@ -114,6 +115,79 @@ func collectPhaseEvidence(dir string) PhaseEvidence {
 		evidence.NSQDepthDelta = &delta
 	}
 	return evidence
+}
+
+func processContinuityEvidence(before, after []metricSample) EvidenceCheck {
+	const source = "before/after:process_start_time_seconds"
+	beforeProcesses, beforeIssue := processStartTimes(before)
+	afterProcesses, afterIssue := processStartTimes(after)
+	if beforeIssue != "" || afterIssue != "" {
+		issues := make([]string, 0, 2)
+		if beforeIssue != "" {
+			issues = append(issues, beforeIssue)
+		}
+		if afterIssue != "" {
+			issues = append(issues, afterIssue)
+		}
+		return EvidenceCheck{Name: "component process continuity", Status: "INVALID", Source: source, Message: strings.Join(issues, "; ")}
+	}
+	if len(beforeProcesses) == 0 || len(afterProcesses) == 0 {
+		return EvidenceCheck{Name: "component process continuity", Status: "MISSING", Source: source, Message: "process start metrics are unavailable"}
+	}
+	for _, component := range []string{"collection", "apiserver", "worker"} {
+		if !hasProcessComponent(beforeProcesses, component) || !hasProcessComponent(afterProcesses, component) {
+			return EvidenceCheck{Name: "component process continuity", Status: "MISSING", Source: source, Message: component + " process start metric is unavailable"}
+		}
+	}
+	if len(beforeProcesses) != len(afterProcesses) {
+		return EvidenceCheck{Name: "component process continuity", Status: "INVALID", Source: source, Message: fmt.Sprintf("process set changed from %d to %d instances", len(beforeProcesses), len(afterProcesses))}
+	}
+	for identity, beforeStart := range beforeProcesses {
+		afterStart, exists := afterProcesses[identity]
+		if !exists {
+			return EvidenceCheck{Name: "component process continuity", Status: "INVALID", Source: source, Message: identity + " disappeared or changed identity during the load window"}
+		}
+		if afterStart != beforeStart {
+			return EvidenceCheck{Name: "component process continuity", Status: "INVALID", Source: source, Message: fmt.Sprintf("%s process start changed from %.3f to %.3f during the load window", identity, beforeStart, afterStart)}
+		}
+	}
+	return EvidenceCheck{Name: "component process continuity", Status: "PASS", Source: source, Message: fmt.Sprintf("%d process identities remained stable", len(beforeProcesses))}
+}
+
+func processStartTimes(samples []metricSample) (map[string]float64, string) {
+	result := map[string]float64{}
+	for _, sample := range samples {
+		if sample.Name != "process_start_time_seconds" {
+			continue
+		}
+		component := strings.TrimSpace(sample.Labels[snapshotComponentLabel])
+		if component == "" {
+			continue
+		}
+		instance := strings.TrimSpace(sample.Labels["instance"])
+		if instance == "" {
+			instance = strings.TrimSpace(sample.Labels["exported_instance"])
+		}
+		if instance == "" {
+			instance = "direct"
+		}
+		identity := component + "/" + instance
+		if previous, exists := result[identity]; exists && previous != sample.Value {
+			return nil, identity + " exposes conflicting process start times"
+		}
+		result[identity] = sample.Value
+	}
+	return result, ""
+}
+
+func hasProcessComponent(processes map[string]float64, component string) bool {
+	prefix := component + "/"
+	for identity := range processes {
+		if strings.HasPrefix(identity, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func assessmentIntakeOutcomeDeltas(before, after []metricSample) (*float64, *float64, bool) {
@@ -716,6 +790,7 @@ var recoveryEvidenceChecks = []string{
 	"apiserver metrics",
 	"worker metrics replicas",
 	"NSQD stats",
+	"component process continuity",
 	"traffic isolation",
 	"outbox backlog window",
 	"NSQ depth window",
@@ -766,13 +841,25 @@ func classifyRecoveryEvidence(evidence PhaseEvidence, subject string) Verdict {
 
 func classifyEvidence(evidence PhaseEvidence, subject string) Verdict {
 	failed := make([]string, 0)
+	incomplete := make([]string, 0)
 	for _, check := range evidence.Checks {
-		if check.Status == "FAIL" {
+		switch check.Status {
+		case "PASS":
+		case "FAIL":
 			failed = append(failed, fmt.Sprintf("%s failed: %s", subject, check.Name))
+		default:
+			reason := fmt.Sprintf("%s is incomplete: %s (%s)", subject, check.Name, check.Status)
+			if check.Message != "" {
+				reason += ": " + check.Message
+			}
+			incomplete = append(incomplete, reason)
 		}
 	}
 	if len(failed) > 0 {
-		return Verdict{Status: VerdictFail, Reasons: failed}
+		return Verdict{Status: VerdictFail, Reasons: uniqueStrings(failed)}
+	}
+	if len(incomplete) > 0 {
+		return Verdict{Status: VerdictIncomplete, Reasons: uniqueStrings(incomplete)}
 	}
 	if !evidence.Complete {
 		return Verdict{Status: VerdictIncomplete, Reasons: []string{subject + " is incomplete"}}

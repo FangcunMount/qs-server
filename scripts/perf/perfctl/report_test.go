@@ -69,6 +69,24 @@ func TestPhaseReportIncludesThreeDimensions(t *testing.T) {
 	}
 }
 
+func TestIncompleteServiceEvidenceInvalidatesClientFailureVerdict(t *testing.T) {
+	raw := rawSummary{Metrics: map[string]map[string]any{
+		"iterations":         {"count": float64(100), "rate": float64(10)},
+		"dropped_iterations": {"count": float64(3)},
+	}}
+	evidence := PhaseEvidence{Complete: false, Checks: []EvidenceCheck{{Name: "component process continuity", Status: "INVALID"}}}
+	phase := buildPhaseSummary(
+		phaseSpec{ID: "capacity_110", Profile: "capacity_110", TargetQPS: 110, Duration: "2m", ThresholdTier: "protection"},
+		map[string]float64{}, raw, evidence, time.Now(), time.Now(), 99,
+	)
+	if phase.Verdict.Status != VerdictIncomplete {
+		t.Fatalf("verdict = %#v, want INCOMPLETE for a service restart window", phase.Verdict)
+	}
+	if !strings.Contains(strings.Join(phase.Verdict.Reasons, "\n"), "component process continuity") {
+		t.Fatalf("verdict reasons = %#v, want the invalid continuity check", phase.Verdict.Reasons)
+	}
+}
+
 func TestRawFixtureKeepsConsoleMarkdownAndJSONConsistent(t *testing.T) {
 	rawBytes, err := os.ReadFile("testdata/raw-summary.json")
 	if err != nil {

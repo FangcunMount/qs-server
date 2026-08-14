@@ -228,8 +228,8 @@ perf-preflight: perf-ensure-config ## Token 预检（k6 前必跑）
 perf-check-k6:
 	@command -v k6 >/dev/null 2>&1 || { echo "$(COLOR_RED)❌ 需要 k6: brew install k6$(COLOR_RESET)" >&2; exit 1; }
 
-perf-run: perf-ensure-config ## 统一压测入口（PLAN=quick|baseline|admission|diagnose）
-	@test -n "$(PLAN)" || { echo "$(COLOR_RED)❌ 缺少 PLAN；使用 quick、baseline、admission 或 diagnose$(COLOR_RESET)" >&2; exit 1; }
+perf-run: perf-ensure-config ## 统一压测入口（PLAN=quick|baseline|ceiling-120|admission|diagnose）
+	@test -n "$(PLAN)" || { echo "$(COLOR_RED)❌ 缺少 PLAN；使用 quick、baseline、ceiling-120、admission 或 diagnose$(COLOR_RESET)" >&2; exit 1; }
 	@if [ "$(DRY_RUN)" != "1" ] && [ "$(DRY_RUN)" != "true" ] && [ "$(PLAN)" != "diagnose" ]; then \
 		$(MAKE) perf-preflight && \
 		$(MAKE) perf-check-k6; \

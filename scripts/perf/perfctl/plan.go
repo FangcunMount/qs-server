@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 )
 
 type phaseSpec struct {
@@ -39,6 +40,11 @@ func phasesForPlan(plan string) ([]phaseSpec, error) {
 		return []phaseSpec{smoke}, nil
 	case "baseline":
 		return []phaseSpec{smoke, experience}, nil
+	case "ceiling-120":
+		return []phaseSpec{
+			{ID: "capacity_110", Profile: "capacity_110", TargetQPS: 110, Duration: "2m", ThresholdTier: "protection", Dynamic: true},
+			{ID: "capacity_120", Profile: "capacity_120", TargetQPS: 120, Duration: "2m", ThresholdTier: "protection", Dynamic: true},
+		}, nil
 	case "admission":
 		return []phaseSpec{
 			smoke,
@@ -53,7 +59,7 @@ func phasesForPlan(plan string) ([]phaseSpec, error) {
 			{ID: "admission_300", Profile: "admission_300", TargetQPS: 300, Duration: "10m", ThresholdTier: "protection"},
 		}, nil
 	default:
-		return nil, fmt.Errorf("unknown PLAN %q; use quick, baseline, admission, or diagnose", plan)
+		return nil, fmt.Errorf("unknown PLAN %q; use quick, baseline, ceiling-120, admission, or diagnose", plan)
 	}
 }
 
@@ -111,11 +117,45 @@ func profileQPS(profile map[string]any) map[string]float64 {
 	result := map[string]float64{}
 	qps, _ := profile["qps"].(map[string]any)
 	for key, value := range qps {
-		if number, ok := value.(float64); ok {
+		if number, ok := numericFloat64(value); ok {
 			result[key] = number
 		}
 	}
 	return result
+}
+
+func numericFloat64(value any) (float64, bool) {
+	switch number := value.(type) {
+	case float64:
+		return number, true
+	case float32:
+		return float64(number), true
+	case int:
+		return float64(number), true
+	case int8:
+		return float64(number), true
+	case int16:
+		return float64(number), true
+	case int32:
+		return float64(number), true
+	case int64:
+		return float64(number), true
+	case uint:
+		return float64(number), true
+	case uint8:
+		return float64(number), true
+	case uint16:
+		return float64(number), true
+	case uint32:
+		return float64(number), true
+	case uint64:
+		return float64(number), true
+	case json.Number:
+		parsed, err := strconv.ParseFloat(number.String(), 64)
+		return parsed, err == nil
+	default:
+		return 0, false
+	}
 }
 
 func scaledWorkload(canonical map[string]float64, target int) (map[string]any, error) {

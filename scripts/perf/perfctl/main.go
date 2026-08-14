@@ -11,7 +11,7 @@ import (
 
 func main() {
 	root, _ := os.Getwd()
-	plan := flag.String("plan", envString("PLAN", "quick"), "quick, baseline, admission, or diagnose")
+	plan := flag.String("plan", envString("PLAN", "quick"), "quick, baseline, ceiling-120, admission, or diagnose")
 	diagnostic := flag.String("case", envString("CASE", ""), "registered diagnostic case")
 	config := flag.String("config", envString("PERF_CONFIG_FILE", filepath.Join(root, "tmp/perf/qs-perf.config.json")), "perf JSON config")
 	output := flag.String("output", envString("PERF_RUN_ROOT", filepath.Join(root, "tmp/perf/runs")), "run output root")

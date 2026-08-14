@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 func TestAdmissionPlanStages(t *testing.T) {
 	phases, err := phasesForPlan("admission")
@@ -31,6 +34,36 @@ func TestAdmissionPlanStages(t *testing.T) {
 		if got.ID != want.id || got.TargetQPS != want.target || got.Duration != want.duration {
 			t.Fatalf("phase[%d] = %#v, want %#v", index, got, want)
 		}
+	}
+}
+
+func TestCeiling120PlanStopsAtCurrentHardwareBoundary(t *testing.T) {
+	phases, err := phasesForPlan("ceiling-120")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(phases) != 2 || phases[0].ID != "capacity_110" || phases[1].ID != "capacity_120" {
+		t.Fatalf("ceiling-120 phases = %#v, want 110 then 120", phases)
+	}
+	if phases[1].TargetQPS != 120 {
+		t.Fatalf("last target = %d, want 120", phases[1].TargetQPS)
+	}
+}
+
+func TestProfileQPSAcceptsGeneratedIntegerRates(t *testing.T) {
+	got := profileQPS(map[string]any{
+		"qps": map[string]any{
+			"medicalSubmit": 7,
+			"medicalQuery":  29.0,
+			"chainProbe":    json.Number("1"),
+			"invalid":       "3",
+		},
+	})
+	if got["medicalSubmit"] != 7 || got["medicalQuery"] != 29 || got["chainProbe"] != 1 {
+		t.Fatalf("profile QPS = %#v, want generated integer and decoded numeric rates", got)
+	}
+	if _, exists := got["invalid"]; exists {
+		t.Fatalf("profile QPS accepted a non-numeric value: %#v", got)
 	}
 }
 
