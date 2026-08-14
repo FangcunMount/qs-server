@@ -46,6 +46,8 @@ Admission 的容量阶段持续时间固定为：
 
 80～280 不保存独立 profile。编排器固定链路探针为 1 QPS，其余流量按 300 配比使用最大余数法整数缩放，确保总量精确。VU 按到达率、典型耗时、超时和 headroom 计算，并为 HTTP 到达率场景预留 `startupBuffer` 个冷启动 VU；环境变量仍可显式覆盖。80/100 两档用于定位 60 到 120 QPS 之间的容量拐点，不允许用跳档方式掩盖首个失败阶段。
 
+医疗链路探针只使用 `SCALE_CODES` 对应的已发布模型绑定，并按模型声明的 `questionnaire_version` 获取精确题版。普通问卷产生的 `no_assessment_required` 是合法业务终态，但不能作为 submit → Assessment → report 端到端探针样本；若探针收到该终态会立即失败，不再把它误记为 120 秒 readiness 超时。
+
 ## 三维指标契约
 
 ### 吞吐与处理能力

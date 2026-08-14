@@ -582,6 +582,8 @@ func writeNativeChainCounters(output *strings.Builder, raw rawSummary) {
 	names := []string{
 		"chain_probe_started", "chain_probe_accepted", "chain_probe_completed", "chain_probe_failed",
 		"chain_probe_timeout", "chain_probe_final_failed", "chain_probe_poll_requests",
+		"chain_probe_timeout{stage:assessment_readiness}", "chain_probe_timeout{stage:report_terminal}",
+		"chain_probe_failed{reason:assessment_no_assessment_required}", "chain_probe_failed{reason:assessment_failed}",
 	}
 	for _, name := range names {
 		writeNativeCounterWithIndent(output, "      ", name, findMetric(raw, name, nil))

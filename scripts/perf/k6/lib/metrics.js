@@ -294,6 +294,10 @@ export function buildThresholds() {
   }
   if (chainProbeRps > 0) {
     thresholds.chain_probe_timeout = ['count==0'];
+    thresholds['chain_probe_timeout{stage:assessment_readiness}'] = ['count==0'];
+    thresholds['chain_probe_timeout{stage:report_terminal}'] = ['count==0'];
+    thresholds['chain_probe_failed{reason:assessment_no_assessment_required}'] = ['count==0'];
+    thresholds['chain_probe_failed{reason:assessment_failed}'] = ['count==0'];
   }
   if (REPORT_MODE === 'websocket' && reportRps > 0) {
     thresholds.report_ws_timeout_total = ['count==0'];

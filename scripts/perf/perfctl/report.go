@@ -261,8 +261,10 @@ func operationResults(qps map[string]float64, raw rawSummary) ([]LatencyMetric, 
 		interpreted := metricInt64(findMetric(raw, "chain_probe_completed", nil), "count")
 		failed := metricInt64(findMetric(raw, "chain_probe_final_failed", nil), "count")
 		timeouts := metricInt64(findMetric(raw, "chain_probe_timeout", nil), "count")
-		otherErrors := metricInt64(findMetric(raw, "chain_probe_failed", nil), "count")
-		errorCount := maxInt64(failed+timeouts, otherErrors)
+		// A started probe that never reaches a success counter is an error as well.
+		// This includes iterations interrupted during graceful stop; otherwise the
+		// displayed success and error rates do not add up to the attempt count.
+		errorCount := maxInt64(0, attempts-interpreted)
 		correctness = append(correctness, correctnessFromCounts("async_chain_probe", attempts, interpreted, errorCount, timeouts, failed, "k6:chain_probe_*"))
 		trend := findMetric(raw, "report_generated_latency", nil)
 		latencies = append(latencies, LatencyMetric{

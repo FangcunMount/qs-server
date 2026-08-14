@@ -218,20 +218,22 @@ func TestNativeDiagnosticsGroupEachActiveInterface(t *testing.T) {
 		},
 	}
 	raw := rawSummary{Metrics: map[string]map[string]any{
-		"medical_model_query_duration":                   trend(20),
-		"medical_model_query_5xx":                        {"count": float64(1), "rate": float64(1.0 / 6)},
-		"medical_answer_submit_duration":                 trend(30),
-		"personality_session_duration":                   trend(40),
-		"report_ws_connect_duration{model_type:medical}": trend(50),
-		"statistics_overview_duration":                   trend(60),
-		"report_generated_latency":                       trend(70),
-		"chain_probe_started":                            {"count": float64(1), "rate": float64(1.0 / 6)},
-		"chain_probe_accepted":                           {"count": float64(1), "rate": float64(1.0 / 6)},
-		"chain_probe_completed":                          {"count": float64(1), "rate": float64(1.0 / 6)},
-		"chain_probe_failed":                             {"count": float64(0), "rate": float64(0)},
-		"chain_probe_timeout":                            {"count": float64(0), "rate": float64(0)},
-		"chain_probe_final_failed":                       {"count": float64(0), "rate": float64(0)},
-		"chain_probe_poll_requests":                      {"count": float64(2), "rate": float64(2.0 / 6)},
+		"medical_model_query_duration":                    trend(20),
+		"medical_model_query_5xx":                         {"count": float64(1), "rate": float64(1.0 / 6)},
+		"medical_answer_submit_duration":                  trend(30),
+		"personality_session_duration":                    trend(40),
+		"report_ws_connect_duration{model_type:medical}":  trend(50),
+		"statistics_overview_duration":                    trend(60),
+		"report_generated_latency":                        trend(70),
+		"chain_probe_started":                             {"count": float64(1), "rate": float64(1.0 / 6)},
+		"chain_probe_accepted":                            {"count": float64(1), "rate": float64(1.0 / 6)},
+		"chain_probe_completed":                           {"count": float64(1), "rate": float64(1.0 / 6)},
+		"chain_probe_failed":                              {"count": float64(0), "rate": float64(0)},
+		"chain_probe_timeout":                             {"count": float64(0), "rate": float64(0)},
+		"chain_probe_final_failed":                        {"count": float64(0), "rate": float64(0)},
+		"chain_probe_poll_requests":                       {"count": float64(2), "rate": float64(2.0 / 6)},
+		"chain_probe_timeout{stage:assessment_readiness}": {"count": float64(0), "rate": float64(0)},
+		"chain_probe_timeout{stage:report_terminal}":      {"count": float64(0), "rate": float64(0)},
 	}}
 
 	console := renderK6NativeDiagnostics(phase, raw)
@@ -252,10 +254,40 @@ func TestNativeDiagnosticsGroupEachActiveInterface(t *testing.T) {
 		"failure_breakdown", "4xx=0 5xx=1 transport=0", "medical_answer_submit_duration",
 		"report_ws_connect_duration{model_type:medical}", "statistics_overview_duration",
 		"report_generated_latency", "chain_probe_poll_requests", "2  0.333333/s",
+		"chain_probe_timeout{stage:assessment_readiness}", "chain_probe_timeout{stage:report_terminal}",
 	} {
 		if !strings.Contains(console, want) {
 			t.Fatalf("interface diagnostics missing %q:\n%s", want, console)
 		}
+	}
+}
+
+func TestUnclosedChainProbeAttemptsCountAsErrors(t *testing.T) {
+	raw := rawSummary{Metrics: map[string]map[string]any{
+		"iterations":               {"count": float64(113), "rate": float64(1)},
+		"dropped_iterations":       {"count": float64(0), "rate": float64(0)},
+		"chain_probe_started":      {"count": float64(113), "rate": float64(1)},
+		"chain_probe_completed":    {"count": float64(102), "rate": float64(1)},
+		"chain_probe_failed":       {"count": float64(2), "rate": float64(1)},
+		"chain_probe_timeout":      {"count": float64(2), "rate": float64(1)},
+		"report_generated_latency": {"med": float64(10)},
+	}}
+	phase := buildPhaseSummary(
+		phaseSpec{ID: "chain", Profile: "chain", TargetQPS: 1, Duration: "113s", ThresholdTier: "none"},
+		map[string]float64{"chainProbe": 1}, raw, PhaseEvidence{}, time.Now(), time.Now(), 0,
+	)
+	var chain CorrectnessMetric
+	for _, item := range phase.Correctness {
+		if item.Operation == "async_chain_probe" {
+			chain = item
+			break
+		}
+	}
+	if chain.ErrorCount == nil || *chain.ErrorCount != 11 {
+		t.Fatalf("chain probe error count = %#v, want all 11 non-successful attempts", chain.ErrorCount)
+	}
+	if chain.ErrorRate.Value == nil || *chain.ErrorRate.Value != 11.0/113.0 {
+		t.Fatalf("chain probe error rate = %#v, want 11/113", chain.ErrorRate)
 	}
 }
 

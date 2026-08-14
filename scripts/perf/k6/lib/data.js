@@ -105,6 +105,9 @@ export function validateScenarioData(data) {
   if (needsMedicalCases && data.medicalCases.length === 0) {
     throw new Error('No medical answer templates found. Set ANSWERS_JSON/ANSWERS_FILE, or provide valid collection tokens and SCALE_CODES for auto discovery. Check setup_discovery_failed plus http_401_total/http_403_total/http_5xx_total in the k6 summary.');
   }
+  if (CHAIN_PROBE_MEDICAL_RPS > 0 && assessmentBoundMedicalCases(data.medicalCases).length === 0) {
+    throw new Error('No assessment-bound medical case found for the chain probe. Provide a valid SCALE_CODES model binding or an answer template with scale_code.');
+  }
   if (needsPersonalityCases && data.personalityCases.length === 0) {
     throw new Error('No personality cases found. Set PERSONALITY_MODEL_CODES with discoverAnswers=true, or provide personalityCases / personalityCasesFile in config.');
   }
@@ -385,8 +388,16 @@ export function reportSampleAvailability(reportSamples) {
     total: medical + behavior + personality,
   };
 }
-export function buildMedicalSubmitRequest(data) {
-  const template = clone(pick(data.medicalCases.length > 0 ? data.medicalCases : data.answerTemplates));
+export function assessmentBoundMedicalCases(cases) {
+  return (Array.isArray(cases) ? cases : []).filter((item) =>
+    String((item && (item.scale_code || item.scaleCode)) || '').trim() !== ''
+  );
+}
+
+export function buildMedicalSubmitRequest(data, options = {}) {
+  const source = data.medicalCases.length > 0 ? data.medicalCases : data.answerTemplates;
+  const candidates = options.requireAssessment ? assessmentBoundMedicalCases(source) : source;
+  const template = clone(pick(candidates));
   const subject = pick(normalizeSubmitSubjects(data.submitSubjects));
   if (template && subject) {
     template.testee_id = subject.testee_id;
@@ -740,8 +751,7 @@ export function discoverMedicalCases(testeeIDs) {
   }
 
   const discovered = [];
-  const scaleQuestionnaireCodes = [];
-  const questionnaireModelTypes = {};
+  const modelBindings = [];
   SCALE_CODES.forEach((scaleCode) => {
     const scale = getCollectionData(`/api/v1/assessment-models/${encodeURIComponent(scaleCode)}`, 'discover_assessment_model');
     if (!scale) {
@@ -749,14 +759,49 @@ export function discoverMedicalCases(testeeIDs) {
     }
     const qCode = String(scale.questionnaire_code || scale.questionnaireCode || '');
     if (qCode) {
-      scaleQuestionnaireCodes.push(qCode);
-      questionnaireModelTypes[qCode] = normalizeExecutionModelType(scale.kind || scale.model_kind || scale.modelKind);
+      modelBindings.push({
+        scaleCode: String(scale.code || scaleCode),
+        questionnaireCode: qCode,
+        questionnaireVersion: String(scale.questionnaire_version || scale.questionnaireVersion || ''),
+        modelType: normalizeExecutionModelType(scale.kind || scale.model_kind || scale.modelKind),
+      });
     }
   });
 
-  uniqueList(questionnaireCodes.concat(scaleQuestionnaireCodes)).forEach((qCode) => {
-    const detail = getCollectionData(`/api/v1/questionnaires/${encodeURIComponent(qCode)}`, 'discover_questionnaire');
+  const targets = [];
+  const seenTargets = {};
+  const boundQuestionnaireCodes = {};
+  modelBindings.forEach((binding) => {
+    const key = `${binding.questionnaireCode}\u0000${binding.questionnaireVersion}`;
+    boundQuestionnaireCodes[binding.questionnaireCode] = true;
+    if (!seenTargets[key]) {
+      seenTargets[key] = true;
+      targets.push(binding);
+    }
+  });
+  questionnaireCodes.forEach((qCode) => {
+    if (!boundQuestionnaireCodes[qCode]) {
+      targets.push({
+        scaleCode: '',
+        questionnaireCode: qCode,
+        questionnaireVersion: '',
+        modelType: 'medical',
+      });
+    }
+  });
+
+  targets.forEach((target) => {
+    const qCode = target.questionnaireCode;
+    const detail = getCollectionData(questionnaireDetailPath(qCode, target.questionnaireVersion), 'discover_questionnaire');
     if (!detail || !Array.isArray(detail.questions)) {
+      return;
+    }
+    const detailVersion = String(detail.version || '');
+    if (target.questionnaireVersion && detailVersion !== target.questionnaireVersion) {
+      console.warn(
+        `[setup-warning] questionnaire ${qCode} returned version ${detailVersion || '<empty>'}; `
+        + `assessment model requires ${target.questionnaireVersion}, so the case is skipped.`
+      );
       return;
     }
     const answers = buildAnswersFromQuestionnaire(detail);
@@ -764,10 +809,10 @@ export function discoverMedicalCases(testeeIDs) {
       return;
     }
     discovered.push(normalizeMedicalCase({
-      model_type: questionnaireModelTypes[qCode] || 'medical',
-      scale_code: '',
+      model_type: target.modelType,
+      scale_code: target.scaleCode,
       questionnaire_code: detail.code || qCode,
-      questionnaire_version: detail.version || QUESTIONNAIRE_VERSION || '',
+      questionnaire_version: target.questionnaireVersion || detailVersion || QUESTIONNAIRE_VERSION || '',
       title: detail.title || envOrConfigString('ANSWERSHEET_TITLE', ['answersheetTitle', 'answersheet_title'], 'k6 300qps mixed scenario'),
       testee_id: pick(testeeIDs),
       answers,
@@ -775,9 +820,15 @@ export function discoverMedicalCases(testeeIDs) {
   });
 
   return {
-    questionnaireCodes: uniqueList(questionnaireCodes.concat(scaleQuestionnaireCodes).concat(discovered.map((item) => item.questionnaire_code))),
+    questionnaireCodes: uniqueList(questionnaireCodes.concat(modelBindings.map((item) => item.questionnaireCode)).concat(discovered.map((item) => item.questionnaire_code))),
     cases: fromStatic.concat(discovered),
   };
+}
+
+export function questionnaireDetailPath(questionnaireCode, questionnaireVersion) {
+  const base = `/api/v1/questionnaires/${encodeURIComponent(String(questionnaireCode || ''))}`;
+  const version = String(questionnaireVersion || '').trim();
+  return version ? `${base}?version=${encodeURIComponent(version)}` : base;
 }
 
 export function discoverPersonalityCases(testeeIDs, submitSubjects) {

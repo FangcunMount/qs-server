@@ -43,7 +43,7 @@ export function runAsyncChainProbe(ctx, modelType) {
     payload = buildSubmitPayloadFromCase(personalityCase);
     collectionTokenIndex = personalityCase.collection_token_index;
   } else {
-    const request = buildMedicalSubmitRequest(ctx);
+    const request = buildMedicalSubmitRequest(ctx, { requireAssessment: true });
     payload = request.payload;
     collectionTokenIndex = request.collectionTokenIndex;
     modelType = request.modelType;
@@ -69,12 +69,17 @@ export function runAsyncChainProbe(ctx, modelType) {
   }
   chainProbeAccepted.add(1, { model_type: modelType });
 
-  const assessmentID = waitAssessmentReadiness(accepted.answersheet_id, payload.testee_id, modelType, token);
-  if (!assessmentID) {
+  const readiness = waitAssessmentReadiness(accepted.answersheet_id, payload.testee_id, modelType, token);
+  if (readiness.status === 'timeout') {
     chainProbeTimeout.add(1, { stage: 'assessment_readiness', model_type: modelType });
     chainProbeFailed.add(1, { reason: 'assessment_readiness_timeout', model_type: modelType });
     return;
   }
+  if (readiness.status !== 'ready' || !readiness.assessmentID) {
+    chainProbeFailed.add(1, { reason: `assessment_${readiness.status}`, model_type: modelType });
+    return;
+  }
+  const assessmentID = readiness.assessmentID;
   submitToAssessmentLatency.add(Date.now() - start, { model_type: modelType });
 
   const reportPathTemplate = modelType === 'personality'
@@ -145,15 +150,28 @@ export function waitAssessmentReadiness(answerSheetID, testeeID, modelType, toke
     chainProbePollRequests.add(1, { stage: 'assessment_readiness', model_type: modelType });
     if (res.status === 200) {
       const data = responseData(res);
-      if (data.status === 'ready' && data.assessment_id) {
-        return String(data.assessment_id);
+      const readiness = classifyAssessmentReadiness(data);
+      if (readiness.status !== 'pending') {
+        return readiness;
       }
       sleep(Math.max(0.2, Number(data.next_poll_after_ms || CHAIN_PROBE_POLL_SECONDS * 1000) / 1000));
       continue;
     }
     sleep(CHAIN_PROBE_POLL_SECONDS);
   }
-  return '';
+  return { status: 'timeout', assessmentID: '' };
+}
+
+export function classifyAssessmentReadiness(data) {
+  const status = String((data && data.status) || '').trim().toLowerCase();
+  const assessmentID = String((data && (data.assessment_id || data.assessmentId)) || '').trim();
+  if (status === 'ready' && assessmentID) {
+    return { status: 'ready', assessmentID };
+  }
+  if (status === 'no_assessment_required' || status === 'failed') {
+    return { status, assessmentID };
+  }
+  return { status: 'pending', assessmentID: '' };
 }
 
 export function waitReportTerminal(assessmentID, testeeID, data, pathTemplate, endpoint, token) {
