@@ -20,8 +20,10 @@ services:
       - "prometheus.metrics_port=8080"
       - "prometheus.metrics_path=/metrics"
     ports:
-      - "8081:8080"
-      - "9445:8443"
+      # 生产业务流量必须经 serverA Nginx；宿主机映射只保留给本机排障，
+      # 避免公网直接访问容器端口并绕过入口策略与压测流量归因。
+      - "127.0.0.1:8081:8080"
+      - "127.0.0.1:9445:8443"
       - "127.0.0.1:19090:9090"
     env_file:
       - /opt/qs-server/qs-apiserver/configs/env/config.prod.env

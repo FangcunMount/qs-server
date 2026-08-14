@@ -264,6 +264,9 @@ jobs:
       - name: Validate deployment planning contract
         run: bash scripts/cd/test-plan-services.sh
 
+      - name: Validate production network exposure contract
+        run: bash scripts/cd/test-production-compose-network-exposure.sh
+
       - name: Validate Attention reconcile dry-run/apply audit contract
         run: bash scripts/cd/test-attention-reconcile-audit.sh
 
