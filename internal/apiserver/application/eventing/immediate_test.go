@@ -2,6 +2,7 @@ package eventing
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -14,23 +15,37 @@ import (
 
 type immediateTestStore struct {
 	fakeOutboxStore
-	getBlock chan struct{}
-	getCalls int
-	mu       sync.Mutex
+	claimBlock chan struct{}
+	claimCalls int
+	claimed    map[string]bool
+	mu         sync.Mutex
 }
 
-func (s *immediateTestStore) GetPublishableEvent(ctx context.Context, eventID string, _ time.Time) (outboxport.PendingEvent, bool, error) {
+func (s *immediateTestStore) ClaimEventsByIDs(ctx context.Context, eventIDs []string, _ time.Time) ([]outboxport.PendingEvent, error) {
 	s.mu.Lock()
-	s.getCalls++
+	s.claimCalls++
 	s.mu.Unlock()
-	if s.getBlock != nil {
+	if s.claimBlock != nil {
 		select {
-		case <-s.getBlock:
+		case <-s.claimBlock:
 		case <-ctx.Done():
-			return outboxport.PendingEvent{}, false, ctx.Err()
+			return nil, ctx.Err()
 		}
 	}
-	return pendingEvent(eventID, eventcatalog.AnswerSheetSubmitted), true, nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.claimed == nil {
+		s.claimed = make(map[string]bool)
+	}
+	claimed := make([]outboxport.PendingEvent, 0, len(eventIDs))
+	for _, eventID := range eventIDs {
+		if s.claimed[eventID] {
+			continue
+		}
+		s.claimed[eventID] = true
+		claimed = append(claimed, pendingEvent(eventID, eventcatalog.AnswerSheetSubmitted))
+	}
+	return claimed, nil
 }
 
 func TestImmediateDispatcherUsesExplicitEventTypes(t *testing.T) {
@@ -46,7 +61,7 @@ func TestImmediateDispatcherUsesExplicitEventTypes(t *testing.T) {
 }
 
 func TestImmediateDispatcherRespectsMaxConcurrent(t *testing.T) {
-	store := &immediateTestStore{getBlock: make(chan struct{})}
+	store := &immediateTestStore{claimBlock: make(chan struct{})}
 	publisher := &fakePublisher{}
 	observer := &outboxObserver{}
 	dispatcher := NewImmediateDispatcher(ImmediateDispatcherOptions{
@@ -66,7 +81,7 @@ func TestImmediateDispatcherRespectsMaxConcurrent(t *testing.T) {
 	waitFor(t, func() bool {
 		store.mu.Lock()
 		defer store.mu.Unlock()
-		return store.getCalls == 1
+		return store.claimCalls == 1
 	})
 
 	deferred := event.New(eventcatalog.AnswerSheetSubmitted, "Sample", "evt-2", struct{}{})
@@ -74,13 +89,13 @@ func TestImmediateDispatcherRespectsMaxConcurrent(t *testing.T) {
 
 	waitFor(t, func() bool {
 		store.mu.Lock()
-		calls := store.getCalls
+		calls := store.claimCalls
 		store.mu.Unlock()
 		return calls == 1 && observer.hasOutcome(eventobservability.OutboxOutcomeImmediateSkipped)
 	})
 	assertOutboxContainsOutcome(t, observer, eventobservability.OutboxOutcomeImmediateSkipped)
 
-	close(store.getBlock)
+	close(store.claimBlock)
 
 	waitFor(t, func() bool {
 		publisher.mu.Lock()
@@ -113,10 +128,10 @@ func TestImmediateDispatcherRequiresMQBackedPublisherForDurableEvents(t *testing
 	time.Sleep(20 * time.Millisecond)
 
 	store.mu.Lock()
-	getCalls := store.getCalls
+	claimCalls := store.claimCalls
 	store.mu.Unlock()
-	if getCalls != 0 {
-		t.Fatalf("GetPublishableEvent calls = %d, want 0", getCalls)
+	if claimCalls != 0 {
+		t.Fatalf("ClaimEventsByIDs calls = %d, want 0", claimCalls)
 	}
 	if len(store.published) != 0 {
 		t.Fatalf("published = %#v, want durable event to remain pending", store.published)
@@ -140,6 +155,60 @@ func TestImmediateDispatcherAllowsMQBackedPublisherForDurableEvents(t *testing.T
 	dispatcher.Close()
 	if len(store.published) != 1 {
 		t.Fatalf("published = %#v, want one event", store.published)
+	}
+}
+
+func TestImmediateDispatcherAtomicallyClaimsEventBeforePublish(t *testing.T) {
+	store := &immediateTestStore{}
+	publisher := &durableFakePublisher{mqBacked: true}
+	dispatcher := NewImmediateDispatcher(ImmediateDispatcherOptions{
+		Name:                    "test-claim-immediate",
+		Store:                   store,
+		Publisher:               publisher,
+		Enabled:                 true,
+		RequireDurablePublisher: true,
+		ImmediateEventTypes:     []string{eventcatalog.AnswerSheetSubmitted},
+	})
+
+	evt := event.New(eventcatalog.AnswerSheetSubmitted, "Sample", "evt-claimed-once", struct{}{})
+	dispatcher.TryDispatchAfterCommit(context.Background(), []event.DomainEvent{evt, evt})
+	dispatcher.Close()
+
+	publisher.mu.Lock()
+	published := append([]string(nil), publisher.published...)
+	publisher.mu.Unlock()
+	if len(published) != 1 {
+		t.Fatalf("published = %#v, want one atomic-claim winner", published)
+	}
+	store.mu.Lock()
+	claimCalls := store.claimCalls
+	store.mu.Unlock()
+	if claimCalls != 2 {
+		t.Fatalf("ClaimEventsByIDs calls = %d, want 2 competing claims", claimCalls)
+	}
+}
+
+func TestImmediateDispatcherPersistsPublishFailureAfterClaim(t *testing.T) {
+	store := &immediateTestStore{}
+	wantErr := errors.New("nsq unavailable")
+	publisher := &fakePublisher{failAt: map[string]error{
+		eventcatalog.AnswerSheetSubmitted: wantErr,
+	}}
+	dispatcher := NewImmediateDispatcher(ImmediateDispatcherOptions{
+		Name:                "test-failed-immediate",
+		Store:               store,
+		Publisher:           publisher,
+		Enabled:             true,
+		ImmediateEventTypes: []string{eventcatalog.AnswerSheetSubmitted},
+	})
+
+	evt := event.New(eventcatalog.AnswerSheetSubmitted, "Sample", "evt-failed-claim", struct{}{})
+	eventID := evt.EventID()
+	dispatcher.TryDispatchAfterCommit(context.Background(), []event.DomainEvent{evt})
+	dispatcher.Close()
+
+	if len(store.failed) != 1 || store.failed[0] != eventID {
+		t.Fatalf("failed marks = %#v, want claimed event persisted for retry", store.failed)
 	}
 }
 

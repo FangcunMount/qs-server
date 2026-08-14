@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
+	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"github.com/FangcunMount/qs-server/internal/pkg/retryobservability"
 )
 
@@ -21,7 +22,7 @@ const (
 type ImmediateDispatcher struct {
 	name                string
 	store               outboxport.Store
-	reader              outboxport.ImmediatePublishReader
+	claimer             outboxport.EventIDClaimer
 	publisher           event.EventPublisher
 	observer            eventobservability.Observer
 	enabled             bool
@@ -53,7 +54,7 @@ type ImmediateDispatcherOptions struct {
 }
 
 func NewImmediateDispatcher(opts ImmediateDispatcherOptions) *ImmediateDispatcher {
-	reader, _ := opts.Store.(outboxport.ImmediatePublishReader)
+	claimer, _ := opts.Store.(outboxport.EventIDClaimer)
 	if opts.Timeout <= 0 {
 		opts.Timeout = defaultImmediateDispatchTimeout
 	}
@@ -64,14 +65,14 @@ func NewImmediateDispatcher(opts ImmediateDispatcherOptions) *ImmediateDispatche
 	if maxConcurrent <= 0 {
 		maxConcurrent = defaultImmediateMaxConcurrent
 	}
-	enabled := opts.Enabled && reader != nil && opts.Publisher != nil
+	enabled := opts.Enabled && claimer != nil && opts.Publisher != nil
 	if opts.RequireDurablePublisher && !isDurablePublisher(opts.Publisher) {
 		enabled = false
 	}
 	return &ImmediateDispatcher{
 		name:                opts.Name,
 		store:               opts.Store,
-		reader:              reader,
+		claimer:             claimer,
 		publisher:           opts.Publisher,
 		observer:            opts.Observer,
 		enabled:             enabled,
@@ -162,23 +163,29 @@ func detachedContext(parent context.Context, timeout time.Duration) (context.Con
 
 func (d *ImmediateDispatcher) dispatchOne(ctx context.Context, eventID, eventType string) {
 	now := time.Now()
-	pending, found, err := d.reader.GetPublishableEvent(ctx, eventID, now)
-	if err != nil || !found {
+	claimed, err := d.claimer.ClaimEventsByIDs(ctx, []string{eventID}, now)
+	if err != nil || len(claimed) == 0 {
 		d.observeImmediate(ctx, eventType, "not_found")
 		return
 	}
+	pending := claimed[0]
 	l := logger.L(ctx)
 	d.attemptTracker.Mark(eventID)
 	if err := d.publisher.Publish(ctx, pending.Event); err != nil {
+		settleCtx, cancel := detachedContext(ctx, d.timeout)
+		defer cancel()
 		d.observeImmediate(ctx, eventType, "publish_failed", retryobservability.AttemptClassForAttempt(pending.AttemptCount+1))
 		l.Warnw("immediate outbox publish failed",
 			"dispatcher", d.name,
 			"event_id", eventID,
 			"error", err.Error(),
 		)
+		d.markPublishFailed(settleCtx, pending, err, time.Now())
 		return
 	}
-	if err := d.store.MarkEventPublished(ctx, eventID, now); err != nil {
+	settleCtx, cancel := detachedContext(ctx, d.timeout)
+	defer cancel()
+	if err := d.store.MarkEventPublished(settleCtx, eventID, now); err != nil {
 		d.observeImmediate(ctx, eventType, "mark_failed", retryobservability.AttemptClassForAttempt(pending.AttemptCount+1))
 		l.Warnw("immediate outbox mark published failed",
 			"dispatcher", d.name,
@@ -192,6 +199,50 @@ func (d *ImmediateDispatcher) dispatchOne(ctx context.Context, eventID, eventTyp
 	}
 	d.attemptTracker.Forget(eventID)
 	d.observeImmediate(ctx, eventType, "published", retryobservability.AttemptClassForAttempt(pending.AttemptCount+1))
+}
+
+func (d *ImmediateDispatcher) markPublishFailed(ctx context.Context, pending outboxport.PendingEvent, cause error, failedAt time.Time) {
+	failure := outboxport.FailedMark{
+		EventID:   pending.EventID,
+		EventType: eventTypeOf(pending),
+		LastError: cause.Error(),
+	}
+	if governed, ok := d.store.(outboxport.GovernedFailureMarker); ok {
+		marked, err := governed.MarkEventsFailedGoverned(ctx, []outboxport.FailedMark{failure}, failedAt)
+		if err != nil {
+			logger.L(ctx).Errorw("immediate outbox mark failed failed", "dispatcher", d.name, "event_id", pending.EventID, "error", err.Error())
+			return
+		}
+		d.attemptTracker.Forget(pending.EventID)
+		if d.readyIndex == nil {
+			return
+		}
+		for _, result := range marked {
+			if result.Disposition == retrygovernance.DispositionAutomatic && result.NextAttemptAt != nil {
+				_ = d.readyIndex.Enqueue(ctx, result.EventType, result.EventID, *result.NextAttemptAt, eventCreatedAt(pending, failedAt))
+				continue
+			}
+			_ = d.readyIndex.Remove(ctx, result.EventType, result.EventID)
+		}
+		return
+	}
+
+	retryAt := failedAt.Add(defaultOutboxRelayRetryDelay)
+	if err := d.store.MarkEventFailed(ctx, pending.EventID, cause.Error(), retryAt); err != nil {
+		logger.L(ctx).Errorw("immediate outbox mark failed failed", "dispatcher", d.name, "event_id", pending.EventID, "error", err.Error())
+		return
+	}
+	d.attemptTracker.Forget(pending.EventID)
+	if d.readyIndex != nil {
+		_ = d.readyIndex.Enqueue(ctx, failure.EventType, failure.EventID, retryAt, eventCreatedAt(pending, failedAt))
+	}
+}
+
+func eventCreatedAt(pending outboxport.PendingEvent, fallback time.Time) time.Time {
+	if pending.Event != nil && !pending.Event.OccurredAt().IsZero() {
+		return pending.Event.OccurredAt()
+	}
+	return fallback
 }
 
 func (d *ImmediateDispatcher) observeImmediate(ctx context.Context, eventType, outcome string, attemptClass ...string) {
