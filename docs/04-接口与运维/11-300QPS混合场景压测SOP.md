@@ -11,7 +11,7 @@ make perf-run PLAN=admission
 make perf-run PLAN=diagnose CASE=<专项场景>
 ```
 
-`admission` 自动执行 smoke、60、120、200、240、280、恢复证据门、300 和最终排空验收。操作者不再逐档拼命令；任何硬门禁失败立即停止，证据不足时标记 `INCOMPLETE` 并禁止进入 300。
+`admission` 自动执行 smoke、60、80、100、120、200、240、280、恢复证据门、300 和最终排空验收。80/100 两档用于定位正常体验基线到保护线之间的容量拐点。操作者不再逐档拼命令；任何硬门禁失败立即停止，证据不足时标记 `INCOMPLETE` 并禁止进入 300。
 
 本地静态检查或 dry-run 不能称为 300 QPS 验收成功。正式结论必须引用本次 run ID、Git SHA、`summary.json`、`report.md` 和 `evidence.json`。
 
@@ -121,15 +121,17 @@ make perf-run PLAN=admission
 | ---: | --- | ---: | --- |
 | 1 | smoke 4 QPS | 30s | 连通性 |
 | 2 | experience 60 QPS | 5min | 用户体验线 |
-| 3 | capacity 120 QPS | 2min | 渐进容量 |
-| 4 | capacity 200 QPS | 3min | 渐进容量 |
-| 5 | capacity 240 QPS | 4min | 渐进容量 |
-| 6 | capacity 280 QPS | 3min | 300 前证据阶段 |
-| 7 | 恢复门 | 最多 5min | 健康、Outbox、NSQ 必须回落 |
-| 8 | admission 300 QPS | 10min | 正式保护线 |
-| 9 | 最终恢复门 | 最多 5min | 排空与残留验收 |
+| 3 | capacity 80 QPS | 2min | 容量拐点下探 |
+| 4 | capacity 100 QPS | 2min | 容量拐点下探 |
+| 5 | capacity 120 QPS | 2min | 渐进容量 |
+| 6 | capacity 200 QPS | 3min | 渐进容量 |
+| 7 | capacity 240 QPS | 4min | 渐进容量 |
+| 8 | capacity 280 QPS | 3min | 300 前证据阶段 |
+| 9 | 恢复门 | 最多 5min | 健康、Outbox、NSQ 必须回落 |
+| 10 | admission 300 QPS | 10min | 正式保护线 |
+| 11 | 最终恢复门 | 最多 5min | 排空与残留验收 |
 
-120～280 由 300 配比动态缩放，链路探针始终是 1 QPS，总 QPS 精确等于阶段目标。
+80～280 由 300 配比动态缩放，链路探针始终是 1 QPS，总 QPS 精确等于阶段目标。
 
 ### Diagnose
 
@@ -175,7 +177,7 @@ make perf-run PLAN=diagnose CASE=submit-coalescing-healthy
 - 最大耗时：极端异常样本；
 - 排队等待：Outbox/异步链路饱和信号。
 
-60 QPS 使用 `experience` 体验目标；120～300 使用 `protection` 高压保护线。P50 正常而 P99 明显劣化时，优先检查排队、慢 SQL、连接池与下游抖动。
+60 QPS 使用 `experience` 体验目标；80～300 使用 `protection` 高压保护线。P50 正常而 P99 明显劣化时，优先检查排队、慢 SQL、连接池与下游抖动。
 
 ### 4. 可靠性与正确性
 
@@ -211,7 +213,7 @@ make perf-run PLAN=diagnose CASE=submit-coalescing-healthy
 
 重试率本版不做硬门禁。至少积累三次相同环境、相同计划的有效 admission 结果后，再单独评审阈值。
 
-进入 300 时会再次核对 smoke、60、120、200、240、280 六个前置阶段；任一阶段不是 `PASS` 或没有实际执行，即使 280 后的即时恢复快照已经健康，也不得执行 300。
+进入 300 时会再次核对 smoke、60、80、100、120、200、240、280 八个前置阶段；任一阶段不是 `PASS` 或没有实际执行，即使 280 后的即时恢复快照已经健康，也不得执行 300。
 
 ## 五、报告与归档
 

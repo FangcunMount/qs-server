@@ -388,6 +388,22 @@ func TestCollectionNginxUsesDynamicDockerDNSInsideUpstream(t *testing.T) {
 	}
 }
 
+func TestCollectionNginxDoesNotEjectReplicasOnProtective503(t *testing.T) {
+	t.Parallel()
+
+	config := readDeploymentContractFile(t, "configs", "nginx", "conf.d", "collect.fangcunmount.cn.conf")
+	server := nginxNamedBlock(t, config, "server {\n    listen 443 ssl;")
+	const policy = "proxy_next_upstream error timeout http_502 http_504;"
+	if !strings.Contains(server, policy) {
+		t.Fatalf("collection TLS server must contain %q", policy)
+	}
+	for _, line := range strings.Split(server, "\n") {
+		if strings.Contains(line, "proxy_next_upstream") && strings.Contains(line, "http_503") {
+			t.Fatalf("collection TLS server must not treat protective 503 as an upstream failure: %q", strings.TrimSpace(line))
+		}
+	}
+}
+
 func TestPerfObservabilityNginxUsesAggregateReadOnlyRoutes(t *testing.T) {
 	t.Parallel()
 

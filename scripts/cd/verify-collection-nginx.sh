@@ -118,6 +118,58 @@ nginx_dns_ip_set() {
     sort -u
 }
 
+collection_tls_server_block() {
+  awk '
+    function brace_delta(line, copy, opens, closes) {
+      copy = line
+      opens = gsub(/\{/, "", copy)
+      copy = line
+      closes = gsub(/\}/, "", copy)
+      return opens - closes
+    }
+    !inside && /^[[:space:]]*server[[:space:]]*\{/ {
+      inside = 1
+      depth = 0
+      block = ""
+      matched = 0
+    }
+    inside {
+      block = block $0 ORS
+      depth += brace_delta($0)
+      if ($0 ~ /^[[:space:]]*server_name[[:space:]]+collect[.]fangcunmount[.]cn[[:space:]]*;/) {
+        matched = 1
+      }
+      if (depth == 0) {
+        if (matched && block ~ /listen[[:space:]]+443[[:space:]]+ssl/) {
+          printf "%s", block
+          exit
+        }
+        inside = 0
+      }
+    }
+  '
+}
+
+verify_protective_503_policy() {
+  local config="$1"
+  local label="$2"
+  local server_block
+  server_block="$(printf '%s\n' "$config" | collection_tls_server_block)"
+  if [ -z "$server_block" ]; then
+    echo "${label} Nginx config has no TLS server for collect.fangcunmount.cn" >&2
+    return 1
+  fi
+  if ! grep -Eq '^[[:space:]]*proxy_next_upstream[[:space:]]+error[[:space:]]+timeout[[:space:]]+http_502[[:space:]]+http_504[[:space:]]*;' <<<"$server_block"; then
+    echo "${label} collection TLS server does not preserve protective 503 responses" >&2
+    return 1
+  fi
+  if grep -E '^[[:space:]]*proxy_next_upstream[^;]*http_503' <<<"$server_block" >/dev/null; then
+    echo "${label} collection TLS server still treats protective 503 as an upstream failure" >&2
+    return 1
+  fi
+  echo "${label} collection protective-503 upstream policy passed"
+}
+
 verify_effective_config() {
   local effective upstream_count upstream
   effective="$(run_privileged docker exec "$NGINX_CONTAINER" nginx -T 2>&1)"
@@ -159,6 +211,7 @@ verify_effective_config() {
     echo "Effective collect-api upstream contains a forbidden sticky, weighted, or backup policy" >&2
     return 1
   fi
+  verify_protective_503_policy "$effective" "Effective"
   echo "Effective Nginx collect-api upstream contract passed"
 }
 
@@ -310,6 +363,7 @@ install_and_verify() {
     echo "Nginx config source is not readable: $NGINX_CONFIG_SOURCE" >&2
     return 1
   fi
+  verify_protective_503_policy "$(<"$NGINX_CONFIG_SOURCE")" "Candidate"
   if [ "$NGINX_CONFIG_DEST" != "$NGINX_CONFIG_LEGACY_DEST" ] &&
     [ -e "$NGINX_CONFIG_DEST" ] &&
     [ -e "$NGINX_CONFIG_LEGACY_DEST" ]; then
@@ -355,11 +409,19 @@ Usage:
   verify-collection-nginx.sh preflight
   verify-collection-nginx.sh install-and-verify
   verify-collection-nginx.sh verify-only
+  verify-collection-nginx.sh --verify-config-policy PATH
   verify-collection-nginx.sh --version-at-least CURRENT MINIMUM
 EOF
 }
 
 case "${1:-}" in
+  --verify-config-policy)
+    if [ "$#" -ne 2 ] || [ ! -r "$2" ]; then
+      usage >&2
+      exit 2
+    fi
+    verify_protective_503_policy "$(<"$2")" "Candidate"
+    ;;
   --version-at-least)
     if [ "$#" -ne 3 ]; then
       usage >&2

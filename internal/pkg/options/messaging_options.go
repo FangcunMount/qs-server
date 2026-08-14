@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	"github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
+	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"github.com/spf13/pflag"
 )
@@ -128,8 +129,11 @@ func (o *MessagingOptions) NewPublisher() (messaging.Publisher, error) {
 
 	switch o.Provider {
 	case "nsq":
-		// 创建 NSQ Publisher
-		return nsq.NewPublisher(o.NSQAddr, nil)
+		publisher, err := nsq.NewPublisher(o.NSQAddr, nil)
+		if err != nil {
+			return nil, err
+		}
+		return messagingruntime.WrapNSQReconnectPublisher(publisher), nil
 	case "rabbitmq":
 		// 创建 RabbitMQ Publisher
 		return rabbitmq.NewPublisher(o.RabbitMQURL)

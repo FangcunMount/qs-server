@@ -299,6 +299,7 @@ cd-validate: ## 校验 CD 服务元数据和脚本入口 (SERVICE=apiserver|coll
 	@test -x "$(CD_SCRIPT_DIR)/remote-deploy.sh"
 	@test -x "$(CD_SCRIPT_DIR)/verify-collection-nginx.sh"
 	@test -x "$(CD_SCRIPT_DIR)/verify-observability-nginx.sh"
+	@"$(CD_SCRIPT_DIR)/verify-collection-nginx.sh" --verify-config-policy configs/nginx/conf.d/collect.fangcunmount.cn.conf
 	@test -x "$(CD_SCRIPT_DIR)/plan-services.sh"
 	@echo "$(COLOR_GREEN)✅ CD metadata validated for SERVICE=$(SERVICE)$(COLOR_RESET)"
 

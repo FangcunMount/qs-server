@@ -12,6 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/observe"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/runtime"
+	"github.com/FangcunMount/qs-server/internal/pkg/messagingruntime"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
 	"github.com/nsqio/go-nsq"
 )
@@ -34,7 +35,11 @@ func CreatePublisher(cfg *config.MessagingConfig) (basemessaging.Publisher, erro
 	case "rabbitmq":
 		return cbrabbit.NewPublisher(cfg.RabbitMQURL)
 	default:
-		return cbnsq.NewPublisher(cfg.NSQAddr, nsq.NewConfig())
+		publisher, err := cbnsq.NewPublisher(cfg.NSQAddr, nsq.NewConfig())
+		if err != nil {
+			return nil, err
+		}
+		return messagingruntime.WrapNSQReconnectPublisher(publisher), nil
 	}
 }
 

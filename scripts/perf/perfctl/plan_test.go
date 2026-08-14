@@ -14,6 +14,8 @@ func TestAdmissionPlanStages(t *testing.T) {
 	}{
 		{"smoke", 4, "30s"},
 		{"experience_60", 60, "5m"},
+		{"capacity_80", 80, "2m"},
+		{"capacity_100", 100, "2m"},
 		{"capacity_120", 120, "2m"},
 		{"capacity_200", 200, "3m"},
 		{"capacity_240", 240, "4m"},
@@ -39,7 +41,7 @@ func TestScaledWorkloadKeepsExactTargetAndChainProbe(t *testing.T) {
 		"medicalWaitReport": 70, "behaviorWaitReport": 10,
 		"personalityWaitReport": 20, "stats": 29, "chainProbe": 1,
 	}
-	for _, target := range []int{120, 200, 240, 280, 300} {
+	for _, target := range []int{80, 100, 120, 200, 240, 280, 300} {
 		got, err := scaledWorkload(canonical, target)
 		if err != nil {
 			t.Fatalf("target %d: %v", target, err)

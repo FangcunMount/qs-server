@@ -27,13 +27,15 @@ make perf-run PLAN=diagnose CASE=<专项场景>
 | --- | --- | --- |
 | `quick` | smoke 4 QPS × 30s | 配置、鉴权与全链路连通性 |
 | `baseline` | smoke + experience 60 QPS × 5min | 正常负载体验基线 |
-| `admission` | smoke → 60 → 120 → 200 → 240 → 280 → 恢复门 → 300 → 最终恢复门 | 正式容量准入 |
+| `admission` | smoke → 60 → 80 → 100 → 120 → 200 → 240 → 280 → 恢复门 → 300 → 最终恢复门 | 正式容量准入 |
 | `diagnose` | 一个注册专项 | 故障、降级、幂等或 gRPC 专项 |
 
 Admission 的容量阶段持续时间固定为：
 
 | 阶段 | 目标 | 时长 |
 | --- | ---: | ---: |
+| `capacity_80` | 80 QPS | 2min |
+| `capacity_100` | 100 QPS | 2min |
 | `capacity_120` | 120 QPS | 2min |
 | `capacity_200` | 200 QPS | 3min |
 | `capacity_240` | 240 QPS | 4min |
@@ -42,7 +44,7 @@ Admission 的容量阶段持续时间固定为：
 
 300 QPS 的正式配比是：医疗模型查询 80、人格模型查询 40、两类问卷各 13、医疗/人格提交 19/5、医疗/行为/人格报告 70/10/20、Statistics 29、链路探针 1。
 
-120～280 不保存独立 profile。编排器固定链路探针为 1 QPS，其余流量按 300 配比使用最大余数法整数缩放，确保总量精确。VU 按到达率、典型耗时、超时和 headroom 计算，并为 HTTP 到达率场景预留 `startupBuffer` 个冷启动 VU；环境变量仍可显式覆盖。
+80～280 不保存独立 profile。编排器固定链路探针为 1 QPS，其余流量按 300 配比使用最大余数法整数缩放，确保总量精确。VU 按到达率、典型耗时、超时和 headroom 计算，并为 HTTP 到达率场景预留 `startupBuffer` 个冷启动 VU；环境变量仍可显式覆盖。80/100 两档用于定位 60 到 120 QPS 之间的容量拐点，不允许用跳档方式掩盖首个失败阶段。
 
 ## 三维指标契约
 
@@ -168,7 +170,7 @@ Verdict 与退出码：
 - `dropped_iterations == 0`；
 - 实际 business QPS 至少达到目标的 99%；
 - 对应 tier 的 P95/P99 全部通过；
-- 进入 300 前，smoke、60、120、200、240、280 必须全部为 `PASS`，且 collection、apiserver、worker、Outbox 和 NSQ 恢复证据通过；
+- 进入 300 前，smoke、60、80、100、120、200、240、280 必须全部为 `PASS`，且 collection、apiserver、worker、Outbox 和 NSQ 恢复证据通过；
 - 300 后必须完成最终排空与恢复验收。
 
 服务端证据缺失会产生 `INCOMPLETE`。在无法隔离并发业务流量的环境中，完成 TPS 与最终完成率不可作为正式准入证据。
