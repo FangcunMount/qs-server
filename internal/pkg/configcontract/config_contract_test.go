@@ -10,6 +10,7 @@ import (
 	"time"
 
 	basegrpc "github.com/FangcunMount/component-base/pkg/grpc/interceptors"
+	baselog "github.com/FangcunMount/component-base/pkg/log"
 	apiserverconfig "github.com/FangcunMount/qs-server/internal/apiserver/config"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	collectionconfig "github.com/FangcunMount/qs-server/internal/collection-server/config"
@@ -60,6 +61,10 @@ func TestAPIServerDevProdConfigContracts(t *testing.T) {
 				t.Fatal("apiserver backpressure config must include mysql, mongo, and iam")
 			}
 			assertMongoPoolBudget(t, "apiserver", name, opts.MongoDBOptions, opts.Backpressure.Mongo.MaxInflight)
+			assertProductionLogBudget(t, "apiserver", name, opts.Log)
+			if strings.Contains(name, ".prod.") && opts.MySQLOptions.LogLevel != 2 {
+				t.Fatalf("%s MySQL log level = %d, want 2 so real errors remain visible without SQL info traces", name, opts.MySQLOptions.LogLevel)
+			}
 			if opts.IAMOptions == nil || opts.IAMOptions.ServiceAuth == nil {
 				t.Fatal("apiserver IAM service auth config must be traceable")
 			}
@@ -150,6 +155,7 @@ func TestCollectionDevProdConfigContracts(t *testing.T) {
 				t.Fatal("collection IAM service auth config must be traceable")
 			}
 			assertCollectionGRPCClientIdentityContract(t, name, opts.GRPCClient)
+			assertProductionLogBudget(t, "collection", name, opts.Log)
 			assertIAMJWKSURLContract(t, "collection", name, opts.IAMOptions)
 			published := opts.Cache.Capabilities.Catalog.PublishedModel
 			if published == nil || published.TTLSeconds != 180 || published.TTLJitterRatio != 0.2 || published.MaxEntries != 64 || !published.Singleflight || !published.SignalEvictEnabled {
@@ -345,6 +351,7 @@ func TestWorkerDevProdConfigContracts(t *testing.T) {
 				t.Fatal("worker runtime config must define positive concurrency")
 			}
 			assertMongoPoolBudget(t, "worker", name, opts.MongoDB, 0)
+			assertProductionLogBudget(t, "worker", name, opts.Log)
 			if name == "worker.prod.yaml" {
 				if cfg.Worker.AttentionProjectionReconcileEnabled {
 					t.Fatal("production attention projection fact recovery must remain disabled after convergence")
@@ -402,6 +409,30 @@ func assertMongoPoolBudget(t *testing.T, component, configName string, opts *gen
 	maxSafeInflight := int(opts.MaxPoolSize * 3 / 4)
 	if maxInflight > maxSafeInflight {
 		t.Fatalf("%s %s MongoDB max_inflight=%d must be <= 75%% of max-pool-size=%d (%d)", component, configName, maxInflight, opts.MaxPoolSize, maxSafeInflight)
+	}
+}
+
+func assertProductionLogBudget(t *testing.T, component, configName string, opts *baselog.Options) {
+	t.Helper()
+	if !strings.Contains(configName, ".prod.") {
+		return
+	}
+	if opts == nil {
+		t.Fatalf("%s %s log options must be traceable", component, configName)
+	}
+	if opts.Level != "warn" || opts.Format != "json" {
+		t.Fatalf("%s %s production log mode = %s/%s, want warn/json", component, configName, opts.Level, opts.Format)
+	}
+	if !opts.DisableCaller || !opts.DisableStacktrace || opts.Development || opts.EnableColor {
+		t.Fatalf(
+			"%s %s production log runtime must disable caller/stacktrace/development/color: caller=%t stacktrace=%t development=%t color=%t",
+			component,
+			configName,
+			opts.DisableCaller,
+			opts.DisableStacktrace,
+			opts.Development,
+			opts.EnableColor,
+		)
 	}
 }
 

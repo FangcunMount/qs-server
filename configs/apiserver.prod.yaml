@@ -136,7 +136,9 @@ mysql:
   max-open-connections: 150       # 与 backpressure.mysql.max_inflight 对齐（4C/8G 榨干档）
   max-connection-life-time: 30m   # 缩短连接生命周期，避免超时
   max-idle-time: 10m              # 添加空闲超时
-  log-level: 4 # 生产降低日志级别
+  # 生产仅保留真实 SQL 错误；预期的 gorm.ErrRecordNotFound 由适配器过滤。
+  # Info 会在高吞吐下为每条 SQL 生成结构化日志，显著放大 stdout/file I/O。
+  log-level: 2
   location: "Asia/Shanghai"      # DATETIME 解析统一使用上海时区
   session-time-zone: "+08:00"   # 每个连接显式设置 MySQL session time_zone
 
@@ -607,8 +609,12 @@ assessment_assets:
 # 5.1 日志配置（生产环境 - 使用 component-base duplicate 模式）
 # ----------------------------------------------------------------------------
 log:
-  level: info                   # 日志基本级别：debug, info, warn, error, fatal, panic
+  # 热路径状态已经由 Prometheus 指标覆盖；生产仅保留异常与需要关注的状态。
+  # info 会在 110 QPS 下产生每分钟数万条 gRPC/业务阶段日志并争用宿主机 CPU。
+  level: warn                   # 日志基本级别：debug, info, warn, error, fatal, panic
   format: json               # 日志格式（json 适合生产环境，console 适合开发环境）
+  disable-caller: true           # 避免热路径为每条日志解析调用栈
+  disable-stacktrace: true       # 业务错误保留结构化字段，避免自动堆栈重复放大
   enable-color: false            # 文件输出启用颜色
   development: false             # 开发模式: true, false
   name: "qs-apiserver"          # 日志名称

@@ -14,6 +14,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/config"
 	mongo_interpretation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
+	qsgormlogger "github.com/FangcunMount/qs-server/internal/pkg/gormlogger"
 	"github.com/FangcunMount/qs-server/internal/pkg/migration"
 	"github.com/FangcunMount/qs-server/internal/pkg/mongoconfig"
 	mongo_indexes "github.com/FangcunMount/qs-server/internal/pkg/mongodb"
@@ -94,7 +95,9 @@ func (dm *DatabaseManager) initMySQL(ctx context.Context) error {
 		LogLevel:              dm.config.MySQLOptions.LogLevel,
 		Location:              dm.config.MySQLOptions.Location,
 		SessionTimeZone:       dm.config.MySQLOptions.SessionTimeZone,
-		Logger:                logger.NewGormLogger(dm.config.MySQLOptions.LogLevel),
+		Logger: qsgormlogger.IgnoreRecordNotFound(
+			logger.NewGormLogger(dm.config.MySQLOptions.LogLevel),
+		),
 	}
 
 	if mysqlConfig.Host == "" {

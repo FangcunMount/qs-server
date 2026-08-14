@@ -190,10 +190,10 @@ signaling:
 log:
   disable-caller: true          # 生产环境禁用调用者信息（性能优化）
   disable-stacktrace: true      # 仅在 panic 时记录堆栈
-  level: debug                   # 日志级别: debug, info, warn, error, fatal, panic
-  format: console               # 日志格式: console(开发), json(生产)
-  enable-color: true            # 生产环境禁用颜色
-  development: true            # 生产模式
+  level: warn                    # 正常消费/投递状态由指标观测，日志保留异常和需关注状态
+  format: json                   # 生产使用结构化 JSON
+  enable-color: false            # 生产环境禁用颜色
+  development: false             # 生产模式
   name: "qs-worker"             # 日志名称
   max-size: 100                 # 单个日志文件最大 100MB
   max-age: 30                   # 保留 30 天
