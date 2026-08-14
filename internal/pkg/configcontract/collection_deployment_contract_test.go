@@ -30,6 +30,13 @@ type collectionComposeContract struct {
 	} `yaml:"services"`
 }
 
+type productionDeployWorkflowContract struct {
+	Jobs map[string]struct {
+		Needs []string `yaml:"needs"`
+		If    string   `yaml:"if"`
+	} `yaml:"jobs"`
+}
+
 func TestCollectionComposeSupportsTwoReplicas(t *testing.T) {
 	t.Parallel()
 
@@ -301,6 +308,31 @@ func TestCollectionDeploymentPipelineScalesAndVerifiesEveryReplica(t *testing.T)
 	} {
 		if !strings.Contains(ci, required) {
 			t.Errorf("CI deployment contracts must contain %q", required)
+		}
+	}
+}
+
+func TestDependentServicesDeployAfterAPIServerWhenPlanned(t *testing.T) {
+	t.Parallel()
+
+	content, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "cd.yml"))
+	if err != nil {
+		t.Fatalf("read production deploy workflow: %v", err)
+	}
+	var workflow productionDeployWorkflowContract
+	if err := yaml.Unmarshal(content, &workflow); err != nil {
+		t.Fatalf("parse production deploy workflow: %v", err)
+	}
+	for _, jobName := range []string{"deploy-collection", "deploy-worker"} {
+		job, ok := workflow.Jobs[jobName]
+		if !ok {
+			t.Fatalf("production deploy workflow missing %s", jobName)
+		}
+		if !slices.Contains(job.Needs, "deploy-apiserver") {
+			t.Errorf("%s needs = %v, want deploy-apiserver ordering dependency", jobName, job.Needs)
+		}
+		if !strings.Contains(job.If, "needs.plan.outputs.apiserver != 'true' || needs.deploy-apiserver.result == 'success'") {
+			t.Errorf("%s must wait for a planned apiserver deploy without blocking service-only deploys", jobName)
 		}
 	}
 }
