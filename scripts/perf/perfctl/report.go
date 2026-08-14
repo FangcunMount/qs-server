@@ -419,14 +419,18 @@ func evaluatePhase(spec phaseSpec, phase PhaseSummary, raw rawSummary, k6Exit in
 				reasons = append(reasons, fmt.Sprintf("assessment completion rate %.4f is outside [0.99, 1.01]", *phase.Throughput.FinalCompletionRate.Value))
 			}
 		}
-		if phase.Evidence.OutboxBacklogDelta != nil && *phase.Evidence.OutboxBacklogDelta > 0 {
-			reasons = append(reasons, fmt.Sprintf("outbox backlog grew by %.0f during the load window", *phase.Evidence.OutboxBacklogDelta))
+		backlogAllowance := steadyBacklogAllowance(phase)
+		if phase.Evidence.OutboxBacklogDelta != nil && *phase.Evidence.OutboxBacklogDelta > backlogAllowance {
+			reasons = append(reasons, fmt.Sprintf("outbox backlog grew by %.0f during the load window (allowance %.0f)", *phase.Evidence.OutboxBacklogDelta, backlogAllowance))
 		}
 		if phase.Evidence.OutboxBacklogBaseline != nil && *phase.Evidence.OutboxBacklogBaseline > 0 {
 			reasons = append(reasons, fmt.Sprintf("outbox backlog baseline %.0f is not empty", *phase.Evidence.OutboxBacklogBaseline))
 		}
-		if phase.Evidence.NSQDepthDelta != nil && *phase.Evidence.NSQDepthDelta > 0 {
-			reasons = append(reasons, fmt.Sprintf("NSQ depth grew by %.0f during the load window", *phase.Evidence.NSQDepthDelta))
+		if phase.Evidence.OutboxBacklog != nil && *phase.Evidence.OutboxBacklog > 0 && phase.Evidence.OutboxOldestAge != nil && *phase.Evidence.OutboxOldestAge > 5 {
+			reasons = append(reasons, fmt.Sprintf("oldest outbox item %.2fs exceeds 5s", *phase.Evidence.OutboxOldestAge))
+		}
+		if phase.Evidence.NSQDepthDelta != nil && *phase.Evidence.NSQDepthDelta > backlogAllowance {
+			reasons = append(reasons, fmt.Sprintf("NSQ depth grew by %.0f during the load window (allowance %.0f)", *phase.Evidence.NSQDepthDelta, backlogAllowance))
 		}
 		if phase.Evidence.NSQDepthBaseline != nil && *phase.Evidence.NSQDepthBaseline > 0 {
 			reasons = append(reasons, fmt.Sprintf("NSQ depth baseline %.0f is not empty", *phase.Evidence.NSQDepthBaseline))
@@ -439,6 +443,14 @@ func evaluatePhase(spec phaseSpec, phase PhaseSummary, raw rawSummary, k6Exit in
 		return Verdict{Status: VerdictError, Reasons: []string{fmt.Sprintf("k6 exited with code %d without an exported failed threshold", k6Exit)}}
 	}
 	return Verdict{Status: VerdictPass, Reasons: []string{"load, latency, correctness, and steady-state gates passed"}}
+}
+
+func steadyBacklogAllowance(phase PhaseSummary) float64 {
+	expected := phase.Throughput.ExpectedCompletions.Value
+	if expected == nil || *expected <= 0 {
+		return 1
+	}
+	return math.Max(1, math.Ceil(*expected*0.01))
 }
 
 func thresholdResults(raw rawSummary) []ThresholdResult {
@@ -645,6 +657,7 @@ func renderRunMarkdown(summary RunSummary) string {
 		fmt.Fprintf(&output, "| 完成 TPS 观测窗口 | %s | %s |\n", formatMeasurement(phase.Evidence.CompletionWindow), phase.Evidence.CompletionWindow.Source)
 		fmt.Fprintf(&output, "| Outbox backlog（前 / 后 / 增量） | %s / %s / %s | Prometheus 快照 |\n", formatFloatCount(phase.Evidence.OutboxBacklogBaseline), formatFloatCount(phase.Evidence.OutboxBacklog), formatSignedFloatCount(phase.Evidence.OutboxBacklogDelta))
 		fmt.Fprintf(&output, "| NSQ depth（前 / 后 / 增量） | %s / %s / %s | NSQD 快照 |\n", formatFloatCount(phase.Evidence.NSQDepthBaseline), formatFloatCount(phase.Evidence.NSQDepth), formatSignedFloatCount(phase.Evidence.NSQDepthDelta))
+		fmt.Fprintf(&output, "| 阶段结束在途残留上限 | %.0f | max(1, ceil(应完成 Assessment 数 × 1%%)) |\n", steadyBacklogAllowance(phase))
 		for _, item := range phase.QueueWait {
 			fmt.Fprintf(&output, "| %s | %s | %s |\n", item.Layer, formatMeasurement(item.Wait), item.Wait.Source)
 		}

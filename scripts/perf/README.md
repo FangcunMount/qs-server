@@ -68,7 +68,7 @@ Admission 的容量阶段持续时间固定为：
 | `request_amplification` | HTTP RPS ÷ business QPS |
 | `polling_amplification` | 报告轮询请求数 ÷ 链路探针初始数，不计作重试 |
 
-异步场景必须区分受理 TPS、应完成受理量与完成 TPS。缺少服务端完成证据或 assessment intake outcome 证据时，完成率是 `N/A`，不得用全部受理量或链路探针估算。保护档还要求快照窗口完成率在 `[99%, 101%]` 内，且阶段结束时 Outbox backlog 与 NSQ depth 均不得相对阶段前增长；压测后的恢复门只证明系统能排空，不计入该档稳态容量。
+异步场景必须区分受理 TPS、应完成受理量与完成 TPS。缺少服务端完成证据或 assessment intake outcome 证据时，完成率是 `N/A`，不得用全部受理量或链路探针估算。保护档还要求快照窗口完成率在 `[99%, 101%]` 内；阶段开始时 Outbox/NSQ 必须为空，结束快照允许至多 `max(1, ceil(expected_completions × 1%))` 条新鲜在途残留，Outbox 最老年龄不得超过 5 秒。压测后的恢复门只证明系统能排空，不计入该档稳态容量。
 
 WebSocket 同时记录端到端 `report_ws_first_message_latency` 与握手后 `report_ws_subscribe_to_first_message_latency`。后者从客户端发送 subscribe 帧起计时，只用于定位首帧慢在公网握手还是服务端状态读取，不单独改变验收阈值。
 
@@ -175,7 +175,7 @@ Verdict 与退出码：
 - `dropped_iterations == 0`；
 - 实际 business QPS 至少达到目标的 99%；
 - 有 Assessment 的异步负载，其快照窗口完成率必须在 `[99%, 101%]` 内；
-- 阶段开始时 Outbox backlog 与 NSQ depth 必须为 0，阶段结束时也不得相对阶段前增长；
+- 阶段开始时 Outbox backlog 与 NSQ depth 必须为 0；阶段结束残留不得超过应完成量的 1%（至少容许 1 条快照边界在途），Outbox 最老年龄不得超过 5 秒；
 - 对应 tier 的 P95/P99 全部通过；
 - 进入 300 前，smoke、60、80、100、110、120、200、240、280 必须全部为 `PASS`，且 collection、apiserver、worker、Outbox 和 NSQ 恢复证据通过；
 - 300 后必须完成最终排空与恢复验收。

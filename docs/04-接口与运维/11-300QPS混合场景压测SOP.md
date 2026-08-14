@@ -11,7 +11,7 @@ make perf-run PLAN=admission
 make perf-run PLAN=diagnose CASE=<专项场景>
 ```
 
-`admission` 自动执行 smoke、60、80、100、120、200、240、280、恢复证据门、300 和最终排空验收。80/100 两档用于定位正常体验基线到保护线之间的容量拐点。操作者不再逐档拼命令；任何硬门禁失败立即停止，证据不足时标记 `INCOMPLETE` 并禁止进入 300。
+`admission` 自动执行 smoke、60、80、100、110、120、200、240、280、恢复证据门、300 和最终排空验收。80/100/110 三档用于定位正常体验基线到 120 保护档之间的容量拐点。操作者不再逐档拼命令；任何硬门禁失败立即停止，证据不足时标记 `INCOMPLETE` 并禁止进入 300。
 
 本地静态检查或 dry-run 不能称为 300 QPS 验收成功。正式结论必须引用本次 run ID、Git SHA、`summary.json`、`report.md` 和 `evidence.json`。
 
@@ -166,7 +166,7 @@ make perf-run PLAN=diagnose CASE=submit-coalescing-healthy
 - Outbox backlog、最老待处理年龄与 NSQ depth 是否持续增长；
 - 压测停止后积压是否回到基线。
 
-受理 TPS 高但完成 TPS 低，只能说明入口能接收，不能说明系统完成了业务交付。每档开始时 Outbox backlog 与 NSQ depth 必须为 0；阶段结束时任一指标相对阶段前增长会直接判定该档 `FAIL`。随后的恢复门即使排空，也只能证明可恢复，不能把该档改判为稳态可承载。
+受理 TPS 高但完成 TPS 低，只能说明入口能接收，不能说明系统完成了业务交付。每档开始时 Outbox backlog 与 NSQ depth 必须为 0；结束快照只容许 `max(1, ceil(应完成 Assessment 数 × 1%))` 条新鲜在途残留，Outbox 最老年龄不得超过 5 秒。超过比例或年龄会直接判定该档 `FAIL`。随后的恢复门即使排空，也只能证明可恢复，不能把该档改判为稳态可承载。
 
 ### 3. 时延与响应体验
 

@@ -351,19 +351,19 @@ func TestProtectionVerdictRejectsDeferredCompletionAndGrowingBacklog(t *testing.
 	}
 }
 
-func TestProtectionVerdictAcceptsWindowCompletionWithoutBacklogGrowth(t *testing.T) {
+func TestProtectionVerdictAcceptsBoundedFreshInFlightAtSnapshotBoundary(t *testing.T) {
 	raw := rawSummary{Metrics: map[string]map[string]any{
 		"iterations":             {"count": float64(100), "rate": float64(10)},
 		"http_reqs":              {"count": float64(100), "rate": float64(10)},
 		"dropped_iterations":     {"count": float64(0), "rate": float64(0)},
 		"answer_submit_accepted": {"count": float64(100), "rate": float64(10)},
 	}}
-	completed, expected, zero := 100.0, 100.0, 0.0
+	completed, expected, zero, one, fresh := 100.0, 100.0, 0.0, 1.0, 0.03
 	evidence := PhaseEvidence{
 		Complete: true, CompletionWindow: measured(floatPtr(10), "seconds", "test"),
 		CompletedCountDelta: &completed, ExpectedCompletionCountDelta: &expected,
-		OutboxBacklogBaseline: &zero, OutboxBacklog: &zero, OutboxBacklogDelta: &zero,
-		NSQDepthBaseline: &zero, NSQDepth: &zero, NSQDepthDelta: &zero,
+		OutboxBacklogBaseline: &zero, OutboxBacklog: &one, OutboxBacklogDelta: &one, OutboxOldestAge: &fresh,
+		NSQDepthBaseline: &zero, NSQDepth: &one, NSQDepthDelta: &one,
 	}
 	phase := buildPhaseSummary(
 		phaseSpec{ID: "capacity", Profile: "test", TargetQPS: 10, Duration: "10s", ThresholdTier: "protection"},

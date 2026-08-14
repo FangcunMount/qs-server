@@ -8,20 +8,20 @@
 
 | 目标 QPS | 推荐部署形态 | 结论 |
 | -------- | ------------ | ---- |
-| 100 | 单机单实例 | 小规格可承接，重点保护 DB |
-| 200 | 单机单实例 | **通过**（`mixed_200`；**4C/8G** 2026-07-02） |
-| 220 | 单机单实例 | **通过**（`mixed_220`；**4C/8G** 2026-07-02，http p95≈79ms） |
-| 240 | 单机单实例 | **通过**（`mixed_240_models` 三域 **4C/8G** 2026-07-02，http p95≈100ms） |
-| 280 | 单机单实例 | **边际通过**（4C/8G WS+VU 收紧，0.20%；catalog 503）；8C/16G 全绿 |
-| 300 | 单机单实例 | **通过**（8C/16G 全量）；**4C/8G 全量未过**（~9–11%，Step2 0.01% 过） |
+| 100 | 单机单实例 | 当前 4C/8G 候选档；必须由新版 `admission` 重新验收 |
+| 200 | 单机单实例 | 当前拓扑未验收，不承诺 |
+| 220 | 单机单实例 | 当前拓扑未验收，不承诺 |
+| 240 | 单机单实例 | 当前拓扑未验收，不承诺 |
+| 280 | 单机单实例 | 2026-07 旧测试只证明到达率与可恢复性，容量结论已撤销 |
+| 300 | 单机单实例 | 当前 4C/8G 拓扑未验收，不承诺；8C/16G 旧结果也需新门禁复测 |
 | 500 | 至少应用双实例 | 不建议单点承诺 |
 | 700 | 应用多实例 | Redis/DB/MQ/IAM 应独立 |
 | 900 | 应用多实例 + LB | 不能只调限流数字 |
 | 1000 | 应用多实例 + LB | 必须正式压测验收 |
 
-**单机实测（2026-07）**：8C/16G 下 `mixed_280_models` / `mixed_300` 全绿；4C/8G 下 **`mixed_200`～`mixed_240_models` 全绿**，**280 边际 + Step2 过、全量 300 未过**（§2.4、SOP §3.8.3）。
+**当前有效结论（2026-08-14）**：2026-07 的 4C/8G 与 8C/16G 结果没有把负载窗口完成率及阶段前后 Outbox/NSQ 增量作为阶段硬门，并允许压测后继续排空，因此只能保留为历史调参记录，不能继续写成稳态容量。当前版本必须重新执行 `make perf-run PLAN=baseline` 与 `make perf-run PLAN=admission`。
 
-> 上述数据是旧提交链和已删除 profile 的历史基线，不能直接作为可靠受理新链的容量承诺。当前版本必须重新执行 `make perf-run PLAN=baseline` 与 `make perf-run PLAN=admission`。
+同日 `ff729be2` 的新版混合链路运行中，4C/8G serverA 在 110 QPS 通过当时的负载/时延/正确性门，120 QPS 出现 4 个 dropped iterations、Submit P95 约 920ms、serverA CPU 接近耗尽。该结果证明容量拐点已落在 110～120 之间，但它早于 backlog 窗口硬门，110 只能作为当前调优基线，不是最终容量承诺。
 
 核心原则：
 
@@ -41,19 +41,19 @@
 | ---- | ------ | ---- |
 | collection rate_limit | submit/query global QPS 300；**report_events global 120** | 入口保护（压测配比见 k6 profile） |
 | collection submit degraded local | 每实例 global 30/45；user 10/15 | Redis rate backend 故障时的保守容量保护 |
-| collection grpc_client | max_inflight **420** | 4C/8G 榨干档 |
+| collection grpc_client | max_inflight **420** | 2026-07 历史调参值，不代表当前容量 |
 | collection submit | accept timeout **2000ms**，gate wait **50ms** | 可靠受理时限和有界等待 |
 | collection questionnaire_cache | enabled，TTL 180s，max_entries 256 | 已发布问卷 REST DTO 进程内 L1（跳过 gRPC） |
 | collection scale_cache | enabled，TTL 180s，max_entries 256 | 量表目录 REST DTO 进程内 L1 |
 | collection typology_cache | enabled，TTL 180s，max_entries 256 | 人格模型目录 REST DTO 进程内 L1 |
 
 目录缓存分层说明见 [Cache 架构与责任边界](../03-基础设施/cache/10-架构与责任边界.md)。
-| collection concurrency | query **460** + submit **96**（catalog Try 503） | 4C/8G；280 档 169×503 后上调读池 |
+| collection concurrency | query **460** + submit **96**（catalog Try 503） | 2026-07 历史调参值；当前必须以新 admission 复核 |
 | collection wait_report | max_http_concurrency **400**，degrade_immediate_enabled | wait-report 独立池；槽位满立即 pending |
 | collection report_events | enabled **false**（灰度）；max_connections 2000 | WebSocket 报告推送（方案 E） |
 | collection redis pool | max-active 256 | collection 侧 Redis 活跃连接 |
 | apiserver rate_limit | submit/query/wait-report global QPS 300，admin submit global QPS 360 | 后台 REST 入口 |
-| apiserver backpressure | mysql **150**，mongo **120**，iam **100** | 4C/8G 榨干档；timeout 4～5s |
+| apiserver backpressure | mysql **150**，mongo **120**，iam **100** | 保护上限，不是 QPS 或稳态容量；timeout 4～5s |
 | apiserver mysql pool | max open **150** | DB 连接池 |
 | worker concurrency | 48 | 后台消费并发 |
 
@@ -119,9 +119,9 @@
 8C/16G 历史验收：`qs-apiserver` 5 CPU / 8GiB，`qs-collection-server` 2 CPU / 4GiB。
 submit 稳态由 Submit Gate、gRPC inflight、Mongo 事务与 Outbox Stage 能力共同约束。
 
-现有 4C/8G 容量数据来自单 collection 进程。双实例提高了 collection CPU 总配额，而且 `max_inflight`、Gate 与 Redis pool 是进程级配置，聚合上限也会变化；发布后必须重新运行混合压测和 SubmitCoalescer 100 重复请求验收，不能直接继承旧容量结论。
+当前 serverA 的两个 collection 副本能够被 Nginx 实际分流，并提供进程故障冗余与各自的目录 L1；但它们与单个 apiserver、Nginx 和 Tailscale 共享同一台 4 核主机，不是物理横向扩容。三个 worker 副本能够竞争消费 NSQ 并提供异步层冗余，但不参与大多数前台查询和可靠受理响应；当 NSQ depth 为 0 时，增加 worker 不会提高前台 QPS。端到端容量必须以单 apiserver 和共享 serverA CPU 这一最窄层为准，不能把 `collection ×2`、`worker ×3` 的副本数相加成系统容量。
 
-### 2.4 serverA 4C/8G 榨干档（2026-07）
+### 2.4 serverA 4C/8G 历史调参记录（2026-07，容量结论已撤销）
 
 以下是 2026-07 旧 profiles 的历史攻关记录，用于解释配置来源，不是当前执行入口：
 
@@ -142,15 +142,15 @@ submit 稳态由 Submit Gate、gRPC inflight、Mongo 事务与 Outbox Stage 能�
 
 **当前验收顺序**：`make perf-run PLAN=baseline` → `make perf-run PLAN=admission`。历史分步 profile 不再可执行。
 
-**4C/8G 实测结论**（2026-07-02 晚，WS + 分池 + VU 收紧）：
+**历史工具输出**（2026-07-02 晚，WS + 分池 + VU 收紧；不得作为当前容量验收）：
 
 | Profile | failed | 判定 |
 | ------- | ---: | ---- |
-| `mixed_280_models` | 0.20% | **边际通过**（catalog 503×173，阈值全绿） |
-| `mixed_300_http_query` | 0.01% | **通过**（146/s 读 + WS，无 probe） |
+| `mixed_280_models` | 0.20% | 历史工具判为边际通过；未证明窗口内业务完成能力 |
+| `mixed_300_http_query` | 0.01% | 历史工具判为通过；只是读 + WS 子集，无 probe |
 | `mixed_300` 全量（×2） | 8.75%～10.60% | **未过**（catalog 503 + chain_probe 128–137） |
 
-**容量承诺（4C/8G）**：生产可验收 **~280/s 混合（WS）** 或 **~295/s 读+WS（无 probe）**；**不可承诺 300/s 全量 + chain_probe**。瓶颈在 catalog Try 503 与异步 probe，非盲目加 VU。8C/16G 历史已验收全量 300。
+这些运行主要证明入口能按目标到达率发起请求，并且系统在事后有机会排空。由于阶段 verdict 未硬性比较快照窗口完成率、干净 backlog 基线与 Outbox/NSQ 增量，“更多请求进入后慢慢处理”仍可能被写成通过。因此原先“4C/8G 可验收约 280/s”以及“8C/16G 已验收 300/s”的容量承诺一并撤销；新的承诺只能来自现行 admission 的逐档稳态门。
 
 ---
 
