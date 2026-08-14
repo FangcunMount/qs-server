@@ -32,13 +32,39 @@ func TestParsePrometheusAndRetryRateCanExceedOne(t *testing.T) {
 }
 
 func TestRecoveryRequiresBacklogToReturnToBaseline(t *testing.T) {
-	baselineBacklog, currentBacklog := 1.0, 3.0
-	baselineDepth, currentDepth := 0.0, 0.0
-	baseline := PhaseEvidence{Complete: true, OutboxBacklog: &baselineBacklog, NSQDepth: &baselineDepth}
-	current := PhaseEvidence{Complete: true, OutboxBacklog: &currentBacklog, NSQDepth: &currentDepth}
+	baseline := completeRecoveryEvidence(1, 0)
+	current := completeRecoveryEvidence(3, 0)
 	verdict := recoveryVerdict(baseline, current)
 	if verdict.Status != VerdictFail {
 		t.Fatalf("verdict = %s, want FAIL", verdict.Status)
+	}
+}
+
+func TestRecoveryBaselineDoesNotRequireLoadWindowCounters(t *testing.T) {
+	baseline := completeRecoveryEvidence(0, 0)
+	baseline.Complete = false
+	baseline.CompletedCountDelta = nil
+	baseline.ExpectedCompletionCountDelta = nil
+	baseline.Retry = nil
+
+	verdict := classifyRecoveryEvidence(baseline, "baseline recovery evidence")
+	if verdict.Status != VerdictPass {
+		t.Fatalf("verdict = %#v, want PASS without load-window counters", verdict)
+	}
+}
+
+func completeRecoveryEvidence(outbox, nsq float64) PhaseEvidence {
+	oldest := 0.0
+	checks := make([]EvidenceCheck, 0, len(recoveryEvidenceChecks))
+	for _, name := range recoveryEvidenceChecks {
+		checks = append(checks, EvidenceCheck{Name: name, Status: "PASS"})
+	}
+	return PhaseEvidence{
+		Complete:        true,
+		Checks:          checks,
+		OutboxBacklog:   &outbox,
+		OutboxOldestAge: &oldest,
+		NSQDepth:        &nsq,
 	}
 }
 

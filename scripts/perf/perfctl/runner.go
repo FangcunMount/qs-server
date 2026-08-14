@@ -797,8 +797,7 @@ func waitForInterPhaseRecovery(ctx context.Context, opts runOptions, runDir, id 
 
 func waitForRecoveryWithTiming(ctx context.Context, opts runOptions, runDir, id string, baseline PhaseEvidence, drainStartDir string, timeout, poll time.Duration) RecoverySummary {
 	started := time.Now()
-	if !baseline.Complete {
-		verdict := classifyEvidence(baseline, "baseline recovery evidence")
+	if verdict := classifyRecoveryEvidence(baseline, "baseline recovery evidence"); verdict.Status != VerdictPass {
 		return RecoverySummary{
 			ID: id, StartedAt: started, FinishedAt: time.Now(), Evidence: baseline,
 			Verdict: verdict,

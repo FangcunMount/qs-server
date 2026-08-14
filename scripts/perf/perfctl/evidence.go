@@ -671,11 +671,13 @@ func nonNegativeDelta(before, after float64) float64 {
 
 func recoveryVerdict(baseline, current PhaseEvidence) Verdict {
 	reasons := make([]string, 0)
-	if !baseline.Complete {
-		reasons = append(reasons, "baseline recovery evidence is incomplete")
+	baselineVerdict := classifyRecoveryEvidence(baseline, "baseline recovery evidence")
+	currentVerdict := classifyRecoveryEvidence(current, "recovery evidence")
+	if baselineVerdict.Status != VerdictPass {
+		reasons = append(reasons, baselineVerdict.Reasons...)
 	}
-	if !current.Complete {
-		reasons = append(reasons, "recovery evidence is incomplete")
+	if currentVerdict.Status != VerdictPass {
+		reasons = append(reasons, currentVerdict.Reasons...)
 	}
 	if baseline.OutboxBacklog == nil || current.OutboxBacklog == nil {
 		reasons = append(reasons, "outbox backlog baseline is unavailable")
@@ -699,13 +701,67 @@ func recoveryVerdict(baseline, current PhaseEvidence) Verdict {
 	if len(reasons) == 0 {
 		return Verdict{Status: VerdictPass, Reasons: []string{"readiness is healthy and asynchronous backlog returned to baseline"}}
 	}
-	status := VerdictFail
-	if classifyEvidence(baseline, "baseline recovery evidence").Status == VerdictIncomplete ||
-		classifyEvidence(current, "recovery evidence").Status == VerdictIncomplete ||
-		baseline.OutboxBacklog == nil || baseline.NSQDepth == nil {
-		status = VerdictIncomplete
+	status := worseVerdict(baselineVerdict.Status, currentVerdict.Status)
+	if status == VerdictPass {
+		status = VerdictFail
 	}
 	return Verdict{Status: status, Reasons: uniqueStrings(reasons)}
+}
+
+var recoveryEvidenceChecks = []string{
+	"collection readyz",
+	"apiserver readyz",
+	"worker readyz",
+	"collection metrics replicas",
+	"apiserver metrics",
+	"worker metrics replicas",
+	"NSQD stats",
+	"traffic isolation",
+	"outbox backlog window",
+	"NSQ depth window",
+}
+
+func classifyRecoveryEvidence(evidence PhaseEvidence, subject string) Verdict {
+	checks := make(map[string]EvidenceCheck, len(evidence.Checks))
+	for _, check := range evidence.Checks {
+		checks[check.Name] = check
+	}
+	failures := make([]string, 0)
+	incomplete := make([]string, 0)
+	for _, name := range recoveryEvidenceChecks {
+		check, found := checks[name]
+		if !found {
+			incomplete = append(incomplete, fmt.Sprintf("%s is missing %s", subject, name))
+			continue
+		}
+		switch check.Status {
+		case "PASS":
+		case "FAIL":
+			failures = append(failures, fmt.Sprintf("%s failed: %s", subject, name))
+		default:
+			incomplete = append(incomplete, fmt.Sprintf("%s is incomplete: %s", subject, name))
+		}
+	}
+	fields := []struct {
+		name  string
+		value *float64
+	}{
+		{name: "outbox backlog", value: evidence.OutboxBacklog},
+		{name: "outbox oldest age", value: evidence.OutboxOldestAge},
+		{name: "NSQ depth", value: evidence.NSQDepth},
+	}
+	for _, field := range fields {
+		if field.value == nil {
+			incomplete = append(incomplete, fmt.Sprintf("%s is missing %s", subject, field.name))
+		}
+	}
+	if len(failures) > 0 {
+		return Verdict{Status: VerdictFail, Reasons: uniqueStrings(failures)}
+	}
+	if len(incomplete) > 0 {
+		return Verdict{Status: VerdictIncomplete, Reasons: uniqueStrings(incomplete)}
+	}
+	return Verdict{Status: VerdictPass, Reasons: []string{subject + " is complete"}}
 }
 
 func classifyEvidence(evidence PhaseEvidence, subject string) Verdict {

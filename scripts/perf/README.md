@@ -68,7 +68,7 @@ Admission 的容量阶段持续时间固定为：
 | `request_amplification` | HTTP RPS ÷ business QPS |
 | `polling_amplification` | 报告轮询请求数 ÷ 链路探针初始数，不计作重试 |
 
-异步场景必须区分受理 TPS、应完成受理量与完成 TPS。缺少服务端完成证据或 assessment intake outcome 证据时，完成率是 `N/A`，不得用全部受理量或链路探针估算。保护档还要求快照窗口完成率在 `[99%, 101%]` 内；阶段开始时 Outbox/NSQ 必须为空，结束快照允许至多 `max(1, ceil(expected_completions × 1%))` 条新鲜在途残留，Outbox 最老年龄不得超过 5 秒。连续档位之间会先执行默认 30 秒、每 2 秒采样一次的有界恢复检查，确认上一档的边界在途已回到运行前基线后才采集下一档 `before` 快照；可通过 `PERF_INTER_PHASE_RECOVERY_TIMEOUT` 和 `PERF_INTER_PHASE_RECOVERY_POLL` 调整，但该恢复不会升级上一档容量结论。压测后的恢复门只证明系统能排空，不计入该档稳态容量。
+异步场景必须区分受理 TPS、应完成受理量与完成 TPS。缺少服务端完成证据或 assessment intake outcome 证据时，完成率是 `N/A`，不得用全部受理量或链路探针估算。保护档还要求快照窗口完成率在 `[99%, 101%]` 内；阶段开始时 Outbox/NSQ 必须为空，结束快照允许至多 `max(1, ceil(expected_completions × 1%))` 条新鲜在途残留，Outbox 最老年龄不得超过 5 秒。连续档位之间会先执行默认 30 秒、每 2 秒采样一次的有界恢复检查，确认上一档的边界在途已回到运行前基线后才采集下一档 `before` 快照；可通过 `PERF_INTER_PHASE_RECOVERY_TIMEOUT` 和 `PERF_INTER_PHASE_RECOVERY_POLL` 调整，但该恢复不会升级上一档容量结论。恢复门只依赖组件健康、隔离状态及 Outbox/NSQ 证据；空闲基线尚无完成 TPS、intake 或 retry 样本时仍可判定恢复完整。压测后的恢复门只证明系统能排空，不计入该档稳态容量。
 
 WebSocket 同时记录端到端 `report_ws_first_message_latency` 与握手后 `report_ws_subscribe_to_first_message_latency`。后者从客户端发送 subscribe 帧起计时，只用于定位首帧慢在公网握手还是服务端状态读取，不单独改变验收阈值。
 
