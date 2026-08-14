@@ -128,7 +128,7 @@ make perf-run PLAN=admission
 | 7 | capacity 200 QPS | 3min | 渐进容量 |
 | 8 | capacity 240 QPS | 4min | 渐进容量 |
 | 9 | capacity 280 QPS | 3min | 300 前证据阶段 |
-| 10 | 恢复门 | 最多 5min | 健康、Outbox、NSQ 必须回落 |
+| 每档之间 | 阶段间恢复门 | 默认最多 30s | 健康、Outbox、NSQ 必须回到运行前基线，再采集下一档 before 快照 |
 | 11 | admission 300 QPS | 10min | 正式保护线 |
 | 12 | 最终恢复门 | 最多 5min | 排空与残留验收 |
 
@@ -166,7 +166,7 @@ make perf-run PLAN=diagnose CASE=submit-coalescing-healthy
 - Outbox backlog、最老待处理年龄与 NSQ depth 是否持续增长；
 - 压测停止后积压是否回到基线。
 
-受理 TPS 高但完成 TPS 低，只能说明入口能接收，不能说明系统完成了业务交付。每档开始时 Outbox backlog 与 NSQ depth 必须为 0；结束快照只容许 `max(1, ceil(应完成 Assessment 数 × 1%))` 条新鲜在途残留，Outbox 最老年龄不得超过 5 秒。超过比例或年龄会直接判定该档 `FAIL`。随后的恢复门即使排空，也只能证明可恢复，不能把该档改判为稳态可承载。
+受理 TPS 高但完成 TPS 低，只能说明入口能接收，不能说明系统完成了业务交付。每档开始时 Outbox backlog 与 NSQ depth 必须为 0；结束快照只容许 `max(1, ceil(应完成 Assessment 数 × 1%))` 条新鲜在途残留，Outbox 最老年龄不得超过 5 秒。超过比例或年龄会直接判定该档 `FAIL`。相邻档位之间先执行默认最多 30 秒、每 2 秒采样一次的有界恢复检查，确认上一档的边界在途回到运行前基线后，才采集下一档 `before` 快照；恢复即使成功，也只能证明可恢复，不能把上一档改判为稳态可承载。
 
 ### 3. 时延与响应体验
 

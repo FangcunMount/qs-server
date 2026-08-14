@@ -121,7 +121,9 @@ func execute(ctx context.Context, opts runOptions) (RunSummary, int, error) {
 				_, _ = fmt.Fprintf(opts.Stdout, "\nadmission_300 skipped: %s\n", strings.Join(prerequisite.Reasons, "; "))
 				break
 			}
-			recovery := waitForRecovery(ctx, opts, runDir, "pre-admission-300", baselineEvidence, filepath.Join(runDir, "capacity_280"))
+		}
+		if recoveryID, previousPhaseID, required := interPhaseRecovery(phases, phaseIndex); required {
+			recovery := waitForInterPhaseRecovery(ctx, opts, runDir, recoveryID, baselineEvidence, filepath.Join(runDir, previousPhaseID))
 			summary.Recovery = append(summary.Recovery, recovery)
 			if recovery.Verdict.Status != VerdictPass {
 				break
@@ -188,6 +190,13 @@ func execute(ctx context.Context, opts runOptions) (RunSummary, int, error) {
 	}
 	_, _ = fmt.Fprintf(opts.Stdout, "\nK6 admission result: %s\nreport: %s\n", summary.Verdict.Status, filepath.Join(runDir, "report.md"))
 	return summary, exitCodeForVerdict(summary.Verdict.Status), nil
+}
+
+func interPhaseRecovery(phases []phaseSpec, phaseIndex int) (recoveryID, previousPhaseID string, required bool) {
+	if phaseIndex <= 0 || phaseIndex >= len(phases) {
+		return "", "", false
+	}
+	return "pre-" + phases[phaseIndex].ID, phases[phaseIndex-1].ID, true
 }
 
 func admissionPrerequisiteVerdict(expected []phaseSpec, actual []PhaseSummary) Verdict {
@@ -775,6 +784,18 @@ func takeSnapshot(ctx context.Context, root, outDir, label string, stdout, stder
 }
 
 func waitForRecovery(ctx context.Context, opts runOptions, runDir, id string, baseline PhaseEvidence, drainStartDir string) RecoverySummary {
+	timeout := envDuration("PERF_RECOVERY_TIMEOUT", 5*time.Minute)
+	poll := envDuration("PERF_RECOVERY_POLL", 10*time.Second)
+	return waitForRecoveryWithTiming(ctx, opts, runDir, id, baseline, drainStartDir, timeout, poll)
+}
+
+func waitForInterPhaseRecovery(ctx context.Context, opts runOptions, runDir, id string, baseline PhaseEvidence, drainStartDir string) RecoverySummary {
+	timeout := envDuration("PERF_INTER_PHASE_RECOVERY_TIMEOUT", 30*time.Second)
+	poll := envDuration("PERF_INTER_PHASE_RECOVERY_POLL", 2*time.Second)
+	return waitForRecoveryWithTiming(ctx, opts, runDir, id, baseline, drainStartDir, timeout, poll)
+}
+
+func waitForRecoveryWithTiming(ctx context.Context, opts runOptions, runDir, id string, baseline PhaseEvidence, drainStartDir string, timeout, poll time.Duration) RecoverySummary {
 	started := time.Now()
 	if !baseline.Complete {
 		verdict := classifyEvidence(baseline, "baseline recovery evidence")
@@ -783,8 +804,6 @@ func waitForRecovery(ctx context.Context, opts runOptions, runDir, id string, ba
 			Verdict: verdict,
 		}
 	}
-	timeout := envDuration("PERF_RECOVERY_TIMEOUT", 5*time.Minute)
-	poll := envDuration("PERF_RECOVERY_POLL", 10*time.Second)
 	result := RecoverySummary{ID: id, StartedAt: started}
 	for attempt := 1; time.Since(started) <= timeout; attempt++ {
 		attemptDir := filepath.Join(runDir, id, fmt.Sprintf("attempt-%02d", attempt))

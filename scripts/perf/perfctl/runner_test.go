@@ -85,3 +85,25 @@ func TestAdmissionPrerequisitesRejectMissingPhase(t *testing.T) {
 		t.Fatalf("verdict = %#v, want INCOMPLETE", verdict)
 	}
 }
+
+func TestAdmissionWaitsForCleanBaselineBetweenEveryPhase(t *testing.T) {
+	phases, err := phasesForPlan("admission")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if recoveryID, previousID, required := interPhaseRecovery(phases, 0); required || recoveryID != "" || previousID != "" {
+		t.Fatalf("first phase recovery = (%q, %q, %v), want none", recoveryID, previousID, required)
+	}
+	for index := 1; index < len(phases); index++ {
+		recoveryID, previousID, required := interPhaseRecovery(phases, index)
+		if !required {
+			t.Fatalf("phase %s has no inter-phase recovery", phases[index].ID)
+		}
+		if want := "pre-" + phases[index].ID; recoveryID != want {
+			t.Fatalf("phase %s recovery id = %q, want %q", phases[index].ID, recoveryID, want)
+		}
+		if previousID != phases[index-1].ID {
+			t.Fatalf("phase %s recovers from %q, want %q", phases[index].ID, previousID, phases[index-1].ID)
+		}
+	}
+}
