@@ -8,9 +8,10 @@ import (
 )
 
 const (
-	perfRunIDHeader    = "X-Perf-Run-ID"
-	trafficOriginPerf  = "perf"
-	trafficOriginOther = "other"
+	perfRunIDHeader               = "X-Perf-Run-ID"
+	perfTrafficEvidenceContextKey = "qs.perf_traffic_evidence.observed"
+	trafficOriginPerf             = "perf"
+	trafficOriginOther            = "other"
 )
 
 // PerfTrafficEvidence classifies business traffic without attaching the run ID
@@ -23,6 +24,14 @@ func PerfTrafficEvidence() gin.HandlerFunc {
 
 func perfTrafficEvidence(observe func(origin string)) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// GenericAPIServer owns this middleware, but keep it idempotent so a
+		// component cannot accidentally double-count traffic by installing it
+		// again on the same Gin chain.
+		if _, observed := c.Get(perfTrafficEvidenceContextKey); observed {
+			c.Next()
+			return
+		}
+		c.Set(perfTrafficEvidenceContextKey, true)
 		if !excludedFromPerfTrafficEvidence(c.Request.URL.Path) {
 			observe(classifyPerfTrafficOrigin(c.GetHeader(perfRunIDHeader)))
 		}

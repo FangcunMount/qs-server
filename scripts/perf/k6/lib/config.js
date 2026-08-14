@@ -183,6 +183,7 @@ export function configAliasesForEnv(name) {
     THRESHOLD_TIER: ['thresholdTier', 'threshold_tier'],
     CHAIN_PROBE_TIMEOUT_SECONDS: ['chainProbeTimeoutSeconds', 'chain_probe_timeout_seconds'],
     CHAIN_PROBE_POLL_SECONDS: ['chainProbePollSeconds', 'chain_probe_poll_seconds'],
+    CHAIN_PROBE_MAX_POLL_SECONDS: ['chainProbeMaxPollSeconds', 'chain_probe_max_poll_seconds'],
     NO_CONNECTION_REUSE: ['noConnectionReuse', 'no_connection_reuse'],
     USE_IDEMPOTENCY_KEY: ['useIdempotencyKey', 'use_idempotency_key'],
   };
@@ -621,6 +622,7 @@ export const STRICT_THRESHOLDS = boolEnv('STRICT_THRESHOLDS', false);
 export const THRESHOLD_TIER = resolveThresholdTier();
 export const CHAIN_PROBE_TIMEOUT_SECONDS = intEnv('CHAIN_PROBE_TIMEOUT_SECONDS', 120);
 export const CHAIN_PROBE_POLL_SECONDS = numberEnv('CHAIN_PROBE_POLL_SECONDS', 1);
+export const CHAIN_PROBE_MAX_POLL_SECONDS = numberEnv('CHAIN_PROBE_MAX_POLL_SECONDS', 10);
 export const HTTP_TIMEOUT = envOrConfigString('HTTP_TIMEOUT', ['httpTimeout', 'http_timeout'], '30s');
 export const USER_AGENT = envOrConfigString('USER_AGENT', ['userAgent', 'user_agent'], 'qs-server-k6-300qps/1.0');
 

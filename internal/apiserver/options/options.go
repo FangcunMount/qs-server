@@ -419,9 +419,10 @@ func (o *EventingOptions) AddFlags(fs *pflag.FlagSet) {
 func NewOutboxRelayOptions() *OutboxRelayOptions {
 	return &OutboxRelayOptions{
 		Mongo: &OutboxRelayStoreOptions{
-			Interval:       500 * time.Millisecond,
-			BatchSize:      300,
-			PublishWorkers: 8,
+			Interval:               500 * time.Millisecond,
+			BatchSize:              300,
+			PublishWorkers:         8,
+			ImmediateMaxConcurrent: 16,
 		},
 		Assessment: &OutboxRelayStoreOptions{
 			Interval:               500 * time.Millisecond,
@@ -440,13 +441,13 @@ func (o *OutboxRelayOptions) AddFlags(fs *pflag.FlagSet) {
 		fs.DurationVar(&o.Mongo.Interval, "outbox_relay.mongo.interval", o.Mongo.Interval, "Interval for dispatching Mongo durable outbox events.")
 		fs.IntVar(&o.Mongo.BatchSize, "outbox_relay.mongo.batch-size", o.Mongo.BatchSize, "Maximum Mongo durable outbox events to claim in one relay tick.")
 		fs.IntVar(&o.Mongo.PublishWorkers, "outbox_relay.mongo.publish-workers", o.Mongo.PublishWorkers, "Maximum concurrent Mongo durable outbox publish workers.")
-		fs.IntVar(&o.Mongo.ImmediateMaxConcurrent, "outbox_relay.mongo.immediate-max-concurrent", o.Mongo.ImmediateMaxConcurrent, "Maximum concurrent post-commit immediate outbox dispatches for Mongo outbox (0 uses default).")
+		fs.IntVar(&o.Mongo.ImmediateMaxConcurrent, "outbox_relay.mongo.immediate-max-concurrent", o.Mongo.ImmediateMaxConcurrent, "Maximum concurrent post-commit immediate outbox dispatches for Mongo outbox.")
 	}
 	if o.Assessment != nil {
 		fs.DurationVar(&o.Assessment.Interval, "outbox_relay.assessment.interval", o.Assessment.Interval, "Interval for dispatching assessment MySQL durable outbox events.")
 		fs.IntVar(&o.Assessment.BatchSize, "outbox_relay.assessment.batch-size", o.Assessment.BatchSize, "Maximum assessment MySQL durable outbox events to claim in one relay tick.")
 		fs.IntVar(&o.Assessment.PublishWorkers, "outbox_relay.assessment.publish-workers", o.Assessment.PublishWorkers, "Maximum concurrent assessment MySQL durable outbox publish workers.")
-		fs.IntVar(&o.Assessment.ImmediateMaxConcurrent, "outbox_relay.assessment.immediate-max-concurrent", o.Assessment.ImmediateMaxConcurrent, "Maximum concurrent post-commit immediate outbox dispatches for assessment MySQL outbox (0 uses default).")
+		fs.IntVar(&o.Assessment.ImmediateMaxConcurrent, "outbox_relay.assessment.immediate-max-concurrent", o.Assessment.ImmediateMaxConcurrent, "Maximum concurrent post-commit immediate outbox dispatches for assessment MySQL outbox.")
 	}
 }
 

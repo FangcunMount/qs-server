@@ -5,7 +5,8 @@ import {
   COLLECTION_BASE_URL, SUBMIT_PATH, ASSESSMENT_READINESS_PATH,
   REPORT_STATUS_PATH, PERSONALITY_REPORT_STATUS_PATH, PERSONALITY_REPORT_PATH,
   BEHAVIOR_REPORT_STATUS_PATH,
-  IDEMPOTENCY_PREFIX, CHAIN_PROBE_TIMEOUT_SECONDS, CHAIN_PROBE_POLL_SECONDS, REPORT_TIMEOUT,
+  IDEMPOTENCY_PREFIX, CHAIN_PROBE_TIMEOUT_SECONDS, CHAIN_PROBE_POLL_SECONDS,
+  CHAIN_PROBE_MAX_POLL_SECONDS, REPORT_TIMEOUT,
   CHAIN_PROBE_MODEL_TYPE,
 } from '../lib/config.js';
 import {
@@ -136,6 +137,7 @@ export function runAsyncChainProbe(ctx, modelType) {
 
 export function waitAssessmentReadiness(answerSheetID, testeeID, modelType, token) {
   const deadline = Date.now() + CHAIN_PROBE_TIMEOUT_SECONDS * 1000;
+  let pollAttempt = 0;
   while (Date.now() < deadline) {
     const path = renderPath(ASSESSMENT_READINESS_PATH, {
       answersheet_id: encodeURIComponent(answerSheetID),
@@ -154,10 +156,12 @@ export function waitAssessmentReadiness(answerSheetID, testeeID, modelType, toke
       if (readiness.status !== 'pending') {
         return readiness;
       }
-      sleep(Math.max(0.2, Number(data.next_poll_after_ms || CHAIN_PROBE_POLL_SECONDS * 1000) / 1000));
+      sleepBeforeNextChainProbePoll(deadline, pollAttempt, data.next_poll_after_ms);
+      pollAttempt += 1;
       continue;
     }
-    sleep(CHAIN_PROBE_POLL_SECONDS);
+    sleepBeforeNextChainProbePoll(deadline, pollAttempt, 0);
+    pollAttempt += 1;
   }
   return { status: 'timeout', assessmentID: '' };
 }
@@ -176,6 +180,7 @@ export function classifyAssessmentReadiness(data) {
 
 export function waitReportTerminal(assessmentID, testeeID, data, pathTemplate, endpoint, token) {
   const deadline = Date.now() + CHAIN_PROBE_TIMEOUT_SECONDS * 1000;
+  let pollAttempt = 0;
   while (Date.now() < deadline) {
     const path = renderPath(pathTemplate || REPORT_STATUS_PATH, {
       assessment_id: assessmentID,
@@ -188,13 +193,45 @@ export function waitReportTerminal(assessmentID, testeeID, data, pathTemplate, e
     });
     recordHTTPStatus(res, null, endpoint || 'chain_probe_report_status');
     chainProbePollRequests.add(1, { stage: 'report_terminal' });
+    let nextPollAfterMS = 0;
     if (res.status === 200) {
-      const status = responseData(res).status || '';
+      const response = responseData(res);
+      const status = response.status || '';
       if (status === 'interpreted' || status === 'failed') {
         return status;
       }
+      nextPollAfterMS = response.next_poll_after_ms || 0;
     }
-    sleep(CHAIN_PROBE_POLL_SECONDS);
+    sleepBeforeNextChainProbePoll(deadline, pollAttempt, nextPollAfterMS);
+    pollAttempt += 1;
   }
   return '';
+}
+
+export function chainProbePollDelaySeconds(
+  attempt,
+  hintedMilliseconds,
+  baseSeconds = CHAIN_PROBE_POLL_SECONDS,
+  maxSeconds = CHAIN_PROBE_MAX_POLL_SECONDS
+) {
+  const base = Math.max(0.2, Number(baseSeconds) || 1);
+  const maximum = Math.max(base, Number(maxSeconds) || 10);
+  const exponent = Math.max(0, Math.min(16, Math.floor(Number(attempt) || 0)));
+  const backoff = Math.min(maximum, base * (2 ** exponent));
+  const hintedSeconds = Number(hintedMilliseconds) / 1000;
+  if (Number.isFinite(hintedSeconds) && hintedSeconds > 0) {
+    return Math.min(maximum, Math.max(backoff, hintedSeconds));
+  }
+  return backoff;
+}
+
+function sleepBeforeNextChainProbePoll(deadlineMilliseconds, attempt, hintedMilliseconds) {
+  const remainingSeconds = Math.max(0, (deadlineMilliseconds - Date.now()) / 1000);
+  if (remainingSeconds <= 0) {
+    return;
+  }
+  sleep(Math.min(
+    remainingSeconds,
+    chainProbePollDelaySeconds(attempt, hintedMilliseconds)
+  ));
 }

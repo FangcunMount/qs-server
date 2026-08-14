@@ -319,14 +319,14 @@ report_catalog_audit:
 outbox_relay:
   mongo:
     interval: "1s"                # mongo_domain_events DB fallback relay 周期；ready-index/immediate 可更早触发
-    batch_size: 1000              # 每轮最多 claim 的 Mongo profile 事件数
-    publish_workers: 48           # pretest120 实测 128 会把 Mongo 连接池打满；保留 48
-    immediate_max_concurrent: 24  # mixed_300 chain_probe：略提 immediate 旁路并发
+    batch_size: 200               # MQ 故障时限制单轮 claim，避免大批 pending 事件同时争抢 Mongo/NSQ
+    publish_workers: 16           # 与 immediate 合计 24，仅占 Mongo 背压预算的一半
+    immediate_max_concurrent: 8   # 为业务事务、健康检查与连接恢复保留 Mongo 容量
   assessment:
     interval: "1s"               # assessment_mysql_events DB fallback relay 周期
     batch_size: 200               # 每轮最多 claim 的 MySQL profile 事件数
-    publish_workers: 24           # MySQL profile 并发 publish
-    immediate_max_concurrent: 24  # evaluation.requested / outcome.committed immediate 并发上限
+    publish_workers: 16           # 限制 NSQ 故障时的并发重投放大
+    immediate_max_concurrent: 8   # evaluation.requested / outcome.committed immediate 并发上限
 
 # ----------------------------------------------------------------------------
 # 3.6.6 统计数据同步任务
@@ -365,15 +365,15 @@ rate_limit:
 # 3.8 下游背压配置
 # ----------------------------------------------------------------------------
 backpressure:
-  # 4C/8G 榨干档（serverA）：抬高 inflight、延长槽位等待，减少 k6 30s transport timeout。
-  # mongo max_inflight 必须小于驱动 max-pool-size；为健康检查和连接恢复预留连接。
+  # 4C/8G 保护档（serverA）：入口先于连接池耗尽而背压，避免 MQ 故障与重投形成正反馈。
+  # mongo max_inflight 最多占驱动连接池 75%，为业务、健康检查和连接恢复预留连接。
   mysql:
     enabled: true                  # 启用 MySQL 背压: true
     max_inflight: 150              # 4C/8G mixed_280+（原 180；对齐连接池 150）
     timeout_ms: 5000               # 槽位满时多等一会儿，避免过早失败放大 k6 VU 螺旋
   mongo:
     enabled: true                  # 启用 Mongo 背压: true
-    max_inflight: 60               # 单 apiserver 64 连接池预留 4 条；可靠提交整笔事务占一个槽位
+    max_inflight: 48               # 单 apiserver 64 连接池保留 25%；可靠提交整笔事务占一个槽位
     timeout_ms: 1500               # 必须短于 collection 2s 可靠受理总预算，避免无效长排队
   iam:
     enabled: true                  # 启用 IAM 背压: true
@@ -446,7 +446,7 @@ mongodb:
   replica-set: ""                  # 副本集名称（如 rs0）；使用分离字段或完整 url 都会生效
   direct-connection: false         # 单节点副本集可设为 true；使用分离字段或完整 url 都会生效
   min-pool-size: 16                # 预热突发提交所需连接，避免默认 0 冷池
-  max-pool-size: 64                # 单 apiserver 预算；与 mongo max_inflight=60 对齐并留恢复余量
+  max-pool-size: 64                # 单 apiserver 预算；mongo max_inflight=48，固定保留 25%
   max-connecting: 8                # 默认 2 建连过慢；限制为 8，避免恢复期连接风暴
   max-conn-idle-time: 10m          # 平峰回收连接，同时避免几秒级连接抖动
   use-ssl: false                   # 是否启用 SSL: false

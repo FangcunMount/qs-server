@@ -387,8 +387,12 @@ func assertMongoPoolBudget(t *testing.T, component, configName string, opts *gen
 	if opts.MinPoolSize > opts.MaxPoolSize || opts.MaxConnecting > opts.MaxPoolSize {
 		t.Fatalf("%s %s invalid MongoDB pool budget: min=%d max=%d connecting=%d", component, configName, opts.MinPoolSize, opts.MaxPoolSize, opts.MaxConnecting)
 	}
-	if maxInflight > 0 && uint64(maxInflight) >= opts.MaxPoolSize {
-		t.Fatalf("%s %s MongoDB max_inflight=%d must remain below max-pool-size=%d", component, configName, maxInflight, opts.MaxPoolSize)
+	// Reserve at least 25% of the pool for health checks, recovery and
+	// non-relay business work. A merely smaller limiter still allowed the
+	// durable relay to consume nearly the entire pool during MQ outages.
+	maxSafeInflight := int(opts.MaxPoolSize * 3 / 4)
+	if maxInflight > maxSafeInflight {
+		t.Fatalf("%s %s MongoDB max_inflight=%d must be <= 75%% of max-pool-size=%d (%d)", component, configName, maxInflight, opts.MaxPoolSize, maxSafeInflight)
 	}
 }
 

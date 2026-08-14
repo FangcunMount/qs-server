@@ -45,6 +45,7 @@ func phasesForPlan(plan string) ([]phaseSpec, error) {
 			experience,
 			{ID: "capacity_80", Profile: "capacity_80", TargetQPS: 80, Duration: "2m", ThresholdTier: "protection", Dynamic: true},
 			{ID: "capacity_100", Profile: "capacity_100", TargetQPS: 100, Duration: "2m", ThresholdTier: "protection", Dynamic: true},
+			{ID: "capacity_110", Profile: "capacity_110", TargetQPS: 110, Duration: "2m", ThresholdTier: "protection", Dynamic: true},
 			{ID: "capacity_120", Profile: "capacity_120", TargetQPS: 120, Duration: "2m", ThresholdTier: "protection", Dynamic: true},
 			{ID: "capacity_200", Profile: "capacity_200", TargetQPS: 200, Duration: "3m", ThresholdTier: "protection", Dynamic: true},
 			{ID: "capacity_240", Profile: "capacity_240", TargetQPS: 240, Duration: "4m", ThresholdTier: "protection", Dynamic: true},

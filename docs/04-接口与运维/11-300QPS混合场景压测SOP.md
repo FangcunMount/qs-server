@@ -123,13 +123,14 @@ make perf-run PLAN=admission
 | 2 | experience 60 QPS | 5min | 用户体验线 |
 | 3 | capacity 80 QPS | 2min | 容量拐点下探 |
 | 4 | capacity 100 QPS | 2min | 容量拐点下探 |
-| 5 | capacity 120 QPS | 2min | 渐进容量 |
-| 6 | capacity 200 QPS | 3min | 渐进容量 |
-| 7 | capacity 240 QPS | 4min | 渐进容量 |
-| 8 | capacity 280 QPS | 3min | 300 前证据阶段 |
-| 9 | 恢复门 | 最多 5min | 健康、Outbox、NSQ 必须回落 |
-| 10 | admission 300 QPS | 10min | 正式保护线 |
-| 11 | 最终恢复门 | 最多 5min | 排空与残留验收 |
+| 5 | capacity 110 QPS | 2min | 已知容量拐点细分 |
+| 6 | capacity 120 QPS | 2min | 渐进容量 |
+| 7 | capacity 200 QPS | 3min | 渐进容量 |
+| 8 | capacity 240 QPS | 4min | 渐进容量 |
+| 9 | capacity 280 QPS | 3min | 300 前证据阶段 |
+| 10 | 恢复门 | 最多 5min | 健康、Outbox、NSQ 必须回落 |
+| 11 | admission 300 QPS | 10min | 正式保护线 |
+| 12 | 最终恢复门 | 最多 5min | 排空与残留验收 |
 
 80～280 由 300 配比动态缩放，链路探针始终是 1 QPS，总 QPS 精确等于阶段目标。
 
@@ -213,7 +214,7 @@ make perf-run PLAN=diagnose CASE=submit-coalescing-healthy
 
 重试率本版不做硬门禁。至少积累三次相同环境、相同计划的有效 admission 结果后，再单独评审阈值。
 
-进入 300 时会再次核对 smoke、60、80、100、120、200、240、280 八个前置阶段；任一阶段不是 `PASS` 或没有实际执行，即使 280 后的即时恢复快照已经健康，也不得执行 300。
+进入 300 时会再次核对 smoke、60、80、100、110、120、200、240、280 九个前置阶段；任一阶段不是 `PASS` 或没有实际执行，即使 280 后的即时恢复快照已经健康，也不得执行 300。
 
 ## 五、报告与归档
 
@@ -228,6 +229,9 @@ tmp/perf/runs/<run-id>/
 ├── evidence.json
 ├── smoke/
 ├── experience_60/
+├── capacity_80/
+├── capacity_100/
+├── capacity_110/
 ├── capacity_120/
 ├── capacity_200/
 ├── capacity_240/

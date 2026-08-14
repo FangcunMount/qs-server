@@ -24,6 +24,9 @@
   },
   "reportMode": "websocket",
   "thresholdTier": "none",
+  "chainProbeTimeoutSeconds": 120,
+  "chainProbePollSeconds": 1,
+  "chainProbeMaxPollSeconds": 10,
   "reportSizing": {
     "note": "正式主路径使用 WebSocket report-events；HTTP report-status 模式只用于显式诊断，不进入 Admission。",
     "modes": {

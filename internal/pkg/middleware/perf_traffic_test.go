@@ -51,3 +51,22 @@ func TestPerfTrafficEvidenceCountsPerfAndOtherRequests(t *testing.T) {
 		t.Fatalf("observed origins = %v, want %v", observed, want)
 	}
 }
+
+func TestPerfTrafficEvidenceIsIdempotentWithinOneHandlerChain(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var observed []string
+	middleware := perfTrafficEvidence(func(origin string) {
+		observed = append(observed, origin)
+	})
+	engine := gin.New()
+	engine.Use(middleware, middleware)
+	engine.GET("/api/v1/test", func(c *gin.Context) { c.Status(http.StatusNoContent) })
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/test", nil)
+	request.Header.Set(perfRunIDHeader, "run-1")
+	engine.ServeHTTP(httptest.NewRecorder(), request)
+
+	if want := []string{trafficOriginPerf}; !reflect.DeepEqual(observed, want) {
+		t.Fatalf("observed origins = %v, want %v", observed, want)
+	}
+}
