@@ -19,6 +19,8 @@ import (
 	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/collection-server/resilience/subsystem"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	sharedreportstatus "github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
 	"github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
 )
@@ -119,6 +121,55 @@ func TestSubscribeLimiterUsesSharedGlobalAndPerUserBudgets(t *testing.T) {
 	}
 	if got := calls[1]; got.key != "limit:report_events:user:user:42" || got.rate != 2 || got.burst != 4 {
 		t.Fatalf("user call = %+v, want per-user budget", got)
+	}
+}
+
+func TestSubscribeLimiterObservesGlobalAndPerUserDecisions(t *testing.T) {
+	backend := &recordingRateLimitBackend{}
+	observer := &recordingResilienceObserver{}
+	cfg := &options.RateLimitOptions{
+		Enabled:                 true,
+		ReportEventsGlobalQPS:   10,
+		ReportEventsGlobalBurst: 20,
+		ReportEventsUserQPS:     2,
+		ReportEventsUserBurst:   4,
+	}
+	limiter := newSubscribeLimiterWithObserver(
+		backend,
+		cfg,
+		observer,
+		mustNewResilience(resiliencesubsystem.Options{RateLimit: cfg, Backend: backend}),
+	)
+
+	if decision := limiter.Decide(context.Background(), "user:42"); !decision.Allowed {
+		t.Fatalf("subscribe decision = %+v, want allowed", decision)
+	}
+
+	decisions := observer.snapshot()
+	if len(decisions) != 2 {
+		t.Fatalf("observed decisions = %+v, want global and per-user decisions", decisions)
+	}
+	for index, resource := range []string{"global", "user"} {
+		if got := decisions[index]; got.Kind != resilience.ProtectionRateLimit || got.Subject.Scope != "report_events" || got.Subject.Resource != resource || got.Outcome != resilience.OutcomeAllowed {
+			t.Fatalf("decision[%d] = %+v, want allowed report_events/%s rate-limit decision", index, got, resource)
+		}
+	}
+}
+
+func TestSubscribeLimiterObservesUnavailableBudgetRejection(t *testing.T) {
+	observer := &recordingResilienceObserver{}
+	limiter := newSubscribeLimiterWithObserver(nil, &options.RateLimitOptions{Enabled: true}, observer)
+
+	if decision := limiter.Decide(context.Background(), "user:42"); decision.Allowed {
+		t.Fatalf("subscribe decision = %+v, want unavailable budget rejection", decision)
+	}
+	decisions := observer.snapshot()
+	if len(decisions) != 1 {
+		t.Fatalf("observed decisions = %+v, want one unavailable-budget decision", decisions)
+	}
+	got := decisions[0]
+	if got.Kind != resilience.ProtectionRateLimit || got.Subject.Scope != "report_events" || got.Subject.Resource != "budget" || got.Subject.Strategy != "unavailable" || got.Outcome != resilience.OutcomeRateLimited {
+		t.Fatalf("unavailable-budget decision = %+v", got)
 	}
 }
 
@@ -493,6 +544,26 @@ type recordingRateLimitBackend struct {
 	mu    sync.Mutex
 	calls []rateLimitBackendCall
 }
+
+type recordingResilienceObserver struct {
+	mu        sync.Mutex
+	decisions []resilience.Decision
+}
+
+func (o *recordingResilienceObserver) ObserveDecision(_ context.Context, decision resilience.Decision) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.decisions = append(o.decisions, decision)
+}
+
+func (o *recordingResilienceObserver) snapshot() []resilience.Decision {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return append([]resilience.Decision(nil), o.decisions...)
+}
+
+var _ ratelimit.Backend = (*recordingRateLimitBackend)(nil)
+var _ resilience.Observer = (*recordingResilienceObserver)(nil)
 
 func (b *recordingRateLimitBackend) Allow(_ context.Context, key string, rate float64, burst int) (bool, time.Duration, error) {
 	b.mu.Lock()

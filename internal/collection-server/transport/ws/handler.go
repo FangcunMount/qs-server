@@ -18,6 +18,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/testeeaccess"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilience"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/ratelimit"
 	"github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
@@ -31,6 +32,7 @@ type Dependencies struct {
 	RateLimit    ratelimit.Backend
 	RateLimitCfg *options.RateLimitOptions
 	RateBudgets  ratelimit.RateBudgetProvider
+	Observer     resilience.Observer
 }
 
 // ReportEventsHandler serves WSS /api/v1/report-events.
@@ -72,8 +74,9 @@ func unwrapResponseWriter(writer http.ResponseWriter) http.ResponseWriter {
 }
 
 type subscribeLimiter struct {
-	global ratelimit.RateLimiter
-	user   ratelimit.RateLimiter
+	global   ratelimit.RateLimiter
+	user     ratelimit.RateLimiter
+	observer resilience.Observer
 }
 
 func NewReportEventsHandler(deps Dependencies) *ReportEventsHandler {
@@ -81,16 +84,24 @@ func NewReportEventsHandler(deps Dependencies) *ReportEventsHandler {
 	if opts == nil {
 		opts = options.NewReportEventsOptions()
 	}
+	observer := deps.Observer
+	if observer == nil {
+		observer = resilience.DefaultObserver()
+	}
 	return &ReportEventsHandler{
 		notifier: deps.Notifier,
 		events:   deps.Events,
 		opts:     opts,
 		connMgr:  newConnectionManager(opts.MaxConnections, opts.MaxPerTestee),
-		limiter:  newSubscribeLimiter(deps.RateLimit, deps.RateLimitCfg, deps.RateBudgets),
+		limiter:  newSubscribeLimiterWithObserver(deps.RateLimit, deps.RateLimitCfg, observer, deps.RateBudgets),
 	}
 }
 
 func newSubscribeLimiter(_ ratelimit.Backend, cfg *options.RateLimitOptions, providers ...ratelimit.RateBudgetProvider) ratelimit.RateLimiter {
+	return newSubscribeLimiterWithObserver(nil, cfg, resilience.NopObserver{}, providers...)
+}
+
+func newSubscribeLimiterWithObserver(_ ratelimit.Backend, cfg *options.RateLimitOptions, observer resilience.Observer, providers ...ratelimit.RateBudgetProvider) ratelimit.RateLimiter {
 	if cfg == nil {
 		cfg = options.NewRateLimitOptions()
 	}
@@ -102,25 +113,36 @@ func newSubscribeLimiter(_ ratelimit.Backend, cfg *options.RateLimitOptions, pro
 			continue
 		}
 		if budget, ok := provider.Budget(ratelimit.BudgetID("report_events")); ok {
-			return &subscribeLimiter{global: budget.Global, user: budget.User}
+			return &subscribeLimiter{global: budget.Global, user: budget.User, observer: resilience.NormalizeObserver(observer)}
 		}
 	}
 
-	return unavailableSubscribeLimiter{}
+	return unavailableSubscribeLimiter{observer: resilience.NormalizeObserver(observer)}
 }
 
-type unavailableSubscribeLimiter struct{}
+type unavailableSubscribeLimiter struct {
+	observer resilience.Observer
+}
 
-func (unavailableSubscribeLimiter) Decide(context.Context, string) ratelimit.RateLimitDecision {
-	return ratelimit.RateLimitDecision{Allowed: false, RetryAfter: time.Second, RetryAfterSeconds: 1}
+func (l unavailableSubscribeLimiter) Decide(ctx context.Context, _ string) ratelimit.RateLimitDecision {
+	decision := ratelimit.RateLimitDecision{
+		Allowed: false, RetryAfter: time.Second, RetryAfterSeconds: 1,
+		Subject: resilience.Subject{Component: "collection-server", Scope: "report_events", Resource: "budget", Strategy: "unavailable"},
+		Outcome: resilience.OutcomeRateLimited,
+	}
+	resilience.Observe(ctx, l.observer, resilience.ProtectionRateLimit, decision.Subject, decision.Outcome)
+	return decision
 }
 
 func (l *subscribeLimiter) Decide(ctx context.Context, key string) ratelimit.RateLimitDecision {
 	globalDecision := l.global.Decide(ctx, "limit:report_events:global")
+	resilience.Observe(ctx, l.observer, resilience.ProtectionRateLimit, globalDecision.Subject, globalDecision.Outcome)
 	if !globalDecision.Allowed || l.user == nil {
 		return globalDecision
 	}
-	return l.user.Decide(ctx, "limit:report_events:user:"+key)
+	userDecision := l.user.Decide(ctx, "limit:report_events:user:"+key)
+	resilience.Observe(ctx, l.observer, resilience.ProtectionRateLimit, userDecision.Subject, userDecision.Outcome)
+	return userDecision
 }
 
 func subscribeLimitKey(c *gin.Context) string {
