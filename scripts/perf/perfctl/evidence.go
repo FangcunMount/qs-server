@@ -60,14 +60,26 @@ func collectPhaseEvidence(dir string) PhaseEvidence {
 	} else {
 		checks = append(checks, EvidenceCheck{Name: "layered retry metric", Status: "MISSING", Source: "qs_retry_layer_attempt_total", Message: "one or more server processes do not expose the retry contract"})
 	}
+	outboxBacklogBaseline, hasOutboxBaseline := sumOutboxBacklog(before)
 	outboxBacklog, hasOutbox := sumOutboxBacklog(after)
 	outboxOldest, hasOldest := maxOutboxAge(after)
+	nsqDepthBaseline, hasNSQBaseline := readNSQDepth(filepath.Join(dir, "before-nsqd-stats.json"))
 	nsqDepth, hasNSQ := readNSQDepth(filepath.Join(dir, "after-nsqd-stats.json"))
+	if hasOutboxBaseline && hasOutbox {
+		checks = append(checks, EvidenceCheck{Name: "outbox backlog window", Status: "PASS", Source: "before/after:qs_event_outbox_backlog"})
+	} else {
+		checks = append(checks, EvidenceCheck{Name: "outbox backlog window", Status: "MISSING", Source: "before/after:qs_event_outbox_backlog", Message: "cannot determine whether the load window accumulated outbox work"})
+	}
+	if hasNSQBaseline && hasNSQ {
+		checks = append(checks, EvidenceCheck{Name: "NSQ depth window", Status: "PASS", Source: "before/after:NSQD stats"})
+	} else {
+		checks = append(checks, EvidenceCheck{Name: "NSQ depth window", Status: "MISSING", Source: "before/after:NSQD stats", Message: "cannot determine whether the load window accumulated NSQ work"})
+	}
 	queueWait := make([]QueueWaitMetric, 0, 1)
 	if hasOldest {
 		queueWait = append(queueWait, QueueWaitMetric{Layer: "outbox_oldest_pending", Wait: measured(&outboxOldest, "seconds", "prometheus:qs_event_outbox_oldest_age_seconds")})
 	}
-	complete := retryComplete && hasCompletionEvidence && hasIntakeOutcomeEvidence && hasCompletionWindow && hasOutbox && hasOldest && hasNSQ
+	complete := retryComplete && hasCompletionEvidence && hasIntakeOutcomeEvidence && hasCompletionWindow && hasOutboxBaseline && hasOutbox && hasOldest && hasNSQBaseline && hasNSQ
 	for _, check := range checks {
 		if check.Status != "PASS" {
 			complete = false
@@ -78,14 +90,28 @@ func collectPhaseEvidence(dir string) PhaseEvidence {
 		CompletedCountDeltaByModel: completedByModel, ExpectedCompletionCountDelta: expectedCompletionDelta, NoAssessmentRequiredCountDelta: noAssessmentRequiredDelta,
 		Retry: retry, QueueWait: queueWait,
 	}
+	if hasOutboxBaseline {
+		evidence.OutboxBacklogBaseline = &outboxBacklogBaseline
+	}
 	if hasOutbox {
 		evidence.OutboxBacklog = &outboxBacklog
+	}
+	if hasOutboxBaseline && hasOutbox {
+		delta := outboxBacklog - outboxBacklogBaseline
+		evidence.OutboxBacklogDelta = &delta
 	}
 	if hasOldest {
 		evidence.OutboxOldestAge = &outboxOldest
 	}
+	if hasNSQBaseline {
+		evidence.NSQDepthBaseline = &nsqDepthBaseline
+	}
 	if hasNSQ {
 		evidence.NSQDepth = &nsqDepth
+	}
+	if hasNSQBaseline && hasNSQ {
+		delta := nsqDepth - nsqDepthBaseline
+		evidence.NSQDepthDelta = &delta
 	}
 	return evidence
 }

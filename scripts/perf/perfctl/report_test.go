@@ -320,6 +320,60 @@ func TestMissingDroppedIterationsMetricMeansZeroWhenIterationsExist(t *testing.T
 	}
 }
 
+func TestProtectionVerdictRejectsDeferredCompletionAndGrowingBacklog(t *testing.T) {
+	raw := rawSummary{Metrics: map[string]map[string]any{
+		"iterations":             {"count": float64(100), "rate": float64(10)},
+		"http_reqs":              {"count": float64(100), "rate": float64(10)},
+		"dropped_iterations":     {"count": float64(0), "rate": float64(0)},
+		"answer_submit_accepted": {"count": float64(100), "rate": float64(10)},
+	}}
+	completed, expected := 90.0, 100.0
+	outboxBaseline, outbox, outboxDelta := 1.0, 5.0, 4.0
+	nsqBaseline, nsq, nsqDelta := 1.0, 3.0, 2.0
+	evidence := PhaseEvidence{
+		Complete: true, CompletionWindow: measured(floatPtr(10), "seconds", "test"),
+		CompletedCountDelta: &completed, ExpectedCompletionCountDelta: &expected,
+		OutboxBacklogBaseline: &outboxBaseline, OutboxBacklog: &outbox, OutboxBacklogDelta: &outboxDelta,
+		NSQDepthBaseline: &nsqBaseline, NSQDepth: &nsq, NSQDepthDelta: &nsqDelta,
+	}
+	phase := buildPhaseSummary(
+		phaseSpec{ID: "capacity", Profile: "test", TargetQPS: 10, Duration: "10s", ThresholdTier: "protection"},
+		map[string]float64{}, raw, evidence, time.Now(), time.Now(), 0,
+	)
+	if phase.Verdict.Status != VerdictFail {
+		t.Fatalf("verdict = %#v, want FAIL", phase.Verdict)
+	}
+	joined := strings.Join(phase.Verdict.Reasons, "\n")
+	for _, want := range []string{"assessment completion rate 0.9000", "outbox backlog grew by 4", "outbox backlog baseline 1 is not empty", "NSQ depth grew by 2", "NSQ depth baseline 1 is not empty"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("verdict reasons missing %q: %s", want, joined)
+		}
+	}
+}
+
+func TestProtectionVerdictAcceptsWindowCompletionWithoutBacklogGrowth(t *testing.T) {
+	raw := rawSummary{Metrics: map[string]map[string]any{
+		"iterations":             {"count": float64(100), "rate": float64(10)},
+		"http_reqs":              {"count": float64(100), "rate": float64(10)},
+		"dropped_iterations":     {"count": float64(0), "rate": float64(0)},
+		"answer_submit_accepted": {"count": float64(100), "rate": float64(10)},
+	}}
+	completed, expected, zero := 100.0, 100.0, 0.0
+	evidence := PhaseEvidence{
+		Complete: true, CompletionWindow: measured(floatPtr(10), "seconds", "test"),
+		CompletedCountDelta: &completed, ExpectedCompletionCountDelta: &expected,
+		OutboxBacklogBaseline: &zero, OutboxBacklog: &zero, OutboxBacklogDelta: &zero,
+		NSQDepthBaseline: &zero, NSQDepth: &zero, NSQDepthDelta: &zero,
+	}
+	phase := buildPhaseSummary(
+		phaseSpec{ID: "capacity", Profile: "test", TargetQPS: 10, Duration: "10s", ThresholdTier: "protection"},
+		map[string]float64{}, raw, evidence, time.Now(), time.Now(), 0,
+	)
+	if phase.Verdict.Status != VerdictPass {
+		t.Fatalf("verdict = %#v, want PASS", phase.Verdict)
+	}
+}
+
 func TestThroughputUsesPlannedTrafficWindowInsteadOfSetupInclusiveK6Rate(t *testing.T) {
 	raw := rawSummary{Metrics: map[string]map[string]any{
 		// The k6 rate covers a 60s process lifetime: 30s setup + 30s traffic.

@@ -119,9 +119,13 @@ type PhaseEvidence struct {
 	NoAssessmentRequiredCountDelta *float64           `json:"no_assessment_required_count_delta"`
 	Retry                          []RetryMetric      `json:"retry"`
 	QueueWait                      []QueueWaitMetric  `json:"queue_wait"`
+	OutboxBacklogBaseline          *float64           `json:"outbox_backlog_baseline"`
 	OutboxBacklog                  *float64           `json:"outbox_backlog"`
+	OutboxBacklogDelta             *float64           `json:"outbox_backlog_delta"`
 	OutboxOldestAge                *float64           `json:"outbox_oldest_age_seconds"`
+	NSQDepthBaseline               *float64           `json:"nsq_depth_baseline"`
 	NSQDepth                       *float64           `json:"nsq_depth"`
+	NSQDepthDelta                  *float64           `json:"nsq_depth_delta"`
 }
 
 type ThresholdResult struct {

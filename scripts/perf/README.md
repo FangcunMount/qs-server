@@ -61,14 +61,14 @@ Admission 的容量阶段持续时间固定为：
 | `http_rps` | 真实 HTTP 请求速率；包括 HTTP 报告轮询产生的请求 |
 | `ws_sessions_per_second` | WebSocket 新建会话速率，不混入 HTTP RPS |
 | `accepted_tps` | 每秒被可靠受理的答卷数，按总量和模型类型展示 |
-| `completed_tps` | 服务端成功 Interpretation Run 增量除以阶段时长，按总量和模型类型展示 |
+| `completed_tps` | 服务端成功 Interpretation Run 增量除以阶段前后快照的实际观测时长，按总量和模型类型展示 |
 | `expected_completions` | assessment intake 在观测窗口内新建的 Assessment 数；排除独立问卷和幂等重放 |
 | `no_assessment_required` | assessment intake 正常结束且无需创建 Assessment 的独立问卷受理量 |
-| `final_completion_rate` | 服务端完成增量除以 `expected_completions`，不得使用全部受理量作为分母 |
+| `final_completion_rate` | 阶段前后快照窗口内的服务端完成增量除以 `expected_completions`，不得使用全部受理量作为分母 |
 | `request_amplification` | HTTP RPS ÷ business QPS |
 | `polling_amplification` | 报告轮询请求数 ÷ 链路探针初始数，不计作重试 |
 
-异步场景必须区分受理 TPS、应完成受理量与完成 TPS。缺少服务端完成证据或 assessment intake outcome 证据时，最终完成率是 `N/A`，不得用全部受理量或链路探针估算。
+异步场景必须区分受理 TPS、应完成受理量与完成 TPS。缺少服务端完成证据或 assessment intake outcome 证据时，完成率是 `N/A`，不得用全部受理量或链路探针估算。保护档还要求快照窗口完成率在 `[99%, 101%]` 内，且阶段结束时 Outbox backlog 与 NSQ depth 均不得相对阶段前增长；压测后的恢复门只证明系统能排空，不计入该档稳态容量。
 
 WebSocket 同时记录端到端 `report_ws_first_message_latency` 与握手后 `report_ws_subscribe_to_first_message_latency`。后者从客户端发送 subscribe 帧起计时，只用于定位首帧慢在公网握手还是服务端状态读取，不单独改变验收阈值。
 
@@ -174,8 +174,10 @@ Verdict 与退出码：
 - 答卷提交和端到端链路探针超时数为 0；
 - `dropped_iterations == 0`；
 - 实际 business QPS 至少达到目标的 99%；
+- 有 Assessment 的异步负载，其快照窗口完成率必须在 `[99%, 101%]` 内；
+- 阶段开始时 Outbox backlog 与 NSQ depth 必须为 0，阶段结束时也不得相对阶段前增长；
 - 对应 tier 的 P95/P99 全部通过；
-- 进入 300 前，smoke、60、80、100、120、200、240、280 必须全部为 `PASS`，且 collection、apiserver、worker、Outbox 和 NSQ 恢复证据通过；
+- 进入 300 前，smoke、60、80、100、110、120、200、240、280 必须全部为 `PASS`，且 collection、apiserver、worker、Outbox 和 NSQ 恢复证据通过；
 - 300 后必须完成最终排空与恢复验收。
 
 服务端证据缺失会产生 `INCOMPLETE`。在无法隔离并发业务流量的环境中，完成 TPS 与最终完成率不可作为正式准入证据。

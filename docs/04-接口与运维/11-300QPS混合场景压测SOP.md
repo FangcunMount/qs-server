@@ -162,11 +162,11 @@ make perf-run PLAN=diagnose CASE=submit-coalescing-healthy
 
 - 受理 TPS：答卷是否可靠进入系统；
 - 完成 TPS：成功 Interpretation Run 是否持续跟上；
-- 最终完成率：目标窗口内完成量占受理量的比例；
+- 负载窗口完成率：阶段前后快照窗口内完成量占应完成 Assessment 数的比例，保护档必须在 `[99%, 101%]` 内；
 - Outbox backlog、最老待处理年龄与 NSQ depth 是否持续增长；
 - 压测停止后积压是否回到基线。
 
-受理 TPS 高但完成 TPS 低，只能说明入口能接收，不能说明系统完成了业务交付。
+受理 TPS 高但完成 TPS 低，只能说明入口能接收，不能说明系统完成了业务交付。每档开始时 Outbox backlog 与 NSQ depth 必须为 0；阶段结束时任一指标相对阶段前增长会直接判定该档 `FAIL`。随后的恢复门即使排空，也只能证明可恢复，不能把该档改判为稳态可承载。
 
 ### 3. 时延与响应体验
 

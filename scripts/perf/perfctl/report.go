@@ -411,6 +411,26 @@ func evaluatePhase(spec phaseSpec, phase PhaseSummary, raw rawSummary, k6Exit in
 		} else if *phase.Throughput.BusinessQPS.Dropped.Value != 0 {
 			reasons = append(reasons, fmt.Sprintf("dropped iterations %.0f is not zero", *phase.Throughput.BusinessQPS.Dropped.Value))
 		}
+		acceptedCount := metricInt64(findMetric(raw, "answer_submit_accepted", nil), "count") + metricInt64(findMetric(raw, "chain_probe_accepted", nil), "count")
+		if acceptedCount > 0 && phase.Throughput.ExpectedCompletions.Value != nil && *phase.Throughput.ExpectedCompletions.Value > 0 {
+			if phase.Throughput.FinalCompletionRate.Value == nil {
+				reasons = append(reasons, "assessment completion rate is unavailable")
+			} else if *phase.Throughput.FinalCompletionRate.Value < 0.99 || *phase.Throughput.FinalCompletionRate.Value > 1.01 {
+				reasons = append(reasons, fmt.Sprintf("assessment completion rate %.4f is outside [0.99, 1.01]", *phase.Throughput.FinalCompletionRate.Value))
+			}
+		}
+		if phase.Evidence.OutboxBacklogDelta != nil && *phase.Evidence.OutboxBacklogDelta > 0 {
+			reasons = append(reasons, fmt.Sprintf("outbox backlog grew by %.0f during the load window", *phase.Evidence.OutboxBacklogDelta))
+		}
+		if phase.Evidence.OutboxBacklogBaseline != nil && *phase.Evidence.OutboxBacklogBaseline > 0 {
+			reasons = append(reasons, fmt.Sprintf("outbox backlog baseline %.0f is not empty", *phase.Evidence.OutboxBacklogBaseline))
+		}
+		if phase.Evidence.NSQDepthDelta != nil && *phase.Evidence.NSQDepthDelta > 0 {
+			reasons = append(reasons, fmt.Sprintf("NSQ depth grew by %.0f during the load window", *phase.Evidence.NSQDepthDelta))
+		}
+		if phase.Evidence.NSQDepthBaseline != nil && *phase.Evidence.NSQDepthBaseline > 0 {
+			reasons = append(reasons, fmt.Sprintf("NSQ depth baseline %.0f is not empty", *phase.Evidence.NSQDepthBaseline))
+		}
 	}
 	if len(reasons) > 0 {
 		return Verdict{Status: VerdictFail, Reasons: uniqueStrings(reasons)}
@@ -418,7 +438,7 @@ func evaluatePhase(spec phaseSpec, phase PhaseSummary, raw rawSummary, k6Exit in
 	if k6Exit != 0 {
 		return Verdict{Status: VerdictError, Reasons: []string{fmt.Sprintf("k6 exited with code %d without an exported failed threshold", k6Exit)}}
 	}
-	return Verdict{Status: VerdictPass, Reasons: []string{"load, latency, and correctness gates passed"}}
+	return Verdict{Status: VerdictPass, Reasons: []string{"load, latency, correctness, and steady-state gates passed"}}
 }
 
 func thresholdResults(raw rawSummary) []ThresholdResult {
@@ -586,7 +606,7 @@ func renderRunMarkdown(summary RunSummary) string {
 		fmt.Fprintf(&output, "| WebSocket sessions/s | %s | 新建 WS 会话速率 |\n", formatMeasurement(phase.Throughput.WSSessionsPerSecond))
 		fmt.Fprintf(&output, "| 受理 TPS | %s | 每秒可靠受理答卷数 |\n", formatMeasurement(phase.Throughput.AcceptedTPS))
 		fmt.Fprintf(&output, "| 完成 TPS | %s | 服务端每秒成功完成数 |\n", formatMeasurement(phase.Throughput.CompletedTPS))
-		fmt.Fprintf(&output, "| 最终完成率 | %s | 完成数 / 应完成 Assessment 数 |\n", formatPercent(phase.Throughput.FinalCompletionRate))
+		fmt.Fprintf(&output, "| 负载窗口完成率 | %s | 阶段快照窗口内完成数 / 应完成 Assessment 数 |\n", formatPercent(phase.Throughput.FinalCompletionRate))
 		fmt.Fprintf(&output, "| 应完成 Assessment 数 | %s | intake 创建 Assessment 的数量 |\n", formatMeasurement(phase.Throughput.ExpectedCompletions))
 		fmt.Fprintf(&output, "| 无需评估受理量 | %s | 正常受理但无需创建 Assessment |\n", formatMeasurement(phase.Throughput.NoAssessmentRequired))
 		fmt.Fprintf(&output, "| 请求放大率 | %s | HTTP RPS / business QPS |\n", formatRatio(phase.Throughput.RequestAmplification))
@@ -623,6 +643,8 @@ func renderRunMarkdown(summary RunSummary) string {
 		fmt.Fprintln(&output, "| 项目 | 状态 / 数值 | 来源 |")
 		fmt.Fprintln(&output, "| --- | --- | --- |")
 		fmt.Fprintf(&output, "| 完成 TPS 观测窗口 | %s | %s |\n", formatMeasurement(phase.Evidence.CompletionWindow), phase.Evidence.CompletionWindow.Source)
+		fmt.Fprintf(&output, "| Outbox backlog（前 / 后 / 增量） | %s / %s / %s | Prometheus 快照 |\n", formatFloatCount(phase.Evidence.OutboxBacklogBaseline), formatFloatCount(phase.Evidence.OutboxBacklog), formatSignedFloatCount(phase.Evidence.OutboxBacklogDelta))
+		fmt.Fprintf(&output, "| NSQ depth（前 / 后 / 增量） | %s / %s / %s | NSQD 快照 |\n", formatFloatCount(phase.Evidence.NSQDepthBaseline), formatFloatCount(phase.Evidence.NSQDepth), formatSignedFloatCount(phase.Evidence.NSQDepthDelta))
 		for _, item := range phase.QueueWait {
 			fmt.Fprintf(&output, "| %s | %s | %s |\n", item.Layer, formatMeasurement(item.Wait), item.Wait.Source)
 		}
@@ -687,6 +709,13 @@ func formatFloatCount(value *float64) string {
 		return "N/A"
 	}
 	return fmt.Sprintf("%.0f", *value)
+}
+
+func formatSignedFloatCount(value *float64) string {
+	if value == nil {
+		return "N/A"
+	}
+	return fmt.Sprintf("%+.0f", *value)
 }
 
 func formatSeconds(value *float64) string {
