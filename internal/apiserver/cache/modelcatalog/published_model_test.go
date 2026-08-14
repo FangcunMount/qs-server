@@ -155,6 +155,37 @@ func TestCachedPublishedModelStoreCachesImmutableExactVersionButActiveLookupBypa
 	}
 }
 
+func TestCachedPublishedModelStoreImmutableExactVersionL1AvoidsRedisDecode(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = client.Close() })
+	snapshot := &port.PublishedModel{Kind: domain.KindScale, Code: "scale-001", Version: "1.0.0"}
+	inner := &publishedModelStoreStub{getByRef: snapshot}
+	cached := NewCachedPublishedModelStore(inner, client, keyspace.NewBuilderWithNamespace("test-ns"), publishedModelPolicies(sharedcache.Policy{TTL: time.Hour}), nil)
+	ref := port.Ref{Kind: domain.KindScale, Code: "scale-001", Version: "1.0.0"}
+
+	first, err := cached.GetPublishedModelByRef(context.Background(), ref)
+	if err != nil || first != snapshot {
+		t.Fatalf("first GetPublishedModelByRef() = %#v, %v", first, err)
+	}
+	key := cached.refCacheKey(ref)
+	if err := mr.Set(key, "not-json"); err != nil {
+		t.Fatal(err)
+	}
+
+	second, err := cached.GetPublishedModelByRef(context.Background(), ref)
+	if err != nil || second != snapshot {
+		t.Fatalf("L1 GetPublishedModelByRef() = %#v, %v", second, err)
+	}
+	if inner.getByRefCalls != 1 {
+		t.Fatalf("source calls = %d, want 1", inner.getByRefCalls)
+	}
+	hits, misses := cached.exactByRefL1.Stats()
+	if hits != 1 || misses != 1 {
+		t.Fatalf("L1 stats = hits %d misses %d, want 1/1", hits, misses)
+	}
+}
+
 type activePublishedModelStoreStub struct {
 	publishedModelStoreStub
 	activeCalls int

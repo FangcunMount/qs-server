@@ -66,6 +66,8 @@ statistics.query
 
 `evaluation.assessment_list` 的历史实现未接入实际读取路径，已连同 version bump 和配置入口退役；assessment list 继续直接读取既有 read model。`report_status` 同样出现在 Registry 和三进程配置中，但它的 `kind` 是 `operational_state`，不是普通 Cache-Aside。collection-server 另有独立 L1 capability：`catalog.questionnaire`、`catalog.published_model`、`catalog.typology`、`evaluation.assessment_access` 与 `evaluation.assessment_detail`。
 
+`modelcatalog.published_model` 当前是有意收窄的 L1+L2：只有 immutable exact-by-ref 运行快照进入 apiserver L1，以复用已经解码的 `DefinitionV2`；可变目录读取仍使用 L2，Active admission 仍绕过缓存读取 Mongo。
+
 IAM/JWKS/ProfileLink、WeChat SDK token 等私有缓存继续由各自 integration owner 维护，不纳入上述业务 Registry。
 
 ## 4. 事实源

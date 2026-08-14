@@ -80,17 +80,20 @@ func TestEffectiveRegistryUsesCanonicalIDsAndLegacyMetricLabels(t *testing.T) {
 	}
 }
 
-func TestFixedTopologySpecsMatchL2Catalog(t *testing.T) {
-	want := map[sharedcache.Capability]string{
-		CapabilitySurveyQuestionnaire:        "questionnaire",
-		CapabilityModelCatalogPublished:      "published-model",
-		CapabilityEvaluationAssessmentDetail: "assessment-detail",
-		CapabilityEvaluationAssessmentAccess: "assessment-access",
+func TestFixedTopologySpecsMatchCacheLayers(t *testing.T) {
+	want := map[sharedcache.Capability]struct {
+		group string
+		layer sharedcache.Layer
+	}{
+		CapabilitySurveyQuestionnaire:        {group: "questionnaire", layer: sharedcache.LayerL2},
+		CapabilityModelCatalogPublished:      {group: "published-model", layer: sharedcache.LayerL1L2},
+		CapabilityEvaluationAssessmentDetail: {group: "assessment-detail", layer: sharedcache.LayerL2},
+		CapabilityEvaluationAssessmentAccess: {group: "assessment-access", layer: sharedcache.LayerL2},
 	}
-	for capability, group := range want {
+	for capability, expected := range want {
 		spec, ok := Lookup(capability)
-		if !ok || spec.TopologyGroup != group || spec.TopologyOrder != 20 || spec.ReadModel == "" || spec.Layer != sharedcache.LayerL2 {
-			t.Fatalf("L2 topology spec %q = %#v, found=%v", capability, spec, ok)
+		if !ok || spec.TopologyGroup != expected.group || spec.TopologyOrder != 20 || spec.ReadModel == "" || spec.Layer != expected.layer {
+			t.Fatalf("cache topology spec %q = %#v, found=%v", capability, spec, ok)
 		}
 	}
 }

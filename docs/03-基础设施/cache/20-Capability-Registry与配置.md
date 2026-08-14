@@ -15,13 +15,15 @@ Capability 是 Cache 的最小治理单位。apiserver 的 [`catalog.Spec`](../.
 | Capability | Owner | Kind | Layer | Family | 代码默认 TTL | 生产 TTL | Metric label |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `survey.questionnaire` | survey | cache | L2 | `static_meta` | 12h | 2h | `questionnaire` |
-| `modelcatalog.published_model` | modelcatalog | cache | L2 | `static_meta` | 24h | 2h | `published_model` |
+| `modelcatalog.published_model` | modelcatalog | cache | L1+L2 | `static_meta` | 24h | 2h | `published_model` |
 | `evaluation.assessment_access` | evaluation | cache | L2 | `object_view` | 5m | 5m | `assessment_access` |
 | `evaluation.assessment_detail` | evaluation | cache | L2 | `object_view` | 2h | 1h | `assessment_detail` |
 | `actor.testee` | actor | cache | L2 | `object_view` | 30m | 30m | `testee` |
 | `plan.detail` | plan | cache | L2 | `object_view` | 2h | 12h | `plan` |
 | `statistics.query` | statistics | cache | L2 + bounded L1 stale | `query_result` | 26h | 26h | `stats_query` |
 | `report_status` | interpretation | operational_state | runtime | `ops_runtime` | 48h | 48h | `report_status` |
+
+`modelcatalog.published_model` 只有不可变的 `exact_by_ref` 运行快照进入 apiserver 进程内 L1，命中后直接复用已解码的 `DefinitionV2`；latest-by-code、questionnaire/list/algorithms 等可变目录桶仍使用 L2。Active admission 继续绕过两级缓存读取 Mongo，以重新校验 release status。L1 有界为 512 条，TTL 沿用 capability 的 effective TTL，并通过 `qs_apiserver_l1_cache_*` 指标暴露 hit/miss、entries 与 eviction。
 
 `statistics.query` 的 generation/hotset 元数据使用 `meta_hotset`，但 capability family 仍投影为 `query_result`；支撑元数据不是第二个业务 capability。`evaluation.assessment_list` 因读路径从未接入缓存而已退役，system-governance 不保留虚假的 disabled row。
 
@@ -32,13 +34,13 @@ collection-server 的 Registry 是静态 snapshot，能力由 [`internal/collect
 | Capability | Layer | Family | 生产配置 | 回源 |
 | --- | --- | --- | --- | --- |
 | `catalog.questionnaire` | L1 | `local` | TTL 180s、max 256、singleflight、signal evict | apiserver questionnaire gRPC |
-| `catalog.published_model` | L1 | `local` | 生产已启用；TTL 180s、jitter 0.2、每 bucket max 64、singleflight、signal evict | apiserver published-model L2 |
+| `catalog.published_model` | L1 | `local` | 生产已启用；TTL 180s、jitter 0.2、每 bucket max 64、singleflight、signal evict | apiserver published-model capability；exact version 为 L1+L2，其余目录桶为 L2 |
 | `catalog.typology` | L1 | `local` | TTL 180s、max 256、singleflight、signal evict | assessment-model catalog gRPC |
 | `evaluation.assessment_access` | L1 | `local` | 生产已启用；TTL 60s、jitter 0.2、max 1024、singleflight；仅正向 ownership token | apiserver assessment-access L2 |
 | `evaluation.assessment_detail` | L1 | `local` | 生产已启用；TTL 180s、jitter 0.2、max 256、singleflight；仅 `evaluated` DTO | apiserver assessment-detail L2 |
 | `report_status` | runtime | `ops_runtime` | TTL 172800s | report workflow |
 
-collection catalog capability 使用 consumer-owned `catalog.*` ID；evaluation 两个意图保持业务名称一致。即使 ID 相同，collection L1 与 apiserver L2 仍是不同进程 Registry 里的独立 entry、policy 和生命周期。
+collection catalog capability 使用 consumer-owned `catalog.*` ID；evaluation 两个意图保持业务名称一致。collection L1 与 apiserver cache 仍是不同进程 Registry 里的独立 entry、policy 和生命周期；apiserver 内部的 immutable exact-by-ref L1 不改变这一跨进程边界。
 
 published-model 与 evaluation access/detail L1 在 dev/prod policy 中均已启用；主配置只引用独立 policy：
 

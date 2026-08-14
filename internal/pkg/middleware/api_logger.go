@@ -222,6 +222,13 @@ func readAndRestoreRequestBody(c *gin.Context, maxSize int64) []byte {
 
 // logRequestStart 记录请求开始信息
 func logRequestStart(c *gin.Context, config APILoggerConfig, requestID string) {
+	// Building header and trace fields is measurable work on the HTTP hot path.
+	// Do not pay that cost when the configured logger will discard the info
+	// event (production normally runs at warn).
+	if !log.V(log.InfoLevel).Enabled() {
+		return
+	}
+
 	fields := []log.Field{
 		log.String("event", "request_start"),
 		log.String("request_id", requestID),
@@ -256,6 +263,14 @@ func logRequestStart(c *gin.Context, config APILoggerConfig, requestID string) {
 
 // logRequestEnd 记录请求结束信息
 func logRequestEnd(c *gin.Context, config APILoggerConfig, requestID string, latency time.Duration, statusCode int, requestBody, responseBody []byte) {
+	// Successful requests are debug events, client failures are warn events and
+	// server failures are error events. Check the effective level before
+	// parsing/masking captured JSON; otherwise production silently spends CPU on
+	// fields that the logger immediately drops.
+	if !requestCompletionLoggingEnabled(statusCode) {
+		return
+	}
+
 	fields := []log.Field{
 		log.String("event", "request_end"),
 		log.String("request_id", requestID),
@@ -311,6 +326,17 @@ func logRequestEnd(c *gin.Context, config APILoggerConfig, requestID string, lat
 		log.HTTPWarn("HTTP Request Completed with Client Error", fields...)
 	} else {
 		log.HTTPDebug("HTTP Request Completed Successfully", fields...)
+	}
+}
+
+func requestCompletionLoggingEnabled(statusCode int) bool {
+	switch {
+	case statusCode >= http.StatusInternalServerError:
+		return log.V(log.ErrorLevel).Enabled()
+	case statusCode >= http.StatusBadRequest:
+		return log.V(log.WarnLevel).Enabled()
+	default:
+		return log.V(log.DebugLevel).Enabled()
 	}
 }
 

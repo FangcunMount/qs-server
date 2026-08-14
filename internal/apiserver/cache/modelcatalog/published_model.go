@@ -14,6 +14,7 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	sharedcache "github.com/FangcunMount/qs-server/internal/pkg/cache"
+	localcache "github.com/FangcunMount/qs-server/internal/pkg/cache/local"
 	querycache "github.com/FangcunMount/qs-server/internal/pkg/cache/query"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
@@ -39,6 +40,7 @@ type CachedPublishedModelStore struct {
 	catalogAlgorithms  *adapterkit.ObjectCacheStore[publishedModelCatalogAlgorithms]
 	latestByCode       *adapterkit.ObjectCacheStore[port.PublishedModel]
 	exactByRef         *adapterkit.ObjectCacheStore[port.PublishedModel]
+	exactByRefL1       *localcache.Cache[*port.PublishedModel]
 	byQuestionnaire    *adapterkit.ObjectCacheStore[port.PublishedModel]
 }
 
@@ -93,6 +95,7 @@ func NewCachedPublishedModelStore(
 			Cache: redisCache, PolicyKey: cachepolicy.CapabilityModelCatalogPublished,
 			Codec: publishedModelCodec(),
 		}),
+		exactByRefL1: newPublishedModelExactL1(policies),
 		byQuestionnaire: adapterkit.NewObjectCacheStore(adapterkit.ObjectCacheStoreOptions[port.PublishedModel]{
 			Cache: redisCache, PolicyKey: cachepolicy.CapabilityModelCatalogPublished,
 			Codec: publishedModelCodec(),
@@ -155,17 +158,39 @@ func (c *CachedPublishedModelStore) GetPublishedModelByRef(ctx context.Context, 
 	if c == nil || c.inner == nil {
 		return nil, domain.ErrNotFound
 	}
-	if c.exactByRef == nil || !c.exactByRef.Available() {
+	cacheKey := c.refCacheKey(ref)
+	if c.exactByRefL1 != nil && c.cacheEnabled() {
+		if cached, ok := c.exactByRefL1.Get(cacheKey); ok {
+			return cached, nil
+		}
+	}
+	loaded, err := c.getPublishedModelByRefL2(ctx, ref, cacheKey)
+	if err == nil && loaded != nil && c.exactByRefL1 != nil && c.cacheEnabled() {
+		c.exactByRefL1.Set(cacheKey, loaded)
+	}
+	return loaded, err
+}
+
+func (c *CachedPublishedModelStore) getPublishedModelByRefL2(ctx context.Context, ref port.Ref, cacheKey string) (*port.PublishedModel, error) {
+	if c.exactByRef == nil || !c.exactByRef.Available() || !c.cacheEnabled() {
 		return c.inner.GetPublishedModelByRef(ctx, ref)
 	}
 	return adapterkit.ReadThroughObject(ctx, adapterkit.ObjectReadThroughOptions[port.PublishedModel]{
 		PolicyKey: cachepolicy.CapabilityModelCatalogPublished,
-		CacheKey:  c.refCacheKey(ref), PolicyProvider: c.policies,
+		CacheKey:  cacheKey, PolicyProvider: c.policies,
 		Observer: c.observer, Store: c.exactByRef, AsyncSetCached: false,
 		Load: func(loadCtx context.Context) (*port.PublishedModel, error) {
 			return c.inner.GetPublishedModelByRef(loadCtx, ref)
 		},
 	})
+}
+
+func (c *CachedPublishedModelStore) cacheEnabled() bool {
+	if c == nil || c.policies == nil {
+		return false
+	}
+	effective, ok := c.policies.Resolve(cachepolicy.CapabilityModelCatalogPublished)
+	return ok && effective.Enabled
 }
 
 // GetActivePublishedModelByRef deliberately bypasses exact-version payload

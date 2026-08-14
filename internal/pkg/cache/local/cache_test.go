@@ -24,6 +24,29 @@ func TestCacheHitMissAndTTL(t *testing.T) {
 	}
 }
 
+func TestCacheResolvesTTLForEachNewEntry(t *testing.T) {
+	currentTTL := time.Hour
+	cache := New(Options{
+		TTL: time.Hour,
+		TTLProvider: func() time.Duration {
+			return currentTTL
+		},
+		MaxEntries: 4,
+	}, func(v string) string { return v })
+
+	cache.Set("long", "value")
+	currentTTL = 5 * time.Millisecond
+	cache.Set("short", "value")
+	time.Sleep(10 * time.Millisecond)
+
+	if _, ok := cache.Get("long"); !ok {
+		t.Fatal("entry written with the previous TTL expired")
+	}
+	if _, ok := cache.Get("short"); ok {
+		t.Fatal("entry did not use the latest TTL")
+	}
+}
+
 func TestCacheCloneOnGet(t *testing.T) {
 	type item struct{ Title string }
 	cache := New(Options{TTL: time.Minute, MaxEntries: 4}, func(v item) item { return v })

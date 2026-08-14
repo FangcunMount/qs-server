@@ -47,9 +47,8 @@ func TestPolicyReloaderPublishesCASAndPreservesSnapshotOnFailure(t *testing.T) {
 
 func TestPolicyReloaderNoopAndLoaderFailureDoNotBumpVersion(t *testing.T) {
 	entry := sharedcache.EffectiveCapability{Capability: "plan.detail", Enabled: true, Policy: sharedcache.Policy{TTL: time.Hour}}
-	registry := sharedcache.NewRegistry(entry)
 	source := sharedcache.PolicySource{Component: "qs-apiserver", SchemaVersion: "1.0", Path: "config.yaml", PolicySHA256: "hash"}
-	registry = sharedcache.NewRegistryWithSource(source, entry)
+	registry := sharedcache.NewRegistryWithSource(source, entry)
 	reloader := NewPolicyReloader("test", registry, func(context.Context) ([]sharedcache.EffectiveCapability, sharedcache.PolicySource, error) {
 		return []sharedcache.EffectiveCapability{entry}, source, nil
 	})

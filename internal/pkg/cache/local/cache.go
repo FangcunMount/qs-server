@@ -11,6 +11,7 @@ import (
 // Options 进程内 TTL 缓存配置。
 type Options struct {
 	TTL            time.Duration
+	TTLProvider    func() time.Duration
 	MaxEntries     int
 	TTLJitterRatio float64
 	OnHit          func()
@@ -141,9 +142,15 @@ func (c *Cache[T]) Set(key string, value T) {
 		return
 	}
 
+	ttl := c.opts.TTL
+	if c.opts.TTLProvider != nil {
+		if current := c.opts.TTLProvider(); current > 0 {
+			ttl = current
+		}
+	}
 	entry := cacheEntry[T]{
 		value:     c.clone(value),
-		expiresAt: time.Now().Add(sharedcache.JitterTTL(c.opts.TTL, c.opts.TTLJitterRatio)),
+		expiresAt: time.Now().Add(sharedcache.JitterTTL(ttl, c.opts.TTLJitterRatio)),
 	}
 
 	c.mu.Lock()
