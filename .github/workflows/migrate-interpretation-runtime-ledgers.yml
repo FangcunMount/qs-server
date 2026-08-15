@@ -117,10 +117,10 @@ jobs:
           sudo_run() {
             if [ "$(id -u)" -eq 0 ]; then
               "$@"
-            elif sudo -n true 2>/dev/null; then
-              sudo "$@"
+            elif [ -n "${SUDO_PASSWORD:-}" ]; then
+              sudo -S -p '' "$@" <<<"${SUDO_PASSWORD}"
             else
-              printf '%s\n' "${SUDO_PASSWORD}" | sudo -S -p '' "$@"
+              sudo -n "$@"
             fi
           }
           expected="$(printf '%s\n' qs-worker-runtime-1 qs-worker-runtime-2 qs-worker-runtime-3 | sort)"
@@ -163,10 +163,10 @@ jobs:
           sudo_run() {
             if [ "$(id -u)" -eq 0 ]; then
               "$@"
-            elif sudo -n true 2>/dev/null; then
-              sudo "$@"
+            elif [ -n "${SUDO_PASSWORD:-}" ]; then
+              sudo -S -p '' "$@" <<<"${SUDO_PASSWORD}"
             else
-              printf '%s\n' "${SUDO_PASSWORD}" | sudo -S -p '' "$@"
+              sudo -n "$@"
             fi
           }
           migration_binary=/tmp/migrate-interpretation-runtime-ledgers
@@ -241,10 +241,10 @@ jobs:
           sudo_run() {
             if [ "$(id -u)" -eq 0 ]; then
               "$@"
-            elif sudo -n true 2>/dev/null; then
-              sudo "$@"
+            elif [ -n "${SUDO_PASSWORD:-}" ]; then
+              sudo -S -p '' "$@" <<<"${SUDO_PASSWORD}"
             else
-              printf '%s\n' "${SUDO_PASSWORD}" | sudo -S -p '' "$@"
+              sudo -n "$@"
             fi
           }
           sudo_run docker start qs-worker-runtime-1 qs-worker-runtime-2 qs-worker-runtime-3 >/dev/null
