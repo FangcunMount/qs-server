@@ -95,11 +95,10 @@ func (InterpretReportPO) CollectionName() string { return "interpret_report_arti
 
 const (
 	ReportCatalogSourceArtifact = "artifact"
-	ReportCatalogSourceArchive  = "archive"
 )
 
 // ReportCatalogPO is a compact, assessment-level query index. Report content
-// remains in interpret_report_artifacts or archived_reports.
+// remains in interpret_report_artifacts.
 type ReportCatalogPO struct {
 	AssessmentID uint64    `bson:"assessment_id"`
 	OrgID        int64     `bson:"org_id"`

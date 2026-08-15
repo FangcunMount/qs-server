@@ -2,7 +2,6 @@ package interpretation
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -51,13 +50,6 @@ type CatalogRepairPlan struct {
 	Item      CatalogDriftItem
 	CreatedAt time.Time
 	ExpiresAt time.Time
-}
-
-type CatalogOutcomeAssociation struct {
-	OutcomeID    uint64
-	OrgID        int64
-	AssessmentID uint64
-	TesteeID     uint64
 }
 
 type catalogRepairPlanPO struct {
@@ -123,56 +115,6 @@ func (s *CatalogReconcileStore) ApplyRepair(ctx context.Context, plan CatalogRep
 	}
 }
 
-// RecoverArchiveAssociation fills only legacy association metadata using the
-// committed Evaluation outcome as authority. The immutable report body,
-// conclusion and risk fields are never part of the update.
-func (s *CatalogReconcileStore) RecoverArchiveAssociation(
-	ctx context.Context,
-	assessmentID uint64,
-	authority CatalogOutcomeAssociation,
-) (string, error) {
-	if s == nil || s.db == nil || assessmentID == 0 || authority.AssessmentID != assessmentID ||
-		authority.OrgID == 0 || authority.OutcomeID == 0 || authority.TesteeID == 0 {
-		return "rejected", fmt.Errorf("archive association authority is invalid")
-	}
-	collection := s.db.Collection((ArchivedReportPO{}).CollectionName())
-	var archive ArchivedReportPO
-	if err := collection.FindOne(ctx, bson.M{
-		"domain_id": assessmentID, "deleted_at": nil,
-	}).Decode(&archive); err != nil {
-		return "rejected", fmt.Errorf("load archive repair target: %w", err)
-	}
-	if archive.TesteeID != authority.TesteeID {
-		return "rejected", fmt.Errorf("archive testee association conflicts with committed outcome")
-	}
-	if archive.OutcomeID != 0 && archive.OutcomeID != authority.OutcomeID {
-		return "rejected", fmt.Errorf("archive outcome association conflicts with committed outcome")
-	}
-	if archive.OrgID != nil {
-		if *archive.OrgID == authority.OrgID {
-			return "already_repaired", nil
-		}
-		return "rejected", fmt.Errorf("archive organization association conflicts with committed outcome")
-	}
-	set := bson.M{"org_id": authority.OrgID, "updated_at": time.Now().UTC()}
-	if archive.OutcomeID == 0 {
-		set["outcome_id"] = authority.OutcomeID
-	}
-	result, err := collection.UpdateOne(ctx, bson.M{
-		"_id": archive.ID, "domain_id": assessmentID, "deleted_at": nil,
-		"updated_at": archive.UpdatedAt, "testee_id": archive.TesteeID,
-		"outcome_id": archive.OutcomeID,
-		"$or":        []bson.M{{"org_id": bson.M{"$exists": false}}, {"org_id": nil}},
-	}, bson.M{"$set": set})
-	if err != nil {
-		return "conflict", fmt.Errorf("recover archive association: %w", err)
-	}
-	if result.ModifiedCount == 0 {
-		return "conflict", fmt.Errorf("archive association CAS conflict")
-	}
-	return "repaired", nil
-}
-
 func (s *CatalogReconcileStore) repairAssociation(ctx context.Context, plan CatalogRepairPlan) (string, error) {
 	var entry ReportCatalogPO
 	if err := s.db.Collection((ReportCatalogPO{}).CollectionName()).FindOne(ctx, bson.M{
@@ -193,7 +135,7 @@ func (s *CatalogReconcileStore) repairAssociation(ctx context.Context, plan Cata
 		return "rejected", fmt.Errorf("catalog source is dangling")
 	}
 	if !source.HasOrgID {
-		return "rejected", fmt.Errorf("archive org_id must be recovered from committed outcome before catalog repair")
+		return "rejected", fmt.Errorf("catalog source organization is unproven")
 	}
 	set := bson.M{
 		"org_id": source.OrgID, "testee_id": source.TesteeID, "updated_at": time.Now().UTC(),
@@ -254,25 +196,7 @@ func (s *CatalogReconcileStore) latestCatalogCandidate(ctx context.Context, asse
 			SortAt: artifact.GeneratedAt, SortReportID: artifact.DomainID.Uint64(), UpdatedAt: time.Now().UTC(),
 		}, nil
 	}
-	if !errors.Is(err, mongo.ErrNoDocuments) {
-		return ReportCatalogPO{}, err
-	}
-	var archive ArchivedReportPO
-	if err := s.db.Collection((ArchivedReportPO{}).CollectionName()).FindOne(ctx,
-		bson.M{"domain_id": assessmentID, "deleted_at": nil},
-	).Decode(&archive); err != nil {
-		return ReportCatalogPO{}, err
-	}
-	if archive.OrgID == nil {
-		return ReportCatalogPO{}, fmt.Errorf("archive org_id is unproven")
-	}
-	return ReportCatalogPO{
-		AssessmentID: assessmentID, OrgID: *archive.OrgID, TesteeID: archive.TesteeID,
-		OutcomeID:  archive.OutcomeID,
-		SourceKind: ReportCatalogSourceArchive, SourceID: archive.DomainID.Uint64(),
-		ModelCode: archive.ScaleCode, RiskLevel: archive.RiskLevel,
-		SortAt: archive.CreatedAt, SortReportID: archive.DomainID.Uint64(), UpdatedAt: time.Now().UTC(),
-	}, nil
+	return ReportCatalogPO{}, err
 }
 
 func parseCatalogCursor(cursor string) (uint64, error) {
@@ -334,61 +258,33 @@ func (s *CatalogReconcileStore) loadCatalogSourceAssociations(
 		ids = append(ids, entry.SourceID)
 	}
 	sources := make(map[uint64]CatalogSourceAssociation, len(ids))
-	switch sourceKind {
-	case ReportCatalogSourceArtifact:
-		cur, err := s.db.Collection((InterpretReportPO{}).CollectionName()).Find(
-			ctx,
-			bson.M{"domain_id": bson.M{"$in": ids}, "deleted_at": nil},
-			options.Find().SetProjection(bson.M{
-				"domain_id": 1, "assessment_id": 1, "org_id": 1, "testee_id": 1,
-				"outcome_id": 1, "generation_id": 1,
-			}),
-		)
-		if err != nil {
-			return nil, err
-		}
-		defer func() { _ = cur.Close(ctx) }()
-		for cur.Next(ctx) {
-			var po InterpretReportPO
-			if err := cur.Decode(&po); err != nil {
-				return nil, err
-			}
-			sources[po.DomainID.Uint64()] = CatalogSourceAssociation{
-				AssessmentID: po.AssessmentID, OrgID: po.OrgID, HasOrgID: true, TesteeID: po.TesteeID,
-				OutcomeID: po.OutcomeID, HasOutcomeID: po.OutcomeID != 0,
-				GenerationID: po.GenerationID, HasGenerationID: po.GenerationID != 0,
-			}
-		}
-		return sources, cur.Err()
-	case ReportCatalogSourceArchive:
-		cur, err := s.db.Collection((ArchivedReportPO{}).CollectionName()).Find(
-			ctx,
-			bson.M{"domain_id": bson.M{"$in": ids}, "deleted_at": nil},
-			options.Find().SetProjection(bson.M{"domain_id": 1, "org_id": 1, "testee_id": 1, "outcome_id": 1}),
-		)
-		if err != nil {
-			return nil, err
-		}
-		defer func() { _ = cur.Close(ctx) }()
-		for cur.Next(ctx) {
-			var po ArchivedReportPO
-			if err := cur.Decode(&po); err != nil {
-				return nil, err
-			}
-			source := CatalogSourceAssociation{
-				AssessmentID: po.DomainID.Uint64(), TesteeID: po.TesteeID,
-				OutcomeID: po.OutcomeID, HasOutcomeID: po.OutcomeID != 0,
-			}
-			if po.OrgID != nil {
-				source.OrgID = *po.OrgID
-				source.HasOrgID = true
-			}
-			sources[po.DomainID.Uint64()] = source
-		}
-		return sources, cur.Err()
-	default:
+	if sourceKind != ReportCatalogSourceArtifact {
 		return nil, fmt.Errorf("unknown report catalog source %q", sourceKind)
 	}
+	cur, err := s.db.Collection((InterpretReportPO{}).CollectionName()).Find(
+		ctx,
+		bson.M{"domain_id": bson.M{"$in": ids}, "deleted_at": nil},
+		options.Find().SetProjection(bson.M{
+			"domain_id": 1, "assessment_id": 1, "org_id": 1, "testee_id": 1,
+			"outcome_id": 1, "generation_id": 1,
+		}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cur.Close(ctx) }()
+	for cur.Next(ctx) {
+		var po InterpretReportPO
+		if err := cur.Decode(&po); err != nil {
+			return nil, err
+		}
+		sources[po.DomainID.Uint64()] = CatalogSourceAssociation{
+			AssessmentID: po.AssessmentID, OrgID: po.OrgID, HasOrgID: true, TesteeID: po.TesteeID,
+			OutcomeID: po.OutcomeID, HasOutcomeID: po.OutcomeID != 0,
+			GenerationID: po.GenerationID, HasGenerationID: po.GenerationID != 0,
+		}
+	}
+	return sources, cur.Err()
 }
 
 func countAssociationMismatches(entries []ReportCatalogPO, sources map[uint64]CatalogSourceAssociation) int64 {
@@ -521,17 +417,13 @@ func (s *CatalogReconcileStore) listMissing(
 	limit int,
 ) (CatalogDriftPage, error) {
 	artifactMatch := bson.M{"deleted_at": nil}
-	archiveMatch := bson.M{"deleted_at": nil, "org_id": bson.M{"$ne": nil}}
 	if filter.OrgID != nil {
 		artifactMatch["org_id"] = *filter.OrgID
-		archiveMatch["org_id"] = *filter.OrgID
 	}
 	if filter.AssessmentID != nil {
 		artifactMatch["assessment_id"] = *filter.AssessmentID
-		archiveMatch["domain_id"] = *filter.AssessmentID
 	} else if after != 0 {
 		artifactMatch["assessment_id"] = bson.M{"$gt": after}
-		archiveMatch["domain_id"] = bson.M{"$gt": after}
 	}
 	pipeline := mongo.Pipeline{
 		{{Key: "$match", Value: artifactMatch}},
@@ -541,15 +433,6 @@ func (s *CatalogReconcileStore) listMissing(
 			"assessment_id": 1, "report_id": "$domain_id", "source": bson.M{"$literal": ReportCatalogSourceArtifact},
 			"priority": bson.M{"$literal": 2}, "sort_at": "$generated_at",
 		}}},
-		{{Key: "$unionWith", Value: bson.M{"coll": (ArchivedReportPO{}).CollectionName(), "pipeline": mongo.Pipeline{
-			{{Key: "$match", Value: archiveMatch}},
-			{{Key: "$sort", Value: bson.D{{Key: "domain_id", Value: 1}}}},
-			{{Key: "$limit", Value: limit}},
-			{{Key: "$project", Value: bson.M{
-				"assessment_id": "$domain_id", "report_id": "$domain_id", "source": bson.M{"$literal": ReportCatalogSourceArchive},
-				"priority": bson.M{"$literal": 1}, "sort_at": "$created_at",
-			}}},
-		}}}},
 		{{Key: "$sort", Value: bson.D{{Key: "assessment_id", Value: 1}, {Key: "priority", Value: -1}, {Key: "sort_at", Value: -1}, {Key: "report_id", Value: -1}}}},
 		{{Key: "$group", Value: bson.M{
 			"_id": "$assessment_id", "report_id": bson.M{"$first": "$report_id"}, "source": bson.M{"$first": "$source"},
@@ -558,16 +441,6 @@ func (s *CatalogReconcileStore) listMissing(
 		{{Key: "$limit", Value: limit}},
 		{{Key: "$lookup", Value: bson.M{
 			"from": (ReportCatalogPO{}).CollectionName(), "localField": "_id", "foreignField": "assessment_id", "as": "catalog",
-		}}},
-		{{Key: "$lookup", Value: bson.M{
-			"from": (InterpretReportPO{}).CollectionName(), "let": bson.M{"assessment_id": "$_id"},
-			"pipeline": mongo.Pipeline{
-				{{Key: "$match", Value: bson.M{"$expr": bson.M{"$and": bson.A{
-					bson.M{"$eq": bson.A{"$assessment_id", "$$assessment_id"}},
-					bson.M{"$eq": bson.A{bson.M{"$ifNull": bson.A{"$deleted_at", nil}}, nil}},
-				}}}}},
-				{{Key: "$limit", Value: 1}},
-			}, "as": "active_artifact",
 		}}},
 	}
 	cur, err := s.db.Collection((InterpretReportPO{}).CollectionName()).Aggregate(ctx, pipeline)
@@ -580,18 +453,17 @@ func (s *CatalogReconcileStore) listMissing(
 	rows := 0
 	for cur.Next(ctx) {
 		var row struct {
-			AssessmentID   uint64     `bson:"_id"`
-			ReportID       uint64     `bson:"report_id"`
-			Source         string     `bson:"source"`
-			Catalog        []bson.Raw `bson:"catalog"`
-			ActiveArtifact []bson.Raw `bson:"active_artifact"`
+			AssessmentID uint64     `bson:"_id"`
+			ReportID     uint64     `bson:"report_id"`
+			Source       string     `bson:"source"`
+			Catalog      []bson.Raw `bson:"catalog"`
 		}
 		if err := cur.Decode(&row); err != nil {
 			return CatalogDriftPage{}, err
 		}
 		rows++
 		last = row.AssessmentID
-		if len(row.Catalog) > 0 || (row.Source == ReportCatalogSourceArchive && len(row.ActiveArtifact) > 0) {
+		if len(row.Catalog) > 0 {
 			continue
 		}
 		items = append(items, CatalogDriftItem{

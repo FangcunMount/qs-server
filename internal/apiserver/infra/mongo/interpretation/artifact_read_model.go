@@ -17,14 +17,13 @@ import (
 // reportReadModel resolves assessment-level report queries through the compact
 // report catalog and loads report bodies only for the requested page.
 type reportReadModel struct {
-	reports, archives, catalog base.BaseRepository
+	reports, catalog base.BaseRepository
 }
 
 func NewReportReadModel(db *mongo.Database, opts ...base.BaseRepositoryOptions) readmodel.ReportReader {
 	return &reportReadModel{
-		reports:  base.NewBaseRepository(db, (InterpretReportPO{}).CollectionName(), opts...),
-		archives: base.NewBaseRepository(db, (ArchivedReportPO{}).CollectionName(), opts...),
-		catalog:  base.NewBaseRepository(db, (ReportCatalogPO{}).CollectionName(), opts...),
+		reports: base.NewBaseRepository(db, (InterpretReportPO{}).CollectionName(), opts...),
+		catalog: base.NewBaseRepository(db, (ReportCatalogPO{}).CollectionName(), opts...),
 	}
 }
 
@@ -119,13 +118,10 @@ type catalogSourceMetadata struct {
 }
 
 func (r *reportReadModel) loadCatalogSourceMetadata(ctx context.Context, entries []ReportCatalogPO) (map[string]catalogSourceMetadata, error) {
-	artifactIDs, archiveIDs := make([]uint64, 0, len(entries)), make([]uint64, 0, len(entries))
+	artifactIDs := make([]uint64, 0, len(entries))
 	for _, entry := range entries {
-		switch entry.SourceKind {
-		case ReportCatalogSourceArtifact:
+		if entry.SourceKind == ReportCatalogSourceArtifact {
 			artifactIDs = append(artifactIDs, entry.SourceID)
-		case ReportCatalogSourceArchive:
-			archiveIDs = append(archiveIDs, entry.SourceID)
 		}
 	}
 	result := make(map[string]catalogSourceMetadata, len(entries))
@@ -159,44 +155,6 @@ func (r *reportReadModel) loadCatalogSourceMetadata(ctx context.Context, entries
 					GenerationID: po.GenerationID, HasGenerationID: po.GenerationID != 0,
 				},
 				CreatedAt: po.GeneratedAt,
-			}
-		}
-		if err := cursor.Err(); err != nil {
-			return nil, err
-		}
-	}
-	if len(archiveIDs) > 0 {
-		cursor, err := r.archives.Find(
-			ctx,
-			bson.M{"domain_id": bson.M{"$in": archiveIDs}, "deleted_at": nil},
-			options.Find().SetProjection(bson.M{
-				"domain_id":  1,
-				"org_id":     1,
-				"testee_id":  1,
-				"outcome_id": 1,
-				"created_at": 1,
-			}),
-		)
-		if err != nil {
-			return nil, err
-		}
-		defer func() { _ = cursor.Close(ctx) }()
-		for cursor.Next(ctx) {
-			var po ArchivedReportPO
-			if err := cursor.Decode(&po); err != nil {
-				return nil, err
-			}
-			association := CatalogSourceAssociation{
-				AssessmentID: po.DomainID.Uint64(), TesteeID: po.TesteeID,
-				OutcomeID: po.OutcomeID, HasOutcomeID: po.OutcomeID != 0,
-			}
-			if po.OrgID != nil {
-				association.OrgID = *po.OrgID
-				association.HasOrgID = true
-			}
-			result[fmt.Sprintf("%s:%d", ReportCatalogSourceArchive, po.DomainID.Uint64())] = catalogSourceMetadata{
-				Association: association,
-				CreatedAt:   po.CreatedAt,
 			}
 		}
 		if err := cursor.Err(); err != nil {
@@ -273,22 +231,15 @@ func (r *reportReadModel) loadCatalogRows(ctx context.Context, entries []ReportC
 	if len(entries) == 0 {
 		return []readmodel.ReportRow{}, nil
 	}
-	artifactIDs, archiveIDs := make([]uint64, 0, len(entries)), make([]uint64, 0, len(entries))
+	artifactIDs := make([]uint64, 0, len(entries))
 	for _, e := range entries {
-		switch e.SourceKind {
-		case ReportCatalogSourceArtifact:
-			artifactIDs = append(artifactIDs, e.SourceID)
-		case ReportCatalogSourceArchive:
-			archiveIDs = append(archiveIDs, e.SourceID)
-		default:
+		if e.SourceKind != ReportCatalogSourceArtifact {
 			return nil, fmt.Errorf("unknown report catalog source %q", e.SourceKind)
 		}
+		artifactIDs = append(artifactIDs, e.SourceID)
 	}
 	byKey := map[string]catalogSourceEnvelope{}
 	if err := r.loadArtifacts(ctx, artifactIDs, byKey); err != nil {
-		return nil, err
-	}
-	if err := r.loadArchives(ctx, archiveIDs, byKey); err != nil {
 		return nil, err
 	}
 	rows := make([]readmodel.ReportRow, 0, len(entries))
@@ -359,40 +310,10 @@ func (r *reportReadModel) loadArtifacts(ctx context.Context, ids []uint64, dst m
 	return cur.Err()
 }
 
-func (r *reportReadModel) loadArchives(ctx context.Context, ids []uint64, dst map[string]catalogSourceEnvelope) error {
-	if len(ids) == 0 {
-		return nil
-	}
-	cur, err := r.archives.Find(ctx, bson.M{"domain_id": bson.M{"$in": ids}, "deleted_at": nil})
-	if err != nil {
-		return err
-	}
-	defer func() { _ = cur.Close(ctx) }()
-	for cur.Next(ctx) {
-		var po ArchivedReportPO
-		if err := cur.Decode(&po); err != nil {
-			return err
-		}
-		env := catalogSourceEnvelope{
-			AssessmentID: po.DomainID.Uint64(),
-			TesteeID:     po.TesteeID,
-			OutcomeID:    po.OutcomeID,
-			HasOutcomeID: po.OutcomeID != 0,
-			Row:          projectArchivedReportRow(&po),
-		}
-		if po.OrgID != nil {
-			env.OrgID = *po.OrgID
-			env.HasOrgID = true
-		}
-		dst[fmt.Sprintf("%s:%d", ReportCatalogSourceArchive, po.DomainID.Uint64())] = env
-	}
-	return cur.Err()
-}
-
 func interpretReportPOToReadRow(po *InterpretReportPO) readmodel.ReportRow {
 	if po == nil {
 		return readmodel.ReportRow{}
 	}
-	archived := &ArchivedReportPO{BaseDocument: base.BaseDocument{DomainID: meta.FromUint64(po.AssessmentID), CreatedAt: po.GeneratedAt}, ScaleName: po.ScaleName, ScaleCode: po.ScaleCode, Model: po.Model, PrimaryScore: po.PrimaryScore, Level: po.Level, TotalScore: po.TotalScore, RiskLevel: po.RiskLevel, Conclusion: po.Conclusion, Dimensions: po.Dimensions, Suggestions: po.Suggestions, ModelExtra: po.ModelExtra, PresentationProfile: po.PresentationProfile}
-	return projectArchivedReportRow(archived)
+	body := &reportBodyPO{BaseDocument: base.BaseDocument{DomainID: meta.FromUint64(po.AssessmentID), CreatedAt: po.GeneratedAt}, ScaleName: po.ScaleName, ScaleCode: po.ScaleCode, Model: po.Model, PrimaryScore: po.PrimaryScore, Level: po.Level, TotalScore: po.TotalScore, RiskLevel: po.RiskLevel, Conclusion: po.Conclusion, Dimensions: po.Dimensions, Suggestions: po.Suggestions, ModelExtra: po.ModelExtra, PresentationProfile: po.PresentationProfile}
+	return projectReportBodyRow(body)
 }

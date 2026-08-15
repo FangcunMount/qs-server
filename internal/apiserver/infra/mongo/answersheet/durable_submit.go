@@ -10,7 +10,6 @@ import (
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -97,7 +96,7 @@ func (r *Repository) findByIdempotencyKey(ctx context.Context, metaInfo submitpo
 		"deleted_at":                  nil,
 	}, &sheetPO); err != nil {
 		if stderrors.Is(err, mongo.ErrNoDocuments) {
-			return r.findLegacyIdempotentSubmission(ctx, metaInfo)
+			return nil, nil
 		}
 		return nil, err
 	}
@@ -111,34 +110,6 @@ func (r *Repository) findByIdempotencyKey(ctx context.Context, metaInfo submitpo
 	}
 	return completedSubmission(sheet, storedFingerprint, metaInfo.Fingerprint)
 }
-
-// findLegacyIdempotentSubmission keeps pre-migration retry keys readable. New
-// submissions never write this collection; it can be archived after the
-// compatibility window and an explicit data migration.
-func (r *Repository) findLegacyIdempotentSubmission(ctx context.Context, metaInfo submitport.DurableSubmitMeta) (*submitport.CompletedSubmission, error) {
-	legacyIdempotencyFallbackLookupTotal.Inc()
-	if r.idempotencyColl == nil {
-		return nil, nil
-	}
-	var po AnswerSheetSubmitIdempotencyPO
-	if err := r.idempotencyColl.FindOne(ctx, bson.M{"writer_id": metaInfo.WriterID, "idempotency_key": metaInfo.IdempotencyKey, "status": idempotencyStatusCompleted}).Decode(&po); err != nil {
-		if stderrors.Is(err, mongo.ErrNoDocuments) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	legacyIdempotencyFallbackHitTotal.Inc()
-	sheet, err := r.FindByID(ctx, meta.MustFromUint64(po.AnswerSheetID))
-	if err != nil {
-		return nil, err
-	}
-	if sheet == nil {
-		return nil, fmt.Errorf("legacy completed submission %q references missing answersheet %d", metaInfo.IdempotencyKey, po.AnswerSheetID)
-	}
-	stored := po.Fingerprint
-	return completedSubmission(sheet, stored, metaInfo.Fingerprint)
-}
-
 func completedSubmission(
 	sheet *domainAnswerSheet.AnswerSheet,
 	storedFingerprint string,

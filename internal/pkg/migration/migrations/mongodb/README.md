@@ -38,6 +38,20 @@ active artifact winner 扫描与已知机构 archive keyset 扫描增加专用�
 down migration 只删除本版本拥有的两个扫描索引和 checkpoint 集合。生产回滚应优先关闭
 `report_catalog_audit.enable` 并保留 checkpoint，不应依赖 down migration。
 
+## Empty compatibility collections retirement（000022）
+
+`000022_retire_empty_compatibility_collections` 退役已完成观察和生产只读预检的
+`answersheet_submit_idempotency` 与 `archived_reports`。Mongo driver 在执行本版本前强制确认：
+
+- 两个集合文档数均为 0；
+- `report_query_catalog` 中 `source_kind=archive` 的引用数为 0。
+
+为保证全新数据库也能执行 MongoDB `drop` 命令，driver 会先幂等地确保这两个空命名空间存在，
+再执行文档数和 Catalog 引用预检。
+
+任一条件不满足都会中止启动迁移，禁止通过 drop collection 丢弃兼容数据。down migration
+只恢复空集合和原索引，不恢复历史文档；生产回滚仍应以迁移前备份为准。
+
 ## Legacy collections retirement（000020）
 
 `000020_retire_legacy_collections` 删除已退出运行时的 `published_assessment_models`、

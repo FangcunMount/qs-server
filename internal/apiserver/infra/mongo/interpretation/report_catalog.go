@@ -102,7 +102,6 @@ func (p *ReportCatalogProjector) ProjectCurrent(ctx context.Context, report *dom
 		SortReportID: po.DomainID.Uint64(), UpdatedAt: po.GeneratedAt,
 	}
 	filter := bson.M{"assessment_id": po.AssessmentID, "$or": bson.A{
-		bson.M{"source_kind": ReportCatalogSourceArchive},
 		bson.M{"sort_at": bson.M{"$lt": po.GeneratedAt}},
 		bson.M{"sort_at": po.GeneratedAt, "sort_report_id": bson.M{"$lt": po.DomainID.Uint64()}},
 	}}

@@ -19,7 +19,7 @@ func TestValidator(t *testing.T) {
 	}{
 		{name: "valid", source: strict},
 		{
-			name: "missing archive org is inconsistent",
+			name: "missing source org is inconsistent",
 			source: Association{
 				AssessmentID: 1, TesteeID: 3, OutcomeID: 4, HasOutcomeID: true,
 				GenerationID: 5, HasGenerationID: true,

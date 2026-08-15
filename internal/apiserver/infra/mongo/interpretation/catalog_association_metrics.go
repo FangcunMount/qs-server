@@ -5,8 +5,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-// IR-R002 read-path observability. Association mismatch is always fail-closed,
-// including archive sources without org_id.
+// IR-R002 read-path observability. Association mismatch is always fail-closed.
 var (
 	catalogAssociationMismatchTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "qs",

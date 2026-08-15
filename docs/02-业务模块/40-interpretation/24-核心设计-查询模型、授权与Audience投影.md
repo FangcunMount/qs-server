@@ -44,7 +44,7 @@ Audience + Transport Projection
 | 认证 | 调用者是谁 | IAM JWT、HTTP protected scope、gRPC mTLS |
 | 授权 | 是否能读目标资源 | ProfileLink、Assessment ownership、Operator/Clinician 绑定、Testee relation、IAM capability |
 | 范围 | 列表中哪些资源可见 | TesteeID、AccessibleTesteeIDs 或 OrgID 过滤 |
-| 读模型 | 哪份正文是当前报告 | `report_query_catalog -> artifact/archive` |
+| 读模型 | 哪份正文是当前报告 | `report_query_catalog -> artifact` |
 | Audience 投影 | 授权后还需隐藏什么 | 当前仅对 `ModelExtra` 显式决策 |
 | Transport 投影 | REST / gRPC 如何表达内容 | participant gRPC 保留富结构；当前 apiserver REST 仍是较窄的兼容 DTO |
 

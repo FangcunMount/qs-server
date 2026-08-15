@@ -5,7 +5,7 @@ import (
 	evaluationreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 )
 
-func projectArchivedReportRow(po *ArchivedReportPO) evaluationreadmodel.ReportRow {
+func projectReportBodyRow(po *reportBodyPO) evaluationreadmodel.ReportRow {
 	if po == nil {
 		return evaluationreadmodel.ReportRow{}
 	}
@@ -91,11 +91,11 @@ func projectArchivedReportRow(po *ArchivedReportPO) evaluationreadmodel.ReportRo
 			Severity: po.Level.Severity,
 		}
 	}
-	normalizeArchivedReportRow(&row)
+	normalizeReportRow(&row)
 	return row
 }
 
-func normalizeArchivedReportRow(row *evaluationreadmodel.ReportRow) {
+func normalizeReportRow(row *evaluationreadmodel.ReportRow) {
 	if row == nil {
 		return
 	}

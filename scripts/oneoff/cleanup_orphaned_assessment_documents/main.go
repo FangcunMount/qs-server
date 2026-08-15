@@ -1,5 +1,5 @@
-// cleanup_orphaned_assessment_documents removes Mongo report and answer-sheet
-// documents whose owning MySQL assessment no longer exists.
+// cleanup_orphaned_assessment_documents removes Mongo answer-sheet documents
+// whose owning MySQL assessment no longer exists.
 package main
 
 import (
@@ -97,15 +97,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if cfg.source == "reports" || cfg.source == "all" {
-		if err := runPhase(ctx, db, my, cfg, reportPhase()); err != nil {
-			log.Fatal(err)
-		}
-	}
-	if cfg.source == "answersheets" || cfg.source == "all" {
-		if err := runPhase(ctx, db, my, cfg, answerSheetPhase()); err != nil {
-			log.Fatal(err)
-		}
+	if err := runPhase(ctx, db, my, cfg, answerSheetPhase()); err != nil {
+		log.Fatal(err)
 	}
 }
 
@@ -115,7 +108,7 @@ func parseConfig() config {
 	flag.StringVar(&c.mongoURI, "mongo-uri", os.Getenv("MONGO_URI"), "MongoDB URI")
 	flag.StringVar(&c.mongoDB, "mongo-db", os.Getenv("MONGO_DB"), "MongoDB database")
 	flag.StringVar(&c.mysqlDSN, "mysql-dsn", os.Getenv("MYSQL_DSN"), "MySQL DSN")
-	flag.StringVar(&c.source, "source", "all", "reports|answersheets|all")
+	flag.StringVar(&c.source, "source", "answersheets", "answersheets")
 	flag.StringVar(&cutoff, "answersheet-created-before", "", "required for answersheets; RFC3339 or YYYY-MM-DD")
 	flag.StringVar(&c.backupSuffix, "backup-suffix", time.Now().Format("20060102T150405"), "backup collection suffix")
 	flag.Int64Var(&c.batchSize, "batch-size", 1000, "documents per page")
@@ -126,7 +119,7 @@ func parseConfig() config {
 	flag.DurationVar(&c.timeout, "timeout", 24*time.Hour, "overall timeout; 0 disables")
 	flag.BoolVar(&c.apply, "apply", false, "perform cleanup; default is dry-run")
 	flag.BoolVar(&c.skipBackup, "skip-backup", false, "do not back up matching Mongo documents")
-	flag.BoolVar(&c.hardDelete, "hard-delete", false, "physically delete primary report/answersheet documents")
+	flag.BoolVar(&c.hardDelete, "hard-delete", false, "physically delete primary answersheet documents")
 	flag.Parse()
 	if cutoff != "" {
 		for _, layout := range []string{time.RFC3339, "2006-01-02"} {
@@ -143,10 +136,10 @@ func validateConfig(c config) error {
 	if c.mongoURI == "" || c.mongoDB == "" || c.mysqlDSN == "" {
 		return fmt.Errorf("mongo-uri, mongo-db and mysql-dsn are required")
 	}
-	if c.source != "reports" && c.source != "answersheets" && c.source != "all" {
-		return fmt.Errorf("source must be reports, answersheets or all")
+	if c.source != "answersheets" {
+		return fmt.Errorf("source must be answersheets; the archived report cleanup path was retired")
 	}
-	if (c.source == "answersheets" || c.source == "all") && c.answerSheetCreatedBefore.IsZero() {
+	if c.answerSheetCreatedBefore.IsZero() {
 		return fmt.Errorf("answersheet-created-before is required when cleaning answersheets")
 	}
 	if c.batchSize < 1 || c.batchSize > 10000 || c.workers < 1 || c.workers > 64 || c.maxDocs < 0 {
@@ -161,23 +154,15 @@ func validateConfig(c config) error {
 	return nil
 }
 
-func reportPhase() phase {
-	return phase{name: "reports", collection: "archived_reports", filter: activeRangeFilter,
-		lookupSQL: func(n int) string { return inQuery("SELECT id FROM assessment WHERE id IN (", n) },
-		related:   []relatedCollection{{"report_query_catalog", "assessment_id", false}}}
-}
-
 func answerSheetPhase() phase {
 	return phase{name: "answersheets", collection: "answersheets",
 		filter: func(c config, after uint64) bson.M {
 			q := activeRangeFilter(c, after)
 			q["created_at"] = bson.M{"$lt": c.answerSheetCreatedBefore}
 			return q
-		},
-		lookupSQL: func(n int) string {
+		}, lookupSQL: func(n int) string {
 			return inQuery("SELECT answer_sheet_id FROM assessment WHERE answer_sheet_id IN (", n)
-		},
-		related: []relatedCollection{{"answersheet_submit_idempotency", "answersheet_id", false}}}
+		}}
 }
 
 func inQuery(prefix string, count int) string {

@@ -16,17 +16,15 @@ import (
 // Repository 答卷MongoDB存储库
 type Repository struct {
 	mongoBase.BaseRepository
-	mapper          *AnswerSheetMapper
-	idempotencyColl *mongo.Collection
+	mapper *AnswerSheetMapper
 }
 
 // NewRepository 创建答卷MongoDB存储库
 func NewRepository(db *mongo.Database, opts ...mongoBase.BaseRepositoryOptions) (*Repository, error) {
 	po := &AnswerSheetPO{}
 	repo := &Repository{
-		BaseRepository:  mongoBase.NewBaseRepository(db, po.CollectionName(), opts...),
-		mapper:          NewAnswerSheetMapper(),
-		idempotencyColl: db.Collection((&AnswerSheetSubmitIdempotencyPO{}).CollectionName()),
+		BaseRepository: mongoBase.NewBaseRepository(db, po.CollectionName(), opts...),
+		mapper:         NewAnswerSheetMapper(),
 	}
 	if err := repo.ensureIndexes(context.Background()); err != nil {
 		return nil, err

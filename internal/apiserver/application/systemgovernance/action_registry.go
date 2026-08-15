@@ -146,7 +146,7 @@ func catalogRepairAction(enabled bool) ActionDescriptor {
 			"properties": map[string]interface{}{
 				"dry_run_id":               map[string]interface{}{"type": "string", "minLength": 1},
 				"expected_catalog_version": map[string]interface{}{"type": "string", "minLength": 1},
-				"expected_source":          map[string]interface{}{"type": "string", "enum": []string{"artifact", "archive"}},
+				"expected_source":          map[string]interface{}{"type": "string", "enum": []string{"artifact"}},
 				"reason":                   map[string]interface{}{"type": "string", "minLength": 1},
 			},
 		},

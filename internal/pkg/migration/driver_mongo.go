@@ -17,7 +17,13 @@ import (
 const (
 	scaleSnapshotMergeMigrationVersion = 6
 	scaleSnapshotMergeIndexName        = "idx_scales_snapshot_merge_migration"
+	compatibilityRetirementVersion     = 22
 )
+
+var compatibilityRetirementCollections = []string{
+	"answersheet_submit_idempotency",
+	"archived_reports",
+}
 
 // MongoDriver implements the Driver interface for MongoDB databases.
 type MongoDriver struct {
@@ -51,17 +57,29 @@ func (d *MongoDriver) CreateInstance(fs embed.FS, config *Config) (*migrate.Migr
 	return d.createInstance(fs, databaseDriver)
 }
 
-// PrepareRun installs the non-partial unique index required by MongoDB's
-// $merge in migration 6. The migration's durable partial index correctly
-// represents the final schema, but MongoDB does not accept a partial index as
-// the uniqueness proof for $merge. Keeping this index process-scoped avoids
-// rewriting an already released migration and leaves no schema artifact.
+// PrepareRun enforces data-dependent migration preconditions and installs the
+// non-partial unique index required by MongoDB's $merge in migration 6. The
+// migration's durable partial index correctly represents the final schema, but
+// MongoDB does not accept a partial index as the uniqueness proof for $merge.
+// Keeping this index process-scoped avoids rewriting an already released
+// migration and leaves no schema artifact.
 func (d *MongoDriver) PrepareRun(parent context.Context, config *Config, versionBefore uint) (func(context.Context) error, error) {
-	if d == nil || d.client == nil || config == nil || versionBefore >= scaleSnapshotMergeMigrationVersion {
+	if d == nil || d.client == nil || config == nil {
 		return func(context.Context) error { return nil }, nil
 	}
 	ctx, cancel := context.WithTimeout(parent, 30*time.Second)
 	defer cancel()
+	if versionBefore < compatibilityRetirementVersion {
+		if err := d.ensureCompatibilityRetirementCollections(ctx, config.Database); err != nil {
+			return nil, err
+		}
+		if err := d.verifyCompatibilityRetirement(ctx, config.Database); err != nil {
+			return nil, err
+		}
+	}
+	if versionBefore >= scaleSnapshotMergeMigrationVersion {
+		return func(context.Context) error { return nil }, nil
+	}
 	collection := d.client.Database(config.Database).Collection("scales")
 	_, err := collection.Indexes().CreateOne(ctx, mongo.IndexModel{
 		Keys:    bson.D{{Key: "code", Value: 1}, {Key: "scale_version", Value: 1}, {Key: "record_role", Value: 1}},
@@ -79,6 +97,45 @@ func (d *MongoDriver) PrepareRun(parent context.Context, config *Config, version
 		}
 		return err
 	}, nil
+}
+
+// ensureCompatibilityRetirementCollections makes the drop migration safe on a
+// brand-new database. MongoDB returns NamespaceNotFound when a drop command
+// targets a collection that has never existed.
+func (d *MongoDriver) ensureCompatibilityRetirementCollections(ctx context.Context, databaseName string) error {
+	db := d.client.Database(databaseName)
+	for _, name := range compatibilityRetirementCollections {
+		if err := db.CreateCollection(ctx, name); err != nil && !isMongoNamespaceExists(err) {
+			return fmt.Errorf("prepare Mongo retirement collection %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
+func (d *MongoDriver) verifyCompatibilityRetirement(ctx context.Context, databaseName string) error {
+	db := d.client.Database(databaseName)
+	for _, name := range compatibilityRetirementCollections {
+		count, err := db.Collection(name).CountDocuments(ctx, bson.M{})
+		if err != nil {
+			return fmt.Errorf("verify Mongo retirement precondition %s: %w", name, err)
+		}
+		if count != 0 {
+			return fmt.Errorf("Mongo retirement precondition failed: %s contains %d documents", name, count)
+		}
+	}
+	archiveRefs, err := db.Collection("report_query_catalog").CountDocuments(ctx, bson.M{"source_kind": "archive"})
+	if err != nil {
+		return fmt.Errorf("verify Mongo retirement precondition report_query_catalog archive references: %w", err)
+	}
+	if archiveRefs != 0 {
+		return fmt.Errorf("Mongo retirement precondition failed: report_query_catalog contains %d archive references", archiveRefs)
+	}
+	return nil
+}
+
+func isMongoNamespaceExists(err error) bool {
+	var commandErr mongo.CommandError
+	return errors.As(err, &commandErr) && commandErr.Code == 48
 }
 
 func isIgnorableMongoIndexCleanupError(err error) bool {

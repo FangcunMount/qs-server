@@ -324,59 +324,7 @@ func auditModelCatalogIdentityMongo(ctx context.Context, uri, database string) (
 	if err != nil {
 		return nil, err
 	}
-	reportItems, err := auditModelCatalogIdentityArchivedReports(ctx, db.Collection("archived_reports"))
-	if err != nil {
-		return nil, err
-	}
-	return append(append(items, indexItems...), reportItems...), nil
-}
-
-// auditModelCatalogIdentityArchivedReports keeps unrecoverable historical
-// archives observable without treating them as migration blockers: they are
-// intentionally static-only and cannot enter a rebuild or descriptor route.
-func auditModelCatalogIdentityArchivedReports(ctx context.Context, reports *mongo.Collection) ([]finding, error) {
-	cursor, err := reports.Find(ctx, bson.M{"deleted_at": nil}, options.Find().SetProjection(bson.M{
-		"_id": 1, "assessment_id": 1, "model.kind": 1, "model.algorithm": 1, "model.decision_kind": 1,
-	}))
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = cursor.Close(ctx) }()
-	result := finding{Severity: "info", Source: "archived_reports", Rule: "runtime_identity.static_only"}
-	for cursor.Next(ctx) {
-		var row struct {
-			ID           any `bson:"_id"`
-			AssessmentID any `bson:"assessment_id"`
-			Model        struct {
-				Kind         string `bson:"kind"`
-				Algorithm    string `bson:"algorithm"`
-				DecisionKind string `bson:"decision_kind"`
-			} `bson:"model"`
-		}
-		if err := cursor.Decode(&row); err != nil {
-			return nil, err
-		}
-		if row.Model.Algorithm != "" {
-			if _, err := domain.ResolveLegacyRuntime(domain.Kind(row.Model.Kind), domain.Algorithm(row.Model.Algorithm), domain.DecisionKind(row.Model.DecisionKind)); err == nil {
-				continue
-			}
-		}
-		result.Count++
-		if len(result.Samples) < sampleLimit {
-			sample := fmt.Sprint(row.AssessmentID)
-			if sample == "<nil>" || sample == "" {
-				sample = fmt.Sprint(row.ID)
-			}
-			result.Samples = append(result.Samples, sample)
-		}
-	}
-	if err := cursor.Err(); err != nil {
-		return nil, err
-	}
-	if result.Count == 0 {
-		return []finding{{Severity: "info", Source: "archived_reports", Rule: "runtime_identity.static_only", Count: 0}}, nil
-	}
-	return []finding{result}, nil
+	return append(items, indexItems...), nil
 }
 
 func auditModelCatalogIdentityModels(ctx context.Context, models *mongo.Collection) ([]finding, error) {

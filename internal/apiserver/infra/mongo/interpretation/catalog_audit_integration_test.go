@@ -21,7 +21,6 @@ func TestReportCatalogAuditIndexesCheckpointCASAndBatchBoundAgainstMongo(t *test
 	defer cancel()
 
 	artifactCollection := db.Collection((InterpretReportPO{}).CollectionName())
-	archiveCollection := db.Collection((ArchivedReportPO{}).CollectionName())
 	catalogCollection := db.Collection((ReportCatalogPO{}).CollectionName())
 	checkpointCollection := db.Collection(CatalogAuditCheckpointCollection)
 	if _, err := artifactCollection.Indexes().CreateOne(ctx, mongo.IndexModel{
@@ -29,12 +28,6 @@ func TestReportCatalogAuditIndexesCheckpointCASAndBatchBoundAgainstMongo(t *test
 		Options: options.Index().SetName(IndexCatalogAuditArtifact),
 	}); err != nil {
 		t.Fatalf("create artifact audit index: %v", err)
-	}
-	if _, err := archiveCollection.Indexes().CreateOne(ctx, mongo.IndexModel{
-		Keys:    bson.D{{Key: "deleted_at", Value: 1}, {Key: "domain_id", Value: 1}, {Key: "org_id", Value: 1}},
-		Options: options.Index().SetName(IndexCatalogAuditArchive),
-	}); err != nil {
-		t.Fatalf("create archive audit index: %v", err)
 	}
 	if _, err := catalogCollection.Indexes().CreateOne(ctx, mongo.IndexModel{
 		Keys:    bson.D{{Key: "assessment_id", Value: 1}},

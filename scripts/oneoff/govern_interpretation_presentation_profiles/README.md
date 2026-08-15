@@ -5,7 +5,6 @@
 工具只允许操作：
 
 - `interpret_report_artifacts`
-- `archived_reports`
 
 默认操作是只读 `audit`。写入只会设置或撤销 `presentation_profile`，不会读取当前 ModelCatalog，也不会重新生成报告。
 

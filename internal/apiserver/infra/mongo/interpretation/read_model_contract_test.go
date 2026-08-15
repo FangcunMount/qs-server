@@ -14,7 +14,7 @@ func TestReportPOToReadRowMapsReportDocumentShape(t *testing.T) {
 	factorCode := "sleep"
 	createdAt := time.Date(2026, 5, 2, 11, 0, 0, 0, time.UTC)
 
-	row := projectArchivedReportRow(&ArchivedReportPO{
+	row := projectReportBodyRow(&reportBodyPO{
 		BaseDocument: base.BaseDocument{
 			DomainID:  meta.FromUint64(7001),
 			CreatedAt: createdAt,
@@ -72,7 +72,7 @@ func TestReportPOToReadRowMapsReportDocumentShape(t *testing.T) {
 }
 
 func TestReportPOToReadRowToleratesNilLegacySlices(t *testing.T) {
-	row := projectArchivedReportRow(&ArchivedReportPO{
+	row := projectReportBodyRow(&reportBodyPO{
 		BaseDocument: base.BaseDocument{DomainID: meta.FromUint64(7001)},
 	})
 
@@ -91,7 +91,7 @@ func TestReportPOToReadRowToleratesNilLegacySlices(t *testing.T) {
 }
 
 func TestReportPOToReadRowSynthesizesLegacyPresentationProfileFromArtifactDimensions(t *testing.T) {
-	row := projectArchivedReportRow(&ArchivedReportPO{
+	row := projectReportBodyRow(&reportBodyPO{
 		BaseDocument: base.BaseDocument{DomainID: meta.FromUint64(7001)},
 		Dimensions: []DimensionInterpretPO{
 			{FactorCode: "B"},
@@ -114,7 +114,7 @@ func TestReportPOToReadRowSynthesizesLegacyPresentationProfileFromArtifactDimens
 }
 
 func TestReportPOToReadRowPrefersStoredPresentationProfile(t *testing.T) {
-	row := projectArchivedReportRow(&ArchivedReportPO{
+	row := projectReportBodyRow(&reportBodyPO{
 		BaseDocument: base.BaseDocument{DomainID: meta.FromUint64(7001)},
 		Dimensions:   []DimensionInterpretPO{{FactorCode: "artifact"}},
 		PresentationProfile: &PresentationProfilePO{

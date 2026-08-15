@@ -905,7 +905,6 @@ LIMIT 20`, cfg.testeeCreatedAfter)
 func verifyMongoReadAccess(ctx context.Context, db *mongo.Database) error {
 	collections := []string{
 		"answersheets",
-		"answersheet_submit_idempotency",
 		"domain_event_outbox",
 	}
 	for _, name := range collections {
@@ -997,7 +996,6 @@ func enrichScopeIDsFromMongo(ctx context.Context, db *mongo.Database, ids scopeI
 	}
 	tasks := []mongoFieldTask{
 		{coll: "answersheets", field: "domain_id", label: "answersheets.domain_id"},
-		{coll: "answersheet_submit_idempotency", field: "answersheet_id", label: "answersheet_submit_idempotency.answersheet_id"},
 	}
 	results := make([][]uint64, len(tasks))
 	group, groupCtx := errgroup.WithContext(ctx)
@@ -1018,7 +1016,7 @@ func enrichScopeIDsFromMongo(ctx context.Context, db *mongo.Database, ids scopeI
 		return ids, err
 	}
 
-	ids.AnswerSheetIDs = uniqueUint64(append(append(ids.AnswerSheetIDs, results[0]...), results[1]...))
+	ids.AnswerSheetIDs = uniqueUint64(append(ids.AnswerSheetIDs, results[0]...))
 	reportIDs, err := loadMongoUint64FieldByFilters(ctx, db.Collection("interpret_report_artifacts"), interpretReportFilters(ids), "domain_id", "interpret_report_artifacts.domain_id")
 	if err != nil {
 		return ids, err
@@ -1988,12 +1986,10 @@ type mongoCollectionScope struct {
 func mongoCollectionScopes(ids scopeIDs) []mongoCollectionScope {
 	return []mongoCollectionScope{
 		{name: "answersheets", coll: "answersheets", filters: answersheetFilters(ids)},
-		{name: "answersheet_submit_idempotency", coll: "answersheet_submit_idempotency", filters: answerSheetIdempotencyFilters(ids)},
 		{name: "report_generations", coll: "report_generations", filters: reportGenerationFilters(ids)},
 		{name: "interpretation_runs", coll: "interpretation_runs", filters: interpretationRunFilters(ids)},
 		{name: "interpret_report_artifacts", coll: "interpret_report_artifacts", filters: interpretReportFilters(ids)},
 		{name: "report_query_catalog", coll: "report_query_catalog", filters: reportCatalogFilters(ids)},
-		{name: "archived_reports", coll: "archived_reports", filters: archivedReportFilters(ids)},
 		{name: "interpretation_admission_failures", coll: "interpretation_admission_failures", filters: interpretationAdmissionFilters(ids)},
 		{name: "interpretation_attention_projections", coll: "interpretation_attention_projections", filters: interpretationAttentionFilters(ids)},
 		{name: "domain_event_outbox", coll: "domain_event_outbox", filters: mongoOutboxFilters(ids)},
@@ -2043,13 +2039,6 @@ func answersheetFilters(ids scopeIDs) []bson.M {
 	)
 }
 
-func answerSheetIdempotencyFilters(ids scopeIDs) []bson.M {
-	return append(
-		inUint64Filters("testee_id", ids.TesteeIDs),
-		inUint64Filters("answersheet_id", ids.AnswerSheetIDs)...,
-	)
-}
-
 func reportGenerationFilters(ids scopeIDs) []bson.M {
 	filters := inUint64Filters("domain_id", ids.GenerationIDs)
 	filters = append(filters, inUint64Filters("outcome_id", ids.OutcomeIDs)...)
@@ -2074,13 +2063,6 @@ func reportCatalogFilters(ids scopeIDs) []bson.M {
 	filters := inUint64Filters("assessment_id", ids.AssessmentIDs)
 	filters = append(filters, inUint64Filters("outcome_id", ids.OutcomeIDs)...)
 	filters = append(filters, inUint64Filters("source_id", ids.ReportIDs)...)
-	return filters
-}
-
-func archivedReportFilters(ids scopeIDs) []bson.M {
-	filters := inUint64Filters("domain_id", ids.AssessmentIDs)
-	filters = append(filters, inUint64Filters("outcome_id", ids.OutcomeIDs)...)
-	filters = append(filters, inUint64Filters("testee_id", ids.TesteeIDs)...)
 	return filters
 }
 

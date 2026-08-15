@@ -165,12 +165,12 @@ collection-server 的 `AcceptDurably` 在进入持久化前完成：
 当前可靠提交事务共同写入：
 
 1. AnswerSheet document；
-2. 提交幂等记录；
+2. AnswerSheet 内嵌 `submit_meta` 幂等事实；
 3. `answersheet.submitted` Outbox record。
 
 任一步失败都回滚事务，不返回 `202`。若 Mongo commit 结果因超时而未知，应用会在短暂、脱离原取消上下文的只读窗口中按幂等键查询 completed 结果；只有确实读到持久化 AnswerSheet，才允许把请求视为成功。
 
-当前幂等元数据仍物理存放在独立的 `answersheet_submit_idempotency` 集合。这一实现细节属于 Survey 数据模型，Evaluation 只依赖“一个幂等意图最终解析为一个 AnswerSheet ID”的契约。
+幂等元数据物理存放在 AnswerSheet 的 `submit_meta` 中；旧独立集合已经退役。Evaluation 只依赖“一个幂等意图最终解析为一个 AnswerSheet ID”的契约。
 
 ### 5.3 202 没有承诺什么
 

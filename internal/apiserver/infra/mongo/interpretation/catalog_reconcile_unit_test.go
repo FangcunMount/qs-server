@@ -46,7 +46,7 @@ func TestCatalogAuditCheckpointPORoundTripPreservesOrgSnapshots(t *testing.T) {
 
 func TestClassifyCatalogAuditEntryDetectsCatalogDriftClasses(t *testing.T) {
 	t.Parallel()
-	entry := ReportCatalogPO{AssessmentID: 1, OrgID: 7, TesteeID: 8, SourceKind: ReportCatalogSourceArchive, SourceID: 1}
+	entry := ReportCatalogPO{AssessmentID: 1, OrgID: 7, TesteeID: 8, SourceKind: ReportCatalogSourceArtifact, SourceID: 1}
 	danglingAndWrong := classifyCatalogAuditEntry(entry, CatalogSourceAssociation{}, false, 99)
 	if danglingAndWrong.Dangling != 1 || danglingAndWrong.WrongWinner != 1 {
 		t.Fatalf("dangling/wrong = %#v", danglingAndWrong)

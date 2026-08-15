@@ -21,7 +21,6 @@ const (
 	CatalogAuditPhaseCatalog         = "catalog_entries"
 
 	IndexCatalogAuditArtifact = "idx_interpret_report_audit_active_assessment_winner"
-	IndexCatalogAuditArchive  = "idx_archived_report_audit_active_org_domain"
 )
 
 var (
@@ -105,7 +104,6 @@ func (s *CatalogReconcileStore) VerifyAuditIndexes(ctx context.Context) error {
 	}{
 		{(ReportCatalogPO{}).CollectionName(), "uk_report_catalog_assessment"},
 		{(InterpretReportPO{}).CollectionName(), IndexCatalogAuditArtifact},
-		{(ArchivedReportPO{}).CollectionName(), IndexCatalogAuditArchive},
 	}
 	for _, item := range required {
 		present, err := listReportCatalogIndexNames(ctx, s.db.Collection(item.collection))
@@ -167,15 +165,11 @@ func (s *CatalogReconcileStore) LoadAuditUpperBounds(ctx context.Context, maxTim
 	if err != nil {
 		return CatalogAuditUpperBounds{}, err
 	}
-	archive, err := maxUint64Field(ctx, s.db.Collection((ArchivedReportPO{}).CollectionName()), "domain_id", bson.M{"deleted_at": nil, "org_id": bson.M{"$ne": nil}}, maxTime)
-	if err != nil {
-		return CatalogAuditUpperBounds{}, err
-	}
 	catalog, err := maxUint64Field(ctx, s.db.Collection((ReportCatalogPO{}).CollectionName()), "assessment_id", bson.M{}, maxTime)
 	if err != nil {
 		return CatalogAuditUpperBounds{}, err
 	}
-	return CatalogAuditUpperBounds{SourceAssessmentID: max(artifact, archive), CatalogAssessmentID: catalog}, nil
+	return CatalogAuditUpperBounds{SourceAssessmentID: artifact, CatalogAssessmentID: catalog}, nil
 }
 
 func maxUint64Field(ctx context.Context, collection *mongo.Collection, field string, filter bson.M, maxTime time.Duration) (uint64, error) {
@@ -224,17 +218,10 @@ func (s *CatalogReconcileStore) scanMissingSources(ctx context.Context, request 
 	if err != nil {
 		return CatalogAuditBatchResult{}, err
 	}
-	archiveRows, archiveFull, err := s.loadArchiveCandidates(ctx, request)
-	if err != nil {
-		return CatalogAuditBatchResult{}, err
-	}
-	byAssessment := make(map[uint64]catalogSourceCandidate, len(artifactRows)+len(archiveRows))
-	for _, candidate := range archiveRows {
-		byAssessment[candidate.AssessmentID] = candidate
-	}
+	byAssessment := make(map[uint64]catalogSourceCandidate, len(artifactRows))
 	for _, candidate := range artifactRows {
 		current, exists := byAssessment[candidate.AssessmentID]
-		if !exists || current.Source != ReportCatalogSourceArtifact || candidate.SortAt.After(current.SortAt) ||
+		if !exists || candidate.SortAt.After(current.SortAt) ||
 			(candidate.SortAt.Equal(current.SortAt) && candidate.ReportID > current.ReportID) {
 			byAssessment[candidate.AssessmentID] = candidate
 		}
@@ -246,9 +233,6 @@ func (s *CatalogReconcileStore) scanMissingSources(ctx context.Context, request 
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 	if len(ids) > request.Limit {
 		ids = ids[:request.Limit]
-	}
-	if err := s.promoteArchiveCandidatesWithArtifacts(ctx, ids, byAssessment, request.MaxTime); err != nil {
-		return CatalogAuditBatchResult{}, err
 	}
 	catalogExists, err := s.catalogAssessmentSet(ctx, ids, request.MaxTime)
 	if err != nil {
@@ -268,7 +252,7 @@ func (s *CatalogReconcileStore) scanMissingSources(ctx context.Context, request 
 	if len(ids) > 0 {
 		result.NextAssessmentID = ids[len(ids)-1]
 	}
-	result.Exhausted = len(ids) == 0 || (!artifactFull && !archiveFull && len(byAssessment) <= request.Limit)
+	result.Exhausted = len(ids) == 0 || (!artifactFull && len(byAssessment) <= request.Limit)
 	return result, nil
 }
 
@@ -292,65 +276,6 @@ func (s *CatalogReconcileStore) loadArtifactCandidates(ctx context.Context, requ
 		rows = append(rows, catalogSourceCandidate{AssessmentID: po.AssessmentID, ReportID: po.DomainID.Uint64(), OrgID: po.OrgID, Source: ReportCatalogSourceArtifact, SortAt: po.GeneratedAt})
 	}
 	return rows, len(rows) == request.Limit, cursor.Err()
-}
-
-func (s *CatalogReconcileStore) loadArchiveCandidates(ctx context.Context, request CatalogAuditBatchRequest) ([]catalogSourceCandidate, bool, error) {
-	filter := auditRange("domain_id", request)
-	filter["deleted_at"] = nil
-	filter["org_id"] = bson.M{"$ne": nil}
-	cursor, err := s.db.Collection((ArchivedReportPO{}).CollectionName()).Find(ctx, filter, options.Find().
-		SetSort(bson.D{{Key: "domain_id", Value: 1}}).SetLimit(int64(request.Limit)).SetMaxTime(request.MaxTime).
-		SetProjection(bson.M{"domain_id": 1, "org_id": 1, "created_at": 1}))
-	if err != nil {
-		return nil, false, err
-	}
-	defer func() { _ = cursor.Close(ctx) }()
-	rows := make([]catalogSourceCandidate, 0, request.Limit)
-	for cursor.Next(ctx) {
-		var po ArchivedReportPO
-		if err := cursor.Decode(&po); err != nil {
-			return nil, false, err
-		}
-		if po.OrgID != nil {
-			rows = append(rows, catalogSourceCandidate{AssessmentID: po.DomainID.Uint64(), ReportID: po.DomainID.Uint64(), OrgID: *po.OrgID, Source: ReportCatalogSourceArchive, SortAt: po.CreatedAt})
-		}
-	}
-	return rows, len(rows) == request.Limit, cursor.Err()
-}
-
-func (s *CatalogReconcileStore) promoteArchiveCandidatesWithArtifacts(ctx context.Context, ids []uint64, candidates map[uint64]catalogSourceCandidate, maxTime time.Duration) error {
-	archiveIDs := make([]uint64, 0, len(ids))
-	for _, assessmentID := range ids {
-		if candidates[assessmentID].Source == ReportCatalogSourceArchive {
-			archiveIDs = append(archiveIDs, assessmentID)
-		}
-	}
-	if len(archiveIDs) == 0 {
-		return nil
-	}
-	pipeline := mongo.Pipeline{
-		{{Key: "$match", Value: bson.M{"assessment_id": bson.M{"$in": archiveIDs}, "deleted_at": nil}}},
-		{{Key: "$sort", Value: bson.D{{Key: "assessment_id", Value: 1}, {Key: "generated_at", Value: -1}, {Key: "domain_id", Value: -1}}}},
-		{{Key: "$group", Value: bson.M{"_id": "$assessment_id", "report_id": bson.M{"$first": "$domain_id"}, "org_id": bson.M{"$first": "$org_id"}, "sort_at": bson.M{"$first": "$generated_at"}}}},
-	}
-	cursor, err := s.db.Collection((InterpretReportPO{}).CollectionName()).Aggregate(ctx, pipeline, options.Aggregate().SetMaxTime(maxTime))
-	if err != nil {
-		return err
-	}
-	defer func() { _ = cursor.Close(ctx) }()
-	for cursor.Next(ctx) {
-		var row struct {
-			AssessmentID uint64    `bson:"_id"`
-			ReportID     uint64    `bson:"report_id"`
-			OrgID        int64     `bson:"org_id"`
-			SortAt       time.Time `bson:"sort_at"`
-		}
-		if err := cursor.Decode(&row); err != nil {
-			return err
-		}
-		candidates[row.AssessmentID] = catalogSourceCandidate{AssessmentID: row.AssessmentID, ReportID: row.ReportID, OrgID: row.OrgID, Source: ReportCatalogSourceArtifact, SortAt: row.SortAt}
-	}
-	return cursor.Err()
 }
 
 func (s *CatalogReconcileStore) catalogAssessmentSet(ctx context.Context, ids []uint64, maxTime time.Duration) (map[uint64]bool, error) {
@@ -446,41 +371,21 @@ func (s *CatalogReconcileStore) loadAuditSourceAssociations(ctx context.Context,
 		ids = append(ids, entry.SourceID)
 	}
 	sources := make(map[uint64]CatalogSourceAssociation, len(ids))
-	collection := ""
-	var projection bson.M
-	switch sourceKind {
-	case ReportCatalogSourceArtifact:
-		collection = (InterpretReportPO{}).CollectionName()
-		projection = bson.M{"domain_id": 1, "assessment_id": 1, "org_id": 1, "testee_id": 1, "outcome_id": 1, "generation_id": 1}
-	case ReportCatalogSourceArchive:
-		collection = (ArchivedReportPO{}).CollectionName()
-		projection = bson.M{"domain_id": 1, "org_id": 1, "testee_id": 1, "outcome_id": 1}
-	default:
+	if sourceKind != ReportCatalogSourceArtifact {
 		return sources, nil
 	}
-	cursor, err := s.db.Collection(collection).Find(ctx, bson.M{"domain_id": bson.M{"$in": ids}, "deleted_at": nil}, options.Find().SetProjection(projection).SetMaxTime(maxTime))
+	projection := bson.M{"domain_id": 1, "assessment_id": 1, "org_id": 1, "testee_id": 1, "outcome_id": 1, "generation_id": 1}
+	cursor, err := s.db.Collection((InterpretReportPO{}).CollectionName()).Find(ctx, bson.M{"domain_id": bson.M{"$in": ids}, "deleted_at": nil}, options.Find().SetProjection(projection).SetMaxTime(maxTime))
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = cursor.Close(ctx) }()
 	for cursor.Next(ctx) {
-		if sourceKind == ReportCatalogSourceArtifact {
-			var po InterpretReportPO
-			if err := cursor.Decode(&po); err != nil {
-				return nil, err
-			}
-			sources[po.DomainID.Uint64()] = CatalogSourceAssociation{AssessmentID: po.AssessmentID, OrgID: po.OrgID, HasOrgID: true, TesteeID: po.TesteeID, OutcomeID: po.OutcomeID, HasOutcomeID: po.OutcomeID != 0, GenerationID: po.GenerationID, HasGenerationID: po.GenerationID != 0}
-			continue
-		}
-		var po ArchivedReportPO
+		var po InterpretReportPO
 		if err := cursor.Decode(&po); err != nil {
 			return nil, err
 		}
-		source := CatalogSourceAssociation{AssessmentID: po.DomainID.Uint64(), TesteeID: po.TesteeID, OutcomeID: po.OutcomeID, HasOutcomeID: po.OutcomeID != 0}
-		if po.OrgID != nil {
-			source.OrgID, source.HasOrgID = *po.OrgID, true
-		}
-		sources[po.DomainID.Uint64()] = source
+		sources[po.DomainID.Uint64()] = CatalogSourceAssociation{AssessmentID: po.AssessmentID, OrgID: po.OrgID, HasOrgID: true, TesteeID: po.TesteeID, OutcomeID: po.OutcomeID, HasOutcomeID: po.OutcomeID != 0, GenerationID: po.GenerationID, HasGenerationID: po.GenerationID != 0}
 	}
 	return sources, cursor.Err()
 }

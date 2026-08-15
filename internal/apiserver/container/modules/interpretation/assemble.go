@@ -171,7 +171,6 @@ func (m *Module) BindOutcomeRepository(repo domainoutcome.Repository) error {
 	}
 	m.automationService = automationService
 	m.readmissionService = interpretationreadmission.NewService(m.admissionRepo, repo, automationService)
-	m.catalogReconcile.BindArchiveAuthority(catalogOutcomeAuthority{repo: repo})
 	m.operationsService = interpretationoperations.NewService(
 		outcomeCorrelationAdapter{repo: repo},
 		m.generationRepo,
@@ -399,17 +398,6 @@ func (a catalogReconcileStoreAdapter) ApplyRepair(ctx context.Context, plan inte
 	})
 }
 
-func (a catalogReconcileStoreAdapter) RecoverArchiveAssociation(
-	ctx context.Context,
-	assessmentID uint64,
-	association interpretationcatalog.OutcomeAssociation,
-) (string, error) {
-	return a.store.RecoverArchiveAssociation(ctx, assessmentID, mongoEval.CatalogOutcomeAssociation{
-		OutcomeID: association.OutcomeID, OrgID: association.OrgID,
-		AssessmentID: association.AssessmentID, TesteeID: association.TesteeID,
-	})
-}
-
 func (m *Module) ReportReader() evaluationreadmodel.ReportReader {
 	if m == nil {
 		return nil
@@ -421,30 +409,6 @@ func (m *Module) ReportReader() evaluationreadmodel.ReportReader {
 // composition root so application/interpretation does not import them.
 type outcomeCorrelationAdapter struct {
 	repo domainoutcome.Repository
-}
-
-type catalogOutcomeAuthority struct {
-	repo domainoutcome.Repository
-}
-
-func (a catalogOutcomeAuthority) FindCommittedOutcome(
-	ctx context.Context,
-	assessmentID uint64,
-) (interpretationcatalog.OutcomeAssociation, error) {
-	if a.repo == nil {
-		return interpretationcatalog.OutcomeAssociation{}, fmt.Errorf("evaluation outcome repository is not configured")
-	}
-	record, err := a.repo.FindByAssessmentID(ctx, meta.ID(assessmentID))
-	if err != nil {
-		return interpretationcatalog.OutcomeAssociation{}, err
-	}
-	if record == nil {
-		return interpretationcatalog.OutcomeAssociation{}, domainoutcome.ErrNotFound
-	}
-	return interpretationcatalog.OutcomeAssociation{
-		OutcomeID: record.ID().Uint64(), OrgID: record.OrgID(),
-		AssessmentID: record.AssessmentID().Uint64(), TesteeID: record.TesteeID(),
-	}, nil
 }
 
 func (a outcomeCorrelationAdapter) FindOutcomeByAssessmentID(ctx context.Context, assessmentID meta.ID) (interpretationoperations.OutcomeRef, error) {

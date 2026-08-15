@@ -41,7 +41,7 @@ Data Access 层解决的不是“如何调用数据库 SDK”，而是四个更�
 - `questionnaire`：问卷定义和发布查询。
 - `answersheet`：答卷事实、提交幂等记录和 AnswerSheet 读模型。
 - `modelcatalog`、`ruleset`：评估模型、常模、规则集和发布快照。
-- `interpretation`：generation、run、report artifact、archive、query catalog、template 和 admission failure。
+- `interpretation`：generation、run、report artifact、query catalog、template 和 admission failure。
 - `eventoutbox`：与上述 Mongo 业务事实同事务的可靠事件。
 
 ## 3. 依赖方向：port 是边界，BaseRepository 不是

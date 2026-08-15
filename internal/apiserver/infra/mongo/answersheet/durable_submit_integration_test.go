@@ -100,12 +100,6 @@ func TestDurableSubmissionTransactionAgainstMongoReplicaSet(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 	defer cancel()
 
-	idempotency := db.Collection("answersheet_submit_idempotency")
-	if _, err := idempotency.Indexes().CreateOne(ctx, mongo.IndexModel{
-		Keys: bson.D{{Key: "idempotency_key", Value: 1}}, Options: options.Index().SetName("uk_idempotency_key").SetUnique(true),
-	}); err != nil {
-		t.Fatalf("create legacy index: %v", err)
-	}
 	repo, err := mongoanswersheet.NewRepository(db)
 	if err != nil {
 		t.Fatalf("NewRepository: %v", err)
@@ -140,7 +134,6 @@ func TestDurableSubmissionTransactionAgainstMongoReplicaSet(t *testing.T) {
 	}
 	assertMongoCount(t, ctx, db.Collection("answersheets"), bson.M{"domain_id": uint64(90010001)}, 1)
 	assertMongoCount(t, ctx, db.Collection("answersheets"), bson.M{"submit_meta.writer_id": uint64(301), "submit_meta.idempotency_key": metaInfo.IdempotencyKey}, 1)
-	assertMongoCount(t, ctx, idempotency, bson.M{"writer_id": uint64(301), "idempotency_key": metaInfo.IdempotencyKey}, 0)
 	assertMongoCount(t, ctx, outbox, bson.M{"aggregate_id": sheet.ID().String()}, 1)
 	completed, err := repo.FindCompletedSubmission(ctx, metaInfo)
 	if err != nil || completed == nil || completed.Sheet == nil || completed.Sheet.ID().Uint64() != sheet.ID().Uint64() || completed.Fingerprint != fingerprint {
@@ -171,34 +164,6 @@ func TestDurableSubmissionTransactionAgainstMongoReplicaSet(t *testing.T) {
 		t.Fatalf("historical candidate lookup error = %v, want idempotency conflict", err)
 	}
 
-	legacySheet := newIntegrationSheet(t, 90010008, "legacy")
-	if err := repo.Create(ctx, legacySheet); err != nil {
-		t.Fatalf("create legacy AnswerSheet: %v", err)
-	}
-	legacyKey := "integration-idem-legacy"
-	now := time.Now()
-	if _, err := idempotency.InsertOne(ctx, bson.M{
-		"idempotency_key":       legacyKey,
-		"writer_id":             uint64(301),
-		"testee_id":             uint64(401),
-		"questionnaire_code":    "QNR-INTEGRATION",
-		"questionnaire_version": "1.0.0",
-		"answersheet_id":        legacySheet.ID().Uint64(),
-		"status":                "completed",
-		"created_at":            now,
-		"updated_at":            now,
-	}); err != nil {
-		t.Fatalf("insert legacy idempotency record: %v", err)
-	}
-	legacyFingerprint, err := submitport.Fingerprint(legacySheet)
-	if err != nil {
-		t.Fatal(err)
-	}
-	completed, err = repo.FindCompletedSubmission(ctx, appanswersheet.DurableSubmitMeta{WriterID: 301, IdempotencyKey: legacyKey})
-	if err != nil || completed == nil || completed.Sheet == nil || completed.Sheet.ID().Uint64() != legacySheet.ID().Uint64() || completed.Fingerprint != legacyFingerprint {
-		t.Fatalf("legacy completed submission = %#v err=%v, want fallback fingerprint %q", completed, err, legacyFingerprint)
-	}
-
 	stageFailure := errors.New("injected outbox stage failure")
 	failingStore := appanswersheet.NewTransactionalSubmissionDurableStore(mongoIntegrationRunner(db), repo, integrationOutboxStager{coll: outbox, err: stageFailure}, nil)
 	failedSheet := newIntegrationSheet(t, 90010002, "rollback")
@@ -208,8 +173,6 @@ func TestDurableSubmissionTransactionAgainstMongoReplicaSet(t *testing.T) {
 		t.Fatalf("stage failure error = %v, want injected error", err)
 	}
 	assertMongoCount(t, ctx, db.Collection("answersheets"), bson.M{"domain_id": uint64(90010002)}, 0)
-	assertMongoCount(t, ctx, idempotency, bson.M{"idempotency_key": "integration-idem-0002"}, 0)
-
 	concurrentKey := "integration-idem-concurrent"
 	sheets := []*domainanswersheet.AnswerSheet{newIntegrationSheet(t, 90010003, "same"), newIntegrationSheet(t, 90010004, "same")}
 	concurrentFingerprint, _ := submitport.Fingerprint(sheets[0])

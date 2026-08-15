@@ -78,13 +78,14 @@ func TestReportReadModelListReportsFiltersAgainstMongo(t *testing.T) {
 		primitive.NewObjectID(),
 	}
 	docs := []interface{}{
-		ArchivedReportPO{
+		InterpretReportPO{
 			BaseDocument: base.BaseDocument{
 				ID:        ids[0],
-				DomainID:  meta.FromUint64(baseID + 1),
+				DomainID:  meta.FromUint64(baseID + 101),
 				CreatedAt: now.Add(-3 * time.Minute),
 				UpdatedAt: now.Add(-3 * time.Minute),
 			},
+			GeneratedAt: now.Add(-3 * time.Minute), OrgID: 1, AssessmentID: baseID + 1,
 			ScaleName:  "抑郁自评",
 			ScaleCode:  scaleCode,
 			TesteeID:   testeeID,
@@ -92,13 +93,14 @@ func TestReportReadModelListReportsFiltersAgainstMongo(t *testing.T) {
 			RiskLevel:  "high",
 			Conclusion: "高风险",
 		},
-		ArchivedReportPO{
+		InterpretReportPO{
 			BaseDocument: base.BaseDocument{
 				ID:        ids[1],
-				DomainID:  meta.FromUint64(baseID + 2),
+				DomainID:  meta.FromUint64(baseID + 102),
 				CreatedAt: now.Add(-1 * time.Minute),
 				UpdatedAt: now.Add(-1 * time.Minute),
 			},
+			GeneratedAt: now.Add(-1 * time.Minute), OrgID: 1, AssessmentID: baseID + 2,
 			ScaleName:  "抑郁自评",
 			ScaleCode:  scaleCode,
 			TesteeID:   testeeID,
@@ -106,13 +108,14 @@ func TestReportReadModelListReportsFiltersAgainstMongo(t *testing.T) {
 			RiskLevel:  "medium",
 			Conclusion: "中风险",
 		},
-		ArchivedReportPO{
+		InterpretReportPO{
 			BaseDocument: base.BaseDocument{
 				ID:        ids[2],
-				DomainID:  meta.FromUint64(baseID + 3),
+				DomainID:  meta.FromUint64(baseID + 103),
 				CreatedAt: now.Add(-2 * time.Minute),
 				UpdatedAt: now.Add(-2 * time.Minute),
 			},
+			GeneratedAt: now.Add(-2 * time.Minute), OrgID: 1, AssessmentID: baseID + 3,
 			ScaleName:  "焦虑自评",
 			ScaleCode:  otherScaleCode,
 			TesteeID:   testeeID,
@@ -120,13 +123,14 @@ func TestReportReadModelListReportsFiltersAgainstMongo(t *testing.T) {
 			RiskLevel:  "severe",
 			Conclusion: "严重风险",
 		},
-		ArchivedReportPO{
+		InterpretReportPO{
 			BaseDocument: base.BaseDocument{
 				ID:        ids[3],
-				DomainID:  meta.FromUint64(baseID + 4),
+				DomainID:  meta.FromUint64(baseID + 104),
 				CreatedAt: now,
 				UpdatedAt: now,
 			},
+			GeneratedAt: now, OrgID: 1, AssessmentID: baseID + 4,
 			ScaleName:  "抑郁自评",
 			ScaleCode:  scaleCode,
 			TesteeID:   testeeID + 1,
@@ -136,15 +140,15 @@ func TestReportReadModelListReportsFiltersAgainstMongo(t *testing.T) {
 		},
 	}
 
-	collection := db.Collection((&ArchivedReportPO{}).CollectionName())
+	collection := db.Collection((InterpretReportPO{}).CollectionName())
 	catalog := db.Collection((ReportCatalogPO{}).CollectionName())
 	if _, err := collection.InsertMany(ctx, docs); err != nil {
 		t.Fatalf("insert reports: %v", err)
 	}
 	catalogDocs := make([]interface{}, 0, len(docs))
 	for _, raw := range docs {
-		po := raw.(ArchivedReportPO)
-		catalogDocs = append(catalogDocs, ReportCatalogPO{AssessmentID: po.DomainID.Uint64(), OrgID: 1, TesteeID: po.TesteeID, SourceKind: ReportCatalogSourceArchive, SourceID: po.DomainID.Uint64(), ModelCode: po.ScaleCode, RiskLevel: po.RiskLevel, SortAt: po.CreatedAt})
+		po := raw.(InterpretReportPO)
+		catalogDocs = append(catalogDocs, ReportCatalogPO{AssessmentID: po.AssessmentID, OrgID: po.OrgID, TesteeID: po.TesteeID, SourceKind: ReportCatalogSourceArtifact, SourceID: po.DomainID.Uint64(), ModelCode: po.ScaleCode, RiskLevel: po.RiskLevel, SortAt: po.GeneratedAt, SortReportID: po.DomainID.Uint64()})
 	}
 	if _, err := catalog.InsertMany(ctx, catalogDocs); err != nil {
 		t.Fatalf("insert report catalog: %v", err)
@@ -188,77 +192,6 @@ func TestReportReadModelListReportsFiltersAgainstMongo(t *testing.T) {
 	}
 	if reportRow.ModelCode != scaleCode || reportRow.RiskLevel != "high" || reportRow.AssessmentID != baseID+1 {
 		t.Fatalf("unexpected report row: %#v", reportRow)
-	}
-}
-
-func TestReportReadModelPrefersCurrentReportsAndFallsBackToArchivesAgainstMongo(t *testing.T) {
-	db := openEvaluationMongoContractDB(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	baseID := uint64(time.Now().UnixNano() / int64(time.Millisecond))
-	testeeID := baseID + 1000
-	now := time.Now().UTC().Truncate(time.Second)
-	archiveCollection := db.Collection((&ArchivedReportPO{}).CollectionName())
-	reportCollection := db.Collection((InterpretReportPO{}).CollectionName())
-	catalogCollection := db.Collection((ReportCatalogPO{}).CollectionName())
-	archiveIDs := []primitive.ObjectID{primitive.NewObjectID(), primitive.NewObjectID()}
-	reportID := primitive.NewObjectID()
-
-	archiveDocs := []interface{}{
-		ArchivedReportPO{
-			BaseDocument: base.BaseDocument{ID: archiveIDs[0], DomainID: meta.FromUint64(baseID + 1), CreatedAt: now.Add(time.Minute), UpdatedAt: now.Add(time.Minute)},
-			TesteeID:     testeeID, ScaleCode: "SDS", Conclusion: "archived duplicate", TotalScore: 1,
-		},
-		ArchivedReportPO{
-			BaseDocument: base.BaseDocument{ID: archiveIDs[1], DomainID: meta.FromUint64(baseID + 2), CreatedAt: now.Add(-time.Minute), UpdatedAt: now.Add(-time.Minute)},
-			TesteeID:     testeeID, ScaleCode: "SDS", Conclusion: "archived only", TotalScore: 2,
-		},
-	}
-	if _, err := archiveCollection.InsertMany(ctx, archiveDocs); err != nil {
-		t.Fatalf("insert archived reports: %v", err)
-	}
-	reportPO := InterpretReportPO{
-		BaseDocument:        base.BaseDocument{ID: reportID, DomainID: meta.FromUint64(baseID + 101), CreatedAt: now, UpdatedAt: now},
-		GenerationID:        baseID + 201,
-		OutcomeID:           baseID + 301,
-		InterpretationRunID: baseID + 401,
-		ReportType:          "standard",
-		TemplateVersion:     "v1",
-		GeneratedAt:         now,
-		OrgID:               1,
-		AssessmentID:        baseID + 1,
-		TesteeID:            testeeID,
-		ScaleCode:           "SDS",
-		Conclusion:          "current report wins",
-		TotalScore:          42,
-	}
-	if _, err := reportCollection.InsertOne(ctx, reportPO); err != nil {
-		t.Fatalf("insert current report: %v", err)
-	}
-	if _, err := catalogCollection.InsertMany(ctx, []interface{}{ReportCatalogPO{AssessmentID: baseID + 1, OrgID: 1, TesteeID: testeeID, SourceKind: ReportCatalogSourceArtifact, SourceID: baseID + 101, ModelCode: "SDS", SortAt: now, SortReportID: baseID + 101}, ReportCatalogPO{AssessmentID: baseID + 2, OrgID: 1, TesteeID: testeeID, SourceKind: ReportCatalogSourceArchive, SourceID: baseID + 2, ModelCode: "SDS", SortAt: now.Add(-time.Minute)}}); err != nil {
-		t.Fatalf("insert catalog: %v", err)
-	}
-	t.Cleanup(func() {
-		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cleanupCancel()
-		_, _ = archiveCollection.DeleteMany(cleanupCtx, bson.M{"_id": bson.M{"$in": archiveIDs}})
-		_, _ = reportCollection.DeleteOne(cleanupCtx, bson.M{"_id": reportID})
-		_, _ = catalogCollection.DeleteMany(cleanupCtx, bson.M{"assessment_id": bson.M{"$in": []uint64{baseID + 1, baseID + 2}}})
-	})
-
-	reader := NewReportReadModel(db)
-	newRow, err := reader.GetReportByAssessmentID(ctx, baseID+1)
-	if err != nil || newRow.Conclusion != "current report wins" || newRow.TotalScore != 42 {
-		t.Fatalf("new-first report = %#v err=%v", newRow, err)
-	}
-	archivedRow, err := reader.GetReportByAssessmentID(ctx, baseID+2)
-	if err != nil || archivedRow.Conclusion != "archived only" {
-		t.Fatalf("archive fallback report = %#v err=%v", archivedRow, err)
-	}
-	rows, total, err := reader.ListReports(ctx, evaluationreadmodel.ReportFilter{TesteeID: &testeeID}, evaluationreadmodel.PageRequest{Page: 1, PageSize: 10})
-	if err != nil || total != 2 || len(rows) != 2 || rows[0].AssessmentID != baseID+1 || rows[0].Conclusion != "current report wins" {
-		t.Fatalf("new-first report list = %#v total=%d err=%v", rows, total, err)
 	}
 }
 
@@ -319,54 +252,6 @@ func TestReportReadModelFailsClosedOnArtifactAssociationMismatchAgainstMongo(t *
 
 	reader := NewReportReadModel(db)
 	assertAssociationMismatchFailClosed(t, reader, ctx, catalogAssessment, testeeID, ReportCatalogSourceArtifact, reportDomainID, "SECRET_FOREIGN_BODY")
-}
-
-func TestReportReadModelFailsClosedOnArchiveAssociationMismatchAgainstMongo(t *testing.T) {
-	db := openEvaluationMongoContractDB(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	baseID := uint64(time.Now().UnixNano() / int64(time.Millisecond))
-	catalogAssessment := baseID + 1
-	archiveDomainID := baseID + 2 // assessment_id for archive source (= domain_id)
-	testeeID := baseID + 1000
-	foreignTestee := baseID + 1001
-	now := time.Now().UTC().Truncate(time.Second)
-	archiveID := primitive.NewObjectID()
-
-	archiveCollection := db.Collection((&ArchivedReportPO{}).CollectionName())
-	catalogCollection := db.Collection((ReportCatalogPO{}).CollectionName())
-
-	archivePO := ArchivedReportPO{
-		BaseDocument: base.BaseDocument{ID: archiveID, DomainID: meta.FromUint64(archiveDomainID), CreatedAt: now, UpdatedAt: now},
-		TesteeID:     foreignTestee,
-		ScaleCode:    "SDS",
-		Conclusion:   "SECRET_ARCHIVE_BODY",
-		TotalScore:   88,
-	}
-	if _, err := archiveCollection.InsertOne(ctx, archivePO); err != nil {
-		t.Fatalf("insert mismatched archive: %v", err)
-	}
-	if _, err := catalogCollection.InsertOne(ctx, ReportCatalogPO{
-		AssessmentID: catalogAssessment,
-		OrgID:        1,
-		TesteeID:     testeeID,
-		SourceKind:   ReportCatalogSourceArchive,
-		SourceID:     archiveDomainID,
-		ModelCode:    "SDS",
-		SortAt:       now,
-	}); err != nil {
-		t.Fatalf("insert catalog: %v", err)
-	}
-	t.Cleanup(func() {
-		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cleanupCancel()
-		_, _ = archiveCollection.DeleteOne(cleanupCtx, bson.M{"_id": archiveID})
-		_, _ = catalogCollection.DeleteMany(cleanupCtx, bson.M{"assessment_id": catalogAssessment})
-	})
-
-	reader := NewReportReadModel(db)
-	assertAssociationMismatchFailClosed(t, reader, ctx, catalogAssessment, testeeID, ReportCatalogSourceArchive, archiveDomainID, "SECRET_ARCHIVE_BODY")
 }
 
 func assertAssociationMismatchFailClosed(

@@ -330,7 +330,7 @@ func modelIdentityToPO(model domainreport.ModelIdentity) *ModelIdentityPO {
 		return nil
 	}
 	// New report documents persist only canonical directory identity. The legacy
-	// fields remain on the PO solely so historical archived reports can be read.
+	// fields remain on the PO solely so historical Artifacts can be read.
 	return &ModelIdentityPO{Kind: model.Kind, Algorithm: model.Algorithm, Code: model.Code, Version: model.Version, Title: model.Title}
 }
 

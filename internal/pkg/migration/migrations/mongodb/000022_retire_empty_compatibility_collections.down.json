@@ -1,0 +1,32 @@
+[
+  { "create": "answersheet_submit_idempotency" },
+  {
+    "createIndexes": "answersheet_submit_idempotency",
+    "indexes": [
+      {
+        "key": { "status": 1, "updated_at": 1 },
+        "name": "idx_status_updated_at"
+      },
+      {
+        "key": { "writer_id": 1, "idempotency_key": 1 },
+        "name": "uk_writer_id_idempotency_key",
+        "unique": true
+      }
+    ]
+  },
+  { "create": "archived_reports" },
+  {
+    "createIndexes": "archived_reports",
+    "indexes": [
+      {
+        "key": { "domain_id": 1 },
+        "name": "uk_archived_report_assessment",
+        "unique": true
+      },
+      {
+        "key": { "deleted_at": 1, "domain_id": 1, "org_id": 1 },
+        "name": "idx_archived_report_audit_active_org_domain"
+      }
+    ]
+  }
+]

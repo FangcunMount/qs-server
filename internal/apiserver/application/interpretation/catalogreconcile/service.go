@@ -81,22 +81,7 @@ type Store interface {
 	ListDrifts(context.Context, Filter, string, int) (DriftPage, error)
 	SaveRepairPlan(context.Context, RepairPlan) error
 	FindRepairPlan(context.Context, string) (RepairPlan, error)
-	RecoverArchiveAssociation(context.Context, uint64, OutcomeAssociation) (string, error)
 	ApplyRepair(context.Context, RepairPlan) (string, error)
-}
-
-// OutcomeAssociation is the committed Evaluation authority used only to
-// recover legacy Archive association metadata. It never carries report
-// content into the repair path.
-type OutcomeAssociation struct {
-	OutcomeID    uint64
-	OrgID        int64
-	AssessmentID uint64
-	TesteeID     uint64
-}
-
-type ArchiveAuthority interface {
-	FindCommittedOutcome(context.Context, uint64) (OutcomeAssociation, error)
 }
 
 // Service runs read-only catalog reconcile. Repair is intentionally separate.
@@ -105,7 +90,6 @@ type Service interface {
 	ListDrifts(context.Context, Filter, string, int) (DriftPage, error)
 	CreateRepairPlan(context.Context, int64, Filter) (RepairPlan, error)
 	Repair(context.Context, RepairCommand) (RepairResult, error)
-	BindArchiveAuthority(ArchiveAuthority)
 }
 
 type CatalogService interface {
@@ -134,8 +118,6 @@ type service struct {
 	auditIndexesReady bool
 	now               func() time.Time
 	newID             func() string
-	mu                sync.RWMutex
-	authority         ArchiveAuthority
 }
 
 func NewService(store Store, audit ...AuditStore) CatalogService {
@@ -144,21 +126,6 @@ func NewService(store Store, audit ...AuditStore) CatalogService {
 		auditStore = audit[0]
 	}
 	return &service{store: store, audit: auditStore, now: time.Now, newID: func() string { return meta.New().String() }}
-}
-
-func (s *service) BindArchiveAuthority(authority ArchiveAuthority) {
-	if s == nil {
-		return
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.authority = authority
-}
-
-func (s *service) archiveAuthority() ArchiveAuthority {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.authority
 }
 
 func (s *service) CreateRepairPlan(ctx context.Context, orgID int64, filter Filter) (RepairPlan, error) {
@@ -199,26 +166,6 @@ func (s *service) Repair(ctx context.Context, command RepairCommand) (RepairResu
 	if plan.Item.Version != command.ExpectedCatalogVersion || plan.Item.Source != command.ExpectedSource {
 		return RepairResult{}, fmt.Errorf("catalog repair expected state changed")
 	}
-	recoveredArchive := false
-	if plan.Item.Source == "archive" && containsField(plan.Item.Fields, "org_id") {
-		authority := s.archiveAuthority()
-		if authority == nil {
-			return RepairResult{}, fmt.Errorf("committed outcome authority is not configured")
-		}
-		association, err := authority.FindCommittedOutcome(ctx, plan.Item.AssessmentID)
-		if err != nil {
-			return RepairResult{}, fmt.Errorf("load committed outcome authority: %w", err)
-		}
-		if association.AssessmentID != plan.Item.AssessmentID || association.OrgID != command.OrgID ||
-			association.OutcomeID == 0 || association.TesteeID == 0 {
-			return RepairResult{}, fmt.Errorf("committed outcome association does not match repair target")
-		}
-		status, err := s.store.RecoverArchiveAssociation(ctx, plan.Item.AssessmentID, association)
-		if err != nil {
-			return RepairResult{}, err
-		}
-		recoveredArchive = status == "repaired" || status == "already_repaired"
-	}
 	assessmentID := plan.Item.AssessmentID
 	page, err := s.ListDrifts(ctx, Filter{
 		OrgID: &command.OrgID, AssessmentID: &assessmentID, Kind: plan.Item.Kind,
@@ -227,11 +174,7 @@ func (s *service) Repair(ctx context.Context, command RepairCommand) (RepairResu
 		return RepairResult{}, err
 	}
 	if len(page.Items) == 0 {
-		status := "already_repaired"
-		if recoveredArchive {
-			status = "repaired"
-		}
-		return RepairResult{Status: status, Item: plan.Item}, nil
+		return RepairResult{Status: "already_repaired", Item: plan.Item}, nil
 	}
 	if len(page.Items) != 1 || page.Items[0].Version != plan.Item.Version || page.Items[0].Source != plan.Item.Source {
 		return RepairResult{}, fmt.Errorf("catalog repair candidate changed after dry-run")
@@ -241,13 +184,4 @@ func (s *service) Repair(ctx context.Context, command RepairCommand) (RepairResu
 		return RepairResult{}, err
 	}
 	return RepairResult{Status: status, Item: plan.Item}, nil
-}
-
-func containsField(fields []string, target string) bool {
-	for _, field := range fields {
-		if field == target {
-			return true
-		}
-	}
-	return false
 }

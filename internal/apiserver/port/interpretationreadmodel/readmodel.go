@@ -149,7 +149,7 @@ type ModelIdentityRow struct {
 	Version      string
 	Title        string
 	DecisionKind string
-	// StaticOnly marks archived content that has no safe runtime identity.
+	// StaticOnly marks historical content that has no safe runtime identity.
 	// It may be displayed but cannot be rebuilt or sent to a renderer.
 	StaticOnly bool
 }

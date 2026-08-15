@@ -3,13 +3,11 @@ package catalogreconcile
 import (
 	"context"
 	"testing"
-	"time"
 )
 
 type fakeStore struct {
 	err       error
 	plan      RepairPlan
-	recovered string
 	pages     []DriftPage
 	listCalls int
 }
@@ -27,21 +25,7 @@ func (f *fakeStore) SaveRepairPlan(_ context.Context, plan RepairPlan) error {
 	return f.err
 }
 
-type archiveAuthorityStub struct {
-	association OutcomeAssociation
-	err         error
-}
-
-func (a archiveAuthorityStub) FindCommittedOutcome(context.Context, uint64) (OutcomeAssociation, error) {
-	return a.association, a.err
-}
 func (f *fakeStore) FindRepairPlan(context.Context, string) (RepairPlan, error) { return f.plan, f.err }
-func (f *fakeStore) RecoverArchiveAssociation(context.Context, uint64, OutcomeAssociation) (string, error) {
-	if f.recovered == "" {
-		return "already_repaired", f.err
-	}
-	return f.recovered, f.err
-}
 func (f *fakeStore) ApplyRepair(context.Context, RepairPlan) (string, error) {
 	return "repaired", f.err
 }
@@ -58,34 +42,5 @@ func TestListDriftsRequiresStableKind(t *testing.T) {
 	}
 	if len(page.Items) != 1 || page.Items[0].Kind != DriftDangling {
 		t.Fatalf("page = %#v", page)
-	}
-}
-
-func TestRepairRecoversArchiveAssociationFromCommittedOutcome(t *testing.T) {
-	t.Parallel()
-	item := DriftItem{
-		AssessmentID: 7, Kind: DriftAssociationMismatch, Source: "archive",
-		Version: "v1", Fields: []string{"org_id"},
-	}
-	store := &fakeStore{
-		plan: RepairPlan{
-			DryRunID: "dry-1", OrgID: 9, Item: item,
-			ExpiresAt: time.Now().Add(time.Hour),
-		},
-		recovered: "repaired",
-		pages:     []DriftPage{{}},
-	}
-	service := NewService(store)
-	service.BindArchiveAuthority(archiveAuthorityStub{association: OutcomeAssociation{
-		OutcomeID: 11, OrgID: 9, AssessmentID: 7, TesteeID: 13,
-	}})
-	result, err := service.Repair(context.Background(), RepairCommand{
-		OrgID: 9, DryRunID: "dry-1", ExpectedCatalogVersion: "v1", ExpectedSource: "archive",
-	})
-	if err != nil {
-		t.Fatalf("Repair: %v", err)
-	}
-	if result.Status != "repaired" {
-		t.Fatalf("status = %q, want repaired", result.Status)
 	}
 }

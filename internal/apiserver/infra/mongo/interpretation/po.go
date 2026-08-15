@@ -5,10 +5,11 @@ import (
 	"time"
 )
 
-// ==================== ArchivedReport persistence shape ====================
+// ==================== Report body persistence shape ====================
 
-// ArchivedReportPO is the immutable historical v0 report projection.
-type ArchivedReportPO struct {
+// reportBodyPO is the shared nested report body shape used by the canonical
+// artifact read mapper. It has no standalone collection owner.
+type reportBodyPO struct {
 	base.BaseDocument `bson:",inline"`
 
 	OutcomeID     uint64     `bson:"outcome_id,omitempty" json:"outcome_id,omitempty"`
@@ -31,9 +32,8 @@ type ArchivedReportPO struct {
 	// 受试者ID（冗余，用于查询）
 	TesteeID uint64 `bson:"testee_id" json:"testee_id"`
 
-	// OrgID is optional on historical archives. When present it participates in
-	// catalog↔source association checks (IR-R002). When absent, read paths still
-	// fail-closed on assessment_id/testee_id and only observe the unproven org.
+	// OrgID remains optional in the shared mapper shape for legacy Artifact
+	// decoding. Canonical Artifact persistence requires a proven organization.
 	OrgID *int64 `bson:"org_id,omitempty" json:"org_id,omitempty"`
 
 	// 评估结果汇总
@@ -139,8 +139,4 @@ type ModelRarityPO struct {
 	Percent float64 `bson:"percent,omitempty" json:"percent,omitempty"`
 	Label   string  `bson:"label,omitempty" json:"label,omitempty"`
 	OneInX  int     `bson:"one_in_x,omitempty" json:"one_in_x,omitempty"`
-}
-
-func (ArchivedReportPO) CollectionName() string {
-	return "archived_reports"
 }

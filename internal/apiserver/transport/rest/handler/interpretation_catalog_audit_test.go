@@ -30,8 +30,6 @@ func (catalogSnapshotServiceStub) CreateRepairPlan(context.Context, int64, inter
 func (catalogSnapshotServiceStub) Repair(context.Context, interpretationcatalog.RepairCommand) (interpretationcatalog.RepairResult, error) {
 	return interpretationcatalog.RepairResult{}, nil
 }
-func (catalogSnapshotServiceStub) BindArchiveAuthority(interpretationcatalog.ArchiveAuthority) {}
-
 func TestCatalogReconcileReturnsCompletedSnapshotHeaders(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	completedAt := time.Date(2026, 8, 5, 12, 0, 0, 123, time.UTC)

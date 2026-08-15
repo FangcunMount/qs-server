@@ -6,7 +6,7 @@ const crypto = require("crypto")
 
 const schemaVersion = "interpretation-presentation-profile-governance/v1"
 const legacySource = "legacy_artifact_dimensions/v1"
-const allowedCollections = new Set(["interpret_report_artifacts", "archived_reports"])
+const allowedCollections = new Set(["interpret_report_artifacts"])
 const applyConfirmation = "materialize-legacy-artifact-dimensions-v1"
 const rollbackConfirmation = "rollback-legacy-artifact-dimensions-v1"
 
