@@ -95,7 +95,7 @@ jobs:
             "interpretation-ledger-servera:${remote_binary}"
           local_sha="$(shasum -a 256 "${MIGRATION_BINARY}" | awk '{print $1}')"
           remote_sha="$(ssh -F "${SERVERA_SSH_CONFIG}" interpretation-ledger-servera \
-            "sha256sum ${remote_binary} | awk '{print \\$1}'")"
+            "sha256sum ${remote_binary} | cut -d ' ' -f 1")"
           test "${local_sha}" = "${remote_sha}"
           ssh -F "${SERVERA_SSH_CONFIG}" interpretation-ledger-servera \
             "chmod 0755 ${remote_binary}"
