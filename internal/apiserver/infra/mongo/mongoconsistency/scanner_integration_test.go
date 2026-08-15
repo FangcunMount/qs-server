@@ -4,6 +4,7 @@ package mongoconsistency
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/mongodbtest"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func TestScannerDetectsEverySupportedDriftAgainstReplicaSet(t *testing.T) {
@@ -49,6 +51,67 @@ func TestScannerAcceptsMarkedHealthyTransactionsAgainstReplicaSet(t *testing.T) 
 	}
 }
 
+func TestScannerPagesSubmittedOutboxAcrossAggregateIDDigitWidths(t *testing.T) {
+	_, db := mongodbtest.ReplicaSetDatabase(t)
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
+	defer cancel()
+
+	ids := []uint64{1, 2, 3, 10, 20, 100}
+	sheets := make([]any, 0, len(ids))
+	events := make([]any, 0, len(ids))
+	for _, id := range ids {
+		sheets = append(sheets, bson.M{"domain_id": id})
+		events = append(events, bson.M{
+			"event_id":       fmt.Sprintf("evt-sheet-%d", id),
+			"event_type":     answersheet.EventTypeSubmitted,
+			"aggregate_type": answersheet.AggregateType,
+			"aggregate_id":   fmt.Sprintf("%d", id),
+		})
+	}
+	mustInsertMany(t, ctx, db.Collection("answersheets"), sheets)
+	mustInsertMany(t, ctx, db.Collection("domain_event_outbox"), events)
+	ensureOutboxAuditIndex(t, ctx, db)
+
+	scanner := NewScanner(db, nil)
+	upper, err := scanner.UpperBound(ctx, appaudit.PhaseOutboxAnswerSheet, 3*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The lexicographic maximum is "3", not the numeric maximum 100.
+	if upper != 3 {
+		t.Fatalf("upper bound = %d, want 3", upper)
+	}
+
+	request := appaudit.BatchRequest{
+		Phase: appaudit.PhaseOutboxAnswerSheet, UpperBound: upper,
+		Limit: 2, MaxTime: 3 * time.Second, MaxSamples: 10,
+	}
+	var cursors []uint64
+	total := 0
+	for batchNumber := 0; batchNumber < 10; batchNumber++ {
+		batch, scanErr := scanner.ScanBatch(ctx, request)
+		if scanErr != nil {
+			t.Fatal(scanErr)
+		}
+		if len(batch.Findings) != 0 {
+			t.Fatalf("healthy outbox page produced drift: %#v", batch.Findings)
+		}
+		total += batch.Scanned
+		cursors = append(cursors, batch.NextID)
+		if batch.Exhausted {
+			break
+		}
+		request.AfterID = batch.NextID
+	}
+	if total != len(ids) {
+		t.Fatalf("scanned = %d, want %d; cursors=%v", total, len(ids), cursors)
+	}
+	wantCursors := []uint64{10, 2, 3}
+	if fmt.Sprint(cursors) != fmt.Sprint(wantCursors) {
+		t.Fatalf("cursors = %v, want %v", cursors, wantCursors)
+	}
+}
+
 func insertAuditDriftFixtures(t *testing.T, ctx context.Context, db *mongo.Database) {
 	t.Helper()
 	mustInsertMany(t, ctx, db.Collection("answersheets"), []any{
@@ -83,6 +146,7 @@ func insertAuditDriftFixtures(t *testing.T, ctx context.Context, db *mongo.Datab
 
 func scanAllPhases(t *testing.T, ctx context.Context, db *mongo.Database) appaudit.Statistics {
 	t.Helper()
+	ensureOutboxAuditIndex(t, ctx, db)
 	stats := appaudit.NewStatistics()
 	scanner := NewScanner(db, nil)
 	for _, phase := range appaudit.AuditPhases {
@@ -102,6 +166,20 @@ func scanAllPhases(t *testing.T, ctx context.Context, db *mongo.Database) appaud
 		stats.Add(result, 10)
 	}
 	return stats
+}
+
+func ensureOutboxAuditIndex(t *testing.T, ctx context.Context, db *mongo.Database) {
+	t.Helper()
+	if _, err := db.Collection("domain_event_outbox").Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "aggregate_type", Value: 1},
+			{Key: "event_type", Value: 1},
+			{Key: "aggregate_id", Value: 1},
+		},
+		Options: options.Index().SetName(outboxConsistencyAuditIndex),
+	}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func mustInsertMany(t *testing.T, ctx context.Context, collection *mongo.Collection, docs []any) {

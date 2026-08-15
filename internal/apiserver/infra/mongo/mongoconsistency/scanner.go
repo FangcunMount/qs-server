@@ -191,51 +191,66 @@ func (s *Scanner) scanAnswerSheetOutbox(ctx context.Context, request appaudit.Ba
 }
 
 type submittedOutbox struct {
-	AuditID     uint64 `bson:"audit_id"`
 	EventID     string `bson:"event_id"`
 	AggregateID string `bson:"aggregate_id"`
 }
 
-func (s *Scanner) outboxPipeline(after, upper uint64, limit int, descending bool) mongo.Pipeline {
-	sortOrder := 1
-	if descending {
-		sortOrder = -1
+const outboxConsistencyAuditIndex = "idx_outbox_consistency_audit"
+
+func outboxBaseFilter() bson.M {
+	return bson.M{
+		"event_type":     answersheetdomain.EventTypeSubmitted,
+		"aggregate_type": answersheetdomain.AggregateType,
 	}
-	match := bson.M{"event_type": answersheetdomain.EventTypeSubmitted, "aggregate_type": answersheetdomain.AggregateType}
-	if !descending {
-		match["audit_id"] = bson.M{"$gt": after, "$lte": upper}
+}
+
+func parseOutboxAggregateID(value string) (uint64, error) {
+	id, err := strconv.ParseUint(value, 10, 64)
+	if err != nil || id == 0 {
+		return 0, fmt.Errorf("invalid AnswerSheet outbox aggregate_id %q", value)
 	}
-	return mongo.Pipeline{
-		{{Key: "$match", Value: bson.M{"event_type": answersheetdomain.EventTypeSubmitted, "aggregate_type": answersheetdomain.AggregateType}}},
-		{{Key: "$addFields", Value: bson.M{"audit_id": bson.M{"$convert": bson.M{"input": "$aggregate_id", "to": "long", "onError": 0, "onNull": 0}}}}},
-		{{Key: "$match", Value: match}},
-		{{Key: "$sort", Value: bson.D{{Key: "audit_id", Value: sortOrder}}}},
-		{{Key: "$limit", Value: limit}},
-		{{Key: "$project", Value: bson.M{"audit_id": 1, "event_id": 1, "aggregate_id": 1}}},
-	}
+	return id, nil
 }
 
 func (s *Scanner) outboxUpperBound(ctx context.Context, maxTime time.Duration) (uint64, error) {
-	cur, err := s.db.Collection("domain_event_outbox").Aggregate(ctx, s.outboxPipeline(0, 0, 1, true), options.Aggregate().SetMaxTime(maxTime))
+	var row submittedOutbox
+	err := s.db.Collection("domain_event_outbox").FindOne(
+		ctx,
+		outboxBaseFilter(),
+		options.FindOne().
+			SetSort(bson.D{{Key: "aggregate_id", Value: -1}}).
+			SetProjection(bson.M{"aggregate_id": 1}).
+			SetHint(outboxConsistencyAuditIndex).
+			SetMaxTime(maxTime),
+	).Decode(&row)
+	if err == mongo.ErrNoDocuments {
+		return 0, nil
+	}
 	if err != nil {
 		return 0, err
 	}
-	defer func() { _ = cur.Close(ctx) }()
-	var rows []submittedOutbox
-	if err := cur.All(ctx, &rows); err != nil || len(rows) == 0 {
-		return 0, err
-	}
-	return rows[0].AuditID, nil
+	return parseOutboxAggregateID(row.AggregateID)
 }
 
 func (s *Scanner) scanOutboxAnswerSheet(ctx context.Context, request appaudit.BatchRequest) (appaudit.BatchResult, error) {
-	cur, err := s.db.Collection("domain_event_outbox").Aggregate(ctx, s.outboxPipeline(request.AfterID, request.UpperBound, request.Limit, false), options.Aggregate().SetMaxTime(request.MaxTime))
-	if err != nil {
-		return appaudit.BatchResult{}, err
-	}
-	defer func() { _ = cur.Close(ctx) }()
 	var rows []submittedOutbox
-	if err := cur.All(ctx, &rows); err != nil {
+	filter := outboxBaseFilter()
+	filter["aggregate_id"] = bson.M{
+		"$gt":  strconv.FormatUint(request.AfterID, 10),
+		"$lte": strconv.FormatUint(request.UpperBound, 10),
+	}
+	if err := findAll(
+		ctx,
+		s.db.Collection("domain_event_outbox"),
+		filter,
+		options.Find().
+			SetSort(bson.D{{Key: "aggregate_id", Value: 1}}).
+			SetLimit(int64(request.Limit)).
+			SetProjection(bson.M{"event_id": 1, "aggregate_id": 1}).
+			SetHint(outboxConsistencyAuditIndex).
+			SetMaxTime(request.MaxTime),
+		&rows,
+	); err != nil {
 		return appaudit.BatchResult{}, err
 	}
 	result := appaudit.BatchResult{Scanned: len(rows)}
@@ -245,8 +260,12 @@ func (s *Scanner) scanOutboxAnswerSheet(ctx context.Context, request appaudit.Ba
 	}
 	ids := make([]uint64, 0, len(rows))
 	for _, row := range rows {
-		ids = append(ids, row.AuditID)
-		result.NextID = row.AuditID
+		auditID, err := parseOutboxAggregateID(row.AggregateID)
+		if err != nil {
+			return appaudit.BatchResult{}, err
+		}
+		ids = append(ids, auditID)
+		result.NextID = auditID
 	}
 	var sheets []struct {
 		DomainID uint64 `bson:"domain_id"`
@@ -258,12 +277,15 @@ func (s *Scanner) scanOutboxAnswerSheet(ctx context.Context, request appaudit.Ba
 	for _, sheet := range sheets {
 		found[sheet.DomainID] = struct{}{}
 	}
-	for _, row := range rows {
-		if _, ok := found[row.AuditID]; !ok {
-			result.Findings = append(result.Findings, finding(appaudit.DriftOutboxMissingAnswerSheet, row.AuditID))
+	for index := range rows {
+		if _, ok := found[ids[index]]; !ok {
+			result.Findings = append(result.Findings, finding(appaudit.DriftOutboxMissingAnswerSheet, ids[index]))
 		}
 	}
-	result.Exhausted = batchDone(result.Scanned, result.NextID, request)
+	// aggregate_id is stored and indexed as a decimal string. Cursor equality,
+	// rather than numeric >=, preserves correct exhaustion when lexicographic
+	// order crosses digit widths (for example 1, 10, 100, 2).
+	result.Exhausted = result.Scanned < request.Limit || result.NextID == request.UpperBound
 	return result, nil
 }
 
