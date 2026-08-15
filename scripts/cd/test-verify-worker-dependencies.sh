@@ -79,4 +79,13 @@ sed -n '/^  deploy-worker:/,/^  verify-worker-governance:/p' \
 grep -Fq 'MYSQL_HOST: mysql-rds-proxy' "$worker_job"
 grep -Fq 'MYSQL_PORT: 3306' "$worker_job"
 
+worker_deploy="$TEST_ROOT/worker-deploy.sh"
+sed -n '/^deploy_worker()/,/^echo "=========================================="/p' \
+  "$SCRIPT_DIR/remote-deploy.sh" >"$worker_deploy"
+grep -Fq 'WORKER_ENV_FILE="$DEPLOY_TMP/configs/env/config.prod.env"' "$worker_deploy"
+if grep -Fq 'WORKER_ENV_FILE="$COMPOSE_ENV_FILE"' "$worker_deploy"; then
+  echo 'worker dependency preflight reads the image-only Compose environment' >&2
+  exit 1
+fi
+
 echo '[OK] worker dependency preflight fails before replacement and does not expose credentials'

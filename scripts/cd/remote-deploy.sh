@@ -729,7 +729,7 @@ deploy_worker() {
     exit 1
   fi
   PRIVILEGE_RUNNER="$SUDO" \
-    WORKER_ENV_FILE="$COMPOSE_ENV_FILE" \
+    WORKER_ENV_FILE="$DEPLOY_TMP/configs/env/config.prod.env" \
     WORKER_IMAGE_REF="$(resolve_compose_image_ref)" \
     WORKER_DEPENDENCY_TIMEOUT_SECONDS="${WORKER_DEPENDENCY_TIMEOUT_SECONDS:-5}" \
     bash "$dependency_verifier" verify

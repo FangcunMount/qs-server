@@ -102,6 +102,7 @@ assert_package_contract() {
       assert_line "$env_file" "QS_WORKER_MONGODB_MAX_POOL_SIZE=32"
       assert_line "$env_file" "QS_WORKER_MONGODB_MAX_CONNECTING=4"
       assert_line "$env_file" "QS_WORKER_MONGODB_MAX_CONN_IDLE_TIME=10m"
+      assert_line "$env_file" "QS_WORKER_MYSQL_HOST=mysql:3306"
       assert_line "$env_file" "QS_WORKER_REDIS_DATABASE=0"
       assert_line "$env_file" "QS_WORKER_MESSAGING_NSQ_ADDR=nsqd:4150"
       assert_line "$env_file" "QS_WORKER_MESSAGING_NSQ_LOOKUPD_ADDR=nsqlookupd:4161"
