@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -1324,10 +1325,28 @@ LIMIT ?`, limit)
 }
 
 func countMySQLRows(ctx context.Context, conn *sql.Conn) ([]namedCount, error) {
-	items := []mysqlCountItem{
+	items := mysqlCountItems()
+	out := make([]namedCount, 0, len(items))
+	for i, item := range items {
+		item := item
+		var count int64
+		if err := prog.RunStep("count mysql "+item.name, i+1, len(items), func() error {
+			return conn.QueryRowContext(ctx, item.query).Scan(&count)
+		}); err != nil {
+			return nil, fmt.Errorf("%s: %w", item.name, err)
+		}
+		out = append(out, namedCount{Name: item.name, Count: count})
+	}
+	return out, nil
+}
+
+func mysqlCountItems() []mysqlCountItem {
+	return []mysqlCountItem{
 		{"testee", `SELECT COUNT(*) FROM testee t JOIN tmp_cleanup_testee_ids x ON x.id = t.id`},
 		{"assessment", `SELECT COUNT(*) FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id`},
 		{"evaluation_outcome", `SELECT COUNT(*) FROM evaluation_outcome o JOIN tmp_cleanup_outcome_ids x ON x.id = o.id`},
+		{"interpretation_admission_failure", `SELECT COUNT(*) FROM interpretation_admission_failure f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id`},
+		{"interpretation_attention_projection", `SELECT COUNT(*) FROM interpretation_attention_projection p JOIN tmp_cleanup_testee_ids t ON t.id = p.testee_id`},
 		{"assessment_score", `SELECT COUNT(*) FROM assessment_score s LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id LEFT JOIN tmp_cleanup_testee_ids t ON t.id = s.testee_id WHERE a.id IS NOT NULL OR t.id IS NOT NULL`},
 		{"assessment_task", `SELECT COUNT(*) FROM assessment_task task LEFT JOIN tmp_cleanup_testee_ids t ON t.id = task.testee_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = task.assessment_id LEFT JOIN tmp_cleanup_plan_enrollment_ids e ON e.id = task.enrollment_id WHERE t.id IS NOT NULL OR a.id IS NOT NULL OR e.id IS NOT NULL`},
 		{"plan_enrollment", `SELECT COUNT(*) FROM plan_enrollment e JOIN tmp_cleanup_plan_enrollment_ids x ON x.id = e.id`},
@@ -1346,18 +1365,6 @@ func countMySQLRows(ctx context.Context, conn *sql.Conn) ([]namedCount, error) {
 		{"runtime_checkpoint", `SELECT COUNT(*) FROM runtime_checkpoint r JOIN tmp_cleanup_assessment_ids a ON a.id = r.assessment_id`},
 		{"retry_event_hold", `SELECT COUNT(*) FROM retry_event_hold h JOIN tmp_cleanup_event_ids e ON BINARY e.event_id = BINARY h.event_id`},
 	}
-	out := make([]namedCount, 0, len(items))
-	for i, item := range items {
-		item := item
-		var count int64
-		if err := prog.RunStep("count mysql "+item.name, i+1, len(items), func() error {
-			return conn.QueryRowContext(ctx, item.query).Scan(&count)
-		}); err != nil {
-			return nil, fmt.Errorf("%s: %w", item.name, err)
-		}
-		out = append(out, namedCount{Name: item.name, Count: count})
-	}
-	return out, nil
 }
 
 func countMongoRows(ctx context.Context, db *mongo.Database, ids scopeIDs, workers int) ([]namedCount, error) {
@@ -1496,6 +1503,8 @@ func mysqlBackupItems() []mysqlBackupItem {
 		{"testee", `SELECT t.* FROM testee t JOIN tmp_cleanup_testee_ids x ON x.id = t.id`},
 		{"assessment", `SELECT a.* FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id`},
 		{"evaluation_outcome", `SELECT o.* FROM evaluation_outcome o JOIN tmp_cleanup_outcome_ids x ON x.id = o.id`},
+		{"interpretation_admission_failure", `SELECT f.* FROM interpretation_admission_failure f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id`},
+		{"interpretation_attention_projection", `SELECT p.* FROM interpretation_attention_projection p JOIN tmp_cleanup_testee_ids t ON t.id = p.testee_id`},
 		{"assessment_score", `SELECT s.* FROM assessment_score s LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id LEFT JOIN tmp_cleanup_testee_ids t ON t.id = s.testee_id WHERE a.id IS NOT NULL OR t.id IS NOT NULL`},
 		{"assessment_task", `SELECT task.* FROM assessment_task task LEFT JOIN tmp_cleanup_testee_ids t ON t.id = task.testee_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = task.assessment_id LEFT JOIN tmp_cleanup_plan_enrollment_ids e ON e.id = task.enrollment_id WHERE t.id IS NOT NULL OR a.id IS NOT NULL OR e.id IS NOT NULL`},
 		{"plan_enrollment", `SELECT e.* FROM plan_enrollment e JOIN tmp_cleanup_plan_enrollment_ids x ON x.id = e.id`},
@@ -1609,6 +1618,8 @@ func mysqlDeleteItems(_ context.Context, _ *sql.Conn) ([]mysqlDeleteItem, error)
 		{"retry_event_hold", `DELETE h FROM retry_event_hold h JOIN tmp_cleanup_event_ids e ON BINARY e.event_id = BINARY h.event_id`},
 		{"runtime_checkpoint", `DELETE r FROM runtime_checkpoint r JOIN tmp_cleanup_assessment_ids a ON a.id = r.assessment_id`},
 		{"domain_event_outbox", `DELETE o FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
+		{"interpretation_attention_projection", `DELETE p FROM interpretation_attention_projection p JOIN tmp_cleanup_testee_ids t ON t.id = p.testee_id`},
+		{"interpretation_admission_failure", `DELETE f FROM interpretation_admission_failure f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id`},
 		{"assessment_entry_resolve_log", `DELETE l FROM assessment_entry_resolve_log l JOIN tmp_cleanup_resolve_log_ids x ON x.id = l.id`},
 		{"assessment_entry_intake_log", `DELETE l FROM assessment_entry_intake_log l LEFT JOIN tmp_cleanup_testee_ids t ON t.id = l.testee_id LEFT JOIN tmp_cleanup_intake_log_ids scoped ON scoped.id = l.id WHERE t.id IS NOT NULL OR scoped.id IS NOT NULL`},
 		{"clinician_relation", `DELETE r FROM clinician_relation r LEFT JOIN tmp_cleanup_testee_ids t ON t.id = r.testee_id LEFT JOIN tmp_cleanup_relation_ids scoped ON scoped.id = r.id WHERE t.id IS NOT NULL OR scoped.id IS NOT NULL`},
@@ -2245,10 +2256,16 @@ func validateBackupSuffix(suffix string) error {
 
 func mysqlBackupTableName(sourceTable, suffix string) (string, error) {
 	name := mysqlBackupTablePrefix + sourceTable + "_" + suffix
-	if len(name) > mysqlIdentifierMaxLength {
-		return "", fmt.Errorf("backup table name %q exceeds MySQL identifier limit %d; shorten --backup-suffix", name, mysqlIdentifierMaxLength)
+	if len(name) <= mysqlIdentifierMaxLength {
+		return name, nil
 	}
-	return name, nil
+
+	digest := fmt.Sprintf("%x", sha256.Sum256([]byte(sourceTable)))[:8]
+	availableSourceLength := mysqlIdentifierMaxLength - len(mysqlBackupTablePrefix) - len(digest) - len(suffix) - 2
+	if availableSourceLength <= 0 {
+		return "", fmt.Errorf("backup suffix %q exceeds MySQL identifier limit %d after reserving a unique table prefix; shorten --backup-suffix", suffix, mysqlIdentifierMaxLength)
+	}
+	return mysqlBackupTablePrefix + sourceTable[:min(len(sourceTable), availableSourceLength)] + "_" + digest + "_" + suffix, nil
 }
 
 func printScopeSummary(summary scopeSummary, cfg config) {

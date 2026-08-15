@@ -7,11 +7,14 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/database"
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/logger"
+	qsgormlogger "github.com/FangcunMount/qs-server/internal/pkg/gormlogger"
 	"github.com/FangcunMount/qs-server/internal/pkg/mongoconfig"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
 // DatabaseManager 数据库管理器
@@ -19,6 +22,7 @@ type DatabaseManager struct {
 	config          *config.Config
 	registry        *database.Registry
 	redisProfiles   *database.NamedRedisRegistry
+	mysqlRegistered bool
 	mongoRegistered bool
 }
 
@@ -33,6 +37,9 @@ func NewDatabaseManager(cfg *config.Config) *DatabaseManager {
 // Initialize 初始化所有数据库连接
 func (m *DatabaseManager) Initialize() error {
 	log.Info("Initializing database connections...")
+	if err := m.initMySQL(); err != nil {
+		return fmt.Errorf("failed to initialize MySQL: %w", err)
+	}
 
 	if err := m.initRedis(); err != nil {
 		return fmt.Errorf("failed to initialize Redis: %w", err)
@@ -42,13 +49,33 @@ func (m *DatabaseManager) Initialize() error {
 		return fmt.Errorf("failed to initialize MongoDB: %w", err)
 	}
 
-	if m.registry != nil && m.mongoRegistered {
+	if m.registry != nil && (m.mysqlRegistered || m.mongoRegistered) {
 		if err := m.registry.Init(); err != nil {
 			return fmt.Errorf("failed to initialize database registry: %w", err)
 		}
 	}
 
 	log.Info("All database connections initialized successfully")
+	return nil
+}
+
+func (m *DatabaseManager) initMySQL() error {
+	if m == nil || m.config == nil || m.config.MySQL == nil || m.config.MySQL.Host == "" || m.config.MySQL.Database == "" {
+		log.Warn("MySQL not configured, skipping")
+		return nil
+	}
+	opts := m.config.MySQL
+	mysqlConfig := &database.MySQLConfig{
+		Host: opts.Host, Username: opts.Username, Password: opts.Password, Database: opts.Database,
+		MaxIdleConnections: opts.MaxIdleConnections, MaxOpenConnections: opts.MaxOpenConnections,
+		MaxConnectionLifeTime: opts.MaxConnectionLifeTime, LogLevel: opts.LogLevel,
+		Location: opts.Location, SessionTimeZone: opts.SessionTimeZone,
+		Logger: qsgormlogger.IgnoreRecordNotFound(logger.NewGormLogger(opts.LogLevel)),
+	}
+	if err := m.registry.Register(database.MySQL, mysqlConfig, database.NewMySQLConnection(mysqlConfig)); err != nil {
+		return err
+	}
+	m.mysqlRegistered = true
 	return nil
 }
 
@@ -272,6 +299,23 @@ func (m *DatabaseManager) GetMongoDatabase() (*mongo.Database, error) {
 		return nil, fmt.Errorf("failed to cast client to *mongo.Client")
 	}
 	return mongoClient.Database(m.config.MongoDB.Database), nil
+}
+
+// GetMySQLDB returns the shared worker MySQL connection used by durable
+// transport ledgers and attention projection state.
+func (m *DatabaseManager) GetMySQLDB() (*gorm.DB, error) {
+	if m == nil || m.registry == nil || !m.mysqlRegistered {
+		return nil, fmt.Errorf("mysql is not configured")
+	}
+	client, err := m.registry.GetClient(database.MySQL)
+	if err != nil {
+		return nil, err
+	}
+	db, ok := client.(*gorm.DB)
+	if !ok {
+		return nil, fmt.Errorf("failed to cast client to *gorm.DB")
+	}
+	return db, nil
 }
 
 func cloneWorkerDatabaseRedisConfig(cfg *database.RedisConfig) *database.RedisConfig {

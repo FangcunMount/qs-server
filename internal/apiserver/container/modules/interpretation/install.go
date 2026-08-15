@@ -15,6 +15,8 @@ type InstallHost interface {
 // InstallFrom wires and registers the report module using composition-root host inputs.
 func InstallFrom(host InstallHost) error {
 	module, err := Wire(WireInput{
+		MySQLDB:            host.MySQLDB(),
+		MySQLLimiter:       host.MySQLLimiter(),
 		MongoDB:            host.MongoDB(),
 		MongoLimiter:       host.MongoLimiter(),
 		OpsHandle:          host.CacheHandle(redisruntime.FamilyOps),

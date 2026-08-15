@@ -1,0 +1,60 @@
+CREATE TABLE `interpretation_admission_failure` (
+  `id` bigint unsigned NOT NULL,
+  `outcome_id` bigint unsigned NOT NULL DEFAULT 0,
+  `org_id` bigint NOT NULL DEFAULT 0,
+  `assessment_id` bigint unsigned NOT NULL DEFAULT 0,
+  `testee_id` bigint unsigned NOT NULL DEFAULT 0,
+  `event_id` varchar(128) NOT NULL DEFAULT '',
+  `trace_id` varchar(128) NOT NULL DEFAULT '',
+  `kind` varchar(64) NOT NULL,
+  `code` varchar(128) NOT NULL,
+  `safe_message` text NOT NULL,
+  `retryable` tinyint(1) NOT NULL DEFAULT 0,
+  `fingerprint` varchar(191) NOT NULL,
+  `generation_id` bigint unsigned NOT NULL DEFAULT 0,
+  `outcome_version` varchar(128) NOT NULL DEFAULT '',
+  `attempt` int unsigned NOT NULL DEFAULT 1,
+  `decision` varchar(32) NOT NULL,
+  `first_failed_at` datetime(3) NOT NULL,
+  `last_failed_at` datetime(3) NOT NULL,
+  `occurred_at` datetime(3) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_interpretation_admission_failure_fingerprint` (`fingerprint`),
+  KEY `idx_interpretation_admission_failure_outcome_occurred` (`outcome_id`, `occurred_at` DESC),
+  KEY `idx_interpretation_admission_failure_operations` (`org_id`, `kind`, `decision`, `occurred_at` DESC, `id` DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `interpretation_catalog_audit_checkpoint` (
+  `checkpoint_key` varchar(64) NOT NULL,
+  `schema_version` int NOT NULL,
+  `revision` bigint NOT NULL,
+  `cycle_id` varchar(64) NOT NULL,
+  `phase` varchar(32) NOT NULL,
+  `after_assessment_id` bigint unsigned NOT NULL DEFAULT 0,
+  `source_upper_assessment_id` bigint unsigned NOT NULL DEFAULT 0,
+  `catalog_upper_assessment_id` bigint unsigned NOT NULL DEFAULT 0,
+  `working_counts_json` json NOT NULL,
+  `working_org_counts_json` json NOT NULL,
+  `last_completed_json` json DEFAULT NULL,
+  `next_cycle_at` datetime(3) DEFAULT NULL,
+  `created_at` datetime(3) NOT NULL,
+  `updated_at` datetime(3) NOT NULL,
+  PRIMARY KEY (`checkpoint_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `interpretation_attention_projection` (
+  `event_id` varchar(128) NOT NULL,
+  `report_id` varchar(64) NOT NULL,
+  `assessment_id` varchar(64) NOT NULL,
+  `testee_id` bigint unsigned NOT NULL,
+  `risk_level` varchar(32) NOT NULL,
+  `mark_key_focus` tinyint(1) NOT NULL DEFAULT 0,
+  `status` varchar(32) NOT NULL,
+  `attempt` int unsigned NOT NULL DEFAULT 0,
+  `last_error` text NULL,
+  `created_at` datetime(3) NOT NULL,
+  `updated_at` datetime(3) NOT NULL,
+  PRIMARY KEY (`event_id`),
+  KEY `idx_interpretation_attention_projection_status_updated` (`status`, `updated_at`, `event_id`),
+  KEY `idx_interpretation_attention_projection_report` (`report_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

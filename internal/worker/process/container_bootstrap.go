@@ -14,6 +14,11 @@ func (s *server) initializeContainer(resources resourceOutput) (containerOutput,
 		return containerOutput{}, err
 	}
 	if resources.handles.dbManager != nil {
+		db, err := resources.handles.dbManager.GetMySQLDB()
+		if err != nil {
+			return containerOutput{}, err
+		}
+		workerContainer.SetMySQLDatabase(db)
 		if db, err := resources.handles.dbManager.GetMongoDatabase(); err == nil {
 			workerContainer.SetMongoDatabase(db)
 		} else if s.logger != nil {

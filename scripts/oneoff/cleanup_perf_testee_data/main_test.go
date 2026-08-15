@@ -26,6 +26,52 @@ func TestCleanupPreservesStatisticsRunAuditLedger(t *testing.T) {
 	}
 }
 
+func TestCleanupCoversMigratedInterpretationLedgersButPreservesGlobalCheckpoint(t *testing.T) {
+	want := map[string]bool{
+		"interpretation_admission_failure":    false,
+		"interpretation_attention_projection": false,
+	}
+	assertCoverage := func(kind string, names []string) {
+		t.Helper()
+		covered := make(map[string]bool, len(want))
+		for _, name := range names {
+			if name == "interpretation_catalog_audit_checkpoint" {
+				t.Fatalf("%s must preserve the global catalog audit checkpoint", kind)
+			}
+			if _, ok := want[name]; ok {
+				covered[name] = true
+			}
+		}
+		for name := range want {
+			if !covered[name] {
+				t.Fatalf("%s does not cover migrated table %s", kind, name)
+			}
+		}
+	}
+
+	countNames := make([]string, 0, len(mysqlCountItems()))
+	for _, item := range mysqlCountItems() {
+		countNames = append(countNames, item.name)
+	}
+	assertCoverage("count", countNames)
+
+	backupNames := make([]string, 0, len(mysqlBackupItems()))
+	for _, item := range mysqlBackupItems() {
+		backupNames = append(backupNames, item.table)
+	}
+	assertCoverage("backup", backupNames)
+
+	deleteItems, err := mysqlDeleteItems(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deleteNames := make([]string, 0, len(deleteItems))
+	for _, item := range deleteItems {
+		deleteNames = append(deleteNames, item.name)
+	}
+	assertCoverage("delete", deleteNames)
+}
+
 func TestValidateBackupSuffixChecksGeneratedMySQLIdentifiers(t *testing.T) {
 	if err := validateBackupSuffix("seeddata_dup_20260812_v1"); err != nil {
 		t.Fatalf("documented backup suffix should be valid: %v", err)

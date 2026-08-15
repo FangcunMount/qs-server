@@ -26,6 +26,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/worker/port"
 	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/worker/resilience/subsystem"
 	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
 // Container 主容器，负责管理所有组件
@@ -41,6 +42,7 @@ type Container struct {
 	eventCatalog            *eventcatalog.Catalog
 	reportStatus            *reportstatus.Reporter
 	mongoDatabase           *mongo.Database
+	mysqlDatabase           *gorm.DB
 	attentionProjector      *attentionprojection.Projector
 	attentionReconciler     *attentionprojection.Reconciler
 	attentionFactReconciler *attentionprojection.FactReconciler
@@ -94,7 +96,7 @@ func NewContainer(opts *options.Options, logger *slog.Logger, opsHandle *redisru
 	return c, nil
 }
 
-// SetMongoDatabase enables durable attention projection when Mongo is configured.
+// SetMongoDatabase enables report-fact reconciliation when Mongo is configured.
 func (c *Container) SetMongoDatabase(db *mongo.Database) {
 	if c == nil {
 		return
@@ -102,11 +104,19 @@ func (c *Container) SetMongoDatabase(db *mongo.Database) {
 	c.mongoDatabase = db
 }
 
+// SetMySQLDatabase enables the canonical attention projection ledger.
+func (c *Container) SetMySQLDatabase(db *gorm.DB) {
+	if c == nil {
+		return
+	}
+	c.mysqlDatabase = db
+}
+
 func (c *Container) initAttentionProjection() error {
-	if c == nil || c.mongoDatabase == nil || c.internalClient == nil {
+	if c == nil || c.mysqlDatabase == nil || c.internalClient == nil {
 		return nil
 	}
-	store, err := attentionprojection.NewMongoStore(c.mongoDatabase)
+	store, err := attentionprojection.NewMySQLStore(c.mysqlDatabase)
 	if err != nil {
 		return fmt.Errorf("initialize attention projection store: %w", err)
 	}
@@ -121,6 +131,9 @@ func (c *Container) initAttentionProjection() error {
 		return fmt.Errorf("initialize attention projection reconciler: %w", err)
 	}
 	if c.opts != nil && c.opts.Worker != nil && c.opts.Worker.AttentionProjectionReconcileEnabled {
+		if c.mongoDatabase == nil {
+			return fmt.Errorf("attention projection fact reconciliation requires MongoDB")
+		}
 		from, err := time.Parse(time.RFC3339, c.opts.Worker.AttentionProjectionReconcileFrom)
 		if err != nil {
 			return fmt.Errorf("parse attention projection reconcile_from: %w", err)

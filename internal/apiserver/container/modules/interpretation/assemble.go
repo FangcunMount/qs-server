@@ -23,18 +23,22 @@ import (
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
+	interpretationadmission "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/admission"
 	interpretationbuilder "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
+	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/interpretation"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	evaluationreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	mysqlBase "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
+	"gorm.io/gorm"
 )
 
 // Module assembles report read/query, builder-registry, and durable write capabilities.
@@ -44,7 +48,7 @@ type Module struct {
 	generationRepo        *mongoEval.GenerationRepository
 	runRepo               *mongoEval.RunRepository
 	reportRepo            *mongoEval.ReportRepository
-	admissionRepo         *mongoEval.AdmissionFailureRepository
+	admissionRepo         interpretationadmission.QueryRepository
 	reportTemplateRepo    *mongoEval.ReportTemplateRepository
 	reportTemplateService appreporttemplate.Service
 	automationService     interpretationautomation.Service
@@ -65,6 +69,8 @@ type Module struct {
 
 // Deps defines explicit constructor dependencies for the report module.
 type Deps struct {
+	MySQLDB            *gorm.DB
+	MySQLLimiter       backpressure.Acquirer
 	MongoDB            *mongo.Database
 	MongoLimiter       backpressure.Acquirer
 	OpsHandle          *redisruntime.Handle
@@ -75,6 +81,9 @@ type Deps struct {
 
 // New assembles the report module.
 func New(deps Deps) (*Module, error) {
+	if deps.MySQLDB == nil {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "MySQL database connection is nil or invalid")
+	}
 	if deps.MongoDB == nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "MongoDB database connection is nil or invalid")
 	}
@@ -91,7 +100,8 @@ func New(deps Deps) (*Module, error) {
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report catalog reconcile store: %v", err)
 	}
-	catalogStoreAdapter := catalogReconcileStoreAdapter{store: catalogReconcileStore}
+	catalogCheckpointRepo := mysqlEval.NewCatalogAuditCheckpointRepository(deps.MySQLDB)
+	catalogStoreAdapter := catalogReconcileStoreAdapter{store: catalogReconcileStore, checkpoint: catalogCheckpointRepo}
 	catalogService := interpretationcatalog.NewService(catalogStoreAdapter, catalogStoreAdapter)
 	module.catalogReconcile = catalogService
 	module.catalogAudit = catalogService
@@ -110,10 +120,7 @@ func New(deps Deps) (*Module, error) {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation report repository: %v", err)
 	}
 	module.reportRepo = reportRepo
-	admissionRepo, err := mongoEval.NewAdmissionFailureRepository(deps.MongoDB, mongoOptions)
-	if err != nil {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation admission failure repository: %v", err)
-	}
+	admissionRepo := mysqlEval.NewAdmissionFailureRepository(deps.MySQLDB, mysqlBase.BaseRepositoryOptions{Limiter: deps.MySQLLimiter})
 	module.admissionRepo = admissionRepo
 	reportTemplateManifests, err := rendering.NewBuiltinReleaseManifestCatalog()
 	if err != nil {
@@ -227,7 +234,13 @@ func (m *Module) CatalogAuditService() interpretationcatalog.RunnerService {
 }
 
 type catalogReconcileStoreAdapter struct {
-	store *mongoEval.CatalogReconcileStore
+	store      *mongoEval.CatalogReconcileStore
+	checkpoint auditCheckpointStore
+}
+
+type auditCheckpointStore interface {
+	LoadAuditCheckpoint(context.Context) (interpretationcatalog.AuditCheckpoint, error)
+	SaveAuditCheckpoint(context.Context, int64, interpretationcatalog.AuditCheckpoint) error
 }
 
 func (a catalogReconcileStoreAdapter) ListDrifts(
@@ -265,22 +278,17 @@ func (a catalogReconcileStoreAdapter) VerifyAuditIndexes(ctx context.Context) er
 }
 
 func (a catalogReconcileStoreAdapter) LoadAuditCheckpoint(ctx context.Context) (interpretationcatalog.AuditCheckpoint, error) {
-	checkpoint, err := a.store.LoadAuditCheckpoint(ctx)
-	if err == mongoEval.ErrCatalogAuditCheckpointMissing {
-		return interpretationcatalog.AuditCheckpoint{}, interpretationcatalog.ErrAuditCheckpointMissing
+	if a.checkpoint == nil {
+		return interpretationcatalog.AuditCheckpoint{}, fmt.Errorf("catalog audit checkpoint store is not configured")
 	}
-	if err != nil {
-		return interpretationcatalog.AuditCheckpoint{}, err
-	}
-	return auditCheckpointFromMongo(checkpoint), nil
+	return a.checkpoint.LoadAuditCheckpoint(ctx)
 }
 
 func (a catalogReconcileStoreAdapter) SaveAuditCheckpoint(ctx context.Context, expectedRevision int64, checkpoint interpretationcatalog.AuditCheckpoint) error {
-	err := a.store.SaveAuditCheckpoint(ctx, expectedRevision, auditCheckpointToMongo(checkpoint))
-	if err == mongoEval.ErrCatalogAuditCheckpointCAS {
-		return interpretationcatalog.ErrAuditCheckpointCAS
+	if a.checkpoint == nil {
+		return fmt.Errorf("catalog audit checkpoint store is not configured")
 	}
-	return err
+	return a.checkpoint.SaveAuditCheckpoint(ctx, expectedRevision, checkpoint)
 }
 
 func (a catalogReconcileStoreAdapter) LoadAuditUpperBounds(ctx context.Context, maxTime time.Duration) (interpretationcatalog.AuditUpperBounds, error) {
@@ -302,58 +310,14 @@ func (a catalogReconcileStoreAdapter) ScanAuditBatch(ctx context.Context, reques
 	}, nil
 }
 
-func auditCheckpointFromMongo(source mongoEval.CatalogAuditCheckpoint) interpretationcatalog.AuditCheckpoint {
-	checkpoint := interpretationcatalog.AuditCheckpoint{
-		SchemaVersion: source.SchemaVersion, Revision: source.Revision, CycleID: source.CycleID, Phase: source.Phase,
-		AfterAssessmentID: source.AfterAssessmentID, SourceUpperAssessmentID: source.SourceUpperAssessmentID,
-		CatalogUpperAssessmentID: source.CatalogUpperAssessmentID, WorkingCounts: driftCountsFromMongo(source.WorkingCounts),
-		WorkingOrgCounts: orgDriftCountsFromMongo(source.WorkingOrgCounts), NextCycleAt: source.NextCycleAt, UpdatedAt: source.UpdatedAt,
-	}
-	if source.LastCompleted != nil {
-		checkpoint.LastCompleted = &interpretationcatalog.CompletedAuditSnapshot{
-			CycleID: source.LastCompleted.CycleID, CompletedAt: source.LastCompleted.CompletedAt,
-			Counts: driftCountsFromMongo(source.LastCompleted.Counts), OrgCounts: orgDriftCountsFromMongo(source.LastCompleted.OrgCounts),
-		}
-	}
-	return checkpoint
-}
-
-func auditCheckpointToMongo(source interpretationcatalog.AuditCheckpoint) mongoEval.CatalogAuditCheckpoint {
-	checkpoint := mongoEval.CatalogAuditCheckpoint{
-		SchemaVersion: source.SchemaVersion, Revision: source.Revision, CycleID: source.CycleID, Phase: source.Phase,
-		AfterAssessmentID: source.AfterAssessmentID, SourceUpperAssessmentID: source.SourceUpperAssessmentID,
-		CatalogUpperAssessmentID: source.CatalogUpperAssessmentID, WorkingCounts: driftCountsToMongo(source.WorkingCounts),
-		WorkingOrgCounts: orgDriftCountsToMongo(source.WorkingOrgCounts), NextCycleAt: source.NextCycleAt, UpdatedAt: source.UpdatedAt,
-	}
-	if source.LastCompleted != nil {
-		checkpoint.LastCompleted = &mongoEval.CatalogCompletedAuditSnapshot{
-			CycleID: source.LastCompleted.CycleID, CompletedAt: source.LastCompleted.CompletedAt,
-			Counts: driftCountsToMongo(source.LastCompleted.Counts), OrgCounts: orgDriftCountsToMongo(source.LastCompleted.OrgCounts),
-		}
-	}
-	return checkpoint
-}
-
 func driftCountsFromMongo(source mongoEval.CatalogDriftCounts) interpretationcatalog.DriftCounts {
 	return interpretationcatalog.DriftCounts{Missing: source.Missing, Dangling: source.Dangling, AssociationMismatch: source.AssociationMismatch, WrongWinner: source.WrongWinner}
-}
-
-func driftCountsToMongo(source interpretationcatalog.DriftCounts) mongoEval.CatalogDriftCounts {
-	return mongoEval.CatalogDriftCounts{Missing: source.Missing, Dangling: source.Dangling, AssociationMismatch: source.AssociationMismatch, WrongWinner: source.WrongWinner}
 }
 
 func orgDriftCountsFromMongo(source map[int64]mongoEval.CatalogDriftCounts) map[int64]interpretationcatalog.DriftCounts {
 	result := make(map[int64]interpretationcatalog.DriftCounts, len(source))
 	for orgID, counts := range source {
 		result[orgID] = driftCountsFromMongo(counts)
-	}
-	return result
-}
-
-func orgDriftCountsToMongo(source map[int64]interpretationcatalog.DriftCounts) map[int64]mongoEval.CatalogDriftCounts {
-	result := make(map[int64]mongoEval.CatalogDriftCounts, len(source))
-	for orgID, counts := range source {
-		result[orgID] = driftCountsToMongo(counts)
 	}
 	return result
 }
