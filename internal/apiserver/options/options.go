@@ -40,6 +40,7 @@ type Options struct {
 	EvaluationLeaseRecovery     *LeaseRecoveryOptions                   `json:"evaluation_lease_recovery" mapstructure:"evaluation_lease_recovery"`
 	InterpretationLeaseRecovery *LeaseRecoveryOptions                   `json:"interpretation_lease_recovery" mapstructure:"interpretation_lease_recovery"`
 	ReportCatalogAudit          *ReportCatalogAuditOptions              `json:"report_catalog_audit" mapstructure:"report_catalog_audit"`
+	MongoConsistencyAudit       *MongoConsistencyAuditOptions           `json:"mongo_consistency_audit" mapstructure:"mongo_consistency_audit"`
 	OutboxRelay                 *OutboxRelayOptions                     `json:"outbox_relay" mapstructure:"outbox_relay"`
 	Eventing                    *EventingOptions                        `json:"eventing" mapstructure:"eventing"`
 	RateLimit                   *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
@@ -109,6 +110,7 @@ func NewOptions() *Options {
 		EvaluationLeaseRecovery:     NewEvaluationLeaseRecoveryOptions(),
 		InterpretationLeaseRecovery: NewInterpretationLeaseRecoveryOptions(),
 		ReportCatalogAudit:          NewReportCatalogAuditOptions(),
+		MongoConsistencyAudit:       NewMongoConsistencyAuditOptions(),
 		OutboxRelay:                 NewOutboxRelayOptions(),
 		Eventing:                    NewEventingOptions(),
 		RateLimit:                   NewRateLimitOptions(),
@@ -353,6 +355,41 @@ type ReportCatalogAuditOptions struct {
 	LockTTL       time.Duration `json:"lock_ttl" mapstructure:"lock_ttl"`
 }
 
+type MongoConsistencyAuditOptions struct {
+	Enable        bool          `json:"enable" mapstructure:"enable"`
+	InitialDelay  time.Duration `json:"initial_delay" mapstructure:"initial_delay"`
+	TickInterval  time.Duration `json:"tick_interval" mapstructure:"tick_interval"`
+	CycleInterval time.Duration `json:"cycle_interval" mapstructure:"cycle_interval"`
+	BatchSize     int           `json:"batch_size" mapstructure:"batch_size"`
+	BatchTimeout  time.Duration `json:"batch_timeout" mapstructure:"batch_timeout"`
+	MaxSamples    int           `json:"max_samples" mapstructure:"max_samples"`
+	LockKey       string        `json:"lock_key" mapstructure:"lock_key"`
+	LockTTL       time.Duration `json:"lock_ttl" mapstructure:"lock_ttl"`
+}
+
+func NewMongoConsistencyAuditOptions() *MongoConsistencyAuditOptions {
+	return &MongoConsistencyAuditOptions{
+		Enable: false, InitialDelay: 30 * time.Minute, TickInterval: 5 * time.Second,
+		CycleInterval: 24 * time.Hour, BatchSize: 200, BatchTimeout: 3 * time.Second, MaxSamples: 10,
+		LockKey: "qs:mongo-consistency-audit:leader", LockTTL: 30 * time.Second,
+	}
+}
+
+func (o *MongoConsistencyAuditOptions) AddFlags(fs *pflag.FlagSet) {
+	if o == nil {
+		return
+	}
+	fs.BoolVar(&o.Enable, "mongo_consistency_audit.enable", o.Enable, "Enable the bounded read-only Mongo consistency audit.")
+	fs.DurationVar(&o.InitialDelay, "mongo_consistency_audit.initial-delay", o.InitialDelay, "Delay before the first Mongo consistency audit tick.")
+	fs.DurationVar(&o.TickInterval, "mongo_consistency_audit.tick-interval", o.TickInterval, "Interval between bounded Mongo consistency audit ticks.")
+	fs.DurationVar(&o.CycleInterval, "mongo_consistency_audit.cycle-interval", o.CycleInterval, "Interval between complete Mongo consistency audit cycles.")
+	fs.IntVar(&o.BatchSize, "mongo_consistency_audit.batch-size", o.BatchSize, "Maximum anchor documents scanned per Mongo consistency audit tick.")
+	fs.DurationVar(&o.BatchTimeout, "mongo_consistency_audit.batch-timeout", o.BatchTimeout, "Deadline for one Mongo consistency audit batch.")
+	fs.IntVar(&o.MaxSamples, "mongo_consistency_audit.max-samples", o.MaxSamples, "Maximum internal sample IDs retained per drift kind.")
+	fs.StringVar(&o.LockKey, "mongo_consistency_audit.lock-key", o.LockKey, "Redis leader lock key for Mongo consistency audit.")
+	fs.DurationVar(&o.LockTTL, "mongo_consistency_audit.lock-ttl", o.LockTTL, "Renewed Redis leader lease TTL for Mongo consistency audit.")
+}
+
 func NewReportCatalogAuditOptions() *ReportCatalogAuditOptions {
 	return &ReportCatalogAuditOptions{
 		Enable: true, InitialDelay: 15 * time.Minute, TickInterval: 5 * time.Second,
@@ -518,6 +555,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.EvaluationLeaseRecovery.AddFlags(fss.FlagSet("evaluation_lease_recovery"), "evaluation_lease_recovery")
 	o.InterpretationLeaseRecovery.AddFlags(fss.FlagSet("interpretation_lease_recovery"), "interpretation_lease_recovery")
 	o.ReportCatalogAudit.AddFlags(fss.FlagSet("report_catalog_audit"))
+	o.MongoConsistencyAudit.AddFlags(fss.FlagSet("mongo_consistency_audit"))
 	o.OutboxRelay.AddFlags(fss.FlagSet("outbox_relay"))
 	o.Eventing.AddFlags(fss.FlagSet("eventing"))
 	o.RateLimit.AddFlags(fss.FlagSet("rate_limit"))

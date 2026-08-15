@@ -86,7 +86,10 @@ func New(deps Deps) (*Module, error) {
 
 	module.eventPublisher = normalized.EventPublisher
 	if err := module.initQuestionnaireSubModule(
-		modtx.NewMongoRunner(normalized.MongoDB),
+		modtx.NewMongoRunner(normalized.MongoDB, modtx.MongoRunnerOptions{
+			Boundary: "questionnaire_lifecycle",
+			Limiter:  normalized.MongoLimiter,
+		}),
 		normalized.IdentityService,
 		normalized.HotsetRecorder,
 		module.bindingSyncer,
@@ -171,7 +174,10 @@ func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, mongoLimiter 
 
 	answerScorer := ruleengineInfra.NewAnswerScorer()
 
-	mongoTxRunner := modtx.NewMongoRunnerWithLimiter(mongoDB, mongoLimiter)
+	mongoTxRunner := modtx.NewMongoRunner(mongoDB, modtx.MongoRunnerOptions{
+		Boundary: "answersheet_submit",
+		Limiter:  mongoLimiter,
+	})
 	if profile.Stager == nil || profile.PostCommit == nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "mongo domain event profile is required")
 	}

@@ -90,6 +90,60 @@ VALUES ('event-2','message-1','nsq','topic','channel','{}',1,'paused',NOW(3))`);
 	assertMySQLColumn(t, db, databaseName, "retry_event_hold", "claim_token", false)
 }
 
+func TestMongoConsistencyAuditCheckpointMySQLMigrationUpDown(t *testing.T) {
+	dsn := os.Getenv("MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("MYSQL_DSN is required for migration integration tests")
+	}
+	cfg, err := drivermysql.ParseDSN(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	databaseName := fmt.Sprintf("qs_mongo_consistency_migration_%d", time.Now().UnixNano())
+	cfg.DBName = ""
+	cfg.MultiStatements = true
+	server, err := sql.Open("mysql", cfg.FormatDSN())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	if _, err := server.ExecContext(t.Context(), "CREATE DATABASE `"+databaseName+"` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _, _ = server.ExecContext(context.Background(), "DROP DATABASE IF EXISTS `"+databaseName+"`") }()
+	cfg.DBName = databaseName
+	db, err := sql.Open("mysql", cfg.FormatDSN())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	execSQLMigration(t, db, "000069_add_mongo_consistency_audit_checkpoint.up.sql")
+	assertConsistencyCheckpointTable(t, db, databaseName, true)
+	if _, err := db.ExecContext(t.Context(),
+		"INSERT INTO mongo_consistency_audit_checkpoint "+
+			"(`checkpoint_key`,`schema_version`,`revision`,`cycle_id`,`phase`,`cursor`,`cycle_upper_bound`,`statistics_json`,`created_at`,`updated_at`) "+
+			"VALUES ('global',1,1,'cycle-1','answersheet_outbox',0,10,'{}',NOW(3),NOW(3))"); err != nil {
+		t.Fatal(err)
+	}
+	result, err := db.ExecContext(t.Context(), `UPDATE mongo_consistency_audit_checkpoint SET revision=2 WHERE checkpoint_key='global' AND revision=1`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if affected, err := result.RowsAffected(); err != nil || affected != 1 {
+		t.Fatalf("checkpoint CAS first update affected=%d err=%v, want 1", affected, err)
+	}
+	result, err = db.ExecContext(t.Context(), `UPDATE mongo_consistency_audit_checkpoint SET revision=3 WHERE checkpoint_key='global' AND revision=1`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if affected, err := result.RowsAffected(); err != nil || affected != 0 {
+		t.Fatalf("checkpoint stale CAS affected=%d err=%v, want 0", affected, err)
+	}
+	execSQLMigration(t, db, "000069_add_mongo_consistency_audit_checkpoint.down.sql")
+	assertConsistencyCheckpointTable(t, db, databaseName, false)
+}
+
 func TestRetryGovernanceMongoMigrationUpDown(t *testing.T) {
 	_, db := mongodbtest.ReplicaSetDatabase(t)
 	if err := db.CreateCollection(t.Context(), "interpretation_runs"); err != nil {
@@ -124,6 +178,18 @@ func assertMySQLColumn(t *testing.T, db *sql.DB, databaseName, table, column str
 	}
 	if (count == 1) != want {
 		t.Fatalf("column %s.%s exists=%v, want %v", table, column, count == 1, want)
+	}
+}
+
+func assertConsistencyCheckpointTable(t *testing.T, db *sql.DB, databaseName string, want bool) {
+	t.Helper()
+	var count int
+	const table = "mongo_consistency_audit_checkpoint"
+	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=? AND table_name=?`, databaseName, table).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if (count == 1) != want {
+		t.Fatalf("table %s exists=%v, want %v", table, count == 1, want)
 	}
 }
 

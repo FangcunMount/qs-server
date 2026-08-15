@@ -121,6 +121,11 @@ func TestStageRequiresActiveSessionTransactionContext(t *testing.T) {
 func TestMongoOutboxIndexModelsCoverHotRelayAndStatusQueries(t *testing.T) {
 	indexes := mongoOutboxIndexModels()
 
+	assertMongoIndex(t, indexes, "idx_outbox_consistency_audit", bson.D{
+		{Key: "aggregate_type", Value: 1},
+		{Key: "event_type", Value: 1},
+		{Key: "aggregate_id", Value: 1},
+	})
 	assertMongoIndex(t, indexes, "idx_pending_status_event_type_created_next", bson.D{
 		{Key: "status", Value: 1},
 		{Key: "event_type", Value: 1},

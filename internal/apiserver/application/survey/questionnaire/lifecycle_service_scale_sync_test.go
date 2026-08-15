@@ -4,7 +4,10 @@ import (
 	"context"
 	"testing"
 
+	baseerrors "github.com/FangcunMount/component-base/pkg/errors"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -84,6 +87,25 @@ func TestStandaloneLifecycleRejectsQuestionnaireBoundToAssessmentRelease(t *test
 	err := svc.rejectBoundStandaloneLifecycle(context.Background(), "Q-BOUND")
 	if err == nil {
 		t.Fatal("rejectBoundStandaloneLifecycle() error = nil, want conflict")
+	}
+}
+
+func TestDeleteRejectsQuestionnaireBoundToAssessmentReleaseInsideTransaction(t *testing.T) {
+	txCalls := 0
+	svc := &lifecycleService{
+		bindingSyncer: &scaleBindingSyncerRecorder{bound: true},
+		transactions: apptransaction.RunnerFunc(func(ctx context.Context, fn func(context.Context) error) error {
+			txCalls++
+			return fn(ctx)
+		}),
+	}
+
+	err := svc.Delete(context.Background(), "Q-BOUND")
+	if got := baseerrors.ParseCoder(err).Code(); got != code.ErrConflict {
+		t.Fatalf("Delete() code = %d, want %d; error=%v", got, code.ErrConflict, err)
+	}
+	if txCalls != 1 {
+		t.Fatalf("Delete() transaction calls = %d, want 1", txCalls)
 	}
 }
 

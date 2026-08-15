@@ -105,7 +105,7 @@ func (p *ReportCatalogProjector) ProjectCurrent(ctx context.Context, report *dom
 		bson.M{"sort_at": bson.M{"$lt": po.GeneratedAt}},
 		bson.M{"sort_at": po.GeneratedAt, "sort_report_id": bson.M{"$lt": po.DomainID.Uint64()}},
 	}}
-	_, err := p.Collection().UpdateOne(ctx, filter, bson.M{"$set": entry}, options.Update().SetUpsert(true))
+	_, err := p.UpdateOne(ctx, filter, bson.M{"$set": entry}, options.Update().SetUpsert(true))
 	if mongo.IsDuplicateKeyError(err) { // a newer artifact already won
 		return nil
 	}

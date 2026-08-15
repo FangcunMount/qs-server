@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -14,6 +15,13 @@ type transactionLimiterSpy struct {
 	acquired int
 	released int
 	err      error
+}
+
+type labeledTransactionError struct{}
+
+func (labeledTransactionError) Error() string { return "commit result is unknown" }
+func (labeledTransactionError) HasErrorLabel(label string) bool {
+	return label == "UnknownTransactionCommitResult"
 }
 
 func (s *transactionLimiterSpy) Acquire(ctx context.Context) (context.Context, func(), error) {
@@ -32,7 +40,7 @@ func TestMongoRunnerWithLimiterRejectsBeforeStartingSession(t *testing.T) {
 		t.Fatalf("mongo.Connect() error = %v", err)
 	}
 	t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
-	runner := NewMongoRunnerWithLimiter(client.Database("test"), limiter)
+	runner := NewMongoRunner(client.Database("test"), MongoRunnerOptions{Boundary: "test", Limiter: limiter})
 
 	err = runner.WithinTransaction(t.Context(), func(context.Context) error {
 		t.Fatal("transaction callback must not run when limiter rejects")
@@ -58,5 +66,57 @@ func TestMongoTransactionOptionsFreezePublishDurability(t *testing.T) {
 	}
 	if opts.WriteConcern == nil || opts.WriteConcern.W != "majority" {
 		t.Fatalf("write concern = %#v, want majority", opts.WriteConcern)
+	}
+}
+
+func TestMongoRunnerRequiresStableBoundaryBeforeStartingSession(t *testing.T) {
+	client, err := mongo.Connect(t.Context(), options.Client())
+	if err != nil {
+		t.Fatalf("mongo.Connect() error = %v", err)
+	}
+	t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
+	runner := NewMongoRunner(client.Database("test"), MongoRunnerOptions{})
+
+	err = runner.WithinTransaction(t.Context(), func(context.Context) error {
+		t.Fatal("callback must not run without a stable boundary")
+		return nil
+	})
+	if err == nil || err.Error() != "mongo transaction boundary is required" {
+		t.Fatalf("WithinTransaction() error = %v, want boundary validation error", err)
+	}
+}
+
+func TestMongoRunnerRequiresLimiterBeforeStartingSession(t *testing.T) {
+	client, err := mongo.Connect(t.Context(), options.Client())
+	if err != nil {
+		t.Fatalf("mongo.Connect() error = %v", err)
+	}
+	t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
+	runner := NewMongoRunner(client.Database("test"), MongoRunnerOptions{Boundary: "test"})
+
+	err = runner.WithinTransaction(t.Context(), func(context.Context) error {
+		t.Fatal("callback must not run without a limiter")
+		return nil
+	})
+	if err == nil || err.Error() != `mongo transaction limiter is required for boundary "test"` {
+		t.Fatalf("WithinTransaction() error = %v, want limiter validation error", err)
+	}
+}
+
+func TestMongoTransactionOutcomeRecognizesWrappedCommitUnknown(t *testing.T) {
+	if got := mongoTransactionOutcome(errors.Join(errors.New("wrapper"), labeledTransactionError{})); got != "commit_unknown" {
+		t.Fatalf("mongoTransactionOutcome() = %q, want commit_unknown", got)
+	}
+	if got := mongoTransactionOutcome(errors.New("callback failed")); got != "rolled_back" {
+		t.Fatalf("mongoTransactionOutcome() = %q, want rolled_back", got)
+	}
+}
+
+func TestMongoCallbackRetryMetricCountsAttemptsBeyondFirst(t *testing.T) {
+	metric := mongoTransactionCallbackRetries.WithLabelValues("metric_test")
+	before := testutil.ToFloat64(metric)
+	observeMongoCallbackAttempts("metric_test", 3)
+	if delta := testutil.ToFloat64(metric) - before; delta != 2 {
+		t.Fatalf("callback retry metric delta = %f, want 2", delta)
 	}
 }

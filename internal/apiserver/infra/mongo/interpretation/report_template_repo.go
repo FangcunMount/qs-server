@@ -93,7 +93,7 @@ func (r *ReportTemplateRepository) Save(ctx context.Context, template *domainrep
 	default:
 		return fmt.Errorf("save report template: invalid status")
 	}
-	result, err := r.Collection().ReplaceOne(ctx, filter, po, options.Replace().SetUpsert(upsert))
+	result, err := r.ReplaceOne(ctx, filter, po, options.Replace().SetUpsert(upsert))
 	if err != nil {
 		if mongo.IsDuplicateKeyError(err) {
 			return domainreporttemplate.ErrConflict

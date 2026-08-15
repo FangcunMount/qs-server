@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"testing"
 	"time"
@@ -15,10 +16,16 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 )
 
-type starterTx struct{ calls int }
+type starterTx struct {
+	calls int
+	err   error
+}
 
 func (t *starterTx) WithinTransaction(ctx context.Context, fn func(context.Context) error) error {
 	t.calls++
+	if t.err != nil {
+		return t.err
+	}
 	return fn(ctx)
 }
 
@@ -254,11 +261,32 @@ func TestStarterReclaimsExpiredLeaseWithoutCreatingNextAttempt(t *testing.T) {
 	if result.Status != StartStatusStarted || result.Run.Attempt() != 1 || result.Generation.Status() != domaingeneration.StatusGenerating || result.Generation.LatestRunID() != result.Run.ID() {
 		t.Fatalf("recovery result = %#v", result)
 	}
-	if staleRun.Status() != interpretationrun.StatusRunning || staleRun.Origin() != retrygovernance.AttemptOriginInitial || !staleRun.HasActiveLease(now) {
-		t.Fatalf("stale run not reclaimed = origin:%s recovery:%d history:%#v", staleRun.Origin(), staleRun.RecoveryCount(), staleRun.ClaimHistory())
+	if staleRun.HasActiveLease(now) || staleRun.RecoveryCount() != 0 {
+		t.Fatalf("caller-owned stale run was mutated = recovery:%d history:%#v", staleRun.RecoveryCount(), staleRun.ClaimHistory())
+	}
+	if result.Run.Status() != interpretationrun.StatusRunning || result.Run.Origin() != retrygovernance.AttemptOriginInitial || !result.Run.HasActiveLease(now) {
+		t.Fatalf("reclaimed run = origin:%s recovery:%d history:%#v", result.Run.Origin(), result.Run.RecoveryCount(), result.Run.ClaimHistory())
 	}
 	if tx.calls != 1 || runs.saves != 1 || runs.creates != 0 || generationRecord.Version() != 2 {
 		t.Fatalf("recovery writes tx=%d saves=%d creates=%d generation_version=%d", tx.calls, runs.saves, runs.creates, generationRecord.Version())
+	}
+}
+
+func TestStarterTransactionFailureDoesNotMutateCallerOwnedGeneration(t *testing.T) {
+	now := time.Date(2026, 7, 14, 10, 0, 0, 0, time.UTC)
+	service, generations, _, tx := newStarterFixture(t, now)
+	pending, err := domaingeneration.New(meta.FromUint64(1), starterKey(), now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	generations.put(pending)
+	tx.err = errors.New("injected transaction failure")
+
+	if _, err := service.Start(context.Background(), StartRequest{Key: starterKey(), TraceID: "failed"}); err == nil {
+		t.Fatal("Start() error = nil, want transaction failure")
+	}
+	if pending.Status() != domaingeneration.StatusPending || pending.Version() != 1 || !pending.LatestRunID().IsZero() {
+		t.Fatalf("caller generation mutated after rollback: status=%s version=%d run=%s", pending.Status(), pending.Version(), pending.LatestRunID())
 	}
 }
 

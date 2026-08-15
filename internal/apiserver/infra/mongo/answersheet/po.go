@@ -24,9 +24,19 @@ type AnswerSheetPO struct {
 	Admission            *AdmissionPO           `bson:"admission,omitempty" json:"admission,omitempty"`
 	Attribution          *AttributionSnapshotPO `bson:"attribution,omitempty" json:"attribution,omitempty"`
 	SubmitMeta           *SubmitMetaPO          `bson:"submit_meta,omitempty" json:"submit_meta,omitempty"`
+	DurableAcceptance    *DurableAcceptancePO   `bson:"durable_acceptance,omitempty" json:"durable_acceptance,omitempty"`
 	TotalScore           float64                `bson:"total_score" json:"total_score"`
 	FilledAt             time.Time              `bson:"filled_at" json:"filled_at"`
 	Answers              []AnswerPO             `bson:"answers" json:"answers"`
+}
+
+// DurableAcceptancePO marks submissions created by the current atomic
+// AnswerSheet + Outbox contract. Historical documents without this marker are
+// intentionally outside the bidirectional consistency invariant.
+type DurableAcceptancePO struct {
+	SchemaVersion uint32    `bson:"schema_version" json:"schema_version"`
+	EventID       string    `bson:"event_id" json:"event_id"`
+	AcceptedAt    time.Time `bson:"accepted_at" json:"accepted_at"`
 }
 
 // SubmitMetaPO is a technical acceptance fact embedded in the AnswerSheet

@@ -99,7 +99,11 @@ func TestUnpublishReleaseArchivesPairAndKeepsHeadEditable(t *testing.T) {
 	models := &publishedReleaseModelRepo{model: model}
 	published := &unpublishPublishedRepo{}
 	questionnaires := &unpublishQuestionnaireLifecycle{}
-	service := Service{Transactions: directTransactionRunner{}, Models: models, Published: published, Authorizer: allowReleaseAuthorizer{}, Questionnaires: questionnaires, Now: func() time.Time { return now.Add(time.Hour) }}
+	nowCalls := 0
+	service := Service{Transactions: directTransactionRunner{}, Models: models, Published: published, Authorizer: allowReleaseAuthorizer{}, Questionnaires: questionnaires, Now: func() time.Time {
+		nowCalls++
+		return now.Add(time.Hour)
+	}}
 
 	result, err := service.UnpublishRelease(context.Background(), modelcatalog.ActorContext{}, model.Code)
 	if err != nil {
@@ -110,6 +114,9 @@ func TestUnpublishReleaseArchivesPairAndKeepsHeadEditable(t *testing.T) {
 	}
 	if !published.deleted || !questionnaires.called || !questionnaires.invalidated || models.updateCalls != 1 {
 		t.Fatalf("transition calls = published:%t questionnaire:%t invalidated:%t updates:%d", published.deleted, questionnaires.called, questionnaires.invalidated, models.updateCalls)
+	}
+	if nowCalls != 1 {
+		t.Fatalf("transaction transition time calls = %d, want 1 before callback", nowCalls)
 	}
 }
 

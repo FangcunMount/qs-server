@@ -36,6 +36,14 @@ type failingLifecycleRepository struct {
 	domainquestionnaire.Repository
 	failSetActive   bool
 	failClearActive bool
+	failCreate      bool
+}
+
+func (r failingLifecycleRepository) Create(ctx context.Context, questionnaire *domainquestionnaire.Questionnaire) error {
+	if r.failCreate {
+		return errInjectedLifecyclePersistence
+	}
+	return r.Repository.Create(ctx, questionnaire)
 }
 
 func (r failingLifecycleRepository) SetActivePublishedVersion(ctx context.Context, code, version string) error {
@@ -127,6 +135,45 @@ func TestStandaloneQuestionnaireLifecycleRollsBackOnPartialFailure(t *testing.T)
 			assertSnapshotCount(t, db, code, 1)
 		})
 	}
+
+	t.Run("delete rolls back removed head when published head restore fails", func(t *testing.T) {
+		_, db := mongodbtest.ReplicaSetDatabase(t)
+		repo := mongoquestionnaire.NewRepository(db)
+		code := "Q-STANDALONE-DELETE-ROLLBACK"
+		createDraftQuestionnaire(t, repo, code)
+		service := newLifecycleService(db, repo)
+		if _, err := service.Publish(t.Context(), code); err != nil {
+			t.Fatalf("prepare published questionnaire: %v", err)
+		}
+		publishedHead, err := repo.FindByCode(t.Context(), code)
+		if err != nil {
+			t.Fatalf("load published head: %v", err)
+		}
+		if err := (domainquestionnaire.Versioning{}).ForkDraftFromPublished(publishedHead); err != nil {
+			t.Fatalf("fork editable draft: %v", err)
+		}
+		if err := repo.Update(t.Context(), publishedHead); err != nil {
+			t.Fatalf("persist editable draft: %v", err)
+		}
+		before, err := repo.FindByCode(t.Context(), code)
+		if err != nil || before == nil || !before.IsDraft() {
+			t.Fatalf("draft before delete = %#v err=%v", before, err)
+		}
+
+		failingService := newLifecycleService(db, failingLifecycleRepository{Repository: repo, failCreate: true})
+		if err := failingService.Delete(t.Context(), code); err == nil {
+			t.Fatal("Delete() error = nil, want injected restore failure")
+		}
+
+		after, err := repo.FindByCode(t.Context(), code)
+		if err != nil || after == nil {
+			t.Fatalf("head after rollback = %#v err=%v, want original draft", after, err)
+		}
+		if !after.IsDraft() || after.GetVersion().String() != before.GetVersion().String() {
+			t.Fatalf("head after rollback = status=%s version=%s, want draft/%s", after.GetStatus(), after.GetVersion(), before.GetVersion())
+		}
+		assertSnapshotCount(t, db, code, 1)
+	})
 }
 
 func newLifecycleService(db *mongo.Database, repo domainquestionnaire.Repository) appquestionnaire.QuestionnaireLifecycleService {

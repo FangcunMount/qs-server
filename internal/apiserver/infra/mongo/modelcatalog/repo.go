@@ -73,7 +73,7 @@ func (r *Repository) DeletePublished(ctx context.Context, kind domain.Kind, code
 	if code == "" {
 		return domain.ErrNotFound
 	}
-	_, err := r.Collection().UpdateMany(ctx, activePublishedFilter(bson.M{
+	_, err := r.UpdateMany(ctx, activePublishedFilter(bson.M{
 		"kind": kindBSONFilter(kind),
 		"code": code,
 	}), bson.M{"$set": bson.M{
@@ -112,7 +112,7 @@ func (r *Repository) upsertPublishedModel(ctx context.Context, model *port.Publi
 
 	// Earlier active releases remain immutable and are archived in the same
 	// outer Mongo transaction before the new active row is inserted.
-	_, err := r.Collection().UpdateMany(ctx, activePublishedFilter(bson.M{
+	_, err := r.UpdateMany(ctx, activePublishedFilter(bson.M{
 		"kind": po.Kind,
 		"code": po.Code,
 	}), bson.M{"$set": bson.M{

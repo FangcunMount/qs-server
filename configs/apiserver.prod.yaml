@@ -313,6 +313,18 @@ report_catalog_audit:
   lock_key: "qs:report-catalog-audit:leader"
   lock_ttl: 30s
 
+# 第一阶段保持关闭；一次只读全量审计无未解释 high drift 后改为 true。
+mongo_consistency_audit:
+  enable: false
+  initial_delay: 30m
+  tick_interval: 5s
+  cycle_interval: 24h
+  batch_size: 200
+  batch_timeout: 3s
+  max_samples: 10
+  lock_key: "qs:mongo-consistency-audit:leader"
+  lock_ttl: 30s
+
 # ----------------------------------------------------------------------------
 # 3.6.5 事件出库重投任务
 # ----------------------------------------------------------------------------

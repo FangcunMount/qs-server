@@ -1,6 +1,7 @@
 package questionnaire
 
 import (
+	"context"
 	"slices"
 	"time"
 
@@ -423,59 +424,55 @@ func (q *Questionnaire) updateVersion(newVersion Version) error {
 
 // publish 发布问卷（包内方法）
 // 更新状态并触发 QuestionnaireChangedEvent
-func (q *Questionnaire) publish() error {
+func (q *Questionnaire) publish(ctx context.Context) error {
 	if err := q.updateStatus(STATUS_PUBLISHED); err != nil {
 		return err
 	}
 
 	// 触发领域事件
-	q.addEvent(NewQuestionnaireChangedEvent(
-		string(q.code),
-		q.version.String(),
-		q.title,
-		ChangeActionPublished,
-		time.Now(),
-	))
+	q.addLifecycleEvent(ctx, ChangeActionPublished)
 
 	return nil
 }
 
 // unpublish 下架问卷（包内方法）
 // 更新状态并触发 QuestionnaireChangedEvent
-func (q *Questionnaire) unpublish() error {
+func (q *Questionnaire) unpublish(ctx context.Context) error {
 	if err := q.updateStatus(STATUS_DRAFT); err != nil {
 		return err
 	}
 
 	// 触发领域事件
-	q.addEvent(NewQuestionnaireChangedEvent(
-		string(q.code),
-		q.version.String(),
-		q.title,
-		ChangeActionUnpublished,
-		time.Now(),
-	))
+	q.addLifecycleEvent(ctx, ChangeActionUnpublished)
 
 	return nil
 }
 
 // archive 归档问卷（包内方法）
 // 更新状态并触发 QuestionnaireChangedEvent
-func (q *Questionnaire) archive() error {
+func (q *Questionnaire) archive(ctx context.Context) error {
 	if err := q.updateStatus(STATUS_ARCHIVED); err != nil {
 		return err
 	}
 
 	// 触发领域事件
-	q.addEvent(NewQuestionnaireChangedEvent(
+	q.addLifecycleEvent(ctx, ChangeActionArchived)
+
+	return nil
+}
+
+func (q *Questionnaire) addLifecycleEvent(ctx context.Context, action ChangeAction) {
+	metadata, ok := LifecycleEventMetadataFromContext(ctx)
+	if !ok {
+		metadata = NewLifecycleEventMetadata(time.Now())
+	}
+	q.addEvent(newQuestionnaireChangedEventWithMetadata(
+		metadata,
 		string(q.code),
 		q.version.String(),
 		q.title,
-		ChangeActionArchived,
-		time.Now(),
+		action,
 	))
-
-	return nil
 }
 
 // ===================== 领域事件相关方法 =====================

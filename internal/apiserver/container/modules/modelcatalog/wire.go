@@ -131,7 +131,10 @@ func buildCatalogDeps(
 		NormRepo:            normRepo,
 		QuestionnaireQuery:  questionnaireQuery,
 		CacheSignalNotifier: cacheCfg.Notifier,
-		Transactions:        modtx.NewMongoRunner(mongoDB),
-		PublishedTemplates:  publishedTemplates,
+		Transactions: modtx.NewMongoRunner(mongoDB, modtx.MongoRunnerOptions{
+			Boundary: "assessment_release",
+			Limiter:  mongoLimiter,
+		}),
+		PublishedTemplates: publishedTemplates,
 	}
 }

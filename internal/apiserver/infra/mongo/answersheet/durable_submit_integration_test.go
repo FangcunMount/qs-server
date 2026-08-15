@@ -119,6 +119,9 @@ func TestDurableSubmissionTransactionAgainstMongoReplicaSet(t *testing.T) {
 	if !indexNames["uk_answersheet_submit_intent"] {
 		t.Fatalf("answersheet indexes = %v, want embedded submit intent unique index", indexNames)
 	}
+	if !indexNames["uk_answersheet_durable_event_id"] {
+		t.Fatalf("answersheet indexes = %v, want durable event unique index", indexNames)
+	}
 
 	outbox := db.Collection("domain_event_outbox")
 	store := appanswersheet.NewTransactionalSubmissionDurableStore(mongoIntegrationRunner(db), repo, integrationOutboxStager{coll: outbox}, nil)
@@ -135,6 +138,16 @@ func TestDurableSubmissionTransactionAgainstMongoReplicaSet(t *testing.T) {
 	assertMongoCount(t, ctx, db.Collection("answersheets"), bson.M{"domain_id": uint64(90010001)}, 1)
 	assertMongoCount(t, ctx, db.Collection("answersheets"), bson.M{"submit_meta.writer_id": uint64(301), "submit_meta.idempotency_key": metaInfo.IdempotencyKey}, 1)
 	assertMongoCount(t, ctx, outbox, bson.M{"aggregate_id": sheet.ID().String()}, 1)
+	var accepted struct {
+		DurableAcceptance *mongoanswersheet.DurableAcceptancePO `bson:"durable_acceptance"`
+	}
+	if err := db.Collection("answersheets").FindOne(ctx, bson.M{"domain_id": uint64(90010001)}).Decode(&accepted); err != nil {
+		t.Fatalf("read durable acceptance: %v", err)
+	}
+	marker := accepted.DurableAcceptance
+	if marker == nil || marker.SchemaVersion != 1 || marker.EventID == "" || marker.AcceptedAt.IsZero() {
+		t.Fatalf("durable_acceptance = %#v, want schema, event and accepted_at", marker)
+	}
 	completed, err := repo.FindCompletedSubmission(ctx, metaInfo)
 	if err != nil || completed == nil || completed.Sheet == nil || completed.Sheet.ID().Uint64() != sheet.ID().Uint64() || completed.Fingerprint != fingerprint {
 		t.Fatalf("FindCompletedSubmission() = %#v err=%v, want persisted submission metadata", completed, err)

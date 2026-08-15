@@ -1,0 +1,7 @@
+[
+  { "dropIndexes": "answersheets", "index": "uk_answersheet_durable_event_id" },
+  { "dropIndexes": "answersheets", "index": "idx_answersheet_durable_audit" },
+  { "dropIndexes": "report_generations", "index": "idx_generation_tx_schema_status_domain" },
+  { "dropIndexes": "interpretation_runs", "index": "idx_interpretation_run_retry_audit" },
+  { "dropIndexes": "domain_event_outbox", "index": "idx_outbox_consistency_audit" }
+]
