@@ -103,9 +103,10 @@ func TestRuntimeLedgerRetirementFromVersion22WithSourcesAlreadyDropped(t *testin
 		}
 	}
 
+	wantVersion := latestEmbeddedMongoMigrationVersion(t)
 	version, changed, err := NewMongoMigrator(client, config).Run()
-	if err != nil || !changed || version != runtimeLedgerRetirementVersion {
-		t.Fatalf("migrate MongoDB %d -> %d: version=%d changed=%v err=%v", compatibilityRetirementVersion, runtimeLedgerRetirementVersion, version, changed, err)
+	if err != nil || !changed || version != wantVersion {
+		t.Fatalf("migrate MongoDB %d -> %d: version=%d changed=%v err=%v", compatibilityRetirementVersion, wantVersion, version, changed, err)
 	}
 	collectionNames, err := db.ListCollectionNames(t.Context(), bson.M{})
 	if err != nil {
