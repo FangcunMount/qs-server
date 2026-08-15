@@ -190,12 +190,11 @@ jobs:
                 rc=1
               fi
             fi
-            sudo_run rm -f "${migration_binary}" || true
+            rm -f "${migration_binary}" || true
             exit "${rc}"
           }
           trap restore_apiserver EXIT
           test -x "${migration_binary}"
-          test -r "${env_file}"
           image_ref="$(sudo_run docker inspect qs-apiserver --format '{{.Config.Image}}')"
           case "${image_ref}" in
             ghcr.io/fangcunmount/qs-apiserver:*) ;;
