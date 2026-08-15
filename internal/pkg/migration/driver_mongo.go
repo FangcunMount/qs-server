@@ -120,7 +120,7 @@ func (d *MongoDriver) verifyCompatibilityRetirement(ctx context.Context, databas
 			return fmt.Errorf("verify Mongo retirement precondition %s: %w", name, err)
 		}
 		if count != 0 {
-			return fmt.Errorf("Mongo retirement precondition failed: %s contains %d documents", name, count)
+			return fmt.Errorf("mongo retirement precondition failed: %s contains %d documents", name, count)
 		}
 	}
 	archiveRefs, err := db.Collection("report_query_catalog").CountDocuments(ctx, bson.M{"source_kind": "archive"})
@@ -128,7 +128,7 @@ func (d *MongoDriver) verifyCompatibilityRetirement(ctx context.Context, databas
 		return fmt.Errorf("verify Mongo retirement precondition report_query_catalog archive references: %w", err)
 	}
 	if archiveRefs != 0 {
-		return fmt.Errorf("Mongo retirement precondition failed: report_query_catalog contains %d archive references", archiveRefs)
+		return fmt.Errorf("mongo retirement precondition failed: report_query_catalog contains %d archive references", archiveRefs)
 	}
 	return nil
 }
