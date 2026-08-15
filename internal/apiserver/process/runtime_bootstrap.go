@@ -116,6 +116,12 @@ func buildSchedulerManager(cfg *config.Config, deps container.ServerRuntimeDeps)
 			deps.LockManager,
 			deps.LockBuilder,
 		),
+		runtimescheduler.NewMongoConsistencyAuditRunner(
+			cfg.MongoConsistencyAudit,
+			deps.MongoConsistencyAuditService,
+			deps.LockManager,
+			deps.LockBuilder,
+		),
 	)
 	if manager.Len() == 0 {
 		return nil

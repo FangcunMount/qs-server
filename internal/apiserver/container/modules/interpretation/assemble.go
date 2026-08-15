@@ -96,7 +96,7 @@ func New(deps Deps) (*Module, error) {
 	module.ReportStatusReporter = reportStatusReporter
 	mongoOptions := mongoBase.BaseRepositoryOptions{Limiter: deps.MongoLimiter}
 	module.reader = mongoEval.NewReportReadModel(deps.MongoDB, mongoOptions)
-	catalogReconcileStore, err := mongoEval.NewCatalogReconcileStore(deps.MongoDB)
+	catalogReconcileStore, err := mongoEval.NewCatalogReconcileStore(deps.MongoDB, mongoOptions)
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report catalog reconcile store: %v", err)
 	}
@@ -140,19 +140,30 @@ func New(deps Deps) (*Module, error) {
 	if deps.OutboxProfile.Stager == nil || deps.OutboxProfile.PostCommit == nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "mongo domain event profile is required")
 	}
-	mongoTxRunner := modtx.NewMongoRunner(deps.MongoDB)
-	module.txRunner = mongoTxRunner
+	startTxRunner := modtx.NewMongoRunner(deps.MongoDB, modtx.MongoRunnerOptions{
+		Boundary: "interpretation_start",
+		Limiter:  deps.MongoLimiter,
+	})
+	commitTxRunner := modtx.NewMongoRunner(deps.MongoDB, modtx.MongoRunnerOptions{
+		Boundary: "interpretation_commit",
+		Limiter:  deps.MongoLimiter,
+	})
+	retryTxRunner := modtx.NewMongoRunner(deps.MongoDB, modtx.MongoRunnerOptions{
+		Boundary: "interpretation_retry",
+		Limiter:  deps.MongoLimiter,
+	})
+	module.txRunner = retryTxRunner
 	module.eventStager = deps.OutboxProfile.Stager
 	{
 		registry, err := buildReportBuilderRegistry()
 		if err != nil {
 			return nil, err
 		}
-		starter, err := interpretationexecution.NewStarter(mongoTxRunner, module.generationRepo, module.runRepo, module.reportRepo, deps.RunLeaseDuration)
+		starter, err := interpretationexecution.NewStarter(startTxRunner, module.generationRepo, module.runRepo, module.reportRepo, deps.RunLeaseDuration)
 		if err != nil {
 			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report generation starter: %v", err)
 		}
-		committer, err := interpretationexecution.NewInterpretationCommitter(mongoTxRunner, module.generationRepo, module.runRepo, module.reportRepo, deps.OutboxProfile.Stager, deps.OutboxProfile.PostCommit, catalogProjector)
+		committer, err := interpretationexecution.NewInterpretationCommitter(commitTxRunner, module.generationRepo, module.runRepo, module.reportRepo, deps.OutboxProfile.Stager, deps.OutboxProfile.PostCommit, catalogProjector)
 		if err != nil {
 			return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation committer: %v", err)
 		}

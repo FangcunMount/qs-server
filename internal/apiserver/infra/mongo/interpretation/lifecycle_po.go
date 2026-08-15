@@ -17,6 +17,9 @@ type ReportGenerationPO struct {
 	LatestRunID     uint64 `bson:"latest_run_id,omitempty"`
 	ReportID        uint64 `bson:"report_id,omitempty"`
 	Version         uint64 `bson:"version"`
+	// TransactionSchemaVersion distinguishes the current atomic lifecycle
+	// contract from historical generations that predate cross-collection audit.
+	TransactionSchemaVersion uint32 `bson:"transaction_schema_version,omitempty"`
 }
 
 func (ReportGenerationPO) CollectionName() string { return "report_generations" }

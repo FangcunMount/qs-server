@@ -14,6 +14,7 @@ import (
 func (s *lifecycleService) Unpublish(ctx context.Context, code string) (*QuestionnaireResult, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
+	ctx = domainQuestionnaire.WithLifecycleEventMetadata(ctx, startTime)
 
 	l.Debugw("下架问卷",
 		"action", "unpublish",
@@ -95,6 +96,7 @@ func (s *lifecycleService) UnpublishForRelease(ctx context.Context, code string)
 func (s *lifecycleService) Archive(ctx context.Context, code string) (*QuestionnaireResult, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
+	ctx = domainQuestionnaire.WithLifecycleEventMetadata(ctx, startTime)
 
 	l.Debugw("归档问卷",
 		"action", "archive",

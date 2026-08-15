@@ -16,6 +16,7 @@ import (
 	questionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	domainquestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	modelcatalogport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -41,6 +42,8 @@ var _ modelcatalog.AssessmentReleaseService = Service{}
 
 func (s Service) PublishRelease(ctx context.Context, actor modelcatalog.ActorContext, modelCode string) (*modelcatalog.AssessmentRelease, error) {
 	start := time.Now()
+	transitionAt := s.now()
+	ctx = domainquestionnaire.WithLifecycleEventMetadata(ctx, transitionAt)
 	var result *modelcatalog.AssessmentRelease
 	var transitionedModel *domain.AssessmentModel
 	alreadyPublished := false
@@ -72,7 +75,7 @@ func (s Service) PublishRelease(ctx context.Context, actor modelcatalog.ActorCon
 			return err
 		}
 		if binding != model.Binding {
-			if err := model.BindQuestionnaire(binding, s.now()); err != nil {
+			if err := model.BindQuestionnaire(binding, transitionAt); err != nil {
 				return err
 			}
 			if model.Kind == domain.KindScale {
@@ -90,7 +93,7 @@ func (s Service) PublishRelease(ctx context.Context, actor modelcatalog.ActorCon
 		if err := s.Bindings.BeforePublish(txCtx, model); err != nil {
 			return err
 		}
-		publisher := publication.Publisher{Registry: s.Registry, ModelRepo: s.Models, Repo: s.Published, Now: s.Now}
+		publisher := publication.Publisher{Registry: s.Registry, ModelRepo: s.Models, Repo: s.Published, Now: func() time.Time { return transitionAt }}
 		if _, err := publisher.Publish(txCtx, model, publication.PublishOptions{ReplaceKind: model.Kind}); err != nil {
 			return err
 		}
@@ -119,6 +122,8 @@ func (s Service) PublishRelease(ctx context.Context, actor modelcatalog.ActorCon
 // created before the transition.
 func (s Service) UnpublishRelease(ctx context.Context, actor modelcatalog.ActorContext, modelCode string) (*modelcatalog.AssessmentRelease, error) {
 	start := time.Now()
+	transitionAt := s.now()
+	ctx = domainquestionnaire.WithLifecycleEventMetadata(ctx, transitionAt)
 	var result *modelcatalog.AssessmentRelease
 	var transitionedModel *domain.AssessmentModel
 	err := s.withTransaction(ctx, func(txCtx context.Context) error {
@@ -137,7 +142,7 @@ func (s Service) UnpublishRelease(ctx context.Context, actor modelcatalog.ActorC
 			return err
 		}
 		if model.IsPublished() {
-			if err := model.MarkUnpublished(s.now()); err != nil {
+			if err := model.MarkUnpublished(transitionAt); err != nil {
 				return err
 			}
 			if err := s.Models.Update(txCtx, model); err != nil {
@@ -160,6 +165,8 @@ func (s Service) UnpublishRelease(ctx context.Context, actor modelcatalog.ActorC
 
 func (s Service) ArchiveRelease(ctx context.Context, actor modelcatalog.ActorContext, modelCode string) (*modelcatalog.AssessmentRelease, error) {
 	start := time.Now()
+	transitionAt := s.now()
+	ctx = domainquestionnaire.WithLifecycleEventMetadata(ctx, transitionAt)
 	var result *modelcatalog.AssessmentRelease
 	var transitionedModel *domain.AssessmentModel
 	err := s.withTransaction(ctx, func(txCtx context.Context) error {
@@ -181,7 +188,7 @@ func (s Service) ArchiveRelease(ctx context.Context, actor modelcatalog.ActorCon
 			if err := s.Published.DeletePublished(txCtx, model.Kind, model.Code); err != nil {
 				return err
 			}
-			if err := model.MarkArchived(s.now()); err != nil {
+			if err := model.MarkArchived(transitionAt); err != nil {
 				return err
 			}
 			if err := s.Models.Update(txCtx, model); err != nil {

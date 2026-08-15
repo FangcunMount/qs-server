@@ -21,6 +21,18 @@ type durableStoreRunnerStub struct {
 	err    error
 }
 
+type durableStoreRetryTwiceRunner struct{}
+
+func (durableStoreRetryTwiceRunner) WithinTransaction(ctx context.Context, fn func(context.Context) error) error {
+	for attempt := 0; attempt < 2; attempt++ {
+		txCtx := context.WithValue(ctx, durableStoreTxMarkerKey{}, "tx")
+		if err := fn(txCtx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *durableStoreRunnerStub) WithinTransaction(ctx context.Context, fn func(context.Context) error) error {
 	r.called = true
 	txCtx := context.WithValue(ctx, durableStoreTxMarkerKey{}, "tx")
@@ -39,6 +51,7 @@ type durableStoreWriterStub struct {
 	saveErr      error
 	findCalled   bool
 	saveCalled   bool
+	saveCalls    int
 	waitCalled   bool
 	saveSawTxCtx bool
 	waitKey      string
@@ -55,6 +68,7 @@ func (w *durableStoreWriterStub) FindCompletedSubmission(_ context.Context, meta
 
 func (w *durableStoreWriterStub) SaveSubmittedAnswerSheet(ctx context.Context, _ *domainAnswerSheet.AnswerSheet, _ DurableSubmitMeta) ([]event.DomainEvent, error) {
 	w.saveCalled = true
+	w.saveCalls++
 	w.saveSawTxCtx = ctx.Value(durableStoreTxMarkerKey{}) == "tx"
 	return w.saveEvents, w.saveErr
 }
@@ -315,6 +329,31 @@ func TestTransactionalSubmissionDurableStoreStagesInTransactionContext(t *testin
 	}
 	if postCommit.calls != 1 || len(postCommit.eventTypes) != 1 {
 		t.Fatalf("post-commit calls=%d event types=%v, want one notification", postCommit.calls, postCommit.eventTypes)
+	}
+}
+
+func TestTransactionalSubmissionDurableStoreIsStableWhenCallbackRunsTwice(t *testing.T) {
+	sheet := newDurableStoreTestSheet(t)
+	writer := &durableStoreWriterStub{saveEvents: sheet.Events()}
+	stager := &durableStoreStagerStub{}
+	postCommit := &durableStorePostCommitStub{}
+	store := NewTransactionalSubmissionDurableStore(durableStoreRetryTwiceRunner{}, writer, stager, postCommit)
+
+	got, existed, err := store.CreateDurably(t.Context(), sheet, DurableSubmitMeta{RequestID: "retry-stable"})
+	if err != nil || existed || got != sheet {
+		t.Fatalf("CreateDurably() = (%p, %v, %v), want one committed sheet", got, existed, err)
+	}
+	if writer.saveCalls != 2 || len(stager.events) != 2 {
+		t.Fatalf("callback writes = writer:%d stager:%d, want 2/2", writer.saveCalls, len(stager.events))
+	}
+	if stager.events[0].EventID() == "" || stager.events[0].EventID() != stager.events[1].EventID() || !stager.events[0].OccurredAt().Equal(stager.events[1].OccurredAt()) {
+		t.Fatalf("callback events are not retry-stable: %s/%s", stager.events[0].EventID(), stager.events[1].EventID())
+	}
+	if postCommit.calls != 1 || len(postCommit.eventTypes) != 1 {
+		t.Fatalf("post-commit effects = calls:%d events:%d, want 1/1", postCommit.calls, len(postCommit.eventTypes))
+	}
+	if len(sheet.Events()) != 0 {
+		t.Fatal("committed sheet retained duplicate pending events")
 	}
 }
 

@@ -23,6 +23,8 @@ type GenerationRepository struct {
 	mapper *LifecycleMapper
 }
 
+const generationTransactionSchemaVersion uint32 = 1
+
 func NewGenerationRepository(db *mongo.Database, opts ...base.BaseRepositoryOptions) (*GenerationRepository, error) {
 	repo := &GenerationRepository{BaseRepository: base.NewBaseRepository(db, (ReportGenerationPO{}).CollectionName(), opts...), mapper: NewLifecycleMapper()}
 	if _, err := repo.Collection().Indexes().CreateMany(context.Background(), generationIndexModels()); err != nil {
@@ -36,6 +38,7 @@ func generationIndexModels() []mongo.IndexModel {
 		{Keys: bson.D{{Key: "domain_id", Value: 1}}, Options: options.Index().SetName("uk_generation_domain_id").SetUnique(true)},
 		{Keys: bson.D{{Key: "outcome_id", Value: 1}, {Key: "report_type", Value: 1}, {Key: "template_version", Value: 1}}, Options: options.Index().SetName("uk_generation_key").SetUnique(true)},
 		{Keys: bson.D{{Key: "outcome_id", Value: 1}, {Key: "status", Value: 1}, {Key: "updated_at", Value: -1}}, Options: options.Index().SetName("idx_generation_outcome_status_updated")},
+		{Keys: bson.D{{Key: "transaction_schema_version", Value: 1}, {Key: "status", Value: 1}, {Key: "domain_id", Value: 1}}, Options: options.Index().SetName("idx_generation_tx_schema_status_domain")},
 	}
 }
 
@@ -46,6 +49,7 @@ func (r *GenerationRepository) Create(ctx context.Context, domain *generation.Re
 	if po == nil {
 		return fmt.Errorf("report generation is required")
 	}
+	po.TransactionSchemaVersion = generationTransactionSchemaVersion
 	if _, err := r.InsertOne(ctx, po); err != nil {
 		if mongo.IsDuplicateKeyError(err) {
 			return fmt.Errorf("create report generation: %w", generation.ErrAlreadyExists)
@@ -104,11 +108,12 @@ func (r *GenerationRepository) Save(ctx context.Context, domain *generation.Repo
 	}
 	po := r.mapper.GenerationToPO(domain)
 	update := bson.M{"$set": bson.M{
-		"status":        po.Status,
-		"latest_run_id": po.LatestRunID,
-		"report_id":     po.ReportID,
-		"version":       po.Version,
-		"updated_at":    po.UpdatedAt,
+		"status":                     po.Status,
+		"latest_run_id":              po.LatestRunID,
+		"report_id":                  po.ReportID,
+		"version":                    po.Version,
+		"updated_at":                 po.UpdatedAt,
+		"transaction_schema_version": generationTransactionSchemaVersion,
 	}}
 	result, err := r.UpdateOne(ctx, bson.M{"domain_id": domain.ID().Uint64(), "version": expectedVersion}, update)
 	if err != nil {
@@ -138,6 +143,11 @@ func runIndexModels() []mongo.IndexModel {
 		{Keys: bson.D{{Key: "domain_id", Value: 1}}, Options: options.Index().SetName("uk_interpretation_run_domain_id").SetUnique(true)},
 		{Keys: bson.D{{Key: "generation_id", Value: 1}, {Key: "attempt", Value: 1}}, Options: options.Index().SetName("uk_interpretation_run_generation_attempt").SetUnique(true)},
 		{Keys: bson.D{{Key: "generation_id", Value: 1}, {Key: "attempt", Value: -1}}, Options: options.Index().SetName("idx_interpretation_run_generation_attempt_desc")},
+		{
+			Keys: bson.D{{Key: "retry_event_id", Value: 1}, {Key: "deleted_at", Value: 1}, {Key: "domain_id", Value: 1}},
+			Options: options.Index().SetName("idx_interpretation_run_retry_audit").
+				SetPartialFilterExpression(bson.M{"retry_event_id": bson.M{"$type": "string"}}),
+		},
 	}
 }
 
@@ -220,14 +230,14 @@ func (r *RunRepository) ReclaimExpiredLease(ctx context.Context, id interpretati
 	}
 	updated := r.mapper.RunToPO(domain)
 	var po InterpretationRunPO
-	err = r.Collection().FindOneAndUpdate(ctx, bson.M{
+	err = r.FindOneAndUpdate(ctx, bson.M{
 		"domain_id": id.Uint64(), "status": interpretationrun.StatusRunning,
 		"lease_expires_at": bson.M{"$lte": at},
 	}, bson.M{"$set": bson.M{
 		"trace_id": updated.TraceID, "lease_expires_at": updated.LeaseExpiresAt,
 		"recovery_count": updated.RecoveryCount, "last_reclaimed_at": updated.LastReclaimedAt,
 		"claim_history": updated.ClaimHistory, "updated_at": at,
-	}}, options.FindOneAndUpdate().SetReturnDocument(options.After)).Decode(&po)
+	}}, &po, options.FindOneAndUpdate().SetReturnDocument(options.After))
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		return nil, false, nil
 	}

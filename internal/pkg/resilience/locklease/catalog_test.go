@@ -7,8 +7,8 @@ func TestCatalogIsCompleteImmutableAndValid(t *testing.T) {
 		t.Fatalf("ValidateCatalog() error = %v", err)
 	}
 	all := All()
-	if len(all) != 10 {
-		t.Fatalf("len(All()) = %d, want 10", len(all))
+	if len(all) != 11 {
+		t.Fatalf("len(All()) = %d, want 11", len(all))
 	}
 
 	want := []WorkloadID{
@@ -20,6 +20,7 @@ func TestCatalogIsCompleteImmutableAndValid(t *testing.T) {
 		WorkloadEvaluationLeaseRecovery,
 		WorkloadInterpretationLeaseRecovery,
 		WorkloadReportCatalogAudit,
+		WorkloadMongoConsistencyAudit,
 		WorkloadAttentionProjectionReconcile,
 		WorkloadCollectionSubmit,
 	}

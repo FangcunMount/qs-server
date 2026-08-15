@@ -991,6 +991,9 @@ debug: ## 显示调试信息
 	@echo "GOARCH:       $(shell go env GOARCH)"
 	@echo "$(COLOR_BOLD)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(COLOR_RESET)"
 
+mongo-consistency-audit: ## 只读巡检 Mongo 跨集合一致性（MONGO_CONSISTENCY_ARGS='--mongo-uri ... --json'）
+	@$(GO) run ./scripts/oneoff/mongo_consistency_audit $(MONGO_CONSISTENCY_ARGS)
+
 # ============================================================================
 # 快捷命令
 # ============================================================================

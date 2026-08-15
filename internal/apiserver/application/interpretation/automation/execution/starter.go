@@ -185,16 +185,20 @@ func (s *starter) resumeOrRecover(ctx context.Context, generationRecord *domaing
 		}
 		return &StartResult{Status: StartStatusProcessing, Generation: generationRecord, Run: winner}, nil
 	}
-	if err := latest.ReclaimExpiredLease(at, request.TraceID, at.Add(s.leaseDuration)); err != nil {
+	latestToReclaim, err := cloneRun(latest)
+	if err != nil {
+		return nil, err
+	}
+	if err := latestToReclaim.ReclaimExpiredLease(at, request.TraceID, at.Add(s.leaseDuration)); err != nil {
 		return nil, err
 	}
 	if err := s.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
-		return s.runs.Save(txCtx, latest)
+		return s.runs.Save(txCtx, latestToReclaim)
 	}); err != nil {
 		return nil, err
 	}
 	recordLeaseRecovery(expiredAt, at)
-	return &StartResult{Status: StartStatusStarted, Generation: generationRecord, Run: latest}, nil
+	return &StartResult{Status: StartStatusStarted, Generation: generationRecord, Run: latestToReclaim}, nil
 }
 
 func recordLeaseRecovery(expiredAt *time.Time, reclaimedAt time.Time) {
@@ -232,20 +236,30 @@ func (s *starter) startFailedIfAuthorized(ctx context.Context, generationRecord 
 // one Mongo transaction. staleRun, when present, has already transitioned to
 // failed and is persisted in the same transaction before the new attempt.
 func (s *starter) startNext(ctx context.Context, generationRecord *domaingeneration.ReportGeneration, staleRun *interpretationrun.InterpretationRun, origin retrygovernance.AttemptOrigin, request StartRequest) (*StartResult, error) {
-	expectedVersion := generationRecord.Version()
+	generationToStart, err := cloneGeneration(generationRecord)
+	if err != nil {
+		return nil, err
+	}
+	var staleToSave *interpretationrun.InterpretationRun
+	if staleRun != nil {
+		staleToSave, err = cloneRun(staleRun)
+		if err != nil {
+			return nil, err
+		}
+	}
+	expectedVersion := generationToStart.Version()
 	if staleRun != nil {
 		// Fail followed by Begin advances the Generation twice. CAS protects the
 		// original version while storing the final generating state atomically.
 		expectedVersion -= 1
 	}
 	var runRecord *interpretationrun.InterpretationRun
-	var err error
-	if staleRun != nil {
-		runRecord, err = interpretationrun.NextWithOrigin(s.newID(), staleRun, origin)
-	} else if generationRecord.Status() == domaingeneration.StatusPending {
-		runRecord, err = interpretationrun.NewPending(s.newID(), generationRecord.ID(), 1)
+	if staleToSave != nil {
+		runRecord, err = interpretationrun.NextWithOrigin(s.newID(), staleToSave, origin)
+	} else if generationToStart.Status() == domaingeneration.StatusPending {
+		runRecord, err = interpretationrun.NewPending(s.newID(), generationToStart.ID(), 1)
 	} else {
-		latest, findErr := s.runs.FindLatestByGenerationID(ctx, generationRecord.ID())
+		latest, findErr := s.runs.FindLatestByGenerationID(ctx, generationToStart.ID())
 		if findErr != nil {
 			return nil, fmt.Errorf("load latest interpretation run: %w", findErr)
 		}
@@ -258,23 +272,23 @@ func (s *starter) startNext(ctx context.Context, generationRecord *domaingenerat
 	if err := runRecord.StartWithLease(at, request.TraceID, at.Add(s.leaseDuration)); err != nil {
 		return nil, err
 	}
-	if err := generationRecord.Begin(runRecord.ID(), at); err != nil {
+	if err := generationToStart.Begin(runRecord.ID(), at); err != nil {
 		return nil, err
 	}
 	if err := s.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
-		if staleRun != nil {
-			if err := s.runs.Save(txCtx, staleRun); err != nil {
+		if staleToSave != nil {
+			if err := s.runs.Save(txCtx, staleToSave); err != nil {
 				return err
 			}
 		}
 		if err := s.runs.Create(txCtx, runRecord); err != nil {
 			return err
 		}
-		return s.generations.Save(txCtx, generationRecord, expectedVersion)
+		return s.generations.Save(txCtx, generationToStart, expectedVersion)
 	}); err != nil {
 		return nil, err
 	}
-	return &StartResult{Status: StartStatusStarted, Generation: generationRecord, Run: runRecord}, nil
+	return &StartResult{Status: StartStatusStarted, Generation: generationToStart, Run: runRecord}, nil
 }
 
 func isClaimConflict(err error) bool {

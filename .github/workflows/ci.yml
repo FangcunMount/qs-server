@@ -146,7 +146,7 @@ jobs:
           QS_SERVER_TEST_MONGO_DB_PREFIX: qs_survey_ci_test
         run: |
           go test -tags=integration \
-            -run '^(TestDurableSubmissionTransactionAgainstMongoReplicaSet|TestRepositoryConcurrentWritersUseRevisionCAS|TestDraftRepositoryConcurrentWritersUseRevisionCAS|TestStandaloneQuestionnaireLifecycleRollsBackOnPartialFailure|TestMongoReleasePairRollsBackEveryFailureBoundary)$' \
+            -run '^(TestDurableSubmissionTransactionAgainstMongoReplicaSet|TestRepositoryConcurrentWritersUseRevisionCAS|TestDraftRepositoryConcurrentWritersUseRevisionCAS|TestStandaloneQuestionnaireLifecycleRollsBackOnPartialFailure|TestMongoReleasePairRollsBackEveryFailureBoundary|TestPublishReleaseRollsBackEveryPersistedBoundary)$' \
             -count=1 -timeout=10m -v \
             ./internal/apiserver/infra/mongo/answersheet \
             ./internal/apiserver/infra/mongo/questionnaire \
@@ -161,6 +161,19 @@ jobs:
           go test -tags=integration \
             -run '^(TestCompatibilityRetirementPreconditionRejectsLiveDataAndArchiveReferences|TestRuntimeLedgerRetirementPreconditionRejectsAnySourceDocument|TestRuntimeLedgerRetirementFromVersion22WithSourcesAlreadyDropped)$' \
             -count=1 -timeout=5m -v \
+            ./internal/pkg/migration
+
+      - name: Run Mongo transaction consistency integration contracts
+        env:
+          MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true&loc=Asia%2FShanghai
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_mongo_consistency_test
+        run: |
+          go test -tags=integration \
+            -run '^(TestInterpretationSuccessRollsBackEveryPersistedBoundary|TestInterpretationFailureAndScheduledRetryRollBackTogether|TestScannerDetectsEverySupportedDriftAgainstReplicaSet|TestScannerAcceptsMarkedHealthyTransactionsAgainstReplicaSet|TestMongoTransactionAuditIndexesUpDown|TestMongoConsistencyAuditCheckpointMySQLMigrationUpDown)$' \
+            -count=1 -timeout=10m -v \
+            ./internal/apiserver/infra/mongo/interpretation \
+            ./internal/apiserver/infra/mongo/mongoconsistency \
             ./internal/pkg/migration
 
       - name: Run current runtime closure E2E

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -87,7 +88,7 @@ func (s *CatalogReconcileStore) SaveRepairPlan(ctx context.Context, plan Catalog
 	if s == nil || s.db == nil || plan.DryRunID == "" || plan.ExpiresAt.IsZero() {
 		return fmt.Errorf("catalog repair plan is invalid")
 	}
-	_, err := s.db.Collection(catalogRepairPlanCollection).InsertOne(ctx, catalogRepairPlanPO(plan))
+	_, err := s.repairPlans.InsertOne(ctx, catalogRepairPlanPO(plan))
 	if err != nil {
 		return fmt.Errorf("save catalog repair plan: %w", err)
 	}
@@ -96,7 +97,7 @@ func (s *CatalogReconcileStore) SaveRepairPlan(ctx context.Context, plan Catalog
 
 func (s *CatalogReconcileStore) FindRepairPlan(ctx context.Context, dryRunID string) (CatalogRepairPlan, error) {
 	var po catalogRepairPlanPO
-	if err := s.db.Collection(catalogRepairPlanCollection).FindOne(ctx, bson.M{"dry_run_id": dryRunID}).Decode(&po); err != nil {
+	if err := s.repairPlans.FindOne(ctx, bson.M{"dry_run_id": dryRunID}, &po); err != nil {
 		return CatalogRepairPlan{}, fmt.Errorf("find catalog repair plan: %w", err)
 	}
 	return CatalogRepairPlan(po), nil
@@ -117,9 +118,9 @@ func (s *CatalogReconcileStore) ApplyRepair(ctx context.Context, plan CatalogRep
 
 func (s *CatalogReconcileStore) repairAssociation(ctx context.Context, plan CatalogRepairPlan) (string, error) {
 	var entry ReportCatalogPO
-	if err := s.db.Collection((ReportCatalogPO{}).CollectionName()).FindOne(ctx, bson.M{
+	if err := s.catalog.FindOne(ctx, bson.M{
 		"assessment_id": plan.Item.AssessmentID,
-	}).Decode(&entry); err != nil {
+	}, &entry); err != nil {
 		return "conflict", err
 	}
 	if strconv.FormatInt(entry.UpdatedAt.UnixNano(), 10) != plan.Item.Version ||
@@ -146,7 +147,7 @@ func (s *CatalogReconcileStore) repairAssociation(ctx context.Context, plan Cata
 	if source.HasGenerationID {
 		set["generation_id"] = source.GenerationID
 	}
-	res, err := s.db.Collection((ReportCatalogPO{}).CollectionName()).UpdateOne(ctx,
+	res, err := s.catalog.UpdateOne(ctx,
 		bson.M{"assessment_id": entry.AssessmentID, "source_kind": entry.SourceKind, "source_id": entry.SourceID, "updated_at": entry.UpdatedAt},
 		bson.M{"$set": set},
 	)
@@ -171,7 +172,7 @@ func (s *CatalogReconcileStore) repairWinner(ctx context.Context, plan CatalogRe
 	if plan.Item.Kind == CatalogDriftMissing {
 		filter = bson.M{"assessment_id": entry.AssessmentID, "source_kind": bson.M{"$exists": false}}
 	}
-	_, err = s.db.Collection((ReportCatalogPO{}).CollectionName()).ReplaceOne(ctx, filter, entry, options.Replace().SetUpsert(plan.Item.Kind == CatalogDriftMissing))
+	_, err = s.catalog.ReplaceOne(ctx, filter, entry, options.Replace().SetUpsert(plan.Item.Kind == CatalogDriftMissing))
 	if mongo.IsDuplicateKeyError(err) {
 		return "conflict", fmt.Errorf("catalog repair CAS conflict")
 	}
@@ -183,10 +184,11 @@ func (s *CatalogReconcileStore) repairWinner(ctx context.Context, plan CatalogRe
 
 func (s *CatalogReconcileStore) latestCatalogCandidate(ctx context.Context, assessmentID uint64) (ReportCatalogPO, error) {
 	var artifact InterpretReportPO
-	err := s.db.Collection((InterpretReportPO{}).CollectionName()).FindOne(ctx,
+	err := s.reports.FindOne(ctx,
 		bson.M{"assessment_id": assessmentID, "deleted_at": nil},
+		&artifact,
 		options.FindOne().SetSort(bson.D{{Key: "generated_at", Value: -1}, {Key: "domain_id", Value: -1}}),
-	).Decode(&artifact)
+	)
 	if err == nil {
 		return ReportCatalogPO{
 			AssessmentID: artifact.AssessmentID, OrgID: artifact.OrgID, TesteeID: artifact.TesteeID,
@@ -232,12 +234,18 @@ func (c CatalogDriftCounts) Total() int64 {
 
 // CatalogReconcileStore performs read-only catalog drift detection against Mongo.
 type CatalogReconcileStore struct {
-	db *mongo.Database
+	db          *mongo.Database
+	repairPlans base.BaseRepository
+	catalog     base.BaseRepository
+	reports     base.BaseRepository
 }
 
-func NewCatalogReconcileStore(db *mongo.Database) (*CatalogReconcileStore, error) {
+func NewCatalogReconcileStore(db *mongo.Database, opts ...base.BaseRepositoryOptions) (*CatalogReconcileStore, error) {
 	store := &CatalogReconcileStore{db: db}
 	if db != nil {
+		store.repairPlans = base.NewBaseRepository(db, catalogRepairPlanCollection, opts...)
+		store.catalog = base.NewBaseRepository(db, (ReportCatalogPO{}).CollectionName(), opts...)
+		store.reports = base.NewBaseRepository(db, (InterpretReportPO{}).CollectionName(), opts...)
 		if _, err := db.Collection(catalogRepairPlanCollection).Indexes().CreateMany(context.Background(), []mongo.IndexModel{
 			{Keys: bson.D{{Key: "dry_run_id", Value: 1}}, Options: options.Index().SetName("uk_catalog_repair_dry_run").SetUnique(true)},
 			{Keys: bson.D{{Key: "expires_at", Value: 1}}, Options: options.Index().SetName("ttl_catalog_repair_plan").SetExpireAfterSeconds(0)},
@@ -261,7 +269,7 @@ func (s *CatalogReconcileStore) loadCatalogSourceAssociations(
 	if sourceKind != ReportCatalogSourceArtifact {
 		return nil, fmt.Errorf("unknown report catalog source %q", sourceKind)
 	}
-	cur, err := s.db.Collection((InterpretReportPO{}).CollectionName()).Find(
+	cur, err := s.reports.Find(
 		ctx,
 		bson.M{"domain_id": bson.M{"$in": ids}, "deleted_at": nil},
 		options.Find().SetProjection(bson.M{

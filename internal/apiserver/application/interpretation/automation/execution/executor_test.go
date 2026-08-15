@@ -84,10 +84,11 @@ func newExecutorFixture(t *testing.T, builder *executorBuilder) (*executor, *mem
 	runs := newMemoryRunRepo()
 	reports := &memoryArtifactRepo{items: map[meta.ID]*report.InterpretReport{}}
 	tx := &starterTx{}
-	starter, err := NewStarter(tx, gens, runs, reports, time.Minute)
+	starterService, err := NewStarter(tx, gens, runs, reports, time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
+	starterService.(*starter).now = func() time.Time { return now }
 	registry, err := rendering.NewRegistry(builder)
 	if err != nil {
 		t.Fatal(err)
@@ -97,7 +98,7 @@ func newExecutorFixture(t *testing.T, builder *executorBuilder) (*executor, *mem
 	if err != nil {
 		t.Fatal(err)
 	}
-	service, err := NewExecutor(starter, registry, committer)
+	service, err := NewExecutor(starterService, registry, committer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,6 +209,7 @@ func TestExecutorPersistsFailedRunThenRetriesWithoutEvaluation(t *testing.T) {
 		t.Fatal("automatic retry is missing next attempt time")
 	}
 	service.now = func() time.Time { return *nextAttemptAt }
+	service.starter.(*starter).now = func() time.Time { return *nextAttemptAt }
 	retryCtx := retrygovernance.WithAuthorization(context.Background(), retrygovernance.Authorization{
 		EventID: failedError.Decision.RetryEventID, ExpectedAttempt: failedError.Decision.Attempt, Origin: retrygovernance.AttemptOriginAutomatic,
 	})

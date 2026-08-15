@@ -105,7 +105,7 @@ func (r *Repository) CreatePublishedSnapshot(ctx context.Context, qDomain *domai
 	if err != nil {
 		return err
 	}
-	_, err = r.Collection().InsertOne(ctx, insertData)
+	_, err = r.InsertOne(ctx, insertData)
 	return err
 }
 
@@ -302,7 +302,7 @@ func (r *Repository) Update(ctx context.Context, qDomain *domainQuestionnaire.Qu
 	delete(updateData, "created_by")
 
 	filter := headRevisionFilter(qDomain.GetCode().Value(), expectedRevision)
-	result, err := r.Collection().UpdateOne(ctx, filter, bson.M{"$set": updateData})
+	result, err := r.UpdateOne(ctx, filter, bson.M{"$set": updateData})
 	if err != nil {
 		qDomain.SetRevision(expectedRevision)
 		return err
@@ -323,7 +323,7 @@ func (r *Repository) SetActivePublishedVersion(ctx context.Context, code, versio
 	now := time.Now()
 	userID := mongoBase.AuditUserID(ctx)
 
-	_, err := r.Collection().UpdateMany(ctx, bson.M{
+	_, err := r.UpdateMany(ctx, bson.M{
 		"code":        code,
 		"record_role": domainQuestionnaire.RecordRolePublishedSnapshot.String(),
 		"deleted_at":  nil,
@@ -337,7 +337,7 @@ func (r *Repository) SetActivePublishedVersion(ctx context.Context, code, versio
 		return err
 	}
 
-	result, err := r.Collection().UpdateOne(ctx, bson.M{
+	result, err := r.UpdateOne(ctx, bson.M{
 		"code":        code,
 		"version":     version,
 		"record_role": domainQuestionnaire.RecordRolePublishedSnapshot.String(),
@@ -363,7 +363,7 @@ func (r *Repository) SetActivePublishedVersion(ctx context.Context, code, versio
 func (r *Repository) ClearActivePublishedVersion(ctx context.Context, code string) error {
 	now := time.Now()
 	userID := mongoBase.AuditUserID(ctx)
-	_, err := r.Collection().UpdateMany(ctx, bson.M{
+	_, err := r.UpdateMany(ctx, bson.M{
 		"code":        code,
 		"record_role": domainQuestionnaire.RecordRolePublishedSnapshot.String(),
 		"deleted_at":  nil,
@@ -380,7 +380,7 @@ func (r *Repository) ClearActivePublishedVersion(ctx context.Context, code strin
 func (r *Repository) Remove(ctx context.Context, code string) error {
 	now := time.Now()
 	userID := mongoBase.AuditUserID(ctx)
-	result, err := r.Collection().UpdateMany(ctx, bson.M{
+	result, err := r.UpdateMany(ctx, bson.M{
 		"code":       code,
 		"deleted_at": nil,
 	}, bson.M{"$set": bson.M{
@@ -412,7 +412,7 @@ func (r *Repository) HardDelete(ctx context.Context, code string) error {
 
 // HardDeleteFamily 物理删除整个问卷族
 func (r *Repository) HardDeleteFamily(ctx context.Context, code string) error {
-	result, err := r.Collection().DeleteMany(ctx, bson.M{"code": code})
+	result, err := r.DeleteMany(ctx, bson.M{"code": code})
 	if err != nil {
 		return err
 	}

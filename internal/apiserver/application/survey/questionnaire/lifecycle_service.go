@@ -121,6 +121,7 @@ func (s *lifecycleService) SaveDraft(ctx context.Context, code string) (*Questio
 func (s *lifecycleService) Publish(ctx context.Context, code string) (*QuestionnaireResult, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
+	ctx = questionnaire.WithLifecycleEventMetadata(ctx, startTime)
 
 	l.Debugw("发布问卷",
 		"action", "publish",
@@ -232,9 +233,21 @@ func (s *lifecycleService) Delete(ctx context.Context, code string) error {
 		"code", code,
 	)
 
-	if err := s.deleteQuestionnaire(ctx, l, code); err != nil {
+	if err := s.validateCode(ctx, code, "delete"); err != nil {
 		return err
 	}
+	if err := s.withStandaloneLifecycleTransaction(ctx, func(txCtx context.Context) error {
+		if err := s.rejectBoundStandaloneLifecycle(txCtx, code); err != nil {
+			return err
+		}
+		return s.deleteQuestionnaire(txCtx, l, code)
+	}); err != nil {
+		return err
+	}
+
+	// Cached repositories suppress cache mutation while a Mongo session is
+	// active. Invalidate only after commit so rollback never hides the live head.
+	s.InvalidateReleaseCache(ctx, code)
 
 	s.logSuccess(ctx, "delete", code, startTime)
 

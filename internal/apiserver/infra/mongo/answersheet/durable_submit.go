@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	idempotencyLookupTimeout = 2 * time.Second
-	idempotencyLookupPoll    = 100 * time.Millisecond
+	idempotencyLookupTimeout       = 2 * time.Second
+	idempotencyLookupPoll          = 100 * time.Millisecond
+	durableAcceptanceSchemaVersion = 1
 )
 
 func (r *Repository) ensureIndexes(ctx context.Context) error {
@@ -31,6 +32,23 @@ func (r *Repository) ensureIndexes(ctx context.Context) error {
 			SetPartialFilterExpression(bson.M{"submit_meta.idempotency_key": bson.M{"$exists": true}}),
 	}); err != nil {
 		return fmt.Errorf("create embedded answersheet idempotency index: %w", err)
+	}
+	if _, err := r.Collection().Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "durable_acceptance.event_id", Value: 1}},
+		Options: options.Index().SetName("uk_answersheet_durable_event_id").SetUnique(true).
+			SetPartialFilterExpression(bson.M{"durable_acceptance.event_id": bson.M{"$type": "string"}}),
+	}); err != nil {
+		return fmt.Errorf("create durable acceptance event index: %w", err)
+	}
+	if _, err := r.Collection().Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "durable_acceptance.schema_version", Value: 1},
+			{Key: "deleted_at", Value: 1},
+			{Key: "domain_id", Value: 1},
+		},
+		Options: options.Index().SetName("idx_answersheet_durable_audit"),
+	}); err != nil {
+		return fmt.Errorf("create durable acceptance audit index: %w", err)
 	}
 
 	return nil
@@ -51,6 +69,10 @@ func (r *Repository) SaveSubmittedAnswerSheet(ctx context.Context, sheet *domain
 	if sheet.ID().IsZero() {
 		return nil, fmt.Errorf("answersheet durable save requires preassigned answer sheet id")
 	}
+	events := append([]event.DomainEvent{}, sheet.Events()...)
+	if len(events) != 1 || events[0] == nil || events[0].EventType() != domainAnswerSheet.EventTypeSubmitted || events[0].EventID() == "" {
+		return nil, fmt.Errorf("answersheet durable save requires exactly one submitted event")
+	}
 	submissionContext := sheet.SubmissionContext()
 	if err := submissionContext.Validate(); err != nil {
 		return nil, fmt.Errorf("answersheet durable save requires complete submission context: %w", err)
@@ -68,19 +90,26 @@ func (r *Repository) SaveSubmittedAnswerSheet(ctx context.Context, sheet *domain
 	if err != nil {
 		return nil, err
 	}
+	// The submitted event is created before the retryable transaction callback;
+	// reuse its timestamp so every callback attempt writes identical metadata.
+	acceptedAt := events[0].OccurredAt().UTC()
+	po.DurableAcceptance = &DurableAcceptancePO{
+		SchemaVersion: durableAcceptanceSchemaVersion,
+		EventID:       events[0].EventID(),
+		AcceptedAt:    acceptedAt,
+	}
 	if metaInfo.IdempotencyKey != "" {
-		po.SubmitMeta = &SubmitMetaPO{IdempotencyKey: metaInfo.IdempotencyKey, WriterID: writerID, Fingerprint: metaInfo.Fingerprint, RequestID: metaInfo.RequestID, AcceptedAt: time.Now()}
+		po.SubmitMeta = &SubmitMetaPO{IdempotencyKey: metaInfo.IdempotencyKey, WriterID: writerID, Fingerprint: metaInfo.Fingerprint, RequestID: metaInfo.RequestID, AcceptedAt: acceptedAt}
 	}
 	answerSheetDoc, err := po.ToBsonM()
 	if err != nil {
 		return nil, err
 	}
 
-	if _, err := r.Collection().InsertOne(ctx, answerSheetDoc); err != nil {
+	if _, err := r.InsertOne(ctx, answerSheetDoc); err != nil {
 		return nil, err
 	}
 
-	events := append([]event.DomainEvent{}, sheet.Events()...)
 	return events, nil
 }
 

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/event"
+	basemongo "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
@@ -50,6 +51,7 @@ func (OutboxPO) CollectionName() string {
 
 type Store struct {
 	coll               *mongo.Collection
+	transactionWrites  basemongo.BaseRepository
 	limiter            backpressure.Acquirer
 	publishingStaleFor time.Duration
 	topicResolver      eventcatalog.TopicResolver
@@ -81,6 +83,11 @@ func NewStoreWithTopicResolver(db *mongo.Database, resolver eventcatalog.TopicRe
 			opt(store)
 		}
 	}
+	store.transactionWrites = basemongo.NewBaseRepository(
+		db,
+		(&OutboxPO{}).CollectionName(),
+		basemongo.BaseRepositoryOptions{Limiter: store.limiter},
+	)
 	if err := store.ensureIndexes(context.Background()); err != nil {
 		return nil, err
 	}
@@ -111,6 +118,10 @@ func mongoOutboxIndexModels() []mongo.IndexModel {
 		{
 			Keys:    bson.D{{Key: "org_id", Value: 1}, {Key: "status", Value: 1}, {Key: "retry_disposition", Value: 1}, {Key: "next_attempt_at", Value: 1}},
 			Options: options.Index().SetName("idx_outbox_org_retry_due"),
+		},
+		{
+			Keys:    bson.D{{Key: "aggregate_type", Value: 1}, {Key: "event_type", Value: 1}, {Key: "aggregate_id", Value: 1}},
+			Options: options.Index().SetName("idx_outbox_consistency_audit"),
 		},
 		{
 			Keys: bson.D{
@@ -205,7 +216,7 @@ func (s *Store) StageAt(ctx context.Context, dueAt time.Time, events ...event.Do
 	if len(items) == 0 {
 		return nil
 	}
-	_, err = s.coll.InsertMany(txCtx, items)
+	_, err = s.transactionWrites.InsertMany(txCtx, items)
 	return err
 }
 
@@ -222,7 +233,7 @@ func (s *Store) stageWithSession(ctx mongo.SessionContext, events []event.Domain
 	for _, doc := range docs {
 		items = append(items, doc)
 	}
-	_, err = s.coll.InsertMany(ctx, items)
+	_, err = s.transactionWrites.InsertMany(ctx, items)
 	return err
 }
 

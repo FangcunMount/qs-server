@@ -23,6 +23,7 @@ import (
 	interpretationReportTemplate "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporttemplate"
 	reportqueryjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportquery"
 	reportwaitjourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/reportwait"
+	mongoconsistency "github.com/FangcunMount/qs-server/internal/apiserver/application/mongoconsistency"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	systemgovApp "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
@@ -36,6 +37,8 @@ import (
 	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
 	interpretationrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/run"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	mongomongoconsistency "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/mongoconsistency"
+	mysqlmongoconsistency "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/mongoconsistency"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -486,6 +489,7 @@ type ServerRuntimeDeps struct {
 	EvaluationLeaseRecoverer          evaluationScheduler.LeaseRecoverer
 	InterpretationLeaseRecoverer      evaluationScheduler.LeaseRecoverer
 	ReportCatalogAuditService         interpretationcatalog.RunnerService
+	MongoConsistencyAuditService      mongoconsistency.RunnerService
 }
 
 func (c *Container) BuildServerGRPCBootstrapDeps() ServerGRPCBootstrapDeps {
@@ -529,6 +533,12 @@ func (c *Container) BuildServerRuntimeDeps() ServerRuntimeDeps {
 	if c.EvaluationModule != nil {
 		deps.EvaluationConsistencyAuditService = c.EvaluationModule.ConsistencyAuditService
 		deps.EvaluationLeaseRecoverer = c.EvaluationModule.EvaluationLeaseRecoverer
+	}
+	if c.mongoDB != nil && c.mysqlDB != nil {
+		deps.MongoConsistencyAuditService = mongoconsistency.NewService(
+			mongomongoconsistency.NewScanner(c.mongoDB, c.MongoLimiter()),
+			mysqlmongoconsistency.NewCheckpointRepository(c.mysqlDB),
+		)
 	}
 
 	return deps

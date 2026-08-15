@@ -27,10 +27,24 @@ func TestLifecycleIndexesProtectThreeObjectIdentities(t *testing.T) {
 	runIndexes := runIndexModels()
 	assertUniqueIndex(t, runIndexes, "uk_interpretation_run_domain_id", bson.D{{Key: "domain_id", Value: 1}})
 	assertUniqueIndex(t, runIndexes, "uk_interpretation_run_generation_attempt", bson.D{{Key: "generation_id", Value: 1}, {Key: "attempt", Value: 1}})
+	assertIndex(t, runIndexes, "idx_interpretation_run_retry_audit", bson.D{{Key: "retry_event_id", Value: 1}, {Key: "deleted_at", Value: 1}, {Key: "domain_id", Value: 1}})
 
 	artifactIndexes := reportIndexModels()
 	assertUniqueIndex(t, artifactIndexes, "uk_artifact_domain_id", bson.D{{Key: "domain_id", Value: 1}})
 	assertUniqueIndex(t, artifactIndexes, "uk_artifact_generation_id", bson.D{{Key: "generation_id", Value: 1}})
+}
+
+func assertIndex(t *testing.T, indexes []mongo.IndexModel, name string, keys bson.D) {
+	t.Helper()
+	for _, index := range indexes {
+		if index.Options != nil && index.Options.Name != nil && *index.Options.Name == name {
+			if !reflect.DeepEqual(index.Keys, keys) {
+				t.Fatalf("index %s = %#v", name, index)
+			}
+			return
+		}
+	}
+	t.Fatalf("index %s not found", name)
 }
 
 func assertUniqueIndex(t *testing.T, indexes []mongo.IndexModel, name string, keys bson.D) {

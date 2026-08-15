@@ -89,7 +89,7 @@ func (r *Repository) Update(ctx context.Context, sheet *answersheet.AnswerSheet)
 		"domain_id": domainID,
 	}
 
-	result, err := r.Collection().UpdateOne(ctx, filter, update)
+	result, err := r.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -142,7 +142,7 @@ func (r *Repository) Delete(ctx context.Context, id meta.ID) error {
 		"domain_id": domainID,
 	}
 
-	result, err := r.Collection().UpdateOne(ctx, filter, update)
+	result, err := r.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}

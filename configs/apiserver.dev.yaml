@@ -316,6 +316,18 @@ report_catalog_audit:
   lock_key: "qs:report-catalog-audit:leader"
   lock_ttl: 30s
 
+# 跨集合只读巡检默认关闭；完成首次 one-off 验收后再开启 scheduler。
+mongo_consistency_audit:
+  enable: false
+  initial_delay: 30m
+  tick_interval: 5s
+  cycle_interval: 24h
+  batch_size: 200
+  batch_timeout: 3s
+  max_samples: 10
+  lock_key: "qs:mongo-consistency-audit:leader"
+  lock_ttl: 30s
+
 # durable event 始终先写本地 Outbox；logging/nop 模式不会把 immediate 标记为 published。
 outbox_relay:
   mongo:

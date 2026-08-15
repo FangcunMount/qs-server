@@ -41,6 +41,11 @@ func (r *BaseRepository) acquire(ctx context.Context) (context.Context, func(), 
 	if r == nil || r.limiter == nil {
 		return ctx, func() {}, nil
 	}
+	// The transaction runner owns one Mongo dependency slot for the complete
+	// session. Re-acquiring it from a repository can self-deadlock at saturation.
+	if mongo.SessionFromContext(ctx) != nil {
+		return ctx, func() {}, nil
+	}
 	return r.limiter.Acquire(ctx)
 }
 
@@ -64,14 +69,25 @@ func (r *BaseRepository) InsertOne(ctx context.Context, document interface{}) (*
 	return r.collection.InsertOne(ctx, document)
 }
 
+// InsertMany inserts multiple documents under dependency admission. When ctx
+// carries a Mongo session, the outer transaction runner already owns the slot.
+func (r *BaseRepository) InsertMany(ctx context.Context, documents []interface{}, opts ...*options.InsertManyOptions) (*mongo.InsertManyResult, error) {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	return r.collection.InsertMany(ctx, documents, opts...)
+}
+
 // FindOne 查找一条文档
-func (r *BaseRepository) FindOne(ctx context.Context, filter bson.M, result interface{}) error {
+func (r *BaseRepository) FindOne(ctx context.Context, filter bson.M, result interface{}, opts ...*options.FindOneOptions) error {
 	ctx, release, err := r.acquire(ctx)
 	if err != nil {
 		return err
 	}
 	defer release()
-	return r.collection.FindOne(ctx, filter).Decode(result)
+	return r.collection.FindOne(ctx, filter, opts...).Decode(result)
 }
 
 // FindByID 根据ObjectID查找文档
@@ -86,13 +102,23 @@ func (r *BaseRepository) FindByID(ctx context.Context, id primitive.ObjectID, re
 }
 
 // UpdateOne 更新一条文档
-func (r *BaseRepository) UpdateOne(ctx context.Context, filter bson.M, update bson.M) (*mongo.UpdateResult, error) {
+func (r *BaseRepository) UpdateOne(ctx context.Context, filter bson.M, update bson.M, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
 	ctx, release, err := r.acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer release()
-	return r.collection.UpdateOne(ctx, filter, update)
+	return r.collection.UpdateOne(ctx, filter, update, opts...)
+}
+
+// UpdateMany updates all documents matching filter under dependency admission.
+func (r *BaseRepository) UpdateMany(ctx context.Context, filter bson.M, update bson.M, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	return r.collection.UpdateMany(ctx, filter, update, opts...)
 }
 
 // UpdateByID 根据ObjectID更新文档
@@ -114,6 +140,36 @@ func (r *BaseRepository) DeleteOne(ctx context.Context, filter bson.M) (*mongo.D
 	}
 	defer release()
 	return r.collection.DeleteOne(ctx, filter)
+}
+
+// DeleteMany deletes all documents matching filter under dependency admission.
+func (r *BaseRepository) DeleteMany(ctx context.Context, filter bson.M, opts ...*options.DeleteOptions) (*mongo.DeleteResult, error) {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	return r.collection.DeleteMany(ctx, filter, opts...)
+}
+
+// ReplaceOne replaces one document under dependency admission.
+func (r *BaseRepository) ReplaceOne(ctx context.Context, filter bson.M, replacement interface{}, opts ...*options.ReplaceOptions) (*mongo.UpdateResult, error) {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	return r.collection.ReplaceOne(ctx, filter, replacement, opts...)
+}
+
+// FindOneAndUpdate atomically updates and decodes one document under dependency admission.
+func (r *BaseRepository) FindOneAndUpdate(ctx context.Context, filter bson.M, update bson.M, result interface{}, opts ...*options.FindOneAndUpdateOptions) error {
+	ctx, release, err := r.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+	return r.collection.FindOneAndUpdate(ctx, filter, update, opts...).Decode(result)
 }
 
 // DeleteByID 根据ObjectID删除文档
