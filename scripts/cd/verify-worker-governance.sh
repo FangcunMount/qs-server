@@ -128,8 +128,8 @@ verify_worker_snapshots() {
       echo "Worker ${ip} governance instance_id mismatch" >&2
       return 1
     fi
-    assert_resilience_lock_capability "$resilience_snapshot" answersheet_processing duplicate_suppression 300 100
-    assert_resilience_lock_capability "$resilience_snapshot" attention_projection_reconcile leader 1800 600
+    assert_resilience_lock_capability "$resilience_snapshot" answersheet_processing duplicate_suppression 300 100 || return 1
+    assert_resilience_lock_capability "$resilience_snapshot" attention_projection_reconcile leader 1800 600 || return 1
 
     printf 'Worker governance endpoint %s instance=%s ready\n' "$ip" "$redis_instance"
     instance_ids="${instance_ids}${redis_instance}"$'\n'

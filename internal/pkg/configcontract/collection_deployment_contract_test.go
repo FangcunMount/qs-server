@@ -674,6 +674,8 @@ esac
 	cmd.Env = append(os.Environ(),
 		"PRIVILEGE_RUNNER="+runnerPath,
 		"DNS_RETRY_ATTEMPTS=1",
+		"GOVERNANCE_RETRY_ATTEMPTS=1",
+		"GOVERNANCE_RETRY_INTERVAL_SECONDS=0",
 		"FAKE_DEGRADED_ATTENTION=true",
 	)
 	output, err = cmd.CombinedOutput()
