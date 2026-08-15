@@ -267,6 +267,15 @@ jobs:
       - name: Validate production network exposure contract
         run: bash scripts/cd/test-production-compose-network-exposure.sh
 
+      - name: Validate worker deployment readiness gate
+        run: bash scripts/cd/test-wait-worker-readiness.sh
+
+      - name: Validate worker dependency preflight gate
+        run: bash scripts/cd/test-verify-worker-dependencies.sh
+
+      - name: Validate worker governance convergence gate
+        run: bash scripts/cd/test-verify-worker-governance.sh
+
       - name: Validate Attention reconcile dry-run/apply audit contract
         run: bash scripts/cd/test-attention-reconcile-audit.sh
 

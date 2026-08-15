@@ -48,6 +48,8 @@ cp build/docker/docker-compose.prod.yml "${PACKAGE_DIR}/docker-compose.prod.yml"
 cp \
   scripts/cd/image-metadata.sh \
   scripts/cd/remote-deploy.sh \
+  scripts/cd/wait-worker-readiness.sh \
+  scripts/cd/verify-worker-dependencies.sh \
   scripts/cd/verify-collection-nginx.sh \
   scripts/cd/verify-observability-nginx.sh \
   scripts/cd/verify-worker-governance.sh \

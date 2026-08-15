@@ -8,6 +8,8 @@ WORKER_GOVERNANCE_PORT="${WORKER_GOVERNANCE_PORT:-9092}"
 WORKER_GOVERNANCE_TIMEOUT="${WORKER_GOVERNANCE_TIMEOUT:-3}"
 DNS_RETRY_ATTEMPTS="${DNS_RETRY_ATTEMPTS:-20}"
 DNS_RETRY_INTERVAL_SECONDS="${DNS_RETRY_INTERVAL_SECONDS:-1}"
+GOVERNANCE_RETRY_ATTEMPTS="${GOVERNANCE_RETRY_ATTEMPTS:-20}"
+GOVERNANCE_RETRY_INTERVAL_SECONDS="${GOVERNANCE_RETRY_INTERVAL_SECONDS:-3}"
 PRIVILEGE_RUNNER="${PRIVILEGE_RUNNER:-sudo}"
 
 require_positive_integer() {
@@ -15,6 +17,15 @@ require_positive_integer() {
   local value="$2"
   if ! [[ "$value" =~ ^[0-9]+$ ]] || [ "$value" -lt 1 ]; then
     echo "$name must be a positive integer, got: $value" >&2
+    return 1
+  fi
+}
+
+require_nonnegative_integer() {
+  local name="$1"
+  local value="$2"
+  if ! [[ "$value" =~ ^[0-9]+$ ]]; then
+    echo "$name must be a non-negative integer, got: $value" >&2
     return 1
   fi
 }
@@ -138,7 +149,9 @@ verify() {
   require_positive_integer WORKER_GOVERNANCE_PORT "$WORKER_GOVERNANCE_PORT"
   require_positive_integer WORKER_GOVERNANCE_TIMEOUT "$WORKER_GOVERNANCE_TIMEOUT"
   require_positive_integer DNS_RETRY_ATTEMPTS "$DNS_RETRY_ATTEMPTS"
-  require_positive_integer DNS_RETRY_INTERVAL_SECONDS "$DNS_RETRY_INTERVAL_SECONDS"
+  require_nonnegative_integer DNS_RETRY_INTERVAL_SECONDS "$DNS_RETRY_INTERVAL_SECONDS"
+  require_positive_integer GOVERNANCE_RETRY_ATTEMPTS "$GOVERNANCE_RETRY_ATTEMPTS"
+  require_nonnegative_integer GOVERNANCE_RETRY_INTERVAL_SECONDS "$GOVERNANCE_RETRY_INTERVAL_SECONDS"
 
   if [ "$(run_privileged docker inspect "$APISERVER_CONTAINER" --format '{{.State.Running}}' 2>/dev/null || true)" != "true" ]; then
     echo "API server container $APISERVER_CONTAINER is not running" >&2
@@ -154,7 +167,9 @@ verify() {
     if [ "$resolved_count" -eq "$EXPECTED_WORKER_REPLICAS" ]; then
       break
     fi
-    sleep "$DNS_RETRY_INTERVAL_SECONDS"
+    if [ "$attempt" -lt "$DNS_RETRY_ATTEMPTS" ]; then
+      sleep "$DNS_RETRY_INTERVAL_SECONDS"
+    fi
   done
 
   if [ "$resolved_count" -ne "$EXPECTED_WORKER_REPLICAS" ]; then
@@ -163,9 +178,37 @@ verify() {
     return 1
   fi
 
+  local snapshot_output=""
+  local snapshot_error=""
+  local governance_ready=0
+  for attempt in $(seq 1 "$GOVERNANCE_RETRY_ATTEMPTS"); do
+    # Re-resolve on every attempt because Compose may replace worker IPs while
+    # the replicas are converging.
+    resolved_ips="$(worker_dns_ip_set || true)"
+    resolved_count="$(printf '%s\n' "$resolved_ips" | sed '/^$/d' | wc -l | tr -d '[:space:]')"
+    if [ "$resolved_count" -ne "$EXPECTED_WORKER_REPLICAS" ]; then
+      snapshot_error="Docker DNS ${WORKER_DNS_NAME} returned ${resolved_count} unique IPv4 addresses during governance readiness, want ${EXPECTED_WORKER_REPLICAS}"
+    elif snapshot_output="$(verify_worker_snapshots "$resolved_ips" 2>&1)"; then
+      governance_ready=1
+      break
+    else
+      snapshot_error="$snapshot_output"
+    fi
+
+    if [ "$attempt" -lt "$GOVERNANCE_RETRY_ATTEMPTS" ]; then
+      sleep "$GOVERNANCE_RETRY_INTERVAL_SECONDS"
+    fi
+  done
+
+  if [ "$governance_ready" -ne 1 ]; then
+    echo "Worker governance endpoints did not become ready after ${GOVERNANCE_RETRY_ATTEMPTS} attempts" >&2
+    printf '%s\n' "$snapshot_error" >&2
+    return 1
+  fi
+
   echo "Docker DNS ${WORKER_DNS_NAME} resolved the expected worker endpoints:"
   printf '%s\n' "$resolved_ips"
-  verify_worker_snapshots "$resolved_ips"
+  printf '%s\n' "$snapshot_output"
   echo "Worker governance reverse verification passed (${EXPECTED_WORKER_REPLICAS} endpoints)"
 }
 

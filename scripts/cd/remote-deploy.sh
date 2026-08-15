@@ -723,6 +723,17 @@ deploy_worker() {
   cd "/opt/qs-server/${CONTAINER_NAME}"
   docker_compose_pull -p "$WORKER_COMPOSE_PROJECT" -f "$DEPLOY_TMP/docker-compose.prod.yml"
 
+  local dependency_verifier="$DEPLOY_TMP/scripts/cd/verify-worker-dependencies.sh"
+  if [ ! -x "$dependency_verifier" ]; then
+    echo "Worker dependency verifier is missing or not executable: $dependency_verifier" >&2
+    exit 1
+  fi
+  PRIVILEGE_RUNNER="$SUDO" \
+    WORKER_ENV_FILE="$COMPOSE_ENV_FILE" \
+    WORKER_IMAGE_REF="$(resolve_compose_image_ref)" \
+    WORKER_DEPENDENCY_TIMEOUT_SECONDS="${WORKER_DEPENDENCY_TIMEOUT_SECONDS:-5}" \
+    bash "$dependency_verifier" verify
+
   echo "Cleaning up legacy non-Compose worker containers..."
   local legacy_workers
   legacy_workers=$($SUDO docker ps -a --format '{{.ID}} {{.Names}}' | awk '$2 == "qs-worker" || $2 ~ /^qs-deploy-worker-[0-9]+-qs-worker-[0-9]+$/ {print $1}')
@@ -737,22 +748,26 @@ deploy_worker() {
   # shellcheck disable=SC2046
   docker_compose -p "$WORKER_COMPOSE_PROJECT" -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d $(compose_up_pull_never_flag) --scale "${COMPOSE_SERVICE}=${WORKER_REPLICAS}" "$COMPOSE_SERVICE"
 
-  echo "Waiting for container to start..."
-  sleep 10
-
-  local running_count worker_containers first_worker ready
-  running_count=$(docker_compose -p "$WORKER_COMPOSE_PROJECT" -f "$DEPLOY_TMP/docker-compose.prod.yml" ps --status running -q "$COMPOSE_SERVICE" | wc -l | tr -d ' ')
-
-  if [ "$running_count" -lt "$WORKER_REPLICAS" ]; then
-    echo "Worker replicas failed to reach expected count (${running_count}/${WORKER_REPLICAS})" >&2
-    docker_compose -p "$WORKER_COMPOSE_PROJECT" -f "$DEPLOY_TMP/docker-compose.prod.yml" ps "$COMPOSE_SERVICE" || true
-    docker_compose -p "$WORKER_COMPOSE_PROJECT" -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 100 "$COMPOSE_SERVICE" || true
+  local readiness_verifier="$DEPLOY_TMP/scripts/cd/wait-worker-readiness.sh"
+  if [ ! -x "$readiness_verifier" ]; then
+    echo "Worker readiness verifier is missing or not executable: $readiness_verifier" >&2
     exit 1
   fi
 
-  echo "Worker replicas are running (${running_count}/${WORKER_REPLICAS})"
-  docker_compose -p "$WORKER_COMPOSE_PROJECT" -f "$DEPLOY_TMP/docker-compose.prod.yml" ps "$COMPOSE_SERVICE"
-  worker_containers="$(docker_compose -p "$WORKER_COMPOSE_PROJECT" -f "$DEPLOY_TMP/docker-compose.prod.yml" ps -q "$COMPOSE_SERVICE")"
+  PRIVILEGE_RUNNER="$SUDO" \
+    EXPECTED_WORKER_REPLICAS="$WORKER_REPLICAS" \
+    WORKER_COMPOSE_PROJECT="$WORKER_COMPOSE_PROJECT" \
+    WORKER_COMPOSE_SERVICE="$COMPOSE_SERVICE" \
+    WORKER_COMPOSE_FILE="$DEPLOY_TMP/docker-compose.prod.yml" \
+    WORKER_COMPOSE_ENV_FILE="$COMPOSE_ENV_FILE" \
+    WORKER_IMAGE_TAG="$IMAGE_TAG" \
+    WORKER_READY_ATTEMPTS="${WORKER_READY_ATTEMPTS:-60}" \
+    WORKER_READY_INTERVAL_SECONDS="${WORKER_READY_INTERVAL_SECONDS:-3}" \
+    WORKER_READY_TIMEOUT_SECONDS="${WORKER_READY_TIMEOUT_SECONDS:-3}" \
+    bash "$readiness_verifier" verify
+
+  local worker_containers first_worker ready
+  worker_containers="$(docker_compose -p "$WORKER_COMPOSE_PROJECT" -f "$DEPLOY_TMP/docker-compose.prod.yml" ps --status running -q "$COMPOSE_SERVICE")"
   first_worker="$(printf '%s\n' "$worker_containers" | sed -n '1p')"
   if [ -z "$first_worker" ]; then
     echo "No running worker container found for connectivity check" >&2
@@ -771,14 +786,11 @@ deploy_worker() {
   if [ "$ready" -ne 1 ]; then
     echo "Worker cannot resolve or reach qs-apiserver:9090 from inside container" >&2
     $SUDO docker exec "$first_worker" sh -lc 'echo "--- /etc/resolv.conf ---"; cat /etc/resolv.conf; echo "--- getent ---"; getent hosts qs-apiserver || true; echo "--- nc ---"; nc -vz qs-apiserver 9090 || true'
-    docker_compose -p "$WORKER_COMPOSE_PROJECT" -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 100 "$COMPOSE_SERVICE" || true
     exit 1
   fi
 
   echo "Worker can resolve and reach qs-apiserver:9090"
   remove_legacy_compose_service "$WORKER_COMPOSE_PROJECT" "qs-worker"
-  echo "Recent logs (all worker replicas):"
-  docker_compose -p "$WORKER_COMPOSE_PROJECT" -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 20 "$COMPOSE_SERVICE"
 }
 
 echo "=========================================="

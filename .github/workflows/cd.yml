@@ -12,7 +12,7 @@ name: Production Deploy
 #   SVRA_SSH_KEY；SVRB/SVRD_SSH_KEY 可选，缺省复用 SVRA_SSH_KEY
 #   SVRA/SVRB/SVRD_SUDO_PASSWORD（可选，sudo 需要密码时）
 #   MONGODB_HOST, MONGODB_PORT
-#   MYSQL_HOST, MYSQL_PORT (Worker 使用)
+#   MYSQL_HOST, MYSQL_PORT (apiserver 直连 RDS；worker 固定走 mysql-rds-proxy:3306)
 #   REDIS_HOST, REDIS_PORT, REDIS_USE_SSL, REDIS_SSL_INSECURE_SKIP_VERIFY
 #   NSQ_NSQD_HOST, NSQ_NSQD_PORT, NSQ_LOOKUPD_HOST, NSQ_LOOKUPD_PORT
 #   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
@@ -477,8 +477,10 @@ jobs:
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
           MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
-          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          # serverD cannot route to the Aliyun RDS private address directly.
+          # The serverA-only proxy is reachable through infra-network.
+          MYSQL_HOST: mysql-rds-proxy
+          MYSQL_PORT: 3306
           MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
