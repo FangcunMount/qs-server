@@ -170,7 +170,7 @@ jobs:
           QS_SERVER_TEST_MONGO_DB_PREFIX: qs_mongo_consistency_test
         run: |
           go test -tags=integration \
-            -run '^(TestInterpretationSuccessRollsBackEveryPersistedBoundary|TestInterpretationFailureAndScheduledRetryRollBackTogether|TestScannerDetectsEverySupportedDriftAgainstReplicaSet|TestScannerAcceptsMarkedHealthyTransactionsAgainstReplicaSet|TestMongoTransactionAuditIndexesUpDown|TestMongoConsistencyAuditCheckpointMySQLMigrationUpDown)$' \
+            -run '^(TestInterpretationSuccessRollsBackEveryPersistedBoundary|TestInterpretationFailureAndScheduledRetryRollBackTogether|TestScannerDetectsEverySupportedDriftAgainstReplicaSet|TestScannerAcceptsMarkedHealthyTransactionsAgainstReplicaSet|TestScannerPagesSubmittedOutboxAcrossAggregateIDDigitWidths|TestMongoTransactionAuditIndexesUpDown|TestMongoConsistencyAuditCheckpointMySQLMigrationUpDown)$' \
             -count=1 -timeout=10m -v \
             ./internal/apiserver/infra/mongo/interpretation \
             ./internal/apiserver/infra/mongo/mongoconsistency \
