@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/catalogreconcile"
@@ -21,6 +24,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -39,6 +43,8 @@ type config struct {
 	apply                  bool
 	prepareSchema          bool
 	confirmServicesStopped bool
+	dropSource             bool
+	confirmDropSource      bool
 }
 
 type migrationStats struct {
@@ -82,6 +88,24 @@ type mongoAttentionProjection struct {
 	LastError    string                     `bson:"last_error,omitempty"`
 	CreatedAt    time.Time                  `bson:"created_at"`
 	UpdatedAt    time.Time                  `bson:"updated_at"`
+}
+
+type mysqlAttentionProjectionRow struct {
+	EventID      string                     `gorm:"column:event_id;primaryKey;size:128"`
+	ReportID     string                     `gorm:"column:report_id;size:64;not null"`
+	AssessmentID string                     `gorm:"column:assessment_id;size:64;not null"`
+	TesteeID     uint64                     `gorm:"column:testee_id;not null"`
+	RiskLevel    string                     `gorm:"column:risk_level;size:32;not null"`
+	MarkKeyFocus bool                       `gorm:"column:mark_key_focus;not null"`
+	Status       attentionprojection.Status `gorm:"column:status;size:32;not null"`
+	Attempt      int                        `gorm:"column:attempt;not null"`
+	LastError    string                     `gorm:"column:last_error;type:text"`
+	CreatedAt    time.Time                  `gorm:"column:created_at;not null"`
+	UpdatedAt    time.Time                  `gorm:"column:updated_at;not null"`
+}
+
+func (mysqlAttentionProjectionRow) TableName() string {
+	return "interpretation_attention_projection"
 }
 
 type mongoDriftCounts struct {
@@ -130,15 +154,30 @@ func parseFlags() (config, error) {
 	cfg := config{}
 	flag.StringVar(&cfg.mysqlDSN, "mysql-dsn", os.Getenv("QS_MYSQL_DSN"), "target MySQL DSN; defaults to QS_MYSQL_DSN")
 	flag.StringVar(&cfg.mongoURI, "mongo-uri", os.Getenv("QS_MONGO_URI"), "source MongoDB URI; defaults to QS_MONGO_URI")
-	flag.StringVar(&cfg.mongoDB, "mongo-db", envOr("QS_MONGO_DB", "qs"), "source MongoDB database")
+	flag.StringVar(&cfg.mongoDB, "mongo-db", firstNonEmpty(os.Getenv("QS_MONGO_DB"), os.Getenv("QS_APISERVER_MONGODB_DATABASE"), "qs"), "source MongoDB database")
 	flag.DurationVar(&cfg.timeout, "timeout", 10*time.Minute, "overall migration timeout")
 	flag.IntVar(&cfg.batchSize, "batch-size", 500, "Mongo cursor batch size")
 	flag.BoolVar(&cfg.apply, "apply", false, "write and verify MySQL rows; default is read-only preflight")
 	flag.BoolVar(&cfg.prepareSchema, "prepare-schema", false, "run embedded MySQL migrations through 000068 before applying data")
 	flag.BoolVar(&cfg.confirmServicesStopped, "confirm-services-stopped", false, "confirm apiserver and workers are stopped for the apply window")
+	flag.BoolVar(&cfg.dropSource, "drop-source", false, "drop the three Mongo source collections after verified apply")
+	flag.BoolVar(&cfg.confirmDropSource, "confirm-drop-source", false, "confirm permanent removal of the three verified Mongo source collections")
 	flag.Parse()
+	var err error
+	if cfg.mysqlDSN == "" {
+		cfg.mysqlDSN, err = componentMySQLDSNFromEnv()
+		if err != nil {
+			return config{}, err
+		}
+	}
+	if cfg.mongoURI == "" {
+		cfg.mongoURI, err = componentMongoURIFromEnv(cfg.mongoDB)
+		if err != nil {
+			return config{}, err
+		}
+	}
 	if cfg.mysqlDSN == "" || cfg.mongoURI == "" || cfg.mongoDB == "" {
-		return config{}, fmt.Errorf("--mysql-dsn, --mongo-uri and --mongo-db are required")
+		return config{}, fmt.Errorf("--mysql-dsn, --mongo-uri and --mongo-db are required; component QS_APISERVER database variables are also accepted")
 	}
 	mysqlConfig, err := drivermysql.ParseDSN(cfg.mysqlDSN)
 	if err != nil || mysqlConfig.DBName == "" {
@@ -154,7 +193,57 @@ func parseFlags() (config, error) {
 	if cfg.prepareSchema && !cfg.apply {
 		return config{}, fmt.Errorf("--prepare-schema requires --apply")
 	}
+	if cfg.dropSource && (!cfg.apply || !cfg.confirmDropSource) {
+		return config{}, fmt.Errorf("--drop-source requires --apply and --confirm-drop-source")
+	}
+	if cfg.confirmDropSource && !cfg.dropSource {
+		return config{}, fmt.Errorf("--confirm-drop-source requires --drop-source")
+	}
 	return cfg, nil
+}
+
+func componentMySQLDSNFromEnv() (string, error) {
+	host := strings.TrimSpace(os.Getenv("QS_APISERVER_MYSQL_HOST"))
+	username := os.Getenv("QS_APISERVER_MYSQL_USERNAME")
+	password := os.Getenv("QS_APISERVER_MYSQL_PASSWORD")
+	database := strings.TrimSpace(os.Getenv("QS_APISERVER_MYSQL_DATABASE"))
+	if host == "" && username == "" && password == "" && database == "" {
+		return "", nil
+	}
+	if host == "" || username == "" || password == "" || database == "" {
+		return "", fmt.Errorf("QS_APISERVER_MYSQL_HOST/USERNAME/PASSWORD/DATABASE must be configured together")
+	}
+	location, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		return "", fmt.Errorf("load MySQL timezone: %w", err)
+	}
+	cfg := drivermysql.NewConfig()
+	cfg.User = username
+	cfg.Passwd = password
+	cfg.Net = "tcp"
+	cfg.Addr = host
+	cfg.DBName = database
+	cfg.ParseTime = true
+	cfg.Loc = location
+	cfg.Params = map[string]string{"charset": "utf8mb4"}
+	return cfg.FormatDSN(), nil
+}
+
+func componentMongoURIFromEnv(database string) (string, error) {
+	host := strings.TrimSpace(os.Getenv("QS_APISERVER_MONGODB_HOST"))
+	username := os.Getenv("QS_APISERVER_MONGODB_USERNAME")
+	password := os.Getenv("QS_APISERVER_MONGODB_PASSWORD")
+	if host == "" && username == "" && password == "" {
+		return "", nil
+	}
+	if host == "" || username == "" || password == "" || database == "" {
+		return "", fmt.Errorf("QS_APISERVER_MONGODB_HOST/USERNAME/PASSWORD/DATABASE must be configured together")
+	}
+	if strings.Contains(host, "://") {
+		return "", fmt.Errorf("QS_APISERVER_MONGODB_HOST must be host:port, got a URI")
+	}
+	u := &url.URL{Scheme: "mongodb", Host: host, Path: "/" + database, User: url.UserPassword(username, password)}
+	return u.String(), nil
 }
 
 func run(ctx context.Context, cfg config) error {
@@ -205,11 +294,6 @@ func run(ctx context.Context, cfg config) error {
 
 	admissionRepo := mysqlinterpretation.NewAdmissionFailureRepository(mysqlDB)
 	checkpointRepo := mysqlinterpretation.NewCatalogAuditCheckpointRepository(mysqlDB)
-	attentionStore, err := attentionprojection.NewMySQLStore(mysqlDB)
-	if err != nil {
-		return err
-	}
-
 	changed, err := migrateAdmissions(ctx, mongoDB, admissionRepo, cfg.batchSize)
 	if err != nil {
 		return err
@@ -220,7 +304,7 @@ func run(ctx context.Context, cfg config) error {
 		return err
 	}
 	setChanged(stats, checkpointCollection, changed)
-	changed, err = migrateAttention(ctx, mongoDB, attentionStore, cfg.batchSize)
+	changed, err = migrateAttention(ctx, mongoDB, mysqlDB, cfg.batchSize)
 	if err != nil {
 		return err
 	}
@@ -236,6 +320,13 @@ func run(ctx context.Context, cfg config) error {
 		stats[source] = item
 	}
 	printStats("apply", stats)
+	if cfg.dropSource {
+		if err := dropSourceCollections(ctx, mongoDB); err != nil {
+			return err
+		}
+		log.Print("verified Mongo source collections dropped")
+		return nil
+	}
 	log.Print("interpretation runtime ledger migration verified; keep Mongo source collections for rollback until the observation window closes")
 	return nil
 }
@@ -345,8 +436,11 @@ func migrateCheckpoint(ctx context.Context, db *mongo.Database, repo *mysqlinter
 	if err != nil {
 		return 0, fmt.Errorf("verify catalog audit checkpoint: %w", err)
 	}
-	if stored.Revision < checkpoint.Revision {
-		return 0, fmt.Errorf("verify catalog audit checkpoint: target revision %d is behind source %d", stored.Revision, checkpoint.Revision)
+	if stored.UpdatedAt.Before(checkpoint.UpdatedAt) {
+		return 0, fmt.Errorf("verify catalog audit checkpoint: target updated_at %s is behind source %s", stored.UpdatedAt, checkpoint.UpdatedAt)
+	}
+	if checkpoint.LastCompleted != nil && (stored.LastCompleted == nil || stored.LastCompleted.CompletedAt.Before(checkpoint.LastCompleted.CompletedAt)) {
+		return 0, fmt.Errorf("verify catalog audit checkpoint: target completed snapshot is behind source")
 	}
 	if changed {
 		return 1, nil
@@ -397,40 +491,93 @@ func (counts mongoDriftCounts) application() catalogreconcile.DriftCounts {
 	}
 }
 
-func migrateAttention(ctx context.Context, db *mongo.Database, store *attentionprojection.MySQLStore, batchSize int) (int64, error) {
+func migrateAttention(ctx context.Context, db *mongo.Database, mysqlDB *gorm.DB, batchSize int) (int64, error) {
 	cursor, err := db.Collection(attentionCollection).Find(ctx, bson.M{}, options.Find().SetSort(bson.D{{Key: "event_id", Value: 1}}).SetBatchSize(int32(batchSize)))
 	if err != nil {
 		return 0, fmt.Errorf("scan mongo attention projections: %w", err)
 	}
 	defer func() { _ = cursor.Close(ctx) }()
 	var changed int64
+	batch := make([]mysqlAttentionProjectionRow, 0, batchSize)
 	for cursor.Next(ctx) {
 		var source mongoAttentionProjection
 		if err := cursor.Decode(&source); err != nil {
 			return changed, fmt.Errorf("decode mongo attention projection: %w", err)
 		}
-		record := attentionprojection.Record{
+		if source.EventID == "" || source.ReportID == "" {
+			return changed, fmt.Errorf("invalid attention projection event=%q report=%q", source.EventID, source.ReportID)
+		}
+		batch = append(batch, mysqlAttentionProjectionRow{
 			EventID: source.EventID, ReportID: source.ReportID, AssessmentID: source.AssessmentID,
 			TesteeID: source.TesteeID, RiskLevel: source.RiskLevel, MarkKeyFocus: source.MarkKeyFocus,
 			Status: source.Status, Attempt: source.Attempt, LastError: source.LastError,
-			CreatedAt: source.CreatedAt, UpdatedAt: source.UpdatedAt,
-		}
-		imported, err := store.ImportRecord(ctx, record)
-		if err != nil {
-			return changed, err
-		}
-		if imported {
-			changed++
-		}
-		stored, err := store.GetByEventID(ctx, record.EventID)
-		if err != nil {
-			return changed, fmt.Errorf("verify attention projection %s: %w", record.EventID, err)
-		}
-		if stored.ReportID != record.ReportID || stored.UpdatedAt.Before(record.UpdatedAt) {
-			return changed, fmt.Errorf("verify attention projection %s: target state is older or mismatched", record.EventID)
+			CreatedAt: source.CreatedAt.UTC(), UpdatedAt: source.UpdatedAt.UTC(),
+		})
+		if len(batch) == batchSize {
+			imported, err := flushAttentionBatch(ctx, mysqlDB, batch)
+			if err != nil {
+				return changed, err
+			}
+			changed += imported
+			batch = batch[:0]
 		}
 	}
-	return changed, cursor.Err()
+	if err := cursor.Err(); err != nil {
+		return changed, err
+	}
+	imported, err := flushAttentionBatch(ctx, mysqlDB, batch)
+	return changed + imported, err
+}
+
+func flushAttentionBatch(ctx context.Context, db *gorm.DB, batch []mysqlAttentionProjectionRow) (int64, error) {
+	if len(batch) == 0 {
+		return 0, nil
+	}
+	result := db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&batch)
+	if result.Error != nil {
+		return 0, fmt.Errorf("import attention projection batch: %w", result.Error)
+	}
+	eventIDs := make([]string, 0, len(batch))
+	for i := range batch {
+		eventIDs = append(eventIDs, batch[i].EventID)
+	}
+	var stored []mysqlAttentionProjectionRow
+	if err := db.WithContext(ctx).Select("event_id", "report_id", "updated_at").Where("event_id IN ?", eventIDs).Find(&stored).Error; err != nil {
+		return result.RowsAffected, fmt.Errorf("verify attention projection batch: %w", err)
+	}
+	byEventID := make(map[string]mysqlAttentionProjectionRow, len(stored))
+	for i := range stored {
+		byEventID[stored[i].EventID] = stored[i]
+	}
+	for i := range batch {
+		row, exists := byEventID[batch[i].EventID]
+		if !exists || row.ReportID != batch[i].ReportID || row.UpdatedAt.Before(batch[i].UpdatedAt) {
+			return result.RowsAffected, fmt.Errorf("verify attention projection %s: target state is missing, older or mismatched", batch[i].EventID)
+		}
+	}
+	return result.RowsAffected, nil
+}
+
+func dropSourceCollections(ctx context.Context, db *mongo.Database) error {
+	for _, name := range []string{admissionCollection, checkpointCollection, attentionCollection} {
+		if err := db.Collection(name).Drop(ctx); err != nil && !isNamespaceNotFound(err) {
+			return fmt.Errorf("drop Mongo source collection %s: %w", name, err)
+		}
+		log.Printf("dropped Mongo source collection=%s", name)
+	}
+	names, err := db.ListCollectionNames(ctx, bson.M{"name": bson.M{"$in": bson.A{admissionCollection, checkpointCollection, attentionCollection}}})
+	if err != nil {
+		return fmt.Errorf("verify dropped Mongo source collections: %w", err)
+	}
+	if len(names) != 0 {
+		return fmt.Errorf("verify dropped Mongo source collections: still present=%v", names)
+	}
+	return nil
+}
+
+func isNamespaceNotFound(err error) bool {
+	var commandError mongo.CommandError
+	return errors.As(err, &commandError) && commandError.Code == 26
 }
 
 func printStats(phase string, stats map[string]migrationStats) {
@@ -451,4 +598,13 @@ func envOr(name, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }

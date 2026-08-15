@@ -92,9 +92,9 @@ func (r *CatalogAuditCheckpointRepository) SaveAuditCheckpoint(ctx context.Conte
 	return nil
 }
 
-// ImportAuditCheckpoint installs a historical Mongo checkpoint only when it is
-// newer than the current MySQL revision. The row lock makes repeated or resumed
-// cutovers deterministic.
+// ImportAuditCheckpoint imports historical Mongo audit state without moving a
+// live MySQL audit cycle backwards. Revision is a store-local CAS token, so it
+// must never be used to compare independently advanced Mongo and MySQL rows.
 func (r *CatalogAuditCheckpointRepository) ImportAuditCheckpoint(ctx context.Context, checkpoint catalogreconcile.AuditCheckpoint) (bool, error) {
 	if r == nil || r.db == nil {
 		return false, fmt.Errorf("catalog audit checkpoint repository is not configured")
@@ -118,8 +118,17 @@ func (r *CatalogAuditCheckpointRepository) ImportAuditCheckpoint(ctx context.Con
 		if err != nil {
 			return err
 		}
-		if current.Revision >= po.Revision {
+		currentCheckpoint, err := catalogAuditCheckpointFromPO(current)
+		if err != nil {
+			return err
+		}
+		next, changed := mergeImportedAuditCheckpoint(currentCheckpoint, checkpoint)
+		if !changed {
 			return nil
+		}
+		po, err = catalogAuditCheckpointToPO(next)
+		if err != nil {
+			return err
 		}
 		result := tx.Model(&catalogAuditCheckpointPO{}).
 			Where("checkpoint_key = ? AND revision = ?", catalogreconcile.AuditCheckpointID, current.Revision).
@@ -137,6 +146,27 @@ func (r *CatalogAuditCheckpointRepository) ImportAuditCheckpoint(ctx context.Con
 		return false, fmt.Errorf("import catalog audit checkpoint: %w", err)
 	}
 	return imported, nil
+}
+
+func mergeImportedAuditCheckpoint(current, source catalogreconcile.AuditCheckpoint) (catalogreconcile.AuditCheckpoint, bool) {
+	if source.UpdatedAt.After(current.UpdatedAt) {
+		source.Revision = current.Revision + 1
+		return source, true
+	}
+	if !completedSnapshotAfter(source.LastCompleted, current.LastCompleted) {
+		return current, false
+	}
+	next := current
+	next.Revision = current.Revision + 1
+	next.LastCompleted = source.LastCompleted
+	return next, true
+}
+
+func completedSnapshotAfter(candidate, current *catalogreconcile.CompletedAuditSnapshot) bool {
+	if candidate == nil {
+		return false
+	}
+	return current == nil || candidate.CompletedAt.After(current.CompletedAt)
 }
 
 func catalogAuditCheckpointUpdates(po catalogAuditCheckpointPO) map[string]any {
