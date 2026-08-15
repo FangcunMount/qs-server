@@ -39,7 +39,9 @@ import (
 	mongoModelCatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	mongoQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
+	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	modelport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	resiliencesubsystem "github.com/FangcunMount/qs-server/internal/apiserver/resilience/subsystem"
 	grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
 	grpcservice "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	collectionevaluation "github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
@@ -138,9 +140,17 @@ func TestCurrentRuntimeClosure(t *testing.T) {
 	}
 	locks := newTestLocks(redisClient, "apiserver", "test:runtime-closure:apiserver")
 	workerLocks := newTestLocks(redisClient, "worker", "test:runtime-closure:worker")
+	resilienceRuntime, err := resiliencesubsystem.New(resiliencesubsystem.Options{
+		InstanceID:   "runtime-closure-test",
+		Backpressure: apiserveroptions.NewBackpressureOptions(),
+		Locks:        locks,
+	})
+	if err != nil {
+		t.Fatalf("build resilience subsystem: %v", err)
+	}
 	cacheSubsystem := newRuntimeCacheSubsystem(redisClient)
 	c := container.NewContainerWithOptions(gormDB, mongoDB, redisClient, container.ContainerOptions{
-		EventSubsystem: eventing, CacheSubsystem: cacheSubsystem, LockSubsystem: locks, Silent: true,
+		EventSubsystem: eventing, CacheSubsystem: cacheSubsystem, LockSubsystem: locks, Resilience: resilienceRuntime, Silent: true,
 	})
 	if err := c.Initialize(); err != nil {
 		t.Fatalf("initialize application container: %v", err)
