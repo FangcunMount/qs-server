@@ -114,65 +114,6 @@ func TestCatalogAuditCheckpointSaveRejectsStaleRevision(t *testing.T) {
 	}
 }
 
-func TestMergeImportedAuditCheckpointPreservesNewerLiveCycle(t *testing.T) {
-	currentAt := time.Date(2026, 8, 15, 6, 0, 0, 0, time.UTC)
-	sourceCompletedAt := currentAt.Add(-2 * time.Hour)
-	current := catalogreconcile.AuditCheckpoint{
-		SchemaVersion: 1, Revision: 510, CycleID: "mysql-live", Phase: catalogreconcile.AuditPhaseMissing,
-		AfterAssessmentID: 100, UpdatedAt: currentAt,
-	}
-	source := catalogreconcile.AuditCheckpoint{
-		SchemaVersion: 1, Revision: 20577, CycleID: "mongo-old", Phase: catalogreconcile.AuditPhaseCompleted,
-		UpdatedAt:     currentAt.Add(-time.Hour),
-		LastCompleted: &catalogreconcile.CompletedAuditSnapshot{CycleID: "mongo-old", CompletedAt: sourceCompletedAt},
-	}
-
-	merged, changed := mergeImportedAuditCheckpoint(current, source)
-	if !changed {
-		t.Fatal("historical completed snapshot was not merged")
-	}
-	if merged.CycleID != current.CycleID || merged.Phase != current.Phase || merged.AfterAssessmentID != current.AfterAssessmentID {
-		t.Fatalf("live MySQL cycle was replaced: %#v", merged)
-	}
-	if merged.Revision != current.Revision+1 {
-		t.Fatalf("merged revision = %d, want %d", merged.Revision, current.Revision+1)
-	}
-	if merged.LastCompleted == nil || merged.LastCompleted.CycleID != source.LastCompleted.CycleID {
-		t.Fatalf("historical completed snapshot was not preserved: %#v", merged.LastCompleted)
-	}
-}
-
-func TestMergeImportedAuditCheckpointUsesNewerSourceWithLocalRevision(t *testing.T) {
-	currentAt := time.Date(2026, 8, 15, 6, 0, 0, 0, time.UTC)
-	current := catalogreconcile.AuditCheckpoint{Revision: 20, CycleID: "mysql-old", UpdatedAt: currentAt}
-	source := catalogreconcile.AuditCheckpoint{Revision: 3, CycleID: "mongo-new", UpdatedAt: currentAt.Add(time.Minute)}
-
-	merged, changed := mergeImportedAuditCheckpoint(current, source)
-	if !changed || merged.CycleID != source.CycleID {
-		t.Fatalf("newer source was not imported: changed=%t checkpoint=%#v", changed, merged)
-	}
-	if merged.Revision != current.Revision+1 {
-		t.Fatalf("imported revision = %d, want local CAS revision %d", merged.Revision, current.Revision+1)
-	}
-}
-
-func TestMergeImportedAuditCheckpointSkipsOlderEvidence(t *testing.T) {
-	currentAt := time.Date(2026, 8, 15, 6, 0, 0, 0, time.UTC)
-	current := catalogreconcile.AuditCheckpoint{
-		Revision: 20, CycleID: "mysql-live", UpdatedAt: currentAt,
-		LastCompleted: &catalogreconcile.CompletedAuditSnapshot{CycleID: "mysql-complete", CompletedAt: currentAt.Add(-time.Hour)},
-	}
-	source := catalogreconcile.AuditCheckpoint{
-		Revision: 200, CycleID: "mongo-old", UpdatedAt: currentAt.Add(-time.Minute),
-		LastCompleted: &catalogreconcile.CompletedAuditSnapshot{CycleID: "mongo-complete", CompletedAt: currentAt.Add(-2 * time.Hour)},
-	}
-
-	merged, changed := mergeImportedAuditCheckpoint(current, source)
-	if changed || merged.CycleID != current.CycleID || merged.Revision != current.Revision {
-		t.Fatalf("older evidence changed live checkpoint: changed=%t checkpoint=%#v", changed, merged)
-	}
-}
-
 func newMockGorm(t *testing.T) (*gorm.DB, sqlmock.Sqlmock) {
 	t.Helper()
 	sqlDB, mock, err := sqlmock.New()

@@ -555,6 +555,35 @@ func TestCIRunsModelCatalogMongoContracts(t *testing.T) {
 	}
 }
 
+func TestCIRunsMongoRuntimeLedgerRetirementGuards(t *testing.T) {
+	t.Parallel()
+
+	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatalf("read CI workflow: %v", err)
+	}
+	content := string(workflow)
+	for _, required := range []string{
+		"Run Mongo runtime-ledger retirement guards",
+		"TestCompatibilityRetirementPreconditionRejectsLiveDataAndArchiveReferences",
+		"TestRuntimeLedgerRetirementPreconditionRejectsAnySourceDocument",
+		"TestRuntimeLedgerRetirementFromVersion22WithSourcesAlreadyDropped",
+		"QS_SERVER_TEST_MONGO_DB_PREFIX: qs_runtime_ledger_retirement_test",
+	} {
+		if !strings.Contains(content, required) {
+			t.Errorf("CI Mongo runtime-ledger retirement contract must contain %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		"Run attention projection Mongo integration contract",
+		"TestMongoStoreProjectorUpsertAndDuplicateEvent",
+	} {
+		if strings.Contains(content, forbidden) {
+			t.Errorf("CI must not reference retired Attention Mongo test %q", forbidden)
+		}
+	}
+}
+
 func TestCIRunsStatisticsMigrationAndColdStartContracts(t *testing.T) {
 	t.Parallel()
 
@@ -632,6 +661,26 @@ func TestDBOpsRatchetsRetiredMySQLObjectsAbsent(t *testing.T) {
 	}
 }
 
+func TestDBOpsDoesNotReferenceRetiredMongoCollections(t *testing.T) {
+	t.Parallel()
+
+	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "db-ops.yml"))
+	if err != nil {
+		t.Fatalf("read db ops workflow: %v", err)
+	}
+	content := string(workflow)
+	for _, forbidden := range []string{
+		"archived_reports",
+		"interpretation_admission_failures",
+		"interpretation_attention_projections",
+		"interpretation_catalog_audit_checkpoints",
+	} {
+		if strings.Contains(content, forbidden) {
+			t.Errorf("DB ops must not reference retired Mongo collection %q", forbidden)
+		}
+	}
+}
+
 func TestDBOpsInventoriesStatisticsCanonicalAndCompatibilityState(t *testing.T) {
 	t.Parallel()
 
@@ -692,9 +741,9 @@ func TestDBOpsAttentionRecoveryAuditOnlyCountsHighRiskSideEffects(t *testing.T) 
 	}
 	content := string(workflow)
 	for _, required := range []string{
-		"High-risk report artifact attention coverage since",
+		"High-risk report artifacts exported for MySQL Attention coverage audit since",
 		`risk_level: {$in: ["high", "severe"]}`,
-		"Attention projection identity integrity",
+		"missing_report_id",
 		"duplicate_report_groups",
 		"generated_within_30m_safety_lag",
 		"Attention gap cross-store classification (aggregate counts only)",

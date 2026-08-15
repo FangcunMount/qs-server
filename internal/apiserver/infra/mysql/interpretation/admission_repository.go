@@ -14,7 +14,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 // AdmissionFailurePO is the relational form of lifecycle-front admission evidence.
@@ -100,55 +99,8 @@ func (r *AdmissionFailureRepository) UpsertByFingerprint(ctx context.Context, fa
 		return false, fmt.Errorf("update interpretation admission failure: %w", result.Error)
 	}
 	// A collision on the immutable domain id but not on fingerprint preserves
-	// the historical Mongo behavior: no new evidence is created or mutated.
+	// the idempotency contract: no new evidence is created or mutated.
 	return false, nil
-}
-
-// ImportFailure inserts one historical Mongo row without incrementing its
-// attempt counter. Existing MySQL evidence always wins so reruns are safe.
-func (r *AdmissionFailureRepository) ImportFailure(ctx context.Context, failure *admission.Failure) (bool, error) {
-	if r == nil || r.db == nil {
-		return false, fmt.Errorf("interpretation admission failure repository is not configured")
-	}
-	if failure == nil {
-		return false, fmt.Errorf("admission failure is required")
-	}
-	po := admissionFailureToPO(failure)
-	var imported bool
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var current AdmissionFailurePO
-		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("fingerprint = ?", po.Fingerprint).First(&current).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			if err := tx.Create(po).Error; err != nil {
-				return err
-			}
-			imported = true
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		if current.ID != po.ID || current.OutcomeID != po.OutcomeID || current.Kind != po.Kind || current.Code != po.Code {
-			return fmt.Errorf("admission failure fingerprint collision for %s", po.Fingerprint)
-		}
-		if current.Attempt >= po.Attempt && !po.LastFailedAt.After(current.LastFailedAt) {
-			return nil
-		}
-		updates := map[string]any{"attempt": max(current.Attempt, po.Attempt)}
-		if po.LastFailedAt.After(current.LastFailedAt) {
-			updates["last_failed_at"] = po.LastFailedAt
-			updates["trace_id"] = po.TraceID
-		}
-		if err := tx.Model(&AdmissionFailurePO{}).Where("fingerprint = ?", po.Fingerprint).Updates(updates).Error; err != nil {
-			return err
-		}
-		imported = true
-		return nil
-	})
-	if err != nil {
-		return false, fmt.Errorf("import interpretation admission failure: %w", err)
-	}
-	return imported, nil
 }
 
 func (r *AdmissionFailureRepository) FindByFingerprint(ctx context.Context, fingerprint string) (*admission.Failure, error) {

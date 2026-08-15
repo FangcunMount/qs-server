@@ -153,15 +153,15 @@ jobs:
             ./internal/apiserver/infra/mongo/modelcatalog \
             ./internal/apiserver/container/modules/modelcatalog
 
-      - name: Run attention projection Mongo integration contract
+      - name: Run Mongo runtime-ledger retirement guards
         env:
           QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
-          QS_SERVER_TEST_MONGO_DB: qs_attention_projection_ci_test
+          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_runtime_ledger_retirement_test
         run: |
-          go test \
-            -run '^TestMongoStoreProjectorUpsertAndDuplicateEvent$' \
+          go test -tags=integration \
+            -run '^(TestCompatibilityRetirementPreconditionRejectsLiveDataAndArchiveReferences|TestRuntimeLedgerRetirementPreconditionRejectsAnySourceDocument|TestRuntimeLedgerRetirementFromVersion22WithSourcesAlreadyDropped)$' \
             -count=1 -timeout=5m -v \
-            ./internal/pkg/attentionprojection
+            ./internal/pkg/migration
 
       - name: Run current runtime closure E2E
         env:

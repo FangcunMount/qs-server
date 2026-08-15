@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strconv"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -14,41 +13,11 @@ import (
 )
 
 const (
-	CatalogAuditCheckpointCollection = "interpretation_catalog_audit_checkpoints"
-	CatalogAuditCheckpointID         = "report_catalog"
-	CatalogAuditCheckpointSchema     = 1
-	CatalogAuditPhaseMissing         = "missing_sources"
-	CatalogAuditPhaseCatalog         = "catalog_entries"
+	CatalogAuditPhaseMissing = "missing_sources"
+	CatalogAuditPhaseCatalog = "catalog_entries"
 
 	IndexCatalogAuditArtifact = "idx_interpret_report_audit_active_assessment_winner"
 )
-
-var (
-	ErrCatalogAuditCheckpointMissing = errors.New("catalog audit checkpoint is missing")
-	ErrCatalogAuditCheckpointCAS     = errors.New("catalog audit checkpoint CAS conflict")
-)
-
-type CatalogCompletedAuditSnapshot struct {
-	CycleID     string
-	CompletedAt time.Time
-	Counts      CatalogDriftCounts
-	OrgCounts   map[int64]CatalogDriftCounts
-}
-
-type CatalogAuditCheckpoint struct {
-	SchemaVersion            int
-	Revision                 int64
-	CycleID                  string
-	Phase                    string
-	AfterAssessmentID        uint64
-	SourceUpperAssessmentID  uint64
-	CatalogUpperAssessmentID uint64
-	WorkingCounts            CatalogDriftCounts
-	WorkingOrgCounts         map[int64]CatalogDriftCounts
-	LastCompleted            *CatalogCompletedAuditSnapshot
-	NextCycleAt              time.Time
-	UpdatedAt                time.Time
-}
 
 type CatalogAuditUpperBounds struct {
 	SourceAssessmentID  uint64
@@ -71,29 +40,6 @@ type CatalogAuditBatchResult struct {
 	OrgCounts        map[int64]CatalogDriftCounts
 }
 
-type catalogAuditSnapshotPO struct {
-	CycleID     string                        `bson:"cycle_id"`
-	CompletedAt time.Time                     `bson:"completed_at"`
-	Counts      CatalogDriftCounts            `bson:"counts"`
-	OrgCounts   map[string]CatalogDriftCounts `bson:"org_counts"`
-}
-
-type catalogAuditCheckpointPO struct {
-	ID                       string                        `bson:"_id"`
-	SchemaVersion            int                           `bson:"schema_version"`
-	Revision                 int64                         `bson:"revision"`
-	CycleID                  string                        `bson:"cycle_id"`
-	Phase                    string                        `bson:"phase"`
-	AfterAssessmentID        uint64                        `bson:"after_assessment_id"`
-	SourceUpperAssessmentID  uint64                        `bson:"source_upper_assessment_id"`
-	CatalogUpperAssessmentID uint64                        `bson:"catalog_upper_assessment_id"`
-	WorkingCounts            CatalogDriftCounts            `bson:"working_counts"`
-	WorkingOrgCounts         map[string]CatalogDriftCounts `bson:"working_org_counts"`
-	LastCompleted            *catalogAuditSnapshotPO       `bson:"last_completed,omitempty"`
-	NextCycleAt              time.Time                     `bson:"next_cycle_at,omitempty"`
-	UpdatedAt                time.Time                     `bson:"updated_at"`
-}
-
 func (s *CatalogReconcileStore) VerifyAuditIndexes(ctx context.Context) error {
 	if s == nil || s.db == nil {
 		return fmt.Errorf("catalog audit store is not configured")
@@ -113,46 +59,6 @@ func (s *CatalogReconcileStore) VerifyAuditIndexes(ctx context.Context) error {
 		if !present[item.index] {
 			return fmt.Errorf("required audit index %s.%s is missing; run Mongo migration 000021", item.collection, item.index)
 		}
-	}
-	return nil
-}
-
-func (s *CatalogReconcileStore) LoadAuditCheckpoint(ctx context.Context) (CatalogAuditCheckpoint, error) {
-	if s == nil || s.db == nil {
-		return CatalogAuditCheckpoint{}, fmt.Errorf("catalog audit store is not configured")
-	}
-	var po catalogAuditCheckpointPO
-	if err := s.db.Collection(CatalogAuditCheckpointCollection).FindOne(ctx, bson.M{"_id": CatalogAuditCheckpointID}).Decode(&po); err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			return CatalogAuditCheckpoint{}, ErrCatalogAuditCheckpointMissing
-		}
-		return CatalogAuditCheckpoint{}, err
-	}
-	if po.SchemaVersion != CatalogAuditCheckpointSchema {
-		return CatalogAuditCheckpoint{}, fmt.Errorf("unsupported catalog audit checkpoint schema version %d", po.SchemaVersion)
-	}
-	return checkpointFromPO(po), nil
-}
-
-func (s *CatalogReconcileStore) SaveAuditCheckpoint(ctx context.Context, expectedRevision int64, checkpoint CatalogAuditCheckpoint) error {
-	if s == nil || s.db == nil || checkpoint.Revision != expectedRevision+1 {
-		return fmt.Errorf("catalog audit checkpoint revision is invalid")
-	}
-	po := checkpointToPO(checkpoint)
-	collection := s.db.Collection(CatalogAuditCheckpointCollection)
-	if expectedRevision == 0 {
-		_, err := collection.InsertOne(ctx, po)
-		if mongo.IsDuplicateKeyError(err) {
-			return ErrCatalogAuditCheckpointCAS
-		}
-		return err
-	}
-	result, err := collection.ReplaceOne(ctx, bson.M{"_id": CatalogAuditCheckpointID, "revision": expectedRevision}, po)
-	if err != nil {
-		return err
-	}
-	if result.ModifiedCount != 1 {
-		return ErrCatalogAuditCheckpointCAS
 	}
 	return nil
 }
@@ -426,52 +332,6 @@ func auditRange(field string, request CatalogAuditBatchRequest) bson.M {
 
 func addCatalogDriftCounts(left, right CatalogDriftCounts) CatalogDriftCounts {
 	return CatalogDriftCounts{Missing: left.Missing + right.Missing, Dangling: left.Dangling + right.Dangling, AssociationMismatch: left.AssociationMismatch + right.AssociationMismatch, WrongWinner: left.WrongWinner + right.WrongWinner}
-}
-
-func checkpointToPO(checkpoint CatalogAuditCheckpoint) catalogAuditCheckpointPO {
-	po := catalogAuditCheckpointPO{
-		ID: CatalogAuditCheckpointID, SchemaVersion: checkpoint.SchemaVersion, Revision: checkpoint.Revision,
-		CycleID: checkpoint.CycleID, Phase: checkpoint.Phase, AfterAssessmentID: checkpoint.AfterAssessmentID,
-		SourceUpperAssessmentID: checkpoint.SourceUpperAssessmentID, CatalogUpperAssessmentID: checkpoint.CatalogUpperAssessmentID,
-		WorkingCounts: checkpoint.WorkingCounts, WorkingOrgCounts: orgCountsToPO(checkpoint.WorkingOrgCounts),
-		NextCycleAt: checkpoint.NextCycleAt, UpdatedAt: checkpoint.UpdatedAt,
-	}
-	if checkpoint.LastCompleted != nil {
-		po.LastCompleted = &catalogAuditSnapshotPO{CycleID: checkpoint.LastCompleted.CycleID, CompletedAt: checkpoint.LastCompleted.CompletedAt, Counts: checkpoint.LastCompleted.Counts, OrgCounts: orgCountsToPO(checkpoint.LastCompleted.OrgCounts)}
-	}
-	return po
-}
-
-func checkpointFromPO(po catalogAuditCheckpointPO) CatalogAuditCheckpoint {
-	checkpoint := CatalogAuditCheckpoint{
-		SchemaVersion: po.SchemaVersion, Revision: po.Revision, CycleID: po.CycleID, Phase: po.Phase,
-		AfterAssessmentID: po.AfterAssessmentID, SourceUpperAssessmentID: po.SourceUpperAssessmentID,
-		CatalogUpperAssessmentID: po.CatalogUpperAssessmentID, WorkingCounts: po.WorkingCounts,
-		WorkingOrgCounts: orgCountsFromPO(po.WorkingOrgCounts), NextCycleAt: po.NextCycleAt, UpdatedAt: po.UpdatedAt,
-	}
-	if po.LastCompleted != nil {
-		checkpoint.LastCompleted = &CatalogCompletedAuditSnapshot{CycleID: po.LastCompleted.CycleID, CompletedAt: po.LastCompleted.CompletedAt, Counts: po.LastCompleted.Counts, OrgCounts: orgCountsFromPO(po.LastCompleted.OrgCounts)}
-	}
-	return checkpoint
-}
-
-func orgCountsToPO(source map[int64]CatalogDriftCounts) map[string]CatalogDriftCounts {
-	result := make(map[string]CatalogDriftCounts, len(source))
-	for orgID, counts := range source {
-		result[strconv.FormatInt(orgID, 10)] = counts
-	}
-	return result
-}
-
-func orgCountsFromPO(source map[string]CatalogDriftCounts) map[int64]CatalogDriftCounts {
-	result := make(map[int64]CatalogDriftCounts, len(source))
-	for rawOrgID, counts := range source {
-		orgID, err := strconv.ParseInt(rawOrgID, 10, 64)
-		if err == nil {
-			result[orgID] = counts
-		}
-	}
-	return result
 }
 
 func numericUint64(value any) (uint64, bool) {

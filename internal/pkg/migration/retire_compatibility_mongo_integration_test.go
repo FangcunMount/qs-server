@@ -51,3 +51,71 @@ func TestCompatibilityRetirementPreconditionRejectsLiveDataAndArchiveReferences(
 		t.Fatalf("catalog precondition error = %v", err)
 	}
 }
+
+func TestRuntimeLedgerRetirementPreconditionRejectsAnySourceDocument(t *testing.T) {
+	client, db := mongodbtest.ReplicaSetDatabase(t)
+	driver := NewMongoDriver(client)
+
+	if err := driver.ensureMongoCollections(t.Context(), db.Name(), runtimeLedgerRetirementCollections); err != nil {
+		t.Fatalf("prepare runtime ledger retirement collections: %v", err)
+	}
+	if err := driver.verifyEmptyMongoCollections(t.Context(), db.Name(), runtimeLedgerRetirementCollections, "runtime ledger"); err != nil {
+		t.Fatalf("empty runtime ledger precondition: %v", err)
+	}
+	for _, name := range runtimeLedgerRetirementCollections {
+		name := name
+		t.Run(name, func(t *testing.T) {
+			if _, err := db.Collection(name).InsertOne(t.Context(), bson.M{"proof": true}); err != nil {
+				t.Fatal(err)
+			}
+			err := driver.verifyEmptyMongoCollections(t.Context(), db.Name(), runtimeLedgerRetirementCollections, "runtime ledger")
+			if err == nil || !strings.Contains(err.Error(), name+" contains 1 documents") {
+				t.Fatalf("runtime ledger precondition error = %v", err)
+			}
+			if _, err := db.Collection(name).DeleteMany(t.Context(), bson.M{}); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestRuntimeLedgerRetirementFromVersion22WithSourcesAlreadyDropped(t *testing.T) {
+	client, db := mongodbtest.ReplicaSetDatabase(t)
+	config := ensureConfigDefaults(&Config{Enabled: true, Database: db.Name()})
+	driver := NewMongoDriver(client)
+	instance, err := driver.CreateInstance(migrations, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cleanup, err := driver.PrepareRun(t.Context(), config, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := instance.Migrate(compatibilityRetirementVersion); err != nil {
+		t.Fatalf("migrate MongoDB 0 -> %d: %v", compatibilityRetirementVersion, err)
+	}
+	if err := cleanup(t.Context()); err != nil {
+		t.Fatalf("cleanup temporary migration index: %v", err)
+	}
+	for _, name := range runtimeLedgerRetirementCollections {
+		if err := db.Collection(name).Drop(t.Context()); err != nil {
+			t.Fatalf("simulate bounded cutover drop %s: %v", name, err)
+		}
+	}
+
+	version, changed, err := NewMongoMigrator(client, config).Run()
+	if err != nil || !changed || version != runtimeLedgerRetirementVersion {
+		t.Fatalf("migrate MongoDB %d -> %d: version=%d changed=%v err=%v", compatibilityRetirementVersion, runtimeLedgerRetirementVersion, version, changed, err)
+	}
+	collectionNames, err := db.ListCollectionNames(t.Context(), bson.M{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, retired := range runtimeLedgerRetirementCollections {
+		for _, name := range collectionNames {
+			if name == retired {
+				t.Fatalf("retired runtime ledger %s was recreated", retired)
+			}
+		}
+	}
+}

@@ -1,0 +1,5 @@
+[
+  { "drop": "interpretation_admission_failures" },
+  { "drop": "interpretation_attention_projections" },
+  { "drop": "interpretation_catalog_audit_checkpoints" }
+]

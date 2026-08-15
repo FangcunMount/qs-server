@@ -160,6 +160,11 @@ func TestRetireLegacyMongoCollectionsColdStart(t *testing.T) {
 			t.Fatalf("retired collection %s exists after cold start", name)
 		}
 	}
+	for _, name := range runtimeLedgerRetirementCollections {
+		if containsString(mongoCollectionNames(t, db), name) {
+			t.Fatalf("retired runtime ledger %s exists after cold start", name)
+		}
+	}
 	for _, name := range []string{"answersheets", "questionnaires", "assessment_models", "assessment_norms", "interpret_report_artifacts"} {
 		if !containsString(mongoCollectionNames(t, db), name) {
 			t.Fatalf("canonical collection %s is missing after cold start", name)

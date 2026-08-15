@@ -1,0 +1,25 @@
+[
+  { "create": "interpretation_admission_failures" },
+  {
+    "createIndexes": "interpretation_admission_failures",
+    "indexes": [
+      { "key": { "domain_id": 1 }, "name": "uk_admission_failure_domain_id", "unique": true },
+      { "key": { "fingerprint": 1 }, "name": "uk_admission_failure_fingerprint", "unique": true },
+      { "key": { "outcome_id": 1, "occurred_at": -1 }, "name": "idx_admission_failure_outcome_occurred" },
+      {
+        "key": { "org_id": 1, "kind": 1, "decision": 1, "occurred_at": -1, "domain_id": -1 },
+        "name": "idx_admission_failure_operations"
+      }
+    ]
+  },
+  { "create": "interpretation_attention_projections" },
+  {
+    "createIndexes": "interpretation_attention_projections",
+    "indexes": [
+      { "key": { "event_id": 1 }, "name": "uk_attention_projection_event_id", "unique": true },
+      { "key": { "status": 1, "updated_at": 1 }, "name": "idx_attention_projection_status_updated" },
+      { "key": { "report_id": 1 }, "name": "idx_attention_projection_report" }
+    ]
+  },
+  { "create": "interpretation_catalog_audit_checkpoints" }
+]

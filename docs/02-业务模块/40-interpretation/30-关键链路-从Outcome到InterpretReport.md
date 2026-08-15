@@ -1108,7 +1108,7 @@ retry event delivered
 
 ### 23.1 准入失败已有独立持久化证据
 
-Outcome 解码、冻结身份、Catalog 路由和成品契约等 Starter 前失败不会伪造 Generation/Run，而是幂等写入 `interpretation_admission_failures`。Operations API 可按组织或 Outcome 查询，记录稳定 kind、safe code/message、重试属性、decision、时间和 fingerprint。
+Outcome 解码、冻结身份、Catalog 路由和成品契约等 Starter 前失败不会伪造 Generation/Run，而是幂等写入 MySQL `interpretation_admission_failure`。Operations API 可按组织或 Outcome 查询，记录稳定 kind、safe code/message、重试属性、decision、时间和 fingerprint。
 
 这使“业务生命周期尚未准入”与“Generation 已开始但执行失败”保持两个明确事实层。
 

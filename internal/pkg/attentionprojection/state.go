@@ -20,8 +20,6 @@ const (
 const (
 	// DefaultMaxAttempts is the automatic retry budget before manual_required.
 	DefaultMaxAttempts = 10
-	// CollectionName stores interpretation report attention projection state.
-	CollectionName = "interpretation_attention_projections"
 )
 
 // Record is the queryable attention projection state for one report event.

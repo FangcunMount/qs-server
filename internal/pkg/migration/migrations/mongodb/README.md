@@ -22,21 +22,35 @@ mongodb/
 | `report_generations` | 报告生成意图（v2） | outcome_id, report_type, template_version |
 | `interpretation_runs` | 报告生成尝试（v2） | generation_id, attempt |
 | `interpret_report_artifacts` | 成功报告成品（v2） | generation_id, assessment_id, testee_id |
-| `interpretation_admission_failures` | 生命周期前准入失败证据（v2） | fingerprint unique, outcome_id+occurred_at（见 000014） |
 | `report_query_catalog` | Assessment 级当前报告查询索引（v2） | assessment_id unique, org/testee sort indexes（见 000015） |
-| `interpretation_attention_projections` | 报告生成后 attention 投影状态（v2） | event_id unique, status+updated_at（见 000016） |
 | `interpretation_report_templates` | Interpretation 报告模板发布资产（v2） | template_id+template_version unique（见 000017） |
 | `interpretation_catalog_repair_plans` | Catalog 修复 dry-run 快照 | dry_run_id unique、expires_at TTL（见 000019） |
-| `interpretation_catalog_audit_checkpoints` | Catalog 有界审计进度与最近完整快照 | `_id=report_catalog` 单例、revision CAS（见 000021） |
 
 ## Report catalog bounded audit（000021）
 
-`000021_add_report_catalog_audit_checkpoint` 创建只保存运维进度/计数的 checkpoint 集合，并为
-active artifact winner 扫描与已知机构 archive keyset 扫描增加专用索引。应用只读校验这些索引，
-不会在启动时创建它们；任一索引缺失时审计 runner 保持 degraded 且不推进 checkpoint。
+`000021_add_report_catalog_audit_checkpoint` 历史上创建 checkpoint 集合，并为 active artifact winner
+扫描与已知机构 archive keyset 扫描增加专用索引。扫描索引仍由应用只读校验；任一索引缺失时审计
+runner 保持 degraded 且不推进当前位于 MySQL `interpretation_catalog_audit_checkpoint` 的 checkpoint。
 
 down migration 只删除本版本拥有的两个扫描索引和 checkpoint 集合。生产回滚应优先关闭
 `report_catalog_audit.enable` 并保留 checkpoint，不应依赖 down migration。
+
+## Interpretation runtime ledgers retirement（000023）
+
+`000023_retire_interpretation_runtime_ledgers` 在停写、全量导入和逐批校验完成后，退役三个已经由
+MySQL 接管的 MongoDB 运行账本：
+
+- `interpretation_admission_failures` → `interpretation_admission_failure`；
+- `interpretation_attention_projections` → `interpretation_attention_projection`；
+- `interpretation_catalog_audit_checkpoints` → `interpretation_catalog_audit_checkpoint`。
+
+Mongo driver 在执行版本 23 前强制确认三个源集合均为空；生产版本 22 若已在受控切换中删除源集合，
+driver 只会临时创建空命名空间以使 `drop` 幂等。任一集合仍有文档都会中止启动迁移。down migration
+只恢复空集合及历史索引，不恢复已迁移数据；生产回滚必须使用切换前备份和 MySQL 对应快照。
+
+2026-08-15 的生产维护运行 [31872956357](https://github.com/FangcunMount/qs-server/actions/runs/31872956357)
+在停写窗口内导入并回读校验 131,273 条 Attention ledger、合并 1 条 Catalog checkpoint；Admission
+源与目标均为 0。随后三个 Mongo 源集合均已删除，apiserver、3 个 worker 和公开 readiness 全部恢复。
 
 ## Empty compatibility collections retirement（000022）
 
@@ -63,7 +77,7 @@ migration 恢复数据，必须连同 migration state 使用完整 MongoDB 备�
 
 ## Interpretation recovery indexes（000019）
 
-`000019_add_interpretation_recovery_indexes` 增加按 ReportID 查询 Attention 投影的索引、AdmissionFailure 运维稳定分页索引，并创建保存 7 天受控 Catalog repair dry-run 的 TTL 集合。down migration 只删除本版本增加的索引和 repair plan 集合。
+`000019_add_interpretation_recovery_indexes` 历史上增加按 ReportID 查询 Attention 投影的索引、AdmissionFailure 运维稳定分页索引，并创建保存 7 天受控 Catalog repair dry-run 的 TTL 集合。前两类索引随版本 23 的运行账本退役而退出当前结构；repair plan 集合继续使用。down migration 只删除本版本增加的索引和 repair plan 集合。
 
 ## Statistics Collector indexes（000018）
 

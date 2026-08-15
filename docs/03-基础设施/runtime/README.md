@@ -248,7 +248,7 @@ prepare resources
         ↓
 initialize container
   ├─ application handlers
-  └─ optional attention projection Mongo binding
+  └─ MySQL attention projection ledger + optional Mongo artifact reconciliation
         ↓
 initialize integrations
   ├─ apiserver gRPC manager
@@ -273,7 +273,7 @@ worker 不启动业务 HTTP API。`metrics.enable` 时启动独立 HTTP server�
 
 - Event catalog、gRPC manager、metrics bind、dead-letter recorder、hold store、subscriber 或 handler subscription 失败会中止启动。
 - NSQ topic ensure 失败只 warning；真正 subscribe 能否成功仍由后续步骤决定。
-- Mongo 不能提供 attention projection 时可记录 warning 并禁用该投影，但其它 handler 是否可运行取决于 Container 初始化。
+- MySQL 是 attention projection ledger 的唯一运行时存储；未配置 MySQL 时不装配该投影。只有启用 artifact fact reconciliation 时才额外依赖 MongoDB，开关已启用但 MongoDB 不可用会中止 Container 初始化。
 - automatic retry enabled 时创建 retry publisher 失败会中止启动；关闭该开关时不启动 hold replayer。
 - delivery attempts 被 hard cap 为 8，hold publish attempts 被 hard cap 为 30；runtime 不会因为 YAML 写更大值而突破代码上限。
 

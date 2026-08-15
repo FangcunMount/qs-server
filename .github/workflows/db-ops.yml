@@ -747,13 +747,9 @@ jobs:
               "report_generations",
               "interpretation_runs",
               "interpret_report_artifacts",
-              "archived_reports",
               "report_query_catalog",
-              "interpretation_admission_failures",
-              "interpretation_attention_projections",
               "interpretation_report_templates",
-              "interpretation_catalog_repair_plans",
-              "interpretation_catalog_audit_checkpoints"
+              "interpretation_catalog_repair_plans"
             ]
             const retiredInterpretationCollections = [
               "interpret_reports",
@@ -773,10 +769,8 @@ jobs:
             const generations = targetDB.getCollection("report_generations")
             const runs = targetDB.getCollection("interpretation_runs")
             const artifacts = targetDB.getCollection("interpret_report_artifacts")
-            const archives = targetDB.getCollection("archived_reports")
             const reportCatalog = targetDB.getCollection("report_query_catalog")
             const reportTemplates = targetDB.getCollection("interpretation_report_templates")
-            const admissionFailures = targetDB.getCollection("interpretation_admission_failures")
             const aggregateCount = (collection, pipeline) =>
               collection.aggregate([...pipeline, {$count: "count"}], {allowDiskUse: true}).toArray()[0]?.count || 0
 
@@ -815,11 +809,6 @@ jobs:
               artifact_catalog_sources_missing: aggregateCount(reportCatalog, [
                 {$match: {source_kind: "artifact"}},
                 {$lookup: {from: "interpret_report_artifacts", localField: "source_id", foreignField: "domain_id", as: "source"}},
-                {$match: {source: {$size: 0}}}
-              ]),
-              archive_catalog_sources_missing: aggregateCount(reportCatalog, [
-                {$match: {source_kind: "archive"}},
-                {$lookup: {from: "archived_reports", localField: "source_id", foreignField: "domain_id", as: "source"}},
                 {$match: {source: {$size: 0}}}
               ])
             })
@@ -924,41 +913,14 @@ jobs:
             print("Interpretation presentation governance inventory:")
             printjson({
               artifacts: presentationGovernanceInventory(artifacts, "generated_at"),
-              archives: presentationGovernanceInventory(archives, "created_at"),
-              artifact_profile_sources: presentationSourceInventory(artifacts),
-              archive_profile_sources: presentationSourceInventory(archives)
+              artifact_profile_sources: presentationSourceInventory(artifacts)
             })
-            print("Interpretation archived report compatibility inventory:")
-            printjson({
-              active_archives: archives.countDocuments({deleted_at: null}),
-              missing_org_id: archives.countDocuments({deleted_at: null, $or: [
-                {org_id: {$exists: false}}, {org_id: null}
-              ]}),
-              missing_outcome_id: archives.countDocuments({deleted_at: null, $or: [
-                {outcome_id: {$exists: false}}, {outcome_id: 0}
-              ]}),
-              missing_model_identity: archives.countDocuments({deleted_at: null, $or: [
-                {"model.code": {$exists: false}}, {"model.code": ""},
-                {"model.version": {$exists: false}}, {"model.version": ""}
-              ]}),
-              missing_presentation_profile: archives.countDocuments({deleted_at: null, $or: [
-                {presentation_profile: {$exists: false}}, {presentation_profile: null}
-              ]})
-            })
-            print("Interpretation template and admission inventory:")
+            print("Interpretation template inventory:")
             printjson({
               templates: reportTemplates.aggregate([
                 {$group: {_id: {status: "$status", version: "$template_version"}, count: {$sum: 1}}},
                 {$sort: {"_id.status": 1, "_id.version": 1}}
-              ]).toArray(),
-              admission_failures: admissionFailures.aggregate([
-                {$group: {_id: {kind: "$kind", decision: "$decision"}, count: {$sum: 1}, last_occurred_at: {$max: "$occurred_at"}}},
-                {$sort: {"_id.kind": 1, "_id.decision": 1}}
-              ]).toArray(),
-              catalog_audit_checkpoint: targetDB.getCollection("interpretation_catalog_audit_checkpoints").findOne(
-                {_id: "report_catalog"},
-                {_id: 0, schema_version: 1, revision: 1, phase: 1, updated_at: 1, last_completed: 1}
-              )
+              ]).toArray()
             })
             const activeFactorModelFilter = {
               record_role: "published_snapshot",
@@ -1038,31 +1000,12 @@ jobs:
                 {$sort: {count: -1, "_id.model_kind": 1, "_id.template_id": 1, "_id.template_version": 1}}
               ], {allowDiskUse: true}).toArray()
             })
-            const attentionProjections = targetDB.getCollection("interpretation_attention_projections")
-            const duplicateProjectionReports = attentionProjections.aggregate([
-              {$match: {report_id: {$type: "string"}}},
-              {$group: {_id: "$report_id", records: {$sum: 1}}},
-              {$match: {records: {$gt: 1}}}
-            ]).toArray()
-            print("Attention projection status counts:")
-            printjson(attentionProjections.aggregate([
-              {$group: {_id: "$status", count: {$sum: 1}}},
-              {$sort: {_id: 1}}
-            ]).toArray())
-            print("Attention projection identity integrity:")
-            printjson({
-              missing_report_id: attentionProjections.countDocuments({$or: [
-                {report_id: {$exists: false}}, {report_id: ""}, {report_id: null}
-              ]}),
-              duplicate_report_groups: duplicateProjectionReports.length,
-              duplicate_report_records: duplicateProjectionReports.reduce((total, row) => total + row.records, 0)
-            })
             if (process.env.AUDIT_FROM) {
               const from = new Date(process.env.AUDIT_FROM)
               if (Number.isNaN(from.getTime())) {
                 throw new Error("invalid AUDIT_FROM")
               }
-              const gaps = targetDB.getCollection("interpret_report_artifacts").aggregate([
+              const candidates = targetDB.getCollection("interpret_report_artifacts").aggregate([
                 {$match: {
                   deleted_at: null,
                   generated_at: {$gte: from},
@@ -1076,66 +1019,53 @@ jobs:
                   risk_level: {$ifNull: ["$risk_level", ""]},
                   generated_at: 1
                 }},
-                {$lookup: {
-                  from: "interpretation_attention_projections",
-                  localField: "report_id",
-                  foreignField: "report_id",
-                  as: "projection"
-                }},
-                {$match: {projection: {$size: 0}}},
-                {$project: {projection: 0}},
                 {$sort: {generated_at: 1, report_id: 1}}
               ], {allowDiskUse: true}).toArray()
               const numericID = /^[1-9][0-9]*$/
-              for (const gap of gaps) {
+              for (const candidate of candidates) {
                 for (const field of ["report_id", "assessment_id", "testee_id", "org_id"]) {
-                  if (!numericID.test(gap[field] || "")) {
-                    throw new Error(`invalid ${field} in Attention gap audit`)
+                  if (!numericID.test(candidate[field] || "")) {
+                    throw new Error(`invalid ${field} in Attention artifact audit`)
                   }
                 }
               }
-              const gapCountsByRisk = Object.entries(gaps.reduce((counts, gap) => {
-                counts[gap.risk_level] = (counts[gap.risk_level] || 0) + 1
+              const countsByRisk = Object.entries(candidates.reduce((counts, candidate) => {
+                counts[candidate.risk_level] = (counts[candidate.risk_level] || 0) + 1
                 return counts
               }, {})).sort(([left], [right]) => left.localeCompare(right)).map(([risk_level, count]) => ({risk_level, count}))
-              const reportsPerTestee = gaps.reduce((counts, gap) => {
-                counts[gap.testee_id] = (counts[gap.testee_id] || 0) + 1
+              const reportsPerTestee = candidates.reduce((counts, candidate) => {
+                counts[candidate.testee_id] = (counts[candidate.testee_id] || 0) + 1
                 return counts
               }, {})
               const safetyCutoff = new Date(Date.now() - 30 * 60 * 1000)
               const crypto = require("crypto")
-              const manifestLines = gaps.map(gap => [
-                gap.report_id, gap.assessment_id, gap.testee_id, gap.risk_level, "true"
+              const manifestLines = candidates.map(candidate => [
+                candidate.report_id, candidate.assessment_id, candidate.testee_id, candidate.risk_level, "true"
               ].join("\t")).sort()
               const manifestFingerprint = crypto.createHash("sha256")
                 .update(manifestLines.join("\n") + "\n")
                 .digest("hex")
-              print(`High-risk report artifact attention coverage since ${process.env.AUDIT_FROM}:`)
+              print(`High-risk report artifacts exported for MySQL Attention coverage audit since ${process.env.AUDIT_FROM}:`)
               printjson({
-                artifacts: targetDB.getCollection("interpret_report_artifacts").countDocuments({
-                  deleted_at: null,
-                  generated_at: {$gte: from},
-                  risk_level: {$in: ["high", "severe"]}
-                }),
-                missing: gaps.length,
-                distinct_assessments: new Set(gaps.map(gap => gap.assessment_id)).size,
+                artifacts: candidates.length,
+                distinct_assessments: new Set(candidates.map(candidate => candidate.assessment_id)).size,
                 distinct_testees: Object.keys(reportsPerTestee).length,
                 duplicate_testee_groups: Object.values(reportsPerTestee).filter(count => count > 1).length,
-                max_gap_reports_per_testee: Math.max(0, ...Object.values(reportsPerTestee)),
-                generated_within_30m_safety_lag: gaps.filter(gap => gap.generated_at >= safetyCutoff).length,
-                oldest_generated_at: gaps.length > 0 ? gaps[0].generated_at : null,
-                newest_generated_at: gaps.length > 0 ? gaps[gaps.length - 1].generated_at : null,
-                by_risk: gapCountsByRisk,
-                target_manifest: {
-                  count: gaps.length,
+                max_reports_per_testee: Math.max(0, ...Object.values(reportsPerTestee)),
+                generated_within_30m_safety_lag: candidates.filter(candidate => candidate.generated_at >= safetyCutoff).length,
+                oldest_generated_at: candidates.length > 0 ? candidates[0].generated_at : null,
+                newest_generated_at: candidates.length > 0 ? candidates[candidates.length - 1].generated_at : null,
+                by_risk: countsByRisk,
+                artifact_manifest: {
+                  count: candidates.length,
                   fingerprint: manifestFingerprint,
-                  report_ids: gaps.map(gap => gap.report_id).sort()
+                  report_ids: candidates.map(candidate => candidate.report_id).sort()
                 }
               })
               const fs = require("fs")
               fs.writeFileSync(
                 process.env.ATTENTION_GAP_EXPORT_PATH,
-                gaps.map(gap => [gap.report_id, gap.assessment_id, gap.testee_id, gap.org_id].join("\t")).join("\n") + (gaps.length > 0 ? "\n" : ""),
+                candidates.map(candidate => [candidate.report_id, candidate.assessment_id, candidate.testee_id, candidate.org_id].join("\t")).join("\n") + (candidates.length > 0 ? "\n" : ""),
                 {encoding: "utf8", mode: 0o600}
               )
             }
@@ -1162,13 +1092,13 @@ jobs:
             if [ -n "${AUDIT_FROM:-}" ]; then
               chmod 0600 "$ATTENTION_GAP_TSV"
               emit_attention_gap_cte() {
-                printf 'WITH attention_gap (report_id, assessment_id, testee_id, org_id) AS (\n'
+                printf 'WITH attention_artifact (report_id, assessment_id, testee_id, org_id) AS (\n'
                 row_count=0
                 while IFS=$'\t' read -r report_id assessment_id testee_id org_id; do
                   [ -z "$report_id" ] && continue
                   for value in "$report_id" "$assessment_id" "$testee_id" "$org_id"; do
                     if ! [[ "$value" =~ ^[1-9][0-9]*$ ]]; then
-                      echo "Invalid numeric identifier in private Attention gap export" >&2
+                      echo "Invalid numeric identifier in private Attention artifact export" >&2
                       return 1
                     fi
                   done
@@ -1181,7 +1111,13 @@ jobs:
                 if [ "$row_count" -eq 0 ]; then
                   printf ' SELECT CAST(NULL AS UNSIGNED), CAST(NULL AS UNSIGNED), CAST(NULL AS UNSIGNED), CAST(NULL AS UNSIGNED) WHERE FALSE'
                 fi
-                printf '\n)\n'
+                printf '\n), attention_gap AS (\n'
+                printf ' SELECT artifact.report_id, artifact.assessment_id, artifact.testee_id, artifact.org_id\n'
+                printf ' FROM attention_artifact AS artifact\n'
+                printf ' LEFT JOIN interpretation_attention_projection AS projection\n'
+                printf '   ON BINARY projection.report_id = BINARY CAST(artifact.report_id AS CHAR)\n'
+                printf ' WHERE projection.event_id IS NULL\n'
+                printf ')\n'
               }
 
               {
@@ -2132,6 +2068,38 @@ jobs:
                   SELECT version AS schema_migration_version, dirty AS schema_migration_dirty
                   FROM schema_migrations
                   LIMIT 1;
+                  SELECT status, COUNT(*) AS records,
+                         MIN(updated_at) AS oldest_updated_at,
+                         MAX(updated_at) AS newest_updated_at,
+                         MAX(attempt) AS max_attempt
+                  FROM interpretation_attention_projection
+                  GROUP BY status
+                  ORDER BY status;
+                  SELECT COUNT(*) AS total_records,
+                         COALESCE(SUM(report_id = ''), 0) AS missing_report_id
+                  FROM interpretation_attention_projection;
+                  SELECT COUNT(*) AS duplicate_report_groups,
+                         COALESCE(SUM(records), 0) AS duplicate_report_records
+                  FROM (
+                    SELECT COUNT(*) AS records
+                    FROM interpretation_attention_projection
+                    GROUP BY report_id
+                    HAVING COUNT(*) > 1
+                  ) AS duplicate_attention_reports;
+                  SELECT kind, decision, COUNT(*) AS records,
+                         MAX(occurred_at) AS last_occurred_at
+                  FROM interpretation_admission_failure
+                  GROUP BY kind, decision
+                  ORDER BY kind, decision;
+                  SELECT checkpoint_key, schema_version, revision, cycle_id, phase,
+                         after_assessment_id, source_upper_assessment_id,
+                         catalog_upper_assessment_id, next_cycle_at, updated_at,
+                         JSON_UNQUOTE(JSON_EXTRACT(last_completed_json, '$.cycle_id'))
+                           AS last_completed_cycle_id,
+                         JSON_UNQUOTE(JSON_EXTRACT(last_completed_json, '$.completed_at'))
+                           AS last_completed_at
+                  FROM interpretation_catalog_audit_checkpoint
+                  ORDER BY checkpoint_key;
                   SELECT table_name, engine, table_rows, data_length, index_length
                   FROM information_schema.tables
                   WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'

@@ -15,14 +15,13 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func TestReportCatalogAuditIndexesCheckpointCASAndBatchBoundAgainstMongo(t *testing.T) {
+func TestReportCatalogAuditIndexesAndBatchBoundAgainstMongo(t *testing.T) {
 	db := openCatalogAuditMongoContractDB(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	artifactCollection := db.Collection((InterpretReportPO{}).CollectionName())
 	catalogCollection := db.Collection((ReportCatalogPO{}).CollectionName())
-	checkpointCollection := db.Collection(CatalogAuditCheckpointCollection)
 	if _, err := artifactCollection.Indexes().CreateOne(ctx, mongo.IndexModel{
 		Keys:    bson.D{{Key: "deleted_at", Value: 1}, {Key: "assessment_id", Value: 1}, {Key: "generated_at", Value: -1}, {Key: "domain_id", Value: -1}},
 		Options: options.Index().SetName(IndexCatalogAuditArtifact),
@@ -51,16 +50,12 @@ func TestReportCatalogAuditIndexesCheckpointCASAndBatchBoundAgainstMongo(t *test
 	if _, err := artifactCollection.InsertMany(ctx, documents); err != nil {
 		t.Fatalf("insert audit candidates: %v", err)
 	}
-	if _, err := checkpointCollection.DeleteOne(ctx, bson.M{"_id": CatalogAuditCheckpointID}); err != nil {
-		t.Fatalf("reset audit checkpoint fixture: %v", err)
-	}
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cleanupCancel()
 		rangeFilter := bson.M{"$gt": baseAssessmentID, "$lte": baseAssessmentID + 250}
 		_, _ = artifactCollection.DeleteMany(cleanupCtx, bson.M{"assessment_id": rangeFilter})
 		_, _ = catalogCollection.DeleteMany(cleanupCtx, bson.M{"assessment_id": rangeFilter})
-		_, _ = checkpointCollection.DeleteOne(cleanupCtx, bson.M{"_id": CatalogAuditCheckpointID})
 	})
 
 	store := &CatalogReconcileStore{db: db}
@@ -89,22 +84,6 @@ func TestReportCatalogAuditIndexesCheckpointCASAndBatchBoundAgainstMongo(t *test
 		t.Fatalf("second bounded batch = %#v", second)
 	}
 
-	checkpoint := CatalogAuditCheckpoint{SchemaVersion: 1, Revision: 1, CycleID: "mongo-cycle", Phase: CatalogAuditPhaseMissing, UpdatedAt: now}
-	if err := store.SaveAuditCheckpoint(ctx, 0, checkpoint); err != nil {
-		t.Fatalf("insert checkpoint: %v", err)
-	}
-	if err := store.SaveAuditCheckpoint(ctx, 0, checkpoint); err != ErrCatalogAuditCheckpointCAS {
-		t.Fatalf("duplicate checkpoint error = %v, want CAS conflict", err)
-	}
-	checkpoint.Revision = 2
-	checkpoint.AfterAssessmentID = first.NextAssessmentID
-	if err := store.SaveAuditCheckpoint(ctx, 1, checkpoint); err != nil {
-		t.Fatalf("advance checkpoint: %v", err)
-	}
-	checkpoint.Revision = 2
-	if err := store.SaveAuditCheckpoint(ctx, 1, checkpoint); err != ErrCatalogAuditCheckpointCAS {
-		t.Fatalf("stale checkpoint error = %v, want CAS conflict", err)
-	}
 }
 
 func openCatalogAuditMongoContractDB(t *testing.T) *mongo.Database {
@@ -112,9 +91,9 @@ func openCatalogAuditMongoContractDB(t *testing.T) *mongo.Database {
 	uri := os.Getenv("QS_SERVER_TEST_MONGO_URI")
 	if uri == "" {
 		message := "QS_SERVER_TEST_MONGO_URI is not set; skipping report catalog audit Mongo contract test. " +
-			"Coverage: required index verification and execution plan, 200-candidate batch bound, and checkpoint revision CAS. " +
+			"Coverage: required index verification, execution plan, and 200-candidate batch bound. " +
 			"Run: QS_SERVER_TEST_MONGO_URI='mongodb://127.0.0.1:27017' QS_SERVER_TEST_MONGO_DB='qs_server_contract_test' " +
-			"go test ./internal/apiserver/infra/mongo/interpretation -run TestReportCatalogAuditIndexesCheckpointCASAndBatchBoundAgainstMongo -v"
+			"go test ./internal/apiserver/infra/mongo/interpretation -run TestReportCatalogAuditIndexesAndBatchBoundAgainstMongo -v"
 		fmt.Fprintln(os.Stderr, message)
 		t.Skip(message)
 	}

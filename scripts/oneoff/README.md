@@ -39,7 +39,6 @@
 | `govern_interpretation_template_releases` | 为历史 ReportTemplate release 物化 Builder/schema manifest 并补齐 Enneagram 发布身份 |
 | `govern_interpretation_model_template_routes` | 以新不可变 ModelCatalog release 切换显式 TemplateID/TemplateVersion，并固化新旧 DefinitionV2 哈希 |
 | `govern_evaluation_outcome_template_routes` | 以可回滚 manifest 显式化历史 EvaluationOutcome 冻结输入中的模板路由 |
-| `migrate_interpretation_runtime_ledgers` | 将三个独立 Interpretation 运行账本从 MongoDB 幂等迁移到 MySQL；默认只读，apply 要求停写确认 |
 
 具体参数以各命令的 `--help`、相邻 README 和测试为准。
 

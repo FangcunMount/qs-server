@@ -173,59 +173,6 @@ func (s *MySQLStore) ListRetryable(ctx context.Context, maxAttempts int, limit i
 	return items, nil
 }
 
-// ImportRecord inserts a historical Mongo ledger row without changing an
-// already imported or newly written MySQL row. It is intended for the bounded
-// cutover command, not runtime dual writes.
-func (s *MySQLStore) ImportRecord(ctx context.Context, record Record) (bool, error) {
-	if s == nil || s.db == nil {
-		return false, fmt.Errorf("attention projection store is not configured")
-	}
-	if record.EventID == "" {
-		return false, fmt.Errorf("event_id is required")
-	}
-	po := mysqlProjectionPO{
-		EventID: record.EventID, ReportID: record.ReportID, AssessmentID: record.AssessmentID,
-		TesteeID: record.TesteeID, RiskLevel: record.RiskLevel, MarkKeyFocus: record.MarkKeyFocus,
-		Status: record.Status, Attempt: record.Attempt, LastError: record.LastError,
-		CreatedAt: record.CreatedAt.UTC(), UpdatedAt: record.UpdatedAt.UTC(),
-	}
-	var imported bool
-	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var current mysqlProjectionPO
-		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("event_id = ?", po.EventID).First(&current).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			if err := tx.Create(&po).Error; err != nil {
-				return err
-			}
-			imported = true
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		if !po.UpdatedAt.After(current.UpdatedAt) {
-			return nil
-		}
-		result := tx.Model(&mysqlProjectionPO{}).Where("event_id = ?", po.EventID).Updates(map[string]any{
-			"report_id": po.ReportID, "assessment_id": po.AssessmentID, "testee_id": po.TesteeID,
-			"risk_level": po.RiskLevel, "mark_key_focus": po.MarkKeyFocus, "status": po.Status,
-			"attempt": po.Attempt, "last_error": po.LastError, "updated_at": po.UpdatedAt,
-		})
-		if result.Error != nil {
-			return result.Error
-		}
-		if result.RowsAffected != 1 {
-			return fmt.Errorf("%w: event=%s", ErrNotFound, po.EventID)
-		}
-		imported = true
-		return nil
-	})
-	if err != nil {
-		return false, fmt.Errorf("import attention projection: %w", err)
-	}
-	return imported, nil
-}
-
 func mysqlPOToRecord(po *mysqlProjectionPO) *Record {
 	if po == nil {
 		return nil

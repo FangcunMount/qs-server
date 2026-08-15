@@ -2001,8 +2001,6 @@ func mongoCollectionScopes(ids scopeIDs) []mongoCollectionScope {
 		{name: "interpretation_runs", coll: "interpretation_runs", filters: interpretationRunFilters(ids)},
 		{name: "interpret_report_artifacts", coll: "interpret_report_artifacts", filters: interpretReportFilters(ids)},
 		{name: "report_query_catalog", coll: "report_query_catalog", filters: reportCatalogFilters(ids)},
-		{name: "interpretation_admission_failures", coll: "interpretation_admission_failures", filters: interpretationAdmissionFilters(ids)},
-		{name: "interpretation_attention_projections", coll: "interpretation_attention_projections", filters: interpretationAttentionFilters(ids)},
 		{name: "domain_event_outbox", coll: "domain_event_outbox", filters: mongoOutboxFilters(ids)},
 	}
 }
@@ -2074,20 +2072,6 @@ func reportCatalogFilters(ids scopeIDs) []bson.M {
 	filters := inUint64Filters("assessment_id", ids.AssessmentIDs)
 	filters = append(filters, inUint64Filters("outcome_id", ids.OutcomeIDs)...)
 	filters = append(filters, inUint64Filters("source_id", ids.ReportIDs)...)
-	return filters
-}
-
-func interpretationAdmissionFilters(ids scopeIDs) []bson.M {
-	filters := inUint64Filters("outcome_id", ids.OutcomeIDs)
-	filters = append(filters, inUint64Filters("assessment_id", ids.AssessmentIDs)...)
-	filters = append(filters, inUint64Filters("testee_id", ids.TesteeIDs)...)
-	filters = append(filters, inUint64Filters("generation_id", ids.GenerationIDs)...)
-	return filters
-}
-
-func interpretationAttentionFilters(ids scopeIDs) []bson.M {
-	filters := inStringFilters("report_id", uint64Strings(ids.ReportIDs))
-	filters = append(filters, inStringFilters("assessment_id", uint64Strings(ids.AssessmentIDs))...)
 	return filters
 }
 

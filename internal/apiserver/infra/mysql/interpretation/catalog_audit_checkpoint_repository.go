@@ -10,7 +10,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/catalogreconcile"
 	basemysql "github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type catalogAuditCheckpointPO struct {
@@ -90,83 +89,6 @@ func (r *CatalogAuditCheckpointRepository) SaveAuditCheckpoint(ctx context.Conte
 		return catalogreconcile.ErrAuditCheckpointCAS
 	}
 	return nil
-}
-
-// ImportAuditCheckpoint imports historical Mongo audit state without moving a
-// live MySQL audit cycle backwards. Revision is a store-local CAS token, so it
-// must never be used to compare independently advanced Mongo and MySQL rows.
-func (r *CatalogAuditCheckpointRepository) ImportAuditCheckpoint(ctx context.Context, checkpoint catalogreconcile.AuditCheckpoint) (bool, error) {
-	if r == nil || r.db == nil {
-		return false, fmt.Errorf("catalog audit checkpoint repository is not configured")
-	}
-	po, err := catalogAuditCheckpointToPO(checkpoint)
-	if err != nil {
-		return false, err
-	}
-	var imported bool
-	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var current catalogAuditCheckpointPO
-		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("checkpoint_key = ?", catalogreconcile.AuditCheckpointID).First(&current).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			if err := tx.Create(&po).Error; err != nil {
-				return err
-			}
-			imported = true
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		currentCheckpoint, err := catalogAuditCheckpointFromPO(current)
-		if err != nil {
-			return err
-		}
-		next, changed := mergeImportedAuditCheckpoint(currentCheckpoint, checkpoint)
-		if !changed {
-			return nil
-		}
-		po, err = catalogAuditCheckpointToPO(next)
-		if err != nil {
-			return err
-		}
-		result := tx.Model(&catalogAuditCheckpointPO{}).
-			Where("checkpoint_key = ? AND revision = ?", catalogreconcile.AuditCheckpointID, current.Revision).
-			Updates(catalogAuditCheckpointUpdates(po))
-		if result.Error != nil {
-			return result.Error
-		}
-		if result.RowsAffected != 1 {
-			return catalogreconcile.ErrAuditCheckpointCAS
-		}
-		imported = true
-		return nil
-	})
-	if err != nil {
-		return false, fmt.Errorf("import catalog audit checkpoint: %w", err)
-	}
-	return imported, nil
-}
-
-func mergeImportedAuditCheckpoint(current, source catalogreconcile.AuditCheckpoint) (catalogreconcile.AuditCheckpoint, bool) {
-	if source.UpdatedAt.After(current.UpdatedAt) {
-		source.Revision = current.Revision + 1
-		return source, true
-	}
-	if !completedSnapshotAfter(source.LastCompleted, current.LastCompleted) {
-		return current, false
-	}
-	next := current
-	next.Revision = current.Revision + 1
-	next.LastCompleted = source.LastCompleted
-	return next, true
-}
-
-func completedSnapshotAfter(candidate, current *catalogreconcile.CompletedAuditSnapshot) bool {
-	if candidate == nil {
-		return false
-	}
-	return current == nil || candidate.CompletedAt.After(current.CompletedAt)
 }
 
 func catalogAuditCheckpointUpdates(po catalogAuditCheckpointPO) map[string]any {

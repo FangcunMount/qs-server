@@ -2,7 +2,6 @@ package interpretation
 
 import (
 	"testing"
-	"time"
 )
 
 func TestCountAssociationMismatchesUsesSharedValidatorAndSkipsDangling(t *testing.T) {
@@ -26,21 +25,6 @@ func TestCatalogDriftPageCanAdvanceCursorWithNoFindings(t *testing.T) {
 	page := catalogDriftPage([]CatalogDriftItem{}, 42, false)
 	if len(page.Items) != 0 || page.NextCursor != "42" {
 		t.Fatalf("page = %#v", page)
-	}
-}
-
-func TestCatalogAuditCheckpointPORoundTripPreservesOrgSnapshots(t *testing.T) {
-	t.Parallel()
-	completedAt := time.Date(2026, 8, 5, 12, 0, 0, 0, time.UTC)
-	source := CatalogAuditCheckpoint{
-		SchemaVersion: 1, Revision: 9, CycleID: "cycle-1", Phase: CatalogAuditPhaseCatalog,
-		AfterAssessmentID: 99, SourceUpperAssessmentID: 100, CatalogUpperAssessmentID: 101,
-		WorkingCounts: CatalogDriftCounts{Missing: 1}, WorkingOrgCounts: map[int64]CatalogDriftCounts{7: {Missing: 1}},
-		LastCompleted: &CatalogCompletedAuditSnapshot{CycleID: "cycle-0", CompletedAt: completedAt, Counts: CatalogDriftCounts{Dangling: 2}, OrgCounts: map[int64]CatalogDriftCounts{7: {Dangling: 2}}},
-	}
-	result := checkpointFromPO(checkpointToPO(source))
-	if result.Revision != 9 || result.WorkingOrgCounts[7].Missing != 1 || result.LastCompleted == nil || result.LastCompleted.OrgCounts[7].Dangling != 2 {
-		t.Fatalf("checkpoint round-trip = %#v", result)
 	}
 }
 
