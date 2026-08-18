@@ -1028,7 +1028,7 @@ resolver failure 当前同时表达 semantic kind、retryability、safe message 
 | EvaluationRun | [`domain/evaluation/run`](../../../internal/apiserver/domain/evaluation/run/) |
 | Run checkpoint Repository | [`infra/mysql/checkpoint`](../../../internal/apiserver/infra/mysql/checkpoint/) |
 | Outcome Committer | [`application/evaluation/outcome/commit`](../../../internal/apiserver/application/evaluation/outcome/commit/) |
-| Retry governance | [`pkg/retrygovernance`](../../../internal/pkg/retrygovernance/) |
+| Retry governance | [`internal/pkg/retrygovernance`](../../../internal/pkg/retrygovernance/) |
 | Lease scheduler recovery | [`application/evaluation/scheduler`](../../../internal/apiserver/application/evaluation/scheduler/) |
 
 建议验证：

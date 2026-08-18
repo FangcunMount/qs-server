@@ -4,7 +4,7 @@
 
 ## 1. 适用范围
 
-- `docs/00-05` 是现行事实与决策层。
+- `docs/00-总览` 至 `docs/05-决策记录` 是现行事实与决策层。
 - `docs/06-宣讲` 是可重建的派生层。
 - `docs/_archive` 是历史快照，不适用现行结构要求，也不参与默认校验。
 
@@ -12,7 +12,7 @@
 
 1. 源码与运行时行为：`cmd/`、`internal/`、`pkg/`。
 2. 机器契约：`api/`、`configs/`、migration、生成契约和 `Makefile`。
-3. `docs/00-05`。
+3. `docs/00-总览` 至 `docs/05-决策记录`。
 4. `docs/06-宣讲`。
 5. `docs/_archive`。
 
@@ -135,7 +135,7 @@ make docs-facts
 git diff --check
 ```
 
-`docs-hygiene` 覆盖仓库根 README 及代码、配置、脚本旁的现行 Markdown，默认只排除 `docs/_archive`；`docs-facts` 专门验证 `docs/` 事实层的目录预算、模块入口与关键契约名称。
+`docs-hygiene` 覆盖仓库根 README 及代码、配置、脚本旁的现行 Markdown，默认只排除 `docs/_archive`；`docs-facts` 验证 active taxonomy、反引号仓库源码路径、目录预算、模块/事件入口、版本/API 数量、scheduler/config 清单、关键状态、Mongo audit 与性能计划。反引号路径若只是历史已删除位置，应改写为历史说明并指向当前防回流测试或 Git 历史，不能继续伪装成现行事实入口。
 
 涉及 REST 生成契约时再执行：
 

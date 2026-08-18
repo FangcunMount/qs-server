@@ -56,7 +56,7 @@ Questionnaire / AnswerSheet
 
 1. 源码和运行时行为；
 2. `api/`、`configs/`、migration 等机器可读契约；
-3. `docs/00-05` 现行文档；
+3. `docs/00-总览` 至 `docs/05-决策记录` 的现行文档；
 4. `docs/06-宣讲` 派生材料；
 5. `docs/_archive` 历史快照。
 

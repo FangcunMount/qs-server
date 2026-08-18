@@ -578,7 +578,7 @@ Interpretation adapter 当前使用默认 `TemplateVersionV1`，代码注释也�
 | 只读事实端口与 codec | [`port/evaluationfact`](../../../internal/apiserver/port/evaluationfact/) |
 | Interpretation 输入适配 | [`application/interpretation/automation/input`](../../../internal/apiserver/application/interpretation/automation/input/) |
 | Interpretation automation | [`application/interpretation/automation`](../../../internal/apiserver/application/interpretation/automation/) |
-| committed 事件 | [`domain/evaluation/event`](../../../internal/apiserver/domain/evaluation/event/)、[`pkg/eventing/payload`](../../../internal/pkg/eventing/payload/) |
+| committed 事件 | [`domain/evaluation/event`](../../../internal/apiserver/domain/evaluation/event/)、[`internal/pkg/eventing/payload`](../../../internal/pkg/eventing/payload/) |
 | Worker 驱动报告 | [`worker/handlers/assessment_evaluated_handler.go`](../../../internal/worker/handlers/assessment_evaluated_handler.go) |
 | Outcome MySQL Repository | [`infra/mysql/evaluation/outcome_repository.go`](../../../internal/apiserver/infra/mysql/evaluation/outcome_repository.go) |
 | score projection | [`application/evaluation/outcome/scoring`](../../../internal/apiserver/application/evaluation/outcome/scoring/) |

@@ -184,9 +184,11 @@ start shutdown manager → HTTP and gRPC concurrently
 
 - EventSubsystem 拥有 Mongo/MySQL Outbox relay 和已启用的 apiserver local consumer。
 - cache subsystem 启动 signal watcher/warmup/repair 等运行能力，关闭时由 Container cleanup 负责。
-- scheduler manager 当前可装配 Plan、Statistics nightly sync、Evaluation consistency reconcile runner。
+- scheduler manager 当前可装配七个 runner：Plan、Statistics nightly sync、Evaluation consistency audit、Evaluation lease recovery、Interpretation lease recovery、Report Catalog audit、Mongo consistency audit。
 - scheduler 使用独立 cancel context，并向 runtime lifecycle 注册 `stop schedulers`。
 - action audit recovery 与 resilience control 在 Container.Initialize 中启动，并由 Container.Cleanup 取消。
+
+Mongo consistency runner 存在于 composition root，但 dev/prod 配置当前都为 `mongo_consistency_audit.enable: false`。它启用后才注册，并要求 service、Redis lock manager、lock key/TTL 和批处理参数全部有效；缺少 HA lock 时 fail-closed，不会以无锁模式运行。其 scanner 只读 Mongo 业务集合，运行进度则通过 MySQL checkpoint revision CAS 持久化。完整七阶段和生产启用门禁见[后台任务与调度](../../01-运行时/06-后台任务与调度.md)与[调度任务](../../04-接口与运维/07-调度任务.md)。
 
 业务模块不应在 `Wire()` 内自行启动匿名 goroutine。长跑任务必须返回给 process/container 生命周期，否则无法测试关闭和避免重复启动。
 

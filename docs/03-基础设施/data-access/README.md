@@ -137,7 +137,34 @@ local transaction
 
 Stager 要求活跃 transaction context；缺少 transaction 时必须报错，不能单独写 Outbox。`AfterCommit` 只做 ready-index/immediate 等提交后推动，失败不能推翻已经 commit 的业务事实。完整状态机见 [Outbox 可靠出站链路](../event/30-Outbox可靠出站链路.md)。
 
-## 6. 并发正确性落在哪里
+## 6. 跨集合 Mongo consistency audit
+
+MongoDB 没有 foreign key，唯一索引和同库 transaction 也只能保护新写入的局部边界，不能发现手工改库、旧脚本、历史物理删除或 transaction 落地前的数据漂移。当前 Data Access 层因此提供一条 **只读 Mongo scanner + MySQL checkpoint** 的跨集合审计链。
+
+需要精确理解“只读”：
+
+- `internal/apiserver/infra/mongo/mongoconsistency.Scanner` 只有 upper-bound 和 batch scan 查询，没有 Mongo 写入或 repair 方法；
+- application 的 `CheckpointStore` 是唯一写端口，实现写入 MySQL `mongo_consistency_audit_checkpoint`；
+- scheduler 还会获取 Redis leader lease；所以它是“Mongo 业务事实只读”，不是“对所有依赖零写入”；
+- `scripts/oneoff/mongo_consistency_audit` 绕过 scheduler/checkpoint，只输出报告，退出码 0 表示无漂移、2 表示发现漂移、1 表示执行失败。
+
+七阶段的数据责任如下：
+
+| 阶段 | anchor / 对账对象 | 主要 finding |
+| --- | --- | --- |
+| `answersheet_outbox` | durable AnswerSheet → Mongo Outbox | missing/mismatched submitted Outbox |
+| `outbox_answersheet` | submitted Outbox → AnswerSheet | Outbox 指向不存在的 AnswerSheet |
+| `generation_run` | ReportGeneration → LatestRun | Run 缺失、owner/status 不一致 |
+| `generated_terminal` | generated Generation → Artifact + terminal Outbox | 成品或终态事件缺失 |
+| `retry_outbox` | InterpretationRun retry fact → scheduled Outbox | event identity/due time 不一致 |
+| `model_release` | published model head → active model/questionnaire snapshot | active 数量、binding、Questionnaire 缺失 |
+| `published_model_runtime` | active published snapshot → DefinitionV2/Norm/runtime | hash、NormRef 或 runtime materialization 异常 |
+
+每阶段进入时读取并冻结该阶段 `upper_bound`，按稳定 cursor、最大 500 的有界 batch 和单 batch deadline 推进。checkpoint 保存 schema version、cycle ID、phase、cursor、upper bound、working statistics、last completed 和 next cycle time；`Save(expectedRevision, next)` 只有主键和 revision 同时命中才更新，否则返回 CAS conflict。leader lock 降低正常多实例竞争，checkpoint CAS 仍是持久进度的最终并发裁决，两者不能互相替代。
+
+审计不会修复发现。finding 样本只保留有界内部 ID，日志不记录答卷答案或报告正文；任何 delete/backfill/repair 都必须进入独立维护流程。生产默认关闭及启用条件见[调度任务](../../04-接口与运维/07-调度任务.md)。
+
+## 7. 并发正确性落在哪里
 
 | 问题 | 最终保护 | Redis/进程内机制的角色 |
 | --- | --- | --- |
@@ -149,7 +176,7 @@ Stager 要求活跃 transaction context；缺少 transaction 时必须报错，�
 
 这也是“Redis SubmitCoalescer 不是正确性机制”的根本原因：只要 Redis 故障、过期或两个请求绕开同一 coalescer，正确性仍必须由持久化约束成立；否则系统只是把竞态隐藏在正常路径里。
 
-## 7. Backpressure 与连接池
+## 8. Backpressure 与连接池
 
 MySQL/Mongo BaseRepository 可注入同一个进程级 `backpressure.Acquirer`。一次操作先等待 slot，成功后持有到数据库调用返回，最后 release：
 
@@ -170,7 +197,7 @@ slot obtained ──> DB operation ──> release
 
 当前 limiter 是每个 apiserver 实例本地状态，并通过 module assembly 注入普通 repository；Mongo Outbox 也显式接入 Mongo limiter。MySQL Outbox 当前直接使用 GORM DB，尚未进入共享 MySQL limiter 计数。新增 raw GORM/Mongo adapter 时必须确认是否显式接入 limiter；只要直接使用裸 `*gorm.DB`/`*mongo.Collection`，就不能假定 BaseRepository 的保护自动生效。容量推导和故障恢复见 [下游背压与容量预算](../concurrency/40-下游背压与容量预算.md)。
 
-## 8. 错误与幂等映射
+## 9. 错误与幂等映射
 
 - MySQL helper 能识别常见 duplicate/unique violation；只有 repository 安装 translator 后，才会变成对应业务错误。
 - Mongo repository 应依据 error code、matched/modified count 和唯一索引解释冲突；不能只匹配错误字符串。
@@ -178,7 +205,7 @@ slot obtained ──> DB operation ──> release
 - `not found`、`conflict`、`dependency unavailable` 和 `backpressure timeout` 是不同语义，不应全部翻译成 500。
 - 日志可记录表/集合、操作、耗时和错误分类，但不得输出答卷、令牌、数据库密码或完整敏感 payload。
 
-## 9. 连接、启动与关闭
+## 10. 连接、启动与关闭
 
 apiserver 的 `DatabaseManager` 负责：
 
@@ -190,7 +217,7 @@ apiserver 的 `DatabaseManager` 负责：
 
 当前 composition 要求 module assembly 取得 MySQL 与 MongoDB；不要仅根据 `initMySQL/initMongoDB` 中“未配置则 skip”的日志，就断言生产进程可以缺少该数据库正常提供完整 API。
 
-## 10. Migration 与一次性数据修复
+## 11. Migration 与一次性数据修复
 
 MySQL 与 Mongo migration 各有独立版本序列，文件嵌入二进制：
 
@@ -206,13 +233,13 @@ MySQL 与 Mongo migration 各有独立版本序列，文件嵌入二进制：
 - migration 中出现 `DROP` 只能证明部署时会执行删除；安全性还取决于旧版本进程、灰度窗口、查询脚本、worker 和回滚版本是否仍访问它。
 - `AutoSeed` 是配置字段，不应据此推断当前 migration 自动载入全部业务种子；以实际 runner 调用链为准。
 
-## 11. OSS 边界
+## 12. OSS 边界
 
 `internal/apiserver/infra/objectstorage` 把 Aliyun OSS 适配为窄 ObjectStore，用于评估素材和二维码等对象。对象 visibility 由消费它的 HTTP proxy/应用协议控制，不依赖把 bucket ACL 当作业务鉴权。
 
 OSS 写入不参加 MySQL/Mongo transaction。需要“元数据 + 对象”一致性时，应设计 pending/ready 状态、幂等 key 和垃圾回收/补偿；当前不能把两个独立调用描述为原子发布。
 
-## 12. 排障顺序
+## 13. 排障顺序
 
 | 现象 | 先看 | 再看 | 不应直接下结论 |
 | --- | --- | --- | --- |
@@ -223,7 +250,7 @@ OSS 写入不参加 MySQL/Mongo transaction。需要“元数据 + 对象”一�
 | migration 启动失败 | backend/version/dirty state | 当前 schema 与 migration SQL/JSON | “重跑容器就会好” |
 | Mongo transaction 失败 | replica set、write concern、session error | keyfile/权限、transaction integration test | “代码编译通过所以 durable submit 可用” |
 
-## 13. 扩展与验收清单
+## 14. 扩展与验收清单
 
 新增 repository/read model 时：
 

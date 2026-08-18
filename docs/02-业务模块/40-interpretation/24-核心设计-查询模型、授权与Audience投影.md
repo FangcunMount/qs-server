@@ -728,7 +728,7 @@ Operations 的任务是回答生命周期、失败原因、重试决策和版本
 | Operations 审计用例 | `internal/apiserver/application/interpretation/operations/service.go` |
 | Audience 枚举 | `internal/apiserver/domain/interpretation/policy/policy.go` |
 | Section 可见性 | `internal/apiserver/domain/interpretation/presentation/presenter.go` |
-| 统一应用 Report 投影 | `internal/apiserver/application/interpretation/internal/reportprojection/mapper.go` |
+| 统一应用 Report 投影 | `internal/apiserver/application/interpretation/reportprojection/mapper.go` |
 | ReportRow 契约 | `internal/apiserver/port/interpretationreadmodel/readmodel.go` |
 | Catalog 查询和正文加载 | `internal/apiserver/infra/mongo/interpretation/artifact_read_model.go` |
 | Participant / Clinician / Administration Access 装配 | `internal/apiserver/container/module_init.go` |

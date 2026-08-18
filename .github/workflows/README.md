@@ -27,7 +27,7 @@ JavaScript Action 必须使用原生 Node 24 主版本：测试覆盖率、扫�
 本仓库生产部署直接以仓库内配置文件为准，不再额外注入“升配/降配档位”。流程要点：
 
 1. 镜像：CD 先规划本次受影响服务，只构建并推送需要发布的 `qs-apiserver` / `qs-collection-server` / `qs-worker` 镜像到 GHCR/Docker Hub；目标机按本次 `DEPLOY_SHA` 对应的不可变 tag 拉取。
-2. 包含文件：`deploy-package` 会携带 `configs`、`configs/env/config.prod.env` 以及 `docker-compose.prod.yml`。
+2. 包含文件：`deploy-package` 会携带仓库内 `configs`，并在包内生成 `deploy-package/configs/env/config.prod.env`，同时携带 `build/docker/docker-compose.prod.yml`。
 3. 目标机操作：
    - 备份现有 configs，展开 deploy-package。
    - apiserver 使用单实例 `docker compose up -d`。
@@ -35,7 +35,7 @@ JavaScript Action 必须使用原生 Node 24 主版本：测试覆盖率、扫�
    - worker 使用固定 Compose project `qs-worker`、service key `runtime` 和 `--scale` 启动全部副本，容器名为 `qs-worker-runtime-N`。
 4. 资源配额：直接维护在 `build/docker/docker-compose.prod.yml`（serverA 4C/8G：apiserver + collection x2 同机；collection 两副本共享原总预算）。
 5. 服务内部并发/连接池：直接维护在 `configs/apiserver.prod.yaml`、`configs/collection-server.prod.yaml`、`configs/worker.prod.yaml`。
-6. Cache policy：apiserver 与 collection-server 分别维护 `configs/cache/<component>.prod.yaml`，并与引用它的主配置、镜像作为同一原子发布单元；`report_status` 在本次切换中直接迁移到三进程主配置的 `runtime_state`，不设置额外观察窗口。
+6. Cache policy：apiserver 与 collection-server 分别维护 `configs/cache/apiserver.prod.yaml`、`configs/cache/collection-server.prod.yaml`，并与引用它的主配置、镜像作为同一原子发布单元；`report_status` 在本次切换中直接迁移到三进程主配置的 `runtime_state`，不设置额外观察窗口。
 7. Collection 副本数：workflow_dispatch 可填写 `collection_replicas`，留空时读取仓库变量 `QS_COLLECTION_REPLICAS`，缺失时默认 `2`。
 8. Worker 副本数：workflow_dispatch 可填写 `worker_replicas`，留空时读取仓库变量 `QS_WORKER_REPLICAS`，缺失时默认 `3`。
 

@@ -67,22 +67,31 @@ def compare(service: str) -> bool:
 
     missing_in_rest = sorted(swagger_paths - rest_paths)
     missing_in_swagger = sorted(rest_paths - swagger_paths)
+    rest_unique_paths = {path for _, path in rest_paths}
+    swagger_unique_paths = {path for _, path in swagger_paths}
 
     print(f"\n=== {service} ===")
-    print(f"REST paths: {len(rest_paths)}, swagger paths: {len(swagger_paths)}")
+    print(
+        "REST method-path operations: "
+        f"{len(rest_paths)}, swagger method-path operations: {len(swagger_paths)}"
+    )
+    print(
+        f"REST unique paths: {len(rest_unique_paths)}, "
+        f"swagger unique paths: {len(swagger_unique_paths)}"
+    )
     if missing_in_rest:
-        print("→ In swagger.json but NOT in api/rest:")
+        print("→ Method-path operations in swagger.json but NOT in api/rest:")
         for method, path in missing_in_rest:
             print(f"  {method} {path}")
     else:
-        print("→ No swagger-only paths.")
+        print("→ No swagger-only method-path operations.")
 
     if missing_in_swagger:
-        print("→ In api/rest but NOT in swagger.json:")
+        print("→ Method-path operations in api/rest but NOT in swagger.json:")
         for method, path in missing_in_swagger:
             print(f"  {method} {path}")
     else:
-        print("→ No rest-only paths.")
+        print("→ No REST-only method-path operations.")
 
     quality_errors = validate_openapi(rest_path)
     if quality_errors:

@@ -7,11 +7,12 @@
 ```bash
 make perf-run PLAN=quick
 make perf-run PLAN=baseline
+make perf-run PLAN=ceiling-120
 make perf-run PLAN=admission
 make perf-run PLAN=diagnose CASE=<专项场景>
 ```
 
-`admission` 自动执行 smoke、60、80、100、110、120、200、240、280、恢复证据门、300 和最终排空验收。80/100/110 三档用于定位正常体验基线到 120 保护档之间的容量拐点。操作者不再逐档拼命令；任何硬门禁失败立即停止，证据不足时标记 `INCOMPLETE` 并禁止进入 300。
+`ceiling-120` 只执行 110、恢复门、120 两档，用于已有可信低档证据时复验当前硬件上限，永远不会继续进入 200 QPS。`admission` 自动执行 smoke、60、80、100、110、120、200、240、280、恢复证据门、300 和最终排空验收。80/100/110 三档用于定位正常体验基线到 120 保护档之间的容量拐点。操作者不再逐档拼命令；任何硬门禁失败立即停止，证据不足时标记 `INCOMPLETE` 并禁止进入 300。
 
 本地静态检查或 dry-run 不能称为 300 QPS 验收成功。正式结论必须引用本次 run ID、Git SHA、`summary.json`、`report.md` 和 `evidence.json`。
 
@@ -86,6 +87,7 @@ export PERF_RECOVERY_POLL=15s
 ### 3. 只检查编排计划
 
 ```bash
+make perf-run PLAN=ceiling-120 DRY_RUN=1
 make perf-run PLAN=admission DRY_RUN=1
 ```
 
@@ -108,6 +110,22 @@ make perf-run PLAN=baseline
 ```
 
 依次运行 smoke 与 60 QPS/5 分钟体验档。发布前性能回归、依赖变更或正式 admission 前应先获得有效 baseline。
+
+### Ceiling-120
+
+```bash
+make perf-run PLAN=ceiling-120
+```
+
+仅当同一环境、同一代码/配置族已经有可信的 quick/baseline 或更低容量档证据，只需要复验当前硬件的 120 QPS 上限时使用。该计划没有内置 smoke 与 60 QPS，不能拿来补齐缺失的低档证据。
+
+| 顺序 | 阶段 | 时长 | 说明 |
+| ---: | --- | ---: | --- |
+| 1 | `capacity_110` / 110 QPS | `2m` | `protection` 保护线，按 300 配比动态缩放 |
+| 2 | 阶段间恢复门 | 默认最多 30s | 健康、Outbox、NSQ 回到运行前基线 |
+| 3 | `capacity_120` / 120 QPS | `2m` | `protection` 保护线；结束后停止 |
+
+110 阶段不是 `PASS`，或恢复门不是 `PASS`，就不会进入 120；120 完成后无论结果如何都结束本计划，不会进入 200/240/280/300。需要形成完整容量准入证据时必须执行 `admission`。
 
 ### Admission
 

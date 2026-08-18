@@ -165,7 +165,7 @@ docs-rest: docs-swagger ## 从 swagger 生成 api/rest 的 OAS 3.1 摘要
 docs-hygiene: ## 检查仓库现行 Markdown 的链接、锚点与章节编号（排除 docs/_archive）
 	python scripts/check_docs_hygiene.py
 
-docs-facts: ## 检查现行文档层次、模块入口与关键契约名称
+docs-facts: ## 检查 taxonomy、源码路径、版本/API、scheduler/config、Mongo audit 与性能计划
 	python scripts/check_docs_facts.py
 
 docs-verify: docs-rest docs-hygiene docs-facts ## 对比 api/rest 与 swagger，并检查现行文档

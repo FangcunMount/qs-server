@@ -1182,7 +1182,7 @@ Artifact、Catalog、Run succeeded、Generation generated 和 generated Outbox �
 | 链路阶段 | 事实源 |
 | --- | --- |
 | Evaluation 可靠提交 | [`application/evaluation/outcome/commit/committer.go`](../../../internal/apiserver/application/evaluation/outcome/commit/committer.go) |
-| Outcome 事件契约 | [`domain/evaluation/assessment/events.go`](../../../internal/apiserver/domain/evaluation/assessment/events.go)、[`pkg/eventing/payload/assessment.go`](../../../internal/pkg/eventing/payload/assessment.go) |
+| Outcome 事件契约 | [`domain/evaluation/assessment/events.go`](../../../internal/apiserver/domain/evaluation/assessment/events.go)、[`internal/pkg/eventing/payload/assessment.go`](../../../internal/pkg/eventing/payload/assessment.go) |
 | 事件目录 | [`configs/events.yaml`](../../../configs/events.yaml) |
 | Outcome 事件 Handler | [`worker/handlers/assessment_evaluated_handler.go`](../../../internal/worker/handlers/assessment_evaluated_handler.go) |
 | Worker gRPC Client | [`worker/infra/grpcclient/evaluation_clients.go`](../../../internal/worker/infra/grpcclient/evaluation_clients.go) |
@@ -1195,7 +1195,7 @@ Artifact、Catalog、Run succeeded、Generation generated 和 generated Outbox �
 | Builder Registry | [`domain/interpretation/rendering`](../../../internal/apiserver/domain/interpretation/rendering/) |
 | InterpretReport | [`domain/interpretation/report/artifact.go`](../../../internal/apiserver/domain/interpretation/report/artifact.go) |
 | Committer | [`automation/execution/committer.go`](../../../internal/apiserver/application/interpretation/automation/execution/committer.go) |
-| Interpretation 终态事件 | [`domain/interpretation/events_outcome.go`](../../../internal/apiserver/domain/interpretation/events_outcome.go)、[`pkg/eventing/outcome/payload.go`](../../../internal/pkg/eventing/outcome/payload.go) |
+| Interpretation 终态事件 | [`domain/interpretation/events_outcome.go`](../../../internal/apiserver/domain/interpretation/events_outcome.go)、[`internal/pkg/eventing/outcome/payload.go`](../../../internal/pkg/eventing/outcome/payload.go) |
 | 终态与重试 Handler | [`worker/handlers/report_handler.go`](../../../internal/worker/handlers/report_handler.go) |
 | Worker settlement | [`worker/handlers/evaluation_response.go`](../../../internal/worker/handlers/evaluation_response.go)、[`worker/integration/messaging/runtime.go`](../../../internal/worker/integration/messaging/runtime.go) |
 | Retry Hold | [`worker/integration/messaging/retry_hold.go`](../../../internal/worker/integration/messaging/retry_hold.go) |

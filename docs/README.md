@@ -61,4 +61,4 @@ make docs-facts
 git diff --check
 ```
 
-`docs-hygiene` 检查仓库现行 Markdown（包括根 README 与代码、配置、脚本旁的 README，排除 `docs/_archive`）的链接、锚点和章节编号；`docs-facts` 检查 `docs/` 现行树边界、模块入口和关键契约名称。两者都通过，仍不等于正文事实永久正确，涉及行为变更时必须重新沿代码链核对。
+`docs-hygiene` 检查仓库现行 Markdown（包括根 README 与代码、配置、脚本旁的 README，排除 `docs/_archive`）的链接、锚点和章节编号；`docs-facts` 进一步检查 active taxonomy、反引号仓库源码路径、模块/事件入口、版本/API 数量、scheduler/config 清单、关键状态、Mongo audit 与性能计划 ratchet。两者都通过，仍不等于正文事实永久正确，涉及行为变更时必须重新沿代码链核对。

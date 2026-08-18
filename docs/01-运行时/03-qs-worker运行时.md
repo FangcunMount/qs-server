@@ -138,7 +138,7 @@ worker concurrency 和 subscriber max-in-flight 由配置决定，默认值不�
 ## 11. 源码证据
 
 - 进程生命周期：`internal/worker/process`；
-- runtime 装配：`internal/worker/process/runtime.go`；
+- runtime 装配：`internal/worker/process/runtime_bootstrap.go`；
 - gRPC clients：`internal/worker/infra/grpcclient`、`integration/grpcclient`；
 - handler registry 与实现：`internal/worker/handlers`；
 - 消息订阅和 retry hold：`internal/worker/integration/messaging`；

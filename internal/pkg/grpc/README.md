@@ -1,221 +1,52 @@
-# 使用 component-base 构建 gRPC 服务
+# gRPC 服务基础设施
 
-## ✅ 重构完成
+## 结论
 
-QS Server 已经成功重构为使用 `component-base/pkg/grpc` 提供的通用能力，不再自己在 `internal/pkg/grpcserver` 中实现。
+`internal/pkg/grpc` 是 qs-server 的通用 gRPC server 集成层；业务服务注册与 handler 位于 `internal/apiserver/transport/grpc`。本包复用 component-base 的 recovery、logging、mTLS identity、ACL 与 audit 能力，同时接入 IAM TokenVerifier、组织授权快照和 qs-server 自己的配置校验。
 
-## 📁 新的架构
+生产是否启用 TLS、mTLS、IAM auth、ACL、audit 或 reflection，必须回到 `configs/apiserver.prod.yaml`、`configs/grpc-acl.prod.yaml` 与实际部署证据核对；代码支持不等于环境已经启用。
 
-### 代码结构
+## 职责边界
 
-```
-internal/pkg/grpc/                # 项目特定的 gRPC 集成层
-├── config.go                     # 配置定义和适配
-├── server.go                     # 服务器构建（组装 component-base 能力）
-└── interceptors.go               # 日志适配器
+| 层 | 当前入口 | 责任 |
+| --- | --- | --- |
+| 通用 server | `internal/pkg/grpc/server.go` | listener、消息大小、连接年龄、health、reflection、拦截器链 |
+| 配置 | `internal/pkg/grpc/config.go` | TLS/mTLS、IAM auth、ACL、audit 与 server 参数 |
+| ACL 加载 | `internal/pkg/grpc/acl_loader.go` | strict、non-empty、default-deny 配置校验 |
+| 请求上下文 | `internal/pkg/grpc/context.go` | User、Org、mTLS service identity 与 Request ID 投影 |
+| 业务注册 | `internal/apiserver/transport/grpc/registry.go` | 将各模块 application service 注册到 server |
+| handler | `internal/apiserver/transport/grpc/service` | Proto DTO、鉴权后的用例调用与错误映射 |
+| 机器契约 | `api/grpc/proto` | 手写 Proto 真源；生成代码不作为首要编辑入口 |
 
-↓ 使用
+本包不拥有领域授权规则，也不把 transport identity 当作资源 ownership。资源级授权仍由 application/domain service 完成。
 
-component-base/pkg/grpc/          # 通用 gRPC 能力（v0.3.8）
-├── mtls/                         # mTLS 双向认证
-│   ├── config.go                # TLS 配置
-│   ├── credentials.go           # 服务端/客户端凭证
-│   └── identity.go              # 身份提取
-└── interceptors/                 # 通用拦截器
-    ├── common.go                # Recovery/RequestID/Logging
-    ├── mtls.go                  # mTLS 身份提取
-    ├── credential.go            # 凭证验证
-    ├── acl.go                   # ACL 权限控制
-    └── audit.go                 # 审计日志
+## 一元拦截器顺序
 
-↓ 基于
+`buildUnaryInterceptors` 当前按以下顺序组装：
 
-google.golang.org/grpc            # gRPC 框架
-```
+1. recovery；
+2. Request ID 传播/生成；
+3. logging；
+4. mTLS identity（启用时）；
+5. IAM authentication（启用且 TokenVerifier 可用时）；
+6. `ExtraUnaryAfterAuth`，当前用于授权快照等进程级扩展；
+7. ACL（启用时）；
+8. audit（启用时）。
 
-### 职责划分
+ACL 运行策略必须是 `deny`，配置文件缺失、为空、方法名未知或与运行策略不一致都会令 server 构造失败。新增 RPC 时必须同步 Proto、service registry、collection/worker client method 清单与生产 ACL。
 
-| 层级 | 位置 | 职责 |
-| ------ | ------ | ------ |
-| **业务代码** | `internal/apiserver` | 服务实现、业务逻辑 |
-| **项目集成** | `internal/apiserver/grpc` | 适配配置、集成日志 |
-| **通用能力** | `component-base/pkg/grpc` | mTLS、拦截器 |
-| **底层框架** | `google.golang.org/grpc` | gRPC 核心 |
+## 验证
 
-## 🎯 关键变化
-
-### 1. 使用 component-base 的 mTLS
-
-**之前**（自己实现）：
-```go
-// internal/pkg/grpcserver/server.go
-tlsConfig, err := buildTLSConfig(config)  // 自己实现
+```bash
+go test ./internal/pkg/grpc
+go test ./internal/apiserver/transport/grpc/...
 ```
 
-**现在**（使用 component-base）：
-```go
-// internal/apiserver/grpc/server.go
-import basemtls "github.com/FangcunMount/component-base/pkg/grpc/mtls"
+重点回归：
 
-mtlsConfig := config.MTLS.ToBaseMTLSConfig(config.TLSCertFile, config.TLSKeyFile)
-creds, err := basemtls.NewServerCredentials(mtlsConfig)
-```
+- `acl_identity_matrix_test.go`：注册 RPC、客户端身份和生产 ACL 的闭包；
+- `acl_loader_test.go`：default-deny 与非法配置 fail-closed；
+- `requestid_test.go`：请求 ID 传播；
+- `proto_contract_test.go`、`architecture_test.go`：Proto 与 transport 边界。
 
-### 2. 使用 component-base 的拦截器
-
-**之前**（自己实现）：
-```go
-// internal/pkg/grpcserver/interceptors.go
-func LoggingInterceptor() grpc.UnaryServerInterceptor {
-    // 自己实现日志逻辑
-}
-```
-
-**现在**（使用 component-base）：
-```go
-// internal/apiserver/grpc/server.go
-import basegrpc "github.com/FangcunMount/component-base/pkg/grpc/interceptors"
-
-// 使用 component-base 提供的拦截器
-basegrpc.RecoveryInterceptor()
-basegrpc.RequestIDInterceptor(...)
-basegrpc.LoggingInterceptor(logger)
-basegrpc.MTLSInterceptor()
-```
-
-### 3. 日志适配器
-
-只需要实现简单的适配器：
-
-```go
-// internal/apiserver/grpc/interceptors.go
-type componentBaseLogger struct{}
-
-func (l *componentBaseLogger) LogInfo(msg string, fields map[string]interface{}) {
-    log.Infow(msg, mapToLogFields(fields)...)
-}
-
-func (l *componentBaseLogger) LogError(msg string, fields map[string]interface{}) {
-    log.Errorw(msg, mapToLogFields(fields)...)
-}
-```
-
-## 📊 对比
-
-| 方面 | 之前 | 现在 |
-| ----- | ------ | ------ |
-| **代码位置** | `internal/pkg/grpcserver` | `internal/apiserver/grpc` |
-| **mTLS 实现** | 自己实现 300+ 行 | 使用 component-base |
-| **拦截器** | 自己实现 150+ 行 | 使用 component-base |
-| **身份提取** | 自己实现 100+ 行 | 使用 component-base |
-| **代码量** | ~600 行 | ~200 行（仅配置和适配） |
-| **可维护性** | 需要维护自己的实现 | 使用经过验证的通用实现 |
-| **功能完整性** | 基础功能 | 完整功能（ACL/审计等） |
-
-## 🚀 使用方式
-
-### 创建服务器（与之前完全相同）
-
-```go
-import grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
-
-// 1. 创建配置
-config := grpcpkg.NewConfig()
-config.BindPort = 9090
-
-// 2. 启用 mTLS
-config.Insecure = false
-config.TLSCertFile = "server.crt"
-config.TLSKeyFile = "server.key"
-config.MTLS.Enabled = true
-config.MTLS.CAFile = "ca.crt"
-config.MTLS.AllowedCNs = []string{"collection-server"}
-
-// 3. 创建服务器（自动使用 component-base 能力）
-server, _ := config.Complete().New()
-
-// 4. 注册服务
-server.RegisterService(&myService{})
-
-// 5. 启动
-server.Run()
-```
-
-### 在 Handler 中获取身份
-
-```go
-import basemtls "github.com/FangcunMount/component-base/pkg/grpc/mtls"
-
-func (s *Service) MyMethod(ctx context.Context, req *pb.Request) (*pb.Response, error) {
-    // 使用 component-base 提供的函数
-    if identity, ok := basemtls.ServiceIdentityFromContext(ctx); ok {
-        log.Infof("Request from: %s", identity.ServiceName)
-    }
-    
-    return &pb.Response{}, nil
-}
-```
-
-## ✨ 优势
-
-1. **代码复用**
-   - 不需要重复实现 mTLS、拦截器
-   - 使用经过验证的通用实现
-
-2. **功能完整**
-   - component-base 提供了完整的功能
-   - 包括 ACL、审计、凭证验证等
-
-3. **易于维护**
-   - 只需维护配置适配层
-   - component-base 的更新自动获益
-
-4. **架构一致**
-   - 与 IAM 等其他项目保持一致
-   - 遵循三层架构设计
-
-5. **向后兼容**
-   - API 保持不变
-   - 业务代码无需修改
-
-## 📝 迁移说明
-
-### 旧代码位置
-
-```
-internal/pkg/grpcserver/    # 已删除 ✅
-├── config.go
-├── server.go
-├── interceptors.go
-├── mtls.go
-└── README.md
-```
-
-### 新代码位置
-
-```
-internal/pkg/grpc/          # 新的集成层
-├── config.go              # 配置定义
-├── server.go              # 服务器构建
-├── interceptors.go        # 日志适配
-└── README.md              # 文档
-
-使用 component-base/pkg/grpc  # 通用能力
-```
-
-## 🎉 结论
-
-重构成功完成！现在 QS Server：
-
-- ✅ 使用 `component-base/pkg/grpc` 提供的通用能力
-- ✅ 不再自己实现 mTLS 和拦截器
-- ✅ 代码量减少 2/3（从 600 行到 200 行）
-- ✅ 功能更完整（支持 ACL/审计等）
-- ✅ 与 IAM 架构保持一致
-- ✅ 向后兼容，业务代码无需修改
-- ✅ 编译通过 ✅
-
-下一步可以根据需要实现：
-- 🔄 凭证验证（Bearer Token / HMAC）
-- 🔄 ACL 权限控制
-- 🔄 审计日志
+历史上已删除的自建 grpcserver 包和旧 transport 目录只存在于 Git 历史，不再是当前代码入口。

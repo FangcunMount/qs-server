@@ -139,7 +139,7 @@ scheduler、Outbox consumer 和 gRPC handler 即使没有用户 HTTP 请求，�
 
 1. `cmd/qs-apiserver/apiserver.go`；
 2. `internal/apiserver/process/runner.go`；
-3. `internal/apiserver/process/resource.go`、`container.go`、`integration.go`、`transport.go`、`runtime.go`；
+3. `internal/apiserver/process/resource_bootstrap.go`、`container_bootstrap.go`、`transport_bootstrap.go`、`runtime_bootstrap.go`；
 4. `internal/apiserver/container` 与 `container/modules`；
 5. `internal/apiserver/transport/rest`、`transport/grpc`；
 6. `internal/apiserver/eventing/subsystem`；

@@ -16,9 +16,9 @@
 
 - [配置与环境变量](./05-配置与环境变量.md)
 - [部署与端口](./06-部署与端口.md)
-- [调度任务](./07-调度任务.md)
-- [健康检查与观测](./08-健康检查与观测.md)
-- [常见排障](./09-常见排障.md)
+- [调度任务](./07-调度任务.md)：含 Mongo consistency audit 七阶段、one-off、checkpoint/CAS、leader lock 和生产启用门禁
+- [健康检查与观测](./08-健康检查与观测.md)：含 Mongo consistency audit 指标解释
+- [常见排障](./09-常见排障.md)：含 finding/last-success 排查与禁止自动修复边界
 
 ## 3. 保留的执行指南
 
