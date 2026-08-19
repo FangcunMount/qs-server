@@ -1,6 +1,6 @@
 # Select seeddata duplicate testees
 
-只读识别 `daily_simulation` 重试产生的重复 Testee，并生成后续清理所需的显式 ID 清单。
+只读识别 `daily_simulation` 重试产生的重复 Testee，并生成后续审计所需的显式 ID 清单。
 
 ## 判定边界
 
@@ -36,36 +36,31 @@ selector 按上海自然日拆分查询；重复键本身包含创建日期，�
 输出文件权限为 `0600`，且不会覆盖已有文件：
 
 - `manifest.csv`：目标 Testee/Profile/ProfileLink、对应 IAM User、保留行映射和下游完成度计数。
-- `testee_ids.txt`：供 `cleanup_perf_testee_data --testee-ids-file` 使用。
-- `profile_ids.txt`：供 `cleanup_perf_testee_data --profile-ids-file` 使用。
+- `testee_ids.txt`：显式 Testee 范围；可供 `cleanup_perf_testee_data --testee-ids-file`
+  只清理其中的临时测评，但不能用于删除重复 Testee。
+- `profile_ids.txt`：IAM Profile 审计范围；当前 `cleanup_perf_testee_data` 不读取也不删除 IAM 数据。
 - `summary.txt`：范围与行数摘要。
 
-生成后必须先人工核对 `summary.txt`、`manifest.csv` 抽样，以及按日期汇总是否与事故查询一致，再进入清理工具 dry-run。
+生成后必须先人工核对 `summary.txt`、`manifest.csv` 抽样，以及按日期汇总是否与事故查询一致。
 
-## 清理顺序
+## 与临时测评清理工具的边界
 
-runner 以及其他会写目标 Testee 的进程保持停止，且 MySQL/Mongo 已完成数据库级备份后，先执行 dry-run：
+`cleanup_perf_testee_data` 现在只删除 `assessment.origin_type = 'adhoc'` 的临时测评及其派生数据，
+并明确保留 Testee、IAM Profile、关系、计划入组和计划任务。因此它不能完成重复 Testee 清零。
+
+如果仅需清理这些重复 Testee 产生的临时测评，可在停止相关写入并完成 MySQL/Mongo 数据库级
+备份后先执行 dry-run：
 
 ```bash
 go run ./scripts/oneoff/cleanup_perf_testee_data \
   --mysql-dsn "$QS_MYSQL_DSN" \
-  --iam-mysql-dsn "$IAM_MYSQL_DSN" \
   --mongo-uri "$QS_MONGO_URI" \
   --mongo-db qs \
   --testee-ids-file /secure/path/seeddata-duplicates-20260812/testee_ids.txt \
-  --profile-ids-file /secure/path/seeddata-duplicates-20260812/profile_ids.txt \
-  --scan-event-payloads \
-  --mysql-outbox-scan-batch-size 500 \
-  --iam-delete-batch-size 500 \
   --backup-suffix seeddata_dup_20260812
 ```
 
-`--scan-event-payloads` 以目标 Testee 最早创建时间为下界、以启动扫描时的 Outbox 最大 ID
-为上界，按主键游标分批读取；每条 payload 只解码一次，遇到非法 JSON 会 fail closed。
-它不再执行“每个 Testee ID 对 Outbox 全表做一次 REGEXP”的查询。
-
-核对 QS、Mongo、IAM 各表计数和样例后，使用完全相同的参数追加 `--apply`。工具先备份，
-再依次删除 QS/MySQL、Mongo、IAM；进入 IAM 前会重新确认 QS 中已无目标或非目标 Testee
-引用这些 Profile，随后按 `--iam-delete-batch-size` 分批事务删除 ProfileLink 和 Profile。
-删除后按工具输出的日期窗口运行 `rebuild_statistics` repair/validate/publish，并重新执行本 selector；
-输出 `no duplicate rows matched the explicit scope` 才表示本范围已清零。
+核对临时 Assessment、Mongo 和统计范围后，使用完全相同的参数追加 `--apply`。删除后按工具
+输出的日期窗口运行 `rebuild_statistics` repair/validate/publish。若需要删除重复 Testee/Profile，
+必须另行使用具备独立 dry-run、备份、引用校验和回滚边界的专用维护工具；当前仓库没有将该
+删除能力隐含在临时测评清理脚本中。

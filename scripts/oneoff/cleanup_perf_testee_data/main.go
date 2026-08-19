@@ -1,11 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -30,8 +28,6 @@ import (
 const mongoIDChunkSize = 1000
 const mysqlInsertChunkSize = 1000
 const defaultMySQLDeleteBatchSize = 5000
-const defaultMySQLOutboxScanBatchSize = 500
-const defaultIAMDeleteBatchSize = 500
 const progressBarWidth = 32
 const mysqlIdentifierMaxLength = 64
 const mysqlBackupTablePrefix = "cbpt_"
@@ -40,20 +36,12 @@ var prog progressReporter
 
 type config struct {
 	mysqlDSN                  string
-	iamMySQLDSN               string
 	mongoURI                  string
 	mongoDB                   string
 	testeeIDsRaw              string
 	testeeIDsFile             string
-	profileIDsRaw             string
-	profileIDsFile            string
-	testeeCreatedAfter        string
-	allowOldTestees           bool
-	scanEventPayloads         bool
 	skipCounts                bool
 	skipMongoOutboxEventScope bool
-	mongoOnly                 bool
-	allowMissingTestees       bool
 	backupSuffix              string
 	timeout                   time.Duration
 	apply                     bool
@@ -63,8 +51,6 @@ type config struct {
 	mysqlLockWaitTimeout      int
 	mysqlDeleteRetries        int
 	mysqlDeleteBatchSize      int
-	mysqlOutboxScanBatchSize  int
-	iamDeleteBatchSize        int
 	workers                   int
 }
 
@@ -107,23 +93,12 @@ type mysqlChunkedDeleteSpec struct {
 	pruneStagingTable string
 }
 
-type mysqlOutboxPayloadRow struct {
-	ID      uint64
-	EventID string
-	Payload []byte
-}
-
-type mysqlOutboxPayloadScanSummary struct {
-	Scanned int64
-	Matched int64
-}
-
 type testeePreview struct {
-	ID            uint64
-	Name          string
-	OrgID         int64
-	CreatedAt     sql.NullTime
-	AssessmentCnt int64
+	ID                uint64
+	Name              string
+	OrgID             int64
+	CreatedAt         sql.NullTime
+	TempAssessmentCnt int64
 }
 
 type scopeSummary struct {
@@ -143,8 +118,6 @@ FROM (
   SELECT DATE(a.created_at) AS d FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id
   UNION ALL
   SELECT x.stat_date AS d FROM tmp_cleanup_statistics_dates x
-  UNION ALL
-  SELECT DATE(l.intake_at) AS d FROM assessment_entry_intake_log l JOIN tmp_cleanup_testee_ids t ON t.id = l.testee_id
 ) touched`
 
 func main() {
@@ -153,13 +126,6 @@ func main() {
 	testeeIDs, err := parseTesteeIDs(cfg.testeeIDsRaw, cfg.testeeIDsFile)
 	if err != nil {
 		log.Fatalf("parse testee ids: %v", err)
-	}
-	var profileIDs []uint64
-	if cfg.iamEnabled() {
-		profileIDs, err = parseTesteeIDs(cfg.profileIDsRaw, cfg.profileIDsFile)
-		if err != nil {
-			log.Fatalf("parse profile ids: %v", err)
-		}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
@@ -182,16 +148,6 @@ func main() {
 	if _, err := conn.ExecContext(ctx, "SET NAMES utf8mb4"); err != nil {
 		log.Fatalf("set mysql names: %v", err)
 	}
-	var iamDB *sql.DB
-	var iamConn *sql.Conn
-	if cfg.iamEnabled() {
-		iamDB, iamConn, err = openIAMMySQL(ctx, cfg.iamMySQLDSN)
-		if err != nil {
-			log.Fatalf("connect iam mysql: %v", err)
-		}
-		defer func() { _ = iamConn.Close() }()
-		defer func() { _ = iamDB.Close() }()
-	}
 	mongoClient, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.mongoURI))
 	if err != nil {
 		log.Fatalf("connect mongo: %v", err)
@@ -206,19 +162,8 @@ func main() {
 	}
 	prog.Finish("connect databases", "")
 	prog.Phase("prepare mysql scope")
-	if err := prepareMySQLScope(ctx, conn, cfg, testeeIDs); err != nil {
+	if err := prepareMySQLScope(ctx, conn, testeeIDs); err != nil {
 		log.Fatalf("prepare mysql scope: %v", err)
-	}
-	if cfg.iamEnabled() {
-		if err := prepareQSProfileScope(ctx, conn, profileIDs); err != nil {
-			log.Fatalf("prepare qs profile scope: %v", err)
-		}
-		if err := validateQSProfileScope(ctx, conn, cfg.allowMissingTestees, cfg.mongoOnly, len(testeeIDs), len(profileIDs)); err != nil {
-			log.Fatalf("validate qs/profile scope: %v", err)
-		}
-		if err := prepareIAMScope(ctx, iamConn, profileIDs, cfg.mongoOnly); err != nil {
-			log.Fatalf("prepare iam scope: %v", err)
-		}
 	}
 	prog.Finish("prepare mysql scope", fmt.Sprintf("testees=%d", len(testeeIDs)))
 
@@ -228,7 +173,7 @@ func main() {
 	}
 	mysqlScopedIDs := ids
 	prog.Phase("enrich scope from mongo")
-	ids, err = enrichScopeIDsFromMongo(ctx, mongoDB, ids, cfg.workers)
+	ids, err = enrichScopeIDsFromMongo(ctx, mongoDB, ids)
 	if err != nil {
 		log.Fatalf("enrich scope ids from mongo: %v", err)
 	}
@@ -266,7 +211,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("load scope summary: %v", err)
 		}
-		var mysqlCounts, mongoCounts, iamCounts []namedCount
+		var mysqlCounts, mongoCounts []namedCount
 		countGroup, countCtx := errgroup.WithContext(ctx)
 		countGroup.Go(func() error {
 			var err error
@@ -278,13 +223,6 @@ func main() {
 			mongoCounts, err = countMongoRows(countCtx, mongoDB, ids, cfg.workers)
 			return err
 		})
-		if cfg.iamEnabled() {
-			countGroup.Go(func() error {
-				var err error
-				iamCounts, err = countIAMRows(countCtx, iamConn)
-				return err
-			})
-		}
 		if err := countGroup.Wait(); err != nil {
 			log.Fatalf("count scoped rows: %v", err)
 		}
@@ -293,7 +231,6 @@ func main() {
 		printScopeSummary(summary, cfg)
 		printCounts("mysql", mysqlCounts)
 		printCounts("mongo", mongoCounts)
-		printCounts("iam", iamCounts)
 	}
 
 	previews, err := loadTesteePreview(ctx, conn, cfg.previewLimit)
@@ -302,14 +239,17 @@ func main() {
 	}
 	printTesteePreview(previews)
 	if !cfg.apply {
-		log.Print("dry-run only; re-run with --apply to delete scoped perf data")
+		log.Print("dry-run only; re-run with --apply to delete scoped temporary assessments")
 		return
+	}
+	if err := validateTemporaryAssessmentScope(ctx, conn); err != nil {
+		log.Fatalf("revalidate temporary assessment scope before apply: %v", err)
 	}
 	if !cfg.skipBackup {
 		if err := validateBackupSuffix(cfg.backupSuffix); err != nil {
 			log.Fatalf("invalid backup suffix: %v", err)
 		}
-		prog.Phase("backup mysql, mongo and iam rows")
+		prog.Phase("backup mysql and mongo rows")
 		backupGroup, backupCtx := errgroup.WithContext(ctx)
 		backupGroup.Go(func() error {
 			return backupMongoRows(backupCtx, mongoDB, ids, cfg.backupSuffix, cfg.workers)
@@ -317,32 +257,17 @@ func main() {
 		backupGroup.Go(func() error {
 			return backupMySQLRows(backupCtx, conn, cfg.backupSuffix)
 		})
-		if cfg.iamEnabled() {
-			backupGroup.Go(func() error {
-				return backupIAMRows(backupCtx, iamConn, cfg.backupSuffix, len(profileIDs))
-			})
-		}
 		if err := backupGroup.Wait(); err != nil {
 			log.Fatalf("backup rows: %v", err)
 		}
-		prog.Finish("backup mysql, mongo and iam rows", "suffix="+cfg.backupSuffix)
+		prog.Finish("backup mysql and mongo rows", "suffix="+cfg.backupSuffix)
 		log.Printf("backup completed: suffix=%s", cfg.backupSuffix)
 	} else {
 		log.Print("backup skipped by --skip-backup")
 	}
-
-	prog.Phase("delete mysql rows")
-	var mysqlDeleted []namedCount
-	if cfg.mongoOnly {
-		log.Print("mysql delete skipped by --mongo-only")
-	} else {
-		var err error
-		mysqlDeleted, err = deleteMySQLRows(ctx, conn, cfg, cfg.mysqlLockWaitTimeout, cfg.mysqlDeleteRetries, cfg.mysqlDeleteBatchSize)
-		if err != nil {
-			log.Fatalf("delete mysql rows: %v", err)
-		}
+	if err := validateTemporaryAssessmentScope(ctx, conn); err != nil {
+		log.Fatalf("revalidate temporary assessment scope before delete: %v", err)
 	}
-	prog.Finish("delete mysql rows", "")
 
 	prog.Phase("delete mongo rows")
 	mongoDeleted, err := deleteMongoRows(ctx, mongoDB, ids, cfg.workers)
@@ -350,55 +275,36 @@ func main() {
 		log.Fatalf("delete mongo rows: %v", err)
 	}
 	prog.Finish("delete mongo rows", "")
-	var iamDeleted []namedCount
-	if cfg.iamEnabled() {
-		prog.Phase("revalidate qs profile scope before iam delete")
-		if err := validateQSProfileScope(ctx, conn, true, true, len(testeeIDs), len(profileIDs)); err != nil {
-			log.Fatalf("revalidate qs/profile scope before iam delete: %v", err)
-		}
-		prog.Finish("revalidate qs profile scope before iam delete", "zero qs references")
 
-		prog.Phase("delete iam rows")
-		iamDeleted, err = deleteIAMRows(ctx, iamConn, cfg.mysqlLockWaitTimeout, cfg.mysqlDeleteRetries, cfg.iamDeleteBatchSize, cfg.mongoOnly)
-		if err != nil {
-			log.Fatalf("delete iam rows: %v", err)
-		}
-		prog.Finish("delete iam rows", "")
+	prog.Phase("delete mysql rows")
+	mysqlDeleted, err := deleteMySQLRows(ctx, conn, cfg.mysqlLockWaitTimeout, cfg.mysqlDeleteRetries, cfg.mysqlDeleteBatchSize)
+	if err != nil {
+		log.Fatalf("delete mysql rows: %v", err)
 	}
+	prog.Finish("delete mysql rows", "")
 	printCounts("mysql_deleted", mysqlDeleted)
 	printCounts("mongo_deleted", mongoDeleted)
-	printCounts("iam_deleted", iamDeleted)
-	log.Print("cleanup completed")
+	log.Print("temporary assessment cleanup completed; testees, IAM profiles, care relationships, plan enrollments and plan tasks were preserved")
 }
 
 func parseFlags() config {
 	cfg := config{}
 	flag.StringVar(&cfg.mysqlDSN, "mysql-dsn", "", "MySQL DSN, for example user:pass@tcp(host:3306)/qs?parseTime=true")
-	flag.StringVar(&cfg.iamMySQLDSN, "iam-mysql-dsn", "", "optional IAM MySQL DSN; requires explicit profile IDs")
 	flag.StringVar(&cfg.mongoURI, "mongo-uri", "", "MongoDB URI")
 	flag.StringVar(&cfg.mongoDB, "mongo-db", "", "MongoDB database name")
 	flag.StringVar(&cfg.testeeIDsRaw, "testee-ids", "", "comma/space/newline separated testee IDs")
 	flag.StringVar(&cfg.testeeIDsFile, "testee-ids-file", "", "file containing comma/space/newline separated testee IDs")
-	flag.StringVar(&cfg.profileIDsRaw, "profile-ids", "", "comma/space/newline separated IAM profile IDs; requires --iam-mysql-dsn")
-	flag.StringVar(&cfg.profileIDsFile, "profile-ids-file", "", "file containing IAM profile IDs; requires --iam-mysql-dsn")
-	flag.StringVar(&cfg.testeeCreatedAfter, "testee-created-after", "2026-05-01 00:00:00", "safety guard: selected testees must have created_at after this MySQL timestamp")
-	flag.BoolVar(&cfg.allowOldTestees, "allow-old-testees", false, "bypass --testee-created-after guard")
-	flag.BoolVar(&cfg.scanEventPayloads, "scan-event-payloads", false, "also decode MySQL outbox payload_json in bounded ID batches and match testee_id")
 	flag.BoolVar(&cfg.skipCounts, "skip-counts", false, "skip expensive row counts and affected source date window; useful when an external backup already protects an apply run")
 	flag.BoolVar(&cfg.skipMongoOutboxEventScope, "skip-mongo-outbox-event-scope", false, "skip loading Mongo outbox event_id values into MySQL temp scope; Mongo outbox documents are still deleted by aggregate filters")
-	flag.BoolVar(&cfg.mongoOnly, "mongo-only", false, "skip MySQL delete; allow testee IDs already removed from MySQL (resume interrupted mongo cleanup)")
-	flag.BoolVar(&cfg.allowMissingTestees, "allow-missing-testees", false, "do not fail when testee IDs are absent from MySQL testee table")
 	flag.StringVar(&cfg.backupSuffix, "backup-suffix", time.Now().Format("20060102150405"), "backup table/collection suffix")
 	flag.DurationVar(&cfg.timeout, "timeout", 2*time.Hour, "overall timeout, for example 30m or 2h")
 	flag.BoolVar(&cfg.apply, "apply", false, "apply deletes; default is dry-run")
-	flag.BoolVar(&cfg.skipBackup, "skip-backup", false, "skip built-in QS MySQL, Mongo and optional IAM MySQL backups before deleting")
+	flag.BoolVar(&cfg.skipBackup, "skip-backup", false, "skip built-in MySQL and Mongo backups before deleting")
 	flag.IntVar(&cfg.previewLimit, "preview-limit", 20, "number of scoped testees to preview")
 	flag.BoolVar(&cfg.noProgress, "no-progress", false, "disable terminal progress output")
 	flag.IntVar(&cfg.mysqlLockWaitTimeout, "mysql-lock-wait-timeout", 300, "MySQL SESSION innodb_lock_wait_timeout seconds during delete; 0 keeps server default")
 	flag.IntVar(&cfg.mysqlDeleteRetries, "mysql-delete-retries", 5, "retries per table when MySQL delete hits lock wait timeout or deadlock")
 	flag.IntVar(&cfg.mysqlDeleteBatchSize, "mysql-delete-batch-size", defaultMySQLDeleteBatchSize, "rows per transaction for chunked MySQL deletes")
-	flag.IntVar(&cfg.mysqlOutboxScanBatchSize, "mysql-outbox-scan-batch-size", defaultMySQLOutboxScanBatchSize, "rows per query for --scan-event-payloads; each eligible outbox row is decoded at most once")
-	flag.IntVar(&cfg.iamDeleteBatchSize, "iam-delete-batch-size", defaultIAMDeleteBatchSize, "profiles per IAM delete transaction")
 	flag.IntVar(&cfg.workers, "workers", 4, "parallel workers for independent Mongo scans and cross-store backup/count")
 	flag.Parse()
 
@@ -416,11 +322,6 @@ func parseFlags() config {
 	if !hasManualScope {
 		log.Fatal("provide --testee-ids or --testee-ids-file")
 	}
-	hasIAMDSN := strings.TrimSpace(cfg.iamMySQLDSN) != ""
-	hasProfileScope := strings.TrimSpace(cfg.profileIDsRaw) != "" || strings.TrimSpace(cfg.profileIDsFile) != ""
-	if hasIAMDSN != hasProfileScope {
-		log.Fatal("--iam-mysql-dsn and --profile-ids/--profile-ids-file must be configured together")
-	}
 	if cfg.previewLimit < 0 {
 		log.Fatal("--preview-limit must be >= 0")
 	}
@@ -433,29 +334,13 @@ func parseFlags() config {
 	if cfg.mysqlDeleteBatchSize < 1 {
 		log.Fatal("--mysql-delete-batch-size must be >= 1")
 	}
-	if cfg.mysqlOutboxScanBatchSize < 1 {
-		log.Fatal("--mysql-outbox-scan-batch-size must be >= 1")
-	}
-	if cfg.iamDeleteBatchSize < 1 {
-		log.Fatal("--iam-delete-batch-size must be >= 1")
-	}
 	if cfg.workers < 1 {
 		log.Fatal("--workers must be >= 1")
-	}
-	if cfg.mongoOnly {
-		cfg.allowMissingTestees = true
-	}
-	if !cfg.apply && cfg.mongoOnly {
-		log.Print("--mongo-only has no effect in dry-run mode")
 	}
 	if !cfg.apply && cfg.skipBackup {
 		log.Print("--skip-backup has no effect in dry-run mode")
 	}
 	return cfg
-}
-
-func (cfg config) iamEnabled() bool {
-	return strings.TrimSpace(cfg.iamMySQLDSN) != ""
 }
 
 func parseTesteeIDs(raw, file string) ([]uint64, error) {
@@ -508,7 +393,7 @@ func splitIDs(raw string) []string {
 	return out
 }
 
-func prepareMySQLScope(ctx context.Context, conn *sql.Conn, cfg config, testeeIDs []uint64) error {
+func prepareMySQLScope(ctx context.Context, conn *sql.Conn, testeeIDs []uint64) error {
 	eventIDCollation, err := loadEventIDCollation(ctx, conn)
 	if err != nil {
 		return err
@@ -528,13 +413,8 @@ func prepareMySQLScope(ctx context.Context, conn *sql.Conn, cfg config, testeeID
 		`CREATE TEMPORARY TABLE tmp_cleanup_report_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
 		fmt.Sprintf(`CREATE TEMPORARY TABLE tmp_cleanup_event_ids (event_id %s NOT NULL PRIMARY KEY)`, eventIDType),
 		fmt.Sprintf(`CREATE TEMPORARY TABLE tmp_cleanup_mysql_outbox_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY, event_id %s NOT NULL, UNIQUE KEY uk_event_id (event_id))`, eventIDType),
-		`CREATE TEMPORARY TABLE tmp_cleanup_assessment_task_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
 		`CREATE TEMPORARY TABLE tmp_cleanup_assessment_score_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
-		`CREATE TEMPORARY TABLE tmp_cleanup_plan_enrollment_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
 		`CREATE TEMPORARY TABLE tmp_cleanup_outcome_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
-		`CREATE TEMPORARY TABLE tmp_cleanup_resolve_log_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
-		`CREATE TEMPORARY TABLE tmp_cleanup_intake_log_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
-		`CREATE TEMPORARY TABLE tmp_cleanup_relation_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
 		`CREATE TEMPORARY TABLE tmp_cleanup_statistics_dates (org_id BIGINT NOT NULL, stat_date DATE NOT NULL, PRIMARY KEY (org_id, stat_date))`,
 	}
 	for i, stmt := range stmts {
@@ -551,45 +431,11 @@ func prepareMySQLScope(ctx context.Context, conn *sql.Conn, cfg config, testeeID
 		return fmt.Errorf("insert testee ids: %w", err)
 	}
 
-	if err := validateTesteeGuard(ctx, conn, cfg, len(testeeIDs)); err != nil {
+	if err := validateTesteeScope(ctx, conn, len(testeeIDs)); err != nil {
 		return err
 	}
 
-	ordinaryPopulate := []namedSQL{
-		{"assessment ids from assessment.testee_id", `INSERT IGNORE INTO tmp_cleanup_assessment_ids (id)
-SELECT a.id FROM assessment a JOIN tmp_cleanup_testee_ids t ON t.id = a.testee_id`,
-		},
-	}
-	ordinaryPopulate = append(ordinaryPopulate, namedSQL{"assessment ids from statistics facts", `INSERT IGNORE INTO tmp_cleanup_assessment_ids (id)
-SELECT DISTINCT f.assessment_id FROM statistics_assessment_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id WHERE f.assessment_id IS NOT NULL AND f.assessment_id <> 0`})
-	ordinaryPopulate = append(ordinaryPopulate,
-		namedSQL{"answersheet ids from assessment scope", `INSERT IGNORE INTO tmp_cleanup_answersheet_ids (id)
-SELECT DISTINCT a.answer_sheet_id FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id WHERE a.answer_sheet_id <> 0`},
-	)
-	ordinaryPopulate = append(ordinaryPopulate,
-		namedSQL{"plan enrollment ids from testee scope", `INSERT IGNORE INTO tmp_cleanup_plan_enrollment_ids (id)
-SELECT e.id FROM plan_enrollment e JOIN tmp_cleanup_testee_ids t ON t.id = e.testee_id`},
-		namedSQL{"outcome ids from assessment scope", `INSERT IGNORE INTO tmp_cleanup_outcome_ids (id)
-SELECT o.id FROM evaluation_outcome o JOIN tmp_cleanup_assessment_ids a ON a.id = o.assessment_id`},
-	)
-	populate := append([]namedSQL{}, ordinaryPopulate...)
-	populate = append(populate, namedSQL{"answersheet ids from statistics facts", `INSERT IGNORE INTO tmp_cleanup_answersheet_ids (id)
-SELECT DISTINCT f.answersheet_id FROM statistics_assessment_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id WHERE f.answersheet_id IS NOT NULL AND f.answersheet_id <> 0`})
-	populate = append(populate,
-		namedSQL{"report ids from assessment scope", `INSERT IGNORE INTO tmp_cleanup_report_ids (id)
-SELECT id FROM tmp_cleanup_assessment_ids`,
-		},
-	)
-	populate = append(populate,
-		namedSQL{"report ids from statistics facts", `INSERT IGNORE INTO tmp_cleanup_report_ids (id)
-SELECT DISTINCT f.report_id FROM statistics_assessment_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id WHERE f.report_id IS NOT NULL AND f.report_id <> 0`},
-		namedSQL{"statistics dates from access facts", `INSERT IGNORE INTO tmp_cleanup_statistics_dates (org_id, stat_date)
-SELECT DISTINCT f.org_id, f.stat_date FROM statistics_access_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id`},
-		namedSQL{"statistics dates from assessment facts", `INSERT IGNORE INTO tmp_cleanup_statistics_dates (org_id, stat_date)
-SELECT DISTINCT f.org_id, f.stat_date FROM statistics_assessment_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id`},
-		namedSQL{"statistics dates from plan facts", `INSERT IGNORE INTO tmp_cleanup_statistics_dates (org_id, stat_date)
-SELECT DISTINCT f.org_id, f.stat_date FROM statistics_plan_fact f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id`},
-	)
+	populate := mysqlScopePopulateStatements()
 	for i, item := range populate {
 		item := item
 		if err := prog.RunStep(item.name, i+1, len(populate), func() error {
@@ -601,17 +447,77 @@ SELECT DISTINCT f.org_id, f.stat_date FROM statistics_plan_fact f JOIN tmp_clean
 			return err
 		}
 	}
+	if err := validateTemporaryAssessmentScope(ctx, conn); err != nil {
+		return err
+	}
 	if err := addMySQLOutboxIDsToScope(ctx, conn); err != nil {
 		return err
 	}
-	if cfg.scanEventPayloads && !cfg.mongoOnly {
-		summary, err := scanMySQLOutboxPayloads(ctx, conn, testeeIDs, cfg.mysqlOutboxScanBatchSize)
-		if err != nil {
-			return fmt.Errorf("scan mysql outbox payloads: %w", err)
-		}
-		log.Printf("mysql outbox payload scan completed: batch_size=%d scanned=%d matched=%d", cfg.mysqlOutboxScanBatchSize, summary.Scanned, summary.Matched)
-	} else if cfg.scanEventPayloads {
-		log.Print("skip mysql outbox payload scan in --mongo-only recovery mode")
+	return nil
+}
+
+func mysqlScopePopulateStatements() []namedSQL {
+	return []namedSQL{
+		{"temporary assessment ids", `INSERT IGNORE INTO tmp_cleanup_assessment_ids (id)
+SELECT a.id
+FROM assessment a
+JOIN tmp_cleanup_testee_ids t ON t.id = a.testee_id
+WHERE a.origin_type = 'adhoc'`},
+		{"answersheet ids from temporary assessments", `INSERT IGNORE INTO tmp_cleanup_answersheet_ids (id)
+SELECT DISTINCT a.answer_sheet_id
+FROM assessment a
+JOIN tmp_cleanup_assessment_ids x ON x.id = a.id
+WHERE a.answer_sheet_id <> 0`},
+		{"outcome ids from temporary assessments", `INSERT IGNORE INTO tmp_cleanup_outcome_ids (id)
+SELECT o.id
+FROM evaluation_outcome o
+JOIN tmp_cleanup_assessment_ids a ON a.id = o.assessment_id`},
+		{"report ids from scoped assessment facts", `INSERT IGNORE INTO tmp_cleanup_report_ids (id)
+SELECT DISTINCT f.report_id
+FROM statistics_assessment_fact f
+LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = f.answersheet_id
+LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id
+LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = f.outcome_id
+WHERE (s.id IS NOT NULL OR a.id IS NOT NULL OR o.id IS NOT NULL)
+  AND f.report_id IS NOT NULL AND f.report_id <> 0`},
+		{"statistics dates from temporary assessments", `INSERT IGNORE INTO tmp_cleanup_statistics_dates (org_id, stat_date)
+SELECT DISTINCT a.org_id, DATE(a.created_at)
+FROM assessment a
+JOIN tmp_cleanup_assessment_ids x ON x.id = a.id`},
+		{"statistics dates from scoped assessment facts", `INSERT IGNORE INTO tmp_cleanup_statistics_dates (org_id, stat_date)
+SELECT DISTINCT f.org_id, f.stat_date
+FROM statistics_assessment_fact f
+LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = f.answersheet_id
+LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id
+LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = f.outcome_id
+LEFT JOIN tmp_cleanup_report_ids r ON r.id = f.report_id
+WHERE s.id IS NOT NULL OR a.id IS NOT NULL OR o.id IS NOT NULL OR r.id IS NOT NULL`},
+	}
+}
+
+func validateTemporaryAssessmentScope(ctx context.Context, conn *sql.Conn) error {
+	var invalidAssessments int64
+	if err := conn.QueryRowContext(ctx, `SELECT COUNT(*)
+FROM tmp_cleanup_assessment_ids scoped
+LEFT JOIN assessment a ON a.id = scoped.id
+WHERE a.id IS NULL OR a.origin_type <> 'adhoc'`).Scan(&invalidAssessments); err != nil {
+		return fmt.Errorf("validate temporary assessment origin boundary: %w", err)
+	}
+	var linkedPlanTasks int64
+	if err := conn.QueryRowContext(ctx, `SELECT COUNT(*)
+FROM assessment_task task
+JOIN tmp_cleanup_assessment_ids a ON a.id = task.assessment_id`).Scan(&linkedPlanTasks); err != nil {
+		return fmt.Errorf("validate temporary assessment plan-task boundary: %w", err)
+	}
+	return validateTemporaryAssessmentScopeCounts(invalidAssessments, linkedPlanTasks)
+}
+
+func validateTemporaryAssessmentScopeCounts(invalidAssessments, linkedPlanTasks int64) error {
+	if invalidAssessments > 0 {
+		return fmt.Errorf("temporary assessment scope contains %d missing or non-adhoc assessment(s); aborting because the scope changed", invalidAssessments)
+	}
+	if linkedPlanTasks > 0 {
+		return fmt.Errorf("temporary assessment scope contains %d assessment(s) linked to plan tasks; aborting to preserve plan data", linkedPlanTasks)
 	}
 	return nil
 }
@@ -649,174 +555,6 @@ SELECT event_id FROM tmp_cleanup_mysql_outbox_ids`})
 	return outboxStmts
 }
 
-func scanMySQLOutboxPayloads(ctx context.Context, conn *sql.Conn, testeeIDs []uint64, batchSize int) (mysqlOutboxPayloadScanSummary, error) {
-	var summary mysqlOutboxPayloadScanSummary
-	if len(testeeIDs) == 0 {
-		return summary, errors.New("testee ids are required")
-	}
-	if batchSize <= 0 {
-		return summary, errors.New("batch size must be positive")
-	}
-
-	var minTesteeCreatedAt sql.NullTime
-	if err := conn.QueryRowContext(ctx, `SELECT MIN(t.created_at)
-FROM testee t
-JOIN tmp_cleanup_testee_ids target ON target.id = t.id`).Scan(&minTesteeCreatedAt); err != nil {
-		return summary, err
-	}
-	if !minTesteeCreatedAt.Valid {
-		return summary, errors.New("selected testees have no minimum created_at")
-	}
-
-	var maxOutboxID uint64
-	if err := conn.QueryRowContext(ctx, `SELECT COALESCE(MAX(id), 0) FROM domain_event_outbox`).Scan(&maxOutboxID); err != nil {
-		return summary, err
-	}
-	if maxOutboxID == 0 {
-		return summary, nil
-	}
-
-	targets := make(map[uint64]struct{}, len(testeeIDs))
-	for _, id := range testeeIDs {
-		targets[id] = struct{}{}
-	}
-
-	var cursor uint64
-	for cursor < maxOutboxID {
-		rows, err := conn.QueryContext(ctx, `SELECT id, event_id, payload_json
-FROM domain_event_outbox
-WHERE id > ? AND id <= ? AND created_at >= ?
-ORDER BY id
-LIMIT ?`, cursor, maxOutboxID, minTesteeCreatedAt.Time, batchSize)
-		if err != nil {
-			return summary, err
-		}
-
-		batch := make([]mysqlOutboxPayloadRow, 0, batchSize)
-		for rows.Next() {
-			var row mysqlOutboxPayloadRow
-			if err := rows.Scan(&row.ID, &row.EventID, &row.Payload); err != nil {
-				_ = rows.Close()
-				return summary, err
-			}
-			batch = append(batch, row)
-		}
-		if err := rows.Err(); err != nil {
-			_ = rows.Close()
-			return summary, err
-		}
-		if err := rows.Close(); err != nil {
-			return summary, err
-		}
-		if len(batch) == 0 {
-			break
-		}
-		cursor = batch[len(batch)-1].ID
-		summary.Scanned += int64(len(batch))
-
-		matches := make([]mysqlOutboxPayloadRow, 0)
-		for _, row := range batch {
-			matched, err := payloadContainsTesteeID(row.Payload, targets)
-			if err != nil {
-				return summary, fmt.Errorf("decode outbox id %d payload: %w", row.ID, err)
-			}
-			if matched {
-				matches = append(matches, row)
-			}
-		}
-		if err := insertMySQLOutboxPayloadMatches(ctx, conn, matches); err != nil {
-			return summary, err
-		}
-		summary.Matched += int64(len(matches))
-	}
-
-	if _, err := conn.ExecContext(ctx, `INSERT IGNORE INTO tmp_cleanup_event_ids (event_id)
-SELECT event_id FROM tmp_cleanup_mysql_outbox_ids`); err != nil {
-		return summary, err
-	}
-	return summary, nil
-}
-
-func insertMySQLOutboxPayloadMatches(ctx context.Context, conn *sql.Conn, rows []mysqlOutboxPayloadRow) error {
-	if len(rows) == 0 {
-		return nil
-	}
-	placeholders := make([]string, 0, len(rows))
-	args := make([]any, 0, len(rows)*2)
-	for _, row := range rows {
-		placeholders = append(placeholders, "(?, ?)")
-		args = append(args, row.ID, row.EventID)
-	}
-	query := `INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id) VALUES ` + strings.Join(placeholders, ",")
-	if _, err := conn.ExecContext(ctx, query, args...); err != nil {
-		return fmt.Errorf("insert payload-matched mysql outbox ids: %w", err)
-	}
-	return nil
-}
-
-func payloadContainsTesteeID(raw []byte, targets map[uint64]struct{}) (bool, error) {
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.UseNumber()
-	var payload any
-	if err := decoder.Decode(&payload); err != nil {
-		return false, err
-	}
-	if err := ensureJSONEOF(decoder); err != nil {
-		return false, err
-	}
-	return jsonValueContainsTesteeID(payload, targets), nil
-}
-
-func ensureJSONEOF(decoder *json.Decoder) error {
-	var extra any
-	if err := decoder.Decode(&extra); err != io.EOF {
-		if err == nil {
-			return errors.New("payload contains multiple JSON values")
-		}
-		return err
-	}
-	return nil
-}
-
-func jsonValueContainsTesteeID(value any, targets map[uint64]struct{}) bool {
-	switch typed := value.(type) {
-	case map[string]any:
-		for key, child := range typed {
-			if key == "testee_id" {
-				if id, ok := jsonUint64(child); ok {
-					if _, exists := targets[id]; exists {
-						return true
-					}
-				}
-			}
-			if jsonValueContainsTesteeID(child, targets) {
-				return true
-			}
-		}
-	case []any:
-		for _, child := range typed {
-			if jsonValueContainsTesteeID(child, targets) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func jsonUint64(value any) (uint64, bool) {
-	var raw string
-	switch typed := value.(type) {
-	case json.Number:
-		raw = typed.String()
-	case string:
-		raw = strings.TrimSpace(typed)
-	default:
-		return 0, false
-	}
-	id, err := strconv.ParseUint(raw, 10, 64)
-	return id, err == nil && id != 0
-}
-
 func loadEventIDCollation(ctx context.Context, conn *sql.Conn) (string, error) {
 	var collation sql.NullString
 	if err := conn.QueryRowContext(ctx, `
@@ -844,16 +582,12 @@ WHERE table_schema = DATABASE()
 	return name, nil
 }
 
-func validateTesteeGuard(ctx context.Context, conn *sql.Conn, cfg config, expected int) error {
+func validateTesteeScope(ctx context.Context, conn *sql.Conn, expected int) error {
 	var existing int
 	if err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM testee t JOIN tmp_cleanup_testee_ids x ON x.id = t.id`).Scan(&existing); err != nil {
 		return err
 	}
 	if existing != expected {
-		if cfg.allowMissingTestees {
-			log.Printf("prepare mysql scope: %d/%d testee IDs are absent from MySQL testee table (allowed)", expected-existing, expected)
-			return nil
-		}
 		rows, err := conn.QueryContext(ctx, `SELECT x.id FROM tmp_cleanup_testee_ids x LEFT JOIN testee t ON t.id = x.id WHERE t.id IS NULL ORDER BY x.id LIMIT 20`)
 		if err != nil {
 			return err
@@ -869,38 +603,7 @@ func validateTesteeGuard(ctx context.Context, conn *sql.Conn, cfg config, expect
 		}
 		return fmt.Errorf("some testee IDs do not exist in MySQL testee table; missing sample=%s", strings.Join(missing, ","))
 	}
-	if cfg.allowOldTestees {
-		return nil
-	}
-	var oldCount int
-	if err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM testee t JOIN tmp_cleanup_testee_ids x ON x.id = t.id WHERE t.created_at <= ?`, cfg.testeeCreatedAfter).Scan(&oldCount); err != nil {
-		return err
-	}
-	if oldCount == 0 {
-		return nil
-	}
-	rows, err := conn.QueryContext(ctx, `
-SELECT t.id, t.name, t.created_at
-FROM testee t
-JOIN tmp_cleanup_testee_ids x ON x.id = t.id
-WHERE t.created_at <= ?
-ORDER BY t.created_at ASC
-LIMIT 20`, cfg.testeeCreatedAfter)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = rows.Close() }()
-	samples := []string{}
-	for rows.Next() {
-		var id uint64
-		var name string
-		var createdAt time.Time
-		if err := rows.Scan(&id, &name, &createdAt); err != nil {
-			return err
-		}
-		samples = append(samples, fmt.Sprintf("%d/%s/%s", id, name, createdAt.Format("2006-01-02 15:04:05")))
-	}
-	return fmt.Errorf("%d testee(s) violate --testee-created-after=%q; sample=%s; use --allow-old-testees only after manual verification", oldCount, cfg.testeeCreatedAfter, strings.Join(samples, ", "))
+	return nil
 }
 
 func verifyMongoReadAccess(ctx context.Context, db *mongo.Database) error {
@@ -989,35 +692,7 @@ func loadScopeIDs(ctx context.Context, conn *sql.Conn) (scopeIDs, error) {
 	return scopeIDs{TesteeIDs: testeeIDs, AssessmentIDs: assessmentIDs, AnswerSheetIDs: answerSheetIDs, OutcomeIDs: outcomeIDs, ReportIDs: reportIDs}, nil
 }
 
-func enrichScopeIDsFromMongo(ctx context.Context, db *mongo.Database, ids scopeIDs, workers int) (scopeIDs, error) {
-	type mongoFieldTask struct {
-		coll  string
-		field string
-		label string
-	}
-	tasks := []mongoFieldTask{
-		{coll: "answersheets", field: "domain_id", label: "answersheets.domain_id"},
-	}
-	results := make([][]uint64, len(tasks))
-	group, groupCtx := errgroup.WithContext(ctx)
-	group.SetLimit(workers)
-	for i, task := range tasks {
-		i, task := i, task
-		group.Go(func() error {
-			filter := inUint64("testee_id", ids.TesteeIDs)
-			out, err := loadMongoUint64Field(groupCtx, db.Collection(task.coll), filter, task.field, task.label)
-			if err != nil {
-				return fmt.Errorf("load %s: %w", task.label, err)
-			}
-			results[i] = out
-			return nil
-		})
-	}
-	if err := group.Wait(); err != nil {
-		return ids, err
-	}
-
-	ids.AnswerSheetIDs = uniqueUint64(append(ids.AnswerSheetIDs, results[0]...))
+func enrichScopeIDsFromMongo(ctx context.Context, db *mongo.Database, ids scopeIDs) (scopeIDs, error) {
 	reportIDs, err := loadMongoUint64FieldByFilters(ctx, db.Collection("interpret_report_artifacts"), interpretReportFilters(ids), "domain_id", "interpret_report_artifacts.domain_id")
 	if err != nil {
 		return ids, err
@@ -1277,7 +952,7 @@ func loadScopeSummary(ctx context.Context, conn *sql.Conn) (scopeSummary, error)
 			return s, err
 		}
 	}
-	rows, err := conn.QueryContext(ctx, `SELECT DISTINCT org_id FROM testee t JOIN tmp_cleanup_testee_ids x ON x.id = t.id ORDER BY org_id`)
+	rows, err := conn.QueryContext(ctx, `SELECT DISTINCT a.org_id FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id ORDER BY a.org_id`)
 	if err != nil {
 		return s, err
 	}
@@ -1302,12 +977,13 @@ func loadTesteePreview(ctx context.Context, conn *sql.Conn, limit int) ([]testee
 		return nil, nil
 	}
 	rows, err := conn.QueryContext(ctx, `
-SELECT t.id, t.name, t.org_id, t.created_at, COUNT(a.id) AS assessment_cnt
+SELECT t.id, t.name, t.org_id, t.created_at, COUNT(scoped.id) AS temporary_assessment_cnt
 FROM testee t
 JOIN tmp_cleanup_testee_ids x ON x.id = t.id
 LEFT JOIN assessment a ON a.testee_id = t.id
+LEFT JOIN tmp_cleanup_assessment_ids scoped ON scoped.id = a.id
 GROUP BY t.id, t.name, t.org_id, t.created_at
-ORDER BY assessment_cnt DESC, t.id
+ORDER BY temporary_assessment_cnt DESC, t.id
 LIMIT ?`, limit)
 	if err != nil {
 		return nil, err
@@ -1316,7 +992,7 @@ LIMIT ?`, limit)
 	var out []testeePreview
 	for rows.Next() {
 		var row testeePreview
-		if err := rows.Scan(&row.ID, &row.Name, &row.OrgID, &row.CreatedAt, &row.AssessmentCnt); err != nil {
+		if err := rows.Scan(&row.ID, &row.Name, &row.OrgID, &row.CreatedAt, &row.TempAssessmentCnt); err != nil {
 			return nil, err
 		}
 		out = append(out, row)
@@ -1342,24 +1018,13 @@ func countMySQLRows(ctx context.Context, conn *sql.Conn) ([]namedCount, error) {
 
 func mysqlCountItems() []mysqlCountItem {
 	return []mysqlCountItem{
-		{"testee", `SELECT COUNT(*) FROM testee t JOIN tmp_cleanup_testee_ids x ON x.id = t.id`},
 		{"assessment", `SELECT COUNT(*) FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id`},
 		{"evaluation_outcome", `SELECT COUNT(*) FROM evaluation_outcome o JOIN tmp_cleanup_outcome_ids x ON x.id = o.id`},
-		{"interpretation_admission_failure", `SELECT COUNT(*) FROM interpretation_admission_failure f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id`},
-		{"interpretation_attention_projection", `SELECT COUNT(*) FROM interpretation_attention_projection p JOIN tmp_cleanup_testee_ids t ON t.id = p.testee_id`},
-		{"assessment_score", `SELECT COUNT(*) FROM assessment_score s LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id LEFT JOIN tmp_cleanup_testee_ids t ON t.id = s.testee_id WHERE a.id IS NOT NULL OR t.id IS NOT NULL`},
-		{"assessment_task", `SELECT COUNT(*) FROM assessment_task task LEFT JOIN tmp_cleanup_testee_ids t ON t.id = task.testee_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = task.assessment_id LEFT JOIN tmp_cleanup_plan_enrollment_ids e ON e.id = task.enrollment_id WHERE t.id IS NOT NULL OR a.id IS NOT NULL OR e.id IS NOT NULL`},
-		{"plan_enrollment", `SELECT COUNT(*) FROM plan_enrollment e JOIN tmp_cleanup_plan_enrollment_ids x ON x.id = e.id`},
-		{"clinician_relation", `SELECT COUNT(*) FROM clinician_relation r LEFT JOIN tmp_cleanup_testee_ids t ON t.id = r.testee_id LEFT JOIN tmp_cleanup_relation_ids scoped ON scoped.id = r.id WHERE t.id IS NOT NULL OR scoped.id IS NOT NULL`},
-		{"assessment_entry_resolve_log", `SELECT COUNT(*) FROM assessment_entry_resolve_log l JOIN tmp_cleanup_resolve_log_ids x ON x.id = l.id`},
-		{"assessment_entry_intake_log", `SELECT COUNT(*) FROM assessment_entry_intake_log l LEFT JOIN tmp_cleanup_testee_ids t ON t.id = l.testee_id LEFT JOIN tmp_cleanup_intake_log_ids scoped ON scoped.id = l.id WHERE t.id IS NOT NULL OR scoped.id IS NOT NULL`},
-		{"statistics_access_fact", `SELECT COUNT(*) FROM statistics_access_fact f LEFT JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_resolve_log_ids r ON f.source_type = 'entry_resolve' AND BINARY f.source_ref = BINARY CAST(r.id AS CHAR) LEFT JOIN tmp_cleanup_intake_log_ids i ON f.source_type = 'entry_intake' AND BINARY f.source_ref = BINARY CAST(i.id AS CHAR) WHERE t.id IS NOT NULL OR r.id IS NOT NULL OR i.id IS NOT NULL`},
-		{"statistics_assessment_fact", `SELECT COUNT(*) FROM statistics_assessment_fact f LEFT JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = f.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = f.report_id WHERE t.id IS NOT NULL OR s.id IS NOT NULL OR a.id IS NOT NULL OR r.id IS NOT NULL`},
-		{"statistics_plan_fact", `SELECT COUNT(*) FROM statistics_plan_fact f LEFT JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_plan_enrollment_ids e ON e.id = f.enrollment_id LEFT JOIN tmp_cleanup_assessment_task_ids task ON task.id = f.task_id WHERE t.id IS NOT NULL OR e.id IS NOT NULL OR task.id IS NOT NULL`},
-		{"statistics_access_daily", `SELECT COUNT(*) FROM statistics_access_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date`},
-		{"statistics_assessment_daily", `SELECT COUNT(*) FROM statistics_assessment_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date`},
-		{"statistics_plan_activity_daily", `SELECT COUNT(*) FROM statistics_plan_activity_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date`},
-		{"statistics_plan_fulfillment_daily", `SELECT COUNT(*) FROM statistics_plan_fulfillment_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.cohort_date`},
+		{"interpretation_admission_failure", `SELECT COUNT(*) FROM interpretation_admission_failure f LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = f.outcome_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id WHERE o.id IS NOT NULL OR a.id IS NOT NULL`},
+		{"interpretation_attention_projection", `SELECT COUNT(*) FROM interpretation_attention_projection p LEFT JOIN tmp_cleanup_assessment_ids a ON BINARY p.assessment_id = BINARY CAST(a.id AS CHAR) LEFT JOIN tmp_cleanup_report_ids r ON BINARY p.report_id = BINARY CAST(r.id AS CHAR) WHERE a.id IS NOT NULL OR r.id IS NOT NULL`},
+		{"assessment_score", `SELECT COUNT(*) FROM assessment_score s LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = s.evaluation_outcome_id WHERE a.id IS NOT NULL OR o.id IS NOT NULL`},
+		{"statistics_assessment_fact", `SELECT COUNT(*) FROM statistics_assessment_fact f LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = f.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = f.outcome_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = f.report_id WHERE s.id IS NOT NULL OR a.id IS NOT NULL OR o.id IS NOT NULL OR r.id IS NOT NULL`},
+		{"statistics_assessment_daily", `SELECT COUNT(*) FROM statistics_assessment_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date WHERE d.origin_type = 'adhoc'`},
 		{"statistics_org_snapshot", `SELECT COUNT(*) FROM statistics_org_snapshot s WHERE EXISTS (SELECT 1 FROM tmp_cleanup_statistics_dates x WHERE x.org_id = s.org_id)`},
 		{"domain_event_outbox", `SELECT COUNT(*) FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
 		{"runtime_checkpoint", `SELECT COUNT(*) FROM runtime_checkpoint r JOIN tmp_cleanup_assessment_ids a ON a.id = r.assessment_id`},
@@ -1500,24 +1165,13 @@ func quoteMySQLIdentifier(name string) (string, error) {
 
 func mysqlBackupItems() []mysqlBackupItem {
 	return []mysqlBackupItem{
-		{"testee", `SELECT t.* FROM testee t JOIN tmp_cleanup_testee_ids x ON x.id = t.id`},
 		{"assessment", `SELECT a.* FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id`},
 		{"evaluation_outcome", `SELECT o.* FROM evaluation_outcome o JOIN tmp_cleanup_outcome_ids x ON x.id = o.id`},
-		{"interpretation_admission_failure", `SELECT f.* FROM interpretation_admission_failure f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id`},
-		{"interpretation_attention_projection", `SELECT p.* FROM interpretation_attention_projection p JOIN tmp_cleanup_testee_ids t ON t.id = p.testee_id`},
-		{"assessment_score", `SELECT s.* FROM assessment_score s LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id LEFT JOIN tmp_cleanup_testee_ids t ON t.id = s.testee_id WHERE a.id IS NOT NULL OR t.id IS NOT NULL`},
-		{"assessment_task", `SELECT task.* FROM assessment_task task LEFT JOIN tmp_cleanup_testee_ids t ON t.id = task.testee_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = task.assessment_id LEFT JOIN tmp_cleanup_plan_enrollment_ids e ON e.id = task.enrollment_id WHERE t.id IS NOT NULL OR a.id IS NOT NULL OR e.id IS NOT NULL`},
-		{"plan_enrollment", `SELECT e.* FROM plan_enrollment e JOIN tmp_cleanup_plan_enrollment_ids x ON x.id = e.id`},
-		{"clinician_relation", `SELECT r.* FROM clinician_relation r LEFT JOIN tmp_cleanup_testee_ids t ON t.id = r.testee_id LEFT JOIN tmp_cleanup_relation_ids scoped ON scoped.id = r.id WHERE t.id IS NOT NULL OR scoped.id IS NOT NULL`},
-		{"assessment_entry_resolve_log", `SELECT l.* FROM assessment_entry_resolve_log l JOIN tmp_cleanup_resolve_log_ids x ON x.id = l.id`},
-		{"assessment_entry_intake_log", `SELECT l.* FROM assessment_entry_intake_log l LEFT JOIN tmp_cleanup_testee_ids t ON t.id = l.testee_id LEFT JOIN tmp_cleanup_intake_log_ids scoped ON scoped.id = l.id WHERE t.id IS NOT NULL OR scoped.id IS NOT NULL`},
-		{"statistics_access_fact", `SELECT f.* FROM statistics_access_fact f LEFT JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_resolve_log_ids r ON f.source_type = 'entry_resolve' AND BINARY f.source_ref = BINARY CAST(r.id AS CHAR) LEFT JOIN tmp_cleanup_intake_log_ids i ON f.source_type = 'entry_intake' AND BINARY f.source_ref = BINARY CAST(i.id AS CHAR) WHERE t.id IS NOT NULL OR r.id IS NOT NULL OR i.id IS NOT NULL`},
-		{"statistics_assessment_fact", `SELECT f.* FROM statistics_assessment_fact f LEFT JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = f.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = f.report_id WHERE t.id IS NOT NULL OR s.id IS NOT NULL OR a.id IS NOT NULL OR r.id IS NOT NULL`},
-		{"statistics_plan_fact", `SELECT f.* FROM statistics_plan_fact f LEFT JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_plan_enrollment_ids e ON e.id = f.enrollment_id LEFT JOIN tmp_cleanup_assessment_task_ids task ON task.id = f.task_id WHERE t.id IS NOT NULL OR e.id IS NOT NULL OR task.id IS NOT NULL`},
-		{"statistics_access_daily", `SELECT d.* FROM statistics_access_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date`},
-		{"statistics_assessment_daily", `SELECT d.* FROM statistics_assessment_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date`},
-		{"statistics_plan_activity_daily", `SELECT d.* FROM statistics_plan_activity_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date`},
-		{"statistics_plan_fulfillment_daily", `SELECT d.* FROM statistics_plan_fulfillment_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.cohort_date`},
+		{"interpretation_admission_failure", `SELECT f.* FROM interpretation_admission_failure f LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = f.outcome_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id WHERE o.id IS NOT NULL OR a.id IS NOT NULL`},
+		{"interpretation_attention_projection", `SELECT p.* FROM interpretation_attention_projection p LEFT JOIN tmp_cleanup_assessment_ids a ON BINARY p.assessment_id = BINARY CAST(a.id AS CHAR) LEFT JOIN tmp_cleanup_report_ids r ON BINARY p.report_id = BINARY CAST(r.id AS CHAR) WHERE a.id IS NOT NULL OR r.id IS NOT NULL`},
+		{"assessment_score", `SELECT s.* FROM assessment_score s LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = s.evaluation_outcome_id WHERE a.id IS NOT NULL OR o.id IS NOT NULL`},
+		{"statistics_assessment_fact", `SELECT f.* FROM statistics_assessment_fact f LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = f.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = f.outcome_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = f.report_id WHERE s.id IS NOT NULL OR a.id IS NOT NULL OR o.id IS NOT NULL OR r.id IS NOT NULL`},
+		{"statistics_assessment_daily", `SELECT d.* FROM statistics_assessment_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date WHERE d.origin_type = 'adhoc'`},
 		{"statistics_org_snapshot", `SELECT s.* FROM statistics_org_snapshot s WHERE EXISTS (SELECT 1 FROM tmp_cleanup_statistics_dates x WHERE x.org_id = s.org_id)`},
 		{"domain_event_outbox", `SELECT o.* FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
 		{"runtime_checkpoint", `SELECT r.* FROM runtime_checkpoint r JOIN tmp_cleanup_assessment_ids a ON a.id = r.assessment_id`},
@@ -1532,7 +1186,7 @@ func backupMongoRows(ctx context.Context, db *mongo.Database, ids scopeIDs, suff
 	for _, item := range items {
 		item := item
 		group.Go(func() error {
-			backupName := "cleanup_bak_perf_testee_" + item.coll + "_" + suffix
+			backupName := "cleanup_bak_temp_assessment_" + item.coll + "_" + suffix
 			count, err := backupMongoCollection(groupCtx, db.Collection(item.coll), db.Collection(backupName), item.filters, item.coll)
 			if err != nil {
 				return fmt.Errorf("backup mongo %s: %w", item.coll, err)
@@ -1608,50 +1262,28 @@ func backupMongoCollection(ctx context.Context, source, backup *mongo.Collection
 func mysqlDeleteItems(_ context.Context, _ *sql.Conn) ([]mysqlDeleteItem, error) {
 	items := []mysqlDeleteItem{
 		{"statistics_org_snapshot", `DELETE s FROM statistics_org_snapshot s WHERE EXISTS (SELECT 1 FROM tmp_cleanup_statistics_dates x WHERE x.org_id = s.org_id)`},
-		{"statistics_plan_fulfillment_daily", `DELETE d FROM statistics_plan_fulfillment_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.cohort_date`},
-		{"statistics_plan_activity_daily", `DELETE d FROM statistics_plan_activity_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date`},
-		{"statistics_assessment_daily", `DELETE d FROM statistics_assessment_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date`},
-		{"statistics_access_daily", `DELETE d FROM statistics_access_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date`},
-		{"statistics_plan_fact", `DELETE f FROM statistics_plan_fact f LEFT JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_plan_enrollment_ids e ON e.id = f.enrollment_id LEFT JOIN tmp_cleanup_assessment_task_ids task ON task.id = f.task_id WHERE t.id IS NOT NULL OR e.id IS NOT NULL OR task.id IS NOT NULL`},
-		{"statistics_assessment_fact", `DELETE f FROM statistics_assessment_fact f LEFT JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = f.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = f.report_id WHERE t.id IS NOT NULL OR s.id IS NOT NULL OR a.id IS NOT NULL OR r.id IS NOT NULL`},
-		{"statistics_access_fact", `DELETE f FROM statistics_access_fact f LEFT JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id LEFT JOIN tmp_cleanup_resolve_log_ids r ON f.source_type = 'entry_resolve' AND BINARY f.source_ref = BINARY CAST(r.id AS CHAR) LEFT JOIN tmp_cleanup_intake_log_ids i ON f.source_type = 'entry_intake' AND BINARY f.source_ref = BINARY CAST(i.id AS CHAR) WHERE t.id IS NOT NULL OR r.id IS NOT NULL OR i.id IS NOT NULL`},
+		{"statistics_assessment_daily", `DELETE d FROM statistics_assessment_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date WHERE d.origin_type = 'adhoc'`},
+		{"statistics_assessment_fact", `DELETE f FROM statistics_assessment_fact f LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = f.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = f.outcome_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = f.report_id WHERE s.id IS NOT NULL OR a.id IS NOT NULL OR o.id IS NOT NULL OR r.id IS NOT NULL`},
 		{"retry_event_hold", `DELETE h FROM retry_event_hold h JOIN tmp_cleanup_event_ids e ON BINARY e.event_id = BINARY h.event_id`},
 		{"runtime_checkpoint", `DELETE r FROM runtime_checkpoint r JOIN tmp_cleanup_assessment_ids a ON a.id = r.assessment_id`},
 		{"domain_event_outbox", `DELETE o FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
-		{"interpretation_attention_projection", `DELETE p FROM interpretation_attention_projection p JOIN tmp_cleanup_testee_ids t ON t.id = p.testee_id`},
-		{"interpretation_admission_failure", `DELETE f FROM interpretation_admission_failure f JOIN tmp_cleanup_testee_ids t ON t.id = f.testee_id`},
-		{"assessment_entry_resolve_log", `DELETE l FROM assessment_entry_resolve_log l JOIN tmp_cleanup_resolve_log_ids x ON x.id = l.id`},
-		{"assessment_entry_intake_log", `DELETE l FROM assessment_entry_intake_log l LEFT JOIN tmp_cleanup_testee_ids t ON t.id = l.testee_id LEFT JOIN tmp_cleanup_intake_log_ids scoped ON scoped.id = l.id WHERE t.id IS NOT NULL OR scoped.id IS NOT NULL`},
-		{"clinician_relation", `DELETE r FROM clinician_relation r LEFT JOIN tmp_cleanup_testee_ids t ON t.id = r.testee_id LEFT JOIN tmp_cleanup_relation_ids scoped ON scoped.id = r.id WHERE t.id IS NOT NULL OR scoped.id IS NOT NULL`},
-		{"assessment_task", `DELETE task FROM assessment_task task LEFT JOIN tmp_cleanup_testee_ids t ON t.id = task.testee_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = task.assessment_id LEFT JOIN tmp_cleanup_plan_enrollment_ids e ON e.id = task.enrollment_id WHERE t.id IS NOT NULL OR a.id IS NOT NULL OR e.id IS NOT NULL`},
-		{"plan_enrollment", `DELETE e FROM plan_enrollment e JOIN tmp_cleanup_plan_enrollment_ids x ON x.id = e.id`},
-		{"assessment_score", `DELETE s FROM assessment_score s LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id LEFT JOIN tmp_cleanup_testee_ids t ON t.id = s.testee_id WHERE a.id IS NOT NULL OR t.id IS NOT NULL`},
+		{"interpretation_attention_projection", `DELETE p FROM interpretation_attention_projection p LEFT JOIN tmp_cleanup_assessment_ids a ON BINARY p.assessment_id = BINARY CAST(a.id AS CHAR) LEFT JOIN tmp_cleanup_report_ids r ON BINARY p.report_id = BINARY CAST(r.id AS CHAR) WHERE a.id IS NOT NULL OR r.id IS NOT NULL`},
+		{"interpretation_admission_failure", `DELETE f FROM interpretation_admission_failure f LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = f.outcome_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id WHERE o.id IS NOT NULL OR a.id IS NOT NULL`},
+		{"assessment_score", `DELETE s FROM assessment_score s LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = s.evaluation_outcome_id WHERE a.id IS NOT NULL OR o.id IS NOT NULL`},
 		{"evaluation_outcome", `DELETE o FROM evaluation_outcome o JOIN tmp_cleanup_outcome_ids x ON x.id = o.id`},
 		{"assessment", `DELETE a FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id`},
-		{"testee", `DELETE t FROM testee t JOIN tmp_cleanup_testee_ids x ON x.id = t.id`},
 	}
 	return items, nil
 }
 
 func materializeScopedDeleteIDs(ctx context.Context, conn *sql.Conn) error {
-	taskSQL := `INSERT IGNORE INTO tmp_cleanup_assessment_task_ids (id)
-SELECT task.id
-FROM assessment_task task
-LEFT JOIN tmp_cleanup_testee_ids t ON t.id = task.testee_id
-LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = task.assessment_id
-LEFT JOIN tmp_cleanup_plan_enrollment_ids e ON e.id = task.enrollment_id
-WHERE t.id IS NOT NULL OR a.id IS NOT NULL OR e.id IS NOT NULL`
 	scoreSQL := `INSERT IGNORE INTO tmp_cleanup_assessment_score_ids (id)
 SELECT s.id
 FROM assessment_score s
 LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id
-LEFT JOIN tmp_cleanup_testee_ids t ON t.id = s.testee_id
-WHERE a.id IS NOT NULL OR t.id IS NOT NULL`
+LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = s.evaluation_outcome_id
+WHERE a.id IS NOT NULL OR o.id IS NOT NULL`
 	items := []namedSQL{
-		{
-			name: "assessment_task ids",
-			sql:  taskSQL,
-		},
 		{
 			name: "assessment_score ids",
 			sql:  scoreSQL,
@@ -1675,7 +1307,7 @@ WHERE a.id IS NOT NULL OR t.id IS NOT NULL`
 	return nil
 }
 
-func deleteMySQLRows(ctx context.Context, conn *sql.Conn, cfg config, lockWaitTimeoutSec, maxRetries, batchSize int) ([]namedCount, error) {
+func deleteMySQLRows(ctx context.Context, conn *sql.Conn, lockWaitTimeoutSec, maxRetries, batchSize int) ([]namedCount, error) {
 	if lockWaitTimeoutSec > 0 {
 		if _, err := conn.ExecContext(ctx, "SET SESSION innodb_lock_wait_timeout = ?", lockWaitTimeoutSec); err != nil {
 			return nil, fmt.Errorf("set innodb_lock_wait_timeout: %w", err)
@@ -1724,57 +1356,6 @@ LIMIT ?`,
 			deleteBatch: `DELETE o
 FROM domain_event_outbox o
 JOIN tmp_cleanup_batch_ids b ON b.id = o.id`,
-		}, true
-	case "assessment_entry_intake_log":
-		return mysqlChunkedDeleteSpec{
-			name:             name,
-			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
-			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_ids`,
-			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_ids (id)
-SELECT l.id
-FROM assessment_entry_intake_log l
-LEFT JOIN tmp_cleanup_testee_ids t ON t.id = l.testee_id
-LEFT JOIN tmp_cleanup_intake_log_ids scoped ON scoped.id = l.id
-WHERE t.id IS NOT NULL OR scoped.id IS NOT NULL
-ORDER BY l.id
-LIMIT ?`,
-			deleteBatch: `DELETE l
-FROM assessment_entry_intake_log l
-JOIN tmp_cleanup_batch_ids b ON b.id = l.id`,
-		}, true
-	case "clinician_relation":
-		return mysqlChunkedDeleteSpec{
-			name:             name,
-			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
-			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_ids`,
-			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_ids (id)
-SELECT r.id
-FROM clinician_relation r
-LEFT JOIN tmp_cleanup_testee_ids t ON t.id = r.testee_id
-LEFT JOIN tmp_cleanup_relation_ids scoped ON scoped.id = r.id
-WHERE t.id IS NOT NULL OR scoped.id IS NOT NULL
-ORDER BY r.id
-LIMIT ?`,
-			deleteBatch: `DELETE r
-FROM clinician_relation r
-JOIN tmp_cleanup_batch_ids b ON b.id = r.id`,
-		}, true
-	case "assessment_task":
-		return mysqlChunkedDeleteSpec{
-			name:             name,
-			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
-			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_ids`,
-			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_ids (id)
-SELECT s.id
-FROM tmp_cleanup_assessment_task_ids s
-ORDER BY s.id
-LIMIT ?`,
-			deleteBatch: `DELETE task
-FROM assessment_task task
-JOIN tmp_cleanup_batch_ids b ON b.id = task.id`,
-			pruneStagingTable: `DELETE s
-FROM tmp_cleanup_assessment_task_ids s
-JOIN tmp_cleanup_batch_ids b ON b.id = s.id`,
 		}, true
 	case "assessment_score":
 		return mysqlChunkedDeleteSpec{
@@ -2042,10 +1623,7 @@ func countMongoDocumentsByFilters(ctx context.Context, coll *mongo.Collection, f
 }
 
 func answersheetFilters(ids scopeIDs) []bson.M {
-	return append(
-		inUint64Filters("testee_id", ids.TesteeIDs),
-		inUint64Filters("domain_id", ids.AnswerSheetIDs)...,
-	)
+	return inUint64Filters("domain_id", ids.AnswerSheetIDs)
 }
 
 func reportGenerationFilters(ids scopeIDs) []bson.M {
@@ -2079,17 +1657,12 @@ func mongoOutboxFilters(ids scopeIDs) []bson.M {
 	answerStrings := uint64Strings(ids.AnswerSheetIDs)
 	assessmentStrings := uint64Strings(ids.AssessmentIDs)
 	reportStrings := uint64Strings(ids.ReportIDs)
+	generationStrings := uint64Strings(ids.GenerationIDs)
 	filters := inStringWithAggregateFilters("AnswerSheet", answerStrings)
 	filters = append(filters, inStringWithAggregateFilters("Assessment", assessmentStrings)...)
 	filters = append(filters, inStringWithAggregateFilters("Report", reportStrings)...)
+	filters = append(filters, inStringWithAggregateFilters("ReportGeneration", generationStrings)...)
 	return filters
-}
-
-func inUint64(field string, values []uint64) bson.M {
-	if len(values) == 0 {
-		return nil
-	}
-	return bson.M{field: bson.M{"$in": values}}
 }
 
 func inUint64Filters(field string, values []uint64) []bson.M {
@@ -2229,8 +1802,7 @@ func validateBackupSuffix(suffix string) error {
 	if !ok {
 		return fmt.Errorf("suffix %q must contain only letters, digits, and underscore", suffix)
 	}
-	items := append(mysqlBackupItems(), iamBackupItems()...)
-	for _, item := range items {
+	for _, item := range mysqlBackupItems() {
 		if _, err := mysqlBackupTableName(item.table, suffix); err != nil {
 			return err
 		}
@@ -2253,9 +1825,8 @@ func mysqlBackupTableName(sourceTable, suffix string) (string, error) {
 }
 
 func printScopeSummary(summary scopeSummary, cfg config) {
-	log.Printf("scope: apply=%v backup=%v testee_created_after=%q allow_old_testees=%v",
-		cfg.apply, !cfg.skipBackup, cfg.testeeCreatedAfter, cfg.allowOldTestees)
-	log.Printf("scope ids: testees=%d assessments=%d answersheets=%d reports=%d event_ids=%d org_ids=%v",
+	log.Printf("scope: temporary_assessments_only=true apply=%v backup=%v", cfg.apply, !cfg.skipBackup)
+	log.Printf("scope ids: input_testees=%d temporary_assessments=%d answersheets=%d reports=%d event_ids=%d org_ids=%v",
 		summary.Testees, summary.Assessments, summary.AnswerSheets, summary.Reports, summary.EventIDs, summary.OrgIDs)
 	if summary.MinTouchedDate.Valid || summary.MaxTouchedDate.Valid {
 		log.Printf("affected source date window: min=%s max=%s", nullableString(summary.MinTouchedDate), nullableString(summary.MaxTouchedDate))
@@ -2263,9 +1834,8 @@ func printScopeSummary(summary scopeSummary, cfg config) {
 }
 
 func printScopeIDsSummary(ids scopeIDs, cfg config) {
-	log.Printf("scope: apply=%v backup=%v mongo_only=%v testee_created_after=%q allow_old_testees=%v skip_counts=true",
-		cfg.apply, !cfg.skipBackup, cfg.mongoOnly, cfg.testeeCreatedAfter, cfg.allowOldTestees)
-	log.Printf("scope ids: testees=%d assessments=%d answersheets=%d outcomes=%d reports=%d generations=%d report_runs=%d",
+	log.Printf("scope: temporary_assessments_only=true apply=%v backup=%v skip_counts=true", cfg.apply, !cfg.skipBackup)
+	log.Printf("scope ids: input_testees=%d temporary_assessments=%d answersheets=%d outcomes=%d reports=%d generations=%d report_runs=%d",
 		len(ids.TesteeIDs), len(ids.AssessmentIDs), len(ids.AnswerSheetIDs), len(ids.OutcomeIDs), len(ids.ReportIDs), len(ids.GenerationIDs), len(ids.ReportRunIDs))
 }
 
@@ -2281,8 +1851,8 @@ func printTesteePreview(rows []testeePreview) {
 		if row.CreatedAt.Valid {
 			createdAt = row.CreatedAt.Time.Format("2006-01-02 15:04:05")
 		}
-		log.Printf("preview testee id=%d org=%d name=%s created_at=%s assessment_cnt=%d",
-			row.ID, row.OrgID, row.Name, createdAt, row.AssessmentCnt)
+		log.Printf("preview testee id=%d org=%d name=%s created_at=%s temporary_assessment_cnt=%d",
+			row.ID, row.OrgID, row.Name, createdAt, row.TempAssessmentCnt)
 	}
 }
 

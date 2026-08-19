@@ -26,6 +26,97 @@ func TestCleanupPreservesStatisticsRunAuditLedger(t *testing.T) {
 	}
 }
 
+func TestTemporaryAssessmentScopeUsesAuthoritativeOriginType(t *testing.T) {
+	statements := mysqlScopePopulateStatements()
+	if len(statements) == 0 {
+		t.Fatal("mysql scope statements are empty")
+	}
+	first := statements[0]
+	if first.name != "temporary assessment ids" {
+		t.Fatalf("first scope statement = %q, want temporary assessment ids", first.name)
+	}
+	if !strings.Contains(first.sql, "a.origin_type = 'adhoc'") {
+		t.Fatalf("temporary assessment scope must use assessment.origin_type='adhoc'; sql=%s", first.sql)
+	}
+	for _, statement := range statements[1:] {
+		if strings.Contains(statement.sql, "tmp_cleanup_testee_ids") {
+			t.Fatalf("derived scope %q must expand only from temporary assessment ids, not all testee data; sql=%s", statement.name, statement.sql)
+		}
+		if strings.Contains(statement.sql, "SELECT id FROM tmp_cleanup_assessment_ids") {
+			t.Fatalf("report ids are independent from assessment ids and must be discovered by references; sql=%s", statement.sql)
+		}
+	}
+}
+
+func TestTemporaryAssessmentCleanupPreservesTesteePlanAccessAndIAMData(t *testing.T) {
+	forbidden := map[string]struct{}{
+		"testee": {}, "assessment_task": {}, "plan_enrollment": {}, "clinician_relation": {},
+		"assessment_entry_resolve_log": {}, "assessment_entry_intake_log": {},
+		"statistics_access_fact": {}, "statistics_access_daily": {}, "statistics_plan_fact": {},
+		"statistics_plan_activity_daily": {}, "statistics_plan_fulfillment_daily": {},
+		"profile_links": {}, "profiles": {},
+	}
+	assertAbsent := func(kind string, names []string) {
+		t.Helper()
+		for _, name := range names {
+			if _, exists := forbidden[name]; exists {
+				t.Fatalf("%s unexpectedly includes preserved table %s", kind, name)
+			}
+		}
+	}
+
+	countNames := make([]string, 0, len(mysqlCountItems()))
+	for _, item := range mysqlCountItems() {
+		countNames = append(countNames, item.name)
+	}
+	assertAbsent("count", countNames)
+
+	backupNames := make([]string, 0, len(mysqlBackupItems()))
+	for _, item := range mysqlBackupItems() {
+		backupNames = append(backupNames, item.table)
+	}
+	assertAbsent("backup", backupNames)
+
+	deleteItems, err := mysqlDeleteItems(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deleteNames := make([]string, 0, len(deleteItems))
+	for _, item := range deleteItems {
+		deleteNames = append(deleteNames, item.name)
+		if strings.Contains(item.stmt, "tmp_cleanup_testee_ids") {
+			t.Fatalf("delete %s must not scope by all rows of a testee; sql=%s", item.name, item.stmt)
+		}
+	}
+	assertAbsent("delete", deleteNames)
+}
+
+func TestTemporaryAssessmentScopeRejectsPlanTaskLinks(t *testing.T) {
+	if err := validateTemporaryAssessmentScopeCounts(0, 0); err != nil {
+		t.Fatalf("zero plan-task links should be valid: %v", err)
+	}
+	if err := validateTemporaryAssessmentScopeCounts(1, 0); err == nil || !strings.Contains(err.Error(), "scope changed") {
+		t.Fatalf("invalid origin error = %v, want scope-changed error", err)
+	}
+	err := validateTemporaryAssessmentScopeCounts(0, 1)
+	if err == nil || !strings.Contains(err.Error(), "preserve plan data") {
+		t.Fatalf("linked plan task error = %v, want fail-closed preservation error", err)
+	}
+}
+
+func TestMongoAnswerSheetScopeUsesOnlyScopedAnswerSheetIDs(t *testing.T) {
+	filters := answersheetFilters(scopeIDs{TesteeIDs: []uint64{7}, AnswerSheetIDs: []uint64{11}})
+	if len(filters) != 1 {
+		t.Fatalf("answersheet filter count = %d, want 1", len(filters))
+	}
+	if _, exists := filters[0]["testee_id"]; exists {
+		t.Fatalf("answersheet filters must not select every answer sheet for a testee: %#v", filters[0])
+	}
+	if _, exists := filters[0]["domain_id"]; !exists {
+		t.Fatalf("answersheet filters must use scoped domain ids: %#v", filters[0])
+	}
+}
+
 func TestCleanupCoversMigratedInterpretationLedgersButPreservesGlobalCheckpoint(t *testing.T) {
 	want := map[string]bool{
 		"interpretation_admission_failure":    false,
@@ -79,7 +170,7 @@ func TestValidateBackupSuffixChecksGeneratedMySQLIdentifiers(t *testing.T) {
 	if err := validateBackupSuffix(strings.Repeat("x", mysqlIdentifierMaxLength)); err == nil || !strings.Contains(err.Error(), "exceeds MySQL identifier limit") {
 		t.Fatalf("oversized backup suffix error = %v, want MySQL identifier limit error", err)
 	}
-	for _, item := range append(mysqlBackupItems(), iamBackupItems()...) {
+	for _, item := range mysqlBackupItems() {
 		name, err := mysqlBackupTableName(item.table, "seeddata_dup_20260812_v1")
 		if err != nil {
 			t.Fatalf("backup table name for %s: %v", item.table, err)
@@ -105,22 +196,22 @@ func TestBackupMySQLTableOmitsGeneratedColumnsFromInsert(t *testing.T) {
 	defer func() { _ = conn.Close() }()
 
 	item := mysqlBackupItem{
-		table:     "plan_enrollment",
-		selectSQL: `SELECT e.* FROM plan_enrollment e`,
+		table:     "assessment",
+		selectSQL: `SELECT a.* FROM assessment a`,
 	}
-	backupTable := "cbpt_plan_enrollment_s812v3"
-	mock.ExpectExec(regexp.QuoteMeta("CREATE TABLE IF NOT EXISTS `cbpt_plan_enrollment_s812v3` LIKE `plan_enrollment`")).
+	backupTable := "cbpt_assessment_s812v3"
+	mock.ExpectExec(regexp.QuoteMeta("CREATE TABLE IF NOT EXISTS `cbpt_assessment_s812v3` LIKE `assessment`")).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectQuery(regexp.QuoteMeta(mysqlBackupColumnsQuery)).
-		WithArgs("plan_enrollment").
+		WithArgs("assessment").
 		WillReturnRows(sqlmock.NewRows([]string{"column_name", "generation_expression"}).
 			AddRow("id", "").
 			AddRow("status", "").
 			AddRow("active_slot", "case when (`status` = _utf8mb4'active') then 1 else NULL end"))
 	mock.ExpectExec(regexp.QuoteMeta(
-		"INSERT IGNORE INTO `cbpt_plan_enrollment_s812v3` (`id`, `status`) " +
+		"INSERT IGNORE INTO `cbpt_assessment_s812v3` (`id`, `status`) " +
 			"SELECT `backup_source`.`id`, `backup_source`.`status` " +
-			"FROM (SELECT e.* FROM plan_enrollment e) AS `backup_source`",
+			"FROM (SELECT a.* FROM assessment a) AS `backup_source`",
 	)).WillReturnResult(sqlmock.NewResult(0, 1))
 
 	if err := backupMySQLTable(ctx, conn, item, backupTable); err != nil {
@@ -132,7 +223,7 @@ func TestBackupMySQLTableOmitsGeneratedColumnsFromInsert(t *testing.T) {
 }
 
 func TestMySQLBackupInsertSQLRejectsUnsafeColumnName(t *testing.T) {
-	_, err := mysqlBackupInsertSQL("cbpt_testee_s812v3", "SELECT t.* FROM testee t", []string{"id`, active_slot"})
+	_, err := mysqlBackupInsertSQL("cbpt_assessment_s812v3", "SELECT a.* FROM assessment a", []string{"id`, active_slot"})
 	if err == nil || !strings.Contains(err.Error(), "unsafe MySQL identifier") {
 		t.Fatalf("error = %v, want unsafe identifier error", err)
 	}
@@ -175,14 +266,19 @@ func TestMongoOutboxFiltersAreChunked(t *testing.T) {
 		AnswerSheetIDs: makeUint64Range(1, mongoIDChunkSize+1),
 		AssessmentIDs:  makeUint64Range(10_000, mongoIDChunkSize+1),
 		ReportIDs:      makeUint64Range(20_000, 2),
+		GenerationIDs:  []uint64{25_000},
 		TesteeIDs:      []uint64{30_000},
 	}
 
 	filters := mongoOutboxFilters(ids)
-	if len(filters) < 5 {
+	if len(filters) < 6 {
 		t.Fatalf("filter count = %d, want chunked filters", len(filters))
 	}
+	foundGeneration := false
 	for _, filter := range filters {
+		if filter["aggregate_type"] == "ReportGeneration" {
+			foundGeneration = true
+		}
 		idsFilter, ok := filter["aggregate_id"].(bson.M)
 		if !ok {
 			t.Fatalf("aggregate_id filter = %#v, want bson.M", filter["aggregate_id"])
@@ -194,6 +290,9 @@ func TestMongoOutboxFiltersAreChunked(t *testing.T) {
 		if len(values) > mongoIDChunkSize {
 			t.Fatalf("chunk size = %d, want <= %d", len(values), mongoIDChunkSize)
 		}
+	}
+	if !foundGeneration {
+		t.Fatal("mongo outbox scope must include ReportGeneration aggregate ids")
 	}
 }
 
@@ -234,37 +333,6 @@ func TestMySQLOutboxScopeNeverUsesPerTesteePayloadRegexpJoin(t *testing.T) {
 	}
 }
 
-func TestPayloadContainsTesteeID(t *testing.T) {
-	targets := map[uint64]struct{}{631727129519731246: {}}
-	tests := []struct {
-		name    string
-		payload string
-		want    bool
-	}{
-		{name: "numeric nested", payload: `{"data":{"testee_id":631727129519731246}}`, want: true},
-		{name: "string nested in array", payload: `{"items":[{"testee_id":"631727129519731246"}]}`, want: true},
-		{name: "other testee", payload: `{"testee_id":631727129519731247}`},
-		{name: "similar key", payload: `{"canonical_testee_id":631727129519731246}`},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := payloadContainsTesteeID([]byte(tt.payload), targets)
-			if err != nil {
-				t.Fatalf("payloadContainsTesteeID() error = %v", err)
-			}
-			if got != tt.want {
-				t.Fatalf("payloadContainsTesteeID() = %t, want %t", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestPayloadContainsTesteeIDFailsClosedOnInvalidJSON(t *testing.T) {
-	if _, err := payloadContainsTesteeID([]byte(`{"testee_id":`), map[uint64]struct{}{1: {}}); err == nil {
-		t.Fatal("payloadContainsTesteeID() error = nil, want invalid JSON error")
-	}
-}
-
 func TestIsMySQLLockError(t *testing.T) {
 	tests := []struct {
 		name string
@@ -287,9 +355,6 @@ func TestIsMySQLLockError(t *testing.T) {
 func TestMySQLChunkedDeleteSpecForLargeDeleteTables(t *testing.T) {
 	for _, name := range []string{
 		"domain_event_outbox",
-		"assessment_entry_intake_log",
-		"clinician_relation",
-		"assessment_task",
 		"assessment_score",
 		"assessment",
 	} {
@@ -314,13 +379,15 @@ func TestMySQLChunkedDeleteSpecForLargeDeleteTables(t *testing.T) {
 		})
 	}
 
-	if _, ok := mysqlChunkedDeleteSpecFor("testee"); ok {
-		t.Fatal("testee should keep the ordinary delete path")
+	for _, preserved := range []string{"testee", "assessment_task", "clinician_relation"} {
+		if _, ok := mysqlChunkedDeleteSpecFor(preserved); ok {
+			t.Fatalf("preserved table %s must not have a cleanup delete path", preserved)
+		}
 	}
 }
 
 func TestMySQLChunkedDeleteUsesStagingTablesForMultiSourceTables(t *testing.T) {
-	for _, name := range []string{"assessment_task", "assessment_score"} {
+	for _, name := range []string{"assessment_score"} {
 		t.Run(name, func(t *testing.T) {
 			spec, ok := mysqlChunkedDeleteSpecFor(name)
 			if !ok {
@@ -381,7 +448,6 @@ func TestScopeTouchedDateSQLDoesNotReopenTemporaryTables(t *testing.T) {
 	for _, table := range []string{
 		"tmp_cleanup_assessment_ids",
 		"tmp_cleanup_statistics_dates",
-		"tmp_cleanup_testee_ids",
 	} {
 		if got := strings.Count(scopeTouchedDateSQL, table); got != 1 {
 			t.Fatalf("scope touched-date SQL references %s %d times, want exactly once; MySQL cannot reopen a temporary table in one statement", table, got)
