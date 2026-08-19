@@ -30,6 +30,7 @@ PERF_RUNNER_SOURCE = ROOT / "scripts/perf/perfctl/runner.go"
 PERF_CONFIG = ROOT / "scripts/perf/qs-perf.config.example.json"
 PERF_README = ROOT / "scripts/perf/README.md"
 PERF_SOP = DOCS / "04-接口与运维/11-300QPS混合场景压测SOP.md"
+BRIEFING_DOC = DOCS / "06-宣讲/01-系统技术简报.md"
 RUNTIME_SCHEDULER_DOC = DOCS / "01-运行时/06-后台任务与调度.md"
 OPS_SCHEDULER_DOC = DOCS / "04-接口与运维/07-调度任务.md"
 MONGO_AUDIT_SOURCE = ROOT / "internal/apiserver/application/mongoconsistency/audit.go"
@@ -124,6 +125,7 @@ REQUIRED_CONTRACTS = {
     PERF_CONFIG,
     PERF_README,
     PERF_SOP,
+    BRIEFING_DOC,
     MONGO_AUDIT_SOURCE,
     MONGO_AUDIT_METRICS_SOURCE,
     APISERVER_OPTIONS_SOURCE,
@@ -461,6 +463,13 @@ def line_for_offset(text: str, offset: int) -> int:
     return text.count("\n", 0, offset) + 1
 
 
+def briefing_case_sections(text: str) -> list[str]:
+    return re.findall(
+        r"(?ms)^## \d+\. 案例卡[一二三四五]：.*?(?=^## \d+\.|\Z)",
+        text,
+    )
+
+
 def main() -> int:
     issues: list[Issue] = []
 
@@ -581,6 +590,47 @@ def main() -> int:
                         f"{path.relative_to(ROOT)}: {snippet}",
                     )
                 )
+
+    # The briefing layer is intentionally derived, but its decision cards must
+    # remain traceable and honest. Freeze the three reading routes, five-card
+    # inventory, field order and explicit personal-evidence placeholders.
+    if BRIEFING_DOC.exists():
+        briefing_text = BRIEFING_DOC.read_text(encoding="utf-8")
+        for duration in ("3 分钟", "10 分钟", "30 分钟"):
+            if f"| {duration} |" not in briefing_text:
+                issues.append(Issue("briefing-reading-route-drift", duration))
+        cases = briefing_case_sections(briefing_text)
+        if len(cases) != 5:
+            issues.append(Issue("briefing-case-count-drift", f"expected 5, got {len(cases)}"))
+        required_fields = (
+            "问题",
+            "约束",
+            "备选方案",
+            "决策",
+            "代码链",
+            "失败窗口",
+            "验证",
+            "仍存边界",
+        )
+        for index, case in enumerate(cases, start=1):
+            offsets = [case.find(f"### {field}") for field in required_fields]
+            if any(offset < 0 for offset in offsets) or offsets != sorted(offsets):
+                issues.append(
+                    Issue(
+                        "briefing-case-schema-drift",
+                        f"case {index}: required order={' -> '.join(required_fields)}",
+                    )
+                )
+            if case.count("### 本人补充区（必须本人填写）") != 1:
+                issues.append(Issue("briefing-personal-evidence-drift", f"case {index}: supplement block"))
+            for field in ("个人角色", "实际贡献", "协作冲突/分歧", "个人量化结果"):
+                if f"| {field} | `[待本人补充" not in case:
+                    issues.append(
+                        Issue(
+                            "briefing-personal-evidence-drift",
+                            f"case {index}: {field}",
+                        )
+                    )
 
     # Scheduler inventory is derived from the composition root, then checked
     # against both versioned configs and the runtime/operations inventories.
