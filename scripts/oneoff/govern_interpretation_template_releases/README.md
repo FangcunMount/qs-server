@@ -5,7 +5,7 @@
 目标集合固定为 `interpretation_report_templates`。工具只会：
 
 1. 为既有 `standard`、`mbti`、`sbti`、`bigfive` release 增加 `report_type`、完整 manifest 和 SHA-256；
-2. 补建代码中已注册但生产缺失的 `enneagram@legacy-v1` release；
+2. 当目标环境缺失时，补建代码中已注册的 `enneagram@legacy-v1` release；
 3. 为新版本补建 `standard`、`mbti`、`sbti`、`bigfive`、`enneagram` 五个独立 release；
 4. 保留现有 release 的 ID、生命周期时间、发布人和旧身份字段；
 5. 不修改任何 Generation、Artifact、Outcome 或 ModelCatalog snapshot。

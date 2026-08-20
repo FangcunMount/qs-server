@@ -17,10 +17,10 @@
 go run ./scripts/oneoff/select_seeddata_duplicate_testees \
   --mysql-dsn "$QS_MYSQL_DSN" \
   --iam-schema iam \
-  --clinician-id 614995509882401326 \
-  --created-from 2026-08-05 \
-  --created-through 2026-08-12 \
-  --output-dir /secure/path/seeddata-duplicates-20260812 \
+  --clinician-id "$QS_CLINICIAN_ID" \
+  --created-from "$QS_CREATED_FROM" \
+  --created-through "$QS_CREATED_THROUGH" \
+  --output-dir "$QS_AUDIT_OUTPUT_DIR" \
   --workers 2 \
   --progress-interval 5s \
   --timeout 30m
@@ -56,9 +56,12 @@ go run ./scripts/oneoff/cleanup_perf_testee_data \
   --mysql-dsn "$QS_MYSQL_DSN" \
   --mongo-uri "$QS_MONGO_URI" \
   --mongo-db qs \
-  --testee-ids-file /secure/path/seeddata-duplicates-20260812/testee_ids.txt \
-  --backup-suffix seeddata_dup_20260812
+  --testee-ids-file "$QS_AUDIT_OUTPUT_DIR/testee_ids.txt" \
+  --backup-suffix "$QS_BACKUP_SUFFIX"
 ```
+
+机构业务 ID、日期窗口、输出目录与备份后缀都是本次变更输入，必须进入审批与
+evidence，不在 sidecar 中预置某次生产参数。
 
 核对临时 Assessment、Mongo 和统计范围后，使用完全相同的参数追加 `--apply`。删除后按工具
 输出的日期窗口运行 `rebuild_statistics` repair/validate/publish。若需要删除重复 Testee/Profile，

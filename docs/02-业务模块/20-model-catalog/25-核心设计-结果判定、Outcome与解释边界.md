@@ -680,41 +680,35 @@ level_label = 中度风险或相应显示结论
 
 | Kind | 当前 DecisionKind 规则 |
 | --- | --- |
-| scale | `score_range` |
-| behavioral_rating | 有 NormRef/NormConclusion 时为 `norm_lookup`，否则 `score_range`；常模模型要求主 NormConclusion |
-| cognitive | `ability_level` |
+| scale | 必须有显式 RiskConclusion，然后为 `score_range` |
+| behavioral_rating | 必须有 NormRef、NormConclusion 且恰好一个 Primary NormConclusion，固定为 `norm_lookup`；不再 fallback 到 `score_range` |
+| cognitive | 必须有显式 AbilityConclusion，然后为 `ability_level` |
 | typology | 必须从 TypeConclusion 显式取得分类 DecisionKind |
 
 发布处理器把推导结果保存到 `AssessmentSnapshot.DecisionKind`。这是正确方向：DecisionKind 属于已发布执行契约，而不是某次请求临时猜测。
 
-### 10.2 当前运行时尚未完全以快照为准
+### 10.2 当前运行时已以 DecisionKind 为 canonical 路由
 
-当前 Evaluation 的 `ModelRouteFromInput` 主要从输入 payload 中提取显式人格 DecisionKind；其他模型经常只携带模型 identity，再由路由层按 Kind/Algorithm 推导默认执行家族与 DecisionKind。
+当前 Evaluation 的 `ModelRouteFromInput` 只从 `InputSnapshot.Model.DecisionKind` 构造路由；`ModelRoute`、`DescriptorKey` 和 Outcome `RuntimeIdentity` 都只包含 DecisionKind。AlgorithmFamily 由 DecisionKind 在 descriptor 注册/解析边界派生并校验，不是 InputSnapshot 传入的第二路由键。
 
-结果是：
-
-- 快照中虽然已有 DecisionKind，运行时并未对所有模型统一消费；
-- identity 推导与发布时推导存在形成两套真相的风险；
-- 不兼容的运行时 DecisionKind 可能被 family 默认值覆盖；
-- 新模型扩展可能发布成功，却因运行时重推导走到另一条路径。
-
-目标设计应是：
+当前设计是：
 
 ```text
 发布阶段
   ModelIdentity + Definition
     -> 校验兼容矩阵
-    -> 冻结 AlgorithmFamily
+    -> 解析并校验 AlgorithmFamily
     -> 冻结 Algorithm
     -> 冻结 DecisionKind
     -> 冻结 ExecutionSpec
 
 运行阶段
-  只读取 snapshot 中的确定执行身份
-  不再次根据 Kind 猜测
+  只读取 snapshot 中的 DecisionKind
+  从 DecisionKind 派生 AlgorithmFamily 并选择 descriptor
+  不再次根据 Kind / Algorithm 猜测 DecisionKind
 ```
 
-兼容推导只能用于读取旧 snapshot，不应继续成为新发布模型的运行真相。
+历史 Outcome/Interpretation 读取仅在 Kind + Algorithm 能唯一恢复缺失 DecisionKind 时使用 `ResolveLegacyRuntime`；该兼容入口不得用于新发布、Worker 重试或 descriptor dispatch。
 
 ---
 
@@ -741,8 +735,8 @@ level_label = 中度风险或相应显示结论
 
 - Outcome ID；
 - org、Assessment、testee、EvaluationRun 身份；
-- 精确模型 Kind/SubKind/Algorithm/code/version；
-- `AlgorithmFamily`、`DecisionKind`；
+- 精确模型 Kind/Algorithm/code/version/title；`model_sub_kind` 仅保留用于读取历史行，新写入不再填充；
+- canonical `DecisionKind`；AlgorithmFamily 可按该值在进程内派生，但不在新 Outcome 中独立持久化；
 - 输入快照引用；
 - `ReportInput`；
 - 版本化 Outcome payload；
@@ -1316,11 +1310,9 @@ Manual action required?
 
 目标：明确 primary ability dimension 或 overall Decision，并完整投影。
 
-### 21.5 发布 DecisionKind 没有完全进入运行时
+### 21.5 发布 DecisionKind 已进入 canonical 运行时
 
-风险：发布验证与实际执行使用不同推导逻辑。
-
-目标：快照冻结并直接提供 AlgorithmFamily + DecisionKind；运行时不重推导。
+当前结论：已收口。快照、InputSnapshot、ModelRoute、DescriptorKey 和 Outcome 直接传递 DecisionKind；AlgorithmFamily 只从它在进程内派生。后续风险是映射规则的集中治理与演进兼容，而不是增加第二个 snapshot 路由字段。
 
 ### 21.6 解释资产仍混在 Conclusion/Profile 中
 
@@ -1430,9 +1422,9 @@ InterpretReport
 
 ### P1：统一发布与运行契约
 
-1. 在 snapshot 中冻结 AlgorithmFamily；
-2. 让运行时直接消费 snapshot DecisionKind；
-3. 为旧 snapshot 保留明确兼容推导；
+1. 保持 snapshot → InputSnapshot → ModelRoute → Outcome 的 DecisionKind-only ratchet；
+2. 把 DecisionKind → AlgorithmFamily 映射和 descriptor manifest 收敛为可验证契约；
+3. 将历史 DecisionKind 恢复限定在显式只读适配器，非唯一或冲突必须 fail closed；
 4. 在 Definition 内拆出清晰 `DecisionSpec` 和 `InterpretationAssets`；
 5. 逐步退出 Conclusion-local Outcomes 和多字段 code fallback。
 
@@ -1518,8 +1510,8 @@ InterpretReport
 | scale 默认风险 fallback 退出 | **待治理** | 当前仍存在硬编码兼容逻辑 |
 | norm/ability 统一使用 OutcomeCode | **待治理** | 当前主要读取 Level |
 | cognitive 主 Outcome | **待治理** | 当前主要停留在维度 level |
-| snapshot DecisionKind 运行时直读 | **待治理** | 非 typology 路径仍可能重推导 |
-| snapshot AlgorithmFamily 冻结 | **待治理** | 当前尚未保存 |
+| snapshot DecisionKind 运行时直读 | 已实现 | 所有 canonical 路径只从 InputSnapshot 读取 DecisionKind |
+| AlgorithmFamily 路由收口 | 已实现 | 由 DecisionKind 派生并在 descriptor 注册时校验，不作为 snapshot 独立字段 |
 | 专用 InterpretationAssets schema | 未实现 | 当前保存完整 ModelPayload |
 | ReportMap 完整发布校验 | **待治理** | 当前主要校验 section code |
 | 通用解释 fallback 治理 | **待治理** | 当前 scale 可生成默认文案 |

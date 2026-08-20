@@ -51,7 +51,9 @@ actor -------- plan -------- statistics ------+
 
 ## 5. 重建状态
 
-2026-07-18 曾把 181 篇、约 4.7 万行的旧现行树收缩为一个更小的维护集合；该迁移清单现已归档。当前完成口径与证据进度统一见[项目完成画像与验收标准](./00-总览/08-项目完成画像与验收标准.md)和[当前版本定档验收台账](./00-总览/09-当前版本定档验收台账.md)。
+2026-07-18 曾把 181 篇、约 4.7 万行的旧现行树收缩为一个更小的维护集合；该迁移清单现已归档。当前完成口径见[项目完成画像与验收标准](./00-总览/08-项目完成画像与验收标准.md)，版本级结论见[当前版本定档验收台账](./00-总览/09-当前版本定档验收台账.md)，基础设施历史运行记录见[基础设施生产证据台账](./00-总览/10-基础设施生产证据台账.md)。逐文档状态、源码基线、七模块七轴与十项基础设施七轴签署见 [`document-closure.json`](./document-closure.json)，基础设施机器证据见 [`infrastructure-production-evidence.json`](./infrastructure-production-evidence.json)。
+
+`document-closure.json` exact-cover 164 篇 primary 文档和 27 篇 maintained sidecar；active 数量超过 150 的评审目标但仍低于 165 硬上限，具名预算例外由 `budgets.exceptions` 管理。它把文档对齐状态、代码实现状态和 E0-E7 证据等级分开记录；`needs_review`、`conditional`、`blocked` 或 `unsigned` 不能由门禁通过或历史生产记录自动升级，必须沿真实责任链复核。
 
 ## 6. 提交前验证
 

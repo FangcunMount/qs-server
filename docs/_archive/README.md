@@ -13,9 +13,13 @@
 
 当前归档批次：
 
+- `2026-08-20-infrastructure-evidence-separation/`：从 maintained sidecar 移出的主机/副本、固定机构与日期、历史执行数量等易失运行参数；稳定工具契约留在原 sidecar，当前结果进入基础设施生产证据台账。
+- `2026-08-20-doc-system-convergence/`：目标模式收口时退出 active 层的已实施重构分析、已关闭风险记录和迁移期完成定义；当前事实已迁入各自 canonical 文档。
 - `2026-08-06-interpretation-history-governance/`：已签署的 Interpretation 历史 Presentation、Template、ModelCatalog 与 Outcome 路由治理专项台账。
+- `2026-08-05-target-mode-bootstrap/`：目标模式建立阶段的迁移清单、专题画像和引导材料；阶段职责已经完成。
 - `2026-07-18-pre-truth-layer-rebuild/`：本轮退出 truth layer 的集中快照；包含被替换的旧总览、运行时、业务支撑模块、基础设施浅模板、接口说明、专题分析、宣讲和系统设计稿。继续留在现行层的核心模块、cache/event 与执行指南不在此重复保存。
-
+- `2026-07-09-model-catalog-redesign/`：ModelCatalog 重建设计与实施期材料。
 - `2026-07-06-business-module-redesign/`：`docs/02-业务模块` 旧未编号模块目录迁移归档。
 - `2026-07-06-interpretation-provider-design/`：旧 Interpretation Provider 设计文档归档。
 - `2026-07-06-infra-component-plane/`：旧基础设施组件平面文档归档。
+- `2026-07-06-infra-legacy-component-docs/`：旧基础设施组件级说明和替代前事实快照。

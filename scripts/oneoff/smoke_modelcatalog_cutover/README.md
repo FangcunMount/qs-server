@@ -35,10 +35,10 @@ go build -o /tmp/smoke-modelcatalog-cutover \
 set -o pipefail
 
 /tmp/smoke-modelcatalog-cutover \
-  --collection-base-url 'https://collect.fangcunmount.cn' \
-  --token-file ./tmp/perf/tokens.json \
-  --testee-id '替换为专用测试受试者ID' \
-  --model-codes 'ISI7,MBTI_OEJTS,gXkk9W,bJFKi3,替换为CognitiveSPM编码' \
+  --collection-base-url "$QS_MODELCATALOG_SMOKE_COLLECTION_URL" \
+  --token-file "$QS_MODELCATALOG_SMOKE_TOKEN_FILE" \
+  --testee-id "$QS_MODELCATALOG_SMOKE_TESTEE_ID" \
+  --model-codes "$QS_MODELCATALOG_SMOKE_MODEL_CODES" \
   --timeout 10m \
   --output /tmp/modelcatalog-smoke-result.json \
   | tee /tmp/modelcatalog-smoke.log
@@ -50,15 +50,18 @@ echo "ModelCatalog smoke 退出码=$QS_SMOKE_RC"
 也可以全部通过环境变量配置：
 
 ```bash
-export QS_MODELCATALOG_SMOKE_COLLECTION_URL='https://collect.fangcunmount.cn'
+export QS_MODELCATALOG_SMOKE_COLLECTION_URL='https://collection.example.com'
 export QS_MODELCATALOG_SMOKE_TOKEN_FILE='./tmp/perf/tokens.json'
 export QS_MODELCATALOG_SMOKE_TESTEE_ID='替换为专用测试受试者ID'
-export QS_MODELCATALOG_SMOKE_MODEL_CODES='ISI7,MBTI_OEJTS,gXkk9W,bJFKi3,替换为CognitiveSPM编码'
+export QS_MODELCATALOG_SMOKE_MODEL_CODES='替换为本次已发布模型编码列表'
 export QS_MODELCATALOG_SMOKE_TIMEOUT='10m'
 export QS_MODELCATALOG_SMOKE_OUTPUT='/tmp/modelcatalog-smoke-result.json'
 
 /tmp/smoke-modelcatalog-cutover
 ```
+
+必须显式指定目标 URL、专用 Testee 和当前发布目录中的 Model codes；这些值随环境变化，
+应与 exact deployed SHA、effective config 和 smoke 输出一同进入本次 evidence，不得从历史示例推断。
 
 不建议把 token 放在命令行参数中，因为它可能出现在进程列表和 shell history；优先使用 `--token-file` 或 `QS_MODELCATALOG_SMOKE_TOKEN`。
 

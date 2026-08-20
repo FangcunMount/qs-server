@@ -29,10 +29,13 @@ LockLease 回答的是“在一段有限时间内，哪个实例有资格执行�
 | apiserver | `evaluation_lease_recovery` | leader | 30s | Evaluation 过期执行租约恢复 leader |
 | apiserver | `interpretation_lease_recovery` | leader | 30s | Interpretation 过期执行租约恢复 leader |
 | apiserver | `report_catalog_audit` | leader | 30s | 报告目录审计 leader |
+| apiserver | `mongo_consistency_audit` | leader | 30s | Mongo 跨集合一致性只读巡检 leader |
 | worker | `attention_projection_reconcile` | leader | 30m | Attention 投影恢复 leader |
 | collection-server | `collection_submit` | duplicate suppression | 5m | 跨实例提交 owner lease |
 
-catalog 中的 renewal mode 是 `auto` 能力描述；三个进程的 dev/prod 配置均启用 `lock_lease.renewal_enabled`。该开关只保留为显式运维回退，不得作为常态关闭续租。
+catalog 中的 renewal mode 是 `auto` 能力描述；三个进程的版本化 dev/prod 配置均声明启用
+`lock_lease.renewal_enabled`。该开关只保留为显式运维回退，不得作为常态关闭续租；仓库 YAML
+不证明部署时合并后的 effective value。
 
 ## 3. Lease 生命周期
 
@@ -197,9 +200,9 @@ qs_locklease_operation_total{
 
 | 状态 | 内容 |
 | --- | --- |
-| `已实现` | 七个 workload 的统一 catalog、token-safe acquire/renew/release、active run 和 cooldown。 |
+| `已实现` | 十一个 workload 的统一 catalog、token-safe acquire/renew/release、active run 和 cooldown。 |
 | `已实现` | renewal failure/loss 取消 body，并对不合作 body 告警。 |
-| `待运行证据` | production 自动续租已启用；仍需按 workload 观察 renew error/lost 与 cancellation 后 body 退出时间。 |
+| `待运行证据` | 版本化 production 配置意图启用自动续租；仍需核对部署 effective value，并按 workload 观察 renew error/lost 与 cancellation 后 body 退出时间。 |
 | `待补证据` | 需要逐 workload 证明持久化副作用具备幂等、CAS 或 fencing 边界。 |
 | `规划改造` | 对确需强互斥的写路径引入持久化 fencing token。 |
 

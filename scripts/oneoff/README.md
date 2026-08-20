@@ -24,6 +24,14 @@
 | `audit_evaluation_p1_evidence.sql` | Evaluation P1 证据查询 | 否 |
 | `audit_evaluation_p2_evidence.sql` | Evaluation P2 证据查询 | 否 |
 | `observe_outbox_by_event_type` | Outbox 事件类型观测 | 否 |
+| `cleanup_orphaned_assessment_documents` | **blocked / audit-only**：只允许 dry-run 对账缺少 MySQL Assessment 引用的 Mongo AnswerSheet 候选；候选结果不是删除授权 | 否；禁止 `--apply` |
+
+`cleanup_orphaned_assessment_documents` 当前必须保持 blocked。不得使用 `--apply`、
+`--hard-delete` 或 `--skip-backup`；代码中存在这些开关只代表历史实现能力，不代表当前运维授权。
+解除 blocked 至少要同时满足：可靠受理状态机已定义可删除终态；完成 MySQL Assessment、Mongo
+AnswerSheet、提交幂等/Outbox 以及下游 Outcome/Report 的反向引用审计；形成不可变 ID 清单、
+成对备份和恢复演练；由数据责任人与发布责任人独立批准；并以专用负向测试和人工复核证明不会
+删除仍待异步创建 Assessment 的合法受理事实。任一条件未满足时只能输出 dry-run 审计结果。
 
 ### 可重复的运维修复
 
@@ -31,7 +39,6 @@
 | --- | --- |
 | `cleanup_perf_testee_data` | 按显式 Testee ID dry-run、备份并且只清理 `origin_type=adhoc` 临时测评数据 |
 | `select_seeddata_duplicate_testees` | 只读识别 seeddata 重试产生的重复 Testee，并生成显式 Testee/Profile 清单 |
-| `cleanup_orphaned_assessment_documents` | 对账并清理缺少 MySQL Assessment 的 Mongo 答卷 |
 | `rebuild_statistics` | 通过受保护 Run API 执行 validate、repair 或 publish |
 | `repair_stranded_plan_tasks` | 审计、修复、验证及 CAS 回滚历史 stale pending 与 Task due_at |
 | `enroll_testees_after_date.py` | 按时间范围补录受试者关系 |

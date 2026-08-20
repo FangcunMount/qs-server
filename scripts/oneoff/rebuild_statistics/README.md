@@ -52,8 +52,8 @@ QS_STATISTICS_TOKEN='***' go run ./scripts/oneoff/rebuild_statistics \
 
 只设置 `QS_STATISTICS_TOKEN` 的静态模式保持兼容，适合能够在 Token 到期前结束的短任务。
 跨多个普通日期窗口、可能持续数小时的 repair、validate 或 publish 应改用 IAM 密码登录模式。
-密码不能放在命令行、环境变量或仓库配置中，
-先在 ServerA 创建仅当前执行用户可读的普通文件：
+密码不能放在命令行、环境变量或仓库配置中。先在本次变更单指定的目标执行主机上，
+创建仅当前执行用户可读的普通文件；主机、账号和文件路径都是本次运行输入，不属于本文档的稳定事实：
 
 ```bash
 sudo install -m 0600 -o root -g root /dev/null \
@@ -65,8 +65,8 @@ sudoedit /secure/path/qs-statistics-iam-password
 然后配置 IAM 登录参数：
 
 ```bash
-export QS_STATISTICS_IAM_LOGIN_URL='https://iam.fangcunmount.cn/api/v2/authn/login'
-export QS_STATISTICS_IAM_USERNAME='system@fangcunmount.com'
+export QS_STATISTICS_IAM_LOGIN_URL='<approved IAM login endpoint>'
+export QS_STATISTICS_IAM_USERNAME='<approved service account>'
 export QS_STATISTICS_IAM_PASSWORD_FILE='/secure/path/qs-statistics-iam-password'
 
 # system 账号通常不需要显式 tenant_id；需要时只能设置数字 ID。
@@ -81,11 +81,16 @@ export QS_STATISTICS_IAM_REFRESH_SKEW='2m'
 ```bash
 unset QS_STATISTICS_TOKEN
 
+export QS_STATISTICS_BASE_URL='<target deployment internal base URL>'
+export QS_STATISTICS_ORG_IDS='<comma-separated org IDs>'
+export QS_STATISTICS_FROM='<YYYY-MM-DD>'
+export QS_STATISTICS_TO='<YYYY-MM-DD>'
+
 go run ./scripts/oneoff/rebuild_statistics \
-  --base-url http://127.0.0.1:8081 \
-  --org-ids 1 \
-  --from 2026-07-01 \
-  --to 2026-08-01 \
+  --base-url "$QS_STATISTICS_BASE_URL" \
+  --org-ids "$QS_STATISTICS_ORG_IDS" \
+  --from "$QS_STATISTICS_FROM" \
+  --to "$QS_STATISTICS_TO" \
   --window-days 7 \
   --timeout 10m \
   --reason approved_statistics_repair \
@@ -103,14 +108,15 @@ go run ./scripts/oneoff/rebuild_statistics \
 `--iam-password-file`、`--iam-tenant-id` 和 `--iam-refresh-skew`，显式 CLI 参数优先于环境变量。
 
 已经启动的旧版本进程不会动态获得自动刷新能力。它若因 401 或其他原因停止，修复原因后由
-操作者显式把 `--from` 调整为首个未完成的普通日期，并保留相同 `reason` 重跑剩余窗口：
+操作者先从 Run 账本确认首个未完成的普通日期，再更新本次输入 `QS_STATISTICS_FROM`，并保留
+相同 `reason` 重跑剩余窗口：
 
 ```bash
 go run ./scripts/oneoff/rebuild_statistics \
-  --base-url http://127.0.0.1:8081 \
-  --org-ids 1 \
-  --from 2026-07-15 \
-  --to 2026-08-01 \
+  --base-url "$QS_STATISTICS_BASE_URL" \
+  --org-ids "$QS_STATISTICS_ORG_IDS" \
+  --from "$QS_STATISTICS_FROM" \
+  --to "$QS_STATISTICS_TO" \
   --window-days 7 \
   --timeout 10m \
   --reason approved_statistics_repair \
@@ -124,11 +130,10 @@ go run ./scripts/oneoff/rebuild_statistics \
 如果最终 publish 已经提交 MySQL 数据、但缓存发布失败，服务端会返回 `data_committed`。
 工具会自动调用受保护的 `resume-cache` 接口，复用同一 Run，不重新采集或投影。
 
-## 生产执行边界
+## 目标环境执行边界
 
-- ServerA 上使用 `http://127.0.0.1:8081`，避免 Nginx 的同步请求超时。
-- 当前生产 Statistics 锁租约为 30 分钟且未启用自动续租。单窗口必须明显短于 30 分钟；
-  默认继续使用 7 天窗口和 10 分钟 HTTP 超时，不建议直接改回 31 天。
+- 使用目标部署单元内经验证的 apiserver internal base URL，避免公网入口超时；具体主机和 URL 进入本次 evidence，不写死在 sidecar。
+- 当前源码 LockLease catalog 为 Statistics workload 声明 30 分钟 TTL 与自动续租；这不证明目标环境续租成功。窗口和 HTTP timeout 必须按本次数据量、锁续租指标、服务端 deadline 与预演结果设定，不沿用历史生产数值。
 - `--timeout` 只调整客户端单请求超时，不延长服务端锁租约。
 - 工具只补齐/校验 Fact，并原子替换窗口 Daily；不会删除“来源已经不存在”的孤岛 Fact。
   执行前必须完成业务源和三类 `statistics_*_fact` 的孤岛审计与清理。
@@ -142,7 +147,7 @@ go run ./scripts/oneoff/rebuild_statistics \
 SELECT id, run_mode, status, stage, window_start, window_end,
        error_code, error_message, started_at
 FROM statistics_sync_run
-WHERE org_id = 1
+WHERE org_id = :org_id
   AND status IN ('running', 'data_committed')
 ORDER BY id DESC;
 ```

@@ -99,7 +99,7 @@ cognitive
 | `factor_norm` | 先计算因子，再用常模转换和分层规则校准 |
 | `task_performance` | 根据正确性、题组或任务表现形成能力结果 |
 
-当前代码根据模型身份推导 AlgorithmFamily；长期目标是发布时冻结确定的兼容结果，执行时不重新猜测。
+当前发布物化会用模型身份与 DecisionKind 交叉校验 AlgorithmFamily；Mongo snapshot 持久化 DecisionKind，Evaluation 从它派生 family，不再从模型身份重新猜测路由。
 
 ### 3.4 Algorithm：具体代码能力
 

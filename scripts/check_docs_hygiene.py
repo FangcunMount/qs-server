@@ -26,7 +26,10 @@ from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parent.parent
 DOCS_ROOT = ROOT / "docs"
-IGNORED_DIR_NAMES = {".git", "node_modules", "vendor"}
+# Runtime and generated artifacts are not maintained documentation. In
+# particular tmp/ may contain copied Markdown evidence with intentionally stale
+# links; scanning it makes the gate depend on local or prior CI residue.
+IGNORED_DIR_NAMES = {".git", ".pytest_cache", "__pycache__", "node_modules", "tmp", "vendor"}
 MARKDOWN_LINK_RE = re.compile(r"(?<!\!)\[[^\]]+\]\(([^)]+)\)")
 NUMBERED_H2_RE = re.compile(r"^##\s+(\d+)\.\s+")
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*$")

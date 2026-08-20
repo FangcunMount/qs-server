@@ -25,7 +25,7 @@ qs-server 的 Cache 不是 Redis 工具箱，而是以 **canonical capability** 
 
 Domain 不依赖 Cache。Cache-Aside 位于 Repository decorator、application query service 或其 consumer-owned port；业务模块只看到自己的窄接口。
 
-版本基线：`2026-08-13`。本轮已核对 capability catalog、Policy/Registry、三进程 Redis runtime 装配、Cache subsystem、失效/信令与专题测试；真实 Redis 故障、多实例 L1 收敛和生产命中率仍需运行环境证据。
+逐篇源码基线和复核状态由 [`document-closure.json`](../../document-closure.json) 维护。稳定文档只声明 capability catalog、Policy/Registry、Redis runtime、Cache subsystem 与失效/信令契约；真实 Redis 故障、多实例 L1 收敛和命中率必须单列环境证据。
 
 ## 1. 阅读路径
 

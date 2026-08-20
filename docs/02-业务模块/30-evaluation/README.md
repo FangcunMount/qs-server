@@ -110,7 +110,7 @@ flowchart TD
 | 管理业务生命周期 | 区分 pending、submitted、evaluated、failed |
 | 管理执行尝试 | 记录 attempt、claim、lease、失败分类和重试决定 |
 | 解析执行输入 | 精确读取答卷、问卷版本和已发布模型版本 |
-| 选择执行机制 | 从模型身份推导 AlgorithmFamily、DecisionKind 和 RuntimeDescriptor |
+| 选择执行机制 | 直读发布快照冻结的 DecisionKind，按它精确选择 RuntimeDescriptor；AlgorithmFamily 是 descriptor 的派生/校验属性 |
 | 编排计算 | 将模型输入适配为 Calculation 输入，再映射为统一 Execution |
 | 提交结果事实 | 原子提交 Outcome、Assessment、Run、查询投影和 Outbox 事件 |
 | 提供结果读取 | 提供 Assessment、Run、Outcome 和得分趋势等只读能力 |
@@ -175,7 +175,7 @@ Assessment 固化 Questionnaire 与 AssessmentModel 的发布版本。运营发�
 
 ## 8. 文档地图
 
-本模块采用精简结构。当前正在按照下列顺序逐篇重构：
+本模块已按下列顺序完成 canonical 文档收口；后续行为变化应更新对应 owner 文档和验证入口：
 
 | 顺序 | 文档 | 状态 | 核心问题 |
 | --- | --- | --- | --- |

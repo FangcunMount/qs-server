@@ -246,16 +246,17 @@ sequenceDiagram
 
 ### 7.3 当前 gRPC 信任边界
 
-仓库的 apiserver 生产配置为：
+仓库的 apiserver 生产配置意图为：
 
 - 启用 mTLS 和客户端证书；
 - `allowed-ous: QS`，CN 白名单为空；
 - gRPC JWT auth 关闭；
-- gRPC ACL 关闭。
+- gRPC ACL 启用、`default_policy: deny`，并从 `configs/grpc-acl.prod.yaml` 加载逐方法白名单；
+- `qs-collection-server.svc` 被精确允许调用 `AuthorizeAssessment` 和 `ParticipantReportService/GetAssessmentReport`，但不能调用未列入白名单的患者报告方法。
 
-这能防止非 QS 证书调用者进入，但不能将 `ParticipantReportService` 只限定给 collection-server，也不能证明 request TesteeID 来自已验证的 ProfileLink。
+这把 `ParticipantReportService/GetAssessmentReport` 限定在持有 collection-server 服务身份的调用方，但服务身份仍不能证明 request TesteeID 来自已验证的终端用户 ProfileLink。
 
-因此这不是端到端完整的参与者授权，而是“可信 BFF + Assessment ownership”组合边界。只要未来增加新的 QS 内部调用者，或将 Participant gRPC 暴露给更广范围，就必须先收紧这个契约。
+因此当前端到端边界是“生产 default-deny 方法 ACL + collection-server ProfileLink 授权 + apiserver Assessment ownership”。新增内部调用者或 gRPC 方法时，必须同时更新客户端允许方法清单、生产 ACL 和契约测试，不能只依赖 QS OU。
 
 ### 7.4 列表与详情的差异
 
@@ -520,11 +521,13 @@ Journey 先通过 Evaluation Operator Query 获得已授权 Assessment，然后�
 7. Operations 同时校验当前 Org 与 audit capability。
 8. 未知 Audience 和未知 Section 不会默认开放。
 9. Catalog 查询只加载当前页正文，悬空 Source 不会被静默忽略。
+10. collection-server 的 `reportwait.Service.GetStatus` 与 `Wait` 在读取 status cache、进入 DB fallback 或注册 notifier 前，先执行 `User -> active ProfileLink -> Testee -> AuthorizeAssessment`；拒绝时不访问 cache。
+11. `AuthorizeAssessment` 已进入 proto、collection client 允许方法清单和生产 default-deny ACL；`report_status_assessment_ownership_total{result}`、对应 duration 指标和 WebSocket 固定低基数拒绝指标提供观测入口。
 
 ### 14.2 应补强的不变量
 
 1. 任何 Participant gRPC 调用必须携带可验证的终端用户—Testee 授权证据，或严格限定为已履行该校验的 BFF。
-2. 服务身份通过 mTLS 后，仍必须有 method-level ACL，不能将“属于 QS OU”等价为“可查任意患者报告”。
+2. 新增或移动 gRPC 方法时，必须保持 method-level ACL、客户端允许方法清单和 proto 契约同步；不能因 mTLS 已通过而放宽 default-deny。
 3. 一个 Actor 被投影为哪个 Audience，必须来自同一份权限决策，不能由不同路由手工指定后产生偏差。
 4. Catalog 的 AssessmentID / OrgID / TesteeID 必须与它指向的正文关联完全一致。
 5. 详情查询返回的 ReportRow.AssessmentID 必须等于请求并已授权的 AssessmentID。
@@ -744,6 +747,8 @@ Operations 的任务是回答生命周期、失败原因、重试决策和版本
 | collection-server ProfileLink 校验 | `internal/collection-server/transport/rest/middleware/iam_middleware.go` |
 | collection-server gRPC Client | `internal/collection-server/infra/grpcclient/evaluation_client.go` |
 | apiserver 生产 gRPC 信任配置 | `configs/apiserver.prod.yaml` |
+| 生产逐方法 ACL | `configs/grpc-acl.prod.yaml` |
+| report-status ownership 指标 | `internal/pkg/reportstatus/metrics.go` |
 
 ## 20. 验证建议
 
@@ -761,6 +766,8 @@ go test ./internal/apiserver/application/journey/reportquery
 go test ./internal/apiserver/transport/grpc/service
 go test ./internal/apiserver/transport/rest
 go test ./internal/collection-server/transport/rest/middleware
+go test ./internal/collection-server/application/reportwait
+go test ./internal/pkg/configcontract -run GRPCACL
 ```
 
 重点场景包括：

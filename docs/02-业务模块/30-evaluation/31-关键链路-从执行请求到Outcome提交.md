@@ -557,16 +557,16 @@ answersheet:<id>
 | 对象 | 示例 | 回答的问题 |
 | --- | --- | --- |
 | ExecutionIdentity | kind + subKind + algorithm | 这是哪一类模型执行身份 |
-| ModelRoute | identity + AlgorithmFamily + DecisionKind | 这次模型要求什么机制 |
-| DescriptorKey | AlgorithmFamily + DecisionKind | 应选择哪个运行时能力 |
+| ModelRoute | DecisionKind | 这次发布模型要求什么判定契约 |
+| DescriptorKey | DecisionKind | 应选择哪个运行时能力 |
 | RuntimeDescriptor | assembler + calculator + outcome assembler | 实际怎样执行 |
 
 ### 12.2 ResolveExecution
 
 RuntimeResolver：
 
-1. 从 InputSnapshot 的冻结身份构造 ModelRoute；
-2. 要求 AlgorithmFamily 与 DecisionKind 均存在；
+1. 从 `InputSnapshot.Model.DecisionKind` 构造 ModelRoute；
+2. 要求 DecisionKind 存在且能映射到已知 AlgorithmFamily；
 3. 生成精确 DescriptorKey；
 4. 从 Registry 选择 descriptor；
 5. 返回 `ResolvedExecution`。
@@ -574,14 +574,14 @@ RuntimeResolver：
 Descriptor Registry 的查找顺序是：
 
 ```text
-exact AlgorithmFamily + DecisionKind
+exact DecisionKind
 ```
 
-缺少精确注册时直接 validation failure，不做 family 或格式级 fallback。
+缺少精确 DecisionKind 注册时直接 validation failure，不做 family 或格式级 fallback。RuntimeDescriptor 声明的 AlgorithmFamily 在注册时必须与该 DecisionKind 映射一致。
 
 ### 12.3 为什么只解析一次
 
-Engine 后续日志、执行和 Outcome RuntimeIdentity 共用同一个 `ResolvedExecution`。Commit 时不会再次根据 code 猜算法家族。
+Engine 后续日志、执行和 Outcome RuntimeIdentity 共用同一个 `ResolvedExecution`。Commit 时只写入该执行的 DecisionKind，不会再次根据 code 猜路由或持久化独立 AlgorithmFamily。
 
 否则可能发生：
 

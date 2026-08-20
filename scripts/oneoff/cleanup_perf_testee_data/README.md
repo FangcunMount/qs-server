@@ -21,7 +21,7 @@ go run ./scripts/oneoff/cleanup_perf_testee_data \
   --mongo-uri '***' \
   --mongo-db qs \
   --testee-ids-file /secure/path/testee-ids.txt \
-  --backup-suffix temp_assessment_20260819
+  --backup-suffix "$QS_BACKUP_SUFFIX"
 ```
 
 核对输出中的 `temporary_assessments`、Outcome、AnswerSheet、Report、Outbox 和
@@ -33,9 +33,12 @@ go run ./scripts/oneoff/cleanup_perf_testee_data \
   --mongo-uri '***' \
   --mongo-db qs \
   --testee-ids-file /secure/path/testee-ids.txt \
-  --backup-suffix temp_assessment_20260819 \
+  --backup-suffix "$QS_BACKUP_SUFFIX" \
   --apply
 ```
+
+`QS_BACKUP_SUFFIX` 必须由本次变更单或时间窗口生成并在 dry-run/apply 中保持不变；
+不得沿用旧的生产日期后缀。
 
 `--skip-backup` 仅用于已经完成外部备份的显式运维场景。脚本不再提供按
 `testee_id` 扫描整个 Outbox payload、删除 Testee/IAM 数据或 `--mongo-only`

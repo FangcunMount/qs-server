@@ -10,9 +10,9 @@ Capability 是 Cache 的最小治理单位。apiserver 的 [`catalog.Spec`](../.
 
 ### 2.1 apiserver
 
-下表的“代码默认 TTL”来自 `Spec.Defaults`，“生产 TTL”来自 [`configs/cache/apiserver.prod.yaml`](../../../configs/cache/apiserver.prod.yaml)。生产 policy 是 override，并不改变代码默认值。
+下表的“代码默认 TTL”来自 `Spec.Defaults`，“版本化 production TTL 意图”来自 [`configs/cache/apiserver.prod.yaml`](../../../configs/cache/apiserver.prod.yaml)。该 policy 是仓库中的 override 意图，并不改变代码默认值，也不能单独证明目标生产环境正在使用这些值。
 
-| Capability | Owner | Kind | Layer | Family | 代码默认 TTL | 生产 TTL | Metric label |
+| Capability | Owner | Kind | Layer | Family | 代码默认 TTL | 版本化 production TTL 意图 | Metric label |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `survey.questionnaire` | survey | cache | L2 | `static_meta` | 12h | 2h | `questionnaire` |
 | `modelcatalog.published_model` | modelcatalog | cache | L1+L2 | `static_meta` | 24h | 2h | `published_model` |
@@ -31,18 +31,18 @@ Capability 是 Cache 的最小治理单位。apiserver 的 [`catalog.Spec`](../.
 
 collection-server 的 Registry 是静态 snapshot，能力由 [`internal/collection-server/cache/subsystem.go`](../../../internal/collection-server/cache/subsystem.go) 构造：
 
-| Capability | Layer | Family | 生产配置 | 回源 |
+| Capability | Layer | Family | 版本化 production 配置意图 | 回源 |
 | --- | --- | --- | --- | --- |
 | `catalog.questionnaire` | L1 | `local` | TTL 180s、max 256、singleflight、signal evict | apiserver questionnaire gRPC |
-| `catalog.published_model` | L1 | `local` | 生产已启用；TTL 180s、jitter 0.2、每 bucket max 64、singleflight、signal evict | apiserver published-model capability；exact version 为 L1+L2，其余目录桶为 L2 |
+| `catalog.published_model` | L1 | `local` | production YAML 声明 enabled；TTL 180s、jitter 0.2、每 bucket max 64、singleflight、signal evict | apiserver published-model capability；exact version 为 L1+L2，其余目录桶为 L2 |
 | `catalog.typology` | L1 | `local` | TTL 180s、max 256、singleflight、signal evict | assessment-model catalog gRPC |
-| `evaluation.assessment_access` | L1 | `local` | 生产已启用；TTL 60s、jitter 0.2、max 1024、singleflight；仅正向 ownership token | apiserver assessment-access L2 |
-| `evaluation.assessment_detail` | L1 | `local` | 生产已启用；TTL 180s、jitter 0.2、max 256、singleflight；仅 `evaluated` DTO | apiserver assessment-detail L2 |
+| `evaluation.assessment_access` | L1 | `local` | production YAML 声明 enabled；TTL 60s、jitter 0.2、max 1024、singleflight；仅正向 ownership token | apiserver assessment-access L2 |
+| `evaluation.assessment_detail` | L1 | `local` | production YAML 声明 enabled；TTL 180s、jitter 0.2、max 256、singleflight；仅 `evaluated` DTO | apiserver assessment-detail L2 |
 | `report_status` | runtime | `ops_runtime` | TTL 172800s | report workflow |
 
 collection catalog capability 使用 consumer-owned `catalog.*` ID；evaluation 两个意图保持业务名称一致。collection L1 与 apiserver cache 仍是不同进程 Registry 里的独立 entry、policy 和生命周期；apiserver 内部的 immutable exact-by-ref L1 不改变这一跨进程边界。
 
-published-model 与 evaluation access/detail L1 在 dev/prod policy 中均已启用；主配置只引用独立 policy：
+published-model 与 evaluation access/detail L1 在版本化 dev/prod policy 文件中均声明 enabled；这仍只是仓库配置意图。主配置引用独立 policy：
 
 ```yaml
 cache:
@@ -169,7 +169,7 @@ negative
 
 - collection-server 的 policy 使用 `capabilities.catalog.questionnaire`、`catalog.published_model` 与 `catalog.typology`；`catalog.published_model` 的启停是启动时接线，修改后必须滚动重启；
 - worker 没有 `CacheOptions` 或 `cache:` 配置段，只消费 `runtime_state.report_status`；
-- 三进程 production `report_status.ttl_seconds` 都是 `172800`，由 config contract test 防止漂移；
+- 三进程版本化 production 配置都声明 `report_status.ttl_seconds: 172800`，由 config contract test 防止仓库内漂移；目标环境的 effective value 仍需部署证据；
 - signal 的 prefix/channel/buffer 属于 `signaling.redis`，不与 report status TTL 混放。
 
 未知 capability 或未知字段由 raw-settings validator 拒绝。仓库只维护当前 schema，不双读已经删除的旧字段。

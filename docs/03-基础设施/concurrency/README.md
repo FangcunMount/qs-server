@@ -2,7 +2,7 @@
 
 本专题研究的不是“怎么把 QPS 调大”，而是：当请求同时到达、依赖变慢、客户端重试、多个实例争抢工作时，系统怎样限制损失，又怎样保证最终只承认正确的业务事实。
 
-版本基线：`2026-07-28`。本轮事实核对覆盖三个 composition root、现行生产配置、入口路由、RateLimit/Gate/Backpressure、SubmitCoalescer、Mongo durable accept、LockLease、resilience control 与压测入口。配置阈值属于生产配置意图，不等于真实容量结论。
+逐篇源码基线和复核状态由 [`document-closure.json`](../../document-closure.json) 维护。配置阈值只属于版本化部署意图，不等于目标环境 effective config 或真实容量结论。
 
 ## 1. 本专题的核心命题
 
@@ -101,7 +101,7 @@ flowchart LR
 | 可靠提交 | `internal/collection-server/application/answersheet`、`internal/apiserver/application/survey/answersheet` |
 | Mongo 幂等 | `internal/apiserver/infra/mongo/answersheet` |
 | 运行时治理 | `internal/apiserver/application/systemgovernance`、三个进程的 resilience subsystem |
-| 生产基线 | `configs/collection-server.prod.yaml`、`configs/apiserver.prod.yaml`、`configs/worker.prod.yaml` |
+| 版本化生产配置意图 | `configs/collection-server.prod.yaml`、`configs/apiserver.prod.yaml`、`configs/worker.prod.yaml` |
 | 压测入口 | `Makefile` 的 `perf-*` 目标、`scripts/perf` |
 
 ## 7. 当前限制不是脚注

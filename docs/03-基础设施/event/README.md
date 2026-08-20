@@ -15,7 +15,7 @@ Event 模块负责把进程内已经发生的业务事实，按明确的可靠�
 
 如果还没有读过根级 [统一模型与推理方法](../04-统一模型与推理方法.md)，建议先读。Event 是其中“持久事实 → 可靠传播 → 派生结果”这一段的展开。
 
-版本基线：`2026-07-28`。本轮已核对 `configs/events.yaml`、`EventSpec`/`EffectiveRegistry`、apiserver EventSubsystem、Mongo/MySQL Outbox 与 worker settlement/replay 链；真实 broker 投递、进程崩溃恢复和积压清理速度仍需环境证据。
+逐篇源码基线和复核状态由 [`document-closure.json`](../../document-closure.json) 维护。稳定文档只声明 `configs/events.yaml`、`EventSpec`/`EffectiveRegistry`、EventSubsystem、Outbox 与 settlement/replay 的当前契约；真实 broker 投递、崩溃恢复和积压清理速度必须单列环境证据。
 
 ## 先看结论
 

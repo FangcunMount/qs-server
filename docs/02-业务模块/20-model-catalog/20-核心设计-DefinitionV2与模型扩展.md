@@ -328,8 +328,8 @@ Questionnaire、AssessmentModel 和 Norm 是独立维护、发布和引用的业
 
 - 行为不变的实现重构沿用原 Algorithm 标识；
 - 算法语义变化时增加新的 Algorithm 标识；
-- 发布快照冻结 Algorithm、ExecutionSpec 和 DecisionKind；
-- AlgorithmFamily 的快照冻结是已经确认但尚未完成的改造；
+- 发布快照持久化 Algorithm、ExecutionSpec 和 DecisionKind；
+- 发布物化会解析并校验 AlgorithmFamily，但 Mongo snapshot 不再将它作为独立 canonical 字段；
 - 只有出现多版本并行、独立部署、精确代码重放、强审计或灰度实验时，才引入 AlgorithmVersion。
 
 ## 7. Interpretation-oriented Assets 为什么仍随模型发布
@@ -369,7 +369,7 @@ Interpretation
 
 ### 8.1 唯一事实源
 
-AssessmentModel 与发布后的 AssessmentSnapshot 都只保存 DefinitionV2。发布快照额外冻结 Model identity、AlgorithmFamily、DecisionKind、Questionnaire 引用和 Definition 内容摘要，但不保存 compatibility payload、payload format 或 projection hash。
+AssessmentModel 与发布后的 AssessmentSnapshot 都保存 DefinitionV2。Mongo 发布快照额外持久化 Model identity 中的 Kind/Algorithm/code/version、DecisionKind、Questionnaire 引用和 Definition 内容摘要，但不保存独立 AlgorithmFamily、compatibility payload、payload format 或 projection hash。
 
 Definition handler 的职责是验证并物化临时运行时 DTO；DTO 只存在于内存。DefinitionV2 缺失、冻结身份不完整或 family-specific 物化失败时必须 fail closed，不允许通过旧 payload 或格式推断恢复。
 
@@ -417,7 +417,7 @@ flowchart LR
 
 发布校验比草稿保存更强，因为它需要证明的是“这份模型现在可以被新测评使用”，包括外部资产存在性和执行契约完整性。
 
-当前快照冻结 Algorithm、AlgorithmFamily、DecisionKind、DefinitionV2、ExecutionSpec、Questionnaire 引用和 Definition 内容摘要。Evaluation 运行时只使用冻结身份，不再重复推导。
+当前 Mongo 快照冻结 Algorithm、DecisionKind、DefinitionV2、ExecutionSpec、Questionnaire 引用和 Definition 内容摘要。发布物化对 AlgorithmFamily 做双向兼容校验；Evaluation 运行时直读 DecisionKind，仅由它派生 family，不从 Kind/Algorithm 重复决定路由。
 
 ## 9. 校验责任链
 
@@ -462,7 +462,6 @@ flowchart LR
 - Decision 必须存在；
 - Factor-only Definition 不能发布；
 - Model Kind 与 AlgorithmFamily/Algorithm 必须通过显式兼容矩阵；
-- 发布快照必须冻结 AlgorithmFamily；
 - 首次发布后同一 model code 不允许更换 Algorithm；
 - 首次发布后 questionnaire code 固定，只允许升级 version。
 
@@ -633,7 +632,7 @@ BehavioralRatingDefinitionHandler
 
 当前限制已经可以从源码看到：
 
-- AlgorithmFamily 仍由 Kind/identity 推导，未冻结在 snapshot；
+- AlgorithmFamily 仍分散在 identity 兼容校验、DecisionKind 映射和 descriptor manifest 中；它是进程内派生属性，不是 snapshot 的独立 canonical 字段；
 - scale handler 没有 NormRepository，无法直接支持未来 scale + Norm 的发布校验；
 - scale 与 cognitive 的 DecisionKind 仍按 Kind 固定推导；
 - typology preview 只有 TypologyDefinitionHandler 实现；

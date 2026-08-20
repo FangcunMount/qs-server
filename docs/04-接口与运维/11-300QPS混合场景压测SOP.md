@@ -12,9 +12,9 @@ make perf-run PLAN=admission
 make perf-run PLAN=diagnose CASE=<专项场景>
 ```
 
-`ceiling-120` 只执行 110、恢复门、120 两档，用于已有可信低档证据时复验当前硬件上限，永远不会继续进入 200 QPS。`admission` 自动执行 smoke、60、80、100、110、120、200、240、280、恢复证据门、300 和最终排空验收。80/100/110 三档用于定位正常体验基线到 120 保护档之间的容量拐点。操作者不再逐档拼命令；任何硬门禁失败立即停止，证据不足时标记 `INCOMPLETE` 并禁止进入 300。
+`ceiling-120` 只执行 110、恢复门、120 两档，用于已有可信低档证据时复验目标环境上限，永远不会继续进入 200 QPS。`admission` 自动执行 smoke、60、80、100、110、120、200、240、280、恢复证据门、300 和最终排空验收。80/100/110 三档用于定位正常体验基线到 120 保护档之间的容量拐点。操作者不再逐档拼命令；任何硬门禁失败立即停止，证据不足时标记 `INCOMPLETE` 并禁止进入 300。
 
-本地静态检查或 dry-run 不能称为 300 QPS 验收成功。正式结论必须引用本次 run ID、Git SHA、`summary.json`、`report.md` 和 `evidence.json`。
+本地静态检查或 dry-run 不能称为 300 QPS 验收成功。正式结论必须引用本次 run ID、Git SHA、`summary.json`、`report.md` 和 `evidence.json`，并写入[基础设施生产证据台账](../00-总览/10-基础设施生产证据台账.md)；本文不保存某次 verdict。
 
 ## 一、运行前准备
 
@@ -53,8 +53,9 @@ export APISERVER_READYZ_URL=https://qs.fangcunmount.cn/readyz
 export WORKER_METRICS_URL=https://worker.fangcunmount.cn/metrics
 export WORKER_READYZ_URL=https://worker.fangcunmount.cn/readyz
 export NSQD_STATS_URL=https://nsqd.fangcunmount.cn/stats
-export EXPECTED_COLLECTION_REPLICAS=2
-export EXPECTED_WORKER_REPLICAS=3
+read -r -p 'Expected collection replicas for this run: ' EXPECTED_COLLECTION_REPLICAS
+read -r -p 'Expected worker replicas for this run: ' EXPECTED_WORKER_REPLICAS
+export EXPECTED_COLLECTION_REPLICAS EXPECTED_WORKER_REPLICAS
 export PERF_ISOLATED_ENV=true
 # 共享 NSQD 时建议限定本次链路涉及的 topic
 # export PERF_NSQ_TOPICS='<topic-a>,<topic-b>'
@@ -66,8 +67,9 @@ export PERF_ISOLATED_ENV=true
 `job`、`instance` 标签；对应 ready 端点返回同时满足 Prometheus `up` 和
 `qs_runtime_component_ready=1` 的实例数量。perfctl 会将数量与两个
 `EXPECTED_*_REPLICAS` 变量比较，并拒绝没有 `instance` 标签的普通直连指标。
-worker、NSQD 域名须解析到 serverA Nginx；NSQ 公网入口只允许读取
-`/stats`、`/ping`、`/nodes`，不得开放 topic/channel 管理接口。
+worker、NSQD 观测域名必须从获准的编排网络解析到本次观测入口；访问边界以
+[部署与网络 canonical 文档](../03-基础设施/config-deployment/20-镜像、CD与网络拓扑.md)为准。
+NSQ 观测入口只允许读取 `/stats`、`/ping`、`/nodes`，不得开放 topic/channel 管理接口。
 
 只有确认窗口内的完成量可归因于本次压测时，才设置 `PERF_ISOLATED_ENV=true`；未设置或显式设为其他值都会把证据标记为 `INCOMPLETE`。该变量现在只是操作者声明，perfctl 还会比较阶段前后 `qs_perf_traffic_requests_total{origin="other"}`：携带 `X-Perf-Run-ID` 的 K6 业务请求归为 `perf`，其他业务请求归为 `other`，只有 `other` 增量为 0 才通过隔离门；大于 0 直接失败，运行版本未暴露指标则为 `INCOMPLETE`。健康、readyz、metrics、ping、version 和 pprof 不计入该指标。完成 TPS 使用阶段前后 Interpretation Prometheus 计数增量，并以这两次指标快照的实际时间窗为分母，不以配置中的计划时长代替服务端观测窗口。
 
@@ -117,7 +119,7 @@ make perf-run PLAN=baseline
 make perf-run PLAN=ceiling-120
 ```
 
-仅当同一环境、同一代码/配置族已经有可信的 quick/baseline 或更低容量档证据，只需要复验当前硬件的 120 QPS 上限时使用。该计划没有内置 smoke 与 60 QPS，不能拿来补齐缺失的低档证据。
+仅当同一环境、同一代码/配置族已经有可信的 quick/baseline 或更低容量档证据，只需要复验目标环境的 120 QPS 上限时使用。该计划没有内置 smoke 与 60 QPS，不能拿来补齐缺失的低档证据。
 
 | 顺序 | 阶段 | 时长 | 说明 |
 | ---: | --- | ---: | --- |

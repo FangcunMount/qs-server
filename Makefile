@@ -110,7 +110,7 @@ COLOR_RED := \033[31m
 .PHONY: install-tools install-air install-golangci-lint install-security-tools install-govulncheck install-gosec create-dirs
 .PHONY: up down re st log
 .PHONY: quick-start
-.PHONY: docs-swagger docs-rest docs-hygiene docs-facts docs-verify
+.PHONY: docs-swagger docs-rest docs-hygiene docs-facts docs-check-tests docs-check docs-api-verify docs-verify
 .PHONY: cd-image cd-package cd-remote-deploy cd-validate cd-plan cd-export-image
 .PHONY: perf-init perf-ensure-config perf-tokens perf-tokens-collection perf-tokens-apiserver
 .PHONY: perf-preflight perf-check-k6 perf-run perf-sync-profiles perf-verify
@@ -168,8 +168,15 @@ docs-hygiene: ## 检查仓库现行 Markdown 的链接、锚点与章节编号�
 docs-facts: ## 检查 taxonomy、源码路径、版本/API、scheduler/config、Mongo audit 与性能计划
 	python scripts/check_docs_facts.py
 
-docs-verify: docs-rest docs-hygiene docs-facts ## 对比 api/rest 与 swagger，并检查现行文档
+docs-check-tests: ## 运行文档门禁自身的无网络单元测试
+	python -m unittest discover -s scripts/tests -p 'test_docs_*.py'
+
+docs-check: docs-check-tests docs-hygiene docs-facts ## 运行廉价、无网络依赖的常驻文档门禁
+
+docs-api-verify: docs-rest ## 生成并对比 api/rest 与 swagger（需要 Go/Swagger/PyYAML 工具链）
 	python scripts/compare_api_docs.py
+
+docs-verify: docs-check docs-api-verify ## 运行常驻文档门禁与条件化 API 生成校验
 
 # ============================================================================
 # K6 混合场景压测（详见 docs/04-接口与运维/11-300QPS混合场景压测SOP.md）

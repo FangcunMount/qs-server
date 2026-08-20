@@ -39,6 +39,7 @@ Signal 名称、SignalKey、JSON payload、prefix/channel 解析属于兼容契�
 | --- | --- | --- | --- | --- | --- |
 | `report_status_changed` | `ephemeral_signal` | `redis_pubsub` | apiserver、worker | collection-server | 唤醒报告状态刷新 |
 | `questionnaire_cache_changed` | `ephemeral_signal` | `redis_pubsub` | apiserver | apiserver、collection-server | 清理问卷缓存 |
+| `assessment_model_cache_changed` | `ephemeral_signal` | `redis_pubsub` | apiserver | collection-server | 清理已发布测评模型目录 L1 缓存 |
 | `scale_cache_changed` | `ephemeral_signal` | `redis_pubsub` | apiserver | apiserver | 清理量表缓存 |
 | `typology_model_cache_changed` | `ephemeral_signal` | `redis_pubsub` | apiserver | apiserver、collection-server | 清理类型模型缓存 |
 

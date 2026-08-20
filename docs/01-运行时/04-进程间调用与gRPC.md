@@ -129,9 +129,9 @@ apiserver gRPC server 代码支持：
 - audit；
 - health 与 reflection。
 
-“代码支持”不等于“环境已经启用”。当前仓库的开发/生产配置以 mTLS 为内部调用的主要认证方式，gRPC JWT auth、ACL 和 audit 默认未开启；生产关闭 reflection、保留 health。collection 可选附加 service JWT，但当 server auth 未开启时它不是当前主要边界；worker client 当前主要依赖 mTLS。
+“代码支持”不等于“某个运行环境已经启用”。当前仓库的开发配置使用 mTLS，但关闭 gRPC JWT auth、ACL 和 audit，并开启 reflection/health。仓库生产配置使用 mTLS，关闭 JWT auth 和 audit，同时明确开启方法级 ACL，以 `deny` 为默认策略并加载 `configs/grpc-acl.prod.yaml`；生产关闭 reflection、保留 health。collection 可选附加 service JWT，但当 server auth 未开启时它不是当前主要边界；worker client 当前主要依赖 mTLS。这些只是仓库配置事实，不能单独证明已部署环境正在使用同一配置和证书。
 
-另外，ACL 文件加载仍有 TODO，当前启用 ACL 时主要依赖 default policy，不能宣称已经具备完整的逐方法 ACL 配置能力。
+ACL 开启时会在 server 构建阶段严格加载配置文件：运行时策略和文件内 `default_policy` 都必须是 `deny`，文件缺失、空配置、策略不一致或方法契约不合法都会阻断启动。`configs/grpc-acl.prod.yaml` 分别限定 `qs-collection-server.svc` 和 `qs-worker.svc` 可访问的精确 RPC，配置契约测试还会与两类 client 的 canonical method 集合对齐。
 
 ## 10. 兼容性与演进
 

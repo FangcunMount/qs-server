@@ -168,8 +168,8 @@ Outcome Record 不只是一个 `payload_json`。它把“结果是什么”和�
 | 事实身份 | Outcome ID | 下游事件、报告和排障引用哪一份事实 |
 | 业务归属 | org ID、assessment ID、testee ID | 事实属于哪个组织、测评和受测者 |
 | 执行归属 | EvaluationRun ID | 哪一次受控执行提交了结果 |
-| 模型身份 | kind、subKind、algorithm、code、version、title | 当时执行的是哪个已发布模型 |
-| 运行时身份 | AlgorithmFamily、DecisionKind | 当时由哪类计算和判定机制处理 |
+| 模型身份 | kind、algorithm、code、version、title；subKind 仅保留用于历史行读取 | 当时执行的是哪个已发布模型 |
+| 运行时身份 | DecisionKind | 当时使用哪种判定契约；AlgorithmFamily 可按 DecisionKind 在进程内派生，不是 Outcome 独立字段 |
 | 输入审计 | InputSnapshotRef | 关联本次执行组装出的输入快照引用 |
 | 结果事实 | Payload、SchemaVersion | 用哪个 schema 解码正式结果 |
 | 解释输入 | ReportInput | 报告所需模型素材的冻结 JSON |

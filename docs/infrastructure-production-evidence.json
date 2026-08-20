@@ -1,0 +1,244 @@
+{
+  "schema_version": 1,
+  "policy": {
+    "current_evidence_requires_exact_deployed_sha": true,
+    "expires_on_scope": "current-state eligibility, not record retention",
+    "effective_config_unknown_codes": [
+      "unknown_not_recorded"
+    ]
+  },
+  "entries": [
+    {
+      "id": "infra-2026-08-15-interpretation-ledger-migration",
+      "topics": [
+        "data_migration_transaction",
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-08-15T15:58:20+08:00",
+      "environment": "production/serverA-serverD",
+      "deployed_sha": "0cc80ae037e06380c93ef99f5945489fde737827",
+      "source_baseline_sha": "df15c6070d91c7ea99e2db02f43b339fb0eb9f2b",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "The workflow recorded the exact migration source SHA and binary checksum verification, but did not retain a digest of the effective production env file or service image configuration."
+      },
+      "command": "docker run <production-apiserver-image> /tmp/migrate-interpretation-runtime-ledgers --timeout 90m --batch-size 1000 --apply --confirm-services-stopped --drop-source --confirm-drop-source",
+      "result": {
+        "status": "passed",
+        "summary": "The controlled stop-write migration imported and read back the runtime ledgers, dropped all three Mongo source collections, and restored apiserver plus three workers.",
+        "measurements": {
+          "admission_source": 0,
+          "admission_target": 0,
+          "catalog_mysql_before": 1,
+          "catalog_changed": 1,
+          "catalog_mysql_after": 1,
+          "attention_source": 131273,
+          "attention_changed": 131273,
+          "attention_mysql_after": 131273,
+          "mongo_source_collections_dropped": 3,
+          "workers_restored": 3
+        }
+      },
+      "owner": "infra",
+      "expires_on": "2026-08-20",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/31872956357"
+        }
+      ],
+      "limitations": [
+        "This proves only the dated migration window and its recorded read-back; it is not evidence for the current checkout or current production state.",
+        "The workflow did not retain an effective configuration hash, so environment parity cannot be reconstructed from this record alone."
+      ]
+    },
+    {
+      "id": "infra-2026-08-16-production-deploy-8f663383",
+      "topics": [
+        "deployment_cd_network"
+      ],
+      "status": "historical",
+      "observed_at": "2026-08-16T00:59:33+08:00",
+      "environment": "production/serverA-serverB-serverD",
+      "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
+      "source_baseline_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "The deployment run retained the exact image SHA and service checks, but no normalized digest of the effective YAML, env files, secrets, or network state."
+      },
+      "command": "GitHub Actions Production Deploy run 31896757704",
+      "result": {
+        "status": "passed",
+        "summary": "The deployment run recorded apiserver, two collection replicas, and three worker replicas running the exact 8f663383 SHA image and passing the deploy gate.",
+        "measurements": {
+          "apiserver_replicas_verified": 1,
+          "collection_replicas_verified": 2,
+          "worker_replicas_verified": 3,
+          "ci_run": 31896282313,
+          "codeql_run": 31896282267,
+          "sonarqube_run": 31896282337
+        }
+      },
+      "owner": "infra",
+      "expires_on": "2026-08-20",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/31896757704"
+        },
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/31896282313"
+        },
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/31896282267"
+        },
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/31896282337"
+        }
+      ],
+      "limitations": [
+        "The record covers only deployed SHA 8f663383 and expired for current-state eligibility on 2026-08-20.",
+        "A successful deploy gate does not prove full business-chain, data-consistency, capacity, or later runtime health."
+      ]
+    },
+    {
+      "id": "infra-2026-08-16-mongo-consistency-oneoff",
+      "topics": [
+        "data_migration_transaction",
+        "event_outbox_mq",
+        "oneoff_recovery_production_evidence"
+      ],
+      "status": "historical",
+      "observed_at": "2026-08-16T01:13:35+08:00",
+      "environment": "production/mongodb-read-only-oneoff",
+      "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
+      "source_baseline_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "The retained result is tied to the last exact-SHA deployment context, but the one-off command arguments, binary digest, Mongo URI target digest, and effective configuration hash were not independently retained."
+      },
+      "command": "make mongo-consistency-audit (historical production arguments not retained)",
+      "result": {
+        "status": "findings",
+        "summary": "The seven-phase read-only scan completed with exit code 2 and found 269 Outbox records without a physical AnswerSheet; every other finding class was zero and no repair was performed.",
+        "measurements": {
+          "anchors_scanned": 347494,
+          "duration_seconds": 25.43,
+          "exit_code": 2,
+          "outbox_missing_answersheet": 269,
+          "other_findings": 0,
+          "repairs_applied": 0
+        }
+      },
+      "owner": "infra",
+      "expires_on": "2026-08-20",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "repository_record",
+          "ref": "docs/00-总览/09-当前版本定档验收台账.md#6-mongo-consistency-audit-当前真值"
+        },
+        {
+          "kind": "repository_record",
+          "ref": "scripts/oneoff/mongo_consistency_audit/main.go"
+        }
+      ],
+      "limitations": [
+        "The 269 high-severity reverse orphans remain unresolved; this record must not be summarized as data consistency passing.",
+        "The exact historical invocation and effective configuration digest were not retained, so the scan is not independently reproducible from this record.",
+        "The scheduler remained disabled and this one-off does not prove continuous post-scan consistency."
+      ]
+    },
+    {
+      "id": "infra-2026-08-18-compatibility-observation",
+      "topics": [
+        "observability_probes"
+      ],
+      "status": "historical",
+      "observed_at": "2026-08-18T02:40:00+08:00",
+      "environment": "production/prometheus-read-only-observation",
+      "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
+      "source_baseline_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "The observation queried a production Prometheus snapshot but did not retain an effective scrape configuration or target-set hash."
+      },
+      "command": "bash scripts/cd/audit-compatibility-observation.sh",
+      "result": {
+        "status": "failed",
+        "summary": "The compatibility observation could not establish a complete 30-day window: all three current series lacked anchors and the legacy idempotency fallback metric was absent.",
+        "measurements": {
+          "window_days": 30,
+          "current_series_checked": 3,
+          "current_series_without_anchor": 3,
+          "current_series_window_increase": 0,
+          "legacy_metric_present": false
+        }
+      },
+      "owner": "infra",
+      "expires_on": "2026-08-20",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/32055956851"
+        }
+      ],
+      "limitations": [
+        "This failed observation is negative evidence about the observation chain, not proof that compatibility traffic was zero or increasing.",
+        "The workflow head SHA identifies the audit source, but the effective Prometheus configuration and deployed container SHA were not re-attested in this run."
+      ]
+    },
+    {
+      "id": "infra-2026-08-18-production-probe",
+      "topics": [
+        "deployment_cd_network",
+        "observability_probes"
+      ],
+      "status": "historical",
+      "observed_at": "2026-08-18T08:45:08+08:00",
+      "environment": "production/serverA-serverB-serverD",
+      "deployed_sha": "8f663383e117f186865686c78c9dbcae7ed50a91",
+      "source_baseline_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
+      "effective_config_hash": null,
+      "effective_config_hash_limitation": {
+        "code": "unknown_not_recorded",
+        "detail": "The scheduled probe retained service outcomes but no digest of effective service configuration, secrets, network rules, or observability targets."
+      },
+      "command": "GitHub Actions Ping Runner run 32085615223",
+      "result": {
+        "status": "passed",
+        "summary": "The dated probe passed apiserver health, collection serving-readiness for two replicas, worker governance for three replicas, and K6 observability reverse checks.",
+        "measurements": {
+          "apiserver_health_passed": true,
+          "collection_replicas_ready": 2,
+          "worker_replicas_governed": 3,
+          "k6_observability_reverse_checks_passed": true
+        }
+      },
+      "owner": "infra",
+      "expires_on": "2026-08-20",
+      "supersedes": [],
+      "evidence": [
+        {
+          "kind": "github_run",
+          "ref": "https://github.com/FangcunMount/qs-server/actions/runs/32085615223"
+        }
+      ],
+      "limitations": [
+        "This is a dated host and shallow service-probe result, not current production evidence for the checkout or source baseline.",
+        "The probe did not independently re-attest the running container SHA, full business path, data consistency, failure recovery, or capacity thresholds."
+      ]
+    }
+  ]
+}

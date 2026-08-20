@@ -490,7 +490,7 @@ Interpretation 不应重新判分，也不应用报告文案反推能力等级�
 | 优先级 | 缺口 | 影响 | 建议 |
 | --- | --- | --- | --- |
 | P0 | Norm 导入校验拒绝 `cognitive + spm` | Raven 常模无法通过正式资产入口闭环 | 扩展 Norm 身份兼容矩阵并增加回归测试 |
-| P0 | NormSubject 生产输入未闭环 | 人口学分层常模可能无法正确选择 | 明确 Actor 信息来源、缺失语义和审计 |
+| P0 | NormSubject 已接入当前装配链，但缺当前 checkout 的 cognitive 环境 smoke | 仓库源码能从 Assessment 时点的 Actor Testee 快照物化人口学输入；真实数据上的分层选择仍未取得本轮环境证据 | 执行 cognitive SPM smoke，核对缺失语义、精确 NormReference 与审计记录 |
 | P1 | 四方版本一致性尚未统一收敛 | 错误输入可能被带入计分 | 复用统一 InputInvariantValidator |
 | P1 | TimeLimitSeconds 仅是客户端元数据 | 不能宣称服务端强制限时 | 产品先决定限时语义，再设计可信时间契约 |
 | P1 | Raven 纯计算位于 Evaluation application | 领域算法边界不够清晰 | 行为保护下逐步下沉 `domain/calculation` |

@@ -397,7 +397,20 @@ jobs:
           make tier1-test-policy
 
   docs:
-    name: Docs & API Sync
+    name: Docs Hygiene & Facts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with history for source-baseline verification
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Run offline documentation gates
+        run: |
+          make docs-check
+
+  docs-api-sync:
+    name: Docs & API Generated Sync
     if: ${{ vars.DOCS_VERIFY == 'true' }}
     runs-on: ubuntu-latest
     steps:
@@ -423,9 +436,9 @@ jobs:
         run: |
           go mod download
 
-      - name: Verify docs locally (make docs-verify)
+      - name: Verify generated API contracts
         run: |
-          make docs-verify
+          make docs-api-verify
 
       - name: Ensure no doc drift
         run: |
@@ -433,7 +446,7 @@ jobs:
 
   build:
     name: Build Applications
-    needs: [test, runtime-closure-e2e, lint, lint-boundaries, deployment-contracts, tier1-test-policy]
+    needs: [test, runtime-closure-e2e, lint, lint-boundaries, deployment-contracts, tier1-test-policy, docs]
     runs-on: ubuntu-latest
     strategy:
       matrix:

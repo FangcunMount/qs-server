@@ -2,6 +2,10 @@
 
 本目录存放 MongoDB 迁移文件，使用 `golang-migrate` 进行版本管理。
 
+本页只说明 Mongo migration 文件与索引契约。通用破坏性风险、dirty 状态处置、备份与恢复边界
+以[数据库迁移](../../README.md)为准；仓库中的迁移定义不能证明任一环境已经执行，本页也不记录
+会随部署变化的生产运行结果。
+
 ## 📁 目录结构
 
 ```text
@@ -32,7 +36,7 @@ mongodb/
 扫描与已知机构 archive keyset 扫描增加专用索引。扫描索引仍由应用只读校验；任一索引缺失时审计
 runner 保持 degraded 且不推进当前位于 MySQL `interpretation_catalog_audit_checkpoint` 的 checkpoint。
 
-down migration 只删除本版本拥有的两个扫描索引和 checkpoint 集合。生产回滚应优先关闭
+down migration 只删除本版本拥有的两个扫描索引和 checkpoint 集合。回滚应优先关闭
 `report_catalog_audit.enable` 并保留 checkpoint，不应依赖 down migration。
 
 ## Interpretation runtime ledgers retirement（000023）
@@ -44,17 +48,13 @@ MySQL 接管的 MongoDB 运行账本：
 - `interpretation_attention_projections` → `interpretation_attention_projection`；
 - `interpretation_catalog_audit_checkpoints` → `interpretation_catalog_audit_checkpoint`。
 
-Mongo driver 在执行版本 23 前强制确认三个源集合均为空；生产版本 22 若已在受控切换中删除源集合，
+Mongo driver 在执行版本 23 前强制确认三个源集合均为空；若某个版本 22 环境已在受控切换中删除源集合，
 driver 只会临时创建空命名空间以使 `drop` 幂等。任一集合仍有文档都会中止启动迁移。down migration
 只恢复空集合及历史索引，不恢复已迁移数据；生产回滚必须使用切换前备份和 MySQL 对应快照。
 
-2026-08-15 的生产维护运行 [31872956357](https://github.com/FangcunMount/qs-server/actions/runs/31872956357)
-在停写窗口内导入并回读校验 131,273 条 Attention ledger、合并 1 条 Catalog checkpoint；Admission
-源与目标均为 0。随后三个 Mongo 源集合均已删除，apiserver、3 个 worker 和公开 readiness 全部恢复。
-
 ## Empty compatibility collections retirement（000022）
 
-`000022_retire_empty_compatibility_collections` 退役已完成观察和生产只读预检的
+`000022_retire_empty_compatibility_collections` 退役两个要求在迁移前证明为空的 compatibility collection：
 `answersheet_submit_idempotency` 与 `archived_reports`。Mongo driver 在执行本版本前强制确认：
 
 - 两个集合文档数均为 0；
@@ -110,13 +110,20 @@ Runtime `ReportCatalogProjector` 的 `CreateMany` 仅作防御性 reconcile，�
 
 `000013_unified_modelcatalog_schema` 是 ModelCatalog unified schema 的标准部署入口：
 
-1. 删除冲突旧索引：`assessment_models.idx_assessment_models_code`、`questionnaires.idx_code_version`
-2. 建立与 cutover 脚本同构的 role-based partial unique indexes
-3. 创建 `assessment_norms` 与 `table_version` unique index
+1. `000013_*.up.json` 只创建 role-based partial unique indexes 与 `assessment_norms.table_version` unique index，不执行 `dropIndexes`；
+2. migration 后，`IndexManager.ReconcileUnifiedModelCatalogIndexes` 幂等删除
+   `assessment_models.idx_assessment_models_code` 与 `questionnaires.idx_code_version`，并对齐当前 canonical indexes；
+3. `VerifyUnifiedModelCatalogIndexes` 要求 required indexes 全部存在、forbidden legacy indexes 全部不存在，否则拒绝启动。
 
-**已做过 one-off cutover 的环境**：若旧冲突索引已不存在，`dropIndexes` 可能报 IndexNotFound。请先确认 `RequiredUnifiedIndexNames` 已齐全，再用 `migrate force 13` 标记版本，或手动补齐缺失索引后重跑。
+JSON up 刻意不使用非幂等 `dropIndexes`，以避免已切换环境因 `IndexNotFound` 进入
+dirty@13。若迁移已是 dirty，不得直接执行 `migrate force` 或手工改写 migration state；
+按[数据库迁移](../../README.md)核对真实索引、备份与补偿方案后再经审批处置。
 
-启动时 `bootstrap` 会在 Mongo migration 后执行 `VerifyUnifiedModelCatalogIndexes`（缺失 required / 仍存在 forbidden legacy → 拒绝启动）。
+验证入口：
+
+```bash
+go test -count=1 ./internal/pkg/migration ./internal/pkg/mongodb
+```
 
 ## 🔧 迁移文件格式
 
