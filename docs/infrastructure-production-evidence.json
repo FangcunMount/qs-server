@@ -2,6 +2,7 @@
   "schema_version": 1,
   "policy": {
     "current_evidence_requires_exact_deployed_sha": true,
+    "current_evidence_max_validity_days": 30,
     "expires_on_scope": "current-state eligibility, not record retention",
     "effective_config_unknown_codes": [
       "unknown_not_recorded"

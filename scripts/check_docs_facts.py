@@ -28,6 +28,7 @@ SIGNALS = ROOT / "configs/signals.yaml"
 VERSION_LEDGER = DOCS / "00-总览/09-当前版本定档验收台账.md"
 CLOSURE_MANIFEST = DOCS / "document-closure.json"
 INFRA_PRODUCTION_EVIDENCE = DOCS / "infrastructure-production-evidence.json"
+CURRENT_PRODUCTION_MAX_VALIDITY_DAYS = 30
 PROTO_ROOT = ROOT / "api/grpc/proto"
 MIGRATION_ROOT = ROOT / "internal/pkg/migration/migrations"
 MIGRATION_README = ROOT / "internal/pkg/migration/README.md"
@@ -349,10 +350,14 @@ INFRASTRUCTURE_REQUIRED_SOURCE_SCOPES = {
         "event_catalog": ("configs/events.yaml",),
         "event_runtime": ("internal/pkg/eventing/runtime/publisher.go",),
         "event_contract": ("internal/pkg/eventing/catalog/catalog.go",),
+        "mysql_outbox_store": ("internal/apiserver/infra/mysql/eventoutbox/store.go",),
+        "mongo_outbox_store": ("internal/apiserver/infra/mongo/eventoutbox/store.go",),
         "outbox_atomicity": ("internal/pkg/architecture/uow_outbox_ratchet_test.go",),
     },
     "cache_redis_signal": {
         "signal_catalog": ("configs/signals.yaml",),
+        "apiserver_prod_policy": ("configs/cache/apiserver.prod.yaml",),
+        "collection_prod_policy": ("configs/cache/collection-server.prod.yaml",),
         "cache_policy": ("internal/apiserver/cache/catalog/policy.go",),
         "cache_core": ("internal/pkg/cache/query/versioned.go",),
         "signal_contract": ("internal/pkg/signalcatalog/types.go",),
@@ -361,6 +366,7 @@ INFRASTRUCTURE_REQUIRED_SOURCE_SCOPES = {
     "concurrency_resilience": {
         "resilience_model": ("internal/pkg/resilience/model.go",),
         "locklease_catalog": ("internal/pkg/resilience/locklease/catalog.go",),
+        "collection_concurrency_gate": ("internal/collection-server/concurrency/gate.go",),
         "transaction_boundary": ("internal/apiserver/container/internal/transaction/runner.go",),
         "apiserver_config": ("configs/apiserver.prod.yaml",),
         "collection_config": ("configs/collection-server.prod.yaml",),
@@ -368,15 +374,23 @@ INFRASTRUCTURE_REQUIRED_SOURCE_SCOPES = {
     },
     "security_acl_resource_ownership": {
         "http_identity": ("internal/pkg/httpauth/identity.go",),
-        "rest_middleware": ("internal/apiserver/transport/rest/middleware/iam_middleware.go",),
+        "apiserver_rest_middleware": ("internal/apiserver/transport/rest/middleware/iam_middleware.go",),
+        "collection_rest_middleware": (
+            "internal/collection-server/transport/rest/middleware/iam_middleware.go",
+        ),
         "grpc_acl_runtime": ("internal/pkg/grpc/server.go",),
         "grpc_acl_config": ("configs/grpc-acl.prod.yaml",),
+        "apiserver_config": ("configs/apiserver.prod.yaml",),
+        "collection_config": ("configs/collection-server.prod.yaml",),
+        "worker_config": ("configs/worker.prod.yaml",),
         "resource_ownership": ("internal/collection-server/application/testeeaccess/authorizer.go",),
     },
     "observability_probes": {
         "apiserver_handler": ("internal/apiserver/transport/rest/router.go",),
         "collection_handler": ("internal/collection-server/transport/rest/handler/health_handler.go",),
         "worker_handler": ("internal/worker/observability/metrics_server.go",),
+        "generic_server": ("internal/pkg/server/genericapiserver.go",),
+        "system_governance": ("internal/apiserver/application/systemgovernance/facade.go",),
         "redis_observability": ("internal/pkg/redisruntime/observability/observer.go",),
         "event_observability": ("internal/pkg/eventing/observe/metrics.go",),
         "lease_observability": ("internal/pkg/resilience/locklease/observability/metrics.go",),
@@ -966,6 +980,29 @@ def command_is_verifiable(command: object) -> bool:
     return False
 
 
+def command_is_non_cached_test(command: object) -> bool:
+    """Require full, cache-bypassing Go suites for infrastructure test evidence."""
+    if not command_is_verifiable(command) or not isinstance(command, str):
+        return False
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return False
+    if tokens[:2] != ["go", "test"]:
+        # Repository test scripts and Make targets are validated by
+        # command_is_verifiable; Go's test cache semantics do not apply.
+        return True
+    count_flags: list[str] = []
+    for token in tokens[2:]:
+        if token in {"-run", "-list", "-skip", "-exec", "-c", "-args", "--"} or token.startswith(
+            ("-run=", "-list=", "-skip=", "-exec=", "-args=")
+        ):
+            return False
+        if token == "-count" or token.startswith("-count="):
+            count_flags.append(token)
+    return count_flags == ["-count=1"]
+
+
 def source_selector_matches(path_pattern: object, selector: object) -> bool:
     if not isinstance(path_pattern, str) or not isinstance(selector, str) or not selector.strip():
         return False
@@ -978,6 +1015,22 @@ def source_selector_matches(path_pattern: object, selector: object) -> bool:
         except (OSError, UnicodeDecodeError):
             continue
     return False
+
+
+def source_selector_is_trivial(selector: object) -> bool:
+    """Reject selectors that prove only file presence, not the claimed behavior."""
+    if not isinstance(selector, str):
+        return True
+    value = selector.strip()
+    return any(
+        pattern.fullmatch(value)
+        for pattern in (
+            re.compile(r"#![^\n]+"),
+            re.compile(r"package\s+[A-Za-z_][A-Za-z0-9_]*"),
+            re.compile(r"[A-Za-z_][A-Za-z0-9_.-]*:\s*"),
+            re.compile(r'["\'][A-Za-z_][A-Za-z0-9_.-]*["\']\s*:\s*'),
+        )
+    )
 
 
 def validate_evidence_item(item: object, context: str, head: str) -> list[Issue]:
@@ -1025,14 +1078,59 @@ def validate_evidence_item(item: object, context: str, head: str) -> list[Issue]
     return issues
 
 
-def valid_rfc3339(value: object) -> bool:
+def parse_rfc3339(value: object) -> datetime | None:
     if not isinstance(value, str) or "T" not in value:
-        return False
+        return None
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else None
+
+
+def valid_rfc3339(value: object) -> bool:
+    return parse_rfc3339(value) is not None
+
+
+def markdown_anchor_exists(path: Path, anchor: str) -> bool:
+    """Resolve GitHub-style heading anchors, including duplicate suffixes."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
         return False
-    return parsed.tzinfo is not None
+    if re.search(rf'<a\s+[^>]*(?:id|name)=["\']{re.escape(anchor)}["\']', text, re.IGNORECASE):
+        return True
+    seen: dict[str, int] = {}
+    for line in text.splitlines():
+        match = re.match(r"^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$", line)
+        if match is None:
+            continue
+        heading = re.sub(r"<[^>]+>", "", match.group(1)).replace("`", "").strip().lower()
+        base = "".join(character for character in heading if character.isalnum() or character in " _-")
+        base = re.sub(r"\s+", "-", base.strip())
+        if not base:
+            continue
+        duplicate_index = seen.get(base, 0)
+        seen[base] = duplicate_index + 1
+        candidate = base if duplicate_index == 0 else f"{base}-{duplicate_index}"
+        if candidate == anchor:
+            return True
+    return False
+
+
+def repository_record_anchor_exists(path: Path, anchor: str) -> bool:
+    if path.suffix.lower() == ".md":
+        return markdown_anchor_exists(path, anchor)
+    line_match = re.fullmatch(r"L([1-9][0-9]*)(?:-L([1-9][0-9]*))?", anchor)
+    if line_match is None:
+        return False
+    try:
+        line_count = sum(1 for _ in path.open(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError):
+        return False
+    start = int(line_match.group(1))
+    end = int(line_match.group(2) or start)
+    return start <= end <= line_count
 
 
 def validate_exact_gap(gap: object, context: str) -> list[Issue]:
@@ -1060,12 +1158,16 @@ def production_evidence_ref_valid(kind: object, ref: object) -> bool:
         path_value, separator, anchor = ref.partition("#")
         if separator and not anchor:
             return False
-        return (
+        path = ROOT / path_value
+        if not (
             valid_repo_pattern(path_value)
             and not any(char in path_value for char in "*?[")
             and not ignored_repo_path(path_value)
-            and (ROOT / path_value).is_file()
-        )
+            and not path_value.startswith("docs/_archive/")
+            and path.is_file()
+        ):
+            return False
+        return not separator or repository_record_anchor_exists(path, anchor)
     return False
 
 
@@ -1170,6 +1272,7 @@ def validate_infrastructure_production_evidence(
         issues.append(Issue("infrastructure-production-ledger-schema", f"top-level fields={sorted(raw)}"))
     expected_policy = {
         "current_evidence_requires_exact_deployed_sha": True,
+        "current_evidence_max_validity_days": CURRENT_PRODUCTION_MAX_VALIDITY_DAYS,
         "expires_on_scope": "current-state eligibility, not record retention",
         "effective_config_unknown_codes": ["unknown_not_recorded"],
     }
@@ -1221,8 +1324,11 @@ def validate_infrastructure_production_evidence(
         status = entry.get("status")
         if status not in {"historical", "current", "superseded"}:
             issues.append(Issue("infrastructure-production-entry-status", f"{entry_id}: {status!r}"))
-        if not valid_rfc3339(entry.get("observed_at")):
+        observed_at = parse_rfc3339(entry.get("observed_at"))
+        if observed_at is None:
             issues.append(Issue("infrastructure-production-entry-observed-at", entry_id))
+        elif observed_at > datetime.now(observed_at.tzinfo):
+            issues.append(Issue("infrastructure-production-entry-observed-at-future", entry_id))
         if not isinstance(entry.get("environment"), str) or not str(entry["environment"]).strip():
             issues.append(Issue("infrastructure-production-entry-environment", entry_id))
         for field in ("deployed_sha", "source_baseline_sha"):
@@ -1232,7 +1338,11 @@ def validate_infrastructure_production_evidence(
 
         effective_hash = entry.get("effective_config_hash")
         hash_limitation = entry.get("effective_config_hash_limitation")
-        has_hash = isinstance(effective_hash, str) and bool(SHA256_RE.fullmatch(effective_hash))
+        has_hash = (
+            isinstance(effective_hash, str)
+            and bool(SHA256_RE.fullmatch(effective_hash))
+            and effective_hash != "sha256:" + "0" * 64
+        )
         has_limitation = (
             isinstance(hash_limitation, dict)
             and set(hash_limitation) == {"code", "detail"}
@@ -1252,6 +1362,9 @@ def validate_infrastructure_production_evidence(
         if hash_limitation is not None and not has_limitation:
             issues.append(Issue("infrastructure-production-effective-config", f"{entry_id}: invalid limitation"))
 
+        # This is a recorded production command, not a command executed by this
+        # offline gate. Immutable provenance and structured results carry the
+        # trust boundary for current evidence.
         if not isinstance(entry.get("command"), str) or not str(entry["command"]).strip():
             issues.append(Issue("infrastructure-production-entry-command", entry_id))
         result = entry.get("result")
@@ -1332,10 +1445,30 @@ def validate_infrastructure_production_evidence(
                         f"{entry_id}: current evidence deployed_sha must equal checkout HEAD",
                     )
                 )
-            if valid_iso_date(entry.get("expires_on")) and date.fromisoformat(str(entry["expires_on"])) < date.today():
-                issues.append(Issue("infrastructure-production-entry-expired-current", entry_id))
+            if valid_iso_date(entry.get("expires_on")):
+                expires_on = date.fromisoformat(str(entry["expires_on"]))
+                if expires_on < date.today():
+                    issues.append(Issue("infrastructure-production-entry-expired-current", entry_id))
+                if observed_at is not None:
+                    validity_days = (expires_on - observed_at.date()).days
+                    if not 0 <= validity_days <= CURRENT_PRODUCTION_MAX_VALIDITY_DAYS:
+                        issues.append(
+                            Issue(
+                                "infrastructure-production-entry-validity-window",
+                                f"{entry_id}: {validity_days} days, max={CURRENT_PRODUCTION_MAX_VALIDITY_DAYS}",
+                            )
+                        )
             if not isinstance(result, dict) or result.get("status") != "passed":
                 issues.append(Issue("infrastructure-production-entry-current-result", entry_id))
+            elif not isinstance(result.get("measurements"), dict) or not result["measurements"]:
+                issues.append(Issue("infrastructure-production-entry-current-measurements", entry_id))
+            if not isinstance(evidence, list) or not any(
+                isinstance(item, dict)
+                and item.get("kind") == "github_run"
+                and production_evidence_ref_valid(item.get("kind"), item.get("ref"))
+                for item in evidence
+            ):
+                issues.append(Issue("infrastructure-production-entry-current-immutable-evidence", entry_id))
 
     for entry_id, entry in entries.items():
         supersedes = entry.get("supersedes")
@@ -1353,14 +1486,24 @@ def current_production_entry_eligible(
 ) -> bool:
     deployed_sha = entry.get("deployed_sha")
     entry_baseline = entry.get("source_baseline_sha")
+    observed_at = parse_rfc3339(entry.get("observed_at"))
+    expires_on = date.fromisoformat(str(entry["expires_on"])) if valid_iso_date(entry.get("expires_on")) else None
+    result = entry.get("result")
+    evidence = entry.get("evidence")
     return (
         entry.get("status") == "current"
-        and isinstance(entry.get("result"), dict)
-        and entry["result"].get("status") == "passed"
-        and valid_iso_date(entry.get("expires_on"))
-        and date.fromisoformat(str(entry["expires_on"])) >= date.today()
+        and isinstance(result, dict)
+        and result.get("status") == "passed"
+        and isinstance(result.get("measurements"), dict)
+        and bool(result["measurements"])
+        and observed_at is not None
+        and observed_at <= datetime.now(observed_at.tzinfo)
+        and expires_on is not None
+        and expires_on >= date.today()
+        and 0 <= (expires_on - observed_at.date()).days <= CURRENT_PRODUCTION_MAX_VALIDITY_DAYS
         and isinstance(entry.get("effective_config_hash"), str)
         and bool(SHA256_RE.fullmatch(str(entry["effective_config_hash"])))
+        and entry.get("effective_config_hash") != "sha256:" + "0" * 64
         and entry.get("effective_config_hash_limitation") is None
         and isinstance(manifest_source_baseline, str)
         and SHA_RE.fullmatch(manifest_source_baseline) is not None
@@ -1370,6 +1513,13 @@ def current_production_entry_eligible(
         and deployed_sha == head
         and is_git_ancestor(manifest_source_baseline, deployed_sha)
         and is_git_ancestor(deployed_sha, head)
+        and isinstance(evidence, list)
+        and any(
+            isinstance(item, dict)
+            and item.get("kind") == "github_run"
+            and production_evidence_ref_valid(item.get("kind"), item.get("ref"))
+            for item in evidence
+        )
     )
 
 
@@ -1502,6 +1652,13 @@ def validate_infrastructure_signoff(
             if not isinstance(item, dict) or item.get("kind") != "command":
                 issues.append(Issue("infrastructure-topic-non-cached-test-kind", f"{topic}[{evidence_index}]"))
             issues.extend(validate_evidence_item(item, f"{topic}.non_cached_tests[{evidence_index}]", head))
+            if isinstance(item, dict) and not command_is_non_cached_test(item.get("command")):
+                issues.append(
+                    Issue(
+                        "infrastructure-topic-non-cached-test-command",
+                        f"{topic}[{evidence_index}]: full Go suites require -count=1 and forbid -run",
+                    )
+                )
 
         environment_tests = raw_topic.get("environment_tests")
         if not isinstance(environment_tests, list) or not environment_tests:
@@ -1599,6 +1756,19 @@ def validate_infrastructure_signoff(
                 issues.append(Issue("infrastructure-dimension-signoff-state", f"{dimension_context}: {state!r}"))
 
             upgraded = review_state == "ready" or state == "signed"
+            if upgraded:
+                for evidence_index, item in enumerate(dimension_evidence):
+                    if (
+                        isinstance(item, dict)
+                        and item.get("kind") == "source_selector"
+                        and source_selector_is_trivial(item.get("selector"))
+                    ):
+                        issues.append(
+                            Issue(
+                                "infrastructure-dimension-trivial-selector",
+                                f"{dimension_context}.evidence[{evidence_index}]",
+                            )
+                        )
             if upgraded and source_patterns:
                 evidence_shas = {
                     item.get("source_sha")

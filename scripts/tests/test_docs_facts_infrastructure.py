@@ -5,7 +5,7 @@ import json
 import tempfile
 import unittest
 from collections.abc import Callable
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
@@ -126,6 +126,33 @@ class StrictEvidenceTest(unittest.TestCase):
             "closure-evidence-selector",
             {issue.kind for issue in check_docs_facts.validate_evidence_item(evidence, "selector", self.head)},
         )
+
+    def test_infrastructure_go_test_evidence_must_be_full_and_non_cached(self) -> None:
+        self.assertTrue(
+            check_docs_facts.command_is_non_cached_test(
+                "go test -count=1 ./internal/pkg/grpc"
+            )
+        )
+        for command in (
+            "go test ./internal/pkg/grpc",
+            "go test -count=0 ./internal/pkg/grpc",
+            "go test -count=2 ./internal/pkg/grpc",
+            "go test -count=1 -count=1 ./internal/pkg/grpc",
+            "go test -count 1 ./internal/pkg/grpc",
+            "go test -run=NoSuchTest -count=1 ./internal/pkg/grpc",
+            "go test -run NoSuchTest -count=1 ./internal/pkg/grpc",
+            "go test -count=1 -list=. ./internal/pkg/grpc",
+            "go test -count=1 -list . ./internal/pkg/grpc",
+            "go test -count=1 -skip=.* ./internal/pkg/grpc",
+            "go test -count=1 -skip .* ./internal/pkg/grpc",
+            "go test -count=1 -exec=/bin/true ./internal/pkg/grpc",
+            "go test -count=1 -exec /bin/true ./internal/pkg/grpc",
+            "go test -count=1 -c ./internal/pkg/grpc",
+            "go test -count=1 ./internal/pkg/grpc -args -test.run=NoSuchTest",
+            "go test -count=1 ./internal/pkg/grpc -- -test.run=.*",
+        ):
+            with self.subTest(command=command):
+                self.assertFalse(check_docs_facts.command_is_non_cached_test(command))
 
 
 class InfrastructureParserTest(unittest.TestCase):
@@ -337,6 +364,26 @@ class InfrastructureSignoffTest(unittest.TestCase):
             "verified_on": self.today,
         }
 
+    def current_production_entry(self, topic: str) -> dict[str, object]:
+        observed_at = datetime.now().astimezone() - timedelta(days=1)
+        return {
+            "status": "current",
+            "topics": [topic],
+            "result": {"status": "passed", "measurements": {"readyz_status": 200}},
+            "observed_at": observed_at.isoformat(),
+            "expires_on": (observed_at.date() + timedelta(days=30)).isoformat(),
+            "deployed_sha": self.head,
+            "source_baseline_sha": self.head,
+            "effective_config_hash": "sha256:" + "1" * 64,
+            "effective_config_hash_limitation": None,
+            "evidence": [
+                {
+                    "kind": "github_run",
+                    "ref": "https://github.com/FangcunMount/qs-server/actions/runs/123456789",
+                }
+            ],
+        }
+
     @staticmethod
     def unsigned_dimension() -> dict[str, object]:
         return {
@@ -442,15 +489,80 @@ class InfrastructureSignoffTest(unittest.TestCase):
         dimension["evidence"] = [{"kind": "semantic_audit", "ref": "looks good"}]
         self.assertIn("closure-evidence-kind", {issue.kind for issue in self.validate(manifest)})
 
-    def test_deleting_required_topic_source_scope_fails(self) -> None:
-        manifest = self.valid_manifest()
-        topic = manifest["infrastructure_signoff"]["topics"][0]
-        required_anchor = next(
-            iter(check_docs_facts.INFRASTRUCTURE_REQUIRED_SOURCE_SCOPES[topic["topic"]].values())
-        )[0]
-        topic["fact_sources"] = [source for source in topic["fact_sources"] if source["path"] != required_anchor]
-        kinds = {issue.kind for issue in self.validate(manifest)}
-        self.assertIn("infrastructure-topic-required-source-scope", kinds)
+    def test_trivial_source_selector_cannot_upgrade_dimension(self) -> None:
+        trivial_selectors = (
+            ("scripts/check_docs_facts.py", "#!/usr/bin/env python3"),
+            ("internal/apiserver/process/runner.go", "package process"),
+            ("configs/apiserver.prod.yaml", "mongo_consistency_audit:"),
+        )
+        for path, selector in trivial_selectors:
+            with self.subTest(selector=selector):
+                manifest = self.valid_manifest()
+                runtime = manifest["infrastructure_signoff"]["topics"][0]["dimensions"]["runtime"]
+                runtime["review_state"] = "ready"
+                runtime["evidence"] = [
+                    {
+                        "kind": "source_selector",
+                        "path": path,
+                        "selector": selector,
+                        "result": "matched",
+                        "source_sha": self.head,
+                        "verified_on": self.today,
+                    }
+                ]
+                kinds = {issue.kind for issue in self.validate(manifest)}
+                self.assertIn("infrastructure-dimension-trivial-selector", kinds)
+
+    def test_deleting_any_required_topic_source_scope_fails(self) -> None:
+        for topic_id, scopes in check_docs_facts.INFRASTRUCTURE_REQUIRED_SOURCE_SCOPES.items():
+            for scope_name, anchors in scopes.items():
+                with self.subTest(topic=topic_id, scope=scope_name):
+                    manifest = self.valid_manifest()
+                    topic = next(
+                        item
+                        for item in manifest["infrastructure_signoff"]["topics"]
+                        if item["topic"] == topic_id
+                    )
+                    topic["fact_sources"] = [
+                        source for source in topic["fact_sources"] if source["path"] not in anchors
+                    ]
+                    issues = self.validate(manifest)
+                    required_scope_issues = [
+                        issue
+                        for issue in issues
+                        if issue.kind == "infrastructure-topic-required-source-scope"
+                    ]
+                    self.assertTrue(
+                        any(issue.detail.startswith(f"{topic_id}.{scope_name}:") for issue in required_scope_issues),
+                        required_scope_issues,
+                    )
+
+    def test_non_cached_test_mutations_fail_infrastructure_schema(self) -> None:
+        for command in (
+            "go test ./internal/pkg/grpc",
+            "go test -count=0 ./internal/pkg/grpc",
+            "go test -count=2 ./internal/pkg/grpc",
+            "go test -count=1 -count=1 ./internal/pkg/grpc",
+            "go test -count 1 ./internal/pkg/grpc",
+            "go test -run=NoSuchTest -count=1 ./internal/pkg/grpc",
+            "go test -run NoSuchTest -count=1 ./internal/pkg/grpc",
+            "go test -count=1 -list=. ./internal/pkg/grpc",
+            "go test -count=1 -list . ./internal/pkg/grpc",
+            "go test -count=1 -skip=.* ./internal/pkg/grpc",
+            "go test -count=1 -skip .* ./internal/pkg/grpc",
+            "go test -count=1 -exec=/bin/true ./internal/pkg/grpc",
+            "go test -count=1 -exec /bin/true ./internal/pkg/grpc",
+            "go test -count=1 -c ./internal/pkg/grpc",
+            "go test -count=1 ./internal/pkg/grpc -args -test.run=NoSuchTest",
+            "go test -count=1 ./internal/pkg/grpc -- -test.run=.*",
+        ):
+            with self.subTest(command=command):
+                manifest = self.valid_manifest()
+                evidence = self.command_evidence()
+                evidence["command"] = command
+                manifest["infrastructure_signoff"]["topics"][0]["non_cached_tests"] = [evidence]
+                kinds = {issue.kind for issue in self.validate(manifest)}
+                self.assertIn("infrastructure-topic-non-cached-test-command", kinds)
 
     def test_operations_and_production_cannot_upgrade_without_real_evidence(self) -> None:
         manifest = self.valid_manifest()
@@ -577,18 +689,43 @@ class InfrastructureSignoffTest(unittest.TestCase):
                 "status": "historical",
                 "topics": list(check_docs_facts.INFRASTRUCTURE_TOPICS),
             },
-            "current-prod": {
-                "status": "current",
-                "topics": [topic["topic"]],
-                "result": {"status": "passed"},
-                "expires_on": "2099-01-01",
-                "deployed_sha": self.head,
-                "source_baseline_sha": self.head,
-                "effective_config_hash": "sha256:" + "1" * 64,
-                "effective_config_hash_limitation": None,
-            }
+            "current-prod": self.current_production_entry(topic["topic"]),
         }
         self.assertEqual(self.validate(manifest, production_entries), [])
+
+    def test_production_upgrade_rejects_current_evidence_shortcuts(self) -> None:
+        def placeholder_hash(entry: dict[str, object]) -> None:
+            entry["effective_config_hash"] = "sha256:" + "0" * 64
+
+        def empty_measurements(entry: dict[str, object]) -> None:
+            entry["result"]["measurements"] = {}
+
+        def repository_only(entry: dict[str, object]) -> None:
+            entry["evidence"] = [{"kind": "repository_record", "ref": "scripts/check_docs_facts.py"}]
+
+        def future_observation(entry: dict[str, object]) -> None:
+            entry["observed_at"] = (datetime.now().astimezone() + timedelta(days=1)).isoformat()
+
+        for name, mutate in (
+            ("placeholder_hash", placeholder_hash),
+            ("empty_measurements", empty_measurements),
+            ("repository_only", repository_only),
+            ("future_observation", future_observation),
+        ):
+            with self.subTest(case=name):
+                manifest = self.valid_manifest()
+                topic = manifest["infrastructure_signoff"]["topics"][0]
+                topic["production_evidence"] = ["current-prod"]
+                production = topic["dimensions"]["production"]
+                production["review_state"] = "ready"
+                production["evidence"] = [self.selector_evidence()]
+                current_entry = self.current_production_entry(topic["topic"])
+                mutate(current_entry)
+                kinds = {
+                    issue.kind
+                    for issue in self.validate(manifest, {"current-prod": current_entry})
+                }
+                self.assertIn("infrastructure-production-upgrade-without-current-evidence", kinds)
 
     def test_production_upgrade_rejects_entry_from_different_source_baseline(self) -> None:
         manifest = self.valid_manifest()
@@ -604,16 +741,7 @@ class InfrastructureSignoffTest(unittest.TestCase):
                 "status": "historical",
                 "topics": list(check_docs_facts.INFRASTRUCTURE_TOPICS),
             },
-            "current-prod": {
-                "status": "current",
-                "topics": [topic["topic"]],
-                "result": {"status": "passed"},
-                "expires_on": "2099-01-01",
-                "deployed_sha": self.head,
-                "source_baseline_sha": self.head,
-                "effective_config_hash": "sha256:" + "1" * 64,
-                "effective_config_hash_limitation": None,
-            },
+            "current-prod": self.current_production_entry(topic["topic"]),
         }
         kinds = {issue.kind for issue in self.validate(manifest, production_entries)}
         self.assertIn("infrastructure-production-upgrade-without-current-evidence", kinds)
@@ -631,10 +759,12 @@ class InfrastructureProductionLedgerTest(unittest.TestCase):
         cls.head = check_docs_facts.current_git_head()
 
     def valid_ledger(self) -> dict[str, object]:
+        observed_at = datetime.now().astimezone() - timedelta(days=1)
         return {
             "schema_version": 1,
             "policy": {
                 "current_evidence_requires_exact_deployed_sha": True,
+                "current_evidence_max_validity_days": 30,
                 "expires_on_scope": "current-state eligibility, not record retention",
                 "effective_config_unknown_codes": ["unknown_not_recorded"],
             },
@@ -642,19 +772,28 @@ class InfrastructureProductionLedgerTest(unittest.TestCase):
                 {
                     "id": "prod-current-1",
                     "status": "current",
-                    "observed_at": "2026-08-20T12:00:00+08:00",
+                    "observed_at": observed_at.isoformat(),
                     "environment": "production",
                     "deployed_sha": self.head,
                     "source_baseline_sha": self.head,
-                    "effective_config_hash": "sha256:" + "0" * 64,
+                    "effective_config_hash": "sha256:" + "1" * 64,
                     "effective_config_hash_limitation": None,
                     "command": "recorded production probe",
-                    "result": {"status": "passed", "summary": "probe passed", "measurements": {}},
+                    "result": {
+                        "status": "passed",
+                        "summary": "probe passed",
+                        "measurements": {"readyz_status": 200},
+                    },
                     "owner": "infra",
                     "topics": ["runtime_lifecycle"],
-                    "expires_on": "2099-01-01",
+                    "expires_on": (observed_at.date() + timedelta(days=30)).isoformat(),
                     "supersedes": [],
-                    "evidence": [{"kind": "repository_record", "ref": "docs/README.md"}],
+                    "evidence": [
+                        {
+                            "kind": "github_run",
+                            "ref": "https://github.com/FangcunMount/qs-server/actions/runs/123456789",
+                        }
+                    ],
                     "limitations": ["point-in-time observation"],
                 }
             ],
@@ -694,6 +833,49 @@ class InfrastructureProductionLedgerTest(unittest.TestCase):
         }
         kinds = {issue.kind for issue in self.validate(ledger)[1]}
         self.assertIn("infrastructure-production-entry-current-effective-config", kinds)
+
+    def test_current_evidence_rejects_placeholder_hash_and_empty_measurements(self) -> None:
+        ledger = self.valid_ledger()
+        entry = ledger["entries"][0]
+        entry["effective_config_hash"] = "sha256:" + "0" * 64
+        entry["result"]["measurements"] = {}
+        kinds = {issue.kind for issue in self.validate(ledger)[1]}
+        self.assertIn("infrastructure-production-effective-config", kinds)
+        self.assertIn("infrastructure-production-entry-current-measurements", kinds)
+
+    def test_current_evidence_rejects_future_observation_and_overlong_validity(self) -> None:
+        ledger = self.valid_ledger()
+        entry = ledger["entries"][0]
+        future = datetime.now().astimezone() + timedelta(days=1)
+        entry["observed_at"] = future.isoformat()
+        entry["expires_on"] = (future.date() + timedelta(days=31)).isoformat()
+        kinds = {issue.kind for issue in self.validate(ledger)[1]}
+        self.assertIn("infrastructure-production-entry-observed-at-future", kinds)
+        self.assertIn("infrastructure-production-entry-validity-window", kinds)
+
+    def test_current_evidence_requires_immutable_github_run(self) -> None:
+        ledger = self.valid_ledger()
+        ledger["entries"][0]["evidence"] = [
+            {"kind": "repository_record", "ref": "scripts/check_docs_facts.py"}
+        ]
+        kinds = {issue.kind for issue in self.validate(ledger)[1]}
+        self.assertIn("infrastructure-production-entry-current-immutable-evidence", kinds)
+
+    def test_repository_record_rejects_missing_anchor_and_archive(self) -> None:
+        valid_ref = "docs/00-总览/09-当前版本定档验收台账.md#6-mongo-consistency-audit-当前真值"
+        self.assertTrue(check_docs_facts.production_evidence_ref_valid("repository_record", valid_ref))
+        self.assertFalse(
+            check_docs_facts.production_evidence_ref_valid(
+                "repository_record",
+                "docs/00-总览/09-当前版本定档验收台账.md#definitely-not-an-anchor",
+            )
+        )
+        self.assertFalse(
+            check_docs_facts.production_evidence_ref_valid(
+                "repository_record",
+                "docs/_archive/README.md",
+            )
+        )
 
     def test_ledger_topics_must_be_nonempty_known_and_unique(self) -> None:
         ledger = self.valid_ledger()

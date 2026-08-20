@@ -141,7 +141,9 @@ git diff --check
 
 `docs-facts` 还必须验证 `document-closure.json` 对 164 篇 primary 文档和 27 篇 maintained sidecar 的 exact coverage、source baseline、状态枚举、七模块七轴签署、十项基础设施七轴签署，以及 REST/gRPC/Event/Signal/Migration 等机器契约 ratchet。164 超过 150 的评审目标但低于 165 硬上限，例外理由记录在 `budgets.exceptions`，不能据此继续无审查扩张。
 
-台账中的 `checkout_ref: git:HEAD` 是动态工作区引用；历史 CI、部署和生产 SHA 使用独立字段，不得要求它们等于 HEAD。`verification`、模块与基础设施维度中的可升级证据只能使用严格 `command` 或 `source_selector` 对象；未实际执行的测试不得登记为 passed。历史基础设施运行证据集中保存在 [`infrastructure-production-evidence.json`](./infrastructure-production-evidence.json)，人工入口见[基础设施生产证据台账](./00-总览/10-基础设施生产证据台账.md)；历史记录不得自动升级当前 production 签署。
+台账中的 `checkout_ref: git:HEAD` 是动态工作区引用；历史 CI、部署和生产 SHA 使用独立字段，不得要求它们等于 HEAD。`verification`、模块与基础设施维度中的可升级证据只能使用严格 `command` 或 `source_selector` 对象；未实际执行的测试不得登记为 passed。`docs-facts` 能校验命令入口、源码 selector、SHA/date schema 和 source freshness，但不会替操作者重演台账中的历史命令或访问外部证据；命令的实际退出码仍必须由本次执行者/CI 保存并负责。
+
+十项基础设施主题必须各自覆盖 checker 规定的关键 source/config scope，不能用一份通用测试或一个无关目录代替。`passed` 环境测试必须附结构化原始证据引用；没有真实环境执行时保持 `not_run` 并绑定 gap。生产记录通过 `topics` 声明适用范围，主题可以诚实保留空引用，但 production 维度必须非 ready、unsigned 且有具名 production gap。只有 topics 相关、未过期、结果 passed、`deployed_sha` 精确等于当前 checkout、`source_baseline_sha` 等于当前机器基线且保存真实 effective-config `sha256` 的记录，才有资格支持 production ready；`unknown_not_recorded` 只允许历史记录。历史基础设施运行证据集中保存在 [`infrastructure-production-evidence.json`](./infrastructure-production-evidence.json)，人工入口见[基础设施生产证据台账](./00-总览/10-基础设施生产证据台账.md)；历史记录不得自动升级当前 production 签署。
 
 涉及 REST 生成契约时再执行：
 
