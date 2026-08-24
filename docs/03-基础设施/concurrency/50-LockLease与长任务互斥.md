@@ -34,8 +34,20 @@ LockLease 回答的是“在一段有限时间内，哪个实例有资格执行�
 | collection-server | `collection_submit` | duplicate suppression | 5m | 跨实例提交 owner lease |
 
 catalog 中的 renewal mode 是 `auto` 能力描述；三个进程的版本化 dev/prod 配置均声明启用
-`lock_lease.renewal_enabled`。该开关只保留为显式运维回退，不得作为常态关闭续租；仓库 YAML
-不证明部署时合并后的 effective value。
+`lock_lease.renewal_enabled`。这些 YAML 只表达仓库配置意图，不证明目标环境合并后的 effective value。
+
+### 2.1 DefaultTTL、caller override 与 snapshot
+
+catalog 表中的 TTL 是 `Capability.Spec.DefaultTTL`，只在调用方传入的 TTL 小于等于 0 时作为回退值。`LockLease.Run` 接受 caller override，实际 acquire、renew 周期和续租 TTL 都使用本次调用解析后的 TTL。
+
+例如：
+
+- `plan_scheduler_leader` 的 catalog DefaultTTL 是 50s；
+- 仓库 `configs/apiserver.prod.yaml` 为 plan scheduler 声明 `lock_ttl: 2m`；
+- 这是仓库版本化配置意图，不证明目标环境已使用 2m；
+- 当前 runtime snapshot 仍按 catalog DefaultTTL 投影该 workload，因此会显示 50s 和约 16s 的续租间隔，而不是 caller 的 2m 和 40s。
+
+因此 snapshot 中的 `ttl_seconds` / `renew_every_seconds` 表示 catalog 默认能力，不是 active run 的 effective TTL。排障时必须同时核对 caller 配置和调用点；不能只依据 snapshot 判断正在运行的 lease 预算。
 
 ## 3. Lease 生命周期
 
@@ -124,7 +136,7 @@ Release 使用 token 校验，只释放当前持有者自己的 lease。release 
 
 没有 cooldown，刚让权的实例可能立即再次抢回 leader，使人工操作失去意义。
 
-当前 production `system_governance.resilience.release_lock=false`，action registry 将其标记为 planned/disabled，不能把让权接口描述为已开放生产操作。
+仓库 `apiserver.prod.yaml` 当前声明 `system_governance.resilience.release_lock=false`，action registry 会在采用该配置时把它标记为 planned/disabled。这个值只是版本化配置意图，不能据此断言目标环境的 effective flag，也不能把让权接口描述为已开放操作。
 
 ## 8. 为什么 lease 不能替代 fencing
 
@@ -137,7 +149,7 @@ Release 使用 token 校验，只释放当前持有者自己的 lease。release 
 
 仅凭 Redis token，数据库不知道 A 已经过期。要阻止旧持有者写入，需要在持久化层比较单调递增 fencing token、版本号或状态机 CAS。
 
-qs-server 当前通用 LockLease 提供随机 ownership token，用于安全 renew/release；它不是对所有业务存储生效的单调 fencing token。文档和面试中必须区分这两个概念。
+qs-server 当前通用 LockLease 提供随机 ownership token，用于安全 renew/release；它不是对所有业务存储生效的单调 fencing token。文档和排障中必须区分这两个概念。
 
 ### 8.1 候选协调机制
 
@@ -184,9 +196,11 @@ qs_locklease_operation_total{
 同时通过统一决策指标观察 `lock_acquired`、`lock_contention`、`lock_error`、`duplicate_skipped`、`degraded_open` 等结果。运行时 snapshot 提供：
 
 - configured / degraded / reason；
-- TTL；
-- renewal mode / renew interval；
+- catalog DefaultTTL；
+- renewal mode / 基于 catalog DefaultTTL 计算的 renew interval；
 - active runs。
+
+snapshot 当前不记录 caller override 或 active run 的 effective TTL；例如 plan scheduler 的配置意图 2m 不会覆盖 snapshot 中的 catalog 默认 50s。这是观测边界，不应被解释成 runtime 已按 snapshot 数值执行。
 
 告警不能只看“Redis up”。更直接的问题是：
 
@@ -202,9 +216,11 @@ qs_locklease_operation_total{
 | --- | --- |
 | `已实现` | 十一个 workload 的统一 catalog、token-safe acquire/renew/release、active run 和 cooldown。 |
 | `已实现` | renewal failure/loss 取消 body，并对不合作 body 告警。 |
-| `待运行证据` | 版本化 production 配置意图启用自动续租；仍需核对部署 effective value，并按 workload 观察 renew error/lost 与 cancellation 后 body 退出时间。 |
+| `配置意图` | 仓库 dev/prod YAML 声明启用自动续租；仍需核对目标环境 effective value。 |
+| `观测缺口` | runtime snapshot 只投影 catalog DefaultTTL，不展示 caller override 或 active run effective TTL。 |
+| `待运行证据` | 需按 workload 观察 renew error/lost 与 cancellation 后 body 退出时间。 |
 | `待补证据` | 需要逐 workload 证明持久化副作用具备幂等、CAS 或 fencing 边界。 |
-| `规划改造` | 对确需强互斥的写路径引入持久化 fencing token。 |
+| `当前未实现` | 通用持久化 fencing token 不属于当前 LockLease 能力。 |
 
 测试入口：
 
@@ -212,7 +228,7 @@ qs_locklease_operation_total{
 - `internal/pkg/resilience/locklease/redisadapter/lock_test.go`
 - `internal/worker/handlers/answersheet_handler_test.go`
 
-## 12. 学习问题
+## 12. 验证问题
 
 1. 为什么 TTL 设得很长不能从根本上解决旧持有者问题？
 2. 如果错误关闭 renewal，30 分钟 statistics task lock 最危险的两种情况是什么？

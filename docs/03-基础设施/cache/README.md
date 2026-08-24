@@ -46,7 +46,7 @@ Domain 不依赖 Cache。Cache-Aside 位于 Repository decorator、application q
 
 1. 数据库、读模型和业务服务是事实源，Cache 不是第二份业务事实。
 2. 一个 apiserver capability 只有一个 `Spec`、一个配置 source 和一个 effective Policy。
-3. 业务 adapter 每次操作从 `PolicyProvider` 解析一次 Policy，不读取 Viper、process Options 或静态副本。
+3. 普通 object/query read-through 每次只从 `PolicyProvider` 解析一次 Policy，不读取 Viper 或 process Options；published-model L1+L2 当前会在外层 enabled、L2 read-through 和 L1 Set 多次 Resolve，且 L1 jitter 保留启动时副本，这是已记录的例外而非应被扩张的契约。
 4. Redis key、payload、negative sentinel、TTL 与失效规则是兼容合同；结构重构不能顺带改写。
 5. Pub/Sub signal 只做 best-effort 驱逐或预热唤醒，TTL 是最终收敛兜底，可靠一致性不能依赖 signal。
 
@@ -66,7 +66,7 @@ statistics.query
 
 `evaluation.assessment_list` 的历史实现未接入实际读取路径，已连同 version bump 和配置入口退役；assessment list 继续直接读取既有 read model。`report_status` 同样出现在 Registry 和三进程配置中，但它的 `kind` 是 `operational_state`，不是普通 Cache-Aside。collection-server 另有独立 L1 capability：`catalog.questionnaire`、`catalog.published_model`、`catalog.typology`、`evaluation.assessment_access` 与 `evaluation.assessment_detail`。
 
-`modelcatalog.published_model` 当前是有意收窄的 L1+L2：immutable exact-by-ref 运行快照，以及 key 包含全局 catalog version 的 list/by-questionnaire 读取进入 apiserver L1，以复用已经解码的 `DefinitionV2`。发布后 bump 全局版本，旧目录 L1 key 会跨实例变为不可达；latest-by-code、algorithms 等非版本化可变目录仍只使用 L2，Active admission 仍绕过缓存读取 Mongo。
+`modelcatalog.published_model` 当前是有意收窄的 L1+L2：immutable exact-by-ref 运行快照，以及 key 包含全局 catalog version 的 list/by-questionnaire 读取进入 apiserver L1，以复用已经解码的 `DefinitionV2`。发布后 bump 全局版本，旧目录 L1 key 会跨实例变为不可达；latest-by-code、algorithms 等非版本化可变目录仍只使用 L2，Active admission 仍绕过缓存读取 Mongo。它的 L1 TTL 在 Set 时动态重取，jitter 则在构造时固定；status 的 effective jitter 不证明 L1 已热生效该值。
 
 IAM/JWKS/ProfileLink、WeChat SDK token 等私有缓存继续由各自 integration owner 维护，不纳入上述业务 Registry。
 
@@ -84,8 +84,8 @@ IAM/JWKS/ProfileLink、WeChat SDK token 等私有缓存继续由各自 integrati
 ## 5. 快速验证
 
 ```bash
-go test ./internal/pkg/cache/... ./internal/pkg/redisruntime/...
-go test ./internal/apiserver/cache/... ./internal/collection-server/cache
-go test ./internal/pkg/configcontract ./internal/pkg/architecture
+go test -count=1 ./internal/pkg/cache/... ./internal/pkg/redisruntime/...
+go test -count=1 ./internal/apiserver/cache/... ./internal/collection-server/cache
+go test -count=1 ./internal/pkg/configcontract ./internal/pkg/architecture
 make docs-hygiene
 ```

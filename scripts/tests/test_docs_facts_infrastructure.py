@@ -317,6 +317,123 @@ class InfrastructureParserTest(unittest.TestCase):
     def test_all_current_infrastructure_contracts_pass(self) -> None:
         self.assertEqual(check_docs_facts.infrastructure_contract_issues(), [])
 
+    def test_cache_responsibility_and_l1_metric_drift_is_rejected(self) -> None:
+        issues = self.issues_after_mutation(
+            check_docs_facts.CACHE_OBSERVABILITY_DOC,
+            "qs_apiserver_l1_cache_requests_total",
+            "qs_apiserver_unknown_cache_requests_total",
+            check_docs_facts.priority_infrastructure_doc_contract_issues,
+        )
+        self.assertIn("priority-infrastructure-doc-drift", {issue.kind for issue in issues})
+
+    def test_published_model_negative_cache_drift_is_rejected(self) -> None:
+        issues = self.issues_after_mutation(
+            check_docs_facts.CACHE_KERNEL_DOC,
+            "`CacheNegative: false`",
+            "`CacheNegative: true`",
+            check_docs_facts.priority_infrastructure_doc_contract_issues,
+        )
+        self.assertIn("priority-infrastructure-doc-drift", {issue.kind for issue in issues})
+
+    def test_published_model_l1_reload_boundary_drift_is_rejected(self) -> None:
+        issues = self.issues_after_mutation(
+            check_docs_facts.CACHE_REGISTRY_DOC,
+            "`TTLJitterRatio` 在 L1 构造时固定",
+            "`TTLJitterRatio` 在每次 Set 时热加载",
+            check_docs_facts.priority_infrastructure_doc_contract_issues,
+        )
+        self.assertIn("priority-infrastructure-doc-drift", {issue.kind for issue in issues})
+
+    def test_published_model_l1_l2_single_snapshot_overclaim_is_rejected(self) -> None:
+        issues = self.issues_after_mutation(
+            check_docs_facts.CACHE_KERNEL_DOC,
+            "published-model 外层 `cacheEnabled()`、L2 read-through 与 L1 Set 的 `TTLProvider` 会多次 Resolve",
+            "published-model 顶层读取只 Resolve 一次",
+            check_docs_facts.priority_infrastructure_doc_contract_issues,
+        )
+        self.assertIn("priority-infrastructure-doc-drift", {issue.kind for issue in issues})
+
+    def test_cache_overview_cannot_hide_l1_reload_exception(self) -> None:
+        issues = self.issues_after_mutation(
+            check_docs_facts.CACHE_README,
+            "L1 jitter 保留启动时副本",
+            "L1 jitter 随 reload 立即热生效",
+            check_docs_facts.priority_infrastructure_doc_contract_issues,
+        )
+        self.assertIn("priority-infrastructure-doc-drift", {issue.kind for issue in issues})
+
+    def test_event_terminal_handoff_simplification_is_rejected(self) -> None:
+        issues = self.issues_after_mutation(
+            check_docs_facts.EVENT_MQ_DOC,
+            "发布 cb.failed.<hash> handoff topic",
+            "直接写入 MySQL dead-letter",
+            check_docs_facts.priority_infrastructure_doc_contract_issues,
+        )
+        self.assertIn("priority-event-terminal-handoff-drift", {issue.kind for issue in issues})
+
+    def test_evaluation_failed_best_effort_projection_drift_is_rejected(self) -> None:
+        issues = self.issues_after_mutation(
+            check_docs_facts.EVENT_CONTRACT_DOC,
+            "错误都不返回给 handler",
+            "错误会返回给 handler",
+            check_docs_facts.priority_infrastructure_doc_contract_issues,
+        )
+        self.assertIn("priority-infrastructure-doc-drift", {issue.kind for issue in issues})
+
+    def test_event_frontend_claim_requires_independent_exact_sha(self) -> None:
+        issues = self.issues_after_mutation(
+            check_docs_facts.EVENT_OBSERVABILITY_DOC,
+            "不在本文档的 exact-SHA closure 内",
+            "已由本文档完成验收",
+            check_docs_facts.priority_infrastructure_doc_contract_issues,
+        )
+        self.assertIn("priority-infrastructure-doc-drift", {issue.kind for issue in issues})
+
+    def test_event_overview_cannot_equate_ack_with_report_status_projection(self) -> None:
+        issues = self.issues_after_mutation(
+            check_docs_facts.EVENT_README,
+            "ACK 不证明 report-status 投影或唤醒已成功",
+            "ACK 证明 report-status 投影和唤醒已成功",
+            check_docs_facts.priority_infrastructure_doc_contract_issues,
+        )
+        self.assertIn("priority-infrastructure-doc-drift", {issue.kind for issue in issues})
+
+    def test_backpressure_value_drift_is_rejected(self) -> None:
+        issues = self.issues_after_mutation(
+            check_docs_facts.CONCURRENCY_BACKPRESSURE_DOC,
+            "| Mongo | 48 | 1500ms |",
+            "| Mongo | 120 | 5000ms |",
+            check_docs_facts.priority_infrastructure_doc_contract_issues,
+        )
+        self.assertIn("priority-backpressure-doc-drift", {issue.kind for issue in issues})
+
+    def test_backpressure_method_coverage_overclaim_is_rejected(self) -> None:
+        issues = self.issues_after_mutation(
+            check_docs_facts.CONCURRENCY_BACKPRESSURE_DOC,
+            "limiter 指标只表示“显式 acquire 的受控操作”",
+            "limiter 指标表示该进程全部 DB 操作",
+            check_docs_facts.priority_infrastructure_doc_contract_issues,
+        )
+        self.assertIn("priority-infrastructure-doc-drift", {issue.kind for issue in issues})
+
+    def test_concurrency_overview_cannot_hide_method_level_bypasses(self) -> None:
+        issues = self.issues_after_mutation(
+            check_docs_facts.CONCURRENCY_README,
+            "limiter 注入不等于方法级全覆盖",
+            "limiter 注入即代表方法级全覆盖",
+            check_docs_facts.priority_infrastructure_doc_contract_issues,
+        )
+        self.assertIn("priority-infrastructure-doc-drift", {issue.kind for issue in issues})
+
+    def test_phantom_control_metric_is_rejected(self) -> None:
+        issues = self.issues_after_mutation(
+            check_docs_facts.CONCURRENCY_ACCEPTANCE_DOC,
+            "当前没有专用的统一 control-operation Prometheus counter",
+            "当前统一指标是 resilience_control_operation_total",
+            check_docs_facts.priority_infrastructure_doc_contract_issues,
+        )
+        self.assertIn("priority-concurrency-phantom-metric", {issue.kind for issue in issues})
+
     def test_oneoff_cleanup_must_remain_blocked_and_audit_only(self) -> None:
         text = check_docs_facts.ONEOFF_README.read_text(encoding="utf-8")
         self.assertEqual(check_docs_facts.oneoff_safety_contract_issues(text), [])

@@ -63,6 +63,23 @@ INFRA_CONFIG_DOC = DOCS / "03-基础设施/config-deployment/10-配置、Secret�
 INFRA_DEPLOYMENT_DOC = DOCS / "03-基础设施/config-deployment/20-镜像、CD与网络拓扑.md"
 LOCKLEASE_DOC = DOCS / "03-基础设施/concurrency/50-LockLease与长任务互斥.md"
 SIGNAL_DOC = DOCS / "03-基础设施/event/60-Signal一次性信令.md"
+CACHE_MODEL_DOC = DOCS / "03-基础设施/cache/15-从事实到派生读取-一致性与容量模型.md"
+CACHE_REGISTRY_DOC = DOCS / "03-基础设施/cache/20-Capability-Registry与配置.md"
+CACHE_KERNEL_DOC = DOCS / "03-基础设施/cache/30-缓存内核与读写链路.md"
+CACHE_README = DOCS / "03-基础设施/cache/README.md"
+CACHE_CONSISTENCY_DOC = DOCS / "03-基础设施/cache/40-一致性失效与降级.md"
+CACHE_OBSERVABILITY_DOC = DOCS / "03-基础设施/cache/60-可观测性与运营页面.md"
+CACHE_ACCEPTANCE_DOC = DOCS / "03-基础设施/cache/70-扩展与验收.md"
+EVENT_STATE_DOC = DOCS / "03-基础设施/event/15-从事实到结算-失败窗口与状态机.md"
+EVENT_CONTRACT_DOC = DOCS / "03-基础设施/event/20-事件契约与演进.md"
+EVENT_OUTBOX_DOC = DOCS / "03-基础设施/event/30-Outbox可靠出站链路.md"
+EVENT_MQ_DOC = DOCS / "03-基础设施/event/40-MQ发布消费与结算.md"
+EVENT_OBSERVABILITY_DOC = DOCS / "03-基础设施/event/50-可观测性与故障恢复.md"
+EVENT_README = DOCS / "03-基础设施/event/README.md"
+CONCURRENCY_BACKPRESSURE_DOC = DOCS / "03-基础设施/concurrency/40-下游背压与容量预算.md"
+CONCURRENCY_GOVERNANCE_DOC = DOCS / "03-基础设施/concurrency/60-运行时治理与故障恢复.md"
+CONCURRENCY_ACCEPTANCE_DOC = DOCS / "03-基础设施/concurrency/70-可观测性-压测与验收.md"
+CONCURRENCY_README = DOCS / "03-基础设施/concurrency/README.md"
 GRPC_SIDECAR_DOC = ROOT / "internal/pkg/grpc/README.md"
 LOCKLEASE_CATALOG_SOURCE = ROOT / "internal/pkg/resilience/locklease/catalog.go"
 GRPC_SERVER_SOURCE = ROOT / "internal/pkg/grpc/server.go"
@@ -348,25 +365,62 @@ INFRASTRUCTURE_REQUIRED_SOURCE_SCOPES = {
     },
     "event_outbox_mq": {
         "event_catalog": ("configs/events.yaml",),
+        "signal_catalog": ("configs/signals.yaml",),
+        "messaging_dependency": ("go.mod",),
         "event_runtime": ("internal/pkg/eventing/runtime/publisher.go",),
         "event_contract": ("internal/pkg/eventing/catalog/catalog.go",),
+        "dead_letter_transport": ("internal/pkg/eventing/transport/dead_letter.go",),
+        "apiserver_event_subsystem": ("internal/apiserver/eventing/subsystem/subsystem.go",),
+        "worker_messaging_runtime": ("internal/worker/integration/messaging/runtime.go",),
+        "worker_business_handler": ("internal/worker/handlers/assessment_handler.go",),
+        "report_status_reporter": ("internal/pkg/reportstatus/reporter.go",),
+        "report_status_cache": ("internal/pkg/reportstatus/cache.go",),
+        "delivery_replay": ("internal/apiserver/application/systemgovernance/delivery_replay.go",),
         "mysql_outbox_store": ("internal/apiserver/infra/mysql/eventoutbox/store.go",),
         "mongo_outbox_store": ("internal/apiserver/infra/mongo/eventoutbox/store.go",),
         "outbox_atomicity": ("internal/pkg/architecture/uow_outbox_ratchet_test.go",),
     },
     "cache_redis_signal": {
         "signal_catalog": ("configs/signals.yaml",),
+        "apiserver_config": ("configs/apiserver.prod.yaml",),
+        "collection_config": ("configs/collection-server.prod.yaml",),
         "apiserver_prod_policy": ("configs/cache/apiserver.prod.yaml",),
         "collection_prod_policy": ("configs/cache/collection-server.prod.yaml",),
         "cache_policy": ("internal/apiserver/cache/catalog/policy.go",),
+        "apiserver_cache_subsystem": ("internal/apiserver/cache/subsystem/subsystem.go",),
+        "collection_cache_subsystem": ("internal/collection-server/cache/subsystem.go",),
+        "collection_l1_cache": ("internal/collection-server/application/modelcatalog/readthrough.go",),
+        "published_model_l1": ("internal/apiserver/cache/modelcatalog/published_model_l1.go",),
+        "cache_metric_reader": ("internal/apiserver/application/systemgovernance/metric_evidence_reader.go",),
         "cache_core": ("internal/pkg/cache/query/versioned.go",),
         "signal_contract": ("internal/pkg/signalcatalog/types.go",),
         "redis_runtime": ("internal/pkg/redisruntime/runtime.go",),
+        "config_contract": ("internal/pkg/configcontract/config_contract_test.go",),
     },
     "concurrency_resilience": {
         "resilience_model": ("internal/pkg/resilience/model.go",),
+        "admission_strategy": ("internal/pkg/resilience/admission/strategy.go",),
+        "backpressure_limiter": ("internal/pkg/resilience/backpressure/limiter.go",),
         "locklease_catalog": ("internal/pkg/resilience/locklease/catalog.go",),
+        "locklease_runtime": ("internal/pkg/resilience/locklease/subsystem/subsystem.go",),
         "collection_concurrency_gate": ("internal/collection-server/concurrency/gate.go",),
+        "collection_route_gates": ("internal/collection-server/transport/rest/router_concurrency.go",),
+        "reliable_submit": ("internal/collection-server/application/answersheet/submission_service.go",),
+        "submit_coalescer": ("internal/collection-server/infra/redisops/submit_coalescer.go",),
+        "mongo_durable_submit": ("internal/apiserver/infra/mongo/answersheet/durable_submit.go",),
+        "mysql_repository_limiter": ("internal/pkg/database/mysql/base.go",),
+        "mongo_repository_limiter": ("internal/apiserver/infra/mongo/base.go",),
+        "mysql_actor_raw_handle": ("internal/apiserver/infra/mysql/actor/read_model.go",),
+        "mongo_answersheet_readmodel_raw_handle": (
+            "internal/apiserver/infra/mongo/answersheet/readmodel.go",
+        ),
+        "mongo_answersheet_repository_raw_handle": (
+            "internal/apiserver/infra/mongo/answersheet/repo.go",
+        ),
+        "governance_action_executor": ("internal/apiserver/application/systemgovernance/action_executor.go",),
+        "governance_tune_rate_limit": ("internal/apiserver/resilience/subsystem/governance.go",),
+        "governance_release_lock": ("internal/apiserver/resilience/subsystem/command_agent.go",),
+        "scheduler_lock_caller": ("internal/apiserver/runtime/scheduler/leader_lock.go",),
         "transaction_boundary": ("internal/apiserver/container/internal/transaction/runner.go",),
         "apiserver_config": ("configs/apiserver.prod.yaml",),
         "collection_config": ("configs/collection-server.prod.yaml",),
@@ -3330,6 +3384,258 @@ def oneoff_safety_contract_issues(text: str | None = None) -> list[Issue]:
     return issues
 
 
+def priority_infrastructure_doc_contract_issues() -> list[Issue]:
+    """Ratchet the highest-risk cache, event and concurrency semantics.
+
+    These checks intentionally stay narrow. They do not certify every sentence;
+    they prevent the concrete responsibility-chain drifts found during the
+    source audit from returning behind an otherwise green structural gate.
+    """
+
+    issues: list[Issue] = []
+
+    required_tokens = {
+        CACHE_MODEL_DOC: (
+            "application 显式调用 typed cache port",
+            "Repository wrapper 的职责不是缓存读取",
+            "不是 validation 已强制",
+            "questionnaire 可在 adapter 与 effective Policy 同时允许时写 negative",
+            "published-model 当前不写 negative sentinel",
+            "published-model 的完整 L1+L2 读取不具有这个原子边界",
+            "L2 使用旧快照而 L1 TTL 使用新快照",
+            "published-model L1 仍使用启动时 jitter",
+        ),
+        CACHE_REGISTRY_DOC: (
+            "published-model L1 是当前明确例外",
+            "`TTLJitterRatio` 在 L1 构造时固定",
+            "不是一个跨 L1/L2 的单快照操作",
+            "每次单独 `Resolve/All/Snapshot` 调用只看到完整旧版本或完整新版本",
+            "不为跨多次 Resolve 的组合操作锁定同一快照",
+            "当前也没有 reload 后验证 L1 jitter 的契约测试",
+        ),
+        CACHE_KERNEL_DOC: (
+            "questionnaire 与 testee adapter 显式声明 `CacheNegative: true`",
+            "published-model 的 by-questionnaire、catalog-list 与 algorithms",
+            "`CacheNegative: false`",
+            "Policy 打开也不会使它们写 negative sentinel",
+            "jitter ratio 仍固定在构造 Options",
+            "published-model 外层 `cacheEnabled()`、L2 read-through 与 L1 Set 的 `TTLProvider` 会多次 Resolve",
+            "reload 后仍使用启动时 jitter",
+        ),
+        CACHE_README: (
+            "普通 object/query read-through 每次只从 `PolicyProvider` 解析一次 Policy",
+            "published-model L1+L2 当前会在外层 enabled、L2 read-through 和 L1 Set 多次 Resolve",
+            "L1 jitter 保留启动时副本",
+            "status 的 effective jitter 不证明 L1 已热生效该值",
+        ),
+        CACHE_CONSISTENCY_DOC: (
+            "仓库 production policy 的版本化意图",
+            "effective runtime",
+            "exact deployed SHA",
+        ),
+        CACHE_OBSERVABILITY_DOC: (
+            "qs_apiserver_l1_cache_requests_total",
+            "qs_apiserver_l1_cache_entries",
+            "qs_apiserver_l1_cache_max_entries",
+            "qs_apiserver_l1_cache_evictions_total",
+            "四条独立 PromQL",
+            "没有被 `MetricEvidenceReader`",
+        ),
+        CACHE_ACCEPTANCE_DOC: (
+            "canonical capability catalog v3",
+            "apiserver published-model L1 当前仅导出原始 Prometheus 指标",
+        ),
+        EVENT_OUTBOX_DOC: (
+            "publish success + mark failed",
+            "MarkEvent(s)Published",
+            "Outbox 行仍保持 `publishing`",
+            "stale-claim recovery",
+            "不会立即改写为 retry 状态",
+        ),
+        EVENT_CONTRACT_DOC: (
+            "当前共享代码缺口：report-status best-effort 写入不参与 settlement",
+            "正常 worker composition",
+            "`reportstatus.NewReporter` 始终返回非 nil reporter 和 nil error",
+            "`interpretation.report.generated` 调用 `SetCompleted`",
+            "`interpretation.report.failed` 的 manual/terminal 分支",
+            "Redis status 写入失败只记录 `report_status_set_failed_total`",
+            "signal notify 失败也只记录 `signaling_notify_failed_total`",
+            "错误都不返回给 handler",
+            "合法 payload 都可能最终 ACK",
+        ),
+        EVENT_OBSERVABILITY_DOC: (
+            "qs-operating-system 的页面路由、重定向与渲染行为是跨仓事实",
+            "不在本文档的 exact-SHA closure 内",
+            "qs-operating-system 的独立 exact SHA",
+        ),
+        EVENT_README: (
+            "`evaluation.failed`、`interpretation.report.generated` 与 `interpretation.report.failed`",
+            "report-status Redis 写入/Signal 唤醒是 best-effort",
+            "handler 可以最终 ACK",
+            "ACK 不证明 report-status 投影或唤醒已成功",
+        ),
+        SIGNAL_DOC: (
+            "测试内硬编码的 expected topology",
+            "不会扫描 composition root",
+            "本轮已人工反查",
+        ),
+        LOCKLEASE_DOC: (
+            "DefaultTTL、caller override 与 snapshot",
+            "plan scheduler 声明 `lock_ttl: 2m`",
+            "不是 active run 的 effective TTL",
+        ),
+        CONCURRENCY_BACKPRESSURE_DOC: (
+            "composition root 已注入 limiter”不等于该 repository 的所有方法都受控",
+            "MySQL `BaseRepository.WithContext()` / `DB()`",
+            "Mongo `BaseRepository.Collection()` / `DB()`",
+            "Actor read model",
+            "AnswerSheet read model",
+            "limiter 指标只表示“显式 acquire 的受控操作”",
+            "不能证明所有 repository 方法都经过 acquire",
+        ),
+        CONCURRENCY_GOVERNANCE_DOC: (
+            "state/command、目标实例实际 effect 与 terminal audit 不在同一事务中",
+            "error、partial 或 timeout，不足以证明“没有任何效果”",
+            "`resilience.tune_rate_limit` 和 `resilience.release_lock`",
+            "`retry.manual_actions_enabled=true`",
+            "当前没有专用的 `resilience control operation` Prometheus counter",
+        ),
+        CONCURRENCY_ACCEPTANCE_DOC: (
+            "snapshot 不能证明 active run 使用哪一个 TTL",
+            "当前没有专用的统一 control-operation Prometheus counter",
+            "Backpressure 指标只覆盖显式调用 limiter acquire 的方法",
+            "MySQL Actor read model",
+            "Mongo AnswerSheet read model/repository",
+            "不是全部 MySQL/Mongo 并发",
+        ),
+        CONCURRENCY_README: (
+            "limiter 注入不等于方法级全覆盖",
+            "MySQL Actor read model",
+            "Mongo AnswerSheet read model/repository",
+            "现有 Backpressure 指标只是已接入方法的子集",
+        ),
+    }
+    for path, tokens in required_tokens.items():
+        text = path.read_text(encoding="utf-8")
+        for token in tokens:
+            if token not in text:
+                issues.append(
+                    Issue(
+                        "priority-infrastructure-doc-drift",
+                        f"{path.relative_to(ROOT)}: missing {token!r}",
+                    )
+                )
+
+    cache_text = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in sorted((DOCS / "03-基础设施/cache").glob("*.md"))
+    )
+    if "Registry v2" in cache_text:
+        issues.append(Issue("priority-cache-retired-registry-version", "cache docs contain Registry v2"))
+
+    event_handoff_orders = {
+        EVENT_STATE_DOC: (
+            "业务 channel 达到 MaxAttempts",
+            "发布 cb.failed.<hash> handoff topic",
+            "finish 原消息",
+            "独立 handoff consumer",
+            "MySQL recorder",
+            "event_delivery_dead_letter(manual_required)",
+        ),
+        EVENT_MQ_DOC: (
+            "业务 channel 达到 MaxAttempts",
+            "发布 cb.failed.<hash> handoff topic",
+            "finish 原消息",
+            "独立 handoff consumer",
+            "MySQL FailedMessageHandler / recorder",
+            "event_delivery_dead_letter(manual_required)",
+        ),
+    }
+    for path, event_handoff_order in event_handoff_orders.items():
+        text = path.read_text(encoding="utf-8")
+        if not ordered_tokens(text, event_handoff_order):
+            issues.append(
+                Issue(
+                    "priority-event-terminal-handoff-drift",
+                    f"{path.relative_to(ROOT)}: expected ordered terminal handoff",
+                )
+            )
+        for token in ("handoff publish", "requeue", "recorder 成功后"):
+            if token not in text:
+                issues.append(
+                    Issue(
+                        "priority-event-terminal-handoff-drift",
+                        f"{path.relative_to(ROOT)}: missing {token!r}",
+                    )
+                )
+
+    go_mod = (ROOT / "go.mod").read_text(encoding="utf-8")
+    if not re.search(r"^\s*github\.com/FangcunMount/component-base\s+v0\.6\.9\s*$", go_mod, flags=re.M):
+        issues.append(
+            Issue(
+                "priority-event-provider-dependency-drift",
+                "component-base version changed; re-audit terminal handoff before updating the docs",
+            )
+        )
+
+    production_values = yaml_scalar_values(PRODUCTION_CONFIG.read_text(encoding="utf-8"))
+    expected_backpressure = {
+        ("backpressure", "mysql", "max_inflight"): "150",
+        ("backpressure", "mysql", "timeout_ms"): "5000",
+        ("backpressure", "mongo", "max_inflight"): "48",
+        ("backpressure", "mongo", "timeout_ms"): "1500",
+        ("backpressure", "iam", "max_inflight"): "100",
+        ("backpressure", "iam", "timeout_ms"): "4000",
+    }
+    for key, expected in expected_backpressure.items():
+        if production_values.get(key) != expected:
+            issues.append(
+                Issue(
+                    "priority-backpressure-config-drift",
+                    f"{'.'.join(key)}={production_values.get(key)!r}, expected={expected!r}",
+                )
+            )
+    backpressure_doc = CONCURRENCY_BACKPRESSURE_DOC.read_text(encoding="utf-8")
+    for row in (
+        "| MySQL | 150 | 5000ms |",
+        "| Mongo | 48 | 1500ms |",
+        "| IAM | 100 | 4000ms |",
+        "不代表目标环境 effective config",
+    ):
+        if row not in backpressure_doc:
+            issues.append(
+                Issue(
+                    "priority-backpressure-doc-drift",
+                    f"{CONCURRENCY_BACKPRESSURE_DOC.relative_to(ROOT)}: missing {row!r}",
+                )
+            )
+
+    concurrency_text = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in sorted((DOCS / "03-基础设施/concurrency").glob("*.md"))
+    )
+    if "resilience_control_operation_total" in concurrency_text:
+        issues.append(
+            Issue(
+                "priority-concurrency-phantom-metric",
+                "concurrency docs reference nonexistent resilience_control_operation_total",
+            )
+        )
+    governance_text = CONCURRENCY_GOVERNANCE_DOC.read_text(encoding="utf-8")
+    for ordered in (
+        ("MySQL claim", "Redis `CompareAndSwap`", "本地 budget 执行 `Apply`", "terminal audit"),
+        ("MySQL claim", "发布带 expiry 的 Redis command", "取消 active leader body", "terminal audit"),
+    ):
+        if not ordered_tokens(governance_text, ordered):
+            issues.append(
+                Issue(
+                    "priority-concurrency-governance-order-drift",
+                    f"{CONCURRENCY_GOVERNANCE_DOC.relative_to(ROOT)}: expected ordered stages={ordered}",
+                )
+            )
+    return issues
+
+
 def infrastructure_contract_issues() -> list[Issue]:
     issues: list[Issue] = []
     for validator in (
@@ -3343,6 +3649,7 @@ def infrastructure_contract_issues() -> list[Issue]:
         docker_config_contract_issues,
         infrastructure_non_cached_test_path_issues,
         oneoff_safety_contract_issues,
+        priority_infrastructure_doc_contract_issues,
     ):
         issues.extend(validator())
     return issues

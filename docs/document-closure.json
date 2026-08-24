@@ -4045,29 +4045,74 @@
       "path": "docs/03-基础设施/cache/10-架构与责任边界.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-20"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/process/resource_bootstrap.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/subsystem/subsystem.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/container/container.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/cache/subsystem.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/redisruntime/catalog.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/process/resource_bootstrap.go",
+          "selector": "func (s *server) buildRedisRuntimeDeps",
+          "result": "matched",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/collection-server/cache/subsystem.go",
+          "selector": "func (s *Subsystem) Start(ctx context.Context) error",
+          "result": "matched",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-20"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "Composition roots and ownership are source-aligned; no exact-SHA multi-replica or production cache lifecycle evidence is recorded."
         ]
       },
       "gaps": [
         {
-          "id": "DOC-CLOSURE-103",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+          "id": "CACHE-DOC-ARCH-ENV",
+          "kind": "environment",
+          "severity": "high",
+          "summary": "The two process composition paths are source-verified but have not been exercised together against multi-replica Redis and Signal infrastructure.",
+          "exit_criteria": "Run exact-SHA apiserver and collection-server lifecycle, Redis loss/recovery and watcher convergence checks in a multi-replica environment."
+        },
+        {
+          "id": "CACHE-DOC-ARCH-PROD",
+          "kind": "production",
+          "severity": "high",
+          "summary": "No current production record proves the documented cache ownership and lifecycle are the deployed effective topology.",
+          "exit_criteria": "Record exact deployed SHA, instance topology, effective Registry and accountable production signoff."
         }
       ]
     },
@@ -4075,29 +4120,100 @@
       "path": "docs/03-基础设施/cache/15-从事实到派生读取-一致性与容量模型.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-20"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/evaluation/assessment_detail.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/statistics/query_cache.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/cache/object/readthrough.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/loadguard/coalescer.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/survey/questionnaire.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/modelcatalog/published_model.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/modelcatalog/published_model_l1.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/cache/local/cache.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/cache/evaluation/assessment_detail.go",
+          "selector": "all reads remain owned by the application services.",
+          "result": "matched",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/cache/statistics/query_cache.go",
+          "selector": "staleTTL: 72 * time.Hour",
+          "result": "matched",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/cache/... ./internal/apiserver/cache/modelcatalog ./internal/apiserver/cache/survey ./internal/apiserver/cache/actor",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "Read ownership and cache behavior are source-aligned; no workload-capacity or target-environment evidence is attached."
         ]
       },
       "gaps": [
         {
-          "id": "DOC-CLOSURE-104",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+          "id": "CACHE-DOC-CAPACITY-ENV",
+          "kind": "environment",
+          "severity": "high",
+          "summary": "No multi-instance herd, Redis outage or source-capacity test validates the documented coalescing and stale model.",
+          "exit_criteria": "Run exact-SHA concurrent-miss and Redis failure tests with source QPS, latency, stale and rejection evidence."
+        },
+        {
+          "id": "CACHE-DOC-CAPACITY-L1-POLICY-SNAPSHOT",
+          "kind": "semantic",
+          "severity": "high",
+          "summary": "Published-model L1 resolves enabled and TTL separately from the L2 read-through, while its jitter ratio is frozen at construction; one top-level read can cross policy snapshots.",
+          "exit_criteria": "Give the combined L1/L2 operation one immutable policy snapshot or expose dynamic TTL and jitter providers together, then add reload-race contract tests."
+        },
+        {
+          "id": "CACHE-DOC-CAPACITY-PROD",
+          "kind": "production",
+          "severity": "high",
+          "summary": "No production sample or threshold proves the current cache model is sufficient for observed workload capacity.",
+          "exit_criteria": "Retain production hit-rate, miss amplification, source latency/QPS and memory evidence with thresholds and signoff."
         }
       ]
     },
@@ -4105,29 +4221,108 @@
       "path": "docs/03-基础设施/cache/20-Capability-Registry与配置.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-20"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/catalog/catalog.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/cache/registry.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/cache/policy.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/cache/policyfile/policyfile.go"
+        },
+        {
+          "kind": "source",
+          "path": "configs/cache/apiserver.prod.yaml"
+        },
+        {
+          "kind": "source",
+          "path": "configs/cache/collection-server.prod.yaml"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/cache/subsystem.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/modelcatalog/published_model.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/modelcatalog/published_model_l1.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/cache/local/cache.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/cache/catalog/catalog.go",
+          "selector": "CatalogVersion: \"v3\"",
+          "result": "matched",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/pkg/cache/policyfile/policyfile.go",
+          "selector": "func applyOverrides",
+          "result": "matched",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/cache/... ./internal/apiserver/cache/modelcatalog ./internal/apiserver/cache/survey ./internal/apiserver/cache/actor",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "Catalog and versioned policy files are source-aligned; repository production files remain deployment intent rather than observed effective configuration."
         ]
       },
       "gaps": [
         {
-          "id": "DOC-CLOSURE-105",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+          "id": "CACHE-DOC-POLICY-ENV",
+          "kind": "environment",
+          "severity": "high",
+          "summary": "Multi-instance policy reload, source-hash drift and rollout convergence have not been exercised in a target environment.",
+          "exit_criteria": "Run exact-SHA multi-instance reload and drift checks, retaining before/after snapshot versions and Policy Source hashes."
+        },
+        {
+          "id": "CACHE-DOC-POLICY-L1-POLICY-SNAPSHOT",
+          "kind": "semantic",
+          "severity": "high",
+          "summary": "Published-model L1 does not apply reloaded jitter and can resolve enabled, L2 policy and L1 TTL from different immutable Registry snapshots.",
+          "exit_criteria": "Make L1 consume one operation-scoped policy or reload both TTL and jitter atomically, with tests that race policy reload against L1 miss and Set."
+        },
+        {
+          "id": "CACHE-DOC-POLICY-PROD",
+          "kind": "production",
+          "severity": "high",
+          "summary": "No current production record proves which policy file, environment overrides or effective TTLs each instance uses.",
+          "exit_criteria": "Capture every production instance effective Registry, policy path/hash, override summary, deployed SHA and signoff."
         }
       ]
     },
@@ -4135,29 +4330,99 @@
       "path": "docs/03-基础设施/cache/30-缓存内核与读写链路.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-20"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/pkg/cache/store.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/cache/local/cache.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/cache/object/readthrough.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/cache/query/versioned.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/cache/redis/payload.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/statistics/query_cache.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/survey/questionnaire.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/actor/testee.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/modelcatalog/published_model.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/modelcatalog/published_model_l1.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 ./internal/pkg/cache/...",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/cache/... ./internal/apiserver/cache/modelcatalog ./internal/apiserver/cache/survey ./internal/apiserver/cache/actor",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "Kernel contracts and race protection are repository-verified; real Redis failure, payload history and deployed key expiry are not attested."
         ]
       },
       "gaps": [
         {
-          "id": "DOC-CLOSURE-106",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+          "id": "CACHE-DOC-KERNEL-ENV",
+          "kind": "environment",
+          "severity": "high",
+          "summary": "Repository tests do not prove real Redis timeout/failover, historical payload decoding or deployed key expiry behavior.",
+          "exit_criteria": "Run exact-SHA Redis adapter and failure tests against representative historical payloads and target namespaces."
+        },
+        {
+          "id": "CACHE-DOC-KERNEL-L1-POLICY-SNAPSHOT",
+          "kind": "semantic",
+          "severity": "high",
+          "summary": "The local cache can refresh TTL through TTLProvider but freezes TTLJitterRatio in Options; published-model combines this with multiple Policy Resolve calls across L1 and L2.",
+          "exit_criteria": "Add a jitter provider or operation-scoped expiry input and prove reload cannot mix policy snapshots across a published-model read."
+        },
+        {
+          "id": "CACHE-DOC-KERNEL-PROD",
+          "kind": "production",
+          "severity": "high",
+          "summary": "No production inventory proves current key, payload, TTL and retired-key cleanup assumptions.",
+          "exit_criteria": "Retain read-only keyspace counts, sampled PTTL/schema evidence, exact deployed SHA and approved cleanup boundaries."
         }
       ]
     },
@@ -4165,29 +4430,77 @@
       "path": "docs/03-基础设施/cache/40-一致性失效与降级.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-20"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/evaluation/assessment_detail.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/actor/testee.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/plan/detail.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/survey/questionnaire.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/modelcatalog/published_model.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/statistics/publisher.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/cache/signal/contract.go"
+        },
+        {
+          "kind": "source",
+          "path": "configs/signals.yaml"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/cache/... ./internal/apiserver/cache/... ./internal/collection-server/cache ./internal/pkg/redisruntime/... ./internal/apiserver/application/systemgovernance/... ./internal/apiserver/transport/rest/... ./internal/pkg/signalcatalog ./internal/pkg/configcontract ./internal/pkg/architecture",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-20"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "Write-side invalidation and best-effort Signal behavior are source-aligned; no target-environment convergence or production stale-window evidence is attached."
         ]
       },
       "gaps": [
         {
-          "id": "DOC-CLOSURE-107",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+          "id": "CACHE-DOC-CONSISTENCY-ENV",
+          "kind": "environment",
+          "severity": "high",
+          "summary": "Signal loss, Redis outage, delete/bump failure and multi-replica convergence have not been fault-injected in a target environment.",
+          "exit_criteria": "Run exact-SHA fault injection and record per-capability convergence time, source fallback and stale observations."
+        },
+        {
+          "id": "CACHE-DOC-CONSISTENCY-PROD",
+          "kind": "production",
+          "severity": "high",
+          "summary": "No current production evidence establishes effective TTLs or observed stale windows after invalidation failure.",
+          "exit_criteria": "Capture effective policy hashes, Signal and delete/bump metrics, stale-window samples and production signoff."
         }
       ]
     },
@@ -4195,29 +4508,78 @@
       "path": "docs/03-基础设施/cache/50-预热与运行时治理.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-20"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/subsystem/subsystem.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/governance/coordinator.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/governance/warmup_scheduler.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/governance/policy_reloader.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/modelcatalog/published_model.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/cache/subsystem.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/cache/governance/warmup_scheduler.go",
+          "selector": "func (c *coordinator) WarmStartup",
+          "result": "matched",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/cache/governance/policy_reloader.go",
+          "selector": "func (r *PolicyReloader) ReloadPolicy",
+          "result": "matched",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-20"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "Warmup, hotset and policy reload orchestration are source-aligned; no cross-instance or production run evidence is recorded."
         ]
       },
       "gaps": [
         {
-          "id": "DOC-CLOSURE-108",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+          "id": "CACHE-DOC-GOVERNANCE-ENV",
+          "kind": "environment",
+          "severity": "high",
+          "summary": "Startup/manual warmup and policy reload have not been validated across multiple instances with unavailable Redis families.",
+          "exit_criteria": "Run exact-SHA multi-instance warmup and reload scenarios, retaining target visibility, skipped/error results and snapshot convergence."
+        },
+        {
+          "id": "CACHE-DOC-GOVERNANCE-PROD",
+          "kind": "production",
+          "severity": "high",
+          "summary": "No production record proves current warmup targets, latest run results, hotsets or reload status.",
+          "exit_criteria": "Retain current production governance snapshots, action audit, policy hashes and accountable signoff."
         }
       ]
     },
@@ -4225,29 +4587,85 @@
       "path": "docs/03-基础设施/cache/60-可观测性与运营页面.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-20"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/pkg/cache/observe/metrics.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/modelcatalog/published_model_l1.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/systemgovernance/metric_evidence_reader.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/systemgovernance/cache_projector.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/systemgovernance/cache_views.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/transport/rest/handler/system_governance.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/application/systemgovernance/cache_projector.go",
+          "selector": "four independent Prometheus expressions.",
+          "result": "matched",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "source_selector",
+          "path": "internal/apiserver/cache/modelcatalog/published_model_l1.go",
+          "selector": "qs_apiserver_l1_cache_requests_total",
+          "result": "matched",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-20"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "Backend metrics and governance projections are source-aligned; current production series and the separate frontend repository are not verified here."
         ]
       },
       "gaps": [
         {
-          "id": "DOC-CLOSURE-109",
-          "kind": "verification",
+          "id": "CACHE-DOC-OBS-L1-SEMANTIC",
+          "kind": "semantic",
+          "severity": "high",
+          "summary": "The apiserver published-model L1 metrics exist but are not projected into MetricEvidenceReader or runtime_view.",
+          "exit_criteria": "Add bounded apiserver L1 projection with contract tests, or explicitly accept raw-Prometheus-only operation."
+        },
+        {
+          "id": "CACHE-DOC-OBS-UI-SEMANTIC",
+          "kind": "semantic",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+          "summary": "qs-operating-system page behavior is a cross-repository claim and is not covered by this document closure.",
+          "exit_criteria": "Record the frontend exact SHA, normalizer/page fixture tests and an explicit cross-repository contract review."
+        },
+        {
+          "id": "CACHE-DOC-OBS-PROD",
+          "kind": "production",
+          "severity": "high",
+          "summary": "No current production metric sample proves family health, cache workload, L1 capacity or governance view availability.",
+          "exit_criteria": "Retain exact-SHA production queries, raw samples, dashboard/API output, thresholds and signoff."
         }
       ]
     },
@@ -4255,29 +4673,76 @@
       "path": "docs/03-基础设施/cache/70-扩展与验收.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-20"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/pkg/architecture/cache_boundary_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/architecture/event_cache_signal_boundary_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/configcontract/config_contract_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/configcontract/resilience_contract_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/options/cache_policy_file.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/options/cache_policy_file.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/cache/... ./internal/apiserver/cache/... ./internal/collection-server/cache ./internal/pkg/redisruntime/... ./internal/apiserver/application/systemgovernance/... ./internal/apiserver/transport/rest/... ./internal/pkg/signalcatalog ./internal/pkg/configcontract ./internal/pkg/architecture",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-20"
+        },
+        {
+          "kind": "command",
+          "command": "go test -race -count=1 ./internal/pkg/cache/...",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-20"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "Repository acceptance and race tests passed; environment, capacity and production acceptance remain separate and unsigned."
         ]
       },
       "gaps": [
         {
-          "id": "DOC-CLOSURE-110",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+          "id": "CACHE-DOC-ACCEPTANCE-ENV",
+          "kind": "environment",
+          "severity": "high",
+          "summary": "The documented environment acceptance matrix has not been run against exact-SHA multi-replica services and Redis.",
+          "exit_criteria": "Execute the failure, convergence, capacity and effective-config matrix and retain raw results."
+        },
+        {
+          "id": "CACHE-DOC-ACCEPTANCE-PROD",
+          "kind": "production",
+          "severity": "high",
+          "summary": "Passing repository gates does not constitute current production cache acceptance.",
+          "exit_criteria": "Complete exact-SHA deployment, current production probes, threshold review and accountable signoff."
         }
       ]
     },
@@ -4285,10 +4750,10 @@
       "path": "docs/03-基础设施/cache/README.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-20"
       },
       "fact_sources": [
         {
@@ -4301,46 +4766,76 @@
         },
         {
           "kind": "source",
-          "path": "internal/pkg/cache/**/*.go"
+          "path": "internal/pkg/cache/registry.go"
         },
         {
           "kind": "source",
-          "path": "internal/pkg/signalcatalog/**/*.go"
+          "path": "internal/pkg/redisruntime/catalog.go"
         },
         {
           "kind": "source",
-          "path": "internal/pkg/redisruntime/**/*.go"
+          "path": "internal/apiserver/cache/modelcatalog/published_model.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/cache/**/*.go"
+          "path": "internal/apiserver/cache/modelcatalog/published_model_l1.go"
         },
         {
           "kind": "source",
-          "path": "internal/collection-server/cache/**/*.go"
+          "path": "internal/pkg/cache/local/cache.go"
         },
         {
           "kind": "source",
-          "path": "internal/collection-server/application/catalogcache/**/*.go"
+          "path": "internal/apiserver/cache/catalog/catalog.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/subsystem/subsystem.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/cache/subsystem.go"
         }
       ],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/cache/... ./internal/apiserver/cache/... ./internal/collection-server/cache ./internal/pkg/redisruntime/... ./internal/apiserver/application/systemgovernance/... ./internal/apiserver/transport/rest/... ./internal/pkg/signalcatalog ./internal/pkg/configcontract ./internal/pkg/architecture",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-20"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "The cache reading map is source-aligned; no target-environment or current production cache evidence is attached."
         ]
       },
       "gaps": [
         {
-          "id": "DOC-CLOSURE-111",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+          "id": "CACHE-DOC-README-ENV",
+          "kind": "environment",
+          "severity": "high",
+          "summary": "The reading path is repository-verified but not backed by a retained multi-replica Redis/Signal environment run.",
+          "exit_criteria": "Run and link exact-SHA cache, Redis and Signal environment verification."
+        },
+        {
+          "id": "CACHE-DOC-README-L1-POLICY-SNAPSHOT",
+          "kind": "semantic",
+          "severity": "high",
+          "summary": "Published-model L1 can cross Registry snapshots with L2 and keeps its startup jitter after reload, so effective status is not the complete operation-level policy evidence.",
+          "exit_criteria": "Make L1 TTL and jitter consume one operation-scoped immutable policy and add reload-race tests plus an effective L1 status field."
+        },
+        {
+          "id": "CACHE-DOC-README-PROD",
+          "kind": "production",
+          "severity": "high",
+          "summary": "No current production record is scoped to the cache documentation set.",
+          "exit_criteria": "Attach an unexpired exact-SHA production record with effective configuration, metrics, limitations and signoff."
         }
       ]
     },
@@ -4348,29 +4843,65 @@
       "path": "docs/03-基础设施/concurrency/10-压力模型与责任边界.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-21"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/router_concurrency.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/resilience/ratelimit/budget.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/resilience/backpressure/limiter.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/resilience/locklease/subsystem/subsystem.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/survey/answersheet/transactional_durable_store.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/resilience/... ./internal/collection-server/concurrency ./internal/collection-server/transport/rest ./internal/collection-server/application/answersheet",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "Protection-layer ownership and failure semantics are repository-aligned; no exact-SHA multi-replica environment or current production capacity record is attached."
         ]
       },
       "gaps": [
         {
-          "id": "DOC-CLOSURE-112",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+          "id": "CONCURRENCY-10-ENVIRONMENT",
+          "kind": "environment",
+          "severity": "high",
+          "summary": "The complete RateLimit, Gate, Backpressure, LockLease and durable-fact chain has not been exercised under multi-replica dependency slowdown and retry amplification.",
+          "exit_criteria": "Run exact-SHA multi-replica load and failure scenarios with per-layer decisions, dependency latency, durable facts and recovery evidence."
+        },
+        {
+          "id": "CONCURRENCY-10-PRODUCTION",
+          "kind": "production",
+          "severity": "high",
+          "summary": "No current production record proves the documented protection ownership, effective budgets or safe capacity.",
+          "exit_criteria": "Attach deployed SHA, instance topology, effective configuration, capacity thresholds, observation window and accountable signoff."
         }
       ]
     },
@@ -4378,29 +4909,72 @@
       "path": "docs/03-基础设施/concurrency/20-入口准入-RateLimit与Gate.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-21"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/router_concurrency.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/transport/rest/router.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/resilience/ratelimit/degraded_fallback.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/resilience/subsystem/subsystem.go"
+        },
+        {
+          "kind": "source",
+          "path": "configs/collection-server.prod.yaml"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/collection-server/concurrency ./internal/collection-server/resilience/subsystem ./internal/collection-server/transport/rest ./internal/collection-server/options",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "Admission ordering, degraded fallback and versioned configuration intent are repository-aligned; target effective budgets and runtime behavior are not attested."
         ]
       },
       "gaps": [
         {
-          "id": "DOC-CLOSURE-113",
-          "kind": "verification",
+          "id": "CONCURRENCY-20-GATE-REJECT-SEMANTIC",
+          "kind": "semantic",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+          "summary": "The submit Gate reject counter does not distinguish slot-wait timeout from request-context cancellation.",
+          "exit_criteria": "Add a bounded reason dimension or separate counters, plus contract tests and governance-query coverage for timeout and cancellation."
+        },
+        {
+          "id": "CONCURRENCY-20-ENVIRONMENT",
+          "kind": "environment",
+          "severity": "high",
+          "summary": "Redis loss, local submit fallback, Gate saturation and recovery have not been validated together in a multi-instance target environment.",
+          "exit_criteria": "Run exact-SHA admission fault scenarios and retain per-instance Gate, distributed/local RateLimit, status-code and recovery evidence."
+        },
+        {
+          "id": "CONCURRENCY-20-PRODUCTION",
+          "kind": "production",
+          "severity": "high",
+          "summary": "No current production evidence establishes effective RateLimit/Gate values, instance count or rejection causes.",
+          "exit_criteria": "Capture deployed SHA, effective configuration, instance topology, reasoned reject metrics, latency and signoff."
         }
       ]
     },
@@ -4408,29 +4982,69 @@
       "path": "docs/03-基础设施/concurrency/30-可靠提交-跨实例合并与幂等.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-21"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/collection-server/application/answersheet/submission_service.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/infra/redisops/submit_coalescer.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/survey/answersheet/transactional_durable_store.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mongo/answersheet/durable_submit.go"
+        },
+        {
+          "kind": "source",
+          "path": "configs/collection-server.prod.yaml"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/configcontract/submit_coalescing_perf_contract_test.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/collection-server/application/answersheet ./internal/collection-server/infra/redisops ./internal/apiserver/application/survey/answersheet ./internal/apiserver/infra/mongo/answersheet ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "Reliable-submit, coalescing and Mongo idempotency contracts passed repository tests; a real replica-set and multi-instance acceptance run is not attached."
         ]
       },
       "gaps": [
         {
-          "id": "DOC-CLOSURE-114",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+          "id": "CONCURRENCY-30-ENVIRONMENT",
+          "kind": "environment",
+          "severity": "high",
+          "summary": "Two collection instances, real Redis failure modes and Mongo replica-set commit/readback windows have not been verified together.",
+          "exit_criteria": "Run exact-SHA healthy, conflict, lock-failure, signal-failure, Redis-unavailable and commit-unknown scenarios with durable AnswerSheet/Outbox counts."
+        },
+        {
+          "id": "CONCURRENCY-30-PRODUCTION",
+          "kind": "production",
+          "severity": "high",
+          "summary": "No current production record proves the deployed reliable-submit/coalescing configuration or durable idempotency outcomes.",
+          "exit_criteria": "Attach deployed SHA, effective submit/coalescing values, representative idempotency evidence, failure samples and signoff."
         }
       ]
     },
@@ -4438,29 +5052,103 @@
       "path": "docs/03-基础设施/concurrency/40-下游背压与容量预算.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-21"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/pkg/resilience/backpressure/limiter.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/resilience/subsystem/subsystem.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mongo/eventoutbox/limiter.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/eventoutbox/store.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/database/mysql/base.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/actor/read_model.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mongo/base.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mongo/answersheet/readmodel.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mongo/answersheet/repo.go"
+        },
+        {
+          "kind": "source",
+          "path": "configs/apiserver.prod.yaml"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/configcontract/resilience_contract_test.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/resilience/backpressure ./internal/apiserver/resilience/subsystem ./internal/apiserver/infra/mongo ./internal/apiserver/infra/iam ./internal/apiserver/infra/mysql/eventoutbox ./internal/apiserver/options ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/database/mysql ./internal/apiserver/infra/mysql/actor ./internal/apiserver/infra/mongo ./internal/apiserver/infra/mongo/answersheet",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "Shared limiter wiring is aligned only for the explicitly acquired method subset; raw-handle bypasses, target dependency capacity, pool pressure and effective values are not attested."
         ]
       },
       "gaps": [
         {
-          "id": "DOC-CLOSURE-115",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+          "id": "CONCURRENCY-40-METHOD-COVERAGE-SEMANTIC",
+          "kind": "semantic",
+          "severity": "high",
+          "summary": "Limiter injection does not guarantee method-level coverage: MySQL WithContext/DB and Mongo Collection/DB allow reachable Actor, AnswerSheet and Outbox operations to bypass acquire and its metrics.",
+          "exit_criteria": "Inventory every production DB method, enforce admission below raw handle access or wrap all bypasses, and add architecture tests plus separate bounded metrics for approved exceptions."
+        },
+        {
+          "id": "CONCURRENCY-40-ENVIRONMENT",
+          "kind": "environment",
+          "severity": "high",
+          "summary": "MySQL, Mongo and IAM latency curves, pool waits and multi-instance aggregate budgets have not been measured in a target environment.",
+          "exit_criteria": "Run exact-SHA staged load with dependency operations, in-flight, pool wait, P95/P99, timeout and saturation thresholds."
+        },
+        {
+          "id": "CONCURRENCY-40-PRODUCTION",
+          "kind": "production",
+          "severity": "high",
+          "summary": "No current production evidence proves the effective 150/48/100 budgets, timeouts, instance topology or safe dependency capacity.",
+          "exit_criteria": "Capture deployed SHA, effective configuration per instance, dependency capacity metrics, observed peaks and accountable signoff."
         }
       ]
     },
@@ -4468,29 +5156,83 @@
       "path": "docs/03-基础设施/concurrency/50-LockLease与长任务互斥.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-21"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/pkg/resilience/locklease/catalog.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/resilience/locklease/subsystem/subsystem.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/runtime/scheduler/plan_scheduler.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/resilience/subsystem/command_agent.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/handlers/answersheet_handler.go"
+        },
+        {
+          "kind": "source",
+          "path": "configs/apiserver.prod.yaml"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/resilience/locklease/... ./internal/apiserver/runtime/scheduler ./internal/worker/handlers",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "The eleven-workload catalog and lease lifecycle are repository-aligned; active caller TTLs, cancellation behavior and deployed renewal settings are not observed here."
         ]
       },
       "gaps": [
         {
-          "id": "DOC-CLOSURE-116",
-          "kind": "verification",
+          "id": "CONCURRENCY-50-SNAPSHOT-TTL-SEMANTIC",
+          "kind": "semantic",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+          "summary": "Runtime snapshot exposes catalog DefaultTTL and derived renewal interval, not caller override or active-run effective TTL.",
+          "exit_criteria": "Expose caller/effective TTL for active runs with bounded labels or a detailed snapshot field, and add plan-scheduler override contract tests."
+        },
+        {
+          "id": "CONCURRENCY-50-FENCING-SEMANTIC",
+          "kind": "semantic",
+          "severity": "high",
+          "summary": "The common LockLease provides ownership tokens but not a persistent monotonic fencing token enforced by every workload side-effect store.",
+          "exit_criteria": "Prove each workload converges through idempotency/version/CAS, or add and enforce a monotonic fencing token at every non-compensable write boundary."
+        },
+        {
+          "id": "CONCURRENCY-50-ENVIRONMENT",
+          "kind": "environment",
+          "severity": "high",
+          "summary": "Renew loss, Redis partitions, long process pauses and cancellation-to-body-exit behavior have not been fault-injected in a target environment.",
+          "exit_criteria": "Run exact-SHA workload-specific acquire, renew-loss, cooldown, cancellation and stale-owner scenarios with durable side-effect checks."
+        },
+        {
+          "id": "CONCURRENCY-50-PRODUCTION",
+          "kind": "production",
+          "severity": "high",
+          "summary": "No current production record proves effective caller TTLs, renewal enablement, lease-loss frequency or cancellation latency.",
+          "exit_criteria": "Capture deployed SHA, effective per-workload TTL/renewal settings, renew/lost metrics, body-exit samples and signoff."
         }
       ]
     },
@@ -4498,29 +5240,80 @@
       "path": "docs/03-基础设施/concurrency/60-运行时治理与故障恢复.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-21"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/systemgovernance/action_executor.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/systemgovernance/action_audit_recovery.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/systemgovernance/action_registry.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/resilience/subsystem/governance.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/resilience/subsystem/command_agent.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/resilience/control/redisadapter/store.go"
+        },
+        {
+          "kind": "source",
+          "path": "configs/apiserver.prod.yaml"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/apiserver/application/systemgovernance/... ./internal/apiserver/resilience/subsystem ./internal/pkg/resilience/control/... ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "Action claim, Redis state/command, target effect and terminal-audit ordering are repository-aligned; target fault behavior and effective action flags are not attested."
         ]
       },
       "gaps": [
         {
-          "id": "DOC-CLOSURE-117",
-          "kind": "verification",
+          "id": "CONCURRENCY-60-CONTROL-METRIC-SEMANTIC",
+          "kind": "semantic",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+          "summary": "There is no dedicated uniform control-operation counter for tune, release, command result and terminal-audit outcomes.",
+          "exit_criteria": "Add a bounded control-operation metric and projection queries covering claim, state/command, target result and audit persistence outcomes."
+        },
+        {
+          "id": "CONCURRENCY-60-ENVIRONMENT",
+          "kind": "environment",
+          "severity": "high",
+          "summary": "Tune state committed before local apply failure, delayed release effect after timeout, and dual audit-persistence failure have not been fault-injected in a target environment.",
+          "exit_criteria": "Run exact-SHA partial-commit scenarios and retain MySQL audit, Redis state/command/result, per-instance snapshot and effect evidence."
+        },
+        {
+          "id": "CONCURRENCY-60-PRODUCTION",
+          "kind": "production",
+          "severity": "high",
+          "summary": "No current production evidence proves effective action flags, operator authorization, target discovery or executed governance outcomes.",
+          "exit_criteria": "Attach deployed SHA, effective flags, authorization record, action audit, Redis control evidence, instance effects and signoff."
         }
       ]
     },
@@ -4528,29 +5321,135 @@
       "path": "docs/03-基础设施/concurrency/70-可观测性-压测与验收.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-21"
       },
-      "fact_sources": [],
-      "verification": [],
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/pkg/resilience/prometheus.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/resilience/locklease/subsystem/subsystem.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/systemgovernance/metric_evidence_reader.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/systemgovernance/resilience_projector.go"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/perf/run-submit-coalescing.sh"
+        },
+        {
+          "kind": "source",
+          "path": "scripts/perf/run-collection-runtime-acceptance.sh"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/configcontract/submit_coalescing_perf_contract_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/database/mysql/base.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/actor/read_model.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mongo/base.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mongo/answersheet/readmodel.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mongo/answersheet/repo.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/resilience/... ./internal/collection-server/transport/rest ./internal/apiserver/application/systemgovernance/... ./internal/pkg/configcontract",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        },
+        {
+          "kind": "command",
+          "command": "make docs-facts",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/database/mysql ./internal/apiserver/infra/mysql/actor ./internal/apiserver/infra/mongo ./internal/apiserver/infra/mongo/answersheet",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "Metric definitions, projection contracts and acceptance runners are repository-aligned; no retained target-environment run or current production series is attached."
         ]
       },
       "gaps": [
         {
-          "id": "DOC-CLOSURE-118",
-          "kind": "verification",
+          "id": "CONCURRENCY-70-GATE-REJECT-SEMANTIC",
+          "kind": "semantic",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+          "summary": "Submit Gate rejects lack a reason dimension separating capacity timeout from request cancellation.",
+          "exit_criteria": "Add bounded reason-level evidence and verify projector/dashboard queries distinguish both paths."
+        },
+        {
+          "id": "CONCURRENCY-70-METHOD-COVERAGE-SEMANTIC",
+          "kind": "semantic",
+          "severity": "high",
+          "summary": "Backpressure metrics only observe explicit acquire calls; representative MySQL and Mongo methods use raw handles and are absent from in-flight, wait and decision series.",
+          "exit_criteria": "Publish a method-level coverage inventory, route all required operations through admission, and validate metric reconciliation against driver pool operations under load."
+        },
+        {
+          "id": "CONCURRENCY-70-LOCK-TTL-SEMANTIC",
+          "kind": "semantic",
+          "severity": "medium",
+          "summary": "LockLease runtime snapshot exposes catalog defaults rather than caller override or active-run effective TTL.",
+          "exit_criteria": "Expose effective TTL evidence without high-cardinality labels and add snapshot/projector contract tests."
+        },
+        {
+          "id": "CONCURRENCY-70-CONTROL-METRIC-SEMANTIC",
+          "kind": "semantic",
+          "severity": "medium",
+          "summary": "No dedicated control-operation metric links governance state/command, target effect and terminal-audit outcomes.",
+          "exit_criteria": "Add bounded control-operation instrumentation plus projector and alert tests for partial-commit outcomes."
+        },
+        {
+          "id": "CONCURRENCY-70-ENVIRONMENT",
+          "kind": "environment",
+          "severity": "high",
+          "summary": "The documented multi-instance load, Redis degradation, lease-loss and governance partial-commit acceptance matrix has not been retained from an exact-SHA target environment run.",
+          "exit_criteria": "Execute the matrix with declared topology/configuration and retain raw K6, Prometheus, snapshot and durable-fact evidence."
+        },
+        {
+          "id": "CONCURRENCY-70-PRODUCTION",
+          "kind": "production",
+          "severity": "high",
+          "summary": "Passing repository gates does not establish current production concurrency capacity, recovery or correctness acceptance.",
+          "exit_criteria": "Attach deployed SHA, effective configuration, time-bounded metrics, capacity/recovery thresholds, correctness samples and signoff."
         }
       ]
     },
@@ -4558,35 +5457,35 @@
       "path": "docs/03-基础设施/concurrency/README.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-21"
       },
       "fact_sources": [
         {
           "kind": "source",
-          "path": "internal/pkg/resilience/**/*.go"
+          "path": "internal/collection-server/transport/rest/router_concurrency.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/resilience/**/*.go"
+          "path": "internal/collection-server/application/answersheet/submission_service.go"
         },
         {
           "kind": "source",
-          "path": "internal/collection-server/resilience/**/*.go"
+          "path": "internal/apiserver/application/survey/answersheet/transactional_durable_store.go"
         },
         {
           "kind": "source",
-          "path": "internal/worker/resilience/**/*.go"
+          "path": "internal/pkg/resilience/backpressure/limiter.go"
         },
         {
           "kind": "source",
-          "path": "internal/collection-server/concurrency/**/*.go"
+          "path": "internal/pkg/resilience/locklease/catalog.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/container/internal/transaction/**/*.go"
+          "path": "internal/apiserver/resilience/subsystem/governance.go"
         },
         {
           "kind": "source",
@@ -4599,25 +5498,74 @@
         {
           "kind": "source",
           "path": "configs/worker.prod.yaml"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/database/mysql/base.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/actor/read_model.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mongo/base.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mongo/answersheet/readmodel.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mongo/answersheet/repo.go"
         }
       ],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/resilience/... ./internal/collection-server/concurrency ./internal/collection-server/resilience/subsystem ./internal/collection-server/transport/rest ./internal/collection-server/application/answersheet ./internal/apiserver/resilience/subsystem ./internal/apiserver/application/systemgovernance/...",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        },
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/database/mysql ./internal/apiserver/infra/mysql/actor ./internal/apiserver/infra/mongo ./internal/apiserver/infra/mongo/answersheet",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "The concurrency reading map and cross-layer contracts are repository-aligned; no exact-SHA target-environment or current production acceptance record is attached."
         ]
       },
       "gaps": [
         {
-          "id": "DOC-CLOSURE-119",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+          "id": "CONCURRENCY-README-ENVIRONMENT",
+          "kind": "environment",
+          "severity": "high",
+          "summary": "No retained multi-replica run covers the complete admission, coalescing, dependency protection, lease and governance reading path.",
+          "exit_criteria": "Run and link an exact-SHA cross-layer environment verification with per-stage, durable-fact and recovery evidence."
+        },
+        {
+          "id": "CONCURRENCY-README-METHOD-COVERAGE-SEMANTIC",
+          "kind": "semantic",
+          "severity": "high",
+          "summary": "The shared DB limiters cover only methods that explicitly acquire; raw GORM and Mongo handles leave reachable Actor, AnswerSheet and Outbox operations outside the metrics.",
+          "exit_criteria": "Complete a method-level coverage inventory, close or bound every bypass, and add architecture tests that fail when production methods access raw handles without an approved budget."
+        },
+        {
+          "id": "CONCURRENCY-README-PRODUCTION",
+          "kind": "production",
+          "severity": "high",
+          "summary": "No current production record is scoped to the concurrency documentation set.",
+          "exit_criteria": "Attach an unexpired production record containing deployed SHA, effective configuration, topology, metrics, limitations and signoff."
         }
       ]
     },
@@ -4984,250 +5932,10 @@
       "path": "docs/03-基础设施/event/10-架构与责任边界.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "needs_review",
+      "doc_status": "aligned",
       "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "DOC-CLOSURE-122",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
-        }
-      ]
-    },
-    {
-      "path": "docs/03-基础设施/event/15-从事实到结算-失败窗口与状态机.md",
-      "class": "primary",
-      "owner": "infra",
-      "doc_status": "needs_review",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "DOC-CLOSURE-123",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
-        }
-      ]
-    },
-    {
-      "path": "docs/03-基础设施/event/20-事件契约与演进.md",
-      "class": "primary",
-      "owner": "infra",
-      "doc_status": "needs_review",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "DOC-CLOSURE-124",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
-        }
-      ]
-    },
-    {
-      "path": "docs/03-基础设施/event/30-Outbox可靠出站链路.md",
-      "class": "primary",
-      "owner": "infra",
-      "doc_status": "needs_review",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "DOC-CLOSURE-125",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
-        }
-      ]
-    },
-    {
-      "path": "docs/03-基础设施/event/40-MQ发布消费与结算.md",
-      "class": "primary",
-      "owner": "infra",
-      "doc_status": "needs_review",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "DOC-CLOSURE-126",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
-        }
-      ]
-    },
-    {
-      "path": "docs/03-基础设施/event/50-可观测性与故障恢复.md",
-      "class": "primary",
-      "owner": "infra",
-      "doc_status": "needs_review",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "DOC-CLOSURE-127",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
-        }
-      ]
-    },
-    {
-      "path": "docs/03-基础设施/event/60-Signal一次性信令.md",
-      "class": "primary",
-      "owner": "infra",
-      "doc_status": "needs_review",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "DOC-CLOSURE-128",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
-        }
-      ]
-    },
-    {
-      "path": "docs/03-基础设施/event/70-扩展与验收.md",
-      "class": "primary",
-      "owner": "infra",
-      "doc_status": "needs_review",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
-      },
-      "fact_sources": [],
-      "verification": [],
-      "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
-        "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
-        ]
-      },
-      "gaps": [
-        {
-          "id": "DOC-CLOSURE-129",
-          "kind": "verification",
-          "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
-        }
-      ]
-    },
-    {
-      "path": "docs/03-基础设施/event/README.md",
-      "class": "primary",
-      "owner": "infra",
-      "doc_status": "needs_review",
-      "verified": {
-        "source_sha": null,
-        "verified_on": null
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-21"
       },
       "fact_sources": [
         {
@@ -5236,50 +5944,670 @@
         },
         {
           "kind": "source",
-          "path": "internal/pkg/eventing/**/*.go"
+          "path": "configs/signals.yaml"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/application/eventing/**/*.go"
+          "path": "internal/apiserver/process/resource_bootstrap.go"
         },
         {
           "kind": "source",
-          "path": "internal/worker/integration/eventing/**/*.go"
+          "path": "internal/apiserver/eventing/subsystem/subsystem.go"
         },
         {
           "kind": "source",
-          "path": "internal/apiserver/infra/mysql/eventoutbox/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/infra/mongo/eventoutbox/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/apiserver/outboxcore/**/*.go"
-        },
-        {
-          "kind": "source",
-          "path": "internal/pkg/architecture/uow_outbox_ratchet_test.go"
+          "path": "internal/pkg/architecture/event_cache_signal_boundary_test.go"
         }
       ],
-      "verification": [],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/architecture ./internal/apiserver/eventing/subsystem",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        }
+      ],
       "production_evidence": {
         "level": "none",
         "refs": [],
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "No per-document production evidence has been recorded in this initial skeleton."
+          "Repository source and non-cached tests are aligned for this document; no target-environment or current exact-SHA production evidence is attached."
         ]
       },
       "gaps": [
         {
-          "id": "DOC-CLOSURE-130",
+          "id": "EVENT-10-ENVIRONMENT",
+          "kind": "environment",
+          "severity": "medium",
+          "summary": "Real NSQ, Redis, and MySQL process composition plus graceful shutdown have not been exercised in a target environment.",
+          "exit_criteria": "Run exact-SHA startup, readiness, subscription, and graceful-shutdown smoke against target infrastructure."
+        },
+        {
+          "id": "EVENT-10-PRODUCTION",
+          "kind": "production",
+          "severity": "medium",
+          "summary": "Current exact-SHA production topology and lifecycle evidence is absent.",
+          "exit_criteria": "Attach exact deployed SHA, effective infrastructure configuration, readiness evidence, and an observation timestamp."
+        }
+      ]
+    },
+    {
+      "path": "docs/03-基础设施/event/15-从事实到结算-失败窗口与状态机.md",
+      "class": "primary",
+      "owner": "infra",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-21"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/eventing/outbox.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/runtime/message_settlement.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/transport/runtime.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/transport/dead_letter.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/transport/provider_dead_letter_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "go.mod"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/eventing/runtime ./internal/pkg/eventing/transport",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Repository source and non-cached tests are aligned for this document; no target-environment or current exact-SHA production evidence is attached.",
+          "The build-tagged NSQ plus MySQL terminal-handoff integration was not run in this review."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "EVENT-15-TERMINAL-INTEGRATION",
+          "kind": "environment",
+          "severity": "high",
+          "summary": "The terminal chain from MaxAttempts through the cb.failed handoff consumer to MySQL dead_letter lacks a current real-broker integration run.",
+          "exit_criteria": "Run the build-tagged terminal-handoff integration with reachable NSQ and MySQL, including handoff publish, consumer, recorder-failure, and recovery assertions."
+        },
+        {
+          "id": "EVENT-15-PRODUCTION",
+          "kind": "production",
+          "severity": "medium",
+          "summary": "Current exact-SHA terminal settlement and dead-letter production evidence is absent.",
+          "exit_criteria": "Attach deployed SHA, effective broker settings, dead-letter persistence evidence, and an observation timestamp."
+        }
+      ]
+    },
+    {
+      "path": "docs/03-基础设施/event/20-事件契约与演进.md",
+      "class": "primary",
+      "owner": "infra",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-21"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "configs/events.yaml"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/catalog/spec.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/catalog/spec_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/handlers/assessment_handler.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/handlers/report_handler.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/container/container.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/container/container_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/reportstatus/reporter.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/reportstatus/cache.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/eventing/catalog ./internal/pkg/eventing/payload ./internal/pkg/eventing/outcome ./internal/pkg/reportstatus ./internal/worker/container ./internal/worker/handlers ./internal/worker/integration/eventing",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Repository source and non-cached tests are aligned for this document; no target-environment or current exact-SHA production evidence is attached."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "EVENT-20-REPORT-STATUS-BEST-EFFORT-PROJECTION",
+          "kind": "semantic",
+          "severity": "high",
+          "summary": "A valid started worker may ACK evaluation.failed or interpretation.report.generated/failed even when the best-effort Redis status write or Signal notify fails; the nil InternalClient guard is only reachable under direct or broken handler construction.",
+          "exit_criteria": "Return projection outcomes to the handlers and define fail-closed or durable reconciliation semantics, with tests covering Redis write failure, Signal failure, settlement and eventual status recovery for all three events."
+        },
+        {
+          "id": "EVENT-20-PRODUCTION",
+          "kind": "production",
+          "severity": "medium",
+          "summary": "Current exact-SHA event-contract and consumer compatibility evidence is absent.",
+          "exit_criteria": "Attach deployed SHA, effective event catalog, consumer compatibility smoke, and an observation timestamp."
+        }
+      ]
+    },
+    {
+      "path": "docs/03-基础设施/event/30-Outbox可靠出站链路.md",
+      "class": "primary",
+      "owner": "infra",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-21"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/eventing/outbox.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/eventing/immediate.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/eventing/ready_index.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mongo/eventoutbox/store.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/mysql/eventoutbox/store.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/redis/outboxready/reconciler.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/apiserver/application/eventing ./internal/apiserver/eventing/subsystem ./internal/apiserver/outboxcore ./internal/apiserver/infra/mongo/eventoutbox ./internal/apiserver/infra/mysql/eventoutbox ./internal/apiserver/infra/redis/outboxready",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Repository source and non-cached tests are aligned for this document; no target-environment or current exact-SHA production evidence is attached."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "EVENT-30-FAILURE-INJECTION",
+          "kind": "environment",
+          "severity": "high",
+          "summary": "Outbox recovery has no current target-environment fault injection covering real Mongo or MySQL storage, broker success, MarkEventsPublished failure, and stale-claim recovery.",
+          "exit_criteria": "Run exact-SHA storage and broker fault injection and prove stale publishing claims are recovered without event loss or duplicate business effects."
+        },
+        {
+          "id": "EVENT-30-PRODUCTION",
+          "kind": "production",
+          "severity": "medium",
+          "summary": "Current exact-SHA Outbox backlog, claim-recovery, and publish-lag evidence is absent.",
+          "exit_criteria": "Attach deployed SHA, effective Outbox configuration, backlog and stale-claim observations, and an observation timestamp."
+        }
+      ]
+    },
+    {
+      "path": "docs/03-基础设施/event/40-MQ发布消费与结算.md",
+      "class": "primary",
+      "owner": "infra",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-21"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/runtime/publisher.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/runtime/message_settlement.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/transport/runtime.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/transport/dead_letter.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/transport/provider_dead_letter_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/integration/messaging/runtime.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/eventing/runtime ./internal/pkg/eventing/observe ./internal/pkg/eventing/transport ./internal/worker/integration/eventing ./internal/worker/integration/messaging ./internal/worker/handlers ./internal/apiserver/application/systemgovernance",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Repository source and non-cached tests are aligned for this document; no target-environment or current exact-SHA production evidence is attached.",
+          "The build-tagged NSQ plus MySQL terminal-handoff integration was not run in this review."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "EVENT-40-TERMINAL-INTEGRATION",
+          "kind": "environment",
+          "severity": "high",
+          "summary": "The current NSQ terminal handoff and MySQL recorder chain lacks a build-tagged real-broker integration run; RabbitMQ retry and DLQ topology remains a provider capability, not production proof.",
+          "exit_criteria": "Run the build-tagged NSQ plus MySQL terminal integration and separately validate any selected provider topology in the target environment."
+        },
+        {
+          "id": "EVENT-40-PRODUCTION",
+          "kind": "production",
+          "severity": "medium",
+          "summary": "Current exact-SHA broker provider, retry, settlement, and dead-letter evidence is absent.",
+          "exit_criteria": "Attach deployed SHA, effective broker provider and topology, retry and settlement observations, and an observation timestamp."
+        }
+      ]
+    },
+    {
+      "path": "docs/03-基础设施/event/50-可观测性与故障恢复.md",
+      "class": "primary",
+      "owner": "infra",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-21"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/observe/metrics.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/observe/outcomes.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/transport/dead_letter.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/systemgovernance/event_projector.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/systemgovernance/types_events.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/eventing/observe ./internal/apiserver/eventing/subsystem ./internal/apiserver/transport/rest ./internal/worker/integration/eventing ./internal/worker/integration/messaging",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Repository source and non-cached tests are aligned for this document; no target-environment or current exact-SHA production evidence is attached."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "EVENT-50-HANDOFF-OBSERVABILITY",
+          "kind": "observability",
+          "severity": "high",
+          "summary": "Repository metrics do not prove terminal-handoff publish, independent consumer backlog, and MySQL recorder outcomes end to end after the original message is finished.",
+          "exit_criteria": "Add durable-handoff publish, consume, persistence, failure, and lag metrics with alert thresholds and recovery evidence."
+        },
+        {
+          "id": "EVENT-50-UI-CROSS-REPOSITORY",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Source and semantic review have not yet been recorded.",
-          "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+          "summary": "qs-operating-system routes, redirects and rendering behavior are outside this repository's exact-SHA closure.",
+          "exit_criteria": "Record the frontend exact SHA and pass route, redirect, normalizer and page-fixture contract tests against the backend status schema."
+        },
+        {
+          "id": "EVENT-50-PRODUCTION",
+          "kind": "production",
+          "severity": "medium",
+          "summary": "Current exact-SHA event metrics, backlog, alert, and recovery-drill evidence is absent.",
+          "exit_criteria": "Attach deployed SHA, target dashboards and alerts, a bounded recovery drill, and an observation timestamp."
+        }
+      ]
+    },
+    {
+      "path": "docs/03-基础设施/event/60-Signal一次性信令.md",
+      "class": "primary",
+      "owner": "infra",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-21"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "configs/signals.yaml"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/signalcatalog/catalog_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/cache/subsystem/signal_runtime.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/cache/subsystem.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/reportstatus/reporter.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/collection-server/application/reportnotify/watcher.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/cache/... ./internal/pkg/signalcatalog ./internal/pkg/reportstatus ./internal/apiserver/cache/... ./internal/collection-server/cache/...",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Repository source and non-cached tests are aligned for this document; no target-environment or current exact-SHA production evidence is attached."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "EVENT-60-TOPOLOGY-RATCHET",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "The Signal topology test compares signals.yaml with a hardcoded expected set; it does not scan real publishers and subscribers, although this review manually found the five declared Signals aligned.",
+          "exit_criteria": "Add a source or composition-derived publisher and subscriber topology ratchet and keep the five-Signal catalog assertion."
+        },
+        {
+          "id": "EVENT-60-ENVIRONMENT",
+          "kind": "environment",
+          "severity": "medium",
+          "summary": "Signal delivery, stale windows, and best-effort loss behavior have not been exercised against target Redis instances.",
+          "exit_criteria": "Run exact-SHA publish, subscribe, disconnect, reconnect, and stale-window smoke against target Redis infrastructure."
+        },
+        {
+          "id": "EVENT-60-PRODUCTION",
+          "kind": "production",
+          "severity": "medium",
+          "summary": "Current exact-SHA Signal topology and Redis delivery evidence is absent.",
+          "exit_criteria": "Attach deployed SHA, effective Redis topology, subscriber observations, and an observation timestamp."
+        }
+      ]
+    },
+    {
+      "path": "docs/03-基础设施/event/70-扩展与验收.md",
+      "class": "primary",
+      "owner": "infra",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-21"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "configs/events.yaml"
+        },
+        {
+          "kind": "source",
+          "path": "configs/signals.yaml"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/catalog/spec_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/signalcatalog/catalog_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/transport/provider_dead_letter_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/architecture/event_cache_signal_boundary_test.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/eventing/... ./internal/pkg/signalcatalog ./internal/pkg/architecture ./internal/apiserver/application/eventing ./internal/apiserver/eventing/subsystem ./internal/apiserver/outboxcore ./internal/apiserver/infra/mongo/eventoutbox ./internal/apiserver/infra/mysql/eventoutbox ./internal/apiserver/infra/redis/outboxready ./internal/worker/integration/eventing ./internal/worker/integration/messaging ./internal/worker/handlers ./internal/apiserver/infra/mysql/eventdelivery ./internal/apiserver/application/systemgovernance",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Repository source and non-cached tests are aligned for this document; no target-environment or current exact-SHA production evidence is attached.",
+          "The build-tagged NSQ plus MySQL terminal-handoff integration was not run in this review."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "EVENT-70-TERMINAL-INTEGRATION",
+          "kind": "environment",
+          "severity": "high",
+          "summary": "The acceptance suite did not run the build-tagged NSQ plus MySQL terminal-handoff integration.",
+          "exit_criteria": "Run the tagged terminal integration with target-like NSQ and MySQL and retain publish, requeue, persistence, and recovery artifacts."
+        },
+        {
+          "id": "EVENT-70-PRODUCTION",
+          "kind": "production",
+          "severity": "medium",
+          "summary": "Repository acceptance is not a current exact-SHA production acceptance.",
+          "exit_criteria": "Attach deployed SHA, effective configuration, target-environment smoke, operational observations, and an observation timestamp."
+        }
+      ]
+    },
+    {
+      "path": "docs/03-基础设施/event/README.md",
+      "class": "primary",
+      "owner": "infra",
+      "doc_status": "aligned",
+      "verified": {
+        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+        "verified_on": "2026-08-21"
+      },
+      "fact_sources": [
+        {
+          "kind": "source",
+          "path": "configs/events.yaml"
+        },
+        {
+          "kind": "source",
+          "path": "configs/signals.yaml"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/catalog/spec.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/eventing/subsystem/subsystem.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/eventing/outbox.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/runtime/message_settlement.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/handlers/assessment_handler.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/worker/handlers/report_handler.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/reportstatus/reporter.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/reportstatus/cache.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/eventing/transport/provider_dead_letter_integration_test.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/pkg/signalcatalog/catalog_test.go"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "command",
+          "command": "go test -count=1 ./internal/pkg/eventing/... ./internal/pkg/signalcatalog ./internal/pkg/architecture ./internal/apiserver/application/eventing ./internal/apiserver/eventing/subsystem ./internal/apiserver/outboxcore ./internal/apiserver/infra/mongo/eventoutbox ./internal/apiserver/infra/mysql/eventoutbox ./internal/apiserver/infra/redis/outboxready ./internal/worker/integration/eventing ./internal/worker/integration/messaging ./internal/worker/handlers ./internal/apiserver/infra/mysql/eventdelivery ./internal/apiserver/application/systemgovernance",
+          "result": "passed",
+          "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
+          "verified_on": "2026-08-21"
+        }
+      ],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "Repository source and non-cached tests are aligned for this document; no target-environment or current exact-SHA production evidence is attached.",
+          "The build-tagged NSQ plus MySQL terminal-handoff integration was not run in this review."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "EVENT-README-TERMINAL-INTEGRATION",
+          "kind": "environment",
+          "severity": "high",
+          "summary": "The Event documentation overview is source-aligned, but the build-tagged NSQ plus MySQL terminal-handoff integration was not run.",
+          "exit_criteria": "Run the tagged terminal integration and retain target-like broker, handoff consumer, persistence, and recovery evidence."
+        },
+        {
+          "id": "EVENT-README-REPORT-STATUS-BEST-EFFORT",
+          "kind": "semantic",
+          "severity": "high",
+          "summary": "Three report-status event handlers may ACK after Redis status or Signal failures because Reporter records but does not return those errors.",
+          "exit_criteria": "Define durable reconciliation or fail-closed settlement and test Redis write, Signal notify, ACK/NACK and eventual status recovery for all three events."
+        },
+        {
+          "id": "EVENT-README-PRODUCTION",
+          "kind": "production",
+          "severity": "medium",
+          "summary": "No current exact-SHA target-environment or production acceptance is attached to the Event documentation set.",
+          "exit_criteria": "Attach deployed SHA, effective Event and Signal topology, broker and Redis observations, and an observation timestamp."
         }
       ]
     },
@@ -10818,6 +12146,14 @@
           },
           {
             "kind": "source",
+            "path": "configs/signals.yaml"
+          },
+          {
+            "kind": "source",
+            "path": "go.mod"
+          },
+          {
+            "kind": "source",
             "path": "internal/pkg/eventing/**/*.go"
           },
           {
@@ -10827,6 +12163,30 @@
           {
             "kind": "source",
             "path": "internal/worker/integration/eventing/**/*.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/worker/integration/messaging/**/*.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/worker/handlers/**/*.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/pkg/reportstatus/reporter.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/pkg/reportstatus/cache.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/apiserver/eventing/subsystem/**/*.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/apiserver/application/systemgovernance/delivery_replay.go"
           },
           {
             "kind": "source",
@@ -10848,10 +12208,10 @@
         "non_cached_tests": [
           {
             "kind": "command",
-            "command": "go test -count=1 ./internal/pkg/eventing/... ./internal/apiserver/application/eventing ./internal/worker/integration/eventing",
+            "command": "go test -count=1 ./internal/pkg/eventing/... ./internal/apiserver/application/eventing ./internal/apiserver/eventing/subsystem ./internal/worker/integration/eventing ./internal/worker/integration/messaging ./internal/worker/handlers",
             "result": "passed",
             "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-            "verified_on": "2026-08-20"
+            "verified_on": "2026-08-21"
           }
         ],
         "environment_tests": [
@@ -10878,8 +12238,8 @@
             "id": "INFRA-EVENT_OUTBOX_MQ-CRITICAL",
             "kind": "semantic",
             "severity": "high",
-            "summary": "The historical audit found 269 published Outbox records whose AnswerSheet no longer exists; delivery completion is not business consistency.",
-            "exit_criteria": "Resolve the reverse-orphan authority decision and run broker, relay, duplicate and dead-letter environment scenarios for an exact SHA."
+            "summary": "The three report-status handlers can ACK after Redis status projection or Signal notification fails because Reporter records the failure but does not return it to the handler.",
+            "exit_criteria": "Make projection failure explicitly retryable or durably recoverable, then run Redis and Signal failure injection for all three handlers at an exact SHA."
           },
           {
             "id": "INFRA-EVENT_OUTBOX_MQ-CURRENT-PRODUCTION",
@@ -10937,8 +12297,8 @@
                 "id": "INFRA-EVENT_OUTBOX_MQ-CRITICAL",
                 "kind": "semantic",
                 "severity": "high",
-                "summary": "The historical audit found 269 published Outbox records whose AnswerSheet no longer exists; delivery completion is not business consistency.",
-                "exit_criteria": "Resolve the reverse-orphan authority decision and run broker, relay, duplicate and dead-letter environment scenarios for an exact SHA."
+                "summary": "The three report-status handlers can ACK after Redis status projection or Signal notification fails because Reporter records the failure but does not return it to the handler.",
+                "exit_criteria": "Make projection failure explicitly retryable or durably recoverable, then run Redis and Signal failure injection for all three handlers at an exact SHA."
               }
             ],
             "signoff": {
@@ -11012,10 +12372,10 @@
             "evidence": [
               {
                 "kind": "command",
-                "command": "go test -count=1 ./internal/pkg/eventing/... ./internal/apiserver/application/eventing ./internal/worker/integration/eventing",
+                "command": "go test -count=1 ./internal/pkg/eventing/... ./internal/apiserver/application/eventing ./internal/apiserver/eventing/subsystem ./internal/worker/integration/eventing ./internal/worker/integration/messaging ./internal/worker/handlers",
                 "result": "passed",
                 "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-                "verified_on": "2026-08-20"
+                "verified_on": "2026-08-21"
               }
             ],
             "gaps": [
@@ -11095,6 +12455,14 @@
           },
           {
             "kind": "source",
+            "path": "configs/apiserver.prod.yaml"
+          },
+          {
+            "kind": "source",
+            "path": "configs/collection-server.prod.yaml"
+          },
+          {
+            "kind": "source",
             "path": "configs/cache/*.prod.yaml"
           },
           {
@@ -11120,15 +12488,27 @@
           {
             "kind": "source",
             "path": "internal/collection-server/application/catalogcache/**/*.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/collection-server/application/modelcatalog/**/*.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/apiserver/application/systemgovernance/**/*.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/pkg/configcontract/**/*.go"
           }
         ],
         "non_cached_tests": [
           {
             "kind": "command",
-            "command": "go test -count=1 ./internal/pkg/cache/... ./internal/pkg/signalcatalog ./internal/pkg/redisruntime/...",
+            "command": "go test -count=1 ./internal/pkg/cache/... ./internal/pkg/redisruntime/... ./internal/pkg/signalcatalog ./internal/apiserver/cache/... ./internal/collection-server/cache ./internal/apiserver/application/systemgovernance/... ./internal/collection-server/process ./internal/pkg/configcontract ./internal/pkg/architecture",
             "result": "passed",
             "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-            "verified_on": "2026-08-20"
+            "verified_on": "2026-08-21"
           }
         ],
         "environment_tests": [
@@ -11153,8 +12533,8 @@
             "id": "INFRA-CACHE_REDIS_SIGNAL-CRITICAL",
             "kind": "semantic",
             "severity": "high",
-            "summary": "Repository tests do not prove real Redis failover, signal loss tolerance, multi-replica invalidation or current production family health.",
-            "exit_criteria": "Record exact-SHA Redis outage, recovery, signal-loss and cache convergence results with family metrics and effective configuration."
+            "summary": "Published-model L1 and L2 perform multiple policy resolutions during one top-level read; a reload can cross snapshots, while L1 TTL jitter remains fixed at construction time.",
+            "exit_criteria": "Introduce an operation-scoped policy snapshot or an equivalent explicit contract, then add reload-race tests covering L1 TTL and jitter behavior."
           },
           {
             "id": "INFRA-CACHE_REDIS_SIGNAL-CURRENT-PRODUCTION",
@@ -11212,8 +12592,8 @@
                 "id": "INFRA-CACHE_REDIS_SIGNAL-CRITICAL",
                 "kind": "semantic",
                 "severity": "high",
-                "summary": "Repository tests do not prove real Redis failover, signal loss tolerance, multi-replica invalidation or current production family health.",
-                "exit_criteria": "Record exact-SHA Redis outage, recovery, signal-loss and cache convergence results with family metrics and effective configuration."
+                "summary": "Published-model L1 and L2 perform multiple policy resolutions during one top-level read; a reload can cross snapshots, while L1 TTL jitter remains fixed at construction time.",
+                "exit_criteria": "Introduce an operation-scoped policy snapshot or an equivalent explicit contract, then add reload-race tests covering L1 TTL and jitter behavior."
               }
             ],
             "signoff": {
@@ -11287,10 +12667,10 @@
             "evidence": [
               {
                 "kind": "command",
-                "command": "go test -count=1 ./internal/pkg/cache/... ./internal/pkg/signalcatalog ./internal/pkg/redisruntime/...",
+                "command": "go test -count=1 ./internal/pkg/cache/... ./internal/pkg/redisruntime/... ./internal/pkg/signalcatalog ./internal/apiserver/cache/... ./internal/collection-server/cache ./internal/apiserver/application/systemgovernance/... ./internal/collection-server/process ./internal/pkg/configcontract ./internal/pkg/architecture",
                 "result": "passed",
                 "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-                "verified_on": "2026-08-20"
+                "verified_on": "2026-08-21"
               }
             ],
             "gaps": [
@@ -11386,6 +12766,54 @@
           },
           {
             "kind": "source",
+            "path": "internal/collection-server/transport/rest/**/*.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/collection-server/application/answersheet/**/*.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/collection-server/infra/redisops/**/*.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/apiserver/application/survey/answersheet/**/*.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/apiserver/infra/mongo/answersheet/**/*.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/apiserver/infra/mongo/base.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/pkg/database/mysql/**/*.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/apiserver/infra/mysql/actor/read_model.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/apiserver/infra/mongo/answersheet/readmodel.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/apiserver/infra/mongo/answersheet/repo.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/apiserver/application/systemgovernance/**/*.go"
+          },
+          {
+            "kind": "source",
+            "path": "internal/apiserver/runtime/scheduler/**/*.go"
+          },
+          {
+            "kind": "source",
             "path": "internal/apiserver/container/internal/transaction/**/*.go"
           },
           {
@@ -11404,10 +12832,10 @@
         "non_cached_tests": [
           {
             "kind": "command",
-            "command": "go test -count=1 ./internal/pkg/resilience/... ./internal/collection-server/concurrency",
+            "command": "go test -count=1 ./internal/pkg/resilience/... ./internal/collection-server/concurrency/... ./internal/collection-server/transport/rest/... ./internal/collection-server/application/answersheet ./internal/collection-server/infra/redisops ./internal/apiserver/application/survey/answersheet ./internal/apiserver/infra/mongo ./internal/apiserver/infra/mongo/answersheet ./internal/pkg/database/mysql ./internal/apiserver/resilience/... ./internal/collection-server/resilience/... ./internal/worker/resilience/... ./internal/apiserver/application/systemgovernance/... ./internal/apiserver/runtime/scheduler",
             "result": "passed",
             "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-            "verified_on": "2026-08-20"
+            "verified_on": "2026-08-21"
           }
         ],
         "environment_tests": [
@@ -11432,8 +12860,8 @@
             "id": "INFRA-CONCURRENCY_RESILIENCE-CRITICAL",
             "kind": "semantic",
             "severity": "high",
-            "summary": "Static lock and admission tests do not prove HA renewal, stale-owner exclusion, downstream limits or capacity thresholds in a real topology.",
-            "exit_criteria": "Complete multi-replica lease-loss and saturation scenarios and retain concurrency, latency, failure and recovery measurements."
+            "summary": "Limiter injection is not method-level coverage: raw WithContext, Collection and direct repository operations bypass Acquire, so metrics and budgets describe only the explicitly admitted subset.",
+            "exit_criteria": "Inventory and guard every database method or centralize acquisition below raw handles, then add method-level coverage tests and saturation evidence."
           },
           {
             "id": "INFRA-CONCURRENCY_RESILIENCE-CURRENT-PRODUCTION",
@@ -11491,8 +12919,8 @@
                 "id": "INFRA-CONCURRENCY_RESILIENCE-CRITICAL",
                 "kind": "semantic",
                 "severity": "high",
-                "summary": "Static lock and admission tests do not prove HA renewal, stale-owner exclusion, downstream limits or capacity thresholds in a real topology.",
-                "exit_criteria": "Complete multi-replica lease-loss and saturation scenarios and retain concurrency, latency, failure and recovery measurements."
+                "summary": "Limiter injection is not method-level coverage: raw WithContext, Collection and direct repository operations bypass Acquire, so metrics and budgets describe only the explicitly admitted subset.",
+                "exit_criteria": "Inventory and guard every database method or centralize acquisition below raw handles, then add method-level coverage tests and saturation evidence."
               }
             ],
             "signoff": {
@@ -11566,10 +12994,10 @@
             "evidence": [
               {
                 "kind": "command",
-                "command": "go test -count=1 ./internal/pkg/resilience/... ./internal/collection-server/concurrency",
+                "command": "go test -count=1 ./internal/pkg/resilience/... ./internal/collection-server/concurrency/... ./internal/collection-server/transport/rest/... ./internal/collection-server/application/answersheet ./internal/collection-server/infra/redisops ./internal/apiserver/application/survey/answersheet ./internal/apiserver/infra/mongo ./internal/apiserver/infra/mongo/answersheet ./internal/pkg/database/mysql ./internal/apiserver/resilience/... ./internal/collection-server/resilience/... ./internal/worker/resilience/... ./internal/apiserver/application/systemgovernance/... ./internal/apiserver/runtime/scheduler",
                 "result": "passed",
                 "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-                "verified_on": "2026-08-20"
+                "verified_on": "2026-08-21"
               }
             ],
             "gaps": [

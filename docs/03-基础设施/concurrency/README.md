@@ -41,7 +41,7 @@ flowchart LR
 | Gate | 本实例现在还能接多少在途请求？ | 快速拒绝；不参与事实裁决 |
 | RateLimit | 时间窗口内允许多少到达，热点用户占多少？ | submit 用本地保守预算；后续 Gate/Backpressure |
 | SubmitCoalescer | 同一意图是否应只展开一次昂贵流程？ | degraded-open；Mongo 唯一键与回读收敛 |
-| Backpressure | 本实例还能向 Mongo 发多少并发操作？ | 有界等待/503；存储不被无限排队放大 |
+| Backpressure | 本实例显式 acquire 的 Mongo 操作还能发多少并发？ | 已接入方法有界等待/503；raw `Collection()` 旁路仍由 driver pool 承担 |
 | Unique + transaction | 哪个意图事实成立，202 能承诺什么？ | 这是最终边界，失败时不能猜测成功 |
 
 ## 3. 学习路径与概念依赖
@@ -79,17 +79,15 @@ flowchart LR
 - unique/transaction/claim/CAS 才能决定最终结果；
 - 若旧 owner 的副作用不可容忍，必须在写入点使用 fencing/version/CAS，延长 TTL 不足以修复。
 
-## 5. 方案演化主线
+## 5. 当前保护组合
 
-本专题保留三条设计演化，不把当前代码写成唯一可能答案：
+| 问题 | 当前组合 | 不能替代什么 |
+| --- | --- | --- |
+| 入口过载 | Route Gate + RateLimit + dependency Backpressure | 不能代替持久化正确性约束 |
+| 重复提交 | stable key + fingerprint + unique/transaction + SubmitCoalescer | Coalescer 不能代替 Mongo 唯一约束与 durable readback |
+| 多实例长任务 | token lease + renewal + cancellation + 持久幂等边界 | 续租不能代替写入点的 version/CAS/fencing |
 
-| 问题 | 早期/简单方案 | 暴露的失败窗口 | 当前组合 | 下一次升级条件 |
-| --- | --- | --- | --- | --- |
-| 入口过载 | 只依赖连接池 | 拒绝太晚，非 DB 依赖无保护 | Route Gate + RateLimit + dependency Backpressure | 证据表明固定预算长期浪费/振荡可控 |
-| 重复提交 | request ID 或 Redis 锁 | 新 request 的同意图重复；lease 过期重叠 | stable key + fingerprint + unique/transaction + Coalescer | 业务改为 durable async intake 才引入持久队列 |
-| 多实例长任务 | 长 TTL Redis lock | GC pause/失租后旧 owner 仍可写 | token lease + cancellation + 持久幂等边界 | 旧 owner 写会破坏不变量时引入 fencing |
-
-当前系统使用固定保守预算，不声称已实现 adaptive concurrency、dependency Circuit Breaker、RateLimit 半开或渐进恢复。
+当前采用固定预算和明确降级策略。任何自动调节或更强互斥能力都必须在代码、配置、指标和故障测试同时具备后，才能进入现行能力说明。
 
 ## 6. 事实源
 
@@ -101,7 +99,7 @@ flowchart LR
 | 可靠提交 | `internal/collection-server/application/answersheet`、`internal/apiserver/application/survey/answersheet` |
 | Mongo 幂等 | `internal/apiserver/infra/mongo/answersheet` |
 | 运行时治理 | `internal/apiserver/application/systemgovernance`、三个进程的 resilience subsystem |
-| 版本化生产配置意图 | `configs/collection-server.prod.yaml`、`configs/apiserver.prod.yaml`、`configs/worker.prod.yaml` |
+| 仓库版本化配置意图 | `configs/collection-server.prod.yaml`、`configs/apiserver.prod.yaml`、`configs/worker.prod.yaml` |
 | 压测入口 | `Makefile` 的 `perf-*` 目标、`scripts/perf` |
 
 ## 7. 当前限制不是脚注
@@ -109,14 +107,14 @@ flowchart LR
 | 状态 | 结论及影响 |
 | --- | --- |
 | `已实现` | collection submit 在 Redis rate backend 缺失或运行期 degraded-open 时使用每实例 30/10 QPS 本地保守预算；集群聚合量仍随实例数变化。 |
-| `已退役` | 无生产注册和 action descriptor 的 queue controller/control 协议已删除；SubmitCoalescer 不是进程内队列。 |
-| `当前接线缺口` | Mongo Outbox 接入共享 Mongo Backpressure；MySQL Outbox 未接入共享 MySQL limiter，因此现有指标不是全部 MySQL 并发。 |
-| `待补证据` | 真实实例数、负载偏斜、依赖放大系数、Redis 故障拐点和自动续租下的长任务失租行为。 |
-| `规划改造` | 连续失败判定、Circuit Breaker、半开/渐进恢复、自适应并发和强互斥 workload fencing。 |
+| `当前接线缺口` | limiter 注入不等于方法级全覆盖：MySQL Actor read model 经 `WithContext()`、MySQL Outbox 经直接 GORM DB、Mongo AnswerSheet read model/repository 经 `Collection()` 绕过 acquire；Mongo Outbox 的显式接入不能证明其他 Mongo 方法已覆盖。现有 Backpressure 指标只是已接入方法的子集，不是全部 MySQL/Mongo 并发。 |
+| `配置意图` | 仓库三个 `*.prod.yaml` 只记录版本化部署意图；不能据此断言目标环境的 effective config 或安全容量。 |
+| `待补证据` | 目标环境实例数、负载偏斜、依赖放大系数、Redis 故障拐点和自动续租下的长任务失租行为。 |
+| `当前未实现` | 自动并发调节和通用持久化 fencing 不属于当前能力。 |
 
 规划项只有在代码、配置、指标和故障测试一起落地后，才成为现行能力。
 
-## 8. 学完后的口述主线
+## 8. 阅读后的核对清单
 
 你应能不用背包名，完整回答：
 

@@ -66,23 +66,21 @@ rollback 路径不调用 post-commit；即使 post-commit 内部 ready-index 或
 ## 4. Outbox 状态机
 
 ```text
-pending ──claim──> publishing ──publish + mark──> published
-   ▲                    │
-   │                    ├─ publish failed ───────> failed
-   │                    └─ stale claim / due retry
-   └──────────────────────── failed + automatic（到期后重新 claim）
-                                      │
-                                      └─ 预算耗尽 → failed + manual_required
-                                                           │
-                                          events.replay_pending 授权一次
-                                                           ↓
-                                              failed + automatic
+pending ──claim──────────────────────────────────> publishing
+failed + automatic ──到期 claim─────────────────> publishing
+publishing ──publish success + mark success──────> published
+publishing ──publish failed──────────────────────> failed + automatic
+publishing ──publish failed 且预算耗尽───────────> failed + manual_required
+publishing ──publish success + mark failed───────> publishing（陈旧 claim）
+publishing（陈旧 claim）──stale recovery + claim─> publishing（新 claim）
+failed + manual_required ──events.replay_pending─> failed + automatic
 ```
 
 核心状态为 `pending`、`publishing`、`published`、`failed`。
 
 - Store 原子 claim，避免同一时刻多个 worker 同时取得同一行。
-- publish 失败或 mark 失败会记录重试状态。
+- publish 失败会进入 governed failure 决策并记录 `failed`、下一次时间或 `manual_required`。
+- MQ publish 已成功但 `MarkEvent(s)Published` 失败时，只记录 `mark_published_failed` 观测结果，Outbox 行仍保持 `publishing`；它依赖 stale-claim recovery 重新进入候选，不会立即改写为 retry 状态。
 - 到期且 `retry_disposition=automatic` 的 failed，以及陈旧 publishing，会重新进入候选集合。
 - Outbox 默认最多进行 30 次自动发布尝试，使用 10 秒起步、1 小时封顶、20% deterministic jitter 的退避；代码硬上限也是 30，部署配置只能下调。
 - 预算耗尽后保留 `failed + manual_required`，不再被 relay 自动 claim。组织管理员必须通过高风险动作 `events.replay_pending`，携带 store、event ID 和预期 attempt count 授权一次重放；状态已变化时拒绝授权。
@@ -126,7 +124,7 @@ Relay 的工作循环：
 2. 优先尝试 ready-index 中已提交事件 ID。
 3. 对数据库执行轮询兜底，claim pending、到期 failed 和 stale publishing。
 4. 编码并发布 MQ message。
-5. 标记 published；失败则记录失败状态和下一次重试时间。
+5. MQ publish 失败时记录 governed failure 与下一次时间；publish 成功后尝试标记 published，mark 失败则保持 `publishing` 并等待 stale-claim recovery。
 
 当前层级顺序是：
 
@@ -152,7 +150,7 @@ Reconciler 解决的是“Outbox 已提交但 post-commit enqueue 丢失”的�
 | ready-index enqueue 失败 | pending 已提交 | 记录失败，relay DB 扫描/reconciler 回填 | 否 |
 | immediate publish 失败 | pending/可重试状态 | relay 后续重试 | 否 |
 | MQ 不可用 | backlog 增长 | relay 重试；logging/nop 不标记 published | 否 |
-| MQ 成功、mark published 失败 | 可能仍可重试 | 后续可能重复发布 | 不丢，但可能重复 |
+| MQ 成功、mark published 失败 | 保持 `publishing` | 记录 `mark_published_failed`；stale-claim recovery 后重新 claim 并可能重复发布 | 不丢，但可能重复 |
 | Redis ready-index 不可用 | Outbox 不变 | DB polling 继续工作 | 否 |
 | Store 读取失败 | Outbox 不变 | status/relay 记录错误并下轮重试 | 否 |
 | 自动发布预算耗尽 | `failed + manual_required` | 停止自动 claim，等待 `events.replay_pending` | 否，但事件尚未投递 |
@@ -188,7 +186,7 @@ Reconciler 解决的是“Outbox 已提交但 post-commit enqueue 丢失”的�
 - Ready-index：`internal/apiserver/infra/redis/outboxready`
 
 ```bash
-go test ./internal/apiserver/application/eventing \
+go test -count=1 ./internal/apiserver/application/eventing \
   ./internal/apiserver/eventing/subsystem \
   ./internal/apiserver/outboxcore \
   ./internal/apiserver/infra/mongo/eventoutbox \

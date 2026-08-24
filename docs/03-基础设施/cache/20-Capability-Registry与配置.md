@@ -4,7 +4,7 @@
 
 Capability 是 Cache 的最小治理单位。apiserver 的 [`catalog.Spec`](../../../internal/apiserver/cache/catalog/catalog.go) 同时声明 identity、owner、kind、layer、family、配置路径、行为默认值与 legacy metric label；[`cache.Registry`](../../../internal/pkg/cache/registry.go) 发布进程内唯一的 effective Policy snapshot。
 
-业务 adapter 不再保存静态 Policy，也不读取 Options。每次操作开始时以固定 capability ID 调用 `PolicyProvider.Resolve`，从而让在线行为、status、reload 和观测投影共享同一事实源。
+普通 Redis/object adapter 不保存静态 Policy，也不读取 Options；它们在每次 read-through 开始时以固定 capability ID 调用 `PolicyProvider.Resolve`。published-model L1 是当前明确例外：TTL 由 `TTLProvider` 在 Set 时重取，但 `TTLJitterRatio` 在 L1 构造时固定；外层 `cacheEnabled()`、L2 read-through 与 L1 Set 还会多次 Resolve，不是一个跨 L1/L2 的单快照操作。因此 Registry、status 与大部分在线行为共享同一事实源，但 status 的 effective TTL/jitter 当前不能单独代表某次 published-model L1+L2 读取实际使用的同一快照。
 
 ## 2. Canonical capability registry
 
@@ -123,7 +123,7 @@ effective := override.MergeWith(
 - 发布成功且确有变化时 version 加一；
 - version conflict 或 candidate 校验失败时保留完整旧 snapshot。
 
-这种模型保证并发读只能看到完整的旧版本或完整的新版本，不会在一次操作内混用两套 Policy。
+这种模型保证每次单独 `Resolve/All/Snapshot` 调用只看到完整旧版本或完整新版本；它不为跨多次 Resolve 的组合操作锁定同一快照。published-model L1+L2 是当前这个边界的直接例子。
 
 ## 6. 配置合同
 
@@ -195,8 +195,10 @@ POST /internal/v1/system-governance/actions/cache.reload_policy/runs
 
 可 reload：
 
-- 七个普通 capability 的 `ttl/negative_ttl/ttl_jitter_ratio/compress/singleflight/negative`；
+- 七个普通 capability 的 `ttl/negative_ttl/ttl_jitter_ratio/compress/singleflight/negative` 可进入新 Registry 快照；
 - global 与 static/object/query family defaults 中相同的 Policy 维度。
+
+实际 adapter 热生效仍以读取点为准：published-model L1 的 TTL 会随后续 Set 重取，其 jitter 不会随 reload 更新，需重启才重建 Options。当前也没有 reload 后验证 L1 jitter 的契约测试。
 
 不可 reload：
 
@@ -206,7 +208,7 @@ POST /internal/v1/system-governance/actions/cache.reload_policy/runs
 - `report_status`；
 - collection-server Registry。
 
-成功 reload 只影响后续操作和新写入。关闭 compression 后旧 gzip payload 仍由 decoder 自动识别；开启后只压缩新 payload。singleflight/negative 的变化从下一次操作开始生效。reload 不创建或拆除 decorator，也不扫描或删除旧 entry。
+成功 reload 只影响能够重取对应 Policy 维度的后续操作和新写入。关闭 compression 后旧 gzip payload 仍由 decoder 自动识别；开启后只压缩新 payload。singleflight/negative 的变化从下一次操作开始生效。reload 不创建或拆除 decorator，也不扫描或删除旧 entry；published-model L1 jitter 是当前已知不热生效的例外。
 
 ## 8. Status 投影
 

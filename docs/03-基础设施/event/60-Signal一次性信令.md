@@ -97,11 +97,13 @@ Cache Signal 保留：
 ## 8. 验证
 
 ```bash
-go test ./internal/pkg/cache/... \
+go test -count=1 ./internal/pkg/cache/... \
   ./internal/pkg/signalcatalog \
   ./internal/pkg/reportstatus \
   ./internal/apiserver/cache/... \
   ./internal/collection-server/cache/...
 ```
 
-新增或修改 Signal 时，还必须运行拓扑同步测试，确保 `configs/signals.yaml`、代码常量和真实 publisher/subscriber 一致。
+`TestSignalsManifestAndCodeConstantsStayInSync` 能证明：Signal 名称、delivery、transport 与代码常量一致，并把清单中的 publisher/subscriber 列表与测试内硬编码的 expected topology 比较。它不会扫描 composition root、publisher 调用点或 subscriber watcher，因此不能单独证明真实运行时接线一致。
+
+本轮已人工反查 apiserver CacheSubsystem、collection-server CacheSubsystem 和 report-status runtime，五条 Signal 拓扑与 `configs/signals.yaml` 一致。新增或修改 Signal 时，除运行上述测试外，仍必须人工或通过新的架构测试核对真实 publisher/subscriber 接线；普通单元测试通过也不代表 Redis Pub/Sub 目标环境已经验收。

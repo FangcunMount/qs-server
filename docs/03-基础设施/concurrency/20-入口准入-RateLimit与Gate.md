@@ -81,7 +81,7 @@ query、wait-report、report-events 的 `newBudget` 会选择按原配置运行�
 
 - global 为每实例 30 QPS / burst 45；
 - user 为每实例每用户 10 QPS / burst 15；
-- 可通过 `rate_limit.submit_degraded_local.enabled=false` 回滚到旧行为。
+- 可通过 `rate_limit.submit_degraded_local.enabled=false` 禁用这层本地 fallback。
 
 ### 5.2 启动时有 backend，运行期 Redis 出错
 
@@ -91,7 +91,7 @@ query、wait-report、report-events 的 `newBudget` 会选择按原配置运行�
 - 其他 budget 继续 degraded-open；
 - Redis 下一次调用恢复正常后，submit 立即重新采用分布式决策。
 
-当前没有连续失败窗口、Circuit Breaker、半开探测或渐进恢复。fallback 只对单次明确的 `degraded_open` 决策生效。
+当前没有连续失败窗口或跨请求恢复状态。fallback 只对单次明确的 `degraded_open` 决策生效。
 
 ### 5.3 为什么选择 fail-open
 
@@ -113,19 +113,11 @@ submit 会进入跨服务校验和 Mongo transaction，成本显著高于普通�
 
 这不是一条通用常数：实例数变化会改变聚合上界；query、wait-report、report-events 尚未复制该策略，也是因为它们的成本与可降级结果不同。应先取得路径成本、cache hit、下游拐点和故障流量证据，再决定每个 budget 的 fallback。
 
-候选恢复模型：
+当前恢复契约只有单次判断：下一次 Redis 调用正常，就重新采用分布式预算；没有连续失败窗口或有状态恢复过程。文档只描述这一现行语义，不把候选算法列为当前能力。
 
-| 模型 | 恢复行为 | 优点 | 风险 |
-| --- | --- | --- | --- |
-| 单次判断、直接恢复（当前） | 下一次 Redis 调用正常即恢复分布式预算 | 无额外状态，恢复快 | Redis 抖动时会在两套预算间切换 |
-| Circuit Breaker + half-open | 连续失败后本地降级，少量探测成功再恢复 | 避免持续打故障 Redis | 需要失败窗口、探测并发和各实例状态治理 |
-| 渐进恢复 | 恢复后逐步放大分布式准入 | 降低瞬时回流 | 控制算法、振荡和多实例协调显著更复杂 |
+## 6. 仓库版本化配置意图
 
-引入后两者前必须先证明 Redis 抖动和恢复回流已构成现实问题；否则复杂状态机可能比单次失败本身更难解释和运维。
-
-## 6. 版本化生产配置意图
-
-以下数字来自仓库 production YAML，是初始预算意图，不证明目标环境采用了同一 effective config，也不是容量证明。
+以下数字来自仓库 `collection-server.prod.yaml`，只是版本化部署意图；不证明目标环境采用了同一 effective config，也不是容量证明。
 
 ### 6.1 collection RateLimit
 
@@ -175,7 +167,7 @@ Redis 下一次调用恢复
   -> 直接回到分布式预算
 ```
 
-半开、连续失败窗口和渐进恢复仍不属于当前实现。实例数变化会改变本地 fallback 的理论聚合上限，扩缩容时必须同步复核配置。
+有状态恢复策略不属于当前实现。实例数变化会改变本地 fallback 的理论聚合上限，扩缩容时必须同步复核配置。
 
 ## 9. 验证入口
 
@@ -185,7 +177,7 @@ Redis 下一次调用恢复
 - 配置校验：`internal/collection-server/options/options_test.go`
 - 压测：`make perf-run PLAN=baseline`、`make perf-run PLAN=admission`；故障与幂等专项使用 `PLAN=diagnose CASE=...`
 
-## 10. 学习问题
+## 10. 验证问题
 
 假设一个 collection 实例的 submit Gate 已经占满 96 个槽位，但 RateLimit token 仍然充足：
 

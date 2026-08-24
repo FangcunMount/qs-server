@@ -23,9 +23,10 @@ Event 模块负责把进程内已经发生的业务事实，按明确的可靠�
 - 允许丢失、只用于轻量后置动作的通知使用 `best_effort`：生产者直接交给 RoutingPublisher，不获得持久化保证。
 - Redis Pub/Sub Signal 只负责一次性唤醒和缓存失效提示，不属于 EventSubsystem，不承担业务事实投递。
 - MQ 消费语义固定为：无法解析的消息 NACK、unknown ACK、handler error NACK、handled ACK；NACK 只消耗有界运输预算。
-- 运输预算耗尽后写入 MySQL `event_delivery_dead_letter`，由高风险治理动作 `events.replay_delivery` 做组织范围、带状态冲突检查的一次性人工重放。
+- 当前 NSQ 终态链不是“第 8 次失败后原子落 MySQL”：业务 channel 达到 `MaxAttempts` 后先发布 `cb.failed.<hash>` handoff topic，发布成功才 finish 原消息；独立 handoff consumer 随后调用 MySQL recorder。handoff 发布、消费或 recorder 失败会 requeue，并形成独立积压窗口；只有 recorder 成功后才能确认 `event_delivery_dead_letter` 已存在。
+- `evaluation.failed`、`interpretation.report.generated` 与 `interpretation.report.failed` 的 report-status Redis 写入/Signal 唤醒是 best-effort；Reporter 吞掉写入与通知错误，handler 可以最终 ACK。因此 ACK 不证明 report-status 投影或唤醒已成功。
+- 已持久化的 transport dead letter 由高风险治理动作 `events.replay_delivery` 做组织范围、带状态冲突检查的一次性人工重放。
 - 系统提供的是可治理的 at-least-once，不提供 exactly-once、统一 event-id ledger、自动修复 poison payload 或 schema negotiation。
-- Statistics 不再维护行为足迹事件链或后台 Scanner；夜间 Data Collector 直接从权威业务数据构建 Access、Assessment 和 Plan Fact。
 
 ## 三种传播语义
 
@@ -76,15 +77,17 @@ Event 模块负责把进程内已经发生的业务事实，按明确的可靠�
 ## 验证入口
 
 ```bash
-go test ./internal/pkg/eventing/... \
+go test -count=1 ./internal/pkg/eventing/... \
   ./internal/apiserver/application/eventing \
   ./internal/apiserver/eventing/subsystem \
   ./internal/worker/integration/eventing \
   ./internal/worker/integration/messaging
 
-go test ./internal/pkg/signalcatalog ./internal/pkg/architecture
+go test -count=1 ./internal/pkg/signalcatalog ./internal/pkg/architecture
 make docs-hygiene
 ```
+
+上述命令不包含带 `//go:build integration` 的 NSQ + MySQL terminal handoff 集成测试；该测试需要 `MESSAGING_INTEGRATION=1`、NSQ 和隔离 MySQL，本轮未运行，不能据此宣称真实 broker 终态交接已验收。
 
 ## 学习检查
 
