@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# GitHub Actions services on macOS do not inherit the interactive Homebrew PATH.
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin${PATH:+:$PATH}"
+
 OPERATION="${MONGO_BACKUP_OPERATION:-}"
 BACKUP_DIR="${MONGO_BACKUP_DIR:-$HOME/backups/qs-server/mongodb}"
 BACKUP_FILE_INPUT="${MONGO_BACKUP_FILE:-}"
