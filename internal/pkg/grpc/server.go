@@ -37,6 +37,12 @@ type Service interface {
 // NewServer 创建新的 gRPC 服务器（使用 component-base 提供的能力）
 // tokenVerifier: SDK 的 TokenVerifier，支持本地 JWKS 验签和远程降级
 func NewServer(config *Config, tokenVerifier *auth.TokenVerifier) (*Server, error) {
+	if config == nil {
+		return nil, fmt.Errorf("gRPC config is required")
+	}
+	if config.Auth.Enabled && tokenVerifier == nil {
+		return nil, fmt.Errorf("gRPC auth is enabled but IAM TokenVerifier is unavailable")
+	}
 	var serverOpts []grpc.ServerOption
 	var mtlsCreds *basemtls.ServerCredentials
 
@@ -163,8 +169,6 @@ func buildUnaryInterceptors(
 		} else {
 			log.Info("gRPC server: IAM authentication interceptor enabled (local JWKS verification)")
 		}
-	} else if config.Auth.Enabled {
-		log.Warn("gRPC server: auth enabled but TokenVerifier not provided, skipping authentication")
 	}
 
 	for _, extra := range config.ExtraUnaryAfterAuth {

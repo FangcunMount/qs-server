@@ -358,8 +358,8 @@ func TestRouterProtectedClinicianRouteRequiresCapabilitySnapshot(t *testing.T) {
 	rec := httptest.NewRecorder()
 	engine.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusForbidden {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
 	}
 }
 
@@ -374,8 +374,8 @@ func TestRouterAdminWorkbenchRouteRequiresOrgAdminCapability(t *testing.T) {
 	rec := httptest.NewRecorder()
 	engine.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusForbidden {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
 	}
 }
 
@@ -436,6 +436,7 @@ func TestRouterProtectedClinicianRoutePassesCapabilityMiddleware(t *testing.T) {
 	engine.Use(func(c *gin.Context) {
 		c.Set(restmiddleware.OrgIDKey, uint64(88))
 		c.Set(restmiddleware.UserIDKey, uint64(701))
+		c.Set(restmiddleware.TenantDomainKey, "tenant-a")
 		c.Set(restmiddleware.AuthzSnapshotKey, &authzapp.Snapshot{
 			Roles: []string{"qs:admin"},
 			Permissions: []authzapp.Permission{

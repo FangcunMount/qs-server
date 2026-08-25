@@ -2,6 +2,8 @@ package process
 
 import (
 	"context"
+	"strings"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/messaging"
@@ -14,6 +16,7 @@ import (
 type containerStageDeps struct {
 	newContainer func() *container.Container
 	newIAMModule func(context.Context) (*container.IAMModule, error)
+	validateIAM  func(context.Context, *container.IAMModule) error
 	initialize   func(*container.Container) error
 }
 
@@ -54,6 +57,17 @@ func (s *server) buildContainerStageDeps(resources resourceOutput) containerStag
 				Limiter: limiter,
 			})
 		}
+		if s.config.GenericServerRunOptions != nil && strings.EqualFold(strings.TrimSpace(s.config.GenericServerRunOptions.Mode), "release") {
+			deps.validateIAM = func(ctx context.Context, module *container.IAMModule) error {
+				timeout := 5 * time.Second
+				if opts := s.config.IAMOptions; opts != nil && opts.GRPC != nil && opts.GRPC.Timeout > 0 {
+					timeout = opts.GRPC.Timeout
+				}
+				validationCtx, cancel := context.WithTimeout(ctx, timeout)
+				defer cancel()
+				return module.ValidateRequiredAuthzRuntime(validationCtx)
+			}
+		}
 	}
 	return deps
 }
@@ -76,6 +90,14 @@ func bootstrapContainerStage(deps containerStageDeps) (containerOutput, error) {
 			return containerOutput{}, err
 		}
 		output.container.IAMModule = iamModule
+		if deps.validateIAM != nil {
+			if err := deps.validateIAM(context.Background(), iamModule); err != nil {
+				if iamModule != nil {
+					_ = iamModule.Close()
+				}
+				return containerOutput{}, err
+			}
+		}
 	}
 	if deps.initialize != nil {
 		if err := deps.initialize(output.container); err != nil {

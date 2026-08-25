@@ -52,6 +52,21 @@ func TestBootstrapContainerStageReturnsIAMError(t *testing.T) {
 	}
 }
 
+func TestBootstrapContainerStageReturnsRequiredIAMValidationError(t *testing.T) {
+	t.Parallel()
+
+	_, err := bootstrapContainerStage(containerStageDeps{
+		newContainer: func() *container.Container { return container.NewContainer(nil, nil, nil) },
+		newIAMModule: func(context.Context) (*container.IAMModule, error) { return &container.IAMModule{}, nil },
+		validateIAM: func(context.Context, *container.IAMModule) error {
+			return errors.New("required IAM AuthZ runtime unavailable")
+		},
+	})
+	if err == nil || err.Error() != "required IAM AuthZ runtime unavailable" {
+		t.Fatalf("bootstrapContainerStage() error = %v", err)
+	}
+}
+
 func TestBootstrapContainerStageReturnsInitializeError(t *testing.T) {
 	t.Parallel()
 

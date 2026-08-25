@@ -15,16 +15,15 @@ import (
 // lifecycleService 操作者生命周期服务实现
 // 行为者：人事/行政部门
 type lifecycleService struct {
-	repo          domain.Repository
-	factory       domain.Factory
-	validator     domain.Validator
-	editor        domain.Editor
-	lifecycler    domain.Lifecycler
-	roleAllocator domain.RoleAllocator
-	uow           apptransaction.Runner
-	identitySvc   iambridge.UserDirectory
-	accountSvc    iambridge.OperationAccountRegistrar
-	authz         iambridge.OperatorAuthzGateway
+	repo        domain.Repository
+	factory     domain.Factory
+	validator   domain.Validator
+	editor      domain.Editor
+	lifecycler  domain.Lifecycler
+	uow         apptransaction.Runner
+	identitySvc iambridge.UserDirectory
+	accountSvc  iambridge.OperationAccountRegistrar
+	authz       iambridge.OperatorAuthzGateway
 }
 
 // NewLifecycleService 创建操作者生命周期服务
@@ -34,28 +33,29 @@ func NewLifecycleService(
 	validator domain.Validator,
 	editor domain.Editor,
 	lifecycler domain.Lifecycler,
-	roleAllocator domain.RoleAllocator,
 	uow apptransaction.Runner,
 	identitySvc iambridge.UserDirectory,
 	accountSvc iambridge.OperationAccountRegistrar,
 	authz iambridge.OperatorAuthzGateway,
 ) OperatorLifecycleService {
 	return &lifecycleService{
-		repo:          repo,
-		factory:       factory,
-		validator:     validator,
-		editor:        editor,
-		lifecycler:    lifecycler,
-		roleAllocator: roleAllocator,
-		uow:           uow,
-		identitySvc:   identitySvc,
-		accountSvc:    accountSvc,
-		authz:         authz,
+		repo:        repo,
+		factory:     factory,
+		validator:   validator,
+		editor:      editor,
+		lifecycler:  lifecycler,
+		uow:         uow,
+		identitySvc: identitySvc,
+		accountSvc:  accountSvc,
+		authz:       authz,
 	}
 }
 
 // Register 注册新操作者
 func (s *lifecycleService) Register(ctx context.Context, dto RegisterOperatorDTO) (*OperatorResult, error) {
+	if err := s.requireOperatorAuthz(); err != nil {
+		return nil, err
+	}
 	var result *domain.Operator
 	var created bool
 
@@ -71,7 +71,7 @@ func (s *lifecycleService) Register(ctx context.Context, dto RegisterOperatorDTO
 			return err
 		}
 
-		// 3~5. 创建操作者、分配角色并持久化
+		// 3~5. 创建或更新本地 Operator 业务投影并持久化。
 		st, wasCreated, err := s.createAndSaveOperator(txCtx, dto, userID)
 		if err != nil {
 			return err
@@ -85,7 +85,7 @@ func (s *lifecycleService) Register(ctx context.Context, dto RegisterOperatorDTO
 		return nil, err
 	}
 
-	if dto.IsActive && s.operatorAuthzEnabled() {
+	if dto.IsActive {
 		if err := s.syncIAMRolesAfterRegister(ctx, result, dto.Roles); err != nil {
 			if created {
 				if rollbackErr := s.rollbackRegisteredOperator(ctx, result.ID()); rollbackErr != nil {
@@ -239,11 +239,6 @@ func (s *lifecycleService) validateRegisterDTO(dto RegisterOperatorDTO) error {
 			return err
 		}
 	}
-	if !s.operatorAuthzEnabled() {
-		if len(dto.Roles) == 0 {
-			return errors.WithCode(code.ErrValidation, "roles are required when IAM authorization is not enabled")
-		}
-	}
 	if dto.UserID == 0 {
 		if dto.Phone == "" {
 			return errors.WithCode(code.ErrValidation, "phone is required when user_id is not provided")
@@ -306,13 +301,11 @@ func isUserAlreadyExistsErr(err error) bool {
 	return strings.Contains(strings.ToLower(err.Error()), "user already exists")
 }
 
-// createAndSaveOperator 在事务内检查是否已存在、创建 Operator、分配角色并保存
+// createAndSaveOperator 在事务内检查是否已存在并保存 Operator 业务投影。
 func (s *lifecycleService) createAndSaveOperator(txCtx context.Context, dto RegisterOperatorDTO, userID int64) (*domain.Operator, bool, error) {
-	useIAM := s.operatorAuthzEnabled()
-
 	st, err := s.repo.FindByUser(txCtx, dto.OrgID, userID)
 	if err == nil {
-		if err := s.syncOperatorProjection(st, dto, useIAM); err != nil {
+		if err := s.syncOperatorProjection(st, dto); err != nil {
 			return nil, false, err
 		}
 		if err := s.repo.Update(txCtx, st); err != nil {
@@ -325,7 +318,7 @@ func (s *lifecycleService) createAndSaveOperator(txCtx context.Context, dto Regi
 	}
 
 	st = domain.NewOperator(dto.OrgID, userID, dto.Name)
-	if err := s.syncOperatorProjection(st, dto, useIAM); err != nil {
+	if err := s.syncOperatorProjection(st, dto); err != nil {
 		return nil, false, err
 	}
 
@@ -339,7 +332,7 @@ func (s *lifecycleService) createAndSaveOperator(txCtx context.Context, dto Regi
 	return st, true, nil
 }
 
-func (s *lifecycleService) syncOperatorProjection(st *domain.Operator, dto RegisterOperatorDTO, useIAM bool) error {
+func (s *lifecycleService) syncOperatorProjection(st *domain.Operator, dto RegisterOperatorDTO) error {
 	if err := s.editor.UpdateBasicInfo(st, &dto.Name); err != nil {
 		return err
 	}
@@ -357,24 +350,7 @@ func (s *lifecycleService) syncOperatorProjection(st *domain.Operator, dto Regis
 		}
 	}
 
-	if useIAM {
-		return nil
-	}
-
-	roles := make([]domain.Role, 0, len(dto.Roles))
-	for _, roleName := range dto.Roles {
-		role := domain.Role(roleName)
-		if err := s.validator.ValidateRole(role); err != nil {
-			return err
-		}
-		roles = append(roles, role)
-	}
-
-	if !dto.IsActive {
-		return s.roleAllocator.ClearRoles(st)
-	}
-
-	return s.roleAllocator.ReplaceRoles(st, roles)
+	return nil
 }
 
 func (s *lifecycleService) syncIAMRolesAfterRegister(ctx context.Context, op *domain.Operator, roleNames []string) error {
@@ -390,13 +366,19 @@ func (s *lifecycleService) syncIAMRolesAfterRegister(ctx context.Context, op *do
 	return s.persistOperatorRolesFromAuthz(ctx, op)
 }
 
-func (s *lifecycleService) operatorAuthzEnabled() bool {
-	return s != nil && s.authz != nil && s.authz.IsEnabled()
+func (s *lifecycleService) requireOperatorAuthz() error {
+	if s == nil || s.authz == nil || !s.authz.IsEnabled() {
+		return errors.New("IAM operator authorization gateway is required")
+	}
+	return nil
 }
 
 func (s *lifecycleService) persistOperatorRolesFromAuthz(ctx context.Context, op *domain.Operator) error {
-	if s == nil || s.authz == nil || op == nil {
-		return nil
+	if err := s.requireOperatorAuthz(); err != nil {
+		return err
+	}
+	if op == nil {
+		return errors.New("operator is required")
 	}
 	roleNames, err := s.authz.LoadOperatorRoleNames(ctx, op.OrgID(), op.UserID())
 	if err != nil {

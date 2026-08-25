@@ -16,15 +16,11 @@ type Lifecycler interface {
 }
 
 // lifecycler 生命周期管理器实现
-type lifecycler struct {
-	roleAllocator RoleAllocator
-}
+type lifecycler struct{}
 
 // NewLifecycler 创建生命周期管理器
-func NewLifecycler(roleAllocator RoleAllocator) Lifecycler {
-	return &lifecycler{
-		roleAllocator: roleAllocator,
-	}
+func NewLifecycler() Lifecycler {
+	return &lifecycler{}
 }
 
 // Activate 激活员工
@@ -54,9 +50,7 @@ func (lc *lifecycler) Deactivate(staff *Operator) error {
 
 	// 2. 业务规则：停用时应清空所有角色
 	if len(staff.Roles()) > 0 {
-		if err := lc.roleAllocator.ClearRoles(staff); err != nil {
-			return errors.Wrap(err, "failed to clear roles during deactivation")
-		}
+		staff.ReplaceRolesProjection(nil)
 	}
 
 	// 3. 执行停用
