@@ -44,6 +44,7 @@ go test -count=1 ./internal/pkg/grpc ./internal/pkg/configcontract
 | AnswerSheet durable result lookup | hit/miss/conflict/read error/cancel/deadline，以及旧服务 `Unimplemented` 的滚动升级回退 |
 | Assessment ownership authorization | owner 成功、owner 不匹配 `PermissionDenied`、collection client/bridge 转发 |
 | 新增 internal 方法 | 调用 workload 身份、default-deny ACL、委托主体和最终资源 ownership |
+| 启用 gRPC JWT auth | `TokenVerifier` 存在时正常启动；缺失时 server 构建失败，不允许跳过认证 |
 
 方法 ACL 只限制哪个服务能调用 RPC，不能替代 User/Testee/Assessment 等业务资源归属；稳定规则见 [Security canonical 文档](../03-基础设施/security/10-身份、服务与资源授权.md)。
 

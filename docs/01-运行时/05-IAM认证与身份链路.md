@@ -76,7 +76,9 @@ TokenVerifier 支持使用 JWKS 在本地验证 token，并在配置允许时使
 
 ## 6. 授权快照与失效
 
-`AuthzSnapshotLoader` 把 IAM 的授权快照加载到进程内缓存。快照通常包含用户角色、能力和 `authz_version`。
+`AuthzSnapshotLoader` 把 IAM AuthZ v3 的授权快照加载到进程内缓存。快照包含用户角色、资源/动作、`AuthorizationMode` 和 `authz_version`；只有 `UNCONDITIONAL` 可以直接通过通用 capability 中间件，`OBJECT_CHECK_REQUIRED` 必须在加载对象后调用 IAM v3 `Check`。
+
+release 模式在启动受保护 transport 之前必须完成 IAM health 和只读快照探针，并确认 `TokenVerifier`、服务身份、v3 快照 loader 与对象 checker 都已装配。任一缺失都阻断启动；受保护 REST 在授权运行时不可用时返回 `503`，不回退为本地角色或无鉴权路由。
 
 apiserver 与 collection 可订阅 IAM 权限版本事件：
 
