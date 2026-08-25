@@ -105,7 +105,7 @@ jobs:
         with:
           host: ${{ vars.SVRD_PUBLIC_HOST || secrets.SVRD_PUBLIC_HOST || vars.SVRD_HOST }}
           username: ${{ vars.SVRD_USERNAME || vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          key: ${{ secrets.SVR_MINI_SSH_KEY || secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
           port: ${{ vars.SVRD_SSH_PORT || vars.SVRA_SSH_PORT || 22 }}
           envs: QS_AUTHZ_CONSUMER_OPERATION,QS_AUTHZ_CONSUMER_HOST_ROLE,QS_AUTHZ_RELEASE_SHA,SUDO_PASSWORD
           script_path: scripts/cd/authz-consumer-control.sh
