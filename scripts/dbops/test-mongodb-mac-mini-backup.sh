@@ -32,6 +32,10 @@ if ! grep -Fq 'MONGO_BACKUP_RETENTION_COUNT:-3' "$SCRIPT"; then
   echo "Mac mini backup script does not default to three retained backups" >&2
   exit 1
 fi
+if ! grep -Fq 'socketTimeoutMS=0' "$SCRIPT"; then
+  echo "Mac mini backup script does not preserve unlimited archive read timeout semantics" >&2
+  exit 1
+fi
 if grep -En 'mongodb-source-backup|MongoDB Source-side Backup|Keeping last 5|keeping last 5' \
   "$WORKFLOW" "$SCRIPT" >/dev/null; then
   echo "legacy serverA/source-host MongoDB backup path is still active" >&2
