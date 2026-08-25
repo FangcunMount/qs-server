@@ -5,7 +5,7 @@ go 1.25.12
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/FangcunMount/component-base v0.6.9
-	github.com/FangcunMount/iam/v3 v3.0.1-0.20260825060046-2b304b55658d
+	github.com/FangcunMount/iam/v3 v3.0.1-0.20260825062208-c27a17d0adbe
 	github.com/alicebob/miniredis/v2 v2.30.0
 	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.4.1
 	github.com/coder/websocket v1.8.15
