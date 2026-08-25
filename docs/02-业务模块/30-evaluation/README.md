@@ -173,6 +173,12 @@ Interpretation 不读取 Evaluation 的临时对象，也不依赖 Worker 内存
 
 Assessment 固化 Questionnaire 与 AssessmentModel 的发布版本。运营发布新版本后，已经创建的 Assessment 和已经提交的 Outcome 不随之漂移。
 
+### 7.5 对象授权必须位于业务事实与事务之间
+
+人工 retry 先用授权快照确认存在 `qs:evaluation:collection:assessments/retry` 候选，再由 `GovernedRetryService` 加载 Assessment、校验组织与 Testee 等业务关系，从领域对象提取 `object.origin_type`，最后调用 IAM AuthZ v3 `Check`。只有对象授权通过后，才检查可观察的失败状态并进入 retry 事务。
+
+条件 Grant 只形成对象级 `retry` 候选，不能授予 list、search、`batch_evaluate` 或 `force_retry`；后两者仍要求无条件权限。IAM 拒绝返回 403，不可用或超时返回 503，属性契约或服务身份配置错误返回 500。以上失败均不得创建事务、写 Outbox 或产生 retry 副作用。
+
 ## 8. 文档地图
 
 本模块已按下列顺序完成 canonical 文档收口；后续行为变化应更新对应 owner 文档和验证入口：
@@ -200,6 +206,7 @@ Assessment 固化 Questionnaire 与 AssessmentModel 的发布版本。运营发�
 | 执行编排 | [`application/evaluation/execute`](../../../internal/apiserver/application/evaluation/execute/) |
 | 执行输入 | [`port/evaluationinput`](../../../internal/apiserver/port/evaluationinput/)、[`infra/evaluationinput`](../../../internal/apiserver/infra/evaluationinput/) |
 | 可靠提交 | [`application/evaluation/outcome/commit`](../../../internal/apiserver/application/evaluation/outcome/commit/) |
+| 对象级重试授权 | [`application/evaluation/operator/retry_governance.go`](../../../internal/apiserver/application/evaluation/operator/retry_governance.go)、[`application/authz/object_checker.go`](../../../internal/apiserver/application/authz/object_checker.go) |
 | MySQL 持久化 | [`infra/mysql/evaluation`](../../../internal/apiserver/infra/mysql/evaluation/)、[`infra/mysql/checkpoint`](../../../internal/apiserver/infra/mysql/checkpoint/) |
 | 事件契约 | [`configs/events.yaml`](../../../configs/events.yaml) |
 | 组合根 | [`container/modules/evaluation`](../../../internal/apiserver/container/modules/evaluation/) |
@@ -208,6 +215,7 @@ Assessment 固化 Questionnaire 与 AssessmentModel 的发布版本。运营发�
 go test ./internal/apiserver/domain/evaluation/...
 go test ./internal/apiserver/domain/calculation/...
 go test ./internal/apiserver/application/evaluation/...
+go test ./internal/apiserver/application/authz ./internal/apiserver/infra/iam
 go test ./internal/apiserver/infra/evaluationinput
 go test ./internal/apiserver/infra/mysql/evaluation ./internal/apiserver/infra/mysql/checkpoint
 go test ./internal/apiserver/container/modules/evaluation/...

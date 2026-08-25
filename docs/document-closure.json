@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-    "verified_on": "2026-08-20"
+    "sha": "7e830e8e33fc0d48372373ea045709aa082ed3d2",
+    "verified_on": "2026-08-25"
   },
   "status_policy": {
     "doc_status": [
@@ -1571,8 +1571,8 @@
       "owner": "modelcatalog",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
+        "verified_on": "2026-08-25"
       },
       "fact_sources": [
         {
@@ -1749,8 +1749,8 @@
       "owner": "modelcatalog",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
+        "verified_on": "2026-08-25"
       },
       "fact_sources": [
         {
@@ -1837,8 +1837,8 @@
       "owner": "modelcatalog",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
+        "verified_on": "2026-08-25"
       },
       "fact_sources": [
         {
@@ -2045,8 +2045,8 @@
       "owner": "modelcatalog",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
+        "verified_on": "2026-08-25"
       },
       "fact_sources": [
         {
@@ -2103,8 +2103,8 @@
       "owner": "modelcatalog",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
+        "verified_on": "2026-08-25"
       },
       "fact_sources": [
         {
@@ -2191,8 +2191,8 @@
       "owner": "evaluation",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
+        "verified_on": "2026-08-25"
       },
       "fact_sources": [
         {
@@ -2369,8 +2369,8 @@
       "owner": "evaluation",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
+        "verified_on": "2026-08-25"
       },
       "fact_sources": [
         {
@@ -2427,8 +2427,8 @@
       "owner": "evaluation",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
+        "verified_on": "2026-08-25"
       },
       "fact_sources": [
         {
@@ -2869,8 +2869,8 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
+        "verified_on": "2026-08-25"
       },
       "fact_sources": [
         {
@@ -2927,8 +2927,8 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
+        "verified_on": "2026-08-25"
       },
       "fact_sources": [
         {
@@ -2985,8 +2985,8 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
+        "verified_on": "2026-08-25"
       },
       "fact_sources": [
         {
@@ -3043,8 +3043,8 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
+        "verified_on": "2026-08-25"
       },
       "fact_sources": [
         {
@@ -3101,8 +3101,8 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
+        "verified_on": "2026-08-25"
       },
       "fact_sources": [
         {
@@ -4911,8 +4911,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-        "verified_on": "2026-08-21"
+        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
+        "verified_on": "2026-08-25"
       },
       "fact_sources": [
         {
@@ -4984,8 +4984,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-        "verified_on": "2026-08-21"
+        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
+        "verified_on": "2026-08-25"
       },
       "fact_sources": [
         {
@@ -5054,8 +5054,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-        "verified_on": "2026-08-21"
+        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
+        "verified_on": "2026-08-25"
       },
       "fact_sources": [
         {
@@ -5158,8 +5158,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-        "verified_on": "2026-08-21"
+        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
+        "verified_on": "2026-08-25"
       },
       "fact_sources": [
         {
@@ -5242,8 +5242,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-        "verified_on": "2026-08-21"
+        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
+        "verified_on": "2026-08-25"
       },
       "fact_sources": [
         {
@@ -5459,8 +5459,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-        "verified_on": "2026-08-21"
+        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
+        "verified_on": "2026-08-25"
       },
       "fact_sources": [
         {
@@ -6000,8 +6000,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-        "verified_on": "2026-08-21"
+        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
+        "verified_on": "2026-08-25"
       },
       "fact_sources": [
         {
