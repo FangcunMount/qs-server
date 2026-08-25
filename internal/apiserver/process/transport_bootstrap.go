@@ -147,8 +147,8 @@ func buildGRPCServer(cfg *config.Config, deps container.ServerGRPCBootstrapDeps)
 	// 获取 SDK TokenVerifier（使用 SDK 的本地 JWKS 验签能力）
 	if deps.TokenVerifier != nil {
 		log.Info("gRPC server: TokenVerifier injected for authentication (local JWKS verification)")
-	} else {
-		log.Warn("gRPC server: TokenVerifier not available, authentication disabled")
+	} else if !grpcConfig.Auth.Enabled {
+		log.Info("gRPC server: JWT authentication disabled by configuration")
 	}
 
 	// 完成配置并创建服务器

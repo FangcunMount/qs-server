@@ -1,7 +1,7 @@
 package rest
 
 import (
-	"fmt"
+	"net/http"
 
 	auth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/verifier"
 	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
@@ -107,32 +107,42 @@ func (registrar internalRouteRegistrar) register(engine *gin.Engine) {
 
 func (composer protectedGroupMiddlewareComposer) apply(group *gin.RouterGroup, routePrefix string) {
 	r := composer.router
-	if r.deps.IAM.Enabled {
-		tokenVerifier := r.deps.IAM.TokenVerifier
-		if tokenVerifier != nil {
-			verifyOpts := r.iamVerifyOptions()
-			group.Use(middleware.JWTAuthMiddlewareWithOptions(tokenVerifier, verifyOpts))
-			group.Use(restmiddleware.UserIdentityMiddleware())
-			group.Use(restmiddleware.RequireTenantDomainMiddleware())
-			if r.deps.Actor.ActiveOperatorChecker != nil {
-				group.Use(restmiddleware.ResolveOperatorOrgScopeMiddleware(r.deps.Actor.ActiveOperatorChecker))
-			} else {
-				group.Use(restmiddleware.ResolveOrgScopeMiddleware(orgscope.FixedResolver(orgscope.DefaultOrgID)))
-			}
-			group.Use(restmiddleware.RequireOrgScopeMiddleware())
-			if loader := r.deps.IAM.SnapshotLoader; loader != nil {
-				group.Use(restmiddleware.AuthzSnapshotMiddleware(loader, r.deps.Actor.OperatorRoleProjectionUpdater))
-			} else {
-				fmt.Printf("⚠️  Warning: IAM AuthzSnapshotLoader unavailable (need gRPC); authorization snapshot disabled for %s\n", routePrefix)
-			}
-			fmt.Printf("🔐 JWT authentication middleware enabled for %s (%s)\n", routePrefix, r.iamVerificationMode())
-			return
-		}
-		fmt.Printf("⚠️  Warning: TokenVerifier not available, JWT authentication disabled for %s!\n", routePrefix)
+	if !r.deps.IAM.Enabled || r.deps.IAM.TokenVerifier == nil || r.deps.IAM.SnapshotLoader == nil {
+		group.Use(unavailableAuthorizationMiddleware(routePrefix))
 		return
 	}
 
-	fmt.Printf("⚠️  Warning: IAM authentication is disabled, routes are unprotected for %s!\n", routePrefix)
+	verifyOpts := r.iamVerifyOptions()
+	group.Use(middleware.JWTAuthMiddlewareWithOptions(r.deps.IAM.TokenVerifier, verifyOpts))
+	group.Use(restmiddleware.UserIdentityMiddleware())
+	group.Use(restmiddleware.RequireTenantDomainMiddleware())
+	if r.deps.Actor.ActiveOperatorChecker != nil {
+		group.Use(restmiddleware.ResolveOperatorOrgScopeMiddleware(r.deps.Actor.ActiveOperatorChecker))
+	} else {
+		group.Use(restmiddleware.ResolveOrgScopeMiddleware(orgscope.FixedResolver(orgscope.DefaultOrgID)))
+	}
+	group.Use(restmiddleware.RequireOrgScopeMiddleware())
+	group.Use(restmiddleware.AuthzSnapshotMiddleware(r.deps.IAM.SnapshotLoader, r.deps.Actor.OperatorRoleProjectionUpdater))
+}
+
+func unavailableAuthorizationMiddleware(routePrefix string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Allow an already-completed trusted middleware chain (used by composed
+		// transports and route contract tests), but never infer authorization
+		// from request headers. Production startup rejects missing IAM runtime.
+		if restmiddleware.GetAuthzSnapshot(c) != nil &&
+			restmiddleware.GetUserID(c) != 0 &&
+			restmiddleware.GetTenantDomain(c) != "" &&
+			restmiddleware.GetOrgID(c) != 0 {
+			c.Next()
+			return
+		}
+		c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{
+			"code":    "authorization_runtime_unavailable",
+			"message": "authorization runtime is unavailable",
+			"route":   routePrefix,
+		})
+	}
 }
 
 func (r *Router) registerPublicRoutes(engine *gin.Engine) {

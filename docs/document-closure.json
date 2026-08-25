@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "48c35b86d2e641a8bccfb8dccfa1bc3ec3e24a9c",
-    "verified_on": "2026-08-25"
+    "sha": "183876f0b9f17209c68eb50156145be9aef7ac4d",
+    "verified_on": "2026-08-26"
   },
   "status_policy": {
     "doc_status": [
@@ -863,8 +863,8 @@
       "owner": "runtime",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-        "verified_on": "2026-08-20"
+        "source_sha": "183876f0b9f17209c68eb50156145be9aef7ac4d",
+        "verified_on": "2026-08-26"
       },
       "fact_sources": [
         {
@@ -2869,8 +2869,8 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
-        "verified_on": "2026-08-25"
+        "source_sha": "183876f0b9f17209c68eb50156145be9aef7ac4d",
+        "verified_on": "2026-08-26"
       },
       "fact_sources": [
         {
@@ -2927,8 +2927,8 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
-        "verified_on": "2026-08-25"
+        "source_sha": "183876f0b9f17209c68eb50156145be9aef7ac4d",
+        "verified_on": "2026-08-26"
       },
       "fact_sources": [
         {
@@ -2985,8 +2985,8 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
-        "verified_on": "2026-08-25"
+        "source_sha": "183876f0b9f17209c68eb50156145be9aef7ac4d",
+        "verified_on": "2026-08-26"
       },
       "fact_sources": [
         {
@@ -3043,8 +3043,8 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
-        "verified_on": "2026-08-25"
+        "source_sha": "183876f0b9f17209c68eb50156145be9aef7ac4d",
+        "verified_on": "2026-08-26"
       },
       "fact_sources": [
         {
@@ -3101,8 +3101,8 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
-        "verified_on": "2026-08-25"
+        "source_sha": "183876f0b9f17209c68eb50156145be9aef7ac4d",
+        "verified_on": "2026-08-26"
       },
       "fact_sources": [
         {
@@ -7313,8 +7313,8 @@
       "owner": "interfaces",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "df09c14c5ebdacc95f463af1b9a0ee55cff735d9",
-        "verified_on": "2026-08-20"
+        "source_sha": "183876f0b9f17209c68eb50156145be9aef7ac4d",
+        "verified_on": "2026-08-26"
       },
       "fact_sources": [
         {

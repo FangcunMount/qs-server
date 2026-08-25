@@ -77,7 +77,7 @@ func newIAMTokenVerifier(ctx context.Context, client *iam.Client) *iam.TokenVeri
 
 	tokenVerifier, err := iam.NewTokenVerifier(ctx, client)
 	if err != nil {
-		logger.L(context.Background()).Warnw("Failed to create token verifier, will use remote verification only",
+		logger.L(context.Background()).Warnw("Failed to create required IAM token verifier",
 			"component", "iam_module",
 			"error", err.Error(),
 		)
@@ -103,7 +103,7 @@ func newIAMServiceAuthHelper(ctx context.Context, client *iam.Client, opts *opti
 		return serviceAuthHelper
 	}
 	if errors.Is(err, iam.ErrServiceTokenNotSupported) {
-		logger.L(context.Background()).Infow("IAM server does not support IssueServiceToken, service-to-service auth disabled",
+		logger.L(context.Background()).Warnw("IAM server does not support required service-to-service authentication",
 			"component", "iam_module",
 			"service_id", serviceAuthConfig.ServiceID,
 			"target_audience", serviceAuthConfig.TargetAudience,
@@ -111,7 +111,7 @@ func newIAMServiceAuthHelper(ctx context.Context, client *iam.Client, opts *opti
 		return nil
 	}
 
-	logger.L(context.Background()).Warnw("Failed to create service auth helper, service-to-service auth will not be available",
+	logger.L(context.Background()).Warnw("Failed to create required IAM service auth helper",
 		"component", "iam_module",
 		"error", err.Error(),
 	)
@@ -251,6 +251,36 @@ func (m *Module) ObjectAuthorizationChecker() *iam.ObjectAuthorizationChecker {
 // IsEnabled 检查 IAM 模块是否启用
 func (m *Module) IsEnabled() bool {
 	return m.client != nil && m.client.IsEnabled()
+}
+
+// ValidateRequiredAuthzRuntime verifies the production authorization
+// dependencies before any protected transport is started.
+func (m *Module) ValidateRequiredAuthzRuntime(ctx context.Context) error {
+	if m == nil || !m.IsEnabled() {
+		return fmt.Errorf("IAM integration is required")
+	}
+	if m.SDKTokenVerifier() == nil {
+		return fmt.Errorf("IAM token verifier is required")
+	}
+	if m.serviceAuthHelper == nil {
+		return fmt.Errorf("IAM service authentication is required for AuthZ v3")
+	}
+	if m.authzSnapshotLoader == nil {
+		return fmt.Errorf("IAM AuthZ v3 snapshot loader is required")
+	}
+	if m.objectAuthzChecker == nil {
+		return fmt.Errorf("IAM AuthZ v3 object checker is required")
+	}
+	if err := m.HealthCheck(ctx); err != nil {
+		return fmt.Errorf("IAM health check failed: %w", err)
+	}
+	// A read-only sentinel snapshot proves that AuthZ v3 registration, service
+	// identity ACL, policy runtime, and the configured authorization domain are
+	// all usable before protected traffic is accepted.
+	if _, err := m.authzSnapshotLoader.Load(ctx, m.authzSnapshotLoader.AuthorizationDomain(), "1"); err != nil {
+		return fmt.Errorf("IAM AuthZ v3 startup probe failed: %w", err)
+	}
+	return nil
 }
 
 // Close 关闭 IAM 模块

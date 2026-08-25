@@ -4,7 +4,7 @@ package operator
 // 设计说明：
 // 1. Operator 是 IAM.User 在本 BC 的业务视图投影，不是完整的用户实体
 // 2. 持久化的核心目的：
-//   - 存储业务角色（roles）：IAM 启用时为 GetAuthorizationSnapshot.roles 的本地投影；未启用 IAM 时仍由本 BC 维护
+//   - 存储业务角色（roles）：GetAuthorizationSnapshot.roles 的本地只读投影
 //   - 多租户隔离：同一 IAM.User 在不同机构可能有不同角色
 //   - 审计追溯：操作记录用 ID 比 IAMUserID 更有业务语义
 //   - 性能优化：缓存常用字段（name），减少 RPC 调用
@@ -86,78 +86,6 @@ func (s *Operator) IsActive() bool {
 // SetID 设置ID
 func (s *Operator) SetID(id ID) {
 	s.id = id
-}
-
-// === 核心行为（包内可见，通过领域服务使用）===
-
-// assignRole 分配角色（包内方法，应通过 RoleManager 调用）
-func (s *Operator) assignRole(role Role) {
-	// 防重复
-	for _, existing := range s.roles {
-		if existing == role {
-			return
-		}
-	}
-	s.roles = append(s.roles, role)
-}
-
-// AssignRole 分配角色。
-func (s *Operator) AssignRole(role Role) error {
-	if !IsSupportedRole(role) {
-		return invalidRoleError()
-	}
-	if !s.IsActive() {
-		return inactiveRoleAssignmentError("cannot assign role to inactive staff")
-	}
-	s.assignRole(role)
-	return nil
-}
-
-// removeRole 移除角色（包内方法，应通过 RoleManager 调用）
-func (s *Operator) removeRole(role Role) {
-	for i, existing := range s.roles {
-		if existing == role {
-			s.roles = append(s.roles[:i], s.roles[i+1:]...)
-			return
-		}
-	}
-}
-
-// RemoveRole 移除角色。
-func (s *Operator) RemoveRole(role Role) error {
-	if !IsSupportedRole(role) {
-		return invalidRoleError()
-	}
-	s.removeRole(role)
-	return nil
-}
-
-// ClearRoles 清空角色集合。
-func (s *Operator) ClearRoles() {
-	s.roles = make([]Role, 0)
-}
-
-// ReplaceRoles 替换角色集合，自动去重并保持输入顺序。
-func (s *Operator) ReplaceRoles(roles []Role) error {
-	if !s.IsActive() {
-		return inactiveRoleAssignmentError("cannot replace roles for inactive staff")
-	}
-
-	nextRoles := make([]Role, 0, len(roles))
-	seen := make(map[Role]bool, len(roles))
-	for _, role := range roles {
-		if !IsSupportedRole(role) {
-			return invalidRoleError()
-		}
-		if seen[role] {
-			continue
-		}
-		nextRoles = append(nextRoles, role)
-		seen[role] = true
-	}
-
-	s.roles = nextRoles
-	return nil
 }
 
 // HasRole 检查是否有某个角色

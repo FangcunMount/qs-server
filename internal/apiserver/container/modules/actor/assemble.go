@@ -120,8 +120,7 @@ func New(deps Deps) (*Module, error) {
 	operatorValidator := operator.NewValidator()
 	operatorFactory := operator.NewFactory(operatorRepo, operatorValidator)
 	operatorEditor := operator.NewEditor(operatorValidator)
-	operatorRoleAllocator := operator.NewRoleAllocator(operatorValidator)
-	operatorLifecycler := operator.NewLifecycler(operatorRoleAllocator)
+	operatorLifecycler := operator.NewLifecycler()
 	clinicianValidator := clinicianDomain.NewValidator()
 	assessmentEntryValidator := assessmentEntryDomain.NewValidator()
 
@@ -156,7 +155,6 @@ func New(deps Deps) (*Module, error) {
 		operatorValidator,
 		operatorEditor,
 		operatorLifecycler,
-		operatorRoleAllocator,
 		txRunner,
 		userDirectory,
 		accountRegistrar,
@@ -165,7 +163,6 @@ func New(deps Deps) (*Module, error) {
 	module.OperatorAuthorizationService = operatorApp.NewAuthorizationService(
 		operatorRepo,
 		operatorValidator,
-		operatorRoleAllocator,
 		operatorLifecycler,
 		txRunner,
 		operatorAuthzGateway,

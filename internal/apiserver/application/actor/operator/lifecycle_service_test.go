@@ -35,8 +35,8 @@ func TestCreateAndSaveOperator_PersistsContactInfoOnCreate(t *testing.T) {
 	if operator.Phone() != dto.Phone {
 		t.Fatalf("expected phone %q, got %q", dto.Phone, operator.Phone())
 	}
-	if !operator.HasRole(domain.RoleOperator) {
-		t.Fatalf("expected operator to have qs:staff role")
+	if len(operator.Roles()) != 0 {
+		t.Fatalf("local operator roles = %v, want IAM snapshot projection only", operator.Roles())
 	}
 }
 
@@ -78,8 +78,8 @@ func TestCreateAndSaveOperator_ReusesExistingOperatorByUserID(t *testing.T) {
 	if operator.Phone() != dto.Phone {
 		t.Fatalf("expected phone %q, got %q", dto.Phone, operator.Phone())
 	}
-	if !operator.HasRole(domain.RoleEvaluatorQS) {
-		t.Fatalf("expected operator to have qs:evaluator role")
+	if len(operator.Roles()) != 0 {
+		t.Fatalf("local operator roles = %v, want IAM snapshot projection only", operator.Roles())
 	}
 }
 
@@ -98,13 +98,11 @@ func TestValidateRegisterDTORequiresPasswordForNewIAMAccount(t *testing.T) {
 
 func newTestLifecycleService(repo domain.Repository) *lifecycleService {
 	validator := domain.NewValidator()
-	roleAllocator := domain.NewRoleAllocator(validator)
 	return &lifecycleService{
-		repo:          repo,
-		validator:     validator,
-		editor:        domain.NewEditor(validator),
-		lifecycler:    domain.NewLifecycler(roleAllocator),
-		roleAllocator: roleAllocator,
+		repo:       repo,
+		validator:  validator,
+		editor:     domain.NewEditor(validator),
+		lifecycler: domain.NewLifecycler(),
 	}
 }
 

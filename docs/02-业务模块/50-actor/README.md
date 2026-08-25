@@ -112,7 +112,7 @@ Actor 参与首尾两段：前段把公开入口变成确定的业务参与者�
 | --- | --- | --- |
 | Testee 建档与 IAM Profile 绑定 | 已实现 | 支持按 Profile 幂等确认，也支持无 Profile 的临时受试者 |
 | AnswerSheet 保存 Testee 与 Filler | 已实现 | SubmissionContext 同时要求 Testee、Filler、Org；历史数据允许缺字段重建 |
-| Operator 与 IAM User 对接 | 已实现 | 支持账号创建、机构内投影和 IAM 授权同步 |
+| Operator 与 IAM User 对接 | 已实现 | 支持账号创建、机构内投影和 IAM AuthZ v3 授权同步；无本地角色写入回退 |
 | Clinician 独立业务身份 | 已实现 | 支持类型、科室、职称、工号、激活状态及 Operator 绑定 |
 | 照护关系与访问范围 | 已实现 | admin 机构范围；非 admin 必须绑定 Clinician 并具有有效访问型关系 |
 | AssessmentEntry 解析与 Intake | 已实现 | token 解析、建档、creator/attending 关系和统计日志在事务内编排 |
