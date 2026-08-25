@@ -83,316 +83,39 @@ concurrency:
 
 jobs:
   mongodb-backup:
-    name: MongoDB Backup
+    name: MongoDB Backup on Mac mini
     if: |
       (github.event_name == 'schedule') ||
-      (github.event.inputs.operation == 'backup' && (github.event.inputs.database == 'mongodb' || github.event.inputs.database == 'all'))
-    # SVRA_HOST is a Tailscale address; run inside the qlume tailnet instead of GitHub-hosted.
+      ((github.event.inputs.operation == 'backup' || github.event.inputs.operation == 'backup-source') &&
+       (github.event.inputs.database == 'mongodb' || github.event.inputs.database == 'all'))
     runs-on:
       group: qlume
       labels: [self-hosted, macOS, ARM64, ops]
     timeout-minutes: 360
-    # MONGODB_* 等敏感项在 production Environment；缺此行会导致 secrets 为空、备份静默失败。
     environment: production
     steps:
-      - name: Validate SSH configuration
-        env:
-          SVRA_HOST: ${{ vars.SVRA_HOST }}
-          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
-          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
-          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
-        run: |
-          set -Eeuo pipefail
-          : "${SVRA_HOST:?SVRA_HOST is empty}"
-          : "${SVRA_USERNAME:?SVRA_USERNAME is empty}"
-          : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
-          : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
-
-      - name: Backup MongoDB
-        uses: appleboy/ssh-action@v1.2.2
-        with:
-          host: ${{ vars.SVRA_HOST }}
-          username: ${{ vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ vars.SVRA_SSH_PORT || 22 }}
-          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          command_timeout: 350m
-          envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
-          script: |
-            set -Eeuo pipefail
-            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
-
-            : "${MONGODB_HOST:?MONGODB_HOST is empty (check production Environment secrets)}"
-            : "${MONGODB_DBNAME:?MONGODB_DBNAME is empty}"
-            : "${MONGODB_USERNAME:?MONGODB_USERNAME is empty}"
-            : "${MONGODB_PASSWORD:?MONGODB_PASSWORD is empty}"
-
-            if ! sudo docker network inspect infra-network >/dev/null 2>&1; then
-              echo "❌ infra-network is unavailable" >&2
-              exit 1
-            fi
-
-            BACKUP_DIR="/opt/backups/qs-server/mongodb"
-            TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-            BACKUP_FILE="qs_mongodb_backup_${TIMESTAMP}.archive.gz"
-            PARTIAL_FILE="${BACKUP_FILE}.partial"
-            BACKUP_CONTAINER_NAME="qs-server-mongodb-backup"
-            MONGODB_PORT="${MONGODB_PORT:-27017}"
-            MONGODB_URI="mongodb://${MONGODB_HOST}:${MONGODB_PORT}/?connectTimeoutMS=30000&socketTimeoutMS=0"
-
-            sudo install -d -m 0750 "$BACKUP_DIR"
-
-            mapfile -t RUNNING_MONGO_UTILITIES < <(
-              sudo docker ps --filter ancestor=mongo:7.0 --format '{{.ID}}'
-            )
-            if (( ${#RUNNING_MONGO_UTILITIES[@]} > 0 )); then
-              echo "❌ Another MongoDB utility container is already running; refusing concurrent backup" >&2
-              sudo docker ps --no-trunc \
-                --filter ancestor=mongo:7.0 \
-                --format '{{.ID}}\t{{.Names}}\t{{.CreatedAt}}\t{{.Status}}\t{{.Labels}}\t{{.Command}}' >&2
-              exit 1
-            fi
-
-            cleanup_backup_container() {
-              sudo docker rm -f "$BACKUP_CONTAINER_NAME" >/dev/null 2>&1 || true
-            }
-            trap cleanup_backup_container EXIT
-
-            echo "Starting MongoDB backup..."
-            echo "Database: $MONGODB_DBNAME"
-            echo "Host: $MONGODB_HOST:$MONGODB_PORT"
-            echo "Timestamp: $TIMESTAMP"
-
-            sudo docker run --rm --network infra-network \
-              --name "$BACKUP_CONTAINER_NAME" \
-              --label "com.fangcunmount.qs-server.operation=mongodb-backup" \
-              --label "com.fangcunmount.qs-server.github-run-id=${{ github.run_id }}" \
-              -v "$BACKUP_DIR:/backup" \
-              -e MONGODB_HOST="$MONGODB_HOST" \
-              -e MONGODB_PORT="$MONGODB_PORT" \
-              -e MONGODB_USERNAME="$MONGODB_USERNAME" \
-              -e MONGODB_PASSWORD="$MONGODB_PASSWORD" \
-              -e MONGODB_DBNAME="$MONGODB_DBNAME" \
-              -e MONGODB_URI="$MONGODB_URI" \
-              -e BACKUP_FILE="$BACKUP_FILE" \
-              -e PARTIAL_FILE="$PARTIAL_FILE" \
-              --entrypoint /usr/bin/timeout \
-              mongo:7.0 345m /bin/bash -Eeuo pipefail -c '
-                cleanup_partial() {
-                  rm -f -- "/backup/$PARTIAL_FILE"
-                }
-                trap cleanup_partial EXIT
-
-                rm -f -- "/backup/$PARTIAL_FILE"
-                mongodump \
-                  --uri="$MONGODB_URI" \
-                  --username="$MONGODB_USERNAME" \
-                  --password="$MONGODB_PASSWORD" \
-                  --authenticationDatabase=admin \
-                  --db="$MONGODB_DBNAME" \
-                  --numParallelCollections=4 \
-                  --gzip \
-                  --archive="/backup/$PARTIAL_FILE"
-
-                if [ ! -s "/backup/$PARTIAL_FILE" ]; then
-                  echo "❌ MongoDB backup archive is empty" >&2
-                  exit 1
-                fi
-                mv -- "/backup/$PARTIAL_FILE" "/backup/$BACKUP_FILE"
-                chmod 0640 "/backup/$BACKUP_FILE"
-                trap - EXIT
-
-                BACKUP_SIZE=$(du -h "/backup/$BACKUP_FILE" | cut -f1)
-                echo "✅ Backup completed: $BACKUP_FILE"
-                echo "Size: $BACKUP_SIZE"
-
-                echo "Cleaning old backups (keeping last 5)..."
-                shopt -s nullglob
-                BACKUPS=(/backup/qs_mongodb_backup_*.archive.gz)
-                if (( ${#BACKUPS[@]} > 5 )); then
-                  mapfile -t SORTED_BACKUPS < <(ls -1t -- "${BACKUPS[@]}")
-                  rm -f -- "${SORTED_BACKUPS[@]:5}"
-                fi
-
-                echo ""
-                echo "Current backups:"
-                BACKUPS=(/backup/qs_mongodb_backup_*.archive.gz)
-                ls -lht -- "${BACKUPS[@]}" | head -6
-              '
-            trap - EXIT
-        env:
-          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
-          MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
-          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
-          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
-          MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
-
-  mongodb-source-backup:
-    name: MongoDB Source-side Backup (Manual Validation)
-    if: github.event.inputs.operation == 'backup-source' && github.event.inputs.database == 'mongodb'
-    runs-on:
-      group: qlume
-      labels: [self-hosted, macOS, ARM64, ops]
-    timeout-minutes: 480
-    environment: production
-    steps:
-      - name: Checkout immutable backup scripts
+      - name: Checkout immutable backup script
         uses: actions/checkout@v6
 
-      - name: Resolve backup identity
-        id: identity
-        run: |
-          set -Eeuo pipefail
-          timestamp="$(TZ=Asia/Shanghai date +%Y%m%d_%H%M%S)"
-          echo "backup_file=qs_mongodb_backup_${timestamp}.archive.gz" >> "$GITHUB_OUTPUT"
-          echo "run_token=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
-
-      - name: Validate source and destination configuration
+      - name: Create, checksum, dry-run validate, and retain three backups
+        id: backup
         env:
-          MONGO_BACKUP_HOST: ${{ secrets.MONGO_BACKUP_HOST }}
-          MONGO_BACKUP_USERNAME: ${{ secrets.MONGO_BACKUP_USERNAME }}
-          MONGO_BACKUP_SSH_KEY: ${{ secrets.MONGO_BACKUP_SSH_KEY }}
-          MONGO_BACKUP_SSH_FINGERPRINT: ${{ secrets.MONGO_BACKUP_SSH_FINGERPRINT }}
-          SVRA_HOST: ${{ vars.SVRA_HOST }}
-          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
-          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
-          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
-        run: |
-          set -Eeuo pipefail
-          : "${MONGO_BACKUP_HOST:?MONGO_BACKUP_HOST is empty}"
-          : "${MONGO_BACKUP_USERNAME:?MONGO_BACKUP_USERNAME is empty}"
-          : "${MONGO_BACKUP_SSH_KEY:?MONGO_BACKUP_SSH_KEY is empty}"
-          : "${MONGO_BACKUP_SSH_FINGERPRINT:?MONGO_BACKUP_SSH_FINGERPRINT is empty}"
-          : "${SVRA_HOST:?SVRA_HOST is empty}"
-          : "${SVRA_USERNAME:?SVRA_USERNAME is empty}"
-          : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
-          : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
-
-      - name: Verify source-space budget against the latest valid archive
-        uses: appleboy/ssh-action@v1.2.2
-        env:
-          MONGO_BACKUP_REQUIRED_FREE_BYTES: ${{ secrets.MONGO_BACKUP_REQUIRED_FREE_BYTES || 1073741824 }}
-          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
-        with:
-          host: ${{ vars.SVRA_HOST }}
-          username: ${{ vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ vars.SVRA_SSH_PORT || 22 }}
-          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          command_timeout: 10m
-          envs: MONGO_BACKUP_REQUIRED_FREE_BYTES,SUDO_PASSWORD
-          script_path: scripts/dbops/mongodb-source-backup-space-budget.sh
-
-      - name: Create compressed archive on the MongoDB host
-        uses: appleboy/ssh-action@v1.2.2
-        env:
-          MONGO_BACKUP_FILE: ${{ steps.identity.outputs.backup_file }}
-          MONGO_BACKUP_RUN_TOKEN: ${{ steps.identity.outputs.run_token }}
-          MONGO_BACKUP_LOCAL_CONTAINER: ${{ secrets.MONGO_BACKUP_LOCAL_CONTAINER || 'mongodb' }}
-          MONGO_BACKUP_REQUIRED_FREE_BYTES: ${{ secrets.MONGO_BACKUP_REQUIRED_FREE_BYTES || 1073741824 }}
-          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
-          MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
-          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
-          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
-          MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
-          SUDO_PASSWORD: ${{ secrets.MONGO_BACKUP_SUDO_PASSWORD }}
-        with:
-          host: ${{ secrets.MONGO_BACKUP_HOST }}
-          username: ${{ secrets.MONGO_BACKUP_USERNAME }}
-          key: ${{ secrets.MONGO_BACKUP_SSH_KEY }}
-          port: ${{ secrets.MONGO_BACKUP_SSH_PORT || 22 }}
-          fingerprint: ${{ secrets.MONGO_BACKUP_SSH_FINGERPRINT }}
-          command_timeout: 350m
-          envs: MONGO_BACKUP_FILE,MONGO_BACKUP_RUN_TOKEN,MONGO_BACKUP_LOCAL_CONTAINER,MONGO_BACKUP_REQUIRED_FREE_BYTES,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,SUDO_PASSWORD
-          script_path: scripts/dbops/mongodb-source-backup.sh
-
-      - name: Transfer compressed archive through the ops runner
-        env:
-          MONGO_BACKUP_FILE: ${{ steps.identity.outputs.backup_file }}
-          MONGO_BACKUP_RUN_TOKEN: ${{ steps.identity.outputs.run_token }}
+          MONGO_BACKUP_OPERATION: backup
+          MONGO_BACKUP_DIR: ${{ vars.MAC_MINI_MONGO_BACKUP_DIR || '/Users/yangshujie/backups/qs-server/mongodb' }}
+          MONGO_BACKUP_RETENTION_COUNT: '3'
           MONGO_BACKUP_HOST: ${{ secrets.MONGO_BACKUP_HOST }}
           MONGO_BACKUP_USERNAME: ${{ secrets.MONGO_BACKUP_USERNAME }}
           MONGO_BACKUP_SSH_PORT: ${{ secrets.MONGO_BACKUP_SSH_PORT || 22 }}
           MONGO_BACKUP_SSH_KEY: ${{ secrets.MONGO_BACKUP_SSH_KEY }}
           MONGO_BACKUP_SSH_FINGERPRINT: ${{ secrets.MONGO_BACKUP_SSH_FINGERPRINT }}
-          SVRA_HOST: ${{ vars.SVRA_HOST }}
-          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
-          SVRA_SSH_PORT: ${{ vars.SVRA_SSH_PORT || 22 }}
-          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
-          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
-        run: bash scripts/dbops/mongodb-source-backup-transfer.sh
-
-      - name: Atomically finalize archive on serverA
-        uses: appleboy/ssh-action@v1.2.2
-        env:
-          MONGO_BACKUP_FILE: ${{ steps.identity.outputs.backup_file }}
-          MONGO_BACKUP_RUN_TOKEN: ${{ steps.identity.outputs.run_token }}
-          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
-        with:
-          host: ${{ vars.SVRA_HOST }}
-          username: ${{ vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ vars.SVRA_SSH_PORT || 22 }}
-          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          command_timeout: 15m
-          envs: MONGO_BACKUP_FILE,MONGO_BACKUP_RUN_TOKEN,SUDO_PASSWORD
-          script_path: scripts/dbops/mongodb-source-backup-finalize.sh
-
-      - name: Validate transferred archive without importing data
-        uses: appleboy/ssh-action@v1.2.2
-        env:
-          MONGO_BACKUP_FILE: ${{ steps.identity.outputs.backup_file }}
-          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
           MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
           MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
-          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
-        with:
-          host: ${{ vars.SVRA_HOST }}
-          username: ${{ vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ vars.SVRA_SSH_PORT || 22 }}
-          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          command_timeout: 115m
-          envs: MONGO_BACKUP_FILE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,SUDO_PASSWORD
-          script_path: scripts/dbops/mongodb-source-backup-validate.sh
-
-      - name: Clean source-host staging
-        if: always() && steps.identity.outputs.backup_file != ''
-        uses: appleboy/ssh-action@v1.2.2
-        env:
-          MONGO_BACKUP_FILE: ${{ steps.identity.outputs.backup_file }}
-          SUDO_PASSWORD: ${{ secrets.MONGO_BACKUP_SUDO_PASSWORD }}
-        with:
-          host: ${{ secrets.MONGO_BACKUP_HOST }}
-          username: ${{ secrets.MONGO_BACKUP_USERNAME }}
-          key: ${{ secrets.MONGO_BACKUP_SSH_KEY }}
-          port: ${{ secrets.MONGO_BACKUP_SSH_PORT || 22 }}
-          fingerprint: ${{ secrets.MONGO_BACKUP_SSH_FINGERPRINT }}
-          command_timeout: 10m
-          envs: MONGO_BACKUP_FILE,SUDO_PASSWORD
-          script_path: scripts/dbops/mongodb-source-backup-cleanup.sh
-
-      - name: Clean serverA transfer staging
-        if: always() && steps.identity.outputs.backup_file != ''
-        uses: appleboy/ssh-action@v1.2.2
-        env:
-          MONGO_BACKUP_FILE: ${{ steps.identity.outputs.backup_file }}
-          MONGO_BACKUP_RUN_TOKEN: ${{ steps.identity.outputs.run_token }}
-          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
-        with:
-          host: ${{ vars.SVRA_HOST }}
-          username: ${{ vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ vars.SVRA_SSH_PORT || 22 }}
-          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          command_timeout: 10m
-          envs: MONGO_BACKUP_FILE,MONGO_BACKUP_RUN_TOKEN,SUDO_PASSWORD
-          script_path: scripts/dbops/mongodb-source-backup-servera-cleanup.sh
+        run: bash scripts/dbops/mongodb-mac-mini-backup.sh
 
   mongodb-backup-validate:
-    name: MongoDB Backup Validate
+    name: MongoDB Backup Validate on Mac mini
     if: github.event.inputs.operation == 'validate' && github.event.inputs.database == 'mongodb'
     runs-on:
       group: qlume
@@ -400,83 +123,28 @@ jobs:
     timeout-minutes: 120
     environment: production
     steps:
-      - name: Validate SSH configuration
+      - name: Checkout immutable backup script
+        uses: actions/checkout@v6
+
+      - name: Verify checksum and mongorestore dry-run
         env:
-          SVRA_HOST: ${{ vars.SVRA_HOST }}
-          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
-          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
-          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
-        run: |
-          set -Eeuo pipefail
-          : "${SVRA_HOST:?SVRA_HOST is empty}"
-          : "${SVRA_USERNAME:?SVRA_USERNAME is empty}"
-          : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
-          : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
-
-      - name: Validate MongoDB backup archive
-        uses: appleboy/ssh-action@v1.2.2
-        with:
-          host: ${{ vars.SVRA_HOST }}
-          username: ${{ vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ vars.SVRA_SSH_PORT || 22 }}
-          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          command_timeout: 115m
-          envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,BACKUP_FILE_INPUT
-          script: |
-            set -Eeuo pipefail
-            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
-
-            : "${MONGODB_HOST:?MONGODB_HOST is empty (check production Environment secrets)}"
-            : "${MONGODB_DBNAME:?MONGODB_DBNAME is empty}"
-            : "${MONGODB_USERNAME:?MONGODB_USERNAME is empty}"
-            : "${MONGODB_PASSWORD:?MONGODB_PASSWORD is empty}"
-
-            if ! sudo docker network inspect infra-network >/dev/null 2>&1; then
-              echo "❌ infra-network is unavailable" >&2
-              exit 1
-            fi
-
-            BACKUP_DIR="/opt/backups/qs-server/mongodb"
-            BACKUP_FILE="$BACKUP_FILE_INPUT"
-            if ! [[ "$BACKUP_FILE" =~ ^qs_mongodb_backup_[0-9]{8}_[0-9]{6}\.archive\.gz$ ]]; then
-              echo "❌ Invalid backup name: $BACKUP_FILE" >&2
-              exit 1
-            fi
-            if ! sudo docker run --rm \
-              -v "$BACKUP_DIR:/backup:ro" \
-              --entrypoint test \
-              mongo:7.0 -s "/backup/$BACKUP_FILE"; then
-              echo "❌ Backup archive is missing or empty: $BACKUP_FILE" >&2
-              exit 1
-            fi
-
-            echo "Validating MongoDB backup archive without importing data..."
-            sudo docker run --rm --network infra-network \
-              -v "$BACKUP_DIR:/backup:ro" \
-              --entrypoint /usr/bin/timeout \
-              mongo:7.0 110m mongorestore \
-                --host="$MONGODB_HOST" \
-                --port="${MONGODB_PORT:-27017}" \
-                --username="$MONGODB_USERNAME" \
-                --password="$MONGODB_PASSWORD" \
-                --authenticationDatabase=admin \
-                --archive="/backup/$BACKUP_FILE" \
-                --gzip \
-                --nsInclude="$MONGODB_DBNAME.*" \
-                --dryRun \
-                --verbose
-            echo "✅ MongoDB backup archive dry-run validation succeeded: $BACKUP_FILE"
-        env:
-          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
+          MONGO_BACKUP_OPERATION: validate
+          MONGO_BACKUP_DIR: ${{ vars.MAC_MINI_MONGO_BACKUP_DIR || '/Users/yangshujie/backups/qs-server/mongodb' }}
+          MONGO_BACKUP_FILE: ${{ github.event.inputs.backup_name }}
+          MONGO_BACKUP_RETENTION_COUNT: '3'
+          MONGO_BACKUP_HOST: ${{ secrets.MONGO_BACKUP_HOST }}
+          MONGO_BACKUP_USERNAME: ${{ secrets.MONGO_BACKUP_USERNAME }}
+          MONGO_BACKUP_SSH_PORT: ${{ secrets.MONGO_BACKUP_SSH_PORT || 22 }}
+          MONGO_BACKUP_SSH_KEY: ${{ secrets.MONGO_BACKUP_SSH_KEY }}
+          MONGO_BACKUP_SSH_FINGERPRINT: ${{ secrets.MONGO_BACKUP_SSH_FINGERPRINT }}
           MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
           MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
-          BACKUP_FILE_INPUT: ${{ github.event.inputs.backup_name }}
+        run: bash scripts/dbops/mongodb-mac-mini-backup.sh
 
   mongodb-restore:
-    name: MongoDB Restore
+    name: MongoDB Restore from Mac mini
     if: github.event.inputs.operation == 'restore' && github.event.inputs.database == 'mongodb'
     runs-on:
       group: qlume
@@ -484,113 +152,26 @@ jobs:
     timeout-minutes: 360
     environment: production
     steps:
-      - name: Validate SSH configuration
+      - name: Checkout immutable restore script
+        uses: actions/checkout@v6
+
+      - name: Validate and restore selected archive
         env:
-          SVRA_HOST: ${{ vars.SVRA_HOST }}
-          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
-          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
-          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
-        run: |
-          set -Eeuo pipefail
-          : "${SVRA_HOST:?SVRA_HOST is empty}"
-          : "${SVRA_USERNAME:?SVRA_USERNAME is empty}"
-          : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
-          : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
-
-      - name: Restore MongoDB
-        uses: appleboy/ssh-action@v1.2.2
-        with:
-          host: ${{ vars.SVRA_HOST }}
-          username: ${{ vars.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ vars.SVRA_SSH_PORT || 22 }}
-          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
-          command_timeout: 350m
-          envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,BACKUP_FILE_INPUT
-          script: |
-            set -Eeuo pipefail
-            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
-
-            : "${MONGODB_HOST:?MONGODB_HOST is empty (check production Environment secrets)}"
-            : "${MONGODB_DBNAME:?MONGODB_DBNAME is empty}"
-            : "${MONGODB_USERNAME:?MONGODB_USERNAME is empty}"
-            : "${MONGODB_PASSWORD:?MONGODB_PASSWORD is empty}"
-
-            if ! sudo docker network inspect infra-network >/dev/null 2>&1; then
-              echo "❌ infra-network is unavailable" >&2
-              exit 1
-            fi
-
-            BACKUP_DIR="/opt/backups/qs-server/mongodb"
-            BACKUP_FILE="$BACKUP_FILE_INPUT"
-            list_backups() {
-              sudo docker run --rm \
-                -v "$BACKUP_DIR:/backup:ro" \
-                --entrypoint /bin/bash \
-                mongo:7.0 -Eeuo pipefail -c '
-                  shopt -s nullglob
-                  BACKUPS=(/backup/qs_mongodb_backup_*.archive.gz)
-                  if (( ${#BACKUPS[@]} == 0 )); then
-                    echo "No backups found"
-                  else
-                    ls -lht -- "${BACKUPS[@]}" | head -10
-                  fi
-                '
-            }
-
-            if [ -z "$BACKUP_FILE" ]; then
-              echo "❌ Backup name is required"
-              echo ""
-              echo "Available backups:"
-              list_backups
-              exit 1
-            fi
-
-            if ! [[ "$BACKUP_FILE" =~ ^qs_mongodb_backup_[0-9]{8}_[0-9]{6}\.archive\.gz$ ]]; then
-              echo "❌ Invalid backup name: $BACKUP_FILE" >&2
-              exit 1
-            fi
-
-            if ! sudo docker run --rm \
-              -v "$BACKUP_DIR:/backup:ro" \
-              --entrypoint test \
-              mongo:7.0 -f "/backup/$BACKUP_FILE"; then
-              echo "❌ Backup file not found: $BACKUP_FILE"
-              echo ""
-              echo "Available backups:"
-              list_backups
-              exit 1
-            fi
-
-            echo "⚠️ WARNING: This will overwrite the current database!"
-            echo "Backup file: $BACKUP_FILE"
-            echo "Target database: $MONGODB_DBNAME"
-            echo "Restoring in 5 seconds..."
-            sleep 5
-
-            echo "Restoring database..."
-            sudo docker run --rm --network infra-network \
-              -v "$BACKUP_DIR:/backup:ro" \
-              --entrypoint /usr/bin/timeout \
-              mongo:7.0 345m mongorestore \
-                --host="$MONGODB_HOST" \
-                --port="${MONGODB_PORT:-27017}" \
-                --username="$MONGODB_USERNAME" \
-                --password="$MONGODB_PASSWORD" \
-                --authenticationDatabase=admin \
-                --archive="/backup/$BACKUP_FILE" \
-                --gzip \
-                --drop \
-                --nsInclude="$MONGODB_DBNAME.*"
-
-            echo "✅ Database restored successfully from $BACKUP_FILE"
-        env:
-          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
+          MONGO_BACKUP_OPERATION: restore
+          MONGO_BACKUP_DIR: ${{ vars.MAC_MINI_MONGO_BACKUP_DIR || '/Users/yangshujie/backups/qs-server/mongodb' }}
+          MONGO_BACKUP_FILE: ${{ github.event.inputs.backup_name }}
+          MONGO_BACKUP_RETENTION_COUNT: '3'
+          MONGO_BACKUP_HOST: ${{ secrets.MONGO_BACKUP_HOST }}
+          MONGO_BACKUP_USERNAME: ${{ secrets.MONGO_BACKUP_USERNAME }}
+          MONGO_BACKUP_SSH_PORT: ${{ secrets.MONGO_BACKUP_SSH_PORT || 22 }}
+          MONGO_BACKUP_SSH_KEY: ${{ secrets.MONGO_BACKUP_SSH_KEY }}
+          MONGO_BACKUP_SSH_FINGERPRINT: ${{ secrets.MONGO_BACKUP_SSH_FINGERPRINT }}
           MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
           MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
-          BACKUP_FILE_INPUT: ${{ github.event.inputs.backup_name }}
+        run: bash scripts/dbops/mongodb-mac-mini-backup.sh
+
 
   mongodb-status:
     name: MongoDB Status
@@ -1351,20 +932,6 @@ jobs:
               --filter ancestor=mongo:7.0 \
               --format '{{.ID}}\t{{.Names}}\t{{.CreatedAt}}\t{{.Status}}\t{{.Labels}}\t{{.Command}}'
 
-            echo ""
-            echo "Available backups:"
-            sudo docker run --rm \
-              -v /opt/backups/qs-server/mongodb:/backup:ro \
-              --entrypoint /bin/bash \
-              mongo:7.0 -Eeuo pipefail -c '
-                shopt -s nullglob
-                FILES=(/backup/qs_mongodb_backup_*.archive.gz /backup/qs_mongodb_backup_*.partial)
-                if (( ${#FILES[@]} == 0 )); then
-                  echo "No backups or partial archives found"
-                else
-                  ls -lht -- "${FILES[@]}" | head -10
-                fi
-              '
         env:
           MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
           MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
@@ -1377,6 +944,20 @@ jobs:
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
           AUDIT_FROM: ${{ github.event.inputs.audit_from }}
+
+      - name: List Mac mini MongoDB backups
+        env:
+          MONGO_BACKUP_DIR: ${{ vars.MAC_MINI_MONGO_BACKUP_DIR || '/Users/yangshujie/backups/qs-server/mongodb' }}
+        run: |
+          set -Eeuo pipefail
+          if ! [[ "$MONGO_BACKUP_DIR" == /*/backups/qs-server/mongodb ]] || [[ "$MONGO_BACKUP_DIR" == *'..'* ]]; then
+            echo "unsafe Mac mini MongoDB backup directory" >&2
+            exit 1
+          fi
+          echo "Mac mini MongoDB backups:"
+          find "$MONGO_BACKUP_DIR" -maxdepth 1 -type f \
+            \( -name 'qs_mongodb_backup_*.archive.gz' -o -name 'qs_mongodb_backup_*.archive.gz.sha256' -o -name '*.partial' \) \
+            -print | LC_ALL=C sort -r | head -10
 
   mongodb-presentation-governance:
     name: MongoDB Interpretation Presentation Governance
