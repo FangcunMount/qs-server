@@ -97,6 +97,20 @@ jobs:
       - name: Checkout immutable backup script
         uses: actions/checkout@v6
 
+      - name: Ensure MongoDB Database Tools on Mac mini
+        run: |
+          set -Eeuo pipefail
+          export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin${PATH:+:$PATH}"
+          if ! command -v mongodump >/dev/null 2>&1 || ! command -v mongorestore >/dev/null 2>&1; then
+            command -v brew >/dev/null 2>&1 || { echo "Homebrew is required on the Mac mini" >&2; exit 1; }
+            HOMEBREW_NO_AUTO_UPDATE=1 brew tap mongodb/brew
+            brew trust --formula mongodb/brew/mongodb-database-tools
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install mongodb-database-tools
+          fi
+          echo "Mac mini runner: $(hostname) / ${RUNNER_NAME}"
+          mongodump --version
+          mongorestore --version
+
       - name: Create, checksum, dry-run validate, and retain three backups
         id: backup
         env:
@@ -126,6 +140,20 @@ jobs:
       - name: Checkout immutable backup script
         uses: actions/checkout@v6
 
+      - name: Ensure MongoDB Database Tools on Mac mini
+        run: |
+          set -Eeuo pipefail
+          export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin${PATH:+:$PATH}"
+          if ! command -v mongodump >/dev/null 2>&1 || ! command -v mongorestore >/dev/null 2>&1; then
+            command -v brew >/dev/null 2>&1 || { echo "Homebrew is required on the Mac mini" >&2; exit 1; }
+            HOMEBREW_NO_AUTO_UPDATE=1 brew tap mongodb/brew
+            brew trust --formula mongodb/brew/mongodb-database-tools
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install mongodb-database-tools
+          fi
+          echo "Mac mini runner: $(hostname) / ${RUNNER_NAME}"
+          mongodump --version
+          mongorestore --version
+
       - name: Verify checksum and mongorestore dry-run
         env:
           MONGO_BACKUP_OPERATION: validate
@@ -154,6 +182,20 @@ jobs:
     steps:
       - name: Checkout immutable restore script
         uses: actions/checkout@v6
+
+      - name: Ensure MongoDB Database Tools on Mac mini
+        run: |
+          set -Eeuo pipefail
+          export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin${PATH:+:$PATH}"
+          if ! command -v mongodump >/dev/null 2>&1 || ! command -v mongorestore >/dev/null 2>&1; then
+            command -v brew >/dev/null 2>&1 || { echo "Homebrew is required on the Mac mini" >&2; exit 1; }
+            HOMEBREW_NO_AUTO_UPDATE=1 brew tap mongodb/brew
+            brew trust --formula mongodb/brew/mongodb-database-tools
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install mongodb-database-tools
+          fi
+          echo "Mac mini runner: $(hostname) / ${RUNNER_NAME}"
+          mongodump --version
+          mongorestore --version
 
       - name: Validate and restore selected archive
         env:
