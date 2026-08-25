@@ -27,9 +27,9 @@ type IAMOptions struct {
 	ProfileLinkCache *CacheOptions
 
 	// Authz 授权快照（GetAuthorizationSnapshot）
-	AuthzAppName              string
-	AuthzCacheTTL             time.Duration
-	AuthzCasbinDomainOverride string
+	AuthzAppName        string
+	AuthzCacheTTL       time.Duration
+	AuthzDomainOverride string
 }
 
 type GRPCOptions struct {

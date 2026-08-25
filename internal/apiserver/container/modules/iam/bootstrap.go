@@ -23,6 +23,7 @@ type Module struct {
 	profileLinkSvc      *iam.ProfileLinkService
 	wechatAppService    *iam.WeChatAppService
 	authzSnapshotLoader *iam.AuthzSnapshotLoader
+	objectAuthzChecker  *iam.ObjectAuthorizationChecker
 }
 
 type RuntimeOptions struct {
@@ -48,15 +49,17 @@ func NewWithRuntimeOptions(ctx context.Context, opts *options.IAMOptions, runtim
 		return nil, fmt.Errorf("failed to create IAM client: %w", err)
 	}
 
+	serviceAuthHelper := newIAMServiceAuthHelper(ctx, client, opts)
 	module := &Module{
 		client:              client,
 		tokenVerifier:       newIAMTokenVerifier(ctx, client),
-		serviceAuthHelper:   newIAMServiceAuthHelper(ctx, client, opts),
+		serviceAuthHelper:   serviceAuthHelper,
 		identityService:     newIAMIdentityService(client),
 		operationAccountSvc: newIAMOperationAccountService(client),
 		profileLinkSvc:      newIAMProfileLinkService(client),
 		wechatAppService:    newIAMWeChatAppService(client),
-		authzSnapshotLoader: newIAMAuthzSnapshotLoader(client, opts),
+		authzSnapshotLoader: newIAMAuthzSnapshotLoader(client, opts, serviceAuthHelper),
+		objectAuthzChecker:  iam.NewObjectAuthorizationChecker(client, serviceAuthHelper),
 	}
 
 	logger.L(context.Background()).Infow("IAM module initialized successfully",
@@ -175,7 +178,7 @@ func newIAMWeChatAppService(client *iam.Client) *iam.WeChatAppService {
 	return service
 }
 
-func newIAMAuthzSnapshotLoader(client *iam.Client, opts *options.IAMOptions) *iam.AuthzSnapshotLoader {
+func newIAMAuthzSnapshotLoader(client *iam.Client, opts *options.IAMOptions, tokens *iam.ServiceAuthHelper) *iam.AuthzSnapshotLoader {
 	if client == nil || !client.IsEnabled() || opts == nil || !opts.GRPCEnabled {
 		return nil
 	}
@@ -183,7 +186,8 @@ func newIAMAuthzSnapshotLoader(client *iam.Client, opts *options.IAMOptions) *ia
 	return iam.NewAuthzSnapshotLoader(client, iam.AuthzSnapshotLoaderOptions{
 		AppName:              iamOpts.AuthzAppName,
 		CacheTTL:             iamOpts.AuthzCacheTTL,
-		CasbinDomainOverride: iamOpts.AuthzCasbinDomainOverride,
+		DomainOverride:       iamOpts.AuthzDomainOverride,
+		ServiceTokenProvider: tokens,
 	})
 }
 
@@ -237,6 +241,11 @@ func (m *Module) WeChatAppService() *iam.WeChatAppService {
 // AuthzSnapshotLoader 返回 IAM 授权快照加载器（gRPC GetAuthorizationSnapshot + 本地缓存）。
 func (m *Module) AuthzSnapshotLoader() *iam.AuthzSnapshotLoader {
 	return m.authzSnapshotLoader
+}
+
+// ObjectAuthorizationChecker returns the authoritative IAM AuthZ v3 object checker.
+func (m *Module) ObjectAuthorizationChecker() *iam.ObjectAuthorizationChecker {
+	return m.objectAuthzChecker
 }
 
 // IsEnabled 检查 IAM 模块是否启用
@@ -365,7 +374,7 @@ func convertIAMOptions(opts *options.IAMOptions) *iam.IAMOptions {
 	if opts.AuthzCacheTTL > 0 {
 		iamOpts.AuthzCacheTTL = opts.AuthzCacheTTL
 	}
-	iamOpts.AuthzCasbinDomainOverride = opts.AuthzCasbinDomainOverride
+	iamOpts.AuthzDomainOverride = opts.AuthzDomainOverride
 
 	return iamOpts
 }

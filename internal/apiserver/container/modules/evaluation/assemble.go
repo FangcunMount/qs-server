@@ -7,6 +7,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/event"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaluationintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
 	evaluationoperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
@@ -71,6 +72,7 @@ type Deps struct {
 	Observer                   *observability.ComponentObserver
 	MySQLLimiter               backpressure.Acquirer
 	TesteeAccessChecker        evaluationoperator.AccessChecker
+	ObjectAuthzChecker         appauthz.ObjectAuthorizationChecker
 	ExecutionPaths             []modelcatalog.ExecutionPath
 	RuntimeDescriptorRegistry  *evalpipeline.RuntimeDescriptorRegistry
 	PublishedModelReader       rulesetport.PublishedModelReader
@@ -211,7 +213,7 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 	scoreFacts := evaluationoutcome.NewScoreFactReader(infra.outcomeRepo, infra.scoreProjectionReader)
 	m.TesteeService = evaluationtestee.NewServiceWithCaches(infra.assessmentRepo, infra.assessmentReader, scoreFacts, infra.assessmentAccessCache, infra.assessmentDetailCache)
 	m.OperatorQuery = evaluationoperator.NewQueryService(infra.assessmentRepo, infra.assessmentReader, normalized.TesteeAccessChecker, scoreFacts, infra.runRepo)
-	m.GovernedRetry = evaluationoperator.NewGovernedRetryService(infra.assessmentRepo, infra.runRepo, infra.txRunner, infra.assessmentOutboxStore, normalized.TesteeAccessChecker)
+	m.GovernedRetry = evaluationoperator.NewGovernedRetryService(infra.assessmentRepo, infra.runRepo, infra.txRunner, infra.assessmentOutboxStore, normalized.TesteeAccessChecker, normalized.ObjectAuthzChecker)
 	m.ScaleAnalysis = evaluationoperator.NewScaleAnalysisService(m.OperatorQuery)
 	m.workbenchLatestRiskReader = infra.latestRiskReader
 }

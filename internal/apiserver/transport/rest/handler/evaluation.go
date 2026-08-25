@@ -396,14 +396,13 @@ func (h *EvaluationOperatorHandler) BatchEvaluate(c *gin.Context) {
 
 // RetryFailed 重试失败的测评
 // @Summary 重试失败的测评
-// @Description 重试指定测评的评估流程；仅 qs:evaluator 或 qs:admin 可访问
+// @Description 根据 IAM 对象属性授权重试指定测评的评估流程
 // @Tags Evaluation-Admin
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param id path string true "测评ID"
 // @Success 200 {object} core.Response{data=response.AssessmentResponse}
 // @Failure 429 {object} core.ErrResponse
-// @Deprecated
 // @Router /api/v1/evaluations/assessments/{id}/retry [post]
 func (h *EvaluationOperatorHandler) RetryFailed(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -422,32 +421,20 @@ func (h *EvaluationOperatorHandler) RetryFailed(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrModuleInitializationFailed, "evaluation retry governance is not configured"))
 		return
 	}
-	actor := evaluationoperator.Actor{OrgID: orgID, OperatorUserID: operatorUserID}
-	latest, err := h.protectedQueryService.GetLatestAssessmentRun(ctx, actor, id)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
 	requestID := pkgmiddleware.RequestIDFromStandardContext(ctx)
-	isAuditReplay := latest != nil && requestID != "" && latest.ActionRequestID == requestID
-	if latest == nil || (!isAuditReplay && (latest.Status != "failed" || latest.RetryDisposition != "manual_required")) {
-		h.Error(c, errors.WithCode(code.ErrConflict, "最新失败尝试不需要人工重试"))
-		return
-	}
 	_, err = h.systemGovernance.RunAction(ctx, orgID, "evaluation.retry", systemgov.ActionRunRequest{
 		RequestID: requestID,
 		Confirm:   true,
 		Input: map[string]interface{}{
-			"resource_id":      strconv.FormatUint(id, 10),
-			"expected_attempt": latest.AttemptNo,
-			"reason":           "legacy evaluation retry endpoint",
+			"resource_id": strconv.FormatUint(id, 10),
+			"reason":      "assessment retry endpoint",
 		},
 	})
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	result, err := h.protectedQueryService.GetAssessment(ctx, actor, id)
+	result, err := h.protectedQueryService.GetAssessment(ctx, evaluationoperator.Actor{OrgID: orgID, OperatorUserID: operatorUserID}, id)
 	if err != nil {
 		h.Error(c, err)
 		return

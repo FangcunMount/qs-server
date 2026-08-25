@@ -544,7 +544,7 @@ iam:
   
   # 服务间认证配置（可选）
   service-auth:
-    service-id: "qs-service"                           # QS 服务 ID
+    service-id: "qs-apiserver.svc"                    # IAM AuthZ v3 信任的服务身份
     target-audience: ["iam-service"]                   # 目标服务列表
     token-ttl: 1h                                      # 服务 Token 有效期
     refresh-before: 5m                                 # 提前刷新时间

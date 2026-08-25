@@ -24,6 +24,7 @@ type WireInput struct {
 	OperationAccountSvc *iam.OperationAccountService
 	IAMClient           *iam.Client
 	AuthzSnapshotLoader *iam.AuthzSnapshotLoader
+	ServiceAuthHelper   *iam.ServiceAuthHelper
 }
 
 // Wire builds and bootstraps the actor module from composition inputs.
@@ -41,7 +42,7 @@ func Wire(in WireInput) (*Module, error) {
 	}
 	if in.IAMEnabled {
 		bootstrap.OperatorAuthz = &iam.OperatorAuthzBundle{
-			Assignment: iam.NewAuthzAssignmentClient(in.IAMClient),
+			Assignment: iam.NewAuthzAssignmentClient(in.IAMClient, in.ServiceAuthHelper),
 			Snapshot:   in.AuthzSnapshotLoader,
 		}
 	}

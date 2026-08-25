@@ -4,21 +4,26 @@ import (
 	"context"
 	"fmt"
 
-	authzv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/authz/v2"
+	authzv3 "github.com/FangcunMount/iam/v3/api/grpc/iam/authz/v3"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 )
 
 // AssignmentClient IAM GrantAssignment / RevokeAssignment。
 type AssignmentClient struct {
 	client GRPCClient
+	tokens TokenProvider
 }
 
 // NewAssignmentClient 创建客户端；IAM 未启用时返回 nil。
-func NewAssignmentClient(c GRPCClient) *AssignmentClient {
+func NewAssignmentClient(c GRPCClient, providers ...TokenProvider) *AssignmentClient {
 	if c == nil || !c.IsEnabled() || c.SDK() == nil {
 		return nil
 	}
-	return &AssignmentClient{client: c}
+	var tokens TokenProvider
+	if len(providers) > 0 {
+		tokens = providers[0]
+	}
+	return &AssignmentClient{client: c, tokens: tokens}
 }
 
 // Grant 授予 IAM 角色。
@@ -26,7 +31,11 @@ func (a *AssignmentClient) Grant(ctx context.Context, domain, targetUserIDStr, r
 	if a == nil || a.client == nil {
 		return fmt.Errorf("iam assignment client not available")
 	}
-	_, err := a.client.SDK().Authz().GrantAssignment(ctx, &authzv2.GrantAssignmentRequest{
+	ctx, err := authorizationContext(ctx, a.tokens)
+	if err != nil {
+		return err
+	}
+	_, err = a.client.SDK().Authz().GrantAssignment(ctx, &authzv3.GrantAssignmentRequest{
 		Subject:   authz.SubjectKey(targetUserIDStr),
 		Domain:    domain,
 		RoleName:  roleName,
@@ -40,7 +49,11 @@ func (a *AssignmentClient) Revoke(ctx context.Context, domain, targetUserIDStr, 
 	if a == nil || a.client == nil {
 		return fmt.Errorf("iam assignment client not available")
 	}
-	_, err := a.client.SDK().Authz().RevokeAssignment(ctx, &authzv2.RevokeAssignmentRequest{
+	ctx, err := authorizationContext(ctx, a.tokens)
+	if err != nil {
+		return err
+	}
+	_, err = a.client.SDK().Authz().RevokeAssignment(ctx, &authzv3.RevokeAssignmentRequest{
 		Subject:  authz.SubjectKey(targetUserIDStr),
 		Domain:   domain,
 		RoleName: roleName,

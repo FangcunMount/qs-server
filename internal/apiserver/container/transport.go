@@ -13,6 +13,7 @@ import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	cachegovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	evaluationOperator "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/operator"
 	evaluationScheduler "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scheduler"
@@ -194,6 +195,11 @@ func (c *Container) retryGovernanceActionHandlers() map[string]systemgovApp.Acti
 		}{{"evaluation.retry", retrygovernance.AttemptOriginManual}, {"evaluation.force_retry", retrygovernance.AttemptOriginForce}} {
 			spec := spec
 			handlers[spec.id] = func(ctx context.Context, orgID int64, requestID string, input map[string]interface{}) (map[string]interface{}, error) {
+				snapshot, ok := appauthz.FromContext(ctx)
+				grantingUserID := actorctx.GrantingUserID(ctx)
+				if !ok || snapshot.AuthorizationDomain == "" || grantingUserID == 0 {
+					return nil, baseerrors.WithCode(code.ErrModuleInitializationFailed, "authorization subject and domain are required")
+				}
 				request, err := decodeRetryActionInput(input)
 				if err != nil {
 					return nil, err
@@ -204,6 +210,8 @@ func (c *Container) retryGovernanceActionHandlers() map[string]systemgovApp.Acti
 				}
 				run, err := c.EvaluationModule.GovernedRetry.Authorize(ctx, evaluationOperator.Actor{OrgID: orgID, OperatorUserID: int64(actorctx.GrantingUserID(ctx))}, evaluationOperator.GovernedRetryCommand{
 					AssessmentID: assessmentID, ExpectedAttempt: request.ExpectedAttempt, Origin: spec.origin, RequestID: requestID, Reason: request.Reason,
+					AuthorizationSubject: appauthz.SubjectKey(strconv.FormatUint(grantingUserID, 10)), AuthorizationDomain: snapshot.AuthorizationDomain,
+					AuthorizationAction: retryAuthorizationAction(spec.id),
 				})
 				if err != nil {
 					return nil, normalizeGovernedRetryError(err)
@@ -355,10 +363,17 @@ func decodeRetryActionInput(input map[string]interface{}) (retryActionInput, err
 	if err := json.Unmarshal(payload, &request); err != nil {
 		return retryActionInput{}, err
 	}
-	if request.ResourceID == "" || request.ExpectedAttempt < 1 || request.Reason == "" {
-		return retryActionInput{}, fmt.Errorf("resource_id, expected_attempt and reason are required")
+	if request.ResourceID == "" || request.ExpectedAttempt < 0 || request.Reason == "" {
+		return retryActionInput{}, fmt.Errorf("resource_id and reason are required; expected_attempt cannot be negative")
 	}
 	return request, nil
+}
+
+func retryAuthorizationAction(actionID string) string {
+	if actionID == "evaluation.force_retry" {
+		return "force_retry"
+	}
+	return "retry"
 }
 
 func (c *Container) localResilienceSnapshot() func() resilience.RuntimeSnapshot {

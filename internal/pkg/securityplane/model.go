@@ -48,20 +48,20 @@ func (p Principal) AuthenticationMethods() []string {
 
 // OrgScope is the read-only IAM authorization domain and QS business org projection.
 type OrgScope struct {
-	TenantDomain   string
-	OrgID          uint64
-	HasOrgID       bool
-	CasbinDomain   string
-	RawScopeSource string
+	TenantDomain        string
+	OrgID               uint64
+	HasOrgID            bool
+	AuthorizationDomain string
+	RawScopeSource      string
 }
 
 // NewOrgScope creates the canonical security-plane org scope view.
-func NewOrgScope(tenantDomain string, orgID uint64, hasOrg bool, casbinDomain string) OrgScope {
+func NewOrgScope(tenantDomain string, orgID uint64, hasOrg bool, authorizationDomain string) OrgScope {
 	return OrgScope{
-		TenantDomain: tenantDomain,
-		OrgID:        orgID,
-		HasOrgID:     hasOrg && orgID > 0,
-		CasbinDomain: casbinDomain,
+		TenantDomain:        tenantDomain,
+		OrgID:               orgID,
+		HasOrgID:            hasOrg && orgID > 0,
+		AuthorizationDomain: authorizationDomain,
 	}
 }
 

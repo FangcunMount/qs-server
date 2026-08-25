@@ -7,7 +7,8 @@ import (
 	"sync"
 	"time"
 
-	authzv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/authz/v2"
+	authzv3 "github.com/FangcunMount/iam/v3/api/grpc/iam/authz/v3"
+	serviceauth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/serviceauth"
 	"github.com/FangcunMount/iam/v3/pkg/tenant"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"golang.org/x/sync/singleflight"
@@ -17,7 +18,13 @@ import (
 type SnapshotLoaderOptions struct {
 	AppName              string
 	CacheTTL             time.Duration
-	CasbinDomainOverride string
+	DomainOverride       string
+	ServiceTokenProvider TokenProvider
+}
+
+// TokenProvider supplies the service credential required by every AuthZ v3 RPC.
+type TokenProvider interface {
+	GetToken(context.Context) (string, error)
 }
 
 // SnapshotLoader CurrentAuthzSnapshot：GetAuthorizationSnapshot + 进程内缓存 + authz_version 水位失效。
@@ -106,15 +113,15 @@ func (l *SnapshotLoader) ObserveTenantAuthzVersion(tenantID string, version int6
 	}
 }
 
-// AuthorizationDomain 返回 IAM Casbin 授权域（与 JWT tenant domain 对齐）。
+// AuthorizationDomain 返回 IAM 授权域（与 JWT tenant domain 对齐）。
 func (l *SnapshotLoader) AuthorizationDomain() string {
-	if l != nil && l.opts.CasbinDomainOverride != "" {
-		return l.opts.CasbinDomainOverride
+	if l != nil && l.opts.DomainOverride != "" {
+		return l.opts.DomainOverride
 	}
 	return tenant.DefaultID
 }
 
-// DomainForOrg 返回 IAM Casbin domain；orgID 为 QS 业务组织，不作为 Casbin domain。
+// DomainForOrg 返回 IAM authorization domain；orgID 为 QS 业务组织，不作为授权域。
 func (l *SnapshotLoader) DomainForOrg(orgID int64) string {
 	_ = orgID
 	return l.AuthorizationDomain()
@@ -126,8 +133,8 @@ func (l *SnapshotLoader) Load(ctx context.Context, jwtTenantID, userIDStr string
 		return nil, fmt.Errorf("iam client not available for authorization snapshot")
 	}
 	domain := jwtTenantID
-	if l.opts.CasbinDomainOverride != "" {
-		domain = l.opts.CasbinDomainOverride
+	if l.opts.DomainOverride != "" {
+		domain = l.opts.DomainOverride
 	}
 	if domain == "" || userIDStr == "" {
 		return nil, fmt.Errorf("domain and user id are required")
@@ -143,7 +150,11 @@ func (l *SnapshotLoader) Load(ctx context.Context, jwtTenantID, userIDStr string
 			return snap, nil
 		}
 		sub := authz.SubjectKey(userIDStr)
-		resp, err := l.client.SDK().Authz().GetAuthorizationSnapshot(ctx, &authzv2.GetAuthorizationSnapshotRequest{
+		ctx, err := authorizationContext(ctx, l.opts.ServiceTokenProvider)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := l.client.SDK().Authz().GetAuthorizationSnapshot(ctx, &authzv3.GetAuthorizationSnapshotRequest{
 			Subject: sub,
 			Domain:  domain,
 			AppName: l.opts.AppName,
@@ -152,10 +163,10 @@ func (l *SnapshotLoader) Load(ctx context.Context, jwtTenantID, userIDStr string
 			return nil, err
 		}
 		snap := &authz.Snapshot{
-			Roles:        append([]string(nil), resp.GetRoles()...),
-			AuthzVersion: resp.GetAuthzVersion(),
-			CasbinDomain: domain,
-			IAMAppName:   l.opts.AppName,
+			Roles:               append([]string(nil), resp.GetRoles()...),
+			AuthzVersion:        resp.GetPolicyVersion(),
+			AuthorizationDomain: domain,
+			IAMAppName:          l.opts.AppName,
 		}
 		for _, p := range resp.GetPermissions() {
 			if p == nil {
@@ -164,6 +175,7 @@ func (l *SnapshotLoader) Load(ctx context.Context, jwtTenantID, userIDStr string
 			snap.Permissions = append(snap.Permissions, authz.Permission{
 				Resource: p.GetResource(),
 				Action:   p.GetAction(),
+				Mode:     authz.AuthorizationMode(p.GetMode()),
 			})
 		}
 		l.setCached(key, domain, snap)
@@ -173,4 +185,18 @@ func (l *SnapshotLoader) Load(ctx context.Context, jwtTenantID, userIDStr string
 		return nil, err
 	}
 	return v.(*authz.Snapshot), nil
+}
+
+func authorizationContext(ctx context.Context, provider TokenProvider) (context.Context, error) {
+	if provider == nil {
+		return nil, fmt.Errorf("iam service token provider is required for AuthZ v3")
+	}
+	token, err := provider.GetToken(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get IAM service token: %w", err)
+	}
+	if strings.TrimSpace(token) == "" {
+		return nil, fmt.Errorf("IAM service token is empty")
+	}
+	return serviceauth.AuthorizationContext(ctx, token), nil
 }

@@ -75,6 +75,10 @@ func PermissionDenied(format string, args ...interface{}) error {
 	return cberrors.WithCode(errorCode.ErrPermissionDenied, format, args...)
 }
 
+func AuthorizationUnavailable(err error, format string, args ...interface{}) error {
+	return cberrors.WrapC(err, errorCode.ErrAuthorizationUnavailable, format, args...)
+}
+
 func Forbidden(format string, args ...interface{}) error {
 	return cberrors.WithCode(errorCode.ErrForbidden, format, args...)
 }

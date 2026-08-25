@@ -7,8 +7,13 @@ import (
 )
 
 func TestDecideCapabilityOutcomes(t *testing.T) {
-	admin := &Snapshot{Roles: []string{"qs:admin"}}
-	reader := &Snapshot{Permissions: []Permission{{Resource: "qs:questionnaires", Action: "read|list"}}}
+	admin := &Snapshot{
+		Roles: []string{"qs:admin"},
+		Permissions: []Permission{{
+			Resource: "qs:*:*:*", Action: "*", Mode: AuthorizationModeUnconditional,
+		}},
+	}
+	reader := &Snapshot{Permissions: []Permission{{Resource: "qs:questionnaire:collection:questionnaires", Action: "read", Mode: AuthorizationModeUnconditional}}}
 
 	tests := []struct {
 		name       string
@@ -63,8 +68,16 @@ func TestDecideCapabilityOutcomes(t *testing.T) {
 	}
 }
 
+func TestAdminRoleWithoutWildcardGrantDoesNotAuthorize(t *testing.T) {
+	t.Parallel()
+	snapshot := &Snapshot{Roles: []string{"qs:admin"}}
+	if snapshot.IsQSAdmin() || DecideCapability(snapshot, CapabilityOrgAdmin).Allowed {
+		t.Fatal("role name alone must not bypass PermissionGrant evaluation")
+	}
+}
+
 func TestDecideAnyCapability(t *testing.T) {
-	snap := &Snapshot{Permissions: []Permission{{Resource: "qs:assessment_models", Action: "read"}}}
+	snap := &Snapshot{Permissions: []Permission{{Resource: "qs:scale:collection:scales", Action: "read", Mode: AuthorizationModeUnconditional}}}
 
 	decision := DecideAnyCapability(snap, CapabilityManageQuestionnaires, CapabilityReadAssessmentModels)
 	if !decision.Allowed || decision.Outcome != securityplane.CapabilityOutcomeAllowed {
@@ -79,11 +92,30 @@ func TestDecideAnyCapability(t *testing.T) {
 
 func TestNormTableCapabilities(t *testing.T) {
 	t.Parallel()
-	snapshot := &Snapshot{Permissions: []Permission{{Resource: "qs:modelcatalog:collection:norm_tables", Action: "read|list|import"}}}
+	snapshot := &Snapshot{Permissions: []Permission{
+		{Resource: "qs:modelcatalog:collection:norm_tables", Action: "read", Mode: AuthorizationModeUnconditional},
+		{Resource: "qs:modelcatalog:collection:norm_tables", Action: "import", Mode: AuthorizationModeUnconditional},
+	}}
 	if !DecideCapability(snapshot, CapabilityReadNormTables).Allowed {
 		t.Fatal("read_norm_tables should be allowed")
 	}
 	if !DecideCapability(snapshot, CapabilityManageNormTables).Allowed {
 		t.Fatal("manage_norm_tables should be allowed")
+	}
+}
+
+func TestConditionalPermissionNeverSatisfiesGenericCapability(t *testing.T) {
+	t.Parallel()
+	snapshot := &Snapshot{Permissions: []Permission{{
+		Resource: AssessmentResource, Action: "retry", Mode: AuthorizationModeObjectCheckRequired,
+	}}}
+	if snapshot.HasResourceAction(AssessmentResource, "retry") {
+		t.Fatal("conditional retry must not satisfy unconditional resource/action checks")
+	}
+	if !snapshot.HasObjectAuthorizationCandidate(AssessmentResource, "retry") {
+		t.Fatal("conditional retry must remain an object authorization candidate")
+	}
+	if DecideCapability(snapshot, CapabilityEvaluateAssessments).Allowed {
+		t.Fatal("conditional retry must not grant batch evaluation capability")
 	}
 }

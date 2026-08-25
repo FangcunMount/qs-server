@@ -103,7 +103,8 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 		authzSnapshotLoader = iamauth.NewSnapshotLoader(client, iamauth.SnapshotLoaderOptions{
 			AppName:              iamOpts.AuthzAppName,
 			CacheTTL:             iamOpts.AuthzCacheTTL,
-			CasbinDomainOverride: iamOpts.AuthzCasbinDomainOverride,
+			DomainOverride:       iamOpts.AuthzDomainOverride,
+			ServiceTokenProvider: serviceAuthHelper,
 		})
 	}
 
@@ -290,7 +291,7 @@ func convertIAMOptions(opts *options.IAMOptions) *iam.IAMOptions {
 	if opts.AuthzCacheTTL > 0 {
 		iamOpts.AuthzCacheTTL = opts.AuthzCacheTTL
 	}
-	iamOpts.AuthzCasbinDomainOverride = opts.AuthzCasbinDomainOverride
+	iamOpts.AuthzDomainOverride = opts.AuthzDomainOverride
 
 	return iamOpts
 }

@@ -12,8 +12,8 @@ func TestOrgScopeCarriesTenantDomainAndOrgID(t *testing.T) {
 	if !scope.HasOrgID || scope.OrgID != 42 {
 		t.Fatalf("org = (%v, %d), want (true, 42)", scope.HasOrgID, scope.OrgID)
 	}
-	if scope.CasbinDomain != "tenant:fangcun" {
-		t.Fatalf("CasbinDomain = %q, want tenant:fangcun", scope.CasbinDomain)
+	if scope.AuthorizationDomain != "tenant:fangcun" {
+		t.Fatalf("AuthorizationDomain = %q, want tenant:fangcun", scope.AuthorizationDomain)
 	}
 }
 

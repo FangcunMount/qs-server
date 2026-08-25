@@ -207,10 +207,14 @@ func replayDeliverySchema() map[string]interface{} {
 }
 
 func governedRetryAction(id string, domain Domain, label, risk string, enabled bool) ActionDescriptor {
+	required := []string{"resource_id", "expected_attempt", "reason"}
+	if id == "evaluation.retry" {
+		required = []string{"resource_id", "reason"}
+	}
 	return ActionDescriptor{
 		ID: id, Domain: domain, Label: label, RiskLevel: risk, Enabled: enabled, RequiresConfirmation: true,
 		InputSchema: map[string]interface{}{
-			"type": "object", "required": []string{"resource_id", "expected_attempt", "reason"},
+			"type": "object", "required": required,
 			"properties": map[string]interface{}{
 				"resource_id":      map[string]interface{}{"type": "string"},
 				"expected_attempt": map[string]interface{}{"type": "integer", "minimum": 1},

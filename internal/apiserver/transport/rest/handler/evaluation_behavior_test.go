@@ -86,7 +86,7 @@ func (s *governanceActionRunnerStub) RunAction(_ context.Context, orgID int64, a
 	return &systemgov.ActionRunResult{RequestID: request.RequestID, ActionID: actionID, Status: "succeeded", StartedAt: time.Now(), FinishedAt: time.Now()}, nil
 }
 
-func TestLegacyEvaluationRetryUsesGovernanceAction(t *testing.T) {
+func TestEvaluationRetryUsesGovernanceActionWithoutReadingRunState(t *testing.T) {
 	query := &operatorQueryStub{
 		result:    &evaluationoperator.Assessment{ID: 301, OrgID: 12, Status: "failed"},
 		latestRun: &evaluationoperator.Run{AssessmentID: 301, AttemptNo: 3, Status: "failed", RetryDisposition: "manual_required"},
@@ -103,24 +103,30 @@ func TestLegacyEvaluationRetryUsesGovernanceAction(t *testing.T) {
 	if actions.calls != 1 || actions.orgID != 12 || actions.actionID != "evaluation.retry" || !actions.request.Confirm || actions.request.RequestID != "request-legacy-retry" {
 		t.Fatalf("governance action=%#v", actions)
 	}
-	if actions.request.Input["reason"] != "legacy evaluation retry endpoint" || actions.request.Input["expected_attempt"] != 3 {
+	if actions.request.Input["reason"] != "assessment retry endpoint" {
 		t.Fatalf("governance input=%#v", actions.request.Input)
+	}
+	if _, exists := actions.request.Input["expected_attempt"]; exists {
+		t.Fatalf("handler must not probe retry state before object authorization: %#v", actions.request.Input)
 	}
 }
 
-func TestLegacyEvaluationRetryRejectsNonManualLatestRun(t *testing.T) {
-	query := &operatorQueryStub{latestRun: &evaluationoperator.Run{AssessmentID: 301, AttemptNo: 2, Status: "failed", RetryDisposition: "automatic"}}
+func TestEvaluationRetryDoesNotExposeLatestRunDispositionBeforeGovernance(t *testing.T) {
+	query := &operatorQueryStub{
+		result:    &evaluationoperator.Assessment{ID: 301, OrgID: 12, Status: "failed"},
+		latestRun: &evaluationoperator.Run{AssessmentID: 301, AttemptNo: 2, Status: "failed", RetryDisposition: "automatic"},
+	}
 	actions := &governanceActionRunnerStub{}
 	h := NewEvaluationOperatorHandler(nil, query, actions)
 	c, rec := protectedContext(http.MethodPost, "/api/v1/evaluations/assessments/301/retry")
 	c.Params = gin.Params{{Key: "id", Value: "301"}}
 	h.RetryFailed(c)
-	if rec.Code != http.StatusConflict || actions.calls != 0 {
+	if rec.Code != http.StatusOK || actions.calls != 1 {
 		t.Fatalf("response=%d actions=%d body=%s", rec.Code, actions.calls, rec.Body.String())
 	}
 }
 
-func TestLegacyEvaluationRetryReplaysAuditedRequestAfterDispositionChanged(t *testing.T) {
+func TestEvaluationRetryPreservesRequestIDForGovernanceIdempotency(t *testing.T) {
 	query := &operatorQueryStub{
 		result:    &evaluationoperator.Assessment{ID: 301, OrgID: 12, Status: "failed"},
 		latestRun: &evaluationoperator.Run{AssessmentID: 301, AttemptNo: 3, Status: "failed", RetryDisposition: "automatic", ActionRequestID: "request-legacy-retry"},
