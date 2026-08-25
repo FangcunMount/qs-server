@@ -2929,6 +2929,32 @@ jobs:
           OUTCOME_TEMPLATE_ROUTE_REQUIRE_COMPLETE_INPUT: ${{ github.event.inputs.presentation_require_complete }}
           OUTCOME_TEMPLATE_ROUTE_CONFIRM_INPUT: ${{ github.event.inputs.governance_confirm }}
 
+  redis-cli-image:
+    name: Prepare Redis CLI Image
+    if: |
+      (github.event.inputs.operation == 'status' && (github.event.inputs.database == 'redis' || github.event.inputs.database == 'all')) ||
+      (github.event.inputs.operation == 'preflight-redis-control' && github.event.inputs.database == 'redis')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Export Redis CLI image archive
+        env:
+          REDIS_CLI_IMAGE_ARCHIVE: redis-cli-image-${{ github.run_id }}.tar.gz
+        run: |
+          set -Eeuo pipefail
+          docker pull redis:7-alpine
+          docker save redis:7-alpine -o "${REDIS_CLI_IMAGE_ARCHIVE%.gz}"
+          gzip -f "${REDIS_CLI_IMAGE_ARCHIVE%.gz}"
+          test -s "$REDIS_CLI_IMAGE_ARCHIVE"
+
+      - name: Upload Redis CLI image artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: redis-cli-image-${{ github.run_id }}
+          path: redis-cli-image-${{ github.run_id }}.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
   redis-status:
     name: Redis Keyspace Status
     if: |
@@ -2937,6 +2963,7 @@ jobs:
     runs-on:
       group: qlume
       labels: [self-hosted, macOS, ARM64, ops]
+    needs: redis-cli-image
     timeout-minutes: 30
     environment: production
     steps:
@@ -2953,15 +2980,11 @@ jobs:
           : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
           : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
 
-      - name: Prepare Redis CLI image archive on runner
-        env:
-          REDIS_CLI_IMAGE_ARCHIVE: redis-cli-image-${{ github.run_id }}.tar.gz
-        run: |
-          set -Eeuo pipefail
-          docker pull redis:7-alpine
-          docker save redis:7-alpine -o "${REDIS_CLI_IMAGE_ARCHIVE%.gz}"
-          gzip -f "${REDIS_CLI_IMAGE_ARCHIVE%.gz}"
-          test -s "$REDIS_CLI_IMAGE_ARCHIVE"
+      - name: Download Redis CLI image artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: redis-cli-image-${{ github.run_id }}
+          path: .
 
       - name: Upload Redis CLI image archive to serverA
         uses: appleboy/scp-action@v1.0.0
