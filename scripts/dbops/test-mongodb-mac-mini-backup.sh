@@ -24,20 +24,20 @@ if [[ "$output" != *"invalid MongoDB backup file name"* ]]; then
   exit 1
 fi
 
-if rg -n -- '--password=' "$SCRIPT" >/dev/null; then
+if grep -n -- '--password=' "$SCRIPT" >/dev/null; then
   echo "Mac mini backup script exposes the MongoDB password through process arguments" >&2
   exit 1
 fi
-if ! rg -Fq 'MONGO_BACKUP_RETENTION_COUNT:-3' "$SCRIPT"; then
+if ! grep -Fq 'MONGO_BACKUP_RETENTION_COUNT:-3' "$SCRIPT"; then
   echo "Mac mini backup script does not default to three retained backups" >&2
   exit 1
 fi
-if rg -n 'mongodb-source-backup|MongoDB Source-side Backup|Keeping last 5|keeping last 5' \
+if grep -En 'mongodb-source-backup|MongoDB Source-side Backup|Keeping last 5|keeping last 5' \
   "$WORKFLOW" "$SCRIPT" >/dev/null; then
   echo "legacy serverA/source-host MongoDB backup path is still active" >&2
   exit 1
 fi
-if ! rg -Fq 'name: MongoDB Backup on Mac mini' "$WORKFLOW"; then
+if ! grep -Fq 'name: MongoDB Backup on Mac mini' "$WORKFLOW"; then
   echo "scheduled MongoDB backup is not routed to the Mac mini" >&2
   exit 1
 fi
