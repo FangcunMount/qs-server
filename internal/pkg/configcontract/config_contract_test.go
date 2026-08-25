@@ -857,39 +857,64 @@ func TestDBOpsMongoStatusRunsAsFailFastScript(t *testing.T) {
 	}
 }
 
-func TestDBOpsMongoBackupIsBoundedAndOwned(t *testing.T) {
+func TestDBOpsMongoBackupRunsOnMacMiniAndIsFailClosed(t *testing.T) {
 	t.Parallel()
 
 	workflow, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "db-ops.yml"))
 	if err != nil {
 		t.Fatalf("read db ops workflow: %v", err)
 	}
-	content := string(workflow)
+	backupScript, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "dbops", "mongodb-mac-mini-backup.sh"))
+	if err != nil {
+		t.Fatalf("read Mac mini Mongo backup script: %v", err)
+	}
+	workflowContent := string(workflow)
 	for _, required := range []string{
-		`BACKUP_CONTAINER_NAME="qs-server-mongodb-backup"`,
-		`--name "$BACKUP_CONTAINER_NAME"`,
-		`com.fangcunmount.qs-server.operation=mongodb-backup`,
-		`com.fangcunmount.qs-server.github-run-id=${{ github.run_id }}`,
-		`Another MongoDB utility container is already running`,
-		`cleanup_backup_container`,
-		`command_timeout: 350m`,
-		`mongo:7.0 345m /bin/bash`,
-		`--numParallelCollections=4`,
-		`--archive="/backup/$PARTIAL_FILE"`,
-		`mongo:7.0 110m mongorestore`,
+		`name: MongoDB Backup on Mac mini`,
+		`group: qlume`,
+		`labels: [self-hosted, macOS, ARM64, ops]`,
+		`timeout-minutes: 360`,
+		`MONGO_BACKUP_RETENTION_COUNT: '3'`,
+		`MONGO_BACKUP_SSH_FINGERPRINT: ${{ secrets.MONGO_BACKUP_SSH_FINGERPRINT }}`,
+		`run: bash scripts/dbops/mongodb-mac-mini-backup.sh`,
 	} {
-		if !strings.Contains(content, required) {
-			t.Errorf("DB ops bounded Mongo backup contract must contain %q", required)
+		if !strings.Contains(workflowContent, required) {
+			t.Errorf("DB ops Mac mini Mongo backup workflow must contain %q", required)
+		}
+	}
+
+	scriptContent := string(backupScript)
+	for _, required := range []string{
+		`MONGO_BACKUP_RETENTION_COUNT:-3`,
+		`if ! [[ "$BACKUP_DIR" == /*/backups/qs-server/mongodb ]]`,
+		`ssh-keyscan -T 10`,
+		`grep -Fqx -- "$MONGO_BACKUP_SSH_FINGERPRINT"`,
+		`ExitOnForwardFailure=yes`,
+		`socketTimeoutMS=0`,
+		`trap cleanup EXIT`,
+		`--numParallelCollections=4`,
+		`--archive="$PARTIAL_FILE"`,
+		`validate_archive "$PARTIAL_FILE"`,
+		`mv -- "$PARTIAL_FILE" "$FINAL_FILE"`,
+		`rm -f -- "$old_backup" "$old_backup.sha256"`,
+	} {
+		if !strings.Contains(scriptContent, required) {
+			t.Errorf("Mac mini Mongo backup script must contain %q", required)
 		}
 	}
 	for _, forbidden := range []string{
-		`mongo:7.0 115m`,
+		`BACKUP_CONTAINER_NAME="qs-server-mongodb-backup"`,
+		`com.fangcunmount.qs-server.operation=mongodb-backup`,
+		`mongo:7.0 345m /bin/bash`,
 		`for ATTEMPT in 1 2 3`,
 		`--archive | gzip`,
 	} {
-		if strings.Contains(content, forbidden) {
-			t.Errorf("DB ops bounded Mongo backup must not contain %q", forbidden)
+		if strings.Contains(workflowContent, forbidden) || strings.Contains(scriptContent, forbidden) {
+			t.Errorf("Mac mini Mongo backup path must not contain %q", forbidden)
 		}
+	}
+	if strings.Contains(scriptContent, `--password=`) {
+		t.Error("Mac mini Mongo backup script must not expose the password through process arguments")
 	}
 }
 
