@@ -2953,6 +2953,27 @@ jobs:
           : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
           : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
 
+      - name: Prepare Redis CLI image archive on runner
+        env:
+          REDIS_CLI_IMAGE_ARCHIVE: redis-cli-image-${{ github.run_id }}.tar.gz
+        run: |
+          set -Eeuo pipefail
+          docker pull redis:7-alpine
+          docker save redis:7-alpine -o "${REDIS_CLI_IMAGE_ARCHIVE%.gz}"
+          gzip -f "${REDIS_CLI_IMAGE_ARCHIVE%.gz}"
+          test -s "$REDIS_CLI_IMAGE_ARCHIVE"
+
+      - name: Upload Redis CLI image archive to serverA
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          source: redis-cli-image-${{ github.run_id }}.tar.gz
+          target: /tmp
+
       - name: Inventory Redis keyspaces without exposing keys
         uses: appleboy/ssh-action@v1.2.2
         with:
@@ -2970,16 +2991,23 @@ jobs:
             : "${REDIS_HOST:?REDIS_HOST is empty}"
             REDIS_PORT="${REDIS_PORT:-6379}"
             REDIS_AUDIT_CONTAINER="qs-server-redis-keyspace-audit"
+            REDIS_CLI_IMAGE_ARCHIVE="/tmp/redis-cli-image-${{ github.run_id }}.tar.gz"
+
+            cleanup_redis_audit() {
+              sudo docker rm -f "$REDIS_AUDIT_CONTAINER" >/dev/null 2>&1 || true
+              rm -f -- "$REDIS_CLI_IMAGE_ARCHIVE"
+            }
+            trap cleanup_redis_audit EXIT
 
             if ! sudo docker network inspect infra-network >/dev/null 2>&1; then
               echo "❌ infra-network is unavailable" >&2
               exit 1
             fi
 
-            cleanup_redis_audit_container() {
-              sudo docker rm -f "$REDIS_AUDIT_CONTAINER" >/dev/null 2>&1 || true
-            }
-            trap cleanup_redis_audit_container EXIT
+            if ! sudo docker image inspect redis:7-alpine >/dev/null 2>&1; then
+              test -s "$REDIS_CLI_IMAGE_ARCHIVE"
+              sudo docker load -i "$REDIS_CLI_IMAGE_ARCHIVE"
+            fi
 
             REDIS_CLI_ARGS=(-h "$REDIS_HOST" -p "$REDIS_PORT" --no-auth-warning --raw)
             if [ -n "${REDIS_USERNAME:-}" ]; then
@@ -3150,7 +3178,7 @@ jobs:
               echo "✅ Redis control cutover preflight passed; instance heartbeats are informational and may expire naturally"
             fi
 
-            cleanup_redis_audit_container
+            cleanup_redis_audit
             trap - EXIT
             echo "✅ Redis read-only keyspace audit OK"
         env:
@@ -3161,3 +3189,9 @@ jobs:
           REDIS_USE_SSL: ${{ secrets.REDIS_USE_SSL }}
           REDIS_SSL_INSECURE_SKIP_VERIFY: ${{ secrets.REDIS_SSL_INSECURE_SKIP_VERIFY }}
           REDIS_CONTROL_PREFLIGHT: ${{ github.event.inputs.operation == 'preflight-redis-control' && 'true' || 'false' }}
+
+      - name: Cleanup runner Redis CLI image archive
+        if: always()
+        env:
+          REDIS_CLI_IMAGE_ARCHIVE: redis-cli-image-${{ github.run_id }}.tar.gz
+        run: rm -f -- "$REDIS_CLI_IMAGE_ARCHIVE" "${REDIS_CLI_IMAGE_ARCHIVE%.gz}"
