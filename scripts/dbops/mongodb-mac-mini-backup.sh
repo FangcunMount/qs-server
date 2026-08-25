@@ -124,12 +124,13 @@ fi
 # MongoDB Database Tools accepts sensitive options from a permission-restricted
 # YAML config file, keeping the password out of process arguments and logs.
 escaped_password="${MONGODB_PASSWORD//\'/\'\'}"
-printf "password: '%s'\n" "$escaped_password" >"$MONGO_CONFIG"
+{
+  printf "password: '%s'\n" "$escaped_password"
+  printf "uri: 'mongodb://127.0.0.1:%s/?connectTimeoutMS=30000&socketTimeoutMS=0'\n" "$TUNNEL_PORT"
+} >"$MONGO_CONFIG"
 chmod 0600 "$MONGO_CONFIG"
 COMMON_ARGS=(
   --config="$MONGO_CONFIG"
-  --host=127.0.0.1
-  --port="$TUNNEL_PORT"
   --username="$MONGODB_USERNAME"
   --authenticationDatabase=admin
 )
