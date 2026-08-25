@@ -119,12 +119,28 @@ func (b *Builder) BuildResilienceCommandKey(component, requestID string) string 
 	return NewOpsKeyspace(b.namespace()).ResilienceCommand(component, requestID)
 }
 
+func (b *Builder) BuildResilienceCommandIndexKey(component string) string {
+	return NewOpsKeyspace(b.namespace()).ResilienceCommandIndex(component)
+}
+
 func (b *Builder) BuildResilienceCommandResultKey(requestID, instanceID string) string {
 	return NewOpsKeyspace(b.namespace()).ResilienceCommandResult(requestID, instanceID)
 }
 
+func (b *Builder) BuildResilienceCommandResultIndexKey(requestID string) string {
+	return NewOpsKeyspace(b.namespace()).ResilienceCommandResultIndex(requestID)
+}
+
+func (b *Builder) BuildResilienceInstanceIndexKey(component string) string {
+	return NewOpsKeyspace(b.namespace()).ResilienceInstanceIndex(component)
+}
+
 func (b *Builder) BuildGovernanceAuditReplayKey(orgID, requestID string) string {
 	return NewOpsKeyspace(b.namespace()).GovernanceAuditReplay(orgID, requestID)
+}
+
+func (b *Builder) BuildGovernanceAuditReplayIndexKey() string {
+	return NewOpsKeyspace(b.namespace()).GovernanceAuditReplayIndex()
 }
 
 func (b *Builder) namespace() string {

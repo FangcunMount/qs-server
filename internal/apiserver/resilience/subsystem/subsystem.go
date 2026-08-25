@@ -20,6 +20,9 @@ const (
 	BudgetSubmit      ratelimit.BudgetID = "submit"
 	BudgetAdminSubmit ratelimit.BudgetID = "admin_submit"
 	BudgetWaitReport  ratelimit.BudgetID = "wait_report"
+
+	stateReconcileInterval  = time.Second
+	commandRecoveryInterval = 5 * time.Second
 )
 
 type Options struct {
@@ -37,6 +40,8 @@ type Subsystem struct {
 	backpressure map[string]backpressure.Acquirer
 	locks        *locksubsystem.Subsystem
 	stateStore   control.StateStore
+	stateEvery   time.Duration
+	commandEvery time.Duration
 }
 
 func New(opts Options) (*Subsystem, error) {
@@ -55,6 +60,8 @@ func New(opts Options) (*Subsystem, error) {
 		backpressure: buildBackpressure(opts.Backpressure),
 		locks:        opts.Locks,
 		stateStore:   opts.StateStore,
+		stateEvery:   stateReconcileInterval,
+		commandEvery: commandRecoveryInterval,
 	}
 	s.budgets[BudgetQuery] = newLocalBudget(BudgetQuery, cfg.QueryGlobalQPS, cfg.QueryGlobalBurst, cfg.QueryUserQPS, cfg.QueryUserBurst)
 	s.budgets[BudgetSubmit] = newLocalBudget(BudgetSubmit, cfg.SubmitGlobalQPS, cfg.SubmitGlobalBurst, cfg.SubmitUserQPS, cfg.SubmitUserBurst)
@@ -71,21 +78,32 @@ func (s *Subsystem) Start(parent context.Context) context.CancelFunc {
 		return cancel
 	}
 	go func() {
-		ticker := time.NewTicker(time.Second)
-		defer ticker.Stop()
+		stateTicker := time.NewTicker(s.stateEvery)
+		defer stateTicker.Stop()
+		commandTicker := time.NewTicker(s.commandEvery)
+		defer commandTicker.Stop()
 		var signals <-chan string
 		if watcher, ok := s.stateStore.(control.StateSignalWatcher); ok {
 			signals, _ = watcher.WatchStateSignals(ctx)
 		}
+		s.reconcile(ctx)
+		s.pollCommands(ctx, "startup")
 		for {
-			s.reconcile(ctx)
 			select {
 			case <-ctx.Done():
 				return
-			case <-ticker.C:
-			case _, ok := <-signals:
+			case <-stateTicker.C:
+				s.reconcile(ctx)
+			case <-commandTicker.C:
+				s.pollCommands(ctx, "recovery")
+			case signal, ok := <-signals:
 				if !ok {
 					signals = nil
+					continue
+				}
+				s.reconcile(ctx)
+				if signal == "command:apiserver" {
+					s.pollCommands(ctx, "signal")
 				}
 			}
 		}
@@ -130,7 +148,14 @@ func (s *Subsystem) reconcile(ctx context.Context) {
 		_, _ = budget.Reconcile(state.Version, policy, "governance", state.ExpiresAt)
 	}
 	s.reconcileLeaderCooldowns(ctx)
-	s.processCommands(ctx)
+}
+
+func (s *Subsystem) pollCommands(ctx context.Context, trigger string) {
+	outcome := "ok"
+	if err := s.processCommands(ctx); err != nil {
+		outcome = "failed"
+	}
+	resilience.ObserveControlCommandPoll(trigger, outcome)
 }
 
 func (s *Subsystem) reconcileLeaderCooldowns(ctx context.Context) {

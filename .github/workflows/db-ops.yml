@@ -9,9 +9,11 @@ on:
         type: choice
         options:
           - backup
+          - backup-source
           - validate
           - restore
           - status
+          - preflight-redis-control
           - govern-presentation
           - govern-template-release
           - govern-template-release-current
@@ -22,7 +24,7 @@ on:
         required: false
         type: string
       database:
-        description: 'Data store to operate on (Redis supports status only)'
+        description: 'Data store to operate on (Redis supports status/control preflight only)'
         required: true
         type: choice
         options:
@@ -224,6 +226,170 @@ jobs:
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
           MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
+
+  mongodb-source-backup:
+    name: MongoDB Source-side Backup (Manual Validation)
+    if: github.event.inputs.operation == 'backup-source' && github.event.inputs.database == 'mongodb'
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 480
+    environment: production
+    steps:
+      - name: Checkout immutable backup scripts
+        uses: actions/checkout@v6
+
+      - name: Resolve backup identity
+        id: identity
+        run: |
+          set -Eeuo pipefail
+          timestamp="$(TZ=Asia/Shanghai date +%Y%m%d_%H%M%S)"
+          echo "backup_file=qs_mongodb_backup_${timestamp}.archive.gz" >> "$GITHUB_OUTPUT"
+          echo "run_token=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate source and destination configuration
+        env:
+          MONGO_BACKUP_HOST: ${{ secrets.MONGO_BACKUP_HOST }}
+          MONGO_BACKUP_USERNAME: ${{ secrets.MONGO_BACKUP_USERNAME }}
+          MONGO_BACKUP_SSH_KEY: ${{ secrets.MONGO_BACKUP_SSH_KEY }}
+          MONGO_BACKUP_SSH_FINGERPRINT: ${{ secrets.MONGO_BACKUP_SSH_FINGERPRINT }}
+          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
+          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+        run: |
+          set -Eeuo pipefail
+          : "${MONGO_BACKUP_HOST:?MONGO_BACKUP_HOST is empty}"
+          : "${MONGO_BACKUP_USERNAME:?MONGO_BACKUP_USERNAME is empty}"
+          : "${MONGO_BACKUP_SSH_KEY:?MONGO_BACKUP_SSH_KEY is empty}"
+          : "${MONGO_BACKUP_SSH_FINGERPRINT:?MONGO_BACKUP_SSH_FINGERPRINT is empty}"
+          : "${SVRA_HOST:?SVRA_HOST is empty}"
+          : "${SVRA_USERNAME:?SVRA_USERNAME is empty}"
+          : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
+          : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
+
+      - name: Verify source-space budget against the latest valid archive
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          MONGO_BACKUP_REQUIRED_FREE_BYTES: ${{ secrets.MONGO_BACKUP_REQUIRED_FREE_BYTES || 1073741824 }}
+          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          command_timeout: 10m
+          envs: MONGO_BACKUP_REQUIRED_FREE_BYTES,SUDO_PASSWORD
+          script_path: scripts/dbops/mongodb-source-backup-space-budget.sh
+
+      - name: Create compressed archive on the MongoDB host
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          MONGO_BACKUP_FILE: ${{ steps.identity.outputs.backup_file }}
+          MONGO_BACKUP_RUN_TOKEN: ${{ steps.identity.outputs.run_token }}
+          MONGO_BACKUP_LOCAL_CONTAINER: ${{ secrets.MONGO_BACKUP_LOCAL_CONTAINER || 'mongodb' }}
+          MONGO_BACKUP_REQUIRED_FREE_BYTES: ${{ secrets.MONGO_BACKUP_REQUIRED_FREE_BYTES || 1073741824 }}
+          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
+          MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
+          SUDO_PASSWORD: ${{ secrets.MONGO_BACKUP_SUDO_PASSWORD }}
+        with:
+          host: ${{ secrets.MONGO_BACKUP_HOST }}
+          username: ${{ secrets.MONGO_BACKUP_USERNAME }}
+          key: ${{ secrets.MONGO_BACKUP_SSH_KEY }}
+          port: ${{ secrets.MONGO_BACKUP_SSH_PORT || 22 }}
+          fingerprint: ${{ secrets.MONGO_BACKUP_SSH_FINGERPRINT }}
+          command_timeout: 350m
+          envs: MONGO_BACKUP_FILE,MONGO_BACKUP_RUN_TOKEN,MONGO_BACKUP_LOCAL_CONTAINER,MONGO_BACKUP_REQUIRED_FREE_BYTES,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,SUDO_PASSWORD
+          script_path: scripts/dbops/mongodb-source-backup.sh
+
+      - name: Transfer compressed archive through the ops runner
+        env:
+          MONGO_BACKUP_FILE: ${{ steps.identity.outputs.backup_file }}
+          MONGO_BACKUP_RUN_TOKEN: ${{ steps.identity.outputs.run_token }}
+          MONGO_BACKUP_HOST: ${{ secrets.MONGO_BACKUP_HOST }}
+          MONGO_BACKUP_USERNAME: ${{ secrets.MONGO_BACKUP_USERNAME }}
+          MONGO_BACKUP_SSH_PORT: ${{ secrets.MONGO_BACKUP_SSH_PORT || 22 }}
+          MONGO_BACKUP_SSH_KEY: ${{ secrets.MONGO_BACKUP_SSH_KEY }}
+          MONGO_BACKUP_SSH_FINGERPRINT: ${{ secrets.MONGO_BACKUP_SSH_FINGERPRINT }}
+          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
+          SVRA_SSH_PORT: ${{ vars.SVRA_SSH_PORT || 22 }}
+          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+        run: bash scripts/dbops/mongodb-source-backup-transfer.sh
+
+      - name: Atomically finalize archive on serverA
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          MONGO_BACKUP_FILE: ${{ steps.identity.outputs.backup_file }}
+          MONGO_BACKUP_RUN_TOKEN: ${{ steps.identity.outputs.run_token }}
+          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          command_timeout: 15m
+          envs: MONGO_BACKUP_FILE,MONGO_BACKUP_RUN_TOKEN,SUDO_PASSWORD
+          script_path: scripts/dbops/mongodb-source-backup-finalize.sh
+
+      - name: Validate transferred archive without importing data
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          MONGO_BACKUP_FILE: ${{ steps.identity.outputs.backup_file }}
+          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
+          MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
+          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          command_timeout: 115m
+          envs: MONGO_BACKUP_FILE,MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,SUDO_PASSWORD
+          script_path: scripts/dbops/mongodb-source-backup-validate.sh
+
+      - name: Clean source-host staging
+        if: always() && steps.identity.outputs.backup_file != ''
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          MONGO_BACKUP_FILE: ${{ steps.identity.outputs.backup_file }}
+          SUDO_PASSWORD: ${{ secrets.MONGO_BACKUP_SUDO_PASSWORD }}
+        with:
+          host: ${{ secrets.MONGO_BACKUP_HOST }}
+          username: ${{ secrets.MONGO_BACKUP_USERNAME }}
+          key: ${{ secrets.MONGO_BACKUP_SSH_KEY }}
+          port: ${{ secrets.MONGO_BACKUP_SSH_PORT || 22 }}
+          fingerprint: ${{ secrets.MONGO_BACKUP_SSH_FINGERPRINT }}
+          command_timeout: 10m
+          envs: MONGO_BACKUP_FILE,SUDO_PASSWORD
+          script_path: scripts/dbops/mongodb-source-backup-cleanup.sh
+
+      - name: Clean serverA transfer staging
+        if: always() && steps.identity.outputs.backup_file != ''
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          MONGO_BACKUP_FILE: ${{ steps.identity.outputs.backup_file }}
+          MONGO_BACKUP_RUN_TOKEN: ${{ steps.identity.outputs.run_token }}
+          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          command_timeout: 10m
+          envs: MONGO_BACKUP_FILE,MONGO_BACKUP_RUN_TOKEN,SUDO_PASSWORD
+          script_path: scripts/dbops/mongodb-source-backup-servera-cleanup.sh
 
   mongodb-backup-validate:
     name: MongoDB Backup Validate
@@ -2765,7 +2931,9 @@ jobs:
 
   redis-status:
     name: Redis Keyspace Status
-    if: github.event.inputs.operation == 'status' && (github.event.inputs.database == 'redis' || github.event.inputs.database == 'all')
+    if: |
+      (github.event.inputs.operation == 'status' && (github.event.inputs.database == 'redis' || github.event.inputs.database == 'all')) ||
+      (github.event.inputs.operation == 'preflight-redis-control' && github.event.inputs.database == 'redis')
     runs-on:
       group: qlume
       labels: [self-hosted, macOS, ARM64, ops]
@@ -2794,7 +2962,7 @@ jobs:
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           command_timeout: 25m
-          envs: REDIS_HOST,REDIS_PORT,REDIS_USERNAME,REDIS_PASSWORD,REDIS_USE_SSL,REDIS_SSL_INSECURE_SKIP_VERIFY
+          envs: REDIS_HOST,REDIS_PORT,REDIS_USERNAME,REDIS_PASSWORD,REDIS_USE_SSL,REDIS_SSL_INSECURE_SKIP_VERIFY,REDIS_CONTROL_PREFLIGHT
           script: |
             set -Eeuo pipefail
             export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
@@ -2956,6 +3124,32 @@ jobs:
             echo "  standard_host_rebuild_processes=${statistics_rebuild_host_processes} matching_running_containers=${statistics_rebuild_containers}"
             echo "  evidence_boundary=process audit covers standard rebuild_statistics executable names and matching ServerA container names/images"
 
+            count_matching_keys() {
+              local pattern="$1"
+              redis_cli 0 --scan --count 1000 --pattern "$pattern" |
+                awk 'NF { count++ } END { print count + 0 }'
+            }
+
+            echo ""
+            echo "Redis resilience-control index status (counts only):"
+            control_command_values="$(count_matching_keys 'ops:runtime:resilience:command:*:*')"
+            control_result_values="$(count_matching_keys 'ops:runtime:resilience:result:*:*')"
+            control_instance_values="$(count_matching_keys 'ops:runtime:resilience:instance:*:*:*')"
+            control_audit_values="$(count_matching_keys 'ops:runtime:governance:audit-replay:*:*')"
+            control_result_indexes="$(count_matching_keys 'ops:runtime:resilience:index:result:*')"
+            control_command_index_members="$(redis_cli 0 ZCARD 'ops:runtime:resilience:index:command:apiserver' | tr -d '\r')"
+            control_instance_index_members="$(redis_cli 0 ZCARD 'ops:runtime:resilience:index:instance:apiserver' | tr -d '\r')"
+            control_audit_index_members="$(redis_cli 0 ZCARD 'ops:runtime:governance:index:audit-replay' | tr -d '\r')"
+            echo "  command_values=${control_command_values} result_values=${control_result_values} instance_values=${control_instance_values} audit_values=${control_audit_values}"
+            echo "  command_index_members=${control_command_index_members} result_index_keys=${control_result_indexes} instance_index_members=${control_instance_index_members} audit_index_members=${control_audit_index_members}"
+            if [ "${REDIS_CONTROL_PREFLIGHT:-false}" = "true" ]; then
+              if [ "$control_command_values" != 0 ] || [ "$control_result_values" != 0 ] || [ "$control_audit_values" != 0 ]; then
+                echo "❌ Redis control cutover is blocked: wait for command/result TTLs and recover audit fallbacks; never delete them for deployment" >&2
+                exit 1
+              fi
+              echo "✅ Redis control cutover preflight passed; instance heartbeats are informational and may expire naturally"
+            fi
+
             cleanup_redis_audit_container
             trap - EXIT
             echo "✅ Redis read-only keyspace audit OK"
@@ -2966,3 +3160,4 @@ jobs:
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           REDIS_USE_SSL: ${{ secrets.REDIS_USE_SSL }}
           REDIS_SSL_INSECURE_SKIP_VERIFY: ${{ secrets.REDIS_SSL_INSECURE_SKIP_VERIFY }}
+          REDIS_CONTROL_PREFLIGHT: ${{ github.event.inputs.operation == 'preflight-redis-control' && 'true' || 'false' }}

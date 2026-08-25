@@ -170,10 +170,26 @@ func (k OpsKeyspace) ResilienceCommand(component, requestID string) string {
 	return k.keyspace.Prefix("resilience:command:" + component + ":" + requestID)
 }
 
+func (k OpsKeyspace) ResilienceCommandIndex(component string) string {
+	return k.keyspace.Prefix("resilience:index:command:" + component)
+}
+
 func (k OpsKeyspace) ResilienceCommandResult(requestID, instanceID string) string {
 	return k.keyspace.Prefix("resilience:result:" + requestID + ":" + instanceID)
 }
 
+func (k OpsKeyspace) ResilienceCommandResultIndex(requestID string) string {
+	return k.keyspace.Prefix("resilience:index:result:" + requestID)
+}
+
+func (k OpsKeyspace) ResilienceInstanceIndex(component string) string {
+	return k.keyspace.Prefix("resilience:index:instance:" + component)
+}
+
 func (k OpsKeyspace) GovernanceAuditReplay(orgID, requestID string) string {
 	return k.keyspace.Prefix("governance:audit-replay:" + orgID + ":" + requestID)
+}
+
+func (k OpsKeyspace) GovernanceAuditReplayIndex() string {
+	return k.keyspace.Prefix("governance:index:audit-replay")
 }

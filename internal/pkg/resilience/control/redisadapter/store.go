@@ -5,12 +5,49 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/control"
 	redis "github.com/redis/go-redis/v9"
 )
+
+const persistentIndexScore int64 = 9007199254740991
+
+var setIndexedValueScript = redis.NewScript(`
+local ttl = tonumber(ARGV[2])
+if ttl > 0 then
+	redis.call('SET', KEYS[1], ARGV[1], 'PX', ttl)
+else
+	redis.call('SET', KEYS[1], ARGV[1])
+end
+redis.call('ZADD', KEYS[2], ARGV[3], KEYS[1])
+return 1
+`)
+
+var setNXIndexedValueScript = redis.NewScript(`
+local ttl = tonumber(ARGV[2])
+local created
+if ttl > 0 then
+	created = redis.call('SET', KEYS[1], ARGV[1], 'PX', ttl, 'NX')
+else
+	created = redis.call('SET', KEYS[1], ARGV[1], 'NX')
+end
+if not created then
+	local remaining = redis.call('PTTL', KEYS[1])
+	local score = ARGV[3]
+	if remaining > 0 then
+		score = tonumber(ARGV[4]) + remaining
+	elseif remaining == -1 then
+		score = ARGV[5]
+	end
+	redis.call('ZADD', KEYS[2], score, KEYS[1])
+	return 0
+end
+redis.call('ZADD', KEYS[2], ARGV[3], KEYS[1])
+return 1
+`)
 
 type Store struct {
 	client  redis.UniversalClient
@@ -132,11 +169,24 @@ func (s *Store) PublishCommand(ctx context.Context, command control.Command, ttl
 	if err != nil {
 		return err
 	}
-	created, err := s.client.SetNX(ctx, s.builder.BuildResilienceCommandKey(command.Target.Component, control.ScopedRequestID(command.Actor.OrgID, command.RequestID)), raw, ttl).Result()
+	now := time.Now()
+	ttlMillis, score := indexedExpiry(now, ttl)
+	commandKey := s.builder.BuildResilienceCommandKey(command.Target.Component, control.ScopedRequestID(command.Actor.OrgID, command.RequestID))
+	indexKey := s.builder.BuildResilienceCommandIndexKey(command.Target.Component)
+	created, err := setNXIndexedValueScript.Run(
+		ctx,
+		s.client,
+		[]string{commandKey, indexKey},
+		raw,
+		ttlMillis,
+		score,
+		now.UnixMilli(),
+		persistentIndexScore,
+	).Int64()
 	if err != nil {
 		return err
 	}
-	if !created {
+	if created == 0 {
 		return nil
 	}
 	_ = s.client.Publish(ctx, s.builder.BuildResilienceSignalChannel(), "command:"+command.Target.Component).Err()
@@ -147,26 +197,21 @@ func (s *Store) ListCommands(ctx context.Context, component, instanceID string) 
 	if s == nil || s.client == nil {
 		return nil, control.ErrUnavailable
 	}
-	pattern := s.builder.BuildResilienceCommandKey(component, "*")
 	commands := []control.Command{}
-	iter := s.client.Scan(ctx, 0, pattern, 100).Iterator()
-	for iter.Next(ctx) {
-		raw, err := s.client.Get(ctx, iter.Val()).Bytes()
-		if errors.Is(err, redis.Nil) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
+	values, err := s.activeIndexedValues(ctx, s.builder.BuildResilienceCommandIndexKey(component), time.Now())
+	if err != nil {
+		return nil, err
+	}
+	for _, value := range values {
 		var command control.Command
-		if json.Unmarshal(raw, &command) != nil {
+		if json.Unmarshal(value.raw, &command) != nil {
 			continue
 		}
 		if command.Target.InstanceID == "" || command.Target.InstanceID == "all" || command.Target.InstanceID == instanceID {
 			commands = append(commands, command)
 		}
 	}
-	return commands, iter.Err()
+	return commands, nil
 }
 
 func (s *Store) PutCommandResult(ctx context.Context, result control.CommandResult, ttl time.Duration) error {
@@ -177,50 +222,48 @@ func (s *Store) PutCommandResult(ctx context.Context, result control.CommandResu
 	if err != nil {
 		return err
 	}
-	return s.client.Set(ctx, s.builder.BuildResilienceCommandResultKey(control.ScopedRequestID(result.OrgID, result.RequestID), result.InstanceID), raw, ttl).Err()
+	scopedRequestID := control.ScopedRequestID(result.OrgID, result.RequestID)
+	return s.setIndexedValue(
+		ctx,
+		s.builder.BuildResilienceCommandResultKey(scopedRequestID, result.InstanceID),
+		s.builder.BuildResilienceCommandResultIndexKey(scopedRequestID),
+		raw,
+		ttl,
+	)
 }
 
 func (s *Store) ListCommandResults(ctx context.Context, orgID int64, requestID string) ([]control.CommandResult, error) {
 	if s == nil || s.client == nil {
 		return nil, control.ErrUnavailable
 	}
-	pattern := s.builder.BuildResilienceCommandResultKey(control.ScopedRequestID(orgID, requestID), "*")
 	results := []control.CommandResult{}
-	iter := s.client.Scan(ctx, 0, pattern, 100).Iterator()
-	for iter.Next(ctx) {
-		raw, err := s.client.Get(ctx, iter.Val()).Bytes()
-		if errors.Is(err, redis.Nil) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
+	indexKey := s.builder.BuildResilienceCommandResultIndexKey(control.ScopedRequestID(orgID, requestID))
+	values, err := s.activeIndexedValues(ctx, indexKey, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	for _, value := range values {
 		var result control.CommandResult
-		if json.Unmarshal(raw, &result) == nil {
+		if json.Unmarshal(value.raw, &result) == nil {
 			results = append(results, result)
 		}
 	}
-	return results, iter.Err()
+	return results, nil
 }
 
 func (s *Store) ListInstances(ctx context.Context, component string) ([]control.InstanceIdentity, error) {
 	if s == nil || s.client == nil {
 		return nil, control.ErrUnavailable
 	}
-	pattern := s.builder.BuildResilienceInstanceKey(component, "*", "*")
 	instances := []control.InstanceIdentity{}
 	seen := make(map[string]struct{})
-	iter := s.client.Scan(ctx, 0, pattern, 100).Iterator()
-	for iter.Next(ctx) {
-		raw, err := s.client.Get(ctx, iter.Val()).Bytes()
-		if errors.Is(err, redis.Nil) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
+	values, err := s.activeIndexedValues(ctx, s.builder.BuildResilienceInstanceIndexKey(component), time.Now())
+	if err != nil {
+		return nil, err
+	}
+	for _, value := range values {
 		var identity control.InstanceIdentity
-		if json.Unmarshal(raw, &identity) == nil {
+		if json.Unmarshal(value.raw, &identity) == nil {
 			key := identity.InstanceID + "\x00" + identity.Generation
 			if _, exists := seen[key]; exists {
 				continue
@@ -229,7 +272,7 @@ func (s *Store) ListInstances(ctx context.Context, component string) ([]control.
 			instances = append(instances, identity)
 		}
 	}
-	return instances, iter.Err()
+	return instances, nil
 }
 
 func (s *Store) Heartbeat(ctx context.Context, identity control.InstanceIdentity, ttl time.Duration) error {
@@ -240,7 +283,68 @@ func (s *Store) Heartbeat(ctx context.Context, identity control.InstanceIdentity
 	if err != nil {
 		return err
 	}
-	return s.client.Set(ctx, s.builder.BuildResilienceInstanceKey(identity.Component, identity.InstanceID, identity.Generation), raw, ttl).Err()
+	return s.setIndexedValue(
+		ctx,
+		s.builder.BuildResilienceInstanceKey(identity.Component, identity.InstanceID, identity.Generation),
+		s.builder.BuildResilienceInstanceIndexKey(identity.Component),
+		raw,
+		ttl,
+	)
+}
+
+type indexedValue struct {
+	key string
+	raw []byte
+}
+
+func indexedExpiry(now time.Time, ttl time.Duration) (int64, int64) {
+	if ttl <= 0 {
+		return 0, persistentIndexScore
+	}
+	ttlMillis := ttl.Milliseconds()
+	if ttlMillis <= 0 {
+		ttlMillis = 1
+	}
+	return ttlMillis, now.Add(time.Duration(ttlMillis) * time.Millisecond).UnixMilli()
+}
+
+func (s *Store) setIndexedValue(ctx context.Context, valueKey, indexKey string, raw []byte, ttl time.Duration) error {
+	ttlMillis, score := indexedExpiry(time.Now(), ttl)
+	return setIndexedValueScript.Run(ctx, s.client, []string{valueKey, indexKey}, raw, ttlMillis, score).Err()
+}
+
+func (s *Store) activeIndexedValues(ctx context.Context, indexKey string, now time.Time) ([]indexedValue, error) {
+	nowMillis := strconv.FormatInt(now.UnixMilli(), 10)
+	if err := s.client.ZRemRangeByScore(ctx, indexKey, "-inf", nowMillis).Err(); err != nil {
+		return nil, err
+	}
+	keys, err := s.client.ZRangeByScore(ctx, indexKey, &redis.ZRangeBy{Min: "(" + nowMillis, Max: "+inf"}).Result()
+	if err != nil || len(keys) == 0 {
+		return []indexedValue{}, err
+	}
+	rawValues, err := s.client.MGet(ctx, keys...).Result()
+	if err != nil {
+		return nil, err
+	}
+	values := make([]indexedValue, 0, len(keys))
+	stale := make([]interface{}, 0)
+	for i, rawValue := range rawValues {
+		if rawValue == nil {
+			stale = append(stale, keys[i])
+			continue
+		}
+		raw, ok := rawValue.(string)
+		if !ok {
+			continue
+		}
+		values = append(values, indexedValue{key: keys[i], raw: []byte(raw)})
+	}
+	if len(stale) > 0 {
+		if err := s.client.ZRem(ctx, indexKey, stale...).Err(); err != nil {
+			return nil, err
+		}
+	}
+	return values, nil
 }
 
 func (s *Store) WatchStateSignals(ctx context.Context) (<-chan string, error) {

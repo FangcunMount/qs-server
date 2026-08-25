@@ -10,14 +10,14 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/locklease"
 )
 
-func (s *Subsystem) processCommands(ctx context.Context) {
+func (s *Subsystem) processCommands(ctx context.Context) error {
 	store, ok := s.stateStore.(control.CommandStore)
 	if !ok {
-		return
+		return nil
 	}
 	commands, err := store.ListCommands(ctx, "apiserver", s.identity.InstanceID)
 	if err != nil {
-		return
+		return err
 	}
 	for _, command := range commands {
 		if command.ActionID != "resilience.release_lock" {
@@ -29,6 +29,7 @@ func (s *Subsystem) processCommands(ctx context.Context) {
 		}
 		go s.executeLeaderCommand(ctx, store, command)
 	}
+	return nil
 }
 
 func (s *Subsystem) executeLeaderCommand(ctx context.Context, store control.CommandStore, command control.Command) {
