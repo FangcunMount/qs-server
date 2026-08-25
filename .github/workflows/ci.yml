@@ -286,9 +286,6 @@ jobs:
       - name: Validate worker dependency preflight gate
         run: bash scripts/cd/test-verify-worker-dependencies.sh
 
-      - name: Validate AuthZ maintenance consumer control
-        run: bash scripts/cd/test-authz-consumer-control.sh
-
       - name: Validate worker governance convergence gate
         run: bash scripts/cd/test-verify-worker-governance.sh
 

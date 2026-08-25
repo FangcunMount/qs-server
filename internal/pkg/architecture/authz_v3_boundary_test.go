@@ -45,6 +45,40 @@ func TestAuthzV3OnlyBoundaryDoesNotRegress(t *testing.T) {
 	assertArchitectureFileContains(t, root, "internal/apiserver/application/authz/snapshot.go", "AuthorizationModeObjectCheckRequired")
 }
 
+func TestRetiredAuthzCutoverEntrypointsStayAbsent(t *testing.T) {
+	root := repoRoot(t)
+	for _, rel := range []string{
+		".github/workflows/authz-consumer-control.yml",
+		"scripts/cd/authz-consumer-control.sh",
+		"scripts/cd/test-authz-consumer-control.sh",
+	} {
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel))); !os.IsNotExist(err) {
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Fatalf("retired AuthZ cutover entrypoint exists: %s", rel)
+		}
+	}
+	for _, rel := range []string{
+		".github/actionlint.yaml",
+		".github/workflows/cd.yml",
+		".github/workflows/ci.yml",
+	} {
+		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, forbidden := range []string{
+			"AUTHZ_CUTOVER_AUTO_DEPLOY_PAUSED",
+			"authz-consumer-control",
+		} {
+			if strings.Contains(string(data), forbidden) {
+				t.Fatalf("%s contains retired AuthZ cutover token %q", rel, forbidden)
+			}
+		}
+	}
+}
+
 func assertArchitectureFileContains(t *testing.T, root, rel, token string) {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
