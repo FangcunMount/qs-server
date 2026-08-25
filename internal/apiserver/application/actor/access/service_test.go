@@ -49,7 +49,12 @@ func TestResolveAccessScopeUsesContextSnapshotBeforeReader(t *testing.T) {
 		reader,
 	)
 
-	ctx := authzapp.WithSnapshot(context.Background(), &authzapp.Snapshot{Roles: []string{"qs:admin"}})
+	ctx := authzapp.WithSnapshot(context.Background(), &authzapp.Snapshot{
+		Roles: []string{"qs:admin"},
+		Permissions: []authzapp.Permission{{
+			Resource: "qs:*:*:*", Action: "*", Mode: authzapp.AuthorizationModeUnconditional,
+		}},
+	})
 	scope, err := svc.ResolveAccessScope(ctx, 1, 101)
 	if err != nil {
 		t.Fatalf("expected access scope to resolve: %v", err)

@@ -5,6 +5,7 @@ self-hosted-runner:
     - ops
 
 config-variables:
+  - AUTHZ_CUTOVER_AUTO_DEPLOY_PAUSED
   - QS_DEPLOY_EXPORT_REGISTRY
   - QS_DEPLOY_HTTP_PROXY
   - QS_DEPLOY_HTTPS_PROXY

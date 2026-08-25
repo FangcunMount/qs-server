@@ -15,7 +15,7 @@ func TestSnapshotAuthorizerRequiresActionCapability(t *testing.T) {
 		Scope:     securityplane.NewOrgScope("tenant", 1, true, "tenant"),
 	}
 	ctx := appauthz.WithSnapshot(context.Background(), &appauthz.Snapshot{
-		Permissions: []appauthz.Permission{{Resource: "qs:assessment_model_definitions", Action: "update"}},
+		Permissions: []appauthz.Permission{{Resource: "qs:scale:collection:scales", Action: "update", Mode: appauthz.AuthorizationModeUnconditional}},
 	})
 	if err := (SnapshotAuthorizer{}).Authorize(ctx, actor, ActionEditDefinition, Resource{Code: "brief2"}); err != nil {
 		t.Fatalf("Authorize() error = %v", err)
@@ -28,7 +28,7 @@ func TestSnapshotAuthorizerRequiresActionCapability(t *testing.T) {
 func TestSnapshotAuthorizerRequiresServicePrincipalForRuntimeResolution(t *testing.T) {
 	t.Parallel()
 	ctx := appauthz.WithSnapshot(context.Background(), &appauthz.Snapshot{
-		Permissions: []appauthz.Permission{{Resource: "qs:assessment_models", Action: "resolve"}},
+		Permissions: []appauthz.Permission{{Resource: "qs:scale:collection:scales", Action: "read", Mode: appauthz.AuthorizationModeUnconditional}},
 	})
 	err := (SnapshotAuthorizer{}).Authorize(ctx, ActorContext{Principal: securityplane.Principal{Kind: securityplane.PrincipalKindUser}}, ActionResolvePublished, Resource{})
 	if err == nil {
@@ -43,7 +43,7 @@ func TestSnapshotAuthorizerRequiresServicePrincipalForRuntimeResolution(t *testi
 func TestSnapshotAuthorizerRejectsCommandWithoutOrganizationScope(t *testing.T) {
 	t.Parallel()
 	ctx := appauthz.WithSnapshot(context.Background(), &appauthz.Snapshot{
-		Permissions: []appauthz.Permission{{Resource: "qs:assessment_models", Action: "create"}},
+		Permissions: []appauthz.Permission{{Resource: "qs:scale:collection:scales", Action: "create", Mode: appauthz.AuthorizationModeUnconditional}},
 	})
 	err := (SnapshotAuthorizer{}).Authorize(ctx, ActorContext{Principal: securityplane.Principal{Kind: securityplane.PrincipalKindUser}}, ActionManageCatalog, Resource{})
 	if err == nil {
@@ -54,7 +54,7 @@ func TestSnapshotAuthorizerRejectsCommandWithoutOrganizationScope(t *testing.T) 
 func TestSnapshotAuthorizerAllowsTrustedServiceCatalogCommandWithoutOrganizationScope(t *testing.T) {
 	t.Parallel()
 	ctx := appauthz.WithSnapshot(context.Background(), &appauthz.Snapshot{
-		Permissions: []appauthz.Permission{{Resource: "qs:assessment_models", Action: "create"}},
+		Permissions: []appauthz.Permission{{Resource: "qs:scale:collection:scales", Action: "create", Mode: appauthz.AuthorizationModeUnconditional}},
 	})
 	actor := ActorContext{Principal: securityplane.Principal{
 		Kind:   securityplane.PrincipalKindService,

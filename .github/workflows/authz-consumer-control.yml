@@ -1,0 +1,136 @@
+name: AuthZ Production Consumer Control
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Stop, restore, or inspect qs-server AuthZ consumers
+        required: true
+        type: choice
+        options:
+          - stop
+          - start
+          - status
+      expected_qs_sha:
+        description: Exact qs-server main SHA for this maintenance window
+        required: true
+        type: string
+      confirmation:
+        description: STOP_AUTHZ_CONSUMERS, START_AUTHZ_CONSUMERS, or STATUS_AUTHZ_CONSUMERS
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qs-production-authz-consumer-control
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate Release Evidence
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    steps:
+      - name: Validate exact main SHA and confirmation
+        env:
+          OPERATION: ${{ github.event.inputs.operation }}
+          EXPECTED_QS_SHA: ${{ github.event.inputs.expected_qs_sha }}
+          CONFIRMATION: ${{ github.event.inputs.confirmation }}
+        run: |
+          set -Eeuo pipefail
+          if [ "${#EXPECTED_QS_SHA}" -ne 40 ] || [ -n "${EXPECTED_QS_SHA//[0-9a-f]/}" ]; then
+            echo "expected_qs_sha must be an exact lowercase 40-character Git SHA" >&2
+            exit 1
+          fi
+          if [ "$GITHUB_REF_NAME" != main ] || [ "$GITHUB_SHA" != "$EXPECTED_QS_SHA" ]; then
+            echo "workflow must run from the exact qs-server main release SHA" >&2
+            exit 1
+          fi
+          case "$OPERATION:$CONFIRMATION" in
+            stop:STOP_AUTHZ_CONSUMERS|start:START_AUTHZ_CONSUMERS|status:STATUS_AUTHZ_CONSUMERS) ;;
+            *) echo "operation confirmation does not match" >&2; exit 1 ;;
+          esac
+
+  control-app:
+    name: Control API and Collection Consumers
+    needs: [validate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+    steps:
+      - name: Checkout exact qs-server release
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.expected_qs_sha }}
+
+      - name: Control serverA consumers
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
+        env:
+          QS_AUTHZ_CONSUMER_OPERATION: ${{ github.event.inputs.operation }}
+          QS_AUTHZ_CONSUMER_HOST_ROLE: app
+          QS_AUTHZ_RELEASE_SHA: ${{ github.event.inputs.expected_qs_sha }}
+          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
+        with:
+          host: ${{ vars.SVRA_PUBLIC_HOST || secrets.SVRA_PUBLIC_HOST || vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          envs: QS_AUTHZ_CONSUMER_OPERATION,QS_AUTHZ_CONSUMER_HOST_ROLE,QS_AUTHZ_RELEASE_SHA,SUDO_PASSWORD
+          script_path: scripts/cd/authz-consumer-control.sh
+
+  control-worker:
+    name: Control Worker Consumers
+    needs: [validate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+    steps:
+      - name: Checkout exact qs-server release
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.expected_qs_sha }}
+
+      - name: Control serverD consumers
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
+        env:
+          QS_AUTHZ_CONSUMER_OPERATION: ${{ github.event.inputs.operation }}
+          QS_AUTHZ_CONSUMER_HOST_ROLE: worker
+          QS_AUTHZ_RELEASE_SHA: ${{ github.event.inputs.expected_qs_sha }}
+          SUDO_PASSWORD: ${{ secrets.SVRD_SUDO_PASSWORD || secrets.SVRA_SUDO_PASSWORD }}
+        with:
+          host: ${{ vars.SVRD_PUBLIC_HOST || secrets.SVRD_PUBLIC_HOST || vars.SVRD_HOST }}
+          username: ${{ vars.SVRD_USERNAME || vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRD_SSH_PORT || vars.SVRA_SSH_PORT || 22 }}
+          envs: QS_AUTHZ_CONSUMER_OPERATION,QS_AUTHZ_CONSUMER_HOST_ROLE,QS_AUTHZ_RELEASE_SHA,SUDO_PASSWORD
+          script_path: scripts/cd/authz-consumer-control.sh
+
+  evidence:
+    name: Record Consumer Control Evidence
+    needs: [validate, control-app, control-worker]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Write result summary
+        env:
+          OPERATION: ${{ github.event.inputs.operation }}
+          EXPECTED_QS_SHA: ${{ github.event.inputs.expected_qs_sha }}
+          APP_RESULT: ${{ needs.control-app.result }}
+          WORKER_RESULT: ${{ needs.control-worker.result }}
+        run: |
+          {
+            echo '### qs-server AuthZ consumer control'
+            echo
+            echo "- operation: ${OPERATION}"
+            echo "- qs-server SHA: ${EXPECTED_QS_SHA}"
+            echo "- serverA: ${APP_RESULT}"
+            echo "- serverD: ${WORKER_RESULT}"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$APP_RESULT" != success ] || [ "$WORKER_RESULT" != success ]; then
+            exit 1
+          fi

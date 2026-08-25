@@ -15,29 +15,29 @@ func TestRequireCapabilityMiddleware(t *testing.T) {
 	planManagerSnap := &authzapp.Snapshot{
 		Roles: []string{"qs:evaluation_plan_manager"},
 		Permissions: []authzapp.Permission{
-			{Resource: "qs:evaluation_plans", Action: "create|read|list|update|pause|resume|cancel|enroll|terminate|statistics"},
-			{Resource: "qs:evaluation_plan_tasks", Action: "schedule|read|list|open|complete|expire|cancel"},
+			{Resource: "qs:plan:collection:evaluation_plans", Action: "create", Mode: authzapp.AuthorizationModeUnconditional},
+			{Resource: "qs:plan_task:collection:evaluation_plan_tasks", Action: "schedule", Mode: authzapp.AuthorizationModeUnconditional},
 		},
 	}
 	evaluatorSnap := &authzapp.Snapshot{
 		Roles: []string{"qs:evaluator"},
 		Permissions: []authzapp.Permission{
-			{Resource: "qs:assessments", Action: "read|list|retry|batch_evaluate|statistics"},
-			{Resource: "qs:answersheets", Action: "read|list|statistics"},
+			{Resource: authzapp.AssessmentResource, Action: "batch_evaluate", Mode: authzapp.AuthorizationModeUnconditional},
+			{Resource: "qs:answersheet:collection:answersheets", Action: "read", Mode: authzapp.AuthorizationModeUnconditional},
 		},
 	}
 	contentManagerSnap := &authzapp.Snapshot{
 		Roles: []string{"qs:content_manager"},
 		Permissions: []authzapp.Permission{
-			{Resource: "qs:questionnaires", Action: "create|read|list|update|delete|publish|unpublish|archive|statistics"},
-			{Resource: "qs:assessment_models", Action: "create|read|list|update|delete|publish|unpublish|archive"},
-			{Resource: "qs:modelcatalog:collection:norm_tables", Action: "read|list|import"},
+			{Resource: "qs:questionnaire:collection:questionnaires", Action: "create", Mode: authzapp.AuthorizationModeUnconditional},
+			{Resource: "qs:scale:collection:scales", Action: "read", Mode: authzapp.AuthorizationModeUnconditional},
+			{Resource: "qs:modelcatalog:collection:norm_tables", Action: "import", Mode: authzapp.AuthorizationModeUnconditional},
 		},
 	}
 	adminSnap := &authzapp.Snapshot{
 		Roles: []string{"qs:admin"},
 		Permissions: []authzapp.Permission{
-			{Resource: "qs:*", Action: ".*"},
+			{Resource: "qs:*:*:*", Action: "*", Mode: authzapp.AuthorizationModeUnconditional},
 		},
 	}
 

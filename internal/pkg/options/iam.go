@@ -35,10 +35,10 @@ type IAMOptions struct {
 	// ProfileLink 缓存配置
 	ProfileLinkCache *IAMCacheOptions `json:"profile-link-cache" mapstructure:"profile-link-cache"`
 
-	// Authz 快照（与 IAM Casbin domain / app_name 对齐）
-	AuthzAppName              string        `json:"authz-app-name" mapstructure:"authz-app-name"`
-	AuthzCacheTTL             time.Duration `json:"authz-cache-ttl" mapstructure:"authz-cache-ttl"`
-	AuthzCasbinDomainOverride string        `json:"authz-casbin-domain" mapstructure:"authz-casbin-domain"` // 仅迁移例外：默认留空，使 domain=JWT tenant_id（与 IAM 契约一致）
+	// Authz v3 快照（与 IAM authorization domain / app_name 对齐）
+	AuthzAppName        string        `json:"authz-app-name" mapstructure:"authz-app-name"`
+	AuthzCacheTTL       time.Duration `json:"authz-cache-ttl" mapstructure:"authz-cache-ttl"`
+	AuthzDomainOverride string        `json:"authz-domain" mapstructure:"authz-domain"` // 仅迁移例外：默认留空，使 domain=JWT tenant_id（与 IAM 契约一致）
 
 	// Authz 版本同步订阅配置
 	AuthzSync *IAMAuthzSyncOptions `json:"authz-sync" mapstructure:"authz-sync"`
@@ -136,7 +136,7 @@ func NewIAMOptions() *IAMOptions {
 		},
 
 		ServiceAuth: &IAMServiceAuthOptions{
-			ServiceID:      "qs-service",
+			ServiceID:      "qs-apiserver.svc",
 			TargetAudience: []string{"iam-service"},
 			TokenTTL:       1 * time.Hour,
 			RefreshBefore:  5 * time.Minute,
@@ -154,10 +154,10 @@ func NewIAMOptions() *IAMOptions {
 			MaxSize: 50000,
 		},
 
-		AuthzAppName:              "qs",
-		AuthzCacheTTL:             30 * time.Second,
-		AuthzCasbinDomainOverride: "",
-		AuthzSync:                 NewIAMAuthzSyncOptions(),
+		AuthzAppName:        "qs",
+		AuthzCacheTTL:       30 * time.Second,
+		AuthzDomainOverride: "",
+		AuthzSync:           NewIAMAuthzSyncOptions(),
 	}
 }
 
@@ -282,8 +282,8 @@ func (o *IAMOptions) AddFlags(fs *pflag.FlagSet) {
 		"IAM authorization snapshot app_name filter (e.g. qs)")
 	fs.DurationVar(&o.AuthzCacheTTL, "iam.authz.cache-ttl", o.AuthzCacheTTL,
 		"In-process TTL for GetAuthorizationSnapshot cache")
-	fs.StringVar(&o.AuthzCasbinDomainOverride, "iam.authz.casbin-domain", o.AuthzCasbinDomainOverride,
-		"Override Casbin domain for IAM snapshot when JWT tenant_id differs from IAM domain")
+	fs.StringVar(&o.AuthzDomainOverride, "iam.authz.domain", o.AuthzDomainOverride,
+		"Override IAM authorization domain when JWT tenant_id differs from the policy domain")
 	fs.BoolVar(&o.AuthzSync.Enabled, "iam.authz-sync.enabled", o.AuthzSync.Enabled,
 		"Enable IAM authz version topic subscription for local snapshot invalidation")
 	fs.StringVar(&o.AuthzSync.Provider, "iam.authz-sync.provider", o.AuthzSync.Provider,

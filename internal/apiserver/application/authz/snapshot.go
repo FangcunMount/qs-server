@@ -7,20 +7,30 @@ import (
 
 type snapCtxKey struct{}
 
-// Permission 表示 IAM 授权快照中的一条 (resource, action)；action 可能为 Casbin 中的组合串如 "read|update"。
+// AuthorizationMode is the local projection of IAM AuthZ v3 permission modes.
+type AuthorizationMode int32
+
+const (
+	AuthorizationModeUnspecified         AuthorizationMode = 0
+	AuthorizationModeUnconditional       AuthorizationMode = 1
+	AuthorizationModeObjectCheckRequired AuthorizationMode = 2
+)
+
+// Permission is a single exact AuthZ v3 resource/action capability.
 type Permission struct {
 	Resource string
 	Action   string
+	Mode     AuthorizationMode
 }
 
 // Snapshot 即 CurrentAuthzSnapshot：IAM GetAuthorizationSnapshot 在单次请求内的授权投影。
 // 动作真值以 IAM 为准；不在 QS 内自造与 IAM 冲突的角色真值。
 type Snapshot struct {
-	Roles        []string
-	Permissions  []Permission
-	AuthzVersion int64
-	CasbinDomain string
-	IAMAppName   string
+	Roles               []string
+	Permissions         []Permission
+	AuthzVersion        int64
+	AuthorizationDomain string
+	IAMAppName          string
 }
 
 // WithSnapshot 将快照写入 context（供 application 层使用）。
@@ -44,21 +54,9 @@ func FromContext(ctx context.Context) (*Snapshot, bool) {
 	return s, ok && s != nil
 }
 
-// SubjectKey 固定为 user:<user_id>，与 IAM Assignment / Casbin sub 对齐。
+// SubjectKey 固定为 user:<user_id>，与 IAM AuthZ v3 Subject 契约对齐。
 func SubjectKey(userIDStr string) string {
 	return "user:" + userIDStr
-}
-
-func (s *Snapshot) hasRole(name string) bool {
-	if s == nil || name == "" {
-		return false
-	}
-	for _, r := range s.Roles {
-		if r == name {
-			return true
-		}
-	}
-	return false
 }
 
 // RoleNames 返回defensive copy of 角色列表 用于 投影-oriented callers。
@@ -73,19 +71,30 @@ func actionCovers(have, want string) bool {
 	if have == "" || want == "" {
 		return false
 	}
-	// Casbin 管理员策略常见为 object=qs:*, action=.*
-	if have == ".*" || have == "*" {
+	if have == "*" {
 		return true
 	}
-	for _, part := range strings.Split(have, "|") {
-		if strings.TrimSpace(part) == want {
-			return true
-		}
-	}
-	return false
+	return have == want
 }
 
-// HasResourceAction 判断快照中是否允许对 resource 执行 want 动作（支持 qs:* / .* 通配）。
+func resourceCovers(pattern, resource string) bool {
+	if pattern == resource {
+		return true
+	}
+	patternParts := strings.Split(pattern, ":")
+	resourceParts := strings.Split(resource, ":")
+	if len(patternParts) != len(resourceParts) {
+		return false
+	}
+	for i := range patternParts {
+		if patternParts[i] != "*" && patternParts[i] != resourceParts[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// HasResourceAction only recognizes unconditional permissions.
 func (s *Snapshot) HasResourceAction(resource, want string) bool {
 	if s == nil {
 		return false
@@ -93,26 +102,39 @@ func (s *Snapshot) HasResourceAction(resource, want string) bool {
 	for _, p := range s.Permissions {
 		res := p.Resource
 		act := p.Action
-		if res == "qs:*" && actionCovers(act, want) {
-			return true
-		}
-		if res == resource && actionCovers(act, want) {
+		if p.Mode == AuthorizationModeUnconditional && resourceCovers(res, resource) && actionCovers(act, want) {
 			return true
 		}
 	}
 	return false
 }
 
-// IsQSAdmin 使用 IAM 快照：qs:admin 角色或 qs:* + 通配动作（如 .*）。
+// HasObjectAuthorizationCandidate recognizes both unconditional and object-check permissions.
+// It is only a routing guard; IAM Check remains authoritative for object-check entries.
+func (s *Snapshot) HasObjectAuthorizationCandidate(resource, action string) bool {
+	if s == nil {
+		return false
+	}
+	for _, permission := range s.Permissions {
+		if permission.Mode == AuthorizationModeUnspecified {
+			continue
+		}
+		if resourceCovers(permission.Resource, resource) && actionCovers(permission.Action, action) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsQSAdmin requires the final unconditional QS wildcard grant. A role name
+// alone is not an authorization decision.
 func (s *Snapshot) IsQSAdmin() bool {
 	if s == nil {
 		return false
 	}
-	if s.hasRole("qs:admin") {
-		return true
-	}
 	for _, p := range s.Permissions {
-		if p.Resource == "qs:*" && actionCovers(p.Action, "read") {
+		if p.Mode == AuthorizationModeUnconditional &&
+			(p.Resource == "qs:*:*:*" || p.Resource == "*:*:*:*") && p.Action == "*" {
 			return true
 		}
 	}

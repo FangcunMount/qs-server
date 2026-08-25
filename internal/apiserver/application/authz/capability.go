@@ -132,43 +132,42 @@ func capabilityAllowed(s *Snapshot, c Capability) bool {
 	case CapabilityOrgAdmin:
 		return s.IsQSAdmin()
 	case CapabilityAuditInterpretation:
-		return s.IsQSAdmin() || hasAnyResourceAction(s, "qs:interpretation_reports", []string{"audit"})
+		return s.IsQSAdmin() || hasAnyResourceAction(s, "qs:evaluation:collection:reports", []string{"audit"})
 	case CapabilityReadQuestionnaires:
 		if s.IsQSAdmin() {
 			return true
 		}
-		return hasAnyResourceAction(s, "qs:questionnaires", []string{"read", "list"})
+		return hasAnyResourceAction(s, "qs:questionnaire:collection:questionnaires", []string{"read", "list"})
 	case CapabilityManageQuestionnaires:
 		if s.IsQSAdmin() {
 			return true
 		}
-		return hasAnyResourceAction(s, "qs:questionnaires", []string{"create", "update", "delete", "publish", "unpublish", "archive", "statistics"})
+		return hasAnyResourceAction(s, "qs:questionnaire:collection:questionnaires", []string{"create", "update", "delete", "publish", "unpublish", "archive", "statistics"})
 	case CapabilityReadAssessmentModels:
 		if s.IsQSAdmin() {
 			return true
 		}
-		return hasAnyResourceAction(s, "qs:assessment_models", []string{"read", "list"})
+		return hasAnyResourceAction(s, "qs:scale:collection:scales", []string{"read", "list"})
 	case CapabilityManageAssessmentModels:
 		if s.IsQSAdmin() {
 			return true
 		}
-		return hasAnyResourceAction(s, "qs:assessment_models", []string{"create", "update", "delete", "archive"})
+		return hasAnyResourceAction(s, "qs:scale:collection:scales", []string{"create", "update", "delete", "archive"})
 	case CapabilityEditAssessmentModelDefinitions:
 		if s.IsQSAdmin() {
 			return true
 		}
-		return hasAnyResourceAction(s, "qs:assessment_model_definitions", []string{"read", "update", "validate", "preview", "apply_codes"}) ||
-			hasAnyResourceAction(s, "qs:assessment_models", []string{"update"})
+		return hasAnyResourceAction(s, "qs:scale:collection:scales", []string{"read", "update"})
 	case CapabilityPublishAssessmentModels:
 		if s.IsQSAdmin() {
 			return true
 		}
-		return hasAnyResourceAction(s, "qs:assessment_models", []string{"publish", "unpublish"})
+		return hasAnyResourceAction(s, "qs:scale:collection:scales", []string{"publish", "unpublish"})
 	case CapabilityResolvePublishedAssessmentModels:
 		if s.IsQSAdmin() {
 			return true
 		}
-		return hasAnyResourceAction(s, "qs:assessment_models", []string{"resolve"})
+		return hasAnyResourceAction(s, "qs:scale:collection:scales", []string{"read"})
 	case CapabilityReadNormTables:
 		if s.IsQSAdmin() {
 			return true
@@ -183,21 +182,20 @@ func capabilityAllowed(s *Snapshot, c Capability) bool {
 		if s.IsQSAdmin() {
 			return true
 		}
-		return hasAnyResourceAction(s, "qs:answersheets", []string{"read", "list", "statistics"})
+		return hasAnyResourceAction(s, "qs:answersheet:collection:answersheets", []string{"read", "list", "statistics"})
 	case CapabilityManageEvaluationPlans:
 		if s.IsQSAdmin() {
 			return true
 		}
 		planActs := []string{"create", "update", "pause", "resume", "cancel", "enroll", "terminate", "statistics"}
 		taskActs := []string{"schedule", "open", "complete", "expire", "cancel", "read", "list"}
-		return hasAnyResourceAction(s, "qs:evaluation_plans", planActs) &&
-			hasAnyResourceAction(s, "qs:evaluation_plan_tasks", taskActs)
+		return hasAnyResourceAction(s, "qs:plan:collection:evaluation_plans", planActs) &&
+			hasAnyResourceAction(s, "qs:plan_task:collection:evaluation_plan_tasks", taskActs)
 	case CapabilityEvaluateAssessments:
 		if s.IsQSAdmin() {
 			return true
 		}
-		return s.HasResourceAction("qs:assessments", "retry") ||
-			s.HasResourceAction("qs:assessments", "batch_evaluate")
+		return s.HasResourceAction("qs:evaluation:collection:assessments", "batch_evaluate")
 	default:
 		return false
 	}

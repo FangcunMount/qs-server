@@ -3,6 +3,7 @@ package evaluation
 import (
 	"fmt"
 
+	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 
 	"github.com/FangcunMount/component-base/pkg/event"
@@ -37,6 +38,7 @@ type WireInput struct {
 	MySQLLimiter              backpressure.Acquirer
 	MongoLimiter              backpressure.Acquirer
 	TesteeAccessChecker       evaluationoperator.AccessChecker
+	ObjectAuthzChecker        appauthz.ObjectAuthorizationChecker
 	NormSubjectReader         evaluationinput.NormSubjectReader
 	SurveyRuntimeInfra        *surveymod.SurveyRuntimeInfra
 	PublishedModelCatalog     rulesetport.Catalog
@@ -100,6 +102,7 @@ func Wire(in WireInput) (WireResult, error) {
 		Observer:                   in.Observer,
 		MySQLLimiter:               in.MySQLLimiter,
 		TesteeAccessChecker:        in.TesteeAccessChecker,
+		ObjectAuthzChecker:         in.ObjectAuthzChecker,
 		ExecutionPaths:             executionPaths,
 		RuntimeDescriptorRegistry:  in.RuntimeDescriptorRegistry,
 		PublishedModelReader:       publishedModelReader,

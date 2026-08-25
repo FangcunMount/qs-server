@@ -6,6 +6,6 @@ import iamauth "github.com/FangcunMount/qs-server/internal/pkg/iamauth"
 type AuthzAssignmentClient = iamauth.AssignmentClient
 
 // NewAuthzAssignmentClient 创建客户端。
-func NewAuthzAssignmentClient(c *Client) *AuthzAssignmentClient {
-	return iamauth.NewAssignmentClient(c)
+func NewAuthzAssignmentClient(c *Client, tokens ...iamauth.TokenProvider) *AuthzAssignmentClient {
+	return iamauth.NewAssignmentClient(c, tokens...)
 }

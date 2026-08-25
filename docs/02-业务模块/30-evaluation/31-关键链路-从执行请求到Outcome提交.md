@@ -190,6 +190,21 @@ Worker handler 使用 `EvaluationRequestedData.ClassifyPayloadGate()` 把事件�
 
 `legacy_incomplete` 不再被静默 ACK。是否需要执行最终由 apiserver 回读 canonical Assessment 后调用 `Assessment.NeedsEvaluation()` 决定，事件 payload 只负责唤醒和兼容分类。该兼容分支在 `qs_worker_evaluation_payload_gate_total{class="legacy_incomplete"}` 连续 14 天为零且有正常流量后才可移除。
 
+### 4.4 人工 retry 在事件形成前完成对象授权
+
+公开 retry 路由与 system-governance action 最终都汇合到 `GovernedRetryService`，授权顺序固定为：
+
+```text
+snapshot 中存在 retry 候选
+  -> 加载 Assessment 并校验组织/Testee 业务关系
+  -> 从 Assessment 读取 ID 与 OriginType
+  -> IAM AuthZ v3 Check(resource=qs:evaluation:collection:assessments, action=retry)
+  -> 检查 failed/manual_required 状态
+  -> 事务内 AuthorizeRetry + evaluation.retry.requested Outbox
+```
+
+对象属性只由已加载的领域对象提供，终端用户不能提交可信的 `object.origin_type`。条件授权不参与 list、search、batch 或 `force_retry`；IAM 拒绝、不可用、超时或契约错误都在事务和 Outbox 之前 fail closed。这样既避免内部治理入口绕过对象授权，也避免未授权调用者利用状态错误探测 Assessment 是否可重试。
+
 ---
 
 ## 5. Worker handler 只负责异步执行控制

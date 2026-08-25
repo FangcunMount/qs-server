@@ -23,9 +23,9 @@ type IAMOptions struct {
 	UserCache        *CacheOptions
 	ProfileLinkCache *CacheOptions
 
-	AuthzAppName              string
-	AuthzCacheTTL             time.Duration
-	AuthzCasbinDomainOverride string
+	AuthzAppName        string
+	AuthzCacheTTL       time.Duration
+	AuthzDomainOverride string
 }
 
 type GRPCOptions struct {

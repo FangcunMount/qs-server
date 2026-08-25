@@ -117,6 +117,8 @@ func (c *Container) ActorIAMPorts() compose.ActorIAMPorts {
 		ports.OperationAccountSvc = c.IAMModule.OperationAccountService()
 		ports.IAMClient = c.IAMModule.Client()
 		ports.AuthzSnapshotLoader = c.IAMModule.AuthzSnapshotLoader()
+		ports.ServiceAuthHelper = c.IAMModule.ServiceAuthHelper()
+		ports.ObjectAuthzChecker = c.IAMModule.ObjectAuthorizationChecker()
 	}
 	return ports
 }

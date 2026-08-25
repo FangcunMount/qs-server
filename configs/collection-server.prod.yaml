@@ -223,6 +223,13 @@ iam:
     grpc-endpoint: "iam-apiserver:9090"                    # gRPC 降级端点（HTTP 失败时使用，端口 9090）
     refresh-interval: 1h
     cache-ttl: 24h
+
+  # 服务认证配置
+  service-auth:
+    service-id: "qs-collection-server.svc"                 # 服务 ID: qs-collection-server.svc (生产环境建议使用 service name)
+    target-audience: ["iam-service"]                       # 目标受众: iam-service (生产环境建议使用 service name)
+    token-ttl: 1h                                          # 令牌有效期: 1h (生产环境建议调高)
+    refresh-before: 5m                                     # 刷新前提前时间: 5m (生产环境建议调高)
   
   # 用户信息缓存
   user-cache:

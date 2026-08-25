@@ -117,7 +117,7 @@ func orgAdminSnapshotMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Set(restmiddleware.AuthzSnapshotKey, &authzapp.Snapshot{
 			Permissions: []authzapp.Permission{
-				{Resource: "qs:*", Action: ".*"},
+				{Resource: "qs:*:*:*", Action: "*", Mode: authzapp.AuthorizationModeUnconditional},
 			},
 		})
 		c.Next()

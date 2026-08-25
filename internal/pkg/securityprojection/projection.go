@@ -45,8 +45,8 @@ func PrincipalFromInput(in PrincipalInput) securityplane.Principal {
 }
 
 // OrgScopeFromIdentity creates the canonical IAM domain + QS org scope view.
-func OrgScopeFromIdentity(tenantDomain string, orgID uint64, hasOrg bool, casbinDomain string) securityplane.OrgScope {
-	return securityplane.NewOrgScope(tenantDomain, orgID, hasOrg, casbinDomain)
+func OrgScopeFromIdentity(tenantDomain string, orgID uint64, hasOrg bool, authorizationDomain string) securityplane.OrgScope {
+	return securityplane.NewOrgScope(tenantDomain, orgID, hasOrg, authorizationDomain)
 }
 
 // ServiceIdentityInput is a transport-neutral service identity projection input.

@@ -34,6 +34,7 @@ func InstallFrom(host InstallHost) error {
 		OperationAccountSvc: iamPorts.OperationAccountSvc,
 		IAMClient:           iamPorts.IAMClient,
 		AuthzSnapshotLoader: iamPorts.AuthzSnapshotLoader,
+		ServiceAuthHelper:   iamPorts.ServiceAuthHelper,
 	})
 	if err != nil {
 		return err
