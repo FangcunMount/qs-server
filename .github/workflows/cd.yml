@@ -95,8 +95,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main' &&
-       vars.AUTHZ_CUTOVER_AUTO_DEPLOY_PAUSED != 'true')
+       github.event.workflow_run.head_branch == 'main')
     permissions:
       contents: read
       actions: read
@@ -615,8 +614,7 @@ jobs:
       always() && (
         (github.event_name == 'workflow_run' &&
          github.event.workflow_run.conclusion == 'success' &&
-         github.event.workflow_run.head_branch == 'main' &&
-         vars.AUTHZ_CUTOVER_AUTO_DEPLOY_PAUSED != 'true') ||
+         github.event.workflow_run.head_branch == 'main') ||
         github.event_name == 'workflow_dispatch'
       )
     steps:
