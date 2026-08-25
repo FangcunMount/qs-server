@@ -183,6 +183,22 @@ func TestRateLimitEntrypointsUseDecisionAdapter(t *testing.T) {
 	}
 }
 
+func TestControlPlaneRedisAdaptersDoNotScanDatabase(t *testing.T) {
+	root := repoRoot(t)
+	for _, rel := range []string{
+		"internal/pkg/resilience/control/redisadapter/store.go",
+		"internal/apiserver/infra/redis/systemgovernance/action_audit_fallback.go",
+	} {
+		content, err := os.ReadFile(filepath.Join(root, rel))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(content), ".Scan(") {
+			t.Fatalf("%s uses Redis database SCAN; control-plane discovery must use explicit indexes", rel)
+		}
+	}
+}
+
 func TestLockLeaseSpecsHaveResilienceSemantics(t *testing.T) {
 	for _, capability := range locklease.All() {
 		spec := capability.Spec

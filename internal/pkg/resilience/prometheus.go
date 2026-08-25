@@ -49,6 +49,14 @@ var resilienceBackpressureWaitDuration = promauto.NewHistogramVec(
 	[]string{"component", "scope", "resource", "strategy", "outcome"},
 )
 
+var resilienceControlCommandPollTotal = promauto.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "qs_resilience_control_command_poll_total",
+		Help: "Control-plane command polls by bounded trigger and outcome.",
+	},
+	[]string{"trigger", "outcome"},
+)
+
 var collectionHTTPGateWaitSeconds = promauto.NewHistogram(prometheus.HistogramOpts{
 	Name:    "collection_http_gate_wait_seconds",
 	Help:    "Time spent waiting for collection-server HTTP concurrency slots.",
@@ -201,6 +209,20 @@ func ObserveBackpressureWaitDuration(subject Subject, outcome Outcome, duration 
 		normalized.Strategy,
 		outcome.String(),
 	).Observe(duration.Seconds())
+}
+
+func ObserveControlCommandPoll(trigger, outcome string) {
+	switch trigger {
+	case "startup", "signal", "recovery":
+	default:
+		trigger = "unknown"
+	}
+	switch outcome {
+	case "ok", "failed":
+	default:
+		outcome = "unknown"
+	}
+	resilienceControlCommandPollTotal.WithLabelValues(trigger, outcome).Inc()
 }
 
 func ObserveHTTPGateWait(duration time.Duration) {

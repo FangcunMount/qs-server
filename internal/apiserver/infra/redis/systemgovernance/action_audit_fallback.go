@@ -1,7 +1,6 @@
 package systemgovernance
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -25,6 +24,26 @@ var auditFallbackTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 	Name: "system_governance_audit_fallback_total",
 	Help: "Total governance audit fallback operations.",
 }, []string{"operation", "outcome"})
+
+var putAuditFallbackScript = redis.NewScript(`
+local existing = redis.call('GET', KEYS[1])
+if existing then
+	if existing ~= ARGV[1] then
+		return -1
+	end
+	redis.call('ZADD', KEYS[2], ARGV[2], KEYS[1])
+	return 0
+end
+redis.call('SET', KEYS[1], ARGV[1])
+redis.call('ZADD', KEYS[2], ARGV[2], KEYS[1])
+return 1
+`)
+
+var deleteAuditFallbackScript = redis.NewScript(`
+local deleted = redis.call('DEL', KEYS[1])
+redis.call('ZREM', KEYS[2], KEYS[1])
+return deleted
+`)
 
 type ActionAuditFallbackStore struct {
 	client  redis.UniversalClient
@@ -85,19 +104,22 @@ func (s *ActionAuditFallbackStore) Put(ctx context.Context, record app.ActionAud
 		return err
 	}
 	key := s.key(record.OrgID, record.RequestID)
-	created, err := s.client.SetNX(ctx, key, raw, 0).Result()
+	created, err := putAuditFallbackScript.Run(
+		ctx,
+		s.client,
+		[]string{key, s.builder.BuildGovernanceAuditReplayIndexKey()},
+		raw,
+		record.FinishedAt.UnixMilli(),
+	).Int64()
 	if err != nil {
 		auditFallbackTotal.WithLabelValues("put", "failed").Inc()
 		return err
 	}
-	if !created {
-		existing, loadErr := s.client.Get(ctx, key).Bytes()
-		if loadErr != nil {
-			return loadErr
-		}
-		if !bytes.Equal(existing, raw) {
-			return errors.New("governance audit fallback terminal conflicts with existing record")
-		}
+	if created < 0 {
+		auditFallbackTotal.WithLabelValues("put", "conflict").Inc()
+		return errors.New("governance audit fallback terminal conflicts with existing record")
+	}
+	if created == 0 {
 		auditFallbackTotal.WithLabelValues("put", "noop").Inc()
 		return nil
 	}
@@ -110,7 +132,12 @@ func (s *ActionAuditFallbackStore) Delete(ctx context.Context, orgID int64, requ
 	if s == nil || s.client == nil {
 		return errors.New("governance audit fallback redis is unavailable")
 	}
-	deleted, err := s.client.Del(ctx, s.key(orgID, requestID)).Result()
+	key := s.key(orgID, requestID)
+	deleted, err := deleteAuditFallbackScript.Run(
+		ctx,
+		s.client,
+		[]string{key, s.builder.BuildGovernanceAuditReplayIndexKey()},
+	).Int64()
 	if err != nil {
 		auditFallbackTotal.WithLabelValues("delete", "failed").Inc()
 		return err
@@ -129,28 +156,47 @@ func (s *ActionAuditFallbackStore) List(ctx context.Context, limit int) ([]app.A
 	if limit <= 0 {
 		limit = 100
 	}
-	pattern := s.builder.BuildGovernanceAuditReplayKey("*", "*")
 	records := make([]app.ActionAuditRecord, 0, limit)
-	pending := 0
-	iter := s.client.Scan(ctx, 0, pattern, int64(limit)).Iterator()
-	for iter.Next(ctx) {
-		raw, err := s.client.Get(ctx, iter.Val()).Bytes()
-		if errors.Is(err, redis.Nil) {
-			continue
-		}
+	indexKey := s.builder.BuildGovernanceAuditReplayIndexKey()
+	for len(records) < limit {
+		remaining := limit - len(records)
+		start := int64(len(records))
+		keys, err := s.client.ZRange(ctx, indexKey, start, start+int64(remaining)-1).Result()
 		if err != nil {
 			return nil, err
 		}
-		record, err := decodeActionAuditFallback(raw)
-		if err != nil {
-			return nil, fmt.Errorf("decode governance audit fallback %q: %w", iter.Val(), err)
+		if len(keys) == 0 {
+			break
 		}
-		pending++
-		if len(records) < limit {
+		rawValues, err := s.client.MGet(ctx, keys...).Result()
+		if err != nil {
+			return nil, err
+		}
+		stale := make([]interface{}, 0)
+		for i, rawValue := range rawValues {
+			if rawValue == nil {
+				stale = append(stale, keys[i])
+				continue
+			}
+			raw, ok := rawValue.(string)
+			if !ok {
+				continue
+			}
+			record, err := decodeActionAuditFallback([]byte(raw))
+			if err != nil {
+				return nil, fmt.Errorf("decode governance audit fallback %q: %w", keys[i], err)
+			}
 			records = append(records, record)
 		}
+		if len(stale) == 0 {
+			break
+		}
+		if err := s.client.ZRem(ctx, indexKey, stale...).Err(); err != nil {
+			return nil, err
+		}
 	}
-	if err := iter.Err(); err != nil {
+	pending, err := s.client.ZCard(ctx, indexKey).Result()
+	if err != nil {
 		return nil, err
 	}
 	auditFallbackPending.Set(float64(pending))

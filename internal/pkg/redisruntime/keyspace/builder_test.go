@@ -34,6 +34,28 @@ func TestBuilderWithNamespace(t *testing.T) {
 	}
 }
 
+func TestBuilderUsesDedicatedOperationalIndexes(t *testing.T) {
+	builder := NewBuilderWithNamespace("ops:runtime")
+
+	tests := map[string]string{
+		"command":        builder.BuildResilienceCommandIndexKey("apiserver"),
+		"result":         builder.BuildResilienceCommandResultIndexKey("9:request-1"),
+		"instance":       builder.BuildResilienceInstanceIndexKey("apiserver"),
+		"audit fallback": builder.BuildGovernanceAuditReplayIndexKey(),
+	}
+	wants := map[string]string{
+		"command":        "ops:runtime:resilience:index:command:apiserver",
+		"result":         "ops:runtime:resilience:index:result:9:request-1",
+		"instance":       "ops:runtime:resilience:index:instance:apiserver",
+		"audit fallback": "ops:runtime:governance:index:audit-replay",
+	}
+	for name, got := range tests {
+		if got != wants[name] {
+			t.Fatalf("%s index key = %q, want %q", name, got, wants[name])
+		}
+	}
+}
+
 func TestStatisticsBuilderUsesNamespacedV2Schema(t *testing.T) {
 	builder := NewBuilderWithNamespace("cache:query")
 

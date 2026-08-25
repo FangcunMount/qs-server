@@ -49,3 +49,12 @@ func TestObservePerfTrafficRequestKeepsOriginBounded(t *testing.T) {
 		t.Fatalf("traffic deltas = perf %.0f other %.0f, want 1/1", perfAfter-perfBefore, otherAfter-otherBefore)
 	}
 }
+
+func TestObserveControlCommandPollKeepsLabelsBounded(t *testing.T) {
+	before := testutil.ToFloat64(resilienceControlCommandPollTotal.WithLabelValues("unknown", "unknown"))
+	ObserveControlCommandPoll("arbitrary-trigger", "arbitrary-outcome")
+	after := testutil.ToFloat64(resilienceControlCommandPollTotal.WithLabelValues("unknown", "unknown"))
+	if after != before+1 {
+		t.Fatalf("unknown command poll metric delta=%v, want 1", after-before)
+	}
+}

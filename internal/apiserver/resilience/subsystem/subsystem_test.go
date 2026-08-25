@@ -2,6 +2,7 @@ package subsystem
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -114,6 +115,81 @@ func TestCommandTargetInstancesDeduplicatesGenerations(t *testing.T) {
 	if err != nil || len(instances) != 1 || instances[0] != identity.InstanceID {
 		t.Fatalf("commandTargetInstances() = %v, %v", instances, err)
 	}
+}
+
+func TestSubsystemPollsCommandsOnStartupSignalAndRecoveryOnly(t *testing.T) {
+	store := &commandPollStore{signals: make(chan string, 4)}
+	s := mustNewSubsystem(t, Options{RateLimit: options.NewRateLimitOptions(), StateStore: store})
+	s.stateEvery = time.Hour
+	s.commandEvery = 200 * time.Millisecond
+	cancel := s.Start(context.Background())
+	t.Cleanup(cancel)
+
+	waitForCommandPolls(t, store, 1)
+	store.signals <- "rate:apiserver:query"
+	time.Sleep(30 * time.Millisecond)
+	if got := store.polls.Load(); got != 1 {
+		t.Fatalf("non-command signal command polls=%d, want 1", got)
+	}
+	store.signals <- "command:apiserver"
+	waitForCommandPolls(t, store, 2)
+	waitForCommandPolls(t, store, 3)
+}
+
+type commandPollStore struct {
+	signals chan string
+	polls   atomic.Int64
+}
+
+func (s *commandPollStore) Load(context.Context, string) (control.VersionedState, bool, error) {
+	return control.VersionedState{}, false, nil
+}
+
+func (s *commandPollStore) CompareAndSwap(_ context.Context, _ string, _ uint64, candidate control.VersionedState, _ time.Duration) (control.VersionedState, error) {
+	return candidate, nil
+}
+
+func (s *commandPollStore) Delete(context.Context, string, uint64) error { return nil }
+
+func (s *commandPollStore) WatchStateSignals(context.Context) (<-chan string, error) {
+	return s.signals, nil
+}
+
+func (s *commandPollStore) PublishCommand(context.Context, control.Command, time.Duration) error {
+	return nil
+}
+
+func (s *commandPollStore) ListCommands(context.Context, string, string) ([]control.Command, error) {
+	s.polls.Add(1)
+	return []control.Command{}, nil
+}
+
+func (s *commandPollStore) Claim(context.Context, string, string, time.Duration) (bool, error) {
+	return false, nil
+}
+
+func (s *commandPollStore) PutCommandResult(context.Context, control.CommandResult, time.Duration) error {
+	return nil
+}
+
+func (s *commandPollStore) ListCommandResults(context.Context, int64, string) ([]control.CommandResult, error) {
+	return []control.CommandResult{}, nil
+}
+
+func (s *commandPollStore) ListInstances(context.Context, string) ([]control.InstanceIdentity, error) {
+	return []control.InstanceIdentity{}, nil
+}
+
+func waitForCommandPolls(t *testing.T, store *commandPollStore, want int64) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if store.polls.Load() >= want {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("command polls=%d, want at least %d", store.polls.Load(), want)
 }
 
 func waitForBudget(t *testing.T, subsystem *Subsystem, version uint64, source string) {

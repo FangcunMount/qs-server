@@ -1,0 +1,57 @@
+name: ServerA Traffic Contracts
+
+on:
+  pull_request:
+    paths:
+      - 'internal/pkg/resilience/control/redisadapter/**'
+      - 'internal/apiserver/infra/redis/systemgovernance/**'
+      - 'internal/pkg/redisruntime/keyspace/**'
+      - 'scripts/dbops/**'
+      - '.github/workflows/db-ops.yml'
+      - '.github/workflows/redis-control-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  redis-control-contract:
+    name: Redis 7 Indexed Control Contract
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run Redis control integration contracts
+        env:
+          QS_SERVER_TEST_REDIS_URL: redis://127.0.0.1:6379/13
+        run: |
+          go test -tags=integration -count=1 \
+            ./internal/pkg/resilience/control/redisadapter \
+            ./internal/apiserver/infra/redis/systemgovernance
+
+  mongodb-source-backup-contract:
+    name: MongoDB Source Backup Script Contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate source-side backup scripts
+        run: bash scripts/dbops/test-mongodb-source-backup-scripts.sh

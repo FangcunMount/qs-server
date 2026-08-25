@@ -2,6 +2,7 @@ package redisadapter
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -72,6 +73,24 @@ func TestStoreCommandClaimAndPerInstanceResults(t *testing.T) {
 	if err := store.PublishCommand(ctx, command, time.Minute); err != nil {
 		t.Fatal(err)
 	}
+	commandIndex := keyspace.NewBuilderWithNamespace("ops:runtime").BuildResilienceCommandIndexKey(command.Target.Component)
+	if count, err := client.ZCard(ctx, commandIndex).Result(); err != nil || count != 1 {
+		t.Fatalf("command index count=%d err=%v", count, err)
+	}
+	duplicate := command
+	duplicate.ActionID = "must-not-replace-first-command"
+	if err := store.PublishCommand(ctx, duplicate, 2*time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	commandKey := keyspace.NewBuilderWithNamespace("ops:runtime").BuildResilienceCommandKey(command.Target.Component, control.ScopedRequestID(command.Actor.OrgID, command.RequestID))
+	rawCommand, err := client.Get(ctx, commandKey).Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var storedCommand control.Command
+	if err := json.Unmarshal(rawCommand, &storedCommand); err != nil || storedCommand.ActionID != command.ActionID {
+		t.Fatalf("duplicate publish replaced first command: command=%+v err=%v", storedCommand, err)
+	}
 	commands, err := store.ListCommands(ctx, "apiserver", "api-0")
 	if err != nil || len(commands) != 1 {
 		t.Fatalf("ListCommands() = %+v, %v", commands, err)
@@ -97,5 +116,57 @@ func TestStoreCommandClaimAndPerInstanceResults(t *testing.T) {
 	instances, err := store.ListInstances(ctx, identity.Component)
 	if err != nil || len(instances) != 2 || instances[0].Generation == "" || instances[1].Generation == "" {
 		t.Fatalf("ListInstances() = %+v, %v", instances, err)
+	}
+}
+
+func TestStoreIndexedReadsPruneExpiredAndMissingValues(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = client.Close() })
+	builder := keyspace.NewBuilderWithNamespace("ops:runtime")
+	store := NewStore(client, builder)
+	ctx := context.Background()
+
+	identity, err := control.ResolveInstanceIdentity("apiserver", "api-expiring")
+	if err != nil {
+		t.Fatal(err)
+	}
+	command := control.Command{
+		RequestID: "request-expiring", ActionID: "resilience.release_lock",
+		Target: control.Target{Component: "apiserver", InstanceID: identity.InstanceID},
+		Actor:  control.ActionActor{OrgID: 9}, ExpiresAt: time.Now().Add(time.Second),
+	}
+	result := control.CommandResult{
+		RequestID: command.RequestID, OrgID: command.Actor.OrgID, ActionID: command.ActionID,
+		Component: identity.Component, InstanceID: identity.InstanceID, Status: control.CommandStatusOK,
+	}
+	if err := store.Heartbeat(ctx, identity, time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.PublishCommand(ctx, command, time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.PutCommandResult(ctx, result, time.Second); err != nil {
+		t.Fatal(err)
+	}
+
+	mr.FastForward(2 * time.Second)
+	commands, commandErr := store.ListCommands(ctx, identity.Component, identity.InstanceID)
+	results, resultErr := store.ListCommandResults(ctx, command.Actor.OrgID, command.RequestID)
+	instances, instanceErr := store.ListInstances(ctx, identity.Component)
+	if commandErr != nil || resultErr != nil || instanceErr != nil || len(commands) != 0 || len(results) != 0 || len(instances) != 0 {
+		t.Fatalf("expired indexed values commands=%v results=%v instances=%v errors=%v/%v/%v", commands, results, instances, commandErr, resultErr, instanceErr)
+	}
+
+	missingKey := builder.BuildResilienceCommandKey(identity.Component, "9:missing")
+	commandIndex := builder.BuildResilienceCommandIndexKey(identity.Component)
+	if err := client.ZAdd(ctx, commandIndex, redis.Z{Score: float64(time.Now().Add(time.Minute).UnixMilli()), Member: missingKey}).Err(); err != nil {
+		t.Fatal(err)
+	}
+	if commands, err := store.ListCommands(ctx, identity.Component, identity.InstanceID); err != nil || len(commands) != 0 {
+		t.Fatalf("ListCommands() with orphaned index = %v, %v", commands, err)
+	}
+	if count, err := client.ZCard(ctx, commandIndex).Result(); err != nil || count != 0 {
+		t.Fatalf("orphaned command index count=%d err=%v", count, err)
 	}
 }
