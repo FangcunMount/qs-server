@@ -86,6 +86,10 @@ func buildSchedulerManager(cfg *config.Config, deps container.ServerRuntimeDeps)
 	)
 	manager := runtimescheduler.NewManager(
 		planRunner,
+		runtimescheduler.NewAuthzRoleProjectionRunner(
+			deps.OperatorRoleProjectionReconciler,
+			deps.LockRunner,
+		),
 		runtimescheduler.NewStatisticsSyncRunner(
 			cfg.StatisticsSync,
 			deps.StatisticsCoordinator,

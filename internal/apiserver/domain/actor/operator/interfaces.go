@@ -20,6 +20,12 @@ type Repository interface {
 	Delete(ctx context.Context, id ID) error
 }
 
+// PendingProjectionRepository lists non-authoritative role projections that
+// still need to converge after IAM has committed an assignment change.
+type PendingProjectionRepository interface {
+	ListAuthzProjectionPending(ctx context.Context, limit int) ([]*Operator, error)
+}
+
 // Factory 员工工厂领域服务
 type Factory interface {
 	// GetOrCreateByUser 根据用户ID获取或创建员工（幂等）

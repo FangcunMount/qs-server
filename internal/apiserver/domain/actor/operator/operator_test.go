@@ -19,7 +19,8 @@ func TestOperatorRolesReturnsCopy(t *testing.T) {
 	roles := item.Roles()
 	roles[0] = RoleQSAdmin
 
-	if !item.HasRole(RoleOperator) || item.HasRole(RoleQSAdmin) {
+	current := item.Roles()
+	if len(current) != 1 || current[0] != RoleOperator {
 		t.Fatalf("expected returned roles slice not to mutate aggregate")
 	}
 }

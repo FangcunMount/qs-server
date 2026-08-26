@@ -46,12 +46,6 @@ type OperatorLifecycleService interface {
 // 职责：角色分配、权限管理、账号启停用
 // 变更来源：IT部门的权限管理需求变化
 type OperatorAuthorizationService interface {
-	// AssignRole 分配角色
-	AssignRole(ctx context.Context, operatorID uint64, role string) error
-
-	// RemoveRole 移除角色
-	RemoveRole(ctx context.Context, operatorID uint64, role string) error
-
 	// ReplaceRoles atomically replaces only the QS-managed direct IAM roles.
 	ReplaceRoles(ctx context.Context, operatorID uint64, roles []string) error
 

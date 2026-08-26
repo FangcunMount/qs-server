@@ -38,18 +38,19 @@ type Module struct {
 	TesteeBackendQueryService        testeeApp.TesteeBackendQueryService
 	TesteeAssessmentAttentionService testeeApp.TesteeAssessmentAttentionService
 
-	OperatorLifecycleService      operatorApp.OperatorLifecycleService
-	OperatorAuthorizationService  operatorApp.OperatorAuthorizationService
-	OperatorQueryService          operatorApp.OperatorQueryService
-	ClinicianLifecycleService     clinicianApp.ClinicianLifecycleService
-	ClinicianQueryService         clinicianApp.ClinicianQueryService
-	ClinicianRelationshipService  clinicianApp.ClinicianRelationshipService
-	AssessmentEntryService        assessmentEntryApp.AssessmentEntryService
-	TesteeAccessService           actorAccessApp.TesteeAccessService
-	ActiveOperatorChecker         operatorApp.ActiveOperatorChecker
-	OperatorRoleProjectionUpdater operatorApp.OperatorRoleProjectionUpdater
-	ReadModel                     actorreadmodel.ReadModel
-	AssessmentSummaryReader       actorreadmodel.AssessmentSummaryReader
+	OperatorLifecycleService         operatorApp.OperatorLifecycleService
+	OperatorAuthorizationService     operatorApp.OperatorAuthorizationService
+	OperatorQueryService             operatorApp.OperatorQueryService
+	ClinicianLifecycleService        clinicianApp.ClinicianLifecycleService
+	ClinicianQueryService            clinicianApp.ClinicianQueryService
+	ClinicianRelationshipService     clinicianApp.ClinicianRelationshipService
+	AssessmentEntryService           assessmentEntryApp.AssessmentEntryService
+	TesteeAccessService              actorAccessApp.TesteeAccessService
+	ActiveOperatorChecker            operatorApp.ActiveOperatorChecker
+	OperatorRoleProjectionUpdater    operatorApp.OperatorRoleProjectionUpdater
+	OperatorRoleProjectionReconciler operatorApp.OperatorRoleProjectionReconciler
+	ReadModel                        actorreadmodel.ReadModel
+	AssessmentSummaryReader          actorreadmodel.AssessmentSummaryReader
 }
 
 // Deps defines explicit constructor dependencies for the actor module.
@@ -170,6 +171,7 @@ func New(deps Deps) (*Module, error) {
 	module.OperatorQueryService = operatorApp.NewQueryService(actorReadModel)
 	module.ActiveOperatorChecker = operatorApp.NewActiveOperatorChecker(actorReadModel)
 	module.OperatorRoleProjectionUpdater = operatorApp.NewRoleProjectionUpdater(operatorRepo, operatorAuthzGateway)
+	module.OperatorRoleProjectionReconciler = operatorApp.NewRoleProjectionReconciler(operatorRepo, operatorAuthzGateway)
 	module.ClinicianLifecycleService = clinicianApp.NewLifecycleService(
 		clinicianRepo,
 		operatorRepo,

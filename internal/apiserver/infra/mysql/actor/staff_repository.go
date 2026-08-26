@@ -80,6 +80,23 @@ func (r *operatorRepository) FindByUser(ctx context.Context, orgID int64, userID
 	return r.mapper.ToDomain(&po), nil
 }
 
+// ListAuthzProjectionPending returns a bounded, stable batch for the
+// background IAM role projection reconciler.
+func (r *operatorRepository) ListAuthzProjectionPending(ctx context.Context, limit int) ([]*domain.Operator, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	var pos []*OperatorPO
+	if err := r.WithContext(ctx).
+		Where("authz_projection_pending = ? AND deleted_at IS NULL", true).
+		Order("id ASC").
+		Limit(limit).
+		Find(&pos).Error; err != nil {
+		return nil, err
+	}
+	return r.mapper.ToDomains(pos), nil
+}
+
 // ListByOrg 列出机构下的操作者
 func (r *operatorRepository) ListByOrg(ctx context.Context, orgID int64, offset, limit int) ([]*domain.Operator, error) {
 	var pos []*OperatorPO

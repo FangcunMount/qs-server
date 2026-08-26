@@ -497,6 +497,8 @@ type ServerGRPCBootstrapDeps struct {
 type ServerRuntimeDeps struct {
 	LockBuilder                       *keyspace.Builder
 	LockManager                       locklease.Manager
+	LockRunner                        locklease.Runner
+	OperatorRoleProjectionReconciler  operatorApp.OperatorRoleProjectionReconciler
 	WarmupCoordinator                 cachegovernance.WarmupCoordinator
 	PlanCommandService                planApp.PlanCommandService
 	StatisticsCoordinator             *statisticsApp.Coordinator
@@ -533,7 +535,11 @@ func (c *Container) BuildServerRuntimeDeps() ServerRuntimeDeps {
 		deps.LockBuilder = c.locks.Builder()
 	}
 	deps.LockManager = c.LockManager()
+	deps.LockRunner = c.LockRunner()
 	deps.WarmupCoordinator = c.WarmupCoordinator()
+	if c.ActorModule != nil {
+		deps.OperatorRoleProjectionReconciler = c.ActorModule.OperatorRoleProjectionReconciler
+	}
 
 	if c.PlanModule != nil {
 		deps.PlanCommandService = c.PlanModule.CommandService

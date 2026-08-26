@@ -6,7 +6,7 @@ import "time"
 // 设计说明：
 // 1. Operator 是 IAM.User 在本 BC 的业务视图投影，不是完整的用户实体
 // 2. 持久化的核心目的：
-//   - 存储业务角色（roles）：GetAuthorizationSnapshot.roles 的本地只读投影
+//   - 存储 direct/effective roles：GetAuthorizationSnapshot 的本地非权威投影
 //   - 多租户隔离：同一 IAM.User 在不同机构可能有不同角色
 //   - 审计追溯：操作记录用 ID 比 IAMUserID 更有业务语义
 //   - 性能优化：缓存常用字段（name），减少 RPC 调用
@@ -17,6 +17,7 @@ import "time"
 //   - 以行为为中心，通过领域服务管理复杂逻辑
 //   - 不过度暴露内部状态，保持封装性
 //   - 审计字段由基础设施层（PO）处理
+//   - 任何授权判定必须使用请求期 IAM Snapshot/Check，不读取本地角色投影
 type Operator struct {
 	id                     ID     // 内部员工ID（主键）
 	orgID                  int64  // 所属机构（多租户隔离）
@@ -117,26 +118,6 @@ func (s *Operator) SetID(id ID) {
 	s.id = id
 }
 
-// HasRole 检查是否有某个角色
-func (s *Operator) HasRole(role Role) bool {
-	for _, r := range s.roles {
-		if r == role {
-			return true
-		}
-	}
-	return false
-}
-
-// HasAnyRole 检查是否有任意一个角色
-func (s *Operator) HasAnyRole(roles ...Role) bool {
-	for _, role := range roles {
-		if s.HasRole(role) {
-			return true
-		}
-	}
-	return false
-}
-
 // activate 激活（包内方法，应通过 Editor 调用）
 func (s *Operator) activate() {
 	s.isActive = true
@@ -145,24 +126,6 @@ func (s *Operator) activate() {
 // deactivate 停用（包内方法，应通过 Editor 调用）
 func (s *Operator) deactivate() {
 	s.isActive = false
-}
-
-// CanEvaluate 是否可以评估
-func (s *Operator) CanEvaluate() bool {
-	// QS 评估员或管理员可以评估
-	return s.HasAnyRole(RoleEvaluatorQS, RoleQSAdmin)
-}
-
-// CanAuditReport 是否可以审核报告
-func (s *Operator) CanAuditReport() bool {
-	// 目前仅管理员可以审核报告
-	return s.HasRole(RoleQSAdmin)
-}
-
-// CanManageEvaluationPlans 是否可以管理测评计划
-func (s *Operator) CanManageEvaluationPlans() bool {
-	// 管理员或测评计划管理员可以管理测评计划
-	return s.HasAnyRole(RoleQSAdmin, RoleEvaluationPlanManager)
 }
 
 // === 仓储层重建方法（用于从数据库加载）===
