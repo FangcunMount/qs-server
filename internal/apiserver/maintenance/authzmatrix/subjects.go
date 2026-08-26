@@ -99,16 +99,17 @@ func selectSubject(ctx context.Context, tx *sql.Tx, query subjectQuery) (string,
 // SyntheticSubjectDirectory resolves deliberately isolated IAM identities. It
 // must be read-only while the matrix is running.
 type SyntheticSubjectDirectory interface {
-	FindActiveIsolatedUser(context.Context, string) (string, error)
+	FindActiveIsolatedUsers(context.Context, string) ([]string, error)
 }
 
 type StableSubjectSource struct {
 	db        *sql.DB
 	synthetic SyntheticSubjectDirectory
+	snapshots SnapshotReader
 }
 
-func NewStableSubjectSource(db *sql.DB, synthetic SyntheticSubjectDirectory) *StableSubjectSource {
-	return &StableSubjectSource{db: db, synthetic: synthetic}
+func NewStableSubjectSource(db *sql.DB, synthetic SyntheticSubjectDirectory, snapshots SnapshotReader) *StableSubjectSource {
+	return &StableSubjectSource{db: db, synthetic: synthetic, snapshots: snapshots}
 }
 
 func (s *StableSubjectSource) Load(ctx context.Context) ([]Subject, error) {
@@ -139,8 +140,8 @@ func (s *StableSubjectSource) Load(ctx context.Context) ([]Subject, error) {
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("complete read-only subject transaction: %w", err)
 	}
-	if s.synthetic == nil {
-		return nil, fmt.Errorf("synthetic IAM subject directory is required")
+	if s.synthetic == nil || s.snapshots == nil {
+		return nil, fmt.Errorf("synthetic IAM subject directory and snapshot reader are required")
 	}
 	result := []Subject{production["admin"]}
 	for _, subject := range []struct {
@@ -149,7 +150,11 @@ func (s *StableSubjectSource) Load(ctx context.Context) ([]Subject, error) {
 		{kind: "evaluator", role: RoleEvaluator, nickname: SyntheticEvaluatorNickname},
 		{kind: "plan_manager", role: RolePlanManager, nickname: SyntheticPlanManagerNickname},
 	} {
-		userID, syntheticErr := s.synthetic.FindActiveIsolatedUser(ctx, subject.nickname)
+		candidates, syntheticErr := s.synthetic.FindActiveIsolatedUsers(ctx, subject.nickname)
+		if syntheticErr != nil {
+			return nil, fmt.Errorf("resolve isolated %s subject: %w", subject.kind, syntheticErr)
+		}
+		userID, syntheticErr := s.selectCandidateByDirectRole(ctx, candidates, subject.role)
 		if syntheticErr != nil {
 			return nil, fmt.Errorf("resolve isolated %s subject: %w", subject.kind, syntheticErr)
 		}
@@ -158,6 +163,23 @@ func (s *StableSubjectSource) Load(ctx context.Context) ([]Subject, error) {
 		})
 	}
 	return append(result, production["other"]), nil
+}
+
+func (s *StableSubjectSource) selectCandidateByDirectRole(ctx context.Context, candidates []string, role string) (string, error) {
+	matches := make([]string, 0, 1)
+	for _, userID := range candidates {
+		snapshot, err := s.snapshots.Load(ctx, Domain, userID)
+		if err != nil {
+			return "", fmt.Errorf("load candidate IAM snapshot: %w", err)
+		}
+		if equalRoles(snapshot.DirectRoleNames(), []string{role}) {
+			matches = append(matches, userID)
+		}
+	}
+	if len(matches) != 1 {
+		return "", fmt.Errorf("expected one active isolated subject with direct role %s, found %d among %d nickname matches", role, len(matches), len(candidates))
+	}
+	return matches[0], nil
 }
 
 func jsonString(value string) string {
