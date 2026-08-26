@@ -13,6 +13,7 @@
 | `db-ops.yml` | 受保护的备份、恢复与只读数据盘点入口 | 写操作/恢复需要独立授权、备份和复验 |
 | `attention-reconcile-audit.yml` | 受控 Attention reconciliation 审计 | 不得把 dry-run 自动升级为 apply |
 | `compatibility-observation.yml` | 只读兼容流量/指标观察 | 无指标、零值、无命中和证据缺失必须区分 |
+| `authz-production-matrix.yml` | 使用真实生产主体执行只读 IAM AuthZ v3 矩阵 | 主体来自活跃 `staff` 投影并由 IAM 快照复核；不写角色或业务数据 |
 
 删除、重命名或改变触发关系时，必须同步 `scripts/cd` 契约测试和文档门禁。历史 run 只进入证据台账，不回写本页。
 
@@ -49,6 +50,7 @@ bash scripts/cd/test-production-compose-network-exposure.sh
 bash scripts/cd/test-wait-worker-readiness.sh
 bash scripts/cd/test-verify-worker-dependencies.sh
 bash scripts/cd/test-verify-worker-governance.sh
+bash scripts/cd/test-verify-authz-production-matrix.sh
 ```
 
 这些命令不读取生产 Secret，也不证明目标主机可达。真实部署必须另存 workflow URL/run ID、exact source/deployed SHA、image digest、effective-config hash、逐实例检查、limitations 和失效期。

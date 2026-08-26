@@ -295,6 +295,9 @@ jobs:
       - name: Validate compatibility observation contract
         run: bash scripts/cd/test-compatibility-observation.sh
 
+      - name: Validate production AuthZ matrix contract
+        run: bash scripts/cd/test-verify-authz-production-matrix.sh
+
       - name: Validate production Compose
         run: |
           printf '%s\n' \
