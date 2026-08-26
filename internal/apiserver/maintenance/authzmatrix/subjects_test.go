@@ -17,7 +17,7 @@ func TestSQLSubjectSourceUsesReadOnlyDeterministicQueries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
 	expectSubjectQuery(mock, "admin", []string{RoleAdmin}, "101")

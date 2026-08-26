@@ -219,13 +219,14 @@ func matrixCases(subjects []Subject) []matrixCase {
 	for _, kind := range []string{"admin", "evaluator", "plan_manager", "other"} {
 		subject := byKind[kind]
 		item := matrixCase{subject: subject, objectSuffix: "attribute-missing"}
-		if kind == "admin" {
+		switch kind {
+		case "admin":
 			item.expectedAllowed = true
 			item.expectedMatchedRole = RoleAdmin
-		} else if kind == "evaluator" || kind == "plan_manager" {
+		case "evaluator", "plan_manager":
 			item.expectedDenyCode = "attribute_missing"
 			item.expectMissingOrigin = true
-		} else {
+		default:
 			item.expectedDenyCode = "policy_not_matched"
 		}
 		result = append(result, item)
