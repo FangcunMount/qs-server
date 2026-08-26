@@ -47,7 +47,7 @@ fi
 
 evidence_file="$(mktemp /tmp/qs-authz-matrix-evidence.XXXXXX)"
 trap 'rm -f -- "$evidence_file"' EXIT
-printf '%s\n' "$matrix_output" | awk '/^\{"schema_version":"iam-authz-production-matrix\/v1"/{evidence=$0} END{print evidence}' >"$evidence_file"
+printf '%s\n' "$matrix_output" | awk '/^\{"schema_version":"iam-authz-production-matrix\/v2"/{evidence=$0} END{print evidence}' >"$evidence_file"
 if [ ! -s "$evidence_file" ]; then
   echo "Production AuthZ matrix evidence JSON is missing" >&2
   exit 1
@@ -71,7 +71,7 @@ expected = {
     ("other", "adhoc"): False,
     ("other", "plan"): False,
 }
-if evidence.get("schema_version") != "iam-authz-production-matrix/v1":
+if evidence.get("schema_version") != "iam-authz-production-matrix/v2":
     raise SystemExit("unexpected AuthZ matrix evidence schema")
 if evidence.get("git_commit") != os.environ["DEPLOYED_SHA"]:
     raise SystemExit("AuthZ matrix binary SHA does not match deployed image")
@@ -96,13 +96,30 @@ for subject in subjects.values():
         raise SystemExit("AuthZ matrix subject fingerprint is invalid")
 
 observed = {}
+special = {}
 for case in evidence["cases"]:
-    if case.get("origin_type"):
+    if case.get("scenario") == "origin" and case.get("action") == "retry" and case.get("origin_type"):
         observed[(case["kind"], case["origin_type"])] = case.get("allowed")
+    else:
+        special[(case.get("kind"), case.get("scenario"), case.get("action"))] = case
     if case.get("passed") is not True:
-        raise SystemExit(f"AuthZ matrix case failed: {case.get('kind')}/{case.get('origin_type')}")
+        raise SystemExit(f"AuthZ matrix case failed: {case.get('kind')}/{case.get('scenario')}")
 if observed != expected:
     raise SystemExit(f"AuthZ role x origin matrix mismatch: {observed}")
+missing = special.get(("evaluator", "attribute_missing", "retry"), {})
+if missing.get("allowed") is not False or missing.get("deny_code") != "attribute_missing" or "object.origin_type" not in missing.get("missing_attribute_keys", []):
+    raise SystemExit("AuthZ evaluator missing-attribute evidence is invalid")
+invalid_type = special.get(("evaluator", "attribute_type_error", "retry"), {})
+if invalid_type.get("error_code") != "authorization_contract":
+    raise SystemExit("AuthZ evaluator invalid-type evidence is invalid")
+evaluator_force = special.get(("evaluator", "force_retry", "force_retry"), {})
+if evaluator_force.get("allowed") is not False or evaluator_force.get("deny_code") != "policy_not_matched":
+    raise SystemExit("AuthZ evaluator force_retry evidence is invalid")
+admin_force = special.get(("admin", "force_retry", "force_retry"), {})
+if admin_force.get("allowed") is not True:
+    raise SystemExit("AuthZ admin force_retry evidence is invalid")
+if len(special) != 4:
+    raise SystemExit(f"AuthZ special-case evidence is incomplete: {sorted(special)}")
 print(
     "Production AuthZ v3 matrix passed: "
     f"subjects=4 cases=12 synthetic_subjects=2 "

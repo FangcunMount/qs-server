@@ -84,14 +84,15 @@ func (s *server) buildResilienceSubsystem(runtime *cacheplanebootstrap.RuntimeBu
 		RenewalEnabled: renewalEnabled,
 		Warn:           func(message string) { log.Warn(message) },
 		EnabledWorkloads: map[locklease.WorkloadID]bool{
-			locklease.WorkloadPlanSchedulerLeader:         s.config.PlanScheduler != nil && s.config.PlanScheduler.Enable,
-			locklease.WorkloadStatisticsSyncLeader:        s.config.StatisticsSync != nil && s.config.StatisticsSync.Enable,
-			locklease.WorkloadStatisticsSync:              true,
-			locklease.WorkloadEvaluationConsistencyAudit:  s.config.EvaluationConsistencyAudit != nil && s.config.EvaluationConsistencyAudit.Enable,
-			locklease.WorkloadEvaluationLeaseRecovery:     s.config.EvaluationLeaseRecovery != nil && s.config.EvaluationLeaseRecovery.Enable,
-			locklease.WorkloadInterpretationLeaseRecovery: s.config.InterpretationLeaseRecovery != nil && s.config.InterpretationLeaseRecovery.Enable,
-			locklease.WorkloadReportCatalogAudit:          s.config.ReportCatalogAudit != nil && s.config.ReportCatalogAudit.Enable,
-			locklease.WorkloadMongoConsistencyAudit:       s.config.MongoConsistencyAudit != nil && s.config.MongoConsistencyAudit.Enable,
+			locklease.WorkloadAuthzRoleProjectionReconcile: true,
+			locklease.WorkloadPlanSchedulerLeader:          s.config.PlanScheduler != nil && s.config.PlanScheduler.Enable,
+			locklease.WorkloadStatisticsSyncLeader:         s.config.StatisticsSync != nil && s.config.StatisticsSync.Enable,
+			locklease.WorkloadStatisticsSync:               true,
+			locklease.WorkloadEvaluationConsistencyAudit:   s.config.EvaluationConsistencyAudit != nil && s.config.EvaluationConsistencyAudit.Enable,
+			locklease.WorkloadEvaluationLeaseRecovery:      s.config.EvaluationLeaseRecovery != nil && s.config.EvaluationLeaseRecovery.Enable,
+			locklease.WorkloadInterpretationLeaseRecovery:  s.config.InterpretationLeaseRecovery != nil && s.config.InterpretationLeaseRecovery.Enable,
+			locklease.WorkloadReportCatalogAudit:           s.config.ReportCatalogAudit != nil && s.config.ReportCatalogAudit.Enable,
+			locklease.WorkloadMongoConsistencyAudit:        s.config.MongoConsistencyAudit != nil && s.config.MongoConsistencyAudit.Enable,
 		},
 	})
 	var stateStore *controlredis.Store

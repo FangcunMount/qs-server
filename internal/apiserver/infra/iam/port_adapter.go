@@ -145,20 +145,6 @@ func (g *operatorAuthzGateway) IsEnabled() bool {
 	return g != nil && g.assignment != nil && g.snapshot != nil
 }
 
-func (g *operatorAuthzGateway) GrantOperatorRole(ctx context.Context, orgID, userID int64, roleName, grantedBy string) error {
-	if !g.IsEnabled() {
-		return fmt.Errorf("iam operator authorization gateway is not available")
-	}
-	return g.assignment.Grant(ctx, g.snapshot.DomainForOrg(orgID), strconv.FormatInt(userID, 10), roleName, grantedBy)
-}
-
-func (g *operatorAuthzGateway) RevokeOperatorRole(ctx context.Context, orgID, userID int64, roleName string) error {
-	if !g.IsEnabled() {
-		return fmt.Errorf("iam operator authorization gateway is not available")
-	}
-	return g.assignment.Revoke(ctx, g.snapshot.DomainForOrg(orgID), strconv.FormatInt(userID, 10), roleName)
-}
-
 func (g *operatorAuthzGateway) ReplaceManagedOperatorRoles(ctx context.Context, orgID, userID int64, roleNames []string, changedBy, reason string) (int64, error) {
 	if !g.IsEnabled() {
 		return 0, fmt.Errorf("iam operator authorization gateway is not available")

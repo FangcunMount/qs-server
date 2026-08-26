@@ -8,7 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 )
 
-// AssignmentClient IAM GrantAssignment / RevokeAssignment。
+// AssignmentClient atomically replaces the QS-managed direct role set.
 type AssignmentClient struct {
 	client GRPCClient
 	tokens TokenProvider
@@ -30,41 +30,6 @@ func NewAssignmentClient(c GRPCClient, providers ...TokenProvider) *AssignmentCl
 		tokens = providers[0]
 	}
 	return &AssignmentClient{client: c, tokens: tokens}
-}
-
-// Grant 授予 IAM 角色。
-func (a *AssignmentClient) Grant(ctx context.Context, domain, targetUserIDStr, roleName, grantedBy string) error {
-	if a == nil || a.client == nil {
-		return fmt.Errorf("iam assignment client not available")
-	}
-	ctx, err := authorizationContext(ctx, a.tokens)
-	if err != nil {
-		return err
-	}
-	_, err = a.client.SDK().Authz().GrantAssignment(ctx, &authzv3.GrantAssignmentRequest{
-		Subject:   authz.SubjectKey(targetUserIDStr),
-		Domain:    domain,
-		RoleName:  roleName,
-		GrantedBy: grantedBy,
-	})
-	return err
-}
-
-// Revoke 撤销 IAM 角色。
-func (a *AssignmentClient) Revoke(ctx context.Context, domain, targetUserIDStr, roleName string) error {
-	if a == nil || a.client == nil {
-		return fmt.Errorf("iam assignment client not available")
-	}
-	ctx, err := authorizationContext(ctx, a.tokens)
-	if err != nil {
-		return err
-	}
-	_, err = a.client.SDK().Authz().RevokeAssignment(ctx, &authzv3.RevokeAssignmentRequest{
-		Subject:  authz.SubjectKey(targetUserIDStr),
-		Domain:   domain,
-		RoleName: roleName,
-	})
-	return err
 }
 
 // ReplaceManaged atomically replaces only the QS roles delegated to qs-apiserver.

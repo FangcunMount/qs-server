@@ -32,7 +32,7 @@ esac
 EOF
 chmod +x "$FAKE_DOCKER"
 
-evidence='{"schema_version":"iam-authz-production-matrix/v1","checked_at":"2026-08-26T00:00:00Z","git_commit":"0123456789abcdef0123456789abcdef01234567","service_identity":"qs-apiserver.svc","domain":"fangcun","resource":"qs:evaluation:collection:assessments","action":"retry","policy_version":27,"subjects":[{"kind":"admin","source":"production_staff","subject_fingerprint":"1111111111111111"},{"kind":"evaluator","source":"synthetic_iam_user","subject_fingerprint":"2222222222222222"},{"kind":"plan_manager","source":"synthetic_iam_user","subject_fingerprint":"3333333333333333"},{"kind":"other","source":"production_staff","subject_fingerprint":"4444444444444444"}],"cases":['
+evidence='{"schema_version":"iam-authz-production-matrix/v2","checked_at":"2026-08-26T00:00:00Z","git_commit":"0123456789abcdef0123456789abcdef01234567","service_identity":"qs-apiserver.svc","domain":"fangcun","resource":"qs:evaluation:collection:assessments","action":"retry","policy_version":27,"subjects":[{"kind":"admin","source":"production_staff","subject_fingerprint":"1111111111111111"},{"kind":"evaluator","source":"synthetic_iam_user","subject_fingerprint":"2222222222222222"},{"kind":"plan_manager","source":"synthetic_iam_user","subject_fingerprint":"3333333333333333"},{"kind":"other","source":"production_staff","subject_fingerprint":"4444444444444444"}],"cases":['
 first=1
 for origin in adhoc plan; do
   for kind in admin evaluator plan_manager other; do
@@ -42,12 +42,13 @@ for origin in adhoc plan; do
     fi
     [ "$first" -eq 1 ] || evidence+=','
     first=0
-    evidence+="{\"kind\":\"$kind\",\"origin_type\":\"$origin\",\"expected_allowed\":$allowed,\"allowed\":$allowed,\"policy_version\":27,\"passed\":true}"
+    evidence+="{\"kind\":\"$kind\",\"scenario\":\"origin\",\"action\":\"retry\",\"origin_type\":\"$origin\",\"expected_allowed\":$allowed,\"allowed\":$allowed,\"policy_version\":27,\"passed\":true}"
   done
 done
-for kind in admin evaluator plan_manager other; do
-  evidence+=",{\"kind\":\"$kind\",\"expected_allowed\":false,\"allowed\":false,\"policy_version\":27,\"passed\":true}"
-done
+evidence+=',{"kind":"evaluator","scenario":"attribute_missing","action":"retry","expected_allowed":false,"allowed":false,"deny_code":"attribute_missing","missing_attribute_keys":["object.origin_type"],"policy_version":27,"passed":true}'
+evidence+=',{"kind":"evaluator","scenario":"attribute_type_error","action":"retry","expected_allowed":false,"expected_error_code":"authorization_contract","allowed":false,"error_code":"authorization_contract","policy_version":27,"passed":true}'
+evidence+=',{"kind":"evaluator","scenario":"force_retry","action":"force_retry","expected_allowed":false,"allowed":false,"deny_code":"policy_not_matched","policy_version":27,"passed":true}'
+evidence+=',{"kind":"admin","scenario":"force_retry","action":"force_retry","expected_allowed":true,"allowed":true,"matched_role":"qs:admin","policy_version":27,"passed":true}'
 evidence+='],"passed":true}'
 
 output="$(PRIVILEGE_RUNNER= DOCKER_BIN="$FAKE_DOCKER" FAKE_MATRIX_EVIDENCE="$evidence" \

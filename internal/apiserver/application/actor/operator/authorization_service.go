@@ -37,62 +37,6 @@ func NewAuthorizationService(
 	}
 }
 
-// AssignRole delegates the role fact write to IAM, then refreshes the local projection.
-func (s *authorizationService) AssignRole(ctx context.Context, operatorID uint64, roleName string) error {
-	role := domain.Role(roleName)
-	if err := s.validator.ValidateRole(role); err != nil {
-		return err
-	}
-	if err := s.requireOperatorAuthz(); err != nil {
-		return err
-	}
-	targetOperatorID, err := operatorIDFromUint64("operator_id", operatorID)
-	if err != nil {
-		return err
-	}
-
-	st, err := s.repo.FindByID(ctx, targetOperatorID)
-	if err != nil {
-		return errors.Wrap(err, "failed to find operator")
-	}
-
-	if err := s.authz.GrantOperatorRole(ctx, st.OrgID(), st.UserID(), roleName, actorctx.IAMGrantedBySubject(ctx)); err != nil {
-		return errors.Wrap(err, "iam grant assignment")
-	}
-	if err := s.persistOperatorRolesFromAuthz(ctx, st); err != nil {
-		return errors.Wrap(err, "sync roles from iam snapshot")
-	}
-	return nil
-}
-
-// RemoveRole 移除角色
-func (s *authorizationService) RemoveRole(ctx context.Context, operatorID uint64, roleName string) error {
-	role := domain.Role(roleName)
-	if err := s.validator.ValidateRole(role); err != nil {
-		return err
-	}
-	if err := s.requireOperatorAuthz(); err != nil {
-		return err
-	}
-	targetOperatorID, err := operatorIDFromUint64("operator_id", operatorID)
-	if err != nil {
-		return err
-	}
-
-	st, err := s.repo.FindByID(ctx, targetOperatorID)
-	if err != nil {
-		return errors.Wrap(err, "failed to find operator")
-	}
-
-	if err := s.authz.RevokeOperatorRole(ctx, st.OrgID(), st.UserID(), roleName); err != nil {
-		return errors.Wrap(err, "iam revoke assignment")
-	}
-	if err := s.persistOperatorRolesFromAuthz(ctx, st); err != nil {
-		return errors.Wrap(err, "sync roles from iam snapshot")
-	}
-	return nil
-}
-
 func (s *authorizationService) ReplaceRoles(ctx context.Context, operatorID uint64, roleNames []string) error {
 	if err := s.requireOperatorAuthz(); err != nil {
 		return err
@@ -129,20 +73,6 @@ func (s *authorizationService) requireOperatorAuthz() error {
 		return errors.New("IAM operator authorization gateway is required")
 	}
 	return nil
-}
-
-func (s *authorizationService) persistOperatorRolesFromAuthz(ctx context.Context, op *domain.Operator) error {
-	if err := s.requireOperatorAuthz(); err != nil {
-		return err
-	}
-	if op == nil {
-		return errors.New("operator is required")
-	}
-	projection, err := s.authz.LoadOperatorRoleProjection(ctx, op.OrgID(), op.UserID())
-	if err != nil {
-		return err
-	}
-	return persistOperatorRoleProjection(ctx, s.repo, op, projection, false)
 }
 
 // Activate 激活操作者

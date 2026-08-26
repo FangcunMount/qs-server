@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "141ef59c54d987c08af70cd22ea68e9e2647b2c8",
+    "sha": "b5baef7648bd6d0ddbb5b40c6763a94defdf39db",
     "verified_on": "2026-08-26"
   },
   "status_policy": {
@@ -2869,7 +2869,7 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "2a22b31a1b0fa3cd7135f7e160176a053733e15a",
+        "source_sha": "b5baef7648bd6d0ddbb5b40c6763a94defdf39db",
         "verified_on": "2026-08-26"
       },
       "fact_sources": [
@@ -2927,7 +2927,7 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "2a22b31a1b0fa3cd7135f7e160176a053733e15a",
+        "source_sha": "b5baef7648bd6d0ddbb5b40c6763a94defdf39db",
         "verified_on": "2026-08-26"
       },
       "fact_sources": [
@@ -2985,7 +2985,7 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "2a22b31a1b0fa3cd7135f7e160176a053733e15a",
+        "source_sha": "b5baef7648bd6d0ddbb5b40c6763a94defdf39db",
         "verified_on": "2026-08-26"
       },
       "fact_sources": [
@@ -3043,7 +3043,7 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "2a22b31a1b0fa3cd7135f7e160176a053733e15a",
+        "source_sha": "b5baef7648bd6d0ddbb5b40c6763a94defdf39db",
         "verified_on": "2026-08-26"
       },
       "fact_sources": [
@@ -3101,7 +3101,7 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "2a22b31a1b0fa3cd7135f7e160176a053733e15a",
+        "source_sha": "b5baef7648bd6d0ddbb5b40c6763a94defdf39db",
         "verified_on": "2026-08-26"
       },
       "fact_sources": [
@@ -5158,7 +5158,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "6c49a2545087f0f5fa7cc8857a8b75f65c98663a",
+        "source_sha": "b5baef7648bd6d0ddbb5b40c6763a94defdf39db",
         "verified_on": "2026-08-25"
       },
       "fact_sources": [
@@ -5459,7 +5459,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "2a22b31a1b0fa3cd7135f7e160176a053733e15a",
+        "source_sha": "b5baef7648bd6d0ddbb5b40c6763a94defdf39db",
         "verified_on": "2026-08-25"
       },
       "fact_sources": [

@@ -2,6 +2,7 @@ package authzmatrix
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -41,13 +42,22 @@ func TestRunnerExecutesProductionRoleOriginMatrix(t *testing.T) {
 			t.Fatalf("failed case = %+v", testCase)
 		}
 	}
+	wantScenarios := map[string]int{"origin": 8, "attribute_missing": 1, "attribute_type_error": 1, "force_retry": 2}
+	for _, testCase := range evidence.Cases {
+		wantScenarios[testCase.Scenario]--
+	}
+	for scenario, remaining := range wantScenarios {
+		if remaining != 0 {
+			t.Fatalf("scenario %s remaining count = %d", scenario, remaining)
+		}
+	}
 }
 
 func TestRunnerFailsClosedOnMatrixMismatch(t *testing.T) {
 	t.Parallel()
 
 	checker := matrixChecker{override: map[string]appauthz.ObjectDecision{
-		"user:102/plan": {Allowed: true, MatchedRole: RoleEvaluator, PolicyVersion: 42},
+		"user:102/retry/plan": {Allowed: true, MatchedRole: RoleEvaluator, PolicyVersion: 42},
 	}}
 	runner := NewRunner(staticSubjects(testSubjects()), staticSnapshots{
 		"101": {RoleAdmin}, "102": {RoleEvaluator}, "103": {RolePlanManager}, "104": {RoleStaff},
@@ -111,10 +121,15 @@ type matrixChecker struct {
 
 func (c matrixChecker) CheckObject(_ context.Context, request appauthz.ObjectCheckRequest) (appauthz.ObjectDecision, error) {
 	origin := "missing"
-	if attribute, ok := request.Attributes[appauthz.ObjectOriginTypeAttribute]; ok && attribute.String != nil {
-		origin = *attribute.String
+	if attribute, ok := request.Attributes[appauthz.ObjectOriginTypeAttribute]; ok {
+		if attribute.Int64 != nil {
+			return appauthz.ObjectDecision{}, fmt.Errorf("%w: invalid origin type", appauthz.ErrAuthorizationContract)
+		}
+		if attribute.String != nil {
+			origin = *attribute.String
+		}
 	}
-	if decision, ok := c.override[request.Subject+"/"+origin]; ok {
+	if decision, ok := c.override[request.Subject+"/"+request.Action+"/"+origin]; ok {
 		return decision, nil
 	}
 	role := map[string]string{"user:101": RoleAdmin, "user:102": RoleEvaluator, "user:103": RolePlanManager, "user:104": RoleStaff}[request.Subject]
@@ -124,15 +139,15 @@ func (c matrixChecker) CheckObject(_ context.Context, request appauthz.ObjectChe
 		decision.Allowed = true
 		decision.MatchedRole = RoleAdmin
 		decision.MatchedGrantID = "grant-admin"
-	case role == RoleEvaluator && origin == "adhoc":
+	case request.Action == RetryAction && role == RoleEvaluator && origin == "adhoc":
 		decision.Allowed = true
 		decision.MatchedRole = RoleEvaluator
 		decision.MatchedGrantID = "grant-evaluator"
-	case role == RolePlanManager && origin == "plan":
+	case request.Action == RetryAction && role == RolePlanManager && origin == "plan":
 		decision.Allowed = true
 		decision.MatchedRole = RolePlanManager
 		decision.MatchedGrantID = "grant-plan-manager"
-	case origin == "missing" && (role == RoleEvaluator || role == RolePlanManager):
+	case request.Action == RetryAction && origin == "missing" && (role == RoleEvaluator || role == RolePlanManager):
 		decision.DenyCode = "attribute_missing"
 		decision.MissingAttributeKeys = []string{appauthz.ObjectOriginTypeAttribute}
 	default:

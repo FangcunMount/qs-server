@@ -20,6 +20,7 @@ const (
 	WorkloadReportCatalogAudit           WorkloadID = "report_catalog_audit"
 	WorkloadMongoConsistencyAudit        WorkloadID = "mongo_consistency_audit"
 	WorkloadAttentionProjectionReconcile WorkloadID = "attention_projection_reconcile"
+	WorkloadAuthzRoleProjectionReconcile WorkloadID = "authz_role_projection_reconcile"
 	WorkloadCollectionSubmit             WorkloadID = "collection_submit"
 )
 
@@ -60,6 +61,7 @@ var capabilities = [...]Capability{
 	{WorkloadReportCatalogAudit, "apiserver", KindLeader, Spec{Name: string(WorkloadReportCatalogAudit), Description: "用于 apiserver 有界报告目录审计多实例 leader 选举与自动续租。", DefaultTTL: 30 * time.Second}, RenewalModeAuto},
 	{WorkloadMongoConsistencyAudit, "apiserver", KindLeader, Spec{Name: string(WorkloadMongoConsistencyAudit), Description: "用于 apiserver Mongo 跨集合一致性只读巡检的单 leader 执行。", DefaultTTL: 30 * time.Second}, RenewalModeAuto},
 	{WorkloadAttentionProjectionReconcile, "worker", KindLeader, Spec{Name: string(WorkloadAttentionProjectionReconcile), Description: "用于 worker Attention 失败重试与历史事实恢复的多实例 leader 选举。", DefaultTTL: 30 * time.Minute}, RenewalModeAuto},
+	{WorkloadAuthzRoleProjectionReconcile, "apiserver", KindLeader, Spec{Name: string(WorkloadAuthzRoleProjectionReconcile), Description: "用于 apiserver 待同步 IAM 角色投影收敛的多实例 leader 选举。", DefaultTTL: 15 * time.Minute}, RenewalModeAuto},
 	{WorkloadCollectionSubmit, "collection-server", KindDuplicateSuppression, Spec{Name: string(WorkloadCollectionSubmit), Description: "用于 collection-server 跨实例合并相同答卷提交的建议性 lease；最终幂等由 Mongo 裁决。", DefaultTTL: 5 * time.Minute}, RenewalModeAuto},
 }
 

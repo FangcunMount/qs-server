@@ -9,35 +9,6 @@ import (
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 )
 
-func TestAssignRoleFailsClosedWithoutIAMGateway(t *testing.T) {
-	repo := newFakeOperatorRepo()
-	op := domain.NewOperator(1, 10001, "operator")
-	op.SetID(20001)
-	if err := repo.Save(context.Background(), op); err != nil {
-		t.Fatal(err)
-	}
-	validator := domain.NewValidator()
-	service := NewAuthorizationService(
-		repo,
-		validator,
-		domain.NewLifecycler(),
-		nil,
-		nil,
-	)
-
-	err := service.AssignRole(context.Background(), uint64(op.ID()), string(domain.RoleEvaluatorQS))
-
-	if err == nil {
-		t.Fatal("AssignRole() error = nil, want IAM dependency error")
-	}
-	if repo.updates != 0 {
-		t.Fatalf("local repository updates = %d, want 0", repo.updates)
-	}
-	if len(op.Roles()) != 0 {
-		t.Fatalf("local roles = %v, want no local role fact write", op.Roles())
-	}
-}
-
 func TestReplaceRolesUsesDirectRolesAndPersistsEffectiveProjection(t *testing.T) {
 	repo := newFakeOperatorRepo()
 	op := domain.NewOperator(1, 10001, "operator")
@@ -109,12 +80,6 @@ type operatorAuthzGatewayFake struct {
 }
 
 func (*operatorAuthzGatewayFake) IsEnabled() bool { return true }
-func (*operatorAuthzGatewayFake) GrantOperatorRole(context.Context, int64, int64, string, string) error {
-	return nil
-}
-func (*operatorAuthzGatewayFake) RevokeOperatorRole(context.Context, int64, int64, string) error {
-	return nil
-}
 func (f *operatorAuthzGatewayFake) ReplaceManagedOperatorRoles(_ context.Context, _, _ int64, roles []string, _, _ string) (int64, error) {
 	f.replacedRoles = append([]string(nil), roles...)
 	return f.committedVersion, nil

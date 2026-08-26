@@ -188,6 +188,7 @@ EXPECTED_LOCKLEASE_INVENTORY = (
     ("apiserver", "report_catalog_audit", "leader", "30s", "auto"),
     ("apiserver", "mongo_consistency_audit", "leader", "30s", "auto"),
     ("worker", "attention_projection_reconcile", "leader", "30m", "auto"),
+    ("apiserver", "authz_role_projection_reconcile", "leader", "15m", "auto"),
     ("collection-server", "collection_submit", "duplicate_suppression", "5m", "auto"),
 )
 

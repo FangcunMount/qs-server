@@ -60,8 +60,6 @@ type AuthzSnapshotReader interface {
 
 type OperatorAuthzGateway interface {
 	IsEnabled() bool
-	GrantOperatorRole(ctx context.Context, orgID, userID int64, roleName, grantedBy string) error
-	RevokeOperatorRole(ctx context.Context, orgID, userID int64, roleName string) error
 	ReplaceManagedOperatorRoles(ctx context.Context, orgID, userID int64, roleNames []string, changedBy, reason string) (int64, error)
 	LoadOperatorRoleProjection(ctx context.Context, orgID, userID int64) (OperatorRoleProjection, error)
 }
