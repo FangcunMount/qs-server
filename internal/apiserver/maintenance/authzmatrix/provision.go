@@ -17,7 +17,7 @@ import (
 
 const (
 	ProvisionConfirmation = "provision-isolated-authz-matrix-subjects-v2"
-	ProvisionActor        = "qs-authz-matrix-provisioner"
+	ProvisionActor        = "service:qs-apiserver.svc"
 )
 
 type ProvisionBatchEvidence struct {
