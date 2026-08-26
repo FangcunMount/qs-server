@@ -52,10 +52,11 @@ func TestStableSubjectSourceUsesIsolatedIAMForEvaluatorAndPlanManager(t *testing
 	expectSubjectQuery(mock, "other", []string{RoleStaff, RoleAdmin, RoleEvaluator, RolePlanManager}, "104")
 	mock.ExpectCommit()
 
-	directory := &syntheticDirectoryStub{userIDs: map[string]string{
-		SyntheticEvaluatorNickname: "102", SyntheticPlanManagerNickname: "103",
+	directory := &syntheticDirectoryStub{userIDs: map[string][]string{
+		SyntheticEvaluatorNickname: {"102", "105"}, SyntheticPlanManagerNickname: {"103"},
 	}}
-	got, err := NewStableSubjectSource(db, directory).Load(context.Background())
+	snapshots := staticSnapshots{"102": {RoleEvaluator}, "103": {RolePlanManager}, "105": {}}
+	got, err := NewStableSubjectSource(db, directory, snapshots).Load(context.Background())
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -102,15 +103,15 @@ func subjectSQLExpectation(kind string, roles []string) (string, []driver.Value)
 }
 
 type syntheticDirectoryStub struct {
-	userIDs   map[string]string
+	userIDs   map[string][]string
 	nicknames []string
 }
 
-func (s *syntheticDirectoryStub) FindActiveIsolatedUser(_ context.Context, nickname string) (string, error) {
+func (s *syntheticDirectoryStub) FindActiveIsolatedUsers(_ context.Context, nickname string) ([]string, error) {
 	s.nicknames = append(s.nicknames, nickname)
-	userID, ok := s.userIDs[nickname]
+	userIDs, ok := s.userIDs[nickname]
 	if !ok {
-		return "", ErrSubjectNotFound
+		return nil, ErrSubjectNotFound
 	}
-	return userID, nil
+	return append([]string(nil), userIDs...), nil
 }

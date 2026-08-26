@@ -60,7 +60,7 @@ func run(opts *apiserveroptions.Options) app.RunFunc {
 		runner := authzmatrix.NewRunner(
 			authzmatrix.NewStableSubjectSource(sqlDB, authzmatrix.NewIAMSyntheticSubjectDirectory(
 				iamModule.IdentityService().Raw(), iamModule.ServiceAuthHelper(),
-			)),
+			), iamModule.AuthzSnapshotLoader()),
 			iamModule.AuthzSnapshotLoader(),
 			iamModule.ObjectAuthorizationChecker(),
 			version.Get().GitCommit,
