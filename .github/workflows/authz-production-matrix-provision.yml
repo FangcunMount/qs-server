@@ -1,10 +1,10 @@
-name: Provision Production AuthZ Matrix Evaluator
+name: Provision Production AuthZ Matrix Subjects
 
 on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: Type provision-isolated-authz-matrix-evaluator
+        description: Type provision-isolated-authz-matrix-subjects-v2
         required: true
         type: string
 
@@ -17,8 +17,8 @@ concurrency:
 
 jobs:
   provision:
-    name: Provision isolated evaluator identity and assignment
-    if: inputs.confirmation == 'provision-isolated-authz-matrix-evaluator'
+    name: Provision isolated matrix identities and assignments
+    if: inputs.confirmation == 'provision-isolated-authz-matrix-subjects-v2'
     runs-on:
       group: qlume
       labels: [self-hosted, macOS, ARM64, ops]
@@ -41,7 +41,7 @@ jobs:
           : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
           : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
 
-      - name: Provision isolated evaluator
+      - name: Provision isolated matrix subjects
         uses: appleboy/ssh-action@v1.2.2
         env:
           PRIVILEGE_RUNNER: sudo

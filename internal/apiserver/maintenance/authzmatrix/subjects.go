@@ -13,7 +13,8 @@ const (
 	SubjectSourceProductionStaff = "production_staff"
 	SubjectSourceSyntheticIAM    = "synthetic_iam_user"
 
-	SyntheticEvaluatorNickname = "__qs_authz_matrix_evaluator_v1__"
+	SyntheticEvaluatorNickname   = "__qs_authz_matrix_evaluator_v2__"
+	SyntheticPlanManagerNickname = "__qs_authz_matrix_plan_manager_v2__"
 )
 
 var ErrSubjectNotFound = errors.New("authz matrix subject not found")
@@ -95,22 +96,22 @@ func selectSubject(ctx context.Context, tx *sql.Tx, query subjectQuery) (string,
 	return strconv.FormatUint(parsed, 10), nil
 }
 
-// SyntheticSubjectDirectory resolves the deliberately isolated IAM identity
-// used only when production contains no evaluator staff. It must be read-only.
+// SyntheticSubjectDirectory resolves deliberately isolated IAM identities. It
+// must be read-only while the matrix is running.
 type SyntheticSubjectDirectory interface {
 	FindActiveIsolatedUser(context.Context, string) (string, error)
 }
 
-type FallbackSubjectSource struct {
+type StableSubjectSource struct {
 	db        *sql.DB
 	synthetic SyntheticSubjectDirectory
 }
 
-func NewFallbackSubjectSource(db *sql.DB, synthetic SyntheticSubjectDirectory) *FallbackSubjectSource {
-	return &FallbackSubjectSource{db: db, synthetic: synthetic}
+func NewStableSubjectSource(db *sql.DB, synthetic SyntheticSubjectDirectory) *StableSubjectSource {
+	return &StableSubjectSource{db: db, synthetic: synthetic}
 }
 
-func (s *FallbackSubjectSource) Load(ctx context.Context) ([]Subject, error) {
+func (s *StableSubjectSource) Load(ctx context.Context) ([]Subject, error) {
 	if s == nil || s.db == nil {
 		return nil, fmt.Errorf("qs MySQL connection is required")
 	}
@@ -122,39 +123,41 @@ func (s *FallbackSubjectSource) Load(ctx context.Context) ([]Subject, error) {
 
 	queries := []subjectQuery{
 		{kind: "admin", role: RoleAdmin},
-		{kind: "evaluator", role: RoleEvaluator, excluded: []string{RoleAdmin, RolePlanManager}},
-		{kind: "plan_manager", role: RolePlanManager, excluded: []string{RoleAdmin, RoleEvaluator}},
 		{kind: "other", role: RoleStaff, excluded: []string{RoleAdmin, RoleEvaluator, RolePlanManager}},
 	}
-	result := make([]Subject, 0, len(queries))
+	production := make(map[string]Subject, len(queries))
 	for _, query := range queries {
 		userID, selectErr := selectSubject(ctx, tx, query)
-		if selectErr == nil {
-			result = append(result, Subject{
-				Kind: query.kind, ExpectedRole: query.role, UserID: userID,
-				Source: SubjectSourceProductionStaff,
-			})
-			continue
-		}
-		if !errors.Is(selectErr, ErrSubjectNotFound) || query.kind != "evaluator" {
+		if selectErr != nil {
 			return nil, selectErr
 		}
-		if s.synthetic == nil {
-			return nil, selectErr
-		}
-		userID, syntheticErr := s.synthetic.FindActiveIsolatedUser(ctx, SyntheticEvaluatorNickname)
-		if syntheticErr != nil {
-			return nil, fmt.Errorf("resolve isolated evaluator subject: %w", syntheticErr)
-		}
-		result = append(result, Subject{
+		production[query.kind] = Subject{
 			Kind: query.kind, ExpectedRole: query.role, UserID: userID,
-			Source: SubjectSourceSyntheticIAM,
-		})
+			Source: SubjectSourceProductionStaff,
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("complete read-only subject transaction: %w", err)
 	}
-	return result, nil
+	if s.synthetic == nil {
+		return nil, fmt.Errorf("synthetic IAM subject directory is required")
+	}
+	result := []Subject{production["admin"]}
+	for _, subject := range []struct {
+		kind, role, nickname string
+	}{
+		{kind: "evaluator", role: RoleEvaluator, nickname: SyntheticEvaluatorNickname},
+		{kind: "plan_manager", role: RolePlanManager, nickname: SyntheticPlanManagerNickname},
+	} {
+		userID, syntheticErr := s.synthetic.FindActiveIsolatedUser(ctx, subject.nickname)
+		if syntheticErr != nil {
+			return nil, fmt.Errorf("resolve isolated %s subject: %w", subject.kind, syntheticErr)
+		}
+		result = append(result, Subject{
+			Kind: subject.kind, ExpectedRole: subject.role, UserID: userID, Source: SubjectSourceSyntheticIAM,
+		})
+	}
+	return append(result, production["other"]), nil
 }
 
 func jsonString(value string) string {

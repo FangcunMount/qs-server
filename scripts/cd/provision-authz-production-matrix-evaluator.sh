@@ -16,8 +16,8 @@ run_privileged() {
   fi
 }
 
-if [ "$CONFIRMATION" != "provision-isolated-authz-matrix-evaluator" ]; then
-  echo "Exact evaluator provisioning confirmation is required" >&2
+if [ "$CONFIRMATION" != "provision-isolated-authz-matrix-subjects-v2" ]; then
+  echo "Exact matrix subject provisioning confirmation is required" >&2
   exit 1
 fi
 if [ -n "$PRIVILEGE_RUNNER" ] && ! command -v "$PRIVILEGE_RUNNER" >/dev/null 2>&1; then
@@ -47,15 +47,15 @@ provision_status=$?
 set -e
 printf '%s\n' "$provision_output"
 if [ "$provision_status" -ne 0 ]; then
-  echo "Production AuthZ evaluator provisioning failed with status $provision_status" >&2
+  echo "Production AuthZ matrix subject provisioning failed with status $provision_status" >&2
   exit "$provision_status"
 fi
 
 evidence_file="$(mktemp /tmp/qs-authz-matrix-provision-evidence.XXXXXX)"
 trap 'rm -f -- "$evidence_file"' EXIT
-printf '%s\n' "$provision_output" | awk '/^\{"schema_version":"iam-authz-matrix-provision\/v1"/{evidence=$0} END{print evidence}' >"$evidence_file"
+printf '%s\n' "$provision_output" | awk '/^\{"schema_version":"iam-authz-matrix-provision\/v2"/{evidence=$0} END{print evidence}' >"$evidence_file"
 if [ ! -s "$evidence_file" ]; then
-  echo "Production AuthZ evaluator provisioning evidence JSON is missing" >&2
+  echo "Production AuthZ matrix subject provisioning evidence JSON is missing" >&2
   exit 1
 fi
 
@@ -67,21 +67,29 @@ import sys
 with open(sys.argv[1], encoding="utf-8") as handle:
     evidence = json.load(handle)
 
-if evidence.get("schema_version") != "iam-authz-matrix-provision/v1":
-    raise SystemExit("unexpected evaluator provisioning evidence schema")
+if evidence.get("schema_version") != "iam-authz-matrix-provision/v2":
+    raise SystemExit("unexpected matrix provisioning evidence schema")
 if evidence.get("git_commit") != os.environ["DEPLOYED_SHA"]:
-    raise SystemExit("evaluator provisioner SHA does not match deployed image")
+    raise SystemExit("matrix provisioner SHA does not match deployed image")
 if evidence.get("service_identity") != "qs-apiserver.svc":
-    raise SystemExit("evaluator provisioner did not use qs-apiserver.svc")
-if evidence.get("nickname") != "__qs_authz_matrix_evaluator_v1__" or evidence.get("role") != "qs:evaluator":
-    raise SystemExit("evaluator provisioner targeted an unexpected identity or role")
-if len(evidence.get("subject_fingerprint", "")) != 16:
-    raise SystemExit("evaluator provisioning fingerprint is invalid")
-if evidence.get("policy_version", 0) <= 0 or evidence.get("passed") is not True:
-    raise SystemExit("evaluator provisioning did not become authoritative")
+    raise SystemExit("matrix provisioner did not use qs-apiserver.svc")
+expected = {
+    "__qs_authz_matrix_evaluator_v2__": "qs:evaluator",
+    "__qs_authz_matrix_plan_manager_v2__": "qs:evaluation_plan_manager",
+}
+subjects = evidence.get("subjects", [])
+if {subject.get("nickname"): subject.get("role") for subject in subjects} != expected:
+    raise SystemExit("matrix provisioner targeted unexpected identities or roles")
+if evidence.get("passed") is not True:
+    raise SystemExit("matrix provisioning did not pass")
+for subject in subjects:
+    if len(subject.get("subject_fingerprint", "")) != 16:
+        raise SystemExit("matrix provisioning fingerprint is invalid")
+    if subject.get("policy_version", 0) <= 0 or subject.get("passed") is not True:
+        raise SystemExit("matrix subject did not become authoritative")
 print(
-    "Production AuthZ matrix evaluator is ready: "
-    f"user_created={evidence['user_created']} assignment_created={evidence['assignment_created']} "
-    f"policy_version={evidence['policy_version']} sha={evidence['git_commit']}"
+    "Production AuthZ matrix subjects are ready: "
+    f"subjects={len(subjects)} policy_version={max(s['policy_version'] for s in subjects)} "
+    f"sha={evidence['git_commit']}"
 )
 PY

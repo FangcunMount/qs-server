@@ -85,11 +85,12 @@ if len(evidence.get("subjects", [])) != 4 or len(evidence.get("cases", [])) != 1
 subjects = {subject.get("kind"): subject for subject in evidence["subjects"]}
 if set(subjects) != {"admin", "evaluator", "plan_manager", "other"}:
     raise SystemExit("AuthZ matrix subject kinds are incomplete")
-for kind in ("admin", "plan_manager", "other"):
+for kind in ("admin", "other"):
     if subjects[kind].get("source") != "production_staff":
         raise SystemExit(f"AuthZ matrix {kind} subject is not production staff")
-if subjects["evaluator"].get("source") not in {"production_staff", "synthetic_iam_user"}:
-    raise SystemExit("AuthZ matrix evaluator subject source is invalid")
+for kind in ("evaluator", "plan_manager"):
+    if subjects[kind].get("source") != "synthetic_iam_user":
+        raise SystemExit(f"AuthZ matrix {kind} subject is not an isolated IAM user")
 for subject in subjects.values():
     if len(subject.get("subject_fingerprint", "")) != 16:
         raise SystemExit("AuthZ matrix subject fingerprint is invalid")
@@ -104,7 +105,7 @@ if observed != expected:
     raise SystemExit(f"AuthZ role x origin matrix mismatch: {observed}")
 print(
     "Production AuthZ v3 matrix passed: "
-    f"subjects=4 cases=12 evaluator_source={subjects['evaluator']['source']} "
+    f"subjects=4 cases=12 synthetic_subjects=2 "
     f"policy_version={evidence['policy_version']} sha={evidence['git_commit']}"
 )
 PY
