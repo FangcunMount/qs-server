@@ -4,7 +4,7 @@ import "testing"
 
 func TestOperatorRoleProjectionIsCopied(t *testing.T) {
 	item := NewOperator(1, 10, "operator")
-	item.ReplaceRolesProjection([]Role{RoleOperator})
+	item.ReplaceRolesProjection([]Role{RoleOperator}, []Role{RoleOperator}, 1, nil, false)
 
 	roles := item.Roles()
 	if len(roles) != 1 || roles[0] != RoleOperator {
@@ -14,7 +14,7 @@ func TestOperatorRoleProjectionIsCopied(t *testing.T) {
 
 func TestOperatorRolesReturnsCopy(t *testing.T) {
 	item := NewOperator(1, 10, "operator")
-	item.ReplaceRolesProjection([]Role{RoleOperator})
+	item.ReplaceRolesProjection([]Role{RoleOperator}, []Role{RoleOperator}, 1, nil, false)
 
 	roles := item.Roles()
 	roles[0] = RoleQSAdmin

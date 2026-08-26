@@ -26,7 +26,8 @@ type Permission struct {
 // Snapshot 即 CurrentAuthzSnapshot：IAM GetAuthorizationSnapshot 在单次请求内的授权投影。
 // 动作真值以 IAM 为准；不在 QS 内自造与 IAM 冲突的角色真值。
 type Snapshot struct {
-	Roles               []string
+	DirectRoles         []string
+	EffectiveRoles      []string
 	Permissions         []Permission
 	AuthzVersion        int64
 	AuthorizationDomain string
@@ -59,12 +60,20 @@ func SubjectKey(userIDStr string) string {
 	return "user:" + userIDStr
 }
 
-// RoleNames 返回defensive copy of 角色列表 用于 投影-oriented callers。
-func (s *Snapshot) RoleNames() []string {
+// DirectRoleNames returns the roles assigned directly to the subject.
+func (s *Snapshot) DirectRoleNames() []string {
 	if s == nil {
 		return nil
 	}
-	return append([]string(nil), s.Roles...)
+	return append([]string(nil), s.DirectRoles...)
+}
+
+// EffectiveRoleNames returns direct roles plus their inheritance closure.
+func (s *Snapshot) EffectiveRoleNames() []string {
+	if s == nil {
+		return nil
+	}
+	return append([]string(nil), s.EffectiveRoles...)
 }
 
 func actionCovers(have, want string) bool {

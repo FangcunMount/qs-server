@@ -24,15 +24,23 @@ func (m *OperatorMapper) ToPO(item *domain.Operator) *OperatorPO {
 	for i, role := range item.Roles() {
 		roles[i] = string(role)
 	}
+	effectiveRoles := make([]string, len(item.EffectiveRoles()))
+	for i, role := range item.EffectiveRoles() {
+		effectiveRoles[i] = string(role)
+	}
 
 	po := &OperatorPO{
-		OrgID:    item.OrgID(),
-		UserID:   item.UserID(),
-		Roles:    roles,
-		Name:     item.Name(),
-		Email:    item.Email(),
-		Phone:    item.Phone(),
-		IsActive: item.IsActive(),
+		OrgID:                  item.OrgID(),
+		UserID:                 item.UserID(),
+		Roles:                  roles,
+		EffectiveRoles:         effectiveRoles,
+		AuthzPolicyVersion:     item.AuthzPolicyVersion(),
+		AuthzProjectedAt:       item.AuthzProjectedAt(),
+		AuthzProjectionPending: item.AuthzProjectionPending(),
+		Name:                   item.Name(),
+		Email:                  item.Email(),
+		Phone:                  item.Phone(),
+		IsActive:               item.IsActive(),
 	}
 
 	// 设置ID（如果已存在）
@@ -60,10 +68,18 @@ func (m *OperatorMapper) ToDomain(po *OperatorPO) *domain.Operator {
 	for i, roleStr := range po.Roles {
 		roles[i] = domain.Role(roleStr)
 	}
+	effectiveRoles := make([]domain.Role, len(po.EffectiveRoles))
+	for i, roleStr := range po.EffectiveRoles {
+		effectiveRoles[i] = domain.Role(roleStr)
+	}
 
 	// 从仓储恢复状态
 	item.RestoreFromRepository(
 		roles,
+		effectiveRoles,
+		po.AuthzPolicyVersion,
+		po.AuthzProjectedAt,
+		po.AuthzProjectionPending,
 		po.Email,
 		po.Phone,
 		po.IsActive,

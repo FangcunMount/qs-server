@@ -169,7 +169,7 @@ func New(deps Deps) (*Module, error) {
 	)
 	module.OperatorQueryService = operatorApp.NewQueryService(actorReadModel)
 	module.ActiveOperatorChecker = operatorApp.NewActiveOperatorChecker(actorReadModel)
-	module.OperatorRoleProjectionUpdater = operatorApp.NewRoleProjectionUpdater(operatorRepo)
+	module.OperatorRoleProjectionUpdater = operatorApp.NewRoleProjectionUpdater(operatorRepo, operatorAuthzGateway)
 	module.ClinicianLifecycleService = clinicianApp.NewLifecycleService(
 		clinicianRepo,
 		operatorRepo,

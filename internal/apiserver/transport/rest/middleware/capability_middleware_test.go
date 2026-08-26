@@ -13,21 +13,21 @@ func TestRequireCapabilityMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	planManagerSnap := &authzapp.Snapshot{
-		Roles: []string{"qs:evaluation_plan_manager"},
+		EffectiveRoles: []string{"qs:evaluation_plan_manager"},
 		Permissions: []authzapp.Permission{
 			{Resource: "qs:plan:collection:evaluation_plans", Action: "create", Mode: authzapp.AuthorizationModeUnconditional},
 			{Resource: "qs:plan_task:collection:evaluation_plan_tasks", Action: "schedule", Mode: authzapp.AuthorizationModeUnconditional},
 		},
 	}
 	evaluatorSnap := &authzapp.Snapshot{
-		Roles: []string{"qs:evaluator"},
+		EffectiveRoles: []string{"qs:evaluator"},
 		Permissions: []authzapp.Permission{
 			{Resource: authzapp.AssessmentResource, Action: "batch_evaluate", Mode: authzapp.AuthorizationModeUnconditional},
 			{Resource: "qs:answersheet:collection:answersheets", Action: "read", Mode: authzapp.AuthorizationModeUnconditional},
 		},
 	}
 	contentManagerSnap := &authzapp.Snapshot{
-		Roles: []string{"qs:content_manager"},
+		EffectiveRoles: []string{"qs:content_manager"},
 		Permissions: []authzapp.Permission{
 			{Resource: "qs:questionnaire:collection:questionnaires", Action: "create", Mode: authzapp.AuthorizationModeUnconditional},
 			{Resource: "qs:scale:collection:scales", Action: "read", Mode: authzapp.AuthorizationModeUnconditional},
@@ -35,7 +35,7 @@ func TestRequireCapabilityMiddleware(t *testing.T) {
 		},
 	}
 	adminSnap := &authzapp.Snapshot{
-		Roles: []string{"qs:admin"},
+		EffectiveRoles: []string{"qs:admin"},
 		Permissions: []authzapp.Permission{
 			{Resource: "qs:*:*:*", Action: "*", Mode: authzapp.AuthorizationModeUnconditional},
 		},

@@ -45,16 +45,20 @@ type TesteeListResponse struct {
 
 // StaffResponse 员工响应
 type StaffResponse struct {
-	ID        string   `json:"id"`                   // ID
-	OrgID     string   `json:"org_id"`               // 机构ID
-	UserID    string   `json:"user_id"`              // 用户ID
-	Roles     []string `json:"roles"`                // 角色列表
-	Name      string   `json:"name"`                 // 姓名
-	Email     string   `json:"email,omitempty"`      // 邮箱
-	Phone     string   `json:"phone,omitempty"`      // 电话
-	IsActive  bool     `json:"is_active"`            // 是否激活
-	CreatedAt string   `json:"created_at,omitempty"` // 创建时间
-	UpdatedAt string   `json:"updated_at,omitempty"` // 更新时间
+	ID                     string   `json:"id"`      // ID
+	OrgID                  string   `json:"org_id"`  // 机构ID
+	UserID                 string   `json:"user_id"` // 用户ID
+	Roles                  []string `json:"roles"`   // 直接角色
+	EffectiveRoles         []string `json:"effective_roles"`
+	InheritedRoles         []string `json:"inherited_roles"`
+	AuthzPolicyVersion     int64    `json:"authz_policy_version"`
+	AuthzProjectionPending bool     `json:"authz_projection_pending"`
+	Name                   string   `json:"name"`                 // 姓名
+	Email                  string   `json:"email,omitempty"`      // 邮箱
+	Phone                  string   `json:"phone,omitempty"`      // 电话
+	IsActive               bool     `json:"is_active"`            // 是否激活
+	CreatedAt              string   `json:"created_at,omitempty"` // 创建时间
+	UpdatedAt              string   `json:"updated_at,omitempty"` // 更新时间
 }
 
 // StaffListResponse 员工列表响应

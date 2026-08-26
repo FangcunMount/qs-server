@@ -125,11 +125,11 @@ func (r *Runner) Run(ctx context.Context) (Evidence, error) {
 		if err != nil {
 			return evidence, fmt.Errorf("load IAM snapshot for %s subject: %w", subject.Kind, err)
 		}
-		if err := validateResolvedRoles(subject, snapshot.RoleNames()); err != nil {
+		if err := validateResolvedRoles(subject, snapshot.DirectRoleNames()); err != nil {
 			return evidence, err
 		}
 		versions[snapshot.AuthzVersion] = struct{}{}
-		roles := snapshot.RoleNames()
+		roles := snapshot.EffectiveRoleNames()
 		sort.Strings(roles)
 		evidence.Subjects = append(evidence.Subjects, SubjectEvidence{
 			Kind: subject.Kind, ExpectedRole: subject.ExpectedRole,

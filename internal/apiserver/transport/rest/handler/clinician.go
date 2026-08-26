@@ -1009,18 +1009,8 @@ func (h *OperatorClinicianHandler) syncStaffActiveState(c *gin.Context, staffID 
 }
 
 func (h *OperatorClinicianHandler) syncStaffRoles(c *gin.Context, staffID uint64, currentRoles, targetRoles []string) error {
-	rolesToAssign, rolesToRemove := diffStringSet(currentRoles, targetRoles)
-	for _, role := range rolesToAssign {
-		if err := h.operatorAuthorizationService.AssignRole(c.Request.Context(), staffID, role); err != nil {
-			return err
-		}
-	}
-	for _, role := range rolesToRemove {
-		if err := h.operatorAuthorizationService.RemoveRole(c.Request.Context(), staffID, role); err != nil {
-			return err
-		}
-	}
-	return nil
+	_ = currentRoles
+	return h.operatorAuthorizationService.ReplaceRoles(c.Request.Context(), staffID, targetRoles)
 }
 
 func (h *OperatorClinicianHandler) currentClinician(c *gin.Context) (*clinicianApp.ClinicianResult, error) {
@@ -1204,32 +1194,6 @@ func resolveTargetStaffActive(currentActive bool, requested *bool) bool {
 	return *requested
 }
 
-func diffStringSet(current, target []string) ([]string, []string) {
-	currentSet := make(map[string]struct{}, len(current))
-	targetSet := make(map[string]struct{}, len(target))
-	for _, role := range current {
-		currentSet[role] = struct{}{}
-	}
-	for _, role := range target {
-		targetSet[role] = struct{}{}
-	}
-
-	toAssign := make([]string, 0, len(target))
-	for _, role := range target {
-		if _, exists := currentSet[role]; !exists {
-			toAssign = append(toAssign, role)
-		}
-	}
-
-	toRemove := make([]string, 0, len(current))
-	for _, role := range current {
-		if _, exists := targetSet[role]; !exists {
-			toRemove = append(toRemove, role)
-		}
-	}
-	return toAssign, toRemove
-}
-
 func toRegisterStaffDTO(req *request.CreateStaffRequest, orgID int64) operatorApp.RegisterOperatorDTO {
 	isActive := true
 	if req.IsActive != nil {
@@ -1250,14 +1214,18 @@ func toRegisterStaffDTO(req *request.CreateStaffRequest, orgID int64) operatorAp
 
 func toStaffResponse(result *operatorApp.OperatorResult) *response.StaffResponse {
 	return &response.StaffResponse{
-		ID:       fmt.Sprintf("%d", result.ID),
-		OrgID:    fmt.Sprintf("%d", result.OrgID),
-		UserID:   fmt.Sprintf("%d", result.UserID),
-		Roles:    result.Roles,
-		Name:     result.Name,
-		Email:    result.Email,
-		Phone:    result.Phone,
-		IsActive: result.IsActive,
+		ID:                     fmt.Sprintf("%d", result.ID),
+		OrgID:                  fmt.Sprintf("%d", result.OrgID),
+		UserID:                 fmt.Sprintf("%d", result.UserID),
+		Roles:                  result.Roles,
+		EffectiveRoles:         result.EffectiveRoles,
+		InheritedRoles:         result.InheritedRoles,
+		AuthzPolicyVersion:     result.AuthzPolicyVersion,
+		AuthzProjectionPending: result.AuthzProjectionPending,
+		Name:                   result.Name,
+		Email:                  result.Email,
+		Phone:                  result.Phone,
+		IsActive:               result.IsActive,
 	}
 }
 

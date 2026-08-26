@@ -52,6 +52,9 @@ type OperatorAuthorizationService interface {
 	// RemoveRole 移除角色
 	RemoveRole(ctx context.Context, operatorID uint64, role string) error
 
+	// ReplaceRoles atomically replaces only the QS-managed direct IAM roles.
+	ReplaceRoles(ctx context.Context, operatorID uint64, roles []string) error
+
 	// Activate 激活操作者账号
 	Activate(ctx context.Context, operatorID uint64) error
 
@@ -126,14 +129,18 @@ type ListOperatorDTO struct {
 
 // OperatorResult 操作者结果 DTO
 type OperatorResult struct {
-	ID       uint64   // 操作者ID
-	OrgID    int64    // 机构ID
-	UserID   int64    // 用户ID
-	Roles    []string // 角色列表
-	Name     string   // 姓名
-	Email    string   // 邮箱
-	Phone    string   // 手机号
-	IsActive bool     // 是否激活
+	ID                     uint64
+	OrgID                  int64
+	UserID                 int64
+	Roles                  []string // direct IAM roles
+	EffectiveRoles         []string
+	InheritedRoles         []string
+	AuthzPolicyVersion     int64
+	AuthzProjectionPending bool
+	Name                   string
+	Email                  string
+	Phone                  string
+	IsActive               bool
 }
 
 // OperatorListResult 操作者列表结果 DTO

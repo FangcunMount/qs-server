@@ -50,7 +50,7 @@ func TestResolveAccessScopeUsesContextSnapshotBeforeReader(t *testing.T) {
 	)
 
 	ctx := authzapp.WithSnapshot(context.Background(), &authzapp.Snapshot{
-		Roles: []string{"qs:admin"},
+		EffectiveRoles: []string{"qs:admin"},
 		Permissions: []authzapp.Permission{{
 			Resource: "qs:*:*:*", Action: "*", Mode: authzapp.AuthorizationModeUnconditional,
 		}},

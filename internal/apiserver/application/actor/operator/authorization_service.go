@@ -93,6 +93,37 @@ func (s *authorizationService) RemoveRole(ctx context.Context, operatorID uint64
 	return nil
 }
 
+func (s *authorizationService) ReplaceRoles(ctx context.Context, operatorID uint64, roleNames []string) error {
+	if err := s.requireOperatorAuthz(); err != nil {
+		return err
+	}
+	for _, roleName := range roleNames {
+		if err := s.validator.ValidateRole(domain.Role(roleName)); err != nil {
+			return err
+		}
+	}
+	targetOperatorID, err := operatorIDFromUint64("operator_id", operatorID)
+	if err != nil {
+		return err
+	}
+	op, err := s.repo.FindByID(ctx, targetOperatorID)
+	if err != nil {
+		return errors.Wrap(err, "failed to find operator")
+	}
+	committedVersion, err := s.authz.ReplaceManagedOperatorRoles(ctx, op.OrgID(), op.UserID(), roleNames,
+		actorctx.IAMGrantedBySubject(ctx), "replace staff direct roles")
+	if err != nil {
+		return errors.Wrap(err, "iam replace managed assignments")
+	}
+	projection, loadErr := s.authz.LoadOperatorRoleProjection(ctx, op.OrgID(), op.UserID())
+	if loadErr != nil || projection.PolicyVersion < committedVersion {
+		op.MarkAuthzProjectionPending()
+		_ = s.repo.Update(ctx, op)
+		return nil
+	}
+	return persistOperatorRoleProjection(ctx, s.repo, op, projection, false)
+}
+
 func (s *authorizationService) requireOperatorAuthz() error {
 	if s == nil || s.authz == nil || !s.authz.IsEnabled() {
 		return errors.New("IAM operator authorization gateway is required")
@@ -107,11 +138,11 @@ func (s *authorizationService) persistOperatorRolesFromAuthz(ctx context.Context
 	if op == nil {
 		return errors.New("operator is required")
 	}
-	roleNames, err := s.authz.LoadOperatorRoleNames(ctx, op.OrgID(), op.UserID())
+	projection, err := s.authz.LoadOperatorRoleProjection(ctx, op.OrgID(), op.UserID())
 	if err != nil {
 		return err
 	}
-	return persistOperatorRolesFromNames(ctx, s.repo, op, roleNames)
+	return persistOperatorRoleProjection(ctx, s.repo, op, projection, false)
 }
 
 // Activate 激活操作者

@@ -163,7 +163,8 @@ func (l *SnapshotLoader) Load(ctx context.Context, jwtTenantID, userIDStr string
 			return nil, err
 		}
 		snap := &authz.Snapshot{
-			Roles:               append([]string(nil), resp.GetRoles()...),
+			DirectRoles:         append([]string(nil), resp.GetDirectRoles()...),
+			EffectiveRoles:      append([]string(nil), resp.GetRoles()...),
 			AuthzVersion:        resp.GetPolicyVersion(),
 			AuthorizationDomain: domain,
 			IAMAppName:          l.opts.AppName,

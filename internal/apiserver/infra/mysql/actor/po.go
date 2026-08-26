@@ -61,13 +61,17 @@ func (s *StringSliceCol) Scan(value interface{}) error {
 type OperatorPO struct {
 	mysql.AuditFields
 
-	OrgID    int64          `gorm:"column:org_id;not null;index:idx_org_id;uniqueIndex:uk_staff_org_user,priority:1"`
-	UserID   int64          `gorm:"column:user_id;not null;index:idx_user_id;uniqueIndex:uk_staff_org_user,priority:2"`
-	Roles    StringSliceCol `gorm:"column:roles;type:json;not null"`
-	Name     string         `gorm:"column:name;size:100;not null"`
-	Email    string         `gorm:"column:email;size:255"`
-	Phone    string         `gorm:"column:phone;size:20"`
-	IsActive bool           `gorm:"column:is_active;not null;default:true;index:idx_is_active"`
+	OrgID                  int64          `gorm:"column:org_id;not null;index:idx_org_id;uniqueIndex:uk_staff_org_user,priority:1"`
+	UserID                 int64          `gorm:"column:user_id;not null;index:idx_user_id;uniqueIndex:uk_staff_org_user,priority:2"`
+	Roles                  StringSliceCol `gorm:"column:roles;type:json;not null"`
+	EffectiveRoles         StringSliceCol `gorm:"column:effective_roles;type:json;not null"`
+	AuthzPolicyVersion     int64          `gorm:"column:authz_policy_version;not null;default:0"`
+	AuthzProjectedAt       *time.Time     `gorm:"column:authz_projected_at;type:datetime(3)"`
+	AuthzProjectionPending bool           `gorm:"column:authz_projection_pending;not null;default:false"`
+	Name                   string         `gorm:"column:name;size:100;not null"`
+	Email                  string         `gorm:"column:email;size:255"`
+	Phone                  string         `gorm:"column:phone;size:20"`
+	IsActive               bool           `gorm:"column:is_active;not null;default:true;index:idx_is_active"`
 }
 
 // TableName 指定表名
