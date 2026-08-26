@@ -38,7 +38,54 @@ func TestSQLSubjectSourceUsesReadOnlyDeterministicQueries(t *testing.T) {
 	}
 }
 
+func TestFallbackSubjectSourceUsesIsolatedIAMOnlyForMissingEvaluator(t *testing.T) {
+	t.Parallel()
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+
+	mock.ExpectBegin()
+	expectSubjectQuery(mock, "admin", []string{RoleAdmin}, "101")
+	expectMissingSubjectQuery(mock, "evaluator", []string{RoleEvaluator, RoleAdmin, RolePlanManager})
+	expectSubjectQuery(mock, "plan_manager", []string{RolePlanManager, RoleAdmin, RoleEvaluator}, "103")
+	expectSubjectQuery(mock, "other", []string{RoleStaff, RoleAdmin, RoleEvaluator, RolePlanManager}, "104")
+	mock.ExpectCommit()
+
+	directory := &syntheticDirectoryStub{userID: "102"}
+	got, err := NewFallbackSubjectSource(db, directory).Load(context.Background())
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if len(got) != 4 || got[1].UserID != "102" || got[1].Source != SubjectSourceSyntheticIAM {
+		t.Fatalf("Load() = %+v", got)
+	}
+	if directory.nickname != SyntheticEvaluatorNickname {
+		t.Fatalf("synthetic nickname = %q", directory.nickname)
+	}
+	for i, subject := range got {
+		if i != 1 && subject.Source != SubjectSourceProductionStaff {
+			t.Fatalf("unexpected fallback source: %+v", subject)
+		}
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func expectSubjectQuery(mock sqlmock.Sqlmock, kind string, roles []string, userID string) {
+	query, args := subjectSQLExpectation(kind, roles)
+	mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(args...).WillReturnRows(sqlmock.NewRows([]string{"user_id"}).AddRow(userID))
+}
+
+func expectMissingSubjectQuery(mock sqlmock.Sqlmock, kind string, roles []string) {
+	query, args := subjectSQLExpectation(kind, roles)
+	mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(args...).WillReturnRows(sqlmock.NewRows([]string{"user_id"}))
+}
+
+func subjectSQLExpectation(kind string, roles []string) (string, []driver.Value) {
 	clauses := []string{"is_active = 1", "deleted_at IS NULL", "JSON_VALID(roles)", "JSON_CONTAINS(roles, ?)"}
 	for range roles[1:] {
 		clauses = append(clauses, "NOT JSON_CONTAINS(roles, ?)")
@@ -51,5 +98,15 @@ func expectSubjectQuery(mock sqlmock.Sqlmock, kind string, roles []string, userI
 	for _, role := range roles {
 		args = append(args, jsonString(role))
 	}
-	mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(args...).WillReturnRows(sqlmock.NewRows([]string{"user_id"}).AddRow(userID))
+	return query, args
+}
+
+type syntheticDirectoryStub struct {
+	userID   string
+	nickname string
+}
+
+func (s *syntheticDirectoryStub) FindActiveIsolatedUser(_ context.Context, nickname string) (string, error) {
+	s.nickname = nickname
+	return s.userID, nil
 }

@@ -32,7 +32,7 @@ esac
 EOF
 chmod +x "$FAKE_DOCKER"
 
-evidence='{"schema_version":"iam-authz-production-matrix/v1","checked_at":"2026-08-26T00:00:00Z","git_commit":"0123456789abcdef0123456789abcdef01234567","service_identity":"qs-apiserver.svc","domain":"fangcun","resource":"qs:evaluation:collection:assessments","action":"retry","policy_version":27,"subjects":[{"kind":"admin"},{"kind":"evaluator"},{"kind":"plan_manager"},{"kind":"other"}],"cases":['
+evidence='{"schema_version":"iam-authz-production-matrix/v1","checked_at":"2026-08-26T00:00:00Z","git_commit":"0123456789abcdef0123456789abcdef01234567","service_identity":"qs-apiserver.svc","domain":"fangcun","resource":"qs:evaluation:collection:assessments","action":"retry","policy_version":27,"subjects":[{"kind":"admin","source":"production_staff","subject_fingerprint":"1111111111111111"},{"kind":"evaluator","source":"synthetic_iam_user","subject_fingerprint":"2222222222222222"},{"kind":"plan_manager","source":"production_staff","subject_fingerprint":"3333333333333333"},{"kind":"other","source":"production_staff","subject_fingerprint":"4444444444444444"}],"cases":['
 first=1
 for origin in adhoc plan; do
   for kind in admin evaluator plan_manager other; do
@@ -52,7 +52,7 @@ evidence+='],"passed":true}'
 
 output="$(PRIVILEGE_RUNNER= DOCKER_BIN="$FAKE_DOCKER" FAKE_MATRIX_EVIDENCE="$evidence" \
   "$SCRIPT_DIR/verify-authz-production-matrix.sh")"
-printf '%s\n' "$output" | grep -Fq 'Production AuthZ v3 matrix passed: subjects=4 cases=12 policy_version=27'
+printf '%s\n' "$output" | grep -Fq 'Production AuthZ v3 matrix passed: subjects=4 cases=12 evaluator_source=synthetic_iam_user policy_version=27'
 
 bad_evidence="${evidence/\"passed\":true}/\"passed\":false}"
 if PRIVILEGE_RUNNER= DOCKER_BIN="$FAKE_DOCKER" FAKE_MATRIX_EVIDENCE="$bad_evidence" \

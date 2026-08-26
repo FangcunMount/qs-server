@@ -1,0 +1,56 @@
+name: Provision Production AuthZ Matrix Evaluator
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type provision-isolated-authz-matrix-evaluator
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qs-server-authz-production-matrix-provision
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    name: Provision isolated evaluator identity and assignment
+    if: inputs.confirmation == 'provision-isolated-authz-matrix-evaluator'
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate SSH configuration
+        env:
+          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
+          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+        run: |
+          set -Eeuo pipefail
+          : "${SVRA_HOST:?SVRA_HOST is empty}"
+          : "${SVRA_USERNAME:?SVRA_USERNAME is empty}"
+          : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
+          : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
+
+      - name: Provision isolated evaluator
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          PRIVILEGE_RUNNER: sudo
+          QS_AUTHZ_MATRIX_PROVISION_CONFIRM: ${{ inputs.confirmation }}
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          envs: PRIVILEGE_RUNNER,QS_AUTHZ_MATRIX_PROVISION_CONFIRM
+          script_path: scripts/cd/provision-authz-production-matrix-evaluator.sh

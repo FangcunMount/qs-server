@@ -42,6 +42,15 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -o /build/bin/qs-authz-matrix \
     ./cmd/qs-authz-matrix/
 
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags "-s -w \
+    -X github.com/FangcunMount/qs-server/pkg/version.GitVersion=${VERSION} \
+    -X github.com/FangcunMount/qs-server/pkg/version.GitCommit=${GIT_COMMIT} \
+    -X github.com/FangcunMount/qs-server/pkg/version.GitBranch=${GIT_BRANCH} \
+    -X github.com/FangcunMount/qs-server/pkg/version.BuildDate=${BUILD_TIME}" \
+    -o /build/bin/qs-authz-matrix-provision \
+    ./cmd/qs-authz-matrix-provision/
+
 # ===================================
 # 运行阶段
 # ===================================
@@ -65,6 +74,7 @@ WORKDIR /app
 # 从构建阶段复制二进制文件
 COPY --from=builder --chown=www:www /build/bin/qs-apiserver /app/qs-apiserver
 COPY --from=builder --chown=www:www /build/bin/qs-authz-matrix /app/qs-authz-matrix
+COPY --from=builder --chown=www:www /build/bin/qs-authz-matrix-provision /app/qs-authz-matrix-provision
 
 # 复制配置文件（包含 dev/prod，镜像内默认使用 prod）
 # 注意：证书文件由 docker-compose 从宿主机挂载，不打包到镜像中
