@@ -48,12 +48,7 @@ func (lc *lifecycler) Deactivate(staff *Operator) error {
 		return nil
 	}
 
-	// 2. 业务规则：停用时应清空所有角色
-	if len(staff.Roles()) > 0 {
-		staff.ReplaceRolesProjection(nil)
-	}
-
-	// 3. 执行停用
+	// 停用只改变 QS 业务状态；IAM Assignment 与本地角色投影保持不变。
 	staff.deactivate()
 
 	return nil

@@ -58,7 +58,7 @@ func run(opts *apiserveroptions.Options) app.RunFunc {
 
 		serviceIdentity := iamModule.ServiceAuthHelper().ServiceIdentity().ServiceID
 		runner := authzmatrix.NewRunner(
-			authzmatrix.NewFallbackSubjectSource(sqlDB, authzmatrix.NewIAMSyntheticSubjectDirectory(
+			authzmatrix.NewStableSubjectSource(sqlDB, authzmatrix.NewIAMSyntheticSubjectDirectory(
 				iamModule.IdentityService().Raw(), iamModule.ServiceAuthHelper(),
 			)),
 			iamModule.AuthzSnapshotLoader(),

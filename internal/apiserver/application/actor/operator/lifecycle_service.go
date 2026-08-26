@@ -359,11 +359,19 @@ func (s *lifecycleService) syncIAMRolesAfterRegister(ctx context.Context, op *do
 		if err := s.validator.ValidateRole(role); err != nil {
 			return err
 		}
-		if err := s.authz.GrantOperatorRole(ctx, op.OrgID(), op.UserID(), rn, actorctx.IAMGrantedBySubject(ctx)); err != nil {
-			return err
-		}
 	}
-	return s.persistOperatorRolesFromAuthz(ctx, op)
+	committedVersion, err := s.authz.ReplaceManagedOperatorRoles(ctx, op.OrgID(), op.UserID(), roleNames,
+		actorctx.IAMGrantedBySubject(ctx), "register staff direct roles")
+	if err != nil {
+		return err
+	}
+	projection, loadErr := s.authz.LoadOperatorRoleProjection(ctx, op.OrgID(), op.UserID())
+	if loadErr != nil || projection.PolicyVersion < committedVersion {
+		op.MarkAuthzProjectionPending()
+		_ = s.repo.Update(ctx, op)
+		return nil
+	}
+	return persistOperatorRoleProjection(ctx, s.repo, op, projection, false)
 }
 
 func (s *lifecycleService) requireOperatorAuthz() error {
@@ -380,11 +388,11 @@ func (s *lifecycleService) persistOperatorRolesFromAuthz(ctx context.Context, op
 	if op == nil {
 		return errors.New("operator is required")
 	}
-	roleNames, err := s.authz.LoadOperatorRoleNames(ctx, op.OrgID(), op.UserID())
+	projection, err := s.authz.LoadOperatorRoleProjection(ctx, op.OrgID(), op.UserID())
 	if err != nil {
 		return err
 	}
-	return persistOperatorRolesFromNames(ctx, s.repo, op, roleNames)
+	return persistOperatorRoleProjection(ctx, s.repo, op, projection, false)
 }
 
 func (s *lifecycleService) rollbackRegisteredOperator(ctx context.Context, id domain.ID) error {

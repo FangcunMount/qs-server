@@ -438,7 +438,7 @@ func TestRouterProtectedClinicianRoutePassesCapabilityMiddleware(t *testing.T) {
 		c.Set(restmiddleware.UserIDKey, uint64(701))
 		c.Set(restmiddleware.TenantDomainKey, "tenant-a")
 		c.Set(restmiddleware.AuthzSnapshotKey, &authzapp.Snapshot{
-			Roles: []string{"qs:admin"},
+			EffectiveRoles: []string{"qs:admin"},
 			Permissions: []authzapp.Permission{
 				{Resource: "qs:*:*:*", Action: "*", Mode: authzapp.AuthorizationModeUnconditional},
 			},

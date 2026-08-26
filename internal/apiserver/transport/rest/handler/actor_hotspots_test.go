@@ -87,14 +87,3 @@ func TestMergeAccessibleTesteeIDs(t *testing.T) {
 		})
 	}
 }
-
-func TestDiffStringSet(t *testing.T) {
-	toAssign, toRemove := diffStringSet([]string{"admin", "viewer"}, []string{"viewer", "editor"})
-
-	if len(toAssign) != 1 || toAssign[0] != "editor" {
-		t.Fatalf("toAssign = %v, want [editor]", toAssign)
-	}
-	if len(toRemove) != 1 || toRemove[0] != "admin" {
-		t.Fatalf("toRemove = %v, want [admin]", toRemove)
-	}
-}

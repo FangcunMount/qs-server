@@ -565,14 +565,17 @@ func testeeRowsFromPOs(pos []*TesteePO) []actorreadmodel.TesteeRow {
 
 func operatorRowFromPO(po *OperatorPO) actorreadmodel.OperatorRow {
 	return actorreadmodel.OperatorRow{
-		ID:       uint64(po.ID),
-		OrgID:    po.OrgID,
-		UserID:   po.UserID,
-		Roles:    append([]string(nil), po.Roles...),
-		Name:     po.Name,
-		Email:    po.Email,
-		Phone:    po.Phone,
-		IsActive: po.IsActive,
+		ID:                     uint64(po.ID),
+		OrgID:                  po.OrgID,
+		UserID:                 po.UserID,
+		Roles:                  append([]string(nil), po.Roles...),
+		EffectiveRoles:         append([]string(nil), po.EffectiveRoles...),
+		AuthzPolicyVersion:     po.AuthzPolicyVersion,
+		AuthzProjectionPending: po.AuthzProjectionPending,
+		Name:                   po.Name,
+		Email:                  po.Email,
+		Phone:                  po.Phone,
+		IsActive:               po.IsActive,
 	}
 }
 

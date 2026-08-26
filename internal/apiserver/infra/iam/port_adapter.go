@@ -159,18 +159,33 @@ func (g *operatorAuthzGateway) RevokeOperatorRole(ctx context.Context, orgID, us
 	return g.assignment.Revoke(ctx, g.snapshot.DomainForOrg(orgID), strconv.FormatInt(userID, 10), roleName)
 }
 
-func (g *operatorAuthzGateway) LoadOperatorRoleNames(ctx context.Context, orgID, userID int64) ([]string, error) {
+func (g *operatorAuthzGateway) ReplaceManagedOperatorRoles(ctx context.Context, orgID, userID int64, roleNames []string, changedBy, reason string) (int64, error) {
 	if !g.IsEnabled() {
-		return nil, fmt.Errorf("iam operator authorization gateway is not available")
+		return 0, fmt.Errorf("iam operator authorization gateway is not available")
+	}
+	domain := g.snapshot.DomainForOrg(orgID)
+	result, err := g.assignment.ReplaceManaged(ctx, domain, strconv.FormatInt(userID, 10), roleNames, changedBy, reason)
+	if err != nil {
+		return 0, err
+	}
+	g.snapshot.ObserveTenantAuthzVersion(domain, result.PolicyVersion)
+	return result.PolicyVersion, nil
+}
+
+func (g *operatorAuthzGateway) LoadOperatorRoleProjection(ctx context.Context, orgID, userID int64) (iambridge.OperatorRoleProjection, error) {
+	if !g.IsEnabled() {
+		return iambridge.OperatorRoleProjection{}, fmt.Errorf("iam operator authorization gateway is not available")
 	}
 	snap, err := g.snapshot.Load(ctx, g.snapshot.DomainForOrg(orgID), strconv.FormatInt(userID, 10))
 	if err != nil {
-		return nil, err
+		return iambridge.OperatorRoleProjection{}, err
 	}
 	if snap == nil {
-		return nil, nil
+		return iambridge.OperatorRoleProjection{}, nil
 	}
-	return snap.RoleNames(), nil
+	return iambridge.OperatorRoleProjection{
+		DirectRoles: snap.DirectRoleNames(), EffectiveRoles: snap.EffectiveRoleNames(), PolicyVersion: snap.AuthzVersion,
+	}, nil
 }
 
 type profileLinkDirectory struct {

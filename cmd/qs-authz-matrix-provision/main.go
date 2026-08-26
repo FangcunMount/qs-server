@@ -18,7 +18,7 @@ import (
 func main() {
 	opts := apiserveroptions.NewOptions()
 	app.NewApp(
-		"Explicitly provision the isolated production IAM AuthZ matrix evaluator",
+		"Explicitly provision the isolated production IAM AuthZ matrix subjects",
 		"qs-apiserver",
 		app.WithDefaultValidArgs(),
 		app.WithOptions(opts),
@@ -49,14 +49,14 @@ func run(opts *apiserveroptions.Options) app.RunFunc {
 			iamModule.IdentityService().Raw(), iamModule.Client().SDK().Authz(),
 			iamModule.ServiceAuthHelper(), version.Get().GitCommit, serviceIdentity,
 		)
-		evidence, provisionErr := provisioner.EnsureEvaluator(ctx, os.Getenv("QS_AUTHZ_MATRIX_PROVISION_CONFIRM"))
+		evidence, provisionErr := provisioner.EnsureSubjects(ctx, os.Getenv("QS_AUTHZ_MATRIX_PROVISION_CONFIRM"))
 		encoder := json.NewEncoder(os.Stdout)
 		encoder.SetEscapeHTML(false)
 		if err := encoder.Encode(evidence); err != nil {
 			return fmt.Errorf("write provisioning evidence: %w", err)
 		}
 		if provisionErr != nil {
-			return fmt.Errorf("provision isolated AuthZ matrix evaluator: %w", provisionErr)
+			return fmt.Errorf("provision isolated AuthZ matrix subjects: %w", provisionErr)
 		}
 		return nil
 	}

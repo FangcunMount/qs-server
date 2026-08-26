@@ -12,7 +12,7 @@ func TestOperationsAccessRequiresAuditCapabilityAndSameOrganization(t *testing.T
 	adapter := operationsAccessAdapter{}
 	actor := operations.Actor{OrgID: 7, OperatorUserID: 9}
 	ctx := authzapp.WithSnapshot(context.Background(), &authzapp.Snapshot{
-		Roles: []string{"qs:admin"},
+		EffectiveRoles: []string{"qs:admin"},
 		Permissions: []authzapp.Permission{{
 			Resource: "qs:*:*:*", Action: "*", Mode: authzapp.AuthorizationModeUnconditional,
 		}},

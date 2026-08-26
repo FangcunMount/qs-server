@@ -8,7 +8,7 @@ import (
 
 func TestDecideCapabilityOutcomes(t *testing.T) {
 	admin := &Snapshot{
-		Roles: []string{"qs:admin"},
+		EffectiveRoles: []string{"qs:admin"},
 		Permissions: []Permission{{
 			Resource: "qs:*:*:*", Action: "*", Mode: AuthorizationModeUnconditional,
 		}},
@@ -70,7 +70,7 @@ func TestDecideCapabilityOutcomes(t *testing.T) {
 
 func TestAdminRoleWithoutWildcardGrantDoesNotAuthorize(t *testing.T) {
 	t.Parallel()
-	snapshot := &Snapshot{Roles: []string{"qs:admin"}}
+	snapshot := &Snapshot{EffectiveRoles: []string{"qs:admin"}}
 	if snapshot.IsQSAdmin() || DecideCapability(snapshot, CapabilityOrgAdmin).Allowed {
 		t.Fatal("role name alone must not bypass PermissionGrant evaluation")
 	}

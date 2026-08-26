@@ -69,14 +69,17 @@ type OperatorFilter struct {
 }
 
 type OperatorRow struct {
-	ID       uint64
-	OrgID    int64
-	UserID   int64
-	Roles    []string
-	Name     string
-	Email    string
-	Phone    string
-	IsActive bool
+	ID                     uint64
+	OrgID                  int64
+	UserID                 int64
+	Roles                  []string
+	EffectiveRoles         []string
+	AuthzPolicyVersion     int64
+	AuthzProjectionPending bool
+	Name                   string
+	Email                  string
+	Phone                  string
+	IsActive               bool
 }
 
 type OperatorReader interface {

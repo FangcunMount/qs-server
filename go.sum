@@ -8,6 +8,8 @@ github.com/FangcunMount/component-base v0.6.9 h1:PCf48lmwJSpROvCtVvI2qQqTKYL8q19
 github.com/FangcunMount/component-base v0.6.9/go.mod h1:geIr3xPkOsDaGMbgKLoQNzkKp8OwAQ1AMaPojX4Bs14=
 github.com/FangcunMount/iam/v3 v3.1.0 h1:h6TtFmJDnnBZGL96c2lPH6Xx76LG8d7N5VxO5FoQbl8=
 github.com/FangcunMount/iam/v3 v3.1.0/go.mod h1:ALRYLD4TgFc0HNtPjg9WGVt6rtAIvTDTmIhpaJ8pngU=
+github.com/FangcunMount/iam/v3 v3.1.1-0.20260826051036-1d58a85968fe h1:xUkA2o7JLnEAHta8kKJlVxb5tLAeqrb7G9XtES7znmM=
+github.com/FangcunMount/iam/v3 v3.1.1-0.20260826051036-1d58a85968fe/go.mod h1:ALRYLD4TgFc0HNtPjg9WGVt6rtAIvTDTmIhpaJ8pngU=
 github.com/KyleBanks/depth v1.2.1 h1:5h8fQADFrWtarTdtDudMmGsC7GPbOAu6RVB3ffsVFHc=
 github.com/KyleBanks/depth v1.2.1/go.mod h1:jzSb9d0L43HxTQfT+oSA1EEp2q+ne2uh6XgeJcm8brE=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=

@@ -38,7 +38,7 @@ func TestSQLSubjectSourceUsesReadOnlyDeterministicQueries(t *testing.T) {
 	}
 }
 
-func TestFallbackSubjectSourceUsesIsolatedIAMOnlyForMissingEvaluator(t *testing.T) {
+func TestStableSubjectSourceUsesIsolatedIAMForEvaluatorAndPlanManager(t *testing.T) {
 	t.Parallel()
 
 	db, mock, err := sqlmock.New()
@@ -49,24 +49,24 @@ func TestFallbackSubjectSourceUsesIsolatedIAMOnlyForMissingEvaluator(t *testing.
 
 	mock.ExpectBegin()
 	expectSubjectQuery(mock, "admin", []string{RoleAdmin}, "101")
-	expectMissingSubjectQuery(mock, "evaluator", []string{RoleEvaluator, RoleAdmin, RolePlanManager})
-	expectSubjectQuery(mock, "plan_manager", []string{RolePlanManager, RoleAdmin, RoleEvaluator}, "103")
 	expectSubjectQuery(mock, "other", []string{RoleStaff, RoleAdmin, RoleEvaluator, RolePlanManager}, "104")
 	mock.ExpectCommit()
 
-	directory := &syntheticDirectoryStub{userID: "102"}
-	got, err := NewFallbackSubjectSource(db, directory).Load(context.Background())
+	directory := &syntheticDirectoryStub{userIDs: map[string]string{
+		SyntheticEvaluatorNickname: "102", SyntheticPlanManagerNickname: "103",
+	}}
+	got, err := NewStableSubjectSource(db, directory).Load(context.Background())
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
 	if len(got) != 4 || got[1].UserID != "102" || got[1].Source != SubjectSourceSyntheticIAM {
 		t.Fatalf("Load() = %+v", got)
 	}
-	if directory.nickname != SyntheticEvaluatorNickname {
-		t.Fatalf("synthetic nickname = %q", directory.nickname)
+	if strings.Join(directory.nicknames, ",") != SyntheticEvaluatorNickname+","+SyntheticPlanManagerNickname {
+		t.Fatalf("synthetic nicknames = %v", directory.nicknames)
 	}
 	for i, subject := range got {
-		if i != 1 && subject.Source != SubjectSourceProductionStaff {
+		if (i == 1 || i == 2) != (subject.Source == SubjectSourceSyntheticIAM) {
 			t.Fatalf("unexpected fallback source: %+v", subject)
 		}
 	}
@@ -102,11 +102,15 @@ func subjectSQLExpectation(kind string, roles []string) (string, []driver.Value)
 }
 
 type syntheticDirectoryStub struct {
-	userID   string
-	nickname string
+	userIDs   map[string]string
+	nicknames []string
 }
 
 func (s *syntheticDirectoryStub) FindActiveIsolatedUser(_ context.Context, nickname string) (string, error) {
-	s.nickname = nickname
-	return s.userID, nil
+	s.nicknames = append(s.nicknames, nickname)
+	userID, ok := s.userIDs[nickname]
+	if !ok {
+		return "", ErrSubjectNotFound
+	}
+	return userID, nil
 }

@@ -1,5 +1,7 @@
 package operator
 
+import "time"
+
 // Operator 后台工作人员聚合根
 // 设计说明：
 // 1. Operator 是 IAM.User 在本 BC 的业务视图投影，不是完整的用户实体
@@ -16,24 +18,29 @@ package operator
 //   - 不过度暴露内部状态，保持封装性
 //   - 审计字段由基础设施层（PO）处理
 type Operator struct {
-	id       ID     // 内部员工ID（主键）
-	orgID    int64  // 所属机构（多租户隔离）
-	userID   int64  // 用户ID（外键，必须绑定）
-	roles    []Role // 业务角色列表（核心业务数据）
-	name     string // 姓名（缓存字段）
-	email    string // 邮箱（缓存字段）
-	phone    string // 手机号（缓存字段）
-	isActive bool   // 在本系统内的激活状态
+	id                     ID     // 内部员工ID（主键）
+	orgID                  int64  // 所属机构（多租户隔离）
+	userID                 int64  // 用户ID（外键，必须绑定）
+	roles                  []Role // IAM 直接角色的只读投影；列名为兼容保留
+	effectiveRoles         []Role
+	authzPolicyVersion     int64
+	authzProjectedAt       *time.Time
+	authzProjectionPending bool
+	name                   string // 姓名（缓存字段）
+	email                  string // 邮箱（缓存字段）
+	phone                  string // 手机号（缓存字段）
+	isActive               bool   // 在本系统内的激活状态
 }
 
 // NewOperator 创建新的后台操作者
 func NewOperator(orgID int64, userID int64, name string) *Operator {
 	return &Operator{
-		orgID:    orgID,
-		userID:   userID,
-		name:     name,
-		roles:    make([]Role, 0),
-		isActive: true,
+		orgID:          orgID,
+		userID:         userID,
+		name:           name,
+		roles:          make([]Role, 0),
+		effectiveRoles: make([]Role, 0),
+		isActive:       true,
 	}
 }
 
@@ -59,6 +66,28 @@ func (s *Operator) Roles() []Role {
 	roles := make([]Role, len(s.roles))
 	copy(roles, s.roles)
 	return roles
+}
+
+func (s *Operator) EffectiveRoles() []Role {
+	roles := make([]Role, len(s.effectiveRoles))
+	copy(roles, s.effectiveRoles)
+	return roles
+}
+
+func (s *Operator) AuthzPolicyVersion() int64 { return s.authzPolicyVersion }
+
+func (s *Operator) AuthzProjectedAt() *time.Time {
+	if s.authzProjectedAt == nil {
+		return nil
+	}
+	value := *s.authzProjectedAt
+	return &value
+}
+
+func (s *Operator) AuthzProjectionPending() bool { return s.authzProjectionPending }
+
+func (s *Operator) MarkAuthzProjectionPending() {
+	s.authzProjectionPending = true
 }
 
 // Name 获取姓名
@@ -138,22 +167,40 @@ func (s *Operator) CanManageEvaluationPlans() bool {
 
 // === 仓储层重建方法（用于从数据库加载）===
 
-// ReplaceRolesProjection 用 IAM 授权快照中的角色名替换本地持久化投影（非业务规则真值来源）。
-func (s *Operator) ReplaceRolesProjection(roles []Role) {
-	s.roles = make([]Role, len(roles))
-	copy(s.roles, roles)
+// ReplaceRolesProjection replaces the non-authoritative IAM role projection.
+func (s *Operator) ReplaceRolesProjection(directRoles, effectiveRoles []Role, policyVersion int64, projectedAt *time.Time, pending bool) {
+	s.roles = append([]Role(nil), directRoles...)
+	s.effectiveRoles = append([]Role(nil), effectiveRoles...)
+	s.authzPolicyVersion = policyVersion
+	s.authzProjectionPending = pending
+	if projectedAt == nil {
+		s.authzProjectedAt = nil
+	} else {
+		value := *projectedAt
+		s.authzProjectedAt = &value
+	}
 }
 
 // RestoreFromRepository 从仓储恢复聚合根状态（用于仓储层重建对象）
 // 这些方法绕过领域服务的验证，仅用于从持久化存储加载数据
 func (s *Operator) RestoreFromRepository(
 	roles []Role,
+	effectiveRoles []Role,
+	authzPolicyVersion int64,
+	authzProjectedAt *time.Time,
+	authzProjectionPending bool,
 	email string,
 	phone string,
 	isActive bool,
 ) {
-	s.roles = make([]Role, len(roles))
-	copy(s.roles, roles)
+	s.roles = append([]Role(nil), roles...)
+	s.effectiveRoles = append([]Role(nil), effectiveRoles...)
+	s.authzPolicyVersion = authzPolicyVersion
+	s.authzProjectionPending = authzProjectionPending
+	if authzProjectedAt != nil {
+		value := *authzProjectedAt
+		s.authzProjectedAt = &value
+	}
 	s.email = email
 	s.phone = phone
 	s.isActive = isActive

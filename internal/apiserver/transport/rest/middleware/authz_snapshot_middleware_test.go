@@ -39,7 +39,7 @@ func (s *stubOperatorRoleProjectionUpdater) SyncRoles(context.Context, int64, ui
 func TestAuthzSnapshotMiddlewareStoresSnapshotInGinAndRequestContext(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	snap := &authzapp.Snapshot{Roles: []string{"qs:admin"}}
+	snap := &authzapp.Snapshot{DirectRoles: []string{"qs:admin"}, EffectiveRoles: []string{"qs:admin"}}
 	var gotTenantDomain string
 	var gotUserID string
 
@@ -84,7 +84,7 @@ func TestAuthzSnapshotMiddlewareStoresSnapshotInGinAndRequestContext(t *testing.
 func TestAuthzSnapshotMiddlewarePersistsProjectionWhenCurrentOperatorExists(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	snap := &authzapp.Snapshot{Roles: []string{"qs:admin"}}
+	snap := &authzapp.Snapshot{DirectRoles: []string{"qs:admin"}, EffectiveRoles: []string{"qs:admin"}}
 	updater := &stubOperatorRoleProjectionUpdater{}
 	operator := &operatorapp.OperatorResult{ID: 801, OrgID: 88, UserID: 701, Name: "Router User", IsActive: true}
 
@@ -137,7 +137,7 @@ func TestAuthzSnapshotMiddlewareUpdaterFailureDoesNotAbortRequest(t *testing.T) 
 		c.Next()
 	})
 	engine.Use(newAuthzSnapshotMiddleware(func(ctx context.Context, tenantDomain, userID string) (*authzapp.Snapshot, error) {
-		return &authzapp.Snapshot{Roles: []string{"qs:admin"}}, nil
+		return &authzapp.Snapshot{DirectRoles: []string{"qs:admin"}, EffectiveRoles: []string{"qs:admin"}}, nil
 	}, updater))
 	engine.GET("/check", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)

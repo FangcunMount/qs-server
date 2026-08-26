@@ -62,7 +62,14 @@ type OperatorAuthzGateway interface {
 	IsEnabled() bool
 	GrantOperatorRole(ctx context.Context, orgID, userID int64, roleName, grantedBy string) error
 	RevokeOperatorRole(ctx context.Context, orgID, userID int64, roleName string) error
-	LoadOperatorRoleNames(ctx context.Context, orgID, userID int64) ([]string, error)
+	ReplaceManagedOperatorRoles(ctx context.Context, orgID, userID int64, roleNames []string, changedBy, reason string) (int64, error)
+	LoadOperatorRoleProjection(ctx context.Context, orgID, userID int64) (OperatorRoleProjection, error)
+}
+
+type OperatorRoleProjection struct {
+	DirectRoles    []string
+	EffectiveRoles []string
+	PolicyVersion  int64
 }
 
 type ProfileReader interface {
