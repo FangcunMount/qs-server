@@ -29,6 +29,7 @@ type Subject struct {
 	Kind         string
 	ExpectedRole string
 	UserID       string
+	Source       string
 }
 
 type SubjectSource interface {
@@ -60,6 +61,7 @@ type Evidence struct {
 type SubjectEvidence struct {
 	Kind               string   `json:"kind"`
 	ExpectedRole       string   `json:"expected_role"`
+	Source             string   `json:"source"`
 	SubjectFingerprint string   `json:"subject_fingerprint"`
 	ResolvedRoles      []string `json:"resolved_roles"`
 }
@@ -131,6 +133,7 @@ func (r *Runner) Run(ctx context.Context) (Evidence, error) {
 		sort.Strings(roles)
 		evidence.Subjects = append(evidence.Subjects, SubjectEvidence{
 			Kind: subject.Kind, ExpectedRole: subject.ExpectedRole,
+			Source:             subject.Source,
 			SubjectFingerprint: fingerprint(subject.UserID), ResolvedRoles: roles,
 		})
 	}

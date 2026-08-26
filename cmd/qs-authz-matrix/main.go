@@ -51,13 +51,16 @@ func run(opts *apiserveroptions.Options) app.RunFunc {
 			return fmt.Errorf("initialize IAM v3 client: %w", err)
 		}
 		defer func() { _ = iamModule.Close() }()
-		if iamModule.AuthzSnapshotLoader() == nil || iamModule.ObjectAuthorizationChecker() == nil || iamModule.ServiceAuthHelper() == nil {
+		if iamModule.AuthzSnapshotLoader() == nil || iamModule.ObjectAuthorizationChecker() == nil ||
+			iamModule.ServiceAuthHelper() == nil || iamModule.IdentityService() == nil || iamModule.IdentityService().Raw() == nil {
 			return fmt.Errorf("IAM v3 matrix dependencies are unavailable")
 		}
 
 		serviceIdentity := iamModule.ServiceAuthHelper().ServiceIdentity().ServiceID
 		runner := authzmatrix.NewRunner(
-			authzmatrix.NewSQLSubjectSource(sqlDB),
+			authzmatrix.NewFallbackSubjectSource(sqlDB, authzmatrix.NewIAMSyntheticSubjectDirectory(
+				iamModule.IdentityService().Raw(), iamModule.ServiceAuthHelper(),
+			)),
 			iamModule.AuthzSnapshotLoader(),
 			iamModule.ObjectAuthorizationChecker(),
 			version.Get().GitCommit,

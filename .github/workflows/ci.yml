@@ -298,6 +298,9 @@ jobs:
       - name: Validate production AuthZ matrix contract
         run: bash scripts/cd/test-verify-authz-production-matrix.sh
 
+      - name: Validate production AuthZ matrix evaluator provisioning contract
+        run: bash scripts/cd/test-provision-authz-production-matrix-evaluator.sh
+
       - name: Validate production Compose
         run: |
           printf '%s\n' \
