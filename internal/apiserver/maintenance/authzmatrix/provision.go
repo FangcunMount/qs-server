@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -167,12 +168,19 @@ func (p *Provisioner) createIsolatedUser(ctx context.Context, nickname string) (
 	if err != nil {
 		return "", fmt.Errorf("create isolated matrix identity %q: %w", nickname, err)
 	}
-	user := resp.GetUser()
-	if user == nil || user.GetStatus() != identityv2.UserStatus_USER_STATUS_ACTIVE ||
+	return createdIsolatedUserID(resp.GetUser(), nickname)
+}
+
+func createdIsolatedUserID(user *identityv2.User, nickname string) (string, error) {
+	if user == nil || user.GetNickname() != nickname || user.GetStatus() != identityv2.UserStatus_USER_STATUS_ACTIVE ||
 		len(user.GetContacts()) != 0 || len(user.GetExternalIdentities()) != 0 {
 		return "", fmt.Errorf("created matrix identity %q is not active and isolated", nickname)
 	}
-	return p.directory.FindActiveIsolatedUser(ctx, nickname)
+	parsed, err := strconv.ParseUint(strings.TrimSpace(user.GetId()), 10, 64)
+	if err != nil || parsed == 0 {
+		return "", fmt.Errorf("created matrix identity %q has invalid user ID", nickname)
+	}
+	return strconv.FormatUint(parsed, 10), nil
 }
 
 func (p *Provisioner) getSnapshot(ctx context.Context, userID string) (*authzv3.GetAuthorizationSnapshotResponse, error) {
