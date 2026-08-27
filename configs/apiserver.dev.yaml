@@ -106,8 +106,8 @@ grpc:
 # 密钥使用 OPENAI_API_KEY、DEEPSEEK_API_KEY 或 QS_APISERVER_AI_EXPLANATION_API_KEY 注入。
 ai_explanation:
   enabled: false
-  provider: "openai"
-  model: ""
+  provider: "deepseek"
+  model: "deepseek-v4-flash"
   route_revision: "v1"
   endpoint: ""
   api_key: ""

@@ -2,7 +2,7 @@
 
 > 状态：本篇已按当前源码重写。Interpretation 的生成生命周期、重试治理、查询模型与报告模板版本发布均已落地；历史路由已完成显式冻结，运行时对缺失身份执行 fail-closed。
 
-> AI 解读是本模块下默认关闭的独立发布候选能力：标准报告继续自动生成并保持唯一权威，Participant 可在报告可用后手动触发一次性 AI 补充解读。机器契约、领域/Application、Participant REST/gRPC、Outbox/Worker、OpenAI/DeepSeek Responses API Adapter、确定性校验、耐久 Prompt 评测、双角色复核、Profile 治理、容量治理、数据生命周期和 Mongo migration 已接线；API 密钥、已发布 Profile、真实模型评测、正式保留期限、跨进程联调和生产验收仍缺失，见[AI 解读核心设计](./25-核心设计-AI解读.md)。
+> AI 解读是本模块下默认关闭的独立发布候选能力：标准报告继续自动生成并保持唯一权威，Participant 可在报告可用后手动触发一次性 AI 补充解读。机器契约、领域/Application、Participant REST/gRPC、Outbox/Worker、OpenAI/DeepSeek Responses API Adapter、确定性校验、耐久 Prompt 评测、双角色复核、Profile 治理、容量治理、数据生命周期和 Mongo migration 已接线；当前默认主 Provider 为 DeepSeek，OpenAI 保留为备选；API 密钥、已发布 Profile、真实模型评测、正式保留期限、跨进程联调和生产验收仍缺失，见[AI 解读核心设计](./25-核心设计-AI解读.md)。
 
 ## 1. 30 秒结论
 

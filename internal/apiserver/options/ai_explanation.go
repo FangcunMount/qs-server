@@ -14,6 +14,7 @@ const (
 	DefaultAIExplanationSemanticProviderRoute = "semantic_judge_v1"
 	AIExplanationProviderOpenAI               = "openai"
 	AIExplanationProviderDeepSeek             = "deepseek"
+	DefaultAIExplanationDeepSeekModel         = "deepseek-v4-flash"
 )
 
 // AIExplanationOptions controls the optional, manually triggered AI
@@ -81,7 +82,7 @@ type AIExplanationEvaluationCapacityOptions struct {
 
 func NewAIExplanationOptions() *AIExplanationOptions {
 	return &AIExplanationOptions{
-		Enabled: false, Provider: AIExplanationProviderOpenAI, RouteRevision: "v1",
+		Enabled: false, Provider: AIExplanationProviderDeepSeek, Model: DefaultAIExplanationDeepSeekModel, RouteRevision: "v1",
 		Timeout: 60 * time.Second, RunLeaseDuration: 2 * time.Minute,
 		MaxOutputTokens: 3000, MaxResponseBytes: 4 << 20,
 		DataLifecycle: AIExplanationDataLifecycleOptions{},

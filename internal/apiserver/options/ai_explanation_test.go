@@ -17,6 +17,9 @@ func TestAIExplanationDisabledPreservesStandardRuntimeDefaults(t *testing.T) {
 	if opts.AIExplanation.Evaluation.Enabled {
 		t.Fatalf("AI explanation evaluation must default disabled: %#v", opts.AIExplanation.Evaluation)
 	}
+	if opts.AIExplanation.Provider != AIExplanationProviderDeepSeek || opts.AIExplanation.Model != DefaultAIExplanationDeepSeekModel {
+		t.Fatalf("AI explanation primary provider/model defaults = %#v", opts.AIExplanation)
+	}
 	if errs := opts.AIExplanation.Validate(); len(errs) != 0 {
 		t.Fatalf("disabled validation errors = %v", errs)
 	}
