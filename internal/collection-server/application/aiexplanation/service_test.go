@@ -61,6 +61,9 @@ func TestServiceRejectsMalformedBackendLifecycleState(t *testing.T) {
 		{name: "unknown status", result: &aiport.Output{Status: "done", SourceState: "current"}},
 		{name: "unknown source state", result: &aiport.Output{Status: "pending", GenerationID: "9001", SourceState: "latest"}},
 		{name: "pending without generation", result: &aiport.Output{Status: "pending", SourceState: "current"}},
+		{name: "unknown reason", result: &aiport.Output{Status: "not_applicable", ReasonCode: "future_unbounded_reason", SourceState: "current"}},
+		{name: "reason does not match status", result: &aiport.Output{Status: "not_ready", ReasonCode: aiport.ReasonCodeProfileUnresolved, SourceState: "unavailable"}},
+		{name: "lifecycle state contains reason", result: &aiport.Output{Status: "pending", ReasonCode: aiport.ReasonCodeProfileUnresolved, GenerationID: "9001", SourceState: "current"}},
 		{name: "generated without artifact", result: &aiport.Output{
 			Status: "generated", GenerationID: "9001", SourceState: "current",
 			Content: &aiport.Content{SchemaVersion: "ai-explanation-output/v1"},
@@ -73,6 +76,31 @@ func TestServiceRejectsMalformedBackendLifecycleState(t *testing.T) {
 			service := NewService(clientStub{capability: testCase.result})
 			if _, err := service.Request(context.Background(), 7, 42, Request{Locale: "zh-CN"}); err == nil {
 				t.Fatal("expected malformed upstream lifecycle state rejection")
+			}
+		})
+	}
+}
+
+func TestServiceAcceptsBoundedReasonCodes(t *testing.T) {
+	tests := []struct {
+		name   string
+		status string
+		reason string
+	}{
+		{name: "standard report not ready", status: "not_ready", reason: aiport.ReasonCodeStandardReportNotReady},
+		{name: "feature disabled", status: "not_applicable", reason: aiport.ReasonCodeFeatureDisabled},
+		{name: "source not supported", status: "not_applicable", reason: aiport.ReasonCodeSourceNotSupported},
+		{name: "profile unresolved", status: "not_applicable", reason: aiport.ReasonCodeProfileUnresolved},
+		{name: "profile mismatch", status: "not_applicable", reason: aiport.ReasonCodeProfileMismatch},
+		{name: "input not applicable", status: "not_applicable", reason: aiport.ReasonCodeNotApplicable},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			service := NewService(clientStub{capability: &aiport.Output{
+				Status: testCase.status, ReasonCode: testCase.reason, SourceState: "current",
+			}})
+			if _, err := service.Capability(context.Background(), 7, 42, Request{Locale: "zh-CN"}); err != nil {
+				t.Fatalf("bounded reason rejected: %v", err)
 			}
 		})
 	}

@@ -117,6 +117,7 @@ func normalizeResult(result *aiport.Output, err error) (*Response, error) {
 
 func validateResult(result *aiport.Output) error {
 	status := strings.TrimSpace(result.Status)
+	reasonCode := strings.TrimSpace(result.ReasonCode)
 	sourceState := strings.TrimSpace(result.SourceState)
 	switch sourceState {
 	case "current", "stale", "unavailable", "unknown":
@@ -126,23 +127,39 @@ func validateResult(result *aiport.Output) error {
 
 	switch status {
 	case "ready":
+		if reasonCode != "" {
+			return fmt.Errorf("ready result must not contain reason code")
+		}
 		if strings.TrimSpace(result.SourceReportID) == "" {
 			return fmt.Errorf("ready result requires source report")
 		}
-	case "not_ready", "not_applicable":
-		if strings.TrimSpace(result.ReasonCode) == "" {
-			return fmt.Errorf("%s result requires reason code", status)
+	case "not_ready":
+		if reasonCode != aiport.ReasonCodeStandardReportNotReady {
+			return fmt.Errorf("not_ready result requires standard_report_not_ready reason code")
+		}
+	case "not_applicable":
+		if !isNotApplicableReasonCode(reasonCode) {
+			return fmt.Errorf("not_applicable result contains unsupported reason code %q", reasonCode)
 		}
 	case "pending", "generating":
+		if reasonCode != "" {
+			return fmt.Errorf("%s result must not contain reason code", status)
+		}
 		if strings.TrimSpace(result.GenerationID) == "" {
 			return fmt.Errorf("%s result requires generation", status)
 		}
 	case "generated":
+		if reasonCode != "" {
+			return fmt.Errorf("generated result must not contain reason code")
+		}
 		if strings.TrimSpace(result.GenerationID) == "" || strings.TrimSpace(result.ArtifactID) == "" || result.Content == nil ||
 			strings.TrimSpace(result.Content.SchemaVersion) == "" {
 			return fmt.Errorf("generated result requires generation, artifact and content")
 		}
 	case "failed":
+		if reasonCode != "" {
+			return fmt.Errorf("failed result must not contain reason code")
+		}
 		if strings.TrimSpace(result.GenerationID) == "" || result.Failure == nil || strings.TrimSpace(result.Failure.Code) == "" {
 			return fmt.Errorf("failed result requires generation and failure")
 		}
@@ -152,6 +169,19 @@ func validateResult(result *aiport.Output) error {
 	return nil
 }
 
+func isNotApplicableReasonCode(reasonCode string) bool {
+	switch reasonCode {
+	case aiport.ReasonCodeFeatureDisabled,
+		aiport.ReasonCodeSourceNotSupported,
+		aiport.ReasonCodeProfileUnresolved,
+		aiport.ReasonCodeProfileMismatch,
+		aiport.ReasonCodeNotApplicable:
+		return true
+	default:
+		return false
+	}
+}
+
 func disabledResponse() *Response {
-	return &Response{Status: "not_applicable", ReasonCode: "feature_disabled", SourceState: "unavailable"}
+	return &Response{Status: "not_applicable", ReasonCode: aiport.ReasonCodeFeatureDisabled, SourceState: "unavailable"}
 }

@@ -56,6 +56,14 @@ const (
 	StatusFailed        Status = "failed"
 )
 
+const (
+	ReasonCodeStandardReportNotReady = "standard_report_not_ready"
+	ReasonCodeSourceNotSupported     = "source_not_supported"
+	ReasonCodeProfileUnresolved      = "profile_unresolved"
+	ReasonCodeProfileMismatch        = "profile_mismatch"
+	ReasonCodeNotApplicable          = "not_applicable"
+)
+
 type SourceState string
 
 const (
@@ -238,9 +246,9 @@ func (s *service) prepare(ctx context.Context, input RequestInput) (*prepared, *
 	if err != nil {
 		switch {
 		case errors.Is(err, appsource.ErrNotReady):
-			return nil, &Result{Status: StatusNotReady, ReasonCode: "standard_report_not_ready", SourceState: SourceStateUnavailable}, nil
+			return nil, &Result{Status: StatusNotReady, ReasonCode: ReasonCodeStandardReportNotReady, SourceState: SourceStateUnavailable}, nil
 		case errors.Is(err, appsource.ErrNotApplicable):
-			return nil, &Result{Status: StatusNotApplicable, ReasonCode: "source_not_supported", SourceState: SourceStateCurrent}, nil
+			return nil, &Result{Status: StatusNotApplicable, ReasonCode: ReasonCodeSourceNotSupported, SourceState: SourceStateCurrent}, nil
 		default:
 			return nil, nil, err
 		}
@@ -253,9 +261,9 @@ func (s *service) prepare(ctx context.Context, input RequestInput) (*prepared, *
 	if err != nil {
 		switch {
 		case errors.Is(err, domainprofile.ErrNotFound):
-			return nil, &Result{Status: StatusNotApplicable, ReasonCode: "profile_unresolved", SourceReportID: current.Report.ID(), SourceState: SourceStateCurrent}, nil
+			return nil, &Result{Status: StatusNotApplicable, ReasonCode: ReasonCodeProfileUnresolved, SourceReportID: current.Report.ID(), SourceState: SourceStateCurrent}, nil
 		case errors.Is(err, domainprofile.ErrAmbiguousSelector):
-			return nil, &Result{Status: StatusNotApplicable, ReasonCode: "profile_mismatch", SourceReportID: current.Report.ID(), SourceState: SourceStateCurrent}, nil
+			return nil, &Result{Status: StatusNotApplicable, ReasonCode: ReasonCodeProfileMismatch, SourceReportID: current.Report.ID(), SourceState: SourceStateCurrent}, nil
 		default:
 			return nil, nil, err
 		}
@@ -266,9 +274,9 @@ func (s *service) prepare(ctx context.Context, input RequestInput) (*prepared, *
 	if err != nil {
 		switch {
 		case errors.Is(err, appinput.ErrNotApplicable):
-			return nil, &Result{Status: StatusNotApplicable, ReasonCode: "not_applicable", SourceReportID: current.Report.ID(), SourceState: SourceStateCurrent}, nil
+			return nil, &Result{Status: StatusNotApplicable, ReasonCode: ReasonCodeNotApplicable, SourceReportID: current.Report.ID(), SourceState: SourceStateCurrent}, nil
 		case errors.Is(err, appinput.ErrProfileMismatch):
-			return nil, &Result{Status: StatusNotApplicable, ReasonCode: "profile_mismatch", SourceReportID: current.Report.ID(), SourceState: SourceStateCurrent}, nil
+			return nil, &Result{Status: StatusNotApplicable, ReasonCode: ReasonCodeProfileMismatch, SourceReportID: current.Report.ID(), SourceState: SourceStateCurrent}, nil
 		case errors.Is(err, appinput.ErrInvalidInput):
 			return nil, nil, fmt.Errorf("%w: %v", ErrInvalidRequest, err)
 		default:

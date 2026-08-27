@@ -149,6 +149,13 @@ definitions:
       generation_id:
         type: string
       reason_code:
+        enum:
+        - standard_report_not_ready
+        - feature_disabled
+        - source_not_supported
+        - profile_unresolved
+        - profile_mismatch
+        - not_applicable
         type: string
       source_report_id:
         type: string

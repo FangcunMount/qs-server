@@ -7,6 +7,15 @@ import (
 
 var ErrDisabled = errors.New("AI explanation service is disabled")
 
+const (
+	ReasonCodeStandardReportNotReady = "standard_report_not_ready"
+	ReasonCodeFeatureDisabled        = "feature_disabled"
+	ReasonCodeSourceNotSupported     = "source_not_supported"
+	ReasonCodeProfileUnresolved      = "profile_unresolved"
+	ReasonCodeProfileMismatch        = "profile_mismatch"
+	ReasonCodeNotApplicable          = "not_applicable"
+)
+
 type EvidenceRef struct {
 	Kind string `json:"kind" enums:"dimension,overall_result,model_result,standard_suggestion"`
 	Ref  string `json:"ref"`
@@ -48,7 +57,7 @@ type Failure struct {
 
 type Output struct {
 	Status         string   `json:"status" enums:"ready,not_ready,not_applicable,pending,generating,generated,failed"`
-	ReasonCode     string   `json:"reason_code,omitempty"`
+	ReasonCode     string   `json:"reason_code,omitempty" enums:"standard_report_not_ready,feature_disabled,source_not_supported,profile_unresolved,profile_mismatch,not_applicable"`
 	GenerationID   string   `json:"generation_id,omitempty"`
 	ArtifactID     string   `json:"artifact_id,omitempty"`
 	SourceReportID string   `json:"source_report_id,omitempty"`

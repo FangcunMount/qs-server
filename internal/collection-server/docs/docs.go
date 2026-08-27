@@ -3143,7 +3143,15 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "reason_code": {
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "standard_report_not_ready",
+                        "feature_disabled",
+                        "source_not_supported",
+                        "profile_unresolved",
+                        "profile_mismatch",
+                        "not_applicable"
+                    ]
                 },
                 "source_report_id": {
                     "type": "string"

@@ -88,6 +88,10 @@ func TestCollectionOpenAPIAIExplanationLifecycleContract(t *testing.T) {
 	if !openAPIEnumEquals(status["enum"], "ready", "not_ready", "not_applicable", "pending", "generating", "generated", "failed") {
 		t.Fatalf("AI explanation status enum = %v", status["enum"])
 	}
+	reasonCode := properties["reason_code"].(map[string]any)
+	if !openAPIEnumEquals(reasonCode["enum"], "standard_report_not_ready", "feature_disabled", "source_not_supported", "profile_unresolved", "profile_mismatch", "not_applicable") {
+		t.Fatalf("AI explanation reason_code enum = %v", reasonCode["enum"])
+	}
 	sourceState := properties["source_state"].(map[string]any)
 	if !openAPIEnumEquals(sourceState["enum"], "current", "stale", "unavailable", "unknown") {
 		t.Fatalf("AI explanation source_state enum = %v", sourceState["enum"])
