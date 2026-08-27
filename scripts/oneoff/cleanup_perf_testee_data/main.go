@@ -201,6 +201,11 @@ func main() {
 			log.Fatalf("load mongo outbox event ids: %v", err)
 		}
 	}
+	prog.Phase("materialize mysql scoped row ids")
+	if err := materializeScopedDeleteIDs(ctx, conn); err != nil {
+		log.Fatalf("materialize mysql scoped row ids: %v", err)
+	}
+	prog.Finish("materialize mysql scoped row ids", "")
 
 	if cfg.skipCounts {
 		printScopeIDsSummary(ids, cfg)
@@ -413,6 +418,9 @@ func prepareMySQLScope(ctx context.Context, conn *sql.Conn, testeeIDs []uint64) 
 		`CREATE TEMPORARY TABLE tmp_cleanup_report_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
 		fmt.Sprintf(`CREATE TEMPORARY TABLE tmp_cleanup_event_ids (event_id %s NOT NULL PRIMARY KEY)`, eventIDType),
 		fmt.Sprintf(`CREATE TEMPORARY TABLE tmp_cleanup_mysql_outbox_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY, event_id %s NOT NULL, UNIQUE KEY uk_event_id (event_id))`, eventIDType),
+		fmt.Sprintf(`CREATE TEMPORARY TABLE tmp_cleanup_attention_projection_event_ids (event_id %s NOT NULL PRIMARY KEY)`, eventIDType),
+		`CREATE TEMPORARY TABLE tmp_cleanup_interpretation_admission_failure_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
+		`CREATE TEMPORARY TABLE tmp_cleanup_statistics_assessment_fact_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
 		`CREATE TEMPORARY TABLE tmp_cleanup_assessment_score_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
 		`CREATE TEMPORARY TABLE tmp_cleanup_outcome_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
 		`CREATE TEMPORARY TABLE tmp_cleanup_statistics_dates (org_id BIGINT NOT NULL, stat_date DATE NOT NULL, PRIMARY KEY (org_id, stat_date))`,
@@ -1020,10 +1028,10 @@ func mysqlCountItems() []mysqlCountItem {
 	return []mysqlCountItem{
 		{"assessment", `SELECT COUNT(*) FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id`},
 		{"evaluation_outcome", `SELECT COUNT(*) FROM evaluation_outcome o JOIN tmp_cleanup_outcome_ids x ON x.id = o.id`},
-		{"interpretation_admission_failure", `SELECT COUNT(*) FROM interpretation_admission_failure f LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = f.outcome_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id WHERE o.id IS NOT NULL OR a.id IS NOT NULL`},
-		{"interpretation_attention_projection", `SELECT COUNT(*) FROM interpretation_attention_projection p LEFT JOIN tmp_cleanup_assessment_ids a ON BINARY p.assessment_id = BINARY CAST(a.id AS CHAR) LEFT JOIN tmp_cleanup_report_ids r ON BINARY p.report_id = BINARY CAST(r.id AS CHAR) WHERE a.id IS NOT NULL OR r.id IS NOT NULL`},
-		{"assessment_score", `SELECT COUNT(*) FROM assessment_score s LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = s.evaluation_outcome_id WHERE a.id IS NOT NULL OR o.id IS NOT NULL`},
-		{"statistics_assessment_fact", `SELECT COUNT(*) FROM statistics_assessment_fact f LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = f.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = f.outcome_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = f.report_id WHERE s.id IS NOT NULL OR a.id IS NOT NULL OR o.id IS NOT NULL OR r.id IS NOT NULL`},
+		{"interpretation_admission_failure", `SELECT COUNT(*) FROM interpretation_admission_failure f JOIN tmp_cleanup_interpretation_admission_failure_ids x ON x.id = f.id`},
+		{"interpretation_attention_projection", `SELECT COUNT(*) FROM interpretation_attention_projection p JOIN tmp_cleanup_attention_projection_event_ids x ON x.event_id = p.event_id`},
+		{"assessment_score", `SELECT COUNT(*) FROM assessment_score s JOIN tmp_cleanup_assessment_score_ids x ON x.id = s.id`},
+		{"statistics_assessment_fact", `SELECT COUNT(*) FROM statistics_assessment_fact f JOIN tmp_cleanup_statistics_assessment_fact_ids x ON x.id = f.id`},
 		{"statistics_assessment_daily", `SELECT COUNT(*) FROM statistics_assessment_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date WHERE d.origin_type = 'adhoc'`},
 		{"statistics_org_snapshot", `SELECT COUNT(*) FROM statistics_org_snapshot s WHERE EXISTS (SELECT 1 FROM tmp_cleanup_statistics_dates x WHERE x.org_id = s.org_id)`},
 		{"domain_event_outbox", `SELECT COUNT(*) FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
@@ -1167,10 +1175,10 @@ func mysqlBackupItems() []mysqlBackupItem {
 	return []mysqlBackupItem{
 		{"assessment", `SELECT a.* FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id`},
 		{"evaluation_outcome", `SELECT o.* FROM evaluation_outcome o JOIN tmp_cleanup_outcome_ids x ON x.id = o.id`},
-		{"interpretation_admission_failure", `SELECT f.* FROM interpretation_admission_failure f LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = f.outcome_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id WHERE o.id IS NOT NULL OR a.id IS NOT NULL`},
-		{"interpretation_attention_projection", `SELECT p.* FROM interpretation_attention_projection p LEFT JOIN tmp_cleanup_assessment_ids a ON BINARY p.assessment_id = BINARY CAST(a.id AS CHAR) LEFT JOIN tmp_cleanup_report_ids r ON BINARY p.report_id = BINARY CAST(r.id AS CHAR) WHERE a.id IS NOT NULL OR r.id IS NOT NULL`},
-		{"assessment_score", `SELECT s.* FROM assessment_score s LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = s.evaluation_outcome_id WHERE a.id IS NOT NULL OR o.id IS NOT NULL`},
-		{"statistics_assessment_fact", `SELECT f.* FROM statistics_assessment_fact f LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = f.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = f.outcome_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = f.report_id WHERE s.id IS NOT NULL OR a.id IS NOT NULL OR o.id IS NOT NULL OR r.id IS NOT NULL`},
+		{"interpretation_admission_failure", `SELECT f.* FROM interpretation_admission_failure f JOIN tmp_cleanup_interpretation_admission_failure_ids x ON x.id = f.id`},
+		{"interpretation_attention_projection", `SELECT p.* FROM interpretation_attention_projection p JOIN tmp_cleanup_attention_projection_event_ids x ON x.event_id = p.event_id`},
+		{"assessment_score", `SELECT s.* FROM assessment_score s JOIN tmp_cleanup_assessment_score_ids x ON x.id = s.id`},
+		{"statistics_assessment_fact", `SELECT f.* FROM statistics_assessment_fact f JOIN tmp_cleanup_statistics_assessment_fact_ids x ON x.id = f.id`},
 		{"statistics_assessment_daily", `SELECT d.* FROM statistics_assessment_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date WHERE d.origin_type = 'adhoc'`},
 		{"statistics_org_snapshot", `SELECT s.* FROM statistics_org_snapshot s WHERE EXISTS (SELECT 1 FROM tmp_cleanup_statistics_dates x WHERE x.org_id = s.org_id)`},
 		{"domain_event_outbox", `SELECT o.* FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
@@ -1263,13 +1271,13 @@ func mysqlDeleteItems(_ context.Context, _ *sql.Conn) ([]mysqlDeleteItem, error)
 	items := []mysqlDeleteItem{
 		{"statistics_org_snapshot", `DELETE s FROM statistics_org_snapshot s WHERE EXISTS (SELECT 1 FROM tmp_cleanup_statistics_dates x WHERE x.org_id = s.org_id)`},
 		{"statistics_assessment_daily", `DELETE d FROM statistics_assessment_daily d JOIN tmp_cleanup_statistics_dates x ON x.org_id = d.org_id AND x.stat_date = d.stat_date WHERE d.origin_type = 'adhoc'`},
-		{"statistics_assessment_fact", `DELETE f FROM statistics_assessment_fact f LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = f.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = f.outcome_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = f.report_id WHERE s.id IS NOT NULL OR a.id IS NOT NULL OR o.id IS NOT NULL OR r.id IS NOT NULL`},
+		{"statistics_assessment_fact", `DELETE f FROM statistics_assessment_fact f JOIN tmp_cleanup_statistics_assessment_fact_ids x ON x.id = f.id`},
 		{"retry_event_hold", `DELETE h FROM retry_event_hold h JOIN tmp_cleanup_event_ids e ON BINARY e.event_id = BINARY h.event_id`},
 		{"runtime_checkpoint", `DELETE r FROM runtime_checkpoint r JOIN tmp_cleanup_assessment_ids a ON a.id = r.assessment_id`},
 		{"domain_event_outbox", `DELETE o FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
-		{"interpretation_attention_projection", `DELETE p FROM interpretation_attention_projection p LEFT JOIN tmp_cleanup_assessment_ids a ON BINARY p.assessment_id = BINARY CAST(a.id AS CHAR) LEFT JOIN tmp_cleanup_report_ids r ON BINARY p.report_id = BINARY CAST(r.id AS CHAR) WHERE a.id IS NOT NULL OR r.id IS NOT NULL`},
-		{"interpretation_admission_failure", `DELETE f FROM interpretation_admission_failure f LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = f.outcome_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id WHERE o.id IS NOT NULL OR a.id IS NOT NULL`},
-		{"assessment_score", `DELETE s FROM assessment_score s LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = s.evaluation_outcome_id WHERE a.id IS NOT NULL OR o.id IS NOT NULL`},
+		{"interpretation_attention_projection", `DELETE p FROM interpretation_attention_projection p JOIN tmp_cleanup_attention_projection_event_ids x ON x.event_id = p.event_id`},
+		{"interpretation_admission_failure", `DELETE f FROM interpretation_admission_failure f JOIN tmp_cleanup_interpretation_admission_failure_ids x ON x.id = f.id`},
+		{"assessment_score", `DELETE s FROM assessment_score s JOIN tmp_cleanup_assessment_score_ids x ON x.id = s.id`},
 		{"evaluation_outcome", `DELETE o FROM evaluation_outcome o JOIN tmp_cleanup_outcome_ids x ON x.id = o.id`},
 		{"assessment", `DELETE a FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id`},
 	}
@@ -1277,18 +1285,7 @@ func mysqlDeleteItems(_ context.Context, _ *sql.Conn) ([]mysqlDeleteItem, error)
 }
 
 func materializeScopedDeleteIDs(ctx context.Context, conn *sql.Conn) error {
-	scoreSQL := `INSERT IGNORE INTO tmp_cleanup_assessment_score_ids (id)
-SELECT s.id
-FROM assessment_score s
-LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id
-LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = s.evaluation_outcome_id
-WHERE a.id IS NOT NULL OR o.id IS NOT NULL`
-	items := []namedSQL{
-		{
-			name: "assessment_score ids",
-			sql:  scoreSQL,
-		},
-	}
+	items := mysqlScopedDeleteIDMaterializationStatements()
 	for i, item := range items {
 		item := item
 		if err := prog.RunStep("materialize "+item.name, i+1, len(items), func() error {
@@ -1307,16 +1304,66 @@ WHERE a.id IS NOT NULL OR o.id IS NOT NULL`
 	return nil
 }
 
+func mysqlScopedDeleteIDMaterializationStatements() []namedSQL {
+	statisticsAssessmentFactSQL := `INSERT IGNORE INTO tmp_cleanup_statistics_assessment_fact_ids (id)
+SELECT f.id
+FROM statistics_assessment_fact f
+LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = f.answersheet_id
+LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id
+LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = f.outcome_id
+LEFT JOIN tmp_cleanup_report_ids r ON r.id = f.report_id
+WHERE s.id IS NOT NULL OR a.id IS NOT NULL OR o.id IS NOT NULL OR r.id IS NOT NULL`
+	attentionProjectionSQL := `INSERT IGNORE INTO tmp_cleanup_attention_projection_event_ids (event_id)
+SELECT p.event_id
+FROM interpretation_attention_projection p
+WHERE EXISTS (
+	SELECT 1
+	FROM tmp_cleanup_assessment_ids a
+	WHERE a.id = CAST(p.assessment_id AS UNSIGNED)
+)
+OR EXISTS (
+	SELECT 1
+	FROM tmp_cleanup_report_ids r
+	WHERE r.id = CAST(p.report_id AS UNSIGNED)
+)`
+	interpretationAdmissionFailureSQL := `INSERT IGNORE INTO tmp_cleanup_interpretation_admission_failure_ids (id)
+SELECT f.id
+FROM interpretation_admission_failure f
+LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = f.outcome_id
+LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = f.assessment_id
+WHERE o.id IS NOT NULL OR a.id IS NOT NULL`
+	scoreSQL := `INSERT IGNORE INTO tmp_cleanup_assessment_score_ids (id)
+SELECT s.id
+FROM assessment_score s
+LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id
+LEFT JOIN tmp_cleanup_outcome_ids o ON o.id = s.evaluation_outcome_id
+WHERE a.id IS NOT NULL OR o.id IS NOT NULL`
+	return []namedSQL{
+		{
+			name: "statistics_assessment_fact ids",
+			sql:  statisticsAssessmentFactSQL,
+		},
+		{
+			name: "interpretation_attention_projection event ids",
+			sql:  attentionProjectionSQL,
+		},
+		{
+			name: "interpretation_admission_failure ids",
+			sql:  interpretationAdmissionFailureSQL,
+		},
+		{
+			name: "assessment_score ids",
+			sql:  scoreSQL,
+		},
+	}
+}
+
 func deleteMySQLRows(ctx context.Context, conn *sql.Conn, lockWaitTimeoutSec, maxRetries, batchSize int) ([]namedCount, error) {
 	if lockWaitTimeoutSec > 0 {
 		if _, err := conn.ExecContext(ctx, "SET SESSION innodb_lock_wait_timeout = ?", lockWaitTimeoutSec); err != nil {
 			return nil, fmt.Errorf("set innodb_lock_wait_timeout: %w", err)
 		}
 		log.Printf("mysql delete: innodb_lock_wait_timeout=%ds per-table commit retries=%d batch_size=%d", lockWaitTimeoutSec, maxRetries, batchSize)
-	}
-
-	if err := materializeScopedDeleteIDs(ctx, conn); err != nil {
-		return nil, fmt.Errorf("materialize scoped delete ids: %w", err)
 	}
 
 	items, err := mysqlDeleteItems(ctx, conn)
@@ -1357,6 +1404,57 @@ LIMIT ?`,
 FROM domain_event_outbox o
 JOIN tmp_cleanup_batch_ids b ON b.id = o.id`,
 		}, true
+	case "statistics_assessment_fact":
+		return mysqlChunkedDeleteSpec{
+			name:             name,
+			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
+			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_ids`,
+			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_ids (id)
+SELECT id
+FROM tmp_cleanup_statistics_assessment_fact_ids
+ORDER BY id
+LIMIT ?`,
+			deleteBatch: `DELETE f
+FROM statistics_assessment_fact f
+JOIN tmp_cleanup_batch_ids b ON b.id = f.id`,
+			pruneStagingTable: `DELETE scoped
+FROM tmp_cleanup_statistics_assessment_fact_ids scoped
+JOIN tmp_cleanup_batch_ids b ON b.id = scoped.id`,
+		}, true
+	case "interpretation_attention_projection":
+		return mysqlChunkedDeleteSpec{
+			name:             name,
+			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_attention_projection_batch_event_ids LIKE tmp_cleanup_attention_projection_event_ids`,
+			clearBatchTable:  `DELETE FROM tmp_cleanup_attention_projection_batch_event_ids`,
+			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_attention_projection_batch_event_ids (event_id)
+SELECT event_id
+FROM tmp_cleanup_attention_projection_event_ids
+ORDER BY event_id
+LIMIT ?`,
+			deleteBatch: `DELETE p
+FROM interpretation_attention_projection p
+JOIN tmp_cleanup_attention_projection_batch_event_ids b ON b.event_id = p.event_id`,
+			pruneStagingTable: `DELETE scoped
+FROM tmp_cleanup_attention_projection_event_ids scoped
+JOIN tmp_cleanup_attention_projection_batch_event_ids b ON b.event_id = scoped.event_id`,
+		}, true
+	case "interpretation_admission_failure":
+		return mysqlChunkedDeleteSpec{
+			name:             name,
+			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
+			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_ids`,
+			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_ids (id)
+SELECT id
+FROM tmp_cleanup_interpretation_admission_failure_ids
+ORDER BY id
+LIMIT ?`,
+			deleteBatch: `DELETE f
+FROM interpretation_admission_failure f
+JOIN tmp_cleanup_batch_ids b ON b.id = f.id`,
+			pruneStagingTable: `DELETE scoped
+FROM tmp_cleanup_interpretation_admission_failure_ids scoped
+JOIN tmp_cleanup_batch_ids b ON b.id = scoped.id`,
+		}, true
 	case "assessment_score":
 		return mysqlChunkedDeleteSpec{
 			name:             name,
@@ -1373,6 +1471,21 @@ JOIN tmp_cleanup_batch_ids b ON b.id = s.id`,
 			pruneStagingTable: `DELETE scoped
 FROM tmp_cleanup_assessment_score_ids scoped
 JOIN tmp_cleanup_batch_ids b ON b.id = scoped.id`,
+		}, true
+	case "evaluation_outcome":
+		return mysqlChunkedDeleteSpec{
+			name:             name,
+			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
+			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_ids`,
+			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_ids (id)
+SELECT o.id
+FROM evaluation_outcome o
+JOIN tmp_cleanup_outcome_ids x ON x.id = o.id
+ORDER BY o.id
+LIMIT ?`,
+			deleteBatch: `DELETE o
+FROM evaluation_outcome o
+JOIN tmp_cleanup_batch_ids b ON b.id = o.id`,
 		}, true
 	case "assessment":
 		return mysqlChunkedDeleteSpec{

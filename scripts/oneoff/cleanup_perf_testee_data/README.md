@@ -46,6 +46,10 @@ go run ./scripts/oneoff/cleanup_perf_testee_data \
 派生数据、再删 MySQL 数据；若 MySQL 阶段失败，仍可由保留的 MySQL Assessment
 重新建立同一范围后重试。
 
+MySQL 删除阶段会先将 `interpretation_attention_projection.event_id` 物化到临时表，
+再按 `--mysql-delete-batch-size` 分批以主键删除和提交，避免使用 Assessment/Report
+大范围 JOIN 进行单事务删除。
+
 内置 MySQL 备份表使用短前缀 `cbpt_`；工具在创建任何备份对象前，会根据 MySQL
 64 字符标识符上限校验 `--backup-suffix`。备份插入会从
 `information_schema.columns` 读取源表列，显式排除生成列；备份表通过

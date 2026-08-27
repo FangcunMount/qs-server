@@ -355,7 +355,11 @@ func TestIsMySQLLockError(t *testing.T) {
 func TestMySQLChunkedDeleteSpecForLargeDeleteTables(t *testing.T) {
 	for _, name := range []string{
 		"domain_event_outbox",
+		"statistics_assessment_fact",
+		"interpretation_attention_projection",
+		"interpretation_admission_failure",
 		"assessment_score",
+		"evaluation_outcome",
 		"assessment",
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -387,7 +391,12 @@ func TestMySQLChunkedDeleteSpecForLargeDeleteTables(t *testing.T) {
 }
 
 func TestMySQLChunkedDeleteUsesStagingTablesForMultiSourceTables(t *testing.T) {
-	for _, name := range []string{"assessment_score"} {
+	for _, name := range []string{
+		"statistics_assessment_fact",
+		"interpretation_attention_projection",
+		"interpretation_admission_failure",
+		"assessment_score",
+	} {
 		t.Run(name, func(t *testing.T) {
 			spec, ok := mysqlChunkedDeleteSpecFor(name)
 			if !ok {
@@ -403,6 +412,51 @@ func TestMySQLChunkedDeleteUsesStagingTablesForMultiSourceTables(t *testing.T) {
 				t.Fatalf("%s fill SQL should accept one batch size placeholder; sql=%s", name, spec.fillBatchTable)
 			}
 		})
+	}
+}
+
+func TestAttentionProjectionChunkedDeleteUsesEventIDPrimaryKey(t *testing.T) {
+	spec, ok := mysqlChunkedDeleteSpecFor("interpretation_attention_projection")
+	if !ok {
+		t.Fatal("interpretation_attention_projection should use chunked delete")
+	}
+	for label, sql := range map[string]string{
+		"fill":   spec.fillBatchTable,
+		"delete": spec.deleteBatch,
+		"prune":  spec.pruneStagingTable,
+	} {
+		if !strings.Contains(sql, "event_id") {
+			t.Fatalf("%s SQL should use event_id; sql=%s", label, sql)
+		}
+	}
+	if strings.Contains(spec.deleteBatch, "assessment_id") || strings.Contains(spec.deleteBatch, "report_id") {
+		t.Fatalf("delete batch must join only materialized event_id values; sql=%s", spec.deleteBatch)
+	}
+}
+
+func TestAttentionProjectionMaterializationKeepsTemporaryIDPrimaryKeysUsable(t *testing.T) {
+	var query string
+	for _, item := range mysqlScopedDeleteIDMaterializationStatements() {
+		if item.name == "interpretation_attention_projection event ids" {
+			query = item.sql
+			break
+		}
+	}
+	if query == "" {
+		t.Fatal("attention projection event-id materialization is missing")
+	}
+	for _, want := range []string{
+		"a.id = CAST(p.assessment_id AS UNSIGNED)",
+		"r.id = CAST(p.report_id AS UNSIGNED)",
+	} {
+		if !strings.Contains(query, want) {
+			t.Fatalf("materialization query should preserve temporary-table PK lookup %q; sql=%s", want, query)
+		}
+	}
+	for _, unsafe := range []string{"CAST(a.id", "CAST(r.id", "DELETE"} {
+		if strings.Contains(query, unsafe) {
+			t.Fatalf("materialization query should not contain %q; sql=%s", unsafe, query)
+		}
 	}
 }
 
