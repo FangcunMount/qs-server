@@ -1,0 +1,19 @@
+[
+  { "create": "ai_explanation_participant_daily_budgets" },
+  {
+    "createIndexes": "ai_explanation_participant_daily_budgets",
+    "indexes": [
+      {
+        "key": { "org_id": 1, "budget_day": 1 },
+        "name": "uk_ai_explanation_participant_budget_org_day",
+        "unique": true
+      },
+      {
+        "key": { "reservations.generation_id": 1 },
+        "name": "uk_ai_explanation_participant_budget_generation",
+        "unique": true,
+        "sparse": true
+      }
+    ]
+  }
+]

@@ -59,7 +59,9 @@ apiserver registry 根据模块依赖注册以下角色化能力：
 - `TesteeEvaluationService`：面向受试者的测评查询；
 - `EvaluationWorkerService`：面向 worker 的执行能力；
 - `ParticipantReportService`：面向参与者的报告查询；
+- `ParticipantAIExplanationService`：面向 collection 的 AI 解读 capability、手动请求和成品查询；功能关闭时不注册；
 - `InterpretationAutomationService`：面向 worker 的自动报告生成能力。
+- `AIExplanationAutomationService`：面向 worker 的单次 Participant AI 解读执行和 Prompt 评测单步执行能力；两者都与标准报告 Automation 独立，功能关闭时不注册。
 
 ### 4.4 InternalService
 
@@ -82,7 +84,7 @@ proto 中还可能存在已生成但未被当前 registry 注册的能力。判�
 跨进程调用至少要区分三类上下文：
 
 1. **观测上下文**：request ID、trace 信息，用于串联 REST → gRPC → 日志；
-2. **用户身份上下文**：IAM 用户、tenant domain、授权快照来源；
+2. **用户身份上下文**：IAM 用户、tenant domain、授权快照来源；Participant Report 与 AI Explanation 由 collection 签发绑定 User/Testee/purpose 的 delegated-subject token；
 3. **业务范围上下文**：QS `org_id`、testee、filler 等用例参数。
 
 collection client interceptor 会把现有 `x-request-id` 写入 gRPC metadata，apiserver server interceptor 再投影到服务端 context。worker client 当前没有同等明确的 request-id interceptor，因此不能把“所有异步调用都已端到端透传请求标识”写成现状；异步链路更适合使用 event ID、correlation ID 和 assessment ID 追踪。

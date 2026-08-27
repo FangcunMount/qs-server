@@ -1,0 +1,19 @@
+[
+  { "dropIndexes": "ai_explanation_profiles", "index": "idx_ai_explanation_profile_selector" },
+  { "dropIndexes": "ai_explanation_profiles", "index": "uk_ai_explanation_profile_release" },
+  { "dropIndexes": "ai_explanation_profiles", "index": "uk_ai_explanation_profile_domain" },
+  { "drop": "ai_explanation_profiles" },
+  { "dropIndexes": "ai_explanation_artifacts", "index": "idx_ai_explanation_artifact_source_audience" },
+  { "dropIndexes": "ai_explanation_artifacts", "index": "uk_ai_explanation_artifact_generation" },
+  { "dropIndexes": "ai_explanation_artifacts", "index": "uk_ai_explanation_artifact_domain" },
+  { "drop": "ai_explanation_artifacts" },
+  { "dropIndexes": "ai_explanation_runs", "index": "idx_ai_explanation_run_expired_lease" },
+  { "dropIndexes": "ai_explanation_runs", "index": "idx_ai_explanation_run_latest" },
+  { "dropIndexes": "ai_explanation_runs", "index": "uk_ai_explanation_run_attempt" },
+  { "dropIndexes": "ai_explanation_runs", "index": "uk_ai_explanation_run_domain" },
+  { "drop": "ai_explanation_runs" },
+  { "dropIndexes": "ai_explanation_generations", "index": "idx_ai_explanation_generation_assessment_created" },
+  { "dropIndexes": "ai_explanation_generations", "index": "uk_ai_explanation_generation_semantic_key" },
+  { "dropIndexes": "ai_explanation_generations", "index": "uk_ai_explanation_generation_domain" },
+  { "drop": "ai_explanation_generations" }
+]

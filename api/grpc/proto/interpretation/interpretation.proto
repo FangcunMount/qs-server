@@ -11,11 +11,28 @@ service ParticipantReportService {
   rpc ListMyReports(ListMyReportsRequest) returns (ListMyReportsResponse);
 }
 
+// ParticipantAIExplanationService exposes the optional manual AI supplement.
+// Standard report reads stay on ParticipantReportService and do not depend on
+// this service being configured or available.
+service ParticipantAIExplanationService {
+  rpc GetAIExplanationCapability(GetAIExplanationCapabilityRequest) returns (AIExplanationResponse);
+  rpc RequestAIExplanation(RequestAIExplanationRequest) returns (AIExplanationResponse);
+  rpc GetAIExplanation(GetAIExplanationRequest) returns (AIExplanationResponse);
+  rpc ExportAIExplanations(ExportAIExplanationsRequest) returns (AIExplanationSubjectExportResponse);
+}
+
 service InterpretationAutomationService {
   rpc GenerateReportFromOutcome(GenerateReportFromOutcomeRequest) returns (GenerateReportFromAssessmentResponse);
   rpc GenerateReportFromAssessment(GenerateReportFromAssessmentRequest) returns (GenerateReportFromAssessmentResponse) {
     option deprecated = true;
   }
+}
+
+// AIExplanationAutomationService is an internal one-shot execution boundary.
+// It is called by Worker after the durable requested event is delivered.
+service AIExplanationAutomationService {
+  rpc ExecuteAIExplanation(ExecuteAIExplanationRequest) returns (ExecuteAIExplanationResponse);
+  rpc ExecutePromptEvaluationStep(ExecutePromptEvaluationStepRequest) returns (ExecutePromptEvaluationStepResponse);
 }
 
 message Suggestion { string category = 1; string content = 2; string factor_code = 3; }
@@ -71,4 +88,179 @@ message GenerateReportFromAssessmentResponse {
   int32 current_attempt = 12; int32 max_automatic_attempts = 13;
   int32 remaining_automatic_attempts = 14; string next_attempt_at = 15;
   string retry_event_id = 16; string action_request_id = 17;
+}
+
+message ExecuteAIExplanationRequest {
+  string generation_id = 1;
+  string trace_id = 2;
+  string event_id = 3;
+  int32 expected_attempt = 4;
+  string attempt_origin = 5;
+  string action_request_id = 6;
+  string expected_run_id = 7;
+  string expected_lease_expires_at = 8;
+  string expected_invocation_phase = 9;
+}
+
+message ExecuteAIExplanationResponse {
+  bool success = 1;
+  string status = 2;
+  string generation_id = 3;
+  string run_id = 4;
+  string artifact_id = 5;
+  string failure_kind = 6;
+  string failure_code = 7;
+  string safe_message = 8;
+  bool retryable = 9;
+}
+
+message ExecutePromptEvaluationStepRequest {
+  int64 org_id = 1;
+  string run_id = 2;
+  string case_id = 3;
+  int32 attempt = 4;
+  string requested_by = 5;
+  string event_id = 6;
+}
+
+message ExecutePromptEvaluationStepResponse {
+  bool success = 1;
+  string run_id = 2;
+  string case_id = 3;
+  int32 attempt = 4;
+  string status = 5;
+  string run_status = 6;
+  string next_case_id = 7;
+  int32 next_attempt = 8;
+}
+
+message AIExplanationEvidenceRef {
+  string kind = 1;
+  string ref = 2;
+}
+
+message AIExplanationIntegratedInsight {
+  string kind = 1;
+  string title = 2;
+  string content = 3;
+  string why_it_matters = 4;
+  repeated AIExplanationEvidenceRef evidence_refs = 5;
+}
+
+message AIExplanationSuggestion {
+  string origin = 1;
+  string category = 2;
+  string title = 3;
+  string goal = 4;
+  repeated string actions = 5;
+  string rationale = 6;
+  repeated AIExplanationEvidenceRef evidence_refs = 7;
+  repeated string source_suggestion_refs = 8;
+  string caution = 9;
+}
+
+message AIExplanationContent {
+  string schema_version = 1;
+  string summary = 2;
+  repeated AIExplanationIntegratedInsight integrated_insights = 3;
+  repeated AIExplanationSuggestion suggestions = 4;
+  repeated string limitations = 5;
+}
+
+message AIExplanationFailure {
+  string code = 1;
+  string safe_message = 2;
+  bool retryable = 3;
+}
+
+message GetAIExplanationCapabilityRequest {
+  uint64 assessment_id = 1;
+  uint64 testee_id = 2;
+  string locale = 3;
+  repeated string focus_areas = 4;
+}
+
+message RequestAIExplanationRequest {
+  uint64 assessment_id = 1;
+  uint64 testee_id = 2;
+  string locale = 3;
+  repeated string focus_areas = 4;
+}
+
+message GetAIExplanationRequest {
+  uint64 assessment_id = 1;
+  uint64 testee_id = 2;
+  string generation_id = 3;
+}
+
+message AIExplanationResponse {
+  string status = 1;
+  string reason_code = 2;
+  string generation_id = 3;
+  string artifact_id = 4;
+  string source_report_id = 5;
+  string source_state = 6;
+  AIExplanationContent content = 7;
+  AIExplanationFailure failure = 8;
+  string created_at = 9;
+  string updated_at = 10;
+}
+
+message ExportAIExplanationsRequest {
+  uint64 testee_id = 1;
+  int32 page_size = 2;
+  string cursor = 3;
+}
+
+message AIExplanationExportSourceReceipt {
+  string assessment_id = 1;
+  string report_id = 2;
+  string outcome_id = 3;
+  string report_type = 4;
+  string template_version = 5;
+  string content_schema_version = 6;
+  string builder_identity = 7;
+  string report_generated_at = 8;
+}
+
+message AIExplanationExportReleaseReceipt {
+  string profile_id = 1;
+  string profile_version = 2;
+  string profile_fingerprint = 3;
+  string prompt_template_id = 4;
+  string prompt_version = 5;
+  string prompt_fingerprint = 6;
+  string prompt_git_blob_sha = 7;
+  string provider_route = 8;
+  string provider_route_revision = 9;
+  string resolved_provider = 10;
+  string resolved_model = 11;
+  string execution_spec_fingerprint = 12;
+  string input_schema = 13;
+  string output_schema = 14;
+  string safety_policy = 15;
+  string schema_validator_version = 16;
+  string reference_validator_version = 17;
+  string profile_validator_version = 18;
+  string safety_validator_version = 19;
+  string validated_at = 20;
+}
+
+message AIExplanationSubjectExportItem {
+  string generation_id = 1;
+  string artifact_id = 2;
+  AIExplanationExportSourceReceipt source = 3;
+  AIExplanationExportReleaseReceipt release = 4;
+  AIExplanationContent content = 5;
+  string generated_at = 6;
+}
+
+message AIExplanationSubjectExportResponse {
+  string schema_version = 1;
+  uint64 org_id = 2;
+  uint64 testee_id = 3;
+  string exported_at = 4;
+  string snapshot_at = 5;
+  repeated AIExplanationSubjectExportItem items = 6;
+  string next_cursor = 7;
 }

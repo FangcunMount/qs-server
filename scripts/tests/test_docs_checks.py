@@ -26,16 +26,17 @@ class DocsFactsHelpersTest(unittest.TestCase):
     def test_grpc_inventory_includes_multiline_and_deprecated_rpcs(self) -> None:
         services, proto_file_count = check_docs_facts.grpc_inventory()
         self.assertEqual(proto_file_count, 7)
-        self.assertEqual(len(services), 11)
-        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 49)
+        self.assertEqual(len(services), 13)
+        self.assertEqual(sum(len(rpcs) for rpcs in services.values()), 55)
         self.assertIn("GenerateReportFromAssessment", services["interpretation.InterpretationAutomationService"])
+        self.assertIn("ExecutePromptEvaluationStep", services["interpretation.AIExplanationAutomationService"])
         self.assertIn("SyncAssessmentAttention", services["internalapi.InternalService"])
 
     def test_migration_inventory_is_paired_and_current(self) -> None:
         inventory, issues = check_docs_facts.migration_inventory()
         self.assertEqual(issues, [])
         self.assertEqual(inventory["mysql"], {"max_version": 70, "version_count": 70})
-        self.assertEqual(inventory["mongodb"], {"max_version": 24, "version_count": 24})
+        self.assertEqual(inventory["mongodb"], {"max_version": 32, "version_count": 32})
 
     def test_ledger_metadata_uses_named_fields(self) -> None:
         text = (

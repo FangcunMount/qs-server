@@ -16,6 +16,13 @@ definitions:
     - dominant_factor
     - norm_lookup
     - ability_level
+    - score_range
+    - pole_composition
+    - trait_profile
+    - nearest_pattern
+    - dominant_factor
+    - norm_lookup
+    - ability_level
     type: string
     x-enum-varnames:
     - DecisionKindScoreRange
@@ -740,6 +747,688 @@ definitions:
       t_score:
         type: number
     type: object
+  handler.AIExplanationAssertionReceiptWire:
+    properties:
+      detail:
+        type: string
+      evaluator:
+        type: string
+      hard:
+        type: boolean
+      ordinal:
+        type: integer
+      scope:
+        type: string
+      status:
+        type: string
+      type:
+        type: string
+    type: object
+  handler.AIExplanationAttemptFailureWire:
+    properties:
+      code:
+        type: string
+      result_unknown:
+        type: boolean
+      retryable:
+        type: boolean
+      safe_message:
+        type: string
+      stage:
+        type: string
+    type: object
+  handler.AIExplanationCancellationWire:
+    properties:
+      actor:
+        type: string
+      at:
+        type: string
+      reason:
+        type: string
+    type: object
+  handler.AIExplanationCapacityReservationWire:
+    properties:
+      provider_invocations:
+        type: integer
+      requested_by:
+        type: string
+      reserved_at:
+        type: string
+      run_id:
+        type: string
+    type: object
+  handler.AIExplanationDecodingWire:
+    properties:
+      max_output_tokens:
+        type: integer
+      seed:
+        type: integer
+      temperature:
+        type: number
+      top_p:
+        type: number
+    type: object
+  handler.AIExplanationEvaluationCancelRequest:
+    properties:
+      reason:
+        maxLength: 1000
+        type: string
+    required:
+    - reason
+    type: object
+  handler.AIExplanationEvaluationCapacityWire:
+    properties:
+      available_full_run_starts:
+        type: integer
+      budget_day:
+        type: string
+      daily_provider_invocation_limit:
+        type: integer
+      max_active_runs_per_org:
+        type: integer
+      organization_id:
+        type: integer
+      over_limit:
+        type: boolean
+      provider_invocations_per_start:
+        type: integer
+      remaining_provider_invocations:
+        type: integer
+      reservations:
+        items:
+          $ref: '#/definitions/handler.AIExplanationCapacityReservationWire'
+        type: array
+      reserved_provider_invocations:
+        type: integer
+    type: object
+  handler.AIExplanationEvaluationExecutionWire:
+    properties:
+      attempt:
+        type: integer
+      case_id:
+        type: string
+      claimed_at:
+        type: string
+      dispatch_started_at:
+        type: string
+      lease_expires_at:
+        type: string
+      phase:
+        type: string
+    type: object
+  handler.AIExplanationEvaluationRecoverRequest:
+    properties:
+      confirm:
+        type: boolean
+      expected_provider_invocations:
+        type: integer
+      reason:
+        maxLength: 1000
+        type: string
+    required:
+    - confirm
+    - expected_provider_invocations
+    - reason
+    type: object
+  handler.AIExplanationEvaluationRecoveryWire:
+    properties:
+      actor:
+        type: string
+      attempt:
+        type: integer
+      case_id:
+        type: string
+      id:
+        type: string
+      reason:
+        type: string
+      requested_at:
+        type: string
+    type: object
+  handler.AIExplanationEvaluationReleaseWire:
+    properties:
+      decoding:
+        $ref: '#/definitions/handler.AIExplanationDecodingWire'
+      generation_case_ids:
+        items:
+          type: string
+        type: array
+      input_schema:
+        $ref: '#/definitions/handler.AIExplanationSchemaRefWire'
+      output_schema:
+        $ref: '#/definitions/handler.AIExplanationSchemaRefWire'
+      preflight_case_id:
+        type: string
+      preflight_rejection_reason:
+        type: string
+      profile:
+        $ref: '#/definitions/handler.AIExplanationProfileRefWire'
+      prompt:
+        $ref: '#/definitions/handler.AIExplanationPromptRefWire'
+      provider:
+        $ref: '#/definitions/handler.AIExplanationProviderSpecWire'
+      repetitions_per_case:
+        type: integer
+      semantic_evaluator:
+        $ref: '#/definitions/handler.AIExplanationSemanticEvaluatorWire'
+      suite:
+        $ref: '#/definitions/handler.AIExplanationSuiteRefWire'
+    type: object
+  handler.AIExplanationEvaluationRunWire:
+    properties:
+      attempts:
+        items:
+          $ref: '#/definitions/handler.AIExplanationReviewAttemptSummary'
+        type: array
+      can_finalize:
+        type: boolean
+      can_review:
+        type: boolean
+      canceled:
+        $ref: '#/definitions/handler.AIExplanationCancellationWire'
+      created_at:
+        type: string
+      execution:
+        $ref: '#/definitions/handler.AIExplanationEvaluationExecutionWire'
+      finalized:
+        $ref: '#/definitions/handler.AIExplanationFinalizationWire'
+      gate:
+        $ref: '#/definitions/handler.AIExplanationGateWire'
+      progress:
+        $ref: '#/definitions/handler.AIExplanationReviewProgressWire'
+      recoveries:
+        items:
+          $ref: '#/definitions/handler.AIExplanationEvaluationRecoveryWire'
+        type: array
+      recovery_max_provider_invocations:
+        type: integer
+      release:
+        $ref: '#/definitions/handler.AIExplanationEvaluationReleaseWire'
+      request_reason:
+        type: string
+      requested_by:
+        type: string
+      requested_org_id:
+        type: integer
+      run_id:
+        type: string
+      status:
+        type: string
+      version:
+        type: integer
+    type: object
+  handler.AIExplanationEvaluationStartRequest:
+    properties:
+      confirm:
+        type: boolean
+      expected_provider_invocations:
+        type: integer
+      reason:
+        maxLength: 1000
+        type: string
+    required:
+    - confirm
+    - expected_provider_invocations
+    - reason
+    type: object
+  handler.AIExplanationFinalizationWire:
+    properties:
+      actor:
+        type: string
+      at:
+        type: string
+      reason:
+        type: string
+    type: object
+  handler.AIExplanationFinalizeRequest:
+    properties:
+      reason:
+        maxLength: 1000
+        type: string
+    required:
+    - reason
+    type: object
+  handler.AIExplanationGateReasonWire:
+    properties:
+      attempt:
+        type: integer
+      case_id:
+        type: string
+      code:
+        type: string
+      detail:
+        type: string
+    type: object
+  handler.AIExplanationGateWire:
+    properties:
+      metrics:
+        $ref: '#/definitions/handler.AIExplanationQualityMetricsWire'
+      passed:
+        type: boolean
+      reasons:
+        items:
+          $ref: '#/definitions/handler.AIExplanationGateReasonWire'
+        type: array
+    type: object
+  handler.AIExplanationHumanReviewWire:
+    properties:
+      decision:
+        type: string
+      reason:
+        type: string
+      reviewed_at:
+        type: string
+      reviewer:
+        type: string
+      role:
+        type: string
+    type: object
+  handler.AIExplanationParticipantActiveCapacityReservationWire:
+    properties:
+      acquired_at:
+        type: string
+      assessment_id:
+        type: string
+      generation_id:
+        type: string
+      run_id:
+        type: string
+      user_id:
+        type: string
+    type: object
+  handler.AIExplanationParticipantCapacityReservationWire:
+    properties:
+      assessment_id:
+        type: string
+      attempt:
+        type: integer
+      generation_id:
+        type: string
+      origin:
+        type: string
+      provider_invocations:
+        type: integer
+      reservation_id:
+        type: string
+      reserved_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  handler.AIExplanationParticipantCapacityWire:
+    properties:
+      active_provider_executions:
+        type: integer
+      active_reservations:
+        items:
+          $ref: '#/definitions/handler.AIExplanationParticipantActiveCapacityReservationWire'
+        type: array
+      budget_day:
+        type: string
+      daily_provider_invocation_limit_per_assessment:
+        type: integer
+      daily_provider_invocation_limit_per_org:
+        type: integer
+      daily_provider_invocation_limit_per_user:
+        type: integer
+      max_active_provider_executions_per_assessment:
+        type: integer
+      max_active_provider_executions_per_org:
+        type: integer
+      max_active_provider_executions_per_user:
+        type: integer
+      organization_id:
+        type: integer
+      over_org_active_limit:
+        type: boolean
+      over_org_limit:
+        type: boolean
+      provider_invocations_per_generation:
+        type: integer
+      redacted_provider_invocations:
+        type: integer
+      remaining_org_active_provider_executions:
+        type: integer
+      remaining_org_provider_invocations:
+        type: integer
+      reservations:
+        items:
+          $ref: '#/definitions/handler.AIExplanationParticipantCapacityReservationWire'
+        type: array
+      reserved_provider_invocations:
+        type: integer
+    type: object
+  handler.AIExplanationParticipantRetryRequest:
+    properties:
+      accept_result_unknown_risk:
+        type: boolean
+      confirm:
+        type: boolean
+      expected_attempt:
+        type: integer
+      expected_provider_invocations:
+        type: integer
+      reason:
+        maxLength: 1000
+        type: string
+      request_id:
+        maxLength: 256
+        type: string
+    required:
+    - confirm
+    - expected_attempt
+    - expected_provider_invocations
+    - reason
+    - request_id
+    type: object
+  handler.AIExplanationParticipantRetryWire:
+    properties:
+      accepted_result_unknown_risk:
+        type: boolean
+      authorized_at:
+        type: string
+      created:
+        type: boolean
+      expected_attempt:
+        type: integer
+      failed_run_id:
+        type: string
+      generation_id:
+        type: string
+      next_attempt:
+        type: integer
+      origin:
+        type: string
+      request_id:
+        type: string
+    type: object
+  handler.AIExplanationProfileDisableRequest:
+    properties:
+      reason:
+        maxLength: 1000
+        type: string
+    required:
+    - reason
+    type: object
+  handler.AIExplanationProfileDraftRequest:
+    properties:
+      definition:
+        $ref: '#/definitions/profile.Definition'
+      fingerprint:
+        type: string
+      reason:
+        maxLength: 1000
+        type: string
+    required:
+    - definition
+    - fingerprint
+    - reason
+    type: object
+  handler.AIExplanationProfilePublishRequest:
+    properties:
+      evaluation_run_id:
+        type: string
+      reason:
+        maxLength: 1000
+        type: string
+    required:
+    - evaluation_run_id
+    - reason
+    type: object
+  handler.AIExplanationProfileRefWire:
+    properties:
+      fingerprint:
+        type: string
+      id:
+        type: string
+      version:
+        type: string
+    type: object
+  handler.AIExplanationProfileWire:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      created_reason:
+        type: string
+      definition:
+        $ref: '#/definitions/profile.Definition'
+      disabled_at:
+        type: string
+      disabled_by:
+        type: string
+      disabled_reason:
+        type: string
+      fingerprint:
+        type: string
+      id:
+        type: string
+      published_at:
+        type: string
+      published_by:
+        type: string
+      published_evidence_run_id:
+        type: string
+      published_reason:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  handler.AIExplanationPromptRefWire:
+    properties:
+      fingerprint:
+        type: string
+      git_blob_sha:
+        type: string
+      template_id:
+        type: string
+      version:
+        type: string
+    type: object
+  handler.AIExplanationProviderReceiptWire:
+    properties:
+      input_tokens:
+        type: integer
+      invocation_id:
+        type: string
+      latency_ms:
+        type: integer
+      model:
+        type: string
+      output_tokens:
+        type: integer
+      provider:
+        type: string
+      request_id:
+        type: string
+    type: object
+  handler.AIExplanationProviderSpecWire:
+    properties:
+      fingerprint:
+        type: string
+      resolved_model:
+        type: string
+      resolved_provider:
+        type: string
+      route:
+        type: string
+      route_revision:
+        type: string
+    type: object
+  handler.AIExplanationQualityMetricsWire:
+    properties:
+      actionability_average:
+        type: number
+      audience_clarity_average:
+        type: number
+      case_assertion_passes:
+        type: integer
+      concision_average:
+        type: number
+      cross_dimension_average:
+        type: number
+      faithfulness_average:
+        type: number
+      generation_attempts:
+        type: integer
+      human_reviews:
+        type: integer
+    type: object
+  handler.AIExplanationReviewAttemptSummary:
+    properties:
+      attempt:
+        type: integer
+      case_id:
+        type: string
+      failure:
+        $ref: '#/definitions/handler.AIExplanationAttemptFailureWire'
+      missing_roles:
+        items:
+          type: string
+        type: array
+      output_fingerprint:
+        type: string
+      reviews:
+        items:
+          $ref: '#/definitions/handler.AIExplanationHumanReviewWire'
+        type: array
+      semantic_scores:
+        $ref: '#/definitions/handler.AIExplanationSemanticScoresWire'
+    type: object
+  handler.AIExplanationReviewAttemptWire:
+    properties:
+      assertions:
+        items:
+          $ref: '#/definitions/handler.AIExplanationAssertionReceiptWire'
+        type: array
+      assessment_input:
+        type: object
+      attempt:
+        type: integer
+      case_id:
+        type: string
+      failure:
+        $ref: '#/definitions/handler.AIExplanationAttemptFailureWire'
+      missing_roles:
+        items:
+          type: string
+        type: array
+      normalized_output:
+        type: object
+      output_fingerprint:
+        type: string
+      provider_receipt:
+        $ref: '#/definitions/handler.AIExplanationProviderReceiptWire'
+      raw_provider_output:
+        type: string
+      reviews:
+        items:
+          $ref: '#/definitions/handler.AIExplanationHumanReviewWire'
+        type: array
+      semantic:
+        $ref: '#/definitions/handler.AIExplanationSemanticReceiptWire'
+      semantic_scores:
+        $ref: '#/definitions/handler.AIExplanationSemanticScoresWire'
+    type: object
+  handler.AIExplanationReviewProgressWire:
+    properties:
+      all_required_reviews_recorded:
+        type: boolean
+      fully_reviewed_attempts:
+        type: integer
+      generation_attempts:
+        type: integer
+      missing_reviews:
+        type: integer
+      pending_generation_attempts:
+        type: integer
+      planned_generation_attempts:
+        type: integer
+      recorded_reviews:
+        type: integer
+      rejected_reviews:
+        type: integer
+      required_reviews:
+        type: integer
+    type: object
+  handler.AIExplanationReviewRequest:
+    properties:
+      attempt:
+        type: integer
+      case_id:
+        type: string
+      decision:
+        type: string
+      reason:
+        maxLength: 1000
+        type: string
+      role:
+        type: string
+    required:
+    - attempt
+    - case_id
+    - decision
+    - reason
+    - role
+    type: object
+  handler.AIExplanationSchemaRefWire:
+    properties:
+      fingerprint:
+        type: string
+      version:
+        type: string
+    type: object
+  handler.AIExplanationSemanticEvaluatorWire:
+    properties:
+      decoding:
+        $ref: '#/definitions/handler.AIExplanationDecodingWire'
+      output_schema:
+        $ref: '#/definitions/handler.AIExplanationSchemaRefWire'
+      prompt:
+        $ref: '#/definitions/handler.AIExplanationPromptRefWire'
+      provider:
+        $ref: '#/definitions/handler.AIExplanationProviderSpecWire'
+      version:
+        type: string
+    type: object
+  handler.AIExplanationSemanticReceiptWire:
+    properties:
+      evaluator_version:
+        type: string
+      provider_receipt:
+        $ref: '#/definitions/handler.AIExplanationProviderReceiptWire'
+      rationale:
+        type: string
+      scores:
+        $ref: '#/definitions/handler.AIExplanationSemanticScoresWire'
+    type: object
+  handler.AIExplanationSemanticScoresWire:
+    properties:
+      audience_clarity:
+        type: integer
+      concision:
+        type: integer
+      cross_dimension_quality:
+        type: integer
+      faithfulness:
+        type: integer
+      suggestion_actionability:
+        type: integer
+    type: object
+  handler.AIExplanationSuiteRefWire:
+    properties:
+      fingerprint:
+        type: string
+      git_blob_sha:
+        type: string
+      id:
+        type: string
+      version:
+        type: string
+    type: object
   handler.StatisticsClinicianDetailResponse:
     properties:
       freshness:
@@ -930,6 +1619,31 @@ definitions:
       release_status:
         type: string
     type: object
+  modelcatalog.DecisionKind:
+    enum:
+    - score_range
+    - pole_composition
+    - trait_profile
+    - nearest_pattern
+    - dominant_factor
+    - norm_lookup
+    - ability_level
+    - score_range
+    - pole_composition
+    - trait_profile
+    - nearest_pattern
+    - dominant_factor
+    - norm_lookup
+    - ability_level
+    type: string
+    x-enum-varnames:
+    - DecisionKindScoreRange
+    - DecisionKindPoleComposition
+    - DecisionKindTraitProfile
+    - DecisionKindNearestPattern
+    - DecisionKindDominantFactor
+    - DecisionKindNormLookup
+    - DecisionKindAbilityLevel
   modelcatalog.Definition:
     properties:
       DecisionSpec:
@@ -1004,6 +1718,27 @@ definitions:
       updated_at:
         type: string
     type: object
+  modelcatalog.Kind:
+    enum:
+    - scale
+    - typology
+    - behavioral_rating
+    - cognitive
+    - scale
+    - typology
+    - behavioral_rating
+    - cognitive
+    type: string
+    x-enum-comments:
+      KindBehavioralRating: 行为评分
+      KindCognitive: 认知测验
+      KindScale: 量表
+      KindTypology: 类型学
+    x-enum-varnames:
+    - KindScale
+    - KindTypology
+    - KindBehavioralRating
+    - KindCognitive
   modelcatalog.ModelSummary:
     properties:
       algorithm:
@@ -1254,6 +1989,175 @@ definitions:
         type: integer
       traceID:
         type: string
+    type: object
+  output.InsightKind:
+    enum:
+    - reinforcing_pattern
+    - contrasting_pattern
+    - combined_strength
+    - combined_attention
+    - context_dependent_pattern
+    type: string
+    x-enum-varnames:
+    - InsightKindReinforcingPattern
+    - InsightKindContrastingPattern
+    - InsightKindCombinedStrength
+    - InsightKindCombinedAttention
+    - InsightKindContextDependent
+  output.SuggestionOrigin:
+    enum:
+    - standard_derived
+    - generated_low_risk
+    type: string
+    x-enum-varnames:
+    - SuggestionOriginStandardDerived
+    - SuggestionOriginGeneratedLowRisk
+  policy.Audience:
+    enum:
+    - participant
+    - clinician
+    - admin
+    type: string
+    x-enum-varnames:
+    - AudienceParticipant
+    - AudienceClinician
+    - AudienceAdmin
+  profile.Definition:
+    properties:
+      eligibility:
+        $ref: '#/definitions/profile.EligibilityPolicy'
+      generation_policy:
+        $ref: '#/definitions/profile.GenerationPolicy'
+      input_policy:
+        $ref: '#/definitions/profile.InputPolicy'
+      insight_policy:
+        $ref: '#/definitions/profile.InsightPolicy'
+      profile_id:
+        type: string
+      safety_policy:
+        $ref: '#/definitions/profile.SafetyPolicy'
+      schema_version:
+        type: string
+      selector:
+        $ref: '#/definitions/profile.Selector'
+      suggestion_policy:
+        $ref: '#/definitions/profile.SuggestionPolicy'
+      version:
+        type: string
+    type: object
+  profile.EligibilityPolicy:
+    properties:
+      eligible_dimension_codes:
+        items:
+          type: string
+        type: array
+      excluded_dimension_codes:
+        items:
+          type: string
+        type: array
+      max_input_dimensions:
+        type: integer
+      min_eligible_dimensions:
+        type: integer
+      on_dimension_overflow:
+        type: string
+    type: object
+  profile.GenerationPolicy:
+    properties:
+      input_schema_version:
+        type: string
+      max_output_characters:
+        type: integer
+      output_schema_version:
+        type: string
+      prompt_template_id:
+        type: string
+      prompt_version:
+        type: string
+      provider_route:
+        type: string
+    type: object
+  profile.HierarchyPolicy:
+    properties:
+      allow_parent_child_in_same_insight:
+        type: boolean
+    type: object
+  profile.InputPolicy:
+    properties:
+      allowed_focus_areas:
+        items:
+          type: string
+        type: array
+      context_scope:
+        type: string
+      hierarchy_policy:
+        $ref: '#/definitions/profile.HierarchyPolicy'
+      include_model_result:
+        type: boolean
+      include_norm_context:
+        type: boolean
+    type: object
+  profile.InsightPolicy:
+    properties:
+      allow_causal_claims:
+        type: boolean
+      allowed_kinds:
+        items:
+          $ref: '#/definitions/output.InsightKind'
+        type: array
+      max_dimension_refs_per_item:
+        type: integer
+      max_items:
+        type: integer
+      min_dimension_refs_per_item:
+        type: integer
+      min_items:
+        type: integer
+    type: object
+  profile.SafetyPolicy:
+    properties:
+      disclaimer_version:
+        type: string
+      forbidden_claims:
+        items:
+          type: string
+        type: array
+      policy_version:
+        type: string
+    type: object
+  profile.Selector:
+    properties:
+      audience:
+        $ref: '#/definitions/policy.Audience'
+      decision_kind:
+        $ref: '#/definitions/modelcatalog.DecisionKind'
+      model_code:
+        type: string
+      model_kind:
+        $ref: '#/definitions/modelcatalog.Kind'
+      model_version:
+        type: string
+    type: object
+  profile.SuggestionPolicy:
+    properties:
+      allowed_categories:
+        items:
+          type: string
+        type: array
+      allowed_origins:
+        items:
+          $ref: '#/definitions/output.SuggestionOrigin'
+        type: array
+      max_actions_per_item:
+        type: integer
+      max_items:
+        type: integer
+      min_items:
+        type: integer
+      require_evidence_refs:
+        type: boolean
+      require_standard_refs_for_standard_derived:
+        type: boolean
     type: object
   questionnaire.QuestionnaireReleaseVersion:
     properties:
@@ -7209,8 +8113,7 @@ paths:
       - Evaluation-Report
   /api/v1/evaluations/assessments/{id}/retry:
     post:
-      deprecated: true
-      description: 重试指定测评的评估流程；仅 qs:evaluator 或 qs:admin 可访问
+      description: 根据 IAM 对象属性授权重试指定测评的评估流程
       parameters:
       - description: Bearer 用户令牌
         in: header
@@ -9719,6 +10622,418 @@ paths:
       summary: 分页查询当前组织的 Interpretation 准入失败
       tags:
       - Interpretation-Operations
+  /internal/v1/interpretation/ai-explanation/generations/{generation_id}/retry:
+    post:
+      consumes:
+      - application/json
+      description: 为指定 failed attempt 原子写入一次人工重试授权、追加 1 次 UTC 日调用预算并投递下一 attempt；provider_result_unknown
+        必须显式接受潜在重复调用与计费风险。相同 request_id 幂等复用。
+      parameters:
+      - description: AI 解读 Generation ID
+        in: path
+        name: generation_id
+        required: true
+        type: string
+      - description: attempt、幂等键、成本与未知结果风险确认
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.AIExplanationParticipantRetryRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationParticipantRetryWire'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 人工恢复失败的 Participant AI 解读
+      tags:
+      - AI-Explanation-Administration
+  /internal/v1/interpretation/ai-explanation/participant-capacity:
+    get:
+      description: 按可信身份中的机构读取当前 UTC 日机构/用户/Assessment 上限与逐 Generation 预留审计；不接受请求体中的机构或日期。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationParticipantCapacityWire'
+              type: object
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询当前机构 Participant AI 解读容量
+      tags:
+      - AI-Explanation-Administration
+  /internal/v1/interpretation/ai-explanation/profiles:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Profile draft
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.AIExplanationProfileDraftRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationProfileWire'
+              type: object
+      summary: 创建 AI 解读 Profile draft
+      tags:
+      - AI-Explanation-Administration
+  /internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}/disable:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Profile ID
+        in: path
+        name: profile_id
+        required: true
+        type: string
+      - description: Profile 版本
+        in: path
+        name: version
+        required: true
+        type: string
+      - description: 禁用命令
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.AIExplanationProfileDisableRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationProfileWire'
+              type: object
+      summary: 禁用 AI 解读 Profile
+      tags:
+      - AI-Explanation-Administration
+  /internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}/publish:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Profile ID
+        in: path
+        name: profile_id
+        required: true
+        type: string
+      - description: Profile 版本
+        in: path
+        name: version
+        required: true
+        type: string
+      - description: 发布命令
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.AIExplanationProfilePublishRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationProfileWire'
+              type: object
+      summary: 发布 AI 解读 Profile
+      tags:
+      - AI-Explanation-Administration
+  /internal/v1/interpretation/ai-explanation/prompt-evaluation-capacity:
+    get:
+      description: 按可信身份中的机构读取当前 UTC 日预算账本、剩余完整评测次数与逐 Run 预留审计；不接受请求体中的机构或日期。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationEvaluationCapacityWire'
+              type: object
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询当前机构 AI 解读 Prompt 评测容量
+      tags:
+      - AI-Explanation-Administration
+  /internal/v1/interpretation/ai-explanation/prompt-evaluations:
+    post:
+      consumes:
+      - application/json
+      description: 请求体必须确认 v1 最多执行 70 次 Provider 调用；start 同时执行机构 collecting 并发和 UTC
+        日调用预算准入，仅持久化预算预留、评测与首个事件，不同步调用模型。
+      parameters:
+      - description: 成本确认与审计理由
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.AIExplanationEvaluationStartRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationEvaluationRunWire'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 手动启动 AI 解读 Prompt 在线评测
+      tags:
+      - AI-Explanation-Administration
+  /internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}:
+    get:
+      parameters:
+      - description: 评测运行 ID
+        in: path
+        name: run_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationEvaluationRunWire'
+              type: object
+      summary: 查询 AI 解读 Prompt 评测摘要
+      tags:
+      - AI-Explanation-Administration
+  /internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}:
+    get:
+      parameters:
+      - description: 评测运行 ID
+        in: path
+        name: run_id
+        required: true
+        type: string
+      - description: 合成 case ID
+        in: path
+        name: case_id
+        required: true
+        type: string
+      - description: 重复序号
+        in: path
+        name: attempt
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationReviewAttemptWire'
+              type: object
+      summary: 查询一份 AI 解读 Prompt 评测证据
+      tags:
+      - AI-Explanation-Administration
+  /internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/cancel:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 评测运行 ID
+        in: path
+        name: run_id
+        required: true
+        type: string
+      - description: 取消理由
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.AIExplanationEvaluationCancelRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationEvaluationRunWire'
+              type: object
+      summary: 取消尚未 dispatch 的 AI 解读 Prompt 在线评测
+      tags:
+      - AI-Explanation-Administration
+  /internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/finalize:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 评测运行 ID
+        in: path
+        name: run_id
+        required: true
+        type: string
+      - description: 终审理由
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.AIExplanationFinalizeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationEvaluationRunWire'
+              type: object
+      summary: 终审 AI 解读 Prompt 评测
+      tags:
+      - AI-Explanation-Administration
+  /internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/recover:
+    post:
+      consumes:
+      - application/json
+      description: 仅重新投递当前待执行或租约已过期的 attempt；dispatch 结果未知时不会重放原 Provider 调用。
+      parameters:
+      - description: 评测运行 ID
+        in: path
+        name: run_id
+        required: true
+        type: string
+      - description: 剩余链路成本确认与恢复理由
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.AIExplanationEvaluationRecoverRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationEvaluationRunWire'
+              type: object
+      summary: 人工恢复 AI 解读 Prompt 在线评测
+      tags:
+      - AI-Explanation-Administration
+  /internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/reviews:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 评测运行 ID
+        in: path
+        name: run_id
+        required: true
+        type: string
+      - description: 复核命令
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.AIExplanationReviewRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationEvaluationRunWire'
+              type: object
+      summary: 记录 AI 解读 Prompt 人工复核
+      tags:
+      - AI-Explanation-Administration
   /internal/v1/interpretation/assessments/{assessment_id}/lifecycle:
     get:
       parameters:

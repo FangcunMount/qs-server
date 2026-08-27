@@ -175,7 +175,7 @@ func TestEffectiveRegistryCoversWireCatalog(t *testing.T) {
 func TestEffectiveRegistryDerivesProfilePolicy(t *testing.T) {
 	registry := loadDefaultRegistry(t)
 
-	if got := registry.ImmediateTypes(OutboxProfileMongoDomain); !slices.Equal(got, []string{AnswerSheetSubmitted}) {
+	if got := registry.ImmediateTypes(OutboxProfileMongoDomain); !slices.Equal(got, []string{AnswerSheetSubmitted, AIExplanationLeaseRecoveryRequested, AIExplanationPromptEvaluationStepRequested, AIExplanationRequested, AIExplanationRetryRequested}) {
 		t.Fatalf("mongo immediate types = %#v", got)
 	}
 	if got := registry.ImmediateTypes(OutboxProfileAssessmentMySQL); !slices.Equal(got, []string{EvaluationOutcomeCommitted, EvaluationRequested}) && !slices.Equal(got, []string{EvaluationRequested, EvaluationOutcomeCommitted}) {
@@ -184,12 +184,21 @@ func TestEffectiveRegistryDerivesProfilePolicy(t *testing.T) {
 	if got := registry.PriorityBucket(AnswerSheetSubmitted); got != string(PriorityP0) {
 		t.Fatalf("answersheet bucket = %q", got)
 	}
+	if got := registry.PriorityBucket(AIExplanationRequested); got != string(PriorityP0) {
+		t.Fatalf("AI explanation requested bucket = %q", got)
+	}
+	if got := registry.PriorityBucket(AIExplanationRetryRequested); got != string(PriorityP0) {
+		t.Fatalf("AI explanation retry requested bucket = %q", got)
+	}
+	if got := registry.PriorityBucket(AIExplanationLeaseRecoveryRequested); got != string(PriorityP0) {
+		t.Fatalf("AI explanation lease recovery bucket = %q", got)
+	}
 	if got := registry.PriorityBucket(TaskOpened); got != string(PriorityP2) {
 		t.Fatalf("best-effort fallback bucket = %q", got)
 	}
 
 	tiers := registry.PriorityTiers(OutboxProfileMongoDomain)
-	if len(tiers) != 3 || !slices.Contains(tiers[0], AnswerSheetSubmitted) || tiers[2] != nil {
+	if len(tiers) != 3 || !slices.Contains(tiers[0], AnswerSheetSubmitted) || !slices.Contains(tiers[0], AIExplanationRequested) || !slices.Contains(tiers[0], AIExplanationRetryRequested) || !slices.Contains(tiers[0], AIExplanationLeaseRecoveryRequested) || !slices.Contains(tiers[1], AIExplanationPromptEvaluationStepRequested) || tiers[2] != nil {
 		t.Fatalf("mongo priority tiers = %#v", tiers)
 	}
 }

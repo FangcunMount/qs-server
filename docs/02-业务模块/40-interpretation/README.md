@@ -2,6 +2,8 @@
 
 > 状态：本篇已按当前源码重写。Interpretation 的生成生命周期、重试治理、查询模型与报告模板版本发布均已落地；历史路由已完成显式冻结，运行时对缺失身份执行 fail-closed。
 
+> AI 解读是本模块下默认关闭的独立发布候选能力：标准报告继续自动生成并保持唯一权威，Participant 可在报告可用后手动触发一次性 AI 补充解读。机器契约、领域/Application、Participant REST/gRPC、Outbox/Worker、OpenAI Adapter、确定性校验、耐久 Prompt 评测、双角色复核、Profile 治理、容量治理、数据生命周期和 Mongo migration 已接线；API 密钥、已发布 Profile、真实模型评测、正式保留期限、跨进程联调和生产验收仍缺失，见[AI 解读核心设计](./25-核心设计-AI解读.md)。
+
 ## 1. 30 秒结论
 
 Interpretation 是 qs-server 的统一报告生成模块：
@@ -239,6 +241,7 @@ AssessmentID、TesteeID 和 OrgID 是报告关联事实，不是授权凭据。�
 | 多行为人查询 | 已实现 | participant、clinician、administration、operations |
 | 报告模板版本发布 | 已实现 | 5 个 TemplateID 的历史版与当前版共 10 个 release；ModelCatalog、Outcome 和 Artifact 路由已显式冻结 |
 | 成品自包含 Builder 与 ContentSchema 来源 | 已实现 | Artifact 持久化精确来源，提交器校验与实际 Builder 一致；历史成品已完成等价补齐 |
+| AI 解读 | 代码发布候选 / 默认关闭 | 标准报告之上的手动、一次性补充能力；治理框架已接线，缺 OpenAI API 密钥、已发布 Profile、真实评测和生产验收 |
 | 多 ReportType 并存查询 | 待明确 | 当前 catalog 以 AssessmentID 作为唯一当前报告键 |
 
 ## 10. 文档地图
@@ -253,6 +256,7 @@ AssessmentID、TesteeID 和 OrgID 是报告关联事实，不是授权凭据。�
 | 22 | [核心设计：状态、幂等、重试与可靠提交](./22-核心设计-状态、幂等、重试与可靠提交.md) | 已重写 | 双状态机、lease、重试治理和终态事务 |
 | 23 | [核心设计：报告成品、版本与数据一致性](./23-核心设计-报告成品、版本与数据一致性.md) | 已重写 | 不可变成品、模板版本、Mongo 数据关系和历史兼容 |
 | 24 | [核心设计：查询模型、授权与 Audience 投影](./24-核心设计-查询模型、授权与Audience投影.md) | 已重写 | catalog、行为人用例和报告章节可见性 |
+| 25 | [核心设计：AI 解读](./25-核心设计-AI解读.md) | 代码发布候选 / 用户功能未开放 | 一次性 AI 补充解读的领域知识、契约、生命周期、质量治理、发布阶梯与未来演进 |
 | 30 | [关键链路：从 Outcome 到 InterpretReport](./30-关键链路-从Outcome到InterpretReport.md) | 已重写 | Worker 如何从 Outcome 事件走到可靠报告提交 |
 | 31 | [关键链路：从报告查询到组合状态](./31-关键链路-从报告查询到组合状态.md) | 已重写 | 报告查询、Audience 投影和客户端完成状态如何组合 |
 | 90 | [设计问题与重构清单](./90-设计问题与重构清单.md) | 当前版本有条件通过 | 已关闭主链风险、兼容观察与未来业务/容量触发项 |
@@ -273,6 +277,8 @@ AssessmentID、TesteeID 和 OrgID 是报告关联事实，不是授权凭据。�
 | Worker 事件消费 | [`assessment_evaluated_handler.go`](../../../internal/worker/handlers/assessment_evaluated_handler.go)、[`report_handler.go`](../../../internal/worker/handlers/report_handler.go) |
 | 事件契约 | [`configs/events.yaml`](../../../configs/events.yaml) |
 | 模块装配 | [`container/modules/interpretation`](../../../internal/apiserver/container/modules/interpretation/) |
+| AI 解读机器契约与 Prompt | [`api/schema/interpretation`](../../../api/schema/interpretation/) |
+| AI 解读领域与应用 | [`domain/interpretation/aiexplanation`](../../../internal/apiserver/domain/interpretation/aiexplanation/)、[`application/interpretation/aiexplanation`](../../../internal/apiserver/application/interpretation/aiexplanation/) |
 
 ```bash
 go test ./internal/apiserver/domain/interpretation/...
@@ -280,5 +286,7 @@ go test ./internal/apiserver/application/interpretation/...
 go test ./internal/apiserver/infra/mongo/interpretation
 go test ./internal/apiserver/container/modules/interpretation/...
 go test ./internal/apiserver/transport/grpc/service ./internal/worker/handlers
+go test -count=1 ./internal/pkg/contract
+go test -count=1 ./internal/apiserver/domain/interpretation/aiexplanation/...
 make docs-hygiene
 ```

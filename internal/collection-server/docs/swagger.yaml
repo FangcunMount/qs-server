@@ -1,5 +1,207 @@
 basePath: /api/v1
 definitions:
+  aiexplanation.Content:
+    properties:
+      integrated_insights:
+        items:
+          $ref: '#/definitions/aiexplanation.IntegratedInsight'
+        type: array
+      limitations:
+        items:
+          type: string
+        type: array
+      schema_version:
+        example: ai-explanation-output/v1
+        type: string
+      suggestions:
+        items:
+          $ref: '#/definitions/aiexplanation.Suggestion'
+        type: array
+      summary:
+        type: string
+    type: object
+  aiexplanation.EvidenceRef:
+    properties:
+      kind:
+        enum:
+        - dimension
+        - overall_result
+        - model_result
+        - standard_suggestion
+        type: string
+      ref:
+        type: string
+    type: object
+  aiexplanation.ExportReleaseReceipt:
+    properties:
+      execution_spec_fingerprint:
+        type: string
+      input_schema:
+        type: string
+      output_schema:
+        type: string
+      profile_fingerprint:
+        type: string
+      profile_id:
+        type: string
+      profile_validator_version:
+        type: string
+      profile_version:
+        type: string
+      prompt_fingerprint:
+        type: string
+      prompt_git_blob_sha:
+        type: string
+      prompt_template_id:
+        type: string
+      prompt_version:
+        type: string
+      provider_route:
+        type: string
+      provider_route_revision:
+        type: string
+      reference_validator_version:
+        type: string
+      resolved_model:
+        type: string
+      resolved_provider:
+        type: string
+      safety_policy:
+        type: string
+      safety_validator_version:
+        type: string
+      schema_validator_version:
+        type: string
+      validated_at:
+        type: string
+    type: object
+  aiexplanation.ExportSourceReceipt:
+    properties:
+      assessment_id:
+        type: string
+      builder_identity:
+        type: string
+      content_schema_version:
+        type: string
+      outcome_id:
+        type: string
+      report_generated_at:
+        type: string
+      report_id:
+        type: string
+      report_type:
+        type: string
+      template_version:
+        type: string
+    type: object
+  aiexplanation.Failure:
+    properties:
+      code:
+        type: string
+      retryable:
+        type: boolean
+      safe_message:
+        type: string
+    type: object
+  aiexplanation.IntegratedInsight:
+    properties:
+      content:
+        type: string
+      evidence_refs:
+        items:
+          $ref: '#/definitions/aiexplanation.EvidenceRef'
+        type: array
+      kind:
+        enum:
+        - reinforcing_pattern
+        - contrasting_pattern
+        - combined_strength
+        - combined_attention
+        - context_dependent_pattern
+        type: string
+      title:
+        type: string
+      why_it_matters:
+        type: string
+    type: object
+  aiexplanation.Request:
+    properties:
+      focus_areas:
+        items:
+          type: string
+        maxItems: 3
+        type: array
+      locale:
+        type: string
+    required:
+    - locale
+    type: object
+  aiexplanation.Response:
+    properties:
+      artifact_id:
+        type: string
+      content:
+        $ref: '#/definitions/aiexplanation.Content'
+      created_at:
+        type: string
+      failure:
+        $ref: '#/definitions/aiexplanation.Failure'
+      generation_id:
+        type: string
+      reason_code:
+        type: string
+      source_report_id:
+        type: string
+      source_state:
+        enum:
+        - current
+        - stale
+        - unavailable
+        - unknown
+        type: string
+      status:
+        enum:
+        - ready
+        - not_ready
+        - not_applicable
+        - pending
+        - generating
+        - generated
+        - failed
+        type: string
+      updated_at:
+        type: string
+    type: object
+  aiexplanation.Suggestion:
+    properties:
+      actions:
+        items:
+          type: string
+        type: array
+      category:
+        type: string
+      caution:
+        type: string
+      evidence_refs:
+        items:
+          $ref: '#/definitions/aiexplanation.EvidenceRef'
+        type: array
+      goal:
+        type: string
+      origin:
+        enum:
+        - standard_derived
+        - generated_low_risk
+        type: string
+      rationale:
+        type: string
+      source_suggestion_refs:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+    type: object
   answersheet.AnswerSheetResponse:
     properties:
       answers:
@@ -584,6 +786,25 @@ definitions:
       score:
         type: number
     type: object
+  github_com_FangcunMount_qs-server_internal_collection-server_application_aiexplanation.ExportPage:
+    properties:
+      exported_at:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_port_aiexplanation.ExportItem'
+        type: array
+      next_cursor:
+        type: string
+      org_id:
+        type: integer
+      schema_version:
+        type: string
+      snapshot_at:
+        type: string
+      testee_id:
+        type: integer
+    type: object
   github_com_FangcunMount_qs-server_internal_collection-server_application_answersheet.Answer:
     properties:
       question_code:
@@ -621,6 +842,21 @@ definitions:
         type: array
       total:
         type: integer
+    type: object
+  github_com_FangcunMount_qs-server_internal_collection-server_port_aiexplanation.ExportItem:
+    properties:
+      artifact_id:
+        type: string
+      content:
+        $ref: '#/definitions/aiexplanation.Content'
+      generated_at:
+        type: string
+      generation_id:
+        type: string
+      release:
+        $ref: '#/definitions/aiexplanation.ExportReleaseReceipt'
+      source:
+        $ref: '#/definitions/aiexplanation.ExportSourceReceipt'
     type: object
   governance.CapabilityPolicyView:
     properties:
@@ -1603,6 +1839,56 @@ info:
   title: Collection Server
   version: "1.0"
 paths:
+  /api/v1/ai-explanations/export:
+    get:
+      parameters:
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: integer
+      - default: 50
+        description: 每页条数，1-100
+        in: query
+        name: page_size
+        type: integer
+      - description: 上一页返回的游标
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_aiexplanation.ExportPage'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - BearerAuth: []
+      summary: 导出本人 AI 解读数据
+      tags:
+      - AI解读
   /api/v1/answersheets:
     post:
       consumes:
@@ -1921,6 +2207,186 @@ paths:
       summary: 查询医学量表测评列表
       tags:
       - 测评
+  /api/v1/assessments/{id}/ai-explanation/capability:
+    get:
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: integer
+      - default: zh-CN
+        description: 输出语言
+        in: query
+        name: locale
+        type: string
+      - collectionFormat: csv
+        description: 关注领域，可重复
+        in: query
+        items:
+          type: string
+        name: focus_area
+        type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aiexplanation.Response'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - BearerAuth: []
+      summary: 查询 AI 解读能力
+      tags:
+      - AI解读
+  /api/v1/assessments/{id}/ai-explanations:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: integer
+      - description: AI 解读范围
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/aiexplanation.Request'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aiexplanation.Response'
+              type: object
+        "202":
+          description: Accepted
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aiexplanation.Response'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - BearerAuth: []
+      summary: 手动请求 AI 解读
+      tags:
+      - AI解读
+  /api/v1/assessments/{id}/ai-explanations/{generation_id}:
+    get:
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: AI 解读 Generation ID
+        in: path
+        name: generation_id
+        required: true
+        type: string
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/aiexplanation.Response'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - BearerAuth: []
+      summary: 查询 AI 解读
+      tags:
+      - AI解读
   /api/v1/assessments/{id}/factors/high-risk:
     get:
       description: 获取指定测评的高风险因子列表

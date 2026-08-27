@@ -120,6 +120,12 @@ func TestCatalogDeliveryClass(t *testing.T) {
 		{InterpretationReportGenerated, DeliveryClassDurableOutbox, true},
 		{InterpretationReportFailed, DeliveryClassDurableOutbox, true},
 		{InterpretationRetryRequested, DeliveryClassDurableOutbox, true},
+		{AIExplanationRequested, DeliveryClassDurableOutbox, true},
+		{AIExplanationRetryRequested, DeliveryClassDurableOutbox, true},
+		{AIExplanationLeaseRecoveryRequested, DeliveryClassDurableOutbox, true},
+		{AIExplanationGenerated, DeliveryClassDurableOutbox, true},
+		{AIExplanationFailed, DeliveryClassDurableOutbox, true},
+		{AIExplanationPromptEvaluationStepRequested, DeliveryClassDurableOutbox, true},
 	}
 
 	if len(tests) != len(EventTypes()) {

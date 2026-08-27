@@ -32,7 +32,7 @@ make docs-check
 
 ```bash
 go test -count=1 ./internal/apiserver/transport/grpc/...
-go test -count=1 ./internal/collection-server/infra/grpcclient/... ./internal/collection-server/port/grpcbridge/...
+go test -count=1 ./internal/collection-server/infra/grpcclient/... ./internal/collection-server/port/grpcbridge/... ./internal/collection-server/port/aiexplanation/...
 go test -count=1 ./internal/worker/infra/grpcclient/...
 go test -count=1 ./internal/pkg/grpc ./internal/pkg/configcontract
 ```
@@ -43,6 +43,8 @@ go test -count=1 ./internal/pkg/grpc ./internal/pkg/configcontract
 | --- | --- |
 | AnswerSheet durable result lookup | hit/miss/conflict/read error/cancel/deadline，以及旧服务 `Unimplemented` 的滚动升级回退 |
 | Assessment ownership authorization | owner 成功、owner 不匹配 `PermissionDenied`、collection client/bridge 转发 |
+| Participant AI explanation | capability/request/get 三个 delegated purpose、功能关闭的 `Unimplemented -> feature_disabled`、完整结构化内容投影 |
+| Prompt evaluation step | event ID metadata 与 payload 一致、请求审计匹配、active lease 映射 `Aborted`、重复/取消目标 ACK 且不调用 Provider |
 | 新增 internal 方法 | 调用 workload 身份、default-deny ACL、委托主体和最终资源 ownership |
 | 启用 gRPC JWT auth | `TokenVerifier` 存在时正常启动；缺失时 server 构建失败，不允许跳过认证 |
 

@@ -7,8 +7,12 @@ func (m *Module) ExportGRPCDeps() grpctransport.InterpretationDeps {
 		return grpctransport.InterpretationDeps{}
 	}
 	return grpctransport.InterpretationDeps{
-		AutomationService:    m.AutomationService(),
-		ParticipantService:   m.ParticipantService(),
-		ReportStatusReporter: m.ReportStatusReporter,
+		AutomationService:          m.AutomationService(),
+		AIExplanationExecutor:      m.aiExplanationExecutor,
+		AIExplanationEvaluation:    m.aiOnlineEvalRunner,
+		AIExplanationParticipant:   m.aiExplanationService,
+		AIExplanationSubjectExport: m.aiSubjectExport,
+		ParticipantService:         m.ParticipantService(),
+		ReportStatusReporter:       m.ReportStatusReporter,
 	}
 }

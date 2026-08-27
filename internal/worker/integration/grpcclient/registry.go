@@ -34,6 +34,7 @@ func (r *GRPCClientRegistry) ClientBundle() container.ClientBundle {
 		AssessmentIntake:         r.manager.AssessmentIntakeClient(),
 		EvaluationWorker:         r.manager.EvaluationWorkerClient(),
 		InterpretationAutomation: r.manager.InterpretationAutomationClient(),
+		AIExplanationAutomation:  r.manager.AIExplanationAutomationClient(),
 	}
 	log.Info("✅ Worker gRPC client bundle built")
 	return bundle

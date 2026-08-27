@@ -14,12 +14,14 @@ import (
 func TestProductionMongoRunnersDeclareLimiterAndStableBoundary(t *testing.T) {
 	root := repoRoot(t)
 	want := map[string]bool{
-		"answersheet_submit":      false,
-		"questionnaire_lifecycle": false,
-		"assessment_release":      false,
-		"interpretation_start":    false,
-		"interpretation_commit":   false,
-		"interpretation_retry":    false,
+		"answersheet_submit":               false,
+		"questionnaire_lifecycle":          false,
+		"assessment_release":               false,
+		"interpretation_start":             false,
+		"interpretation_commit":            false,
+		"interpretation_retry":             false,
+		"ai_explanation_lifecycle":         false,
+		"ai_explanation_prompt_evaluation": false,
 	}
 	fset := token.NewFileSet()
 	walkGoFiles(t, filepath.Join(root, "internal/apiserver/container/modules"), func(path, text string) {

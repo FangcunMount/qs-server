@@ -1,0 +1,25 @@
+[
+  { "create": "ai_explanation_participant_active_capacity" },
+  {
+    "createIndexes": "ai_explanation_participant_active_capacity",
+    "indexes": [
+      {
+        "key": { "org_id": 1 },
+        "name": "uk_ai_explanation_participant_active_capacity_org",
+        "unique": true
+      },
+      {
+        "key": { "reservations.generation_id": 1 },
+        "name": "uk_ai_explanation_participant_active_generation",
+        "unique": true,
+        "sparse": true
+      },
+      {
+        "key": { "reservations.run_id": 1 },
+        "name": "uk_ai_explanation_participant_active_run",
+        "unique": true,
+        "sparse": true
+      }
+    ]
+  }
+]

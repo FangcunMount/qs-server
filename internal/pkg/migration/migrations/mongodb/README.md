@@ -28,7 +28,97 @@ mongodb/
 | `interpret_report_artifacts` | 成功报告成品（v2） | generation_id, assessment_id, testee_id |
 | `report_query_catalog` | Assessment 级当前报告查询索引（v2） | assessment_id unique, org/testee sort indexes（见 000015） |
 | `interpretation_report_templates` | Interpretation 报告模板发布资产（v2） | template_id+template_version unique（见 000017） |
+| `ai_explanation_generations` | 手动 AI 解读生成意图 | semantic unique、规范 Input 快照、终态 TTL（见 000025/000031） |
+| `ai_explanation_runs` | 单次 Provider 执行尝试 | generation+attempt unique、expired lease、终态 TTL（见 000025/000031） |
+| `ai_explanation_artifacts` | 通过确定性校验的不可变 AI 解读内容 | generation unique、结构化 Content、TTL、Org/Testee 数据主体导出 keyset（见 000025/000031/000032） |
+| `ai_explanation_profiles` | AI 解读发布策略 | profile_id+version unique、published selector（见 000025） |
+| `ai_explanation_prompt_evaluations` | 合成 Prompt 评测、语义评分与人工复核的不可变证据 | domain_id unique、active release unique、profile/status、suite/prompt release 与过期执行租约查询（见 000026/000027） |
+| `ai_explanation_prompt_evaluation_daily_budgets` | 机构级 Prompt 评测 UTC 日调用预留账本 | org+budget day unique、reservation run unique（见 000027） |
+| `ai_explanation_participant_daily_budgets` | Participant 每次 Provider attempt 的 UTC 日调用预留账本 | org+budget day unique、reservation generation+attempt unique（见 000028/000030） |
+| `ai_explanation_participant_active_capacity` | Participant Provider 执行的分布式活跃槽账本 | org unique、active generation/run unique（见 000029） |
 | `interpretation_catalog_repair_plans` | Catalog 修复 dry-run 快照 | dry_run_id unique、expires_at TTL（见 000019） |
+
+## AI explanation runtime（000025）
+
+`000025_add_ai_explanation_runtime` 只创建四个生命周期集合和与 Repository 对齐的索引，不发布
+任何 Profile，也不启用功能开关。Prompt/Profile/Provider Route 组合必须先完成真实模型评测与人工复核，
+再通过独立的发布流程写入 `ai_explanation_profiles`；数据库结构存在不代表 AI 解读已可用。
+
+## AI explanation Prompt evaluation evidence（000026）
+
+`000026_add_ai_explanation_prompt_evaluations` 创建合成评测证据集合及与 Repository 对齐的三个索引，
+并为 Profile 增加只约束 `status=published` 的 selector-slot partial unique index，避免并发发布形成同级歧义。
+Mongo driver 在迁移到 26 前要求 `ai_explanation_profiles` 中不存在任何 pre-existing published Profile；
+若发现手工或预发布数据会中止迁移，禁止猜测 slot key 或自动背书既有发布状态。
+该迁移不调用 Provider、不写 approved evaluation、不发布 Profile，也不启用功能。Profile 发布审计通过
+`published_evidence_run_id` 引用已经由应用 gate 判定为 approved 的完整评测运行；没有真实 35 次生成、
+零调用 preflight、semantic rubric 和双角色人工复核时，不存在可用发布证据。
+
+## AI explanation Prompt evaluation durable execution（000027）
+
+`000027_add_ai_explanation_prompt_evaluation_execution` 为 operator-only Prompt 评测执行增加四类物理保护：
+
+- `active_release_key` 的 partial unique index，保证同一冻结 release 在 `collecting|awaiting_review` 阶段最多只有一个 active run；终态保存会 unset 该键；
+- `active_execution_org_key` 的 partial unique index，保证同一机构最多只有一个 `collecting` run；进入 `awaiting_review`、取消或终态时 unset 该键；
+- `(status, execution.phase, execution.lease_expires_at, domain_id)` partial index，只覆盖 `collecting + prepared`，为自动唤醒过期 prepared checkpoint 提供有界查询；`dispatching` 不进入扫描索引；
+- `ai_explanation_prompt_evaluation_daily_budgets` 按 `(org_id, budget_day)` 唯一，并对 `reservations.run_id` 建唯一 sparse index，防止同一 Run 跨预算桶重复预留。
+
+Mongo driver 在迁移到 27 前要求不存在 pre-existing `collecting` 或 `awaiting_review` 评测。该功能在 27
+之前没有受 active-release 唯一键保护，driver 因此拒绝猜测或自动改写这些未完成运行。迁移只增加预算集合与执行索引，
+不会启动评测、调用 Provider、恢复任务或发布 Profile。应用在一个 Mongo 事务中完成日预算预留、Run 创建和首条 Outbox；默认每次预留 70、每机构 UTC 日上限 140，取消或失败不返还预留。应用已提供默认关闭的周期 scanner；只有显式启用对应配置后才会扫描，并且 scanner 只持久化唤醒事件，不直接调用 Provider。000031 之后账本按显式 lifecycle policy 从 UTC 日结束计算 `expires_at`；仓库不提供法务期限默认值。
+
+## AI explanation participant capacity（000028）
+
+`000028_add_ai_explanation_participant_capacity` 创建按 `(org_id, budget_day)` 唯一的 Participant 预算账本，
+初始版本对 `reservations.generation_id` 建立唯一 sparse index。应用为首次语义 Generation 预留 1 次 Provider
+调用，并在同一个 Mongo 事务内提交预算、Generation 与 requested Outbox；事务任一写入失败即整体回滚。
+相同语义请求优先读取既有 Generation，并在并发争用后再次回读，因此精确复用不重复扣减，也不会因预算
+已满而遮蔽已存在结果。机构、用户和 Assessment 三个 UTC 日上限在同一文档条件更新中同时裁决。
+
+仓库默认值 `500/5/3` 只是功能关闭状态下的保守配置起点，不是生产容量或成本结论；上线前必须结合模型
+价格、机构规模和灰度数据确认。该账本不退款，000031 之后按显式 policy 设置 TTL，也不等同于 token/金额计费账本；后续若允许新的
+Provider retry attempt，必须先扩展预留模型，不能直接绕过这次首调用预算。`000030` 已将唯一预留身份升级为
+`GenerationID + attempt`，所以治理批准的每次人工 retry 都会再预留 1 次调用；首次请求仍对应 attempt 1。
+
+## AI explanation participant active capacity（000029）
+
+`000029_add_ai_explanation_participant_active_capacity` 创建每机构一份、仅保留当前活跃项的 Provider
+执行槽账本。应用在 `pending -> generating` 的 Mongo 事务中同时取得机构/用户/Assessment 三层槽、
+创建 Run 并 CAS 保存 Generation；生成成功或失败时，又在对应终态事务内精确释放同一
+`GenerationID + RunID` 槽。进程崩溃或 lease 恢复期间不提前释放，因此活跃槽代表仍需结算的外部执行，
+而不是 HTTP 到达率或待处理请求数。
+
+仓库默认上限为机构/用户/Assessment `10/2/1`，仅是功能关闭状态下的保守起点。Mongo driver 在迁移
+到 29 前要求不存在 `generating + participant` Generation；否则既有 Run 没有可证明的槽记录，迁移会
+fail closed。`pending` Generation 不受此限制，它会在实际开始 Run 时按新契约取得槽。账本不设 TTL，
+不得用过期时间自动删除仍可能处于 Provider 调用或恢复窗口中的活跃项。
+
+## AI explanation participant manual retry governance（000030）
+
+`000030_add_ai_explanation_participant_retry_governance` 将 Participant UTC 日调用预算的唯一身份从
+`generation_id` 改为 `reservation_id = ai-explanation:<generation_id>:attempt:<n>`，从而允许同一个失败
+Generation 在人工授权后为下一次独立 Provider 调用再次预留额度。同时为 Run 上的
+`retry_authorization.request_id` 与 `retry_authorization.event_id` 建立全局唯一稀疏索引，约束治理动作和
+durable wake-up 都只能发生一次。
+
+迁移到 30 前要求 Participant 日预算账本不存在既有 reservation。该功能分支尚未承载 Participant 流量，
+driver 因此拒绝猜测旧 reservation 的 attempt 来源；若未来要迁移已有流量，必须先设计带审计证据的专用
+backfill。down migration 会尝试恢复“一代一次”的旧唯一索引；只要已存在多 attempt reservation，它就会
+因唯一键冲突而失败，不能把 down migration 当作数据回滚方案。
+
+## AI explanation data lifecycle（000031）
+
+`000031_add_ai_explanation_retention_ttl` 为 Generation、Run、Artifact、Prompt evaluation 和两类 UTC 日预算账本创建 `expires_at` 的 `expireAfterSeconds=0` 索引。migration 不写任何业务过期时间，也不猜测合规期限。
+
+应用只有在 `ai_explanation.data_lifecycle` 同时配置 policy version 和三类正保留期后才允许启用功能。终态记录写入 `expires_at + retention_policy_version`，预算账本从 UTC 日结束计算；启用 policy 时 Repository 启动扫描会拒绝历史终态记录缺少 lifecycle 元数据，要求先做离线 backfill。
+
+down migration 只删除本版本拥有的 TTL indexes，不恢复已经由 TTL 删除的数据，也不撤销 `expires_at` 字段。任何生产回滚必须先停止相关写入并按备份恢复策略处理，不能把 down migration 当作数据恢复。
+
+## AI explanation subject export index（000032）
+
+`000032_add_ai_explanation_subject_export_index` 在 `ai_explanation_artifacts` 上增加 `(source.association.org_id, source.association.testee_id, audience, generated_at desc, domain_id desc)` 索引，支持数据主体导出按 Org/Testee 与 Participant audience 精确过滤，并使用固定 snapshot 下的 `generated_at + artifact_id` keyset 稳定分页。migration 只建索引，不导出数据、不扩大授权，也不改写 Artifact。
+
+应用导出路径只投影标准报告来源、Profile/Prompt/Route/校验器版本收据和最终正文，排除 Input、Prompt 渲染、Run、Outbox、Provider Invocation/request ID、token/延迟和预算账本。该索引存在只证明仓库查询契约已有物理支撑，不代表真实授权联调、大数据量或生产合规验收已完成。down migration 只删除该索引，不改写任何 Artifact。
 
 ## Report catalog bounded audit（000021）
 

@@ -162,6 +162,36 @@ func TestStatusServiceExportsCompleteEffectiveContract(t *testing.T) {
 			Profile: eventcatalog.OutboxProfileMongoDomain, Priority: eventcatalog.PriorityP1,
 			Handler: "interpretation_retry_requested_handler", Idempotency: "generation-latest-run-retry-decision", Settlement: eventcatalog.SettlementHandlerErrorNack,
 		},
+		eventcatalog.AIExplanationRequested: {
+			Type: eventcatalog.AIExplanationRequested, Owner: "interpretation/aiexplanation", Delivery: eventcatalog.DeliveryClassDurableOutbox,
+			Profile: eventcatalog.OutboxProfileMongoDomain, Immediate: true, Priority: eventcatalog.PriorityP0,
+			Handler: "ai_explanation_requested_handler", Idempotency: "generation-state-claim", Settlement: eventcatalog.SettlementHandlerErrorNack,
+		},
+		eventcatalog.AIExplanationRetryRequested: {
+			Type: eventcatalog.AIExplanationRetryRequested, Owner: "interpretation/aiexplanation", Delivery: eventcatalog.DeliveryClassDurableOutbox,
+			Profile: eventcatalog.OutboxProfileMongoDomain, Immediate: true, Priority: eventcatalog.PriorityP0,
+			Handler: "ai_explanation_requested_handler", Idempotency: "failed-run-retry-authorization", Settlement: eventcatalog.SettlementHandlerErrorNack,
+		},
+		eventcatalog.AIExplanationLeaseRecoveryRequested: {
+			Type: eventcatalog.AIExplanationLeaseRecoveryRequested, Owner: "interpretation/aiexplanation", Delivery: eventcatalog.DeliveryClassDurableOutbox,
+			Profile: eventcatalog.OutboxProfileMongoDomain, Immediate: true, Priority: eventcatalog.PriorityP0,
+			Handler: "ai_explanation_requested_handler", Idempotency: "exact-run-lease-wakeup-cas", Settlement: eventcatalog.SettlementHandlerErrorNack,
+		},
+		eventcatalog.AIExplanationGenerated: {
+			Type: eventcatalog.AIExplanationGenerated, Owner: "interpretation/aiexplanation", Delivery: eventcatalog.DeliveryClassDurableOutbox,
+			Profile: eventcatalog.OutboxProfileMongoDomain, Priority: eventcatalog.PriorityP1,
+			Handler: "ai_explanation_terminal_handler", Idempotency: "terminal-generation-reference-audit", Settlement: eventcatalog.SettlementHandlerErrorNack,
+		},
+		eventcatalog.AIExplanationFailed: {
+			Type: eventcatalog.AIExplanationFailed, Owner: "interpretation/aiexplanation", Delivery: eventcatalog.DeliveryClassDurableOutbox,
+			Profile: eventcatalog.OutboxProfileMongoDomain, Priority: eventcatalog.PriorityP1,
+			Handler: "ai_explanation_terminal_handler", Idempotency: "terminal-failure-reference-audit", Settlement: eventcatalog.SettlementHandlerErrorNack,
+		},
+		eventcatalog.AIExplanationPromptEvaluationStepRequested: {
+			Type: eventcatalog.AIExplanationPromptEvaluationStepRequested, Owner: "interpretation/aiexplanation", Delivery: eventcatalog.DeliveryClassDurableOutbox,
+			Profile: eventcatalog.OutboxProfileMongoDomain, Immediate: true, Priority: eventcatalog.PriorityP1,
+			Handler: "ai_explanation_prompt_evaluation_step_handler", Idempotency: "run-case-attempt-checkpoint-cas", Settlement: eventcatalog.SettlementHandlerErrorNack,
+		},
 		eventcatalog.TaskOpened: {
 			Type: eventcatalog.TaskOpened, Owner: "plan", Delivery: eventcatalog.DeliveryClassBestEffort,
 			Handler: "task_opened_handler", Idempotency: "notification-event-metadata", Settlement: eventcatalog.SettlementHandlerErrorNack,
@@ -196,7 +226,7 @@ func TestStatusServiceExportsCompleteEffectiveContract(t *testing.T) {
 		profiles[profile.Name] = profile
 	}
 	mongo := profiles[eventcatalog.OutboxProfileMongoDomain]
-	if mongo.EventCount != 4 || !slices.Equal(mongo.ImmediateEventTypes, []string{eventcatalog.AnswerSheetSubmitted}) || !mongo.Running || !mongo.RelayEnabled || !mongo.ReconcilerEnabled || !mongo.ImmediateEnabled {
+	if mongo.EventCount != 10 || !slices.Equal(mongo.ImmediateEventTypes, []string{eventcatalog.AnswerSheetSubmitted, eventcatalog.AIExplanationLeaseRecoveryRequested, eventcatalog.AIExplanationPromptEvaluationStepRequested, eventcatalog.AIExplanationRequested, eventcatalog.AIExplanationRetryRequested}) || !mongo.Running || !mongo.RelayEnabled || !mongo.ReconcilerEnabled || !mongo.ImmediateEnabled {
 		t.Fatalf("mongo profile = %#v", mongo)
 	}
 	mysql := profiles[eventcatalog.OutboxProfileAssessmentMySQL]

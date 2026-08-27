@@ -102,6 +102,47 @@ grpc:
   enable-reflection: true     # 启用反射，方便 grpcurl 调试
   enable-health-check: true   # 启用健康检查
 
+# AI 解读默认关闭；启用前需完成 Prompt/Profile/模型发布验收。
+# 密钥使用 OPENAI_API_KEY 或 QS_APISERVER_AI_EXPLANATION_API_KEY 注入。
+ai_explanation:
+  enabled: false
+  provider: "openai"
+  model: ""
+  route_revision: "v1"
+  endpoint: ""
+  api_key: ""
+  timeout: 60s
+  run_lease_duration: 2m
+  max_output_tokens: 3000
+  max_response_bytes: 4194304
+  # 不提供法务/产品默认值；启用前必须填写已批准的策略版本和三类保留期。
+  data_lifecycle:
+    policy_version: ""
+    participant_record_retention: 0s
+    prompt_evaluation_retention: 0s
+    capacity_ledger_retention: 0s
+  # 首次语义 Generation 按 UTC 日同时预留机构/用户/Assessment 三层各 1 次调用；精确复用不重复扣减。
+  # 这些值只是默认关闭状态下的保守配置起点，不代表生产容量结论。
+  participant_capacity:
+    daily_provider_invocation_budget_per_org: 500
+    daily_provider_invocation_budget_per_user: 5
+    daily_provider_invocation_budget_per_assessment: 3
+    # Conservative disabled-by-default starting point; validate against real Provider capacity before rollout.
+    max_active_provider_executions_per_org: 10
+    max_active_provider_executions_per_user: 2
+    max_active_provider_executions_per_assessment: 1
+  # Operator-only synthetic release evaluation; uses a distinct frozen Route/model.
+  evaluation:
+    enabled: false
+    model: ""
+    route_revision: "v1"
+    timeout: 60s
+    max_output_tokens: 2500
+    # v1 每次启动按 UTC 日保守预留完整 70 次调用；取消/失败不退款。
+    capacity:
+      max_active_runs_per_org: 1
+      daily_provider_invocation_budget_per_org: 140
+
 # ============================================================
 # 3. 存储配置
 # ============================================================
@@ -304,6 +345,22 @@ interpretation_lease_recovery:
   interval: "10s"
   batch_limit: 100
   lock_key: "qs:interpretation-lease-recovery:leader"
+  lock_ttl: "30s"
+
+# 仅唤醒过期 prepared checkpoint；dispatching 必须人工恢复。
+ai_explanation_prompt_evaluation_lease_recovery:
+  enable: false
+  interval: "10s"
+  batch_limit: 20
+  lock_key: "qs:ai-explanation-prompt-evaluation-lease-recovery:leader"
+  lock_ttl: "30s"
+
+# 只投递同一 attempt 的过期 lease 恢复事件，不自动创建 retry attempt。
+ai_explanation_participant_lease_recovery:
+  enable: false
+  interval: "10s"
+  batch_limit: 100
+  lock_key: "qs:ai-explanation-participant-lease-recovery:leader"
   lock_ttl: "30s"
 
 report_catalog_audit:

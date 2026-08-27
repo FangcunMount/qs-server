@@ -11,6 +11,16 @@ import (
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	interpretationadmin "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/administration"
+	aiexplanationadministration "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/administration"
+	aiexplanationevaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/evaluation"
+	aiexplanationexecution "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/execution"
+	aiexplanationgovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/governance"
+	aiexplanationparticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/participant"
+	aiexplanationpersistence "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/persistence"
+	appport "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/port"
+	aiexplanationrecovery "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/recovery"
+	aiexplanationsource "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/source"
+	aiexplanationsubjectexport "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/subjectexport"
 	interpretationautomation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
 	interpretationexecution "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation/execution"
 	interpretationcatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/catalogreconcile"
@@ -24,12 +34,23 @@ import (
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	interpretationadmission "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/admission"
+	domainevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/evaluation"
+	aiexplanationevents "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/events"
+	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/generation"
 	interpretationbuilder "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
+	aiexplanationopenai "github.com/FangcunMount/qs-server/internal/apiserver/infra/aiexplanation/openai"
+	aiexplanationprompt "github.com/FangcunMount/qs-server/internal/apiserver/infra/aiexplanation/prompt"
+	aiexplanationprovider "github.com/FangcunMount/qs-server/internal/apiserver/infra/aiexplanation/provider"
+	aiexplanationsafety "github.com/FangcunMount/qs-server/internal/apiserver/infra/aiexplanation/safety"
+	aiexplanationschema "github.com/FangcunMount/qs-server/internal/apiserver/infra/aiexplanation/schema"
+	aiexplanationsemantic "github.com/FangcunMount/qs-server/internal/apiserver/infra/aiexplanation/semantic"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
+	mongoAIExplanation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation/aiexplanation"
 	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/interpretation"
+	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	domainoutcome "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationfact"
 	evaluationreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -43,28 +64,54 @@ import (
 
 // Module assembles report read/query, builder-registry, and durable write capabilities.
 type Module struct {
-	reader                evaluationreadmodel.ReportReader
-	executionExecutor     interpretationexecution.Executor
-	generationRepo        *mongoEval.GenerationRepository
-	runRepo               *mongoEval.RunRepository
-	reportRepo            *mongoEval.ReportRepository
-	admissionRepo         interpretationadmission.QueryRepository
-	reportTemplateRepo    *mongoEval.ReportTemplateRepository
-	reportTemplateService appreporttemplate.Service
-	automationService     interpretationautomation.Service
-	projectionMapper      reportprojection.Mapper
-	participantService    interpretationparticipant.Service
-	administrationService interpretationadmin.Service
-	clinicianService      interpretationclinician.Service
-	operationsService     interpretationoperations.Service
-	catalogReconcile      interpretationcatalog.Service
-	catalogAudit          interpretationcatalog.RunnerService
-	governedRetryService  interpretationautomation.GovernedRetryService
-	readmissionService    interpretationreadmission.Service
-	leaseRecoverer        interpretationautomation.LeaseRecoverer
-	txRunner              apptransaction.Runner
-	eventStager           appEventing.EventStager
-	ReportStatusReporter  *reportstatus.Reporter
+	reader                      evaluationreadmodel.ReportReader
+	reportCatalog               evaluationreadmodel.BatchReportMetadataReader
+	executionExecutor           interpretationexecution.Executor
+	generationRepo              *mongoEval.GenerationRepository
+	runRepo                     *mongoEval.RunRepository
+	reportRepo                  *mongoEval.ReportRepository
+	admissionRepo               interpretationadmission.QueryRepository
+	reportTemplateRepo          *mongoEval.ReportTemplateRepository
+	reportTemplateService       appreporttemplate.Service
+	automationService           interpretationautomation.Service
+	projectionMapper            reportprojection.Mapper
+	participantService          interpretationparticipant.Service
+	administrationService       interpretationadmin.Service
+	clinicianService            interpretationclinician.Service
+	operationsService           interpretationoperations.Service
+	catalogReconcile            interpretationcatalog.Service
+	catalogAudit                interpretationcatalog.RunnerService
+	governedRetryService        interpretationautomation.GovernedRetryService
+	readmissionService          interpretationreadmission.Service
+	leaseRecoverer              interpretationautomation.LeaseRecoverer
+	aiExplanationEnabled        bool
+	aiExplanationExecutor       aiexplanationexecution.Executor
+	aiExplanationService        aiexplanationparticipant.Service
+	aiGenerationRepo            *mongoAIExplanation.GenerationRepository
+	aiRunRepo                   *mongoAIExplanation.RunRepository
+	aiArtifactRepo              *mongoAIExplanation.ArtifactRepository
+	aiProfileRepo               *mongoAIExplanation.ProfileRepository
+	aiEvaluationRepo            *mongoAIExplanation.PromptEvaluationRepository
+	aiEvaluationBudgetRepo      *mongoAIExplanation.PromptEvaluationBudgetRepository
+	aiParticipantBudgetRepo     *mongoAIExplanation.ParticipantBudgetRepository
+	aiParticipantActiveRepo     *mongoAIExplanation.ParticipantActiveCapacityRepository
+	aiEvidenceService           *aiexplanationevaluation.EvidenceService
+	aiEvaluationCommitter       *aiexplanationevaluation.DurableCommitter
+	aiEvaluationLeaseRecoverer  *aiexplanationevaluation.PreparedLeaseRecoverer
+	aiParticipantLeaseRecoverer *aiexplanationrecovery.LeaseRecoverer
+	aiSubjectExport             *aiexplanationsubjectexport.Service
+	aiReviewService             *aiexplanationevaluation.ReviewService
+	aiAdministration            aiexplanationadministration.Service
+	aiOnlineEvalRunner          *aiexplanationevaluation.OnlineRunner
+	aiGovernanceService         *aiexplanationgovernance.Service
+	aiPromptCatalog             *aiexplanationprompt.Catalog
+	aiRouteCatalog              *aiexplanationprovider.Catalog
+	aiCommitter                 *aiexplanationpersistence.Committer
+	aiOutcomeRepo               domainoutcome.Repository
+	participantAccess           interpretationparticipant.Access
+	txRunner                    apptransaction.Runner
+	eventStager                 appEventing.EventStager
+	ReportStatusReporter        *reportstatus.Reporter
 }
 
 // Deps defines explicit constructor dependencies for the report module.
@@ -77,6 +124,7 @@ type Deps struct {
 	ReportStatusConfig reportstatus.Config
 	OutboxProfile      appEventing.ProfileBinding
 	RunLeaseDuration   time.Duration
+	AIExplanation      *apiserveroptions.AIExplanationOptions
 }
 
 // New assembles the report module.
@@ -95,7 +143,9 @@ func New(deps Deps) (*Module, error) {
 	}
 	module.ReportStatusReporter = reportStatusReporter
 	mongoOptions := mongoBase.BaseRepositoryOptions{Limiter: deps.MongoLimiter}
-	module.reader = mongoEval.NewReportReadModel(deps.MongoDB, mongoOptions)
+	reportReadModel := mongoEval.NewReportReadModel(deps.MongoDB, mongoOptions)
+	module.reader = reportReadModel
+	module.reportCatalog = reportReadModel
 	catalogReconcileStore, err := mongoEval.NewCatalogReconcileStore(deps.MongoDB, mongoOptions)
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report catalog reconcile store: %v", err)
@@ -173,8 +223,283 @@ func New(deps Deps) (*Module, error) {
 		}
 		module.executionExecutor = executor
 	}
+	if err := module.assembleAIExplanation(deps, mongoOptions); err != nil {
+		return nil, err
+	}
 
 	return module, nil
+}
+
+func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRepositoryOptions) error {
+	config := deps.AIExplanation
+	if config == nil || !config.Enabled {
+		return nil
+	}
+	if validationErrors := config.Validate(); len(validationErrors) > 0 {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "invalid AI explanation runtime configuration: %v", validationErrors)
+	}
+	retentionPolicy := mongoAIExplanation.RetentionPolicy{
+		Version:                    config.DataLifecycle.PolicyVersion,
+		ParticipantRecordRetention: config.DataLifecycle.ParticipantRecordRetention,
+		PromptEvaluationRetention:  config.DataLifecycle.PromptEvaluationRetention,
+		CapacityLedgerRetention:    config.DataLifecycle.CapacityLedgerRetention,
+	}
+	profileRepo, err := mongoAIExplanation.NewProfileRepository(deps.MongoDB, mongoOptions)
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation profile repository: %v", err)
+	}
+	evaluationRepo, err := mongoAIExplanation.NewPromptEvaluationRepository(deps.MongoDB, retentionPolicy, mongoOptions)
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation Prompt evaluation repository: %v", err)
+	}
+	evaluationBudgetRepo, err := mongoAIExplanation.NewPromptEvaluationBudgetRepository(deps.MongoDB, retentionPolicy, mongoOptions)
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation Prompt evaluation budget repository: %v", err)
+	}
+	governanceService, err := aiexplanationgovernance.NewService(profileRepo, evaluationRepo, time.Now)
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation release governance: %v", err)
+	}
+	m.aiProfileRepo = profileRepo
+	m.aiEvaluationRepo = evaluationRepo
+	m.aiEvaluationBudgetRepo = evaluationBudgetRepo
+	evidenceService, err := aiexplanationevaluation.NewEvidenceService(evaluationRepo, meta.New, time.Now)
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation evaluation evidence service: %v", err)
+	}
+	m.aiEvidenceService = evidenceService
+	reviewService, err := aiexplanationevaluation.NewReviewService(evidenceService)
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation evaluation review service: %v", err)
+	}
+	m.aiReviewService = reviewService
+	m.aiGovernanceService = governanceService
+	m.aiAdministration = aiexplanationadministration.NewService(reviewService, governanceService, aiAdministrationAccessAdapter{})
+
+	promptCatalog := aiexplanationprompt.NewCatalog()
+	routeConfigs := []aiexplanationprovider.Config{{
+		Route: apiserveroptions.DefaultAIExplanationProviderRoute, Revision: config.RouteRevision,
+		Provider: config.Provider, Model: config.Model, Current: true,
+		Capabilities: appport.ProviderCapabilities{StructuredOutput: true},
+		Timeout:      config.Timeout, MaxOutputTokens: config.MaxOutputTokens,
+	}}
+	if config.Evaluation.Enabled {
+		routeConfigs = append(routeConfigs, aiexplanationprovider.Config{
+			Route: apiserveroptions.DefaultAIExplanationSemanticProviderRoute, Revision: config.Evaluation.RouteRevision,
+			Provider: config.Provider, Model: config.Evaluation.Model, Current: true,
+			Capabilities: appport.ProviderCapabilities{StructuredOutput: true},
+			Timeout:      config.Evaluation.Timeout, MaxOutputTokens: config.Evaluation.MaxOutputTokens,
+		})
+	}
+	routeCatalog, err := aiexplanationprovider.NewCatalog(routeConfigs)
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation provider route: %v", err)
+	}
+	providerAdapter, err := aiexplanationopenai.NewProvider(aiexplanationopenai.Config{
+		Endpoint: config.Endpoint, APIKey: config.APIKey, MaxResponseBytes: config.MaxResponseBytes,
+	})
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize OpenAI explanation provider: %v", err)
+	}
+	generationRepo, err := mongoAIExplanation.NewGenerationRepository(deps.MongoDB, retentionPolicy, mongoOptions)
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation generation repository: %v", err)
+	}
+	runRepo, err := mongoAIExplanation.NewRunRepository(deps.MongoDB, retentionPolicy, mongoOptions)
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation run repository: %v", err)
+	}
+	artifactRepo, err := mongoAIExplanation.NewArtifactRepository(deps.MongoDB, retentionPolicy, mongoOptions)
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation artifact repository: %v", err)
+	}
+	participantBudgetRepo, err := mongoAIExplanation.NewParticipantBudgetRepository(deps.MongoDB, retentionPolicy, mongoOptions)
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation participant budget repository: %v", err)
+	}
+	participantActiveRepo, err := mongoAIExplanation.NewParticipantActiveCapacityRepository(deps.MongoDB, mongoOptions)
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation participant active capacity repository: %v", err)
+	}
+	participantCapacityPolicy := domaingeneration.ParticipantCapacityPolicy{
+		DailyProviderInvocationBudgetPerOrg:        config.ParticipantCapacity.DailyProviderInvocationBudgetPerOrg,
+		DailyProviderInvocationBudgetPerUser:       config.ParticipantCapacity.DailyProviderInvocationBudgetPerUser,
+		DailyProviderInvocationBudgetPerAssessment: config.ParticipantCapacity.DailyProviderInvocationBudgetPerAssessment,
+		MaxActiveProviderExecutionsPerOrg:          config.ParticipantCapacity.MaxActiveProviderExecutionsPerOrg,
+		MaxActiveProviderExecutionsPerUser:         config.ParticipantCapacity.MaxActiveProviderExecutionsPerUser,
+		MaxActiveProviderExecutionsPerAssessment:   config.ParticipantCapacity.MaxActiveProviderExecutionsPerAssessment,
+	}
+	lifecycleTx := modtx.NewMongoRunner(deps.MongoDB, modtx.MongoRunnerOptions{Boundary: "ai_explanation_lifecycle", Limiter: deps.MongoLimiter})
+	committer, err := aiexplanationpersistence.NewCommitter(
+		lifecycleTx,
+		generationRepo, runRepo, artifactRepo, participantBudgetRepo, participantActiveRepo, participantCapacityPolicy,
+		aiexplanationevents.Factory{}, deps.OutboxProfile.Stager, deps.OutboxProfile.PostCommit,
+	)
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation committer: %v", err)
+	}
+	subjectExport, err := aiexplanationsubjectexport.NewService(artifactRepo, time.Now)
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation subject export: %v", err)
+	}
+	recoveryService, err := aiexplanationrecovery.NewService(generationRepo, runRepo, committer, time.Now)
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation participant recovery: %v", err)
+	}
+	participantLeaseRecoverer, err := aiexplanationrecovery.NewLeaseRecoverer(runRepo, generationRepo, runRepo, committer)
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation participant lease recovery: %v", err)
+	}
+	safetyGate := aiexplanationsafety.NewDeterministicGate()
+	executor, err := aiexplanationexecution.NewExecutor(
+		generationRepo, runRepo, artifactRepo, profileRepo, promptCatalog, routeCatalog,
+		aiexplanationschema.NewCatalog(), providerAdapter, safetyGate, committer, config.RunLeaseDuration,
+	)
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation executor: %v", err)
+	}
+
+	m.aiExplanationEnabled = true
+	m.aiExplanationExecutor = executor
+	m.aiGenerationRepo = generationRepo
+	m.aiRunRepo = runRepo
+	m.aiArtifactRepo = artifactRepo
+	m.aiParticipantBudgetRepo = participantBudgetRepo
+	m.aiParticipantActiveRepo = participantActiveRepo
+	m.aiSubjectExport = subjectExport
+	m.aiPromptCatalog = promptCatalog
+	m.aiRouteCatalog = routeCatalog
+	m.aiCommitter = committer
+	m.aiParticipantLeaseRecoverer = participantLeaseRecoverer
+	m.aiAdministration = aiexplanationadministration.NewService(
+		reviewService, governanceService, aiAdministrationAccessAdapter{},
+		aiexplanationadministration.WithParticipantCapacity(participantBudgetRepo, participantActiveRepo, participantCapacityPolicy, time.Now),
+		aiexplanationadministration.WithParticipantRecovery(recoveryService),
+	)
+	if config.Evaluation.Enabled {
+		evaluationCommitter, err := aiexplanationevaluation.NewDurableCommitter(
+			modtx.NewMongoRunner(deps.MongoDB, modtx.MongoRunnerOptions{Boundary: "ai_explanation_prompt_evaluation", Limiter: deps.MongoLimiter}),
+			evaluationRepo, aiexplanationevents.Factory{}, deps.OutboxProfile.Stager, deps.OutboxProfile.PostCommit,
+			evaluationBudgetRepo, config.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg, time.Now,
+		)
+		if err != nil {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation evaluation committer: %v", err)
+		}
+		evaluationLeaseRecoverer, err := aiexplanationevaluation.NewPreparedLeaseRecoverer(evaluationRepo, evaluationCommitter)
+		if err != nil {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation Prompt evaluation lease recovery: %v", err)
+		}
+		semanticRoute, err := routeCatalog.ResolveProviderRoute(context.Background(), apiserveroptions.DefaultAIExplanationSemanticProviderRoute)
+		if err != nil {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to resolve AI explanation semantic evaluator route: %v", err)
+		}
+		semanticEvaluator, err := aiexplanationsemantic.NewEvaluator(providerAdapter, semanticRoute)
+		if err != nil {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation semantic evaluator: %v", err)
+		}
+		onlineRunner, err := aiexplanationevaluation.NewOnlineRunner(aiexplanationevaluation.OnlineRunnerDependencies{
+			Prompts: promptCatalog, Schemas: aiexplanationschema.NewCatalog(), Routes: routeCatalog,
+			Provider: providerAdapter, Safety: safetyGate, Semantic: semanticEvaluator,
+			SemanticTimeout: config.Evaluation.Timeout, Evidence: evidenceService,
+			DurableCommitter: evaluationCommitter, Now: time.Now,
+		})
+		if err != nil {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation online evaluation runner: %v", err)
+		}
+		m.aiOnlineEvalRunner = onlineRunner
+		m.aiEvaluationCommitter = evaluationCommitter
+		m.aiEvaluationLeaseRecoverer = evaluationLeaseRecoverer
+		m.aiAdministration = aiexplanationadministration.NewService(
+			reviewService, governanceService, aiAdministrationAccessAdapter{},
+			aiexplanationadministration.WithParticipantCapacity(participantBudgetRepo, participantActiveRepo, participantCapacityPolicy, time.Now),
+			aiexplanationadministration.WithParticipantRecovery(recoveryService),
+			aiexplanationadministration.WithEvaluationExecution(onlineRunner, evaluationCommitter, meta.New),
+			aiexplanationadministration.WithEvaluationCapacity(
+				evaluationBudgetRepo, config.Evaluation.Capacity.MaxActiveRunsPerOrg,
+				config.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg, time.Now,
+			),
+		)
+	}
+	return nil
+}
+
+// AIExplanationGovernance exposes the operator-only release service when the
+// AI explanation feature is enabled. Online evaluation execution may remain
+// disabled; existing evaluation evidence can still be reviewed and used by
+// the authenticated administration transport.
+func (m *Module) AIExplanationGovernance() *aiexplanationgovernance.Service {
+	if m == nil {
+		return nil
+	}
+	return m.aiGovernanceService
+}
+
+// AIExplanationEvaluationEvidence exposes the operator-only evidence recorder.
+// It does not invoke a Provider; the online runner and administration
+// transport use this CAS-protected boundary.
+func (m *Module) AIExplanationEvaluationEvidence() *aiexplanationevaluation.EvidenceService {
+	if m == nil {
+		return nil
+	}
+	return m.aiEvidenceService
+}
+
+// AIExplanationEvaluationReview exposes the operator-only synthetic review
+// workflow. The caller must authenticate the reviewer, authorize the selected
+// review role and keep this boundary out of participant-facing transports.
+func (m *Module) AIExplanationEvaluationReview() *aiexplanationevaluation.ReviewService {
+	if m == nil {
+		return nil
+	}
+	return m.aiReviewService
+}
+
+// AIExplanationAdministration exposes the authenticated operator workflow for
+// synthetic evidence review and Profile lifecycle governance. Provider
+// execution remains a separate durable-operation concern.
+func (m *Module) AIExplanationAdministration() aiexplanationadministration.Service {
+	if m == nil {
+		return nil
+	}
+	return m.aiAdministration
+}
+
+// AIExplanationSubjectExport exposes the participant-authorized, paginated
+// projection of immutable final artifacts. The transport must authorize the
+// Testee before invoking this boundary.
+func (m *Module) AIExplanationSubjectExport() *aiexplanationsubjectexport.Service {
+	if m == nil {
+		return nil
+	}
+	return m.aiSubjectExport
+}
+
+// AIExplanationOnlineEvaluation exposes the operator-only 35-attempt release
+// runner when the independent evaluator Route is explicitly enabled. It never
+// finalizes evidence or publishes a Profile.
+func (m *Module) AIExplanationOnlineEvaluation() *aiexplanationevaluation.OnlineRunner {
+	if m == nil {
+		return nil
+	}
+	return m.aiOnlineEvalRunner
+}
+
+// AIExplanationPromptEvaluationLeaseRecoverer exposes the scanner boundary
+// only when the operator evaluation runtime is explicitly enabled.
+func (m *Module) AIExplanationPromptEvaluationLeaseRecoverer() *aiexplanationevaluation.PreparedLeaseRecoverer {
+	if m == nil {
+		return nil
+	}
+	return m.aiEvaluationLeaseRecoverer
+}
+
+// AIExplanationParticipantLeaseRecoverer exposes the default-off scheduler
+// boundary that persists exact lease wake-ups without invoking a Provider.
+func (m *Module) AIExplanationParticipantLeaseRecoverer() *aiexplanationrecovery.LeaseRecoverer {
+	if m == nil {
+		return nil
+	}
+	return m.aiParticipantLeaseRecoverer
 }
 
 // BindOutcomeRepository completes the cross-storage Interpretation use case
@@ -199,6 +524,10 @@ func (m *Module) BindOutcomeRepository(repo domainoutcome.Repository) error {
 	)
 	m.governedRetryService = interpretationautomation.NewGovernedRetryService(m.generationRepo, m.runRepo, repo, m.txRunner, m.eventStager)
 	m.leaseRecoverer = interpretationautomation.NewLeaseRecoverer(m.runRepo, m.generationRepo, m.automationService)
+	m.aiOutcomeRepo = repo
+	if err := m.tryBindAIExplanationParticipant(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -424,6 +753,37 @@ func (operationsAccessAdapter) AuthorizeAudit(ctx context.Context, actor interpr
 	return nil
 }
 
+type aiAdministrationAccessAdapter struct{}
+
+func (aiAdministrationAccessAdapter) AuthorizeRead(ctx context.Context, actor aiexplanationadministration.Actor) error {
+	if actor.OrgID <= 0 || actor.OperatorUserID <= 0 {
+		return errors.WithCode(code.ErrPermissionDenied, "AI explanation administrator identity is required")
+	}
+	snapshot, ok := authzapp.FromContext(ctx)
+	if !ok || !authzapp.DecideCapability(snapshot, authzapp.CapabilityAuditInterpretation).Allowed {
+		return errors.WithCode(code.ErrPermissionDenied, "AI explanation evaluation audit permission is required")
+	}
+	return nil
+}
+
+func (aiAdministrationAccessAdapter) AuthorizeReview(ctx context.Context, actor aiexplanationadministration.Actor, role domainevaluation.ReviewRole) error {
+	if role != domainevaluation.ReviewRoleAssessmentSemantics && role != domainevaluation.ReviewRoleSafetyProduct {
+		return errors.WithCode(code.ErrPermissionDenied, "AI explanation review role is invalid")
+	}
+	return aiAdministrationAccessAdapter{}.AuthorizeGovernance(ctx, actor)
+}
+
+func (aiAdministrationAccessAdapter) AuthorizeGovernance(ctx context.Context, actor aiexplanationadministration.Actor) error {
+	if actor.OrgID <= 0 || actor.OperatorUserID <= 0 {
+		return errors.WithCode(code.ErrPermissionDenied, "AI explanation administrator identity is required")
+	}
+	snapshot, ok := authzapp.FromContext(ctx)
+	if !ok || !authzapp.DecideCapability(snapshot, authzapp.CapabilityOrgAdmin).Allowed {
+		return errors.WithCode(code.ErrPermissionDenied, "AI explanation release governance permission is required")
+	}
+	return nil
+}
+
 func (m *Module) AutomationService() interpretationautomation.Service {
 	if m == nil {
 		return nil
@@ -445,6 +805,26 @@ func (m *Module) BindParticipantAccess(access interpretationparticipant.Access) 
 		return errors.WithCode(code.ErrModuleInitializationFailed, "interpretation participant service dependencies are not configured")
 	}
 	m.participantService = interpretationparticipant.NewService(m.reader, access, m.projectionMapper)
+	m.participantAccess = access
+	return m.tryBindAIExplanationParticipant()
+}
+
+func (m *Module) tryBindAIExplanationParticipant() error {
+	if m == nil || !m.aiExplanationEnabled || m.aiExplanationService != nil || m.aiOutcomeRepo == nil || m.participantAccess == nil {
+		return nil
+	}
+	sourceResolver, err := aiexplanationsource.NewResolver(m.reportCatalog, m.reportRepo, m.aiOutcomeRepo)
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation source resolver: %v", err)
+	}
+	service, err := aiexplanationparticipant.NewService(
+		m.participantAccess, sourceResolver, m.aiProfileRepo, m.aiPromptCatalog, m.aiRouteCatalog, m.aiCommitter,
+		m.aiGenerationRepo, m.aiRunRepo, m.aiArtifactRepo, m.reportCatalog,
+	)
+	if err != nil {
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize participant AI explanation service: %v", err)
+	}
+	m.aiExplanationService = service
 	return nil
 }
 

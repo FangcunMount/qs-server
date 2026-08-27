@@ -25,6 +25,9 @@ const (
 
 	// ErrInterpretCatalogAuditNotReady - 503: no complete catalog audit snapshot exists.
 	ErrInterpretCatalogAuditNotReady
+
+	// ErrAIExplanationCapacityExceeded - 429: organization concurrency or daily Provider budget exhausted.
+	ErrAIExplanationCapacityExceeded
 )
 
 func init() {
@@ -36,4 +39,5 @@ func init() {
 	register(ErrInterpretItemInvalid, 400, "Interpret item is invalid")
 	register(ErrInterpretReportConsistency, 500, "report temporarily unavailable")
 	register(ErrInterpretCatalogAuditNotReady, 503, "catalog_audit_not_ready")
+	register(ErrAIExplanationCapacityExceeded, 429, "ai_explanation_capacity_exceeded")
 }

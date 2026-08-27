@@ -1,0 +1,7 @@
+[
+  { "dropIndexes": "ai_explanation_prompt_evaluations", "index": "idx_ai_explanation_prompt_evaluation_release" },
+  { "dropIndexes": "ai_explanation_prompt_evaluations", "index": "idx_ai_explanation_prompt_evaluation_profile_status" },
+  { "dropIndexes": "ai_explanation_prompt_evaluations", "index": "uk_ai_explanation_prompt_evaluation_domain" },
+  { "drop": "ai_explanation_prompt_evaluations" },
+  { "dropIndexes": "ai_explanation_profiles", "index": "uk_ai_explanation_profile_published_selector_slot" }
+]

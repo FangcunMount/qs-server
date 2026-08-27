@@ -160,6 +160,231 @@ var ParticipantReportService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
+	ParticipantAIExplanationService_GetAIExplanationCapability_FullMethodName = "/interpretation.ParticipantAIExplanationService/GetAIExplanationCapability"
+	ParticipantAIExplanationService_RequestAIExplanation_FullMethodName       = "/interpretation.ParticipantAIExplanationService/RequestAIExplanation"
+	ParticipantAIExplanationService_GetAIExplanation_FullMethodName           = "/interpretation.ParticipantAIExplanationService/GetAIExplanation"
+	ParticipantAIExplanationService_ExportAIExplanations_FullMethodName       = "/interpretation.ParticipantAIExplanationService/ExportAIExplanations"
+)
+
+// ParticipantAIExplanationServiceClient is the client API for ParticipantAIExplanationService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// ParticipantAIExplanationService exposes the optional manual AI supplement.
+// Standard report reads stay on ParticipantReportService and do not depend on
+// this service being configured or available.
+type ParticipantAIExplanationServiceClient interface {
+	GetAIExplanationCapability(ctx context.Context, in *GetAIExplanationCapabilityRequest, opts ...grpc.CallOption) (*AIExplanationResponse, error)
+	RequestAIExplanation(ctx context.Context, in *RequestAIExplanationRequest, opts ...grpc.CallOption) (*AIExplanationResponse, error)
+	GetAIExplanation(ctx context.Context, in *GetAIExplanationRequest, opts ...grpc.CallOption) (*AIExplanationResponse, error)
+	ExportAIExplanations(ctx context.Context, in *ExportAIExplanationsRequest, opts ...grpc.CallOption) (*AIExplanationSubjectExportResponse, error)
+}
+
+type participantAIExplanationServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewParticipantAIExplanationServiceClient(cc grpc.ClientConnInterface) ParticipantAIExplanationServiceClient {
+	return &participantAIExplanationServiceClient{cc}
+}
+
+func (c *participantAIExplanationServiceClient) GetAIExplanationCapability(ctx context.Context, in *GetAIExplanationCapabilityRequest, opts ...grpc.CallOption) (*AIExplanationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIExplanationResponse)
+	err := c.cc.Invoke(ctx, ParticipantAIExplanationService_GetAIExplanationCapability_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *participantAIExplanationServiceClient) RequestAIExplanation(ctx context.Context, in *RequestAIExplanationRequest, opts ...grpc.CallOption) (*AIExplanationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIExplanationResponse)
+	err := c.cc.Invoke(ctx, ParticipantAIExplanationService_RequestAIExplanation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *participantAIExplanationServiceClient) GetAIExplanation(ctx context.Context, in *GetAIExplanationRequest, opts ...grpc.CallOption) (*AIExplanationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIExplanationResponse)
+	err := c.cc.Invoke(ctx, ParticipantAIExplanationService_GetAIExplanation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *participantAIExplanationServiceClient) ExportAIExplanations(ctx context.Context, in *ExportAIExplanationsRequest, opts ...grpc.CallOption) (*AIExplanationSubjectExportResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIExplanationSubjectExportResponse)
+	err := c.cc.Invoke(ctx, ParticipantAIExplanationService_ExportAIExplanations_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ParticipantAIExplanationServiceServer is the server API for ParticipantAIExplanationService service.
+// All implementations must embed UnimplementedParticipantAIExplanationServiceServer
+// for forward compatibility.
+//
+// ParticipantAIExplanationService exposes the optional manual AI supplement.
+// Standard report reads stay on ParticipantReportService and do not depend on
+// this service being configured or available.
+type ParticipantAIExplanationServiceServer interface {
+	GetAIExplanationCapability(context.Context, *GetAIExplanationCapabilityRequest) (*AIExplanationResponse, error)
+	RequestAIExplanation(context.Context, *RequestAIExplanationRequest) (*AIExplanationResponse, error)
+	GetAIExplanation(context.Context, *GetAIExplanationRequest) (*AIExplanationResponse, error)
+	ExportAIExplanations(context.Context, *ExportAIExplanationsRequest) (*AIExplanationSubjectExportResponse, error)
+	mustEmbedUnimplementedParticipantAIExplanationServiceServer()
+}
+
+// UnimplementedParticipantAIExplanationServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedParticipantAIExplanationServiceServer struct{}
+
+func (UnimplementedParticipantAIExplanationServiceServer) GetAIExplanationCapability(context.Context, *GetAIExplanationCapabilityRequest) (*AIExplanationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAIExplanationCapability not implemented")
+}
+func (UnimplementedParticipantAIExplanationServiceServer) RequestAIExplanation(context.Context, *RequestAIExplanationRequest) (*AIExplanationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RequestAIExplanation not implemented")
+}
+func (UnimplementedParticipantAIExplanationServiceServer) GetAIExplanation(context.Context, *GetAIExplanationRequest) (*AIExplanationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAIExplanation not implemented")
+}
+func (UnimplementedParticipantAIExplanationServiceServer) ExportAIExplanations(context.Context, *ExportAIExplanationsRequest) (*AIExplanationSubjectExportResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ExportAIExplanations not implemented")
+}
+func (UnimplementedParticipantAIExplanationServiceServer) mustEmbedUnimplementedParticipantAIExplanationServiceServer() {
+}
+func (UnimplementedParticipantAIExplanationServiceServer) testEmbeddedByValue() {}
+
+// UnsafeParticipantAIExplanationServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ParticipantAIExplanationServiceServer will
+// result in compilation errors.
+type UnsafeParticipantAIExplanationServiceServer interface {
+	mustEmbedUnimplementedParticipantAIExplanationServiceServer()
+}
+
+func RegisterParticipantAIExplanationServiceServer(s grpc.ServiceRegistrar, srv ParticipantAIExplanationServiceServer) {
+	// If the following call panics, it indicates UnimplementedParticipantAIExplanationServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&ParticipantAIExplanationService_ServiceDesc, srv)
+}
+
+func _ParticipantAIExplanationService_GetAIExplanationCapability_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAIExplanationCapabilityRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ParticipantAIExplanationServiceServer).GetAIExplanationCapability(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ParticipantAIExplanationService_GetAIExplanationCapability_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ParticipantAIExplanationServiceServer).GetAIExplanationCapability(ctx, req.(*GetAIExplanationCapabilityRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ParticipantAIExplanationService_RequestAIExplanation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestAIExplanationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ParticipantAIExplanationServiceServer).RequestAIExplanation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ParticipantAIExplanationService_RequestAIExplanation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ParticipantAIExplanationServiceServer).RequestAIExplanation(ctx, req.(*RequestAIExplanationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ParticipantAIExplanationService_GetAIExplanation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAIExplanationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ParticipantAIExplanationServiceServer).GetAIExplanation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ParticipantAIExplanationService_GetAIExplanation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ParticipantAIExplanationServiceServer).GetAIExplanation(ctx, req.(*GetAIExplanationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ParticipantAIExplanationService_ExportAIExplanations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExportAIExplanationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ParticipantAIExplanationServiceServer).ExportAIExplanations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ParticipantAIExplanationService_ExportAIExplanations_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ParticipantAIExplanationServiceServer).ExportAIExplanations(ctx, req.(*ExportAIExplanationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// ParticipantAIExplanationService_ServiceDesc is the grpc.ServiceDesc for ParticipantAIExplanationService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var ParticipantAIExplanationService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "interpretation.ParticipantAIExplanationService",
+	HandlerType: (*ParticipantAIExplanationServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetAIExplanationCapability",
+			Handler:    _ParticipantAIExplanationService_GetAIExplanationCapability_Handler,
+		},
+		{
+			MethodName: "RequestAIExplanation",
+			Handler:    _ParticipantAIExplanationService_RequestAIExplanation_Handler,
+		},
+		{
+			MethodName: "GetAIExplanation",
+			Handler:    _ParticipantAIExplanationService_GetAIExplanation_Handler,
+		},
+		{
+			MethodName: "ExportAIExplanations",
+			Handler:    _ParticipantAIExplanationService_ExportAIExplanations_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "interpretation/interpretation.proto",
+}
+
+const (
 	InterpretationAutomationService_GenerateReportFromOutcome_FullMethodName    = "/interpretation.InterpretationAutomationService/GenerateReportFromOutcome"
 	InterpretationAutomationService_GenerateReportFromAssessment_FullMethodName = "/interpretation.InterpretationAutomationService/GenerateReportFromAssessment"
 )
@@ -297,6 +522,153 @@ var InterpretationAutomationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GenerateReportFromAssessment",
 			Handler:    _InterpretationAutomationService_GenerateReportFromAssessment_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "interpretation/interpretation.proto",
+}
+
+const (
+	AIExplanationAutomationService_ExecuteAIExplanation_FullMethodName        = "/interpretation.AIExplanationAutomationService/ExecuteAIExplanation"
+	AIExplanationAutomationService_ExecutePromptEvaluationStep_FullMethodName = "/interpretation.AIExplanationAutomationService/ExecutePromptEvaluationStep"
+)
+
+// AIExplanationAutomationServiceClient is the client API for AIExplanationAutomationService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// AIExplanationAutomationService is an internal one-shot execution boundary.
+// It is called by Worker after the durable requested event is delivered.
+type AIExplanationAutomationServiceClient interface {
+	ExecuteAIExplanation(ctx context.Context, in *ExecuteAIExplanationRequest, opts ...grpc.CallOption) (*ExecuteAIExplanationResponse, error)
+	ExecutePromptEvaluationStep(ctx context.Context, in *ExecutePromptEvaluationStepRequest, opts ...grpc.CallOption) (*ExecutePromptEvaluationStepResponse, error)
+}
+
+type aIExplanationAutomationServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewAIExplanationAutomationServiceClient(cc grpc.ClientConnInterface) AIExplanationAutomationServiceClient {
+	return &aIExplanationAutomationServiceClient{cc}
+}
+
+func (c *aIExplanationAutomationServiceClient) ExecuteAIExplanation(ctx context.Context, in *ExecuteAIExplanationRequest, opts ...grpc.CallOption) (*ExecuteAIExplanationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExecuteAIExplanationResponse)
+	err := c.cc.Invoke(ctx, AIExplanationAutomationService_ExecuteAIExplanation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aIExplanationAutomationServiceClient) ExecutePromptEvaluationStep(ctx context.Context, in *ExecutePromptEvaluationStepRequest, opts ...grpc.CallOption) (*ExecutePromptEvaluationStepResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExecutePromptEvaluationStepResponse)
+	err := c.cc.Invoke(ctx, AIExplanationAutomationService_ExecutePromptEvaluationStep_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// AIExplanationAutomationServiceServer is the server API for AIExplanationAutomationService service.
+// All implementations must embed UnimplementedAIExplanationAutomationServiceServer
+// for forward compatibility.
+//
+// AIExplanationAutomationService is an internal one-shot execution boundary.
+// It is called by Worker after the durable requested event is delivered.
+type AIExplanationAutomationServiceServer interface {
+	ExecuteAIExplanation(context.Context, *ExecuteAIExplanationRequest) (*ExecuteAIExplanationResponse, error)
+	ExecutePromptEvaluationStep(context.Context, *ExecutePromptEvaluationStepRequest) (*ExecutePromptEvaluationStepResponse, error)
+	mustEmbedUnimplementedAIExplanationAutomationServiceServer()
+}
+
+// UnimplementedAIExplanationAutomationServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedAIExplanationAutomationServiceServer struct{}
+
+func (UnimplementedAIExplanationAutomationServiceServer) ExecuteAIExplanation(context.Context, *ExecuteAIExplanationRequest) (*ExecuteAIExplanationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ExecuteAIExplanation not implemented")
+}
+func (UnimplementedAIExplanationAutomationServiceServer) ExecutePromptEvaluationStep(context.Context, *ExecutePromptEvaluationStepRequest) (*ExecutePromptEvaluationStepResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ExecutePromptEvaluationStep not implemented")
+}
+func (UnimplementedAIExplanationAutomationServiceServer) mustEmbedUnimplementedAIExplanationAutomationServiceServer() {
+}
+func (UnimplementedAIExplanationAutomationServiceServer) testEmbeddedByValue() {}
+
+// UnsafeAIExplanationAutomationServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to AIExplanationAutomationServiceServer will
+// result in compilation errors.
+type UnsafeAIExplanationAutomationServiceServer interface {
+	mustEmbedUnimplementedAIExplanationAutomationServiceServer()
+}
+
+func RegisterAIExplanationAutomationServiceServer(s grpc.ServiceRegistrar, srv AIExplanationAutomationServiceServer) {
+	// If the following call panics, it indicates UnimplementedAIExplanationAutomationServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&AIExplanationAutomationService_ServiceDesc, srv)
+}
+
+func _AIExplanationAutomationService_ExecuteAIExplanation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExecuteAIExplanationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIExplanationAutomationServiceServer).ExecuteAIExplanation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIExplanationAutomationService_ExecuteAIExplanation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIExplanationAutomationServiceServer).ExecuteAIExplanation(ctx, req.(*ExecuteAIExplanationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AIExplanationAutomationService_ExecutePromptEvaluationStep_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExecutePromptEvaluationStepRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIExplanationAutomationServiceServer).ExecutePromptEvaluationStep(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIExplanationAutomationService_ExecutePromptEvaluationStep_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIExplanationAutomationServiceServer).ExecutePromptEvaluationStep(ctx, req.(*ExecutePromptEvaluationStepRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// AIExplanationAutomationService_ServiceDesc is the grpc.ServiceDesc for AIExplanationAutomationService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var AIExplanationAutomationService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "interpretation.AIExplanationAutomationService",
+	HandlerType: (*AIExplanationAutomationServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ExecuteAIExplanation",
+			Handler:    _AIExplanationAutomationService_ExecuteAIExplanation_Handler,
+		},
+		{
+			MethodName: "ExecutePromptEvaluationStep",
+			Handler:    _AIExplanationAutomationService_ExecutePromptEvaluationStep_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

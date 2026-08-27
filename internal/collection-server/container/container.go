@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/aiexplanation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/behaviorassessment"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
@@ -52,18 +53,20 @@ type Container struct {
 	IAMModule *IAMModule
 
 	// gRPC 客户端（由 GRPCClientRegistry 注入）
-	answerSheetClient            *grpcclient.AnswerSheetClient
-	questionnaireClient          *grpcclient.QuestionnaireClient
-	testeeEvaluationClient       *grpcclient.TesteeEvaluationClient
-	participantReportClient      *grpcclient.ParticipantReportClient
-	assessmentIntakeClient       *grpcclient.AssessmentIntakeClient
-	actorClient                  *grpcclient.ActorClient
-	assessmentModelCatalogClient *grpcclient.AssessmentModelCatalogClient
+	answerSheetClient              *grpcclient.AnswerSheetClient
+	questionnaireClient            *grpcclient.QuestionnaireClient
+	testeeEvaluationClient         *grpcclient.TesteeEvaluationClient
+	participantReportClient        *grpcclient.ParticipantReportClient
+	participantAIExplanationClient *grpcclient.ParticipantAIExplanationClient
+	assessmentIntakeClient         *grpcclient.AssessmentIntakeClient
+	actorClient                    *grpcclient.ActorClient
+	assessmentModelCatalogClient   *grpcclient.AssessmentModelCatalogClient
 
 	// 应用层服务
 	submissionService                  *answersheet.SubmissionService
 	questionnaireQueryService          *questionnaire.QueryService
 	evaluationQueryService             *evaluation.QueryService
+	aiExplanationService               *aiexplanation.Service
 	waitReportService                  *reportwait.Service
 	assessmentModelCatalogQueryService *appmodelcatalog.QueryService
 	typologyModelQueryService          *typologymodel.QueryService
@@ -84,6 +87,7 @@ type Container struct {
 	answerSheetHandler               *handler.AnswerSheetHandler
 	questionnaireHandler             *handler.QuestionnaireHandler
 	evaluationHandler                *handler.EvaluationHandler
+	aiExplanationHandler             *handler.AIExplanationHandler
 	assessmentModelCatalogHandler    *handler.AssessmentModelCatalogHandler
 	typologyModelHandler             *handler.TypologyModelHandler
 	typologyAssessmentHandler        *handler.TypologyAssessmentHandler
@@ -101,13 +105,14 @@ type Container struct {
 // ClientBundle is the collection-server runtime client graph produced by the
 // gRPC integration stage and consumed by the container composition root.
 type ClientBundle struct {
-	AnswerSheet            *grpcclient.AnswerSheetClient
-	Questionnaire          *grpcclient.QuestionnaireClient
-	TesteeEvaluation       *grpcclient.TesteeEvaluationClient
-	ParticipantReport      *grpcclient.ParticipantReportClient
-	AssessmentIntake       *grpcclient.AssessmentIntakeClient
-	Actor                  *grpcclient.ActorClient
-	AssessmentModelCatalog *grpcclient.AssessmentModelCatalogClient
+	AnswerSheet              *grpcclient.AnswerSheetClient
+	Questionnaire            *grpcclient.QuestionnaireClient
+	TesteeEvaluation         *grpcclient.TesteeEvaluationClient
+	ParticipantReport        *grpcclient.ParticipantReportClient
+	ParticipantAIExplanation *grpcclient.ParticipantAIExplanationClient
+	AssessmentIntake         *grpcclient.AssessmentIntakeClient
+	Actor                    *grpcclient.ActorClient
+	AssessmentModelCatalog   *grpcclient.AssessmentModelCatalogClient
 }
 
 func (c *Container) TesteeService() *testee.Service {
@@ -306,6 +311,7 @@ func (c *Container) initApplicationServices() {
 		evaluation.WithAssessmentAccessCache(assessmentAccessCache, assessmentAccessSingleflight),
 		evaluation.WithAssessmentDetailCache(assessmentDetailCache, assessmentDetailSingleflight),
 	)
+	c.aiExplanationService = aiexplanation.NewService(c.participantAIExplanationClient)
 	reportRuntime := c.buildReportRuntime(c.evaluationQueryService)
 	c.reportStatusReporter = reportRuntime.reporter
 	c.reportNotifier = reportRuntime.notifier
@@ -341,6 +347,7 @@ func (c *Container) initHandlers() {
 	c.answerSheetHandler = handler.NewAnswerSheetHandler(c.submissionService)
 	c.questionnaireHandler = handler.NewQuestionnaireHandler(c.questionnaireQueryService)
 	c.evaluationHandler = handler.NewEvaluationHandler(c.evaluationQueryService, c.waitReportService)
+	c.aiExplanationHandler = handler.NewAIExplanationHandler(c.aiExplanationService)
 	c.assessmentModelCatalogHandler = handler.NewAssessmentModelCatalogHandler(c.assessmentModelCatalogQueryService)
 	c.typologyModelHandler = handler.NewTypologyModelHandler(c.typologyModelQueryService)
 	c.typologyAssessmentHandler = handler.NewTypologyAssessmentHandler(c.typologyAssessmentQueryService, c.waitReportService)
@@ -408,6 +415,10 @@ func (c *Container) HealthHandler() *handler.HealthHandler {
 // EvaluationHandler 获取测评处理器
 func (c *Container) EvaluationHandler() *handler.EvaluationHandler {
 	return c.evaluationHandler
+}
+
+func (c *Container) AIExplanationHandler() *handler.AIExplanationHandler {
+	return c.aiExplanationHandler
 }
 
 // TesteeHandler 获取受试者处理器
@@ -580,6 +591,7 @@ func (c *Container) InitializeRuntimeClients(bundle ClientBundle) {
 	c.questionnaireClient = bundle.Questionnaire
 	c.testeeEvaluationClient = bundle.TesteeEvaluation
 	c.participantReportClient = bundle.ParticipantReport
+	c.participantAIExplanationClient = bundle.ParticipantAIExplanation
 	c.assessmentIntakeClient = bundle.AssessmentIntake
 	c.actorClient = bundle.Actor
 	c.assessmentModelCatalogClient = bundle.AssessmentModelCatalog

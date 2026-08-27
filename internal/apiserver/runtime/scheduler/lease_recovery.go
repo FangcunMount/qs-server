@@ -30,6 +30,14 @@ func NewInterpretationLeaseRecoveryRunner(opts *apiserveroptions.LeaseRecoveryOp
 	return newLeaseRecoveryRunner(opts, recoverer, lockManager, lockBuilder, "interpretation_lease_recovery", locklease.WorkloadInterpretationLeaseRecovery)
 }
 
+func NewAIExplanationPromptEvaluationLeaseRecoveryRunner(opts *apiserveroptions.LeaseRecoveryOptions, recoverer evaluationscheduler.LeaseRecoverer, lockManager locklease.Manager, lockBuilder *keyspace.Builder) *LeaseRecoveryRunner {
+	return newLeaseRecoveryRunner(opts, recoverer, lockManager, lockBuilder, "ai_explanation_prompt_evaluation_lease_recovery", locklease.WorkloadAIExplanationPromptEvaluationLeaseRecovery)
+}
+
+func NewAIExplanationParticipantLeaseRecoveryRunner(opts *apiserveroptions.LeaseRecoveryOptions, recoverer evaluationscheduler.LeaseRecoverer, lockManager locklease.Manager, lockBuilder *keyspace.Builder) *LeaseRecoveryRunner {
+	return newLeaseRecoveryRunner(opts, recoverer, lockManager, lockBuilder, "ai_explanation_participant_lease_recovery", locklease.WorkloadAIExplanationParticipantLeaseRecovery)
+}
+
 func newLeaseRecoveryRunner(opts *apiserveroptions.LeaseRecoveryOptions, recoverer evaluationscheduler.LeaseRecoverer, lockManager locklease.Manager, lockBuilder *keyspace.Builder, name string, workload locklease.WorkloadID) *LeaseRecoveryRunner {
 	if opts == nil || !opts.Enable || recoverer == nil || opts.Interval <= 0 || opts.BatchLimit <= 0 || opts.LockKey == "" || opts.LockTTL <= 0 {
 		return nil

@@ -19,8 +19,12 @@ import (
 const (
 	MetadataKey = "x-qs-delegated-subject"
 
-	PurposeGetAssessmentReport = "participant_report.get_assessment_report"
-	PurposeListMyReports       = "participant_report.list_my_reports"
+	PurposeGetAssessmentReport     = "participant_report.get_assessment_report"
+	PurposeListMyReports           = "participant_report.list_my_reports"
+	PurposeAIExplanationCapability = "participant_ai_explanation.capability"
+	PurposeAIExplanationRequest    = "participant_ai_explanation.request"
+	PurposeAIExplanationGet        = "participant_ai_explanation.get"
+	PurposeAIExplanationExport     = "participant_ai_explanation.export"
 
 	TrustedCallerQSCollection = serviceidentity.CollectionServerServiceID
 )

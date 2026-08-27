@@ -9,7 +9,7 @@ Runtime 主题只维护三个进程的 composition root、Stage、后台任务 o
 ## 快速事实
 
 - qs-apiserver、collection-server、qs-worker 是三个独立进程，各有显式 Stage runner。
-- apiserver 组合 7 个 scheduler runner；能装配不等于生产启用，实际开关以 effective config 和部署证据为准。
+- apiserver 组合 9 个 scheduler runner；其中 AI Prompt 评测 prepared lease recovery、Participant AI 解读 lease recovery 与 Mongo consistency audit 的版本化生产配置为关闭。能装配不等于生产启用，实际开关以 effective config 和部署证据为准。
 - Stage runner 遇错即停但没有通用 rollback；prepare 阶段资源所有权和关闭注册顺序仍是风险点。
 - 正常信号关闭、监听器异常退出和 prepare 失败不是同一条路径，必须分别验证。
 - 当前 gRPC `GracefulStop()` 没有 deadline，collection pprof 未统一纳入 shutdown，worker 存在双重信号所有权；这些 gap 不能被文档重构抹去。

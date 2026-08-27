@@ -200,24 +200,28 @@ func (s *SubmitOptions) ResolvedCoalescingSignalTTL() time.Duration {
 
 // RateLimitOptions 限流配置
 type RateLimitOptions struct {
-	Enabled                 bool                                 `json:"enabled" mapstructure:"enabled"`
-	SubmitDegradedLocal     *SubmitDegradedLocalRateLimitOptions `json:"submit_degraded_local" mapstructure:"submit_degraded_local"`
-	SubmitGlobalQPS         float64                              `json:"submit_global_qps" mapstructure:"submit_global_qps"`
-	SubmitGlobalBurst       int                                  `json:"submit_global_burst" mapstructure:"submit_global_burst"`
-	SubmitUserQPS           float64                              `json:"submit_user_qps" mapstructure:"submit_user_qps"`
-	SubmitUserBurst         int                                  `json:"submit_user_burst" mapstructure:"submit_user_burst"`
-	QueryGlobalQPS          float64                              `json:"query_global_qps" mapstructure:"query_global_qps"`
-	QueryGlobalBurst        int                                  `json:"query_global_burst" mapstructure:"query_global_burst"`
-	QueryUserQPS            float64                              `json:"query_user_qps" mapstructure:"query_user_qps"`
-	QueryUserBurst          int                                  `json:"query_user_burst" mapstructure:"query_user_burst"`
-	WaitReportGlobalQPS     float64                              `json:"wait_report_global_qps" mapstructure:"wait_report_global_qps"`
-	WaitReportGlobalBurst   int                                  `json:"wait_report_global_burst" mapstructure:"wait_report_global_burst"`
-	WaitReportUserQPS       float64                              `json:"wait_report_user_qps" mapstructure:"wait_report_user_qps"`
-	WaitReportUserBurst     int                                  `json:"wait_report_user_burst" mapstructure:"wait_report_user_burst"`
-	ReportEventsGlobalQPS   float64                              `json:"report_events_global_qps" mapstructure:"report_events_global_qps"`
-	ReportEventsGlobalBurst int                                  `json:"report_events_global_burst" mapstructure:"report_events_global_burst"`
-	ReportEventsUserQPS     float64                              `json:"report_events_user_qps" mapstructure:"report_events_user_qps"`
-	ReportEventsUserBurst   int                                  `json:"report_events_user_burst" mapstructure:"report_events_user_burst"`
+	Enabled                         bool                                 `json:"enabled" mapstructure:"enabled"`
+	SubmitDegradedLocal             *SubmitDegradedLocalRateLimitOptions `json:"submit_degraded_local" mapstructure:"submit_degraded_local"`
+	SubmitGlobalQPS                 float64                              `json:"submit_global_qps" mapstructure:"submit_global_qps"`
+	SubmitGlobalBurst               int                                  `json:"submit_global_burst" mapstructure:"submit_global_burst"`
+	SubmitUserQPS                   float64                              `json:"submit_user_qps" mapstructure:"submit_user_qps"`
+	SubmitUserBurst                 int                                  `json:"submit_user_burst" mapstructure:"submit_user_burst"`
+	QueryGlobalQPS                  float64                              `json:"query_global_qps" mapstructure:"query_global_qps"`
+	QueryGlobalBurst                int                                  `json:"query_global_burst" mapstructure:"query_global_burst"`
+	QueryUserQPS                    float64                              `json:"query_user_qps" mapstructure:"query_user_qps"`
+	QueryUserBurst                  int                                  `json:"query_user_burst" mapstructure:"query_user_burst"`
+	AIExplanationRequestGlobalQPS   float64                              `json:"ai_explanation_request_global_qps" mapstructure:"ai_explanation_request_global_qps"`
+	AIExplanationRequestGlobalBurst int                                  `json:"ai_explanation_request_global_burst" mapstructure:"ai_explanation_request_global_burst"`
+	AIExplanationRequestUserQPS     float64                              `json:"ai_explanation_request_user_qps" mapstructure:"ai_explanation_request_user_qps"`
+	AIExplanationRequestUserBurst   int                                  `json:"ai_explanation_request_user_burst" mapstructure:"ai_explanation_request_user_burst"`
+	WaitReportGlobalQPS             float64                              `json:"wait_report_global_qps" mapstructure:"wait_report_global_qps"`
+	WaitReportGlobalBurst           int                                  `json:"wait_report_global_burst" mapstructure:"wait_report_global_burst"`
+	WaitReportUserQPS               float64                              `json:"wait_report_user_qps" mapstructure:"wait_report_user_qps"`
+	WaitReportUserBurst             int                                  `json:"wait_report_user_burst" mapstructure:"wait_report_user_burst"`
+	ReportEventsGlobalQPS           float64                              `json:"report_events_global_qps" mapstructure:"report_events_global_qps"`
+	ReportEventsGlobalBurst         int                                  `json:"report_events_global_burst" mapstructure:"report_events_global_burst"`
+	ReportEventsUserQPS             float64                              `json:"report_events_user_qps" mapstructure:"report_events_user_qps"`
+	ReportEventsUserBurst           int                                  `json:"report_events_user_burst" mapstructure:"report_events_user_burst"`
 }
 
 type SubmitDegradedLocalRateLimitOptions struct {
@@ -339,24 +343,28 @@ func NewSubmitOptions() *SubmitOptions {
 // NewRateLimitOptions 创建默认限流配置
 func NewRateLimitOptions() *RateLimitOptions {
 	return &RateLimitOptions{
-		Enabled:                 true,
-		SubmitDegradedLocal:     NewSubmitDegradedLocalRateLimitOptions(),
-		SubmitGlobalQPS:         200,
-		SubmitGlobalBurst:       300,
-		SubmitUserQPS:           5,
-		SubmitUserBurst:         10,
-		QueryGlobalQPS:          200,
-		QueryGlobalBurst:        300,
-		QueryUserQPS:            10,
-		QueryUserBurst:          20,
-		WaitReportGlobalQPS:     80,
-		WaitReportGlobalBurst:   120,
-		WaitReportUserQPS:       2,
-		WaitReportUserBurst:     5,
-		ReportEventsGlobalQPS:   100,
-		ReportEventsGlobalBurst: 150,
-		ReportEventsUserQPS:     10,
-		ReportEventsUserBurst:   20,
+		Enabled:                         true,
+		SubmitDegradedLocal:             NewSubmitDegradedLocalRateLimitOptions(),
+		SubmitGlobalQPS:                 200,
+		SubmitGlobalBurst:               300,
+		SubmitUserQPS:                   5,
+		SubmitUserBurst:                 10,
+		QueryGlobalQPS:                  200,
+		QueryGlobalBurst:                300,
+		QueryUserQPS:                    10,
+		QueryUserBurst:                  20,
+		AIExplanationRequestGlobalQPS:   20,
+		AIExplanationRequestGlobalBurst: 40,
+		AIExplanationRequestUserQPS:     0.2,
+		AIExplanationRequestUserBurst:   2,
+		WaitReportGlobalQPS:             80,
+		WaitReportGlobalBurst:           120,
+		WaitReportUserQPS:               2,
+		WaitReportUserBurst:             5,
+		ReportEventsGlobalQPS:           100,
+		ReportEventsGlobalBurst:         150,
+		ReportEventsUserQPS:             10,
+		ReportEventsUserBurst:           20,
 	}
 }
 
@@ -489,6 +497,10 @@ func (r *RateLimitOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&r.QueryGlobalBurst, "rate_limit.query-global-burst", r.QueryGlobalBurst, "Global burst for queries.")
 	fs.Float64Var(&r.QueryUserQPS, "rate_limit.query-user-qps", r.QueryUserQPS, "Per-user QPS limit for queries.")
 	fs.IntVar(&r.QueryUserBurst, "rate_limit.query-user-burst", r.QueryUserBurst, "Per-user burst for queries.")
+	fs.Float64Var(&r.AIExplanationRequestGlobalQPS, "rate_limit.ai-explanation-request-global-qps", r.AIExplanationRequestGlobalQPS, "Global QPS limit for manually requesting AI explanations.")
+	fs.IntVar(&r.AIExplanationRequestGlobalBurst, "rate_limit.ai-explanation-request-global-burst", r.AIExplanationRequestGlobalBurst, "Global burst for manually requesting AI explanations.")
+	fs.Float64Var(&r.AIExplanationRequestUserQPS, "rate_limit.ai-explanation-request-user-qps", r.AIExplanationRequestUserQPS, "Per-user QPS limit for manually requesting AI explanations.")
+	fs.IntVar(&r.AIExplanationRequestUserBurst, "rate_limit.ai-explanation-request-user-burst", r.AIExplanationRequestUserBurst, "Per-user burst for manually requesting AI explanations.")
 	fs.Float64Var(&r.WaitReportGlobalQPS, "rate_limit.wait-report-global-qps", r.WaitReportGlobalQPS, "Global QPS limit for wait-report.")
 	fs.IntVar(&r.WaitReportGlobalBurst, "rate_limit.wait-report-global-burst", r.WaitReportGlobalBurst, "Global burst for wait-report.")
 	fs.Float64Var(&r.WaitReportUserQPS, "rate_limit.wait-report-user-qps", r.WaitReportUserQPS, "Per-user QPS limit for wait-report.")
@@ -743,6 +755,12 @@ func validateCollectionRateLimit(opts *RateLimitOptions) []error {
 	}
 	if opts.QueryUserQPS <= 0 || opts.QueryUserBurst <= 0 {
 		errs = append(errs, fmt.Errorf("rate_limit.query_user_* must be greater than 0"))
+	}
+	if opts.AIExplanationRequestGlobalQPS <= 0 || opts.AIExplanationRequestGlobalBurst <= 0 {
+		errs = append(errs, fmt.Errorf("rate_limit.ai_explanation_request_* must be greater than 0"))
+	}
+	if opts.AIExplanationRequestUserQPS <= 0 || opts.AIExplanationRequestUserBurst <= 0 {
+		errs = append(errs, fmt.Errorf("rate_limit.ai_explanation_request_user_* must be greater than 0"))
 	}
 	if opts.WaitReportGlobalQPS <= 0 || opts.WaitReportGlobalBurst <= 0 {
 		errs = append(errs, fmt.Errorf("rate_limit.wait_report_* must be greater than 0"))

@@ -11,9 +11,15 @@ const (
 	EvaluationOutcomeCommitted = "evaluation.outcome.committed"
 	EvaluationFailed           = "evaluation.failed"
 
-	InterpretationReportGenerated = "interpretation.report.generated"
-	InterpretationReportFailed    = "interpretation.report.failed"
-	InterpretationRetryRequested  = "interpretation.retry.requested"
+	InterpretationReportGenerated              = "interpretation.report.generated"
+	InterpretationReportFailed                 = "interpretation.report.failed"
+	InterpretationRetryRequested               = "interpretation.retry.requested"
+	AIExplanationRequested                     = "interpretation.ai_explanation.requested"
+	AIExplanationRetryRequested                = "interpretation.ai_explanation.retry.requested"
+	AIExplanationLeaseRecoveryRequested        = "interpretation.ai_explanation.lease_recovery.requested"
+	AIExplanationGenerated                     = "interpretation.ai_explanation.generated"
+	AIExplanationFailed                        = "interpretation.ai_explanation.failed"
+	AIExplanationPromptEvaluationStepRequested = "interpretation.ai_explanation.prompt_evaluation.step_requested"
 
 	AssessmentModelChanged = "assessment_model.changed"
 
@@ -35,6 +41,12 @@ func EventTypes() []string {
 		InterpretationReportGenerated,
 		InterpretationReportFailed,
 		InterpretationRetryRequested,
+		AIExplanationRequested,
+		AIExplanationRetryRequested,
+		AIExplanationLeaseRecoveryRequested,
+		AIExplanationGenerated,
+		AIExplanationFailed,
+		AIExplanationPromptEvaluationStepRequested,
 		AssessmentModelChanged,
 		TaskOpened,
 		TaskCompleted,

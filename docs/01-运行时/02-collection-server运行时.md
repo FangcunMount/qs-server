@@ -96,6 +96,13 @@ completion signal，随后仍调用 apiserver 从 Mongo 回读并校验结果。
 
 默认配置曾把 Submit Gate 等待设置为 `50ms`，但架构契约不是 50ms 本身，而是**等待必须有界，超过预算必须在持久化前明确拒绝**。具体值以 `collection-server.<env>.yaml` 和 `internal/collection-server/options` 为准。
 
+手动 AI 解读 POST 使用独立的 `ai_explanation_request` global/user rate budget，避免与普通查询共用速率额度；
+它仍复用 query concurrency Gate 和 gRPC downstream Gate。该 token-bucket 只负责入口削峰，不能替代
+apiserver 在 Mongo 事务内对机构、用户、Assessment UTC 日 Provider 调用预算，以及 Worker 开始 Run 时三层
+活跃 Provider 执行槽的最终裁决。精确语义复用不应
+因为入口之后的成本预算已满而失败；新请求的持久预算不足由 apiserver 返回 `ResourceExhausted`，BFF 映射为
+带 `Retry-After` 的 `429`；异步执行槽不足不会撤销已接受的 Generation，而是由内部 RPC 返回容量不足并让消息重投。
+
 当 Redis 或缓存整体不可用时，高流量接口不能无保护地全部回源数据库。根据路径的重要性，允许采用快速拒绝、固定降级数据或降低容量后的有限服务。
 
 ## 7. 读路径与缓存

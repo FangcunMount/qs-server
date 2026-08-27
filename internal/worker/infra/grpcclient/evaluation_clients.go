@@ -50,6 +50,35 @@ type InterpretationAutomationClient struct {
 	client  interpretationpb.InterpretationAutomationServiceClient
 }
 
+type AIExplanationAutomationClient struct {
+	manager *Manager
+	client  interpretationpb.AIExplanationAutomationServiceClient
+}
+
+func NewAIExplanationAutomationClient(manager *Manager) *AIExplanationAutomationClient {
+	return &AIExplanationAutomationClient{manager: manager, client: interpretationpb.NewAIExplanationAutomationServiceClient(manager.Conn())}
+}
+
+func (c *AIExplanationAutomationClient) ExecuteAIExplanation(ctx context.Context, req *interpretationpb.ExecuteAIExplanationRequest) (*interpretationpb.ExecuteAIExplanationResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
+	defer cancel()
+	resp, err := c.client.ExecuteAIExplanation(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute AI explanation: %w", err)
+	}
+	return resp, nil
+}
+
+func (c *AIExplanationAutomationClient) ExecutePromptEvaluationStep(ctx context.Context, request *interpretationpb.ExecutePromptEvaluationStepRequest) (*interpretationpb.ExecutePromptEvaluationStepResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
+	defer cancel()
+	resp, err := c.client.ExecutePromptEvaluationStep(ctx, request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute AI explanation prompt evaluation step: %w", err)
+	}
+	return resp, nil
+}
+
 func NewInterpretationAutomationClient(manager *Manager) *InterpretationAutomationClient {
 	return &InterpretationAutomationClient{manager: manager, client: interpretationpb.NewInterpretationAutomationServiceClient(manager.Conn())}
 }

@@ -28,6 +28,8 @@ LockLease 回答的是“在一段有限时间内，哪个实例有资格执行�
 | apiserver | `evaluation_consistency_audit` | leader | 30s | Evaluation 全周期一致性审计 leader |
 | apiserver | `evaluation_lease_recovery` | leader | 30s | Evaluation 过期执行租约恢复 leader |
 | apiserver | `interpretation_lease_recovery` | leader | 30s | Interpretation 过期执行租约恢复 leader |
+| apiserver | `ai_explanation_prompt_evaluation_lease_recovery` | leader | 30s | AI Prompt 评测过期 prepared checkpoint 唤醒 leader |
+| apiserver | `ai_explanation_participant_lease_recovery` | leader | 30s | Participant AI 解读过期 Run 的耐久唤醒 leader |
 | apiserver | `report_catalog_audit` | leader | 30s | 报告目录审计 leader |
 | apiserver | `mongo_consistency_audit` | leader | 30s | Mongo 跨集合一致性只读巡检 leader |
 | worker | `attention_projection_reconcile` | leader | 30m | Attention 投影恢复 leader |
@@ -215,7 +217,7 @@ snapshot 当前不记录 caller override 或 active run 的 effective TTL；例�
 
 | 状态 | 内容 |
 | --- | --- |
-| `已实现` | 十二个 workload 的统一 catalog、token-safe acquire/renew/release、active run 和 cooldown。 |
+| `已实现` | 十四个 workload 的统一 catalog、token-safe acquire/renew/release、active run 和 cooldown。 |
 | `已实现` | renewal failure/loss 取消 body，并对不合作 body 告警。 |
 | `配置意图` | 仓库 dev/prod YAML 声明启用自动续租；仍需核对目标环境 effective value。 |
 | `观测缺口` | runtime snapshot 只投影 catalog DefaultTTL，不展示 caller override 或 active run effective TTL。 |

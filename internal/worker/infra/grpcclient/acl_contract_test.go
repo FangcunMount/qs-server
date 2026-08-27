@@ -22,14 +22,14 @@ func TestWorkerACLContract(t *testing.T) {
 	t.Parallel()
 
 	allowed := ACLAllowedMethods()
-	if len(allowed) != 7 {
-		t.Fatalf("ACLAllowedMethods() count = %d, want 7", len(allowed))
+	if len(allowed) != 9 {
+		t.Fatalf("ACLAllowedMethods() count = %d, want 9", len(allowed))
 	}
 	assertUniqueWorkerMethods(t, allowed)
 
 	outbound := discoverWorkerOutboundRPCMethods(t)
-	if len(outbound) != 12 {
-		t.Fatalf("worker outbound RPC surface count = %d, want 12", len(outbound))
+	if len(outbound) != 14 {
+		t.Fatalf("worker outbound RPC surface count = %d, want 14", len(outbound))
 	}
 	assertExactWorkerMethods(t, discoverWorkerRuntimeRPCMethods(t, outbound), allowed)
 
@@ -103,6 +103,7 @@ func discoverWorkerOutboundRPCMethods(t *testing.T) []string {
 		"EvaluationWorkerServiceClient":         "/evaluation.EvaluationWorkerService/",
 		"InternalServiceClient":                 "/internalapi.InternalService/",
 		"InterpretationAutomationServiceClient": "/interpretation.InterpretationAutomationService/",
+		"AIExplanationAutomationServiceClient":  "/interpretation.AIExplanationAutomationService/",
 		"PlanCommandServiceClient":              "/internalapi.PlanCommandService/",
 	}
 

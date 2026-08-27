@@ -1,0 +1,8 @@
+[
+  { "dropIndexes": "ai_explanation_participant_daily_budgets", "index": "ttl_ai_explanation_expires_at" },
+  { "dropIndexes": "ai_explanation_prompt_evaluation_daily_budgets", "index": "ttl_ai_explanation_expires_at" },
+  { "dropIndexes": "ai_explanation_prompt_evaluations", "index": "ttl_ai_explanation_expires_at" },
+  { "dropIndexes": "ai_explanation_artifacts", "index": "ttl_ai_explanation_expires_at" },
+  { "dropIndexes": "ai_explanation_runs", "index": "ttl_ai_explanation_expires_at" },
+  { "dropIndexes": "ai_explanation_generations", "index": "ttl_ai_explanation_expires_at" }
+]
