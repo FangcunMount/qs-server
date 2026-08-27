@@ -121,10 +121,10 @@ delegated-subject:
   previous-key: ""
   ttl: 5m
 
-# 手动触发的 AI 解读独立于标准报告链路，默认关闭。
-# 启用前必须发布 Profile 并完成真实模型评测；API key 使用 Provider 对应的环境变量注入。
+# 手动触发的 AI 解读独立于标准报告链路。治理与评测先启用，参与者流量独立保持关闭。
+# API key 使用 Provider 对应的环境变量注入；发布 Profile 和最小验收完成前不得开启 participant_enabled。
 ai_explanation:
-  enabled: false
+  enabled: true
   # 独立用户流量开关；首个生产 Profile 发布和最小验收通过前保持 false。
   participant_enabled: false
   provider: "deepseek"
@@ -136,12 +136,13 @@ ai_explanation:
   run_lease_duration: 2m
   max_output_tokens: 3000
   max_response_bytes: 4194304
-  # 不提供法务/产品默认值；启用前必须填写已批准的策略版本和三类保留期。
+  # 2026-08-27 已确认的生产保留策略：Participant 180 天、Prompt 评测 365 天、容量账本 35 天。
+  # Go time.Duration 不支持 d，配置统一使用小时。
   data_lifecycle:
-    policy_version: ""
-    participant_record_retention: 0s
-    prompt_evaluation_retention: 0s
-    capacity_ledger_retention: 0s
+    policy_version: "ai-explanation-retention-v1"
+    participant_record_retention: 4320h
+    prompt_evaluation_retention: 8760h
+    capacity_ledger_retention: 840h
   # 首次语义 Generation 按 UTC 日同时预留机构/用户/Assessment 三层各 1 次调用；精确复用不重复扣减。
   # 上线前必须结合价格、目标机构规模和灰度结果重新确认；仓库值不是生产验收证据。
   participant_capacity:
@@ -154,8 +155,8 @@ ai_explanation:
     max_active_provider_executions_per_assessment: 1
   # Operator-only synthetic release evaluation; never enable without an independent judged release plan.
   evaluation:
-    enabled: false
-    model: ""
+    enabled: true
+    model: "deepseek-v4-pro"
     route_revision: "v1"
     timeout: 60s
     max_output_tokens: 2500
@@ -347,7 +348,7 @@ interpretation_lease_recovery:
   lock_key: "qs:interpretation-lease-recovery:leader"
   lock_ttl: "30s"
 
-# AI 解读与独立语义评测启用并完成真实环境验收后再开启。
+# 首次真实评测通过显式恢复 API 处置中断；完成目标环境故障演练后再开启自动 prepared-lease 扫描。
 ai_explanation_prompt_evaluation_lease_recovery:
   enable: false
   interval: "10s"
