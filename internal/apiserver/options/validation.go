@@ -66,11 +66,11 @@ func (o *Options) Validate() []error {
 		errs = append(errs, fmt.Errorf("ai_explanation_prompt_evaluation_lease_recovery requires ai_explanation.enabled and ai_explanation.evaluation.enabled"))
 	}
 	if o.AIExplanationParticipantLeaseRecovery != nil && o.AIExplanationParticipantLeaseRecovery.Enable &&
-		(o.AIExplanation == nil || !o.AIExplanation.Enabled) {
-		errs = append(errs, fmt.Errorf("ai_explanation_participant_lease_recovery requires ai_explanation.enabled"))
+		(o.AIExplanation == nil || !o.AIExplanation.Enabled || !o.AIExplanation.ParticipantEnabled) {
+		errs = append(errs, fmt.Errorf("ai_explanation_participant_lease_recovery requires ai_explanation.enabled and ai_explanation.participant_enabled"))
 	}
-	if o.AIExplanation != nil && o.AIExplanation.Enabled && (o.DelegatedSubject == nil || !o.DelegatedSubject.Enabled) {
-		errs = append(errs, fmt.Errorf("delegated_subject.enabled must be true when ai_explanation.enabled is true"))
+	if o.AIExplanation != nil && o.AIExplanation.ParticipantEnabled && (o.DelegatedSubject == nil || !o.DelegatedSubject.Enabled) {
+		errs = append(errs, fmt.Errorf("delegated_subject.enabled must be true when ai_explanation.participant_enabled is true"))
 	}
 
 	errs = append(errs, redisruntime.ValidateRuntimeOptions(

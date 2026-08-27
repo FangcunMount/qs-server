@@ -85,6 +85,7 @@ type Module struct {
 	readmissionService          interpretationreadmission.Service
 	leaseRecoverer              interpretationautomation.LeaseRecoverer
 	aiExplanationEnabled        bool
+	aiParticipantEnabled        bool
 	aiExplanationExecutor       aiexplanationexecution.Executor
 	aiExplanationService        aiexplanationparticipant.Service
 	aiGenerationRepo            *mongoAIExplanation.GenerationRepository
@@ -360,6 +361,7 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 	}
 
 	m.aiExplanationEnabled = true
+	m.aiParticipantEnabled = config.ParticipantEnabled
 	m.aiExplanationExecutor = executor
 	m.aiGenerationRepo = generationRepo
 	m.aiRunRepo = runRepo
@@ -468,7 +470,7 @@ func (m *Module) AIExplanationAdministration() aiexplanationadministration.Servi
 // projection of immutable final artifacts. The transport must authorize the
 // Testee before invoking this boundary.
 func (m *Module) AIExplanationSubjectExport() *aiexplanationsubjectexport.Service {
-	if m == nil {
+	if m == nil || !m.aiParticipantEnabled {
 		return nil
 	}
 	return m.aiSubjectExport
@@ -496,7 +498,7 @@ func (m *Module) AIExplanationPromptEvaluationLeaseRecoverer() *aiexplanationeva
 // AIExplanationParticipantLeaseRecoverer exposes the default-off scheduler
 // boundary that persists exact lease wake-ups without invoking a Provider.
 func (m *Module) AIExplanationParticipantLeaseRecoverer() *aiexplanationrecovery.LeaseRecoverer {
-	if m == nil {
+	if m == nil || !m.aiParticipantEnabled {
 		return nil
 	}
 	return m.aiParticipantLeaseRecoverer
@@ -810,7 +812,7 @@ func (m *Module) BindParticipantAccess(access interpretationparticipant.Access) 
 }
 
 func (m *Module) tryBindAIExplanationParticipant() error {
-	if m == nil || !m.aiExplanationEnabled || m.aiExplanationService != nil || m.aiOutcomeRepo == nil || m.participantAccess == nil {
+	if m == nil || !m.aiParticipantEnabled || m.aiExplanationService != nil || m.aiOutcomeRepo == nil || m.participantAccess == nil {
 		return nil
 	}
 	sourceResolver, err := aiexplanationsource.NewResolver(m.reportCatalog, m.reportRepo, m.aiOutcomeRepo)

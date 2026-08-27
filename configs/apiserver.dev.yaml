@@ -106,6 +106,8 @@ grpc:
 # 密钥使用 OPENAI_API_KEY、DEEPSEEK_API_KEY 或 QS_APISERVER_AI_EXPLANATION_API_KEY 注入。
 ai_explanation:
   enabled: false
+  # 治理面可启用但用户流量保持关闭；Profile 发布与最小验收通过后再打开。
+  participant_enabled: false
   provider: "deepseek"
   model: "deepseek-v4-flash"
   route_revision: "v1"

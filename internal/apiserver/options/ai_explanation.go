@@ -22,6 +22,7 @@ const (
 // startup configuration diagnostics cannot print it.
 type AIExplanationOptions struct {
 	Enabled             bool                                    `json:"enabled" mapstructure:"enabled"`
+	ParticipantEnabled  bool                                    `json:"participant_enabled" mapstructure:"participant_enabled"`
 	Provider            string                                  `json:"provider" mapstructure:"provider"`
 	Model               string                                  `json:"model" mapstructure:"model"`
 	RouteRevision       string                                  `json:"route_revision" mapstructure:"route_revision"`
@@ -82,7 +83,8 @@ type AIExplanationEvaluationCapacityOptions struct {
 
 func NewAIExplanationOptions() *AIExplanationOptions {
 	return &AIExplanationOptions{
-		Enabled: false, Provider: AIExplanationProviderDeepSeek, Model: DefaultAIExplanationDeepSeekModel, RouteRevision: "v1",
+		Enabled: false, ParticipantEnabled: false,
+		Provider: AIExplanationProviderDeepSeek, Model: DefaultAIExplanationDeepSeekModel, RouteRevision: "v1",
 		Timeout: 60 * time.Second, RunLeaseDuration: 2 * time.Minute,
 		MaxOutputTokens: 3000, MaxResponseBytes: 4 << 20,
 		DataLifecycle: AIExplanationDataLifecycleOptions{},
@@ -117,6 +119,9 @@ func (o *AIExplanationOptions) Validate() []error {
 		return nil
 	}
 	if !o.Enabled {
+		if o.ParticipantEnabled {
+			return []error{fmt.Errorf("ai_explanation.participant_enabled requires ai_explanation.enabled")}
+		}
 		if o.Evaluation.Enabled {
 			return []error{fmt.Errorf("ai_explanation.evaluation requires ai_explanation.enabled")}
 		}
@@ -216,7 +221,8 @@ func (o *AIExplanationOptions) AddFlags(fs *pflag.FlagSet) {
 	if o == nil {
 		return
 	}
-	fs.BoolVar(&o.Enabled, "ai_explanation.enabled", o.Enabled, "Enable manually triggered AI explanation services.")
+	fs.BoolVar(&o.Enabled, "ai_explanation.enabled", o.Enabled, "Enable AI explanation governance and configured evaluation runtime.")
+	fs.BoolVar(&o.ParticipantEnabled, "ai_explanation.participant-enabled", o.ParticipantEnabled, "Expose participant AI explanation APIs and worker execution after release acceptance.")
 	fs.StringVar(&o.Provider, "ai_explanation.provider", o.Provider, "AI explanation provider implementation.")
 	fs.StringVar(&o.Model, "ai_explanation.model", o.Model, "Exact model or model snapshot used for AI explanations.")
 	fs.StringVar(&o.RouteRevision, "ai_explanation.route-revision", o.RouteRevision, "Immutable AI explanation provider route revision.")

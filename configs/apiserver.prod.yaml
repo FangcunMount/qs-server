@@ -125,6 +125,8 @@ delegated-subject:
 # 启用前必须发布 Profile 并完成真实模型评测；API key 使用 Provider 对应的环境变量注入。
 ai_explanation:
   enabled: false
+  # 独立用户流量开关；首个生产 Profile 发布和最小验收通过前保持 false。
+  participant_enabled: false
   provider: "deepseek"
   model: "deepseek-v4-flash"
   route_revision: "v1"

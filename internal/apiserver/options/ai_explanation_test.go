@@ -17,11 +17,29 @@ func TestAIExplanationDisabledPreservesStandardRuntimeDefaults(t *testing.T) {
 	if opts.AIExplanation.Evaluation.Enabled {
 		t.Fatalf("AI explanation evaluation must default disabled: %#v", opts.AIExplanation.Evaluation)
 	}
+	if opts.AIExplanation.ParticipantEnabled {
+		t.Fatal("AI explanation participant traffic must default disabled")
+	}
 	if opts.AIExplanation.Provider != AIExplanationProviderDeepSeek || opts.AIExplanation.Model != DefaultAIExplanationDeepSeekModel {
 		t.Fatalf("AI explanation primary provider/model defaults = %#v", opts.AIExplanation)
 	}
 	if errs := opts.AIExplanation.Validate(); len(errs) != 0 {
 		t.Fatalf("disabled validation errors = %v", errs)
+	}
+}
+
+func TestAIExplanationParticipantTrafficRequiresParentRuntime(t *testing.T) {
+	opts := NewAIExplanationOptions()
+	opts.ParticipantEnabled = true
+	if joined := errorsText(opts.Validate()); !strings.Contains(joined, "participant_enabled requires ai_explanation.enabled") {
+		t.Fatalf("disabled parent validation errors = %v", opts.Validate())
+	}
+
+	opts.Enabled = true
+	opts.APIKey = "provider-test-secret"
+	configureAIExplanationTestLifecycle(opts)
+	if errs := opts.Validate(); len(errs) != 0 {
+		t.Fatalf("valid participant rollout options = %v", errs)
 	}
 }
 
@@ -168,13 +186,14 @@ func TestAIExplanationEnabledRequiresExplicitDataLifecyclePolicy(t *testing.T) {
 	}
 }
 
-func TestAIExplanationEnabledRequiresCredentialAndDelegatedSubject(t *testing.T) {
+func TestAIExplanationParticipantEnabledRequiresCredentialAndDelegatedSubject(t *testing.T) {
 	opts := NewOptions()
 	opts.AIExplanation.Enabled = true
+	opts.AIExplanation.ParticipantEnabled = true
 	opts.AIExplanation.Model = "gpt-test-snapshot"
 	errs := opts.Validate()
 	joined := errorsText(errs)
-	if !strings.Contains(joined, "API key") || !strings.Contains(joined, "delegated_subject.enabled") {
+	if !strings.Contains(joined, "API key") || !strings.Contains(joined, "delegated_subject.enabled must be true when ai_explanation.participant_enabled is true") {
 		t.Fatalf("validation errors = %v", errs)
 	}
 
@@ -186,6 +205,17 @@ func TestAIExplanationEnabledRequiresCredentialAndDelegatedSubject(t *testing.T)
 	}
 	if rendered := configmask.String(opts); strings.Contains(rendered, opts.AIExplanation.APIKey) || strings.Contains(rendered, "sk-test") {
 		t.Fatalf("rendered options leaked API key: %s", rendered)
+	}
+}
+
+func TestAIExplanationGovernanceDoesNotRequireParticipantDelegation(t *testing.T) {
+	opts := NewOptions()
+	opts.AIExplanation.Enabled = true
+	opts.AIExplanation.APIKey = "provider-test-secret"
+	configureAIExplanationTestLifecycle(opts.AIExplanation)
+
+	if joined := errorsText(opts.Validate()); strings.Contains(joined, "delegated_subject.enabled") {
+		t.Fatalf("governance-only runtime must not require participant delegation: %v", opts.Validate())
 	}
 }
 
