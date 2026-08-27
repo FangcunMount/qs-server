@@ -580,6 +580,8 @@ func NewProfileRepository(db *mongo.Database, opts ...base.BaseRepositoryOptions
 		{Keys: bson.D{{Key: "definition.profile_id", Value: 1}, {Key: "definition.version", Value: 1}}, Options: options.Index().SetName("uk_ai_explanation_profile_release").SetUnique(true)},
 		{Keys: bson.D{{Key: "selector_slot_key", Value: 1}}, Options: options.Index().SetName("uk_ai_explanation_profile_published_selector_slot").SetUnique(true).SetPartialFilterExpression(bson.M{"status": string(domainprofile.StatusPublished)})},
 		{Keys: bson.D{{Key: "status", Value: 1}, {Key: "definition.selector.audience", Value: 1}, {Key: "definition.selector.model_kind", Value: 1}, {Key: "definition.selector.decision_kind", Value: 1}}, Options: options.Index().SetName("idx_ai_explanation_profile_selector")},
+		{Keys: bson.D{{Key: "created_at", Value: -1}, {Key: "domain_id", Value: -1}}, Options: options.Index().SetName("idx_ai_explanation_profile_created")},
+		{Keys: bson.D{{Key: "status", Value: 1}, {Key: "created_at", Value: -1}, {Key: "domain_id", Value: -1}}, Options: options.Index().SetName("idx_ai_explanation_profile_status_created")},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create AI explanation Profile indexes: %w", err)
@@ -682,6 +684,8 @@ func NewPromptEvaluationRepository(db *mongo.Database, retention RetentionPolicy
 		{Keys: bson.D{{Key: "active_release_key", Value: 1}}, Options: options.Index().SetName("uk_ai_explanation_prompt_evaluation_active_release").SetUnique(true).SetPartialFilterExpression(bson.M{"active_release_key": bson.M{"$type": "string"}})},
 		{Keys: bson.D{{Key: "active_execution_org_key", Value: 1}}, Options: options.Index().SetName("uk_ai_explanation_prompt_evaluation_active_org_execution").SetUnique(true).SetPartialFilterExpression(bson.M{"active_execution_org_key": bson.M{"$type": "string"}})},
 		{Keys: bson.D{{Key: "status", Value: 1}, {Key: "execution.phase", Value: 1}, {Key: "execution.lease_expires_at", Value: 1}, {Key: "domain_id", Value: 1}}, Options: options.Index().SetName("idx_ai_explanation_prompt_evaluation_expired_lease").SetPartialFilterExpression(bson.M{"status": string(domainevaluation.StatusCollecting), "execution.phase": string(domainevaluation.AttemptExecutionPrepared), "execution.lease_expires_at": bson.M{"$type": "date"}})},
+		{Keys: bson.D{{Key: "requested_org_id", Value: 1}, {Key: "created_at", Value: -1}, {Key: "domain_id", Value: -1}}, Options: options.Index().SetName("idx_ai_explanation_prompt_evaluation_org_created")},
+		{Keys: bson.D{{Key: "requested_org_id", Value: 1}, {Key: "status", Value: 1}, {Key: "created_at", Value: -1}, {Key: "domain_id", Value: -1}}, Options: options.Index().SetName("idx_ai_explanation_prompt_evaluation_org_status_created")},
 		ttlIndex(),
 	})
 	if err != nil {

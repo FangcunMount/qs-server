@@ -1,0 +1,18 @@
+[
+  {
+    "dropIndexes": "ai_explanation_prompt_evaluations",
+    "index": "idx_ai_explanation_prompt_evaluation_org_created"
+  },
+  {
+    "dropIndexes": "ai_explanation_prompt_evaluations",
+    "index": "idx_ai_explanation_prompt_evaluation_org_status_created"
+  },
+  {
+    "dropIndexes": "ai_explanation_profiles",
+    "index": "idx_ai_explanation_profile_created"
+  },
+  {
+    "dropIndexes": "ai_explanation_profiles",
+    "index": "idx_ai_explanation_profile_status_created"
+  }
+]

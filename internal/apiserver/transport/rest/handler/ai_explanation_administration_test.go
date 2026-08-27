@@ -11,6 +11,7 @@ import (
 
 	aiexplanationadministration "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/administration"
 	appevaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/evaluation"
+	appgovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/governance"
 	apprecovery "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/recovery"
 	domainevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/evaluation"
 	domainprofile "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/profile"
@@ -54,6 +55,58 @@ func TestAIExplanationAdministrationAttemptReturnsOnlyRequestedEvidence(t *testi
 	handler.FindAttempt(ctx)
 	if recorder.Code != http.StatusOK || !bytes.Contains(recorder.Body.Bytes(), []byte(`"raw_provider_output":"{\"summary\":\"synthetic\"}"`)) || !bytes.Contains(recorder.Body.Bytes(), []byte(`"assessment_input":{"context":{},"facts":{}}`)) {
 		t.Fatalf("response=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestAIExplanationAdministrationListEvaluationsUsesBoundedSummaryQuery(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	service := &aiAdministrationServiceStub{evaluationPage: &appevaluation.ReviewRunPage{
+		Items: []*appevaluation.ReviewRun{administrationReviewRun()}, NextCursor: "next-evaluation-page",
+	}}
+	handler := NewAIExplanationAdministrationHandler(service)
+	ctx, recorder := aiAdministrationContext(http.MethodGet, "/internal/v1/interpretation/ai-explanation/prompt-evaluations?status=awaiting_review&cursor=current&limit=7", nil)
+
+	handler.ListEvaluations(ctx)
+	if recorder.Code != http.StatusOK || service.lastActor != (aiexplanationadministration.Actor{OrgID: 12, OperatorUserID: 34}) ||
+		service.lastEvaluationQuery.Status == nil || *service.lastEvaluationQuery.Status != domainevaluation.StatusAwaitingReview ||
+		service.lastEvaluationQuery.Cursor != "current" || service.lastEvaluationQuery.Limit != 7 {
+		t.Fatalf("response=%d actor=%#v query=%#v body=%s", recorder.Code, service.lastActor, service.lastEvaluationQuery, recorder.Body.String())
+	}
+	if !bytes.Contains(recorder.Body.Bytes(), []byte(`"next_cursor":"next-evaluation-page"`)) ||
+		bytes.Contains(recorder.Body.Bytes(), []byte("assessment_input")) || bytes.Contains(recorder.Body.Bytes(), []byte("raw_provider_output")) ||
+		bytes.Contains(recorder.Body.Bytes(), []byte(`"attempts"`)) {
+		t.Fatalf("evaluation catalog must remain a bounded summary: %s", recorder.Body.String())
+	}
+
+	invalid, invalidRecorder := aiAdministrationContext(http.MethodGet, "/internal/v1/interpretation/ai-explanation/prompt-evaluations?status=unknown", nil)
+	handler.ListEvaluations(invalid)
+	if invalidRecorder.Code != http.StatusBadRequest || service.listEvaluationCalls != 1 {
+		t.Fatalf("invalid status response/calls = %d/%d body=%s", invalidRecorder.Code, service.listEvaluationCalls, invalidRecorder.Body.String())
+	}
+}
+
+func TestAIExplanationAdministrationProfileCatalogUsesStatusAndVersionKeys(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	profileRecord := administrationProfile(t)
+	service := &aiAdministrationServiceStub{
+		profile:     profileRecord,
+		profilePage: &appgovernance.ProfilePage{Items: []*domainprofile.AIExplanationProfile{profileRecord}, NextCursor: "next-profile-page"},
+	}
+	handler := NewAIExplanationAdministrationHandler(service)
+	list, listRecorder := aiAdministrationContext(http.MethodGet, "/internal/v1/interpretation/ai-explanation/profiles?status=draft&cursor=current&limit=9", nil)
+	handler.ListProfiles(list)
+	if listRecorder.Code != http.StatusOK || service.lastProfileQuery.Status == nil || *service.lastProfileQuery.Status != domainprofile.StatusDraft ||
+		service.lastProfileQuery.Cursor != "current" || service.lastProfileQuery.Limit != 9 ||
+		!bytes.Contains(listRecorder.Body.Bytes(), []byte(`"next_cursor":"next-profile-page"`)) {
+		t.Fatalf("profile list response=%d query=%#v body=%s", listRecorder.Code, service.lastProfileQuery, listRecorder.Body.String())
+	}
+
+	find, findRecorder := aiAdministrationContext(http.MethodGet, "/internal/v1/interpretation/ai-explanation/profiles/participant-scale/versions/v1", nil)
+	find.Params = gin.Params{{Key: "profile_id", Value: "participant-scale"}, {Key: "version", Value: "v1"}}
+	handler.FindProfile(find)
+	if findRecorder.Code != http.StatusOK || service.lastProfileID != "participant-scale" || service.lastProfileVersion != "v1" ||
+		!bytes.Contains(findRecorder.Body.Bytes(), []byte(`"status":"draft"`)) {
+		t.Fatalf("profile find response=%d key=%s/%s body=%s", findRecorder.Code, service.lastProfileID, service.lastProfileVersion, findRecorder.Body.String())
 	}
 }
 
@@ -185,6 +238,19 @@ func administrationReviewRun() *appevaluation.ReviewRun {
 	}
 }
 
+func administrationProfile(t *testing.T) *domainprofile.AIExplanationProfile {
+	t.Helper()
+	suite, err := appevaluation.LoadV1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, err := domainprofile.NewDraftForRelease(meta.ID(81), suite.ProfileFixture.Definition, "user:34", "review candidate", time.Date(2026, 8, 27, 8, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return value
+}
+
 func aiAdministrationContext(method, path string, body *bytes.Buffer) (*gin.Context, *httptest.ResponseRecorder) {
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
@@ -201,6 +267,9 @@ func aiAdministrationContext(method, path string, body *bytes.Buffer) (*gin.Cont
 
 type aiAdministrationServiceStub struct {
 	run                 *appevaluation.ReviewRun
+	evaluationPage      *appevaluation.ReviewRunPage
+	profile             *domainprofile.AIExplanationProfile
+	profilePage         *appgovernance.ProfilePage
 	capacity            *aiexplanationadministration.EvaluationCapacity
 	participantCapacity *aiexplanationadministration.ParticipantCapacity
 	lastActor           aiexplanationadministration.Actor
@@ -210,6 +279,11 @@ type aiAdministrationServiceStub struct {
 	lastRetry           aiexplanationadministration.RetryParticipantGenerationCommand
 	lastRunID           meta.ID
 	lastCancelReason    string
+	lastEvaluationQuery aiexplanationadministration.EvaluationListQuery
+	lastProfileQuery    aiexplanationadministration.ProfileListQuery
+	lastProfileID       string
+	lastProfileVersion  string
+	listEvaluationCalls int
 }
 
 func (s *aiAdministrationServiceStub) FindEvaluationCapacity(_ context.Context, actor aiexplanationadministration.Actor) (*aiexplanationadministration.EvaluationCapacity, error) {
@@ -239,6 +313,12 @@ func (s *aiAdministrationServiceStub) RetryParticipantGeneration(_ context.Conte
 	return nil, nil
 }
 
+func (s *aiAdministrationServiceStub) ListEvaluations(_ context.Context, actor aiexplanationadministration.Actor, query aiexplanationadministration.EvaluationListQuery) (*appevaluation.ReviewRunPage, error) {
+	s.lastActor, s.lastEvaluationQuery = actor, query
+	s.listEvaluationCalls++
+	return s.evaluationPage, nil
+}
+
 func (s *aiAdministrationServiceStub) FindEvaluation(_ context.Context, actor aiexplanationadministration.Actor, _ meta.ID) (*appevaluation.ReviewRun, error) {
 	s.lastActor = actor
 	return s.run, nil
@@ -249,6 +329,14 @@ func (s *aiAdministrationServiceStub) RecordReview(_ context.Context, actor aiex
 }
 func (s *aiAdministrationServiceStub) FinalizeEvaluation(context.Context, aiexplanationadministration.Actor, meta.ID, string) (*appevaluation.ReviewRun, error) {
 	return s.run, nil
+}
+func (s *aiAdministrationServiceStub) ListProfiles(_ context.Context, actor aiexplanationadministration.Actor, query aiexplanationadministration.ProfileListQuery) (*appgovernance.ProfilePage, error) {
+	s.lastActor, s.lastProfileQuery = actor, query
+	return s.profilePage, nil
+}
+func (s *aiAdministrationServiceStub) FindProfile(_ context.Context, actor aiexplanationadministration.Actor, profileID, version string) (*domainprofile.AIExplanationProfile, error) {
+	s.lastActor, s.lastProfileID, s.lastProfileVersion = actor, profileID, version
+	return s.profile, nil
 }
 func (*aiAdministrationServiceStub) CreateProfileDraft(context.Context, aiexplanationadministration.Actor, aiexplanationadministration.CreateProfileDraftCommand) (*domainprofile.AIExplanationProfile, error) {
 	return nil, nil

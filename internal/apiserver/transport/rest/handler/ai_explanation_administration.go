@@ -10,6 +10,7 @@ import (
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	aiexplanationadministration "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/administration"
 	appevaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/evaluation"
+	appgovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/governance"
 	apprecovery "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/recovery"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation"
 	domainevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/evaluation"
@@ -100,6 +101,35 @@ type AIExplanationEvaluationRunWire struct {
 	CanReview                      bool                                  `json:"can_review"`
 	CanFinalize                    bool                                  `json:"can_finalize"`
 	RecoveryMaxProviderInvocations int                                   `json:"recovery_max_provider_invocations"`
+}
+
+type AIExplanationEvaluationPageWire struct {
+	Items      []AIExplanationEvaluationSummaryWire `json:"items"`
+	NextCursor string                               `json:"next_cursor,omitempty"`
+}
+
+// AIExplanationEvaluationSummaryWire is intentionally bounded for queue
+// views. Attempt inputs and Provider outputs are available only from the
+// explicit attempt evidence endpoint.
+type AIExplanationEvaluationSummaryWire struct {
+	RunID                          string                             `json:"run_id"`
+	Version                        int64                              `json:"version"`
+	Status                         string                             `json:"status"`
+	RequestedOrgID                 int64                              `json:"requested_org_id"`
+	RequestedBy                    string                             `json:"requested_by"`
+	RequestReason                  string                             `json:"request_reason"`
+	CreatedAt                      time.Time                          `json:"created_at"`
+	Release                        AIExplanationEvaluationReleaseWire `json:"release"`
+	Progress                       AIExplanationReviewProgressWire    `json:"progress"`
+	Gate                           *AIExplanationGateWire             `json:"gate,omitempty"`
+	CanReview                      bool                               `json:"can_review"`
+	CanFinalize                    bool                               `json:"can_finalize"`
+	RecoveryMaxProviderInvocations int                                `json:"recovery_max_provider_invocations"`
+}
+
+type AIExplanationProfilePageWire struct {
+	Items      []AIExplanationProfileWire `json:"items"`
+	NextCursor string                     `json:"next_cursor,omitempty"`
 }
 
 type AIExplanationEvaluationCapacityWire struct {
@@ -560,6 +590,43 @@ func (h *AIExplanationAdministrationHandler) CancelEvaluation(c *gin.Context) {
 	h.Success(c, evaluationRunWire(result))
 }
 
+// ListEvaluations godoc
+// @Summary 分页查询 AI 解读 Prompt 评测审核目录
+// @Description 只返回当前可信机构的队列摘要；原始测评输入和 Provider 输出必须通过单份 attempt 证据接口读取。
+// @Tags AI-Explanation-Administration
+// @Produce json
+// @Param status query string false "状态" Enums(collecting,awaiting_review,approved,rejected,canceled)
+// @Param cursor query string false "稳定分页游标"
+// @Param limit query int false "页大小，默认 20，最大 100"
+// @Success 200 {object} core.Response{data=AIExplanationEvaluationPageWire}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 501 {object} core.ErrResponse
+// @Router /internal/v1/interpretation/ai-explanation/prompt-evaluations [get]
+func (h *AIExplanationAdministrationHandler) ListEvaluations(c *gin.Context) {
+	actor, ok := h.actor(c)
+	if !ok {
+		return
+	}
+	status, err := optionalEvaluationStatus(c.Query("status"))
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	limit, err := administrationCatalogLimit(c, appevaluation.DefaultReviewRunPageSize, appevaluation.MaxReviewRunPageSize)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.service.ListEvaluations(c.Request.Context(), actor, aiexplanationadministration.EvaluationListQuery{
+		Status: status, Cursor: c.Query("cursor"), Limit: limit,
+	})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, evaluationPageWire(result))
+}
+
 // FindEvaluation godoc
 // @Summary 查询 AI 解读 Prompt 评测摘要
 // @Tags AI-Explanation-Administration
@@ -666,6 +733,66 @@ func (h *AIExplanationAdministrationHandler) FinalizeEvaluation(c *gin.Context) 
 		return
 	}
 	h.Success(c, evaluationRunWire(result))
+}
+
+// ListProfiles godoc
+// @Summary 分页查询 AI 解读 Profile 治理目录
+// @Tags AI-Explanation-Administration
+// @Produce json
+// @Param status query string false "状态" Enums(draft,published,disabled)
+// @Param cursor query string false "稳定分页游标"
+// @Param limit query int false "页大小，默认 20，最大 100"
+// @Success 200 {object} core.Response{data=AIExplanationProfilePageWire}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 501 {object} core.ErrResponse
+// @Router /internal/v1/interpretation/ai-explanation/profiles [get]
+func (h *AIExplanationAdministrationHandler) ListProfiles(c *gin.Context) {
+	actor, ok := h.actor(c)
+	if !ok {
+		return
+	}
+	status, err := optionalProfileStatus(c.Query("status"))
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	limit, err := administrationCatalogLimit(c, appgovernance.DefaultProfilePageSize, appgovernance.MaxProfilePageSize)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result, err := h.service.ListProfiles(c.Request.Context(), actor, aiexplanationadministration.ProfileListQuery{
+		Status: status, Cursor: c.Query("cursor"), Limit: limit,
+	})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, profilePageWire(result))
+}
+
+// FindProfile godoc
+// @Summary 查询一个 AI 解读 Profile 版本
+// @Tags AI-Explanation-Administration
+// @Produce json
+// @Param profile_id path string true "Profile ID"
+// @Param version path string true "Profile 版本"
+// @Success 200 {object} core.Response{data=AIExplanationProfileWire}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
+// @Failure 501 {object} core.ErrResponse
+// @Router /internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version} [get]
+func (h *AIExplanationAdministrationHandler) FindProfile(c *gin.Context) {
+	actor, ok := h.actor(c)
+	if !ok {
+		return
+	}
+	result, err := h.service.FindProfile(c.Request.Context(), actor, c.Param("profile_id"), c.Param("version"))
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, profileWire(result))
 }
 
 // CreateProfileDraft godoc
@@ -819,6 +946,32 @@ func evaluationRunWire(value *appevaluation.ReviewRun) AIExplanationEvaluationRu
 		result.Canceled = &AIExplanationCancellationWire{At: value.Canceled.At, Actor: value.Canceled.Actor, Reason: value.Canceled.Reason}
 	}
 	return result
+}
+
+func evaluationPageWire(value *appevaluation.ReviewRunPage) AIExplanationEvaluationPageWire {
+	result := AIExplanationEvaluationPageWire{Items: []AIExplanationEvaluationSummaryWire{}}
+	if value == nil {
+		return result
+	}
+	result.NextCursor = value.NextCursor
+	result.Items = make([]AIExplanationEvaluationSummaryWire, 0, len(value.Items))
+	for _, item := range value.Items {
+		if item != nil {
+			result.Items = append(result.Items, evaluationSummaryWire(item))
+		}
+	}
+	return result
+}
+
+func evaluationSummaryWire(value *appevaluation.ReviewRun) AIExplanationEvaluationSummaryWire {
+	return AIExplanationEvaluationSummaryWire{
+		RunID: value.RunID.String(), Version: value.Version, Status: string(value.Status),
+		RequestedOrgID: value.RequestedOrgID, RequestedBy: value.RequestedBy,
+		RequestReason: value.RequestReason, CreatedAt: value.CreatedAt,
+		Release: releaseWire(value.Release), Progress: reviewProgressWire(value.Progress), Gate: gateWire(value.Gate),
+		CanReview: value.CanReview, CanFinalize: value.CanFinalize,
+		RecoveryMaxProviderInvocations: value.RecoveryMaxProviderInvocations,
+	}
 }
 
 func evaluationCapacityWire(value *aiexplanationadministration.EvaluationCapacity) AIExplanationEvaluationCapacityWire {
@@ -1007,6 +1160,52 @@ func profileWire(value *domainprofile.AIExplanationProfile) AIExplanationProfile
 		PublishedAt: value.PublishedAt(), PublishedBy: value.PublishedBy(), PublishedReason: value.PublishedReason(), PublishedEvidenceRunID: evidenceID,
 		DisabledAt: value.DisabledAt(), DisabledBy: value.DisabledBy(), DisabledReason: value.DisabledReason(),
 	}
+}
+
+func profilePageWire(value *appgovernance.ProfilePage) AIExplanationProfilePageWire {
+	result := AIExplanationProfilePageWire{Items: []AIExplanationProfileWire{}}
+	if value == nil {
+		return result
+	}
+	result.NextCursor = value.NextCursor
+	result.Items = make([]AIExplanationProfileWire, 0, len(value.Items))
+	for _, item := range value.Items {
+		if item != nil {
+			result.Items = append(result.Items, profileWire(item))
+		}
+	}
+	return result
+}
+
+func optionalEvaluationStatus(raw string) (*domainevaluation.Status, error) {
+	if strings.TrimSpace(raw) == "" {
+		return nil, nil
+	}
+	value := domainevaluation.Status(strings.TrimSpace(raw))
+	if !value.IsValid() {
+		return nil, cberrors.WithCode(code.ErrInvalidArgument, "AI explanation evaluation status is invalid")
+	}
+	return &value, nil
+}
+
+func optionalProfileStatus(raw string) (*domainprofile.Status, error) {
+	if strings.TrimSpace(raw) == "" {
+		return nil, nil
+	}
+	value := domainprofile.Status(strings.TrimSpace(raw))
+	if !value.IsValid() {
+		return nil, cberrors.WithCode(code.ErrInvalidArgument, "AI explanation Profile status is invalid")
+	}
+	return &value, nil
+}
+
+func administrationCatalogLimit(c *gin.Context, fallback, maximum int) (int, error) {
+	raw := strings.TrimSpace(c.DefaultQuery("limit", fmt.Sprint(fallback)))
+	var result int
+	if _, err := fmt.Sscan(raw, &result); err != nil || result < 1 || result > maximum || fmt.Sprint(result) != raw {
+		return 0, cberrors.WithCode(code.ErrInvalidArgument, "AI explanation administration page limit is invalid")
+	}
+	return result, nil
 }
 
 func parsePositiveInt(value string) (int, error) {

@@ -7507,6 +7507,71 @@ paths:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
   /internal/v1/interpretation/ai-explanation/profiles:
+    get:
+      tags:
+      - AI-Explanation-Administration
+      summary: 分页查询 AI 解读 Profile 治理目录
+      operationId: 分页查询AI解读Profile治理目录
+      description: 分页查询 AI 解读 Profile 治理目录
+      parameters:
+      - enum:
+        - draft
+        - published
+        - disabled
+        type: string
+        description: 状态
+        name: status
+        in: query
+      - type: string
+        description: 稳定分页游标
+        name: cursor
+        in: query
+      - type: integer
+        description: 页大小，默认 20，最大 100
+        name: limit
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/handler.AIExplanationProfilePageWire'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '501':
+          description: Not Implemented
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
     post:
       tags:
       - AI-Explanation-Administration
@@ -7531,6 +7596,72 @@ paths:
                   properties:
                     data:
                       $ref: '#/components/schemas/handler.AIExplanationProfileWire'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}:
+    get:
+      tags:
+      - AI-Explanation-Administration
+      summary: 查询一个 AI 解读 Profile 版本
+      operationId: 查询一个AI解读Profile版本
+      description: 查询一个 AI 解读 Profile 版本
+      parameters:
+      - type: string
+        description: Profile ID
+        name: profile_id
+        in: path
+        required: true
+      - type: string
+        description: Profile 版本
+        name: version
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/handler.AIExplanationProfileWire'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '501':
+          description: Not Implemented
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
         '401':
           description: 认证失败或访问令牌无效
           content:
@@ -7701,6 +7832,73 @@ paths:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
   /internal/v1/interpretation/ai-explanation/prompt-evaluations:
+    get:
+      tags:
+      - AI-Explanation-Administration
+      summary: 分页查询 AI 解读 Prompt 评测审核目录
+      description: 只返回当前可信机构的队列摘要；原始测评输入和 Provider 输出必须通过单份 attempt 证据接口读取。
+      operationId: 分页查询AI解读Prompt评测审核目录
+      parameters:
+      - enum:
+        - collecting
+        - awaiting_review
+        - approved
+        - rejected
+        - canceled
+        type: string
+        description: 状态
+        name: status
+        in: query
+      - type: string
+        description: 稳定分页游标
+        name: cursor
+        in: query
+      - type: integer
+        description: 页大小，默认 20，最大 100
+        name: limit
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/handler.AIExplanationEvaluationPageWire'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '501':
+          description: Not Implemented
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
     post:
       tags:
       - AI-Explanation-Administration
@@ -10116,6 +10314,15 @@ components:
           type: string
         phase:
           type: string
+    handler.AIExplanationEvaluationPageWire:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/handler.AIExplanationEvaluationSummaryWire'
+        next_cursor:
+          type: string
     handler.AIExplanationEvaluationRecoverRequest:
       type: object
       required:
@@ -10231,6 +10438,35 @@ components:
         reason:
           type: string
           maxLength: 1000
+    handler.AIExplanationEvaluationSummaryWire:
+      type: object
+      properties:
+        can_finalize:
+          type: boolean
+        can_review:
+          type: boolean
+        created_at:
+          type: string
+        gate:
+          $ref: '#/components/schemas/handler.AIExplanationGateWire'
+        progress:
+          $ref: '#/components/schemas/handler.AIExplanationReviewProgressWire'
+        recovery_max_provider_invocations:
+          type: integer
+        release:
+          $ref: '#/components/schemas/handler.AIExplanationEvaluationReleaseWire'
+        request_reason:
+          type: string
+        requested_by:
+          type: string
+        requested_org_id:
+          type: integer
+        run_id:
+          type: string
+        status:
+          type: string
+        version:
+          type: integer
     handler.AIExplanationFinalizationWire:
       type: object
       properties:
@@ -10424,6 +10660,15 @@ components:
         reason:
           type: string
           maxLength: 1000
+    handler.AIExplanationProfilePageWire:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/handler.AIExplanationProfileWire'
+        next_cursor:
+          type: string
     handler.AIExplanationProfilePublishRequest:
       type: object
       required:

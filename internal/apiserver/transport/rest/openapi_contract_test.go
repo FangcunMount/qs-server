@@ -95,6 +95,7 @@ func TestAIExplanationAdministrationOpenAPIContract(t *testing.T) {
 		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/reviews":                      "post",
 		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/finalize":                     "post",
 		"/internal/v1/interpretation/ai-explanation/profiles":                                                 "post",
+		"/internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}":                 "get",
 		"/internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}/publish":         "post",
 		"/internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}/disable":         "post",
 	} {
@@ -103,6 +104,12 @@ func TestAIExplanationAdministrationOpenAPIContract(t *testing.T) {
 		if security, explicitlyPublic := operation["security"].([]any); explicitlyPublic && len(security) == 0 {
 			t.Fatalf("AI explanation administration operation must not override root authentication: %s %s", method, path)
 		}
+	}
+	for _, path := range []string{
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluations",
+		"/internal/v1/interpretation/ai-explanation/profiles",
+	} {
+		assertOpenAPIOperation(t, spec, path, "get")
 	}
 	start := spec.Paths["/internal/v1/interpretation/ai-explanation/prompt-evaluations"]["post"].(map[string]any)
 	responses := start["responses"].(map[string]any)
@@ -127,6 +134,29 @@ func TestAIExplanationAdministrationOpenAPIContract(t *testing.T) {
 	for _, property := range []string{"run_id", "requested_by", "request_reason", "execution", "recoveries", "recovery_max_provider_invocations", "canceled", "release", "attempts", "progress", "gate", "can_review", "can_finalize"} {
 		if _, ok := summary[property]; !ok {
 			t.Fatalf("evaluation summary missing property %q", property)
+		}
+	}
+	catalogSummary := openAPISchemaProperties(t, schemas, "handler.AIExplanationEvaluationSummaryWire")
+	for _, property := range []string{"run_id", "status", "requested_org_id", "release", "progress", "gate", "can_review", "can_finalize"} {
+		if _, ok := catalogSummary[property]; !ok {
+			t.Fatalf("evaluation catalog summary missing property %q", property)
+		}
+	}
+	for _, forbidden := range []string{"attempts", "execution", "recoveries", "assessment_input", "raw_provider_output"} {
+		if _, ok := catalogSummary[forbidden]; ok {
+			t.Fatalf("evaluation catalog summary must not expose %q", forbidden)
+		}
+	}
+	evaluationPage := openAPISchemaProperties(t, schemas, "handler.AIExplanationEvaluationPageWire")
+	for _, property := range []string{"items", "next_cursor"} {
+		if _, ok := evaluationPage[property]; !ok {
+			t.Fatalf("evaluation page missing property %q", property)
+		}
+	}
+	profilePage := openAPISchemaProperties(t, schemas, "handler.AIExplanationProfilePageWire")
+	for _, property := range []string{"items", "next_cursor"} {
+		if _, ok := profilePage[property]; !ok {
+			t.Fatalf("Profile page missing property %q", property)
 		}
 	}
 

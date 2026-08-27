@@ -156,3 +156,86 @@ func TestReviewServiceProjectsRemainingRecoveryProviderInvocationCeiling(t *test
 	// so recovery can invoke only the remaining 34 generation/judge pairs.
 	assertCeiling(68)
 }
+
+func TestReviewServiceListsOrganizationScopedReviewQueue(t *testing.T) {
+	fixed := time.Date(2026, 8, 27, 15, 0, 0, 0, time.UTC)
+	repository := &onlineEvidenceRepository{}
+	runner := newOnlineRunnerWithClock(t, promptResolverStub{}, &onlineProviderStub{}, &onlineSemanticStub{}, repository, func() time.Time { return fixed })
+	started, err := runner.StartV1(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	requested, err := domainevaluation.NewRequested(91, started.Run.Release(), 7, "user:42", "review release candidate", fixed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository.value = requested
+	repository.list = []evaluation.ReviewRunCatalogRecord{catalogRecordFromRun(requested)}
+	repository.nextCursor = "next-review-page"
+	evidence, err := evaluation.NewEvidenceService(repository, nil, func() time.Time { return fixed })
+	if err != nil {
+		t.Fatal(err)
+	}
+	service, err := evaluation.NewReviewService(evidence)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := domainevaluation.StatusCollecting
+	page, err := service.List(context.Background(), evaluation.ReviewRunListQuery{OrgID: 7, Status: &status, Cursor: "current", Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repository.listOrgID != 7 || repository.listStatus == nil || *repository.listStatus != status || repository.listCursor != "current" || repository.listLimit != 5 ||
+		len(page.Items) != 1 || page.Items[0].RunID != requested.ID() || page.Items[0].RequestedOrgID != 7 || page.NextCursor != "next-review-page" {
+		t.Fatalf("review catalog query/page = org:%d status:%v cursor:%q limit:%d page:%#v", repository.listOrgID, repository.listStatus, repository.listCursor, repository.listLimit, page)
+	}
+
+	other, err := domainevaluation.NewRequested(92, started.Run.Release(), 8, "user:99", "other organization", fixed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository.list = []evaluation.ReviewRunCatalogRecord{catalogRecordFromRun(other)}
+	if _, err := service.List(context.Background(), evaluation.ReviewRunListQuery{OrgID: 7, Limit: 5}); err == nil {
+		t.Fatal("review catalog must reject a cross-organization projection")
+	}
+}
+
+func TestReviewServiceListDerivesProgressWithoutReturningDetailedEvidence(t *testing.T) {
+	fixed := time.Date(2026, 8, 27, 15, 0, 0, 0, time.UTC)
+	repository := &onlineEvidenceRepository{}
+	runner := newOnlineRunnerWithClock(t, promptResolverStub{}, &onlineProviderStub{}, &onlineSemanticStub{}, repository, func() time.Time { return fixed })
+	result, err := runner.RunV1(context.Background(), evaluation.OnlineRunCommand{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := catalogRecordFromRun(result.Run)
+	record.RequestedOrgID = 7
+	record.RequestedBy = "user:42"
+	record.RequestReason = "review release candidate"
+	repository.list = []evaluation.ReviewRunCatalogRecord{record}
+	evidence, err := evaluation.NewEvidenceService(repository, nil, func() time.Time { return fixed })
+	if err != nil {
+		t.Fatal(err)
+	}
+	service, err := evaluation.NewReviewService(evidence)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := domainevaluation.StatusAwaitingReview
+	page, err := service.List(context.Background(), evaluation.ReviewRunListQuery{OrgID: 7, Status: &status})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Items) != 1 {
+		t.Fatalf("review queue size = %d", len(page.Items))
+	}
+	item := page.Items[0]
+	if len(item.Attempts) != 0 || item.Execution != nil || len(item.Recoveries) != 0 {
+		t.Fatalf("review queue returned detailed evidence: %#v", item)
+	}
+	if item.Progress.GenerationAttempts != domainevaluation.RequiredGenerationAttempts ||
+		item.Progress.RequiredReviews != domainevaluation.RequiredGenerationAttempts*2 ||
+		item.Progress.MissingReviews != domainevaluation.RequiredGenerationAttempts*2 || !item.CanReview || item.CanFinalize {
+		t.Fatalf("review queue progress = %#v", item)
+	}
+}

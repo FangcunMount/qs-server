@@ -856,6 +856,15 @@ definitions:
       phase:
         type: string
     type: object
+  handler.AIExplanationEvaluationPageWire:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/handler.AIExplanationEvaluationSummaryWire'
+        type: array
+      next_cursor:
+        type: string
+    type: object
   handler.AIExplanationEvaluationRecoverRequest:
     properties:
       confirm:
@@ -970,6 +979,35 @@ definitions:
     - confirm
     - expected_provider_invocations
     - reason
+    type: object
+  handler.AIExplanationEvaluationSummaryWire:
+    properties:
+      can_finalize:
+        type: boolean
+      can_review:
+        type: boolean
+      created_at:
+        type: string
+      gate:
+        $ref: '#/definitions/handler.AIExplanationGateWire'
+      progress:
+        $ref: '#/definitions/handler.AIExplanationReviewProgressWire'
+      recovery_max_provider_invocations:
+        type: integer
+      release:
+        $ref: '#/definitions/handler.AIExplanationEvaluationReleaseWire'
+      request_reason:
+        type: string
+      requested_by:
+        type: string
+      requested_org_id:
+        type: integer
+      run_id:
+        type: string
+      status:
+        type: string
+      version:
+        type: integer
     type: object
   handler.AIExplanationFinalizationWire:
     properties:
@@ -1163,6 +1201,15 @@ definitions:
     - definition
     - fingerprint
     - reason
+    type: object
+  handler.AIExplanationProfilePageWire:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/handler.AIExplanationProfileWire'
+        type: array
+      next_cursor:
+        type: string
     type: object
   handler.AIExplanationProfilePublishRequest:
     properties:
@@ -10694,6 +10741,47 @@ paths:
       tags:
       - AI-Explanation-Administration
   /internal/v1/interpretation/ai-explanation/profiles:
+    get:
+      parameters:
+      - description: 状态
+        enum:
+        - draft
+        - published
+        - disabled
+        in: query
+        name: status
+        type: string
+      - description: 稳定分页游标
+        in: query
+        name: cursor
+        type: string
+      - description: 页大小，默认 20，最大 100
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationProfilePageWire'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 分页查询 AI 解读 Profile 治理目录
+      tags:
+      - AI-Explanation-Administration
     post:
       consumes:
       - application/json
@@ -10717,6 +10805,46 @@ paths:
                   $ref: '#/definitions/handler.AIExplanationProfileWire'
               type: object
       summary: 创建 AI 解读 Profile draft
+      tags:
+      - AI-Explanation-Administration
+  /internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}:
+    get:
+      parameters:
+      - description: Profile ID
+        in: path
+        name: profile_id
+        required: true
+        type: string
+      - description: Profile 版本
+        in: path
+        name: version
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationProfileWire'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询一个 AI 解读 Profile 版本
       tags:
       - AI-Explanation-Administration
   /internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}/disable:
@@ -10814,6 +10942,50 @@ paths:
       tags:
       - AI-Explanation-Administration
   /internal/v1/interpretation/ai-explanation/prompt-evaluations:
+    get:
+      description: 只返回当前可信机构的队列摘要；原始测评输入和 Provider 输出必须通过单份 attempt 证据接口读取。
+      parameters:
+      - description: 状态
+        enum:
+        - collecting
+        - awaiting_review
+        - approved
+        - rejected
+        - canceled
+        in: query
+        name: status
+        type: string
+      - description: 稳定分页游标
+        in: query
+        name: cursor
+        type: string
+      - description: 页大小，默认 20，最大 100
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationEvaluationPageWire'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 分页查询 AI 解读 Prompt 评测审核目录
+      tags:
+      - AI-Explanation-Administration
     post:
       consumes:
       - application/json

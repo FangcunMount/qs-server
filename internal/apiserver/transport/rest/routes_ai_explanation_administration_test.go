@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	aiexplanationadministration "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/administration"
 	appevaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/evaluation"
+	appgovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/governance"
 	apprecovery "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/recovery"
 	domainevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/evaluation"
 	domainprofile "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/profile"
@@ -30,6 +31,16 @@ func TestAIExplanationAdministrationRoutesSeparateAuditReadsFromGovernanceWrites
 	auditEngine.ServeHTTP(read, httptest.NewRequest(http.MethodGet, "/internal/v1/interpretation/ai-explanation/prompt-evaluations/9", nil))
 	if read.Code != http.StatusOK || service.findCalls != 1 {
 		t.Fatalf("audit read status/calls = %d/%d body=%s", read.Code, service.findCalls, read.Body.String())
+	}
+	list := httptest.NewRecorder()
+	auditEngine.ServeHTTP(list, httptest.NewRequest(http.MethodGet, "/internal/v1/interpretation/ai-explanation/prompt-evaluations?status=awaiting_review", nil))
+	if list.Code != http.StatusOK || service.listCalls != 1 {
+		t.Fatalf("audit list status/calls = %d/%d body=%s", list.Code, service.listCalls, list.Body.String())
+	}
+	profiles := httptest.NewRecorder()
+	auditEngine.ServeHTTP(profiles, httptest.NewRequest(http.MethodGet, "/internal/v1/interpretation/ai-explanation/profiles?status=draft", nil))
+	if profiles.Code != http.StatusOK || service.profileListCalls != 1 {
+		t.Fatalf("audit Profile list status/calls = %d/%d body=%s", profiles.Code, service.profileListCalls, profiles.Body.String())
 	}
 	write := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/internal/v1/interpretation/ai-explanation/prompt-evaluations/9/reviews", bytes.NewBufferString(`{"case_id":"PROMPT-EVAL-001","attempt":1,"role":"assessment_semantics","decision":"approve","reason":"reviewed"}`))
@@ -138,6 +149,8 @@ type routeAIAdministrationStub struct {
 	capacityCalls            int
 	participantCapacityCalls int
 	retryCalls               int
+	listCalls                int
+	profileListCalls         int
 }
 
 func (s *routeAIAdministrationStub) FindEvaluationCapacity(context.Context, aiexplanationadministration.Actor) (*aiexplanationadministration.EvaluationCapacity, error) {
@@ -167,6 +180,11 @@ func (s *routeAIAdministrationStub) RetryParticipantGeneration(context.Context, 
 	return nil, nil
 }
 
+func (s *routeAIAdministrationStub) ListEvaluations(context.Context, aiexplanationadministration.Actor, aiexplanationadministration.EvaluationListQuery) (*appevaluation.ReviewRunPage, error) {
+	s.listCalls++
+	return &appevaluation.ReviewRunPage{Items: []*appevaluation.ReviewRun{s.run}}, nil
+}
+
 func (s *routeAIAdministrationStub) FindEvaluation(context.Context, aiexplanationadministration.Actor, meta.ID) (*appevaluation.ReviewRun, error) {
 	s.findCalls++
 	return s.run, nil
@@ -177,6 +195,13 @@ func (s *routeAIAdministrationStub) RecordReview(context.Context, aiexplanationa
 }
 func (s *routeAIAdministrationStub) FinalizeEvaluation(context.Context, aiexplanationadministration.Actor, meta.ID, string) (*appevaluation.ReviewRun, error) {
 	return s.run, nil
+}
+func (s *routeAIAdministrationStub) ListProfiles(context.Context, aiexplanationadministration.Actor, aiexplanationadministration.ProfileListQuery) (*appgovernance.ProfilePage, error) {
+	s.profileListCalls++
+	return &appgovernance.ProfilePage{}, nil
+}
+func (*routeAIAdministrationStub) FindProfile(context.Context, aiexplanationadministration.Actor, string, string) (*domainprofile.AIExplanationProfile, error) {
+	return nil, nil
 }
 func (*routeAIAdministrationStub) CreateProfileDraft(context.Context, aiexplanationadministration.Actor, aiexplanationadministration.CreateProfileDraftCommand) (*domainprofile.AIExplanationProfile, error) {
 	return nil, nil

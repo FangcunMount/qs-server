@@ -57,7 +57,7 @@ func TestAIExplanationPromptEvaluationProgressIsAtomicOnReplicaSet(t *testing.T)
 		if err := committer.CommitStart(t.Context(), runRecord); err == nil {
 			t.Fatal("CommitStart() error = nil, want injected failure")
 		}
-		assertMongoCount(t, db.Collection("ai_explanation_prompt_evaluation_runs"), bson.M{"domain_id": runRecord.ID()}, 0)
+		assertMongoCount(t, db.Collection("ai_explanation_prompt_evaluations"), bson.M{"domain_id": runRecord.ID()}, 0)
 		assertMongoCount(t, db.Collection("domain_event_outbox"), bson.M{"aggregate_id": runRecord.ID().String()}, 0)
 		usage, found, findErr := capacity.FindDailyCapacityUsage(t.Context(), 81, domainevaluation.UTCBudgetDay(now))
 		if findErr != nil || !found || usage.ReservedProviderInvocations != 0 || len(usage.Reservations) != 0 {
@@ -132,7 +132,7 @@ func TestAIExplanationPromptEvaluationProgressIsAtomicOnReplicaSet(t *testing.T)
 		if findErr != nil || !found || usage.ReservedProviderInvocations != appevaluation.MaxProviderInvocationsV1 || len(usage.Reservations) != 1 {
 			t.Fatalf("organization concurrency rollback capacity = %#v, %v, %v", usage, found, findErr)
 		}
-		assertMongoCount(t, db.Collection("ai_explanation_prompt_evaluation_runs"), bson.M{"domain_id": second.ID()}, 0)
+		assertMongoCount(t, db.Collection("ai_explanation_prompt_evaluations"), bson.M{"domain_id": second.ID()}, 0)
 	})
 }
 

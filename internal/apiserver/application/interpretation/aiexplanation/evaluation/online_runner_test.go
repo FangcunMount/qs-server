@@ -371,7 +371,13 @@ func (s *onlineSemanticStub) Evaluate(_ context.Context, request evaluation.Sema
 }
 
 type onlineEvidenceRepository struct {
-	value *domainevaluation.PromptEvaluationRun
+	value      *domainevaluation.PromptEvaluationRun
+	list       []evaluation.ReviewRunCatalogRecord
+	nextCursor string
+	listOrgID  int64
+	listStatus *domainevaluation.Status
+	listCursor string
+	listLimit  int
 }
 
 func (r *onlineEvidenceRepository) Create(_ context.Context, value *domainevaluation.PromptEvaluationRun) error {
@@ -392,6 +398,34 @@ func (r *onlineEvidenceRepository) FindByID(_ context.Context, id meta.ID) (*dom
 		return nil, domainevaluation.ErrNotFound
 	}
 	return r.value, nil
+}
+
+func (r *onlineEvidenceRepository) ListForReview(_ context.Context, orgID int64, status *domainevaluation.Status, cursor string, limit int) ([]evaluation.ReviewRunCatalogRecord, string, error) {
+	r.listOrgID, r.listStatus, r.listCursor, r.listLimit = orgID, status, cursor, limit
+	return append([]evaluation.ReviewRunCatalogRecord(nil), r.list...), r.nextCursor, nil
+}
+
+func catalogRecordFromRun(runRecord *domainevaluation.PromptEvaluationRun) evaluation.ReviewRunCatalogRecord {
+	record := evaluation.ReviewRunCatalogRecord{
+		RunID: runRecord.ID(), Version: runRecord.Version(), Status: runRecord.Status(), Release: runRecord.Release(),
+		RequestedOrgID: runRecord.RequestedOrgID(), RequestedBy: runRecord.RequestedBy(),
+		RequestReason: runRecord.RequestReason(), CreatedAt: runRecord.CreatedAt(), Gate: runRecord.Gate(),
+	}
+	for _, attempt := range runRecord.Attempts() {
+		record.Attempts = append(record.Attempts, evaluation.ReviewRunCatalogAttempt{
+			CaseID: attempt.CaseID, Attempt: attempt.Attempt, Stage: attempt.Stage,
+		})
+	}
+	for _, review := range runRecord.Reviews() {
+		record.Reviews = append(record.Reviews, evaluation.ReviewRunCatalogReview{
+			CaseID: review.CaseID, Attempt: review.Attempt, Role: review.Role, Decision: review.Decision,
+		})
+	}
+	if execution := runRecord.Execution(); execution != nil {
+		phase := execution.Phase
+		record.ExecutionPhase = &phase
+	}
+	return record
 }
 
 type failingPromptResolver struct{}

@@ -50,6 +50,8 @@ func TestAIExplanationMongoColdStartEnforcesRuntimeSchema(t *testing.T) {
 			"uk_ai_explanation_profile_release",
 			"idx_ai_explanation_profile_selector",
 			"uk_ai_explanation_profile_published_selector_slot",
+			"idx_ai_explanation_profile_created",
+			"idx_ai_explanation_profile_status_created",
 		},
 		"ai_explanation_prompt_evaluations": {
 			"uk_ai_explanation_prompt_evaluation_domain",
@@ -58,6 +60,8 @@ func TestAIExplanationMongoColdStartEnforcesRuntimeSchema(t *testing.T) {
 			"uk_ai_explanation_prompt_evaluation_active_release",
 			"uk_ai_explanation_prompt_evaluation_active_org_execution",
 			"idx_ai_explanation_prompt_evaluation_expired_lease",
+			"idx_ai_explanation_prompt_evaluation_org_created",
+			"idx_ai_explanation_prompt_evaluation_org_status_created",
 			"ttl_ai_explanation_expires_at",
 		},
 		"ai_explanation_prompt_evaluation_daily_budgets": {

@@ -21,6 +21,7 @@ var (
 	ErrReleaseMismatch         = errors.New("AI explanation evaluation release does not match the Profile")
 	ErrSelectorConflict        = errors.New("AI explanation published Profile selector conflicts at the same specificity")
 	ErrProfileFingerprint      = errors.New("AI explanation Profile fingerprint does not match its definition")
+	ErrProfileCatalogCursor    = errors.New("AI explanation Profile catalog cursor is invalid")
 )
 
 type Service struct {
@@ -28,6 +29,29 @@ type Service struct {
 	evaluations domainevaluation.Repository
 	now         func() time.Time
 	newID       func() meta.ID
+}
+
+const (
+	DefaultProfilePageSize = 20
+	MaxProfilePageSize     = 100
+)
+
+// ProfileCatalog is the read-side contract for release governance. Published
+// resolution remains on the domain Repository; this catalog never participates
+// in participant request routing.
+type ProfileCatalog interface {
+	ListProfiles(context.Context, *domainprofile.Status, string, int) ([]*domainprofile.AIExplanationProfile, string, error)
+}
+
+type ProfileListQuery struct {
+	Status *domainprofile.Status
+	Cursor string
+	Limit  int
+}
+
+type ProfilePage struct {
+	Items      []*domainprofile.AIExplanationProfile
+	NextCursor string
 }
 
 func NewService(profiles domainprofile.Repository, evaluations domainevaluation.Repository, now func() time.Time, newIDs ...func() meta.ID) (*Service, error) {
@@ -42,6 +66,41 @@ func NewService(profiles domainprofile.Repository, evaluations domainevaluation.
 		newID = newIDs[0]
 	}
 	return &Service{profiles: profiles, evaluations: evaluations, now: now, newID: newID}, nil
+}
+
+func (s *Service) Find(ctx context.Context, profileID, version string) (*domainprofile.AIExplanationProfile, error) {
+	if s == nil || s.profiles == nil || strings.TrimSpace(profileID) == "" || aiexplanation.ValidateVersion(strings.TrimSpace(version)) != nil {
+		return nil, fmt.Errorf("AI explanation Profile query is invalid")
+	}
+	return s.profiles.FindByKey(ctx, strings.TrimSpace(profileID), strings.TrimSpace(version))
+}
+
+func (s *Service) List(ctx context.Context, query ProfileListQuery) (*ProfilePage, error) {
+	if s == nil || s.profiles == nil || query.Limit < 0 || query.Limit > MaxProfilePageSize ||
+		(query.Status != nil && !query.Status.IsValid()) {
+		return nil, fmt.Errorf("AI explanation Profile catalog query is invalid")
+	}
+	reader, ok := s.profiles.(ProfileCatalog)
+	if !ok {
+		return nil, fmt.Errorf("AI explanation Profile catalog is not configured")
+	}
+	limit := query.Limit
+	if limit == 0 {
+		limit = DefaultProfilePageSize
+	}
+	items, nextCursor, err := reader.ListProfiles(ctx, query.Status, query.Cursor, limit)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) > limit {
+		return nil, fmt.Errorf("AI explanation Profile catalog exceeded requested limit")
+	}
+	for _, item := range items {
+		if item == nil || (query.Status != nil && item.Status() != *query.Status) {
+			return nil, fmt.Errorf("AI explanation Profile catalog returned inconsistent data")
+		}
+	}
+	return &ProfilePage{Items: items, NextCursor: nextCursor}, nil
 }
 
 type CreateDraftCommand struct {

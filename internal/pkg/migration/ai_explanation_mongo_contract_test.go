@@ -343,6 +343,48 @@ func TestAIExplanationSubjectExportMigrationOwnsScopedKeysetIndex(t *testing.T) 
 	}
 }
 
+func TestAIExplanationGovernanceCatalogMigrationOwnsStableReadIndexes(t *testing.T) {
+	up, err := os.ReadFile("migrations/mongodb/000033_add_ai_explanation_governance_catalog_indexes.up.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var commands []map[string]any
+	if err := json.Unmarshal(up, &commands); err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{
+		"ai_explanation_prompt_evaluations", "requested_org_id", "status", "created_at", "domain_id",
+		"idx_ai_explanation_prompt_evaluation_org_created", "idx_ai_explanation_prompt_evaluation_org_status_created",
+		"ai_explanation_profiles", "idx_ai_explanation_profile_created", "idx_ai_explanation_profile_status_created",
+	} {
+		if !containsJSONToken(up, required) {
+			t.Fatalf("AI explanation governance catalog migration does not contain %q", required)
+		}
+	}
+	if len(commands) != 2 || containsJSONToken(up, "insert") || containsJSONToken(up, "update") {
+		t.Fatalf("AI explanation governance catalog up migration must contain two read-only index commands: %s", up)
+	}
+
+	down, err := os.ReadFile("migrations/mongodb/000033_add_ai_explanation_governance_catalog_indexes.down.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(down, &commands); err != nil {
+		t.Fatal(err)
+	}
+	for _, index := range []string{
+		"idx_ai_explanation_prompt_evaluation_org_created", "idx_ai_explanation_prompt_evaluation_org_status_created",
+		"idx_ai_explanation_profile_created", "idx_ai_explanation_profile_status_created",
+	} {
+		if !containsJSONToken(down, index) {
+			t.Fatalf("AI explanation governance catalog down migration does not own %q", index)
+		}
+	}
+	if len(commands) != 4 || containsJSONToken(down, "dropDatabase") || containsJSONToken(down, "drop") {
+		t.Fatalf("AI explanation governance catalog down migration must drop four indexes only: %s", down)
+	}
+}
+
 func containsJSONToken(raw []byte, token string) bool {
 	quoted, _ := json.Marshal(token)
 	for index := 0; index+len(quoted) <= len(raw); index++ {

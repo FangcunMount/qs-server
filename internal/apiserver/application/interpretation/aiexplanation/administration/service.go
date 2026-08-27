@@ -46,6 +46,7 @@ type Access interface {
 }
 
 type ReviewWorkflow interface {
+	List(context.Context, appevaluation.ReviewRunListQuery) (*appevaluation.ReviewRunPage, error)
 	Find(context.Context, meta.ID) (*appevaluation.ReviewRun, error)
 	RecordHumanReview(context.Context, meta.ID, appevaluation.HumanReviewCommand) (*appevaluation.ReviewRun, error)
 	Finalize(context.Context, meta.ID, string, string) (*appevaluation.ReviewRun, error)
@@ -53,6 +54,8 @@ type ReviewWorkflow interface {
 }
 
 type ProfileGovernance interface {
+	List(context.Context, appgovernance.ProfileListQuery) (*appgovernance.ProfilePage, error)
+	Find(context.Context, string, string) (*domainprofile.AIExplanationProfile, error)
 	CreateDraft(context.Context, appgovernance.CreateDraftCommand) (*domainprofile.AIExplanationProfile, error)
 	Publish(context.Context, appgovernance.PublishCommand) (*domainprofile.AIExplanationProfile, error)
 	Disable(context.Context, appgovernance.DisableCommand) (*domainprofile.AIExplanationProfile, error)
@@ -75,15 +78,30 @@ type Service interface {
 	FindEvaluationCapacity(context.Context, Actor) (*EvaluationCapacity, error)
 	FindParticipantCapacity(context.Context, Actor) (*ParticipantCapacity, error)
 	RetryParticipantGeneration(context.Context, Actor, RetryParticipantGenerationCommand) (*apprecovery.Result, error)
+	ListEvaluations(context.Context, Actor, EvaluationListQuery) (*appevaluation.ReviewRunPage, error)
 	FindEvaluation(context.Context, Actor, meta.ID) (*appevaluation.ReviewRun, error)
 	StartEvaluation(context.Context, Actor, StartEvaluationCommand) (*appevaluation.ReviewRun, error)
 	RecoverEvaluation(context.Context, Actor, meta.ID, RecoverEvaluationCommand) (*appevaluation.ReviewRun, error)
 	CancelEvaluation(context.Context, Actor, meta.ID, string) (*appevaluation.ReviewRun, error)
 	RecordReview(context.Context, Actor, meta.ID, ReviewCommand) (*appevaluation.ReviewRun, error)
 	FinalizeEvaluation(context.Context, Actor, meta.ID, string) (*appevaluation.ReviewRun, error)
+	ListProfiles(context.Context, Actor, ProfileListQuery) (*appgovernance.ProfilePage, error)
+	FindProfile(context.Context, Actor, string, string) (*domainprofile.AIExplanationProfile, error)
 	CreateProfileDraft(context.Context, Actor, CreateProfileDraftCommand) (*domainprofile.AIExplanationProfile, error)
 	PublishProfile(context.Context, Actor, PublishProfileCommand) (*domainprofile.AIExplanationProfile, error)
 	DisableProfile(context.Context, Actor, DisableProfileCommand) (*domainprofile.AIExplanationProfile, error)
+}
+
+type EvaluationListQuery struct {
+	Status *domainevaluation.Status
+	Cursor string
+	Limit  int
+}
+
+type ProfileListQuery struct {
+	Status *domainprofile.Status
+	Cursor string
+	Limit  int
 }
 
 type ReviewCommand struct {
@@ -499,6 +517,55 @@ func (s *service) FindEvaluation(ctx context.Context, actor Actor, runID meta.ID
 	return result, nil
 }
 
+func (s *service) ListEvaluations(ctx context.Context, actor Actor, query EvaluationListQuery) (*appevaluation.ReviewRunPage, error) {
+	if actor.OrgID <= 0 || actor.OperatorUserID <= 0 || query.Limit < 0 || query.Limit > appevaluation.MaxReviewRunPageSize ||
+		(query.Status != nil && !query.Status.IsValid()) {
+		return nil, cberrors.WithCode(code.ErrInvalidArgument, "AI explanation evaluation list query is invalid")
+	}
+	if s == nil || s.reviews == nil || s.access == nil {
+		return nil, cberrors.WithCode(code.ErrUnsupportedOperation, "AI explanation evaluation review is disabled")
+	}
+	if err := s.access.AuthorizeRead(ctx, actor); err != nil {
+		return nil, err
+	}
+	result, err := s.reviews.List(ctx, appevaluation.ReviewRunListQuery{
+		OrgID: actor.OrgID, Status: query.Status, Cursor: strings.TrimSpace(query.Cursor), Limit: query.Limit,
+	})
+	return result, mapKnownError(err)
+}
+
+func (s *service) ListProfiles(ctx context.Context, actor Actor, query ProfileListQuery) (*appgovernance.ProfilePage, error) {
+	if actor.OrgID <= 0 || actor.OperatorUserID <= 0 || query.Limit < 0 || query.Limit > appgovernance.MaxProfilePageSize ||
+		(query.Status != nil && !query.Status.IsValid()) {
+		return nil, cberrors.WithCode(code.ErrInvalidArgument, "AI explanation Profile list query is invalid")
+	}
+	if s == nil || s.governance == nil || s.access == nil {
+		return nil, cberrors.WithCode(code.ErrUnsupportedOperation, "AI explanation Profile governance is disabled")
+	}
+	if err := s.access.AuthorizeRead(ctx, actor); err != nil {
+		return nil, err
+	}
+	result, err := s.governance.List(ctx, appgovernance.ProfileListQuery{
+		Status: query.Status, Cursor: strings.TrimSpace(query.Cursor), Limit: query.Limit,
+	})
+	return result, mapKnownError(err)
+}
+
+func (s *service) FindProfile(ctx context.Context, actor Actor, profileID, version string) (*domainprofile.AIExplanationProfile, error) {
+	profileID, version = strings.TrimSpace(profileID), strings.TrimSpace(version)
+	if actor.OrgID <= 0 || actor.OperatorUserID <= 0 || profileID == "" || aiexplanation.ValidateVersion(version) != nil {
+		return nil, cberrors.WithCode(code.ErrInvalidArgument, "AI explanation Profile query is invalid")
+	}
+	if s == nil || s.governance == nil || s.access == nil {
+		return nil, cberrors.WithCode(code.ErrUnsupportedOperation, "AI explanation Profile governance is disabled")
+	}
+	if err := s.access.AuthorizeRead(ctx, actor); err != nil {
+		return nil, err
+	}
+	result, err := s.governance.Find(ctx, profileID, version)
+	return result, mapKnownError(err)
+}
+
 func (s *service) StartEvaluation(ctx context.Context, actor Actor, command StartEvaluationCommand) (*appevaluation.ReviewRun, error) {
 	if actor.OrgID <= 0 || actor.OperatorUserID <= 0 {
 		return nil, cberrors.WithCode(code.ErrInvalidArgument, "AI explanation administrator identity is required")
@@ -709,6 +776,8 @@ func mapKnownError(err error) error {
 	case stderrors.Is(err, domainevaluation.ErrNotFound), stderrors.Is(err, domainprofile.ErrNotFound),
 		stderrors.Is(err, domaingeneration.ErrNotFound), stderrors.Is(err, domainrun.ErrNotFound):
 		return cberrors.WithCode(code.ErrPageNotFound, "%s", err.Error())
+	case stderrors.Is(err, appevaluation.ErrReviewCatalogCursor), stderrors.Is(err, appgovernance.ErrProfileCatalogCursor):
+		return cberrors.WithCode(code.ErrInvalidArgument, "%s", err.Error())
 	case stderrors.Is(err, domainevaluation.ErrOrgConcurrencyExceeded), stderrors.Is(err, domainevaluation.ErrDailyBudgetExceeded):
 		return cberrors.WithCode(code.ErrAIExplanationCapacityExceeded, "%s", err.Error())
 	case stderrors.Is(err, domaingeneration.ErrOrgDailyBudgetExceeded), stderrors.Is(err, domaingeneration.ErrUserDailyBudgetExceeded),

@@ -42,8 +42,11 @@ func (r *Router) registerInterpretationInternalRoutes(internalV1 *gin.RouterGrou
 	if r.deps.Interpretation.AIExplanationAdministration != nil {
 		aiHandler := handler.NewAIExplanationAdministrationHandler(r.deps.Interpretation.AIExplanationAdministration)
 		ai := g.Group("/ai-explanation")
+		ai.GET("/prompt-evaluations", aiHandler.ListEvaluations)
 		ai.GET("/prompt-evaluations/:run_id", aiHandler.FindEvaluation)
 		ai.GET("/prompt-evaluations/:run_id/attempts/:case_id/:attempt", aiHandler.FindAttempt)
+		ai.GET("/profiles", aiHandler.ListProfiles)
+		ai.GET("/profiles/:profile_id/versions/:version", aiHandler.FindProfile)
 		governance := ai.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
 		governance.GET("/prompt-evaluation-capacity", aiHandler.FindEvaluationCapacity)
 		governance.GET("/participant-capacity", aiHandler.FindParticipantCapacity)

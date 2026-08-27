@@ -86,6 +86,37 @@ func TestCreateDraftRecomputesFingerprintAndPersistsCreationAudit(t *testing.T) 
 	}
 }
 
+func TestProfileCatalogFindsVersionAndUsesStableStatusPage(t *testing.T) {
+	now := time.Date(2026, 8, 27, 15, 0, 0, 0, time.UTC)
+	profileRecord := testDraftProfile(t, meta.ID(1010), now)
+	profiles := &profileRepositoryStub{
+		records: map[string]*domainprofile.AIExplanationProfile{profileKey(profileRecord.ProfileID(), profileRecord.Version()): profileRecord},
+		catalog: []*domainprofile.AIExplanationProfile{profileRecord}, nextCursor: "next-profile-page",
+	}
+	service, err := NewService(profiles, &evaluationRepositoryStub{records: map[meta.ID]*domainevaluation.PromptEvaluationRun{}}, func() time.Time { return now })
+	if err != nil {
+		t.Fatal(err)
+	}
+	found, err := service.Find(context.Background(), profileRecord.ProfileID(), profileRecord.Version())
+	if err != nil || found != profileRecord {
+		t.Fatalf("find Profile = %#v, err = %v", found, err)
+	}
+	status := domainprofile.StatusDraft
+	page, err := service.List(context.Background(), ProfileListQuery{Status: &status, Cursor: "current", Limit: 7})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profiles.catalogStatus == nil || *profiles.catalogStatus != status || profiles.catalogCursor != "current" || profiles.catalogLimit != 7 ||
+		len(page.Items) != 1 || page.Items[0] != profileRecord || page.NextCursor != "next-profile-page" {
+		t.Fatalf("Profile catalog query/page = status:%v cursor:%q limit:%d page:%#v", profiles.catalogStatus, profiles.catalogCursor, profiles.catalogLimit, page)
+	}
+
+	profiles.catalog = []*domainprofile.AIExplanationProfile{testPublishedProfile(t, meta.ID(1011), now)}
+	if _, err := service.List(context.Background(), ProfileListQuery{Status: &status, Limit: 7}); err == nil {
+		t.Fatal("Profile catalog must reject a result that does not match the status filter")
+	}
+}
+
 func TestPublishRejectsIncompleteOrMismatchedEvidence(t *testing.T) {
 	now := time.Date(2026, 8, 27, 16, 0, 0, 0, time.UTC)
 	profileRecord := testDraftProfile(t, meta.ID(1002), now.Add(-time.Hour))
@@ -155,6 +186,15 @@ func testDraftProfile(t *testing.T, id meta.ID, at time.Time) *domainprofile.AIE
 		t.Fatal(err)
 	}
 	return profileRecord
+}
+
+func testPublishedProfile(t *testing.T, id meta.ID, at time.Time) *domainprofile.AIExplanationProfile {
+	t.Helper()
+	value := testDraftProfile(t, id, at)
+	if err := value.Publish(meta.ID(7000)+id, "release-owner", "approved evidence", at.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	return value
 }
 
 func testRelease(profileRecord *domainprofile.AIExplanationProfile) domainevaluation.ReleaseIdentity {
@@ -249,9 +289,14 @@ func governanceSemanticEvaluator() domainevaluation.SemanticEvaluatorSpec {
 }
 
 type profileRepositoryStub struct {
-	records   map[string]*domainprofile.AIExplanationProfile
-	published []*domainprofile.AIExplanationProfile
-	saveCalls int
+	records       map[string]*domainprofile.AIExplanationProfile
+	published     []*domainprofile.AIExplanationProfile
+	catalog       []*domainprofile.AIExplanationProfile
+	nextCursor    string
+	catalogStatus *domainprofile.Status
+	catalogCursor string
+	catalogLimit  int
+	saveCalls     int
 }
 
 func (r *profileRepositoryStub) Save(_ context.Context, value *domainprofile.AIExplanationProfile) error {
@@ -268,6 +313,10 @@ func (r *profileRepositoryStub) FindByKey(_ context.Context, id, version string)
 }
 func (r *profileRepositoryStub) ListPublishedByBaseSelector(context.Context, policy.Audience, modelcatalog.Kind, modelcatalog.DecisionKind) ([]*domainprofile.AIExplanationProfile, error) {
 	return append([]*domainprofile.AIExplanationProfile(nil), r.published...), nil
+}
+func (r *profileRepositoryStub) ListProfiles(_ context.Context, status *domainprofile.Status, cursor string, limit int) ([]*domainprofile.AIExplanationProfile, string, error) {
+	r.catalogStatus, r.catalogCursor, r.catalogLimit = status, cursor, limit
+	return append([]*domainprofile.AIExplanationProfile(nil), r.catalog...), r.nextCursor, nil
 }
 
 type evaluationRepositoryStub struct {

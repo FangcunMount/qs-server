@@ -1,0 +1,44 @@
+[
+  {
+    "createIndexes": "ai_explanation_prompt_evaluations",
+    "indexes": [
+      {
+        "key": {
+          "requested_org_id": 1,
+          "created_at": -1,
+          "domain_id": -1
+        },
+        "name": "idx_ai_explanation_prompt_evaluation_org_created"
+      },
+      {
+        "key": {
+          "requested_org_id": 1,
+          "status": 1,
+          "created_at": -1,
+          "domain_id": -1
+        },
+        "name": "idx_ai_explanation_prompt_evaluation_org_status_created"
+      }
+    ]
+  },
+  {
+    "createIndexes": "ai_explanation_profiles",
+    "indexes": [
+      {
+        "key": {
+          "created_at": -1,
+          "domain_id": -1
+        },
+        "name": "idx_ai_explanation_profile_created"
+      },
+      {
+        "key": {
+          "status": 1,
+          "created_at": -1,
+          "domain_id": -1
+        },
+        "name": "idx_ai_explanation_profile_status_created"
+      }
+    ]
+  }
+]

@@ -76,6 +76,65 @@ func TestCreateProfileDraftPassesFingerprintAndTrustedAudit(t *testing.T) {
 	}
 }
 
+func TestGovernanceCatalogReadsUseTrustedActorAndAuditAuthorization(t *testing.T) {
+	profileDefinition := profileDefinitionFixture(t)
+	profileRecord, err := domainprofile.NewDraftForRelease(meta.ID(81), profileDefinition, "user:42", "review candidate", time.Date(2026, 8, 27, 8, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	reviews := &reviewWorkflowStub{listPage: &appevaluation.ReviewRunPage{
+		Items:      []*appevaluation.ReviewRun{{RunID: meta.ID(9), RequestedOrgID: 7, Status: domainevaluation.StatusAwaitingReview}},
+		NextCursor: "next-evaluation-page",
+	}}
+	governance := &governanceStub{
+		profile:  profileRecord,
+		listPage: &appgovernance.ProfilePage{Items: []*domainprofile.AIExplanationProfile{profileRecord}, NextCursor: "next-profile-page"},
+	}
+	access := &accessStub{}
+	service := NewService(reviews, governance, access)
+	actor := Actor{OrgID: 7, OperatorUserID: 42}
+	evaluationStatus := domainevaluation.StatusAwaitingReview
+	evaluations, err := service.ListEvaluations(context.Background(), actor, EvaluationListQuery{Status: &evaluationStatus, Cursor: "current-evaluation", Limit: 7})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reviews.listQuery.OrgID != 7 || reviews.listQuery.Status == nil || *reviews.listQuery.Status != evaluationStatus || reviews.listQuery.Cursor != "current-evaluation" || reviews.listQuery.Limit != 7 ||
+		evaluations.NextCursor != "next-evaluation-page" {
+		t.Fatalf("evaluation catalog query/page = %#v / %#v", reviews.listQuery, evaluations)
+	}
+
+	profileStatus := domainprofile.StatusDraft
+	profiles, err := service.ListProfiles(context.Background(), actor, ProfileListQuery{Status: &profileStatus, Cursor: "current-profile", Limit: 9})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if governance.listQuery.Status == nil || *governance.listQuery.Status != profileStatus || governance.listQuery.Cursor != "current-profile" || governance.listQuery.Limit != 9 ||
+		profiles.NextCursor != "next-profile-page" {
+		t.Fatalf("Profile catalog query/page = %#v / %#v", governance.listQuery, profiles)
+	}
+	found, err := service.FindProfile(context.Background(), actor, profileRecord.ProfileID(), profileRecord.Version())
+	if err != nil || found != profileRecord || governance.foundProfileID != profileRecord.ProfileID() || governance.foundVersion != profileRecord.Version() {
+		t.Fatalf("Profile find = %#v key=%s/%s err=%v", found, governance.foundProfileID, governance.foundVersion, err)
+	}
+	if access.readCalls != 3 || access.readActor != actor {
+		t.Fatalf("catalog audit authorization = calls:%d actor:%#v", access.readCalls, access.readActor)
+	}
+}
+
+func TestGovernanceCatalogMapsOpaqueCursorFailuresToInvalidArgument(t *testing.T) {
+	actor := Actor{OrgID: 7, OperatorUserID: 42}
+	reviews := &reviewWorkflowStub{listErr: appevaluation.ErrReviewCatalogCursor}
+	governance := &governanceStub{listErr: appgovernance.ErrProfileCatalogCursor}
+	service := NewService(reviews, governance, &accessStub{})
+
+	if _, err := service.ListEvaluations(context.Background(), actor, EvaluationListQuery{Cursor: "invalid"}); cberrors.ParseCoder(err) == nil || cberrors.ParseCoder(err).Code() != code.ErrInvalidArgument {
+		t.Fatalf("evaluation cursor error = %v", err)
+	}
+	if _, err := service.ListProfiles(context.Background(), actor, ProfileListQuery{Cursor: "invalid"}); cberrors.ParseCoder(err) == nil || cberrors.ParseCoder(err).Code() != code.ErrInvalidArgument {
+		t.Fatalf("Profile cursor error = %v", err)
+	}
+}
+
 func TestStartEvaluationRequiresExplicitCostConfirmationAndTrustedAudit(t *testing.T) {
 	reviews := &reviewWorkflowStub{run: &appevaluation.ReviewRun{RunID: meta.ID(700), Status: domainevaluation.StatusCollecting}}
 	starter := &evaluationStarterStub{}
@@ -318,6 +377,9 @@ type reviewWorkflowStub struct {
 	recordCalls  int
 	canceledBy   string
 	cancelReason string
+	listPage     *appevaluation.ReviewRunPage
+	listQuery    appevaluation.ReviewRunListQuery
+	listErr      error
 }
 
 func (s *reviewWorkflowStub) Find(context.Context, meta.ID) (*appevaluation.ReviewRun, error) {
@@ -334,9 +396,19 @@ func (s *reviewWorkflowStub) Cancel(_ context.Context, _ meta.ID, actor, reason 
 	s.canceledBy, s.cancelReason = actor, reason
 	return s.run, nil
 }
+func (s *reviewWorkflowStub) List(_ context.Context, query appevaluation.ReviewRunListQuery) (*appevaluation.ReviewRunPage, error) {
+	s.listQuery = query
+	return s.listPage, s.listErr
+}
 
 type governanceStub struct {
-	created appgovernance.CreateDraftCommand
+	created        appgovernance.CreateDraftCommand
+	profile        *domainprofile.AIExplanationProfile
+	listPage       *appgovernance.ProfilePage
+	listQuery      appgovernance.ProfileListQuery
+	foundProfileID string
+	foundVersion   string
+	listErr        error
 }
 
 func (s *governanceStub) CreateDraft(_ context.Context, command appgovernance.CreateDraftCommand) (*domainprofile.AIExplanationProfile, error) {
@@ -349,13 +421,27 @@ func (*governanceStub) Publish(context.Context, appgovernance.PublishCommand) (*
 func (*governanceStub) Disable(context.Context, appgovernance.DisableCommand) (*domainprofile.AIExplanationProfile, error) {
 	return nil, nil
 }
+func (s *governanceStub) List(_ context.Context, query appgovernance.ProfileListQuery) (*appgovernance.ProfilePage, error) {
+	s.listQuery = query
+	return s.listPage, s.listErr
+}
+func (s *governanceStub) Find(_ context.Context, profileID, version string) (*domainprofile.AIExplanationProfile, error) {
+	s.foundProfileID, s.foundVersion = profileID, version
+	return s.profile, nil
+}
 
 type accessStub struct {
 	reviewRole      domainevaluation.ReviewRole
 	governanceCalls int
+	readCalls       int
+	readActor       Actor
 }
 
-func (*accessStub) AuthorizeRead(context.Context, Actor) error { return nil }
+func (s *accessStub) AuthorizeRead(_ context.Context, actor Actor) error {
+	s.readCalls++
+	s.readActor = actor
+	return nil
+}
 func (s *accessStub) AuthorizeReview(_ context.Context, _ Actor, role domainevaluation.ReviewRole) error {
 	s.reviewRole = role
 	return nil

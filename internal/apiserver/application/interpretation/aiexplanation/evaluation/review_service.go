@@ -3,6 +3,7 @@ package evaluation
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -13,6 +14,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
+var ErrReviewCatalogCursor = errors.New("AI explanation Prompt review catalog cursor is invalid")
+
 // ReviewService exposes the synthetic evidence packet needed by release
 // reviewers and delegates all writes to EvidenceService's aggregate-version
 // CAS. Authentication and authorization must provide a trusted Reviewer
@@ -20,10 +23,67 @@ import (
 // This service deliberately has no participant-facing transport.
 type ReviewService struct {
 	evidence         *EvidenceService
+	catalog          ReviewRunCatalog
 	suiteID          string
 	suiteVersion     string
 	suiteFingerprint aiexplanation.Fingerprint
 	assessmentInputs map[string]json.RawMessage
+}
+
+const (
+	DefaultReviewRunPageSize = 20
+	MaxReviewRunPageSize     = 100
+)
+
+// ReviewRunCatalog is the bounded, organization-scoped read contract used by
+// operator review workbenches. Cursor semantics are owned by the persistence
+// adapter so transports never learn Mongo keyset details.
+type ReviewRunCatalog interface {
+	ListForReview(context.Context, int64, *domainevaluation.Status, string, int) ([]ReviewRunCatalogRecord, string, error)
+}
+
+// ReviewRunCatalogRecord is the deliberately bounded queue projection. It
+// contains only the identities needed to derive review progress; raw Provider
+// output, normalized output, receipts, assertions and semantic rationale are
+// available only through the explicit single-run evidence query.
+type ReviewRunCatalogRecord struct {
+	RunID          meta.ID
+	Version        int64
+	Status         domainevaluation.Status
+	Release        domainevaluation.ReleaseIdentity
+	RequestedOrgID int64
+	RequestedBy    string
+	RequestReason  string
+	CreatedAt      time.Time
+	Attempts       []ReviewRunCatalogAttempt
+	Reviews        []ReviewRunCatalogReview
+	ExecutionPhase *domainevaluation.AttemptExecutionPhase
+	Gate           *domainevaluation.GateResult
+}
+
+type ReviewRunCatalogAttempt struct {
+	CaseID  string
+	Attempt int
+	Stage   domainevaluation.AttemptStage
+}
+
+type ReviewRunCatalogReview struct {
+	CaseID   string
+	Attempt  int
+	Role     domainevaluation.ReviewRole
+	Decision domainevaluation.ReviewDecision
+}
+
+type ReviewRunListQuery struct {
+	OrgID  int64
+	Status *domainevaluation.Status
+	Cursor string
+	Limit  int
+}
+
+type ReviewRunPage struct {
+	Items      []*ReviewRun
+	NextCursor string
 }
 
 type ReviewRun struct {
@@ -129,11 +189,142 @@ func NewReviewService(evidence *EvidenceService) (*ReviewService, error) {
 	}
 	return &ReviewService{
 		evidence:         evidence,
+		catalog:          reviewRunCatalog(evidence.repository),
 		suiteID:          suite.SuiteID,
 		suiteVersion:     suite.SuiteVersion,
 		suiteFingerprint: aiexplanation.NewFingerprint(raw),
 		assessmentInputs: inputs,
 	}, nil
+}
+
+func reviewRunCatalog(repository domainevaluation.Repository) ReviewRunCatalog {
+	reader, _ := repository.(ReviewRunCatalog)
+	return reader
+}
+
+// List returns review-safe projections only for the trusted organization.
+// Supplying awaiting_review is the v1 review-queue query; no separate mutable
+// queue is introduced because missing roles are derived from immutable evidence.
+func (s *ReviewService) List(ctx context.Context, query ReviewRunListQuery) (*ReviewRunPage, error) {
+	if s == nil || s.catalog == nil {
+		return nil, fmt.Errorf("AI explanation Prompt review catalog is not configured")
+	}
+	if query.OrgID <= 0 || query.Limit < 0 || query.Limit > MaxReviewRunPageSize ||
+		(query.Status != nil && !query.Status.IsValid()) {
+		return nil, fmt.Errorf("AI explanation Prompt review catalog query is invalid")
+	}
+	limit := query.Limit
+	if limit == 0 {
+		limit = DefaultReviewRunPageSize
+	}
+	values, nextCursor, err := s.catalog.ListForReview(ctx, query.OrgID, query.Status, query.Cursor, limit)
+	if err != nil {
+		return nil, err
+	}
+	if len(values) > limit {
+		return nil, fmt.Errorf("AI explanation Prompt review catalog exceeded requested limit")
+	}
+	page := &ReviewRunPage{Items: make([]*ReviewRun, 0, len(values)), NextCursor: nextCursor}
+	for _, value := range values {
+		if value.RequestedOrgID != query.OrgID {
+			return nil, fmt.Errorf("AI explanation Prompt review catalog crossed organization boundary")
+		}
+		if query.Status != nil && value.Status != *query.Status {
+			return nil, fmt.Errorf("AI explanation Prompt review catalog returned inconsistent status")
+		}
+		projected, err := s.projectCatalogRecord(value)
+		if err != nil {
+			return nil, err
+		}
+		page.Items = append(page.Items, projected)
+	}
+	return page, nil
+}
+
+func (s *ReviewService) projectCatalogRecord(value ReviewRunCatalogRecord) (*ReviewRun, error) {
+	if value.RunID.IsZero() || !value.Status.IsValid() || value.RequestedOrgID <= 0 || value.CreatedAt.IsZero() {
+		return nil, fmt.Errorf("AI explanation Prompt review catalog record is invalid")
+	}
+	if value.Release.Suite.ID != s.suiteID || value.Release.Suite.Version != s.suiteVersion ||
+		value.Release.Suite.Fingerprint != s.suiteFingerprint {
+		return nil, fmt.Errorf("AI explanation Prompt review suite does not match frozen release evidence")
+	}
+	if err := value.Release.Validate(); err != nil {
+		return nil, err
+	}
+
+	generationAttempts := make(map[string]struct{}, len(value.Attempts))
+	for _, attempt := range value.Attempts {
+		if attempt.Stage == domainevaluation.AttemptStagePreflight {
+			if attempt.CaseID != value.Release.PreflightCaseID || attempt.Attempt != 1 {
+				return nil, fmt.Errorf("AI explanation Prompt review catalog preflight attempt is invalid")
+			}
+			continue
+		}
+		if attempt.Stage != domainevaluation.AttemptStageGeneration || !value.Release.IsGenerationCase(attempt.CaseID) ||
+			attempt.Attempt < 1 || attempt.Attempt > value.Release.RepetitionsPerCase {
+			return nil, fmt.Errorf("AI explanation Prompt review catalog attempt is invalid")
+		}
+		key := reviewAttemptKey(attempt.CaseID, attempt.Attempt)
+		if _, exists := generationAttempts[key]; exists {
+			return nil, fmt.Errorf("AI explanation Prompt review catalog attempt is duplicated")
+		}
+		generationAttempts[key] = struct{}{}
+	}
+
+	reviewsByAttempt := make(map[string]map[domainevaluation.ReviewRole]domainevaluation.ReviewDecision, len(value.Reviews))
+	progress := ReviewProgress{GenerationAttempts: len(generationAttempts), RequiredReviews: len(generationAttempts) * 2}
+	for _, review := range value.Reviews {
+		key := reviewAttemptKey(review.CaseID, review.Attempt)
+		if _, exists := generationAttempts[key]; !exists ||
+			(review.Role != domainevaluation.ReviewRoleAssessmentSemantics && review.Role != domainevaluation.ReviewRoleSafetyProduct) ||
+			(review.Decision != domainevaluation.ReviewDecisionApprove && review.Decision != domainevaluation.ReviewDecisionReject) {
+			return nil, fmt.Errorf("AI explanation Prompt review catalog review is invalid")
+		}
+		if reviewsByAttempt[key] == nil {
+			reviewsByAttempt[key] = make(map[domainevaluation.ReviewRole]domainevaluation.ReviewDecision, 2)
+		}
+		if _, exists := reviewsByAttempt[key][review.Role]; exists {
+			return nil, fmt.Errorf("AI explanation Prompt review catalog review role is duplicated")
+		}
+		reviewsByAttempt[key][review.Role] = review.Decision
+		progress.RecordedReviews++
+		if review.Decision == domainevaluation.ReviewDecisionReject {
+			progress.RejectedReviews++
+		}
+	}
+	for key := range generationAttempts {
+		recorded := len(reviewsByAttempt[key])
+		progress.MissingReviews += 2 - recorded
+		if recorded == 2 {
+			progress.FullyReviewedAttempts++
+		}
+	}
+	progress.AllRequiredReviewsRecorded = progress.GenerationAttempts == domainevaluation.RequiredGenerationAttempts && progress.MissingReviews == 0
+	if value.ExecutionPhase != nil &&
+		(value.Status != domainevaluation.StatusCollecting ||
+			(*value.ExecutionPhase != domainevaluation.AttemptExecutionPrepared && *value.ExecutionPhase != domainevaluation.AttemptExecutionDispatching)) {
+		return nil, fmt.Errorf("AI explanation Prompt review catalog execution checkpoint is invalid")
+	}
+
+	result := &ReviewRun{
+		RunID: value.RunID, Version: value.Version, Status: value.Status, Release: value.Release,
+		RequestedOrgID: value.RequestedOrgID, RequestedBy: value.RequestedBy,
+		RequestReason: value.RequestReason, CreatedAt: value.CreatedAt,
+		Progress: progress, Gate: value.Gate,
+		CanReview:   value.Status == domainevaluation.StatusAwaitingReview,
+		CanFinalize: value.Status == domainevaluation.StatusAwaitingReview && progress.AllRequiredReviewsRecorded,
+	}
+	if value.Status == domainevaluation.StatusCollecting {
+		result.RecoveryMaxProviderInvocations = (domainevaluation.RequiredGenerationAttempts - progress.GenerationAttempts) * 2
+		if value.ExecutionPhase != nil && *value.ExecutionPhase == domainevaluation.AttemptExecutionDispatching {
+			result.RecoveryMaxProviderInvocations -= 2
+		}
+		if result.RecoveryMaxProviderInvocations < 0 {
+			result.RecoveryMaxProviderInvocations = 0
+		}
+	}
+	return result, nil
 }
 
 func (s *ReviewService) Find(ctx context.Context, runID meta.ID) (*ReviewRun, error) {

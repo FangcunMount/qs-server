@@ -31,8 +31,8 @@ mongodb/
 | `ai_explanation_generations` | 手动 AI 解读生成意图 | semantic unique、规范 Input 快照、终态 TTL（见 000025/000031） |
 | `ai_explanation_runs` | 单次 Provider 执行尝试 | generation+attempt unique、expired lease、终态 TTL（见 000025/000031） |
 | `ai_explanation_artifacts` | 通过确定性校验的不可变 AI 解读内容 | generation unique、结构化 Content、TTL、Org/Testee 数据主体导出 keyset（见 000025/000031/000032） |
-| `ai_explanation_profiles` | AI 解读发布策略 | profile_id+version unique、published selector（见 000025） |
-| `ai_explanation_prompt_evaluations` | 合成 Prompt 评测、语义评分与人工复核的不可变证据 | domain_id unique、active release unique、profile/status、suite/prompt release 与过期执行租约查询（见 000026/000027） |
+| `ai_explanation_profiles` | AI 解读发布策略 | profile_id+version unique、published selector、status/created keyset（见 000025/000033） |
+| `ai_explanation_prompt_evaluations` | 合成 Prompt 评测、语义评分与人工复核的不可变证据 | domain_id unique、active release unique、profile/status、suite/prompt release、过期执行租约与 Org/created keyset 查询（见 000026/000027/000033） |
 | `ai_explanation_prompt_evaluation_daily_budgets` | 机构级 Prompt 评测 UTC 日调用预留账本 | org+budget day unique、reservation run unique（见 000027） |
 | `ai_explanation_participant_daily_budgets` | Participant 每次 Provider attempt 的 UTC 日调用预留账本 | org+budget day unique、reservation generation+attempt unique（见 000028/000030） |
 | `ai_explanation_participant_active_capacity` | Participant Provider 执行的分布式活跃槽账本 | org unique、active generation/run unique（见 000029） |
@@ -119,6 +119,10 @@ down migration 只删除本版本拥有的 TTL indexes，不恢复已经由 TTL 
 `000032_add_ai_explanation_subject_export_index` 在 `ai_explanation_artifacts` 上增加 `(source.association.org_id, source.association.testee_id, audience, generated_at desc, domain_id desc)` 索引，支持数据主体导出按 Org/Testee 与 Participant audience 精确过滤，并使用固定 snapshot 下的 `generated_at + artifact_id` keyset 稳定分页。migration 只建索引，不导出数据、不扩大授权，也不改写 Artifact。
 
 应用导出路径只投影标准报告来源、Profile/Prompt/Route/校验器版本收据和最终正文，排除 Input、Prompt 渲染、Run、Outbox、Provider Invocation/request ID、token/延迟和预算账本。该索引存在只证明仓库查询契约已有物理支撑，不代表真实授权联调、大数据量或生产合规验收已完成。down migration 只删除该索引，不改写任何 Artifact。
+
+## AI explanation governance catalog indexes（000033）
+
+`000033_add_ai_explanation_governance_catalog_indexes` 为评测审核目录增加 `(requested_org_id, status?, created_at desc, domain_id desc)`，为 Profile 治理目录增加 `(status?, created_at desc, domain_id desc)`。这些索引只服务可信管理面的组织隔离和稳定 keyset 分页，不改变评测、审核或 Profile 状态，也不会自动发布任何配置。down migration 只删除本版本拥有的四个索引。
 
 ## Report catalog bounded audit（000021）
 

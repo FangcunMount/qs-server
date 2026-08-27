@@ -304,31 +304,7 @@ func (*Mapper) PromptEvaluationRunToDomain(po *PromptEvaluationRunPO) (*domainev
 	if po == nil {
 		return nil, fmt.Errorf("AI explanation Prompt evaluation document is required")
 	}
-	suiteFingerprint, err := aiexplanation.ParseFingerprint(po.Release.Suite.Fingerprint)
-	if err != nil {
-		return nil, err
-	}
-	promptRef, err := promptFromPO(po.Release.Prompt)
-	if err != nil {
-		return nil, err
-	}
-	profileRef, err := profileRefFromPO(po.Release.Profile)
-	if err != nil {
-		return nil, err
-	}
-	inputSchema, err := schemaRefFromPO(po.Release.InputSchema)
-	if err != nil {
-		return nil, err
-	}
-	outputSchema, err := schemaRefFromPO(po.Release.OutputSchema)
-	if err != nil {
-		return nil, err
-	}
-	provider, err := executionFromPO(po.Release.Provider)
-	if err != nil {
-		return nil, err
-	}
-	semanticEvaluator, err := semanticEvaluatorSpecFromPO(po.Release.SemanticEvaluator)
+	release, err := evaluationReleaseFromPO(po.Release)
 	if err != nil {
 		return nil, err
 	}
@@ -353,14 +329,6 @@ func (*Mapper) PromptEvaluationRunToDomain(po *PromptEvaluationRunPO) (*domainev
 			ID: value.ID, CaseID: value.CaseID, Attempt: value.Attempt, Actor: value.Actor,
 			Reason: value.Reason, RequestedAt: value.RequestedAt,
 		})
-	}
-	release := domainevaluation.ReleaseIdentity{
-		Suite:  domainevaluation.SuiteRef{ID: po.Release.Suite.ID, Version: po.Release.Suite.Version, Fingerprint: suiteFingerprint, GitBlobSHA: po.Release.Suite.GitBlobSHA},
-		Prompt: promptRef, Profile: profileRef, InputSchema: inputSchema, OutputSchema: outputSchema, Provider: provider,
-		SemanticEvaluator: semanticEvaluator,
-		Decoding:          decodingFromPO(po.Release.Decoding), GenerationCaseIDs: append([]string(nil), po.Release.GenerationCaseIDs...),
-		PreflightCaseID: po.Release.PreflightCaseID, PreflightRejectionReason: po.Release.PreflightRejectionReason,
-		RepetitionsPerCase: po.Release.RepetitionsPerCase,
 	}
 	releaseFingerprint, err := release.Fingerprint()
 	if err != nil {
@@ -388,6 +356,49 @@ func (*Mapper) PromptEvaluationRunToDomain(po *PromptEvaluationRunPO) (*domainev
 		FinalReason: po.FinalReason, Gate: gateFromPO(po.Gate),
 		CanceledAt: po.CanceledAt, CanceledBy: po.CanceledBy, CancelReason: po.CancelReason,
 	})
+}
+
+// evaluationReleaseFromPO converts the immutable release identity without
+// restoring the full aggregate. Catalog queries use it together with a narrow
+// Mongo projection so queue reads cannot load Provider output evidence.
+func evaluationReleaseFromPO(value EvaluationReleasePO) (domainevaluation.ReleaseIdentity, error) {
+	suiteFingerprint, err := aiexplanation.ParseFingerprint(value.Suite.Fingerprint)
+	if err != nil {
+		return domainevaluation.ReleaseIdentity{}, err
+	}
+	promptRef, err := promptFromPO(value.Prompt)
+	if err != nil {
+		return domainevaluation.ReleaseIdentity{}, err
+	}
+	profileRef, err := profileRefFromPO(value.Profile)
+	if err != nil {
+		return domainevaluation.ReleaseIdentity{}, err
+	}
+	inputSchema, err := schemaRefFromPO(value.InputSchema)
+	if err != nil {
+		return domainevaluation.ReleaseIdentity{}, err
+	}
+	outputSchema, err := schemaRefFromPO(value.OutputSchema)
+	if err != nil {
+		return domainevaluation.ReleaseIdentity{}, err
+	}
+	provider, err := executionFromPO(value.Provider)
+	if err != nil {
+		return domainevaluation.ReleaseIdentity{}, err
+	}
+	semanticEvaluator, err := semanticEvaluatorSpecFromPO(value.SemanticEvaluator)
+	if err != nil {
+		return domainevaluation.ReleaseIdentity{}, err
+	}
+	release := domainevaluation.ReleaseIdentity{
+		Suite:  domainevaluation.SuiteRef{ID: value.Suite.ID, Version: value.Suite.Version, Fingerprint: suiteFingerprint, GitBlobSHA: value.Suite.GitBlobSHA},
+		Prompt: promptRef, Profile: profileRef, InputSchema: inputSchema, OutputSchema: outputSchema, Provider: provider,
+		SemanticEvaluator: semanticEvaluator,
+		Decoding:          decodingFromPO(value.Decoding), GenerationCaseIDs: append([]string(nil), value.GenerationCaseIDs...),
+		PreflightCaseID: value.PreflightCaseID, PreflightRejectionReason: value.PreflightRejectionReason,
+		RepetitionsPerCase: value.RepetitionsPerCase,
+	}
+	return release, release.Validate()
 }
 
 func schemaRefToPO(value domainevaluation.SchemaRef) EvaluationSchemaRefPO {

@@ -88,8 +88,8 @@
         "version_count": 70
       },
       "mongodb": {
-        "max_version": 32,
-        "version_count": 32
+        "max_version": 33,
+        "version_count": 33
       }
     },
     "events": {

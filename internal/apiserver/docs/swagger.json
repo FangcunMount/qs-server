@@ -7270,6 +7270,72 @@
             }
         },
         "/internal/v1/interpretation/ai-explanation/profiles": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Explanation-Administration"
+                ],
+                "summary": "分页查询 AI 解读 Profile 治理目录",
+                "parameters": [
+                    {
+                        "enum": [
+                            "draft",
+                            "published",
+                            "disabled"
+                        ],
+                        "type": "string",
+                        "description": "状态",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "稳定分页游标",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页大小，默认 20，最大 100",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AIExplanationProfilePageWire"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            },
             "post": {
                 "consumes": [
                     "application/json"
@@ -7309,6 +7375,71 @@
                                     }
                                 }
                             ]
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Explanation-Administration"
+                ],
+                "summary": "查询一个 AI 解读 Profile 版本",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Profile ID",
+                        "name": "profile_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Profile 版本",
+                        "name": "version",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AIExplanationProfileWire"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
                         }
                     }
                 }
@@ -7471,6 +7602,75 @@
             }
         },
         "/internal/v1/interpretation/ai-explanation/prompt-evaluations": {
+            "get": {
+                "description": "只返回当前可信机构的队列摘要；原始测评输入和 Provider 输出必须通过单份 attempt 证据接口读取。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Explanation-Administration"
+                ],
+                "summary": "分页查询 AI 解读 Prompt 评测审核目录",
+                "parameters": [
+                    {
+                        "enum": [
+                            "collecting",
+                            "awaiting_review",
+                            "approved",
+                            "rejected",
+                            "canceled"
+                        ],
+                        "type": "string",
+                        "description": "状态",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "稳定分页游标",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页大小，默认 20，最大 100",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AIExplanationEvaluationPageWire"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            },
             "post": {
                 "description": "请求体必须确认 v1 最多执行 70 次 Provider 调用；start 同时执行机构 collecting 并发和 UTC 日调用预算准入，仅持久化预算预留、评测与首个事件，不同步调用模型。",
                 "consumes": [
@@ -10249,6 +10449,20 @@
                 }
             }
         },
+        "handler.AIExplanationEvaluationPageWire": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.AIExplanationEvaluationSummaryWire"
+                    }
+                },
+                "next_cursor": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.AIExplanationEvaluationRecoverRequest": {
             "type": "object",
             "required": [
@@ -10418,6 +10632,50 @@
                 "reason": {
                     "type": "string",
                     "maxLength": 1000
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationSummaryWire": {
+            "type": "object",
+            "properties": {
+                "can_finalize": {
+                    "type": "boolean"
+                },
+                "can_review": {
+                    "type": "boolean"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "gate": {
+                    "$ref": "#/definitions/handler.AIExplanationGateWire"
+                },
+                "progress": {
+                    "$ref": "#/definitions/handler.AIExplanationReviewProgressWire"
+                },
+                "recovery_max_provider_invocations": {
+                    "type": "integer"
+                },
+                "release": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationReleaseWire"
+                },
+                "request_reason": {
+                    "type": "string"
+                },
+                "requested_by": {
+                    "type": "string"
+                },
+                "requested_org_id": {
+                    "type": "integer"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
                 }
             }
         },
@@ -10708,6 +10966,20 @@
                 "reason": {
                     "type": "string",
                     "maxLength": 1000
+                }
+            }
+        },
+        "handler.AIExplanationProfilePageWire": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.AIExplanationProfileWire"
+                    }
+                },
+                "next_cursor": {
+                    "type": "string"
                 }
             }
         },
