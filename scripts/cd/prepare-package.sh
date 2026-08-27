@@ -34,7 +34,7 @@ default_redis_ssl() {
 
 redact_env_file() {
   sed -E \
-    -e 's/^([^=]*(PASSWORD|SECRET|ACCESS_KEY_ID|SESSION_TOKEN|CURRENT_KEY|PREVIOUS_KEY)[^=]*)=.*/\1=***REDACTED***/' \
+    -e 's/^([^=]*(PASSWORD|SECRET|API_KEY|ACCESS_KEY_ID|SESSION_TOKEN|CURRENT_KEY|PREVIOUS_KEY)[^=]*)=.*/\1=***REDACTED***/' \
     "$1"
 }
 
@@ -124,6 +124,9 @@ QS_APISERVER_MESSAGING_NSQ_ADDR=${NSQ_NSQD_HOST}:${NSQ_NSQD_PORT}
 QS_APISERVER_OSS_ACCESS_KEY_ID=${OSS_ACCESS_KEY_ID}
 QS_APISERVER_OSS_ACCESS_KEY_SECRET=${OSS_ACCESS_KEY_SECRET}
 QS_APISERVER_OSS_SESSION_TOKEN=${OSS_SESSION_TOKEN:-}
+
+# The selected AI Provider credential is process-scoped and never stored in YAML.
+DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
 EOF
     ;;
   collection)

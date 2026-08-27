@@ -28,6 +28,7 @@ name: Production Deploy
 #   DELEGATED_SUBJECT_CURRENT_KEY（apiserver/collection 共享，必需）
 #   DELEGATED_SUBJECT_PREVIOUS_KEY（仅密钥轮换窗口使用，可选）
 #   OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET（apiserver 二维码 OSS）
+#   DEEPSEEK_API_KEY（apiserver AI 解读 Provider；仅在 production environment 配置）
 #   OSS_SESSION_TOKEN（可选 STS）：写入 ServerD runner .env，由 source-runner-env.sh 注入，勿放 workflow env
 #   GRPC_APISERVER_ADDR（可选，worker gRPC 地址，默认 qs-apiserver:9090）
 #
@@ -266,6 +267,7 @@ jobs:
           NSQ_NSQD_PORT: ${{ secrets.NSQ_NSQD_PORT || 4150 }}
           OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
           OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
           # shellcheck source=/dev/null
           . scripts/cd/source-runner-env.sh
