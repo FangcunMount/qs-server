@@ -45,6 +45,7 @@ assert_package_contract() {
         JWT_SECRET=jwt-secret DELEGATED_SUBJECT_CURRENT_KEY=delegated-key \
         NSQ_NSQD_HOST=nsqd NSQ_NSQD_PORT=4150 \
         OSS_ACCESS_KEY_ID=access-key OSS_ACCESS_KEY_SECRET=access-secret \
+        DEEPSEEK_API_KEY=deepseek-test-secret-value \
         "$SCRIPT_DIR/prepare-package.sh" >"$output_file"
       ;;
     collection)
@@ -91,6 +92,9 @@ assert_package_contract() {
       test -s "$package_dir/configs/cache/apiserver.prod.yaml"
       assert_line "$env_file" "QS_APISERVER_REDIS_DATABASE=0"
       assert_line "$env_file" "QS_APISERVER_MESSAGING_NSQ_ADDR=nsqd:4150"
+      assert_line "$env_file" "DEEPSEEK_API_KEY=deepseek-test-secret-value"
+      assert_absent "$output_file" "deepseek-test-secret-value"
+      assert_line "$output_file" "DEEPSEEK_API_KEY=***REDACTED***"
       assert_absent "$env_file" "QS_APISERVER_NSQ_NSQD_"
       ;;
     collection)
