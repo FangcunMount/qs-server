@@ -183,7 +183,7 @@ jobs:
           QS_SERVER_TEST_MONGO_TTL_TIMEOUT: 15s
         run: |
           go test -tags=integration \
-            -run '^(TestAIExplanation.*IsAtomicOnReplicaSet|TestAIExplanationMongo(ColdStartEnforcesRuntimeSchema|TTLMonitorDeletesExpiredRecords))$' \
+            -run '^(TestAIExplanation.*IsAtomicOnReplicaSet|TestAIExplanationGovernanceCatalogsPageStableScopedRecordsOnReplicaSet|TestAIExplanationMongo(ColdStartEnforcesRuntimeSchema|TTLMonitorDeletesExpiredRecords))$' \
             -count=1 -timeout=10m -v \
             ./internal/apiserver/infra/mongo/interpretation/aiexplanation \
             ./internal/pkg/migration
