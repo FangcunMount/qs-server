@@ -34,6 +34,9 @@ func TestAPIServerDevProdConfigContracts(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			opts := apiserveroptions.NewOptions()
 			loadConfig(t, filepath.Join(repoRoot(t), "configs", name), opts)
+			if opts.AIExplanation != nil && opts.AIExplanation.Enabled {
+				opts.AIExplanation.APIKey = "config-contract-test-secret"
+			}
 			prepareDelegatedSubjectContract(t, name, opts.DelegatedSubject)
 			stubSecureTLSFiles(t, opts.SecureServing)
 			completeAndValidate(t, opts)
