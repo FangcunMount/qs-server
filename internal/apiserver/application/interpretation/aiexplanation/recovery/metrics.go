@@ -29,8 +29,8 @@ func observeParticipantRetryAuthorization(result *Result, err error) {
 }
 
 var participantRetryAuthorizationTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-	Namespace: "qs_server",
-	Subsystem: "ai_explanation",
-	Name:      "participant_retry_authorizations_total",
+	Namespace: "qs",
+	Subsystem: "ai_explanation_participant",
+	Name:      "retry_authorizations_total",
 	Help:      "Participant AI explanation manual retry authorization outcomes by low-cardinality result.",
 }, []string{"result"})
