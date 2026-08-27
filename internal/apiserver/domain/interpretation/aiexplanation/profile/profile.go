@@ -527,13 +527,25 @@ func validateLifecycle(input PersistedInput) error {
 func cloneDefinition(value Definition) Definition {
 	cloned := value
 	cloned.Selector = cloneSelector(value.Selector)
-	cloned.Eligibility.EligibleDimensionCodes = append([]string(nil), value.Eligibility.EligibleDimensionCodes...)
-	cloned.Eligibility.ExcludedDimensionCodes = append([]string(nil), value.Eligibility.ExcludedDimensionCodes...)
-	cloned.InputPolicy.AllowedFocusAreas = append([]string(nil), value.InputPolicy.AllowedFocusAreas...)
-	cloned.InsightPolicy.AllowedKinds = append([]output.InsightKind(nil), value.InsightPolicy.AllowedKinds...)
-	cloned.SuggestionPolicy.AllowedOrigins = append([]output.SuggestionOrigin(nil), value.SuggestionPolicy.AllowedOrigins...)
-	cloned.SuggestionPolicy.AllowedCategories = append([]string(nil), value.SuggestionPolicy.AllowedCategories...)
-	cloned.SafetyPolicy.ForbiddenClaims = append([]string(nil), value.SafetyPolicy.ForbiddenClaims...)
+	cloned.Eligibility.EligibleDimensionCodes = cloneSlice(value.Eligibility.EligibleDimensionCodes)
+	cloned.Eligibility.ExcludedDimensionCodes = cloneSlice(value.Eligibility.ExcludedDimensionCodes)
+	cloned.InputPolicy.AllowedFocusAreas = cloneSlice(value.InputPolicy.AllowedFocusAreas)
+	cloned.InsightPolicy.AllowedKinds = cloneSlice(value.InsightPolicy.AllowedKinds)
+	cloned.SuggestionPolicy.AllowedOrigins = cloneSlice(value.SuggestionPolicy.AllowedOrigins)
+	cloned.SuggestionPolicy.AllowedCategories = cloneSlice(value.SuggestionPolicy.AllowedCategories)
+	cloned.SafetyPolicy.ForbiddenClaims = cloneSlice(value.SafetyPolicy.ForbiddenClaims)
+	return cloned
+}
+
+// cloneSlice preserves the nil-versus-empty distinction because Definition
+// fingerprints are computed from canonical JSON, where null and [] are
+// intentionally different representations.
+func cloneSlice[T any](value []T) []T {
+	if value == nil {
+		return nil
+	}
+	cloned := make([]T, len(value))
+	copy(cloned, value)
 	return cloned
 }
 

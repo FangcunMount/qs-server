@@ -31,6 +31,24 @@ func TestProfileLifecycleDoesNotChangeFingerprint(t *testing.T) {
 	}
 }
 
+func TestProfileDefinitionClonePreservesEmptyArrayFingerprint(t *testing.T) {
+	definition := validDefinition(nil, nil)
+	definition.Eligibility.EligibleDimensionCodes = []string{}
+	definition.Eligibility.ExcludedDimensionCodes = []string{}
+	profile, err := NewDraft(meta.FromUint64(1), definition, time.Date(2026, 8, 27, 12, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clonedFingerprint, err := profile.Definition().Fingerprint()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if clonedFingerprint != profile.Fingerprint() {
+		t.Fatalf("cloned Definition fingerprint = %s, want %s", clonedFingerprint, profile.Fingerprint())
+	}
+}
+
 func TestReleaseDraftRetainsTrustedCreationAudit(t *testing.T) {
 	createdAt := time.Date(2026, 8, 26, 10, 0, 0, 0, time.UTC)
 	profile, err := NewDraftForRelease(meta.FromUint64(1), validDefinition(nil, nil), "user:42", "initial release candidate", createdAt)

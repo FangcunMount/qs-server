@@ -16,7 +16,48 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
+	"go.mongodb.org/mongo-driver/bson"
 )
+
+func TestProfileMapperRoundTripsThroughBSON(t *testing.T) {
+	mapper := NewMapper()
+	now := time.Date(2026, 8, 27, 12, 0, 0, 0, time.UTC)
+	draftDefinition := mapperProfile(t, now).Definition()
+	draftDefinition.ProfileID = "participant-scale-empty-array-fixture"
+	draftDefinition.Eligibility.EligibleDimensionCodes = []string{}
+	draftDefinition.Eligibility.ExcludedDimensionCodes = []string{}
+	draft, err := domainprofile.NewDraftForRelease(meta.FromUint64(501), draftDefinition, "user:41", "initial release candidate", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for name, profileRecord := range map[string]*domainprofile.AIExplanationProfile{
+		"draft suite fixture": draft,
+		"published":           mapperProfile(t, now),
+	} {
+		t.Run(name, func(t *testing.T) {
+			profilePO, mapErr := mapper.ProfileToPO(profileRecord)
+			if mapErr != nil {
+				t.Fatal(mapErr)
+			}
+			payload, marshalErr := bson.Marshal(profilePO)
+			if marshalErr != nil {
+				t.Fatal(marshalErr)
+			}
+			var restoredPO ProfilePO
+			if unmarshalErr := bson.Unmarshal(payload, &restoredPO); unmarshalErr != nil {
+				t.Fatal(unmarshalErr)
+			}
+			restoredProfile, restoreErr := mapper.ProfileToDomain(&restoredPO)
+			if restoreErr != nil {
+				t.Fatalf("restore Profile after BSON round trip: %v; persisted=%#v", restoreErr, restoredPO)
+			}
+			if restoredProfile.Fingerprint() != profileRecord.Fingerprint() || restoredProfile.Status() != profileRecord.Status() || restoredProfile.CreatedBy() != profileRecord.CreatedBy() {
+				t.Fatalf("restored Profile = %#v", restoredProfile)
+			}
+		})
+	}
+}
 
 func TestMapperRoundTripsLifecycleAndImmutableArtifact(t *testing.T) {
 	mapper := NewMapper()
