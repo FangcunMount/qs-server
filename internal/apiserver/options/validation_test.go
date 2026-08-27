@@ -193,7 +193,7 @@ func TestOptionsValidateAIExplanationParticipantLeaseRecoveryDependency(t *testi
 
 	errs := opts.Validate()
 	for _, err := range errs {
-		if strings.Contains(err.Error(), "ai_explanation_participant_lease_recovery requires ai_explanation.enabled") {
+		if strings.Contains(err.Error(), "ai_explanation_participant_lease_recovery requires ai_explanation.enabled and ai_explanation.participant_enabled") {
 			return
 		}
 	}
