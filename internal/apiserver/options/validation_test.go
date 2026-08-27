@@ -150,14 +150,15 @@ func TestOptionsValidateLeaseRecoveryCadence(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			opts := NewOptions()
 			var target *LeaseRecoveryOptions
-			if name == "evaluation_lease_recovery" {
+			switch name {
+			case "evaluation_lease_recovery":
 				target = opts.EvaluationLeaseRecovery
-			} else if name == "interpretation_lease_recovery" {
+			case "interpretation_lease_recovery":
 				target = opts.InterpretationLeaseRecovery
-			} else if name == "ai_explanation_prompt_evaluation_lease_recovery" {
+			case "ai_explanation_prompt_evaluation_lease_recovery":
 				target = opts.AIExplanationPromptEvaluationLeaseRecovery
 				target.Enable = true
-			} else {
+			default:
 				target = opts.AIExplanationParticipantLeaseRecovery
 				target.Enable = true
 			}

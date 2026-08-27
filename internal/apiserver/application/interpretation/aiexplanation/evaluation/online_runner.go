@@ -266,7 +266,7 @@ func (r *OnlineRunner) RunStepV1(ctx context.Context, command OnlineStepCommand)
 		if leaseDuration < minimumLease {
 			leaseDuration = minimumLease
 		}
-		runRecord, err = r.evidence.ClaimAttempt(ctx, command.RunID, ClaimAttemptCommand{
+		_, err = r.evidence.ClaimAttempt(ctx, command.RunID, ClaimAttemptCommand{
 			CaseID: command.CaseID, Attempt: command.Attempt, Owner: strings.TrimSpace(command.Owner),
 			InvocationID: invocationID, ClaimedAt: now, LeaseExpiresAt: now.Add(leaseDuration),
 		})
@@ -276,7 +276,7 @@ func (r *OnlineRunner) RunStepV1(ctx context.Context, command OnlineStepCommand)
 	}
 
 	dispatchAt := r.now().UTC()
-	runRecord, err = r.evidence.MarkAttemptDispatching(ctx, command.RunID, command.Owner, dispatchAt)
+	_, err = r.evidence.MarkAttemptDispatching(ctx, command.RunID, command.Owner, dispatchAt)
 	if err != nil {
 		return nil, err
 	}

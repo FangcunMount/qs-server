@@ -209,6 +209,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v6
@@ -225,7 +227,16 @@ jobs:
         run: |
           make fmt-check
 
-      - name: golangci-lint (only new issues)
+      - name: golangci-lint (pull request diff)
+        if: github.event_name == 'pull_request'
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.5.0
+          only-new-issues: false
+          args: --timeout=5m --new-from-rev=${{ github.event.pull_request.base.sha }}
+
+      - name: golangci-lint (push diff)
+        if: github.event_name != 'pull_request'
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.5.0

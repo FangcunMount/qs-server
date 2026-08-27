@@ -127,7 +127,7 @@ func (r *PreflightRunner) Run(ctx context.Context, suite *Suite) (*PreflightRepo
 	}
 	fingerprintErr := error(nil)
 	if profileRecord.Fingerprint().String() != suite.ProfileFixture.Fingerprint {
-		fingerprintErr = fmt.Errorf("Profile fingerprint mismatch: got %s", profileRecord.Fingerprint())
+		fingerprintErr = fmt.Errorf("profile fingerprint mismatch: got %s", profileRecord.Fingerprint())
 	}
 	addCheck("SUITE-003", fingerprintErr)
 	if fingerprintErr != nil {
@@ -137,7 +137,7 @@ func (r *PreflightRunner) Run(ctx context.Context, suite *Suite) (*PreflightRepo
 	definition := profileRecord.Definition()
 	promptCheckErr := error(nil)
 	if definition.GenerationPolicy.PromptTemplateID != suite.Prompt.TemplateID || definition.GenerationPolicy.PromptVersion != suite.Prompt.Version {
-		promptCheckErr = fmt.Errorf("Prompt and Profile identity mismatch")
+		promptCheckErr = fmt.Errorf("prompt and Profile identity mismatch")
 	}
 	pkg, promptErr := r.prompts.ResolvePromptPackage(ctx, suite.Prompt.TemplateID, suite.Prompt.Version)
 	if promptCheckErr == nil {
@@ -184,10 +184,11 @@ func (r *PreflightRunner) Run(ctx context.Context, suite *Suite) (*PreflightRepo
 	for index := range suite.Cases {
 		caseResult, caseErr := r.preflightCase(suite, profileRecord, pkg, &suite.Cases[index], seen)
 		report.Cases = append(report.Cases, caseResult)
-		if suite.Cases[index].Stage == "generation" {
+		switch suite.Cases[index].Stage {
+		case "generation":
 			report.GenerationCases++
 			report.PlannedProviderInvocations += caseResult.PlannedProviderCalls
-		} else if suite.Cases[index].Stage == "preflight" {
+		case "preflight":
 			report.PreflightCases++
 		}
 		addCheck(fmt.Sprintf("CASE-%03d", index+1), caseErr)

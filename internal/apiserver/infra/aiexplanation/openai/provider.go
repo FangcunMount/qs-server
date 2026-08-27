@@ -176,7 +176,7 @@ func (p *Provider) Generate(ctx context.Context, request appport.ProviderRequest
 		kind, code := classifyTransportError(err)
 		return nil, providerError(kind, code, true, true, sanitizedTransportCause(err))
 	}
-	defer httpResponse.Body.Close()
+	defer func() { _ = httpResponse.Body.Close() }()
 
 	responseBody, tooLarge, err := readLimited(httpResponse.Body, p.maxResponseBytes)
 	if err != nil {
