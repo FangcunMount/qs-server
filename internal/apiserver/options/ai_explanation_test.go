@@ -22,6 +22,48 @@ func TestAIExplanationDisabledPreservesStandardRuntimeDefaults(t *testing.T) {
 	}
 }
 
+func TestAIExplanationSupportsOpenAIAndDeepSeekProviderCredentials(t *testing.T) {
+	for _, testCase := range []struct {
+		provider string
+		envName  string
+	}{
+		{provider: AIExplanationProviderOpenAI, envName: "OPENAI_API_KEY"},
+		{provider: AIExplanationProviderDeepSeek, envName: "DEEPSEEK_API_KEY"},
+	} {
+		t.Run(testCase.provider, func(t *testing.T) {
+			opts := NewAIExplanationOptions()
+			opts.Provider = testCase.provider
+			opts.completeAPIKey(func(name string) string {
+				if name == testCase.envName {
+					return "provider-test-secret"
+				}
+				return "wrong-provider-secret"
+			})
+			if opts.APIKey != "provider-test-secret" {
+				t.Fatalf("resolved API key for %s", testCase.provider)
+			}
+		})
+	}
+
+	opts := NewAIExplanationOptions()
+	opts.Provider = AIExplanationProviderDeepSeek
+	opts.APIKey = "explicit-test-secret"
+	opts.completeAPIKey(func(string) string { return "environment-test-secret" })
+	if opts.APIKey != "explicit-test-secret" {
+		t.Fatalf("explicit API key must take precedence, got %q", opts.APIKey)
+	}
+
+	opts = NewAIExplanationOptions()
+	opts.Provider = "unsupported"
+	opts.Enabled = true
+	opts.Model = "model"
+	opts.APIKey = "secret"
+	configureAIExplanationTestLifecycle(opts)
+	if joined := errorsText(opts.Validate()); !strings.Contains(joined, "one of openai or deepseek") {
+		t.Fatalf("unsupported Provider errors = %v", opts.Validate())
+	}
+}
+
 func TestAIExplanationEvaluationRequiresIndependentModelAndParentRuntime(t *testing.T) {
 	opts := NewAIExplanationOptions()
 	opts.Evaluation.Enabled = true

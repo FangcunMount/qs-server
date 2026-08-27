@@ -1,4 +1,4 @@
-package openai
+package responsesapi
 
 import (
 	"errors"

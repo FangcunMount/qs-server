@@ -969,9 +969,7 @@ func (o *Options) Complete() error {
 	if o.AIExplanation == nil {
 		o.AIExplanation = NewAIExplanationOptions()
 	}
-	if o.AIExplanation.APIKey == "" {
-		o.AIExplanation.APIKey = os.Getenv("OPENAI_API_KEY")
-	}
+	o.AIExplanation.completeAPIKey(os.Getenv)
 	if o.Cache == nil {
 		o.Cache = NewCacheOptions()
 	}

@@ -1,7 +1,8 @@
-// Package openai implements the one-shot AI explanation provider port with
-// OpenAI's Responses API. It deliberately exposes no SDK types outside this
-// package and never logs prompts, assessment data, model output or credentials.
-package openai
+// Package responsesapi implements the one-shot AI explanation provider port
+// for explicitly supported Responses API providers. It deliberately exposes no
+// SDK types outside this package and never logs prompts, assessment data, model
+// output or credentials.
+package responsesapi
 
 import (
 	"bytes"
@@ -22,14 +23,17 @@ import (
 )
 
 const (
-	ProviderName            = "openai"
-	defaultEndpoint         = "https://api.openai.com/v1/responses"
+	ProviderOpenAI          = "openai"
+	ProviderDeepSeek        = "deepseek"
+	openAIDefaultEndpoint   = "https://api.openai.com/v1/responses"
+	deepSeekDefaultEndpoint = "https://api.deepseek.com/responses"
 	defaultMaxResponseBytes = int64(4 << 20)
 )
 
 var schemaNamePartPattern = regexp.MustCompile(`[^A-Za-z0-9_-]+`)
 
 type Config struct {
+	Provider         string
 	Endpoint         string
 	APIKey           string
 	HTTPClient       *http.Client
@@ -37,23 +41,31 @@ type Config struct {
 }
 
 type Provider struct {
+	name             string
 	endpoint         string
 	apiKey           string
 	httpClient       *http.Client
 	maxResponseBytes int64
+	strictJSONSchema bool
+	explicitStore    bool
 }
 
 func NewProvider(config Config) (*Provider, error) {
+	name := strings.ToLower(strings.TrimSpace(config.Provider))
+	profile, ok := profileForProvider(name)
+	if !ok {
+		return nil, fmt.Errorf("unsupported AI explanation Responses API provider %q", name)
+	}
 	endpoint := strings.TrimSpace(config.Endpoint)
 	if endpoint == "" {
-		endpoint = defaultEndpoint
+		endpoint = profile.defaultEndpoint
 	}
 	parsed, err := url.ParseRequestURI(endpoint)
 	if err != nil || parsed.Scheme != "https" && parsed.Scheme != "http" || parsed.Host == "" {
-		return nil, fmt.Errorf("invalid OpenAI Responses endpoint")
+		return nil, fmt.Errorf("invalid %s Responses endpoint", name)
 	}
 	if strings.TrimSpace(config.APIKey) == "" {
-		return nil, fmt.Errorf("OpenAI API key is required")
+		return nil, fmt.Errorf("%s API key is required", name)
 	}
 	client := config.HTTPClient
 	if client == nil {
@@ -64,9 +76,29 @@ func NewProvider(config Config) (*Provider, error) {
 		limit = defaultMaxResponseBytes
 	}
 	if limit < 1 {
-		return nil, fmt.Errorf("OpenAI response byte limit must be positive")
+		return nil, fmt.Errorf("responses API response byte limit must be positive")
 	}
-	return &Provider{endpoint: endpoint, apiKey: config.APIKey, httpClient: client, maxResponseBytes: limit}, nil
+	return &Provider{
+		name: name, endpoint: endpoint, apiKey: config.APIKey, httpClient: client,
+		maxResponseBytes: limit, strictJSONSchema: profile.strictJSONSchema, explicitStore: profile.explicitStore,
+	}, nil
+}
+
+type providerProfile struct {
+	defaultEndpoint  string
+	strictJSONSchema bool
+	explicitStore    bool
+}
+
+func profileForProvider(name string) (providerProfile, bool) {
+	switch name {
+	case ProviderOpenAI:
+		return providerProfile{defaultEndpoint: openAIDefaultEndpoint, strictJSONSchema: true, explicitStore: true}, true
+	case ProviderDeepSeek:
+		return providerProfile{defaultEndpoint: deepSeekDefaultEndpoint, strictJSONSchema: false}, true
+	default:
+		return providerProfile{}, false
+	}
 }
 
 type responseRequest struct {
@@ -75,7 +107,7 @@ type responseRequest struct {
 	Input           []inputMessage    `json:"input"`
 	Text            textConfiguration `json:"text"`
 	MaxOutputTokens int               `json:"max_output_tokens"`
-	Store           bool              `json:"store"`
+	Store           *bool             `json:"store,omitempty"`
 }
 
 type inputMessage struct {
@@ -95,7 +127,7 @@ type textConfiguration struct {
 type responseFormat struct {
 	Type   string          `json:"type"`
 	Name   string          `json:"name"`
-	Strict bool            `json:"strict"`
+	Strict *bool           `json:"strict,omitempty"`
 	Schema json.RawMessage `json:"schema"`
 }
 
@@ -139,7 +171,7 @@ func (p *Provider) Generate(ctx context.Context, request appport.ProviderRequest
 		observeProviderInvocation(request.OutputSchema.Version, time.Since(metricStartedAt), response, resultErr)
 	}()
 
-	if err := validateProviderRequest(request); err != nil {
+	if err := p.validateProviderRequest(request); err != nil {
 		return nil, providerError(domainrun.FailureKindProviderTransport, "provider_request_invalid", false, false, err)
 	}
 	if err := ctx.Err(); err != nil {
@@ -152,10 +184,10 @@ func (p *Provider) Generate(ctx context.Context, request appport.ProviderRequest
 			{Role: "user", Content: []inputTextContent{{Type: "input_text", Text: request.DataPreamble + "\n\n" + string(request.DataJSON)}}},
 		},
 		Text: textConfiguration{Format: responseFormat{
-			Type: "json_schema", Name: normalizedSchemaName(request.OutputSchema.Name), Strict: true,
+			Type: "json_schema", Name: normalizedSchemaName(request.OutputSchema.Name), Strict: p.strictSchemaFlag(),
 			Schema: json.RawMessage(request.OutputSchema.JSON),
 		}},
-		MaxOutputTokens: request.Route.MaxOutputTokens, Store: false,
+		MaxOutputTokens: request.Route.MaxOutputTokens, Store: p.storeFlag(),
 	})
 	if err != nil {
 		return nil, providerError(domainrun.FailureKindProviderTransport, "provider_request_encode_failed", false, false, err)
@@ -210,21 +242,21 @@ func (p *Provider) Generate(ctx context.Context, request appport.ProviderRequest
 	return &appport.ProviderResponse{
 		RawOutput: []byte(rawOutput),
 		Receipt: aiexplanation.ProviderReceipt{
-			InvocationID: request.InvocationID, RequestID: decoded.ID, Provider: ProviderName,
+			InvocationID: request.InvocationID, RequestID: decoded.ID, Provider: p.name,
 			Model: decoded.Model, InputTokens: usage.InputTokens, OutputTokens: usage.OutputTokens, Latency: latency,
 		},
 	}, nil
 }
 
-func validateProviderRequest(request appport.ProviderRequest) error {
+func (p *Provider) validateProviderRequest(request appport.ProviderRequest) error {
 	if strings.TrimSpace(request.InvocationID) == "" {
 		return fmt.Errorf("invocation ID is required")
 	}
 	if err := request.Route.Validate(); err != nil {
 		return err
 	}
-	if request.Route.ExecutionSpec.ResolvedProvider != ProviderName {
-		return fmt.Errorf("route provider is not OpenAI")
+	if request.Route.ExecutionSpec.ResolvedProvider != p.name {
+		return fmt.Errorf("route provider does not match configured Responses API provider")
 	}
 	if strings.TrimSpace(request.SystemMessage) == "" || strings.TrimSpace(request.TaskMessage) == "" || strings.TrimSpace(request.DataPreamble) == "" {
 		return fmt.Errorf("prompt messages are required")
@@ -237,6 +269,22 @@ func validateProviderRequest(request appport.ProviderRequest) error {
 		return fmt.Errorf("provider data must be a JSON object")
 	}
 	return request.OutputSchema.Validate()
+}
+
+func (p *Provider) strictSchemaFlag() *bool {
+	if !p.strictJSONSchema {
+		return nil
+	}
+	value := true
+	return &value
+}
+
+func (p *Provider) storeFlag() *bool {
+	if !p.explicitStore {
+		return nil
+	}
+	value := false
+	return &value
 }
 
 func normalizedSchemaName(name string) string {

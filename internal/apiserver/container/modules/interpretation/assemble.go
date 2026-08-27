@@ -40,9 +40,9 @@ import (
 	interpretationbuilder "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/builder"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/rendering"
 	domainreporttemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/reporttemplate"
-	aiexplanationopenai "github.com/FangcunMount/qs-server/internal/apiserver/infra/aiexplanation/openai"
 	aiexplanationprompt "github.com/FangcunMount/qs-server/internal/apiserver/infra/aiexplanation/prompt"
 	aiexplanationprovider "github.com/FangcunMount/qs-server/internal/apiserver/infra/aiexplanation/provider"
+	aiexplanationresponsesapi "github.com/FangcunMount/qs-server/internal/apiserver/infra/aiexplanation/responsesapi"
 	aiexplanationsafety "github.com/FangcunMount/qs-server/internal/apiserver/infra/aiexplanation/safety"
 	aiexplanationschema "github.com/FangcunMount/qs-server/internal/apiserver/infra/aiexplanation/schema"
 	aiexplanationsemantic "github.com/FangcunMount/qs-server/internal/apiserver/infra/aiexplanation/semantic"
@@ -295,11 +295,11 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 	if err != nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation provider route: %v", err)
 	}
-	providerAdapter, err := aiexplanationopenai.NewProvider(aiexplanationopenai.Config{
-		Endpoint: config.Endpoint, APIKey: config.APIKey, MaxResponseBytes: config.MaxResponseBytes,
+	providerAdapter, err := aiexplanationresponsesapi.NewProvider(aiexplanationresponsesapi.Config{
+		Provider: config.Provider, Endpoint: config.Endpoint, APIKey: config.APIKey, MaxResponseBytes: config.MaxResponseBytes,
 	})
 	if err != nil {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize OpenAI explanation provider: %v", err)
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation Responses API provider: %v", err)
 	}
 	generationRepo, err := mongoAIExplanation.NewGenerationRepository(deps.MongoDB, retentionPolicy, mongoOptions)
 	if err != nil {

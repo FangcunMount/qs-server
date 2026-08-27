@@ -1,4 +1,4 @@
-package openai
+package responsesapi
 
 import (
 	"context"
@@ -37,7 +37,7 @@ func TestProviderSendsOneStatelessStructuredResponsesRequest(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider := mustProvider(t, Config{Endpoint: server.URL, APIKey: "test-secret", HTTPClient: server.Client()})
+	provider := mustProvider(t, Config{Provider: ProviderOpenAI, Endpoint: server.URL, APIKey: "test-secret", HTTPClient: server.Client()})
 	request := validRequest()
 	response, err := provider.Generate(context.Background(), request)
 	if err != nil {
@@ -46,7 +46,7 @@ func TestProviderSendsOneStatelessStructuredResponsesRequest(t *testing.T) {
 	if string(response.RawOutput) != `{"summary":"ok"}` {
 		t.Fatalf("raw output = %s", response.RawOutput)
 	}
-	if response.Receipt.InvocationID != request.InvocationID || response.Receipt.RequestID != "resp_123" || response.Receipt.Provider != ProviderName || response.Receipt.Model != request.Route.ExecutionSpec.ResolvedModel {
+	if response.Receipt.InvocationID != request.InvocationID || response.Receipt.RequestID != "resp_123" || response.Receipt.Provider != ProviderOpenAI || response.Receipt.Model != request.Route.ExecutionSpec.ResolvedModel {
 		t.Fatalf("receipt = %#v", response.Receipt)
 	}
 	if response.Receipt.InputTokens != 21 || response.Receipt.OutputTokens != 8 || response.Receipt.Latency < 0 {
@@ -83,6 +83,44 @@ func TestProviderSendsOneStatelessStructuredResponsesRequest(t *testing.T) {
 	}
 }
 
+func TestDeepSeekProviderUsesResponsesSchemaWithoutOpenAIStrictExtension(t *testing.T) {
+	var captured map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&captured); err != nil {
+			t.Fatal(err)
+		}
+		_, _ = w.Write([]byte(`{
+          "id":"ds_resp_123","status":"completed","model":"deepseek-v4-flash",
+          "output":[{"type":"reasoning","content":[{"type":"reasoning_text","text":"not persisted"}]},{"type":"message","content":[{"type":"output_text","text":"{\"summary\":\"ok\"}"}]}],
+          "usage":{"input_tokens":34,"output_tokens":13}
+        }`))
+	}))
+	defer server.Close()
+
+	provider := mustProvider(t, Config{
+		Provider: ProviderDeepSeek, Endpoint: server.URL, APIKey: "test-deepseek-secret", HTTPClient: server.Client(),
+	})
+	request := validRequestForProvider(ProviderDeepSeek, "deepseek-v4-flash")
+	response, err := provider.Generate(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Receipt.Provider != ProviderDeepSeek || response.Receipt.Model != "deepseek-v4-flash" ||
+		response.Receipt.InputTokens != 34 || response.Receipt.OutputTokens != 13 {
+		t.Fatalf("DeepSeek receipt = %#v", response.Receipt)
+	}
+	format := captured["text"].(map[string]any)["format"].(map[string]any)
+	if format["type"] != "json_schema" || format["name"] != "AIExplanationOutput_v1" || format["schema"] == nil {
+		t.Fatalf("DeepSeek structured format = %#v", format)
+	}
+	if _, exists := format["strict"]; exists {
+		t.Fatalf("DeepSeek request must not send the OpenAI-only strict extension: %#v", format)
+	}
+	if _, exists := captured["store"]; exists {
+		t.Fatalf("DeepSeek request must omit the unsupported store parameter: %#v", captured)
+	}
+}
+
 func TestProviderClassifiesRefusalWithoutReturningRawRefusal(t *testing.T) {
 	provider := providerForResponse(t, http.StatusOK, `{
       "id":"resp_refusal","status":"completed","model":"gpt-test-2026-01-01",
@@ -110,12 +148,38 @@ func TestProviderClassifiesRateLimitFromStatusOnly(t *testing.T) {
 	}
 }
 
+func TestDeepSeekProviderClassifiesDocumentedHTTPStatuses(t *testing.T) {
+	for _, testCase := range []struct {
+		name      string
+		status    int
+		kind      domainrun.FailureKind
+		code      string
+		retryable bool
+	}{
+		{name: "insufficient balance", status: http.StatusPaymentRequired, kind: domainrun.FailureKindProviderTransport, code: "provider_request_rejected"},
+		{name: "rate limited", status: http.StatusTooManyRequests, kind: domainrun.FailureKindProviderRateLimit, code: "provider_rate_limited", retryable: true},
+		{name: "service unavailable", status: http.StatusServiceUnavailable, kind: domainrun.FailureKindProviderTransport, code: "provider_server_error", retryable: true},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			provider := providerForProviderResponse(t, ProviderDeepSeek, testCase.status, `{"error":{"message":"must not escape"}}`)
+			_, err := provider.Generate(context.Background(), validRequestForProvider(ProviderDeepSeek, "deepseek-test-model"))
+			classified := requireProviderError(t, err)
+			if classified.Kind != testCase.kind || classified.Code != testCase.code || classified.Retryable != testCase.retryable || classified.ResultUnknown {
+				t.Fatalf("classified DeepSeek error = %#v", classified)
+			}
+			if strings.Contains(err.Error(), "must not escape") {
+				t.Fatal("DeepSeek HTTP response body leaked through provider error")
+			}
+		})
+	}
+}
+
 func TestProviderMarksPostDispatchTimeoutResultUnknown(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond)
 	}))
 	defer server.Close()
-	provider := mustProvider(t, Config{Endpoint: server.URL, APIKey: "test-secret", HTTPClient: server.Client()})
+	provider := mustProvider(t, Config{Provider: ProviderOpenAI, Endpoint: server.URL, APIKey: "test-secret", HTTPClient: server.Client()})
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
 	_, err := provider.Generate(ctx, validRequest())
@@ -126,7 +190,7 @@ func TestProviderMarksPostDispatchTimeoutResultUnknown(t *testing.T) {
 }
 
 func TestProviderDoesNotMarkPreDispatchCancellationUnknown(t *testing.T) {
-	provider := mustProvider(t, Config{Endpoint: "https://example.invalid/v1/responses", APIKey: "test-secret"})
+	provider := mustProvider(t, Config{Provider: ProviderOpenAI, Endpoint: "https://example.invalid/v1/responses", APIKey: "test-secret"})
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	_, err := provider.Generate(ctx, validRequest())
@@ -148,6 +212,15 @@ func TestProviderRejectsMismatchedResolvedModel(t *testing.T) {
 	}
 }
 
+func TestProviderRejectsRouteForDifferentProviderBeforeDispatch(t *testing.T) {
+	provider := mustProvider(t, Config{Provider: ProviderDeepSeek, APIKey: "secret"})
+	_, err := provider.Generate(context.Background(), validRequest())
+	classified := requireProviderError(t, err)
+	if classified.Code != "provider_request_invalid" || classified.ResultUnknown {
+		t.Fatalf("mismatched Provider error = %#v", classified)
+	}
+}
+
 func TestProviderRejectsOversizedResponse(t *testing.T) {
 	provider := providerForResponseWithLimit(t, http.StatusOK, strings.Repeat("x", 65), 64)
 	_, err := provider.Generate(context.Background(), validRequest())
@@ -158,11 +231,19 @@ func TestProviderRejectsOversizedResponse(t *testing.T) {
 }
 
 func TestProviderConfigurationRequiresCredential(t *testing.T) {
-	if _, err := NewProvider(Config{}); err == nil {
+	if _, err := NewProvider(Config{Provider: ProviderOpenAI}); err == nil {
 		t.Fatal("expected missing API key rejection")
 	}
-	if _, err := NewProvider(Config{APIKey: "secret", Endpoint: "://bad"}); err == nil {
+	if _, err := NewProvider(Config{Provider: ProviderDeepSeek, APIKey: "secret", Endpoint: "://bad"}); err == nil {
 		t.Fatal("expected endpoint rejection")
+	}
+	if _, err := NewProvider(Config{Provider: "unsupported", APIKey: "secret"}); err == nil {
+		t.Fatal("expected unsupported Provider rejection")
+	}
+	openAI := mustProvider(t, Config{Provider: ProviderOpenAI, APIKey: "secret"})
+	deepSeek := mustProvider(t, Config{Provider: ProviderDeepSeek, APIKey: "secret"})
+	if openAI.endpoint != openAIDefaultEndpoint || deepSeek.endpoint != deepSeekDefaultEndpoint {
+		t.Fatalf("default endpoints = %q/%q", openAI.endpoint, deepSeek.endpoint)
 	}
 }
 
@@ -209,13 +290,17 @@ func TestProviderMetricsExposeOnlyBoundedPurposeResultsAndTokenDirections(t *tes
 }
 
 func validRequest() appport.ProviderRequest {
+	return validRequestForProvider(ProviderOpenAI, "gpt-test-2026-01-01")
+}
+
+func validRequestForProvider(providerName, model string) appport.ProviderRequest {
 	schema := []byte(`{"type":"object","additionalProperties":false,"properties":{"summary":{"type":"string"}},"required":["summary"]}`)
 	return appport.ProviderRequest{
 		InvocationID: "generation-9001-run-1",
 		Route: appport.ProviderRoute{
 			ExecutionSpec: aiexplanation.ProviderExecutionSpec{
-				Route: "ai-explanation-primary", RouteRevision: "v1", ResolvedProvider: ProviderName,
-				ResolvedModel: "gpt-test-2026-01-01", Fingerprint: aiexplanation.NewFingerprint([]byte("route")),
+				Route: "ai-explanation-primary", RouteRevision: "v1", ResolvedProvider: providerName,
+				ResolvedModel: model, Fingerprint: aiexplanation.NewFingerprint([]byte("route")),
 			},
 			Capabilities: appport.ProviderCapabilities{StructuredOutput: true}, Timeout: time.Second, MaxOutputTokens: 1200,
 		},
@@ -233,6 +318,16 @@ func providerForResponse(t *testing.T, status int, body string) *Provider {
 	return providerForResponseWithLimit(t, status, body, 4096)
 }
 
+func providerForProviderResponse(t *testing.T, providerName string, status int, body string) *Provider {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(server.Close)
+	return mustProvider(t, Config{Provider: providerName, Endpoint: server.URL, APIKey: "test-secret", HTTPClient: server.Client(), MaxResponseBytes: 4096})
+}
+
 func providerForResponseWithLimit(t *testing.T, status int, body string, limit int64) *Provider {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -240,7 +335,7 @@ func providerForResponseWithLimit(t *testing.T, status int, body string, limit i
 		_, _ = w.Write([]byte(body))
 	}))
 	t.Cleanup(server.Close)
-	return mustProvider(t, Config{Endpoint: server.URL, APIKey: "test-secret", HTTPClient: server.Client(), MaxResponseBytes: limit})
+	return mustProvider(t, Config{Provider: ProviderOpenAI, Endpoint: server.URL, APIKey: "test-secret", HTTPClient: server.Client(), MaxResponseBytes: limit})
 }
 
 func mustProvider(t *testing.T, config Config) *Provider {

@@ -103,7 +103,7 @@ grpc:
   enable-health-check: true   # 启用健康检查
 
 # AI 解读默认关闭；启用前需完成 Prompt/Profile/模型发布验收。
-# 密钥使用 OPENAI_API_KEY 或 QS_APISERVER_AI_EXPLANATION_API_KEY 注入。
+# 密钥使用 OPENAI_API_KEY、DEEPSEEK_API_KEY 或 QS_APISERVER_AI_EXPLANATION_API_KEY 注入。
 ai_explanation:
   enabled: false
   provider: "openai"

@@ -122,7 +122,7 @@ delegated-subject:
   ttl: 5m
 
 # 手动触发的 AI 解读独立于标准报告链路，默认关闭。
-# 启用前必须发布 Profile 并完成真实模型评测；API key 只从环境变量注入。
+# 启用前必须发布 Profile 并完成真实模型评测；API key 使用 Provider 对应的环境变量注入。
 ai_explanation:
   enabled: false
   provider: "openai"
