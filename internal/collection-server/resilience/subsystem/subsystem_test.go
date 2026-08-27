@@ -25,6 +25,10 @@ func TestSubsystemOwnsBudgetsAndGates(t *testing.T) {
 	if left.Global != right.Global || left.User != right.User {
 		t.Fatal("report events callers must share stable limiter proxies")
 	}
+	aiRequest, ok := s.Budget(BudgetAIExplanationRequest)
+	if !ok || aiRequest.Global == nil || aiRequest.User == nil {
+		t.Fatal("AI explanation request budget unavailable")
+	}
 	if s.Gate(GateQuery) == nil || s.Gate(GateSubmit) == nil || s.Gate(GateWaitReport) == nil {
 		t.Fatal("expected process-owned concurrency gates")
 	}
@@ -34,7 +38,7 @@ func TestSubsystemOwnsBudgetsAndGates(t *testing.T) {
 	}
 	t.Cleanup(grpcGate.Release)
 	snapshot := s.Snapshot(time.Now())
-	if len(snapshot.RateLimits) != 8 || snapshot.InstanceID == "" {
+	if len(snapshot.RateLimits) != 10 || snapshot.InstanceID == "" {
 		t.Fatalf("Snapshot() = %+v", snapshot)
 	}
 	if len(snapshot.Backpressure) != 1 || snapshot.Backpressure[0].Name != GateGRPCDownstream || snapshot.Backpressure[0].MaxInflight != 7 || snapshot.Backpressure[0].InFlight != 1 || snapshot.Backpressure[0].TimeoutMillis != 25 {

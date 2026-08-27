@@ -1,0 +1,6 @@
+[
+  { "drop": "ai_explanation_prompt_evaluation_daily_budgets" },
+  { "dropIndexes": "ai_explanation_prompt_evaluations", "index": "idx_ai_explanation_prompt_evaluation_expired_lease" },
+  { "dropIndexes": "ai_explanation_prompt_evaluations", "index": "uk_ai_explanation_prompt_evaluation_active_org_execution" },
+  { "dropIndexes": "ai_explanation_prompt_evaluations", "index": "uk_ai_explanation_prompt_evaluation_active_release" }
+]

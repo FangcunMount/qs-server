@@ -355,11 +355,52 @@ func (r *Router) registerAnswerSheetRoutes(api *gin.RouterGroup) {
 // registerEvaluationRoutes 注册测评相关路由
 func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 	evaluationHandler := r.container.EvaluationHandler()
+	aiExplanationHandler := r.container.AIExplanationHandler()
 	rateCfg := ensureRateLimitOptions(r.container.RateLimitOptions())
 	reportIdentity := collectionmiddleware.TesteeAccessMiddleware(r.container.TesteeAccessAuthorizer(), "testee_id")
+	api.GET("/ai-explanations/export", append([]gin.HandlerFunc{reportIdentity}, r.rateLimitedQueryHandlers(
+		r.container.RateLimitBackend(),
+		"query",
+		rateCfg,
+		rateCfg.QueryGlobalQPS,
+		rateCfg.QueryGlobalBurst,
+		rateCfg.QueryUserQPS,
+		rateCfg.QueryUserBurst,
+		aiExplanationHandler.Export,
+	)...)...)
 
 	assessments := api.Group("/assessments")
 	{
+		assessments.GET("/:id/ai-explanation/capability", append([]gin.HandlerFunc{reportIdentity}, r.rateLimitedQueryHandlers(
+			r.container.RateLimitBackend(),
+			"query",
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			aiExplanationHandler.Capability,
+		)...)...)
+		assessments.POST("/:id/ai-explanations", append([]gin.HandlerFunc{reportIdentity}, r.rateLimitedQueryHandlers(
+			r.container.RateLimitBackend(),
+			"ai-explanation-request",
+			rateCfg,
+			rateCfg.AIExplanationRequestGlobalQPS,
+			rateCfg.AIExplanationRequestGlobalBurst,
+			rateCfg.AIExplanationRequestUserQPS,
+			rateCfg.AIExplanationRequestUserBurst,
+			aiExplanationHandler.Request,
+		)...)...)
+		assessments.GET("/:id/ai-explanations/:generation_id", append([]gin.HandlerFunc{reportIdentity}, r.rateLimitedQueryHandlers(
+			r.container.RateLimitBackend(),
+			"query",
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			aiExplanationHandler.Get,
+		)...)...)
 		// 医学量表测评列表（放在 :id 前面避免路由冲突）
 		assessments.GET("", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),

@@ -1,0 +1,6 @@
+[
+  {
+    "dropIndexes": "ai_explanation_artifacts",
+    "index": "idx_ai_explanation_artifact_subject_export"
+  }
+]

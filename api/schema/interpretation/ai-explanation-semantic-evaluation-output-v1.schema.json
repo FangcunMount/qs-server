@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/FangcunMount/qs-server/main/api/schema/interpretation/ai-explanation-semantic-evaluation-output-v1.schema.json",
+  "title": "AIExplanationSemanticEvaluationOutput v1",
+  "description": "Strict model-judge output for one synthetic AI explanation Prompt evaluation attempt. It is release evidence, not participant-facing content.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scores",
+    "rationale",
+    "decisions"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ai-explanation-semantic-evaluation-output/v1"
+    },
+    "scores": {
+      "$ref": "#/$defs/scores"
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000,
+      "pattern": "^[^<>]*$"
+    },
+    "decisions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "$ref": "#/$defs/decision"
+      }
+    }
+  },
+  "$defs": {
+    "score": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "scores": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "faithfulness",
+        "cross_dimension_quality",
+        "suggestion_actionability",
+        "audience_clarity",
+        "concision"
+      ],
+      "properties": {
+        "faithfulness": {
+          "$ref": "#/$defs/score"
+        },
+        "cross_dimension_quality": {
+          "$ref": "#/$defs/score"
+        },
+        "suggestion_actionability": {
+          "$ref": "#/$defs/score"
+        },
+        "audience_clarity": {
+          "$ref": "#/$defs/score"
+        },
+        "concision": {
+          "$ref": "#/$defs/score"
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "scope",
+        "ordinal",
+        "status",
+        "detail"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "scope": {
+          "enum": [
+            "default",
+            "case"
+          ]
+        },
+        "ordinal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed"
+          ]
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "pattern": "^[^<>]*$"
+        }
+      }
+    }
+  }
+}

@@ -1074,6 +1074,1622 @@ func (x *GenerateReportFromAssessmentResponse) GetActionRequestId() string {
 	return ""
 }
 
+type ExecuteAIExplanationRequest struct {
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	GenerationId            string                 `protobuf:"bytes,1,opt,name=generation_id,json=generationId,proto3" json:"generation_id,omitempty"`
+	TraceId                 string                 `protobuf:"bytes,2,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	EventId                 string                 `protobuf:"bytes,3,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	ExpectedAttempt         int32                  `protobuf:"varint,4,opt,name=expected_attempt,json=expectedAttempt,proto3" json:"expected_attempt,omitempty"`
+	AttemptOrigin           string                 `protobuf:"bytes,5,opt,name=attempt_origin,json=attemptOrigin,proto3" json:"attempt_origin,omitempty"`
+	ActionRequestId         string                 `protobuf:"bytes,6,opt,name=action_request_id,json=actionRequestId,proto3" json:"action_request_id,omitempty"`
+	ExpectedRunId           string                 `protobuf:"bytes,7,opt,name=expected_run_id,json=expectedRunId,proto3" json:"expected_run_id,omitempty"`
+	ExpectedLeaseExpiresAt  string                 `protobuf:"bytes,8,opt,name=expected_lease_expires_at,json=expectedLeaseExpiresAt,proto3" json:"expected_lease_expires_at,omitempty"`
+	ExpectedInvocationPhase string                 `protobuf:"bytes,9,opt,name=expected_invocation_phase,json=expectedInvocationPhase,proto3" json:"expected_invocation_phase,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
+}
+
+func (x *ExecuteAIExplanationRequest) Reset() {
+	*x = ExecuteAIExplanationRequest{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExecuteAIExplanationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExecuteAIExplanationRequest) ProtoMessage() {}
+
+func (x *ExecuteAIExplanationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExecuteAIExplanationRequest.ProtoReflect.Descriptor instead.
+func (*ExecuteAIExplanationRequest) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ExecuteAIExplanationRequest) GetGenerationId() string {
+	if x != nil {
+		return x.GenerationId
+	}
+	return ""
+}
+
+func (x *ExecuteAIExplanationRequest) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+func (x *ExecuteAIExplanationRequest) GetEventId() string {
+	if x != nil {
+		return x.EventId
+	}
+	return ""
+}
+
+func (x *ExecuteAIExplanationRequest) GetExpectedAttempt() int32 {
+	if x != nil {
+		return x.ExpectedAttempt
+	}
+	return 0
+}
+
+func (x *ExecuteAIExplanationRequest) GetAttemptOrigin() string {
+	if x != nil {
+		return x.AttemptOrigin
+	}
+	return ""
+}
+
+func (x *ExecuteAIExplanationRequest) GetActionRequestId() string {
+	if x != nil {
+		return x.ActionRequestId
+	}
+	return ""
+}
+
+func (x *ExecuteAIExplanationRequest) GetExpectedRunId() string {
+	if x != nil {
+		return x.ExpectedRunId
+	}
+	return ""
+}
+
+func (x *ExecuteAIExplanationRequest) GetExpectedLeaseExpiresAt() string {
+	if x != nil {
+		return x.ExpectedLeaseExpiresAt
+	}
+	return ""
+}
+
+func (x *ExecuteAIExplanationRequest) GetExpectedInvocationPhase() string {
+	if x != nil {
+		return x.ExpectedInvocationPhase
+	}
+	return ""
+}
+
+type ExecuteAIExplanationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	GenerationId  string                 `protobuf:"bytes,3,opt,name=generation_id,json=generationId,proto3" json:"generation_id,omitempty"`
+	RunId         string                 `protobuf:"bytes,4,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	ArtifactId    string                 `protobuf:"bytes,5,opt,name=artifact_id,json=artifactId,proto3" json:"artifact_id,omitempty"`
+	FailureKind   string                 `protobuf:"bytes,6,opt,name=failure_kind,json=failureKind,proto3" json:"failure_kind,omitempty"`
+	FailureCode   string                 `protobuf:"bytes,7,opt,name=failure_code,json=failureCode,proto3" json:"failure_code,omitempty"`
+	SafeMessage   string                 `protobuf:"bytes,8,opt,name=safe_message,json=safeMessage,proto3" json:"safe_message,omitempty"`
+	Retryable     bool                   `protobuf:"varint,9,opt,name=retryable,proto3" json:"retryable,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExecuteAIExplanationResponse) Reset() {
+	*x = ExecuteAIExplanationResponse{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExecuteAIExplanationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExecuteAIExplanationResponse) ProtoMessage() {}
+
+func (x *ExecuteAIExplanationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExecuteAIExplanationResponse.ProtoReflect.Descriptor instead.
+func (*ExecuteAIExplanationResponse) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ExecuteAIExplanationResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *ExecuteAIExplanationResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *ExecuteAIExplanationResponse) GetGenerationId() string {
+	if x != nil {
+		return x.GenerationId
+	}
+	return ""
+}
+
+func (x *ExecuteAIExplanationResponse) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *ExecuteAIExplanationResponse) GetArtifactId() string {
+	if x != nil {
+		return x.ArtifactId
+	}
+	return ""
+}
+
+func (x *ExecuteAIExplanationResponse) GetFailureKind() string {
+	if x != nil {
+		return x.FailureKind
+	}
+	return ""
+}
+
+func (x *ExecuteAIExplanationResponse) GetFailureCode() string {
+	if x != nil {
+		return x.FailureCode
+	}
+	return ""
+}
+
+func (x *ExecuteAIExplanationResponse) GetSafeMessage() string {
+	if x != nil {
+		return x.SafeMessage
+	}
+	return ""
+}
+
+func (x *ExecuteAIExplanationResponse) GetRetryable() bool {
+	if x != nil {
+		return x.Retryable
+	}
+	return false
+}
+
+type ExecutePromptEvaluationStepRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OrgId         int64                  `protobuf:"varint,1,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`
+	RunId         string                 `protobuf:"bytes,2,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	CaseId        string                 `protobuf:"bytes,3,opt,name=case_id,json=caseId,proto3" json:"case_id,omitempty"`
+	Attempt       int32                  `protobuf:"varint,4,opt,name=attempt,proto3" json:"attempt,omitempty"`
+	RequestedBy   string                 `protobuf:"bytes,5,opt,name=requested_by,json=requestedBy,proto3" json:"requested_by,omitempty"`
+	EventId       string                 `protobuf:"bytes,6,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExecutePromptEvaluationStepRequest) Reset() {
+	*x = ExecutePromptEvaluationStepRequest{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExecutePromptEvaluationStepRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExecutePromptEvaluationStepRequest) ProtoMessage() {}
+
+func (x *ExecutePromptEvaluationStepRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExecutePromptEvaluationStepRequest.ProtoReflect.Descriptor instead.
+func (*ExecutePromptEvaluationStepRequest) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ExecutePromptEvaluationStepRequest) GetOrgId() int64 {
+	if x != nil {
+		return x.OrgId
+	}
+	return 0
+}
+
+func (x *ExecutePromptEvaluationStepRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *ExecutePromptEvaluationStepRequest) GetCaseId() string {
+	if x != nil {
+		return x.CaseId
+	}
+	return ""
+}
+
+func (x *ExecutePromptEvaluationStepRequest) GetAttempt() int32 {
+	if x != nil {
+		return x.Attempt
+	}
+	return 0
+}
+
+func (x *ExecutePromptEvaluationStepRequest) GetRequestedBy() string {
+	if x != nil {
+		return x.RequestedBy
+	}
+	return ""
+}
+
+func (x *ExecutePromptEvaluationStepRequest) GetEventId() string {
+	if x != nil {
+		return x.EventId
+	}
+	return ""
+}
+
+type ExecutePromptEvaluationStepResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	RunId         string                 `protobuf:"bytes,2,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	CaseId        string                 `protobuf:"bytes,3,opt,name=case_id,json=caseId,proto3" json:"case_id,omitempty"`
+	Attempt       int32                  `protobuf:"varint,4,opt,name=attempt,proto3" json:"attempt,omitempty"`
+	Status        string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
+	RunStatus     string                 `protobuf:"bytes,6,opt,name=run_status,json=runStatus,proto3" json:"run_status,omitempty"`
+	NextCaseId    string                 `protobuf:"bytes,7,opt,name=next_case_id,json=nextCaseId,proto3" json:"next_case_id,omitempty"`
+	NextAttempt   int32                  `protobuf:"varint,8,opt,name=next_attempt,json=nextAttempt,proto3" json:"next_attempt,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExecutePromptEvaluationStepResponse) Reset() {
+	*x = ExecutePromptEvaluationStepResponse{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExecutePromptEvaluationStepResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExecutePromptEvaluationStepResponse) ProtoMessage() {}
+
+func (x *ExecutePromptEvaluationStepResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExecutePromptEvaluationStepResponse.ProtoReflect.Descriptor instead.
+func (*ExecutePromptEvaluationStepResponse) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ExecutePromptEvaluationStepResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *ExecutePromptEvaluationStepResponse) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *ExecutePromptEvaluationStepResponse) GetCaseId() string {
+	if x != nil {
+		return x.CaseId
+	}
+	return ""
+}
+
+func (x *ExecutePromptEvaluationStepResponse) GetAttempt() int32 {
+	if x != nil {
+		return x.Attempt
+	}
+	return 0
+}
+
+func (x *ExecutePromptEvaluationStepResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *ExecutePromptEvaluationStepResponse) GetRunStatus() string {
+	if x != nil {
+		return x.RunStatus
+	}
+	return ""
+}
+
+func (x *ExecutePromptEvaluationStepResponse) GetNextCaseId() string {
+	if x != nil {
+		return x.NextCaseId
+	}
+	return ""
+}
+
+func (x *ExecutePromptEvaluationStepResponse) GetNextAttempt() int32 {
+	if x != nil {
+		return x.NextAttempt
+	}
+	return 0
+}
+
+type AIExplanationEvidenceRef struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Kind          string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
+	Ref           string                 `protobuf:"bytes,2,opt,name=ref,proto3" json:"ref,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIExplanationEvidenceRef) Reset() {
+	*x = AIExplanationEvidenceRef{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIExplanationEvidenceRef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIExplanationEvidenceRef) ProtoMessage() {}
+
+func (x *AIExplanationEvidenceRef) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIExplanationEvidenceRef.ProtoReflect.Descriptor instead.
+func (*AIExplanationEvidenceRef) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *AIExplanationEvidenceRef) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *AIExplanationEvidenceRef) GetRef() string {
+	if x != nil {
+		return x.Ref
+	}
+	return ""
+}
+
+type AIExplanationIntegratedInsight struct {
+	state         protoimpl.MessageState      `protogen:"open.v1"`
+	Kind          string                      `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
+	Title         string                      `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Content       string                      `protobuf:"bytes,3,opt,name=content,proto3" json:"content,omitempty"`
+	WhyItMatters  string                      `protobuf:"bytes,4,opt,name=why_it_matters,json=whyItMatters,proto3" json:"why_it_matters,omitempty"`
+	EvidenceRefs  []*AIExplanationEvidenceRef `protobuf:"bytes,5,rep,name=evidence_refs,json=evidenceRefs,proto3" json:"evidence_refs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIExplanationIntegratedInsight) Reset() {
+	*x = AIExplanationIntegratedInsight{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIExplanationIntegratedInsight) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIExplanationIntegratedInsight) ProtoMessage() {}
+
+func (x *AIExplanationIntegratedInsight) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIExplanationIntegratedInsight.ProtoReflect.Descriptor instead.
+func (*AIExplanationIntegratedInsight) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *AIExplanationIntegratedInsight) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *AIExplanationIntegratedInsight) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *AIExplanationIntegratedInsight) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+func (x *AIExplanationIntegratedInsight) GetWhyItMatters() string {
+	if x != nil {
+		return x.WhyItMatters
+	}
+	return ""
+}
+
+func (x *AIExplanationIntegratedInsight) GetEvidenceRefs() []*AIExplanationEvidenceRef {
+	if x != nil {
+		return x.EvidenceRefs
+	}
+	return nil
+}
+
+type AIExplanationSuggestion struct {
+	state                protoimpl.MessageState      `protogen:"open.v1"`
+	Origin               string                      `protobuf:"bytes,1,opt,name=origin,proto3" json:"origin,omitempty"`
+	Category             string                      `protobuf:"bytes,2,opt,name=category,proto3" json:"category,omitempty"`
+	Title                string                      `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	Goal                 string                      `protobuf:"bytes,4,opt,name=goal,proto3" json:"goal,omitempty"`
+	Actions              []string                    `protobuf:"bytes,5,rep,name=actions,proto3" json:"actions,omitempty"`
+	Rationale            string                      `protobuf:"bytes,6,opt,name=rationale,proto3" json:"rationale,omitempty"`
+	EvidenceRefs         []*AIExplanationEvidenceRef `protobuf:"bytes,7,rep,name=evidence_refs,json=evidenceRefs,proto3" json:"evidence_refs,omitempty"`
+	SourceSuggestionRefs []string                    `protobuf:"bytes,8,rep,name=source_suggestion_refs,json=sourceSuggestionRefs,proto3" json:"source_suggestion_refs,omitempty"`
+	Caution              string                      `protobuf:"bytes,9,opt,name=caution,proto3" json:"caution,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *AIExplanationSuggestion) Reset() {
+	*x = AIExplanationSuggestion{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIExplanationSuggestion) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIExplanationSuggestion) ProtoMessage() {}
+
+func (x *AIExplanationSuggestion) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIExplanationSuggestion.ProtoReflect.Descriptor instead.
+func (*AIExplanationSuggestion) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *AIExplanationSuggestion) GetOrigin() string {
+	if x != nil {
+		return x.Origin
+	}
+	return ""
+}
+
+func (x *AIExplanationSuggestion) GetCategory() string {
+	if x != nil {
+		return x.Category
+	}
+	return ""
+}
+
+func (x *AIExplanationSuggestion) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *AIExplanationSuggestion) GetGoal() string {
+	if x != nil {
+		return x.Goal
+	}
+	return ""
+}
+
+func (x *AIExplanationSuggestion) GetActions() []string {
+	if x != nil {
+		return x.Actions
+	}
+	return nil
+}
+
+func (x *AIExplanationSuggestion) GetRationale() string {
+	if x != nil {
+		return x.Rationale
+	}
+	return ""
+}
+
+func (x *AIExplanationSuggestion) GetEvidenceRefs() []*AIExplanationEvidenceRef {
+	if x != nil {
+		return x.EvidenceRefs
+	}
+	return nil
+}
+
+func (x *AIExplanationSuggestion) GetSourceSuggestionRefs() []string {
+	if x != nil {
+		return x.SourceSuggestionRefs
+	}
+	return nil
+}
+
+func (x *AIExplanationSuggestion) GetCaution() string {
+	if x != nil {
+		return x.Caution
+	}
+	return ""
+}
+
+type AIExplanationContent struct {
+	state              protoimpl.MessageState            `protogen:"open.v1"`
+	SchemaVersion      string                            `protobuf:"bytes,1,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
+	Summary            string                            `protobuf:"bytes,2,opt,name=summary,proto3" json:"summary,omitempty"`
+	IntegratedInsights []*AIExplanationIntegratedInsight `protobuf:"bytes,3,rep,name=integrated_insights,json=integratedInsights,proto3" json:"integrated_insights,omitempty"`
+	Suggestions        []*AIExplanationSuggestion        `protobuf:"bytes,4,rep,name=suggestions,proto3" json:"suggestions,omitempty"`
+	Limitations        []string                          `protobuf:"bytes,5,rep,name=limitations,proto3" json:"limitations,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *AIExplanationContent) Reset() {
+	*x = AIExplanationContent{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIExplanationContent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIExplanationContent) ProtoMessage() {}
+
+func (x *AIExplanationContent) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIExplanationContent.ProtoReflect.Descriptor instead.
+func (*AIExplanationContent) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *AIExplanationContent) GetSchemaVersion() string {
+	if x != nil {
+		return x.SchemaVersion
+	}
+	return ""
+}
+
+func (x *AIExplanationContent) GetSummary() string {
+	if x != nil {
+		return x.Summary
+	}
+	return ""
+}
+
+func (x *AIExplanationContent) GetIntegratedInsights() []*AIExplanationIntegratedInsight {
+	if x != nil {
+		return x.IntegratedInsights
+	}
+	return nil
+}
+
+func (x *AIExplanationContent) GetSuggestions() []*AIExplanationSuggestion {
+	if x != nil {
+		return x.Suggestions
+	}
+	return nil
+}
+
+func (x *AIExplanationContent) GetLimitations() []string {
+	if x != nil {
+		return x.Limitations
+	}
+	return nil
+}
+
+type AIExplanationFailure struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	SafeMessage   string                 `protobuf:"bytes,2,opt,name=safe_message,json=safeMessage,proto3" json:"safe_message,omitempty"`
+	Retryable     bool                   `protobuf:"varint,3,opt,name=retryable,proto3" json:"retryable,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIExplanationFailure) Reset() {
+	*x = AIExplanationFailure{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIExplanationFailure) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIExplanationFailure) ProtoMessage() {}
+
+func (x *AIExplanationFailure) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIExplanationFailure.ProtoReflect.Descriptor instead.
+func (*AIExplanationFailure) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *AIExplanationFailure) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *AIExplanationFailure) GetSafeMessage() string {
+	if x != nil {
+		return x.SafeMessage
+	}
+	return ""
+}
+
+func (x *AIExplanationFailure) GetRetryable() bool {
+	if x != nil {
+		return x.Retryable
+	}
+	return false
+}
+
+type GetAIExplanationCapabilityRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AssessmentId  uint64                 `protobuf:"varint,1,opt,name=assessment_id,json=assessmentId,proto3" json:"assessment_id,omitempty"`
+	TesteeId      uint64                 `protobuf:"varint,2,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
+	Locale        string                 `protobuf:"bytes,3,opt,name=locale,proto3" json:"locale,omitempty"`
+	FocusAreas    []string               `protobuf:"bytes,4,rep,name=focus_areas,json=focusAreas,proto3" json:"focus_areas,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAIExplanationCapabilityRequest) Reset() {
+	*x = GetAIExplanationCapabilityRequest{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAIExplanationCapabilityRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAIExplanationCapabilityRequest) ProtoMessage() {}
+
+func (x *GetAIExplanationCapabilityRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAIExplanationCapabilityRequest.ProtoReflect.Descriptor instead.
+func (*GetAIExplanationCapabilityRequest) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *GetAIExplanationCapabilityRequest) GetAssessmentId() uint64 {
+	if x != nil {
+		return x.AssessmentId
+	}
+	return 0
+}
+
+func (x *GetAIExplanationCapabilityRequest) GetTesteeId() uint64 {
+	if x != nil {
+		return x.TesteeId
+	}
+	return 0
+}
+
+func (x *GetAIExplanationCapabilityRequest) GetLocale() string {
+	if x != nil {
+		return x.Locale
+	}
+	return ""
+}
+
+func (x *GetAIExplanationCapabilityRequest) GetFocusAreas() []string {
+	if x != nil {
+		return x.FocusAreas
+	}
+	return nil
+}
+
+type RequestAIExplanationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AssessmentId  uint64                 `protobuf:"varint,1,opt,name=assessment_id,json=assessmentId,proto3" json:"assessment_id,omitempty"`
+	TesteeId      uint64                 `protobuf:"varint,2,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
+	Locale        string                 `protobuf:"bytes,3,opt,name=locale,proto3" json:"locale,omitempty"`
+	FocusAreas    []string               `protobuf:"bytes,4,rep,name=focus_areas,json=focusAreas,proto3" json:"focus_areas,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RequestAIExplanationRequest) Reset() {
+	*x = RequestAIExplanationRequest{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestAIExplanationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestAIExplanationRequest) ProtoMessage() {}
+
+func (x *RequestAIExplanationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestAIExplanationRequest.ProtoReflect.Descriptor instead.
+func (*RequestAIExplanationRequest) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *RequestAIExplanationRequest) GetAssessmentId() uint64 {
+	if x != nil {
+		return x.AssessmentId
+	}
+	return 0
+}
+
+func (x *RequestAIExplanationRequest) GetTesteeId() uint64 {
+	if x != nil {
+		return x.TesteeId
+	}
+	return 0
+}
+
+func (x *RequestAIExplanationRequest) GetLocale() string {
+	if x != nil {
+		return x.Locale
+	}
+	return ""
+}
+
+func (x *RequestAIExplanationRequest) GetFocusAreas() []string {
+	if x != nil {
+		return x.FocusAreas
+	}
+	return nil
+}
+
+type GetAIExplanationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AssessmentId  uint64                 `protobuf:"varint,1,opt,name=assessment_id,json=assessmentId,proto3" json:"assessment_id,omitempty"`
+	TesteeId      uint64                 `protobuf:"varint,2,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
+	GenerationId  string                 `protobuf:"bytes,3,opt,name=generation_id,json=generationId,proto3" json:"generation_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAIExplanationRequest) Reset() {
+	*x = GetAIExplanationRequest{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAIExplanationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAIExplanationRequest) ProtoMessage() {}
+
+func (x *GetAIExplanationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAIExplanationRequest.ProtoReflect.Descriptor instead.
+func (*GetAIExplanationRequest) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *GetAIExplanationRequest) GetAssessmentId() uint64 {
+	if x != nil {
+		return x.AssessmentId
+	}
+	return 0
+}
+
+func (x *GetAIExplanationRequest) GetTesteeId() uint64 {
+	if x != nil {
+		return x.TesteeId
+	}
+	return 0
+}
+
+func (x *GetAIExplanationRequest) GetGenerationId() string {
+	if x != nil {
+		return x.GenerationId
+	}
+	return ""
+}
+
+type AIExplanationResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Status         string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	ReasonCode     string                 `protobuf:"bytes,2,opt,name=reason_code,json=reasonCode,proto3" json:"reason_code,omitempty"`
+	GenerationId   string                 `protobuf:"bytes,3,opt,name=generation_id,json=generationId,proto3" json:"generation_id,omitempty"`
+	ArtifactId     string                 `protobuf:"bytes,4,opt,name=artifact_id,json=artifactId,proto3" json:"artifact_id,omitempty"`
+	SourceReportId string                 `protobuf:"bytes,5,opt,name=source_report_id,json=sourceReportId,proto3" json:"source_report_id,omitempty"`
+	SourceState    string                 `protobuf:"bytes,6,opt,name=source_state,json=sourceState,proto3" json:"source_state,omitempty"`
+	Content        *AIExplanationContent  `protobuf:"bytes,7,opt,name=content,proto3" json:"content,omitempty"`
+	Failure        *AIExplanationFailure  `protobuf:"bytes,8,opt,name=failure,proto3" json:"failure,omitempty"`
+	CreatedAt      string                 `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt      string                 `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *AIExplanationResponse) Reset() {
+	*x = AIExplanationResponse{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIExplanationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIExplanationResponse) ProtoMessage() {}
+
+func (x *AIExplanationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIExplanationResponse.ProtoReflect.Descriptor instead.
+func (*AIExplanationResponse) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *AIExplanationResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AIExplanationResponse) GetReasonCode() string {
+	if x != nil {
+		return x.ReasonCode
+	}
+	return ""
+}
+
+func (x *AIExplanationResponse) GetGenerationId() string {
+	if x != nil {
+		return x.GenerationId
+	}
+	return ""
+}
+
+func (x *AIExplanationResponse) GetArtifactId() string {
+	if x != nil {
+		return x.ArtifactId
+	}
+	return ""
+}
+
+func (x *AIExplanationResponse) GetSourceReportId() string {
+	if x != nil {
+		return x.SourceReportId
+	}
+	return ""
+}
+
+func (x *AIExplanationResponse) GetSourceState() string {
+	if x != nil {
+		return x.SourceState
+	}
+	return ""
+}
+
+func (x *AIExplanationResponse) GetContent() *AIExplanationContent {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
+func (x *AIExplanationResponse) GetFailure() *AIExplanationFailure {
+	if x != nil {
+		return x.Failure
+	}
+	return nil
+}
+
+func (x *AIExplanationResponse) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *AIExplanationResponse) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
+type ExportAIExplanationsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TesteeId      uint64                 `protobuf:"varint,1,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
+	PageSize      int32                  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	Cursor        string                 `protobuf:"bytes,3,opt,name=cursor,proto3" json:"cursor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExportAIExplanationsRequest) Reset() {
+	*x = ExportAIExplanationsRequest{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExportAIExplanationsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExportAIExplanationsRequest) ProtoMessage() {}
+
+func (x *ExportAIExplanationsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExportAIExplanationsRequest.ProtoReflect.Descriptor instead.
+func (*ExportAIExplanationsRequest) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *ExportAIExplanationsRequest) GetTesteeId() uint64 {
+	if x != nil {
+		return x.TesteeId
+	}
+	return 0
+}
+
+func (x *ExportAIExplanationsRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ExportAIExplanationsRequest) GetCursor() string {
+	if x != nil {
+		return x.Cursor
+	}
+	return ""
+}
+
+type AIExplanationExportSourceReceipt struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	AssessmentId         string                 `protobuf:"bytes,1,opt,name=assessment_id,json=assessmentId,proto3" json:"assessment_id,omitempty"`
+	ReportId             string                 `protobuf:"bytes,2,opt,name=report_id,json=reportId,proto3" json:"report_id,omitempty"`
+	OutcomeId            string                 `protobuf:"bytes,3,opt,name=outcome_id,json=outcomeId,proto3" json:"outcome_id,omitempty"`
+	ReportType           string                 `protobuf:"bytes,4,opt,name=report_type,json=reportType,proto3" json:"report_type,omitempty"`
+	TemplateVersion      string                 `protobuf:"bytes,5,opt,name=template_version,json=templateVersion,proto3" json:"template_version,omitempty"`
+	ContentSchemaVersion string                 `protobuf:"bytes,6,opt,name=content_schema_version,json=contentSchemaVersion,proto3" json:"content_schema_version,omitempty"`
+	BuilderIdentity      string                 `protobuf:"bytes,7,opt,name=builder_identity,json=builderIdentity,proto3" json:"builder_identity,omitempty"`
+	ReportGeneratedAt    string                 `protobuf:"bytes,8,opt,name=report_generated_at,json=reportGeneratedAt,proto3" json:"report_generated_at,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *AIExplanationExportSourceReceipt) Reset() {
+	*x = AIExplanationExportSourceReceipt{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIExplanationExportSourceReceipt) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIExplanationExportSourceReceipt) ProtoMessage() {}
+
+func (x *AIExplanationExportSourceReceipt) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIExplanationExportSourceReceipt.ProtoReflect.Descriptor instead.
+func (*AIExplanationExportSourceReceipt) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *AIExplanationExportSourceReceipt) GetAssessmentId() string {
+	if x != nil {
+		return x.AssessmentId
+	}
+	return ""
+}
+
+func (x *AIExplanationExportSourceReceipt) GetReportId() string {
+	if x != nil {
+		return x.ReportId
+	}
+	return ""
+}
+
+func (x *AIExplanationExportSourceReceipt) GetOutcomeId() string {
+	if x != nil {
+		return x.OutcomeId
+	}
+	return ""
+}
+
+func (x *AIExplanationExportSourceReceipt) GetReportType() string {
+	if x != nil {
+		return x.ReportType
+	}
+	return ""
+}
+
+func (x *AIExplanationExportSourceReceipt) GetTemplateVersion() string {
+	if x != nil {
+		return x.TemplateVersion
+	}
+	return ""
+}
+
+func (x *AIExplanationExportSourceReceipt) GetContentSchemaVersion() string {
+	if x != nil {
+		return x.ContentSchemaVersion
+	}
+	return ""
+}
+
+func (x *AIExplanationExportSourceReceipt) GetBuilderIdentity() string {
+	if x != nil {
+		return x.BuilderIdentity
+	}
+	return ""
+}
+
+func (x *AIExplanationExportSourceReceipt) GetReportGeneratedAt() string {
+	if x != nil {
+		return x.ReportGeneratedAt
+	}
+	return ""
+}
+
+type AIExplanationExportReleaseReceipt struct {
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	ProfileId                 string                 `protobuf:"bytes,1,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
+	ProfileVersion            string                 `protobuf:"bytes,2,opt,name=profile_version,json=profileVersion,proto3" json:"profile_version,omitempty"`
+	ProfileFingerprint        string                 `protobuf:"bytes,3,opt,name=profile_fingerprint,json=profileFingerprint,proto3" json:"profile_fingerprint,omitempty"`
+	PromptTemplateId          string                 `protobuf:"bytes,4,opt,name=prompt_template_id,json=promptTemplateId,proto3" json:"prompt_template_id,omitempty"`
+	PromptVersion             string                 `protobuf:"bytes,5,opt,name=prompt_version,json=promptVersion,proto3" json:"prompt_version,omitempty"`
+	PromptFingerprint         string                 `protobuf:"bytes,6,opt,name=prompt_fingerprint,json=promptFingerprint,proto3" json:"prompt_fingerprint,omitempty"`
+	PromptGitBlobSha          string                 `protobuf:"bytes,7,opt,name=prompt_git_blob_sha,json=promptGitBlobSha,proto3" json:"prompt_git_blob_sha,omitempty"`
+	ProviderRoute             string                 `protobuf:"bytes,8,opt,name=provider_route,json=providerRoute,proto3" json:"provider_route,omitempty"`
+	ProviderRouteRevision     string                 `protobuf:"bytes,9,opt,name=provider_route_revision,json=providerRouteRevision,proto3" json:"provider_route_revision,omitempty"`
+	ResolvedProvider          string                 `protobuf:"bytes,10,opt,name=resolved_provider,json=resolvedProvider,proto3" json:"resolved_provider,omitempty"`
+	ResolvedModel             string                 `protobuf:"bytes,11,opt,name=resolved_model,json=resolvedModel,proto3" json:"resolved_model,omitempty"`
+	ExecutionSpecFingerprint  string                 `protobuf:"bytes,12,opt,name=execution_spec_fingerprint,json=executionSpecFingerprint,proto3" json:"execution_spec_fingerprint,omitempty"`
+	InputSchema               string                 `protobuf:"bytes,13,opt,name=input_schema,json=inputSchema,proto3" json:"input_schema,omitempty"`
+	OutputSchema              string                 `protobuf:"bytes,14,opt,name=output_schema,json=outputSchema,proto3" json:"output_schema,omitempty"`
+	SafetyPolicy              string                 `protobuf:"bytes,15,opt,name=safety_policy,json=safetyPolicy,proto3" json:"safety_policy,omitempty"`
+	SchemaValidatorVersion    string                 `protobuf:"bytes,16,opt,name=schema_validator_version,json=schemaValidatorVersion,proto3" json:"schema_validator_version,omitempty"`
+	ReferenceValidatorVersion string                 `protobuf:"bytes,17,opt,name=reference_validator_version,json=referenceValidatorVersion,proto3" json:"reference_validator_version,omitempty"`
+	ProfileValidatorVersion   string                 `protobuf:"bytes,18,opt,name=profile_validator_version,json=profileValidatorVersion,proto3" json:"profile_validator_version,omitempty"`
+	SafetyValidatorVersion    string                 `protobuf:"bytes,19,opt,name=safety_validator_version,json=safetyValidatorVersion,proto3" json:"safety_validator_version,omitempty"`
+	ValidatedAt               string                 `protobuf:"bytes,20,opt,name=validated_at,json=validatedAt,proto3" json:"validated_at,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
+}
+
+func (x *AIExplanationExportReleaseReceipt) Reset() {
+	*x = AIExplanationExportReleaseReceipt{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIExplanationExportReleaseReceipt) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIExplanationExportReleaseReceipt) ProtoMessage() {}
+
+func (x *AIExplanationExportReleaseReceipt) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIExplanationExportReleaseReceipt.ProtoReflect.Descriptor instead.
+func (*AIExplanationExportReleaseReceipt) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *AIExplanationExportReleaseReceipt) GetProfileId() string {
+	if x != nil {
+		return x.ProfileId
+	}
+	return ""
+}
+
+func (x *AIExplanationExportReleaseReceipt) GetProfileVersion() string {
+	if x != nil {
+		return x.ProfileVersion
+	}
+	return ""
+}
+
+func (x *AIExplanationExportReleaseReceipt) GetProfileFingerprint() string {
+	if x != nil {
+		return x.ProfileFingerprint
+	}
+	return ""
+}
+
+func (x *AIExplanationExportReleaseReceipt) GetPromptTemplateId() string {
+	if x != nil {
+		return x.PromptTemplateId
+	}
+	return ""
+}
+
+func (x *AIExplanationExportReleaseReceipt) GetPromptVersion() string {
+	if x != nil {
+		return x.PromptVersion
+	}
+	return ""
+}
+
+func (x *AIExplanationExportReleaseReceipt) GetPromptFingerprint() string {
+	if x != nil {
+		return x.PromptFingerprint
+	}
+	return ""
+}
+
+func (x *AIExplanationExportReleaseReceipt) GetPromptGitBlobSha() string {
+	if x != nil {
+		return x.PromptGitBlobSha
+	}
+	return ""
+}
+
+func (x *AIExplanationExportReleaseReceipt) GetProviderRoute() string {
+	if x != nil {
+		return x.ProviderRoute
+	}
+	return ""
+}
+
+func (x *AIExplanationExportReleaseReceipt) GetProviderRouteRevision() string {
+	if x != nil {
+		return x.ProviderRouteRevision
+	}
+	return ""
+}
+
+func (x *AIExplanationExportReleaseReceipt) GetResolvedProvider() string {
+	if x != nil {
+		return x.ResolvedProvider
+	}
+	return ""
+}
+
+func (x *AIExplanationExportReleaseReceipt) GetResolvedModel() string {
+	if x != nil {
+		return x.ResolvedModel
+	}
+	return ""
+}
+
+func (x *AIExplanationExportReleaseReceipt) GetExecutionSpecFingerprint() string {
+	if x != nil {
+		return x.ExecutionSpecFingerprint
+	}
+	return ""
+}
+
+func (x *AIExplanationExportReleaseReceipt) GetInputSchema() string {
+	if x != nil {
+		return x.InputSchema
+	}
+	return ""
+}
+
+func (x *AIExplanationExportReleaseReceipt) GetOutputSchema() string {
+	if x != nil {
+		return x.OutputSchema
+	}
+	return ""
+}
+
+func (x *AIExplanationExportReleaseReceipt) GetSafetyPolicy() string {
+	if x != nil {
+		return x.SafetyPolicy
+	}
+	return ""
+}
+
+func (x *AIExplanationExportReleaseReceipt) GetSchemaValidatorVersion() string {
+	if x != nil {
+		return x.SchemaValidatorVersion
+	}
+	return ""
+}
+
+func (x *AIExplanationExportReleaseReceipt) GetReferenceValidatorVersion() string {
+	if x != nil {
+		return x.ReferenceValidatorVersion
+	}
+	return ""
+}
+
+func (x *AIExplanationExportReleaseReceipt) GetProfileValidatorVersion() string {
+	if x != nil {
+		return x.ProfileValidatorVersion
+	}
+	return ""
+}
+
+func (x *AIExplanationExportReleaseReceipt) GetSafetyValidatorVersion() string {
+	if x != nil {
+		return x.SafetyValidatorVersion
+	}
+	return ""
+}
+
+func (x *AIExplanationExportReleaseReceipt) GetValidatedAt() string {
+	if x != nil {
+		return x.ValidatedAt
+	}
+	return ""
+}
+
+type AIExplanationSubjectExportItem struct {
+	state         protoimpl.MessageState             `protogen:"open.v1"`
+	GenerationId  string                             `protobuf:"bytes,1,opt,name=generation_id,json=generationId,proto3" json:"generation_id,omitempty"`
+	ArtifactId    string                             `protobuf:"bytes,2,opt,name=artifact_id,json=artifactId,proto3" json:"artifact_id,omitempty"`
+	Source        *AIExplanationExportSourceReceipt  `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`
+	Release       *AIExplanationExportReleaseReceipt `protobuf:"bytes,4,opt,name=release,proto3" json:"release,omitempty"`
+	Content       *AIExplanationContent              `protobuf:"bytes,5,opt,name=content,proto3" json:"content,omitempty"`
+	GeneratedAt   string                             `protobuf:"bytes,6,opt,name=generated_at,json=generatedAt,proto3" json:"generated_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIExplanationSubjectExportItem) Reset() {
+	*x = AIExplanationSubjectExportItem{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIExplanationSubjectExportItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIExplanationSubjectExportItem) ProtoMessage() {}
+
+func (x *AIExplanationSubjectExportItem) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIExplanationSubjectExportItem.ProtoReflect.Descriptor instead.
+func (*AIExplanationSubjectExportItem) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *AIExplanationSubjectExportItem) GetGenerationId() string {
+	if x != nil {
+		return x.GenerationId
+	}
+	return ""
+}
+
+func (x *AIExplanationSubjectExportItem) GetArtifactId() string {
+	if x != nil {
+		return x.ArtifactId
+	}
+	return ""
+}
+
+func (x *AIExplanationSubjectExportItem) GetSource() *AIExplanationExportSourceReceipt {
+	if x != nil {
+		return x.Source
+	}
+	return nil
+}
+
+func (x *AIExplanationSubjectExportItem) GetRelease() *AIExplanationExportReleaseReceipt {
+	if x != nil {
+		return x.Release
+	}
+	return nil
+}
+
+func (x *AIExplanationSubjectExportItem) GetContent() *AIExplanationContent {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
+func (x *AIExplanationSubjectExportItem) GetGeneratedAt() string {
+	if x != nil {
+		return x.GeneratedAt
+	}
+	return ""
+}
+
+type AIExplanationSubjectExportResponse struct {
+	state         protoimpl.MessageState            `protogen:"open.v1"`
+	SchemaVersion string                            `protobuf:"bytes,1,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
+	OrgId         uint64                            `protobuf:"varint,2,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`
+	TesteeId      uint64                            `protobuf:"varint,3,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
+	ExportedAt    string                            `protobuf:"bytes,4,opt,name=exported_at,json=exportedAt,proto3" json:"exported_at,omitempty"`
+	SnapshotAt    string                            `protobuf:"bytes,5,opt,name=snapshot_at,json=snapshotAt,proto3" json:"snapshot_at,omitempty"`
+	Items         []*AIExplanationSubjectExportItem `protobuf:"bytes,6,rep,name=items,proto3" json:"items,omitempty"`
+	NextCursor    string                            `protobuf:"bytes,7,opt,name=next_cursor,json=nextCursor,proto3" json:"next_cursor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIExplanationSubjectExportResponse) Reset() {
+	*x = AIExplanationSubjectExportResponse{}
+	mi := &file_interpretation_interpretation_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIExplanationSubjectExportResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIExplanationSubjectExportResponse) ProtoMessage() {}
+
+func (x *AIExplanationSubjectExportResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_interpretation_interpretation_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIExplanationSubjectExportResponse.ProtoReflect.Descriptor instead.
+func (*AIExplanationSubjectExportResponse) Descriptor() ([]byte, []int) {
+	return file_interpretation_interpretation_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *AIExplanationSubjectExportResponse) GetSchemaVersion() string {
+	if x != nil {
+		return x.SchemaVersion
+	}
+	return ""
+}
+
+func (x *AIExplanationSubjectExportResponse) GetOrgId() uint64 {
+	if x != nil {
+		return x.OrgId
+	}
+	return 0
+}
+
+func (x *AIExplanationSubjectExportResponse) GetTesteeId() uint64 {
+	if x != nil {
+		return x.TesteeId
+	}
+	return 0
+}
+
+func (x *AIExplanationSubjectExportResponse) GetExportedAt() string {
+	if x != nil {
+		return x.ExportedAt
+	}
+	return ""
+}
+
+func (x *AIExplanationSubjectExportResponse) GetSnapshotAt() string {
+	if x != nil {
+		return x.SnapshotAt
+	}
+	return ""
+}
+
+func (x *AIExplanationSubjectExportResponse) GetItems() []*AIExplanationSubjectExportItem {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *AIExplanationSubjectExportResponse) GetNextCursor() string {
+	if x != nil {
+		return x.NextCursor
+	}
+	return ""
+}
+
 var File_interpretation_interpretation_proto protoreflect.FileDescriptor
 
 const file_interpretation_interpretation_proto_rawDesc = "" +
@@ -1192,13 +2808,178 @@ const file_interpretation_interpretation_proto_rawDesc = "" +
 	"\x1cremaining_automatic_attempts\x18\x0e \x01(\x05R\x1aremainingAutomaticAttempts\x12&\n" +
 	"\x0fnext_attempt_at\x18\x0f \x01(\tR\rnextAttemptAt\x12$\n" +
 	"\x0eretry_event_id\x18\x10 \x01(\tR\fretryEventId\x12*\n" +
-	"\x11action_request_id\x18\x11 \x01(\tR\x0factionRequestId2\xe8\x01\n" +
+	"\x11action_request_id\x18\x11 \x01(\tR\x0factionRequestId\"\x95\x03\n" +
+	"\x1bExecuteAIExplanationRequest\x12#\n" +
+	"\rgeneration_id\x18\x01 \x01(\tR\fgenerationId\x12\x19\n" +
+	"\btrace_id\x18\x02 \x01(\tR\atraceId\x12\x19\n" +
+	"\bevent_id\x18\x03 \x01(\tR\aeventId\x12)\n" +
+	"\x10expected_attempt\x18\x04 \x01(\x05R\x0fexpectedAttempt\x12%\n" +
+	"\x0eattempt_origin\x18\x05 \x01(\tR\rattemptOrigin\x12*\n" +
+	"\x11action_request_id\x18\x06 \x01(\tR\x0factionRequestId\x12&\n" +
+	"\x0fexpected_run_id\x18\a \x01(\tR\rexpectedRunId\x129\n" +
+	"\x19expected_lease_expires_at\x18\b \x01(\tR\x16expectedLeaseExpiresAt\x12:\n" +
+	"\x19expected_invocation_phase\x18\t \x01(\tR\x17expectedInvocationPhase\"\xb4\x02\n" +
+	"\x1cExecuteAIExplanationResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\tR\x06status\x12#\n" +
+	"\rgeneration_id\x18\x03 \x01(\tR\fgenerationId\x12\x15\n" +
+	"\x06run_id\x18\x04 \x01(\tR\x05runId\x12\x1f\n" +
+	"\vartifact_id\x18\x05 \x01(\tR\n" +
+	"artifactId\x12!\n" +
+	"\ffailure_kind\x18\x06 \x01(\tR\vfailureKind\x12!\n" +
+	"\ffailure_code\x18\a \x01(\tR\vfailureCode\x12!\n" +
+	"\fsafe_message\x18\b \x01(\tR\vsafeMessage\x12\x1c\n" +
+	"\tretryable\x18\t \x01(\bR\tretryable\"\xc3\x01\n" +
+	"\"ExecutePromptEvaluationStepRequest\x12\x15\n" +
+	"\x06org_id\x18\x01 \x01(\x03R\x05orgId\x12\x15\n" +
+	"\x06run_id\x18\x02 \x01(\tR\x05runId\x12\x17\n" +
+	"\acase_id\x18\x03 \x01(\tR\x06caseId\x12\x18\n" +
+	"\aattempt\x18\x04 \x01(\x05R\aattempt\x12!\n" +
+	"\frequested_by\x18\x05 \x01(\tR\vrequestedBy\x12\x19\n" +
+	"\bevent_id\x18\x06 \x01(\tR\aeventId\"\x85\x02\n" +
+	"#ExecutePromptEvaluationStepResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x15\n" +
+	"\x06run_id\x18\x02 \x01(\tR\x05runId\x12\x17\n" +
+	"\acase_id\x18\x03 \x01(\tR\x06caseId\x12\x18\n" +
+	"\aattempt\x18\x04 \x01(\x05R\aattempt\x12\x16\n" +
+	"\x06status\x18\x05 \x01(\tR\x06status\x12\x1d\n" +
+	"\n" +
+	"run_status\x18\x06 \x01(\tR\trunStatus\x12 \n" +
+	"\fnext_case_id\x18\a \x01(\tR\n" +
+	"nextCaseId\x12!\n" +
+	"\fnext_attempt\x18\b \x01(\x05R\vnextAttempt\"@\n" +
+	"\x18AIExplanationEvidenceRef\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x10\n" +
+	"\x03ref\x18\x02 \x01(\tR\x03ref\"\xd9\x01\n" +
+	"\x1eAIExplanationIntegratedInsight\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x12\x18\n" +
+	"\acontent\x18\x03 \x01(\tR\acontent\x12$\n" +
+	"\x0ewhy_it_matters\x18\x04 \x01(\tR\fwhyItMatters\x12M\n" +
+	"\revidence_refs\x18\x05 \x03(\v2(.interpretation.AIExplanationEvidenceRefR\fevidenceRefs\"\xce\x02\n" +
+	"\x17AIExplanationSuggestion\x12\x16\n" +
+	"\x06origin\x18\x01 \x01(\tR\x06origin\x12\x1a\n" +
+	"\bcategory\x18\x02 \x01(\tR\bcategory\x12\x14\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\x12\x12\n" +
+	"\x04goal\x18\x04 \x01(\tR\x04goal\x12\x18\n" +
+	"\aactions\x18\x05 \x03(\tR\aactions\x12\x1c\n" +
+	"\trationale\x18\x06 \x01(\tR\trationale\x12M\n" +
+	"\revidence_refs\x18\a \x03(\v2(.interpretation.AIExplanationEvidenceRefR\fevidenceRefs\x124\n" +
+	"\x16source_suggestion_refs\x18\b \x03(\tR\x14sourceSuggestionRefs\x12\x18\n" +
+	"\acaution\x18\t \x01(\tR\acaution\"\xa5\x02\n" +
+	"\x14AIExplanationContent\x12%\n" +
+	"\x0eschema_version\x18\x01 \x01(\tR\rschemaVersion\x12\x18\n" +
+	"\asummary\x18\x02 \x01(\tR\asummary\x12_\n" +
+	"\x13integrated_insights\x18\x03 \x03(\v2..interpretation.AIExplanationIntegratedInsightR\x12integratedInsights\x12I\n" +
+	"\vsuggestions\x18\x04 \x03(\v2'.interpretation.AIExplanationSuggestionR\vsuggestions\x12 \n" +
+	"\vlimitations\x18\x05 \x03(\tR\vlimitations\"k\n" +
+	"\x14AIExplanationFailure\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12!\n" +
+	"\fsafe_message\x18\x02 \x01(\tR\vsafeMessage\x12\x1c\n" +
+	"\tretryable\x18\x03 \x01(\bR\tretryable\"\x9e\x01\n" +
+	"!GetAIExplanationCapabilityRequest\x12#\n" +
+	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\x12\x1b\n" +
+	"\ttestee_id\x18\x02 \x01(\x04R\btesteeId\x12\x16\n" +
+	"\x06locale\x18\x03 \x01(\tR\x06locale\x12\x1f\n" +
+	"\vfocus_areas\x18\x04 \x03(\tR\n" +
+	"focusAreas\"\x98\x01\n" +
+	"\x1bRequestAIExplanationRequest\x12#\n" +
+	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\x12\x1b\n" +
+	"\ttestee_id\x18\x02 \x01(\x04R\btesteeId\x12\x16\n" +
+	"\x06locale\x18\x03 \x01(\tR\x06locale\x12\x1f\n" +
+	"\vfocus_areas\x18\x04 \x03(\tR\n" +
+	"focusAreas\"\x80\x01\n" +
+	"\x17GetAIExplanationRequest\x12#\n" +
+	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\x12\x1b\n" +
+	"\ttestee_id\x18\x02 \x01(\x04R\btesteeId\x12#\n" +
+	"\rgeneration_id\x18\x03 \x01(\tR\fgenerationId\"\xa1\x03\n" +
+	"\x15AIExplanationResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x12\x1f\n" +
+	"\vreason_code\x18\x02 \x01(\tR\n" +
+	"reasonCode\x12#\n" +
+	"\rgeneration_id\x18\x03 \x01(\tR\fgenerationId\x12\x1f\n" +
+	"\vartifact_id\x18\x04 \x01(\tR\n" +
+	"artifactId\x12(\n" +
+	"\x10source_report_id\x18\x05 \x01(\tR\x0esourceReportId\x12!\n" +
+	"\fsource_state\x18\x06 \x01(\tR\vsourceState\x12>\n" +
+	"\acontent\x18\a \x01(\v2$.interpretation.AIExplanationContentR\acontent\x12>\n" +
+	"\afailure\x18\b \x01(\v2$.interpretation.AIExplanationFailureR\afailure\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\t \x01(\tR\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\n" +
+	" \x01(\tR\tupdatedAt\"o\n" +
+	"\x1bExportAIExplanationsRequest\x12\x1b\n" +
+	"\ttestee_id\x18\x01 \x01(\x04R\btesteeId\x12\x1b\n" +
+	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\x12\x16\n" +
+	"\x06cursor\x18\x03 \x01(\tR\x06cursor\"\xe0\x02\n" +
+	" AIExplanationExportSourceReceipt\x12#\n" +
+	"\rassessment_id\x18\x01 \x01(\tR\fassessmentId\x12\x1b\n" +
+	"\treport_id\x18\x02 \x01(\tR\breportId\x12\x1d\n" +
+	"\n" +
+	"outcome_id\x18\x03 \x01(\tR\toutcomeId\x12\x1f\n" +
+	"\vreport_type\x18\x04 \x01(\tR\n" +
+	"reportType\x12)\n" +
+	"\x10template_version\x18\x05 \x01(\tR\x0ftemplateVersion\x124\n" +
+	"\x16content_schema_version\x18\x06 \x01(\tR\x14contentSchemaVersion\x12)\n" +
+	"\x10builder_identity\x18\a \x01(\tR\x0fbuilderIdentity\x12.\n" +
+	"\x13report_generated_at\x18\b \x01(\tR\x11reportGeneratedAt\"\xc0\a\n" +
+	"!AIExplanationExportReleaseReceipt\x12\x1d\n" +
+	"\n" +
+	"profile_id\x18\x01 \x01(\tR\tprofileId\x12'\n" +
+	"\x0fprofile_version\x18\x02 \x01(\tR\x0eprofileVersion\x12/\n" +
+	"\x13profile_fingerprint\x18\x03 \x01(\tR\x12profileFingerprint\x12,\n" +
+	"\x12prompt_template_id\x18\x04 \x01(\tR\x10promptTemplateId\x12%\n" +
+	"\x0eprompt_version\x18\x05 \x01(\tR\rpromptVersion\x12-\n" +
+	"\x12prompt_fingerprint\x18\x06 \x01(\tR\x11promptFingerprint\x12-\n" +
+	"\x13prompt_git_blob_sha\x18\a \x01(\tR\x10promptGitBlobSha\x12%\n" +
+	"\x0eprovider_route\x18\b \x01(\tR\rproviderRoute\x126\n" +
+	"\x17provider_route_revision\x18\t \x01(\tR\x15providerRouteRevision\x12+\n" +
+	"\x11resolved_provider\x18\n" +
+	" \x01(\tR\x10resolvedProvider\x12%\n" +
+	"\x0eresolved_model\x18\v \x01(\tR\rresolvedModel\x12<\n" +
+	"\x1aexecution_spec_fingerprint\x18\f \x01(\tR\x18executionSpecFingerprint\x12!\n" +
+	"\finput_schema\x18\r \x01(\tR\vinputSchema\x12#\n" +
+	"\routput_schema\x18\x0e \x01(\tR\foutputSchema\x12#\n" +
+	"\rsafety_policy\x18\x0f \x01(\tR\fsafetyPolicy\x128\n" +
+	"\x18schema_validator_version\x18\x10 \x01(\tR\x16schemaValidatorVersion\x12>\n" +
+	"\x1breference_validator_version\x18\x11 \x01(\tR\x19referenceValidatorVersion\x12:\n" +
+	"\x19profile_validator_version\x18\x12 \x01(\tR\x17profileValidatorVersion\x128\n" +
+	"\x18safety_validator_version\x18\x13 \x01(\tR\x16safetyValidatorVersion\x12!\n" +
+	"\fvalidated_at\x18\x14 \x01(\tR\vvalidatedAt\"\xe0\x02\n" +
+	"\x1eAIExplanationSubjectExportItem\x12#\n" +
+	"\rgeneration_id\x18\x01 \x01(\tR\fgenerationId\x12\x1f\n" +
+	"\vartifact_id\x18\x02 \x01(\tR\n" +
+	"artifactId\x12H\n" +
+	"\x06source\x18\x03 \x01(\v20.interpretation.AIExplanationExportSourceReceiptR\x06source\x12K\n" +
+	"\arelease\x18\x04 \x01(\v21.interpretation.AIExplanationExportReleaseReceiptR\arelease\x12>\n" +
+	"\acontent\x18\x05 \x01(\v2$.interpretation.AIExplanationContentR\acontent\x12!\n" +
+	"\fgenerated_at\x18\x06 \x01(\tR\vgeneratedAt\"\xa8\x02\n" +
+	"\"AIExplanationSubjectExportResponse\x12%\n" +
+	"\x0eschema_version\x18\x01 \x01(\tR\rschemaVersion\x12\x15\n" +
+	"\x06org_id\x18\x02 \x01(\x04R\x05orgId\x12\x1b\n" +
+	"\ttestee_id\x18\x03 \x01(\x04R\btesteeId\x12\x1f\n" +
+	"\vexported_at\x18\x04 \x01(\tR\n" +
+	"exportedAt\x12\x1f\n" +
+	"\vsnapshot_at\x18\x05 \x01(\tR\n" +
+	"snapshotAt\x12D\n" +
+	"\x05items\x18\x06 \x03(\v2..interpretation.AIExplanationSubjectExportItemR\x05items\x12\x1f\n" +
+	"\vnext_cursor\x18\a \x01(\tR\n" +
+	"nextCursor2\xe8\x01\n" +
 	"\x18ParticipantReportService\x12n\n" +
 	"\x13GetAssessmentReport\x12*.interpretation.GetAssessmentReportRequest\x1a+.interpretation.GetAssessmentReportResponse\x12\\\n" +
-	"\rListMyReports\x12$.interpretation.ListMyReportsRequest\x1a%.interpretation.ListMyReportsResponse2\xb8\x02\n" +
+	"\rListMyReports\x12$.interpretation.ListMyReportsRequest\x1a%.interpretation.ListMyReportsResponse2\xe2\x03\n" +
+	"\x1fParticipantAIExplanationService\x12v\n" +
+	"\x1aGetAIExplanationCapability\x121.interpretation.GetAIExplanationCapabilityRequest\x1a%.interpretation.AIExplanationResponse\x12j\n" +
+	"\x14RequestAIExplanation\x12+.interpretation.RequestAIExplanationRequest\x1a%.interpretation.AIExplanationResponse\x12b\n" +
+	"\x10GetAIExplanation\x12'.interpretation.GetAIExplanationRequest\x1a%.interpretation.AIExplanationResponse\x12w\n" +
+	"\x14ExportAIExplanations\x12+.interpretation.ExportAIExplanationsRequest\x1a2.interpretation.AIExplanationSubjectExportResponse2\xb8\x02\n" +
 	"\x1fInterpretationAutomationService\x12\x83\x01\n" +
 	"\x19GenerateReportFromOutcome\x120.interpretation.GenerateReportFromOutcomeRequest\x1a4.interpretation.GenerateReportFromAssessmentResponse\x12\x8e\x01\n" +
-	"\x1cGenerateReportFromAssessment\x123.interpretation.GenerateReportFromAssessmentRequest\x1a4.interpretation.GenerateReportFromAssessmentResponse\"\x03\x88\x02\x01B?Z=github.com/FangcunMount/qs-server/api/grpc/gen/interpretationb\x06proto3"
+	"\x1cGenerateReportFromAssessment\x123.interpretation.GenerateReportFromAssessmentRequest\x1a4.interpretation.GenerateReportFromAssessmentResponse\"\x03\x88\x02\x012\x9c\x02\n" +
+	"\x1eAIExplanationAutomationService\x12q\n" +
+	"\x14ExecuteAIExplanation\x12+.interpretation.ExecuteAIExplanationRequest\x1a,.interpretation.ExecuteAIExplanationResponse\x12\x86\x01\n" +
+	"\x1bExecutePromptEvaluationStep\x122.interpretation.ExecutePromptEvaluationStepRequest\x1a3.interpretation.ExecutePromptEvaluationStepResponseB?Z=github.com/FangcunMount/qs-server/api/grpc/gen/interpretationb\x06proto3"
 
 var (
 	file_interpretation_interpretation_proto_rawDescOnce sync.Once
@@ -1212,7 +2993,7 @@ func file_interpretation_interpretation_proto_rawDescGZIP() []byte {
 	return file_interpretation_interpretation_proto_rawDescData
 }
 
-var file_interpretation_interpretation_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_interpretation_interpretation_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_interpretation_interpretation_proto_goTypes = []any{
 	(*Suggestion)(nil),                           // 0: interpretation.Suggestion
 	(*NormReference)(nil),                        // 1: interpretation.NormReference
@@ -1227,36 +3008,76 @@ var file_interpretation_interpretation_proto_goTypes = []any{
 	(*GenerateReportFromAssessmentRequest)(nil),  // 10: interpretation.GenerateReportFromAssessmentRequest
 	(*GenerateReportFromOutcomeRequest)(nil),     // 11: interpretation.GenerateReportFromOutcomeRequest
 	(*GenerateReportFromAssessmentResponse)(nil), // 12: interpretation.GenerateReportFromAssessmentResponse
-	(*evaluation.ScoreValue)(nil),                // 13: evaluation.ScoreValue
-	(*evaluation.ResultLevel)(nil),               // 14: evaluation.ResultLevel
-	(*evaluation.ModelIdentity)(nil),             // 15: evaluation.ModelIdentity
+	(*ExecuteAIExplanationRequest)(nil),          // 13: interpretation.ExecuteAIExplanationRequest
+	(*ExecuteAIExplanationResponse)(nil),         // 14: interpretation.ExecuteAIExplanationResponse
+	(*ExecutePromptEvaluationStepRequest)(nil),   // 15: interpretation.ExecutePromptEvaluationStepRequest
+	(*ExecutePromptEvaluationStepResponse)(nil),  // 16: interpretation.ExecutePromptEvaluationStepResponse
+	(*AIExplanationEvidenceRef)(nil),             // 17: interpretation.AIExplanationEvidenceRef
+	(*AIExplanationIntegratedInsight)(nil),       // 18: interpretation.AIExplanationIntegratedInsight
+	(*AIExplanationSuggestion)(nil),              // 19: interpretation.AIExplanationSuggestion
+	(*AIExplanationContent)(nil),                 // 20: interpretation.AIExplanationContent
+	(*AIExplanationFailure)(nil),                 // 21: interpretation.AIExplanationFailure
+	(*GetAIExplanationCapabilityRequest)(nil),    // 22: interpretation.GetAIExplanationCapabilityRequest
+	(*RequestAIExplanationRequest)(nil),          // 23: interpretation.RequestAIExplanationRequest
+	(*GetAIExplanationRequest)(nil),              // 24: interpretation.GetAIExplanationRequest
+	(*AIExplanationResponse)(nil),                // 25: interpretation.AIExplanationResponse
+	(*ExportAIExplanationsRequest)(nil),          // 26: interpretation.ExportAIExplanationsRequest
+	(*AIExplanationExportSourceReceipt)(nil),     // 27: interpretation.AIExplanationExportSourceReceipt
+	(*AIExplanationExportReleaseReceipt)(nil),    // 28: interpretation.AIExplanationExportReleaseReceipt
+	(*AIExplanationSubjectExportItem)(nil),       // 29: interpretation.AIExplanationSubjectExportItem
+	(*AIExplanationSubjectExportResponse)(nil),   // 30: interpretation.AIExplanationSubjectExportResponse
+	(*evaluation.ScoreValue)(nil),                // 31: evaluation.ScoreValue
+	(*evaluation.ResultLevel)(nil),               // 32: evaluation.ResultLevel
+	(*evaluation.ModelIdentity)(nil),             // 33: evaluation.ModelIdentity
 }
 var file_interpretation_interpretation_proto_depIdxs = []int32{
-	13, // 0: interpretation.DimensionInterpret.derived_scores:type_name -> evaluation.ScoreValue
-	14, // 1: interpretation.DimensionInterpret.level:type_name -> evaluation.ResultLevel
+	31, // 0: interpretation.DimensionInterpret.derived_scores:type_name -> evaluation.ScoreValue
+	32, // 1: interpretation.DimensionInterpret.level:type_name -> evaluation.ResultLevel
 	1,  // 2: interpretation.DimensionInterpret.norm_reference:type_name -> interpretation.NormReference
 	3,  // 3: interpretation.ModelExtra.rarity:type_name -> interpretation.ModelRarity
 	2,  // 4: interpretation.AssessmentReport.dimensions:type_name -> interpretation.DimensionInterpret
 	0,  // 5: interpretation.AssessmentReport.suggestions:type_name -> interpretation.Suggestion
 	4,  // 6: interpretation.AssessmentReport.model_extra:type_name -> interpretation.ModelExtra
-	15, // 7: interpretation.AssessmentReport.model:type_name -> evaluation.ModelIdentity
-	13, // 8: interpretation.AssessmentReport.primary_score:type_name -> evaluation.ScoreValue
-	14, // 9: interpretation.AssessmentReport.level:type_name -> evaluation.ResultLevel
+	33, // 7: interpretation.AssessmentReport.model:type_name -> evaluation.ModelIdentity
+	31, // 8: interpretation.AssessmentReport.primary_score:type_name -> evaluation.ScoreValue
+	32, // 9: interpretation.AssessmentReport.level:type_name -> evaluation.ResultLevel
 	5,  // 10: interpretation.GetAssessmentReportResponse.report:type_name -> interpretation.AssessmentReport
 	5,  // 11: interpretation.ListMyReportsResponse.items:type_name -> interpretation.AssessmentReport
-	6,  // 12: interpretation.ParticipantReportService.GetAssessmentReport:input_type -> interpretation.GetAssessmentReportRequest
-	8,  // 13: interpretation.ParticipantReportService.ListMyReports:input_type -> interpretation.ListMyReportsRequest
-	11, // 14: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:input_type -> interpretation.GenerateReportFromOutcomeRequest
-	10, // 15: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:input_type -> interpretation.GenerateReportFromAssessmentRequest
-	7,  // 16: interpretation.ParticipantReportService.GetAssessmentReport:output_type -> interpretation.GetAssessmentReportResponse
-	9,  // 17: interpretation.ParticipantReportService.ListMyReports:output_type -> interpretation.ListMyReportsResponse
-	12, // 18: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:output_type -> interpretation.GenerateReportFromAssessmentResponse
-	12, // 19: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:output_type -> interpretation.GenerateReportFromAssessmentResponse
-	16, // [16:20] is the sub-list for method output_type
-	12, // [12:16] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	17, // 12: interpretation.AIExplanationIntegratedInsight.evidence_refs:type_name -> interpretation.AIExplanationEvidenceRef
+	17, // 13: interpretation.AIExplanationSuggestion.evidence_refs:type_name -> interpretation.AIExplanationEvidenceRef
+	18, // 14: interpretation.AIExplanationContent.integrated_insights:type_name -> interpretation.AIExplanationIntegratedInsight
+	19, // 15: interpretation.AIExplanationContent.suggestions:type_name -> interpretation.AIExplanationSuggestion
+	20, // 16: interpretation.AIExplanationResponse.content:type_name -> interpretation.AIExplanationContent
+	21, // 17: interpretation.AIExplanationResponse.failure:type_name -> interpretation.AIExplanationFailure
+	27, // 18: interpretation.AIExplanationSubjectExportItem.source:type_name -> interpretation.AIExplanationExportSourceReceipt
+	28, // 19: interpretation.AIExplanationSubjectExportItem.release:type_name -> interpretation.AIExplanationExportReleaseReceipt
+	20, // 20: interpretation.AIExplanationSubjectExportItem.content:type_name -> interpretation.AIExplanationContent
+	29, // 21: interpretation.AIExplanationSubjectExportResponse.items:type_name -> interpretation.AIExplanationSubjectExportItem
+	6,  // 22: interpretation.ParticipantReportService.GetAssessmentReport:input_type -> interpretation.GetAssessmentReportRequest
+	8,  // 23: interpretation.ParticipantReportService.ListMyReports:input_type -> interpretation.ListMyReportsRequest
+	22, // 24: interpretation.ParticipantAIExplanationService.GetAIExplanationCapability:input_type -> interpretation.GetAIExplanationCapabilityRequest
+	23, // 25: interpretation.ParticipantAIExplanationService.RequestAIExplanation:input_type -> interpretation.RequestAIExplanationRequest
+	24, // 26: interpretation.ParticipantAIExplanationService.GetAIExplanation:input_type -> interpretation.GetAIExplanationRequest
+	26, // 27: interpretation.ParticipantAIExplanationService.ExportAIExplanations:input_type -> interpretation.ExportAIExplanationsRequest
+	11, // 28: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:input_type -> interpretation.GenerateReportFromOutcomeRequest
+	10, // 29: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:input_type -> interpretation.GenerateReportFromAssessmentRequest
+	13, // 30: interpretation.AIExplanationAutomationService.ExecuteAIExplanation:input_type -> interpretation.ExecuteAIExplanationRequest
+	15, // 31: interpretation.AIExplanationAutomationService.ExecutePromptEvaluationStep:input_type -> interpretation.ExecutePromptEvaluationStepRequest
+	7,  // 32: interpretation.ParticipantReportService.GetAssessmentReport:output_type -> interpretation.GetAssessmentReportResponse
+	9,  // 33: interpretation.ParticipantReportService.ListMyReports:output_type -> interpretation.ListMyReportsResponse
+	25, // 34: interpretation.ParticipantAIExplanationService.GetAIExplanationCapability:output_type -> interpretation.AIExplanationResponse
+	25, // 35: interpretation.ParticipantAIExplanationService.RequestAIExplanation:output_type -> interpretation.AIExplanationResponse
+	25, // 36: interpretation.ParticipantAIExplanationService.GetAIExplanation:output_type -> interpretation.AIExplanationResponse
+	30, // 37: interpretation.ParticipantAIExplanationService.ExportAIExplanations:output_type -> interpretation.AIExplanationSubjectExportResponse
+	12, // 38: interpretation.InterpretationAutomationService.GenerateReportFromOutcome:output_type -> interpretation.GenerateReportFromAssessmentResponse
+	12, // 39: interpretation.InterpretationAutomationService.GenerateReportFromAssessment:output_type -> interpretation.GenerateReportFromAssessmentResponse
+	14, // 40: interpretation.AIExplanationAutomationService.ExecuteAIExplanation:output_type -> interpretation.ExecuteAIExplanationResponse
+	16, // 41: interpretation.AIExplanationAutomationService.ExecutePromptEvaluationStep:output_type -> interpretation.ExecutePromptEvaluationStepResponse
+	32, // [32:42] is the sub-list for method output_type
+	22, // [22:32] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_interpretation_interpretation_proto_init() }
@@ -1270,9 +3091,9 @@ func file_interpretation_interpretation_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_interpretation_interpretation_proto_rawDesc), len(file_interpretation_interpretation_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   31,
 			NumExtensions: 0,
-			NumServices:   2,
+			NumServices:   4,
 		},
 		GoTypes:           file_interpretation_interpretation_proto_goTypes,
 		DependencyIndexes: file_interpretation_interpretation_proto_depIdxs,

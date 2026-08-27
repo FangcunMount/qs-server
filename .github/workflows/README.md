@@ -6,7 +6,7 @@
 
 | Workflow | 稳定职责 | 状态写入边界 |
 | --- | --- | --- |
-| `ci.yml` | 单测、静态/架构/配置契约、文档与 API 同步、构建 | 只证明该 run 的 checkout；不证明部署 |
+| `ci.yml` | 单测、静态/架构/配置契约、一次性 Mongo Replica Set 上的事务/schema 集成契约、文档与 API 同步、构建 | 只证明该 run 的 checkout；不证明部署 |
 | `sonar.yml` | SonarQube 分析 | 不替代 CI、部署或运行验收 |
 | `cd.yml` | 计划服务、构建/交付镜像、生成部署包、按依赖顺序部署、逐实例验证 | 成功结果必须记录 exact SHA、image digest、effective config 与环境 |
 | `ping-runner.yml` | 周期/手动执行目标环境连通与服务探针 | 只证明该时点、该检查项；不证明业务全链和数据一致性 |

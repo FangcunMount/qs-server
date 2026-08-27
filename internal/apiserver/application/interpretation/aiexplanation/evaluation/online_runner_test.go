@@ -1,0 +1,435 @@
+package evaluation_test
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/evaluation"
+	appport "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/port"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation"
+	domainevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/evaluation"
+	domainoutput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/output"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+)
+
+func TestOnlineRunnerExecutesThirtyFiveAttemptsAndStopsBeforeHumanReview(t *testing.T) {
+	provider := &onlineProviderStub{}
+	semantic := &onlineSemanticStub{}
+	repository := &onlineEvidenceRepository{}
+	runner := newOnlineRunner(t, promptResolverStub{}, provider, semantic, repository)
+
+	result, err := runner.RunV1(context.Background(), evaluation.OnlineRunCommand{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Preflight == nil || result.Preflight.Status != "passed" || result.Run == nil {
+		t.Fatalf("online result = %#v", result)
+	}
+	if result.Run.Status() != domainevaluation.StatusAwaitingReview || result.Run.IsPublishEvidence() {
+		t.Fatalf("run status/publish evidence = %s/%v", result.Run.Status(), result.Run.IsPublishEvidence())
+	}
+	if provider.calls != domainevaluation.RequiredGenerationAttempts || semantic.calls != domainevaluation.RequiredGenerationAttempts {
+		t.Fatalf("provider/semantic calls = %d/%d; deterministic failures = %v", provider.calls, semantic.calls, deterministicFailures(result.Run.Attempts()))
+	}
+	attempts := result.Run.Attempts()
+	if len(attempts) != domainevaluation.RequiredGenerationAttempts+1 {
+		t.Fatalf("attempt count = %d", len(attempts))
+	}
+	invocations := make(map[string]struct{}, provider.calls)
+	for _, invocationID := range provider.invocationIDs {
+		if _, duplicate := invocations[invocationID]; duplicate {
+			t.Fatalf("duplicate invocation id %q", invocationID)
+		}
+		invocations[invocationID] = struct{}{}
+	}
+
+	preflightFound := false
+	caseSevenOrdinals := map[int]bool{}
+	for _, attempt := range attempts {
+		if attempt.Stage == domainevaluation.AttemptStagePreflight {
+			preflightFound = attempt.ProviderCallCount == 0 && attempt.RejectionReason == "insufficient_eligible_dimensions"
+			continue
+		}
+		if attempt.Failure != nil || attempt.Semantic == nil || len(attempt.RawOutput) == 0 || len(attempt.NormalizedOutput) == 0 {
+			t.Fatalf("generation attempt evidence is incomplete: %#v", attempt)
+		}
+		if attempt.CaseID == "PROMPT-EVAL-007" && attempt.Attempt == 1 {
+			for _, receipt := range attempt.Assertions {
+				if receipt.Type == "forbid_dimension_group" && receipt.Scope == domainevaluation.AssertionScopeCase && receipt.Evaluator == "deterministic" {
+					caseSevenOrdinals[receipt.Ordinal] = true
+				}
+			}
+		}
+	}
+	if !preflightFound || !caseSevenOrdinals[1] || !caseSevenOrdinals[2] {
+		t.Fatalf("preflight/repeated assertion evidence = %v/%v", preflightFound, caseSevenOrdinals)
+	}
+}
+
+func deterministicFailures(attempts []domainevaluation.AttemptRecord) map[string][]string {
+	result := map[string][]string{}
+	for _, attempt := range attempts {
+		if attempt.Stage != domainevaluation.AttemptStageGeneration || attempt.Semantic != nil {
+			continue
+		}
+		for _, receipt := range attempt.Assertions {
+			if receipt.Status == domainevaluation.AssertionFailed || receipt.Status == domainevaluation.AssertionBlocked {
+				result[attempt.CaseID] = append(result[attempt.CaseID], receipt.Type+":"+receipt.Detail)
+			}
+		}
+	}
+	return result
+}
+
+func TestOnlineRunnerPersistsProviderFailureAndCompletesInventory(t *testing.T) {
+	provider := &onlineProviderStub{failAt: 3}
+	semantic := &onlineSemanticStub{}
+	repository := &onlineEvidenceRepository{}
+	runner := newOnlineRunner(t, promptResolverStub{}, provider, semantic, repository)
+
+	result, err := runner.RunV1(context.Background(), evaluation.OnlineRunCommand{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Run.Status() != domainevaluation.StatusAwaitingReview || provider.calls != 35 || semantic.calls != 34 {
+		t.Fatalf("run/calls = %s/%d/%d", result.Run.Status(), provider.calls, semantic.calls)
+	}
+	failures := 0
+	for _, attempt := range result.Run.Attempts() {
+		if attempt.Failure != nil {
+			failures++
+			if attempt.Failure.Stage != "provider_execution" || attempt.ProviderCallCount != 1 {
+				t.Fatalf("failure evidence = %#v", attempt)
+			}
+		}
+	}
+	if failures != 1 {
+		t.Fatalf("failure count = %d", failures)
+	}
+}
+
+func TestOnlineRunnerPreflightFailureMakesNoProviderCallOrEvidenceRun(t *testing.T) {
+	provider := &onlineProviderStub{}
+	semantic := &onlineSemanticStub{}
+	repository := &onlineEvidenceRepository{}
+	runner := newOnlineRunner(t, failingPromptResolver{}, provider, semantic, repository)
+
+	result, err := runner.RunV1(context.Background(), evaluation.OnlineRunCommand{})
+	if err == nil || result == nil || result.Preflight == nil || result.Preflight.Status != "failed" {
+		t.Fatalf("preflight result/error = %#v / %v", result, err)
+	}
+	if provider.calls != 0 || repository.value != nil {
+		t.Fatalf("provider calls/evidence = %d/%#v", provider.calls, repository.value)
+	}
+}
+
+func TestOnlineRunnerStepIsIdempotentForCompletedEventTarget(t *testing.T) {
+	fixed := time.Date(2026, 8, 27, 10, 0, 0, 0, time.UTC)
+	provider := &onlineProviderStub{}
+	semantic := &onlineSemanticStub{}
+	repository := &onlineEvidenceRepository{}
+	runner := newOnlineRunnerWithClock(t, promptResolverStub{}, provider, semantic, repository, func() time.Time { return fixed })
+
+	started, err := runner.StartV1(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	command := evaluation.OnlineStepCommand{
+		RunID: started.Run.ID(), CaseID: "PROMPT-EVAL-001", Attempt: 1, Owner: "event-step-1",
+	}
+	first, err := runner.RunStepV1(context.Background(), command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := runner.RunStepV1(context.Background(), command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Status != evaluation.OnlineStepProgressed || second.Status != evaluation.OnlineStepAlreadyCompleted || provider.calls != 1 || semantic.calls != 1 {
+		t.Fatalf("step results/calls = %s/%s/%d/%d", first.Status, second.Status, provider.calls, semantic.calls)
+	}
+}
+
+func TestOnlineRunnerExpiredDispatchRecordsUnknownWithoutProviderReplay(t *testing.T) {
+	now := time.Date(2026, 8, 27, 10, 0, 0, 0, time.UTC)
+	provider := &onlineProviderStub{}
+	semantic := &onlineSemanticStub{}
+	repository := &onlineEvidenceRepository{}
+	runner := newOnlineRunnerWithClock(t, promptResolverStub{}, provider, semantic, repository, func() time.Time { return now })
+
+	started, err := runner.StartV1(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	leaseUntil := now.Add(time.Minute)
+	if err := repository.value.BeginAttemptExecution(domainevaluation.AttemptExecution{
+		CaseID: "PROMPT-EVAL-001", Attempt: 1, Owner: "crashed-event", InvocationID: "ai-prompt-eval:9001:PROMPT-EVAL-001:1",
+		Phase: domainevaluation.AttemptExecutionPrepared, ClaimedAt: now, LeaseExpiresAt: leaseUntil,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repository.value.MarkAttemptDispatching("crashed-event", now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	now = leaseUntil
+
+	result, err := runner.RunStepV1(context.Background(), evaluation.OnlineStepCommand{
+		RunID: started.Run.ID(), CaseID: "PROMPT-EVAL-001", Attempt: 1, Owner: "redelivered-event",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != evaluation.OnlineStepProgressed || provider.calls != 0 || semantic.calls != 0 {
+		t.Fatalf("result/calls = %s/%d/%d", result.Status, provider.calls, semantic.calls)
+	}
+	attempts := result.Run.Attempts()
+	last := attempts[len(attempts)-1]
+	if last.Failure == nil || last.Failure.Code != "provider_result_unknown" || !last.Failure.ResultUnknown || last.ProviderCallCount != 1 {
+		t.Fatalf("unknown dispatch evidence = %#v", last)
+	}
+}
+
+func newOnlineRunner(
+	t *testing.T,
+	prompts appport.PromptPackageResolver,
+	provider *onlineProviderStub,
+	semantic *onlineSemanticStub,
+	repository *onlineEvidenceRepository,
+) *evaluation.OnlineRunner {
+	t.Helper()
+	fixed := time.Date(2026, 8, 27, 10, 0, 0, 0, time.UTC)
+	return newOnlineRunnerWithClock(t, prompts, provider, semantic, repository, func() time.Time { return fixed })
+}
+
+func newOnlineRunnerWithClock(
+	t *testing.T,
+	prompts appport.PromptPackageResolver,
+	provider *onlineProviderStub,
+	semantic *onlineSemanticStub,
+	repository *onlineEvidenceRepository,
+	now func() time.Time,
+) *evaluation.OnlineRunner {
+	t.Helper()
+	evidence, err := evaluation.NewEvidenceService(repository, func() meta.ID { return meta.ID(9001) }, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner, err := evaluation.NewOnlineRunner(evaluation.OnlineRunnerDependencies{
+		Prompts: prompts, Schemas: schemaResolverStub{}, Routes: onlineRouteResolver{},
+		Provider: provider, Safety: onlineSafetyStub{}, Semantic: semantic, Evidence: evidence,
+		AttemptLease: time.Minute, Now: now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return runner
+}
+
+type onlineRouteResolver struct{}
+
+func (onlineRouteResolver) ResolveProviderRoute(_ context.Context, route string) (appport.ProviderRoute, error) {
+	return appport.ProviderRoute{
+		ExecutionSpec: aiexplanation.ProviderExecutionSpec{
+			Route: route, RouteRevision: "v1", ResolvedProvider: "provider-a", ResolvedModel: "model-a",
+			Fingerprint: aiexplanation.NewFingerprint([]byte("online-route-v1")),
+		},
+		Capabilities: appport.ProviderCapabilities{StructuredOutput: true}, Timeout: time.Second, MaxOutputTokens: 3000,
+	}, nil
+}
+
+type onlineProviderStub struct {
+	calls         int
+	failAt        int
+	invocationIDs []string
+}
+
+func (p *onlineProviderStub) Generate(_ context.Context, request appport.ProviderRequest) (*appport.ProviderResponse, error) {
+	p.calls++
+	p.invocationIDs = append(p.invocationIDs, request.InvocationID)
+	if p.failAt == p.calls {
+		return nil, errors.New("synthetic provider failure")
+	}
+	caseID := onlineCaseID(request.InvocationID)
+	content := onlineCandidate(caseID)
+	raw, err := json.Marshal(content)
+	if err != nil {
+		return nil, err
+	}
+	return &appport.ProviderResponse{
+		RawOutput: raw,
+		Receipt: aiexplanation.ProviderReceipt{
+			InvocationID: request.InvocationID, RequestID: "request-" + request.InvocationID,
+			Provider: request.Route.ExecutionSpec.ResolvedProvider, Model: request.Route.ExecutionSpec.ResolvedModel,
+			InputTokens: 100, OutputTokens: 200, Latency: 10 * time.Millisecond,
+		},
+	}, nil
+}
+
+func onlineCaseID(invocationID string) string {
+	for index := 1; index <= 7; index++ {
+		caseID := "PROMPT-EVAL-00" + string(rune('0'+index))
+		if strings.Contains(invocationID, caseID) {
+			return caseID
+		}
+	}
+	return ""
+}
+
+func onlineCandidate(caseID string) domainoutput.Content {
+	refs := map[string][]string{
+		"PROMPT-EVAL-001": {"dimension:emotional_awareness", "dimension:self_regulation"},
+		"PROMPT-EVAL-002": {"dimension:task_initiation", "dimension:persistence"},
+		"PROMPT-EVAL-003": {"dimension:stress_load", "dimension:sleep_recovery"},
+		"PROMPT-EVAL-004": {"dimension:flexible_planning", "dimension:detail_checking"},
+		"PROMPT-EVAL-005": {"dimension:sleep_recovery", "dimension:daily_energy"},
+		"PROMPT-EVAL-006": {"dimension:reflection", "dimension:planning"},
+		"PROMPT-EVAL-007": {"dimension:impulse_control", "dimension:attention_shift"},
+	}[caseID]
+	kind := map[string]domainoutput.InsightKind{
+		"PROMPT-EVAL-001": domainoutput.InsightKindReinforcingPattern,
+		"PROMPT-EVAL-002": domainoutput.InsightKindContrastingPattern,
+		"PROMPT-EVAL-003": domainoutput.InsightKindCombinedAttention,
+		"PROMPT-EVAL-004": domainoutput.InsightKindContextDependent,
+		"PROMPT-EVAL-005": domainoutput.InsightKindReinforcingPattern,
+		"PROMPT-EVAL-006": domainoutput.InsightKindContextDependent,
+		"PROMPT-EVAL-007": domainoutput.InsightKindContrastingPattern,
+	}[caseID]
+	evidenceRefs := []domainoutput.EvidenceRef{
+		{Kind: domainoutput.EvidenceKindDimension, Ref: refs[0]},
+		{Kind: domainoutput.EvidenceKindDimension, Ref: refs[1]},
+	}
+	origin := domainoutput.SuggestionOriginGeneratedLowRisk
+	sourceRefs := []string{}
+	if caseID == "PROMPT-EVAL-001" {
+		origin = domainoutput.SuggestionOriginStandardDerived
+		sourceRefs = []string{"suggestion:awareness_note"}
+	}
+	return domainoutput.Content{
+		SchemaVersion: aiexplanation.OutputSchemaVersionV1,
+		Summary:       "本次两个维度可结合观察，并以保守方式理解其关系。",
+		IntegratedInsights: []domainoutput.IntegratedInsight{{
+			Kind: kind, Title: "跨维度组合", Content: "本次结果显示，两个维度在部分情境中可能形成可观察的组合关系。",
+			WhyItMatters: "结合观察有助于理解本次结果。", EvidenceRefs: evidenceRefs,
+		}},
+		Suggestions: []domainoutput.Suggestion{{
+			Origin: origin, Category: "daily_practice", Title: "小步观察", Goal: "观察两个维度的共同变化",
+			Actions: []string{"选择一个日常情境做简短记录"}, Rationale: "该步骤与本次两个维度相关。",
+			EvidenceRefs: evidenceRefs, SourceSuggestionRefs: sourceRefs,
+		}},
+		Limitations: []string{"本解读仅基于本次测评，不构成诊断或确定性判断。"},
+	}
+}
+
+type onlineSafetyStub struct{}
+
+func (onlineSafetyStub) Evaluate(_ context.Context, _ appport.SafetyRequest) (appport.SafetyResult, error) {
+	return appport.SafetyResult{Allowed: true, ValidatorVersion: "test-safety/v1"}, nil
+}
+
+type onlineSemanticStub struct{ calls int }
+
+func (*onlineSemanticStub) Identity() domainevaluation.SemanticEvaluatorSpec {
+	return domainevaluation.SemanticEvaluatorSpec{
+		Version: "synthetic-semantic/v1",
+		Prompt: aiexplanation.PromptRef{
+			TemplateID: "ai-explanation-semantic-evaluator", Version: "v1",
+			Fingerprint: aiexplanation.NewFingerprint([]byte("semantic-prompt")), GitBlobSHA: "semantic-prompt-blob",
+		},
+		OutputSchema: domainevaluation.SchemaRef{Version: "ai-explanation-semantic-evaluation-output/v1", Fingerprint: aiexplanation.NewFingerprint([]byte("semantic-schema"))},
+		Provider: aiexplanation.ProviderExecutionSpec{
+			Route: "semantic_judge_v1", RouteRevision: "v1", ResolvedProvider: "judge-provider", ResolvedModel: "judge-model",
+			Fingerprint: aiexplanation.NewFingerprint([]byte("semantic-route")),
+		},
+		Decoding: domainevaluation.DecodingParameters{MaxOutputTokens: 2000},
+	}
+}
+
+func (s *onlineSemanticStub) Evaluate(_ context.Context, request evaluation.SemanticEvaluationRequest) (evaluation.SemanticEvaluationResult, error) {
+	s.calls++
+	decisions := make([]evaluation.SemanticDecision, 0, len(request.Assertions))
+	for _, assertion := range request.Assertions {
+		decisions = append(decisions, evaluation.SemanticDecision{
+			Type: assertion.Type, Scope: assertion.Scope, Ordinal: assertion.Ordinal,
+			Status: domainevaluation.AssertionPassed, Detail: "synthetic evaluator passed the frozen obligation",
+		})
+	}
+	return evaluation.SemanticEvaluationResult{
+		EvaluatorVersion: "synthetic-semantic/v1",
+		ProviderReceipt: aiexplanation.ProviderReceipt{
+			InvocationID: request.InvocationID, RequestID: "judge-" + request.InvocationID,
+			Provider: "judge-provider", Model: "judge-model", InputTokens: 50, OutputTokens: 50, Latency: 5 * time.Millisecond,
+		},
+		Scores: domainevaluation.SemanticScores{
+			Faithfulness: 5, CrossDimensionQuality: 5, SuggestionActionability: 5, AudienceClarity: 5, Concision: 5,
+		},
+		Rationale: "synthetic rubric evaluation", Decisions: decisions,
+	}, nil
+}
+
+type onlineEvidenceRepository struct {
+	value      *domainevaluation.PromptEvaluationRun
+	list       []evaluation.ReviewRunCatalogRecord
+	nextCursor string
+	listOrgID  int64
+	listStatus *domainevaluation.Status
+	listCursor string
+	listLimit  int
+}
+
+func (r *onlineEvidenceRepository) Create(_ context.Context, value *domainevaluation.PromptEvaluationRun) error {
+	if r.value != nil {
+		return domainevaluation.ErrAlreadyExists
+	}
+	r.value = value
+	return nil
+}
+
+func (r *onlineEvidenceRepository) Save(_ context.Context, value *domainevaluation.PromptEvaluationRun, _ int64) error {
+	r.value = value
+	return nil
+}
+
+func (r *onlineEvidenceRepository) FindByID(_ context.Context, id meta.ID) (*domainevaluation.PromptEvaluationRun, error) {
+	if r.value == nil || r.value.ID() != id {
+		return nil, domainevaluation.ErrNotFound
+	}
+	return r.value, nil
+}
+
+func (r *onlineEvidenceRepository) ListForReview(_ context.Context, orgID int64, status *domainevaluation.Status, cursor string, limit int) ([]evaluation.ReviewRunCatalogRecord, string, error) {
+	r.listOrgID, r.listStatus, r.listCursor, r.listLimit = orgID, status, cursor, limit
+	return append([]evaluation.ReviewRunCatalogRecord(nil), r.list...), r.nextCursor, nil
+}
+
+func catalogRecordFromRun(runRecord *domainevaluation.PromptEvaluationRun) evaluation.ReviewRunCatalogRecord {
+	record := evaluation.ReviewRunCatalogRecord{
+		RunID: runRecord.ID(), Version: runRecord.Version(), Status: runRecord.Status(), Release: runRecord.Release(),
+		RequestedOrgID: runRecord.RequestedOrgID(), RequestedBy: runRecord.RequestedBy(),
+		RequestReason: runRecord.RequestReason(), CreatedAt: runRecord.CreatedAt(), Gate: runRecord.Gate(),
+	}
+	for _, attempt := range runRecord.Attempts() {
+		record.Attempts = append(record.Attempts, evaluation.ReviewRunCatalogAttempt{
+			CaseID: attempt.CaseID, Attempt: attempt.Attempt, Stage: attempt.Stage,
+		})
+	}
+	for _, review := range runRecord.Reviews() {
+		record.Reviews = append(record.Reviews, evaluation.ReviewRunCatalogReview{
+			CaseID: review.CaseID, Attempt: review.Attempt, Role: review.Role, Decision: review.Decision,
+		})
+	}
+	if execution := runRecord.Execution(); execution != nil {
+		phase := execution.Phase
+		record.ExecutionPhase = &phase
+	}
+	return record
+}
+
+type failingPromptResolver struct{}
+
+func (failingPromptResolver) ResolvePromptPackage(context.Context, string, string) (appport.PromptPackage, error) {
+	return appport.PromptPackage{}, errors.New("synthetic Prompt catalog failure")
+}

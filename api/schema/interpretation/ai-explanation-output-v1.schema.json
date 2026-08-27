@@ -1,0 +1,301 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/FangcunMount/qs-server/main/api/schema/interpretation/ai-explanation-output-v1.schema.json",
+  "title": "AIExplanationOutput v1",
+  "description": "Provider-independent content returned by one AI explanation generation. Persistence metadata and lifecycle state belong to a separate artifact envelope.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "summary",
+    "integrated_insights",
+    "suggestions",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ai-explanation-output/v1"
+    },
+    "summary": {
+      "$ref": "#/$defs/longPlainText"
+    },
+    "integrated_insights": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/integratedInsight"
+      }
+    },
+    "suggestions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/suggestion"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/shortPlainText"
+      }
+    }
+  },
+  "$defs": {
+    "shortPlainText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000,
+      "pattern": "^[^<>]*$"
+    },
+    "longPlainText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000,
+      "pattern": "^[^<>]*$"
+    },
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "dimension",
+            "overall_result",
+            "model_result",
+            "standard_suggestion"
+          ]
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 266
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "dimension"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "ref": {
+                "pattern": "^dimension:[^\\s]+$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "standard_suggestion"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "ref": {
+                "pattern": "^suggestion:[^\\s]+$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "overall_result"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "ref": {
+                "const": "overall_result"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "model_result"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "ref": {
+                "const": "model_result"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "integratedInsight": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "title",
+        "content",
+        "why_it_matters",
+        "evidence_refs"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "reinforcing_pattern",
+            "contrasting_pattern",
+            "combined_strength",
+            "combined_attention",
+            "context_dependent_pattern"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^<>]*$"
+        },
+        "content": {
+          "$ref": "#/$defs/longPlainText"
+        },
+        "why_it_matters": {
+          "$ref": "#/$defs/shortPlainText"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidenceRef"
+          }
+        }
+      }
+    },
+    "suggestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "origin",
+        "category",
+        "title",
+        "goal",
+        "actions",
+        "rationale",
+        "evidence_refs",
+        "source_suggestion_refs",
+        "caution"
+      ],
+      "properties": {
+        "origin": {
+          "enum": [
+            "standard_derived",
+            "generated_low_risk"
+          ]
+        },
+        "category": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^<>]*$"
+        },
+        "goal": {
+          "$ref": "#/$defs/shortPlainText"
+        },
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^[^<>]*$"
+          }
+        },
+        "rationale": {
+          "$ref": "#/$defs/shortPlainText"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidenceRef"
+          }
+        },
+        "source_suggestion_refs": {
+          "type": "array",
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^suggestion:[^\\s]+$",
+            "maxLength": 266
+          }
+        },
+        "caution": {
+          "type": "string",
+          "maxLength": 1000,
+          "pattern": "^[^<>]*$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "origin": {
+                "const": "standard_derived"
+              }
+            },
+            "required": [
+              "origin"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_suggestion_refs": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

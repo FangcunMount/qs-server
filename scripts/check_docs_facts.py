@@ -167,13 +167,32 @@ SCHEDULER_RUNNERS = (
         "interpretation_lease_recovery",
         "InterpretationLeaseRecovery",
     ),
+    (
+        "AIExplanationPromptEvaluationLeaseRecoveryRunner",
+        "AIExplanationPromptEvaluationLeaseRecovery",
+        "ai_explanation_prompt_evaluation_lease_recovery",
+        "AIExplanationPromptEvaluationLeaseRecovery",
+    ),
+    (
+        "AIExplanationParticipantLeaseRecoveryRunner",
+        "AIExplanationParticipantLeaseRecovery",
+        "ai_explanation_participant_lease_recovery",
+        "AIExplanationParticipantLeaseRecovery",
+    ),
     ("ReportCatalogAuditRunner", "ReportCatalogAudit", "report_catalog_audit", "ReportCatalogAudit"),
     ("MongoConsistencyAuditRunner", "MongoConsistencyAudit", "mongo_consistency_audit", "MongoConsistencyAudit"),
 )
 
 EXPECTED_SCHEDULER_REGISTRATIONS = tuple((runner, option) for runner, option, _, _ in SCHEDULER_RUNNERS)
 EXPECTED_SCHEDULER_PRODUCTION_ENABLE = {
-    config_key: "false" if config_key == "mongo_consistency_audit" else "true"
+    config_key: "false"
+    if config_key
+    in {
+        "mongo_consistency_audit",
+        "ai_explanation_prompt_evaluation_lease_recovery",
+        "ai_explanation_participant_lease_recovery",
+    }
+    else "true"
     for _, _, config_key, _ in SCHEDULER_RUNNERS
 }
 
@@ -185,6 +204,8 @@ EXPECTED_LOCKLEASE_INVENTORY = (
     ("apiserver", "evaluation_consistency_audit", "leader", "30s", "auto"),
     ("apiserver", "evaluation_lease_recovery", "leader", "30s", "auto"),
     ("apiserver", "interpretation_lease_recovery", "leader", "30s", "auto"),
+    ("apiserver", "ai_explanation_prompt_evaluation_lease_recovery", "leader", "30s", "auto"),
+    ("apiserver", "ai_explanation_participant_lease_recovery", "leader", "30s", "auto"),
     ("apiserver", "report_catalog_audit", "leader", "30s", "auto"),
     ("apiserver", "mongo_consistency_audit", "leader", "30s", "auto"),
     ("worker", "attention_projection_reconcile", "leader", "30m", "auto"),
@@ -269,6 +290,12 @@ EXPECTED_EVENTS = {
     "interpretation.report.generated",
     "interpretation.report.failed",
     "interpretation.retry.requested",
+    "interpretation.ai_explanation.requested",
+    "interpretation.ai_explanation.retry.requested",
+    "interpretation.ai_explanation.lease_recovery.requested",
+    "interpretation.ai_explanation.generated",
+    "interpretation.ai_explanation.failed",
+    "interpretation.ai_explanation.prompt_evaluation.step_requested",
     "task.opened",
     "task.completed",
     "task.expired",
@@ -283,7 +310,7 @@ EXPECTED_SIGNALS = {
     "typology_model_cache_changed",
 }
 
-EXPECTED_MIGRATION_MAX = {"mysql": 70, "mongodb": 24}
+EXPECTED_MIGRATION_MAX = {"mysql": 70, "mongodb": 33}
 EXPECTED_DOC_STATUS = {"aligned", "drifted", "needs_review", "planned", "archive_candidate"}
 EXPECTED_OWNERS = {
     "overview",
@@ -597,7 +624,7 @@ CURRENT_FACT_SNIPPETS = {
         "required": (
             "退出码 2",
             "MySQL migration 000069",
-            "Mongo migration 000024",
+            "Mongo migration 000027",
             "Redis leader lock",
         ),
         "forbidden": (),
@@ -2324,7 +2351,8 @@ def scheduler_registrations(text: str) -> list[tuple[str, str]]:
 
 
 def camel_to_snake(value: str) -> str:
-    return re.sub(r"(?<!^)(?=[A-Z])", "_", value).lower()
+    first_pass = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", value)
+    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", first_pass).lower()
 
 
 def yaml_scalar_inventory(text: str) -> tuple[dict[tuple[str, ...], str], set[tuple[str, ...]]]:
@@ -2549,6 +2577,7 @@ CHINESE_COUNTS = {
     "十": 10,
     "十一": 11,
     "十二": 12,
+    "十三": 13,
 }
 
 
@@ -4008,7 +4037,7 @@ def main() -> int:
     if IR_CHECKLIST.exists():
         ir_text = IR_CHECKLIST.read_text(encoding="utf-8")
         if not re.search(
-            r"(?m)^\| IR-R001 \| P0 \|[^\n]*\| 已发布 \| 已关闭 \|",
+            r"(?m)^\|\s*IR-R001\s*\|\s*P0\s*\|[^\n]*\|\s*已发布\s*\|\s*已关闭\s*\|",
             ir_text,
         ):
             issues.append(Issue("ir-r001-status-drift", "checklist must remain 已发布 / 已关闭"))

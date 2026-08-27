@@ -20,7 +20,7 @@ type reportReadModel struct {
 	reports, catalog base.BaseRepository
 }
 
-func NewReportReadModel(db *mongo.Database, opts ...base.BaseRepositoryOptions) readmodel.ReportReader {
+func NewReportReadModel(db *mongo.Database, opts ...base.BaseRepositoryOptions) *reportReadModel {
 	return &reportReadModel{
 		reports: base.NewBaseRepository(db, (InterpretReportPO{}).CollectionName(), opts...),
 		catalog: base.NewBaseRepository(db, (ReportCatalogPO{}).CollectionName(), opts...),

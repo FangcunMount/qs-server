@@ -15,11 +15,16 @@ import (
 )
 
 const (
-	scaleSnapshotMergeMigrationVersion = 6
-	scaleSnapshotMergeIndexName        = "idx_scales_snapshot_merge_migration"
-	compatibilityRetirementVersion     = 22
-	runtimeLedgerRetirementVersion     = 23
+	scaleSnapshotMergeMigrationVersion    = 6
+	scaleSnapshotMergeIndexName           = "idx_scales_snapshot_merge_migration"
+	compatibilityRetirementVersion        = 22
+	runtimeLedgerRetirementVersion        = 23
+	aiExplanationEvaluationVersion        = 26
+	aiExplanationDurableEvaluationVersion = 27
 )
+
+const aiExplanationParticipantActiveCapacityVersion = 29
+const aiExplanationParticipantRetryGovernanceVersion = 30
 
 var compatibilityRetirementCollections = []string{
 	"answersheet_submit_idempotency",
@@ -98,6 +103,26 @@ func (d *MongoDriver) PrepareRun(parent context.Context, config *Config, version
 			return nil, err
 		}
 	}
+	if versionBefore < aiExplanationEvaluationVersion {
+		if err := d.verifyNoPublishedAIExplanationProfiles(ctx, config.Database); err != nil {
+			return nil, err
+		}
+	}
+	if versionBefore < aiExplanationDurableEvaluationVersion {
+		if err := d.verifyNoActiveAIExplanationPromptEvaluations(ctx, config.Database); err != nil {
+			return nil, err
+		}
+	}
+	if versionBefore < aiExplanationParticipantActiveCapacityVersion {
+		if err := d.verifyNoGeneratingAIExplanationParticipants(ctx, config.Database); err != nil {
+			return nil, err
+		}
+	}
+	if versionBefore < aiExplanationParticipantRetryGovernanceVersion {
+		if err := d.verifyNoAIExplanationParticipantBudgetReservations(ctx, config.Database); err != nil {
+			return nil, err
+		}
+	}
 	if versionBefore >= scaleSnapshotMergeMigrationVersion {
 		return func(context.Context) error { return nil }, nil
 	}
@@ -118,6 +143,69 @@ func (d *MongoDriver) PrepareRun(parent context.Context, config *Config, version
 		}
 		return err
 	}, nil
+}
+
+// Version 30 changes the participant budget identity from one reservation per
+// Generation to one reservation per attempt. This branch has not shipped
+// participant traffic, so fail closed instead of guessing attempt provenance
+// for a pre-existing ledger.
+func (d *MongoDriver) verifyNoAIExplanationParticipantBudgetReservations(ctx context.Context, databaseName string) error {
+	count, err := d.client.Database(databaseName).Collection("ai_explanation_participant_daily_budgets").CountDocuments(ctx, bson.M{
+		"reservations.0": bson.M{"$exists": true},
+	})
+	if err != nil {
+		return fmt.Errorf("verify AI explanation participant retry budget precondition: %w", err)
+	}
+	if count != 0 {
+		return fmt.Errorf("AI explanation participant retry budget precondition failed: found %d non-empty daily budget ledgers", count)
+	}
+	return nil
+}
+
+// Version 29 introduces a separately persisted active execution ledger. A
+// pre-existing generating participant Run would have no exact slot to release,
+// so the migration fails closed instead of inventing live execution state.
+func (d *MongoDriver) verifyNoGeneratingAIExplanationParticipants(ctx context.Context, databaseName string) error {
+	count, err := d.client.Database(databaseName).Collection("ai_explanation_generations").CountDocuments(ctx, bson.M{
+		"status": "generating", "requested_by.kind": "participant",
+	})
+	if err != nil {
+		return fmt.Errorf("verify AI explanation participant active capacity precondition: %w", err)
+	}
+	if count != 0 {
+		return fmt.Errorf("AI explanation participant active capacity precondition failed: found %d generating participant explanations", count)
+	}
+	return nil
+}
+
+// Version 27 adds a derived active_release_key. This branch has not shipped
+// online Prompt evaluation, so fail closed if an active document exists rather
+// than silently leaving it outside the new uniqueness constraint.
+func (d *MongoDriver) verifyNoActiveAIExplanationPromptEvaluations(ctx context.Context, databaseName string) error {
+	count, err := d.client.Database(databaseName).Collection("ai_explanation_prompt_evaluations").CountDocuments(ctx, bson.M{
+		"status": bson.M{"$in": []string{"collecting", "awaiting_review"}},
+	})
+	if err != nil {
+		return fmt.Errorf("verify AI explanation Prompt evaluation durability precondition: %w", err)
+	}
+	if count != 0 {
+		return fmt.Errorf("AI explanation Prompt evaluation durability precondition failed: found %d active evaluations", count)
+	}
+	return nil
+}
+
+// Version 26 introduces the physical published selector-slot uniqueness gate.
+// This branch has never shipped a governed Profile, so fail closed instead of
+// guessing selector_slot_key values for manually inserted pre-release data.
+func (d *MongoDriver) verifyNoPublishedAIExplanationProfiles(ctx context.Context, databaseName string) error {
+	count, err := d.client.Database(databaseName).Collection("ai_explanation_profiles").CountDocuments(ctx, bson.M{"status": "published"})
+	if err != nil {
+		return fmt.Errorf("verify AI explanation Profile publish-gate precondition: %w", err)
+	}
+	if count != 0 {
+		return fmt.Errorf("AI explanation Profile publish-gate precondition failed: found %d pre-existing published Profiles", count)
+	}
+	return nil
 }
 
 // ensureCompatibilityRetirementCollections makes the drop migration safe on a

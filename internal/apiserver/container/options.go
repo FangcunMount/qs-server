@@ -33,6 +33,7 @@ type ContainerOptions struct {
 	Silent bool
 	// SystemGovernance unified governance facade configuration.
 	SystemGovernance  *apiserveroptions.SystemGovernanceOptions
+	AIExplanation     *apiserveroptions.AIExplanationOptions
 	ActionAuditStore  systemgov.ActionAuditStore
 	ActionAuditRunner *systemgov.ActionAuditRecoveryRunner
 }

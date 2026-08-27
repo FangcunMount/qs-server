@@ -93,7 +93,7 @@ jobs:
           docker run --detach --rm \
             --name qs-runtime-closure-e2e-mongo \
             --publish 27017:27017 \
-            mongo:7.0 --replSet rs0 --bind_ip_all
+            mongo:7.0 --replSet rs0 --bind_ip_all --setParameter ttlMonitorSleepSecs=1
           for attempt in $(seq 1 30); do
             if docker exec qs-runtime-closure-e2e-mongo mongosh --quiet --eval 'db.adminCommand({ping: 1})' >/dev/null 2>&1; then
               break
@@ -176,6 +176,18 @@ jobs:
             ./internal/apiserver/infra/mongo/mongoconsistency \
             ./internal/pkg/migration
 
+      - name: Run AI explanation Mongo transaction and schema contracts
+        env:
+          QS_SERVER_TEST_MONGO_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          QS_SERVER_TEST_MONGO_DB_PREFIX: qs_ai_explanation_ci_test
+          QS_SERVER_TEST_MONGO_TTL_TIMEOUT: 15s
+        run: |
+          go test -tags=integration \
+            -run '^(TestAIExplanation.*IsAtomicOnReplicaSet|TestAIExplanationGovernanceCatalogsPageStableScopedRecordsOnReplicaSet|TestAIExplanationMongo(ColdStartEnforcesRuntimeSchema|TTLMonitorDeletesExpiredRecords))$' \
+            -count=1 -timeout=10m -v \
+            ./internal/apiserver/infra/mongo/interpretation/aiexplanation \
+            ./internal/pkg/migration
+
       - name: Run current runtime closure E2E
         env:
           MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=true&multiStatements=true&loc=Asia%2FShanghai
@@ -197,6 +209,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v6
@@ -213,7 +227,16 @@ jobs:
         run: |
           make fmt-check
 
-      - name: golangci-lint (only new issues)
+      - name: golangci-lint (pull request diff)
+        if: github.event_name == 'pull_request'
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.5.0
+          only-new-issues: false
+          args: --timeout=5m --new-from-rev=${{ github.event.pull_request.base.sha }}
+
+      - name: golangci-lint (push diff)
+        if: github.event_name != 'pull_request'
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.5.0

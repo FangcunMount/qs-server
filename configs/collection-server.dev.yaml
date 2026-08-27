@@ -123,6 +123,11 @@ rate_limit:
   query_global_burst: 300
   query_user_qps: 10
   query_user_burst: 20
+  # 手动 AI 解读触发的独立到达层预算；最终成本仍由 apiserver Mongo reservation 裁决。
+  ai_explanation_request_global_qps: 20
+  ai_explanation_request_global_burst: 40
+  ai_explanation_request_user_qps: 0.2
+  ai_explanation_request_user_burst: 2
   wait_report_global_qps: 80
   wait_report_global_burst: 120
   wait_report_user_qps: 2

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
@@ -21,6 +22,7 @@ type WireInput struct {
 	ReportStatusConfig reportstatus.Config
 	OutboxProfile      appEventing.ProfileBinding
 	RunLeaseDuration   time.Duration
+	AIExplanation      *apiserveroptions.AIExplanationOptions
 }
 
 // Wire builds and bootstraps the report module from composition inputs.

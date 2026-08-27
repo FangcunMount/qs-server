@@ -2,6 +2,7 @@ package options
 
 import (
 	"context"
+	"os"
 	"strconv"
 	"time"
 
@@ -17,43 +18,46 @@ import (
 
 // Options 包含所有配置项
 type Options struct {
-	Log                         *log.Options                            `json:"log"       mapstructure:"log"`
-	GenericServerRunOptions     *genericoptions.ServerRunOptions        `json:"server"    mapstructure:"server"`
-	GRPCOptions                 *genericoptions.GRPCOptions             `json:"grpc"      mapstructure:"grpc"`
-	InsecureServing             *genericoptions.InsecureServingOptions  `json:"insecure"  mapstructure:"insecure"`
-	SecureServing               *genericoptions.SecureServingOptions    `json:"secure"    mapstructure:"secure"`
-	MySQLOptions                *genericoptions.MySQLOptions            `json:"mysql"     mapstructure:"mysql"`
-	MigrationOptions            *genericoptions.MigrationOptions        `json:"migration" mapstructure:"migration"`
-	RedisOptions                *genericoptions.RedisOptions            `json:"redis"     mapstructure:"redis"`
-	RedisProfiles               map[string]*genericoptions.RedisOptions `json:"redis_profiles" mapstructure:"redis_profiles"`
-	RedisRuntime                *genericoptions.RedisRuntimeOptions     `json:"redis_runtime" mapstructure:"redis_runtime"`
-	LockLease                   *genericoptions.LockLeaseOptions        `json:"lock_lease" mapstructure:"lock_lease"`
-	MongoDBOptions              *genericoptions.MongoDBOptions          `json:"mongodb"   mapstructure:"mongodb"`
-	MessagingOptions            *genericoptions.MessagingOptions        `json:"messaging" mapstructure:"messaging"`
-	IAMOptions                  *genericoptions.IAMOptions              `json:"iam"       mapstructure:"iam"`
-	OSSOptions                  *genericoptions.OSSOptions              `json:"oss"       mapstructure:"oss"`
-	AssessmentAssets            *AssessmentAssetsOptions                `json:"assessment_assets" mapstructure:"assessment_assets"`
-	WeChatOptions               *genericoptions.WeChatOptions           `json:"wechat"    mapstructure:"wechat"`
-	Plan                        *PlanOptions                            `json:"plan"      mapstructure:"plan"`
-	PlanScheduler               *PlanSchedulerOptions                   `json:"plan_scheduler" mapstructure:"plan_scheduler"`
-	EvaluationConsistencyAudit  *EvaluationConsistencyAuditOptions      `json:"evaluation_consistency_audit" mapstructure:"evaluation_consistency_audit"`
-	EvaluationLeaseRecovery     *LeaseRecoveryOptions                   `json:"evaluation_lease_recovery" mapstructure:"evaluation_lease_recovery"`
-	InterpretationLeaseRecovery *LeaseRecoveryOptions                   `json:"interpretation_lease_recovery" mapstructure:"interpretation_lease_recovery"`
-	ReportCatalogAudit          *ReportCatalogAuditOptions              `json:"report_catalog_audit" mapstructure:"report_catalog_audit"`
-	MongoConsistencyAudit       *MongoConsistencyAuditOptions           `json:"mongo_consistency_audit" mapstructure:"mongo_consistency_audit"`
-	OutboxRelay                 *OutboxRelayOptions                     `json:"outbox_relay" mapstructure:"outbox_relay"`
-	Eventing                    *EventingOptions                        `json:"eventing" mapstructure:"eventing"`
-	RateLimit                   *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
-	Backpressure                *BackpressureOptions                    `json:"backpressure" mapstructure:"backpressure"`
-	Cache                       *CacheOptions                           `json:"cache"     mapstructure:"cache"`
-	RuntimeState                *genericoptions.RuntimeStateOptions     `json:"runtime_state" mapstructure:"runtime_state"`
-	StatisticsSync              *StatisticsSyncOptions                  `json:"statistics_sync" mapstructure:"statistics_sync"`
-	Signaling                   *genericoptions.SignalingOptions        `json:"signaling" mapstructure:"signaling"`
-	SystemGovernance            *SystemGovernanceOptions                `json:"system_governance" mapstructure:"system_governance"`
-	DelegatedSubject            *delegatedsubject.Options               `json:"delegated_subject" mapstructure:"delegated-subject"`
-	runtimeConfigContext        app.RuntimeConfigContext
-	cachePolicySource           CachePolicySource
-	cachePolicyMetadata         sharedcache.PolicySource
+	Log                                        *log.Options                            `json:"log"       mapstructure:"log"`
+	GenericServerRunOptions                    *genericoptions.ServerRunOptions        `json:"server"    mapstructure:"server"`
+	GRPCOptions                                *genericoptions.GRPCOptions             `json:"grpc"      mapstructure:"grpc"`
+	InsecureServing                            *genericoptions.InsecureServingOptions  `json:"insecure"  mapstructure:"insecure"`
+	SecureServing                              *genericoptions.SecureServingOptions    `json:"secure"    mapstructure:"secure"`
+	MySQLOptions                               *genericoptions.MySQLOptions            `json:"mysql"     mapstructure:"mysql"`
+	MigrationOptions                           *genericoptions.MigrationOptions        `json:"migration" mapstructure:"migration"`
+	RedisOptions                               *genericoptions.RedisOptions            `json:"redis"     mapstructure:"redis"`
+	RedisProfiles                              map[string]*genericoptions.RedisOptions `json:"redis_profiles" mapstructure:"redis_profiles"`
+	RedisRuntime                               *genericoptions.RedisRuntimeOptions     `json:"redis_runtime" mapstructure:"redis_runtime"`
+	LockLease                                  *genericoptions.LockLeaseOptions        `json:"lock_lease" mapstructure:"lock_lease"`
+	MongoDBOptions                             *genericoptions.MongoDBOptions          `json:"mongodb"   mapstructure:"mongodb"`
+	MessagingOptions                           *genericoptions.MessagingOptions        `json:"messaging" mapstructure:"messaging"`
+	IAMOptions                                 *genericoptions.IAMOptions              `json:"iam"       mapstructure:"iam"`
+	OSSOptions                                 *genericoptions.OSSOptions              `json:"oss"       mapstructure:"oss"`
+	AssessmentAssets                           *AssessmentAssetsOptions                `json:"assessment_assets" mapstructure:"assessment_assets"`
+	WeChatOptions                              *genericoptions.WeChatOptions           `json:"wechat"    mapstructure:"wechat"`
+	Plan                                       *PlanOptions                            `json:"plan"      mapstructure:"plan"`
+	PlanScheduler                              *PlanSchedulerOptions                   `json:"plan_scheduler" mapstructure:"plan_scheduler"`
+	EvaluationConsistencyAudit                 *EvaluationConsistencyAuditOptions      `json:"evaluation_consistency_audit" mapstructure:"evaluation_consistency_audit"`
+	EvaluationLeaseRecovery                    *LeaseRecoveryOptions                   `json:"evaluation_lease_recovery" mapstructure:"evaluation_lease_recovery"`
+	InterpretationLeaseRecovery                *LeaseRecoveryOptions                   `json:"interpretation_lease_recovery" mapstructure:"interpretation_lease_recovery"`
+	AIExplanationPromptEvaluationLeaseRecovery *LeaseRecoveryOptions                   `json:"ai_explanation_prompt_evaluation_lease_recovery" mapstructure:"ai_explanation_prompt_evaluation_lease_recovery"`
+	AIExplanationParticipantLeaseRecovery      *LeaseRecoveryOptions                   `json:"ai_explanation_participant_lease_recovery" mapstructure:"ai_explanation_participant_lease_recovery"`
+	ReportCatalogAudit                         *ReportCatalogAuditOptions              `json:"report_catalog_audit" mapstructure:"report_catalog_audit"`
+	MongoConsistencyAudit                      *MongoConsistencyAuditOptions           `json:"mongo_consistency_audit" mapstructure:"mongo_consistency_audit"`
+	OutboxRelay                                *OutboxRelayOptions                     `json:"outbox_relay" mapstructure:"outbox_relay"`
+	Eventing                                   *EventingOptions                        `json:"eventing" mapstructure:"eventing"`
+	RateLimit                                  *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
+	Backpressure                               *BackpressureOptions                    `json:"backpressure" mapstructure:"backpressure"`
+	Cache                                      *CacheOptions                           `json:"cache"     mapstructure:"cache"`
+	RuntimeState                               *genericoptions.RuntimeStateOptions     `json:"runtime_state" mapstructure:"runtime_state"`
+	StatisticsSync                             *StatisticsSyncOptions                  `json:"statistics_sync" mapstructure:"statistics_sync"`
+	Signaling                                  *genericoptions.SignalingOptions        `json:"signaling" mapstructure:"signaling"`
+	SystemGovernance                           *SystemGovernanceOptions                `json:"system_governance" mapstructure:"system_governance"`
+	DelegatedSubject                           *delegatedsubject.Options               `json:"delegated_subject" mapstructure:"delegated-subject"`
+	AIExplanation                              *AIExplanationOptions                   `json:"ai_explanation" mapstructure:"ai_explanation"`
+	runtimeConfigContext                       app.RuntimeConfigContext
+	cachePolicySource                          CachePolicySource
+	cachePolicyMetadata                        sharedcache.PolicySource
 }
 
 func (o *Options) SetRuntimeConfigContext(runtime app.RuntimeConfigContext) {
@@ -109,17 +113,20 @@ func NewOptions() *Options {
 		EvaluationConsistencyAudit:  NewEvaluationConsistencyAuditOptions(),
 		EvaluationLeaseRecovery:     NewEvaluationLeaseRecoveryOptions(),
 		InterpretationLeaseRecovery: NewInterpretationLeaseRecoveryOptions(),
-		ReportCatalogAudit:          NewReportCatalogAuditOptions(),
-		MongoConsistencyAudit:       NewMongoConsistencyAuditOptions(),
-		OutboxRelay:                 NewOutboxRelayOptions(),
-		Eventing:                    NewEventingOptions(),
-		RateLimit:                   NewRateLimitOptions(),
-		Backpressure:                NewBackpressureOptions(),
-		Cache:                       NewCacheOptions(),
-		RuntimeState:                genericoptions.NewRuntimeStateOptions(),
-		StatisticsSync:              NewStatisticsSyncOptions(),
-		Signaling:                   genericoptions.NewSignalingOptions(),
-		SystemGovernance:            NewSystemGovernanceOptions(),
+		AIExplanationPromptEvaluationLeaseRecovery: NewAIExplanationPromptEvaluationLeaseRecoveryOptions(),
+		AIExplanationParticipantLeaseRecovery:      NewAIExplanationParticipantLeaseRecoveryOptions(),
+		ReportCatalogAudit:                         NewReportCatalogAuditOptions(),
+		MongoConsistencyAudit:                      NewMongoConsistencyAuditOptions(),
+		OutboxRelay:                                NewOutboxRelayOptions(),
+		Eventing:                                   NewEventingOptions(),
+		RateLimit:                                  NewRateLimitOptions(),
+		Backpressure:                               NewBackpressureOptions(),
+		Cache:                                      NewCacheOptions(),
+		RuntimeState:                               genericoptions.NewRuntimeStateOptions(),
+		StatisticsSync:                             NewStatisticsSyncOptions(),
+		Signaling:                                  genericoptions.NewSignalingOptions(),
+		SystemGovernance:                           NewSystemGovernanceOptions(),
+		AIExplanation:                              NewAIExplanationOptions(),
 	}
 }
 
@@ -330,6 +337,20 @@ func NewInterpretationLeaseRecoveryOptions() *LeaseRecoveryOptions {
 	return &LeaseRecoveryOptions{
 		Enable: true, Interval: 10 * time.Second, BatchLimit: 100,
 		LockKey: "qs:interpretation-lease-recovery:leader", LockTTL: 30 * time.Second,
+	}
+}
+
+func NewAIExplanationPromptEvaluationLeaseRecoveryOptions() *LeaseRecoveryOptions {
+	return &LeaseRecoveryOptions{
+		Enable: false, Interval: 10 * time.Second, BatchLimit: 20,
+		LockKey: "qs:ai-explanation-prompt-evaluation-lease-recovery:leader", LockTTL: 30 * time.Second,
+	}
+}
+
+func NewAIExplanationParticipantLeaseRecoveryOptions() *LeaseRecoveryOptions {
+	return &LeaseRecoveryOptions{
+		Enable: false, Interval: 10 * time.Second, BatchLimit: 100,
+		LockKey: "qs:ai-explanation-participant-lease-recovery:leader", LockTTL: 30 * time.Second,
 	}
 }
 
@@ -554,6 +575,8 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.EvaluationConsistencyAudit.AddFlags(fss.FlagSet("evaluation_consistency_audit"))
 	o.EvaluationLeaseRecovery.AddFlags(fss.FlagSet("evaluation_lease_recovery"), "evaluation_lease_recovery")
 	o.InterpretationLeaseRecovery.AddFlags(fss.FlagSet("interpretation_lease_recovery"), "interpretation_lease_recovery")
+	o.AIExplanationPromptEvaluationLeaseRecovery.AddFlags(fss.FlagSet("ai_explanation_prompt_evaluation_lease_recovery"), "ai_explanation_prompt_evaluation_lease_recovery")
+	o.AIExplanationParticipantLeaseRecovery.AddFlags(fss.FlagSet("ai_explanation_participant_lease_recovery"), "ai_explanation_participant_lease_recovery")
 	o.ReportCatalogAudit.AddFlags(fss.FlagSet("report_catalog_audit"))
 	o.MongoConsistencyAudit.AddFlags(fss.FlagSet("mongo_consistency_audit"))
 	o.OutboxRelay.AddFlags(fss.FlagSet("outbox_relay"))
@@ -562,6 +585,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.Backpressure.AddFlags(fss.FlagSet("backpressure"))
 	o.Cache.AddFlags(fss.FlagSet("cache"))
 	o.StatisticsSync.AddFlags(fss.FlagSet("statistics_sync"))
+	o.AIExplanation.AddFlags(fss.FlagSet("ai_explanation"))
 	return fss
 }
 
@@ -942,6 +966,10 @@ func (o *Options) Complete() error {
 	if err := o.SecureServing.Complete(); err != nil {
 		return err
 	}
+	if o.AIExplanation == nil {
+		o.AIExplanation = NewAIExplanationOptions()
+	}
+	o.AIExplanation.completeAPIKey(os.Getenv)
 	if o.Cache == nil {
 		o.Cache = NewCacheOptions()
 	}

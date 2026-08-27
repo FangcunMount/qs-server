@@ -122,6 +122,10 @@ rate_limit:                          # 限流配置
   query_global_burst: 450            # 查询全局突发 450
   query_user_qps: 120                # 查询用户 QPS 120
   query_user_burst: 180              # 查询用户突发 180
+  ai_explanation_request_global_qps: 20    # 手动 AI 解读独立到达层 QPS
+  ai_explanation_request_global_burst: 40  # 手动 AI 解读独立到达层突发
+  ai_explanation_request_user_qps: 0.2     # 单用户约每 5 秒补充 1 个 token
+  ai_explanation_request_user_burst: 2     # 单用户约每 5 秒补充 1 个 token 突发
   wait_report_global_qps: 200        # 等待报告全局 QPS 200
   wait_report_global_burst: 300      # 等待报告全局突发 300
   wait_report_user_qps: 60           # 等待报告用户 QPS 60

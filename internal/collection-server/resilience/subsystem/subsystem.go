@@ -16,10 +16,11 @@ import (
 )
 
 const (
-	BudgetQuery        ratelimit.BudgetID = "query"
-	BudgetSubmit       ratelimit.BudgetID = "submit"
-	BudgetWaitReport   ratelimit.BudgetID = "wait_report"
-	BudgetReportEvents ratelimit.BudgetID = "report_events"
+	BudgetQuery                ratelimit.BudgetID = "query"
+	BudgetSubmit               ratelimit.BudgetID = "submit"
+	BudgetAIExplanationRequest ratelimit.BudgetID = "ai_explanation_request"
+	BudgetWaitReport           ratelimit.BudgetID = "wait_report"
+	BudgetReportEvents         ratelimit.BudgetID = "report_events"
 )
 
 const (
@@ -81,6 +82,11 @@ func New(opts Options) (*Subsystem, error) {
 	}
 	s.budgets[BudgetQuery] = newBudget(BudgetQuery, opts.Backend, rateCfg.QueryGlobalQPS, rateCfg.QueryGlobalBurst, rateCfg.QueryUserQPS, rateCfg.QueryUserBurst)
 	s.budgets[BudgetSubmit] = newSubmitBudget(opts.Backend, rateCfg)
+	s.budgets[BudgetAIExplanationRequest] = newBudget(
+		BudgetAIExplanationRequest, opts.Backend,
+		rateCfg.AIExplanationRequestGlobalQPS, rateCfg.AIExplanationRequestGlobalBurst,
+		rateCfg.AIExplanationRequestUserQPS, rateCfg.AIExplanationRequestUserBurst,
+	)
 	s.budgets[BudgetWaitReport] = newBudget(BudgetWaitReport, opts.Backend, rateCfg.WaitReportGlobalQPS, rateCfg.WaitReportGlobalBurst, rateCfg.WaitReportUserQPS, rateCfg.WaitReportUserBurst)
 	s.budgets[BudgetReportEvents] = newBudget(BudgetReportEvents, opts.Backend, rateCfg.ReportEventsGlobalQPS, rateCfg.ReportEventsGlobalBurst, rateCfg.ReportEventsUserQPS, rateCfg.ReportEventsUserBurst)
 	s.buildGates(opts.Concurrency, opts.WaitReport)
@@ -153,7 +159,7 @@ func (s *Subsystem) reconcile(ctx context.Context) {
 	if heartbeater, ok := s.stateStore.(control.InstanceHeartbeater); ok {
 		_ = heartbeater.Heartbeat(ctx, s.identity, 5*time.Second)
 	}
-	for _, id := range []ratelimit.BudgetID{BudgetQuery, BudgetSubmit, BudgetWaitReport, BudgetReportEvents} {
+	for _, id := range []ratelimit.BudgetID{BudgetQuery, BudgetSubmit, BudgetAIExplanationRequest, BudgetWaitReport, BudgetReportEvents} {
 		state, exists, err := s.stateStore.Load(ctx, "rate:collection-server:"+string(id))
 		if err != nil {
 			continue
@@ -307,7 +313,7 @@ func (s *Subsystem) Snapshot(now time.Time) resilience.RuntimeSnapshot {
 		return resilience.FinalizeRuntimeSnapshot(snapshot)
 	}
 	snapshot.InstanceID, snapshot.Generation = s.identity.InstanceID, s.identity.Generation
-	for _, id := range []ratelimit.BudgetID{BudgetQuery, BudgetSubmit, BudgetWaitReport, BudgetReportEvents} {
+	for _, id := range []ratelimit.BudgetID{BudgetQuery, BudgetSubmit, BudgetAIExplanationRequest, BudgetWaitReport, BudgetReportEvents} {
 		policy := s.budgets[id].Snapshot()
 		global := rateSnapshot(id, "global", s.rateEnabled, policy, policy.Policy.Global)
 		user := rateSnapshot(id, "user", s.rateEnabled, policy, policy.Policy.User)

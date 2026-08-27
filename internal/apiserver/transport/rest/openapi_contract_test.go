@@ -81,6 +81,110 @@ func TestApiserverOpenAPIHasExplicitModelAndInterpretationWireSchemas(t *testing
 	}
 }
 
+func TestAIExplanationAdministrationOpenAPIContract(t *testing.T) {
+	t.Parallel()
+
+	spec := loadOpenAPISpec(t, "../../../../api/rest/apiserver.yaml")
+	for path, method := range map[string]string{
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluation-capacity":                               "get",
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluations":                                       "post",
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}":                              "get",
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/recover":                      "post",
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/cancel":                       "post",
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}": "get",
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/reviews":                      "post",
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/finalize":                     "post",
+		"/internal/v1/interpretation/ai-explanation/profiles":                                                 "post",
+		"/internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}":                 "get",
+		"/internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}/publish":         "post",
+		"/internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}/disable":         "post",
+	} {
+		assertOpenAPIOperation(t, spec, path, method)
+		operation := spec.Paths[path][method].(map[string]any)
+		if security, explicitlyPublic := operation["security"].([]any); explicitlyPublic && len(security) == 0 {
+			t.Fatalf("AI explanation administration operation must not override root authentication: %s %s", method, path)
+		}
+	}
+	for _, path := range []string{
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluations",
+		"/internal/v1/interpretation/ai-explanation/profiles",
+	} {
+		assertOpenAPIOperation(t, spec, path, "get")
+	}
+	start := spec.Paths["/internal/v1/interpretation/ai-explanation/prompt-evaluations"]["post"].(map[string]any)
+	responses := start["responses"].(map[string]any)
+	for _, status := range []string{"400", "409", "429"} {
+		if _, ok := responses[status]; !ok {
+			t.Fatalf("Prompt evaluation start OpenAPI missing %s response", status)
+		}
+	}
+	capacityOperation := spec.Paths["/internal/v1/interpretation/ai-explanation/prompt-evaluation-capacity"]["get"].(map[string]any)
+	if _, ok := capacityOperation["responses"].(map[string]any)["501"]; !ok {
+		t.Fatal("Prompt evaluation capacity OpenAPI missing disabled response")
+	}
+
+	schemas := loadOpenAPIComponents(t, "../../../../api/rest/apiserver.yaml")
+	capacity := openAPISchemaProperties(t, schemas, "handler.AIExplanationEvaluationCapacityWire")
+	for _, property := range []string{"organization_id", "budget_day", "max_active_runs_per_org", "provider_invocations_per_start", "daily_provider_invocation_limit", "reserved_provider_invocations", "remaining_provider_invocations", "available_full_run_starts", "over_limit", "reservations"} {
+		if _, ok := capacity[property]; !ok {
+			t.Fatalf("evaluation capacity missing property %q", property)
+		}
+	}
+	summary := openAPISchemaProperties(t, schemas, "handler.AIExplanationEvaluationRunWire")
+	for _, property := range []string{"run_id", "requested_by", "request_reason", "execution", "recoveries", "recovery_max_provider_invocations", "canceled", "release", "attempts", "progress", "gate", "can_review", "can_finalize"} {
+		if _, ok := summary[property]; !ok {
+			t.Fatalf("evaluation summary missing property %q", property)
+		}
+	}
+	catalogSummary := openAPISchemaProperties(t, schemas, "handler.AIExplanationEvaluationSummaryWire")
+	for _, property := range []string{"run_id", "status", "requested_org_id", "release", "progress", "gate", "can_review", "can_finalize"} {
+		if _, ok := catalogSummary[property]; !ok {
+			t.Fatalf("evaluation catalog summary missing property %q", property)
+		}
+	}
+	for _, forbidden := range []string{"attempts", "execution", "recoveries", "assessment_input", "raw_provider_output"} {
+		if _, ok := catalogSummary[forbidden]; ok {
+			t.Fatalf("evaluation catalog summary must not expose %q", forbidden)
+		}
+	}
+	evaluationPage := openAPISchemaProperties(t, schemas, "handler.AIExplanationEvaluationPageWire")
+	for _, property := range []string{"items", "next_cursor"} {
+		if _, ok := evaluationPage[property]; !ok {
+			t.Fatalf("evaluation page missing property %q", property)
+		}
+	}
+	profilePage := openAPISchemaProperties(t, schemas, "handler.AIExplanationProfilePageWire")
+	for _, property := range []string{"items", "next_cursor"} {
+		if _, ok := profilePage[property]; !ok {
+			t.Fatalf("Profile page missing property %q", property)
+		}
+	}
+
+	attemptSummary := openAPISchemaProperties(t, schemas, "handler.AIExplanationReviewAttemptSummary")
+	for _, forbidden := range []string{"assessment_input", "normalized_output", "raw_provider_output", "provider_receipt", "semantic"} {
+		if _, ok := attemptSummary[forbidden]; ok {
+			t.Fatalf("evaluation summary must not expose raw evidence property %q", forbidden)
+		}
+	}
+
+	attemptDetail := openAPISchemaProperties(t, schemas, "handler.AIExplanationReviewAttemptWire")
+	for _, property := range []string{"assessment_input", "normalized_output", "raw_provider_output", "provider_receipt", "semantic", "assertions"} {
+		if _, ok := attemptDetail[property]; !ok {
+			t.Fatalf("attempt evidence detail missing property %q", property)
+		}
+	}
+
+	draft := openAPISchemaProperties(t, schemas, "handler.AIExplanationProfileDraftRequest")
+	for _, property := range []string{"definition", "fingerprint", "reason"} {
+		if _, ok := draft[property]; !ok {
+			t.Fatalf("profile draft request missing property %q", property)
+		}
+	}
+	if _, ok := draft["actor"]; ok {
+		t.Fatal("profile draft request must derive actor from authentication instead of request body")
+	}
+}
+
 func TestStatisticsOpenAPIExposesRunModesAndAuditedCacheResume(t *testing.T) {
 	t.Parallel()
 
@@ -217,6 +321,19 @@ func loadOpenAPIComponents(t *testing.T, path string) map[string]any {
 		t.Fatalf("%s has no OpenAPI schemas", path)
 	}
 	return root.Components.Schemas
+}
+
+func openAPISchemaProperties(t *testing.T, schemas map[string]any, name string) map[string]any {
+	t.Helper()
+	schema, ok := schemas[name].(map[string]any)
+	if !ok {
+		t.Fatalf("missing OpenAPI schema %s", name)
+	}
+	properties, ok := schema["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("OpenAPI schema %s has no properties", name)
+	}
+	return properties
 }
 
 func assertOpenAPIOperation(t *testing.T, spec openAPISpec, path, method string) {

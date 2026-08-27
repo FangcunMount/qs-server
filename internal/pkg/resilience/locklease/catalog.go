@@ -10,18 +10,20 @@ import (
 type WorkloadID string
 
 const (
-	WorkloadAnswersheetProcessing        WorkloadID = "answersheet_processing"
-	WorkloadPlanSchedulerLeader          WorkloadID = "plan_scheduler_leader"
-	WorkloadStatisticsSyncLeader         WorkloadID = "statistics_sync_leader"
-	WorkloadStatisticsSync               WorkloadID = "statistics_sync"
-	WorkloadEvaluationConsistencyAudit   WorkloadID = "evaluation_consistency_audit"
-	WorkloadEvaluationLeaseRecovery      WorkloadID = "evaluation_lease_recovery"
-	WorkloadInterpretationLeaseRecovery  WorkloadID = "interpretation_lease_recovery"
-	WorkloadReportCatalogAudit           WorkloadID = "report_catalog_audit"
-	WorkloadMongoConsistencyAudit        WorkloadID = "mongo_consistency_audit"
-	WorkloadAttentionProjectionReconcile WorkloadID = "attention_projection_reconcile"
-	WorkloadAuthzRoleProjectionReconcile WorkloadID = "authz_role_projection_reconcile"
-	WorkloadCollectionSubmit             WorkloadID = "collection_submit"
+	WorkloadAnswersheetProcessing                      WorkloadID = "answersheet_processing"
+	WorkloadPlanSchedulerLeader                        WorkloadID = "plan_scheduler_leader"
+	WorkloadStatisticsSyncLeader                       WorkloadID = "statistics_sync_leader"
+	WorkloadStatisticsSync                             WorkloadID = "statistics_sync"
+	WorkloadEvaluationConsistencyAudit                 WorkloadID = "evaluation_consistency_audit"
+	WorkloadEvaluationLeaseRecovery                    WorkloadID = "evaluation_lease_recovery"
+	WorkloadInterpretationLeaseRecovery                WorkloadID = "interpretation_lease_recovery"
+	WorkloadAIExplanationPromptEvaluationLeaseRecovery WorkloadID = "ai_explanation_prompt_evaluation_lease_recovery"
+	WorkloadAIExplanationParticipantLeaseRecovery      WorkloadID = "ai_explanation_participant_lease_recovery"
+	WorkloadReportCatalogAudit                         WorkloadID = "report_catalog_audit"
+	WorkloadMongoConsistencyAudit                      WorkloadID = "mongo_consistency_audit"
+	WorkloadAttentionProjectionReconcile               WorkloadID = "attention_projection_reconcile"
+	WorkloadAuthzRoleProjectionReconcile               WorkloadID = "authz_role_projection_reconcile"
+	WorkloadCollectionSubmit                           WorkloadID = "collection_submit"
 )
 
 // Kind classifies the business semantics of a lease workload.
@@ -58,6 +60,8 @@ var capabilities = [...]Capability{
 	{WorkloadEvaluationConsistencyAudit, "apiserver", KindLeader, Spec{Name: string(WorkloadEvaluationConsistencyAudit), Description: "用于 apiserver Evaluation 一致性审计周期的单 leader 执行。", DefaultTTL: 30 * time.Second}, RenewalModeAuto},
 	{WorkloadEvaluationLeaseRecovery, "apiserver", KindLeader, Spec{Name: string(WorkloadEvaluationLeaseRecovery), Description: "用于 apiserver Evaluation 过期运行租约恢复的单 leader 执行。", DefaultTTL: 30 * time.Second}, RenewalModeAuto},
 	{WorkloadInterpretationLeaseRecovery, "apiserver", KindLeader, Spec{Name: string(WorkloadInterpretationLeaseRecovery), Description: "用于 apiserver Interpretation 过期运行租约恢复的单 leader 执行。", DefaultTTL: 30 * time.Second}, RenewalModeAuto},
+	{WorkloadAIExplanationPromptEvaluationLeaseRecovery, "apiserver", KindLeader, Spec{Name: string(WorkloadAIExplanationPromptEvaluationLeaseRecovery), Description: "用于 apiserver AI 解读 Prompt 评测过期 prepared 执行唤醒的单 leader 执行。", DefaultTTL: 30 * time.Second}, RenewalModeAuto},
+	{WorkloadAIExplanationParticipantLeaseRecovery, "apiserver", KindLeader, Spec{Name: string(WorkloadAIExplanationParticipantLeaseRecovery), Description: "用于 apiserver Participant AI 解读过期 Run 租约耐久唤醒的单 leader 执行。", DefaultTTL: 30 * time.Second}, RenewalModeAuto},
 	{WorkloadReportCatalogAudit, "apiserver", KindLeader, Spec{Name: string(WorkloadReportCatalogAudit), Description: "用于 apiserver 有界报告目录审计多实例 leader 选举与自动续租。", DefaultTTL: 30 * time.Second}, RenewalModeAuto},
 	{WorkloadMongoConsistencyAudit, "apiserver", KindLeader, Spec{Name: string(WorkloadMongoConsistencyAudit), Description: "用于 apiserver Mongo 跨集合一致性只读巡检的单 leader 执行。", DefaultTTL: 30 * time.Second}, RenewalModeAuto},
 	{WorkloadAttentionProjectionReconcile, "worker", KindLeader, Spec{Name: string(WorkloadAttentionProjectionReconcile), Description: "用于 worker Attention 失败重试与历史事实恢复的多实例 leader 选举。", DefaultTTL: 30 * time.Minute}, RenewalModeAuto},

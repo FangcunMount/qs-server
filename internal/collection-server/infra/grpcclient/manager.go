@@ -57,13 +57,14 @@ type Manager struct {
 	clients map[string]interface{}
 
 	// 已注册的客户端
-	answerSheetClient            *AnswerSheetClient
-	questionnaireClient          *QuestionnaireClient
-	testeeEvaluationClient       *TesteeEvaluationClient
-	participantReportClient      *ParticipantReportClient
-	assessmentIntakeClient       *AssessmentIntakeClient
-	actorClient                  *ActorClient
-	assessmentModelCatalogClient *AssessmentModelCatalogClient
+	answerSheetClient              *AnswerSheetClient
+	questionnaireClient            *QuestionnaireClient
+	testeeEvaluationClient         *TesteeEvaluationClient
+	participantReportClient        *ParticipantReportClient
+	participantAIExplanationClient *ParticipantAIExplanationClient
+	assessmentIntakeClient         *AssessmentIntakeClient
+	actorClient                    *ActorClient
+	assessmentModelCatalogClient   *AssessmentModelCatalogClient
 }
 
 // NewManager 创建 gRPC 客户端管理器
@@ -259,9 +260,11 @@ func (m *Manager) RegisterClients() error {
 	// 注册 Evaluation 客户端
 	m.testeeEvaluationClient = NewTesteeEvaluationClient(baseClient)
 	m.participantReportClient = NewParticipantReportClient(baseClient, m.config.DelegatedSubjectSigner)
+	m.participantAIExplanationClient = NewParticipantAIExplanationClient(baseClient, m.config.DelegatedSubjectSigner)
 	m.assessmentIntakeClient = NewAssessmentIntakeClient(baseClient)
 	m.clients["testeeEvaluation"] = m.testeeEvaluationClient
 	m.clients["participantReport"] = m.participantReportClient
+	m.clients["participantAIExplanation"] = m.participantAIExplanationClient
 	m.clients["assessmentIntake"] = m.assessmentIntakeClient
 	log.Info("   📊 actor-oriented Evaluation/Interpretation clients registered")
 
@@ -292,6 +295,9 @@ func (m *Manager) QuestionnaireClient() *QuestionnaireClient {
 func (m *Manager) TesteeEvaluationClient() *TesteeEvaluationClient { return m.testeeEvaluationClient }
 func (m *Manager) ParticipantReportClient() *ParticipantReportClient {
 	return m.participantReportClient
+}
+func (m *Manager) ParticipantAIExplanationClient() *ParticipantAIExplanationClient {
+	return m.participantAIExplanationClient
 }
 func (m *Manager) AssessmentIntakeClient() *AssessmentIntakeClient { return m.assessmentIntakeClient }
 

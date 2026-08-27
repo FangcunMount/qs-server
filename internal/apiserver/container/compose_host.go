@@ -89,6 +89,13 @@ func (c *Container) InterpretationRunLeaseDuration() time.Duration {
 	return c.systemGovernanceOptions.Retry.Lease.RunLeaseDuration()
 }
 
+func (c *Container) AIExplanationOptions() *apiserveroptions.AIExplanationOptions {
+	if c == nil {
+		return nil
+	}
+	return c.aiExplanationOptions
+}
+
 func (c *Container) PublishedReportTemplateCatalog() domainreporttemplate.Catalog {
 	if c == nil || c.ReportModule == nil {
 		return nil

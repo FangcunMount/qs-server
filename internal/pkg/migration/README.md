@@ -17,7 +17,7 @@ qs-server 在 apiserver 启动阶段按配置执行 MySQL 与 MongoDB 向上迁�
 - MySQL：`NewMigrator(db, config)`；
 - MongoDB：`NewMongoMigrator(client, config)`；
 - dirty 状态会阻断继续迁移；
-- 当前目录末端版本为 MySQL `70`、MongoDB `24`。生产实际版本以数据库只读查询和[当前版本定档验收台账](../../../docs/00-总览/09-当前版本定档验收台账.md)为准；仓库目录版本不能单独证明生产已执行到该版本。
+- 当前目录末端版本为 MySQL `70`、MongoDB `33`。生产实际版本以数据库只读查询和[当前版本定档验收台账](../../../docs/00-总览/09-当前版本定档验收台账.md)为准；仓库目录版本不能单独证明生产已执行到该版本。
 
 ## 目录与职责
 
@@ -105,8 +105,8 @@ QS_APISERVER_MIGRATION_ENABLED=false make run-apiserver
 在 `migrations/mongodb/` 下增加同版本号的一对 JSON 文件：
 
 ```text
-000025_change_name.up.json
-000025_change_name.down.json
+000033_change_name.up.json
+000033_change_name.down.json
 ```
 
 文件内容是操作数组，例如：

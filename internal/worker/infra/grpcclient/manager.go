@@ -50,6 +50,7 @@ type Manager struct {
 	assessmentIntakeClient         *AssessmentIntakeClient
 	evaluationWorkerClient         *EvaluationWorkerClient
 	interpretationAutomationClient *InterpretationAutomationClient
+	aiExplanationAutomationClient  *AIExplanationAutomationClient
 	planClient                     *PlanClient
 }
 
@@ -169,9 +170,11 @@ func (m *Manager) RegisterClients() error {
 	m.assessmentIntakeClient = NewAssessmentIntakeClient(m)
 	m.evaluationWorkerClient = NewEvaluationWorkerClient(m)
 	m.interpretationAutomationClient = NewInterpretationAutomationClient(m)
+	m.aiExplanationAutomationClient = NewAIExplanationAutomationClient(m)
 	m.clients["assessmentIntake"] = m.assessmentIntakeClient
 	m.clients["evaluationWorker"] = m.evaluationWorkerClient
 	m.clients["interpretationAutomation"] = m.interpretationAutomationClient
+	m.clients["aiExplanationAutomation"] = m.aiExplanationAutomationClient
 
 	// 注册 PlanCommand 客户端
 	m.planClient = NewPlanClient(m)
@@ -195,6 +198,9 @@ func (m *Manager) AssessmentIntakeClient() *AssessmentIntakeClient { return m.as
 func (m *Manager) EvaluationWorkerClient() *EvaluationWorkerClient { return m.evaluationWorkerClient }
 func (m *Manager) InterpretationAutomationClient() *InterpretationAutomationClient {
 	return m.interpretationAutomationClient
+}
+func (m *Manager) AIExplanationAutomationClient() *AIExplanationAutomationClient {
+	return m.aiExplanationAutomationClient
 }
 
 // PlanClient 获取 plan 命令客户端

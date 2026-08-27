@@ -1,0 +1,17 @@
+[
+  {
+    "createIndexes": "ai_explanation_artifacts",
+    "indexes": [
+      {
+        "key": {
+          "source.association.org_id": 1,
+          "source.association.testee_id": 1,
+          "audience": 1,
+          "generated_at": -1,
+          "domain_id": -1
+        },
+        "name": "idx_ai_explanation_artifact_subject_export"
+      }
+    ]
+  }
+]

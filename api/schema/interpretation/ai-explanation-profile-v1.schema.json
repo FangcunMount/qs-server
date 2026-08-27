@@ -1,0 +1,435 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/FangcunMount/qs-server/main/api/schema/interpretation/ai-explanation-profile-v1.schema.json",
+  "title": "AIExplanationProfile v1",
+  "description": "Versioned policy that selects, shapes, and validates a manually triggered AI explanation. Published versions are immutable application artifacts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile_id",
+    "version",
+    "status",
+    "fingerprint",
+    "selector",
+    "eligibility",
+    "input_policy",
+    "insight_policy",
+    "suggestion_policy",
+    "safety_policy",
+    "generation_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ai-explanation-profile/v1"
+    },
+    "profile_id": {
+      "$ref": "#/$defs/nonEmptyString"
+    },
+    "version": {
+      "$ref": "#/$defs/versionString"
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "published",
+        "disabled"
+      ]
+    },
+    "fingerprint": {
+      "$ref": "#/$defs/sha256Fingerprint"
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "audience",
+        "model_kind",
+        "decision_kind",
+        "model_code",
+        "model_version"
+      ],
+      "properties": {
+        "audience": {
+          "$ref": "#/$defs/audience"
+        },
+        "model_kind": {
+          "$ref": "#/$defs/modelKind"
+        },
+        "decision_kind": {
+          "$ref": "#/$defs/decisionKind"
+        },
+        "model_code": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "model_version": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/versionString"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "model_version": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "model_version"
+            ]
+          },
+          "then": {
+            "properties": {
+              "model_code": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "eligibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "min_eligible_dimensions",
+        "eligible_dimension_codes",
+        "excluded_dimension_codes",
+        "max_input_dimensions",
+        "on_dimension_overflow"
+      ],
+      "properties": {
+        "min_eligible_dimensions": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 50
+        },
+        "eligible_dimension_codes": {
+          "$ref": "#/$defs/dimensionCodes"
+        },
+        "excluded_dimension_codes": {
+          "$ref": "#/$defs/dimensionCodes"
+        },
+        "max_input_dimensions": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 50
+        },
+        "on_dimension_overflow": {
+          "const": "reject"
+        }
+      }
+    },
+    "input_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context_scope",
+        "include_norm_context",
+        "include_model_result",
+        "allowed_focus_areas",
+        "hierarchy_policy"
+      ],
+      "properties": {
+        "context_scope": {
+          "const": "current_assessment_only"
+        },
+        "include_norm_context": {
+          "type": "boolean"
+        },
+        "include_model_result": {
+          "type": "boolean"
+        },
+        "allowed_focus_areas": {
+          "type": "array",
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+          }
+        },
+        "hierarchy_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "allow_parent_child_in_same_insight"
+          ],
+          "properties": {
+            "allow_parent_child_in_same_insight": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "insight_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowed_kinds",
+        "min_items",
+        "max_items",
+        "min_dimension_refs_per_item",
+        "max_dimension_refs_per_item",
+        "allow_causal_claims"
+      ],
+      "properties": {
+        "allowed_kinds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/insightKind"
+          }
+        },
+        "min_items": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "max_items": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "min_dimension_refs_per_item": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 6
+        },
+        "max_dimension_refs_per_item": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 6
+        },
+        "allow_causal_claims": {
+          "const": false
+        }
+      }
+    },
+    "suggestion_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowed_origins",
+        "allowed_categories",
+        "min_items",
+        "max_items",
+        "max_actions_per_item",
+        "require_evidence_refs",
+        "require_standard_refs_for_standard_derived"
+      ],
+      "properties": {
+        "allowed_origins": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "standard_derived",
+              "generated_low_risk"
+            ]
+          }
+        },
+        "allowed_categories": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+          }
+        },
+        "min_items": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "max_items": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "max_actions_per_item": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "require_evidence_refs": {
+          "const": true
+        },
+        "require_standard_refs_for_standard_derived": {
+          "const": true
+        }
+      }
+    },
+    "safety_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_version",
+        "forbidden_claims",
+        "disclaimer_version"
+      ],
+      "properties": {
+        "policy_version": {
+          "$ref": "#/$defs/versionString"
+        },
+        "forbidden_claims": {
+          "type": "array",
+          "minItems": 7,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "diagnosis",
+              "causality",
+              "medication",
+              "treatment_plan",
+              "risk_reclassification",
+              "identity_inference",
+              "deterministic_future_prediction"
+            ]
+          },
+          "allOf": [
+            {
+              "contains": {
+                "const": "diagnosis"
+              }
+            },
+            {
+              "contains": {
+                "const": "causality"
+              }
+            },
+            {
+              "contains": {
+                "const": "medication"
+              }
+            },
+            {
+              "contains": {
+                "const": "treatment_plan"
+              }
+            },
+            {
+              "contains": {
+                "const": "risk_reclassification"
+              }
+            },
+            {
+              "contains": {
+                "const": "identity_inference"
+              }
+            },
+            {
+              "contains": {
+                "const": "deterministic_future_prediction"
+              }
+            }
+          ]
+        },
+        "disclaimer_version": {
+          "$ref": "#/$defs/versionString"
+        }
+      }
+    },
+    "generation_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prompt_template_id",
+        "prompt_version",
+        "provider_route",
+        "input_schema_version",
+        "output_schema_version",
+        "max_output_characters"
+      ],
+      "properties": {
+        "prompt_template_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "prompt_version": {
+          "$ref": "#/$defs/versionString"
+        },
+        "provider_route": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{0,63}$",
+          "description": "Logical route key resolved by server configuration. It MUST NOT contain a provider name, model id, credential, or endpoint."
+        },
+        "input_schema_version": {
+          "const": "ai-explanation-input/v1"
+        },
+        "output_schema_version": {
+          "const": "ai-explanation-output/v1"
+        },
+        "max_output_characters": {
+          "type": "integer",
+          "minimum": 512,
+          "maximum": 20000
+        }
+      }
+    }
+  },
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "versionString": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$"
+    },
+    "sha256Fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "audience": {
+      "enum": [
+        "participant"
+      ]
+    },
+    "modelKind": {
+      "enum": [
+        "scale"
+      ]
+    },
+    "decisionKind": {
+      "enum": [
+        "score_range"
+      ]
+    },
+    "dimensionCodes": {
+      "type": "array",
+      "maxItems": 50,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/nonEmptyString"
+      }
+    },
+    "insightKind": {
+      "enum": [
+        "reinforcing_pattern",
+        "contrasting_pattern",
+        "combined_strength",
+        "combined_attention",
+        "context_dependent_pattern"
+      ]
+    }
+  }
+}

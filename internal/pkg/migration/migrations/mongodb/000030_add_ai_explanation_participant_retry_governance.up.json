@@ -1,0 +1,34 @@
+[
+  {
+    "dropIndexes": "ai_explanation_participant_daily_budgets",
+    "index": "uk_ai_explanation_participant_budget_generation"
+  },
+  {
+    "createIndexes": "ai_explanation_participant_daily_budgets",
+    "indexes": [
+      {
+        "key": { "reservations.reservation_id": 1 },
+        "name": "uk_ai_explanation_participant_budget_reservation",
+        "unique": true,
+        "sparse": true
+      }
+    ]
+  },
+  {
+    "createIndexes": "ai_explanation_runs",
+    "indexes": [
+      {
+        "key": { "retry_authorization.request_id": 1 },
+        "name": "uk_ai_explanation_run_retry_request",
+        "unique": true,
+        "sparse": true
+      },
+      {
+        "key": { "retry_authorization.event_id": 1 },
+        "name": "uk_ai_explanation_run_retry_event",
+        "unique": true,
+        "sparse": true
+      }
+    ]
+  }
+]

@@ -44,6 +44,7 @@ type Container struct {
 	statisticsRepairWindowDays int
 	reportStatusConfig         reportstatus.Config
 	systemGovernanceOptions    *apiserveroptions.SystemGovernanceOptions
+	aiExplanationOptions       *apiserveroptions.AIExplanationOptions
 	actionAuditStore           systemgov.ActionAuditStore
 	actionAuditRunner          *systemgov.ActionAuditRecoveryRunner
 	actionAuditCancel          context.CancelFunc
@@ -157,6 +158,7 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	c.statisticsRepairWindowDays = opts.StatisticsRepairWindowDays
 	c.reportStatusConfig = reportstatus.ConfigFromOptions(opts.ReportStatus, opts.Signaling, "apiserver")
 	c.systemGovernanceOptions = opts.SystemGovernance
+	c.aiExplanationOptions = opts.AIExplanation
 	c.actionAuditStore = opts.ActionAuditStore
 	c.actionAuditRunner = opts.ActionAuditRunner
 	c.silent = opts.Silent

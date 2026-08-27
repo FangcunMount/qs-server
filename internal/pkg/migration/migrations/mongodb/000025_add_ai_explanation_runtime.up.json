@@ -1,0 +1,59 @@
+[
+  { "create": "ai_explanation_generations" },
+  {
+    "createIndexes": "ai_explanation_generations",
+    "indexes": [
+      { "key": { "domain_id": 1 }, "name": "uk_ai_explanation_generation_domain", "unique": true },
+      {
+        "key": {
+          "source_report_id": 1,
+          "audience": 1,
+          "profile.id": 1,
+          "profile.version": 1,
+          "profile.fingerprint": 1,
+          "input_fingerprint": 1,
+          "execution_spec_fingerprint": 1
+        },
+        "name": "uk_ai_explanation_generation_semantic_key",
+        "unique": true
+      },
+      { "key": { "association.assessment_id": 1, "created_at": -1 }, "name": "idx_ai_explanation_generation_assessment_created" }
+    ]
+  },
+  { "create": "ai_explanation_runs" },
+  {
+    "createIndexes": "ai_explanation_runs",
+    "indexes": [
+      { "key": { "domain_id": 1 }, "name": "uk_ai_explanation_run_domain", "unique": true },
+      { "key": { "generation_id": 1, "attempt": 1 }, "name": "uk_ai_explanation_run_attempt", "unique": true },
+      { "key": { "generation_id": 1, "attempt": -1 }, "name": "idx_ai_explanation_run_latest" },
+      { "key": { "status": 1, "lease_expires_at": 1, "domain_id": 1 }, "name": "idx_ai_explanation_run_expired_lease" }
+    ]
+  },
+  { "create": "ai_explanation_artifacts" },
+  {
+    "createIndexes": "ai_explanation_artifacts",
+    "indexes": [
+      { "key": { "domain_id": 1 }, "name": "uk_ai_explanation_artifact_domain", "unique": true },
+      { "key": { "generation_id": 1 }, "name": "uk_ai_explanation_artifact_generation", "unique": true },
+      { "key": { "source.report_id": 1, "audience": 1, "generated_at": -1 }, "name": "idx_ai_explanation_artifact_source_audience" }
+    ]
+  },
+  { "create": "ai_explanation_profiles" },
+  {
+    "createIndexes": "ai_explanation_profiles",
+    "indexes": [
+      { "key": { "domain_id": 1 }, "name": "uk_ai_explanation_profile_domain", "unique": true },
+      { "key": { "definition.profile_id": 1, "definition.version": 1 }, "name": "uk_ai_explanation_profile_release", "unique": true },
+      {
+        "key": {
+          "status": 1,
+          "definition.selector.audience": 1,
+          "definition.selector.model_kind": 1,
+          "definition.selector.decision_kind": 1
+        },
+        "name": "idx_ai_explanation_profile_selector"
+      }
+    ]
+  }
+]

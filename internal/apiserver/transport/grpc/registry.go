@@ -12,6 +12,10 @@ import (
 	evaluationintake "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/intake"
 	evaluationtestee "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/testee"
 	evaluationworker "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/worker"
+	aiexplanationevaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/evaluation"
+	aiExplanationExecution "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/execution"
+	aiExplanationParticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/participant"
+	aiExplanationSubjectExport "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/subjectexport"
 	interpretationAutomation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/automation"
 	interpretationParticipant "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/participant"
 	assessmentintakejourney "github.com/FangcunMount/qs-server/internal/apiserver/application/journey/assessmentintake"
@@ -82,10 +86,14 @@ type EvaluationDeps struct {
 }
 
 type InterpretationDeps struct {
-	AutomationService        interpretationAutomation.Service
-	ParticipantService       interpretationParticipant.Service
-	ReportStatusReporter     *reportstatus.Reporter
-	DelegatedSubjectVerifier *delegatedsubject.Verifier
+	AutomationService          interpretationAutomation.Service
+	AIExplanationExecutor      aiExplanationExecution.Executor
+	AIExplanationEvaluation    *aiexplanationevaluation.OnlineRunner
+	AIExplanationParticipant   aiExplanationParticipant.Service
+	AIExplanationSubjectExport *aiExplanationSubjectExport.Service
+	ParticipantService         interpretationParticipant.Service
+	ReportStatusReporter       *reportstatus.Reporter
+	DelegatedSubjectVerifier   *delegatedsubject.Verifier
 }
 
 type AssessmentModelCatalogDeps struct {
@@ -125,6 +133,12 @@ func (r *Registry) RegisterServices() error {
 		return err
 	}
 	if err := r.registerEvaluationService(); err != nil {
+		return err
+	}
+	if err := r.registerAIExplanationAutomationService(); err != nil {
+		return err
+	}
+	if err := r.registerParticipantAIExplanationService(); err != nil {
 		return err
 	}
 	if err := r.registerAssessmentModelCatalogService(); err != nil {
@@ -222,6 +236,33 @@ func (r *Registry) registerEvaluationService() error {
 	return nil
 }
 
+func (r *Registry) registerAIExplanationAutomationService() error {
+	if r.deps.Interpretation.AIExplanationExecutor == nil && r.deps.Interpretation.AIExplanationEvaluation == nil {
+		log.Info("AI explanation automation is disabled; service not registered")
+		return nil
+	}
+	r.server.RegisterService(service.NewAIExplanationAutomationService(
+		r.deps.Interpretation.AIExplanationExecutor,
+		r.deps.Interpretation.AIExplanationEvaluation,
+	))
+	log.Info("   🤖 AI explanation automation service registered")
+	return nil
+}
+
+func (r *Registry) registerParticipantAIExplanationService() error {
+	if r.deps.Interpretation.AIExplanationParticipant == nil || r.deps.Interpretation.DelegatedSubjectVerifier == nil || !r.deps.Interpretation.DelegatedSubjectVerifier.Enabled() {
+		log.Info("participant AI explanation is disabled; service not registered")
+		return nil
+	}
+	r.server.RegisterService(service.NewParticipantAIExplanationService(
+		r.deps.Interpretation.AIExplanationParticipant,
+		r.deps.Interpretation.AIExplanationSubjectExport,
+		r.deps.Interpretation.DelegatedSubjectVerifier,
+	))
+	log.Info("   🤖 participant AI explanation service registered")
+	return nil
+}
+
 func (r *Registry) registerAssessmentModelCatalogService() error {
 	if r.deps.AssessmentModelCatalog.QueryService == nil {
 		log.Warn("AssessmentModelCatalog is not initialized, skipping published catalogue service registration")
@@ -294,6 +335,12 @@ func (r *Registry) GetRegisteredServices() []string {
 	}
 	if r.deps.Plan.CommandService != nil {
 		services = append(services, "PlanCommandService")
+	}
+	if r.deps.Interpretation.AIExplanationExecutor != nil || r.deps.Interpretation.AIExplanationEvaluation != nil {
+		services = append(services, "AIExplanationAutomationService")
+	}
+	if r.deps.Interpretation.AIExplanationParticipant != nil && r.deps.Interpretation.DelegatedSubjectVerifier != nil && r.deps.Interpretation.DelegatedSubjectVerifier.Enabled() {
+		services = append(services, "ParticipantAIExplanationService")
 	}
 
 	return services

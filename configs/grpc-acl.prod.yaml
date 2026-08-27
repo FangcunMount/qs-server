@@ -25,6 +25,10 @@ services:
       - /evaluation.TesteeEvaluationService/GetHighRiskFactors
       - /evaluation.AssessmentIntakeService/ResolveAssessmentByAnswerSheetID
       - /interpretation.ParticipantReportService/GetAssessmentReport
+      - /interpretation.ParticipantAIExplanationService/GetAIExplanationCapability
+      - /interpretation.ParticipantAIExplanationService/RequestAIExplanation
+      - /interpretation.ParticipantAIExplanationService/GetAIExplanation
+      - /interpretation.ParticipantAIExplanationService/ExportAIExplanations
       - /actor.ActorService/CreateTestee
       - /actor.ActorService/GetTestee
       - /actor.ActorService/UpdateTestee
@@ -44,6 +48,8 @@ services:
       - /evaluation.AssessmentIntakeService/EnsureAssessment
       - /evaluation.EvaluationWorkerService/ExecuteEvaluation
       - /interpretation.InterpretationAutomationService/GenerateReportFromOutcome
+      - /interpretation.AIExplanationAutomationService/ExecuteAIExplanation
+      - /interpretation.AIExplanationAutomationService/ExecutePromptEvaluationStep
       - /internalapi.InternalService/SyncAssessmentAttention
       - /internalapi.InternalService/HandleQuestionnairePublishedPostActions
       - /internalapi.InternalService/HandleScalePublishedPostActions

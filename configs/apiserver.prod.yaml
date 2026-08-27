@@ -121,6 +121,47 @@ delegated-subject:
   previous-key: ""
   ttl: 5m
 
+# 手动触发的 AI 解读独立于标准报告链路，默认关闭。
+# 启用前必须发布 Profile 并完成真实模型评测；API key 使用 Provider 对应的环境变量注入。
+ai_explanation:
+  enabled: false
+  provider: "deepseek"
+  model: "deepseek-v4-flash"
+  route_revision: "v1"
+  endpoint: ""
+  api_key: ""
+  timeout: 60s
+  run_lease_duration: 2m
+  max_output_tokens: 3000
+  max_response_bytes: 4194304
+  # 不提供法务/产品默认值；启用前必须填写已批准的策略版本和三类保留期。
+  data_lifecycle:
+    policy_version: ""
+    participant_record_retention: 0s
+    prompt_evaluation_retention: 0s
+    capacity_ledger_retention: 0s
+  # 首次语义 Generation 按 UTC 日同时预留机构/用户/Assessment 三层各 1 次调用；精确复用不重复扣减。
+  # 上线前必须结合价格、目标机构规模和灰度结果重新确认；仓库值不是生产验收证据。
+  participant_capacity:
+    daily_provider_invocation_budget_per_org: 500
+    daily_provider_invocation_budget_per_user: 5
+    daily_provider_invocation_budget_per_assessment: 3
+    # Conservative disabled-by-default starting point; this is not production capacity evidence.
+    max_active_provider_executions_per_org: 10
+    max_active_provider_executions_per_user: 2
+    max_active_provider_executions_per_assessment: 1
+  # Operator-only synthetic release evaluation; never enable without an independent judged release plan.
+  evaluation:
+    enabled: false
+    model: ""
+    route_revision: "v1"
+    timeout: 60s
+    max_output_tokens: 2500
+    # v1 每次启动按 UTC 日保守预留完整 70 次调用；取消/失败不退款。
+    capacity:
+      max_active_runs_per_org: 1
+      daily_provider_invocation_budget_per_org: 140
+
 # ============================================================================
 # 3. 数据存储配置
 # ============================================================================
@@ -302,6 +343,22 @@ interpretation_lease_recovery:
   interval: "10s"
   batch_limit: 100
   lock_key: "qs:interpretation-lease-recovery:leader"
+  lock_ttl: "30s"
+
+# AI 解读与独立语义评测启用并完成真实环境验收后再开启。
+ai_explanation_prompt_evaluation_lease_recovery:
+  enable: false
+  interval: "10s"
+  batch_limit: 20
+  lock_key: "qs:ai-explanation-prompt-evaluation-lease-recovery:leader"
+  lock_ttl: "30s"
+
+# AI 解读真实环境故障演练完成后再开启；不会自动创建 retry attempt。
+ai_explanation_participant_lease_recovery:
+  enable: false
+  interval: "10s"
+  batch_limit: 100
+  lock_key: "qs:ai-explanation-participant-lease-recovery:leader"
   lock_ttl: "30s"
 
 report_catalog_audit:

@@ -104,6 +104,54 @@ events:
     description: "Interpretation 自动或人工重试已获授权"
     handler: interpretation_retry_requested_handler
 
+  interpretation.ai_explanation.requested:
+    topic: assessment-lifecycle
+    delivery: durable_outbox
+    aggregate: AIExplanationGeneration
+    domain: interpretation/aiexplanation
+    description: "参与者已手动请求一次 AI 解读，等待异步执行"
+    handler: ai_explanation_requested_handler
+
+  interpretation.ai_explanation.retry.requested:
+    topic: assessment-lifecycle
+    delivery: durable_outbox
+    aggregate: AIExplanationGeneration
+    domain: interpretation/aiexplanation
+    description: "AI 解读失败 attempt 的人工重试已获授权并完成调用预算预留"
+    handler: ai_explanation_requested_handler
+
+  interpretation.ai_explanation.lease_recovery.requested:
+    topic: assessment-lifecycle
+    delivery: durable_outbox
+    aggregate: AIExplanationGeneration
+    domain: interpretation/aiexplanation
+    description: "AI 解读同一 attempt 的过期执行租约已被确定性唤醒"
+    handler: ai_explanation_requested_handler
+
+  interpretation.ai_explanation.generated:
+    topic: assessment-lifecycle
+    delivery: durable_outbox
+    aggregate: AIExplanationGeneration
+    domain: interpretation/aiexplanation
+    description: "AI 解读 Artifact 已可靠提交（事件不携带解读正文）"
+    handler: ai_explanation_terminal_handler
+
+  interpretation.ai_explanation.failed:
+    topic: assessment-lifecycle
+    delivery: durable_outbox
+    aggregate: AIExplanationGeneration
+    domain: interpretation/aiexplanation
+    description: "AI 解读尝试失败（仅安全失败摘要）"
+    handler: ai_explanation_terminal_handler
+
+  interpretation.ai_explanation.prompt_evaluation.step_requested:
+    topic: assessment-lifecycle
+    delivery: durable_outbox
+    aggregate: AIExplanationPromptEvaluation
+    domain: interpretation/aiexplanation
+    description: "AI 解读 Prompt 评测的一个合成 attempt 已请求执行"
+    handler: ai_explanation_prompt_evaluation_step_handler
+
   task.opened:
     topic: task-lifecycle
     delivery: best_effort

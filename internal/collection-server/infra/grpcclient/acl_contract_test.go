@@ -22,8 +22,8 @@ func TestCollectionServerACLContract(t *testing.T) {
 	t.Parallel()
 
 	allowed := ACLAllowedMethods()
-	if len(allowed) != 25 {
-		t.Fatalf("ACLAllowedMethods() count = %d, want 25", len(allowed))
+	if len(allowed) != 29 {
+		t.Fatalf("ACLAllowedMethods() count = %d, want 29", len(allowed))
 	}
 	assertUniqueMethods(t, allowed)
 	assertExactMethods(t, allowed, discoverOutboundRPCMethods(t))
@@ -69,13 +69,14 @@ func discoverOutboundRPCMethods(t *testing.T) []string {
 	t.Helper()
 
 	servicePrefixByClientType := map[string]string{
-		"ActorServiceClient":                  "/actor.ActorService/",
-		"AnswerSheetServiceClient":            "/answersheet.AnswerSheetService/",
-		"AssessmentIntakeServiceClient":       "/evaluation.AssessmentIntakeService/",
-		"AssessmentModelCatalogServiceClient": "/assessmentmodel.AssessmentModelCatalogService/",
-		"ParticipantReportServiceClient":      "/interpretation.ParticipantReportService/",
-		"QuestionnaireServiceClient":          "/questionnaire.QuestionnaireService/",
-		"TesteeEvaluationServiceClient":       "/evaluation.TesteeEvaluationService/",
+		"ActorServiceClient":                    "/actor.ActorService/",
+		"AnswerSheetServiceClient":              "/answersheet.AnswerSheetService/",
+		"AssessmentIntakeServiceClient":         "/evaluation.AssessmentIntakeService/",
+		"AssessmentModelCatalogServiceClient":   "/assessmentmodel.AssessmentModelCatalogService/",
+		"ParticipantReportServiceClient":        "/interpretation.ParticipantReportService/",
+		"ParticipantAIExplanationServiceClient": "/interpretation.ParticipantAIExplanationService/",
+		"QuestionnaireServiceClient":            "/questionnaire.QuestionnaireService/",
+		"TesteeEvaluationServiceClient":         "/evaluation.TesteeEvaluationService/",
 	}
 
 	_, currentFile, _, ok := runtime.Caller(0)
@@ -86,7 +87,7 @@ func discoverOutboundRPCMethods(t *testing.T) []string {
 	parsedFiles := parseNonTestGoFiles(t, packageDir)
 	serviceByStructField := discoverGeneratedClientFields(t, parsedFiles, servicePrefixByClientType)
 
-	methodSet := make(map[string]struct{}, 25)
+	methodSet := make(map[string]struct{}, 29)
 	for _, parsed := range parsedFiles {
 		for _, declaration := range parsed.Decls {
 			function, ok := declaration.(*ast.FuncDecl)

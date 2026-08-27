@@ -146,14 +146,21 @@ func TestOptionsValidateEvaluationConsistencyAudit(t *testing.T) {
 }
 
 func TestOptionsValidateLeaseRecoveryCadence(t *testing.T) {
-	for _, name := range []string{"evaluation_lease_recovery", "interpretation_lease_recovery"} {
+	for _, name := range []string{"evaluation_lease_recovery", "interpretation_lease_recovery", "ai_explanation_prompt_evaluation_lease_recovery", "ai_explanation_participant_lease_recovery"} {
 		t.Run(name, func(t *testing.T) {
 			opts := NewOptions()
 			var target *LeaseRecoveryOptions
-			if name == "evaluation_lease_recovery" {
+			switch name {
+			case "evaluation_lease_recovery":
 				target = opts.EvaluationLeaseRecovery
-			} else {
+			case "interpretation_lease_recovery":
 				target = opts.InterpretationLeaseRecovery
+			case "ai_explanation_prompt_evaluation_lease_recovery":
+				target = opts.AIExplanationPromptEvaluationLeaseRecovery
+				target.Enable = true
+			default:
+				target = opts.AIExplanationParticipantLeaseRecovery
+				target.Enable = true
 			}
 			target.Interval = 31 * time.Second
 			errs := opts.Validate()
@@ -165,6 +172,32 @@ func TestOptionsValidateLeaseRecoveryCadence(t *testing.T) {
 			t.Fatalf("expected %s interval validation error, got %v", name, errs)
 		})
 	}
+}
+
+func TestOptionsValidateAIExplanationPromptEvaluationLeaseRecoveryDependency(t *testing.T) {
+	opts := NewOptions()
+	opts.AIExplanationPromptEvaluationLeaseRecovery.Enable = true
+
+	errs := opts.Validate()
+	for _, err := range errs {
+		if strings.Contains(err.Error(), "ai_explanation_prompt_evaluation_lease_recovery requires ai_explanation.enabled and ai_explanation.evaluation.enabled") {
+			return
+		}
+	}
+	t.Fatalf("expected AI explanation evaluation recovery dependency validation error, got %v", errs)
+}
+
+func TestOptionsValidateAIExplanationParticipantLeaseRecoveryDependency(t *testing.T) {
+	opts := NewOptions()
+	opts.AIExplanationParticipantLeaseRecovery.Enable = true
+
+	errs := opts.Validate()
+	for _, err := range errs {
+		if strings.Contains(err.Error(), "ai_explanation_participant_lease_recovery requires ai_explanation.enabled") {
+			return
+		}
+	}
+	t.Fatalf("expected AI explanation participant recovery dependency validation error, got %v", errs)
 }
 
 func TestOptionsValidateEvaluationMaintenanceLockIsolation(t *testing.T) {

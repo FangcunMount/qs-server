@@ -30,6 +30,10 @@ func ACLAllowedMethods() []string {
 		evaluationpb.AssessmentIntakeService_ResolveAssessmentByAnswerSheetID_FullMethodName,
 
 		interpretationpb.ParticipantReportService_GetAssessmentReport_FullMethodName,
+		interpretationpb.ParticipantAIExplanationService_GetAIExplanationCapability_FullMethodName,
+		interpretationpb.ParticipantAIExplanationService_RequestAIExplanation_FullMethodName,
+		interpretationpb.ParticipantAIExplanationService_GetAIExplanation_FullMethodName,
+		interpretationpb.ParticipantAIExplanationService_ExportAIExplanations_FullMethodName,
 
 		actorpb.ActorService_CreateTestee_FullMethodName,
 		actorpb.ActorService_GetTestee_FullMethodName,

@@ -145,6 +145,19 @@ func TestValidateRejectsInvalidEnabledSubmitDegradedLocalBudget(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsInvalidAIExplanationRequestBudget(t *testing.T) {
+	opts := NewOptions()
+	opts.RateLimit.AIExplanationRequestUserQPS = 0
+	if !containsCollectionValidationError(opts.Validate(), "rate_limit.ai_explanation_request_user_* must be greater than 0") {
+		t.Fatalf("Validate() errors = %v", opts.Validate())
+	}
+
+	opts.RateLimit.AIExplanationRequestUserQPS = 0.2
+	if containsCollectionValidationError(opts.Validate(), "rate_limit.ai_explanation_request") {
+		t.Fatalf("valid AI explanation request budget errors = %v", opts.Validate())
+	}
+}
+
 func TestValidateRejectsSubmitCoalescingWaitThatConsumesAcceptDeadline(t *testing.T) {
 	opts := NewOptions()
 	opts.Submit.CoalescingWaitMs = opts.Submit.AcceptTimeoutMs

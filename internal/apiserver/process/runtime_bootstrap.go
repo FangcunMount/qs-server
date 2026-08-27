@@ -114,6 +114,18 @@ func buildSchedulerManager(cfg *config.Config, deps container.ServerRuntimeDeps)
 			deps.LockManager,
 			deps.LockBuilder,
 		),
+		runtimescheduler.NewAIExplanationPromptEvaluationLeaseRecoveryRunner(
+			cfg.AIExplanationPromptEvaluationLeaseRecovery,
+			deps.AIExplanationPromptEvaluationLeaseRecoverer,
+			deps.LockManager,
+			deps.LockBuilder,
+		),
+		runtimescheduler.NewAIExplanationParticipantLeaseRecoveryRunner(
+			cfg.AIExplanationParticipantLeaseRecovery,
+			deps.AIExplanationParticipantLeaseRecoverer,
+			deps.LockManager,
+			deps.LockBuilder,
+		),
 		runtimescheduler.NewReportCatalogAuditRunner(
 			cfg.ReportCatalogAudit,
 			deps.ReportCatalogAuditService,

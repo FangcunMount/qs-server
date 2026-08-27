@@ -30,6 +30,15 @@ func NewRegistry() *Registry {
 		"interpretation_retry_requested_handler": func(deps *Dependencies) HandlerFunc {
 			return handleInterpretationRetryRequested(deps)
 		},
+		"ai_explanation_requested_handler": func(deps *Dependencies) HandlerFunc {
+			return handleAIExplanationRequested(deps)
+		},
+		"ai_explanation_terminal_handler": func(deps *Dependencies) HandlerFunc {
+			return handleAIExplanationTerminal(deps)
+		},
+		"ai_explanation_prompt_evaluation_step_handler": func(deps *Dependencies) HandlerFunc {
+			return handleAIExplanationPromptEvaluationStep(deps)
+		},
 		"assessment_model_changed_handler": func(deps *Dependencies) HandlerFunc {
 			return handleAssessmentModelChanged(deps)
 		},
