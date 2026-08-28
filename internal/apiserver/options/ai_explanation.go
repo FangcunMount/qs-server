@@ -31,6 +31,7 @@ type AIExplanationOptions struct {
 	Timeout             time.Duration                           `json:"timeout" mapstructure:"timeout"`
 	RunLeaseDuration    time.Duration                           `json:"run_lease_duration" mapstructure:"run_lease_duration"`
 	MaxOutputTokens     int                                     `json:"max_output_tokens" mapstructure:"max_output_tokens"`
+	ReasoningEffort     string                                  `json:"reasoning_effort,omitempty" mapstructure:"reasoning_effort"`
 	MaxResponseBytes    int64                                   `json:"max_response_bytes" mapstructure:"max_response_bytes"`
 	DataLifecycle       AIExplanationDataLifecycleOptions       `json:"data_lifecycle" mapstructure:"data_lifecycle"`
 	ParticipantCapacity AIExplanationParticipantCapacityOptions `json:"participant_capacity" mapstructure:"participant_capacity"`
@@ -71,6 +72,7 @@ type AIExplanationEvaluationOptions struct {
 	Timeout              time.Duration                          `json:"timeout" mapstructure:"timeout"`
 	AttemptLeaseDuration time.Duration                          `json:"attempt_lease_duration" mapstructure:"attempt_lease_duration"`
 	MaxOutputTokens      int                                    `json:"max_output_tokens" mapstructure:"max_output_tokens"`
+	ReasoningEffort      string                                 `json:"reasoning_effort,omitempty" mapstructure:"reasoning_effort"`
 	Capacity             AIExplanationEvaluationCapacityOptions `json:"capacity" mapstructure:"capacity"`
 }
 
@@ -151,6 +153,9 @@ func (o *AIExplanationOptions) Validate() []error {
 	if o.MaxOutputTokens < 1 {
 		errs = append(errs, fmt.Errorf("ai_explanation.max_output_tokens must be positive"))
 	}
+	if !validAIExplanationReasoningEffort(o.ReasoningEffort) {
+		errs = append(errs, fmt.Errorf("ai_explanation.reasoning_effort is invalid"))
+	}
 	if o.MaxResponseBytes < 1 {
 		errs = append(errs, fmt.Errorf("ai_explanation.max_response_bytes must be positive"))
 	}
@@ -197,6 +202,9 @@ func (o *AIExplanationOptions) Validate() []error {
 		if o.Evaluation.MaxOutputTokens < 1 {
 			errs = append(errs, fmt.Errorf("ai_explanation.evaluation.max_output_tokens must be positive"))
 		}
+		if !validAIExplanationReasoningEffort(o.Evaluation.ReasoningEffort) {
+			errs = append(errs, fmt.Errorf("ai_explanation.evaluation.reasoning_effort is invalid"))
+		}
 		if o.Evaluation.Capacity.MaxActiveRunsPerOrg != 1 {
 			errs = append(errs, fmt.Errorf("ai_explanation.evaluation.capacity.max_active_runs_per_org must equal 1 in v1"))
 		}
@@ -205,6 +213,15 @@ func (o *AIExplanationOptions) Validate() []error {
 		}
 	}
 	return errs
+}
+
+func validAIExplanationReasoningEffort(value string) bool {
+	switch strings.TrimSpace(value) {
+	case "", "none", "minimal", "low", "medium", "high", "xhigh", "max":
+		return true
+	default:
+		return false
+	}
 }
 
 func (o AIExplanationDataLifecycleOptions) validate() []error {
@@ -237,6 +254,7 @@ func (o *AIExplanationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&o.Timeout, "ai_explanation.timeout", o.Timeout, "Deadline for the single provider call.")
 	fs.DurationVar(&o.RunLeaseDuration, "ai_explanation.run-lease-duration", o.RunLeaseDuration, "Durable ownership lease for one AI explanation run.")
 	fs.IntVar(&o.MaxOutputTokens, "ai_explanation.max-output-tokens", o.MaxOutputTokens, "Maximum total output tokens for one provider response.")
+	fs.StringVar(&o.ReasoningEffort, "ai_explanation.reasoning-effort", o.ReasoningEffort, "Optional Provider Responses API reasoning effort frozen into the route identity.")
 	fs.Int64Var(&o.MaxResponseBytes, "ai_explanation.max-response-bytes", o.MaxResponseBytes, "Maximum Provider response body size.")
 	fs.StringVar(&o.DataLifecycle.PolicyVersion, "ai_explanation.data-lifecycle.policy-version", o.DataLifecycle.PolicyVersion, "Approved AI explanation data lifecycle policy version.")
 	fs.DurationVar(&o.DataLifecycle.ParticipantRecordRetention, "ai_explanation.data-lifecycle.participant-record-retention", o.DataLifecycle.ParticipantRecordRetention, "Retention after participant AI explanation records reach a terminal state.")
@@ -254,6 +272,7 @@ func (o *AIExplanationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&o.Evaluation.Timeout, "ai_explanation.evaluation.timeout", o.Evaluation.Timeout, "Deadline for one semantic evaluator call.")
 	fs.DurationVar(&o.Evaluation.AttemptLeaseDuration, "ai_explanation.evaluation.attempt-lease-duration", o.Evaluation.AttemptLeaseDuration, "Durable ownership lease for one generation and semantic evaluation attempt.")
 	fs.IntVar(&o.Evaluation.MaxOutputTokens, "ai_explanation.evaluation.max-output-tokens", o.Evaluation.MaxOutputTokens, "Maximum output tokens for one semantic evaluator response.")
+	fs.StringVar(&o.Evaluation.ReasoningEffort, "ai_explanation.evaluation.reasoning-effort", o.Evaluation.ReasoningEffort, "Optional semantic evaluator reasoning effort frozen into the route identity.")
 	fs.IntVar(&o.Evaluation.Capacity.MaxActiveRunsPerOrg, "ai_explanation.evaluation.capacity.max-active-runs-per-org", o.Evaluation.Capacity.MaxActiveRunsPerOrg, "Maximum collecting Prompt evaluation runs per organization; v1 requires exactly one.")
 	fs.IntVar(&o.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg, "ai_explanation.evaluation.capacity.daily-provider-invocation-budget-per-org", o.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg, "UTC-day Provider invocation reservation budget per organization.")
 }

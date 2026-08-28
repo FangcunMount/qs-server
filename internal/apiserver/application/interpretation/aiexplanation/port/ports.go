@@ -61,6 +61,7 @@ type ProviderRoute struct {
 	Capabilities    ProviderCapabilities
 	Timeout         time.Duration
 	MaxOutputTokens int
+	ReasoningEffort string
 }
 
 func (r ProviderRoute) Validate() error {
@@ -73,7 +74,19 @@ func (r ProviderRoute) Validate() error {
 	if r.Timeout <= 0 || r.MaxOutputTokens <= 0 {
 		return fmt.Errorf("AI explanation provider timeout and output token limit are required")
 	}
+	if !validReasoningEffort(r.ReasoningEffort) {
+		return fmt.Errorf("AI explanation provider reasoning effort is invalid")
+	}
 	return nil
+}
+
+func validReasoningEffort(value string) bool {
+	switch strings.TrimSpace(value) {
+	case "", "none", "minimal", "low", "medium", "high", "xhigh", "max":
+		return true
+	default:
+		return false
+	}
 }
 
 type ProviderRouteResolver interface {

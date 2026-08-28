@@ -25,6 +25,9 @@ func TestCatalogResolvesFrozenNonSecretRoute(t *testing.T) {
 	if route.ExecutionSpec.Route != config.Route || route.ExecutionSpec.ResolvedProvider != config.Provider || route.ExecutionSpec.ResolvedModel != config.Model {
 		t.Fatalf("resolved route = %#v", route)
 	}
+	if route.ReasoningEffort != config.ReasoningEffort {
+		t.Fatalf("resolved reasoning effort = %q, want %q", route.ReasoningEffort, config.ReasoningEffort)
+	}
 	if route.ExecutionSpec.Fingerprint.String() == "" || len(catalog.RouteNames()) != 1 {
 		t.Fatalf("route fingerprint/names = %s/%v", route.ExecutionSpec.Fingerprint, catalog.RouteNames())
 	}
@@ -49,6 +52,33 @@ func TestCatalogFingerprintChangesWithExecutionSemantics(t *testing.T) {
 	b, _ := second.ResolveProviderRoute(context.Background(), changed.Route)
 	if a.ExecutionSpec.Fingerprint == b.ExecutionSpec.Fingerprint {
 		t.Fatal("route fingerprint did not change with resolved model")
+	}
+
+	changedReasoning := validConfig()
+	changedReasoning.ReasoningEffort = "high"
+	third, err := NewCatalog([]Config{changedReasoning})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, _ := third.ResolveProviderRoute(context.Background(), changedReasoning.Route)
+	if a.ExecutionSpec.Fingerprint == c.ExecutionSpec.Fingerprint {
+		t.Fatal("route fingerprint did not change with reasoning effort")
+	}
+}
+
+func TestCatalogCanonicalizesReasoningEffortBeforeFreezingRoute(t *testing.T) {
+	config := validConfig()
+	config.ReasoningEffort = " low "
+	catalog, err := NewCatalog([]Config{config})
+	if err != nil {
+		t.Fatal(err)
+	}
+	route, err := catalog.ResolveProviderRoute(context.Background(), config.Route)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if route.ReasoningEffort != "low" {
+		t.Fatalf("canonical reasoning effort = %q, want low", route.ReasoningEffort)
 	}
 }
 
@@ -81,6 +111,7 @@ func TestCatalogRejectsUnsupportedOrDuplicateRoutes(t *testing.T) {
 func validConfig() Config {
 	return Config{
 		Route: "balanced_text_v1", Revision: "v1", Provider: "provider-a", Model: "model-a", Current: true,
-		Capabilities: appport.ProviderCapabilities{StructuredOutput: true}, Timeout: 45 * time.Second, MaxOutputTokens: 4096,
+		Capabilities: appport.ProviderCapabilities{StructuredOutput: true}, Timeout: 45 * time.Second,
+		MaxOutputTokens: 4096, ReasoningEffort: "low",
 	}
 }

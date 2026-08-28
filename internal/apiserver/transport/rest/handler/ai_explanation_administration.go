@@ -283,6 +283,7 @@ type AIExplanationDecodingWire struct {
 	Temperature     *float64 `json:"temperature,omitempty"`
 	TopP            *float64 `json:"top_p,omitempty"`
 	Seed            *int64   `json:"seed,omitempty"`
+	ReasoningEffort string   `json:"reasoning_effort,omitempty"`
 }
 
 type AIExplanationSemanticEvaluatorWire struct {
@@ -1111,7 +1112,10 @@ func providerSpecWire(value aiexplanation.ProviderExecutionSpec) AIExplanationPr
 }
 
 func decodingWire(value domainevaluation.DecodingParameters) AIExplanationDecodingWire {
-	return AIExplanationDecodingWire{MaxOutputTokens: value.MaxOutputTokens, Temperature: value.Temperature, TopP: value.TopP, Seed: value.Seed}
+	return AIExplanationDecodingWire{
+		MaxOutputTokens: value.MaxOutputTokens, Temperature: value.Temperature,
+		TopP: value.TopP, Seed: value.Seed, ReasoningEffort: value.ReasoningEffort,
+	}
 }
 
 func reviewProgressWire(value appevaluation.ReviewProgress) AIExplanationReviewProgressWire {

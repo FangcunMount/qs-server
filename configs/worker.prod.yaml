@@ -47,7 +47,7 @@ messaging:
   nsq-addr: "nsqd:4150"
   nsq-lookupd-addr: "nsqlookupd:4161"
   # 长于 AI gRPC deadline，避免 NSQ 在仍执行 Provider 调用时重复投递。
-  nsq-message-timeout: 6m
+  nsq-message-timeout: 9m
   rabbitmq-url: "amqp://guest:guest@127.0.0.1:5672/"
   delivery:
     enable: true
@@ -69,7 +69,7 @@ retry_governance:
 grpc:
   apiserver-addr: "qs-apiserver:9090"  # Docker 容器服务名
   request-timeout: 30s
-  ai-explanation-timeout: 5m  # 覆盖 120s 生成、120s 独立裁判及服务端收尾时间
+  ai-explanation-timeout: 7m  # 覆盖 120s 生成、180s 独立裁判及服务端提交余量
   insecure: false
   tls-ca-file: "/etc/qs-server/ssl/grpc/ca/ca-chain.crt"
   tls-cert-file: "/etc/qs-server/ssl/grpc/server/qs-worker.crt"

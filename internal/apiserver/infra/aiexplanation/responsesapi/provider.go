@@ -106,8 +106,13 @@ type responseRequest struct {
 	Instructions    string            `json:"instructions"`
 	Input           []inputMessage    `json:"input"`
 	Text            textConfiguration `json:"text"`
+	Reasoning       *reasoningConfig  `json:"reasoning,omitempty"`
 	MaxOutputTokens int               `json:"max_output_tokens"`
 	Store           *bool             `json:"store,omitempty"`
+}
+
+type reasoningConfig struct {
+	Effort string `json:"effort"`
 }
 
 type inputMessage struct {
@@ -161,8 +166,13 @@ type outputContent struct {
 }
 
 type responseUsage struct {
-	InputTokens  int64 `json:"input_tokens"`
-	OutputTokens int64 `json:"output_tokens"`
+	InputTokens         int64                `json:"input_tokens"`
+	OutputTokens        int64                `json:"output_tokens"`
+	OutputTokensDetails *outputTokensDetails `json:"output_tokens_details"`
+}
+
+type outputTokensDetails struct {
+	ReasoningTokens int64 `json:"reasoning_tokens"`
 }
 
 func (p *Provider) Generate(ctx context.Context, request appport.ProviderRequest) (response *appport.ProviderResponse, resultErr error) {
@@ -187,6 +197,7 @@ func (p *Provider) Generate(ctx context.Context, request appport.ProviderRequest
 			Type: "json_schema", Name: normalizedSchemaName(request.OutputSchema.Name), Strict: p.strictSchemaFlag(),
 			Schema: json.RawMessage(request.OutputSchema.JSON),
 		}},
+		Reasoning:       reasoningForRoute(request.Route.ReasoningEffort),
 		MaxOutputTokens: request.Route.MaxOutputTokens, Store: p.storeFlag(),
 	})
 	if err != nil {
@@ -237,7 +248,8 @@ func (p *Provider) Generate(ctx context.Context, request appport.ProviderRequest
 	if decoded.Usage != nil {
 		usage = *decoded.Usage
 	}
-	if usage.InputTokens < 0 || usage.OutputTokens < 0 {
+	if usage.InputTokens < 0 || usage.OutputTokens < 0 ||
+		(usage.OutputTokensDetails != nil && (usage.OutputTokensDetails.ReasoningTokens < 0 || usage.OutputTokensDetails.ReasoningTokens > usage.OutputTokens)) {
 		return nil, providerError(domainrun.FailureKindProviderTransport, "provider_usage_invalid", false, false, nil)
 	}
 	return &appport.ProviderResponse{
@@ -247,6 +259,14 @@ func (p *Provider) Generate(ctx context.Context, request appport.ProviderRequest
 			Model: decoded.Model, InputTokens: usage.InputTokens, OutputTokens: usage.OutputTokens, Latency: latency,
 		},
 	}, nil
+}
+
+func reasoningForRoute(effort string) *reasoningConfig {
+	effort = strings.TrimSpace(effort)
+	if effort == "" {
+		return nil
+	}
+	return &reasoningConfig{Effort: effort}
 }
 
 func (p *Provider) validateProviderRequest(request appport.ProviderRequest) error {

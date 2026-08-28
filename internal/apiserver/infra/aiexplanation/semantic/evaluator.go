@@ -69,7 +69,9 @@ func NewEvaluator(provider appport.Provider, route appport.ProviderRoute) (*Eval
 		},
 		OutputSchema: domainevaluation.SchemaRef{Version: schema.Version, Fingerprint: schema.Fingerprint},
 		Provider:     route.ExecutionSpec,
-		Decoding:     domainevaluation.DecodingParameters{MaxOutputTokens: route.MaxOutputTokens},
+		Decoding: domainevaluation.DecodingParameters{
+			MaxOutputTokens: route.MaxOutputTokens, ReasoningEffort: route.ReasoningEffort,
+		},
 	}
 	if err := identity.Validate(); err != nil {
 		return nil, err

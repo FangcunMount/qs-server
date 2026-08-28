@@ -470,9 +470,11 @@ func (r *OnlineRunner) prepare(
 		InputSchema: domainevaluation.SchemaRef{
 			Version: suite.Contracts.InputSchema, Fingerprint: aiexplanation.NewFingerprint(interpretationschema.AIExplanationInputV1()),
 		},
-		OutputSchema:      domainevaluation.SchemaRef{Version: outputSchema.Version, Fingerprint: outputSchema.Fingerprint},
-		Provider:          route.ExecutionSpec,
-		Decoding:          domainevaluation.DecodingParameters{MaxOutputTokens: route.MaxOutputTokens},
+		OutputSchema: domainevaluation.SchemaRef{Version: outputSchema.Version, Fingerprint: outputSchema.Fingerprint},
+		Provider:     route.ExecutionSpec,
+		Decoding: domainevaluation.DecodingParameters{
+			MaxOutputTokens: route.MaxOutputTokens, ReasoningEffort: route.ReasoningEffort,
+		},
 		SemanticEvaluator: semanticEvaluator,
 		GenerationCaseIDs: caseIDs, PreflightCaseID: preflightCase.CaseID,
 		PreflightRejectionReason: preflightReason, RepetitionsPerCase: suite.ExecutionPolicy.GenerationRepetitionsPerCase,

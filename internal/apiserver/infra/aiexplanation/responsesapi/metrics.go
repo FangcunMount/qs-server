@@ -79,6 +79,9 @@ func observeDecodedProviderResponse(schemaVersion string, response responsesAPIR
 	}
 	providerResponseTokensTotal.WithLabelValues(purpose, status, "input").Add(float64(response.Usage.InputTokens))
 	providerResponseTokensTotal.WithLabelValues(purpose, status, "output").Add(float64(response.Usage.OutputTokens))
+	if details := response.Usage.OutputTokensDetails; details != nil && details.ReasoningTokens >= 0 && details.ReasoningTokens <= response.Usage.OutputTokens {
+		providerResponseTokensTotal.WithLabelValues(purpose, status, "reasoning").Add(float64(details.ReasoningTokens))
+	}
 }
 
 func providerMetricResponseStatus(response responsesAPIResponse) string {

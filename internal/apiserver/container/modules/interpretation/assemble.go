@@ -282,7 +282,7 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 		Route: apiserveroptions.DefaultAIExplanationProviderRoute, Revision: config.RouteRevision,
 		Provider: config.Provider, Model: config.Model, Current: true,
 		Capabilities: appport.ProviderCapabilities{StructuredOutput: true},
-		Timeout:      config.Timeout, MaxOutputTokens: config.MaxOutputTokens,
+		Timeout:      config.Timeout, MaxOutputTokens: config.MaxOutputTokens, ReasoningEffort: config.ReasoningEffort,
 	}}
 	if config.Evaluation.Enabled {
 		routeConfigs = append(routeConfigs, aiexplanationprovider.Config{
@@ -290,6 +290,7 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 			Provider: config.Provider, Model: config.Evaluation.Model, Current: true,
 			Capabilities: appport.ProviderCapabilities{StructuredOutput: true},
 			Timeout:      config.Evaluation.Timeout, MaxOutputTokens: config.Evaluation.MaxOutputTokens,
+			ReasoningEffort: config.Evaluation.ReasoningEffort,
 		})
 	}
 	routeCatalog, err := aiexplanationprovider.NewCatalog(routeConfigs)

@@ -143,6 +143,7 @@ type DecodingParameters struct {
 	Temperature     *float64
 	TopP            *float64
 	Seed            *int64
+	ReasoningEffort string
 }
 
 // SemanticEvaluatorSpec freezes the independent model-judge release used to
@@ -182,6 +183,11 @@ func (p DecodingParameters) Validate() error {
 	}
 	if p.TopP != nil && (*p.TopP <= 0 || *p.TopP > 1) {
 		return fmt.Errorf("AI explanation evaluation top-p is invalid")
+	}
+	switch strings.TrimSpace(p.ReasoningEffort) {
+	case "", "none", "minimal", "low", "medium", "high", "xhigh", "max":
+	default:
+		return fmt.Errorf("AI explanation evaluation reasoning effort is invalid")
 	}
 	return nil
 }
