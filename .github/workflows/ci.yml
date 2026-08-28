@@ -312,6 +312,9 @@ jobs:
       - name: Validate worker governance convergence gate
         run: bash scripts/cd/test-verify-worker-governance.sh
 
+      - name: Validate public observability convergence gate
+        run: bash scripts/cd/test-verify-observability-nginx.sh
+
       - name: Validate Attention reconcile dry-run/apply audit contract
         run: bash scripts/cd/test-attention-reconcile-audit.sh
 

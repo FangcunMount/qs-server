@@ -12,6 +12,8 @@ PUBLIC_WORKER_READY_URL="${PUBLIC_WORKER_READY_URL:-https://worker.fangcunmount.
 PUBLIC_NSQD_STATS_URL="${PUBLIC_NSQD_STATS_URL:-https://nsqd.fangcunmount.cn/stats}"
 EXPECTED_COLLECTION_REPLICAS="${EXPECTED_COLLECTION_REPLICAS:-2}"
 EXPECTED_WORKER_REPLICAS="${EXPECTED_WORKER_REPLICAS:-3}"
+READY_PROBE_ATTEMPTS="${READY_PROBE_ATTEMPTS:-12}"
+READY_PROBE_INTERVAL_SECONDS="${READY_PROBE_INTERVAL_SECONDS:-5}"
 VERIFY_PUBLIC_ROUTES="${VERIFY_PUBLIC_ROUTES:-true}"
 PRIVILEGE_RUNNER="${PRIVILEGE_RUNNER:-sudo}"
 
@@ -24,6 +26,28 @@ require_privilege_runner() {
     echo "Privilege runner is unavailable: $PRIVILEGE_RUNNER" >&2
     return 1
   fi
+}
+
+require_positive_integer() {
+  local name="$1"
+  local value="$2"
+  case "$value" in
+    ''|*[!0-9]*|0)
+      echo "$name must be a positive integer, got: $value" >&2
+      return 1
+      ;;
+  esac
+}
+
+require_nonnegative_integer() {
+  local name="$1"
+  local value="$2"
+  case "$value" in
+    ''|*[!0-9]*)
+      echo "$name must be a non-negative integer, got: $value" >&2
+      return 1
+      ;;
+  esac
 }
 
 preflight() {
@@ -89,7 +113,7 @@ probe_url() {
   rm -f "$body"
 }
 
-probe_ready_replicas() {
+probe_ready_replicas_once() {
   local url="$1"
   local host="$2"
   local expected="$3"
@@ -112,6 +136,27 @@ probe_ready_replicas() {
   fi
 }
 
+probe_ready_replicas() {
+  local url="$1"
+  local host="$2"
+  local expected="$3"
+  local attempt
+  for attempt in $(seq 1 "$READY_PROBE_ATTEMPTS"); do
+    if probe_ready_replicas_once "$url" "$host" "$expected"; then
+      if [ "$attempt" -gt 1 ]; then
+        echo "Observability probe ${url} converged after ${attempt}/${READY_PROBE_ATTEMPTS} attempts"
+      fi
+      return 0
+    fi
+    if [ "$attempt" -lt "$READY_PROBE_ATTEMPTS" ]; then
+      echo "Observability probe ${url} not converged, retrying (${attempt}/${READY_PROBE_ATTEMPTS})" >&2
+      sleep "$READY_PROBE_INTERVAL_SECONDS"
+    fi
+  done
+  echo "Observability probe ${url} did not converge after ${READY_PROBE_ATTEMPTS} attempts" >&2
+  return 1
+}
+
 verify_public_routes() {
   case "$EXPECTED_COLLECTION_REPLICAS:$EXPECTED_WORKER_REPLICAS" in
     *[!0-9:]*|0:*|*:0|:*|*:)
@@ -119,6 +164,8 @@ verify_public_routes() {
       return 1
       ;;
   esac
+  require_positive_integer READY_PROBE_ATTEMPTS "$READY_PROBE_ATTEMPTS"
+  require_nonnegative_integer READY_PROBE_INTERVAL_SECONDS "$READY_PROBE_INTERVAL_SECONDS"
   probe_url "$PUBLIC_COLLECTION_METRICS_URL" collect.fangcunmount.cn 'qs_runtime_component_ready'
   probe_ready_replicas "$PUBLIC_COLLECTION_READY_URL" collect.fangcunmount.cn "$EXPECTED_COLLECTION_REPLICAS"
   probe_url "$PUBLIC_WORKER_METRICS_URL" worker.fangcunmount.cn 'qs_runtime_component_ready'
