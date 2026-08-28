@@ -123,6 +123,52 @@ func TestDeepSeekProviderUsesResponsesSchemaWithoutOpenAIStrictExtension(t *test
 	}
 }
 
+func TestDeepSeekProviderConcatenatesOneMessageOutputTextParts(t *testing.T) {
+	provider := providerForProviderResponse(t, ProviderDeepSeek, http.StatusOK, `{
+      "id":"ds_resp_parts","status":"completed","model":"deepseek-v4-flash",
+      "output":[
+        {"type":"reasoning","content":[{"type":"reasoning_text","text":"not persisted"}]},
+        {"type":"message","content":[
+          {"type":"output_text","text":"{\"summary\":"},
+          {"type":"output_text","text":"\"ok\"}"}
+        ]}
+      ],
+      "usage":{"input_tokens":34,"output_tokens":13}
+    }`)
+
+	response, err := provider.Generate(context.Background(), validRequestForProvider(ProviderDeepSeek, "deepseek-v4-flash"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(response.RawOutput) != `{"summary":"ok"}` {
+		t.Fatalf("concatenated raw output = %q", response.RawOutput)
+	}
+}
+
+func TestProviderClassifiesDocumentedIncompleteReasons(t *testing.T) {
+	for _, testCase := range []struct {
+		name   string
+		reason string
+		kind   domainrun.FailureKind
+		code   string
+	}{
+		{name: "output token limit", reason: "max_output_tokens", kind: domainrun.FailureKindProviderTransport, code: "provider_output_token_limit"},
+		{name: "content filter", reason: "content_filter", kind: domainrun.FailureKindProviderRefusal, code: "provider_refusal"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			provider := providerForProviderResponse(t, ProviderDeepSeek, http.StatusOK, fmt.Sprintf(`{
+              "id":"ds_incomplete","status":"incomplete","model":"deepseek-v4-flash",
+              "incomplete_details":{"reason":%q},"output":[]
+            }`, testCase.reason))
+			_, err := provider.Generate(context.Background(), validRequestForProvider(ProviderDeepSeek, "deepseek-v4-flash"))
+			classified := requireProviderError(t, err)
+			if classified.Kind != testCase.kind || classified.Code != testCase.code || classified.Retryable || classified.ResultUnknown {
+				t.Fatalf("classified incomplete response = %#v", classified)
+			}
+		})
+	}
+}
+
 func TestProviderClassifiesRefusalWithoutReturningRawRefusal(t *testing.T) {
 	provider := providerForResponse(t, http.StatusOK, `{
       "id":"resp_refusal","status":"completed","model":"gpt-test-2026-01-01",

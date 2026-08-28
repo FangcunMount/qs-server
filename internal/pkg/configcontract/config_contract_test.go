@@ -76,6 +76,7 @@ func TestAPIServerDevProdConfigContracts(t *testing.T) {
 			assertStatisticsCacheContract(t, name, opts.Cache)
 			assertIAMJWKSURLContract(t, "apiserver", name, opts.IAMOptions)
 			assertAPIServerGRPCTrustContract(t, name, opts)
+			assertAIExplanationProductionLongCallContract(t, name, opts)
 			assertEventCatalogLoads(t)
 		})
 	}
@@ -235,6 +236,29 @@ func assertAPIServerGRPCTrustContract(t *testing.T, configName string, opts *api
 	assertExactGRPCACLConfig(t, opts.GRPCOptions.ACL.ConfigFile, data)
 }
 
+func assertAIExplanationProductionLongCallContract(t *testing.T, configName string, opts *apiserveroptions.Options) {
+	t.Helper()
+	if !strings.Contains(configName, ".prod.") {
+		return
+	}
+	if opts == nil || opts.AIExplanation == nil || !opts.AIExplanation.Enabled || !opts.AIExplanation.Evaluation.Enabled {
+		t.Fatalf("%s AI explanation governance and evaluation must be enabled", configName)
+	}
+	ai := opts.AIExplanation
+	if ai.Timeout < 2*time.Minute || ai.Evaluation.Timeout < 2*time.Minute {
+		t.Fatalf("%s AI provider timeouts = %s/%s, want at least 2m", configName, ai.Timeout, ai.Evaluation.Timeout)
+	}
+	if ai.MaxOutputTokens < 8000 || ai.Evaluation.MaxOutputTokens < 8000 {
+		t.Fatalf("%s AI output token limits = %d/%d, want at least 8000", configName, ai.MaxOutputTokens, ai.Evaluation.MaxOutputTokens)
+	}
+	if ai.RunLeaseDuration < ai.Timeout+ai.Evaluation.Timeout+30*time.Second {
+		t.Fatalf("%s AI run lease = %s, must cover both Provider stages", configName, ai.RunLeaseDuration)
+	}
+	if opts.GRPCOptions.MaxConnectionAge < time.Hour || opts.GRPCOptions.MaxConnectionAgeGrace < ai.RunLeaseDuration {
+		t.Fatalf("%s gRPC connection age/grace = %s/%s, must preserve an active AI run lease", configName, opts.GRPCOptions.MaxConnectionAge, opts.GRPCOptions.MaxConnectionAgeGrace)
+	}
+}
+
 func TestGRPCACLFilesMatchCanonicalClientContracts(t *testing.T) {
 	t.Parallel()
 
@@ -375,6 +399,9 @@ func TestWorkerDevProdConfigContracts(t *testing.T) {
 				t.Fatal("development attention projection reconcile must remain opt-in")
 			}
 			assertWorkerGRPCClientIdentityContract(t, name, opts.GRPC)
+			if name == "worker.prod.yaml" && opts.GRPC.AIExplanationTimeout < 5*time.Minute {
+				t.Fatalf("production worker AI explanation timeout = %s, want at least 5m", opts.GRPC.AIExplanationTimeout)
+			}
 			if workerEventConfigPath(cfg.Worker) != "configs/events.yaml" {
 				t.Fatalf("worker event config fallback = %q, want configs/events.yaml", workerEventConfigPath(cfg.Worker))
 			}

@@ -69,8 +69,9 @@ grpc:
   max-msg-size: 4194304  # 4MB
 
   # 连接管理
-  max-connection-age: 120s
-  max-connection-age-grace: 20s
+  # AI 评测 RPC 会串行执行生成与独立裁判；连接轮换不得中断活动长调用。
+  max-connection-age: 2h
+  max-connection-age-grace: 5m
 
   # mTLS 双向认证配置（QS 内部服务简化模式）
   # 说明：QS 三件套内部通信，通过 OU 白名单简化管理，无需维护 CN 白名单
@@ -132,9 +133,10 @@ ai_explanation:
   route_revision: "v1"
   endpoint: ""
   api_key: ""
-  timeout: 60s
-  run_lease_duration: 2m
-  max_output_tokens: 3000
+  timeout: 120s
+  run_lease_duration: 5m
+  # DeepSeek Responses API 的上限同时覆盖推理 token 与最终结构化输出。
+  max_output_tokens: 8000
   max_response_bytes: 4194304
   # 2026-08-27 已确认的生产保留策略：Participant 180 天、Prompt 评测 365 天、容量账本 35 天。
   # Go time.Duration 不支持 d，配置统一使用小时。
@@ -158,8 +160,8 @@ ai_explanation:
     enabled: true
     model: "deepseek-v4-pro"
     route_revision: "v1"
-    timeout: 60s
-    max_output_tokens: 2500
+    timeout: 120s
+    max_output_tokens: 8000
     # v1 每次启动按 UTC 日保守预留完整 70 次调用；取消/失败不退款。
     capacity:
       max_active_runs_per_org: 1
