@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	appport "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/port"
@@ -29,6 +30,7 @@ type Config struct {
 	Capabilities    appport.ProviderCapabilities
 	Timeout         time.Duration
 	MaxOutputTokens int
+	ReasoningEffort string
 }
 
 type Catalog struct {
@@ -88,6 +90,7 @@ func (c *Catalog) ResolveFrozenProviderRoute(_ context.Context, spec aiexplanati
 }
 
 func buildRoute(config Config) (appport.ProviderRoute, error) {
+	reasoningEffort := strings.TrimSpace(config.ReasoningEffort)
 	fingerprintDocument := struct {
 		Route                  string `json:"route"`
 		Revision               string `json:"revision"`
@@ -98,11 +101,12 @@ func buildRoute(config Config) (appport.ProviderRoute, error) {
 		RetrieveByInvocationID bool   `json:"retrieve_by_invocation_id"`
 		TimeoutMilliseconds    int64  `json:"timeout_milliseconds"`
 		MaxOutputTokens        int    `json:"max_output_tokens"`
+		ReasoningEffort        string `json:"reasoning_effort,omitempty"`
 	}{
 		Route: config.Route, Revision: config.Revision, Provider: config.Provider, Model: config.Model,
 		StructuredOutput: config.Capabilities.StructuredOutput, IdempotentRedispatch: config.Capabilities.IdempotentRedispatch,
 		RetrieveByInvocationID: config.Capabilities.RetrieveByInvocationID, TimeoutMilliseconds: config.Timeout.Milliseconds(),
-		MaxOutputTokens: config.MaxOutputTokens,
+		MaxOutputTokens: config.MaxOutputTokens, ReasoningEffort: reasoningEffort,
 	}
 	raw, err := json.Marshal(fingerprintDocument)
 	if err != nil {
@@ -114,6 +118,7 @@ func buildRoute(config Config) (appport.ProviderRoute, error) {
 			ResolvedModel: config.Model, Fingerprint: aiexplanation.NewFingerprint(raw),
 		},
 		Capabilities: config.Capabilities, Timeout: config.Timeout, MaxOutputTokens: config.MaxOutputTokens,
+		ReasoningEffort: reasoningEffort,
 	}
 	if err := resolved.Validate(); err != nil {
 		return appport.ProviderRoute{}, fmt.Errorf("%w: %v", ErrInvalidConfig, err)

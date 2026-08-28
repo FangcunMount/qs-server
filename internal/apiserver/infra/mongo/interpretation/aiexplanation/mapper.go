@@ -411,11 +411,17 @@ func schemaRefFromPO(value EvaluationSchemaRefPO) (domainevaluation.SchemaRef, e
 }
 
 func decodingToPO(value domainevaluation.DecodingParameters) EvaluationDecodingPO {
-	return EvaluationDecodingPO{MaxOutputTokens: value.MaxOutputTokens, Temperature: cloneFloatPtr(value.Temperature), TopP: cloneFloatPtr(value.TopP), Seed: cloneInt64Ptr(value.Seed)}
+	return EvaluationDecodingPO{
+		MaxOutputTokens: value.MaxOutputTokens, Temperature: cloneFloatPtr(value.Temperature),
+		TopP: cloneFloatPtr(value.TopP), Seed: cloneInt64Ptr(value.Seed), ReasoningEffort: value.ReasoningEffort,
+	}
 }
 
 func decodingFromPO(value EvaluationDecodingPO) domainevaluation.DecodingParameters {
-	return domainevaluation.DecodingParameters{MaxOutputTokens: value.MaxOutputTokens, Temperature: cloneFloatPtr(value.Temperature), TopP: cloneFloatPtr(value.TopP), Seed: cloneInt64Ptr(value.Seed)}
+	return domainevaluation.DecodingParameters{
+		MaxOutputTokens: value.MaxOutputTokens, Temperature: cloneFloatPtr(value.Temperature),
+		TopP: cloneFloatPtr(value.TopP), Seed: cloneInt64Ptr(value.Seed), ReasoningEffort: value.ReasoningEffort,
+	}
 }
 
 func semanticEvaluatorSpecToPO(value domainevaluation.SemanticEvaluatorSpec) EvaluationSemanticEvaluatorSpecPO {

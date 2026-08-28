@@ -128,6 +128,30 @@ func TestAIExplanationEvaluationAttemptLeaseCoversBothProviderStages(t *testing.
 	}
 }
 
+func TestAIExplanationRejectsUnknownReasoningEffort(t *testing.T) {
+	opts := NewAIExplanationOptions()
+	opts.Enabled = true
+	opts.APIKey = "provider-test-secret"
+	configureAIExplanationTestLifecycle(opts)
+	opts.ReasoningEffort = "extreme"
+	if joined := errorsText(opts.Validate()); !strings.Contains(joined, "reasoning_effort is invalid") {
+		t.Fatalf("generation reasoning validation errors = %v", opts.Validate())
+	}
+
+	opts.ReasoningEffort = "low"
+	opts.Evaluation.Enabled = true
+	opts.Evaluation.Model = "independent-judge-model-snapshot"
+	opts.Evaluation.ReasoningEffort = "extreme"
+	if joined := errorsText(opts.Validate()); !strings.Contains(joined, "evaluation.reasoning_effort is invalid") {
+		t.Fatalf("evaluation reasoning validation errors = %v", opts.Validate())
+	}
+
+	opts.Evaluation.ReasoningEffort = "none"
+	if errs := opts.Validate(); len(errs) != 0 {
+		t.Fatalf("valid reasoning efforts = %v", errs)
+	}
+}
+
 func TestAIExplanationEvaluationCapacityUsesFixedV1RunCeiling(t *testing.T) {
 	opts := NewAIExplanationOptions()
 	opts.Enabled = true

@@ -64,6 +64,9 @@ func TestProviderSendsOneStatelessStructuredResponsesRequest(t *testing.T) {
 	if _, exists := captured["metadata"]; exists {
 		t.Fatal("internal invocation identity must not be sent as metadata")
 	}
+	if _, exists := captured["reasoning"]; exists {
+		t.Fatal("unset reasoning effort must preserve the Provider default")
+	}
 	if strings.Contains(mustJSON(t, captured), request.InvocationID) {
 		t.Fatal("internal invocation identity leaked into provider body")
 	}
@@ -103,6 +106,7 @@ func TestDeepSeekProviderUsesResponsesSchemaWithoutOpenAIStrictExtension(t *test
 		Provider: ProviderDeepSeek, Endpoint: server.URL, APIKey: "test-deepseek-secret", HTTPClient: server.Client(),
 	})
 	request := validRequestForProvider(ProviderDeepSeek, "deepseek-v4-flash")
+	request.Route.ReasoningEffort = "low"
 	response, err := provider.Generate(context.Background(), request)
 	if err != nil {
 		t.Fatal(err)
@@ -120,6 +124,10 @@ func TestDeepSeekProviderUsesResponsesSchemaWithoutOpenAIStrictExtension(t *test
 	}
 	if _, exists := captured["store"]; exists {
 		t.Fatalf("DeepSeek request must omit the unsupported store parameter: %#v", captured)
+	}
+	reasoning := captured["reasoning"].(map[string]any)
+	if reasoning["effort"] != "low" {
+		t.Fatalf("DeepSeek reasoning config = %#v", reasoning)
 	}
 }
 
@@ -185,12 +193,17 @@ func TestProviderRecordsIncompleteResponseUsageAndSafeShape(t *testing.T) {
 		providerResponseStatusIncompleteTokenLimit,
 		"output",
 	))
+	reasoningBefore := testutil.ToFloat64(providerResponseTokensTotal.WithLabelValues(
+		providerPurposeGeneration,
+		providerResponseStatusIncompleteTokenLimit,
+		"reasoning",
+	))
 
 	provider := providerForProviderResponse(t, ProviderDeepSeek, http.StatusOK, `{
       "id":"ds_incomplete_usage","status":"incomplete","model":"deepseek-v4-flash",
       "incomplete_details":{"reason":"max_output_tokens"},
       "output":[{"type":"message","content":[{"type":"output_text","text":"partial provider output must not escape"}]}],
-      "usage":{"input_tokens":321,"output_tokens":8000}
+	  "usage":{"input_tokens":321,"output_tokens":8000,"output_tokens_details":{"reasoning_tokens":7600}}
     }`)
 	_, err := provider.Generate(context.Background(), validRequestForProvider(ProviderDeepSeek, "deepseek-v4-flash"))
 	classified := requireProviderError(t, err)
@@ -220,6 +233,13 @@ func TestProviderRecordsIncompleteResponseUsageAndSafeShape(t *testing.T) {
 		"output",
 	)) - outputBefore; delta != 8000 {
 		t.Fatalf("incomplete output token metric delta = %v", delta)
+	}
+	if delta := testutil.ToFloat64(providerResponseTokensTotal.WithLabelValues(
+		providerPurposeGeneration,
+		providerResponseStatusIncompleteTokenLimit,
+		"reasoning",
+	)) - reasoningBefore; delta != 7600 {
+		t.Fatalf("incomplete reasoning token metric delta = %v", delta)
 	}
 }
 

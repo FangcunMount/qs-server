@@ -213,6 +213,7 @@ type EvaluationDecodingPO struct {
 	Temperature     *float64 `bson:"temperature,omitempty"`
 	TopP            *float64 `bson:"top_p,omitempty"`
 	Seed            *int64   `bson:"seed,omitempty"`
+	ReasoningEffort string   `bson:"reasoning_effort,omitempty"`
 }
 
 type EvaluationSemanticEvaluatorSpecPO struct {

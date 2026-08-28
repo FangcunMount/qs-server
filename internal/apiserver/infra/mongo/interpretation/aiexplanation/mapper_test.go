@@ -356,7 +356,7 @@ func mapperEvaluationRelease(profileRecord *domainprofile.AIExplanationProfile) 
 		InputSchema:       domainevaluation.SchemaRef{Version: aiexplanation.InputSchemaVersionV1, Fingerprint: aiexplanation.NewFingerprint([]byte("input-schema"))},
 		OutputSchema:      domainevaluation.SchemaRef{Version: aiexplanation.OutputSchemaVersionV1, Fingerprint: aiexplanation.NewFingerprint([]byte("output-schema"))},
 		Provider:          aiexplanation.ProviderExecutionSpec{Route: profileRecord.Definition().GenerationPolicy.ProviderRoute, RouteRevision: "v1", ResolvedProvider: "provider-a", ResolvedModel: "model-a", Fingerprint: aiexplanation.NewFingerprint([]byte("provider-route"))},
-		Decoding:          domainevaluation.DecodingParameters{MaxOutputTokens: 3000},
+		Decoding:          domainevaluation.DecodingParameters{MaxOutputTokens: 3000, ReasoningEffort: "low"},
 		SemanticEvaluator: mapperSemanticEvaluator(),
 		GenerationCaseIDs: []string{"g1", "g2", "g3", "g4", "g5", "g6", "g7"}, PreflightCaseID: "p1",
 		PreflightRejectionReason: "insufficient_eligible_dimensions", RepetitionsPerCase: 5,
@@ -375,7 +375,7 @@ func mapperSemanticEvaluator() domainevaluation.SemanticEvaluatorSpec {
 			Route: "semantic_judge_v1", RouteRevision: "v1", ResolvedProvider: "judge-provider", ResolvedModel: "judge-model",
 			Fingerprint: aiexplanation.NewFingerprint([]byte("semantic-route")),
 		},
-		Decoding: domainevaluation.DecodingParameters{MaxOutputTokens: 2000},
+		Decoding: domainevaluation.DecodingParameters{MaxOutputTokens: 2000, ReasoningEffort: "low"},
 	}
 }
 
