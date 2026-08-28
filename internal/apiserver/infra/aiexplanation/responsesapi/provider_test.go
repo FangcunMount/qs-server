@@ -169,6 +169,124 @@ func TestProviderClassifiesDocumentedIncompleteReasons(t *testing.T) {
 	}
 }
 
+func TestProviderRecordsIncompleteResponseUsageAndSafeShape(t *testing.T) {
+	shapeBefore := testutil.ToFloat64(providerResponseShapesTotal.WithLabelValues(
+		providerPurposeGeneration,
+		providerResponseStatusIncompleteTokenLimit,
+		providerResponseShapeSingleMessageOutputText,
+	))
+	inputBefore := testutil.ToFloat64(providerResponseTokensTotal.WithLabelValues(
+		providerPurposeGeneration,
+		providerResponseStatusIncompleteTokenLimit,
+		"input",
+	))
+	outputBefore := testutil.ToFloat64(providerResponseTokensTotal.WithLabelValues(
+		providerPurposeGeneration,
+		providerResponseStatusIncompleteTokenLimit,
+		"output",
+	))
+
+	provider := providerForProviderResponse(t, ProviderDeepSeek, http.StatusOK, `{
+      "id":"ds_incomplete_usage","status":"incomplete","model":"deepseek-v4-flash",
+      "incomplete_details":{"reason":"max_output_tokens"},
+      "output":[{"type":"message","content":[{"type":"output_text","text":"partial provider output must not escape"}]}],
+      "usage":{"input_tokens":321,"output_tokens":8000}
+    }`)
+	_, err := provider.Generate(context.Background(), validRequestForProvider(ProviderDeepSeek, "deepseek-v4-flash"))
+	classified := requireProviderError(t, err)
+	if classified.Code != "provider_output_token_limit" || classified.SafeMessage != "Provider 输出达到 token 上限，未形成完整结构化结果" {
+		t.Fatalf("classified incomplete response = %#v", classified)
+	}
+	if strings.Contains(err.Error(), "partial provider output") {
+		t.Fatal("partial provider output leaked through provider error")
+	}
+	if delta := testutil.ToFloat64(providerResponseShapesTotal.WithLabelValues(
+		providerPurposeGeneration,
+		providerResponseStatusIncompleteTokenLimit,
+		providerResponseShapeSingleMessageOutputText,
+	)) - shapeBefore; delta != 1 {
+		t.Fatalf("incomplete shape metric delta = %v", delta)
+	}
+	if delta := testutil.ToFloat64(providerResponseTokensTotal.WithLabelValues(
+		providerPurposeGeneration,
+		providerResponseStatusIncompleteTokenLimit,
+		"input",
+	)) - inputBefore; delta != 321 {
+		t.Fatalf("incomplete input token metric delta = %v", delta)
+	}
+	if delta := testutil.ToFloat64(providerResponseTokensTotal.WithLabelValues(
+		providerPurposeGeneration,
+		providerResponseStatusIncompleteTokenLimit,
+		"output",
+	)) - outputBefore; delta != 8000 {
+		t.Fatalf("incomplete output token metric delta = %v", delta)
+	}
+}
+
+func TestProviderExplainsInvalidOutputCardinalityWithoutLeakingContent(t *testing.T) {
+	for _, testCase := range []struct {
+		name        string
+		output      string
+		expectedMsg string
+		shape       string
+	}{
+		{
+			name:        "no message",
+			output:      `[{"type":"reasoning","content":[{"type":"reasoning_text","text":"sensitive reasoning"}]}]`,
+			expectedMsg: "Provider 未返回结构化消息",
+			shape:       providerResponseShapeNoMessage,
+		},
+		{
+			name: "multiple messages",
+			output: `[
+              {"type":"message","content":[{"type":"output_text","text":"first sensitive output"}]},
+              {"type":"message","content":[{"type":"output_text","text":"second sensitive output"}]}
+            ]`,
+			expectedMsg: "Provider 返回了多个结构化消息",
+			shape:       providerResponseShapeMultipleMessages,
+		},
+		{
+			name:        "message without output text",
+			output:      `[{"type":"message","content":[{"type":"reasoning_text","text":"sensitive reasoning"}]}]`,
+			expectedMsg: "Provider 结构化消息缺少输出文本",
+			shape:       providerResponseShapeSingleMessageNoText,
+		},
+		{
+			name:        "message with empty output text",
+			output:      `[{"type":"message","content":[{"type":"output_text","text":"  "}]}]`,
+			expectedMsg: "Provider 结构化消息的输出文本为空",
+			shape:       providerResponseShapeSingleMessageEmptyText,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			shapeBefore := testutil.ToFloat64(providerResponseShapesTotal.WithLabelValues(
+				providerPurposeGeneration,
+				providerResponseStatusCompleted,
+				testCase.shape,
+			))
+			provider := providerForResponse(t, http.StatusOK, fmt.Sprintf(`{
+              "id":"resp_invalid_shape","status":"completed","model":"gpt-test-2026-01-01",
+              "output":%s
+            }`, testCase.output))
+			_, err := provider.Generate(context.Background(), validRequest())
+			classified := requireProviderError(t, err)
+			if classified.Code != "provider_output_cardinality_invalid" || classified.SafeMessage != testCase.expectedMsg {
+				t.Fatalf("classified invalid output = %#v", classified)
+			}
+			if strings.Contains(err.Error(), "sensitive") {
+				t.Fatal("provider-generated output leaked through cardinality error")
+			}
+			if delta := testutil.ToFloat64(providerResponseShapesTotal.WithLabelValues(
+				providerPurposeGeneration,
+				providerResponseStatusCompleted,
+				testCase.shape,
+			)) - shapeBefore; delta != 1 {
+				t.Fatalf("response shape metric delta = %v", delta)
+			}
+		})
+	}
+}
+
 func TestProviderClassifiesRefusalWithoutReturningRawRefusal(t *testing.T) {
 	provider := providerForResponse(t, http.StatusOK, `{
       "id":"resp_refusal","status":"completed","model":"gpt-test-2026-01-01",

@@ -225,6 +225,7 @@ func (p *Provider) Generate(ctx context.Context, request appport.ProviderRequest
 	if err := json.Unmarshal(responseBody, &decoded); err != nil {
 		return nil, providerError(domainrun.FailureKindProviderTransport, "provider_response_invalid", false, false, nil)
 	}
+	observeDecodedProviderResponse(request.OutputSchema.Version, decoded)
 	if err := validateCompletedResponse(decoded, request.Route.ExecutionSpec.ResolvedModel); err != nil {
 		return nil, err
 	}
@@ -326,7 +327,14 @@ func classifyResponseStatus(response responsesAPIResponse) error {
 		if response.IncompleteDetails != nil {
 			switch strings.ToLower(strings.TrimSpace(response.IncompleteDetails.Reason)) {
 			case "max_output_tokens":
-				return providerError(domainrun.FailureKindProviderTransport, "provider_output_token_limit", false, false, nil)
+				return providerErrorWithSafeMessage(
+					domainrun.FailureKindProviderTransport,
+					"provider_output_token_limit",
+					"Provider 输出达到 token 上限，未形成完整结构化结果",
+					false,
+					false,
+					nil,
+				)
 			case "content_filter":
 				return providerError(domainrun.FailureKindProviderRefusal, "provider_refusal", false, false, nil)
 			}
@@ -343,6 +351,7 @@ func classifyResponseStatus(response responsesAPIResponse) error {
 
 func extractSingleOutput(items []outputItem) (string, error) {
 	messageCount := 0
+	outputTextCount := 0
 	var output strings.Builder
 	for _, item := range items {
 		if item.Type != "message" {
@@ -354,14 +363,50 @@ func extractSingleOutput(items []outputItem) (string, error) {
 			case "refusal":
 				return "", providerError(domainrun.FailureKindProviderRefusal, "provider_refusal", false, false, nil)
 			case "output_text":
+				outputTextCount++
 				if content.Text != "" {
 					output.WriteString(content.Text)
 				}
 			}
 		}
 	}
-	if messageCount != 1 || strings.TrimSpace(output.String()) == "" {
-		return "", providerError(domainrun.FailureKindProviderTransport, "provider_output_cardinality_invalid", false, false, nil)
+	switch {
+	case messageCount == 0:
+		return "", providerErrorWithSafeMessage(
+			domainrun.FailureKindProviderTransport,
+			"provider_output_cardinality_invalid",
+			"Provider 未返回结构化消息",
+			false,
+			false,
+			nil,
+		)
+	case messageCount > 1:
+		return "", providerErrorWithSafeMessage(
+			domainrun.FailureKindProviderTransport,
+			"provider_output_cardinality_invalid",
+			"Provider 返回了多个结构化消息",
+			false,
+			false,
+			nil,
+		)
+	case outputTextCount == 0:
+		return "", providerErrorWithSafeMessage(
+			domainrun.FailureKindProviderTransport,
+			"provider_output_cardinality_invalid",
+			"Provider 结构化消息缺少输出文本",
+			false,
+			false,
+			nil,
+		)
+	case strings.TrimSpace(output.String()) == "":
+		return "", providerErrorWithSafeMessage(
+			domainrun.FailureKindProviderTransport,
+			"provider_output_cardinality_invalid",
+			"Provider 结构化消息的输出文本为空",
+			false,
+			false,
+			nil,
+		)
 	}
 	return output.String(), nil
 }
@@ -461,8 +506,19 @@ func readLimited(reader io.Reader, limit int64) ([]byte, bool, error) {
 }
 
 func providerError(kind domainrun.FailureKind, code string, retryable, resultUnknown bool, cause error) *appport.ProviderError {
+	return providerErrorWithSafeMessage(kind, code, "AI 解读暂时不可用，请稍后再试", retryable, resultUnknown, cause)
+}
+
+func providerErrorWithSafeMessage(
+	kind domainrun.FailureKind,
+	code string,
+	safeMessage string,
+	retryable bool,
+	resultUnknown bool,
+	cause error,
+) *appport.ProviderError {
 	return &appport.ProviderError{
-		Kind: kind, Code: code, SafeMessage: "AI 解读暂时不可用，请稍后再试",
+		Kind: kind, Code: code, SafeMessage: safeMessage,
 		Retryable: retryable, ResultUnknown: resultUnknown, Cause: cause,
 	}
 }
