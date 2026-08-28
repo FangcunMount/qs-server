@@ -46,7 +46,8 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 		return runtimeOutput{}, err
 	}
 	subscriber, err := eventtransport.NewSubscriber(eventtransport.SubscriberConfig{
-		Provider: s.config.Messaging.Provider, NSQLookupdAddr: s.config.Messaging.NSQLookupdAddr, RabbitMQURL: s.config.Messaging.RabbitMQURL,
+		Provider: s.config.Messaging.Provider, NSQLookupdAddr: s.config.Messaging.NSQLookupdAddr,
+		NSQMessageTimeout: s.config.Messaging.NSQMessageTimeout, RabbitMQURL: s.config.Messaging.RabbitMQURL,
 	}, subscriberOptions)
 	if err != nil {
 		_ = deadLetterRecorder.Close()

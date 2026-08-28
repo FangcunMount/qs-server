@@ -71,7 +71,8 @@ grpc:
   # 连接管理
   # AI 评测 RPC 会串行执行生成与独立裁判；连接轮换不得中断活动长调用。
   max-connection-age: 2h
-  max-connection-age-grace: 5m
+  # 覆盖 6m 的 AI 评测 Attempt 租约，避免连接轮换中断在途评测。
+  max-connection-age-grace: 7m
 
   # mTLS 双向认证配置（QS 内部服务简化模式）
   # 说明：QS 三件套内部通信，通过 OU 白名单简化管理，无需维护 CN 白名单
@@ -161,6 +162,8 @@ ai_explanation:
     model: "deepseek-v4-pro"
     route_revision: "v1"
     timeout: 120s
+    # 必须覆盖生成、独立模型裁判与服务端提交，且长于 worker 的 5m AI RPC deadline。
+    attempt_lease_duration: 6m
     max_output_tokens: 8000
     # v1 每次启动按 UTC 日保守预留完整 70 次调用；取消/失败不退款。
     # 2026-08-28 为完成修复后生产质量验收，经审计批准将每机构日上限由 140 提高到 280。

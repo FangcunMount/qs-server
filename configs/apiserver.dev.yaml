@@ -70,7 +70,8 @@ grpc:
   
   # 连接管理
   max-connection-age: 120s
-  max-connection-age-grace: 20s
+  # AI 评测启用时覆盖默认 4m Attempt 租约。
+  max-connection-age-grace: 4m
   
   # mTLS 双向认证配置（开发环境测试）
   mtls:
@@ -139,6 +140,7 @@ ai_explanation:
     model: ""
     route_revision: "v1"
     timeout: 60s
+    attempt_lease_duration: 4m
     max_output_tokens: 2500
     # v1 每次启动按 UTC 日保守预留完整 70 次调用；取消/失败不退款。
     capacity:

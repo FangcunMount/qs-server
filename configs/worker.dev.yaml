@@ -48,6 +48,7 @@ messaging:
   # NSQ 配置（开发环境默认）
   nsq-addr: "127.0.0.1:4150"           # NSQ Daemon 地址
   nsq-lookupd-addr: "127.0.0.1:4161"   # NSQ Lookupd 地址
+  nsq-message-timeout: 4m
   # RabbitMQ 配置（可选）
   rabbitmq-url: "amqp://guest:guest@localhost:5672/"
   delivery:

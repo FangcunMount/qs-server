@@ -376,6 +376,32 @@ func TestProviderMetricsExposeOnlyBoundedPurposeResultsAndTokenDirections(t *tes
 	}
 }
 
+func TestProviderFailureMetricsExposeOnlyReviewedCodes(t *testing.T) {
+	known := &appport.ProviderError{
+		Kind: domainrun.FailureKindProviderTransport, Code: "provider_response_read_failed", ResultUnknown: true,
+	}
+	knownBefore := testutil.ToFloat64(providerFailuresTotal.WithLabelValues(
+		providerPurposeGeneration, providerResultUnknown, "provider_response_read_failed",
+	))
+	observeProviderInvocation(aiexplanation.OutputSchemaVersionV1, time.Second, nil, known)
+	if delta := testutil.ToFloat64(providerFailuresTotal.WithLabelValues(
+		providerPurposeGeneration, providerResultUnknown, "provider_response_read_failed",
+	)) - knownBefore; delta != 1 {
+		t.Fatalf("known failure metric delta = %v", delta)
+	}
+
+	unknown := &appport.ProviderError{Kind: domainrun.FailureKindProviderTransport, Code: "remote_dynamic_code"}
+	otherBefore := testutil.ToFloat64(providerFailuresTotal.WithLabelValues(
+		providerPurposeSemanticEvaluator, providerResultError, providerFailureCodeOther,
+	))
+	observeProviderInvocation(aiexplanation.SemanticEvaluationOutputSchemaVersionV1, time.Second, nil, unknown)
+	if delta := testutil.ToFloat64(providerFailuresTotal.WithLabelValues(
+		providerPurposeSemanticEvaluator, providerResultError, providerFailureCodeOther,
+	)) - otherBefore; delta != 1 {
+		t.Fatalf("unreviewed failure metric delta = %v", delta)
+	}
+}
+
 func validRequest() appport.ProviderRequest {
 	return validRequestForProvider(ProviderOpenAI, "gpt-test-2026-01-01")
 }

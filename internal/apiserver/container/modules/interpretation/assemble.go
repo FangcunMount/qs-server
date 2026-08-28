@@ -402,7 +402,7 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 		onlineRunner, err := aiexplanationevaluation.NewOnlineRunner(aiexplanationevaluation.OnlineRunnerDependencies{
 			Prompts: promptCatalog, Schemas: aiexplanationschema.NewCatalog(), Routes: routeCatalog,
 			Provider: providerAdapter, Safety: safetyGate, Semantic: semanticEvaluator,
-			SemanticTimeout: config.Evaluation.Timeout, Evidence: evidenceService,
+			SemanticTimeout: config.Evaluation.Timeout, AttemptLease: config.Evaluation.AttemptLeaseDuration, Evidence: evidenceService,
 			DurableCommitter: evaluationCommitter, Now: time.Now,
 		})
 		if err != nil {

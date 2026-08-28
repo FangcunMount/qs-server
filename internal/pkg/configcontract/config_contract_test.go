@@ -254,11 +254,14 @@ func assertAIExplanationProductionLongCallContract(t *testing.T, configName stri
 	if ai.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg != 280 {
 		t.Fatalf("%s AI evaluation daily Provider budget = %d, want approved production limit 280", configName, ai.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg)
 	}
-	if ai.RunLeaseDuration < ai.Timeout+ai.Evaluation.Timeout+30*time.Second {
-		t.Fatalf("%s AI run lease = %s, must cover both Provider stages", configName, ai.RunLeaseDuration)
+	if ai.RunLeaseDuration <= ai.Timeout {
+		t.Fatalf("%s participant AI run lease = %s, must exceed the generation timeout", configName, ai.RunLeaseDuration)
 	}
-	if opts.GRPCOptions.MaxConnectionAge < time.Hour || opts.GRPCOptions.MaxConnectionAgeGrace < ai.RunLeaseDuration {
-		t.Fatalf("%s gRPC connection age/grace = %s/%s, must preserve an active AI run lease", configName, opts.GRPCOptions.MaxConnectionAge, opts.GRPCOptions.MaxConnectionAgeGrace)
+	if ai.Evaluation.AttemptLeaseDuration < ai.Timeout+ai.Evaluation.Timeout+time.Minute {
+		t.Fatalf("%s evaluation attempt lease = %s, must cover both Provider stages and commit grace", configName, ai.Evaluation.AttemptLeaseDuration)
+	}
+	if opts.GRPCOptions.MaxConnectionAge < time.Hour || opts.GRPCOptions.MaxConnectionAgeGrace < ai.Evaluation.AttemptLeaseDuration {
+		t.Fatalf("%s gRPC connection age/grace = %s/%s, must preserve an active AI evaluation attempt lease", configName, opts.GRPCOptions.MaxConnectionAge, opts.GRPCOptions.MaxConnectionAgeGrace)
 	}
 }
 
@@ -405,11 +408,28 @@ func TestWorkerDevProdConfigContracts(t *testing.T) {
 			if name == "worker.prod.yaml" && opts.GRPC.AIExplanationTimeout < 5*time.Minute {
 				t.Fatalf("production worker AI explanation timeout = %s, want at least 5m", opts.GRPC.AIExplanationTimeout)
 			}
+			if opts.Messaging.Provider == "nsq" && opts.Messaging.NSQMessageTimeout <= opts.GRPC.AIExplanationTimeout {
+				t.Fatalf("%s NSQ message timeout = %s, must exceed AI RPC timeout %s", name, opts.Messaging.NSQMessageTimeout, opts.GRPC.AIExplanationTimeout)
+			}
 			if workerEventConfigPath(cfg.Worker) != "configs/events.yaml" {
 				t.Fatalf("worker event config fallback = %q, want configs/events.yaml", workerEventConfigPath(cfg.Worker))
 			}
 			assertEventCatalogLoads(t)
 		})
+	}
+}
+
+func TestProductionAIExplanationTimeoutHierarchy(t *testing.T) {
+	apiOptions := apiserveroptions.NewOptions()
+	loadConfig(t, filepath.Join(repoRoot(t), "configs", "apiserver.prod.yaml"), apiOptions)
+	workerOptions := workeroptions.NewOptions()
+	loadConfig(t, filepath.Join(repoRoot(t), "configs", "worker.prod.yaml"), workerOptions)
+
+	attemptLease := apiOptions.AIExplanation.Evaluation.AttemptLeaseDuration
+	workerDeadline := workerOptions.GRPC.AIExplanationTimeout
+	messageTimeout := workerOptions.Messaging.NSQMessageTimeout
+	if attemptLease <= workerDeadline || messageTimeout <= workerDeadline {
+		t.Fatalf("production AI timeout hierarchy attempt lease/NSQ message/worker RPC = %s/%s/%s; both outer boundaries must exceed the worker RPC deadline", attemptLease, messageTimeout, workerDeadline)
 	}
 }
 
