@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "7e54d799487997d5de60989ab4bbe211d815844e",
+    "sha": "42bf9cc901fa2f79b0b731b131bd6473352588b7",
     "verified_on": "2026-08-28"
   },
   "status_policy": {
@@ -5064,7 +5064,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "557b068cbb75c0aa1025b3cce215a59ea8d8bbf6",
+        "source_sha": "42bf9cc901fa2f79b0b731b131bd6473352588b7",
         "verified_on": "2026-08-28"
       },
       "fact_sources": [
@@ -5098,7 +5098,7 @@
           "kind": "command",
           "command": "go test -count=1 ./internal/pkg/cache/... ./internal/apiserver/cache/... ./internal/collection-server/cache ./internal/pkg/redisruntime/... ./internal/apiserver/application/systemgovernance/... ./internal/apiserver/transport/rest/... ./internal/pkg/signalcatalog ./internal/pkg/configcontract ./internal/pkg/architecture",
           "result": "passed",
-          "source_sha": "557b068cbb75c0aa1025b3cce215a59ea8d8bbf6",
+          "source_sha": "42bf9cc901fa2f79b0b731b131bd6473352588b7",
           "verified_on": "2026-08-28"
         },
         {
