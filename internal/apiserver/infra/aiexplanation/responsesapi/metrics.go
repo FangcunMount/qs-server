@@ -82,7 +82,7 @@ func providerMetricResult(err error) string {
 	case "provider_response_invalid", "provider_response_too_large", "provider_response_id_missing",
 		"provider_model_mismatch", "provider_response_failed", "provider_response_incomplete",
 		"provider_response_not_terminal", "provider_response_status_invalid", "provider_output_cardinality_invalid",
-		"provider_usage_invalid":
+		"provider_output_token_limit", "provider_usage_invalid":
 		return providerResultInvalidResponse
 	default:
 		return providerResultError

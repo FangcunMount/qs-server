@@ -323,6 +323,14 @@ func classifyResponseStatus(response responsesAPIResponse) error {
 		}
 		return providerError(domainrun.FailureKindProviderTransport, code, false, false, nil)
 	case "incomplete":
+		if response.IncompleteDetails != nil {
+			switch strings.ToLower(strings.TrimSpace(response.IncompleteDetails.Reason)) {
+			case "max_output_tokens":
+				return providerError(domainrun.FailureKindProviderTransport, "provider_output_token_limit", false, false, nil)
+			case "content_filter":
+				return providerError(domainrun.FailureKindProviderRefusal, "provider_refusal", false, false, nil)
+			}
+		}
 		return providerError(domainrun.FailureKindProviderTransport, "provider_response_incomplete", false, false, nil)
 	case "cancelled":
 		return providerError(domainrun.FailureKindProviderTransport, "provider_response_cancelled", true, false, nil)
@@ -334,26 +342,28 @@ func classifyResponseStatus(response responsesAPIResponse) error {
 }
 
 func extractSingleOutput(items []outputItem) (string, error) {
-	texts := make([]string, 0, 1)
+	messageCount := 0
+	var output strings.Builder
 	for _, item := range items {
 		if item.Type != "message" {
 			continue
 		}
+		messageCount++
 		for _, content := range item.Content {
 			switch content.Type {
 			case "refusal":
 				return "", providerError(domainrun.FailureKindProviderRefusal, "provider_refusal", false, false, nil)
 			case "output_text":
-				if strings.TrimSpace(content.Text) != "" {
-					texts = append(texts, content.Text)
+				if content.Text != "" {
+					output.WriteString(content.Text)
 				}
 			}
 		}
 	}
-	if len(texts) != 1 {
+	if messageCount != 1 || strings.TrimSpace(output.String()) == "" {
 		return "", providerError(domainrun.FailureKindProviderTransport, "provider_output_cardinality_invalid", false, false, nil)
 	}
-	return texts[0], nil
+	return output.String(), nil
 }
 
 func classifyHTTPStatus(statusCode int) error {

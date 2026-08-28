@@ -2,7 +2,7 @@
 
 > 状态：本篇已按当前源码重写。Interpretation 的生成生命周期、重试治理、查询模型与报告模板版本发布均已落地；历史路由已完成显式冻结，运行时对缺失身份执行 fail-closed。
 
-> AI 解读是本模块下默认关闭的独立发布候选能力：标准报告继续自动生成并保持唯一权威，Participant 可在报告可用后手动触发一次性 AI 补充解读。机器契约、领域/Application、Participant REST/gRPC、Outbox/Worker、OpenAI/DeepSeek Responses API Adapter、确定性校验、耐久 Prompt 评测、双角色复核、Profile 治理、容量治理、数据生命周期和 Mongo migration 已接线；当前默认主 Provider 为 DeepSeek，OpenAI 保留为备选；API 密钥、已发布 Profile、真实模型评测、正式保留期限、跨进程联调和生产验收仍缺失，见[AI 解读核心设计](./25-核心设计-AI解读.md)。
+> AI 解读是本模块下默认关闭的独立发布候选能力：标准报告继续自动生成并保持唯一权威，Participant 可在报告可用后手动触发一次性 AI 补充解读。机器契约、领域/Application、Participant REST/gRPC、Outbox/Worker、OpenAI/DeepSeek Responses API Adapter、确定性校验、耐久 Prompt 评测、双角色复核、Profile 治理、容量治理、数据生命周期和 Mongo migration 已接线；当前默认主 Provider 为 DeepSeek，OpenAI 保留为备选。生产密钥和 180/365/35 天保留策略已配置，两次真实 35+35 Run 均因技术失败不可审核；Profile、人工复核、灰度和生产验收仍未完成，见[AI 解读核心设计](./25-核心设计-AI解读.md)。
 
 ## 1. 30 秒结论
 
@@ -241,7 +241,7 @@ AssessmentID、TesteeID 和 OrgID 是报告关联事实，不是授权凭据。�
 | 多行为人查询 | 已实现 | participant、clinician、administration、operations |
 | 报告模板版本发布 | 已实现 | 5 个 TemplateID 的历史版与当前版共 10 个 release；ModelCatalog、Outcome 和 Artifact 路由已显式冻结 |
 | 成品自包含 Builder 与 ContentSchema 来源 | 已实现 | Artifact 持久化精确来源，提交器校验与实际 Builder 一致；历史成品已完成等价补齐 |
-| AI 解读 | 代码发布候选 / 默认关闭 | 标准报告之上的手动、一次性补充能力；治理框架已接线，支持 OpenAI/DeepSeek Responses API，缺 Provider API 密钥、已发布 Profile、真实评测和生产验收 |
+| AI 解读 | 代码发布候选 / 默认关闭 | 标准报告之上的手动、一次性补充能力；生产 DeepSeek 密钥、保留策略和两次真实评测已有证据，但两次 Run 都因技术失败不可审核，仍缺通过评测、已发布 Profile、人工复核和生产验收 |
 | 多 ReportType 并存查询 | 待明确 | 当前 catalog 以 AssessmentID 作为唯一当前报告键 |
 
 ## 10. 文档地图
