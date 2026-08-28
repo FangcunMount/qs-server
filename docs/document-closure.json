@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "c4666ab46006139851f4c3e4724cf178f82d5f73",
+    "sha": "35d64a8c8d49eaf6d7e618bfdd097911e5b7d576",
     "verified_on": "2026-08-28"
   },
   "status_policy": {
@@ -5064,7 +5064,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "c4666ab46006139851f4c3e4724cf178f82d5f73",
+        "source_sha": "35d64a8c8d49eaf6d7e618bfdd097911e5b7d576",
         "verified_on": "2026-08-28"
       },
       "fact_sources": [
@@ -5098,14 +5098,14 @@
           "kind": "command",
           "command": "go test -count=1 ./internal/pkg/cache/... ./internal/apiserver/cache/... ./internal/collection-server/cache ./internal/pkg/redisruntime/... ./internal/apiserver/application/systemgovernance/... ./internal/apiserver/transport/rest/... ./internal/pkg/signalcatalog ./internal/pkg/configcontract ./internal/pkg/architecture",
           "result": "passed",
-          "source_sha": "c4666ab46006139851f4c3e4724cf178f82d5f73",
+          "source_sha": "35d64a8c8d49eaf6d7e618bfdd097911e5b7d576",
           "verified_on": "2026-08-28"
         },
         {
           "kind": "command",
           "command": "go test -race -count=1 ./internal/pkg/cache/...",
           "result": "passed",
-          "source_sha": "c4666ab46006139851f4c3e4724cf178f82d5f73",
+          "source_sha": "35d64a8c8d49eaf6d7e618bfdd097911e5b7d576",
           "verified_on": "2026-08-28"
         }
       ],
