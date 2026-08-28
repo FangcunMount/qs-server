@@ -251,8 +251,8 @@ func assertAIExplanationProductionLongCallContract(t *testing.T, configName stri
 	if ai.MaxOutputTokens < 8000 || ai.Evaluation.MaxOutputTokens < 8000 {
 		t.Fatalf("%s AI output token limits = %d/%d, want at least 8000", configName, ai.MaxOutputTokens, ai.Evaluation.MaxOutputTokens)
 	}
-	if ai.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg != 280 {
-		t.Fatalf("%s AI evaluation daily Provider budget = %d, want approved production limit 280", configName, ai.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg)
+	if ai.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg != 1024 {
+		t.Fatalf("%s AI evaluation daily Provider budget = %d, want approved production limit 1024", configName, ai.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg)
 	}
 	if ai.RunLeaseDuration <= ai.Timeout {
 		t.Fatalf("%s participant AI run lease = %s, must exceed the generation timeout", configName, ai.RunLeaseDuration)

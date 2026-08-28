@@ -163,8 +163,11 @@ func TestNewDurableCommitterRejectsMissingCapacityAndInvalidBudget(t *testing.T)
 	if err := dependencies(nil, 140); err == nil {
 		t.Fatal("expected nil capacity repository to be rejected")
 	}
-	if err := dependencies(&capacityRepositoryStub{}, 100); err == nil {
-		t.Fatal("expected non-v1-multiple budget to be rejected")
+	if err := dependencies(&capacityRepositoryStub{}, 69); err == nil {
+		t.Fatal("expected budget below one complete v1 run to be rejected")
+	}
+	if err := dependencies(&capacityRepositoryStub{}, 1024); err != nil {
+		t.Fatalf("expected budget with a partial remainder to be accepted: %v", err)
 	}
 }
 

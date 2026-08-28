@@ -76,7 +76,8 @@ type AIExplanationEvaluationOptions struct {
 
 // AIExplanationEvaluationCapacityOptions is a conservative v1 admission
 // policy. One start reserves the complete 70-call generation/judge ceiling;
-// the reservation is intentionally not refunded after cancellation.
+// any remainder below 70 cannot admit another run, and reservations are not
+// refunded after cancellation.
 type AIExplanationEvaluationCapacityOptions struct {
 	MaxActiveRunsPerOrg                 int `json:"max_active_runs_per_org" mapstructure:"max_active_runs_per_org"`
 	DailyProviderInvocationBudgetPerOrg int `json:"daily_provider_invocation_budget_per_org" mapstructure:"daily_provider_invocation_budget_per_org"`
@@ -199,8 +200,8 @@ func (o *AIExplanationOptions) Validate() []error {
 		if o.Evaluation.Capacity.MaxActiveRunsPerOrg != 1 {
 			errs = append(errs, fmt.Errorf("ai_explanation.evaluation.capacity.max_active_runs_per_org must equal 1 in v1"))
 		}
-		if budget := o.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg; budget < 70 || budget%70 != 0 {
-			errs = append(errs, fmt.Errorf("ai_explanation.evaluation.capacity.daily_provider_invocation_budget_per_org must be a positive multiple of 70"))
+		if budget := o.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg; budget < 70 {
+			errs = append(errs, fmt.Errorf("ai_explanation.evaluation.capacity.daily_provider_invocation_budget_per_org must be at least 70"))
 		}
 	}
 	return errs

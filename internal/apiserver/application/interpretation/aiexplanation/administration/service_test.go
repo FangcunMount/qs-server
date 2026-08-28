@@ -194,7 +194,7 @@ func TestFindEvaluationCapacityUsesTrustedOrganizationAndCurrentUTCDay(t *testin
 	}}
 	access := &accessStub{}
 	service := NewService(&reviewWorkflowStub{}, &governanceStub{}, access,
-		WithEvaluationCapacity(reader, 1, 140, func() time.Time { return now }),
+		WithEvaluationCapacity(reader, 1, 1024, func() time.Time { return now }),
 	)
 	result, err := service.FindEvaluationCapacity(context.Background(), Actor{OrgID: 7, OperatorUserID: 42})
 	if err != nil {
@@ -203,8 +203,8 @@ func TestFindEvaluationCapacityUsesTrustedOrganizationAndCurrentUTCDay(t *testin
 	if reader.orgID != 7 || !reader.budgetDay.Equal(day) || access.governanceCalls != 1 {
 		t.Fatalf("trusted capacity query = org:%d day:%s auth:%d", reader.orgID, reader.budgetDay, access.governanceCalls)
 	}
-	if result.DailyProviderInvocationLimit != 140 || result.ReservedProviderInvocations != 70 ||
-		result.RemainingProviderInvocations != 70 || result.AvailableFullRunStarts != 1 || result.OverLimit ||
+	if result.DailyProviderInvocationLimit != 1024 || result.ReservedProviderInvocations != 70 ||
+		result.RemainingProviderInvocations != 954 || result.AvailableFullRunStarts != 13 || result.OverLimit ||
 		len(result.Reservations) != 1 || result.Reservations[0].RunID != meta.ID(700) {
 		t.Fatalf("capacity projection = %#v", result)
 	}
