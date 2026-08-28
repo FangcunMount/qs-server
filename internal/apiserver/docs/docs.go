@@ -10562,6 +10562,9 @@ const docTemplate = `{
                         "$ref": "#/definitions/handler.AIExplanationReviewAttemptSummary"
                     }
                 },
+                "can_cancel": {
+                    "type": "boolean"
+                },
                 "can_finalize": {
                     "type": "boolean"
                 },
@@ -10641,6 +10644,9 @@ const docTemplate = `{
         "handler.AIExplanationEvaluationSummaryWire": {
             "type": "object",
             "properties": {
+                "can_cancel": {
+                    "type": "boolean"
+                },
                 "can_finalize": {
                     "type": "boolean"
                 },
@@ -11248,6 +11254,9 @@ const docTemplate = `{
             "properties": {
                 "all_required_reviews_recorded": {
                     "type": "boolean"
+                },
+                "failed_attempts": {
+                    "type": "integer"
                 },
                 "fully_reviewed_attempts": {
                     "type": "integer"

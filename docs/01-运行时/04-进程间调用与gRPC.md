@@ -101,9 +101,11 @@ collection gRPC manager 当前提供：
 - 可选 PerRPC service JWT；
 - request ID metadata 传播。
 
-worker manager 提供 RPC timeout 和 TLS/mTLS，但当前没有 collection 同样的共享 inflight Gate。两侧配置虽有 `PoolSize` 字段，当前 manager 实际以一个 `grpc.ClientConn` 注册各 service client，不能把它描述成已实现多连接池。
+worker manager 提供 RPC timeout 和 TLS/mTLS，但当前没有 collection 同样的共享 inflight Gate。普通 RPC 使用 `grpc.request-timeout`（生产基线 30 秒）；AI 解读生成与 Prompt 评测可能顺序执行生成和独立模型裁判，使用独立的 `grpc.ai-explanation-timeout`（生产基线 3 分钟）。两侧配置虽有 `PoolSize` 字段，当前 manager 实际以一个 `grpc.ClientConn` 注册各 service client，不能把它描述成已实现多连接池。
 
 调用方 timeout 只限定等待时间，不意味着服务端事务一定已回滚。超时后的重试必须依赖幂等键和业务状态查询，不能简单假设“超时就是没有执行”。
+
+对 AI Provider 而言，HTTP 响应头已经返回、但响应体读取被 deadline 或取消中断，属于 dispatch 后结果不确定：服务端必须记录 `result_unknown`；deadline 映射为 `provider_timeout`，不能降级成普通 `provider_response_read_failed` 后盲目重放。
 
 ## 8. 错误边界
 

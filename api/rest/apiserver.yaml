@@ -10388,6 +10388,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/handler.AIExplanationReviewAttemptSummary'
+        can_cancel:
+          type: boolean
         can_finalize:
           type: boolean
         can_review:
@@ -10441,6 +10443,8 @@ components:
     handler.AIExplanationEvaluationSummaryWire:
       type: object
       properties:
+        can_cancel:
+          type: boolean
         can_finalize:
           type: boolean
         can_review:
@@ -10843,6 +10847,8 @@ components:
       properties:
         all_required_reviews_recorded:
           type: boolean
+        failed_attempts:
+          type: integer
         fully_reviewed_attempts:
           type: integer
         generation_attempts:

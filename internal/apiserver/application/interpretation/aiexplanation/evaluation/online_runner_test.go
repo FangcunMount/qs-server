@@ -413,7 +413,7 @@ func catalogRecordFromRun(runRecord *domainevaluation.PromptEvaluationRun) evalu
 	}
 	for _, attempt := range runRecord.Attempts() {
 		record.Attempts = append(record.Attempts, evaluation.ReviewRunCatalogAttempt{
-			CaseID: attempt.CaseID, Attempt: attempt.Attempt, Stage: attempt.Stage,
+			CaseID: attempt.CaseID, Attempt: attempt.Attempt, Stage: attempt.Stage, Failed: attempt.Failure != nil,
 		})
 	}
 	for _, review := range runRecord.Reviews() {

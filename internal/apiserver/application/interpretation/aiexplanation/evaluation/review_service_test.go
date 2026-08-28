@@ -235,7 +235,22 @@ func TestReviewServiceListDerivesProgressWithoutReturningDetailedEvidence(t *tes
 	}
 	if item.Progress.GenerationAttempts != domainevaluation.RequiredGenerationAttempts ||
 		item.Progress.RequiredReviews != domainevaluation.RequiredGenerationAttempts*2 ||
-		item.Progress.MissingReviews != domainevaluation.RequiredGenerationAttempts*2 || !item.CanReview || item.CanFinalize {
+		item.Progress.MissingReviews != domainevaluation.RequiredGenerationAttempts*2 || !item.CanReview || item.CanFinalize || item.CanCancel {
 		t.Fatalf("review queue progress = %#v", item)
+	}
+
+	for index := range repository.list[0].Attempts {
+		if repository.list[0].Attempts[index].Stage == domainevaluation.AttemptStageGeneration {
+			repository.list[0].Attempts[index].Failed = true
+			break
+		}
+	}
+	page, err = service.List(context.Background(), evaluation.ReviewRunListQuery{OrgID: 7, Status: &status})
+	if err != nil {
+		t.Fatal(err)
+	}
+	failed := page.Items[0]
+	if failed.Progress.FailedAttempts != 1 || failed.CanReview || failed.CanFinalize || !failed.CanCancel {
+		t.Fatalf("failed review queue state = %#v", failed)
 	}
 }

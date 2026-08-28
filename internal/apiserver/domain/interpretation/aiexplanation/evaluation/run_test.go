@@ -202,7 +202,7 @@ func TestAttemptKeepsRepeatedAssertionTypeIndependentByOrdinal(t *testing.T) {
 	require.Error(t, duplicated.Validate())
 }
 
-func TestFailedGenerationAttemptIsValidEvidenceAndFailsReleaseGate(t *testing.T) {
+func TestFailedGenerationAttemptRequiresAuditedCancellationBeforeReview(t *testing.T) {
 	startedAt := time.Date(2026, 8, 27, 8, 0, 0, 0, time.UTC)
 	attempt := generationAttempt("generation-1", 1, startedAt)
 	attempt.ProviderReceipt = nil
@@ -232,10 +232,35 @@ func TestFailedGenerationAttemptIsValidEvidenceAndFailsReleaseGate(t *testing.T)
 	}
 	require.NoError(t, run.AddAttempt(preflightAttempt(run.Release(), startedAt.Add(90*time.Minute))))
 	require.NoError(t, run.CloseCollection(startedAt.Add(2*time.Hour)))
-	addApprovingReviews(t, run, startedAt.Add(3*time.Hour))
-	require.NoError(t, run.Finalize("release-owner", "failed attempt must remain visible", startedAt.Add(4*time.Hour)))
-	require.Equal(t, StatusRejected, run.Status())
-	require.Contains(t, reasonCodes(run.Gate()), "attempt_execution_failed")
+	require.Equal(t, 1, run.FailedAttemptCount())
+	require.True(t, run.CanCancel())
+	require.Error(t, run.AddHumanReview(HumanReview{
+		CaseID: attempt.CaseID, Attempt: attempt.Attempt, Role: ReviewRoleAssessmentSemantics,
+		Reviewer: "reviewer-1", Decision: ReviewDecisionReject, ReviewedAt: startedAt.Add(3 * time.Hour), Reason: "technical failure",
+	}))
+	require.Error(t, run.Finalize("release-owner", "must not finalize technical failure", startedAt.Add(3*time.Hour)))
+	require.NoError(t, run.Cancel("release-owner", "technical failure requires a clean rerun", startedAt.Add(4*time.Hour)))
+	require.Equal(t, StatusCanceled, run.Status())
+	require.NotNil(t, run.ClosedAt())
+	require.Len(t, run.Attempts(), RequiredGenerationAttempts+1)
+
+	restored, err := Restore(PersistedInput{
+		ID: run.ID(), Release: run.Release(), Status: run.Status(), Version: run.Version(), Attempts: run.Attempts(), Reviews: run.Reviews(),
+		CreatedAt: run.CreatedAt(), ClosedAt: run.ClosedAt(), CanceledAt: run.CanceledAt(), CanceledBy: run.CanceledBy(), CancelReason: run.CancelReason(),
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, restored.FailedAttemptCount())
+	require.False(t, restored.CanCancel())
+}
+
+func TestSuccessfulAwaitingReviewRunCannotBypassReviewThroughCancellation(t *testing.T) {
+	startedAt := time.Date(2026, 8, 27, 8, 0, 0, 0, time.UTC)
+	run, err := New(meta.ID(9011), validRelease(), startedAt)
+	require.NoError(t, err)
+	addCompleteAttempts(t, run, startedAt)
+	require.NoError(t, run.CloseCollection(startedAt.Add(2*time.Hour)))
+	require.False(t, run.CanCancel())
+	require.ErrorIs(t, run.Cancel("release-owner", "bypass review", startedAt.Add(3*time.Hour)), ErrCancellationNotAllowed)
 }
 
 func TestPromptEvaluationAttemptExecutionCheckpointGuardsDispatchAndOrder(t *testing.T) {

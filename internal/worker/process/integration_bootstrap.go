@@ -7,10 +7,7 @@ func (s *server) initializeIntegrations(containerOutput containerOutput) (integr
 		return integrationOutput{}, nil
 	}
 
-	grpcManager, err := grpcclientintegration.CreateGRPCClientManager(
-		s.config.GRPC,
-		30,
-	)
+	grpcManager, err := grpcclientintegration.CreateGRPCClientManager(s.config.GRPC)
 	if err != nil {
 		return integrationOutput{}, err
 	}
