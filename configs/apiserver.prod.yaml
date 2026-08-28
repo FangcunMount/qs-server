@@ -163,9 +163,10 @@ ai_explanation:
     timeout: 120s
     max_output_tokens: 8000
     # v1 每次启动按 UTC 日保守预留完整 70 次调用；取消/失败不退款。
+    # 2026-08-28 为完成修复后生产质量验收，经审计批准将每机构日上限由 140 提高到 280。
     capacity:
       max_active_runs_per_org: 1
-      daily_provider_invocation_budget_per_org: 140
+      daily_provider_invocation_budget_per_org: 280
 
 # ============================================================================
 # 3. 数据存储配置
