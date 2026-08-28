@@ -49,7 +49,7 @@ func NewDurableCommitter(
 	if tx == nil || repository == nil || events == nil || stager == nil || postCommit == nil || capacity == nil {
 		return nil, fmt.Errorf("AI explanation Prompt evaluation durable commit dependencies are required")
 	}
-	if dailyProviderInvocationBudget < MaxProviderInvocationsV1 || dailyProviderInvocationBudget%MaxProviderInvocationsV1 != 0 {
+	if dailyProviderInvocationBudget < MaxProviderInvocationsV1 {
 		return nil, fmt.Errorf("AI explanation Prompt evaluation daily Provider invocation budget is invalid")
 	}
 	if now == nil {

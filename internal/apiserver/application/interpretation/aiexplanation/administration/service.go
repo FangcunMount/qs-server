@@ -244,8 +244,7 @@ func WithEvaluationExecution(starter EvaluationStarter, committer EvaluationExec
 
 func WithEvaluationCapacity(reader domainevaluation.CapacityReader, maxActiveRunsPerOrg, dailyProviderInvocationBudget int, now func() time.Time) Option {
 	return func(value *service) {
-		if reader == nil || maxActiveRunsPerOrg != 1 || dailyProviderInvocationBudget < appevaluation.MaxProviderInvocationsV1 ||
-			dailyProviderInvocationBudget%appevaluation.MaxProviderInvocationsV1 != 0 {
+		if reader == nil || maxActiveRunsPerOrg != 1 || dailyProviderInvocationBudget < appevaluation.MaxProviderInvocationsV1 {
 			return
 		}
 		value.capacity = reader
