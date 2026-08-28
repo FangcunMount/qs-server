@@ -61,11 +61,13 @@ func NewSubscriber(config SubscriberConfig, options basemessaging.SubscriberOpti
 }
 
 func newNSQConfig(messageTimeout time.Duration) (*nsq.Config, error) {
-	if messageTimeout <= 0 {
-		return nil, fmt.Errorf("NSQ message timeout must be greater than 0")
+	if messageTimeout < 0 {
+		return nil, fmt.Errorf("NSQ message timeout must not be negative")
 	}
 	config := nsq.NewConfig()
-	config.MsgTimeout = messageTimeout
+	if messageTimeout > 0 {
+		config.MsgTimeout = messageTimeout
+	}
 	return config, nil
 }
 

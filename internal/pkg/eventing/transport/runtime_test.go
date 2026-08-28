@@ -45,11 +45,18 @@ func TestNewSubscriberOptionsRejectsMissingTerminalHandlerAndHardCap(t *testing.
 	}
 }
 
-func TestNewNSQConfigRequiresAndAppliesMessageTimeout(t *testing.T) {
+func TestNewNSQConfigPreservesDefaultAndAppliesExplicitMessageTimeout(t *testing.T) {
 	t.Parallel()
 
-	if _, err := newNSQConfig(0); err == nil {
-		t.Fatal("zero NSQ message timeout accepted")
+	defaultConfig, err := newNSQConfig(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if defaultConfig.MsgTimeout != 0 {
+		t.Fatalf("default NSQ message timeout = %s, want server-negotiated zero value", defaultConfig.MsgTimeout)
+	}
+	if _, err := newNSQConfig(-time.Second); err == nil {
+		t.Fatal("negative NSQ message timeout accepted")
 	}
 	config, err := newNSQConfig(6 * time.Minute)
 	if err != nil {
