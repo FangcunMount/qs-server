@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "557b068cbb75c0aa1025b3cce215a59ea8d8bbf6",
+    "sha": "b1f6d35417e5a28fef5cfa8a72b709cb65066f5f",
     "verified_on": "2026-08-28"
   },
   "status_policy": {
@@ -6612,7 +6612,7 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "557b068cbb75c0aa1025b3cce215a59ea8d8bbf6",
+        "source_sha": "b1f6d35417e5a28fef5cfa8a72b709cb65066f5f",
         "verified_on": "2026-08-28"
       },
       "fact_sources": [
@@ -6646,7 +6646,7 @@
           "kind": "command",
           "command": "go test -count=1 ./internal/pkg/eventing/runtime ./internal/pkg/eventing/observe ./internal/pkg/eventing/transport ./internal/worker/integration/eventing ./internal/worker/integration/messaging ./internal/worker/handlers ./internal/apiserver/application/systemgovernance",
           "result": "passed",
-          "source_sha": "557b068cbb75c0aa1025b3cce215a59ea8d8bbf6",
+          "source_sha": "b1f6d35417e5a28fef5cfa8a72b709cb65066f5f",
           "verified_on": "2026-08-28"
         }
       ],
