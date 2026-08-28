@@ -9,18 +9,18 @@ import (
 	workeroptions "github.com/FangcunMount/qs-server/internal/worker/options"
 )
 
-func TestProductionAIExplanationDeepSeekRouteV2Contract(t *testing.T) {
+func TestProductionAIExplanationDeepSeekRouteV3Contract(t *testing.T) {
 	apiOptions := apiserveroptions.NewOptions()
 	loadConfig(t, filepath.Join(repoRoot(t), "configs", "apiserver.prod.yaml"), apiOptions)
 	workerOptions := workeroptions.NewOptions()
 	loadConfig(t, filepath.Join(repoRoot(t), "configs", "worker.prod.yaml"), workerOptions)
 
 	ai := apiOptions.AIExplanation
-	if ai.RouteRevision != "v2" || ai.Evaluation.RouteRevision != "v2" {
-		t.Fatalf("production AI route revisions = %q/%q, want v2/v2", ai.RouteRevision, ai.Evaluation.RouteRevision)
+	if ai.RouteRevision != "v3" || ai.Evaluation.RouteRevision != "v2" {
+		t.Fatalf("production AI route revisions = %q/%q, want v3/v2", ai.RouteRevision, ai.Evaluation.RouteRevision)
 	}
-	if ai.ReasoningEffort != "low" || ai.Evaluation.ReasoningEffort != "low" {
-		t.Fatalf("production AI reasoning efforts = %q/%q, want low/low", ai.ReasoningEffort, ai.Evaluation.ReasoningEffort)
+	if ai.ReasoningEffort != "none" || ai.Evaluation.ReasoningEffort != "low" {
+		t.Fatalf("production AI reasoning efforts = %q/%q, want none/low", ai.ReasoningEffort, ai.Evaluation.ReasoningEffort)
 	}
 	if ai.MaxOutputTokens < 12000 || ai.Evaluation.MaxOutputTokens < 8000 {
 		t.Fatalf("production AI output token limits = %d/%d, want at least 12000/8000", ai.MaxOutputTokens, ai.Evaluation.MaxOutputTokens)

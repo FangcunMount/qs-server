@@ -131,15 +131,16 @@ ai_explanation:
   participant_enabled: false
   provider: "deepseek"
   model: "deepseek-v4-flash"
-  route_revision: "v2"
+  route_revision: "v3"
   endpoint: ""
   api_key: ""
   timeout: 120s
   run_lease_duration: 5m
-  # DeepSeek Responses API 默认启用 high 思考；真实 35 次评测中 9 次在 8000 token 截断。
-  # low 仍保留推理，但显著减少思维 token 对最终结构化输出和时延的挤占。
-  reasoning_effort: "low"
-  # 上限同时覆盖推理 token 与最终结构化输出；v2 在 low 思考下保留结构化输出余量。
+  # v2 的 low 思考已将技术失败从 15/35 降至 1/35；剩余失败是 completed/no_message，
+  # 且只使用 956 output tokens，不是 token 或 timeout 问题。v3 关闭生成端思考，要求 Provider
+  # 直接形成受 JSON Schema 约束的最终 message；独立模型裁判继续保留 low 思考。
+  reasoning_effort: "none"
+  # 上限同时覆盖推理 token 与最终结构化输出；关闭生成端思考后继续保留 12000 的输出余量。
   max_output_tokens: 12000
   max_response_bytes: 4194304
   # 2026-08-27 已确认的生产保留策略：Participant 180 天、Prompt 评测 365 天、容量账本 35 天。
