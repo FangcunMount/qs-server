@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "c3be316dfde3acf69dbdc79aba88e10ca00def9a",
+    "sha": "c4666ab46006139851f4c3e4724cf178f82d5f73",
     "verified_on": "2026-08-28"
   },
   "status_policy": {
@@ -5064,8 +5064,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "6a61be5d4ab3d9720e018b6bd862ce0c0fd25aa7",
-        "verified_on": "2026-08-27"
+        "source_sha": "c4666ab46006139851f4c3e4724cf178f82d5f73",
+        "verified_on": "2026-08-28"
       },
       "fact_sources": [
         {
@@ -5098,15 +5098,15 @@
           "kind": "command",
           "command": "go test -count=1 ./internal/pkg/cache/... ./internal/apiserver/cache/... ./internal/collection-server/cache ./internal/pkg/redisruntime/... ./internal/apiserver/application/systemgovernance/... ./internal/apiserver/transport/rest/... ./internal/pkg/signalcatalog ./internal/pkg/configcontract ./internal/pkg/architecture",
           "result": "passed",
-          "source_sha": "6a61be5d4ab3d9720e018b6bd862ce0c0fd25aa7",
-          "verified_on": "2026-08-27"
+          "source_sha": "c4666ab46006139851f4c3e4724cf178f82d5f73",
+          "verified_on": "2026-08-28"
         },
         {
           "kind": "command",
           "command": "go test -race -count=1 ./internal/pkg/cache/...",
           "result": "passed",
-          "source_sha": "6a61be5d4ab3d9720e018b6bd862ce0c0fd25aa7",
-          "verified_on": "2026-08-27"
+          "source_sha": "c4666ab46006139851f4c3e4724cf178f82d5f73",
+          "verified_on": "2026-08-28"
         }
       ],
       "production_evidence": {
