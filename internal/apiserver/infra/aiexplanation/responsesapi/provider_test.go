@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -189,6 +191,45 @@ func TestProviderMarksPostDispatchTimeoutResultUnknown(t *testing.T) {
 	}
 }
 
+func TestProviderClassifiesResponseBodyDeadlineAsUnknownTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	provider := mustProvider(t, Config{Provider: ProviderOpenAI, Endpoint: server.URL, APIKey: "test-secret", HTTPClient: server.Client()})
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	_, err := provider.Generate(ctx, validRequest())
+	classified := requireProviderError(t, err)
+	if classified.Kind != domainrun.FailureKindProviderTimeout || classified.Code != "provider_timeout" || !classified.Retryable || !classified.ResultUnknown {
+		t.Fatalf("classified body deadline = %#v", classified)
+	}
+}
+
+func TestProviderMarksGenericResponseBodyReadFailureResultUnknown(t *testing.T) {
+	client := &http.Client{Transport: roundTripperFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     make(http.Header),
+			Body:       readFailureBody{},
+		}, nil
+	})}
+	provider := mustProvider(t, Config{Provider: ProviderOpenAI, Endpoint: "https://provider.example/responses", APIKey: "test-secret", HTTPClient: client})
+	_, err := provider.Generate(context.Background(), validRequest())
+	classified := requireProviderError(t, err)
+	if classified.Kind != domainrun.FailureKindProviderTransport || classified.Code != "provider_response_read_failed" || !classified.Retryable || !classified.ResultUnknown {
+		t.Fatalf("classified body read failure = %#v", classified)
+	}
+	if strings.Contains(err.Error(), "sensitive response read detail") {
+		t.Fatal("raw response read failure leaked through provider error")
+	}
+}
+
 func TestProviderDoesNotMarkPreDispatchCancellationUnknown(t *testing.T) {
 	provider := mustProvider(t, Config{Provider: ProviderOpenAI, Endpoint: "https://example.invalid/v1/responses", APIKey: "test-secret"})
 	ctx, cancel := context.WithCancel(context.Background())
@@ -364,3 +405,19 @@ func mustJSON(t *testing.T, value any) string {
 	}
 	return string(raw)
 }
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripperFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return fn(request)
+}
+
+type readFailureBody struct{}
+
+func (readFailureBody) Read([]byte) (int, error) {
+	return 0, fmt.Errorf("sensitive response read detail")
+}
+
+func (readFailureBody) Close() error { return nil }
+
+var _ io.ReadCloser = readFailureBody{}

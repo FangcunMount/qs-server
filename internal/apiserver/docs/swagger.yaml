@@ -929,6 +929,8 @@ definitions:
         items:
           $ref: '#/definitions/handler.AIExplanationReviewAttemptSummary'
         type: array
+      can_cancel:
+        type: boolean
       can_finalize:
         type: boolean
       can_review:
@@ -982,6 +984,8 @@ definitions:
     type: object
   handler.AIExplanationEvaluationSummaryWire:
     properties:
+      can_cancel:
+        type: boolean
       can_finalize:
         type: boolean
       can_review:
@@ -1384,6 +1388,8 @@ definitions:
     properties:
       all_required_reviews_recorded:
         type: boolean
+      failed_attempts:
+        type: integer
       fully_reviewed_attempts:
         type: integer
       generation_attempts:

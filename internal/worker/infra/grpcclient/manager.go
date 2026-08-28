@@ -17,14 +17,15 @@ import (
 
 // ManagerConfig gRPC 客户端管理器配置
 type ManagerConfig struct {
-	Endpoint      string        // apiserver gRPC 地址
-	Timeout       time.Duration // 请求超时时间
-	DialTimeout   time.Duration // 连接超时时间
-	PoolSize      int           // 连接池大小（默认 1）
-	MaxRetries    int           // 最大重试次数
-	KeepaliveTime time.Duration // Keepalive 时间
-	Insecure      bool          // 是否使用明文连接
-	TLS           TLSConfig     // TLS 配置
+	Endpoint             string        // apiserver gRPC 地址
+	Timeout              time.Duration // 普通请求超时时间
+	AIExplanationTimeout time.Duration // AI 解读与评测请求超时时间
+	DialTimeout          time.Duration // 连接超时时间
+	PoolSize             int           // 连接池大小（默认 1）
+	MaxRetries           int           // 最大重试次数
+	KeepaliveTime        time.Duration // Keepalive 时间
+	Insecure             bool          // 是否使用明文连接
+	TLS                  TLSConfig     // TLS 配置
 }
 
 // TLSConfig TLS/mTLS 配置
@@ -61,6 +62,9 @@ func NewManager(cfg *ManagerConfig) (*Manager, error) {
 	}
 	if cfg.Timeout <= 0 {
 		cfg.Timeout = 30 * time.Second
+	}
+	if cfg.AIExplanationTimeout <= 0 {
+		cfg.AIExplanationTimeout = 3 * time.Minute
 	}
 	if cfg.DialTimeout <= 0 {
 		cfg.DialTimeout = 5 * time.Second
@@ -223,6 +227,11 @@ func (m *Manager) Conn() *grpc.ClientConn {
 // Timeout 获取请求超时时间
 func (m *Manager) Timeout() time.Duration {
 	return m.config.Timeout
+}
+
+// AIExplanationTimeout 获取 AI 解读与评测请求超时时间。
+func (m *Manager) AIExplanationTimeout() time.Duration {
+	return m.config.AIExplanationTimeout
 }
 
 // Close 关闭所有连接

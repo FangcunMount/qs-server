@@ -60,7 +60,7 @@ func NewAIExplanationAutomationClient(manager *Manager) *AIExplanationAutomation
 }
 
 func (c *AIExplanationAutomationClient) ExecuteAIExplanation(ctx context.Context, req *interpretationpb.ExecuteAIExplanationRequest) (*interpretationpb.ExecuteAIExplanationResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
+	ctx, cancel := context.WithTimeout(ctx, c.manager.AIExplanationTimeout())
 	defer cancel()
 	resp, err := c.client.ExecuteAIExplanation(ctx, req)
 	if err != nil {
@@ -70,7 +70,7 @@ func (c *AIExplanationAutomationClient) ExecuteAIExplanation(ctx context.Context
 }
 
 func (c *AIExplanationAutomationClient) ExecutePromptEvaluationStep(ctx context.Context, request *interpretationpb.ExecutePromptEvaluationStepRequest) (*interpretationpb.ExecutePromptEvaluationStepResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
+	ctx, cancel := context.WithTimeout(ctx, c.manager.AIExplanationTimeout())
 	defer cancel()
 	resp, err := c.client.ExecutePromptEvaluationStep(ctx, request)
 	if err != nil {

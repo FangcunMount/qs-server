@@ -100,6 +100,7 @@ type AIExplanationEvaluationRunWire struct {
 	Gate                           *AIExplanationGateWire                `json:"gate,omitempty"`
 	CanReview                      bool                                  `json:"can_review"`
 	CanFinalize                    bool                                  `json:"can_finalize"`
+	CanCancel                      bool                                  `json:"can_cancel"`
 	RecoveryMaxProviderInvocations int                                   `json:"recovery_max_provider_invocations"`
 }
 
@@ -124,6 +125,7 @@ type AIExplanationEvaluationSummaryWire struct {
 	Gate                           *AIExplanationGateWire             `json:"gate,omitempty"`
 	CanReview                      bool                               `json:"can_review"`
 	CanFinalize                    bool                               `json:"can_finalize"`
+	CanCancel                      bool                               `json:"can_cancel"`
 	RecoveryMaxProviderInvocations int                                `json:"recovery_max_provider_invocations"`
 }
 
@@ -294,6 +296,7 @@ type AIExplanationSemanticEvaluatorWire struct {
 type AIExplanationReviewProgressWire struct {
 	PlannedGenerationAttempts  int  `json:"planned_generation_attempts"`
 	GenerationAttempts         int  `json:"generation_attempts"`
+	FailedAttempts             int  `json:"failed_attempts"`
 	PendingGenerationAttempts  int  `json:"pending_generation_attempts"`
 	RequiredReviews            int  `json:"required_reviews"`
 	RecordedReviews            int  `json:"recorded_reviews"`
@@ -922,7 +925,7 @@ func evaluationRunWire(value *appevaluation.ReviewRun) AIExplanationEvaluationRu
 		RequestedOrgID: value.RequestedOrgID, RequestedBy: value.RequestedBy,
 		RequestReason: value.RequestReason, CreatedAt: value.CreatedAt,
 		Release: releaseWire(value.Release), Progress: reviewProgressWire(value.Progress), Attempts: attempts,
-		Gate: gateWire(value.Gate), CanReview: value.CanReview, CanFinalize: value.CanFinalize,
+		Gate: gateWire(value.Gate), CanReview: value.CanReview, CanFinalize: value.CanFinalize, CanCancel: value.CanCancel,
 		RecoveryMaxProviderInvocations: value.RecoveryMaxProviderInvocations,
 	}
 	if value.Execution != nil {
@@ -969,7 +972,7 @@ func evaluationSummaryWire(value *appevaluation.ReviewRun) AIExplanationEvaluati
 		RequestedOrgID: value.RequestedOrgID, RequestedBy: value.RequestedBy,
 		RequestReason: value.RequestReason, CreatedAt: value.CreatedAt,
 		Release: releaseWire(value.Release), Progress: reviewProgressWire(value.Progress), Gate: gateWire(value.Gate),
-		CanReview: value.CanReview, CanFinalize: value.CanFinalize,
+		CanReview: value.CanReview, CanFinalize: value.CanFinalize, CanCancel: value.CanCancel,
 		RecoveryMaxProviderInvocations: value.RecoveryMaxProviderInvocations,
 	}
 }
@@ -1116,7 +1119,7 @@ func reviewProgressWire(value appevaluation.ReviewProgress) AIExplanationReviewP
 	if pending < 0 {
 		pending = 0
 	}
-	return AIExplanationReviewProgressWire{PlannedGenerationAttempts: domainevaluation.RequiredGenerationAttempts, GenerationAttempts: value.GenerationAttempts, PendingGenerationAttempts: pending, RequiredReviews: value.RequiredReviews, RecordedReviews: value.RecordedReviews, MissingReviews: value.MissingReviews, FullyReviewedAttempts: value.FullyReviewedAttempts, RejectedReviews: value.RejectedReviews, AllRequiredReviewsRecorded: value.AllRequiredReviewsRecorded}
+	return AIExplanationReviewProgressWire{PlannedGenerationAttempts: domainevaluation.RequiredGenerationAttempts, GenerationAttempts: value.GenerationAttempts, FailedAttempts: value.FailedAttempts, PendingGenerationAttempts: pending, RequiredReviews: value.RequiredReviews, RecordedReviews: value.RecordedReviews, MissingReviews: value.MissingReviews, FullyReviewedAttempts: value.FullyReviewedAttempts, RejectedReviews: value.RejectedReviews, AllRequiredReviewsRecorded: value.AllRequiredReviewsRecorded}
 }
 
 func providerReceiptWire(value *aiexplanation.ProviderReceipt) *AIExplanationProviderReceiptWire {

@@ -356,6 +356,9 @@ func (s *service) CancelEvaluation(ctx context.Context, actor Actor, runID meta.
 	if err := validateEvaluationOrg(current, actor); err != nil {
 		return nil, err
 	}
+	if !current.CanCancel {
+		return nil, cberrors.WithCode(code.ErrConflict, "AI explanation evaluation cannot be canceled in its current state")
+	}
 	result, err := s.reviews.Cancel(ctx, runID, actor.Subject(), reason)
 	return result, mapKnownError(err)
 }

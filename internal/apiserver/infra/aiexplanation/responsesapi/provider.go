@@ -212,7 +212,7 @@ func (p *Provider) Generate(ctx context.Context, request appport.ProviderRequest
 
 	responseBody, tooLarge, err := readLimited(httpResponse.Body, p.maxResponseBytes)
 	if err != nil {
-		return nil, providerError(domainrun.FailureKindProviderTransport, "provider_response_read_failed", true, false, err)
+		return nil, classifyResponseReadError(err)
 	}
 	if tooLarge {
 		return nil, providerError(domainrun.FailureKindProviderTransport, "provider_response_too_large", false, false, nil)
@@ -379,6 +379,21 @@ func classifyTransportError(err error) (domainrun.FailureKind, string) {
 		return domainrun.FailureKindProviderTransport, "provider_request_cancelled"
 	}
 	return domainrun.FailureKindProviderTransport, "provider_transport_error"
+}
+
+// classifyResponseReadError is deliberately different from a pre-dispatch or
+// connect failure. Once response headers have been received, the provider may
+// already have completed and charged the request even when the body cannot be
+// read locally. The result must therefore remain unknown and must not be
+// blindly replayed.
+func classifyResponseReadError(err error) error {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return providerError(domainrun.FailureKindProviderTimeout, "provider_timeout", true, true, context.DeadlineExceeded)
+	}
+	if errors.Is(err, context.Canceled) {
+		return providerError(domainrun.FailureKindProviderTransport, "provider_response_cancelled", false, true, context.Canceled)
+	}
+	return providerError(domainrun.FailureKindProviderTransport, "provider_response_read_failed", true, true, nil)
 }
 
 func classifyContextKind(err error) domainrun.FailureKind {

@@ -298,7 +298,7 @@ func TestFindParticipantCapacityFailsClosedWhenDisabledOrReaderCrossesOrganizati
 }
 
 func TestRecoverAndCancelEvaluationKeepTrustedAudit(t *testing.T) {
-	run := &appevaluation.ReviewRun{RunID: meta.ID(700), Status: domainevaluation.StatusCollecting, RequestedOrgID: 7, RecoveryMaxProviderInvocations: 70}
+	run := &appevaluation.ReviewRun{RunID: meta.ID(700), Status: domainevaluation.StatusCollecting, RequestedOrgID: 7, RecoveryMaxProviderInvocations: 70, CanCancel: true}
 	reviews := &reviewWorkflowStub{run: run}
 	committer := &evaluationStartCommitterStub{}
 	service := NewService(reviews, &governanceStub{}, &accessStub{}, WithEvaluationExecution(

@@ -225,14 +225,32 @@ func (r *PromptEvaluationRun) appendRecovery(id, caseID string, attempt int, act
 	return caseID, attempt, nil
 }
 
-// Cancel stops a collecting run only while no Provider call can be in flight.
-// A prepared checkpoint is safe because aggregate-version CAS races with
-// MarkAttemptDispatching; a dispatching checkpoint requires recovery first.
+// CanCancel reports whether cancellation is a valid governance action. A
+// collecting run may be canceled only while no Provider call can be in flight.
+// An inventory-complete run may be canceled only when immutable attempt
+// evidence proves a technical failure; this prevents cancellation from being
+// used to bypass human review of a successful release candidate.
+func (r *PromptEvaluationRun) CanCancel() bool {
+	if r == nil {
+		return false
+	}
+	switch r.status {
+	case StatusCollecting:
+		return r.execution == nil || r.execution.Phase != AttemptExecutionDispatching
+	case StatusAwaitingReview:
+		return r.FailedAttemptCount() > 0
+	default:
+		return false
+	}
+}
+
+// Cancel records an audited terminal decision while preserving all completed
+// attempt and review evidence.
 func (r *PromptEvaluationRun) Cancel(actor, reason string, at time.Time) error {
 	actor, reason = strings.TrimSpace(actor), strings.TrimSpace(reason)
-	if r == nil || r.status != StatusCollecting || actor == "" || len(actor) > 256 || reason == "" || len(reason) > 1000 ||
-		at.IsZero() || at.Before(r.createdAt) || r.execution != nil && r.execution.Phase == AttemptExecutionDispatching {
-		return fmt.Errorf("%w: Provider dispatch may be in flight", ErrCancellationNotAllowed)
+	if r == nil || !r.CanCancel() || actor == "" || len(actor) > 256 || reason == "" || len(reason) > 1000 ||
+		at.IsZero() || at.Before(r.createdAt) || r.closedAt != nil && at.Before(*r.closedAt) {
+		return fmt.Errorf("%w: cancellation requires a safe collecting run or immutable technical failure evidence", ErrCancellationNotAllowed)
 	}
 	r.status = StatusCanceled
 	r.execution = nil
@@ -278,7 +296,7 @@ func (r *PromptEvaluationRun) CloseCollection(at time.Time) error {
 }
 
 func (r *PromptEvaluationRun) AddHumanReview(value HumanReview) error {
-	if r == nil || r.status != StatusAwaitingReview {
+	if r == nil || r.status != StatusAwaitingReview || r.FailedAttemptCount() > 0 {
 		return fmt.Errorf("AI explanation evaluation run awaiting review is required")
 	}
 	if err := value.Validate(); err != nil {
@@ -312,7 +330,7 @@ func (r *PromptEvaluationRun) AddHumanReview(value HumanReview) error {
 // durable rejected result; callers must start a new run rather than rewriting
 // release evidence.
 func (r *PromptEvaluationRun) Finalize(actor, reason string, at time.Time) error {
-	if r == nil || r.status != StatusAwaitingReview || strings.TrimSpace(actor) == "" || strings.TrimSpace(reason) == "" || at.IsZero() || at.Before(*r.closedAt) {
+	if r == nil || r.status != StatusAwaitingReview || r.FailedAttemptCount() > 0 || strings.TrimSpace(actor) == "" || strings.TrimSpace(reason) == "" || at.IsZero() || at.Before(*r.closedAt) {
 		return fmt.Errorf("AI explanation evaluation finalization audit is required")
 	}
 	for _, review := range r.reviews {
@@ -641,10 +659,17 @@ func (r *PromptEvaluationRun) validateLifecycle() error {
 			return fmt.Errorf("AI explanation evaluation persisted gate is invalid")
 		}
 	case StatusCanceled:
-		if r.execution != nil || r.closedAt != nil || r.finalizedAt != nil || r.gate != nil || len(r.reviews) != 0 ||
+		if r.execution != nil || r.finalizedAt != nil || r.gate != nil ||
 			r.canceledAt == nil || r.canceledAt.Before(r.createdAt) || r.canceledBy == "" || r.cancelReason == "" ||
 			r.finalizedBy != "" || r.finalReason != "" {
 			return fmt.Errorf("AI explanation evaluation canceled lifecycle is invalid")
+		}
+		if r.closedAt == nil {
+			if len(r.reviews) != 0 {
+				return fmt.Errorf("AI explanation evaluation collecting cancellation cannot contain reviews")
+			}
+		} else if !r.inventoryComplete() || r.FailedAttemptCount() == 0 || r.canceledAt.Before(*r.closedAt) || !r.reviewTimesValid() {
+			return fmt.Errorf("AI explanation evaluation post-collection cancellation requires technical failure evidence")
 		}
 	}
 	return nil
@@ -681,7 +706,8 @@ func (r *PromptEvaluationRun) reviewTimesValid() bool {
 		}
 	}
 	for _, review := range r.reviews {
-		if review.ReviewedAt.Before(*r.closedAt) || r.finalizedAt != nil && review.ReviewedAt.After(*r.finalizedAt) {
+		if review.ReviewedAt.Before(*r.closedAt) || r.finalizedAt != nil && review.ReviewedAt.After(*r.finalizedAt) ||
+			r.canceledAt != nil && review.ReviewedAt.After(*r.canceledAt) {
 			return false
 		}
 	}
@@ -706,6 +732,18 @@ func (r *PromptEvaluationRun) RequestedBy() string      { return r.requestedBy }
 func (r *PromptEvaluationRun) RequestReason() string    { return r.requestReason }
 func (r *PromptEvaluationRun) Execution() *AttemptExecution {
 	return cloneAttemptExecution(r.execution)
+}
+func (r *PromptEvaluationRun) FailedAttemptCount() int {
+	if r == nil {
+		return 0
+	}
+	count := 0
+	for _, attempt := range r.attempts {
+		if attempt.Stage == AttemptStageGeneration && attempt.Failure != nil {
+			count++
+		}
+	}
+	return count
 }
 func (r *PromptEvaluationRun) IsPublishEvidence() bool {
 	return r.status == StatusApproved && r.gate != nil && r.gate.Passed

@@ -65,6 +65,7 @@ type ReviewRunCatalogAttempt struct {
 	CaseID  string
 	Attempt int
 	Stage   domainevaluation.AttemptStage
+	Failed  bool
 }
 
 type ReviewRunCatalogReview struct {
@@ -104,6 +105,7 @@ type ReviewRun struct {
 	Gate                           *domainevaluation.GateResult
 	CanReview                      bool
 	CanFinalize                    bool
+	CanCancel                      bool
 	RecoveryMaxProviderInvocations int
 }
 
@@ -136,6 +138,7 @@ type ReviewCancellation struct {
 
 type ReviewProgress struct {
 	GenerationAttempts         int
+	FailedAttempts             int
 	RequiredReviews            int
 	RecordedReviews            int
 	MissingReviews             int
@@ -253,7 +256,8 @@ func (s *ReviewService) projectCatalogRecord(value ReviewRunCatalogRecord) (*Rev
 		return nil, err
 	}
 
-	generationAttempts := make(map[string]struct{}, len(value.Attempts))
+	progress := ReviewProgress{}
+	generationAttempts := make(map[string]bool, len(value.Attempts))
 	for _, attempt := range value.Attempts {
 		if attempt.Stage == domainevaluation.AttemptStagePreflight {
 			if attempt.CaseID != value.Release.PreflightCaseID || attempt.Attempt != 1 {
@@ -269,11 +273,15 @@ func (s *ReviewService) projectCatalogRecord(value ReviewRunCatalogRecord) (*Rev
 		if _, exists := generationAttempts[key]; exists {
 			return nil, fmt.Errorf("AI explanation Prompt review catalog attempt is duplicated")
 		}
-		generationAttempts[key] = struct{}{}
+		generationAttempts[key] = attempt.Failed
+		if attempt.Failed {
+			progress.FailedAttempts++
+		}
 	}
 
 	reviewsByAttempt := make(map[string]map[domainevaluation.ReviewRole]domainevaluation.ReviewDecision, len(value.Reviews))
-	progress := ReviewProgress{GenerationAttempts: len(generationAttempts), RequiredReviews: len(generationAttempts) * 2}
+	progress.GenerationAttempts = len(generationAttempts)
+	progress.RequiredReviews = len(generationAttempts) * 2
 	for _, review := range value.Reviews {
 		key := reviewAttemptKey(review.CaseID, review.Attempt)
 		if _, exists := generationAttempts[key]; !exists ||
@@ -312,8 +320,10 @@ func (s *ReviewService) projectCatalogRecord(value ReviewRunCatalogRecord) (*Rev
 		RequestedOrgID: value.RequestedOrgID, RequestedBy: value.RequestedBy,
 		RequestReason: value.RequestReason, CreatedAt: value.CreatedAt,
 		Progress: progress, Gate: value.Gate,
-		CanReview:   value.Status == domainevaluation.StatusAwaitingReview,
-		CanFinalize: value.Status == domainevaluation.StatusAwaitingReview && progress.AllRequiredReviewsRecorded,
+		CanReview:   value.Status == domainevaluation.StatusAwaitingReview && progress.FailedAttempts == 0,
+		CanFinalize: value.Status == domainevaluation.StatusAwaitingReview && progress.FailedAttempts == 0 && progress.AllRequiredReviewsRecorded,
+		CanCancel: value.Status == domainevaluation.StatusCollecting && (value.ExecutionPhase == nil || *value.ExecutionPhase != domainevaluation.AttemptExecutionDispatching) ||
+			value.Status == domainevaluation.StatusAwaitingReview && progress.FailedAttempts > 0,
 	}
 	if value.Status == domainevaluation.StatusCollecting {
 		result.RecoveryMaxProviderInvocations = (domainevaluation.RequiredGenerationAttempts - progress.GenerationAttempts) * 2
@@ -412,6 +422,9 @@ func (s *ReviewService) project(runRecord *domainevaluation.PromptEvaluationRun)
 		sort.Slice(reviews, func(i, j int) bool { return reviews[i].Role < reviews[j].Role })
 		missing := missingReviewRoles(reviews)
 		progress.GenerationAttempts++
+		if attempt.Failure != nil {
+			progress.FailedAttempts++
+		}
 		progress.RequiredReviews += 2
 		progress.RecordedReviews += len(reviews)
 		progress.MissingReviews += len(missing)
@@ -445,8 +458,9 @@ func (s *ReviewService) project(runRecord *domainevaluation.PromptEvaluationRun)
 		RequestedOrgID: runRecord.RequestedOrgID(), RequestedBy: runRecord.RequestedBy(),
 		RequestReason: runRecord.RequestReason(), CreatedAt: runRecord.CreatedAt(),
 		Progress: progress, Attempts: attempts, Gate: runRecord.Gate(),
-		CanReview:   runRecord.Status() == domainevaluation.StatusAwaitingReview,
-		CanFinalize: runRecord.Status() == domainevaluation.StatusAwaitingReview && progress.AllRequiredReviewsRecorded,
+		CanReview:   runRecord.Status() == domainevaluation.StatusAwaitingReview && progress.FailedAttempts == 0,
+		CanFinalize: runRecord.Status() == domainevaluation.StatusAwaitingReview && progress.FailedAttempts == 0 && progress.AllRequiredReviewsRecorded,
+		CanCancel:   runRecord.CanCancel(),
 	}
 	if runRecord.Status() == domainevaluation.StatusCollecting {
 		pending := domainevaluation.RequiredGenerationAttempts - progress.GenerationAttempts

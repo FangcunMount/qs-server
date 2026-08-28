@@ -54,9 +54,10 @@ type promptEvaluationCatalogPO struct {
 }
 
 type promptEvaluationCatalogAttemptPO struct {
-	CaseID  string `bson:"case_id"`
-	Attempt int    `bson:"attempt"`
-	Stage   string `bson:"stage"`
+	CaseID  string   `bson:"case_id"`
+	Attempt int      `bson:"attempt"`
+	Stage   string   `bson:"stage"`
+	Failure bson.Raw `bson:"failure,omitempty"`
 }
 
 type promptEvaluationCatalogReviewPO struct {
@@ -129,7 +130,7 @@ func (r *PromptEvaluationRepository) ListForReview(
 		}
 		for _, attempt := range value.Attempts {
 			record.Attempts = append(record.Attempts, appevaluation.ReviewRunCatalogAttempt{
-				CaseID: attempt.CaseID, Attempt: attempt.Attempt, Stage: domainevaluation.AttemptStage(attempt.Stage),
+				CaseID: attempt.CaseID, Attempt: attempt.Attempt, Stage: domainevaluation.AttemptStage(attempt.Stage), Failed: len(attempt.Failure) > 0,
 			})
 		}
 		for _, review := range value.Reviews {
@@ -152,7 +153,7 @@ func (r *PromptEvaluationRepository) listPromptEvaluationPOs(ctx context.Context
 		SetSort(bson.D{{Key: "created_at", Value: -1}, {Key: "domain_id", Value: -1}}).
 		SetProjection(bson.M{
 			"_id": 0, "domain_id": 1, "created_at": 1, "release": 1, "status": 1, "version": 1,
-			"attempts.case_id": 1, "attempts.attempt": 1, "attempts.stage": 1,
+			"attempts.case_id": 1, "attempts.attempt": 1, "attempts.stage": 1, "attempts.failure": 1,
 			"reviews.case_id": 1, "reviews.attempt": 1, "reviews.role": 1, "reviews.decision": 1,
 			"execution.phase": 1, "requested_org_id": 1, "requested_by": 1, "request_reason": 1, "gate": 1,
 		}).
