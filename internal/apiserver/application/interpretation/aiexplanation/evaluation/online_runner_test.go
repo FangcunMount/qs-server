@@ -112,6 +112,47 @@ func TestOnlineRunnerPersistsProviderFailureAndCompletesInventory(t *testing.T) 
 	}
 }
 
+func TestOnlineRunnerJudgesStructurallyValidCandidateThatFailsDeterministicGate(t *testing.T) {
+	provider := &onlineProviderStub{mutate: func(caseID string, content *domainoutput.Content) {
+		if caseID == "PROMPT-EVAL-001" {
+			content.Suggestions[0].Origin = domainoutput.SuggestionOriginGeneratedLowRisk
+			content.Suggestions[0].SourceSuggestionRefs = []string{}
+		}
+	}}
+	semantic := &onlineSemanticStub{}
+	repository := &onlineEvidenceRepository{}
+	runner := newOnlineRunner(t, promptResolverStub{}, provider, semantic, repository)
+
+	started, err := runner.StartV1(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := runner.RunStepV1(context.Background(), evaluation.OnlineStepCommand{
+		RunID: started.Run.ID(), CaseID: "PROMPT-EVAL-001", Attempt: 1, Owner: "event-step-hard-gate",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != evaluation.OnlineStepProgressed || provider.calls != 1 || semantic.calls != 1 {
+		attempts := result.Run.Attempts()
+		t.Fatalf("step/calls = %s/%d/%d; attempt = %#v", result.Status, provider.calls, semantic.calls, attempts[len(attempts)-1])
+	}
+	attempts := result.Run.Attempts()
+	attempt := attempts[len(attempts)-1]
+	if attempt.Failure != nil || attempt.Semantic == nil || len(attempt.NormalizedOutput) == 0 {
+		t.Fatalf("hard-gate attempt evidence = %#v", attempt)
+	}
+	foundDeterministicFailure := false
+	for _, receipt := range attempt.Assertions {
+		if receipt.Type == "suggestion_origin_present" && receipt.Status == domainevaluation.AssertionFailed {
+			foundDeterministicFailure = true
+		}
+	}
+	if !foundDeterministicFailure {
+		t.Fatalf("hard-gate failure receipts = %#v", attempt.Assertions)
+	}
+}
+
 func TestOnlineRunnerPreflightFailureMakesNoProviderCallOrEvidenceRun(t *testing.T) {
 	provider := &onlineProviderStub{}
 	semantic := &onlineSemanticStub{}
@@ -244,6 +285,7 @@ func (onlineRouteResolver) ResolveProviderRoute(_ context.Context, route string)
 type onlineProviderStub struct {
 	calls         int
 	failAt        int
+	mutate        func(caseID string, content *domainoutput.Content)
 	invocationIDs []string
 }
 
@@ -255,6 +297,9 @@ func (p *onlineProviderStub) Generate(_ context.Context, request appport.Provide
 	}
 	caseID := onlineCaseID(request.InvocationID)
 	content := onlineCandidate(caseID)
+	if p.mutate != nil {
+		p.mutate(caseID, &content)
+	}
 	raw, err := json.Marshal(content)
 	if err != nil {
 		return nil, err

@@ -49,7 +49,7 @@ func TestNSQDeliveryExhaustionPersistsMySQLDeadLetter(t *testing.T) {
 		},
 		FailedMessageHandler: FailedMessageHandler(recorder),
 	}
-	subscriber, err := NewSubscriber(SubscriberConfig{Provider: "nsq", NSQLookupdAddr: lookupd}, options)
+	subscriber, err := NewSubscriber(SubscriberConfig{Provider: "nsq", NSQLookupdAddr: lookupd, NSQMessageTimeout: time.Minute}, options)
 	if err != nil {
 		t.Fatal(err)
 	}

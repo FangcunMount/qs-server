@@ -574,7 +574,11 @@ func (r *OnlineRunner) executeAttempt(
 		return r.failedAttempt(base, "deterministic_evaluation", "candidate_receipts_invalid", "candidate assertion evidence could not be created", false, false)
 	}
 	base.Assertions = receipts
-	if !candidate.DeterministicHardGatePassed {
+	// A deterministic hard-gate failure remains release-blocking, but it must
+	// not erase the independent-model evidence for an otherwise structurally
+	// valid candidate. Invalid/unparseable Provider output has no normalized
+	// document and is therefore not sent to the semantic evaluator.
+	if validationErr != nil || len(base.NormalizedOutput) == 0 || len(semanticObligations) == 0 {
 		base.FinishedAt = r.finishTime(startedAt)
 		return base
 	}

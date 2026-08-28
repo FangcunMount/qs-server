@@ -45,6 +45,21 @@ func TestNewSubscriberOptionsRejectsMissingTerminalHandlerAndHardCap(t *testing.
 	}
 }
 
+func TestNewNSQConfigRequiresAndAppliesMessageTimeout(t *testing.T) {
+	t.Parallel()
+
+	if _, err := newNSQConfig(0); err == nil {
+		t.Fatal("zero NSQ message timeout accepted")
+	}
+	config, err := newNSQConfig(6 * time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.MsgTimeout != 6*time.Minute {
+		t.Fatalf("NSQ message timeout = %s, want 6m", config.MsgTimeout)
+	}
+}
+
 func TestFailedMessageHandlerPreservesTransportEvidence(t *testing.T) {
 	recorder := &deadLetterRecorderStub{}
 	handler := FailedMessageHandler(recorder)

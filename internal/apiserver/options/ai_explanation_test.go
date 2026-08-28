@@ -106,6 +106,28 @@ func TestAIExplanationEvaluationRequiresIndependentModelAndParentRuntime(t *test
 	}
 }
 
+func TestAIExplanationEvaluationAttemptLeaseCoversBothProviderStages(t *testing.T) {
+	t.Parallel()
+
+	opts := NewAIExplanationOptions()
+	if opts.Evaluation.AttemptLeaseDuration != 4*time.Minute {
+		t.Fatalf("default evaluation attempt lease = %s, want 4m", opts.Evaluation.AttemptLeaseDuration)
+	}
+	if opts.Evaluation.AttemptLeaseDuration < opts.Timeout+opts.Evaluation.Timeout+time.Minute {
+		t.Fatalf("default evaluation attempt lease = %s, does not cover both Provider stages", opts.Evaluation.AttemptLeaseDuration)
+	}
+
+	opts.Enabled = true
+	opts.APIKey = "provider-test-secret"
+	configureAIExplanationTestLifecycle(opts)
+	opts.Evaluation.Enabled = true
+	opts.Evaluation.Model = "independent-judge-model-snapshot"
+	opts.Evaluation.AttemptLeaseDuration = opts.Timeout + opts.Evaluation.Timeout
+	if joined := errorsText(opts.Validate()); !strings.Contains(joined, "attempt_lease_duration") {
+		t.Fatalf("short attempt lease validation errors = %v", opts.Validate())
+	}
+}
+
 func TestAIExplanationEvaluationCapacityUsesFixedV1RunCeiling(t *testing.T) {
 	opts := NewAIExplanationOptions()
 	opts.Enabled = true

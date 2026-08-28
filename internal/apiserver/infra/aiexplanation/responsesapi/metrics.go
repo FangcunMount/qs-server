@@ -26,6 +26,7 @@ const (
 	providerResultInvalidResponse = "invalid_response"
 	providerResultUnknown         = "result_unknown"
 	providerResultError           = "error"
+	providerFailureCodeOther      = "other"
 )
 
 // observeProviderInvocation exposes only bounded purpose/result labels. Model,
@@ -36,9 +37,35 @@ func observeProviderInvocation(schemaVersion string, duration time.Duration, res
 	result := providerMetricResult(err)
 	providerRequestsTotal.WithLabelValues(purpose, result).Inc()
 	providerDurationSeconds.WithLabelValues(purpose, result).Observe(duration.Seconds())
+	if err != nil {
+		providerFailuresTotal.WithLabelValues(purpose, result, providerMetricFailureCode(err)).Inc()
+	}
 	if err == nil && response != nil {
 		providerTokensTotal.WithLabelValues(purpose, "input").Add(float64(response.Receipt.InputTokens))
 		providerTokensTotal.WithLabelValues(purpose, "output").Add(float64(response.Receipt.OutputTokens))
+	}
+}
+
+// providerMetricFailureCode keeps the error-code label finite. New Provider
+// error codes must be reviewed and added explicitly; arbitrary remote values
+// and wrapped error messages collapse to "other".
+func providerMetricFailureCode(err error) string {
+	var providerErr *appport.ProviderError
+	if !errors.As(err, &providerErr) || providerErr == nil {
+		return providerFailureCodeOther
+	}
+	switch providerErr.Code {
+	case "provider_request_invalid", "provider_request_encode_failed", "provider_request_build_failed",
+		"provider_request_cancelled", "provider_request_rejected", "provider_authentication_failed",
+		"provider_transport_error", "provider_response_read_failed", "provider_server_error",
+		"provider_response_invalid", "provider_response_too_large", "provider_response_id_missing",
+		"provider_model_mismatch", "provider_response_failed", "provider_response_incomplete",
+		"provider_response_cancelled", "provider_response_not_terminal", "provider_response_status_invalid",
+		"provider_output_cardinality_invalid", "provider_output_token_limit", "provider_usage_invalid",
+		"provider_rate_limited", "provider_timeout", "provider_refusal":
+		return providerErr.Code
+	default:
+		return providerFailureCodeOther
 	}
 }
 
@@ -99,6 +126,10 @@ var (
 		Help:    "AI explanation Provider request duration by bounded purpose and result.",
 		Buckets: []float64{0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 40, 80},
 	}, []string{"purpose", "result"})
+	providerFailuresTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "qs", Subsystem: "ai_explanation_provider", Name: "failures_total",
+		Help: "AI explanation Provider failures by bounded purpose, result, and reviewed code.",
+	}, []string{"purpose", "result", "code"})
 	providerTokensTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "qs", Subsystem: "ai_explanation_provider", Name: "tokens_total",
 		Help: "Provider-reported AI explanation token usage by bounded purpose and direction.",

@@ -58,8 +58,9 @@ type MessagingOptions struct {
 	// Provider 消息队列提供者 (nsq, rabbitmq)
 	Provider string `json:"provider" mapstructure:"provider"`
 	// NSQ 配置
-	NSQAddr        string `json:"nsq_addr" mapstructure:"nsq-addr"`
-	NSQLookupdAddr string `json:"nsq_lookupd_addr" mapstructure:"nsq-lookupd-addr"`
+	NSQAddr           string        `json:"nsq_addr" mapstructure:"nsq-addr"`
+	NSQLookupdAddr    string        `json:"nsq_lookupd_addr" mapstructure:"nsq-lookupd-addr"`
+	NSQMessageTimeout time.Duration `json:"nsq_message_timeout" mapstructure:"nsq-message-timeout"`
 	// RabbitMQ 配置
 	RabbitMQURL string           `json:"rabbitmq_url" mapstructure:"rabbitmq_url"`
 	Delivery    *DeliveryOptions `json:"delivery" mapstructure:"delivery"`
@@ -135,10 +136,11 @@ func NewOptions() *Options {
 		MySQL:   genericoptions.NewMySQLOptions(),
 		MongoDB: genericoptions.NewMongoDBOptions(),
 		Messaging: &MessagingOptions{
-			Provider:       "nsq",
-			NSQAddr:        "localhost:4150",
-			NSQLookupdAddr: "localhost:4161",
-			Delivery:       genericoptions.NewTransportDeliveryOptions(),
+			Provider:          "nsq",
+			NSQAddr:           "localhost:4150",
+			NSQLookupdAddr:    "localhost:4161",
+			NSQMessageTimeout: 4 * time.Minute,
+			Delivery:          genericoptions.NewTransportDeliveryOptions(),
 		},
 		RetryGovernance: &RetryGovernanceOptions{AutomaticRetryEnabled: true, HoldReplay: &RetryPolicyOptions{MaxAttempts: 30, BaseDelay: 10 * time.Second, MaxDelay: time.Hour, JitterFraction: .2}},
 		GRPC: &GRPCOptions{
@@ -207,6 +209,8 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 		"NSQ daemon address")
 	messagingFS.StringVar(&o.Messaging.NSQLookupdAddr, "messaging.nsq-lookupd-addr", o.Messaging.NSQLookupdAddr,
 		"NSQ lookupd address")
+	messagingFS.DurationVar(&o.Messaging.NSQMessageTimeout, "messaging.nsq-message-timeout", o.Messaging.NSQMessageTimeout,
+		"NSQ server-side message timeout; must cover the longest worker handler RPC")
 	messagingFS.StringVar(&o.Messaging.RabbitMQURL, "messaging.rabbitmq-url", o.Messaging.RabbitMQURL,
 		"RabbitMQ connection URL")
 	if o.Messaging.Delivery == nil {
@@ -317,6 +321,13 @@ func (o *Options) Validate() []error {
 	if o.Messaging != nil && o.Messaging.Delivery != nil {
 		if o.Messaging.Delivery.MaxAttempts < 1 || o.Messaging.Delivery.MaxAttempts > retrygovernance.HardMaxDeliveryAttempts {
 			errs = append(errs, fmt.Errorf("messaging.delivery.max_attempts must be between 1 and %d", retrygovernance.HardMaxDeliveryAttempts))
+		}
+	}
+	if o.Messaging != nil && o.Messaging.Provider == "nsq" {
+		if o.Messaging.NSQMessageTimeout <= 0 {
+			errs = append(errs, fmt.Errorf("messaging.nsq_message_timeout must be greater than 0"))
+		} else if o.GRPC != nil && o.Messaging.NSQMessageTimeout <= o.GRPC.AIExplanationTimeout {
+			errs = append(errs, fmt.Errorf("messaging.nsq_message_timeout must be greater than grpc.ai-explanation-timeout"))
 		}
 	}
 	if o.RetryGovernance != nil && o.RetryGovernance.HoldReplay != nil {

@@ -65,12 +65,13 @@ type AIExplanationParticipantCapacityOptions struct {
 // resolves a distinct Route/model and is never enabled implicitly with the
 // participant runtime.
 type AIExplanationEvaluationOptions struct {
-	Enabled         bool                                   `json:"enabled" mapstructure:"enabled"`
-	Model           string                                 `json:"model" mapstructure:"model"`
-	RouteRevision   string                                 `json:"route_revision" mapstructure:"route_revision"`
-	Timeout         time.Duration                          `json:"timeout" mapstructure:"timeout"`
-	MaxOutputTokens int                                    `json:"max_output_tokens" mapstructure:"max_output_tokens"`
-	Capacity        AIExplanationEvaluationCapacityOptions `json:"capacity" mapstructure:"capacity"`
+	Enabled              bool                                   `json:"enabled" mapstructure:"enabled"`
+	Model                string                                 `json:"model" mapstructure:"model"`
+	RouteRevision        string                                 `json:"route_revision" mapstructure:"route_revision"`
+	Timeout              time.Duration                          `json:"timeout" mapstructure:"timeout"`
+	AttemptLeaseDuration time.Duration                          `json:"attempt_lease_duration" mapstructure:"attempt_lease_duration"`
+	MaxOutputTokens      int                                    `json:"max_output_tokens" mapstructure:"max_output_tokens"`
+	Capacity             AIExplanationEvaluationCapacityOptions `json:"capacity" mapstructure:"capacity"`
 }
 
 // AIExplanationEvaluationCapacityOptions is a conservative v1 admission
@@ -94,7 +95,8 @@ func NewAIExplanationOptions() *AIExplanationOptions {
 			MaxActiveProviderExecutionsPerUser: 2, MaxActiveProviderExecutionsPerAssessment: 1,
 		},
 		Evaluation: AIExplanationEvaluationOptions{
-			Enabled: false, RouteRevision: "v1", Timeout: 60 * time.Second, MaxOutputTokens: 2500,
+			Enabled: false, RouteRevision: "v1", Timeout: 60 * time.Second,
+			AttemptLeaseDuration: 4 * time.Minute, MaxOutputTokens: 2500,
 			Capacity: AIExplanationEvaluationCapacityOptions{
 				MaxActiveRunsPerOrg: 1, DailyProviderInvocationBudgetPerOrg: 140,
 			},
@@ -187,6 +189,10 @@ func (o *AIExplanationOptions) Validate() []error {
 		if o.Evaluation.Timeout <= 0 {
 			errs = append(errs, fmt.Errorf("ai_explanation.evaluation.timeout must be positive"))
 		}
+		minimumAttemptLease := o.Timeout + o.Evaluation.Timeout + time.Minute
+		if o.Evaluation.AttemptLeaseDuration < minimumAttemptLease {
+			errs = append(errs, fmt.Errorf("ai_explanation.evaluation.attempt_lease_duration must be at least generation timeout plus semantic timeout plus 1m"))
+		}
 		if o.Evaluation.MaxOutputTokens < 1 {
 			errs = append(errs, fmt.Errorf("ai_explanation.evaluation.max_output_tokens must be positive"))
 		}
@@ -245,6 +251,7 @@ func (o *AIExplanationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.Evaluation.Model, "ai_explanation.evaluation.model", o.Evaluation.Model, "Exact independent model or model snapshot used to judge synthetic explanations.")
 	fs.StringVar(&o.Evaluation.RouteRevision, "ai_explanation.evaluation.route-revision", o.Evaluation.RouteRevision, "Immutable semantic evaluator route revision.")
 	fs.DurationVar(&o.Evaluation.Timeout, "ai_explanation.evaluation.timeout", o.Evaluation.Timeout, "Deadline for one semantic evaluator call.")
+	fs.DurationVar(&o.Evaluation.AttemptLeaseDuration, "ai_explanation.evaluation.attempt-lease-duration", o.Evaluation.AttemptLeaseDuration, "Durable ownership lease for one generation and semantic evaluation attempt.")
 	fs.IntVar(&o.Evaluation.MaxOutputTokens, "ai_explanation.evaluation.max-output-tokens", o.Evaluation.MaxOutputTokens, "Maximum output tokens for one semantic evaluator response.")
 	fs.IntVar(&o.Evaluation.Capacity.MaxActiveRunsPerOrg, "ai_explanation.evaluation.capacity.max-active-runs-per-org", o.Evaluation.Capacity.MaxActiveRunsPerOrg, "Maximum collecting Prompt evaluation runs per organization; v1 requires exactly one.")
 	fs.IntVar(&o.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg, "ai_explanation.evaluation.capacity.daily-provider-invocation-budget-per-org", o.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg, "UTC-day Provider invocation reservation budget per organization.")

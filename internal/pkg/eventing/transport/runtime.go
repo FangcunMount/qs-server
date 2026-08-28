@@ -21,9 +21,10 @@ const (
 )
 
 type SubscriberConfig struct {
-	Provider       string
-	NSQLookupdAddr string
-	RabbitMQURL    string
+	Provider          string
+	NSQLookupdAddr    string
+	NSQMessageTimeout time.Duration
+	RabbitMQURL       string
 }
 
 func NewSubscriberOptions(maxInFlight, maxAttempts int, failedHandler basemessaging.FailedMessageHandler) (basemessaging.SubscriberOptions, error) {
@@ -47,12 +48,25 @@ func NewSubscriber(config SubscriberConfig, options basemessaging.SubscriberOpti
 	}
 	switch config.Provider {
 	case "nsq":
-		return cbnsq.NewSubscriberWithOptions([]string{config.NSQLookupdAddr}, nsq.NewConfig(), options)
+		nsqConfig, err := newNSQConfig(config.NSQMessageTimeout)
+		if err != nil {
+			return nil, err
+		}
+		return cbnsq.NewSubscriberWithOptions([]string{config.NSQLookupdAddr}, nsqConfig, options)
 	case "rabbitmq":
 		return cbrabbit.NewSubscriberWithOptions(config.RabbitMQURL, options)
 	default:
 		return nil, fmt.Errorf("unsupported messaging provider: %s", config.Provider)
 	}
+}
+
+func newNSQConfig(messageTimeout time.Duration) (*nsq.Config, error) {
+	if messageTimeout <= 0 {
+		return nil, fmt.Errorf("NSQ message timeout must be greater than 0")
+	}
+	config := nsq.NewConfig()
+	config.MsgTimeout = messageTimeout
+	return config, nil
 }
 
 func TerminalFailedMessageHandler(logger *slog.Logger, component string) basemessaging.FailedMessageHandler {
