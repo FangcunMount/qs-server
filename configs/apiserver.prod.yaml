@@ -131,16 +131,16 @@ ai_explanation:
   participant_enabled: false
   provider: "deepseek"
   model: "deepseek-v4-flash"
-  route_revision: "v4"
-  # DeepSeek 的 Responses json_schema 在生产样本中频繁返回 Markdown JSON 围栏。
-  # v4 改用 Provider 原生 json_object 保证 JSON 包络；服务端仍执行完整 v1 Schema 严格校验。
-  structured_output_mode: "json_object"
+  route_revision: "v5"
+  # v4 证明 json_object 只能保证合法 JSON，无法约束 AIExplanationOutput v1 的字段结构。
+  # v5 按 DeepSeek Responses API 当前契约恢复 json_schema，把完整冻结 Schema 交给 Provider。
+  structured_output_mode: "json_schema"
   endpoint: ""
   api_key: ""
   timeout: 120s
   run_lease_duration: 5m
-  # v3 已消除 no_message、token 和 timeout 失败，但 27/35 completed 正文带 Markdown JSON 围栏。
-  # v4 保持生成端关闭思考，并通过原生 json_object 约束最终 JSON 包络；独立模型裁判保留 low 思考。
+  # v3 已消除 no_message、token 和 timeout 失败；v4 消除了 Markdown 围栏，
+  # 但 35/35 输出仅满足 JSON 语法而不满足 v1 Schema。v5 恢复原生 Schema 约束。
   reasoning_effort: "none"
   # 上限同时覆盖推理 token 与最终结构化输出；关闭生成端思考后继续保留 12000 的输出余量。
   max_output_tokens: 12000

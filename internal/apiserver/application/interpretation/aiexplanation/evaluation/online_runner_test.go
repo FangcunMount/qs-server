@@ -112,6 +112,40 @@ func TestOnlineRunnerPersistsProviderFailureAndCompletesInventory(t *testing.T) 
 	}
 }
 
+func TestOnlineRunnerClassifiesSchemaInvalidProviderOutputAsTechnicalFailure(t *testing.T) {
+	provider := &onlineProviderStub{mutate: func(caseID string, content *domainoutput.Content) {
+		if caseID == "PROMPT-EVAL-001" {
+			content.SchemaVersion = ""
+		}
+	}}
+	semantic := &onlineSemanticStub{}
+	repository := &onlineEvidenceRepository{}
+	runner := newOnlineRunner(t, promptResolverStub{}, provider, semantic, repository)
+
+	result, err := runner.RunV1(context.Background(), evaluation.OnlineRunCommand{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Run.Status() != domainevaluation.StatusAwaitingReview || semantic.calls != 30 {
+		t.Fatalf("run/semantic calls = %s/%d", result.Run.Status(), semantic.calls)
+	}
+
+	failures := 0
+	for _, attempt := range result.Run.Attempts() {
+		if attempt.CaseID != "PROMPT-EVAL-001" || attempt.Stage != domainevaluation.AttemptStageGeneration {
+			continue
+		}
+		if attempt.Failure == nil || attempt.Failure.Stage != "output_validation" ||
+			attempt.Failure.Code != "provider_output_schema_invalid" || len(attempt.RawOutput) == 0 || len(attempt.NormalizedOutput) != 0 {
+			t.Fatalf("schema-invalid attempt evidence = %#v", attempt)
+		}
+		failures++
+	}
+	if failures != 5 || result.Run.FailedAttemptCount() != 5 || !result.Run.CanCancel() {
+		t.Fatalf("schema-invalid failure/cancel evidence = %d/%d/%v", failures, result.Run.FailedAttemptCount(), result.Run.CanCancel())
+	}
+}
+
 func TestOnlineRunnerJudgesStructurallyValidCandidateThatFailsDeterministicGate(t *testing.T) {
 	provider := &onlineProviderStub{mutate: func(caseID string, content *domainoutput.Content) {
 		if caseID == "PROMPT-EVAL-001" {

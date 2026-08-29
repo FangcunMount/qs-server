@@ -576,11 +576,31 @@ func (r *OnlineRunner) executeAttempt(
 		return r.failedAttempt(base, "deterministic_evaluation", "candidate_receipts_invalid", "candidate assertion evidence could not be created", false, false)
 	}
 	base.Assertions = receipts
+	// A Provider route that promises structured output has failed its execution
+	// contract when the returned document cannot pass the frozen output Schema.
+	// Keep the raw output and deterministic receipts as evidence, but also mark
+	// that structural violation as a technical failure so it cannot masquerade
+	// as a candidate ready for human review. Reference and Profile-policy
+	// failures remain ordinary release-gate evidence rather than Provider
+	// protocol failures.
+	if errors.Is(validationErr, appvalidation.ErrSchema) {
+		return r.failedAttempt(
+			base,
+			"output_validation",
+			"provider_output_schema_invalid",
+			"Provider output did not satisfy the frozen output schema",
+			false,
+			false,
+		)
+	}
+	if validationErr != nil || len(base.NormalizedOutput) == 0 {
+		base.FinishedAt = r.finishTime(startedAt)
+		return base
+	}
 	// A deterministic hard-gate failure remains release-blocking, but it must
 	// not erase the independent-model evidence for an otherwise structurally
-	// valid candidate. Invalid/unparseable Provider output has no normalized
-	// document and is therefore not sent to the semantic evaluator.
-	if validationErr != nil || len(base.NormalizedOutput) == 0 || len(semanticObligations) == 0 {
+	// valid candidate.
+	if len(semanticObligations) == 0 {
 		base.FinishedAt = r.finishTime(startedAt)
 		return base
 	}
