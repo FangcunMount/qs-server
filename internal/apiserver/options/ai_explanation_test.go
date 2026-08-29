@@ -23,6 +23,10 @@ func TestAIExplanationDisabledPreservesStandardRuntimeDefaults(t *testing.T) {
 	if opts.AIExplanation.Provider != AIExplanationProviderDeepSeek || opts.AIExplanation.Model != DefaultAIExplanationDeepSeekModel {
 		t.Fatalf("AI explanation primary provider/model defaults = %#v", opts.AIExplanation)
 	}
+	if opts.AIExplanation.StructuredOutputMode != AIExplanationStructuredOutputJSONSchema ||
+		opts.AIExplanation.Evaluation.StructuredOutputMode != AIExplanationStructuredOutputJSONSchema {
+		t.Fatalf("AI explanation structured output defaults = %#v", opts.AIExplanation)
+	}
 	if errs := opts.AIExplanation.Validate(); len(errs) != 0 {
 		t.Fatalf("disabled validation errors = %v", errs)
 	}
@@ -149,6 +153,30 @@ func TestAIExplanationRejectsUnknownReasoningEffort(t *testing.T) {
 	opts.Evaluation.ReasoningEffort = "none"
 	if errs := opts.Validate(); len(errs) != 0 {
 		t.Fatalf("valid reasoning efforts = %v", errs)
+	}
+}
+
+func TestAIExplanationValidatesFrozenStructuredOutputModes(t *testing.T) {
+	opts := NewAIExplanationOptions()
+	opts.Enabled = true
+	opts.APIKey = "provider-test-secret"
+	configureAIExplanationTestLifecycle(opts)
+	opts.StructuredOutputMode = "markdown"
+	if joined := errorsText(opts.Validate()); !strings.Contains(joined, "structured_output_mode") {
+		t.Fatalf("generation structured output validation errors = %v", opts.Validate())
+	}
+
+	opts.StructuredOutputMode = AIExplanationStructuredOutputJSONObject
+	opts.Evaluation.Enabled = true
+	opts.Evaluation.Model = "independent-judge-model-snapshot"
+	opts.Evaluation.StructuredOutputMode = "yaml"
+	if joined := errorsText(opts.Validate()); !strings.Contains(joined, "evaluation.structured_output_mode") {
+		t.Fatalf("evaluation structured output validation errors = %v", opts.Validate())
+	}
+
+	opts.Evaluation.StructuredOutputMode = AIExplanationStructuredOutputJSONSchema
+	if errs := opts.Validate(); len(errs) != 0 {
+		t.Fatalf("valid structured output modes = %v", errs)
 	}
 }
 

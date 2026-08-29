@@ -22,15 +22,16 @@ var (
 )
 
 type Config struct {
-	Route           string
-	Revision        string
-	Provider        string
-	Model           string
-	Current         bool
-	Capabilities    appport.ProviderCapabilities
-	Timeout         time.Duration
-	MaxOutputTokens int
-	ReasoningEffort string
+	Route                string
+	Revision             string
+	Provider             string
+	Model                string
+	Current              bool
+	Capabilities         appport.ProviderCapabilities
+	StructuredOutputMode string
+	Timeout              time.Duration
+	MaxOutputTokens      int
+	ReasoningEffort      string
 }
 
 type Catalog struct {
@@ -91,6 +92,17 @@ func (c *Catalog) ResolveFrozenProviderRoute(_ context.Context, spec aiexplanati
 
 func buildRoute(config Config) (appport.ProviderRoute, error) {
 	reasoningEffort := strings.TrimSpace(config.ReasoningEffort)
+	structuredOutputMode := strings.TrimSpace(config.StructuredOutputMode)
+	if structuredOutputMode == "" {
+		structuredOutputMode = appport.StructuredOutputModeJSONSchema
+	}
+	// Keep the historical json_schema route fingerprint stable. Only a route
+	// that opts into a different wire contract adds this field and therefore
+	// requires a new frozen revision.
+	fingerprintStructuredOutputMode := structuredOutputMode
+	if fingerprintStructuredOutputMode == appport.StructuredOutputModeJSONSchema {
+		fingerprintStructuredOutputMode = ""
+	}
 	fingerprintDocument := struct {
 		Route                  string `json:"route"`
 		Revision               string `json:"revision"`
@@ -102,11 +114,13 @@ func buildRoute(config Config) (appport.ProviderRoute, error) {
 		TimeoutMilliseconds    int64  `json:"timeout_milliseconds"`
 		MaxOutputTokens        int    `json:"max_output_tokens"`
 		ReasoningEffort        string `json:"reasoning_effort,omitempty"`
+		StructuredOutputMode   string `json:"structured_output_mode,omitempty"`
 	}{
 		Route: config.Route, Revision: config.Revision, Provider: config.Provider, Model: config.Model,
 		StructuredOutput: config.Capabilities.StructuredOutput, IdempotentRedispatch: config.Capabilities.IdempotentRedispatch,
 		RetrieveByInvocationID: config.Capabilities.RetrieveByInvocationID, TimeoutMilliseconds: config.Timeout.Milliseconds(),
 		MaxOutputTokens: config.MaxOutputTokens, ReasoningEffort: reasoningEffort,
+		StructuredOutputMode: fingerprintStructuredOutputMode,
 	}
 	raw, err := json.Marshal(fingerprintDocument)
 	if err != nil {
@@ -117,8 +131,8 @@ func buildRoute(config Config) (appport.ProviderRoute, error) {
 			Route: config.Route, RouteRevision: config.Revision, ResolvedProvider: config.Provider,
 			ResolvedModel: config.Model, Fingerprint: aiexplanation.NewFingerprint(raw),
 		},
-		Capabilities: config.Capabilities, Timeout: config.Timeout, MaxOutputTokens: config.MaxOutputTokens,
-		ReasoningEffort: reasoningEffort,
+		Capabilities: config.Capabilities, StructuredOutputMode: structuredOutputMode,
+		Timeout: config.Timeout, MaxOutputTokens: config.MaxOutputTokens, ReasoningEffort: reasoningEffort,
 	}
 	if err := resolved.Validate(); err != nil {
 		return appport.ProviderRoute{}, fmt.Errorf("%w: %v", ErrInvalidConfig, err)

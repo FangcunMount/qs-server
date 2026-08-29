@@ -112,6 +112,7 @@ ai_explanation:
   provider: "deepseek"
   model: "deepseek-v4-flash"
   route_revision: "v1"
+  structured_output_mode: "json_schema"
   endpoint: ""
   api_key: ""
   timeout: 60s
@@ -139,6 +140,7 @@ ai_explanation:
     enabled: false
     model: ""
     route_revision: "v1"
+    structured_output_mode: "json_schema"
     timeout: 60s
     attempt_lease_duration: 4m
     max_output_tokens: 2500

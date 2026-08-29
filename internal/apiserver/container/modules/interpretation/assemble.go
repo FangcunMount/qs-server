@@ -281,15 +281,17 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 	routeConfigs := []aiexplanationprovider.Config{{
 		Route: apiserveroptions.DefaultAIExplanationProviderRoute, Revision: config.RouteRevision,
 		Provider: config.Provider, Model: config.Model, Current: true,
-		Capabilities: appport.ProviderCapabilities{StructuredOutput: true},
-		Timeout:      config.Timeout, MaxOutputTokens: config.MaxOutputTokens, ReasoningEffort: config.ReasoningEffort,
+		Capabilities:         appport.ProviderCapabilities{StructuredOutput: true},
+		StructuredOutputMode: config.StructuredOutputMode,
+		Timeout:              config.Timeout, MaxOutputTokens: config.MaxOutputTokens, ReasoningEffort: config.ReasoningEffort,
 	}}
 	if config.Evaluation.Enabled {
 		routeConfigs = append(routeConfigs, aiexplanationprovider.Config{
 			Route: apiserveroptions.DefaultAIExplanationSemanticProviderRoute, Revision: config.Evaluation.RouteRevision,
 			Provider: config.Provider, Model: config.Evaluation.Model, Current: true,
-			Capabilities: appport.ProviderCapabilities{StructuredOutput: true},
-			Timeout:      config.Evaluation.Timeout, MaxOutputTokens: config.Evaluation.MaxOutputTokens,
+			Capabilities:         appport.ProviderCapabilities{StructuredOutput: true},
+			StructuredOutputMode: config.Evaluation.StructuredOutputMode,
+			Timeout:              config.Evaluation.Timeout, MaxOutputTokens: config.Evaluation.MaxOutputTokens,
 			ReasoningEffort: config.Evaluation.ReasoningEffort,
 		})
 	}

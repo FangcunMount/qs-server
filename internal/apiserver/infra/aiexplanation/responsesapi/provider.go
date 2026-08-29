@@ -131,9 +131,9 @@ type textConfiguration struct {
 
 type responseFormat struct {
 	Type   string          `json:"type"`
-	Name   string          `json:"name"`
+	Name   string          `json:"name,omitempty"`
 	Strict *bool           `json:"strict,omitempty"`
-	Schema json.RawMessage `json:"schema"`
+	Schema json.RawMessage `json:"schema,omitempty"`
 }
 
 type responsesAPIResponse struct {
@@ -193,10 +193,7 @@ func (p *Provider) Generate(ctx context.Context, request appport.ProviderRequest
 			{Role: "developer", Content: []inputTextContent{{Type: "input_text", Text: request.TaskMessage}}},
 			{Role: "user", Content: []inputTextContent{{Type: "input_text", Text: request.DataPreamble + "\n\n" + string(request.DataJSON)}}},
 		},
-		Text: textConfiguration{Format: responseFormat{
-			Type: "json_schema", Name: normalizedSchemaName(request.OutputSchema.Name), Strict: p.strictSchemaFlag(),
-			Schema: json.RawMessage(request.OutputSchema.JSON),
-		}},
+		Text:            textConfiguration{Format: p.responseFormat(request)},
 		Reasoning:       reasoningForRoute(request.Route.ReasoningEffort),
 		MaxOutputTokens: request.Route.MaxOutputTokens, Store: p.storeFlag(),
 	})
@@ -244,6 +241,7 @@ func (p *Provider) Generate(ctx context.Context, request appport.ProviderRequest
 	if err != nil {
 		return nil, err
 	}
+	observeProviderOutputEnvelope(request.OutputSchema.Version, rawOutput)
 	usage := responseUsage{}
 	if decoded.Usage != nil {
 		usage = *decoded.Usage
@@ -259,6 +257,16 @@ func (p *Provider) Generate(ctx context.Context, request appport.ProviderRequest
 			Model: decoded.Model, InputTokens: usage.InputTokens, OutputTokens: usage.OutputTokens, Latency: latency,
 		},
 	}, nil
+}
+
+func (p *Provider) responseFormat(request appport.ProviderRequest) responseFormat {
+	if request.Route.EffectiveStructuredOutputMode() == appport.StructuredOutputModeJSONObject {
+		return responseFormat{Type: appport.StructuredOutputModeJSONObject}
+	}
+	return responseFormat{
+		Type: appport.StructuredOutputModeJSONSchema, Name: normalizedSchemaName(request.OutputSchema.Name),
+		Strict: p.strictSchemaFlag(), Schema: json.RawMessage(request.OutputSchema.JSON),
+	}
 }
 
 func reasoningForRoute(effort string) *reasoningConfig {
@@ -281,6 +289,10 @@ func (p *Provider) validateProviderRequest(request appport.ProviderRequest) erro
 	}
 	if strings.TrimSpace(request.SystemMessage) == "" || strings.TrimSpace(request.TaskMessage) == "" || strings.TrimSpace(request.DataPreamble) == "" {
 		return fmt.Errorf("prompt messages are required")
+	}
+	if request.Route.EffectiveStructuredOutputMode() == appport.StructuredOutputModeJSONObject &&
+		!strings.Contains(strings.ToLower(request.SystemMessage+"\n"+request.TaskMessage), "json") {
+		return fmt.Errorf("json_object mode requires an explicit JSON instruction")
 	}
 	if !json.Valid(request.DataJSON) {
 		return fmt.Errorf("provider data must be valid JSON")

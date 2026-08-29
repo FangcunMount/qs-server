@@ -9,15 +9,22 @@ import (
 	workeroptions "github.com/FangcunMount/qs-server/internal/worker/options"
 )
 
-func TestProductionAIExplanationDeepSeekRouteV3Contract(t *testing.T) {
+func TestProductionAIExplanationDeepSeekRouteV4Contract(t *testing.T) {
 	apiOptions := apiserveroptions.NewOptions()
 	loadConfig(t, filepath.Join(repoRoot(t), "configs", "apiserver.prod.yaml"), apiOptions)
 	workerOptions := workeroptions.NewOptions()
 	loadConfig(t, filepath.Join(repoRoot(t), "configs", "worker.prod.yaml"), workerOptions)
 
 	ai := apiOptions.AIExplanation
-	if ai.RouteRevision != "v3" || ai.Evaluation.RouteRevision != "v2" {
-		t.Fatalf("production AI route revisions = %q/%q, want v3/v2", ai.RouteRevision, ai.Evaluation.RouteRevision)
+	if ai.RouteRevision != "v4" || ai.Evaluation.RouteRevision != "v2" {
+		t.Fatalf("production AI route revisions = %q/%q, want v4/v2", ai.RouteRevision, ai.Evaluation.RouteRevision)
+	}
+	if ai.StructuredOutputMode != apiserveroptions.AIExplanationStructuredOutputJSONObject ||
+		ai.Evaluation.StructuredOutputMode != apiserveroptions.AIExplanationStructuredOutputJSONSchema {
+		t.Fatalf(
+			"production AI structured output modes = %q/%q, want json_object/json_schema",
+			ai.StructuredOutputMode, ai.Evaluation.StructuredOutputMode,
+		)
 	}
 	if ai.ReasoningEffort != "none" || ai.Evaluation.ReasoningEffort != "low" {
 		t.Fatalf("production AI reasoning efforts = %q/%q, want none/low", ai.ReasoningEffort, ai.Evaluation.ReasoningEffort)

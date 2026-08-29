@@ -15,27 +15,30 @@ const (
 	AIExplanationProviderOpenAI               = "openai"
 	AIExplanationProviderDeepSeek             = "deepseek"
 	DefaultAIExplanationDeepSeekModel         = "deepseek-v4-flash"
+	AIExplanationStructuredOutputJSONSchema   = "json_schema"
+	AIExplanationStructuredOutputJSONObject   = "json_object"
 )
 
 // AIExplanationOptions controls the optional, manually triggered AI
 // explanation runtime. APIKey is deliberately excluded from JSON rendering so
 // startup configuration diagnostics cannot print it.
 type AIExplanationOptions struct {
-	Enabled             bool                                    `json:"enabled" mapstructure:"enabled"`
-	ParticipantEnabled  bool                                    `json:"participant_enabled" mapstructure:"participant_enabled"`
-	Provider            string                                  `json:"provider" mapstructure:"provider"`
-	Model               string                                  `json:"model" mapstructure:"model"`
-	RouteRevision       string                                  `json:"route_revision" mapstructure:"route_revision"`
-	Endpoint            string                                  `json:"endpoint,omitempty" mapstructure:"endpoint"`
-	APIKey              string                                  `json:"-" mapstructure:"api_key"`
-	Timeout             time.Duration                           `json:"timeout" mapstructure:"timeout"`
-	RunLeaseDuration    time.Duration                           `json:"run_lease_duration" mapstructure:"run_lease_duration"`
-	MaxOutputTokens     int                                     `json:"max_output_tokens" mapstructure:"max_output_tokens"`
-	ReasoningEffort     string                                  `json:"reasoning_effort,omitempty" mapstructure:"reasoning_effort"`
-	MaxResponseBytes    int64                                   `json:"max_response_bytes" mapstructure:"max_response_bytes"`
-	DataLifecycle       AIExplanationDataLifecycleOptions       `json:"data_lifecycle" mapstructure:"data_lifecycle"`
-	ParticipantCapacity AIExplanationParticipantCapacityOptions `json:"participant_capacity" mapstructure:"participant_capacity"`
-	Evaluation          AIExplanationEvaluationOptions          `json:"evaluation" mapstructure:"evaluation"`
+	Enabled              bool                                    `json:"enabled" mapstructure:"enabled"`
+	ParticipantEnabled   bool                                    `json:"participant_enabled" mapstructure:"participant_enabled"`
+	Provider             string                                  `json:"provider" mapstructure:"provider"`
+	Model                string                                  `json:"model" mapstructure:"model"`
+	RouteRevision        string                                  `json:"route_revision" mapstructure:"route_revision"`
+	StructuredOutputMode string                                  `json:"structured_output_mode" mapstructure:"structured_output_mode"`
+	Endpoint             string                                  `json:"endpoint,omitempty" mapstructure:"endpoint"`
+	APIKey               string                                  `json:"-" mapstructure:"api_key"`
+	Timeout              time.Duration                           `json:"timeout" mapstructure:"timeout"`
+	RunLeaseDuration     time.Duration                           `json:"run_lease_duration" mapstructure:"run_lease_duration"`
+	MaxOutputTokens      int                                     `json:"max_output_tokens" mapstructure:"max_output_tokens"`
+	ReasoningEffort      string                                  `json:"reasoning_effort,omitempty" mapstructure:"reasoning_effort"`
+	MaxResponseBytes     int64                                   `json:"max_response_bytes" mapstructure:"max_response_bytes"`
+	DataLifecycle        AIExplanationDataLifecycleOptions       `json:"data_lifecycle" mapstructure:"data_lifecycle"`
+	ParticipantCapacity  AIExplanationParticipantCapacityOptions `json:"participant_capacity" mapstructure:"participant_capacity"`
+	Evaluation           AIExplanationEvaluationOptions          `json:"evaluation" mapstructure:"evaluation"`
 }
 
 // AIExplanationDataLifecycleOptions records an explicitly approved retention
@@ -69,6 +72,7 @@ type AIExplanationEvaluationOptions struct {
 	Enabled              bool                                   `json:"enabled" mapstructure:"enabled"`
 	Model                string                                 `json:"model" mapstructure:"model"`
 	RouteRevision        string                                 `json:"route_revision" mapstructure:"route_revision"`
+	StructuredOutputMode string                                 `json:"structured_output_mode" mapstructure:"structured_output_mode"`
 	Timeout              time.Duration                          `json:"timeout" mapstructure:"timeout"`
 	AttemptLeaseDuration time.Duration                          `json:"attempt_lease_duration" mapstructure:"attempt_lease_duration"`
 	MaxOutputTokens      int                                    `json:"max_output_tokens" mapstructure:"max_output_tokens"`
@@ -89,7 +93,8 @@ func NewAIExplanationOptions() *AIExplanationOptions {
 	return &AIExplanationOptions{
 		Enabled: false, ParticipantEnabled: false,
 		Provider: AIExplanationProviderDeepSeek, Model: DefaultAIExplanationDeepSeekModel, RouteRevision: "v1",
-		Timeout: 60 * time.Second, RunLeaseDuration: 2 * time.Minute,
+		StructuredOutputMode: AIExplanationStructuredOutputJSONSchema,
+		Timeout:              60 * time.Second, RunLeaseDuration: 2 * time.Minute,
 		MaxOutputTokens: 3000, MaxResponseBytes: 4 << 20,
 		DataLifecycle: AIExplanationDataLifecycleOptions{},
 		ParticipantCapacity: AIExplanationParticipantCapacityOptions{
@@ -98,7 +103,7 @@ func NewAIExplanationOptions() *AIExplanationOptions {
 			MaxActiveProviderExecutionsPerUser: 2, MaxActiveProviderExecutionsPerAssessment: 1,
 		},
 		Evaluation: AIExplanationEvaluationOptions{
-			Enabled: false, RouteRevision: "v1", Timeout: 60 * time.Second,
+			Enabled: false, RouteRevision: "v1", StructuredOutputMode: AIExplanationStructuredOutputJSONSchema, Timeout: 60 * time.Second,
 			AttemptLeaseDuration: 4 * time.Minute, MaxOutputTokens: 2500,
 			Capacity: AIExplanationEvaluationCapacityOptions{
 				MaxActiveRunsPerOrg: 1, DailyProviderInvocationBudgetPerOrg: 140,
@@ -147,6 +152,9 @@ func (o *AIExplanationOptions) Validate() []error {
 	if strings.TrimSpace(o.RouteRevision) == "" {
 		errs = append(errs, fmt.Errorf("ai_explanation.route_revision is required when enabled"))
 	}
+	if !validAIExplanationStructuredOutputMode(o.StructuredOutputMode) {
+		errs = append(errs, fmt.Errorf("ai_explanation.structured_output_mode must be one of json_schema or json_object"))
+	}
 	if o.Timeout <= 0 || o.RunLeaseDuration <= o.Timeout {
 		errs = append(errs, fmt.Errorf("ai_explanation.run_lease_duration must be greater than timeout"))
 	}
@@ -192,6 +200,9 @@ func (o *AIExplanationOptions) Validate() []error {
 		if strings.TrimSpace(o.Evaluation.RouteRevision) == "" {
 			errs = append(errs, fmt.Errorf("ai_explanation.evaluation.route_revision is required when evaluation is enabled"))
 		}
+		if !validAIExplanationStructuredOutputMode(o.Evaluation.StructuredOutputMode) {
+			errs = append(errs, fmt.Errorf("ai_explanation.evaluation.structured_output_mode must be one of json_schema or json_object"))
+		}
 		if o.Evaluation.Timeout <= 0 {
 			errs = append(errs, fmt.Errorf("ai_explanation.evaluation.timeout must be positive"))
 		}
@@ -224,6 +235,15 @@ func validAIExplanationReasoningEffort(value string) bool {
 	}
 }
 
+func validAIExplanationStructuredOutputMode(value string) bool {
+	switch strings.TrimSpace(value) {
+	case AIExplanationStructuredOutputJSONSchema, AIExplanationStructuredOutputJSONObject:
+		return true
+	default:
+		return false
+	}
+}
+
 func (o AIExplanationDataLifecycleOptions) validate() []error {
 	var errs []error
 	if strings.TrimSpace(o.PolicyVersion) == "" {
@@ -250,6 +270,7 @@ func (o *AIExplanationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.Provider, "ai_explanation.provider", o.Provider, "AI explanation provider implementation.")
 	fs.StringVar(&o.Model, "ai_explanation.model", o.Model, "Exact model or model snapshot used for AI explanations.")
 	fs.StringVar(&o.RouteRevision, "ai_explanation.route-revision", o.RouteRevision, "Immutable AI explanation provider route revision.")
+	fs.StringVar(&o.StructuredOutputMode, "ai_explanation.structured-output-mode", o.StructuredOutputMode, "Frozen Provider structured output wire mode: json_schema or json_object.")
 	fs.StringVar(&o.Endpoint, "ai_explanation.endpoint", o.Endpoint, "Optional Provider Responses API endpoint override.")
 	fs.DurationVar(&o.Timeout, "ai_explanation.timeout", o.Timeout, "Deadline for the single provider call.")
 	fs.DurationVar(&o.RunLeaseDuration, "ai_explanation.run-lease-duration", o.RunLeaseDuration, "Durable ownership lease for one AI explanation run.")
@@ -269,6 +290,7 @@ func (o *AIExplanationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.Evaluation.Enabled, "ai_explanation.evaluation.enabled", o.Evaluation.Enabled, "Enable operator-only synthetic AI explanation release evaluation.")
 	fs.StringVar(&o.Evaluation.Model, "ai_explanation.evaluation.model", o.Evaluation.Model, "Exact independent model or model snapshot used to judge synthetic explanations.")
 	fs.StringVar(&o.Evaluation.RouteRevision, "ai_explanation.evaluation.route-revision", o.Evaluation.RouteRevision, "Immutable semantic evaluator route revision.")
+	fs.StringVar(&o.Evaluation.StructuredOutputMode, "ai_explanation.evaluation.structured-output-mode", o.Evaluation.StructuredOutputMode, "Frozen semantic evaluator structured output wire mode: json_schema or json_object.")
 	fs.DurationVar(&o.Evaluation.Timeout, "ai_explanation.evaluation.timeout", o.Evaluation.Timeout, "Deadline for one semantic evaluator call.")
 	fs.DurationVar(&o.Evaluation.AttemptLeaseDuration, "ai_explanation.evaluation.attempt-lease-duration", o.Evaluation.AttemptLeaseDuration, "Durable ownership lease for one generation and semantic evaluation attempt.")
 	fs.IntVar(&o.Evaluation.MaxOutputTokens, "ai_explanation.evaluation.max-output-tokens", o.Evaluation.MaxOutputTokens, "Maximum output tokens for one semantic evaluator response.")
