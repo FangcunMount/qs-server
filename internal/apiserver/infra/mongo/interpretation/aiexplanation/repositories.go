@@ -846,6 +846,127 @@ func expiredPreparedEvaluationFilter(at time.Time) bson.M {
 	}
 }
 
+type PromptEvaluationRecheckRepository struct {
+	base.BaseRepository
+	mapper    *Mapper
+	retention RetentionPolicy
+}
+
+func NewPromptEvaluationRecheckRepository(db *mongo.Database, retention RetentionPolicy, opts ...base.BaseRepositoryOptions) (*PromptEvaluationRecheckRepository, error) {
+	if err := retention.Validate(); err != nil {
+		return nil, err
+	}
+	repository := &PromptEvaluationRecheckRepository{
+		BaseRepository: base.NewBaseRepository(db, (PromptEvaluationRecheckPO{}).CollectionName(), opts...), mapper: NewMapper(), retention: retention,
+	}
+	_, err := repository.Collection().Indexes().CreateMany(context.Background(), []mongo.IndexModel{
+		{Keys: bson.D{{Key: "domain_id", Value: 1}}, Options: options.Index().SetName("uk_ai_explanation_prompt_evaluation_recheck_domain").SetUnique(true)},
+		{Keys: bson.D{{Key: "active_source_key", Value: 1}}, Options: options.Index().SetName("uk_ai_explanation_prompt_evaluation_recheck_active_source").SetUnique(true).SetPartialFilterExpression(bson.M{"active_source_key": bson.M{"$type": "string"}})},
+		{Keys: bson.D{{Key: "source_run_id", Value: 1}, {Key: "source_case_id", Value: 1}, {Key: "source_attempt", Value: 1}, {Key: "created_at", Value: -1}, {Key: "domain_id", Value: -1}}, Options: options.Index().SetName("idx_ai_explanation_prompt_evaluation_recheck_source")},
+		{Keys: bson.D{{Key: "requested_org_id", Value: 1}, {Key: "status", Value: 1}, {Key: "created_at", Value: -1}}, Options: options.Index().SetName("idx_ai_explanation_prompt_evaluation_recheck_org_status")},
+		ttlIndex(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create AI explanation Prompt evaluation recheck indexes: %w", err)
+	}
+	return repository, nil
+}
+
+var _ domainevaluation.RecheckRepository = (*PromptEvaluationRecheckRepository)(nil)
+
+func (r *PromptEvaluationRecheckRepository) CreateRecheck(ctx context.Context, value *domainevaluation.PromptEvaluationRecheck) error {
+	po, err := r.mapper.PromptEvaluationRecheckToPO(value)
+	if err != nil {
+		return err
+	}
+	if _, err := r.InsertOne(ctx, po); err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			if strings.Contains(err.Error(), "uk_ai_explanation_prompt_evaluation_recheck_active_source") {
+				return domainevaluation.ErrRecheckInProgress
+			}
+			return domainevaluation.ErrAlreadyExists
+		}
+		return fmt.Errorf("create AI explanation Prompt evaluation recheck: %w", err)
+	}
+	return nil
+}
+
+func (r *PromptEvaluationRecheckRepository) SaveRecheck(ctx context.Context, value *domainevaluation.PromptEvaluationRecheck, expectedVersion int64) error {
+	po, err := r.mapper.PromptEvaluationRecheckToPO(value)
+	if err != nil {
+		return err
+	}
+	if expectedVersion < 1 || po.Version <= expectedVersion {
+		return domainevaluation.ErrConflict
+	}
+	setFields := bson.M{
+		"status": po.Status, "version": po.Version, "execution": po.Execution, "result": po.Result,
+		"finished_at": po.FinishedAt, "updated_at": po.UpdatedAt,
+	}
+	update := bson.M{"$set": setFields}
+	if po.ActiveSourceKey != "" {
+		setFields["active_source_key"] = po.ActiveSourceKey
+	} else {
+		update["$unset"] = bson.M{"active_source_key": ""}
+	}
+	if value.Status().IsTerminal() {
+		if po.FinishedAt == nil {
+			return fmt.Errorf("terminal AI explanation Prompt evaluation recheck has no finish time")
+		}
+		expiresAt, expiryErr := expiresAfter(*po.FinishedAt, r.retention.PromptEvaluationRetention)
+		if expiryErr != nil {
+			return expiryErr
+		}
+		setFields["expires_at"] = expiresAt
+		setFields["retention_policy_version"] = strings.TrimSpace(r.retention.Version)
+	}
+	result, err := r.UpdateOne(ctx, bson.M{"domain_id": po.DomainID, "version": expectedVersion}, update)
+	if err != nil {
+		return fmt.Errorf("save AI explanation Prompt evaluation recheck: %w", err)
+	}
+	if result.MatchedCount != 1 {
+		return domainevaluation.ErrConflict
+	}
+	return nil
+}
+
+func (r *PromptEvaluationRecheckRepository) FindRecheckByID(ctx context.Context, id meta.ID) (*domainevaluation.PromptEvaluationRecheck, error) {
+	var po PromptEvaluationRecheckPO
+	if err := r.FindOne(ctx, bson.M{"domain_id": id}, &po); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, domainevaluation.ErrNotFound
+		}
+		return nil, fmt.Errorf("find AI explanation Prompt evaluation recheck: %w", err)
+	}
+	return r.mapper.PromptEvaluationRecheckToDomain(&po)
+}
+
+func (r *PromptEvaluationRecheckRepository) ListRechecksBySource(ctx context.Context, runID meta.ID, caseID string, attempt, limit int) ([]*domainevaluation.PromptEvaluationRecheck, error) {
+	caseID = strings.TrimSpace(caseID)
+	if runID.IsZero() || caseID == "" || attempt < 1 || limit < 1 || limit > 100 {
+		return nil, fmt.Errorf("list AI explanation Prompt evaluation rechecks: invalid source query")
+	}
+	cursor, err := r.Find(ctx, bson.M{"source_run_id": runID, "source_case_id": caseID, "source_attempt": attempt},
+		options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}, {Key: "domain_id", Value: -1}}).SetLimit(int64(limit)))
+	if err != nil {
+		return nil, fmt.Errorf("list AI explanation Prompt evaluation rechecks: %w", err)
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+	values := make([]*domainevaluation.PromptEvaluationRecheck, 0)
+	for cursor.Next(ctx) {
+		var po PromptEvaluationRecheckPO
+		if err := cursor.Decode(&po); err != nil {
+			return nil, err
+		}
+		value, err := r.mapper.PromptEvaluationRecheckToDomain(&po)
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, value)
+	}
+	return values, cursor.Err()
+}
+
 type PromptEvaluationBudgetRepository struct {
 	base.BaseRepository
 	retention RetentionPolicy

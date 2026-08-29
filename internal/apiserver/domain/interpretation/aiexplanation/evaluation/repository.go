@@ -15,6 +15,15 @@ type Repository interface {
 	FindByID(context.Context, meta.ID) (*PromptEvaluationRun, error)
 }
 
+// RecheckRepository stores diagnostic single-attempt reruns separately from
+// immutable release-gate evidence.
+type RecheckRepository interface {
+	CreateRecheck(context.Context, *PromptEvaluationRecheck) error
+	SaveRecheck(context.Context, *PromptEvaluationRecheck, int64) error
+	FindRecheckByID(context.Context, meta.ID) (*PromptEvaluationRecheck, error)
+	ListRechecksBySource(context.Context, meta.ID, string, int, int) ([]*PromptEvaluationRecheck, error)
+}
+
 // ExpiredPreparation is the minimum safe identity needed to reawaken a
 // prepared execution. InvocationID plus LeaseExpiresAt prevent a stale scanner
 // result from recovering a newer claim that intentionally reuses the stable

@@ -27,6 +27,9 @@ func TestAIExplanationDisabledPreservesStandardRuntimeDefaults(t *testing.T) {
 		opts.AIExplanation.Evaluation.StructuredOutputMode != AIExplanationStructuredOutputJSONSchema {
 		t.Fatalf("AI explanation structured output defaults = %#v", opts.AIExplanation)
 	}
+	if opts.AIExplanation.Evaluation.ProviderProtocol != AIExplanationProviderProtocolResponses {
+		t.Fatalf("AI explanation semantic evaluator protocol default = %q", opts.AIExplanation.Evaluation.ProviderProtocol)
+	}
 	if errs := opts.AIExplanation.Validate(); len(errs) != 0 {
 		t.Fatalf("disabled validation errors = %v", errs)
 	}
@@ -199,6 +202,7 @@ func TestAIExplanationValidatesFrozenProviderProtocol(t *testing.T) {
 
 	opts.Provider = AIExplanationProviderDeepSeek
 	opts.ProviderProtocol = AIExplanationProviderProtocolDeepSeekStrictToolCall
+	opts.ReasoningEffort = "none"
 	opts.StructuredOutputMode = AIExplanationStructuredOutputJSONObject
 	if joined := errorsText(opts.Validate()); !strings.Contains(joined, "strict tool protocol requires json_schema") {
 		t.Fatalf("strict-tool output-mode validation errors = %v", opts.Validate())
@@ -207,6 +211,31 @@ func TestAIExplanationValidatesFrozenProviderProtocol(t *testing.T) {
 	opts.StructuredOutputMode = AIExplanationStructuredOutputJSONSchema
 	if errs := opts.Validate(); len(errs) != 0 {
 		t.Fatalf("valid DeepSeek strict-tool protocol = %v", errs)
+	}
+
+	opts.ReasoningEffort = "low"
+	if joined := errorsText(opts.Validate()); !strings.Contains(joined, "non-thinking reasoning_effort") {
+		t.Fatalf("strict-tool thinking validation errors = %v", opts.Validate())
+	}
+
+	opts.ProviderProtocol = AIExplanationProviderProtocolResponses
+	opts.ReasoningEffort = "low"
+	opts.Evaluation.Enabled = true
+	opts.Evaluation.Model = "independent-judge-model-snapshot"
+	opts.Evaluation.ProviderProtocol = AIExplanationProviderProtocolDeepSeekStrictToolCall
+	opts.Evaluation.ReasoningEffort = "low"
+	if joined := errorsText(opts.Validate()); !strings.Contains(joined, "evaluation deepseek strict tool protocol requires non-thinking") {
+		t.Fatalf("semantic strict-tool thinking validation errors = %v", opts.Validate())
+	}
+
+	opts.Evaluation.ProviderProtocol = AIExplanationProviderProtocolResponses
+	opts.Evaluation.Endpoint = "http://provider.example.invalid/v1/responses"
+	if joined := errorsText(opts.Validate()); !strings.Contains(joined, "evaluation.endpoint must be an absolute https URL") {
+		t.Fatalf("semantic endpoint validation errors = %v", opts.Validate())
+	}
+	opts.Evaluation.Endpoint = "https://provider.example.invalid/v1/responses"
+	if errs := opts.Validate(); len(errs) != 0 {
+		t.Fatalf("valid split semantic Provider route = %v", errs)
 	}
 }
 

@@ -43,7 +43,7 @@ func TestDeepSeekStrictToolProviderForcesOneSchemaConstrainedFunctionCall(t *tes
 		APIKey:   "test-secret", HTTPClient: server.Client(),
 	})
 	request := validDeepSeekStrictRequest()
-	request.Route.ReasoningEffort = "low"
+	request.Route.ReasoningEffort = "none"
 	response, err := provider.Generate(context.Background(), request)
 	if err != nil {
 		t.Fatal(err)
@@ -62,11 +62,14 @@ func TestDeepSeekStrictToolProviderForcesOneSchemaConstrainedFunctionCall(t *tes
 	if strings.Contains(mustJSON(t, captured), request.InvocationID) {
 		t.Fatal("internal invocation identity leaked into strict-tool body")
 	}
-	if captured.Thinking.Type != "enabled" || captured.ReasoningEffort != "low" || captured.Stream {
+	if captured.Thinking.Type != "disabled" || captured.ReasoningEffort != "" || captured.Stream {
 		t.Fatalf("strict-tool thinking/stream = %#v/%q/%v", captured.Thinking, captured.ReasoningEffort, captured.Stream)
 	}
-	if capturedRaw["stream"] != false || capturedRaw["reasoning_effort"] != "low" {
+	if capturedRaw["stream"] != false {
 		t.Fatalf("strict-tool top-level controls = %#v", capturedRaw)
+	}
+	if _, exists := capturedRaw["reasoning_effort"]; exists {
+		t.Fatalf("non-thinking strict-tool request must omit reasoning_effort: %#v", capturedRaw)
 	}
 	if _, nested := capturedRaw["thinking"].(map[string]any)["reasoning_effort"]; nested {
 		t.Fatalf("reasoning_effort must not be nested under thinking: %#v", capturedRaw["thinking"])
@@ -121,6 +124,27 @@ func TestDeepSeekStrictToolProviderClassifiesTokenLimitWithoutLeakingArguments(t
 	}
 	if strings.Contains(err.Error(), "sensitive partial output") {
 		t.Fatal("partial strict-tool arguments leaked through error")
+	}
+}
+
+func TestDeepSeekStrictToolPreservesRawEnvelopeAndExposesValidatedInnerObject(t *testing.T) {
+	wantRaw := `{"parameters":{"summary":"ok"}}`
+	provider := providerForDeepSeekStrictResponse(t, http.StatusOK, `{
+      "id":"chatcmpl-strict-envelope","model":"deepseek-v4-pro",
+      "choices":[{"finish_reason":"tool_calls","message":{"tool_calls":[{
+        "type":"function","function":{"name":"AIExplanationOutput_v1","arguments":"{\"parameters\":{\"summary\":\"ok\"}}"}
+      }]}}],
+      "usage":{"prompt_tokens":34,"completion_tokens":13}
+    }`)
+	response, err := provider.Generate(context.Background(), validDeepSeekStrictRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(response.RawOutput) != wantRaw {
+		t.Fatalf("raw strict-tool evidence = %q, want %q", response.RawOutput, wantRaw)
+	}
+	if got := string(response.OutputForValidation()); got != `{"summary":"ok"}` {
+		t.Fatalf("strict-tool validation output = %q", got)
 	}
 }
 

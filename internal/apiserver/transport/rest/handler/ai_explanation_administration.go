@@ -54,6 +54,12 @@ type AIExplanationEvaluationRecoverRequest struct {
 	Reason                      string `json:"reason" binding:"required,max=1000"`
 }
 
+type AIExplanationAttemptRecheckRequest struct {
+	Confirm                     bool   `json:"confirm" binding:"required"`
+	ExpectedProviderInvocations int    `json:"expected_provider_invocations" binding:"required"`
+	Reason                      string `json:"reason" binding:"required,max=1000"`
+}
+
 type AIExplanationParticipantRetryRequest struct {
 	ExpectedAttempt             int    `json:"expected_attempt" binding:"required"`
 	RequestID                   string `json:"request_id" binding:"required,max=256"`
@@ -213,6 +219,23 @@ type AIExplanationEvaluationRecoveryWire struct {
 	Actor       string    `json:"actor"`
 	Reason      string    `json:"reason"`
 	RequestedAt time.Time `json:"requested_at"`
+}
+
+type AIExplanationAttemptRecheckWire struct {
+	RecheckID      string                                `json:"recheck_id"`
+	SourceRunID    string                                `json:"source_run_id"`
+	SourceCaseID   string                                `json:"source_case_id"`
+	SourceAttempt  int                                   `json:"source_attempt"`
+	Status         string                                `json:"status"`
+	Version        int64                                 `json:"version"`
+	RequestedOrgID int64                                 `json:"requested_org_id"`
+	RequestedBy    string                                `json:"requested_by"`
+	Reason         string                                `json:"reason"`
+	CreatedAt      time.Time                             `json:"created_at"`
+	FinishedAt     *time.Time                            `json:"finished_at,omitempty"`
+	Release        AIExplanationEvaluationReleaseWire    `json:"release"`
+	Execution      *AIExplanationEvaluationExecutionWire `json:"execution,omitempty"`
+	Result         *AIExplanationReviewAttemptWire       `json:"result,omitempty"`
 }
 
 type AIExplanationCancellationWire struct {
@@ -684,6 +707,97 @@ func (h *AIExplanationAdministrationHandler) FindAttempt(c *gin.Context) {
 	h.Error(c, cberrors.WithCode(code.ErrPageNotFound, "AI explanation review attempt not found"))
 }
 
+// StartAttemptRecheck godoc
+// @Summary 重新测评一条 AI 解读 Prompt 评测记录
+// @Description 创建独立诊断证据；不覆盖源记录，不参与 35+35 发布门禁，最多调用两次 Provider。
+// @Tags AI-Explanation-Administration
+// @Accept json
+// @Produce json
+// @Param run_id path string true "源评测运行 ID"
+// @Param case_id path string true "合成 case ID"
+// @Param attempt path int true "源重复序号"
+// @Param request body AIExplanationAttemptRecheckRequest true "复测成本确认与审计理由"
+// @Success 202 {object} core.Response{data=AIExplanationAttemptRecheckWire}
+// @Router /internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}/rechecks [post]
+func (h *AIExplanationAdministrationHandler) StartAttemptRecheck(c *gin.Context) {
+	actor, runID, attempt, ok := h.actorAndAttemptAddress(c)
+	if !ok {
+		return
+	}
+	var request AIExplanationAttemptRecheckRequest
+	if err := h.BindJSON(c, &request); err != nil {
+		return
+	}
+	result, err := h.service.StartEvaluationRecheck(c.Request.Context(), actor, runID, c.Param("case_id"), attempt, aiexplanationadministration.StartEvaluationRecheckCommand{
+		Confirm: request.Confirm, ExpectedProviderInvocations: request.ExpectedProviderInvocations, Reason: request.Reason,
+	})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	c.JSON(http.StatusAccepted, core.Response{Code: 0, Message: "accepted", Data: attemptRecheckWire(result, true)})
+}
+
+// ListAttemptRechecks godoc
+// @Summary 查询一条 AI 解读评测记录的复测历史
+// @Tags AI-Explanation-Administration
+// @Produce json
+// @Param run_id path string true "源评测运行 ID"
+// @Param case_id path string true "合成 case ID"
+// @Param attempt path int true "源重复序号"
+// @Param limit query int false "页大小，默认 20，最大 100"
+// @Success 200 {object} core.Response{data=[]AIExplanationAttemptRecheckWire}
+// @Router /internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}/rechecks [get]
+func (h *AIExplanationAdministrationHandler) ListAttemptRechecks(c *gin.Context) {
+	actor, runID, attempt, ok := h.actorAndAttemptAddress(c)
+	if !ok {
+		return
+	}
+	limit, err := administrationCatalogLimit(c, 20, 100)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	values, err := h.service.ListEvaluationRechecks(c.Request.Context(), actor, runID, c.Param("case_id"), attempt, limit)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	result := make([]AIExplanationAttemptRecheckWire, 0, len(values))
+	for _, value := range values {
+		result = append(result, attemptRecheckWire(value, false))
+	}
+	h.Success(c, result)
+}
+
+// FindAttemptRecheck godoc
+// @Summary 查询一份 AI 解读单条复测证据
+// @Tags AI-Explanation-Administration
+// @Produce json
+// @Param run_id path string true "源评测运行 ID"
+// @Param case_id path string true "合成 case ID"
+// @Param attempt path int true "源重复序号"
+// @Param recheck_id path string true "复测 ID"
+// @Success 200 {object} core.Response{data=AIExplanationAttemptRecheckWire}
+// @Router /internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}/rechecks/{recheck_id} [get]
+func (h *AIExplanationAdministrationHandler) FindAttemptRecheck(c *gin.Context) {
+	actor, runID, attempt, ok := h.actorAndAttemptAddress(c)
+	if !ok {
+		return
+	}
+	recheckID, err := meta.ParseID(c.Param("recheck_id"))
+	if err != nil || recheckID.IsZero() {
+		h.Error(c, cberrors.WithCode(code.ErrInvalidArgument, "recheck_id is invalid"))
+		return
+	}
+	value, err := h.service.FindEvaluationRecheck(c.Request.Context(), actor, runID, c.Param("case_id"), attempt, recheckID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, attemptRecheckWire(value, true))
+}
+
 // RecordReview godoc
 // @Summary 记录 AI 解读 Prompt 人工复核
 // @Tags AI-Explanation-Administration
@@ -916,6 +1030,23 @@ func (h *AIExplanationAdministrationHandler) actorAndRunID(c *gin.Context) (aiex
 	return actor, runID, true
 }
 
+func (h *AIExplanationAdministrationHandler) actorAndAttemptAddress(c *gin.Context) (aiexplanationadministration.Actor, meta.ID, int, bool) {
+	actor, runID, ok := h.actorAndRunID(c)
+	if !ok {
+		return actor, runID, 0, false
+	}
+	attempt, err := parsePositiveInt(c.Param("attempt"))
+	if err != nil {
+		h.Error(c, err)
+		return actor, runID, 0, false
+	}
+	if strings.TrimSpace(c.Param("case_id")) == "" {
+		h.Error(c, cberrors.WithCode(code.ErrInvalidArgument, "case_id is invalid"))
+		return actor, runID, 0, false
+	}
+	return actor, runID, attempt, true
+}
+
 func evaluationRunWire(value *appevaluation.ReviewRun) AIExplanationEvaluationRunWire {
 	attempts := make([]AIExplanationReviewAttemptSummary, 0, len(value.Attempts))
 	for _, item := range value.Attempts {
@@ -948,6 +1079,33 @@ func evaluationRunWire(value *appevaluation.ReviewRun) AIExplanationEvaluationRu
 	}
 	if value.Canceled != nil {
 		result.Canceled = &AIExplanationCancellationWire{At: value.Canceled.At, Actor: value.Canceled.Actor, Reason: value.Canceled.Reason}
+	}
+	return result
+}
+
+func attemptRecheckWire(value *domainevaluation.PromptEvaluationRecheck, includeResult bool) AIExplanationAttemptRecheckWire {
+	if value == nil {
+		return AIExplanationAttemptRecheckWire{}
+	}
+	result := AIExplanationAttemptRecheckWire{
+		RecheckID: value.ID().String(), SourceRunID: value.SourceRunID().String(), SourceCaseID: value.SourceCaseID(),
+		SourceAttempt: value.SourceAttempt(), Status: string(value.Status()), Version: value.Version(),
+		RequestedOrgID: value.RequestedOrgID(), RequestedBy: value.RequestedBy(), Reason: value.Reason(),
+		CreatedAt: value.CreatedAt(), FinishedAt: value.FinishedAt(), Release: releaseWire(value.Release()),
+	}
+	if execution := value.Execution(); execution != nil {
+		result.Execution = &AIExplanationEvaluationExecutionWire{
+			CaseID: execution.CaseID, Attempt: execution.Attempt, Phase: string(execution.Phase),
+			ClaimedAt: execution.ClaimedAt, LeaseExpiresAt: execution.LeaseExpiresAt, DispatchStartedAt: execution.DispatchStartedAt,
+		}
+	}
+	if record := value.Result(); includeResult && record != nil {
+		wire := reviewAttemptWire(appevaluation.ReviewAttempt{
+			CaseID: record.CaseID, Attempt: record.Attempt, RawProviderOutput: record.RawOutput,
+			NormalizedOutput: record.NormalizedOutput, ProviderReceipt: record.ProviderReceipt, Failure: record.Failure,
+			Assertions: record.Assertions, Semantic: record.Semantic,
+		})
+		result.Result = &wire
 	}
 	return result
 }

@@ -79,14 +79,21 @@ func TestCatalogFingerprintChangesWithExecutionSemantics(t *testing.T) {
 		t.Fatal("route fingerprint did not change with structured output mode")
 	}
 
-	changedProtocol := validConfig()
+	protocolBaseline := validConfig()
+	protocolBaseline.ReasoningEffort = "none"
+	responsesCatalog, err := NewCatalog([]Config{protocolBaseline})
+	if err != nil {
+		t.Fatal(err)
+	}
+	changedProtocol := protocolBaseline
 	changedProtocol.Protocol = appport.ProviderProtocolDeepSeekStrictToolCall
 	fifth, err := NewCatalog([]Config{changedProtocol})
 	if err != nil {
 		t.Fatal(err)
 	}
+	p, _ := responsesCatalog.ResolveProviderRoute(context.Background(), protocolBaseline.Route)
 	e, _ := fifth.ResolveProviderRoute(context.Background(), changedProtocol.Route)
-	if a.ExecutionSpec.Fingerprint == e.ExecutionSpec.Fingerprint {
+	if p.ExecutionSpec.Fingerprint == e.ExecutionSpec.Fingerprint {
 		t.Fatal("route fingerprint did not change with Provider protocol")
 	}
 }

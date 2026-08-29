@@ -374,6 +374,30 @@ func (PromptEvaluationRunPO) CollectionName() string {
 	return "ai_explanation_prompt_evaluations"
 }
 
+type PromptEvaluationRecheckPO struct {
+	base.BaseDocument `bson:",inline"`
+
+	SourceRunID            meta.ID                       `bson:"source_run_id"`
+	SourceCaseID           string                        `bson:"source_case_id"`
+	SourceAttempt          int                           `bson:"source_attempt"`
+	ActiveSourceKey        string                        `bson:"active_source_key,omitempty"`
+	Release                EvaluationReleasePO           `bson:"release"`
+	Status                 string                        `bson:"status"`
+	Version                int64                         `bson:"version"`
+	Execution              *EvaluationAttemptExecutionPO `bson:"execution,omitempty"`
+	Result                 *EvaluationAttemptPO          `bson:"result,omitempty"`
+	RequestedOrgID         int64                         `bson:"requested_org_id"`
+	RequestedBy            string                        `bson:"requested_by"`
+	Reason                 string                        `bson:"reason"`
+	FinishedAt             *time.Time                    `bson:"finished_at,omitempty"`
+	ExpiresAt              *time.Time                    `bson:"expires_at,omitempty"`
+	RetentionPolicyVersion string                        `bson:"retention_policy_version,omitempty"`
+}
+
+func (PromptEvaluationRecheckPO) CollectionName() string {
+	return "ai_explanation_prompt_evaluation_rechecks"
+}
+
 type PromptEvaluationBudgetReservationPO struct {
 	RunID               meta.ID   `bson:"run_id"`
 	RequestedBy         string    `bson:"requested_by"`

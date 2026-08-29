@@ -1298,6 +1298,7 @@ type ExecutePromptEvaluationStepRequest struct {
 	Attempt       int32                  `protobuf:"varint,4,opt,name=attempt,proto3" json:"attempt,omitempty"`
 	RequestedBy   string                 `protobuf:"bytes,5,opt,name=requested_by,json=requestedBy,proto3" json:"requested_by,omitempty"`
 	EventId       string                 `protobuf:"bytes,6,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	RecheckId     string                 `protobuf:"bytes,7,opt,name=recheck_id,json=recheckId,proto3" json:"recheck_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1374,6 +1375,13 @@ func (x *ExecutePromptEvaluationStepRequest) GetEventId() string {
 	return ""
 }
 
+func (x *ExecutePromptEvaluationStepRequest) GetRecheckId() string {
+	if x != nil {
+		return x.RecheckId
+	}
+	return ""
+}
+
 type ExecutePromptEvaluationStepResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
@@ -1384,6 +1392,7 @@ type ExecutePromptEvaluationStepResponse struct {
 	RunStatus     string                 `protobuf:"bytes,6,opt,name=run_status,json=runStatus,proto3" json:"run_status,omitempty"`
 	NextCaseId    string                 `protobuf:"bytes,7,opt,name=next_case_id,json=nextCaseId,proto3" json:"next_case_id,omitempty"`
 	NextAttempt   int32                  `protobuf:"varint,8,opt,name=next_attempt,json=nextAttempt,proto3" json:"next_attempt,omitempty"`
+	RecheckId     string                 `protobuf:"bytes,9,opt,name=recheck_id,json=recheckId,proto3" json:"recheck_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1472,6 +1481,13 @@ func (x *ExecutePromptEvaluationStepResponse) GetNextAttempt() int32 {
 		return x.NextAttempt
 	}
 	return 0
+}
+
+func (x *ExecutePromptEvaluationStepResponse) GetRecheckId() string {
+	if x != nil {
+		return x.RecheckId
+	}
+	return ""
 }
 
 type AIExplanationEvidenceRef struct {
@@ -2829,14 +2845,16 @@ const file_interpretation_interpretation_proto_rawDesc = "" +
 	"\ffailure_kind\x18\x06 \x01(\tR\vfailureKind\x12!\n" +
 	"\ffailure_code\x18\a \x01(\tR\vfailureCode\x12!\n" +
 	"\fsafe_message\x18\b \x01(\tR\vsafeMessage\x12\x1c\n" +
-	"\tretryable\x18\t \x01(\bR\tretryable\"\xc3\x01\n" +
+	"\tretryable\x18\t \x01(\bR\tretryable\"\xe2\x01\n" +
 	"\"ExecutePromptEvaluationStepRequest\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\x03R\x05orgId\x12\x15\n" +
 	"\x06run_id\x18\x02 \x01(\tR\x05runId\x12\x17\n" +
 	"\acase_id\x18\x03 \x01(\tR\x06caseId\x12\x18\n" +
 	"\aattempt\x18\x04 \x01(\x05R\aattempt\x12!\n" +
 	"\frequested_by\x18\x05 \x01(\tR\vrequestedBy\x12\x19\n" +
-	"\bevent_id\x18\x06 \x01(\tR\aeventId\"\x85\x02\n" +
+	"\bevent_id\x18\x06 \x01(\tR\aeventId\x12\x1d\n" +
+	"\n" +
+	"recheck_id\x18\a \x01(\tR\trecheckId\"\xa4\x02\n" +
 	"#ExecutePromptEvaluationStepResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x15\n" +
 	"\x06run_id\x18\x02 \x01(\tR\x05runId\x12\x17\n" +
@@ -2847,7 +2865,9 @@ const file_interpretation_interpretation_proto_rawDesc = "" +
 	"run_status\x18\x06 \x01(\tR\trunStatus\x12 \n" +
 	"\fnext_case_id\x18\a \x01(\tR\n" +
 	"nextCaseId\x12!\n" +
-	"\fnext_attempt\x18\b \x01(\x05R\vnextAttempt\"@\n" +
+	"\fnext_attempt\x18\b \x01(\x05R\vnextAttempt\x12\x1d\n" +
+	"\n" +
+	"recheck_id\x18\t \x01(\tR\trecheckId\"@\n" +
 	"\x18AIExplanationEvidenceRef\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x10\n" +
 	"\x03ref\x18\x02 \x01(\tR\x03ref\"\xd9\x01\n" +

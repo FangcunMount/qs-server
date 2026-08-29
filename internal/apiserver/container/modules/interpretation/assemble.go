@@ -3,6 +3,7 @@ package interpretation
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"
@@ -291,7 +292,7 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 			Route: apiserveroptions.DefaultAIExplanationSemanticProviderRoute, Revision: config.Evaluation.RouteRevision,
 			Provider: config.Provider, Model: config.Evaluation.Model, Current: true,
 			Capabilities:         appport.ProviderCapabilities{StructuredOutput: true},
-			Protocol:             config.ProviderProtocol,
+			Protocol:             config.Evaluation.ProviderProtocol,
 			StructuredOutputMode: config.Evaluation.StructuredOutputMode,
 			Timeout:              config.Evaluation.Timeout, MaxOutputTokens: config.Evaluation.MaxOutputTokens,
 			ReasoningEffort: config.Evaluation.ReasoningEffort,
@@ -301,7 +302,7 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 	if err != nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation provider route: %v", err)
 	}
-	providerAdapter, err := aiexplanationresponsesapi.NewProvider(aiexplanationresponsesapi.Config{
+	generationProviderAdapter, err := aiexplanationresponsesapi.NewProvider(aiexplanationresponsesapi.Config{
 		Provider: config.Provider, Protocol: config.ProviderProtocol,
 		Endpoint: config.Endpoint, APIKey: config.APIKey, MaxResponseBytes: config.MaxResponseBytes,
 	})
@@ -360,7 +361,7 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 	safetyGate := aiexplanationsafety.NewDeterministicGate()
 	executor, err := aiexplanationexecution.NewExecutor(
 		generationRepo, runRepo, artifactRepo, profileRepo, promptCatalog, routeCatalog,
-		aiexplanationschema.NewCatalog(), providerAdapter, safetyGate, committer, config.RunLeaseDuration,
+		aiexplanationschema.NewCatalog(), generationProviderAdapter, safetyGate, committer, config.RunLeaseDuration,
 	)
 	if err != nil {
 		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation executor: %v", err)
@@ -385,6 +386,10 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 		aiexplanationadministration.WithParticipantRecovery(recoveryService),
 	)
 	if config.Evaluation.Enabled {
+		recheckRepo, err := mongoAIExplanation.NewPromptEvaluationRecheckRepository(deps.MongoDB, retentionPolicy, mongoOptions)
+		if err != nil {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation Prompt evaluation recheck repository: %v", err)
+		}
 		evaluationCommitter, err := aiexplanationevaluation.NewDurableCommitter(
 			modtx.NewMongoRunner(deps.MongoDB, modtx.MongoRunnerOptions{Boundary: "ai_explanation_prompt_evaluation", Limiter: deps.MongoLimiter}),
 			evaluationRepo, aiexplanationevents.Factory{}, deps.OutboxProfile.Stager, deps.OutboxProfile.PostCommit,
@@ -392,6 +397,14 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 		)
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation evaluation committer: %v", err)
+		}
+		recheckCommitter, err := aiexplanationevaluation.NewRecheckCommitter(
+			modtx.NewMongoRunner(deps.MongoDB, modtx.MongoRunnerOptions{Boundary: "ai_explanation_prompt_evaluation_recheck", Limiter: deps.MongoLimiter}),
+			recheckRepo, aiexplanationevents.Factory{}, deps.OutboxProfile.Stager, deps.OutboxProfile.PostCommit,
+			evaluationBudgetRepo, config.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg, time.Now,
+		)
+		if err != nil {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation evaluation recheck committer: %v", err)
 		}
 		evaluationLeaseRecoverer, err := aiexplanationevaluation.NewPreparedLeaseRecoverer(evaluationRepo, evaluationCommitter)
 		if err != nil {
@@ -401,15 +414,26 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to resolve AI explanation semantic evaluator route: %v", err)
 		}
-		semanticEvaluator, err := aiexplanationsemantic.NewEvaluator(providerAdapter, semanticRoute)
+		semanticEndpoint := strings.TrimSpace(config.Evaluation.Endpoint)
+		if semanticEndpoint == "" && config.Evaluation.ProviderProtocol == config.ProviderProtocol {
+			semanticEndpoint = config.Endpoint
+		}
+		semanticProviderAdapter, err := aiexplanationresponsesapi.NewProvider(aiexplanationresponsesapi.Config{
+			Provider: config.Provider, Protocol: config.Evaluation.ProviderProtocol,
+			Endpoint: semanticEndpoint, APIKey: config.APIKey, MaxResponseBytes: config.MaxResponseBytes,
+		})
+		if err != nil {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation semantic Provider adapter: %v", err)
+		}
+		semanticEvaluator, err := aiexplanationsemantic.NewEvaluator(semanticProviderAdapter, semanticRoute)
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation semantic evaluator: %v", err)
 		}
 		onlineRunner, err := aiexplanationevaluation.NewOnlineRunner(aiexplanationevaluation.OnlineRunnerDependencies{
 			Prompts: promptCatalog, Schemas: aiexplanationschema.NewCatalog(), Routes: routeCatalog,
-			Provider: providerAdapter, Safety: safetyGate, Semantic: semanticEvaluator,
+			Provider: generationProviderAdapter, Safety: safetyGate, Semantic: semanticEvaluator,
 			SemanticTimeout: config.Evaluation.Timeout, AttemptLease: config.Evaluation.AttemptLeaseDuration, Evidence: evidenceService,
-			DurableCommitter: evaluationCommitter, Now: time.Now,
+			Rechecks: recheckRepo, DurableCommitter: evaluationCommitter, Now: time.Now,
 		})
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation online evaluation runner: %v", err)
@@ -422,6 +446,7 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 			aiexplanationadministration.WithParticipantCapacity(participantBudgetRepo, participantActiveRepo, participantCapacityPolicy, time.Now),
 			aiexplanationadministration.WithParticipantRecovery(recoveryService),
 			aiexplanationadministration.WithEvaluationExecution(onlineRunner, evaluationCommitter, meta.New),
+			aiexplanationadministration.WithEvaluationRechecks(onlineRunner, recheckCommitter, recheckRepo),
 			aiexplanationadministration.WithEvaluationCapacity(
 				evaluationBudgetRepo, config.Evaluation.Capacity.MaxActiveRunsPerOrg,
 				config.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg, time.Now,

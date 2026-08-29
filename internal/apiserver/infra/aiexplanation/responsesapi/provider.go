@@ -279,8 +279,8 @@ func (p *Provider) Generate(ctx context.Context, request appport.ProviderRequest
 		return nil, err
 	}
 	observeProviderOutputEnvelope(request.OutputSchema.Version, rawOutput)
-	validationOutput := validationOutputForProvider(p.name, rawOutput)
-	observeProviderOutputNormalization(request.OutputSchema.Version, len(validationOutput) > 0)
+	validationOutput, normalization := validationOutputForProviderWithKind(p.name, rawOutput)
+	observeProviderOutputNormalization(request.OutputSchema.Version, normalization)
 	usage := responseUsage{}
 	if decoded.Usage != nil {
 		usage = *decoded.Usage
@@ -305,23 +305,82 @@ func (p *Provider) Generate(ctx context.Context, request appport.ProviderRequest
 // strict Schema/reference/Profile validators. Ambiguous or malformed fences
 // deliberately remain unchanged and therefore fail closed.
 func validationOutputForProvider(provider, output string) []byte {
+	validationOutput, _ := validationOutputForProviderWithKind(provider, output)
+	return validationOutput
+}
+
+func validationOutputForProviderWithKind(provider, output string) ([]byte, string) {
 	if provider != ProviderDeepSeek {
-		return nil
+		return nil, providerOutputNormalizationUnchanged
 	}
 	trimmed := strings.TrimSpace(output)
+	candidate := trimmed
+	normalization := providerOutputNormalizationUnchanged
 	openingEnd := strings.IndexByte(trimmed, '\n')
-	if openingEnd < 0 || !strings.EqualFold(strings.TrimSpace(trimmed[:openingEnd]), "```json") {
-		return nil
+	if openingEnd >= 0 && strings.EqualFold(strings.TrimSpace(trimmed[:openingEnd]), "```json") {
+		closingStart := strings.LastIndex(trimmed, "\n```")
+		if closingStart > openingEnd && strings.TrimSpace(trimmed[closingStart+1:]) == "```" {
+			fenced := strings.TrimSpace(trimmed[openingEnd+1 : closingStart])
+			if isJSONObject([]byte(fenced)) {
+				candidate = fenced
+				normalization = providerOutputNormalizationMarkdownUnwrapped
+			}
+		}
 	}
-	closingStart := strings.LastIndex(trimmed, "\n```")
-	if closingStart <= openingEnd || strings.TrimSpace(trimmed[closingStart+1:]) != "```" {
-		return nil
+	if unwrapped, ok := unwrapKnownDeepSeekJSONEnvelope(candidate); ok {
+		return unwrapped, providerOutputNormalizationEnvelopeUnwrapped
 	}
-	candidate := strings.TrimSpace(trimmed[openingEnd+1 : closingStart])
-	if candidate == "" || candidate[0] != '{' || !json.Valid([]byte(candidate)) {
-		return nil
+	if normalization != providerOutputNormalizationUnchanged {
+		return []byte(candidate), normalization
 	}
-	return []byte(candidate)
+	return nil, providerOutputNormalizationUnchanged
+}
+
+// unwrapKnownDeepSeekJSONEnvelope accepts only the exact single-key wrappers
+// observed in production. It never repairs fields or JSON syntax: the value
+// must already be one complete JSON object and the canonical validators still
+// decide whether that object satisfies AIExplanationOutput v1.
+func unwrapKnownDeepSeekJSONEnvelope(value string) ([]byte, bool) {
+	if !isJSONObject([]byte(value)) {
+		return nil, false
+	}
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(value), &envelope); err != nil || len(envelope) != 1 {
+		return nil, false
+	}
+	for _, key := range []string{"parameters", "json"} {
+		raw, exists := envelope[key]
+		if !exists {
+			continue
+		}
+		raw = bytes.TrimSpace(raw)
+		if !isJSONObject(raw) {
+			return nil, false
+		}
+		return append([]byte(nil), raw...), true
+	}
+	raw, exists := envelope["json_string"]
+	if !exists {
+		return nil, false
+	}
+	var encoded string
+	if err := json.Unmarshal(raw, &encoded); err != nil {
+		return nil, false
+	}
+	decoded := []byte(strings.TrimSpace(encoded))
+	if !isJSONObject(decoded) {
+		return nil, false
+	}
+	return decoded, true
+}
+
+func isJSONObject(value []byte) bool {
+	value = bytes.TrimSpace(value)
+	if len(value) == 0 || value[0] != '{' || !json.Valid(value) {
+		return false
+	}
+	var object map[string]json.RawMessage
+	return json.Unmarshal(value, &object) == nil && object != nil
 }
 
 func (p *Provider) responseFormat(request appport.ProviderRequest) responseFormat {
@@ -521,6 +580,16 @@ func classifyHTTPStatus(statusCode int) error {
 		return providerError(domainrun.FailureKindProviderTransport, "provider_server_error", true, false, nil)
 	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
 		return providerError(domainrun.FailureKindProviderTransport, "provider_authentication_failed", false, false, nil)
+	case statusCode == http.StatusBadRequest:
+		return providerError(domainrun.FailureKindProviderTransport, "provider_bad_request", false, false, nil)
+	case statusCode == http.StatusPaymentRequired:
+		return providerError(domainrun.FailureKindProviderTransport, "provider_insufficient_balance", false, false, nil)
+	case statusCode == http.StatusNotFound:
+		return providerError(domainrun.FailureKindProviderTransport, "provider_not_found", false, false, nil)
+	case statusCode == http.StatusConflict:
+		return providerError(domainrun.FailureKindProviderTransport, "provider_conflict", false, false, nil)
+	case statusCode == http.StatusUnprocessableEntity:
+		return providerError(domainrun.FailureKindProviderTransport, "provider_unprocessable_request", false, false, nil)
 	default:
 		return providerError(domainrun.FailureKindProviderTransport, "provider_request_rejected", false, false, nil)
 	}

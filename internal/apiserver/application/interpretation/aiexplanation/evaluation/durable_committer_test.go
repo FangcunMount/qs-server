@@ -151,6 +151,46 @@ func TestDurableCommitterRejectsStartBeforeRunAndEventWhenDailyBudgetIsExhausted
 	}
 }
 
+func TestRecheckCommitterBindsTwoCallBudgetAndDiagnosticEvent(t *testing.T) {
+	now := time.Date(2026, 8, 29, 12, 0, 0, 0, time.UTC)
+	repository := &recheckRepositoryStub{}
+	stager := &evaluationEventStagerStub{}
+	postCommit := &evaluationPostCommitStub{}
+	capacity := &capacityRepositoryStub{}
+	committer, err := NewRecheckCommitter(
+		apptransaction.RunnerFunc(func(ctx context.Context, fn func(context.Context) error) error {
+			stager.insideTransaction = true
+			capacity.insideTransaction = true
+			defer func() { stager.insideTransaction = false; capacity.insideTransaction = false }()
+			return fn(ctx)
+		}),
+		repository, evaluationevents.Factory{}, stager, postCommit, capacity, 140, func() time.Time { return now },
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, err := domainevaluation.NewPromptEvaluationRecheck(
+		meta.ID(701), meta.ID(601), "g1", 1, evidenceRelease(), 12, "user:42", "single record diagnostic", now,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := committer.CommitRecheckStart(context.Background(), value); err != nil {
+		t.Fatal(err)
+	}
+	if repository.created != value || !stager.stagedInTransaction || !capacity.reservedInTransaction || postCommit.calls != 1 || len(stager.events) != 1 {
+		t.Fatalf("recheck durable commit = repository:%v staged:%v reserved:%v post:%d events:%d", repository.created == value, stager.stagedInTransaction, capacity.reservedInTransaction, postCommit.calls, len(stager.events))
+	}
+	reservation := capacity.reservations[0]
+	if reservation.RunID != value.ID() || reservation.ProviderInvocations != domainevaluation.RecheckProviderInvocationsV1 {
+		t.Fatalf("recheck capacity reservation = %#v", reservation)
+	}
+	typed, ok := stager.events[0].(evaluationevents.PromptEvaluationStepEvent)
+	if !ok || typed.Data.RunID != "601" || typed.Data.CaseID != "g1" || typed.Data.Attempt != 1 || typed.Data.RecheckID != "701" || typed.AggregateID() != "701" {
+		t.Fatalf("recheck event = %#v", stager.events[0])
+	}
+}
+
 func TestNewDurableCommitterRejectsMissingCapacityAndInvalidBudget(t *testing.T) {
 	dependencies := func(capacity domainevaluation.CapacityRepository, budget int) error {
 		_, err := NewDurableCommitter(
@@ -263,6 +303,27 @@ type capacityRepositoryStub struct {
 	insideTransaction     bool
 	reservedInTransaction bool
 	reservations          []domainevaluation.DailyCapacityReservation
+}
+
+type recheckRepositoryStub struct {
+	created *domainevaluation.PromptEvaluationRecheck
+}
+
+func (s *recheckRepositoryStub) CreateRecheck(_ context.Context, value *domainevaluation.PromptEvaluationRecheck) error {
+	s.created = value
+	return nil
+}
+func (*recheckRepositoryStub) SaveRecheck(context.Context, *domainevaluation.PromptEvaluationRecheck, int64) error {
+	return nil
+}
+func (s *recheckRepositoryStub) FindRecheckByID(_ context.Context, id meta.ID) (*domainevaluation.PromptEvaluationRecheck, error) {
+	if s.created == nil || s.created.ID() != id {
+		return nil, domainevaluation.ErrNotFound
+	}
+	return s.created, nil
+}
+func (*recheckRepositoryStub) ListRechecksBySource(context.Context, meta.ID, string, int, int) ([]*domainevaluation.PromptEvaluationRecheck, error) {
+	return nil, nil
 }
 
 func (s *capacityRepositoryStub) EnsureDailyBucket(context.Context, int64, time.Time, time.Time) error {
