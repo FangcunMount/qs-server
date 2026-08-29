@@ -124,6 +124,27 @@ func TestAIExplanationPromptEvaluationStepHandlerCallsAddressedAutomation(t *tes
 	}
 }
 
+func TestAIExplanationPromptEvaluationRecheckHandlerForwardsAndValidatesRecheckIdentity(t *testing.T) {
+	client := &aiExplanationAutomationClientStub{evaluationResponse: &interpretationpb.ExecutePromptEvaluationStepResponse{
+		Success: true, RunId: "1701", CaseId: "PROMPT-EVAL-001", Attempt: 1,
+		Status: "recheck_completed", RunStatus: "completed", RecheckId: "1801",
+	}}
+	handler := handleAIExplanationPromptEvaluationStep(&Dependencies{Logger: discardLogger(), AIExplanationAutomationClient: client})
+	if err := handler(context.Background(), eventcatalog.AIExplanationPromptEvaluationStepRequested, aiExplanationPromptEvaluationRecheckPayload(t)); err != nil {
+		t.Fatal(err)
+	}
+	request := client.evaluationRequest
+	if request == nil || request.GetRunId() != "1701" || request.GetCaseId() != "PROMPT-EVAL-001" ||
+		request.GetAttempt() != 1 || request.GetRecheckId() != "1801" || request.GetEventId() != "evt-ai-prompt-recheck-1" {
+		t.Fatalf("recheck automation request = %#v", request)
+	}
+
+	client.evaluationResponse.RecheckId = "1802"
+	if err := handler(context.Background(), eventcatalog.AIExplanationPromptEvaluationStepRequested, aiExplanationPromptEvaluationRecheckPayload(t)); err == nil {
+		t.Fatal("mismatched recheck response must NACK the event")
+	}
+}
+
 func TestAIExplanationPromptEvaluationStepHandlerNacksTransportAndInvalidResponse(t *testing.T) {
 	for _, test := range []struct {
 		name   string
@@ -220,6 +241,21 @@ func aiExplanationPromptEvaluationStepPayload(t *testing.T) []byte {
 		Data: eventpayload.AIExplanationPromptEvaluationStepRequestedData{
 			OrgID: 1, RunID: "1701", CaseID: "PROMPT-EVAL-001", Attempt: 1,
 			RequestedBy: "user:42", RequestedAt: time.Date(2026, 8, 27, 2, 0, 0, 0, time.UTC),
+		},
+	}
+	return encodeAIExplanationEvent(t, requested)
+}
+
+func aiExplanationPromptEvaluationRecheckPayload(t *testing.T) []byte {
+	t.Helper()
+	requested := event.Event[eventpayload.AIExplanationPromptEvaluationStepRequestedData]{
+		BaseEvent: event.BaseEvent{
+			ID: "evt-ai-prompt-recheck-1", EventTypeValue: eventcatalog.AIExplanationPromptEvaluationStepRequested,
+			OccurredAtValue: time.Date(2026, 8, 29, 2, 0, 0, 0, time.UTC), AggregateTypeValue: "AIExplanationPromptEvaluationRecheck", AggregateIDValue: "1801",
+		},
+		Data: eventpayload.AIExplanationPromptEvaluationStepRequestedData{
+			OrgID: 1, RunID: "1701", CaseID: "PROMPT-EVAL-001", Attempt: 1, RecheckID: "1801",
+			RequestedBy: "user:42", RequestedAt: time.Date(2026, 8, 29, 2, 0, 0, 0, time.UTC),
 		},
 	}
 	return encodeAIExplanationEvent(t, requested)
