@@ -291,6 +291,7 @@ func (r *OnlineRunner) RunStepV1(ctx context.Context, command OnlineStepCommand)
 	if err != nil {
 		return nil, err
 	}
+	observePromptEvaluationAttemptFailure(record.Failure)
 	return r.closeWhenComplete(persistCtx, runRecord)
 }
 
@@ -351,6 +352,7 @@ func (r *OnlineRunner) recordUnknownDispatch(
 	if err != nil {
 		return nil, err
 	}
+	observePromptEvaluationAttemptFailure(record.Failure)
 	_ = prepared
 	return r.closeWhenComplete(persistCtx, updated)
 }
