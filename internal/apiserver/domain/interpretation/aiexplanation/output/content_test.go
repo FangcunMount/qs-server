@@ -1,6 +1,10 @@
 package output
 
-import "testing"
+import (
+	"bytes"
+	"encoding/json"
+	"testing"
+)
 
 func TestContentRejectsDuplicateEvidence(t *testing.T) {
 	content := validContent()
@@ -25,6 +29,20 @@ func TestContentCloneProtectsNestedSlices(t *testing.T) {
 	clone.Suggestions[0].Actions[0] = "changed"
 	if content.IntegratedInsights[0].EvidenceRefs[0].Ref == "dimension:changed" || content.Suggestions[0].Actions[0] == "changed" {
 		t.Fatal("content was mutated through cloned slices")
+	}
+}
+
+func TestContentClonePreservesRequiredEmptyJSONArray(t *testing.T) {
+	content := validContent()
+	content.Suggestions[0].Origin = SuggestionOriginGeneratedLowRisk
+	content.Suggestions[0].SourceSuggestionRefs = []string{}
+
+	raw, err := json.Marshal(content.Clone())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(raw, []byte(`"source_suggestion_refs":[]`)) {
+		t.Fatalf("normalized clone lost required empty array: %s", raw)
 	}
 }
 

@@ -25,12 +25,45 @@ func TestValidateAcceptsResolvableProfileConstrainedOutput(t *testing.T) {
 
 func TestValidateRejectsUnknownJSONFieldAndTrailingText(t *testing.T) {
 	base := marshal(t, validContent())
-	withUnknown := append(base[:len(base)-1], []byte(`,"unknown":true}`)...)
-	for _, raw := range [][]byte{withUnknown, append(base, []byte(" trailing")...)} {
-		_, err := Validate(raw, validInput(), validDefinition())
+	withUnknown := append(append([]byte(nil), base[:len(base)-1]...), []byte(`,"unknown":true}`)...)
+	tests := []struct {
+		raw  []byte
+		want SchemaViolation
+	}{
+		{raw: withUnknown, want: SchemaViolationUnknownField},
+		{raw: append(append([]byte(nil), base...), []byte(" trailing")...), want: SchemaViolationTrailingContent},
+	}
+	for _, test := range tests {
+		_, err := Validate(test.raw, validInput(), validDefinition())
 		if !errors.Is(err, ErrSchema) {
 			t.Fatalf("schema error = %v", err)
 		}
+		if got := SchemaViolationOf(err); got != test.want {
+			t.Fatalf("schema violation = %q, want %q: %v", got, test.want, err)
+		}
+	}
+}
+
+func TestValidateClassifiesSchemaViolationsWithoutUnboundedDetails(t *testing.T) {
+	contentInvalid := validContent()
+	contentInvalid.SchemaVersion = ""
+	tests := []struct {
+		name string
+		raw  []byte
+		want SchemaViolation
+	}{
+		{name: "object", raw: []byte(`[]`), want: SchemaViolationObjectRequired},
+		{name: "syntax", raw: []byte(`{"schema_version":`), want: SchemaViolationJSONSyntax},
+		{name: "field type", raw: []byte(`{"schema_version":"ai-explanation-output/v1","summary":1}`), want: SchemaViolationFieldType},
+		{name: "content contract", raw: marshal(t, contentInvalid), want: SchemaViolationContentContract},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := Validate(test.raw, validInput(), validDefinition())
+			if !errors.Is(err, ErrSchema) || SchemaViolationOf(err) != test.want {
+				t.Fatalf("schema violation = %q/%v, want %q", SchemaViolationOf(err), err, test.want)
+			}
+		})
 	}
 }
 

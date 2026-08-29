@@ -42,6 +42,7 @@ const (
 	providerResponseShapeSingleMessageOutputText = "single_message_output_text"
 	providerResponseShapeSingleMessageEmptyText  = "single_message_empty_output_text"
 	providerResponseShapeSingleMessageNoText     = "single_message_no_output_text"
+	providerResponseShapeSingleStrictToolCall    = "single_strict_tool_call"
 	providerResponseShapeMultipleMessages        = "multiple_messages"
 	providerResponseShapeNoMessage               = "no_message"
 	providerResponseShapeRefusal                 = "refusal"
@@ -124,6 +125,50 @@ func observeDecodedProviderResponse(schemaVersion string, response responsesAPIR
 	providerResponseTokensTotal.WithLabelValues(purpose, status, "input").Add(float64(response.Usage.InputTokens))
 	providerResponseTokensTotal.WithLabelValues(purpose, status, "output").Add(float64(response.Usage.OutputTokens))
 	if details := response.Usage.OutputTokensDetails; details != nil && details.ReasoningTokens >= 0 && details.ReasoningTokens <= response.Usage.OutputTokens {
+		providerResponseTokensTotal.WithLabelValues(purpose, status, "reasoning").Add(float64(details.ReasoningTokens))
+	}
+}
+
+// observeDeepSeekStrictToolResponse records only the finite terminal status,
+// strict-tool structural shape and numeric usage. Function arguments and every
+// Provider-generated string remain excluded from metrics.
+func observeDeepSeekStrictToolResponse(schemaVersion string, response deepSeekChatResponse) {
+	purpose := providerMetricPurpose(schemaVersion)
+	status := providerResponseStatusInvalid
+	shape := providerResponseShapeNoMessage
+	if len(response.Choices) == 1 {
+		choice := response.Choices[0]
+		switch choice.FinishReason {
+		case "tool_calls":
+			status = providerResponseStatusCompleted
+		case "length":
+			status = providerResponseStatusIncompleteTokenLimit
+		case "content_filter":
+			status = providerResponseStatusIncompleteContent
+		case "insufficient_system_resource":
+			status = providerResponseStatusFailed
+		default:
+			status = providerResponseStatusInvalid
+		}
+		switch {
+		case strings.TrimSpace(choice.Message.Refusal) != "":
+			shape = providerResponseShapeRefusal
+		case len(choice.Message.ToolCalls) == 1:
+			shape = providerResponseShapeSingleStrictToolCall
+		case len(choice.Message.ToolCalls) > 1:
+			shape = providerResponseShapeMultipleMessages
+		default:
+			shape = providerResponseShapeSingleMessageNoText
+		}
+	}
+	providerResponseShapesTotal.WithLabelValues(purpose, status, shape).Inc()
+	if response.Usage == nil || response.Usage.PromptTokens < 0 || response.Usage.CompletionTokens < 0 {
+		return
+	}
+	providerResponseTokensTotal.WithLabelValues(purpose, status, "input").Add(float64(response.Usage.PromptTokens))
+	providerResponseTokensTotal.WithLabelValues(purpose, status, "output").Add(float64(response.Usage.CompletionTokens))
+	if details := response.Usage.CompletionTokensDetails; details != nil &&
+		details.ReasoningTokens >= 0 && details.ReasoningTokens <= response.Usage.CompletionTokens {
 		providerResponseTokensTotal.WithLabelValues(purpose, status, "reasoning").Add(float64(details.ReasoningTokens))
 	}
 }

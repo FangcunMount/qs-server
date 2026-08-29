@@ -103,7 +103,8 @@ func TestDeepSeekProviderUsesResponsesSchemaWithoutOpenAIStrictExtension(t *test
 	defer server.Close()
 
 	provider := mustProvider(t, Config{
-		Provider: ProviderDeepSeek, Endpoint: server.URL, APIKey: "test-deepseek-secret", HTTPClient: server.Client(),
+		Provider: ProviderDeepSeek, Protocol: ProviderProtocolResponses,
+		Endpoint: server.URL, APIKey: "test-deepseek-secret", HTTPClient: server.Client(),
 	})
 	request := validRequestForProvider(ProviderDeepSeek, "deepseek-v4-flash")
 	request.Route.ReasoningEffort = "low"
@@ -201,7 +202,8 @@ func TestDeepSeekProviderUsesJSONObjectModeWithoutSchemaEnvelope(t *testing.T) {
 	defer server.Close()
 
 	provider := mustProvider(t, Config{
-		Provider: ProviderDeepSeek, Endpoint: server.URL, APIKey: "test-deepseek-secret", HTTPClient: server.Client(),
+		Provider: ProviderDeepSeek, Protocol: ProviderProtocolResponses,
+		Endpoint: server.URL, APIKey: "test-deepseek-secret", HTTPClient: server.Client(),
 	})
 	request := validRequestForProvider(ProviderDeepSeek, "deepseek-v4-flash")
 	request.Route.StructuredOutputMode = appport.StructuredOutputModeJSONObject
@@ -222,7 +224,7 @@ func TestDeepSeekProviderUsesJSONObjectModeWithoutSchemaEnvelope(t *testing.T) {
 }
 
 func TestJSONObjectModeRequiresExplicitJSONInstruction(t *testing.T) {
-	provider := mustProvider(t, Config{Provider: ProviderDeepSeek, APIKey: "test-deepseek-secret"})
+	provider := mustProvider(t, Config{Provider: ProviderDeepSeek, Protocol: ProviderProtocolResponses, APIKey: "test-deepseek-secret"})
 	request := validRequestForProvider(ProviderDeepSeek, "deepseek-v4-flash")
 	request.Route.StructuredOutputMode = appport.StructuredOutputModeJSONObject
 	if err := provider.validateProviderRequest(request); err == nil || !strings.Contains(err.Error(), "explicit JSON instruction") {
@@ -569,6 +571,17 @@ func TestProviderRejectsRouteForDifferentProviderBeforeDispatch(t *testing.T) {
 	}
 }
 
+func TestProviderRejectsFrozenRouteProtocolMismatchBeforeDispatch(t *testing.T) {
+	provider := mustProvider(t, Config{Provider: ProviderDeepSeek, Protocol: ProviderProtocolDeepSeekStrictToolCall, APIKey: "secret"})
+	request := validRequestForProvider(ProviderDeepSeek, "deepseek-v4-pro")
+	request.Route.Protocol = ProviderProtocolResponses
+	_, err := provider.Generate(context.Background(), request)
+	classified := requireProviderError(t, err)
+	if classified.Code != "provider_request_invalid" || classified.ResultUnknown {
+		t.Fatalf("mismatched frozen protocol error = %#v", classified)
+	}
+}
+
 func TestProviderRejectsOversizedResponse(t *testing.T) {
 	provider := providerForResponseWithLimit(t, http.StatusOK, strings.Repeat("x", 65), 64)
 	_, err := provider.Generate(context.Background(), validRequest())
@@ -590,8 +603,13 @@ func TestProviderConfigurationRequiresCredential(t *testing.T) {
 	}
 	openAI := mustProvider(t, Config{Provider: ProviderOpenAI, APIKey: "secret"})
 	deepSeek := mustProvider(t, Config{Provider: ProviderDeepSeek, APIKey: "secret"})
-	if openAI.endpoint != openAIDefaultEndpoint || deepSeek.endpoint != deepSeekDefaultEndpoint {
+	if openAI.endpoint != openAIDefaultEndpoint || openAI.protocol != ProviderProtocolResponses ||
+		deepSeek.endpoint != deepSeekResponsesDefaultEndpoint || deepSeek.protocol != ProviderProtocolResponses {
 		t.Fatalf("default endpoints = %q/%q", openAI.endpoint, deepSeek.endpoint)
+	}
+	deepSeekStrict := mustProvider(t, Config{Provider: ProviderDeepSeek, Protocol: ProviderProtocolDeepSeekStrictToolCall, APIKey: "secret"})
+	if deepSeekStrict.endpoint != deepSeekStrictToolDefaultEndpoint {
+		t.Fatalf("explicit DeepSeek strict-tool endpoint = %q", deepSeekStrict.endpoint)
 	}
 }
 
@@ -699,7 +717,10 @@ func providerForProviderResponse(t *testing.T, providerName string, status int, 
 		_, _ = w.Write([]byte(body))
 	}))
 	t.Cleanup(server.Close)
-	return mustProvider(t, Config{Provider: providerName, Endpoint: server.URL, APIKey: "test-secret", HTTPClient: server.Client(), MaxResponseBytes: 4096})
+	return mustProvider(t, Config{
+		Provider: providerName, Protocol: ProviderProtocolResponses,
+		Endpoint: server.URL, APIKey: "test-secret", HTTPClient: server.Client(), MaxResponseBytes: 4096,
+	})
 }
 
 func providerForResponseWithLimit(t *testing.T, status int, body string, limit int64) *Provider {

@@ -136,7 +136,7 @@ func TestOnlineRunnerClassifiesSchemaInvalidProviderOutputAsTechnicalFailure(t *
 			continue
 		}
 		if attempt.Failure == nil || attempt.Failure.Stage != "output_validation" ||
-			attempt.Failure.Code != "provider_output_schema_invalid" || len(attempt.RawOutput) == 0 || len(attempt.NormalizedOutput) != 0 {
+			attempt.Failure.Code != "provider_output_content_contract_invalid" || len(attempt.RawOutput) == 0 || len(attempt.NormalizedOutput) != 0 {
 			t.Fatalf("schema-invalid attempt evidence = %#v", attempt)
 		}
 		failures++

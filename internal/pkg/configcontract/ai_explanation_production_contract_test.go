@@ -9,18 +9,21 @@ import (
 	workeroptions "github.com/FangcunMount/qs-server/internal/worker/options"
 )
 
-func TestProductionAIExplanationDeepSeekRouteV6Contract(t *testing.T) {
+func TestProductionAIExplanationDeepSeekStrictToolRouteV7Contract(t *testing.T) {
 	apiOptions := apiserveroptions.NewOptions()
 	loadConfig(t, filepath.Join(repoRoot(t), "configs", "apiserver.prod.yaml"), apiOptions)
 	workerOptions := workeroptions.NewOptions()
 	loadConfig(t, filepath.Join(repoRoot(t), "configs", "worker.prod.yaml"), workerOptions)
 
 	ai := apiOptions.AIExplanation
+	if ai.ProviderProtocol != apiserveroptions.AIExplanationProviderProtocolDeepSeekStrictToolCall {
+		t.Fatalf("production AI provider protocol = %q, want deepseek_strict_tool_call", ai.ProviderProtocol)
+	}
 	if ai.Model != "deepseek-v4-pro" || ai.Evaluation.Model != "deepseek-v4-pro" {
 		t.Fatalf("production AI models = %q/%q, want deepseek-v4-pro/deepseek-v4-pro", ai.Model, ai.Evaluation.Model)
 	}
-	if ai.RouteRevision != "v6" || ai.Evaluation.RouteRevision != "v3" {
-		t.Fatalf("production AI route revisions = %q/%q, want v6/v3", ai.RouteRevision, ai.Evaluation.RouteRevision)
+	if ai.RouteRevision != "v7" || ai.Evaluation.RouteRevision != "v4" {
+		t.Fatalf("production AI route revisions = %q/%q, want v7/v4", ai.RouteRevision, ai.Evaluation.RouteRevision)
 	}
 	if ai.StructuredOutputMode != apiserveroptions.AIExplanationStructuredOutputJSONSchema ||
 		ai.Evaluation.StructuredOutputMode != apiserveroptions.AIExplanationStructuredOutputJSONSchema {

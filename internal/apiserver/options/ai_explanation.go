@@ -10,13 +10,15 @@ import (
 )
 
 const (
-	DefaultAIExplanationProviderRoute         = "balanced_text_v1"
-	DefaultAIExplanationSemanticProviderRoute = "semantic_judge_v1"
-	AIExplanationProviderOpenAI               = "openai"
-	AIExplanationProviderDeepSeek             = "deepseek"
-	DefaultAIExplanationDeepSeekModel         = "deepseek-v4-flash"
-	AIExplanationStructuredOutputJSONSchema   = "json_schema"
-	AIExplanationStructuredOutputJSONObject   = "json_object"
+	DefaultAIExplanationProviderRoute                   = "balanced_text_v1"
+	DefaultAIExplanationSemanticProviderRoute           = "semantic_judge_v1"
+	AIExplanationProviderOpenAI                         = "openai"
+	AIExplanationProviderDeepSeek                       = "deepseek"
+	AIExplanationProviderProtocolResponses              = "responses"
+	AIExplanationProviderProtocolDeepSeekStrictToolCall = "deepseek_strict_tool_call"
+	DefaultAIExplanationDeepSeekModel                   = "deepseek-v4-flash"
+	AIExplanationStructuredOutputJSONSchema             = "json_schema"
+	AIExplanationStructuredOutputJSONObject             = "json_object"
 )
 
 // AIExplanationOptions controls the optional, manually triggered AI
@@ -26,6 +28,7 @@ type AIExplanationOptions struct {
 	Enabled              bool                                    `json:"enabled" mapstructure:"enabled"`
 	ParticipantEnabled   bool                                    `json:"participant_enabled" mapstructure:"participant_enabled"`
 	Provider             string                                  `json:"provider" mapstructure:"provider"`
+	ProviderProtocol     string                                  `json:"provider_protocol" mapstructure:"provider_protocol"`
 	Model                string                                  `json:"model" mapstructure:"model"`
 	RouteRevision        string                                  `json:"route_revision" mapstructure:"route_revision"`
 	StructuredOutputMode string                                  `json:"structured_output_mode" mapstructure:"structured_output_mode"`
@@ -92,7 +95,8 @@ type AIExplanationEvaluationCapacityOptions struct {
 func NewAIExplanationOptions() *AIExplanationOptions {
 	return &AIExplanationOptions{
 		Enabled: false, ParticipantEnabled: false,
-		Provider: AIExplanationProviderDeepSeek, Model: DefaultAIExplanationDeepSeekModel, RouteRevision: "v1",
+		Provider: AIExplanationProviderDeepSeek, ProviderProtocol: AIExplanationProviderProtocolResponses,
+		Model: DefaultAIExplanationDeepSeekModel, RouteRevision: "v1",
 		StructuredOutputMode: AIExplanationStructuredOutputJSONSchema,
 		Timeout:              60 * time.Second, RunLeaseDuration: 2 * time.Minute,
 		MaxOutputTokens: 3000, MaxResponseBytes: 4 << 20,
@@ -143,6 +147,9 @@ func (o *AIExplanationOptions) Validate() []error {
 	default:
 		errs = append(errs, fmt.Errorf("ai_explanation.provider must be one of openai or deepseek"))
 	}
+	if !validAIExplanationProviderProtocol(o.Provider, o.ProviderProtocol) {
+		errs = append(errs, fmt.Errorf("ai_explanation.provider_protocol is incompatible with the configured provider"))
+	}
 	if strings.TrimSpace(o.Model) == "" {
 		errs = append(errs, fmt.Errorf("ai_explanation.model is required when enabled"))
 	}
@@ -154,6 +161,10 @@ func (o *AIExplanationOptions) Validate() []error {
 	}
 	if !validAIExplanationStructuredOutputMode(o.StructuredOutputMode) {
 		errs = append(errs, fmt.Errorf("ai_explanation.structured_output_mode must be one of json_schema or json_object"))
+	}
+	if strings.TrimSpace(o.ProviderProtocol) == AIExplanationProviderProtocolDeepSeekStrictToolCall &&
+		o.StructuredOutputMode != AIExplanationStructuredOutputJSONSchema {
+		errs = append(errs, fmt.Errorf("ai_explanation deepseek strict tool protocol requires json_schema"))
 	}
 	if o.Timeout <= 0 || o.RunLeaseDuration <= o.Timeout {
 		errs = append(errs, fmt.Errorf("ai_explanation.run_lease_duration must be greater than timeout"))
@@ -203,6 +214,10 @@ func (o *AIExplanationOptions) Validate() []error {
 		if !validAIExplanationStructuredOutputMode(o.Evaluation.StructuredOutputMode) {
 			errs = append(errs, fmt.Errorf("ai_explanation.evaluation.structured_output_mode must be one of json_schema or json_object"))
 		}
+		if strings.TrimSpace(o.ProviderProtocol) == AIExplanationProviderProtocolDeepSeekStrictToolCall &&
+			o.Evaluation.StructuredOutputMode != AIExplanationStructuredOutputJSONSchema {
+			errs = append(errs, fmt.Errorf("ai_explanation.evaluation deepseek strict tool protocol requires json_schema"))
+		}
 		if o.Evaluation.Timeout <= 0 {
 			errs = append(errs, fmt.Errorf("ai_explanation.evaluation.timeout must be positive"))
 		}
@@ -244,6 +259,19 @@ func validAIExplanationStructuredOutputMode(value string) bool {
 	}
 }
 
+func validAIExplanationProviderProtocol(provider, protocol string) bool {
+	switch strings.TrimSpace(provider) {
+	case AIExplanationProviderOpenAI:
+		return strings.TrimSpace(protocol) == AIExplanationProviderProtocolResponses
+	case AIExplanationProviderDeepSeek:
+		switch strings.TrimSpace(protocol) {
+		case AIExplanationProviderProtocolResponses, AIExplanationProviderProtocolDeepSeekStrictToolCall:
+			return true
+		}
+	}
+	return false
+}
+
 func (o AIExplanationDataLifecycleOptions) validate() []error {
 	var errs []error
 	if strings.TrimSpace(o.PolicyVersion) == "" {
@@ -268,10 +296,11 @@ func (o *AIExplanationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.Enabled, "ai_explanation.enabled", o.Enabled, "Enable AI explanation governance and configured evaluation runtime.")
 	fs.BoolVar(&o.ParticipantEnabled, "ai_explanation.participant-enabled", o.ParticipantEnabled, "Expose participant AI explanation APIs and worker execution after release acceptance.")
 	fs.StringVar(&o.Provider, "ai_explanation.provider", o.Provider, "AI explanation provider implementation.")
+	fs.StringVar(&o.ProviderProtocol, "ai_explanation.provider-protocol", o.ProviderProtocol, "Frozen Provider wire protocol: responses or deepseek_strict_tool_call.")
 	fs.StringVar(&o.Model, "ai_explanation.model", o.Model, "Exact model or model snapshot used for AI explanations.")
 	fs.StringVar(&o.RouteRevision, "ai_explanation.route-revision", o.RouteRevision, "Immutable AI explanation provider route revision.")
 	fs.StringVar(&o.StructuredOutputMode, "ai_explanation.structured-output-mode", o.StructuredOutputMode, "Frozen Provider structured output wire mode: json_schema or json_object.")
-	fs.StringVar(&o.Endpoint, "ai_explanation.endpoint", o.Endpoint, "Optional Provider Responses API endpoint override.")
+	fs.StringVar(&o.Endpoint, "ai_explanation.endpoint", o.Endpoint, "Optional Provider protocol endpoint override.")
 	fs.DurationVar(&o.Timeout, "ai_explanation.timeout", o.Timeout, "Deadline for the single provider call.")
 	fs.DurationVar(&o.RunLeaseDuration, "ai_explanation.run-lease-duration", o.RunLeaseDuration, "Durable ownership lease for one AI explanation run.")
 	fs.IntVar(&o.MaxOutputTokens, "ai_explanation.max-output-tokens", o.MaxOutputTokens, "Maximum total output tokens for one provider response.")
