@@ -9,20 +9,20 @@ import (
 	workeroptions "github.com/FangcunMount/qs-server/internal/worker/options"
 )
 
-func TestProductionAIExplanationDeepSeekRouteV4Contract(t *testing.T) {
+func TestProductionAIExplanationDeepSeekRouteV5Contract(t *testing.T) {
 	apiOptions := apiserveroptions.NewOptions()
 	loadConfig(t, filepath.Join(repoRoot(t), "configs", "apiserver.prod.yaml"), apiOptions)
 	workerOptions := workeroptions.NewOptions()
 	loadConfig(t, filepath.Join(repoRoot(t), "configs", "worker.prod.yaml"), workerOptions)
 
 	ai := apiOptions.AIExplanation
-	if ai.RouteRevision != "v4" || ai.Evaluation.RouteRevision != "v2" {
-		t.Fatalf("production AI route revisions = %q/%q, want v4/v2", ai.RouteRevision, ai.Evaluation.RouteRevision)
+	if ai.RouteRevision != "v5" || ai.Evaluation.RouteRevision != "v2" {
+		t.Fatalf("production AI route revisions = %q/%q, want v5/v2", ai.RouteRevision, ai.Evaluation.RouteRevision)
 	}
-	if ai.StructuredOutputMode != apiserveroptions.AIExplanationStructuredOutputJSONObject ||
+	if ai.StructuredOutputMode != apiserveroptions.AIExplanationStructuredOutputJSONSchema ||
 		ai.Evaluation.StructuredOutputMode != apiserveroptions.AIExplanationStructuredOutputJSONSchema {
 		t.Fatalf(
-			"production AI structured output modes = %q/%q, want json_object/json_schema",
+			"production AI structured output modes = %q/%q, want json_schema/json_schema",
 			ai.StructuredOutputMode, ai.Evaluation.StructuredOutputMode,
 		)
 	}
