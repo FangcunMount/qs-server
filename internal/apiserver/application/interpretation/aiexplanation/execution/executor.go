@@ -268,7 +268,7 @@ func (e *executor) executeRunning(
 		})
 	}
 	validationStartedAt := time.Now()
-	validated, err := appvalidation.Validate(response.RawOutput, prepared.input.Document, prepared.profile.Definition())
+	validated, err := appvalidation.Validate(response.OutputForValidation(), prepared.input.Document, prepared.profile.Definition())
 	if err != nil {
 		observeOutputValidation(validationResultOutputRejected, time.Since(validationStartedAt))
 		return e.commitFailure(ctx, generationRecord, runRecord, domainrun.Failure{

@@ -131,6 +131,61 @@ func TestDeepSeekProviderUsesResponsesSchemaWithoutOpenAIStrictExtension(t *test
 	}
 }
 
+func TestDeepSeekProviderUnwrapsExactJSONFenceWithoutRewritingRawEvidence(t *testing.T) {
+	normalizationsBefore := testutil.ToFloat64(providerOutputNormalizationsTotal.WithLabelValues(
+		providerPurposeGeneration,
+		providerOutputNormalizationMarkdownUnwrapped,
+	))
+	wantRaw := "```json\n{\"summary\":\"ok\"}\n```"
+	provider := providerForProviderResponse(t, ProviderDeepSeek, http.StatusOK, fmt.Sprintf(`{
+      "id":"ds_resp_fenced","status":"completed","model":"deepseek-v4-flash",
+	  "output":[{"type":"message","content":[{"type":"output_text","text":%q}]}],
+      "usage":{"input_tokens":34,"output_tokens":13}
+	}`, wantRaw))
+
+	response, err := provider.Generate(context.Background(), validRequestForProvider(ProviderDeepSeek, "deepseek-v4-flash"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(response.RawOutput) != wantRaw {
+		t.Fatalf("raw audit output = %q, want %q", response.RawOutput, wantRaw)
+	}
+	if got := string(response.OutputForValidation()); got != `{"summary":"ok"}` {
+		t.Fatalf("validation output = %q", got)
+	}
+	if delta := testutil.ToFloat64(providerOutputNormalizationsTotal.WithLabelValues(
+		providerPurposeGeneration,
+		providerOutputNormalizationMarkdownUnwrapped,
+	)) - normalizationsBefore; delta != 1 {
+		t.Fatalf("Markdown normalization metric delta = %v", delta)
+	}
+}
+
+func TestProviderValidationOutputRejectsAmbiguousOrNonDeepSeekFences(t *testing.T) {
+	tests := []struct {
+		name     string
+		provider string
+		output   string
+		want     string
+	}{
+		{name: "exact DeepSeek fence", provider: ProviderDeepSeek, output: "```JSON\r\n {\"summary\":\"ok\"} \r\n```", want: `{"summary":"ok"}`},
+		{name: "OpenAI remains strict", provider: ProviderOpenAI, output: "```json\n{\"summary\":\"ok\"}\n```"},
+		{name: "plain DeepSeek object needs no alternate output", provider: ProviderDeepSeek, output: `{"summary":"ok"}`},
+		{name: "unlabelled fence", provider: ProviderDeepSeek, output: "```\n{\"summary\":\"ok\"}\n```"},
+		{name: "trailing prose", provider: ProviderDeepSeek, output: "```json\n{\"summary\":\"ok\"}\n```\nexplanation"},
+		{name: "multiple fences", provider: ProviderDeepSeek, output: "```json\n{\"summary\":\"one\"}\n```\n```json\n{\"summary\":\"two\"}\n```"},
+		{name: "array body", provider: ProviderDeepSeek, output: "```json\n[]\n```"},
+		{name: "invalid object body", provider: ProviderDeepSeek, output: "```json\n{bad}\n```"},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			if got := string(validationOutputForProvider(testCase.provider, testCase.output)); got != testCase.want {
+				t.Fatalf("validation output = %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}
+
 func TestDeepSeekProviderUsesJSONObjectModeWithoutSchemaEnvelope(t *testing.T) {
 	var captured map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

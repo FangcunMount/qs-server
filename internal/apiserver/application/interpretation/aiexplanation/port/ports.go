@@ -167,8 +167,23 @@ type ProviderRequest struct {
 }
 
 type ProviderResponse struct {
+	// RawOutput is the exact Provider message text retained for audit evidence.
 	RawOutput []byte
-	Receipt   aiexplanation.ProviderReceipt
+	// ValidationOutput is an optional, deterministically envelope-normalized
+	// representation used by strict local validators. It must never contain
+	// inferred fields or content repairs. When empty, RawOutput is authoritative.
+	ValidationOutput []byte
+	Receipt          aiexplanation.ProviderReceipt
+}
+
+func (r *ProviderResponse) OutputForValidation() []byte {
+	if r == nil {
+		return nil
+	}
+	if len(r.ValidationOutput) > 0 {
+		return r.ValidationOutput
+	}
+	return r.RawOutput
 }
 
 type Provider interface {
