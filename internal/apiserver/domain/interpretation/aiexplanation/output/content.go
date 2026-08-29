@@ -194,19 +194,31 @@ func (c Content) Validate() error {
 
 func (c Content) Clone() Content {
 	cloned := c
-	cloned.IntegratedInsights = make([]IntegratedInsight, len(c.IntegratedInsights))
+	cloned.IntegratedInsights = cloneSlice(c.IntegratedInsights)
 	for index, insight := range c.IntegratedInsights {
-		cloned.IntegratedInsights[index] = insight
-		cloned.IntegratedInsights[index].EvidenceRefs = append([]EvidenceRef(nil), insight.EvidenceRefs...)
+		cloned.IntegratedInsights[index].EvidenceRefs = cloneSlice(insight.EvidenceRefs)
 	}
-	cloned.Suggestions = make([]Suggestion, len(c.Suggestions))
+	cloned.Suggestions = cloneSlice(c.Suggestions)
 	for index, suggestion := range c.Suggestions {
-		cloned.Suggestions[index] = suggestion
-		cloned.Suggestions[index].Actions = append([]string(nil), suggestion.Actions...)
-		cloned.Suggestions[index].EvidenceRefs = append([]EvidenceRef(nil), suggestion.EvidenceRefs...)
-		cloned.Suggestions[index].SourceSuggestionRefs = append([]string(nil), suggestion.SourceSuggestionRefs...)
+		cloned.Suggestions[index].Actions = cloneSlice(suggestion.Actions)
+		cloned.Suggestions[index].EvidenceRefs = cloneSlice(suggestion.EvidenceRefs)
+		cloned.Suggestions[index].SourceSuggestionRefs = cloneSlice(suggestion.SourceSuggestionRefs)
 	}
-	cloned.Limitations = append([]string(nil), c.Limitations...)
+	cloned.Limitations = cloneSlice(c.Limitations)
+	return cloned
+}
+
+// cloneSlice preserves the nil-versus-empty distinction. Both are valid Go
+// slices, but AIExplanationOutput v1 requires JSON arrays for every collection
+// field. Turning a provider-supplied [] into nil would make the normalized
+// evidence marshal as null and drift away from the document that passed the
+// frozen output contract.
+func cloneSlice[T any](values []T) []T {
+	if values == nil {
+		return nil
+	}
+	cloned := make([]T, len(values))
+	copy(cloned, values)
 	return cloned
 }
 

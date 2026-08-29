@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"unicode/utf8"
 
 	appinput "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/input"
@@ -21,6 +22,44 @@ var (
 	ErrReference = errors.New("AI explanation output reference validation failed")
 	ErrProfile   = errors.New("AI explanation output Profile validation failed")
 )
+
+type SchemaViolation string
+
+const (
+	SchemaViolationObjectRequired  SchemaViolation = "object_required"
+	SchemaViolationJSONSyntax      SchemaViolation = "json_syntax_invalid"
+	SchemaViolationUnknownField    SchemaViolation = "unknown_field"
+	SchemaViolationFieldType       SchemaViolation = "field_type_invalid"
+	SchemaViolationDecode          SchemaViolation = "json_decode_invalid"
+	SchemaViolationTrailingContent SchemaViolation = "trailing_content"
+	SchemaViolationContentContract SchemaViolation = "content_contract_invalid"
+)
+
+type schemaViolationError struct {
+	violation SchemaViolation
+	detail    string
+}
+
+func (e *schemaViolationError) Error() string {
+	return fmt.Sprintf("%s: %s", ErrSchema, e.detail)
+}
+
+func (e *schemaViolationError) Unwrap() error { return ErrSchema }
+
+// SchemaViolationOf returns a reviewed, low-cardinality reason suitable for
+// evaluation evidence and metrics. The original decoder detail remains local
+// and must not become a metric label or an operator-facing remote error.
+func SchemaViolationOf(err error) SchemaViolation {
+	var violation *schemaViolationError
+	if errors.As(err, &violation) {
+		return violation.violation
+	}
+	return ""
+}
+
+func schemaViolation(violation SchemaViolation, detail string) error {
+	return &schemaViolationError{violation: violation, detail: detail}
+}
 
 const (
 	SchemaValidatorVersion    = "ai-explanation-output-typed/v1"
@@ -40,7 +79,7 @@ func Validate(raw []byte, input appinput.Document, definition domainprofile.Defi
 		return nil, fmt.Errorf("%w: %v", ErrProfile, err)
 	}
 	if len(bytes.TrimSpace(raw)) == 0 || bytes.TrimSpace(raw)[0] != '{' || !utf8.Valid(raw) {
-		return nil, fmt.Errorf("%w: output must be one UTF-8 JSON object", ErrSchema)
+		return nil, schemaViolation(SchemaViolationObjectRequired, "output must be one UTF-8 JSON object")
 	}
 	if utf8.RuneCount(raw) > definition.GenerationPolicy.MaxOutputCharacters {
 		return nil, fmt.Errorf("%w: output exceeds %d characters", ErrProfile, definition.GenerationPolicy.MaxOutputCharacters)
@@ -49,16 +88,16 @@ func Validate(raw []byte, input appinput.Document, definition domainprofile.Defi
 	decoder.DisallowUnknownFields()
 	var content output.Content
 	if err := decoder.Decode(&content); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrSchema, err)
+		return nil, schemaViolation(classifyDecodeViolation(err), err.Error())
 	}
 	var trailing any
 	if err := decoder.Decode(&trailing); err != nil && !errors.Is(err, io.EOF) {
-		return nil, fmt.Errorf("%w: trailing content: %v", ErrSchema, err)
+		return nil, schemaViolation(SchemaViolationTrailingContent, "trailing content: "+err.Error())
 	} else if err == nil {
-		return nil, fmt.Errorf("%w: trailing content", ErrSchema)
+		return nil, schemaViolation(SchemaViolationTrailingContent, "trailing content")
 	}
 	if err := content.Validate(); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrSchema, err)
+		return nil, schemaViolation(SchemaViolationContentContract, err.Error())
 	}
 	if err := validateReferences(content, input); err != nil {
 		return nil, err
@@ -70,6 +109,24 @@ func Validate(raw []byte, input appinput.Document, definition domainprofile.Defi
 		Content: content.Clone(), SchemaValidatorVersion: SchemaValidatorVersion,
 		ReferenceValidatorVersion: ReferenceValidatorVersion, ProfileValidatorVersion: ProfileValidatorVersion,
 	}, nil
+}
+
+func classifyDecodeViolation(err error) SchemaViolation {
+	if errors.Is(err, io.ErrUnexpectedEOF) {
+		return SchemaViolationJSONSyntax
+	}
+	var syntax *json.SyntaxError
+	if errors.As(err, &syntax) {
+		return SchemaViolationJSONSyntax
+	}
+	var fieldType *json.UnmarshalTypeError
+	if errors.As(err, &fieldType) {
+		return SchemaViolationFieldType
+	}
+	if strings.HasPrefix(err.Error(), "json: unknown field ") {
+		return SchemaViolationUnknownField
+	}
+	return SchemaViolationDecode
 }
 
 func validateReferences(content output.Content, input appinput.Document) error {

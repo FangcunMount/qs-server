@@ -282,6 +282,7 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 		Route: apiserveroptions.DefaultAIExplanationProviderRoute, Revision: config.RouteRevision,
 		Provider: config.Provider, Model: config.Model, Current: true,
 		Capabilities:         appport.ProviderCapabilities{StructuredOutput: true},
+		Protocol:             config.ProviderProtocol,
 		StructuredOutputMode: config.StructuredOutputMode,
 		Timeout:              config.Timeout, MaxOutputTokens: config.MaxOutputTokens, ReasoningEffort: config.ReasoningEffort,
 	}}
@@ -290,6 +291,7 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 			Route: apiserveroptions.DefaultAIExplanationSemanticProviderRoute, Revision: config.Evaluation.RouteRevision,
 			Provider: config.Provider, Model: config.Evaluation.Model, Current: true,
 			Capabilities:         appport.ProviderCapabilities{StructuredOutput: true},
+			Protocol:             config.ProviderProtocol,
 			StructuredOutputMode: config.Evaluation.StructuredOutputMode,
 			Timeout:              config.Evaluation.Timeout, MaxOutputTokens: config.Evaluation.MaxOutputTokens,
 			ReasoningEffort: config.Evaluation.ReasoningEffort,
@@ -300,10 +302,11 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation provider route: %v", err)
 	}
 	providerAdapter, err := aiexplanationresponsesapi.NewProvider(aiexplanationresponsesapi.Config{
-		Provider: config.Provider, Endpoint: config.Endpoint, APIKey: config.APIKey, MaxResponseBytes: config.MaxResponseBytes,
+		Provider: config.Provider, Protocol: config.ProviderProtocol,
+		Endpoint: config.Endpoint, APIKey: config.APIKey, MaxResponseBytes: config.MaxResponseBytes,
 	})
 	if err != nil {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation Responses API provider: %v", err)
+		return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation Provider adapter: %v", err)
 	}
 	generationRepo, err := mongoAIExplanation.NewGenerationRepository(deps.MongoDB, retentionPolicy, mongoOptions)
 	if err != nil {

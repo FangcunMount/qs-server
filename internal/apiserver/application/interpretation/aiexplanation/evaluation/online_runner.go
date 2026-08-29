@@ -587,11 +587,12 @@ func (r *OnlineRunner) executeAttempt(
 	// failures remain ordinary release-gate evidence rather than Provider
 	// protocol failures.
 	if errors.Is(validationErr, appvalidation.ErrSchema) {
+		code, safeMessage := providerOutputSchemaFailure(validationErr)
 		return r.failedAttempt(
 			base,
 			"output_validation",
-			"provider_output_schema_invalid",
-			"Provider output did not satisfy the frozen output schema",
+			code,
+			safeMessage,
 			false,
 			false,
 		)
@@ -629,6 +630,27 @@ func (r *OnlineRunner) executeAttempt(
 	base.Semantic = semanticReceipt
 	base.FinishedAt = r.finishTime(startedAt)
 	return base
+}
+
+func providerOutputSchemaFailure(err error) (string, string) {
+	switch appvalidation.SchemaViolationOf(err) {
+	case appvalidation.SchemaViolationObjectRequired:
+		return "provider_output_object_required", "Provider output was not one JSON object"
+	case appvalidation.SchemaViolationJSONSyntax:
+		return "provider_output_json_syntax_invalid", "Provider output contained invalid JSON syntax"
+	case appvalidation.SchemaViolationUnknownField:
+		return "provider_output_unknown_field", "Provider output contained a field outside the frozen schema"
+	case appvalidation.SchemaViolationFieldType:
+		return "provider_output_field_type_invalid", "Provider output used an invalid field type"
+	case appvalidation.SchemaViolationDecode:
+		return "provider_output_json_decode_invalid", "Provider output could not be decoded as the frozen schema"
+	case appvalidation.SchemaViolationTrailingContent:
+		return "provider_output_trailing_content", "Provider output contained trailing content"
+	case appvalidation.SchemaViolationContentContract:
+		return "provider_output_content_contract_invalid", "Provider output violated a frozen content constraint"
+	default:
+		return "provider_output_schema_invalid", "Provider output did not satisfy the frozen output schema"
+	}
 }
 
 func candidateReceipts(

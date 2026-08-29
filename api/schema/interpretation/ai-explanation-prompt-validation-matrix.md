@@ -4,7 +4,7 @@
 
 `cross-dimension-participant-scale/v1` 的发布门槛不是“能生成一段看起来合理的文字”，而是：在固定 Profile、固定输入、固定 Provider Route 配置下重复运行，结构、引用、策略和安全硬门禁全部通过，同时跨维度质量、忠实度、建议可操作性和表达清晰度达到阈值。
 
-Prompt 发布状态仍是 `planned`。仓库已经实现不调用 Provider 的离线 preflight runner、确定性候选输出判定器，以及消费同一合成 suite 的在线 attempt runner。在线 runner 会执行零调用 preflight、7×5 次独立 generation、确定性门禁和 `SemanticEvaluator` port，并把全部成功/失败 attempt 写入不可变证据后停在 `awaiting_review`。独立 semantic adapter 已使用固定裁判 Prompt、严格输出 Schema、最小化合成 payload 和 Provider receipt；ReviewService 已要求每个 attempt 由不同主体完成双角色复核，70 条复核齐全后才允许 finalize。内部 REST/OpenAPI 已提供受授权的摘要/单 attempt 证据读取、review、finalize 和 Profile draft/publish/disable，但尚未提供可恢复的评测执行任务。当前仍只有 fake Provider 编排/契约测试，尚未执行 35 次真实生成与 35 次真实裁判调用，没有实际人工复核或 approved 报告。因此离线/假实现验证均不表示 Prompt 已可发布，更不表示 AI Explanation 已具备生产能力。
+Prompt 发布状态仍是 `planned`。仓库已经实现离线 preflight、确定性候选输出判定、可恢复的在线 attempt runner、独立 `SemanticEvaluator`、不可变证据、双角色 ReviewService 和受授权的治理 API；生产也已执行多轮真实冻结评测。最近一次 `v6/v3 + deepseek-v4-pro` 复测仍有 1 条生成输出未通过 `AIExplanationOutput v1`，因此 first-attempt 结构硬门禁失败，该 Run 不能进入审核或发布。当前 `v7/v4` 候选把 DeepSeek 调用冻结为强制单函数 `strict=true` 通道，并继续执行服务端完整 Schema/引用/Profile/Safety 校验。尚未产生 v7/v4 的 35 次真实生成、35 次真实裁判、70 条双角色人工复核和 approved 报告，因此现有实现与历史 Run 均不表示 Prompt 已可发布，更不表示 AI Explanation 已具备用户生产能力。
 
 规范性文件：
 
@@ -230,4 +230,4 @@ git diff --check
 
 仓库现已实现 `PromptEvaluationRun` 聚合、CAS EvidenceService/ReviewService、Mongo PO/Mapper/Repository、migration 26、在线 attempt runner、独立 semantic evaluator adapter，以及绑定 approved evaluation run 的 Profile publish/disable 治理服务。在线 runner 为每个生成和裁判 attempt 分配稳定 InvocationID，冻结 suite/生成 Prompt/Profile/Schema/Route 与独立裁判 identity，限制证据大小，保留 Provider/渲染/校验/semantic evaluator 的失败事实，并用 assertion 的 `scope + type + ordinal` 区分同一 case 内重复的规则。领域 gate 固定要求 35 个 generation attempts、零调用 preflight、确定性/语义 assertion、五项 rubric 阈值和每份输出的 assessment-semantics 与 safety-product 双角色复核；失败或分歧会生成不可改写的 rejected run。
 
-这些结构仍未执行真实 Provider 调用；独立生成/裁判 Route 的配置与 composition 虽已存在但默认关闭。管理面通过 operator-only start 创建耐久 `PromptEvaluationRun`，在同一事务预留完整调用预算并写入首个 Outbox step；Worker 经内部 Automation gRPC 每次只推进一个带稳定 InvocationID、lease 和 checkpoint 的生成/裁判 attempt，完成后再原子保存证据并写下一 step。进度、dispatch 前取消、过期 prepared 周期恢复和过期 lease 人工恢复均已接入，不把 35 次生成与 35 次裁判绑定到同步 HTTP 生命周期。未实际产生包含 35 个 generation outputs、35 个 semantic receipts、1 个 preflight 结果和 70 条角色复核记录的 approved 不可变报告前，`publish_evidence` 仍为 false，Prompt 状态必须保持 `planned`，不得发布 Profile。
+生产实调已经验证这条可恢复链路，也证明技术成功、结构合格、模型裁判、人工审核和 Profile 发布是彼此独立的门禁。管理面通过 operator-only start 创建耐久 `PromptEvaluationRun`，在同一事务预留完整调用预算并写入首个 Outbox step；Worker 经内部 Automation gRPC 每次只推进一个带稳定 InvocationID、lease 和 checkpoint 的生成/裁判 attempt，完成后再原子保存证据并写下一 step。进度、dispatch 前取消、过期 prepared 周期恢复和过期 lease 人工恢复均已接入，不把 35 次生成与 35 次裁判绑定到同步 HTTP 生命周期。未实际产生包含 35 个 generation outputs、35 个 semantic receipts、1 个 preflight 结果和 70 条角色复核记录的 approved 不可变报告前，`publish_evidence` 仍为 false，Prompt 状态必须保持 `planned`，不得发布 Profile。

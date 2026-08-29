@@ -57,6 +57,15 @@ type ProviderCapabilities struct {
 }
 
 const (
+	// ProviderProtocolResponses is the legacy one-shot Responses API wire
+	// contract. An empty protocol on a previously frozen route resolves here so
+	// historical fingerprints and fixtures retain their original semantics.
+	ProviderProtocolResponses = "responses"
+	// ProviderProtocolDeepSeekStrictToolCall uses DeepSeek Beta Chat
+	// Completions with one forced strict function call. It is a distinct frozen
+	// execution semantic and must never be enabled by mutating an old route.
+	ProviderProtocolDeepSeekStrictToolCall = "deepseek_strict_tool_call"
+
 	// StructuredOutputModeJSONSchema asks the Provider to constrain output with
 	// the complete output schema. It remains the legacy default for frozen
 	// routes created before the mode became explicit.
@@ -70,6 +79,7 @@ const (
 type ProviderRoute struct {
 	ExecutionSpec        aiexplanation.ProviderExecutionSpec
 	Capabilities         ProviderCapabilities
+	Protocol             string
 	StructuredOutputMode string
 	Timeout              time.Duration
 	MaxOutputTokens      int
@@ -83,6 +93,9 @@ func (r ProviderRoute) Validate() error {
 	if !r.Capabilities.StructuredOutput {
 		return fmt.Errorf("AI explanation provider route must support structured output")
 	}
+	if _, err := normalizeProviderProtocol(r.Protocol); err != nil {
+		return err
+	}
 	if _, err := normalizeStructuredOutputMode(r.StructuredOutputMode); err != nil {
 		return err
 	}
@@ -93,6 +106,24 @@ func (r ProviderRoute) Validate() error {
 		return fmt.Errorf("AI explanation provider reasoning effort is invalid")
 	}
 	return nil
+}
+
+// EffectiveProtocol preserves Responses API as the wire behavior of routes
+// frozen before protocol became explicit.
+func (r ProviderRoute) EffectiveProtocol() string {
+	protocol, _ := normalizeProviderProtocol(r.Protocol)
+	return protocol
+}
+
+func normalizeProviderProtocol(value string) (string, error) {
+	switch strings.TrimSpace(value) {
+	case "", ProviderProtocolResponses:
+		return ProviderProtocolResponses, nil
+	case ProviderProtocolDeepSeekStrictToolCall:
+		return ProviderProtocolDeepSeekStrictToolCall, nil
+	default:
+		return "", fmt.Errorf("AI explanation provider protocol is invalid")
+	}
 }
 
 // EffectiveStructuredOutputMode preserves json_schema as the behavior of

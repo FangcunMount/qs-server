@@ -78,6 +78,17 @@ func TestCatalogFingerprintChangesWithExecutionSemantics(t *testing.T) {
 	if a.ExecutionSpec.Fingerprint == d.ExecutionSpec.Fingerprint {
 		t.Fatal("route fingerprint did not change with structured output mode")
 	}
+
+	changedProtocol := validConfig()
+	changedProtocol.Protocol = appport.ProviderProtocolDeepSeekStrictToolCall
+	fifth, err := NewCatalog([]Config{changedProtocol})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e, _ := fifth.ResolveProviderRoute(context.Background(), changedProtocol.Route)
+	if a.ExecutionSpec.Fingerprint == e.ExecutionSpec.Fingerprint {
+		t.Fatal("route fingerprint did not change with Provider protocol")
+	}
 }
 
 func TestCatalogCanonicalizesReasoningEffortBeforeFreezingRoute(t *testing.T) {
@@ -115,6 +126,20 @@ func TestCatalogPreservesLegacyJSONSchemaFingerprint(t *testing.T) {
 	if legacyRoute.StructuredOutputMode != appport.StructuredOutputModeJSONSchema {
 		t.Fatalf("legacy mode = %q", legacyRoute.StructuredOutputMode)
 	}
+	legacyProtocol := validConfig()
+	legacyProtocol.Protocol = ""
+	explicitResponses := validConfig()
+	explicitResponses.Protocol = appport.ProviderProtocolResponses
+	legacyProtocolCatalog, _ := NewCatalog([]Config{legacyProtocol})
+	explicitResponsesCatalog, _ := NewCatalog([]Config{explicitResponses})
+	legacyProtocolRoute, _ := legacyProtocolCatalog.ResolveProviderRoute(context.Background(), legacyProtocol.Route)
+	explicitResponsesRoute, _ := explicitResponsesCatalog.ResolveProviderRoute(context.Background(), explicitResponses.Route)
+	if legacyProtocolRoute.ExecutionSpec.Fingerprint != explicitResponsesRoute.ExecutionSpec.Fingerprint {
+		t.Fatalf("legacy/explicit Responses fingerprints differ: %s/%s", legacyProtocolRoute.ExecutionSpec.Fingerprint, explicitResponsesRoute.ExecutionSpec.Fingerprint)
+	}
+	if legacyProtocolRoute.EffectiveProtocol() != appport.ProviderProtocolResponses {
+		t.Fatalf("legacy protocol = %q", legacyProtocolRoute.EffectiveProtocol())
+	}
 }
 
 func TestCatalogRejectsUnsupportedOrDuplicateRoutes(t *testing.T) {
@@ -130,6 +155,13 @@ func TestCatalogRejectsUnsupportedOrDuplicateRoutes(t *testing.T) {
 	_, err = NewCatalog([]Config{invalidMode})
 	if !errors.Is(err, ErrInvalidConfig) {
 		t.Fatalf("invalid structured output mode error = %v", err)
+	}
+
+	invalidProtocol := validConfig()
+	invalidProtocol.Protocol = "unreviewed_protocol"
+	_, err = NewCatalog([]Config{invalidProtocol})
+	if !errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("invalid Provider protocol error = %v", err)
 	}
 
 	config := validConfig()

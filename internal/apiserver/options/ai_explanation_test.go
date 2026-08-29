@@ -180,6 +180,36 @@ func TestAIExplanationValidatesFrozenStructuredOutputModes(t *testing.T) {
 	}
 }
 
+func TestAIExplanationValidatesFrozenProviderProtocol(t *testing.T) {
+	opts := NewAIExplanationOptions()
+	opts.Enabled = true
+	opts.APIKey = "provider-test-secret"
+	configureAIExplanationTestLifecycle(opts)
+
+	opts.ProviderProtocol = "unreviewed_protocol"
+	if joined := errorsText(opts.Validate()); !strings.Contains(joined, "provider_protocol") {
+		t.Fatalf("provider protocol validation errors = %v", opts.Validate())
+	}
+
+	opts.Provider = AIExplanationProviderOpenAI
+	opts.ProviderProtocol = AIExplanationProviderProtocolDeepSeekStrictToolCall
+	if joined := errorsText(opts.Validate()); !strings.Contains(joined, "provider_protocol") {
+		t.Fatalf("OpenAI strict-tool validation errors = %v", opts.Validate())
+	}
+
+	opts.Provider = AIExplanationProviderDeepSeek
+	opts.ProviderProtocol = AIExplanationProviderProtocolDeepSeekStrictToolCall
+	opts.StructuredOutputMode = AIExplanationStructuredOutputJSONObject
+	if joined := errorsText(opts.Validate()); !strings.Contains(joined, "strict tool protocol requires json_schema") {
+		t.Fatalf("strict-tool output-mode validation errors = %v", opts.Validate())
+	}
+
+	opts.StructuredOutputMode = AIExplanationStructuredOutputJSONSchema
+	if errs := opts.Validate(); len(errs) != 0 {
+		t.Fatalf("valid DeepSeek strict-tool protocol = %v", errs)
+	}
+}
+
 func TestAIExplanationEvaluationCapacityUsesFixedV1RunCeiling(t *testing.T) {
 	opts := NewAIExplanationOptions()
 	opts.Enabled = true

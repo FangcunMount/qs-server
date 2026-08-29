@@ -1,7 +1,7 @@
 // Package responsesapi implements the one-shot AI explanation provider port
-// for explicitly supported Responses API providers. It deliberately exposes no
-// SDK types outside this package and never logs prompts, assessment data, model
-// output or credentials.
+// for explicitly reviewed OpenAI/DeepSeek wire protocols. It deliberately
+// exposes no SDK types outside this package and never logs prompts, assessment
+// data, model output or credentials.
 package responsesapi
 
 import (
@@ -23,17 +23,21 @@ import (
 )
 
 const (
-	ProviderOpenAI          = "openai"
-	ProviderDeepSeek        = "deepseek"
-	openAIDefaultEndpoint   = "https://api.openai.com/v1/responses"
-	deepSeekDefaultEndpoint = "https://api.deepseek.com/responses"
-	defaultMaxResponseBytes = int64(4 << 20)
+	ProviderOpenAI                         = "openai"
+	ProviderDeepSeek                       = "deepseek"
+	ProviderProtocolResponses              = appport.ProviderProtocolResponses
+	ProviderProtocolDeepSeekStrictToolCall = appport.ProviderProtocolDeepSeekStrictToolCall
+	openAIDefaultEndpoint                  = "https://api.openai.com/v1/responses"
+	deepSeekResponsesDefaultEndpoint       = "https://api.deepseek.com/responses"
+	deepSeekStrictToolDefaultEndpoint      = "https://api.deepseek.com/beta/chat/completions"
+	defaultMaxResponseBytes                = int64(4 << 20)
 )
 
 var schemaNamePartPattern = regexp.MustCompile(`[^A-Za-z0-9_-]+`)
 
 type Config struct {
 	Provider         string
+	Protocol         string
 	Endpoint         string
 	APIKey           string
 	HTTPClient       *http.Client
@@ -42,6 +46,7 @@ type Config struct {
 
 type Provider struct {
 	name             string
+	protocol         string
 	endpoint         string
 	apiKey           string
 	httpClient       *http.Client
@@ -54,15 +59,22 @@ func NewProvider(config Config) (*Provider, error) {
 	name := strings.ToLower(strings.TrimSpace(config.Provider))
 	profile, ok := profileForProvider(name)
 	if !ok {
-		return nil, fmt.Errorf("unsupported AI explanation Responses API provider %q", name)
+		return nil, fmt.Errorf("unsupported AI explanation provider %q", name)
+	}
+	protocol := strings.TrimSpace(config.Protocol)
+	if protocol == "" {
+		protocol = profile.defaultProtocol
+	}
+	if !profile.supportsProtocol(protocol) {
+		return nil, fmt.Errorf("unsupported AI explanation %s protocol %q", name, protocol)
 	}
 	endpoint := strings.TrimSpace(config.Endpoint)
 	if endpoint == "" {
-		endpoint = profile.defaultEndpoint
+		endpoint = defaultEndpoint(name, protocol)
 	}
 	parsed, err := url.ParseRequestURI(endpoint)
 	if err != nil || parsed.Scheme != "https" && parsed.Scheme != "http" || parsed.Host == "" {
-		return nil, fmt.Errorf("invalid %s Responses endpoint", name)
+		return nil, fmt.Errorf("invalid %s provider endpoint", name)
 	}
 	if strings.TrimSpace(config.APIKey) == "" {
 		return nil, fmt.Errorf("%s API key is required", name)
@@ -76,26 +88,48 @@ func NewProvider(config Config) (*Provider, error) {
 		limit = defaultMaxResponseBytes
 	}
 	if limit < 1 {
-		return nil, fmt.Errorf("responses API response byte limit must be positive")
+		return nil, fmt.Errorf("provider response byte limit must be positive")
 	}
 	return &Provider{
-		name: name, endpoint: endpoint, apiKey: config.APIKey, httpClient: client,
+		name: name, protocol: protocol, endpoint: endpoint, apiKey: config.APIKey, httpClient: client,
 		maxResponseBytes: limit, strictJSONSchema: profile.strictJSONSchema, explicitStore: profile.explicitStore,
 	}, nil
 }
 
 type providerProfile struct {
-	defaultEndpoint  string
+	defaultProtocol  string
+	strictToolCall   bool
 	strictJSONSchema bool
 	explicitStore    bool
+}
+
+func (p providerProfile) supportsProtocol(protocol string) bool {
+	switch protocol {
+	case ProviderProtocolResponses:
+		return true
+	case ProviderProtocolDeepSeekStrictToolCall:
+		return p.strictToolCall
+	default:
+		return false
+	}
+}
+
+func defaultEndpoint(provider, protocol string) string {
+	if provider == ProviderDeepSeek {
+		if protocol == ProviderProtocolResponses {
+			return deepSeekResponsesDefaultEndpoint
+		}
+		return deepSeekStrictToolDefaultEndpoint
+	}
+	return openAIDefaultEndpoint
 }
 
 func profileForProvider(name string) (providerProfile, bool) {
 	switch name {
 	case ProviderOpenAI:
-		return providerProfile{defaultEndpoint: openAIDefaultEndpoint, strictJSONSchema: true, explicitStore: true}, true
+		return providerProfile{defaultProtocol: ProviderProtocolResponses, strictJSONSchema: true, explicitStore: true}, true
 	case ProviderDeepSeek:
-		return providerProfile{defaultEndpoint: deepSeekDefaultEndpoint, strictJSONSchema: false}, true
+		return providerProfile{defaultProtocol: ProviderProtocolResponses, strictToolCall: true}, true
 	default:
 		return providerProfile{}, false
 	}
@@ -180,6 +214,9 @@ func (p *Provider) Generate(ctx context.Context, request appport.ProviderRequest
 	defer func() {
 		observeProviderInvocation(request.OutputSchema.Version, time.Since(metricStartedAt), response, resultErr)
 	}()
+	if p.protocol == ProviderProtocolDeepSeekStrictToolCall {
+		return p.generateDeepSeekStrictToolCall(ctx, request)
+	}
 
 	if err := p.validateProviderRequest(request); err != nil {
 		return nil, providerError(domainrun.FailureKindProviderTransport, "provider_request_invalid", false, false, err)
@@ -313,7 +350,10 @@ func (p *Provider) validateProviderRequest(request appport.ProviderRequest) erro
 		return err
 	}
 	if request.Route.ExecutionSpec.ResolvedProvider != p.name {
-		return fmt.Errorf("route provider does not match configured Responses API provider")
+		return fmt.Errorf("route provider does not match configured Provider adapter")
+	}
+	if request.Route.EffectiveProtocol() != p.protocol {
+		return fmt.Errorf("frozen route protocol does not match configured Provider adapter")
 	}
 	if strings.TrimSpace(request.SystemMessage) == "" || strings.TrimSpace(request.TaskMessage) == "" || strings.TrimSpace(request.DataPreamble) == "" {
 		return fmt.Errorf("prompt messages are required")
