@@ -358,6 +358,67 @@ func (*Mapper) PromptEvaluationRunToDomain(po *PromptEvaluationRunPO) (*domainev
 	})
 }
 
+func (*Mapper) PromptEvaluationRecheckToPO(value *domainevaluation.PromptEvaluationRecheck) (*PromptEvaluationRecheckPO, error) {
+	if value == nil {
+		return nil, fmt.Errorf("AI explanation Prompt evaluation recheck is required")
+	}
+	release := value.Release()
+	po := &PromptEvaluationRecheckPO{
+		BaseDocument: base.BaseDocument{DomainID: value.ID(), CreatedAt: value.CreatedAt(), UpdatedAt: value.CreatedAt()},
+		SourceRunID:  value.SourceRunID(), SourceCaseID: value.SourceCaseID(), SourceAttempt: value.SourceAttempt(),
+		Release: EvaluationReleasePO{
+			Suite:  EvaluationSuiteRefPO{ID: release.Suite.ID, Version: release.Suite.Version, Fingerprint: release.Suite.Fingerprint.String(), GitBlobSHA: release.Suite.GitBlobSHA},
+			Prompt: promptToPO(release.Prompt), Profile: profileRefToPO(release.Profile),
+			InputSchema: schemaRefToPO(release.InputSchema), OutputSchema: schemaRefToPO(release.OutputSchema),
+			Provider: executionToPO(release.Provider), Decoding: decodingToPO(release.Decoding),
+			SemanticEvaluator: semanticEvaluatorSpecToPO(release.SemanticEvaluator),
+			GenerationCaseIDs: append([]string(nil), release.GenerationCaseIDs...), PreflightCaseID: release.PreflightCaseID,
+			PreflightRejectionReason: release.PreflightRejectionReason, RepetitionsPerCase: release.RepetitionsPerCase,
+		},
+		Status: string(value.Status()), Version: value.Version(), Execution: evaluationExecutionToPO(value.Execution()),
+		RequestedOrgID: value.RequestedOrgID(), RequestedBy: value.RequestedBy(), Reason: value.Reason(),
+		FinishedAt: value.FinishedAt(),
+	}
+	if !value.Status().IsTerminal() {
+		po.ActiveSourceKey = value.SourceRunID().String() + ":" + strconv.Itoa(len(value.SourceCaseID())) + ":" + value.SourceCaseID() + ":" + strconv.Itoa(value.SourceAttempt())
+	}
+	if po.FinishedAt != nil {
+		po.UpdatedAt = *po.FinishedAt
+	} else if execution := value.Execution(); execution != nil {
+		po.UpdatedAt = execution.ClaimedAt
+	}
+	if result := value.Result(); result != nil {
+		mapped := attemptToPO(*result)
+		po.Result = &mapped
+	}
+	return po, nil
+}
+
+func (*Mapper) PromptEvaluationRecheckToDomain(po *PromptEvaluationRecheckPO) (*domainevaluation.PromptEvaluationRecheck, error) {
+	if po == nil {
+		return nil, fmt.Errorf("AI explanation Prompt evaluation recheck document is required")
+	}
+	release, err := evaluationReleaseFromPO(po.Release)
+	if err != nil {
+		return nil, err
+	}
+	var result *domainevaluation.AttemptRecord
+	if po.Result != nil {
+		mapped, mapErr := attemptFromPO(*po.Result)
+		if mapErr != nil {
+			return nil, mapErr
+		}
+		result = &mapped
+	}
+	return domainevaluation.RestorePromptEvaluationRecheck(domainevaluation.PromptEvaluationRecheckPersistedInput{
+		ID: po.DomainID, SourceRunID: po.SourceRunID, SourceCaseID: po.SourceCaseID, SourceAttempt: po.SourceAttempt,
+		Release: release, Status: domainevaluation.RecheckStatus(po.Status), Version: po.Version,
+		Execution: evaluationExecutionFromPO(po.Execution), Result: result,
+		RequestedOrg: po.RequestedOrgID, RequestedBy: po.RequestedBy, Reason: po.Reason,
+		CreatedAt: po.CreatedAt, FinishedAt: po.FinishedAt,
+	})
+}
+
 // evaluationReleaseFromPO converts the immutable release identity without
 // restoring the full aggregate. Catalog queries use it together with a narrow
 // Mongo projection so queue reads cannot load Provider output evidence.

@@ -54,6 +54,7 @@ const (
 
 	providerOutputNormalizationUnchanged         = "unchanged"
 	providerOutputNormalizationMarkdownUnwrapped = "markdown_json_fence_unwrapped"
+	providerOutputNormalizationEnvelopeUnwrapped = "known_json_envelope_unwrapped"
 )
 
 // observeProviderInvocation exposes only bounded purpose/result labels. Model,
@@ -85,10 +86,13 @@ func observeProviderOutputEnvelope(schemaVersion, output string) {
 // observeProviderOutputNormalization records only whether a reviewed,
 // deterministic wire-envelope compatibility rule was applied. It never
 // records generated text or Provider identities.
-func observeProviderOutputNormalization(schemaVersion string, normalized bool) {
-	result := providerOutputNormalizationUnchanged
-	if normalized {
-		result = providerOutputNormalizationMarkdownUnwrapped
+func observeProviderOutputNormalization(schemaVersion, result string) {
+	switch result {
+	case providerOutputNormalizationUnchanged,
+		providerOutputNormalizationMarkdownUnwrapped,
+		providerOutputNormalizationEnvelopeUnwrapped:
+	default:
+		result = providerOutputNormalizationUnchanged
 	}
 	providerOutputNormalizationsTotal.WithLabelValues(providerMetricPurpose(schemaVersion), result).Inc()
 }
@@ -246,6 +250,8 @@ func providerMetricFailureCode(err error) string {
 	switch providerErr.Code {
 	case "provider_request_invalid", "provider_request_encode_failed", "provider_request_build_failed",
 		"provider_request_cancelled", "provider_request_rejected", "provider_authentication_failed",
+		"provider_bad_request", "provider_insufficient_balance", "provider_not_found",
+		"provider_conflict", "provider_unprocessable_request",
 		"provider_transport_error", "provider_response_read_failed", "provider_server_error",
 		"provider_response_invalid", "provider_response_too_large", "provider_response_id_missing",
 		"provider_model_mismatch", "provider_response_failed", "provider_response_incomplete",
@@ -289,7 +295,9 @@ func providerMetricResult(err error) string {
 		return providerResultRefusal
 	}
 	switch providerErr.Code {
-	case "provider_request_invalid", "provider_request_encode_failed", "provider_request_build_failed":
+	case "provider_request_invalid", "provider_request_encode_failed", "provider_request_build_failed",
+		"provider_request_rejected", "provider_authentication_failed", "provider_bad_request",
+		"provider_insufficient_balance", "provider_not_found", "provider_conflict", "provider_unprocessable_request":
 		return providerResultRequestRejected
 	case "provider_request_cancelled", "provider_response_cancelled":
 		return providerResultCanceled

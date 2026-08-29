@@ -196,6 +196,15 @@ func (s *routeAIAdministrationStub) RecordReview(context.Context, aiexplanationa
 func (s *routeAIAdministrationStub) FinalizeEvaluation(context.Context, aiexplanationadministration.Actor, meta.ID, string) (*appevaluation.ReviewRun, error) {
 	return s.run, nil
 }
+func (*routeAIAdministrationStub) StartEvaluationRecheck(context.Context, aiexplanationadministration.Actor, meta.ID, string, int, aiexplanationadministration.StartEvaluationRecheckCommand) (*domainevaluation.PromptEvaluationRecheck, error) {
+	return nil, nil
+}
+func (*routeAIAdministrationStub) ListEvaluationRechecks(context.Context, aiexplanationadministration.Actor, meta.ID, string, int, int) ([]*domainevaluation.PromptEvaluationRecheck, error) {
+	return nil, nil
+}
+func (*routeAIAdministrationStub) FindEvaluationRecheck(context.Context, aiexplanationadministration.Actor, meta.ID, string, int, meta.ID) (*domainevaluation.PromptEvaluationRecheck, error) {
+	return nil, nil
+}
 func (s *routeAIAdministrationStub) ListProfiles(context.Context, aiexplanationadministration.Actor, aiexplanationadministration.ProfileListQuery) (*appgovernance.ProfilePage, error) {
 	s.profileListCalls++
 	return &appgovernance.ProfilePage{}, nil

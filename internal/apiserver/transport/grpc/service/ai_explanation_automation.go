@@ -31,6 +31,10 @@ type PromptEvaluationStepRunner interface {
 	RunStepV1(context.Context, aievaluation.OnlineStepCommand) (*aievaluation.OnlineStepResult, error)
 }
 
+type promptEvaluationRecheckRunner interface {
+	RunRecheckV1(context.Context, aievaluation.RunRecheckCommand) (*aievaluation.OnlineRecheckResult, error)
+}
+
 func NewAIExplanationAutomationService(executor aiexecution.Executor, evaluationRunner PromptEvaluationStepRunner) *AIExplanationAutomationService {
 	return &AIExplanationAutomationService{executor: executor, evaluationRunner: evaluationRunner}
 }
@@ -53,6 +57,32 @@ func (s *AIExplanationAutomationService) ExecutePromptEvaluationStep(ctx context
 	if s.evaluationRunner == nil {
 		return nil, status.Error(codes.FailedPrecondition, "AI explanation prompt evaluation is not configured")
 	}
+	if recheckIDText := strings.TrimSpace(request.GetRecheckId()); recheckIDText != "" {
+		recheckID, parseErr := meta.ParseID(recheckIDText)
+		if parseErr != nil || recheckID.IsZero() {
+			return nil, status.Error(codes.InvalidArgument, "recheck_id is invalid")
+		}
+		recheckRunner, supported := s.evaluationRunner.(promptEvaluationRecheckRunner)
+		if !supported {
+			return nil, status.Error(codes.FailedPrecondition, "AI explanation prompt evaluation recheck is not configured")
+		}
+		result, runErr := recheckRunner.RunRecheckV1(ctx, aievaluation.RunRecheckCommand{
+			RecheckID: recheckID, SourceRunID: runID, CaseID: strings.TrimSpace(request.GetCaseId()), Attempt: int(request.GetAttempt()),
+			Owner: eventID, RequestedOrg: request.GetOrgId(), RequestedBy: strings.TrimSpace(request.GetRequestedBy()),
+		})
+		if runErr != nil {
+			if errors.Is(runErr, aievaluation.ErrAttemptExecutionBusy) {
+				return nil, status.Error(codes.Aborted, "prompt evaluation recheck is leased")
+			}
+			slog.ErrorContext(ctx, "AI explanation prompt evaluation recheck failed",
+				slog.String("run_id", runID.String()), slog.String("recheck_id", recheckID.String()),
+				slog.String("case_id", request.GetCaseId()), slog.Int("attempt", int(request.GetAttempt())),
+				slog.String("event_id", eventID), slog.String("error", runErr.Error()),
+			)
+			return nil, status.Error(codes.Internal, "AI explanation prompt evaluation recheck failed")
+		}
+		return mapPromptEvaluationRecheckResult(request, result)
+	}
 	result, err := s.evaluationRunner.RunStepV1(ctx, aievaluation.OnlineStepCommand{
 		RunID: runID, CaseID: strings.TrimSpace(request.GetCaseId()), Attempt: int(request.GetAttempt()),
 		Owner: eventID, RequestedOrgID: request.GetOrgId(), RequestedBy: strings.TrimSpace(request.GetRequestedBy()),
@@ -68,6 +98,27 @@ func (s *AIExplanationAutomationService) ExecutePromptEvaluationStep(ctx context
 		return nil, status.Error(codes.Internal, "AI explanation prompt evaluation step failed")
 	}
 	return mapPromptEvaluationStepResult(request, result)
+}
+
+func mapPromptEvaluationRecheckResult(request *interpretationpb.ExecutePromptEvaluationStepRequest, result *aievaluation.OnlineRecheckResult) (*interpretationpb.ExecutePromptEvaluationStepResponse, error) {
+	if result == nil || result.Recheck == nil || result.Recheck.ID().String() != request.GetRecheckId() ||
+		result.Recheck.SourceRunID().String() != request.GetRunId() || result.Recheck.SourceCaseID() != request.GetCaseId() ||
+		result.Recheck.SourceAttempt() != int(request.GetAttempt()) {
+		return nil, status.Error(codes.Internal, "prompt evaluation recheck returned mismatched evidence")
+	}
+	switch result.Status {
+	case aievaluation.OnlineRecheckCompleted, aievaluation.OnlineRecheckFailed,
+		aievaluation.OnlineRecheckResultUnknown, aievaluation.OnlineRecheckAlreadyCompleted:
+	default:
+		return nil, status.Error(codes.Internal, "prompt evaluation recheck returned unsupported status")
+	}
+	if !result.Recheck.Status().IsTerminal() {
+		return nil, status.Error(codes.Internal, "prompt evaluation recheck did not persist terminal evidence")
+	}
+	return &interpretationpb.ExecutePromptEvaluationStepResponse{
+		Success: true, RunId: request.GetRunId(), CaseId: request.GetCaseId(), Attempt: request.GetAttempt(),
+		Status: string(result.Status), RunStatus: string(result.Recheck.Status()), RecheckId: request.GetRecheckId(),
+	}, nil
 }
 
 func mapPromptEvaluationStepResult(request *interpretationpb.ExecutePromptEvaluationStepRequest, result *aievaluation.OnlineStepResult) (*interpretationpb.ExecutePromptEvaluationStepResponse, error) {

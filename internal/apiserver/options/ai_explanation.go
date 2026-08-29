@@ -74,8 +74,10 @@ type AIExplanationParticipantCapacityOptions struct {
 type AIExplanationEvaluationOptions struct {
 	Enabled              bool                                   `json:"enabled" mapstructure:"enabled"`
 	Model                string                                 `json:"model" mapstructure:"model"`
+	ProviderProtocol     string                                 `json:"provider_protocol" mapstructure:"provider_protocol"`
 	RouteRevision        string                                 `json:"route_revision" mapstructure:"route_revision"`
 	StructuredOutputMode string                                 `json:"structured_output_mode" mapstructure:"structured_output_mode"`
+	Endpoint             string                                 `json:"endpoint,omitempty" mapstructure:"endpoint"`
 	Timeout              time.Duration                          `json:"timeout" mapstructure:"timeout"`
 	AttemptLeaseDuration time.Duration                          `json:"attempt_lease_duration" mapstructure:"attempt_lease_duration"`
 	MaxOutputTokens      int                                    `json:"max_output_tokens" mapstructure:"max_output_tokens"`
@@ -107,7 +109,8 @@ func NewAIExplanationOptions() *AIExplanationOptions {
 			MaxActiveProviderExecutionsPerUser: 2, MaxActiveProviderExecutionsPerAssessment: 1,
 		},
 		Evaluation: AIExplanationEvaluationOptions{
-			Enabled: false, RouteRevision: "v1", StructuredOutputMode: AIExplanationStructuredOutputJSONSchema, Timeout: 60 * time.Second,
+			Enabled: false, ProviderProtocol: AIExplanationProviderProtocolResponses,
+			RouteRevision: "v1", StructuredOutputMode: AIExplanationStructuredOutputJSONSchema, Timeout: 60 * time.Second,
 			AttemptLeaseDuration: 4 * time.Minute, MaxOutputTokens: 2500,
 			Capacity: AIExplanationEvaluationCapacityOptions{
 				MaxActiveRunsPerOrg: 1, DailyProviderInvocationBudgetPerOrg: 140,
@@ -166,6 +169,10 @@ func (o *AIExplanationOptions) Validate() []error {
 		o.StructuredOutputMode != AIExplanationStructuredOutputJSONSchema {
 		errs = append(errs, fmt.Errorf("ai_explanation deepseek strict tool protocol requires json_schema"))
 	}
+	if strings.TrimSpace(o.ProviderProtocol) == AIExplanationProviderProtocolDeepSeekStrictToolCall &&
+		!isNonThinkingAIExplanationEffort(o.ReasoningEffort) {
+		errs = append(errs, fmt.Errorf("ai_explanation deepseek strict tool protocol requires non-thinking reasoning_effort while named tool_choice is forced"))
+	}
 	if o.Timeout <= 0 || o.RunLeaseDuration <= o.Timeout {
 		errs = append(errs, fmt.Errorf("ai_explanation.run_lease_duration must be greater than timeout"))
 	}
@@ -211,12 +218,25 @@ func (o *AIExplanationOptions) Validate() []error {
 		if strings.TrimSpace(o.Evaluation.RouteRevision) == "" {
 			errs = append(errs, fmt.Errorf("ai_explanation.evaluation.route_revision is required when evaluation is enabled"))
 		}
+		if !validAIExplanationProviderProtocol(o.Provider, o.Evaluation.ProviderProtocol) {
+			errs = append(errs, fmt.Errorf("ai_explanation.evaluation.provider_protocol is incompatible with the configured provider"))
+		}
 		if !validAIExplanationStructuredOutputMode(o.Evaluation.StructuredOutputMode) {
 			errs = append(errs, fmt.Errorf("ai_explanation.evaluation.structured_output_mode must be one of json_schema or json_object"))
 		}
-		if strings.TrimSpace(o.ProviderProtocol) == AIExplanationProviderProtocolDeepSeekStrictToolCall &&
+		if strings.TrimSpace(o.Evaluation.ProviderProtocol) == AIExplanationProviderProtocolDeepSeekStrictToolCall &&
 			o.Evaluation.StructuredOutputMode != AIExplanationStructuredOutputJSONSchema {
 			errs = append(errs, fmt.Errorf("ai_explanation.evaluation deepseek strict tool protocol requires json_schema"))
+		}
+		if strings.TrimSpace(o.Evaluation.ProviderProtocol) == AIExplanationProviderProtocolDeepSeekStrictToolCall &&
+			!isNonThinkingAIExplanationEffort(o.Evaluation.ReasoningEffort) {
+			errs = append(errs, fmt.Errorf("ai_explanation.evaluation deepseek strict tool protocol requires non-thinking reasoning_effort while named tool_choice is forced"))
+		}
+		if endpoint := strings.TrimSpace(o.Evaluation.Endpoint); endpoint != "" {
+			parsed, err := url.ParseRequestURI(endpoint)
+			if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
+				errs = append(errs, fmt.Errorf("ai_explanation.evaluation.endpoint must be an absolute https URL"))
+			}
 		}
 		if o.Evaluation.Timeout <= 0 {
 			errs = append(errs, fmt.Errorf("ai_explanation.evaluation.timeout must be positive"))
@@ -244,6 +264,15 @@ func (o *AIExplanationOptions) Validate() []error {
 func validAIExplanationReasoningEffort(value string) bool {
 	switch strings.TrimSpace(value) {
 	case "", "none", "minimal", "low", "medium", "high", "xhigh", "max":
+		return true
+	default:
+		return false
+	}
+}
+
+func isNonThinkingAIExplanationEffort(value string) bool {
+	switch strings.TrimSpace(value) {
+	case "", "none":
 		return true
 	default:
 		return false
@@ -318,8 +347,10 @@ func (o *AIExplanationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&o.ParticipantCapacity.MaxActiveProviderExecutionsPerAssessment, "ai_explanation.participant-capacity.max-active-provider-executions-per-assessment", o.ParticipantCapacity.MaxActiveProviderExecutionsPerAssessment, "Maximum active participant Provider executions per Assessment.")
 	fs.BoolVar(&o.Evaluation.Enabled, "ai_explanation.evaluation.enabled", o.Evaluation.Enabled, "Enable operator-only synthetic AI explanation release evaluation.")
 	fs.StringVar(&o.Evaluation.Model, "ai_explanation.evaluation.model", o.Evaluation.Model, "Exact independent model or model snapshot used to judge synthetic explanations.")
+	fs.StringVar(&o.Evaluation.ProviderProtocol, "ai_explanation.evaluation.provider-protocol", o.Evaluation.ProviderProtocol, "Frozen semantic evaluator Provider wire protocol: responses or deepseek_strict_tool_call.")
 	fs.StringVar(&o.Evaluation.RouteRevision, "ai_explanation.evaluation.route-revision", o.Evaluation.RouteRevision, "Immutable semantic evaluator route revision.")
 	fs.StringVar(&o.Evaluation.StructuredOutputMode, "ai_explanation.evaluation.structured-output-mode", o.Evaluation.StructuredOutputMode, "Frozen semantic evaluator structured output wire mode: json_schema or json_object.")
+	fs.StringVar(&o.Evaluation.Endpoint, "ai_explanation.evaluation.endpoint", o.Evaluation.Endpoint, "Optional semantic evaluator Provider protocol endpoint override.")
 	fs.DurationVar(&o.Evaluation.Timeout, "ai_explanation.evaluation.timeout", o.Evaluation.Timeout, "Deadline for one semantic evaluator call.")
 	fs.DurationVar(&o.Evaluation.AttemptLeaseDuration, "ai_explanation.evaluation.attempt-lease-duration", o.Evaluation.AttemptLeaseDuration, "Durable ownership lease for one generation and semantic evaluation attempt.")
 	fs.IntVar(&o.Evaluation.MaxOutputTokens, "ai_explanation.evaluation.max-output-tokens", o.Evaluation.MaxOutputTokens, "Maximum output tokens for one semantic evaluator response.")

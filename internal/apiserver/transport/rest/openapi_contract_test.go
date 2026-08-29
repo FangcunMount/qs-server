@@ -105,6 +105,11 @@ func TestAIExplanationAdministrationOpenAPIContract(t *testing.T) {
 			t.Fatalf("AI explanation administration operation must not override root authentication: %s %s", method, path)
 		}
 	}
+	recheckPath := "/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}/rechecks"
+	for _, method := range []string{"get", "post"} {
+		assertOpenAPIOperation(t, spec, recheckPath, method)
+	}
+	assertOpenAPIOperation(t, spec, recheckPath+"/{recheck_id}", "get")
 	for _, path := range []string{
 		"/internal/v1/interpretation/ai-explanation/prompt-evaluations",
 		"/internal/v1/interpretation/ai-explanation/profiles",
@@ -171,6 +176,12 @@ func TestAIExplanationAdministrationOpenAPIContract(t *testing.T) {
 	for _, property := range []string{"assessment_input", "normalized_output", "raw_provider_output", "provider_receipt", "semantic", "assertions"} {
 		if _, ok := attemptDetail[property]; !ok {
 			t.Fatalf("attempt evidence detail missing property %q", property)
+		}
+	}
+	recheck := openAPISchemaProperties(t, schemas, "handler.AIExplanationAttemptRecheckWire")
+	for _, property := range []string{"recheck_id", "source_run_id", "source_case_id", "source_attempt", "status", "release", "result", "reason"} {
+		if _, ok := recheck[property]; !ok {
+			t.Fatalf("attempt recheck evidence missing property %q", property)
 		}
 	}
 

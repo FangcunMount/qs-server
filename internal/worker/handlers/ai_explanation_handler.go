@@ -124,20 +124,22 @@ func handleAIExplanationPromptEvaluationStep(deps *Dependencies) HandlerFunc {
 		callCtx := metadata.AppendToOutgoingContext(ctx, "x-event-id", envelope.ID)
 		response, err := deps.AIExplanationAutomationClient.ExecutePromptEvaluationStep(callCtx, &interpretationpb.ExecutePromptEvaluationStepRequest{
 			OrgId: data.OrgID, RunId: data.RunID, CaseId: data.CaseID, Attempt: int32(data.Attempt),
-			RequestedBy: data.RequestedBy, EventId: envelope.ID,
+			RequestedBy: data.RequestedBy, EventId: envelope.ID, RecheckId: data.RecheckID,
 		})
 		if err != nil {
 			return fmt.Errorf("execute AI explanation prompt evaluation run %s case %s attempt %d: %w", data.RunID, data.CaseID, data.Attempt, err)
 		}
 		if response == nil || !response.GetSuccess() || response.GetRunId() != data.RunID ||
-			response.GetCaseId() != data.CaseID || response.GetAttempt() != int32(data.Attempt) {
+			response.GetCaseId() != data.CaseID || response.GetAttempt() != int32(data.Attempt) || response.GetRecheckId() != data.RecheckID {
 			return fmt.Errorf("AI explanation prompt evaluation automation returned an invalid response")
 		}
 		switch response.GetStatus() {
-		case "progressed", "already_completed", "awaiting_review", "canceled":
+		case "progressed", "already_completed", "awaiting_review", "canceled",
+			"recheck_completed", "recheck_failed", "recheck_result_unknown", "recheck_already_completed":
 			deps.Logger.Info("AI explanation prompt evaluation step handled",
 				slog.String("event_id", envelope.ID), slog.String("run_id", data.RunID),
 				slog.String("case_id", data.CaseID), slog.Int("attempt", data.Attempt),
+				slog.String("recheck_id", data.RecheckID),
 				slog.String("status", response.GetStatus()), slog.String("run_status", response.GetRunStatus()),
 				slog.String("next_case_id", response.GetNextCaseId()), slog.Int("next_attempt", int(response.GetNextAttempt())),
 			)
@@ -230,6 +232,12 @@ func validateAIExplanationPromptEvaluationStep(data eventpayload.AIExplanationPr
 	if data.OrgID <= 0 || err != nil || runID.IsZero() || strings.TrimSpace(data.CaseID) == "" ||
 		data.Attempt < 1 || strings.TrimSpace(data.RequestedBy) == "" || data.RequestedAt.IsZero() {
 		return fmt.Errorf("invalid AI explanation prompt evaluation step event: address and audit are required")
+	}
+	if strings.TrimSpace(data.RecheckID) != "" {
+		recheckID, parseErr := meta.ParseID(data.RecheckID)
+		if parseErr != nil || recheckID.IsZero() {
+			return fmt.Errorf("invalid AI explanation prompt evaluation step event: recheck identity is invalid")
+		}
 	}
 	return nil
 }

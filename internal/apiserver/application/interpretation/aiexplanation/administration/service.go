@@ -69,6 +69,14 @@ type EvaluationStartCommitter interface {
 	CommitStart(context.Context, *domainevaluation.PromptEvaluationRun) error
 }
 
+type EvaluationRecheckStarter interface {
+	PrepareRequestedRecheckV1(context.Context, appevaluation.PrepareRecheckCommand) (*domainevaluation.PromptEvaluationRecheck, error)
+}
+
+type EvaluationRecheckStartCommitter interface {
+	CommitRecheckStart(context.Context, *domainevaluation.PromptEvaluationRecheck) error
+}
+
 type EvaluationExecutionCommitter interface {
 	EvaluationStartCommitter
 	CommitRecovery(context.Context, meta.ID, string, string, string) (*domainevaluation.PromptEvaluationRun, error)
@@ -85,6 +93,9 @@ type Service interface {
 	CancelEvaluation(context.Context, Actor, meta.ID, string) (*appevaluation.ReviewRun, error)
 	RecordReview(context.Context, Actor, meta.ID, ReviewCommand) (*appevaluation.ReviewRun, error)
 	FinalizeEvaluation(context.Context, Actor, meta.ID, string) (*appevaluation.ReviewRun, error)
+	StartEvaluationRecheck(context.Context, Actor, meta.ID, string, int, StartEvaluationRecheckCommand) (*domainevaluation.PromptEvaluationRecheck, error)
+	ListEvaluationRechecks(context.Context, Actor, meta.ID, string, int, int) ([]*domainevaluation.PromptEvaluationRecheck, error)
+	FindEvaluationRecheck(context.Context, Actor, meta.ID, string, int, meta.ID) (*domainevaluation.PromptEvaluationRecheck, error)
 	ListProfiles(context.Context, Actor, ProfileListQuery) (*appgovernance.ProfilePage, error)
 	FindProfile(context.Context, Actor, string, string) (*domainprofile.AIExplanationProfile, error)
 	CreateProfileDraft(context.Context, Actor, CreateProfileDraftCommand) (*domainprofile.AIExplanationProfile, error)
@@ -119,6 +130,12 @@ type StartEvaluationCommand struct {
 }
 
 type RecoverEvaluationCommand struct {
+	Confirm                     bool
+	ExpectedProviderInvocations int
+	Reason                      string
+}
+
+type StartEvaluationRecheckCommand struct {
 	Confirm                     bool
 	ExpectedProviderInvocations int
 	Reason                      string
@@ -219,6 +236,9 @@ type service struct {
 	access                        Access
 	starter                       EvaluationStarter
 	startCommitter                EvaluationExecutionCommitter
+	recheckStarter                EvaluationRecheckStarter
+	recheckCommitter              EvaluationRecheckStartCommitter
+	rechecks                      domainevaluation.RecheckRepository
 	capacity                      domainevaluation.CapacityReader
 	participantCapacity           domaingeneration.ParticipantCapacityReader
 	participantActiveCapacity     domaingeneration.ParticipantActiveCapacityReader
@@ -239,6 +259,14 @@ func WithEvaluationExecution(starter EvaluationStarter, committer EvaluationExec
 		if newID != nil {
 			value.newID = newID
 		}
+	}
+}
+
+func WithEvaluationRechecks(starter EvaluationRecheckStarter, committer EvaluationRecheckStartCommitter, repository domainevaluation.RecheckRepository) Option {
+	return func(value *service) {
+		value.recheckStarter = starter
+		value.recheckCommitter = committer
+		value.rechecks = repository
 	}
 }
 
@@ -360,6 +388,103 @@ func (s *service) CancelEvaluation(ctx context.Context, actor Actor, runID meta.
 	}
 	result, err := s.reviews.Cancel(ctx, runID, actor.Subject(), reason)
 	return result, mapKnownError(err)
+}
+
+func (s *service) StartEvaluationRecheck(
+	ctx context.Context,
+	actor Actor,
+	runID meta.ID,
+	caseID string,
+	attempt int,
+	command StartEvaluationRecheckCommand,
+) (*domainevaluation.PromptEvaluationRecheck, error) {
+	caseID, command.Reason = strings.TrimSpace(caseID), strings.TrimSpace(command.Reason)
+	if actor.OrgID <= 0 || actor.OperatorUserID <= 0 || runID.IsZero() || caseID == "" || attempt < 1 ||
+		!command.Confirm || command.ExpectedProviderInvocations != domainevaluation.RecheckProviderInvocationsV1 ||
+		command.Reason == "" || len(command.Reason) > maxAuditReasonLength {
+		return nil, cberrors.WithCode(code.ErrInvalidArgument, "AI explanation attempt recheck cost confirmation is invalid")
+	}
+	if s == nil || s.recheckStarter == nil || s.recheckCommitter == nil || s.rechecks == nil || s.reviews == nil || s.access == nil || s.newID == nil {
+		return nil, cberrors.WithCode(code.ErrUnsupportedOperation, "AI explanation attempt recheck is disabled")
+	}
+	if err := s.access.AuthorizeGovernance(ctx, actor); err != nil {
+		return nil, err
+	}
+	source, err := s.reviews.Find(ctx, runID)
+	if err != nil {
+		return nil, mapKnownError(err)
+	}
+	if err := validateEvaluationOrg(source, actor); err != nil {
+		return nil, err
+	}
+	found := false
+	for _, item := range source.Attempts {
+		if item.CaseID == caseID && item.Attempt == attempt {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return nil, cberrors.WithCode(code.ErrPageNotFound, "AI explanation source attempt not found")
+	}
+	prepared, err := s.recheckStarter.PrepareRequestedRecheckV1(ctx, appevaluation.PrepareRecheckCommand{
+		RecheckID: s.newID(), SourceRunID: runID, CaseID: caseID, Attempt: attempt,
+		OrgID: actor.OrgID, RequestedBy: actor.Subject(), Reason: command.Reason,
+	})
+	if err != nil {
+		return nil, mapKnownError(err)
+	}
+	if err := s.recheckCommitter.CommitRecheckStart(ctx, prepared); err != nil {
+		return nil, mapKnownError(err)
+	}
+	result, err := s.rechecks.FindRecheckByID(ctx, prepared.ID())
+	return result, mapKnownError(err)
+}
+
+func (s *service) ListEvaluationRechecks(ctx context.Context, actor Actor, runID meta.ID, caseID string, attempt, limit int) ([]*domainevaluation.PromptEvaluationRecheck, error) {
+	caseID = strings.TrimSpace(caseID)
+	if actor.OrgID <= 0 || actor.OperatorUserID <= 0 || runID.IsZero() || caseID == "" || attempt < 1 || limit < 1 || limit > 100 {
+		return nil, cberrors.WithCode(code.ErrInvalidArgument, "AI explanation attempt recheck query is invalid")
+	}
+	if s == nil || s.rechecks == nil || s.reviews == nil || s.access == nil {
+		return nil, cberrors.WithCode(code.ErrUnsupportedOperation, "AI explanation attempt recheck is disabled")
+	}
+	if err := s.access.AuthorizeRead(ctx, actor); err != nil {
+		return nil, err
+	}
+	source, err := s.reviews.Find(ctx, runID)
+	if err != nil {
+		return nil, mapKnownError(err)
+	}
+	if err := validateEvaluationOrg(source, actor); err != nil {
+		return nil, err
+	}
+	values, err := s.rechecks.ListRechecksBySource(ctx, runID, caseID, attempt, limit)
+	return values, mapKnownError(err)
+}
+
+func (s *service) FindEvaluationRecheck(ctx context.Context, actor Actor, runID meta.ID, caseID string, attempt int, recheckID meta.ID) (*domainevaluation.PromptEvaluationRecheck, error) {
+	caseID = strings.TrimSpace(caseID)
+	if actor.OrgID <= 0 || actor.OperatorUserID <= 0 || runID.IsZero() || recheckID.IsZero() || caseID == "" || attempt < 1 {
+		return nil, cberrors.WithCode(code.ErrInvalidArgument, "AI explanation attempt recheck identity is invalid")
+	}
+	if s == nil || s.rechecks == nil || s.access == nil {
+		return nil, cberrors.WithCode(code.ErrUnsupportedOperation, "AI explanation attempt recheck is disabled")
+	}
+	if err := s.access.AuthorizeRead(ctx, actor); err != nil {
+		return nil, err
+	}
+	value, err := s.rechecks.FindRecheckByID(ctx, recheckID)
+	if err != nil {
+		return nil, mapKnownError(err)
+	}
+	if value.SourceRunID() != runID || value.SourceCaseID() != caseID || value.SourceAttempt() != attempt {
+		return nil, cberrors.WithCode(code.ErrPageNotFound, "AI explanation attempt recheck not found")
+	}
+	if value.RequestedOrgID() != actor.OrgID {
+		return nil, cberrors.WithCode(code.ErrPermissionDenied, "AI explanation attempt recheck belongs to another organization")
+	}
+	return value, nil
 }
 
 func NewService(reviews ReviewWorkflow, governance ProfileGovernance, access Access, options ...Option) Service {
@@ -786,6 +911,7 @@ func mapKnownError(err error) error {
 		stderrors.Is(err, domaingeneration.ErrAssessmentDailyBudgetExceeded):
 		return cberrors.WithCode(code.ErrAIExplanationCapacityExceeded, "%s", err.Error())
 	case stderrors.Is(err, domainevaluation.ErrConflict), stderrors.Is(err, domainevaluation.ErrAlreadyExists),
+		stderrors.Is(err, domainevaluation.ErrRecheckInProgress),
 		stderrors.Is(err, domainevaluation.ErrRecoveryNotAllowed), stderrors.Is(err, domainevaluation.ErrCancellationNotAllowed), stderrors.Is(err, domainprofile.ErrConflict),
 		stderrors.Is(err, domainprofile.ErrAlreadyExists), stderrors.Is(err, domainprofile.ErrAmbiguousSelector),
 		stderrors.Is(err, appgovernance.ErrPublishEvidenceRequired), stderrors.Is(err, appgovernance.ErrReleaseMismatch),

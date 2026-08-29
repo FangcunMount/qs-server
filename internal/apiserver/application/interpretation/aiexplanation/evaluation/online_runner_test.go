@@ -112,6 +112,61 @@ func TestOnlineRunnerPersistsProviderFailureAndCompletesInventory(t *testing.T) 
 	}
 }
 
+func TestOnlineRunnerRechecksOneAttemptWithoutMutatingSourceEvidence(t *testing.T) {
+	provider := &onlineProviderStub{}
+	semantic := &onlineSemanticStub{}
+	repository := &onlineEvidenceRepository{}
+	rechecks := &onlineRecheckRepository{}
+	fixed := time.Date(2026, 8, 29, 11, 0, 0, 0, time.UTC)
+	runner := newOnlineRunnerWithRepositories(t, promptResolverStub{}, provider, semantic, repository, rechecks, func() time.Time { return fixed })
+
+	prepared, err := runner.PrepareRequestedV1(context.Background(), evaluation.OnlineStartCommand{
+		RunID: meta.ID(9201), OrgID: 12, RequestedBy: "user:34", Reason: "source run",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repository.Create(context.Background(), prepared.Run); err != nil {
+		t.Fatal(err)
+	}
+	step, err := runner.RunStepV1(context.Background(), evaluation.OnlineStepCommand{
+		RunID: meta.ID(9201), CaseID: "PROMPT-EVAL-001", Attempt: 1, Owner: "source-event",
+		RequestedOrgID: 12, RequestedBy: "user:34",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourceAttemptCount := len(step.Run.Attempts())
+
+	recheck, err := runner.PrepareRequestedRecheckV1(context.Background(), evaluation.PrepareRecheckCommand{
+		RecheckID: meta.ID(9301), SourceRunID: meta.ID(9201), CaseID: "PROMPT-EVAL-001", Attempt: 1,
+		OrgID: 12, RequestedBy: "user:34", Reason: "verify current candidate",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rechecks.CreateRecheck(context.Background(), recheck); err != nil {
+		t.Fatal(err)
+	}
+	result, err := runner.RunRecheckV1(context.Background(), evaluation.RunRecheckCommand{
+		RecheckID: meta.ID(9301), SourceRunID: meta.ID(9201), CaseID: "PROMPT-EVAL-001", Attempt: 1,
+		Owner: "recheck-event", RequestedOrg: 12, RequestedBy: "user:34",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != evaluation.OnlineRecheckCompleted || result.Recheck.Status() != domainevaluation.RecheckStatusCompleted ||
+		result.Recheck.Result() == nil || result.Recheck.Result().Semantic == nil {
+		t.Fatalf("recheck result = %#v", result)
+	}
+	if len(repository.value.Attempts()) != sourceAttemptCount {
+		t.Fatalf("source attempt count changed from %d to %d", sourceAttemptCount, len(repository.value.Attempts()))
+	}
+	if provider.calls != 2 || semantic.calls != 2 {
+		t.Fatalf("source plus recheck Provider calls = %d/%d, want 2/2", provider.calls, semantic.calls)
+	}
+}
+
 func TestOnlineRunnerClassifiesSchemaInvalidProviderOutputAsTechnicalFailure(t *testing.T) {
 	provider := &onlineProviderStub{mutate: func(caseID string, content *domainoutput.Content) {
 		if caseID == "PROMPT-EVAL-001" {
@@ -311,6 +366,18 @@ func newOnlineRunnerWithClock(
 	repository *onlineEvidenceRepository,
 	now func() time.Time,
 ) *evaluation.OnlineRunner {
+	return newOnlineRunnerWithRepositories(t, prompts, provider, semantic, repository, &onlineRecheckRepository{}, now)
+}
+
+func newOnlineRunnerWithRepositories(
+	t *testing.T,
+	prompts appport.PromptPackageResolver,
+	provider *onlineProviderStub,
+	semantic *onlineSemanticStub,
+	repository *onlineEvidenceRepository,
+	rechecks *onlineRecheckRepository,
+	now func() time.Time,
+) *evaluation.OnlineRunner {
 	t.Helper()
 	evidence, err := evaluation.NewEvidenceService(repository, func() meta.ID { return meta.ID(9001) }, now)
 	if err != nil {
@@ -319,7 +386,7 @@ func newOnlineRunnerWithClock(
 	runner, err := evaluation.NewOnlineRunner(evaluation.OnlineRunnerDependencies{
 		Prompts: prompts, Schemas: schemaResolverStub{}, Routes: onlineRouteResolver{},
 		Provider: provider, Safety: onlineSafetyStub{}, Semantic: semantic, Evidence: evidence,
-		AttemptLease: time.Minute, Now: now,
+		AttemptLease: time.Minute, Rechecks: rechecks, Now: now,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -486,6 +553,47 @@ type onlineEvidenceRepository struct {
 	listStatus *domainevaluation.Status
 	listCursor string
 	listLimit  int
+}
+
+type onlineRecheckRepository struct {
+	values map[meta.ID]*domainevaluation.PromptEvaluationRecheck
+}
+
+func (r *onlineRecheckRepository) CreateRecheck(_ context.Context, value *domainevaluation.PromptEvaluationRecheck) error {
+	if r.values == nil {
+		r.values = map[meta.ID]*domainevaluation.PromptEvaluationRecheck{}
+	}
+	if _, exists := r.values[value.ID()]; exists {
+		return domainevaluation.ErrAlreadyExists
+	}
+	r.values[value.ID()] = value
+	return nil
+}
+
+func (r *onlineRecheckRepository) SaveRecheck(_ context.Context, value *domainevaluation.PromptEvaluationRecheck, _ int64) error {
+	if r.values == nil {
+		r.values = map[meta.ID]*domainevaluation.PromptEvaluationRecheck{}
+	}
+	r.values[value.ID()] = value
+	return nil
+}
+
+func (r *onlineRecheckRepository) FindRecheckByID(_ context.Context, id meta.ID) (*domainevaluation.PromptEvaluationRecheck, error) {
+	value := r.values[id]
+	if value == nil {
+		return nil, domainevaluation.ErrNotFound
+	}
+	return value, nil
+}
+
+func (r *onlineRecheckRepository) ListRechecksBySource(_ context.Context, runID meta.ID, caseID string, attempt, _ int) ([]*domainevaluation.PromptEvaluationRecheck, error) {
+	values := make([]*domainevaluation.PromptEvaluationRecheck, 0)
+	for _, value := range r.values {
+		if value.SourceRunID() == runID && value.SourceCaseID() == caseID && value.SourceAttempt() == attempt {
+			values = append(values, value)
+		}
+	}
+	return values, nil
 }
 
 func (r *onlineEvidenceRepository) Create(_ context.Context, value *domainevaluation.PromptEvaluationRun) error {

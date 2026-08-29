@@ -123,6 +123,22 @@ func TestAIExplanationAdministrationStartReturnsAcceptedAndTrustedActor(t *testi
 	}
 }
 
+func TestAIExplanationAdministrationStartsAuditedSingleAttemptRecheck(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	service := &aiAdministrationServiceStub{}
+	handler := NewAIExplanationAdministrationHandler(service)
+	body := bytes.NewBufferString(`{"confirm":true,"expected_provider_invocations":2,"reason":"verify one failed record"}`)
+	ctx, recorder := aiAdministrationContext(http.MethodPost, "/internal/v1/interpretation/ai-explanation/prompt-evaluations/9/attempts/PROMPT-EVAL-002/3/rechecks", body)
+	ctx.Params = gin.Params{{Key: "run_id", Value: "9"}, {Key: "case_id", Value: "PROMPT-EVAL-002"}, {Key: "attempt", Value: "3"}}
+
+	handler.StartAttemptRecheck(ctx)
+	if recorder.Code != http.StatusAccepted || service.lastActor != (aiexplanationadministration.Actor{OrgID: 12, OperatorUserID: 34}) ||
+		service.lastRunID != meta.ID(9) || service.lastRecheckCaseID != "PROMPT-EVAL-002" || service.lastRecheckAttempt != 3 ||
+		!service.lastRecheck.Confirm || service.lastRecheck.ExpectedProviderInvocations != 2 {
+		t.Fatalf("response=%d actor=%#v source=%s/%s/%d command=%#v body=%s", recorder.Code, service.lastActor, service.lastRunID.String(), service.lastRecheckCaseID, service.lastRecheckAttempt, service.lastRecheck, recorder.Body.String())
+	}
+}
+
 func TestAIExplanationAdministrationCapacityReturnsTrustedOrganizationLedger(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	day := time.Date(2026, 8, 27, 0, 0, 0, 0, time.UTC)
@@ -276,6 +292,9 @@ type aiAdministrationServiceStub struct {
 	lastReview          aiexplanationadministration.ReviewCommand
 	lastStart           aiexplanationadministration.StartEvaluationCommand
 	lastRecover         aiexplanationadministration.RecoverEvaluationCommand
+	lastRecheck         aiexplanationadministration.StartEvaluationRecheckCommand
+	lastRecheckCaseID   string
+	lastRecheckAttempt  int
 	lastRetry           aiexplanationadministration.RetryParticipantGenerationCommand
 	lastRunID           meta.ID
 	lastCancelReason    string
@@ -329,6 +348,17 @@ func (s *aiAdministrationServiceStub) RecordReview(_ context.Context, actor aiex
 }
 func (s *aiAdministrationServiceStub) FinalizeEvaluation(context.Context, aiexplanationadministration.Actor, meta.ID, string) (*appevaluation.ReviewRun, error) {
 	return s.run, nil
+}
+
+func (s *aiAdministrationServiceStub) StartEvaluationRecheck(_ context.Context, actor aiexplanationadministration.Actor, runID meta.ID, caseID string, attempt int, command aiexplanationadministration.StartEvaluationRecheckCommand) (*domainevaluation.PromptEvaluationRecheck, error) {
+	s.lastActor, s.lastRunID, s.lastRecheckCaseID, s.lastRecheckAttempt, s.lastRecheck = actor, runID, caseID, attempt, command
+	return nil, nil
+}
+func (*aiAdministrationServiceStub) ListEvaluationRechecks(context.Context, aiexplanationadministration.Actor, meta.ID, string, int, int) ([]*domainevaluation.PromptEvaluationRecheck, error) {
+	return nil, nil
+}
+func (*aiAdministrationServiceStub) FindEvaluationRecheck(context.Context, aiexplanationadministration.Actor, meta.ID, string, int, meta.ID) (*domainevaluation.PromptEvaluationRecheck, error) {
+	return nil, nil
 }
 func (s *aiAdministrationServiceStub) ListProfiles(_ context.Context, actor aiexplanationadministration.Actor, query aiexplanationadministration.ProfileListQuery) (*appgovernance.ProfilePage, error) {
 	s.lastActor, s.lastProfileQuery = actor, query

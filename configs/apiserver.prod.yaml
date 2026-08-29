@@ -130,13 +130,12 @@ ai_explanation:
   # 独立用户流量开关；首个生产 Profile 发布和最小验收通过前保持 false。
   participant_enabled: false
   provider: "deepseek"
-  # v7/v4 将 v4-pro 冻结到 DeepSeek Beta strict tool-call 线协议；不能在旧 Run 上静默切换。
-  provider_protocol: "deepseek_strict_tool_call"
+  # v7/v4 strict-tool 生产 Run 出现结构漂移与裁判请求拒绝，活动路由回退到已验证的 Responses 线协议。
+  provider_protocol: "responses"
   model: "deepseek-v4-pro"
-  route_revision: "v7"
+  route_revision: "v6"
   # v4 证明 json_object 只能保证合法 JSON，无法约束 AIExplanationOutput v1 的字段结构。
-  # v6 已收敛围栏问题，但生产复测仍有 1 条 completed 正文不满足 v1 Schema。
-  # v7 使用强制单函数 strict=true 约束输出结构，服务端仍执行完整 v1 校验。
+  # v6 保留原始证据，只对唯一完整 JSON 围栏做确定性解包，随后执行完整 v1 校验。
   structured_output_mode: "json_schema"
   endpoint: ""
   api_key: ""
@@ -168,7 +167,9 @@ ai_explanation:
   evaluation:
     enabled: true
     model: "deepseek-v4-pro"
-    route_revision: "v4"
+    # 裁判协议独立冻结；避免生成协议实验同时改变独立模型裁判线协议。
+    provider_protocol: "responses"
+    route_revision: "v3"
     structured_output_mode: "json_schema"
     timeout: 180s
     # 必须覆盖生成、独立模型裁判与服务端提交，并长于 worker 的 7m AI RPC deadline。

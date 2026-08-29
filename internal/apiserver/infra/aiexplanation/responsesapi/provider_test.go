@@ -187,6 +187,38 @@ func TestProviderValidationOutputRejectsAmbiguousOrNonDeepSeekFences(t *testing.
 	}
 }
 
+func TestDeepSeekProviderUnwrapsOnlyKnownSingleKeyJSONEnvelopes(t *testing.T) {
+	tests := []struct {
+		name   string
+		output string
+		want   string
+	}{
+		{name: "parameters object", output: `{"parameters":{"summary":"ok"}}`, want: `{"summary":"ok"}`},
+		{name: "json object", output: `{"json":{"summary":"ok"}}`, want: `{"summary":"ok"}`},
+		{name: "json string", output: `{"json_string":"{\"summary\":\"ok\"}"}`, want: `{"summary":"ok"}`},
+		{name: "fenced known envelope", output: "```json\n{\"parameters\":{\"summary\":\"ok\"}}\n```", want: `{"summary":"ok"}`},
+		{name: "additional envelope key fails closed", output: `{"parameters":{"summary":"ok"},"extra":true}`},
+		{name: "unknown envelope fails closed", output: `{"payload":{"summary":"ok"}}`},
+		{name: "known envelope array fails closed", output: `{"parameters":[]}`},
+		{name: "invalid json string fails closed", output: `{"json_string":"{bad}"}`},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			got, kind := validationOutputForProviderWithKind(ProviderDeepSeek, testCase.output)
+			if string(got) != testCase.want {
+				t.Fatalf("validation output = %q, want %q", got, testCase.want)
+			}
+			wantKind := providerOutputNormalizationUnchanged
+			if testCase.want != "" {
+				wantKind = providerOutputNormalizationEnvelopeUnwrapped
+			}
+			if kind != wantKind {
+				t.Fatalf("normalization kind = %q, want %q", kind, wantKind)
+			}
+		})
+	}
+}
+
 func TestDeepSeekProviderUsesJSONObjectModeWithoutSchemaEnvelope(t *testing.T) {
 	var captured map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -467,7 +499,11 @@ func TestDeepSeekProviderClassifiesDocumentedHTTPStatuses(t *testing.T) {
 		code      string
 		retryable bool
 	}{
-		{name: "insufficient balance", status: http.StatusPaymentRequired, kind: domainrun.FailureKindProviderTransport, code: "provider_request_rejected"},
+		{name: "bad request", status: http.StatusBadRequest, kind: domainrun.FailureKindProviderTransport, code: "provider_bad_request"},
+		{name: "insufficient balance", status: http.StatusPaymentRequired, kind: domainrun.FailureKindProviderTransport, code: "provider_insufficient_balance"},
+		{name: "not found", status: http.StatusNotFound, kind: domainrun.FailureKindProviderTransport, code: "provider_not_found"},
+		{name: "conflict", status: http.StatusConflict, kind: domainrun.FailureKindProviderTransport, code: "provider_conflict"},
+		{name: "unprocessable request", status: http.StatusUnprocessableEntity, kind: domainrun.FailureKindProviderTransport, code: "provider_unprocessable_request"},
 		{name: "rate limited", status: http.StatusTooManyRequests, kind: domainrun.FailureKindProviderRateLimit, code: "provider_rate_limited", retryable: true},
 		{name: "service unavailable", status: http.StatusServiceUnavailable, kind: domainrun.FailureKindProviderTransport, code: "provider_server_error", retryable: true},
 	} {

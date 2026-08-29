@@ -179,9 +179,10 @@ func (p *Provider) generateDeepSeekStrictToolCall(ctx context.Context, request a
 		return nil, providerError(domainrun.FailureKindProviderTransport, "provider_usage_invalid", false, false, nil)
 	}
 	observeProviderOutputEnvelope(request.OutputSchema.Version, rawOutput)
-	observeProviderOutputNormalization(request.OutputSchema.Version, false)
+	validationOutput, normalization := validationOutputForProviderWithKind(p.name, rawOutput)
+	observeProviderOutputNormalization(request.OutputSchema.Version, normalization)
 	return &appport.ProviderResponse{
-		RawOutput: []byte(rawOutput),
+		RawOutput: []byte(rawOutput), ValidationOutput: validationOutput,
 		Receipt: aiexplanation.ProviderReceipt{
 			InvocationID: request.InvocationID, RequestID: decoded.ID, Provider: p.name, Model: decoded.Model,
 			InputTokens: usage.PromptTokens, OutputTokens: usage.CompletionTokens, Latency: latency,

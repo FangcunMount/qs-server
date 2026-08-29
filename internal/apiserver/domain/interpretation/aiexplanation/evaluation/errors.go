@@ -8,4 +8,5 @@ var (
 	ErrConflict               = errors.New("AI explanation Prompt evaluation run state conflict")
 	ErrOrgConcurrencyExceeded = errors.New("AI explanation Prompt evaluation organization concurrency exceeded")
 	ErrDailyBudgetExceeded    = errors.New("AI explanation Prompt evaluation daily Provider invocation budget exceeded")
+	ErrRecheckInProgress      = errors.New("AI explanation attempt already has an active recheck")
 )

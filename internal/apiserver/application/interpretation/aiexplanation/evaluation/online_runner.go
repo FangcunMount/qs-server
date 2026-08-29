@@ -35,6 +35,7 @@ type OnlineRunnerDependencies struct {
 	SemanticTimeout  time.Duration
 	AttemptLease     time.Duration
 	Evidence         *EvidenceService
+	Rechecks         domainevaluation.RecheckRepository
 	DurableCommitter *DurableCommitter
 	Now              func() time.Time
 }
@@ -53,6 +54,7 @@ type OnlineRunner struct {
 	semanticTimeout  time.Duration
 	attemptLease     time.Duration
 	evidence         *EvidenceService
+	rechecks         domainevaluation.RecheckRepository
 	durableCommitter *DurableCommitter
 	preflight        *PreflightRunner
 	now              func() time.Time
@@ -84,6 +86,7 @@ func NewOnlineRunner(dependencies OnlineRunnerDependencies) (*OnlineRunner, erro
 		provider: dependencies.Provider, safety: dependencies.Safety, semantic: dependencies.Semantic,
 		semanticTimeout: semanticTimeout, attemptLease: attemptLease,
 		evidence: dependencies.Evidence, durableCommitter: dependencies.DurableCommitter,
+		rechecks:  dependencies.Rechecks,
 		preflight: preflight, now: now,
 	}, nil
 }

@@ -105,6 +105,13 @@ func (r ProviderRoute) Validate() error {
 	if !validReasoningEffort(r.ReasoningEffort) {
 		return fmt.Errorf("AI explanation provider reasoning effort is invalid")
 	}
+	if r.EffectiveProtocol() == ProviderProtocolDeepSeekStrictToolCall {
+		switch strings.TrimSpace(r.ReasoningEffort) {
+		case "", "none":
+		default:
+			return fmt.Errorf("AI explanation DeepSeek strict tool route requires non-thinking reasoning effort while named tool_choice is forced")
+		}
+	}
 	return nil
 }
 

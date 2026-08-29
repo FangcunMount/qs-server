@@ -316,6 +316,37 @@ func TestMapperRoundTripsPromptEvaluationDispatchCheckpoint(t *testing.T) {
 	}
 }
 
+func TestMapperRoundTripsPromptEvaluationRecheckDispatchCheckpoint(t *testing.T) {
+	mapper := NewMapper()
+	createdAt := time.Date(2026, 8, 29, 8, 0, 0, 0, time.UTC)
+	release := mapperEvaluationRelease(mapperProfile(t, createdAt))
+	value, err := domainevaluation.NewPromptEvaluationRecheck(
+		meta.ID(881), meta.ID(778), "g1", 1, release, 12, "user:42", "single record diagnostic", createdAt,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := value.BeginDispatch("recheck-event-881", createdAt.Add(time.Second), 5*time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	po, err := mapper.PromptEvaluationRecheckToPO(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if po.ActiveSourceKey == "" {
+		t.Fatal("dispatching recheck must reserve the active source key")
+	}
+	restored, err := mapper.PromptEvaluationRecheckToDomain(po)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkpoint := restored.Execution()
+	if restored.Status() != domainevaluation.RecheckStatusDispatching || restored.SourceRunID() != meta.ID(778) ||
+		checkpoint == nil || checkpoint.Owner != "recheck-event-881" || checkpoint.Phase != domainevaluation.AttemptExecutionDispatching {
+		t.Fatalf("restored recheck = %#v checkpoint=%#v", restored, checkpoint)
+	}
+}
+
 func TestMapperDerivesActiveOrganizationExecutionKeyFromAuditedCollectingRun(t *testing.T) {
 	mapper := NewMapper()
 	createdAt := time.Date(2026, 8, 27, 8, 0, 0, 0, time.UTC)

@@ -86,6 +86,7 @@ type AIExplanationPromptEvaluationStepRequestedData struct {
 	RunID       string    `json:"run_id"`
 	CaseID      string    `json:"case_id"`
 	Attempt     int       `json:"attempt"`
+	RecheckID   string    `json:"recheck_id,omitempty"`
 	RequestedBy string    `json:"requested_by"`
 	RequestedAt time.Time `json:"requested_at"`
 }

@@ -47,6 +47,8 @@ func promptEvaluationFailureCodeLabel(value string) string {
 		"provider_result_unknown",
 		"provider_request_invalid", "provider_request_encode_failed", "provider_request_build_failed",
 		"provider_request_cancelled", "provider_request_rejected", "provider_authentication_failed",
+		"provider_bad_request", "provider_insufficient_balance", "provider_not_found",
+		"provider_conflict", "provider_unprocessable_request",
 		"provider_transport_error", "provider_response_read_failed", "provider_server_error",
 		"provider_response_invalid", "provider_response_too_large", "provider_response_id_missing",
 		"provider_model_mismatch", "provider_response_failed", "provider_response_incomplete",

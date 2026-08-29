@@ -15,6 +15,29 @@ const PromptEvaluationAggregateType = "AIExplanationPromptEvaluation"
 
 type PromptEvaluationStepEvent = event.Event[eventpayload.AIExplanationPromptEvaluationStepRequestedData]
 
+func (Factory) PromptEvaluationRecheck(
+	value *domainevaluation.PromptEvaluationRecheck,
+	eventID string,
+	occurredAt time.Time,
+) (event.DomainEvent, error) {
+	eventID = strings.TrimSpace(eventID)
+	if value == nil || value.Status() != domainevaluation.RecheckStatusQueued || eventID == "" || len(eventID) > 256 ||
+		occurredAt.IsZero() || value.RequestedOrgID() <= 0 || strings.TrimSpace(value.RequestedBy()) == "" {
+		return nil, fmt.Errorf("queued audited AI explanation Prompt evaluation recheck and event identity are required")
+	}
+	return PromptEvaluationStepEvent{
+		BaseEvent: event.BaseEvent{
+			ID: eventID, EventTypeValue: eventcatalog.AIExplanationPromptEvaluationStepRequested,
+			OccurredAtValue: occurredAt, AggregateTypeValue: "AIExplanationPromptEvaluationRecheck",
+			AggregateIDValue: value.ID().String(),
+		},
+		Data: eventpayload.AIExplanationPromptEvaluationStepRequestedData{
+			OrgID: value.RequestedOrgID(), RunID: value.SourceRunID().String(), CaseID: value.SourceCaseID(),
+			Attempt: value.SourceAttempt(), RecheckID: value.ID().String(), RequestedBy: value.RequestedBy(), RequestedAt: occurredAt,
+		},
+	}, nil
+}
+
 func (Factory) PromptEvaluationStep(
 	runRecord *domainevaluation.PromptEvaluationRun,
 	caseID string,
@@ -71,4 +94,8 @@ func PromptEvaluationStepEventID(runID, caseID string, attempt int) string {
 
 func PromptEvaluationRecoveryEventID(runID, requestID string) string {
 	return fmt.Sprintf("ai-prompt-evaluation-recovery:%s:%s", strings.TrimSpace(runID), strings.TrimSpace(requestID))
+}
+
+func PromptEvaluationRecheckEventID(recheckID string) string {
+	return "ai-prompt-evaluation-recheck:" + strings.TrimSpace(recheckID)
 }

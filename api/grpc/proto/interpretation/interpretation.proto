@@ -121,6 +121,7 @@ message ExecutePromptEvaluationStepRequest {
   int32 attempt = 4;
   string requested_by = 5;
   string event_id = 6;
+  string recheck_id = 7;
 }
 
 message ExecutePromptEvaluationStepResponse {
@@ -132,6 +133,7 @@ message ExecutePromptEvaluationStepResponse {
   string run_status = 6;
   string next_case_id = 7;
   int32 next_attempt = 8;
+  string recheck_id = 9;
 }
 
 message AIExplanationEvidenceRef {
