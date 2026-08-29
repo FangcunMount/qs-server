@@ -28,6 +28,9 @@ func TestCatalogResolvesFrozenNonSecretRoute(t *testing.T) {
 	if route.ReasoningEffort != config.ReasoningEffort {
 		t.Fatalf("resolved reasoning effort = %q, want %q", route.ReasoningEffort, config.ReasoningEffort)
 	}
+	if route.StructuredOutputMode != appport.StructuredOutputModeJSONSchema {
+		t.Fatalf("resolved structured output mode = %q", route.StructuredOutputMode)
+	}
 	if route.ExecutionSpec.Fingerprint.String() == "" || len(catalog.RouteNames()) != 1 {
 		t.Fatalf("route fingerprint/names = %s/%v", route.ExecutionSpec.Fingerprint, catalog.RouteNames())
 	}
@@ -64,6 +67,17 @@ func TestCatalogFingerprintChangesWithExecutionSemantics(t *testing.T) {
 	if a.ExecutionSpec.Fingerprint == c.ExecutionSpec.Fingerprint {
 		t.Fatal("route fingerprint did not change with reasoning effort")
 	}
+
+	changedOutputMode := validConfig()
+	changedOutputMode.StructuredOutputMode = appport.StructuredOutputModeJSONObject
+	fourth, err := NewCatalog([]Config{changedOutputMode})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, _ := fourth.ResolveProviderRoute(context.Background(), changedOutputMode.Route)
+	if a.ExecutionSpec.Fingerprint == d.ExecutionSpec.Fingerprint {
+		t.Fatal("route fingerprint did not change with structured output mode")
+	}
 }
 
 func TestCatalogCanonicalizesReasoningEffortBeforeFreezingRoute(t *testing.T) {
@@ -82,12 +96,40 @@ func TestCatalogCanonicalizesReasoningEffortBeforeFreezingRoute(t *testing.T) {
 	}
 }
 
+func TestCatalogPreservesLegacyJSONSchemaFingerprint(t *testing.T) {
+	legacy := validConfig()
+	legacy.StructuredOutputMode = ""
+	legacyCatalog, err := NewCatalog([]Config{legacy})
+	if err != nil {
+		t.Fatal(err)
+	}
+	explicitCatalog, err := NewCatalog([]Config{validConfig()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyRoute, _ := legacyCatalog.ResolveProviderRoute(context.Background(), legacy.Route)
+	explicitRoute, _ := explicitCatalog.ResolveProviderRoute(context.Background(), legacy.Route)
+	if legacyRoute.ExecutionSpec.Fingerprint != explicitRoute.ExecutionSpec.Fingerprint {
+		t.Fatalf("legacy/explicit json_schema fingerprints differ: %s/%s", legacyRoute.ExecutionSpec.Fingerprint, explicitRoute.ExecutionSpec.Fingerprint)
+	}
+	if legacyRoute.StructuredOutputMode != appport.StructuredOutputModeJSONSchema {
+		t.Fatalf("legacy mode = %q", legacyRoute.StructuredOutputMode)
+	}
+}
+
 func TestCatalogRejectsUnsupportedOrDuplicateRoutes(t *testing.T) {
 	invalid := validConfig()
 	invalid.Capabilities.StructuredOutput = false
 	_, err := NewCatalog([]Config{invalid})
 	if !errors.Is(err, ErrInvalidConfig) {
 		t.Fatalf("invalid config error = %v", err)
+	}
+
+	invalidMode := validConfig()
+	invalidMode.StructuredOutputMode = "markdown"
+	_, err = NewCatalog([]Config{invalidMode})
+	if !errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("invalid structured output mode error = %v", err)
 	}
 
 	config := validConfig()
@@ -112,6 +154,7 @@ func validConfig() Config {
 	return Config{
 		Route: "balanced_text_v1", Revision: "v1", Provider: "provider-a", Model: "model-a", Current: true,
 		Capabilities: appport.ProviderCapabilities{StructuredOutput: true}, Timeout: 45 * time.Second,
-		MaxOutputTokens: 4096, ReasoningEffort: "low",
+		StructuredOutputMode: appport.StructuredOutputModeJSONSchema,
+		MaxOutputTokens:      4096, ReasoningEffort: "low",
 	}
 }

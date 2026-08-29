@@ -1,6 +1,7 @@
 package responsesapi
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -44,6 +45,11 @@ const (
 	providerResponseShapeMultipleMessages        = "multiple_messages"
 	providerResponseShapeNoMessage               = "no_message"
 	providerResponseShapeRefusal                 = "refusal"
+
+	providerOutputEnvelopeJSONObject    = "json_object"
+	providerOutputEnvelopeMarkdownFence = "markdown_fence"
+	providerOutputEnvelopeNonObjectJSON = "non_object_json"
+	providerOutputEnvelopeInvalidJSON   = "invalid_json"
 )
 
 // observeProviderInvocation exposes only bounded purpose/result labels. Model,
@@ -61,6 +67,30 @@ func observeProviderInvocation(schemaVersion string, duration time.Duration, res
 		providerTokensTotal.WithLabelValues(purpose, "input").Add(float64(response.Receipt.InputTokens))
 		providerTokensTotal.WithLabelValues(purpose, "output").Add(float64(response.Receipt.OutputTokens))
 	}
+}
+
+// observeProviderOutputEnvelope records the bounded outer shape of completed
+// output before schema validation. It never records generated text. This makes
+// Provider wire-contract drift such as Markdown fences directly observable.
+func observeProviderOutputEnvelope(schemaVersion, output string) {
+	providerOutputEnvelopesTotal.WithLabelValues(
+		providerMetricPurpose(schemaVersion), providerMetricOutputEnvelope(output),
+	).Inc()
+}
+
+func providerMetricOutputEnvelope(output string) string {
+	trimmed := strings.TrimSpace(output)
+	if strings.HasPrefix(trimmed, "```") {
+		return providerOutputEnvelopeMarkdownFence
+	}
+	if !json.Valid([]byte(trimmed)) {
+		return providerOutputEnvelopeInvalidJSON
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(trimmed), &object); err == nil && object != nil {
+		return providerOutputEnvelopeJSONObject
+	}
+	return providerOutputEnvelopeNonObjectJSON
 }
 
 // observeDecodedProviderResponse records only reviewed finite response-shape
@@ -242,4 +272,8 @@ var (
 		Namespace: "qs", Subsystem: "ai_explanation_provider", Name: "response_tokens_total",
 		Help: "Provider-reported token usage for decoded responses by bounded purpose, terminal status, and direction.",
 	}, []string{"purpose", "status", "direction"})
+	providerOutputEnvelopesTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "qs", Subsystem: "ai_explanation_provider", Name: "output_envelopes_total",
+		Help: "Completed Provider output text by bounded purpose and safe outer JSON envelope classification.",
+	}, []string{"purpose", "envelope"})
 )

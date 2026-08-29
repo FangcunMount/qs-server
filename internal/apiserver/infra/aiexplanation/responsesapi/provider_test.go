@@ -131,6 +131,74 @@ func TestDeepSeekProviderUsesResponsesSchemaWithoutOpenAIStrictExtension(t *test
 	}
 }
 
+func TestDeepSeekProviderUsesJSONObjectModeWithoutSchemaEnvelope(t *testing.T) {
+	var captured map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&captured); err != nil {
+			t.Fatal(err)
+		}
+		_, _ = w.Write([]byte(`{
+          "id":"ds_resp_json_object","status":"completed","model":"deepseek-v4-flash",
+          "output":[{"type":"message","content":[{"type":"output_text","text":"{\"summary\":\"ok\"}"}]}],
+          "usage":{"input_tokens":34,"output_tokens":13}
+        }`))
+	}))
+	defer server.Close()
+
+	provider := mustProvider(t, Config{
+		Provider: ProviderDeepSeek, Endpoint: server.URL, APIKey: "test-deepseek-secret", HTTPClient: server.Client(),
+	})
+	request := validRequestForProvider(ProviderDeepSeek, "deepseek-v4-flash")
+	request.Route.StructuredOutputMode = appport.StructuredOutputModeJSONObject
+	request.TaskMessage += "; return one JSON object"
+	if _, err := provider.Generate(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+
+	format := captured["text"].(map[string]any)["format"].(map[string]any)
+	if format["type"] != "json_object" {
+		t.Fatalf("DeepSeek JSON object format = %#v", format)
+	}
+	for _, forbidden := range []string{"name", "strict", "schema"} {
+		if _, exists := format[forbidden]; exists {
+			t.Fatalf("DeepSeek json_object request must omit %q: %#v", forbidden, format)
+		}
+	}
+}
+
+func TestJSONObjectModeRequiresExplicitJSONInstruction(t *testing.T) {
+	provider := mustProvider(t, Config{Provider: ProviderDeepSeek, APIKey: "test-deepseek-secret"})
+	request := validRequestForProvider(ProviderDeepSeek, "deepseek-v4-flash")
+	request.Route.StructuredOutputMode = appport.StructuredOutputModeJSONObject
+	if err := provider.validateProviderRequest(request); err == nil || !strings.Contains(err.Error(), "explicit JSON instruction") {
+		t.Fatalf("json_object prompt validation error = %v", err)
+	}
+	request.SystemMessage += "; respond as JSON"
+	if err := provider.validateProviderRequest(request); err != nil {
+		t.Fatalf("valid json_object prompt = %v", err)
+	}
+}
+
+func TestProviderClassifiesCompletedOutputEnvelopeWithoutPersistingContent(t *testing.T) {
+	for _, testCase := range []struct {
+		name   string
+		output string
+		want   string
+	}{
+		{name: "object", output: ` {"summary":"ok"} `, want: providerOutputEnvelopeJSONObject},
+		{name: "markdown fence", output: "```json\n{\"summary\":\"ok\"}\n```", want: providerOutputEnvelopeMarkdownFence},
+		{name: "array", output: `[{"summary":"ok"}]`, want: providerOutputEnvelopeNonObjectJSON},
+		{name: "null", output: `null`, want: providerOutputEnvelopeNonObjectJSON},
+		{name: "invalid", output: `answer: ok`, want: providerOutputEnvelopeInvalidJSON},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			if got := providerMetricOutputEnvelope(testCase.output); got != testCase.want {
+				t.Fatalf("output envelope = %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}
+
 func TestDeepSeekProviderConcatenatesOneMessageOutputTextParts(t *testing.T) {
 	provider := providerForProviderResponse(t, ProviderDeepSeek, http.StatusOK, `{
       "id":"ds_resp_parts","status":"completed","model":"deepseek-v4-flash",

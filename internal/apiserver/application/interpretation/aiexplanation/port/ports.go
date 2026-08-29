@@ -56,12 +56,24 @@ type ProviderCapabilities struct {
 	RetrieveByInvocationID bool
 }
 
+const (
+	// StructuredOutputModeJSONSchema asks the Provider to constrain output with
+	// the complete output schema. It remains the legacy default for frozen
+	// routes created before the mode became explicit.
+	StructuredOutputModeJSONSchema = "json_schema"
+	// StructuredOutputModeJSONObject asks the Provider to return one valid JSON
+	// object. The application still validates that object against the complete
+	// versioned output schema before accepting it.
+	StructuredOutputModeJSONObject = "json_object"
+)
+
 type ProviderRoute struct {
-	ExecutionSpec   aiexplanation.ProviderExecutionSpec
-	Capabilities    ProviderCapabilities
-	Timeout         time.Duration
-	MaxOutputTokens int
-	ReasoningEffort string
+	ExecutionSpec        aiexplanation.ProviderExecutionSpec
+	Capabilities         ProviderCapabilities
+	StructuredOutputMode string
+	Timeout              time.Duration
+	MaxOutputTokens      int
+	ReasoningEffort      string
 }
 
 func (r ProviderRoute) Validate() error {
@@ -71,6 +83,9 @@ func (r ProviderRoute) Validate() error {
 	if !r.Capabilities.StructuredOutput {
 		return fmt.Errorf("AI explanation provider route must support structured output")
 	}
+	if _, err := normalizeStructuredOutputMode(r.StructuredOutputMode); err != nil {
+		return err
+	}
 	if r.Timeout <= 0 || r.MaxOutputTokens <= 0 {
 		return fmt.Errorf("AI explanation provider timeout and output token limit are required")
 	}
@@ -78,6 +93,24 @@ func (r ProviderRoute) Validate() error {
 		return fmt.Errorf("AI explanation provider reasoning effort is invalid")
 	}
 	return nil
+}
+
+// EffectiveStructuredOutputMode preserves json_schema as the behavior of
+// legacy route fixtures and frozen route revisions where the mode was absent.
+func (r ProviderRoute) EffectiveStructuredOutputMode() string {
+	mode, _ := normalizeStructuredOutputMode(r.StructuredOutputMode)
+	return mode
+}
+
+func normalizeStructuredOutputMode(value string) (string, error) {
+	switch strings.TrimSpace(value) {
+	case "", StructuredOutputModeJSONSchema:
+		return StructuredOutputModeJSONSchema, nil
+	case StructuredOutputModeJSONObject:
+		return StructuredOutputModeJSONObject, nil
+	default:
+		return "", fmt.Errorf("AI explanation provider structured output mode is invalid")
+	}
 }
 
 func validReasoningEffort(value string) bool {
