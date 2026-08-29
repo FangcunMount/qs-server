@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "cead5d081774a43f3c1e1ab3801ab592de78c381",
+    "sha": "29715787d9f635dba55345455e6996c883f8c0ae",
     "verified_on": "2026-08-29"
   },
   "status_policy": {
@@ -560,7 +560,7 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "PromptEvaluationRun, provider/semantic adapters, ReviewService and the online synthetic-suite runner are implemented, but no real 35-output generation/judge evaluation, dual-role human review, or approved report has been executed."
+          "Production frozen runs have executed real Provider generation and semantic-evaluator calls, but the latest reviewed route still has a technical output-schema failure; no complete 70-entry dual-role human review or approved report exists."
         ]
       },
       "gaps": [
@@ -568,7 +568,7 @@
           "id": "DOC-CLOSURE-AI-EXPLANATION-PROMPT-EVAL",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Prompt evaluation execution and human review have not been performed.",
+          "summary": "Real Prompt evaluation runs have executed, but no technically clean 35+35 run, complete dual-role human review, or approved report exists.",
           "exit_criteria": "Produce a complete evaluation report with 35 generation outputs, 35 semantic receipts, one preflight result, all hard gates and 70 dual-role human reviews."
         }
       ]
@@ -3051,7 +3051,7 @@
         "deployed_sha": null,
         "observed_at": null,
         "limitations": [
-          "AI explanation has contracts, runtime transport/event/worker wiring, an OpenAI adapter, immutable evaluation evidence and Profile governance code, but no real provider evaluation, live Mongo transaction evidence, published Profile or production runtime evidence exists."
+          "AI explanation has contracts, runtime transport/event/worker wiring, OpenAI and DeepSeek adapters, immutable evaluation evidence, Profile governance, production governance deployment and multiple real Provider evaluations; the latest route still failed a technical hard gate, and no approved Run, published Profile or participant traffic exists."
         ]
       },
       "gaps": [
@@ -3059,8 +3059,8 @@
           "id": "AI-EXPLANATION-DESIGN-CLOSURE",
           "kind": "verification",
           "severity": "high",
-          "summary": "Contracts and the first complete repository implementation exist, but the dirty feature branch has no commit-scoped semantic signoff, live Replica Set result, real Provider evaluation, approved evidence run or published Profile.",
-          "exit_criteria": "Commit a stable revision, re-run and record repository and authorized Replica Set verification against that SHA, complete the real 35+35 evaluation and dual-role review, then sign the document without upgrading absent production evidence."
+          "summary": "Contracts and production governance runtime exist, but the strict-tool release candidate has no deployed 35+35 result, approved evidence run, published Profile or participant acceptance.",
+          "exit_criteria": "Deploy the strict-tool Route revision, complete a technically clean real 35+35 evaluation and dual-role review, approve the immutable Run, publish the Profile, and finish participant acceptance before changing the production conclusion."
         }
       ]
     },
