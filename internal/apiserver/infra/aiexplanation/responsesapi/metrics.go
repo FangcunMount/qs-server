@@ -50,6 +50,9 @@ const (
 	providerOutputEnvelopeMarkdownFence = "markdown_fence"
 	providerOutputEnvelopeNonObjectJSON = "non_object_json"
 	providerOutputEnvelopeInvalidJSON   = "invalid_json"
+
+	providerOutputNormalizationUnchanged         = "unchanged"
+	providerOutputNormalizationMarkdownUnwrapped = "markdown_json_fence_unwrapped"
 )
 
 // observeProviderInvocation exposes only bounded purpose/result labels. Model,
@@ -76,6 +79,17 @@ func observeProviderOutputEnvelope(schemaVersion, output string) {
 	providerOutputEnvelopesTotal.WithLabelValues(
 		providerMetricPurpose(schemaVersion), providerMetricOutputEnvelope(output),
 	).Inc()
+}
+
+// observeProviderOutputNormalization records only whether a reviewed,
+// deterministic wire-envelope compatibility rule was applied. It never
+// records generated text or Provider identities.
+func observeProviderOutputNormalization(schemaVersion string, normalized bool) {
+	result := providerOutputNormalizationUnchanged
+	if normalized {
+		result = providerOutputNormalizationMarkdownUnwrapped
+	}
+	providerOutputNormalizationsTotal.WithLabelValues(providerMetricPurpose(schemaVersion), result).Inc()
 }
 
 func providerMetricOutputEnvelope(output string) string {
@@ -276,4 +290,8 @@ var (
 		Namespace: "qs", Subsystem: "ai_explanation_provider", Name: "output_envelopes_total",
 		Help: "Completed Provider output text by bounded purpose and safe outer JSON envelope classification.",
 	}, []string{"purpose", "envelope"})
+	providerOutputNormalizationsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "qs", Subsystem: "ai_explanation_provider", Name: "output_normalizations_total",
+		Help: "Completed Provider outputs by bounded deterministic envelope normalization result.",
+	}, []string{"purpose", "result"})
 )

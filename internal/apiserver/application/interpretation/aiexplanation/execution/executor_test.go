@@ -62,6 +62,20 @@ func TestExecuteFailsClosedOnInvalidProviderOutput(t *testing.T) {
 	}
 }
 
+func TestExecuteUsesEnvelopeNormalizedProviderOutput(t *testing.T) {
+	f := newFixture(t)
+	f.provider.validationOutput = append([]byte(nil), f.provider.raw...)
+	f.provider.raw = []byte("```json\n" + string(f.provider.raw) + "\n```")
+
+	result, err := f.executor.Execute(context.Background(), Command{GenerationID: f.generation.ID(), TraceID: "trace-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != StatusGenerated || result.Artifact == nil || f.safety.calls != 1 {
+		t.Fatalf("result/safety calls = %#v/%d", result, f.safety.calls)
+	}
+}
+
 func TestExecuteNeverCallsProviderWhenDispatchStateCannotPersist(t *testing.T) {
 	f := newFixture(t)
 	f.committer.dispatchErr = errors.New("storage unavailable")
@@ -579,11 +593,12 @@ func (*schemaResolverStub) ResolveOutputSchema(context.Context, string) (appport
 }
 
 type providerStub struct {
-	sequence *[]string
-	raw      []byte
-	err      error
-	request  appport.ProviderRequest
-	calls    int
+	sequence         *[]string
+	raw              []byte
+	validationOutput []byte
+	err              error
+	request          appport.ProviderRequest
+	calls            int
 }
 
 func (s *providerStub) Generate(_ context.Context, request appport.ProviderRequest) (*appport.ProviderResponse, error) {
@@ -593,7 +608,7 @@ func (s *providerStub) Generate(_ context.Context, request appport.ProviderReque
 	if s.err != nil {
 		return nil, s.err
 	}
-	return &appport.ProviderResponse{RawOutput: s.raw, Receipt: aiexplanation.ProviderReceipt{InvocationID: request.InvocationID, RequestID: "request-1", Provider: request.Route.ExecutionSpec.ResolvedProvider, Model: request.Route.ExecutionSpec.ResolvedModel, InputTokens: 100, OutputTokens: 200, Latency: time.Second}}, nil
+	return &appport.ProviderResponse{RawOutput: s.raw, ValidationOutput: s.validationOutput, Receipt: aiexplanation.ProviderReceipt{InvocationID: request.InvocationID, RequestID: "request-1", Provider: request.Route.ExecutionSpec.ResolvedProvider, Model: request.Route.ExecutionSpec.ResolvedModel, InputTokens: 100, OutputTokens: 200, Latency: time.Second}}, nil
 }
 
 type safetyStub struct {

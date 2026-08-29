@@ -557,7 +557,8 @@ func (r *OnlineRunner) executeAttempt(
 		return r.failedAttempt(base, "evidence_capture", "provider_receipt_invalid", "Provider receipt did not match the frozen evaluation request", false, true)
 	}
 
-	validated, validationErr := appvalidation.Validate(base.RawOutput, assembled.Document, prepared.profile.Definition())
+	validationOutput := response.OutputForValidation()
+	validated, validationErr := appvalidation.Validate(validationOutput, assembled.Document, prepared.profile.Definition())
 	if validationErr == nil {
 		base.NormalizedOutput, err = json.Marshal(validated.Content)
 		if err != nil {
@@ -567,7 +568,7 @@ func (r *OnlineRunner) executeAttempt(
 	}
 
 	allAssertions := append(cloneAssertions(prepared.defaultAssertions), cloneAssertions(testCase.Expected.Assertions)...)
-	candidate, err := EvaluateCandidate(ctx, base.RawOutput, assembled.Document, prepared.profile.Definition(), allAssertions, r.safety)
+	candidate, err := EvaluateCandidate(ctx, validationOutput, assembled.Document, prepared.profile.Definition(), allAssertions, r.safety)
 	if err != nil {
 		return r.failedAttempt(base, "deterministic_evaluation", "candidate_evaluation_failed", "candidate safety evaluation could not complete", false, false)
 	}

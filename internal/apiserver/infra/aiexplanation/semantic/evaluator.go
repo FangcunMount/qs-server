@@ -108,10 +108,11 @@ func (e *Evaluator) Evaluate(ctx context.Context, request appevaluation.Semantic
 	if err := validateReceipt(response.Receipt, request.InvocationID, e.route.ExecutionSpec); err != nil {
 		return appevaluation.SemanticEvaluationResult{}, err
 	}
-	if err := validateSchema(e.compiled, response.RawOutput); err != nil {
+	validationOutput := response.OutputForValidation()
+	if err := validateSchema(e.compiled, validationOutput); err != nil {
 		return appevaluation.SemanticEvaluationResult{}, err
 	}
-	decoded, err := decodeOutput(response.RawOutput)
+	decoded, err := decodeOutput(validationOutput)
 	if err != nil {
 		return appevaluation.SemanticEvaluationResult{}, err
 	}

@@ -242,6 +242,8 @@ func (p *Provider) Generate(ctx context.Context, request appport.ProviderRequest
 		return nil, err
 	}
 	observeProviderOutputEnvelope(request.OutputSchema.Version, rawOutput)
+	validationOutput := validationOutputForProvider(p.name, rawOutput)
+	observeProviderOutputNormalization(request.OutputSchema.Version, len(validationOutput) > 0)
 	usage := responseUsage{}
 	if decoded.Usage != nil {
 		usage = *decoded.Usage
@@ -251,12 +253,38 @@ func (p *Provider) Generate(ctx context.Context, request appport.ProviderRequest
 		return nil, providerError(domainrun.FailureKindProviderTransport, "provider_usage_invalid", false, false, nil)
 	}
 	return &appport.ProviderResponse{
-		RawOutput: []byte(rawOutput),
+		RawOutput: append([]byte(nil), rawOutput...), ValidationOutput: validationOutput,
 		Receipt: aiexplanation.ProviderReceipt{
 			InvocationID: request.InvocationID, RequestID: decoded.ID, Provider: p.name,
 			Model: decoded.Model, InputTokens: usage.InputTokens, OutputTokens: usage.OutputTokens, Latency: latency,
 		},
 	}, nil
+}
+
+// validationOutputForProvider compensates only for a reviewed Provider wire
+// quirk. DeepSeek can return an otherwise valid structured response inside one
+// Markdown JSON fence even when json_schema was requested. Preserve the exact
+// Provider text in RawOutput, but expose the enclosed object to the existing
+// strict Schema/reference/Profile validators. Ambiguous or malformed fences
+// deliberately remain unchanged and therefore fail closed.
+func validationOutputForProvider(provider, output string) []byte {
+	if provider != ProviderDeepSeek {
+		return nil
+	}
+	trimmed := strings.TrimSpace(output)
+	openingEnd := strings.IndexByte(trimmed, '\n')
+	if openingEnd < 0 || !strings.EqualFold(strings.TrimSpace(trimmed[:openingEnd]), "```json") {
+		return nil
+	}
+	closingStart := strings.LastIndex(trimmed, "\n```")
+	if closingStart <= openingEnd || strings.TrimSpace(trimmed[closingStart+1:]) != "```" {
+		return nil
+	}
+	candidate := strings.TrimSpace(trimmed[openingEnd+1 : closingStart])
+	if candidate == "" || candidate[0] != '{' || !json.Valid([]byte(candidate)) {
+		return nil
+	}
+	return []byte(candidate)
 }
 
 func (p *Provider) responseFormat(request appport.ProviderRequest) responseFormat {

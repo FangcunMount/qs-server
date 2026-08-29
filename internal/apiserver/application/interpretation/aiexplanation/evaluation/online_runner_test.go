@@ -146,6 +146,29 @@ func TestOnlineRunnerClassifiesSchemaInvalidProviderOutputAsTechnicalFailure(t *
 	}
 }
 
+func TestOnlineRunnerValidatesNormalizedEnvelopeAndPreservesRawEvidence(t *testing.T) {
+	provider := &onlineProviderStub{wrapValidationFence: true}
+	semantic := &onlineSemanticStub{}
+	repository := &onlineEvidenceRepository{}
+	runner := newOnlineRunner(t, promptResolverStub{}, provider, semantic, repository)
+
+	result, err := runner.RunV1(context.Background(), evaluation.OnlineRunCommand{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Run.FailedAttemptCount() != 0 || semantic.calls != domainevaluation.RequiredGenerationAttempts {
+		t.Fatalf("failures/semantic calls = %d/%d", result.Run.FailedAttemptCount(), semantic.calls)
+	}
+	for _, attempt := range result.Run.Attempts() {
+		if attempt.Stage != domainevaluation.AttemptStageGeneration {
+			continue
+		}
+		if !strings.HasPrefix(string(attempt.RawOutput), "```json\n") || len(attempt.NormalizedOutput) == 0 || attempt.Failure != nil {
+			t.Fatalf("normalized-envelope attempt evidence = %#v", attempt)
+		}
+	}
+}
+
 func TestOnlineRunnerJudgesStructurallyValidCandidateThatFailsDeterministicGate(t *testing.T) {
 	provider := &onlineProviderStub{mutate: func(caseID string, content *domainoutput.Content) {
 		if caseID == "PROMPT-EVAL-001" {
@@ -317,10 +340,11 @@ func (onlineRouteResolver) ResolveProviderRoute(_ context.Context, route string)
 }
 
 type onlineProviderStub struct {
-	calls         int
-	failAt        int
-	mutate        func(caseID string, content *domainoutput.Content)
-	invocationIDs []string
+	calls               int
+	failAt              int
+	mutate              func(caseID string, content *domainoutput.Content)
+	wrapValidationFence bool
+	invocationIDs       []string
 }
 
 func (p *onlineProviderStub) Generate(_ context.Context, request appport.ProviderRequest) (*appport.ProviderResponse, error) {
@@ -338,14 +362,19 @@ func (p *onlineProviderStub) Generate(_ context.Context, request appport.Provide
 	if err != nil {
 		return nil, err
 	}
-	return &appport.ProviderResponse{
+	response := &appport.ProviderResponse{
 		RawOutput: raw,
 		Receipt: aiexplanation.ProviderReceipt{
 			InvocationID: request.InvocationID, RequestID: "request-" + request.InvocationID,
 			Provider: request.Route.ExecutionSpec.ResolvedProvider, Model: request.Route.ExecutionSpec.ResolvedModel,
 			InputTokens: 100, OutputTokens: 200, Latency: 10 * time.Millisecond,
 		},
-	}, nil
+	}
+	if p.wrapValidationFence {
+		response.RawOutput = []byte("```json\n" + string(raw) + "\n```")
+		response.ValidationOutput = append([]byte(nil), raw...)
+	}
+	return response, nil
 }
 
 func onlineCaseID(invocationID string) string {

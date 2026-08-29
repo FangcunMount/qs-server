@@ -108,6 +108,25 @@ func TestEvaluatorRejectsInvalidOutputContract(t *testing.T) {
 	}
 }
 
+func TestEvaluatorUsesEnvelopeNormalizedProviderOutput(t *testing.T) {
+	validationOutput := validSemanticOutput(t)
+	provider := &providerStub{
+		raw:              []byte("```json\n" + string(validationOutput) + "\n```"),
+		validationOutput: validationOutput,
+	}
+	evaluator, err := NewEvaluator(provider, semanticRoute())
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := evaluator.Evaluate(context.Background(), validSemanticRequest(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Scores.Faithfulness != 5 || len(result.Decisions) != 1 {
+		t.Fatalf("semantic evaluation result = %#v", result)
+	}
+}
+
 func TestEvaluatorRejectsMismatchedReceipt(t *testing.T) {
 	provider := &providerStub{
 		raw: validSemanticOutput(t),
@@ -174,10 +193,11 @@ func TestExecutablePromptMatchesNormativeMarkdownAndFrozenHashes(t *testing.T) {
 }
 
 type providerStub struct {
-	calls   int
-	request appport.ProviderRequest
-	raw     []byte
-	receipt *aiexplanation.ProviderReceipt
+	calls            int
+	request          appport.ProviderRequest
+	raw              []byte
+	validationOutput []byte
+	receipt          *aiexplanation.ProviderReceipt
 }
 
 func (p *providerStub) Generate(_ context.Context, request appport.ProviderRequest) (*appport.ProviderResponse, error) {
@@ -191,7 +211,9 @@ func (p *providerStub) Generate(_ context.Context, request appport.ProviderReque
 	if p.receipt != nil {
 		receipt = *p.receipt
 	}
-	return &appport.ProviderResponse{RawOutput: append([]byte(nil), p.raw...), Receipt: receipt}, nil
+	return &appport.ProviderResponse{
+		RawOutput: append([]byte(nil), p.raw...), ValidationOutput: append([]byte(nil), p.validationOutput...), Receipt: receipt,
+	}, nil
 }
 
 func semanticRoute() appport.ProviderRoute {
