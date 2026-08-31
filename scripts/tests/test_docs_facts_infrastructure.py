@@ -258,8 +258,8 @@ class InfrastructureParserTest(unittest.TestCase):
 
         shutdown_issues = self.issues_after_mutation(
             check_docs_facts.PROCESS_SOURCES["apiserver"][1],
-            "if deps.transport.closeGRPC != nil {\n\t\tdeps.transport.closeGRPC()\n\t}",
-            "if deps.transport.terminateGRPC != nil {\n\t\tdeps.transport.terminateGRPC()\n\t}",
+            "if deps.transport.closeGRPC != nil {\n\t\tlog.Info(\"Draining API server gRPC transports...\")\n\t\tdeps.transport.closeGRPC()\n\t}",
+            "if deps.transport.terminateGRPC != nil {\n\t\tlog.Info(\"Draining API server gRPC transports...\")\n\t\tdeps.transport.terminateGRPC()\n\t}",
             check_docs_facts.process_lifecycle_contract_issues,
         )
         self.assertIn("process-shutdown-source-drift", {issue.kind for issue in shutdown_issues})

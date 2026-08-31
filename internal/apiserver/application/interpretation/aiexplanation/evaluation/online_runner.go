@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"reflect"
 	"strings"
 	"time"
@@ -240,6 +241,7 @@ func (r *OnlineRunner) RunStepV1(ctx context.Context, command OnlineStepCommand)
 	if !reflect.DeepEqual(runRecord.Release(), prepared.release) {
 		return nil, fmt.Errorf("AI explanation evaluation release no longer matches the executable assets")
 	}
+	invocationID := fmt.Sprintf("ai-prompt-eval:%s:%s:%d", command.RunID, command.CaseID, command.Attempt)
 
 	now := r.now().UTC()
 	if execution := runRecord.Execution(); execution != nil {
@@ -263,7 +265,6 @@ func (r *OnlineRunner) RunStepV1(ctx context.Context, command OnlineStepCommand)
 		if !ok || caseID != command.CaseID || attempt != command.Attempt {
 			return nil, fmt.Errorf("AI explanation evaluation step is not the next frozen attempt")
 		}
-		invocationID := fmt.Sprintf("ai-prompt-eval:%s:%s:%d", command.RunID, command.CaseID, command.Attempt)
 		leaseDuration := r.attemptLease
 		minimumLease := prepared.route.Timeout + r.semanticTimeout + 30*time.Second
 		if leaseDuration < minimumLease {
@@ -278,6 +279,11 @@ func (r *OnlineRunner) RunStepV1(ctx context.Context, command OnlineStepCommand)
 		}
 	}
 
+	slog.InfoContext(ctx, "AI explanation candidate pipeline dispatching",
+		slog.String("run_id", command.RunID.String()), slog.String("case_id", command.CaseID),
+		slog.Int("attempt", command.Attempt), slog.String("invocation_id", invocationID),
+		slog.String("event_id", strings.TrimSpace(command.Owner)),
+	)
 	dispatchAt := r.now().UTC()
 	_, err = r.evidence.MarkAttemptDispatching(ctx, command.RunID, command.Owner, dispatchAt)
 	if err != nil {
@@ -295,6 +301,18 @@ func (r *OnlineRunner) RunStepV1(ctx context.Context, command OnlineStepCommand)
 		return nil, err
 	}
 	observePromptEvaluationAttemptFailure(record.Failure)
+	completionAttrs := []any{
+		slog.String("run_id", command.RunID.String()), slog.String("case_id", command.CaseID),
+		slog.Int("attempt", command.Attempt), slog.String("invocation_id", invocationID),
+		slog.String("event_id", strings.TrimSpace(command.Owner)),
+	}
+	if record.Failure != nil {
+		completionAttrs = append(completionAttrs,
+			slog.String("failure_stage", record.Failure.Stage),
+			slog.String("failure_code", record.Failure.Code),
+		)
+	}
+	slog.InfoContext(ctx, "AI explanation candidate pipeline committed", completionAttrs...)
 	return r.closeWhenComplete(persistCtx, runRecord)
 }
 
@@ -338,6 +356,11 @@ func (r *OnlineRunner) recordUnknownDispatch(
 	execution *domainevaluation.AttemptExecution,
 	now time.Time,
 ) (*OnlineStepResult, error) {
+	slog.WarnContext(ctx, "AI explanation candidate pipeline found an expired dispatch lease",
+		slog.String("run_id", command.RunID.String()), slog.String("case_id", command.CaseID),
+		slog.Int("attempt", command.Attempt), slog.String("invocation_id", execution.InvocationID),
+		slog.String("event_id", execution.Owner),
+	)
 	startedAt := execution.ClaimedAt
 	if execution.DispatchStartedAt != nil {
 		startedAt = *execution.DispatchStartedAt

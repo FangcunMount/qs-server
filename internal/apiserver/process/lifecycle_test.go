@@ -89,7 +89,7 @@ func TestRunProcessLifecycleDepsRunsInExpectedOrder(t *testing.T) {
 		},
 	})
 
-	want := []string{"container", "authz", "database", "http", "grpc"}
+	want := []string{"http", "grpc", "authz", "container", "database"}
 	if !reflect.DeepEqual(order, want) {
 		t.Fatalf("lifecycle dep order = %#v, want %#v", order, want)
 	}

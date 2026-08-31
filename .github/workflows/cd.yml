@@ -118,11 +118,31 @@ jobs:
           ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 0
 
+      - name: Resolve last completed full production deployment
+        id: production_baseline
+        if: github.event_name == 'workflow_run'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          marker_name="$({
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+              --jq '.artifacts[] | select((.name | startswith("production-full-deploy-marker-")) and .expired == false) | .name'
+          } | sed -n '1p')"
+          last_deployed_sha="${marker_name#production-full-deploy-marker-}"
+          if [ "${last_deployed_sha}" = "${marker_name}" ] ||
+             ! [[ "${last_deployed_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+            last_deployed_sha=""
+          fi
+          echo "Trusted full-deploy baseline: ${last_deployed_sha:-<none>}"
+          printf 'last_deployed_sha=%s\n' "${last_deployed_sha}" >> "${GITHUB_OUTPUT}"
+
       - name: Plan deploy services
         id: plan
         env:
           EVENT_NAME: ${{ github.event_name }}
           MANUAL_SERVICE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.service || 'all' }}
+          LAST_DEPLOYED_SHA: ${{ steps.production_baseline.outputs.last_deployed_sha }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           make cd-plan
@@ -608,9 +628,41 @@ jobs:
         run: |
           rm -f "${RUNNER_SSH_KEY_FILE:-}" "${RUNNER_SSH_CONFIG:-}" 2>/dev/null || true
 
+  record-automatic-full-deploy:
+    name: Record Automatic Full Deployment
+    needs: [plan, docker, deploy-apiserver, deploy-collection, deploy-worker, verify-worker-governance]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+    if: |
+      always() &&
+      github.event_name == 'workflow_run' &&
+      needs.plan.result == 'success' &&
+      needs.plan.outputs.apiserver == 'true' &&
+      needs.plan.outputs.collection == 'true' &&
+      needs.plan.outputs.worker == 'true' &&
+      needs.docker.result == 'success' &&
+      needs.deploy-apiserver.result == 'success' &&
+      needs.deploy-collection.result == 'success' &&
+      needs.deploy-worker.result == 'success' &&
+      needs.verify-worker-governance.result == 'success'
+    steps:
+      - name: Write deployment marker
+        run: |
+          printf '{"deploy_sha":"%s","workflow_run_id":"%s"}\n' \
+            "${DEPLOY_SHA}" "${GITHUB_RUN_ID}" > production-full-deploy-marker.json
+
+      - name: Persist deployment marker
+        uses: actions/upload-artifact@v7
+        with:
+          name: production-full-deploy-marker-${{ env.DEPLOY_SHA }}
+          path: production-full-deploy-marker.json
+          retention-days: 90
+
   notify:
     name: Send Notification
-    needs: [plan, docker, deploy-apiserver, deploy-collection, deploy-worker, verify-worker-governance]
+    needs: [plan, docker, deploy-apiserver, deploy-collection, deploy-worker, verify-worker-governance, record-automatic-full-deploy]
     runs-on: ubuntu-latest
     if: |
       always() && (
@@ -632,6 +684,7 @@ jobs:
           echo "Collection Server: ${{ needs.deploy-collection.result }}"
           echo "Worker: ${{ needs.deploy-worker.result }}"
           echo "Worker governance reverse verification: ${{ needs.verify-worker-governance.result }}"
+          echo "Automatic full-deploy marker: ${{ needs.record-automatic-full-deploy.result }}"
 
           if [ "${{ needs.plan.result }}" != "success" ]; then
             echo "Deploy planning failed"
@@ -645,6 +698,12 @@ jobs:
 
           if [ "${{ needs.docker.result }}" != "success" ]; then
             echo "Docker image build/push failed"
+            exit 1
+          fi
+
+          if [ "${{ github.event_name }}" = "workflow_run" ] &&
+             [ "${{ needs.record-automatic-full-deploy.result }}" != "success" ]; then
+            echo "Automatic deployment completed without a durable full-deploy marker"
             exit 1
           fi
 

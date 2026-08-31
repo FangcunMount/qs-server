@@ -87,26 +87,32 @@ func runPrepareRunShutdownHooks(lifecycle processruntime.Lifecycle) {
 }
 
 func runProcessLifecycleDeps(deps processLifecycleDeps) {
-	if deps.container.containerCleanup != nil {
-		if err := deps.container.containerCleanup(); err != nil {
-			log.Errorf("Failed to cleanup container resources: %v", err)
-		}
+	// Stop accepting new work and wait for in-flight transports before closing
+	// the database or Provider/container resources they still need to persist a
+	// terminal result. In particular, gRPC GracefulStop must complete before the
+	// AI Prompt evaluation commit path loses its dependencies.
+	if deps.transport.closeHTTP != nil {
+		log.Info("Draining API server HTTP transports...")
+		deps.transport.closeHTTP()
+	}
+	if deps.transport.closeGRPC != nil {
+		log.Info("Draining API server gRPC transports...")
+		deps.transport.closeGRPC()
 	}
 	if deps.container.stopAuthzSync != nil {
 		if err := deps.container.stopAuthzSync(); err != nil {
 			log.Errorf("Failed to close IAM authz version subscriber: %v", err)
 		}
 	}
+	if deps.container.containerCleanup != nil {
+		if err := deps.container.containerCleanup(); err != nil {
+			log.Errorf("Failed to cleanup container resources: %v", err)
+		}
+	}
 	if deps.resource.closeDatabase != nil {
 		if err := deps.resource.closeDatabase(); err != nil {
 			log.Errorf("Failed to close database connections: %v", err)
 		}
-	}
-	if deps.transport.closeHTTP != nil {
-		deps.transport.closeHTTP()
-	}
-	if deps.transport.closeGRPC != nil {
-		deps.transport.closeGRPC()
 	}
 }
 

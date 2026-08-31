@@ -126,18 +126,18 @@ scheduler、Outbox consumer 和 gRPC handler 即使没有用户 HTTP 请求，�
 
 “能跳过”不等于“无风险”。是否允许缺少某项能力继续启动，应根据它属于核心正确性依赖还是增强型运行能力来判断。
 
-## 7. 当前关闭顺序的已知不足
+## 7. 当前关闭顺序
 
 当前 apiserver shutdown callback 的实际顺序是：
 
 1. runtime hooks（当前主要是停止 scheduler）；
-2. Container Cleanup；
-3. 停止 IAM authz sync；
-4. 关闭数据库；
-5. 关闭 HTTP；
-6. 关闭 gRPC。
+2. 关闭 HTTP 并排空在途 handler；
+3. 通过 gRPC `GracefulStop` 等待在途 RPC；
+4. 停止 IAM authz sync；
+5. Container Cleanup；
+6. 关闭数据库。
 
-这与更安全的“先停止入口并排空在途请求，再释放下游依赖”顺序不一致。本文记录的是当前源码事实，不把它描述成理想实现。详细风险和建议见[优雅关闭与资源释放](./07-优雅关闭与资源释放.md)。
+该顺序先停止入口并排空在途请求，再释放 application、Provider 与数据库依赖，避免长耗时 AI Prompt 评测在 Provider 已返回但结果尚未持久化时被部署打断。生产 Compose 同时为 apiserver 和 worker 配置 8 分 30 秒 stop grace。仍需继续完善 readiness 摘流时机和分阶段关闭耗时指标，详见[优雅关闭与资源释放](./07-优雅关闭与资源释放.md)。
 
 ## 8. 阅读和验证路径
 

@@ -4,6 +4,7 @@ set -Eeuo pipefail
 EVENT_NAME="${EVENT_NAME:-${GITHUB_EVENT_NAME:-}}"
 MANUAL_SERVICE="${MANUAL_SERVICE:-}"
 DEPLOY_SHA="${DEPLOY_SHA:-${GITHUB_SHA:-}}"
+LAST_DEPLOYED_SHA="${LAST_DEPLOYED_SHA:-}"
 
 want_apiserver=0
 want_collection=0
@@ -82,6 +83,50 @@ current_main_sha() {
   done
 }
 
+is_non_runtime_path() {
+  case "$1" in
+    docs/*|*.md)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+only_non_runtime_changes_since_last_deploy() {
+  local changed_path changed_count=0
+
+  if [ -z "$LAST_DEPLOYED_SHA" ]; then
+    echo "No trusted production deployment baseline was found; using a conservative full deploy."
+    return 1
+  fi
+  if ! git rev-parse --verify "${LAST_DEPLOYED_SHA}^{commit}" >/dev/null 2>&1; then
+    echo "Production deployment baseline is not available locally: ${LAST_DEPLOYED_SHA}; using a conservative full deploy."
+    return 1
+  fi
+  if ! git merge-base --is-ancestor "$LAST_DEPLOYED_SHA" "$DEPLOY_SHA"; then
+    echo "Production deployment baseline is not an ancestor of the target: baseline=${LAST_DEPLOYED_SHA} target=${DEPLOY_SHA}; using a conservative full deploy."
+    return 1
+  fi
+
+  while IFS= read -r changed_path; do
+    [ -z "$changed_path" ] && continue
+    changed_count=$((changed_count + 1))
+    if ! is_non_runtime_path "$changed_path"; then
+      echo "Runtime-affecting path changed since the last full production deploy: ${changed_path}"
+      return 1
+    fi
+  done < <(git diff --name-only "$LAST_DEPLOYED_SHA" "$DEPLOY_SHA")
+
+  if [ "$changed_count" -eq 0 ]; then
+    echo "Target ${DEPLOY_SHA} is already recorded as the last full production deploy."
+  else
+    echo "Only documentation changed since the last full production deploy (${LAST_DEPLOYED_SHA}..${DEPLOY_SHA})."
+  fi
+  return 0
+}
+
 if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
   add_service "${MANUAL_SERVICE:-all}"
   emit_outputs
@@ -101,6 +146,12 @@ fi
 
 if [ "$DEPLOY_SHA" != "$main_sha" ]; then
   echo "Skipping stale automatic deploy target: target=${DEPLOY_SHA} current_main=${main_sha}"
+  emit_outputs
+  exit 0
+fi
+
+if only_non_runtime_changes_since_last_deploy; then
+  echo "Skipping service deployment because production runtime bytes are unchanged."
   emit_outputs
   exit 0
 fi
