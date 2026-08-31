@@ -188,12 +188,25 @@ case "$OPERATION" in
       exit 1
     fi
 
-    mongodump \
-      "${COMMON_ARGS[@]}" \
-      --db="$MONGODB_DBNAME" \
-      --numParallelCollections=4 \
-      --gzip \
-      --archive="$PARTIAL_FILE"
+    DUMP_LOG="$TEMP_DIR/mongodump.log"
+    dump_attempt=1
+    while true; do
+      : >"$DUMP_LOG"
+      if mongodump \
+        "${COMMON_ARGS[@]}" \
+        --db="$MONGODB_DBNAME" \
+        --numParallelCollections=4 \
+        --gzip \
+        --archive="$PARTIAL_FILE" 2>&1 | tee "$DUMP_LOG"; then
+        break
+      fi
+      if (( dump_attempt >= 2 )) || ! grep -Fq '(CursorNotFound)' "$DUMP_LOG"; then
+        exit 1
+      fi
+      echo "MongoDB dump cursor was lost; removing incomplete archive and retrying once"
+      rm -f -- "$PARTIAL_FILE"
+      dump_attempt=$(( dump_attempt + 1 ))
+    done
     test -s "$PARTIAL_FILE"
     archive_checksum="$(shasum -a 256 "$PARTIAL_FILE" | awk '{ print $1 }')"
     printf '%s\n' "$archive_checksum" >"$CHECKSUM_PARTIAL"
