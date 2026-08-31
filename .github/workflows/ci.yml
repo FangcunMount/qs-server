@@ -183,10 +183,11 @@ jobs:
           QS_SERVER_TEST_MONGO_TTL_TIMEOUT: 15s
         run: |
           go test -tags=integration \
-            -run '^(TestAIExplanation.*(IsAtomic|Converge)OnReplicaSet|TestAIExplanationGovernanceCatalogsPageStableScopedRecordsOnReplicaSet|TestAIExplanationMongo(ColdStartEnforcesRuntimeSchema|TTLMonitorDeletesExpiredRecords)|TestPromptEvaluationEvidenceV2RepositoryUsesSameCollectionWithVersionIsolationAndCAS)$' \
+            -run '^(TestAIExplanation.*(IsAtomic|Converge)OnReplicaSet|TestAIExplanationGovernanceCatalogsPageStableScopedRecordsOnReplicaSet|TestAIExplanationMongo(ColdStartEnforcesRuntimeSchema|TTLMonitorDeletesExpiredRecords)|TestPromptEvaluationEvidenceV2RepositoryUsesSameCollectionWithVersionIsolationAndCAS|TestAIExplanationPromptEvaluationSizeAuditReadsRawBSONWithoutReencoding)$' \
             -count=1 -timeout=10m -v \
             ./internal/apiserver/infra/mongo/interpretation/aiexplanation \
-            ./internal/pkg/migration
+            ./internal/pkg/migration \
+            ./scripts/oneoff/audit_ai_explanation_prompt_evaluation_size
 
       - name: Run current runtime closure E2E
         env:
