@@ -29,7 +29,7 @@ go run ./scripts/oneoff/audit_ai_explanation_prompt_evaluation_size/ \
 ## 结果解释
 
 - `run_bson` 使用 Mongo 返回的原始 BSON 字节长度，不使用 JSON 大小近似。
-- `run_bson_without_stored_outputs` 将 generation/semantic raw 与 normalized 字段移除后重新编码，用于估计非正文开销。
+- `run_bson_without_stored_output_payloads` 从 Mongo 返回的原始 BSON 字节数中只减去 generation/semantic raw 与 normalized payload 字节；字段名、类型和长度开销仍保留，避免将稀疏历史文档解码成完整 PO 后重编码造成虚高。
 - `missing` 是对应 Execution 没有该证据的数量，不能当作零字节样本。
 - `v2_observed_output_projection` 使用当前最小策略的 70 次 generation + 70 次 semantic 上限；它没有伪造未来 Slot 元数据，仍需保留安全余量。
 

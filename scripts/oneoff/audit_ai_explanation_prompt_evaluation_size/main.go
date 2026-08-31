@@ -71,37 +71,37 @@ type projection struct {
 }
 
 type report struct {
-	ObservedAt                  time.Time        `json:"observed_at"`
-	Collection                  string           `json:"collection"`
-	MatchedRuns                 int64            `json:"matched_runs"`
-	ScannedRuns                 int              `json:"scanned_runs"`
-	Truncated                   bool             `json:"truncated"`
-	GenerationExecutions        int              `json:"generation_executions"`
-	SemanticExecutions          int              `json:"semantic_executions"`
-	RunBSON                     sizeDistribution `json:"run_bson"`
-	RunBSONWithoutStoredOutputs sizeDistribution `json:"run_bson_without_stored_outputs"`
-	GenerationRawOutput         sizeDistribution `json:"generation_raw_output"`
-	GenerationNormalizedOutput  sizeDistribution `json:"generation_normalized_output"`
-	SemanticRawOutput           sizeDistribution `json:"semantic_raw_output"`
-	SemanticNormalizedOutput    sizeDistribution `json:"semantic_normalized_output"`
-	LargestRuns                 []runSize        `json:"largest_runs"`
-	V2ObservedOutputProjection  projection       `json:"v2_observed_output_projection"`
+	ObservedAt                   time.Time        `json:"observed_at"`
+	Collection                   string           `json:"collection"`
+	MatchedRuns                  int64            `json:"matched_runs"`
+	ScannedRuns                  int              `json:"scanned_runs"`
+	Truncated                    bool             `json:"truncated"`
+	GenerationExecutions         int              `json:"generation_executions"`
+	SemanticExecutions           int              `json:"semantic_executions"`
+	RunBSON                      sizeDistribution `json:"run_bson"`
+	RunBSONWithoutOutputPayloads sizeDistribution `json:"run_bson_without_stored_output_payloads"`
+	GenerationRawOutput          sizeDistribution `json:"generation_raw_output"`
+	GenerationNormalizedOutput   sizeDistribution `json:"generation_normalized_output"`
+	SemanticRawOutput            sizeDistribution `json:"semantic_raw_output"`
+	SemanticNormalizedOutput     sizeDistribution `json:"semantic_normalized_output"`
+	LargestRuns                  []runSize        `json:"largest_runs"`
+	V2ObservedOutputProjection   projection       `json:"v2_observed_output_projection"`
 }
 
 type measurements struct {
-	runBSON                     []int64
-	runBSONWithoutOutputs       []int64
-	generationRaw               []int64
-	generationNormalized        []int64
-	semanticRaw                 []int64
-	semanticNormalized          []int64
-	generationRawMissing        int
-	generationNormalizedMissing int
-	semanticRawMissing          int
-	semanticNormalizedMissing   int
-	generationExecutions        int
-	semanticExecutions          int
-	largestRuns                 []runSize
+	runBSON                      []int64
+	runBSONWithoutOutputPayloads []int64
+	generationRaw                []int64
+	generationNormalized         []int64
+	semanticRaw                  []int64
+	semanticNormalized           []int64
+	generationRawMissing         int
+	generationNormalizedMissing  int
+	semanticRawMissing           int
+	semanticNormalizedMissing    int
+	generationExecutions         int
+	semanticExecutions           int
+	largestRuns                  []runSize
 }
 
 func main() {
@@ -224,8 +224,6 @@ func loadMeasurements(ctx context.Context, coll *mongo.Collection, maxRuns int64
 		if err := bson.Unmarshal(raw, &document); err != nil {
 			return 0, measurements{}, err
 		}
-		withoutOutputs := document
-		withoutOutputs.Attempts = append([]isoaiexplanation.EvaluationAttemptPO(nil), document.Attempts...)
 		for index := range document.Attempts {
 			attempt := document.Attempts[index]
 			if attempt.Stage != "generation" {
@@ -239,21 +237,13 @@ func loadMeasurements(ctx context.Context, coll *mongo.Collection, maxRuns int64
 				appendPresentOrMissing(&values.semanticRaw, &values.semanticRawMissing, attempt.SemanticExecution.RawOutput)
 				appendPresentOrMissing(&values.semanticNormalized, &values.semanticNormalizedMissing, attempt.SemanticExecution.NormalizedOutput)
 			}
-			withoutOutputs.Attempts[index].RawOutput = nil
-			withoutOutputs.Attempts[index].NormalizedOutput = nil
-			if withoutOutputs.Attempts[index].SemanticExecution != nil {
-				semantic := *withoutOutputs.Attempts[index].SemanticExecution
-				semantic.RawOutput = nil
-				semantic.NormalizedOutput = nil
-				withoutOutputs.Attempts[index].SemanticExecution = &semantic
-			}
 		}
-		withoutRaw, err := bson.Marshal(withoutOutputs)
+		withoutOutputPayloads, err := runBSONWithoutStoredOutputPayloads(len(raw), document.Attempts)
 		if err != nil {
 			return 0, measurements{}, err
 		}
 		values.runBSON = append(values.runBSON, int64(len(raw)))
-		values.runBSONWithoutOutputs = append(values.runBSONWithoutOutputs, int64(len(withoutRaw)))
+		values.runBSONWithoutOutputPayloads = append(values.runBSONWithoutOutputPayloads, withoutOutputPayloads)
 		values.largestRuns = append(values.largestRuns, runSize{
 			RunID: document.DomainID.String(), Status: document.Status, BSONBytes: int64(len(raw)),
 		})
@@ -272,6 +262,24 @@ func appendPresentOrMissing(values *[]int64, missing *int, raw []byte) {
 	*values = append(*values, int64(len(raw)))
 }
 
+func runBSONWithoutStoredOutputPayloads(rawBSONBytes int, attempts []isoaiexplanation.EvaluationAttemptPO) (int64, error) {
+	storedOutputPayloadBytes := 0
+	for _, attempt := range attempts {
+		if attempt.Stage != "generation" {
+			continue
+		}
+		storedOutputPayloadBytes += len(attempt.RawOutput) + len(attempt.NormalizedOutput)
+		if attempt.SemanticExecution != nil {
+			storedOutputPayloadBytes += len(attempt.SemanticExecution.RawOutput) + len(attempt.SemanticExecution.NormalizedOutput)
+		}
+	}
+	withoutOutputPayloads := int64(rawBSONBytes - storedOutputPayloadBytes)
+	if withoutOutputPayloads < 0 {
+		return 0, fmt.Errorf("stored output payloads exceed raw BSON size")
+	}
+	return withoutOutputPayloads, nil
+}
+
 func buildReport(observedAt time.Time, collectionName string, matched int64, values measurements) report {
 	sort.Slice(values.largestRuns, func(i, j int) bool {
 		if values.largestRuns[i].BSONBytes == values.largestRuns[j].BSONBytes {
@@ -285,14 +293,14 @@ func buildReport(observedAt time.Time, collectionName string, matched int64, val
 	result := report{
 		ObservedAt: observedAt, Collection: collectionName, MatchedRuns: matched, ScannedRuns: len(values.runBSON),
 		Truncated: matched > int64(len(values.runBSON)), GenerationExecutions: values.generationExecutions,
-		SemanticExecutions:          values.semanticExecutions,
-		RunBSON:                     distribution(values.runBSON, 0),
-		RunBSONWithoutStoredOutputs: distribution(values.runBSONWithoutOutputs, 0),
-		GenerationRawOutput:         distribution(values.generationRaw, values.generationRawMissing),
-		GenerationNormalizedOutput:  distribution(values.generationNormalized, values.generationNormalizedMissing),
-		SemanticRawOutput:           distribution(values.semanticRaw, values.semanticRawMissing),
-		SemanticNormalizedOutput:    distribution(values.semanticNormalized, values.semanticNormalizedMissing),
-		LargestRuns:                 values.largestRuns,
+		SemanticExecutions:           values.semanticExecutions,
+		RunBSON:                      distribution(values.runBSON, 0),
+		RunBSONWithoutOutputPayloads: distribution(values.runBSONWithoutOutputPayloads, 0),
+		GenerationRawOutput:          distribution(values.generationRaw, values.generationRawMissing),
+		GenerationNormalizedOutput:   distribution(values.generationNormalized, values.generationNormalizedMissing),
+		SemanticRawOutput:            distribution(values.semanticRaw, values.semanticRawMissing),
+		SemanticNormalizedOutput:     distribution(values.semanticNormalized, values.semanticNormalizedMissing),
+		LargestRuns:                  values.largestRuns,
 	}
 	result.V2ObservedOutputProjection = projectV2(result)
 	return result
@@ -336,7 +344,7 @@ func projectV2(value report) projection {
 		return result
 	}
 	distributions := []sizeDistribution{
-		value.RunBSONWithoutStoredOutputs, value.GenerationRawOutput, value.GenerationNormalizedOutput,
+		value.RunBSONWithoutOutputPayloads, value.GenerationRawOutput, value.GenerationNormalizedOutput,
 		value.SemanticRawOutput, value.SemanticNormalizedOutput,
 	}
 	for _, observed := range distributions {
@@ -346,8 +354,8 @@ func projectV2(value report) projection {
 		}
 	}
 	result.Available = true
-	result.P95ProjectedBytes = value.RunBSONWithoutStoredOutputs.P95 + int64(result.GenerationMax)*(value.GenerationRawOutput.P95+value.GenerationNormalizedOutput.P95) + int64(result.SemanticMax)*(value.SemanticRawOutput.P95+value.SemanticNormalizedOutput.P95)
-	result.MaxProjectedBytes = value.RunBSONWithoutStoredOutputs.Max + int64(result.GenerationMax)*(value.GenerationRawOutput.Max+value.GenerationNormalizedOutput.Max) + int64(result.SemanticMax)*(value.SemanticRawOutput.Max+value.SemanticNormalizedOutput.Max)
+	result.P95ProjectedBytes = value.RunBSONWithoutOutputPayloads.P95 + int64(result.GenerationMax)*(value.GenerationRawOutput.P95+value.GenerationNormalizedOutput.P95) + int64(result.SemanticMax)*(value.SemanticRawOutput.P95+value.SemanticNormalizedOutput.P95)
+	result.MaxProjectedBytes = value.RunBSONWithoutOutputPayloads.Max + int64(result.GenerationMax)*(value.GenerationRawOutput.Max+value.GenerationNormalizedOutput.Max) + int64(result.SemanticMax)*(value.SemanticRawOutput.Max+value.SemanticNormalizedOutput.Max)
 	result.P95HeadroomBytes = mongoMaxBSONBytes - result.P95ProjectedBytes
 	result.MaxHeadroomBytes = mongoMaxBSONBytes - result.MaxProjectedBytes
 	result.P95WithinMongoLimit = result.P95ProjectedBytes < mongoMaxBSONBytes
@@ -360,7 +368,7 @@ func printHuman(value report) {
 	fmt.Printf("collection: %s\n", value.Collection)
 	fmt.Printf("runs: matched=%d scanned=%d truncated=%t\n", value.MatchedRuns, value.ScannedRuns, value.Truncated)
 	printDistribution("run_bson", value.RunBSON)
-	printDistribution("run_bson_without_stored_outputs", value.RunBSONWithoutStoredOutputs)
+	printDistribution("run_bson_without_stored_output_payloads", value.RunBSONWithoutOutputPayloads)
 	printDistribution("generation_raw_output", value.GenerationRawOutput)
 	printDistribution("generation_normalized_output", value.GenerationNormalizedOutput)
 	printDistribution("semantic_raw_output", value.SemanticRawOutput)

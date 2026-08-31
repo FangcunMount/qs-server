@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	isoaiexplanation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation/aiexplanation"
 )
 
 func TestMongoClientOptionsSupportsProtectedSplitCredentials(t *testing.T) {
@@ -41,10 +43,30 @@ func TestDistributionUsesNearestRankAndTracksMissing(t *testing.T) {
 	}
 }
 
+func TestRunBSONWithoutStoredOutputPayloadsKeepsOriginalFieldOverhead(t *testing.T) {
+	got, err := runBSONWithoutStoredOutputPayloads(561, []isoaiexplanation.EvaluationAttemptPO{
+		{Stage: "preflight", RawOutput: []byte("ignored")},
+		{
+			Stage: "generation", RawOutput: make([]byte, 2), NormalizedOutput: make([]byte, 11),
+			SemanticExecution: &isoaiexplanation.EvaluationSemanticExecutionPO{
+				RawOutput: make([]byte, 2), NormalizedOutput: make([]byte, 11),
+			},
+		},
+	})
+	if err != nil || got != 535 {
+		t.Fatalf("BSON without output payloads = %d, %v; want 535", got, err)
+	}
+	if _, err := runBSONWithoutStoredOutputPayloads(10, []isoaiexplanation.EvaluationAttemptPO{{
+		Stage: "generation", RawOutput: make([]byte, 11),
+	}}); err == nil {
+		t.Fatal("payload larger than raw BSON must fail closed")
+	}
+}
+
 func TestBuildReportProjectsBoundedSlotPayloadFromObservedSizes(t *testing.T) {
 	now := time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
 	got := buildReport(now, "runs", 2, measurements{
-		runBSON: []int64{1000, 2000}, runBSONWithoutOutputs: []int64{500, 700},
+		runBSON: []int64{1000, 2000}, runBSONWithoutOutputPayloads: []int64{500, 700},
 		generationRaw: []int64{10, 20}, generationNormalized: []int64{30, 40},
 		semanticRaw: []int64{50, 60}, semanticNormalized: []int64{70, 80},
 		generationExecutions: 2, semanticExecutions: 2,
@@ -64,8 +86,8 @@ func TestBuildReportProjectsBoundedSlotPayloadFromObservedSizes(t *testing.T) {
 
 func TestProjectionFailsClosedForTruncatedOrMissingSemanticSamples(t *testing.T) {
 	base := report{
-		RunBSONWithoutStoredOutputs: distribution([]int64{500}, 0),
-		GenerationRawOutput:         distribution([]int64{10}, 0), GenerationNormalizedOutput: distribution([]int64{20}, 0),
+		RunBSONWithoutOutputPayloads: distribution([]int64{500}, 0),
+		GenerationRawOutput:          distribution([]int64{10}, 0), GenerationNormalizedOutput: distribution([]int64{20}, 0),
 		SemanticRawOutput: distribution([]int64{30}, 0), SemanticNormalizedOutput: distribution([]int64{40}, 0),
 	}
 	base.Truncated = true
@@ -83,7 +105,7 @@ func TestBuildReportKeepsOnlyTenLargestRuns(t *testing.T) {
 	values := measurements{}
 	for index := 1; index <= 12; index++ {
 		values.runBSON = append(values.runBSON, int64(index))
-		values.runBSONWithoutOutputs = append(values.runBSONWithoutOutputs, int64(index))
+		values.runBSONWithoutOutputPayloads = append(values.runBSONWithoutOutputPayloads, int64(index))
 		values.largestRuns = append(values.largestRuns, runSize{RunID: string(rune('a' + index - 1)), BSONBytes: int64(index)})
 	}
 	got := buildReport(time.Now(), "runs", 12, values)
