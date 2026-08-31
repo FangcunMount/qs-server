@@ -32,4 +32,10 @@ reject_mapping "9445:8443"
 reject_mapping "0.0.0.0:9445:8443"
 reject_mapping "9445:8443/tcp"
 
-echo "[OK] production apiserver host ports are loopback-only"
+stop_grace_count="$(grep -Fc 'stop_grace_period: 8m30s' "${compose_file}")"
+if [ "${stop_grace_count}" -ne 2 ]; then
+  echo "production apiserver and worker must both have an 8m30s graceful-stop budget" >&2
+  exit 1
+fi
+
+echo "[OK] production apiserver ports and AI evaluation drain budgets are safe"

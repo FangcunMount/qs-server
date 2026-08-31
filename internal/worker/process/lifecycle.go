@@ -78,6 +78,7 @@ func buildLifecycleDeps(resources resourceOutput, containerOutput containerOutpu
 }
 
 func runWorkerLifecycle(deps lifecycleDeps) {
+	log.Info("Draining worker subscribers before closing gRPC and database dependencies...")
 	lifecycle := processruntime.Lifecycle{}
 	lifecycle.AddShutdownHook("stop subscriber", deps.stopSubscriber)
 	lifecycle.AddShutdownHook("close grpc manager", deps.closeGRPCManager)

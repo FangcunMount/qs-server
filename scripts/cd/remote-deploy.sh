@@ -389,8 +389,19 @@ cleanup_old_backups() {
 
 stop_single_container() {
   if $SUDO docker ps -a --format '{{.Names}}' | grep -w "$CONTAINER_NAME" >/dev/null 2>&1; then
-    echo "Stopping existing container..."
-    $SUDO docker stop "$CONTAINER_NAME" || true
+    local stop_timeout_seconds="${CONTAINER_STOP_TIMEOUT_SECONDS:-}"
+    if [ -z "$stop_timeout_seconds" ]; then
+      case "$SERVICE" in
+        apiserver|worker) stop_timeout_seconds=510 ;;
+        *) stop_timeout_seconds=60 ;;
+      esac
+    fi
+    if ! [[ "$stop_timeout_seconds" =~ ^[0-9]+$ ]] || [ "$stop_timeout_seconds" -lt 1 ]; then
+      echo "CONTAINER_STOP_TIMEOUT_SECONDS must be a positive integer, got: ${stop_timeout_seconds}" >&2
+      exit 1
+    fi
+    echo "Stopping existing container with a ${stop_timeout_seconds}s graceful-drain budget..."
+    $SUDO docker stop --time "$stop_timeout_seconds" "$CONTAINER_NAME" || true
     $SUDO docker rm "$CONTAINER_NAME" || true
   fi
 }

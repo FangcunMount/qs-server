@@ -7,6 +7,9 @@ services:
     image: ${DOCKER_IMAGE_QS_APISERVER:-ghcr.io/fangcunmount/qs-apiserver:latest}
     container_name: qs-apiserver
     restart: unless-stopped
+    # Must exceed the 8m Prompt-evaluation attempt lease so GracefulStop can
+    # persist an in-flight Provider result before Docker sends SIGKILL.
+    stop_grace_period: 8m30s
     # apiserver 4C/4G；GOMEMLIMIT 取容器内存 75%。
     mem_limit: "4096m"
     cpus: "4"
@@ -85,6 +88,9 @@ services:
   runtime:
     image: ${DOCKER_IMAGE_QS_WORKER:-ghcr.io/fangcunmount/qs-worker:latest}
     restart: unless-stopped
+    # Worker Stop waits for NSQ handlers (including the 7m AI gRPC deadline)
+    # before closing clients and persistence resources.
+    stop_grace_period: 8m30s
     # serverD 独立部署（compose -p qs-worker）；此处为资源模板
     mem_limit: "768m"
     cpus: "1.0"
