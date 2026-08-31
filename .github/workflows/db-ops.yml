@@ -13,6 +13,7 @@ on:
           - validate
           - restore
           - status
+          - audit-ai-evaluation-size
           - preflight-redis-control
           - govern-presentation
           - govern-template-release
@@ -1000,6 +1001,118 @@ jobs:
           find "$MONGO_BACKUP_DIR" -maxdepth 1 -type f \
             \( -name 'qs_mongodb_backup_*.archive.gz' -o -name 'qs_mongodb_backup_*.archive.gz.sha256' -o -name '*.partial' \) \
             -print | LC_ALL=C sort -r | head -10
+
+  mongodb-ai-evaluation-size-audit:
+    name: MongoDB AI Evaluation Size Audit
+    if: github.event.inputs.operation == 'audit-ai-evaluation-size' && github.event.inputs.database == 'mongodb'
+    runs-on:
+      group: qlume
+      labels: [self-hosted, macOS, ARM64, ops]
+    timeout-minutes: 30
+    environment: production
+    steps:
+      - name: Checkout immutable read-only audit tool
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build static Linux audit binary
+        env:
+          AUDIT_BINARY: ai-evaluation-size-audit-${{ github.run_id }}
+        run: |
+          set -Eeuo pipefail
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
+            -o "$AUDIT_BINARY" \
+            ./scripts/oneoff/audit_ai_explanation_prompt_evaluation_size
+          test -x "$AUDIT_BINARY"
+          shasum -a 256 "$AUDIT_BINARY"
+
+      - name: Validate SSH configuration
+        env:
+          SVRA_HOST: ${{ vars.SVRA_HOST }}
+          SVRA_USERNAME: ${{ vars.SVRA_USERNAME }}
+          SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_FINGERPRINT: ${{ vars.SVRA_SSH_FINGERPRINT }}
+        run: |
+          set -Eeuo pipefail
+          : "${SVRA_HOST:?SVRA_HOST is empty}"
+          : "${SVRA_USERNAME:?SVRA_USERNAME is empty}"
+          : "${SVRA_SSH_KEY:?SVRA_SSH_KEY is empty}"
+          : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
+
+      - name: Upload immutable audit binary to serverA
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          source: ai-evaluation-size-audit-${{ github.run_id }}
+          target: /tmp
+
+      - name: Measure Prompt evaluation BSON and output distributions
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          command_timeout: 15m
+          envs: MONGO_HOST,MONGO_PORT,MONGO_USERNAME,MONGO_PASSWORD,MONGO_DB,MONGO_AUTH_DB
+          script: |
+            set -Eeuo pipefail
+            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+
+            : "${MONGO_HOST:?MONGO_HOST is empty}"
+            : "${MONGO_PORT:?MONGO_PORT is empty}"
+            : "${MONGO_USERNAME:?MONGO_USERNAME is empty}"
+            : "${MONGO_PASSWORD:?MONGO_PASSWORD is empty}"
+            : "${MONGO_DB:?MONGO_DB is empty}"
+            : "${MONGO_AUTH_DB:?MONGO_AUTH_DB is empty}"
+
+            AUDIT_BINARY="/tmp/ai-evaluation-size-audit-${{ github.run_id }}"
+            AUDIT_CONTAINER="qs-ai-evaluation-size-audit-${{ github.run_id }}"
+            cleanup_ai_evaluation_size_audit() {
+              sudo docker rm -f "$AUDIT_CONTAINER" >/dev/null 2>&1 || true
+              rm -f -- "$AUDIT_BINARY"
+            }
+            trap cleanup_ai_evaluation_size_audit EXIT
+
+            test -f "$AUDIT_BINARY"
+            chmod 0755 "$AUDIT_BINARY"
+            sudo docker network inspect infra-network >/dev/null
+            sudo docker run --rm \
+              --name "$AUDIT_CONTAINER" \
+              --label com.fangcunmount.qs-server.operation=ai-evaluation-size-audit \
+              --network infra-network \
+              --read-only \
+              --tmpfs /tmp:rw,noexec,nosuid,size=16m \
+              --cap-drop ALL \
+              --security-opt no-new-privileges:true \
+              --user 65534:65534 \
+              -v "$AUDIT_BINARY:/audit:ro" \
+              -e MONGO_HOST="$MONGO_HOST" \
+              -e MONGO_PORT="$MONGO_PORT" \
+              -e MONGO_USERNAME="$MONGO_USERNAME" \
+              -e MONGO_PASSWORD="$MONGO_PASSWORD" \
+              -e MONGO_DB="$MONGO_DB" \
+              -e MONGO_AUTH_DB="$MONGO_AUTH_DB" \
+              --entrypoint /audit \
+              mongo:7.0 \
+              --json --max-runs=0 --timeout=10m
+        env:
+          MONGO_HOST: ${{ secrets.MONGODB_HOST }}
+          MONGO_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
+          MONGO_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGO_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGO_DB: ${{ secrets.MONGODB_DBNAME }}
+          MONGO_AUTH_DB: admin
 
   mongodb-presentation-governance:
     name: MongoDB Interpretation Presentation Governance

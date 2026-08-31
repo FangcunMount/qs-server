@@ -8,8 +8,10 @@ import (
 	"flag"
 	"fmt"
 	"math"
+	"net"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,11 +29,16 @@ const (
 )
 
 type config struct {
-	mongoURI string
-	mongoDB  string
-	maxRuns  int64
-	jsonOut  bool
-	timeout  time.Duration
+	mongoURI      string
+	mongoHost     string
+	mongoPort     string
+	mongoUsername string
+	mongoPassword string
+	mongoAuthDB   string
+	mongoDB       string
+	maxRuns       int64
+	jsonOut       bool
+	timeout       time.Duration
 }
 
 type sizeDistribution struct {
@@ -99,13 +106,13 @@ type measurements struct {
 
 func main() {
 	cfg := parseFlags()
-	if strings.TrimSpace(cfg.mongoURI) == "" {
-		fmt.Fprintln(os.Stderr, "AI explanation Prompt evaluation size audit failed: --mongo-uri is required (or set MONGO_URI)")
-		os.Exit(1)
+	clientOptions, err := mongoClientOptions(cfg)
+	if err != nil {
+		fail("validate mongo configuration", err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
 	defer cancel()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.mongoURI))
+	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
 		fail("connect mongo", err)
 	}
@@ -135,6 +142,11 @@ func main() {
 func parseFlags() config {
 	var cfg config
 	flag.StringVar(&cfg.mongoURI, "mongo-uri", os.Getenv("MONGO_URI"), "MongoDB URI")
+	flag.StringVar(&cfg.mongoHost, "mongo-host", os.Getenv("MONGO_HOST"), "MongoDB host when MONGO_URI is not used")
+	flag.StringVar(&cfg.mongoPort, "mongo-port", envOr("MONGO_PORT", "27017"), "MongoDB port when MONGO_URI is not used")
+	flag.StringVar(&cfg.mongoUsername, "mongo-username", os.Getenv("MONGO_USERNAME"), "MongoDB username when MONGO_URI is not used")
+	flag.StringVar(&cfg.mongoPassword, "mongo-password", os.Getenv("MONGO_PASSWORD"), "MongoDB password when MONGO_URI is not used; prefer the environment variable")
+	flag.StringVar(&cfg.mongoAuthDB, "mongo-auth-db", envOr("MONGO_AUTH_DB", "admin"), "MongoDB authentication database when MONGO_URI is not used")
 	flag.StringVar(&cfg.mongoDB, "mongo-db", envOr("MONGO_DB", "qs"), "MongoDB database")
 	flag.Int64Var(&cfg.maxRuns, "max-runs", 1000, "maximum newest Runs to scan; 0 scans all")
 	flag.BoolVar(&cfg.jsonOut, "json", false, "emit machine-readable JSON")
@@ -145,6 +157,37 @@ func parseFlags() config {
 		os.Exit(1)
 	}
 	return cfg
+}
+
+func mongoClientOptions(cfg config) (*options.ClientOptions, error) {
+	if uri := strings.TrimSpace(cfg.mongoURI); uri != "" {
+		return options.Client().ApplyURI(uri), nil
+	}
+	host := strings.TrimSpace(cfg.mongoHost)
+	port := strings.TrimSpace(cfg.mongoPort)
+	username := strings.TrimSpace(cfg.mongoUsername)
+	authDB := strings.TrimSpace(cfg.mongoAuthDB)
+	if host == "" || port == "" {
+		return nil, fmt.Errorf("MONGO_URI or MONGO_HOST/MONGO_PORT is required")
+	}
+	if _, err := strconv.ParseUint(port, 10, 16); err != nil {
+		return nil, fmt.Errorf("mongo port is invalid")
+	}
+	if (username == "") != (cfg.mongoPassword == "") {
+		return nil, fmt.Errorf("mongo username and password must be provided together")
+	}
+	result := options.Client().SetHosts([]string{net.JoinHostPort(host, port)})
+	if username != "" {
+		if authDB == "" {
+			return nil, fmt.Errorf("mongo authentication database is required")
+		}
+		result.SetAuth(options.Credential{
+			AuthSource: authDB,
+			Username:   username,
+			Password:   cfg.mongoPassword,
+		})
+	}
+	return result, nil
 }
 
 func envOr(key, fallback string) string {

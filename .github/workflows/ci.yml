@@ -285,6 +285,9 @@ jobs:
       - name: Validate GitHub Action runtime contract
         run: bash scripts/cd/test-github-action-runtimes.sh
 
+      - name: Validate AI evaluation size audit contract
+        run: bash scripts/cd/test-ai-evaluation-size-audit-workflow.sh
+
       - name: Validate deployment shell scripts
         run: bash -n scripts/cd/*.sh
 

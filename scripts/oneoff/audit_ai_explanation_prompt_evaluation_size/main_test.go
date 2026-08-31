@@ -1,9 +1,38 @@
 package main
 
 import (
+	"reflect"
 	"testing"
 	"time"
 )
+
+func TestMongoClientOptionsSupportsProtectedSplitCredentials(t *testing.T) {
+	got, err := mongoClientOptions(config{
+		mongoHost: "mongodb", mongoPort: "27017", mongoUsername: "audit-user",
+		mongoPassword: "secret", mongoAuthDB: "admin",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got.Hosts, []string{"mongodb:27017"}) || got.Auth == nil ||
+		got.Auth.Username != "audit-user" || got.Auth.Password != "secret" || got.Auth.AuthSource != "admin" {
+		t.Fatalf("client options = %#v", got)
+	}
+}
+
+func TestMongoClientOptionsRejectsPartialOrInvalidEndpoint(t *testing.T) {
+	for name, cfg := range map[string]config{
+		"missing endpoint": {mongoPort: "27017"},
+		"invalid port":     {mongoHost: "mongodb", mongoPort: "not-a-port"},
+		"partial auth":     {mongoHost: "mongodb", mongoPort: "27017", mongoUsername: "audit-user"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := mongoClientOptions(cfg); err == nil {
+				t.Fatal("expected invalid Mongo configuration to fail closed")
+			}
+		})
+	}
+}
 
 func TestDistributionUsesNearestRankAndTracksMissing(t *testing.T) {
 	got := distribution([]int64{100, 20, 60, 40, 80}, 2)
