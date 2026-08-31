@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "3bb0dc80d1b92ebc5b7854022317da26cbfc5d8d",
+    "sha": "43d310d489cc0a5684af02fa011a13aeba2ef8e0",
     "verified_on": "2026-09-01"
   },
   "status_policy": {
@@ -8513,12 +8513,14 @@
       "fact_sources": [],
       "verification": [],
       "production_evidence": {
-        "level": "none",
-        "refs": [],
-        "deployed_sha": null,
-        "observed_at": null,
+        "level": "current",
+        "refs": [
+          "https://github.com/FangcunMount/qs-server/actions/runs/33443439888"
+        ],
+        "deployed_sha": "f6bb4c7e30728d4416547741c053ae837c1de23a",
+        "observed_at": "2026-08-31",
         "limitations": [
-          "The read-only audit tool has package tests, but no authorized production Mongo size sample has been recorded."
+          "The production history contained 525 generation executions but no semantic execution sample, so the complete v2 projection remains unavailable."
         ]
       },
       "gaps": [
@@ -8526,8 +8528,8 @@
           "id": "DOC-CLOSURE-178",
           "kind": "verification",
           "severity": "medium",
-          "summary": "Production BSON and output-size distributions have not yet been collected.",
-          "exit_criteria": "Run the read-only audit against the authorized production collection, retain the bounded output and review the single-document capacity decision."
+          "summary": "The production audit has no semantic execution sample for a complete v2 size projection.",
+          "exit_criteria": "After the first complete v2 run, repeat the read-only audit and review semantic output sizes and the single-document capacity decision."
         }
       ]
     },
