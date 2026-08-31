@@ -8846,6 +8846,73 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v2/interpretation/ai-explanation/legacy-prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}/rechecks": {
+            "post": {
+                "description": "创建独立诊断证据；不覆盖源 v1 Run，不参与 v2 发布门禁，最多调用两次 Provider。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Explanation-Administration"
+                ],
+                "summary": "重新测评一条 AI 解读 Prompt 评测记录",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "源评测运行 ID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "合成 case ID",
+                        "name": "case_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "源重复序号",
+                        "name": "attempt",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "复测成本确认与审计理由",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.AIExplanationAttemptRecheckRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AIExplanationAttemptRecheckWire"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v2/interpretation/ai-explanation/prompt-evaluations": {
             "post": {
                 "description": "冻结当前 execution/gate policy，确认最坏 140 次 Provider 调用，并在一个事务中预留容量、写 Evidence 和首个 Outbox 事件。",

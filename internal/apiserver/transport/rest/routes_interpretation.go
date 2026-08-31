@@ -73,6 +73,7 @@ func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGr
 	ai.GET("/prompt-evaluations/:run_id/executions/:execution_id/output", aiHandler.FindEvaluationV2Output)
 	governance := ai.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
 	governance.POST("/prompt-evaluations", aiHandler.StartEvaluationV2)
+	governance.POST("/legacy-prompt-evaluations/:run_id/attempts/:case_id/:attempt/rechecks", aiHandler.StartAttemptRecheck)
 	governance.POST("/prompt-evaluations/:run_id/reviews", aiHandler.RecordReviewV2)
 	governance.POST("/prompt-evaluations/:run_id/finalize", aiHandler.FinalizeEvaluationV2)
 	governance.POST("/prompt-evaluations/:run_id/result-unknown/resolve", aiHandler.ResolveResultUnknownV2)

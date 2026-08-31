@@ -29,14 +29,7 @@ type AIExplanationAutomationService struct {
 }
 
 type PromptEvaluationStepRunner interface {
-	RunStepV1(context.Context, aievaluation.OnlineStepCommand) (*aievaluation.OnlineStepResult, error)
-}
-
-type promptEvaluationRecheckRunner interface {
 	RunRecheckV1(context.Context, aievaluation.RunRecheckCommand) (*aievaluation.OnlineRecheckResult, error)
-}
-
-type promptEvaluationV2StepRunner interface {
 	RunStepV2(context.Context, aievaluation.OnlineStepV2Command) (*aievaluation.OnlineStepV2Result, error)
 }
 
@@ -68,11 +61,7 @@ func (s *AIExplanationAutomationService) ExecutePromptEvaluationStep(ctx context
 		if parseErr != nil || recheckID.IsZero() {
 			return nil, status.Error(codes.InvalidArgument, "recheck_id is invalid")
 		}
-		recheckRunner, supported := s.evaluationRunner.(promptEvaluationRecheckRunner)
-		if !supported {
-			return nil, status.Error(codes.FailedPrecondition, "AI explanation prompt evaluation recheck is not configured")
-		}
-		result, runErr := recheckRunner.RunRecheckV1(ctx, aievaluation.RunRecheckCommand{
+		result, runErr := s.evaluationRunner.RunRecheckV1(ctx, aievaluation.RunRecheckCommand{
 			RecheckID: recheckID, SourceRunID: runID, CaseID: strings.TrimSpace(request.GetCaseId()), Attempt: int(request.GetAttempt()),
 			Owner: eventID, RequestedOrg: request.GetOrgId(), RequestedBy: strings.TrimSpace(request.GetRequestedBy()),
 		})
@@ -89,21 +78,7 @@ func (s *AIExplanationAutomationService) ExecutePromptEvaluationStep(ctx context
 		}
 		return mapPromptEvaluationRecheckResult(request, result)
 	}
-	result, err := s.evaluationRunner.RunStepV1(ctx, aievaluation.OnlineStepCommand{
-		RunID: runID, CaseID: strings.TrimSpace(request.GetCaseId()), Attempt: int(request.GetAttempt()),
-		Owner: eventID, RequestedOrgID: request.GetOrgId(), RequestedBy: strings.TrimSpace(request.GetRequestedBy()),
-	})
-	if err != nil {
-		if errors.Is(err, aievaluation.ErrAttemptExecutionBusy) {
-			return nil, status.Error(codes.Aborted, "prompt evaluation attempt is leased")
-		}
-		slog.ErrorContext(ctx, "AI explanation prompt evaluation step failed",
-			slog.String("run_id", runID.String()), slog.String("case_id", request.GetCaseId()),
-			slog.Int("attempt", int(request.GetAttempt())), slog.String("event_id", eventID), slog.String("error", err.Error()),
-		)
-		return nil, status.Error(codes.Internal, "AI explanation prompt evaluation step failed")
-	}
-	return mapPromptEvaluationStepResult(request, result)
+	return nil, status.Error(codes.FailedPrecondition, "legacy prompt evaluation Run execution is read-only")
 }
 
 func (s *AIExplanationAutomationService) executePromptEvaluationStepV2(
@@ -112,17 +87,13 @@ func (s *AIExplanationAutomationService) executePromptEvaluationStepV2(
 	runID meta.ID,
 	eventID string,
 ) (*interpretationpb.ExecutePromptEvaluationStepResponse, error) {
-	runner, supported := s.evaluationRunner.(promptEvaluationV2StepRunner)
-	if !supported {
-		return nil, status.Error(codes.FailedPrecondition, "AI explanation prompt evaluation v2 is not configured")
-	}
 	command := aievaluation.OnlineStepV2Command{
 		RunID: runID, ExecutionKind: domainevaluation.EvidenceExecutionKind(strings.TrimSpace(request.GetExecutionKind())),
 		CaseID: strings.TrimSpace(request.GetCaseId()), SlotOrdinal: int(request.GetSlotOrdinal()),
 		CandidateID: strings.TrimSpace(request.GetCandidateId()), ExecutionOrdinal: int(request.GetExecutionOrdinal()),
 		Owner: eventID, RequestedOrgID: request.GetOrgId(), RequestedBy: strings.TrimSpace(request.GetRequestedBy()),
 	}
-	result, err := runner.RunStepV2(ctx, command)
+	result, err := s.evaluationRunner.RunStepV2(ctx, command)
 	if err != nil {
 		if errors.Is(err, aievaluation.ErrAttemptExecutionBusy) {
 			return nil, status.Error(codes.Aborted, "prompt evaluation v2 execution is leased")

@@ -146,6 +146,13 @@ func TestAIExplanationAdministrationRoutesSeparateAuditReadsFromGovernanceWrites
 	if v2AuditStart.Code != http.StatusForbidden || service.startV2Calls != 0 {
 		t.Fatalf("v2 audit start status/calls = %d/%d body=%s", v2AuditStart.Code, service.startV2Calls, v2AuditStart.Body.String())
 	}
+	v2AuditRecheck := httptest.NewRecorder()
+	v2AuditRecheckRequest := httptest.NewRequest(http.MethodPost, "/internal/v2/interpretation/ai-explanation/legacy-prompt-evaluations/9/attempts/PROMPT-EVAL-002/3/rechecks", bytes.NewBufferString(`{"confirm":true,"expected_provider_invocations":2,"reason":"verify one failed record"}`))
+	v2AuditRecheckRequest.Header.Set("Content-Type", "application/json")
+	v2AuditEngine.ServeHTTP(v2AuditRecheck, v2AuditRecheckRequest)
+	if v2AuditRecheck.Code != http.StatusForbidden || service.recheckCalls != 0 {
+		t.Fatalf("v2 audit recheck status/calls = %d/%d body=%s", v2AuditRecheck.Code, service.recheckCalls, v2AuditRecheck.Body.String())
+	}
 
 	v2AdminEngine := gin.New()
 	v2AdminEngine.Use(aiRouteSnapshotMiddleware(true))
@@ -156,6 +163,13 @@ func TestAIExplanationAdministrationRoutesSeparateAuditReadsFromGovernanceWrites
 	v2AdminEngine.ServeHTTP(v2Start, v2StartRequest)
 	if v2Start.Code != http.StatusAccepted || service.startV2Calls != 1 {
 		t.Fatalf("v2 admin start status/calls = %d/%d body=%s", v2Start.Code, service.startV2Calls, v2Start.Body.String())
+	}
+	v2Recheck := httptest.NewRecorder()
+	v2RecheckRequest := httptest.NewRequest(http.MethodPost, "/internal/v2/interpretation/ai-explanation/legacy-prompt-evaluations/9/attempts/PROMPT-EVAL-002/3/rechecks", bytes.NewBufferString(`{"confirm":true,"expected_provider_invocations":2,"reason":"verify one failed record"}`))
+	v2RecheckRequest.Header.Set("Content-Type", "application/json")
+	v2AdminEngine.ServeHTTP(v2Recheck, v2RecheckRequest)
+	if v2Recheck.Code != http.StatusAccepted || service.recheckCalls != 1 {
+		t.Fatalf("v2 admin recheck status/calls = %d/%d body=%s", v2Recheck.Code, service.recheckCalls, v2Recheck.Body.String())
 	}
 }
 
@@ -189,6 +203,7 @@ type routeAIAdministrationStub struct {
 	profileListCalls         int
 	findV2Calls              int
 	startV2Calls             int
+	recheckCalls             int
 }
 
 func (s *routeAIAdministrationStub) FindEvaluationCapacity(context.Context, aiexplanationadministration.Actor) (*aiexplanationadministration.EvaluationCapacity, error) {
@@ -251,7 +266,8 @@ func (s *routeAIAdministrationStub) RecordReview(context.Context, aiexplanationa
 func (s *routeAIAdministrationStub) FinalizeEvaluation(context.Context, aiexplanationadministration.Actor, meta.ID, string) (*appevaluation.ReviewRun, error) {
 	return s.run, nil
 }
-func (*routeAIAdministrationStub) StartEvaluationRecheck(context.Context, aiexplanationadministration.Actor, meta.ID, string, int, aiexplanationadministration.StartEvaluationRecheckCommand) (*domainevaluation.PromptEvaluationRecheck, error) {
+func (s *routeAIAdministrationStub) StartEvaluationRecheck(context.Context, aiexplanationadministration.Actor, meta.ID, string, int, aiexplanationadministration.StartEvaluationRecheckCommand) (*domainevaluation.PromptEvaluationRecheck, error) {
+	s.recheckCalls++
 	return nil, nil
 }
 func (*routeAIAdministrationStub) ListEvaluationRechecks(context.Context, aiexplanationadministration.Actor, meta.ID, string, int, int) ([]*domainevaluation.PromptEvaluationRecheck, error) {

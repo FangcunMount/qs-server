@@ -9094,6 +9094,65 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-explanation/legacy-prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}/rechecks:
+    post:
+      tags:
+      - AI-Explanation-Administration
+      summary: 重新测评一条 AI 解读 Prompt 评测记录
+      description: 创建独立诊断证据；不覆盖源 v1 Run，不参与 v2 发布门禁，最多调用两次 Provider。
+      operationId: 重新测评一条AI解读Prompt评测记录
+      parameters:
+      - type: string
+        description: 源评测运行 ID
+        name: run_id
+        in: path
+        required: true
+      - type: string
+        description: 合成 case ID
+        name: case_id
+        in: path
+        required: true
+      - type: integer
+        description: 源重复序号
+        name: attempt
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/handler.AIExplanationAttemptRecheckRequest'
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/handler.AIExplanationAttemptRecheckWire'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /internal/v2/interpretation/ai-explanation/prompt-evaluations:
     post:
       tags:

@@ -86,20 +86,21 @@ func TestAIExplanationAdministrationOpenAPIContract(t *testing.T) {
 
 	spec := loadOpenAPISpec(t, "../../../../api/rest/apiserver.yaml")
 	for path, method := range map[string]string{
-		"/internal/v1/interpretation/ai-explanation/prompt-evaluation-capacity":                                   "get",
-		"/internal/v1/interpretation/ai-explanation/prompt-evaluations":                                           "get",
-		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}":                                  "get",
-		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}":     "get",
-		"/internal/v2/interpretation/ai-explanation/prompt-evaluations":                                           "post",
-		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}":                                  "get",
-		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/executions/{execution_id}/output": "get",
-		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/reviews":                          "post",
-		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/finalize":                         "post",
-		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/result-unknown/resolve":           "post",
-		"/internal/v1/interpretation/ai-explanation/profiles":                                                     "post",
-		"/internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}":                     "get",
-		"/internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}/publish":             "post",
-		"/internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}/disable":             "post",
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluation-capacity":                                               "get",
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluations":                                                       "get",
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}":                                              "get",
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}":                 "get",
+		"/internal/v2/interpretation/ai-explanation/prompt-evaluations":                                                       "post",
+		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}":                                              "get",
+		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/executions/{execution_id}/output":             "get",
+		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/reviews":                                      "post",
+		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/finalize":                                     "post",
+		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/result-unknown/resolve":                       "post",
+		"/internal/v2/interpretation/ai-explanation/legacy-prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}/rechecks": "post",
+		"/internal/v1/interpretation/ai-explanation/profiles":                                                                 "post",
+		"/internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}":                                 "get",
+		"/internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}/publish":                         "post",
+		"/internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}/disable":                         "post",
 	} {
 		assertOpenAPIOperation(t, spec, path, method)
 		operation := spec.Paths[path][method].(map[string]any)

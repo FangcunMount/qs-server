@@ -726,7 +726,7 @@ func (h *AIExplanationAdministrationHandler) FindAttempt(c *gin.Context) {
 
 // StartAttemptRecheck godoc
 // @Summary 重新测评一条 AI 解读 Prompt 评测记录
-// @Description 创建独立诊断证据；不覆盖源记录，不参与 35+35 发布门禁，最多调用两次 Provider。
+// @Description 创建独立诊断证据；不覆盖源 v1 Run，不参与 v2 发布门禁，最多调用两次 Provider。
 // @Tags AI-Explanation-Administration
 // @Accept json
 // @Produce json
@@ -735,6 +735,7 @@ func (h *AIExplanationAdministrationHandler) FindAttempt(c *gin.Context) {
 // @Param attempt path int true "源重复序号"
 // @Param request body AIExplanationAttemptRecheckRequest true "复测成本确认与审计理由"
 // @Success 202 {object} core.Response{data=AIExplanationAttemptRecheckWire}
+// @Router /internal/v2/interpretation/ai-explanation/legacy-prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}/rechecks [post]
 func (h *AIExplanationAdministrationHandler) StartAttemptRecheck(c *gin.Context) {
 	actor, runID, attempt, ok := h.actorAndAttemptAddress(c)
 	if !ok {
