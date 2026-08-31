@@ -1,0 +1,279 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/FangcunMount/qs-server/main/api/schema/interpretation/ai-explanation-release-gate-policy-v1.schema.json",
+  "title": "AIExplanationReleaseGatePolicy v1",
+  "description": "Immutable G1-G5 release decision policy for one AI explanation evaluation run. Reliability thresholds are explicit configuration and have no hidden defaults.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "version",
+    "release_identity",
+    "sample_completeness",
+    "execution_reliability",
+    "candidate_quality",
+    "human_accountability",
+    "approval_rule"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ai-explanation-release-gate-policy/v1"
+    },
+    "policy_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "version": {
+      "$ref": "#/$defs/version"
+    },
+    "release_identity": {
+      "$ref": "#/$defs/releaseIdentityGate"
+    },
+    "sample_completeness": {
+      "$ref": "#/$defs/sampleCompletenessGate"
+    },
+    "execution_reliability": {
+      "$ref": "#/$defs/executionReliabilityGate"
+    },
+    "candidate_quality": {
+      "$ref": "#/$defs/candidateQualityGate"
+    },
+    "human_accountability": {
+      "$ref": "#/$defs/humanAccountabilityGate"
+    },
+    "approval_rule": {
+      "const": "all_gates_must_pass"
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9_-]*$"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^v[1-9][0-9]*$"
+    },
+    "rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "releaseIdentityGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_components",
+        "require_fingerprint_match"
+      ],
+      "properties": {
+        "required_components": {
+          "type": "array",
+          "minItems": 10,
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "suite",
+              "prompt",
+              "profile",
+              "input_schema",
+              "output_schema",
+              "generation_route",
+              "semantic_prompt",
+              "semantic_output_schema",
+              "semantic_route",
+              "execution_policy"
+            ]
+          }
+        },
+        "require_fingerprint_match": {
+          "const": true
+        }
+      }
+    },
+    "sampleCompletenessGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_generation_cases",
+        "required_candidates_per_case",
+        "required_candidate_count",
+        "required_semantic_receipts_per_candidate",
+        "reject_unresolved_result_unknown",
+        "reject_budget_overrun"
+      ],
+      "properties": {
+        "required_generation_cases": {
+          "const": 7
+        },
+        "required_candidates_per_case": {
+          "const": 5
+        },
+        "required_candidate_count": {
+          "const": 35
+        },
+        "required_semantic_receipts_per_candidate": {
+          "const": 1
+        },
+        "reject_unresolved_result_unknown": {
+          "const": true
+        },
+        "reject_budget_overrun": {
+          "const": true
+        }
+      }
+    },
+    "executionReliabilityGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "min_infrastructure_success_rate",
+        "min_generation_contract_conformance_rate",
+        "min_semantic_execution_success_rate",
+        "infrastructure_denominator",
+        "generation_contract_denominator",
+        "semantic_execution_denominator",
+        "include_result_unknown_in_infrastructure_denominator"
+      ],
+      "properties": {
+        "min_infrastructure_success_rate": {
+          "$ref": "#/$defs/rate"
+        },
+        "min_generation_contract_conformance_rate": {
+          "$ref": "#/$defs/rate"
+        },
+        "min_semantic_execution_success_rate": {
+          "$ref": "#/$defs/rate"
+        },
+        "infrastructure_denominator": {
+          "const": "dispatched_provider_executions"
+        },
+        "generation_contract_denominator": {
+          "const": "definite_output_generation_executions"
+        },
+        "semantic_execution_denominator": {
+          "const": "dispatched_semantic_executions"
+        },
+        "include_result_unknown_in_infrastructure_denominator": {
+          "const": true
+        }
+      }
+    },
+    "semanticScores": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "faithfulness",
+        "cross_dimension_quality",
+        "suggestion_actionability",
+        "audience_clarity",
+        "concision"
+      ],
+      "properties": {
+        "faithfulness": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "cross_dimension_quality": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "suggestion_actionability": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "audience_clarity": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "concision": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 5
+        }
+      }
+    },
+    "candidateQualityGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "min_assertion_passes_per_case",
+        "min_assertion_passes_overall",
+        "minimum_semantic_scores",
+        "minimum_semantic_averages",
+        "hard_assertion_failure_rejects_release",
+        "quality_failure_replacement_allowed"
+      ],
+      "properties": {
+        "min_assertion_passes_per_case": {
+          "const": 4
+        },
+        "min_assertion_passes_overall": {
+          "const": 32
+        },
+        "minimum_semantic_scores": {
+          "$ref": "#/$defs/semanticScores"
+        },
+        "minimum_semantic_averages": {
+          "$ref": "#/$defs/semanticScores"
+        },
+        "hard_assertion_failure_rejects_release": {
+          "const": true
+        },
+        "quality_failure_replacement_allowed": {
+          "const": false
+        }
+      }
+    },
+    "humanAccountabilityGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_roles",
+        "required_reviews_per_candidate",
+        "required_review_count",
+        "require_distinct_reviewers_per_candidate",
+        "require_reason",
+        "any_rejection_rejects_release"
+      ],
+      "properties": {
+        "required_roles": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "assessment_semantics",
+              "safety_product"
+            ]
+          }
+        },
+        "required_reviews_per_candidate": {
+          "const": 2
+        },
+        "required_review_count": {
+          "const": 70
+        },
+        "require_distinct_reviewers_per_candidate": {
+          "const": true
+        },
+        "require_reason": {
+          "const": true
+        },
+        "any_rejection_rejects_release": {
+          "const": true
+        }
+      }
+    }
+  }
+}

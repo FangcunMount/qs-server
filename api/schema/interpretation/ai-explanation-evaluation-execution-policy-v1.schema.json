@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/FangcunMount/qs-server/main/api/schema/interpretation/ai-explanation-evaluation-execution-policy-v1.schema.json",
+  "title": "AIExplanationEvaluationExecutionPolicy v1",
+  "description": "Immutable execution and recovery limits for one AI explanation release evaluation. This policy controls evidence collection, not participant generation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "version",
+    "slot_policy",
+    "generation_budget",
+    "semantic_budget",
+    "recovery_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ai-explanation-evaluation-execution-policy/v1"
+    },
+    "policy_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "version": {
+      "$ref": "#/$defs/version"
+    },
+    "slot_policy": {
+      "$ref": "#/$defs/slotPolicy"
+    },
+    "generation_budget": {
+      "$ref": "#/$defs/generationBudget"
+    },
+    "semantic_budget": {
+      "$ref": "#/$defs/semanticBudget"
+    },
+    "recovery_policy": {
+      "$ref": "#/$defs/recoveryPolicy"
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9_-]*$"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^v[1-9][0-9]*$"
+    },
+    "stageCode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "code"
+      ],
+      "properties": {
+        "stage": {
+          "enum": [
+            "generation_execution",
+            "output_validation",
+            "deterministic_validation",
+            "semantic_evaluation",
+            "human_review",
+            "run_governance"
+          ]
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-z][a-z0-9_]*$"
+        }
+      }
+    },
+    "slotPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_generation_cases",
+        "required_candidates_per_case",
+        "required_preflight_cases",
+        "candidate_selection"
+      ],
+      "properties": {
+        "required_generation_cases": {
+          "const": 7
+        },
+        "required_candidates_per_case": {
+          "const": 5
+        },
+        "required_preflight_cases": {
+          "const": 1
+        },
+        "candidate_selection": {
+          "const": "first_contract_conformant_execution"
+        }
+      }
+    },
+    "generationBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_executions_per_case",
+        "max_executions_per_run"
+      ],
+      "properties": {
+        "max_executions_per_case": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 32
+        },
+        "max_executions_per_run": {
+          "type": "integer",
+          "minimum": 35,
+          "maximum": 224
+        }
+      }
+    },
+    "semanticBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_executions_per_candidate",
+        "max_executions_per_run"
+      ],
+      "properties": {
+        "max_executions_per_candidate": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "max_executions_per_run": {
+          "type": "integer",
+          "minimum": 35,
+          "maximum": 280
+        }
+      }
+    },
+    "recoveryPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "auto_retryable_stage_codes",
+        "manual_recovery_stage_codes",
+        "result_unknown_requires_manual_acknowledgement",
+        "quality_failure_replacement_allowed",
+        "semantic_failure_regenerates_candidate"
+      ],
+      "properties": {
+        "auto_retryable_stage_codes": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/stageCode"
+          }
+        },
+        "manual_recovery_stage_codes": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/stageCode"
+          }
+        },
+        "result_unknown_requires_manual_acknowledgement": {
+          "const": true
+        },
+        "quality_failure_replacement_allowed": {
+          "const": false
+        },
+        "semantic_failure_regenerates_candidate": {
+          "const": false
+        }
+      }
+    }
+  }
+}

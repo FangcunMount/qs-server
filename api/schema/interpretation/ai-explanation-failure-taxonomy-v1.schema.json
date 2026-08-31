@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/FangcunMount/qs-server/main/api/schema/interpretation/ai-explanation-failure-taxonomy-v1.schema.json",
+  "title": "AIExplanationFailureTaxonomy v1",
+  "description": "A stable classified failure record used by AI explanation evaluation evidence. Stage and code locate the failure; kind and disposition govern release semantics.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "stage",
+    "kind",
+    "code",
+    "retryable",
+    "result_unknown",
+    "disposition",
+    "safe_message",
+    "evidence_refs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ai-explanation-failure-taxonomy/v1"
+    },
+    "stage": {
+      "$ref": "#/$defs/stage"
+    },
+    "kind": {
+      "$ref": "#/$defs/kind"
+    },
+    "code": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "retryable": {
+      "type": "boolean"
+    },
+    "result_unknown": {
+      "type": "boolean"
+    },
+    "disposition": {
+      "$ref": "#/$defs/disposition"
+    },
+    "safe_message": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000,
+      "pattern": "^[^<>]*$"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]*$"
+      }
+    }
+  },
+  "$defs": {
+    "stage": {
+      "enum": [
+        "generation_execution",
+        "output_validation",
+        "deterministic_validation",
+        "semantic_evaluation",
+        "human_review",
+        "run_governance"
+      ]
+    },
+    "kind": {
+      "enum": [
+        "infrastructure_execution",
+        "result_unknown",
+        "provider_protocol",
+        "output_contract_conformance",
+        "semantic_execution",
+        "quality_failure"
+      ]
+    },
+    "disposition": {
+      "enum": [
+        "retry_generation",
+        "replace_generation",
+        "retry_semantic",
+        "manual_acknowledgement",
+        "retain_candidate",
+        "reject_release",
+        "cancel_run",
+        "no_action"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "result_unknown"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result_unknown": {
+            "const": true
+          },
+          "retryable": {
+            "const": false
+          },
+          "disposition": {
+            "const": "manual_acknowledgement"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "output_contract_conformance"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "stage": {
+            "const": "output_validation"
+          },
+          "result_unknown": {
+            "const": false
+          },
+          "retryable": {
+            "const": false
+          },
+          "disposition": {
+            "const": "replace_generation"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "semantic_execution"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "stage": {
+            "const": "semantic_evaluation"
+          },
+          "result_unknown": {
+            "const": false
+          },
+          "disposition": {
+            "const": "retry_semantic"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "quality_failure"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "retryable": {
+            "const": false
+          },
+          "result_unknown": {
+            "const": false
+          },
+          "disposition": {
+            "enum": [
+              "retain_candidate",
+              "reject_release"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "result_unknown": {
+            "const": true
+          }
+        },
+        "required": [
+          "result_unknown"
+        ]
+      },
+      "then": {
+        "properties": {
+          "kind": {
+            "const": "result_unknown"
+          }
+        }
+      }
+    }
+  ]
+}

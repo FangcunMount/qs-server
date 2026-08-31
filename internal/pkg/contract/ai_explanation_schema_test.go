@@ -1,6 +1,7 @@
 package contract_test
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	interpretationschema "github.com/FangcunMount/qs-server/api/schema/interpretation"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 const draft202012Schema = "https://json-schema.org/draft/2020-12/schema"
@@ -58,6 +62,38 @@ func TestAIExplanationSchemasDeclareStableStrictRoots(t *testing.T) {
 				"schema_version", "scores", "rationale", "decisions",
 			},
 		},
+		{
+			file:    "ai-explanation-evaluation-execution-policy-v1.schema.json",
+			id:      "https://raw.githubusercontent.com/FangcunMount/qs-server/main/api/schema/interpretation/ai-explanation-evaluation-execution-policy-v1.schema.json",
+			version: "ai-explanation-evaluation-execution-policy/v1",
+			required: []string{
+				"schema_version", "policy_id", "version", "slot_policy", "generation_budget", "semantic_budget", "recovery_policy",
+			},
+		},
+		{
+			file:    "ai-explanation-release-gate-policy-v1.schema.json",
+			id:      "https://raw.githubusercontent.com/FangcunMount/qs-server/main/api/schema/interpretation/ai-explanation-release-gate-policy-v1.schema.json",
+			version: "ai-explanation-release-gate-policy/v1",
+			required: []string{
+				"schema_version", "policy_id", "version", "release_identity", "sample_completeness", "execution_reliability", "candidate_quality", "human_accountability", "approval_rule",
+			},
+		},
+		{
+			file:    "ai-explanation-failure-taxonomy-v1.schema.json",
+			id:      "https://raw.githubusercontent.com/FangcunMount/qs-server/main/api/schema/interpretation/ai-explanation-failure-taxonomy-v1.schema.json",
+			version: "ai-explanation-failure-taxonomy/v1",
+			required: []string{
+				"schema_version", "stage", "kind", "code", "retryable", "result_unknown", "disposition", "safe_message", "evidence_refs",
+			},
+		},
+		{
+			file:    "prompt-evaluation-evidence-v2.schema.json",
+			id:      "https://raw.githubusercontent.com/FangcunMount/qs-server/main/api/schema/interpretation/prompt-evaluation-evidence-v2.schema.json",
+			version: "prompt-evaluation-evidence/v2",
+			required: []string{
+				"schema_version", "run_id", "release_identity", "execution_policy", "gate_policy", "status", "preflight_evidence", "slots", "generation_executions", "semantic_executions", "human_reviews", "unresolved_result_unknown_count", "result_unknown_resolutions", "state_transitions", "gate_result", "audit",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -71,6 +107,139 @@ func TestAIExplanationSchemasDeclareStableStrictRoots(t *testing.T) {
 			assertStringValue(t, objectAt(t, schema, "properties", "schema_version"), "const", tt.version)
 			assertRequiredFields(t, schema, tt.required)
 			assertAllTypedObjectsAreStrict(t, schema, tt.file)
+		})
+	}
+}
+
+func TestAIExplanationEvaluationExecutionPolicySeparatesSampleTargetsFromBudgets(t *testing.T) {
+	t.Parallel()
+
+	schema := loadAIExplanationSchema(t, "ai-explanation-evaluation-execution-policy-v1.schema.json")
+	slots := objectAt(t, schema, "$defs", "slotPolicy", "properties")
+	assertNumberValue(t, objectAt(t, slots, "required_generation_cases"), "const", 7)
+	assertNumberValue(t, objectAt(t, slots, "required_candidates_per_case"), "const", 5)
+	assertStringValue(t, objectAt(t, slots, "candidate_selection"), "const", "first_contract_conformant_execution")
+
+	recovery := objectAt(t, schema, "$defs", "recoveryPolicy", "properties")
+	assertBoolValue(t, objectAt(t, recovery, "result_unknown_requires_manual_acknowledgement"), "const", true)
+	assertBoolValue(t, objectAt(t, recovery, "quality_failure_replacement_allowed"), "const", false)
+	assertBoolValue(t, objectAt(t, recovery, "semantic_failure_regenerates_candidate"), "const", false)
+}
+
+func TestAIExplanationReleaseGatePolicyFreezesDenominatorsAndFiveGates(t *testing.T) {
+	t.Parallel()
+
+	schema := loadAIExplanationSchema(t, "ai-explanation-release-gate-policy-v1.schema.json")
+	reliability := objectAt(t, schema, "$defs", "executionReliabilityGate", "properties")
+	assertStringValue(t, objectAt(t, reliability, "infrastructure_denominator"), "const", "dispatched_provider_executions")
+	assertStringValue(t, objectAt(t, reliability, "generation_contract_denominator"), "const", "definite_output_generation_executions")
+	assertStringValue(t, objectAt(t, reliability, "semantic_execution_denominator"), "const", "dispatched_semantic_executions")
+	assertBoolValue(t, objectAt(t, reliability, "include_result_unknown_in_infrastructure_denominator"), "const", true)
+
+	quality := objectAt(t, schema, "$defs", "candidateQualityGate", "properties")
+	assertNumberValue(t, objectAt(t, quality, "min_assertion_passes_per_case"), "const", 4)
+	assertNumberValue(t, objectAt(t, quality, "min_assertion_passes_overall"), "const", 32)
+	assertBoolValue(t, objectAt(t, quality, "quality_failure_replacement_allowed"), "const", false)
+
+	human := objectAt(t, schema, "$defs", "humanAccountabilityGate", "properties")
+	assertNumberValue(t, objectAt(t, human, "required_review_count"), "const", 70)
+	assertBoolValue(t, objectAt(t, human, "require_distinct_reviewers_per_candidate"), "const", true)
+}
+
+func TestAIExplanationFailureTaxonomySeparatesFailureKindFromDisposition(t *testing.T) {
+	t.Parallel()
+
+	schema := loadAIExplanationSchema(t, "ai-explanation-failure-taxonomy-v1.schema.json")
+	assertStringEnum(t, objectAt(t, schema, "$defs", "kind"), []string{
+		"infrastructure_execution", "result_unknown", "provider_protocol", "output_contract_conformance", "semantic_execution", "quality_failure",
+	})
+	assertStringEnum(t, objectAt(t, schema, "$defs", "disposition"), []string{
+		"retry_generation", "replace_generation", "retry_semantic", "manual_acknowledgement", "retain_candidate", "reject_release", "cancel_run", "no_action",
+	})
+
+	compiled := compileSchemaForContractTest(t, "ai-explanation-failure-taxonomy-v1.schema.json", schema)
+	valid := map[string]any{
+		"schema_version": "ai-explanation-failure-taxonomy/v1",
+		"stage":          "semantic_evaluation", "kind": "semantic_execution", "code": "semantic_output_schema_invalid",
+		"retryable": true, "result_unknown": false, "disposition": "retry_semantic",
+		"safe_message": "AI 裁判输出不符合契约", "evidence_refs": []any{"semantic-execution:1"},
+	}
+	if err := compiled.Validate(valid); err != nil {
+		t.Fatalf("valid semantic failure: %v", err)
+	}
+	invalid := cloneJSONObject(t, valid)
+	invalid["disposition"] = "replace_generation"
+	if err := compiled.Validate(invalid); err == nil {
+		t.Fatal("semantic execution failure must not regenerate a candidate")
+	}
+}
+
+func TestPromptEvaluationEvidenceV2SeparatesSlotsAndExecutions(t *testing.T) {
+	t.Parallel()
+
+	schema := loadAIExplanationSchema(t, "prompt-evaluation-evidence-v2.schema.json")
+	slots := objectAt(t, schema, "properties", "slots")
+	assertNumberValue(t, slots, "minItems", 35)
+	assertNumberValue(t, slots, "maxItems", 35)
+	assertNumberValue(t, objectAt(t, schema, "properties", "generation_executions"), "maxItems", 224)
+	assertNumberValue(t, objectAt(t, schema, "properties", "semantic_executions"), "maxItems", 280)
+	assertNumberValue(t, objectAt(t, schema, "properties", "human_reviews"), "maxItems", 70)
+	preflight := objectAt(t, schema, "properties", "preflight_evidence")
+	assertNumberValue(t, preflight, "minItems", 1)
+	assertNumberValue(t, preflight, "maxItems", 1)
+	assertStringEnum(t, objectAt(t, schema, "properties", "status"), []string{
+		"requested", "collecting", "blocked", "awaiting_review", "approved", "rejected", "canceled",
+	})
+}
+
+func TestAIExplanationGovernanceSchemasAreEmbeddedAndCompilable(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		raw  func() []byte
+	}{
+		{"ai-explanation-evaluation-execution-policy-v1.schema.json", interpretationschema.AIExplanationEvaluationExecutionPolicyV1},
+		{"ai-explanation-release-gate-policy-v1.schema.json", interpretationschema.AIExplanationReleaseGatePolicyV1},
+		{"ai-explanation-failure-taxonomy-v1.schema.json", interpretationschema.AIExplanationFailureTaxonomyV1},
+		{"prompt-evaluation-evidence-v2.schema.json", interpretationschema.PromptEvaluationEvidenceV2},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			compiler := jsonschema.NewCompiler()
+			compiler.AssertFormat()
+			locations := make(map[string]string, len(tests))
+			for _, dependency := range tests {
+				raw := dependency.raw()
+				if len(raw) == 0 {
+					t.Fatalf("embedded schema %s is empty", dependency.name)
+				}
+				document, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
+				if err != nil {
+					t.Fatalf("decode embedded schema %s: %v", dependency.name, err)
+				}
+				object, ok := document.(map[string]any)
+				if !ok {
+					t.Fatalf("embedded schema %s root is %T", dependency.name, document)
+				}
+				location, ok := object["$id"].(string)
+				if !ok || location == "" {
+					t.Fatalf("embedded schema %s has no $id", dependency.name)
+				}
+				locations[dependency.name] = location
+				if err := compiler.AddResource(location, document); err != nil {
+					t.Fatalf("register embedded schema %s: %v", dependency.name, err)
+				}
+			}
+			if _, err := compiler.Compile(locations[tt.name]); err != nil {
+				t.Fatalf("compile embedded schema: %v", err)
+			}
+			raw := tt.raw()
+			raw[0] = 'x'
+			if bytes.Equal(raw, tt.raw()) {
+				t.Fatal("embedded schema accessor must return an isolated copy")
+			}
 		})
 	}
 }
@@ -194,10 +363,14 @@ func TestAIExplanationValidationMatrixNamesContractsAndRuntimeBoundary(t *testin
 		"ai-explanation-input-v1.schema.json",
 		"ai-explanation-output-v1.schema.json",
 		"ai-explanation-profile-v1.schema.json",
+		"ai-explanation-evaluation-execution-policy-v1.schema.json",
+		"ai-explanation-release-gate-policy-v1.schema.json",
+		"ai-explanation-failure-taxonomy-v1.schema.json",
+		"prompt-evaluation-evidence-v2.schema.json",
 		"current_assessment_only",
 		"RUNTIME-004",
 		"SEM-012",
-		"当前状态是 `planned`",
+		"旧 `AttemptRecord` 继续只读兼容",
 	} {
 		if !strings.Contains(text, required) {
 			t.Errorf("validation matrix must contain %q", required)
@@ -383,6 +556,33 @@ func loadJSONObject(t *testing.T, path string) map[string]any {
 		t.Fatalf("parse %s: %v", path, err)
 	}
 	return object
+}
+
+func compileSchemaForContractTest(t *testing.T, name string, document map[string]any) *jsonschema.Schema {
+	t.Helper()
+	compiler := jsonschema.NewCompiler()
+	compiler.AssertFormat()
+	if err := compiler.AddResource(name, document); err != nil {
+		t.Fatalf("register %s: %v", name, err)
+	}
+	compiled, err := compiler.Compile(name)
+	if err != nil {
+		t.Fatalf("compile %s: %v", name, err)
+	}
+	return compiled
+}
+
+func cloneJSONObject(t *testing.T, value map[string]any) map[string]any {
+	t.Helper()
+	raw, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("marshal JSON object clone: %v", err)
+	}
+	var cloned map[string]any
+	if err := json.Unmarshal(raw, &cloned); err != nil {
+		t.Fatalf("unmarshal JSON object clone: %v", err)
+	}
+	return cloned
 }
 
 func assertionTypesAt(t *testing.T, object map[string]any, key string) map[string]bool {

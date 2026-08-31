@@ -1,0 +1,1115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/FangcunMount/qs-server/main/api/schema/interpretation/prompt-evaluation-evidence-v2.schema.json",
+  "title": "PromptEvaluationEvidence v2",
+  "description": "Immutable release-evaluation evidence separating fixed candidate slots, generation executions, accepted candidates, semantic executions, human reviews and the final G1-G5 gate result.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "release_identity",
+    "execution_policy",
+    "gate_policy",
+    "status",
+    "preflight_evidence",
+    "slots",
+    "generation_executions",
+    "semantic_executions",
+    "human_reviews",
+    "unresolved_result_unknown_count",
+    "result_unknown_resolutions",
+    "state_transitions",
+    "gate_result",
+    "audit"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "prompt-evaluation-evidence/v2"
+    },
+    "run_id": {
+      "$ref": "#/$defs/entityID"
+    },
+    "release_identity": {
+      "$ref": "#/$defs/releaseIdentity"
+    },
+    "execution_policy": {
+      "$ref": "https://raw.githubusercontent.com/FangcunMount/qs-server/main/api/schema/interpretation/ai-explanation-evaluation-execution-policy-v1.schema.json"
+    },
+    "gate_policy": {
+      "$ref": "https://raw.githubusercontent.com/FangcunMount/qs-server/main/api/schema/interpretation/ai-explanation-release-gate-policy-v1.schema.json"
+    },
+    "status": {
+      "enum": [
+        "requested",
+        "collecting",
+        "blocked",
+        "awaiting_review",
+        "approved",
+        "rejected",
+        "canceled"
+      ]
+    },
+    "preflight_evidence": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "$ref": "#/$defs/preflightEvidence"
+      }
+    },
+    "slots": {
+      "type": "array",
+      "minItems": 35,
+      "maxItems": 35,
+      "items": {
+        "$ref": "#/$defs/candidateSlot"
+      }
+    },
+    "generation_executions": {
+      "type": "array",
+      "maxItems": 224,
+      "items": {
+        "$ref": "#/$defs/generationExecution"
+      }
+    },
+    "semantic_executions": {
+      "type": "array",
+      "maxItems": 280,
+      "items": {
+        "$ref": "#/$defs/semanticExecution"
+      }
+    },
+    "human_reviews": {
+      "type": "array",
+      "maxItems": 70,
+      "items": {
+        "$ref": "#/$defs/humanReview"
+      }
+    },
+    "unresolved_result_unknown_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 504
+    },
+    "result_unknown_resolutions": {
+      "type": "array",
+      "maxItems": 504,
+      "items": {
+        "$ref": "#/$defs/resultUnknownResolution"
+      }
+    },
+    "state_transitions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": {
+        "$ref": "#/$defs/stateTransition"
+      }
+    },
+    "gate_result": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/gateResult"
+        }
+      ]
+    },
+    "audit": {
+      "$ref": "#/$defs/runAudit"
+    }
+  },
+  "$defs": {
+    "entityID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]*$"
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9_-]*$"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "nullableTimestamp": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "frozenRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "fingerprint"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/entityID"
+        },
+        "version": {
+          "$ref": "#/$defs/version"
+        },
+        "fingerprint": {
+          "$ref": "#/$defs/fingerprint"
+        }
+      }
+    },
+    "releaseIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fingerprint",
+        "suite",
+        "prompt",
+        "profile",
+        "input_schema",
+        "output_schema",
+        "generation_route",
+        "semantic_prompt",
+        "semantic_output_schema",
+        "semantic_route",
+        "execution_policy",
+        "gate_policy"
+      ],
+      "properties": {
+        "fingerprint": {
+          "$ref": "#/$defs/fingerprint"
+        },
+        "suite": {
+          "$ref": "#/$defs/frozenRef"
+        },
+        "prompt": {
+          "$ref": "#/$defs/frozenRef"
+        },
+        "profile": {
+          "$ref": "#/$defs/frozenRef"
+        },
+        "input_schema": {
+          "$ref": "#/$defs/frozenRef"
+        },
+        "output_schema": {
+          "$ref": "#/$defs/frozenRef"
+        },
+        "generation_route": {
+          "$ref": "#/$defs/frozenRef"
+        },
+        "semantic_prompt": {
+          "$ref": "#/$defs/frozenRef"
+        },
+        "semantic_output_schema": {
+          "$ref": "#/$defs/frozenRef"
+        },
+        "semantic_route": {
+          "$ref": "#/$defs/frozenRef"
+        },
+        "execution_policy": {
+          "$ref": "#/$defs/frozenRef"
+        },
+        "gate_policy": {
+          "$ref": "#/$defs/frozenRef"
+        }
+      }
+    },
+    "assertionReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "scope",
+        "ordinal",
+        "hard",
+        "evaluator",
+        "status",
+        "detail"
+      ],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/identifier"
+        },
+        "scope": {
+          "enum": [
+            "default",
+            "case"
+          ]
+        },
+        "ordinal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "hard": {
+          "type": "boolean"
+        },
+        "evaluator": {
+          "$ref": "#/$defs/entityID"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "pending_semantic",
+            "blocked"
+          ]
+        },
+        "detail": {
+          "type": "string",
+          "maxLength": 2000,
+          "pattern": "^[^<>]*$"
+        }
+      }
+    },
+    "preflightEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "status",
+        "evaluated_at",
+        "provider_call_count",
+        "rejection_reason",
+        "assertions"
+      ],
+      "properties": {
+        "case_id": {
+          "$ref": "#/$defs/entityID"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "passed",
+            "failed"
+          ]
+        },
+        "evaluated_at": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "provider_call_count": {
+          "const": 0
+        },
+        "rejection_reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128,
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "assertions": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/assertionReceipt"
+          }
+        }
+      }
+    },
+    "providerReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invocation_id",
+        "request_id",
+        "provider",
+        "model",
+        "input_tokens",
+        "output_tokens",
+        "latency_milliseconds"
+      ],
+      "properties": {
+        "invocation_id": {
+          "$ref": "#/$defs/entityID"
+        },
+        "request_id": {
+          "$ref": "#/$defs/entityID"
+        },
+        "provider": {
+          "$ref": "#/$defs/identifier"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "input_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "output_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "latency_milliseconds": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "generation_execution_id",
+        "normalized_output_fingerprint",
+        "accepted_at",
+        "assertions",
+        "semantic_execution_ids",
+        "accepted_semantic_execution_id",
+        "review_ready"
+      ],
+      "properties": {
+        "candidate_id": {
+          "$ref": "#/$defs/entityID"
+        },
+        "generation_execution_id": {
+          "$ref": "#/$defs/entityID"
+        },
+        "normalized_output_fingerprint": {
+          "$ref": "#/$defs/fingerprint"
+        },
+        "accepted_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "assertions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/assertionReceipt"
+          }
+        },
+        "semantic_execution_ids": {
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/entityID"
+          }
+        },
+        "accepted_semantic_execution_id": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/entityID"
+            }
+          ]
+        },
+        "review_ready": {
+          "type": "boolean"
+        }
+      }
+    },
+    "candidateSlot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "slot_ordinal",
+        "status",
+        "generation_execution_ids"
+      ],
+      "properties": {
+        "case_id": {
+          "$ref": "#/$defs/entityID"
+        },
+        "slot_ordinal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "accepted",
+            "blocked"
+          ]
+        },
+        "generation_execution_ids": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/entityID"
+          }
+        },
+        "candidate": {
+          "$ref": "#/$defs/candidate"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "accepted"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "candidate"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "candidate"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "generationExecution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "execution_id",
+        "case_id",
+        "slot_ordinal",
+        "execution_ordinal",
+        "invocation_id",
+        "status",
+        "started_at",
+        "finished_at",
+        "provider_call_count",
+        "provider_receipt",
+        "raw_output",
+        "normalized_output",
+        "normalized_output_fingerprint",
+        "failure"
+      ],
+      "properties": {
+        "execution_id": {
+          "$ref": "#/$defs/entityID"
+        },
+        "case_id": {
+          "$ref": "#/$defs/entityID"
+        },
+        "slot_ordinal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "execution_ordinal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "invocation_id": {
+          "$ref": "#/$defs/entityID"
+        },
+        "status": {
+          "enum": [
+            "prepared",
+            "dispatching",
+            "succeeded",
+            "failed",
+            "result_unknown"
+          ]
+        },
+        "started_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "finished_at": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "provider_call_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "provider_receipt": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/providerReceipt"
+            }
+          ]
+        },
+        "raw_output": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 262144
+        },
+        "normalized_output": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 262144
+        },
+        "normalized_output_fingerprint": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/fingerprint"
+            }
+          ]
+        },
+        "failure": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "https://raw.githubusercontent.com/FangcunMount/qs-server/main/api/schema/interpretation/ai-explanation-failure-taxonomy-v1.schema.json"
+            }
+          ]
+        }
+      }
+    },
+    "score": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "semanticScores": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "faithfulness",
+        "cross_dimension_quality",
+        "suggestion_actionability",
+        "audience_clarity",
+        "concision"
+      ],
+      "properties": {
+        "faithfulness": {
+          "$ref": "#/$defs/score"
+        },
+        "cross_dimension_quality": {
+          "$ref": "#/$defs/score"
+        },
+        "suggestion_actionability": {
+          "$ref": "#/$defs/score"
+        },
+        "audience_clarity": {
+          "$ref": "#/$defs/score"
+        },
+        "concision": {
+          "$ref": "#/$defs/score"
+        }
+      }
+    },
+    "semanticDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "scope",
+        "ordinal",
+        "status",
+        "detail"
+      ],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/identifier"
+        },
+        "scope": {
+          "enum": [
+            "default",
+            "case"
+          ]
+        },
+        "ordinal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed"
+          ]
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "pattern": "^[^<>]*$"
+        }
+      }
+    },
+    "semanticResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evaluator_version",
+        "scores",
+        "rationale",
+        "decisions",
+        "output_fingerprint"
+      ],
+      "properties": {
+        "evaluator_version": {
+          "$ref": "#/$defs/version"
+        },
+        "scores": {
+          "$ref": "#/$defs/semanticScores"
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000,
+          "pattern": "^[^<>]*$"
+        },
+        "decisions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/semanticDecision"
+          }
+        },
+        "output_fingerprint": {
+          "$ref": "#/$defs/fingerprint"
+        }
+      }
+    },
+    "semanticExecution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "execution_id",
+        "candidate_id",
+        "execution_ordinal",
+        "invocation_id",
+        "status",
+        "started_at",
+        "finished_at",
+        "provider_call_count",
+        "provider_receipt",
+        "raw_output",
+        "normalized_output",
+        "result",
+        "failure"
+      ],
+      "properties": {
+        "execution_id": {
+          "$ref": "#/$defs/entityID"
+        },
+        "candidate_id": {
+          "$ref": "#/$defs/entityID"
+        },
+        "execution_ordinal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "invocation_id": {
+          "$ref": "#/$defs/entityID"
+        },
+        "status": {
+          "enum": [
+            "prepared",
+            "dispatching",
+            "succeeded",
+            "failed",
+            "result_unknown"
+          ]
+        },
+        "started_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "finished_at": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "provider_call_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "provider_receipt": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/providerReceipt"
+            }
+          ]
+        },
+        "raw_output": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 262144
+        },
+        "normalized_output": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 262144
+        },
+        "result": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/semanticResult"
+            }
+          ]
+        },
+        "failure": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "https://raw.githubusercontent.com/FangcunMount/qs-server/main/api/schema/interpretation/ai-explanation-failure-taxonomy-v1.schema.json"
+            }
+          ]
+        }
+      }
+    },
+    "humanReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "role",
+        "reviewer",
+        "decision",
+        "reviewed_at",
+        "reason"
+      ],
+      "properties": {
+        "candidate_id": {
+          "$ref": "#/$defs/entityID"
+        },
+        "role": {
+          "enum": [
+            "assessment_semantics",
+            "safety_product"
+          ]
+        },
+        "reviewer": {
+          "$ref": "#/$defs/entityID"
+        },
+        "decision": {
+          "enum": [
+            "approve",
+            "reject"
+          ]
+        },
+        "reviewed_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "pattern": "^[^<>]*$"
+        }
+      }
+    },
+    "gateMetric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "numerator",
+        "denominator",
+        "value",
+        "threshold"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "numerator": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "denominator": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "gateReason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gate",
+        "code",
+        "detail",
+        "evidence_refs"
+      ],
+      "properties": {
+        "gate": {
+          "enum": [
+            "G1",
+            "G2",
+            "G3",
+            "G4",
+            "G5"
+          ]
+        },
+        "code": {
+          "$ref": "#/$defs/identifier"
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "pattern": "^[^<>]*$"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/entityID"
+          }
+        }
+      }
+    },
+    "gateDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gate",
+        "passed"
+      ],
+      "properties": {
+        "gate": {
+          "enum": [
+            "G1",
+            "G2",
+            "G3",
+            "G4",
+            "G5"
+          ]
+        },
+        "passed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "gateResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evaluated_at",
+        "passed",
+        "gates",
+        "metrics",
+        "reasons"
+      ],
+      "properties": {
+        "evaluated_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "passed": {
+          "type": "boolean"
+        },
+        "gates": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/gateDecision"
+          }
+        },
+        "metrics": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/gateMetric"
+          }
+        },
+        "reasons": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/gateReason"
+          }
+        }
+      }
+    },
+    "stateTransition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from",
+        "to",
+        "cause_code",
+        "actor",
+        "transitioned_at",
+        "evidence_refs"
+      ],
+      "properties": {
+        "from": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "requested",
+                "collecting",
+                "blocked",
+                "awaiting_review",
+                "approved",
+                "rejected",
+                "canceled"
+              ]
+            }
+          ]
+        },
+        "to": {
+          "enum": [
+            "requested",
+            "collecting",
+            "blocked",
+            "awaiting_review",
+            "approved",
+            "rejected",
+            "canceled"
+          ]
+        },
+        "cause_code": {
+          "$ref": "#/$defs/identifier"
+        },
+        "actor": {
+          "$ref": "#/$defs/entityID"
+        },
+        "transitioned_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/entityID"
+          }
+        }
+      }
+    },
+    "resultUnknownResolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "execution_id",
+        "decision",
+        "actor",
+        "reason",
+        "acknowledged_duplicate_call_and_cost_risk",
+        "resolved_at"
+      ],
+      "properties": {
+        "execution_id": {
+          "$ref": "#/$defs/entityID"
+        },
+        "decision": {
+          "enum": [
+            "authorize_replacement",
+            "cancel_run"
+          ]
+        },
+        "actor": {
+          "$ref": "#/$defs/entityID"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "pattern": "^[^<>]*$"
+        },
+        "acknowledged_duplicate_call_and_cost_risk": {
+          "const": true
+        },
+        "resolved_at": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    },
+    "runAudit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "organization_id",
+        "requested_by",
+        "request_reason",
+        "created_at",
+        "closed_at",
+        "finalized_at",
+        "canceled_at"
+      ],
+      "properties": {
+        "organization_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "requested_by": {
+          "$ref": "#/$defs/entityID"
+        },
+        "request_reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "pattern": "^[^<>]*$"
+        },
+        "created_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "closed_at": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "finalized_at": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "canceled_at": {
+          "$ref": "#/$defs/nullableTimestamp"
+        }
+      }
+    }
+  }
+}

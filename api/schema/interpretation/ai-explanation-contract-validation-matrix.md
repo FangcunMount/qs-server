@@ -1,10 +1,10 @@
-# AI Explanation v1 契约验证矩阵
+# AI Explanation 契约验证矩阵
 
 ## 结论与状态
 
 这组 v1 契约定义的是“用户手动触发、仅基于本次标准报告、一次性生成跨维度综合洞察和结果相关建议”的能力。标准报告仍是权威结果，AI 输出只是可独立失败、重新生成和审计的补充解读，不参与评分、等级判定或风险重分类。
 
-当前状态是 `planned`（指发布状态）：机器契约、领域/Application、Profile/Mongo、Participant API、Provider Adapter、确定性校验、合成评测、独立语义裁判和双角色复核框架已经实现，但默认关闭，尚无真实 Provider 评测、已发布 Profile、管理面真实身份联调或生产验收。本文不构成运行态或生产可用性证明。
+截至 2026-08-31，Input/Output/Profile v1、Participant 主链和旧版发布评测运行时已经实现；治理与评测可以在生产关闭用户流量的前提下运行，`participant_enabled=false`。本轮新增四份发布治理机器契约及对应领域值对象，但 `PromptEvaluationRun`、Mongo 持久化、应用编排和治理台尚未切换到 `PromptEvaluationEvidence v2`。旧 `AttemptRecord` 继续只读兼容，不能被静默解释成 Candidate/Execution 新证据。本文不构成首个 Profile 已发布或用户能力可用的证明。
 
 规范性文件：
 
@@ -12,8 +12,12 @@
 - [AIExplanationOutput v1](./ai-explanation-output-v1.schema.json)
 - [AIExplanationProfile v1](./ai-explanation-profile-v1.schema.json)
 - [AIExplanationSemanticEvaluationOutput v1](./ai-explanation-semantic-evaluation-output-v1.schema.json)（仅用于合成发布评测，不是 participant 输出）
+- [AIExplanationEvaluationExecutionPolicy v1](./ai-explanation-evaluation-execution-policy-v1.schema.json)
+- [AIExplanationReleaseGatePolicy v1](./ai-explanation-release-gate-policy-v1.schema.json)
+- [AIExplanationFailureTaxonomy v1](./ai-explanation-failure-taxonomy-v1.schema.json)
+- [PromptEvaluationEvidence v2](./prompt-evaluation-evidence-v2.schema.json)
 
-本文中的 `MUST`、`MUST NOT`、`SHOULD` 是实现约束。前三份业务 JSON Schema 是 AI 解读输入、输出和 Profile 字段结构的唯一机器事实来源；Semantic Evaluation Output Schema 单独约束内部模型裁判输出。本文负责补充跨对象、语义、安全和运行时约束。
+本文中的 `MUST`、`MUST NOT`、`SHOULD` 是实现约束。Input、Output 和 Profile 三份业务 JSON Schema 是用户解读字段结构的唯一机器事实来源；Semantic Evaluation Output Schema 单独约束内部模型裁判输出；四份治理契约负责冻结评测执行预算、G1～G5 门禁、失败分类和发布证据。本文负责补充跨对象、语义、安全和运行时约束。
 
 ## 责任边界
 
@@ -78,6 +82,26 @@ Provider payload 只能包含 `context` 和 `facts`。`source`、Profile 标识�
 | PROFILE-007 | Profile | 洞察/建议条数、建议动作数和允许类别必须有显式上限 | JSON Schema validator | `profile_mismatch` |
 | PROFILE-008 | Profile | 七类禁止主张必须全部保留，不能由具体 Profile 放宽 | JSON Schema validator | `profile_mismatch` |
 | PROFILE-009 | Profile | Profile 只能持有逻辑 Provider Route，不持有供应商名、模型 ID、Endpoint 或凭据 | Schema + profile publisher | `profile_mismatch` |
+
+## 发布治理契约验证
+
+| ID | 对象 | 必须成立的规则 | 当前代码责任 | 接线状态 |
+| --- | --- | --- | --- | --- |
+| POLICY-001 | Execution Policy | 固定 7 个 generation case、每 case 5 个 Slot、1 个 preflight；Candidate 只能选择 Slot 中第一个满足结构与内容契约的执行 | `EvaluationExecutionPolicy.Validate` | 领域已实现；Run 未接线 |
+| POLICY-002 | Execution Policy | 样本目标与调用预算分离；生成预算至少覆盖 35 个 Candidate，裁判预算至少覆盖 35 份收据，最坏调用数为两类 Run 上限之和 | `RequiredCandidateCount`、`WorstCaseProviderCalls` | 领域已实现；容量账本未接线 |
+| POLICY-003 | Execution Policy | `result_unknown` 必须人工确认；质量失败不能替换 Candidate；裁判失败不能触发重新生成 | Schema const + `EvaluationExecutionPolicy.Validate` | 已实现 |
+| GATE-001 | Gate Policy | G1 冻结 Suite、Prompt、Profile、Schema、生成/裁判 Route 和 Execution Policy 指纹 | `ReleaseGatePolicy.Validate` | 领域已实现；Run 未接线 |
+| GATE-002 | Gate Policy | G2 要求 35 个 accepted Candidate、每个 1 份完整裁判收据、无未处置 `result_unknown`、无预算越界 | `PromptEvaluationEvidenceV2.Validate` | 领域已实现；现行 Run 未接线 |
+| GATE-003 | Gate Policy | G3 的三个分母分别固定为 dispatched Provider executions、definite-output generation executions 和 dispatched semantic executions；`result_unknown` 保留在基础设施分母 | `PromptEvaluationEvidenceV2.EvaluateGate` | 领域已实现；Runner 未接线 |
+| GATE-004 | Gate Policy | G4 保留当前 4/5、32/35、单份语义最低分与总体均分；低质量 Candidate 不得补样替换 | `PromptEvaluationEvidenceV2.EvaluateGate` | 领域已实现；Runner 未接线 |
+| GATE-005 | Gate Policy | G5 要求每个 Candidate 两个角色、两个不同 reviewer、理由必填，共 70 条；任一拒绝导致发布失败 | `PromptEvaluationEvidenceV2.EvaluateGate` | 领域已实现；现行审核服务未接线 |
+| FAILURE-001 | Failure Taxonomy | 每条失败同时具有 `stage/kind/code/retryable/result_unknown/disposition/evidence_refs`，且 `retryable` 不直接授权新调用 | `ClassifiedFailure.Validate` | 已实现 |
+| FAILURE-002 | Failure Taxonomy | 输出契约失败只能补 generation；semantic execution 失败只能补裁判；quality failure 保留 Candidate；result unknown 进入人工确认 | JSON Schema conditional + `ClassifiedFailure` | 已实现 |
+| EVIDENCE-001 | Evidence v2 | 固定 35 个 Slot，Generation Execution、Candidate、Semantic Execution、Review 和 GateResult 分开持久化 | `PromptEvaluationEvidenceV2.Validate` | 领域已实现；Mongo/Application 未接线 |
+| EVIDENCE-002 | Evidence v2 | Slot 只能接受第一个 contract-conformant generation execution；Candidate 只能接受第一个完整 semantic execution | `validateCandidateSlots` | 已实现 |
+| EVIDENCE-003 | Evidence v2 | 所有执行均受 Policy 上限约束并保留；增量人工审核只能针对已有完整裁判证据的 Candidate | `validateGenerationExecutions`、`validateSemanticExecutions`、`validateCandidateReviews` | 已实现 |
+| EVIDENCE-004 | Evidence v2 | `result_unknown` 执行永久保留；Run 必须 blocked，只有显式承认重复调用/计费风险的 resolution 才能清除 unresolved 计数 | `ResultUnknownResolution`、状态迁移历史 | 已实现 |
+| EVIDENCE-005 | Evidence v2 | v1 `AttemptRecord` 不自动迁移为 v2；迁移必须通过显式 mapper/版本化持久化和兼容测试 | repository/application migration | 未实现 |
 
 ## 跨 Schema 与语义验证
 
@@ -189,8 +213,8 @@ git diff --check
 
 ## 发布前最低验收
 
-- 保持四份 Schema 的 strict-root、合法/非法 fixture 和 Draft 2020-12 元模式门禁；新增版本必须同步契约测试。
+- 保持八份 Schema 的 strict-root、合法/非法 fixture、跨 Schema 引用和 Draft 2020-12 编译门禁；新增版本必须同步契约测试。
 - 保持 `SEM-*` 的 Profile resolver、Input assembler、Output validator 与独立 semantic evaluator 单元测试，并用真实模型完成冻结 suite 的 35 次生成和 35 次裁判评测。
-- 补齐 `RUNTIME-*` 的真实鉴权、跨进程数据读取边界、失败隔离、并发幂等和 Mongo Replica Set 持久化集成验收。
+- 补齐 `RUNTIME-*` 的真实鉴权、跨进程数据读取边界、失败隔离、并发幂等和 Mongo Replica Set 持久化集成验收；新 Run 必须写 v2，旧 Run 必须保持只读可回放。
 - 对每个已发布 Profile 建立固定输入回放集，验证引用完整性、低风险建议和七类禁止主张。
 - 生产验收必须另行提供准确部署 SHA、实际 Profile/Prompt/Provider 路由版本、成功率、延迟、拒绝率和抽样安全评估；本文与仓库门禁均不证明生产已发布。

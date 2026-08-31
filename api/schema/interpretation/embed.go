@@ -19,6 +19,18 @@ var aiExplanationPromptEvaluationCasesV1 []byte
 //go:embed ai-explanation-semantic-evaluation-output-v1.schema.json
 var aiExplanationSemanticEvaluationOutputV1 []byte
 
+//go:embed ai-explanation-evaluation-execution-policy-v1.schema.json
+var aiExplanationEvaluationExecutionPolicyV1 []byte
+
+//go:embed ai-explanation-release-gate-policy-v1.schema.json
+var aiExplanationReleaseGatePolicyV1 []byte
+
+//go:embed ai-explanation-failure-taxonomy-v1.schema.json
+var aiExplanationFailureTaxonomyV1 []byte
+
+//go:embed prompt-evaluation-evidence-v2.schema.json
+var promptEvaluationEvidenceV2 []byte
+
 func AIExplanationInputV1() []byte {
 	return append([]byte(nil), aiExplanationInputV1...)
 }
@@ -41,4 +53,20 @@ func AIExplanationPromptEvaluationCasesV1() []byte {
 
 func AIExplanationSemanticEvaluationOutputV1() []byte {
 	return append([]byte(nil), aiExplanationSemanticEvaluationOutputV1...)
+}
+
+func AIExplanationEvaluationExecutionPolicyV1() []byte {
+	return append([]byte(nil), aiExplanationEvaluationExecutionPolicyV1...)
+}
+
+func AIExplanationReleaseGatePolicyV1() []byte {
+	return append([]byte(nil), aiExplanationReleaseGatePolicyV1...)
+}
+
+func AIExplanationFailureTaxonomyV1() []byte {
+	return append([]byte(nil), aiExplanationFailureTaxonomyV1...)
+}
+
+func PromptEvaluationEvidenceV2() []byte {
+	return append([]byte(nil), promptEvaluationEvidenceV2...)
 }
