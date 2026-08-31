@@ -42,6 +42,26 @@ func TestPromptEvaluationEvidenceV2MapperRoundTripPreservesTerminalOutputAndChec
 	require.ErrorContains(t, err, "indexed projection is inconsistent")
 }
 
+func TestPromptEvaluationEvidenceV2MapperRoundTripsCompleteThirtyFiveSlotDocument(t *testing.T) {
+	evidence := completeMapperEvidenceV2(t)
+	mapper := NewMapper()
+
+	po, err := mapper.PromptEvaluationEvidenceV2ToPO(evidence)
+	require.NoError(t, err)
+	raw, err := bson.Marshal(po)
+	require.NoError(t, err)
+	var decoded PromptEvaluationEvidenceV2PO
+	require.NoError(t, bson.Unmarshal(raw, &decoded))
+	restored, err := mapper.PromptEvaluationEvidenceV2ToDomain(&decoded)
+	require.NoError(t, err)
+	require.Equal(t, domainevaluation.EvidenceStatusAwaitingReview, restored.Status)
+	require.Len(t, restored.Slots, domainevaluation.RequiredGenerationAttempts)
+	require.Len(t, restored.GenerationExecutions, domainevaluation.RequiredGenerationAttempts)
+	require.Len(t, restored.SemanticExecutions, domainevaluation.RequiredGenerationAttempts)
+	require.Nil(t, restored.Execution())
+	require.NoError(t, restored.Validate())
+}
+
 func newMapperEvidenceV2(t *testing.T) *domainevaluation.PromptEvaluationEvidenceV2 {
 	t.Helper()
 	createdAt := time.Date(2026, 8, 31, 8, 0, 0, 0, time.UTC)
@@ -115,6 +135,107 @@ func newMapperEvidenceV2(t *testing.T) *domainevaluation.PromptEvaluationEvidenc
 		ClaimedAt: semanticAt, LeaseExpiresAt: semanticAt.Add(2 * time.Minute),
 	}))
 	return evidence
+}
+
+func completeMapperEvidenceV2(t *testing.T) *domainevaluation.PromptEvaluationEvidenceV2 {
+	t.Helper()
+	evidence := newMapperEvidenceV2(t)
+	for evidence.Status == domainevaluation.EvidenceStatusCollecting {
+		if checkpoint := evidence.Execution(); checkpoint != nil {
+			completeMapperSemanticExecutionV2(t, evidence, *checkpoint)
+			continue
+		}
+		action, err := evidence.NextAction()
+		require.NoError(t, err)
+		switch action.Kind {
+		case domainevaluation.EvidenceNextActionGeneration:
+			completeMapperGenerationExecutionV2(t, evidence, action)
+		case domainevaluation.EvidenceNextActionSemantic:
+			checkpoint := beginMapperSemanticExecutionV2(t, evidence, action)
+			completeMapperSemanticExecutionV2(t, evidence, checkpoint)
+		default:
+			t.Fatalf("unexpected next action while completing v2 evidence: %#v", action)
+		}
+	}
+	require.Equal(t, domainevaluation.EvidenceStatusAwaitingReview, evidence.Status)
+	require.Len(t, evidence.Slots, domainevaluation.RequiredGenerationAttempts)
+	require.Len(t, evidence.GenerationExecutions, domainevaluation.RequiredGenerationAttempts)
+	require.Len(t, evidence.SemanticExecutions, domainevaluation.RequiredGenerationAttempts)
+	require.NoError(t, evidence.Validate())
+	return evidence
+}
+
+func completeMapperGenerationExecutionV2(t *testing.T, evidence *domainevaluation.PromptEvaluationEvidenceV2, action domainevaluation.EvidenceNextAction) {
+	t.Helper()
+	sequence := len(evidence.GenerationExecutions) + 1
+	claimedAt := evidence.LastModifiedAt().Add(time.Minute)
+	checkpoint := domainevaluation.EvidenceExecutionCheckpoint{
+		ID: fmt.Sprintf("generation:full:%d", sequence), Kind: domainevaluation.EvidenceExecutionGeneration,
+		CaseID: action.CaseID, SlotOrdinal: action.SlotOrdinal, ExecutionOrdinal: action.ExecutionOrdinal,
+		Owner: "worker:full", InvocationID: fmt.Sprintf("generation:full:invocation:%d", sequence),
+		Phase: domainevaluation.AttemptExecutionPrepared, ClaimedAt: claimedAt, LeaseExpiresAt: claimedAt.Add(time.Minute),
+	}
+	require.NoError(t, evidence.BeginNextExecution(checkpoint))
+	dispatchedAt := claimedAt.Add(time.Second)
+	require.NoError(t, evidence.MarkExecutionDispatching(checkpoint.Owner, dispatchedAt))
+	finishedAt := dispatchedAt.Add(time.Second)
+	rawOutput := []byte(fmt.Sprintf(`{"schema_version":"ai-explanation-output/v1","summary":"candidate %d"}`, sequence))
+	receipt := mapperProviderReceiptV2(checkpoint.InvocationID, fmt.Sprintf("generation:full:request:%d", sequence))
+	require.NoError(t, evidence.CompleteGenerationExecution(checkpoint.Owner, fmt.Sprintf("candidate:full:%d", sequence), []domainevaluation.AssertionReceipt{
+		{Type: "output_schema_valid", Scope: domainevaluation.AssertionScopeDefault, Ordinal: 1, Hard: true, Evaluator: "deterministic-v1", Status: domainevaluation.AssertionPassed},
+		{Type: "case_goal", Scope: domainevaluation.AssertionScopeCase, Ordinal: 1, Evaluator: "semantic-v1", Status: domainevaluation.AssertionPendingSemantic},
+	}, domainevaluation.CandidateGenerationExecution{
+		ID: checkpoint.ID, CaseID: checkpoint.CaseID, SlotOrdinal: checkpoint.SlotOrdinal, ExecutionOrdinal: checkpoint.ExecutionOrdinal,
+		InvocationID: checkpoint.InvocationID, Status: domainevaluation.ExecutionStatusSucceeded,
+		StartedAt: dispatchedAt, FinishedAt: &finishedAt, ProviderCallCount: 1, ProviderReceipt: &receipt,
+		RawOutput: rawOutput, NormalizedOutput: rawOutput, NormalizedOutputFingerprint: domainai.NewFingerprint(rawOutput),
+	}))
+}
+
+func beginMapperSemanticExecutionV2(t *testing.T, evidence *domainevaluation.PromptEvaluationEvidenceV2, action domainevaluation.EvidenceNextAction) domainevaluation.EvidenceExecutionCheckpoint {
+	t.Helper()
+	sequence := len(evidence.SemanticExecutions) + 1
+	claimedAt := evidence.LastModifiedAt().Add(time.Minute)
+	checkpoint := domainevaluation.EvidenceExecutionCheckpoint{
+		ID: fmt.Sprintf("semantic:full:%d", sequence), Kind: domainevaluation.EvidenceExecutionSemantic,
+		CaseID: action.CaseID, SlotOrdinal: action.SlotOrdinal, CandidateID: action.CandidateID, ExecutionOrdinal: action.ExecutionOrdinal,
+		Owner: "worker:full", InvocationID: fmt.Sprintf("semantic:full:invocation:%d", sequence),
+		Phase: domainevaluation.AttemptExecutionPrepared, ClaimedAt: claimedAt, LeaseExpiresAt: claimedAt.Add(time.Minute),
+	}
+	require.NoError(t, evidence.BeginNextExecution(checkpoint))
+	return checkpoint
+}
+
+func completeMapperSemanticExecutionV2(t *testing.T, evidence *domainevaluation.PromptEvaluationEvidenceV2, checkpoint domainevaluation.EvidenceExecutionCheckpoint) {
+	t.Helper()
+	sequence := len(evidence.SemanticExecutions) + 1
+	dispatchedAt := checkpoint.ClaimedAt.Add(time.Second)
+	require.NoError(t, evidence.MarkExecutionDispatching(checkpoint.Owner, dispatchedAt))
+	finishedAt := dispatchedAt.Add(time.Second)
+	rawOutput := []byte(fmt.Sprintf(`{"schema_version":"ai-explanation-semantic-evaluation-output/v1","candidate":%d}`, sequence))
+	receipt := mapperProviderReceiptV2(checkpoint.InvocationID, fmt.Sprintf("semantic:full:request:%d", sequence))
+	require.NoError(t, evidence.CompleteSemanticExecution(checkpoint.Owner, domainevaluation.SemanticEvaluationExecution{
+		ID: checkpoint.ID, CandidateID: checkpoint.CandidateID, ExecutionOrdinal: checkpoint.ExecutionOrdinal,
+		InvocationID: checkpoint.InvocationID, Status: domainevaluation.ExecutionStatusSucceeded,
+		StartedAt: dispatchedAt, FinishedAt: &finishedAt, ProviderCallCount: 1, ProviderReceipt: &receipt,
+		RawOutput: rawOutput, NormalizedOutput: rawOutput,
+		Result: &domainevaluation.SemanticEvaluationResult{
+			EvaluatorVersion: "v1", Scores: domainevaluation.SemanticScores{Faithfulness: 5, CrossDimensionQuality: 5, SuggestionActionability: 5, AudienceClarity: 5, Concision: 5},
+			Rationale: "output remains faithful to the frozen input",
+			Decisions: []domainevaluation.SemanticDecision{{
+				Type: "case_goal", Scope: domainevaluation.AssertionScopeCase, Ordinal: 1,
+				Status: domainevaluation.AssertionPassed, Detail: "candidate satisfies the frozen case goal",
+			}},
+			OutputFingerprint: domainai.NewFingerprint(rawOutput),
+		},
+	}))
+}
+
+func mapperProviderReceiptV2(invocationID, requestID string) domainai.ProviderReceipt {
+	return domainai.ProviderReceipt{
+		InvocationID: invocationID, RequestID: requestID, Provider: "deepseek", Model: "deepseek-v4-pro",
+		InputTokens: 100, OutputTokens: 200, Latency: time.Second,
+	}
 }
 
 func mapperExecutionPolicyV2() domainevaluation.EvaluationExecutionPolicy {
