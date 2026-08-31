@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	aiexplanationadministration "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/administration"
+	appevaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/evaluation"
 	domainevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/evaluation"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/core"
@@ -39,6 +41,7 @@ type AIExplanationEvaluationV2Wire struct {
 	ClosedAt                     *time.Time                                 `json:"closed_at,omitempty"`
 	FinalizedAt                  *time.Time                                 `json:"finalized_at,omitempty"`
 	ReleaseFingerprint           string                                     `json:"release_fingerprint"`
+	Release                      AIExplanationEvaluationV2ReleaseWire       `json:"release"`
 	ExecutionPolicyID            string                                     `json:"execution_policy_id"`
 	ExecutionPolicyVersion       string                                     `json:"execution_policy_version"`
 	GatePolicyID                 string                                     `json:"gate_policy_id"`
@@ -55,6 +58,27 @@ type AIExplanationEvaluationV2Wire struct {
 	HumanReviews                 []AIExplanationEvaluationV2HumanReviewWire `json:"human_reviews"`
 	ResultUnknownResolutions     []AIExplanationResultUnknownResolutionWire `json:"result_unknown_resolutions"`
 	Gate                         *AIExplanationEvaluationV2GateWire         `json:"gate,omitempty"`
+}
+
+type AIExplanationEvaluationV2FrozenRefWire struct {
+	ID          string `json:"id"`
+	Version     string `json:"version"`
+	Fingerprint string `json:"fingerprint"`
+}
+
+type AIExplanationEvaluationV2ReleaseWire struct {
+	Fingerprint          string                                 `json:"fingerprint"`
+	Suite                AIExplanationEvaluationV2FrozenRefWire `json:"suite"`
+	Prompt               AIExplanationEvaluationV2FrozenRefWire `json:"prompt"`
+	Profile              AIExplanationEvaluationV2FrozenRefWire `json:"profile"`
+	InputSchema          AIExplanationEvaluationV2FrozenRefWire `json:"input_schema"`
+	OutputSchema         AIExplanationEvaluationV2FrozenRefWire `json:"output_schema"`
+	GenerationRoute      AIExplanationEvaluationV2FrozenRefWire `json:"generation_route"`
+	SemanticPrompt       AIExplanationEvaluationV2FrozenRefWire `json:"semantic_prompt"`
+	SemanticOutputSchema AIExplanationEvaluationV2FrozenRefWire `json:"semantic_output_schema"`
+	SemanticRoute        AIExplanationEvaluationV2FrozenRefWire `json:"semantic_route"`
+	ExecutionPolicy      AIExplanationEvaluationV2FrozenRefWire `json:"execution_policy"`
+	GatePolicy           AIExplanationEvaluationV2FrozenRefWire `json:"gate_policy"`
 }
 
 type AIExplanationEvaluationV2CheckpointWire struct {
@@ -100,22 +124,23 @@ type AIExplanationEvaluationV2AssertionWire struct {
 }
 
 type AIExplanationEvaluationV2ExecutionWire struct {
-	ExecutionID       string                                 `json:"execution_id"`
-	Kind              string                                 `json:"kind"`
-	CaseID            string                                 `json:"case_id,omitempty"`
-	SlotOrdinal       int                                    `json:"slot_ordinal,omitempty"`
-	CandidateID       string                                 `json:"candidate_id,omitempty"`
-	ExecutionOrdinal  int                                    `json:"execution_ordinal"`
-	InvocationID      string                                 `json:"invocation_id"`
-	Status            string                                 `json:"status"`
-	StartedAt         time.Time                              `json:"started_at"`
-	FinishedAt        *time.Time                             `json:"finished_at,omitempty"`
-	ProviderCallCount int                                    `json:"provider_call_count"`
-	ProviderReceipt   bool                                   `json:"provider_receipt_present"`
-	RawOutputBytes    int                                    `json:"raw_output_bytes"`
-	NormalizedBytes   int                                    `json:"normalized_output_bytes"`
-	Failure           *AIExplanationEvaluationV2FailureWire  `json:"failure,omitempty"`
-	SemanticResult    *AIExplanationEvaluationV2SemanticWire `json:"semantic_result,omitempty"`
+	ExecutionID            string                                 `json:"execution_id"`
+	Kind                   string                                 `json:"kind"`
+	CaseID                 string                                 `json:"case_id,omitempty"`
+	SlotOrdinal            int                                    `json:"slot_ordinal,omitempty"`
+	CandidateID            string                                 `json:"candidate_id,omitempty"`
+	ExecutionOrdinal       int                                    `json:"execution_ordinal"`
+	InvocationID           string                                 `json:"invocation_id"`
+	Status                 string                                 `json:"status"`
+	StartedAt              time.Time                              `json:"started_at"`
+	FinishedAt             *time.Time                             `json:"finished_at,omitempty"`
+	ProviderCallCount      int                                    `json:"provider_call_count"`
+	ProviderReceiptPresent bool                                   `json:"provider_receipt_present"`
+	ProviderReceipt        *AIExplanationProviderReceiptWire      `json:"provider_receipt,omitempty"`
+	RawOutputBytes         int                                    `json:"raw_output_bytes"`
+	NormalizedBytes        int                                    `json:"normalized_output_bytes"`
+	Failure                *AIExplanationEvaluationV2FailureWire  `json:"failure,omitempty"`
+	SemanticResult         *AIExplanationEvaluationV2SemanticWire `json:"semantic_result,omitempty"`
 }
 
 type AIExplanationEvaluationV2FailureWire struct {
@@ -186,10 +211,28 @@ type AIExplanationEvaluationV2GateReasonWire struct {
 }
 
 type AIExplanationEvaluationV2OutputWire struct {
-	ExecutionID      string `json:"execution_id"`
-	Kind             string `json:"kind"`
+	ExecutionID      string                            `json:"execution_id"`
+	Kind             string                            `json:"kind"`
+	RawOutput        string                            `json:"raw_output"`
+	NormalizedOutput string                            `json:"normalized_output"`
+	ProviderReceipt  *AIExplanationProviderReceiptWire `json:"provider_receipt,omitempty"`
+}
+
+type AIExplanationEvaluationV2ExecutionEvidenceWire struct {
+	AIExplanationEvaluationV2ExecutionWire
 	RawOutput        string `json:"raw_output"`
 	NormalizedOutput string `json:"normalized_output"`
+}
+
+type AIExplanationEvaluationV2CandidateEvidenceWire struct {
+	RunID                       string                                          `json:"run_id"`
+	CaseID                      string                                          `json:"case_id"`
+	SlotOrdinal                 int                                             `json:"slot_ordinal"`
+	AssessmentInput             json.RawMessage                                 `json:"assessment_input" swaggertype:"object"`
+	Candidate                   AIExplanationEvaluationV2CandidateWire          `json:"candidate"`
+	AcceptedGenerationExecution AIExplanationEvaluationV2ExecutionEvidenceWire  `json:"accepted_generation_execution"`
+	AcceptedSemanticExecution   *AIExplanationEvaluationV2ExecutionEvidenceWire `json:"accepted_semantic_execution,omitempty"`
+	HumanReviews                []AIExplanationEvaluationV2HumanReviewWire      `json:"human_reviews"`
 }
 
 // StartEvaluationV2 godoc
@@ -244,6 +287,34 @@ func (h *AIExplanationAdministrationHandler) FindEvaluationV2(c *gin.Context) {
 	h.Success(c, evaluationV2Wire(value))
 }
 
+// FindEvaluationV2Candidate godoc
+// @Summary 查询一个 v2 Candidate 的人工审核证据
+// @Description 返回冻结用例输入、已接受的生成与语义执行完整输出和 Provider 收据，以及该 Candidate 的人工审核记录。
+// @Tags AI-Explanation-Administration
+// @Produce json
+// @Param run_id path string true "评测 Run ID"
+// @Param candidate_id path string true "Candidate ID"
+// @Success 200 {object} core.Response{data=AIExplanationEvaluationV2CandidateEvidenceWire}
+// @Failure 404 {object} core.ErrResponse
+// @Router /internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/candidates/{candidate_id} [get]
+func (h *AIExplanationAdministrationHandler) FindEvaluationV2Candidate(c *gin.Context) {
+	actor, runID, ok := h.actorAndRunID(c)
+	if !ok {
+		return
+	}
+	value, err := h.service.FindEvaluationV2(c.Request.Context(), actor, runID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	wire, err := evaluationV2CandidateEvidenceWire(value, c.Param("candidate_id"))
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, wire)
+}
+
 // FindEvaluationV2Output godoc
 // @Summary 查询一条 v2 执行的 Provider 输出证据
 // @Description 仅详情接口返回 raw/normalized output；Run 摘要只返回字节数和收据存在性。
@@ -267,13 +338,13 @@ func (h *AIExplanationAdministrationHandler) FindEvaluationV2Output(c *gin.Conte
 	executionID := c.Param("execution_id")
 	for _, execution := range value.GenerationExecutions {
 		if execution.ID == executionID {
-			h.Success(c, AIExplanationEvaluationV2OutputWire{ExecutionID: execution.ID, Kind: "generation", RawOutput: string(execution.RawOutput), NormalizedOutput: string(execution.NormalizedOutput)})
+			h.Success(c, AIExplanationEvaluationV2OutputWire{ExecutionID: execution.ID, Kind: "generation", RawOutput: string(execution.RawOutput), NormalizedOutput: string(execution.NormalizedOutput), ProviderReceipt: providerReceiptWire(execution.ProviderReceipt)})
 			return
 		}
 	}
 	for _, execution := range value.SemanticExecutions {
 		if execution.ID == executionID {
-			h.Success(c, AIExplanationEvaluationV2OutputWire{ExecutionID: execution.ID, Kind: "semantic", RawOutput: string(execution.RawOutput), NormalizedOutput: string(execution.NormalizedOutput)})
+			h.Success(c, AIExplanationEvaluationV2OutputWire{ExecutionID: execution.ID, Kind: "semantic", RawOutput: string(execution.RawOutput), NormalizedOutput: string(execution.NormalizedOutput), ProviderReceipt: providerReceiptWire(execution.ProviderReceipt)})
 			return
 		}
 	}
@@ -379,7 +450,7 @@ func evaluationV2Wire(value *domainevaluation.PromptEvaluationEvidenceV2) *AIExp
 		SchemaVersion: value.SchemaVersion, RunID: value.RunID.String(), Version: value.Version(), Status: string(value.Status),
 		OrganizationID: value.Audit.OrganizationID, RequestedBy: value.Audit.RequestedBy, RequestReason: value.Audit.RequestReason,
 		CreatedAt: value.Audit.CreatedAt, ClosedAt: value.Audit.ClosedAt, FinalizedAt: value.Audit.FinalizedAt,
-		ReleaseFingerprint: string(value.Release.Fingerprint), ExecutionPolicyID: value.ExecutionPolicy.PolicyID,
+		ReleaseFingerprint: string(value.Release.Fingerprint), Release: evaluationV2ReleaseWire(value.Release), ExecutionPolicyID: value.ExecutionPolicy.PolicyID,
 		ExecutionPolicyVersion: value.ExecutionPolicy.Version, GatePolicyID: value.GatePolicy.PolicyID, GatePolicyVersion: value.GatePolicy.Version,
 		ReservedProviderInvocations: value.ExecutionPolicy.WorstCaseProviderCalls(), RequiredCandidates: value.ExecutionPolicy.RequiredCandidateCount(),
 		UnresolvedResultUnknownCount: value.UnresolvedResultUnknownCount,
@@ -406,20 +477,8 @@ func evaluationV2Wire(value *domainevaluation.PromptEvaluationEvidenceV2) *AIExp
 			if slot.Candidate.ReviewReady {
 				result.ReviewReadyCandidates++
 			}
-			candidate := slot.Candidate
-			wire.Candidate = &AIExplanationEvaluationV2CandidateWire{
-				CandidateID: candidate.ID, GenerationExecutionID: candidate.GenerationExecutionID,
-				NormalizedOutputFingerprint: string(candidate.NormalizedOutputFingerprint), AcceptedAt: candidate.AcceptedAt,
-				SemanticExecutionIDs:        append([]string(nil), candidate.SemanticExecutionIDs...),
-				AcceptedSemanticExecutionID: candidate.AcceptedSemanticExecutionID, ReviewReady: candidate.ReviewReady,
-				Assertions: make([]AIExplanationEvaluationV2AssertionWire, 0, len(candidate.Assertions)),
-			}
-			for _, assertion := range candidate.Assertions {
-				wire.Candidate.Assertions = append(wire.Candidate.Assertions, AIExplanationEvaluationV2AssertionWire{
-					Type: assertion.Type, Scope: string(assertion.Scope), Ordinal: assertion.Ordinal, Hard: assertion.Hard,
-					Evaluator: assertion.Evaluator, Status: string(assertion.Status), Detail: assertion.Detail,
-				})
-			}
+			candidate := candidateV2Wire(*slot.Candidate)
+			wire.Candidate = &candidate
 		}
 		result.Slots = append(result.Slots, wire)
 	}
@@ -464,7 +523,7 @@ func generationExecutionV2Wire(value domainevaluation.CandidateGenerationExecuti
 		ExecutionID: value.ID, Kind: "generation", CaseID: value.CaseID, SlotOrdinal: value.SlotOrdinal,
 		ExecutionOrdinal: value.ExecutionOrdinal, InvocationID: value.InvocationID, Status: string(value.Status),
 		StartedAt: value.StartedAt, FinishedAt: value.FinishedAt, ProviderCallCount: value.ProviderCallCount,
-		ProviderReceipt: value.ProviderReceipt != nil, RawOutputBytes: len(value.RawOutput), NormalizedBytes: len(value.NormalizedOutput),
+		ProviderReceiptPresent: value.ProviderReceipt != nil, ProviderReceipt: providerReceiptWire(value.ProviderReceipt), RawOutputBytes: len(value.RawOutput), NormalizedBytes: len(value.NormalizedOutput),
 		Failure: failureV2Wire(value.Failure),
 	}
 }
@@ -473,7 +532,7 @@ func semanticExecutionV2Wire(value domainevaluation.SemanticEvaluationExecution)
 	result := AIExplanationEvaluationV2ExecutionWire{
 		ExecutionID: value.ID, Kind: "semantic", CandidateID: value.CandidateID, ExecutionOrdinal: value.ExecutionOrdinal,
 		InvocationID: value.InvocationID, Status: string(value.Status), StartedAt: value.StartedAt, FinishedAt: value.FinishedAt,
-		ProviderCallCount: value.ProviderCallCount, ProviderReceipt: value.ProviderReceipt != nil,
+		ProviderCallCount: value.ProviderCallCount, ProviderReceiptPresent: value.ProviderReceipt != nil, ProviderReceipt: providerReceiptWire(value.ProviderReceipt),
 		RawOutputBytes: len(value.RawOutput), NormalizedBytes: len(value.NormalizedOutput), Failure: failureV2Wire(value.Failure),
 	}
 	if value.Result != nil {
@@ -494,6 +553,124 @@ func semanticExecutionV2Wire(value domainevaluation.SemanticEvaluationExecution)
 		}
 	}
 	return result
+}
+
+func evaluationV2ReleaseWire(value domainevaluation.EvidenceReleaseIdentity) AIExplanationEvaluationV2ReleaseWire {
+	return AIExplanationEvaluationV2ReleaseWire{
+		Fingerprint: string(value.Fingerprint), Suite: evaluationV2FrozenRefWire(value.Suite), Prompt: evaluationV2FrozenRefWire(value.Prompt),
+		Profile: evaluationV2FrozenRefWire(value.Profile), InputSchema: evaluationV2FrozenRefWire(value.InputSchema),
+		OutputSchema: evaluationV2FrozenRefWire(value.OutputSchema), GenerationRoute: evaluationV2FrozenRefWire(value.GenerationRoute),
+		SemanticPrompt: evaluationV2FrozenRefWire(value.SemanticPrompt), SemanticOutputSchema: evaluationV2FrozenRefWire(value.SemanticOutputSchema),
+		SemanticRoute: evaluationV2FrozenRefWire(value.SemanticRoute), ExecutionPolicy: evaluationV2FrozenRefWire(value.ExecutionPolicy),
+		GatePolicy: evaluationV2FrozenRefWire(value.GatePolicy),
+	}
+}
+
+func evaluationV2FrozenRefWire(value domainevaluation.FrozenContractRef) AIExplanationEvaluationV2FrozenRefWire {
+	return AIExplanationEvaluationV2FrozenRefWire{ID: value.ID, Version: value.Version, Fingerprint: string(value.Fingerprint)}
+}
+
+func evaluationV2CandidateEvidenceWire(value *domainevaluation.PromptEvaluationEvidenceV2, candidateID string) (*AIExplanationEvaluationV2CandidateEvidenceWire, error) {
+	if value == nil || candidateID == "" {
+		return nil, cberrors.WithCode(code.ErrPageNotFound, "AI explanation evaluation v2 candidate not found")
+	}
+	suite, err := appevaluation.LoadV1()
+	if err != nil {
+		return nil, err
+	}
+	if value.Release.Suite.ID != appevaluation.SuiteIDV1 || value.Release.Suite.Version != appevaluation.SuiteVersionV1 || value.Release.Suite.Fingerprint != appevaluation.SuiteFingerprintV1 {
+		return nil, cberrors.WithCode(code.ErrPageNotFound, "AI explanation evaluation v2 frozen suite is unavailable")
+	}
+	var slot *domainevaluation.CandidateSlot
+	for index := range value.Slots {
+		if value.Slots[index].Candidate != nil && value.Slots[index].Candidate.ID == candidateID {
+			slot = &value.Slots[index]
+			break
+		}
+	}
+	if slot == nil {
+		return nil, cberrors.WithCode(code.ErrPageNotFound, "AI explanation evaluation v2 candidate not found")
+	}
+	var assessmentInput json.RawMessage
+	for _, testCase := range suite.Cases {
+		if testCase.CaseID == slot.CaseID {
+			assessmentInput, err = json.Marshal(testCase.ProviderPayload)
+			break
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(assessmentInput) == 0 {
+		return nil, cberrors.WithCode(code.ErrPageNotFound, "AI explanation evaluation v2 frozen case not found")
+	}
+	candidate := candidateV2Wire(*slot.Candidate)
+	result := &AIExplanationEvaluationV2CandidateEvidenceWire{
+		RunID: value.RunID.String(), CaseID: slot.CaseID, SlotOrdinal: slot.Ordinal, AssessmentInput: assessmentInput, Candidate: candidate,
+		HumanReviews: make([]AIExplanationEvaluationV2HumanReviewWire, 0, len(value.HumanReviews)),
+	}
+	foundGeneration := false
+	for _, execution := range value.GenerationExecutions {
+		if execution.ID == slot.Candidate.GenerationExecutionID {
+			result.AcceptedGenerationExecution = generationExecutionV2EvidenceWire(execution)
+			foundGeneration = true
+			break
+		}
+	}
+	if !foundGeneration {
+		return nil, cberrors.WithCode(code.ErrPageNotFound, "AI explanation evaluation v2 accepted generation execution not found")
+	}
+	if slot.Candidate.AcceptedSemanticExecutionID != "" {
+		for _, execution := range value.SemanticExecutions {
+			if execution.ID == slot.Candidate.AcceptedSemanticExecutionID {
+				wire := semanticExecutionV2EvidenceWire(execution)
+				result.AcceptedSemanticExecution = &wire
+				break
+			}
+		}
+		if result.AcceptedSemanticExecution == nil {
+			return nil, cberrors.WithCode(code.ErrPageNotFound, "AI explanation evaluation v2 accepted semantic execution not found")
+		}
+	}
+	for _, review := range value.HumanReviews {
+		if review.CandidateID == candidateID {
+			result.HumanReviews = append(result.HumanReviews, AIExplanationEvaluationV2HumanReviewWire{
+				CandidateID: review.CandidateID, Role: string(review.Role), Reviewer: review.Reviewer,
+				Decision: string(review.Decision), ReviewedAt: review.ReviewedAt, Reason: review.Reason,
+			})
+		}
+	}
+	return result, nil
+}
+
+func candidateV2Wire(value domainevaluation.Candidate) AIExplanationEvaluationV2CandidateWire {
+	result := AIExplanationEvaluationV2CandidateWire{
+		CandidateID: value.ID, GenerationExecutionID: value.GenerationExecutionID, NormalizedOutputFingerprint: string(value.NormalizedOutputFingerprint),
+		AcceptedAt: value.AcceptedAt, SemanticExecutionIDs: append([]string(nil), value.SemanticExecutionIDs...),
+		AcceptedSemanticExecutionID: value.AcceptedSemanticExecutionID, ReviewReady: value.ReviewReady,
+		Assertions: make([]AIExplanationEvaluationV2AssertionWire, 0, len(value.Assertions)),
+	}
+	for _, assertion := range value.Assertions {
+		result.Assertions = append(result.Assertions, AIExplanationEvaluationV2AssertionWire{
+			Type: assertion.Type, Scope: string(assertion.Scope), Ordinal: assertion.Ordinal, Hard: assertion.Hard,
+			Evaluator: assertion.Evaluator, Status: string(assertion.Status), Detail: assertion.Detail,
+		})
+	}
+	return result
+}
+
+func generationExecutionV2EvidenceWire(value domainevaluation.CandidateGenerationExecution) AIExplanationEvaluationV2ExecutionEvidenceWire {
+	return AIExplanationEvaluationV2ExecutionEvidenceWire{
+		AIExplanationEvaluationV2ExecutionWire: generationExecutionV2Wire(value),
+		RawOutput:                              string(value.RawOutput), NormalizedOutput: string(value.NormalizedOutput),
+	}
+}
+
+func semanticExecutionV2EvidenceWire(value domainevaluation.SemanticEvaluationExecution) AIExplanationEvaluationV2ExecutionEvidenceWire {
+	return AIExplanationEvaluationV2ExecutionEvidenceWire{
+		AIExplanationEvaluationV2ExecutionWire: semanticExecutionV2Wire(value),
+		RawOutput:                              string(value.RawOutput), NormalizedOutput: string(value.NormalizedOutput),
+	}
 }
 
 func failureV2Wire(value *domainevaluation.ClassifiedFailure) *AIExplanationEvaluationV2FailureWire {

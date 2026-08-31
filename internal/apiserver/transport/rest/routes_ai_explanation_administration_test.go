@@ -139,6 +139,11 @@ func TestAIExplanationAdministrationRoutesSeparateAuditReadsFromGovernanceWrites
 	if v2Read.Code != http.StatusOK || service.findV2Calls != 1 {
 		t.Fatalf("v2 audit read status/calls = %d/%d body=%s", v2Read.Code, service.findV2Calls, v2Read.Body.String())
 	}
+	v2CandidateRead := httptest.NewRecorder()
+	v2AuditEngine.ServeHTTP(v2CandidateRead, httptest.NewRequest(http.MethodGet, "/internal/v2/interpretation/ai-explanation/prompt-evaluations/10/candidates/candidate:1", nil))
+	if v2CandidateRead.Code != http.StatusNotFound || service.findV2Calls != 2 {
+		t.Fatalf("v2 candidate audit read status/calls = %d/%d body=%s", v2CandidateRead.Code, service.findV2Calls, v2CandidateRead.Body.String())
+	}
 	v2AuditStart := httptest.NewRecorder()
 	v2AuditStartRequest := httptest.NewRequest(http.MethodPost, "/internal/v2/interpretation/ai-explanation/prompt-evaluations", bytes.NewBufferString(`{"confirm":true,"expected_provider_invocations":140,"reason":"evaluate frozen v2 release"}`))
 	v2AuditStartRequest.Header.Set("Content-Type", "application/json")

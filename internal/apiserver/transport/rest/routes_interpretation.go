@@ -70,6 +70,7 @@ func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGr
 	ai := g.Group("/ai-explanation")
 	aiHandler := handler.NewAIExplanationAdministrationHandler(r.deps.Interpretation.AIExplanationAdministration)
 	ai.GET("/prompt-evaluations/:run_id", aiHandler.FindEvaluationV2)
+	ai.GET("/prompt-evaluations/:run_id/candidates/:candidate_id", aiHandler.FindEvaluationV2Candidate)
 	ai.GET("/prompt-evaluations/:run_id/executions/:execution_id/output", aiHandler.FindEvaluationV2Output)
 	governance := ai.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
 	governance.POST("/prompt-evaluations", aiHandler.StartEvaluationV2)

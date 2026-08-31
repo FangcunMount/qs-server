@@ -9264,6 +9264,60 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/candidates/{candidate_id}:
+    get:
+      tags:
+      - AI-Explanation-Administration
+      summary: 查询一个 v2 Candidate 的人工审核证据
+      description: 返回冻结用例输入、已接受的生成与语义执行完整输出和 Provider 收据，以及该 Candidate 的人工审核记录。
+      operationId: 查询一个v2Candidate的人工审核证据
+      parameters:
+      - type: string
+        description: 评测 Run ID
+        name: run_id
+        in: path
+        required: true
+      - type: string
+        description: Candidate ID
+        name: candidate_id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/handler.AIExplanationEvaluationV2CandidateEvidenceWire'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/executions/{execution_id}/output:
     get:
       tags:
@@ -10802,6 +10856,27 @@ components:
           type: string
         type:
           type: string
+    handler.AIExplanationEvaluationV2CandidateEvidenceWire:
+      type: object
+      properties:
+        accepted_generation_execution:
+          $ref: '#/components/schemas/handler.AIExplanationEvaluationV2ExecutionEvidenceWire'
+        accepted_semantic_execution:
+          $ref: '#/components/schemas/handler.AIExplanationEvaluationV2ExecutionEvidenceWire'
+        assessment_input:
+          type: object
+        candidate:
+          $ref: '#/components/schemas/handler.AIExplanationEvaluationV2CandidateWire'
+        case_id:
+          type: string
+        human_reviews:
+          type: array
+          items:
+            $ref: '#/components/schemas/handler.AIExplanationEvaluationV2HumanReviewWire'
+        run_id:
+          type: string
+        slot_ordinal:
+          type: integer
     handler.AIExplanationEvaluationV2CandidateWire:
       type: object
       properties:
@@ -10848,6 +10923,47 @@ components:
           type: string
         slot_ordinal:
           type: integer
+    handler.AIExplanationEvaluationV2ExecutionEvidenceWire:
+      type: object
+      properties:
+        candidate_id:
+          type: string
+        case_id:
+          type: string
+        execution_id:
+          type: string
+        execution_ordinal:
+          type: integer
+        failure:
+          $ref: '#/components/schemas/handler.AIExplanationEvaluationV2FailureWire'
+        finished_at:
+          type: string
+        invocation_id:
+          type: string
+        kind:
+          type: string
+        normalized_output:
+          type: string
+        normalized_output_bytes:
+          type: integer
+        provider_call_count:
+          type: integer
+        provider_receipt:
+          $ref: '#/components/schemas/handler.AIExplanationProviderReceiptWire'
+        provider_receipt_present:
+          type: boolean
+        raw_output:
+          type: string
+        raw_output_bytes:
+          type: integer
+        semantic_result:
+          $ref: '#/components/schemas/handler.AIExplanationEvaluationV2SemanticWire'
+        slot_ordinal:
+          type: integer
+        started_at:
+          type: string
+        status:
+          type: string
     handler.AIExplanationEvaluationV2ExecutionWire:
       type: object
       properties:
@@ -10871,6 +10987,8 @@ components:
           type: integer
         provider_call_count:
           type: integer
+        provider_receipt:
+          $ref: '#/components/schemas/handler.AIExplanationProviderReceiptWire'
         provider_receipt_present:
           type: boolean
         raw_output_bytes:
@@ -10903,6 +11021,15 @@ components:
         safe_message:
           type: string
         stage:
+          type: string
+    handler.AIExplanationEvaluationV2FrozenRefWire:
+      type: object
+      properties:
+        fingerprint:
+          type: string
+        id:
+          type: string
+        version:
           type: string
     handler.AIExplanationEvaluationV2GateReasonWire:
       type: object
@@ -10956,8 +11083,37 @@ components:
           type: string
         normalized_output:
           type: string
+        provider_receipt:
+          $ref: '#/components/schemas/handler.AIExplanationProviderReceiptWire'
         raw_output:
           type: string
+    handler.AIExplanationEvaluationV2ReleaseWire:
+      type: object
+      properties:
+        execution_policy:
+          $ref: '#/components/schemas/handler.AIExplanationEvaluationV2FrozenRefWire'
+        fingerprint:
+          type: string
+        gate_policy:
+          $ref: '#/components/schemas/handler.AIExplanationEvaluationV2FrozenRefWire'
+        generation_route:
+          $ref: '#/components/schemas/handler.AIExplanationEvaluationV2FrozenRefWire'
+        input_schema:
+          $ref: '#/components/schemas/handler.AIExplanationEvaluationV2FrozenRefWire'
+        output_schema:
+          $ref: '#/components/schemas/handler.AIExplanationEvaluationV2FrozenRefWire'
+        profile:
+          $ref: '#/components/schemas/handler.AIExplanationEvaluationV2FrozenRefWire'
+        prompt:
+          $ref: '#/components/schemas/handler.AIExplanationEvaluationV2FrozenRefWire'
+        semantic_output_schema:
+          $ref: '#/components/schemas/handler.AIExplanationEvaluationV2FrozenRefWire'
+        semantic_prompt:
+          $ref: '#/components/schemas/handler.AIExplanationEvaluationV2FrozenRefWire'
+        semantic_route:
+          $ref: '#/components/schemas/handler.AIExplanationEvaluationV2FrozenRefWire'
+        suite:
+          $ref: '#/components/schemas/handler.AIExplanationEvaluationV2FrozenRefWire'
     handler.AIExplanationEvaluationV2ReviewRequest:
       type: object
       required:
@@ -11064,6 +11220,8 @@ components:
             $ref: '#/components/schemas/handler.AIExplanationEvaluationV2HumanReviewWire'
         organization_id:
           type: integer
+        release:
+          $ref: '#/components/schemas/handler.AIExplanationEvaluationV2ReleaseWire'
         release_fingerprint:
           type: string
         request_reason:

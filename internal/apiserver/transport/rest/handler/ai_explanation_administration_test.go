@@ -63,6 +63,73 @@ func TestAIExplanationAdministrationAttemptReturnsOnlyRequestedEvidence(t *testi
 	}
 }
 
+func TestAIExplanationEvaluationV2WireExposesFrozenReleaseAndCandidateReviewEvidence(t *testing.T) {
+	now := time.Date(2026, time.August, 31, 9, 0, 0, 0, time.UTC)
+	finishedAt := now.Add(time.Second)
+	generationOutput := []byte(`{"schema_version":"ai-explanation-output/v1","summary":"synthetic"}`)
+	semanticOutput := []byte(`{"schema_version":"ai-explanation-semantic-evaluation-output/v1","scores":{"faithfulness":5}}`)
+	generationReceipt := &aiexplanation.ProviderReceipt{
+		InvocationID: "generation-invocation:1", RequestID: "provider-request:generation", Provider: "openai", Model: "gpt-test",
+		InputTokens: 101, OutputTokens: 202, Latency: 1500 * time.Millisecond,
+	}
+	semanticReceipt := &aiexplanation.ProviderReceipt{
+		InvocationID: "semantic-invocation:1", RequestID: "provider-request:semantic", Provider: "openai", Model: "gpt-test",
+		InputTokens: 303, OutputTokens: 404, Latency: 2500 * time.Millisecond,
+	}
+	ref := domainevaluation.FrozenContractRef{ID: "contract-id", Version: "v1", Fingerprint: aiexplanation.NewFingerprint([]byte("contract"))}
+	release := domainevaluation.EvidenceReleaseIdentity{
+		Fingerprint: aiexplanation.NewFingerprint([]byte("release")), Suite: domainevaluation.FrozenContractRef{
+			ID: appevaluation.SuiteIDV1, Version: appevaluation.SuiteVersionV1, Fingerprint: appevaluation.SuiteFingerprintV1,
+		},
+		Prompt: ref, Profile: ref, InputSchema: ref, OutputSchema: ref, GenerationRoute: ref,
+		SemanticPrompt: ref, SemanticOutputSchema: ref, SemanticRoute: ref, ExecutionPolicy: ref, GatePolicy: ref,
+	}
+	run := &domainevaluation.PromptEvaluationEvidenceV2{
+		SchemaVersion: domainevaluation.PromptEvaluationEvidenceSchemaVersionV2, RunID: meta.ID(10), Status: domainevaluation.EvidenceStatusAwaitingReview,
+		Release: release, ExecutionPolicy: domainevaluation.CurrentEvaluationExecutionPolicy(), GatePolicy: domainevaluation.CurrentReleaseGatePolicy(),
+		Audit: domainevaluation.EvidenceRunAudit{OrganizationID: 12, RequestedBy: "user:34", RequestReason: "review evidence", CreatedAt: now},
+		Slots: []domainevaluation.CandidateSlot{{
+			CaseID: "PROMPT-EVAL-001", Ordinal: 1, Status: domainevaluation.CandidateSlotAccepted,
+			GenerationExecutionIDs: []string{"generation:1"}, Candidate: &domainevaluation.Candidate{
+				ID: "candidate:1", GenerationExecutionID: "generation:1", NormalizedOutputFingerprint: aiexplanation.NewFingerprint(generationOutput),
+				AcceptedAt: now, SemanticExecutionIDs: []string{"semantic:1"}, AcceptedSemanticExecutionID: "semantic:1", ReviewReady: true,
+				Assertions: []domainevaluation.AssertionReceipt{{Type: "output_schema_valid", Scope: domainevaluation.AssertionScopeDefault, Ordinal: 1, Hard: true, Evaluator: "deterministic-v1", Status: domainevaluation.AssertionPassed}},
+			},
+		}},
+		GenerationExecutions: []domainevaluation.CandidateGenerationExecution{{
+			ID: "generation:1", CaseID: "PROMPT-EVAL-001", SlotOrdinal: 1, ExecutionOrdinal: 1, InvocationID: generationReceipt.InvocationID,
+			Status: domainevaluation.ExecutionStatusSucceeded, StartedAt: now, FinishedAt: &finishedAt, ProviderCallCount: 1,
+			ProviderReceipt: generationReceipt, RawOutput: generationOutput, NormalizedOutput: generationOutput,
+		}},
+		SemanticExecutions: []domainevaluation.SemanticEvaluationExecution{{
+			ID: "semantic:1", CandidateID: "candidate:1", ExecutionOrdinal: 1, InvocationID: semanticReceipt.InvocationID,
+			Status: domainevaluation.ExecutionStatusSucceeded, StartedAt: now, FinishedAt: &finishedAt, ProviderCallCount: 1,
+			ProviderReceipt: semanticReceipt, RawOutput: semanticOutput, NormalizedOutput: semanticOutput,
+		}},
+		HumanReviews: []domainevaluation.CandidateHumanReview{{
+			CandidateID: "candidate:1", Role: domainevaluation.ReviewRoleAssessmentSemantics, Reviewer: "user:34",
+			Decision: domainevaluation.ReviewDecisionApprove, ReviewedAt: finishedAt, Reason: "facts match",
+		}},
+	}
+
+	summary := evaluationV2Wire(run)
+	if summary.Release.Suite.ID != appevaluation.SuiteIDV1 || summary.Release.Fingerprint != string(release.Fingerprint) ||
+		!summary.GenerationExecutions[0].ProviderReceiptPresent || summary.GenerationExecutions[0].ProviderReceipt == nil ||
+		summary.GenerationExecutions[0].ProviderReceipt.RequestID != "provider-request:generation" {
+		t.Fatalf("v2 summary omitted frozen release or Provider receipt: %#v", summary)
+	}
+	detail, err := evaluationV2CandidateEvidenceWire(run, "candidate:1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detail.CaseID != "PROMPT-EVAL-001" || len(detail.AssessmentInput) == 0 ||
+		detail.AcceptedGenerationExecution.RawOutput != string(generationOutput) || detail.AcceptedGenerationExecution.ProviderReceipt == nil ||
+		detail.AcceptedSemanticExecution == nil || detail.AcceptedSemanticExecution.NormalizedOutput != string(semanticOutput) ||
+		len(detail.HumanReviews) != 1 || detail.HumanReviews[0].Role != string(domainevaluation.ReviewRoleAssessmentSemantics) {
+		t.Fatalf("candidate evidence is incomplete: %#v", detail)
+	}
+}
+
 func TestAIExplanationAdministrationListEvaluationsUsesBoundedSummaryQuery(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	service := &aiAdministrationServiceStub{evaluationPage: &appevaluation.ReviewRunPage{

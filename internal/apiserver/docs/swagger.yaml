@@ -1077,6 +1077,27 @@ definitions:
       type:
         type: string
     type: object
+  handler.AIExplanationEvaluationV2CandidateEvidenceWire:
+    properties:
+      accepted_generation_execution:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2ExecutionEvidenceWire'
+      accepted_semantic_execution:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2ExecutionEvidenceWire'
+      assessment_input:
+        type: object
+      candidate:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2CandidateWire'
+      case_id:
+        type: string
+      human_reviews:
+        items:
+          $ref: '#/definitions/handler.AIExplanationEvaluationV2HumanReviewWire'
+        type: array
+      run_id:
+        type: string
+      slot_ordinal:
+        type: integer
+    type: object
   handler.AIExplanationEvaluationV2CandidateWire:
     properties:
       accepted_at:
@@ -1123,6 +1144,47 @@ definitions:
       slot_ordinal:
         type: integer
     type: object
+  handler.AIExplanationEvaluationV2ExecutionEvidenceWire:
+    properties:
+      candidate_id:
+        type: string
+      case_id:
+        type: string
+      execution_id:
+        type: string
+      execution_ordinal:
+        type: integer
+      failure:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2FailureWire'
+      finished_at:
+        type: string
+      invocation_id:
+        type: string
+      kind:
+        type: string
+      normalized_output:
+        type: string
+      normalized_output_bytes:
+        type: integer
+      provider_call_count:
+        type: integer
+      provider_receipt:
+        $ref: '#/definitions/handler.AIExplanationProviderReceiptWire'
+      provider_receipt_present:
+        type: boolean
+      raw_output:
+        type: string
+      raw_output_bytes:
+        type: integer
+      semantic_result:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2SemanticWire'
+      slot_ordinal:
+        type: integer
+      started_at:
+        type: string
+      status:
+        type: string
+    type: object
   handler.AIExplanationEvaluationV2ExecutionWire:
     properties:
       candidate_id:
@@ -1145,6 +1207,8 @@ definitions:
         type: integer
       provider_call_count:
         type: integer
+      provider_receipt:
+        $ref: '#/definitions/handler.AIExplanationProviderReceiptWire'
       provider_receipt_present:
         type: boolean
       raw_output_bytes:
@@ -1177,6 +1241,15 @@ definitions:
       safe_message:
         type: string
       stage:
+        type: string
+    type: object
+  handler.AIExplanationEvaluationV2FrozenRefWire:
+    properties:
+      fingerprint:
+        type: string
+      id:
+        type: string
+      version:
         type: string
     type: object
   handler.AIExplanationEvaluationV2GateReasonWire:
@@ -1230,8 +1303,37 @@ definitions:
         type: string
       normalized_output:
         type: string
+      provider_receipt:
+        $ref: '#/definitions/handler.AIExplanationProviderReceiptWire'
       raw_output:
         type: string
+    type: object
+  handler.AIExplanationEvaluationV2ReleaseWire:
+    properties:
+      execution_policy:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire'
+      fingerprint:
+        type: string
+      gate_policy:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire'
+      generation_route:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire'
+      input_schema:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire'
+      output_schema:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire'
+      profile:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire'
+      prompt:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire'
+      semantic_output_schema:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire'
+      semantic_prompt:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire'
+      semantic_route:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire'
+      suite:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire'
     type: object
   handler.AIExplanationEvaluationV2ReviewRequest:
     properties:
@@ -1338,6 +1440,8 @@ definitions:
         type: array
       organization_id:
         type: integer
+      release:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2ReleaseWire'
       release_fingerprint:
         type: string
       request_reason:
@@ -12250,6 +12354,39 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 查询 v2 AI 解读 Prompt 评测证据摘要
+      tags:
+      - AI-Explanation-Administration
+  /internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/candidates/{candidate_id}:
+    get:
+      description: 返回冻结用例输入、已接受的生成与语义执行完整输出和 Provider 收据，以及该 Candidate 的人工审核记录。
+      parameters:
+      - description: 评测 Run ID
+        in: path
+        name: run_id
+        required: true
+        type: string
+      - description: Candidate ID
+        in: path
+        name: candidate_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationEvaluationV2CandidateEvidenceWire'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询一个 v2 Candidate 的人工审核证据
       tags:
       - AI-Explanation-Administration
   /internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/executions/{execution_id}/output:

@@ -9023,6 +9023,60 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/candidates/{candidate_id}": {
+            "get": {
+                "description": "返回冻结用例输入、已接受的生成与语义执行完整输出和 Provider 收据，以及该 Candidate 的人工审核记录。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Explanation-Administration"
+                ],
+                "summary": "查询一个 v2 Candidate 的人工审核证据",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "评测 Run ID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Candidate ID",
+                        "name": "candidate_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AIExplanationEvaluationV2CandidateEvidenceWire"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/executions/{execution_id}/output": {
             "get": {
                 "description": "仅详情接口返回 raw/normalized output；Run 摘要只返回字节数和收据存在性。",
@@ -11061,6 +11115,38 @@ const docTemplate = `{
                 }
             }
         },
+        "handler.AIExplanationEvaluationV2CandidateEvidenceWire": {
+            "type": "object",
+            "properties": {
+                "accepted_generation_execution": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2ExecutionEvidenceWire"
+                },
+                "accepted_semantic_execution": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2ExecutionEvidenceWire"
+                },
+                "assessment_input": {
+                    "type": "object"
+                },
+                "candidate": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2CandidateWire"
+                },
+                "case_id": {
+                    "type": "string"
+                },
+                "human_reviews": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.AIExplanationEvaluationV2HumanReviewWire"
+                    }
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "slot_ordinal": {
+                    "type": "integer"
+                }
+            }
+        },
         "handler.AIExplanationEvaluationV2CandidateWire": {
             "type": "object",
             "properties": {
@@ -11131,6 +11217,68 @@ const docTemplate = `{
                 }
             }
         },
+        "handler.AIExplanationEvaluationV2ExecutionEvidenceWire": {
+            "type": "object",
+            "properties": {
+                "candidate_id": {
+                    "type": "string"
+                },
+                "case_id": {
+                    "type": "string"
+                },
+                "execution_id": {
+                    "type": "string"
+                },
+                "execution_ordinal": {
+                    "type": "integer"
+                },
+                "failure": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FailureWire"
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "invocation_id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "normalized_output": {
+                    "type": "string"
+                },
+                "normalized_output_bytes": {
+                    "type": "integer"
+                },
+                "provider_call_count": {
+                    "type": "integer"
+                },
+                "provider_receipt": {
+                    "$ref": "#/definitions/handler.AIExplanationProviderReceiptWire"
+                },
+                "provider_receipt_present": {
+                    "type": "boolean"
+                },
+                "raw_output": {
+                    "type": "string"
+                },
+                "raw_output_bytes": {
+                    "type": "integer"
+                },
+                "semantic_result": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2SemanticWire"
+                },
+                "slot_ordinal": {
+                    "type": "integer"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.AIExplanationEvaluationV2ExecutionWire": {
             "type": "object",
             "properties": {
@@ -11163,6 +11311,9 @@ const docTemplate = `{
                 },
                 "provider_call_count": {
                     "type": "integer"
+                },
+                "provider_receipt": {
+                    "$ref": "#/definitions/handler.AIExplanationProviderReceiptWire"
                 },
                 "provider_receipt_present": {
                     "type": "boolean"
@@ -11212,6 +11363,20 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "stage": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2FrozenRefWire": {
+            "type": "object",
+            "properties": {
+                "fingerprint": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "version": {
                     "type": "string"
                 }
             }
@@ -11294,8 +11459,52 @@ const docTemplate = `{
                 "normalized_output": {
                     "type": "string"
                 },
+                "provider_receipt": {
+                    "$ref": "#/definitions/handler.AIExplanationProviderReceiptWire"
+                },
                 "raw_output": {
                     "type": "string"
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2ReleaseWire": {
+            "type": "object",
+            "properties": {
+                "execution_policy": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
+                },
+                "fingerprint": {
+                    "type": "string"
+                },
+                "gate_policy": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
+                },
+                "generation_route": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
+                },
+                "input_schema": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
+                },
+                "output_schema": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
+                },
+                "profile": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
+                },
+                "prompt": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
+                },
+                "semantic_output_schema": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
+                },
+                "semantic_prompt": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
+                },
+                "semantic_route": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
+                },
+                "suite": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
                 }
             }
         },
@@ -11456,6 +11665,9 @@ const docTemplate = `{
                 },
                 "organization_id": {
                     "type": "integer"
+                },
+                "release": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2ReleaseWire"
                 },
                 "release_fingerprint": {
                     "type": "string"

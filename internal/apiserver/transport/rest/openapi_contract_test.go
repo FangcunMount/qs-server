@@ -92,6 +92,7 @@ func TestAIExplanationAdministrationOpenAPIContract(t *testing.T) {
 		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}":                 "get",
 		"/internal/v2/interpretation/ai-explanation/prompt-evaluations":                                                       "post",
 		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}":                                              "get",
+		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/candidates/{candidate_id}":                    "get",
 		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/executions/{execution_id}/output":             "get",
 		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/reviews":                                      "post",
 		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/finalize":                                     "post",
@@ -170,9 +171,15 @@ func TestAIExplanationAdministrationOpenAPIContract(t *testing.T) {
 		}
 	}
 	v2Evidence := openAPISchemaProperties(t, schemas, "handler.AIExplanationEvaluationV2Wire")
-	for _, property := range []string{"schema_version", "run_id", "status", "release_fingerprint", "reserved_provider_invocations", "required_candidates", "accepted_candidates", "review_ready_candidates", "unresolved_result_unknown_count", "slots", "generation_executions", "semantic_executions", "human_reviews", "gate"} {
+	for _, property := range []string{"schema_version", "run_id", "status", "release_fingerprint", "release", "reserved_provider_invocations", "required_candidates", "accepted_candidates", "review_ready_candidates", "unresolved_result_unknown_count", "slots", "generation_executions", "semantic_executions", "human_reviews", "gate"} {
 		if _, ok := v2Evidence[property]; !ok {
 			t.Fatalf("v2 evaluation evidence missing property %q", property)
+		}
+	}
+	v2Candidate := openAPISchemaProperties(t, schemas, "handler.AIExplanationEvaluationV2CandidateEvidenceWire")
+	for _, property := range []string{"run_id", "case_id", "slot_ordinal", "assessment_input", "candidate", "accepted_generation_execution", "accepted_semantic_execution", "human_reviews"} {
+		if _, ok := v2Candidate[property]; !ok {
+			t.Fatalf("v2 candidate evidence missing property %q", property)
 		}
 	}
 	profilePage := openAPISchemaProperties(t, schemas, "handler.AIExplanationProfilePageWire")
