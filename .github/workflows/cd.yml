@@ -654,7 +654,7 @@ jobs:
             "${DEPLOY_SHA}" "${GITHUB_RUN_ID}" > production-full-deploy-marker.json
 
       - name: Persist deployment marker
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: production-full-deploy-marker-${{ env.DEPLOY_SHA }}
           path: production-full-deploy-marker.json

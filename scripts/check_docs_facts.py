@@ -2946,11 +2946,11 @@ def process_lifecycle_contract_issues() -> list[Issue]:
     lifecycle_source_tokens = {
         "apiserver": [
             "runPrepareRunShutdownHooks",
-            "containerCleanup",
-            "stopAuthzSync",
-            "closeDatabase",
             "closeHTTP",
             "closeGRPC",
+            "stopAuthzSync",
+            "containerCleanup",
+            "closeDatabase",
         ],
         "collection-server": [
             "closeHTTP",
@@ -2975,7 +2975,7 @@ def process_lifecycle_contract_issues() -> list[Issue]:
         ],
     }
     doc_tokens = {
-        "apiserver": ["runtime shutdown hooks", "Container.Cleanup", "authz subscriber", "DatabaseManager", "HTTP", "gRPC"],
+        "apiserver": ["runtime shutdown hooks", "HTTP", "gRPC", "authz subscriber", "Container.Cleanup", "DatabaseManager"],
         "collection-server": ["HTTP shutdown", "gRPC manager", "DatabaseManager", "authz sync", "IAM", "cleanup container"],
         "worker": [
             "hold replayer",
