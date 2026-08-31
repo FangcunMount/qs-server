@@ -3,6 +3,7 @@ package aiexplanation
 import (
 	"time"
 
+	domainevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/evaluation"
 	domainoutput "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/output"
 	domainprofile "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/profile"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
@@ -272,21 +273,35 @@ type EvaluationAttemptFailurePO struct {
 	ResultUnknown bool   `bson:"result_unknown"`
 }
 
+type EvaluationSemanticExecutionPO struct {
+	InvocationID        string                      `bson:"invocation_id"`
+	EvaluatorVersion    string                      `bson:"evaluator_version"`
+	StartedAt           time.Time                   `bson:"started_at"`
+	FinishedAt          time.Time                   `bson:"finished_at"`
+	ProviderCallCount   int                         `bson:"provider_call_count"`
+	ProviderReceipt     *ProviderReceiptPO          `bson:"provider_receipt,omitempty"`
+	RawOutput           []byte                      `bson:"raw_output,omitempty"`
+	NormalizedOutput    []byte                      `bson:"normalized_output,omitempty"`
+	ProviderFailureCode string                      `bson:"provider_failure_code,omitempty"`
+	Failure             *EvaluationAttemptFailurePO `bson:"failure,omitempty"`
+}
+
 type EvaluationAttemptPO struct {
-	CaseID            string                      `bson:"case_id"`
-	Attempt           int                         `bson:"attempt"`
-	Stage             string                      `bson:"stage"`
-	StartedAt         time.Time                   `bson:"started_at"`
-	FinishedAt        time.Time                   `bson:"finished_at"`
-	ProviderCallCount int                         `bson:"provider_call_count"`
-	ProviderReceipt   *ProviderReceiptPO          `bson:"provider_receipt,omitempty"`
-	RawOutput         []byte                      `bson:"raw_output,omitempty"`
-	NormalizedOutput  []byte                      `bson:"normalized_output,omitempty"`
-	OutputFingerprint string                      `bson:"output_fingerprint,omitempty"`
-	RejectionReason   string                      `bson:"rejection_reason,omitempty"`
-	Failure           *EvaluationAttemptFailurePO `bson:"failure,omitempty"`
-	Assertions        []EvaluationAssertionPO     `bson:"assertions"`
-	Semantic          *EvaluationSemanticPO       `bson:"semantic,omitempty"`
+	CaseID            string                         `bson:"case_id"`
+	Attempt           int                            `bson:"attempt"`
+	Stage             string                         `bson:"stage"`
+	StartedAt         time.Time                      `bson:"started_at"`
+	FinishedAt        time.Time                      `bson:"finished_at"`
+	ProviderCallCount int                            `bson:"provider_call_count"`
+	ProviderReceipt   *ProviderReceiptPO             `bson:"provider_receipt,omitempty"`
+	RawOutput         []byte                         `bson:"raw_output,omitempty"`
+	NormalizedOutput  []byte                         `bson:"normalized_output,omitempty"`
+	OutputFingerprint string                         `bson:"output_fingerprint,omitempty"`
+	RejectionReason   string                         `bson:"rejection_reason,omitempty"`
+	Failure           *EvaluationAttemptFailurePO    `bson:"failure,omitempty"`
+	Assertions        []EvaluationAssertionPO        `bson:"assertions"`
+	Semantic          *EvaluationSemanticPO          `bson:"semantic,omitempty"`
+	SemanticExecution *EvaluationSemanticExecutionPO `bson:"semantic_execution,omitempty"`
 }
 
 type EvaluationHumanReviewPO struct {
@@ -372,6 +387,62 @@ type PromptEvaluationRunPO struct {
 
 func (PromptEvaluationRunPO) CollectionName() string {
 	return "ai_explanation_prompt_evaluations"
+}
+
+type EvaluationV2ExecutionCheckpointPO struct {
+	ID                string     `bson:"id"`
+	Kind              string     `bson:"kind"`
+	CaseID            string     `bson:"case_id"`
+	SlotOrdinal       int        `bson:"slot_ordinal"`
+	CandidateID       string     `bson:"candidate_id,omitempty"`
+	ExecutionOrdinal  int        `bson:"execution_ordinal"`
+	Owner             string     `bson:"owner"`
+	InvocationID      string     `bson:"invocation_id"`
+	Phase             string     `bson:"phase"`
+	ClaimedAt         time.Time  `bson:"claimed_at"`
+	LeaseExpiresAt    time.Time  `bson:"lease_expires_at"`
+	DispatchStartedAt *time.Time `bson:"dispatch_started_at,omitempty"`
+}
+
+const PromptEvaluationEvidenceVersionV2 = "v2"
+
+// PromptEvaluationEvidenceV2PO deliberately remains in the existing Run
+// collection. evidence_version is the fail-closed discriminator; v1 readers
+// exclude documents that contain it.
+type PromptEvaluationEvidenceV2PO struct {
+	base.BaseDocument `bson:",inline"`
+
+	EvidenceVersion              string                                          `bson:"evidence_version"`
+	SchemaVersion                string                                          `bson:"schema_version"`
+	Release                      domainevaluation.EvidenceReleaseIdentity        `bson:"release"`
+	ReleaseFingerprint           string                                          `bson:"release_fingerprint"`
+	ExecutionPolicy              domainevaluation.EvaluationExecutionPolicy      `bson:"execution_policy"`
+	GatePolicy                   domainevaluation.ReleaseGatePolicy              `bson:"gate_policy"`
+	Status                       string                                          `bson:"status"`
+	Version                      int64                                           `bson:"version"`
+	PreflightEvidence            []domainevaluation.PreflightCaseEvidence        `bson:"preflight_evidence"`
+	Slots                        []domainevaluation.CandidateSlot                `bson:"slots"`
+	GenerationExecutions         []domainevaluation.CandidateGenerationExecution `bson:"generation_executions"`
+	SemanticExecutions           []domainevaluation.SemanticEvaluationExecution  `bson:"semantic_executions"`
+	HumanReviews                 []domainevaluation.CandidateHumanReview         `bson:"human_reviews"`
+	UnresolvedResultUnknownCount int                                             `bson:"unresolved_result_unknown_count"`
+	ResultUnknownResolutions     []domainevaluation.ResultUnknownResolution      `bson:"result_unknown_resolutions"`
+	StateTransitions             []domainevaluation.EvidenceStateTransition      `bson:"state_transitions"`
+	GateResult                   *domainevaluation.EvidenceGateResult            `bson:"gate_result,omitempty"`
+	Audit                        domainevaluation.EvidenceRunAudit               `bson:"audit"`
+	Execution                    *EvaluationV2ExecutionCheckpointPO              `bson:"execution,omitempty"`
+	ActiveReleaseKey             string                                          `bson:"active_release_key,omitempty"`
+	ActiveExecutionOrgKey        string                                          `bson:"active_execution_org_key,omitempty"`
+	RequestedOrgID               int64                                           `bson:"requested_org_id"`
+	ClosedAt                     *time.Time                                      `bson:"closed_at,omitempty"`
+	FinalizedAt                  *time.Time                                      `bson:"finalized_at,omitempty"`
+	CanceledAt                   *time.Time                                      `bson:"canceled_at,omitempty"`
+	ExpiresAt                    *time.Time                                      `bson:"expires_at,omitempty"`
+	RetentionPolicyVersion       string                                          `bson:"retention_policy_version,omitempty"`
+}
+
+func (PromptEvaluationEvidenceV2PO) CollectionName() string {
+	return (PromptEvaluationRunPO{}).CollectionName()
 }
 
 type PromptEvaluationRecheckPO struct {

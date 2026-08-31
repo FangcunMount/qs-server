@@ -436,6 +436,60 @@ func TestEvaluationAttemptMapperRoundTripsFailureAndAssertionOrdinal(t *testing.
 	}
 }
 
+func TestEvaluationAttemptMapperRoundTripsSemanticFailureEvidenceThroughBSON(t *testing.T) {
+	at := time.Date(2026, 8, 31, 9, 0, 0, 0, time.UTC)
+	normalized := []byte(`{"summary":"candidate"}`)
+	generationReceipt := aiexplanation.ProviderReceipt{
+		InvocationID: "generation:g1:1", RequestID: "generation-request", Provider: "provider-a", Model: "model-a", Latency: time.Second,
+	}
+	semanticReceipt := aiexplanation.ProviderReceipt{
+		InvocationID: "semantic:g1:1", RequestID: "semantic-request", Provider: "judge-provider", Model: "judge-model", Latency: time.Second,
+	}
+	failure := domainevaluation.AttemptFailure{
+		Stage: string(domainevaluation.FailureStageSemanticEvaluation),
+		Code:  domainevaluation.SemanticOutputSchemaInvalid, SafeMessage: "semantic output violated the frozen schema", Retryable: true,
+	}
+	attempt := domainevaluation.AttemptRecord{
+		CaseID: "g1", Attempt: 1, Stage: domainevaluation.AttemptStageGeneration,
+		StartedAt: at, FinishedAt: at.Add(2 * time.Second), ProviderCallCount: 1,
+		ProviderReceipt: &generationReceipt, RawOutput: normalized, NormalizedOutput: normalized,
+		OutputFingerprint: aiexplanation.NewFingerprint(normalized), Failure: &failure,
+		Assertions: []domainevaluation.AssertionReceipt{
+			{Type: "output_schema_valid", Scope: domainevaluation.AssertionScopeDefault, Ordinal: 1, Hard: true, Evaluator: "contract-v1", Status: domainevaluation.AssertionPassed},
+			{Type: string(domainevaluation.FailureStageSemanticEvaluation), Scope: domainevaluation.AssertionScopeDefault, Ordinal: 1, Hard: true, Evaluator: "runner-v1", Status: domainevaluation.AssertionFailed, Detail: failure.Code},
+		},
+		SemanticExecution: &domainevaluation.SemanticExecutionRecord{
+			InvocationID: semanticReceipt.InvocationID, EvaluatorVersion: "semantic-rubric-v1",
+			StartedAt: at.Add(time.Second), FinishedAt: at.Add(2 * time.Second), ProviderCallCount: 1,
+			ProviderReceipt: &semanticReceipt, RawOutput: []byte(`{"unexpected":true}`),
+			NormalizedOutput: []byte(`{"unexpected":true}`), Failure: &failure,
+		},
+	}
+	if err := attempt.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	payload, err := bson.Marshal(attemptToPO(attempt))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var persisted EvaluationAttemptPO
+	if err := bson.Unmarshal(payload, &persisted); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := attemptFromPO(persisted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restored.SemanticExecution == nil || restored.SemanticExecution.Failure == nil ||
+		restored.SemanticExecution.Failure.Code != failure.Code || restored.SemanticExecution.ProviderReceipt == nil ||
+		string(restored.SemanticExecution.RawOutput) != `{"unexpected":true}` {
+		t.Fatalf("restored semantic execution = %#v", restored.SemanticExecution)
+	}
+	if err := restored.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func mapperProfile(t *testing.T, now time.Time) *domainprofile.AIExplanationProfile {
 	t.Helper()
 	definition := domainprofile.Definition{

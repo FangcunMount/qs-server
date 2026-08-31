@@ -13,6 +13,7 @@ import (
 	appevaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/evaluation"
 	appgovernance "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/governance"
 	apprecovery "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/recovery"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation"
 	domainevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/evaluation"
 	domainprofile "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/profile"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
@@ -40,7 +41,7 @@ func TestAIExplanationAdministrationReviewUsesProtectedActorAndOmitsRawOutputFro
 		t.Fatal(err)
 	}
 	encoded, _ := json.Marshal(payload.Data)
-	if bytes.Contains(encoded, []byte("raw_provider_output")) || bytes.Contains(encoded, []byte("assessment_input")) {
+	if bytes.Contains(encoded, []byte("raw_provider_output")) || bytes.Contains(encoded, []byte("assessment_input")) || bytes.Contains(encoded, []byte("semantic_execution")) {
 		t.Fatalf("evaluation summary leaked detailed evidence: %s", encoded)
 	}
 }
@@ -53,7 +54,11 @@ func TestAIExplanationAdministrationAttemptReturnsOnlyRequestedEvidence(t *testi
 	ctx.Params = gin.Params{{Key: "run_id", Value: "9"}, {Key: "case_id", Value: "PROMPT-EVAL-001"}, {Key: "attempt", Value: "1"}}
 
 	handler.FindAttempt(ctx)
-	if recorder.Code != http.StatusOK || !bytes.Contains(recorder.Body.Bytes(), []byte(`"raw_provider_output":"{\"summary\":\"synthetic\"}"`)) || !bytes.Contains(recorder.Body.Bytes(), []byte(`"assessment_input":{"context":{},"facts":{}}`)) {
+	if recorder.Code != http.StatusOK || !bytes.Contains(recorder.Body.Bytes(), []byte(`"raw_provider_output":"{\"summary\":\"synthetic\"}"`)) ||
+		!bytes.Contains(recorder.Body.Bytes(), []byte(`"assessment_input":{"context":{},"facts":{}}`)) ||
+		!bytes.Contains(recorder.Body.Bytes(), []byte(`"semantic_execution":{"status":"failed"`)) ||
+		!bytes.Contains(recorder.Body.Bytes(), []byte(`"code":"semantic_output_schema_invalid"`)) ||
+		!bytes.Contains(recorder.Body.Bytes(), []byte(`"raw_output_bytes":19`)) {
 		t.Fatalf("response=%d body=%s", recorder.Code, recorder.Body.String())
 	}
 }
@@ -243,13 +248,28 @@ func TestAIExplanationAdministrationCancelUsesTrustedActorAndReason(t *testing.T
 }
 
 func administrationReviewRun() *appevaluation.ReviewRun {
+	now := time.Date(2026, 8, 31, 9, 0, 0, 0, time.UTC)
+	failure := domainevaluation.AttemptFailure{
+		Stage: string(domainevaluation.FailureStageSemanticEvaluation),
+		Code:  domainevaluation.SemanticOutputSchemaInvalid, SafeMessage: "semantic output violated the frozen schema", Retryable: true,
+	}
+	semanticReceipt := aiexplanation.ProviderReceipt{
+		InvocationID: "semantic:PROMPT-EVAL-001:1", RequestID: "semantic-request-1",
+		Provider: "judge-provider", Model: "judge-model", Latency: time.Second,
+	}
 	return &appevaluation.ReviewRun{
 		RunID: meta.ID(9), Version: 37, Status: domainevaluation.StatusAwaitingReview, CanReview: true,
 		Progress: appevaluation.ReviewProgress{GenerationAttempts: 35, RequiredReviews: 70, MissingReviews: 70},
 		Attempts: []appevaluation.ReviewAttempt{{
 			CaseID: "PROMPT-EVAL-001", Attempt: 1,
 			AssessmentInput: []byte(`{"context":{},"facts":{}}`), RawProviderOutput: []byte(`{"summary":"synthetic"}`),
-			NormalizedOutput: []byte(`{"summary":"synthetic"}`), MissingRoles: []domainevaluation.ReviewRole{domainevaluation.ReviewRoleAssessmentSemantics, domainevaluation.ReviewRoleSafetyProduct},
+			NormalizedOutput: []byte(`{"summary":"synthetic"}`), Failure: &failure,
+			SemanticExecution: &domainevaluation.SemanticExecutionRecord{
+				InvocationID: semanticReceipt.InvocationID, EvaluatorVersion: "semantic-rubric-v1",
+				StartedAt: now, FinishedAt: now.Add(time.Second), ProviderCallCount: 1, ProviderReceipt: &semanticReceipt,
+				RawOutput: []byte(`{"unexpected":true}`), NormalizedOutput: []byte(`{"unexpected":true}`), Failure: &failure,
+			},
+			MissingRoles: []domainevaluation.ReviewRole{domainevaluation.ReviewRoleAssessmentSemantics, domainevaluation.ReviewRoleSafetyProduct},
 		}},
 	}
 }
@@ -283,6 +303,7 @@ func aiAdministrationContext(method, path string, body *bytes.Buffer) (*gin.Cont
 
 type aiAdministrationServiceStub struct {
 	run                 *appevaluation.ReviewRun
+	runV2               *domainevaluation.PromptEvaluationEvidenceV2
 	evaluationPage      *appevaluation.ReviewRunPage
 	profile             *domainprofile.AIExplanationProfile
 	profilePage         *appgovernance.ProfilePage
@@ -318,6 +339,31 @@ func (s *aiAdministrationServiceStub) FindParticipantCapacity(_ context.Context,
 func (s *aiAdministrationServiceStub) StartEvaluation(_ context.Context, actor aiexplanationadministration.Actor, command aiexplanationadministration.StartEvaluationCommand) (*appevaluation.ReviewRun, error) {
 	s.lastActor, s.lastStart = actor, command
 	return s.run, nil
+}
+
+func (s *aiAdministrationServiceStub) StartEvaluationV2(_ context.Context, actor aiexplanationadministration.Actor, command aiexplanationadministration.StartEvaluationV2Command) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	s.lastActor = actor
+	return s.runV2, nil
+}
+
+func (s *aiAdministrationServiceStub) FindEvaluationV2(_ context.Context, actor aiexplanationadministration.Actor, _ meta.ID) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	s.lastActor = actor
+	return s.runV2, nil
+}
+
+func (s *aiAdministrationServiceStub) RecordReviewV2(_ context.Context, actor aiexplanationadministration.Actor, _ meta.ID, _ aiexplanationadministration.ReviewV2Command) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	s.lastActor = actor
+	return s.runV2, nil
+}
+
+func (s *aiAdministrationServiceStub) FinalizeEvaluationV2(_ context.Context, actor aiexplanationadministration.Actor, _ meta.ID, _ string) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	s.lastActor = actor
+	return s.runV2, nil
+}
+
+func (s *aiAdministrationServiceStub) ResolveResultUnknownV2(_ context.Context, actor aiexplanationadministration.Actor, _ meta.ID, _ aiexplanationadministration.ResolveResultUnknownV2Command) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	s.lastActor = actor
+	return s.runV2, nil
 }
 func (s *aiAdministrationServiceStub) RecoverEvaluation(_ context.Context, actor aiexplanationadministration.Actor, runID meta.ID, command aiexplanationadministration.RecoverEvaluationCommand) (*appevaluation.ReviewRun, error) {
 	s.lastActor, s.lastRunID, s.lastRecover = actor, runID, command

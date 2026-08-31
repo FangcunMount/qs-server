@@ -4,6 +4,7 @@ package aiexplanation_test
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -134,6 +135,191 @@ func TestAIExplanationPromptEvaluationProgressIsAtomicOnReplicaSet(t *testing.T)
 		}
 		assertMongoCount(t, db.Collection("ai_explanation_prompt_evaluations"), bson.M{"domain_id": second.ID()}, 0)
 	})
+}
+
+func TestAIExplanationPromptEvaluationV2ProgressIsAtomicOnReplicaSet(t *testing.T) {
+	_, db := mongodbtest.ReplicaSetDatabase(t)
+	retention := mongoai.RetentionPolicy{
+		Version: "integration-v2", ParticipantRecordRetention: 24 * time.Hour,
+		PromptEvaluationRetention: 24 * time.Hour, CapacityLedgerRetention: 24 * time.Hour,
+	}
+	repository, err := mongoai.NewPromptEvaluationRepository(db, retention)
+	if err != nil {
+		t.Fatal(err)
+	}
+	capacity, err := mongoai.NewPromptEvaluationBudgetRepository(db, retention)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outbox, err := mongoeventoutbox.NewStoreWithTopicResolver(db, aiExplanationTopicResolver{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := aiExplanationMongoRunner(db)
+	now := time.Date(2026, 9, 1, 2, 0, 0, 0, time.UTC)
+	newCommitter := func(t *testing.T, stager appevaluation.PromptEvaluationEventStager) *appevaluation.DurableCommitterV2 {
+		t.Helper()
+		committer, err := appevaluation.NewDurableCommitterV2(
+			runner, repository, aievents.Factory{}, stager, noopAIPostCommit{}, capacity,
+			280, func() time.Time { return now },
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return committer
+	}
+	evidence := integrationPromptEvaluationEvidenceV2(t, now, 82, "primary")
+
+	t.Run("start rolls back v2 budget evidence and first event when staging fails", func(t *testing.T) {
+		committer := newCommitter(t, failingAIEventStager{err: errors.New("injected v2 outbox failure")})
+		if err := committer.CommitStartV2(t.Context(), evidence); err == nil {
+			t.Fatal("CommitStartV2() error = nil, want injected failure")
+		}
+		assertMongoCount(t, db.Collection("ai_explanation_prompt_evaluations"), bson.M{"domain_id": evidence.RunID}, 0)
+		assertMongoCount(t, db.Collection("domain_event_outbox"), bson.M{"aggregate_id": evidence.RunID.String()}, 0)
+		usage, found, findErr := capacity.FindDailyCapacityUsage(t.Context(), 82, domainevaluation.UTCBudgetDay(now))
+		if findErr != nil || !found || usage.ReservedProviderInvocations != 0 || len(usage.Reservations) != 0 {
+			t.Fatalf("rolled-back v2 capacity = %#v, %v, %v", usage, found, findErr)
+		}
+	})
+
+	committer := newCommitter(t, outbox)
+	if err := committer.CommitStartV2(t.Context(), evidence); err != nil {
+		t.Fatalf("CommitStartV2() error = %v", err)
+	}
+	persisted, err := repository.FindEvidenceV2ByID(t.Context(), evidence.RunID)
+	if err != nil || persisted.Status != domainevaluation.EvidenceStatusCollecting || persisted.Execution() != nil {
+		t.Fatalf("persisted v2 start = %#v, %v", persisted, err)
+	}
+	reservedCalls := evidence.ExecutionPolicy.WorstCaseProviderCalls()
+	usage, found, err := capacity.FindDailyCapacityUsage(t.Context(), 82, domainevaluation.UTCBudgetDay(now))
+	if err != nil || !found || usage.ReservedProviderInvocations != reservedCalls || len(usage.Reservations) != 1 {
+		t.Fatalf("committed v2 capacity = %#v, %v, %v", usage, found, err)
+	}
+	assertMongoCount(t, db.Collection("domain_event_outbox"), bson.M{
+		"aggregate_id": evidence.RunID.String(), "event_type": eventcatalog.AIExplanationPromptEvaluationStepRequested,
+	}, 1)
+
+	service, err := appevaluation.NewEvidenceV2Service(repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	action, err := persisted.NextAction()
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner := aievents.PromptEvaluationStepV2EventID(evidence.RunID.String(), action)
+	claimedAt := now.Add(time.Minute)
+	if _, err := service.ClaimNextExecution(t.Context(), evidence.RunID, appevaluation.ClaimEvidenceV2ExecutionCommand{
+		ExecutionID: "generation:v2:case-1:slot-1:1", Owner: owner,
+		InvocationID: "invocation:v2:case-1:slot-1:1", ClaimedAt: claimedAt, LeaseExpiresAt: claimedAt.Add(time.Minute),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	dispatchedAt := claimedAt.Add(10 * time.Second)
+	if _, err := service.MarkExecutionDispatching(t.Context(), evidence.RunID, owner, dispatchedAt); err != nil {
+		t.Fatal(err)
+	}
+	finishedAt := dispatchedAt.Add(time.Second)
+	normalized := []byte(`{"schema_version":"ai-explanation-output/v1","summary":"candidate"}`)
+	execution := domainevaluation.CandidateGenerationExecution{
+		ID: "generation:v2:case-1:slot-1:1", CaseID: action.CaseID, SlotOrdinal: action.SlotOrdinal, ExecutionOrdinal: action.ExecutionOrdinal,
+		InvocationID: "invocation:v2:case-1:slot-1:1", Status: domainevaluation.ExecutionStatusSucceeded,
+		StartedAt: dispatchedAt, FinishedAt: &finishedAt, ProviderCallCount: 1,
+		ProviderReceipt: &aiexplanation.ProviderReceipt{
+			InvocationID: "invocation:v2:case-1:slot-1:1", RequestID: "provider-request-v2-1",
+			Provider: "provider-a", Model: "model-a", Latency: time.Second,
+		},
+		RawOutput: normalized, NormalizedOutput: normalized,
+		NormalizedOutputFingerprint: aiexplanation.NewFingerprint(normalized),
+	}
+	complete := appevaluation.CompleteGenerationV2Command{
+		Owner: owner, CandidateID: "candidate:v2:case-1:slot-1",
+		Assertions: []domainevaluation.AssertionReceipt{{
+			Type: "output_schema_valid", Scope: domainevaluation.AssertionScopeDefault, Ordinal: 1,
+			Hard: true, Evaluator: "deterministic-v1", Status: domainevaluation.AssertionPassed,
+		}},
+		Execution: execution,
+	}
+
+	t.Run("generation completion rolls back v2 evidence and next event when staging fails", func(t *testing.T) {
+		failingCommitter := newCommitter(t, failingAIEventStager{err: errors.New("injected v2 continuation outbox failure")})
+		if _, err := failingCommitter.CommitGenerationV2(t.Context(), evidence.RunID, complete); err == nil {
+			t.Fatal("CommitGenerationV2() error = nil, want injected failure")
+		}
+		stored, findErr := repository.FindEvidenceV2ByID(t.Context(), evidence.RunID)
+		if findErr != nil || len(stored.GenerationExecutions) != 0 || stored.Execution() == nil ||
+			stored.Execution().Phase != domainevaluation.AttemptExecutionDispatching {
+			t.Fatalf("rolled-back v2 checkpoint = %#v, %v", stored, findErr)
+		}
+		assertMongoCount(t, db.Collection("domain_event_outbox"), bson.M{
+			"aggregate_id": evidence.RunID.String(), "event_type": eventcatalog.AIExplanationPromptEvaluationStepRequested,
+		}, 1)
+	})
+
+	updated, err := committer.CommitGenerationV2(t.Context(), evidence.RunID, complete)
+	if err != nil {
+		t.Fatalf("CommitGenerationV2() error = %v", err)
+	}
+	if len(updated.GenerationExecutions) != 1 || updated.Execution() != nil || updated.Slots[0].Candidate == nil {
+		t.Fatalf("committed v2 generation = %#v", updated)
+	}
+	assertMongoCount(t, db.Collection("domain_event_outbox"), bson.M{
+		"aggregate_id": evidence.RunID.String(), "event_type": eventcatalog.AIExplanationPromptEvaluationStepRequested,
+	}, 2)
+}
+
+func integrationPromptEvaluationEvidenceV2(t *testing.T, now time.Time, orgID int64, salt string) *domainevaluation.PromptEvaluationEvidenceV2 {
+	t.Helper()
+	executionPolicy := domainevaluation.CurrentEvaluationExecutionPolicy()
+	gatePolicy := domainevaluation.CurrentReleaseGatePolicy()
+	executionFingerprint, err := executionPolicy.Fingerprint()
+	if err != nil {
+		t.Fatal(err)
+	}
+	gateFingerprint, err := gatePolicy.Fingerprint()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref := func(id string) domainevaluation.FrozenContractRef {
+		return domainevaluation.FrozenContractRef{ID: id + "-" + salt, Version: "v1", Fingerprint: aiexplanation.NewFingerprint([]byte(id + "-" + salt))}
+	}
+	release := domainevaluation.EvidenceReleaseIdentity{
+		Suite: ref("suite"), Prompt: ref("prompt"), Profile: ref("profile"),
+		InputSchema: ref("input-schema"), OutputSchema: ref("output-schema"), GenerationRoute: ref("generation-route"),
+		SemanticPrompt: ref("semantic-prompt"), SemanticOutputSchema: ref("semantic-output-schema"), SemanticRoute: ref("semantic-route"),
+		ExecutionPolicy: domainevaluation.FrozenContractRef{ID: executionPolicy.PolicyID, Version: executionPolicy.Version, Fingerprint: executionFingerprint},
+		GatePolicy:      domainevaluation.FrozenContractRef{ID: gatePolicy.PolicyID, Version: gatePolicy.Version, Fingerprint: gateFingerprint},
+	}
+	release.Fingerprint, err = release.ExpectedFingerprint()
+	if err != nil {
+		t.Fatal(err)
+	}
+	caseIDs := make([]string, domainevaluation.RequiredGenerationCaseCount)
+	for index := range caseIDs {
+		caseIDs[index] = fmt.Sprintf("case-%d", index+1)
+	}
+	evidence, err := domainevaluation.NewPromptEvaluationEvidenceV2(
+		meta.New(), release, executionPolicy, gatePolicy, caseIDs, "preflight-ineligible",
+		orgID, "user:integration", "verify v2 Mongo transaction", now,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := evidence.Transition(domainevaluation.EvidenceStatusCollecting, "capacity_reserved", "system:integration", nil, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := evidence.CompletePreflight(domainevaluation.PreflightCaseEvidence{
+		CaseID: "preflight-ineligible", Status: domainevaluation.PreflightEvidencePassed, EvaluatedAt: &now,
+		RejectionReason: "insufficient_eligible_dimensions",
+		Assertions: []domainevaluation.AssertionReceipt{
+			{Type: "provider_call_count", Scope: domainevaluation.AssertionScopeDefault, Ordinal: 1, Hard: true, Evaluator: "preflight-v1", Status: domainevaluation.AssertionPassed},
+			{Type: "rejection_reason", Scope: domainevaluation.AssertionScopeDefault, Ordinal: 1, Hard: true, Evaluator: "preflight-v1", Status: domainevaluation.AssertionPassed},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return evidence
 }
 
 func integrationPromptEvaluationRun(t *testing.T, now time.Time, releaseSalt string) *domainevaluation.PromptEvaluationRun {

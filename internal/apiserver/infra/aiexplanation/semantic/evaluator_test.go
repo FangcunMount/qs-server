@@ -42,7 +42,7 @@ func TestEvaluatorUsesFrozenIndependentRouteAndMinimizedSyntheticPayload(t *test
 	}
 
 	request := validSemanticRequest(t)
-	result, err := evaluator.Evaluate(context.Background(), request)
+	outcome, err := evaluator.Evaluate(context.Background(), request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,13 @@ func TestEvaluatorUsesFrozenIndependentRouteAndMinimizedSyntheticPayload(t *test
 		provider.request.DataPreamble != dataPreambleV1 || provider.request.OutputSchema.Version != aiexplanation.SemanticEvaluationOutputSchemaVersionV1 {
 		t.Fatalf("semantic Provider messages/schema drifted: %#v", provider.request)
 	}
-	if result.EvaluatorVersion != EvaluatorVersionV1 || result.ProviderReceipt.RequestID != "judge-request-1" ||
+	if outcome.Failure != nil || outcome.Result == nil || outcome.ProviderReceipt == nil || outcome.ProviderCallCount != 1 ||
+		outcome.InvocationID != request.InvocationID || outcome.RawOutput == nil || outcome.NormalizedOutput == nil ||
+		outcome.StartedAt.IsZero() || outcome.FinishedAt.Before(outcome.StartedAt) {
+		t.Fatalf("semantic evaluation outcome = %#v", outcome)
+	}
+	result := outcome.Result
+	if result.EvaluatorVersion != EvaluatorVersionV1 || outcome.ProviderReceipt.RequestID != "judge-request-1" ||
 		result.Scores.Faithfulness != 5 || len(result.Decisions) != 1 ||
 		result.Decisions[0].Type != request.Assertions[0].Type || result.Decisions[0].Status != domainevaluation.AssertionPassed {
 		t.Fatalf("semantic evaluation result = %#v", result)
@@ -101,8 +107,10 @@ func TestEvaluatorRejectsInvalidOutputContract(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := evaluator.Evaluate(context.Background(), validSemanticRequest(t)); err == nil {
-				t.Fatal("expected strict semantic output rejection")
+			outcome, err := evaluator.Evaluate(context.Background(), validSemanticRequest(t))
+			if err != nil || outcome.Failure == nil || outcome.Failure.Code != domainevaluation.SemanticOutputSchemaInvalid ||
+				string(outcome.RawOutput) != raw || len(outcome.NormalizedOutput) == 0 {
+				t.Fatalf("strict semantic output outcome = %#v, error = %v", outcome, err)
 			}
 		})
 	}
@@ -118,10 +126,14 @@ func TestEvaluatorUsesEnvelopeNormalizedProviderOutput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := evaluator.Evaluate(context.Background(), validSemanticRequest(t))
+	outcome, err := evaluator.Evaluate(context.Background(), validSemanticRequest(t))
 	if err != nil {
 		t.Fatal(err)
 	}
+	if outcome.Result == nil || string(outcome.RawOutput) != string(provider.raw) || string(outcome.NormalizedOutput) != string(validationOutput) {
+		t.Fatalf("semantic envelope outcome = %#v", outcome)
+	}
+	result := outcome.Result
 	if result.Scores.Faithfulness != 5 || len(result.Decisions) != 1 {
 		t.Fatalf("semantic evaluation result = %#v", result)
 	}
@@ -139,8 +151,52 @@ func TestEvaluatorRejectsMismatchedReceipt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := evaluator.Evaluate(context.Background(), validSemanticRequest(t)); err == nil {
-		t.Fatal("expected mismatched semantic Provider receipt rejection")
+	outcome, err := evaluator.Evaluate(context.Background(), validSemanticRequest(t))
+	if err != nil || outcome.Failure == nil || outcome.Failure.Code != domainevaluation.SemanticReceiptInvalid ||
+		outcome.ProviderReceipt == nil || outcome.ProviderReceipt.InvocationID != "other-invocation" || len(outcome.RawOutput) == 0 {
+		t.Fatalf("mismatched semantic Provider receipt outcome = %#v, error = %v", outcome, err)
+	}
+}
+
+func TestEvaluatorClassifiesProviderAndMissingOutputFailures(t *testing.T) {
+	tests := []struct {
+		name          string
+		provider      *providerStub
+		code          string
+		resultUnknown bool
+		providerCode  string
+	}{
+		{
+			name: "provider failure",
+			provider: &providerStub{err: &appport.ProviderError{
+				Code: "provider_timeout", SafeMessage: "provider timed out", Retryable: true,
+			}},
+			code: domainevaluation.SemanticProviderFailed, providerCode: "provider_timeout",
+		},
+		{
+			name: "provider result unknown",
+			provider: &providerStub{err: &appport.ProviderError{
+				Code: "provider_result_unknown", SafeMessage: "provider result is unknown", ResultUnknown: true,
+			}},
+			code: domainevaluation.SemanticResultUnknown, resultUnknown: true, providerCode: "provider_result_unknown",
+		},
+		{
+			name: "missing output", provider: &providerStub{}, code: domainevaluation.SemanticOutputMissingOrTooLarge,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			evaluator, err := NewEvaluator(test.provider, semanticRoute())
+			if err != nil {
+				t.Fatal(err)
+			}
+			outcome, err := evaluator.Evaluate(context.Background(), validSemanticRequest(t))
+			if err != nil || outcome.Failure == nil || outcome.Failure.Code != test.code ||
+				outcome.Failure.ResultUnknown != test.resultUnknown || outcome.ProviderFailureCode != test.providerCode ||
+				outcome.ProviderCallCount != 1 || outcome.Result != nil {
+				t.Fatalf("semantic failure outcome = %#v, error = %v", outcome, err)
+			}
+		})
 	}
 }
 
@@ -198,11 +254,15 @@ type providerStub struct {
 	raw              []byte
 	validationOutput []byte
 	receipt          *aiexplanation.ProviderReceipt
+	err              error
 }
 
 func (p *providerStub) Generate(_ context.Context, request appport.ProviderRequest) (*appport.ProviderResponse, error) {
 	p.calls++
 	p.request = request
+	if p.err != nil {
+		return nil, p.err
+	}
 	receipt := aiexplanation.ProviderReceipt{
 		InvocationID: request.InvocationID, RequestID: "judge-request-1",
 		Provider: request.Route.ExecutionSpec.ResolvedProvider, Model: request.Route.ExecutionSpec.ResolvedModel,

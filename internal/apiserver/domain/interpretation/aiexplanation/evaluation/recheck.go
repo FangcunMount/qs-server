@@ -119,6 +119,17 @@ func (r *PromptEvaluationRecheck) Complete(owner string, result AttemptRecord) e
 		result.Semantic.ProviderReceipt.Model != r.release.SemanticEvaluator.Provider.ResolvedModel) {
 		return fmt.Errorf("AI explanation attempt recheck semantic receipt does not match the candidate release")
 	}
+	if result.SemanticExecution != nil {
+		if result.SemanticExecution.EvaluatorVersion != r.release.SemanticEvaluator.Version {
+			return fmt.Errorf("AI explanation attempt recheck semantic execution does not match the candidate release")
+		}
+		receipt := result.SemanticExecution.ProviderReceipt
+		failure := result.SemanticExecution.Failure
+		if receipt != nil && (failure == nil || failure.Code != SemanticReceiptInvalid) &&
+			(receipt.Provider != r.release.SemanticEvaluator.Provider.ResolvedProvider || receipt.Model != r.release.SemanticEvaluator.Provider.ResolvedModel) {
+			return fmt.Errorf("AI explanation attempt recheck semantic execution receipt does not match the candidate release")
+		}
+	}
 	r.result = cloneAttemptPtr(&result)
 	r.execution = nil
 	finishedAt := result.FinishedAt

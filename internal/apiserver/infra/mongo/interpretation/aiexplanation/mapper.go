@@ -538,6 +538,9 @@ func attemptToPO(value domainevaluation.AttemptRecord) EvaluationAttemptPO {
 			Scores: scoresToPO(value.Semantic.Scores), Rationale: value.Semantic.Rationale,
 		}
 	}
+	if value.SemanticExecution != nil {
+		po.SemanticExecution = semanticExecutionToPO(*value.SemanticExecution)
+	}
 	return po
 }
 
@@ -577,7 +580,50 @@ func attemptFromPO(value EvaluationAttemptPO) (domainevaluation.AttemptRecord, e
 			Scores: scoresFromPO(value.Semantic.Scores), Rationale: value.Semantic.Rationale,
 		}
 	}
+	if value.SemanticExecution != nil {
+		result.SemanticExecution = semanticExecutionFromPO(*value.SemanticExecution)
+	}
 	return result, nil
+}
+
+func semanticExecutionToPO(value domainevaluation.SemanticExecutionRecord) *EvaluationSemanticExecutionPO {
+	po := &EvaluationSemanticExecutionPO{
+		InvocationID: value.InvocationID, EvaluatorVersion: value.EvaluatorVersion,
+		StartedAt: value.StartedAt, FinishedAt: value.FinishedAt, ProviderCallCount: value.ProviderCallCount,
+		RawOutput: append([]byte(nil), value.RawOutput...), NormalizedOutput: append([]byte(nil), value.NormalizedOutput...),
+		ProviderFailureCode: value.ProviderFailureCode,
+	}
+	if value.ProviderReceipt != nil {
+		receipt := receiptToPO(*value.ProviderReceipt)
+		po.ProviderReceipt = &receipt
+	}
+	if value.Failure != nil {
+		po.Failure = &EvaluationAttemptFailurePO{
+			Stage: value.Failure.Stage, Code: value.Failure.Code, SafeMessage: value.Failure.SafeMessage,
+			Retryable: value.Failure.Retryable, ResultUnknown: value.Failure.ResultUnknown,
+		}
+	}
+	return po
+}
+
+func semanticExecutionFromPO(value EvaluationSemanticExecutionPO) *domainevaluation.SemanticExecutionRecord {
+	result := &domainevaluation.SemanticExecutionRecord{
+		InvocationID: value.InvocationID, EvaluatorVersion: value.EvaluatorVersion,
+		StartedAt: value.StartedAt, FinishedAt: value.FinishedAt, ProviderCallCount: value.ProviderCallCount,
+		RawOutput: append([]byte(nil), value.RawOutput...), NormalizedOutput: append([]byte(nil), value.NormalizedOutput...),
+		ProviderFailureCode: value.ProviderFailureCode,
+	}
+	if value.ProviderReceipt != nil {
+		receipt := receiptFromPO(*value.ProviderReceipt)
+		result.ProviderReceipt = &receipt
+	}
+	if value.Failure != nil {
+		result.Failure = &domainevaluation.AttemptFailure{
+			Stage: value.Failure.Stage, Code: value.Failure.Code, SafeMessage: value.Failure.SafeMessage,
+			Retryable: value.Failure.Retryable, ResultUnknown: value.Failure.ResultUnknown,
+		}
+	}
+	return result
 }
 
 func scoresToPO(value domainevaluation.SemanticScores) EvaluationSemanticScoresPO {

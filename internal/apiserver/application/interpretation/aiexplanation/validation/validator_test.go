@@ -70,9 +70,14 @@ func TestValidateClassifiesSchemaViolationsWithoutUnboundedDetails(t *testing.T)
 func TestValidateRejectsUnresolvedAndWrongKindReferences(t *testing.T) {
 	content := validContent()
 	content.IntegratedInsights[0].EvidenceRefs[1].Ref = "dimension:invented"
-	_, err := Validate(marshal(t, content), validInput(), validDefinition())
+	raw := marshal(t, content)
+	_, err := Validate(raw, validInput(), validDefinition())
 	if !errors.Is(err, ErrReference) {
 		t.Fatalf("reference error = %v", err)
+	}
+	typed, err := ParseTypedContent(raw)
+	if err != nil || typed.IntegratedInsights[0].EvidenceRefs[1].Ref != "dimension:invented" {
+		t.Fatalf("typed content must survive a quality-only reference failure: %#v / %v", typed, err)
 	}
 
 	content = validContent()

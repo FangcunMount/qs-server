@@ -2,7 +2,7 @@
 
 > 状态：本篇已按当前源码重写。Interpretation 的生成生命周期、重试治理、查询模型与报告模板版本发布均已落地；历史路由已完成显式冻结，运行时对缺失身份执行 fail-closed。
 
-> AI 解读是本模块下用户流量关闭、治理与评测开启的独立发布候选能力：标准报告继续自动生成并保持唯一权威，Participant 未来可在报告可用后手动触发一次性 AI 补充解读。现行 v1 机器契约、领域/Application、Participant REST/gRPC、Outbox/Worker、OpenAI/DeepSeek Adapter、确定性校验、耐久 Prompt 评测、双角色复核、Profile 治理、容量治理、数据生命周期和 Mongo migration 已接线；当前主 Provider 为 DeepSeek，生成/裁判使用已发布的 v6/v3 Responses Route，OpenAI 保留为备选。最新生产 Run `635231960356106798` 仍有 1 条内容契约失败和 1 条无法细分的裁判失败，暴露出固定 35 次、任一失败冻结整轮、裁判失败证据不足的问题。新的 Execution Policy、Release Gate Policy、Failure Taxonomy 和 PromptEvaluationEvidence v2 机器契约与领域不变式已实现；下一步是版本化 Mongo mapper/repository、Application/Runner 和治理台迁移，新 Run 切换后再重跑生产评测。首个 Profile、70 条人工复核、灰度和生产验收仍未完成，见[AI 解读核心设计](./25-核心设计-AI解读.md)。
+> AI 解读是本模块下用户流量关闭、治理与评测开启的独立发布候选能力：标准报告继续自动生成并保持唯一权威，Participant 未来可在报告可用后手动触发一次性 AI 补充解读。现行 v1 机器契约、领域/Application、Participant REST/gRPC、Outbox/Worker、OpenAI/DeepSeek Adapter、确定性校验、耐久 Prompt 评测、双角色复核、Profile 治理、容量治理、数据生命周期和 Mongo migration 已接线；当前主 Provider 为 DeepSeek，生成/裁判使用已发布的 v6/v3 Responses Route，OpenAI 保留为备选。最新生产 Run `635231960356106798` 暴露出固定 35 次、任一失败冻结整轮、裁判失败证据不足的问题。当前工作树已完成 Semantic Outcome、7 个稳定失败码、v1 `AttemptRecord` 兼容证据、Mongo BSON 映射与治理详情投影，并完成轻量 v2 的固定 Slot、单检查点、有界补生成/补裁判和收齐后审核领域流程；这些尚未发布、尚未接入 v2 Mongo/Application，也未做生产 Recheck。多集合、增量审核和完整双运行时仍是有证据触发的未来架构。首个 Profile、70 条人工复核、灰度和生产验收仍未完成，见[AI 解读核心设计](./25-核心设计-AI解读.md)及其中的[近期最小改造与架构分析](./25-核心设计-AI解读.md#十六近期最小改造与架构分析)。
 
 ## 1. 30 秒结论
 
@@ -256,7 +256,7 @@ AssessmentID、TesteeID 和 OrgID 是报告关联事实，不是授权凭据。�
 | 22 | [核心设计：状态、幂等、重试与可靠提交](./22-核心设计-状态、幂等、重试与可靠提交.md) | 已重写 | 双状态机、lease、重试治理和终态事务 |
 | 23 | [核心设计：报告成品、版本与数据一致性](./23-核心设计-报告成品、版本与数据一致性.md) | 已重写 | 不可变成品、模板版本、Mongo 数据关系和历史兼容 |
 | 24 | [核心设计：查询模型、授权与 Audience 投影](./24-核心设计-查询模型、授权与Audience投影.md) | 已重写 | catalog、行为人用例和报告章节可见性 |
-| 25 | [核心设计：AI 解读](./25-核心设计-AI解读.md) | 治理已启用 / 用户功能未开放 / 评测规划改造 | 一次性 AI 补充解读、Candidate/Execution 证据、失败分类、有界补样、质量发布、发布阶梯与未来演进 |
+| 25 | [核心设计：AI 解读](./25-核心设计-AI解读.md) | 治理已启用 / 用户功能未开放 / 评测规划改造 | 一次性 AI 补充解读、Semantic 证据、单文档轻量 Slot、有界补样、质量发布与未来架构触发条件 |
 | 30 | [关键链路：从 Outcome 到 InterpretReport](./30-关键链路-从Outcome到InterpretReport.md) | 已重写 | Worker 如何从 Outcome 事件走到可靠报告提交 |
 | 31 | [关键链路：从报告查询到组合状态](./31-关键链路-从报告查询到组合状态.md) | 已重写 | 报告查询、Audience 投影和客户端完成状态如何组合 |
 | 90 | [设计问题与重构清单](./90-设计问题与重构清单.md) | 当前版本有条件通过 | 已关闭主链风险、兼容观察与未来业务/容量触发项 |

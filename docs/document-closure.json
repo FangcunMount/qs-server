@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "f49567941a31e36f0df8bbb1ceff91865b2c5a80",
-    "verified_on": "2026-08-31"
+    "sha": "00f5e7b5fefd3a64f23025c5808c918b6b447f7f",
+    "verified_on": "2026-09-01"
   },
   "status_policy": {
     "doc_status": [
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 31,
+      "expected_count": 32,
       "budgeted": false
     }
   },
@@ -8498,6 +8498,36 @@
           "severity": "medium",
           "summary": "Source and semantic review have not yet been recorded.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+        }
+      ]
+    },
+    {
+      "path": "scripts/oneoff/audit_ai_explanation_prompt_evaluation_size/README.md",
+      "class": "sidecar",
+      "owner": "tooling",
+      "doc_status": "needs_review",
+      "verified": {
+        "source_sha": null,
+        "verified_on": null
+      },
+      "fact_sources": [],
+      "verification": [],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "The read-only audit tool has package tests, but no authorized production Mongo size sample has been recorded."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "DOC-CLOSURE-178",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "Production BSON and output-size distributions have not yet been collected.",
+          "exit_criteria": "Run the read-only audit against the authorized production collection, retain the bounded output and review the single-document capacity decision."
         }
       ]
     },

@@ -348,6 +348,7 @@ type AIExplanationReviewAttemptWire struct {
 	ProviderReceipt   *AIExplanationProviderReceiptWire   `json:"provider_receipt,omitempty"`
 	Assertions        []AIExplanationAssertionReceiptWire `json:"assertions"`
 	Semantic          *AIExplanationSemanticReceiptWire   `json:"semantic,omitempty"`
+	SemanticExecution *AIExplanationSemanticExecutionWire `json:"semantic_execution,omitempty"`
 }
 
 type AIExplanationProviderReceiptWire struct {
@@ -391,6 +392,25 @@ type AIExplanationSemanticReceiptWire struct {
 	ProviderReceipt  AIExplanationProviderReceiptWire `json:"provider_receipt"`
 	Scores           AIExplanationSemanticScoresWire  `json:"scores"`
 	Rationale        string                           `json:"rationale"`
+}
+
+type AIExplanationSemanticExecutionWire struct {
+	Status                  string                            `json:"status"`
+	InvocationID            string                            `json:"invocation_id"`
+	EvaluatorVersion        string                            `json:"evaluator_version"`
+	StartedAt               time.Time                         `json:"started_at"`
+	FinishedAt              time.Time                         `json:"finished_at"`
+	ProviderCallCount       int                               `json:"provider_call_count"`
+	ProviderReceiptPresent  bool                              `json:"provider_receipt_present"`
+	ProviderReceipt         *AIExplanationProviderReceiptWire `json:"provider_receipt,omitempty"`
+	RawOutputPresent        bool                              `json:"raw_output_present"`
+	RawOutputBytes          int                               `json:"raw_output_bytes"`
+	RawOutput               string                            `json:"raw_output,omitempty"`
+	NormalizedOutputPresent bool                              `json:"normalized_output_present"`
+	NormalizedOutputBytes   int                               `json:"normalized_output_bytes"`
+	NormalizedOutput        string                            `json:"normalized_output,omitempty"`
+	ProviderFailureCode     string                            `json:"provider_failure_code,omitempty"`
+	Failure                 *AIExplanationAttemptFailureWire  `json:"failure,omitempty"`
 }
 
 type AIExplanationHumanReviewWire struct {
@@ -542,7 +562,6 @@ func (h *AIExplanationAdministrationHandler) RetryParticipantGeneration(c *gin.C
 // @Failure 400 {object} core.ErrResponse
 // @Failure 409 {object} core.ErrResponse
 // @Failure 429 {object} core.ErrResponse
-// @Router /internal/v1/interpretation/ai-explanation/prompt-evaluations [post]
 func (h *AIExplanationAdministrationHandler) StartEvaluation(c *gin.Context) {
 	actor, ok := h.actor(c)
 	if !ok {
@@ -571,7 +590,6 @@ func (h *AIExplanationAdministrationHandler) StartEvaluation(c *gin.Context) {
 // @Param run_id path string true "评测运行 ID"
 // @Param request body AIExplanationEvaluationRecoverRequest true "剩余链路成本确认与恢复理由"
 // @Success 202 {object} core.Response{data=AIExplanationEvaluationRunWire}
-// @Router /internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/recover [post]
 func (h *AIExplanationAdministrationHandler) RecoverEvaluation(c *gin.Context) {
 	actor, runID, ok := h.actorAndRunID(c)
 	if !ok {
@@ -599,7 +617,6 @@ func (h *AIExplanationAdministrationHandler) RecoverEvaluation(c *gin.Context) {
 // @Param run_id path string true "评测运行 ID"
 // @Param request body AIExplanationEvaluationCancelRequest true "取消理由"
 // @Success 200 {object} core.Response{data=AIExplanationEvaluationRunWire}
-// @Router /internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/cancel [post]
 func (h *AIExplanationAdministrationHandler) CancelEvaluation(c *gin.Context) {
 	actor, runID, ok := h.actorAndRunID(c)
 	if !ok {
@@ -718,7 +735,6 @@ func (h *AIExplanationAdministrationHandler) FindAttempt(c *gin.Context) {
 // @Param attempt path int true "源重复序号"
 // @Param request body AIExplanationAttemptRecheckRequest true "复测成本确认与审计理由"
 // @Success 202 {object} core.Response{data=AIExplanationAttemptRecheckWire}
-// @Router /internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}/rechecks [post]
 func (h *AIExplanationAdministrationHandler) StartAttemptRecheck(c *gin.Context) {
 	actor, runID, attempt, ok := h.actorAndAttemptAddress(c)
 	if !ok {
@@ -806,7 +822,6 @@ func (h *AIExplanationAdministrationHandler) FindAttemptRecheck(c *gin.Context) 
 // @Param run_id path string true "评测运行 ID"
 // @Param request body AIExplanationReviewRequest true "复核命令"
 // @Success 200 {object} core.Response{data=AIExplanationEvaluationRunWire}
-// @Router /internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/reviews [post]
 func (h *AIExplanationAdministrationHandler) RecordReview(c *gin.Context) {
 	actor, runID, ok := h.actorAndRunID(c)
 	if !ok {
@@ -835,7 +850,6 @@ func (h *AIExplanationAdministrationHandler) RecordReview(c *gin.Context) {
 // @Param run_id path string true "评测运行 ID"
 // @Param request body AIExplanationFinalizeRequest true "终审理由"
 // @Success 200 {object} core.Response{data=AIExplanationEvaluationRunWire}
-// @Router /internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/finalize [post]
 func (h *AIExplanationAdministrationHandler) FinalizeEvaluation(c *gin.Context) {
 	actor, runID, ok := h.actorAndRunID(c)
 	if !ok {
@@ -1103,7 +1117,7 @@ func attemptRecheckWire(value *domainevaluation.PromptEvaluationRecheck, include
 		wire := reviewAttemptWire(appevaluation.ReviewAttempt{
 			CaseID: record.CaseID, Attempt: record.Attempt, RawProviderOutput: record.RawOutput,
 			NormalizedOutput: record.NormalizedOutput, ProviderReceipt: record.ProviderReceipt, Failure: record.Failure,
-			Assertions: record.Assertions, Semantic: record.Semantic,
+			Assertions: record.Assertions, Semantic: record.Semantic, SemanticExecution: record.SemanticExecution,
 		})
 		result.Result = &wire
 	}
@@ -1243,7 +1257,22 @@ func reviewAttemptWire(value appevaluation.ReviewAttempt) AIExplanationReviewAtt
 			Scores: semanticScoresWire(value.Semantic.Scores), Rationale: value.Semantic.Rationale,
 		}
 	}
+	result.SemanticExecution = semanticExecutionWire(value.SemanticExecution)
 	return result
+}
+
+func semanticExecutionWire(value *domainevaluation.SemanticExecutionRecord) *AIExplanationSemanticExecutionWire {
+	if value == nil {
+		return nil
+	}
+	return &AIExplanationSemanticExecutionWire{
+		Status: string(value.Status()), InvocationID: value.InvocationID, EvaluatorVersion: value.EvaluatorVersion,
+		StartedAt: value.StartedAt, FinishedAt: value.FinishedAt, ProviderCallCount: value.ProviderCallCount,
+		ProviderReceiptPresent: value.ProviderReceipt != nil, ProviderReceipt: providerReceiptWire(value.ProviderReceipt),
+		RawOutputPresent: len(value.RawOutput) > 0, RawOutputBytes: len(value.RawOutput), RawOutput: string(value.RawOutput),
+		NormalizedOutputPresent: len(value.NormalizedOutput) > 0, NormalizedOutputBytes: len(value.NormalizedOutput), NormalizedOutput: string(value.NormalizedOutput),
+		ProviderFailureCode: value.ProviderFailureCode, Failure: attemptFailureWire(value.Failure),
+	}
 }
 
 func releaseWire(value domainevaluation.ReleaseIdentity) AIExplanationEvaluationReleaseWire {

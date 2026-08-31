@@ -21,6 +21,7 @@
 | `smoke_modelcatalog_cutover` | 完成 AnswerSheet → Assessment → Outcome → Report 部署 smoke | 是，创建 smoke 事实 |
 | `smoke_modelcatalog_revision_conflict` | 验证 Model/Questionnaire revision conflict 的 REST 409 映射 | 是，恢复测试字段 |
 | `audit_norm_usage` | Norm 反向引用、悬空引用和人口学常模审计 | 否 |
+| `audit_ai_explanation_prompt_evaluation_size` | AI 解读 Prompt Evaluation Run BSON 与 generation/semantic 输出尺寸分布 | 否 |
 | `audit_evaluation_p1_evidence.sql` | Evaluation P1 证据查询 | 否 |
 | `audit_evaluation_p2_evidence.sql` | Evaluation P2 证据查询 | 否 |
 | `observe_outbox_by_event_type` | Outbox 事件类型观测 | 否 |

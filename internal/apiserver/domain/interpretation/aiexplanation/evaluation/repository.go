@@ -15,6 +15,15 @@ type Repository interface {
 	FindByID(context.Context, meta.ID) (*PromptEvaluationRun, error)
 }
 
+// EvidenceV2Repository is the new-write/read boundary. It intentionally does
+// not replace Repository: v1 remains readable while only explicitly selected
+// v2 application code can create or mutate v2 evidence.
+type EvidenceV2Repository interface {
+	CreateEvidenceV2(context.Context, *PromptEvaluationEvidenceV2) error
+	SaveEvidenceV2(context.Context, *PromptEvaluationEvidenceV2, int64) error
+	FindEvidenceV2ByID(context.Context, meta.ID) (*PromptEvaluationEvidenceV2, error)
+}
+
 // RecheckRepository stores diagnostic single-attempt reruns separately from
 // immutable release-gate evidence.
 type RecheckRepository interface {

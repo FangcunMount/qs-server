@@ -63,6 +63,22 @@ func TestExpiredPreparedEvaluationFilterNeverSelectsDispatching(t *testing.T) {
 	if !ok || lease["$lte"] != at {
 		t.Fatalf("lease filter = %#v", filter["execution.lease_expires_at"])
 	}
+	legacy, ok := filter["evidence_version"].(bson.M)
+	if !ok || legacy["$exists"] != false {
+		t.Fatalf("v1 expired preparation filter can select v2 evidence: %#v", filter)
+	}
+}
+
+func TestLegacyPromptEvaluationFilterCannotReadV2Evidence(t *testing.T) {
+	original := bson.M{"domain_id": meta.ID(91)}
+	filter := legacyPromptEvaluationFilter(original)
+	legacy, ok := filter["evidence_version"].(bson.M)
+	if !ok || legacy["$exists"] != false || filter["domain_id"] != meta.ID(91) {
+		t.Fatalf("legacy Prompt evaluation filter = %#v", filter)
+	}
+	if _, changed := original["evidence_version"]; changed {
+		t.Fatalf("legacy filter mutated caller input: %#v", original)
+	}
 }
 
 func TestDailyBudgetReservationUsesAtomicCeilingAndAuditAppend(t *testing.T) {

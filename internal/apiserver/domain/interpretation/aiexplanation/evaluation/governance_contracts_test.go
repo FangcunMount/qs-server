@@ -11,11 +11,24 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
+func TestCurrentV2PoliciesAreSelfValidatingAndFreeze140ProviderCalls(t *testing.T) {
+	execution := CurrentEvaluationExecutionPolicy()
+	require.NoError(t, execution.Validate())
+	require.Equal(t, 140, execution.WorstCaseProviderCalls())
+	_, err := execution.Fingerprint()
+	require.NoError(t, err)
+
+	gate := CurrentReleaseGatePolicy()
+	require.NoError(t, gate.Validate())
+	_, err = gate.Fingerprint()
+	require.NoError(t, err)
+}
+
 func TestEvaluationExecutionPolicySeparatesRequiredCandidatesFromWorstCaseCalls(t *testing.T) {
 	policy := validEvaluationExecutionPolicy()
 	require.NoError(t, policy.Validate())
 	require.Equal(t, 35, policy.RequiredCandidateCount())
-	require.Equal(t, 119, policy.WorstCaseProviderCalls())
+	require.Equal(t, 140, policy.WorstCaseProviderCalls())
 	_, err := policy.Fingerprint()
 	require.NoError(t, err)
 
@@ -151,14 +164,13 @@ func TestPromptEvaluationEvidenceV2PreservesAndResolvesResultUnknown(t *testing.
 	require.NoError(t, evidence.Transition(EvidenceStatusBlocked, "result_unknown_requires_review", "system:runner", []string{"generation:unknown"}, finishedAt))
 	require.NoError(t, evidence.Validate())
 
-	evidence.ResultUnknownResolutions = []ResultUnknownResolution{{
+	require.NoError(t, evidence.ResolveResultUnknown(ResultUnknownResolution{
 		ExecutionID: "generation:unknown", Decision: ResultUnknownAuthorizeReplacement,
 		Actor: "user:88", Reason: "确认可能发生重复调用与计费，授权在冻结预算内补样",
 		AcknowledgedDuplicateCallAndCostRisk: true, ResolvedAt: finishedAt.Add(time.Minute),
-	}}
-	evidence.UnresolvedResultUnknownCount = 0
-	require.NoError(t, evidence.Transition(EvidenceStatusCollecting, "manual_recovery_approved", "user:88", []string{"generation:unknown"}, finishedAt.Add(time.Minute)))
+	}))
 	require.NoError(t, evidence.Validate())
+	require.Equal(t, EvidenceStatusCollecting, evidence.Status)
 	require.Equal(t, ExecutionStatusResultUnknown, evidence.GenerationExecutions[len(evidence.GenerationExecutions)-1].Status)
 }
 
@@ -188,12 +200,13 @@ func validEvaluationExecutionPolicy() EvaluationExecutionPolicy {
 			RequiredGenerationCases: RequiredGenerationCaseCount, RequiredCandidatesPerCase: RequiredRepetitionsPerCase,
 			RequiredPreflightCases: 1, CandidateSelection: CandidateSelectionFirstContractConformant,
 		},
-		Generation: GenerationExecutionBudget{MaxExecutionsPerCase: 7, MaxExecutionsPerRun: 49},
+		Generation: GenerationExecutionBudget{MaxExecutionsPerSlot: 2, MaxExecutionsPerRun: 70},
 		Semantic:   SemanticExecutionBudget{MaxExecutionsPerCandidate: 2, MaxExecutionsPerRun: 70},
 		Recovery: EvaluationRecoveryPolicy{
 			AutoRetryableStageCodes: []FailureSelector{
 				{Stage: FailureStageGenerationExecution, Code: "provider_rate_limited"},
 				{Stage: FailureStageSemanticEvaluation, Code: "semantic_provider_rate_limited"},
+				{Stage: FailureStageSemanticEvaluation, Code: SemanticOutputSchemaInvalid},
 			},
 			ManualRecoveryStageCodes: []FailureSelector{
 				{Stage: FailureStageGenerationExecution, Code: "provider_result_unknown"},
@@ -338,7 +351,8 @@ func validCollectingEvidenceV2(t *testing.T) PromptEvaluationEvidenceV2 {
 	return PromptEvaluationEvidenceV2{
 		SchemaVersion: PromptEvaluationEvidenceSchemaVersionV2,
 		RunID:         meta.ID(9901), Release: release, ExecutionPolicy: executionPolicy, GatePolicy: gatePolicy,
-		Status: EvidenceStatusCollecting,
+		version: 1,
+		Status:  EvidenceStatusCollecting,
 		PreflightEvidence: []PreflightCaseEvidence{{
 			CaseID: "preflight-ineligible", Status: PreflightEvidencePassed, EvaluatedAt: copyTime(createdAt.Add(2 * time.Second)),
 			RejectionReason: "insufficient_eligible_dimensions",
@@ -404,14 +418,14 @@ func completeEvidenceV2ForReview(t *testing.T) PromptEvaluationEvidenceV2 {
 				SemanticExecutionIDs: []string{semanticID}, AcceptedSemanticExecutionID: semanticID, ReviewReady: true,
 			}
 		}
-		candidateID := slot.Candidate.ID
-		reviewedAt := createdAt.Add(2 * time.Hour)
-		evidence.HumanReviews = append(evidence.HumanReviews,
-			CandidateHumanReview{CandidateID: candidateID, Role: ReviewRoleAssessmentSemantics, Reviewer: fmt.Sprintf("reviewer:assessment:%d", index+1), Decision: ReviewDecisionApprove, ReviewedAt: reviewedAt, Reason: "完成测评语义审核"},
-			CandidateHumanReview{CandidateID: candidateID, Role: ReviewRoleSafetyProduct, Reviewer: fmt.Sprintf("reviewer:safety:%d", index+1), Decision: ReviewDecisionApprove, ReviewedAt: reviewedAt, Reason: "完成安全与产品审核"},
-		)
 	}
 	require.NoError(t, evidence.Transition(EvidenceStatusAwaitingReview, "candidate_evidence_complete", "system:runner", nil, createdAt.Add(150*time.Minute)))
+	reviewedAt := createdAt.Add(160 * time.Minute)
+	for index, slot := range evidence.Slots {
+		candidateID := slot.Candidate.ID
+		require.NoError(t, evidence.AddHumanReview(CandidateHumanReview{CandidateID: candidateID, Role: ReviewRoleAssessmentSemantics, Reviewer: fmt.Sprintf("reviewer:assessment:%d", index+1), Decision: ReviewDecisionApprove, ReviewedAt: reviewedAt, Reason: "完成测评语义审核"}))
+		require.NoError(t, evidence.AddHumanReview(CandidateHumanReview{CandidateID: candidateID, Role: ReviewRoleSafetyProduct, Reviewer: fmt.Sprintf("reviewer:safety:%d", index+1), Decision: ReviewDecisionApprove, ReviewedAt: reviewedAt, Reason: "完成安全与产品审核"}))
+	}
 	return evidence
 }
 

@@ -93,6 +93,11 @@ type Service interface {
 	CancelEvaluation(context.Context, Actor, meta.ID, string) (*appevaluation.ReviewRun, error)
 	RecordReview(context.Context, Actor, meta.ID, ReviewCommand) (*appevaluation.ReviewRun, error)
 	FinalizeEvaluation(context.Context, Actor, meta.ID, string) (*appevaluation.ReviewRun, error)
+	FindEvaluationV2(context.Context, Actor, meta.ID) (*domainevaluation.PromptEvaluationEvidenceV2, error)
+	StartEvaluationV2(context.Context, Actor, StartEvaluationV2Command) (*domainevaluation.PromptEvaluationEvidenceV2, error)
+	RecordReviewV2(context.Context, Actor, meta.ID, ReviewV2Command) (*domainevaluation.PromptEvaluationEvidenceV2, error)
+	FinalizeEvaluationV2(context.Context, Actor, meta.ID, string) (*domainevaluation.PromptEvaluationEvidenceV2, error)
+	ResolveResultUnknownV2(context.Context, Actor, meta.ID, ResolveResultUnknownV2Command) (*domainevaluation.PromptEvaluationEvidenceV2, error)
 	StartEvaluationRecheck(context.Context, Actor, meta.ID, string, int, StartEvaluationRecheckCommand) (*domainevaluation.PromptEvaluationRecheck, error)
 	ListEvaluationRechecks(context.Context, Actor, meta.ID, string, int, int) ([]*domainevaluation.PromptEvaluationRecheck, error)
 	FindEvaluationRecheck(context.Context, Actor, meta.ID, string, int, meta.ID) (*domainevaluation.PromptEvaluationRecheck, error)
@@ -127,6 +132,27 @@ type StartEvaluationCommand struct {
 	Confirm                     bool
 	ExpectedProviderInvocations int
 	Reason                      string
+}
+
+type StartEvaluationV2Command struct {
+	Confirm                     bool
+	ExpectedProviderInvocations int
+	Reason                      string
+}
+
+type ReviewV2Command struct {
+	CandidateID string
+	Role        domainevaluation.ReviewRole
+	Decision    domainevaluation.ReviewDecision
+	Reason      string
+}
+
+type ResolveResultUnknownV2Command struct {
+	ExecutionID                          string
+	Decision                             domainevaluation.ResultUnknownResolutionDecision
+	Confirm                              bool
+	AcknowledgedDuplicateCallAndCostRisk bool
+	Reason                               string
 }
 
 type RecoverEvaluationCommand struct {
@@ -236,6 +262,9 @@ type service struct {
 	access                        Access
 	starter                       EvaluationStarter
 	startCommitter                EvaluationExecutionCommitter
+	starterV2                     EvaluationV2Starter
+	evidenceV2                    EvaluationV2EvidenceWorkflow
+	resolutionCommitterV2         EvaluationV2ResolutionCommitter
 	recheckStarter                EvaluationRecheckStarter
 	recheckCommitter              EvaluationRecheckStartCommitter
 	rechecks                      domainevaluation.RecheckRepository
@@ -262,6 +291,17 @@ func WithEvaluationExecution(starter EvaluationStarter, committer EvaluationExec
 	}
 }
 
+func WithEvaluationV2(starter EvaluationV2Starter, evidence EvaluationV2EvidenceWorkflow, committer EvaluationV2ResolutionCommitter, newID func() meta.ID) Option {
+	return func(value *service) {
+		value.starterV2 = starter
+		value.evidenceV2 = evidence
+		value.resolutionCommitterV2 = committer
+		if newID != nil {
+			value.newID = newID
+		}
+	}
+}
+
 func WithEvaluationRechecks(starter EvaluationRecheckStarter, committer EvaluationRecheckStartCommitter, repository domainevaluation.RecheckRepository) Option {
 	return func(value *service) {
 		value.recheckStarter = starter
@@ -272,7 +312,7 @@ func WithEvaluationRechecks(starter EvaluationRecheckStarter, committer Evaluati
 
 func WithEvaluationCapacity(reader domainevaluation.CapacityReader, maxActiveRunsPerOrg, dailyProviderInvocationBudget int, now func() time.Time) Option {
 	return func(value *service) {
-		if reader == nil || maxActiveRunsPerOrg != 1 || dailyProviderInvocationBudget < appevaluation.MaxProviderInvocationsV1 {
+		if reader == nil || maxActiveRunsPerOrg != 1 || dailyProviderInvocationBudget < domainevaluation.CurrentEvaluationExecutionPolicy().WorstCaseProviderCalls() {
 			return
 		}
 		value.capacity = reader
@@ -501,8 +541,9 @@ func (s *service) FindEvaluationCapacity(ctx context.Context, actor Actor) (*Eva
 	if actor.OrgID <= 0 || actor.OperatorUserID <= 0 {
 		return nil, cberrors.WithCode(code.ErrInvalidArgument, "AI explanation administrator identity is required")
 	}
+	providerInvocationsPerStart := domainevaluation.CurrentEvaluationExecutionPolicy().WorstCaseProviderCalls()
 	if s == nil || s.capacity == nil || s.access == nil || s.now == nil || s.maxActiveRunsPerOrg != 1 ||
-		s.dailyProviderInvocationBudget < appevaluation.MaxProviderInvocationsV1 {
+		s.dailyProviderInvocationBudget < providerInvocationsPerStart {
 		return nil, cberrors.WithCode(code.ErrUnsupportedOperation, "AI explanation evaluation capacity is disabled")
 	}
 	if err := s.access.AuthorizeGovernance(ctx, actor); err != nil {
@@ -528,11 +569,11 @@ func (s *service) FindEvaluationCapacity(ctx context.Context, actor Actor) (*Eva
 	}
 	result := &EvaluationCapacity{
 		OrgID: actor.OrgID, BudgetDay: budgetDay, MaxActiveRunsPerOrg: s.maxActiveRunsPerOrg,
-		ProviderInvocationsPerStart:  appevaluation.MaxProviderInvocationsV1,
+		ProviderInvocationsPerStart:  providerInvocationsPerStart,
 		DailyProviderInvocationLimit: s.dailyProviderInvocationBudget,
 		ReservedProviderInvocations:  usage.ReservedProviderInvocations,
 		RemainingProviderInvocations: remaining,
-		AvailableFullRunStarts:       remaining / appevaluation.MaxProviderInvocationsV1,
+		AvailableFullRunStarts:       remaining / providerInvocationsPerStart,
 		OverLimit:                    usage.ReservedProviderInvocations > s.dailyProviderInvocationBudget,
 		Reservations:                 make([]EvaluationCapacityReservation, 0, len(usage.Reservations)),
 	}

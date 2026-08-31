@@ -149,7 +149,7 @@ func (r *PromptEvaluationRepository) ListForReview(
 }
 
 func (r *PromptEvaluationRepository) listPromptEvaluationPOs(ctx context.Context, filter bson.M, limit int) ([]promptEvaluationCatalogPO, error) {
-	cursor, err := r.Find(ctx, filter, options.Find().
+	cursor, err := r.Find(ctx, legacyPromptEvaluationFilter(filter), options.Find().
 		SetSort(bson.D{{Key: "created_at", Value: -1}, {Key: "domain_id", Value: -1}}).
 		SetProjection(bson.M{
 			"_id": 0, "domain_id": 1, "created_at": 1, "release": 1, "status": 1, "version": 1,

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
@@ -86,35 +87,55 @@ func (e *Evaluator) Identity() domainevaluation.SemanticEvaluatorSpec {
 	return e.identity
 }
 
-func (e *Evaluator) Evaluate(ctx context.Context, request appevaluation.SemanticEvaluationRequest) (appevaluation.SemanticEvaluationResult, error) {
+func (e *Evaluator) Evaluate(ctx context.Context, request appevaluation.SemanticEvaluationRequest) (appevaluation.SemanticEvaluationOutcome, error) {
 	if e == nil {
-		return appevaluation.SemanticEvaluationResult{}, fmt.Errorf("AI explanation semantic evaluator is required")
+		return appevaluation.SemanticEvaluationOutcome{}, fmt.Errorf("AI explanation semantic evaluator is required")
 	}
 	payload, err := buildPayload(request)
 	if err != nil {
-		return appevaluation.SemanticEvaluationResult{}, err
+		return appevaluation.SemanticEvaluationOutcome{}, err
+	}
+	startedAt := time.Now().UTC()
+	outcome := appevaluation.SemanticEvaluationOutcome{
+		InvocationID: request.InvocationID, EvaluatorVersion: e.identity.Version, StartedAt: startedAt,
 	}
 	response, err := e.provider.Generate(ctx, appport.ProviderRequest{
 		InvocationID: request.InvocationID, Route: e.route,
 		SystemMessage: systemMessageV1, TaskMessage: taskMessageV1,
 		DataPreamble: dataPreambleV1, DataJSON: payload, OutputSchema: e.schema,
 	})
+	outcome.ProviderCallCount = 1
+	outcome.FinishedAt = semanticFinishTime(startedAt)
 	if err != nil {
-		return appevaluation.SemanticEvaluationResult{}, err
+		return semanticProviderFailure(outcome, err), nil
 	}
-	if response == nil || len(response.RawOutput) == 0 || len(response.RawOutput) > maxEvaluatorOutputBytes {
-		return appevaluation.SemanticEvaluationResult{}, fmt.Errorf("AI explanation semantic Provider output is missing or too large")
+	if response == nil {
+		return semanticFailure(outcome, domainevaluation.SemanticOutputMissingOrTooLarge, "semantic Provider returned no output", true, false), nil
 	}
-	if err := validateReceipt(response.Receipt, request.InvocationID, e.route.ExecutionSpec); err != nil {
-		return appevaluation.SemanticEvaluationResult{}, err
+	if len(response.RawOutput) <= maxEvaluatorOutputBytes {
+		outcome.RawOutput = append([]byte(nil), response.RawOutput...)
 	}
 	validationOutput := response.OutputForValidation()
+	if len(validationOutput) <= maxEvaluatorOutputBytes {
+		outcome.NormalizedOutput = append([]byte(nil), validationOutput...)
+	}
+	if response.Receipt.Validate() == nil {
+		receipt := response.Receipt
+		outcome.ProviderReceipt = &receipt
+	}
+	if len(response.RawOutput) == 0 || len(response.RawOutput) > maxEvaluatorOutputBytes ||
+		len(validationOutput) == 0 || len(validationOutput) > maxEvaluatorOutputBytes {
+		return semanticFailure(outcome, domainevaluation.SemanticOutputMissingOrTooLarge, "semantic Provider output is missing or too large", true, false), nil
+	}
+	if err := validateReceipt(response.Receipt, request.InvocationID, e.route.ExecutionSpec); err != nil {
+		return semanticFailure(outcome, domainevaluation.SemanticReceiptInvalid, "semantic Provider receipt did not match the frozen evaluation", false, false), nil
+	}
 	if err := validateSchema(e.compiled, validationOutput); err != nil {
-		return appevaluation.SemanticEvaluationResult{}, err
+		return semanticFailure(outcome, domainevaluation.SemanticOutputSchemaInvalid, "semantic Provider output violated the frozen schema", true, false), nil
 	}
 	decoded, err := decodeOutput(validationOutput)
 	if err != nil {
-		return appevaluation.SemanticEvaluationResult{}, err
+		return semanticFailure(outcome, domainevaluation.SemanticOutputDecodeInvalid, "semantic Provider output could not be decoded", true, false), nil
 	}
 	decisions := make([]appevaluation.SemanticDecision, 0, len(decoded.Decisions))
 	for _, decision := range decoded.Decisions {
@@ -123,15 +144,60 @@ func (e *Evaluator) Evaluate(ctx context.Context, request appevaluation.Semantic
 			Status: domainevaluation.AssertionStatus(decision.Status), Detail: decision.Detail,
 		})
 	}
-	return appevaluation.SemanticEvaluationResult{
-		EvaluatorVersion: e.identity.Version, ProviderReceipt: response.Receipt,
+	result := appevaluation.SemanticEvaluationResult{
+		EvaluatorVersion: e.identity.Version,
 		Scores: domainevaluation.SemanticScores{
 			Faithfulness: decoded.Scores.Faithfulness, CrossDimensionQuality: decoded.Scores.CrossDimensionQuality,
 			SuggestionActionability: decoded.Scores.SuggestionActionability,
 			AudienceClarity:         decoded.Scores.AudienceClarity, Concision: decoded.Scores.Concision,
 		},
 		Rationale: decoded.Rationale, Decisions: decisions,
-	}, nil
+	}
+	outcome.Result = &result
+	return outcome, nil
+}
+
+func semanticProviderFailure(outcome appevaluation.SemanticEvaluationOutcome, err error) appevaluation.SemanticEvaluationOutcome {
+	code := domainevaluation.SemanticProviderFailed
+	safeMessage := "semantic Provider call failed"
+	retryable := false
+	resultUnknown := false
+	var providerErr *appport.ProviderError
+	if errors.As(err, &providerErr) && providerErr != nil {
+		outcome.ProviderFailureCode = strings.TrimSpace(providerErr.Code)
+		if strings.TrimSpace(providerErr.SafeMessage) != "" {
+			safeMessage = strings.TrimSpace(providerErr.SafeMessage)
+		}
+		retryable = providerErr.Retryable
+		resultUnknown = providerErr.ResultUnknown
+		if resultUnknown {
+			code = domainevaluation.SemanticResultUnknown
+			retryable = false
+		}
+	}
+	return semanticFailure(outcome, code, safeMessage, retryable, resultUnknown)
+}
+
+func semanticFailure(
+	outcome appevaluation.SemanticEvaluationOutcome,
+	code, safeMessage string,
+	retryable, resultUnknown bool,
+) appevaluation.SemanticEvaluationOutcome {
+	failure := domainevaluation.AttemptFailure{
+		Stage: string(domainevaluation.FailureStageSemanticEvaluation), Code: code,
+		SafeMessage: safeMessage, Retryable: retryable, ResultUnknown: resultUnknown,
+	}
+	outcome.Result = nil
+	outcome.Failure = &failure
+	return outcome
+}
+
+func semanticFinishTime(startedAt time.Time) time.Time {
+	finishedAt := time.Now().UTC()
+	if finishedAt.Before(startedAt) {
+		return startedAt
+	}
+	return finishedAt
 }
 
 type inputPayload struct {

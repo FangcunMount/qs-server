@@ -2,6 +2,14 @@ package eventpayload
 
 import "time"
 
+const (
+	AIExplanationPromptEvaluationEvidenceVersionV2       = "v2"
+	AIExplanationPromptEvaluationExecutionKindGeneration = "generation"
+	AIExplanationPromptEvaluationExecutionKindSemantic   = "semantic"
+	AIExplanationPromptEvaluationRequiredSlotsPerCase    = 5
+	AIExplanationPromptEvaluationMaxExecutionsPerTarget  = 2
+)
+
 // AIExplanationRequestedData is the minimal durable wake-up fact for one
 // manually requested AI explanation. Frozen input, Prompt and provider details
 // stay in the Generation aggregate and never travel through MQ.
@@ -82,11 +90,16 @@ type AIExplanationFailedData struct {
 // address for exactly one synthetic evaluation attempt. The immutable suite
 // input and release identities stay in PromptEvaluationRun.
 type AIExplanationPromptEvaluationStepRequestedData struct {
-	OrgID       int64     `json:"org_id"`
-	RunID       string    `json:"run_id"`
-	CaseID      string    `json:"case_id"`
-	Attempt     int       `json:"attempt"`
-	RecheckID   string    `json:"recheck_id,omitempty"`
-	RequestedBy string    `json:"requested_by"`
-	RequestedAt time.Time `json:"requested_at"`
+	OrgID            int64     `json:"org_id"`
+	RunID            string    `json:"run_id"`
+	CaseID           string    `json:"case_id"`
+	Attempt          int       `json:"attempt"`
+	RecheckID        string    `json:"recheck_id,omitempty"`
+	EvidenceVersion  string    `json:"evidence_version,omitempty"`
+	ExecutionKind    string    `json:"execution_kind,omitempty"`
+	SlotOrdinal      int       `json:"slot_ordinal,omitempty"`
+	CandidateID      string    `json:"candidate_id,omitempty"`
+	ExecutionOrdinal int       `json:"execution_ordinal,omitempty"`
+	RequestedBy      string    `json:"requested_by"`
+	RequestedAt      time.Time `json:"requested_at"`
 }

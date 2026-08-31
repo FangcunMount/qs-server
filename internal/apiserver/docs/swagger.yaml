@@ -1060,6 +1060,319 @@ definitions:
       version:
         type: integer
     type: object
+  handler.AIExplanationEvaluationV2AssertionWire:
+    properties:
+      detail:
+        type: string
+      evaluator:
+        type: string
+      hard:
+        type: boolean
+      ordinal:
+        type: integer
+      scope:
+        type: string
+      status:
+        type: string
+      type:
+        type: string
+    type: object
+  handler.AIExplanationEvaluationV2CandidateWire:
+    properties:
+      accepted_at:
+        type: string
+      accepted_semantic_execution_id:
+        type: string
+      assertions:
+        items:
+          $ref: '#/definitions/handler.AIExplanationEvaluationV2AssertionWire'
+        type: array
+      candidate_id:
+        type: string
+      generation_execution_id:
+        type: string
+      normalized_output_fingerprint:
+        type: string
+      review_ready:
+        type: boolean
+      semantic_execution_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  handler.AIExplanationEvaluationV2CheckpointWire:
+    properties:
+      candidate_id:
+        type: string
+      case_id:
+        type: string
+      claimed_at:
+        type: string
+      dispatch_started_at:
+        type: string
+      execution_ordinal:
+        type: integer
+      id:
+        type: string
+      kind:
+        type: string
+      lease_expires_at:
+        type: string
+      phase:
+        type: string
+      slot_ordinal:
+        type: integer
+    type: object
+  handler.AIExplanationEvaluationV2ExecutionWire:
+    properties:
+      candidate_id:
+        type: string
+      case_id:
+        type: string
+      execution_id:
+        type: string
+      execution_ordinal:
+        type: integer
+      failure:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2FailureWire'
+      finished_at:
+        type: string
+      invocation_id:
+        type: string
+      kind:
+        type: string
+      normalized_output_bytes:
+        type: integer
+      provider_call_count:
+        type: integer
+      provider_receipt_present:
+        type: boolean
+      raw_output_bytes:
+        type: integer
+      semantic_result:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2SemanticWire'
+      slot_ordinal:
+        type: integer
+      started_at:
+        type: string
+      status:
+        type: string
+    type: object
+  handler.AIExplanationEvaluationV2FailureWire:
+    properties:
+      code:
+        type: string
+      disposition:
+        type: string
+      evidence_refs:
+        items:
+          type: string
+        type: array
+      kind:
+        type: string
+      result_unknown:
+        type: boolean
+      retryable:
+        type: boolean
+      safe_message:
+        type: string
+      stage:
+        type: string
+    type: object
+  handler.AIExplanationEvaluationV2GateReasonWire:
+    properties:
+      code:
+        type: string
+      detail:
+        type: string
+      evidence_refs:
+        items:
+          type: string
+        type: array
+      gate:
+        type: string
+    type: object
+  handler.AIExplanationEvaluationV2GateWire:
+    properties:
+      evaluated_at:
+        type: string
+      gate_passes:
+        additionalProperties:
+          type: boolean
+        type: object
+      passed:
+        type: boolean
+      reasons:
+        items:
+          $ref: '#/definitions/handler.AIExplanationEvaluationV2GateReasonWire'
+        type: array
+    type: object
+  handler.AIExplanationEvaluationV2HumanReviewWire:
+    properties:
+      candidate_id:
+        type: string
+      decision:
+        type: string
+      reason:
+        type: string
+      reviewed_at:
+        type: string
+      reviewer:
+        type: string
+      role:
+        type: string
+    type: object
+  handler.AIExplanationEvaluationV2OutputWire:
+    properties:
+      execution_id:
+        type: string
+      kind:
+        type: string
+      normalized_output:
+        type: string
+      raw_output:
+        type: string
+    type: object
+  handler.AIExplanationEvaluationV2ReviewRequest:
+    properties:
+      candidate_id:
+        type: string
+      decision:
+        type: string
+      reason:
+        maxLength: 1000
+        type: string
+      role:
+        type: string
+    required:
+    - candidate_id
+    - decision
+    - reason
+    - role
+    type: object
+  handler.AIExplanationEvaluationV2SemanticDecisionWire:
+    properties:
+      detail:
+        type: string
+      ordinal:
+        type: integer
+      scope:
+        type: string
+      status:
+        type: string
+      type:
+        type: string
+    type: object
+  handler.AIExplanationEvaluationV2SemanticScoresWire:
+    properties:
+      audience_clarity:
+        type: integer
+      concision:
+        type: integer
+      cross_dimension_quality:
+        type: integer
+      faithfulness:
+        type: integer
+      suggestion_actionability:
+        type: integer
+    type: object
+  handler.AIExplanationEvaluationV2SemanticWire:
+    properties:
+      decisions:
+        items:
+          $ref: '#/definitions/handler.AIExplanationEvaluationV2SemanticDecisionWire'
+        type: array
+      evaluator_version:
+        type: string
+      output_fingerprint:
+        type: string
+      rationale:
+        type: string
+      scores:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2SemanticScoresWire'
+    type: object
+  handler.AIExplanationEvaluationV2SlotWire:
+    properties:
+      candidate:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2CandidateWire'
+      case_id:
+        type: string
+      generation_execution_ids:
+        items:
+          type: string
+        type: array
+      slot_ordinal:
+        type: integer
+      status:
+        type: string
+    type: object
+  handler.AIExplanationEvaluationV2Wire:
+    properties:
+      accepted_candidates:
+        type: integer
+      closed_at:
+        type: string
+      created_at:
+        type: string
+      execution:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2CheckpointWire'
+      execution_policy_id:
+        type: string
+      execution_policy_version:
+        type: string
+      finalized_at:
+        type: string
+      gate:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2GateWire'
+      gate_policy_id:
+        type: string
+      gate_policy_version:
+        type: string
+      generation_executions:
+        items:
+          $ref: '#/definitions/handler.AIExplanationEvaluationV2ExecutionWire'
+        type: array
+      human_reviews:
+        items:
+          $ref: '#/definitions/handler.AIExplanationEvaluationV2HumanReviewWire'
+        type: array
+      organization_id:
+        type: integer
+      release_fingerprint:
+        type: string
+      request_reason:
+        type: string
+      requested_by:
+        type: string
+      required_candidates:
+        type: integer
+      reserved_provider_invocations:
+        type: integer
+      result_unknown_resolutions:
+        items:
+          $ref: '#/definitions/handler.AIExplanationResultUnknownResolutionWire'
+        type: array
+      review_ready_candidates:
+        type: integer
+      run_id:
+        type: string
+      schema_version:
+        type: string
+      semantic_executions:
+        items:
+          $ref: '#/definitions/handler.AIExplanationEvaluationV2ExecutionWire'
+        type: array
+      slots:
+        items:
+          $ref: '#/definitions/handler.AIExplanationEvaluationV2SlotWire'
+        type: array
+      status:
+        type: string
+      unresolved_result_unknown_count:
+        type: integer
+      version:
+        type: integer
+    type: object
   handler.AIExplanationFinalizationWire:
     properties:
       actor:
@@ -1375,6 +1688,41 @@ definitions:
       human_reviews:
         type: integer
     type: object
+  handler.AIExplanationResultUnknownResolutionWire:
+    properties:
+      acknowledged_duplicate_call_and_cost_risk:
+        type: boolean
+      actor:
+        type: string
+      decision:
+        type: string
+      execution_id:
+        type: string
+      reason:
+        type: string
+      resolved_at:
+        type: string
+    type: object
+  handler.AIExplanationResultUnknownV2Request:
+    properties:
+      acknowledged_duplicate_call_and_cost_risk:
+        type: boolean
+      confirm:
+        type: boolean
+      decision:
+        type: string
+      execution_id:
+        type: string
+      reason:
+        maxLength: 1000
+        type: string
+    required:
+    - acknowledged_duplicate_call_and_cost_risk
+    - confirm
+    - decision
+    - execution_id
+    - reason
+    type: object
   handler.AIExplanationReviewAttemptSummary:
     properties:
       attempt:
@@ -1428,6 +1776,8 @@ definitions:
         type: array
       semantic:
         $ref: '#/definitions/handler.AIExplanationSemanticReceiptWire'
+      semantic_execution:
+        $ref: '#/definitions/handler.AIExplanationSemanticExecutionWire'
       semantic_scores:
         $ref: '#/definitions/handler.AIExplanationSemanticScoresWire'
     type: object
@@ -1492,6 +1842,41 @@ definitions:
       provider:
         $ref: '#/definitions/handler.AIExplanationProviderSpecWire'
       version:
+        type: string
+    type: object
+  handler.AIExplanationSemanticExecutionWire:
+    properties:
+      evaluator_version:
+        type: string
+      failure:
+        $ref: '#/definitions/handler.AIExplanationAttemptFailureWire'
+      finished_at:
+        type: string
+      invocation_id:
+        type: string
+      normalized_output:
+        type: string
+      normalized_output_bytes:
+        type: integer
+      normalized_output_present:
+        type: boolean
+      provider_call_count:
+        type: integer
+      provider_failure_code:
+        type: string
+      provider_receipt:
+        $ref: '#/definitions/handler.AIExplanationProviderReceiptWire'
+      provider_receipt_present:
+        type: boolean
+      raw_output:
+        type: string
+      raw_output_bytes:
+        type: integer
+      raw_output_present:
+        type: boolean
+      started_at:
+        type: string
+      status:
         type: string
     type: object
   handler.AIExplanationSemanticReceiptWire:
@@ -11039,45 +11424,6 @@ paths:
       summary: 分页查询 AI 解读 Prompt 评测审核目录
       tags:
       - AI-Explanation-Administration
-    post:
-      consumes:
-      - application/json
-      description: 请求体必须确认 v1 最多执行 70 次 Provider 调用；start 同时执行机构 collecting 并发和 UTC
-        日调用预算准入，仅持久化预算预留、评测与首个事件，不同步调用模型。
-      parameters:
-      - description: 成本确认与审计理由
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handler.AIExplanationEvaluationStartRequest'
-      produces:
-      - application/json
-      responses:
-        "202":
-          description: Accepted
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/handler.AIExplanationEvaluationRunWire'
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 手动启动 AI 解读 Prompt 在线评测
-      tags:
-      - AI-Explanation-Administration
   /internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}:
     get:
       parameters:
@@ -11173,47 +11519,6 @@ paths:
       summary: 查询一条 AI 解读评测记录的复测历史
       tags:
       - AI-Explanation-Administration
-    post:
-      consumes:
-      - application/json
-      description: 创建独立诊断证据；不覆盖源记录，不参与 35+35 发布门禁，最多调用两次 Provider。
-      parameters:
-      - description: 源评测运行 ID
-        in: path
-        name: run_id
-        required: true
-        type: string
-      - description: 合成 case ID
-        in: path
-        name: case_id
-        required: true
-        type: string
-      - description: 源重复序号
-        in: path
-        name: attempt
-        required: true
-        type: integer
-      - description: 复测成本确认与审计理由
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handler.AIExplanationAttemptRecheckRequest'
-      produces:
-      - application/json
-      responses:
-        "202":
-          description: Accepted
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/handler.AIExplanationAttemptRecheckWire'
-              type: object
-      summary: 重新测评一条 AI 解读 Prompt 评测记录
-      tags:
-      - AI-Explanation-Administration
   /internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}/rechecks/{recheck_id}:
     get:
       parameters:
@@ -11250,131 +11555,6 @@ paths:
                   $ref: '#/definitions/handler.AIExplanationAttemptRecheckWire'
               type: object
       summary: 查询一份 AI 解读单条复测证据
-      tags:
-      - AI-Explanation-Administration
-  /internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/cancel:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: 评测运行 ID
-        in: path
-        name: run_id
-        required: true
-        type: string
-      - description: 取消理由
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handler.AIExplanationEvaluationCancelRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/handler.AIExplanationEvaluationRunWire'
-              type: object
-      summary: 取消尚未 dispatch 的 AI 解读 Prompt 在线评测
-      tags:
-      - AI-Explanation-Administration
-  /internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/finalize:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: 评测运行 ID
-        in: path
-        name: run_id
-        required: true
-        type: string
-      - description: 终审理由
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handler.AIExplanationFinalizeRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/handler.AIExplanationEvaluationRunWire'
-              type: object
-      summary: 终审 AI 解读 Prompt 评测
-      tags:
-      - AI-Explanation-Administration
-  /internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/recover:
-    post:
-      consumes:
-      - application/json
-      description: 仅重新投递当前待执行或租约已过期的 attempt；dispatch 结果未知时不会重放原 Provider 调用。
-      parameters:
-      - description: 评测运行 ID
-        in: path
-        name: run_id
-        required: true
-        type: string
-      - description: 剩余链路成本确认与恢复理由
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handler.AIExplanationEvaluationRecoverRequest'
-      produces:
-      - application/json
-      responses:
-        "202":
-          description: Accepted
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/handler.AIExplanationEvaluationRunWire'
-              type: object
-      summary: 人工恢复 AI 解读 Prompt 在线评测
-      tags:
-      - AI-Explanation-Administration
-  /internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/reviews:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: 评测运行 ID
-        in: path
-        name: run_id
-        required: true
-        type: string
-      - description: 复核命令
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handler.AIExplanationReviewRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/handler.AIExplanationEvaluationRunWire'
-              type: object
-      summary: 记录 AI 解读 Prompt 人工复核
       tags:
       - AI-Explanation-Administration
   /internal/v1/interpretation/assessments/{assessment_id}/lifecycle:
@@ -11963,6 +12143,224 @@ paths:
       summary: 系统治理-承压保护
       tags:
       - System-Governance
+  /internal/v2/interpretation/ai-explanation/prompt-evaluations:
+    post:
+      consumes:
+      - application/json
+      description: 冻结当前 execution/gate policy，确认最坏 140 次 Provider 调用，并在一个事务中预留容量、写
+        Evidence 和首个 Outbox 事件。
+      parameters:
+      - description: 成本确认与审计理由
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.AIExplanationEvaluationStartRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationEvaluationV2Wire'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 启动 v2 AI 解读 Prompt 评测
+      tags:
+      - AI-Explanation-Administration
+  /internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}:
+    get:
+      parameters:
+      - description: 评测 Run ID
+        in: path
+        name: run_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationEvaluationV2Wire'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询 v2 AI 解读 Prompt 评测证据摘要
+      tags:
+      - AI-Explanation-Administration
+  /internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/executions/{execution_id}/output:
+    get:
+      description: 仅详情接口返回 raw/normalized output；Run 摘要只返回字节数和收据存在性。
+      parameters:
+      - description: 评测 Run ID
+        in: path
+        name: run_id
+        required: true
+        type: string
+      - description: 执行 ID
+        in: path
+        name: execution_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationEvaluationV2OutputWire'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询一条 v2 执行的 Provider 输出证据
+      tags:
+      - AI-Explanation-Administration
+  /internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/finalize:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 评测 Run ID
+        in: path
+        name: run_id
+        required: true
+        type: string
+      - description: 终审理由
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.AIExplanationFinalizeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationEvaluationV2Wire'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 按冻结 G1-G5 Policy 终审 v2 Evidence
+      tags:
+      - AI-Explanation-Administration
+  /internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/result-unknown/resolve:
+    post:
+      consumes:
+      - application/json
+      description: 授权替换执行或取消 Run；两种决定都必须确认潜在重复调用与计费风险。授权替换与下一 Outbox 事件原子提交。
+      parameters:
+      - description: 评测 Run ID
+        in: path
+        name: run_id
+        required: true
+        type: string
+      - description: 未知结果决定与风险确认
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.AIExplanationResultUnknownV2Request'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationEvaluationV2Wire'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 人工处理 v2 result_unknown
+      tags:
+      - AI-Explanation-Administration
+  /internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/reviews:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 评测 Run ID
+        in: path
+        name: run_id
+        required: true
+        type: string
+      - description: Candidate、角色、决定与理由
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.AIExplanationEvaluationV2ReviewRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationEvaluationV2Wire'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 记录一个 v2 Candidate 的人工审核
+      tags:
+      - AI-Explanation-Administration
   /internal/v2/statistics/runs:
     get:
       responses:

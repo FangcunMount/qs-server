@@ -112,6 +112,94 @@ func TestOnlineRunnerPersistsProviderFailureAndCompletesInventory(t *testing.T) 
 	}
 }
 
+func TestOnlineRunnerPersistsSemanticFailureOutcomeWithoutLosingCandidateEvidence(t *testing.T) {
+	provider := &onlineProviderStub{}
+	semantic := &onlineSemanticStub{
+		failAt: 1,
+		failure: &domainevaluation.AttemptFailure{
+			Stage: string(domainevaluation.FailureStageSemanticEvaluation),
+			Code:  domainevaluation.SemanticOutputSchemaInvalid, SafeMessage: "semantic output violated the frozen schema", Retryable: true,
+		},
+	}
+	repository := &onlineEvidenceRepository{}
+	runner := newOnlineRunner(t, promptResolverStub{}, provider, semantic, repository)
+
+	result, err := runner.RunV1(context.Background(), evaluation.OnlineRunCommand{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var failed *domainevaluation.AttemptRecord
+	for _, attempt := range result.Run.Attempts() {
+		if attempt.Failure != nil && attempt.Failure.Code == domainevaluation.SemanticOutputSchemaInvalid {
+			copy := attempt
+			failed = &copy
+			break
+		}
+	}
+	if failed == nil || failed.Semantic != nil || failed.SemanticExecution == nil ||
+		failed.SemanticExecution.Status() != domainevaluation.ExecutionStatusFailed ||
+		failed.SemanticExecution.ProviderReceipt == nil || len(failed.SemanticExecution.RawOutput) == 0 ||
+		len(failed.SemanticExecution.NormalizedOutput) == 0 || len(failed.NormalizedOutput) == 0 {
+		t.Fatalf("semantic failure evidence = %#v", failed)
+	}
+}
+
+func TestOnlineRunnerClassifiesInvalidSemanticDecisionsWithoutDroppingExecutionEvidence(t *testing.T) {
+	provider := &onlineProviderStub{}
+	semantic := &onlineSemanticStub{invalidDecisionsAt: 1}
+	repository := &onlineEvidenceRepository{}
+	runner := newOnlineRunner(t, promptResolverStub{}, provider, semantic, repository)
+
+	result, err := runner.RunV1(context.Background(), evaluation.OnlineRunCommand{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, attempt := range result.Run.Attempts() {
+		if attempt.Failure == nil || attempt.Failure.Code != domainevaluation.SemanticDecisionContractInvalid {
+			continue
+		}
+		if attempt.SemanticExecution == nil || attempt.SemanticExecution.Failure == nil ||
+			attempt.SemanticExecution.ProviderReceipt == nil || len(attempt.SemanticExecution.RawOutput) == 0 {
+			t.Fatalf("semantic decision failure evidence = %#v", attempt)
+		}
+		return
+	}
+	t.Fatal("semantic decision failure was not recorded")
+}
+
+func TestOnlineRunnerPersistsMismatchedSemanticReceiptAsFailureEvidence(t *testing.T) {
+	provider := &onlineProviderStub{}
+	mismatched := aiexplanation.ProviderReceipt{
+		InvocationID: "different-semantic-invocation", RequestID: "judge-mismatch",
+		Provider: "different-judge", Model: "different-model", Latency: time.Millisecond,
+	}
+	semantic := &onlineSemanticStub{
+		failAt: 1, receiptOverride: &mismatched,
+		failure: &domainevaluation.AttemptFailure{
+			Stage: string(domainevaluation.FailureStageSemanticEvaluation),
+			Code:  domainevaluation.SemanticReceiptInvalid, SafeMessage: "semantic receipt did not match the frozen execution",
+		},
+	}
+	repository := &onlineEvidenceRepository{}
+	runner := newOnlineRunner(t, promptResolverStub{}, provider, semantic, repository)
+
+	result, err := runner.RunV1(context.Background(), evaluation.OnlineRunCommand{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, attempt := range result.Run.Attempts() {
+		if attempt.Failure == nil || attempt.Failure.Code != domainevaluation.SemanticReceiptInvalid {
+			continue
+		}
+		if attempt.SemanticExecution == nil || attempt.SemanticExecution.ProviderReceipt == nil ||
+			attempt.SemanticExecution.ProviderReceipt.RequestID != mismatched.RequestID {
+			t.Fatalf("mismatched semantic receipt evidence = %#v", attempt.SemanticExecution)
+		}
+		return
+	}
+	t.Fatal("mismatched semantic receipt was not persisted")
+}
+
 func TestOnlineRunnerRechecksOneAttemptWithoutMutatingSourceEvidence(t *testing.T) {
 	provider := &onlineProviderStub{}
 	semantic := &onlineSemanticStub{}
@@ -505,7 +593,13 @@ func (onlineSafetyStub) Evaluate(_ context.Context, _ appport.SafetyRequest) (ap
 	return appport.SafetyResult{Allowed: true, ValidatorVersion: "test-safety/v1"}, nil
 }
 
-type onlineSemanticStub struct{ calls int }
+type onlineSemanticStub struct {
+	calls              int
+	failAt             int
+	failure            *domainevaluation.AttemptFailure
+	invalidDecisionsAt int
+	receiptOverride    *aiexplanation.ProviderReceipt
+}
 
 func (*onlineSemanticStub) Identity() domainevaluation.SemanticEvaluatorSpec {
 	return domainevaluation.SemanticEvaluatorSpec{
@@ -523,7 +617,7 @@ func (*onlineSemanticStub) Identity() domainevaluation.SemanticEvaluatorSpec {
 	}
 }
 
-func (s *onlineSemanticStub) Evaluate(_ context.Context, request evaluation.SemanticEvaluationRequest) (evaluation.SemanticEvaluationResult, error) {
+func (s *onlineSemanticStub) Evaluate(_ context.Context, request evaluation.SemanticEvaluationRequest) (evaluation.SemanticEvaluationOutcome, error) {
 	s.calls++
 	decisions := make([]evaluation.SemanticDecision, 0, len(request.Assertions))
 	for _, assertion := range request.Assertions {
@@ -532,17 +626,36 @@ func (s *onlineSemanticStub) Evaluate(_ context.Context, request evaluation.Sema
 			Status: domainevaluation.AssertionPassed, Detail: "synthetic evaluator passed the frozen obligation",
 		})
 	}
-	return evaluation.SemanticEvaluationResult{
+	if s.invalidDecisionsAt == s.calls {
+		decisions = nil
+	}
+	receipt := aiexplanation.ProviderReceipt{
+		InvocationID: request.InvocationID, RequestID: "judge-" + request.InvocationID,
+		Provider: "judge-provider", Model: "judge-model", InputTokens: 50, OutputTokens: 50, Latency: 5 * time.Millisecond,
+	}
+	if s.receiptOverride != nil && (s.failAt == 0 || s.failAt == s.calls) {
+		receipt = *s.receiptOverride
+	}
+	result := evaluation.SemanticEvaluationResult{
 		EvaluatorVersion: "synthetic-semantic/v1",
-		ProviderReceipt: aiexplanation.ProviderReceipt{
-			InvocationID: request.InvocationID, RequestID: "judge-" + request.InvocationID,
-			Provider: "judge-provider", Model: "judge-model", InputTokens: 50, OutputTokens: 50, Latency: 5 * time.Millisecond,
-		},
 		Scores: domainevaluation.SemanticScores{
 			Faithfulness: 5, CrossDimensionQuality: 5, SuggestionActionability: 5, AudienceClarity: 5, Concision: 5,
 		},
 		Rationale: "synthetic rubric evaluation", Decisions: decisions,
-	}, nil
+	}
+	now := time.Now().UTC()
+	raw := []byte(`{"schema_version":"synthetic-semantic/v1"}`)
+	outcome := evaluation.SemanticEvaluationOutcome{
+		InvocationID: request.InvocationID, EvaluatorVersion: "synthetic-semantic/v1",
+		StartedAt: now, FinishedAt: now, ProviderCallCount: 1, ProviderReceipt: &receipt,
+		RawOutput: raw, NormalizedOutput: append([]byte(nil), raw...), Result: &result,
+	}
+	if s.failAt == s.calls && s.failure != nil {
+		failure := *s.failure
+		outcome.Result = nil
+		outcome.Failure = &failure
+	}
+	return outcome, nil
 }
 
 type onlineEvidenceRepository struct {

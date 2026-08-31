@@ -14,6 +14,7 @@ import (
 	domainevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/evaluation"
 	domaingeneration "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/generation"
 	domainrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/run"
+	eventpayload "github.com/FangcunMount/qs-server/internal/pkg/eventing/payload"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/retrygovernance"
 	"google.golang.org/grpc"
@@ -35,15 +36,17 @@ type promptEvaluationRecheckRunner interface {
 	RunRecheckV1(context.Context, aievaluation.RunRecheckCommand) (*aievaluation.OnlineRecheckResult, error)
 }
 
+type promptEvaluationV2StepRunner interface {
+	RunStepV2(context.Context, aievaluation.OnlineStepV2Command) (*aievaluation.OnlineStepV2Result, error)
+}
+
 func NewAIExplanationAutomationService(executor aiexecution.Executor, evaluationRunner PromptEvaluationStepRunner) *AIExplanationAutomationService {
 	return &AIExplanationAutomationService{executor: executor, evaluationRunner: evaluationRunner}
 }
 
 func (s *AIExplanationAutomationService) ExecutePromptEvaluationStep(ctx context.Context, request *interpretationpb.ExecutePromptEvaluationStepRequest) (*interpretationpb.ExecutePromptEvaluationStepResponse, error) {
-	if request == nil || request.GetOrgId() <= 0 || strings.TrimSpace(request.GetRunId()) == "" ||
-		strings.TrimSpace(request.GetCaseId()) == "" || request.GetAttempt() < 1 ||
-		strings.TrimSpace(request.GetRequestedBy()) == "" || strings.TrimSpace(request.GetEventId()) == "" {
-		return nil, status.Error(codes.InvalidArgument, "prompt evaluation step address and audit are required")
+	if err := validatePromptEvaluationStepRequest(request); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	runID, err := meta.ParseID(request.GetRunId())
 	if err != nil || runID.IsZero() {
@@ -56,6 +59,9 @@ func (s *AIExplanationAutomationService) ExecutePromptEvaluationStep(ctx context
 	}
 	if s.evaluationRunner == nil {
 		return nil, status.Error(codes.FailedPrecondition, "AI explanation prompt evaluation is not configured")
+	}
+	if strings.TrimSpace(request.GetEvidenceVersion()) == eventpayload.AIExplanationPromptEvaluationEvidenceVersionV2 {
+		return s.executePromptEvaluationStepV2(ctx, request, runID, eventID)
 	}
 	if recheckIDText := strings.TrimSpace(request.GetRecheckId()); recheckIDText != "" {
 		recheckID, parseErr := meta.ParseID(recheckIDText)
@@ -98,6 +104,63 @@ func (s *AIExplanationAutomationService) ExecutePromptEvaluationStep(ctx context
 		return nil, status.Error(codes.Internal, "AI explanation prompt evaluation step failed")
 	}
 	return mapPromptEvaluationStepResult(request, result)
+}
+
+func (s *AIExplanationAutomationService) executePromptEvaluationStepV2(
+	ctx context.Context,
+	request *interpretationpb.ExecutePromptEvaluationStepRequest,
+	runID meta.ID,
+	eventID string,
+) (*interpretationpb.ExecutePromptEvaluationStepResponse, error) {
+	runner, supported := s.evaluationRunner.(promptEvaluationV2StepRunner)
+	if !supported {
+		return nil, status.Error(codes.FailedPrecondition, "AI explanation prompt evaluation v2 is not configured")
+	}
+	command := aievaluation.OnlineStepV2Command{
+		RunID: runID, ExecutionKind: domainevaluation.EvidenceExecutionKind(strings.TrimSpace(request.GetExecutionKind())),
+		CaseID: strings.TrimSpace(request.GetCaseId()), SlotOrdinal: int(request.GetSlotOrdinal()),
+		CandidateID: strings.TrimSpace(request.GetCandidateId()), ExecutionOrdinal: int(request.GetExecutionOrdinal()),
+		Owner: eventID, RequestedOrgID: request.GetOrgId(), RequestedBy: strings.TrimSpace(request.GetRequestedBy()),
+	}
+	result, err := runner.RunStepV2(ctx, command)
+	if err != nil {
+		if errors.Is(err, aievaluation.ErrAttemptExecutionBusy) {
+			return nil, status.Error(codes.Aborted, "prompt evaluation v2 execution is leased")
+		}
+		slog.ErrorContext(ctx, "AI explanation prompt evaluation v2 step failed",
+			slog.String("run_id", runID.String()), slog.String("execution_kind", request.GetExecutionKind()),
+			slog.String("case_id", request.GetCaseId()), slog.Int("slot_ordinal", int(request.GetSlotOrdinal())),
+			slog.String("candidate_id", request.GetCandidateId()), slog.Int("execution_ordinal", int(request.GetExecutionOrdinal())),
+			slog.String("event_id", eventID), slog.String("error", err.Error()),
+		)
+		return nil, status.Error(codes.Internal, "AI explanation prompt evaluation v2 step failed")
+	}
+	return mapPromptEvaluationStepV2Result(request, command, result)
+}
+
+func validatePromptEvaluationStepRequest(request *interpretationpb.ExecutePromptEvaluationStepRequest) error {
+	if request == nil || request.GetOrgId() <= 0 || strings.TrimSpace(request.GetRunId()) == "" ||
+		strings.TrimSpace(request.GetCaseId()) == "" || strings.TrimSpace(request.GetRequestedBy()) == "" ||
+		strings.TrimSpace(request.GetEventId()) == "" {
+		return fmt.Errorf("prompt evaluation step address and audit are required")
+	}
+	version := strings.TrimSpace(request.GetEvidenceVersion())
+	if version == eventpayload.AIExplanationPromptEvaluationEvidenceVersionV2 {
+		kind := domainevaluation.EvidenceExecutionKind(strings.TrimSpace(request.GetExecutionKind()))
+		if request.GetAttempt() != 0 || strings.TrimSpace(request.GetRecheckId()) != "" || !kind.IsValid() ||
+			request.GetSlotOrdinal() < 1 || request.GetSlotOrdinal() > int32(domainevaluation.RequiredRepetitionsPerCase) ||
+			request.GetExecutionOrdinal() < 1 || request.GetExecutionOrdinal() > 2 ||
+			(kind == domainevaluation.EvidenceExecutionGeneration && strings.TrimSpace(request.GetCandidateId()) != "") ||
+			(kind == domainevaluation.EvidenceExecutionSemantic && strings.TrimSpace(request.GetCandidateId()) == "") {
+			return fmt.Errorf("prompt evaluation v2 exact execution address is required")
+		}
+		return nil
+	}
+	if version != "" || request.GetAttempt() < 1 || strings.TrimSpace(request.GetExecutionKind()) != "" ||
+		request.GetSlotOrdinal() != 0 || strings.TrimSpace(request.GetCandidateId()) != "" || request.GetExecutionOrdinal() != 0 {
+		return fmt.Errorf("prompt evaluation evidence version is invalid")
+	}
+	return nil
 }
 
 func mapPromptEvaluationRecheckResult(request *interpretationpb.ExecutePromptEvaluationStepRequest, result *aievaluation.OnlineRecheckResult) (*interpretationpb.ExecutePromptEvaluationStepResponse, error) {
@@ -147,6 +210,36 @@ func mapPromptEvaluationStepResult(request *interpretationpb.ExecutePromptEvalua
 		return nil, status.Error(codes.Internal, "prompt evaluation step did not preserve cancellation")
 	}
 	return response, nil
+}
+
+func mapPromptEvaluationStepV2Result(
+	request *interpretationpb.ExecutePromptEvaluationStepRequest,
+	command aievaluation.OnlineStepV2Command,
+	result *aievaluation.OnlineStepV2Result,
+) (*interpretationpb.ExecutePromptEvaluationStepResponse, error) {
+	if result == nil || result.Evidence == nil || result.Evidence.RunID.String() != request.GetRunId() {
+		return nil, status.Error(codes.Internal, "prompt evaluation v2 step returned mismatched evidence")
+	}
+	switch result.Status {
+	case aievaluation.OnlineStepV2Progressed, aievaluation.OnlineStepV2AlreadyCompleted,
+		aievaluation.OnlineStepV2AwaitingReview, aievaluation.OnlineStepV2Blocked, aievaluation.OnlineStepV2Canceled:
+	default:
+		return nil, status.Error(codes.Internal, "prompt evaluation v2 step returned unsupported status")
+	}
+	if result.Status != aievaluation.OnlineStepV2Canceled && !result.Evidence.HasTerminalExecution(command.Action()) {
+		return nil, status.Error(codes.Internal, "prompt evaluation v2 step did not persist its target")
+	}
+	if result.Status == aievaluation.OnlineStepV2AwaitingReview && result.Evidence.Status != domainevaluation.EvidenceStatusAwaitingReview ||
+		result.Status == aievaluation.OnlineStepV2Blocked && result.Evidence.Status != domainevaluation.EvidenceStatusBlocked ||
+		result.Status == aievaluation.OnlineStepV2Canceled && result.Evidence.Status != domainevaluation.EvidenceStatusCanceled {
+		return nil, status.Error(codes.Internal, "prompt evaluation v2 step returned inconsistent status")
+	}
+	return &interpretationpb.ExecutePromptEvaluationStepResponse{
+		Success: true, RunId: request.GetRunId(), CaseId: request.GetCaseId(), Status: string(result.Status),
+		RunStatus: string(result.Evidence.Status), EvidenceVersion: request.GetEvidenceVersion(),
+		ExecutionKind: request.GetExecutionKind(), SlotOrdinal: request.GetSlotOrdinal(),
+		CandidateId: request.GetCandidateId(), ExecutionOrdinal: request.GetExecutionOrdinal(),
+	}, nil
 }
 
 func (s *AIExplanationAutomationService) RegisterService(server *grpc.Server) {

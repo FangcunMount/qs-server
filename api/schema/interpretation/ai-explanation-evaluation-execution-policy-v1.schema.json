@@ -104,19 +104,15 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "max_executions_per_case",
+        "max_executions_per_slot",
         "max_executions_per_run"
       ],
       "properties": {
-        "max_executions_per_case": {
-          "type": "integer",
-          "minimum": 5,
-          "maximum": 32
+        "max_executions_per_slot": {
+          "const": 2
         },
         "max_executions_per_run": {
-          "type": "integer",
-          "minimum": 35,
-          "maximum": 224
+          "const": 70
         }
       }
     },
@@ -129,14 +125,10 @@
       ],
       "properties": {
         "max_executions_per_candidate": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 8
+          "const": 2
         },
         "max_executions_per_run": {
-          "type": "integer",
-          "minimum": 35,
-          "maximum": 280
+          "const": 70
         }
       }
     },

@@ -181,8 +181,8 @@ func TestPromptEvaluationEvidenceV2SeparatesSlotsAndExecutions(t *testing.T) {
 	slots := objectAt(t, schema, "properties", "slots")
 	assertNumberValue(t, slots, "minItems", 35)
 	assertNumberValue(t, slots, "maxItems", 35)
-	assertNumberValue(t, objectAt(t, schema, "properties", "generation_executions"), "maxItems", 224)
-	assertNumberValue(t, objectAt(t, schema, "properties", "semantic_executions"), "maxItems", 280)
+	assertNumberValue(t, objectAt(t, schema, "properties", "generation_executions"), "maxItems", 70)
+	assertNumberValue(t, objectAt(t, schema, "properties", "semantic_executions"), "maxItems", 70)
 	assertNumberValue(t, objectAt(t, schema, "properties", "human_reviews"), "maxItems", 70)
 	preflight := objectAt(t, schema, "properties", "preflight_evidence")
 	assertNumberValue(t, preflight, "minItems", 1)
@@ -190,6 +190,24 @@ func TestPromptEvaluationEvidenceV2SeparatesSlotsAndExecutions(t *testing.T) {
 	assertStringEnum(t, objectAt(t, schema, "properties", "status"), []string{
 		"requested", "collecting", "blocked", "awaiting_review", "approved", "rejected", "canceled",
 	})
+	assertStringEnum(t, objectAt(t, schema, "$defs", "generationExecution", "properties", "status"), []string{
+		"succeeded", "failed", "result_unknown",
+	})
+	assertStringEnum(t, objectAt(t, schema, "$defs", "semanticExecution", "properties", "status"), []string{
+		"succeeded", "failed", "result_unknown",
+	})
+}
+
+func TestAIExplanationExecutionPolicyBoundsRecoveryPerSlot(t *testing.T) {
+	t.Parallel()
+
+	schema := loadAIExplanationSchema(t, "ai-explanation-evaluation-execution-policy-v1.schema.json")
+	generation := objectAt(t, schema, "$defs", "generationBudget", "properties")
+	assertNumberValue(t, objectAt(t, generation, "max_executions_per_slot"), "const", 2)
+	assertNumberValue(t, objectAt(t, generation, "max_executions_per_run"), "const", 70)
+	semantic := objectAt(t, schema, "$defs", "semanticBudget", "properties")
+	assertNumberValue(t, objectAt(t, semantic, "max_executions_per_candidate"), "const", 2)
+	assertNumberValue(t, objectAt(t, semantic, "max_executions_per_run"), "const", 70)
 }
 
 func TestAIExplanationGovernanceSchemasAreEmbeddedAndCompilable(t *testing.T) {
