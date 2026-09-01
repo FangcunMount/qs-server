@@ -440,6 +440,50 @@ func TestAIExplanationPromptTemplateUsesOnlyAllowlistedPlaceholders(t *testing.T
 	}
 }
 
+func TestAIExplanationPromptTemplateV2KeepsContractAndAddsMeasuredGuardrails(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(repoRoot(t), "api", "schema", "interpretation", "ai-explanation-prompt-template-v2.md")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read v2 prompt template: %v", err)
+	}
+	text := string(data)
+	for _, required := range []string{
+		"`prompt_version` | `v2`",
+		"弱化词不能把因果内容变成允许",
+		"不得根据原始分数",
+		"focus areas 只是本次请求的组织重点",
+		"不得同时包含父维度与其任何子孙维度",
+		"不能据此确认维度间因果关系",
+	} {
+		if !strings.Contains(text, required) {
+			t.Errorf("v2 prompt template must contain %q", required)
+		}
+	}
+
+	placeholderPattern := regexp.MustCompile(`\{\{([a-z_]+)\}\}`)
+	actual := map[string]bool{}
+	for _, match := range placeholderPattern.FindAllStringSubmatch(text, -1) {
+		actual[match[1]] = true
+	}
+	want := []string{
+		"locale", "focus_areas_json", "allowed_insight_kinds_json", "insight_min_items",
+		"insight_max_items", "min_dimension_refs", "max_dimension_refs",
+		"allow_parent_child_in_same_insight", "allowed_suggestion_origins_json",
+		"allowed_suggestion_categories_json", "suggestion_min_items", "suggestion_max_items",
+		"max_actions_per_item", "max_output_characters", "provider_payload_json",
+	}
+	if len(actual) != len(want) {
+		t.Fatalf("v2 prompt placeholders = %v, want %v", sortedKeys(actual), want)
+	}
+	for _, name := range want {
+		if !actual[name] {
+			t.Errorf("v2 prompt template is missing placeholder %q", name)
+		}
+	}
+}
+
 func TestAIExplanationPromptEvaluationSuiteIsClosedAndTraceable(t *testing.T) {
 	t.Parallel()
 

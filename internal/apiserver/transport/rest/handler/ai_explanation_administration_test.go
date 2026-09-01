@@ -144,6 +144,17 @@ func TestAIExplanationEvaluationV2WireExposesFrozenReleaseAndCandidateReviewEvid
 		len(detail.HumanReviews) != 1 || detail.HumanReviews[0].Role != string(domainevaluation.ReviewRoleAssessmentSemantics) {
 		t.Fatalf("candidate evidence is incomplete: %#v", detail)
 	}
+
+	run.Release.Suite = domainevaluation.FrozenContractRef{
+		ID: appevaluation.SuiteIDV2, Version: appevaluation.SuiteVersionV2, Fingerprint: appevaluation.SuiteFingerprintV2,
+	}
+	v2Detail, err := evaluationV2CandidateEvidenceWire(run, "candidate:1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v2Detail.CaseID != detail.CaseID || !bytes.Equal(v2Detail.AssessmentInput, detail.AssessmentInput) {
+		t.Fatalf("v2 frozen Candidate evidence drifted: %#v", v2Detail)
+	}
 }
 
 func TestAIExplanationAdministrationListEvaluationsUsesBoundedSummaryQuery(t *testing.T) {

@@ -1,15 +1,17 @@
-# AI Explanation Prompt v1 验证矩阵
+# AI Explanation Prompt 验证矩阵
 
 ## 结论与状态
 
-`cross-dimension-participant-scale/v1` 的发布门槛不是“能生成一段看起来合理的文字”，而是：在固定 Profile、固定输入、固定 Provider Route 配置下重复运行，结构、引用、策略和安全硬门禁全部通过，同时跨维度质量、忠实度、建议可操作性和表达清晰度达到阈值。
+Prompt 的发布门槛不是“能生成一段看起来合理的文字”，而是：在固定 Profile、固定输入、固定 Provider Route 配置下重复运行，结构、引用、策略和安全硬门禁全部通过，同时跨维度质量、忠实度、建议可操作性和表达清晰度达到阈值。
 
-Prompt 发布状态仍是 `planned`。仓库已经实现离线 preflight、确定性候选输出判定、可恢复的在线 attempt runner、独立 `SemanticEvaluator`、不可变证据、双角色 ReviewService 和受授权的治理 API；生产也已执行多轮真实冻结评测。最近一次 `v6/v3 + deepseek-v4-pro` 复测仍有 1 条生成输出未通过 `AIExplanationOutput v1`，因此 first-attempt 结构硬门禁失败，该 Run 不能进入审核或发布。当前 `v7/v4` 候选把 DeepSeek 调用冻结为强制单函数 `strict=true` 通道，并继续执行服务端完整 Schema/引用/Profile/Safety 校验。尚未产生 v7/v4 的 35 次真实生成、35 次真实裁判、70 条双角色人工复核和 approved 报告，因此现有实现与历史 Run 均不表示 Prompt 已可发布，更不表示 AI Explanation 已具备用户生产能力。
+Prompt 发布状态仍是 `planned`。生产 Run `635356837083886126` 冻结的是 Prompt/Suite/Profile v1 与 Provider Route v6/v3；它已经收集 35 个 Candidate 和 35 份 semantic receipt，并进入 `awaiting_review`，但尚无服务端持久化的双角色人工审核和 approved Gate，因此不能作为 Profile 发布证据。对这些候选的本地预审只用于发现 Prompt 问题，不属于不可变审核事实，也不能替代 Batch Review。
+
+`cross-dimension-participant-scale/v2` 是基于上述输出暴露的问题形成的最小候选版本：禁止把共现写成因果链或机制，禁止在缺少等级/常模时创造“中等”“平衡”等分类，限制 focus area 只能影响组织顺序，并禁止在不允许层级组合时把父子维度写进同一洞察。仓库保留 v1 只读解析，新 Run 在该变更发布后才会冻结 v2；v2 尚未完成 35 次真实生成、35 次真实裁判、70 条双角色人工复核和 approved Gate，不能视为已经发布。
 
 规范性文件：
 
-- [Prompt Template v1](./ai-explanation-prompt-template-v1.md)
-- [Prompt Evaluation Cases v1](./ai-explanation-prompt-evaluation-cases-v1.json)
+- 历史只读：[Prompt Template v1](./ai-explanation-prompt-template-v1.md)、[Prompt Evaluation Cases v1](./ai-explanation-prompt-evaluation-cases-v1.json)
+- 当前候选：[Prompt Template v2](./ai-explanation-prompt-template-v2.md)、[Prompt Evaluation Cases v2](./ai-explanation-prompt-evaluation-cases-v2.json)
 - [AIExplanationInput v1](./ai-explanation-input-v1.schema.json)
 - [AIExplanationOutput v1](./ai-explanation-output-v1.schema.json)
 - [AIExplanationProfile v1](./ai-explanation-profile-v1.schema.json)
@@ -26,11 +28,11 @@ Prompt 发布状态仍是 `planned`。仓库已经实现离线 preflight、确�
 | decision kind | `score_range` |
 | model fixture | `prompt-eval-scale/v1` |
 | locale | `zh-CN` |
-| Prompt | `cross-dimension-participant-scale/v1` |
-| Profile | `participant-scale-score-range-default/v1`；selector 固定为 `participant + scale + score_range`，不绑定具体 model code/version |
-| Profile fingerprint | `sha256:f01557e0009b4320911a325495049c4e5a6e5a301c95129c1f85d5a4adf12aef` |
-| suite Git blob SHA | `94044088a539c9c289cb29be88f2c4d9b27eec23` |
-| suite SHA-256 | `sha256:7f5393124cb09517284d590cca652803db4a2aa86f9eaa07b684f7b46953d3b7` |
+| Prompt | `cross-dimension-participant-scale/v2` |
+| Profile | `participant-scale-score-range-default/v2`；selector 固定为 `participant + scale + score_range`，不绑定具体 model code/version |
+| Profile fingerprint | `sha256:5d31fde9c2912626bb618419f95f108d5276ed000b4d13f5ddf25d5ea44e1d7a` |
+| suite Git blob SHA | `b747b9ba7727413e9318d9cc9b7e9b41ce2fc6e1` |
+| suite SHA-256 | `sha256:625633a8d376ddacd82b1f588bf71869aa6a719d0cd17cd03e1b894293fa6e3d` |
 | generation cases | 7 |
 | preflight cases | 1 |
 | 每个 generation case 重复次数 | 5 |

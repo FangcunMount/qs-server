@@ -51,7 +51,7 @@ func (r *OnlineRunner) PrepareRequestedV2(ctx context.Context, command OnlineSta
 	if err := command.GatePolicy.Validate(); err != nil {
 		return nil, err
 	}
-	_, preflightReport, prepared, err := r.prepareV1(ctx)
+	_, preflightReport, prepared, err := r.prepareV2(ctx)
 	result := &OnlineRunV2Result{Preflight: preflightReport}
 	if err != nil {
 		return result, err
@@ -401,7 +401,7 @@ func (r *OnlineRunner) completeUnknownV2(
 }
 
 func (r *OnlineRunner) prepareExecutableV2(ctx context.Context, value *domainevaluation.PromptEvaluationEvidenceV2) (*preparedOnlineRun, error) {
-	_, _, prepared, err := r.prepareV1(ctx)
+	_, _, prepared, err := r.prepareV2(ctx)
 	if err != nil {
 		return nil, err
 	}

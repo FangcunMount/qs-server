@@ -622,11 +622,8 @@ func evaluationV2CandidateEvidenceWire(value *domainevaluation.PromptEvaluationE
 	if value == nil || candidateID == "" {
 		return nil, cberrors.WithCode(code.ErrPageNotFound, "AI explanation evaluation v2 candidate not found")
 	}
-	suite, err := appevaluation.LoadV1()
+	suite, err := appevaluation.LoadFrozen(value.Release.Suite.ID, value.Release.Suite.Version, value.Release.Suite.Fingerprint)
 	if err != nil {
-		return nil, err
-	}
-	if value.Release.Suite.ID != appevaluation.SuiteIDV1 || value.Release.Suite.Version != appevaluation.SuiteVersionV1 || value.Release.Suite.Fingerprint != appevaluation.SuiteFingerprintV1 {
 		return nil, cberrors.WithCode(code.ErrPageNotFound, "AI explanation evaluation v2 frozen suite is unavailable")
 	}
 	var slot *domainevaluation.CandidateSlot

@@ -16,6 +16,9 @@ var aiExplanationProfileV1 []byte
 //go:embed ai-explanation-prompt-evaluation-cases-v1.json
 var aiExplanationPromptEvaluationCasesV1 []byte
 
+//go:embed ai-explanation-prompt-evaluation-cases-v2.json
+var aiExplanationPromptEvaluationCasesV2 []byte
+
 //go:embed ai-explanation-semantic-evaluation-output-v1.schema.json
 var aiExplanationSemanticEvaluationOutputV1 []byte
 
@@ -49,6 +52,13 @@ func AIExplanationProfileV1() []byte {
 // path.
 func AIExplanationPromptEvaluationCasesV1() []byte {
 	return append([]byte(nil), aiExplanationPromptEvaluationCasesV1...)
+}
+
+// AIExplanationPromptEvaluationCasesV2 returns an isolated copy of the
+// canonical v2 evaluation suite. v1 remains embedded for historical evidence
+// reads; new evaluation Runs execute v2 after the controlled cutover.
+func AIExplanationPromptEvaluationCasesV2() []byte {
+	return append([]byte(nil), aiExplanationPromptEvaluationCasesV2...)
 }
 
 func AIExplanationSemanticEvaluationOutputV1() []byte {
