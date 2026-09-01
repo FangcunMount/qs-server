@@ -224,13 +224,17 @@ func (p *Provider) Generate(ctx context.Context, request appport.ProviderRequest
 	if err := ctx.Err(); err != nil {
 		return nil, providerError(classifyContextKind(err), classifyContextCode(err), false, false, err)
 	}
+	format, err := p.responseFormat(request)
+	if err != nil {
+		return nil, providerError(domainrun.FailureKindProviderTransport, "provider_request_invalid", false, false, err)
+	}
 	body, err := json.Marshal(responseRequest{
 		Model: request.Route.ExecutionSpec.ResolvedModel, Instructions: request.SystemMessage,
 		Input: []inputMessage{
 			{Role: "developer", Content: []inputTextContent{{Type: "input_text", Text: request.TaskMessage}}},
 			{Role: "user", Content: []inputTextContent{{Type: "input_text", Text: request.DataPreamble + "\n\n" + string(request.DataJSON)}}},
 		},
-		Text:            textConfiguration{Format: p.responseFormat(request)},
+		Text:            textConfiguration{Format: format},
 		Reasoning:       reasoningForRoute(request.Route.ReasoningEffort),
 		MaxOutputTokens: request.Route.MaxOutputTokens, Store: p.storeFlag(),
 	})
@@ -383,14 +387,22 @@ func isJSONObject(value []byte) bool {
 	return json.Unmarshal(value, &object) == nil && object != nil
 }
 
-func (p *Provider) responseFormat(request appport.ProviderRequest) responseFormat {
+func (p *Provider) responseFormat(request appport.ProviderRequest) (responseFormat, error) {
 	if request.Route.EffectiveStructuredOutputMode() == appport.StructuredOutputModeJSONObject {
-		return responseFormat{Type: appport.StructuredOutputModeJSONObject}
+		return responseFormat{Type: appport.StructuredOutputModeJSONObject}, nil
+	}
+	schema := json.RawMessage(request.OutputSchema.JSON)
+	if p.name == ProviderDeepSeek {
+		compatible, err := deepSeekCompatibleOutputSchema(request.OutputSchema.JSON)
+		if err != nil {
+			return responseFormat{}, err
+		}
+		schema = compatible
 	}
 	return responseFormat{
 		Type: appport.StructuredOutputModeJSONSchema, Name: normalizedSchemaName(request.OutputSchema.Name),
-		Strict: p.strictSchemaFlag(), Schema: json.RawMessage(request.OutputSchema.JSON),
-	}
+		Strict: p.strictSchemaFlag(), Schema: schema,
+	}, nil
 }
 
 func reasoningForRoute(effort string) *reasoningConfig {

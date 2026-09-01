@@ -9,7 +9,7 @@ import (
 	workeroptions "github.com/FangcunMount/qs-server/internal/worker/options"
 )
 
-func TestProductionAIExplanationDeepSeekResponsesRollbackContract(t *testing.T) {
+func TestProductionAIExplanationDeepSeekResponsesCompatibleSchemaContract(t *testing.T) {
 	apiOptions := apiserveroptions.NewOptions()
 	loadConfig(t, filepath.Join(repoRoot(t), "configs", "apiserver.prod.yaml"), apiOptions)
 	workerOptions := workeroptions.NewOptions()
@@ -23,8 +23,8 @@ func TestProductionAIExplanationDeepSeekResponsesRollbackContract(t *testing.T) 
 	if ai.Model != "deepseek-v4-pro" || ai.Evaluation.Model != "deepseek-v4-pro" {
 		t.Fatalf("production AI models = %q/%q, want deepseek-v4-pro/deepseek-v4-pro", ai.Model, ai.Evaluation.Model)
 	}
-	if ai.RouteRevision != "v6" || ai.Evaluation.RouteRevision != "v3" {
-		t.Fatalf("production AI route revisions = %q/%q, want v6/v3", ai.RouteRevision, ai.Evaluation.RouteRevision)
+	if ai.RouteRevision != "v8" || ai.Evaluation.RouteRevision != "v5" {
+		t.Fatalf("production AI route revisions = %q/%q, want v8/v5", ai.RouteRevision, ai.Evaluation.RouteRevision)
 	}
 	if ai.StructuredOutputMode != apiserveroptions.AIExplanationStructuredOutputJSONSchema ||
 		ai.Evaluation.StructuredOutputMode != apiserveroptions.AIExplanationStructuredOutputJSONSchema {

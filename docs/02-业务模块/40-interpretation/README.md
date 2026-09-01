@@ -2,7 +2,7 @@
 
 > 状态：本篇已按当前源码重写。Interpretation 的生成生命周期、重试治理、查询模型与报告模板版本发布均已落地；历史路由已完成显式冻结，运行时对缺失身份执行 fail-closed。
 
-> AI 解读是本模块下用户流量关闭、治理与评测开启的独立发布候选能力：标准报告继续自动生成并保持唯一权威，Participant 未来可在报告可用后手动触发一次性 AI 补充解读。现行 v1 机器契约、领域/Application、Participant REST/gRPC、Outbox/Worker、OpenAI/DeepSeek Adapter、确定性校验、耐久 Prompt 评测、双角色复核、Profile 治理、容量治理、数据生命周期和 Mongo migration 已接线；当前主 Provider 为 DeepSeek，生成/裁判使用已发布的 v6/v3 Responses Route，OpenAI 保留为备选。最新生产 Run `635231960356106798` 暴露出固定 35 次、任一失败冻结整轮、裁判失败证据不足的问题。当前工作树已完成 Semantic Outcome、7 个稳定失败码、v1 `AttemptRecord` 兼容证据，以及轻量 v2 的固定 Slot、单文档 Mongo CAS、容量预留、Outbox/Worker/gRPC、分步 Runner、有界补生成/补裁判、收齐后审核、G1～G5 Gate 和 Profile 发布约束；这些仓库能力尚未发布，也未做生产 BSON 测量、Recheck 或完整 v2 Run。多集合、增量审核和完整双运行时仍是有证据触发的未来架构。首个 Profile、70 条人工复核、灰度和生产验收仍未完成，见[AI 解读核心设计](./25-核心设计-AI解读.md)及其中的[近期最小改造与架构分析](./25-核心设计-AI解读.md#十六近期最小改造与架构分析)。
+> AI 解读是本模块下用户流量关闭、治理与评测开启的独立发布候选能力：标准报告继续自动生成并保持唯一权威，Participant 未来可在报告可用后手动触发一次性 AI 补充解读。轻量 v2 已部署，固定 Slot、有界 Generation/Semantic Execution、失败证据、双角色复核、G1～G5 Gate、Profile 治理、容量与生命周期均已接线。生产 Run `635398770544095790` 已形成 35 个 Candidate 和 35 份 semantic receipt，但 39 次生成中保留了 4 次输出契约失败，契约符合率为 `35/39 = 89.74%`，低于冻结的 95% 门槛，因此不能成为 approved 发布证据。当前分支仅调整 DeepSeek Responses 的线协议 Schema 投影并发布新 Route revision，服务端完整契约校验保持不变；多集合、增量审核和完整双运行时继续作为有证据触发的未来架构。`participant_enabled=false`，首个 approved Evidence、生产 Profile、灰度和生产验收仍未完成，见[AI 解读核心设计](./25-核心设计-AI解读.md)及其中的[近期最小改造与架构分析](./25-核心设计-AI解读.md#十六近期最小改造与架构分析)。
 
 ## 1. 30 秒结论
 
@@ -241,7 +241,7 @@ AssessmentID、TesteeID 和 OrgID 是报告关联事实，不是授权凭据。�
 | 多行为人查询 | 已实现 | participant、clinician、administration、operations |
 | 报告模板版本发布 | 已实现 | 5 个 TemplateID 的历史版与当前版共 10 个 release；ModelCatalog、Outcome 和 Artifact 路由已显式冻结 |
 | 成品自包含 Builder 与 ContentSchema 来源 | 已实现 | Artifact 持久化精确来源，提交器校验与实际 Builder 一致；历史成品已完成等价补齐 |
-| AI 解读 | 治理已启用 / 用户流量关闭 / 评测模型规划改造 | 标准报告之上的手动、一次性补充能力；v6/v3 已发布，最新 Run 暴露零失败门禁和裁判证据缺口；需先完成有效 Candidate 补样、执行可靠性 Gate 和裁判证据，再完成 70 条审核、Profile 和生产验收 |
+| AI 解读 | 治理已启用 / 用户流量关闭 / v2 受控验证 | 标准报告之上的手动、一次性补充能力；当前 Run 已补齐 35 个 Candidate/35 份裁判证据，但 4/39 次生成契约失败使 G3 必然不通过；待发布 DeepSeek Responses Schema 兼容修复并新建 Run 验证 |
 | 多 ReportType 并存查询 | 待明确 | 当前 catalog 以 AssessmentID 作为唯一当前报告键 |
 
 ## 10. 文档地图
@@ -256,7 +256,7 @@ AssessmentID、TesteeID 和 OrgID 是报告关联事实，不是授权凭据。�
 | 22 | [核心设计：状态、幂等、重试与可靠提交](./22-核心设计-状态、幂等、重试与可靠提交.md) | 已重写 | 双状态机、lease、重试治理和终态事务 |
 | 23 | [核心设计：报告成品、版本与数据一致性](./23-核心设计-报告成品、版本与数据一致性.md) | 已重写 | 不可变成品、模板版本、Mongo 数据关系和历史兼容 |
 | 24 | [核心设计：查询模型、授权与 Audience 投影](./24-核心设计-查询模型、授权与Audience投影.md) | 已重写 | catalog、行为人用例和报告章节可见性 |
-| 25 | [核心设计：AI 解读](./25-核心设计-AI解读.md) | 治理已启用 / 用户功能未开放 / v2 仓库闭环待发布 | 一次性 AI 补充解读、Semantic 证据、单文档轻量 Slot、有界补样、质量发布与未来架构触发条件 |
+| 25 | [核心设计：AI 解读](./25-核心设计-AI解读.md) | 治理已启用 / 用户功能未开放 / v2 生产验证中 | 一次性 AI 补充解读、Semantic 证据、单文档轻量 Slot、有界补样、质量发布与未来架构触发条件 |
 | 30 | [关键链路：从 Outcome 到 InterpretReport](./30-关键链路-从Outcome到InterpretReport.md) | 已重写 | Worker 如何从 Outcome 事件走到可靠报告提交 |
 | 31 | [关键链路：从报告查询到组合状态](./31-关键链路-从报告查询到组合状态.md) | 已重写 | 报告查询、Audience 投影和客户端完成状态如何组合 |
 | 90 | [设计问题与重构清单](./90-设计问题与重构清单.md) | 当前版本有条件通过 | 已关闭主链风险、兼容观察与未来业务/容量触发项 |

@@ -88,7 +88,7 @@ func TestDeepSeekStrictToolProviderForcesOneSchemaConstrainedFunctionCall(t *tes
 	}
 }
 
-func TestDeepSeekStrictToolSchemaSupportsBothFrozenProductionContracts(t *testing.T) {
+func TestDeepSeekCompatibleOutputSchemaSupportsBothFrozenProductionContracts(t *testing.T) {
 	for _, testCase := range []struct {
 		name string
 		raw  []byte
@@ -97,7 +97,7 @@ func TestDeepSeekStrictToolSchemaSupportsBothFrozenProductionContracts(t *testin
 		{name: "semantic evaluator", raw: interpretationschema.AIExplanationSemanticEvaluationOutputV1()},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			encoded, err := deepSeekStrictToolSchema(testCase.raw)
+			encoded, err := deepSeekCompatibleOutputSchema(testCase.raw)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -105,7 +105,7 @@ func TestDeepSeekStrictToolSchemaSupportsBothFrozenProductionContracts(t *testin
 			if err := json.Unmarshal(encoded, &schema); err != nil {
 				t.Fatal(err)
 			}
-			assertDeepSeekStrictSchemaSubset(t, schema, "$")
+			assertDeepSeekCompatibleSchemaSubset(t, schema, "$")
 		})
 	}
 }
@@ -168,7 +168,7 @@ func TestDeepSeekThinkingMappingIsBounded(t *testing.T) {
 	}
 }
 
-func assertDeepSeekStrictSchemaSubset(t *testing.T, node map[string]any, path string) {
+func assertDeepSeekCompatibleSchemaSubset(t *testing.T, node map[string]any, path string) {
 	t.Helper()
 	for _, forbidden := range []string{"$defs", "$ref", "const", "allOf", "if", "then", "pattern", "minItems", "maxItems", "minLength", "maxLength", "minimum", "maximum", "uniqueItems"} {
 		if _, exists := node[forbidden]; exists {
@@ -188,7 +188,7 @@ func assertDeepSeekStrictSchemaSubset(t *testing.T, node map[string]any, path st
 			if !ok {
 				t.Fatalf("property %s.%s is not an object", path, name)
 			}
-			assertDeepSeekStrictSchemaSubset(t, child, path+"."+name)
+			assertDeepSeekCompatibleSchemaSubset(t, child, path+"."+name)
 		}
 	}
 	if rawItems, exists := node["items"]; exists {
@@ -196,7 +196,7 @@ func assertDeepSeekStrictSchemaSubset(t *testing.T, node map[string]any, path st
 		if !ok {
 			t.Fatalf("array items at %s are not an object", path)
 		}
-		assertDeepSeekStrictSchemaSubset(t, items, path+"[]")
+		assertDeepSeekCompatibleSchemaSubset(t, items, path+"[]")
 	}
 	if variants, ok := node["anyOf"].([]any); ok {
 		for index, rawVariant := range variants {
@@ -204,7 +204,7 @@ func assertDeepSeekStrictSchemaSubset(t *testing.T, node map[string]any, path st
 			if !ok {
 				t.Fatalf("anyOf variant at %s[%d] is not an object", path, index)
 			}
-			assertDeepSeekStrictSchemaSubset(t, variant, path)
+			assertDeepSeekCompatibleSchemaSubset(t, variant, path)
 		}
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	interpretationschema "github.com/FangcunMount/qs-server/api/schema/interpretation"
 	appport "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/port"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation"
 	domainrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/run"
@@ -107,6 +108,11 @@ func TestDeepSeekProviderUsesResponsesSchemaWithoutOpenAIStrictExtension(t *test
 		Endpoint: server.URL, APIKey: "test-deepseek-secret", HTTPClient: server.Client(),
 	})
 	request := validRequestForProvider(ProviderDeepSeek, "deepseek-v4-flash")
+	canonicalSchema := interpretationschema.AIExplanationOutputV1()
+	request.OutputSchema = appport.StructuredOutputSchema{
+		Version: aiexplanation.OutputSchemaVersionV1, Name: "AIExplanationOutput v1", JSON: canonicalSchema,
+		Fingerprint: aiexplanation.NewFingerprint(canonicalSchema),
+	}
 	request.Route.ReasoningEffort = "low"
 	response, err := provider.Generate(context.Background(), request)
 	if err != nil {
@@ -125,6 +131,18 @@ func TestDeepSeekProviderUsesResponsesSchemaWithoutOpenAIStrictExtension(t *test
 	}
 	if _, exists := captured["store"]; exists {
 		t.Fatalf("DeepSeek request must omit the unsupported store parameter: %#v", captured)
+	}
+	wireSchema := format["schema"].(map[string]any)
+	if _, exists := wireSchema["$defs"]; exists {
+		t.Fatalf("DeepSeek Responses schema must inline definitions: %#v", wireSchema)
+	}
+	insight := wireSchema["properties"].(map[string]any)["integrated_insights"].(map[string]any)["items"].(map[string]any)
+	evidenceRef := insight["properties"].(map[string]any)["evidence_refs"].(map[string]any)["items"].(map[string]any)
+	if evidenceRef["type"] != "object" || evidenceRef["additionalProperties"] != false {
+		t.Fatalf("DeepSeek nested evidence ref schema = %#v", evidenceRef)
+	}
+	if _, exists := evidenceRef["$ref"]; exists {
+		t.Fatalf("DeepSeek Responses schema retained a nested ref: %#v", evidenceRef)
 	}
 	reasoning := captured["reasoning"].(map[string]any)
 	if reasoning["effort"] != "low" {
