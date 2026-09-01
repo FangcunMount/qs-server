@@ -146,7 +146,7 @@ transport 的精确 HTTP 映射以 handler 和 OpenAPI 为准；application serv
 
 ## 10. 关闭顺序
 
-collection 当前先关闭 HTTP，排空可靠提交入口，再依次关闭 gRPC clients、数据库/Redis profile、IAM authz sync、IAM module 和 Container。这一顺序避免在途提交尚未结束时先断开 apiserver 或持久化依赖。
+collection 当前先关闭 HTTP，排空可靠提交入口，再依次关闭 gRPC clients、数据库/Redis profile、IAM module 和 Container。collection 不再持有 IAM authz version subscriber；这一顺序避免在途提交尚未结束时先断开 apiserver 或持久化依赖。
 
 详细对比见[优雅关闭与资源释放](./07-优雅关闭与资源释放.md)。
 

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "ca4e59c82f6036f7f13a3149dadac31dbfb8149c",
+    "sha": "236c25b4f3c9eeae2845fd13a0689c6826503cb8",
     "verified_on": "2026-09-01"
   },
   "status_policy": {
@@ -3932,8 +3932,8 @@
       "owner": "statistics",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "236c25b4f3c9eeae2845fd13a0689c6826503cb8",
+        "verified_on": "2026-09-01"
       },
       "fact_sources": [
         {
@@ -3959,8 +3959,8 @@
           "path": "internal/apiserver/domain/statistics/**/*.go",
           "selector": "package statistics",
           "result": "matched",
-          "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-          "verified_on": "2026-08-20"
+          "source_sha": "236c25b4f3c9eeae2845fd13a0689c6826503cb8",
+          "verified_on": "2026-09-01"
         }
       ],
       "production_evidence": {
@@ -4110,8 +4110,8 @@
       "owner": "statistics",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "236c25b4f3c9eeae2845fd13a0689c6826503cb8",
+        "verified_on": "2026-09-01"
       },
       "fact_sources": [
         {
@@ -4137,8 +4137,8 @@
           "path": "internal/apiserver/domain/statistics/**/*.go",
           "selector": "package statistics",
           "result": "matched",
-          "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-          "verified_on": "2026-08-20"
+          "source_sha": "236c25b4f3c9eeae2845fd13a0689c6826503cb8",
+          "verified_on": "2026-09-01"
         }
       ],
       "production_evidence": {
@@ -4168,8 +4168,8 @@
       "owner": "statistics",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-        "verified_on": "2026-08-20"
+        "source_sha": "236c25b4f3c9eeae2845fd13a0689c6826503cb8",
+        "verified_on": "2026-09-01"
       },
       "fact_sources": [
         {
@@ -4195,8 +4195,8 @@
           "path": "internal/apiserver/domain/statistics/**/*.go",
           "selector": "package statistics",
           "result": "matched",
-          "source_sha": "e9f085e308009fbfdeb6d188c1af91e85c19b103",
-          "verified_on": "2026-08-20"
+          "source_sha": "236c25b4f3c9eeae2845fd13a0689c6826503cb8",
+          "verified_on": "2026-09-01"
         }
       ],
       "production_evidence": {
@@ -5064,8 +5064,8 @@
       "owner": "infra",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "42bf9cc901fa2f79b0b731b131bd6473352588b7",
-        "verified_on": "2026-08-28"
+        "source_sha": "236c25b4f3c9eeae2845fd13a0689c6826503cb8",
+        "verified_on": "2026-09-01"
       },
       "fact_sources": [
         {
@@ -5098,8 +5098,8 @@
           "kind": "command",
           "command": "go test -count=1 ./internal/pkg/cache/... ./internal/apiserver/cache/... ./internal/collection-server/cache ./internal/pkg/redisruntime/... ./internal/apiserver/application/systemgovernance/... ./internal/apiserver/transport/rest/... ./internal/pkg/signalcatalog ./internal/pkg/configcontract ./internal/pkg/architecture",
           "result": "passed",
-          "source_sha": "42bf9cc901fa2f79b0b731b131bd6473352588b7",
-          "verified_on": "2026-08-28"
+          "source_sha": "236c25b4f3c9eeae2845fd13a0689c6826503cb8",
+          "verified_on": "2026-09-01"
         },
         {
           "kind": "command",

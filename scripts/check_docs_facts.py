@@ -2955,7 +2955,6 @@ def process_lifecycle_contract_issues() -> list[Issue]:
             "closeHTTP",
             'AddShutdownHook("close grpc clients"',
             'AddShutdownHook("close database"',
-            'AddShutdownHook("stop authz sync"',
             'AddShutdownHook("close iam"',
             'AddShutdownHook("cleanup container"',
         ],
@@ -2975,7 +2974,7 @@ def process_lifecycle_contract_issues() -> list[Issue]:
     }
     doc_tokens = {
         "apiserver": ["runtime shutdown hooks", "HTTP", "gRPC", "authz subscriber", "Container.Cleanup", "DatabaseManager"],
-        "collection-server": ["HTTP shutdown", "gRPC manager", "DatabaseManager", "authz sync", "IAM", "cleanup container"],
+        "collection-server": ["HTTP shutdown", "gRPC manager", "DatabaseManager", "IAM", "cleanup container"],
         "worker": [
             "hold replayer",
             "subscriber",
