@@ -131,6 +131,50 @@ func (c *DurableCommitterV2) CommitResultUnknownResolutionV2(
 	})
 }
 
+// CommitExpiredPreparationRecoveryV2 atomically releases the exact expired
+// prepared checkpoint and stages a uniquely identified wake-up. It never
+// releases a dispatching checkpoint and never calls a Provider itself.
+func (c *DurableCommitterV2) CommitExpiredPreparationRecoveryV2(
+	ctx context.Context,
+	runID meta.ID,
+	invocationID string,
+	observedLeaseExpiresAt time.Time,
+	requestID string,
+) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	invocationID, requestID = strings.TrimSpace(invocationID), strings.TrimSpace(requestID)
+	if c == nil || runID.IsZero() || invocationID == "" || observedLeaseExpiresAt.IsZero() || requestID == "" || len(requestID) > 256 {
+		return nil, fmt.Errorf("AI explanation Prompt evaluation v2 prepared recovery is invalid")
+	}
+	value, err := c.repository.FindEvidenceV2ByID(ctx, runID)
+	if err != nil {
+		return nil, err
+	}
+	expectedVersion := value.Version()
+	at := c.now().UTC()
+	if err := value.RequestExpiredPreparationRecovery(invocationID, observedLeaseExpiresAt, at); err != nil {
+		return nil, err
+	}
+	action, err := value.NextAction()
+	if err != nil || action.Kind != domainevaluation.EvidenceNextActionGeneration && action.Kind != domainevaluation.EvidenceNextActionSemantic {
+		return nil, fmt.Errorf("AI explanation Prompt evaluation v2 recovery action is invalid")
+	}
+	eventID := evaluationevents.PromptEvaluationRecoveryEventID(runID.String(), requestID)
+	eventRecord, err := c.events.PromptEvaluationStepV2(value, action, eventID, at)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
+		if err := c.repository.SaveEvidenceV2(txCtx, value, expectedVersion); err != nil {
+			return err
+		}
+		return c.stager.Stage(txCtx, eventRecord)
+	}); err != nil {
+		return nil, err
+	}
+	c.postCommit.AfterCommit(ctx, []event.DomainEvent{eventRecord}, eventRecord.OccurredAt())
+	return value, nil
+}
+
 func (c *DurableCommitterV2) commitTerminalV2(
 	ctx context.Context,
 	runID meta.ID,

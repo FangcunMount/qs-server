@@ -112,6 +112,36 @@ func TestOnlineRunnerV2RetriesOnlySemanticExecution(t *testing.T) {
 	}
 }
 
+func TestOnlineRunnerV2KeepsSemanticEvidenceAfterDeterministicSafetyFailure(t *testing.T) {
+	clock := &onlineV2Clock{now: time.Date(2026, 9, 1, 2, 30, 0, 0, time.UTC)}
+	provider := &onlineProviderStub{}
+	semantic := &onlineSemanticStub{}
+	runner, _, stager := newOnlineRunnerV2WithSafety(t, clock, provider, semantic, onlineRejectingSafetyStub{})
+	started := startOnlineRunV2(t, runner, meta.ID(9504))
+	firstAction, err := started.Evidence.NextAction()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	generation, err := runner.RunStepV2(context.Background(), onlineV2Command(started.Evidence, firstAction, stager.events[0].EventID()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	semanticAction, err := generation.Evidence.NextAction()
+	if err != nil || semanticAction.Kind != domainevaluation.EvidenceNextActionSemantic {
+		t.Fatalf("semantic action after deterministic safety failure = %#v / %v", semanticAction, err)
+	}
+	completed, err := runner.RunStepV2(context.Background(), onlineV2Command(generation.Evidence, semanticAction, stager.events[1].EventID()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if completed.Status != evaluation.OnlineStepV2Progressed || provider.calls != 1 || semantic.calls != 1 ||
+		len(completed.Evidence.SemanticExecutions) != 1 || !completed.Evidence.Slots[0].Candidate.ReviewReady {
+		t.Fatalf("semantic evidence after safety failure = status:%s calls:%d/%d executions:%d candidate:%#v",
+			completed.Status, provider.calls, semantic.calls, len(completed.Evidence.SemanticExecutions), completed.Evidence.Slots[0].Candidate)
+	}
+}
+
 func TestOnlineRunnerV2TurnsExpiredDispatchIntoResultUnknownWithoutProviderReplay(t *testing.T) {
 	clock := &onlineV2Clock{now: time.Date(2026, 9, 1, 3, 0, 0, 0, time.UTC)}
 	provider := &onlineProviderStub{}
@@ -156,6 +186,16 @@ func newOnlineRunnerV2(
 	provider *onlineProviderStub,
 	semantic *onlineSemanticStub,
 ) (*evaluation.OnlineRunner, *evaluation.EvidenceV2Service, *onlineV2EventStager) {
+	return newOnlineRunnerV2WithSafety(t, clock, provider, semantic, onlineSafetyStub{})
+}
+
+func newOnlineRunnerV2WithSafety(
+	t *testing.T,
+	clock *onlineV2Clock,
+	provider *onlineProviderStub,
+	semantic *onlineSemanticStub,
+	safety appport.SafetyEvaluator,
+) (*evaluation.OnlineRunner, *evaluation.EvidenceV2Service, *onlineV2EventStager) {
 	t.Helper()
 	v1Evidence, err := evaluation.NewEvidenceService(&onlineEvidenceRepository{}, func() meta.ID { return meta.ID(9001) }, clock.Time)
 	if err != nil {
@@ -176,13 +216,22 @@ func newOnlineRunnerV2(
 	}
 	runner, err := evaluation.NewOnlineRunner(evaluation.OnlineRunnerDependencies{
 		Prompts: promptResolverStub{}, Schemas: schemaResolverStub{}, Routes: onlineRouteResolver{},
-		Provider: provider, Safety: onlineSafetyStub{}, Semantic: semantic, SemanticTimeout: time.Minute,
+		Provider: provider, Safety: safety, Semantic: semantic, SemanticTimeout: time.Minute,
 		AttemptLease: time.Minute, Evidence: v1Evidence, EvidenceV2: v2Evidence, DurableCommitterV2: committer, Now: clock.Time,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return runner, v2Evidence, stager
+}
+
+type onlineRejectingSafetyStub struct{}
+
+func (onlineRejectingSafetyStub) Evaluate(_ context.Context, _ appport.SafetyRequest) (appport.SafetyResult, error) {
+	return appport.SafetyResult{
+		Allowed: false, ValidatorVersion: "test-safety/v1", FailureCode: "limitations_incomplete",
+		SafeMessage: "candidate limitations are incomplete",
+	}, nil
 }
 
 func startOnlineRunV2(t *testing.T, runner *evaluation.OnlineRunner, runID meta.ID) *evaluation.OnlineRunV2Result {

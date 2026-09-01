@@ -144,6 +144,39 @@ func TestEvidenceV2ExecutionCheckpointClaimsOnlyNextAction(t *testing.T) {
 	require.Error(t, evidence.ReleaseExpiredPreparation(claimedAt.Add(2*time.Minute)))
 }
 
+func TestEvidenceV2PreparedRecoveryRequiresExactExpiredV2Checkpoint(t *testing.T) {
+	evidence := newEmptyCollectingEvidenceV2(t)
+	claimedAt := evidence.Audit.CreatedAt.Add(time.Minute)
+	checkpoint := runtimeCheckpoint(EvidenceExecutionGeneration, "checkpoint:generation:recovery", "case-1", 1, "", 1, claimedAt)
+	require.NoError(t, evidence.BeginNextExecution(checkpoint))
+
+	require.ErrorIs(t, evidence.RequestExpiredPreparationRecovery(
+		"different-invocation", checkpoint.LeaseExpiresAt, checkpoint.LeaseExpiresAt.Add(time.Second),
+	), ErrRecoveryNotAllowed)
+	require.ErrorIs(t, evidence.RequestExpiredPreparationRecovery(
+		checkpoint.InvocationID, checkpoint.LeaseExpiresAt.Add(time.Second), checkpoint.LeaseExpiresAt.Add(time.Second),
+	), ErrRecoveryNotAllowed)
+	require.ErrorIs(t, evidence.RequestExpiredPreparationRecovery(
+		checkpoint.InvocationID, checkpoint.LeaseExpiresAt, checkpoint.LeaseExpiresAt.Add(-time.Nanosecond),
+	), ErrRecoveryNotAllowed)
+	require.NoError(t, evidence.RequestExpiredPreparationRecovery(
+		checkpoint.InvocationID, checkpoint.LeaseExpiresAt, checkpoint.LeaseExpiresAt,
+	))
+	require.Nil(t, evidence.Execution())
+	action, err := evidence.NextAction()
+	require.NoError(t, err)
+	require.Equal(t, EvidenceNextActionGeneration, action.Kind)
+	require.False(t, action.Resume)
+
+	dispatching := newEmptyCollectingEvidenceV2(t)
+	dispatchCheckpoint := runtimeCheckpoint(EvidenceExecutionGeneration, "checkpoint:generation:dispatching", "case-1", 1, "", 1, claimedAt)
+	require.NoError(t, dispatching.BeginNextExecution(dispatchCheckpoint))
+	require.NoError(t, dispatching.MarkExecutionDispatching(dispatchCheckpoint.Owner, claimedAt.Add(time.Second)))
+	require.ErrorIs(t, dispatching.RequestExpiredPreparationRecovery(
+		dispatchCheckpoint.InvocationID, dispatchCheckpoint.LeaseExpiresAt, dispatchCheckpoint.LeaseExpiresAt,
+	), ErrRecoveryNotAllowed)
+}
+
 func TestEvidenceV2CompletionKeepsGenerationAndSemanticRecoverySeparate(t *testing.T) {
 	evidence := newEmptyCollectingEvidenceV2(t)
 	template := validCollectingEvidenceV2(t)

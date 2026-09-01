@@ -787,10 +787,18 @@ func (r *PromptEvaluationRepository) FindByID(ctx context.Context, id meta.ID) (
 }
 
 func (r *PromptEvaluationRepository) ListExpiredPreparations(ctx context.Context, at time.Time, limit int) ([]domainevaluation.ExpiredPreparation, error) {
+	return r.listExpiredPreparations(ctx, at, expiredPreparedEvaluationFilter(at), limit)
+}
+
+func (r *PromptEvaluationRepository) ListExpiredPreparationsV2(ctx context.Context, at time.Time, limit int) ([]domainevaluation.ExpiredPreparation, error) {
+	return r.listExpiredPreparations(ctx, at, expiredPreparedEvaluationV2Filter(at), limit)
+}
+
+func (r *PromptEvaluationRepository) listExpiredPreparations(ctx context.Context, at time.Time, filter bson.M, limit int) ([]domainevaluation.ExpiredPreparation, error) {
 	if r == nil || at.IsZero() || limit < 1 {
 		return nil, fmt.Errorf("list expired AI explanation Prompt evaluation preparations: invalid query")
 	}
-	cursor, err := r.Find(ctx, expiredPreparedEvaluationFilter(at), options.Find().
+	cursor, err := r.Find(ctx, filter, options.Find().
 		SetProjection(bson.M{"domain_id": 1, "execution.invocation_id": 1, "execution.lease_expires_at": 1}).
 		SetSort(bson.D{{Key: "execution.lease_expires_at", Value: 1}, {Key: "domain_id", Value: 1}}).
 		SetLimit(int64(limit)))
@@ -831,6 +839,15 @@ func expiredPreparedEvaluationFilter(at time.Time) bson.M {
 		"execution.phase":            string(domainevaluation.AttemptExecutionPrepared),
 		"execution.lease_expires_at": bson.M{"$lte": at},
 	})
+}
+
+func expiredPreparedEvaluationV2Filter(at time.Time) bson.M {
+	return bson.M{
+		"evidence_version":           PromptEvaluationEvidenceVersionV2,
+		"status":                     string(domainevaluation.EvidenceStatusCollecting),
+		"execution.phase":            string(domainevaluation.AttemptExecutionPrepared),
+		"execution.lease_expires_at": bson.M{"$lte": at},
+	}
 }
 
 func legacyPromptEvaluationFilter(filter bson.M) bson.M {

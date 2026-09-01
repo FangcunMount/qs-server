@@ -99,6 +99,50 @@ func TestDurableCommitterV2RejectsBudgetBelowFrozenPolicy(t *testing.T) {
 	require.Error(t, committer.CommitStartV2(context.Background(), value))
 }
 
+func TestDurableCommitterV2ReawakensExactExpiredPreparedCheckpoint(t *testing.T) {
+	now := time.Date(2026, 8, 31, 9, 0, 0, 0, time.UTC)
+	value := newServiceEvidenceV2(t)
+	repository := &evidenceV2RepositoryStub{}
+	stager := &evaluationEventStagerStub{}
+	postCommit := &evaluationPostCommitStub{}
+	committer, err := NewDurableCommitterV2(
+		apptransaction.RunnerFunc(func(ctx context.Context, fn func(context.Context) error) error { return fn(ctx) }),
+		repository, evaluationevents.Factory{}, stager, postCommit, &capacityRepositoryStub{}, 280, func() time.Time { return now },
+	)
+	require.NoError(t, err)
+	require.NoError(t, committer.CommitStartV2(context.Background(), value))
+	service, err := NewEvidenceV2Service(repository)
+	require.NoError(t, err)
+	owner := stager.events[0].EventID()
+	claimedAt := now.Add(-2 * time.Minute)
+	leaseExpiresAt := now.Add(-time.Minute)
+	invocationID := "invocation:generation:expired:1"
+	_, err = service.ClaimNextExecution(context.Background(), value.RunID, ClaimEvidenceV2ExecutionCommand{
+		ExecutionID: "generation:expired:1", Owner: owner, InvocationID: invocationID,
+		ClaimedAt: claimedAt, LeaseExpiresAt: leaseExpiresAt,
+	})
+	require.NoError(t, err)
+
+	require.ErrorIs(t, func() error {
+		_, err := committer.CommitExpiredPreparationRecoveryV2(
+			context.Background(), value.RunID, "different-invocation", leaseExpiresAt, "auto-prepared:stale",
+		)
+		return err
+	}(), domainevaluation.ErrRecoveryNotAllowed)
+	requestID := "auto-prepared:exact-v2"
+	recovered, err := committer.CommitExpiredPreparationRecoveryV2(
+		context.Background(), value.RunID, invocationID, leaseExpiresAt, requestID,
+	)
+	require.NoError(t, err)
+	require.Nil(t, recovered.Execution())
+	require.Len(t, stager.events, 2)
+	require.Equal(t, 2, postCommit.calls)
+	require.Equal(t, evaluationevents.PromptEvaluationRecoveryEventID(value.RunID.String(), requestID), stager.events[1].EventID())
+	action, err := recovered.NextAction()
+	require.NoError(t, err)
+	assertEvaluationStepV2EventAddress(t, stager.events[1], action)
+}
+
 func TestDurableCommitterV2StagesReplacementAtomicallyAfterResultUnknownAcknowledgement(t *testing.T) {
 	now := time.Date(2026, 8, 31, 9, 0, 0, 0, time.UTC)
 	value := newServiceEvidenceV2(t)
@@ -173,4 +217,16 @@ func assertEvaluationStepV2Event(t *testing.T, value interface{ EventID() string
 	require.Equal(t, action.ExecutionOrdinal, typed.Data.ExecutionOrdinal)
 	require.Zero(t, typed.Data.Attempt)
 	require.LessOrEqual(t, len(typed.EventID()), 256)
+}
+
+func assertEvaluationStepV2EventAddress(t *testing.T, value interface{ EventID() string }, action domainevaluation.EvidenceNextAction) {
+	t.Helper()
+	typed, ok := value.(evaluationevents.PromptEvaluationStepEvent)
+	require.True(t, ok)
+	require.Equal(t, "v2", typed.Data.EvidenceVersion)
+	require.Equal(t, string(action.Kind), typed.Data.ExecutionKind)
+	require.Equal(t, action.CaseID, typed.Data.CaseID)
+	require.Equal(t, action.SlotOrdinal, typed.Data.SlotOrdinal)
+	require.Equal(t, action.CandidateID, typed.Data.CandidateID)
+	require.Equal(t, action.ExecutionOrdinal, typed.Data.ExecutionOrdinal)
 }
