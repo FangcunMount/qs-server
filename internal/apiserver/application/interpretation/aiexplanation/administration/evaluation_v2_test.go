@@ -70,6 +70,70 @@ func TestEvaluationV2ReviewUsesCandidateIdentityAndDistinctTrustedReviewers(t *t
 	}
 }
 
+func TestEvaluationV2BatchReviewValidatesAllCandidatesAndCommitsOnce(t *testing.T) {
+	now := time.Date(2026, 9, 1, 8, 30, 0, 0, time.UTC)
+	current := reviewableEvaluationV2()
+	current.Slots = append(current.Slots, domainevaluation.CandidateSlot{
+		CaseID: "case-1", Ordinal: 2,
+		Candidate: &domainevaluation.Candidate{ID: "candidate:case-1:slot-2", ReviewReady: true},
+	})
+	evidence := &evaluationV2EvidenceStub{value: current}
+	svc := NewService(&reviewWorkflowStub{}, &governanceStub{}, &accessStub{},
+		WithEvaluationV2(&evaluationV2StarterStub{}, evidence, &evaluationV2ResolutionCommitterStub{}, nil),
+	)
+	svc.(*service).now = func() time.Time { return now }
+
+	result, err := svc.RecordReviewsV2(context.Background(), Actor{OrgID: 7, OperatorUserID: 42}, meta.ID(701), ReviewV2BatchCommand{
+		Role: domainevaluation.ReviewRoleAssessmentSemantics,
+		Reviews: []ReviewV2BatchItemCommand{
+			{CandidateID: "candidate:case-1:slot-1", Decision: domainevaluation.ReviewDecisionApprove, Reason: " facts match "},
+			{CandidateID: "candidate:case-1:slot-2", Decision: domainevaluation.ReviewDecisionReject, Reason: "unsupported inference"},
+		},
+	})
+	if err != nil || result == nil || evidence.recordBatchCalls != 1 || len(evidence.recordedBatch) != 2 {
+		t.Fatalf("batch result=%#v calls=%d reviews=%#v error=%v", result, evidence.recordBatchCalls, evidence.recordedBatch, err)
+	}
+	for _, review := range evidence.recordedBatch {
+		if review.Role != domainevaluation.ReviewRoleAssessmentSemantics || review.Reviewer != "user:42" || !review.ReviewedAt.Equal(now) {
+			t.Fatalf("trusted batch audit is invalid: %#v", review)
+		}
+	}
+	if evidence.recordedBatch[0].Reason != "facts match" {
+		t.Fatalf("trimmed reason = %q", evidence.recordedBatch[0].Reason)
+	}
+
+	evidence.recordedBatch = nil
+	evidence.recordBatchCalls = 0
+	_, err = svc.RecordReviewsV2(context.Background(), Actor{OrgID: 7, OperatorUserID: 42}, meta.ID(701), ReviewV2BatchCommand{
+		Role: domainevaluation.ReviewRoleAssessmentSemantics,
+		Reviews: []ReviewV2BatchItemCommand{
+			{CandidateID: "candidate:case-1:slot-1", Decision: domainevaluation.ReviewDecisionApprove, Reason: "facts match"},
+			{CandidateID: "candidate:missing", Decision: domainevaluation.ReviewDecisionApprove, Reason: "missing"},
+		},
+	})
+	if coder := cberrors.ParseCoder(err); coder == nil || coder.Code() != code.ErrConflict || evidence.recordBatchCalls != 0 {
+		t.Fatalf("invalid target error=%v calls=%d", err, evidence.recordBatchCalls)
+	}
+}
+
+func TestEvaluationV2BatchReviewRejectsDuplicateCandidateBeforeWrite(t *testing.T) {
+	evidence := &evaluationV2EvidenceStub{value: reviewableEvaluationV2()}
+	svc := NewService(&reviewWorkflowStub{}, &governanceStub{}, &accessStub{},
+		WithEvaluationV2(&evaluationV2StarterStub{}, evidence, &evaluationV2ResolutionCommitterStub{}, nil),
+	)
+
+	_, err := svc.RecordReviewsV2(context.Background(), Actor{OrgID: 7, OperatorUserID: 42}, meta.ID(701), ReviewV2BatchCommand{
+		Role: domainevaluation.ReviewRoleAssessmentSemantics,
+		Reviews: []ReviewV2BatchItemCommand{
+			{CandidateID: "candidate:case-1:slot-1", Decision: domainevaluation.ReviewDecisionApprove, Reason: "facts match"},
+			{CandidateID: "candidate:case-1:slot-1", Decision: domainevaluation.ReviewDecisionApprove, Reason: "duplicate"},
+		},
+	})
+	if coder := cberrors.ParseCoder(err); coder == nil || coder.Code() != code.ErrInvalidArgument || evidence.recordBatchCalls != 0 {
+		t.Fatalf("duplicate error=%v calls=%d", err, evidence.recordBatchCalls)
+	}
+}
+
 func TestResolveResultUnknownV2RequiresExplicitDuplicateCallRiskAndUsesDurableCommitter(t *testing.T) {
 	now := time.Date(2026, 9, 1, 8, 0, 0, 0, time.UTC)
 	evidence := &evaluationV2EvidenceStub{value: &domainevaluation.PromptEvaluationEvidenceV2{
@@ -112,9 +176,11 @@ func (s *evaluationV2StarterStub) StartRequestedV2(_ context.Context, command ap
 }
 
 type evaluationV2EvidenceStub struct {
-	value     *domainevaluation.PromptEvaluationEvidenceV2
-	recorded  domainevaluation.CandidateHumanReview
-	finalized bool
+	value            *domainevaluation.PromptEvaluationEvidenceV2
+	recorded         domainevaluation.CandidateHumanReview
+	recordedBatch    []domainevaluation.CandidateHumanReview
+	recordBatchCalls int
+	finalized        bool
 }
 
 func (s *evaluationV2EvidenceStub) Find(context.Context, meta.ID) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
@@ -123,6 +189,15 @@ func (s *evaluationV2EvidenceStub) Find(context.Context, meta.ID) (*domainevalua
 
 func (s *evaluationV2EvidenceStub) RecordHumanReview(_ context.Context, _ meta.ID, value domainevaluation.CandidateHumanReview) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
 	s.recorded = value
+	return s.value, nil
+}
+
+func (s *evaluationV2EvidenceStub) RecordHumanReviews(_ context.Context, _ meta.ID, values []domainevaluation.CandidateHumanReview) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	s.recordBatchCalls++
+	s.recordedBatch = append([]domainevaluation.CandidateHumanReview(nil), values...)
+	if len(values) == 1 {
+		s.recorded = values[0]
+	}
 	return s.value, nil
 }
 
@@ -147,7 +222,7 @@ func reviewableEvaluationV2() *domainevaluation.PromptEvaluationEvidenceV2 {
 		Audit: domainevaluation.EvidenceRunAudit{OrganizationID: 7},
 		Slots: []domainevaluation.CandidateSlot{{
 			CaseID: "case-1", Ordinal: 1,
-			Candidate: &domainevaluation.Candidate{ID: "candidate:case-1:slot-1"},
+			Candidate: &domainevaluation.Candidate{ID: "candidate:case-1:slot-1", ReviewReady: true},
 		}},
 	}
 }

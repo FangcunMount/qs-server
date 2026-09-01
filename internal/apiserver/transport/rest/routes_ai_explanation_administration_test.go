@@ -158,6 +158,13 @@ func TestAIExplanationAdministrationRoutesSeparateAuditReadsFromGovernanceWrites
 	if v2AuditRecheck.Code != http.StatusForbidden || service.recheckCalls != 0 {
 		t.Fatalf("v2 audit recheck status/calls = %d/%d body=%s", v2AuditRecheck.Code, service.recheckCalls, v2AuditRecheck.Body.String())
 	}
+	v2AuditBatch := httptest.NewRecorder()
+	v2AuditBatchRequest := httptest.NewRequest(http.MethodPost, "/internal/v2/interpretation/ai-explanation/prompt-evaluations/10/reviews/batch", bytes.NewBufferString(`{"role":"assessment_semantics","reviews":[{"candidate_id":"candidate:1","decision":"approve","reason":"reviewed"}]}`))
+	v2AuditBatchRequest.Header.Set("Content-Type", "application/json")
+	v2AuditEngine.ServeHTTP(v2AuditBatch, v2AuditBatchRequest)
+	if v2AuditBatch.Code != http.StatusForbidden || service.batchReviewV2Calls != 0 {
+		t.Fatalf("v2 audit batch-review status/calls = %d/%d body=%s", v2AuditBatch.Code, service.batchReviewV2Calls, v2AuditBatch.Body.String())
+	}
 
 	v2AdminEngine := gin.New()
 	v2AdminEngine.Use(aiRouteSnapshotMiddleware(true))
@@ -175,6 +182,13 @@ func TestAIExplanationAdministrationRoutesSeparateAuditReadsFromGovernanceWrites
 	v2AdminEngine.ServeHTTP(v2Recheck, v2RecheckRequest)
 	if v2Recheck.Code != http.StatusAccepted || service.recheckCalls != 1 {
 		t.Fatalf("v2 admin recheck status/calls = %d/%d body=%s", v2Recheck.Code, service.recheckCalls, v2Recheck.Body.String())
+	}
+	v2Batch := httptest.NewRecorder()
+	v2BatchRequest := httptest.NewRequest(http.MethodPost, "/internal/v2/interpretation/ai-explanation/prompt-evaluations/10/reviews/batch", bytes.NewBufferString(`{"role":"assessment_semantics","reviews":[{"candidate_id":"candidate:1","decision":"approve","reason":"reviewed"}]}`))
+	v2BatchRequest.Header.Set("Content-Type", "application/json")
+	v2AdminEngine.ServeHTTP(v2Batch, v2BatchRequest)
+	if v2Batch.Code != http.StatusOK || service.batchReviewV2Calls != 1 {
+		t.Fatalf("v2 admin batch-review status/calls = %d/%d body=%s", v2Batch.Code, service.batchReviewV2Calls, v2Batch.Body.String())
 	}
 }
 
@@ -209,6 +223,7 @@ type routeAIAdministrationStub struct {
 	findV2Calls              int
 	startV2Calls             int
 	recheckCalls             int
+	batchReviewV2Calls       int
 }
 
 func (s *routeAIAdministrationStub) FindEvaluationCapacity(context.Context, aiexplanationadministration.Actor) (*aiexplanationadministration.EvaluationCapacity, error) {
@@ -234,6 +249,10 @@ func (s *routeAIAdministrationStub) FindEvaluationV2(context.Context, aiexplanat
 	return s.runV2, nil
 }
 func (s *routeAIAdministrationStub) RecordReviewV2(context.Context, aiexplanationadministration.Actor, meta.ID, aiexplanationadministration.ReviewV2Command) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	return s.runV2, nil
+}
+func (s *routeAIAdministrationStub) RecordReviewsV2(context.Context, aiexplanationadministration.Actor, meta.ID, aiexplanationadministration.ReviewV2BatchCommand) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	s.batchReviewV2Calls++
 	return s.runV2, nil
 }
 func (s *routeAIAdministrationStub) FinalizeEvaluationV2(context.Context, aiexplanationadministration.Actor, meta.ID, string) (*domainevaluation.PromptEvaluationEvidenceV2, error) {

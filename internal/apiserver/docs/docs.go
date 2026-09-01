@@ -9324,6 +9324,71 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/reviews/batch": {
+            "post": {
+                "description": "一批仅允许一个审核角色，最多 35 条；任一条不合法时整批不写入。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Explanation-Administration"
+                ],
+                "summary": "原子记录一批 v2 Candidate 人工审核",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "评测 Run ID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "单角色 Candidate 审核列表",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.AIExplanationEvaluationV2BatchReviewRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AIExplanationEvaluationV2Wire"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v2/statistics/runs": {
             "get": {
                 "tags": [
@@ -11111,6 +11176,46 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2BatchReviewItemRequest": {
+            "type": "object",
+            "required": [
+                "candidate_id",
+                "decision",
+                "reason"
+            ],
+            "properties": {
+                "candidate_id": {
+                    "type": "string"
+                },
+                "decision": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string",
+                    "maxLength": 1000
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2BatchReviewRequest": {
+            "type": "object",
+            "required": [
+                "reviews",
+                "role"
+            ],
+            "properties": {
+                "reviews": {
+                    "type": "array",
+                    "maxItems": 35,
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/handler.AIExplanationEvaluationV2BatchReviewItemRequest"
+                    }
+                },
+                "role": {
                     "type": "string"
                 }
             }

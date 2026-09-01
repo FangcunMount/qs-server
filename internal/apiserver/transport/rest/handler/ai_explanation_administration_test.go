@@ -46,6 +46,22 @@ func TestAIExplanationAdministrationReviewUsesProtectedActorAndOmitsRawOutputFro
 	}
 }
 
+func TestAIExplanationAdministrationBatchReviewUsesProtectedActorAndSingleRole(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	service := &aiAdministrationServiceStub{}
+	handler := NewAIExplanationAdministrationHandler(service)
+	body := bytes.NewBufferString(`{"role":"assessment_semantics","reviews":[{"candidate_id":"candidate:1","decision":"approve","reason":"facts match"},{"candidate_id":"candidate:2","decision":"reject","reason":"unsupported inference"}]}`)
+	ctx, recorder := aiAdministrationContext(http.MethodPost, "/internal/v2/interpretation/ai-explanation/prompt-evaluations/9/reviews/batch", body)
+	ctx.Params = gin.Params{{Key: "run_id", Value: "9"}}
+
+	handler.RecordReviewsV2(ctx)
+	if recorder.Code != http.StatusOK || service.lastActor != (aiexplanationadministration.Actor{OrgID: 12, OperatorUserID: 34}) ||
+		service.lastReviewBatch.Role != domainevaluation.ReviewRoleAssessmentSemantics || len(service.lastReviewBatch.Reviews) != 2 ||
+		service.lastReviewBatch.Reviews[1].CandidateID != "candidate:2" || service.lastReviewBatch.Reviews[1].Decision != domainevaluation.ReviewDecisionReject {
+		t.Fatalf("response=%d actor=%#v batch=%#v body=%s", recorder.Code, service.lastActor, service.lastReviewBatch, recorder.Body.String())
+	}
+}
+
 func TestAIExplanationAdministrationAttemptReturnsOnlyRequestedEvidence(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	service := &aiAdministrationServiceStub{run: administrationReviewRun()}
@@ -378,6 +394,7 @@ type aiAdministrationServiceStub struct {
 	participantCapacity *aiexplanationadministration.ParticipantCapacity
 	lastActor           aiexplanationadministration.Actor
 	lastReview          aiexplanationadministration.ReviewCommand
+	lastReviewBatch     aiexplanationadministration.ReviewV2BatchCommand
 	lastStart           aiexplanationadministration.StartEvaluationCommand
 	lastRecover         aiexplanationadministration.RecoverEvaluationCommand
 	lastRecheck         aiexplanationadministration.StartEvaluationRecheckCommand
@@ -420,6 +437,11 @@ func (s *aiAdministrationServiceStub) FindEvaluationV2(_ context.Context, actor 
 
 func (s *aiAdministrationServiceStub) RecordReviewV2(_ context.Context, actor aiexplanationadministration.Actor, _ meta.ID, _ aiexplanationadministration.ReviewV2Command) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
 	s.lastActor = actor
+	return s.runV2, nil
+}
+
+func (s *aiAdministrationServiceStub) RecordReviewsV2(_ context.Context, actor aiexplanationadministration.Actor, _ meta.ID, command aiexplanationadministration.ReviewV2BatchCommand) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	s.lastActor, s.lastReviewBatch = actor, command
 	return s.runV2, nil
 }
 

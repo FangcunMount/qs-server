@@ -123,6 +123,30 @@ func TestPromptEvaluationEvidenceV2RejectsReviewBeforeSemanticEvidence(t *testin
 	require.ErrorContains(t, evidence.Validate(), "without complete semantic evidence")
 }
 
+func TestPromptEvaluationEvidenceV2AddsHumanReviewBatchAtomically(t *testing.T) {
+	evidence := completeEvidenceV2ForReview(t)
+	evidence.HumanReviews = nil
+	beforeVersion := evidence.Version()
+	reviewedAt := evidence.Audit.ClosedAt.Add(time.Minute)
+	firstCandidateID := evidence.Slots[0].Candidate.ID
+	secondCandidateID := evidence.Slots[1].Candidate.ID
+
+	err := evidence.AddHumanReviews([]CandidateHumanReview{
+		{CandidateID: firstCandidateID, Role: ReviewRoleAssessmentSemantics, Reviewer: "user:42", Decision: ReviewDecisionApprove, ReviewedAt: reviewedAt, Reason: "语义与冻结事实一致"},
+		{CandidateID: "candidate:missing", Role: ReviewRoleAssessmentSemantics, Reviewer: "user:42", Decision: ReviewDecisionApprove, ReviewedAt: reviewedAt, Reason: "不可写入的目标"},
+	})
+	require.ErrorContains(t, err, "unknown candidate")
+	require.Empty(t, evidence.HumanReviews)
+	require.Equal(t, beforeVersion, evidence.Version())
+
+	require.NoError(t, evidence.AddHumanReviews([]CandidateHumanReview{
+		{CandidateID: firstCandidateID, Role: ReviewRoleAssessmentSemantics, Reviewer: "user:42", Decision: ReviewDecisionApprove, ReviewedAt: reviewedAt, Reason: "语义与冻结事实一致"},
+		{CandidateID: secondCandidateID, Role: ReviewRoleAssessmentSemantics, Reviewer: "user:42", Decision: ReviewDecisionReject, ReviewedAt: reviewedAt, Reason: "存在超出输入证据的推断"},
+	}))
+	require.Len(t, evidence.HumanReviews, 2)
+	require.Equal(t, beforeVersion+1, evidence.Version())
+}
+
 func TestPromptEvaluationEvidenceV2StateMachineKeepsBlockedRecoveryAuditable(t *testing.T) {
 	template := validCollectingEvidenceV2(t)
 	caseIDs := make([]string, RequiredGenerationCaseCount)

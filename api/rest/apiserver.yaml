@@ -9555,6 +9555,67 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/reviews/batch:
+    post:
+      tags:
+      - AI-Explanation-Administration
+      summary: 原子记录一批 v2 Candidate 人工审核
+      description: 一批仅允许一个审核角色，最多 35 条；任一条不合法时整批不写入。
+      operationId: 原子记录一批v2Candidate人工审核
+      parameters:
+      - type: string
+        description: 评测 Run ID
+        name: run_id
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/handler.AIExplanationEvaluationV2BatchReviewRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/handler.AIExplanationEvaluationV2Wire'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /internal/v2/statistics/runs:
     get:
       tags:
@@ -10855,6 +10916,34 @@ components:
         status:
           type: string
         type:
+          type: string
+    handler.AIExplanationEvaluationV2BatchReviewItemRequest:
+      type: object
+      required:
+      - candidate_id
+      - decision
+      - reason
+      properties:
+        candidate_id:
+          type: string
+        decision:
+          type: string
+        reason:
+          type: string
+          maxLength: 1000
+    handler.AIExplanationEvaluationV2BatchReviewRequest:
+      type: object
+      required:
+      - reviews
+      - role
+      properties:
+        reviews:
+          type: array
+          maxItems: 35
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/handler.AIExplanationEvaluationV2BatchReviewItemRequest'
+        role:
           type: string
     handler.AIExplanationEvaluationV2CandidateEvidenceWire:
       type: object

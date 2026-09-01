@@ -1077,6 +1077,34 @@ definitions:
       type:
         type: string
     type: object
+  handler.AIExplanationEvaluationV2BatchReviewItemRequest:
+    properties:
+      candidate_id:
+        type: string
+      decision:
+        type: string
+      reason:
+        maxLength: 1000
+        type: string
+    required:
+    - candidate_id
+    - decision
+    - reason
+    type: object
+  handler.AIExplanationEvaluationV2BatchReviewRequest:
+    properties:
+      reviews:
+        items:
+          $ref: '#/definitions/handler.AIExplanationEvaluationV2BatchReviewItemRequest'
+        maxItems: 35
+        minItems: 1
+        type: array
+      role:
+        type: string
+    required:
+    - reviews
+    - role
+    type: object
   handler.AIExplanationEvaluationV2CandidateEvidenceWire:
     properties:
       accepted_generation_execution:
@@ -12538,6 +12566,46 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 记录一个 v2 Candidate 的人工审核
+      tags:
+      - AI-Explanation-Administration
+  /internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/reviews/batch:
+    post:
+      consumes:
+      - application/json
+      description: 一批仅允许一个审核角色，最多 35 条；任一条不合法时整批不写入。
+      parameters:
+      - description: 评测 Run ID
+        in: path
+        name: run_id
+        required: true
+        type: string
+      - description: 单角色 Candidate 审核列表
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.AIExplanationEvaluationV2BatchReviewRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationEvaluationV2Wire'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 原子记录一批 v2 Candidate 人工审核
       tags:
       - AI-Explanation-Administration
   /internal/v2/statistics/runs:
