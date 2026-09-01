@@ -102,7 +102,7 @@ func (p *Provider) generateDeepSeekStrictToolCall(ctx context.Context, request a
 	if err := ctx.Err(); err != nil {
 		return nil, providerError(classifyContextKind(err), classifyContextCode(err), false, false, err)
 	}
-	strictSchema, err := deepSeekStrictToolSchema(request.OutputSchema.JSON)
+	strictSchema, err := deepSeekCompatibleOutputSchema(request.OutputSchema.JSON)
 	if err != nil {
 		return nil, providerError(domainrun.FailureKindProviderTransport, "provider_request_invalid", false, false, err)
 	}
@@ -235,12 +235,12 @@ func deepSeekThinkingForRoute(effort string) (deepSeekThinking, string) {
 	}
 }
 
-// deepSeekStrictToolSchema produces the documented strict-tool subset without
-// weakening the canonical server-side contract. References are inlined,
-// const becomes a single-value enum, every object property is required, and
-// unsupported lexical/cross-field keywords stay enforced by the existing
-// deterministic validator after the Provider returns.
-func deepSeekStrictToolSchema(raw []byte) (json.RawMessage, error) {
+// deepSeekCompatibleOutputSchema projects the canonical output Schema onto the
+// JSON-Schema subset DeepSeek documents for strict structured output. Both the
+// Responses json_schema path and the beta strict-tool path use this wire shape.
+// The canonical server-side validator still enforces every omitted lexical and
+// cross-field constraint after the Provider returns.
+func deepSeekCompatibleOutputSchema(raw []byte) (json.RawMessage, error) {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.UseNumber()
 	var root map[string]any
@@ -248,32 +248,32 @@ func deepSeekStrictToolSchema(raw []byte) (json.RawMessage, error) {
 		return nil, fmt.Errorf("decode canonical output schema")
 	}
 	definitions, _ := root["$defs"].(map[string]any)
-	transformed, err := transformDeepSeekStrictSchema(root, definitions)
+	transformed, err := transformDeepSeekCompatibleSchema(root, definitions)
 	if err != nil {
 		return nil, err
 	}
 	value, err := json.Marshal(transformed)
 	if err != nil {
-		return nil, fmt.Errorf("encode DeepSeek strict tool schema: %w", err)
+		return nil, fmt.Errorf("encode DeepSeek compatible output schema: %w", err)
 	}
 	return value, nil
 }
 
-func transformDeepSeekStrictSchema(value any, definitions map[string]any) (map[string]any, error) {
+func transformDeepSeekCompatibleSchema(value any, definitions map[string]any) (map[string]any, error) {
 	node, ok := value.(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("DeepSeek strict tool schema node is not an object")
+		return nil, fmt.Errorf("DeepSeek compatible output schema node is not an object")
 	}
 	if ref, ok := node["$ref"].(string); ok {
 		const prefix = "#/$defs/"
 		if !strings.HasPrefix(ref, prefix) {
-			return nil, fmt.Errorf("DeepSeek strict tool schema ref is unsupported")
+			return nil, fmt.Errorf("DeepSeek compatible output schema ref is unsupported")
 		}
 		resolved, exists := definitions[strings.TrimPrefix(ref, prefix)]
 		if !exists {
-			return nil, fmt.Errorf("DeepSeek strict tool schema ref is unresolved")
+			return nil, fmt.Errorf("DeepSeek compatible output schema ref is unresolved")
 		}
-		return transformDeepSeekStrictSchema(resolved, definitions)
+		return transformDeepSeekCompatibleSchema(resolved, definitions)
 	}
 
 	result := make(map[string]any)
@@ -301,9 +301,9 @@ func transformDeepSeekStrictSchema(value any, definitions map[string]any) (map[s
 		keys := make([]string, 0, len(properties))
 		transformed := make(map[string]any, len(properties))
 		for name, property := range properties {
-			child, err := transformDeepSeekStrictSchema(property, definitions)
+			child, err := transformDeepSeekCompatibleSchema(property, definitions)
 			if err != nil {
-				return nil, fmt.Errorf("DeepSeek strict tool property %q: %w", name, err)
+				return nil, fmt.Errorf("DeepSeek compatible output property %q: %w", name, err)
 			}
 			keys = append(keys, name)
 			transformed[name] = child
@@ -315,7 +315,7 @@ func transformDeepSeekStrictSchema(value any, definitions map[string]any) (map[s
 		result["additionalProperties"] = false
 	}
 	if items, exists := node["items"]; exists {
-		transformed, err := transformDeepSeekStrictSchema(items, definitions)
+		transformed, err := transformDeepSeekCompatibleSchema(items, definitions)
 		if err != nil {
 			return nil, err
 		}
@@ -325,7 +325,7 @@ func transformDeepSeekStrictSchema(value any, definitions map[string]any) (map[s
 	if variants, ok := node["anyOf"].([]any); ok {
 		transformed := make([]any, 0, len(variants))
 		for _, variant := range variants {
-			child, err := transformDeepSeekStrictSchema(variant, definitions)
+			child, err := transformDeepSeekCompatibleSchema(variant, definitions)
 			if err != nil {
 				return nil, err
 			}
@@ -334,7 +334,7 @@ func transformDeepSeekStrictSchema(value any, definitions map[string]any) (map[s
 		result["anyOf"] = transformed
 	}
 	if len(result) == 0 {
-		return nil, fmt.Errorf("DeepSeek strict tool schema node has no supported constraints")
+		return nil, fmt.Errorf("DeepSeek compatible output schema node has no supported constraints")
 	}
 	return result, nil
 }

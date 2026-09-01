@@ -4,9 +4,9 @@
 
 Prompt 的发布门槛不是“能生成一段看起来合理的文字”，而是：在固定 Profile、固定输入、固定 Provider Route 配置下重复运行，结构、引用、策略和安全硬门禁全部通过，同时跨维度质量、忠实度、建议可操作性和表达清晰度达到阈值。
 
-Prompt 发布状态仍是 `planned`。生产 Run `635356837083886126` 冻结的是 Prompt/Suite/Profile v1 与 Provider Route v6/v3；它已经收集 35 个 Candidate 和 35 份 semantic receipt，并进入 `awaiting_review`，但尚无服务端持久化的双角色人工审核和 approved Gate，因此不能作为 Profile 发布证据。对这些候选的本地预审只用于发现 Prompt 问题，不属于不可变审核事实，也不能替代 Batch Review。
+Prompt 发布状态仍是 `planned`。生产 Run `635398770544095790` 已冻结 Prompt/Suite/Profile v2 与 Provider Route v6/v3，形成 35 个 Candidate 和 35 份 semantic receipt，并进入 `awaiting_review`；但 39 次生成中保留了 4 次输出契约失败，`generation_contract_conformance_rate=35/39=89.74%`，低于冻结的 95% G3 门槛。即使补齐 70 条人工审核，该 Run 也只能终审为 `rejected`，不能作为 Profile 发布证据。
 
-`cross-dimension-participant-scale/v2` 是基于上述输出暴露的问题形成的最小候选版本：禁止把共现写成因果链或机制，禁止在缺少等级/常模时创造“中等”“平衡”等分类，限制 focus area 只能影响组织顺序，并禁止在不允许层级组合时把父子维度写进同一洞察。仓库保留 v1 只读解析，新 Run 在该变更发布后才会冻结 v2；v2 尚未完成 35 次真实生成、35 次真实裁判、70 条双角色人工复核和 approved Gate，不能视为已经发布。
+`cross-dimension-participant-scale/v2` 是基于 v1 人工审核问题形成的最小候选版本：禁止把共现写成因果链或机制，禁止在缺少等级/常模时创造“中等”“平衡”等分类，限制 focus area 只能影响组织顺序，并禁止在不允许层级组合时把父子维度写进同一洞察。仓库保留 v1 只读解析；v2 已完成一轮 35 个真实 Candidate 和 35 次真实裁判，但尚未产生通过执行可靠性、70 条双角色人工复核与最终 Gate 的 approved Run，因此仍不能视为已经发布。
 
 规范性文件：
 
