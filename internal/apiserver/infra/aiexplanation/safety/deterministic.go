@@ -13,7 +13,7 @@ import (
 	appport "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/port"
 )
 
-const DeterministicValidatorVersion = "ai-explanation-safety-deterministic-zh-en/v1"
+const DeterministicValidatorVersion = "ai-explanation-safety-deterministic-zh-en/v2"
 
 type DeterministicGate struct{}
 
@@ -40,8 +40,11 @@ func (*DeterministicGate) Evaluate(_ context.Context, request appport.SafetyRequ
 	}
 	limitations := normalize(strings.Join(request.Content.Limitations, " "))
 	if !containsAny(limitations, []string{"本次测评", "本次结果", "current assessment", "this assessment"}) ||
-		!containsAny(limitations, []string{"不构成诊断", "不能作为诊断", "not a diagnosis", "not diagnostic"}) ||
-		!containsAny(limitations, []string{"确定性判断", "确定性结论", "definitive conclusion", "deterministic judgment"}) {
+		!containsNegatedConcept(limitations, []string{"诊断", "diagnosis", "diagnostic"}) ||
+		!containsNegatedConcept(limitations, []string{
+			"确定性判断", "确定判断", "确定性结论", "确定结论", "确定性预测", "确定预测",
+			"definitive conclusion", "deterministic judgment", "definitive prediction",
+		}) {
 		return rejected("limitations_incomplete", "AI 解读结果缺少必要的使用边界"), nil
 	}
 	return appport.SafetyResult{Allowed: true, ValidatorVersion: DeterministicValidatorVersion}, nil
@@ -73,6 +76,53 @@ func containsAny(value string, candidates []string) bool {
 		}
 	}
 	return false
+}
+
+// containsNegatedConcept accepts natural-language boundary statements without
+// requiring the negation and concept to be adjacent. The search stays within a
+// short clause-sized window so unrelated later text cannot satisfy the gate.
+func containsNegatedConcept(value string, concepts []string) bool {
+	const maxWindowRunes = 64
+	for _, negation := range []string{
+		"不构成", "不能作为", "不可作为", "不属于", "不代表", "不等同于", "无法作为",
+		"not a", "not an", "not diagnostic", "cannot be used as", "does not constitute",
+	} {
+		normalizedNegation := normalize(negation)
+		if strings.Contains(value, normalizedNegation) && containsAny(normalizedNegation, concepts) {
+			return true
+		}
+		remaining := value
+		for {
+			index := strings.Index(remaining, normalizedNegation)
+			if index < 0 {
+				break
+			}
+			tail := []rune(remaining[index+len(normalizedNegation):])
+			if len(tail) > maxWindowRunes {
+				tail = tail[:maxWindowRunes]
+			}
+			tail = beforeAdversative(tail)
+			if containsAny(string(tail), concepts) {
+				return true
+			}
+			remaining = remaining[index+len(normalizedNegation):]
+		}
+	}
+	return false
+}
+
+func beforeAdversative(value []rune) []rune {
+	boundary := len(value)
+	text := string(value)
+	for _, marker := range []string{"但是", "但", "然而", "不过", "but", "however"} {
+		if index := strings.Index(text, marker); index >= 0 {
+			runeIndex := len([]rune(text[:index]))
+			if runeIndex < boundary {
+				boundary = runeIndex
+			}
+		}
+	}
+	return value[:boundary]
 }
 
 func normalize(value string) string {

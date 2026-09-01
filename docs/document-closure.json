@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 33,
+      "expected_count": 34,
       "budgeted": false
     }
   },
@@ -496,12 +496,14 @@
       ],
       "verification": [],
       "production_evidence": {
-        "level": "none",
-        "refs": [],
+        "level": "historical",
+        "refs": [
+          "api/schema/interpretation/ai-explanation-prompt-validation-matrix.md"
+        ],
         "deployed_sha": null,
-        "observed_at": null,
+        "observed_at": "2026-09-01",
         "limitations": [
-          "The v2 prompt package has contract and preflight tests but has not completed a real provider evaluation Run or dual-role human review."
+          "Production v2 Runs completed real generation and semantic evaluation, but none passed all release gates."
         ]
       },
       "gaps": [
@@ -511,6 +513,61 @@
           "severity": "medium",
           "summary": "The v2 prompt package is a release candidate without approved production evidence.",
           "exit_criteria": "Run the frozen v2 Prompt, Profile, Suite and Provider Route through 35 candidates, 35 semantic receipts, dual-role human review and an approved Gate."
+        }
+      ]
+    },
+    {
+      "path": "api/schema/interpretation/ai-explanation-prompt-template-v3.md",
+      "class": "sidecar",
+      "owner": "interpretation",
+      "doc_status": "planned",
+      "verified": {
+        "source_sha": null,
+        "verified_on": null
+      },
+      "fact_sources": [
+        {
+          "kind": "contract",
+          "path": "api/schema/interpretation/ai-explanation-input-v1.schema.json"
+        },
+        {
+          "kind": "contract",
+          "path": "api/schema/interpretation/ai-explanation-output-v1.schema.json"
+        },
+        {
+          "kind": "contract",
+          "path": "api/schema/interpretation/ai-explanation-profile-v1.schema.json"
+        },
+        {
+          "kind": "fixture",
+          "path": "api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v3.json"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/aiexplanation/prompt/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/interpretation/aiexplanation/evaluation/**/*.go"
+        }
+      ],
+      "verification": [],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "The v3 prompt package has contract and preflight tests but has not completed a production evaluation Run or dual-role human review."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "DOC-CLOSURE-AI-EXPLANATION-PROMPT-V3",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "The v3 prompt package is a release candidate without approved production evidence.",
+          "exit_criteria": "Run the frozen v3 Prompt, Profile, Suite and Provider Route through 35 candidates, 35 semantic receipts, dual-role human review and an approved Gate."
         }
       ]
     },
@@ -584,12 +641,20 @@
           "path": "api/schema/interpretation/ai-explanation-prompt-template-v2.md"
         },
         {
+          "kind": "contract",
+          "path": "api/schema/interpretation/ai-explanation-prompt-template-v3.md"
+        },
+        {
           "kind": "fixture",
           "path": "api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v1.json"
         },
         {
           "kind": "fixture",
           "path": "api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v2.json"
+        },
+        {
+          "kind": "fixture",
+          "path": "api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v3.json"
         },
         {
           "kind": "contract",
@@ -3069,6 +3134,10 @@
         {
           "kind": "contract",
           "path": "api/schema/interpretation/ai-explanation-prompt-template-v2.md"
+        },
+        {
+          "kind": "contract",
+          "path": "api/schema/interpretation/ai-explanation-prompt-template-v3.md"
         },
         {
           "kind": "source",

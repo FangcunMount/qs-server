@@ -4,14 +4,14 @@
 
 Prompt 的发布门槛不是“能生成一段看起来合理的文字”，而是：在固定 Profile、固定输入、固定 Provider Route 配置下重复运行，结构、引用、策略和安全硬门禁全部通过，同时跨维度质量、忠实度、建议可操作性和表达清晰度达到阈值。
 
-Prompt 发布状态仍是 `planned`。生产 Run `635398770544095790` 已冻结 Prompt/Suite/Profile v2 与 Provider Route v6/v3，形成 35 个 Candidate 和 35 份 semantic receipt，并进入 `awaiting_review`；但 39 次生成中保留了 4 次输出契约失败，`generation_contract_conformance_rate=35/39=89.74%`，低于冻结的 95% G3 门槛。即使补齐 70 条人工审核，该 Run 也只能终审为 `rejected`，不能作为 Profile 发布证据。
+Prompt 发布状态仍是 `planned`。生产 Run `635426176763965998` 已冻结 Prompt/Suite/Profile v2 与 Provider Route v8/v5，35 次生成和 35 次裁判均一次成功，G3 可靠性与契约符合率均为 100%；但 G4 仅 23/35 Candidate 通过全部 hard assertions，Case 断言通过 29/35，低于 32/35，且 Case 004、006 均仅 3/5，低于 4/5。该 Run 仍必须完成 70 条双角色审核并终审为 `rejected`，不能作为 Profile 发布证据。
 
-`cross-dimension-participant-scale/v2` 是基于 v1 人工审核问题形成的最小候选版本：禁止把共现写成因果链或机制，禁止在缺少等级/常模时创造“中等”“平衡”等分类，限制 focus area 只能影响组织顺序，并禁止在不允许层级组合时把父子维度写进同一洞察。仓库保留 v1 只读解析；v2 已完成一轮 35 个真实 Candidate 和 35 次真实裁判，但尚未产生通过执行可靠性、70 条双角色人工复核与最终 Gate 的 approved Run，因此仍不能视为已经发布。
+`cross-dimension-participant-scale/v3` 是基于该 Run 的具体失败形成的最小候选版本：明确每条洞察必须引用两个不同维度，按标准等级的参与者含义判断关注方向，禁止转述或引用不可信指令文本，限制建议 rationale 只陈述证据对应关系，并固定 limitations 边界句。仓库保留 v1/v2 只读解析；新 Run 才写入 v3。不拆 Mongo 集合，不新增状态机、发布开关或审核流程。
 
 规范性文件：
 
-- 历史只读：[Prompt Template v1](./ai-explanation-prompt-template-v1.md)、[Prompt Evaluation Cases v1](./ai-explanation-prompt-evaluation-cases-v1.json)
-- 当前候选：[Prompt Template v2](./ai-explanation-prompt-template-v2.md)、[Prompt Evaluation Cases v2](./ai-explanation-prompt-evaluation-cases-v2.json)
+- 历史只读：[Prompt Template v1](./ai-explanation-prompt-template-v1.md)、[Prompt Evaluation Cases v1](./ai-explanation-prompt-evaluation-cases-v1.json)、[Prompt Template v2](./ai-explanation-prompt-template-v2.md)、[Prompt Evaluation Cases v2](./ai-explanation-prompt-evaluation-cases-v2.json)
+- 当前候选：[Prompt Template v3](./ai-explanation-prompt-template-v3.md)、[Prompt Evaluation Cases v3](./ai-explanation-prompt-evaluation-cases-v3.json)
 - [AIExplanationInput v1](./ai-explanation-input-v1.schema.json)
 - [AIExplanationOutput v1](./ai-explanation-output-v1.schema.json)
 - [AIExplanationProfile v1](./ai-explanation-profile-v1.schema.json)

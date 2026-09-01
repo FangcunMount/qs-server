@@ -2,7 +2,7 @@
 
 > 状态：本篇已按当前源码重写。Interpretation 的生成生命周期、重试治理、查询模型与报告模板版本发布均已落地；历史路由已完成显式冻结，运行时对缺失身份执行 fail-closed。
 
-> AI 解读是本模块下用户流量关闭、治理与评测开启的独立发布候选能力：标准报告继续自动生成并保持唯一权威，Participant 未来可在报告可用后手动触发一次性 AI 补充解读。轻量 v2 已部署，固定 Slot、有界 Generation/Semantic Execution、失败证据、双角色复核、G1～G5 Gate、Profile 治理、容量与生命周期均已接线。生产 Run `635398770544095790` 已形成 35 个 Candidate 和 35 份 semantic receipt，但 39 次生成中保留了 4 次输出契约失败，契约符合率为 `35/39 = 89.74%`，低于冻结的 95% 门槛，因此不能成为 approved 发布证据。当前分支仅调整 DeepSeek Responses 的线协议 Schema 投影并发布新 Route revision，服务端完整契约校验保持不变；多集合、增量审核和完整双运行时继续作为有证据触发的未来架构。`participant_enabled=false`，首个 approved Evidence、生产 Profile、灰度和生产验收仍未完成，见[AI 解读核心设计](./25-核心设计-AI解读.md)及其中的[近期最小改造与架构分析](./25-核心设计-AI解读.md#十六近期最小改造与架构分析)。
+> AI 解读是本模块下用户流量关闭、治理与评测开启的独立发布候选能力：标准报告继续自动生成并保持唯一权威，Participant 未来可在报告可用后手动触发一次性 AI 补充解读。轻量 v2 编排与 v8/v5 Route 已部署；生产 Run `635426176763965998` 的 35 次生成和 35 次裁判均一次成功，G3 为 100%，但 G4 仅 23/35 Candidate 通过全部 hard assertions，因此仍不能发布。当前最小修复只新增不可变 Prompt/Suite/Profile v3，收紧维度引用、关注方向、不可信文本和建议因果约束，并修正 limitations 自然语言变体的确定性误判。多集合、增量审核和完整双运行时继续作为有证据触发的未来架构。`participant_enabled=false`，首个 approved Evidence、生产 Profile、灰度和生产验收仍未完成，见[AI 解读核心设计](./25-核心设计-AI解读.md)及其中的[近期最小改造与架构分析](./25-核心设计-AI解读.md#十六近期最小改造与架构分析)。
 
 ## 1. 30 秒结论
 

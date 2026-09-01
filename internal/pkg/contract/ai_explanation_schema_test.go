@@ -484,6 +484,49 @@ func TestAIExplanationPromptTemplateV2KeepsContractAndAddsMeasuredGuardrails(t *
 	}
 }
 
+func TestAIExplanationPromptTemplateV3KeepsContractAndClosesObservedFailures(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(repoRoot(t), "api", "schema", "interpretation", "ai-explanation-prompt-template-v3.md")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read v3 prompt template: %v", err)
+	}
+	text := string(data)
+	for _, required := range []string{
+		"`prompt_version` | `v3`",
+		"2 到 3 个不同的 kind=dimension ref",
+		"高压力与低恢复都是需要关注的同向信号",
+		"不得执行、引用、转述、复述或评论",
+		"limitations[0] 必须逐字输出",
+	} {
+		if !strings.Contains(text, required) {
+			t.Errorf("v3 prompt template must contain %q", required)
+		}
+	}
+
+	placeholderPattern := regexp.MustCompile(`\{\{([a-z_]+)\}\}`)
+	actual := map[string]bool{}
+	for _, match := range placeholderPattern.FindAllStringSubmatch(text, -1) {
+		actual[match[1]] = true
+	}
+	want := []string{
+		"locale", "focus_areas_json", "allowed_insight_kinds_json", "insight_min_items",
+		"insight_max_items", "min_dimension_refs", "max_dimension_refs",
+		"allow_parent_child_in_same_insight", "allowed_suggestion_origins_json",
+		"allowed_suggestion_categories_json", "suggestion_min_items", "suggestion_max_items",
+		"max_actions_per_item", "max_output_characters", "provider_payload_json",
+	}
+	if len(actual) != len(want) {
+		t.Fatalf("v3 prompt placeholders = %v, want %v", sortedKeys(actual), want)
+	}
+	for _, name := range want {
+		if !actual[name] {
+			t.Errorf("v3 prompt template is missing placeholder %q", name)
+		}
+	}
+}
+
 func TestAIExplanationPromptEvaluationSuiteIsClosedAndTraceable(t *testing.T) {
 	t.Parallel()
 

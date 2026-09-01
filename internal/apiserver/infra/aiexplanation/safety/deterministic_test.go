@@ -33,6 +33,38 @@ func TestDeterministicGateRejectsForbiddenClaimAndMissingLimitations(t *testing.
 	}
 }
 
+func TestDeterministicGateAcceptsEquivalentBoundaryLanguage(t *testing.T) {
+	tests := []string{
+		"本解读仅基于本次测评结果，不构成医学或心理诊断、治疗建议或对个人特质与未来表现的确定性判断。",
+		"以上内容仅基于本次结果，不能作为医疗诊断，也不代表对未来表现的确定预测。",
+		"本内容仅基于本次测评，不构成医学、心理或教育诊断，也不构成对个人特质的确定性结论。",
+		"This interpretation is based only on the current assessment. It is not diagnostic and does not constitute a definitive conclusion.",
+		"This assessment is not a diagnosis and cannot be used as a deterministic judgment.",
+	}
+	for _, limitations := range tests {
+		request := validRequest()
+		request.Content.Limitations = []string{limitations}
+		result, err := NewDeterministicGate().Evaluate(context.Background(), request)
+		if err != nil || !result.Allowed {
+			t.Fatalf("limitations %q result/error = %#v/%v", limitations, result, err)
+		}
+	}
+}
+
+func TestDeterministicGateRequiresNegatedDiagnosisAndDeterministicConclusion(t *testing.T) {
+	for _, limitations := range []string{
+		"本解读仅基于本次测评结果，内容涉及诊断和确定性判断。",
+		"本解读仅基于本次测评结果，不构成诊断，但会给出确定性判断。",
+	} {
+		request := validRequest()
+		request.Content.Limitations = []string{limitations}
+		result, err := NewDeterministicGate().Evaluate(context.Background(), request)
+		if err != nil || result.Allowed || result.FailureCode != "limitations_incomplete" {
+			t.Fatalf("limitations %q result/error = %#v/%v", limitations, result, err)
+		}
+	}
+}
+
 func validRequest() appport.SafetyRequest {
 	return appport.SafetyRequest{
 		Content: output.Content{
