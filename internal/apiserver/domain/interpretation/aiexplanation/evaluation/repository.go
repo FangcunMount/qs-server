@@ -49,3 +49,10 @@ type ExpiredPreparation struct {
 type ExpiredPreparationReader interface {
 	ListExpiredPreparations(context.Context, time.Time, int) ([]ExpiredPreparation, error)
 }
+
+// ExpiredPreparationV2Reader keeps the v2 discriminator explicit so the
+// legacy reader can continue to exclude v2 documents while both versions
+// share one Mongo collection.
+type ExpiredPreparationV2Reader interface {
+	ListExpiredPreparationsV2(context.Context, time.Time, int) ([]ExpiredPreparation, error)
+}

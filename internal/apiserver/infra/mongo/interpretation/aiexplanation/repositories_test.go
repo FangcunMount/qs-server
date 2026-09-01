@@ -69,6 +69,20 @@ func TestExpiredPreparedEvaluationFilterNeverSelectsDispatching(t *testing.T) {
 	}
 }
 
+func TestExpiredPreparedEvaluationV2FilterSelectsOnlyV2PreparedCheckpoints(t *testing.T) {
+	at := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	filter := expiredPreparedEvaluationV2Filter(at)
+	if filter["evidence_version"] != PromptEvaluationEvidenceVersionV2 ||
+		filter["status"] != string(domainevaluation.EvidenceStatusCollecting) ||
+		filter["execution.phase"] != string(domainevaluation.AttemptExecutionPrepared) {
+		t.Fatalf("v2 expired preparation filter = %#v", filter)
+	}
+	lease, ok := filter["execution.lease_expires_at"].(bson.M)
+	if !ok || lease["$lte"] != at {
+		t.Fatalf("v2 lease filter = %#v", filter["execution.lease_expires_at"])
+	}
+}
+
 func TestLegacyPromptEvaluationFilterCannotReadV2Evidence(t *testing.T) {
 	original := bson.M{"domain_id": meta.ID(91)}
 	filter := legacyPromptEvaluationFilter(original)

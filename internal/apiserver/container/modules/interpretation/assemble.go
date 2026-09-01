@@ -410,7 +410,9 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation evaluation v2 committer: %v", err)
 		}
-		evaluationLeaseRecoverer, err := aiexplanationevaluation.NewPreparedLeaseRecoverer(evaluationRepo, evaluationCommitter)
+		evaluationLeaseRecoverer, err := aiexplanationevaluation.NewPreparedLeaseRecoverer(
+			evaluationRepo, evaluationCommitter, evaluationRepo, evaluationCommitterV2,
+		)
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation Prompt evaluation lease recovery: %v", err)
 		}

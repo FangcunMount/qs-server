@@ -216,6 +216,22 @@ func (e *PromptEvaluationEvidenceV2) ReleaseExpiredPreparation(at time.Time) err
 	return nil
 }
 
+// RequestExpiredPreparationRecovery releases only the exact v2 prepared
+// checkpoint observed by a recovery scan. A dispatching checkpoint is never
+// replayed because its Provider result may be unknown.
+func (e *PromptEvaluationEvidenceV2) RequestExpiredPreparationRecovery(invocationID string, observedLeaseExpiresAt, at time.Time) error {
+	invocationID = strings.TrimSpace(invocationID)
+	if e == nil || e.Status != EvidenceStatusCollecting || e.execution == nil ||
+		e.execution.Phase != AttemptExecutionPrepared || invocationID == "" ||
+		e.execution.InvocationID != invocationID || !e.execution.LeaseExpiresAt.Equal(observedLeaseExpiresAt) ||
+		!e.execution.LeaseExpired(at) {
+		return fmt.Errorf("%w: exact expired v2 prepared execution is required", ErrRecoveryNotAllowed)
+	}
+	e.execution = nil
+	e.version++
+	return e.Validate()
+}
+
 func (e *PromptEvaluationEvidenceV2) CompletePreflight(value PreflightCaseEvidence) error {
 	if e == nil || e.Status != EvidenceStatusCollecting || len(e.PreflightEvidence) != 1 ||
 		e.PreflightEvidence[0].Status != PreflightEvidencePending || value.CaseID != e.PreflightEvidence[0].CaseID ||

@@ -275,7 +275,7 @@ func (r *OnlineRunner) runGenerationStepV2(
 	if err != nil {
 		return nil, err
 	}
-	receipts, _, err := candidateReceipts(candidate, allAssertions, len(prepared.defaultAssertions))
+	receipts, _, err := candidateReceiptsV2(candidate, allAssertions, len(prepared.defaultAssertions))
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +312,7 @@ func (r *OnlineRunner) runSemanticStepV2(
 	if err != nil {
 		return nil, err
 	}
-	receipts, obligations, err := candidateReceipts(candidate, allAssertions, len(prepared.defaultAssertions))
+	receipts, obligations, err := candidateReceiptsV2(candidate, allAssertions, len(prepared.defaultAssertions))
 	if err != nil {
 		return nil, err
 	}

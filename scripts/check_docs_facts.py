@@ -189,7 +189,6 @@ EXPECTED_SCHEDULER_PRODUCTION_ENABLE = {
     if config_key
     in {
         "mongo_consistency_audit",
-        "ai_explanation_prompt_evaluation_lease_recovery",
         "ai_explanation_participant_lease_recovery",
     }
     else "true"

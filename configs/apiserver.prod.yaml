@@ -365,9 +365,9 @@ interpretation_lease_recovery:
   lock_key: "qs:interpretation-lease-recovery:leader"
   lock_ttl: "30s"
 
-# 首次真实评测通过显式恢复 API 处置中断；完成目标环境故障演练后再开启自动 prepared-lease 扫描。
+# 仅重新唤醒 v1/v2 已过期的 prepared checkpoint；dispatching 仍需人工确认，避免重复 Provider 调用。
 ai_explanation_prompt_evaluation_lease_recovery:
-  enable: false
+  enable: true
   interval: "10s"
   batch_limit: 20
   lock_key: "qs:ai-explanation-prompt-evaluation-lease-recovery:leader"

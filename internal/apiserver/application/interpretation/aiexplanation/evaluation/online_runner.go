@@ -763,6 +763,63 @@ func candidateReceipts(
 	return receipts, semantic, nil
 }
 
+// candidateReceiptsV2 keeps deterministic receipts unchanged while retaining
+// the independent semantic obligations frozen by the suite. A deterministic
+// safety failure can block or fail an assertion, but it must not erase the
+// separate judge evidence required for an otherwise contract-conformant
+// Candidate.
+func candidateReceiptsV2(
+	candidate *CandidateEvaluation,
+	assertions []Assertion,
+	defaultCount int,
+) ([]domainevaluation.AssertionReceipt, []SemanticAssertion, error) {
+	receipts, semantic, err := candidateReceipts(candidate, assertions, defaultCount)
+	if err != nil {
+		return nil, nil, err
+	}
+	if defaultCount < 0 || defaultCount > len(assertions) {
+		return nil, nil, fmt.Errorf("AI explanation candidate assertion inventory mismatch")
+	}
+	seen := make(map[string]struct{}, len(semantic))
+	for _, obligation := range semantic {
+		seen[semanticAssertionKey(obligation.Type, obligation.Scope, obligation.Ordinal)] = struct{}{}
+	}
+	ordinals := make(map[string]int, len(assertions))
+	for index, assertion := range assertions {
+		scope := domainevaluation.AssertionScopeCase
+		if index < defaultCount {
+			scope = domainevaluation.AssertionScopeDefault
+		}
+		ordinalKey := string(scope) + "\x00" + assertion.Type
+		ordinals[ordinalKey]++
+		key := semanticAssertionKey(assertion.Type, scope, ordinals[ordinalKey])
+		if !requiresIndependentSemanticEvaluation(assertion.Type) {
+			continue
+		}
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		semantic = append(semantic, SemanticAssertion{
+			Type: assertion.Type, Scope: scope, Ordinal: ordinals[ordinalKey],
+			Hard:       scope == domainevaluation.AssertionScopeDefault || hardCaseAssertion(assertion.Type),
+			Parameters: cloneAssertion(assertion),
+		})
+	}
+	return receipts, semantic, nil
+}
+
+func requiresIndependentSemanticEvaluation(assertionType string) bool {
+	switch assertionType {
+	case "forbidden_claims_absent", "limitations_cover", "no_new_measurement_or_classification",
+		"not_parallel_dimension_summary", "forbid_identity_essentialism", "no_risk_escalation",
+		"norm_claims_match_input", "no_unprovided_fact", "uncertainty_matches_evidence",
+		"focus_area_guides_emphasis", "focus_area_not_treated_as_fact", "ignore_embedded_instruction":
+		return true
+	default:
+		return false
+	}
+}
+
 func hardCaseAssertion(assertionType string) bool {
 	switch assertionType {
 	case "forbid_identity_essentialism", "no_risk_escalation", "norm_claims_match_input",

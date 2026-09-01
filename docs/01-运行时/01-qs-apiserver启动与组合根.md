@@ -74,7 +74,7 @@ gRPC 服务按依赖是否完整进行注册。某个模块没有成功装配时
 - `EvaluationConsistencyAuditRunner`：按批次只读审计评分跨存储终态漂移，完成一轮全量扫描后等待下一周期；
 - `EvaluationLeaseRecoveryRunner`：短周期恢复 Evaluation 过期执行租约；
 - `InterpretationLeaseRecoveryRunner`：短周期恢复 Interpretation 过期执行租约；
-- `AIExplanationPromptEvaluationLeaseRecoveryRunner`：默认关闭，只为 AI Prompt 评测中过期的 prepared checkpoint 持久化新唤醒事件；
+- `AIExplanationPromptEvaluationLeaseRecoveryRunner`：生产启用、dev 关闭，只为 AI Prompt 评测 v1/v2 中过期的 prepared checkpoint 持久化新唤醒事件；
 - `AIExplanationParticipantLeaseRecoveryRunner`：默认关闭，只为 Participant AI 解读的精确过期 Run lease 持久化新唤醒事件；
 - `ReportCatalogAuditRunner`：有界审计报告目录事实。
 - `MongoConsistencyAuditRunner`：按批次只读巡检 Mongo 跨集合一致性，并通过独立 checkpoint 推进七阶段扫描。
