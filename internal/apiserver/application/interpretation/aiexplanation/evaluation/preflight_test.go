@@ -28,6 +28,28 @@ func TestV1SuiteBytesMatchFrozenReleaseIdentity(t *testing.T) {
 	}
 }
 
+func TestV2SuiteBytesMatchFrozenReleaseIdentity(t *testing.T) {
+	raw := interpretationschema.AIExplanationPromptEvaluationCasesV2()
+	if got := aiexplanation.NewFingerprint(raw); got != evaluation.SuiteFingerprintV2 {
+		t.Fatalf("suite fingerprint = %s, want %s", got, evaluation.SuiteFingerprintV2)
+	}
+	gitBlobInput := append([]byte(fmt.Sprintf("blob %d\x00", len(raw))), raw...)
+	gitBlobSum := sha1.Sum(gitBlobInput) // #nosec G401 -- Git blob identity is defined as SHA-1.
+	if got := fmt.Sprintf("%x", gitBlobSum); got != evaluation.SuiteGitBlobSHAV2 {
+		t.Fatalf("suite Git blob = %s, want %s", got, evaluation.SuiteGitBlobSHAV2)
+	}
+	suite, err := evaluation.LoadFrozen(evaluation.SuiteIDV2, evaluation.SuiteVersionV2, evaluation.SuiteFingerprintV2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if suite.Prompt.Version != "v2" || suite.ProfileFixture.GenerationPolicy.PromptVersion != "v2" || suite.ProfileFixture.Version != "v2" {
+		t.Fatalf("v2 suite identities = %#v %#v", suite.Prompt, suite.ProfileFixture)
+	}
+	if _, err := evaluation.LoadFrozen(evaluation.SuiteIDV1, evaluation.SuiteVersionV1, evaluation.SuiteFingerprintV2); !errors.Is(err, evaluation.ErrInvalidSuite) {
+		t.Fatalf("mismatched frozen suite error = %v", err)
+	}
+}
+
 func TestV1PreflightPlansThirtyFiveCallsWithoutCallingProvider(t *testing.T) {
 	suite, err := evaluation.LoadV1()
 	if err != nil {
@@ -55,6 +77,27 @@ func TestV1PreflightPlansThirtyFiveCallsWithoutCallingProvider(t *testing.T) {
 		if result.ActualExecution != "ready_for_provider" || result.PlannedProviderCalls != 5 || !result.RenderedPromptChecked || result.InputFingerprint == "" {
 			t.Fatalf("generation case preflight = %#v", result)
 		}
+	}
+}
+
+func TestV2PreflightPlansThirtyFiveCallsWithoutCallingProvider(t *testing.T) {
+	suite, err := evaluation.LoadV2()
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner, err := evaluation.NewPreflightRunner(promptResolverStub{}, schemaResolverStub{}, func() time.Time {
+		return time.Date(2026, 9, 1, 1, 2, 3, 0, time.UTC)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err := runner.Run(context.Background(), suite)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "passed" || report.SuiteVersion != evaluation.SuiteVersionV2 || report.PromptVersion != "v2" ||
+		report.GenerationCases != 7 || report.PreflightCases != 1 || report.PlannedProviderInvocations != 35 || report.ActualProviderInvocations != 0 {
+		t.Fatalf("unexpected v2 preflight summary: %#v", report)
 	}
 }
 

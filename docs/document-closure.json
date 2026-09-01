@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "236c02acc286f18bba9ac3a2cc0e036b2876fc45",
+    "sha": "6526551cbef150bee866b70054de717d1b83e18e",
     "verified_on": "2026-09-01"
   },
   "status_policy": {
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 32,
+      "expected_count": 33,
       "budgeted": false
     }
   },
@@ -460,6 +460,61 @@
       ]
     },
     {
+      "path": "api/schema/interpretation/ai-explanation-prompt-template-v2.md",
+      "class": "sidecar",
+      "owner": "interpretation",
+      "doc_status": "planned",
+      "verified": {
+        "source_sha": null,
+        "verified_on": null
+      },
+      "fact_sources": [
+        {
+          "kind": "contract",
+          "path": "api/schema/interpretation/ai-explanation-input-v1.schema.json"
+        },
+        {
+          "kind": "contract",
+          "path": "api/schema/interpretation/ai-explanation-output-v1.schema.json"
+        },
+        {
+          "kind": "contract",
+          "path": "api/schema/interpretation/ai-explanation-profile-v1.schema.json"
+        },
+        {
+          "kind": "fixture",
+          "path": "api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v2.json"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/aiexplanation/prompt/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/interpretation/aiexplanation/evaluation/**/*.go"
+        }
+      ],
+      "verification": [],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "The v2 prompt package has contract and preflight tests but has not completed a real provider evaluation Run or dual-role human review."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "DOC-CLOSURE-AI-EXPLANATION-PROMPT-V2",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "The v2 prompt package is a release candidate without approved production evidence.",
+          "exit_criteria": "Run the frozen v2 Prompt, Profile, Suite and Provider Route through 35 candidates, 35 semantic receipts, dual-role human review and an approved Gate."
+        }
+      ]
+    },
+    {
       "path": "api/schema/interpretation/ai-explanation-semantic-evaluator-prompt-v1.md",
       "class": "sidecar",
       "owner": "interpretation",
@@ -525,8 +580,16 @@
           "path": "api/schema/interpretation/ai-explanation-prompt-template-v1.md"
         },
         {
+          "kind": "contract",
+          "path": "api/schema/interpretation/ai-explanation-prompt-template-v2.md"
+        },
+        {
           "kind": "fixture",
           "path": "api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v1.json"
+        },
+        {
+          "kind": "fixture",
+          "path": "api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v2.json"
         },
         {
           "kind": "contract",
@@ -3002,6 +3065,10 @@
         {
           "kind": "contract",
           "path": "api/schema/interpretation/ai-explanation-prompt-template-v1.md"
+        },
+        {
+          "kind": "contract",
+          "path": "api/schema/interpretation/ai-explanation-prompt-template-v2.md"
         },
         {
           "kind": "source",

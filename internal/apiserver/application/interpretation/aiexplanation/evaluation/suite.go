@@ -25,6 +25,12 @@ const (
 	SuiteFingerprintV1 = aiexplanation.Fingerprint(
 		"sha256:7f5393124cb09517284d590cca652803db4a2aa86f9eaa07b684f7b46953d3b7",
 	)
+	SuiteVersionV2     = "ai-explanation-prompt-evaluation-cases/v2"
+	SuiteIDV2          = "cross-dimension-participant-scale-v2"
+	SuiteGitBlobSHAV2  = "b747b9ba7727413e9318d9cc9b7e9b41ce2fc6e1"
+	SuiteFingerprintV2 = aiexplanation.Fingerprint(
+		"sha256:625633a8d376ddacd82b1f588bf71869aa6a719d0cd17cd03e1b894293fa6e3d",
+	)
 )
 
 var ErrInvalidSuite = errors.New("AI explanation Prompt evaluation suite is invalid")
@@ -110,6 +116,42 @@ func LoadV1() (*Suite, error) {
 	return Parse(raw)
 }
 
+func LoadV2() (*Suite, error) {
+	raw := interpretationschema.AIExplanationPromptEvaluationCasesV2()
+	if aiexplanation.NewFingerprint(raw) != SuiteFingerprintV2 {
+		return nil, fmt.Errorf("%w: frozen v2 suite fingerprint mismatch", ErrInvalidSuite)
+	}
+	return Parse(raw)
+}
+
+// LoadFrozen resolves only immutable suite identities compiled into this
+// release. v1 remains available for historical evidence reads; callers cannot
+// substitute a matching ID or version with different bytes.
+func LoadFrozen(id, version string, fingerprint aiexplanation.Fingerprint) (*Suite, error) {
+	switch {
+	case id == SuiteIDV1 && version == SuiteVersionV1 && fingerprint == SuiteFingerprintV1:
+		return LoadV1()
+	case id == SuiteIDV2 && version == SuiteVersionV2 && fingerprint == SuiteFingerprintV2:
+		return LoadV2()
+	default:
+		return nil, fmt.Errorf("%w: frozen suite identity is unavailable", ErrInvalidSuite)
+	}
+}
+
+func frozenSuiteIdentity(suite *Suite) (aiexplanation.Fingerprint, string, error) {
+	if suite == nil {
+		return "", "", fmt.Errorf("%w: suite is required", ErrInvalidSuite)
+	}
+	switch {
+	case suite.SuiteID == SuiteIDV1 && suite.SuiteVersion == SuiteVersionV1:
+		return SuiteFingerprintV1, SuiteGitBlobSHAV1, nil
+	case suite.SuiteID == SuiteIDV2 && suite.SuiteVersion == SuiteVersionV2:
+		return SuiteFingerprintV2, SuiteGitBlobSHAV2, nil
+	default:
+		return "", "", fmt.Errorf("%w: frozen suite identity is unavailable", ErrInvalidSuite)
+	}
+}
+
 func Parse(raw []byte) (*Suite, error) {
 	if err := validateRawProviderPayloads(raw); err != nil {
 		return nil, err
@@ -136,10 +178,21 @@ func Parse(raw []byte) (*Suite, error) {
 }
 
 func (s Suite) validateIdentity() error {
-	if s.SuiteVersion != SuiteVersionV1 || s.SuiteID != SuiteIDV1 || s.Status != "planned" {
+	if s.Status != "planned" {
 		return fmt.Errorf("%w: unsupported suite identity or lifecycle", ErrInvalidSuite)
 	}
-	if s.Prompt.TemplateID == "" || s.Prompt.Version == "" || !strings.HasSuffix(s.Prompt.Path, "ai-explanation-prompt-template-v1.md") {
+	validPrompt := false
+	switch {
+	case s.SuiteVersion == SuiteVersionV1 && s.SuiteID == SuiteIDV1:
+		validPrompt = s.Prompt.TemplateID == "cross-dimension-participant-scale" && s.Prompt.Version == "v1" &&
+			strings.HasSuffix(s.Prompt.Path, "ai-explanation-prompt-template-v1.md")
+	case s.SuiteVersion == SuiteVersionV2 && s.SuiteID == SuiteIDV2:
+		validPrompt = s.Prompt.TemplateID == "cross-dimension-participant-scale" && s.Prompt.Version == "v2" &&
+			strings.HasSuffix(s.Prompt.Path, "ai-explanation-prompt-template-v2.md")
+	default:
+		return fmt.Errorf("%w: unsupported suite identity or lifecycle", ErrInvalidSuite)
+	}
+	if !validPrompt {
 		return fmt.Errorf("%w: Prompt reference is invalid", ErrInvalidSuite)
 	}
 	if s.Contracts.InputSchema != aiexplanation.InputSchemaVersionV1 ||

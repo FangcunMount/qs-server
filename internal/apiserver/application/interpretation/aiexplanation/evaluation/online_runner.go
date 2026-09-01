@@ -43,10 +43,10 @@ type OnlineRunnerDependencies struct {
 	Now                func() time.Time
 }
 
-// OnlineRunner executes the frozen synthetic v1 suite. It is not assembled by
-// the default-disabled participant runtime and never publishes a Profile. A
-// successful RunV1 only closes collection and leaves the evidence awaiting the
-// two required human review roles.
+// OnlineRunner executes frozen synthetic suites. Legacy RunV1 and recheck
+// methods retain the v1 assets, while new evidence-v2 Runs freeze the current
+// v2 Prompt/Suite/Profile package. It is not assembled by the default-disabled
+// participant runtime and never publishes a Profile directly.
 type OnlineRunner struct {
 	prompts            appport.PromptPackageResolver
 	schemas            appport.OutputSchemaResolver
@@ -325,11 +325,18 @@ func (r *OnlineRunner) RunStepV1(ctx context.Context, command OnlineStepCommand)
 }
 
 func (r *OnlineRunner) prepareV1(ctx context.Context) (*Suite, *PreflightReport, *preparedOnlineRun, error) {
-	suiteRaw := interpretationschema.AIExplanationPromptEvaluationCasesV1()
-	if aiexplanation.NewFingerprint(suiteRaw) != SuiteFingerprintV1 {
-		return nil, nil, nil, fmt.Errorf("AI explanation evaluation frozen suite fingerprint mismatch")
+	return r.prepareFrozenSuite(ctx, LoadV1)
+}
+
+func (r *OnlineRunner) prepareV2(ctx context.Context) (*Suite, *PreflightReport, *preparedOnlineRun, error) {
+	return r.prepareFrozenSuite(ctx, LoadV2)
+}
+
+func (r *OnlineRunner) prepareFrozenSuite(ctx context.Context, load func() (*Suite, error)) (*Suite, *PreflightReport, *preparedOnlineRun, error) {
+	if load == nil {
+		return nil, nil, nil, fmt.Errorf("AI explanation evaluation frozen suite loader is required")
 	}
-	suite, err := Parse(suiteRaw)
+	suite, err := load()
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -467,6 +474,10 @@ func (r *OnlineRunner) prepare(
 	if err != nil {
 		return nil, err
 	}
+	suiteFingerprint, suiteGitBlobSHA, err := frozenSuiteIdentity(suite)
+	if err != nil {
+		return nil, err
+	}
 
 	generationCases := make([]Case, 0, domainevaluation.RequiredGenerationCaseCount)
 	var preflightCase *Case
@@ -496,8 +507,8 @@ func (r *OnlineRunner) prepare(
 	}
 	release := domainevaluation.ReleaseIdentity{
 		Suite: domainevaluation.SuiteRef{
-			ID: suite.SuiteID, Version: suite.SuiteVersion, Fingerprint: SuiteFingerprintV1,
-			GitBlobSHA: SuiteGitBlobSHAV1,
+			ID: suite.SuiteID, Version: suite.SuiteVersion, Fingerprint: suiteFingerprint,
+			GitBlobSHA: suiteGitBlobSHA,
 		},
 		Prompt: promptPackage.Ref,
 		Profile: aiexplanation.ProfileRef{
