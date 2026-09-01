@@ -76,6 +76,7 @@ func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGr
 	governance.POST("/prompt-evaluations", aiHandler.StartEvaluationV2)
 	governance.POST("/legacy-prompt-evaluations/:run_id/attempts/:case_id/:attempt/rechecks", aiHandler.StartAttemptRecheck)
 	governance.POST("/prompt-evaluations/:run_id/reviews", aiHandler.RecordReviewV2)
+	governance.POST("/prompt-evaluations/:run_id/reviews/batch", aiHandler.RecordReviewsV2)
 	governance.POST("/prompt-evaluations/:run_id/finalize", aiHandler.FinalizeEvaluationV2)
 	governance.POST("/prompt-evaluations/:run_id/result-unknown/resolve", aiHandler.ResolveResultUnknownV2)
 }

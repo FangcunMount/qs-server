@@ -19,8 +19,11 @@ type EvaluationV2Starter interface {
 type EvaluationV2EvidenceWorkflow interface {
 	Find(context.Context, meta.ID) (*domainevaluation.PromptEvaluationEvidenceV2, error)
 	RecordHumanReview(context.Context, meta.ID, domainevaluation.CandidateHumanReview) (*domainevaluation.PromptEvaluationEvidenceV2, error)
+	RecordHumanReviews(context.Context, meta.ID, []domainevaluation.CandidateHumanReview) (*domainevaluation.PromptEvaluationEvidenceV2, error)
 	Finalize(context.Context, meta.ID, string, string, time.Time) (*domainevaluation.PromptEvaluationEvidenceV2, error)
 }
+
+const maxReviewV2BatchSize = 35
 
 type EvaluationV2ResolutionCommitter interface {
 	CommitResultUnknownResolutionV2(context.Context, meta.ID, domainevaluation.ResultUnknownResolution) (*domainevaluation.PromptEvaluationEvidenceV2, error)
@@ -77,15 +80,35 @@ func (s *service) FindEvaluationV2(ctx context.Context, actor Actor, runID meta.
 }
 
 func (s *service) RecordReviewV2(ctx context.Context, actor Actor, runID meta.ID, command ReviewV2Command) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
-	command.CandidateID, command.Reason = strings.TrimSpace(command.CandidateID), strings.TrimSpace(command.Reason)
-	if actor.OrgID <= 0 || actor.OperatorUserID <= 0 || runID.IsZero() || command.CandidateID == "" ||
-		!validRole(command.Role) || !validDecision(command.Decision) || command.Reason == "" || len(command.Reason) > maxAuditReasonLength {
-		return nil, cberrors.WithCode(code.ErrInvalidArgument, "AI explanation evaluation v2 review command is invalid")
+	return s.recordReviewsV2(ctx, actor, runID, command.Role, []ReviewV2BatchItemCommand{{
+		CandidateID: command.CandidateID, Decision: command.Decision, Reason: command.Reason,
+	}}, false)
+}
+
+func (s *service) RecordReviewsV2(ctx context.Context, actor Actor, runID meta.ID, command ReviewV2BatchCommand) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	return s.recordReviewsV2(ctx, actor, runID, command.Role, command.Reviews, true)
+}
+
+func (s *service) recordReviewsV2(ctx context.Context, actor Actor, runID meta.ID, role domainevaluation.ReviewRole, commands []ReviewV2BatchItemCommand, batch bool) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	if actor.OrgID <= 0 || actor.OperatorUserID <= 0 || runID.IsZero() || !validRole(role) || len(commands) == 0 || len(commands) > maxReviewV2BatchSize {
+		return nil, invalidReviewV2Command(batch)
+	}
+	seen := make(map[string]struct{}, len(commands))
+	for index := range commands {
+		commands[index].CandidateID = strings.TrimSpace(commands[index].CandidateID)
+		commands[index].Reason = strings.TrimSpace(commands[index].Reason)
+		if commands[index].CandidateID == "" || !validDecision(commands[index].Decision) || commands[index].Reason == "" || len(commands[index].Reason) > maxAuditReasonLength {
+			return nil, invalidReviewV2Command(batch)
+		}
+		if _, duplicated := seen[commands[index].CandidateID]; duplicated {
+			return nil, cberrors.WithCode(code.ErrInvalidArgument, "AI explanation evaluation v2 review batch contains duplicate candidates")
+		}
+		seen[commands[index].CandidateID] = struct{}{}
 	}
 	if s == nil || s.evidenceV2 == nil || s.access == nil || s.now == nil {
 		return nil, cberrors.WithCode(code.ErrUnsupportedOperation, "AI explanation evaluation v2 review is disabled")
 	}
-	if err := s.access.AuthorizeReview(ctx, actor, command.Role); err != nil {
+	if err := s.access.AuthorizeReview(ctx, actor, role); err != nil {
 		return nil, err
 	}
 	current, err := s.evidenceV2.Find(ctx, runID)
@@ -95,26 +118,43 @@ func (s *service) RecordReviewV2(ctx context.Context, actor Actor, runID meta.ID
 	if err := validateEvaluationV2Org(current, actor); err != nil {
 		return nil, err
 	}
-	if current.Status != domainevaluation.EvidenceStatusAwaitingReview || !evidenceHasCandidate(current, command.CandidateID) {
+	if current.Status != domainevaluation.EvidenceStatusAwaitingReview {
 		return nil, cberrors.WithCode(code.ErrConflict, "AI explanation evaluation v2 candidate is not reviewable")
 	}
 	reviewer := actor.Subject()
-	for _, existing := range current.HumanReviews {
-		if existing.CandidateID != command.CandidateID {
-			continue
+	for _, command := range commands {
+		if !evidenceHasReviewReadyCandidate(current, command.CandidateID) {
+			return nil, cberrors.WithCode(code.ErrConflict, "AI explanation evaluation v2 candidate is not reviewable")
 		}
-		if existing.Role == command.Role {
-			return nil, cberrors.WithCode(code.ErrConflict, "AI explanation evaluation v2 candidate role is already reviewed")
-		}
-		if existing.Reviewer == reviewer {
-			return nil, cberrors.WithCode(code.ErrConflict, "AI explanation evaluation v2 requires distinct reviewers per candidate")
+		for _, existing := range current.HumanReviews {
+			if existing.CandidateID != command.CandidateID {
+				continue
+			}
+			if existing.Role == role {
+				return nil, cberrors.WithCode(code.ErrConflict, "AI explanation evaluation v2 candidate role is already reviewed")
+			}
+			if existing.Reviewer == reviewer {
+				return nil, cberrors.WithCode(code.ErrConflict, "AI explanation evaluation v2 requires distinct reviewers per candidate")
+			}
 		}
 	}
-	value, err := s.evidenceV2.RecordHumanReview(ctx, runID, domainevaluation.CandidateHumanReview{
-		CandidateID: command.CandidateID, Role: command.Role, Reviewer: reviewer,
-		Decision: command.Decision, ReviewedAt: s.now().UTC(), Reason: command.Reason,
-	})
+	reviewedAt := s.now().UTC()
+	reviews := make([]domainevaluation.CandidateHumanReview, 0, len(commands))
+	for _, command := range commands {
+		reviews = append(reviews, domainevaluation.CandidateHumanReview{
+			CandidateID: command.CandidateID, Role: role, Reviewer: reviewer,
+			Decision: command.Decision, ReviewedAt: reviewedAt, Reason: command.Reason,
+		})
+	}
+	value, err := s.evidenceV2.RecordHumanReviews(ctx, runID, reviews)
 	return value, mapKnownError(err)
+}
+
+func invalidReviewV2Command(batch bool) error {
+	if batch {
+		return cberrors.WithCode(code.ErrInvalidArgument, "AI explanation evaluation v2 review batch is invalid")
+	}
+	return cberrors.WithCode(code.ErrInvalidArgument, "AI explanation evaluation v2 review command is invalid")
 }
 
 func (s *service) FinalizeEvaluationV2(ctx context.Context, actor Actor, runID meta.ID, reason string) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
@@ -182,9 +222,9 @@ func validateEvaluationV2Org(value *domainevaluation.PromptEvaluationEvidenceV2,
 	return nil
 }
 
-func evidenceHasCandidate(value *domainevaluation.PromptEvaluationEvidenceV2, candidateID string) bool {
+func evidenceHasReviewReadyCandidate(value *domainevaluation.PromptEvaluationEvidenceV2, candidateID string) bool {
 	for _, slot := range value.Slots {
-		if slot.Candidate != nil && slot.Candidate.ID == candidateID {
+		if slot.Candidate != nil && slot.Candidate.ID == candidateID && slot.Candidate.ReviewReady {
 			return true
 		}
 	}

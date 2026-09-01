@@ -463,14 +463,29 @@ func (e *PromptEvaluationEvidenceV2) ResolveResultUnknown(value ResultUnknownRes
 }
 
 func (e *PromptEvaluationEvidenceV2) AddHumanReview(value CandidateHumanReview) error {
-	if e == nil || e.Status != EvidenceStatusAwaitingReview || e.Audit.ClosedAt == nil || value.ReviewedAt.Before(*e.Audit.ClosedAt) {
+	return e.AddHumanReviews([]CandidateHumanReview{value})
+}
+
+// AddHumanReviews appends one already validated review batch as a single
+// evidence mutation. Validation runs against the complete proposed batch, so
+// a duplicate or invalid item cannot leave a partially applied review set.
+func (e *PromptEvaluationEvidenceV2) AddHumanReviews(values []CandidateHumanReview) error {
+	if e == nil || e.Status != EvidenceStatusAwaitingReview || e.Audit.ClosedAt == nil {
 		return fmt.Errorf("awaiting-review AI explanation evidence is required")
 	}
-	if err := value.Validate(); err != nil {
-		return err
+	if len(values) == 0 {
+		return fmt.Errorf("AI explanation human review batch is required")
+	}
+	for _, value := range values {
+		if err := value.Validate(); err != nil || value.ReviewedAt.Before(*e.Audit.ClosedAt) {
+			if err != nil {
+				return err
+			}
+			return fmt.Errorf("awaiting-review AI explanation evidence is required")
+		}
 	}
 	cloned := e.Clone()
-	cloned.HumanReviews = append(cloned.HumanReviews, value)
+	cloned.HumanReviews = append(cloned.HumanReviews, values...)
 	cloned.version++
 	if err := cloned.Validate(); err != nil {
 		return err

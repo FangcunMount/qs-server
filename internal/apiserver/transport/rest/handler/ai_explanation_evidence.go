@@ -21,6 +21,17 @@ type AIExplanationEvaluationV2ReviewRequest struct {
 	Reason      string `json:"reason" binding:"required,max=1000"`
 }
 
+type AIExplanationEvaluationV2BatchReviewRequest struct {
+	Role    string                                            `json:"role" binding:"required"`
+	Reviews []AIExplanationEvaluationV2BatchReviewItemRequest `json:"reviews" binding:"required,min=1,max=35,dive"`
+}
+
+type AIExplanationEvaluationV2BatchReviewItemRequest struct {
+	CandidateID string `json:"candidate_id" binding:"required"`
+	Decision    string `json:"decision" binding:"required"`
+	Reason      string `json:"reason" binding:"required,max=1000"`
+}
+
 type AIExplanationResultUnknownV2Request struct {
 	ExecutionID                          string `json:"execution_id" binding:"required"`
 	Decision                             string `json:"decision" binding:"required"`
@@ -374,6 +385,43 @@ func (h *AIExplanationAdministrationHandler) RecordReviewV2(c *gin.Context) {
 	value, err := h.service.RecordReviewV2(c.Request.Context(), actor, runID, aiexplanationadministration.ReviewV2Command{
 		CandidateID: request.CandidateID, Role: domainevaluation.ReviewRole(request.Role),
 		Decision: domainevaluation.ReviewDecision(request.Decision), Reason: request.Reason,
+	})
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, evaluationV2Wire(value))
+}
+
+// RecordReviewsV2 godoc
+// @Summary 原子记录一批 v2 Candidate 人工审核
+// @Description 一批仅允许一个审核角色，最多 35 条；任一条不合法时整批不写入。
+// @Tags AI-Explanation-Administration
+// @Accept json
+// @Produce json
+// @Param run_id path string true "评测 Run ID"
+// @Param request body AIExplanationEvaluationV2BatchReviewRequest true "单角色 Candidate 审核列表"
+// @Success 200 {object} core.Response{data=AIExplanationEvaluationV2Wire}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 409 {object} core.ErrResponse
+// @Router /internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/reviews/batch [post]
+func (h *AIExplanationAdministrationHandler) RecordReviewsV2(c *gin.Context) {
+	actor, runID, ok := h.actorAndRunID(c)
+	if !ok {
+		return
+	}
+	var request AIExplanationEvaluationV2BatchReviewRequest
+	if err := h.BindJSON(c, &request); err != nil {
+		return
+	}
+	reviews := make([]aiexplanationadministration.ReviewV2BatchItemCommand, 0, len(request.Reviews))
+	for _, item := range request.Reviews {
+		reviews = append(reviews, aiexplanationadministration.ReviewV2BatchItemCommand{
+			CandidateID: item.CandidateID, Decision: domainevaluation.ReviewDecision(item.Decision), Reason: item.Reason,
+		})
+	}
+	value, err := h.service.RecordReviewsV2(c.Request.Context(), actor, runID, aiexplanationadministration.ReviewV2BatchCommand{
+		Role: domainevaluation.ReviewRole(request.Role), Reviews: reviews,
 	})
 	if err != nil {
 		h.Error(c, err)

@@ -113,8 +113,12 @@ func (s *EvidenceV2Service) ResolveResultUnknown(ctx context.Context, runID meta
 }
 
 func (s *EvidenceV2Service) RecordHumanReview(ctx context.Context, runID meta.ID, value domainevaluation.CandidateHumanReview) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	return s.RecordHumanReviews(ctx, runID, []domainevaluation.CandidateHumanReview{value})
+}
+
+func (s *EvidenceV2Service) RecordHumanReviews(ctx context.Context, runID meta.ID, values []domainevaluation.CandidateHumanReview) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
 	return s.mutate(ctx, runID, func(evidence *domainevaluation.PromptEvaluationEvidenceV2) error {
-		return evidence.AddHumanReview(value)
+		return evidence.AddHumanReviews(values)
 	})
 }
 
