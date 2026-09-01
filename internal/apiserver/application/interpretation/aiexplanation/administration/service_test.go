@@ -204,7 +204,7 @@ func TestFindEvaluationCapacityUsesTrustedOrganizationAndCurrentUTCDay(t *testin
 		t.Fatalf("trusted capacity query = org:%d day:%s auth:%d", reader.orgID, reader.budgetDay, access.governanceCalls)
 	}
 	if result.DailyProviderInvocationLimit != 1024 || result.ReservedProviderInvocations != 70 ||
-		result.RemainingProviderInvocations != 954 || result.AvailableFullRunStarts != 13 || result.OverLimit ||
+		result.ProviderInvocationsPerStart != 140 || result.RemainingProviderInvocations != 954 || result.AvailableFullRunStarts != 6 || result.OverLimit ||
 		len(result.Reservations) != 1 || result.Reservations[0].RunID != meta.ID(700) {
 		t.Fatalf("capacity projection = %#v", result)
 	}

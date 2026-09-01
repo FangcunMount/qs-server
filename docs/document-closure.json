@@ -2,8 +2,8 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "f49567941a31e36f0df8bbb1ceff91865b2c5a80",
-    "verified_on": "2026-08-31"
+    "sha": "43d310d489cc0a5684af02fa011a13aeba2ef8e0",
+    "verified_on": "2026-09-01"
   },
   "status_policy": {
     "doc_status": [
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 31,
+      "expected_count": 32,
       "budgeted": false
     }
   },
@@ -8498,6 +8498,38 @@
           "severity": "medium",
           "summary": "Source and semantic review have not yet been recorded.",
           "exit_criteria": "Record fact sources and verification evidence, then update doc_status through review."
+        }
+      ]
+    },
+    {
+      "path": "scripts/oneoff/audit_ai_explanation_prompt_evaluation_size/README.md",
+      "class": "sidecar",
+      "owner": "tooling",
+      "doc_status": "needs_review",
+      "verified": {
+        "source_sha": null,
+        "verified_on": null
+      },
+      "fact_sources": [],
+      "verification": [],
+      "production_evidence": {
+        "level": "current",
+        "refs": [
+          "https://github.com/FangcunMount/qs-server/actions/runs/33443439888"
+        ],
+        "deployed_sha": "f6bb4c7e30728d4416547741c053ae837c1de23a",
+        "observed_at": "2026-08-31",
+        "limitations": [
+          "The production history contained 525 generation executions but no semantic execution sample, so the complete v2 projection remains unavailable."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "DOC-CLOSURE-178",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "The production audit has no semantic execution sample for a complete v2 size projection.",
+          "exit_criteria": "After the first complete v2 run, repeat the read-only audit and review semantic output sizes and the single-document capacity decision."
         }
       ]
     },

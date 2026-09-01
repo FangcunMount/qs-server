@@ -36,6 +36,12 @@ if ! grep -Fq 'socketTimeoutMS=0' "$SCRIPT"; then
   echo "Mac mini backup script does not preserve unlimited archive read timeout semantics" >&2
   exit 1
 fi
+if ! grep -Fq "grep -Fq '(CursorNotFound)'" "$SCRIPT" ||
+  ! grep -Fq 'dump_attempt >= 2' "$SCRIPT" ||
+  ! grep -Fq 'removing incomplete archive and retrying once' "$SCRIPT"; then
+  echo "Mac mini backup script does not bound CursorNotFound recovery to one retry" >&2
+  exit 1
+fi
 if grep -En 'mongodb-source-backup|MongoDB Source-side Backup|Keeping last 5|keeping last 5' \
   "$WORKFLOW" "$SCRIPT" >/dev/null; then
   echo "legacy serverA/source-host MongoDB backup path is still active" >&2

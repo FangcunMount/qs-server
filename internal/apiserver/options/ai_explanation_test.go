@@ -254,14 +254,14 @@ func TestAIExplanationEvaluationCapacityUsesFixedV1RunCeiling(t *testing.T) {
 	}
 
 	opts.Evaluation.Capacity.MaxActiveRunsPerOrg = 1
-	opts.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg = 69
-	if joined := errorsText(opts.Validate()); !strings.Contains(joined, "must be at least 70") {
+	opts.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg = 139
+	if joined := errorsText(opts.Validate()); !strings.Contains(joined, "must be at least 140") {
 		t.Fatalf("daily budget validation errors = %v", opts.Validate())
 	}
 
 	opts.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg = 1024
 	if errs := opts.Validate(); len(errs) != 0 {
-		t.Fatalf("valid v1 capacity options with partial remainder = %v", errs)
+		t.Fatalf("valid v2 capacity options with partial remainder = %v", errs)
 	}
 }
 

@@ -690,6 +690,7 @@ func NewPromptEvaluationRepository(db *mongo.Database, retention RetentionPolicy
 		}, Options: options.Index().SetName("idx_ai_explanation_prompt_evaluation_release")},
 		{Keys: bson.D{{Key: "active_release_key", Value: 1}}, Options: options.Index().SetName("uk_ai_explanation_prompt_evaluation_active_release").SetUnique(true).SetPartialFilterExpression(bson.M{"active_release_key": bson.M{"$type": "string"}})},
 		{Keys: bson.D{{Key: "active_execution_org_key", Value: 1}}, Options: options.Index().SetName("uk_ai_explanation_prompt_evaluation_active_org_execution").SetUnique(true).SetPartialFilterExpression(bson.M{"active_execution_org_key": bson.M{"$type": "string"}})},
+		{Keys: bson.D{{Key: "evidence_version", Value: 1}, {Key: "release_fingerprint", Value: 1}, {Key: "created_at", Value: -1}}, Options: options.Index().SetName("idx_ai_explanation_prompt_evaluation_v2_release")},
 		{Keys: bson.D{{Key: "status", Value: 1}, {Key: "execution.phase", Value: 1}, {Key: "execution.lease_expires_at", Value: 1}, {Key: "domain_id", Value: 1}}, Options: options.Index().SetName("idx_ai_explanation_prompt_evaluation_expired_lease").SetPartialFilterExpression(bson.M{"status": string(domainevaluation.StatusCollecting), "execution.phase": string(domainevaluation.AttemptExecutionPrepared), "execution.lease_expires_at": bson.M{"$type": "date"}})},
 		{Keys: bson.D{{Key: "requested_org_id", Value: 1}, {Key: "created_at", Value: -1}, {Key: "domain_id", Value: -1}}, Options: options.Index().SetName("idx_ai_explanation_prompt_evaluation_org_created")},
 		{Keys: bson.D{{Key: "requested_org_id", Value: 1}, {Key: "status", Value: 1}, {Key: "created_at", Value: -1}, {Key: "domain_id", Value: -1}}, Options: options.Index().SetName("idx_ai_explanation_prompt_evaluation_org_status_created")},
@@ -763,22 +764,8 @@ func (r *PromptEvaluationRepository) Save(ctx context.Context, value *domaineval
 		setFields["expires_at"] = expiresAt
 		setFields["retention_policy_version"] = strings.TrimSpace(r.retention.Version)
 	}
-	if po.ActiveReleaseKey != "" {
-		setFields["active_release_key"] = po.ActiveReleaseKey
-	} else {
-		update["$unset"] = bson.M{"active_release_key": ""}
-	}
-	if po.ActiveExecutionOrgKey != "" {
-		setFields["active_execution_org_key"] = po.ActiveExecutionOrgKey
-	} else {
-		unset, _ := update["$unset"].(bson.M)
-		if unset == nil {
-			unset = bson.M{}
-		}
-		unset["active_execution_org_key"] = ""
-		update["$unset"] = unset
-	}
-	result, err := r.UpdateOne(ctx, bson.M{"domain_id": po.DomainID, "version": expectedVersion}, update)
+	setOrUnsetPromptEvaluationActiveKeys(update, setFields, po.ActiveReleaseKey, po.ActiveExecutionOrgKey)
+	result, err := r.UpdateOne(ctx, legacyPromptEvaluationFilter(bson.M{"domain_id": po.DomainID, "version": expectedVersion}), update)
 	if err != nil {
 		return fmt.Errorf("save AI explanation Prompt evaluation run: %w", err)
 	}
@@ -790,7 +777,7 @@ func (r *PromptEvaluationRepository) Save(ctx context.Context, value *domaineval
 
 func (r *PromptEvaluationRepository) FindByID(ctx context.Context, id meta.ID) (*domainevaluation.PromptEvaluationRun, error) {
 	var po PromptEvaluationRunPO
-	if err := r.FindOne(ctx, bson.M{"domain_id": id}, &po); err != nil {
+	if err := r.FindOne(ctx, legacyPromptEvaluationFilter(bson.M{"domain_id": id}), &po); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, domainevaluation.ErrNotFound
 		}
@@ -839,11 +826,20 @@ func (r *PromptEvaluationRepository) ListExpiredPreparations(ctx context.Context
 }
 
 func expiredPreparedEvaluationFilter(at time.Time) bson.M {
-	return bson.M{
+	return legacyPromptEvaluationFilter(bson.M{
 		"status":                     string(domainevaluation.StatusCollecting),
 		"execution.phase":            string(domainevaluation.AttemptExecutionPrepared),
 		"execution.lease_expires_at": bson.M{"$lte": at},
+	})
+}
+
+func legacyPromptEvaluationFilter(filter bson.M) bson.M {
+	result := make(bson.M, len(filter)+1)
+	for key, value := range filter {
+		result[key] = value
 	}
+	result["evidence_version"] = bson.M{"$exists": false}
+	return result
 }
 
 type PromptEvaluationRecheckRepository struct {

@@ -1,6 +1,7 @@
 package events
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"strings"
 	"time"
@@ -12,6 +13,8 @@ import (
 )
 
 const PromptEvaluationAggregateType = "AIExplanationPromptEvaluation"
+
+const PromptEvaluationEvidenceVersionV2 = eventpayload.AIExplanationPromptEvaluationEvidenceVersionV2
 
 type PromptEvaluationStepEvent = event.Event[eventpayload.AIExplanationPromptEvaluationStepRequestedData]
 
@@ -88,8 +91,61 @@ func PromptEvaluationStep(
 	}, nil
 }
 
+func (Factory) PromptEvaluationStepV2(
+	value *domainevaluation.PromptEvaluationEvidenceV2,
+	action domainevaluation.EvidenceNextAction,
+	eventID string,
+	occurredAt time.Time,
+) (event.DomainEvent, error) {
+	return PromptEvaluationStepV2(value, action, eventID, occurredAt)
+}
+
+// PromptEvaluationStepV2 binds one durable wake-up to the exact domain-selected
+// Generation or Semantic action. Legacy attempt is deliberately left zero: it
+// cannot identify both kinds without conflating their idempotency domains.
+func PromptEvaluationStepV2(
+	value *domainevaluation.PromptEvaluationEvidenceV2,
+	action domainevaluation.EvidenceNextAction,
+	eventID string,
+	occurredAt time.Time,
+) (event.DomainEvent, error) {
+	eventID = strings.TrimSpace(eventID)
+	if value == nil || value.Status != domainevaluation.EvidenceStatusCollecting || eventID == "" || len(eventID) > 256 ||
+		occurredAt.IsZero() || value.Audit.OrganizationID <= 0 || strings.TrimSpace(value.Audit.RequestedBy) == "" ||
+		(action.Kind != domainevaluation.EvidenceNextActionGeneration && action.Kind != domainevaluation.EvidenceNextActionSemantic) {
+		return nil, fmt.Errorf("collecting audited AI explanation Prompt evaluation v2 Provider action is required")
+	}
+	next, err := value.NextAction()
+	if err != nil {
+		return nil, err
+	}
+	if !samePromptEvaluationV2Action(next, action) {
+		return nil, fmt.Errorf("AI explanation Prompt evaluation v2 event target is not the next frozen action")
+	}
+	return PromptEvaluationStepEvent{
+		BaseEvent: event.BaseEvent{
+			ID: eventID, EventTypeValue: eventcatalog.AIExplanationPromptEvaluationStepRequested,
+			OccurredAtValue: occurredAt, AggregateTypeValue: PromptEvaluationAggregateType,
+			AggregateIDValue: value.RunID.String(),
+		},
+		Data: eventpayload.AIExplanationPromptEvaluationStepRequestedData{
+			OrgID: value.Audit.OrganizationID, RunID: value.RunID.String(), CaseID: action.CaseID,
+			EvidenceVersion: PromptEvaluationEvidenceVersionV2, ExecutionKind: string(action.Kind),
+			SlotOrdinal: action.SlotOrdinal, CandidateID: action.CandidateID, ExecutionOrdinal: action.ExecutionOrdinal,
+			RequestedBy: value.Audit.RequestedBy, RequestedAt: occurredAt,
+		},
+	}, nil
+}
+
 func PromptEvaluationStepEventID(runID, caseID string, attempt int) string {
 	return fmt.Sprintf("ai-prompt-evaluation:%s:%s:%d", strings.TrimSpace(runID), strings.TrimSpace(caseID), attempt)
+}
+
+func PromptEvaluationStepV2EventID(runID string, action domainevaluation.EvidenceNextAction) string {
+	address := fmt.Sprintf("%s\x00%s\x00%d\x00%s\x00%d", action.Kind, strings.TrimSpace(action.CaseID),
+		action.SlotOrdinal, strings.TrimSpace(action.CandidateID), action.ExecutionOrdinal)
+	digest := sha256.Sum256([]byte(address))
+	return fmt.Sprintf("ai-prompt-evaluation:v2:%s:%x", strings.TrimSpace(runID), digest[:16])
 }
 
 func PromptEvaluationRecoveryEventID(runID, requestID string) string {
@@ -98,4 +154,9 @@ func PromptEvaluationRecoveryEventID(runID, requestID string) string {
 
 func PromptEvaluationRecheckEventID(recheckID string) string {
 	return "ai-prompt-evaluation-recheck:" + strings.TrimSpace(recheckID)
+}
+
+func samePromptEvaluationV2Action(left, right domainevaluation.EvidenceNextAction) bool {
+	return left.Kind == right.Kind && left.CaseID == right.CaseID && left.SlotOrdinal == right.SlotOrdinal &&
+		left.CandidateID == right.CandidateID && left.ExecutionOrdinal == right.ExecutionOrdinal && left.Resume == right.Resume
 }

@@ -4,7 +4,7 @@
 
 这组 v1 契约定义的是“用户手动触发、仅基于本次标准报告、一次性生成跨维度综合洞察和结果相关建议”的能力。标准报告仍是权威结果，AI 输出只是可独立失败、重新生成和审计的补充解读，不参与评分、等级判定或风险重分类。
 
-截至 2026-08-31，Input/Output/Profile v1、Participant 主链和旧版发布评测运行时已经实现；治理与评测可以在生产关闭用户流量的前提下运行，`participant_enabled=false`。本轮新增四份发布治理机器契约及对应领域值对象，但 `PromptEvaluationRun`、Mongo 持久化、应用编排和治理台尚未切换到 `PromptEvaluationEvidence v2`。旧 `AttemptRecord` 继续只读兼容，不能被静默解释成 Candidate/Execution 新证据。本文不构成首个 Profile 已发布或用户能力可用的证明。
+截至 2026-08-31，Input/Output/Profile v1、Participant 主链和旧版发布评测运行时已经实现；治理与评测可以在生产关闭用户流量的前提下运行，`participant_enabled=false`。本轮新增四份发布治理机器契约、对应领域值对象以及轻量 v2 下一步决策/单执行检查点：固定 Slot 顺序、每 Slot/每 Candidate 最多一次补执行、裁判失败不换 Candidate、`result_unknown` 人工处置和“收齐后再审核”已经由领域测试锁定；Mongo 持久化、应用编排和治理台尚未切换到 `PromptEvaluationEvidence v2`。旧 `AttemptRecord` 继续只读兼容，不能被静默解释成 Candidate/Execution 新证据。本文不构成首个 Profile 已发布或用户能力可用的证明。
 
 规范性文件：
 
@@ -88,7 +88,7 @@ Provider payload 只能包含 `context` 和 `facts`。`source`、Profile 标识�
 | ID | 对象 | 必须成立的规则 | 当前代码责任 | 接线状态 |
 | --- | --- | --- | --- | --- |
 | POLICY-001 | Execution Policy | 固定 7 个 generation case、每 case 5 个 Slot、1 个 preflight；Candidate 只能选择 Slot 中第一个满足结构与内容契约的执行 | `EvaluationExecutionPolicy.Validate` | 领域已实现；Run 未接线 |
-| POLICY-002 | Execution Policy | 样本目标与调用预算分离；生成预算至少覆盖 35 个 Candidate，裁判预算至少覆盖 35 份收据，最坏调用数为两类 Run 上限之和 | `RequiredCandidateCount`、`WorstCaseProviderCalls` | 领域已实现；容量账本未接线 |
+| POLICY-002 | Execution Policy | 样本目标与调用预算分离；35 个 Slot 各最多 2 次 Generation，35 个 Candidate 各最多 2 次 Semantic，最坏调用数为 `70 + 70 = 140` | `RequiredCandidateCount`、`WorstCaseProviderCalls` | 领域已实现；容量账本未接线 |
 | POLICY-003 | Execution Policy | `result_unknown` 必须人工确认；质量失败不能替换 Candidate；裁判失败不能触发重新生成 | Schema const + `EvaluationExecutionPolicy.Validate` | 已实现 |
 | GATE-001 | Gate Policy | G1 冻结 Suite、Prompt、Profile、Schema、生成/裁判 Route 和 Execution Policy 指纹 | `ReleaseGatePolicy.Validate` | 领域已实现；Run 未接线 |
 | GATE-002 | Gate Policy | G2 要求 35 个 accepted Candidate、每个 1 份完整裁判收据、无未处置 `result_unknown`、无预算越界 | `PromptEvaluationEvidenceV2.Validate` | 领域已实现；现行 Run 未接线 |
@@ -99,7 +99,7 @@ Provider payload 只能包含 `context` 和 `facts`。`source`、Profile 标识�
 | FAILURE-002 | Failure Taxonomy | 输出契约失败只能补 generation；semantic execution 失败只能补裁判；quality failure 保留 Candidate；result unknown 进入人工确认 | JSON Schema conditional + `ClassifiedFailure` | 已实现 |
 | EVIDENCE-001 | Evidence v2 | 固定 35 个 Slot，Generation Execution、Candidate、Semantic Execution、Review 和 GateResult 分开持久化 | `PromptEvaluationEvidenceV2.Validate` | 领域已实现；Mongo/Application 未接线 |
 | EVIDENCE-002 | Evidence v2 | Slot 只能接受第一个 contract-conformant generation execution；Candidate 只能接受第一个完整 semantic execution | `validateCandidateSlots` | 已实现 |
-| EVIDENCE-003 | Evidence v2 | 所有执行均受 Policy 上限约束并保留；增量人工审核只能针对已有完整裁判证据的 Candidate | `validateGenerationExecutions`、`validateSemanticExecutions`、`validateCandidateReviews` | 已实现 |
+| EVIDENCE-003 | Evidence v2 | 所有终态执行均受 Policy 上限约束并保留；第一版必须收齐 35 个 Candidate 及裁判证据后才允许人工审核 | `NextAction`、`validateGenerationExecutions`、`validateSemanticExecutions`、`AddHumanReview` | 领域已实现；Application 未接线 |
 | EVIDENCE-004 | Evidence v2 | `result_unknown` 执行永久保留；Run 必须 blocked，只有显式承认重复调用/计费风险的 resolution 才能清除 unresolved 计数 | `ResultUnknownResolution`、状态迁移历史 | 已实现 |
 | EVIDENCE-005 | Evidence v2 | v1 `AttemptRecord` 不自动迁移为 v2；迁移必须通过显式 mapper/版本化持久化和兼容测试 | repository/application migration | 未实现 |
 

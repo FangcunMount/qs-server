@@ -122,6 +122,11 @@ message ExecutePromptEvaluationStepRequest {
   string requested_by = 5;
   string event_id = 6;
   string recheck_id = 7;
+  string evidence_version = 8;
+  string execution_kind = 9;
+  int32 slot_ordinal = 10;
+  string candidate_id = 11;
+  int32 execution_ordinal = 12;
 }
 
 message ExecutePromptEvaluationStepResponse {
@@ -134,6 +139,11 @@ message ExecutePromptEvaluationStepResponse {
   string next_case_id = 7;
   int32 next_attempt = 8;
   string recheck_id = 9;
+  string evidence_version = 10;
+  string execution_kind = 11;
+  int32 slot_ordinal = 12;
+  string candidate_id = 13;
+  int32 execution_ordinal = 14;
 }
 
 message AIExplanationEvidenceRef {

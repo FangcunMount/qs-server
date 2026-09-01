@@ -390,6 +390,10 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation Prompt evaluation recheck repository: %v", err)
 		}
+		evidenceServiceV2, err := aiexplanationevaluation.NewEvidenceV2Service(evaluationRepo)
+		if err != nil {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation Prompt evaluation v2 evidence service: %v", err)
+		}
 		evaluationCommitter, err := aiexplanationevaluation.NewDurableCommitter(
 			modtx.NewMongoRunner(deps.MongoDB, modtx.MongoRunnerOptions{Boundary: "ai_explanation_prompt_evaluation", Limiter: deps.MongoLimiter}),
 			evaluationRepo, aiexplanationevents.Factory{}, deps.OutboxProfile.Stager, deps.OutboxProfile.PostCommit,
@@ -398,13 +402,13 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation evaluation committer: %v", err)
 		}
-		recheckCommitter, err := aiexplanationevaluation.NewRecheckCommitter(
-			modtx.NewMongoRunner(deps.MongoDB, modtx.MongoRunnerOptions{Boundary: "ai_explanation_prompt_evaluation_recheck", Limiter: deps.MongoLimiter}),
-			recheckRepo, aiexplanationevents.Factory{}, deps.OutboxProfile.Stager, deps.OutboxProfile.PostCommit,
+		evaluationCommitterV2, err := aiexplanationevaluation.NewDurableCommitterV2(
+			modtx.NewMongoRunner(deps.MongoDB, modtx.MongoRunnerOptions{Boundary: "ai_explanation_prompt_evaluation", Limiter: deps.MongoLimiter}),
+			evaluationRepo, aiexplanationevents.Factory{}, deps.OutboxProfile.Stager, deps.OutboxProfile.PostCommit,
 			evaluationBudgetRepo, config.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg, time.Now,
 		)
 		if err != nil {
-			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation evaluation recheck committer: %v", err)
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation evaluation v2 committer: %v", err)
 		}
 		evaluationLeaseRecoverer, err := aiexplanationevaluation.NewPreparedLeaseRecoverer(evaluationRepo, evaluationCommitter)
 		if err != nil {
@@ -433,7 +437,8 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 			Prompts: promptCatalog, Schemas: aiexplanationschema.NewCatalog(), Routes: routeCatalog,
 			Provider: generationProviderAdapter, Safety: safetyGate, Semantic: semanticEvaluator,
 			SemanticTimeout: config.Evaluation.Timeout, AttemptLease: config.Evaluation.AttemptLeaseDuration, Evidence: evidenceService,
-			Rechecks: recheckRepo, DurableCommitter: evaluationCommitter, Now: time.Now,
+			EvidenceV2: evidenceServiceV2, Rechecks: recheckRepo, DurableCommitter: evaluationCommitter,
+			DurableCommitterV2: evaluationCommitterV2, Now: time.Now,
 		})
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation online evaluation runner: %v", err)
@@ -445,8 +450,8 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 			reviewService, governanceService, aiAdministrationAccessAdapter{},
 			aiexplanationadministration.WithParticipantCapacity(participantBudgetRepo, participantActiveRepo, participantCapacityPolicy, time.Now),
 			aiexplanationadministration.WithParticipantRecovery(recoveryService),
-			aiexplanationadministration.WithEvaluationExecution(onlineRunner, evaluationCommitter, meta.New),
-			aiexplanationadministration.WithEvaluationRechecks(onlineRunner, recheckCommitter, recheckRepo),
+			aiexplanationadministration.WithEvaluationV2(onlineRunner, evidenceServiceV2, evaluationCommitterV2, meta.New),
+			aiexplanationadministration.WithEvaluationRechecks(nil, nil, recheckRepo),
 			aiexplanationadministration.WithEvaluationCapacity(
 				evaluationBudgetRepo, config.Evaluation.Capacity.MaxActiveRunsPerOrg,
 				config.Evaluation.Capacity.DailyProviderInvocationBudgetPerOrg, time.Now,

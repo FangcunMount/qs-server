@@ -183,10 +183,11 @@ jobs:
           QS_SERVER_TEST_MONGO_TTL_TIMEOUT: 15s
         run: |
           go test -tags=integration \
-            -run '^(TestAIExplanation.*(IsAtomic|Converge)OnReplicaSet|TestAIExplanationGovernanceCatalogsPageStableScopedRecordsOnReplicaSet|TestAIExplanationMongo(ColdStartEnforcesRuntimeSchema|TTLMonitorDeletesExpiredRecords))$' \
+            -run '^(TestAIExplanation.*(IsAtomic|Converge)OnReplicaSet|TestAIExplanationGovernanceCatalogsPageStableScopedRecordsOnReplicaSet|TestAIExplanationMongo(ColdStartEnforcesRuntimeSchema|TTLMonitorDeletesExpiredRecords)|TestPromptEvaluationEvidenceV2Repository(UsesSameCollectionWithVersionIsolationAndCAS|RoundTripsNearMongoLimit)|TestAIExplanationPromptEvaluationSizeAuditReadsRawBSONWithoutReencoding)$' \
             -count=1 -timeout=10m -v \
             ./internal/apiserver/infra/mongo/interpretation/aiexplanation \
-            ./internal/pkg/migration
+            ./internal/pkg/migration \
+            ./scripts/oneoff/audit_ai_explanation_prompt_evaluation_size
 
       - name: Run current runtime closure E2E
         env:
@@ -284,6 +285,9 @@ jobs:
 
       - name: Validate GitHub Action runtime contract
         run: bash scripts/cd/test-github-action-runtimes.sh
+
+      - name: Validate AI evaluation size audit contract
+        run: bash scripts/cd/test-ai-evaluation-size-audit-workflow.sh
 
       - name: Validate deployment shell scripts
         run: bash -n scripts/cd/*.sh

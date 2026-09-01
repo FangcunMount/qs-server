@@ -98,6 +98,17 @@ func (r *PromptEvaluationRun) addAttempt(value AttemptRecord) error {
 			value.Semantic.ProviderReceipt.Model != r.release.SemanticEvaluator.Provider.ResolvedModel) {
 			return fmt.Errorf("AI explanation semantic evaluator receipt does not match the frozen release")
 		}
+		if value.SemanticExecution != nil {
+			if value.SemanticExecution.EvaluatorVersion != r.release.SemanticEvaluator.Version {
+				return fmt.Errorf("AI explanation semantic execution does not match the frozen evaluator")
+			}
+			receipt := value.SemanticExecution.ProviderReceipt
+			failure := value.SemanticExecution.Failure
+			if receipt != nil && (failure == nil || failure.Code != SemanticReceiptInvalid) &&
+				(receipt.Provider != r.release.SemanticEvaluator.Provider.ResolvedProvider || receipt.Model != r.release.SemanticEvaluator.Provider.ResolvedModel) {
+				return fmt.Errorf("AI explanation semantic execution receipt does not match the frozen release")
+			}
+		}
 	case AttemptStagePreflight:
 		if value.CaseID != r.release.PreflightCaseID || value.RejectionReason != r.release.PreflightRejectionReason {
 			return fmt.Errorf("AI explanation preflight attempt does not match the frozen suite plan")

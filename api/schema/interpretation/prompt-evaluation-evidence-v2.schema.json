@@ -68,14 +68,14 @@
     },
     "generation_executions": {
       "type": "array",
-      "maxItems": 224,
+      "maxItems": 70,
       "items": {
         "$ref": "#/$defs/generationExecution"
       }
     },
     "semantic_executions": {
       "type": "array",
-      "maxItems": 280,
+      "maxItems": 70,
       "items": {
         "$ref": "#/$defs/semanticExecution"
       }
@@ -90,11 +90,11 @@
     "unresolved_result_unknown_count": {
       "type": "integer",
       "minimum": 0,
-      "maximum": 504
+      "maximum": 140
     },
     "result_unknown_resolutions": {
       "type": "array",
-      "maxItems": 504,
+      "maxItems": 140,
       "items": {
         "$ref": "#/$defs/resultUnknownResolution"
       }
@@ -400,7 +400,7 @@
         },
         "semantic_execution_ids": {
           "type": "array",
-          "maxItems": 8,
+          "maxItems": 2,
           "uniqueItems": true,
           "items": {
             "$ref": "#/$defs/entityID"
@@ -519,15 +519,13 @@
         "execution_ordinal": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 32
+          "maximum": 2
         },
         "invocation_id": {
           "$ref": "#/$defs/entityID"
         },
         "status": {
           "enum": [
-            "prepared",
-            "dispatching",
             "succeeded",
             "failed",
             "result_unknown"
@@ -726,15 +724,13 @@
         "execution_ordinal": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 8
+          "maximum": 2
         },
         "invocation_id": {
           "$ref": "#/$defs/entityID"
         },
         "status": {
           "enum": [
-            "prepared",
-            "dispatching",
             "succeeded",
             "failed",
             "result_unknown"

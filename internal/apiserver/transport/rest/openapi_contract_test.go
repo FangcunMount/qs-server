@@ -86,18 +86,22 @@ func TestAIExplanationAdministrationOpenAPIContract(t *testing.T) {
 
 	spec := loadOpenAPISpec(t, "../../../../api/rest/apiserver.yaml")
 	for path, method := range map[string]string{
-		"/internal/v1/interpretation/ai-explanation/prompt-evaluation-capacity":                               "get",
-		"/internal/v1/interpretation/ai-explanation/prompt-evaluations":                                       "post",
-		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}":                              "get",
-		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/recover":                      "post",
-		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/cancel":                       "post",
-		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}": "get",
-		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/reviews":                      "post",
-		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/finalize":                     "post",
-		"/internal/v1/interpretation/ai-explanation/profiles":                                                 "post",
-		"/internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}":                 "get",
-		"/internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}/publish":         "post",
-		"/internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}/disable":         "post",
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluation-capacity":                                               "get",
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluations":                                                       "get",
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}":                                              "get",
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}":                 "get",
+		"/internal/v2/interpretation/ai-explanation/prompt-evaluations":                                                       "post",
+		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}":                                              "get",
+		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/candidates/{candidate_id}":                    "get",
+		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/executions/{execution_id}/output":             "get",
+		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/reviews":                                      "post",
+		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/finalize":                                     "post",
+		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/result-unknown/resolve":                       "post",
+		"/internal/v2/interpretation/ai-explanation/legacy-prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}/rechecks": "post",
+		"/internal/v1/interpretation/ai-explanation/profiles":                                                                 "post",
+		"/internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}":                                 "get",
+		"/internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}/publish":                         "post",
+		"/internal/v1/interpretation/ai-explanation/profiles/{profile_id}/versions/{version}/disable":                         "post",
 	} {
 		assertOpenAPIOperation(t, spec, path, method)
 		operation := spec.Paths[path][method].(map[string]any)
@@ -106,17 +110,25 @@ func TestAIExplanationAdministrationOpenAPIContract(t *testing.T) {
 		}
 	}
 	recheckPath := "/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}/rechecks"
-	for _, method := range []string{"get", "post"} {
-		assertOpenAPIOperation(t, spec, recheckPath, method)
+	assertOpenAPIOperation(t, spec, recheckPath, "get")
+	if _, exists := spec.Paths[recheckPath]["post"]; exists {
+		t.Fatal("v1 Prompt evaluation Recheck must be read-only")
 	}
 	assertOpenAPIOperation(t, spec, recheckPath+"/{recheck_id}", "get")
-	for _, path := range []string{
-		"/internal/v1/interpretation/ai-explanation/prompt-evaluations",
-		"/internal/v1/interpretation/ai-explanation/profiles",
-	} {
-		assertOpenAPIOperation(t, spec, path, "get")
+	if _, exists := spec.Paths["/internal/v1/interpretation/ai-explanation/prompt-evaluations"]["post"]; exists {
+		t.Fatal("v1 Prompt evaluation catalog must be read-only")
 	}
-	start := spec.Paths["/internal/v1/interpretation/ai-explanation/prompt-evaluations"]["post"].(map[string]any)
+	for _, path := range []string{
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/recover",
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/cancel",
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/reviews",
+		"/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/finalize",
+	} {
+		if _, exists := spec.Paths[path]; exists {
+			t.Fatalf("legacy Prompt evaluation write path must be absent: %s", path)
+		}
+	}
+	start := spec.Paths["/internal/v2/interpretation/ai-explanation/prompt-evaluations"]["post"].(map[string]any)
 	responses := start["responses"].(map[string]any)
 	for _, status := range []string{"400", "409", "429"} {
 		if _, ok := responses[status]; !ok {
@@ -158,6 +170,18 @@ func TestAIExplanationAdministrationOpenAPIContract(t *testing.T) {
 			t.Fatalf("evaluation page missing property %q", property)
 		}
 	}
+	v2Evidence := openAPISchemaProperties(t, schemas, "handler.AIExplanationEvaluationV2Wire")
+	for _, property := range []string{"schema_version", "run_id", "status", "release_fingerprint", "release", "reserved_provider_invocations", "required_candidates", "accepted_candidates", "review_ready_candidates", "unresolved_result_unknown_count", "slots", "generation_executions", "semantic_executions", "human_reviews", "gate"} {
+		if _, ok := v2Evidence[property]; !ok {
+			t.Fatalf("v2 evaluation evidence missing property %q", property)
+		}
+	}
+	v2Candidate := openAPISchemaProperties(t, schemas, "handler.AIExplanationEvaluationV2CandidateEvidenceWire")
+	for _, property := range []string{"run_id", "case_id", "slot_ordinal", "assessment_input", "candidate", "accepted_generation_execution", "accepted_semantic_execution", "human_reviews"} {
+		if _, ok := v2Candidate[property]; !ok {
+			t.Fatalf("v2 candidate evidence missing property %q", property)
+		}
+	}
 	profilePage := openAPISchemaProperties(t, schemas, "handler.AIExplanationProfilePageWire")
 	for _, property := range []string{"items", "next_cursor"} {
 		if _, ok := profilePage[property]; !ok {
@@ -173,7 +197,7 @@ func TestAIExplanationAdministrationOpenAPIContract(t *testing.T) {
 	}
 
 	attemptDetail := openAPISchemaProperties(t, schemas, "handler.AIExplanationReviewAttemptWire")
-	for _, property := range []string{"assessment_input", "normalized_output", "raw_provider_output", "provider_receipt", "semantic", "assertions"} {
+	for _, property := range []string{"assessment_input", "normalized_output", "raw_provider_output", "provider_receipt", "semantic", "semantic_execution", "assertions"} {
 		if _, ok := attemptDetail[property]; !ok {
 			t.Fatalf("attempt evidence detail missing property %q", property)
 		}

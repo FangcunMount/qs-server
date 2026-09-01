@@ -84,12 +84,17 @@ func EvaluateCandidate(
 		validationErr = fmt.Errorf("%w: %v", appvalidation.ErrSchema, contractErr)
 	} else {
 		validated, validationErr = appvalidation.Validate(raw, input, definition)
+		if validated == nil && (errors.Is(validationErr, appvalidation.ErrReference) || errors.Is(validationErr, appvalidation.ErrProfile)) {
+			if content, parseErr := appvalidation.ParseTypedContent(raw); parseErr == nil {
+				validated = &appvalidation.Result{Content: content, SchemaValidatorVersion: appvalidation.SchemaValidatorVersion}
+			}
+		}
 	}
 	if validationErr != nil {
 		report.Validation.Failure = validationErr.Error()
 	}
 	var safetyResult appport.SafetyResult
-	if validationErr == nil {
+	if validated != nil {
 		report.Validation.SchemaValidatorVersion = validated.SchemaValidatorVersion
 		report.Validation.ReferenceValidatorVersion = validated.ReferenceValidatorVersion
 		report.Validation.ProfileValidatorVersion = validated.ProfileValidatorVersion

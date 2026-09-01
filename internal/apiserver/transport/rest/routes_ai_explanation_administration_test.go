@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	aiexplanationadministration "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/administration"
@@ -21,7 +22,14 @@ import (
 
 func TestAIExplanationAdministrationRoutesSeparateAuditReadsFromGovernanceWrites(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	service := &routeAIAdministrationStub{run: &appevaluation.ReviewRun{RunID: meta.ID(9), Status: domainevaluation.StatusAwaitingReview}}
+	service := &routeAIAdministrationStub{
+		run: &appevaluation.ReviewRun{RunID: meta.ID(9), Status: domainevaluation.StatusAwaitingReview},
+		runV2: &domainevaluation.PromptEvaluationEvidenceV2{
+			SchemaVersion: domainevaluation.PromptEvaluationEvidenceSchemaVersionV2, RunID: meta.ID(10), Status: domainevaluation.EvidenceStatusCollecting,
+			Audit:           domainevaluation.EvidenceRunAudit{OrganizationID: 12, RequestedBy: "user:34", RequestReason: "evaluate", CreatedAt: time.Now()},
+			ExecutionPolicy: domainevaluation.CurrentEvaluationExecutionPolicy(), GatePolicy: domainevaluation.CurrentReleaseGatePolicy(),
+		},
+	}
 	router := newRouterWithBudgets(Deps{Interpretation: InterpretationDeps{AIExplanationAdministration: service}})
 
 	auditEngine := gin.New()
@@ -46,14 +54,14 @@ func TestAIExplanationAdministrationRoutesSeparateAuditReadsFromGovernanceWrites
 	request := httptest.NewRequest(http.MethodPost, "/internal/v1/interpretation/ai-explanation/prompt-evaluations/9/reviews", bytes.NewBufferString(`{"case_id":"PROMPT-EVAL-001","attempt":1,"role":"assessment_semantics","decision":"approve","reason":"reviewed"}`))
 	request.Header.Set("Content-Type", "application/json")
 	auditEngine.ServeHTTP(write, request)
-	if write.Code != http.StatusForbidden || service.reviewCalls != 0 {
+	if write.Code != http.StatusNotFound || service.reviewCalls != 0 {
 		t.Fatalf("audit-only write status/calls = %d/%d body=%s", write.Code, service.reviewCalls, write.Body.String())
 	}
 	auditStart := httptest.NewRecorder()
 	auditStartRequest := httptest.NewRequest(http.MethodPost, "/internal/v1/interpretation/ai-explanation/prompt-evaluations", bytes.NewBufferString(`{"confirm":true,"expected_provider_invocations":70,"reason":"must require governance"}`))
 	auditStartRequest.Header.Set("Content-Type", "application/json")
 	auditEngine.ServeHTTP(auditStart, auditStartRequest)
-	if auditStart.Code != http.StatusForbidden || service.startCalls != 0 {
+	if auditStart.Code != http.StatusNotFound || service.startCalls != 0 {
 		t.Fatalf("audit-only start status/calls = %d/%d body=%s", auditStart.Code, service.startCalls, auditStart.Body.String())
 	}
 	auditCapacity := httptest.NewRecorder()
@@ -91,28 +99,28 @@ func TestAIExplanationAdministrationRoutesSeparateAuditReadsFromGovernanceWrites
 	adminRequest := httptest.NewRequest(http.MethodPost, "/internal/v1/interpretation/ai-explanation/prompt-evaluations/9/reviews", bytes.NewBufferString(`{"case_id":"PROMPT-EVAL-001","attempt":1,"role":"assessment_semantics","decision":"approve","reason":"reviewed"}`))
 	adminRequest.Header.Set("Content-Type", "application/json")
 	adminEngine.ServeHTTP(adminWrite, adminRequest)
-	if adminWrite.Code != http.StatusOK || service.reviewCalls != 1 {
+	if adminWrite.Code != http.StatusNotFound || service.reviewCalls != 0 {
 		t.Fatalf("admin write status/calls = %d/%d body=%s", adminWrite.Code, service.reviewCalls, adminWrite.Body.String())
 	}
 	start := httptest.NewRecorder()
 	startRequest := httptest.NewRequest(http.MethodPost, "/internal/v1/interpretation/ai-explanation/prompt-evaluations", bytes.NewBufferString(`{"confirm":true,"expected_provider_invocations":70,"reason":"evaluate frozen release"}`))
 	startRequest.Header.Set("Content-Type", "application/json")
 	adminEngine.ServeHTTP(start, startRequest)
-	if start.Code != http.StatusAccepted || service.startCalls != 1 {
+	if start.Code != http.StatusNotFound || service.startCalls != 0 {
 		t.Fatalf("admin start status/calls = %d/%d body=%s", start.Code, service.startCalls, start.Body.String())
 	}
 	recover := httptest.NewRecorder()
 	recoverRequest := httptest.NewRequest(http.MethodPost, "/internal/v1/interpretation/ai-explanation/prompt-evaluations/9/recover", bytes.NewBufferString(`{"confirm":true,"expected_provider_invocations":68,"reason":"recover expired execution"}`))
 	recoverRequest.Header.Set("Content-Type", "application/json")
 	adminEngine.ServeHTTP(recover, recoverRequest)
-	if recover.Code != http.StatusAccepted || service.recoverCalls != 1 {
+	if recover.Code != http.StatusNotFound || service.recoverCalls != 0 {
 		t.Fatalf("admin recover status/calls = %d/%d body=%s", recover.Code, service.recoverCalls, recover.Body.String())
 	}
 	cancel := httptest.NewRecorder()
 	cancelRequest := httptest.NewRequest(http.MethodPost, "/internal/v1/interpretation/ai-explanation/prompt-evaluations/9/cancel", bytes.NewBufferString(`{"reason":"stop before dispatch"}`))
 	cancelRequest.Header.Set("Content-Type", "application/json")
 	adminEngine.ServeHTTP(cancel, cancelRequest)
-	if cancel.Code != http.StatusOK || service.cancelCalls != 1 {
+	if cancel.Code != http.StatusNotFound || service.cancelCalls != 0 {
 		t.Fatalf("admin cancel status/calls = %d/%d body=%s", cancel.Code, service.cancelCalls, cancel.Body.String())
 	}
 	retry := httptest.NewRecorder()
@@ -121,6 +129,52 @@ func TestAIExplanationAdministrationRoutesSeparateAuditReadsFromGovernanceWrites
 	adminEngine.ServeHTTP(retry, retryRequest)
 	if retry.Code != http.StatusAccepted || service.retryCalls != 1 {
 		t.Fatalf("admin participant retry status/calls = %d/%d body=%s", retry.Code, service.retryCalls, retry.Body.String())
+	}
+
+	v2AuditEngine := gin.New()
+	v2AuditEngine.Use(aiRouteSnapshotMiddleware(false))
+	router.registerInterpretationInternalV2Routes(v2AuditEngine.Group("/internal/v2"))
+	v2Read := httptest.NewRecorder()
+	v2AuditEngine.ServeHTTP(v2Read, httptest.NewRequest(http.MethodGet, "/internal/v2/interpretation/ai-explanation/prompt-evaluations/10", nil))
+	if v2Read.Code != http.StatusOK || service.findV2Calls != 1 {
+		t.Fatalf("v2 audit read status/calls = %d/%d body=%s", v2Read.Code, service.findV2Calls, v2Read.Body.String())
+	}
+	v2CandidateRead := httptest.NewRecorder()
+	v2AuditEngine.ServeHTTP(v2CandidateRead, httptest.NewRequest(http.MethodGet, "/internal/v2/interpretation/ai-explanation/prompt-evaluations/10/candidates/candidate:1", nil))
+	if v2CandidateRead.Code != http.StatusNotFound || service.findV2Calls != 2 {
+		t.Fatalf("v2 candidate audit read status/calls = %d/%d body=%s", v2CandidateRead.Code, service.findV2Calls, v2CandidateRead.Body.String())
+	}
+	v2AuditStart := httptest.NewRecorder()
+	v2AuditStartRequest := httptest.NewRequest(http.MethodPost, "/internal/v2/interpretation/ai-explanation/prompt-evaluations", bytes.NewBufferString(`{"confirm":true,"expected_provider_invocations":140,"reason":"evaluate frozen v2 release"}`))
+	v2AuditStartRequest.Header.Set("Content-Type", "application/json")
+	v2AuditEngine.ServeHTTP(v2AuditStart, v2AuditStartRequest)
+	if v2AuditStart.Code != http.StatusForbidden || service.startV2Calls != 0 {
+		t.Fatalf("v2 audit start status/calls = %d/%d body=%s", v2AuditStart.Code, service.startV2Calls, v2AuditStart.Body.String())
+	}
+	v2AuditRecheck := httptest.NewRecorder()
+	v2AuditRecheckRequest := httptest.NewRequest(http.MethodPost, "/internal/v2/interpretation/ai-explanation/legacy-prompt-evaluations/9/attempts/PROMPT-EVAL-002/3/rechecks", bytes.NewBufferString(`{"confirm":true,"expected_provider_invocations":2,"reason":"verify one failed record"}`))
+	v2AuditRecheckRequest.Header.Set("Content-Type", "application/json")
+	v2AuditEngine.ServeHTTP(v2AuditRecheck, v2AuditRecheckRequest)
+	if v2AuditRecheck.Code != http.StatusForbidden || service.recheckCalls != 0 {
+		t.Fatalf("v2 audit recheck status/calls = %d/%d body=%s", v2AuditRecheck.Code, service.recheckCalls, v2AuditRecheck.Body.String())
+	}
+
+	v2AdminEngine := gin.New()
+	v2AdminEngine.Use(aiRouteSnapshotMiddleware(true))
+	router.registerInterpretationInternalV2Routes(v2AdminEngine.Group("/internal/v2"))
+	v2Start := httptest.NewRecorder()
+	v2StartRequest := httptest.NewRequest(http.MethodPost, "/internal/v2/interpretation/ai-explanation/prompt-evaluations", bytes.NewBufferString(`{"confirm":true,"expected_provider_invocations":140,"reason":"evaluate frozen v2 release"}`))
+	v2StartRequest.Header.Set("Content-Type", "application/json")
+	v2AdminEngine.ServeHTTP(v2Start, v2StartRequest)
+	if v2Start.Code != http.StatusAccepted || service.startV2Calls != 1 {
+		t.Fatalf("v2 admin start status/calls = %d/%d body=%s", v2Start.Code, service.startV2Calls, v2Start.Body.String())
+	}
+	v2Recheck := httptest.NewRecorder()
+	v2RecheckRequest := httptest.NewRequest(http.MethodPost, "/internal/v2/interpretation/ai-explanation/legacy-prompt-evaluations/9/attempts/PROMPT-EVAL-002/3/rechecks", bytes.NewBufferString(`{"confirm":true,"expected_provider_invocations":2,"reason":"verify one failed record"}`))
+	v2RecheckRequest.Header.Set("Content-Type", "application/json")
+	v2AdminEngine.ServeHTTP(v2Recheck, v2RecheckRequest)
+	if v2Recheck.Code != http.StatusAccepted || service.recheckCalls != 1 {
+		t.Fatalf("v2 admin recheck status/calls = %d/%d body=%s", v2Recheck.Code, service.recheckCalls, v2Recheck.Body.String())
 	}
 }
 
@@ -141,6 +195,7 @@ func aiRouteSnapshotMiddleware(admin bool) gin.HandlerFunc {
 
 type routeAIAdministrationStub struct {
 	run                      *appevaluation.ReviewRun
+	runV2                    *domainevaluation.PromptEvaluationEvidenceV2
 	findCalls                int
 	reviewCalls              int
 	startCalls               int
@@ -151,6 +206,9 @@ type routeAIAdministrationStub struct {
 	retryCalls               int
 	listCalls                int
 	profileListCalls         int
+	findV2Calls              int
+	startV2Calls             int
+	recheckCalls             int
 }
 
 func (s *routeAIAdministrationStub) FindEvaluationCapacity(context.Context, aiexplanationadministration.Actor) (*aiexplanationadministration.EvaluationCapacity, error) {
@@ -166,6 +224,23 @@ func (s *routeAIAdministrationStub) FindParticipantCapacity(context.Context, aie
 func (s *routeAIAdministrationStub) StartEvaluation(context.Context, aiexplanationadministration.Actor, aiexplanationadministration.StartEvaluationCommand) (*appevaluation.ReviewRun, error) {
 	s.startCalls++
 	return s.run, nil
+}
+func (s *routeAIAdministrationStub) StartEvaluationV2(context.Context, aiexplanationadministration.Actor, aiexplanationadministration.StartEvaluationV2Command) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	s.startV2Calls++
+	return s.runV2, nil
+}
+func (s *routeAIAdministrationStub) FindEvaluationV2(context.Context, aiexplanationadministration.Actor, meta.ID) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	s.findV2Calls++
+	return s.runV2, nil
+}
+func (s *routeAIAdministrationStub) RecordReviewV2(context.Context, aiexplanationadministration.Actor, meta.ID, aiexplanationadministration.ReviewV2Command) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	return s.runV2, nil
+}
+func (s *routeAIAdministrationStub) FinalizeEvaluationV2(context.Context, aiexplanationadministration.Actor, meta.ID, string) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	return s.runV2, nil
+}
+func (s *routeAIAdministrationStub) ResolveResultUnknownV2(context.Context, aiexplanationadministration.Actor, meta.ID, aiexplanationadministration.ResolveResultUnknownV2Command) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	return s.runV2, nil
 }
 func (s *routeAIAdministrationStub) RecoverEvaluation(context.Context, aiexplanationadministration.Actor, meta.ID, aiexplanationadministration.RecoverEvaluationCommand) (*appevaluation.ReviewRun, error) {
 	s.recoverCalls++
@@ -196,7 +271,8 @@ func (s *routeAIAdministrationStub) RecordReview(context.Context, aiexplanationa
 func (s *routeAIAdministrationStub) FinalizeEvaluation(context.Context, aiexplanationadministration.Actor, meta.ID, string) (*appevaluation.ReviewRun, error) {
 	return s.run, nil
 }
-func (*routeAIAdministrationStub) StartEvaluationRecheck(context.Context, aiexplanationadministration.Actor, meta.ID, string, int, aiexplanationadministration.StartEvaluationRecheckCommand) (*domainevaluation.PromptEvaluationRecheck, error) {
+func (s *routeAIAdministrationStub) StartEvaluationRecheck(context.Context, aiexplanationadministration.Actor, meta.ID, string, int, aiexplanationadministration.StartEvaluationRecheckCommand) (*domainevaluation.PromptEvaluationRecheck, error) {
+	s.recheckCalls++
 	return nil, nil
 }
 func (*routeAIAdministrationStub) ListEvaluationRechecks(context.Context, aiexplanationadministration.Actor, meta.ID, string, int, int) ([]*domainevaluation.PromptEvaluationRecheck, error) {

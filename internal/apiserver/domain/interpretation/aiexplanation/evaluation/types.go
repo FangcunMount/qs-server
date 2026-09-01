@@ -357,6 +357,68 @@ type SemanticReceipt struct {
 	Rationale        string
 }
 
+// SemanticExecutionRecord is the terminal execution evidence captured by the
+// v1-compatible runner. It keeps Provider output and failure classification
+// separate from the accepted generation candidate so a failed judge call can
+// be diagnosed without losing or replacing that candidate.
+type SemanticExecutionRecord struct {
+	InvocationID        string
+	EvaluatorVersion    string
+	StartedAt           time.Time
+	FinishedAt          time.Time
+	ProviderCallCount   int
+	ProviderReceipt     *aiexplanation.ProviderReceipt
+	RawOutput           []byte
+	NormalizedOutput    []byte
+	ProviderFailureCode string
+	Failure             *AttemptFailure
+}
+
+func (r SemanticExecutionRecord) Status() ExecutionStatus {
+	if r.Failure == nil {
+		return ExecutionStatusSucceeded
+	}
+	if r.Failure.ResultUnknown {
+		return ExecutionStatusResultUnknown
+	}
+	return ExecutionStatusFailed
+}
+
+func (r SemanticExecutionRecord) Validate() error {
+	if !evidenceEntityIDPattern.MatchString(strings.TrimSpace(r.InvocationID)) ||
+		aiexplanation.ValidateVersion(strings.TrimSpace(r.EvaluatorVersion)) != nil ||
+		r.StartedAt.IsZero() || r.FinishedAt.Before(r.StartedAt) || r.ProviderCallCount != 1 ||
+		len(r.RawOutput) > MaxStoredOutputBytes || len(r.NormalizedOutput) > MaxStoredOutputBytes {
+		return fmt.Errorf("AI explanation semantic execution evidence is invalid")
+	}
+	if r.ProviderReceipt != nil {
+		if err := r.ProviderReceipt.Validate(); err != nil {
+			return err
+		}
+		if r.ProviderReceipt.InvocationID != r.InvocationID && (r.Failure == nil || r.Failure.Code != SemanticReceiptInvalid) {
+			return fmt.Errorf("AI explanation semantic Provider receipt invocation is invalid")
+		}
+	}
+	if r.ProviderFailureCode != "" && !policyIdentifierPattern.MatchString(r.ProviderFailureCode) {
+		return fmt.Errorf("AI explanation semantic Provider failure code is invalid")
+	}
+	if r.Failure == nil {
+		if r.ProviderReceipt == nil || len(r.RawOutput) == 0 || len(r.NormalizedOutput) == 0 ||
+			!json.Valid(r.NormalizedOutput) || r.ProviderFailureCode != "" {
+			return fmt.Errorf("successful AI explanation semantic execution evidence is incomplete")
+		}
+		return nil
+	}
+	if err := r.Failure.Validate(); err != nil {
+		return err
+	}
+	if r.Failure.Stage != string(FailureStageSemanticEvaluation) || !IsSemanticExecutionFailureCode(r.Failure.Code) ||
+		(r.Failure.Code == SemanticResultUnknown) != r.Failure.ResultUnknown {
+		return fmt.Errorf("AI explanation semantic execution failure classification is invalid")
+	}
+	return nil
+}
+
 func (r SemanticReceipt) Validate() error {
 	if strings.TrimSpace(r.EvaluatorVersion) == "" || strings.TrimSpace(r.ProviderReceipt.RequestID) == "" || strings.TrimSpace(r.Rationale) == "" {
 		return fmt.Errorf("AI explanation evaluation semantic evaluator and rationale are required")
@@ -397,6 +459,7 @@ type AttemptRecord struct {
 	Failure           *AttemptFailure
 	Assertions        []AssertionReceipt
 	Semantic          *SemanticReceipt
+	SemanticExecution *SemanticExecutionRecord
 }
 
 func (a AttemptRecord) Validate() error {
@@ -445,17 +508,36 @@ func (a AttemptRecord) Validate() error {
 			return fmt.Errorf("AI explanation output fingerprint requires normalized output")
 		}
 		if a.Semantic != nil {
-			return a.Semantic.Validate()
+			if err := a.Semantic.Validate(); err != nil {
+				return err
+			}
+		}
+		if a.SemanticExecution != nil {
+			if err := a.SemanticExecution.Validate(); err != nil {
+				return err
+			}
+			if a.SemanticExecution.Failure == nil {
+				if a.Semantic == nil {
+					return fmt.Errorf("successful AI explanation semantic execution requires the semantic receipt projection")
+				}
+			} else if a.Semantic != nil || a.Failure == nil || !sameAttemptFailure(*a.Failure, *a.SemanticExecution.Failure) {
+				return fmt.Errorf("failed AI explanation semantic execution projection is inconsistent")
+			}
 		}
 		return nil
 	case AttemptStagePreflight:
-		if a.Attempt != 1 || a.ProviderCallCount != 0 || a.ProviderReceipt != nil || len(a.RawOutput) != 0 || len(a.NormalizedOutput) != 0 || a.OutputFingerprint != "" || a.Failure != nil || a.Semantic != nil || strings.TrimSpace(a.RejectionReason) == "" {
+		if a.Attempt != 1 || a.ProviderCallCount != 0 || a.ProviderReceipt != nil || len(a.RawOutput) != 0 || len(a.NormalizedOutput) != 0 || a.OutputFingerprint != "" || a.Failure != nil || a.Semantic != nil || a.SemanticExecution != nil || strings.TrimSpace(a.RejectionReason) == "" {
 			return fmt.Errorf("AI explanation preflight attempt evidence is invalid")
 		}
 		return nil
 	default:
 		return fmt.Errorf("AI explanation evaluation attempt stage is invalid")
 	}
+}
+
+func sameAttemptFailure(left, right AttemptFailure) bool {
+	return left.Stage == right.Stage && left.Code == right.Code && left.SafeMessage == right.SafeMessage &&
+		left.Retryable == right.Retryable && left.ResultUnknown == right.ResultUnknown
 }
 
 type ReviewRole string
@@ -560,6 +642,20 @@ func cloneAttempt(value AttemptRecord) AttemptRecord {
 	if value.Failure != nil {
 		copy := *value.Failure
 		cloned.Failure = &copy
+	}
+	if value.SemanticExecution != nil {
+		copy := *value.SemanticExecution
+		copy.RawOutput = append([]byte(nil), value.SemanticExecution.RawOutput...)
+		copy.NormalizedOutput = append([]byte(nil), value.SemanticExecution.NormalizedOutput...)
+		if value.SemanticExecution.ProviderReceipt != nil {
+			receipt := *value.SemanticExecution.ProviderReceipt
+			copy.ProviderReceipt = &receipt
+		}
+		if value.SemanticExecution.Failure != nil {
+			failure := *value.SemanticExecution.Failure
+			copy.Failure = &failure
+		}
+		cloned.SemanticExecution = &copy
 	}
 	return cloned
 }

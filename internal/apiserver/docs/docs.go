@@ -7673,68 +7673,6 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "post": {
-                "description": "请求体必须确认 v1 最多执行 70 次 Provider 调用；start 同时执行机构 collecting 并发和 UTC 日调用预算准入，仅持久化预算预留、评测与首个事件，不同步调用模型。",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AI-Explanation-Administration"
-                ],
-                "summary": "手动启动 AI 解读 Prompt 在线评测",
-                "parameters": [
-                    {
-                        "description": "成本确认与审计理由",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.AIExplanationEvaluationStartRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "202": {
-                        "description": "Accepted",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/handler.AIExplanationEvaluationRunWire"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrResponse"
-                        }
-                    }
-                }
             }
         },
         "/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}": {
@@ -7892,71 +7830,6 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "post": {
-                "description": "创建独立诊断证据；不覆盖源记录，不参与 35+35 发布门禁，最多调用两次 Provider。",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AI-Explanation-Administration"
-                ],
-                "summary": "重新测评一条 AI 解读 Prompt 评测记录",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "源评测运行 ID",
-                        "name": "run_id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "合成 case ID",
-                        "name": "case_id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "源重复序号",
-                        "name": "attempt",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "复测成本确认与审计理由",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.AIExplanationAttemptRecheckRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "202": {
-                        "description": "Accepted",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/handler.AIExplanationAttemptRecheckWire"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
             }
         },
         "/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}/rechecks/{recheck_id}": {
@@ -8011,215 +7884,6 @@ const docTemplate = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/handler.AIExplanationAttemptRecheckWire"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/cancel": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AI-Explanation-Administration"
-                ],
-                "summary": "取消尚未 dispatch 的 AI 解读 Prompt 在线评测",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "评测运行 ID",
-                        "name": "run_id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "取消理由",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.AIExplanationEvaluationCancelRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/handler.AIExplanationEvaluationRunWire"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/finalize": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AI-Explanation-Administration"
-                ],
-                "summary": "终审 AI 解读 Prompt 评测",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "评测运行 ID",
-                        "name": "run_id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "终审理由",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.AIExplanationFinalizeRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/handler.AIExplanationEvaluationRunWire"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/recover": {
-            "post": {
-                "description": "仅重新投递当前待执行或租约已过期的 attempt；dispatch 结果未知时不会重放原 Provider 调用。",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AI-Explanation-Administration"
-                ],
-                "summary": "人工恢复 AI 解读 Prompt 在线评测",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "评测运行 ID",
-                        "name": "run_id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "剩余链路成本确认与恢复理由",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.AIExplanationEvaluationRecoverRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "202": {
-                        "description": "Accepted",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/handler.AIExplanationEvaluationRunWire"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/internal/v1/interpretation/ai-explanation/prompt-evaluations/{run_id}/reviews": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AI-Explanation-Administration"
-                ],
-                "summary": "记录 AI 解读 Prompt 人工复核",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "评测运行 ID",
-                        "name": "run_id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "复核命令",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.AIExplanationReviewRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/handler.AIExplanationEvaluationRunWire"
                                         }
                                     }
                                 }
@@ -9175,6 +8839,484 @@ const docTemplate = `{
                     },
                     "429": {
                         "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-explanation/legacy-prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}/rechecks": {
+            "post": {
+                "description": "创建独立诊断证据；不覆盖源 v1 Run，不参与 v2 发布门禁，最多调用两次 Provider。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Explanation-Administration"
+                ],
+                "summary": "重新测评一条 AI 解读 Prompt 评测记录",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "源评测运行 ID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "合成 case ID",
+                        "name": "case_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "源重复序号",
+                        "name": "attempt",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "复测成本确认与审计理由",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.AIExplanationAttemptRecheckRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AIExplanationAttemptRecheckWire"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-explanation/prompt-evaluations": {
+            "post": {
+                "description": "冻结当前 execution/gate policy，确认最坏 140 次 Provider 调用，并在一个事务中预留容量、写 Evidence 和首个 Outbox 事件。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Explanation-Administration"
+                ],
+                "summary": "启动 v2 AI 解读 Prompt 评测",
+                "parameters": [
+                    {
+                        "description": "成本确认与审计理由",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.AIExplanationEvaluationStartRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AIExplanationEvaluationV2Wire"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Explanation-Administration"
+                ],
+                "summary": "查询 v2 AI 解读 Prompt 评测证据摘要",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "评测 Run ID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AIExplanationEvaluationV2Wire"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/candidates/{candidate_id}": {
+            "get": {
+                "description": "返回冻结用例输入、已接受的生成与语义执行完整输出和 Provider 收据，以及该 Candidate 的人工审核记录。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Explanation-Administration"
+                ],
+                "summary": "查询一个 v2 Candidate 的人工审核证据",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "评测 Run ID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Candidate ID",
+                        "name": "candidate_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AIExplanationEvaluationV2CandidateEvidenceWire"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/executions/{execution_id}/output": {
+            "get": {
+                "description": "仅详情接口返回 raw/normalized output；Run 摘要只返回字节数和收据存在性。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Explanation-Administration"
+                ],
+                "summary": "查询一条 v2 执行的 Provider 输出证据",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "评测 Run ID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "执行 ID",
+                        "name": "execution_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AIExplanationEvaluationV2OutputWire"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/finalize": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Explanation-Administration"
+                ],
+                "summary": "按冻结 G1-G5 Policy 终审 v2 Evidence",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "评测 Run ID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "终审理由",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.AIExplanationFinalizeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AIExplanationEvaluationV2Wire"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/result-unknown/resolve": {
+            "post": {
+                "description": "授权替换执行或取消 Run；两种决定都必须确认潜在重复调用与计费风险。授权替换与下一 Outbox 事件原子提交。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Explanation-Administration"
+                ],
+                "summary": "人工处理 v2 result_unknown",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "评测 Run ID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "未知结果决定与风险确认",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.AIExplanationResultUnknownV2Request"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AIExplanationEvaluationV2Wire"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/reviews": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Explanation-Administration"
+                ],
+                "summary": "记录一个 v2 Candidate 的人工审核",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "评测 Run ID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Candidate、角色、决定与理由",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.AIExplanationEvaluationV2ReviewRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AIExplanationEvaluationV2Wire"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/core.ErrResponse"
                         }
@@ -10947,6 +11089,639 @@ const docTemplate = `{
                 }
             }
         },
+        "handler.AIExplanationEvaluationV2AssertionWire": {
+            "type": "object",
+            "properties": {
+                "detail": {
+                    "type": "string"
+                },
+                "evaluator": {
+                    "type": "string"
+                },
+                "hard": {
+                    "type": "boolean"
+                },
+                "ordinal": {
+                    "type": "integer"
+                },
+                "scope": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2CandidateEvidenceWire": {
+            "type": "object",
+            "properties": {
+                "accepted_generation_execution": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2ExecutionEvidenceWire"
+                },
+                "accepted_semantic_execution": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2ExecutionEvidenceWire"
+                },
+                "assessment_input": {
+                    "type": "object"
+                },
+                "candidate": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2CandidateWire"
+                },
+                "case_id": {
+                    "type": "string"
+                },
+                "human_reviews": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.AIExplanationEvaluationV2HumanReviewWire"
+                    }
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "slot_ordinal": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2CandidateWire": {
+            "type": "object",
+            "properties": {
+                "accepted_at": {
+                    "type": "string"
+                },
+                "accepted_semantic_execution_id": {
+                    "type": "string"
+                },
+                "assertions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.AIExplanationEvaluationV2AssertionWire"
+                    }
+                },
+                "candidate_id": {
+                    "type": "string"
+                },
+                "generation_execution_id": {
+                    "type": "string"
+                },
+                "normalized_output_fingerprint": {
+                    "type": "string"
+                },
+                "review_ready": {
+                    "type": "boolean"
+                },
+                "semantic_execution_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2CheckpointWire": {
+            "type": "object",
+            "properties": {
+                "candidate_id": {
+                    "type": "string"
+                },
+                "case_id": {
+                    "type": "string"
+                },
+                "claimed_at": {
+                    "type": "string"
+                },
+                "dispatch_started_at": {
+                    "type": "string"
+                },
+                "execution_ordinal": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "lease_expires_at": {
+                    "type": "string"
+                },
+                "phase": {
+                    "type": "string"
+                },
+                "slot_ordinal": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2ExecutionEvidenceWire": {
+            "type": "object",
+            "properties": {
+                "candidate_id": {
+                    "type": "string"
+                },
+                "case_id": {
+                    "type": "string"
+                },
+                "execution_id": {
+                    "type": "string"
+                },
+                "execution_ordinal": {
+                    "type": "integer"
+                },
+                "failure": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FailureWire"
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "invocation_id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "normalized_output": {
+                    "type": "string"
+                },
+                "normalized_output_bytes": {
+                    "type": "integer"
+                },
+                "provider_call_count": {
+                    "type": "integer"
+                },
+                "provider_receipt": {
+                    "$ref": "#/definitions/handler.AIExplanationProviderReceiptWire"
+                },
+                "provider_receipt_present": {
+                    "type": "boolean"
+                },
+                "raw_output": {
+                    "type": "string"
+                },
+                "raw_output_bytes": {
+                    "type": "integer"
+                },
+                "semantic_result": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2SemanticWire"
+                },
+                "slot_ordinal": {
+                    "type": "integer"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2ExecutionWire": {
+            "type": "object",
+            "properties": {
+                "candidate_id": {
+                    "type": "string"
+                },
+                "case_id": {
+                    "type": "string"
+                },
+                "execution_id": {
+                    "type": "string"
+                },
+                "execution_ordinal": {
+                    "type": "integer"
+                },
+                "failure": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FailureWire"
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "invocation_id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "normalized_output_bytes": {
+                    "type": "integer"
+                },
+                "provider_call_count": {
+                    "type": "integer"
+                },
+                "provider_receipt": {
+                    "$ref": "#/definitions/handler.AIExplanationProviderReceiptWire"
+                },
+                "provider_receipt_present": {
+                    "type": "boolean"
+                },
+                "raw_output_bytes": {
+                    "type": "integer"
+                },
+                "semantic_result": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2SemanticWire"
+                },
+                "slot_ordinal": {
+                    "type": "integer"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2FailureWire": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "disposition": {
+                    "type": "string"
+                },
+                "evidence_refs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "result_unknown": {
+                    "type": "boolean"
+                },
+                "retryable": {
+                    "type": "boolean"
+                },
+                "safe_message": {
+                    "type": "string"
+                },
+                "stage": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2FrozenRefWire": {
+            "type": "object",
+            "properties": {
+                "fingerprint": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2GateReasonWire": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "evidence_refs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "gate": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2GateWire": {
+            "type": "object",
+            "properties": {
+                "evaluated_at": {
+                    "type": "string"
+                },
+                "gate_passes": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "boolean"
+                    }
+                },
+                "passed": {
+                    "type": "boolean"
+                },
+                "reasons": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.AIExplanationEvaluationV2GateReasonWire"
+                    }
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2HumanReviewWire": {
+            "type": "object",
+            "properties": {
+                "candidate_id": {
+                    "type": "string"
+                },
+                "decision": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "reviewed_at": {
+                    "type": "string"
+                },
+                "reviewer": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2OutputWire": {
+            "type": "object",
+            "properties": {
+                "execution_id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "normalized_output": {
+                    "type": "string"
+                },
+                "provider_receipt": {
+                    "$ref": "#/definitions/handler.AIExplanationProviderReceiptWire"
+                },
+                "raw_output": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2ReleaseWire": {
+            "type": "object",
+            "properties": {
+                "execution_policy": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
+                },
+                "fingerprint": {
+                    "type": "string"
+                },
+                "gate_policy": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
+                },
+                "generation_route": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
+                },
+                "input_schema": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
+                },
+                "output_schema": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
+                },
+                "profile": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
+                },
+                "prompt": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
+                },
+                "semantic_output_schema": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
+                },
+                "semantic_prompt": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
+                },
+                "semantic_route": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
+                },
+                "suite": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FrozenRefWire"
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2ReviewRequest": {
+            "type": "object",
+            "required": [
+                "candidate_id",
+                "decision",
+                "reason",
+                "role"
+            ],
+            "properties": {
+                "candidate_id": {
+                    "type": "string"
+                },
+                "decision": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string",
+                    "maxLength": 1000
+                },
+                "role": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2SemanticDecisionWire": {
+            "type": "object",
+            "properties": {
+                "detail": {
+                    "type": "string"
+                },
+                "ordinal": {
+                    "type": "integer"
+                },
+                "scope": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2SemanticScoresWire": {
+            "type": "object",
+            "properties": {
+                "audience_clarity": {
+                    "type": "integer"
+                },
+                "concision": {
+                    "type": "integer"
+                },
+                "cross_dimension_quality": {
+                    "type": "integer"
+                },
+                "faithfulness": {
+                    "type": "integer"
+                },
+                "suggestion_actionability": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2SemanticWire": {
+            "type": "object",
+            "properties": {
+                "decisions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.AIExplanationEvaluationV2SemanticDecisionWire"
+                    }
+                },
+                "evaluator_version": {
+                    "type": "string"
+                },
+                "output_fingerprint": {
+                    "type": "string"
+                },
+                "rationale": {
+                    "type": "string"
+                },
+                "scores": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2SemanticScoresWire"
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2SlotWire": {
+            "type": "object",
+            "properties": {
+                "candidate": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2CandidateWire"
+                },
+                "case_id": {
+                    "type": "string"
+                },
+                "generation_execution_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "slot_ordinal": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.AIExplanationEvaluationV2Wire": {
+            "type": "object",
+            "properties": {
+                "accepted_candidates": {
+                    "type": "integer"
+                },
+                "closed_at": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "execution": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2CheckpointWire"
+                },
+                "execution_policy_id": {
+                    "type": "string"
+                },
+                "execution_policy_version": {
+                    "type": "string"
+                },
+                "finalized_at": {
+                    "type": "string"
+                },
+                "gate": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2GateWire"
+                },
+                "gate_policy_id": {
+                    "type": "string"
+                },
+                "gate_policy_version": {
+                    "type": "string"
+                },
+                "generation_executions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.AIExplanationEvaluationV2ExecutionWire"
+                    }
+                },
+                "human_reviews": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.AIExplanationEvaluationV2HumanReviewWire"
+                    }
+                },
+                "organization_id": {
+                    "type": "integer"
+                },
+                "release": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2ReleaseWire"
+                },
+                "release_fingerprint": {
+                    "type": "string"
+                },
+                "request_reason": {
+                    "type": "string"
+                },
+                "requested_by": {
+                    "type": "string"
+                },
+                "required_candidates": {
+                    "type": "integer"
+                },
+                "reserved_provider_invocations": {
+                    "type": "integer"
+                },
+                "result_unknown_resolutions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.AIExplanationResultUnknownResolutionWire"
+                    }
+                },
+                "review_ready_candidates": {
+                    "type": "integer"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "schema_version": {
+                    "type": "string"
+                },
+                "semantic_executions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.AIExplanationEvaluationV2ExecutionWire"
+                    }
+                },
+                "slots": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.AIExplanationEvaluationV2SlotWire"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "unresolved_result_unknown_count": {
+                    "type": "integer"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
         "handler.AIExplanationFinalizationWire": {
             "type": "object",
             "properties": {
@@ -11423,6 +12198,57 @@ const docTemplate = `{
                 }
             }
         },
+        "handler.AIExplanationResultUnknownResolutionWire": {
+            "type": "object",
+            "properties": {
+                "acknowledged_duplicate_call_and_cost_risk": {
+                    "type": "boolean"
+                },
+                "actor": {
+                    "type": "string"
+                },
+                "decision": {
+                    "type": "string"
+                },
+                "execution_id": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "resolved_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.AIExplanationResultUnknownV2Request": {
+            "type": "object",
+            "required": [
+                "acknowledged_duplicate_call_and_cost_risk",
+                "confirm",
+                "decision",
+                "execution_id",
+                "reason"
+            ],
+            "properties": {
+                "acknowledged_duplicate_call_and_cost_risk": {
+                    "type": "boolean"
+                },
+                "confirm": {
+                    "type": "boolean"
+                },
+                "decision": {
+                    "type": "string"
+                },
+                "execution_id": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string",
+                    "maxLength": 1000
+                }
+            }
+        },
         "handler.AIExplanationReviewAttemptSummary": {
             "type": "object",
             "properties": {
@@ -11502,6 +12328,9 @@ const docTemplate = `{
                 },
                 "semantic": {
                     "$ref": "#/definitions/handler.AIExplanationSemanticReceiptWire"
+                },
+                "semantic_execution": {
+                    "$ref": "#/definitions/handler.AIExplanationSemanticExecutionWire"
                 },
                 "semantic_scores": {
                     "$ref": "#/definitions/handler.AIExplanationSemanticScoresWire"
@@ -11598,6 +12427,59 @@ const docTemplate = `{
                     "$ref": "#/definitions/handler.AIExplanationProviderSpecWire"
                 },
                 "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.AIExplanationSemanticExecutionWire": {
+            "type": "object",
+            "properties": {
+                "evaluator_version": {
+                    "type": "string"
+                },
+                "failure": {
+                    "$ref": "#/definitions/handler.AIExplanationAttemptFailureWire"
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "invocation_id": {
+                    "type": "string"
+                },
+                "normalized_output": {
+                    "type": "string"
+                },
+                "normalized_output_bytes": {
+                    "type": "integer"
+                },
+                "normalized_output_present": {
+                    "type": "boolean"
+                },
+                "provider_call_count": {
+                    "type": "integer"
+                },
+                "provider_failure_code": {
+                    "type": "string"
+                },
+                "provider_receipt": {
+                    "$ref": "#/definitions/handler.AIExplanationProviderReceiptWire"
+                },
+                "provider_receipt_present": {
+                    "type": "boolean"
+                },
+                "raw_output": {
+                    "type": "string"
+                },
+                "raw_output_bytes": {
+                    "type": "integer"
+                },
+                "raw_output_present": {
+                    "type": "boolean"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
                     "type": "string"
                 }
             }

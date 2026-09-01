@@ -53,14 +53,29 @@ func (r *Router) registerInterpretationInternalRoutes(internalV1 *gin.RouterGrou
 		governance.GET("/prompt-evaluation-capacity", aiHandler.FindEvaluationCapacity)
 		governance.GET("/participant-capacity", aiHandler.FindParticipantCapacity)
 		governance.POST("/generations/:generation_id/retry", aiHandler.RetryParticipantGeneration)
-		governance.POST("/prompt-evaluations", aiHandler.StartEvaluation)
-		governance.POST("/prompt-evaluations/:run_id/recover", aiHandler.RecoverEvaluation)
-		governance.POST("/prompt-evaluations/:run_id/cancel", aiHandler.CancelEvaluation)
-		governance.POST("/prompt-evaluations/:run_id/attempts/:case_id/:attempt/rechecks", aiHandler.StartAttemptRecheck)
-		governance.POST("/prompt-evaluations/:run_id/reviews", aiHandler.RecordReview)
-		governance.POST("/prompt-evaluations/:run_id/finalize", aiHandler.FinalizeEvaluation)
 		governance.POST("/profiles", aiHandler.CreateProfileDraft)
 		governance.POST("/profiles/:profile_id/versions/:version/publish", aiHandler.PublishProfile)
 		governance.POST("/profiles/:profile_id/versions/:version/disable", aiHandler.DisableProfile)
 	}
+}
+
+// registerInterpretationInternalV2Routes exposes the only writable Prompt
+// evaluation runtime. The v1 group above intentionally keeps historical Run
+// and Recheck queries but registers no v1 Prompt-evaluation mutation routes.
+func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGroup) {
+	if r.deps.Interpretation.AIExplanationAdministration == nil {
+		return
+	}
+	g := internalV2.Group("/interpretation", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityAuditInterpretation))
+	ai := g.Group("/ai-explanation")
+	aiHandler := handler.NewAIExplanationAdministrationHandler(r.deps.Interpretation.AIExplanationAdministration)
+	ai.GET("/prompt-evaluations/:run_id", aiHandler.FindEvaluationV2)
+	ai.GET("/prompt-evaluations/:run_id/candidates/:candidate_id", aiHandler.FindEvaluationV2Candidate)
+	ai.GET("/prompt-evaluations/:run_id/executions/:execution_id/output", aiHandler.FindEvaluationV2Output)
+	governance := ai.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+	governance.POST("/prompt-evaluations", aiHandler.StartEvaluationV2)
+	governance.POST("/legacy-prompt-evaluations/:run_id/attempts/:case_id/:attempt/rechecks", aiHandler.StartAttemptRecheck)
+	governance.POST("/prompt-evaluations/:run_id/reviews", aiHandler.RecordReviewV2)
+	governance.POST("/prompt-evaluations/:run_id/finalize", aiHandler.FinalizeEvaluationV2)
+	governance.POST("/prompt-evaluations/:run_id/result-unknown/resolve", aiHandler.ResolveResultUnknownV2)
 }

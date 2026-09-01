@@ -78,26 +78,12 @@ func Validate(raw []byte, input appinput.Document, definition domainprofile.Defi
 	if err := definition.Validate(); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrProfile, err)
 	}
-	if len(bytes.TrimSpace(raw)) == 0 || bytes.TrimSpace(raw)[0] != '{' || !utf8.Valid(raw) {
-		return nil, schemaViolation(SchemaViolationObjectRequired, "output must be one UTF-8 JSON object")
-	}
 	if utf8.RuneCount(raw) > definition.GenerationPolicy.MaxOutputCharacters {
 		return nil, fmt.Errorf("%w: output exceeds %d characters", ErrProfile, definition.GenerationPolicy.MaxOutputCharacters)
 	}
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	var content output.Content
-	if err := decoder.Decode(&content); err != nil {
-		return nil, schemaViolation(classifyDecodeViolation(err), err.Error())
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); err != nil && !errors.Is(err, io.EOF) {
-		return nil, schemaViolation(SchemaViolationTrailingContent, "trailing content: "+err.Error())
-	} else if err == nil {
-		return nil, schemaViolation(SchemaViolationTrailingContent, "trailing content")
-	}
-	if err := content.Validate(); err != nil {
-		return nil, schemaViolation(SchemaViolationContentContract, err.Error())
+	content, err := ParseTypedContent(raw)
+	if err != nil {
+		return nil, err
 	}
 	if err := validateReferences(content, input); err != nil {
 		return nil, err
@@ -109,6 +95,32 @@ func Validate(raw []byte, input appinput.Document, definition domainprofile.Defi
 		Content: content.Clone(), SchemaValidatorVersion: SchemaValidatorVersion,
 		ReferenceValidatorVersion: ReferenceValidatorVersion, ProfileValidatorVersion: ProfileValidatorVersion,
 	}, nil
+}
+
+// ParseTypedContent applies only the frozen JSON shape and Content contract.
+// Reference, Profile and safety checks are intentionally excluded so release
+// evaluation can retain a structurally valid Candidate as negative quality
+// evidence instead of replacing it with a more favorable generation.
+func ParseTypedContent(raw []byte) (output.Content, error) {
+	if len(bytes.TrimSpace(raw)) == 0 || bytes.TrimSpace(raw)[0] != '{' || !utf8.Valid(raw) {
+		return output.Content{}, schemaViolation(SchemaViolationObjectRequired, "output must be one UTF-8 JSON object")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	var content output.Content
+	if err := decoder.Decode(&content); err != nil {
+		return output.Content{}, schemaViolation(classifyDecodeViolation(err), err.Error())
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != nil && !errors.Is(err, io.EOF) {
+		return output.Content{}, schemaViolation(SchemaViolationTrailingContent, "trailing content: "+err.Error())
+	} else if err == nil {
+		return output.Content{}, schemaViolation(SchemaViolationTrailingContent, "trailing content")
+	}
+	if err := content.Validate(); err != nil {
+		return output.Content{}, schemaViolation(SchemaViolationContentContract, err.Error())
+	}
+	return content.Clone(), nil
 }
 
 func classifyDecodeViolation(err error) SchemaViolation {

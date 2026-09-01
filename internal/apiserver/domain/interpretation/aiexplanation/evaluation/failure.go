@@ -7,6 +7,31 @@ import (
 
 const FailureTaxonomySchemaVersionV1 = "ai-explanation-failure-taxonomy/v1"
 
+const (
+	SemanticProviderFailed          = "semantic_provider_failed"
+	SemanticResultUnknown           = "semantic_result_unknown"
+	SemanticOutputMissingOrTooLarge = "semantic_output_missing_or_too_large"
+	SemanticOutputSchemaInvalid     = "semantic_output_schema_invalid"
+	SemanticOutputDecodeInvalid     = "semantic_output_decode_invalid"
+	SemanticReceiptInvalid          = "semantic_receipt_invalid"
+	SemanticDecisionContractInvalid = "semantic_decision_contract_invalid"
+)
+
+func IsSemanticExecutionFailureCode(code string) bool {
+	switch strings.TrimSpace(code) {
+	case SemanticProviderFailed,
+		SemanticResultUnknown,
+		SemanticOutputMissingOrTooLarge,
+		SemanticOutputSchemaInvalid,
+		SemanticOutputDecodeInvalid,
+		SemanticReceiptInvalid,
+		SemanticDecisionContractInvalid:
+		return true
+	default:
+		return false
+	}
+}
+
 type FailureStage string
 
 const (

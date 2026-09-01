@@ -124,6 +124,29 @@ func TestAIExplanationPromptEvaluationStepHandlerCallsAddressedAutomation(t *tes
 	}
 }
 
+func TestAIExplanationPromptEvaluationStepHandlerForwardsExactV2Address(t *testing.T) {
+	client := &aiExplanationAutomationClientStub{evaluationResponse: &interpretationpb.ExecutePromptEvaluationStepResponse{
+		Success: true, RunId: "1702", CaseId: "PROMPT-EVAL-001", Status: "progressed", RunStatus: "collecting",
+		EvidenceVersion: eventpayload.AIExplanationPromptEvaluationEvidenceVersionV2, ExecutionKind: "generation",
+		SlotOrdinal: 1, ExecutionOrdinal: 1,
+	}}
+	handler := handleAIExplanationPromptEvaluationStep(&Dependencies{Logger: discardLogger(), AIExplanationAutomationClient: client})
+	if err := handler(context.Background(), eventcatalog.AIExplanationPromptEvaluationStepRequested, aiExplanationPromptEvaluationStepV2Payload(t)); err != nil {
+		t.Fatal(err)
+	}
+	request := client.evaluationRequest
+	if request == nil || request.GetRunId() != "1702" || request.GetAttempt() != 0 || request.GetRecheckId() != "" ||
+		request.GetEvidenceVersion() != "v2" || request.GetExecutionKind() != "generation" || request.GetSlotOrdinal() != 1 ||
+		request.GetCandidateId() != "" || request.GetExecutionOrdinal() != 1 || request.GetEventId() != "evt-ai-prompt-eval-v2-1" {
+		t.Fatalf("v2 evaluation automation request = %#v", request)
+	}
+
+	client.evaluationResponse.ExecutionOrdinal = 2
+	if err := handler(context.Background(), eventcatalog.AIExplanationPromptEvaluationStepRequested, aiExplanationPromptEvaluationStepV2Payload(t)); err == nil {
+		t.Fatal("mismatched v2 execution response must NACK the event")
+	}
+}
+
 func TestAIExplanationPromptEvaluationRecheckHandlerForwardsAndValidatesRecheckIdentity(t *testing.T) {
 	client := &aiExplanationAutomationClientStub{evaluationResponse: &interpretationpb.ExecutePromptEvaluationStepResponse{
 		Success: true, RunId: "1701", CaseId: "PROMPT-EVAL-001", Attempt: 1,
@@ -241,6 +264,22 @@ func aiExplanationPromptEvaluationStepPayload(t *testing.T) []byte {
 		Data: eventpayload.AIExplanationPromptEvaluationStepRequestedData{
 			OrgID: 1, RunID: "1701", CaseID: "PROMPT-EVAL-001", Attempt: 1,
 			RequestedBy: "user:42", RequestedAt: time.Date(2026, 8, 27, 2, 0, 0, 0, time.UTC),
+		},
+	}
+	return encodeAIExplanationEvent(t, requested)
+}
+
+func aiExplanationPromptEvaluationStepV2Payload(t *testing.T) []byte {
+	t.Helper()
+	requested := event.Event[eventpayload.AIExplanationPromptEvaluationStepRequestedData]{
+		BaseEvent: event.BaseEvent{
+			ID: "evt-ai-prompt-eval-v2-1", EventTypeValue: eventcatalog.AIExplanationPromptEvaluationStepRequested,
+			OccurredAtValue: time.Date(2026, 8, 31, 2, 0, 0, 0, time.UTC), AggregateTypeValue: "AIExplanationPromptEvaluation", AggregateIDValue: "1702",
+		},
+		Data: eventpayload.AIExplanationPromptEvaluationStepRequestedData{
+			OrgID: 1, RunID: "1702", CaseID: "PROMPT-EVAL-001",
+			EvidenceVersion: "v2", ExecutionKind: "generation", SlotOrdinal: 1, ExecutionOrdinal: 1,
+			RequestedBy: "user:42", RequestedAt: time.Date(2026, 8, 31, 2, 0, 0, 0, time.UTC),
 		},
 	}
 	return encodeAIExplanationEvent(t, requested)

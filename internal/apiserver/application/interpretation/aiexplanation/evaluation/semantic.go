@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation"
 	domainevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/evaluation"
@@ -42,10 +43,27 @@ type SemanticDecision struct {
 
 type SemanticEvaluationResult struct {
 	EvaluatorVersion string
-	ProviderReceipt  aiexplanation.ProviderReceipt
 	Scores           domainevaluation.SemanticScores
 	Rationale        string
 	Decisions        []SemanticDecision
+}
+
+// SemanticEvaluationOutcome is returned after a semantic Provider dispatch.
+// Controlled Provider/protocol/validation failures are data, not Go errors,
+// so the runner can durably retain any raw output and receipt already obtained.
+// Go errors are reserved for invalid internal requests or evaluator setup.
+type SemanticEvaluationOutcome struct {
+	InvocationID        string
+	EvaluatorVersion    string
+	StartedAt           time.Time
+	FinishedAt          time.Time
+	ProviderCallCount   int
+	ProviderReceipt     *aiexplanation.ProviderReceipt
+	RawOutput           []byte
+	NormalizedOutput    []byte
+	ProviderFailureCode string
+	Result              *SemanticEvaluationResult
+	Failure             *domainevaluation.AttemptFailure
 }
 
 // SemanticEvaluator is intentionally separate from the generation Provider.
@@ -54,18 +72,22 @@ type SemanticEvaluationResult struct {
 // semantic assertion.
 type SemanticEvaluator interface {
 	Identity() domainevaluation.SemanticEvaluatorSpec
-	Evaluate(ctx context.Context, request SemanticEvaluationRequest) (SemanticEvaluationResult, error)
+	Evaluate(ctx context.Context, request SemanticEvaluationRequest) (SemanticEvaluationOutcome, error)
 }
 
 func semanticReceipts(
 	result SemanticEvaluationResult,
+	providerReceipt *aiexplanation.ProviderReceipt,
 	obligations []SemanticAssertion,
 	expected domainevaluation.SemanticEvaluatorSpec,
 	invocationID string,
 ) ([]domainevaluation.AssertionReceipt, *domainevaluation.SemanticReceipt, error) {
+	if providerReceipt == nil {
+		return nil, nil, fmt.Errorf("AI explanation semantic Provider receipt is required")
+	}
 	receipt := &domainevaluation.SemanticReceipt{
 		EvaluatorVersion: strings.TrimSpace(result.EvaluatorVersion),
-		ProviderReceipt:  result.ProviderReceipt,
+		ProviderReceipt:  *providerReceipt,
 		Scores:           result.Scores,
 		Rationale:        strings.TrimSpace(result.Rationale),
 	}

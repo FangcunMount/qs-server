@@ -1291,16 +1291,21 @@ func (x *ExecuteAIExplanationResponse) GetRetryable() bool {
 }
 
 type ExecutePromptEvaluationStepRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	OrgId         int64                  `protobuf:"varint,1,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`
-	RunId         string                 `protobuf:"bytes,2,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
-	CaseId        string                 `protobuf:"bytes,3,opt,name=case_id,json=caseId,proto3" json:"case_id,omitempty"`
-	Attempt       int32                  `protobuf:"varint,4,opt,name=attempt,proto3" json:"attempt,omitempty"`
-	RequestedBy   string                 `protobuf:"bytes,5,opt,name=requested_by,json=requestedBy,proto3" json:"requested_by,omitempty"`
-	EventId       string                 `protobuf:"bytes,6,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
-	RecheckId     string                 `protobuf:"bytes,7,opt,name=recheck_id,json=recheckId,proto3" json:"recheck_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	OrgId            int64                  `protobuf:"varint,1,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`
+	RunId            string                 `protobuf:"bytes,2,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	CaseId           string                 `protobuf:"bytes,3,opt,name=case_id,json=caseId,proto3" json:"case_id,omitempty"`
+	Attempt          int32                  `protobuf:"varint,4,opt,name=attempt,proto3" json:"attempt,omitempty"`
+	RequestedBy      string                 `protobuf:"bytes,5,opt,name=requested_by,json=requestedBy,proto3" json:"requested_by,omitempty"`
+	EventId          string                 `protobuf:"bytes,6,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	RecheckId        string                 `protobuf:"bytes,7,opt,name=recheck_id,json=recheckId,proto3" json:"recheck_id,omitempty"`
+	EvidenceVersion  string                 `protobuf:"bytes,8,opt,name=evidence_version,json=evidenceVersion,proto3" json:"evidence_version,omitempty"`
+	ExecutionKind    string                 `protobuf:"bytes,9,opt,name=execution_kind,json=executionKind,proto3" json:"execution_kind,omitempty"`
+	SlotOrdinal      int32                  `protobuf:"varint,10,opt,name=slot_ordinal,json=slotOrdinal,proto3" json:"slot_ordinal,omitempty"`
+	CandidateId      string                 `protobuf:"bytes,11,opt,name=candidate_id,json=candidateId,proto3" json:"candidate_id,omitempty"`
+	ExecutionOrdinal int32                  `protobuf:"varint,12,opt,name=execution_ordinal,json=executionOrdinal,proto3" json:"execution_ordinal,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ExecutePromptEvaluationStepRequest) Reset() {
@@ -1382,19 +1387,59 @@ func (x *ExecutePromptEvaluationStepRequest) GetRecheckId() string {
 	return ""
 }
 
+func (x *ExecutePromptEvaluationStepRequest) GetEvidenceVersion() string {
+	if x != nil {
+		return x.EvidenceVersion
+	}
+	return ""
+}
+
+func (x *ExecutePromptEvaluationStepRequest) GetExecutionKind() string {
+	if x != nil {
+		return x.ExecutionKind
+	}
+	return ""
+}
+
+func (x *ExecutePromptEvaluationStepRequest) GetSlotOrdinal() int32 {
+	if x != nil {
+		return x.SlotOrdinal
+	}
+	return 0
+}
+
+func (x *ExecutePromptEvaluationStepRequest) GetCandidateId() string {
+	if x != nil {
+		return x.CandidateId
+	}
+	return ""
+}
+
+func (x *ExecutePromptEvaluationStepRequest) GetExecutionOrdinal() int32 {
+	if x != nil {
+		return x.ExecutionOrdinal
+	}
+	return 0
+}
+
 type ExecutePromptEvaluationStepResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	RunId         string                 `protobuf:"bytes,2,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
-	CaseId        string                 `protobuf:"bytes,3,opt,name=case_id,json=caseId,proto3" json:"case_id,omitempty"`
-	Attempt       int32                  `protobuf:"varint,4,opt,name=attempt,proto3" json:"attempt,omitempty"`
-	Status        string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
-	RunStatus     string                 `protobuf:"bytes,6,opt,name=run_status,json=runStatus,proto3" json:"run_status,omitempty"`
-	NextCaseId    string                 `protobuf:"bytes,7,opt,name=next_case_id,json=nextCaseId,proto3" json:"next_case_id,omitempty"`
-	NextAttempt   int32                  `protobuf:"varint,8,opt,name=next_attempt,json=nextAttempt,proto3" json:"next_attempt,omitempty"`
-	RecheckId     string                 `protobuf:"bytes,9,opt,name=recheck_id,json=recheckId,proto3" json:"recheck_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Success          bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	RunId            string                 `protobuf:"bytes,2,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	CaseId           string                 `protobuf:"bytes,3,opt,name=case_id,json=caseId,proto3" json:"case_id,omitempty"`
+	Attempt          int32                  `protobuf:"varint,4,opt,name=attempt,proto3" json:"attempt,omitempty"`
+	Status           string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
+	RunStatus        string                 `protobuf:"bytes,6,opt,name=run_status,json=runStatus,proto3" json:"run_status,omitempty"`
+	NextCaseId       string                 `protobuf:"bytes,7,opt,name=next_case_id,json=nextCaseId,proto3" json:"next_case_id,omitempty"`
+	NextAttempt      int32                  `protobuf:"varint,8,opt,name=next_attempt,json=nextAttempt,proto3" json:"next_attempt,omitempty"`
+	RecheckId        string                 `protobuf:"bytes,9,opt,name=recheck_id,json=recheckId,proto3" json:"recheck_id,omitempty"`
+	EvidenceVersion  string                 `protobuf:"bytes,10,opt,name=evidence_version,json=evidenceVersion,proto3" json:"evidence_version,omitempty"`
+	ExecutionKind    string                 `protobuf:"bytes,11,opt,name=execution_kind,json=executionKind,proto3" json:"execution_kind,omitempty"`
+	SlotOrdinal      int32                  `protobuf:"varint,12,opt,name=slot_ordinal,json=slotOrdinal,proto3" json:"slot_ordinal,omitempty"`
+	CandidateId      string                 `protobuf:"bytes,13,opt,name=candidate_id,json=candidateId,proto3" json:"candidate_id,omitempty"`
+	ExecutionOrdinal int32                  `protobuf:"varint,14,opt,name=execution_ordinal,json=executionOrdinal,proto3" json:"execution_ordinal,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ExecutePromptEvaluationStepResponse) Reset() {
@@ -1488,6 +1533,41 @@ func (x *ExecutePromptEvaluationStepResponse) GetRecheckId() string {
 		return x.RecheckId
 	}
 	return ""
+}
+
+func (x *ExecutePromptEvaluationStepResponse) GetEvidenceVersion() string {
+	if x != nil {
+		return x.EvidenceVersion
+	}
+	return ""
+}
+
+func (x *ExecutePromptEvaluationStepResponse) GetExecutionKind() string {
+	if x != nil {
+		return x.ExecutionKind
+	}
+	return ""
+}
+
+func (x *ExecutePromptEvaluationStepResponse) GetSlotOrdinal() int32 {
+	if x != nil {
+		return x.SlotOrdinal
+	}
+	return 0
+}
+
+func (x *ExecutePromptEvaluationStepResponse) GetCandidateId() string {
+	if x != nil {
+		return x.CandidateId
+	}
+	return ""
+}
+
+func (x *ExecutePromptEvaluationStepResponse) GetExecutionOrdinal() int32 {
+	if x != nil {
+		return x.ExecutionOrdinal
+	}
+	return 0
 }
 
 type AIExplanationEvidenceRef struct {
@@ -2845,7 +2925,7 @@ const file_interpretation_interpretation_proto_rawDesc = "" +
 	"\ffailure_kind\x18\x06 \x01(\tR\vfailureKind\x12!\n" +
 	"\ffailure_code\x18\a \x01(\tR\vfailureCode\x12!\n" +
 	"\fsafe_message\x18\b \x01(\tR\vsafeMessage\x12\x1c\n" +
-	"\tretryable\x18\t \x01(\bR\tretryable\"\xe2\x01\n" +
+	"\tretryable\x18\t \x01(\bR\tretryable\"\xa7\x03\n" +
 	"\"ExecutePromptEvaluationStepRequest\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\x03R\x05orgId\x12\x15\n" +
 	"\x06run_id\x18\x02 \x01(\tR\x05runId\x12\x17\n" +
@@ -2854,7 +2934,13 @@ const file_interpretation_interpretation_proto_rawDesc = "" +
 	"\frequested_by\x18\x05 \x01(\tR\vrequestedBy\x12\x19\n" +
 	"\bevent_id\x18\x06 \x01(\tR\aeventId\x12\x1d\n" +
 	"\n" +
-	"recheck_id\x18\a \x01(\tR\trecheckId\"\xa4\x02\n" +
+	"recheck_id\x18\a \x01(\tR\trecheckId\x12)\n" +
+	"\x10evidence_version\x18\b \x01(\tR\x0fevidenceVersion\x12%\n" +
+	"\x0eexecution_kind\x18\t \x01(\tR\rexecutionKind\x12!\n" +
+	"\fslot_ordinal\x18\n" +
+	" \x01(\x05R\vslotOrdinal\x12!\n" +
+	"\fcandidate_id\x18\v \x01(\tR\vcandidateId\x12+\n" +
+	"\x11execution_ordinal\x18\f \x01(\x05R\x10executionOrdinal\"\xe9\x03\n" +
 	"#ExecutePromptEvaluationStepResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x15\n" +
 	"\x06run_id\x18\x02 \x01(\tR\x05runId\x12\x17\n" +
@@ -2867,7 +2953,13 @@ const file_interpretation_interpretation_proto_rawDesc = "" +
 	"nextCaseId\x12!\n" +
 	"\fnext_attempt\x18\b \x01(\x05R\vnextAttempt\x12\x1d\n" +
 	"\n" +
-	"recheck_id\x18\t \x01(\tR\trecheckId\"@\n" +
+	"recheck_id\x18\t \x01(\tR\trecheckId\x12)\n" +
+	"\x10evidence_version\x18\n" +
+	" \x01(\tR\x0fevidenceVersion\x12%\n" +
+	"\x0eexecution_kind\x18\v \x01(\tR\rexecutionKind\x12!\n" +
+	"\fslot_ordinal\x18\f \x01(\x05R\vslotOrdinal\x12!\n" +
+	"\fcandidate_id\x18\r \x01(\tR\vcandidateId\x12+\n" +
+	"\x11execution_ordinal\x18\x0e \x01(\x05R\x10executionOrdinal\"@\n" +
 	"\x18AIExplanationEvidenceRef\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x10\n" +
 	"\x03ref\x18\x02 \x01(\tR\x03ref\"\xd9\x01\n" +

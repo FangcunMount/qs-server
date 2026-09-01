@@ -157,6 +157,7 @@ type ReviewAttempt struct {
 	Failure           *domainevaluation.AttemptFailure
 	Assertions        []domainevaluation.AssertionReceipt
 	Semantic          *domainevaluation.SemanticReceipt
+	SemanticExecution *domainevaluation.SemanticExecutionRecord
 	Reviews           []domainevaluation.HumanReview
 	MissingRoles      []domainevaluation.ReviewRole
 }
@@ -443,7 +444,8 @@ func (s *ReviewService) project(runRecord *domainevaluation.PromptEvaluationRun)
 			NormalizedOutput:  append(json.RawMessage(nil), attempt.NormalizedOutput...),
 			ProviderReceipt:   attempt.ProviderReceipt, Failure: attempt.Failure,
 			Assertions: append([]domainevaluation.AssertionReceipt(nil), attempt.Assertions...),
-			Semantic:   attempt.Semantic, Reviews: reviews, MissingRoles: missing,
+			Semantic:   attempt.Semantic, SemanticExecution: attempt.SemanticExecution,
+			Reviews: reviews, MissingRoles: missing,
 		})
 	}
 	sort.Slice(attempts, func(i, j int) bool {

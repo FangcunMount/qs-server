@@ -18,22 +18,22 @@ import (
 func TestPublishBindsApprovedEvaluationEvidence(t *testing.T) {
 	now := time.Date(2026, 8, 27, 16, 0, 0, 0, time.UTC)
 	profileRecord := testDraftProfile(t, meta.ID(1001), now.Add(-time.Hour))
-	evidence := testApprovedEvidence(t, meta.ID(2001), profileRecord, now.Add(-2*time.Hour))
+	evidence := testApprovedEvidenceV2(profileRecord, meta.ID(2001), now.Add(-2*time.Hour))
 	profiles := &profileRepositoryStub{records: map[string]*domainprofile.AIExplanationProfile{profileKey(profileRecord.ProfileID(), profileRecord.Version()): profileRecord}}
-	evaluations := &evaluationRepositoryStub{records: map[meta.ID]*domainevaluation.PromptEvaluationRun{evidence.ID(): evidence}}
+	evaluations := &evaluationRepositoryStub{evidenceV2Records: map[meta.ID]*domainevaluation.PromptEvaluationEvidenceV2{evidence.RunID: evidence}}
 	service, err := NewService(profiles, evaluations, func() time.Time { return now })
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	published, err := service.Publish(context.Background(), PublishCommand{
-		ProfileID: profileRecord.ProfileID(), ProfileVersion: profileRecord.Version(), EvaluationRunID: evidence.ID(),
+		ProfileID: profileRecord.ProfileID(), ProfileVersion: profileRecord.Version(), EvaluationRunID: evidence.RunID,
 		Actor: "release-owner", Reason: "rubric and dual review passed",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if published.Status() != domainprofile.StatusPublished || published.PublishedEvidenceRunID() != evidence.ID() || published.PublishedBy() != "release-owner" || published.PublishedReason() != "rubric and dual review passed" {
+	if published.Status() != domainprofile.StatusPublished || published.PublishedEvidenceRunID() != evidence.RunID || published.PublishedBy() != "release-owner" || published.PublishedReason() != "rubric and dual review passed" {
 		t.Fatalf("published Profile audit = %#v", published)
 	}
 	if profiles.saveCalls != 1 {
@@ -46,7 +46,7 @@ func TestPublishBindsApprovedEvaluationEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if disabled.Status() != domainprofile.StatusDisabled || disabled.DisabledReason() != "route retired" || disabled.PublishedEvidenceRunID() != evidence.ID() {
+	if disabled.Status() != domainprofile.StatusDisabled || disabled.DisabledReason() != "route retired" || disabled.PublishedEvidenceRunID() != evidence.RunID {
 		t.Fatalf("disabled Profile audit = %#v", disabled)
 	}
 }
@@ -62,7 +62,7 @@ func TestCreateDraftRecomputesFingerprintAndPersistsCreationAudit(t *testing.T) 
 		t.Fatal(err)
 	}
 	profiles := &profileRepositoryStub{records: map[string]*domainprofile.AIExplanationProfile{}}
-	service, err := NewService(profiles, &evaluationRepositoryStub{records: map[meta.ID]*domainevaluation.PromptEvaluationRun{}}, func() time.Time { return now }, func() meta.ID { return meta.ID(3001) })
+	service, err := NewService(profiles, &evaluationRepositoryStub{evidenceV2Records: map[meta.ID]*domainevaluation.PromptEvaluationEvidenceV2{}}, func() time.Time { return now }, func() meta.ID { return meta.ID(3001) })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func TestProfileCatalogFindsVersionAndUsesStableStatusPage(t *testing.T) {
 		records: map[string]*domainprofile.AIExplanationProfile{profileKey(profileRecord.ProfileID(), profileRecord.Version()): profileRecord},
 		catalog: []*domainprofile.AIExplanationProfile{profileRecord}, nextCursor: "next-profile-page",
 	}
-	service, err := NewService(profiles, &evaluationRepositoryStub{records: map[meta.ID]*domainevaluation.PromptEvaluationRun{}}, func() time.Time { return now })
+	service, err := NewService(profiles, &evaluationRepositoryStub{evidenceV2Records: map[meta.ID]*domainevaluation.PromptEvaluationEvidenceV2{}}, func() time.Time { return now })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,27 +120,33 @@ func TestProfileCatalogFindsVersionAndUsesStableStatusPage(t *testing.T) {
 func TestPublishRejectsIncompleteOrMismatchedEvidence(t *testing.T) {
 	now := time.Date(2026, 8, 27, 16, 0, 0, 0, time.UTC)
 	profileRecord := testDraftProfile(t, meta.ID(1002), now.Add(-time.Hour))
-	release := testRelease(profileRecord)
-	incomplete, err := domainevaluation.New(meta.ID(2002), release, now.Add(-2*time.Hour))
-	if err != nil {
-		t.Fatal(err)
-	}
+	incomplete := testEvaluationEvidenceV2(profileRecord, meta.ID(2002), domainevaluation.EvidenceStatusAwaitingReview, now.Add(-2*time.Hour))
 	profiles := &profileRepositoryStub{records: map[string]*domainprofile.AIExplanationProfile{profileKey(profileRecord.ProfileID(), profileRecord.Version()): profileRecord}}
-	evaluations := &evaluationRepositoryStub{records: map[meta.ID]*domainevaluation.PromptEvaluationRun{incomplete.ID(): incomplete}}
+	evaluations := &evaluationRepositoryStub{evidenceV2Records: map[meta.ID]*domainevaluation.PromptEvaluationEvidenceV2{incomplete.RunID: incomplete}}
 	service, _ := NewService(profiles, evaluations, func() time.Time { return now })
-	_, err = service.Publish(context.Background(), PublishCommand{
-		ProfileID: profileRecord.ProfileID(), ProfileVersion: profileRecord.Version(), EvaluationRunID: incomplete.ID(), Actor: "owner", Reason: "try",
+	_, err := service.Publish(context.Background(), PublishCommand{
+		ProfileID: profileRecord.ProfileID(), ProfileVersion: profileRecord.Version(), EvaluationRunID: incomplete.RunID, Actor: "owner", Reason: "try",
 	})
 	if !errors.Is(err, ErrPublishEvidenceRequired) || profiles.saveCalls != 0 {
 		t.Fatalf("incomplete evidence error/save calls = %v/%d", err, profiles.saveCalls)
 	}
 
-	approved := testApprovedEvidence(t, meta.ID(2003), profileRecord, now.Add(-2*time.Hour))
+	legacyMasquerade := testApprovedEvidenceV2(profileRecord, meta.ID(2004), now.Add(-2*time.Hour))
+	legacyMasquerade.SchemaVersion = "prompt-evaluation-evidence/v1"
+	evaluations.evidenceV2Records[legacyMasquerade.RunID] = legacyMasquerade
+	_, err = service.Publish(context.Background(), PublishCommand{
+		ProfileID: profileRecord.ProfileID(), ProfileVersion: profileRecord.Version(), EvaluationRunID: legacyMasquerade.RunID, Actor: "owner", Reason: "legacy evidence",
+	})
+	if !errors.Is(err, ErrPublishEvidenceRequired) || profiles.saveCalls != 0 {
+		t.Fatalf("legacy evidence error/save calls = %v/%d", err, profiles.saveCalls)
+	}
+
+	approved := testApprovedEvidenceV2(profileRecord, meta.ID(2003), now.Add(-2*time.Hour))
 	other := testDraftProfile(t, meta.ID(1003), now.Add(-time.Hour))
-	evaluations.records[approved.ID()] = approved
+	evaluations.evidenceV2Records[approved.RunID] = approved
 	profiles.records[profileKey(other.ProfileID(), other.Version())] = other
 	_, err = service.Publish(context.Background(), PublishCommand{
-		ProfileID: other.ProfileID(), ProfileVersion: other.Version(), EvaluationRunID: approved.ID(), Actor: "owner", Reason: "wrong release",
+		ProfileID: other.ProfileID(), ProfileVersion: other.Version(), EvaluationRunID: approved.RunID, Actor: "owner", Reason: "wrong release",
 	})
 	if !errors.Is(err, ErrReleaseMismatch) {
 		t.Fatalf("mismatched evidence error = %v", err)
@@ -197,95 +203,41 @@ func testPublishedProfile(t *testing.T, id meta.ID, at time.Time) *domainprofile
 	return value
 }
 
-func testRelease(profileRecord *domainprofile.AIExplanationProfile) domainevaluation.ReleaseIdentity {
+func testApprovedEvidenceV2(profileRecord *domainprofile.AIExplanationProfile, id meta.ID, at time.Time) *domainevaluation.PromptEvaluationEvidenceV2 {
+	return testEvaluationEvidenceV2(profileRecord, id, domainevaluation.EvidenceStatusApproved, at)
+}
+
+func testEvaluationEvidenceV2(profileRecord *domainprofile.AIExplanationProfile, id meta.ID, status domainevaluation.EvidenceStatus, at time.Time) *domainevaluation.PromptEvaluationEvidenceV2 {
 	definition := profileRecord.Definition()
-	caseIDs := []string{"generation-1", "generation-2", "generation-3", "generation-4", "generation-5", "generation-6", "generation-7"}
-	return domainevaluation.ReleaseIdentity{
-		Suite:        domainevaluation.SuiteRef{ID: appevaluation.SuiteIDV1, Version: appevaluation.SuiteVersionV1, Fingerprint: aiexplanation.NewFingerprint([]byte("suite")), GitBlobSHA: "suite-blob"},
-		Prompt:       aiexplanation.PromptRef{TemplateID: definition.GenerationPolicy.PromptTemplateID, Version: definition.GenerationPolicy.PromptVersion, Fingerprint: aiexplanation.NewFingerprint([]byte("prompt")), GitBlobSHA: "prompt-blob"},
-		Profile:      aiexplanation.ProfileRef{ID: profileRecord.ProfileID(), Version: profileRecord.Version(), Fingerprint: profileRecord.Fingerprint()},
-		InputSchema:  domainevaluation.SchemaRef{Version: definition.GenerationPolicy.InputSchemaVersion, Fingerprint: aiexplanation.NewFingerprint([]byte("input-schema"))},
-		OutputSchema: domainevaluation.SchemaRef{Version: definition.GenerationPolicy.OutputSchemaVersion, Fingerprint: aiexplanation.NewFingerprint([]byte("output-schema"))},
-		Provider:     aiexplanation.ProviderExecutionSpec{Route: definition.GenerationPolicy.ProviderRoute, RouteRevision: "v1", ResolvedProvider: "provider-a", ResolvedModel: "model-a", Fingerprint: aiexplanation.NewFingerprint([]byte("provider-route"))},
-		Decoding:     domainevaluation.DecodingParameters{MaxOutputTokens: 3000}, GenerationCaseIDs: caseIDs,
-		SemanticEvaluator: governanceSemanticEvaluator(),
-		PreflightCaseID:   "preflight", PreflightRejectionReason: "insufficient_eligible_dimensions", RepetitionsPerCase: 5,
+	fingerprint := func(seed string) aiexplanation.Fingerprint { return aiexplanation.NewFingerprint([]byte(seed)) }
+	closedAt, finalizedAt := at.Add(time.Hour), at.Add(2*time.Hour)
+	value := &domainevaluation.PromptEvaluationEvidenceV2{
+		SchemaVersion:   domainevaluation.PromptEvaluationEvidenceSchemaVersionV2,
+		RunID:           id,
+		Status:          status,
+		ExecutionPolicy: domainevaluation.CurrentEvaluationExecutionPolicy(),
+		GatePolicy:      domainevaluation.CurrentReleaseGatePolicy(),
+		Release: domainevaluation.EvidenceReleaseIdentity{
+			Fingerprint:     fingerprint("release"),
+			Suite:           domainevaluation.FrozenContractRef{ID: appevaluation.SuiteIDV1, Version: appevaluation.SuiteVersionV1, Fingerprint: fingerprint("suite")},
+			Prompt:          domainevaluation.FrozenContractRef{ID: definition.GenerationPolicy.PromptTemplateID, Version: definition.GenerationPolicy.PromptVersion, Fingerprint: fingerprint("prompt")},
+			Profile:         domainevaluation.FrozenContractRef{ID: profileRecord.ProfileID(), Version: profileRecord.Version(), Fingerprint: profileRecord.Fingerprint()},
+			InputSchema:     domainevaluation.FrozenContractRef{ID: "ai-explanation-input", Version: definition.GenerationPolicy.InputSchemaVersion, Fingerprint: fingerprint("input")},
+			OutputSchema:    domainevaluation.FrozenContractRef{ID: "ai-explanation-output", Version: definition.GenerationPolicy.OutputSchemaVersion, Fingerprint: fingerprint("output")},
+			GenerationRoute: domainevaluation.FrozenContractRef{ID: definition.GenerationPolicy.ProviderRoute, Version: "v1", Fingerprint: fingerprint("generation-route")},
+		},
+		Audit: domainevaluation.EvidenceRunAudit{
+			OrganizationID: 7, RequestedBy: "owner", RequestReason: "evaluate", CreatedAt: at, ClosedAt: &closedAt,
+		},
 	}
-}
-
-func testApprovedEvidence(t *testing.T, id meta.ID, profileRecord *domainprofile.AIExplanationProfile, at time.Time) *domainevaluation.PromptEvaluationRun {
-	t.Helper()
-	release := testRelease(profileRecord)
-	run, err := domainevaluation.New(id, release, at)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for caseIndex, caseID := range release.GenerationCaseIDs {
-		for attempt := 1; attempt <= release.RepetitionsPerCase; attempt++ {
-			normalized := []byte(`{"summary":"synthetic"}`)
-			receipt := aiexplanation.ProviderReceipt{InvocationID: caseID + "-attempt", RequestID: "request", Provider: "provider-a", Model: "model-a", Latency: time.Second}
-			err := run.AddAttempt(domainevaluation.AttemptRecord{
-				CaseID: caseID, Attempt: attempt, Stage: domainevaluation.AttemptStageGeneration,
-				StartedAt: at.Add(time.Duration(caseIndex*10+attempt) * time.Minute), FinishedAt: at.Add(time.Duration(caseIndex*10+attempt)*time.Minute + time.Second),
-				ProviderCallCount: 1, ProviderReceipt: &receipt, RawOutput: normalized, NormalizedOutput: normalized, OutputFingerprint: aiexplanation.NewFingerprint(normalized),
-				Assertions: []domainevaluation.AssertionReceipt{
-					{Type: "output_schema_valid", Scope: domainevaluation.AssertionScopeDefault, Ordinal: 1, Hard: true, Evaluator: "contract-v1", Status: domainevaluation.AssertionPassed},
-					{Type: "case_goal", Scope: domainevaluation.AssertionScopeCase, Ordinal: 1, Evaluator: "semantic-v1", Status: domainevaluation.AssertionPassed},
-				},
-				Semantic: &domainevaluation.SemanticReceipt{
-					EvaluatorVersion: "semantic-rubric-v1",
-					ProviderReceipt:  aiexplanation.ProviderReceipt{InvocationID: "semantic-" + caseID, RequestID: "semantic-request", Provider: "judge-provider", Model: "judge-model", Latency: time.Second},
-					Rationale:        "reviewed", Scores: domainevaluation.SemanticScores{Faithfulness: 5, CrossDimensionQuality: 5, SuggestionActionability: 5, AudienceClarity: 5, Concision: 5},
-				},
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
+	if status == domainevaluation.EvidenceStatusApproved {
+		value.Audit.FinalizedAt = &finalizedAt
+		value.GateResult = &domainevaluation.EvidenceGateResult{
+			EvaluatedAt: finalizedAt, Passed: true,
+			GatePasses: map[string]bool{"G1": true, "G2": true, "G3": true, "G4": true, "G5": true},
 		}
 	}
-	if err := run.AddAttempt(domainevaluation.AttemptRecord{
-		CaseID: release.PreflightCaseID, Attempt: 1, Stage: domainevaluation.AttemptStagePreflight,
-		StartedAt: at.Add(80 * time.Minute), FinishedAt: at.Add(80*time.Minute + time.Second), ProviderCallCount: 0, RejectionReason: release.PreflightRejectionReason,
-		Assertions: []domainevaluation.AssertionReceipt{
-			{Type: "provider_call_count", Scope: domainevaluation.AssertionScopeDefault, Ordinal: 1, Hard: true, Evaluator: "preflight-v1", Status: domainevaluation.AssertionPassed},
-			{Type: "rejection_reason", Scope: domainevaluation.AssertionScopeDefault, Ordinal: 1, Hard: true, Evaluator: "preflight-v1", Status: domainevaluation.AssertionPassed},
-		},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	closedAt := at.Add(90 * time.Minute)
-	if err := run.CloseCollection(closedAt); err != nil {
-		t.Fatal(err)
-	}
-	for _, caseID := range release.GenerationCaseIDs {
-		for attempt := 1; attempt <= release.RepetitionsPerCase; attempt++ {
-			for _, role := range []domainevaluation.ReviewRole{domainevaluation.ReviewRoleAssessmentSemantics, domainevaluation.ReviewRoleSafetyProduct} {
-				if err := run.AddHumanReview(domainevaluation.HumanReview{CaseID: caseID, Attempt: attempt, Role: role, Reviewer: string(role), Decision: domainevaluation.ReviewDecisionApprove, ReviewedAt: closedAt.Add(time.Minute), Reason: "approved"}); err != nil {
-					t.Fatal(err)
-				}
-			}
-		}
-	}
-	if err := run.Finalize("release-owner", "all gates passed", closedAt.Add(2*time.Minute)); err != nil {
-		t.Fatal(err)
-	}
-	return run
-}
-
-func governanceSemanticEvaluator() domainevaluation.SemanticEvaluatorSpec {
-	return domainevaluation.SemanticEvaluatorSpec{
-		Version: "semantic-rubric-v1",
-		Prompt: aiexplanation.PromptRef{
-			TemplateID: "ai-explanation-semantic-evaluator", Version: "v1",
-			Fingerprint: aiexplanation.NewFingerprint([]byte("semantic-prompt")), GitBlobSHA: "semantic-prompt-blob",
-		},
-		OutputSchema: domainevaluation.SchemaRef{Version: "ai-explanation-semantic-evaluation-output/v1", Fingerprint: aiexplanation.NewFingerprint([]byte("semantic-schema"))},
-		Provider: aiexplanation.ProviderExecutionSpec{
-			Route: "semantic_judge_v1", RouteRevision: "v1", ResolvedProvider: "judge-provider", ResolvedModel: "judge-model",
-			Fingerprint: aiexplanation.NewFingerprint([]byte("semantic-route")),
-		},
-		Decoding: domainevaluation.DecodingParameters{MaxOutputTokens: 2000},
-	}
+	return value
 }
 
 type profileRepositoryStub struct {
@@ -320,7 +272,8 @@ func (r *profileRepositoryStub) ListProfiles(_ context.Context, status *domainpr
 }
 
 type evaluationRepositoryStub struct {
-	records map[meta.ID]*domainevaluation.PromptEvaluationRun
+	records           map[meta.ID]*domainevaluation.PromptEvaluationRun
+	evidenceV2Records map[meta.ID]*domainevaluation.PromptEvaluationEvidenceV2
 }
 
 func (r *evaluationRepositoryStub) Create(_ context.Context, value *domainevaluation.PromptEvaluationRun) error {
@@ -333,6 +286,26 @@ func (r *evaluationRepositoryStub) Save(_ context.Context, value *domainevaluati
 }
 func (r *evaluationRepositoryStub) FindByID(_ context.Context, id meta.ID) (*domainevaluation.PromptEvaluationRun, error) {
 	value, ok := r.records[id]
+	if !ok {
+		return nil, domainevaluation.ErrNotFound
+	}
+	return value, nil
+}
+
+func (r *evaluationRepositoryStub) CreateEvidenceV2(_ context.Context, value *domainevaluation.PromptEvaluationEvidenceV2) error {
+	if r.evidenceV2Records == nil {
+		r.evidenceV2Records = make(map[meta.ID]*domainevaluation.PromptEvaluationEvidenceV2)
+	}
+	r.evidenceV2Records[value.RunID] = value
+	return nil
+}
+
+func (r *evaluationRepositoryStub) SaveEvidenceV2(_ context.Context, value *domainevaluation.PromptEvaluationEvidenceV2, _ int64) error {
+	return r.CreateEvidenceV2(context.Background(), value)
+}
+
+func (r *evaluationRepositoryStub) FindEvidenceV2ByID(_ context.Context, id meta.ID) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	value, ok := r.evidenceV2Records[id]
 	if !ok {
 		return nil, domainevaluation.ErrNotFound
 	}

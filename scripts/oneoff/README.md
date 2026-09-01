@@ -21,10 +21,13 @@
 | `smoke_modelcatalog_cutover` | 完成 AnswerSheet → Assessment → Outcome → Report 部署 smoke | 是，创建 smoke 事实 |
 | `smoke_modelcatalog_revision_conflict` | 验证 Model/Questionnaire revision conflict 的 REST 409 映射 | 是，恢复测试字段 |
 | `audit_norm_usage` | Norm 反向引用、悬空引用和人口学常模审计 | 否 |
+| `audit_ai_explanation_prompt_evaluation_size` | AI 解读 Prompt Evaluation Run BSON 与 generation/semantic 输出尺寸分布 | 否 |
 | `audit_evaluation_p1_evidence.sql` | Evaluation P1 证据查询 | 否 |
 | `audit_evaluation_p2_evidence.sql` | Evaluation P2 证据查询 | 否 |
 | `observe_outbox_by_event_type` | Outbox 事件类型观测 | 否 |
 | `cleanup_orphaned_assessment_documents` | **blocked / audit-only**：只允许 dry-run 对账缺少 MySQL Assessment 引用的 Mongo AnswerSheet 候选；候选结果不是删除授权 | 否；禁止 `--apply` |
+
+`audit_ai_explanation_prompt_evaluation_size` 本地可使用 `MONGO_URI`；受保护生产环境通过 Database Operations 的 `audit-ai-evaluation-size` operation 传入分离式 Mongo 环境变量，在 `infra-network` 的只读临时容器中执行 `--max-runs=0` 全量扫描。工作流不得打印 URI、用户名或密码。
 
 `cleanup_orphaned_assessment_documents` 当前必须保持 blocked。不得使用 `--apply`、
 `--hard-delete` 或 `--skip-backup`；代码中存在这些开关只代表历史实现能力，不代表当前运维授权。

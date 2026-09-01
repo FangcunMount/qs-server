@@ -47,7 +47,7 @@ type EvaluationSlotPolicy struct {
 }
 
 type GenerationExecutionBudget struct {
-	MaxExecutionsPerCase int `json:"max_executions_per_case"`
+	MaxExecutionsPerSlot int `json:"max_executions_per_slot"`
 	MaxExecutionsPerRun  int `json:"max_executions_per_run"`
 }
 
@@ -62,6 +62,19 @@ type EvaluationRecoveryPolicy struct {
 	ResultUnknownRequiresManualAcknowledgement bool              `json:"result_unknown_requires_manual_acknowledgement"`
 	QualityFailureReplacementAllowed           bool              `json:"quality_failure_replacement_allowed"`
 	SemanticFailureRegeneratesCandidate        bool              `json:"semantic_failure_regenerates_candidate"`
+}
+
+func (p EvaluationRecoveryPolicy) AllowsAutomaticRetry(failure ClassifiedFailure) bool {
+	if failure.Validate() != nil || !failure.Retryable {
+		return false
+	}
+	selector := FailureSelector{Stage: failure.Stage, Code: failure.Code}
+	for _, allowed := range p.AutoRetryableStageCodes {
+		if allowed.key() == selector.key() {
+			return true
+		}
+	}
+	return false
 }
 
 // EvaluationExecutionPolicy freezes sample targets independently from the
@@ -88,15 +101,12 @@ func (p EvaluationExecutionPolicy) Validate() error {
 		return fmt.Errorf("AI explanation evaluation execution policy slot plan is invalid")
 	}
 	requiredCandidates := p.RequiredCandidateCount()
-	if p.Generation.MaxExecutionsPerCase < p.SlotPolicy.RequiredCandidatesPerCase ||
-		p.Generation.MaxExecutionsPerCase > 32 ||
-		p.Generation.MaxExecutionsPerRun < requiredCandidates ||
-		p.Generation.MaxExecutionsPerRun > p.SlotPolicy.RequiredGenerationCases*p.Generation.MaxExecutionsPerCase {
+	if p.Generation.MaxExecutionsPerSlot != 2 ||
+		p.Generation.MaxExecutionsPerRun != requiredCandidates*p.Generation.MaxExecutionsPerSlot {
 		return fmt.Errorf("AI explanation evaluation generation execution budget is invalid")
 	}
-	if p.Semantic.MaxExecutionsPerCandidate < 1 || p.Semantic.MaxExecutionsPerCandidate > 8 ||
-		p.Semantic.MaxExecutionsPerRun < requiredCandidates ||
-		p.Semantic.MaxExecutionsPerRun > requiredCandidates*p.Semantic.MaxExecutionsPerCandidate {
+	if p.Semantic.MaxExecutionsPerCandidate != 2 ||
+		p.Semantic.MaxExecutionsPerRun != requiredCandidates*p.Semantic.MaxExecutionsPerCandidate {
 		return fmt.Errorf("AI explanation evaluation semantic execution budget is invalid")
 	}
 	if !p.Recovery.ResultUnknownRequiresManualAcknowledgement ||
@@ -149,6 +159,35 @@ func (p EvaluationExecutionPolicy) Clone() EvaluationExecutionPolicy {
 	cloned.Recovery.AutoRetryableStageCodes = append([]FailureSelector(nil), p.Recovery.AutoRetryableStageCodes...)
 	cloned.Recovery.ManualRecoveryStageCodes = append([]FailureSelector(nil), p.Recovery.ManualRecoveryStageCodes...)
 	return cloned
+}
+
+// CurrentEvaluationExecutionPolicy returns the versioned policy used for new
+// v2 runs. The complete value is copied into each Run and fingerprinted; later
+// code changes therefore cannot rewrite historical budgets or recovery rules.
+func CurrentEvaluationExecutionPolicy() EvaluationExecutionPolicy {
+	return EvaluationExecutionPolicy{
+		SchemaVersion: EvaluationExecutionPolicySchemaVersionV1,
+		PolicyID:      "release-evaluation-bounded-recovery",
+		Version:       "v1",
+		SlotPolicy: EvaluationSlotPolicy{
+			RequiredGenerationCases: RequiredGenerationCaseCount, RequiredCandidatesPerCase: RequiredRepetitionsPerCase,
+			RequiredPreflightCases: 1, CandidateSelection: CandidateSelectionFirstContractConformant,
+		},
+		Generation: GenerationExecutionBudget{MaxExecutionsPerSlot: 2, MaxExecutionsPerRun: 2 * RequiredGenerationAttempts},
+		Semantic:   SemanticExecutionBudget{MaxExecutionsPerCandidate: 2, MaxExecutionsPerRun: 2 * RequiredGenerationAttempts},
+		Recovery: EvaluationRecoveryPolicy{
+			AutoRetryableStageCodes: []FailureSelector{
+				{Stage: FailureStageGenerationExecution, Code: "provider_rate_limited"},
+				{Stage: FailureStageSemanticEvaluation, Code: "semantic_provider_rate_limited"},
+				{Stage: FailureStageSemanticEvaluation, Code: SemanticOutputSchemaInvalid},
+			},
+			ManualRecoveryStageCodes: []FailureSelector{
+				{Stage: FailureStageGenerationExecution, Code: "provider_result_unknown"},
+				{Stage: FailureStageSemanticEvaluation, Code: SemanticResultUnknown},
+			},
+			ResultUnknownRequiresManualAcknowledgement: true,
+		},
+	}
 }
 
 type ReleaseIdentityComponent string
@@ -302,6 +341,44 @@ func (p ReleaseGatePolicy) Clone() ReleaseGatePolicy {
 	cloned.ReleaseIdentity.RequiredComponents = append([]ReleaseIdentityComponent(nil), p.ReleaseIdentity.RequiredComponents...)
 	cloned.HumanAccountability.RequiredRoles = append([]ReviewRole(nil), p.HumanAccountability.RequiredRoles...)
 	return cloned
+}
+
+// CurrentReleaseGatePolicy is frozen into every new v2 Run alongside the
+// execution policy. It intentionally keeps all external-call failures in the
+// reliability denominator even when a bounded recovery later succeeds.
+func CurrentReleaseGatePolicy() ReleaseGatePolicy {
+	return ReleaseGatePolicy{
+		SchemaVersion: ReleaseGatePolicySchemaVersionV1,
+		PolicyID:      "release-gates",
+		Version:       "v1",
+		ReleaseIdentity: ReleaseIdentityGatePolicy{
+			RequiredComponents: append([]ReleaseIdentityComponent(nil), requiredReleaseIdentityComponents...), RequireFingerprintMatch: true,
+		},
+		SampleCompleteness: SampleCompletenessGatePolicy{
+			RequiredGenerationCases: RequiredGenerationCaseCount, RequiredCandidatesPerCase: RequiredRepetitionsPerCase,
+			RequiredCandidateCount: RequiredGenerationAttempts, RequiredSemanticReceiptsPerCandidate: 1,
+			RejectUnresolvedResultUnknown: true, RejectBudgetOverrun: true,
+		},
+		ExecutionReliability: ExecutionReliabilityGatePolicy{
+			MinInfrastructureSuccessRate: 0.98, MinGenerationContractConformanceRate: 0.95, MinSemanticExecutionSuccessRate: 0.98,
+			InfrastructureDenominator:                       "dispatched_provider_executions",
+			GenerationContractDenominator:                   "definite_output_generation_executions",
+			SemanticExecutionDenominator:                    "dispatched_semantic_executions",
+			IncludeResultUnknownInInfrastructureDenominator: true,
+		},
+		CandidateQuality: CandidateQualityGatePolicy{
+			MinAssertionPassesPerCase: 4, MinAssertionPassesOverall: 32,
+			MinimumSemanticScores:              SemanticScoreThresholds{Faithfulness: 4, CrossDimensionQuality: 3, SuggestionActionability: 3, AudienceClarity: 3, Concision: 3},
+			MinimumSemanticAverages:            SemanticScoreThresholds{Faithfulness: 4.5, CrossDimensionQuality: 4, SuggestionActionability: 4, AudienceClarity: 4, Concision: 4},
+			HardAssertionFailureRejectsRelease: true,
+		},
+		HumanAccountability: HumanAccountabilityGatePolicy{
+			RequiredRoles:               append([]ReviewRole(nil), ReviewRoleAssessmentSemantics, ReviewRoleSafetyProduct),
+			RequiredReviewsPerCandidate: 2, RequiredReviewCount: 2 * RequiredGenerationAttempts,
+			RequireDistinctReviewersPerCandidate: true, RequireReason: true, AnyRejectionRejectsRelease: true,
+		},
+		ApprovalRule: "all_gates_must_pass",
+	}
 }
 
 func sameReleaseIdentityComponents(actual []ReleaseIdentityComponent) bool {

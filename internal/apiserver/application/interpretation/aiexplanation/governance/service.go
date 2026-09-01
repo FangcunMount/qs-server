@@ -26,7 +26,7 @@ var (
 
 type Service struct {
 	profiles    domainprofile.Repository
-	evaluations domainevaluation.Repository
+	evaluations domainevaluation.EvidenceV2Repository
 	now         func() time.Time
 	newID       func() meta.ID
 }
@@ -54,7 +54,7 @@ type ProfilePage struct {
 	NextCursor string
 }
 
-func NewService(profiles domainprofile.Repository, evaluations domainevaluation.Repository, now func() time.Time, newIDs ...func() meta.ID) (*Service, error) {
+func NewService(profiles domainprofile.Repository, evaluations domainevaluation.EvidenceV2Repository, now func() time.Time, newIDs ...func() meta.ID) (*Service, error) {
 	if profiles == nil || evaluations == nil {
 		return nil, fmt.Errorf("AI explanation Profile and evaluation repositories are required")
 	}
@@ -151,11 +151,13 @@ func (s *Service) Publish(ctx context.Context, command PublishCommand) (*domainp
 	if profileRecord.Status() != domainprofile.StatusDraft {
 		return nil, domainprofile.ErrConflict
 	}
-	evidence, err := s.evaluations.FindByID(ctx, command.EvaluationRunID)
+	evidence, err := s.evaluations.FindEvidenceV2ByID(ctx, command.EvaluationRunID)
 	if err != nil {
 		return nil, err
 	}
-	if !evidence.IsPublishEvidence() {
+	if evidence.SchemaVersion != domainevaluation.PromptEvaluationEvidenceSchemaVersionV2 ||
+		evidence.Status != domainevaluation.EvidenceStatusApproved || evidence.GateResult == nil || !evidence.GateResult.Passed ||
+		evidence.UnresolvedResultUnknownCount != 0 || evidence.Audit.FinalizedAt == nil {
 		return nil, ErrPublishEvidenceRequired
 	}
 	if err := validateReleaseMatch(profileRecord, evidence); err != nil {
@@ -197,16 +199,16 @@ func (s *Service) Disable(ctx context.Context, command DisableCommand) (*domainp
 	return profileRecord, nil
 }
 
-func validateReleaseMatch(profileRecord *domainprofile.AIExplanationProfile, evidence *domainevaluation.PromptEvaluationRun) error {
+func validateReleaseMatch(profileRecord *domainprofile.AIExplanationProfile, evidence *domainevaluation.PromptEvaluationEvidenceV2) error {
 	if profileRecord == nil || evidence == nil {
 		return ErrReleaseMismatch
 	}
-	release := evidence.Release()
+	release := evidence.Release
 	definition := profileRecord.Definition()
 	if release.Profile.ID != profileRecord.ProfileID() || release.Profile.Version != profileRecord.Version() || release.Profile.Fingerprint != profileRecord.Fingerprint() ||
-		release.Prompt.TemplateID != definition.GenerationPolicy.PromptTemplateID || release.Prompt.Version != definition.GenerationPolicy.PromptVersion ||
+		release.Prompt.ID != definition.GenerationPolicy.PromptTemplateID || release.Prompt.Version != definition.GenerationPolicy.PromptVersion ||
 		release.InputSchema.Version != definition.GenerationPolicy.InputSchemaVersion || release.OutputSchema.Version != definition.GenerationPolicy.OutputSchemaVersion ||
-		release.Provider.Route != definition.GenerationPolicy.ProviderRoute {
+		release.GenerationRoute.ID != definition.GenerationPolicy.ProviderRoute {
 		return ErrReleaseMismatch
 	}
 	return nil

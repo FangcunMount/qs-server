@@ -27,18 +27,20 @@ const (
 )
 
 type OnlineRunnerDependencies struct {
-	Prompts          appport.PromptPackageResolver
-	Schemas          appport.OutputSchemaResolver
-	Routes           appport.ProviderRouteResolver
-	Provider         appport.Provider
-	Safety           appport.SafetyEvaluator
-	Semantic         SemanticEvaluator
-	SemanticTimeout  time.Duration
-	AttemptLease     time.Duration
-	Evidence         *EvidenceService
-	Rechecks         domainevaluation.RecheckRepository
-	DurableCommitter *DurableCommitter
-	Now              func() time.Time
+	Prompts            appport.PromptPackageResolver
+	Schemas            appport.OutputSchemaResolver
+	Routes             appport.ProviderRouteResolver
+	Provider           appport.Provider
+	Safety             appport.SafetyEvaluator
+	Semantic           SemanticEvaluator
+	SemanticTimeout    time.Duration
+	AttemptLease       time.Duration
+	Evidence           *EvidenceService
+	EvidenceV2         *EvidenceV2Service
+	Rechecks           domainevaluation.RecheckRepository
+	DurableCommitter   *DurableCommitter
+	DurableCommitterV2 *DurableCommitterV2
+	Now                func() time.Time
 }
 
 // OnlineRunner executes the frozen synthetic v1 suite. It is not assembled by
@@ -46,25 +48,30 @@ type OnlineRunnerDependencies struct {
 // successful RunV1 only closes collection and leaves the evidence awaiting the
 // two required human review roles.
 type OnlineRunner struct {
-	prompts          appport.PromptPackageResolver
-	schemas          appport.OutputSchemaResolver
-	routes           appport.ProviderRouteResolver
-	provider         appport.Provider
-	safety           appport.SafetyEvaluator
-	semantic         SemanticEvaluator
-	semanticTimeout  time.Duration
-	attemptLease     time.Duration
-	evidence         *EvidenceService
-	rechecks         domainevaluation.RecheckRepository
-	durableCommitter *DurableCommitter
-	preflight        *PreflightRunner
-	now              func() time.Time
+	prompts            appport.PromptPackageResolver
+	schemas            appport.OutputSchemaResolver
+	routes             appport.ProviderRouteResolver
+	provider           appport.Provider
+	safety             appport.SafetyEvaluator
+	semantic           SemanticEvaluator
+	semanticTimeout    time.Duration
+	attemptLease       time.Duration
+	evidence           *EvidenceService
+	evidenceV2         *EvidenceV2Service
+	rechecks           domainevaluation.RecheckRepository
+	durableCommitter   *DurableCommitter
+	durableCommitterV2 *DurableCommitterV2
+	preflight          *PreflightRunner
+	now                func() time.Time
 }
 
 func NewOnlineRunner(dependencies OnlineRunnerDependencies) (*OnlineRunner, error) {
 	if dependencies.Prompts == nil || dependencies.Schemas == nil || dependencies.Routes == nil ||
 		dependencies.Provider == nil || dependencies.Safety == nil || dependencies.Semantic == nil || dependencies.Evidence == nil {
 		return nil, fmt.Errorf("AI explanation online evaluation dependencies are required")
+	}
+	if (dependencies.EvidenceV2 == nil) != (dependencies.DurableCommitterV2 == nil) {
+		return nil, fmt.Errorf("AI explanation online evaluation v2 evidence and committer must be configured together")
 	}
 	now := dependencies.Now
 	if now == nil {
@@ -87,6 +94,7 @@ func NewOnlineRunner(dependencies OnlineRunnerDependencies) (*OnlineRunner, erro
 		provider: dependencies.Provider, safety: dependencies.Safety, semantic: dependencies.Semantic,
 		semanticTimeout: semanticTimeout, attemptLease: attemptLease,
 		evidence: dependencies.Evidence, durableCommitter: dependencies.DurableCommitter,
+		evidenceV2: dependencies.EvidenceV2, durableCommitterV2: dependencies.DurableCommitterV2,
 		rechecks:  dependencies.Rechecks,
 		preflight: preflight, now: now,
 	}, nil
@@ -636,7 +644,7 @@ func (r *OnlineRunner) executeAttempt(
 	}
 	semanticInvocationID := fmt.Sprintf("ai-semantic-eval:%s:%s:%d", runID, testCase.CaseID, attempt)
 	semanticContext, semanticCancel := context.WithTimeout(ctx, r.semanticTimeout)
-	semanticResult, err := r.semantic.Evaluate(semanticContext, SemanticEvaluationRequest{
+	semanticOutcome, err := r.semantic.Evaluate(semanticContext, SemanticEvaluationRequest{
 		InvocationID: semanticInvocationID,
 		SuiteID:      prepared.release.Suite.ID, CaseID: testCase.CaseID, Attempt: attempt,
 		InputJSON: append([]byte(nil), messages.DataJSON...), OutputJSON: append([]byte(nil), base.NormalizedOutput...),
@@ -646,16 +654,52 @@ func (r *OnlineRunner) executeAttempt(
 	if err != nil {
 		return r.failedAttemptValue(base, classifyAttemptFailure("semantic_evaluation", err))
 	}
+	base.SemanticExecution = semanticExecutionRecord(semanticOutcome)
+	if semanticOutcome.Failure != nil {
+		return r.failedAttemptValue(base, *semanticOutcome.Failure)
+	}
+	if semanticOutcome.Result == nil {
+		failure := domainevaluation.AttemptFailure{
+			Stage: string(domainevaluation.FailureStageSemanticEvaluation),
+			Code:  domainevaluation.SemanticDecisionContractInvalid, SafeMessage: "semantic evaluator returned no terminal result", Retryable: true,
+		}
+		base.SemanticExecution.Failure = &failure
+		return r.failedAttemptValue(base, failure)
+	}
 	semanticAssertions, semanticReceipt, err := semanticReceipts(
-		semanticResult, semanticObligations, prepared.release.SemanticEvaluator, semanticInvocationID,
+		*semanticOutcome.Result, semanticOutcome.ProviderReceipt, semanticObligations,
+		prepared.release.SemanticEvaluator, semanticInvocationID,
 	)
 	if err != nil {
-		return r.failedAttempt(base, "semantic_evaluation", "semantic_receipt_invalid", "semantic evaluator returned invalid evidence", false, false)
+		failure := domainevaluation.AttemptFailure{
+			Stage: string(domainevaluation.FailureStageSemanticEvaluation),
+			Code:  domainevaluation.SemanticDecisionContractInvalid, SafeMessage: "semantic evaluator returned invalid decision evidence", Retryable: true,
+		}
+		base.SemanticExecution.Failure = &failure
+		return r.failedAttemptValue(base, failure)
 	}
 	base.Assertions = append(base.Assertions, semanticAssertions...)
 	base.Semantic = semanticReceipt
 	base.FinishedAt = r.finishTime(startedAt)
 	return base
+}
+
+func semanticExecutionRecord(outcome SemanticEvaluationOutcome) *domainevaluation.SemanticExecutionRecord {
+	record := &domainevaluation.SemanticExecutionRecord{
+		InvocationID: outcome.InvocationID, EvaluatorVersion: outcome.EvaluatorVersion,
+		StartedAt: outcome.StartedAt, FinishedAt: outcome.FinishedAt, ProviderCallCount: outcome.ProviderCallCount,
+		RawOutput: append([]byte(nil), outcome.RawOutput...), NormalizedOutput: append([]byte(nil), outcome.NormalizedOutput...),
+		ProviderFailureCode: outcome.ProviderFailureCode,
+	}
+	if outcome.ProviderReceipt != nil {
+		receipt := *outcome.ProviderReceipt
+		record.ProviderReceipt = &receipt
+	}
+	if outcome.Failure != nil {
+		failure := *outcome.Failure
+		record.Failure = &failure
+	}
+	return record
 }
 
 func providerOutputSchemaFailure(err error) (string, string) {

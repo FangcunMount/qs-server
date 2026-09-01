@@ -125,20 +125,28 @@ func handleAIExplanationPromptEvaluationStep(deps *Dependencies) HandlerFunc {
 		response, err := deps.AIExplanationAutomationClient.ExecutePromptEvaluationStep(callCtx, &interpretationpb.ExecutePromptEvaluationStepRequest{
 			OrgId: data.OrgID, RunId: data.RunID, CaseId: data.CaseID, Attempt: int32(data.Attempt),
 			RequestedBy: data.RequestedBy, EventId: envelope.ID, RecheckId: data.RecheckID,
+			EvidenceVersion: data.EvidenceVersion, ExecutionKind: data.ExecutionKind, SlotOrdinal: int32(data.SlotOrdinal),
+			CandidateId: data.CandidateID, ExecutionOrdinal: int32(data.ExecutionOrdinal),
 		})
 		if err != nil {
 			return fmt.Errorf("execute AI explanation prompt evaluation run %s case %s attempt %d: %w", data.RunID, data.CaseID, data.Attempt, err)
 		}
 		if response == nil || !response.GetSuccess() || response.GetRunId() != data.RunID ||
-			response.GetCaseId() != data.CaseID || response.GetAttempt() != int32(data.Attempt) || response.GetRecheckId() != data.RecheckID {
+			response.GetCaseId() != data.CaseID || response.GetAttempt() != int32(data.Attempt) || response.GetRecheckId() != data.RecheckID ||
+			response.GetEvidenceVersion() != data.EvidenceVersion || response.GetExecutionKind() != data.ExecutionKind ||
+			response.GetSlotOrdinal() != int32(data.SlotOrdinal) || response.GetCandidateId() != data.CandidateID ||
+			response.GetExecutionOrdinal() != int32(data.ExecutionOrdinal) {
 			return fmt.Errorf("AI explanation prompt evaluation automation returned an invalid response")
 		}
 		switch response.GetStatus() {
-		case "progressed", "already_completed", "awaiting_review", "canceled",
+		case "progressed", "already_completed", "awaiting_review", "blocked", "canceled",
 			"recheck_completed", "recheck_failed", "recheck_result_unknown", "recheck_already_completed":
 			deps.Logger.Info("AI explanation prompt evaluation step handled",
 				slog.String("event_id", envelope.ID), slog.String("run_id", data.RunID),
 				slog.String("case_id", data.CaseID), slog.Int("attempt", data.Attempt),
+				slog.String("evidence_version", data.EvidenceVersion), slog.String("execution_kind", data.ExecutionKind),
+				slog.Int("slot_ordinal", data.SlotOrdinal), slog.String("candidate_id", data.CandidateID),
+				slog.Int("execution_ordinal", data.ExecutionOrdinal),
 				slog.String("recheck_id", data.RecheckID),
 				slog.String("status", response.GetStatus()), slog.String("run_status", response.GetRunStatus()),
 				slog.String("next_case_id", response.GetNextCaseId()), slog.Int("next_attempt", int(response.GetNextAttempt())),
@@ -230,8 +238,26 @@ func validateAIExplanationLeaseRecoveryRequested(data eventpayload.AIExplanation
 func validateAIExplanationPromptEvaluationStep(data eventpayload.AIExplanationPromptEvaluationStepRequestedData) error {
 	runID, err := meta.ParseID(data.RunID)
 	if data.OrgID <= 0 || err != nil || runID.IsZero() || strings.TrimSpace(data.CaseID) == "" ||
-		data.Attempt < 1 || strings.TrimSpace(data.RequestedBy) == "" || data.RequestedAt.IsZero() {
+		strings.TrimSpace(data.RequestedBy) == "" || data.RequestedAt.IsZero() {
 		return fmt.Errorf("invalid AI explanation prompt evaluation step event: address and audit are required")
+	}
+	version := strings.TrimSpace(data.EvidenceVersion)
+	if version == eventpayload.AIExplanationPromptEvaluationEvidenceVersionV2 {
+		kind := strings.TrimSpace(data.ExecutionKind)
+		validKind := kind == eventpayload.AIExplanationPromptEvaluationExecutionKindGeneration ||
+			kind == eventpayload.AIExplanationPromptEvaluationExecutionKindSemantic
+		if data.Attempt != 0 || strings.TrimSpace(data.RecheckID) != "" || !validKind ||
+			data.SlotOrdinal < 1 || data.SlotOrdinal > eventpayload.AIExplanationPromptEvaluationRequiredSlotsPerCase ||
+			data.ExecutionOrdinal < 1 || data.ExecutionOrdinal > eventpayload.AIExplanationPromptEvaluationMaxExecutionsPerTarget ||
+			(kind == eventpayload.AIExplanationPromptEvaluationExecutionKindGeneration && strings.TrimSpace(data.CandidateID) != "") ||
+			(kind == eventpayload.AIExplanationPromptEvaluationExecutionKindSemantic && strings.TrimSpace(data.CandidateID) == "") {
+			return fmt.Errorf("invalid AI explanation prompt evaluation v2 step event: exact execution address is required")
+		}
+		return nil
+	}
+	if version != "" || data.Attempt < 1 || strings.TrimSpace(data.ExecutionKind) != "" || data.SlotOrdinal != 0 ||
+		strings.TrimSpace(data.CandidateID) != "" || data.ExecutionOrdinal != 0 {
+		return fmt.Errorf("invalid AI explanation prompt evaluation step event: evidence version is invalid")
 	}
 	if strings.TrimSpace(data.RecheckID) != "" {
 		recheckID, parseErr := meta.ParseID(data.RecheckID)

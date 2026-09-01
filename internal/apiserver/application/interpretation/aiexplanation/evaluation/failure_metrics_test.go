@@ -31,6 +31,14 @@ func TestPromptEvaluationAttemptFailureMetricsUseBoundedStageAndCode(t *testing.
 			wantCode:  "provider_timeout",
 		},
 		{
+			name: "reviewed semantic evidence failure",
+			failure: domainevaluation.AttemptFailure{
+				Stage: string(domainevaluation.FailureStageSemanticEvaluation), Code: domainevaluation.SemanticOutputSchemaInvalid,
+			},
+			wantStage: "semantic_evaluation",
+			wantCode:  domainevaluation.SemanticOutputSchemaInvalid,
+		},
+		{
 			name: "dynamic values collapse",
 			failure: domainevaluation.AttemptFailure{
 				Stage: "remote-stage-42", Code: "remote_dynamic_code_42",

@@ -100,6 +100,49 @@ func TestEvaluateCandidateDetectsPromptInjectionLiteral(t *testing.T) {
 	t.Fatal("forbid_literal_substrings did not fail")
 }
 
+func TestEvaluateCandidateRetainsTypedContentAndSemanticWorkAfterProfileFailure(t *testing.T) {
+	suite, profileRecord, assembled := candidateFixture(t, 0)
+	content := output.Content{
+		SchemaVersion: aiexplanation.OutputSchemaVersionV1,
+		Summary:       "本次两个维度可以结合观察。",
+		IntegratedInsights: []output.IntegratedInsight{{
+			Kind: output.InsightKindReinforcingPattern, Title: "组合观察", Content: "两个维度在部分情境下可能相关。",
+			WhyItMatters: "帮助理解本次结果。", EvidenceRefs: []output.EvidenceRef{
+				{Kind: output.EvidenceKindDimension, Ref: assembled.Document.Facts.Dimensions[0].Ref},
+				{Kind: output.EvidenceKindDimension, Ref: assembled.Document.Facts.Dimensions[1].Ref},
+			},
+		}},
+		Suggestions: []output.Suggestion{{
+			Origin: output.SuggestionOriginGeneratedLowRisk, Category: "medical_treatment", Title: "记录", Goal: "观察变化",
+			Actions: []string{"每天记录一次"}, Rationale: "与本次结果相关。", EvidenceRefs: []output.EvidenceRef{
+				{Kind: output.EvidenceKindDimension, Ref: assembled.Document.Facts.Dimensions[0].Ref},
+				{Kind: output.EvidenceKindDimension, Ref: assembled.Document.Facts.Dimensions[1].Ref},
+			}, SourceSuggestionRefs: []string{},
+		}},
+		Limitations: []string{"本解读仅基于本次测评，不构成诊断。"},
+	}
+	assertions := append(append([]Assertion(nil), suite.DefaultGenerationAssertions...), suite.Cases[0].Expected.Assertions...)
+	report, err := EvaluateCandidate(context.Background(), marshalCandidate(t, content), assembled.Document, profileRecord.Definition(), assertions, allowSafety{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.DeterministicHardGatePassed || report.Validation.SchemaValidatorVersion == "" {
+		t.Fatalf("profile failure lost typed Candidate evidence: %#v", report)
+	}
+	foundProfileFailure, foundSemantic := false, false
+	for _, result := range report.Assertions {
+		if result.Type == "profile_output_policy_satisfied" && result.Status == AssertionFailed {
+			foundProfileFailure = true
+		}
+		if result.Status == AssertionPendingSemantic {
+			foundSemantic = true
+		}
+	}
+	if !foundProfileFailure || !foundSemantic {
+		t.Fatalf("profile failure/semantic obligations = %v/%v: %#v", foundProfileFailure, foundSemantic, report.Assertions)
+	}
+}
+
 func candidateFixture(t *testing.T, caseIndex int) (*Suite, *domainprofile.AIExplanationProfile, *appinput.Result) {
 	t.Helper()
 	suite, err := LoadV1()

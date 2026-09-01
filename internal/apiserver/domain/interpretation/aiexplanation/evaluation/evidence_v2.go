@@ -276,7 +276,7 @@ type CandidateGenerationExecution struct {
 func (e CandidateGenerationExecution) Validate() error {
 	if !evidenceEntityIDPattern.MatchString(e.ID) || !evidenceEntityIDPattern.MatchString(e.CaseID) ||
 		!evidenceEntityIDPattern.MatchString(e.InvocationID) || e.SlotOrdinal < 1 || e.SlotOrdinal > RequiredRepetitionsPerCase ||
-		e.ExecutionOrdinal < 1 || e.ExecutionOrdinal > 32 || !e.Status.IsValid() || e.StartedAt.IsZero() ||
+		e.ExecutionOrdinal < 1 || e.ExecutionOrdinal > 2 || !e.Status.IsValid() || e.StartedAt.IsZero() ||
 		e.ProviderCallCount < 0 || e.ProviderCallCount > 1 || len(e.RawOutput) > MaxStoredOutputBytes || len(e.NormalizedOutput) > MaxStoredOutputBytes {
 		return fmt.Errorf("AI explanation candidate generation execution is invalid")
 	}
@@ -288,9 +288,6 @@ func (e CandidateGenerationExecution) Validate() error {
 			return fmt.Errorf("AI explanation candidate generation receipt requires one Provider call")
 		}
 		if err := e.ProviderReceipt.Validate(); err != nil {
-			return err
-		}
-		if err := validateV2ProviderReceipt(*e.ProviderReceipt, e.InvocationID); err != nil {
 			return err
 		}
 	}
@@ -309,6 +306,9 @@ func (e CandidateGenerationExecution) Validate() error {
 	case ExecutionStatusSucceeded:
 		if e.FinishedAt == nil || e.ProviderCallCount != 1 || e.ProviderReceipt == nil || len(e.RawOutput) == 0 || len(e.NormalizedOutput) == 0 || e.Failure != nil {
 			return fmt.Errorf("successful AI explanation generation execution evidence is incomplete")
+		}
+		if err := validateV2ProviderReceipt(*e.ProviderReceipt, e.InvocationID); err != nil {
+			return err
 		}
 	case ExecutionStatusFailed, ExecutionStatusResultUnknown:
 		if e.FinishedAt == nil || e.Failure == nil {
@@ -385,7 +385,7 @@ type SemanticEvaluationExecution struct {
 
 func (e SemanticEvaluationExecution) Validate() error {
 	if !evidenceEntityIDPattern.MatchString(e.ID) || !evidenceEntityIDPattern.MatchString(e.CandidateID) ||
-		!evidenceEntityIDPattern.MatchString(e.InvocationID) || e.ExecutionOrdinal < 1 || e.ExecutionOrdinal > 8 ||
+		!evidenceEntityIDPattern.MatchString(e.InvocationID) || e.ExecutionOrdinal < 1 || e.ExecutionOrdinal > 2 ||
 		!e.Status.IsValid() || e.StartedAt.IsZero() || e.ProviderCallCount < 0 || e.ProviderCallCount > 1 ||
 		len(e.RawOutput) > MaxStoredOutputBytes || len(e.NormalizedOutput) > MaxStoredOutputBytes {
 		return fmt.Errorf("AI explanation semantic evaluation execution is invalid")
@@ -398,9 +398,6 @@ func (e SemanticEvaluationExecution) Validate() error {
 			return fmt.Errorf("AI explanation semantic evaluation receipt requires one Provider call")
 		}
 		if err := e.ProviderReceipt.Validate(); err != nil {
-			return err
-		}
-		if err := validateV2ProviderReceipt(*e.ProviderReceipt, e.InvocationID); err != nil {
 			return err
 		}
 	}
@@ -419,6 +416,9 @@ func (e SemanticEvaluationExecution) Validate() error {
 		}
 		if !json.Valid(e.NormalizedOutput) || e.Result.OutputFingerprint != aiexplanation.NewFingerprint(e.NormalizedOutput) {
 			return fmt.Errorf("AI explanation semantic normalized output evidence is invalid")
+		}
+		if err := validateV2ProviderReceipt(*e.ProviderReceipt, e.InvocationID); err != nil {
+			return err
 		}
 		if err := e.Result.Validate(); err != nil {
 			return err
@@ -595,11 +595,16 @@ func (a EvidenceRunAudit) Validate(status EvidenceStatus) error {
 			return fmt.Errorf("AI explanation evaluation v2 audit timing is invalid")
 		}
 	}
-	if status == EvidenceStatusApproved || status == EvidenceStatusRejected {
+	switch status {
+	case EvidenceStatusAwaitingReview:
+		if a.ClosedAt == nil || a.FinalizedAt != nil || a.CanceledAt != nil {
+			return fmt.Errorf("AI explanation evaluation awaiting-review audit is invalid")
+		}
+	case EvidenceStatusApproved, EvidenceStatusRejected:
 		if a.ClosedAt == nil || a.FinalizedAt == nil || a.FinalizedAt.Before(*a.ClosedAt) || a.CanceledAt != nil {
 			return fmt.Errorf("AI explanation evaluation finalized audit is invalid")
 		}
-	} else if status == EvidenceStatusCanceled {
+	case EvidenceStatusCanceled:
 		if a.CanceledAt == nil || a.FinalizedAt != nil {
 			return fmt.Errorf("AI explanation evaluation cancellation audit is invalid")
 		}
@@ -627,6 +632,8 @@ type PromptEvaluationEvidenceV2 struct {
 	StateTransitions             []EvidenceStateTransition
 	GateResult                   *EvidenceGateResult
 	Audit                        EvidenceRunAudit
+	version                      int64
+	execution                    *EvidenceExecutionCheckpoint
 }
 
 func NewPromptEvaluationEvidenceV2(
@@ -661,6 +668,7 @@ func NewPromptEvaluationEvidenceV2(
 	evidence := &PromptEvaluationEvidenceV2{
 		SchemaVersion:   PromptEvaluationEvidenceSchemaVersionV2,
 		RunID:           runID,
+		version:         1,
 		Release:         release,
 		ExecutionPolicy: executionPolicy.Clone(),
 		GatePolicy:      gatePolicy.Clone(),
@@ -697,6 +705,10 @@ func (e *PromptEvaluationEvidenceV2) Transition(to EvidenceStatus, causeCode, ac
 	cloned := e.Clone()
 	cloned.Status = to
 	cloned.StateTransitions = append(cloned.StateTransitions, transition)
+	cloned.version++
+	if to != EvidenceStatusCollecting && cloned.execution != nil {
+		return fmt.Errorf("AI explanation evaluation cannot leave collecting with an active execution")
+	}
 	switch to {
 	case EvidenceStatusAwaitingReview:
 		cloned.Audit.ClosedAt = copyTime(at)
@@ -749,7 +761,7 @@ func (e PromptEvaluationEvidenceV2) EvaluateGate(at time.Time) (EvidenceGateResu
 }
 
 func (e PromptEvaluationEvidenceV2) Validate() error {
-	if e.SchemaVersion != PromptEvaluationEvidenceSchemaVersionV2 || e.RunID.IsZero() || !e.Status.IsValid() {
+	if e.SchemaVersion != PromptEvaluationEvidenceSchemaVersionV2 || e.RunID.IsZero() || !e.Status.IsValid() || e.version < 1 {
 		return fmt.Errorf("AI explanation Prompt evaluation evidence v2 identity is invalid")
 	}
 	if err := e.ExecutionPolicy.Validate(); err != nil {
@@ -762,6 +774,9 @@ func (e PromptEvaluationEvidenceV2) Validate() error {
 		return err
 	}
 	if err := e.Audit.Validate(e.Status); err != nil {
+		return err
+	}
+	if err := e.validateExecutionCheckpoint(); err != nil {
 		return err
 	}
 	if len(e.PreflightEvidence) != e.ExecutionPolicy.SlotPolicy.RequiredPreflightCases {
@@ -800,6 +815,16 @@ func (e PromptEvaluationEvidenceV2) Validate() error {
 	}
 	if err := validateCandidateReviews(e.HumanReviews, candidates, reviewReady); err != nil {
 		return err
+	}
+	if len(e.HumanReviews) > 0 {
+		if e.Status != EvidenceStatusAwaitingReview && e.Status != EvidenceStatusApproved && e.Status != EvidenceStatusRejected || e.Audit.ClosedAt == nil {
+			return fmt.Errorf("AI explanation candidate review requires a closed evidence inventory")
+		}
+		for _, review := range e.HumanReviews {
+			if review.ReviewedAt.Before(*e.Audit.ClosedAt) {
+				return fmt.Errorf("AI explanation candidate review predates evidence collection closure")
+			}
+		}
 	}
 	unknownExecutions := make(map[string]time.Time)
 	for _, execution := range e.GenerationExecutions {
@@ -1056,10 +1081,12 @@ func validateGenerationExecutions(values []CandidateGenerationExecution, policy 
 	byID := make(map[string]CandidateGenerationExecution, len(values))
 	bySlot := make(map[string][]CandidateGenerationExecution)
 	invocations := make(map[string]struct{}, len(values))
-	caseCounts := make(map[string]int)
 	for _, value := range values {
 		if err := value.Validate(); err != nil {
 			return nil, nil, err
+		}
+		if value.Status == ExecutionStatusPrepared || value.Status == ExecutionStatusDispatching {
+			return nil, nil, fmt.Errorf("AI explanation generation execution inventory must contain terminal evidence only")
 		}
 		if _, exists := byID[value.ID]; exists {
 			return nil, nil, fmt.Errorf("AI explanation generation execution id is duplicated")
@@ -1071,9 +1098,8 @@ func validateGenerationExecutions(values []CandidateGenerationExecution, policy 
 		invocations[value.InvocationID] = struct{}{}
 		key := value.CaseID + "\x00" + fmt.Sprint(value.SlotOrdinal)
 		bySlot[key] = append(bySlot[key], value)
-		caseCounts[value.CaseID]++
-		if caseCounts[value.CaseID] > policy.Generation.MaxExecutionsPerCase {
-			return nil, nil, fmt.Errorf("AI explanation generation execution case budget is exceeded")
+		if len(bySlot[key]) > policy.Generation.MaxExecutionsPerSlot {
+			return nil, nil, fmt.Errorf("AI explanation generation execution slot budget is exceeded")
 		}
 	}
 	for key := range bySlot {
@@ -1094,6 +1120,9 @@ func validateSemanticExecutions(values []SemanticEvaluationExecution, policy Eva
 	for _, value := range values {
 		if err := value.Validate(); err != nil {
 			return nil, nil, err
+		}
+		if value.Status == ExecutionStatusPrepared || value.Status == ExecutionStatusDispatching {
+			return nil, nil, fmt.Errorf("AI explanation semantic execution inventory must contain terminal evidence only")
 		}
 		if _, exists := byID[value.ID]; exists {
 			return nil, nil, fmt.Errorf("AI explanation semantic execution id is duplicated")
@@ -1309,6 +1338,7 @@ func cloneCandidate(value *Candidate) *Candidate {
 
 func (e PromptEvaluationEvidenceV2) Clone() PromptEvaluationEvidenceV2 {
 	cloned := e
+	cloned.execution = cloneEvidenceExecutionCheckpoint(e.execution)
 	cloned.ExecutionPolicy = e.ExecutionPolicy.Clone()
 	cloned.GatePolicy = e.GatePolicy.Clone()
 	cloned.PreflightEvidence = append([]PreflightCaseEvidence(nil), e.PreflightEvidence...)
