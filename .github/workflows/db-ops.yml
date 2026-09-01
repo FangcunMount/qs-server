@@ -1064,7 +1064,7 @@ jobs:
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
           command_timeout: 15m
-          envs: MONGO_HOST,MONGO_PORT,MONGO_USERNAME,MONGO_PASSWORD,MONGO_DB,MONGO_AUTH_DB
+          envs: MONGO_HOST,MONGO_PORT,MONGO_USERNAME,MONGO_PASSWORD,MONGO_DB,MONGO_AUTH_DB,REVIEW_RUN_ID
           script: |
             set -Eeuo pipefail
             export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
@@ -1105,7 +1105,8 @@ jobs:
               -e MONGO_AUTH_DB="$MONGO_AUTH_DB" \
               --entrypoint /audit \
               mongo:7.0 \
-              --json --max-runs=0 --timeout=10m
+              --json --max-runs=0 --timeout=10m \
+              --review-run-id "$REVIEW_RUN_ID"
         env:
           MONGO_HOST: ${{ secrets.MONGODB_HOST }}
           MONGO_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
@@ -1113,6 +1114,7 @@ jobs:
           MONGO_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
           MONGO_DB: ${{ secrets.MONGODB_DBNAME }}
           MONGO_AUTH_DB: admin
+          REVIEW_RUN_ID: ${{ github.event.inputs.governance_manifest }}
 
   mongodb-presentation-governance:
     name: MongoDB Interpretation Presentation Governance

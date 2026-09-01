@@ -15,7 +15,9 @@ import (
 	"strings"
 	"time"
 
+	domainevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/evaluation"
 	isoaiexplanation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation/aiexplanation"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -37,6 +39,7 @@ type config struct {
 	mongoAuthDB   string
 	mongoDB       string
 	maxRuns       int64
+	reviewRunID   string
 	jsonOut       bool
 	timeout       time.Duration
 }
@@ -104,6 +107,56 @@ type measurements struct {
 	largestRuns                  []runSize
 }
 
+type reviewAssertion struct {
+	Type      string `json:"type"`
+	Scope     string `json:"scope"`
+	Ordinal   int    `json:"ordinal"`
+	Hard      bool   `json:"hard"`
+	Evaluator string `json:"evaluator"`
+	Status    string `json:"status"`
+	Detail    string `json:"detail"`
+}
+
+type reviewSemanticDecision struct {
+	Type    string `json:"type"`
+	Scope   string `json:"scope"`
+	Ordinal int    `json:"ordinal"`
+	Status  string `json:"status"`
+	Detail  string `json:"detail"`
+}
+
+type reviewSemanticResult struct {
+	EvaluatorVersion        string                   `json:"evaluator_version"`
+	Faithfulness            int                      `json:"faithfulness"`
+	CrossDimensionQuality   int                      `json:"cross_dimension_quality"`
+	SuggestionActionability int                      `json:"suggestion_actionability"`
+	AudienceClarity         int                      `json:"audience_clarity"`
+	Concision               int                      `json:"concision"`
+	Rationale               string                   `json:"rationale"`
+	Decisions               []reviewSemanticDecision `json:"decisions"`
+}
+
+type reviewCandidate struct {
+	CaseID                   string               `json:"case_id"`
+	SlotOrdinal              int                  `json:"slot_ordinal"`
+	CandidateID              string               `json:"candidate_id"`
+	GenerationExecutionID    string               `json:"generation_execution_id"`
+	SemanticExecutionID      string               `json:"semantic_execution_id"`
+	NormalizedOutput         json.RawMessage      `json:"normalized_output"`
+	Assertions               []reviewAssertion    `json:"assertions"`
+	SemanticNormalizedOutput json.RawMessage      `json:"semantic_normalized_output"`
+	Semantic                 reviewSemanticResult `json:"semantic"`
+}
+
+type reviewExport struct {
+	ObservedAt   time.Time         `json:"observed_at"`
+	RunID        string            `json:"run_id"`
+	Status       string            `json:"status"`
+	Version      int64             `json:"version"`
+	HumanReviews int               `json:"human_reviews"`
+	Candidates   []reviewCandidate `json:"candidates"`
+}
+
 func main() {
 	cfg := parseFlags()
 	clientOptions, err := mongoClientOptions(cfg)
@@ -123,6 +176,18 @@ func main() {
 
 	collectionName := (&isoaiexplanation.PromptEvaluationRunPO{}).CollectionName()
 	coll := client.Database(cfg.mongoDB).Collection(collectionName)
+	if strings.TrimSpace(cfg.reviewRunID) != "" {
+		result, err := loadReviewExport(ctx, coll, cfg.reviewRunID)
+		if err != nil {
+			fail("export Prompt evaluation review evidence", err)
+		}
+		encoder := json.NewEncoder(os.Stdout)
+		encoder.SetIndent("", "  ")
+		if err := encoder.Encode(result); err != nil {
+			fail("encode review evidence", err)
+		}
+		return
+	}
 	matched, values, err := loadMeasurements(ctx, coll, cfg.maxRuns)
 	if err != nil {
 		fail("scan Prompt evaluation Runs", err)
@@ -149,6 +214,7 @@ func parseFlags() config {
 	flag.StringVar(&cfg.mongoAuthDB, "mongo-auth-db", envOr("MONGO_AUTH_DB", "admin"), "MongoDB authentication database when MONGO_URI is not used")
 	flag.StringVar(&cfg.mongoDB, "mongo-db", envOr("MONGO_DB", "qs"), "MongoDB database")
 	flag.Int64Var(&cfg.maxRuns, "max-runs", 1000, "maximum newest Runs to scan; 0 scans all")
+	flag.StringVar(&cfg.reviewRunID, "review-run-id", "", "export review evidence for one v2 Run ID instead of size measurements")
 	flag.BoolVar(&cfg.jsonOut, "json", false, "emit machine-readable JSON")
 	flag.DurationVar(&cfg.timeout, "timeout", 5*time.Minute, "operation timeout")
 	flag.Parse()
@@ -157,6 +223,79 @@ func parseFlags() config {
 		os.Exit(1)
 	}
 	return cfg
+}
+
+func loadReviewExport(ctx context.Context, coll *mongo.Collection, rawRunID string) (reviewExport, error) {
+	runID, err := meta.ParseID(strings.TrimSpace(rawRunID))
+	if err != nil {
+		return reviewExport{}, fmt.Errorf("review Run ID is invalid: %w", err)
+	}
+	var document isoaiexplanation.PromptEvaluationEvidenceV2PO
+	if err := coll.FindOne(ctx, bson.M{"domain_id": runID, "evidence_version": isoaiexplanation.PromptEvaluationEvidenceVersionV2}).Decode(&document); err != nil {
+		return reviewExport{}, err
+	}
+	generationByID := make(map[string]domainevaluation.CandidateGenerationExecution, len(document.GenerationExecutions))
+	for _, execution := range document.GenerationExecutions {
+		generationByID[execution.ID] = execution
+	}
+	semanticByID := make(map[string]domainevaluation.SemanticEvaluationExecution, len(document.SemanticExecutions))
+	for _, execution := range document.SemanticExecutions {
+		semanticByID[execution.ID] = execution
+	}
+	result := reviewExport{
+		ObservedAt: time.Now().UTC(), RunID: document.DomainID.String(), Status: document.Status,
+		Version: document.Version, HumanReviews: len(document.HumanReviews), Candidates: make([]reviewCandidate, 0, len(document.Slots)),
+	}
+	for _, slot := range document.Slots {
+		if slot.Candidate == nil || !slot.Candidate.ReviewReady {
+			continue
+		}
+		generation, ok := generationByID[slot.Candidate.GenerationExecutionID]
+		if !ok || !json.Valid(generation.NormalizedOutput) {
+			return reviewExport{}, fmt.Errorf("candidate %s generation evidence is missing or invalid", slot.Candidate.ID)
+		}
+		semantic, ok := semanticByID[slot.Candidate.AcceptedSemanticExecutionID]
+		if !ok || semantic.Result == nil || !json.Valid(semantic.NormalizedOutput) {
+			return reviewExport{}, fmt.Errorf("candidate %s semantic evidence is missing or invalid", slot.Candidate.ID)
+		}
+		candidate := reviewCandidate{
+			CaseID: slot.CaseID, SlotOrdinal: slot.Ordinal, CandidateID: slot.Candidate.ID,
+			GenerationExecutionID: generation.ID, SemanticExecutionID: semantic.ID,
+			NormalizedOutput:         append(json.RawMessage(nil), generation.NormalizedOutput...),
+			SemanticNormalizedOutput: append(json.RawMessage(nil), semantic.NormalizedOutput...),
+			Assertions:               make([]reviewAssertion, 0, len(slot.Candidate.Assertions)),
+			Semantic: reviewSemanticResult{
+				EvaluatorVersion:        semantic.Result.EvaluatorVersion,
+				Faithfulness:            semantic.Result.Scores.Faithfulness,
+				CrossDimensionQuality:   semantic.Result.Scores.CrossDimensionQuality,
+				SuggestionActionability: semantic.Result.Scores.SuggestionActionability,
+				AudienceClarity:         semantic.Result.Scores.AudienceClarity,
+				Concision:               semantic.Result.Scores.Concision,
+				Rationale:               semantic.Result.Rationale,
+				Decisions:               make([]reviewSemanticDecision, 0, len(semantic.Result.Decisions)),
+			},
+		}
+		for _, assertion := range slot.Candidate.Assertions {
+			candidate.Assertions = append(candidate.Assertions, reviewAssertion{
+				Type: assertion.Type, Scope: string(assertion.Scope), Ordinal: assertion.Ordinal, Hard: assertion.Hard,
+				Evaluator: assertion.Evaluator, Status: string(assertion.Status), Detail: assertion.Detail,
+			})
+		}
+		for _, decision := range semantic.Result.Decisions {
+			candidate.Semantic.Decisions = append(candidate.Semantic.Decisions, reviewSemanticDecision{
+				Type: decision.Type, Scope: string(decision.Scope), Ordinal: decision.Ordinal,
+				Status: string(decision.Status), Detail: decision.Detail,
+			})
+		}
+		result.Candidates = append(result.Candidates, candidate)
+	}
+	sort.Slice(result.Candidates, func(i, j int) bool {
+		if result.Candidates[i].CaseID == result.Candidates[j].CaseID {
+			return result.Candidates[i].SlotOrdinal < result.Candidates[j].SlotOrdinal
+		}
+		return result.Candidates[i].CaseID < result.Candidates[j].CaseID
+	})
+	return result, nil
 }
 
 func mongoClientOptions(cfg config) (*options.ClientOptions, error) {
