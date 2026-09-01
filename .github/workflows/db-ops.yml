@@ -1015,12 +1015,14 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Setup Go
+        if: github.event.inputs.governance_manifest == ''
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
 
       - name: Build static Linux audit binary
+        if: github.event.inputs.governance_manifest == ''
         env:
           AUDIT_BINARY: ai-evaluation-size-audit-${{ github.run_id }}
         run: |
@@ -1045,6 +1047,7 @@ jobs:
           : "${SVRA_SSH_FINGERPRINT:?SVRA_SSH_FINGERPRINT is empty}"
 
       - name: Upload immutable audit binary to serverA
+        if: github.event.inputs.governance_manifest == ''
         uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ vars.SVRA_HOST }}
@@ -1056,6 +1059,7 @@ jobs:
           target: /tmp
 
       - name: Measure Prompt evaluation BSON and output distributions
+        if: github.event.inputs.governance_manifest == ''
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ vars.SVRA_HOST }}
@@ -1107,6 +1111,81 @@ jobs:
               mongo:7.0 \
               --json --max-runs=0 --timeout=10m \
               --review-run-id "$REVIEW_RUN_ID"
+        env:
+          MONGO_HOST: ${{ secrets.MONGODB_HOST }}
+          MONGO_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
+          MONGO_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGO_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGO_DB: ${{ secrets.MONGODB_DBNAME }}
+          MONGO_AUTH_DB: admin
+          REVIEW_RUN_ID: ${{ github.event.inputs.governance_manifest }}
+
+      - name: Upload immutable review-evidence query to serverA
+        if: github.event.inputs.governance_manifest != ''
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          source: scripts/oneoff/export_ai_explanation_prompt_evaluation_review.js
+          target: /tmp
+          strip_components: 2
+
+      - name: Export one Prompt evaluation Run for human review
+        if: github.event.inputs.governance_manifest != ''
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
+          fingerprint: ${{ vars.SVRA_SSH_FINGERPRINT }}
+          command_timeout: 5m
+          envs: MONGO_HOST,MONGO_PORT,MONGO_USERNAME,MONGO_PASSWORD,MONGO_DB,MONGO_AUTH_DB,REVIEW_RUN_ID
+          script: |
+            set -Eeuo pipefail
+            export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+
+            : "${MONGO_HOST:?MONGO_HOST is empty}"
+            : "${MONGO_PORT:?MONGO_PORT is empty}"
+            : "${MONGO_USERNAME:?MONGO_USERNAME is empty}"
+            : "${MONGO_PASSWORD:?MONGO_PASSWORD is empty}"
+            : "${MONGO_DB:?MONGO_DB is empty}"
+            : "${MONGO_AUTH_DB:?MONGO_AUTH_DB is empty}"
+            : "${REVIEW_RUN_ID:?REVIEW_RUN_ID is empty}"
+
+            AUDIT_SCRIPT="/tmp/export_ai_explanation_prompt_evaluation_review.js"
+            AUDIT_CONTAINER="qs-ai-evaluation-review-export-${{ github.run_id }}"
+            cleanup_ai_evaluation_review_export() {
+              sudo docker rm -f "$AUDIT_CONTAINER" >/dev/null 2>&1 || true
+              rm -f -- "$AUDIT_SCRIPT"
+            }
+            trap cleanup_ai_evaluation_review_export EXIT
+
+            test -f "$AUDIT_SCRIPT"
+            sudo docker network inspect infra-network >/dev/null
+            sudo docker run --rm \
+              --name "$AUDIT_CONTAINER" \
+              --label com.fangcunmount.qs-server.operation=ai-evaluation-review-export \
+              --network infra-network \
+              --read-only \
+              --tmpfs /tmp:rw,noexec,nosuid,size=16m \
+              --cap-drop ALL \
+              --security-opt no-new-privileges:true \
+              --user 65534:65534 \
+              -v "$AUDIT_SCRIPT:/audit.js:ro" \
+              -e MONGO_DB="$MONGO_DB" \
+              -e REVIEW_RUN_ID="$REVIEW_RUN_ID" \
+              mongo:7 mongosh \
+                --quiet \
+                --host "$MONGO_HOST" \
+                --port "$MONGO_PORT" \
+                --username "$MONGO_USERNAME" \
+                --password "$MONGO_PASSWORD" \
+                --authenticationDatabase "$MONGO_AUTH_DB" \
+                --file /audit.js
         env:
           MONGO_HOST: ${{ secrets.MONGODB_HOST }}
           MONGO_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
