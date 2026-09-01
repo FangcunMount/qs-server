@@ -14,12 +14,17 @@ type userProfileReaderStub struct {
 	enabled bool
 	resp    *identityv2.ListProfilesResponse
 	err     error
+	allowed bool
 }
 
 func (s userProfileReaderStub) IsEnabled() bool { return s.enabled }
 
 func (s userProfileReaderStub) GetUserProfiles(context.Context, string) (*identityv2.ListProfilesResponse, error) {
 	return s.resp, s.err
+}
+
+func (s userProfileReaderStub) HasActiveProfileLink(context.Context, string, string) (bool, error) {
+	return s.allowed, s.err
 }
 
 func TestLoadUserProfileIDsFailsClosedOnIAMError(t *testing.T) {

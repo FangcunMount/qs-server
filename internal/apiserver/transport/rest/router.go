@@ -34,6 +34,7 @@ import (
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
+	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	sharedgovernance "github.com/FangcunMount/qs-server/internal/pkg/cache/governance"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
@@ -219,6 +220,12 @@ func registerRouteSpecs(group *gin.RouterGroup, routes []routeSpec) {
 			group.DELETE(route.path, route.handlers...)
 		}
 	}
+}
+
+func withPermission(resource, action string, handlers ...gin.HandlerFunc) []gin.HandlerFunc {
+	guarded := make([]gin.HandlerFunc, 0, len(handlers)+1)
+	guarded = append(guarded, restmiddleware.RequirePermissionMiddleware(resource, action))
+	return append(guarded, handlers...)
 }
 
 func (r *Router) rateLimitedHandlers(

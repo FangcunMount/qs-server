@@ -51,7 +51,6 @@ func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
 			reports.GET("", r.rateLimitedHandlers(rateLimitBudgetQuery, journeyHandler.ListReports)...)
 		}
 
-		evaluationAdmin := evaluations.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityEvaluateAssessments))
-		evaluationAdmin.POST("/batch-evaluate", r.rateLimitedHandlers(rateLimitBudgetSubmit, evalHandler.BatchEvaluate)...)
+		evaluations.POST("/batch-evaluate", withPermission(authzapp.AssessmentResource, "batch_evaluate", r.rateLimitedHandlers(rateLimitBudgetSubmit, evalHandler.BatchEvaluate)...)...)
 	}
 }

@@ -174,5 +174,5 @@ func (r *Router) iamVerificationMode() string {
 	if opts.ForceRemote {
 		return "authoritative remote verification"
 	}
-	return "local JWKS verification"
+	return "local-first JWKS verification with IAM infrastructure fallback"
 }

@@ -3,8 +3,8 @@ package rest
 import (
 	"net/http"
 
+	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	handler "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
-	middleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,11 +13,10 @@ func (r *Router) registerNormTableProtectedRoutes(apiV1 *gin.RouterGroup) {
 		return
 	}
 	normHandler := handler.NewNormTableHandler(r.deps.AssessmentModel.NormTables)
-	read := apiV1.Group("/norm-tables", middleware.RequireCapabilityMiddleware(middleware.CapabilityReadNormTables))
-	manage := apiV1.Group("/norm-tables", middleware.RequireCapabilityMiddleware(middleware.CapabilityManageNormTables))
-	registerRouteSpecs(read, []routeSpec{
-		{method: http.MethodGet, path: "", handlers: []gin.HandlerFunc{normHandler.List}},
-		{method: http.MethodGet, path: "/:version", handlers: []gin.HandlerFunc{normHandler.Get}},
+	normTables := apiV1.Group("/norm-tables")
+	registerRouteSpecs(normTables, []routeSpec{
+		{method: http.MethodGet, path: "", handlers: withPermission(authzapp.NormTableResource, "list", normHandler.List)},
+		{method: http.MethodGet, path: "/:version", handlers: withPermission(authzapp.NormTableResource, "read", normHandler.Get)},
+		{method: http.MethodPost, path: "", handlers: withPermission(authzapp.NormTableResource, "import", normHandler.Import)},
 	})
-	registerRouteSpecs(manage, []routeSpec{{method: http.MethodPost, path: "", handlers: []gin.HandlerFunc{normHandler.Import}}})
 }

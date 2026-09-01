@@ -2,7 +2,7 @@ package process
 
 import (
 	"context"
-	"github.com/FangcunMount/component-base/pkg/messaging"
+
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
 	bootstrap "github.com/FangcunMount/qs-server/internal/collection-server/bootstrap"
@@ -50,13 +50,8 @@ type grpcClientsOutput struct {
 	grpcManager *grpcclientinfra.Manager
 }
 
-type iamSyncOutput struct {
-	authzVersionSubscriber messaging.Subscriber
-}
-
 type integrationOutput struct {
 	grpcClients grpcClientsOutput
-	iamSync     iamSyncOutput
 }
 
 type transportOutput struct {

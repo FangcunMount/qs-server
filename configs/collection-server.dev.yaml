@@ -218,7 +218,8 @@ iam:
     audience: ["collection-api"]
     algorithms: ["RS256", "ES256"]
     clock-skew: 30s
-    required-claims: ["sub", "exp"]
+    required-claims: ["sub", "exp", "user_id", "tenant_id"]
+    force-remote-verification: false # 开发环境允许本地 JWKS 验签
   
   # JWKS 配置
   jwks:

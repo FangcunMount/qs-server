@@ -68,3 +68,25 @@ func TestCollectionHandlerSwaggerDoesNotHardcodePersonalityAlgorithmNames(t *tes
 		t.Fatal(err)
 	}
 }
+
+func TestParticipantRoutesKeepProfileLinkGuards(t *testing.T) {
+	t.Parallel()
+
+	data, err := os.ReadFile("router.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(data)
+	if got := strings.Count(source, "assessments.Use(reportIdentity)"); got != 3 {
+		t.Fatalf("participant assessment ProfileLink group guards = %d, want 3", got)
+	}
+	for _, guardedRoute := range []string{
+		`testees.GET("/:id", append([]gin.HandlerFunc{testeeAccess}`,
+		`testees.GET("/:id/care-context", append([]gin.HandlerFunc{testeeAccess}`,
+		`testees.PUT("/:id", append([]gin.HandlerFunc{testeeAccess}`,
+	} {
+		if !strings.Contains(source, guardedRoute) {
+			t.Fatalf("participant route is missing ProfileLink guard: %s", guardedRoute)
+		}
+	}
+}

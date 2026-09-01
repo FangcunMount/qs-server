@@ -33,6 +33,42 @@ func TestRESTTransportDoesNotDependOnLegacyRESTImplementation(t *testing.T) {
 	}
 }
 
+func TestConcreteAuthzRoutesDoNotUseCompositeCapabilities(t *testing.T) {
+	t.Parallel()
+
+	forbidden := []string{
+		"CapabilityManageQuestionnaires",
+		"CapabilityReadQuestionnaires",
+		"CapabilityManageAssessmentModels",
+		"CapabilityEditAssessmentModelDefinitions",
+		"CapabilityPublishAssessmentModels",
+		"CapabilityReadAssessmentModels",
+		"CapabilityManageEvaluationPlans",
+		"CapabilityReadAnswersheets",
+		"CapabilityEvaluateAssessments",
+		"CapabilityReadNormTables",
+		"CapabilityManageNormTables",
+	}
+	for _, path := range []string{
+		"routes_survey.go",
+		"routes_assessment_model.go",
+		"routes_plan.go",
+		"routes_norm_table.go",
+		"routes_evaluation.go",
+		"routes_statistics.go",
+	} {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, capability := range forbidden {
+			if strings.Contains(string(data), capability) {
+				t.Fatalf("%s uses composite %s; concrete routes must require an exact IAM resource/action", path, capability)
+			}
+		}
+	}
+}
+
 func TestEvaluationRESTTransportDoesNotExposeV2OutcomeAliases(t *testing.T) {
 	t.Parallel()
 

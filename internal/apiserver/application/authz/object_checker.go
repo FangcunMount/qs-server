@@ -6,7 +6,6 @@ import (
 )
 
 const (
-	AssessmentResource        = "qs:evaluation:collection:assessments"
 	ObjectOriginTypeAttribute = "object.origin_type"
 )
 

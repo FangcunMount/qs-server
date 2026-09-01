@@ -1,6 +1,7 @@
 package rest
 
 import (
+	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
@@ -29,8 +30,10 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV2 *gin.RouterGroup) {
 	me.GET("/overview", r.rateLimitedHandlers(rateLimitBudgetQuery, h.CurrentClinicianOverview)...)
 	me.GET("/entries", r.rateLimitedHandlers(rateLimitBudgetQuery, h.CurrentClinicianEntries)...)
 	me.GET("/testees-summary", r.rateLimitedHandlers(rateLimitBudgetQuery, h.CurrentClinicianTestees)...)
-	content := statistics.Group("", restmiddleware.RequireAnyCapabilityMiddleware(restmiddleware.CapabilityManageQuestionnaires, restmiddleware.CapabilityManageAssessmentModels))
-	content.POST("/contents/batch", r.rateLimitedHandlers(rateLimitBudgetSubmit, h.Contents)...)
+	statistics.POST("/contents/batch", append([]gin.HandlerFunc{restmiddleware.RequireAnyPermissionMiddleware(
+		restmiddleware.PermissionRequirement{Resource: authzapp.QuestionnaireResource, Action: "statistics"},
+		restmiddleware.PermissionRequirement{Resource: authzapp.AssessmentModelResource, Action: "read"},
+	)}, r.rateLimitedHandlers(rateLimitBudgetSubmit, h.Contents)...)...)
 }
 
 func (r *Router) registerStatisticsInternalRoutes(internalV2 *gin.RouterGroup) {

@@ -29,7 +29,7 @@ func TestTesteeAccessMiddlewareRejectsUnlinkedUser(t *testing.T) {
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	if rec.Body.String() != "{\"error\":\"assessment access denied\"}" {
+	if rec.Body.String() != "{\"error\":\"testee access denied\"}" {
 		t.Fatalf("body=%s", rec.Body.String())
 	}
 }

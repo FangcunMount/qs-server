@@ -328,8 +328,8 @@ func (h *StatisticsHandler) Contents(c *gin.Context) {
 	allowed := map[string]bool{"questionnaire": true, "scale": true, "typology": true, "behavioral_rating": true, "cognitive": true}
 	seen := map[string]bool{}
 	snapshot, _ := authzapp.FromContext(c.Request.Context())
-	canQuestionnaire := authzapp.DecideCapability(snapshot, authzapp.CapabilityManageQuestionnaires).Allowed
-	canModel := authzapp.DecideCapability(snapshot, authzapp.CapabilityManageAssessmentModels).Allowed
+	canQuestionnaire := snapshot != nil && snapshot.HasResourceAction(authzapp.QuestionnaireResource, "statistics")
+	canModel := snapshot != nil && snapshot.HasResourceAction(authzapp.AssessmentModelResource, "read")
 	for index := range request.Items {
 		request.Items[index].Kind = strings.TrimSpace(request.Items[index].Kind)
 		request.Items[index].Code = strings.TrimSpace(request.Items[index].Code)

@@ -286,8 +286,8 @@ func TestCollectionRESTProtectsAllAIExplanationParticipantRoutes(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		request := httptest.NewRequest(testCase.method, testCase.path, nil)
 		engine.ServeHTTP(recorder, request)
-		if recorder.Code != http.StatusUnauthorized {
-			t.Fatalf("%s %s status = %d, want 401; body=%s", testCase.method, testCase.path, recorder.Code, recorder.Body.String())
+		if recorder.Code != http.StatusServiceUnavailable {
+			t.Fatalf("%s %s status = %d, want 503; body=%s", testCase.method, testCase.path, recorder.Code, recorder.Body.String())
 		}
 	}
 }

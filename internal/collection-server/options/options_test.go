@@ -49,6 +49,29 @@ func TestResilienceControlDefaultsEnabled(t *testing.T) {
 	}
 }
 
+func TestCollectionIAMDoesNotEnableUnusedAuthzSync(t *testing.T) {
+	opts := NewOptions()
+	if opts.IAMOptions == nil || opts.IAMOptions.AuthzSync == nil {
+		t.Fatal("IAM authz sync options are missing")
+	}
+	if opts.IAMOptions.AuthzSync.Enabled {
+		t.Fatal("collection-server must not subscribe to unused IAM AuthZ snapshots")
+	}
+}
+
+func TestValidateIncludesEnabledIAMConfiguration(t *testing.T) {
+	opts := NewOptions()
+	opts.IAMOptions.Enabled = true
+	opts.IAMOptions.JWT.Issuer = ""
+
+	for _, err := range opts.Validate() {
+		if strings.Contains(err.Error(), "issuer") {
+			return
+		}
+	}
+	t.Fatalf("expected IAM issuer validation error, got %v", opts.Validate())
+}
+
 func TestValidateRejectsIAMTransportHardCapWhileDisabled(t *testing.T) {
 	opts := NewOptions()
 	opts.IAMOptions.AuthzSync.Delivery.Enable = false

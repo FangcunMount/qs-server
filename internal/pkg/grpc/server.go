@@ -167,7 +167,7 @@ func buildUnaryInterceptors(
 		if config.Auth.ForceRemoteVerification {
 			log.Info("gRPC server: IAM authentication interceptor enabled (authoritative remote verification)")
 		} else {
-			log.Info("gRPC server: IAM authentication interceptor enabled (local JWKS verification)")
+			log.Info("gRPC server: IAM authentication interceptor enabled (local-first JWKS verification)")
 		}
 	}
 

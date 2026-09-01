@@ -1,8 +1,8 @@
 package rest
 
 import (
+	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
-	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -26,28 +26,26 @@ func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
 
 	plans := apiV1.Group("/plans")
 	{
-		planWrites := plans.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityManageEvaluationPlans))
-		planWrites.POST("", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.CreatePlan)...)
-		planWrites.POST("/:id/pause", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.PausePlan)...)
-		planWrites.POST("/:id/resume", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.ResumePlan)...)
-		planWrites.POST("/:id/finish", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.FinishPlan)...)
-		planWrites.POST("/:id/cancel", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.CancelPlan)...)
+		plans.POST("", withPermission(authzapp.EvaluationPlanResource, "create", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.CreatePlan)...)...)
+		plans.POST("/:id/pause", withPermission(authzapp.EvaluationPlanResource, "pause", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.PausePlan)...)...)
+		plans.POST("/:id/resume", withPermission(authzapp.EvaluationPlanResource, "resume", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.ResumePlan)...)...)
+		plans.POST("/:id/finish", withPermission(authzapp.EvaluationPlanResource, "update", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.FinishPlan)...)...)
+		plans.POST("/:id/cancel", withPermission(authzapp.EvaluationPlanResource, "cancel", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.CancelPlan)...)...)
 
-		plans.GET("", r.rateLimitedHandlers(rateLimitBudgetQuery, planHandler.ListPlans)...)
-		plans.GET("/:id/tasks", r.rateLimitedHandlers(rateLimitBudgetQuery, planHandler.ListTasksByPlan)...)
-		plans.GET("/:id", r.rateLimitedHandlers(rateLimitBudgetQuery, planHandler.GetPlan)...)
+		plans.GET("", withPermission(authzapp.EvaluationPlanResource, "list", r.rateLimitedHandlers(rateLimitBudgetQuery, planHandler.ListPlans)...)...)
+		plans.GET("/:id/tasks", withPermission(authzapp.EvaluationPlanTaskResource, "list", r.rateLimitedHandlers(rateLimitBudgetQuery, planHandler.ListTasksByPlan)...)...)
+		plans.GET("/:id", withPermission(authzapp.EvaluationPlanResource, "read", r.rateLimitedHandlers(rateLimitBudgetQuery, planHandler.GetPlan)...)...)
 
-		planWrites.POST("/enroll", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.EnrollTestee)...)
-		planWrites.POST("/:id/testees/:testee_id/terminate", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.TerminateEnrollment)...)
+		plans.POST("/enroll", withPermission(authzapp.EvaluationPlanResource, "enroll", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.EnrollTestee)...)...)
+		plans.POST("/:id/testees/:testee_id/terminate", withPermission(authzapp.EvaluationPlanResource, "terminate", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.TerminateEnrollment)...)...)
 	}
 
 	tasks := apiV1.Group("/plans/tasks")
 	{
-		taskWrites := tasks.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityManageEvaluationPlans))
-		tasks.GET("", r.rateLimitedHandlers(rateLimitBudgetQuery, planHandler.ListTasks)...)
-		tasks.GET("/:id", r.rateLimitedHandlers(rateLimitBudgetQuery, planHandler.GetTask)...)
-		taskWrites.POST("/:id/open", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.OpenTask)...)
-		taskWrites.POST("/:id/cancel", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.CancelTask)...)
+		tasks.GET("", withPermission(authzapp.EvaluationPlanTaskResource, "list", r.rateLimitedHandlers(rateLimitBudgetQuery, planHandler.ListTasks)...)...)
+		tasks.GET("/:id", withPermission(authzapp.EvaluationPlanTaskResource, "read", r.rateLimitedHandlers(rateLimitBudgetQuery, planHandler.GetTask)...)...)
+		tasks.POST("/:id/open", withPermission(authzapp.EvaluationPlanTaskResource, "open", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.OpenTask)...)...)
+		tasks.POST("/:id/cancel", withPermission(authzapp.EvaluationPlanTaskResource, "cancel", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.CancelTask)...)...)
 	}
 
 	testees := apiV1.Group("/testees")
@@ -72,9 +70,9 @@ func (r *Router) registerPlanInternalRoutes(internalV1 *gin.RouterGroup) {
 		return
 	}
 
-	tasks := internalV1.Group("/plans/tasks", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityManageEvaluationPlans))
-	tasks.POST("/schedule", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.SchedulePendingTasks)...)
-	tasks.POST("/window", r.rateLimitedHandlers(rateLimitBudgetQuery, planHandler.ListTaskWindow)...)
-	tasks.POST("/:id/complete", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.CompleteTask)...)
-	tasks.POST("/:id/expire", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.ExpireTask)...)
+	tasks := internalV1.Group("/plans/tasks")
+	tasks.POST("/schedule", withPermission(authzapp.EvaluationPlanTaskResource, "schedule", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.SchedulePendingTasks)...)...)
+	tasks.POST("/window", withPermission(authzapp.EvaluationPlanTaskResource, "list", r.rateLimitedHandlers(rateLimitBudgetQuery, planHandler.ListTaskWindow)...)...)
+	tasks.POST("/:id/complete", withPermission(authzapp.EvaluationPlanTaskResource, "complete", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.CompleteTask)...)...)
+	tasks.POST("/:id/expire", withPermission(authzapp.EvaluationPlanTaskResource, "expire", r.rateLimitedHandlers(rateLimitBudgetSubmit, planHandler.ExpireTask)...)...)
 }

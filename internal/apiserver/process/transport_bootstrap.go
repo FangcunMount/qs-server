@@ -138,7 +138,7 @@ func buildGRPCServer(cfg *config.Config, deps container.ServerGRPCBootstrapDeps)
 			grpcpkg.NewOrgScopeUnaryInterceptor(orgscope.FixedResolver(orgscope.DefaultOrgID)))
 	}
 	if loader := deps.AuthzSnapshotLoader; loader != nil {
-		// 授权快照拦截器只负责权限视图，不替代前面的 JWT 权威在线校验。
+		// 授权快照拦截器只负责权限视图，不替代前面的 JWT 认证。
 		grpcConfig.ExtraUnaryAfterAuth = append(grpcConfig.ExtraUnaryAfterAuth,
 			grpctransport.NewAuthzSnapshotUnaryInterceptor(loader, deps.OperatorRoleProjectionUpdater))
 		log.Info("gRPC server: IAM authorization snapshot interceptor enabled (after JWT auth)")
@@ -146,7 +146,7 @@ func buildGRPCServer(cfg *config.Config, deps container.ServerGRPCBootstrapDeps)
 
 	// 获取 SDK TokenVerifier（使用 SDK 的本地 JWKS 验签能力）
 	if deps.TokenVerifier != nil {
-		log.Info("gRPC server: TokenVerifier injected for authentication (local JWKS verification)")
+		log.Info("gRPC server: TokenVerifier injected for authentication (local-first JWKS verification)")
 	} else if !grpcConfig.Auth.Enabled {
 		log.Info("gRPC server: JWT authentication disabled by configuration")
 	}

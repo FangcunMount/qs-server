@@ -625,7 +625,8 @@ iam:
     audience: ["qs-api"]                               # 允许的受众（QS API 标识）
     algorithms: ["RS256", "ES256"]                     # 支持的签名算法
     clock-skew: 60s                                    # 时钟偏移容忍度
-    required-claims: ["user_id", "tenant_id"]          # 必需的 Claims
+    required-claims: ["sub", "exp", "user_id", "tenant_id"] # 必需的身份与生命周期 Claims
+    force-remote-verification: false                    # 生产环境默认本地验证，避免远程验证性能损耗
 
   # JWKS 配置（JWT 公钥管理）
   jwks:

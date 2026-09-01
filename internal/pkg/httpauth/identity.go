@@ -1,7 +1,6 @@
 package httpauth
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -35,7 +34,7 @@ func UserIdentityMiddleware() gin.HandlerFunc {
 		if claims.UserID != "" {
 			userID, err := strconv.ParseUint(claims.UserID, 10, 64)
 			if err != nil {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": fmt.Sprintf("invalid user id format: %s", claims.UserID)})
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user id format"})
 				c.Abort()
 				return
 			}
@@ -51,9 +50,8 @@ func UserIdentityMiddleware() gin.HandlerFunc {
 func RequireTenantDomainMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		claims := pkgmiddleware.GetUserClaims(c)
-		logger.L(c.Request.Context()).Debugw("RequireTenantDomainMiddleware claims", "claims", claims)
 		if claims == nil || tenantDomainFromClaims(claims) == "" {
-			logger.L(c.Request.Context()).Errorw("RequireTenantDomainMiddleware missing tenant domain", "claims", claims)
+			logger.L(c.Request.Context()).Errorw("RequireTenantDomainMiddleware missing tenant domain", "claims_present", claims != nil)
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant domain claim is required"})
 			c.Abort()
 			return

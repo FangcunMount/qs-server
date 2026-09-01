@@ -10,7 +10,6 @@ import (
 type lifecycleDeps struct {
 	closeGRPCManager func() error
 	closeDatabase    func() error
-	stopAuthzSync    func() error
 	closeIAM         func() error
 	cleanupContainer func() error
 	closeHTTP        func()
@@ -31,12 +30,6 @@ func buildLifecycleDeps(resources resourceOutput, containerOutput containerOutpu
 	}
 	if resources.handles.dbManager != nil {
 		deps.closeDatabase = resources.handles.dbManager.Close
-	}
-	if integrationOutput.iamSync.authzVersionSubscriber != nil {
-		deps.stopAuthzSync = func() error {
-			integrationOutput.iamSync.authzVersionSubscriber.Stop()
-			return integrationOutput.iamSync.authzVersionSubscriber.Close()
-		}
 	}
 	if containerOutput.container != nil {
 		if containerOutput.container.IAMModule != nil {
@@ -61,7 +54,6 @@ func runCollectionLifecycle(deps lifecycleDeps) {
 	lifecycle := processruntime.Lifecycle{}
 	lifecycle.AddShutdownHook("close grpc clients", deps.closeGRPCManager)
 	lifecycle.AddShutdownHook("close database", deps.closeDatabase)
-	lifecycle.AddShutdownHook("stop authz sync", deps.stopAuthzSync)
 	lifecycle.AddShutdownHook("close iam", deps.closeIAM)
 	lifecycle.AddShutdownHook("cleanup container", deps.cleanupContainer)
 	lifecycle.Run(func(name string, err error) {

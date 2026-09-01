@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"fmt"
 	"net/http"
 	"slices"
 	"strings"
@@ -121,14 +120,14 @@ func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
 }
 
 func (r *Router) applyIAMAuth(api *gin.RouterGroup, skip func(*gin.Context) bool) {
-	if r.container.IAMModule == nil || !r.container.IAMModule.IsEnabled() {
-		fmt.Printf("⚠️  Warning: IAM authentication is disabled, routes are unprotected!\n")
+	if r == nil || r.container == nil || r.container.IAMModule == nil || !r.container.IAMModule.IsEnabled() {
+		api.Use(withAuthSkip(skip, unavailableAuthenticationMiddleware()))
 		return
 	}
 
 	tokenVerifier := r.container.IAMModule.SDKTokenVerifier()
 	if tokenVerifier == nil {
-		fmt.Printf("⚠️  Warning: TokenVerifier not available, JWT authentication disabled!\n")
+		api.Use(withAuthSkip(skip, unavailableAuthenticationMiddleware()))
 		return
 	}
 
@@ -136,13 +135,12 @@ func (r *Router) applyIAMAuth(api *gin.RouterGroup, skip func(*gin.Context) bool
 	// collection 的 org 由 testee/业务层决定，不在 HTTP 入口解析 OrgScope；仅校验 IAM 身份与授权域。
 	api.Use(withAuthSkip(skip, collectionmiddleware.UserIdentityMiddleware()))
 	api.Use(withAuthSkip(skip, httpauth.RequireTenantDomainMiddleware()))
-	if loader := r.container.IAMModule.AuthzSnapshotLoader(); loader != nil {
-		// 授权快照只负责权限视图，不替代 JWT 的权威在线校验。
-		api.Use(withAuthSkip(skip, httpauth.AuthzSnapshotMiddleware(loader)))
-	} else {
-		fmt.Printf("⚠️  Warning: IAM AuthzSnapshotLoader unavailable for collection-server (need gRPC)\n")
+}
+
+func unavailableAuthenticationMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": "authentication temporarily unavailable"})
 	}
-	fmt.Printf("🔐 JWT + IAM authz snapshot middleware enabled for /api/v1 (%s)\n", r.iamVerificationMode())
 }
 
 func (r *Router) iamVerifyOptions() *auth.VerifyOptions {
@@ -157,14 +155,6 @@ func (r *Router) iamVerifyOptions() *auth.VerifyOptions {
 		ForceRemote:     cfg.JWT.ForceRemoteVerification,
 		IncludeMetadata: true,
 	}
-}
-
-func (r *Router) iamVerificationMode() string {
-	opts := r.iamVerifyOptions()
-	if opts.ForceRemote {
-		return "authoritative remote verification"
-	}
-	return "local JWKS verification"
 }
 
 // withAuthSkip
@@ -371,6 +361,7 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 
 	assessments := api.Group("/assessments")
 	{
+		assessments.Use(reportIdentity)
 		assessments.GET("/:id/ai-explanation/capability", append([]gin.HandlerFunc{reportIdentity}, r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",
@@ -542,6 +533,7 @@ func (r *Router) registerTypologyAssessmentRoutes(api *gin.RouterGroup) {
 
 	assessments := api.Group("/typology-assessments")
 	{
+		assessments.Use(reportIdentity)
 		assessments.GET("", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",
@@ -606,6 +598,7 @@ func (r *Router) registerBehaviorAssessmentRoutes(api *gin.RouterGroup) {
 
 	assessments := api.Group("/behavior-assessments")
 	{
+		assessments.Use(reportIdentity)
 		assessments.GET("", r.rateLimitedQueryHandlers(r.container.RateLimitBackend(), "query", rateCfg, rateCfg.QueryGlobalQPS, rateCfg.QueryGlobalBurst, rateCfg.QueryUserQPS, rateCfg.QueryUserBurst, handler.List)...)
 		assessments.GET("/:id/report-status", append([]gin.HandlerFunc{reportIdentity}, r.rateLimitedReportStatusHandlers(r.container.RateLimitBackend(), "query", rateCfg, rateCfg.QueryGlobalQPS, rateCfg.QueryGlobalBurst, rateCfg.QueryUserQPS, rateCfg.QueryUserBurst, handler.GetReportStatus)...)...)
 		assessments.GET("/:id/wait-report", append([]gin.HandlerFunc{reportIdentity}, r.waitReportHandlers(rateLimitedHandlers(r.container.RateBudgetProvider(), r.container.RateLimitBackend(), "wait-report", rateCfg, rateCfg.WaitReportGlobalQPS, rateCfg.WaitReportGlobalBurst, rateCfg.WaitReportUserQPS, rateCfg.WaitReportUserBurst, handler.WaitReport)...)...)...)
@@ -633,6 +626,7 @@ func (r *Router) registerTypologyAssessmentSessionRoutes(api *gin.RouterGroup) {
 // registerTesteeRoutes 注册受试者相关路由
 func (r *Router) registerTesteeRoutes(api *gin.RouterGroup) {
 	testeeHandler := r.container.TesteeHandler()
+	testeeAccess := collectionmiddleware.TesteeAccessMiddleware(r.container.TesteeAccessAuthorizer(), "id")
 
 	testees := api.Group("/testees")
 	{
@@ -643,11 +637,11 @@ func (r *Router) registerTesteeRoutes(api *gin.RouterGroup) {
 		// 查询受试者列表
 		testees.GET("", r.queryHandlers(testeeHandler.List)...)
 		// 获取受试者详情
-		testees.GET("/:id", r.queryHandlers(testeeHandler.Get)...)
+		testees.GET("/:id", append([]gin.HandlerFunc{testeeAccess}, r.queryHandlers(testeeHandler.Get)...)...)
 		// 获取受试者照护上下文
-		testees.GET("/:id/care-context", r.queryHandlers(testeeHandler.GetCareContext)...)
+		testees.GET("/:id/care-context", append([]gin.HandlerFunc{testeeAccess}, r.queryHandlers(testeeHandler.GetCareContext)...)...)
 		// 更新受试者信息
-		testees.PUT("/:id", r.submitHandlers(testeeHandler.Update)...)
+		testees.PUT("/:id", append([]gin.HandlerFunc{testeeAccess}, r.submitHandlers(testeeHandler.Update)...)...)
 	}
 }
 

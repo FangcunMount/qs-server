@@ -9,19 +9,17 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	auth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
-	iamauth "github.com/FangcunMount/qs-server/internal/pkg/iamauth"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 )
 
 // IAMModule IAM 集成模块
 type IAMModule struct {
-	client              *iam.Client
-	tokenVerifier       *iam.TokenVerifier
-	serviceAuthHelper   *iam.ServiceAuthHelper
-	identityService     *iam.IdentityService
-	profileService      *iam.ProfileService
-	profileLinkSvc      *iam.ProfileLinkService
-	authzSnapshotLoader *iamauth.SnapshotLoader
+	client            *iam.Client
+	tokenVerifier     *iam.TokenVerifier
+	serviceAuthHelper *iam.ServiceAuthHelper
+	identityService   *iam.IdentityService
+	profileService    *iam.ProfileService
+	profileLinkSvc    *iam.ProfileLinkService
 }
 
 // NewIAMModule 创建 IAM 模块
@@ -40,13 +38,13 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 		return nil, fmt.Errorf("failed to create IAM client: %w", err)
 	}
 
-	// 创建 Token 验证器（使用 SDK 的 JWKS 本地验签 + 远程降级）
+	// 创建 Token 验证器。IAM 已启用时，缺少验证器必须阻止服务启动。
 	var tokenVerifier *iam.TokenVerifier
 	if client.IsEnabled() {
 		tokenVerifier, err = iam.NewTokenVerifier(ctx, client)
 		if err != nil {
-			log.Warnf("Failed to create token verifier: %v, will use remote verification only", err)
-			// 不返回错误，允许降级到远程验证
+			_ = client.Close()
+			return nil, fmt.Errorf("failed to create IAM token verifier: %w", err)
 		}
 	}
 
@@ -97,27 +95,15 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 		}
 	}
 
-	var authzSnapshotLoader *iamauth.SnapshotLoader
-	if client.IsEnabled() && opts.GRPCEnabled {
-		iamOpts := convertIAMOptions(opts)
-		authzSnapshotLoader = iamauth.NewSnapshotLoader(client, iamauth.SnapshotLoaderOptions{
-			AppName:              iamOpts.AuthzAppName,
-			CacheTTL:             iamOpts.AuthzCacheTTL,
-			DomainOverride:       iamOpts.AuthzDomainOverride,
-			ServiceTokenProvider: serviceAuthHelper,
-		})
-	}
-
 	log.Info("IAM module initialized successfully")
 
 	return &IAMModule{
-		client:              client,
-		tokenVerifier:       tokenVerifier,
-		serviceAuthHelper:   serviceAuthHelper,
-		identityService:     identityService,
-		profileService:      profileService,
-		profileLinkSvc:      profileLinkSvc,
-		authzSnapshotLoader: authzSnapshotLoader,
+		client:            client,
+		tokenVerifier:     tokenVerifier,
+		serviceAuthHelper: serviceAuthHelper,
+		identityService:   identityService,
+		profileService:    profileService,
+		profileLinkSvc:    profileLinkSvc,
 	}, nil
 }
 
@@ -163,11 +149,6 @@ func (m *IAMModule) ProfileLinkService() *iam.ProfileLinkService {
 	return m.profileLinkSvc
 }
 
-// AuthzSnapshotLoader 返回 IAM 授权快照加载器（与 apiserver 共用 pkg/iamauth）。
-func (m *IAMModule) AuthzSnapshotLoader() *iamauth.SnapshotLoader {
-	return m.authzSnapshotLoader
-}
-
 // IsEnabled 检查 IAM 模块是否启用
 func (m *IAMModule) IsEnabled() bool {
 	return m.client != nil && m.client.IsEnabled()
@@ -196,6 +177,30 @@ func (m *IAMModule) HealthCheck(ctx context.Context) error {
 		return nil
 	}
 	return m.client.HealthCheck(ctx)
+}
+
+// ValidateRequiredRuntime verifies the production AuthN and identity-link
+// dependencies before collection routes begin accepting protected traffic.
+func (m *IAMModule) ValidateRequiredRuntime(ctx context.Context) error {
+	if m == nil || !m.IsEnabled() {
+		return fmt.Errorf("IAM integration is required")
+	}
+	if m.SDKTokenVerifier() == nil {
+		return fmt.Errorf("IAM token verifier is required")
+	}
+	if m.serviceAuthHelper == nil {
+		return fmt.Errorf("IAM service authentication is required")
+	}
+	if m.profileLinkSvc == nil {
+		return fmt.Errorf("IAM ProfileLink service is required")
+	}
+	if m.profileService == nil {
+		return fmt.Errorf("IAM Profile service is required")
+	}
+	if err := m.HealthCheck(ctx); err != nil {
+		return fmt.Errorf("IAM health check failed: %w", err)
+	}
+	return nil
 }
 
 // convertIAMOptions 转换配置选项

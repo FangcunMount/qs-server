@@ -49,6 +49,10 @@ func TesteeAccessMiddleware(authorizer TesteeAccessAuthorizer, testeeParam strin
 			c.Abort()
 			return
 		}
+		if verifiedID, ok := c.Get(TesteeIDKey); ok && verifiedID == id {
+			c.Next()
+			return
+		}
 		if authorizer == nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "authorization temporarily unavailable"})
 			c.Abort()
@@ -56,7 +60,7 @@ func TesteeAccessMiddleware(authorizer TesteeAccessAuthorizer, testeeParam strin
 		}
 		if err := authorizer.Authorize(c.Request.Context(), claims.UserID, id); err != nil {
 			if errors.Is(err, testeeaccess.ErrAccessDenied) {
-				c.JSON(http.StatusForbidden, gin.H{"error": "assessment access denied"})
+				c.JSON(http.StatusForbidden, gin.H{"error": "testee access denied"})
 			} else {
 				c.JSON(http.StatusServiceUnavailable, gin.H{"error": "authorization temporarily unavailable"})
 			}

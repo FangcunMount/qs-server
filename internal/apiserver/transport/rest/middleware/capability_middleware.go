@@ -68,6 +68,53 @@ func RequireAnyCapabilityMiddleware(capabilities ...Capability) gin.HandlerFunc 
 	}
 }
 
+// RequirePermissionMiddleware requires one exact IAM resource/action grant.
+// It is the default route guard for concrete use cases; coarse capabilities
+// remain available only where the route itself represents a composite ability.
+func RequirePermissionMiddleware(resource, action string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		snapshot := GetAuthzSnapshot(c)
+		if snapshot == nil {
+			abortPermissionDenied(c, errors.WithCode(code.ErrPermissionDenied, "authorization snapshot required"))
+			return
+		}
+		if !snapshot.HasResourceAction(resource, action) {
+			abortPermissionDenied(c, errors.WithCode(
+				code.ErrPermissionDenied,
+				"permission %s/%s denied by IAM authorization",
+				resource,
+				action,
+			))
+			return
+		}
+		c.Next()
+	}
+}
+
+// PermissionRequirement identifies one exact IAM resource/action pair.
+type PermissionRequirement struct {
+	Resource string
+	Action   string
+}
+
+// RequireAnyPermissionMiddleware requires at least one exact IAM grant.
+func RequireAnyPermissionMiddleware(permissions ...PermissionRequirement) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		snapshot := GetAuthzSnapshot(c)
+		if snapshot == nil {
+			abortPermissionDenied(c, errors.WithCode(code.ErrPermissionDenied, "authorization snapshot required"))
+			return
+		}
+		for _, permission := range permissions {
+			if snapshot.HasResourceAction(permission.Resource, permission.Action) {
+				c.Next()
+				return
+			}
+		}
+		abortPermissionDenied(c, errors.WithCode(code.ErrPermissionDenied, "required IAM permission denied"))
+	}
+}
+
 // RequireObjectAuthorizationCandidate is a cheap route guard. Conditional
 // candidates must still pass the authoritative IAM Check after object loading.
 func RequireObjectAuthorizationCandidate(resource, action string) gin.HandlerFunc {

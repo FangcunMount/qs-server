@@ -69,20 +69,18 @@ func JWTAuthMiddlewareWithOptions(verifier *auth.TokenVerifier, opts *auth.Verif
 			return
 		}
 
-		// 使用 SDK TokenVerifier 验证（本地 JWKS 优先，远程降级）
+		// 使用调用方配置的验证模式；默认本地 JWKS 验签，显式 ForceRemote 时在线校验。
 		result, err := verifier.Verify(c.Request.Context(), token, verifyOpts)
-		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware result", "result", result)
-		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware err", "err", err)
 		if err != nil {
-			logger.L(c.Request.Context()).Errorw("JWTAuthMiddleware token verification failed", "error", fmt.Sprintf("token verification failed: %v", err))
+			logger.L(c.Request.Context()).Errorw("JWTAuthMiddleware token verification failed", "error", err, "force_remote", verifyOpts.ForceRemote)
 			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": fmt.Sprintf("token verification failed: %v", err),
+				"error": "token verification failed",
 			})
 			c.Abort()
 			return
 		}
 
-		if !result.Valid {
+		if result == nil || !result.Valid {
 			logger.L(c.Request.Context()).Errorw("JWTAuthMiddleware invalid token", "error", "invalid token")
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "invalid token",
@@ -93,7 +91,6 @@ func JWTAuthMiddlewareWithOptions(verifier *auth.TokenVerifier, opts *auth.Verif
 
 		// 将用户信息存入上下文
 		tokenClaims := result.Claims
-		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware tokenClaims", "tokenClaims", tokenClaims)
 		if tokenClaims == nil {
 			logger.L(c.Request.Context()).Errorw("JWTAuthMiddleware invalid token claims", "error", "invalid token claims")
 			c.JSON(http.StatusUnauthorized, gin.H{
@@ -104,7 +101,6 @@ func JWTAuthMiddlewareWithOptions(verifier *auth.TokenVerifier, opts *auth.Verif
 		}
 
 		claims := buildUserClaims(result)
-		logger.L(c.Request.Context()).Debugw("JWTAuthMiddleware claims", "claims", claims)
 		logJWTClaimMapping(c, tokenClaims, claims)
 
 		c.Set("user_claims", claims)
@@ -230,7 +226,7 @@ func logJWTClaimMapping(c *gin.Context, raw *auth.TokenClaims, mapped *UserClaim
 		return
 	}
 	if mapped.TenantDomain != "" && mapped.UserID != "" {
-		logger.L(c.Request.Context()).Debugw("jwt claims mapped with tenant_domain and user_id", "path", c.Request.URL.Path, "method", c.Request.Method, "mapped_tenant_domain", mapped.TenantDomain, "mapped_user_id", mapped.UserID)
+		logger.L(c.Request.Context()).Debugw("jwt claims mapped with tenant_domain and user_id", "path", c.Request.URL.Path, "method", c.Request.Method)
 		return
 	}
 	keys := sortedExtraKeys(raw)

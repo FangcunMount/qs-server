@@ -129,3 +129,39 @@ func TestRequireCapabilityMiddleware(t *testing.T) {
 		})
 	}
 }
+
+func TestRequirePermissionMiddlewareMatchesExactAction(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	snapshot := &authzapp.Snapshot{Permissions: []authzapp.Permission{{
+		Resource: authzapp.QuestionnaireResource,
+		Action:   "create",
+		Mode:     authzapp.AuthorizationModeUnconditional,
+	}}}
+
+	tests := []struct {
+		name       string
+		action     string
+		wantStatus int
+	}{
+		{name: "matching action passes", action: "create", wantStatus: http.StatusOK},
+		{name: "different action is denied", action: "delete", wantStatus: http.StatusForbidden},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(recorder)
+			c.Set(AuthzSnapshotKey, snapshot)
+
+			RequirePermissionMiddleware(authzapp.QuestionnaireResource, tt.action)(c)
+			if !c.IsAborted() {
+				c.Status(http.StatusOK)
+			}
+
+			if recorder.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d", recorder.Code, tt.wantStatus)
+			}
+		})
+	}
+}

@@ -296,10 +296,20 @@ func NewOptions() *Options {
 			SecretKey:     "your-secret-key-change-in-production",
 			TokenDuration: 24 * 7, // 7 天
 		},
-		IAMOptions: genericoptions.NewIAMOptions(),
+		IAMOptions: newCollectionIAMOptions(),
 		Runtime:    NewRuntimeOptions(),
 		Resilience: &ResilienceOptions{Control: &ResilienceControlOptions{Enabled: true}},
 	}
+}
+
+func newCollectionIAMOptions() *genericoptions.IAMOptions {
+	opts := genericoptions.NewIAMOptions()
+	// collection-server performs AuthN and ProfileLink checks; it does not
+	// consume the apiserver's AuthZ snapshot or its version notifications.
+	if opts.AuthzSync != nil {
+		opts.AuthzSync.Enabled = false
+	}
+	return opts
 }
 
 func defaultRedisRuntimeOptions() *genericoptions.RedisRuntimeOptions {
@@ -598,8 +608,13 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateWaitReportOptions(o.WaitReport)...)
 	errs = append(errs, validateReportEventsOptions(o.ReportEvents)...)
 	errs = append(errs, validateCollectionJWT(o.JWT)...)
-	if o.IAMOptions != nil && o.IAMOptions.AuthzSync != nil {
-		errs = append(errs, o.IAMOptions.AuthzSync.Delivery.Validate("iam.authz-sync.delivery")...)
+	if o.IAMOptions == nil {
+		errs = append(errs, fmt.Errorf("iam cannot be nil"))
+	} else {
+		errs = append(errs, o.IAMOptions.Validate()...)
+		if !o.IAMOptions.Enabled && o.IAMOptions.AuthzSync != nil && o.IAMOptions.AuthzSync.Delivery != nil {
+			errs = append(errs, o.IAMOptions.AuthzSync.Delivery.Validate("iam.authz-sync.delivery")...)
+		}
 	}
 	if o.Resilience == nil || o.Resilience.Control == nil {
 		errs = append(errs, fmt.Errorf("resilience.control cannot be nil"))

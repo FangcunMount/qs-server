@@ -3,8 +3,8 @@ package rest
 import (
 	"net/http"
 
+	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
-	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -23,10 +23,7 @@ func (r *Router) registerQuestionnaireProtectedRoutes(apiV1 *gin.RouterGroup) {
 
 	questionnaires := apiV1.Group("/questionnaires")
 	{
-		manage := questionnaires.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityManageQuestionnaires))
-		read := questionnaires.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityReadQuestionnaires))
-		registerRouteSpecs(manage, questionnaireManageRoutes(quesHandler))
-		registerRouteSpecs(read, questionnaireReadRoutes(quesHandler))
+		registerRouteSpecs(questionnaires, questionnaireRoutes(quesHandler))
 	}
 }
 
@@ -43,42 +40,34 @@ func (r *Router) registerAnswersheetProtectedRoutes(apiV1 *gin.RouterGroup) {
 
 	answersheets := apiV1.Group("/answersheets")
 	{
-		admin := answersheets.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
-		read := answersheets.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityReadAnswersheets))
-
-		admin.POST("/admin-submit", r.rateLimitedHandlers(rateLimitBudgetAdminSubmit, answersheetHandler.AdminSubmit)...)
-		read.GET("/:id", r.rateLimitedHandlers(rateLimitBudgetQuery, answersheetHandler.GetByID)...)
-		read.GET("", r.rateLimitedHandlers(rateLimitBudgetQuery, answersheetHandler.List)...)
+		answersheets.POST("/admin-submit", withPermission(authzapp.AnswerSheetResource, "admin_submit", r.rateLimitedHandlers(rateLimitBudgetAdminSubmit, answersheetHandler.AdminSubmit)...)...)
+		answersheets.GET("/:id", withPermission(authzapp.AnswerSheetResource, "read", r.rateLimitedHandlers(rateLimitBudgetQuery, answersheetHandler.GetByID)...)...)
+		answersheets.GET("", withPermission(authzapp.AnswerSheetResource, "list", r.rateLimitedHandlers(rateLimitBudgetQuery, answersheetHandler.List)...)...)
 	}
 }
 
-func questionnaireManageRoutes(handler *codesHandler.QuestionnaireHandler) []routeSpec {
+func questionnaireRoutes(handler *codesHandler.QuestionnaireHandler) []routeSpec {
 	return []routeSpec{
-		{method: http.MethodPost, path: "", handlers: []gin.HandlerFunc{handler.Create}},
-		{method: http.MethodPut, path: "/:code/basic-info", handlers: []gin.HandlerFunc{handler.UpdateBasicInfo}},
-		{method: http.MethodPost, path: "/:code/draft", handlers: []gin.HandlerFunc{handler.SaveDraft}},
+		{method: http.MethodPost, path: "", handlers: withPermission(authzapp.QuestionnaireResource, "create", handler.Create)},
+		{method: http.MethodPut, path: "/:code/basic-info", handlers: withPermission(authzapp.QuestionnaireResource, "update", handler.UpdateBasicInfo)},
+		{method: http.MethodPost, path: "/:code/draft", handlers: withPermission(authzapp.QuestionnaireResource, "update", handler.SaveDraft)},
 		// Standalone questionnaire management remains available until every
 		// legacy survey is migrated to an assessment release. Questionnaire-bound
 		// assessment editors no longer call these routes.
-		{method: http.MethodPost, path: "/:code/publish", handlers: []gin.HandlerFunc{handler.Publish}},
-		{method: http.MethodPost, path: "/:code/unpublish", handlers: []gin.HandlerFunc{handler.Unpublish}},
-		{method: http.MethodPost, path: "/:code/archive", handlers: []gin.HandlerFunc{handler.Archive}},
-		{method: http.MethodDelete, path: "/:code", handlers: []gin.HandlerFunc{handler.Delete}},
-		{method: http.MethodPost, path: "/:code/questions", handlers: []gin.HandlerFunc{handler.AddQuestion}},
-		{method: http.MethodPut, path: "/:code/questions/:qcode", handlers: []gin.HandlerFunc{handler.UpdateQuestion}},
-		{method: http.MethodDelete, path: "/:code/questions/:qcode", handlers: []gin.HandlerFunc{handler.RemoveQuestion}},
-		{method: http.MethodPost, path: "/:code/questions/reorder", handlers: []gin.HandlerFunc{handler.ReorderQuestions}},
-		{method: http.MethodPut, path: "/:code/questions/batch", handlers: []gin.HandlerFunc{handler.BatchUpdateQuestions}},
-	}
-}
-
-func questionnaireReadRoutes(handler *codesHandler.QuestionnaireHandler) []routeSpec {
-	return []routeSpec{
-		{method: http.MethodGet, path: "", handlers: []gin.HandlerFunc{handler.List}},
-		{method: http.MethodGet, path: "/:code/versions", handlers: []gin.HandlerFunc{handler.ListVersions}},
-		{method: http.MethodGet, path: "/:code", handlers: []gin.HandlerFunc{handler.GetByCode}},
-		{method: http.MethodGet, path: "/published/:code", handlers: []gin.HandlerFunc{handler.GetPublishedByCode}},
-		{method: http.MethodGet, path: "/published", handlers: []gin.HandlerFunc{handler.ListPublished}},
-		{method: http.MethodGet, path: "/:code/qrcode", handlers: []gin.HandlerFunc{handler.GetQRCode}},
+		{method: http.MethodPost, path: "/:code/publish", handlers: withPermission(authzapp.QuestionnaireResource, "publish", handler.Publish)},
+		{method: http.MethodPost, path: "/:code/unpublish", handlers: withPermission(authzapp.QuestionnaireResource, "unpublish", handler.Unpublish)},
+		{method: http.MethodPost, path: "/:code/archive", handlers: withPermission(authzapp.QuestionnaireResource, "archive", handler.Archive)},
+		{method: http.MethodDelete, path: "/:code", handlers: withPermission(authzapp.QuestionnaireResource, "delete", handler.Delete)},
+		{method: http.MethodPost, path: "/:code/questions", handlers: withPermission(authzapp.QuestionnaireResource, "update", handler.AddQuestion)},
+		{method: http.MethodPut, path: "/:code/questions/:qcode", handlers: withPermission(authzapp.QuestionnaireResource, "update", handler.UpdateQuestion)},
+		{method: http.MethodDelete, path: "/:code/questions/:qcode", handlers: withPermission(authzapp.QuestionnaireResource, "update", handler.RemoveQuestion)},
+		{method: http.MethodPost, path: "/:code/questions/reorder", handlers: withPermission(authzapp.QuestionnaireResource, "update", handler.ReorderQuestions)},
+		{method: http.MethodPut, path: "/:code/questions/batch", handlers: withPermission(authzapp.QuestionnaireResource, "update", handler.BatchUpdateQuestions)},
+		{method: http.MethodGet, path: "", handlers: withPermission(authzapp.QuestionnaireResource, "list", handler.List)},
+		{method: http.MethodGet, path: "/:code/versions", handlers: withPermission(authzapp.QuestionnaireResource, "read", handler.ListVersions)},
+		{method: http.MethodGet, path: "/:code", handlers: withPermission(authzapp.QuestionnaireResource, "read", handler.GetByCode)},
+		{method: http.MethodGet, path: "/published/:code", handlers: withPermission(authzapp.QuestionnaireResource, "read", handler.GetPublishedByCode)},
+		{method: http.MethodGet, path: "/published", handlers: withPermission(authzapp.QuestionnaireResource, "list", handler.ListPublished)},
+		{method: http.MethodGet, path: "/:code/qrcode", handlers: withPermission(authzapp.QuestionnaireResource, "read", handler.GetQRCode)},
 	}
 }

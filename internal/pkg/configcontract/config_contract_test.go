@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -1029,8 +1030,35 @@ func loadConfig(t *testing.T, path string, target any) {
 
 func assertIAMJWKSURLContract(t *testing.T, service, configName string, opts *genericoptions.IAMOptions) {
 	t.Helper()
-	if opts == nil || opts.JWKS == nil {
+	if opts == nil || opts.JWT == nil || opts.JWKS == nil {
 		t.Fatalf("%s %s IAM JWKS config must be traceable", service, configName)
+	}
+	if !opts.JWKSEnabled {
+		t.Fatalf("%s %s must enable JWKS local verification", service, configName)
+	}
+	if opts.JWT.ForceRemoteVerification {
+		t.Fatalf("%s %s must use local-first JWT verification", service, configName)
+	}
+	wantClaims := []string{"sub", "exp", "user_id", "tenant_id"}
+	for _, claim := range wantClaims {
+		if !slices.Contains(opts.JWT.RequiredClaims, claim) {
+			t.Errorf("%s %s iam.jwt.required-claims = %v, missing %q", service, configName, opts.JWT.RequiredClaims, claim)
+		}
+	}
+	wantAlgorithms := []string{"RS256", "ES256"}
+	if !slices.Equal(opts.JWT.Algorithms, wantAlgorithms) {
+		t.Fatalf("%s %s iam.jwt.algorithms = %v, want %v", service, configName, opts.JWT.Algorithms, wantAlgorithms)
+	}
+	if opts.JWKS.RefreshInterval <= 0 || opts.JWKS.CacheTTL <= opts.JWKS.RefreshInterval {
+		t.Fatalf("%s %s JWKS windows must satisfy 0 < refresh-interval < cache-ttl, got %s/%s", service, configName, opts.JWKS.RefreshInterval, opts.JWKS.CacheTTL)
+	}
+	if strings.Contains(configName, ".prod.") {
+		if !opts.GRPCEnabled || opts.GRPC == nil || opts.GRPC.TLS == nil || !opts.GRPC.TLS.Enabled {
+			t.Fatalf("%s %s must enable IAM gRPC mTLS", service, configName)
+		}
+		if opts.GRPC.TLS.CAFile == "" || opts.GRPC.TLS.CertFile == "" || opts.GRPC.TLS.KeyFile == "" {
+			t.Fatalf("%s %s IAM gRPC mTLS certificate paths must be configured", service, configName)
+		}
 	}
 	rawURL := strings.TrimSpace(opts.JWKS.URL)
 	if rawURL == "" {

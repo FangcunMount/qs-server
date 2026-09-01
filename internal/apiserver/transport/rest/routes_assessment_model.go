@@ -3,8 +3,8 @@ package rest
 import (
 	"net/http"
 
+	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
-	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,61 +15,41 @@ func (r *Router) registerAssessmentModelProtectedRoutes(apiV1 *gin.RouterGroup) 
 	handler := codesHandler.NewAssessmentModelHandler(r.deps.AssessmentModel.Management, r.deps.AssessmentModel.Definition, r.deps.AssessmentModel.Query, r.deps.AssessmentModel.Assets)
 	models := apiV1.Group("/assessment-models")
 	{
-		manage := models.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityManageAssessmentModels))
-		definition := models.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityEditAssessmentModelDefinitions))
-		read := models.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityReadAssessmentModels))
-		registerRouteSpecs(manage, assessmentModelManageRoutes(handler))
-		registerRouteSpecs(definition, assessmentModelDefinitionRoutes(handler))
-		registerRouteSpecs(read, assessmentModelReadRoutes(handler))
+		registerRouteSpecs(models, assessmentModelRoutes(handler))
 		releaseHandler := codesHandler.NewAssessmentReleaseHandler(r.deps.AssessmentModel.Release, r.deps.AssessmentModel.Query)
-		releaseLifecycle := apiV1.Group("/assessment-releases", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityPublishAssessmentModels))
-		releaseHistory := apiV1.Group("/assessment-releases", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityReadAssessmentModels))
-		registerRouteSpecs(releaseLifecycle, assessmentReleaseLifecycleRoutes(releaseHandler))
-		registerRouteSpecs(releaseHistory, assessmentReleaseHistoryRoutes(releaseHandler))
+		releases := apiV1.Group("/assessment-releases")
+		registerRouteSpecs(releases, assessmentReleaseRoutes(releaseHandler))
 	}
 }
 
-func assessmentModelManageRoutes(handler *codesHandler.AssessmentModelHandler) []routeSpec {
+func assessmentModelRoutes(handler *codesHandler.AssessmentModelHandler) []routeSpec {
 	return []routeSpec{
-		{method: http.MethodPost, path: "", handlers: []gin.HandlerFunc{handler.Create}},
-		{method: http.MethodPut, path: "/:code/basic-info", handlers: []gin.HandlerFunc{handler.UpdateBasicInfo}},
-		{method: http.MethodDelete, path: "/:code", handlers: []gin.HandlerFunc{handler.Delete}},
-		{method: http.MethodPut, path: "/:code/questionnaire", handlers: []gin.HandlerFunc{handler.BindQuestionnaire}},
+		{method: http.MethodPost, path: "", handlers: withPermission(authzapp.AssessmentModelResource, "create", handler.Create)},
+		{method: http.MethodPut, path: "/:code/basic-info", handlers: withPermission(authzapp.AssessmentModelResource, "update", handler.UpdateBasicInfo)},
+		{method: http.MethodDelete, path: "/:code", handlers: withPermission(authzapp.AssessmentModelResource, "delete", handler.Delete)},
+		{method: http.MethodPut, path: "/:code/questionnaire", handlers: withPermission(authzapp.AssessmentModelResource, "update", handler.BindQuestionnaire)},
+		{method: http.MethodPut, path: "/:code/definition", handlers: withPermission(authzapp.AssessmentModelResource, "update", handler.UpdateDefinition)},
+		{method: http.MethodGet, path: "/:code/definition", handlers: withPermission(authzapp.AssessmentModelResource, "read", handler.GetDefinition)},
+		{method: http.MethodPost, path: "/:code/codes/apply", handlers: withPermission(authzapp.AssessmentModelResource, "update", handler.ApplyCodes)},
+		{method: http.MethodPost, path: "/:code/validate", handlers: withPermission(authzapp.AssessmentModelResource, "read", handler.Validate)},
+		{method: http.MethodPost, path: "/:code/preview-report", handlers: withPermission(authzapp.AssessmentModelResource, "read", handler.PreviewReport)},
+		{method: http.MethodPost, path: "/:code/outcomes/:outcome_code/image", handlers: withPermission(authzapp.AssessmentModelResource, "update", handler.UploadOutcomeImage)},
+		{method: http.MethodGet, path: "/hot", handlers: withPermission(authzapp.AssessmentModelResource, "list", handler.ListHot)},
+		{method: http.MethodGet, path: "/published/:code", handlers: withPermission(authzapp.AssessmentModelResource, "read", handler.GetPublished)},
+		{method: http.MethodGet, path: "/published", handlers: withPermission(authzapp.AssessmentModelResource, "list", handler.ListPublished)},
+		{method: http.MethodGet, path: "/options", handlers: withPermission(authzapp.AssessmentModelResource, "list", handler.Options)},
+		{method: http.MethodGet, path: "/:code/questionnaire", handlers: withPermission(authzapp.AssessmentModelResource, "read", handler.GetQuestionnaire)},
+		{method: http.MethodGet, path: "/:code/qrcode", handlers: withPermission(authzapp.AssessmentModelResource, "read", handler.GetQRCode)},
+		{method: http.MethodGet, path: "/:code", handlers: withPermission(authzapp.AssessmentModelResource, "read", handler.Get)},
+		{method: http.MethodGet, path: "", handlers: withPermission(authzapp.AssessmentModelResource, "list", handler.List)},
 	}
 }
 
-func assessmentModelDefinitionRoutes(handler *codesHandler.AssessmentModelHandler) []routeSpec {
+func assessmentReleaseRoutes(handler *codesHandler.AssessmentReleaseHandler) []routeSpec {
 	return []routeSpec{
-		{method: http.MethodPut, path: "/:code/definition", handlers: []gin.HandlerFunc{handler.UpdateDefinition}},
-		{method: http.MethodGet, path: "/:code/definition", handlers: []gin.HandlerFunc{handler.GetDefinition}},
-		{method: http.MethodPost, path: "/:code/codes/apply", handlers: []gin.HandlerFunc{handler.ApplyCodes}},
-		{method: http.MethodPost, path: "/:code/validate", handlers: []gin.HandlerFunc{handler.Validate}},
-		{method: http.MethodPost, path: "/:code/preview-report", handlers: []gin.HandlerFunc{handler.PreviewReport}},
-		{method: http.MethodPost, path: "/:code/outcomes/:outcome_code/image", handlers: []gin.HandlerFunc{handler.UploadOutcomeImage}},
-	}
-}
-
-func assessmentReleaseLifecycleRoutes(handler *codesHandler.AssessmentReleaseHandler) []routeSpec {
-	return []routeSpec{
-		{method: http.MethodPost, path: "/:code/publish", handlers: []gin.HandlerFunc{handler.Publish}},
-		{method: http.MethodPost, path: "/:code/unpublish", handlers: []gin.HandlerFunc{handler.Unpublish}},
-		{method: http.MethodPost, path: "/:code/archive", handlers: []gin.HandlerFunc{handler.Archive}},
-	}
-}
-
-func assessmentReleaseHistoryRoutes(handler *codesHandler.AssessmentReleaseHandler) []routeSpec {
-	return []routeSpec{{method: http.MethodGet, path: "/:code/versions", handlers: []gin.HandlerFunc{handler.Versions}}}
-}
-
-func assessmentModelReadRoutes(handler *codesHandler.AssessmentModelHandler) []routeSpec {
-	return []routeSpec{
-		{method: http.MethodGet, path: "/hot", handlers: []gin.HandlerFunc{handler.ListHot}},
-		{method: http.MethodGet, path: "/published/:code", handlers: []gin.HandlerFunc{handler.GetPublished}},
-		{method: http.MethodGet, path: "/published", handlers: []gin.HandlerFunc{handler.ListPublished}},
-		{method: http.MethodGet, path: "/options", handlers: []gin.HandlerFunc{handler.Options}},
-		{method: http.MethodGet, path: "/:code/questionnaire", handlers: []gin.HandlerFunc{handler.GetQuestionnaire}},
-		{method: http.MethodGet, path: "/:code/qrcode", handlers: []gin.HandlerFunc{handler.GetQRCode}},
-		{method: http.MethodGet, path: "/:code", handlers: []gin.HandlerFunc{handler.Get}},
-		{method: http.MethodGet, path: "", handlers: []gin.HandlerFunc{handler.List}},
+		{method: http.MethodPost, path: "/:code/publish", handlers: withPermission(authzapp.AssessmentModelResource, "publish", handler.Publish)},
+		{method: http.MethodPost, path: "/:code/unpublish", handlers: withPermission(authzapp.AssessmentModelResource, "unpublish", handler.Unpublish)},
+		{method: http.MethodPost, path: "/:code/archive", handlers: withPermission(authzapp.AssessmentModelResource, "archive", handler.Archive)},
+		{method: http.MethodGet, path: "/:code/versions", handlers: withPermission(authzapp.AssessmentModelResource, "read", handler.Versions)},
 	}
 }

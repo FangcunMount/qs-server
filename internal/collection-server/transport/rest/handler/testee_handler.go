@@ -14,6 +14,7 @@ import (
 type userProfileReader interface {
 	IsEnabled() bool
 	GetUserProfiles(ctx context.Context, userID string) (*identityv2.ListProfilesResponse, error)
+	HasActiveProfileLink(ctx context.Context, userID, profileID string) (bool, error)
 }
 
 // TesteeHandler 受试者处理器
@@ -262,6 +263,24 @@ func (h *TesteeHandler) Exists(c *gin.Context) {
 	userID := h.GetUserID(c)
 	if userID == 0 {
 		h.UnauthorizedResponse(c, "user not authenticated")
+		return
+	}
+	profileID, err := strconv.ParseUint(iamProfileID, 10, 64)
+	if err != nil || profileID == 0 {
+		h.BadRequestResponse(c, "invalid iam_profile_id", err)
+		return
+	}
+	if h.profileLinkService == nil || !h.profileLinkService.IsEnabled() {
+		h.InternalErrorResponse(c, "IAM ProfileLink service unavailable", nil)
+		return
+	}
+	allowed, err := h.profileLinkService.HasActiveProfileLink(c.Request.Context(), strconv.FormatUint(userID, 10), strconv.FormatUint(profileID, 10))
+	if err != nil {
+		h.InternalErrorResponse(c, "check IAM ProfileLink failed", err)
+		return
+	}
+	if !allowed {
+		h.ForbiddenResponse(c, "profile access denied")
 		return
 	}
 
