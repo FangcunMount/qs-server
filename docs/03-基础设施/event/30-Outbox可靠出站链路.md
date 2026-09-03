@@ -80,10 +80,12 @@ failed + manual_required ──events.replay_pending─> failed + automatic
 
 - Store 原子 claim，避免同一时刻多个 worker 同时取得同一行。
 - publish 失败会进入 governed failure 决策并记录 `failed`、下一次时间或 `manual_required`。
-- MQ publish 已成功但 `MarkEvent(s)Published` 失败时，只记录 `mark_published_failed` 观测结果，Outbox 行仍保持 `publishing`；它依赖 stale-claim recovery 重新进入候选，不会立即改写为 retry 状态。
+- MQ publish 已成功但 `MarkEvent(s)Published` 失败时，只记录 `mark_published_failed` 观测结果，Outbox 行仍保持 `publishing`；
+  它依赖 stale-claim recovery 重新进入候选，不会立即改写为 retry 状态。
 - 到期且 `retry_disposition=automatic` 的 failed，以及陈旧 publishing，会重新进入候选集合。
 - Outbox 默认最多进行 30 次自动发布尝试，使用 10 秒起步、1 小时封顶、20% deterministic jitter 的退避；代码硬上限也是 30，部署配置只能下调。
-- 预算耗尽后保留 `failed + manual_required`，不再被 relay 自动 claim。组织管理员必须通过高风险动作 `events.replay_pending`，携带 store、event ID 和预期 attempt count 授权一次重放；状态已变化时拒绝授权。
+- 预算耗尽后保留 `failed + manual_required`，不再被 relay 自动 claim。组织管理员必须通过高风险动作 `events.replay_pending`，携带 store、event ID 和预期 attempt count 授权一次重放；
+  状态已变化时拒绝授权。
 
 如果 MQ 已经接收消息、进程却在 mark published 前退出，同一事件可能再次发布。这是标准 at-least-once 窗口，不能用 Store 状态推导 exactly-once。
 

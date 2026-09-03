@@ -2,7 +2,11 @@
 
 > 状态：本篇已按当前源码重写。Interpretation 的生成生命周期、重试治理、查询模型与报告模板版本发布均已落地；历史路由已完成显式冻结，运行时对缺失身份执行 fail-closed。
 
-> AI 解读是本模块下用户流量关闭、治理与评测开启的独立发布候选能力：标准报告继续自动生成并保持唯一权威，Participant 未来可在报告可用后手动触发一次性 AI 补充解读。轻量 v2 编排与 v8/v5 Route 已部署；生产 Run `635426176763965998` 的 35 次生成和 35 次裁判均一次成功，G3 为 100%，但 G4 仅 23/35 Candidate 通过全部 hard assertions，因此仍不能发布。当前最小修复只新增不可变 Prompt/Suite/Profile v3，收紧维度引用、关注方向、不可信文本和建议因果约束，并修正 limitations 自然语言变体的确定性误判。多集合、增量审核和完整双运行时继续作为有证据触发的未来架构。`participant_enabled=false`，首个 approved Evidence、生产 Profile、灰度和生产验收仍未完成，见[AI 解读核心设计](./25-核心设计-AI解读.md)及其中的[近期最小改造与架构分析](./25-核心设计-AI解读.md#十六近期最小改造与架构分析)。
+> AI 解读是本模块下用户流量关闭、治理与评测开启的独立发布候选能力：标准报告继续自动生成并保持唯一权威，Participant 未来可在报告可用后手动触发一次性 AI 补充解读。轻量 v2 编排与 v8/v5 Route 已部署；
+> 生产 Run `635426176763965998` 的 35 次生成和 35 次裁判均一次成功，G3 为 100%，但 G4 仅 23/35 Candidate 通过全部 hard assertions，因此仍不能发布。
+> 当前最小修复只新增不可变 Prompt/Suite/Profile v3，收紧维度引用、关注方向、不可信文本和建议因果约束，并修正 limitations 自然语言变体的确定性误判。多集合、增量审核和完整双运行时继续作为有证据触发的未来架构。
+> `participant_enabled=false`，首个 approved Evidence、生产 Profile、灰度和生产验收仍未完成，
+> 见[AI 解读核心设计](./25-核心设计-AI解读.md)及其中的[近期最小改造与架构分析](./25-核心设计-AI解读.md#十六近期最小改造与架构分析)。
 
 ## 1. 30 秒结论
 
@@ -69,7 +73,8 @@ Calculation 成功、Outcome 可靠提交，不代表报告已经生成。报告
 | 特质画像 | 多维特质分布、维度特征和综合画像 |
 | 认知任务 | 正确率、反应时、能力水平和任务维度表现 |
 
-Interpretation 不按 model code 堆叠分支，而是使用 `AlgorithmFamily + DecisionKind + ReportType + TemplateVersion + 可选细分键` 解析 Builder。这使同类模型可以共享报告机制，异类模型通过稳定扩展点接入。
+Interpretation 不按 model code 堆叠分支，而是使用 `AlgorithmFamily + DecisionKind + ReportType + TemplateVersion + 可选细分键` 解析 Builder。
+这使同类模型可以共享报告机制，异类模型通过稳定扩展点接入。
 
 ## 3. Interpretation 负责什么
 
@@ -154,7 +159,8 @@ flowchart TD
     Catalog --> Query
 ```
 
-这条链路的准入事实不是 Assessment ID，也不是 Calculation 的内存返回值，而是已经持久化的 EvaluationOutcome。`GenerateReportFromOutcome` 是当前 canonical gRPC 方法；旧 `GenerateReportFromAssessment` 仅作为 deprecated 兼容入口观察命中，新调用不再接入。
+这条链路的准入事实不是 Assessment ID，也不是 Calculation 的内存返回值，而是已经持久化的 EvaluationOutcome。`GenerateReportFromOutcome` 是当前 canonical gRPC 方法；
+旧 `GenerateReportFromAssessment` 仅作为 deprecated 兼容入口观察命中，新调用不再接入。
 
 ## 7. 三类复杂度
 
@@ -222,7 +228,8 @@ Model code 标识具体业务资产；AlgorithmFamily、DecisionKind、ReportPro
 
 运营后续发布新模型、新解释文案或新报告模板时，已生成 InterpretReport 不应被覆盖。新 TemplateVersion 应当产生新的 ReportGeneration 和新报告成品。
 
-`TemplateVersion` 已进入 Generation、Report 与 Outcome 身份。生产目录同时保留真实历史版本 `legacy-v1` 和当前版本 `2026-08-v1`；24 个 active ModelCatalog snapshot 均显式冻结 TemplateID/TemplateVersion。运行时不再补默认版本，也不根据当前 ModelCatalog 猜测历史路由。
+`TemplateVersion` 已进入 Generation、Report 与 Outcome 身份。生产目录同时保留真实历史版本 `legacy-v1` 和当前版本 `2026-08-v1`；
+24 个 active ModelCatalog snapshot 均显式冻结 TemplateID/TemplateVersion。运行时不再补默认版本，也不根据当前 ModelCatalog 猜测历史路由。
 
 ### 8.5 授权先于正文查询
 

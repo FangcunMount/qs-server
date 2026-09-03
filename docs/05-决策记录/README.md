@@ -8,7 +8,8 @@
 
 ## 2. 已确认并实施的重构决策
 
-- [同步保存答卷，异步执行评估与报告](./01-架构决策总表.md#2-同步保存答卷异步执行评估与报告)：`202 Accepted` 表示 `AnswerSheet + 幂等事实 + Outbox` 已可靠持久化，Assessment 通过 Worker 异步生成；完整实现与失败窗口回链 Survey 和 Concurrency canonical 文档。
+- [同步保存答卷，异步执行评估与报告](./01-架构决策总表.md#2-同步保存答卷异步执行评估与报告)：`202 Accepted` 表示 `AnswerSheet + 幂等事实 + Outbox` 已可靠持久化，Assessment 通过 Worker 异步生成；
+  完整实现与失败窗口回链 Survey 和 Concurrency canonical 文档。
 - [seeddata 历史能力退役](./01-架构决策总表.md#7-seeddata-历史能力永久退役)：永久拒绝历史请求，删除批次控制面和废弃存储对象，只保留当前时间业务链路与每日 mock。
 
 已经实施完毕的完整重构分析退出 active 层；当前取舍只在决策总表保留，历史推演由 archive 和 Git 追溯。当前实现冲突时，以决议节、当前代码和机器契约为准。

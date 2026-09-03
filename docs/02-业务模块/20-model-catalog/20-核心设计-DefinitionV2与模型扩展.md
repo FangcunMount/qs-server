@@ -241,7 +241,9 @@ Decision 是测评模型的必需层。它把 Factor 或校准结果转换为稳
 
 Decision 不负责生成面向用户的标题、长描述、建议或报告 section。当前这些内容仍混合在 Conclusion、Outcome 和 TypeOutcomeProfile 中，是已经识别的物理结构问题。
 
-目标发布规则是：Factor 必需、Norm 可选、Decision 必需。`ValidateMeasureSpecParts` 已对空 Factors 返回 `measure.factors.required`；scale/cognitive 的 `DecisionKindForDefinition` 已要求对应 Conclusion；scale/behavioral/cognitive 发布时已对照已发布问卷版本校验 question/option（及 SPM CorrectOption）存在性。问卷 type 策略与 Bind/Publish 分策仍属 MC-R009。
+目标发布规则是：Factor 必需、Norm 可选、Decision 必需。`ValidateMeasureSpecParts` 已对空 Factors 返回 `measure.factors.required`；
+scale/cognitive 的 `DecisionKindForDefinition` 已要求对应 Conclusion；scale/behavioral/cognitive 发布时已对照已发布问卷版本校验
+question/option（及 SPM CorrectOption）存在性。问卷 type 策略与 Bind/Publish 分策仍属 MC-R009。
 
 ## 6. AlgorithmBinding 与 ExecutionSpec
 
@@ -369,7 +371,9 @@ Interpretation
 
 ### 8.1 唯一事实源
 
-AssessmentModel 与发布后的 AssessmentSnapshot 都保存 DefinitionV2。Mongo 发布快照额外持久化 Model identity 中的 Kind/Algorithm/code/version、DecisionKind、Questionnaire 引用和 Definition 内容摘要，但不保存独立 AlgorithmFamily、compatibility payload、payload format 或 projection hash。
+AssessmentModel 与发布后的 AssessmentSnapshot 都保存 DefinitionV2。Mongo 发布快照额外持久化 Model identity 中的
+Kind/Algorithm/code/version、DecisionKind、Questionnaire 引用和 Definition 内容摘要，
+但不保存独立 AlgorithmFamily、compatibility payload、payload format 或 projection hash。
 
 Definition handler 的职责是验证并物化临时运行时 DTO；DTO 只存在于内存。DefinitionV2 缺失、冻结身份不完整或 family-specific 物化失败时必须 fail closed，不允许通过旧 payload 或格式推断恢复。
 
@@ -417,7 +421,8 @@ flowchart LR
 
 发布校验比草稿保存更强，因为它需要证明的是“这份模型现在可以被新测评使用”，包括外部资产存在性和执行契约完整性。
 
-当前 Mongo 快照冻结 Algorithm、DecisionKind、DefinitionV2、ExecutionSpec、Questionnaire 引用和 Definition 内容摘要。发布物化对 AlgorithmFamily 做双向兼容校验；Evaluation 运行时直读 DecisionKind，仅由它派生 family，不从 Kind/Algorithm 重复决定路由。
+当前 Mongo 快照冻结 Algorithm、DecisionKind、DefinitionV2、ExecutionSpec、Questionnaire 引用和 Definition 内容摘要。发布物化对 AlgorithmFamily 做双向兼容校验；
+Evaluation 运行时直读 DecisionKind，仅由它派生 family，不从 Kind/Algorithm 重复决定路由。
 
 ## 9. 校验责任链
 

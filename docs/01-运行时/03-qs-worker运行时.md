@@ -81,7 +81,8 @@ flowchart TD
 | retry hold | 自动重试暂停或需要延迟治理，把消息保存到可恢复的 hold store |
 | manual_required | 配置/数据/规则问题无法安全自动推进，需要人工确认和补偿 |
 
-worker 的 transport delivery attempts 存在硬上限，当前代码最大不超过 8；旧的 `worker.max-retries` 已移除，配置后会拒绝启动，统一使用 `messaging.delivery.max-attempts`。业务重试、Outbox 发布重试和 transport 投递次数是三个不同预算，不能合并成一个“重试次数”。
+worker 的 transport delivery attempts 存在硬上限，当前代码最大不超过 8；旧的 `worker.max-retries` 已移除，配置后会拒绝启动，统一使用 `messaging.delivery.max-attempts`。
+业务重试、Outbox 发布重试和 transport 投递次数是三个不同预算，不能合并成一个“重试次数”。
 
 `retryable=false` 的正确边界是禁止系统继续自动尝试，不应等价于“永远不能处理”。管理员修复配置或数据后，未来可以通过要求明确确认、操作原因和审计结果的 Force Retry 重新驱动；若功能尚未闭环，文档必须保留为能力缺口。
 

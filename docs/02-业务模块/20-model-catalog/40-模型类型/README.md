@@ -308,7 +308,8 @@ behavioral_rating
   = factor scoring + required norm calibration + norm decision
 ```
 
-当前 `DecisionKindForDefinition` 在没有 NormRef/NormConclusion 时仍可能返回 `score_range`，但执行身份仍映射到 `factor_norm`。这是当前代码的边界不一致，后续应在发布校验中强制 NormRef、Primary NormConclusion 和可用 Norm table。
+当前 `DecisionKindForDefinition` 在没有 NormRef/NormConclusion 时仍可能返回 `score_range`，但执行身份仍映射到 `factor_norm`。这是当前代码的边界不一致，
+后续应在发布校验中强制 NormRef、Primary NormConclusion 和可用 Norm table。
 
 ### 10.2 typology 是广义人格测评
 
@@ -326,7 +327,8 @@ behavioral_rating
 
 ### 10.3 scale capability 元数据需要收敛
 
-`FamilyCapability` 当前把 scale 的部分创建、列表、发布能力标为 false，但管理、定义和发布服务实际上已经支持 scale。运行时只使用其 `RuntimeExecutable/ExecutionPath`，所以没有阻断现有功能，但这张能力表不能被文档写成完整事实。后续应让 capability 成为真正的统一约束，或删掉没有消费者的字段。
+`FamilyCapability` 当前把 scale 的部分创建、列表、发布能力标为 false，但管理、定义和发布服务实际上已经支持 scale。运行时只使用其 `RuntimeExecutable/ExecutionPath`，
+所以没有阻断现有功能，但这张能力表不能被文档写成完整事实。后续应让 capability 成为真正的统一约束，或删掉没有消费者的字段。
 
 ---
 

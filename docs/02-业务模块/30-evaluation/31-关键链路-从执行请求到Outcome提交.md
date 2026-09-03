@@ -1,6 +1,7 @@
 # 关键链路：从执行请求到 Outcome 提交
 
-> 状态：`evaluation.requested` durable Outbox、Worker internal gRPC、EvaluationRun Claim/Lease、精确输入解析、RuntimeDescriptor 统一执行、Outcome 成功事务、失败事务和持久化回执 settlement 已形成完整主链。输入错误分类、Lease 续租和 InputSnapshotRef 审计强度仍有改进空间。
+> 状态：`evaluation.requested` durable Outbox、Worker internal gRPC、EvaluationRun Claim/Lease、精确输入解析、RuntimeDescriptor
+> 统一执行、Outcome 成功事务、失败事务和持久化回执 settlement 已形成完整主链。输入错误分类、Lease 续租和 InputSnapshotRef 审计强度仍有改进空间。
 
 ## 1. 本文回答
 
@@ -21,7 +22,8 @@
 13. 哪些结果应该 ACK，哪些不确定状态必须 NACK；
 14. `evaluation.outcome.committed` 为什么是本文终点，而不是 Report 生成成功。
 
-运行时扩展模型见 [统一测评执行模型](./20-核心设计-统一测评执行模型.md)，状态机与可靠性约束见 [状态、幂等与可靠提交](./21-核心设计-状态、幂等与可靠提交.md)，Outcome 内容及解释边界见 [Outcome 事实与解释边界](./22-核心设计-Outcome事实与解释边界.md)。
+运行时扩展模型见 [统一测评执行模型](./20-核心设计-统一测评执行模型.md)，状态机与可靠性约束见 [状态、幂等与可靠提交](./21-核心设计-状态、幂等与可靠提交.md)，
+Outcome 内容及解释边界见 [Outcome 事实与解释边界](./22-核心设计-Outcome事实与解释边界.md)。
 
 ---
 
@@ -188,7 +190,8 @@ Worker handler 使用 `EvaluationRequestedData.ClassifyPayloadGate()` 把事件�
 - `legacy_incomplete`：有合法 Assessment ID，但 payload 缺少模型身份，记录指标和告警后仍调用 apiserver；
 - `invalid`：Assessment ID 不合法，返回错误并进入消息失败治理。
 
-`legacy_incomplete` 不再被静默 ACK。是否需要执行最终由 apiserver 回读 canonical Assessment 后调用 `Assessment.NeedsEvaluation()` 决定，事件 payload 只负责唤醒和兼容分类。该兼容分支在 `qs_worker_evaluation_payload_gate_total{class="legacy_incomplete"}` 连续 14 天为零且有正常流量后才可移除。
+`legacy_incomplete` 不再被静默 ACK。是否需要执行最终由 apiserver 回读 canonical Assessment 后调用 `Assessment.NeedsEvaluation()` 决定，事件 payload 只负责唤醒和兼容分类。
+该兼容分支在 `qs_worker_evaluation_payload_gate_total{class="legacy_incomplete"}` 连续 14 天为零且有正常流量后才可移除。
 
 ### 4.4 人工 retry 在事件形成前完成对象授权
 
@@ -203,7 +206,8 @@ snapshot 中存在 retry 候选
   -> 事务内 AuthorizeRetry + evaluation.retry.requested Outbox
 ```
 
-对象属性只由已加载的领域对象提供，终端用户不能提交可信的 `object.origin_type`。条件授权不参与 list、search、batch 或 `force_retry`；IAM 拒绝、不可用、超时或契约错误都在事务和 Outbox 之前 fail closed。这样既避免内部治理入口绕过对象授权，也避免未授权调用者利用状态错误探测 Assessment 是否可重试。
+对象属性只由已加载的领域对象提供，终端用户不能提交可信的 `object.origin_type`。条件授权不参与 list、search、batch 或 `force_retry`；IAM 拒绝、不可用、超时或契约错误都在事务和 Outbox 之前 fail closed。
+这样既避免内部治理入口绕过对象授权，也避免未授权调用者利用状态错误探测 Assessment 是否可重试。
 
 ---
 
@@ -254,7 +258,8 @@ apiserver transport 再把它恢复为 `retrygovernance.Authorization` 放入 co
 
 ### 5.3 自动重试紧急开关
 
-当 `DisableAutomaticRetry=true` 且事件 origin 为 automatic 时，handler 返回 `ErrAutomaticRetryPaused`。消息 runtime 会把该消息交给 hold recorder，成功记录后 ACK held，而不是持续 NACK 消耗 transport attempt。
+当 `DisableAutomaticRetry=true` 且事件 origin 为 automatic 时，handler 返回 `ErrAutomaticRetryPaused`。
+消息 runtime 会把该消息交给 hold recorder，成功记录后 ACK held，而不是持续 NACK 消耗 transport attempt。
 
 manual 和 force origin 不受 automatic emergency switch 直接阻断，因为它们代表显式治理授权。
 
@@ -326,7 +331,8 @@ RetryDecision = automatic
 retry event = scheduled
 ```
 
-Engine 会返回原始 calculation error；Worker Service 重新读取后却得到一份完整、持久化、可执行的失败回执。此时 Service 返回 Result 而不是 transport error，gRPC 正常响应 `status=failed, retry_disposition=automatic`。
+Engine 会返回原始 calculation error；Worker Service 重新读取后却得到一份完整、持久化、可执行的失败回执。此时 Service 返回 Result 而不是 transport error，
+gRPC 正常响应 `status=failed, retry_disposition=automatic`。
 
 业务失败已经被可靠接管，不需要用 gRPC error 或 MQ NACK 继续猜测。
 
@@ -955,11 +961,13 @@ sequenceDiagram
 
 ### 21.1 Worker 仍保留 legacy_incomplete 事件兼容
 
-Worker 已不再使用 `NeedsEvaluation()` 作为 ACK 门禁：缺少 model code 的合法事件会标记为 `legacy_incomplete` 并继续回读 Assessment。该分支仍是中间态兼容代码，只有连续 14 天零命中且 `complete` 流量非零，才能将缺失模型身份收紧为 invalid。
+Worker 已不再使用 `NeedsEvaluation()` 作为 ACK 门禁：缺少 model code 的合法事件会标记为 `legacy_incomplete` 并继续回读 Assessment。该分支仍是中间态兼容代码，
+只有连续 14 天零命中且 `complete` 流量非零，才能将缺失模型身份收紧为 invalid。
 
 ### 21.2 输入失败已经区分语义错误与依赖错误
 
-resolver failure 当前同时表达 semantic kind、retryability、safe message 和 dependency category。模型、问卷或版本确实不存在时进入 terminal validation；ModelCatalog、Survey、Actor 等依赖暂时不可用时映射为 retryable dependency failure。剩余工作是用生产指标证明分类分布合理，而不是继续保留“统一非重试”的旧判断。
+resolver failure 当前同时表达 semantic kind、retryability、safe message 和 dependency category。模型、问卷或版本确实不存在时进入 terminal validation；
+ModelCatalog、Survey、Actor 等依赖暂时不可用时映射为 retryable dependency failure。剩余工作是用生产指标证明分类分布合理，而不是继续保留“统一非重试”的旧判断。
 
 ### 21.3 默认 Lease 没有执行中续租
 
@@ -969,11 +977,13 @@ resolver failure 当前同时表达 semantic kind、retryability、safe message 
 
 ### 21.4 InputSnapshotRef 已收敛为 isn:v2 内容身份
 
-当前执行只接受 `isn:v2:<sha256>` composite identity；它覆盖模型、问卷、答卷、常模与受试者快照等白名单语义字段，Run 与 Outcome 持有同一引用，跨 attempt 漂移会被拒绝。旧 `model:`、`answersheet:`、v1 或畸形引用不再作为当前执行输入；历史数据是否仍含旧引用由生产盘点决定。
+当前执行只接受 `isn:v2:<sha256>` composite identity；它覆盖模型、问卷、答卷、常模与受试者快照等白名单语义字段，Run 与 Outcome 持有同一引用，跨 attempt 漂移会被拒绝。
+旧 `model:`、`answersheet:`、v1 或畸形引用不再作为当前执行输入；历史数据是否仍含旧引用由生产盘点决定。
 
 ### 21.5 gRPC 错误码仍较粗
 
-`EvaluationWorkerService` 当前把 Worker Service 返回的多数 error 统一映射为 gRPC Internal。Worker 最终仍会 NACK，但运维难以仅靠 transport code 区分 invalid request、dependency unavailable、claim lost 和 consistency failure。
+`EvaluationWorkerService` 当前把 Worker Service 返回的多数 error 统一映射为 gRPC Internal。Worker 最终仍会 NACK，
+但运维难以仅靠 transport code 区分 invalid request、dependency unavailable、claim lost 和 consistency failure。
 
 ### 21.6 active claim 重复消息会形成 NACK 噪声
 

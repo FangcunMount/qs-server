@@ -23,7 +23,11 @@
 - 配置：`configs/*.yaml`、三个进程的 `options` 包、`internal/pkg/configcontract`。
 - 打包：`build/docker/Dockerfile.*`、`scripts/cd/prepare-package.sh`。
 - 部署：`build/docker/docker-compose.prod.yml`、`.github/workflows/cd.yml`、`scripts/cd/remote-deploy.sh`。
-- 静态回归：`go test -count=1 ./internal/pkg/configcontract ./internal/pkg/options ./internal/pkg/grpc ./internal/apiserver/options ./internal/collection-server/options ./internal/worker/options`。
-- CD 脚本回归：`bash scripts/cd/test-prepare-package.sh`、`bash scripts/cd/test-plan-services.sh`、`bash scripts/cd/test-production-compose-network-exposure.sh`。
+- 静态回归：
+  `go test -count=1 ./internal/pkg/configcontract ./internal/pkg/options ./internal/pkg/grpc ./internal/apiserver/options ./internal/collection-server/options ./internal/worker/options`
+  。
+- CD 脚本回归：
+  `bash scripts/cd/test-prepare-package.sh`、`bash scripts/cd/test-plan-services.sh`、
+  `bash scripts/cd/test-production-compose-network-exposure.sh`。
 
 真实 Secret 挂载、目标网络连通、有效配置摘要、精确镜像 SHA 和部署后探针只能由目标环境验证；本目录不会把本地静态测试提升为这些证据。

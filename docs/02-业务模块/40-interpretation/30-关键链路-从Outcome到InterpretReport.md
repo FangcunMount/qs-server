@@ -59,9 +59,7 @@ Worker ACK / NACK according to durable result
 整条链路有三条最重要的语义：
 
 > 第一，Outcome 是已经成立的测评结果，Interpretation 只解释它，不重新执行 Evaluation。
-
 > 第二，只有 Artifact、Run、Generation、Catalog 和终态 Outbox 在同一 MongoDB 事务中提交成功，报告才算真正生成。
-
 > 第三，已经进入 Interpretation 生命周期并被可靠分类的失败，由 `interpretation.retry.requested` 驱动下一次业务 attempt；尚未形成持久化失败事实的不确定错误，才由当前消息 NACK 和 lease recovery 兜底。
 
 ## 3. 参与者与职责
@@ -140,7 +138,8 @@ sequenceDiagram
     end
 ```
 
-`GenerateReportFromOutcome` 是当前 canonical gRPC 方法，只接受 `outcome_id`。旧 `GenerateReportFromAssessment` 已标记 deprecated，仅保留兼容观察；Worker 不再调用旧方法，也不会填充其中的 `assessment_id`。
+`GenerateReportFromOutcome` 是当前 canonical gRPC 方法，只接受 `outcome_id`。旧 `GenerateReportFromAssessment` 已标记 deprecated，仅保留兼容观察；
+Worker 不再调用旧方法，也不会填充其中的 `assessment_id`。
 
 ## 5. 阶段一：Evaluation 可靠提交报告准入事实
 
@@ -288,7 +287,8 @@ gRPC Service 负责：
 
 当 Automation 返回错误时，Service 会记录完整错误，然后返回 `success=false, status=failed` 的安全响应。
 
-如果错误是已经可靠提交的 `FailedError`，响应会携带持久化的 GenerationID、RunID、Failure 和 RetryDecision；如果错误无法映射到持久化失败，响应默认标记为 `retryable=true, failure_kind=internal, failure_code=internal_error`。
+如果错误是已经可靠提交的 `FailedError`，响应会携带持久化的 GenerationID、RunID、Failure 和 RetryDecision；如果错误无法映射到持久化失败，
+响应默认标记为 `retryable=true, failure_kind=internal, failure_code=internal_error`。
 
 这一区分直接决定 Worker 后续是 ACK 还是 NACK。
 
@@ -351,7 +351,8 @@ DecodeExecution(record.Payload, record.SchemaVersion)
 | `task_performance` | Task dimensions + performance facts |
 | `factor_classification` | PersonalityType 或 TraitProfile facts |
 
-当前适配器不会为缺失的 TemplateID/TemplateVersion、DecisionKind 或冻结 Interpretation assets 补默认值。AlgorithmFamily 只由显式 DecisionKind 推导；历史 Outcome 必须已具备经治理冻结的路由身份，否则进入 fail-closed 准入失败。
+当前适配器不会为缺失的 TemplateID/TemplateVersion、DecisionKind 或冻结 Interpretation assets 补默认值。AlgorithmFamily 只由显式 DecisionKind 推导；
+历史 Outcome 必须已具备经治理冻结的路由身份，否则进入 fail-closed 准入失败。
 
 ### 8.4 这一阶段发生在 Generation 创建之前
 
@@ -879,7 +880,8 @@ Starter 使用 RunRepository 的原子 `ReclaimExpiredLease`：
 1. 事件在 lease 过期后再次调用 Automation；
 2. apiserver 的 `InterpretationLeaseRecoveryRunner` 扫描 Interpretation 过期 lease，并根据 Generation 中的 OutcomeID 再次调用 Automation。
 
-当前生产配置通过独立的 `interpretation_lease_recovery` 配置块每 10 秒执行一次、每批最多处理 100 条，并使用专属 leader lock；配置校验允许 10～30 秒。Run duration 仍由 `system_governance.retry.lease.run_duration` 提供，默认 5 分钟，但不再与恢复调度周期和锁混在同一个治理对象中。
+当前生产配置通过独立的 `interpretation_lease_recovery` 配置块每 10 秒执行一次、每批最多处理 100 条，并使用专属 leader lock；配置校验允许 10～30 秒。
+Run duration 仍由 `system_governance.retry.lease.run_duration` 提供，默认 5 分钟，但不再与恢复调度周期和锁混在同一个治理对象中。
 
 ### 17.5 Mongo 终态事务失败时的具体表现
 
@@ -1108,7 +1110,8 @@ retry event delivered
 
 ### 23.1 准入失败已有独立持久化证据
 
-Outcome 解码、冻结身份、Catalog 路由和成品契约等 Starter 前失败不会伪造 Generation/Run，而是幂等写入 MySQL `interpretation_admission_failure`。Operations API 可按组织或 Outcome 查询，记录稳定 kind、safe code/message、重试属性、decision、时间和 fingerprint。
+Outcome 解码、冻结身份、Catalog 路由和成品契约等 Starter 前失败不会伪造 Generation/Run，而是幂等写入 MySQL `interpretation_admission_failure`。
+Operations API 可按组织或 Outcome 查询，记录稳定 kind、safe code/message、重试属性、decision、时间和 fingerprint。
 
 这使“业务生命周期尚未准入”与“Generation 已开始但执行失败”保持两个明确事实层。
 
@@ -1118,7 +1121,8 @@ Outcome 解码、冻结身份、Catalog 路由和成品契约等 Starter 前失�
 
 ### 23.3 模板发布与严格路由已关闭
 
-内置目录已有 5 个 TemplateID × 两个版本共 10 个 release；ModelCatalog active snapshot 与 Outcome 显式冻结路由。新写入使用 `2026-08-v1`，历史 `legacy-v1` 保留；缺失或未知身份 fail-closed。
+内置目录已有 5 个 TemplateID × 两个版本共 10 个 release；ModelCatalog active snapshot 与 Outcome 显式冻结路由。新写入使用 `2026-08-v1`，历史 `legacy-v1` 保留；
+缺失或未知身份 fail-closed。
 
 ### 23.4 Artifact 来源自证已关闭
 
@@ -1126,17 +1130,20 @@ BuilderIdentity 和 ContentSchemaVersion 已固化到 Artifact/Mongo，并与 ge
 
 ### 23.5 failed 投影已区分三种处置
 
-failed event 携带完整 RetryDecision。Worker 对 `automatic` 保持进行中，对 `manual_required` 投影为 `waiting_manual_action` 的临时不可用，对 `terminal` 投影为失败；不会再仅凭 retryable 猜测状态。
+failed event 携带完整 RetryDecision。Worker 对 `automatic` 保持进行中，对 `manual_required` 投影为 `waiting_manual_action` 的临时不可用，对 `terminal` 投影为失败；
+不会再仅凭 retryable 猜测状态。
 
 Redis 状态仍是可重建投影，Generation/Run/RetryDecision 才是治理事实源。
 
 ### 23.6 lease 时长与恢复调度已解耦
 
-Run duration 位于 `system_governance.retry.lease.run_duration`，默认 5 分钟；恢复调度位于独立的 `interpretation_lease_recovery` 配置块，默认 10 秒、每批 100 条，并使用专属 leader lock。这样执行权时长仍由业务治理，而短周期恢复的频率、批量和 HA 失败边界由 runtime 单独治理。
+Run duration 位于 `system_governance.retry.lease.run_duration`，默认 5 分钟；恢复调度位于独立的 `interpretation_lease_recovery` 配置块，
+默认 10 秒、每批 100 条，并使用专属 leader lock。这样执行权时长仍由业务治理，而短周期恢复的频率、批量和 HA 失败边界由 runtime 单独治理。
 
 ### 23.7 Attention 投影具备持久补偿，当前治理入口关闭
 
-Attention 使用持久化 projection ledger、幂等 Projector 和失败 Reconciler；历史事实恢复还具备默认关闭、清单与 SHA-256 指纹双重保护的 FactReconciler。已授权的 33 + 91 个缺口完成精确恢复和独立对账，固定清单与一次性入口已退役。
+Attention 使用持久化 projection ledger、幂等 Projector 和失败 Reconciler；历史事实恢复还具备默认关闭、清单与 SHA-256 指纹双重保护的 FactReconciler。
+已授权的 33 + 91 个缺口完成精确恢复和独立对账，固定清单与一次性入口已退役。
 
 Redis report status 仍是 best-effort 可重建投影；它不参与 Artifact 成立，也不能替代 Mongo 生命周期事实。
 

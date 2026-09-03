@@ -2,15 +2,21 @@
 
 ## 1. 结论
 
-Capability 是 Cache 的最小治理单位。apiserver 的 [`catalog.Spec`](../../../internal/apiserver/cache/catalog/catalog.go) 同时声明 identity、owner、kind、layer、family、配置路径、行为默认值与 legacy metric label；[`cache.Registry`](../../../internal/pkg/cache/registry.go) 发布进程内唯一的 effective Policy snapshot。
+Capability 是 Cache 的最小治理单位。apiserver 的 [`catalog.Spec`](../../../internal/apiserver/cache/catalog/catalog.go) 同时声明
+identity、owner、kind、layer、family、配置路径、行为默认值与 legacy metric label；
+[`cache.Registry`](../../../internal/pkg/cache/registry.go) 发布进程内唯一的 effective Policy snapshot。
 
-普通 Redis/object adapter 不保存静态 Policy，也不读取 Options；它们在每次 read-through 开始时以固定 capability ID 调用 `PolicyProvider.Resolve`。published-model L1 是当前明确例外：TTL 由 `TTLProvider` 在 Set 时重取，但 `TTLJitterRatio` 在 L1 构造时固定；外层 `cacheEnabled()`、L2 read-through 与 L1 Set 还会多次 Resolve，不是一个跨 L1/L2 的单快照操作。因此 Registry、status 与大部分在线行为共享同一事实源，但 status 的 effective TTL/jitter 当前不能单独代表某次 published-model L1+L2 读取实际使用的同一快照。
+普通 Redis/object adapter 不保存静态 Policy，也不读取 Options；它们在每次 read-through 开始时以固定 capability ID 调用 `PolicyProvider.Resolve`。
+published-model L1 是当前明确例外：TTL 由 `TTLProvider` 在 Set 时重取，但 `TTLJitterRatio` 在 L1 构造时固定；
+外层 `cacheEnabled()`、L2 read-through 与 L1 Set 还会多次 Resolve，不是一个跨 L1/L2 的单快照操作。因此 Registry、status 与大部分在线行为共享同一事实源，
+但 status 的 effective TTL/jitter 当前不能单独代表某次 published-model L1+L2 读取实际使用的同一快照。
 
 ## 2. Canonical capability registry
 
 ### 2.1 apiserver
 
-下表的“代码默认 TTL”来自 `Spec.Defaults`，“版本化 production TTL 意图”来自 [`configs/cache/apiserver.prod.yaml`](../../../configs/cache/apiserver.prod.yaml)。该 policy 是仓库中的 override 意图，并不改变代码默认值，也不能单独证明目标生产环境正在使用这些值。
+下表的“代码默认 TTL”来自 `Spec.Defaults`，“版本化 production TTL 意图”来自 [`configs/cache/apiserver.prod.yaml`](../../../configs/cache/apiserver.prod.yaml)。
+该 policy 是仓库中的 override 意图，并不改变代码默认值，也不能单独证明目标生产环境正在使用这些值。
 
 | Capability | Owner | Kind | Layer | Family | 代码默认 TTL | 版本化 production TTL 意图 | Metric label |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -23,13 +29,18 @@ Capability 是 Cache 的最小治理单位。apiserver 的 [`catalog.Spec`](../.
 | `statistics.query` | statistics | cache | L2 + bounded L1 stale | `query_result` | 26h | 26h | `stats_query` |
 | `report_status` | interpretation | operational_state | runtime | `ops_runtime` | 48h | 48h | `report_status` |
 
-`modelcatalog.published_model` 的不可变 `exact_by_ref` 运行快照，以及 key 包含全局 catalog version 的 `catalog_list_versioned` / `by_questionnaire_versioned` 进入 apiserver 进程内 L1，命中后直接复用已解码的 `DefinitionV2`。发布会 bump 全局版本，使旧目录 key 跨实例不可达；latest-by-code、algorithms 等非版本化可变目录仍使用 L2。Active admission 继续绕过两级缓存读取 Mongo，以重新校验 release status。三个 L1 bucket 上限分别为 512/256/512 条，TTL 沿用 capability 的 effective TTL，并通过 `qs_apiserver_l1_cache_*` 指标暴露 hit/miss、entries 与 eviction。
+`modelcatalog.published_model` 的不可变 `exact_by_ref` 运行快照，以及 key 包含全局 catalog version 的
+`catalog_list_versioned`/`by_questionnaire_versioned` 进入 apiserver 进程内 L1，命中后直接复用已解码的 `DefinitionV2`。发布会 bump 全局版本，使旧目录 key 跨实例不可达；
+latest-by-code、algorithms 等非版本化可变目录仍使用 L2。Active admission 继续绕过两级缓存读取 Mongo，以重新校验 release status。
+三个 L1 bucket 上限分别为 512/256/512 条，TTL 沿用 capability 的 effective TTL，并通过 `qs_apiserver_l1_cache_*` 指标暴露 hit/miss、entries 与 eviction。
 
-`statistics.query` 的 generation/hotset 元数据使用 `meta_hotset`，但 capability family 仍投影为 `query_result`；支撑元数据不是第二个业务 capability。`evaluation.assessment_list` 因读路径从未接入缓存而已退役，system-governance 不保留虚假的 disabled row。
+`statistics.query` 的 generation/hotset 元数据使用 `meta_hotset`，但 capability family 仍投影为 `query_result`；支撑元数据不是第二个业务 capability。
+`evaluation.assessment_list` 因读路径从未接入缓存而已退役，system-governance 不保留虚假的 disabled row。
 
 ### 2.2 collection-server
 
-collection-server 的 Registry 是静态 snapshot，能力由 [`internal/collection-server/cache/subsystem.go`](../../../internal/collection-server/cache/subsystem.go) 构造：
+collection-server 的 Registry 是静态 snapshot，能力由
+[`internal/collection-server/cache/subsystem.go`](../../../internal/collection-server/cache/subsystem.go) 构造：
 
 | Capability | Layer | Family | 版本化 production 配置意图 | 回源 |
 | --- | --- | --- | --- | --- |
@@ -40,7 +51,8 @@ collection-server 的 Registry 是静态 snapshot，能力由 [`internal/collect
 | `evaluation.assessment_detail` | L1 | `local` | production YAML 声明 enabled；TTL 180s、jitter 0.2、max 256、singleflight；仅 `evaluated` DTO | apiserver assessment-detail L2 |
 | `report_status` | runtime | `ops_runtime` | TTL 172800s | report workflow |
 
-collection catalog capability 使用 consumer-owned `catalog.*` ID；evaluation 两个意图保持业务名称一致。collection L1 与 apiserver cache 仍是不同进程 Registry 里的独立 entry、policy 和生命周期；apiserver 内部的 immutable exact-by-ref L1 不改变这一跨进程边界。
+collection catalog capability 使用 consumer-owned `catalog.*` ID；evaluation 两个意图保持业务名称一致。
+collection L1 与 apiserver cache 仍是不同进程 Registry 里的独立 entry、policy 和生命周期；apiserver 内部的 immutable exact-by-ref L1 不改变这一跨进程边界。
 
 published-model 与 evaluation access/detail L1 在版本化 dev/prod policy 文件中均声明 enabled；这仍只是仓库配置意图。主配置引用独立 policy：
 
@@ -106,7 +118,8 @@ effective := override.MergeWith(
 )
 ```
 
-越靠前优先级越高。最终 effective Policy 的三态开关不应残留 `inherit`；`status.effective_registry` 同时保留 `spec_default / global_default / family_default / override / effective`，便于解释一个值为什么生效。
+越靠前优先级越高。最终 effective Policy 的三态开关不应残留 `inherit`；`status.effective_registry` 同时保留
+`spec_default / global_default / family_default / override / effective`，便于解释一个值为什么生效。
 
 `JitterRatio` 当前只把 TTL 延长随机的 `[0, ttl*ratio]`，不会向下缩短 TTL。现有 entry 的 expiry 在写入时确定，Policy 变化不会追溯修改。
 
@@ -145,9 +158,11 @@ configs/cache/apiserver.{dev,prod}.yaml
 configs/cache/collection-server.{dev,prod}.yaml
 ```
 
-policy envelope 固定为 `version: "1.0"`，`component` 必须与进程匹配；capability 集合必须完整、不得包含未知项，每个 capability 必须显式提供 `enabled`。collection policy 还必须显式提供 TTL、容量、singleflight 和 Signal eviction。路径相对主配置文件目录解析，不依赖进程工作目录。
+policy envelope 固定为 `version: "1.0"`，`component` 必须与进程匹配；capability 集合必须完整、不得包含未知项，每个 capability 必须显式提供 `enabled`。
+collection policy 还必须显式提供 TTL、容量、singleflight 和 Signal eviction。路径相对主配置文件目录解析，不依赖进程工作目录。
 
-优先级固定为：代码默认值 `<` policy 文件 `<` 环境变量 `<` 显式 CLI。未显式传入的 flag default 不覆盖 policy。完成 schema 校验和全部覆盖后，规范化 effective policy JSON 生成 SHA-256；注释、YAML 键顺序和格式变化不会改变 hash。
+优先级固定为：代码默认值 `<` policy 文件 `<` 环境变量 `<` 显式 CLI。未显式传入的 flag default 不覆盖 policy。完成 schema 校验和全部覆盖后，规范化 effective policy JSON 生成 SHA-256；
+注释、YAML 键顺序和格式变化不会改变 hash。
 
 普通 capability 可配置：
 
@@ -161,13 +176,15 @@ singleflight
 negative
 ```
 
-`redis_runtime` 只配置 family → Redis profile/namespace/fallback/availability；它不能出现 TTL、negative、compression 或 singleflight。`report_status` 位于 `runtime_state.report_status`，只使用 operational-state TTL，不继承普通 cache policy，也不参与 cache policy reload。
+`redis_runtime` 只配置 family → Redis profile/namespace/fallback/availability；它不能出现 TTL、negative、compression 或 singleflight。
+`report_status` 位于 `runtime_state.report_status`，只使用 operational-state TTL，不继承普通 cache policy，也不参与 cache policy reload。
 
 发布时，cache policy 独立化与 `report_status` 归位作为同一个原子配置/镜像切换直接迁移，不设置额外观察窗口；回滚同样必须同时恢复匹配的配置与镜像。
 
 ### 6.2 collection-server 与 worker
 
-- collection-server 的 policy 使用 `capabilities.catalog.questionnaire`、`catalog.published_model` 与 `catalog.typology`；`catalog.published_model` 的启停是启动时接线，修改后必须滚动重启；
+- collection-server 的 policy 使用 `capabilities.catalog.questionnaire`、`catalog.published_model` 与 `catalog.typology`；
+  `catalog.published_model` 的启停是启动时接线，修改后必须滚动重启；
 - worker 没有 `CacheOptions` 或 `cache:` 配置段，只消费 `runtime_state.report_status`；
 - 三进程版本化 production 配置都声明 `report_status.ttl_seconds: 172800`，由 config contract test 防止仓库内漂移；目标环境的 effective value 仍需部署证据；
 - signal 的 prefix/channel/buffer 属于 `signaling.redis`，不与 report status TTL 混放。
@@ -191,7 +208,8 @@ POST /internal/v1/system-governance/actions/cache.reload_policy/runs
 }
 ```
 
-动作只允许 `qs:admin`，要求显式确认和正整数 `expected_version`。process 只重读启动时已经固定真实路径的 apiserver cache policy 文件，再按启动时相同的默认值、环境变量和显式 CLI 合并链构造 candidate；它不会重读主配置、切换 policy 文件、修改当前 Options 或全局 Viper。
+动作只允许 `qs:admin`，要求显式确认和正整数 `expected_version`。process 只重读启动时已经固定真实路径的 apiserver cache policy 文件，再按启动时相同的默认值、环境变量和显式 CLI 合并链构造 candidate；
+它不会重读主配置、切换 policy 文件、修改当前 Options 或全局 Viper。
 
 可 reload：
 
@@ -208,7 +226,8 @@ POST /internal/v1/system-governance/actions/cache.reload_policy/runs
 - `report_status`；
 - collection-server Registry。
 
-成功 reload 只影响能够重取对应 Policy 维度的后续操作和新写入。关闭 compression 后旧 gzip payload 仍由 decoder 自动识别；开启后只压缩新 payload。singleflight/negative 的变化从下一次操作开始生效。reload 不创建或拆除 decorator，也不扫描或删除旧 entry；published-model L1 jitter 是当前已知不热生效的例外。
+成功 reload 只影响能够重取对应 Policy 维度的后续操作和新写入。关闭 compression 后旧 gzip payload 仍由 decoder 自动识别；开启后只压缩新 payload。singleflight/negative 的变化从下一次操作开始生效。
+reload 不创建或拆除 decorator，也不扫描或删除旧 entry；published-model L1 jitter 是当前已知不热生效的例外。
 
 ## 8. Status 投影
 

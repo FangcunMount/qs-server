@@ -4,7 +4,8 @@
 
 ## 1. 版本与证据基线
 
-当前仓库源码复核基线、逐篇状态和基础设施签署矩阵以 [`document-closure.json`](../document-closure.json) 为准；带日期、部署 SHA、effective config 与失效期的环境/生产结果进入[基础设施生产证据台账](../00-总览/10-基础设施生产证据台账.md)。稳定设计页不保存上一轮主机数、容器数、数据行数或探针结果。基础设施事实源变化后必须重新复核，不能只修改日期或沿用历史结论。
+当前仓库源码复核基线、逐篇状态和基础设施签署矩阵以 [`document-closure.json`](../document-closure.json) 为准；
+带日期、部署 SHA、effective config 与失效期的环境/生产结果进入[基础设施生产证据台账](../00-总览/10-基础设施生产证据台账.md)。稳定设计页不保存上一轮主机数、容器数、数据行数或探针结果。基础设施事实源变化后必须重新复核，不能只修改日期或沿用历史结论。
 
 这里的“当前”分三层：
 
@@ -24,7 +25,8 @@
 2. [统一模型与推理方法](./04-统一模型与推理方法.md)：先分清请求、意图、协调、持久事实与派生证据，再学习如何从失败窗口推导机制。
 3. [基础设施能力地图](./01-基础设施能力地图.md)、[基础设施设计原则](./02-基础设施设计原则.md)：把系统问题映射到 owner、scope、正确性机制与降级语义。
 4. [核心链路全景](./03-核心链路全景.md)：把统一模型代入可靠提交、异步处理、缓存读取、报告等待和运行时治理。
-5. 依次阅读 [Concurrency / Resilience](./concurrency/README.md)、[Event](./event/README.md)、[Cache](./cache/README.md)，最后用 Data Access、Migration & Recovery、Security、Observability、Runtime、Config & Deployment 补全事实、权限、证据、交付与生命周期边界。
+5. 依次阅读 [Concurrency / Resilience](./concurrency/README.md)、[Event](./event/README.md)、[Cache](./cache/README.md)，
+   最后用 Data Access、Migration & Recovery、Security、Observability、Runtime、Config & Deployment 补全事实、权限、证据、交付与生命周期边界。
 
 第一遍读完后，至少应能回答三个问题：Redis 全部不可用时哪些正确性仍成立、一次 `202 Accepted` 精确承诺了什么、为什么限流/锁/Signal/指标都不能替代持久化事实。
 
@@ -104,6 +106,7 @@ go test -count=1 ./internal/pkg/architecture ./internal/pkg/configcontract
 
 ## 9. 文档如何继续维护
 
-统一词汇、四类事实和跨模块因果链由本目录根级文档维护；Cache、Event、Concurrency 只展开自己的失败窗口与实现；Data Access、Migration & Recovery、Security、Observability、Runtime、Config & Deployment 分别补充事实、恢复、权限、证据、生命周期和交付。禁止再增加一份平行的“全量架构说明”。
+统一词汇、四类事实和跨模块因果链由本目录根级文档维护；Cache、Event、Concurrency 只展开自己的失败窗口与实现；Data Access、Migration &
+Recovery、Security、Observability、Runtime、Config & Deployment 分别补充事实、恢复、权限、证据、生命周期和交付。禁止再增加一份平行的“全量架构说明”。
 
 行为或架构变化时，专题文档不能只更新配置表，还要重新检查：业务损失和不变量是否变化、替代方案为何仍不选、降级/恢复是否改变、原有验证证据是否仍有效、是否触发了重决策条件。完整要求见 [文档写作约定](../CONTRIBUTING-DOCS.md#51-基础设施专题的知识结构)。

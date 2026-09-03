@@ -1,6 +1,7 @@
 # Survey 模块
 
-> 状态：主体已实现，受理幂等元数据已收入 AnswerSheet document，独立问卷终止边界、答卷详情资源归属授权和不可见题答案严格拒绝均已进入当前代码。计分状态仍是已接受的可观测性限制；独立问卷完整生命周期事务已实现，真实 CI 故障注入继续作为非阻断运行验收。当前结论见[当前版本定档验收台账](../../00-总览/09-当前版本定档验收台账.md)。本文只做模块边界和阅读地图，详细规则以下方 canonical 文档为准。
+> 状态：主体已实现，受理幂等元数据已收入 AnswerSheet document，独立问卷终止边界、答卷详情资源归属授权和不可见题答案严格拒绝均已进入当前代码。计分状态仍是已接受的可观测性限制；独立问卷完整生命周期事务已实现，真实 CI 故障注入继续作为非阻断运行验收。
+> 当前结论见[当前版本定档验收台账](../../00-总览/09-当前版本定档验收台账.md)。本文只做模块边界和阅读地图，详细规则以下方 canonical 文档为准。
 
 ## 1. 30 秒结论
 
@@ -21,7 +22,8 @@ AnswerSheet
 
 Questionnaire 可以独立发布并作为信息收集器使用，此时 AnswerSheet 就是业务终点；Questionnaire 只有与已发布 AssessmentModel 绑定后，才构成能够继续执行 Evaluation 的完整测评。
 
-AnswerSheet 只表示一次正式、最终提交，系统不定义客户端与服务端之间的草稿或暂存协议。在可靠受理时，AnswerSheet 已经冻结问卷引用、提交上下文和原始答案；单题基础分与总基础分由后续 Survey scoring 按精确问卷版本异步补充。基础题分是可重建的延迟派生属性，不属于 `202 Accepted` 的成立条件。
+AnswerSheet 只表示一次正式、最终提交，系统不定义客户端与服务端之间的草稿或暂存协议。在可靠受理时，AnswerSheet 已经冻结问卷引用、提交上下文和原始答案；单题基础分与总基础分由后续 Survey scoring 按精确问卷版本异步补充。
+基础题分是可重建的延迟派生属性，不属于 `202 Accepted` 的成立条件。
 
 ## 2. 模块边界
 
@@ -39,13 +41,16 @@ AnswerSheet 只表示一次正式、最终提交，系统不定义客户端与�
 - 答卷提交成功不等于 Assessment、Evaluation 或报告已完成。
 - 跨 Survey、ModelCatalog、Plan 和 Evaluation 的编排属于 `application/journey/assessmentintake`。
 
-> **已实现、兼容观察：独立问卷终止边界。** 新提交未找到 AssessmentModel binding 时会冻结 `independent_questionnaire` admission；`assessmentintake.Service.Ensure` 在基础计分后正常结束，不创建 Assessment。历史无 admission 事件仍走 live binding，该分支只服务旧事件，不承载新写入。
+> **已实现、兼容观察：独立问卷终止边界。** 新提交未找到 AssessmentModel binding 时会冻结 `independent_questionnaire` admission；
+> `assessmentintake.Service.Ensure` 在基础计分后正常结束，不创建 Assessment。历史无 admission 事件仍走 live binding，该分支只服务旧事件，不承载新写入。
 >
-> **已关闭：答卷详情资源归属授权。** collection 详情读取会把当前 writer 传入应用服务；服务仅允许原 writer、testee 或具有 active ProfileLink 的访问者读取，其他调用返回拒绝。该资源级授权已由定向测试保护。
+> **已关闭：答卷详情资源归属授权。** collection 详情读取会把当前 writer 传入应用服务；服务仅允许原 writer、testee 或具有 active ProfileLink 的访问者读取，其他调用返回拒绝。
+> 该资源级授权已由定向测试保护。
 >
 > **已关闭：不可见题答案严格拒绝。** 服务端使用同一份最终提交中的控制题答案重新计算 ShowController；提交包含当前不可见问题的答案时会拒绝整份提交，不会忽略或部分接收。入口与领域共用同一份提交规格校验器。
 >
-> **当前不足：基础计分状态不可区分。** AnswerSheet 当前以 `score=0` 创建，异步计分后再写回单题分和总分，但没有独立 scoring status 或 scored timestamp。因此无法仅凭 `score=0` 判断“尚未计分”还是“已计分且真实结果为零”。具体状态模型留待代码改造时确定。
+> **当前不足：基础计分状态不可区分。** AnswerSheet 当前以 `score=0` 创建，异步计分后再写回单题分和总分，但没有独立 scoring status 或 scored timestamp。
+> 因此无法仅凭 `score=0` 判断“尚未计分”还是“已计分且真实结果为零”。具体状态模型留待代码改造时确定。
 
 ## 3. 文档地图
 

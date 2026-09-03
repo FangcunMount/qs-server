@@ -1,6 +1,7 @@
 # 关键链路：从 AnswerSheet 到 Assessment
 
-> 状态：AnswerSheet 可靠受理、durable Outbox、Worker 单一入口、基础题分派生、提交时冻结 Admission、Assessment 幂等创建和 `evaluation.requested` 事务提交已经形成主链路。无 Admission 的历史事件仍保留 live binding 兼容入口。
+> 状态：AnswerSheet 可靠受理、durable Outbox、Worker 单一入口、基础题分派生、提交时冻结 Admission、Assessment 幂等创建和 `evaluation.requested` 事务提交已经形成主链路。
+> 无 Admission 的历史事件仍保留 live binding 兼容入口。
 
 ## 1. 本文回答
 
@@ -19,7 +20,8 @@
 11. 客户端怎样从 AnswerSheet ID 观察 Assessment 是否就绪；
 12. 当前实现在哪些地方仍偏离已经确认的业务边界。
 
-Survey 如何校验并可靠保存 AnswerSheet，见 [答卷校验与可靠受理](../10-survey/31-关键链路-答卷校验与可靠受理.md)；Survey 视角的跨模块交接见 [从作答事实到测评执行](../10-survey/32-关键链路-从作答事实到测评执行.md)。本文重点放在 Evaluation 的准入和 Assessment 成立过程。
+Survey 如何校验并可靠保存 AnswerSheet，见 [答卷校验与可靠受理](../10-survey/31-关键链路-答卷校验与可靠受理.md)；Survey 视角的跨模块交接见 [从作答事实到测评执行](../10-survey/32-关键链路-从作答事实到测评执行.md)。
+本文重点放在 Evaluation 的准入和 Assessment 成立过程。
 
 ---
 
@@ -385,7 +387,8 @@ legacy kind 会先归一为 canonical kind/subKind/algorithm，再进入 Evaluat
 
 ### 10.2 双重校验
 
-Binding Resolver 负责找到候选已发布模型；Evaluation `CreateForAnswerSheet` 在 CreateCommand 携带 ModelRef 时，还必须通过 `EvaluationModelValidator` 验证：
+Binding Resolver 负责找到候选已发布模型；Evaluation `CreateForAnswerSheet` 在 CreateCommand 携带 ModelRef 时，
+还必须通过 `EvaluationModelValidator` 验证：
 
 - 模型引用有效；
 - 模型与 QuestionnaireRef 匹配；
@@ -406,7 +409,8 @@ T5  frozen assessment -> retained_exact
     legacy no-admission -> active_release
 ```
 
-两种模式都校验 model identity、version 与 QuestionnaireRef。`retained_exact` 只读取保留的精确版本，允许冻结后 release 已归档；`active_release` 仍拒绝归档版本。选中 reader 未装配或 mode 非法时 fail closed，不跨模式降级。
+两种模式都校验 model identity、version 与 QuestionnaireRef。`retained_exact` 只读取保留的精确版本，允许冻结后 release 已归档；`active_release` 仍拒绝归档版本。
+选中 reader 未装配或 mode 非法时 fail closed，不跨模式降级。
 
 无 Admission 的历史事件仍通过 live binding 解析当前 active release；该兼容入口不改变新提交必须冻结意图与精确版本的要求。
 
@@ -764,15 +768,18 @@ at-least-once delivery
 
 ### 19.1 无 Admission 的历史事件仍使用 live binding
 
-新提交已在可靠受理事务中冻结 purpose 与 exact release。只有历史 `answersheet.submitted` 没有 Admission 时才查询当前 active binding；查不到时明确返回 `legacy_unclassified`，不再把它当成独立问卷，也不创建 unbound Assessment。移除该入口前必须证明历史事件已经排空，并完成跨仓消费者核对。
+新提交已在可靠受理事务中冻结 purpose 与 exact release。只有历史 `answersheet.submitted` 没有 Admission 时才查询当前 active binding；
+查不到时明确返回 `legacy_unclassified`，不再把它当成独立问卷，也不创建 unbound Assessment。移除该入口前必须证明历史事件已经排空，并完成跨仓消费者核对。
 
 ### 19.2 历史空壳 Assessment 仍可能被幂等查询命中
 
-新链路不会创建无模型 Assessment，`Assessment.SubmitAt` 也会用完整 ModelRef、QuestionnaireRef 和 AnswerSheetRef 作为领域前置条件。但历史空壳行仍可能被 `FindByAnswerSheetID` 命中；是否存在、处于何种状态以及能否删除，需要生产只读盘点和备份证据，不能仅凭静态代码判断。
+新链路不会创建无模型 Assessment，`Assessment.SubmitAt` 也会用完整 ModelRef、QuestionnaireRef 和 AnswerSheetRef 作为领域前置条件。但历史空壳行仍可能被 `FindByAnswerSheetID` 命中；
+是否存在、处于何种状态以及能否删除，需要生产只读盘点和备份证据，不能仅凭静态代码判断。
 
 ### 19.3 readiness 仍保留旧服务返回值兼容
 
-canonical readiness 已区分 `pending`、`ready`、`no_assessment_required` 和 `failed`。collection-server 对没有 `readiness_phase` 的旧响应仍按“有 ID 即 ready、无 ID 即 pending”解释；移除前需要客户端与服务版本覆盖证据。
+canonical readiness 已区分 `pending`、`ready`、`no_assessment_required` 和 `failed`。
+collection-server 对没有 `readiness_phase` 的旧响应仍按“有 ID 即 ready、无 ID 即 pending”解释；移除前需要客户端与服务版本覆盖证据。
 
 ### 19.4 Plan 完成仍是跨模块 best-effort
 
@@ -780,7 +787,8 @@ canonical readiness 已区分 `pending`、`ready`、`no_assessment_required` 和
 
 ### 19.5 生产数据退出需要单独证据
 
-代码已关闭 EV-R001、EV-R002、EV-R003、EV-R006 和 EV-R007 对应的结构性问题，但这不等于历史行已经清零。生产验收仍需核对 unbound Assessment、pending 空壳、冻结 Admission 覆盖率和 `legacy_unclassified` 命中量，再决定是否执行数据退役。
+代码已关闭 EV-R001、EV-R002、EV-R003、EV-R006 和 EV-R007 对应的结构性问题，但这不等于历史行已经清零。
+生产验收仍需核对 unbound Assessment、pending 空壳、冻结 Admission 覆盖率和 `legacy_unclassified` 命中量，再决定是否执行数据退役。
 
 这些问题已按优先级和验收边界进入 [设计问题与重构清单](./90-设计问题与重构清单.md)。
 

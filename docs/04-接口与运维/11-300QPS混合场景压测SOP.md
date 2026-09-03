@@ -12,9 +12,11 @@ make perf-run PLAN=admission
 make perf-run PLAN=diagnose CASE=<专项场景>
 ```
 
-`ceiling-120` 只执行 110、恢复门、120 两档，用于已有可信低档证据时复验目标环境上限，永远不会继续进入 200 QPS。`admission` 自动执行 smoke、60、80、100、110、120、200、240、280、恢复证据门、300 和最终排空验收。80/100/110 三档用于定位正常体验基线到 120 保护档之间的容量拐点。操作者不再逐档拼命令；任何硬门禁失败立即停止，证据不足时标记 `INCOMPLETE` 并禁止进入 300。
+`ceiling-120` 只执行 110、恢复门、120 两档，用于已有可信低档证据时复验目标环境上限，永远不会继续进入 200 QPS。`admission` 自动执行 smoke、60、80、100、110、120、200、240、280、恢复证据门、300 和最终排空验收。
+80/100/110 三档用于定位正常体验基线到 120 保护档之间的容量拐点。操作者不再逐档拼命令；任何硬门禁失败立即停止，证据不足时标记 `INCOMPLETE` 并禁止进入 300。
 
-本地静态检查或 dry-run 不能称为 300 QPS 验收成功。正式结论必须引用本次 run ID、Git SHA、`summary.json`、`report.md` 和 `evidence.json`，并写入[基础设施生产证据台账](../00-总览/10-基础设施生产证据台账.md)；本文不保存某次 verdict。
+本地静态检查或 dry-run 不能称为 300 QPS 验收成功。正式结论必须引用本次 run ID、Git SHA、`summary.json`、`report.md` 和 `evidence.json`，
+并写入[基础设施生产证据台账](../00-总览/10-基础设施生产证据台账.md)；本文不保存某次 verdict。
 
 ## 一、运行前准备
 
@@ -42,8 +44,7 @@ make perf-verify
 
 ### 2. 观测地址
 
-本机默认地址如下；生产环境必须使用聚合端点，不能把多副本服务的普通
-Nginx 轮询 `/metrics`、`/readyz` 当成全体副本证据：
+本机默认地址如下；生产环境必须使用聚合端点，不能把多副本服务的普通 Nginx 轮询 `/metrics`、`/readyz` 当成全体副本证据：
 
 ```bash
 export COLLECTION_METRICS_URL=https://collect.fangcunmount.cn/perf/metrics
@@ -63,17 +64,18 @@ export PERF_ISOLATED_ENV=true
 # export NSQLOOKUPD_NODES_URL=https://nsqd.fangcunmount.cn/nodes
 ```
 
-`/perf/metrics` 与 worker `/metrics` 由 Prometheus federation 返回所有目标并保留
-`job`、`instance` 标签；对应 ready 端点返回同时满足 Prometheus `up` 和
-`qs_runtime_component_ready=1` 的实例数量。perfctl 会将数量与两个
-`EXPECTED_*_REPLICAS` 变量比较，并拒绝没有 `instance` 标签的普通直连指标。
-worker、NSQD 观测域名必须从获准的编排网络解析到本次观测入口；访问边界以
-[部署与网络 canonical 文档](../03-基础设施/config-deployment/20-镜像、CD与网络拓扑.md)为准。
+`/perf/metrics` 与 worker `/metrics` 由 Prometheus federation 返回所有目标并保留 `job`、`instance` 标签；
+对应 ready 端点返回同时满足 Prometheus `up` 和 `qs_runtime_component_ready=1` 的实例数量。perfctl 会将数量与两个 `EXPECTED_*_REPLICAS` 变量比较，并拒绝没有 `instance` 标签的普通直连指标。
+worker、NSQD 观测域名必须从获准的编排网络解析到本次观测入口；访问边界以 [部署与网络 canonical 文档](../03-基础设施/config-deployment/20-镜像、CD与网络拓扑.md)为准。
 NSQ 观测入口只允许读取 `/stats`、`/ping`、`/nodes`，不得开放 topic/channel 管理接口。
 
-只有确认窗口内的完成量可归因于本次压测时，才设置 `PERF_ISOLATED_ENV=true`；未设置或显式设为其他值都会把证据标记为 `INCOMPLETE`。该变量现在只是操作者声明，perfctl 还会比较阶段前后 `qs_perf_traffic_requests_total{origin="other"}`：携带 `X-Perf-Run-ID` 的 K6 业务请求归为 `perf`，其他业务请求归为 `other`，只有 `other` 增量为 0 才通过隔离门；大于 0 直接失败，运行版本未暴露指标则为 `INCOMPLETE`。健康、readyz、metrics、ping、version 和 pprof 不计入该指标。完成 TPS 使用阶段前后 Interpretation Prometheus 计数增量，并以这两次指标快照的实际时间窗为分母，不以配置中的计划时长代替服务端观测窗口。
+只有确认窗口内的完成量可归因于本次压测时，才设置 `PERF_ISOLATED_ENV=true`；未设置或显式设为其他值都会把证据标记为 `INCOMPLETE`。该变量现在只是操作者声明，
+perfctl 还会比较阶段前后 `qs_perf_traffic_requests_total{origin="other"}`：携带 `X-Perf-Run-ID` 的 K6 业务请求归为 `perf`，
+其他业务请求归为 `other`，只有 `other` 增量为 0 才通过隔离门；大于 0 直接失败，运行版本未暴露指标则为 `INCOMPLETE`。健康、readyz、metrics、ping、version 和 pprof 不计入该指标。
+完成 TPS 使用阶段前后 Interpretation Prometheus 计数增量，并以这两次指标快照的实际时间窗为分母，不以配置中的计划时长代替服务端观测窗口。
 
-WebSocket 场景按 testee ID 将样本稳定分配给活动 scenario，并在各 scenario 内按 `iterationInTest` 轮转；不要改回随机选择，否则医疗、行为和人格连接可能并发占用同一 testee 并误触 `report_events.max_per_testee`。`report_status_failed` 必须与真实失败会话一一对应，具体原因在原生诊断的 `WEBSOCKET / 失败分类` 中查看。
+WebSocket 场景按 testee ID 将样本稳定分配给活动 scenario，并在各 scenario 内按 `iterationInTest` 轮转；不要改回随机选择，
+否则医疗、行为和人格连接可能并发占用同一 testee 并误触 `report_events.max_per_testee`。`report_status_failed` 必须与真实失败会话一一对应，具体原因在原生诊断的 `WEBSOCKET / 失败分类` 中查看。
 
 NSQD depth 按 channel 待消费工作求和；topic 没有 channel 时才使用 topic depth，避免重复累计。共享 NSQD 必须通过 `PERF_NSQ_TOPICS` 限定可解释的 topic 范围，配置后没有匹配 topic 会视为证据缺失。
 
@@ -186,7 +188,9 @@ make perf-run PLAN=diagnose CASE=submit-coalescing-healthy
 - Outbox backlog、最老待处理年龄与 NSQ depth 是否持续增长；
 - 压测停止后积压是否回到基线。
 
-受理 TPS 高但完成 TPS 低，只能说明入口能接收，不能说明系统完成了业务交付。每档开始时 Outbox backlog 与 NSQ depth 必须为 0；结束快照只容许 `max(1, ceil(应完成 Assessment 数 × 1%))` 条新鲜在途残留，Outbox 最老年龄不得超过 5 秒。超过比例或年龄会直接判定该档 `FAIL`。相邻档位之间先执行默认最多 30 秒、每 2 秒采样一次的有界恢复检查，确认上一档的边界在途回到运行前基线后，才采集下一档 `before` 快照；恢复即使成功，也只能证明可恢复，不能把上一档改判为稳态可承载。
+受理 TPS 高但完成 TPS 低，只能说明入口能接收，不能说明系统完成了业务交付。每档开始时 Outbox backlog 与 NSQ depth 必须为 0；
+结束快照只容许 `max(1, ceil(应完成 Assessment 数 × 1%))` 条新鲜在途残留，Outbox 最老年龄不得超过 5 秒。超过比例或年龄会直接判定该档 `FAIL`。
+相邻档位之间先执行默认最多 30 秒、每 2 秒采样一次的有界恢复检查，确认上一档的边界在途回到运行前基线后，才采集下一档 `before` 快照；恢复即使成功，也只能证明可恢复，不能把上一档改判为稳态可承载。
 
 ### 3. 时延与响应体验
 
@@ -289,6 +293,8 @@ tmp/perf/runs/<run-id>/
 
 ## 七、最终结论模板
 
-> 在 `<环境/Git SHA>` 上执行 `<run-id>` admission。系统实际达到 `<QPS>`，dropped iterations 为 `<数量>`；HTTP RPS 为 `<值>`，受理/完成 TPS 为 `<值>/<值>`。各关键操作 P50/P90/P95/P99 `<是否达标>`，成功率、错误率、超时率和分层重试率 `<是否达标>`。压测结束后 Outbox/NSQ 于 `<时间>` 内回落至基线。最终 verdict 为 `<PASS/FAIL/INCOMPLETE/ERROR>`。
+> 在 `<环境/Git SHA>` 上执行 `<run-id>` admission。系统实际达到 `<QPS>`，dropped iterations 为 `<数量>`；HTTP RPS 为 `<值>`，受理/完成 TPS 为 `<值>/<值>`。
+> 各关键操作 P50/P90/P95/P99 `<是否达标>`，成功率、错误率、超时率和分层重试率 `<是否达标>`。压测结束后 Outbox/NSQ 于 `<时间>` 内回落至基线。
+> 最终 verdict 为 `<PASS/FAIL/INCOMPLETE/ERROR>`。
 
 只有吞吐、时延、正确性和恢复证据同时满足，才能写“系统在目标负载下稳定完成业务交付”。

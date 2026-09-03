@@ -13,8 +13,11 @@
 7. [源码事实矩阵](./07-源码事实矩阵.md)：按稳定编号追踪架构结论、源码证据、当前约束与禁止误述边界。
 8. [项目完成画像与验收标准](./08-项目完成画像与验收标准.md)：从 7 个业务模块、技术模块和十二个角度定义什么情况下可以定档。
 9. [当前版本定档验收台账](./09-当前版本定档验收台账.md)：分列 checkout、CI、部署和生产时点证据，记录版本级模块结论与阻断；逐文档源码复核基线由 [`document-closure.json`](../document-closure.json)维护。
-10. [基础设施生产证据台账](./10-基础设施生产证据台账.md)：把迁移、部署、探针、兼容观察和 one-off 的历史精确 SHA 记录从当前结论中分离；机器真值由 [`infrastructure-production-evidence.json`](../infrastructure-production-evidence.json)维护。
+10. [基础设施生产证据台账](./10-基础设施生产证据台账.md)：把迁移、部署、探针、兼容观察和 one-off 的历史精确 SHA 记录从当前结论中分离；
+    机器真值由 [`infrastructure-production-evidence.json`](../infrastructure-production-evidence.json)维护。
 
 ## 2. 30 秒结论
 
-`qs-server` 是从 ADHD 医学量表场景生长出来的多模型测评平台，也是以 `qs-apiserver` 为主业务中心、由 `collection-server` 和 `qs-worker` 协作的三进程系统。业务事实按 `survey -> modelcatalog -> evaluation -> interpretation` 分层，`actor`、`plan`、`statistics` 提供参与者、编排与读侧支撑。架构首先服务多模型扩展和可靠异步执行，并以分层重试治理保证业务失败、Outbox 发布失败和消息运输失败不会被混为一谈；BFF/IAM 边界、缓存与过载保护则满足接入和运行质量要求。
+`qs-server` 是从 ADHD 医学量表场景生长出来的多模型测评平台，也是以 `qs-apiserver` 为主业务中心、由 `collection-server` 和 `qs-worker` 协作的三进程系统。
+业务事实按 `survey -> modelcatalog -> evaluation -> interpretation` 分层，`actor`、`plan`、`statistics` 提供参与者、编排与读侧支撑。
+架构首先服务多模型扩展和可靠异步执行，并以分层重试治理保证业务失败、Outbox 发布失败和消息运输失败不会被混为一谈；BFF/IAM 边界、缓存与过载保护则满足接入和运行质量要求。

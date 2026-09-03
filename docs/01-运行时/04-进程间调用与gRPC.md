@@ -87,7 +87,8 @@ proto 中还可能存在已生成但未被当前 registry 注册的能力。判�
 2. **用户身份上下文**：IAM 用户、tenant domain、授权快照来源；Participant Report 与 AI Explanation 由 collection 签发绑定 User/Testee/purpose 的 delegated-subject token；
 3. **业务范围上下文**：QS `org_id`、testee、filler 等用例参数。
 
-collection client interceptor 会把现有 `x-request-id` 写入 gRPC metadata，apiserver server interceptor 再投影到服务端 context。worker client 当前没有同等明确的 request-id interceptor，因此不能把“所有异步调用都已端到端透传请求标识”写成现状；异步链路更适合使用 event ID、correlation ID 和 assessment ID 追踪。
+collection client interceptor 会把现有 `x-request-id` 写入 gRPC metadata，apiserver server interceptor 再投影到服务端 context。
+worker client 当前没有同等明确的 request-id interceptor，因此不能把“所有异步调用都已端到端透传请求标识”写成现状；异步链路更适合使用 event ID、correlation ID 和 assessment ID 追踪。
 
 用户 token、服务身份和业务参与者不能混成同一字段。即使服务间连接已经通过 mTLS 认证，apiserver 仍需校验 org/testee 等业务范围。
 
@@ -101,11 +102,14 @@ collection gRPC manager 当前提供：
 - 可选 PerRPC service JWT；
 - request ID metadata 传播。
 
-worker manager 提供 RPC timeout 和 TLS/mTLS，但当前没有 collection 同样的共享 inflight Gate。普通 RPC 使用 `grpc.request-timeout`（生产基线 30 秒）；AI 解读生成与 Prompt 评测可能顺序执行生成和独立模型裁判，使用独立的 `grpc.ai-explanation-timeout`（生产基线 3 分钟）。两侧配置虽有 `PoolSize` 字段，当前 manager 实际以一个 `grpc.ClientConn` 注册各 service client，不能把它描述成已实现多连接池。
+worker manager 提供 RPC timeout 和 TLS/mTLS，但当前没有 collection 同样的共享 inflight Gate。普通 RPC 使用 `grpc.request-timeout`（生产基线 30 秒）；
+AI 解读生成与 Prompt 评测可能顺序执行生成和独立模型裁判，使用独立的 `grpc.ai-explanation-timeout`（生产基线 3 分钟）。两侧配置虽有 `PoolSize` 字段，
+当前 manager 实际以一个 `grpc.ClientConn` 注册各 service client，不能把它描述成已实现多连接池。
 
 调用方 timeout 只限定等待时间，不意味着服务端事务一定已回滚。超时后的重试必须依赖幂等键和业务状态查询，不能简单假设“超时就是没有执行”。
 
-对 AI Provider 而言，HTTP 响应头已经返回、但响应体读取被 deadline 或取消中断，属于 dispatch 后结果不确定：服务端必须记录 `result_unknown`；deadline 映射为 `provider_timeout`，不能降级成普通 `provider_response_read_failed` 后盲目重放。
+对 AI Provider 而言，HTTP 响应头已经返回、但响应体读取被 deadline 或取消中断，属于 dispatch 后结果不确定：服务端必须记录 `result_unknown`；
+deadline 映射为 `provider_timeout`，不能降级成普通 `provider_response_read_failed` 后盲目重放。
 
 ## 8. 错误边界
 
@@ -135,9 +139,12 @@ apiserver gRPC server 代码支持：
 
 当 gRPC JWT auth 配置为启用时，`TokenVerifier` 是构建 server 的硬依赖；缺失时直接返回错误，不会跳过认证 interceptor 继续启动。
 
-“代码支持”不等于“某个运行环境已经启用”。当前仓库的开发配置使用 mTLS，但关闭 gRPC JWT auth、ACL 和 audit，并开启 reflection/health。仓库生产配置使用 mTLS，关闭 JWT auth 和 audit，同时明确开启方法级 ACL，以 `deny` 为默认策略并加载 `configs/grpc-acl.prod.yaml`；生产关闭 reflection、保留 health。collection 可选附加 service JWT，但当 server auth 未开启时它不是当前主要边界；worker client 当前主要依赖 mTLS。这些只是仓库配置事实，不能单独证明已部署环境正在使用同一配置和证书。
+“代码支持”不等于“某个运行环境已经启用”。当前仓库的开发配置使用 mTLS，但关闭 gRPC JWT auth、ACL 和 audit，并开启 reflection/health。仓库生产配置使用 mTLS，
+关闭 JWT auth 和 audit，同时明确开启方法级 ACL，以 `deny` 为默认策略并加载 `configs/grpc-acl.prod.yaml`；生产关闭 reflection、保留 health。
+collection 可选附加 service JWT，但当 server auth 未开启时它不是当前主要边界；worker client 当前主要依赖 mTLS。这些只是仓库配置事实，不能单独证明已部署环境正在使用同一配置和证书。
 
-ACL 开启时会在 server 构建阶段严格加载配置文件：运行时策略和文件内 `default_policy` 都必须是 `deny`，文件缺失、空配置、策略不一致或方法契约不合法都会阻断启动。`configs/grpc-acl.prod.yaml` 分别限定 `qs-collection-server.svc` 和 `qs-worker.svc` 可访问的精确 RPC，配置契约测试还会与两类 client 的 canonical method 集合对齐。
+ACL 开启时会在 server 构建阶段严格加载配置文件：运行时策略和文件内 `default_policy` 都必须是 `deny`，文件缺失、空配置、策略不一致或方法契约不合法都会阻断启动。
+`configs/grpc-acl.prod.yaml` 分别限定 `qs-collection-server.svc` 和 `qs-worker.svc` 可访问的精确 RPC，配置契约测试还会与两类 client 的 canonical method 集合对齐。
 
 ## 10. 兼容性与演进
 

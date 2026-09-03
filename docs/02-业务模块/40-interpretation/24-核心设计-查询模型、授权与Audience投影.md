@@ -1,6 +1,7 @@
 # 核心设计：查询模型、授权与 Audience 投影
 
-> 状态：本文已按当前源码重写。Participant、Clinician、Administration 与 Operations 查询用例、授权先于正文读取的主链路、Catalog 分页查询和最小 Audience 投影已落地；患者端 gRPC 信任边界、Administration 角色语义、Catalog 关联复验与完整章节级可见性仍有明确缺口。
+> 状态：本文已按当前源码重写。Participant、Clinician、Administration 与 Operations 查询用例、授权先于正文读取的主链路、Catalog 分页查询和最小 Audience 投影已落地；
+> 患者端 gRPC 信任边界、Administration 角色语义、Catalog 关联复验与完整章节级可见性仍有明确缺口。
 
 ## 1. 本文回答
 
@@ -116,7 +117,8 @@ Audience 是内容可见性角色，当前值为：
 | Administration | OrgID + OperatorUserID + scope | 管理后台及业务工作台 | 指定受试者、可访问受试者集合或机构报告 | admin |
 | Operations | OrgID + OperatorUserID + audit capability | 内部运维和审计人员 | Generation、Run、失败、重试和 Artifact 元数据 | 无，不返回业务正文 |
 
-“Participant”不应被简单翻译为“患者本人”。在儿童测评中，家长可以作为实际小程序用户读取孩子的报告。当前 collection-server 通过 IAM User 到 Testee Profile 的 active link 表达这种关系，报告本身仍属于 Testee，不属于当时的 AnswerSheet Filler。
+“Participant”不应被简单翻译为“患者本人”。在儿童测评中，家长可以作为实际小程序用户读取孩子的报告。当前 collection-server 通过 IAM User 到 Testee Profile 的 active link
+表达这种关系，报告本身仍属于 Testee，不属于当时的 AnswerSheet Filler。
 
 ## 5. 统一报告查询主链路
 
@@ -256,7 +258,8 @@ sequenceDiagram
 
 这把 `ParticipantReportService/GetAssessmentReport` 限定在持有 collection-server 服务身份的调用方，但服务身份仍不能证明 request TesteeID 来自已验证的终端用户 ProfileLink。
 
-因此当前端到端边界是“生产 default-deny 方法 ACL + collection-server ProfileLink 授权 + apiserver Assessment ownership”。新增内部调用者或 gRPC 方法时，必须同时更新客户端允许方法清单、生产 ACL 和契约测试，不能只依赖 QS OU。
+因此当前端到端边界是“生产 default-deny 方法 ACL + collection-server ProfileLink 授权 + apiserver Assessment ownership”。
+新增内部调用者或 gRPC 方法时，必须同时更新客户端允许方法清单、生产 ACL 和契约测试，不能只依赖 QS OU。
 
 ### 7.4 列表与详情的差异
 
@@ -388,7 +391,8 @@ qs:interpretation_reports / audit
 
 Operations 按 OutcomeID 或 AssessmentID 查询时，先从 Evaluation Outcome 获得 OrgID，完成授权后才查 Generation 和 Run。这是“为授权读取最小资源包络”，不是“先读业务正文”。
 
-但 `FindReportByID` 当前会先用 ReportRepository 恢复完整 InterpretReport，再从 Association.OrgID 做授权，虽然对外只返回元数据，但数据库已经在授权前加载了报告正文。这不符合最严格的“授权先于正文读取”边界，应使用只返回 OrgID 和成品元数据的轻量 Correlation Reader，或在 Mongo 查询中加入已授权 OrgID。
+但 `FindReportByID` 当前会先用 ReportRepository 恢复完整 InterpretReport，再从 Association.OrgID 做授权，虽然对外只返回元数据，但数据库已经在授权前加载了报告正文。
+这不符合最严格的“授权先于正文读取”边界，应使用只返回 OrgID 和成品元数据的轻量 Correlation Reader，或在 Mongo 查询中加入已授权 OrgID。
 
 ## 11. Audience 当前真正实现了什么
 
@@ -450,7 +454,8 @@ one immutable InterpretReport
 - Suggestions；
 - ModelExtra。
 
-Participant 经过 `AudienceParticipant` 投影后，ModelExtra 会进入 gRPC 响应，collection-server 再转换为小程序 BFF DTO。这是相对于现有 REST DTO 更完整的报告展示契约，但仍不是 Artifact 的无损序列化：当前 proto 没有表达应用 Report Dimension 中的 `Role`、`ParentCode`、`HierarchyLevel` 和 `SortOrder`。
+Participant 经过 `AudienceParticipant` 投影后，ModelExtra 会进入 gRPC 响应，collection-server 再转换为小程序 BFF DTO。
+这是相对于现有 REST DTO 更完整的报告展示契约，但仍不是 Artifact 的无损序列化：当前 proto 没有表达应用 Report Dimension 中的 `Role`、`ParentCode`、`HierarchyLevel` 和 `SortOrder`。
 
 ### 12.2 apiserver REST 仍是兼容摘要形状
 
@@ -521,8 +526,10 @@ Journey 先通过 Evaluation Operator Query 获得已授权 Assessment，然后�
 7. Operations 同时校验当前 Org 与 audit capability。
 8. 未知 Audience 和未知 Section 不会默认开放。
 9. Catalog 查询只加载当前页正文，悬空 Source 不会被静默忽略。
-10. collection-server 的 `reportwait.Service.GetStatus` 与 `Wait` 在读取 status cache、进入 DB fallback 或注册 notifier 前，先执行 `User -> active ProfileLink -> Testee -> AuthorizeAssessment`；拒绝时不访问 cache。
-11. `AuthorizeAssessment` 已进入 proto、collection client 允许方法清单和生产 default-deny ACL；`report_status_assessment_ownership_total{result}`、对应 duration 指标和 WebSocket 固定低基数拒绝指标提供观测入口。
+10. collection-server 的 `reportwait.Service.GetStatus` 与 `Wait` 在读取 status cache、进入 DB fallback 或注册 notifier 前，
+    先执行 `User -> active ProfileLink -> Testee -> AuthorizeAssessment`；拒绝时不访问 cache。
+11. `AuthorizeAssessment` 已进入 proto、collection client 允许方法清单和生产 default-deny ACL；
+    `report_status_assessment_ownership_total{result}`、对应 duration 指标和 WebSocket 固定低基数拒绝指标提供观测入口。
 
 ### 14.2 应补强的不变量
 
@@ -553,7 +560,8 @@ Journey 先通过 Evaluation Operator Query 获得已授权 Assessment，然后�
 
 Administration 允许受限 Clinician Operator 查可访问 Testee，但在生成应用 Report 时无条件传入 `AudienceAdmin`。同一个 Clinician 走专用路由时却使用 `AudienceClinician`。
 
-当前 apiserver REST DTO 会对两者都删掉 ModelExtra，所以尚未通过该 REST 响应直接暴露差异。但应用层已经存在潜在绕过：如果未来 REST DTO 补全 ModelExtra，同一 Clinician 可能通过 generic evaluation route 看到专用 clinician route 明确隐藏的内容。
+当前 apiserver REST DTO 会对两者都删掉 ModelExtra，所以尚未通过该 REST 响应直接暴露差异。但应用层已经存在潜在绕过：如果未来 REST DTO 补全 ModelExtra，
+同一 Clinician 可能通过 generic evaluation route 看到专用 clinician route 明确隐藏的内容。
 
 正确方向是让 scope 决策同时返回 Audience，或将真正只服务管理员的路由用 capability 限定。
 
@@ -699,7 +707,8 @@ Org 9 + Operator 7001
 
 ### 18.1 报告中已经有 TesteeID，为什么查询前还要读 Assessment 或 Actor 关系？
 
-TesteeID 是资源关联，不是当前调用者的授权证据。授权需要验证 IAM User/ProfileLink、Assessment ownership、Operator/Clinician 绑定和活跃关系。如果仅比对客户端传入 TesteeID 和报告 TesteeID，客户端可以同时伪造两者。
+TesteeID 是资源关联，不是当前调用者的授权证据。授权需要验证 IAM User/ProfileLink、Assessment ownership、Operator/Clinician 绑定和活跃关系。
+如果仅比对客户端传入 TesteeID 和报告 TesteeID，客户端可以同时伪造两者。
 
 ### 18.2 为什么不把授权逻辑写进 Mongo ReportReader？
 
@@ -715,7 +724,8 @@ ReportReader 是持久化无关的读边界，它不应该理解 HTTP context、
 
 ### 18.5 当前医生和管理员真的看到不同报告吗？
 
-应用层上，AudienceClinician 会删除 ModelExtra，AudienceAdmin 保留。但当前 apiserver REST DTO 本身不输出 ModelExtra，因此当前 REST 响应上这个差异看不出来。患者 gRPC / collection BFF 契约会输出 ModelExtra。
+应用层上，AudienceClinician 会删除 ModelExtra，AudienceAdmin 保留。但当前 apiserver REST DTO 本身不输出 ModelExtra，因此当前 REST 响应上这个差异看不出来。
+患者 gRPC / collection BFF 契约会输出 ModelExtra。
 
 ### 18.6 为什么 Operations 不直接返回报告正文？
 

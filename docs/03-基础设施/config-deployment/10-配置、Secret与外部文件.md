@@ -14,7 +14,8 @@
 | collection-server | `configs/collection-server.prod.yaml` | `--config=/app/configs/collection-server.prod.yaml` | `COLLECTION_SERVER_` |
 | qs-worker | `configs/worker.prod.yaml` | `--config=/app/configs/worker.prod.yaml` | `QS_WORKER_` |
 
-`scripts/cd/prepare-package.sh` 在每个部署包内生成独立的 `config.prod.env`。MySQL、MongoDB、Redis、NSQ、JWT、委托签名等环境相关值从 CI Secret/Variable 进入该文件；脚本的契约测试必须同时验证所需键存在、废弃键缺失，并禁止把密码打印到日志。
+`scripts/cd/prepare-package.sh` 在每个部署包内生成独立的 `config.prod.env`。MySQL、MongoDB、Redis、NSQ、JWT、委托签名等环境相关值从 CI Secret/Variable 进入该文件；
+脚本的契约测试必须同时验证所需键存在、废弃键缺失，并禁止把密码打印到日志。
 
 ## 3. 外部文件清单
 

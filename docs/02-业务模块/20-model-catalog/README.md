@@ -114,7 +114,8 @@ PHP 简易系统的本质是“表单填写 + 硬编码解析”。每增加一�
 
 `Kind` 与 `AlgorithmFamily` 之间不是永久的一对一领域定律，而是由兼容矩阵连接。例如，一份医学量表未来完全可能增加常模校准并使用 `factor_norm`；不能为了执行路由而把它错误改成 `behavioral_rating`。
 
-当前发布物化会根据 `Kind + SubKind + Algorithm` 和 Definition 中的 `DecisionKind` 解析并交叉校验 `AlgorithmFamily`；`ExecutionPath` 是进程内 descriptor 的装配细节。新发布的 canonical 持久化和 Evaluation 路由以冻结的 `DecisionKind` 为唯一路由事实，`AlgorithmFamily` 由它在进程内派生。这些映射是**当前兼容矩阵**，不是不可改变的模型分类规则。
+当前发布物化会根据 `Kind + SubKind + Algorithm` 和 Definition 中的 `DecisionKind` 解析并交叉校验 `AlgorithmFamily`；`ExecutionPath` 是进程内 descriptor 的装配细节。
+新发布的 canonical 持久化和 Evaluation 路由以冻结的 `DecisionKind` 为唯一路由事实，`AlgorithmFamily` 由它在进程内派生。这些映射是**当前兼容矩阵**，不是不可改变的模型分类规则。
 
 `behavior_ability` 不是领域 `Kind`。同样，产品页面上的“人格测评”“医学量表”也不能直接代替运行时身份。
 
@@ -183,7 +184,9 @@ flowchart LR
 
 新发布会新增一条 release，并将旧 active release 标记为 archived。旧 release 不再接受新测评，但仍可被已经冻结了精确 model ref 的历史测评读取。
 
-发布物化会先得到包含 `AlgorithmFamily / Algorithm / DecisionKind` 的进程内 RuntimeIdentity，并拒绝 identity 派生 family 与 DecisionKind 派生 family 不一致的模型。但 canonical Mongo record 仅保存 `Algorithm` 和 `DecisionKind`；reader 返回的进程内 `AssessmentSnapshot.AlgorithmFamily` 由 `DecisionKind` 派生，不是第二个持久化路由键。Evaluation InputSnapshot、ModelRoute、DescriptorKey 和新写入 Outcome 都只传递/持久化 canonical `DecisionKind`；进程内 descriptor 再用它派生并校验 AlgorithmFamily。
+发布物化会先得到包含 `AlgorithmFamily / Algorithm / DecisionKind` 的进程内 RuntimeIdentity，并拒绝 identity 派生 family 与 DecisionKind 派生 family 不一致的模型。
+但 canonical Mongo record 仅保存 `Algorithm` 和 `DecisionKind`；reader 返回的进程内 `AssessmentSnapshot.AlgorithmFamily` 由 `DecisionKind` 派生，不是第二个持久化路由键。
+Evaluation InputSnapshot、ModelRoute、DescriptorKey 和新写入 Outcome 都只传递/持久化 canonical `DecisionKind`；进程内 descriptor 再用它派生并校验 AlgorithmFamily。
 
 ### 6.3 Norm：独立版本化参考资产
 
@@ -231,7 +234,8 @@ AssessmentModel
 | `DefinitionV2.Outcomes` | 稳定结果代码空间与当前解释资料 | Evaluation / Interpretation |
 | `DefinitionV2.ReportMap` | 报告组织与展示映射 | Interpretation |
 
-`Decision` 的输出只应是稳定结果事实，例如 `OutcomeCode`、`LevelCode`、分类代码或画像事实，不应包含 title、summary、description、suggestions 等解释文案。当前 `Conclusion` 结构仍混合两类内容，文档会如实标明，不把概念拆分写成已经完成的代码重构。
+`Decision` 的输出只应是稳定结果事实，例如 `OutcomeCode`、`LevelCode`、分类代码或画像事实，不应包含 title、summary、description、suggestions 等解释文案。
+当前 `Conclusion` 结构仍混合两类内容，文档会如实标明，不把概念拆分写成已经完成的代码重构。
 
 这里要区分“配置发布位置”和“领域执行职责”：
 

@@ -100,7 +100,8 @@ flowchart TD
 1. AnswerSheet 已经是 Survey 认可的最终作答事实；
 2. 问卷已经绑定一个可执行的已发布 AssessmentModel。
 
-没有绑定模型的独立 Questionnaire 仍然可以收集 AnswerSheet，但其业务链路在 Survey 基础计分后结束，不进入 Evaluation，也不创建 Assessment。新提交通过冻结 Admission 区分独立问卷和完整测评；只有无 Admission 的历史事件仍保留 live binding 兼容入口。
+没有绑定模型的独立 Questionnaire 仍然可以收集 AnswerSheet，但其业务链路在 Survey 基础计分后结束，不进入 Evaluation，也不创建 Assessment。新提交通过冻结 Admission 区分独立问卷和完整测评；
+只有无 Admission 的历史事件仍保留 live binding 兼容入口。
 
 ## 4. Evaluation 负责什么
 
@@ -151,7 +152,8 @@ Outcome 是成功 EvaluationRun 产生的不可变持久化事实。只有 Outco
 
 `Assessment=evaluated` 只表示测评结果事实已经可靠提交。报告生成可能仍在等待、执行或失败。
 
-Interpretation 失败不得把已经 `evaluated` 的 Assessment 改回 `failed`。面向客户端的“测评是否全部完成”应由跨模块 Journey/Read Model 组合 Assessment 与 Report 状态，而不是向 Assessment 增加 `interpreted` 状态。
+Interpretation 失败不得把已经 `evaluated` 的 Assessment 改回 `failed`。面向客户端的“测评是否全部完成”应由跨模块 Journey/Read Model 组合 Assessment 与
+Report 状态，而不是向 Assessment 增加 `interpreted` 状态。
 
 ## 7. 设计原则
 
@@ -175,9 +177,12 @@ Assessment 固化 Questionnaire 与 AssessmentModel 的发布版本。运营发�
 
 ### 7.5 对象授权必须位于业务事实与事务之间
 
-人工 retry 先用授权快照确认存在 `qs:evaluation:collection:assessments/retry` 候选，再由 `GovernedRetryService` 加载 Assessment、校验组织与 Testee 等业务关系，从领域对象提取 `object.origin_type`，最后调用 IAM AuthZ v3 `Check`。只有对象授权通过后，才检查可观察的失败状态并进入 retry 事务。
+人工 retry 先用授权快照确认存在 `qs:evaluation:collection:assessments/retry` 候选，
+再由 `GovernedRetryService` 加载 Assessment、校验组织与 Testee 等业务关系，从领域对象提取 `object.origin_type`，最后调用 IAM AuthZ v3 `Check`。
+只有对象授权通过后，才检查可观察的失败状态并进入 retry 事务。
 
-条件 Grant 只形成对象级 `retry` 候选，不能授予 list、search、`batch_evaluate` 或 `force_retry`；后两者仍要求无条件权限。IAM 拒绝返回 403，不可用或超时返回 503，属性契约或服务身份配置错误返回 500。以上失败均不得创建事务、写 Outbox 或产生 retry 副作用。
+条件 Grant 只形成对象级 `retry` 候选，不能授予 list、search、`batch_evaluate` 或 `force_retry`；后两者仍要求无条件权限。IAM 拒绝返回 403，不可用或超时返回 503，属性契约或服务身份配置错误返回 500。
+以上失败均不得创建事务、写 Outbox 或产生 retry 副作用。
 
 ## 8. 文档地图
 

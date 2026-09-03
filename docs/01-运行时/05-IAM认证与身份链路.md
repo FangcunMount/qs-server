@@ -76,9 +76,11 @@ TokenVerifier 支持使用 JWKS 在本地验证 token，并在配置允许时使
 
 ## 6. 授权快照与失效
 
-`AuthzSnapshotLoader` 把 IAM AuthZ v3 的授权快照加载到进程内缓存。快照包含用户角色、资源/动作、`AuthorizationMode` 和 `authz_version`；只有 `UNCONDITIONAL` 可以直接通过通用 capability 中间件，`OBJECT_CHECK_REQUIRED` 必须在加载对象后调用 IAM v3 `Check`。
+`AuthzSnapshotLoader` 把 IAM AuthZ v3 的授权快照加载到进程内缓存。快照包含用户角色、资源/动作、`AuthorizationMode` 和 `authz_version`；
+只有 `UNCONDITIONAL` 可以直接通过通用 capability 中间件，`OBJECT_CHECK_REQUIRED` 必须在加载对象后调用 IAM v3 `Check`。
 
-release 模式在启动受保护 transport 之前必须完成 IAM health 和只读快照探针，并确认 `TokenVerifier`、服务身份、v3 快照 loader 与对象 checker 都已装配。任一缺失都阻断启动；受保护 REST 在授权运行时不可用时返回 `503`，不回退为本地角色或无鉴权路由。
+release 模式在启动受保护 transport 之前必须完成 IAM health 和只读快照探针，并确认 `TokenVerifier`、服务身份、v3 快照 loader 与对象 checker 都已装配。任一缺失都阻断启动；
+受保护 REST 在授权运行时不可用时返回 `503`，不回退为本地角色或无鉴权路由。
 
 apiserver 与 collection 可订阅 IAM 权限版本事件：
 
@@ -120,7 +122,8 @@ collection/worker 调用 apiserver 时存在两种完全不同的主体：
 - **服务主体**：证明请求来自受信任的 collection/worker 实例；
 - **最终用户主体**：证明当前前台操作代表哪个 IAM 用户。
 
-当前仓库内部 gRPC 主要使用 mTLS 建立服务身份边界。collection client 代码支持通过 `ServiceAuthHelper` 附加 PerRPC service JWT，但 apiserver 环境配置当前未默认开启 gRPC JWT auth；worker client 也主要依赖 mTLS。
+当前仓库内部 gRPC 主要使用 mTLS 建立服务身份边界。collection client 代码支持通过 `ServiceAuthHelper` 附加 PerRPC service JWT，但 apiserver 环境配置当前未默认开启 gRPC JWT auth；
+worker client 也主要依赖 mTLS。
 
 mTLS 不能自动表达最终用户的业务权限，service JWT 也不能冒充用户 token。需要代表用户执行的 gRPC 用例，应显式传递或解析必要的 user/org/testee 上下文，并由服务端复核。
 

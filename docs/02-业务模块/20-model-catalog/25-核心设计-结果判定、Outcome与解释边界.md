@@ -1,6 +1,7 @@
 # 核心设计：结果判定、Outcome 与解释边界
 
-> 状态：Decision 配置、Outcome code 注册、Evaluation Outcome 原子提交、纯事实持久化和基于冻结输入的报告生成已经形成主链路；不同模型族对 `OutcomeCode`、`Level` 和区间规则的使用仍不统一，发布校验、运行时路由和解释资产模型也存在明确缺口。本文严格区分当前实现与目标设计。
+> 状态：Decision 配置、Outcome code 注册、Evaluation Outcome 原子提交、纯事实持久化和基于冻结输入的报告生成已经形成主链路；
+> 不同模型族对 `OutcomeCode`、`Level` 和区间规则的使用仍不统一，发布校验、运行时路由和解释资产模型也存在明确缺口。本文严格区分当前实现与目标设计。
 
 ## 1. 本文回答
 
@@ -264,7 +265,8 @@ flowchart LR
 | Evaluation | 读取精确模型、选择能力、组织输入、保存运行与结果事实 | 拥有模型定义、编辑报告文案 |
 | Interpretation | 消费 Outcome 事实与冻结解释输入，生成报告 | 重新决定 Outcome 或更改 Evaluation 事实 |
 
-这里有一个容易误解的物理事实：当前解释文案仍存放在 `DefinitionV2.Conclusions`、顶层 `Outcomes` 和 `ReportMap` 中，因此物理上属于 ModelCatalog snapshot；但从领域责任看，它们是 Interpretation-oriented assets。
+这里有一个容易误解的物理事实：当前解释文案仍存放在 `DefinitionV2.Conclusions`、顶层 `Outcomes` 和 `ReportMap` 中，因此物理上属于 ModelCatalog snapshot；
+但从领域责任看，它们是 Interpretation-oriented assets。
 
 当前不立即引入独立 `InterpretationDefinition`，原因是：
 
@@ -689,7 +691,9 @@ level_label = 中度风险或相应显示结论
 
 ### 10.2 当前运行时已以 DecisionKind 为 canonical 路由
 
-当前 Evaluation 的 `ModelRouteFromInput` 只从 `InputSnapshot.Model.DecisionKind` 构造路由；`ModelRoute`、`DescriptorKey` 和 Outcome `RuntimeIdentity` 都只包含 DecisionKind。AlgorithmFamily 由 DecisionKind 在 descriptor 注册/解析边界派生并校验，不是 InputSnapshot 传入的第二路由键。
+当前 Evaluation 的 `ModelRouteFromInput` 只从 `InputSnapshot.Model.DecisionKind` 构造路由；
+`ModelRoute`、`DescriptorKey` 和 Outcome `RuntimeIdentity` 都只包含 DecisionKind。
+AlgorithmFamily 由 DecisionKind 在 descriptor 注册/解析边界派生并校验，不是 InputSnapshot 传入的第二路由键。
 
 当前设计是：
 
@@ -1312,7 +1316,8 @@ Manual action required?
 
 ### 21.5 发布 DecisionKind 已进入 canonical 运行时
 
-当前结论：已收口。快照、InputSnapshot、ModelRoute、DescriptorKey 和 Outcome 直接传递 DecisionKind；AlgorithmFamily 只从它在进程内派生。后续风险是映射规则的集中治理与演进兼容，而不是增加第二个 snapshot 路由字段。
+当前结论：已收口。快照、InputSnapshot、ModelRoute、DescriptorKey 和 Outcome 直接传递 DecisionKind；AlgorithmFamily 只从它在进程内派生。
+后续风险是映射规则的集中治理与演进兼容，而不是增加第二个 snapshot 路由字段。
 
 ### 21.6 解释资产仍混在 Conclusion/Profile 中
 
@@ -1595,11 +1600,7 @@ InterpretReport
 可以用五句话概括：
 
 > Factor 和 Norm 负责产生可验证的测量数值；Decision 负责根据发布规则选择稳定业务结果；Interpretation 负责把这个结果解释给人看。
-
 > OutcomeCode 是机器可读、可统计、可追溯的业务身份，不是中文标题、结论或建议；Level 只是 Outcome 的一种有序表达，不能代表所有人格与多维结果。
-
 > Evaluation Outcome 是不可变结果事实，Assessment summary 是查询投影，Interpretation Report 是解释产物；三者服务不同目标，不能互相替代。
-
 > 当前最有价值的边界是“纯事实 Outcome payload + 当次发布冻结的 ReportInput”：新文案不能污染历史结果，报告失败也不能推翻已经成立的 Evaluation Outcome。
-
 > 解释资产在领域责任上属于 Interpretation，但当前继续随 AssessmentModel release 统一冻结；先把类型、校验和消费边界拆清楚，再根据真实独立生命周期决定是否物理拆分。

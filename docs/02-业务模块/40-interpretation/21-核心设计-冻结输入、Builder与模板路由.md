@@ -249,7 +249,8 @@ Outcome schema 版本回答的是“持久化结果事实怎样解码”，不�
 
 ### 6.2 typology schema v1
 
-历史 typology payload 可能已经包含大量报告详情，例如类型名称、一句话描述、优势、弱点、建议、图片和来源信息。codec 会恢复为 `PersonalityTypeDetail` 或 `TraitProfileDetail`，适配器再直接转成 Interpretation facts。
+历史 typology payload 可能已经包含大量报告详情，例如类型名称、一句话描述、优势、弱点、建议、图片和来源信息。codec 会恢复为 `PersonalityTypeDetail` 或
+`TraitProfileDetail`，适配器再直接转成 Interpretation facts。
 
 这条路径的意义是兼容已存在事实，而不是鼓励 Evaluation 继续产出报告文案。
 
@@ -278,7 +279,8 @@ Interpretation 使用 `TypeCode` 在同一 Outcome 的冻结 typology ReportInpu
 
 因子计分报告从冻结 snapshot 恢复因子 code、title、max score、total 标识和解释规则，再把 Outcome dimensions 中的分数与其结合。
 
-常模报告还会使用冻结常模表和 Outcome 已有的 T 分数恢复 conclusion、suggestion 等展示内容。当前代码在个别维度缺少 Level 时还会补齐 Level code/label。这个行为已经接近“重新判定结果”的边界，后续应明确：
+常模报告还会使用冻结常模表和 Outcome 已有的 T 分数恢复 conclusion、suggestion 等展示内容。当前代码在个别维度缺少 Level 时还会补齐 Level code/label。
+这个行为已经接近“重新判定结果”的边界，后续应明确：
 
 - Interpretation 可以根据 Outcome level 选择文案；
 - Interpretation 不应在 Outcome 未给出 level 时重新决定 level；
@@ -343,7 +345,8 @@ TemplateVersion 标识一代不可变的报告生成语义。当前定义希望�
 
 它参与 Generation 幂等键：同一 Outcome、同一 ReportType、同一 TemplateVersion 只对应一个生成意图；新版本应产生新 Generation 和新 Report，而不是覆盖旧成品。
 
-当前发布目录同时保留 `legacy-v1` 与 `2026-08-v1`。ModelCatalog active snapshot 显式冻结 TemplateID/TemplateVersion，Outcome 继续冻结同一组路由身份；运行时只解析已发布 release，缺失或未知版本会 fail-closed。
+当前发布目录同时保留 `legacy-v1` 与 `2026-08-v1`。ModelCatalog active snapshot 显式冻结 TemplateID/TemplateVersion，Outcome 继续冻结同一组路由身份；
+运行时只解析已发布 release，缺失或未知版本会 fail-closed。
 
 ### 7.5 Algorithm、ProductChannel 与 ReportProfile
 
@@ -390,7 +393,8 @@ Algorithm 描述模型如何计算；AdapterKey 描述 Interpretation 怎样选�
 
 Registry 根据机制 Key 选择 Builder，而不是根据 `BuilderIdentity` 反查。BuilderIdentity 是执行证据，用来回答“最终是哪段实现生成了内容”。
 
-当前它已经进入 InterpretReport artifact、Mongo 持久化、`interpretation.report.generated` 事件和执行日志。Committer 会校验 Artifact 与本次 Builder 声明一致；历史缺失字段恢复为显式 unknown，而不是伪装成当前 Builder。
+当前它已经进入 InterpretReport artifact、Mongo 持久化、`interpretation.report.generated` 事件和执行日志。Committer 会校验 Artifact 与本次 Builder 声明一致；
+历史缺失字段恢复为显式 unknown，而不是伪装成当前 Builder。
 
 ### 8.4 ContentSchemaVersion 不是 TemplateVersion
 
@@ -573,7 +577,8 @@ Build(frozen InterpretationInput, fixed builder/template code)
 - 修改 TemplateID 对应模板；
 - 修改 Content 的组装顺序或字段语义。
 
-所以真正的重放契约是“冻结输入 + 可定位的不可变 Builder/模板语义”，而不只是“Builder 不查数据库”。当前二进制保留两代 release manifest 和对应版本化 Builder 包装，发布模型显式冻结版本；未来再发布新版本时，仍必须保留需要重放的旧 manifest 与实现，不能只改动当前版本常量。
+所以真正的重放契约是“冻结输入 + 可定位的不可变 Builder/模板语义”，而不只是“Builder 不查数据库”。当前二进制保留两代 release manifest 和对应版本化 Builder 包装，发布模型显式冻结版本；
+未来再发布新版本时，仍必须保留需要重放的旧 manifest 与实现，不能只改动当前版本常量。
 
 ## 13. 生产生成与运营 Preview
 
@@ -595,7 +600,8 @@ ModelCatalog 的 typology 预览会：
 
 这个边界是正确的：运营预览未发布模型时，不应制造正式测评和正式报告事实。
 
-当前 Preview 与生产路径都使用默认 Builder Registry 和 `ResolveByMechanism`，新增特化路由不会再因直接构造 TypologyBuilder 而漂移。Preview 仍不调用生产 Executor 或生命周期服务，只共享纯 Builder resolver 与内容构建机制。
+当前 Preview 与生产路径都使用默认 Builder Registry 和 `ResolveByMechanism`，新增特化路由不会再因直接构造 TypologyBuilder 而漂移。
+Preview 仍不调用生产 Executor 或生命周期服务，只共享纯 Builder resolver 与内容构建机制。
 
 ## 14. 新增报告能力时怎样判断扩展点
 
@@ -664,7 +670,8 @@ ModelCatalog 的 typology 预览会：
 
 ### 15.1 TemplateVersion 发布路由已关闭
 
-当前 5 个 TemplateID 各有 `legacy-v1` 与 `2026-08-v1` 两个 release，ModelCatalog active snapshot 显式冻结 TemplateID/TemplateVersion，Outcome 继续冻结该身份。发布、运行时路由与二进制 manifest 会互相校验。
+当前 5 个 TemplateID 各有 `legacy-v1` 与 `2026-08-v1` 两个 release，ModelCatalog active snapshot 显式冻结 TemplateID/TemplateVersion，Outcome 继续冻结该身份。
+发布、运行时路由与二进制 manifest 会互相校验。
 
 后续发布新版本仍要遵守：新建 manifest、保留仍需重放的历史 manifest、冻结模型路由、跑 manifest 覆盖与 checksum 门禁，不能原地修改旧 release。
 
@@ -753,7 +760,8 @@ Git commit 只能说明部署过什么代码，不能成为业务 Generation 的
 
 ### 17.5 Builder 与设计模式中的 Builder 有什么关系？
 
-这里的 Builder 更接近“策略 + 内容构建器”：Registry 根据机制键选择策略，具体 Builder 把结构化输入组装为 Draft。它不是为了逐步构造复杂对象而暴露 fluent API。命名强调的是“只构建内容、不拥有生命周期”，解释时不必生硬套用经典 GoF Builder 模式。
+这里的 Builder 更接近“策略 + 内容构建器”：Registry 根据机制键选择策略，具体 Builder 把结构化输入组装为 Draft。它不是为了逐步构造复杂对象而暴露 fluent API。
+命名强调的是“只构建内容、不拥有生命周期”，解释时不必生硬套用经典 GoF Builder 模式。
 
 ### 17.6 Registry 的 fallback 是不是越灵活越好？
 

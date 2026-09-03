@@ -95,7 +95,8 @@ query、wait-report、report-events 的 `newBudget` 会选择按原配置运行�
 
 ### 5.3 为什么选择 fail-open
 
-RateLimit 是容量保护，不是业务事实。Redis 故障时一律 fail-closed 会把原本可以由 DB 承载的小流量也拒绝掉。当前实现选择保可用性，把风险继续交给 Gate、gRPC inflight、apiserver RateLimit、Backpressure 和数据库约束。
+RateLimit 是容量保护，不是业务事实。Redis 故障时一律 fail-closed 会把原本可以由 DB 承载的小流量也拒绝掉。当前实现选择保可用性，
+把风险继续交给 Gate、gRPC inflight、apiserver RateLimit、Backpressure 和数据库约束。
 
 这个选择不是无成本：如果故障时流量很大，后端保护层会承受更多压力。因此需要监控 `degraded_open`、Gate 拒绝、Backpressure timeout 和 DB 饱和信号。
 
@@ -109,7 +110,8 @@ RateLimit 是容量保护，不是业务事实。Redis 故障时一律 fail-clos
 
 ### 5.4 为什么 submit 不是完全 fail-open
 
-submit 会进入跨服务校验和 Mongo transaction，成本显著高于普通缓存命中。Redis 故障若让每个实例都按 300 QPS 分布式基线无条件放行，扩容会把集群放大量直接推给 gRPC/Mongo。因此当前只在 primary 明确返回 `degraded_open` 时，追加每实例 30/10 QPS 的保守本地预算。
+submit 会进入跨服务校验和 Mongo transaction，成本显著高于普通缓存命中。Redis 故障若让每个实例都按 300 QPS 分布式基线无条件放行，扩容会把集群放大量直接推给 gRPC/Mongo。
+因此当前只在 primary 明确返回 `degraded_open` 时，追加每实例 30/10 QPS 的保守本地预算。
 
 这不是一条通用常数：实例数变化会改变聚合上界；query、wait-report、report-events 尚未复制该策略，也是因为它们的成本与可降级结果不同。应先取得路径成本、cache hit、下游拐点和故障流量证据，再决定每个 budget 的 fallback。
 

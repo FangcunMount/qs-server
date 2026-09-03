@@ -39,7 +39,8 @@
 - 实现状态使用 `implemented`、`partial`、`planned`、`not_applicable`：它说明代码能力，不代表生产已启用。
 - 证据等级使用 E0-E7，定义见[项目完成画像与验收标准](./00-总览/08-项目完成画像与验收标准.md#4-证据等级)。
 
-三套状态禁止互相替代。例如 `aligned + partial + E2` 表示“文档准确描述了一个仅局部实现、由仓库测试证明的能力”，不能简写成“文档未完成”或“生产已完成”。规范化元数据集中维护在 [`document-closure.json`](./document-closure.json)，不要求在每篇 active Markdown 中复制 front matter。
+三套状态禁止互相替代。例如 `aligned + partial + E2` 表示“文档准确描述了一个仅局部实现、由仓库测试证明的能力”，不能简写成“文档未完成”或“生产已完成”。
+规范化元数据集中维护在 [`document-closure.json`](./document-closure.json)，不要求在每篇 active Markdown 中复制 front matter。
 
 未标状态的正文默认声称“当前成立”，因此必须有可回查的代码或契约入口。
 
@@ -70,7 +71,8 @@
 
 ### 5.1 基础设施专题的知识结构
 
-基础设施文档按问题组织，不按 Redis、MQ、GORM 等组件平均分栏。Cache、Event、Concurrency / Resilience 是三条问题主线；Data Access、Migration & Recovery、Security、Observability、Runtime、Config & Deployment 分别提供事实、恢复、权限、证据、生命周期和交付支撑。
+基础设施文档按问题组织，不按 Redis、MQ、GORM 等组件平均分栏。Cache、Event、Concurrency / Resilience 是三条问题主线；
+Data Access、Migration & Recovery、Security、Observability、Runtime、Config & Deployment 分别提供事实、恢复、权限、证据、生命周期和交付支撑。
 
 专题可以按篇章拆分，但一组文档整体必须保存以下推理链：
 
@@ -135,15 +137,31 @@
 ```bash
 make docs-check
 git diff --check
+# 仅修正 docs/ 空白、表格后空行、断裂标记、加粗伪标题（不折行，且指纹不变才写盘）：
+python scripts/check_docs_hygiene.py --fix
+# 在 --fix 基础上再把正文折行到约 120 列（代码块/表格/HTML 注释不折，指纹不变才写盘）：
+python scripts/check_docs_hygiene.py --fix --reflow
 ```
 
-`docs-check` 先运行门禁自身的正负/mutation 测试，再执行 `docs-hygiene` 与 `docs-facts`。hygiene 覆盖仓库根 README 及代码、配置、脚本旁的现行 Markdown，默认只排除 `docs/_archive`；facts 验证 active taxonomy、反引号仓库源码路径、目录预算、模块/事件入口、版本/API 数量、scheduler/config 清单、关键状态、Mongo audit 与性能计划。反引号路径若只是历史已删除位置，应改写为历史说明并指向当前防回流测试或 Git 历史，不能继续伪装成现行事实入口。
+`docs-check` 先运行门禁自身的正负/mutation 测试，再执行 `docs-hygiene` 与 `docs-facts`。hygiene 覆盖仓库根 README 及代码、配置、脚本旁的现行 Markdown，默认只排除 `docs/_archive`；
+其中 `docs/` 额外检查连续空行、标题前空行、`---` 前空行、表格后空行、加粗伪标题，以及正文中换行折断的 `` `* *` `` / `` ` - > ` ``（行内代码中的示例除外）。
+`--reflow` 还会把正文段落折到约 120 列，并拼回被错误折断的中文/英文行，但不改信息指纹。facts 验证 active taxonomy、反引号仓库源码路径、目录预算、模块/事件入口、版本/API
+数量、scheduler/config 清单、关键状态、Mongo audit 与性能计划。反引号路径若只是历史已删除位置，应改写为历史说明并指向当前防回流测试或 Git 历史，不能继续伪装成现行事实入口。
 
-`docs-facts` 还必须验证 `document-closure.json` 对 164 篇 primary 文档和 27 篇 maintained sidecar 的 exact coverage、source baseline、状态枚举、七模块七轴签署、十项基础设施七轴签署，以及 REST/gRPC/Event/Signal/Migration 等机器契约 ratchet。164 超过 150 的评审目标但低于 165 硬上限，例外理由记录在 `budgets.exceptions`，不能据此继续无审查扩张。
+`docs-facts` 还必须验证 `document-closure.json` 对 164 篇 primary 文档和 27 篇 maintained sidecar 的 exact coverage、source
+baseline、状态枚举、七模块七轴签署、十项基础设施七轴签署，以及 REST/gRPC/Event/Signal/Migration 等机器契约 ratchet。164 超过 150 的评审目标但低于 165 硬上限，
+例外理由记录在 `budgets.exceptions`，不能据此继续无审查扩张。
 
-台账中的 `checkout_ref: git:HEAD` 是动态工作区引用；历史 CI、部署和生产 SHA 使用独立字段，不得要求它们等于 HEAD。`verification`、模块与基础设施维度中的可升级证据只能使用严格 `command` 或 `source_selector` 对象；未实际执行的测试不得登记为 passed。`docs-facts` 能校验命令入口、源码 selector、SHA/date schema 和 source freshness，但不会替操作者重演台账中的历史命令或访问外部证据；命令的实际退出码仍必须由本次执行者/CI 保存并负责。
+台账中的 `checkout_ref: git:HEAD` 是动态工作区引用；历史 CI、部署和生产 SHA 使用独立字段，不得要求它们等于 HEAD。
+`verification`、模块与基础设施维度中的可升级证据只能使用严格 `command` 或 `source_selector` 对象；未实际执行的测试不得登记为 passed。
+`docs-facts` 能校验命令入口、源码 selector、SHA/date schema 和 source freshness，但不会替操作者重演台账中的历史命令或访问外部证据；命令的实际退出码仍必须由本次执行者/CI 保存并负责。
 
-十项基础设施主题必须各自覆盖 checker 规定的关键 source/config scope，不能用一份通用测试或一个无关目录代替。`passed` 环境测试必须附结构化原始证据引用；没有真实环境执行时保持 `not_run` 并绑定 gap。生产记录通过 `topics` 声明适用范围，主题可以诚实保留空引用，但 production 维度必须非 ready、unsigned 且有具名 production gap。只有 topics 相关、未过期、结果 passed、`deployed_sha` 精确等于当前 checkout、`source_baseline_sha` 等于当前机器基线且保存真实 effective-config `sha256` 的记录，才有资格支持 production ready；`unknown_not_recorded` 只允许历史记录。历史基础设施运行证据集中保存在 [`infrastructure-production-evidence.json`](./infrastructure-production-evidence.json)，人工入口见[基础设施生产证据台账](./00-总览/10-基础设施生产证据台账.md)；历史记录不得自动升级当前 production 签署。
+十项基础设施主题必须各自覆盖 checker 规定的关键 source/config scope，不能用一份通用测试或一个无关目录代替。`passed` 环境测试必须附结构化原始证据引用；没有真实环境执行时保持 `not_run` 并绑定 gap。
+生产记录通过 `topics` 声明适用范围，主题可以诚实保留空引用，但 production 维度必须非 ready、unsigned 且有具名 production gap。
+只有 topics 相关、未过期、结果 passed、`deployed_sha` 精确等于当前 checkout、`source_baseline_sha` 等于当前机器基线且保存真实 effective-config `sha256`
+的记录，才有资格支持 production ready；`unknown_not_recorded` 只允许历史记录。历史基础设施运行证据集中保存在
+[`infrastructure-production-evidence.json`](./infrastructure-production-evidence.json)，人工入口见[基础设施生产证据台账](./00-总览/10-基础设施生产证据台账.md)；
+历史记录不得自动升级当前 production 签署。
 
 涉及 REST 生成契约时再执行：
 

@@ -1,6 +1,7 @@
 # Observability
 
-Observability 分成“瞬时信号”和“可签署证据”两层。日志、指标与 request/event ID 用来定位；probe、runtime snapshot、checkpoint、Outbox 和 dated evidence 用来说明某个时点实际成立了什么。任何单一平面都不能证明端到端正确。
+Observability 分成“瞬时信号”和“可签署证据”两层。日志、指标与 request/event ID 用来定位；probe、runtime snapshot、checkpoint、Outbox 和 dated evidence 用来说明某个时点实际成立了什么。
+任何单一平面都不能证明端到端正确。
 
 ## 阅读顺序
 

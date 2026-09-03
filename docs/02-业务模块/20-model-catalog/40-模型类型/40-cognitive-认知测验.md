@@ -1,6 +1,7 @@
 # cognitive：认知测验
 
-> 状态：`cognitive + task_performance` 当前只有 Raven Standard Progressive Matrices（Raven SPM）一个完整执行实现。系统已能冻结题组、正确答案、总分因子、可选常模引用和能力等级规则；但认知常模导入、受试者人口学资料、服务端计时与更广泛的认知任务扩展尚未闭环。
+> 状态：`cognitive + task_performance` 当前只有 Raven Standard Progressive Matrices（Raven SPM）一个完整执行实现。系统已能冻结题组、正确答案、总分因子、可选常模引用和能力等级规则；
+> 但认知常模导入、受试者人口学资料、服务端计时与更广泛的认知任务扩展尚未闭环。
 
 ## 1. 本文回答
 

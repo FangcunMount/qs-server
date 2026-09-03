@@ -72,11 +72,9 @@ application service 的入口是 `AcceptDurably`。它只有在 apiserver 返回
 
 ### 5.3 SubmitCoalescer 的边界
 
-Redis SubmitCoalescer 是减少同一请求并发重复执行的 advisory
-coordination。owner 在 lease 内执行 durable submit；contender 有界等待
-completion signal，随后仍调用 apiserver 从 Mongo 回读并校验结果。Redis
-故障、等待超时或关闭 coalescer 都进入“先 durable lookup，miss 再完整受理”的
-同一路径。因此：
+Redis SubmitCoalescer 是减少同一请求并发重复执行的 advisory coordination。owner 在 lease 内执行 durable submit；
+contender 有界等待 completion signal，随后仍调用 apiserver 从 Mongo 回读并校验结果。Redis 故障、等待超时或关闭 coalescer 都进入“先 durable lookup，miss 再完整受理”的同一路径。
+因此：
 
 - Redis 锁不能替代幂等键；
 - Redis completion signal 不能直接作为 202 的结果；
@@ -94,14 +92,13 @@ completion signal，随后仍调用 apiserver 从 Mongo 回读并校验结果。
 | gRPC downstream Gate | 限制对 apiserver 的总在途 RPC | 在 inflight wait/调用超时预算内等待，避免无界堆积 |
 | apiserver 自身背压 | 保护 MySQL、MongoDB、IAM 等下游 | 由 gRPC 错误映射为依赖不可用或容量不足 |
 
-默认配置曾把 Submit Gate 等待设置为 `50ms`，但架构契约不是 50ms 本身，而是**等待必须有界，超过预算必须在持久化前明确拒绝**。具体值以 `collection-server.<env>.yaml` 和 `internal/collection-server/options` 为准。
+默认配置曾把 Submit Gate 等待设置为 `50ms`，但架构契约不是 50ms 本身，而是**等待必须有界，超过预算必须在持久化前明确拒绝**。
+具体值以 `collection-server.<env>.yaml` 和 `internal/collection-server/options` 为准。
 
-手动 AI 解读 POST 使用独立的 `ai_explanation_request` global/user rate budget，避免与普通查询共用速率额度；
-它仍复用 query concurrency Gate 和 gRPC downstream Gate。该 token-bucket 只负责入口削峰，不能替代
-apiserver 在 Mongo 事务内对机构、用户、Assessment UTC 日 Provider 调用预算，以及 Worker 开始 Run 时三层
-活跃 Provider 执行槽的最终裁决。精确语义复用不应
-因为入口之后的成本预算已满而失败；新请求的持久预算不足由 apiserver 返回 `ResourceExhausted`，BFF 映射为
-带 `Retry-After` 的 `429`；异步执行槽不足不会撤销已接受的 Generation，而是由内部 RPC 返回容量不足并让消息重投。
+手动 AI 解读 POST 使用独立的 `ai_explanation_request` global/user rate budget，避免与普通查询共用速率额度；它仍复用 query concurrency Gate 和 gRPC downstream Gate。
+该 token-bucket 只负责入口削峰，不能替代 apiserver 在 Mongo 事务内对机构、用户、Assessment UTC 日 Provider 调用预算，以及 Worker 开始 Run 时三层活跃 Provider 执行槽的最终裁决。
+精确语义复用不应因为入口之后的成本预算已满而失败；新请求的持久预算不足由 apiserver 返回 `ResourceExhausted`，BFF 映射为带 `Retry-After` 的 `429`；
+异步执行槽不足不会撤销已接受的 Generation，而是由内部 RPC 返回容量不足并让消息重投。
 
 当 Redis 或缓存整体不可用时，高流量接口不能无保护地全部回源数据库。根据路径的重要性，允许采用快速拒绝、固定降级数据或降低容量后的有限服务。
 
@@ -146,7 +143,8 @@ transport 的精确 HTTP 映射以 handler 和 OpenAPI 为准；application serv
 
 ## 10. 关闭顺序
 
-collection 当前先关闭 HTTP，排空可靠提交入口，再依次关闭 gRPC clients、数据库/Redis profile、IAM module 和 Container。collection 不再持有 IAM authz version subscriber；这一顺序避免在途提交尚未结束时先断开 apiserver 或持久化依赖。
+collection 当前先关闭 HTTP，排空可靠提交入口，再依次关闭 gRPC clients、数据库/Redis profile、IAM module 和 Container。collection 不再持有 IAM authz version subscriber；
+这一顺序避免在途提交尚未结束时先断开 apiserver 或持久化依赖。
 
 详细对比见[优雅关闭与资源释放](./07-优雅关闭与资源释放.md)。
 

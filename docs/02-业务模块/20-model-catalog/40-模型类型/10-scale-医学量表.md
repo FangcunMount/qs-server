@@ -1,6 +1,7 @@
 # scale：医学量表
 
-> 状态：`scale + scale_default + factor_scoring` 已形成完整发布与执行链路，适合以题目基础分聚合因子并按原始分区间形成结果的医学量表。当前运行时 ScaleSnapshot 仍偏向扁平题目—因子结构，DefinitionV2 中更丰富的 FactorGraph、权重和 Factor 来源尚未完整投影到 scale 执行 DTO。
+> 状态：`scale + scale_default + factor_scoring` 已形成完整发布与执行链路，适合以题目基础分聚合因子并按原始分区间形成结果的医学量表。
+> 当前运行时 ScaleSnapshot 仍偏向扁平题目—因子结构，DefinitionV2 中更丰富的 FactorGraph、权重和 Factor 来源尚未完整投影到 scale 执行 DTO。
 
 ## 1. 本文回答
 
@@ -206,7 +207,8 @@ FactorCode
 18..27  -> high
 ```
 
-真正持久化到 Outcome 的核心应是 `low/moderate/high` 等代码和计算证据；title、summary、description 属于解释资产，当前结构仍有混合，详见 [结果判定、Outcome 与解释边界](../25-核心设计-结果判定、Outcome与解释边界.md)。
+真正持久化到 Outcome 的核心应是 `low/moderate/high` 等代码和计算证据；title、summary、description 属于解释资产，当前结构仍有混合，
+详见 [结果判定、Outcome 与解释边界](../25-核心设计-结果判定、Outcome与解释边界.md)。
 
 ---
 
@@ -410,7 +412,8 @@ DefinitionV2 支持 FactorGraph、Factor Source、sign、weight 和 option overr
 - MaxScore；
 - InterpretRules。
 
-`ScaleSnapshotFromDefinition` 只把直接 Question Source 投影成 `QuestionCodes`，没有完整保留 Factor Source、层级边、权重和 sign。运行时又从 DefinitionV2 投影为该 DTO，因此不能把通用领域结构的全部表达力都写成 scale 已支持。
+`ScaleSnapshotFromDefinition` 只把直接 Question Source 投影成 `QuestionCodes`，没有完整保留 Factor Source、层级边、权重和 sign。
+运行时又从 DefinitionV2 投影为该 DTO，因此不能把通用领域结构的全部表达力都写成 scale 已支持。
 
 目标选择有两个：
 
@@ -421,7 +424,8 @@ DefinitionV2 支持 FactorGraph、Factor Source、sign、weight 和 option overr
 
 ### 14.2 capability 元数据不一致
 
-`FamilyCapability` 中 scale 的部分 authoring 字段仍为 false，但 `management.Service`、ScaleDefinitionHandler 和 publication 已支持创建、编辑与发布。当前这些字段没有实际阻断管理服务，属于需要收敛的设计债务。
+`FamilyCapability` 中 scale 的部分 authoring 字段仍为 false，但 `management.Service`、ScaleDefinitionHandler 和 publication 已支持创建、编辑与发布。
+当前这些字段没有实际阻断管理服务，属于需要收敛的设计债务。
 
 ### 14.3 scale 暂不支持常模
 

@@ -38,7 +38,8 @@ flowchart LR
 
 ### 3.2 initialize container
 
-容器阶段创建 `internal/apiserver/container.Container` 并装配业务模块。当前核心装配收敛在 `internal/apiserver/container/modules`，包括 Survey、Actor、ModelCatalog、Evaluation、Interpretation、Plan、Statistics 等模块及其 application/domain/infra 依赖。
+容器阶段创建 `internal/apiserver/container.Container` 并装配业务模块。当前核心装配收敛在 `internal/apiserver/container/modules`，
+包括 Survey、Actor、ModelCatalog、Evaluation、Interpretation、Plan、Statistics 等模块及其 application/domain/infra 依赖。
 
 容器承担的是“把实现连接起来”，不是“成为万能 Service Locator”。阅读某个模块时应从模块导出的 service/port 追踪，而不是让业务代码反向依赖整个 Container。
 
@@ -79,10 +80,8 @@ gRPC 服务按依赖是否完整进行注册。某个模块没有成功装配时
 - `ReportCatalogAuditRunner`：有界审计报告目录事实。
 - `MongoConsistencyAuditRunner`：按批次只读巡检 Mongo 跨集合一致性，并通过独立 checkpoint 推进七阶段扫描。
 
-runner 是否真正存在取决于各自的 enable 开关、必要 service、org_ids、Redis 分布式锁和配置合法性。
-版本化 dev/prod YAML 当前都关闭 Mongo consistency audit；这只说明仓库配置意图，不证明任一部署的
-effective value。Evaluation 审计、Mongo consistency audit 与三条租约恢复链路使用不同配置、
-不同 leader lock 和不同失败流，互不阻塞。
+runner 是否真正存在取决于各自的 enable 开关、必要 service、org_ids、Redis 分布式锁和配置合法性。版本化 dev/prod YAML 当前都关闭 Mongo consistency audit；
+这只说明仓库配置意图，不证明任一部署的 effective value。Evaluation 审计、Mongo consistency audit 与三条租约恢复链路使用不同配置、不同 leader lock 和不同失败流，互不阻塞。
 
 ### 3.6 register shutdown callback
 
@@ -106,7 +105,8 @@ collection、worker 和 REST handler 应依赖 application service 或窄化 por
 
 ### 5.2 跨模块编排有明确位置
 
-例如 `AssessmentIntakeService` 的 gRPC 注册不是简单把一个 repository 暴露出去，而是在组合根构造 assessment intake journey，将答卷计分、模型绑定、Plan Task 解析、Evaluation intake 和报告状态连接起来。
+例如 `AssessmentIntakeService` 的 gRPC 注册不是简单把一个 repository 暴露出去，而是在组合根构造 assessment intake journey，
+将答卷计分、模型绑定、Plan Task 解析、Evaluation intake 和报告状态连接起来。
 
 这类 journey 适合放在 application/组合边界，因为它协调多个模块，但不应把每个模块内部规则重新实现一遍。
 
@@ -137,7 +137,8 @@ scheduler、Outbox consumer 和 gRPC handler 即使没有用户 HTTP 请求，�
 5. Container Cleanup；
 6. 关闭数据库。
 
-该顺序先停止入口并排空在途请求，再释放 application、Provider 与数据库依赖，避免长耗时 AI Prompt 评测在 Provider 已返回但结果尚未持久化时被部署打断。生产 Compose 同时为 apiserver 和 worker 配置 8 分 30 秒 stop grace。仍需继续完善 readiness 摘流时机和分阶段关闭耗时指标，详见[优雅关闭与资源释放](./07-优雅关闭与资源释放.md)。
+该顺序先停止入口并排空在途请求，再释放 application、Provider 与数据库依赖，避免长耗时 AI Prompt 评测在 Provider 已返回但结果尚未持久化时被部署打断。
+生产 Compose 同时为 apiserver 和 worker 配置 8 分 30 秒 stop grace。仍需继续完善 readiness 摘流时机和分阶段关闭耗时指标，详见[优雅关闭与资源释放](./07-优雅关闭与资源释放.md)。
 
 ## 8. 阅读和验证路径
 

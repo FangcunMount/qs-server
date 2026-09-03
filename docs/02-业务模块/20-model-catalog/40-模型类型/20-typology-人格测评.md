@@ -1,6 +1,7 @@
 # typology：人格测评
 
-> 状态：人格测评已经形成统一的 `factor_classification` 运行机制，支持极点组合、最近模式、连续特质画像和主导因子四类 Decision，并支持发布前问卷映射校验和草稿报告预览。代码中的 `KindTypology` 是历史名称，本文统一按广义“人格测评模型”解释。
+> 状态：人格测评已经形成统一的 `factor_classification` 运行机制，支持极点组合、最近模式、连续特质画像和主导因子四类 Decision，并支持发布前问卷映射校验和草稿报告预览。
+> 代码中的 `KindTypology` 是历史名称，本文统一按广义“人格测评模型”解释。
 
 ## 1. 本文回答
 
@@ -479,7 +480,8 @@ Configured Evaluator：
 
 ### 16.1 Algorithm identity 已收敛
 
-API、领域枚举、发布快照与 Assessment 都只使用 `personality_typology`。MBTI、SBTI、Big Five 等差异放入 canonical DefinitionV2 与 Interpretation template identity，不再作为 Algorithm alias。
+API、领域枚举、发布快照与 Assessment 都只使用 `personality_typology`。MBTI、SBTI、Big Five 等差异放入 canonical DefinitionV2 与 Interpretation
+template identity，不再作为 Algorithm alias。
 
 ### 16.2 RuntimeSpec 只从 DefinitionV2 物化
 

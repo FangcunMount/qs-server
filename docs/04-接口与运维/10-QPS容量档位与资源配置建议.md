@@ -2,7 +2,8 @@
 
 本文用于回答“怎样为一个确定的环境定标容量、怎样把业务用户换算成请求负载、怎样决定扩容或调参”。它不保存当前生产容量、主机/副本数量或某次压测结果；这些时点证据统一进入[基础设施生产证据台账](../00-总览/10-基础设施生产证据台账.md)。
 
-部署与网络事实见[配置与部署](../03-基础设施/config-deployment/README.md)，并发保护边界见 [Concurrency](../03-基础设施/concurrency/README.md)，正式压测步骤见 [300QPS 混合场景压测 SOP](./11-300QPS混合场景压测SOP.md)。
+部署与网络事实见[配置与部署](../03-基础设施/config-deployment/README.md)，并发保护边界见 [Concurrency](../03-基础设施/concurrency/README.md)，
+正式压测步骤见 [300QPS 混合场景压测 SOP](./11-300QPS混合场景压测SOP.md)。
 
 ## 1. 30 秒执行入口
 
@@ -196,6 +197,7 @@ CPU 线性估算只是下一档起点。出现 throttling、GC、lock contention
 
 ## 10. 结果与更新
 
-每次 run 保留 `summary.json`、`report.md`、`evidence.json`、完整命令、退出码、source/deployed SHA、effective config、拓扑 hash、观察窗口、owner 和限制。当前生产建议与历史撤销结论只从[基础设施生产证据台账](../00-总览/10-基础设施生产证据台账.md)读取。
+每次 run 保留 `summary.json`、`report.md`、`evidence.json`、完整命令、退出码、source/deployed SHA、effective config、拓扑 hash、观察窗口、owner 和限制。
+当前生产建议与历史撤销结论只从[基础设施生产证据台账](../00-总览/10-基础设施生产证据台账.md)读取。
 
 硬件/故障域、服务拆分、配置族、数据库/MQ、流量混合、用户旅程、数据规模或依赖时延变化后，旧结果仍保留审计价值，但必须失效并重新定标。

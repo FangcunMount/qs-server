@@ -16,9 +16,11 @@ one-off 不是“运行一次的普通脚本”，而是独立变更程序。每
 | destructive | 删除/覆盖不可轻易恢复的数据 | 独立审批、目标清单、业务/合规影响、可验证恢复、双人复核 |
 | blocked | 当前语义无法证明安全 | 禁止 apply；只能补分析、测试和保护条件 |
 
-`cleanup_orphaned_assessment_documents` 当前必须是 blocked：AnswerSheet 与 `answersheet.submitted` Outbox 在同一 Mongo 事务持久化，Assessment 由 worker 异步确保；“暂时没有 MySQL Assessment”不能证明 AnswerSheet 是孤儿。该工具还未把 durable Outbox 纳入候选保护/备份，apply 会制造新的反向不一致。
+`cleanup_orphaned_assessment_documents` 当前必须是 blocked：AnswerSheet 与 `answersheet.submitted` Outbox 在同一 Mongo 事务持久化，Assessment 由 worker 异步确保；
+“暂时没有 MySQL Assessment”不能证明 AnswerSheet 是孤儿。该工具还未把 durable Outbox 纳入候选保护/备份，apply 会制造新的反向不一致。
 
-这里的 blocked 目前是文档、变更流程和运维授权层面的阻断，不是二进制 fail-closed：源码仍解析并执行 `--apply`、`--hard-delete` 与 `--skip-backup`。在代码级拒绝开关或移除可执行分发完成前，必须继续限制工具制品/生产凭证访问；任何人都不能把本页或门禁通过解读为“写删路径已在技术上禁用”。
+这里的 blocked 目前是文档、变更流程和运维授权层面的阻断，不是二进制 fail-closed：源码仍解析并执行 `--apply`、`--hard-delete` 与 `--skip-backup`。在代码级拒绝开关或移除可执行分发完成前，必须继续限制工具制品/生产凭证访问；
+任何人都不能把本页或门禁通过解读为“写删路径已在技术上禁用”。
 
 ## 3. blocked 工具的退出条件
 
@@ -46,7 +48,8 @@ one-off 不是“运行一次的普通脚本”，而是独立变更程序。每
   -> 写入证据台账并设置失效期
 ```
 
-Statistics coordinator 等长任务若留下 stale `running` ledger，不能仅靠“不要启动新批次”作为恢复方案；恢复必须定义 stale 判定、owner、重入/标失败规则和缓存/投影复验。请求 context 已取消时，失败结算还需要独立可用的清理 context，这一代码缺口在修复前保持 gap。
+Statistics coordinator 等长任务若留下 stale `running` ledger，不能仅靠“不要启动新批次”作为恢复方案；恢复必须定义 stale 判定、owner、重入/标失败规则和缓存/投影复验。
+请求 context 已取消时，失败结算还需要独立可用的清理 context，这一代码缺口在修复前保持 gap。
 
 ## 5. 生产证据最小字段
 

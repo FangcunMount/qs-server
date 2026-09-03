@@ -1,6 +1,7 @@
 # 核心设计：Outcome 事实与解释边界
 
-> 状态：Outcome schema v2、不可变 Record、只读 `evaluationfact` 端口、冻结 `ReportInput` 和 `evaluation.outcome.committed` 驱动的 Interpretation 主链路已经实现。历史 schema 兼容、报告输入缺少独立版本标识，以及部分展示语义仍混在模型快照中，是当前需要继续治理的边界。
+> 状态：Outcome schema v2、不可变 Record、只读 `evaluationfact` 端口、冻结 `ReportInput` 和 `evaluation.outcome.committed` 驱动的 Interpretation 主链路已经实现。
+> 历史 schema 兼容、报告输入缺少独立版本标识，以及部分展示语义仍混在模型快照中，是当前需要继续治理的边界。
 
 ## 1. 本文回答
 
@@ -17,7 +18,8 @@
 9. 报告生成失败为什么不能回滚或否定已经成功的 Evaluation；
 10. 查询详情、患者趋势和报告生成分别应该读取哪个事实源。
 
-本文不重复展开双状态机、Claim、Lease 和成功事务，见 [状态、幂等与可靠提交](./21-核心设计-状态、幂等与可靠提交.md)；Decision 的领域含义和发布规则，见 ModelCatalog 的 [结果判定、Outcome 与解释边界](../20-model-catalog/25-核心设计-结果判定、Outcome与解释边界.md)。
+本文不重复展开双状态机、Claim、Lease 和成功事务，见 [状态、幂等与可靠提交](./21-核心设计-状态、幂等与可靠提交.md)；Decision 的领域含义和发布规则，
+见 ModelCatalog 的 [结果判定、Outcome 与解释边界](../20-model-catalog/25-核心设计-结果判定、Outcome与解释边界.md)。
 
 ---
 
@@ -105,7 +107,8 @@ Outcome Record 因而表达：
 
 > 对指定 Assessment、指定模型版本和指定执行尝试，系统已经可靠承诺这就是本次测评的正式结构化结果。
 
-Repository 只提供 `Save`、`FindByID` 和 `FindByAssessmentID`，不提供 Update/Delete；数据库同时以 Assessment ID 和 EvaluationRun ID 建立唯一约束。这让“不可变”既是领域接口约束，也是数据库的最终防线。
+Repository 只提供 `Save`、`FindByID` 和 `FindByAssessmentID`，不提供 Update/Delete；数据库同时以 Assessment ID 和 EvaluationRun ID 建立唯一约束。
+这让“不可变”既是领域接口约束，也是数据库的最终防线。
 
 ### 3.3 Assessment 摘要：业务状态与列表投影
 
@@ -500,7 +503,8 @@ OutcomeCommitted 之后：
 | `2` | 当前生产写入 | 纯事实 payload + 独立冻结 ReportInput |
 | 其他（含 `0`、`1`） | 拒绝 | 不猜测或兼容未知/旧结构 |
 
-ReportInput 只接受 schema 3。空输入、旧 schema 或冻结资产不完整均在 `DecodeReportInput` / `SnapshotFromReportInput` 入口 fail closed；禁止从当前 ModelCatalog 重建历史解释资产。部署前必须执行只读 `verify_definition_v2_cutover --json`，只有 `total=0` 才可继续；非零时按维护窗口备份、删除不兼容派生数据并重建。
+ReportInput 只接受 schema 3。空输入、旧 schema 或冻结资产不完整均在 `DecodeReportInput` / `SnapshotFromReportInput` 入口 fail closed；禁止从当前 ModelCatalog 重建历史解释资产。
+部署前必须执行只读 `verify_definition_v2_cutover --json`，只有 `total=0` 才可继续；非零时按维护窗口备份、删除不兼容派生数据并重建。
 
 ---
 
@@ -549,7 +553,8 @@ Repository 不提供 Update/Delete，但数据库管理员或直接 SQL 仍能�
 
 ### 12.5 模板版本当前仍是默认值
 
-Interpretation adapter 当前使用默认 `TemplateVersionV1`，代码注释也明确等待 ModelCatalog 发布显式 report-template version。未来如需同一模型支持多模板演进，应把模板身份纳入可冻结、可审计的发布契约，而不是依赖运行时默认值。
+Interpretation adapter 当前使用默认 `TemplateVersionV1`，代码注释也明确等待 ModelCatalog 发布显式 report-template version。未来如需同一模型支持多模板演进，
+应把模板身份纳入可冻结、可审计的发布契约，而不是依赖运行时默认值。
 
 ---
 
@@ -557,7 +562,8 @@ Interpretation adapter 当前使用默认 `TemplateVersionV1`，代码注释也�
 
 可以把这一设计概括为：
 
-> qs-server 没有把“计算返回值”“数据库结果”“查询表”和“报告”混成一个对象，而是用不可变 Outcome 建立 Evaluation 的事实边界。Evaluation 在一个事务里提交 Outcome、状态、执行终态、查询投影和 Outbox；Interpretation 再通过只读端口消费 Outcome 与冻结解释素材。这样评分和报告可以独立失败、独立重试，同时历史结果不会因为模型文案更新而漂移。
+> qs-server 没有把“计算返回值”“数据库结果”“查询表”和“报告”混成一个对象，而是用不可变 Outcome 建立 Evaluation 的事实边界。Evaluation 在一个事务里提交 Outcome、状态、执行终态、查询投影和 Outbox；
+> Interpretation 再通过只读端口消费 Outcome 与冻结解释素材。这样评分和报告可以独立失败、独立重试，同时历史结果不会因为模型文案更新而漂移。
 
 进一步追问时，可以从四个方向展开：
 

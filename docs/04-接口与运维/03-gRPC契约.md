@@ -2,7 +2,8 @@
 
 ## 1. 前置条件
 
-以 [`api/grpc/proto`](../../api/grpc/proto/) 为机器事实源，生成文件位于 `api/grpc/gen`。变更前记录 checkout SHA，并确认 `protoc`、`protoc-gen-go`、`protoc-gen-go-grpc` 可用：
+以 [`api/grpc/proto`](../../api/grpc/proto/) 为机器事实源，生成文件位于 `api/grpc/gen`。变更前记录 checkout SHA，
+并确认 `protoc`、`protoc-gen-go`、`protoc-gen-go-grpc` 可用：
 
 ```bash
 git rev-parse HEAD

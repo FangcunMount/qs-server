@@ -2,7 +2,8 @@
 
 ## 1. 当前结论
 
-qs-server 在 apiserver 启动资源阶段执行 MySQL 与 MongoDB 的嵌入式 up migration。两个后端分别维护版本/dirty 状态；任一启用迁移失败都会阻断继续启动。仓库没有应用级 rollback API，也没有通用 `make migrate-up/down/force` 命令。
+qs-server 在 apiserver 启动资源阶段执行 MySQL 与 MongoDB 的嵌入式 up migration。两个后端分别维护版本/dirty 状态；任一启用迁移失败都会阻断继续启动。
+仓库没有应用级 rollback API，也没有通用 `make migrate-up/down/force` 命令。
 
 本页与 [Data Access 的事务边界](../data-access/10-存储所有权与事务边界.md)共同构成 `data/migration/transaction` 主题：本页负责 schema 生命周期，Data Access 负责业务写入事务。
 
@@ -28,7 +29,8 @@ qs-server 在 apiserver 启动资源阶段执行 MySQL 与 MongoDB 的嵌入式 
   -> 重跑 schema/索引/业务不变量检查
 ```
 
-禁止把直接改 `schema_migrations.dirty` 或 `migrate force N` 当作常规步骤。`force` 只改变版本记账，不能补做缺失操作或恢复已删除数据。MongoDB 13 当前迁移不包含 `dropIndexes`，不得保留“force 13 绕过 dropIndexes”的旧指引。
+禁止把直接改 `schema_migrations.dirty` 或 `migrate force N` 当作常规步骤。`force` 只改变版本记账，不能补做缺失操作或恢复已删除数据。
+MongoDB 13 当前迁移不包含 `dropIndexes`，不得保留“force 13 绕过 dropIndexes”的旧指引。
 
 ## 4. 回退边界
 

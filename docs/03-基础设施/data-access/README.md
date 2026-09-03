@@ -1,6 +1,7 @@
 # Data Access
 
-Data Access 维护事实所有权、本地事务、repository/read-model port、Outbox 同事务、数据库约束与存储 backpressure。Schema migration、dirty 和生产修复已提升为独立的[Migration 与恢复](../migration-recovery/README.md)主题。
+Data Access 维护事实所有权、本地事务、repository/read-model port、Outbox 同事务、数据库约束与存储 backpressure。
+Schema migration、dirty 和生产修复已提升为独立的[Migration 与恢复](../migration-recovery/README.md)主题。
 
 ## 阅读顺序
 
