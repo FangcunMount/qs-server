@@ -19,7 +19,6 @@ const (
 	authContextKeyOrgID        authContextKey = "org_id"
 	authContextKeySessionID    authContextKey = "session_id"
 	authContextKeyTokenID      authContextKey = "token_id"
-	authContextKeyRoles        authContextKey = "roles"
 	authContextKeyAMR          authContextKey = "amr"
 	authContextKeyCustomClaims authContextKey = "custom_claims"
 	authContextKeyUsername     authContextKey = "username"
@@ -77,16 +76,6 @@ func UsernameFromContext(ctx context.Context) string {
 	return contextStringValue(ctx, authContextKeyUsername)
 }
 
-// RolesFromContext returns the IAM roles from a gRPC request context.
-func RolesFromContext(ctx context.Context) []string {
-	if ctx == nil {
-		return nil
-	}
-
-	roles, _ := ctx.Value(authContextKeyRoles).([]string)
-	return roles
-}
-
 // AuthenticationMethodsFromContext returns IAM AMR values from a gRPC request context.
 func AuthenticationMethodsFromContext(ctx context.Context) []string {
 	if ctx == nil {
@@ -119,9 +108,8 @@ func PrincipalFromContext(ctx context.Context) (securityplane.Principal, bool) {
 	sessionID := SessionIDFromContext(ctx)
 	tokenID := TokenIDFromContext(ctx)
 	username := UsernameFromContext(ctx)
-	roles := RolesFromContext(ctx)
 	amr := AuthenticationMethodsFromContext(ctx)
-	if userID == "" && accountID == "" && tenantDomain == "" && sessionID == "" && tokenID == "" && username == "" && len(roles) == 0 && len(amr) == 0 {
+	if userID == "" && accountID == "" && tenantDomain == "" && sessionID == "" && tokenID == "" && username == "" && len(amr) == 0 {
 		return securityplane.Principal{}, false
 	}
 	return securityprojection.PrincipalFromInput(securityprojection.PrincipalInput{
@@ -135,7 +123,6 @@ func PrincipalFromContext(ctx context.Context) (securityplane.Principal, bool) {
 		SessionID:    sessionID,
 		TokenID:      tokenID,
 		Username:     username,
-		Roles:        roles,
 		AMR:          amr,
 	}), true
 }

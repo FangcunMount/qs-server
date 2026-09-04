@@ -27,7 +27,6 @@ type UserClaims struct {
 	OrgID        string // IAM 业务组织 ID（JWT org_id 透传）
 	SessionID    string
 	TokenID      string
-	Roles        []string
 	AMR          []string
 	Metadata     *auth.VerifyMetadata
 }
@@ -272,7 +271,6 @@ func buildUserClaims(result *auth.VerifyResult) *UserClaims {
 		OrgID:        resolveOrgIDClaim(tokenClaims),
 		SessionID:    tokenClaims.SessionID,
 		TokenID:      tokenClaims.TokenID,
-		Roles:        tokenClaims.Roles,
 		AMR:          tokenClaims.AMR,
 		Metadata:     result.Metadata,
 	}

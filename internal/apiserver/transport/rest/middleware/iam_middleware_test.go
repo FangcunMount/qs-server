@@ -27,7 +27,6 @@ func TestUserIdentityMiddlewareProjectsSecurityPrincipalAndScope(t *testing.T) {
 			OrgID:        "88",
 			SessionID:    "session-1",
 			TokenID:      "token-1",
-			Roles:        []string{"operator"},
 			AMR:          []string{"pwd"},
 		})
 		c.Next()

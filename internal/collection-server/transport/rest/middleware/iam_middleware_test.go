@@ -23,7 +23,6 @@ func TestUserIdentityMiddlewareKeepsLegacyKeysAndSecurityProjection(t *testing.T
 			OrgID:        "88",
 			SessionID:    "sess-1",
 			TokenID:      "tok-1",
-			Roles:        []string{"guardian"},
 			AMR:          []string{"pwd"},
 		})
 		c.Next()

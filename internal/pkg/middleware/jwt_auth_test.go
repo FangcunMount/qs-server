@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -52,6 +53,9 @@ func TestBuildUserClaimsIncludesSessionAndMetadata(t *testing.T) {
 	}
 	if claims.TokenID != "token-1" {
 		t.Fatalf("unexpected token id: %s", claims.TokenID)
+	}
+	if _, exists := reflect.TypeOf(*claims).FieldByName("Roles"); exists {
+		t.Fatal("UserClaims must not expose JWT roles")
 	}
 	if claims.Metadata == nil {
 		t.Fatal("expected metadata")

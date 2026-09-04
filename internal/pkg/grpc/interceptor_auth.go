@@ -204,11 +204,6 @@ func (i *IAMAuthInterceptor) injectUserContext(ctx context.Context, result *auth
 	ctx = context.WithValue(ctx, authContextKeySessionID, claims.SessionID)
 	ctx = context.WithValue(ctx, authContextKeyTokenID, claims.TokenID)
 
-	// 注入角色
-	if len(claims.Roles) > 0 {
-		ctx = context.WithValue(ctx, authContextKeyRoles, claims.Roles)
-	}
-
 	// 注入认证方式
 	if len(claims.AMR) > 0 {
 		ctx = context.WithValue(ctx, authContextKeyAMR, claims.AMR)
