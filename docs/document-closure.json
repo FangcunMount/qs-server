@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "516fdf37335ed9f7ccf53a5bfdc488e6f8ee3da6",
+    "sha": "ee6156fe9d1350c7fb55a49022bbac069ed24394",
     "verified_on": "2026-09-04"
   },
   "status_policy": {
@@ -3394,8 +3394,8 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "b5baef7648bd6d0ddbb5b40c6763a94defdf39db",
-        "verified_on": "2026-08-26"
+        "source_sha": "ee6156fe9d1350c7fb55a49022bbac069ed24394",
+        "verified_on": "2026-09-04"
       },
       "fact_sources": [
         {
@@ -3452,8 +3452,8 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "b5baef7648bd6d0ddbb5b40c6763a94defdf39db",
-        "verified_on": "2026-08-26"
+        "source_sha": "ee6156fe9d1350c7fb55a49022bbac069ed24394",
+        "verified_on": "2026-09-04"
       },
       "fact_sources": [
         {
@@ -3510,8 +3510,8 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "b5baef7648bd6d0ddbb5b40c6763a94defdf39db",
-        "verified_on": "2026-08-26"
+        "source_sha": "ee6156fe9d1350c7fb55a49022bbac069ed24394",
+        "verified_on": "2026-09-04"
       },
       "fact_sources": [
         {
@@ -3568,8 +3568,8 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "b5baef7648bd6d0ddbb5b40c6763a94defdf39db",
-        "verified_on": "2026-08-26"
+        "source_sha": "ee6156fe9d1350c7fb55a49022bbac069ed24394",
+        "verified_on": "2026-09-04"
       },
       "fact_sources": [
         {
@@ -3626,8 +3626,8 @@
       "owner": "actor",
       "doc_status": "aligned",
       "verified": {
-        "source_sha": "b5baef7648bd6d0ddbb5b40c6763a94defdf39db",
-        "verified_on": "2026-08-26"
+        "source_sha": "ee6156fe9d1350c7fb55a49022bbac069ed24394",
+        "verified_on": "2026-09-04"
       },
       "fact_sources": [
         {
