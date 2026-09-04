@@ -170,11 +170,3 @@ func (r *Router) iamVerifyOptions() *auth.VerifyOptions {
 		AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType_TOKEN_TYPE_ACCESS},
 	}
 }
-
-func (r *Router) iamVerificationMode() string {
-	opts := r.iamVerifyOptions()
-	if opts.ForceRemote {
-		return "authoritative remote verification"
-	}
-	return "local-first JWKS verification with IAM infrastructure fallback"
-}

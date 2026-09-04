@@ -155,34 +155,6 @@ func mapPromptEvaluationRecheckResult(request *interpretationpb.ExecutePromptEva
 	}, nil
 }
 
-func mapPromptEvaluationStepResult(request *interpretationpb.ExecutePromptEvaluationStepRequest, result *aievaluation.OnlineStepResult) (*interpretationpb.ExecutePromptEvaluationStepResponse, error) {
-	if result == nil || result.Run == nil || result.Run.ID().String() != request.GetRunId() {
-		return nil, status.Error(codes.Internal, "prompt evaluation step returned mismatched run")
-	}
-	switch result.Status {
-	case aievaluation.OnlineStepProgressed, aievaluation.OnlineStepAlreadyCompleted, aievaluation.OnlineStepAwaitingReview, aievaluation.OnlineStepCanceled:
-	default:
-		return nil, status.Error(codes.Internal, "prompt evaluation step returned unsupported status")
-	}
-	if result.Status != aievaluation.OnlineStepCanceled && !result.Run.HasAttempt(request.GetCaseId(), int(request.GetAttempt())) {
-		return nil, status.Error(codes.Internal, "prompt evaluation step did not persist its target")
-	}
-	response := &interpretationpb.ExecutePromptEvaluationStepResponse{
-		Success: true, RunId: request.GetRunId(), CaseId: request.GetCaseId(), Attempt: request.GetAttempt(),
-		Status: string(result.Status), RunStatus: string(result.Run.Status()),
-	}
-	if caseID, attempt, ok := result.Run.NextPendingGenerationAttempt(); ok {
-		response.NextCaseId, response.NextAttempt = caseID, int32(attempt)
-	}
-	if result.Status == aievaluation.OnlineStepAwaitingReview && result.Run.Status() != domainevaluation.StatusAwaitingReview {
-		return nil, status.Error(codes.Internal, "prompt evaluation step did not close collection")
-	}
-	if result.Status == aievaluation.OnlineStepCanceled && result.Run.Status() != domainevaluation.StatusCanceled {
-		return nil, status.Error(codes.Internal, "prompt evaluation step did not preserve cancellation")
-	}
-	return response, nil
-}
-
 func mapPromptEvaluationStepV2Result(
 	request *interpretationpb.ExecutePromptEvaluationStepRequest,
 	command aievaluation.OnlineStepV2Command,
