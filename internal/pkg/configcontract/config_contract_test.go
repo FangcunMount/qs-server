@@ -1045,7 +1045,7 @@ func assertIAMJWKSURLContract(t *testing.T, service, configName string, opts *ge
 			t.Errorf("%s %s iam.jwt.required-claims = %v, missing %q", service, configName, opts.JWT.RequiredClaims, claim)
 		}
 	}
-	wantAlgorithms := []string{"RS256", "ES256"}
+	wantAlgorithms := []string{"RS256"}
 	if !slices.Equal(opts.JWT.Algorithms, wantAlgorithms) {
 		t.Fatalf("%s %s iam.jwt.algorithms = %v, want %v", service, configName, opts.JWT.Algorithms, wantAlgorithms)
 	}

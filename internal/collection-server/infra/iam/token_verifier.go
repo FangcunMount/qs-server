@@ -50,12 +50,11 @@ func NewTokenVerifier(_ context.Context, client *Client) (*TokenVerifier, error)
 	}
 
 	// 构建 SDK TokenVerifyConfig
-	verifyCfg := &sdk.TokenVerifyConfig{}
+	verifyCfg := &sdk.TokenVerifyConfig{RequireExpirationTime: true}
 	if config.JWT != nil {
 		verifyCfg.AllowedAudience = config.JWT.Audience
 		verifyCfg.AllowedIssuer = config.JWT.Issuer
 		verifyCfg.ClockSkew = config.JWT.ClockSkew
-		// SDK v0.0.5 新增支持
 		verifyCfg.RequiredClaims = config.JWT.RequiredClaims
 		verifyCfg.Algorithms = config.JWT.Algorithms
 	}
@@ -68,7 +67,7 @@ func NewTokenVerifier(_ context.Context, client *Client) (*TokenVerifier, error)
 			GRPCEndpoint:    config.JWKS.GRPCEndpoint, // gRPC 降级端点
 			RefreshInterval: config.JWKS.RefreshInterval,
 			CacheTTL:        config.JWKS.CacheTTL,
-			FallbackOnError: true, // 失败时使用缓存
+			FallbackOnError: true, // 刷新失败时仅在 CacheTTL 内使用旧缓存
 		}
 		log.Infof("JWKS enabled: URL=%s, GRPCEndpoint=%s, RefreshInterval=%v, CacheTTL=%v",
 			config.JWKS.URL, config.JWKS.GRPCEndpoint, config.JWKS.RefreshInterval, config.JWKS.CacheTTL)

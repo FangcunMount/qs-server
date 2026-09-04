@@ -1,6 +1,7 @@
 package options
 
 import (
+	"strings"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -122,9 +123,9 @@ func NewIAMOptions() *IAMOptions {
 		JWT: &IAMJWTOptions{
 			Issuer:                  "https://iam.example.com",
 			Audience:                []string{"qs"},
-			Algorithms:              []string{"RS256", "ES256"},
+			Algorithms:              []string{"RS256"},
 			ClockSkew:               60 * time.Second,
-			RequiredClaims:          []string{"user_id", "tenant_id"},
+			RequiredClaims:          []string{"sub", "exp", "user_id", "tenant_id"},
 			ForceRemoteVerification: false,
 		},
 
@@ -187,17 +188,26 @@ func (o *IAMOptions) Validate() []error {
 		}
 	}
 
-	// 验证 JWT 配置
-	if o.JWKSEnabled {
-		if o.JWT.Issuer == "" {
+	// IAM Token Profile 始终要求明确的 issuer/audience，并固定使用 RS256。
+	if o.JWT == nil {
+		errs = append(errs, ErrIAMJWTConfigRequired)
+	} else {
+		if strings.TrimSpace(o.JWT.Issuer) == "" {
 			errs = append(errs, ErrIAMJWTIssuerRequired)
 		}
 		if len(o.JWT.Audience) == 0 {
 			errs = append(errs, ErrIAMJWTAudienceRequired)
 		}
-		if o.JWKS.URL == "" {
-			errs = append(errs, ErrIAMJWKSURLRequired)
+		for _, algorithm := range o.JWT.Algorithms {
+			if algorithm != "RS256" {
+				errs = append(errs, ErrIAMJWTAlgorithmUnsupported)
+				break
+			}
 		}
+	}
+
+	if o.JWKSEnabled && (o.JWKS == nil || strings.TrimSpace(o.JWKS.URL) == "") {
+		errs = append(errs, ErrIAMJWKSURLRequired)
 	}
 
 	if o.AuthzSync == nil {
