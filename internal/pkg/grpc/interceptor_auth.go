@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	authnv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/authn/v2"
 	auth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/verifier"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -28,8 +29,9 @@ var mtlsIdentityKey mtlsIdentityContextKey
 
 func buildVerifyOptions(forceRemote bool) *auth.VerifyOptions {
 	return &auth.VerifyOptions{
-		ForceRemote:     forceRemote,
-		IncludeMetadata: true,
+		ForceRemote:       forceRemote,
+		IncludeMetadata:   true,
+		AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType_TOKEN_TYPE_ACCESS},
 	}
 }
 

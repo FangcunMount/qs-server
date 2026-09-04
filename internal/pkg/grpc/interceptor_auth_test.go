@@ -195,4 +195,7 @@ func TestBuildVerifyOptionsHonorsForceRemote(t *testing.T) {
 	if !opts.IncludeMetadata {
 		t.Fatal("expected IncludeMetadata to be enabled")
 	}
+	if len(opts.AllowedTokenTypes) != 1 || opts.AllowedTokenTypes[0] != authnv2.TokenType_TOKEN_TYPE_ACCESS {
+		t.Fatalf("AllowedTokenTypes = %v, want access only", opts.AllowedTokenTypes)
+	}
 }
