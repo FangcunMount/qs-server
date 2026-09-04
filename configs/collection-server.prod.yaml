@@ -217,7 +217,7 @@ iam:
   jwt:
     issuer: "https://iam.fangcunmount.cn"  # canonical issuer
     audience: ["collection-api"]
-    algorithms: ["RS256", "ES256"]
+    algorithms: ["RS256"] # 固定 IAM Token Profile 签名算法
     clock-skew: 30s
     required-claims: ["sub", "exp", "user_id", "tenant_id"]
     force-remote-verification: false  # 生产环境默认本地验证，避免远程验证性能损耗

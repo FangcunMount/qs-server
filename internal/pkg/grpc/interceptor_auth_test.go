@@ -64,6 +64,13 @@ func TestInjectUserContextIncludesSessionAndMetadata(t *testing.T) {
 	if got := TokenMetadataFromContext(ctx); got == nil {
 		t.Fatal("expected token_metadata")
 	}
+	principal, ok := PrincipalFromContext(ctx)
+	if !ok {
+		t.Fatal("expected principal projection")
+	}
+	if got := principal.RoleNames(); len(got) != 0 {
+		t.Fatalf("principal roles = %#v, want none from forged JWT roles", got)
+	}
 }
 
 func TestInjectedUserContextMapsToSecurityPlanePrincipalAndOrgScope(t *testing.T) {
@@ -105,6 +112,9 @@ func TestInjectedUserContextMapsToSecurityPlanePrincipalAndOrgScope(t *testing.T
 	}
 	if got := principal.AuthenticationMethods(); len(got) != 1 || got[0] != "pwd" {
 		t.Fatalf("principal amr = %#v, want [pwd]", got)
+	}
+	if got := principal.RoleNames(); len(got) != 0 {
+		t.Fatalf("principal roles = %#v, want none from forged JWT roles", got)
 	}
 }
 
@@ -194,5 +204,8 @@ func TestBuildVerifyOptionsHonorsForceRemote(t *testing.T) {
 	}
 	if !opts.IncludeMetadata {
 		t.Fatal("expected IncludeMetadata to be enabled")
+	}
+	if len(opts.AllowedTokenTypes) != 1 || opts.AllowedTokenTypes[0] != authnv2.TokenType_TOKEN_TYPE_ACCESS {
+		t.Fatalf("AllowedTokenTypes = %v, want access only", opts.AllowedTokenTypes)
 	}
 }

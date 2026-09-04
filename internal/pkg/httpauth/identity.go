@@ -150,7 +150,6 @@ func setSecurityProjection(c *gin.Context, claims *pkgmiddleware.UserClaims, ten
 		HasOrgID:     hasOrg,
 		SessionID:    claims.SessionID,
 		TokenID:      claims.TokenID,
-		Roles:        claims.Roles,
 		AMR:          claims.AMR,
 	})
 	c.Set(PrincipalKey, principal)

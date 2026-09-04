@@ -81,11 +81,6 @@ func expectSubjectQuery(mock sqlmock.Sqlmock, kind string, roles []string, userI
 	mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(args...).WillReturnRows(sqlmock.NewRows([]string{"user_id"}).AddRow(userID))
 }
 
-func expectMissingSubjectQuery(mock sqlmock.Sqlmock, kind string, roles []string) {
-	query, args := subjectSQLExpectation(kind, roles)
-	mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(args...).WillReturnRows(sqlmock.NewRows([]string{"user_id"}))
-}
-
 func subjectSQLExpectation(kind string, roles []string) (string, []driver.Value) {
 	clauses := []string{"is_active = 1", "deleted_at IS NULL", "JSON_VALID(roles)", "JSON_CONTAINS(roles, ?)"}
 	for range roles[1:] {

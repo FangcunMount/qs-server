@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -52,6 +53,9 @@ func TestBuildUserClaimsIncludesSessionAndMetadata(t *testing.T) {
 	}
 	if claims.TokenID != "token-1" {
 		t.Fatalf("unexpected token id: %s", claims.TokenID)
+	}
+	if _, exists := reflect.TypeOf(*claims).FieldByName("Roles"); exists {
+		t.Fatal("UserClaims must not expose JWT roles")
 	}
 	if claims.Metadata == nil {
 		t.Fatal("expected metadata")
@@ -120,11 +124,17 @@ func TestUserClaimsMapToSecurityPlaneOrgScope(t *testing.T) {
 }
 
 func TestNormalizeVerifyOptionsPreservesForceRemoteAndForcesMetadata(t *testing.T) {
-	opts := normalizeVerifyOptions(&auth.VerifyOptions{ForceRemote: true})
+	opts := normalizeVerifyOptions(&auth.VerifyOptions{
+		ForceRemote:       true,
+		AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType_TOKEN_TYPE_SERVICE},
+	})
 	if !opts.ForceRemote {
 		t.Fatal("expected ForceRemote to be preserved")
 	}
 	if !opts.IncludeMetadata {
 		t.Fatal("expected IncludeMetadata to be forced on")
+	}
+	if len(opts.AllowedTokenTypes) != 1 || opts.AllowedTokenTypes[0] != authnv2.TokenType_TOKEN_TYPE_ACCESS {
+		t.Fatalf("AllowedTokenTypes = %v, want access only", opts.AllowedTokenTypes)
 	}
 }

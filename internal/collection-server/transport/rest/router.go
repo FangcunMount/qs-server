@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	authnv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/authn/v2"
 	auth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/collection-server/concurrency"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
@@ -145,15 +146,20 @@ func unavailableAuthenticationMiddleware() gin.HandlerFunc {
 
 func (r *Router) iamVerifyOptions() *auth.VerifyOptions {
 	if r == nil || r.container == nil || r.container.IAMModule == nil || r.container.IAMModule.Client() == nil {
-		return &auth.VerifyOptions{IncludeMetadata: true}
+		return collectionAccessVerifyOptions(false)
 	}
 	cfg := r.container.IAMModule.Client().Config()
 	if cfg == nil || cfg.JWT == nil {
-		return &auth.VerifyOptions{IncludeMetadata: true}
+		return collectionAccessVerifyOptions(false)
 	}
+	return collectionAccessVerifyOptions(cfg.JWT.ForceRemoteVerification)
+}
+
+func collectionAccessVerifyOptions(forceRemote bool) *auth.VerifyOptions {
 	return &auth.VerifyOptions{
-		ForceRemote:     cfg.JWT.ForceRemoteVerification,
-		IncludeMetadata: true,
+		ForceRemote:       forceRemote,
+		IncludeMetadata:   true,
+		AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType_TOKEN_TYPE_ACCESS},
 	}
 }
 

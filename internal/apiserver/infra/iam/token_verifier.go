@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
+	authnv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/authn/v2"
 	sdk "github.com/FangcunMount/iam/v3/pkg/sdk"
 	authjwks "github.com/FangcunMount/iam/v3/pkg/sdk/auth/jwks"
 	auth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/verifier"
@@ -19,7 +20,8 @@ type TokenVerifier struct {
 
 func defaultVerifyOptions() *auth.VerifyOptions {
 	return &auth.VerifyOptions{
-		IncludeMetadata: true,
+		IncludeMetadata:   true,
+		AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType_TOKEN_TYPE_ACCESS},
 	}
 }
 
@@ -30,7 +32,16 @@ func mergeVerifyOptions(opts *auth.VerifyOptions) *auth.VerifyOptions {
 	merged := *opts
 	// QS 默认希望把会话和令牌元数据一并透出，避免后续调用方再重复补参数。
 	merged.IncludeMetadata = true
+	merged.AllowedTokenTypes = []authnv2.TokenType{authnv2.TokenType_TOKEN_TYPE_ACCESS}
 	return &merged
+}
+
+func remoteVerifyOptions() *auth.VerifyOptions {
+	return &auth.VerifyOptions{
+		ForceRemote:       true,
+		IncludeMetadata:   true,
+		AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType_TOKEN_TYPE_ACCESS},
+	}
 }
 
 // NewTokenVerifier 创建 Token 验证器（使用 SDK）
@@ -50,12 +61,11 @@ func NewTokenVerifier(ctx context.Context, client *Client) (*TokenVerifier, erro
 	}
 
 	// 构建 SDK TokenVerifyConfig
-	verifyCfg := &sdk.TokenVerifyConfig{}
+	verifyCfg := &sdk.TokenVerifyConfig{RequireExpirationTime: true}
 	if config.JWT != nil {
 		verifyCfg.AllowedAudience = config.JWT.Audience
 		verifyCfg.AllowedIssuer = config.JWT.Issuer
 		verifyCfg.ClockSkew = config.JWT.ClockSkew
-		// SDK v0.0.5 新增支持
 		verifyCfg.RequiredClaims = config.JWT.RequiredClaims
 		verifyCfg.Algorithms = config.JWT.Algorithms
 	}
@@ -68,7 +78,7 @@ func NewTokenVerifier(ctx context.Context, client *Client) (*TokenVerifier, erro
 			GRPCEndpoint:    config.JWKS.GRPCEndpoint, // gRPC 降级端点
 			RefreshInterval: config.JWKS.RefreshInterval,
 			CacheTTL:        config.JWKS.CacheTTL,
-			FallbackOnError: true, // 失败时使用缓存
+			FallbackOnError: true, // 刷新失败时仅在 CacheTTL 内使用旧缓存
 		}
 		logger.L(ctx).Infow("JWKS enabled",
 			"component", "iam.token_verifier",
@@ -109,6 +119,8 @@ func NewTokenVerifier(ctx context.Context, client *Client) (*TokenVerifier, erro
 	logger.L(ctx).Infow("Token verifier initialized successfully",
 		"component", "iam.token_verifier",
 		"strategy", verifier.Strategy().Name(),
+		"token_profile_algorithm", "RS256",
+		"accepted_token_types", []string{"access"},
 		"result", "success",
 	)
 
@@ -140,10 +152,7 @@ func (v *TokenVerifier) VerifyRemotely(ctx context.Context, token string) (*auth
 	if v.verifier == nil {
 		return nil, fmt.Errorf("token verifier not initialized")
 	}
-	return v.verifier.Verify(ctx, token, &auth.VerifyOptions{
-		ForceRemote:     true,
-		IncludeMetadata: true,
-	})
+	return v.verifier.Verify(ctx, token, remoteVerifyOptions())
 }
 
 // SDKVerifier 返回底层的 SDK TokenVerifier

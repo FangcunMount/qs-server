@@ -1807,19 +1807,6 @@ func inStringWithAggregateFilters(aggregateType string, values []string) []bson.
 	return filters
 }
 
-func inStringFilters(field string, values []string) []bson.M {
-	values = uniqueStrings(values)
-	filters := make([]bson.M, 0, (len(values)+mongoIDChunkSize-1)/mongoIDChunkSize)
-	for start := 0; start < len(values); start += mongoIDChunkSize {
-		end := start + mongoIDChunkSize
-		if end > len(values) {
-			end = len(values)
-		}
-		filters = append(filters, bson.M{field: bson.M{"$in": values[start:end]}})
-	}
-	return filters
-}
-
 func mongoDocumentIDKey(id any) string {
 	switch value := id.(type) {
 	case primitive.ObjectID:

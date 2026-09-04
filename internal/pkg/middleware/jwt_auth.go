@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
+	authnv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/authn/v2"
 	"github.com/gin-gonic/gin"
 
 	auth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/verifier"
@@ -26,17 +27,21 @@ type UserClaims struct {
 	OrgID        string // IAM 业务组织 ID（JWT org_id 透传）
 	SessionID    string
 	TokenID      string
-	Roles        []string
 	AMR          []string
 	Metadata     *auth.VerifyMetadata
 }
 
 func normalizeVerifyOptions(opts *auth.VerifyOptions) *auth.VerifyOptions {
 	if opts == nil {
-		return &auth.VerifyOptions{IncludeMetadata: true}
+		return &auth.VerifyOptions{
+			IncludeMetadata:   true,
+			AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType_TOKEN_TYPE_ACCESS},
+		}
 	}
 	merged := *opts
 	merged.IncludeMetadata = true
+	// HTTP 用户入口的 Token Profile 固定为 Access Token，调用方不得放宽为 Service Token。
+	merged.AllowedTokenTypes = []authnv2.TokenType{authnv2.TokenType_TOKEN_TYPE_ACCESS}
 	return &merged
 }
 
@@ -266,7 +271,6 @@ func buildUserClaims(result *auth.VerifyResult) *UserClaims {
 		OrgID:        resolveOrgIDClaim(tokenClaims),
 		SessionID:    tokenClaims.SessionID,
 		TokenID:      tokenClaims.TokenID,
-		Roles:        tokenClaims.Roles,
 		AMR:          tokenClaims.AMR,
 		Metadata:     result.Metadata,
 	}

@@ -381,20 +381,6 @@ func (s *lifecycleService) requireOperatorAuthz() error {
 	return nil
 }
 
-func (s *lifecycleService) persistOperatorRolesFromAuthz(ctx context.Context, op *domain.Operator) error {
-	if err := s.requireOperatorAuthz(); err != nil {
-		return err
-	}
-	if op == nil {
-		return errors.New("operator is required")
-	}
-	projection, err := s.authz.LoadOperatorRoleProjection(ctx, op.OrgID(), op.UserID())
-	if err != nil {
-		return err
-	}
-	return persistOperatorRoleProjection(ctx, s.repo, op, projection, false)
-}
-
 func (s *lifecycleService) rollbackRegisteredOperator(ctx context.Context, id domain.ID) error {
 	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := s.repo.Delete(txCtx, id); err != nil {

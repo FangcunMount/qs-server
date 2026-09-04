@@ -19,7 +19,6 @@ func TestUserIdentityMiddlewareProjectsClaimsToGinContext(t *testing.T) {
 			UserID:       "42",
 			TenantDomain: "fangcun",
 			OrgID:        "88",
-			Roles:        []string{"operator"},
 		})
 		c.Next()
 	})
@@ -41,8 +40,8 @@ func TestUserIdentityMiddlewareProjectsClaimsToGinContext(t *testing.T) {
 		if principal.UserID != "42" || principal.TenantDomain != "fangcun" || principal.HasOrgID {
 			t.Fatalf("principal = %#v, want user 42 domain fangcun without org", principal)
 		}
-		if got := principal.RoleNames(); len(got) != 1 || got[0] != "operator" {
-			t.Fatalf("principal roles = %#v, want [operator]", got)
+		if got := principal.RoleNames(); len(got) != 0 {
+			t.Fatalf("principal roles = %#v, want none from JWT identity", got)
 		}
 		c.Status(http.StatusNoContent)
 	})

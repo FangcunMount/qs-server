@@ -3,6 +3,7 @@ package rest
 import (
 	"net/http"
 
+	authnv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/authn/v2"
 	auth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/verifier"
 	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
@@ -164,15 +165,8 @@ func (r *Router) applyProtectedGroupMiddlewares(group *gin.RouterGroup, routePre
 
 func (r *Router) iamVerifyOptions() *auth.VerifyOptions {
 	return &auth.VerifyOptions{
-		ForceRemote:     r != nil && r.deps.IAM.ForceRemoteVerification,
-		IncludeMetadata: true,
+		ForceRemote:       r != nil && r.deps.IAM.ForceRemoteVerification,
+		IncludeMetadata:   true,
+		AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType_TOKEN_TYPE_ACCESS},
 	}
-}
-
-func (r *Router) iamVerificationMode() string {
-	opts := r.iamVerifyOptions()
-	if opts.ForceRemote {
-		return "authoritative remote verification"
-	}
-	return "local-first JWKS verification with IAM infrastructure fallback"
 }
