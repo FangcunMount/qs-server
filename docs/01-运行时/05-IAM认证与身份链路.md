@@ -10,6 +10,8 @@ qs-server 不再自行解析微信身份和维护一套独立 User，而是把�
 - IAM 授权快照回答“你在 IAM 租户中具有什么角色和能力”；
 - qs-server 业务校验回答“你是否可以对这个 org、testee、plan 或 report 执行当前操作”。
 
+JWT 只携带 AuthN 事实；即使历史或伪造 token 中出现 `roles`，qs-server 也不会把它投影到 HTTP/gRPC principal。角色和能力的唯一权威来源是 IAM AuthZ Snapshot/Check。
+
 只完成前两步，不能自动推出第三步。
 
 ## 2. 从项目自管身份到 IAM
@@ -66,13 +68,18 @@ collection 路由也会执行 JWT、UserIdentity、tenant domain 和 authz snaps
 - IAM Client；
 - `TokenVerifier`；
 - 可选 `ServiceAuthHelper`；
-
 - Identity/ProfileLink 等服务；
 - `AuthzSnapshotLoader`。
 
-TokenVerifier 支持使用 JWKS 在本地验证 token，并在配置允许时使用远程验证兜底。JWKS/服务凭据可能有后台刷新任务，因此 IAM module 的 `Close()` 不只是关闭一个 HTTP client，还要停止刷新 goroutine。
+qs-server 使用 IAM SDK `v3.2.0` 的固定 Token Profile：
 
-本地验证提高可用性和延迟表现，但必须处理 key rotation、issuer/audience、过期时间和刷新失败。不能因为 JWT 能被解码就跳过签名与声明校验。
+- 令牌是使用 `RS256` 签名的 JWS，本地验签公钥来自 JWKS；`ES256` 或混合算法配置会在启动校验阶段失败。
+- issuer 和 audience 无论本地还是远程验证都必填；`sub`、`exp`、`user_id`、`tenant_id` 是当前必需 claims，且必须有过期时间。
+- HTTP 用户入口和可选的 gRPC 用户 JWT interceptor 只接受 Access Token；历史缺少 `token_type` 的用户 token 在 SDK 有界兼容规则下视为 Access Token。
+- Service Token 是独立的服务主体凭据，不能通过用户 bearer 入口。若未来需要入站 Service Token，必须建立独立 audience、required claims 和 interceptor。
+- JWKS 刷新失败时，旧缓存只能在配置的 `CacheTTL` 内继续使用。
+
+TokenVerifier 支持使用 JWKS 在本地验证 token，并在配置允许时使用 IAM 远程验证。JWKS/服务凭据可能有后台刷新任务，因此 IAM module 的 `Close()` 不只是关闭一个 HTTP client，还要停止刷新 goroutine。本地验签不等于实时撤销检查；要求即时撤销语义的入口应显式强制远程验证。
 
 ## 6. 授权快照与失效
 
@@ -122,10 +129,10 @@ collection/worker 调用 apiserver 时存在两种完全不同的主体：
 - **服务主体**：证明请求来自受信任的 collection/worker 实例；
 - **最终用户主体**：证明当前前台操作代表哪个 IAM 用户。
 
-当前仓库内部 gRPC 主要使用 mTLS 建立服务身份边界。collection client 代码支持通过 `ServiceAuthHelper` 附加 PerRPC service JWT，但 apiserver 环境配置当前未默认开启 gRPC JWT auth；
+当前仓库内部 gRPC 主要使用 mTLS 建立服务身份边界。collection client 代码支持通过 `ServiceAuthHelper` 附加 PerRPC Service Token，但 apiserver 环境配置当前未默认开启 gRPC JWT auth；
 worker client 也主要依赖 mTLS。
 
-mTLS 不能自动表达最终用户的业务权限，service JWT 也不能冒充用户 token。需要代表用户执行的 gRPC 用例，应显式传递或解析必要的 user/org/testee 上下文，并由服务端复核。
+mTLS 不能自动表达最终用户的业务权限，Service Token 也不能冒充 Access Token。需要代表用户执行的 gRPC 用例，应显式传递或解析必要的 user/org/testee 上下文，并由服务端复核。
 
 ## 10. 失败语义
 
@@ -154,10 +161,12 @@ mTLS 不能自动表达最终用户的业务权限，service JWT 也不能冒充
 
 ## 12. 验证清单
 
-1. 验证无 token、过期 token、错误 issuer/audience；
-2. 验证有 IAM tenant 但无 QS org scope；
-3. 验证有 capability 但访问他人/他组织资源；
-4. 验证 authz_version 更新后缓存被失效；
-5. 验证 IAM 短暂不可用时不会绕过授权；
-6. 验证 collection 家长/患者 ProfileLink；
-7. 分别验证 mTLS 服务身份与最终用户业务权限。
+1. 验证无 token、过期 token、错误 issuer/audience 和非 RS256 配置；
+2. 验证 Access Token 可通过用户入口，Service Token 被拒绝，历史缺少 `token_type` 的用户 token 仍可兼容；
+3. 验证 JWT 中的伪造/历史 `roles` 不会进入 HTTP 或 gRPC principal；
+4. 验证有 IAM tenant 但无 QS org scope；
+5. 验证有 capability 但访问他人/他组织资源；
+6. 验证 authz_version 更新后缓存被失效；
+7. 验证 IAM 短暂不可用时不会绕过授权；
+8. 验证 collection 家长/患者 ProfileLink；
+9. 分别验证 mTLS 服务身份与最终用户业务权限。
