@@ -1,0 +1,84 @@
+{
+  "schema_version": "ai-explanation-output/v1",
+  "summary": "本次结果显示，冲动控制与注意转换两个子维度存在差异：一个处于较稳定范围，另一个显示需要更多支持。总维度呈现不均衡，因此需要分维度观察，而不能用其中一个结果代替另一个。",
+  "integrated_insights": [
+    {
+      "kind": "contrasting_pattern",
+      "title": "冲动控制与注意转换的本次结果存在差异",
+      "content": "本次冲动控制结果处于较稳定范围，而注意转换结果显示可能需要更多准备时间，两者呈现不同状态。",
+      "evidence_refs": [
+        {
+          "kind": "dimension",
+          "ref": "dimension:impulse_control"
+        },
+        {
+          "kind": "dimension",
+          "ref": "dimension:attention_shift"
+        }
+      ],
+      "why_it_matters": "两个子维度表现不同，说明本次观察到的调节表现不能只用单一维度概括，分别观察能更准确地理解当前状态。"
+    },
+    {
+      "kind": "combined_attention",
+      "title": "需要同时关注注意转换的准备时间",
+      "content": "注意转换维度显示可能需要更多支持，而总维度结论提示调节表现存在内部差异，因此需要将注意转换作为本次共同关注的方向。",
+      "evidence_refs": [
+        {
+          "kind": "dimension",
+          "ref": "dimension:attention_shift"
+        },
+        {
+          "kind": "dimension",
+          "ref": "dimension:regulation_total"
+        }
+      ],
+      "why_it_matters": "总维度结论本身不能告诉我们具体是哪个子维度需要支持，结合两个证据可以看出本次更值得关注注意转换的准备时间。"
+    }
+  ],
+  "suggestions": [
+    {
+      "title": "在重要行动前设置短暂停顿",
+      "category": "daily_practice",
+      "origin": "standard_derived",
+      "goal": "为行动前留出观察空间，本次结果与冲动控制的稳定状态相关。",
+      "actions": [
+        "在重要行动前先设置一个短暂停顿。"
+      ],
+      "rationale": "该建议对应冲动控制维度的标准建议。",
+      "caution": "不需要额外记录或报告个人信息，按日常节奏尝试即可。",
+      "evidence_refs": [
+        {
+          "kind": "dimension",
+          "ref": "dimension:impulse_control"
+        }
+      ],
+      "source_suggestion_refs": [
+        "suggestion:pause_before_action"
+      ]
+    },
+    {
+      "title": "任务切换前使用固定提示",
+      "category": "self_observation",
+      "origin": "standard_derived",
+      "goal": "在切换关注对象前设置可重复的提示，作为本次注意转换支持的一部分。",
+      "actions": [
+        "任务切换前使用固定提示标记下一步。"
+      ],
+      "rationale": "该建议对应注意转换维度的标准建议。",
+      "caution": "建议仅作为尝试，不要求立即改变所有任务切换方式。",
+      "evidence_refs": [
+        {
+          "kind": "dimension",
+          "ref": "dimension:attention_shift"
+        }
+      ],
+      "source_suggestion_refs": [
+        "suggestion:transition_cue"
+      ]
+    }
+  ],
+  "limitations": [
+    "本解读仅基于本次测评结果，不构成诊断或确定性判断，也不能据此确认维度间因果关系。",
+    "本次未提供分数常模和更具体的情境信息，因此无法进一步解释差异的来源或在不同情境下的表现。"
+  ]
+}

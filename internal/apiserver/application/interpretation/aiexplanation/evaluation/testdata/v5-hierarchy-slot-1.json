@@ -1,0 +1,86 @@
+{
+  "schema_version": "ai-explanation-output/v1",
+  "summary": "本次结果显示，调节总维度表现不均衡；其中冲动控制处于较稳定范围，注意转换需要更多支持，两个子维度同属本次调节表现的不同观察面。",
+  "integrated_insights": [
+    {
+      "kind": "context_dependent_pattern",
+      "title": "不同情境下，两个子维度的表现存在差异",
+      "content": "本次结果在冲动控制上处于较稳定范围，而在需要切换关注对象时，可能需要更多准备时间。这提示本次需要同时观察不同情境下的表现，而不是把其中一种表现当作整体调节状态。",
+      "evidence_refs": [
+        {
+          "kind": "dimension",
+          "ref": "dimension:impulse_control"
+        },
+        {
+          "kind": "dimension",
+          "ref": "dimension:attention_shift"
+        }
+      ],
+      "why_it_matters": "当不同维度的结果存在差异时，只关注其中一个维度可能无法完整理解本次测评结果；分情境观察有助于在合适的时候使用不同的提示方式。"
+    },
+    {
+      "kind": "combined_attention",
+      "title": "需要支持的两个观察面应继续同时观察",
+      "content": "本次结果显示，调节总维度表现不均衡，同时注意转换需要更多支持。两者提示本次在整体调节和任务切换情境中存在需要进一步关注的信号，应在后续观察中一并留意。",
+      "evidence_refs": [
+        {
+          "kind": "dimension",
+          "ref": "dimension:regulation_total"
+        },
+        {
+          "kind": "dimension",
+          "ref": "dimension:attention_shift"
+        }
+      ],
+      "why_it_matters": "总体调节表现和具体切换任务中的表现提供了不同层面的观察信息，分开单独查看可能遗漏本次测评所揭示的需要关注之处。"
+    }
+  ],
+  "suggestions": [
+    {
+      "title": "重要行动前设置短暂停顿",
+      "category": "daily_practice",
+      "origin": "standard_derived",
+      "goal": "在重要行动前留出短暂的停顿。",
+      "actions": [
+        "在决定采取重要行动前，先停一下，确认下一步选择。",
+        "可以只在关键情境中使用这个停顿，不需要每次行动都执行。"
+      ],
+      "rationale": "该建议对应冲动控制维度的标准建议“重要行动前先设置一个短暂停顿”。",
+      "caution": "这是可选的日常练习，不要求每次成功做到，也不等同于专业处置。",
+      "evidence_refs": [
+        {
+          "kind": "dimension",
+          "ref": "dimension:impulse_control"
+        }
+      ],
+      "source_suggestion_refs": [
+        "suggestion:pause_before_action"
+      ]
+    },
+    {
+      "title": "任务切换时使用固定提示标记下一步",
+      "category": "environment_adjustment",
+      "origin": "standard_derived",
+      "goal": "在需要切换关注对象时提供清晰的下一步提示。",
+      "actions": [
+        "在任务切换前，用一个固定的词、动作或标记提示自己下一步要做什么。",
+        "尽量在需要切换的场合使用同一种提示，逐步形成可识别的信号。"
+      ],
+      "rationale": "该建议对应注意转换维度的标准建议“任务切换前使用固定提示标记下一步”。",
+      "caution": "这是环境层面的辅助提示，不能保证切换更顺利，也可以随时调整或停止使用。",
+      "evidence_refs": [
+        {
+          "kind": "dimension",
+          "ref": "dimension:attention_shift"
+        }
+      ],
+      "source_suggestion_refs": [
+        "suggestion:transition_cue"
+      ]
+    }
+  ],
+  "limitations": [
+    "本解读仅基于本次测评结果，不构成诊断或确定性判断，也不能据此确认维度间因果关系。",
+    "本次解释未使用额外的个人背景、生活事件或历史测评信息，因此不能把观察到的差异归因于生活原因或个人特质。"
+  ]
+}

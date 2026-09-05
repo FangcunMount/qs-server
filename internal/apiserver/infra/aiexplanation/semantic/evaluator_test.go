@@ -395,3 +395,121 @@ func jsonContainsKey(value any, target string) bool {
 	}
 	return false
 }
+
+func TestV2ExecutablePromptMatchesNormativeMarkdownAndFrozenHashes(t *testing.T) {
+	path := filepath.Join("..", "..", "..", "..", "..", "api", "schema", "interpretation", "ai-explanation-semantic-evaluator-prompt-v2.md")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	blocks := regexp.MustCompile("(?s)```text\\n(.*?)\\n```").FindAllStringSubmatch(strings.ReplaceAll(string(raw), "\r\n", "\n"), -1)
+	if len(blocks) < 3 {
+		t.Fatalf("normative semantic evaluator text blocks = %d", len(blocks))
+	}
+	if blocks[0][1] != systemMessageV2 || blocks[1][1] != taskMessageV2 {
+		t.Fatal("executable semantic evaluator system/task messages drifted from normative Markdown")
+	}
+	dataBlock := strings.TrimSuffix(blocks[2][1], "\n\n{{semantic_evaluation_payload_json}}")
+	if dataBlock != dataPreambleV1 {
+		t.Fatal("executable semantic evaluator data preamble drifted from normative Markdown")
+	}
+	sha256Sum := sha256.Sum256(raw)
+	if got := "sha256:" + hex.EncodeToString(sha256Sum[:]); got != PromptFingerprintV2.String() {
+		t.Fatalf("semantic evaluator Prompt fingerprint = %s, want %s", got, PromptFingerprintV2)
+	}
+	gitBlobInput := append([]byte(fmt.Sprintf("blob %d\x00", len(raw))), raw...)
+	gitBlobSum := sha1.Sum(gitBlobInput) // #nosec G401 -- Git blob identity is defined as SHA-1.
+	if got := hex.EncodeToString(gitBlobSum[:]); got != PromptGitBlobSHAV2 {
+		t.Fatalf("semantic evaluator Prompt Git blob = %s, want %s", got, PromptGitBlobSHAV2)
+	}
+}
+
+func TestEvaluatorV2UsesFrozenIndependentRouteAndMinimizedSyntheticPayload(t *testing.T) {
+	provider := &providerStub{raw: validSemanticOutput(t)}
+	evaluator, err := NewEvaluatorV2(provider, semanticRoute())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	identity := evaluator.Identity()
+	if identity.Version != EvaluatorVersionV2 || identity.Prompt.TemplateID != PromptTemplateIDV1 ||
+		identity.Prompt.Version != PromptVersionV2 || identity.Prompt.Fingerprint != PromptFingerprintV2 ||
+		identity.Prompt.GitBlobSHA != PromptGitBlobSHAV2 {
+		t.Fatalf("semantic evaluator identity = %#v", identity)
+	}
+	if identity.OutputSchema.Version != aiexplanation.SemanticEvaluationOutputSchemaVersionV1 ||
+		identity.OutputSchema.Fingerprint != aiexplanation.NewFingerprint(interpretationschema.AIExplanationSemanticEvaluationOutputV1()) ||
+		identity.Provider != semanticRoute().ExecutionSpec || identity.Decoding.MaxOutputTokens != semanticRoute().MaxOutputTokens {
+		t.Fatalf("semantic evaluator release identity = %#v", identity)
+	}
+
+	request := validSemanticRequest(t)
+	outcome, err := evaluator.Evaluate(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if provider.calls != 1 || provider.request.InvocationID != request.InvocationID || provider.request.Route.ExecutionSpec != semanticRoute().ExecutionSpec {
+		t.Fatalf("Provider call/request = %d/%#v", provider.calls, provider.request)
+	}
+	if provider.request.SystemMessage != systemMessageV2 || provider.request.TaskMessage != taskMessageV2 ||
+		provider.request.DataPreamble != dataPreambleV1 || provider.request.OutputSchema.Version != aiexplanation.SemanticEvaluationOutputSchemaVersionV1 {
+		t.Fatalf("semantic Provider messages/schema drifted: %#v", provider.request)
+	}
+	if outcome.Failure != nil || outcome.Result == nil || outcome.ProviderReceipt == nil || outcome.ProviderCallCount != 1 ||
+		outcome.InvocationID != request.InvocationID || outcome.RawOutput == nil || outcome.NormalizedOutput == nil ||
+		outcome.StartedAt.IsZero() || outcome.FinishedAt.Before(outcome.StartedAt) {
+		t.Fatalf("semantic evaluation outcome = %#v", outcome)
+	}
+	result := outcome.Result
+	if result.EvaluatorVersion != EvaluatorVersionV2 || outcome.ProviderReceipt.RequestID != "judge-request-1" ||
+		result.Scores.Faithfulness != 5 || len(result.Decisions) != 1 ||
+		result.Decisions[0].Type != request.Assertions[0].Type || result.Decisions[0].Status != domainevaluation.AssertionPassed {
+		t.Fatalf("semantic evaluation result = %#v", result)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(provider.request.DataJSON, &payload); err != nil {
+		t.Fatal(err)
+	}
+	assertExactKeys(t, payload, []string{"schema_version", "suite_id", "case_id", "attempt", "assessment_input", "candidate_output", "assertions"})
+	assessment := payload["assessment_input"].(map[string]any)
+	assertExactKeys(t, assessment, []string{"context", "facts"})
+	assertion := payload["assertions"].([]any)[0].(map[string]any)
+	assertExactKeys(t, assertion, []string{"type", "scope", "ordinal", "hard", "parameters"})
+	if assertion["type"] != request.Assertions[0].Type || assertion["scope"] != "case" || assertion["ordinal"] != float64(1) {
+		t.Fatalf("semantic assertion wire identity = %#v", assertion)
+	}
+	for _, forbidden := range []string{"report_id", "outcome_id", "assessment_id", "testee_id", "user_id", "profile_id", "invocation_id", "request_id"} {
+		if jsonContainsKey(payload, forbidden) {
+			t.Fatalf("semantic Provider payload leaked forbidden key %q", forbidden)
+		}
+	}
+}
+
+// A Prompt revision must never turn a model's failed judgment into approval by
+// heuristically matching reassuring words in its free-form explanation.
+func TestEvaluatorV2PreservesFailedDecisionEvenWhenDetailContradictsIt(t *testing.T) {
+	var doc outputDocument
+	if err := json.Unmarshal(validSemanticOutput(t), &doc); err != nil {
+		t.Fatal(err)
+	}
+	doc.Decisions = []outputDecision{{Type: "forbidden_claims_absent", Scope: "default", Ordinal: 1, Status: "failed", Detail: "输出未包含禁止声明。"}}
+	raw, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := &providerStub{raw: raw}
+	evaluator, err := NewEvaluatorV2(provider, semanticRoute())
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := validSemanticRequest(t)
+	request.Assertions = []appevaluation.SemanticAssertion{{Type: "forbidden_claims_absent", Scope: domainevaluation.AssertionScopeDefault, Ordinal: 1, Hard: true, Parameters: appevaluation.Assertion{Type: "forbidden_claims_absent", Claims: []string{"diagnosis", "causality"}}}}
+	outcome, err := evaluator.Evaluate(context.Background(), request)
+	if err != nil || outcome.Result == nil {
+		t.Fatalf("outcome = %#v / %v", outcome, err)
+	}
+	if outcome.Result.Decisions[0].Status != domainevaluation.AssertionFailed || string(outcome.RawOutput) != string(raw) {
+		t.Fatal("model rejection or raw evidence was rewritten")
+	}
+}

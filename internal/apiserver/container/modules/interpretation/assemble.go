@@ -431,7 +431,7 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation semantic Provider adapter: %v", err)
 		}
-		semanticEvaluator, err := aiexplanationsemantic.NewEvaluator(semanticProviderAdapter, semanticRoute)
+		semanticEvaluator, err := aiexplanationsemantic.NewEvaluatorV2(semanticProviderAdapter, semanticRoute)
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize AI explanation semantic evaluator: %v", err)
 		}

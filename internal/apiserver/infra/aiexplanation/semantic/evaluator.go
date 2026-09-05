@@ -32,17 +32,33 @@ const (
 	PromptFingerprintV1     = aiexplanation.Fingerprint("sha256:e0e0897f1a81090fe4369043a320361a903571cd4971700df5e104a2382fa2ca")
 	InputSchemaVersionV1    = "ai-explanation-semantic-evaluation-input/v1"
 	maxEvaluatorOutputBytes = 256 << 10
+	EvaluatorVersionV2      = "ai-explanation-semantic-evaluator/v2"
+	PromptVersionV2         = "v2"
+	PromptGitBlobSHAV2      = "ce49f5b7bda879c710e140a65ee2c40d4e25c357"
+	PromptFingerprintV2     = aiexplanation.Fingerprint("sha256:1789c53a44e1be065f5d2691faacaeb65a0a264f9fb0107138c8c8004a8ab572")
 )
 
 type Evaluator struct {
-	provider appport.Provider
-	route    appport.ProviderRoute
-	schema   appport.StructuredOutputSchema
-	compiled *jsonschema.Schema
-	identity domainevaluation.SemanticEvaluatorSpec
+	provider      appport.Provider
+	route         appport.ProviderRoute
+	schema        appport.StructuredOutputSchema
+	compiled      *jsonschema.Schema
+	identity      domainevaluation.SemanticEvaluatorSpec
+	systemMessage string
+	taskMessage   string
 }
 
+// NewEvaluator retains the frozen v1 judge for historical callers.
 func NewEvaluator(provider appport.Provider, route appport.ProviderRoute) (*Evaluator, error) {
+	return newEvaluator(provider, route, PromptVersionV1)
+}
+
+// NewEvaluatorV2 uses explicit assertion polarity and judgment consistency rules.
+func NewEvaluatorV2(provider appport.Provider, route appport.ProviderRoute) (*Evaluator, error) {
+	return newEvaluator(provider, route, PromptVersionV2)
+}
+
+func newEvaluator(provider appport.Provider, route appport.ProviderRoute, promptVersion string) (*Evaluator, error) {
 	if provider == nil {
 		return nil, fmt.Errorf("AI explanation semantic Provider is required")
 	}
@@ -74,10 +90,18 @@ func NewEvaluator(provider appport.Provider, route appport.ProviderRoute) (*Eval
 			MaxOutputTokens: route.MaxOutputTokens, ReasoningEffort: route.ReasoningEffort,
 		},
 	}
+	systemMessage, taskMessage := systemMessageV1, taskMessageV1
+	if promptVersion == PromptVersionV2 {
+		identity.Version = EvaluatorVersionV2
+		identity.Prompt.Version = PromptVersionV2
+		identity.Prompt.Fingerprint = PromptFingerprintV2
+		identity.Prompt.GitBlobSHA = PromptGitBlobSHAV2
+		systemMessage, taskMessage = systemMessageV2, taskMessageV2
+	}
 	if err := identity.Validate(); err != nil {
 		return nil, err
 	}
-	return &Evaluator{provider: provider, route: route, schema: schema, compiled: compiled, identity: identity}, nil
+	return &Evaluator{provider: provider, route: route, schema: schema, compiled: compiled, identity: identity, systemMessage: systemMessage, taskMessage: taskMessage}, nil
 }
 
 func (e *Evaluator) Identity() domainevaluation.SemanticEvaluatorSpec {
@@ -101,7 +125,7 @@ func (e *Evaluator) Evaluate(ctx context.Context, request appevaluation.Semantic
 	}
 	response, err := e.provider.Generate(ctx, appport.ProviderRequest{
 		InvocationID: request.InvocationID, Route: e.route,
-		SystemMessage: systemMessageV1, TaskMessage: taskMessageV1,
+		SystemMessage: e.systemMessage, TaskMessage: e.taskMessage,
 		DataPreamble: dataPreambleV1, DataJSON: payload, OutputSchema: e.schema,
 	})
 	outcome.ProviderCallCount = 1

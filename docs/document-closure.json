@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 36,
+      "expected_count": 38,
       "budgeted": false
     }
   },
@@ -9226,6 +9226,112 @@
           "severity": "medium",
           "summary": "The v5 prompt package is a release candidate without approved production evidence.",
           "exit_criteria": "Run the frozen v5 Prompt, Profile, Suite and Provider Route through 35 candidates, 35 semantic receipts, dual-role human review and an approved Gate."
+        }
+      ]
+    },
+    {
+      "path": "api/schema/interpretation/ai-explanation-prompt-template-v6.md",
+      "class": "sidecar",
+      "owner": "interpretation",
+      "doc_status": "planned",
+      "verified": {
+        "source_sha": null,
+        "verified_on": null
+      },
+      "fact_sources": [
+        {
+          "kind": "contract",
+          "path": "api/schema/interpretation/ai-explanation-input-v1.schema.json"
+        },
+        {
+          "kind": "contract",
+          "path": "api/schema/interpretation/ai-explanation-output-v1.schema.json"
+        },
+        {
+          "kind": "contract",
+          "path": "api/schema/interpretation/ai-explanation-profile-v1.schema.json"
+        },
+        {
+          "kind": "fixture",
+          "path": "api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v6.json"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/aiexplanation/prompt/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/interpretation/aiexplanation/evaluation/**/*.go"
+        }
+      ],
+      "verification": [],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "The v6 prompt package has contract and preflight tests but has not completed a production evaluation Run or dual-role human review."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "DOC-CLOSURE-AI-EXPLANATION-PROMPT-V6",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "The v6 prompt package is a release candidate without approved production evidence.",
+          "exit_criteria": "Run the frozen v6 Prompt, Profile, Suite and Provider Route through 35 candidates, 35 semantic receipts, dual-role human review and an approved Gate."
+        }
+      ]
+    },
+    {
+      "path": "api/schema/interpretation/ai-explanation-semantic-evaluator-prompt-v2.md",
+      "class": "sidecar",
+      "owner": "interpretation",
+      "doc_status": "planned",
+      "verified": {
+        "source_sha": null,
+        "verified_on": null
+      },
+      "fact_sources": [
+        {
+          "kind": "contract",
+          "path": "api/schema/interpretation/ai-explanation-semantic-evaluation-output-v1.schema.json"
+        },
+        {
+          "kind": "fixture",
+          "path": "api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v1.json"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/aiexplanation/semantic/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/interpretation/aiexplanation/evaluation/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/domain/interpretation/aiexplanation/evaluation/**/*.go"
+        }
+      ],
+      "verification": [],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "The executable semantic evaluator Prompt and strict output adapter have contract tests, but no real model-judge call or human release review has been executed."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "DOC-CLOSURE-AI-EXPLANATION-SEMANTIC-EVALUATOR-V2",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "The semantic evaluator has no real provider result or approved release evidence.",
+          "exit_criteria": "Run the frozen evaluator against all 35 generated candidates, retain matching provider receipts and complete dual-role human review."
         }
       ]
     }
