@@ -42,7 +42,7 @@ func (r *PromptEvaluationRepository) SaveEvidenceV2(ctx context.Context, value *
 	setFields := bson.M{
 		"status": po.Status, "version": po.Version, "preflight_evidence": po.PreflightEvidence,
 		"slots": po.Slots, "generation_executions": po.GenerationExecutions, "semantic_executions": po.SemanticExecutions,
-		"human_reviews": po.HumanReviews, "unresolved_result_unknown_count": po.UnresolvedResultUnknownCount,
+		"review_reopenings": po.ReviewReopenings, "human_reviews": po.HumanReviews, "unresolved_result_unknown_count": po.UnresolvedResultUnknownCount,
 		"result_unknown_resolutions": po.ResultUnknownResolutions, "state_transitions": po.StateTransitions,
 		"gate_result": po.GateResult, "audit": po.Audit, "execution": po.Execution,
 		"closed_at": po.ClosedAt, "finalized_at": po.FinalizedAt, "canceled_at": po.CanceledAt,

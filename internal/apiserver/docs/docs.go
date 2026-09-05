@@ -9268,7 +9268,71 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "终审理由",
+                        "description": "终审理由和预检查结果",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.AIExplanationFinalizeV2CheckedRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AIExplanationEvaluationV2Wire"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/reopen-review": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Explanation-Administration"
+                ],
+                "summary": "追加审计记录并重开语义矛盾复核，不调用 Provider",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "评测 Run ID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "重新复核理由",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -10554,6 +10618,107 @@ const docTemplate = `{
                 }
             }
         },
+        "evaluation.CandidateHumanReview": {
+            "type": "object",
+            "properties": {
+                "candidateID": {
+                    "type": "string"
+                },
+                "decision": {
+                    "$ref": "#/definitions/evaluation.ReviewDecision"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "reviewedAt": {
+                    "type": "string"
+                },
+                "reviewer": {
+                    "type": "string"
+                },
+                "role": {
+                    "$ref": "#/definitions/evaluation.ReviewRole"
+                },
+                "semanticReview": {
+                    "$ref": "#/definitions/evaluation.SemanticContradictionReview"
+                }
+            }
+        },
+        "evaluation.EvidenceGateMetric": {
+            "type": "object",
+            "properties": {
+                "denominator": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "numerator": {
+                    "type": "integer"
+                },
+                "threshold": {
+                    "type": "number"
+                },
+                "value": {
+                    "type": "number"
+                }
+            }
+        },
+        "evaluation.EvidenceGateReason": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "evidenceRefs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "gate": {
+                    "type": "string"
+                }
+            }
+        },
+        "evaluation.EvidenceGateResult": {
+            "type": "object",
+            "properties": {
+                "evaluatedAt": {
+                    "type": "string"
+                },
+                "gatePasses": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "boolean"
+                    }
+                },
+                "metrics": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.EvidenceGateMetric"
+                    }
+                },
+                "passed": {
+                    "type": "boolean"
+                },
+                "reasons": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.EvidenceGateReason"
+                    }
+                },
+                "semanticAdjudications": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.SemanticAdjudicationRecord"
+                    }
+                }
+            }
+        },
         "evaluation.EvidenceStatus": {
             "type": "string",
             "enum": [
@@ -10630,6 +10795,63 @@ const docTemplate = `{
                     "type": "integer"
                 }
             }
+        },
+        "evaluation.ReviewDecision": {
+            "type": "string",
+            "enum": [
+                "approve",
+                "reject"
+            ],
+            "x-enum-varnames": [
+                "ReviewDecisionApprove",
+                "ReviewDecisionReject"
+            ]
+        },
+        "evaluation.ReviewReopening": {
+            "type": "object",
+            "properties": {
+                "actor": {
+                    "type": "string"
+                },
+                "candidate_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "finalized_at": {
+                    "type": "string"
+                },
+                "gate": {
+                    "$ref": "#/definitions/evaluation.EvidenceGateResult"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "reopened_at": {
+                    "type": "string"
+                },
+                "reviews": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.CandidateHumanReview"
+                    }
+                },
+                "transition_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "evaluation.ReviewRole": {
+            "type": "string",
+            "enum": [
+                "assessment_semantics",
+                "safety_product"
+            ],
+            "x-enum-varnames": [
+                "ReviewRoleAssessmentSemantics",
+                "ReviewRoleSafetyProduct"
+            ]
         },
         "evaluation.SemanticAdjudicationRecord": {
             "type": "object",
@@ -12105,6 +12327,9 @@ const docTemplate = `{
                 "can_discard": {
                     "type": "boolean"
                 },
+                "can_reopen_review": {
+                    "type": "boolean"
+                },
                 "canceled_at": {
                     "type": "string"
                 },
@@ -12134,6 +12359,9 @@ const docTemplate = `{
                 },
                 "gate_policy_version": {
                     "type": "string"
+                },
+                "gate_preview": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2GateWire"
                 },
                 "generation_executions": {
                     "type": "array",
@@ -12176,6 +12404,12 @@ const docTemplate = `{
                 },
                 "review_ready_candidates": {
                     "type": "integer"
+                },
+                "review_reopenings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.ReviewReopening"
+                    }
                 },
                 "run_id": {
                     "type": "string"
@@ -12235,6 +12469,25 @@ const docTemplate = `{
                 "reason": {
                     "type": "string",
                     "maxLength": 1000
+                }
+            }
+        },
+        "handler.AIExplanationFinalizeV2CheckedRequest": {
+            "type": "object",
+            "required": [
+                "expected_passed",
+                "expected_version",
+                "reason"
+            ],
+            "properties": {
+                "expected_passed": {
+                    "type": "boolean"
+                },
+                "expected_version": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string"
                 }
             }
         },

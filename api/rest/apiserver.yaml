@@ -9502,6 +9502,67 @@ paths:
         content:
           application/json:
             schema:
+              $ref: '#/components/schemas/handler.AIExplanationFinalizeV2CheckedRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/handler.AIExplanationEvaluationV2Wire'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/reopen-review:
+    post:
+      tags:
+      - AI-Explanation-Administration
+      summary: 追加审计记录并重开语义矛盾复核，不调用 Provider
+      operationId: 追加审计记录并重开语义矛盾复核不调用Provider
+      description: 追加审计记录并重开语义矛盾复核，不调用 Provider
+      parameters:
+      - type: string
+        description: 评测 Run ID
+        name: run_id
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
               $ref: '#/components/schemas/handler.AIExplanationFinalizeRequest'
       responses:
         '200':
@@ -10528,6 +10589,72 @@ components:
           type: integer
         totalFactorCode:
           type: string
+    evaluation.CandidateHumanReview:
+      type: object
+      properties:
+        candidateID:
+          type: string
+        decision:
+          $ref: '#/components/schemas/evaluation.ReviewDecision'
+        reason:
+          type: string
+        reviewedAt:
+          type: string
+        reviewer:
+          type: string
+        role:
+          $ref: '#/components/schemas/evaluation.ReviewRole'
+        semanticReview:
+          $ref: '#/components/schemas/evaluation.SemanticContradictionReview'
+    evaluation.EvidenceGateMetric:
+      type: object
+      properties:
+        denominator:
+          type: integer
+        name:
+          type: string
+        numerator:
+          type: integer
+        threshold:
+          type: number
+        value:
+          type: number
+    evaluation.EvidenceGateReason:
+      type: object
+      properties:
+        code:
+          type: string
+        detail:
+          type: string
+        evidenceRefs:
+          type: array
+          items:
+            type: string
+        gate:
+          type: string
+    evaluation.EvidenceGateResult:
+      type: object
+      properties:
+        evaluatedAt:
+          type: string
+        gatePasses:
+          type: object
+          additionalProperties:
+            type: boolean
+        metrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/evaluation.EvidenceGateMetric'
+        passed:
+          type: boolean
+        reasons:
+          type: array
+          items:
+            $ref: '#/components/schemas/evaluation.EvidenceGateReason'
+        semanticAdjudications:
+          type: array
+          items:
+            $ref: '#/components/schemas/evaluation.SemanticAdjudicationRecord'
     evaluation.EvidenceStatus:
       type: string
       enum:
@@ -10583,6 +10710,45 @@ components:
           type: integer
         version:
           type: integer
+    evaluation.ReviewDecision:
+      type: string
+      enum:
+      - approve
+      - reject
+      x-enum-varnames:
+      - ReviewDecisionApprove
+      - ReviewDecisionReject
+    evaluation.ReviewReopening:
+      type: object
+      properties:
+        actor:
+          type: string
+        candidate_ids:
+          type: array
+          items:
+            type: string
+        finalized_at:
+          type: string
+        gate:
+          $ref: '#/components/schemas/evaluation.EvidenceGateResult'
+        reason:
+          type: string
+        reopened_at:
+          type: string
+        reviews:
+          type: array
+          items:
+            $ref: '#/components/schemas/evaluation.CandidateHumanReview'
+        transition_count:
+          type: integer
+    evaluation.ReviewRole:
+      type: string
+      enum:
+      - assessment_semantics
+      - safety_product
+      x-enum-varnames:
+      - ReviewRoleAssessmentSemantics
+      - ReviewRoleSafetyProduct
     evaluation.SemanticAdjudicationRecord:
       type: object
       properties:
@@ -11571,6 +11737,8 @@ components:
           type: boolean
         can_discard:
           type: boolean
+        can_reopen_review:
+          type: boolean
         canceled_at:
           type: string
         closed_at:
@@ -11591,6 +11759,8 @@ components:
           type: string
         gate_policy_version:
           type: string
+        gate_preview:
+          $ref: '#/components/schemas/handler.AIExplanationEvaluationV2GateWire'
         generation_executions:
           type: array
           items:
@@ -11619,6 +11789,10 @@ components:
             $ref: '#/components/schemas/handler.AIExplanationResultUnknownResolutionWire'
         review_ready_candidates:
           type: integer
+        review_reopenings:
+          type: array
+          items:
+            $ref: '#/components/schemas/evaluation.ReviewReopening'
         run_id:
           type: string
         schema_version:
@@ -11658,6 +11832,19 @@ components:
         reason:
           type: string
           maxLength: 1000
+    handler.AIExplanationFinalizeV2CheckedRequest:
+      type: object
+      required:
+      - expected_passed
+      - expected_version
+      - reason
+      properties:
+        expected_passed:
+          type: boolean
+        expected_version:
+          type: integer
+        reason:
+          type: string
     handler.AIExplanationGateReasonWire:
       type: object
       properties:

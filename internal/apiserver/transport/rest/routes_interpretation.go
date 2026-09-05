@@ -80,5 +80,6 @@ func (r *Router) registerInterpretationInternalV2Routes(internalV2 *gin.RouterGr
 	governance.POST("/prompt-evaluations/:run_id/reviews", aiHandler.RecordReviewV2)
 	governance.POST("/prompt-evaluations/:run_id/reviews/batch", aiHandler.RecordReviewsV2)
 	governance.POST("/prompt-evaluations/:run_id/finalize", aiHandler.FinalizeEvaluationV2)
+	governance.POST("/prompt-evaluations/:run_id/reopen-review", aiHandler.ReopenEvaluationReviewV2)
 	governance.POST("/prompt-evaluations/:run_id/result-unknown/resolve", aiHandler.ResolveResultUnknownV2)
 }

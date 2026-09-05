@@ -356,3 +356,11 @@ func TestV2RunManagementRoutesRequireGovernanceForCancellation(t *testing.T) {
 		}
 	}
 }
+
+func (s *routeAIAdministrationStub) ReopenEvaluationReviewV2(context.Context, aiexplanationadministration.Actor, meta.ID, string) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	return s.runV2, nil
+}
+
+func (s *routeAIAdministrationStub) FinalizeEvaluationV2Checked(ctx context.Context, actor aiexplanationadministration.Actor, id meta.ID, reason string, version int64, passed bool) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	return s.FinalizeEvaluationV2(ctx, actor, id, reason)
+}

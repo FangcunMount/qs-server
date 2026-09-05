@@ -54,6 +54,10 @@ type AIExplanationEvaluationV2TransitionWire struct {
 }
 
 type AIExplanationEvaluationV2Wire struct {
+	ReviewReopenings []domainevaluation.ReviewReopening `json:"review_reopenings,omitempty"`
+	CanReopenReview  bool                               `json:"can_reopen_review"`
+	GatePreview      *AIExplanationEvaluationV2GateWire `json:"gate_preview,omitempty"`
+
 	CanceledAt                   *time.Time                                 `json:"canceled_at,omitempty"`
 	CanCancel                    bool                                       `json:"can_cancel"`
 	CanDiscard                   bool                                       `json:"can_discard"`
@@ -457,7 +461,7 @@ func (h *AIExplanationAdministrationHandler) RecordReviewsV2(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param run_id path string true "评测 Run ID"
-// @Param request body AIExplanationFinalizeRequest true "终审理由"
+// @Param request body AIExplanationFinalizeV2CheckedRequest true "终审理由和预检查结果"
 // @Success 200 {object} core.Response{data=AIExplanationEvaluationV2Wire}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 409 {object} core.ErrResponse
@@ -467,11 +471,12 @@ func (h *AIExplanationAdministrationHandler) FinalizeEvaluationV2(c *gin.Context
 	if !ok {
 		return
 	}
-	var request AIExplanationFinalizeRequest
-	if err := h.BindJSON(c, &request); err != nil {
+	var request AIExplanationFinalizeV2CheckedRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		h.Error(c, cberrors.WithCode(code.ErrInvalidArgument, "expected_version, expected_passed and reason are required"))
 		return
 	}
-	value, err := h.service.FinalizeEvaluationV2(c.Request.Context(), actor, runID, request.Reason)
+	value, err := h.service.FinalizeEvaluationV2Checked(c.Request.Context(), actor, runID, request.Reason, *request.ExpectedVersion, *request.ExpectedPassed)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -578,22 +583,14 @@ func evaluationV2Wire(value *domainevaluation.PromptEvaluationEvidenceV2) *AIExp
 			AcknowledgedDuplicateCallAndCostRisk: resolution.AcknowledgedDuplicateCallAndCostRisk, ResolvedAt: resolution.ResolvedAt,
 		})
 	}
-	if value.GateResult != nil {
-		result.Gate = &AIExplanationEvaluationV2GateWire{
-			SemanticAdjudications: value.GateResult.SemanticAdjudications,
-			EvaluatedAt:           value.GateResult.EvaluatedAt, Passed: value.GateResult.Passed,
-			GatePasses: make(map[string]bool, len(value.GateResult.GatePasses)),
-			Reasons:    make([]AIExplanationEvaluationV2GateReasonWire, 0, len(value.GateResult.Reasons)),
-		}
-		for gate, passed := range value.GateResult.GatePasses {
-			result.Gate.GatePasses[gate] = passed
-		}
-		for _, reason := range value.GateResult.Reasons {
-			result.Gate.Reasons = append(result.Gate.Reasons, AIExplanationEvaluationV2GateReasonWire{
-				Gate: reason.Gate, Code: reason.Code, Detail: reason.Detail, EvidenceRefs: append([]string(nil), reason.EvidenceRefs...),
-			})
+	result.ReviewReopenings = value.ReviewReopenings
+	result.CanReopenReview = len(value.ReopenReviewCandidateIDs()) > 0
+	if value.Status == domainevaluation.EvidenceStatusAwaitingReview {
+		if preview, err := value.EvaluateGate(time.Now().UTC()); err == nil {
+			result.GatePreview = evaluationV2GateWire(&preview)
 		}
 	}
+	result.Gate = evaluationV2GateWire(value.GateResult)
 	return result
 }
 
@@ -758,4 +755,59 @@ func failureV2Wire(value *domainevaluation.ClassifiedFailure) *AIExplanationEval
 		ResultUnknown: value.ResultUnknown, Disposition: string(value.Disposition), SafeMessage: value.SafeMessage,
 		EvidenceRefs: append([]string(nil), value.EvidenceRefs...), ProviderDiagnostics: value.Clone().ProviderDiagnostics,
 	}
+}
+
+func evaluationV2GateWire(value *domainevaluation.EvidenceGateResult) *AIExplanationEvaluationV2GateWire {
+	var result *AIExplanationEvaluationV2GateWire
+	if value != nil {
+		result = &AIExplanationEvaluationV2GateWire{
+			SemanticAdjudications: value.SemanticAdjudications,
+			EvaluatedAt:           value.EvaluatedAt, Passed: value.Passed,
+			GatePasses: make(map[string]bool, len(value.GatePasses)),
+			Reasons:    make([]AIExplanationEvaluationV2GateReasonWire, 0, len(value.Reasons)),
+		}
+		for gate, passed := range value.GatePasses {
+			result.GatePasses[gate] = passed
+		}
+		for _, reason := range value.Reasons {
+			result.Reasons = append(result.Reasons, AIExplanationEvaluationV2GateReasonWire{
+				Gate: reason.Gate, Code: reason.Code, Detail: reason.Detail, EvidenceRefs: append([]string(nil), reason.EvidenceRefs...),
+			})
+		}
+	}
+	return result
+}
+
+// ReopenEvaluationReviewV2 godoc
+// @Summary 追加审计记录并重开语义矛盾复核，不调用 Provider
+// @Tags AI-Explanation-Administration
+// @Accept json
+// @Produce json
+// @Param run_id path string true "评测 Run ID"
+// @Param request body AIExplanationFinalizeRequest true "重新复核理由"
+// @Success 200 {object} core.Response{data=AIExplanationEvaluationV2Wire}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 409 {object} core.ErrResponse
+// @Router /internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/reopen-review [post]
+func (h *AIExplanationAdministrationHandler) ReopenEvaluationReviewV2(c *gin.Context) {
+	actor, runID, ok := h.actorAndRunID(c)
+	if !ok {
+		return
+	}
+	var request AIExplanationFinalizeRequest
+	if err := h.BindJSON(c, &request); err != nil {
+		return
+	}
+	value, err := h.service.ReopenEvaluationReviewV2(c.Request.Context(), actor, runID, request.Reason)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, evaluationV2Wire(value))
+}
+
+type AIExplanationFinalizeV2CheckedRequest struct {
+	Reason          string `json:"reason" binding:"required"`
+	ExpectedVersion *int64 `json:"expected_version" binding:"required"`
+	ExpectedPassed  *bool  `json:"expected_passed" binding:"required"`
 }

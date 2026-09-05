@@ -531,3 +531,32 @@ func (s *aiAdministrationServiceStub) ListEvaluationsV2(context.Context, aiexpla
 func (s *aiAdministrationServiceStub) CancelEvaluationV2(context.Context, aiexplanationadministration.Actor, meta.ID, aiexplanationadministration.CancelEvaluationV2Command) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
 	return nil, nil
 }
+
+func (s *aiAdministrationServiceStub) ReopenEvaluationReviewV2(_ context.Context, actor aiexplanationadministration.Actor, _ meta.ID, _ string) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	s.lastActor = actor
+	return s.runV2, nil
+}
+
+func (s *aiAdministrationServiceStub) FinalizeEvaluationV2Checked(ctx context.Context, actor aiexplanationadministration.Actor, id meta.ID, reason string, version int64, passed bool) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	return s.FinalizeEvaluationV2(ctx, actor, id, reason)
+}
+
+func TestFinalizationRequiresAnExplicitPreviewIncludingFalse(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tc := range []struct {
+		body   string
+		status int
+	}{
+		{`{"reason":"checked"}`, http.StatusBadRequest},
+		{`{"reason":"checked","expected_version":213,"expected_passed":false}`, http.StatusOK},
+	} {
+		service := &aiAdministrationServiceStub{}
+		handler := NewAIExplanationAdministrationHandler(service)
+		ctx, rec := aiAdministrationContext(http.MethodPost, "/internal/v2/interpretation/ai-explanation/prompt-evaluations/9/finalize", bytes.NewBufferString(tc.body))
+		ctx.Params = gin.Params{{Key: "run_id", Value: "9"}}
+		handler.FinalizeEvaluationV2(ctx)
+		if rec.Code != tc.status {
+			t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+		}
+	}
+}

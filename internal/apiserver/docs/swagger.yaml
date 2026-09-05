@@ -576,6 +576,72 @@ definitions:
       totalFactorCode:
         type: string
     type: object
+  evaluation.CandidateHumanReview:
+    properties:
+      candidateID:
+        type: string
+      decision:
+        $ref: '#/definitions/evaluation.ReviewDecision'
+      reason:
+        type: string
+      reviewedAt:
+        type: string
+      reviewer:
+        type: string
+      role:
+        $ref: '#/definitions/evaluation.ReviewRole'
+      semanticReview:
+        $ref: '#/definitions/evaluation.SemanticContradictionReview'
+    type: object
+  evaluation.EvidenceGateMetric:
+    properties:
+      denominator:
+        type: integer
+      name:
+        type: string
+      numerator:
+        type: integer
+      threshold:
+        type: number
+      value:
+        type: number
+    type: object
+  evaluation.EvidenceGateReason:
+    properties:
+      code:
+        type: string
+      detail:
+        type: string
+      evidenceRefs:
+        items:
+          type: string
+        type: array
+      gate:
+        type: string
+    type: object
+  evaluation.EvidenceGateResult:
+    properties:
+      evaluatedAt:
+        type: string
+      gatePasses:
+        additionalProperties:
+          type: boolean
+        type: object
+      metrics:
+        items:
+          $ref: '#/definitions/evaluation.EvidenceGateMetric'
+        type: array
+      passed:
+        type: boolean
+      reasons:
+        items:
+          $ref: '#/definitions/evaluation.EvidenceGateReason'
+        type: array
+      semanticAdjudications:
+        items:
+          $ref: '#/definitions/evaluation.SemanticAdjudicationRecord'
+        type: array
+    type: object
   evaluation.EvidenceStatus:
     enum:
     - requested
@@ -631,6 +697,45 @@ definitions:
       version:
         type: integer
     type: object
+  evaluation.ReviewDecision:
+    enum:
+    - approve
+    - reject
+    type: string
+    x-enum-varnames:
+    - ReviewDecisionApprove
+    - ReviewDecisionReject
+  evaluation.ReviewReopening:
+    properties:
+      actor:
+        type: string
+      candidate_ids:
+        items:
+          type: string
+        type: array
+      finalized_at:
+        type: string
+      gate:
+        $ref: '#/definitions/evaluation.EvidenceGateResult'
+      reason:
+        type: string
+      reopened_at:
+        type: string
+      reviews:
+        items:
+          $ref: '#/definitions/evaluation.CandidateHumanReview'
+        type: array
+      transition_count:
+        type: integer
+    type: object
+  evaluation.ReviewRole:
+    enum:
+    - assessment_semantics
+    - safety_product
+    type: string
+    x-enum-varnames:
+    - ReviewRoleAssessmentSemantics
+    - ReviewRoleSafetyProduct
   evaluation.SemanticAdjudicationRecord:
     properties:
       assertion_ordinal:
@@ -1618,6 +1723,8 @@ definitions:
         type: boolean
       can_discard:
         type: boolean
+      can_reopen_review:
+        type: boolean
       canceled_at:
         type: string
       closed_at:
@@ -1638,6 +1745,8 @@ definitions:
         type: string
       gate_policy_version:
         type: string
+      gate_preview:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2GateWire'
       generation_executions:
         items:
           $ref: '#/definitions/handler.AIExplanationEvaluationV2ExecutionWire'
@@ -1666,6 +1775,10 @@ definitions:
         type: array
       review_ready_candidates:
         type: integer
+      review_reopenings:
+        items:
+          $ref: '#/definitions/evaluation.ReviewReopening'
+        type: array
       run_id:
         type: string
       schema_version:
@@ -1704,6 +1817,19 @@ definitions:
         maxLength: 1000
         type: string
     required:
+    - reason
+    type: object
+  handler.AIExplanationFinalizeV2CheckedRequest:
+    properties:
+      expected_passed:
+        type: boolean
+      expected_version:
+        type: integer
+      reason:
+        type: string
+    required:
+    - expected_passed
+    - expected_version
     - reason
     type: object
   handler.AIExplanationGateReasonWire:
@@ -12716,7 +12842,46 @@ paths:
         name: run_id
         required: true
         type: string
-      - description: 终审理由
+      - description: 终审理由和预检查结果
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.AIExplanationFinalizeV2CheckedRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationEvaluationV2Wire'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 按冻结 G1-G5 Policy 终审 v2 Evidence
+      tags:
+      - AI-Explanation-Administration
+  /internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/reopen-review:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 评测 Run ID
+        in: path
+        name: run_id
+        required: true
+        type: string
+      - description: 重新复核理由
         in: body
         name: request
         required: true
@@ -12742,7 +12907,7 @@ paths:
           description: Conflict
           schema:
             $ref: '#/definitions/core.ErrResponse'
-      summary: 按冻结 G1-G5 Policy 终审 v2 Evidence
+      summary: 追加审计记录并重开语义矛盾复核，不调用 Provider
       tags:
       - AI-Explanation-Administration
   /internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/result-unknown/resolve:

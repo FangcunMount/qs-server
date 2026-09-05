@@ -410,6 +410,7 @@ const PromptEvaluationEvidenceVersionV2 = "v2"
 // collection. evidence_version is the fail-closed discriminator; v1 readers
 // exclude documents that contain it.
 type PromptEvaluationEvidenceV2PO struct {
+	ReviewReopenings  []domainevaluation.ReviewReopening `bson:"review_reopenings,omitempty"`
 	base.BaseDocument `bson:",inline"`
 
 	EvidenceVersion              string                                          `bson:"evidence_version"`

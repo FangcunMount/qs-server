@@ -582,6 +582,8 @@ func isAllowedEvidenceTransition(from *EvidenceStatus, to EvidenceStatus) bool {
 		return to == EvidenceStatusBlocked || to == EvidenceStatusAwaitingReview || to == EvidenceStatusCanceled
 	case EvidenceStatusBlocked:
 		return to == EvidenceStatusCollecting || to == EvidenceStatusCanceled
+	case EvidenceStatusRejected:
+		return to == EvidenceStatusAwaitingReview
 	case EvidenceStatusAwaitingReview:
 		return to == EvidenceStatusApproved || to == EvidenceStatusRejected || to == EvidenceStatusCanceled
 	default:
@@ -619,6 +621,7 @@ func (a EvidenceRunAudit) Validate(status EvidenceStatus) error {
 // with legacy AttemptRecord data; no v1 record is silently reinterpreted as a
 // candidate slot or a semantic execution.
 type PromptEvaluationEvidenceV2 struct {
+	ReviewReopenings             []ReviewReopening
 	SchemaVersion                string
 	RunID                        meta.ID
 	Release                      EvidenceReleaseIdentity
@@ -817,6 +820,9 @@ func (e PromptEvaluationEvidenceV2) Validate() error {
 		}
 	}
 	if err := validateCandidateReviews(e.HumanReviews, candidates, reviewReady); err != nil {
+		return err
+	}
+	if err := e.validateReviewReopenings(); err != nil {
 		return err
 	}
 	if err := e.validateSemanticReviews(); err != nil {
@@ -1421,6 +1427,14 @@ func (e PromptEvaluationEvidenceV2) Clone() PromptEvaluationEvidenceV2 {
 			result.Decisions = append([]SemanticDecision(nil), e.SemanticExecutions[index].Result.Decisions...)
 			cloned.SemanticExecutions[index].Result = &result
 		}
+	}
+	cloned.ReviewReopenings = append([]ReviewReopening(nil), e.ReviewReopenings...)
+	for i, h := range e.ReviewReopenings {
+		snapshot := PromptEvaluationEvidenceV2{HumanReviews: h.Reviews, GateResult: &h.Gate}
+		copy := snapshot.Clone()
+		cloned.ReviewReopenings[i].Reviews = copy.HumanReviews
+		cloned.ReviewReopenings[i].Gate = *copy.GateResult
+		cloned.ReviewReopenings[i].CandidateIDs = append([]string(nil), h.CandidateIDs...)
 	}
 	cloned.HumanReviews = append([]CandidateHumanReview(nil), e.HumanReviews...)
 	for i := range cloned.HumanReviews {

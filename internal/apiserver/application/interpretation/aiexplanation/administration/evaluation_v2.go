@@ -230,3 +230,59 @@ func evidenceHasReviewReadyCandidate(value *domainevaluation.PromptEvaluationEvi
 	}
 	return false
 }
+
+func (s *service) ReopenEvaluationReviewV2(ctx context.Context, actor Actor, runID meta.ID, reason string) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	reason = strings.TrimSpace(reason)
+	if actor.OrgID <= 0 || actor.OperatorUserID <= 0 || runID.IsZero() || reason == "" || len(reason) > maxAuditReasonLength {
+		return nil, cberrors.WithCode(code.ErrInvalidArgument, "review reopening reason is required")
+	}
+	if s == nil || s.evidenceV2 == nil || s.access == nil || s.now == nil {
+		return nil, cberrors.WithCode(code.ErrUnsupportedOperation, "review reopening is disabled")
+	}
+	if err := s.access.AuthorizeGovernance(ctx, actor); err != nil {
+		return nil, err
+	}
+	current, err := s.evidenceV2.Find(ctx, runID)
+	if err != nil {
+		return nil, mapKnownError(err)
+	}
+	if err := validateEvaluationV2Org(current, actor); err != nil {
+		return nil, err
+	}
+	workflow, ok := s.evidenceV2.(interface {
+		ReopenReview(context.Context, meta.ID, string, string, time.Time) (*domainevaluation.PromptEvaluationEvidenceV2, error)
+	})
+	if !ok {
+		return nil, cberrors.WithCode(code.ErrUnsupportedOperation, "review reopening is disabled")
+	}
+	value, err := workflow.ReopenReview(ctx, runID, actor.Subject(), reason, s.now().UTC())
+	return value, mapKnownError(err)
+}
+
+func (s *service) FinalizeEvaluationV2Checked(ctx context.Context, actor Actor, runID meta.ID, reason string, version int64, passed bool) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	reason = strings.TrimSpace(reason)
+	if actor.OrgID <= 0 || actor.OperatorUserID <= 0 || runID.IsZero() || version <= 0 || reason == "" || len(reason) > maxAuditReasonLength {
+		return nil, cberrors.WithCode(code.ErrInvalidArgument, "finalization preview and reason are required")
+	}
+	if s == nil || s.evidenceV2 == nil || s.access == nil || s.now == nil {
+		return nil, cberrors.WithCode(code.ErrUnsupportedOperation, "finalization is disabled")
+	}
+	if err := s.access.AuthorizeGovernance(ctx, actor); err != nil {
+		return nil, err
+	}
+	current, err := s.evidenceV2.Find(ctx, runID)
+	if err != nil {
+		return nil, mapKnownError(err)
+	}
+	if err := validateEvaluationV2Org(current, actor); err != nil {
+		return nil, err
+	}
+	workflow, ok := s.evidenceV2.(interface {
+		FinalizeChecked(context.Context, meta.ID, string, string, int64, bool, time.Time) (*domainevaluation.PromptEvaluationEvidenceV2, error)
+	})
+	if !ok {
+		return nil, cberrors.WithCode(code.ErrUnsupportedOperation, "checked finalization is disabled")
+	}
+	value, err := workflow.FinalizeChecked(ctx, runID, actor.Subject(), reason, version, passed, s.now().UTC())
+	return value, mapKnownError(err)
+}

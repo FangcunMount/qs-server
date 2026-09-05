@@ -99,6 +99,8 @@ type Service interface {
 	StartEvaluationV2(context.Context, Actor, StartEvaluationV2Command) (*domainevaluation.PromptEvaluationEvidenceV2, error)
 	RecordReviewV2(context.Context, Actor, meta.ID, ReviewV2Command) (*domainevaluation.PromptEvaluationEvidenceV2, error)
 	RecordReviewsV2(context.Context, Actor, meta.ID, ReviewV2BatchCommand) (*domainevaluation.PromptEvaluationEvidenceV2, error)
+	FinalizeEvaluationV2Checked(context.Context, Actor, meta.ID, string, int64, bool) (*domainevaluation.PromptEvaluationEvidenceV2, error)
+	ReopenEvaluationReviewV2(context.Context, Actor, meta.ID, string) (*domainevaluation.PromptEvaluationEvidenceV2, error)
 	FinalizeEvaluationV2(context.Context, Actor, meta.ID, string) (*domainevaluation.PromptEvaluationEvidenceV2, error)
 	ResolveResultUnknownV2(context.Context, Actor, meta.ID, ResolveResultUnknownV2Command) (*domainevaluation.PromptEvaluationEvidenceV2, error)
 	StartEvaluationRecheck(context.Context, Actor, meta.ID, string, int, StartEvaluationRecheckCommand) (*domainevaluation.PromptEvaluationRecheck, error)

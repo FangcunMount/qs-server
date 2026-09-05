@@ -36,7 +36,7 @@ func (*Mapper) PromptEvaluationEvidenceV2ToPO(value *domainevaluation.PromptEval
 		Status: string(snapshot.Status), Version: snapshot.Version(),
 		PreflightEvidence: snapshot.PreflightEvidence, Slots: snapshot.Slots,
 		GenerationExecutions: snapshot.GenerationExecutions, SemanticExecutions: snapshot.SemanticExecutions,
-		HumanReviews: snapshot.HumanReviews, UnresolvedResultUnknownCount: snapshot.UnresolvedResultUnknownCount,
+		ReviewReopenings: snapshot.ReviewReopenings, HumanReviews: snapshot.HumanReviews, UnresolvedResultUnknownCount: snapshot.UnresolvedResultUnknownCount,
 		ResultUnknownResolutions: snapshot.ResultUnknownResolutions, StateTransitions: snapshot.StateTransitions,
 		GateResult: snapshot.GateResult, Audit: snapshot.Audit, Execution: evidenceV2ExecutionToPO(snapshot.Execution()),
 		ActiveReleaseKey: activeReleaseKey, ActiveExecutionOrgKey: activeExecutionOrgKey,
@@ -54,7 +54,7 @@ func (*Mapper) PromptEvaluationEvidenceV2ToDomain(po *PromptEvaluationEvidenceV2
 		Release: po.Release, ExecutionPolicy: po.ExecutionPolicy, GatePolicy: po.GatePolicy,
 		Status: domainevaluation.EvidenceStatus(po.Status), PreflightEvidence: po.PreflightEvidence, Slots: po.Slots,
 		GenerationExecutions: po.GenerationExecutions, SemanticExecutions: po.SemanticExecutions,
-		HumanReviews: po.HumanReviews, UnresolvedResultUnknownCount: po.UnresolvedResultUnknownCount,
+		ReviewReopenings: po.ReviewReopenings, HumanReviews: po.HumanReviews, UnresolvedResultUnknownCount: po.UnresolvedResultUnknownCount,
 		ResultUnknownResolutions: po.ResultUnknownResolutions, StateTransitions: po.StateTransitions,
 		GateResult: po.GateResult, Audit: po.Audit,
 	}

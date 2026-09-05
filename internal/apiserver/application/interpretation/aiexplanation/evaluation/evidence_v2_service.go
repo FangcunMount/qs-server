@@ -149,3 +149,13 @@ func (s *EvidenceV2Service) mutate(ctx context.Context, runID meta.ID, mutation 
 	}
 	return evidence, nil
 }
+
+func (s *EvidenceV2Service) ReopenReview(ctx context.Context, runID meta.ID, actor, reason string, at time.Time) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	return s.mutate(ctx, runID, func(e *domainevaluation.PromptEvaluationEvidenceV2) error { return e.ReopenReview(actor, reason, at) })
+}
+
+func (s *EvidenceV2Service) FinalizeChecked(ctx context.Context, runID meta.ID, actor, reason string, version int64, passed bool, at time.Time) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	return s.mutate(ctx, runID, func(e *domainevaluation.PromptEvaluationEvidenceV2) error {
+		return e.FinalizeChecked(actor, reason, version, passed, at)
+	})
+}

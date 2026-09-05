@@ -97,6 +97,7 @@ func TestAIExplanationAdministrationOpenAPIContract(t *testing.T) {
 		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/reviews":                                      "post",
 		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/reviews/batch":                                "post",
 		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/finalize":                                     "post",
+		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/reopen-review":                                "post",
 		"/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/result-unknown/resolve":                       "post",
 		"/internal/v2/interpretation/ai-explanation/legacy-prompt-evaluations/{run_id}/attempts/{case_id}/{attempt}/rechecks": "post",
 		"/internal/v1/interpretation/ai-explanation/profiles":                                                                 "post",

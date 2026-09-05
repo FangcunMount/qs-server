@@ -346,7 +346,8 @@ func TestEvidenceV2CancellationRoundTripsAuditAndReleasesActiveKeys(t *testing.T
 	require.Equal(t, "superseded release", catalog.Transitions[len(catalog.Transitions)-1].Reason)
 }
 
-func TestSemanticAdjudicationSurvivesFinalizedBSONRoundTrip(t *testing.T) {
+func reviewedMapperEvidenceV2(t *testing.T) *domainevaluation.PromptEvaluationEvidenceV2 {
+	t.Helper()
 	e := completeMapperEvidenceV2(t)
 	e.GatePolicy.Version = "v2"
 	fp, err := e.GatePolicy.Fingerprint()
@@ -368,6 +369,12 @@ func TestSemanticAdjudicationSurvivesFinalizedBSONRoundTrip(t *testing.T) {
 			require.NoError(t, e.AddHumanReview(r))
 		}
 	}
+	return e
+}
+
+func TestSemanticAdjudicationSurvivesFinalizedBSONRoundTrip(t *testing.T) {
+	e := reviewedMapperEvidenceV2(t)
+	at := e.Audit.CreatedAt.Add(24 * time.Hour)
 	require.NoError(t, e.Finalize("user:admin", "review_completed", at.Add(time.Minute)))
 	require.True(t, e.GateResult.Passed)
 	po, err := NewMapper().PromptEvaluationEvidenceV2ToPO(e)
@@ -384,4 +391,40 @@ func TestSemanticAdjudicationSurvivesFinalizedBSONRoundTrip(t *testing.T) {
 	require.Equal(t, e.SemanticExecutions, restored.SemanticExecutions)
 	require.Equal(t, e.Slots, restored.Slots)
 	require.Len(t, restored.GateResult.SemanticAdjudications, 1)
+}
+
+func TestReopenedReviewHistoryBSONRoundTrip(t *testing.T) {
+	e := reviewedMapperEvidenceV2(t)
+	var signatures []domainevaluation.CandidateHumanReview
+	for i, r := range e.HumanReviews {
+		if r.SemanticReview != nil {
+			signatures = append(signatures, r)
+			e.HumanReviews[i].SemanticReview = nil
+		}
+	}
+	at := e.Audit.CreatedAt.Add(25 * time.Hour)
+	require.NoError(t, e.Finalize("user:admin", "human_review_finalized", at))
+	require.NoError(t, e.ReopenReview("user:admin", "review contradictory judgment", at.Add(time.Minute)))
+	for round := 0; round < 2; round++ {
+		po, err := NewMapper().PromptEvaluationEvidenceV2ToPO(e)
+		require.NoError(t, err)
+		raw, err := bson.Marshal(po)
+		require.NoError(t, err)
+		var decoded PromptEvaluationEvidenceV2PO
+		require.NoError(t, bson.Unmarshal(raw, &decoded))
+		restored, err := NewMapper().PromptEvaluationEvidenceV2ToDomain(&decoded)
+		require.NoError(t, err)
+		require.Equal(t, e.ReviewReopenings, restored.ReviewReopenings)
+		require.NoError(t, restored.Validate())
+		require.False(t, restored.ReviewReopenings[0].Gate.Passed)
+		if round == 0 {
+			e = restored
+			for i := range signatures {
+				signatures[i].ReviewedAt = at.Add(2 * time.Minute)
+			}
+			require.NoError(t, e.AddHumanReviews(signatures))
+			require.NoError(t, e.Finalize("user:admin", "human_review_finalized", at.Add(3*time.Minute)))
+			require.True(t, e.GateResult.Passed)
+		}
+	}
 }

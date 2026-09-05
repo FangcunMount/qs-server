@@ -214,3 +214,13 @@ func TestEvidenceV2CancellationUsesPageVersionAndRepositoryCAS(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, domainevaluation.EvidenceStatusCanceled, updated.Status)
 }
+
+func TestCheckedFinalizationRejectsStalePreviewWithoutWriting(t *testing.T) {
+	e := newServiceEvidenceV2(t)
+	repo := &evidenceV2RepositoryStub{value: e}
+	service, err := NewEvidenceV2Service(repo)
+	require.NoError(t, err)
+	_, err = service.FinalizeChecked(context.Background(), e.RunID, "user:admin", "checked", e.Version()+1, true, e.Audit.CreatedAt.Add(time.Hour))
+	require.Error(t, err)
+	require.Zero(t, repo.saveCalls)
+}
