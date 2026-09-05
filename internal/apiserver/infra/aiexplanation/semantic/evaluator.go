@@ -165,6 +165,15 @@ func semanticProviderFailure(outcome appevaluation.SemanticEvaluationOutcome, er
 	var providerErr *appport.ProviderError
 	if errors.As(err, &providerErr) && providerErr != nil {
 		outcome.ProviderFailureCode = strings.TrimSpace(providerErr.Code)
+		if providerErr.Diagnostics != nil {
+			diagnostics := *providerErr.Diagnostics
+			outcome.ProviderDiagnostics = &diagnostics
+		} else {
+			diagnostics := aiexplanation.ProviderFailureDiagnostics{Code: outcome.ProviderFailureCode}
+			if diagnostics.Validate() == nil {
+				outcome.ProviderDiagnostics = &diagnostics
+			}
+		}
 		if strings.TrimSpace(providerErr.SafeMessage) != "" {
 			safeMessage = strings.TrimSpace(providerErr.SafeMessage)
 		}

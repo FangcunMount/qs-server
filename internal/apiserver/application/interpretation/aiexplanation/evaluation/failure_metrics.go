@@ -44,7 +44,7 @@ func promptEvaluationFailureCodeLabel(value string) string {
 		"provider_output_unknown_field", "provider_output_field_type_invalid", "provider_output_json_decode_invalid",
 		"provider_output_trailing_content", "provider_output_content_contract_invalid",
 		"semantic_evaluation_failed", "semantic_receipt_invalid",
-		"semantic_provider_failed", "semantic_result_unknown", "semantic_output_missing_or_too_large",
+		"semantic_provider_no_message", "semantic_provider_rate_limited", "semantic_provider_failed", "semantic_result_unknown", "semantic_output_missing_or_too_large",
 		"semantic_output_schema_invalid", "semantic_output_decode_invalid", "semantic_decision_contract_invalid",
 		"provider_result_unknown",
 		"provider_request_invalid", "provider_request_encode_failed", "provider_request_build_failed",

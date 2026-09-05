@@ -298,3 +298,29 @@ func mapperGatePolicyV2() domainevaluation.ReleaseGatePolicy {
 		ApprovalRule: "all_gates_must_pass",
 	}
 }
+
+func TestEvidenceV2FailureDiagnosticsSurviveBSONAndClone(t *testing.T) {
+	failure := domainevaluation.ClassifiedFailure{
+		SchemaVersion: domainevaluation.FailureTaxonomySchemaVersionV1, Stage: domainevaluation.FailureStageSemanticEvaluation,
+		Kind: domainevaluation.FailureKindSemanticExecution, Code: domainevaluation.SemanticProviderNoMessage,
+		Retryable: true, Disposition: domainevaluation.FailureDispositionRetrySemantic, SafeMessage: "Provider 未返回结构化消息", EvidenceRefs: []string{"execution:1"},
+		ProviderDiagnostics: &domainai.ProviderFailureDiagnostics{Code: "provider_output_cardinality_invalid", RequestID: "resp_test", ResponseStatus: "completed", ResponseShape: "no_message"},
+	}
+	require.NoError(t, failure.Validate())
+	po := PromptEvaluationEvidenceV2PO{SemanticExecutions: []domainevaluation.SemanticEvaluationExecution{{Failure: &failure}}}
+	raw, err := bson.Marshal(po)
+	require.NoError(t, err)
+	var decoded PromptEvaluationEvidenceV2PO
+	require.NoError(t, bson.Unmarshal(raw, &decoded))
+	require.Equal(t, failure, *decoded.SemanticExecutions[0].Failure)
+	cloned := failure.Clone()
+	cloned.ProviderDiagnostics.RequestID = "changed"
+	require.Equal(t, "resp_test", failure.ProviderDiagnostics.RequestID)
+	// Old documents have no diagnostics; the optional field remains absent.
+	failure.ProviderDiagnostics = nil
+	raw, err = bson.Marshal(failure)
+	require.NoError(t, err)
+	var document bson.M
+	require.NoError(t, bson.Unmarshal(raw, &document))
+	require.NotContains(t, document, "provider_diagnostics")
+}

@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/evaluation"
 	appport "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/port"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation"
 	domainevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/evaluation"
 	evaluationevents "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/events"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -401,3 +402,50 @@ func onlineGatePolicyV2() domainevaluation.ReleaseGatePolicy {
 }
 
 var _ appport.Provider = (*onlineProviderStub)(nil)
+
+func TestOnlineRunnerV2RecoversNoMessageWithoutRegeneratingCandidate(t *testing.T) {
+	clock := &onlineV2Clock{now: time.Date(2026, 9, 1, 2, 0, 0, 0, time.UTC)}
+	provider := &onlineProviderStub{}
+	semantic := &onlineSemanticStub{
+		failAt:      1,
+		diagnostics: &aiexplanation.ProviderFailureDiagnostics{Code: "provider_output_cardinality_invalid", RequestID: "resp_no_message", ResponseStatus: "completed", ResponseShape: "no_message"},
+		failure: &domainevaluation.AttemptFailure{
+			Stage: string(domainevaluation.FailureStageSemanticEvaluation), Code: domainevaluation.SemanticProviderFailed,
+			SafeMessage: "semantic output violated the frozen schema", Retryable: false,
+		},
+	}
+	runner, _, stager := newOnlineRunnerV2(t, clock, provider, semantic)
+	started, startErr := runner.StartRequestedV2(context.Background(), evaluation.OnlineStartV2Command{RunID: meta.ID(9502), OrgID: 12, RequestedBy: "user:42", Reason: "verify bounded semantic recovery", ExecutionPolicy: domainevaluation.CurrentEvaluationExecutionPolicy(), GatePolicy: domainevaluation.CurrentReleaseGatePolicy()})
+	if startErr != nil {
+		t.Fatal(startErr)
+	}
+	firstAction, _ := started.Evidence.NextAction()
+	generation, err := runner.RunStepV2(context.Background(), onlineV2Command(started.Evidence, firstAction, stager.events[0].EventID()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	semanticOne, _ := generation.Evidence.NextAction()
+	failed, err := runner.RunStepV2(context.Background(), onlineV2Command(generation.Evidence, semanticOne, stager.events[1].EventID()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	semanticTwo, err := failed.Evidence.NextAction()
+	if err != nil || semanticTwo.Kind != domainevaluation.EvidenceNextActionSemantic || semanticTwo.ExecutionOrdinal != 2 ||
+		semanticTwo.CandidateID != semanticOne.CandidateID {
+		t.Fatalf("semantic retry action = %#v / %v", semanticTwo, err)
+	}
+	if provider.calls != 1 || semantic.calls != 1 || len(failed.Evidence.GenerationExecutions) != 1 || len(failed.Evidence.SemanticExecutions) != 1 {
+		t.Fatalf("first semantic failure calls/evidence = %d/%d/%d/%d", provider.calls, semantic.calls, len(failed.Evidence.GenerationExecutions), len(failed.Evidence.SemanticExecutions))
+	}
+	succeeded, err := runner.RunStepV2(context.Background(), onlineV2Command(failed.Evidence, semanticTwo, stager.events[2].EventID()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if succeeded.Status != evaluation.OnlineStepV2Progressed || provider.calls != 1 || semantic.calls != 2 ||
+		len(succeeded.Evidence.GenerationExecutions) != 1 || len(succeeded.Evidence.SemanticExecutions) != 2 ||
+		!succeeded.Evidence.Slots[0].Candidate.ReviewReady {
+		t.Fatalf("semantic-only recovery = status:%s calls:%d/%d evidence:%d/%d candidate:%#v",
+			succeeded.Status, provider.calls, semantic.calls, len(succeeded.Evidence.GenerationExecutions),
+			len(succeeded.Evidence.SemanticExecutions), succeeded.Evidence.Slots[0].Candidate)
+	}
+}

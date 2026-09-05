@@ -9840,6 +9840,17 @@ paths:
                 $ref: '#/components/schemas/core.ErrResponse'
 components:
   schemas:
+    aiexplanation.ProviderFailureDiagnostics:
+      type: object
+      properties:
+        code:
+          type: string
+        request_id:
+          type: string
+        response_shape:
+          type: string
+        response_status:
+          type: string
     binding.DecisionKind:
       type: string
       enum:
@@ -11103,6 +11114,8 @@ components:
             type: string
         kind:
           type: string
+        provider_diagnostics:
+          $ref: '#/components/schemas/aiexplanation.ProviderFailureDiagnostics'
         result_unknown:
           type: boolean
         retryable:
@@ -11168,6 +11181,8 @@ components:
       properties:
         execution_id:
           type: string
+        failure:
+          $ref: '#/components/schemas/handler.AIExplanationEvaluationV2FailureWire'
         kind:
           type: string
         normalized_output:

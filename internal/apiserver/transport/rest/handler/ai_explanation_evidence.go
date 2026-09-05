@@ -8,6 +8,7 @@ import (
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	aiexplanationadministration "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/administration"
 	appevaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/evaluation"
+	domainai "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation"
 	domainevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/evaluation"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/core"
@@ -155,14 +156,15 @@ type AIExplanationEvaluationV2ExecutionWire struct {
 }
 
 type AIExplanationEvaluationV2FailureWire struct {
-	Stage         string   `json:"stage"`
-	Kind          string   `json:"kind"`
-	Code          string   `json:"code"`
-	Retryable     bool     `json:"retryable"`
-	ResultUnknown bool     `json:"result_unknown"`
-	Disposition   string   `json:"disposition"`
-	SafeMessage   string   `json:"safe_message"`
-	EvidenceRefs  []string `json:"evidence_refs"`
+	ProviderDiagnostics *domainai.ProviderFailureDiagnostics `json:"provider_diagnostics,omitempty"`
+	Stage               string                               `json:"stage"`
+	Kind                string                               `json:"kind"`
+	Code                string                               `json:"code"`
+	Retryable           bool                                 `json:"retryable"`
+	ResultUnknown       bool                                 `json:"result_unknown"`
+	Disposition         string                               `json:"disposition"`
+	SafeMessage         string                               `json:"safe_message"`
+	EvidenceRefs        []string                             `json:"evidence_refs"`
 }
 
 type AIExplanationEvaluationV2SemanticWire struct {
@@ -222,11 +224,12 @@ type AIExplanationEvaluationV2GateReasonWire struct {
 }
 
 type AIExplanationEvaluationV2OutputWire struct {
-	ExecutionID      string                            `json:"execution_id"`
-	Kind             string                            `json:"kind"`
-	RawOutput        string                            `json:"raw_output"`
-	NormalizedOutput string                            `json:"normalized_output"`
-	ProviderReceipt  *AIExplanationProviderReceiptWire `json:"provider_receipt,omitempty"`
+	Failure          *AIExplanationEvaluationV2FailureWire `json:"failure,omitempty"`
+	ExecutionID      string                                `json:"execution_id"`
+	Kind             string                                `json:"kind"`
+	RawOutput        string                                `json:"raw_output"`
+	NormalizedOutput string                                `json:"normalized_output"`
+	ProviderReceipt  *AIExplanationProviderReceiptWire     `json:"provider_receipt,omitempty"`
 }
 
 type AIExplanationEvaluationV2ExecutionEvidenceWire struct {
@@ -349,13 +352,13 @@ func (h *AIExplanationAdministrationHandler) FindEvaluationV2Output(c *gin.Conte
 	executionID := c.Param("execution_id")
 	for _, execution := range value.GenerationExecutions {
 		if execution.ID == executionID {
-			h.Success(c, AIExplanationEvaluationV2OutputWire{ExecutionID: execution.ID, Kind: "generation", RawOutput: string(execution.RawOutput), NormalizedOutput: string(execution.NormalizedOutput), ProviderReceipt: providerReceiptWire(execution.ProviderReceipt)})
+			h.Success(c, AIExplanationEvaluationV2OutputWire{ExecutionID: execution.ID, Kind: "generation", RawOutput: string(execution.RawOutput), NormalizedOutput: string(execution.NormalizedOutput), ProviderReceipt: providerReceiptWire(execution.ProviderReceipt), Failure: failureV2Wire(execution.Failure)})
 			return
 		}
 	}
 	for _, execution := range value.SemanticExecutions {
 		if execution.ID == executionID {
-			h.Success(c, AIExplanationEvaluationV2OutputWire{ExecutionID: execution.ID, Kind: "semantic", RawOutput: string(execution.RawOutput), NormalizedOutput: string(execution.NormalizedOutput), ProviderReceipt: providerReceiptWire(execution.ProviderReceipt)})
+			h.Success(c, AIExplanationEvaluationV2OutputWire{ExecutionID: execution.ID, Kind: "semantic", RawOutput: string(execution.RawOutput), NormalizedOutput: string(execution.NormalizedOutput), ProviderReceipt: providerReceiptWire(execution.ProviderReceipt), Failure: failureV2Wire(execution.Failure)})
 			return
 		}
 	}
@@ -725,6 +728,6 @@ func failureV2Wire(value *domainevaluation.ClassifiedFailure) *AIExplanationEval
 	return &AIExplanationEvaluationV2FailureWire{
 		Stage: string(value.Stage), Kind: string(value.Kind), Code: value.Code, Retryable: value.Retryable,
 		ResultUnknown: value.ResultUnknown, Disposition: string(value.Disposition), SafeMessage: value.SafeMessage,
-		EvidenceRefs: append([]string(nil), value.EvidenceRefs...),
+		EvidenceRefs: append([]string(nil), value.EvidenceRefs...), ProviderDiagnostics: value.Clone().ProviderDiagnostics,
 	}
 }

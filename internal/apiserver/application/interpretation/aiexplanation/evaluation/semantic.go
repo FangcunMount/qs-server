@@ -61,6 +61,7 @@ type SemanticEvaluationOutcome struct {
 	ProviderReceipt     *aiexplanation.ProviderReceipt
 	RawOutput           []byte
 	NormalizedOutput    []byte
+	ProviderDiagnostics *aiexplanation.ProviderFailureDiagnostics
 	ProviderFailureCode string
 	Result              *SemanticEvaluationResult
 	Failure             *domainevaluation.AttemptFailure

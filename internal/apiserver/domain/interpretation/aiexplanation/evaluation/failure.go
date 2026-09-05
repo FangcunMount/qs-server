@@ -2,12 +2,15 @@ package evaluation
 
 import (
 	"fmt"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation"
 	"strings"
 )
 
 const FailureTaxonomySchemaVersionV1 = "ai-explanation-failure-taxonomy/v1"
 
 const (
+	SemanticProviderNoMessage       = "semantic_provider_no_message"
+	SemanticProviderRateLimited     = "semantic_provider_rate_limited"
 	SemanticProviderFailed          = "semantic_provider_failed"
 	SemanticResultUnknown           = "semantic_result_unknown"
 	SemanticOutputMissingOrTooLarge = "semantic_output_missing_or_too_large"
@@ -19,7 +22,7 @@ const (
 
 func IsSemanticExecutionFailureCode(code string) bool {
 	switch strings.TrimSpace(code) {
-	case SemanticProviderFailed,
+	case SemanticProviderNoMessage, SemanticProviderRateLimited, SemanticProviderFailed,
 		SemanticResultUnknown,
 		SemanticOutputMissingOrTooLarge,
 		SemanticOutputSchemaInvalid,
@@ -115,18 +118,24 @@ func (d FailureDisposition) IsValid() bool {
 // AIExplanationFailureTaxonomy v1. It never contains secret provider payloads;
 // EvidenceRefs point to immutable checkpoints, receipts or outputs.
 type ClassifiedFailure struct {
-	SchemaVersion string             `json:"schema_version"`
-	Stage         FailureStage       `json:"stage"`
-	Kind          FailureKind        `json:"kind"`
-	Code          string             `json:"code"`
-	Retryable     bool               `json:"retryable"`
-	ResultUnknown bool               `json:"result_unknown"`
-	Disposition   FailureDisposition `json:"disposition"`
-	SafeMessage   string             `json:"safe_message"`
-	EvidenceRefs  []string           `json:"evidence_refs"`
+	ProviderDiagnostics *aiexplanation.ProviderFailureDiagnostics `json:"provider_diagnostics,omitempty" bson:"provider_diagnostics,omitempty"`
+	SchemaVersion       string                                    `json:"schema_version"`
+	Stage               FailureStage                              `json:"stage"`
+	Kind                FailureKind                               `json:"kind"`
+	Code                string                                    `json:"code"`
+	Retryable           bool                                      `json:"retryable"`
+	ResultUnknown       bool                                      `json:"result_unknown"`
+	Disposition         FailureDisposition                        `json:"disposition"`
+	SafeMessage         string                                    `json:"safe_message"`
+	EvidenceRefs        []string                                  `json:"evidence_refs"`
 }
 
 func (f ClassifiedFailure) Validate() error {
+	if f.ProviderDiagnostics != nil {
+		if err := f.ProviderDiagnostics.Validate(); err != nil {
+			return err
+		}
+	}
 	if f.SchemaVersion != FailureTaxonomySchemaVersionV1 || !f.Stage.IsValid() || !f.Kind.IsValid() ||
 		!f.Disposition.IsValid() || !policyIdentifierPattern.MatchString(f.Code) ||
 		!validateEvidenceText(f.SafeMessage, 1000) || len(f.EvidenceRefs) < 1 || len(f.EvidenceRefs) > 16 {
@@ -188,6 +197,10 @@ func (f ClassifiedFailure) CandidateExists() bool {
 
 func (f ClassifiedFailure) Clone() ClassifiedFailure {
 	cloned := f
+	if f.ProviderDiagnostics != nil {
+		d := *f.ProviderDiagnostics
+		cloned.ProviderDiagnostics = &d
+	}
 	cloned.EvidenceRefs = append([]string(nil), f.EvidenceRefs...)
 	return cloned
 }

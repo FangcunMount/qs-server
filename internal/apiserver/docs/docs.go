@@ -9587,6 +9587,23 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "aiexplanation.ProviderFailureDiagnostics": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "request_id": {
+                    "type": "string"
+                },
+                "response_shape": {
+                    "type": "string"
+                },
+                "response_status": {
+                    "type": "string"
+                }
+            }
+        },
         "binding.DecisionKind": {
             "type": "string",
             "enum": [
@@ -11458,6 +11475,9 @@ const docTemplate = `{
                 "kind": {
                     "type": "string"
                 },
+                "provider_diagnostics": {
+                    "$ref": "#/definitions/aiexplanation.ProviderFailureDiagnostics"
+                },
                 "result_unknown": {
                     "type": "boolean"
                 },
@@ -11557,6 +11577,9 @@ const docTemplate = `{
             "properties": {
                 "execution_id": {
                     "type": "string"
+                },
+                "failure": {
+                    "$ref": "#/definitions/handler.AIExplanationEvaluationV2FailureWire"
                 },
                 "kind": {
                     "type": "string"

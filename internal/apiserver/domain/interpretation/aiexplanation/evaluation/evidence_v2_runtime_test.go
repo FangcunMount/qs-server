@@ -316,3 +316,60 @@ func runtimeReceipt(value *aiexplanation.ProviderReceipt, invocationID string) *
 	cloned.InvocationID = invocationID
 	return &cloned
 }
+
+func TestNoMessageRecoveryUsesFrozenPolicyAndSameCandidateBudget(t *testing.T) {
+	for _, legacy := range []bool{false, true} {
+		t.Run(fmt.Sprintf("legacy=%v", legacy), func(t *testing.T) {
+			evidence := validCollectingEvidenceV2(t)
+			evidence.ExecutionPolicy = CurrentEvaluationExecutionPolicy()
+			if legacy {
+				evidence.ExecutionPolicy.Version = "v1"
+				selectors := evidence.ExecutionPolicy.Recovery.AutoRetryableStageCodes
+				evidence.ExecutionPolicy.Recovery.AutoRetryableStageCodes = nil
+				for _, selector := range selectors {
+					if selector.Code != SemanticProviderNoMessage {
+						evidence.ExecutionPolicy.Recovery.AutoRetryableStageCodes = append(evidence.ExecutionPolicy.Recovery.AutoRetryableStageCodes, selector)
+					}
+				}
+			}
+			fingerprint, err := evidence.ExecutionPolicy.Fingerprint()
+			require.NoError(t, err)
+			evidence.Release.ExecutionPolicy.Version = evidence.ExecutionPolicy.Version
+			evidence.Release.ExecutionPolicy.Fingerprint = fingerprint
+			evidence.Release.Fingerprint, err = evidence.Release.ExpectedFingerprint()
+			require.NoError(t, err)
+			evidence.SemanticExecutions = evidence.SemanticExecutions[:1]
+			first := &evidence.SemanticExecutions[0]
+			first.Failure.Code = SemanticProviderNoMessage
+			first.Failure.Retryable = true
+			candidate := evidence.Slots[0].Candidate
+			candidate.SemanticExecutionIDs = candidate.SemanticExecutionIDs[:1]
+			candidate.AcceptedSemanticExecutionID = ""
+			candidate.ReviewReady = false
+			action, err := evidence.NextAction()
+			require.NoError(t, err)
+			if legacy {
+				require.Equal(t, EvidenceNextActionBlock, action.Kind)
+				require.Equal(t, "semantic_recovery_not_allowed", action.CauseCode)
+				return
+			}
+			require.Equal(t, "v2", evidence.ExecutionPolicy.Version)
+			require.Equal(t, EvidenceNextActionSemantic, action.Kind)
+			require.Equal(t, candidate.ID, action.CandidateID)
+			require.Equal(t, 2, action.ExecutionOrdinal)
+			second := *first
+			second.ID = "semantic:failure:2"
+			second.InvocationID = "semantic:invocation:2"
+			second.ExecutionOrdinal = 2
+			second.StartedAt = first.StartedAt.Add(time.Minute)
+			second.FinishedAt = copyTime(second.StartedAt.Add(time.Minute))
+			second.Failure = failureWithEvidenceRef(*first.Failure, second.ID)
+			evidence.SemanticExecutions = append(evidence.SemanticExecutions, second)
+			candidate.SemanticExecutionIDs = append(candidate.SemanticExecutionIDs, second.ID)
+			action, err = evidence.NextAction()
+			require.NoError(t, err)
+			require.Equal(t, EvidenceNextActionBlock, action.Kind)
+			require.Equal(t, "semantic_budget_exhausted", action.CauseCode)
+		})
+	}
+}
