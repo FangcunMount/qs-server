@@ -144,10 +144,11 @@ type StartEvaluationV2Command struct {
 }
 
 type ReviewV2Command struct {
-	CandidateID string
-	Role        domainevaluation.ReviewRole
-	Decision    domainevaluation.ReviewDecision
-	Reason      string
+	SemanticReview *domainevaluation.SemanticContradictionReview
+	CandidateID    string
+	Role           domainevaluation.ReviewRole
+	Decision       domainevaluation.ReviewDecision
+	Reason         string
 }
 
 type ReviewV2BatchCommand struct {
@@ -156,9 +157,10 @@ type ReviewV2BatchCommand struct {
 }
 
 type ReviewV2BatchItemCommand struct {
-	CandidateID string
-	Decision    domainevaluation.ReviewDecision
-	Reason      string
+	SemanticReview *domainevaluation.SemanticContradictionReview
+	CandidateID    string
+	Decision       domainevaluation.ReviewDecision
+	Reason         string
 }
 
 type ResolveResultUnknownV2Command struct {
@@ -960,7 +962,7 @@ func mapKnownError(err error) error {
 	case stderrors.Is(err, domainevaluation.ErrNotFound), stderrors.Is(err, domainprofile.ErrNotFound),
 		stderrors.Is(err, domaingeneration.ErrNotFound), stderrors.Is(err, domainrun.ErrNotFound):
 		return cberrors.WithCode(code.ErrPageNotFound, "%s", err.Error())
-	case stderrors.Is(err, appevaluation.ErrReviewCatalogCursor), stderrors.Is(err, appgovernance.ErrProfileCatalogCursor):
+	case stderrors.Is(err, domainevaluation.ErrSemanticAdjudication), stderrors.Is(err, appevaluation.ErrReviewCatalogCursor), stderrors.Is(err, appgovernance.ErrProfileCatalogCursor):
 		return cberrors.WithCode(code.ErrInvalidArgument, "%s", err.Error())
 	case stderrors.Is(err, domainevaluation.ErrOrgConcurrencyExceeded), stderrors.Is(err, domainevaluation.ErrDailyBudgetExceeded):
 		return cberrors.WithCode(code.ErrAIExplanationCapacityExceeded, "%s", err.Error())

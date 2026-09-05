@@ -10631,6 +10631,67 @@ const docTemplate = `{
                 }
             }
         },
+        "evaluation.SemanticAdjudicationRecord": {
+            "type": "object",
+            "properties": {
+                "assertion_ordinal": {
+                    "type": "integer"
+                },
+                "assertion_type": {
+                    "type": "string"
+                },
+                "candidate_id": {
+                    "type": "string"
+                },
+                "effective_status": {
+                    "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_apiserver_domain_interpretation_aiexplanation_evaluation.AssertionStatus"
+                },
+                "execution_id": {
+                    "type": "string"
+                },
+                "original_status": {
+                    "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_apiserver_domain_interpretation_aiexplanation_evaluation.AssertionStatus"
+                },
+                "output_fingerprint": {
+                    "type": "string"
+                },
+                "policy_version": {
+                    "type": "string"
+                },
+                "reviewers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "evaluation.SemanticContradictionReview": {
+            "type": "object",
+            "properties": {
+                "assertion_ordinal": {
+                    "type": "integer"
+                },
+                "candidate_excerpt": {
+                    "type": "string"
+                },
+                "execution_id": {
+                    "type": "string"
+                },
+                "original_detail": {
+                    "type": "string"
+                },
+                "output_fingerprint": {
+                    "type": "string"
+                },
+                "policy_version": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                }
+            }
+        },
         "factor.Factor": {
             "type": "object",
             "properties": {
@@ -10890,6 +10951,21 @@ const docTemplate = `{
                     "type": "number"
                 }
             }
+        },
+        "github_com_FangcunMount_qs-server_internal_apiserver_domain_interpretation_aiexplanation_evaluation.AssertionStatus": {
+            "type": "string",
+            "enum": [
+                "passed",
+                "failed",
+                "pending_semantic",
+                "blocked"
+            ],
+            "x-enum-varnames": [
+                "AssertionPassed",
+                "AssertionFailed",
+                "AssertionPendingSemantic",
+                "AssertionBlocked"
+            ]
         },
         "handler.AIExplanationAssertionReceiptWire": {
             "type": "object",
@@ -11427,6 +11503,9 @@ const docTemplate = `{
                 "reason": {
                     "type": "string",
                     "maxLength": 1000
+                },
+                "semantic_review": {
+                    "$ref": "#/definitions/evaluation.SemanticContradictionReview"
                 }
             }
         },
@@ -11759,6 +11838,12 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/handler.AIExplanationEvaluationV2GateReasonWire"
                     }
+                },
+                "semantic_adjudications": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.SemanticAdjudicationRecord"
+                    }
                 }
             }
         },
@@ -11782,6 +11867,9 @@ const docTemplate = `{
                 },
                 "role": {
                     "type": "string"
+                },
+                "semantic_review": {
+                    "$ref": "#/definitions/evaluation.SemanticContradictionReview"
                 }
             }
         },
@@ -11884,6 +11972,9 @@ const docTemplate = `{
                 },
                 "role": {
                     "type": "string"
+                },
+                "semantic_review": {
+                    "$ref": "#/definitions/evaluation.SemanticContradictionReview"
                 }
             }
         },

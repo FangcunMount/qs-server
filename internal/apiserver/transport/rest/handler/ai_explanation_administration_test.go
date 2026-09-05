@@ -50,12 +50,13 @@ func TestAIExplanationAdministrationBatchReviewUsesProtectedActorAndSingleRole(t
 	gin.SetMode(gin.TestMode)
 	service := &aiAdministrationServiceStub{}
 	handler := NewAIExplanationAdministrationHandler(service)
-	body := bytes.NewBufferString(`{"role":"assessment_semantics","reviews":[{"candidate_id":"candidate:1","decision":"approve","reason":"facts match"},{"candidate_id":"candidate:2","decision":"reject","reason":"unsupported inference"}]}`)
+	body := bytes.NewBufferString(`{"role":"assessment_semantics","reviews":[{"candidate_id":"candidate:1","decision":"approve","reason":"facts match","semantic_review":{"policy_version":"semantic-contradiction-dual-review/v1","execution_id":"semantic:1","output_fingerprint":"sha256:frozen","assertion_ordinal":1,"original_detail":"No forbidden claims","candidate_excerpt":"current result","reason":"contradictory verdict"}},{"candidate_id":"candidate:2","decision":"reject","reason":"unsupported inference"}]}`)
 	ctx, recorder := aiAdministrationContext(http.MethodPost, "/internal/v2/interpretation/ai-explanation/prompt-evaluations/9/reviews/batch", body)
 	ctx.Params = gin.Params{{Key: "run_id", Value: "9"}}
 
 	handler.RecordReviewsV2(ctx)
 	if recorder.Code != http.StatusOK || service.lastActor != (aiexplanationadministration.Actor{OrgID: 12, OperatorUserID: 34}) ||
+		service.lastReviewBatch.Reviews[0].SemanticReview == nil || service.lastReviewBatch.Reviews[0].SemanticReview.ExecutionID != "semantic:1" ||
 		service.lastReviewBatch.Role != domainevaluation.ReviewRoleAssessmentSemantics || len(service.lastReviewBatch.Reviews) != 2 ||
 		service.lastReviewBatch.Reviews[1].CandidateID != "candidate:2" || service.lastReviewBatch.Reviews[1].Decision != domainevaluation.ReviewDecisionReject {
 		t.Fatalf("response=%d actor=%#v batch=%#v body=%s", recorder.Code, service.lastActor, service.lastReviewBatch, recorder.Body.String())

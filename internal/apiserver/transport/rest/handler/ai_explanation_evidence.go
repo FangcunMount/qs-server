@@ -16,10 +16,11 @@ import (
 )
 
 type AIExplanationEvaluationV2ReviewRequest struct {
-	CandidateID string `json:"candidate_id" binding:"required"`
-	Role        string `json:"role" binding:"required"`
-	Decision    string `json:"decision" binding:"required"`
-	Reason      string `json:"reason" binding:"required,max=1000"`
+	SemanticReview *domainevaluation.SemanticContradictionReview `json:"semantic_review,omitempty"`
+	CandidateID    string                                        `json:"candidate_id" binding:"required"`
+	Role           string                                        `json:"role" binding:"required"`
+	Decision       string                                        `json:"decision" binding:"required"`
+	Reason         string                                        `json:"reason" binding:"required,max=1000"`
 }
 
 type AIExplanationEvaluationV2BatchReviewRequest struct {
@@ -28,9 +29,10 @@ type AIExplanationEvaluationV2BatchReviewRequest struct {
 }
 
 type AIExplanationEvaluationV2BatchReviewItemRequest struct {
-	CandidateID string `json:"candidate_id" binding:"required"`
-	Decision    string `json:"decision" binding:"required"`
-	Reason      string `json:"reason" binding:"required,max=1000"`
+	SemanticReview *domainevaluation.SemanticContradictionReview `json:"semantic_review,omitempty"`
+	CandidateID    string                                        `json:"candidate_id" binding:"required"`
+	Decision       string                                        `json:"decision" binding:"required"`
+	Reason         string                                        `json:"reason" binding:"required,max=1000"`
 }
 
 type AIExplanationResultUnknownV2Request struct {
@@ -206,12 +208,13 @@ type AIExplanationEvaluationV2SemanticDecisionWire struct {
 }
 
 type AIExplanationEvaluationV2HumanReviewWire struct {
-	CandidateID string    `json:"candidate_id"`
-	Role        string    `json:"role"`
-	Reviewer    string    `json:"reviewer"`
-	Decision    string    `json:"decision"`
-	ReviewedAt  time.Time `json:"reviewed_at"`
-	Reason      string    `json:"reason"`
+	SemanticReview *domainevaluation.SemanticContradictionReview `json:"semantic_review,omitempty"`
+	CandidateID    string                                        `json:"candidate_id"`
+	Role           string                                        `json:"role"`
+	Reviewer       string                                        `json:"reviewer"`
+	Decision       string                                        `json:"decision"`
+	ReviewedAt     time.Time                                     `json:"reviewed_at"`
+	Reason         string                                        `json:"reason"`
 }
 
 type AIExplanationResultUnknownResolutionWire struct {
@@ -224,10 +227,11 @@ type AIExplanationResultUnknownResolutionWire struct {
 }
 
 type AIExplanationEvaluationV2GateWire struct {
-	EvaluatedAt time.Time                                 `json:"evaluated_at"`
-	Passed      bool                                      `json:"passed"`
-	GatePasses  map[string]bool                           `json:"gate_passes"`
-	Reasons     []AIExplanationEvaluationV2GateReasonWire `json:"reasons"`
+	SemanticAdjudications []domainevaluation.SemanticAdjudicationRecord `json:"semantic_adjudications,omitempty"`
+	EvaluatedAt           time.Time                                     `json:"evaluated_at"`
+	Passed                bool                                          `json:"passed"`
+	GatePasses            map[string]bool                               `json:"gate_passes"`
+	Reasons               []AIExplanationEvaluationV2GateReasonWire     `json:"reasons"`
 }
 
 type AIExplanationEvaluationV2GateReasonWire struct {
@@ -401,7 +405,7 @@ func (h *AIExplanationAdministrationHandler) RecordReviewV2(c *gin.Context) {
 	}
 	value, err := h.service.RecordReviewV2(c.Request.Context(), actor, runID, aiexplanationadministration.ReviewV2Command{
 		CandidateID: request.CandidateID, Role: domainevaluation.ReviewRole(request.Role),
-		Decision: domainevaluation.ReviewDecision(request.Decision), Reason: request.Reason,
+		Decision: domainevaluation.ReviewDecision(request.Decision), Reason: request.Reason, SemanticReview: request.SemanticReview,
 	})
 	if err != nil {
 		h.Error(c, err)
@@ -434,7 +438,7 @@ func (h *AIExplanationAdministrationHandler) RecordReviewsV2(c *gin.Context) {
 	reviews := make([]aiexplanationadministration.ReviewV2BatchItemCommand, 0, len(request.Reviews))
 	for _, item := range request.Reviews {
 		reviews = append(reviews, aiexplanationadministration.ReviewV2BatchItemCommand{
-			CandidateID: item.CandidateID, Decision: domainevaluation.ReviewDecision(item.Decision), Reason: item.Reason,
+			CandidateID: item.CandidateID, Decision: domainevaluation.ReviewDecision(item.Decision), Reason: item.Reason, SemanticReview: item.SemanticReview,
 		})
 	}
 	value, err := h.service.RecordReviewsV2(c.Request.Context(), actor, runID, aiexplanationadministration.ReviewV2BatchCommand{
@@ -565,7 +569,7 @@ func evaluationV2Wire(value *domainevaluation.PromptEvaluationEvidenceV2) *AIExp
 	for _, review := range value.HumanReviews {
 		result.HumanReviews = append(result.HumanReviews, AIExplanationEvaluationV2HumanReviewWire{
 			CandidateID: review.CandidateID, Role: string(review.Role), Reviewer: review.Reviewer,
-			Decision: string(review.Decision), ReviewedAt: review.ReviewedAt, Reason: review.Reason,
+			Decision: string(review.Decision), ReviewedAt: review.ReviewedAt, Reason: review.Reason, SemanticReview: review.SemanticReview,
 		})
 	}
 	for _, resolution := range value.ResultUnknownResolutions {
@@ -576,7 +580,8 @@ func evaluationV2Wire(value *domainevaluation.PromptEvaluationEvidenceV2) *AIExp
 	}
 	if value.GateResult != nil {
 		result.Gate = &AIExplanationEvaluationV2GateWire{
-			EvaluatedAt: value.GateResult.EvaluatedAt, Passed: value.GateResult.Passed,
+			SemanticAdjudications: value.GateResult.SemanticAdjudications,
+			EvaluatedAt:           value.GateResult.EvaluatedAt, Passed: value.GateResult.Passed,
 			GatePasses: make(map[string]bool, len(value.GateResult.GatePasses)),
 			Reasons:    make([]AIExplanationEvaluationV2GateReasonWire, 0, len(value.GateResult.Reasons)),
 		}
@@ -707,7 +712,7 @@ func evaluationV2CandidateEvidenceWire(value *domainevaluation.PromptEvaluationE
 		if review.CandidateID == candidateID {
 			result.HumanReviews = append(result.HumanReviews, AIExplanationEvaluationV2HumanReviewWire{
 				CandidateID: review.CandidateID, Role: string(review.Role), Reviewer: review.Reviewer,
-				Decision: string(review.Decision), ReviewedAt: review.ReviewedAt, Reason: review.Reason,
+				Decision: string(review.Decision), ReviewedAt: review.ReviewedAt, Reason: review.Reason, SemanticReview: review.SemanticReview,
 			})
 		}
 	}

@@ -81,7 +81,7 @@ func (s *service) FindEvaluationV2(ctx context.Context, actor Actor, runID meta.
 
 func (s *service) RecordReviewV2(ctx context.Context, actor Actor, runID meta.ID, command ReviewV2Command) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
 	return s.recordReviewsV2(ctx, actor, runID, command.Role, []ReviewV2BatchItemCommand{{
-		CandidateID: command.CandidateID, Decision: command.Decision, Reason: command.Reason,
+		CandidateID: command.CandidateID, Decision: command.Decision, Reason: command.Reason, SemanticReview: command.SemanticReview,
 	}}, false)
 }
 
@@ -143,7 +143,7 @@ func (s *service) recordReviewsV2(ctx context.Context, actor Actor, runID meta.I
 	for _, command := range commands {
 		reviews = append(reviews, domainevaluation.CandidateHumanReview{
 			CandidateID: command.CandidateID, Role: role, Reviewer: reviewer,
-			Decision: command.Decision, ReviewedAt: reviewedAt, Reason: command.Reason,
+			Decision: command.Decision, ReviewedAt: reviewedAt, Reason: command.Reason, SemanticReview: command.SemanticReview,
 		})
 	}
 	value, err := s.evidenceV2.RecordHumanReviews(ctx, runID, reviews)

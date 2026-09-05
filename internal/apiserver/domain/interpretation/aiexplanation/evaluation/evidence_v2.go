@@ -439,12 +439,13 @@ func (e SemanticEvaluationExecution) Validate() error {
 }
 
 type CandidateHumanReview struct {
-	CandidateID string
-	Role        ReviewRole
-	Reviewer    string
-	Decision    ReviewDecision
-	ReviewedAt  time.Time
-	Reason      string
+	SemanticReview *SemanticContradictionReview
+	CandidateID    string
+	Role           ReviewRole
+	Reviewer       string
+	Decision       ReviewDecision
+	ReviewedAt     time.Time
+	Reason         string
 }
 
 func (r CandidateHumanReview) Validate() error {
@@ -458,11 +459,12 @@ func (r CandidateHumanReview) Validate() error {
 }
 
 type EvidenceGateResult struct {
-	EvaluatedAt time.Time
-	Passed      bool
-	GatePasses  map[string]bool
-	Metrics     []EvidenceGateMetric
-	Reasons     []EvidenceGateReason
+	SemanticAdjudications []SemanticAdjudicationRecord
+	EvaluatedAt           time.Time
+	Passed                bool
+	GatePasses            map[string]bool
+	Metrics               []EvidenceGateMetric
+	Reasons               []EvidenceGateReason
 }
 
 type EvidenceGateMetric struct {
@@ -817,6 +819,9 @@ func (e PromptEvaluationEvidenceV2) Validate() error {
 	if err := validateCandidateReviews(e.HumanReviews, candidates, reviewReady); err != nil {
 		return err
 	}
+	if err := e.validateSemanticReviews(); err != nil {
+		return err
+	}
 	if len(e.HumanReviews) > 0 {
 		if (e.Status != EvidenceStatusAwaitingReview && e.Status != EvidenceStatusApproved && e.Status != EvidenceStatusRejected && e.Status != EvidenceStatusCanceled) || e.Audit.ClosedAt == nil {
 			return fmt.Errorf("AI explanation candidate review requires a closed evidence inventory")
@@ -956,7 +961,11 @@ func (e PromptEvaluationEvidenceV2) evaluateGateUnchecked(at time.Time) Evidence
 			}
 		}
 		candidate := slot.Candidate
-		casePresent, casePassed, hardPassed := evaluateCandidateAssertions(candidate.Assertions)
+		effectiveAssertions, adjudication := e.effectiveCandidateAssertions(*candidate)
+		if adjudication != nil {
+			result.SemanticAdjudications = append(result.SemanticAdjudications, *adjudication)
+		}
+		casePresent, casePassed, hardPassed := evaluateCandidateAssertions(effectiveAssertions)
 		if !casePresent || !casePassed {
 			if !casePresent || e.GatePolicy.Version == "v1" {
 				addReason("G4", "candidate_case_assertion_failed", "Candidate did not pass all case-scoped assertions", candidate.ID)
@@ -1414,6 +1423,12 @@ func (e PromptEvaluationEvidenceV2) Clone() PromptEvaluationEvidenceV2 {
 		}
 	}
 	cloned.HumanReviews = append([]CandidateHumanReview(nil), e.HumanReviews...)
+	for i := range cloned.HumanReviews {
+		if e.HumanReviews[i].SemanticReview != nil {
+			review := *e.HumanReviews[i].SemanticReview
+			cloned.HumanReviews[i].SemanticReview = &review
+		}
+	}
 	cloned.ResultUnknownResolutions = append([]ResultUnknownResolution(nil), e.ResultUnknownResolutions...)
 	cloned.StateTransitions = append([]EvidenceStateTransition(nil), e.StateTransitions...)
 	for index := range cloned.StateTransitions {
@@ -1425,6 +1440,10 @@ func (e PromptEvaluationEvidenceV2) Clone() PromptEvaluationEvidenceV2 {
 	}
 	if e.GateResult != nil {
 		gate := *e.GateResult
+		gate.SemanticAdjudications = append([]SemanticAdjudicationRecord(nil), e.GateResult.SemanticAdjudications...)
+		for i := range gate.SemanticAdjudications {
+			gate.SemanticAdjudications[i].Reviewers = append([]string(nil), gate.SemanticAdjudications[i].Reviewers...)
+		}
 		gate.GatePasses = make(map[string]bool, len(e.GateResult.GatePasses))
 		for key, value := range e.GateResult.GatePasses {
 			gate.GatePasses[key] = value

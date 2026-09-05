@@ -345,3 +345,43 @@ func TestEvidenceV2CancellationRoundTripsAuditAndReleasesActiveKeys(t *testing.T
 	require.Equal(t, 35, catalog.ExecutionPolicy.SlotPolicy.RequiredGenerationCases*catalog.ExecutionPolicy.SlotPolicy.RequiredCandidatesPerCase)
 	require.Equal(t, "superseded release", catalog.Transitions[len(catalog.Transitions)-1].Reason)
 }
+
+func TestSemanticAdjudicationSurvivesFinalizedBSONRoundTrip(t *testing.T) {
+	e := completeMapperEvidenceV2(t)
+	e.GatePolicy.Version = "v2"
+	fp, err := e.GatePolicy.Fingerprint()
+	require.NoError(t, err)
+	e.Release.GatePolicy.Version, e.Release.GatePolicy.Fingerprint = "v2", fp
+	e.Release.Fingerprint, err = e.Release.ExpectedFingerprint()
+	require.NoError(t, err)
+	c, j := e.Slots[0].Candidate, &e.SemanticExecutions[0]
+	detail := "No prohibited claims found."
+	j.Result.Decisions = append(j.Result.Decisions, domainevaluation.SemanticDecision{Type: "forbidden_claims_absent", Scope: domainevaluation.AssertionScopeDefault, Ordinal: 1, Status: domainevaluation.AssertionFailed, Detail: detail})
+	c.Assertions = append(c.Assertions, domainevaluation.AssertionReceipt{Type: "forbidden_claims_absent", Scope: domainevaluation.AssertionScopeDefault, Ordinal: 1, Hard: true, Evaluator: "semantic-" + j.Result.EvaluatorVersion, Status: domainevaluation.AssertionFailed, Detail: detail})
+	at := e.Audit.CreatedAt.Add(24 * time.Hour)
+	for _, slot := range e.Slots {
+		for _, role := range []domainevaluation.ReviewRole{domainevaluation.ReviewRoleAssessmentSemantics, domainevaluation.ReviewRoleSafetyProduct} {
+			r := domainevaluation.CandidateHumanReview{CandidateID: slot.Candidate.ID, Role: role, Reviewer: "user:" + string(role), Decision: domainevaluation.ReviewDecisionApprove, Reason: "Reviewed frozen evidence", ReviewedAt: at}
+			if slot.Candidate.ID == c.ID {
+				r.SemanticReview = &domainevaluation.SemanticContradictionReview{PolicyVersion: domainevaluation.SemanticAdjudicationPolicyV1, ExecutionID: j.ID, OutputFingerprint: j.Result.OutputFingerprint, AssertionOrdinal: 1, OriginalDetail: detail, CandidateExcerpt: "schema_version", Reason: "Reason contradicts failed verdict; checked frozen candidate"}
+			}
+			require.NoError(t, e.AddHumanReview(r))
+		}
+	}
+	require.NoError(t, e.Finalize("user:admin", "review_completed", at.Add(time.Minute)))
+	require.True(t, e.GateResult.Passed)
+	po, err := NewMapper().PromptEvaluationEvidenceV2ToPO(e)
+	require.NoError(t, err)
+	raw, err := bson.Marshal(po)
+	require.NoError(t, err)
+	var decoded PromptEvaluationEvidenceV2PO
+	require.NoError(t, bson.Unmarshal(raw, &decoded))
+	restored, err := NewMapper().PromptEvaluationEvidenceV2ToDomain(&decoded)
+	require.NoError(t, err)
+	require.NoError(t, restored.Validate())
+	require.Equal(t, e.HumanReviews, restored.HumanReviews)
+	require.Equal(t, e.GateResult, restored.GateResult)
+	require.Equal(t, e.SemanticExecutions, restored.SemanticExecutions)
+	require.Equal(t, e.Slots, restored.Slots)
+	require.Len(t, restored.GateResult.SemanticAdjudications, 1)
+}

@@ -486,6 +486,7 @@ func (e *PromptEvaluationEvidenceV2) AddHumanReviews(values []CandidateHumanRevi
 	}
 	cloned := e.Clone()
 	cloned.HumanReviews = append(cloned.HumanReviews, values...)
+	cloned = cloned.Clone()
 	cloned.version++
 	if err := cloned.Validate(); err != nil {
 		return err

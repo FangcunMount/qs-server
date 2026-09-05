@@ -10583,6 +10583,46 @@ components:
           type: integer
         version:
           type: integer
+    evaluation.SemanticAdjudicationRecord:
+      type: object
+      properties:
+        assertion_ordinal:
+          type: integer
+        assertion_type:
+          type: string
+        candidate_id:
+          type: string
+        effective_status:
+          $ref: '#/components/schemas/github_com_FangcunMount_qs-server_internal_apiserver_domain_interpretation_aiexplanation_evaluation.AssertionStatus'
+        execution_id:
+          type: string
+        original_status:
+          $ref: '#/components/schemas/github_com_FangcunMount_qs-server_internal_apiserver_domain_interpretation_aiexplanation_evaluation.AssertionStatus'
+        output_fingerprint:
+          type: string
+        policy_version:
+          type: string
+        reviewers:
+          type: array
+          items:
+            type: string
+    evaluation.SemanticContradictionReview:
+      type: object
+      properties:
+        assertion_ordinal:
+          type: integer
+        candidate_excerpt:
+          type: string
+        execution_id:
+          type: string
+        original_detail:
+          type: string
+        output_fingerprint:
+          type: string
+        policy_version:
+          type: string
+        reason:
+          type: string
     factor.Factor:
       type: object
       properties:
@@ -10765,6 +10805,18 @@ components:
           type: number
         t_score:
           type: number
+    github_com_FangcunMount_qs-server_internal_apiserver_domain_interpretation_aiexplanation_evaluation.AssertionStatus:
+      type: string
+      enum:
+      - passed
+      - failed
+      - pending_semantic
+      - blocked
+      x-enum-varnames:
+      - AssertionPassed
+      - AssertionFailed
+      - AssertionPendingSemantic
+      - AssertionBlocked
     handler.AIExplanationAssertionReceiptWire:
       type: object
       properties:
@@ -11123,6 +11175,8 @@ components:
         reason:
           type: string
           maxLength: 1000
+        semantic_review:
+          $ref: '#/components/schemas/evaluation.SemanticContradictionReview'
     handler.AIExplanationEvaluationV2BatchReviewRequest:
       type: object
       required:
@@ -11342,6 +11396,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/handler.AIExplanationEvaluationV2GateReasonWire'
+        semantic_adjudications:
+          type: array
+          items:
+            $ref: '#/components/schemas/evaluation.SemanticAdjudicationRecord'
     handler.AIExplanationEvaluationV2HumanReviewWire:
       type: object
       properties:
@@ -11357,6 +11415,8 @@ components:
           type: string
         role:
           type: string
+        semantic_review:
+          $ref: '#/components/schemas/evaluation.SemanticContradictionReview'
     handler.AIExplanationEvaluationV2OutputWire:
       type: object
       properties:
@@ -11425,6 +11485,8 @@ components:
           maxLength: 1000
         role:
           type: string
+        semantic_review:
+          $ref: '#/components/schemas/evaluation.SemanticContradictionReview'
     handler.AIExplanationEvaluationV2SemanticDecisionWire:
       type: object
       properties:
