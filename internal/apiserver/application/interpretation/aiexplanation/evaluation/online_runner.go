@@ -329,7 +329,7 @@ func (r *OnlineRunner) prepareV1(ctx context.Context) (*Suite, *PreflightReport,
 }
 
 func (r *OnlineRunner) prepareV2(ctx context.Context) (*Suite, *PreflightReport, *preparedOnlineRun, error) {
-	return r.prepareFrozenSuite(ctx, LoadV4)
+	return r.prepareFrozenSuite(ctx, LoadV5)
 }
 
 func (r *OnlineRunner) prepareFrozenSuite(ctx context.Context, load func() (*Suite, error)) (*Suite, *PreflightReport, *preparedOnlineRun, error) {

@@ -203,3 +203,22 @@ func TestV4PromptIdentityMatchesNormativeBytes(t *testing.T) {
 		t.Fatal("v4 prompt Git blob mismatch")
 	}
 }
+
+func TestExecutableV5MessagesMatchNormativeMarkdownCodeBlocks(t *testing.T) {
+	path := filepath.Join("..", "..", "..", "..", "..", "api", "schema", "interpretation", "ai-explanation-prompt-template-v5.md")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	blocks := regexp.MustCompile("(?s)```text\\n(.*?)\\n```").FindAllStringSubmatch(strings.ReplaceAll(string(raw), "\r\n", "\n"), -1)
+	if len(blocks) < 3 {
+		t.Fatalf("normative text blocks = %d", len(blocks))
+	}
+	if blocks[0][1] != participantScaleSystemMessageV5 || blocks[1][1] != participantScaleTaskTemplateV5 {
+		t.Fatal("executable v5 system/task messages drifted from normative Markdown")
+	}
+	dataBlock := strings.TrimSuffix(blocks[2][1], "\n\n{{provider_payload_json}}")
+	if dataBlock != participantScaleDataPreamble {
+		t.Fatal("executable v5 data preamble drifted from normative Markdown")
+	}
+}

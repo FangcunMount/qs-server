@@ -3,6 +3,7 @@ package validation
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	appinput "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/aiexplanation/input"
@@ -166,4 +167,19 @@ func marshal(t *testing.T, value any) []byte {
 		t.Fatal(err)
 	}
 	return raw
+}
+
+// The v4 injection-case failures preserved valid JSON with no integrated
+// insights. This isolates the observed contract breach without replaying a model.
+func TestParseTypedContentRejectsEmptyInsightsAfterIgnoringUntrustedDescription(t *testing.T) {
+	content := validContent()
+	content.IntegratedInsights = []output.IntegratedInsight{}
+	_, err := ParseTypedContent(marshal(t, content))
+	if !errors.Is(err, ErrSchema) || SchemaViolationOf(err) != SchemaViolationContentContract || !strings.Contains(err.Error(), "output item counts are invalid") {
+		t.Fatalf("empty insight contract = %v", err)
+	}
+	content.IntegratedInsights = validContent().IntegratedInsights
+	if _, err := ParseTypedContent(marshal(t, content)); err != nil {
+		t.Fatalf("minimum populated insight rejected: %v", err)
+	}
 }
