@@ -2,7 +2,9 @@ package prompt
 
 import (
 	"context"
+	"crypto/sha1"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -38,7 +40,7 @@ func TestCatalogReturnsValidatedImmutablePackage(t *testing.T) {
 }
 
 func TestCatalogRejectsUnknownPackage(t *testing.T) {
-	_, err := NewCatalog().ResolvePromptPackage(context.Background(), ParticipantScaleTemplateID, "v4")
+	_, err := NewCatalog().ResolvePromptPackage(context.Background(), ParticipantScaleTemplateID, "unknown")
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("error = %v", err)
 	}
@@ -158,5 +160,46 @@ func TestExecutableV3MessagesMatchNormativeMarkdownCodeBlocks(t *testing.T) {
 	dataBlock := strings.TrimSuffix(blocks[2][1], "\n\n{{provider_payload_json}}")
 	if dataBlock != participantScaleDataPreamble {
 		t.Fatal("executable v3 data preamble drifted from normative Markdown")
+	}
+}
+
+func TestExecutableV4MessagesMatchNormativeMarkdownCodeBlocks(t *testing.T) {
+	path := filepath.Join("..", "..", "..", "..", "..", "api", "schema", "interpretation", "ai-explanation-prompt-template-v4.md")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	blocks := regexp.MustCompile("(?s)```text\\n(.*?)\\n```").FindAllStringSubmatch(strings.ReplaceAll(string(raw), "\r\n", "\n"), -1)
+	if len(blocks) < 3 {
+		t.Fatalf("normative text blocks = %d", len(blocks))
+	}
+	if blocks[0][1] != participantScaleSystemMessageV4 || blocks[1][1] != participantScaleTaskTemplateV4 {
+		t.Fatal("executable v4 system/task messages drifted from normative Markdown")
+	}
+	dataBlock := strings.TrimSuffix(blocks[2][1], "\n\n{{provider_payload_json}}")
+	if dataBlock != participantScaleDataPreamble {
+		t.Fatal("executable v4 data preamble drifted from normative Markdown")
+	}
+}
+
+func TestV4PromptIdentityMatchesNormativeBytes(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "..", "api", "schema", "interpretation", "ai-explanation-prompt-template-v4.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pkg, err := NewCatalog().ResolvePromptPackage(context.Background(), ParticipantScaleTemplateID, ParticipantScaleVersionV4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := pkg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if pkg.Ref.Fingerprint != aiexplanation.NewFingerprint(raw) {
+		t.Fatal("v4 prompt fingerprint mismatch")
+	}
+	input := append([]byte(fmt.Sprintf("blob %d\x00", len(raw))), raw...)
+	sum := sha1.Sum(input) // #nosec G401 -- Git blob identity is defined as SHA-1.
+	if fmt.Sprintf("%x", sum) != pkg.Ref.GitBlobSHA {
+		t.Fatal("v4 prompt Git blob mismatch")
 	}
 }

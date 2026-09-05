@@ -90,3 +90,11 @@ func AIExplanationFailureTaxonomyV1() []byte {
 func PromptEvaluationEvidenceV2() []byte {
 	return append([]byte(nil), promptEvaluationEvidenceV2...)
 }
+
+//go:embed ai-explanation-prompt-evaluation-cases-v4.json
+var aiExplanationPromptEvaluationCasesV4 []byte
+
+// AIExplanationPromptEvaluationCasesV4 returns an isolated copy of the current suite.
+func AIExplanationPromptEvaluationCasesV4() []byte {
+	return append([]byte(nil), aiExplanationPromptEvaluationCasesV4...)
+}

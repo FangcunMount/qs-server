@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -230,4 +231,68 @@ type schemaResolverStub struct{}
 func (schemaResolverStub) ResolveOutputSchema(_ context.Context, version string) (appport.StructuredOutputSchema, error) {
 	raw := []byte(`{"type":"object"}`)
 	return appport.StructuredOutputSchema{Version: version, Name: "test", JSON: raw, Fingerprint: aiexplanation.NewFingerprint(raw)}, nil
+}
+
+func TestV4SuiteBytesMatchFrozenReleaseIdentity(t *testing.T) {
+	raw := interpretationschema.AIExplanationPromptEvaluationCasesV4()
+	if got := aiexplanation.NewFingerprint(raw); got != evaluation.SuiteFingerprintV4 {
+		t.Fatalf("suite fingerprint = %s, want %s", got, evaluation.SuiteFingerprintV4)
+	}
+	gitBlobInput := append([]byte(fmt.Sprintf("blob %d\x00", len(raw))), raw...)
+	gitBlobSum := sha1.Sum(gitBlobInput) // #nosec G401 -- Git blob identity is defined as SHA-1.
+	if got := fmt.Sprintf("%x", gitBlobSum); got != evaluation.SuiteGitBlobSHAV4 {
+		t.Fatalf("suite Git blob = %s, want %s", got, evaluation.SuiteGitBlobSHAV4)
+	}
+	suite, err := evaluation.LoadFrozen(evaluation.SuiteIDV4, evaluation.SuiteVersionV4, evaluation.SuiteFingerprintV4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if suite.Prompt.Version != "v4" || suite.ProfileFixture.GenerationPolicy.PromptVersion != "v4" || suite.ProfileFixture.Version != "v4" {
+		t.Fatalf("v4 suite identities = %#v %#v", suite.Prompt, suite.ProfileFixture)
+	}
+	if _, err := evaluation.LoadFrozen(evaluation.SuiteIDV2, evaluation.SuiteVersionV2, evaluation.SuiteFingerprintV4); !errors.Is(err, evaluation.ErrInvalidSuite) {
+		t.Fatalf("mismatched frozen suite error = %v", err)
+	}
+}
+
+func TestV4PreflightPlansThirtyFiveCallsWithoutCallingProvider(t *testing.T) {
+	suite, err := evaluation.LoadV4()
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner, err := evaluation.NewPreflightRunner(promptResolverStub{}, schemaResolverStub{}, func() time.Time {
+		return time.Date(2026, 9, 1, 1, 2, 3, 0, time.UTC)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err := runner.Run(context.Background(), suite)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "passed" || report.SuiteVersion != evaluation.SuiteVersionV4 || report.PromptVersion != "v4" ||
+		report.GenerationCases != 7 || report.PreflightCases != 1 || report.PlannedProviderInvocations != 35 || report.ActualProviderInvocations != 0 {
+		t.Fatalf("unexpected v4 preflight summary: %#v", report)
+	}
+}
+
+// The new prompt must be judged against the same examples and assertions.
+func TestV4PreservesV3EvaluationCasesAndPolicy(t *testing.T) {
+	old, err := evaluation.LoadV3()
+	if err != nil {
+		t.Fatal(err)
+	}
+	current, err := evaluation.LoadV4()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(old.Cases, current.Cases) || !reflect.DeepEqual(old.DefaultGenerationAssertions, current.DefaultGenerationAssertions) || !reflect.DeepEqual(old.ExecutionPolicy, current.ExecutionPolicy) {
+		t.Fatal("v4 changed evaluation examples, assertions or execution requirements")
+	}
+	definition := current.ProfileFixture.Definition
+	definition.Version = old.ProfileFixture.Version
+	definition.GenerationPolicy.PromptVersion = old.ProfileFixture.GenerationPolicy.PromptVersion
+	if !reflect.DeepEqual(definition, old.ProfileFixture.Definition) {
+		t.Fatal("v4 changed Profile policy beyond version and prompt binding")
+	}
 }

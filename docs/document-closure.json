@@ -2,7 +2,7 @@
   "schema_version": 1,
   "checkout_ref": "git:HEAD",
   "source_baseline": {
-    "sha": "6bc474f3e480d17503a74570790874dd43f55fb9",
+    "sha": "f422d979b2d31129a2f89ed9e57e4cad15997e95",
     "verified_on": "2026-09-05"
   },
   "status_policy": {
@@ -53,7 +53,7 @@
         "docs/_archive/**/*.md",
         "tmp/**/*.md"
       ],
-      "expected_count": 34,
+      "expected_count": 35,
       "budgeted": false
     }
   },
@@ -568,6 +568,61 @@
           "severity": "medium",
           "summary": "The v3 prompt package is a release candidate without approved production evidence.",
           "exit_criteria": "Run the frozen v3 Prompt, Profile, Suite and Provider Route through 35 candidates, 35 semantic receipts, dual-role human review and an approved Gate."
+        }
+      ]
+    },
+    {
+      "path": "api/schema/interpretation/ai-explanation-prompt-template-v4.md",
+      "class": "sidecar",
+      "owner": "interpretation",
+      "doc_status": "planned",
+      "verified": {
+        "source_sha": null,
+        "verified_on": null
+      },
+      "fact_sources": [
+        {
+          "kind": "contract",
+          "path": "api/schema/interpretation/ai-explanation-input-v1.schema.json"
+        },
+        {
+          "kind": "contract",
+          "path": "api/schema/interpretation/ai-explanation-output-v1.schema.json"
+        },
+        {
+          "kind": "contract",
+          "path": "api/schema/interpretation/ai-explanation-profile-v1.schema.json"
+        },
+        {
+          "kind": "fixture",
+          "path": "api/schema/interpretation/ai-explanation-prompt-evaluation-cases-v4.json"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/infra/aiexplanation/prompt/**/*.go"
+        },
+        {
+          "kind": "source",
+          "path": "internal/apiserver/application/interpretation/aiexplanation/evaluation/**/*.go"
+        }
+      ],
+      "verification": [],
+      "production_evidence": {
+        "level": "none",
+        "refs": [],
+        "deployed_sha": null,
+        "observed_at": null,
+        "limitations": [
+          "The v4 prompt package has contract and preflight tests but has not completed a production evaluation Run or dual-role human review."
+        ]
+      },
+      "gaps": [
+        {
+          "id": "DOC-CLOSURE-AI-EXPLANATION-PROMPT-V4",
+          "kind": "verification",
+          "severity": "medium",
+          "summary": "The v4 prompt package is a release candidate without approved production evidence.",
+          "exit_criteria": "Run the frozen v4 Prompt, Profile, Suite and Provider Route through 35 candidates, 35 semantic receipts, dual-role human review and an approved Gate."
         }
       ]
     },
