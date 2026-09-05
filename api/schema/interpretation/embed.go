@@ -98,3 +98,11 @@ var aiExplanationPromptEvaluationCasesV4 []byte
 func AIExplanationPromptEvaluationCasesV4() []byte {
 	return append([]byte(nil), aiExplanationPromptEvaluationCasesV4...)
 }
+
+//go:embed ai-explanation-prompt-evaluation-cases-v5.json
+var aiExplanationPromptEvaluationCasesV5 []byte
+
+// AIExplanationPromptEvaluationCasesV5 returns an isolated copy of the v5 suite.
+func AIExplanationPromptEvaluationCasesV5() []byte {
+	return append([]byte(nil), aiExplanationPromptEvaluationCasesV5...)
+}

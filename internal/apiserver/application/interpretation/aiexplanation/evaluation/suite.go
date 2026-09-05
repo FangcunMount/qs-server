@@ -41,6 +41,10 @@ const (
 	SuiteIDV4          = "cross-dimension-participant-scale-v4"
 	SuiteGitBlobSHAV4  = "13b20099d08b73b2022cc8d981c47f547afc636c"
 	SuiteFingerprintV4 = aiexplanation.Fingerprint("sha256:064946c41dfd93d6dcc2458737526b26e6fd7c3675a0177694b112dcf20be942")
+	SuiteVersionV5     = "ai-explanation-prompt-evaluation-cases/v5"
+	SuiteIDV5          = "cross-dimension-participant-scale-v5"
+	SuiteGitBlobSHAV5  = "9eec206df4033e39ad8a5689ca995279803c5a4d"
+	SuiteFingerprintV5 = aiexplanation.Fingerprint("sha256:dacb7c5a6f9d7a5d1ac8b9fee8b345f159d57ef064e7e45ee2658422349c23a8")
 )
 
 var ErrInvalidSuite = errors.New("AI explanation Prompt evaluation suite is invalid")
@@ -155,6 +159,8 @@ func LoadFrozen(id, version string, fingerprint aiexplanation.Fingerprint) (*Sui
 		return LoadV3()
 	case id == SuiteIDV4 && version == SuiteVersionV4 && fingerprint == SuiteFingerprintV4:
 		return LoadV4()
+	case id == SuiteIDV5 && version == SuiteVersionV5 && fingerprint == SuiteFingerprintV5:
+		return LoadV5()
 	default:
 		return nil, fmt.Errorf("%w: frozen suite identity is unavailable", ErrInvalidSuite)
 	}
@@ -173,6 +179,8 @@ func frozenSuiteIdentity(suite *Suite) (aiexplanation.Fingerprint, string, error
 		return SuiteFingerprintV3, SuiteGitBlobSHAV3, nil
 	case suite.SuiteID == SuiteIDV4 && suite.SuiteVersion == SuiteVersionV4:
 		return SuiteFingerprintV4, SuiteGitBlobSHAV4, nil
+	case suite.SuiteID == SuiteIDV5 && suite.SuiteVersion == SuiteVersionV5:
+		return SuiteFingerprintV5, SuiteGitBlobSHAV5, nil
 	default:
 		return "", "", fmt.Errorf("%w: frozen suite identity is unavailable", ErrInvalidSuite)
 	}
@@ -221,6 +229,9 @@ func (s Suite) validateIdentity() error {
 	case s.SuiteVersion == SuiteVersionV4 && s.SuiteID == SuiteIDV4:
 		validPrompt = s.Prompt.TemplateID == "cross-dimension-participant-scale" && s.Prompt.Version == "v4" &&
 			strings.HasSuffix(s.Prompt.Path, "ai-explanation-prompt-template-v4.md")
+	case s.SuiteVersion == SuiteVersionV5 && s.SuiteID == SuiteIDV5:
+		validPrompt = s.Prompt.TemplateID == "cross-dimension-participant-scale" && s.Prompt.Version == "v5" &&
+			strings.HasSuffix(s.Prompt.Path, "ai-explanation-prompt-template-v5.md")
 	default:
 		return fmt.Errorf("%w: unsupported suite identity or lifecycle", ErrInvalidSuite)
 	}
@@ -322,6 +333,14 @@ func LoadV4() (*Suite, error) {
 	raw := interpretationschema.AIExplanationPromptEvaluationCasesV4()
 	if aiexplanation.NewFingerprint(raw) != SuiteFingerprintV4 {
 		return nil, fmt.Errorf("%w: frozen v4 suite fingerprint mismatch", ErrInvalidSuite)
+	}
+	return Parse(raw)
+}
+
+func LoadV5() (*Suite, error) {
+	raw := interpretationschema.AIExplanationPromptEvaluationCasesV5()
+	if aiexplanation.NewFingerprint(raw) != SuiteFingerprintV5 {
+		return nil, fmt.Errorf("%w: frozen v5 suite fingerprint mismatch", ErrInvalidSuite)
 	}
 	return Parse(raw)
 }

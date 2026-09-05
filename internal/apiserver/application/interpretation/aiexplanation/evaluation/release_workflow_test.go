@@ -47,7 +47,7 @@ func TestReleaseWorkflowFromAdministratorStartToProfilePublication(t *testing.T)
 	require.Equal(t, 35, provider.calls)
 	require.Equal(t, 35, semantic.calls)
 
-	suite, err := evaluation.LoadV4()
+	suite, err := evaluation.LoadV5()
 	require.NoError(t, err)
 	definition := suite.ProfileFixture.Definition
 	draft, err := admin.CreateProfileDraft(ctx, owner, administration.CreateProfileDraftCommand{

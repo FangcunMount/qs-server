@@ -296,3 +296,66 @@ func TestV4PreservesV3EvaluationCasesAndPolicy(t *testing.T) {
 		t.Fatal("v4 changed Profile policy beyond version and prompt binding")
 	}
 }
+
+func TestV5SuiteBytesMatchFrozenReleaseIdentity(t *testing.T) {
+	raw := interpretationschema.AIExplanationPromptEvaluationCasesV5()
+	if got := aiexplanation.NewFingerprint(raw); got != evaluation.SuiteFingerprintV5 {
+		t.Fatalf("suite fingerprint = %s, want %s", got, evaluation.SuiteFingerprintV5)
+	}
+	gitBlobInput := append([]byte(fmt.Sprintf("blob %d\x00", len(raw))), raw...)
+	gitBlobSum := sha1.Sum(gitBlobInput) // #nosec G401 -- Git blob identity is defined as SHA-1.
+	if got := fmt.Sprintf("%x", gitBlobSum); got != evaluation.SuiteGitBlobSHAV5 {
+		t.Fatalf("suite Git blob = %s, want %s", got, evaluation.SuiteGitBlobSHAV5)
+	}
+	suite, err := evaluation.LoadFrozen(evaluation.SuiteIDV5, evaluation.SuiteVersionV5, evaluation.SuiteFingerprintV5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if suite.Prompt.Version != "v5" || suite.ProfileFixture.GenerationPolicy.PromptVersion != "v5" || suite.ProfileFixture.Version != "v5" {
+		t.Fatalf("v5 suite identities = %#v %#v", suite.Prompt, suite.ProfileFixture)
+	}
+	if _, err := evaluation.LoadFrozen(evaluation.SuiteIDV2, evaluation.SuiteVersionV2, evaluation.SuiteFingerprintV5); !errors.Is(err, evaluation.ErrInvalidSuite) {
+		t.Fatalf("mismatched frozen suite error = %v", err)
+	}
+}
+
+func TestV5PreflightPlansThirtyFiveCallsWithoutCallingProvider(t *testing.T) {
+	suite, err := evaluation.LoadV5()
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner, err := evaluation.NewPreflightRunner(promptResolverStub{}, schemaResolverStub{}, func() time.Time {
+		return time.Date(2026, 9, 1, 1, 2, 3, 0, time.UTC)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err := runner.Run(context.Background(), suite)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "passed" || report.SuiteVersion != evaluation.SuiteVersionV5 || report.PromptVersion != "v5" ||
+		report.GenerationCases != 7 || report.PreflightCases != 1 || report.PlannedProviderInvocations != 35 || report.ActualProviderInvocations != 0 {
+		t.Fatalf("unexpected v5 preflight summary: %#v", report)
+	}
+}
+
+func TestV5PreservesV4EvaluationCasesAndPolicy(t *testing.T) {
+	old, err := evaluation.LoadV4()
+	if err != nil {
+		t.Fatal(err)
+	}
+	current, err := evaluation.LoadV5()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(old.Cases, current.Cases) || !reflect.DeepEqual(old.DefaultGenerationAssertions, current.DefaultGenerationAssertions) || !reflect.DeepEqual(old.ExecutionPolicy, current.ExecutionPolicy) {
+		t.Fatal("v5 changed evaluation examples, assertions or execution requirements")
+	}
+	definition := current.ProfileFixture.Definition
+	definition.Version = old.ProfileFixture.Version
+	definition.GenerationPolicy.PromptVersion = old.ProfileFixture.GenerationPolicy.PromptVersion
+	if !reflect.DeepEqual(definition, old.ProfileFixture.Definition) {
+		t.Fatal("v5 changed Profile policy beyond version and prompt binding")
+	}
+}

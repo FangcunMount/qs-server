@@ -25,9 +25,9 @@ func TestOnlineRunnerV2SeparatesGenerationSemanticAndACKsRedelivery(t *testing.T
 	runner, _, stager := newOnlineRunnerV2(t, clock, provider, semantic)
 	started := startOnlineRunV2(t, runner, meta.ID(9501))
 	first := started.Evidence
-	if first.Release.Suite.ID != evaluation.SuiteIDV4 || first.Release.Suite.Version != evaluation.SuiteVersionV4 ||
-		first.Release.Prompt.Version != "v4" || first.Release.Profile.Version != "v4" {
-		t.Fatalf("new Evidence v2 Run did not freeze Prompt/Suite/Profile v4: %#v", first.Release)
+	if first.Release.Suite.ID != evaluation.SuiteIDV5 || first.Release.Suite.Version != evaluation.SuiteVersionV5 ||
+		first.Release.Prompt.Version != "v5" || first.Release.Profile.Version != "v5" {
+		t.Fatalf("new Evidence v2 Run did not freeze Prompt/Suite/Profile v5: %#v", first.Release)
 	}
 	firstAction, err := first.NextAction()
 	if err != nil {
