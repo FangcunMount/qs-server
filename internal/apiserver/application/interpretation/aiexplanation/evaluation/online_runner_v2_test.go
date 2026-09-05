@@ -1,8 +1,10 @@
 package evaluation_test
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -71,6 +73,51 @@ func TestOnlineRunnerV2SeparatesGenerationSemanticAndACKsRedelivery(t *testing.T
 	}
 	if redelivered.Status != evaluation.OnlineStepV2AlreadyCompleted || provider.calls != 1 || semantic.calls != 1 {
 		t.Fatalf("redelivery status/calls = %s/%d/%d", redelivered.Status, provider.calls, semantic.calls)
+	}
+}
+
+// Normalizing an accepted output must not reinterpret its original validation evidence.
+func TestOnlineRunnerV2PreservesRawValidationFailureDuringSemanticStep(t *testing.T) {
+	clock := &onlineV2Clock{now: time.Date(2026, 9, 5, 1, 0, 0, 0, time.UTC)}
+	provider := &onlineProviderStub{transformRaw: func(raw []byte) []byte {
+		return append(bytes.Repeat([]byte(" "), 9000), raw...)
+	}}
+	semantic := &onlineSemanticStub{}
+	runner, _, stager := newOnlineRunnerV2(t, clock, provider, semantic)
+	started := startOnlineRunV2(t, runner, meta.ID(9590))
+	action, _ := started.Evidence.NextAction()
+	generated, err := runner.RunStepV2(context.Background(), onlineV2Command(started.Evidence, action, stager.events[0].EventID()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	frozen := append([]domainevaluation.AssertionReceipt(nil), generated.Evidence.Slots[0].Candidate.Assertions...)
+	var failures []domainevaluation.AssertionReceipt
+	for _, receipt := range frozen {
+		if receipt.Status == domainevaluation.AssertionFailed || receipt.Status == domainevaluation.AssertionBlocked {
+			failures = append(failures, receipt)
+		}
+	}
+	if len(failures) == 0 {
+		t.Fatal("fixture must retain a deterministic validation failure")
+	}
+	action, _ = generated.Evidence.NextAction()
+	completed, err := runner.RunStepV2(context.Background(), onlineV2Command(generated.Evidence, action, stager.events[1].EventID()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if provider.calls != 1 || semantic.calls != 1 || !completed.Evidence.Slots[0].Candidate.ReviewReady {
+		t.Fatal("semantic step must complete on the original Candidate")
+	}
+	for _, failure := range failures {
+		found := false
+		for _, receipt := range completed.Evidence.Slots[0].Candidate.Assertions {
+			if reflect.DeepEqual(receipt, failure) {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("original failure was lost: %#v", failure)
+		}
 	}
 }
 
