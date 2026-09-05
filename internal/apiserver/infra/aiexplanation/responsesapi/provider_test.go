@@ -465,6 +465,9 @@ func TestProviderExplainsInvalidOutputCardinalityWithoutLeakingContent(t *testin
             }`, testCase.output))
 			_, err := provider.Generate(context.Background(), validRequest())
 			classified := requireProviderError(t, err)
+			if classified.Diagnostics == nil || classified.Diagnostics.RequestID != "resp_invalid_shape" || classified.Diagnostics.ResponseShape != testCase.shape || classified.Diagnostics.ResponseStatus != "completed" {
+				t.Fatalf("missing bounded failure diagnostics: %#v", classified.Diagnostics)
+			}
 			if classified.Code != "provider_output_cardinality_invalid" || classified.SafeMessage != testCase.expectedMsg {
 				t.Fatalf("classified invalid output = %#v", classified)
 			}

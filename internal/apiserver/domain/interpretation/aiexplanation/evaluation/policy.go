@@ -168,7 +168,7 @@ func CurrentEvaluationExecutionPolicy() EvaluationExecutionPolicy {
 	return EvaluationExecutionPolicy{
 		SchemaVersion: EvaluationExecutionPolicySchemaVersionV1,
 		PolicyID:      "release-evaluation-bounded-recovery",
-		Version:       "v1",
+		Version:       "v2",
 		SlotPolicy: EvaluationSlotPolicy{
 			RequiredGenerationCases: RequiredGenerationCaseCount, RequiredCandidatesPerCase: RequiredRepetitionsPerCase,
 			RequiredPreflightCases: 1, CandidateSelection: CandidateSelectionFirstContractConformant,
@@ -178,7 +178,8 @@ func CurrentEvaluationExecutionPolicy() EvaluationExecutionPolicy {
 		Recovery: EvaluationRecoveryPolicy{
 			AutoRetryableStageCodes: []FailureSelector{
 				{Stage: FailureStageGenerationExecution, Code: "provider_rate_limited"},
-				{Stage: FailureStageSemanticEvaluation, Code: "semantic_provider_rate_limited"},
+				{Stage: FailureStageSemanticEvaluation, Code: SemanticProviderRateLimited},
+				{Stage: FailureStageSemanticEvaluation, Code: SemanticProviderNoMessage},
 				{Stage: FailureStageSemanticEvaluation, Code: SemanticOutputSchemaInvalid},
 			},
 			ManualRecoveryStageCodes: []FailureSelector{

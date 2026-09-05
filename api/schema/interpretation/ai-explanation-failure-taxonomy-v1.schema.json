@@ -58,6 +58,36 @@
         "maxLength": 256,
         "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]*$"
       }
+    },
+    "provider_diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional bounded Provider failure metadata; excludes response bodies and reasoning text.",
+      "required": [
+        "code"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_.:-]{1,256}$"
+        },
+        "request_id": {
+          "type": "string",
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_.:-]{1,256}$"
+        },
+        "response_status": {
+          "type": "string",
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_.:-]{1,256}$"
+        },
+        "response_shape": {
+          "type": "string",
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_.:-]{1,256}$"
+        }
+      }
     }
   },
   "$defs": {

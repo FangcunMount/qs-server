@@ -229,6 +229,7 @@ type Provider interface {
 }
 
 type ProviderError struct {
+	Diagnostics   *aiexplanation.ProviderFailureDiagnostics
 	Kind          domainrun.FailureKind
 	Code          string
 	SafeMessage   string

@@ -519,6 +519,19 @@ func semanticExecutionV2(
 	}
 	if outcome.Failure != nil {
 		execution.Status, execution.Failure = classifySemanticFailureV2(checkpoint.ID, *outcome.Failure)
+		if outcome.ProviderDiagnostics != nil {
+			diagnostics := *outcome.ProviderDiagnostics
+			execution.Failure.ProviderDiagnostics = &diagnostics
+			if !execution.Failure.ResultUnknown {
+				switch {
+				case diagnostics.Code == "provider_rate_limited":
+					execution.Failure.Code = domainevaluation.SemanticProviderRateLimited
+				case diagnostics.Code == "provider_output_cardinality_invalid" && diagnostics.ResponseStatus == "completed" && diagnostics.ResponseShape == "no_message":
+					execution.Failure.Code = domainevaluation.SemanticProviderNoMessage
+					execution.Failure.Retryable = true
+				}
+			}
+		}
 		return execution
 	}
 	if len(execution.RawOutput) == 0 || len(execution.NormalizedOutput) == 0 {

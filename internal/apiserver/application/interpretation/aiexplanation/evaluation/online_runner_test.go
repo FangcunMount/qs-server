@@ -594,6 +594,7 @@ func (onlineSafetyStub) Evaluate(_ context.Context, _ appport.SafetyRequest) (ap
 }
 
 type onlineSemanticStub struct {
+	diagnostics        *aiexplanation.ProviderFailureDiagnostics
 	calls              int
 	failAt             int
 	failure            *domainevaluation.AttemptFailure
@@ -654,6 +655,12 @@ func (s *onlineSemanticStub) Evaluate(_ context.Context, request evaluation.Sema
 		failure := *s.failure
 		outcome.Result = nil
 		outcome.Failure = &failure
+		outcome.ProviderDiagnostics = s.diagnostics
+		if s.diagnostics != nil {
+			outcome.RawOutput = nil
+			outcome.NormalizedOutput = nil
+			outcome.ProviderReceipt = nil
+		}
 	}
 	return outcome, nil
 }

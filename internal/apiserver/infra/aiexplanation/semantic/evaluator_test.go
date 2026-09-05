@@ -191,6 +191,9 @@ func TestEvaluatorClassifiesProviderAndMissingOutputFailures(t *testing.T) {
 				t.Fatal(err)
 			}
 			outcome, err := evaluator.Evaluate(context.Background(), validSemanticRequest(t))
+			if test.providerCode != "" && (outcome.ProviderDiagnostics == nil || outcome.ProviderDiagnostics.Code != test.providerCode) {
+				t.Fatal("Provider diagnostics were lost")
+			}
 			if err != nil || outcome.Failure == nil || outcome.Failure.Code != test.code ||
 				outcome.Failure.ResultUnknown != test.resultUnknown || outcome.ProviderFailureCode != test.providerCode ||
 				outcome.ProviderCallCount != 1 || outcome.Result != nil {

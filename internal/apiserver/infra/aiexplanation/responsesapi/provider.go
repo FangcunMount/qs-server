@@ -280,6 +280,18 @@ func (p *Provider) Generate(ctx context.Context, request appport.ProviderRequest
 	}
 	rawOutput, err := extractSingleOutput(decoded.Output)
 	if err != nil {
+		var failure *appport.ProviderError
+		if errors.As(err, &failure) {
+			diagnostics := aiexplanation.ProviderFailureDiagnostics{Code: failure.Code,
+				ResponseStatus: decoded.Status, ResponseShape: providerMetricResponseShape(decoded.Output)}
+			diagnostics.RequestID = decoded.ID
+			if diagnostics.Validate() != nil {
+				diagnostics.RequestID = ""
+			}
+			if diagnostics.Validate() == nil {
+				failure.Diagnostics = &diagnostics
+			}
+		}
 		return nil, err
 	}
 	observeProviderOutputEnvelope(request.OutputSchema.Version, rawOutput)

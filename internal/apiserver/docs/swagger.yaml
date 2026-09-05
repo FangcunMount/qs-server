@@ -1,5 +1,16 @@
 basePath: /api/v1
 definitions:
+  aiexplanation.ProviderFailureDiagnostics:
+    properties:
+      code:
+        type: string
+      request_id:
+        type: string
+      response_shape:
+        type: string
+      response_status:
+        type: string
+    type: object
   binding.DecisionKind:
     enum:
     - score_range
@@ -1262,6 +1273,8 @@ definitions:
         type: array
       kind:
         type: string
+      provider_diagnostics:
+        $ref: '#/definitions/aiexplanation.ProviderFailureDiagnostics'
       result_unknown:
         type: boolean
       retryable:
@@ -1327,6 +1340,8 @@ definitions:
     properties:
       execution_id:
         type: string
+      failure:
+        $ref: '#/definitions/handler.AIExplanationEvaluationV2FailureWire'
       kind:
         type: string
       normalized_output:
