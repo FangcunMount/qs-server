@@ -77,6 +77,7 @@ func TestGatePolicyV2AppliesCaseThresholdsWithoutWeakeningHardAssertions(t *test
 		name       string
 		failed     []int
 		hard       bool
+		missing    bool
 		wantPassed bool
 		wantCode   string
 	}{
@@ -86,11 +87,16 @@ func TestGatePolicyV2AppliesCaseThresholdsWithoutWeakeningHardAssertions(t *test
 		{name: "all case candidates failed", failed: []int{0, 1, 2, 3, 4}, wantCode: "case_assertion_stability_failed"},
 		{name: "overall below 32 of 35", failed: []int{0, 5, 10, 15}, wantCode: "case_assertion_overall_failed"},
 		{name: "one hard failure", failed: []int{0}, hard: true, wantCode: "candidate_hard_assertion_failed"},
+		{name: "missing case evidence", failed: []int{0}, missing: true, wantCode: "candidate_case_assertion_failed"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			evidence := completeEvidenceV2ForReview(t)
 			freezeGateVersion(t, &evidence, "v2")
 			for _, index := range test.failed {
+				if test.missing {
+					evidence.Slots[index].Candidate.Assertions = evidence.Slots[index].Candidate.Assertions[:1]
+					continue
+				}
 				assertion := &evidence.Slots[index].Candidate.Assertions[1]
 				assertion.Status = AssertionFailed
 				assertion.Hard = test.hard

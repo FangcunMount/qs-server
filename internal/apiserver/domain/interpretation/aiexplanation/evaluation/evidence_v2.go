@@ -954,7 +954,7 @@ func (e PromptEvaluationEvidenceV2) evaluateGateUnchecked(at time.Time) Evidence
 		candidate := slot.Candidate
 		casePresent, casePassed, hardPassed := evaluateCandidateAssertions(candidate.Assertions)
 		if !casePresent || !casePassed {
-			if e.GatePolicy.Version == "v1" {
+			if !casePresent || e.GatePolicy.Version == "v1" {
 				addReason("G4", "candidate_case_assertion_failed", "Candidate did not pass all case-scoped assertions", candidate.ID)
 			}
 		} else {
