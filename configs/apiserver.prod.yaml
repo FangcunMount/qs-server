@@ -123,12 +123,12 @@ delegated-subject:
   previous-key: ""
   ttl: 5m
 
-# 手动触发的 AI 解读独立于标准报告链路。治理与评测先启用，参与者流量独立保持关闭。
-# API key 使用 Provider 对应的环境变量注入；发布 Profile 和最小验收完成前不得开启 participant_enabled。
+# 手动触发的 AI 解读独立于标准报告链路；API key 使用 Provider 对应的环境变量注入。
+# Profile v6 已发布，发布证据 Run 635983278800646702 已批准。
 ai_explanation:
   enabled: true
-  # 独立用户流量开关；首个生产 Profile 发布和最小验收通过前保持 false。
-  participant_enabled: false
+  # 开放参与者手动生成；运行时仅匹配已发布 Profile，保留现有容量限制。
+  participant_enabled: true
   provider: "deepseek"
   # v7/v4 strict-tool 生产 Run 出现结构漂移与裁判请求拒绝，活动路由继续使用 Responses 线协议。
   provider_protocol: "responses"
