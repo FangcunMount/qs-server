@@ -499,6 +499,7 @@ type onlineProviderStub struct {
 	failAt              int
 	mutate              func(caseID string, content *domainoutput.Content)
 	wrapValidationFence bool
+	transformRaw        func([]byte) []byte
 	invocationIDs       []string
 }
 
@@ -516,6 +517,9 @@ func (p *onlineProviderStub) Generate(_ context.Context, request appport.Provide
 	raw, err := json.Marshal(content)
 	if err != nil {
 		return nil, err
+	}
+	if p.transformRaw != nil {
+		raw = p.transformRaw(raw)
 	}
 	response := &appport.ProviderResponse{
 		RawOutput: raw,

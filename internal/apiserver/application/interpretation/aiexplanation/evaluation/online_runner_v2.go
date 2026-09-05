@@ -308,16 +308,9 @@ func (r *OnlineRunner) runSemanticStepV2(
 		return nil, err
 	}
 	allAssertions := append(cloneAssertions(prepared.defaultAssertions), cloneAssertions(testCase.Expected.Assertions)...)
-	candidate, err := EvaluateCandidate(ctx, generation.NormalizedOutput, assembled.Document, prepared.profile.Definition(), allAssertions, r.safety)
+	obligations, err := frozenSemanticObligationsV2(slot.Candidate.Assertions, allAssertions, len(prepared.defaultAssertions))
 	if err != nil {
 		return nil, err
-	}
-	receipts, obligations, err := candidateReceiptsV2(candidate, allAssertions, len(prepared.defaultAssertions))
-	if err != nil {
-		return nil, err
-	}
-	if !reflect.DeepEqual(receipts, slot.Candidate.Assertions) || len(obligations) == 0 {
-		return nil, fmt.Errorf("AI explanation evaluation v2 Candidate no longer matches frozen deterministic evidence")
 	}
 	dispatchAt := r.now().UTC()
 	if _, err := r.evidenceV2.MarkExecutionDispatching(ctx, command.RunID, checkpoint.Owner, dispatchAt); err != nil {
@@ -452,6 +445,33 @@ func preparedEvidenceReleaseV2(
 		return domainevaluation.EvidenceReleaseIdentity{}, err
 	}
 	return release, release.Validate(executionPolicy, gatePolicy)
+}
+
+// frozenSemanticObligationsV2 consumes the generation-time receipts. Revalidating
+// NormalizedOutput would evaluate different bytes from the original provider
+// response and could change schema, policy, or safety evidence after acceptance.
+// Rebuild only the suite-defined inventory to verify scope, order, ordinal, and
+// hard-gate identity; preserve every recorded status, evaluator, and detail.
+func frozenSemanticObligationsV2(
+	frozen []domainevaluation.AssertionReceipt,
+	assertions []Assertion,
+	defaultCount int,
+) ([]SemanticAssertion, error) {
+	candidate := &CandidateEvaluation{Assertions: make([]CandidateAssertionResult, len(frozen))}
+	for index, receipt := range frozen {
+		candidate.Assertions[index] = CandidateAssertionResult{
+			Type: receipt.Type, Evaluator: receipt.Evaluator,
+			Status: AssertionStatus(receipt.Status), Detail: receipt.Detail,
+		}
+	}
+	receipts, obligations, err := candidateReceiptsV2(candidate, assertions, defaultCount)
+	if err != nil {
+		return nil, err
+	}
+	if !reflect.DeepEqual(receipts, frozen) || len(obligations) == 0 {
+		return nil, fmt.Errorf("AI explanation evaluation v2 Candidate no longer matches frozen deterministic evidence")
+	}
+	return obligations, nil
 }
 
 func semanticSourceV2(
