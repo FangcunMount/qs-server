@@ -8914,6 +8914,64 @@ const docTemplate = `{
             }
         },
         "/internal/v2/interpretation/ai-explanation/prompt-evaluations": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Explanation-Administration"
+                ],
+                "summary": "分页查询当前机构的 v2 评测 Run",
+                "parameters": [
+                    {
+                        "enum": [
+                            "requested",
+                            "collecting",
+                            "blocked",
+                            "awaiting_review",
+                            "approved",
+                            "rejected",
+                            "canceled"
+                        ],
+                        "type": "string",
+                        "description": "状态",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "分页游标",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页大小，默认 20，最大 100",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AIExplanationEvaluationV2PageWire"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
             "post": {
                 "description": "冻结当前 execution/gate policy，确认最坏 140 次 Provider 调用，并在一个事务中预留容量、写 Evidence 和首个 Outbox 事件。",
                 "consumes": [
@@ -9016,6 +9074,64 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/cancel": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI-Explanation-Administration"
+                ],
+                "summary": "取消未完成的 Run 或废弃待审核的 Run，保留审计证据",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Run ID",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "版本和操作理由",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.AIExplanationCancelEvaluationV2Request"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AIExplanationEvaluationV2Wire"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/core.ErrResponse"
                         }
@@ -10438,6 +10554,83 @@ const docTemplate = `{
                 }
             }
         },
+        "evaluation.EvidenceStatus": {
+            "type": "string",
+            "enum": [
+                "requested",
+                "collecting",
+                "blocked",
+                "awaiting_review",
+                "approved",
+                "rejected",
+                "canceled"
+            ],
+            "x-enum-varnames": [
+                "EvidenceStatusRequested",
+                "EvidenceStatusCollecting",
+                "EvidenceStatusBlocked",
+                "EvidenceStatusAwaitingReview",
+                "EvidenceStatusApproved",
+                "EvidenceStatusRejected",
+                "EvidenceStatusCanceled"
+            ]
+        },
+        "evaluation.EvidenceV2Summary": {
+            "type": "object",
+            "properties": {
+                "accepted_candidates": {
+                    "type": "integer"
+                },
+                "can_cancel": {
+                    "type": "boolean"
+                },
+                "can_discard": {
+                    "type": "boolean"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "last_cause": {
+                    "type": "string"
+                },
+                "last_reason": {
+                    "type": "string"
+                },
+                "organization_id": {
+                    "type": "integer"
+                },
+                "profile_version": {
+                    "type": "string"
+                },
+                "prompt_version": {
+                    "type": "string"
+                },
+                "release_fingerprint": {
+                    "type": "string"
+                },
+                "required_candidates": {
+                    "type": "integer"
+                },
+                "review_count": {
+                    "type": "integer"
+                },
+                "review_ready_candidates": {
+                    "type": "integer"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/evaluation.EvidenceStatus"
+                },
+                "unresolved_result_unknown_count": {
+                    "type": "integer"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
         "factor.Factor": {
             "type": "object",
             "properties": {
@@ -10808,6 +11001,26 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "integer"
+                }
+            }
+        },
+        "handler.AIExplanationCancelEvaluationV2Request": {
+            "type": "object",
+            "required": [
+                "expected_version",
+                "reason"
+            ],
+            "properties": {
+                "discard": {
+                    "type": "boolean"
+                },
+                "expected_version": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "reason": {
+                    "type": "string",
+                    "maxLength": 1000
                 }
             }
         },
@@ -11595,6 +11808,20 @@ const docTemplate = `{
                 }
             }
         },
+        "handler.AIExplanationEvaluationV2PageWire": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.EvidenceV2Summary"
+                    }
+                },
+                "next_cursor": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.AIExplanationEvaluationV2ReleaseWire": {
             "type": "object",
             "properties": {
@@ -11746,11 +11973,49 @@ const docTemplate = `{
                 }
             }
         },
+        "handler.AIExplanationEvaluationV2TransitionWire": {
+            "type": "object",
+            "properties": {
+                "actor": {
+                    "type": "string"
+                },
+                "cause_code": {
+                    "type": "string"
+                },
+                "evidence_refs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "from": {
+                    "$ref": "#/definitions/evaluation.EvidenceStatus"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "to": {
+                    "$ref": "#/definitions/evaluation.EvidenceStatus"
+                },
+                "transitioned_at": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.AIExplanationEvaluationV2Wire": {
             "type": "object",
             "properties": {
                 "accepted_candidates": {
                     "type": "integer"
+                },
+                "can_cancel": {
+                    "type": "boolean"
+                },
+                "can_discard": {
+                    "type": "boolean"
+                },
+                "canceled_at": {
+                    "type": "string"
                 },
                 "closed_at": {
                     "type": "string"
@@ -11837,6 +12102,12 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/handler.AIExplanationEvaluationV2SlotWire"
+                    }
+                },
+                "state_transitions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.AIExplanationEvaluationV2TransitionWire"
                     }
                 },
                 "status": {

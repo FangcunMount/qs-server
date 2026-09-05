@@ -1026,6 +1026,10 @@
           "items": {
             "$ref": "#/$defs/entityID"
           }
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 1000
         }
       }
     },

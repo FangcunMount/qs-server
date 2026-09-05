@@ -12,6 +12,7 @@ import (
 
 	domainai "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation"
 	domainevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/aiexplanation/evaluation"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/mongodbtest"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
@@ -138,4 +139,63 @@ func mapperSizedJSON(t *testing.T, label string, size int) []byte {
 	prefix, suffix := fmt.Sprintf(`{"payload":"%s:`, label), `"}`
 	require.GreaterOrEqual(t, size, len(prefix)+len(suffix))
 	return []byte(prefix + strings.Repeat("x", size-len(prefix)-len(suffix)) + suffix)
+}
+
+func TestEvidenceV2CatalogScopesPagesAndCancellationReleasesKeys(t *testing.T) {
+	_, db := mongodbtest.ReplicaSetDatabase(t)
+	repository, err := NewPromptEvaluationRepository(db, RetentionPolicy{Version: "test-catalog", ParticipantRecordRetention: 24 * time.Hour, PromptEvaluationRetention: 24 * time.Hour, CapacityLedgerRetention: 24 * time.Hour})
+	require.NoError(t, err)
+	original := newMapperEvidenceV2(t)
+	for i := 0; i < 3; i++ {
+		e := original.Clone()
+		e.RunID += meta.ID(i)
+		require.NoError(t, e.Cancel("user:42", "superseded", false, e.Audit.CreatedAt.Add(time.Hour)))
+		require.NoError(t, repository.CreateEvidenceV2(t.Context(), &e))
+	}
+	// A second organization and legacy document never appear in this projection.
+	other := original.Clone()
+	other.RunID += 100
+	other.Audit.OrganizationID = 99
+	require.NoError(t, other.Cancel("user:42", "other org", false, other.Audit.CreatedAt.Add(time.Hour)))
+	require.NoError(t, repository.CreateEvidenceV2(t.Context(), &other))
+	_, err = db.Collection((PromptEvaluationRunPO{}).CollectionName()).InsertOne(t.Context(), bson.M{"domain_id": int64(99999999), "requested_org_id": original.Audit.OrganizationID, "status": "canceled", "created_at": original.Audit.CreatedAt})
+	require.NoError(t, err)
+	status := domainevaluation.EvidenceStatusCanceled
+	items, next, err := repository.ListEvidenceV2(t.Context(), original.Audit.OrganizationID, &status, "", 2)
+	require.NoError(t, err)
+	require.Len(t, items, 2)
+	require.NotEmpty(t, next)
+	require.Equal(t, (original.RunID + 2).String(), items[0].RunID)
+	require.Equal(t, 35, items[0].RequiredCandidates)
+	require.False(t, items[0].CanCancel)
+	require.Equal(t, "superseded", items[0].LastReason)
+	tail, end, err := repository.ListEvidenceV2(t.Context(), original.Audit.OrganizationID, &status, next, 2)
+	require.NoError(t, err)
+	require.Len(t, tail, 1)
+	require.Empty(t, end)
+	require.Equal(t, original.RunID.String(), tail[0].RunID)
+	_, _, err = repository.ListEvidenceV2(t.Context(), 99, &status, next, 2)
+	require.Error(t, err)
+	_, _, err = repository.ListEvidenceV2(t.Context(), original.Audit.OrganizationID, nil, next, 2)
+	require.Error(t, err)
+	active := original.Clone()
+	active.RunID += 10
+	require.NoError(t, repository.CreateEvidenceV2(t.Context(), &active))
+	listed, _, err := repository.ListEvidenceV2(t.Context(), active.Audit.OrganizationID, nil, "", 20)
+	require.NoError(t, err)
+	require.Len(t, listed, 4)
+	oldVersion := active.Version()
+	stale := active.Clone()
+	require.NoError(t, active.Cancel("user:42", "cancel before dispatch", false, active.Audit.CreatedAt.Add(time.Hour)))
+	require.NoError(t, repository.SaveEvidenceV2(t.Context(), &active, oldVersion))
+	require.NoError(t, stale.MarkExecutionDispatching(stale.Execution().Owner, stale.Execution().ClaimedAt.Add(time.Second)))
+	require.ErrorIs(t, repository.SaveEvidenceV2(t.Context(), &stale, oldVersion), domainevaluation.ErrConflict)
+	again := original.Clone()
+	again.RunID += 11
+	require.NoError(t, repository.CreateEvidenceV2(t.Context(), &again))
+	var po PromptEvaluationEvidenceV2PO
+	require.NoError(t, db.Collection(po.CollectionName()).FindOne(t.Context(), bson.M{"domain_id": active.RunID}).Decode(&po))
+	require.Empty(t, po.ActiveReleaseKey)
+	require.Empty(t, po.ActiveExecutionOrgKey)
+	require.NotNil(t, po.CanceledAt)
 }

@@ -324,3 +324,24 @@ func TestEvidenceV2FailureDiagnosticsSurviveBSONAndClone(t *testing.T) {
 	require.NoError(t, bson.Unmarshal(raw, &document))
 	require.NotContains(t, document, "provider_diagnostics")
 }
+
+func TestEvidenceV2CancellationRoundTripsAuditAndReleasesActiveKeys(t *testing.T) {
+	evidence := newMapperEvidenceV2(t)
+	require.NoError(t, evidence.Cancel("user:42", "superseded release", false, evidence.Audit.CreatedAt.Add(24*time.Hour)))
+	mapper := NewMapper()
+	po, err := mapper.PromptEvaluationEvidenceV2ToPO(evidence)
+	require.NoError(t, err)
+	require.Empty(t, po.ActiveReleaseKey)
+	require.Empty(t, po.ActiveExecutionOrgKey)
+	raw, err := bson.Marshal(po)
+	require.NoError(t, err)
+	var decoded PromptEvaluationEvidenceV2PO
+	require.NoError(t, bson.Unmarshal(raw, &decoded))
+	restored, err := mapper.PromptEvaluationEvidenceV2ToDomain(&decoded)
+	require.NoError(t, err)
+	require.Equal(t, evidence.StateTransitions, restored.StateTransitions)
+	var catalog evidenceV2CatalogPO
+	require.NoError(t, bson.Unmarshal(raw, &catalog))
+	require.Equal(t, 35, catalog.ExecutionPolicy.SlotPolicy.RequiredGenerationCases*catalog.ExecutionPolicy.SlotPolicy.RequiredCandidatesPerCase)
+	require.Equal(t, "superseded release", catalog.Transitions[len(catalog.Transitions)-1].Reason)
+}

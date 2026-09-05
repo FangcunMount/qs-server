@@ -316,3 +316,43 @@ func (*routeAIAdministrationStub) PublishProfile(context.Context, aiexplanationa
 func (*routeAIAdministrationStub) DisableProfile(context.Context, aiexplanationadministration.Actor, aiexplanationadministration.DisableProfileCommand) (*domainprofile.AIExplanationProfile, error) {
 	return nil, nil
 }
+
+func (s *routeAIAdministrationStub) ListEvaluationsV2(context.Context, aiexplanationadministration.Actor, aiexplanationadministration.EvaluationV2ListQuery) (*appevaluation.EvidenceV2Page, error) {
+	return &appevaluation.EvidenceV2Page{Items: []appevaluation.EvidenceV2Summary{}}, nil
+}
+func (s *routeAIAdministrationStub) CancelEvaluationV2(context.Context, aiexplanationadministration.Actor, meta.ID, aiexplanationadministration.CancelEvaluationV2Command) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	return nil, nil
+}
+
+func TestV2RunManagementRoutesRequireGovernanceForCancellation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	service := &routeAIAdministrationStub{}
+	router := &Router{}
+	router.deps.Interpretation.AIExplanationAdministration = service
+	for _, admin := range []bool{false, true} {
+		engine := gin.New()
+		engine.Use(aiRouteSnapshotMiddleware(admin))
+		router.registerInterpretationInternalV2Routes(engine.Group("/internal/v2"))
+		read := httptest.NewRecorder()
+		engine.ServeHTTP(read, httptest.NewRequest(http.MethodGet, "/internal/v2/interpretation/ai-explanation/prompt-evaluations", nil))
+		if read.Code != http.StatusOK {
+			t.Fatalf("list status=%d body=%s", read.Code, read.Body.String())
+		}
+		for _, body := range []string{`{"expected_version":9,"reason":"stop","discard":false}`, `{"expected_version":0,"reason":"stop"}`} {
+			write := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, "/internal/v2/interpretation/ai-explanation/prompt-evaluations/635960720508334638/cancel", bytes.NewBufferString(body))
+			request.Header.Set("Content-Type", "application/json")
+			engine.ServeHTTP(write, request)
+			expected := http.StatusForbidden
+			if admin {
+				expected = http.StatusOK
+				if body == `{"expected_version":0,"reason":"stop"}` {
+					expected = http.StatusBadRequest
+				}
+			}
+			if write.Code != expected {
+				t.Fatalf("cancel admin=%v status=%d expected=%d body=%s", admin, write.Code, expected, write.Body.String())
+			}
+		}
+	}
+}
