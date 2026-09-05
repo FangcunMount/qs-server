@@ -284,7 +284,7 @@ type ReleaseGatePolicy struct {
 
 func (p ReleaseGatePolicy) Validate() error {
 	if p.SchemaVersion != ReleaseGatePolicySchemaVersionV1 ||
-		!policyIdentifierPattern.MatchString(p.PolicyID) || !policyVersionPattern.MatchString(p.Version) ||
+		!policyIdentifierPattern.MatchString(p.PolicyID) || (p.Version != "v1" && p.Version != "v2") ||
 		p.ApprovalRule != "all_gates_must_pass" {
 		return fmt.Errorf("AI explanation release gate policy identity is invalid")
 	}
@@ -345,12 +345,14 @@ func (p ReleaseGatePolicy) Clone() ReleaseGatePolicy {
 
 // CurrentReleaseGatePolicy is frozen into every new v2 Run alongside the
 // execution policy. It intentionally keeps all external-call failures in the
-// reliability denominator even when a bounded recovery later succeeds.
+// reliability denominator even when a bounded recovery later succeeds. Version
+// v2 corrects infrastructure success and applies the frozen case-pass thresholds;
+// historical Runs retain v1 semantics when their gate result is revalidated.
 func CurrentReleaseGatePolicy() ReleaseGatePolicy {
 	return ReleaseGatePolicy{
 		SchemaVersion: ReleaseGatePolicySchemaVersionV1,
 		PolicyID:      "release-gates",
-		Version:       "v1",
+		Version:       "v2",
 		ReleaseIdentity: ReleaseIdentityGatePolicy{
 			RequiredComponents: append([]ReleaseIdentityComponent(nil), requiredReleaseIdentityComponents...), RequireFingerprintMatch: true,
 		},

@@ -888,13 +888,13 @@ func (e PromptEvaluationEvidenceV2) evaluateGateUnchecked(at time.Time) Evidence
 		result.Reasons = append(result.Reasons, EvidenceGateReason{Gate: gate, Code: code, Detail: detail, EvidenceRefs: append([]string(nil), refs...)})
 	}
 
-	dispatched, definiteTerminal := 0, 0
+	dispatched, infrastructureSucceeded := 0, 0
 	definiteGenerationOutput, conformantGenerationOutput := 0, 0
 	for _, execution := range e.GenerationExecutions {
 		if execution.ProviderCallCount == 1 {
 			dispatched++
-			if execution.Status == ExecutionStatusSucceeded || execution.Status == ExecutionStatusFailed {
-				definiteTerminal++
+			if e.GatePolicy.countsInfrastructureSuccess(execution.Status, execution.InvocationID, execution.ProviderReceipt, execution.Failure) {
+				infrastructureSucceeded++
 			}
 		}
 		if len(execution.RawOutput) > 0 && execution.Status != ExecutionStatusResultUnknown && execution.Status != ExecutionStatusDispatching {
@@ -909,20 +909,20 @@ func (e PromptEvaluationEvidenceV2) evaluateGateUnchecked(at time.Time) Evidence
 		if execution.ProviderCallCount == 1 {
 			dispatched++
 			semanticDispatched++
-			if execution.Status == ExecutionStatusSucceeded || execution.Status == ExecutionStatusFailed {
-				definiteTerminal++
+			if e.GatePolicy.countsInfrastructureSuccess(execution.Status, execution.InvocationID, execution.ProviderReceipt, execution.Failure) {
+				infrastructureSucceeded++
 			}
 		}
 		if execution.Status == ExecutionStatusSucceeded {
 			semanticSucceeded++
 		}
 	}
-	infrastructureRate := evidenceRate(definiteTerminal, dispatched)
+	infrastructureRate := evidenceRate(infrastructureSucceeded, dispatched)
 	generationConformanceRate := evidenceRate(conformantGenerationOutput, definiteGenerationOutput)
 	semanticSuccessRate := evidenceRate(semanticSucceeded, semanticDispatched)
 	reliability := e.GatePolicy.ExecutionReliability
 	result.Metrics = append(result.Metrics,
-		EvidenceGateMetric{Name: "infrastructure_success_rate", Numerator: definiteTerminal, Denominator: dispatched, Value: infrastructureRate, Threshold: reliability.MinInfrastructureSuccessRate},
+		EvidenceGateMetric{Name: "infrastructure_success_rate", Numerator: infrastructureSucceeded, Denominator: dispatched, Value: infrastructureRate, Threshold: reliability.MinInfrastructureSuccessRate},
 		EvidenceGateMetric{Name: "generation_contract_conformance_rate", Numerator: conformantGenerationOutput, Denominator: definiteGenerationOutput, Value: generationConformanceRate, Threshold: reliability.MinGenerationContractConformanceRate},
 		EvidenceGateMetric{Name: "semantic_execution_success_rate", Numerator: semanticSucceeded, Denominator: semanticDispatched, Value: semanticSuccessRate, Threshold: reliability.MinSemanticExecutionSuccessRate},
 	)
@@ -946,10 +946,17 @@ func (e PromptEvaluationEvidenceV2) evaluateGateUnchecked(at time.Time) Evidence
 	}
 	minimumScores := e.GatePolicy.CandidateQuality.MinimumSemanticScores
 	for _, slot := range e.Slots {
+		if e.GatePolicy.Version == "v2" {
+			if _, exists := casePasses[slot.CaseID]; !exists {
+				casePasses[slot.CaseID] = 0
+			}
+		}
 		candidate := slot.Candidate
 		casePresent, casePassed, hardPassed := evaluateCandidateAssertions(candidate.Assertions)
 		if !casePresent || !casePassed {
-			addReason("G4", "candidate_case_assertion_failed", "Candidate did not pass all case-scoped assertions", candidate.ID)
+			if !casePresent || e.GatePolicy.Version == "v1" {
+				addReason("G4", "candidate_case_assertion_failed", "Candidate did not pass all case-scoped assertions", candidate.ID)
+			}
 		} else {
 			casePasses[slot.CaseID]++
 			overallPasses++
@@ -1023,6 +1030,33 @@ func (e PromptEvaluationEvidenceV2) evaluateGateUnchecked(at time.Time) Evidence
 		result.Passed = result.Passed && result.GatePasses[gate]
 	}
 	return result
+}
+
+func (p ReleaseGatePolicy) countsInfrastructureSuccess(status ExecutionStatus, invocationID string, receipt *aiexplanation.ProviderReceipt, failure *ClassifiedFailure) bool {
+	// Preserve the original definite-terminal calculation for frozen v1 Runs.
+	if p.Version == "v1" {
+		return status == ExecutionStatusSucceeded || status == ExecutionStatusFailed
+	}
+	if status == ExecutionStatusSucceeded {
+		return true // Execution validation requires a matching Provider receipt.
+	}
+	if status != ExecutionStatusFailed || failure == nil || receipt == nil ||
+		receipt.Validate() != nil || validateV2ProviderReceipt(*receipt, invocationID) != nil {
+		return false
+	}
+	// A completed Provider response may fail output validation. Count that
+	// response here; its failure remains in the separate contract/semantic gate.
+	switch failure.Kind {
+	case FailureKindOutputContractConformance:
+		return true
+	case FailureKindSemanticExecution:
+		switch failure.Code {
+		case SemanticOutputMissingOrTooLarge, SemanticOutputSchemaInvalid,
+			SemanticOutputDecodeInvalid, SemanticDecisionContractInvalid:
+			return true
+		}
+	}
+	return false
 }
 
 func evaluateCandidateAssertions(assertions []AssertionReceipt) (casePresent, casePassed, hardPassed bool) {
