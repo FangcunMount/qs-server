@@ -200,6 +200,17 @@ func newOnlineRunnerV2WithSafety(
 	semantic *onlineSemanticStub,
 	safety appport.SafetyEvaluator,
 ) (*evaluation.OnlineRunner, *evaluation.EvidenceV2Service, *onlineV2EventStager) {
+	runner, evidence, stager, _, _ := newOnlineReleaseHarness(t, clock, provider, semantic, safety)
+	return runner, evidence, stager
+}
+
+func newOnlineReleaseHarness(
+	t *testing.T,
+	clock *onlineV2Clock,
+	provider *onlineProviderStub,
+	semantic *onlineSemanticStub,
+	safety appport.SafetyEvaluator,
+) (*evaluation.OnlineRunner, *evaluation.EvidenceV2Service, *onlineV2EventStager, *evaluation.DurableCommitterV2, *onlineEvidenceV2Repository) {
 	t.Helper()
 	v1Evidence, err := evaluation.NewEvidenceService(&onlineEvidenceRepository{}, func() meta.ID { return meta.ID(9001) }, clock.Time)
 	if err != nil {
@@ -226,7 +237,7 @@ func newOnlineRunnerV2WithSafety(
 	if err != nil {
 		t.Fatal(err)
 	}
-	return runner, v2Evidence, stager
+	return runner, v2Evidence, stager, committer, v2Repository
 }
 
 type onlineRejectingSafetyStub struct{}
