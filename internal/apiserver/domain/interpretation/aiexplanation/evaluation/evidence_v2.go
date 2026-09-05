@@ -552,6 +552,7 @@ func (r ResultUnknownResolution) Validate() error {
 }
 
 type EvidenceStateTransition struct {
+	Reason         string `json:"reason,omitempty" bson:"reason,omitempty"`
 	From           *EvidenceStatus
 	To             EvidenceStatus
 	CauseCode      string
@@ -561,7 +562,7 @@ type EvidenceStateTransition struct {
 }
 
 func (t EvidenceStateTransition) Validate() error {
-	if !t.To.IsValid() || t.From != nil && !t.From.IsValid() || !policyIdentifierPattern.MatchString(t.CauseCode) ||
+	if len(t.Reason) > 1000 || !t.To.IsValid() || t.From != nil && !t.From.IsValid() || !policyIdentifierPattern.MatchString(t.CauseCode) ||
 		!evidenceEntityIDPattern.MatchString(t.Actor) || t.TransitionedAt.IsZero() || len(t.EvidenceRefs) > 32 {
 		return fmt.Errorf("AI explanation evaluation state transition is invalid")
 	}
@@ -817,10 +818,13 @@ func (e PromptEvaluationEvidenceV2) Validate() error {
 		return err
 	}
 	if len(e.HumanReviews) > 0 {
-		if e.Status != EvidenceStatusAwaitingReview && e.Status != EvidenceStatusApproved && e.Status != EvidenceStatusRejected || e.Audit.ClosedAt == nil {
+		if (e.Status != EvidenceStatusAwaitingReview && e.Status != EvidenceStatusApproved && e.Status != EvidenceStatusRejected && e.Status != EvidenceStatusCanceled) || e.Audit.ClosedAt == nil {
 			return fmt.Errorf("AI explanation candidate review requires a closed evidence inventory")
 		}
 		for _, review := range e.HumanReviews {
+			if e.Audit.CanceledAt != nil && review.ReviewedAt.After(*e.Audit.CanceledAt) {
+				return fmt.Errorf("AI explanation candidate review postdates cancellation")
+			}
 			if review.ReviewedAt.Before(*e.Audit.ClosedAt) {
 				return fmt.Errorf("AI explanation candidate review predates evidence collection closure")
 			}

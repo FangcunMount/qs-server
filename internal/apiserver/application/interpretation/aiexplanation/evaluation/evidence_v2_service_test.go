@@ -194,3 +194,23 @@ func serviceGatePolicyV2() domainevaluation.ReleaseGatePolicy {
 		ApprovalRule: "all_gates_must_pass",
 	}
 }
+
+func TestEvidenceV2CancellationUsesPageVersionAndRepositoryCAS(t *testing.T) {
+	evidence := newServiceEvidenceV2(t)
+	repository := &evidenceV2RepositoryStub{value: evidence}
+	service, err := NewEvidenceV2Service(repository)
+	require.NoError(t, err)
+	at := evidence.Audit.CreatedAt.Add(24 * time.Hour)
+	_, err = service.Cancel(context.Background(), evidence.RunID, evidence.Version()+1, "user:42", "stop", false, at)
+	require.ErrorIs(t, err, domainevaluation.ErrConflict)
+	require.Zero(t, repository.saveCalls)
+	repository.saveErr = domainevaluation.ErrConflict
+	_, err = service.Cancel(context.Background(), evidence.RunID, evidence.Version(), "user:42", "stop", false, at)
+	require.ErrorIs(t, err, domainevaluation.ErrConflict)
+	require.Equal(t, evidence.Version(), repository.expectedVersion)
+	require.NotEqual(t, domainevaluation.EvidenceStatusCanceled, repository.value.Status)
+	repository.saveErr = nil
+	updated, err := service.Cancel(context.Background(), evidence.RunID, evidence.Version(), "user:42", "stop", false, at)
+	require.NoError(t, err)
+	require.Equal(t, domainevaluation.EvidenceStatusCanceled, updated.Status)
+}

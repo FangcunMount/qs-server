@@ -523,3 +523,10 @@ func (*aiAdministrationServiceStub) PublishProfile(context.Context, aiexplanatio
 func (*aiAdministrationServiceStub) DisableProfile(context.Context, aiexplanationadministration.Actor, aiexplanationadministration.DisableProfileCommand) (*domainprofile.AIExplanationProfile, error) {
 	return nil, nil
 }
+
+func (s *aiAdministrationServiceStub) ListEvaluationsV2(context.Context, aiexplanationadministration.Actor, aiexplanationadministration.EvaluationV2ListQuery) (*appevaluation.EvidenceV2Page, error) {
+	return &appevaluation.EvidenceV2Page{Items: []appevaluation.EvidenceV2Summary{}}, nil
+}
+func (s *aiAdministrationServiceStub) CancelEvaluationV2(context.Context, aiexplanationadministration.Actor, meta.ID, aiexplanationadministration.CancelEvaluationV2Command) (*domainevaluation.PromptEvaluationEvidenceV2, error) {
+	return nil, nil
+}

@@ -9154,6 +9154,63 @@ paths:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
   /internal/v2/interpretation/ai-explanation/prompt-evaluations:
+    get:
+      tags:
+      - AI-Explanation-Administration
+      summary: 分页查询当前机构的 v2 评测 Run
+      operationId: 分页查询当前机构的v2评测Run
+      description: 分页查询当前机构的 v2 评测 Run
+      parameters:
+      - enum:
+        - requested
+        - collecting
+        - blocked
+        - awaiting_review
+        - approved
+        - rejected
+        - canceled
+        type: string
+        description: 状态
+        name: status
+        in: query
+      - type: string
+        description: 分页游标
+        name: cursor
+        in: query
+      - type: integer
+        description: 页大小，默认 20，最大 100
+        name: limit
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/handler.AIExplanationEvaluationV2PageWire'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
     post:
       tags:
       - AI-Explanation-Administration
@@ -9242,6 +9299,61 @@ paths:
                       $ref: '#/components/schemas/handler.AIExplanationEvaluationV2Wire'
         '404':
           description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '401':
+          description: 认证失败或访问令牌无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '403':
+          description: 无权访问该资源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: 服务内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/cancel:
+    post:
+      tags:
+      - AI-Explanation-Administration
+      summary: 取消未完成的 Run 或废弃待审核的 Run，保留审计证据
+      operationId: 取消未完成的Run或废弃待审核的Run保留审计证据
+      description: 取消未完成的 Run 或废弃待审核的 Run，保留审计证据
+      parameters:
+      - type: string
+        description: Run ID
+        name: run_id
+        in: path
+        required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/handler.AIExplanationCancelEvaluationV2Request'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/handler.AIExplanationEvaluationV2Wire'
+        '409':
+          description: Conflict
           content:
             application/json:
               schema:
@@ -10416,6 +10528,61 @@ components:
           type: integer
         totalFactorCode:
           type: string
+    evaluation.EvidenceStatus:
+      type: string
+      enum:
+      - requested
+      - collecting
+      - blocked
+      - awaiting_review
+      - approved
+      - rejected
+      - canceled
+      x-enum-varnames:
+      - EvidenceStatusRequested
+      - EvidenceStatusCollecting
+      - EvidenceStatusBlocked
+      - EvidenceStatusAwaitingReview
+      - EvidenceStatusApproved
+      - EvidenceStatusRejected
+      - EvidenceStatusCanceled
+    evaluation.EvidenceV2Summary:
+      type: object
+      properties:
+        accepted_candidates:
+          type: integer
+        can_cancel:
+          type: boolean
+        can_discard:
+          type: boolean
+        created_at:
+          type: string
+        last_cause:
+          type: string
+        last_reason:
+          type: string
+        organization_id:
+          type: integer
+        profile_version:
+          type: string
+        prompt_version:
+          type: string
+        release_fingerprint:
+          type: string
+        required_candidates:
+          type: integer
+        review_count:
+          type: integer
+        review_ready_candidates:
+          type: integer
+        run_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/evaluation.EvidenceStatus'
+        unresolved_result_unknown_count:
+          type: integer
+        version:
+          type: integer
     factor.Factor:
       type: object
       properties:
@@ -10673,6 +10840,20 @@ components:
           type: string
         version:
           type: integer
+    handler.AIExplanationCancelEvaluationV2Request:
+      type: object
+      required:
+      - expected_version
+      - reason
+      properties:
+        discard:
+          type: boolean
+        expected_version:
+          type: integer
+          minimum: 1
+        reason:
+          type: string
+          maxLength: 1000
     handler.AIExplanationCancellationWire:
       type: object
       properties:
@@ -11191,6 +11372,15 @@ components:
           $ref: '#/components/schemas/handler.AIExplanationProviderReceiptWire'
         raw_output:
           type: string
+    handler.AIExplanationEvaluationV2PageWire:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/evaluation.EvidenceV2Summary'
+        next_cursor:
+          type: string
     handler.AIExplanationEvaluationV2ReleaseWire:
       type: object
       properties:
@@ -11291,11 +11481,36 @@ components:
           type: integer
         status:
           type: string
+    handler.AIExplanationEvaluationV2TransitionWire:
+      type: object
+      properties:
+        actor:
+          type: string
+        cause_code:
+          type: string
+        evidence_refs:
+          type: array
+          items:
+            type: string
+        from:
+          $ref: '#/components/schemas/evaluation.EvidenceStatus'
+        reason:
+          type: string
+        to:
+          $ref: '#/components/schemas/evaluation.EvidenceStatus'
+        transitioned_at:
+          type: string
     handler.AIExplanationEvaluationV2Wire:
       type: object
       properties:
         accepted_candidates:
           type: integer
+        can_cancel:
+          type: boolean
+        can_discard:
+          type: boolean
+        canceled_at:
+          type: string
         closed_at:
           type: string
         created_at:
@@ -11354,6 +11569,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/handler.AIExplanationEvaluationV2SlotWire'
+        state_transitions:
+          type: array
+          items:
+            $ref: '#/components/schemas/handler.AIExplanationEvaluationV2TransitionWire'
         status:
           type: string
         unresolved_result_unknown_count:

@@ -576,6 +576,61 @@ definitions:
       totalFactorCode:
         type: string
     type: object
+  evaluation.EvidenceStatus:
+    enum:
+    - requested
+    - collecting
+    - blocked
+    - awaiting_review
+    - approved
+    - rejected
+    - canceled
+    type: string
+    x-enum-varnames:
+    - EvidenceStatusRequested
+    - EvidenceStatusCollecting
+    - EvidenceStatusBlocked
+    - EvidenceStatusAwaitingReview
+    - EvidenceStatusApproved
+    - EvidenceStatusRejected
+    - EvidenceStatusCanceled
+  evaluation.EvidenceV2Summary:
+    properties:
+      accepted_candidates:
+        type: integer
+      can_cancel:
+        type: boolean
+      can_discard:
+        type: boolean
+      created_at:
+        type: string
+      last_cause:
+        type: string
+      last_reason:
+        type: string
+      organization_id:
+        type: integer
+      profile_version:
+        type: string
+      prompt_version:
+        type: string
+      release_fingerprint:
+        type: string
+      required_candidates:
+        type: integer
+      review_count:
+        type: integer
+      review_ready_candidates:
+        type: integer
+      run_id:
+        type: string
+      status:
+        $ref: '#/definitions/evaluation.EvidenceStatus'
+      unresolved_result_unknown_count:
+        type: integer
+      version:
+        type: integer
+    type: object
   factor.Factor:
     properties:
       code:
@@ -832,6 +887,20 @@ definitions:
         type: string
       version:
         type: integer
+    type: object
+  handler.AIExplanationCancelEvaluationV2Request:
+    properties:
+      discard:
+        type: boolean
+      expected_version:
+        minimum: 1
+        type: integer
+      reason:
+        maxLength: 1000
+        type: string
+    required:
+    - expected_version
+    - reason
     type: object
   handler.AIExplanationCancellationWire:
     properties:
@@ -1351,6 +1420,15 @@ definitions:
       raw_output:
         type: string
     type: object
+  handler.AIExplanationEvaluationV2PageWire:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/evaluation.EvidenceV2Summary'
+        type: array
+      next_cursor:
+        type: string
+    type: object
   handler.AIExplanationEvaluationV2ReleaseWire:
     properties:
       execution_policy:
@@ -1451,10 +1529,35 @@ definitions:
       status:
         type: string
     type: object
+  handler.AIExplanationEvaluationV2TransitionWire:
+    properties:
+      actor:
+        type: string
+      cause_code:
+        type: string
+      evidence_refs:
+        items:
+          type: string
+        type: array
+      from:
+        $ref: '#/definitions/evaluation.EvidenceStatus'
+      reason:
+        type: string
+      to:
+        $ref: '#/definitions/evaluation.EvidenceStatus'
+      transitioned_at:
+        type: string
+    type: object
   handler.AIExplanationEvaluationV2Wire:
     properties:
       accepted_candidates:
         type: integer
+      can_cancel:
+        type: boolean
+      can_discard:
+        type: boolean
+      canceled_at:
+        type: string
       closed_at:
         type: string
       created_at:
@@ -1512,6 +1615,10 @@ definitions:
       slots:
         items:
           $ref: '#/definitions/handler.AIExplanationEvaluationV2SlotWire'
+        type: array
+      state_transitions:
+        items:
+          $ref: '#/definitions/handler.AIExplanationEvaluationV2TransitionWire'
         type: array
       status:
         type: string
@@ -12333,6 +12440,43 @@ paths:
       tags:
       - AI-Explanation-Administration
   /internal/v2/interpretation/ai-explanation/prompt-evaluations:
+    get:
+      parameters:
+      - description: 状态
+        enum:
+        - requested
+        - collecting
+        - blocked
+        - awaiting_review
+        - approved
+        - rejected
+        - canceled
+        in: query
+        name: status
+        type: string
+      - description: 分页游标
+        in: query
+        name: cursor
+        type: string
+      - description: 页大小，默认 20，最大 100
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationEvaluationV2PageWire'
+              type: object
+      summary: 分页查询当前机构的 v2 评测 Run
+      tags:
+      - AI-Explanation-Administration
     post:
       consumes:
       - application/json
@@ -12397,6 +12541,41 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 查询 v2 AI 解读 Prompt 评测证据摘要
+      tags:
+      - AI-Explanation-Administration
+  /internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/cancel:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Run ID
+        in: path
+        name: run_id
+        required: true
+        type: string
+      - description: 版本和操作理由
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.AIExplanationCancelEvaluationV2Request'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AIExplanationEvaluationV2Wire'
+              type: object
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 取消未完成的 Run 或废弃待审核的 Run，保留审计证据
       tags:
       - AI-Explanation-Administration
   /internal/v2/interpretation/ai-explanation/prompt-evaluations/{run_id}/candidates/{candidate_id}:

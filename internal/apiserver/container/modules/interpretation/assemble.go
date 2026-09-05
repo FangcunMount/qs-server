@@ -453,6 +453,7 @@ func (m *Module) assembleAIExplanation(deps Deps, mongoOptions mongoBase.BaseRep
 			aiexplanationadministration.WithParticipantCapacity(participantBudgetRepo, participantActiveRepo, participantCapacityPolicy, time.Now),
 			aiexplanationadministration.WithParticipantRecovery(recoveryService),
 			aiexplanationadministration.WithEvaluationV2(onlineRunner, evidenceServiceV2, evaluationCommitterV2, meta.New),
+			aiexplanationadministration.WithEvaluationV2Management(evaluationRepo, evidenceServiceV2),
 			aiexplanationadministration.WithEvaluationRechecks(nil, nil, recheckRepo),
 			aiexplanationadministration.WithEvaluationCapacity(
 				evaluationBudgetRepo, config.Evaluation.Capacity.MaxActiveRunsPerOrg,

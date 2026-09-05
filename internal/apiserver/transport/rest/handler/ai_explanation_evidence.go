@@ -41,7 +41,21 @@ type AIExplanationResultUnknownV2Request struct {
 	Reason                               string `json:"reason" binding:"required,max=1000"`
 }
 
+type AIExplanationEvaluationV2TransitionWire struct {
+	From           *domainevaluation.EvidenceStatus `json:"from"`
+	To             domainevaluation.EvidenceStatus  `json:"to"`
+	CauseCode      string                           `json:"cause_code"`
+	Reason         string                           `json:"reason,omitempty"`
+	Actor          string                           `json:"actor"`
+	TransitionedAt time.Time                        `json:"transitioned_at"`
+	EvidenceRefs   []string                         `json:"evidence_refs"`
+}
+
 type AIExplanationEvaluationV2Wire struct {
+	CanceledAt                   *time.Time                                 `json:"canceled_at,omitempty"`
+	CanCancel                    bool                                       `json:"can_cancel"`
+	CanDiscard                   bool                                       `json:"can_discard"`
+	StateTransitions             []AIExplanationEvaluationV2TransitionWire  `json:"state_transitions"`
 	SchemaVersion                string                                     `json:"schema_version"`
 	RunID                        string                                     `json:"run_id"`
 	Version                      int64                                      `json:"version"`
@@ -511,7 +525,16 @@ func evaluationV2Wire(value *domainevaluation.PromptEvaluationEvidenceV2) *AIExp
 		HumanReviews:                 make([]AIExplanationEvaluationV2HumanReviewWire, 0, len(value.HumanReviews)),
 		ResultUnknownResolutions:     make([]AIExplanationResultUnknownResolutionWire, 0, len(value.ResultUnknownResolutions)),
 	}
-	if checkpoint := value.Execution(); checkpoint != nil {
+	result.CanceledAt = value.Audit.CanceledAt
+	checkpoint := value.Execution()
+	eligible := !value.Status.IsTerminal() && value.UnresolvedResultUnknownCount == 0 && (checkpoint == nil || checkpoint.Phase == domainevaluation.AttemptExecutionPrepared)
+	result.CanDiscard = eligible && value.Status == domainevaluation.EvidenceStatusAwaitingReview
+	result.CanCancel = eligible && !result.CanDiscard
+	result.StateTransitions = make([]AIExplanationEvaluationV2TransitionWire, 0, len(value.StateTransitions))
+	for _, t := range value.StateTransitions {
+		result.StateTransitions = append(result.StateTransitions, AIExplanationEvaluationV2TransitionWire{From: t.From, To: t.To, CauseCode: t.CauseCode, Reason: t.Reason, Actor: t.Actor, TransitionedAt: t.TransitionedAt, EvidenceRefs: append([]string{}, t.EvidenceRefs...)})
+	}
+	if checkpoint != nil {
 		result.Execution = &AIExplanationEvaluationV2CheckpointWire{
 			ID: checkpoint.ID, Kind: string(checkpoint.Kind), CaseID: checkpoint.CaseID, SlotOrdinal: checkpoint.SlotOrdinal,
 			CandidateID: checkpoint.CandidateID, ExecutionOrdinal: checkpoint.ExecutionOrdinal, Phase: string(checkpoint.Phase),

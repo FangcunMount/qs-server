@@ -83,6 +83,8 @@ type EvaluationExecutionCommitter interface {
 }
 
 type Service interface {
+	ListEvaluationsV2(context.Context, Actor, EvaluationV2ListQuery) (*appevaluation.EvidenceV2Page, error)
+	CancelEvaluationV2(context.Context, Actor, meta.ID, CancelEvaluationV2Command) (*domainevaluation.PromptEvaluationEvidenceV2, error)
 	FindEvaluationCapacity(context.Context, Actor) (*EvaluationCapacity, error)
 	FindParticipantCapacity(context.Context, Actor) (*ParticipantCapacity, error)
 	RetryParticipantGeneration(context.Context, Actor, RetryParticipantGenerationCommand) (*apprecovery.Result, error)
@@ -269,6 +271,8 @@ type DisableProfileCommand struct {
 }
 
 type service struct {
+	catalogV2                     appevaluation.EvidenceV2Catalog
+	cancelV2                      EvaluationV2Canceller
 	reviews                       ReviewWorkflow
 	governance                    ProfileGovernance
 	access                        Access
