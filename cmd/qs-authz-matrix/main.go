@@ -22,7 +22,7 @@ import (
 func main() {
 	opts := apiserveroptions.NewOptions()
 	app.NewApp(
-		"Read-only production IAM AuthZ v3 matrix verifier",
+		"Read-only production IAM AuthZ v4 matrix verifier",
 		// Keep the production environment-variable prefix identical to the
 		// online process. The verifier runs in the same container configuration.
 		"qs-apiserver",

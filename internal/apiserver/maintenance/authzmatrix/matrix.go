@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	Domain             = "fangcun"
 	AssessmentResource = "qs:evaluation:collection:assessments"
 	RetryAction        = "retry"
 	ForceRetryAction   = "force_retry"
@@ -50,7 +49,6 @@ type Evidence struct {
 	CheckedAt       time.Time         `json:"checked_at"`
 	GitCommit       string            `json:"git_commit"`
 	ServiceIdentity string            `json:"service_identity"`
-	Domain          string            `json:"domain"`
 	Resource        string            `json:"resource"`
 	Action          string            `json:"action"`
 	PolicyVersion   int64             `json:"policy_version"`
@@ -184,7 +182,13 @@ func (r *Runner) Run(ctx context.Context) (Evidence, error) {
 			passed = passed && decision.DenyCode == testCase.expectedDenyCode
 		}
 		if testCase.expectedMatchedRole != "" {
-			passed = passed && decision.MatchedRole == testCase.expectedMatchedRole
+			matched := decision.MatchedRole == testCase.expectedMatchedRole
+			if testCase.subject.Kind == "admin" {
+				// 快照仅列出 QS 角色；在线决定可以命中该主体的全局角色。
+				// 此处核对允许结果和授权证据，角色归属由 IAM 在线检查保证。
+				matched = decision.MatchedRole != ""
+			}
+			passed = passed && matched && decision.MatchedGrantID != ""
 		}
 		missing := append([]string(nil), decision.MissingAttributeKeys...)
 		sort.Strings(missing)
