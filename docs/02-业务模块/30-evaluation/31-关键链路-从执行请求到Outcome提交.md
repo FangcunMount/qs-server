@@ -201,7 +201,7 @@ Worker handler 使用 `EvaluationRequestedData.ClassifyPayloadGate()` 把事件�
 snapshot 中存在 retry 候选
   -> 加载 Assessment 并校验组织/Testee 业务关系
   -> 从 Assessment 读取 ID 与 OriginType
-  -> IAM AuthZ v3 Check(resource=qs:evaluation:collection:assessments, action=retry)
+  -> IAM AuthZ v4 Check(resource=qs:evaluation:collection:assessments, action=retry)
   -> 检查 failed/manual_required 状态
   -> 事务内 AuthorizeRetry + evaluation.retry.requested Outbox
 ```
