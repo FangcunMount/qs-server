@@ -155,3 +155,28 @@ func (c matrixChecker) CheckObject(_ context.Context, request appauthz.ObjectChe
 	}
 	return decision, nil
 }
+
+// 统一授权空间中，多角色管理员可以由其任一有效角色提供授权。
+func TestRunnerChecksAdministratorMatchAgainstEffectiveRoles(t *testing.T) {
+	for _, tc := range []struct {
+		name, matchedRole, grantID string
+		wantPass                   bool
+	}{
+		{"another assigned role", "platform_admin", "grant-platform", true},
+		{"unassigned role", "unassigned_admin", "grant-unknown", false},
+		{"missing grant evidence", "platform_admin", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			checker := matrixChecker{override: map[string]appauthz.ObjectDecision{
+				"user:101/retry/adhoc": {Allowed: true, MatchedRole: tc.matchedRole, MatchedGrantID: tc.grantID, PolicyVersion: 42},
+			}}
+			runner := NewRunner(staticSubjects(testSubjects()), staticSnapshots{
+				"101": {RoleAdmin, "platform_admin"}, "102": {RoleEvaluator}, "103": {RolePlanManager}, "104": {RoleStaff},
+			}, checker, "commit", "qs-apiserver.svc")
+			evidence, err := runner.Run(context.Background())
+			if (err == nil && evidence.Passed) != tc.wantPass {
+				t.Fatalf("passed=%v err=%v", evidence.Passed, err)
+			}
+		})
+	}
+}

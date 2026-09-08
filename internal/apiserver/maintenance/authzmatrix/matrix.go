@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	Domain             = "fangcun"
 	AssessmentResource = "qs:evaluation:collection:assessments"
 	RetryAction        = "retry"
 	ForceRetryAction   = "force_retry"
@@ -50,7 +49,6 @@ type Evidence struct {
 	CheckedAt       time.Time         `json:"checked_at"`
 	GitCommit       string            `json:"git_commit"`
 	ServiceIdentity string            `json:"service_identity"`
-	Domain          string            `json:"domain"`
 	Resource        string            `json:"resource"`
 	Action          string            `json:"action"`
 	PolicyVersion   int64             `json:"policy_version"`
@@ -125,6 +123,7 @@ func (r *Runner) Run(ctx context.Context) (Evidence, error) {
 	}
 
 	versions := make(map[int64]struct{})
+	effectiveRoles := make(map[string][]string, len(subjects))
 	for _, subject := range subjects {
 		snapshot, err := r.snapshots.Load(ctx, subject.UserID)
 		if err != nil {
@@ -135,6 +134,7 @@ func (r *Runner) Run(ctx context.Context) (Evidence, error) {
 		}
 		versions[snapshot.AuthzVersion] = struct{}{}
 		roles := snapshot.EffectiveRoleNames()
+		effectiveRoles[subject.UserID] = roles
 		sort.Strings(roles)
 		evidence.Subjects = append(evidence.Subjects, SubjectEvidence{
 			Kind: subject.Kind, ExpectedRole: subject.ExpectedRole,
@@ -184,7 +184,12 @@ func (r *Runner) Run(ctx context.Context) (Evidence, error) {
 			passed = passed && decision.DenyCode == testCase.expectedDenyCode
 		}
 		if testCase.expectedMatchedRole != "" {
-			passed = passed && decision.MatchedRole == testCase.expectedMatchedRole
+			matched := decision.MatchedRole == testCase.expectedMatchedRole
+			if testCase.subject.Kind == "admin" {
+				// 管理员可能同时拥有多个角色；统一空间不保证首先命中 QS 角色。
+				matched = contains(effectiveRoles[testCase.subject.UserID], decision.MatchedRole)
+			}
+			passed = passed && matched && decision.MatchedGrantID != ""
 		}
 		missing := append([]string(nil), decision.MissingAttributeKeys...)
 		sort.Strings(missing)
