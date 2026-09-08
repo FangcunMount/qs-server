@@ -26,12 +26,12 @@ type Permission struct {
 // Snapshot 即 CurrentAuthzSnapshot：IAM GetAuthorizationSnapshot 在单次请求内的授权投影。
 // 动作真值以 IAM 为准；不在 QS 内自造与 IAM 冲突的角色真值。
 type Snapshot struct {
-	DirectRoles         []string
-	EffectiveRoles      []string
-	Permissions         []Permission
-	AuthzVersion        int64
-	AuthorizationDomain string
-	IAMAppName          string
+	DirectRoles    []string
+	EffectiveRoles []string
+	Permissions    []Permission
+	AuthzVersion   int64
+
+	IAMAppName string
 }
 
 // WithSnapshot 将快照写入 context（供 application 层使用）。

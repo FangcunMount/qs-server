@@ -3,11 +3,12 @@ package configcontract
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 
-	authnv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/authn/v2"
-	sdk "github.com/FangcunMount/iam/v4/pkg/sdk"
-	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
+	authnv3 "github.com/FangcunMount/iam/v5/api/grpc/iam/authn/v3"
+	sdk "github.com/FangcunMount/iam/v5/pkg/sdk"
+	auth "github.com/FangcunMount/iam/v5/pkg/sdk/auth/verifier"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	collectionoptions "github.com/FangcunMount/qs-server/internal/collection-server/options"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
@@ -15,7 +16,7 @@ import (
 
 type noNetworkVerifyClient struct{}
 
-func (noNetworkVerifyClient) VerifyToken(context.Context, *authnv2.VerifyTokenRequest) (*authnv2.VerifyTokenResponse, error) {
+func (noNetworkVerifyClient) VerifyToken(context.Context, *authnv3.VerifyTokenRequest) (*authnv3.VerifyTokenResponse, error) {
 	return nil, nil
 }
 
@@ -66,6 +67,13 @@ func TestVersionedIAMConfigsConstructV320TokenVerifier(t *testing.T) {
 			t.Parallel()
 
 			iamOpts := tt.load(t)
+			expectedAudience := "qs-api"
+			if strings.HasPrefix(tt.name, "collection-server") {
+				expectedAudience = "collection-api"
+			}
+			if len(iamOpts.JWT.Audience) != 1 || iamOpts.JWT.Audience[0] != expectedAudience {
+				t.Fatalf("recipient audience = %v, want %s", iamOpts.JWT.Audience, expectedAudience)
+			}
 			if iamOpts == nil || iamOpts.JWT == nil {
 				t.Fatal("IAM JWT config must be present")
 			}

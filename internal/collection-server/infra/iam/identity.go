@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	identityv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/identity/v2"
-	"github.com/FangcunMount/iam/v4/pkg/sdk/identity"
+	identityv2 "github.com/FangcunMount/iam/v5/api/grpc/iam/identity/v2"
+	"github.com/FangcunMount/iam/v5/pkg/sdk/identity"
 )
 
 // IdentityService 身份服务封装

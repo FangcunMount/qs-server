@@ -17,9 +17,9 @@ func TestResolveOrgScopeMiddlewareWritesQSOrgScope(t *testing.T) {
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set("user_claims", &pkgmiddleware.UserClaims{
-			UserID:       "42",
-			TenantDomain: "fangcun",
-			OrgID:        "99",
+			UserID: "42",
+
+			OrgID: "99",
 		})
 		c.Next()
 	})

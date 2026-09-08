@@ -9,7 +9,7 @@ import (
 	"time"
 
 	baseerrors "github.com/FangcunMount/component-base/pkg/errors"
-	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
+	auth "github.com/FangcunMount/iam/v5/pkg/sdk/auth/verifier"
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
@@ -198,9 +198,9 @@ func (c *Container) retryGovernanceActionHandlers() map[string]systemgovApp.Acti
 		}{{"evaluation.retry", retrygovernance.AttemptOriginManual}, {"evaluation.force_retry", retrygovernance.AttemptOriginForce}} {
 			spec := spec
 			handlers[spec.id] = func(ctx context.Context, orgID int64, requestID string, input map[string]interface{}) (map[string]interface{}, error) {
-				snapshot, ok := appauthz.FromContext(ctx)
+				_, ok := appauthz.FromContext(ctx)
 				grantingUserID := actorctx.GrantingUserID(ctx)
-				if !ok || snapshot.AuthorizationDomain == "" || grantingUserID == 0 {
+				if !ok || grantingUserID == 0 {
 					return nil, baseerrors.WithCode(code.ErrModuleInitializationFailed, "authorization subject and domain are required")
 				}
 				request, err := decodeRetryActionInput(input)
@@ -213,8 +213,8 @@ func (c *Container) retryGovernanceActionHandlers() map[string]systemgovApp.Acti
 				}
 				run, err := c.EvaluationModule.GovernedRetry.Authorize(ctx, evaluationOperator.Actor{OrgID: orgID, OperatorUserID: int64(actorctx.GrantingUserID(ctx))}, evaluationOperator.GovernedRetryCommand{
 					AssessmentID: assessmentID, ExpectedAttempt: request.ExpectedAttempt, Origin: spec.origin, RequestID: requestID, Reason: request.Reason,
-					AuthorizationSubject: appauthz.SubjectKey(strconv.FormatUint(grantingUserID, 10)), AuthorizationDomain: snapshot.AuthorizationDomain,
-					AuthorizationAction: retryAuthorizationAction(spec.id),
+					AuthorizationSubject: appauthz.SubjectKey(strconv.FormatUint(grantingUserID, 10)),
+					AuthorizationAction:  retryAuthorizationAction(spec.id),
 				})
 				if err != nil {
 					return nil, normalizeGovernedRetryError(err)

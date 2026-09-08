@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	DefaultIAMAuthzSyncTopic = "iam.authz.version"
+	DefaultIAMAuthzSyncTopic = "iam.authz.version.v2"
 )
 
 // IAMAuthzSyncOptions IAM 授权版本同步订阅配置。

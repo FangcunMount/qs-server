@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	authzv3 "github.com/FangcunMount/iam/v4/api/grpc/iam/authz/v3"
-	identityv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/identity/v2"
-	"github.com/FangcunMount/iam/v4/pkg/sdk/authz"
-	"github.com/FangcunMount/iam/v4/pkg/sdk/identity"
+	authzv4 "github.com/FangcunMount/iam/v5/api/grpc/iam/authz/v4"
+	identityv2 "github.com/FangcunMount/iam/v5/api/grpc/iam/identity/v2"
+	"github.com/FangcunMount/iam/v5/pkg/sdk/authz"
+	"github.com/FangcunMount/iam/v5/pkg/sdk/identity"
 )
 
 const (
@@ -115,8 +115,8 @@ func (p *Provisioner) ensureSubject(ctx context.Context, nickname, role string) 
 		return evidence, err
 	}
 	if !equalRoles(snapshot.GetDirectRoles(), []string{role}) {
-		resp, authErr := p.authz.ReplaceManagedAssignments(ctx, &authzv3.ReplaceManagedAssignmentsRequest{
-			Subject: "user:" + userID, Domain: Domain, RoleNames: []string{role}, ChangedBy: ProvisionActor,
+		resp, authErr := p.authz.ReplaceManagedAssignments(ctx, &authzv4.ReplaceManagedAssignmentsRequest{
+			Subject: "user:" + userID, RoleNames: []string{role}, ChangedBy: ProvisionActor,
 			Reason: "stable AuthZ v3 synthetic Check evidence",
 		})
 		if authErr != nil {
@@ -174,9 +174,9 @@ func createdIsolatedUserID(user *identityv2.User, nickname string) (string, erro
 	return strconv.FormatUint(parsed, 10), nil
 }
 
-func (p *Provisioner) getSnapshot(ctx context.Context, userID string) (*authzv3.GetAuthorizationSnapshotResponse, error) {
-	resp, err := p.authz.GetAuthorizationSnapshot(ctx, &authzv3.GetAuthorizationSnapshotRequest{
-		Subject: "user:" + userID, Domain: Domain, AppName: "qs",
+func (p *Provisioner) getSnapshot(ctx context.Context, userID string) (*authzv4.GetAuthorizationSnapshotResponse, error) {
+	resp, err := p.authz.GetAuthorizationSnapshot(ctx, &authzv4.GetAuthorizationSnapshotRequest{
+		Subject: "user:" + userID, AppName: "qs",
 	})
 	if err != nil {
 		return nil, fmt.Errorf("load isolated matrix snapshot: %w", err)

@@ -12,7 +12,7 @@ func TestSnapshotAuthorizerRequiresActionCapability(t *testing.T) {
 	t.Parallel()
 	actor := ActorContext{
 		Principal: securityplane.Principal{Kind: securityplane.PrincipalKindUser},
-		Scope:     securityplane.NewOrgScope("tenant", 1, true, "tenant"),
+		Scope:     securityplane.NewOrgScope(1, true),
 	}
 	ctx := appauthz.WithSnapshot(context.Background(), &appauthz.Snapshot{
 		Permissions: []appauthz.Permission{{Resource: "qs:scale:collection:scales", Action: "update", Mode: appauthz.AuthorizationModeUnconditional}},

@@ -9,9 +9,9 @@ import (
 	"time"
 
 	base "github.com/FangcunMount/component-base/pkg/grpc/interceptors"
-	authnv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/authn/v2"
-	authzv3 "github.com/FangcunMount/iam/v4/api/grpc/iam/authz/v3"
-	identityv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/identity/v2"
+	authnv3 "github.com/FangcunMount/iam/v5/api/grpc/iam/authn/v3"
+	authzv4 "github.com/FangcunMount/iam/v5/api/grpc/iam/authz/v4"
+	identityv2 "github.com/FangcunMount/iam/v5/api/grpc/iam/identity/v2"
 	module "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/iam"
 	collection "github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
@@ -25,16 +25,16 @@ import (
 )
 
 type startupIAM struct {
-	authnv2.UnimplementedAuthServiceServer
-	authzv3.UnimplementedAuthorizationServiceServer
+	authnv3.UnimplementedAuthServiceServer
+	authzv4.UnimplementedAuthorizationServiceServer
 	identityv2.UnimplementedProfileLinkQueryServer
 }
 
-func (*startupIAM) VerifyToken(context.Context, *authnv2.VerifyTokenRequest) (*authnv2.VerifyTokenResponse, error) {
+func (*startupIAM) VerifyToken(context.Context, *authnv3.VerifyTokenRequest) (*authnv3.VerifyTokenResponse, error) {
 	return nil, status.Error(codes.InvalidArgument, "empty token")
 }
-func (*startupIAM) GetAuthorizationSnapshot(context.Context, *authzv3.GetAuthorizationSnapshotRequest) (*authzv3.GetAuthorizationSnapshotResponse, error) {
-	return &authzv3.GetAuthorizationSnapshotResponse{PolicyVersion: 1}, nil
+func (*startupIAM) GetAuthorizationSnapshot(context.Context, *authzv4.GetAuthorizationSnapshotRequest) (*authzv4.GetAuthorizationSnapshotResponse, error) {
+	return &authzv4.GetAuthorizationSnapshotResponse{PolicyVersion: 1}, nil
 }
 func (*startupIAM) ListProfiles(context.Context, *identityv2.ListProfilesRequest) (*identityv2.ListProfilesResponse, error) {
 	return &identityv2.ListProfilesResponse{}, nil
@@ -45,7 +45,7 @@ func TestRequiredRuntimesUseCertificateAndRealRPCWithoutBearer(t *testing.T) {
 	pair := ca.Issue(t, "server.test", false)
 	roots := x509.NewCertPool()
 	roots.AddCert(ca.Cert)
-	methods := []string{"/iam.authn.v2.AuthService/VerifyToken", "/iam.authz.v3.AuthorizationService/GetAuthorizationSnapshot", "/iam.identity.v2.ProfileLinkQuery/ListProfiles"}
+	methods := []string{"/iam.authn.v3.AuthService/VerifyToken", "/iam.authz.v4.AuthorizationService/GetAuthorizationSnapshot", "/iam.identity.v2.ProfileLinkQuery/ListProfiles"}
 	acl := base.NewServiceACL(&base.ACLConfig{DefaultPolicy: "deny", Services: []*base.ServicePermissions{{ServiceName: "qs-apiserver.svc", Enabled: true, AllowedMethods: methods}, {ServiceName: "qs-collection-server.svc", Enabled: true, AllowedMethods: methods}}})
 	calls := make(chan string, 20)
 	srv := grpc.NewServer(grpc.Creds(credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{pair.Certificate}, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: roots})), grpc.ChainUnaryInterceptor(base.MTLSInterceptor(), base.ACLInterceptor(acl), func(ctx context.Context, r interface{}, info *grpc.UnaryServerInfo, h grpc.UnaryHandler) (interface{}, error) {
@@ -57,8 +57,8 @@ func TestRequiredRuntimesUseCertificateAndRealRPCWithoutBearer(t *testing.T) {
 		return h(ctx, r)
 	}))
 	fixture := &startupIAM{}
-	authnv2.RegisterAuthServiceServer(srv, fixture)
-	authzv3.RegisterAuthorizationServiceServer(srv, fixture)
+	authnv3.RegisterAuthServiceServer(srv, fixture)
+	authzv4.RegisterAuthorizationServiceServer(srv, fixture)
 	identityv2.RegisterProfileLinkQueryServer(srv, fixture)
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)

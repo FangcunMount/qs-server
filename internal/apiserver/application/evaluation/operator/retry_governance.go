@@ -25,8 +25,8 @@ type GovernedRetryCommand struct {
 	RequestID            string
 	Reason               string
 	AuthorizationSubject string
-	AuthorizationDomain  string
-	AuthorizationAction  string
+
+	AuthorizationAction string
 }
 
 type EventStager interface {
@@ -64,7 +64,7 @@ func (s *governedRetryService) Authorize(ctx context.Context, actor Actor, comma
 		return nil, fmt.Errorf("evaluation retry governance is not configured")
 	}
 	if command.AssessmentID == 0 || command.ExpectedAttempt < 0 || command.RequestID == "" || command.Reason == "" ||
-		command.AuthorizationSubject == "" || command.AuthorizationDomain == "" ||
+		command.AuthorizationSubject == "" ||
 		(command.AuthorizationAction != "retry" && command.AuthorizationAction != "force_retry") {
 		return nil, fmt.Errorf("evaluation retry governance input is invalid")
 	}
@@ -76,7 +76,7 @@ func (s *governedRetryService) Authorize(ctx context.Context, actor Actor, comma
 		return nil, evalerrors.ModuleNotConfigured("IAM object authorization checker is not configured")
 	}
 	decision, err := s.objectAuthz.CheckObject(ctx, appauthz.ObjectCheckRequest{
-		Subject: command.AuthorizationSubject, Domain: command.AuthorizationDomain,
+		Subject:  command.AuthorizationSubject,
 		Resource: appauthz.AssessmentResource, Action: command.AuthorizationAction,
 		ObjectID: strconv.FormatUint(command.AssessmentID, 10),
 		Attributes: map[string]appauthz.ObjectAttribute{

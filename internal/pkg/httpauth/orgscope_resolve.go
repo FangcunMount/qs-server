@@ -43,6 +43,5 @@ func ResolveOrgScopeMiddleware(resolve orgscope.ResolveFunc) gin.HandlerFunc {
 // ApplyResolvedOrgScope writes a resolved QS business org scope into gin context.
 func ApplyResolvedOrgScope(c *gin.Context, claims *pkgmiddleware.UserClaims, orgID uint64) {
 	c.Set(OrgIDKey, orgID)
-	tenantDomain := tenantDomainFromClaims(claims)
-	setSecurityProjection(c, claims, tenantDomain, orgID, true)
+	setSecurityProjection(c, claims, orgID, true)
 }

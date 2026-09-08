@@ -10,19 +10,17 @@ func TestResolveOrgIDFromClaimsPrefersOrgClaim(t *testing.T) {
 	t.Parallel()
 
 	orgID, ok := resolveOrgIDFromClaims(&pkgmiddleware.UserClaims{
-		TenantDomain: "fangcun",
-		OrgID:        "42",
+
+		OrgID: "42",
 	})
 	if !ok || orgID != 42 {
 		t.Fatalf("org = (%d, %v), want (42, true)", orgID, ok)
 	}
 }
 
-func TestTenantDomainFromClaimsDoesNotUseOrgID(t *testing.T) {
-	t.Parallel()
-
-	domain := tenantDomainFromClaims(&pkgmiddleware.UserClaims{OrgID: "1"})
-	if domain != "" {
-		t.Fatalf("tenant domain = %q, want empty", domain)
+func TestMissingOrgClaimDoesNotInferOrganization(t *testing.T) {
+	id, ok := resolveOrgIDFromClaims(&pkgmiddleware.UserClaims{UserID: "1"})
+	if id != 0 || ok {
+		t.Fatalf("unexpected organization: %d %v", id, ok)
 	}
 }

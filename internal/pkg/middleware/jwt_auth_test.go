@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	authnv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/authn/v2"
-	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
+	authnv3 "github.com/FangcunMount/iam/v5/api/grpc/iam/authn/v3"
+	auth "github.com/FangcunMount/iam/v5/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
 )
 
@@ -16,16 +16,16 @@ func TestBuildUserClaimsIncludesSessionAndMetadata(t *testing.T) {
 		Claims: &auth.TokenClaims{
 			UserID:          "1001",
 			LoginIdentityID: "2001",
-			TenantDomain:    "fangcun",
-			OrgID:           "3001",
-			SessionID:       "session-1",
-			TokenID:         "token-1",
-			Roles:           []string{"admin"},
-			AMR:             []string{"pwd"},
+
+			OrgID:     "3001",
+			SessionID: "session-1",
+			TokenID:   "token-1",
+			Roles:     []string{"admin"},
+			AMR:       []string{"pwd"},
 		},
 		Metadata: &auth.VerifyMetadata{
-			TokenType: authnv2.TokenType_TOKEN_TYPE_ACCESS,
-			Status:    authnv2.TokenStatus_TOKEN_STATUS_VALID,
+			TokenType: authnv3.TokenType_TOKEN_TYPE_ACCESS,
+			Status:    authnv3.TokenStatus_TOKEN_STATUS_VALID,
 			IssuedAt:  now,
 			ExpiresAt: now.Add(time.Hour),
 		},
@@ -42,9 +42,6 @@ func TestBuildUserClaimsIncludesSessionAndMetadata(t *testing.T) {
 	if claims.AccountID != "2001" {
 		t.Fatalf("unexpected account id: %s", claims.AccountID)
 	}
-	if claims.TenantDomain != "fangcun" {
-		t.Fatalf("unexpected tenant domain: %s", claims.TenantDomain)
-	}
 	if claims.OrgID != "3001" {
 		t.Fatalf("unexpected org id: %s", claims.OrgID)
 	}
@@ -60,7 +57,7 @@ func TestBuildUserClaimsIncludesSessionAndMetadata(t *testing.T) {
 	if claims.Metadata == nil {
 		t.Fatal("expected metadata")
 	}
-	if claims.Metadata.Status != authnv2.TokenStatus_TOKEN_STATUS_VALID {
+	if claims.Metadata.Status != authnv3.TokenStatus_TOKEN_STATUS_VALID {
 		t.Fatalf("unexpected metadata status: %v", claims.Metadata.Status)
 	}
 }
@@ -87,9 +84,6 @@ func TestBuildUserClaimsFallsBackToExtraIDs(t *testing.T) {
 	if claims.UserID != "4001" {
 		t.Fatalf("unexpected fallback user id: %s", claims.UserID)
 	}
-	if claims.TenantDomain != "fangcun" {
-		t.Fatalf("unexpected fallback tenant domain: %s", claims.TenantDomain)
-	}
 	if claims.OrgID != "5001" {
 		t.Fatalf("unexpected fallback org id: %s", claims.OrgID)
 	}
@@ -103,22 +97,22 @@ func TestUserClaimsMapToSecurityPlaneOrgScope(t *testing.T) {
 		Claims: &auth.TokenClaims{
 			UserID:          "1001",
 			LoginIdentityID: "2001",
-			TenantDomain:    "fangcun",
-			OrgID:           "3001",
-			SessionID:       "session-1",
-			TokenID:         "token-1",
-			Roles:           []string{"qs:operator"},
-			AMR:             []string{"pwd"},
+
+			OrgID:     "3001",
+			SessionID: "session-1",
+			TokenID:   "token-1",
+			Roles:     []string{"qs:operator"},
+			AMR:       []string{"pwd"},
 		},
 	}
 
 	claims := buildUserClaims(result)
-	scope := securityplane.NewOrgScope(claims.TenantDomain, 3001, true, "")
+	scope := securityplane.NewOrgScope(3001, true)
 
 	if claims.UserID != "1001" || claims.AccountID != "2001" {
 		t.Fatalf("unexpected claims: %#v", claims)
 	}
-	if !scope.HasOrgID || scope.OrgID != 3001 || scope.TenantDomain != "fangcun" {
+	if !scope.HasOrgID || scope.OrgID != 3001 {
 		t.Fatalf("org scope = %#v, want fangcun org 3001", scope)
 	}
 }
@@ -126,7 +120,7 @@ func TestUserClaimsMapToSecurityPlaneOrgScope(t *testing.T) {
 func TestNormalizeVerifyOptionsPreservesForceRemoteAndForcesMetadata(t *testing.T) {
 	opts := normalizeVerifyOptions(&auth.VerifyOptions{
 		ForceRemote:       true,
-		AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType(3)},
+		AllowedTokenTypes: []authnv3.TokenType{authnv3.TokenType(3)},
 	})
 	if !opts.ForceRemote {
 		t.Fatal("expected ForceRemote to be preserved")
@@ -134,7 +128,7 @@ func TestNormalizeVerifyOptionsPreservesForceRemoteAndForcesMetadata(t *testing.
 	if !opts.IncludeMetadata {
 		t.Fatal("expected IncludeMetadata to be forced on")
 	}
-	if len(opts.AllowedTokenTypes) != 1 || opts.AllowedTokenTypes[0] != authnv2.TokenType_TOKEN_TYPE_ACCESS {
+	if len(opts.AllowedTokenTypes) != 1 || opts.AllowedTokenTypes[0] != authnv3.TokenType_TOKEN_TYPE_ACCESS {
 		t.Fatalf("AllowedTokenTypes = %v, want access only", opts.AllowedTokenTypes)
 	}
 }

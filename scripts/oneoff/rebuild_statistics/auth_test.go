@@ -57,7 +57,7 @@ func TestIAMTokenSourceLogsInProactivelyAndReusesToken(t *testing.T) {
 	freshToken := testJWT(t, time.Now().Add(time.Hour))
 	var loginRequests atomic.Int64
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v2/authn/login" {
+		if r.URL.Path != "/api/v3/authn/login" {
 			http.NotFound(w, r)
 			return
 		}
@@ -68,7 +68,6 @@ func TestIAMTokenSourceLogsInProactivelyAndReusesToken(t *testing.T) {
 			MethodPayload struct {
 				Username string `json:"username"`
 				Password string `json:"password"`
-				TenantID uint64 `json:"tenant_id"`
 			} `json:"method_payload"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -76,8 +75,7 @@ func TestIAMTokenSourceLogsInProactivelyAndReusesToken(t *testing.T) {
 			return
 		}
 		if request.AuthMethod != "password" || request.DeviceID != statisticsDeviceID ||
-			request.MethodPayload.Username != "system@example.com" || request.MethodPayload.Password != "iam-password" ||
-			request.MethodPayload.TenantID != 7 {
+			request.MethodPayload.Username != "system@example.com" || request.MethodPayload.Password != "iam-password" {
 			t.Errorf("unexpected IAM login request: %+v", request)
 		}
 		writeIAMLoginResponse(t, w, freshToken)
@@ -86,7 +84,7 @@ func TestIAMTokenSourceLogsInProactivelyAndReusesToken(t *testing.T) {
 
 	var output bytes.Buffer
 	source, err := newBearerTokenSource(options{
-		IAMLoginURL: server.URL + "/api/v2/authn/login", IAMUsername: "system@example.com",
+		IAMLoginURL: server.URL + "/api/v3/authn/login", IAMUsername: "system@example.com",
 		IAMPasswordFile: passwordFile, IAMTenantID: 7, IAMRefreshSkew: 2 * time.Minute,
 	}, &output)
 	if err != nil {
@@ -147,7 +145,7 @@ func TestExecuteRunRefreshesOnceAfterUnauthorized(t *testing.T) {
 	var statisticsRequests atomic.Int64
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/api/v2/authn/login":
+		case "/api/v3/authn/login":
 			loginRequests.Add(1)
 			writeIAMLoginResponse(t, w, freshToken)
 		case "/internal/v2/statistics/runs":
@@ -210,7 +208,7 @@ func TestRunUsesIAMAuthenticationWithoutStaticToken(t *testing.T) {
 	var statisticsRequests atomic.Int64
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/api/v2/authn/login":
+		case "/api/v3/authn/login":
 			loginRequests.Add(1)
 			writeIAMLoginResponse(t, w, freshToken)
 		case "/internal/v2/statistics/runs":
@@ -227,7 +225,7 @@ func TestRunUsesIAMAuthenticationWithoutStaticToken(t *testing.T) {
 
 	err := run([]string{
 		"--base-url", server.URL,
-		"--iam-login-url", server.URL + "/api/v2/authn/login",
+		"--iam-login-url", server.URL + "/api/v3/authn/login",
 		"--iam-username", "system@example.com",
 		"--iam-password-file", passwordFile,
 		"--org-ids", "1",
@@ -249,7 +247,7 @@ func TestExecuteRunDoesNotRefreshAfterForbidden(t *testing.T) {
 	var loginRequests atomic.Int64
 	var statisticsRequests atomic.Int64
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v2/authn/login" {
+		if r.URL.Path == "/api/v3/authn/login" {
 			loginRequests.Add(1)
 			writeIAMLoginResponse(t, w, testJWT(t, time.Now().Add(2*time.Hour)))
 			return
@@ -287,7 +285,7 @@ func TestAuthenticationConfigurationSupportsIAMOrStaticToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := (options{
-		IAMLoginURL: "https://iam.example.com/api/v2/authn/login", IAMUsername: "system@example.com",
+		IAMLoginURL: "https://iam.example.com/api/v3/authn/login", IAMUsername: "system@example.com",
 		IAMPasswordFile: "/secure/iam-password", IAMRefreshSkew: time.Minute,
 	}).validateAuthentication(); err != nil {
 		t.Fatal(err)
@@ -302,8 +300,8 @@ func TestAuthenticationConfigurationSupportsIAMOrStaticToken(t *testing.T) {
 
 func TestIAMLoginClientBaseURL(t *testing.T) {
 	for input, want := range map[string]string{
-		"https://iam.example.com/api/v2/authn/login":        "https://iam.example.com",
-		"https://iam.example.com/prefix/api/v2/authn/login": "https://iam.example.com/prefix",
+		"https://iam.example.com/api/v3/authn/login":        "https://iam.example.com",
+		"https://iam.example.com/prefix/api/v3/authn/login": "https://iam.example.com/prefix",
 		"https://iam.example.com/api/v2":                    "https://iam.example.com",
 		"https://iam.example.com":                           "https://iam.example.com",
 	} {

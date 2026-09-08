@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	sdk "github.com/FangcunMount/iam/v4/pkg/sdk"
-	sdkconfig "github.com/FangcunMount/iam/v4/pkg/sdk/config"
+	sdk "github.com/FangcunMount/iam/v5/pkg/sdk"
+	sdkconfig "github.com/FangcunMount/iam/v5/pkg/sdk/config"
 )
 
 // IAMOptions 简化的 IAM 配置（避免导入循环）
@@ -23,9 +23,8 @@ type IAMOptions struct {
 	UserCache        *CacheOptions
 	ProfileLinkCache *CacheOptions
 
-	AuthzAppName        string
-	AuthzCacheTTL       time.Duration
-	AuthzDomainOverride string
+	AuthzAppName  string
+	AuthzCacheTTL time.Duration
 }
 
 type GRPCOptions struct {

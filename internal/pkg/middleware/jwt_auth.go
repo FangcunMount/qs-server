@@ -10,10 +10,10 @@ import (
 	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	authnv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/authn/v2"
+	authnv3 "github.com/FangcunMount/iam/v5/api/grpc/iam/authn/v3"
 	"github.com/gin-gonic/gin"
 
-	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
+	auth "github.com/FangcunMount/iam/v5/pkg/sdk/auth/verifier"
 )
 
 // UserClaimsContextKey 用户声明上下文键
@@ -21,27 +21,27 @@ type UserClaimsContextKey struct{}
 
 // UserClaims 简化的用户声明
 type UserClaims struct {
-	UserID       string
-	AccountID    string
-	TenantDomain string // IAM 授权域（JWT tenant_id，如 fangcun / platform）
-	OrgID        string // IAM 业务组织 ID（JWT org_id 透传）
-	SessionID    string
-	TokenID      string
-	AMR          []string
-	Metadata     *auth.VerifyMetadata
+	UserID    string
+	AccountID string
+	// IAM 授权域（JWT tenant_id，如 fangcun / platform）
+	OrgID     string // IAM 业务组织 ID（JWT org_id 透传）
+	SessionID string
+	TokenID   string
+	AMR       []string
+	Metadata  *auth.VerifyMetadata
 }
 
 func normalizeVerifyOptions(opts *auth.VerifyOptions) *auth.VerifyOptions {
 	if opts == nil {
 		return &auth.VerifyOptions{
 			IncludeMetadata:   true,
-			AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType_TOKEN_TYPE_ACCESS},
+			AllowedTokenTypes: []authnv3.TokenType{authnv3.TokenType_TOKEN_TYPE_ACCESS},
 		}
 	}
 	merged := *opts
 	merged.IncludeMetadata = true
 	// HTTP 用户入口的 Token Profile 固定为 Access Token，调用方不得放宽为 Service Token。
-	merged.AllowedTokenTypes = []authnv2.TokenType{authnv2.TokenType_TOKEN_TYPE_ACCESS}
+	merged.AllowedTokenTypes = []authnv3.TokenType{authnv3.TokenType_TOKEN_TYPE_ACCESS}
 	return &merged
 }
 
@@ -183,25 +183,6 @@ func GetUserID(c *gin.Context) string {
 }
 
 // resolveTenantDomain 优先使用 SDK 授权域，缺失时从 Extra 的 tenant_id 兼容。
-func resolveTenantDomain(tokenClaims *auth.TokenClaims) string {
-	if tokenClaims == nil {
-		return ""
-	}
-	if domain := strings.TrimSpace(tokenClaims.AuthorizationDomain()); domain != "" {
-		return domain
-	}
-	if len(tokenClaims.Extra) == 0 {
-		return ""
-	}
-	for _, key := range []string{"tenant_id", "tenant_domain", "tid"} {
-		if v, ok := tokenClaims.Extra[key]; ok {
-			if s := claimValueToString(v); s != "" {
-				return s
-			}
-		}
-	}
-	return ""
-}
 
 // resolveOrgIDClaim 读取 JWT org_id；不从 tenant_id / org_id 混用 Extra 中的 tenant 键。
 func resolveOrgIDClaim(tokenClaims *auth.TokenClaims) string {
@@ -230,17 +211,15 @@ func logJWTClaimMapping(c *gin.Context, raw *auth.TokenClaims, mapped *UserClaim
 		logger.L(c.Request.Context()).Debugw("jwt claims mapped is nil", "path", c.Request.URL.Path, "method", c.Request.Method)
 		return
 	}
-	if mapped.TenantDomain != "" && mapped.UserID != "" {
-		logger.L(c.Request.Context()).Debugw("jwt claims mapped with tenant_domain and user_id", "path", c.Request.URL.Path, "method", c.Request.Method)
+	if mapped.UserID != "" {
+		logger.L(c.Request.Context()).Debugw("jwt claims mapped with user_id", "path", c.Request.URL.Path, "method", c.Request.Method)
 		return
 	}
 	keys := sortedExtraKeys(raw)
-	logger.L(c.Request.Context()).Debugw("jwt claims mapped with missing tenant_domain or user_id",
+	logger.L(c.Request.Context()).Debugw("jwt claims mapped with missing user_id",
 		"path", c.Request.URL.Path,
 		"method", c.Request.Method,
-		"mapped_tenant_empty", mapped.TenantDomain == "",
 		"mapped_user_empty", mapped.UserID == "",
-		"raw_tenant_empty", strings.TrimSpace(raw.AuthorizationDomain()) == "",
 		"raw_user_empty", strings.TrimSpace(raw.UserID) == "",
 		"extra_keys", keys,
 	)
@@ -263,16 +242,15 @@ func buildUserClaims(result *auth.VerifyResult) *UserClaims {
 		return nil
 	}
 	tokenClaims := result.Claims
-	tenantDomain := resolveTenantDomain(tokenClaims)
 	return &UserClaims{
-		UserID:       resolveUserID(tokenClaims.UserID, tokenClaims.Extra),
-		AccountID:    resolveAccountID(tokenClaims.LoginIdentityID, tokenClaims.Extra),
-		TenantDomain: tenantDomain,
-		OrgID:        resolveOrgIDClaim(tokenClaims),
-		SessionID:    tokenClaims.SessionID,
-		TokenID:      tokenClaims.TokenID,
-		AMR:          tokenClaims.AMR,
-		Metadata:     result.Metadata,
+		UserID:    resolveUserID(tokenClaims.UserID, tokenClaims.Extra),
+		AccountID: resolveAccountID(tokenClaims.LoginIdentityID, tokenClaims.Extra),
+
+		OrgID:     resolveOrgIDClaim(tokenClaims),
+		SessionID: tokenClaims.SessionID,
+		TokenID:   tokenClaims.TokenID,
+		AMR:       tokenClaims.AMR,
+		Metadata:  result.Metadata,
 	}
 }
 

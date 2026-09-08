@@ -602,7 +602,7 @@ iam:
     enabled: true                       # 是否启用 authz 同步: true
     provider: "nsq"                     # 消息队列类型: nsq 或 rabbitmq (生产环境建议使用 nsq)
     nsq-lookupd-addr: "nsqlookupd:4161" # NSQ Lookupd 地址: nsqlookupd:4161 (用于服务发现)
-    topic: "iam.authz.version"          # 主题: iam.authz.version
+    topic: "iam.authz.version.v2"          # 主题: iam.authz.version.v2
     channel-prefix: "qs-authz-sync"     # 频道前缀: qs-authz-sync
 
   # gRPC 连接配置
@@ -627,7 +627,7 @@ iam:
     audience: ["qs-api"]                               # 允许的受众（QS API 标识）
     algorithms: ["RS256"]                              # 固定 IAM Token Profile 签名算法
     clock-skew: 60s                                    # 时钟偏移容忍度
-    required-claims: ["sub", "exp", "user_id", "tenant_id"] # 必需的身份与生命周期 Claims
+    required-claims: ["sub", "exp", "user_id"] # 必需的身份与生命周期 Claims
     force-remote-verification: false                    # 生产环境默认本地验证，避免远程验证性能损耗
 
   # JWKS 配置（JWT 公钥管理）

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	identityv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/identity/v2"
+	identityv2 "github.com/FangcunMount/iam/v5/api/grpc/iam/identity/v2"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -126,7 +126,7 @@ func (r *authzSnapshotReader) LoadAuthzSnapshot(ctx context.Context, orgID, user
 	if r == nil || r.loader == nil {
 		return nil, fmt.Errorf("iam authorization snapshot loader is not available")
 	}
-	return r.loader.Load(ctx, r.loader.AuthorizationDomain(), strconv.FormatInt(userID, 10))
+	return r.loader.Load(ctx, strconv.FormatInt(userID, 10))
 }
 
 type operatorAuthzGateway struct {
@@ -149,12 +149,11 @@ func (g *operatorAuthzGateway) ReplaceManagedOperatorRoles(ctx context.Context, 
 	if !g.IsEnabled() {
 		return 0, fmt.Errorf("iam operator authorization gateway is not available")
 	}
-	domain := g.snapshot.DomainForOrg(orgID)
-	result, err := g.assignment.ReplaceManaged(ctx, domain, strconv.FormatInt(userID, 10), roleNames, changedBy, reason)
+	result, err := g.assignment.ReplaceManaged(ctx, strconv.FormatInt(userID, 10), roleNames, changedBy, reason)
 	if err != nil {
 		return 0, err
 	}
-	g.snapshot.ObserveTenantAuthzVersion(domain, result.PolicyVersion)
+	g.snapshot.ObserveAuthzVersion(result.PolicyVersion)
 	return result.PolicyVersion, nil
 }
 
@@ -162,7 +161,7 @@ func (g *operatorAuthzGateway) LoadOperatorRoleProjection(ctx context.Context, o
 	if !g.IsEnabled() {
 		return iambridge.OperatorRoleProjection{}, fmt.Errorf("iam operator authorization gateway is not available")
 	}
-	snap, err := g.snapshot.Load(ctx, g.snapshot.DomainForOrg(orgID), strconv.FormatInt(userID, 10))
+	snap, err := g.snapshot.Load(ctx, strconv.FormatInt(userID, 10))
 	if err != nil {
 		return iambridge.OperatorRoleProjection{}, err
 	}

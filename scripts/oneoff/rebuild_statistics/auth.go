@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/FangcunMount/iam/v4/pkg/sdk/auth/loginv2"
+	"github.com/FangcunMount/iam/v5/pkg/sdk/auth/loginv3"
 )
 
 const (
@@ -31,7 +31,7 @@ type bearerTokenSource interface {
 
 type iamBearerTokenSource struct {
 	mu           sync.Mutex
-	client       *loginv2.Client
+	client       *loginv3.Client
 	username     string
 	passwordFile string
 	tenantID     uint64
@@ -53,7 +53,7 @@ func newBearerTokenSource(cfg options, output io.Writer) (bearerTokenSource, err
 	if err != nil {
 		return nil, err
 	}
-	client, err := loginv2.NewClient(baseURL, loginv2.WithHTTPClient(&http.Client{Timeout: defaultIAMLoginTimeout}))
+	client, err := loginv3.NewClient(baseURL, loginv3.WithHTTPClient(&http.Client{Timeout: defaultIAMLoginTimeout}))
 	if err != nil {
 		return nil, fmt.Errorf("create IAM login client: %w", err)
 	}
@@ -113,12 +113,11 @@ func (s *iamBearerTokenSource) loginLocked(ctx context.Context, reason string) (
 	if err != nil {
 		return "", fmt.Errorf("read IAM password: %w", err)
 	}
-	pair, err := s.client.Login(ctx, loginv2.LoginRequest{
-		AuthMethod: loginv2.AuthMethodPassword,
-		MethodPayload: loginv2.PasswordPayload{
+	pair, err := s.client.Login(ctx, loginv3.LoginRequest{
+		AuthMethod: loginv3.AuthMethodPassword,
+		MethodPayload: loginv3.PasswordPayload{
 			Username: s.username,
 			Password: password,
-			TenantID: s.tenantID,
 		},
 		DeviceID: statisticsDeviceID,
 	})
@@ -211,8 +210,8 @@ func iamLoginClientBaseURL(loginURL string) (string, error) {
 	}
 	path := strings.TrimRight(parsed.Path, "/")
 	switch {
-	case strings.HasSuffix(path, "/api/v2/authn/login"):
-		path = strings.TrimSuffix(path, "/api/v2/authn/login")
+	case strings.HasSuffix(path, "/api/v3/authn/login"):
+		path = strings.TrimSuffix(path, "/api/v3/authn/login")
 	case strings.HasSuffix(path, "/api/v2"):
 		path = strings.TrimSuffix(path, "/api/v2")
 	case strings.HasSuffix(path, "/authn/login"):

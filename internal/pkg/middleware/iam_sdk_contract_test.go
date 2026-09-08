@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	authnv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/authn/v2"
-	sdk "github.com/FangcunMount/iam/v4/pkg/sdk"
-	authjwks "github.com/FangcunMount/iam/v4/pkg/sdk/auth/jwks"
-	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
+	authnv3 "github.com/FangcunMount/iam/v5/api/grpc/iam/authn/v3"
+	sdk "github.com/FangcunMount/iam/v5/pkg/sdk"
+	authjwks "github.com/FangcunMount/iam/v5/pkg/sdk/auth/jwks"
+	auth "github.com/FangcunMount/iam/v5/pkg/sdk/auth/verifier"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jws"
@@ -32,24 +32,23 @@ func (f *staticContractKeyFetcher) Fetch(context.Context) (jwk.Set, error) { ret
 func (*staticContractKeyFetcher) Name() string                             { return "static-contract-key" }
 
 type recordingRemoteVerifier struct {
-	request *authnv2.VerifyTokenRequest
+	request *authnv3.VerifyTokenRequest
 }
 
-func (s *recordingRemoteVerifier) VerifyToken(_ context.Context, request *authnv2.VerifyTokenRequest) (*authnv2.VerifyTokenResponse, error) {
+func (s *recordingRemoteVerifier) VerifyToken(_ context.Context, request *authnv3.VerifyTokenRequest) (*authnv3.VerifyTokenResponse, error) {
 	s.request = request
 	now := time.Now().UTC()
-	return &authnv2.VerifyTokenResponse{
+	return &authnv3.VerifyTokenResponse{
 		Valid: true,
-		Claims: &authnv2.TokenClaims{
-			Subject:      "user:1001",
-			UserId:       "1001",
-			TenantId:     "fangcun",
-			TenantDomain: "fangcun",
-			Issuer:       contractIssuer,
-			Audience:     []string{contractAudience},
-			TokenType:    authnv2.TokenType_TOKEN_TYPE_ACCESS,
-			IssuedAt:     timestamppb.New(now),
-			ExpiresAt:    timestamppb.New(now.Add(time.Minute)),
+		Claims: &authnv3.TokenClaims{
+			Subject: "user:1001",
+			UserId:  "1001",
+
+			Issuer:    contractIssuer,
+			Audience:  []string{contractAudience},
+			TokenType: authnv3.TokenType_TOKEN_TYPE_ACCESS,
+			IssuedAt:  timestamppb.New(now),
+			ExpiresAt: timestamppb.New(now.Add(time.Minute)),
 		},
 	}, nil
 }
@@ -87,7 +86,7 @@ func TestIAMV320AccessTokenBoundary(t *testing.T) {
 		{
 			name:      "service token stays rejected when caller tries to allow it",
 			claims:    contractClaims(now, "service"),
-			callerOpt: &auth.VerifyOptions{AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType(3)}},
+			callerOpt: &auth.VerifyOptions{AllowedTokenTypes: []authnv3.TokenType{authnv3.TokenType(3)}},
 		},
 		{
 			name: "wrong issuer",
@@ -138,7 +137,7 @@ func TestIAMV320AccessTokenBoundary(t *testing.T) {
 	}
 }
 
-func TestIAMV320RemoteRequestCarriesAccessTokenType(t *testing.T) {
+func TestIAMRemoteRequestCarriesAccessTypeAndRecipient(t *testing.T) {
 	t.Parallel()
 
 	privateKey, _ := newContractJWKS(t)
@@ -159,7 +158,10 @@ func TestIAMV320RemoteRequestCarriesAccessTokenType(t *testing.T) {
 	if remote.request == nil {
 		t.Fatal("remote VerifyToken request was not captured")
 	}
-	if len(remote.request.AcceptedTokenTypes) != 1 || remote.request.AcceptedTokenTypes[0] != authnv2.TokenType_TOKEN_TYPE_ACCESS {
+	if len(remote.request.ExpectedAudience) != 1 || remote.request.ExpectedAudience[0] != contractAudience {
+		t.Fatalf("expected_audience = %v, want %s", remote.request.ExpectedAudience, contractAudience)
+	}
+	if len(remote.request.AcceptedTokenTypes) != 1 || remote.request.AcceptedTokenTypes[0] != authnv3.TokenType_TOKEN_TYPE_ACCESS {
 		t.Fatalf("accepted_token_types = %v, want access only", remote.request.AcceptedTokenTypes)
 	}
 }

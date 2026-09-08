@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	basegrpc "github.com/FangcunMount/component-base/pkg/grpc/interceptors"
-	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
+	auth "github.com/FangcunMount/iam/v5/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/securityprojection"
 )
@@ -15,7 +15,6 @@ type authContextKey string
 const (
 	authContextKeyUserID       authContextKey = "user_id"
 	authContextKeyAccountID    authContextKey = "account_id"
-	authContextKeyTenantDomain authContextKey = "tenant_domain"
 	authContextKeyOrgID        authContextKey = "org_id"
 	authContextKeySessionID    authContextKey = "session_id"
 	authContextKeyTokenID      authContextKey = "token_id"
@@ -45,9 +44,6 @@ func AccountIDFromContext(ctx context.Context) string {
 }
 
 // TenantDomainFromContext returns the IAM authorization domain from a gRPC request context.
-func TenantDomainFromContext(ctx context.Context) string {
-	return contextStringValue(ctx, authContextKeyTenantDomain)
-}
 
 // OrgIDFromContext returns the QS business org_id from a gRPC request context.
 func OrgIDFromContext(ctx context.Context) (uint64, bool) {
@@ -103,38 +99,36 @@ func PrincipalFromContext(ctx context.Context) (securityplane.Principal, bool) {
 	}
 	userID := UserIDFromContext(ctx)
 	accountID := AccountIDFromContext(ctx)
-	tenantDomain := TenantDomainFromContext(ctx)
 	orgID, hasOrg := OrgIDFromContext(ctx)
 	sessionID := SessionIDFromContext(ctx)
 	tokenID := TokenIDFromContext(ctx)
 	username := UsernameFromContext(ctx)
 	amr := AuthenticationMethodsFromContext(ctx)
-	if userID == "" && accountID == "" && tenantDomain == "" && sessionID == "" && tokenID == "" && username == "" && len(amr) == 0 {
+	if userID == "" && accountID == "" && sessionID == "" && tokenID == "" && username == "" && len(amr) == 0 {
 		return securityplane.Principal{}, false
 	}
 	return securityprojection.PrincipalFromInput(securityprojection.PrincipalInput{
-		Kind:         securityplane.PrincipalKindUser,
-		Source:       securityplane.PrincipalSourceGRPCJWT,
-		UserID:       userID,
-		AccountID:    accountID,
-		TenantDomain: tenantDomain,
-		OrgID:        orgID,
-		HasOrgID:     hasOrg,
-		SessionID:    sessionID,
-		TokenID:      tokenID,
-		Username:     username,
-		AMR:          amr,
+		Kind:      securityplane.PrincipalKindUser,
+		Source:    securityplane.PrincipalSourceGRPCJWT,
+		UserID:    userID,
+		AccountID: accountID,
+
+		OrgID:     orgID,
+		HasOrgID:  hasOrg,
+		SessionID: sessionID,
+		TokenID:   tokenID,
+		Username:  username,
+		AMR:       amr,
 	}), true
 }
 
 // OrgScopeFromContext returns the Security Control Plane org scope projection.
 func OrgScopeFromContext(ctx context.Context) (securityplane.OrgScope, bool) {
-	tenantDomain := TenantDomainFromContext(ctx)
-	if tenantDomain == "" {
+	if UserIDFromContext(ctx) == "" {
 		return securityplane.OrgScope{}, false
 	}
 	orgID, hasOrg := OrgIDFromContext(ctx)
-	return securityprojection.OrgScopeFromIdentity(tenantDomain, orgID, hasOrg, ""), true
+	return securityprojection.OrgScopeFromIdentity(orgID, hasOrg), true
 }
 
 // ServiceIdentityFromMTLSContext returns the mTLS service identity projection when present.

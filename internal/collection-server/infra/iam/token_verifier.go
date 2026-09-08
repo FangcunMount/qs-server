@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	authnv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/authn/v2"
-	sdk "github.com/FangcunMount/iam/v4/pkg/sdk"
-	authjwks "github.com/FangcunMount/iam/v4/pkg/sdk/auth/jwks"
-	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
+	authnv3 "github.com/FangcunMount/iam/v5/api/grpc/iam/authn/v3"
+	sdk "github.com/FangcunMount/iam/v5/pkg/sdk"
+	authjwks "github.com/FangcunMount/iam/v5/pkg/sdk/auth/jwks"
+	auth "github.com/FangcunMount/iam/v5/pkg/sdk/auth/verifier"
 )
 
 // TokenVerifier Token 验证器封装
@@ -21,7 +21,7 @@ type TokenVerifier struct {
 func defaultVerifyOptions() *auth.VerifyOptions {
 	return &auth.VerifyOptions{
 		IncludeMetadata:   true,
-		AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType_TOKEN_TYPE_ACCESS},
+		AllowedTokenTypes: []authnv3.TokenType{authnv3.TokenType_TOKEN_TYPE_ACCESS},
 	}
 }
 
@@ -32,7 +32,7 @@ func mergeVerifyOptions(opts *auth.VerifyOptions) *auth.VerifyOptions {
 	merged := *opts
 	// Collection 侧也默认透出会话与令牌元数据，避免后续调用方遗漏。
 	merged.IncludeMetadata = true
-	merged.AllowedTokenTypes = []authnv2.TokenType{authnv2.TokenType_TOKEN_TYPE_ACCESS}
+	merged.AllowedTokenTypes = []authnv3.TokenType{authnv3.TokenType_TOKEN_TYPE_ACCESS}
 	return &merged
 }
 
@@ -40,7 +40,7 @@ func remoteVerifyOptions() *auth.VerifyOptions {
 	return &auth.VerifyOptions{
 		ForceRemote:       true,
 		IncludeMetadata:   true,
-		AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType_TOKEN_TYPE_ACCESS},
+		AllowedTokenTypes: []authnv3.TokenType{authnv3.TokenType_TOKEN_TYPE_ACCESS},
 	}
 }
 

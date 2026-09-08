@@ -3,8 +3,8 @@ package iam
 import (
 	"testing"
 
-	authnv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/authn/v2"
-	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
+	authnv3 "github.com/FangcunMount/iam/v5/api/grpc/iam/authn/v3"
+	auth "github.com/FangcunMount/iam/v5/pkg/sdk/auth/verifier"
 )
 
 func TestVerifyOptionsAreRestrictedToAccessTokens(t *testing.T) {
@@ -13,7 +13,7 @@ func TestVerifyOptionsAreRestrictedToAccessTokens(t *testing.T) {
 	assertAccessVerifyOptions(t, defaultVerifyOptions())
 	merged := mergeVerifyOptions(&auth.VerifyOptions{
 		ForceRemote:       true,
-		AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType(3)},
+		AllowedTokenTypes: []authnv3.TokenType{authnv3.TokenType(3)},
 	})
 	assertAccessVerifyOptions(t, merged)
 	if !merged.ForceRemote {
@@ -36,7 +36,7 @@ func assertAccessVerifyOptions(t *testing.T, opts *auth.VerifyOptions) {
 	if opts == nil || !opts.IncludeMetadata {
 		t.Fatalf("VerifyOptions = %#v, want metadata", opts)
 	}
-	if len(opts.AllowedTokenTypes) != 1 || opts.AllowedTokenTypes[0] != authnv2.TokenType_TOKEN_TYPE_ACCESS {
+	if len(opts.AllowedTokenTypes) != 1 || opts.AllowedTokenTypes[0] != authnv3.TokenType_TOKEN_TYPE_ACCESS {
 		t.Fatalf("AllowedTokenTypes = %v, want access only", opts.AllowedTokenTypes)
 	}
 }

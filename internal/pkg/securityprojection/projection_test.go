@@ -8,11 +8,11 @@ import (
 
 func TestPrincipalFromInputCopiesSlicesAndDefaults(t *testing.T) {
 	in := PrincipalInput{
-		Source:       securityplane.PrincipalSourceHTTPJWT,
-		UserID:       "1001",
-		TenantDomain: "fangcun",
-		Roles:        []string{"operator"},
-		AMR:          []string{"pwd"},
+		Source: securityplane.PrincipalSourceHTTPJWT,
+		UserID: "1001",
+
+		Roles: []string{"operator"},
+		AMR:   []string{"pwd"},
 	}
 
 	principal := PrincipalFromInput(in)
@@ -34,12 +34,12 @@ func TestPrincipalFromInputCopiesSlicesAndDefaults(t *testing.T) {
 }
 
 func TestOrgScopeFromIdentity(t *testing.T) {
-	scope := OrgScopeFromIdentity("fangcun", 42, true, "tenant:fangcun")
-	if !scope.HasOrgID || scope.OrgID != 42 || scope.TenantDomain != "fangcun" {
+	scope := OrgScopeFromIdentity(42, true)
+	if !scope.HasOrgID || scope.OrgID != 42 {
 		t.Fatalf("scope = %#v, want fangcun org 42", scope)
 	}
 
-	emptyOrg := OrgScopeFromIdentity("fangcun", 0, false, "")
+	emptyOrg := OrgScopeFromIdentity(0, false)
 	if emptyOrg.HasOrgID || emptyOrg.OrgID != 0 {
 		t.Fatalf("scope = %#v, want no org", emptyOrg)
 	}

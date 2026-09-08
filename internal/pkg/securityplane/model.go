@@ -22,18 +22,18 @@ const (
 
 // Principal is the read-only identity view used by the Security Control Plane.
 type Principal struct {
-	Kind         PrincipalKind
-	Source       PrincipalSource
-	UserID       string
-	AccountID    string
-	TenantDomain string // IAM authorization domain (e.g. fangcun, platform).
-	OrgID        uint64 // QS business organization scope when resolved.
-	HasOrgID     bool
-	SessionID    string
-	TokenID      string
-	Username     string
-	Roles        []string
-	AMR          []string
+	Kind      PrincipalKind
+	Source    PrincipalSource
+	UserID    string
+	AccountID string
+	// IAM authorization domain (e.g. fangcun, platform).
+	OrgID     uint64 // QS business organization scope when resolved.
+	HasOrgID  bool
+	SessionID string
+	TokenID   string
+	Username  string
+	Roles     []string
+	AMR       []string
 }
 
 // RoleNames returns a defensive copy of role names.
@@ -48,20 +48,18 @@ func (p Principal) AuthenticationMethods() []string {
 
 // OrgScope is the read-only IAM authorization domain and QS business org projection.
 type OrgScope struct {
-	TenantDomain        string
-	OrgID               uint64
-	HasOrgID            bool
-	AuthorizationDomain string
-	RawScopeSource      string
+	OrgID    uint64
+	HasOrgID bool
+
+	RawScopeSource string
 }
 
 // NewOrgScope creates the canonical security-plane org scope view.
-func NewOrgScope(tenantDomain string, orgID uint64, hasOrg bool, authorizationDomain string) OrgScope {
+func NewOrgScope(orgID uint64, hasOrg bool) OrgScope {
 	return OrgScope{
-		TenantDomain:        tenantDomain,
-		OrgID:               orgID,
-		HasOrgID:            hasOrg && orgID > 0,
-		AuthorizationDomain: authorizationDomain,
+
+		OrgID:    orgID,
+		HasOrgID: hasOrg && orgID > 0,
 	}
 }
 

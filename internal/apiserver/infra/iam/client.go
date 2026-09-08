@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"time"
 
-	sdkerrors "github.com/FangcunMount/iam/v4/pkg/sdk/errors"
+	sdkerrors "github.com/FangcunMount/iam/v5/pkg/sdk/errors"
 	"google.golang.org/grpc/codes"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	authnv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/authn/v2"
-	sdk "github.com/FangcunMount/iam/v4/pkg/sdk"
-	sdkconfig "github.com/FangcunMount/iam/v4/pkg/sdk/config"
+	authnv3 "github.com/FangcunMount/iam/v5/api/grpc/iam/authn/v3"
+	sdk "github.com/FangcunMount/iam/v5/pkg/sdk"
+	sdkconfig "github.com/FangcunMount/iam/v5/pkg/sdk/config"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 )
 
@@ -29,9 +29,8 @@ type IAMOptions struct {
 	ProfileLinkCache *CacheOptions
 
 	// Authz 授权快照（GetAuthorizationSnapshot）
-	AuthzAppName        string
-	AuthzCacheTTL       time.Duration
-	AuthzDomainOverride string
+	AuthzAppName  string
+	AuthzCacheTTL time.Duration
 }
 
 type GRPCOptions struct {
@@ -203,7 +202,7 @@ func (c *Client) HealthCheck(ctx context.Context) error {
 	// 尝试使用一个空的 token 调用 VerifyToken
 	// 如果 IAM 服务可达，应该返回 token 无效的错误，而不是连接错误
 	// 这样可以验证 gRPC 连接和证书是否正常
-	_, err := c.sdk.Auth().VerifyToken(ctx, &authnv2.VerifyTokenRequest{
+	_, err := c.sdk.Auth().VerifyToken(ctx, &authnv3.VerifyTokenRequest{
 		AccessToken: "", // 空 token，预期返回无效错误
 	})
 	if err != nil {

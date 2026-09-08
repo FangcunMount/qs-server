@@ -8,12 +8,6 @@ import (
 )
 
 // tenantDomainFromClaims returns the IAM authorization domain (e.g. fangcun, platform).
-func tenantDomainFromClaims(claims *pkgmiddleware.UserClaims) string {
-	if claims == nil {
-		return ""
-	}
-	return strings.TrimSpace(claims.TenantDomain)
-}
 
 // resolveOrgIDFromClaims derives QS business org_id from IAM claims.
 func resolveOrgIDFromClaims(claims *pkgmiddleware.UserClaims) (uint64, bool) {

@@ -30,13 +30,13 @@ func AuthzSnapshotMiddleware(loader *iamauth.SnapshotLoader, updater operatorapp
 		}
 	}
 
-	return newAuthzSnapshotMiddleware(func(ctx context.Context, tenantID, userID string) (*authz.Snapshot, error) {
-		return loader.Load(ctx, tenantID, userID)
+	return newAuthzSnapshotMiddleware(func(ctx context.Context, userID string) (*authz.Snapshot, error) {
+		return loader.Load(ctx, userID)
 	}, updater)
 }
 
 func newAuthzSnapshotMiddleware(
-	load func(ctx context.Context, tenantID, userID string) (*authz.Snapshot, error),
+	load func(ctx context.Context, userID string) (*authz.Snapshot, error),
 	updater operatorapp.OperatorRoleProjectionUpdater,
 ) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -47,16 +47,15 @@ func newAuthzSnapshotMiddleware(
 			c.Abort()
 			return
 		}
-		tenantDomain := GetTenantDomain(c)
 		userIDStr := GetUserIDStr(c)
-		if tenantDomain == "" || userIDStr == "" {
+		if userIDStr == "" {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "tenant domain and user identity are required for authorization",
+				"error": "user identity is required for authorization",
 			})
 			c.Abort()
 			return
 		}
-		snap, err := load(c.Request.Context(), tenantDomain, userIDStr)
+		snap, err := load(c.Request.Context(), userIDStr)
 		if err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{
 				"error": fmt.Sprintf("failed to load authorization snapshot: %v", err),

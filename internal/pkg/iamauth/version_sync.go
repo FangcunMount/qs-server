@@ -14,15 +14,14 @@ import (
 
 const (
 	// DefaultVersionTopic 与 IAM 授权版本通知主题保持一致。
-	DefaultVersionTopic = "iam.authz.version"
+	DefaultVersionTopic = "iam.authz.version.v2"
 )
 
 var channelSanitizer = regexp.MustCompile(`[^a-zA-Z0-9._-]+`)
 
 // VersionChangeMessage 对齐 IAM 版本通知载荷。
 type VersionChangeMessage struct {
-	TenantID string `json:"tenant_id"`
-	Version  int64  `json:"version"`
+	Version int64 `json:"version"`
 }
 
 // DefaultVersionSyncChannel 为单实例订阅生成唯一 channel，避免多副本间负载均衡掉版本通知。
@@ -66,18 +65,16 @@ func SubscribeVersionChanges(
 			)
 			return nil
 		}
-		if change.TenantID == "" || change.Version <= 0 {
+		if change.Version <= 0 {
 			logger.L(msgCtx).Warnw("ignored invalid IAM authz version message",
 				"topic", topic,
-				"tenant_id", change.TenantID,
 				"version", change.Version,
 			)
 			return nil
 		}
-		loader.ObserveTenantAuthzVersion(change.TenantID, change.Version)
+		loader.ObserveAuthzVersion(change.Version)
 		logger.L(msgCtx).Debugw("applied IAM authz version watermark",
 			"topic", topic,
-			"tenant_id", change.TenantID,
 			"version", change.Version,
 		)
 		return nil
