@@ -51,11 +51,10 @@ func OrgScopeFromIdentity(tenantDomain string, orgID uint64, hasOrg bool, author
 
 // ServiceIdentityInput is a transport-neutral service identity projection input.
 type ServiceIdentityInput struct {
-	ServiceID      string
-	Source         securityplane.ServiceIdentitySource
-	TargetAudience []string
-	CommonName     string
-	Namespace      string
+	ServiceID  string
+	Source     securityplane.ServiceIdentitySource
+	CommonName string
+	Namespace  string
 }
 
 // ServiceIdentityFromInput creates the canonical security-plane service identity view.
@@ -65,10 +64,9 @@ func ServiceIdentityFromInput(in ServiceIdentityInput) securityplane.ServiceIden
 		source = securityplane.ServiceIdentitySourceUnknown
 	}
 	return securityplane.ServiceIdentity{
-		ServiceID:      in.ServiceID,
-		Source:         source,
-		TargetAudience: append([]string(nil), in.TargetAudience...),
-		CommonName:     in.CommonName,
-		Namespace:      in.Namespace,
+		ServiceID:  in.ServiceID,
+		Source:     source,
+		CommonName: in.CommonName,
+		Namespace:  in.Namespace,
 	}
 }

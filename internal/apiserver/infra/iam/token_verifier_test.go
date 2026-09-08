@@ -3,8 +3,8 @@ package iam
 import (
 	"testing"
 
-	authnv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/authn/v2"
-	auth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/verifier"
+	authnv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/authn/v2"
+	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
 )
 
 func TestVerifyOptionsAreRestrictedToAccessTokens(t *testing.T) {
@@ -13,7 +13,7 @@ func TestVerifyOptionsAreRestrictedToAccessTokens(t *testing.T) {
 	assertAccessVerifyOptions(t, defaultVerifyOptions())
 	merged := mergeVerifyOptions(&auth.VerifyOptions{
 		ForceRemote:       true,
-		AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType_TOKEN_TYPE_SERVICE},
+		AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType(3)},
 	})
 	assertAccessVerifyOptions(t, merged)
 	if !merged.ForceRemote {

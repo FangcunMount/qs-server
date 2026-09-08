@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	authzv3 "github.com/FangcunMount/iam/v3/api/grpc/iam/authz/v3"
+	authzv3 "github.com/FangcunMount/iam/v4/api/grpc/iam/authz/v3"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 )
 
 // AssignmentClient atomically replaces the QS-managed direct role set.
 type AssignmentClient struct {
 	client GRPCClient
-	tokens TokenProvider
 }
 
 type ReplaceAssignmentsResult struct {
@@ -21,25 +20,17 @@ type ReplaceAssignmentsResult struct {
 }
 
 // NewAssignmentClient 创建客户端；IAM 未启用时返回 nil。
-func NewAssignmentClient(c GRPCClient, providers ...TokenProvider) *AssignmentClient {
+func NewAssignmentClient(c GRPCClient) *AssignmentClient {
 	if c == nil || !c.IsEnabled() || c.SDK() == nil {
 		return nil
 	}
-	var tokens TokenProvider
-	if len(providers) > 0 {
-		tokens = providers[0]
-	}
-	return &AssignmentClient{client: c, tokens: tokens}
+	return &AssignmentClient{client: c}
 }
 
 // ReplaceManaged atomically replaces only the QS roles delegated to qs-apiserver.
 func (a *AssignmentClient) ReplaceManaged(ctx context.Context, domain, targetUserIDStr string, roleNames []string, changedBy, reason string) (*ReplaceAssignmentsResult, error) {
 	if a == nil || a.client == nil {
 		return nil, fmt.Errorf("iam assignment client not available")
-	}
-	ctx, err := authorizationContext(ctx, a.tokens)
-	if err != nil {
-		return nil, err
 	}
 	resp, err := a.client.SDK().Authz().ReplaceManagedAssignments(ctx, &authzv3.ReplaceManagedAssignmentsRequest{
 		Subject: authz.SubjectKey(targetUserIDStr), Domain: domain, RoleNames: append([]string(nil), roleNames...),

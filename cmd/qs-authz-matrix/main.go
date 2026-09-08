@@ -48,18 +48,21 @@ func run(opts *apiserveroptions.Options) app.RunFunc {
 
 		iamModule, err := container.NewIAMModuleWithRuntimeOptions(ctx, opts.IAMOptions, container.IAMModuleRuntimeOptions{})
 		if err != nil {
-			return fmt.Errorf("initialize IAM v3 client: %w", err)
+			return fmt.Errorf("initialize IAM v4 client: %w", err)
 		}
 		defer func() { _ = iamModule.Close() }()
 		if iamModule.AuthzSnapshotLoader() == nil || iamModule.ObjectAuthorizationChecker() == nil ||
-			iamModule.ServiceAuthHelper() == nil || iamModule.IdentityService() == nil || iamModule.IdentityService().Raw() == nil {
-			return fmt.Errorf("IAM v3 matrix dependencies are unavailable")
+			iamModule.IdentityService() == nil || iamModule.IdentityService().Raw() == nil {
+			return fmt.Errorf("IAM v4 matrix dependencies are unavailable")
 		}
 
-		serviceIdentity := iamModule.ServiceAuthHelper().ServiceIdentity().ServiceID
+		serviceIdentity, err := iamModule.Client().LocalCertificateIdentity()
+		if err != nil {
+			return err
+		}
 		runner := authzmatrix.NewRunner(
 			authzmatrix.NewStableSubjectSource(sqlDB, authzmatrix.NewIAMSyntheticSubjectDirectory(
-				iamModule.IdentityService().Raw(), iamModule.ServiceAuthHelper(),
+				iamModule.IdentityService().Raw(),
 			), iamModule.AuthzSnapshotLoader()),
 			iamModule.AuthzSnapshotLoader(),
 			iamModule.ObjectAuthorizationChecker(),

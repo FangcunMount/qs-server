@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	authnv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/authn/v2"
-	sdk "github.com/FangcunMount/iam/v3/pkg/sdk"
-	authjwks "github.com/FangcunMount/iam/v3/pkg/sdk/auth/jwks"
-	auth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/verifier"
+	authnv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/authn/v2"
+	sdk "github.com/FangcunMount/iam/v4/pkg/sdk"
+	authjwks "github.com/FangcunMount/iam/v4/pkg/sdk/auth/jwks"
+	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
 )
 
 // TokenVerifier Token 验证器封装

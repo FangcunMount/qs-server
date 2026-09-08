@@ -10,10 +10,10 @@ import (
 	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	authnv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/authn/v2"
+	authnv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/authn/v2"
 	"github.com/gin-gonic/gin"
 
-	auth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/verifier"
+	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
 )
 
 // UserClaimsContextKey 用户声明上下文键

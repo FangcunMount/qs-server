@@ -10,7 +10,7 @@ import (
 	modelcatalogApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	modelcatalogRuntime "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/runtime"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	cachetarget "github.com/FangcunMount/qs-server/internal/apiserver/cache/governance/target"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
@@ -28,7 +28,7 @@ import (
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/workbenchreadmodel"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
+	eventcatalog "github.com/FangcunMount/qs-server/internal/pkg/eventing/catalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
@@ -124,7 +124,6 @@ func (c *Container) ActorIAMPorts() compose.ActorIAMPorts {
 		ports.OperationAccountSvc = c.IAMModule.OperationAccountService()
 		ports.IAMClient = c.IAMModule.Client()
 		ports.AuthzSnapshotLoader = c.IAMModule.AuthzSnapshotLoader()
-		ports.ServiceAuthHelper = c.IAMModule.ServiceAuthHelper()
 		ports.ObjectAuthzChecker = c.IAMModule.ObjectAuthorizationChecker()
 	}
 	return ports

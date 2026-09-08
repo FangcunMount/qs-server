@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	authnv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/authn/v2"
-	auth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/verifier"
+	authnv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/authn/v2"
+	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
 )
 
@@ -126,7 +126,7 @@ func TestUserClaimsMapToSecurityPlaneOrgScope(t *testing.T) {
 func TestNormalizeVerifyOptionsPreservesForceRemoteAndForcesMetadata(t *testing.T) {
 	opts := normalizeVerifyOptions(&auth.VerifyOptions{
 		ForceRemote:       true,
-		AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType_TOKEN_TYPE_SERVICE},
+		AllowedTokenTypes: []authnv2.TokenType{authnv2.TokenType(3)},
 	})
 	if !opts.ForceRemote {
 		t.Fatal("expected ForceRemote to be preserved")

@@ -2006,7 +2006,7 @@
       "path": "docs/02-业务模块/20-model-catalog/21-核心设计-模型身份、算法绑定与执行路由.md",
       "class": "primary",
       "owner": "modelcatalog",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
         "verified_on": "2026-08-25"
@@ -2057,6 +2057,13 @@
           "severity": "medium",
           "summary": "Independent-questionnaire admission, replica-set/current-family smoke and production evidence remain conditional.",
           "exit_criteria": "Close the named contract/environment/production gaps, then re-sign affected dimensions."
+        },
+        {
+          "id": "IAM-V4-SOURCE-ANCHOR",
+          "kind": "verification",
+          "severity": "low",
+          "summary": "IAM v4 retirement changes the service identity source or configuration contract. Local tests are recorded in the retirement release checklist; the prior commit-based evidence is historical.",
+          "exit_criteria": "After committing the IAM v4 migration, rerun the listed checks and update the verified source SHA to that commit."
         }
       ]
     },
@@ -2184,7 +2191,7 @@
       "path": "docs/02-业务模块/20-model-catalog/26-核心设计-数据存储与一致性.md",
       "class": "primary",
       "owner": "modelcatalog",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
         "verified_on": "2026-08-25"
@@ -2235,6 +2242,13 @@
           "severity": "medium",
           "summary": "Independent-questionnaire admission, replica-set/current-family smoke and production evidence remain conditional.",
           "exit_criteria": "Close the named contract/environment/production gaps, then re-sign affected dimensions."
+        },
+        {
+          "id": "IAM-V4-SOURCE-ANCHOR",
+          "kind": "verification",
+          "severity": "low",
+          "summary": "IAM v4 retirement changes the service identity source or configuration contract. Local tests are recorded in the retirement release checklist; the prior commit-based evidence is historical.",
+          "exit_criteria": "After committing the IAM v4 migration, rerun the listed checks and update the verified source SHA to that commit."
         }
       ]
     },
@@ -2272,7 +2286,7 @@
       "path": "docs/02-业务模块/20-model-catalog/31-关键链路-已发布模型准入与执行输入.md",
       "class": "primary",
       "owner": "modelcatalog",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
         "verified_on": "2026-08-25"
@@ -2323,6 +2337,13 @@
           "severity": "medium",
           "summary": "Independent-questionnaire admission, replica-set/current-family smoke and production evidence remain conditional.",
           "exit_criteria": "Close the named contract/environment/production gaps, then re-sign affected dimensions."
+        },
+        {
+          "id": "IAM-V4-SOURCE-ANCHOR",
+          "kind": "verification",
+          "severity": "low",
+          "summary": "IAM v4 retirement changes the service identity source or configuration contract. Local tests are recorded in the retirement release checklist; the prior commit-based evidence is historical.",
+          "exit_criteria": "After committing the IAM v4 migration, rerun the listed checks and update the verified source SHA to that commit."
         }
       ]
     },
@@ -2480,7 +2501,7 @@
       "path": "docs/02-业务模块/20-model-catalog/90-设计问题与重构清单.md",
       "class": "primary",
       "owner": "modelcatalog",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
         "verified_on": "2026-08-25"
@@ -2531,6 +2552,13 @@
           "severity": "medium",
           "summary": "Independent-questionnaire admission, replica-set/current-family smoke and production evidence remain conditional.",
           "exit_criteria": "Close the named contract/environment/production gaps, then re-sign affected dimensions."
+        },
+        {
+          "id": "IAM-V4-SOURCE-ANCHOR",
+          "kind": "verification",
+          "severity": "low",
+          "summary": "IAM v4 retirement changes the service identity source or configuration contract. Local tests are recorded in the retirement release checklist; the prior commit-based evidence is historical.",
+          "exit_criteria": "After committing the IAM v4 migration, rerun the listed checks and update the verified source SHA to that commit."
         }
       ]
     },
@@ -2538,7 +2566,7 @@
       "path": "docs/02-业务模块/20-model-catalog/README.md",
       "class": "primary",
       "owner": "modelcatalog",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "f54d96322ebb7003804ae930f2f81ba5785c0ca3",
         "verified_on": "2026-08-25"
@@ -2589,6 +2617,13 @@
           "severity": "medium",
           "summary": "Independent-questionnaire admission, replica-set/current-family smoke and production evidence remain conditional.",
           "exit_criteria": "Close the named contract/environment/production gaps, then re-sign affected dimensions."
+        },
+        {
+          "id": "IAM-V4-SOURCE-ANCHOR",
+          "kind": "verification",
+          "severity": "low",
+          "summary": "IAM v4 retirement changes the service identity source or configuration contract. Local tests are recorded in the retirement release checklist; the prior commit-based evidence is historical.",
+          "exit_criteria": "After committing the IAM v4 migration, rerun the listed checks and update the verified source SHA to that commit."
         }
       ]
     },
@@ -5253,7 +5288,7 @@
       "path": "docs/03-基础设施/cache/70-扩展与验收.md",
       "class": "primary",
       "owner": "infra",
-      "doc_status": "aligned",
+      "doc_status": "needs_review",
       "verified": {
         "source_sha": "516fdf37335ed9f7ccf53a5bfdc488e6f8ee3da6",
         "verified_on": "2026-09-04"
@@ -5323,6 +5358,13 @@
           "severity": "high",
           "summary": "Passing repository gates does not constitute current production cache acceptance.",
           "exit_criteria": "Complete exact-SHA deployment, current production probes, threshold review and accountable signoff."
+        },
+        {
+          "id": "IAM-V4-SOURCE-ANCHOR",
+          "kind": "verification",
+          "severity": "low",
+          "summary": "IAM v4 retirement changes the service identity source or configuration contract. Local tests are recorded in the retirement release checklist; the prior commit-based evidence is historical.",
+          "exit_criteria": "After committing the IAM v4 migration, rerun the listed checks and update the verified source SHA to that commit."
         }
       ]
     },

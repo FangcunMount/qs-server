@@ -585,7 +585,7 @@ iam:
     
     # mTLS 证书配置（开发环境可测试）
     tls:
-      enabled: false              # 开发环境可选启用 mTLS（需要时改为 true）
+      enabled: true               # IAM 服务调用要求 mTLS
       ca-file: "/etc/qs-server/ssl/ca/ca-chain.crt"       # CA 证书链
       cert-file: "/etc/qs-server/ssl/server/qs-apiserver.crt" # QS 客户端证书
       key-file: "/etc/qs-server/ssl/server/qs-apiserver.key"  # QS 客户端私钥
@@ -607,13 +607,6 @@ iam:
     cache-ttl: 30m                                     # 缓存有效期
   
   # 服务间认证配置（可选）
-  service-auth:
-    service-id: "qs-apiserver.svc"                    # IAM AuthZ v3 信任的服务身份
-    target-audience: ["iam-service"]                   # 目标服务列表
-    token-ttl: 1h                                      # 服务 Token 有效期
-    refresh-before: 5m                                 # 提前刷新时间
-  
-  # 用户信息缓存配置
   user-cache:
     enabled: true                                      # 启用用户信息缓存
     ttl: 5m                                            # 缓存时长

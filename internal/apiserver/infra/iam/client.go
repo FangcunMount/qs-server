@@ -3,13 +3,15 @@ package iam
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
+	sdkerrors "github.com/FangcunMount/iam/v4/pkg/sdk/errors"
+	"google.golang.org/grpc/codes"
+
 	"github.com/FangcunMount/component-base/pkg/logger"
-	authnv2 "github.com/FangcunMount/iam/v3/api/grpc/iam/authn/v2"
-	sdk "github.com/FangcunMount/iam/v3/pkg/sdk"
-	sdkconfig "github.com/FangcunMount/iam/v3/pkg/sdk/config"
+	authnv2 "github.com/FangcunMount/iam/v4/api/grpc/iam/authn/v2"
+	sdk "github.com/FangcunMount/iam/v4/pkg/sdk"
+	sdkconfig "github.com/FangcunMount/iam/v4/pkg/sdk/config"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
 )
 
@@ -207,13 +209,8 @@ func (c *Client) HealthCheck(ctx context.Context) error {
 	if err != nil {
 		// 检查是否是连接错误（而非业务错误）
 		// 业务错误（如 token 无效）是预期的，说明服务可达
-		errStr := err.Error()
-		// 如果是 InvalidArgument 或 Unauthenticated 错误，说明服务可达
-		if strings.Contains(errStr, "InvalidArgument") ||
-			strings.Contains(errStr, "Unauthenticated") ||
-			strings.Contains(errStr, "invalid") ||
-			strings.Contains(errStr, "token") {
-			return nil // 服务可达，健康
+		if c := sdkerrors.GRPCCode(err); c == codes.InvalidArgument || c == codes.Unauthenticated {
+			return nil // Expected rejection of the empty user token.
 		}
 		// 其他错误（如连接失败、证书错误等）则认为不健康
 		return fmt.Errorf("IAM health check failed: %w", err)

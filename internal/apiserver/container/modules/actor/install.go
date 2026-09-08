@@ -1,7 +1,7 @@
 package actor
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
+	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/cache/catalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisruntime"
 )
@@ -34,7 +34,6 @@ func InstallFrom(host InstallHost) error {
 		OperationAccountSvc: iamPorts.OperationAccountSvc,
 		IAMClient:           iamPorts.IAMClient,
 		AuthzSnapshotLoader: iamPorts.AuthzSnapshotLoader,
-		ServiceAuthHelper:   iamPorts.ServiceAuthHelper,
 	})
 	if err != nil {
 		return err

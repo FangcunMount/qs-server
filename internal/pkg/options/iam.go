@@ -27,9 +27,6 @@ type IAMOptions struct {
 	// JWKS 配置
 	JWKS *IAMJWKSOptions `json:"jwks" mapstructure:"jwks"`
 
-	// 服务间认证配置
-	ServiceAuth *IAMServiceAuthOptions `json:"service-auth" mapstructure:"service-auth"`
-
 	// 用户信息缓存配置
 	UserCache *IAMCacheOptions `json:"user-cache" mapstructure:"user-cache"`
 
@@ -82,14 +79,6 @@ type IAMJWKSOptions struct {
 	CacheTTL        time.Duration `json:"cache-ttl"         mapstructure:"cache-ttl"`
 }
 
-// IAMServiceAuthOptions 服务间认证配置
-type IAMServiceAuthOptions struct {
-	ServiceID      string        `json:"service-id"       mapstructure:"service-id"`
-	TargetAudience []string      `json:"target-audience"  mapstructure:"target-audience"`
-	TokenTTL       time.Duration `json:"token-ttl"        mapstructure:"token-ttl"`
-	RefreshBefore  time.Duration `json:"refresh-before"   mapstructure:"refresh-before"`
-}
-
 // IAMCacheOptions 缓存配置
 type IAMCacheOptions struct {
 	Enabled bool          `json:"enabled"  mapstructure:"enabled"`
@@ -134,13 +123,6 @@ func NewIAMOptions() *IAMOptions {
 			GRPCEndpoint:    "", // 可选：设置为 "iam.example.com:8081" 启用 gRPC 降级
 			RefreshInterval: 5 * time.Minute,
 			CacheTTL:        30 * time.Minute,
-		},
-
-		ServiceAuth: &IAMServiceAuthOptions{
-			ServiceID:      "qs-apiserver.svc",
-			TargetAudience: []string{"iam-service"},
-			TokenTTL:       1 * time.Hour,
-			RefreshBefore:  5 * time.Minute,
 		},
 
 		UserCache: &IAMCacheOptions{

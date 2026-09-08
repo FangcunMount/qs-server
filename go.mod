@@ -5,11 +5,12 @@ go 1.25.12
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/FangcunMount/component-base v0.6.9
-	github.com/FangcunMount/iam/v3 v3.2.0
+	github.com/FangcunMount/iam/v4 v4.0.0
 	github.com/alicebob/miniredis/v2 v2.30.0
 	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.4.1
 	github.com/coder/websocket v1.8.15
 	github.com/google/uuid v1.6.0
+	github.com/lestrrat-go/jwx/v2 v2.1.6
 	github.com/mattn/go-isatty v0.0.20
 	github.com/moby/term v0.5.2
 	github.com/nsqio/go-nsq v1.1.0
@@ -54,7 +55,6 @@ require (
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/httprc v1.0.6 // indirect
 	github.com/lestrrat-go/iter v1.0.2 // indirect
-	github.com/lestrrat-go/jwx/v2 v2.1.6 // indirect
 	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect

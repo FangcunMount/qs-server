@@ -48,7 +48,7 @@ func (SnapshotAuthorizer) Authorize(ctx context.Context, actor ActorContext, act
 	if actor.Principal.Kind == securityplane.PrincipalKindUnknown {
 		return errors.WithCode(code.ErrPermissionDenied, "authenticated actor is required")
 	}
-	// Published-only service resolution (collection/worker mTLS or ServiceAuth) has
+	// Published-only service resolution (mTLS or internal invocation) has
 	// no IAM user snapshot; align with trustedRuntimeAuthorizer.
 	if action == ActionResolvePublished && IsTrustedServiceActor(actor) {
 		return nil
@@ -75,7 +75,7 @@ func IsTrustedServiceActor(actor ActorContext) bool {
 	if actor.Principal.Kind != securityplane.PrincipalKindService {
 		return false
 	}
-	return actor.Principal.Source == securityplane.PrincipalSourceServiceAuth ||
+	return actor.Principal.Source == securityplane.PrincipalSourceInternal ||
 		actor.Principal.Source == securityplane.PrincipalSourceMTLS
 }
 

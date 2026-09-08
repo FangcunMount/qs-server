@@ -7,24 +7,17 @@ import (
 	"sync"
 	"time"
 
-	authzv3 "github.com/FangcunMount/iam/v3/api/grpc/iam/authz/v3"
-	serviceauth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/serviceauth"
-	"github.com/FangcunMount/iam/v3/pkg/tenant"
+	authzv3 "github.com/FangcunMount/iam/v4/api/grpc/iam/authz/v3"
+	"github.com/FangcunMount/iam/v4/pkg/tenant"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"golang.org/x/sync/singleflight"
 )
 
 // SnapshotLoaderOptions 配置 IAM GetAuthorizationSnapshot。
 type SnapshotLoaderOptions struct {
-	AppName              string
-	CacheTTL             time.Duration
-	DomainOverride       string
-	ServiceTokenProvider TokenProvider
-}
-
-// TokenProvider supplies the service credential required by every AuthZ v3 RPC.
-type TokenProvider interface {
-	GetToken(context.Context) (string, error)
+	AppName        string
+	CacheTTL       time.Duration
+	DomainOverride string
 }
 
 // SnapshotLoader CurrentAuthzSnapshot：GetAuthorizationSnapshot + 进程内缓存 + authz_version 水位失效。
@@ -150,10 +143,6 @@ func (l *SnapshotLoader) Load(ctx context.Context, jwtTenantID, userIDStr string
 			return snap, nil
 		}
 		sub := authz.SubjectKey(userIDStr)
-		ctx, err := authorizationContext(ctx, l.opts.ServiceTokenProvider)
-		if err != nil {
-			return nil, err
-		}
 		resp, err := l.client.SDK().Authz().GetAuthorizationSnapshot(ctx, &authzv3.GetAuthorizationSnapshotRequest{
 			Subject: sub,
 			Domain:  domain,
@@ -186,18 +175,4 @@ func (l *SnapshotLoader) Load(ctx context.Context, jwtTenantID, userIDStr string
 		return nil, err
 	}
 	return v.(*authz.Snapshot), nil
-}
-
-func authorizationContext(ctx context.Context, provider TokenProvider) (context.Context, error) {
-	if provider == nil {
-		return nil, fmt.Errorf("iam service token provider is required for AuthZ v3")
-	}
-	token, err := provider.GetToken(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get IAM service token: %w", err)
-	}
-	if strings.TrimSpace(token) == "" {
-		return nil, fmt.Errorf("IAM service token is empty")
-	}
-	return serviceauth.AuthorizationContext(ctx, token), nil
 }

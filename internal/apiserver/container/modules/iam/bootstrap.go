@@ -2,12 +2,11 @@ package iam
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	auth "github.com/FangcunMount/iam/v3/pkg/sdk/auth/verifier"
+	auth "github.com/FangcunMount/iam/v4/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilience/backpressure"
@@ -17,7 +16,6 @@ import (
 type Module struct {
 	client              *iam.Client
 	tokenVerifier       *iam.TokenVerifier
-	serviceAuthHelper   *iam.ServiceAuthHelper
 	identityService     *iam.IdentityService
 	operationAccountSvc *iam.OperationAccountService
 	profileLinkSvc      *iam.ProfileLinkService
@@ -49,17 +47,15 @@ func NewWithRuntimeOptions(ctx context.Context, opts *options.IAMOptions, runtim
 		return nil, fmt.Errorf("failed to create IAM client: %w", err)
 	}
 
-	serviceAuthHelper := newIAMServiceAuthHelper(ctx, client, opts)
 	module := &Module{
 		client:              client,
 		tokenVerifier:       newIAMTokenVerifier(ctx, client),
-		serviceAuthHelper:   serviceAuthHelper,
 		identityService:     newIAMIdentityService(client),
 		operationAccountSvc: newIAMOperationAccountService(client),
 		profileLinkSvc:      newIAMProfileLinkService(client),
 		wechatAppService:    newIAMWeChatAppService(client),
-		authzSnapshotLoader: newIAMAuthzSnapshotLoader(client, opts, serviceAuthHelper),
-		objectAuthzChecker:  iam.NewObjectAuthorizationChecker(client, serviceAuthHelper),
+		authzSnapshotLoader: newIAMAuthzSnapshotLoader(client, opts),
+		objectAuthzChecker:  iam.NewObjectAuthorizationChecker(client),
 	}
 
 	logger.L(context.Background()).Infow("IAM module initialized successfully",
@@ -84,38 +80,6 @@ func newIAMTokenVerifier(ctx context.Context, client *iam.Client) *iam.TokenVeri
 		return nil
 	}
 	return tokenVerifier
-}
-
-func newIAMServiceAuthHelper(ctx context.Context, client *iam.Client, opts *options.IAMOptions) *iam.ServiceAuthHelper {
-	if client == nil || !client.IsEnabled() || opts == nil || opts.ServiceAuth == nil || opts.ServiceAuth.ServiceID == "" {
-		return nil
-	}
-
-	serviceAuthConfig := &iam.ServiceAuthConfig{
-		ServiceID:      opts.ServiceAuth.ServiceID,
-		TargetAudience: opts.ServiceAuth.TargetAudience,
-		TokenTTL:       int64(opts.ServiceAuth.TokenTTL.Seconds()),
-		RefreshBefore:  int64(opts.ServiceAuth.RefreshBefore.Seconds()),
-	}
-
-	serviceAuthHelper, err := iam.NewServiceAuthHelper(ctx, client, serviceAuthConfig)
-	if err == nil {
-		return serviceAuthHelper
-	}
-	if errors.Is(err, iam.ErrServiceTokenNotSupported) {
-		logger.L(context.Background()).Warnw("IAM server does not support required service-to-service authentication",
-			"component", "iam_module",
-			"service_id", serviceAuthConfig.ServiceID,
-			"target_audience", serviceAuthConfig.TargetAudience,
-		)
-		return nil
-	}
-
-	logger.L(context.Background()).Warnw("Failed to create required IAM service auth helper",
-		"component", "iam_module",
-		"error", err.Error(),
-	)
-	return nil
 }
 
 func newIAMIdentityService(client *iam.Client) *iam.IdentityService {
@@ -178,16 +142,15 @@ func newIAMWeChatAppService(client *iam.Client) *iam.WeChatAppService {
 	return service
 }
 
-func newIAMAuthzSnapshotLoader(client *iam.Client, opts *options.IAMOptions, tokens *iam.ServiceAuthHelper) *iam.AuthzSnapshotLoader {
+func newIAMAuthzSnapshotLoader(client *iam.Client, opts *options.IAMOptions) *iam.AuthzSnapshotLoader {
 	if client == nil || !client.IsEnabled() || opts == nil || !opts.GRPCEnabled {
 		return nil
 	}
 	iamOpts := convertIAMOptions(opts)
 	return iam.NewAuthzSnapshotLoader(client, iam.AuthzSnapshotLoaderOptions{
-		AppName:              iamOpts.AuthzAppName,
-		CacheTTL:             iamOpts.AuthzCacheTTL,
-		DomainOverride:       iamOpts.AuthzDomainOverride,
-		ServiceTokenProvider: tokens,
+		AppName:        iamOpts.AuthzAppName,
+		CacheTTL:       iamOpts.AuthzCacheTTL,
+		DomainOverride: iamOpts.AuthzDomainOverride,
 	})
 }
 
@@ -207,12 +170,6 @@ func (m *Module) SDKTokenVerifier() *auth.TokenVerifier {
 		return nil
 	}
 	return m.tokenVerifier.SDKVerifier()
-}
-
-// ServiceAuthHelper 返回服务间认证助手
-// 用于 QS 服务以服务身份调用 IAM
-func (m *Module) ServiceAuthHelper() *iam.ServiceAuthHelper {
-	return m.serviceAuthHelper
 }
 
 // IdentityService 返回身份服务
@@ -262,14 +219,14 @@ func (m *Module) ValidateRequiredAuthzRuntime(ctx context.Context) error {
 	if m.SDKTokenVerifier() == nil {
 		return fmt.Errorf("IAM token verifier is required")
 	}
-	if m.serviceAuthHelper == nil {
-		return fmt.Errorf("IAM service authentication is required for AuthZ v3")
-	}
 	if m.authzSnapshotLoader == nil {
 		return fmt.Errorf("IAM AuthZ v3 snapshot loader is required")
 	}
 	if m.objectAuthzChecker == nil {
 		return fmt.Errorf("IAM AuthZ v3 object checker is required")
+	}
+	if _, err := m.client.LocalCertificateIdentity(); err != nil {
+		return err
 	}
 	if err := m.HealthCheck(ctx); err != nil {
 		return fmt.Errorf("IAM health check failed: %w", err)
@@ -285,10 +242,6 @@ func (m *Module) ValidateRequiredAuthzRuntime(ctx context.Context) error {
 
 // Close 关闭 IAM 模块
 func (m *Module) Close() error {
-	// 先关闭 ServiceAuthHelper（停止后台刷新）
-	if m.serviceAuthHelper != nil {
-		m.serviceAuthHelper.Stop()
-	}
 	// 关闭 TokenVerifier（停止 JWKS 后台刷新）
 	if m.tokenVerifier != nil {
 		m.tokenVerifier.Close()

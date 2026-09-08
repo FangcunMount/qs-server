@@ -13,11 +13,11 @@ const (
 type PrincipalSource string
 
 const (
-	PrincipalSourceUnknown     PrincipalSource = "unknown"
-	PrincipalSourceHTTPJWT     PrincipalSource = "http_jwt"
-	PrincipalSourceGRPCJWT     PrincipalSource = "grpc_jwt"
-	PrincipalSourceServiceAuth PrincipalSource = "service_auth"
-	PrincipalSourceMTLS        PrincipalSource = "mtls"
+	PrincipalSourceUnknown  PrincipalSource = "unknown"
+	PrincipalSourceHTTPJWT  PrincipalSource = "http_jwt"
+	PrincipalSourceGRPCJWT  PrincipalSource = "grpc_jwt"
+	PrincipalSourceInternal PrincipalSource = "internal"
+	PrincipalSourceMTLS     PrincipalSource = "mtls"
 )
 
 // Principal is the read-only identity view used by the Security Control Plane.
@@ -88,21 +88,14 @@ type CapabilityDecision struct {
 type ServiceIdentitySource string
 
 const (
-	ServiceIdentitySourceUnknown     ServiceIdentitySource = "unknown"
-	ServiceIdentitySourceServiceAuth ServiceIdentitySource = "service_auth"
-	ServiceIdentitySourceMTLS        ServiceIdentitySource = "mtls"
+	ServiceIdentitySourceUnknown ServiceIdentitySource = "unknown"
+	ServiceIdentitySourceMTLS    ServiceIdentitySource = "mtls"
 )
 
-// ServiceIdentity is the read-only service principal view for service auth and mTLS.
+// ServiceIdentity is the read-only service principal view from mTLS.
 type ServiceIdentity struct {
-	ServiceID      string
-	Source         ServiceIdentitySource
-	TargetAudience []string
-	CommonName     string
-	Namespace      string
-}
-
-// Audiences returns a defensive copy of target audiences.
-func (s ServiceIdentity) Audiences() []string {
-	return append([]string(nil), s.TargetAudience...)
+	ServiceID  string
+	Source     ServiceIdentitySource
+	CommonName string
+	Namespace  string
 }

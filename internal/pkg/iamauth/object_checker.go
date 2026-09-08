@@ -6,30 +6,25 @@ import (
 	"fmt"
 	"sort"
 
-	authzv3 "github.com/FangcunMount/iam/v3/api/grpc/iam/authz/v3"
-	sdkerrors "github.com/FangcunMount/iam/v3/pkg/sdk/errors"
+	authzv3 "github.com/FangcunMount/iam/v4/api/grpc/iam/authz/v3"
+	sdkerrors "github.com/FangcunMount/iam/v4/pkg/sdk/errors"
 	appauthz "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 )
 
 type ObjectChecker struct {
 	client GRPCClient
-	tokens TokenProvider
 }
 
-func NewObjectChecker(client GRPCClient, tokens TokenProvider) *ObjectChecker {
+func NewObjectChecker(client GRPCClient) *ObjectChecker {
 	if client == nil || !client.IsEnabled() || client.SDK() == nil {
 		return nil
 	}
-	return &ObjectChecker{client: client, tokens: tokens}
+	return &ObjectChecker{client: client}
 }
 
 func (c *ObjectChecker) CheckObject(ctx context.Context, request appauthz.ObjectCheckRequest) (appauthz.ObjectDecision, error) {
 	if c == nil || c.client == nil || c.client.SDK() == nil {
 		return appauthz.ObjectDecision{}, fmt.Errorf("%w: IAM client is not configured", appauthz.ErrAuthorizationContract)
-	}
-	ctx, err := authorizationContext(ctx, c.tokens)
-	if err != nil {
-		return appauthz.ObjectDecision{}, fmt.Errorf("%w: %v", appauthz.ErrAuthorizationContract, err)
 	}
 	attributes, err := objectAttributes(request.Attributes)
 	if err != nil {
